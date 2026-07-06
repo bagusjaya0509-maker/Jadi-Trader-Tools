@@ -27,6 +27,12 @@
 
   * { box-sizing: border-box; }
 
+  html, body{
+    background: var(--bg);
+    margin:0;
+    padding:0;
+  }
+
   .ema-screener{
     background: var(--bg);
     color: var(--text);
@@ -36,6 +42,54 @@
     padding: 22px 22px 26px;
     max-width: 100%;
     overflow-x: hidden;
+  }
+
+  .es-econ-calendar-panel{
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    width: 320px;
+    height: 420px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .es-econ-calendar-panel.collapsed{ height: auto; }
+  .es-econ-calendar-panel.collapsed .es-econ-calendar-body{ display:none; }
+  .es-econ-calendar-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:8px 12px;
+    border-bottom:1px solid var(--border);
+    font-family: var(--font-mono);
+    font-size:11.5px;
+    font-weight:600;
+    color: var(--text);
+    cursor:pointer;
+    flex-shrink:0;
+  }
+  .es-econ-calendar-toggle{
+    background:none;
+    border:none;
+    color: var(--muted);
+    font-size:16px;
+    cursor:pointer;
+    line-height:1;
+    padding:0 4px;
+  }
+  .es-econ-calendar-toggle:hover{ color: var(--text); }
+  .es-econ-calendar-body{
+    flex:1;
+    overflow:hidden;
+  }
+  @media (max-width: 700px){
+    .es-econ-calendar-panel{ width: 260px; height: 360px; top:8px; right:8px; }
   }
 
   .es-header{
@@ -1007,6 +1061,13 @@
 </style>
 
 <div class="ema-screener">
+  <div class="es-econ-calendar-panel" id="esEconCalendarPanel">
+    <div class="es-econ-calendar-header" id="esEconCalendarHeader">
+      <span>Kalender Ekonomi</span>
+      <button type="button" id="esEconCalendarToggle" class="es-econ-calendar-toggle">&minus;</button>
+    </div>
+    <div class="es-econ-calendar-body" id="esEconCalendarBody"></div>
+  </div>
   <div class="es-header">
     <div>
       <div class="es-title"><span class="dot"></span>EMA Cross Screener</div>
@@ -2810,6 +2871,33 @@
   priorityRiskSel.addEventListener('change', findPrioritySignals);
   psimResetBtn.addEventListener('click', resetPrioritySim);
 
+  function loadEconCalendarWidget(){
+    const container = document.getElementById('esEconCalendarBody');
+    container.innerHTML = '';
+    const script = document.createElement('script');
+    script.type = 'text/javascript';
+    script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-events.js';
+    script.async = true;
+    script.innerHTML = JSON.stringify({
+      width: '100%',
+      height: '100%',
+      colorTheme: 'dark',
+      isTransparent: false,
+      locale: 'en',
+      importanceFilter: '-1,0,1',
+      currencyFilter: 'USD'
+    });
+    container.appendChild(script);
+  }
+
+  const econCalendarPanel = document.getElementById('esEconCalendarPanel');
+  const econCalendarToggle = document.getElementById('esEconCalendarToggle');
+  econCalendarToggle.addEventListener('click', (e)=>{
+    e.stopPropagation();
+    const collapsed = econCalendarPanel.classList.toggle('collapsed');
+    econCalendarToggle.innerHTML = collapsed ? '&plus;' : '&minus;';
+  });
+
   loadPrioritySimState();
   renderPrioritySimUI({});
   scan();
@@ -2819,6 +2907,7 @@
   setInterval(scanFavorites, 90000);
   scanBtcTfStrip();
   setInterval(scanBtcTfStrip, 90000);
+  loadEconCalendarWidget();
   findPrioritySignals();
 })();
 </script>
