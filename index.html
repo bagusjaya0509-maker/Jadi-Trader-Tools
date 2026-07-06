@@ -46,50 +46,69 @@
 
   .es-econ-calendar-panel{
     position: fixed;
-    top: 16px;
+    top: 90px;
     right: 16px;
-    width: 320px;
-    height: 420px;
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+  }
+  .es-econ-calendar-trigger{
+    flex-shrink:0;
+    display:flex;
+    align-items:center;
+    gap:6px;
+    padding:6px 10px;
+    border-radius:20px;
+    background: var(--panel);
+    border:1px solid var(--border);
+    cursor:pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+  }
+  .es-econ-calendar-trigger:hover{ border-color:#8C231A; }
+  .es-econ-calendar-trigger-dot{
+    width:9px;
+    height:9px;
+    border-radius:50%;
+    background:#8C231A;
+    flex-shrink:0;
+  }
+  .es-econ-calendar-trigger-label{
+    font-family: var(--font-mono);
+    font-weight:600;
+    font-size:11px;
+    color: var(--text);
+    white-space:nowrap;
+  }
+  .es-econ-calendar-content{
+    width:320px;
+    height:420px;
     background: var(--panel);
     border: 1px solid var(--border);
     border-radius: 10px;
     box-shadow: 0 10px 30px rgba(0,0,0,0.45);
-    z-index: 50;
     display: flex;
     flex-direction: column;
     overflow: hidden;
   }
-  .es-econ-calendar-panel.collapsed{ height: auto; }
-  .es-econ-calendar-panel.collapsed .es-econ-calendar-body{ display:none; }
+  .es-econ-calendar-panel.collapsed .es-econ-calendar-content{ display:none; }
   .es-econ-calendar-header{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
     padding:8px 12px;
     border-bottom:1px solid var(--border);
     font-family: var(--font-mono);
     font-size:11.5px;
     font-weight:600;
     color: var(--text);
-    cursor:pointer;
     flex-shrink:0;
   }
-  .es-econ-calendar-toggle{
-    background:none;
-    border:none;
-    color: var(--muted);
-    font-size:16px;
-    cursor:pointer;
-    line-height:1;
-    padding:0 4px;
-  }
-  .es-econ-calendar-toggle:hover{ color: var(--text); }
   .es-econ-calendar-body{
     flex:1;
     overflow:hidden;
   }
   @media (max-width: 700px){
-    .es-econ-calendar-panel{ width: 260px; height: 360px; top:8px; right:8px; }
+    .es-econ-calendar-content{ width: 260px; height: 360px; }
+    .es-econ-calendar-panel{ top:70px; right:8px; }
   }
 
   .es-header{
@@ -915,6 +934,85 @@
   }
   .es-sim-controls button:hover{ background: var(--bull-dim); }
   .es-sim-controls button:disabled{ opacity:.5; cursor:not-allowed; }
+  .es-sim-controls button.sell{ border-color: var(--bear); color: var(--bear); }
+  .es-sim-controls button.sell:hover{ background: var(--bear-dim); }
+
+  .es-sim-reset-row{
+    display:flex;
+    justify-content:flex-end;
+    margin-top:14px;
+  }
+  .es-sim-reset-row button{
+    background: var(--panel);
+    border:1px solid var(--bear);
+    color: var(--bear);
+    font-family: var(--font-mono);
+    font-weight:600;
+    font-size:12.5px;
+    padding:8px 14px;
+    border-radius:8px;
+    cursor:pointer;
+    height:34px;
+  }
+  .es-sim-reset-row button:hover{ background: var(--bear-dim); }
+
+  .es-sim-preview{
+    background: var(--panel);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:12px 14px;
+    margin-bottom:14px;
+  }
+  .es-sim-preview-empty{
+    font-family: var(--font-mono);
+    font-size:12px;
+    color: var(--muted);
+  }
+  .es-psim-preview-head{
+    font-family: var(--font-mono);
+    font-size:12.5px;
+    color: var(--gold);
+    margin-bottom:10px;
+  }
+  .es-psim-preview-grid{
+    display:grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px,1fr));
+    gap:10px;
+    margin-bottom:10px;
+  }
+  .es-psim-preview-col{
+    background: var(--panel-2);
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:8px 10px;
+  }
+  .es-psim-preview-label{
+    font-family: var(--font-mono);
+    font-size:10px;
+    color: var(--muted);
+    text-transform:uppercase;
+    letter-spacing:.04em;
+    margin-bottom:4px;
+  }
+  .es-psim-preview-price{
+    font-family: var(--font-display);
+    font-weight:700;
+    font-size:14px;
+    margin-bottom:6px;
+  }
+  .es-psim-preview-line{
+    font-family: var(--font-mono);
+    font-size:11px;
+    margin-top:2px;
+  }
+  .es-psim-preview-line.muted{ color: var(--muted); }
+  .es-psim-preview-line .pnl-pos{ color: var(--bull); }
+  .es-psim-preview-line .pnl-neg{ color: var(--bear); }
+  .es-psim-preview-note{
+    font-family: var(--font-mono);
+    font-size:11px;
+    color: var(--muted);
+  }
 
   .es-sim-status{
     font-family: var(--font-mono);
@@ -1061,12 +1159,15 @@
 </style>
 
 <div class="ema-screener">
-  <div class="es-econ-calendar-panel" id="esEconCalendarPanel">
-    <div class="es-econ-calendar-header" id="esEconCalendarHeader">
-      <span>Kalender Ekonomi</span>
-      <button type="button" id="esEconCalendarToggle" class="es-econ-calendar-toggle">&minus;</button>
+  <div class="es-econ-calendar-panel collapsed" id="esEconCalendarPanel">
+    <div class="es-econ-calendar-trigger" id="esEconCalendarTrigger">
+      <span class="es-econ-calendar-trigger-dot"></span>
+      <span class="es-econ-calendar-trigger-label">News</span>
     </div>
-    <div class="es-econ-calendar-body" id="esEconCalendarBody"></div>
+    <div class="es-econ-calendar-content">
+      <div class="es-econ-calendar-header">Kalender Ekonomi</div>
+      <div class="es-econ-calendar-body" id="esEconCalendarBody"></div>
+    </div>
   </div>
   <div class="es-header">
     <div>
@@ -1160,11 +1261,18 @@
       <label>Modal per Posisi ($)
         <input type="number" id="esPsimModal" value="1000" min="10" step="10">
       </label>
+      <label>Leverage (x)
+        <input type="number" id="esPsimLeverage" value="10" min="1" max="125" step="1">
+      </label>
+      <label>Sinyal Terpilih
+        <select id="esPsimSignalSelect"><option value="">&mdash; Pilih sinyal &mdash;</option></select>
+      </label>
       <label class="es-sim-checkbox-label">Aktif
         <input type="checkbox" id="esPsimToggle" checked>
       </label>
-      <button id="esPsimResetBtn">Reset Simulasi</button>
+      <button id="esPsimOpenBtn">Open Posisi</button>
     </div>
+    <div class="es-sim-preview" id="esPsimPreview"></div>
     <div class="es-sim-status" id="esPsimStatus">Menunggu sinyal prioritas pertama...</div>
     <div class="es-sim-summary" id="esPsimSummary"></div>
 
@@ -1175,7 +1283,7 @@
     <div class="es-sim-table-wrap">
       <table class="es-sim-table">
         <thead>
-          <tr><th>Sumber</th><th>Arah</th><th>Entry</th><th>SL</th><th>RISK SL ($)</th><th>TP1</th><th>TP2</th><th>Area TP</th><th>Harga Sekarang</th><th>PnL ($)</th><th>PnL (%)</th><th>Aksi</th></tr>
+          <tr><th>Sumber</th><th>Arah</th><th>Entry</th><th>SL</th><th>RISK SL ($)</th><th>TP1</th><th>TP2</th><th>Area TP</th><th>Harga Sekarang</th><th>Biaya Exchange</th><th>Biaya Margin</th><th>PnL ($)</th><th>PnL (%)</th><th>Aksi</th></tr>
         </thead>
         <tbody id="esPsimOpenTbody"></tbody>
       </table>
@@ -1185,10 +1293,14 @@
     <div class="es-sim-table-wrap">
       <table class="es-sim-table">
         <thead>
-          <tr><th>Sumber</th><th>Arah</th><th>Entry</th><th>Exit</th><th>Alasan</th><th>Status TP</th><th>PnL ($)</th><th>PnL (%)</th><th>Waktu Exit</th></tr>
+          <tr><th>Sumber</th><th>Arah</th><th>Entry</th><th>Exit</th><th>Alasan</th><th>Status TP</th><th>Biaya Exchange</th><th>Biaya Margin</th><th>PnL ($)</th><th>PnL (%)</th><th>Waktu Exit</th></tr>
         </thead>
         <tbody id="esPsimHistTbody"></tbody>
       </table>
+    </div>
+
+    <div class="es-sim-reset-row">
+      <button id="esPsimResetBtn">Reset Simulasi</button>
     </div>
 
   </div>
@@ -2157,6 +2269,7 @@
 
   function renderPrioritySignals(top){
     window.__esLastPriorityResults = top;
+    populatePsimSignalSelect();
     priorityGrid.innerHTML = top.map((c,i)=>{
       const signalCls = c.signal==='BUY' ? 'buy' : 'sell';
       const bandLabel = c.signal==='BUY' ? 'Lower' : 'Upper';
@@ -2206,7 +2319,7 @@
         </div>
         <div class="es-priority-note">Note EMA9/21: ${emaNoteText}</div>
         <div class="es-priority-note">Note ${stochText}</div>
-        <button class="es-priority-trade-btn" type="button">Trade Sinyal Ini</button>
+        <button class="es-priority-trade-btn" type="button">Pilih Sinyal Ini</button>
       </div>`;
     }).join('');
 
@@ -2219,7 +2332,7 @@
       const tradeBtn = card.querySelector('.es-priority-trade-btn');
       tradeBtn.addEventListener('click', (e)=>{
         e.stopPropagation();
-        handlePriorityTradeClick(cand);
+        selectPrioritySimSignalFromCard(cand);
       });
     });
   }
@@ -2309,13 +2422,18 @@
   let prioritySimHistory = [];
 
   const psimModalInput = document.getElementById('esPsimModal');
+  const psimLeverageInput = document.getElementById('esPsimLeverage');
+  const psimSignalSelect = document.getElementById('esPsimSignalSelect');
   const psimToggle = document.getElementById('esPsimToggle');
+  const psimOpenBtn = document.getElementById('esPsimOpenBtn');
   const psimResetBtn = document.getElementById('esPsimResetBtn');
+  const psimPreviewEl = document.getElementById('esPsimPreview');
   const psimStatusEl = document.getElementById('esPsimStatus');
   const psimSummaryEl = document.getElementById('esPsimSummary');
   const psimOpenTbody = document.getElementById('esPsimOpenTbody');
   const psimHistTbody = document.getElementById('esPsimHistTbody');
   const psimEquityChartEl = document.getElementById('esPsimEquityChart');
+  let psimSelectedCandidate = null;
 
   function loadPrioritySimState(){
     try{
@@ -2334,6 +2452,12 @@
         }
         if(pos.tp1Hit===undefined) pos.tp1Hit = false;
         if(pos.tp2Hit===undefined) pos.tp2Hit = false;
+        // migrasi posisi lama (sebelum fitur leverage) yang belum punya margin/leverage/qty terkunci
+        if(pos.qty===undefined || pos.margin===undefined || pos.leverage===undefined){
+          pos.margin = currentPsimMargin();
+          pos.leverage = currentPsimLeverage();
+          pos.qty = (pos.margin * pos.leverage) / pos.entryPrice;
+        }
       });
       savePrioritySimState();
     }catch(e){
@@ -2348,25 +2472,53 @@
     }catch(e){ /* localStorage penuh/diblokir - abaikan, state tetap ada di memori */ }
   }
 
+  const PSIM_EXCHANGE_FEE_RATE = 0.0004; // taker fee Binance Futures, 0.04% per sisi (buka & tutup)
+  const PSIM_FUNDING_RATE_PER_8H = 0.0001; // rata-rata funding rate Binance Futures, ~0.01% per 8 jam
+
+  function currentPsimMargin(){
+    return Math.max(parseFloat(psimModalInput.value) || 1000, 1);
+  }
+
+  function currentPsimLeverage(){
+    return Math.max(parseFloat(psimLeverageInput.value) || 1, 1);
+  }
+
   function currentPsimQty(entryPrice){
-    const modal = Math.max(parseFloat(psimModalInput.value) || 1000, 1);
-    return modal / entryPrice;
+    const notional = currentPsimMargin() * currentPsimLeverage();
+    return notional / entryPrice;
+  }
+
+  function computePsimExchangeFee(entryPrice, exitPrice, qty){
+    return (entryPrice*qty + exitPrice*qty) * PSIM_EXCHANGE_FEE_RATE;
+  }
+
+  function computePsimMarginFee(entryPrice, qty, entryTime, exitTime){
+    const notional = entryPrice*qty;
+    const hoursHeld = Math.max(0, (exitTime - entryTime)) / 3600000;
+    const fundingIntervals = Math.floor(hoursHeld/8);
+    return notional * PSIM_FUNDING_RATE_PER_8H * fundingIntervals;
   }
 
   function openPrioritySimPosition(key, source, tfLabel, tfValue, dir, entryPrice, sl, tp1, tp2, time){
-    prioritySimPositions[key] = { key, source, tfLabel, tfValue, dir, entryPrice, entryTime: time, sl, tp1, tp2, tp1Hit:false, tp2Hit:false };
+    const margin = currentPsimMargin();
+    const leverage = currentPsimLeverage();
+    const qty = (margin * leverage) / entryPrice;
+    prioritySimPositions[key] = { key, source, tfLabel, tfValue, dir, entryPrice, entryTime: time, sl, tp1, tp2, tp1Hit:false, tp2Hit:false, margin, leverage, qty };
     savePrioritySimState();
   }
 
   function closePrioritySimPosition(key, exitPrice, time, reason){
     const pos = prioritySimPositions[key];
     if(!pos) return;
-    const qty = currentPsimQty(pos.entryPrice);
-    const pnl = pos.dir==='BUY' ? (exitPrice-pos.entryPrice)*qty : (pos.entryPrice-exitPrice)*qty;
-    const pnlPct = ((exitPrice-pos.entryPrice)/pos.entryPrice) * (pos.dir==='BUY'?100:-100);
+    const qty = pos.qty;
+    const grossPnl = pos.dir==='BUY' ? (exitPrice-pos.entryPrice)*qty : (pos.entryPrice-exitPrice)*qty;
+    const exchangeFee = computePsimExchangeFee(pos.entryPrice, exitPrice, qty);
+    const marginFee = computePsimMarginFee(pos.entryPrice, qty, pos.entryTime, time);
+    const pnl = grossPnl - exchangeFee - marginFee;
+    const pnlPct = (pnl / pos.margin) * 100;
     const tpStatus = pos.tp2Hit ? 'TP2' : (pos.tp1Hit ? 'BE/TP1' : '-');
     prioritySimHistory.unshift({ source: pos.source, tfLabel: pos.tfLabel, tfValue: pos.tfValue, dir: pos.dir, entryPrice: pos.entryPrice, entryTime: pos.entryTime,
-      exitPrice, exitTime: time, reason, pnl, pnlPct, tpStatus });
+      exitPrice, exitTime: time, reason, exchangeFee, marginFee, pnl, pnlPct, tpStatus });
     delete prioritySimPositions[key];
     savePrioritySimState();
   }
@@ -2418,6 +2570,96 @@
     renderPrioritySimUI(activeTickers);
   }
 
+  function populatePsimSignalSelect(){
+    const results = window.__esLastPriorityResults || [];
+    const prevKey = psimSelectedCandidate ? `${psimSelectedCandidate.symbol}_${psimSelectedCandidate.tfValue}` : null;
+    psimSignalSelect.innerHTML = '<option value="">&mdash; Pilih sinyal &mdash;</option>' + results.map((c,i)=>{
+      const label = `${c.symbol.replace('USDT','')} (${c.tfLabel}) — ${c.signal}`;
+      return `<option value="${i}">${label}</option>`;
+    }).join('');
+    if(prevKey){
+      const idx = results.findIndex(c=>`${c.symbol}_${c.tfValue}`===prevKey);
+      if(idx>=0){ psimSignalSelect.value = String(idx); psimSelectedCandidate = results[idx]; }
+      else{ psimSelectedCandidate = null; psimSignalSelect.value=''; }
+    }
+    renderPsimPreview();
+  }
+
+  function selectPsimSignalByIndex(idx){
+    const results = window.__esLastPriorityResults || [];
+    psimSelectedCandidate = (idx===''||idx===null||idx===undefined) ? null : (results[parseInt(idx,10)] || null);
+    renderPsimPreview();
+  }
+
+  function selectPrioritySimSignalFromCard(cand){
+    const results = window.__esLastPriorityResults || [];
+    const idx = results.findIndex(c=>c.symbol===cand.symbol && c.tfValue===cand.tfValue);
+    if(idx<0) return;
+    psimSignalSelect.value = String(idx);
+    selectPsimSignalByIndex(idx);
+    priorityStatusEl.classList.remove('error');
+    priorityStatusEl.textContent = `Sinyal ${cand.symbol.replace('USDT','')} (TF ${cand.tfLabel}) dipilih di Simulasi Sinyal Prioritas — cek preview lalu klik "Open Posisi".`;
+    document.querySelector('.es-sim-section').scrollIntoView({ behavior:'smooth', block:'start' });
+  }
+
+  function updatePsimOpenBtn(){
+    if(!psimSelectedCandidate){
+      psimOpenBtn.textContent = 'Open Posisi';
+      psimOpenBtn.classList.remove('sell');
+      return;
+    }
+    const isSell = psimSelectedCandidate.signal === 'SELL';
+    psimOpenBtn.textContent = isSell ? 'Open Sell' : 'Open Buy';
+    psimOpenBtn.classList.toggle('sell', isSell);
+  }
+
+  function renderPsimPreview(){
+    updatePsimOpenBtn();
+    if(!psimSelectedCandidate){
+      psimPreviewEl.innerHTML = `<div class="es-sim-preview-empty">Belum ada sinyal dipilih. Pilih dari dropdown "Sinyal Terpilih" atau klik "Pilih Sinyal Ini" di kartu Sinyal Prioritas.</div>`;
+      return;
+    }
+    const c = psimSelectedCandidate;
+    const entryPrice = c.price;
+    const sl = c.signal==='BUY' ? pickSlForBuy(c.dir) : pickSlForSell(c.dir);
+    const riskDist = Math.abs(entryPrice - sl);
+    const tp1 = c.signal==='BUY' ? entryPrice + riskDist : entryPrice - riskDist;
+    const tp2 = c.signal==='BUY' ? entryPrice + riskDist*2 : entryPrice - riskDist*2;
+
+    const margin = currentPsimMargin();
+    const leverage = currentPsimLeverage();
+    const qty = (margin * leverage) / entryPrice;
+
+    function scenario(exitPrice){
+      const gross = c.signal==='BUY' ? (exitPrice-entryPrice)*qty : (entryPrice-exitPrice)*qty;
+      const fee = computePsimExchangeFee(entryPrice, exitPrice, qty);
+      return { gross, fee, net: gross - fee };
+    }
+    const slS = scenario(sl), tp1S = scenario(tp1), tp2S = scenario(tp2);
+    const fundingPer8h = (margin * leverage) * PSIM_FUNDING_RATE_PER_8H;
+
+    const col = (label, price, s) => `
+      <div class="es-psim-preview-col">
+        <div class="es-psim-preview-label">${label}</div>
+        <div class="es-psim-preview-price">$${fmtPrice(price)}</div>
+        <div class="es-psim-preview-line">PnL Bersih: <span class="${s.net>=0?'pnl-pos':'pnl-neg'}">${s.net>=0?'+':''}$${s.net.toFixed(2)}</span></div>
+        <div class="es-psim-preview-line muted">Biaya Exchange: -$${s.fee.toFixed(2)}</div>
+      </div>`;
+
+    psimPreviewEl.innerHTML = `
+      <div class="es-psim-preview-head">
+        <strong>${c.symbol.replace('USDT','')} (${c.tfLabel})</strong> — ${c.signal} @ $${fmtPrice(entryPrice)}
+        &bull; Modal $${margin.toFixed(0)} &bull; Leverage ${leverage}x &bull; Qty ${qty.toFixed(6)}
+      </div>
+      <div class="es-psim-preview-grid">
+        ${col('SL', sl, slS)}
+        ${col('TP1', tp1, tp1S)}
+        ${col('TP2', tp2, tp2S)}
+      </div>
+      <div class="es-psim-preview-note">Estimasi Biaya Margin (funding): ~$${fundingPer8h.toFixed(2)} / 8 jam selama posisi terbuka (dipotong dari PnL saat posisi ditutup).</div>
+    `;
+  }
+
   function handlePriorityTradeClick(cand){
     if(!psimToggle.checked){
       priorityStatusEl.classList.add('error');
@@ -2447,6 +2689,9 @@
     renderPrioritySimUI(window.__esLastTickers||{});
     priorityStatusEl.classList.remove('error');
     priorityStatusEl.textContent = `Posisi ${cand.signal} untuk ${cand.symbol.replace('USDT','')} (TF ${cand.tfLabel}) dibuka di simulasi.`;
+    psimSelectedCandidate = null;
+    psimSignalSelect.value = '';
+    renderPsimPreview();
   }
 
   function computeEquityCurve(){
@@ -2499,11 +2744,14 @@
     const openStats = openList.map(pos=>{
       let price = tickers[pos.source] ? parseFloat(tickers[pos.source].lastPrice) : null;
       if(price===null || price===undefined) price = pos.entryPrice;
-      const qty = currentPsimQty(pos.entryPrice);
-      const floatPnl = pos.dir==='BUY' ? (price-pos.entryPrice)*qty : (pos.entryPrice-price)*qty;
-      const floatPct = ((price-pos.entryPrice)/pos.entryPrice)*(pos.dir==='BUY'?100:-100);
+      const qty = pos.qty;
+      const grossFloatPnl = pos.dir==='BUY' ? (price-pos.entryPrice)*qty : (pos.entryPrice-price)*qty;
+      const exchangeFee = computePsimExchangeFee(pos.entryPrice, price, qty);
+      const marginFee = computePsimMarginFee(pos.entryPrice, qty, pos.entryTime, Date.now());
+      const floatPnl = grossFloatPnl - exchangeFee - marginFee;
+      const floatPct = (floatPnl / pos.margin) * 100;
       const potentialSlPnl = pos.dir==='BUY' ? (pos.sl-pos.entryPrice)*qty : (pos.entryPrice-pos.sl)*qty;
-      return { pos, price, floatPnl, floatPct, potentialSlPnl };
+      return { pos, price, floatPnl, floatPct, potentialSlPnl, exchangeFee, marginFee };
     });
 
     const totalFloatingPnl = openStats.reduce((s,o)=>s+o.floatPnl, 0);
@@ -2530,9 +2778,9 @@
     const fmtTime = (ms)=> new Date(ms).toLocaleString('id-ID', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit' });
 
     if(openStats.length===0){
-      psimOpenTbody.innerHTML = `<tr><td colspan="12" style="text-align:center;color:var(--muted);padding:14px;">Belum ada posisi terbuka.</td></tr>`;
+      psimOpenTbody.innerHTML = `<tr><td colspan="14" style="text-align:center;color:var(--muted);padding:14px;">Belum ada posisi terbuka.</td></tr>`;
     } else {
-      psimOpenTbody.innerHTML = openStats.map(({pos, price, floatPnl, floatPct, potentialSlPnl})=>{
+      psimOpenTbody.innerHTML = openStats.map(({pos, price, floatPnl, floatPct, potentialSlPnl, exchangeFee, marginFee})=>{
         const pnlCls = floatPnl>=0 ? 'pnl-pos':'pnl-neg';
         const arahCls = pos.dir==='BUY' ? 'arah-buy' : 'arah-sell';
         const label = `${pos.source.replace('USDT','')} (${pos.tfLabel})`;
@@ -2550,6 +2798,8 @@
           <td>$${fmtPrice(pos.tp2)}</td>
           <td class="${areaTpCls}">${areaTpLabel}</td>
           <td class="${pnlCls}">$${fmtPrice(price)}</td>
+          <td>-$${exchangeFee.toFixed(2)}</td>
+          <td>-$${marginFee.toFixed(2)}</td>
           <td class="${pnlCls}">${floatPnl>=0?'+':''}${floatPnl.toFixed(2)}</td>
           <td class="${pnlCls}">${floatPct>=0?'+':''}${floatPct.toFixed(2)}%</td>
           <td><button type="button" class="es-psim-close-btn ${closeCls}" data-key="${pos.key}">Close Posisi</button></td>
@@ -2571,7 +2821,7 @@
     }
 
     if(prioritySimHistory.length===0){
-      psimHistTbody.innerHTML = `<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:14px;">Belum ada transaksi selesai.</td></tr>`;
+      psimHistTbody.innerHTML = `<tr><td colspan="11" style="text-align:center;color:var(--muted);padding:14px;">Belum ada transaksi selesai.</td></tr>`;
     } else {
       psimHistTbody.innerHTML = prioritySimHistory.slice(0,50).map(t=>{
         const pnlCls = t.pnl>=0 ? 'pnl-pos':'pnl-neg';
@@ -2585,6 +2835,8 @@
           <td>$${fmtPrice(t.exitPrice)}</td>
           <td>${t.reason}</td>
           <td class="${tpStatusCls}">${t.tpStatus || '-'}</td>
+          <td>-$${(t.exchangeFee||0).toFixed(2)}</td>
+          <td>-$${(t.marginFee||0).toFixed(2)}</td>
           <td class="${pnlCls}">${t.pnl>=0?'+':''}${t.pnl.toFixed(2)}</td>
           <td class="${pnlCls}">${t.pnlPct>=0?'+':''}${t.pnlPct.toFixed(2)}%</td>
           <td>${fmtTime(t.exitTime)}</td>
@@ -2870,6 +3122,45 @@
   priorityBtn.addEventListener('click', findPrioritySignals);
   priorityRiskSel.addEventListener('change', findPrioritySignals);
   psimResetBtn.addEventListener('click', resetPrioritySim);
+  psimSignalSelect.addEventListener('change', ()=> selectPsimSignalByIndex(psimSignalSelect.value));
+  psimOpenBtn.addEventListener('click', ()=>{
+    if(!psimSelectedCandidate){
+      priorityStatusEl.classList.add('error');
+      priorityStatusEl.textContent = 'Pilih sinyal dulu di "Sinyal Terpilih" sebelum Open Posisi.';
+      return;
+    }
+    handlePriorityTradeClick(psimSelectedCandidate);
+  });
+  psimModalInput.addEventListener('input', renderPsimPreview);
+  psimLeverageInput.addEventListener('input', renderPsimPreview);
+
+  const PSIM_SETTINGS_KEY = 'emaScreenerPsimSettings_v1';
+
+  function loadPsimSettings(){
+    try{
+      const raw = localStorage.getItem(PSIM_SETTINGS_KEY);
+      if(!raw) return;
+      const s = JSON.parse(raw);
+      if(s.modal !== undefined) psimModalInput.value = s.modal;
+      if(s.leverage !== undefined) psimLeverageInput.value = s.leverage;
+      if(s.active !== undefined) psimToggle.checked = s.active;
+    }catch(e){}
+  }
+
+  function savePsimSettings(){
+    try{
+      localStorage.setItem(PSIM_SETTINGS_KEY, JSON.stringify({
+        modal: parseFloat(psimModalInput.value) || 1000,
+        leverage: parseFloat(psimLeverageInput.value) || 10,
+        active: psimToggle.checked
+      }));
+    }catch(e){}
+  }
+
+  psimModalInput.addEventListener('change', savePsimSettings);
+  psimLeverageInput.addEventListener('change', savePsimSettings);
+  psimToggle.addEventListener('change', savePsimSettings);
+  loadPsimSettings();
 
   function loadEconCalendarWidget(){
     const container = document.getElementById('esEconCalendarBody');
@@ -2891,15 +3182,20 @@
   }
 
   const econCalendarPanel = document.getElementById('esEconCalendarPanel');
-  const econCalendarToggle = document.getElementById('esEconCalendarToggle');
-  econCalendarToggle.addEventListener('click', (e)=>{
+  const econCalendarTrigger = document.getElementById('esEconCalendarTrigger');
+  econCalendarTrigger.addEventListener('click', (e)=>{
     e.stopPropagation();
-    const collapsed = econCalendarPanel.classList.toggle('collapsed');
-    econCalendarToggle.innerHTML = collapsed ? '&plus;' : '&minus;';
+    econCalendarPanel.classList.toggle('collapsed');
+  });
+  document.addEventListener('click', (e)=>{
+    if(!econCalendarPanel.contains(e.target)){
+      econCalendarPanel.classList.add('collapsed');
+    }
   });
 
   loadPrioritySimState();
   renderPrioritySimUI({});
+  renderPsimPreview();
   scan();
   setInterval(scan, 90000);
   loadFavorites();
