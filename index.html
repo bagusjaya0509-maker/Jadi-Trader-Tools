@@ -18,12 +18,12 @@
     --demand-c:#3DE0C4;
     --supply-c:#FF6B5E;
     --bbc:#5C7CFA;
-    --font-display:'Space Grotesk', sans-serif;
-    --font-mono:'IBM Plex Mono', monospace;
-    --font-body:'IBM Plex Sans', sans-serif;
+    --font-display:'Inter', sans-serif;
+    --font-mono:'Inter', sans-serif;
+    --font-body:'Inter', sans-serif;
   }
 
-  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
   * { box-sizing: border-box; }
 
@@ -31,6 +31,7 @@
     background: var(--bg);
     color: var(--text);
     font-family: var(--font-body);
+    font-variant-numeric: tabular-nums;
     border-radius: 14px;
     padding: 22px 22px 26px;
     max-width: 100%;
@@ -629,10 +630,18 @@
   .es-fav-status.error{ color: var(--bear); }
 
   .es-fav-grid{
-    display:grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    display:flex;
     gap:8px;
+    overflow-x:auto;
+    overflow-y:hidden;
+    padding-bottom:10px;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
   }
+  .es-fav-grid::-webkit-scrollbar{ height:8px; }
+  .es-fav-grid::-webkit-scrollbar-track{ background: var(--panel-2); border-radius:4px; }
+  .es-fav-grid::-webkit-scrollbar-thumb{ background: var(--border); border-radius:4px; }
+  .es-fav-grid::-webkit-scrollbar-thumb:hover{ background: var(--dim); }
   .es-fav-box{
     position:relative;
     background: var(--panel);
@@ -643,10 +652,16 @@
     flex-direction:column;
     gap:6px;
     cursor:pointer;
+    flex:0 0 155px;
+    scroll-snap-align: start;
   }
   .es-fav-box.buy{ border-color: var(--bull); }
   .es-fav-box.sell{ border-color: var(--bear); }
   .es-fav-box.hold{ border-color: var(--dim); }
+  .es-fav-box[draggable="true"]{ cursor: pointer; }
+  .es-fav-box[draggable="true"].grab-ready{ cursor: grab; }
+  .es-fav-box.dragging{ opacity: 0.4; cursor: grabbing; }
+  .es-fav-box.drag-over{ outline: 2px dashed var(--gold); outline-offset: 2px; }
 
   .es-fav-star{
     position:absolute;
@@ -874,6 +889,10 @@
     border-radius:8px;
     margin-bottom:16px;
   }
+  .es-sim-table-wrap::-webkit-scrollbar{ width:8px; height:8px; }
+  .es-sim-table-wrap::-webkit-scrollbar-track{ background: var(--panel-2); border-radius:4px; }
+  .es-sim-table-wrap::-webkit-scrollbar-thumb{ background: var(--border); border-radius:4px; }
+  .es-sim-table-wrap::-webkit-scrollbar-thumb:hover{ background: var(--dim); }
   .es-sim-table{
     width:100%;
     border-collapse:collapse;
@@ -926,11 +945,6 @@
   }
 
   @media (max-width: 700px){
-    .es-fav-grid{ gap:5px; }
-    .es-fav-box{ padding:5px; gap:4px; }
-    .es-fav-symbol{ font-size:10px; }
-    .es-fav-price{ font-size:8px; }
-    .es-fav-signal-badge{ font-size:8px; padding:1px 5px; }
     .es-checklist{ padding:5px; }
     .es-check-row{ font-size:8px; }
     .es-priority-note{ font-size:8px; }
@@ -990,7 +1004,7 @@
   </div>
 
   <div class="es-fav-section">
-    <div class="es-fav-title">5 Koin Favorit (Checklist Sinyal — Mengikuti TF di Atas)</div>
+    <div class="es-fav-title">Koin Favorit (maks. 50 — Checklist Sinyal, Mengikuti TF di Atas)</div>
     <div class="es-fav-status" id="esFavStatus">Memuat koin favorit...</div>
     <div class="es-fav-grid" id="esFavGrid"></div>
   </div>
@@ -2312,6 +2326,7 @@
 
   const FAVORITE_DEFAULT = ['BTCUSDT','ETHUSDT','SOLUSDT','HYPEUSDT','PENGUUSDT'];
   const FAV_STORAGE_KEY = 'emaScreenerFavorites_v1';
+  const FAV_MAX_SLOTS = 50;
   let favoriteSymbols = [];
   let favScanning = false;
 
@@ -2323,7 +2338,7 @@
       const raw = localStorage.getItem(FAV_STORAGE_KEY);
       if(raw){
         const parsed = JSON.parse(raw);
-        if(Array.isArray(parsed)){ favoriteSymbols = parsed.slice(0,5); return; }
+        if(Array.isArray(parsed)){ favoriteSymbols = parsed.slice(0,FAV_MAX_SLOTS); return; }
       }
     }catch(e){ /* fall through to default */ }
     favoriteSymbols = FAVORITE_DEFAULT.slice();
@@ -2361,7 +2376,7 @@
     if(!symbol) return;
     if(!symbol.endsWith('USDT')) symbol += 'USDT';
     if(favoriteSymbols.includes(symbol)) return;
-    if(favoriteSymbols.length >= 5) return;
+    if(favoriteSymbols.length >= FAV_MAX_SLOTS) return;
     favoriteSymbols.push(symbol);
     saveFavorites();
     scanFavorites();
@@ -2469,9 +2484,66 @@
     favGrid.querySelectorAll('.es-fav-box:not(.es-fav-empty-slot)').forEach(box=>{
       box.addEventListener('click', (e)=>{
         if(e.target.classList.contains('es-fav-star')) return;
+        if(box.classList.contains('was-dragged')){ box.classList.remove('was-dragged'); return; }
         openTradingView(box.getAttribute('data-symbol'), intervalSel.value, box.getAttribute('data-market'));
       });
+
+      box.setAttribute('draggable', 'true');
+
+      let grabTimer = null;
+      const clearGrabTimer = ()=>{ clearTimeout(grabTimer); grabTimer = null; box.classList.remove('grab-ready'); };
+      box.addEventListener('mousedown', (e)=>{
+        if(e.target.classList.contains('es-fav-star')) return;
+        clearTimeout(grabTimer);
+        grabTimer = setTimeout(()=>{ box.classList.add('grab-ready'); }, 350);
+      });
+      box.addEventListener('mouseup', clearGrabTimer);
+      box.addEventListener('mouseleave', clearGrabTimer);
+
+      box.addEventListener('dragstart', (e)=>{
+        e.dataTransfer.setData('text/plain', box.getAttribute('data-symbol'));
+        e.dataTransfer.effectAllowed = 'move';
+        box.classList.add('dragging');
+      });
+      box.addEventListener('dragend', ()=>{
+        clearGrabTimer();
+        box.classList.remove('dragging');
+        box.classList.add('was-dragged');
+      });
+      box.addEventListener('dragover', (e)=>{
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        box.classList.add('drag-over');
+      });
+      box.addEventListener('dragleave', ()=>{
+        box.classList.remove('drag-over');
+      });
+      box.addEventListener('drop', (e)=>{
+        e.preventDefault();
+        box.classList.remove('drag-over');
+        const draggedSymbol = e.dataTransfer.getData('text/plain');
+        const targetSymbol = box.getAttribute('data-symbol');
+        if(!draggedSymbol || draggedSymbol===targetSymbol) return;
+        reorderFavorite(draggedSymbol, targetSymbol);
+      });
     });
+  }
+
+  function reorderFavorite(draggedSymbol, targetSymbol){
+    const fromIdx = favoriteSymbols.indexOf(draggedSymbol);
+    const toIdx = favoriteSymbols.indexOf(targetSymbol);
+    if(fromIdx===-1 || toIdx===-1) return;
+    const movingBefore = fromIdx < toIdx;
+    favoriteSymbols.splice(fromIdx, 1);
+    favoriteSymbols.splice(favoriteSymbols.indexOf(targetSymbol) + (movingBefore?1:0), 0, draggedSymbol);
+    saveFavorites();
+
+    const draggedEl = favGrid.querySelector(`.es-fav-box[data-symbol="${draggedSymbol}"]`);
+    const targetEl = favGrid.querySelector(`.es-fav-box[data-symbol="${targetSymbol}"]`);
+    if(draggedEl && targetEl){
+      if(movingBefore) targetEl.after(draggedEl);
+      else targetEl.before(draggedEl);
+    }
   }
 
   async function scanFavorites(){
@@ -2483,9 +2555,8 @@
     const interval = intervalSel.value;
     const boxesHtml = [];
 
-    for(let i=0;i<5;i++){
+    for(let i=0;i<favoriteSymbols.length;i++){
       const symbol = favoriteSymbols[i];
-      if(!symbol){ boxesHtml.push(renderEmptyFavSlot()); continue; }
       try{
         const { opens, highs, lows, closes, market } = await fetchKlines(symbol, interval, 300);
         const ind = computeFullIndicators(opens, highs, lows, closes);
@@ -2499,6 +2570,9 @@
       }catch(e){
         boxesHtml.push(renderFavoriteBox(symbol, { error:true }));
       }
+    }
+    if(favoriteSymbols.length < FAV_MAX_SLOTS){
+      boxesHtml.push(renderEmptyFavSlot());
     }
 
     favGrid.innerHTML = boxesHtml.join('');
