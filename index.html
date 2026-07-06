@@ -129,8 +129,37 @@
   }
   .es-status.error{ color: var(--bear); }
 
-  .es-symbol-manager{ position:relative; margin: -6px 0 14px; }
+  .es-scan-toolbar{
+    display:flex;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:10px;
+    margin: -6px 0 14px;
+  }
+  .es-symbol-manager{ position:relative; }
   .es-symbol-manager-inline{ margin:0; }
+  .es-btc-tf-strip{
+    display:flex;
+    gap:6px;
+    flex-wrap:wrap;
+  }
+  .es-btc-tf-box{
+    background: var(--panel);
+    border:1px solid var(--border);
+    border-radius:6px;
+    padding:4px 8px;
+    font-family: var(--font-mono);
+    text-align:center;
+    min-width:58px;
+    cursor:pointer;
+  }
+  .es-btc-tf-box:hover{ border-color: var(--dim); }
+  .es-btc-tf-box-label{ color: var(--muted); font-size:8.5px; margin-bottom:2px; }
+  .es-btc-tf-box-status{ font-weight:600; font-size:9.5px; white-space:nowrap; }
+  .es-btc-tf-box-status.bull{ color: var(--bull); }
+  .es-btc-tf-box-status.bear{ color: var(--bear); }
+  .es-btc-tf-box-status.none{ color: var(--dim); }
+  .es-btc-tf-box-status.error{ color: var(--bear); }
   .es-symbol-manager-btn{
     display:inline-flex;
     align-items:center;
@@ -536,6 +565,20 @@
   .es-priority-signal.buy{ background: var(--bull-dim); color: var(--bull); }
   .es-priority-signal.sell{ background: var(--bear-dim); color: var(--bear); }
 
+  .es-priority-hp-badge{
+    font-family: var(--font-mono);
+    font-weight:700;
+    font-size:9.5px;
+    padding:3px 8px;
+    border-radius:6px;
+    letter-spacing:.03em;
+    background: var(--gold);
+    color:#1A1200;
+    white-space:nowrap;
+  }
+
+  .es-confirm-notes{ margin-top:2px; }
+
   .es-priority-tf, .es-priority-trend, .es-priority-stoch{
     font-family: var(--font-mono);
     font-size:11.5px;
@@ -686,6 +729,9 @@
     font-size:10px;
     color: var(--muted);
   }
+  .es-fav-chg{ font-weight:600; }
+  .es-fav-chg.up{ color: var(--bull); }
+  .es-fav-chg.down{ color: var(--bear); }
   .es-fav-signal-badge{
     font-family: var(--font-mono);
     font-weight:700;
@@ -1010,12 +1056,15 @@
   </div>
 
   <div class="es-status" id="esStatus">Memuat data...</div>
-  <div class="es-symbol-manager">
-    <button type="button" id="esSymbolManagerBtn" class="es-symbol-manager-btn">
-      <span>Ganti Chart / Kelola Koin</span>
-      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
-    </button>
-    <div class="es-symbol-manager-dropdown" id="esSymbolManagerDropdown"></div>
+  <div class="es-scan-toolbar">
+    <div class="es-symbol-manager">
+      <button type="button" id="esSymbolManagerBtn" class="es-symbol-manager-btn">
+        <span>Ganti Chart / Kelola Koin</span>
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="es-symbol-manager-dropdown" id="esSymbolManagerDropdown"></div>
+    </div>
+    <div class="es-btc-tf-strip" id="esBtcTfStrip"></div>
   </div>
   <div class="es-grid" id="esGrid"></div>
 
@@ -1026,7 +1075,7 @@
     <div class="es-priority-controls">
       <select id="esPriorityRisk">
         <option value="all" selected>Semua Level Risk</option>
-        <option value="high">High Risk (TF 1m/5m)</option>
+        <option value="high">High Risk (TF 1m/5m/15m)</option>
         <option value="medium">Medium Risk (TF 30m/1H)</option>
         <option value="low">Low Risk (TF 4H/1D)</option>
       </select>
@@ -1047,7 +1096,7 @@
     <div class="es-sim-title">Simulasi Sinyal Prioritas</div>
     <div class="es-sim-controls">
       <label>Modal per Posisi ($)
-        <input type="number" id="esPsimModal" value="4000" min="10" step="10">
+        <input type="number" id="esPsimModal" value="1000" min="10" step="10">
       </label>
       <label class="es-sim-checkbox-label">Aktif
         <input type="checkbox" id="esPsimToggle" checked>
@@ -1491,6 +1540,79 @@
     return null;
   }
 
+  function isPinBar(open, high, low, close, isBullish){
+    const body = Math.abs(close-open);
+    const range = high-low;
+    if(range<=0) return false;
+    const upperWick = high - Math.max(open, close);
+    const lowerWick = Math.min(open, close) - low;
+    if(isBullish) return lowerWick >= body*2 && lowerWick >= range*0.5 && upperWick <= body*1.1;
+    return upperWick >= body*2 && upperWick >= range*0.5 && lowerWick <= body*1.1;
+  }
+
+  function isEngulfing(prevOpen, prevClose, open, close, isBullish){
+    if(isBullish) return close>open && prevClose<prevOpen && close>=prevOpen && open<=prevClose;
+    return close<open && prevClose>prevOpen && close<=prevOpen && open>=prevClose;
+  }
+
+  function isRangingAtZone(highs, lows, zoneValue, atrVal, lookback){
+    if(!atrVal || atrVal<=0) return false;
+    const n = highs.length;
+    const start = Math.max(0, n-lookback);
+    const recentHighs = highs.slice(start);
+    const recentLows = lows.slice(start);
+    const rangeHigh = Math.max(...recentHighs);
+    const rangeLow = Math.min(...recentLows);
+    const rangeSize = rangeHigh-rangeLow;
+    const mid = (rangeHigh+rangeLow)/2;
+    const nearZone = Math.abs(mid - zoneValue) <= atrVal*1.0;
+    const isTight = rangeSize <= atrVal*1.5;
+    return nearZone && isTight;
+  }
+
+  async function checkEmaCrossOnTf(symbol, tfValue, signal){
+    try{
+      const { closes } = await fetchKlines(symbol, tfValue, 50);
+      if(closes.length < 22) return false;
+      const e9 = ema(closes, 9);
+      const e21 = ema(closes, 21);
+      const cross = detectCross(e9, e21, 5);
+      if(!cross) return false;
+      return signal==='BUY' ? cross.type==='bullish' : cross.type==='bearish';
+    }catch(e){
+      return false;
+    }
+  }
+
+  async function computeConfirmationNotes(cand){
+    const { opens, highs, lows, closes, signal, dir, symbol, tfValue } = cand;
+    const n = closes.length;
+    const isBullish = signal==='BUY';
+    const lastOpen = opens[n-1], lastHigh = highs[n-1], lastLow = lows[n-1], lastClose = closes[n-1];
+    const prevOpen = opens[n-2], prevClose = closes[n-2];
+
+    const pinbar = isPinBar(lastOpen, lastHigh, lastLow, lastClose, isBullish);
+    const engulfing = isEngulfing(prevOpen, prevClose, lastOpen, lastClose, isBullish);
+    const ranging = isRangingAtZone(highs, lows, dir.band, dir.atr, 6);
+
+    // cross EMA9/21 (1m/5m) cuma relevan sebagai konfirmasi TF lebih rendah untuk sinyal TF 5 menit ke atas
+    const showEmaCross = tfValue !== '1m';
+    let cross1m = null, cross5m = null;
+    if(showEmaCross){
+      [cross1m, cross5m] = await Promise.all([
+        checkEmaCrossOnTf(symbol, '1m', signal),
+        checkEmaCrossOnTf(symbol, '5m', signal)
+      ]);
+    }
+
+    const notes = { pinbar, cross1m, cross5m, engulfing, ranging, showEmaCross };
+    const checks = [pinbar, engulfing, ranging];
+    if(showEmaCross) checks.push(cross1m, cross5m);
+    const passCount = checks.filter(Boolean).length;
+    const highProbability = passCount >= 3;
+    return { notes, highProbability };
+  }
+
   function buildMiniChart(data){
     const { opens, highs, lows, closes, e9, e21, e200, bb, momentum, crossIdx, resZones, supZones, demandZones, supplyZones } = data;
     const total = closes.length;
@@ -1778,6 +1900,77 @@
     window.open(url, '_blank', 'noopener');
   }
 
+  const BTC_TF_LIST = [
+    { value:'1m', label:'1m' }, { value:'5m', label:'5m' }, { value:'15m', label:'15m' }, { value:'30m', label:'30m' },
+    { value:'1h', label:'1H' }, { value:'4h', label:'4H' }, { value:'1d', label:'1D' }
+  ];
+  const btcTfStripEl = document.getElementById('esBtcTfStrip');
+  let btcTfScanning = false;
+
+  async function computeBtcTfStatus(tfValue){
+    try{
+      const { opens, highs, lows, closes } = await fetchKlines('BTCUSDT', tfValue, 250);
+      if(closes.length < 210) return { label:'n/a', cls:'none' };
+
+      const e9 = ema(closes, 9);
+      const e21 = ema(closes, 21);
+      const cross = detectCross(e9, e21, 2);
+      if(cross) return { label:'Cross EMA', cls: cross.type==='bullish' ? 'bull':'bear' };
+
+      const atrArr = atr(highs, lows, closes, 14);
+      const lastAtr = atrArr[atrArr.length-1] || 0;
+      const lastClose = closes[closes.length-1];
+
+      const pivotHighs = findPivots(highs, 10, 10, true).slice(-2);
+      const pivotLows = findPivots(lows, 10, 10, false).slice(-2);
+      const resZones = pivotHighs.map(p=>({ value:p.value, top:p.value+lastAtr*0.5, bottom:p.value-lastAtr*0.5 }));
+      const supZones = pivotLows.map(p=>({ value:p.value, top:p.value+lastAtr*0.5, bottom:p.value-lastAtr*0.5 }));
+      const nearRes = checkZoneNearBand(resZones, lastClose, lastAtr);
+      const nearSup = checkZoneNearBand(supZones, lastClose, lastAtr);
+      if(nearRes.ok || nearSup.ok) return { label:'Sentuh S/R', cls: nearRes.ok ? 'bear':'bull' };
+
+      const sd = findSupplyDemandZones(opens, closes, atrArr, 1.5, 3);
+      const nearSupply = checkZoneNearBand(sd.supply, lastClose, lastAtr);
+      const nearDemand = checkZoneNearBand(sd.demand, lastClose, lastAtr);
+      if(nearSupply.ok || nearDemand.ok) return { label:'Sentuh S/D', cls: nearSupply.ok ? 'bear':'bull' };
+
+      const bb = bollinger(closes, 20, 2.0);
+      const lastUpper = bb.upper[bb.upper.length-1];
+      const lastLower = bb.lower[bb.lower.length-1];
+      const lastHigh = highs[highs.length-1], lastLow = lows[lows.length-1];
+      const touchUpper = checkBBSide(lastHigh, lastLow, lastClose, lastUpper, lastAtr, true);
+      const touchLower = checkBBSide(lastHigh, lastLow, lastClose, lastLower, lastAtr, false);
+      if(touchUpper.ok) return { label:'Sentuh Upper BB', cls:'bear' };
+      if(touchLower.ok) return { label:'Sentuh Lower BB', cls:'bull' };
+
+      return { label:'-', cls:'none' };
+    }catch(e){
+      return { label:'Error', cls:'error' };
+    }
+  }
+
+  async function scanBtcTfStrip(){
+    if(btcTfScanning) return;
+    btcTfScanning = true;
+    try{
+      const results = await Promise.all(BTC_TF_LIST.map(tf => computeBtcTfStatus(tf.value)));
+      btcTfStripEl.innerHTML = BTC_TF_LIST.map((tf,i)=>{
+        const r = results[i];
+        return `<div class="es-btc-tf-box" data-tf="${tf.value}" title="Buka BTC ${tf.label} di TradingView">
+          <div class="es-btc-tf-box-label">BTC ${tf.label}</div>
+          <div class="es-btc-tf-box-status ${r.cls}">${r.label}</div>
+        </div>`;
+      }).join('');
+      btcTfStripEl.querySelectorAll('.es-btc-tf-box').forEach(box=>{
+        box.addEventListener('click', ()=>{
+          openTradingView('BTCUSDT', box.getAttribute('data-tf'));
+        });
+      });
+    }finally{
+      btcTfScanning = false;
+    }
+  }
+
   function renderSymbolManagerDropdown(){
     const results = window.__esLastResults || [];
     if(results.length===0){
@@ -1827,7 +2020,7 @@
 
   const PRIORITY_LIMIT = 5;
   const PRIORITY_RISK_TIERS = {
-    high:   [ { value:'1m', label:'1m' }, { value:'5m', label:'5m' } ],
+    high:   [ { value:'1m', label:'1m' }, { value:'5m', label:'5m' }, { value:'15m', label:'15m' } ],
     medium: [ { value:'30m', label:'30m' }, { value:'1h', label:'1H' } ],
     low:    [ { value:'4h', label:'4H' }, { value:'1d', label:'1D' } ]
   };
@@ -1918,10 +2111,12 @@
       const riskPct = (riskDist / c.price) * 100;
       const tp1 = c.signal==='BUY' ? c.price + riskDist : c.price - riskDist;
       const tp2 = c.signal==='BUY' ? c.price + riskDist*2 : c.price - riskDist*2;
+      const cn = c.confirmNotes || {};
       return `<div class="es-priority-card ${signalCls}" data-symbol="${c.symbol}" data-tf="${c.tfValue}" data-tflabel="${c.tfLabel}" data-price="${c.price}">
         <div class="es-priority-card-top">
           <span class="es-priority-rank">#${i+1}</span>
           <span class="es-priority-symbol">${c.symbol.replace('USDT','')}</span>
+          ${c.highProbability ? '<span class="es-priority-hp-badge">HIGH PROBABILITY</span>' : ''}
           <span class="es-priority-signal ${signalCls}">${c.signal}</span>
         </div>
         <div class="es-priority-tf">Risk: <strong>${riskLabel}</strong> • TF ${c.tfLabel} • Harga $${fmtPrice(c.price)}</div>
@@ -1935,6 +2130,13 @@
           <div class="es-priority-level-row invalid">Invalid Level (SL): <strong>$${fmtPrice(sl)}</strong></div>
           <div class="es-priority-level-row">Take Profit: <strong>TP1 $${fmtPrice(tp1)}</strong> &bull; <strong>TP2 $${fmtPrice(tp2)}</strong></div>
           <div class="es-priority-level-row">Risk: <strong>${riskPct.toFixed(2)}%</strong></div>
+        </div>
+        <div class="es-checklist es-confirm-notes">
+          <div class="es-check-row ${cn.pinbar?'ok':'fail'}"><span class="es-check-icon">${cn.pinbar?'&check;':'&#10007;'}</span> Pin Bar</div>
+          ${cn.showEmaCross ? `<div class="es-check-row ${cn.cross1m?'ok':'fail'}"><span class="es-check-icon">${cn.cross1m?'&check;':'&#10007;'}</span> Cross EMA9/21 TF 1m</div>
+          <div class="es-check-row ${cn.cross5m?'ok':'fail'}"><span class="es-check-icon">${cn.cross5m?'&check;':'&#10007;'}</span> Cross EMA9/21 TF 5m</div>` : ''}
+          <div class="es-check-row ${cn.engulfing?'ok':'fail'}"><span class="es-check-icon">${cn.engulfing?'&check;':'&#10007;'}</span> Engulfing</div>
+          <div class="es-check-row ${cn.ranging?'ok':'fail'}"><span class="es-check-icon">${cn.ranging?'&check;':'&#10007;'}</span> Ranging di area S/R</div>
         </div>
         <div class="es-priority-note">Note EMA9/21: ${emaNoteText}</div>
         <div class="es-priority-note">Note ${stochText}</div>
@@ -1987,12 +2189,12 @@
           const cands = [];
           if(qualifies3(evalRes.buy)){
             cands.push({ symbol, signal:'BUY', dir:evalRes.buy, price, emaNote:evalRes.emaNote, stochCond:evalRes.stochCond, stochK:evalRes.stochK, stochD:evalRes.stochD, evalRes,
-              tfValue: tf.value, tfLabel: tf.label, risk: tf.risk,
+              tfValue: tf.value, tfLabel: tf.label, risk: tf.risk, opens, highs, lows, closes,
               score: evalRes.buy.bb.dist+evalRes.buy.sr.dist+evalRes.buy.sd.dist });
           }
           if(qualifies3(evalRes.sell)){
             cands.push({ symbol, signal:'SELL', dir:evalRes.sell, price, emaNote:evalRes.emaNote, stochCond:evalRes.stochCond, stochK:evalRes.stochK, stochD:evalRes.stochD, evalRes,
-              tfValue: tf.value, tfLabel: tf.label, risk: tf.risk,
+              tfValue: tf.value, tfLabel: tf.label, risk: tf.risk, opens, highs, lows, closes,
               score: evalRes.sell.bb.dist+evalRes.sell.sr.dist+evalRes.sell.sd.dist });
           }
           return cands.length ? cands : null;
@@ -2016,6 +2218,13 @@
         priorityBtn.disabled = false;
         return;
       }
+
+      priorityStatusEl.textContent = `Ditemukan ${top.length} sinyal, memeriksa note konfirmasi tambahan...`;
+      await Promise.all(top.map(async (cand)=>{
+        const conf = await computeConfirmationNotes(cand);
+        cand.confirmNotes = conf.notes;
+        cand.highProbability = conf.highProbability;
+      }));
 
       renderPrioritySignals(top);
       priorityStatusEl.textContent = `Ditemukan ${top.length} sinyal prioritas dari ${deduped.length} koin valid (${all.length} kandidat) • ${new Date().toLocaleTimeString('id-ID')}.`;
@@ -2073,7 +2282,7 @@
   }
 
   function currentPsimQty(entryPrice){
-    const modal = Math.max(parseFloat(psimModalInput.value) || 4000, 1);
+    const modal = Math.max(parseFloat(psimModalInput.value) || 1000, 1);
     return modal / entryPrice;
   }
 
@@ -2174,7 +2383,7 @@
   }
 
   function computeEquityCurve(){
-    const initialModal = Math.max(parseFloat(psimModalInput.value) || 4000, 1);
+    const initialModal = Math.max(parseFloat(psimModalInput.value) || 1000, 1);
     const chronological = prioritySimHistory.slice().reverse();
     let balance = initialModal;
     const points = [{ time: null, balance }];
@@ -2409,10 +2618,12 @@
     const dir = data.dir;
     const emaNoteText = data.emaNote==='above' ? 'Harga di atas EMA9 &amp; EMA21' : data.emaNote==='below' ? 'Harga di bawah EMA9 &amp; EMA21' : 'Harga di antara EMA9/21';
     const stochText = data.stochK===null ? 'Stoch n/a' : `Stoch K ${data.stochK.toFixed(1)}${data.stochCond==='overbought'?' (OB)':data.stochCond==='oversold'?' (OS)':''}`;
+    const chgVal = data.changeTf;
+    const chgHtml = (chgVal===null || chgVal===undefined) ? '' : ` <span class="es-fav-chg ${chgVal>=0?'up':'down'}">${chgVal>=0?'+':''}${chgVal.toFixed(2)}%</span>`;
     return `<div class="es-fav-box ${cls}" data-symbol="${symbol}" data-market="${data.market||'spot'}">
       <span class="es-fav-star" data-symbol="${symbol}" title="Hapus dari favorit">&#9733;</span>
       <div class="es-fav-symbol">${symbol.replace('USDT','')}</div>
-      <div class="es-fav-price">$${fmtPrice(data.price)}</div>
+      <div class="es-fav-price">$${fmtPrice(data.price)}${chgHtml}</div>
       <span class="es-fav-signal-badge ${cls}">${data.status}</span>
       <div class="es-checklist">
         <div class="es-check-row ${dir.bb.ok?'ok':'fail'}"><span class="es-check-icon">${dir.bb.ok?'&check;':'&#10007;'}</span> BB: ${dir.bb.status}</div>
@@ -2560,11 +2771,13 @@
       try{
         const { opens, highs, lows, closes, market } = await fetchKlines(symbol, interval, 300);
         const ind = computeFullIndicators(opens, highs, lows, closes);
+        const lastOpen = opens[opens.length-1];
         const lastHigh = highs[highs.length-1], lastLow = lows[lows.length-1], lastClose = closes[closes.length-1];
         const evalRes = evaluateChecklist(ind, lastHigh, lastLow, lastClose);
         const cls = classifyFavoriteSignal(evalRes);
+        const changeTf = ((lastClose - lastOpen) / lastOpen) * 100;
         boxesHtml.push(renderFavoriteBox(symbol, {
-          status: cls.status, dir: cls.dir, price: lastClose, market,
+          status: cls.status, dir: cls.dir, price: lastClose, market, changeTf,
           emaNote: evalRes.emaNote, stochCond: evalRes.stochCond, stochK: evalRes.stochK, stochD: evalRes.stochD
         }));
       }catch(e){
@@ -2598,6 +2811,8 @@
   loadFavorites();
   scanFavorites();
   setInterval(scanFavorites, 90000);
+  scanBtcTfStrip();
+  setInterval(scanBtcTfStrip, 90000);
   findPrioritySignals();
 })();
 </script>
