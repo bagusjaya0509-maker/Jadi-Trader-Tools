@@ -564,6 +564,7 @@
   }
   .es-priority-signal.buy{ background: var(--bull-dim); color: var(--bull); }
   .es-priority-signal.sell{ background: var(--bear-dim); color: var(--bear); }
+  .es-priority-signal.watch{ background: rgba(242,184,75,0.18); color: var(--gold); }
 
   .es-priority-hp-badge{
     font-family: var(--font-mono);
@@ -1610,7 +1611,7 @@
     if(showEmaCross) checks.push(cross1m, cross5m);
     const passCount = checks.filter(Boolean).length;
     const highProbability = passCount >= 3;
-    return { notes, highProbability };
+    return { notes, highProbability, passCount };
   }
 
   function buildMiniChart(data){
@@ -2112,12 +2113,16 @@
       const tp1 = c.signal==='BUY' ? c.price + riskDist : c.price - riskDist;
       const tp2 = c.signal==='BUY' ? c.price + riskDist*2 : c.price - riskDist*2;
       const cn = c.confirmNotes || {};
+      const passCount = c.passCount || 0;
+      const isWatch = passCount === 0;
+      const statusLabel = isWatch ? 'PANTAU' : (c.signal==='BUY' ? 'BUY NOW' : 'SELL NOW');
+      const statusCls = isWatch ? 'watch' : signalCls;
       return `<div class="es-priority-card ${signalCls}" data-symbol="${c.symbol}" data-tf="${c.tfValue}" data-tflabel="${c.tfLabel}" data-price="${c.price}">
         <div class="es-priority-card-top">
           <span class="es-priority-rank">#${i+1}</span>
           <span class="es-priority-symbol">${c.symbol.replace('USDT','')}</span>
+          <span class="es-priority-signal ${statusCls}">${statusLabel}</span>
           ${c.highProbability ? '<span class="es-priority-hp-badge">HIGH PROBABILITY</span>' : ''}
-          <span class="es-priority-signal ${signalCls}">${c.signal}</span>
         </div>
         <div class="es-priority-tf">Risk: <strong>${riskLabel}</strong> • TF ${c.tfLabel} • Harga $${fmtPrice(c.price)}</div>
         <div class="es-checklist">
@@ -2224,6 +2229,7 @@
         const conf = await computeConfirmationNotes(cand);
         cand.confirmNotes = conf.notes;
         cand.highProbability = conf.highProbability;
+        cand.passCount = conf.passCount;
       }));
 
       renderPrioritySignals(top);
