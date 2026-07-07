@@ -215,7 +215,73 @@
     display:flex;
     gap:6px;
     flex-wrap:wrap;
+    margin-bottom:14px;
   }
+  #esFavCrossStatus{
+    margin-top:0;
+  }
+  #esStatus{
+    margin-top:14px;
+  }
+  .es-fav-cross-manage{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+    align-items:center;
+    margin-top:14px;
+    margin-bottom:14px;
+  }
+  .es-fav-cross-chip{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    background: var(--panel);
+    border:1px solid var(--border);
+    border-radius:20px;
+    padding:4px 6px 4px 10px;
+    font-family: var(--font-mono);
+    font-size:11px;
+    color: var(--text);
+  }
+  .es-fav-cross-chip-remove{
+    cursor:pointer;
+    color: var(--gold);
+    font-size:13px;
+    line-height:1;
+    padding:2px;
+    user-select:none;
+  }
+  .es-fav-cross-chip-remove:hover{ opacity:0.7; }
+  .es-fav-cross-chip-add{
+    display:flex;
+    align-items:center;
+    gap:4px;
+    background: var(--panel);
+    border:1px dashed var(--border);
+    border-radius:20px;
+    padding:3px 6px 3px 10px;
+    position:relative;
+  }
+  .es-fav-cross-add-input{
+    background:none;
+    border:none;
+    outline:none;
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size:11px;
+    width:120px;
+  }
+  .es-fav-cross-add-btn{
+    background:none;
+    border:none;
+    color: var(--bull);
+    cursor:pointer;
+    font-size:11px;
+    font-weight:600;
+    font-family: var(--font-mono);
+    padding:2px 4px;
+  }
+  .es-fav-cross-add-btn:hover{ opacity:0.8; }
   .es-btc-tf-box{
     background: var(--panel);
     border:1px solid var(--border);
@@ -345,6 +411,18 @@
     letter-spacing:.06em;
     padding:2px 6px;
     border-radius:0 0 5px 5px;
+  }
+  .es-card-fav-star{
+    position:absolute;
+    top:-1px; left:10px;
+    background: var(--gold);
+    color:#1A1200;
+    font-family: var(--font-mono);
+    font-size:11px;
+    font-weight:700;
+    padding:2px 6px;
+    border-radius:0 0 5px 5px;
+    line-height:1.2;
   }
 
   .es-card-top{
@@ -1215,7 +1293,15 @@
   <div class="es-fav-section">
     <div class="es-fav-title">Koin Favorit (maks. 50 — Checklist Sinyal, Mengikuti TF di Atas)</div>
     <div class="es-fav-status" id="esFavStatus">Memuat koin favorit...</div>
+    <div class="es-btc-tf-strip" id="esBtcTfStrip"></div>
     <div class="es-fav-grid" id="esFavGrid"></div>
+  </div>
+
+  <div class="es-fav-cross-section">
+    <div class="es-fav-title">Koin Favorit — Cross EMA 9/21 (Semua Timeframe)</div>
+    <div class="es-status" id="esFavCrossStatus">Menunggu pindaian koin favorit pertama...</div>
+    <div class="es-fav-cross-manage" id="esFavCrossManage"></div>
+    <div class="es-grid" id="esFavCrossGrid"></div>
   </div>
 
   <div class="es-status" id="esStatus">Memuat data...</div>
@@ -1227,7 +1313,6 @@
       </button>
       <div class="es-symbol-manager-dropdown" id="esSymbolManagerDropdown"></div>
     </div>
-    <div class="es-btc-tf-strip" id="esBtcTfStrip"></div>
   </div>
   <div class="es-grid" id="esGrid"></div>
 
@@ -1756,6 +1841,265 @@
     }catch(e){
       return false;
     }
+  }
+
+  const FAV_EMA_CROSS_TF_LIST = ['1m','5m','15m','30m','1h','4h','1d'];
+
+  async function scanFavoriteEmaCrosses(symbol, currentTf, currentE9, currentE21){
+    const results = await Promise.all(FAV_EMA_CROSS_TF_LIST.map(async tf=>{
+      try{
+        let e9, e21;
+        if(tf === currentTf){
+          e9 = currentE9; e21 = currentE21;
+        } else {
+          const { closes } = await fetchKlines(symbol, tf, 60);
+          if(closes.length < 22) return null;
+          e9 = ema(closes, 9);
+          e21 = ema(closes, 21);
+        }
+        const cross = detectCross(e9, e21, 3);
+        if(!cross) return null;
+        return { tf, type: cross.type };
+      }catch(e){
+        return null;
+      }
+    }));
+    return results.filter(Boolean);
+  }
+
+  const FAV_CROSS_TF_SHORT_LABEL = { '1m':'1m', '5m':'5m', '15m':'15m', '30m':'30m', '1h':'1H', '4h':'4H', '1d':'1D' };
+  const favCrossStatusEl = document.getElementById('esFavCrossStatus');
+  const favCrossGridEl = document.getElementById('esFavCrossGrid');
+
+  async function computeFavoriteCrossCard(symbol, tfValue, tfLabel){
+    const { opens, highs, lows, closes } = await fetchKlines(symbol, tfValue, MAIN_KLINES_LIMIT);
+    const e9 = ema(closes, 9);
+    const e21 = ema(closes, 21);
+    const e200 = ema(closes, 200);
+    const cross = detectCross(e9, e21, LOOKBACK) || { type:'bearish', candlesAgo:0 };
+    const tickers = window.__esLastTickers || {};
+    const t = tickers[symbol];
+    const price = t ? parseFloat(t.lastPrice) : closes[closes.length-1];
+    const change24h = t ? parseFloat(t.priceChangePercent) : 0;
+    const rsiArr = rsi(closes, 14);
+    const rsiValue = rsiArr[rsiArr.length-1];
+    const stoch = stochastic(highs, lows, closes, 14, 3, 3);
+    const stochK = stoch.k[stoch.k.length-1];
+    const stochD = stoch.d[stoch.d.length-1];
+    const atrArr = atr(highs, lows, closes, 14);
+    const lastAtr = atrArr[atrArr.length-1] || 0;
+    const pivotHighs = findPivots(highs, 10, 10, true).slice(-2);
+    const pivotLows = findPivots(lows, 10, 10, false).slice(-2);
+    const resZones = pivotHighs.map(p=>({ value: p.value, top: p.value + lastAtr*0.5, bottom: p.value - lastAtr*0.5 }));
+    const supZones = pivotLows.map(p=>({ value: p.value, top: p.value + lastAtr*0.5, bottom: p.value - lastAtr*0.5 }));
+    const sd = findSupplyDemandZones(opens, closes, atrArr, 1.5, 3);
+    const momentum = computeMomentum(opens, highs, lows, closes, 0.70, 5);
+    const momentumSignal = lastMomentumSignal(momentum, 10);
+    const chartSvg = buildMiniChart({
+      opens, highs, lows, closes, e9, e21, e200, momentum,
+      crossIdx: e9.length-1-cross.candlesAgo,
+      resZones, supZones, demandZones: sd.demand, supplyZones: sd.supply
+    });
+    return {
+      symbol, tfValue, tfLabel, cross, price, change24h, chartSvg,
+      cap: capTierOf(symbol),
+      rsi: rsiValue===null||rsiValue===undefined ? null : rsiValue,
+      rsiCondition: rsiConditionOf(rsiValue),
+      stochK: stochK===null||stochK===undefined ? null : stochK,
+      stochD: stochD===null||stochD===undefined ? null : stochD,
+      stochCondition: stochConditionOf(stochK),
+      resZones, supZones, momentumSignal
+    };
+  }
+
+  function favoriteCrossCardHtml(r, i){
+    const chgClass = r.change24h >= 0 ? 'up' : 'down';
+    const chgSign = r.change24h >= 0 ? '+' : '';
+    const crossLabel = r.cross.type==='bullish' ? 'Golden Cross' : 'Death Cross';
+    const arrow = r.cross.type==='bullish' ? '&#8593;' : '&#8595;';
+    const ago = r.cross.candlesAgo===0 ? 'baru saja' : `${r.cross.candlesAgo} candle lalu`;
+    const rsiLabel = r.rsi===null ? 'RSI n/a' : `RSI ${r.rsi.toFixed(1)}${r.rsiCondition==='overbought'?' (OB)':r.rsiCondition==='oversold'?' (OS)':''}`;
+    const stochLabel = r.stochK===null ? 'Stoch n/a' : `K ${r.stochK.toFixed(1)}/D ${r.stochD===null?'-':r.stochD.toFixed(1)}${r.stochCondition==='overbought'?' (OB)':r.stochCondition==='oversold'?' (OS)':''}`;
+    const resNearest = r.resZones.length ? r.resZones[r.resZones.length-1].value : null;
+    const supNearest = r.supZones.length ? r.supZones[r.supZones.length-1].value : null;
+    const momCls = r.momentumSignal ? r.momentumSignal.type : 'none';
+    const momLabel = r.momentumSignal
+      ? `${r.momentumSignal.type==='bullish'?'Bullish':'Bearish'} • ${r.momentumSignal.candlesAgo===0?'baru saja':r.momentumSignal.candlesAgo+'c lalu'}`
+      : 'Tidak ada (10c)';
+    return `<div class="es-card" data-symbol="${r.symbol}" data-tf="${r.tfValue}">
+      <span class="es-card-fav-star" title="Koin favorit">&#9733;</span>
+      <div class="es-card-top">
+        <div><span class="es-rank">TF ${r.tfLabel}</span><span class="es-symbol">${r.symbol.replace('USDT','')}</span></div>
+        <span class="es-cap-tag">${r.cap==='big'?'BIG CAP':'LOW/MID CAP'}</span>
+      </div>
+      <div class="es-price-row">
+        <span class="es-price">$${fmtPrice(r.price)}</span>
+        <span class="es-chg ${chgClass}">${chgSign}${r.change24h.toFixed(2)}% 24h</span>
+      </div>
+      ${r.chartSvg}
+      <div class="es-sr-row">
+        <span class="res">R ${resNearest===null?'n/a':'$'+fmtPrice(resNearest)}</span>
+        <span class="sup">S ${supNearest===null?'n/a':'$'+fmtPrice(supNearest)}</span>
+      </div>
+      <div class="es-mom-row">
+        <span>Momentum</span>
+        <span class="es-mom-badge ${momCls}">${momLabel}</span>
+      </div>
+      <div class="es-cross-row">
+        <span class="es-cross-badge ${r.cross.type}">${arrow} ${crossLabel}</span>
+        <span class="es-ago">${ago}</span>
+      </div>
+      <div class="es-rsi-row">
+        <span>RSI (14)</span>
+        <span class="es-rsi-badge ${r.rsiCondition}">${rsiLabel}</span>
+      </div>
+      <div class="es-stoch-row">
+        <span>Stoch (14,3,3)</span>
+        <span class="es-stoch-badge ${r.stochCondition}">${stochLabel}</span>
+      </div>
+    </div>`;
+  }
+
+  async function renderFavoriteCrossGrid(crossHits, totalScanned){
+    if(crossHits.length===0){
+      favCrossGridEl.innerHTML = '';
+      favCrossStatusEl.classList.remove('error');
+      favCrossStatusEl.textContent = `Terakhir dipindai: ${new Date().toLocaleTimeString('id-ID')} • 0 koin dengan cross ditemukan dari ${totalScanned} dipindai.`;
+      return;
+    }
+    favCrossStatusEl.textContent = `Memindai ${crossHits.length} sinyal cross dari koin favorit...`;
+    const cards = await Promise.all(crossHits.map(h=>
+      computeFavoriteCrossCard(h.symbol, h.tf, FAV_CROSS_TF_SHORT_LABEL[h.tf] || h.tf).catch(()=>null)
+    ));
+    const valid = cards.filter(Boolean);
+    favCrossGridEl.innerHTML = valid.map((r,i)=>favoriteCrossCardHtml(r,i)).join('');
+    favCrossGridEl.querySelectorAll('.es-card').forEach(card=>{
+      card.addEventListener('click', ()=>{
+        openTradingView(card.getAttribute('data-symbol'), card.getAttribute('data-tf'));
+      });
+    });
+    const distinctCoins = new Set(crossHits.map(h=>h.symbol)).size;
+    favCrossStatusEl.classList.remove('error');
+    favCrossStatusEl.textContent = `Terakhir dipindai: ${new Date().toLocaleTimeString('id-ID')} • ${distinctCoins} koin dengan cross ditemukan dari ${totalScanned} dipindai.`;
+  }
+
+  const FAV_CROSS_SYMBOLS_KEY = 'emaScreenerFavCrossSymbols_v1';
+  const FAV_CROSS_SYMBOLS_MAX = 50;
+  let favCrossSymbols = [];
+  let favCrossScanning = false;
+  const favCrossManageEl = document.getElementById('esFavCrossManage');
+
+  function loadFavCrossSymbols(){
+    try{
+      const raw = localStorage.getItem(FAV_CROSS_SYMBOLS_KEY);
+      if(raw){
+        const parsed = JSON.parse(raw);
+        if(Array.isArray(parsed)){ favCrossSymbols = parsed.slice(0, FAV_CROSS_SYMBOLS_MAX); return; }
+      }
+    }catch(e){ /* fall through to default */ }
+    favCrossSymbols = FAVORITE_DEFAULT.slice();
+  }
+
+  function saveFavCrossSymbols(){
+    try{ localStorage.setItem(FAV_CROSS_SYMBOLS_KEY, JSON.stringify(favCrossSymbols)); }catch(e){ /* ignore */ }
+  }
+
+  function removeFavCrossSymbol(symbol){
+    favCrossSymbols = favCrossSymbols.filter(s=>s!==symbol);
+    saveFavCrossSymbols();
+    renderFavCrossManageUI();
+    scanFavoriteCrossSection();
+  }
+
+  function addFavCrossSymbol(rawInput){
+    let symbol = extractSymbolFromFavInput(rawInput);
+    if(!symbol) return;
+    if(!symbol.endsWith('USDT')) symbol += 'USDT';
+    if(favCrossSymbols.includes(symbol)) return;
+    if(favCrossSymbols.length >= FAV_CROSS_SYMBOLS_MAX) return;
+    favCrossSymbols.push(symbol);
+    saveFavCrossSymbols();
+    renderFavCrossManageUI();
+    scanFavoriteCrossSection();
+  }
+
+  function renderFavCrossManageUI(){
+    const chipsHtml = favCrossSymbols.map(symbol=>`
+      <div class="es-fav-cross-chip" data-symbol="${symbol}">
+        <span>${symbol.replace('USDT','')}</span>
+        <span class="es-fav-cross-chip-remove" data-symbol="${symbol}" title="Lepas dari daftar pindai cross">&#9733;</span>
+      </div>`).join('');
+    const addHtml = favCrossSymbols.length >= FAV_CROSS_SYMBOLS_MAX ? '' : `
+      <div class="es-fav-cross-chip-add">
+        <input type="text" class="es-fav-cross-add-input" placeholder="mis. SUIUSDT" autocomplete="off">
+        <div class="es-fav-suggest"></div>
+        <button type="button" class="es-fav-cross-add-btn">+ Tambah</button>
+      </div>`;
+    favCrossManageEl.innerHTML = chipsHtml + addHtml;
+
+    favCrossManageEl.querySelectorAll('.es-fav-cross-chip-remove').forEach(el=>{
+      el.addEventListener('click', ()=> removeFavCrossSymbol(el.getAttribute('data-symbol')));
+    });
+
+    const input = favCrossManageEl.querySelector('.es-fav-cross-add-input');
+    if(!input) return;
+    const suggestBox = favCrossManageEl.querySelector('.es-fav-suggest');
+    const btn = favCrossManageEl.querySelector('.es-fav-cross-add-btn');
+
+    function closeSuggestions(){
+      suggestBox.classList.remove('open');
+      suggestBox.innerHTML = '';
+    }
+    function updateSuggestions(){
+      const q = input.value.trim().toUpperCase();
+      if(!q || q.includes('TRADINGVIEW') || q.includes('HTTP')){ closeSuggestions(); return; }
+      const matches = FAV_SUGGESTION_POOL.filter(s=>{
+        const base = s.replace('USDT','');
+        return s.startsWith(q) || base.startsWith(q);
+      }).slice(0,6);
+      if(matches.length===0){ closeSuggestions(); return; }
+      suggestBox.innerHTML = matches.map(s=>`<div class="es-fav-suggest-item" data-symbol="${s}">${s}</div>`).join('');
+      suggestBox.classList.add('open');
+      suggestBox.querySelectorAll('.es-fav-suggest-item').forEach(item=>{
+        item.addEventListener('mousedown', (e)=>{
+          e.preventDefault();
+          input.value = item.getAttribute('data-symbol');
+          closeSuggestions();
+        });
+      });
+    }
+    input.addEventListener('input', updateSuggestions);
+    input.addEventListener('focus', updateSuggestions);
+    input.addEventListener('blur', ()=> setTimeout(closeSuggestions, 150));
+    input.addEventListener('keydown', (e)=>{
+      if(e.key==='Enter'){ addFavCrossSymbol(input.value); closeSuggestions(); }
+    });
+    btn.addEventListener('click', ()=>{
+      addFavCrossSymbol(input.value);
+      closeSuggestions();
+    });
+  }
+
+  async function scanFavoriteCrossSection(){
+    if(favCrossScanning) return;
+    favCrossScanning = true;
+    favCrossStatusEl.classList.remove('error');
+    favCrossStatusEl.textContent = 'Memindai koin fokus cross EMA...';
+
+    const perSymbol = await Promise.all(favCrossSymbols.map(async symbol=>{
+      try{
+        return await scanFavoriteEmaCrosses(symbol, null, null, null);
+      }catch(e){
+        return [];
+      }
+    }));
+    const crossHits = [];
+    perSymbol.forEach((crossNotes, i)=>{
+      const symbol = favCrossSymbols[i];
+      crossNotes.forEach(cn=>crossHits.push({ symbol, tf: cn.tf, type: cn.type }));
+    });
+    favCrossScanning = false;
+    renderFavoriteCrossGrid(crossHits, favCrossSymbols.length);
   }
 
   async function computeConfirmationNotes(cand){
@@ -2935,7 +3279,6 @@
     }
     const cls = data.status==='BUY' ? 'buy' : data.status==='SELL' ? 'sell' : 'hold';
     const dir = data.dir;
-    const emaNoteText = data.emaNote==='above' ? 'Harga di atas EMA9 &amp; EMA21' : data.emaNote==='below' ? 'Harga di bawah EMA9 &amp; EMA21' : 'Harga di antara EMA9/21';
     const stochText = data.stochK===null ? 'Stoch n/a' : `Stoch K ${data.stochK.toFixed(1)}${data.stochCond==='overbought'?' (OB)':data.stochCond==='oversold'?' (OS)':''}`;
     const chgVal = data.changeTf;
     const chgHtml = (chgVal===null || chgVal===undefined) ? '' : ` <span class="es-fav-chg ${chgVal>=0?'up':'down'}">${chgVal>=0?'+':''}${chgVal.toFixed(2)}%</span>`;
@@ -2949,7 +3292,6 @@
         <div class="es-check-row ${dir.sr.ok?'ok':'fail'}"><span class="es-check-icon">${dir.sr.ok?'&check;':'&#10007;'}</span> S/R: ${dir.sr.status}</div>
         <div class="es-check-row ${dir.sd.ok?'ok':'fail'}"><span class="es-check-icon">${dir.sd.ok?'&check;':'&#10007;'}</span> S/D: ${dir.sd.status}</div>
       </div>
-      <div class="es-priority-note">${emaNoteText}</div>
       <div class="es-priority-note">${stochText}</div>
     </div>`;
   }
@@ -3097,7 +3439,7 @@
         const changeTf = ((lastClose - lastOpen) / lastOpen) * 100;
         boxesHtml.push(renderFavoriteBox(symbol, {
           status: cls.status, dir: cls.dir, price: lastClose, market, changeTf,
-          emaNote: evalRes.emaNote, stochCond: evalRes.stochCond, stochK: evalRes.stochK, stochD: evalRes.stochD
+          stochCond: evalRes.stochCond, stochK: evalRes.stochK, stochD: evalRes.stochD
         }));
       }catch(e){
         boxesHtml.push(renderFavoriteBox(symbol, { error:true }));
@@ -3201,6 +3543,10 @@
   loadFavorites();
   scanFavorites();
   setInterval(scanFavorites, 90000);
+  loadFavCrossSymbols();
+  renderFavCrossManageUI();
+  scanFavoriteCrossSection();
+  setInterval(scanFavoriteCrossSection, 90000);
   scanBtcTfStrip();
   setInterval(scanBtcTfStrip, 90000);
   loadEconCalendarWidget();
