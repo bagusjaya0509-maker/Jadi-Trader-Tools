@@ -1,29 +1,27 @@
 <style>
   :root{
-    --bg:#0A0E14;
-    --panel:#10161F;
-    --panel-2:#151D29;
-    --border:#232E3D;
-    --text:#E8EDF3;
-    --muted:#7C8BA0;
-    --dim:#4B5A70;
-    --bull:#3DE0C4;
-    --bull-dim:#1B4A44;
-    --bear:#FF6B5E;
-    --bear-dim:#4A2420;
-    --gold:#F2B84B;
+    --bg:#0b0c0f;
+    --panel:#131519;
+    --panel-2:#1b1e24;
+    --border:#262a31;
+    --text:#ece8de;
+    --muted:#9a9ca4;
+    --dim:#63656d;
+    --bull:#4f9e82;
+    --bull-dim:#1e3a30;
+    --bear:#c05a4e;
+    --bear-dim:#3a201c;
+    --gold:#c9a24b;
     --ema9c:#FF8A65;
     --ema21c:#FFD54F;
     --ema200c:#B39DDB;
-    --demand-c:#3DE0C4;
-    --supply-c:#FF6B5E;
+    --demand-c:#4f9e82;
+    --supply-c:#c05a4e;
     --bbc:#5C7CFA;
-    --font-display:'Inter', sans-serif;
-    --font-mono:'Inter', sans-serif;
-    --font-body:'Inter', sans-serif;
+    --font-display:Georgia,'Iowan Old Style','Palatino Linotype',serif;
+    --font-mono:'SF Mono','Cascadia Code',Consolas,'Roboto Mono',monospace;
+    --font-body:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
   }
-
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
   * { box-sizing: border-box; }
 
@@ -1015,6 +1013,71 @@
   .es-sim-controls button.sell{ border-color: var(--bear); color: var(--bear); }
   .es-sim-controls button.sell:hover{ background: var(--bear-dim); }
 
+  .es-live-trade-box{
+    background: var(--panel);
+    border:1px solid var(--gold);
+    border-radius:10px;
+    padding:12px 14px;
+    margin-top:12px;
+    margin-bottom:14px;
+  }
+  .es-live-trade-title{
+    font-family: var(--font-mono);
+    font-weight:700;
+    font-size:11.5px;
+    color: var(--gold);
+    margin-bottom:10px;
+    text-transform:uppercase;
+    letter-spacing:.03em;
+  }
+  .es-live-trade-config{
+    display:flex;
+    gap:14px;
+    flex-wrap:wrap;
+    align-items:end;
+  }
+  .es-live-trade-config label{
+    display:flex;
+    flex-direction:column;
+    gap:5px;
+    font-family: var(--font-mono);
+    font-size:11px;
+    color:var(--muted);
+  }
+  .es-live-trade-config input{
+    background: var(--panel-2);
+    border:1px solid var(--border);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size:12.5px;
+    padding:7px 10px;
+    border-radius:8px;
+    outline:none;
+    width:220px;
+  }
+  .es-live-trade-config button{
+    background: var(--panel);
+    border:1px solid var(--gold);
+    color: var(--gold);
+    font-family: var(--font-mono);
+    font-weight:600;
+    font-size:12.5px;
+    padding:8px 14px;
+    border-radius:8px;
+    cursor:pointer;
+    height:34px;
+  }
+  .es-live-trade-config button:hover{ background: rgba(242,184,75,0.12); }
+  .es-live-trade-config button:disabled{ opacity:.5; cursor:not-allowed; }
+  .es-live-trade-status{
+    font-family: var(--font-mono);
+    font-size:11.5px;
+    color: var(--muted);
+    margin-top:8px;
+  }
+  .es-live-trade-status.error{ color: var(--bear); }
+  .es-live-trade-status.success{ color: var(--bull); }
+
   .es-sim-reset-row{
     display:flex;
     justify-content:flex-end;
@@ -1073,7 +1136,7 @@
     margin-bottom:4px;
   }
   .es-psim-preview-price{
-    font-family: var(--font-display);
+    font-family: var(--font-mono);
     font-weight:700;
     font-size:14px;
     margin-bottom:6px;
@@ -1122,7 +1185,7 @@
     margin-bottom:4px;
   }
   .es-sim-stat-value{
-    font-family: var(--font-display);
+    font-family: var(--font-mono);
     font-weight:700;
     font-size:16px;
   }
@@ -1199,6 +1262,19 @@
   .es-sim-table td.pnl-neg{ color: var(--bear); }
   .es-psim-source-link{ cursor:pointer; }
   .es-psim-source-link:hover{ opacity:0.75; }
+  .es-venue-badge{
+    display:inline-block;
+    font-family: var(--font-mono);
+    font-size:8.5px;
+    font-weight:700;
+    color: var(--gold);
+    border:1px solid var(--gold);
+    border-radius:4px;
+    padding:1px 5px;
+    margin-left:6px;
+    letter-spacing:.02em;
+    vertical-align:middle;
+  }
   .es-psim-close-btn{
     background:none;
     border:1px solid currentColor;
@@ -1254,6 +1330,7 @@
     </div>
     <div class="es-controls">
       <a href="xauusd-priority-screener.html" class="es-nav-link">XAUUSD Screener &rarr;</a>
+      <a href="jurnal-trading.html" class="es-nav-link">Jurnal Trading &rarr;</a>
       <select id="esInterval">
         <option value="1m">1m</option>
         <option value="5m">5m</option>
@@ -1356,6 +1433,19 @@
         <input type="checkbox" id="esPsimToggle" checked>
       </label>
       <button id="esPsimOpenBtn">Open Posisi</button>
+    </div>
+    <div class="es-live-trade-box">
+      <div class="es-live-trade-title">Live Trading (Binance Testnet) &mdash; opsional</div>
+      <div class="es-live-trade-config">
+        <label>Backend URL
+          <input type="text" id="esLiveBackendUrl" placeholder="http://IP_VPS_KAMU:4000">
+        </label>
+        <label>App Token
+          <input type="password" id="esLiveAppToken" placeholder="token rahasia dari .env">
+        </label>
+        <button id="esLiveTradeBtn" type="button">Kirim Order Asli (Testnet)</button>
+      </div>
+      <div class="es-live-trade-status" id="esLiveTradeStatus"></div>
     </div>
     <div class="es-sim-preview" id="esPsimPreview"></div>
     <div class="es-sim-status" id="esPsimStatus">Menunggu sinyal prioritas pertama...</div>
@@ -2779,6 +2869,133 @@
   const psimEquityChartEl = document.getElementById('esPsimEquityChart');
   let psimSelectedCandidate = null;
 
+  const LIVE_TRADE_CONFIG_KEY = 'emaScreenerLiveTradeConfig_v1';
+  const liveBackendUrlInput = document.getElementById('esLiveBackendUrl');
+  const liveAppTokenInput = document.getElementById('esLiveAppToken');
+  const liveTradeBtn = document.getElementById('esLiveTradeBtn');
+  const liveTradeStatusEl = document.getElementById('esLiveTradeStatus');
+
+  function loadLiveTradeConfig(){
+    try{
+      const raw = localStorage.getItem(LIVE_TRADE_CONFIG_KEY);
+      if(!raw) return;
+      const cfg = JSON.parse(raw);
+      if(cfg.backendUrl) liveBackendUrlInput.value = cfg.backendUrl;
+      if(cfg.appToken) liveAppTokenInput.value = cfg.appToken;
+    }catch(e){}
+  }
+
+  function saveLiveTradeConfig(){
+    try{
+      localStorage.setItem(LIVE_TRADE_CONFIG_KEY, JSON.stringify({
+        backendUrl: liveBackendUrlInput.value.trim(),
+        appToken: liveAppTokenInput.value.trim()
+      }));
+    }catch(e){}
+  }
+
+  function roundToStep(value, step){
+    if(!step || step <= 0) return value;
+    const precision = Math.max(0, Math.round(-Math.log10(step)));
+    return (Math.floor(value / step) * step).toFixed(precision);
+  }
+
+  async function fetchSymbolFilters(symbol){
+    const res = await fetch(`https://testnet.binance.vision/api/v3/exchangeInfo?symbol=${symbol}`);
+    if(!res.ok) throw new Error('Gagal ambil exchangeInfo simbol');
+    const data = await res.json();
+    const filters = data.symbols[0].filters;
+    const lotSize = filters.find(f=>f.filterType==='LOT_SIZE');
+    const priceFilter = filters.find(f=>f.filterType==='PRICE_FILTER');
+    return {
+      stepSize: lotSize ? parseFloat(lotSize.stepSize) : null,
+      tickSize: priceFilter ? parseFloat(priceFilter.tickSize) : null
+    };
+  }
+
+  async function sendLiveTrade(cand){
+    const backendUrl = liveBackendUrlInput.value.trim().replace(/\/$/, '');
+    const appToken = liveAppTokenInput.value.trim();
+
+    if(!backendUrl || !appToken){
+      liveTradeStatusEl.classList.add('error');
+      liveTradeStatusEl.classList.remove('success');
+      liveTradeStatusEl.textContent = 'Isi dulu Backend URL dan App Token.';
+      return;
+    }
+
+    liveTradeBtn.disabled = true;
+    liveTradeStatusEl.classList.remove('error', 'success');
+    liveTradeStatusEl.textContent = 'Menyiapkan order (ambil aturan lot/harga simbol)...';
+
+    let quantityStr, tpStr, slStr;
+    try{
+      const entryPrice = cand.price;
+      const slRaw = cand.signal==='BUY' ? pickSlForBuy(cand.dir) : pickSlForSell(cand.dir);
+      const riskDist = Math.abs(entryPrice - slRaw);
+      const tpRaw = cand.signal==='BUY' ? entryPrice + riskDist : entryPrice - riskDist;
+      const margin = currentPsimMargin();
+      const quantityRaw = margin / entryPrice; // trading spot testnet: tidak ada leverage sungguhan
+
+      const { stepSize, tickSize } = await fetchSymbolFilters(cand.symbol);
+      quantityStr = stepSize ? roundToStep(quantityRaw, stepSize) : quantityRaw.toFixed(6);
+      tpStr = tickSize ? roundToStep(tpRaw, tickSize) : fmtPrice(tpRaw);
+      slStr = tickSize ? roundToStep(slRaw, tickSize) : fmtPrice(slRaw);
+
+      if(parseFloat(quantityStr) <= 0){
+        throw new Error('Modal terlalu kecil untuk lot minimum simbol ini.');
+      }
+    }catch(e){
+      liveTradeBtn.disabled = false;
+      liveTradeStatusEl.classList.add('error');
+      liveTradeStatusEl.textContent = `Gagal menyiapkan order: ${e.message}`;
+      return;
+    }
+
+    const confirmMsg = `Kirim order ASLI (Binance Testnet) untuk ${cand.symbol.replace('USDT','')} (TF ${cand.tfLabel}):\n\n`
+      + `Arah: ${cand.signal}\nQty: ${quantityStr}\nEntry: MARKET (~$${fmtPrice(cand.price)})\nTP: $${tpStr}\nSL: $${slStr}\n\n`
+      + `Ini order SUNGGUHAN ke akun testnet kamu (saldo palsu). Lanjutkan?`;
+    if(!window.confirm(confirmMsg)){
+      liveTradeBtn.disabled = false;
+      liveTradeStatusEl.textContent = '';
+      return;
+    }
+
+    liveTradeStatusEl.textContent = 'Mengirim order ke backend...';
+
+    try{
+      const res = await fetch(`${backendUrl}/api/trade/oco`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-App-Token': appToken },
+        body: JSON.stringify({
+          symbol: cand.symbol,
+          side: cand.signal,
+          quantity: quantityStr,
+          entryType: 'MARKET',
+          tp: tpStr,
+          sl: slStr
+        })
+      });
+      const data = await res.json();
+      if(!res.ok){
+        throw new Error((data && data.error) ? JSON.stringify(data.error) : `HTTP ${res.status}`);
+      }
+      const entryOrderId = data.entryOrder && data.entryOrder.orderId;
+      const ocoId = data.ocoOrder && data.ocoOrder.orderListId;
+      liveTradeStatusEl.classList.add('success');
+      liveTradeStatusEl.textContent = `Berhasil! Order ID entry: ${entryOrderId}, OCO ID: ${ocoId}`;
+
+      const liveKey = `${cand.symbol}_${cand.tfValue}_LIVE_${Date.now()}`;
+      recordLiveTestnetPosition(liveKey, cand, quantityStr, tpStr, slStr, Date.now(), { entryOrderId, ocoId });
+      renderPrioritySimUI(window.__esLastTickers||{});
+    }catch(e){
+      liveTradeStatusEl.classList.add('error');
+      liveTradeStatusEl.textContent = `Gagal kirim order: ${e.message}`;
+    }finally{
+      liveTradeBtn.disabled = false;
+    }
+  }
+
   function loadPrioritySimState(){
     try{
       const raw = localStorage.getItem(PRIORITY_SIM_KEY);
@@ -2847,7 +3064,19 @@
     const margin = currentPsimMargin();
     const leverage = currentPsimLeverage();
     const qty = (margin * leverage) / entryPrice;
-    prioritySimPositions[key] = { key, source, tfLabel, tfValue, dir, entryPrice, entryTime: time, sl, tp1, tp2, tp1Hit:false, tp2Hit:false, margin, leverage, qty };
+    prioritySimPositions[key] = { key, source, tfLabel, tfValue, dir, entryPrice, entryTime: time, sl, tp1, tp2, tp1Hit:false, tp2Hit:false, margin, leverage, qty, venue:'sim' };
+    savePrioritySimState();
+  }
+
+  // Posisi order ASLI (Binance Testnet, dikirim lewat backend) - dicatat di tabel yang sama tapi
+  // ditandai venue:'live-testnet' supaya tidak ikut logic auto-close simulasi (TP/SL asli dikelola OCO di Binance).
+  function recordLiveTestnetPosition(key, cand, quantity, tp, sl, time, orderIds){
+    prioritySimPositions[key] = {
+      key, source: cand.symbol, tfLabel: cand.tfLabel, tfValue: cand.tfValue, dir: cand.signal,
+      entryPrice: cand.price, entryTime: time, sl: parseFloat(sl), tp1: parseFloat(tp), tp2: parseFloat(tp),
+      tp1Hit:false, tp2Hit:false, margin: currentPsimMargin(), leverage: 1, qty: parseFloat(quantity),
+      venue: 'live-testnet', liveOrderId: orderIds.entryOrderId, liveOcoId: orderIds.ocoId
+    };
     savePrioritySimState();
   }
 
@@ -2862,7 +3091,7 @@
     const pnlPct = (pnl / pos.margin) * 100;
     const tpStatus = pos.tp2Hit ? 'TP2' : (pos.tp1Hit ? 'BE/TP1' : '-');
     prioritySimHistory.unshift({ source: pos.source, tfLabel: pos.tfLabel, tfValue: pos.tfValue, dir: pos.dir, entryPrice: pos.entryPrice, entryTime: pos.entryTime,
-      exitPrice, exitTime: time, reason, exchangeFee, marginFee, pnl, pnlPct, tpStatus });
+      exitPrice, exitTime: time, reason, exchangeFee, marginFee, pnl, pnlPct, tpStatus, venue: pos.venue || 'sim' });
     delete prioritySimPositions[key];
     savePrioritySimState();
   }
@@ -2886,6 +3115,7 @@
   function monitorPrioritySimPositions(tickers){
     Object.keys(prioritySimPositions).forEach(key=>{
       const pos = prioritySimPositions[key];
+      if(pos.venue === 'live-testnet') return; // TP/SL asli dikelola OCO order di Binance, bukan simulasi lokal
       const t = tickers[pos.source];
       const price = t ? parseFloat(t.lastPrice) : null;
       if(price===null || price===undefined) return;
@@ -3128,12 +3358,13 @@
         const pnlCls = floatPnl>=0 ? 'pnl-pos':'pnl-neg';
         const arahCls = pos.dir==='BUY' ? 'arah-buy' : 'arah-sell';
         const label = `${pos.source.replace('USDT','')} (${pos.tfLabel})`;
+        const venueBadge = pos.venue==='live-testnet' ? '<span class="es-venue-badge">Binance Testnet</span>' : '';
         const riskSlDisplay = pos.tp1Hit ? 'BE/TP1' : `-$${Math.abs(potentialSlPnl).toFixed(2)}`;
         const areaTpLabel = pos.tp2Hit ? 'Hit TP2' : (pos.tp1Hit ? 'Hit TP1' : '-');
         const areaTpCls = (pos.tp1Hit || pos.tp2Hit) ? 'pnl-pos' : '';
         const closeCls = floatPnl>=0 ? 'pnl-pos' : 'pnl-neg';
         return `<tr>
-          <td><span class="es-psim-source-link" data-symbol="${pos.source}" data-tf="${pos.tfValue||''}">${label}</span></td>
+          <td><span class="es-psim-source-link" data-symbol="${pos.source}" data-tf="${pos.tfValue||''}">${label}</span>${venueBadge}</td>
           <td class="${arahCls}">${pos.dir}</td>
           <td>$${fmtPrice(pos.entryPrice)}</td>
           <td>$${fmtPrice(pos.sl)}</td>
@@ -3171,9 +3402,10 @@
         const pnlCls = t.pnl>=0 ? 'pnl-pos':'pnl-neg';
         const arahCls = t.dir==='BUY' ? 'arah-buy' : 'arah-sell';
         const label = `${t.source.replace('USDT','')} (${t.tfLabel})`;
+        const venueBadge = t.venue==='live-testnet' ? '<span class="es-venue-badge">Binance Testnet</span>' : '';
         const tpStatusCls = t.tpStatus && t.tpStatus!=='-' ? 'pnl-pos' : '';
         return `<tr>
-          <td><span class="es-psim-source-link" data-symbol="${t.source}" data-tf="${t.tfValue||''}">${label}</span></td>
+          <td><span class="es-psim-source-link" data-symbol="${t.source}" data-tf="${t.tfValue||''}">${label}</span>${venueBadge}</td>
           <td class="${arahCls}">${t.dir}</td>
           <td>$${fmtPrice(t.entryPrice)}</td>
           <td>$${fmtPrice(t.exitPrice)}</td>
@@ -3503,6 +3735,19 @@
   psimLeverageInput.addEventListener('change', savePsimSettings);
   psimToggle.addEventListener('change', savePsimSettings);
   loadPsimSettings();
+
+  liveTradeBtn.addEventListener('click', ()=>{
+    if(!psimSelectedCandidate){
+      liveTradeStatusEl.classList.add('error');
+      liveTradeStatusEl.classList.remove('success');
+      liveTradeStatusEl.textContent = 'Pilih sinyal dulu di "Sinyal Terpilih" sebelum kirim order.';
+      return;
+    }
+    sendLiveTrade(psimSelectedCandidate);
+  });
+  liveBackendUrlInput.addEventListener('change', saveLiveTradeConfig);
+  liveAppTokenInput.addEventListener('change', saveLiveTradeConfig);
+  loadLiveTradeConfig();
 
   function loadEconCalendarWidget(){
     const container = document.getElementById('esEconCalendarBody');
