@@ -1,3800 +1,1084 @@
+<title>Jadi Trader — Jurnal Trading</title>
 <style>
   :root{
-    --bg:#0b0c0f;
-    --panel:#131519;
-    --panel-2:#1b1e24;
+    --ground:#0b0c0f;
+    --surface:#131519;
+    --surface-2:#1b1e24;
     --border:#262a31;
-    --text:#ece8de;
-    --muted:#9a9ca4;
-    --dim:#63656d;
-    --bull:#4f9e82;
-    --bull-dim:#1e3a30;
-    --bear:#c05a4e;
-    --bear-dim:#3a201c;
-    --gold:#c9a24b;
-    --ema9c:#FF8A65;
-    --ema21c:#FFD54F;
-    --ema200c:#B39DDB;
-    --demand-c:#4f9e82;
-    --supply-c:#c05a4e;
-    --bbc:#5C7CFA;
+    --border-soft:#1e2127;
+    --ink:#ece8de;
+    --ink-dim:#9a9ca4;
+    --ink-faint:#63656d;
+    --accent:#c9a24b;
+    --accent-dim:#8a7239;
+    --accent-soft:rgba(201,162,75,.12);
+    --profit:#4f9e82;
+    --profit-soft:rgba(79,158,130,.14);
+    --loss:#c05a4e;
+    --loss-soft:rgba(192,90,78,.14);
     --font-display:Georgia,'Iowan Old Style','Palatino Linotype',serif;
-    --font-mono:'SF Mono','Cascadia Code',Consolas,'Roboto Mono',monospace;
     --font-body:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    --font-mono:'SF Mono','Cascadia Code',Consolas,'Roboto Mono',monospace;
   }
 
-  * { box-sizing: border-box; }
-
-  html, body{
-    background: var(--bg);
+  *{box-sizing:border-box;}
+  body{
     margin:0;
-    padding:0;
+    background: var(--ground);
+    color:var(--ink);
+    font-family:var(--font-body);
+    -webkit-font-smoothing:antialiased;
+    line-height:1.5;
   }
+  h1,h2,h3{font-family:var(--font-display);font-weight:400;text-wrap:balance;margin:0;}
+  .num{font-family:var(--font-mono);font-variant-numeric:tabular-nums;}
+  a{color:var(--accent);}
+  button{font-family:var(--font-body);}
 
-  .ema-screener{
-    background: var(--bg);
-    color: var(--text);
-    font-family: var(--font-body);
-    font-variant-numeric: tabular-nums;
-    border-radius: 14px;
-    padding: 22px 22px 26px;
-    max-width: 100%;
-    overflow-x: hidden;
-  }
+  ::selection{background:var(--accent-soft);color:var(--ink);}
 
-  .es-econ-calendar-panel{
-    position: fixed;
-    top: 90px;
-    right: 16px;
-    z-index: 50;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 8px;
-  }
-  .es-econ-calendar-trigger{
-    flex-shrink:0;
-    display:flex;
-    align-items:center;
-    gap:6px;
-    padding:6px 10px;
-    border-radius:20px;
-    background: var(--panel);
-    border:1px solid var(--border);
-    cursor:pointer;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.35);
-  }
-  .es-econ-calendar-trigger:hover{ border-color:#8C231A; }
-  .es-econ-calendar-trigger-dot{
-    width:9px;
-    height:9px;
-    border-radius:50%;
-    background:#8C231A;
-    flex-shrink:0;
-  }
-  .es-econ-calendar-trigger-label{
-    font-family: var(--font-mono);
-    font-weight:600;
-    font-size:11px;
-    color: var(--text);
-    white-space:nowrap;
-  }
-  .es-econ-calendar-content{
-    width:320px;
-    height:420px;
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.45);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-  .es-econ-calendar-panel.collapsed .es-econ-calendar-content{ display:none; }
-  .es-econ-calendar-header{
-    padding:8px 12px;
-    border-bottom:1px solid var(--border);
-    font-family: var(--font-mono);
-    font-size:11.5px;
-    font-weight:600;
-    color: var(--text);
-    flex-shrink:0;
-  }
-  .es-econ-calendar-body{
-    flex:1;
-    overflow:hidden;
-  }
-  @media (max-width: 700px){
-    .es-econ-calendar-content{ width: 260px; height: 360px; }
-    .es-econ-calendar-panel{ top:70px; right:8px; }
-  }
+  .wrap{max-width:1180px;margin:0 auto;padding:28px 24px 80px;}
 
-  .es-header{
-    display:flex;
-    justify-content:space-between;
-    align-items:flex-start;
-    gap:16px;
+  /* ---------- Nav ---------- */
+  .jt-nav{display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap;}
+  .jt-nav-link{
+    display:inline-flex;align-items:center;
+    background:var(--surface);border:1px solid var(--accent-dim);color:var(--accent);
+    font-family:var(--font-mono);font-size:12px;font-weight:600;
+    padding:7px 12px;border-radius:8px;text-decoration:none;
+  }
+  .jt-nav-link:hover{background:var(--accent-soft);}
+
+  /* ---------- Header ---------- */
+  .masthead{
+    display:flex;justify-content:space-between;align-items:flex-end;gap:24px;
+    padding-bottom:22px;margin-bottom:22px;border-bottom:1px solid var(--border);
     flex-wrap:wrap;
-    margin-bottom:18px;
-    padding-bottom:16px;
-    border-bottom:1px solid var(--border);
   }
+  .brand-mark{display:flex;align-items:center;gap:12px;}
+  .brand-glyph{
+    width:38px;height:38px;border:1px solid var(--accent-dim);border-radius:2px;
+    display:flex;align-items:center;justify-content:center;color:var(--accent);
+    font-family:var(--font-display);font-size:20px;transform:rotate(0deg);
+  }
+  .brand-text .title{font-size:26px;letter-spacing:.04em;}
+  .brand-text .subtitle{font-size:12px;color:var(--ink-dim);letter-spacing:.12em;text-transform:uppercase;margin-top:2px;}
 
-  .es-title{
-    font-family: var(--font-display);
-    font-weight:700;
-    font-size:22px;
-    letter-spacing:-0.01em;
-    display:flex;
-    align-items:center;
-    gap:10px;
-  }
-  .es-title .dot{
-    width:9px;height:9px;border-radius:50%;
-    background:var(--bull);
-    box-shadow:0 0 0 3px var(--bull-dim);
-    animation: pulse 2s infinite;
-  }
-  @keyframes pulse{
-    0%,100%{ opacity:1; } 50%{ opacity:.4; }
-  }
-  .es-sub{
-    font-size:12.5px;
-    color:var(--muted);
-    margin-top:4px;
-    font-family: var(--font-mono);
-  }
+  .account-meta{text-align:right;font-size:12.5px;color:var(--ink-dim);}
+  .account-meta .balance{font-size:28px;color:var(--ink);margin-bottom:2px;}
+  .account-meta .balance .cur{font-size:15px;color:var(--ink-dim);margin-right:4px;}
+  .account-meta .line{margin-top:2px;}
+  .account-meta .line b{color:var(--ink-dim);font-weight:600;}
 
-  .es-controls{
-    display:flex;
-    gap:10px;
-    flex-wrap:wrap;
-    align-items:center;
+  /* ---------- KPI strip ---------- */
+  .kpis{
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+    gap:1px;background:var(--border);border:1px solid var(--border);
+    border-radius:10px;overflow:hidden;margin-bottom:24px;
   }
-  .es-controls select, .es-controls button{
-    background: var(--panel);
-    border:1px solid var(--border);
-    color: var(--text);
-    font-family: var(--font-mono);
-    font-size:12.5px;
-    padding:8px 12px;
-    border-radius:8px;
-    cursor:pointer;
-    outline:none;
-  }
-  .es-controls select:hover, .es-controls button:hover{
-    border-color: var(--dim);
-  }
-  .es-refresh{
-    display:flex;
-    align-items:center;
-    gap:6px;
-    color: var(--bull);
-    font-weight:600;
-  }
-  .es-refresh svg{ width:13px;height:13px; }
-  .es-refresh.spinning svg{ animation: spin 1s linear infinite; }
-  @keyframes spin{ to{ transform: rotate(360deg); } }
+  .kpi{background:var(--surface);padding:16px 18px;}
+  .kpi .label{font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-faint);margin-bottom:8px;}
+  .kpi .value{font-size:21px;}
+  .kpi .value.profit{color:var(--profit);}
+  .kpi .value.loss{color:var(--loss);}
 
-  .es-nav-link{
-    display:inline-flex;
-    align-items:center;
-    background: var(--panel);
-    border:1px solid var(--gold);
-    color: var(--gold);
-    font-family: var(--font-mono);
-    font-size:12px;
-    font-weight:600;
-    padding:8px 12px;
-    border-radius:8px;
-    text-decoration:none;
-  }
-  .es-nav-link:hover{ background: rgba(242,184,75,0.12); }
+  /* ---------- Grid ---------- */
+  .grid{display:grid;grid-template-columns:1.7fr 1fr;gap:20px;align-items:start;}
+  @media (max-width:920px){.grid{grid-template-columns:1fr;}}
 
-  .es-status{
-    font-family: var(--font-mono);
-    font-size:12px;
-    color: var(--muted);
-    margin-bottom:14px;
-    min-height:16px;
+  .card{
+    background:linear-gradient(180deg, var(--surface-2), var(--surface));
+    border:1px solid var(--border);border-radius:12px;
+    padding:20px 22px;margin-bottom:20px;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.02);
   }
-  .es-status.error{ color: var(--bear); }
+  .card-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;}
+  .card-head h2{font-size:16px;letter-spacing:.02em;}
+  .card-head .hint{font-size:11.5px;color:var(--ink-faint);}
 
-  .es-scan-toolbar{
-    display:flex;
-    align-items:center;
-    flex-wrap:wrap;
-    gap:10px;
-    margin: -6px 0 14px;
+  .btn{
+    font-size:12.5px;letter-spacing:.02em;color:var(--ink);
+    background:var(--surface-2);border:1px solid var(--border);
+    padding:8px 14px;border-radius:7px;cursor:pointer;transition:border-color .15s,color .15s;
   }
-  .es-symbol-manager{ position:relative; }
-  .es-symbol-manager-inline{ margin:0; }
-  .es-btc-tf-strip{
-    display:flex;
-    gap:6px;
-    flex-wrap:wrap;
-    margin-bottom:14px;
-  }
-  #esFavCrossStatus{
-    margin-top:0;
-  }
-  #esStatus{
-    margin-top:14px;
-  }
-  .es-fav-cross-manage{
-    display:flex;
-    flex-wrap:wrap;
-    gap:6px;
-    align-items:center;
-    margin-top:14px;
-    margin-bottom:14px;
-  }
-  .es-fav-cross-chip{
-    display:flex;
-    align-items:center;
-    gap:6px;
-    background: var(--panel);
-    border:1px solid var(--border);
-    border-radius:20px;
-    padding:4px 6px 4px 10px;
-    font-family: var(--font-mono);
-    font-size:11px;
-    color: var(--text);
-  }
-  .es-fav-cross-chip-remove{
-    cursor:pointer;
-    color: var(--gold);
-    font-size:13px;
-    line-height:1;
-    padding:2px;
-    user-select:none;
-  }
-  .es-fav-cross-chip-remove:hover{ opacity:0.7; }
-  .es-fav-cross-chip-add{
-    display:flex;
-    align-items:center;
-    gap:4px;
-    background: var(--panel);
-    border:1px dashed var(--border);
-    border-radius:20px;
-    padding:3px 6px 3px 10px;
-    position:relative;
-  }
-  .es-fav-cross-add-input{
-    background:none;
-    border:none;
-    outline:none;
-    color: var(--text);
-    font-family: var(--font-mono);
-    font-size:11px;
-    width:120px;
-  }
-  .es-fav-cross-add-btn{
-    background:none;
-    border:none;
-    color: var(--bull);
-    cursor:pointer;
-    font-size:11px;
-    font-weight:600;
-    font-family: var(--font-mono);
-    padding:2px 4px;
-  }
-  .es-fav-cross-add-btn:hover{ opacity:0.8; }
-  .es-btc-tf-box{
-    background: var(--panel);
-    border:1px solid var(--border);
-    border-radius:6px;
-    padding:4px 8px;
-    font-family: var(--font-mono);
-    text-align:center;
-    min-width:58px;
-    cursor:pointer;
-  }
-  .es-btc-tf-box:hover{ border-color: var(--dim); }
-  .es-btc-tf-box-label{ color: var(--muted); font-size:8.5px; margin-bottom:2px; }
-  .es-btc-tf-box-status{ font-weight:600; font-size:9.5px; white-space:nowrap; }
-  .es-btc-tf-box-status.bull{ color: var(--bull); }
-  .es-btc-tf-box-status.bear{ color: var(--bear); }
-  .es-btc-tf-box-status.none{ color: var(--dim); }
-  .es-btc-tf-box-status.error{ color: var(--bear); }
-  .es-symbol-manager-btn{
-    display:inline-flex;
-    align-items:center;
-    gap:6px;
-    background:none;
-    border:1px solid var(--border);
-    border-radius:6px;
-    color: var(--muted);
-    font-family: var(--font-mono);
-    font-size:11px;
-    padding:5px 10px;
-    cursor:pointer;
-  }
-  .es-symbol-manager-btn:hover{ color: var(--text); border-color: var(--muted); }
-  .es-symbol-manager-btn svg{ transition: transform .15s ease; }
-  .es-symbol-manager-btn.open svg{ transform: rotate(180deg); }
-  .es-symbol-manager-dropdown{
-    display:none;
-    position:absolute;
-    top:calc(100% + 4px);
-    left:0;
-    z-index:20;
-    min-width:300px;
-    max-height:300px;
-    overflow-y:auto;
-    background: var(--panel-2);
-    border:1px solid var(--border);
-    border-radius:8px;
-    box-shadow: 0 10px 28px rgba(0,0,0,0.4);
-    padding:6px;
-  }
-  .es-symbol-manager-dropdown.open{ display:block; }
-  .es-symbol-manager-row{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:10px;
-    padding:6px 8px;
-    border-radius:6px;
-  }
-  .es-symbol-manager-row:hover{ background: rgba(255,255,255,0.05); }
-  .es-symbol-manager-name{
-    cursor:pointer;
-    font-family: var(--font-mono);
-    font-size:12px;
-    color: var(--text);
-    white-space:nowrap;
-  }
-  .es-symbol-manager-name:hover{ color: var(--bull); text-decoration:underline; }
-  .es-symbol-manager-block{
-    background:none;
-    border:1px solid var(--bear);
-    color: var(--bear);
-    border-radius:4px;
-    font-size:10px;
-    padding:3px 8px;
-    cursor:pointer;
-    white-space:nowrap;
-    flex-shrink:0;
-  }
-  .es-symbol-manager-block:hover{ background: var(--bear); color:#fff; }
-  .es-symbol-manager-empty{
-    padding:10px 8px;
-    color: var(--muted);
-    font-size:11px;
-    text-align:center;
-  }
+  .btn:hover{border-color:var(--accent-dim);color:var(--accent);}
+  .btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+  .btn.primary{background:var(--accent);color:#141109;border-color:var(--accent);font-weight:600;}
+  .btn.primary:hover{background:#d8b25e;color:#141109;}
+  .btn.ghost{background:transparent;}
+  .btn.small{padding:5px 10px;font-size:11.5px;}
+  .btn.danger:hover{border-color:var(--loss);color:var(--loss);}
 
-  .es-grid{
-    display:flex;
-    gap:12px;
-    overflow-x:auto;
-    overflow-y:hidden;
-    padding-bottom:10px;
-    scroll-snap-type: x proximity;
-    -webkit-overflow-scrolling: touch;
+  /* ---------- Equity chart ---------- */
+  .chart-box{width:100%;}
+  .chart-box svg{width:100%;height:220px;display:block;overflow:visible;}
+  .chart-empty-note{
+    display:flex;align-items:center;gap:8px;color:var(--ink-faint);font-size:12px;
+    margin-top:10px;
   }
-  .es-grid::-webkit-scrollbar{ height:8px; }
-  .es-grid::-webkit-scrollbar-track{ background: var(--panel-2); border-radius:4px; }
-  .es-grid::-webkit-scrollbar-thumb{ background: var(--border); border-radius:4px; }
-  .es-grid::-webkit-scrollbar-thumb:hover{ background: var(--dim); }
+  .chart-empty-note .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);}
 
-  .es-card{
-    background: var(--panel);
-    border:1px solid var(--border);
-    border-radius:10px;
-    padding:14px;
-    position:relative;
-    display:flex;
-    flex-direction:column;
-    gap:10px;
-    transition: border-color .15s ease, transform .15s ease;
-    flex:0 0 280px;
-    scroll-snap-align: start;
-  }
-  .es-card{ cursor:pointer; }
-  .es-card:hover{
-    border-color: var(--bull);
-    transform: translateY(-1px);
-  }
-  .es-card.fresh::before{
-    content:'BARU';
-    position:absolute;
-    top:-1px; right:10px;
-    background: var(--gold);
-    color:#1A1200;
-    font-family: var(--font-mono);
-    font-size:9px;
-    font-weight:700;
-    letter-spacing:.06em;
-    padding:2px 6px;
-    border-radius:0 0 5px 5px;
-  }
-  .es-card-fav-star{
-    position:absolute;
-    top:-1px; left:10px;
-    background: var(--gold);
-    color:#1A1200;
-    font-family: var(--font-mono);
-    font-size:11px;
-    font-weight:700;
-    padding:2px 6px;
-    border-radius:0 0 5px 5px;
-    line-height:1.2;
-  }
-
-  .es-card-top{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-  }
-  .es-rank{
-    font-family: var(--font-mono);
-    color: var(--dim);
-    font-size:11px;
-    margin-right:8px;
-  }
-  .es-symbol{
-    font-family: var(--font-display);
-    font-weight:700;
-    font-size:16px;
-  }
-  .es-cap-tag{
-    font-family: var(--font-mono);
-    font-size:9.5px;
-    letter-spacing:.04em;
-    color: var(--muted);
-    border:1px solid var(--border);
-    padding:2px 6px;
-    border-radius:5px;
-  }
-
-  .es-price-row{
-    display:flex;
-    justify-content:space-between;
-    align-items:baseline;
-    font-family: var(--font-mono);
-  }
-  .es-price{ font-size:15px; font-weight:500; }
-  .es-chg{ font-size:12px; font-weight:600; }
-  .es-chg.up{ color: var(--bull); }
-  .es-chg.down{ color: var(--bear); }
-
-  .es-spark{ width:100%; height:160px; display:block; }
-
-  .es-sr-row{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    font-family: var(--font-mono);
-    font-size:10.5px;
-    color: var(--muted);
-    flex-wrap:wrap;
-    gap:4px;
-  }
-  .es-sr-row .res{ color: var(--bear); }
-  .es-sr-row .sup{ color: var(--bull); }
-
-  .es-mom-row{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    font-family: var(--font-mono);
-    font-size:11px;
-  }
-  .es-mom-badge{
-    font-weight:600;
-    padding:2px 7px;
-    border-radius:6px;
-  }
-  .es-mom-badge.bullish{ background: var(--bull-dim); color: var(--bull); }
-  .es-mom-badge.bearish{ background: var(--bear-dim); color: var(--bear); }
-  .es-mom-badge.none{ background: var(--panel-2); color: var(--muted); }
-
-  .es-cross-row{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    font-family: var(--font-mono);
-    font-size:11.5px;
-  }
-  .es-cross-badge{
-    display:flex;
-    align-items:center;
-    gap:5px;
-    font-weight:600;
-    padding:3px 8px;
-    border-radius:6px;
-  }
-  .es-cross-badge.bullish{ background: var(--bull-dim); color: var(--bull); }
-  .es-cross-badge.bearish{ background: var(--bear-dim); color: var(--bear); }
-  .es-ago{ color: var(--muted); }
-
-  .es-rsi-row{
-    display:flex;
-    flex-wrap:nowrap;
-    justify-content:space-between;
-    align-items:center;
-    font-family: var(--font-mono);
-    font-size:11px;
-    color: var(--muted);
-  }
-  .es-rsi-row span:first-child{ flex-shrink:0; }
-  .es-rsi-badge{
-    font-weight:600;
-    padding:2px 7px;
-    border-radius:6px;
-    white-space:nowrap;
-    overflow:hidden;
-    text-overflow:ellipsis;
-    min-width:0;
-  }
-  .es-rsi-badge.overbought{ background: var(--bear-dim); color: var(--bear); }
-  .es-rsi-badge.oversold{ background: var(--bull-dim); color: var(--bull); }
-  .es-rsi-badge.neutral{ background: var(--panel-2); color: var(--muted); }
-
-  .es-stoch-row{
-    display:flex;
-    flex-wrap:nowrap;
-    justify-content:space-between;
-    align-items:center;
-    font-family: var(--font-mono);
-    font-size:11px;
-    color: var(--muted);
-  }
-  .es-stoch-row span:first-child{ flex-shrink:0; }
-  .es-stoch-badge{
-    font-weight:600;
-    padding:2px 7px;
-    border-radius:6px;
-    white-space:nowrap;
-    overflow:hidden;
-    text-overflow:ellipsis;
-    min-width:0;
-  }
-  .es-stoch-badge.overbought{ background: var(--bear-dim); color: var(--bear); }
-  .es-stoch-badge.oversold{ background: var(--bull-dim); color: var(--bull); }
-  .es-stoch-badge.neutral{ background: var(--panel-2); color: var(--muted); }
-
-  .es-empty{
-    grid-column: 1 / -1;
-    text-align:center;
-    padding: 40px 20px;
-    color: var(--muted);
-    font-family: var(--font-mono);
-    font-size:13px;
-    border:1px dashed var(--border);
-    border-radius:10px;
-  }
-
-  .es-skel{
-    height:150px;
-    border-radius:10px;
-    background: linear-gradient(90deg, var(--panel) 25%, var(--panel-2) 37%, var(--panel) 63%);
-    background-size: 400% 100%;
-    animation: shimmer 1.4s ease infinite;
-    border:1px solid var(--border);
-  }
-  @keyframes shimmer{ 0%{background-position:100% 50%;} 100%{background-position:0 50%;} }
-
-  .es-footnote{
-    margin-top:18px;
-    font-family: var(--font-mono);
-    font-size:10.5px;
-    color: var(--dim);
-    line-height:1.6;
-  }
-
-  .es-priority-section{
-    margin-top:24px;
-    padding-top:18px;
-    border-top:1px solid var(--border);
-  }
-  .es-priority-header{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    gap:12px;
-    flex-wrap:wrap;
-    margin-bottom:6px;
-  }
-  .es-priority-controls{
-    display:flex;
-    align-items:center;
-    gap:12px;
-    flex-wrap:wrap;
-    margin:10px 0 6px;
-  }
-  .es-priority-controls select{
-    background: var(--panel);
-    border:1px solid var(--border);
-    color: var(--text);
-    font-family: var(--font-mono);
-    font-size:12.5px;
-    padding:8px 12px;
-    border-radius:8px;
-    cursor:pointer;
-    outline:none;
-  }
-  .es-priority-controls select:hover{ border-color: var(--dim); }
-  .es-priority-title{
-    font-family: var(--font-display);
-    font-weight:700;
-    font-size:17px;
-  }
-  .es-priority-btn{
-    background: var(--panel);
-    border:1px solid var(--gold);
-    color: var(--gold);
-    font-family: var(--font-mono);
-    font-weight:600;
-    font-size:12.5px;
-    padding:8px 14px;
-    border-radius:8px;
-    cursor:pointer;
-  }
-  .es-priority-btn:hover{ background: rgba(242,184,75,0.12); }
-  .es-priority-btn:disabled{ opacity:.5; cursor:not-allowed; }
-
-  .es-priority-sub{
-    font-size:12px;
-    color: var(--muted);
-    font-family: var(--font-mono);
-    line-height:1.6;
-    margin-bottom:10px;
-  }
-  .es-priority-tf-badge{
-    display:inline-block;
-    font-family: var(--font-mono);
-    font-size:11.5px;
-    color: var(--gold);
-    background: var(--panel);
-    border:1px solid var(--border);
-    padding:6px 12px;
-    border-radius:8px;
-    margin-bottom:12px;
-  }
-
-  .es-priority-status{
-    font-family: var(--font-mono);
-    font-size:12px;
-    color: var(--muted);
-    margin-top:16px;
-    margin-bottom:14px;
-    min-height:16px;
-  }
-  .es-priority-status.error{ color: var(--bear); }
-
-  .es-priority-grid{
-    display:grid;
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-    gap:12px;
-    margin-top:16px;
-  }
-  .es-priority-card{
-    background: var(--panel);
-    border:1px solid var(--border);
-    border-left:3px solid var(--dim);
-    border-radius:10px;
-    padding:14px;
-    display:flex;
-    flex-direction:column;
-    gap:8px;
-    cursor:pointer;
-    transition: border-color .15s ease, transform .15s ease;
-  }
-  .es-priority-card:hover{ transform: translateY(-1px); }
-  .es-priority-card.buy{ border-left-color: var(--bull); }
-  .es-priority-card.sell{ border-left-color: var(--bear); }
-
-  .es-priority-card-top{
-    display:flex;
-    align-items:center;
-    gap:8px;
-  }
-  .es-priority-rank{
-    font-family: var(--font-mono);
-    color: var(--dim);
-    font-size:11px;
-  }
-  .es-priority-symbol{
-    font-family: var(--font-display);
-    font-weight:700;
-    font-size:16px;
-    flex:1;
-  }
-  .es-priority-signal{
-    font-family: var(--font-mono);
-    font-weight:700;
-    font-size:11px;
-    padding:3px 10px;
-    border-radius:6px;
-    letter-spacing:.04em;
-  }
-  .es-priority-signal.buy{ background: var(--bull-dim); color: var(--bull); }
-  .es-priority-signal.sell{ background: var(--bear-dim); color: var(--bear); }
-  .es-priority-signal.watch{ background: rgba(242,184,75,0.18); color: var(--gold); }
-
-  .es-priority-hp-badge{
-    font-family: var(--font-mono);
-    font-weight:700;
-    font-size:9.5px;
-    padding:3px 8px;
-    border-radius:6px;
-    letter-spacing:.03em;
-    background: var(--gold);
-    color:#1A1200;
-    white-space:nowrap;
-  }
-
-  .es-confirm-notes{ margin-top:2px; }
-
-  .es-priority-tf, .es-priority-trend, .es-priority-stoch{
-    font-family: var(--font-mono);
-    font-size:11.5px;
-    color: var(--muted);
-  }
-  .es-priority-tf strong{ color: var(--text); }
-
-  .es-checklist{
-    display:flex;
-    flex-direction:column;
-    gap:4px;
-    padding:8px;
-    background: var(--panel-2);
-    border-radius:8px;
-  }
-  .es-check-row{
-    display:flex;
-    align-items:flex-start;
-    gap:6px;
-    font-family: var(--font-mono);
-    font-size:10.5px;
-    line-height:1.4;
-  }
-  .es-check-icon{ font-weight:700; flex-shrink:0; }
-  .es-check-row.ok{ color: var(--text); }
-  .es-check-row.ok .es-check-icon{ color: var(--bull); }
-  .es-check-row.fail{ color: var(--muted); }
-  .es-check-row.fail .es-check-icon{ color: var(--bear); }
-
-  .es-priority-note{
-    font-family: var(--font-mono);
-    font-size:10.5px;
-    color: var(--muted);
-  }
-  .es-priority-note strong{ color: var(--text); }
-
-  .es-priority-levels{
-    display:flex;
-    flex-direction:column;
-    gap:3px;
-    padding:8px;
-    background: var(--panel-2);
-    border-radius:8px;
-    font-family: var(--font-mono);
-    font-size:10.5px;
-    color: var(--muted);
-  }
-  .es-priority-level-row strong{ color: var(--text); }
-  .es-priority-level-row.invalid strong{ color: var(--bear); }
-
-  .es-priority-trade-btn{
-    margin-top:auto;
-    padding-top:11px;
-    background: var(--panel-2);
-    border:1px solid var(--gold);
-    color: var(--gold);
-    font-family: var(--font-mono);
-    font-weight:600;
-    font-size:11px;
-    padding:7px 10px;
-    border-radius:6px;
-    cursor:pointer;
-    width:100%;
-  }
-  .es-priority-trade-btn:hover{ background: rgba(242,184,75,0.12); }
-  .es-priority-trade-btn:disabled{ opacity:.5; cursor:not-allowed; }
-
-  .es-fav-section{
-    margin-bottom:22px;
-    padding-bottom:18px;
-    border-bottom:1px solid var(--border);
-  }
-  .es-fav-title{
-    font-family: var(--font-display);
-    font-weight:700;
-    font-size:17px;
-  }
-  .es-fav-sub{
-    font-size:12px;
-    color: var(--muted);
-    font-family: var(--font-mono);
-    margin:4px 0 12px;
-    line-height:1.6;
-  }
-  .es-fav-status{
-    font-family: var(--font-mono);
-    font-size:12px;
-    color: var(--muted);
-    margin-bottom:12px;
-    min-height:16px;
-  }
-  .es-fav-status.error{ color: var(--bear); }
-
-  .es-fav-grid{
-    display:flex;
-    gap:8px;
-    overflow-x:auto;
-    overflow-y:hidden;
-    padding-bottom:10px;
-    scroll-snap-type: x proximity;
-    -webkit-overflow-scrolling: touch;
-  }
-  .es-fav-grid::-webkit-scrollbar{ height:8px; }
-  .es-fav-grid::-webkit-scrollbar-track{ background: var(--panel-2); border-radius:4px; }
-  .es-fav-grid::-webkit-scrollbar-thumb{ background: var(--border); border-radius:4px; }
-  .es-fav-grid::-webkit-scrollbar-thumb:hover{ background: var(--dim); }
-  .es-fav-box{
-    position:relative;
-    background: var(--panel);
-    border:1px solid var(--border);
-    border-radius:10px;
-    padding:10px;
-    display:flex;
-    flex-direction:column;
-    gap:6px;
-    cursor:pointer;
-    flex:0 0 155px;
-    scroll-snap-align: start;
-  }
-  .es-fav-box.buy{ border-color: var(--bull); }
-  .es-fav-box.sell{ border-color: var(--bear); }
-  .es-fav-box.hold{ border-color: var(--dim); }
-  .es-fav-box[draggable="true"]{ cursor: pointer; }
-  .es-fav-box[draggable="true"].grab-ready{ cursor: grab; }
-  .es-fav-box.dragging{ opacity: 0.4; cursor: grabbing; }
-  .es-fav-box.drag-over{ outline: 2px dashed var(--gold); outline-offset: 2px; }
-
-  .es-fav-star{
-    position:absolute;
-    top:6px;
-    right:8px;
-    font-size:15px;
-    color: var(--gold);
-    cursor:pointer;
-    user-select:none;
-    line-height:1;
-  }
-  .es-fav-star:hover{ opacity:0.7; }
-
-  .es-fav-symbol{
-    font-family: var(--font-display);
-    font-weight:700;
-    font-size:14px;
-    padding-right:18px;
-  }
-  .es-fav-price{
-    font-family: var(--font-mono);
-    font-size:10px;
-    color: var(--muted);
-  }
-  .es-fav-chg{ font-weight:600; }
-  .es-fav-chg.up{ color: var(--bull); }
-  .es-fav-chg.down{ color: var(--bear); }
-  .es-fav-signal-badge{
-    font-family: var(--font-mono);
-    font-weight:700;
-    font-size:10px;
-    padding:2px 8px;
-    border-radius:6px;
-    align-self:flex-start;
-    letter-spacing:.03em;
-  }
-  .es-fav-signal-badge.buy{ background: var(--bull-dim); color: var(--bull); }
-  .es-fav-signal-badge.sell{ background: var(--bear-dim); color: var(--bear); }
-  .es-fav-signal-badge.hold{ background: var(--panel-2); color: var(--gold); }
-
-  .es-fav-empty-slot{
-    align-items:center;
-    justify-content:center;
-    gap:8px;
-    border:1px dashed var(--border);
-    cursor:default;
-  }
-  .es-fav-add-wrap{ position:relative; width:100%; }
-  .es-fav-add-input{
-    width:100%;
-    background: var(--panel-2);
-    border:1px solid var(--border);
-    color: var(--text);
-    font-family: var(--font-mono);
-    font-size:11px;
-    padding:6px 8px;
-    border-radius:6px;
-    text-align:center;
-  }
-  .es-fav-suggest{
-    display:none;
-    position:absolute;
-    top:calc(100% + 4px);
-    left:0;
-    right:0;
-    z-index:15;
-    max-height:150px;
-    overflow-y:auto;
-    background: var(--panel-2);
-    border:1px solid var(--border);
-    border-radius:6px;
-    box-shadow: 0 10px 24px rgba(0,0,0,0.4);
-    text-align:left;
-  }
-  .es-fav-suggest.open{ display:block; }
-  .es-fav-suggest-item{
-    padding:6px 8px;
-    font-family: var(--font-mono);
-    font-size:11px;
-    color: var(--text);
-    cursor:pointer;
-  }
-  .es-fav-suggest-item:hover{ background: rgba(255,255,255,0.06); color: var(--bull); }
-  .es-fav-add-btn{
-    background: var(--panel-2);
-    border:1px solid var(--gold);
-    color: var(--gold);
-    font-family: var(--font-mono);
-    font-size:10.5px;
-    font-weight:600;
-    padding:6px 8px;
-    border-radius:6px;
-    cursor:pointer;
-    width:100%;
-  }
-  .es-fav-add-btn:hover{ background: rgba(242,184,75,0.12); }
-
-  .es-sim-section{
-    margin-top:24px;
-    padding-top:18px;
-    border-top:1px solid var(--border);
-  }
-  .es-sim-title{
-    font-family: var(--font-display);
-    font-weight:700;
-    font-size:17px;
-  }
-  .es-sim-sub{
-    font-size:12px;
-    color:var(--muted);
-    margin-top:4px;
-    margin-bottom:14px;
-    font-family: var(--font-mono);
-  }
-  .es-sim-controls{
-    display:flex;
-    gap:14px;
-    flex-wrap:wrap;
-    align-items:end;
-    margin-top:16px;
-    margin-bottom:12px;
-  }
-  .es-sim-controls label{
-    display:flex;
-    flex-direction:column;
-    gap:5px;
-    font-family: var(--font-mono);
-    font-size:11px;
-    color:var(--muted);
-  }
-  .es-sim-controls select, .es-sim-controls input{
-    background: var(--panel);
-    border:1px solid var(--border);
-    color: var(--text);
-    font-family: var(--font-mono);
-    font-size:12.5px;
-    padding:7px 10px;
-    border-radius:8px;
-    outline:none;
-    width:150px;
-  }
-  .es-sim-controls button{
-    background: var(--panel);
-    border:1px solid var(--bull);
-    color: var(--bull);
-    font-family: var(--font-mono);
-    font-weight:600;
-    font-size:12.5px;
-    padding:8px 14px;
-    border-radius:8px;
-    cursor:pointer;
-    height:34px;
-  }
-  .es-sim-controls button:hover{ background: var(--bull-dim); }
-  .es-sim-controls button:disabled{ opacity:.5; cursor:not-allowed; }
-  .es-sim-controls button.sell{ border-color: var(--bear); color: var(--bear); }
-  .es-sim-controls button.sell:hover{ background: var(--bear-dim); }
-
-  .es-live-trade-box{
-    background: var(--panel);
-    border:1px solid var(--gold);
-    border-radius:10px;
-    padding:12px 14px;
-    margin-top:12px;
-    margin-bottom:14px;
-  }
-  .es-live-trade-title{
-    font-family: var(--font-mono);
-    font-weight:700;
-    font-size:11.5px;
-    color: var(--gold);
-    margin-bottom:10px;
-    text-transform:uppercase;
-    letter-spacing:.03em;
-  }
-  .es-live-trade-config{
-    display:flex;
-    gap:14px;
-    flex-wrap:wrap;
-    align-items:end;
-  }
-  .es-live-trade-config label{
-    display:flex;
-    flex-direction:column;
-    gap:5px;
-    font-family: var(--font-mono);
-    font-size:11px;
-    color:var(--muted);
-  }
-  .es-live-trade-config input{
-    background: var(--panel-2);
-    border:1px solid var(--border);
-    color: var(--text);
-    font-family: var(--font-mono);
-    font-size:12.5px;
-    padding:7px 10px;
-    border-radius:8px;
-    outline:none;
-    width:220px;
-  }
-  .es-live-trade-config button{
-    background: var(--panel);
-    border:1px solid var(--gold);
-    color: var(--gold);
-    font-family: var(--font-mono);
-    font-weight:600;
-    font-size:12.5px;
-    padding:8px 14px;
-    border-radius:8px;
-    cursor:pointer;
-    height:34px;
-  }
-  .es-live-trade-config button:hover{ background: rgba(242,184,75,0.12); }
-  .es-live-trade-config button:disabled{ opacity:.5; cursor:not-allowed; }
-  .es-live-trade-status{
-    font-family: var(--font-mono);
-    font-size:11.5px;
-    color: var(--muted);
-    margin-top:8px;
-  }
-  .es-live-trade-status.error{ color: var(--bear); }
-  .es-live-trade-status.success{ color: var(--bull); }
-
-  .es-sim-reset-row{
-    display:flex;
-    justify-content:flex-end;
-    margin-top:14px;
-  }
-  .es-sim-reset-row button{
-    background: var(--panel);
-    border:1px solid var(--bear);
-    color: var(--bear);
-    font-family: var(--font-mono);
-    font-weight:600;
-    font-size:12.5px;
-    padding:8px 14px;
-    border-radius:8px;
-    cursor:pointer;
-    height:34px;
-  }
-  .es-sim-reset-row button:hover{ background: var(--bear-dim); }
-
-  .es-sim-preview{
-    background: var(--panel);
-    border:1px solid var(--border);
-    border-radius:10px;
-    padding:12px 14px;
-    margin-bottom:14px;
-  }
-  .es-sim-preview-empty{
-    font-family: var(--font-mono);
-    font-size:12px;
-    color: var(--muted);
-  }
-  .es-psim-preview-head{
-    font-family: var(--font-mono);
-    font-size:12.5px;
-    color: var(--gold);
-    margin-bottom:10px;
-  }
-  .es-psim-preview-grid{
-    display:grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px,1fr));
-    gap:10px;
-    margin-bottom:10px;
-  }
-  .es-psim-preview-col{
-    background: var(--panel-2);
-    border:1px solid var(--border);
-    border-radius:8px;
-    padding:8px 10px;
-  }
-  .es-psim-preview-label{
-    font-family: var(--font-mono);
-    font-size:10px;
-    color: var(--muted);
-    text-transform:uppercase;
-    letter-spacing:.04em;
-    margin-bottom:4px;
-  }
-  .es-psim-preview-price{
-    font-family: var(--font-mono);
-    font-weight:700;
-    font-size:14px;
-    margin-bottom:6px;
-  }
-  .es-psim-preview-line{
-    font-family: var(--font-mono);
-    font-size:11px;
-    margin-top:2px;
-  }
-  .es-psim-preview-line.muted{ color: var(--muted); }
-  .es-psim-preview-line .pnl-pos{ color: var(--bull); }
-  .es-psim-preview-line .pnl-neg{ color: var(--bear); }
-  .es-psim-preview-note{
-    font-family: var(--font-mono);
-    font-size:11px;
-    color: var(--muted);
-  }
-
-  .es-sim-status{
-    font-family: var(--font-mono);
-    font-size:12px;
-    color: var(--muted);
-    margin-bottom:14px;
-    min-height:16px;
-  }
-  .es-sim-status.error{ color: var(--bear); }
-
-  .es-sim-summary{
-    display:grid;
-    grid-template-columns: repeat(auto-fill, minmax(140px,1fr));
-    gap:10px;
-    margin-bottom:16px;
-  }
-  .es-sim-stat{
-    background: var(--panel);
-    border:1px solid var(--border);
-    border-radius:8px;
-    padding:10px 12px;
-  }
-  .es-sim-stat-label{
-    font-family: var(--font-mono);
-    font-size:10px;
-    color: var(--muted);
-    text-transform:uppercase;
-    letter-spacing:.04em;
-    margin-bottom:4px;
-  }
-  .es-sim-stat-value{
-    font-family: var(--font-mono);
-    font-weight:700;
-    font-size:16px;
-  }
-  .es-sim-stat-value.up{ color: var(--bull); }
-  .es-sim-stat-value.down{ color: var(--bear); }
-
-  .es-sim-subtitle{
-    font-family: var(--font-display);
-    font-weight:600;
-    font-size:13px;
-    margin:18px 0 8px;
-    color: var(--text);
-  }
-  .es-sim-table-label{
-    font-family: var(--font-mono);
-    font-size:11px;
-    color: var(--muted);
-    margin-bottom:6px;
-  }
-  .es-psim-equity-wrap{
-    background: var(--panel);
-    border:1px solid var(--border);
-    border-radius:8px;
-    padding:8px;
-    margin-bottom:16px;
-  }
-  .es-sim-checkbox-label{
-    flex-direction:row !important;
-    align-items:center;
-    gap:6px !important;
-  }
-  .es-sim-checkbox-label input[type="checkbox"]{
-    width:auto;
-    cursor:pointer;
-  }
-
-  .es-sim-table-wrap{
-    max-height:320px;
-    overflow-y:auto;
-    border:1px solid var(--border);
-    border-radius:8px;
-    margin-bottom:16px;
-  }
-  .es-sim-table-wrap::-webkit-scrollbar{ width:8px; height:8px; }
-  .es-sim-table-wrap::-webkit-scrollbar-track{ background: var(--panel-2); border-radius:4px; }
-  .es-sim-table-wrap::-webkit-scrollbar-thumb{ background: var(--border); border-radius:4px; }
-  .es-sim-table-wrap::-webkit-scrollbar-thumb:hover{ background: var(--dim); }
-  .es-sim-table{
-    width:100%;
-    border-collapse:collapse;
-    font-family: var(--font-mono);
-    font-size:11.5px;
-  }
-  .es-sim-table th, .es-sim-table td{
-    padding:7px 10px;
-    text-align:left;
-    border-bottom:1px solid var(--border);
-    white-space:nowrap;
-    color: var(--text);
-  }
-  .es-sim-table th{
-    position:sticky;
-    top:0;
-    background: var(--panel-2);
-    color: var(--muted);
-    font-weight:600;
-    font-size:10.5px;
-    text-transform:uppercase;
-    letter-spacing:.03em;
-  }
-  .es-sim-table td.arah-buy{ color: var(--bull); }
-  .es-sim-table td.arah-sell{ color: var(--bear); }
-  .es-sim-table td.pnl-pos{ color: var(--bull); }
-  .es-sim-table td.pnl-neg{ color: var(--bear); }
-  .es-psim-source-link{ cursor:pointer; }
-  .es-psim-source-link:hover{ opacity:0.75; }
-  .es-venue-badge{
-    display:inline-block;
-    font-family: var(--font-mono);
-    font-size:8.5px;
-    font-weight:700;
-    color: var(--gold);
-    border:1px solid var(--gold);
-    border-radius:4px;
-    padding:1px 5px;
-    margin-left:6px;
+  /* ---------- Trade table ---------- */
+  .table-scroll{overflow-x:auto;}
+  table{width:100%;border-collapse:collapse;font-size:13px;min-width:640px;}
+  thead th{
+    text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;
+    color:var(--ink-faint);font-weight:600;padding:0 10px 10px;border-bottom:1px solid var(--border);
+  }
+  tbody td{padding:11px 10px;border-bottom:1px solid var(--border-soft);}
+  tbody tr{cursor:pointer;transition:background .12s;}
+  tbody tr:hover{background:rgba(255,255,255,.02);}
+  tbody tr:last-child td{border-bottom:none;}
+  .pill{
+    display:inline-block;padding:2px 9px;border-radius:100px;font-size:11px;font-weight:600;
     letter-spacing:.02em;
-    vertical-align:middle;
   }
-  .es-psim-close-btn{
-    background:none;
-    border:1px solid currentColor;
-    border-radius:4px;
-    padding:3px 9px;
-    font-family: var(--font-mono);
-    font-size:10.5px;
-    font-weight:600;
-    cursor:pointer;
+  .pill.win{background:var(--profit-soft);color:var(--profit);}
+  .pill.loss{background:var(--loss-soft);color:var(--loss);}
+  .pill.be{background:var(--surface-2);color:var(--ink-dim);border:1px solid var(--border);}
+  .dir{font-size:11.5px;font-weight:600;letter-spacing:.04em;}
+  .dir.buy{color:var(--profit);}
+  .dir.sell{color:var(--loss);}
+  .emo-chip{font-size:11px;color:var(--ink-dim);}
+  .row-actions{display:flex;gap:6px;justify-content:flex-end;}
+  .icon-btn{
+    background:none;border:none;color:var(--ink-faint);cursor:pointer;padding:4px;border-radius:5px;
+    font-size:13px;line-height:1;
   }
-  .es-psim-close-btn:hover{ opacity:0.75; }
-  .es-psim-close-btn.pnl-pos{ color: var(--bull); }
-  .es-psim-close-btn.pnl-neg{ color: var(--bear); }
+  .icon-btn:hover{color:var(--accent);background:var(--surface-2);}
 
-  .es-sim-note{
-    margin-top:12px;
-    font-family: var(--font-mono);
-    font-size:10.5px;
-    color: var(--dim);
-    line-height:1.6;
+  .empty-state{
+    padding:34px 10px;text-align:center;color:var(--ink-dim);
+  }
+  .empty-state .big{font-family:var(--font-display);font-size:17px;color:var(--ink);margin-bottom:6px;}
+  .empty-state p{font-size:13px;max-width:360px;margin:0 auto 16px;color:var(--ink-faint);}
+
+  /* ---------- Calendar ---------- */
+  .cal-nav{display:flex;align-items:center;gap:10px;}
+  .cal-month{font-size:13px;color:var(--ink-dim);min-width:120px;text-align:center;}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;}
+  .cal-dow{font-size:10px;text-align:center;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.06em;padding-bottom:4px;}
+  .cal-cell{
+    aspect-ratio:1;border-radius:6px;border:1px solid var(--border-soft);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    font-size:11px;color:var(--ink-faint);background:var(--surface);position:relative;
+  }
+  .cal-cell.blank{border:none;background:transparent;}
+  .cal-cell.before-start{opacity:.35;}
+  .cal-cell.profit{background:var(--profit-soft);border-color:rgba(79,158,130,.35);color:var(--ink);}
+  .cal-cell.loss{background:var(--loss-soft);border-color:rgba(192,90,78,.35);color:var(--ink);}
+  .cal-cell.today{box-shadow:0 0 0 1px var(--accent) inset;}
+  .cal-cell .d{font-size:11px;}
+  .cal-cell .pl{font-family:var(--font-mono);font-size:9.5px;margin-top:2px;font-variant-numeric:tabular-nums;}
+  .cal-legend{display:flex;gap:14px;margin-top:12px;font-size:11px;color:var(--ink-faint);}
+  .cal-legend span{display:inline-flex;align-items:center;gap:5px;}
+  .cal-legend i{width:8px;height:8px;border-radius:2px;display:inline-block;}
+
+  /* ---------- Emotion insight ---------- */
+  .emo-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border-soft);font-size:12.5px;}
+  .emo-row:last-child{border-bottom:none;}
+  .emo-bar-track{flex:1;height:5px;background:var(--surface-2);border-radius:3px;margin:0 12px;overflow:hidden;}
+  .emo-bar-fill{height:100%;background:var(--accent);border-radius:3px;}
+
+  /* ---------- Modal ---------- */
+  .modal-overlay{
+    position:fixed;inset:0;background:rgba(6,7,9,.72);backdrop-filter:blur(2px);
+    display:none;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto;z-index:50;
+  }
+  .modal-overlay.open{display:flex;}
+  .modal{
+    background:var(--surface-2);border:1px solid var(--border);border-radius:14px;
+    width:100%;max-width:560px;padding:26px 28px 24px;
+  }
+  .modal h2{font-size:18px;margin-bottom:4px;}
+  .modal .modal-sub{font-size:12px;color:var(--ink-faint);margin-bottom:18px;}
+  .field-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;}
+  .field.full{grid-column:1/-1;}
+  .field label{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-faint);}
+  .field input,.field select,.field textarea{
+    background:var(--surface);border:1px solid var(--border);color:var(--ink);
+    padding:9px 10px;border-radius:7px;font-size:13.5px;font-family:var(--font-body);width:100%;
+  }
+  .field input:focus,.field select:focus,.field textarea:focus{
+    outline:none;border-color:var(--accent-dim);
+  }
+  .field textarea{resize:vertical;min-height:56px;font-family:var(--font-body);}
+  .modal-actions{display:flex;justify-content:space-between;align-items:center;margin-top:6px;gap:10px;}
+  .modal-actions .right{display:flex;gap:8px;}
+
+  .footer{
+    margin-top:8px;display:flex;justify-content:space-between;align-items:center;
+    flex-wrap:wrap;gap:10px;color:var(--ink-faint);font-size:11.5px;
+  }
+  .footer .actions{display:flex;gap:8px;}
+
+  /* ---------- Divider between journals ---------- */
+  .jt-divider{
+    max-width:1180px;margin:36px auto 6px;padding:0 24px;
+    display:flex;align-items:center;gap:14px;
+  }
+  .jt-divider .line{flex:1;height:1px;background:var(--border);}
+  .jt-divider .label{
+    font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:.12em;
+    color:var(--ink-faint);white-space:nowrap;
+  }
+  .venue-badge{
+    display:inline-block;font-family:var(--font-mono);font-size:8.5px;font-weight:700;
+    color:var(--accent);border:1px solid var(--accent-dim);border-radius:4px;
+    padding:1px 5px;margin-left:6px;vertical-align:middle;
   }
 
-  @media (max-width: 700px){
-    .es-checklist{ padding:5px; }
-    .es-check-row{ font-size:8px; }
-    .es-priority-note{ font-size:8px; }
-  }
-
-  @media (max-width: 480px){
-    .es-header{ flex-direction:column; }
-    .es-sim-controls{ flex-direction:column; align-items:stretch; }
-    .es-sim-controls select, .es-sim-controls input{ width:100%; }
-    .es-priority-header{ flex-direction:column; align-items:stretch; }
-    .es-priority-grid{ grid-template-columns: 1fr; }
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;}}
+  @media (max-width:600px){
+    .field-grid{grid-template-columns:1fr;}
+    .account-meta{text-align:left;}
+    .masthead{flex-direction:column;align-items:flex-start;}
   }
 </style>
 
-<div class="ema-screener">
-  <div class="es-econ-calendar-panel collapsed" id="esEconCalendarPanel">
-    <div class="es-econ-calendar-trigger" id="esEconCalendarTrigger">
-      <span class="es-econ-calendar-trigger-dot"></span>
-      <span class="es-econ-calendar-trigger-label">News</span>
-    </div>
-    <div class="es-econ-calendar-content">
-      <div class="es-econ-calendar-header">Kalender Ekonomi</div>
-      <div class="es-econ-calendar-body" id="esEconCalendarBody"></div>
-    </div>
+<div class="wrap">
+
+  <div class="jt-nav">
+    <a href="ema-cross-screener_3.html" class="jt-nav-link">&larr; Kripto Screener</a>
+    <a href="xauusd-priority-screener.html" class="jt-nav-link">XAUUSD Screener</a>
   </div>
-  <div class="es-header">
+
+  <header class="masthead">
+    <div class="brand-mark">
+      <div class="brand-glyph">J</div>
+      <div class="brand-text">
+        <div class="title">Jadi Trader</div>
+        <div class="subtitle">Jurnal Trading Pribadi</div>
+      </div>
+    </div>
+    <div class="account-meta">
+      <div class="balance"><span class="cur">$</span><span id="mBalance" class="num">200.00</span></div>
+      <div class="line"><b>Exness-MT5Real20</b> · login •••7617 · leverage 1:2000</div>
+      <div class="line">Mulai trading: <b>Sabtu, 11 Jul 2026</b></div>
+    </div>
+  </header>
+
+  <section class="kpis">
+    <div class="kpi"><div class="label">Total Trade</div><div class="value num" id="kTotal">0</div></div>
+    <div class="kpi"><div class="label">Win Rate</div><div class="value num" id="kWinrate">—</div></div>
+    <div class="kpi"><div class="label">Total P/L</div><div class="value num" id="kPL">$0.00</div></div>
+    <div class="kpi"><div class="label">Profit Factor</div><div class="value num" id="kPF">—</div></div>
+    <div class="kpi"><div class="label">Avg Win</div><div class="value num profit" id="kAvgWin">$0.00</div></div>
+    <div class="kpi"><div class="label">Avg Loss</div><div class="value num loss" id="kAvgLoss">$0.00</div></div>
+  </section>
+
+  <div class="grid">
+    <!-- LEFT COLUMN -->
     <div>
-      <div class="es-title"><span class="dot"></span>EMA Cross Screener</div>
-      <div class="es-sub" id="esSubtitle">memindai 40 pair USDT di Binance untuk persilangan EMA 9 / EMA 21</div>
-    </div>
-    <div class="es-controls">
-      <a href="xauusd-priority-screener.html" class="es-nav-link">XAUUSD Screener &rarr;</a>
-      <a href="jurnal-trading.html" class="es-nav-link">Jurnal Trading &rarr;</a>
-      <select id="esInterval">
-        <option value="1m">1m</option>
-        <option value="5m">5m</option>
-        <option value="15m">15m</option>
-        <option value="30m">30m</option>
-        <option value="1h" selected>1H</option>
-        <option value="4h">4H</option>
-        <option value="1d">1D</option>
-      </select>
-      <select id="esCap">
-        <option value="all" selected>Semua Cap</option>
-        <option value="big">Big Cap</option>
-        <option value="low">Low/Mid Cap</option>
-      </select>
-      <select id="esType">
-        <option value="all" selected>Semua Cross</option>
-        <option value="bullish">Golden Cross</option>
-        <option value="bearish">Death Cross</option>
-      </select>
-      <select id="esRsi">
-        <option value="all" selected>Semua RSI</option>
-        <option value="overbought">Overbought (RSI&ge;70)</option>
-        <option value="oversold">Oversold (RSI&le;30)</option>
-      </select>
-      <select id="esStoch">
-        <option value="all" selected>Semua Stochastic</option>
-        <option value="overbought">Overbought (K&ge;80)</option>
-        <option value="oversold">Oversold (K&le;20)</option>
-      </select>
-      <button id="esRefreshBtn" class="es-refresh">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 3v6h-6"/></svg>
-        Scan
-      </button>
-    </div>
-  </div>
+      <div class="card">
+        <div class="card-head">
+          <h2>Kurva Ekuitas</h2>
+          <span class="hint" id="chartHint">Mulai dari $200.00</span>
+        </div>
+        <div class="chart-box"><svg id="equitySvg" viewBox="0 0 640 220" preserveAspectRatio="none"></svg></div>
+      </div>
 
-  <div class="es-fav-section">
-    <div class="es-fav-title">Koin Favorit (maks. 50 — Checklist Sinyal, Mengikuti TF di Atas)</div>
-    <div class="es-fav-status" id="esFavStatus">Memuat koin favorit...</div>
-    <div class="es-btc-tf-strip" id="esBtcTfStrip"></div>
-    <div class="es-fav-grid" id="esFavGrid"></div>
-  </div>
-
-  <div class="es-fav-cross-section">
-    <div class="es-fav-title">Koin Favorit — Cross EMA 9/21 (Semua Timeframe)</div>
-    <div class="es-status" id="esFavCrossStatus">Menunggu pindaian koin favorit pertama...</div>
-    <div class="es-fav-cross-manage" id="esFavCrossManage"></div>
-    <div class="es-grid" id="esFavCrossGrid"></div>
-  </div>
-
-  <div class="es-status" id="esStatus">Memuat data...</div>
-  <div class="es-scan-toolbar">
-    <div class="es-symbol-manager">
-      <button type="button" id="esSymbolManagerBtn" class="es-symbol-manager-btn">
-        <span>Ganti Chart / Kelola Koin</span>
-        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
-      </button>
-      <div class="es-symbol-manager-dropdown" id="esSymbolManagerDropdown"></div>
-    </div>
-  </div>
-  <div class="es-grid" id="esGrid"></div>
-
-  <div class="es-priority-section">
-    <div class="es-priority-header">
-      <div class="es-priority-title">5 Sinyal Prioritas (Checklist BB + S/R + S/D)</div>
-    </div>
-    <div class="es-priority-controls">
-      <select id="esPriorityRisk">
-        <option value="all" selected>Semua Level Risk</option>
-        <option value="high">High Risk (TF 1m/5m/15m)</option>
-        <option value="medium">Medium Risk (TF 30m/1H)</option>
-        <option value="low">Low Risk (TF 4H/1D)</option>
-      </select>
-      <button id="esPriorityBtn" class="es-priority-btn">Cari Sinyal Prioritas</button>
-      <div class="es-symbol-manager es-symbol-manager-inline">
-        <button type="button" id="esPriorityManagerBtn" class="es-symbol-manager-btn">
-          <span>Ganti Chart / Kelola Koin</span>
-          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
-        </button>
-        <div class="es-symbol-manager-dropdown" id="esPriorityManagerDropdown"></div>
+      <div class="card">
+        <div class="card-head">
+          <h2>Riwayat Trade</h2>
+          <button class="btn primary" id="btnAddTrade">+ Tambah Trade</button>
+        </div>
+        <div class="table-scroll">
+          <table id="tradeTable">
+            <thead>
+              <tr>
+                <th>Tanggal</th><th>Pair</th><th>Arah</th><th>Lot</th>
+                <th>P/L</th><th>Hasil</th><th>Emosi Entry → Eval</th><th></th>
+              </tr>
+            </thead>
+            <tbody id="tradeTbody"></tbody>
+          </table>
+        </div>
+        <div id="emptyState" class="empty-state" style="display:none">
+          <div class="big">Belum ada trade tercatat</div>
+          <p>Akun ini sengaja dikosongkan — jurnal dimulai bersih dari saldo $200 pada 11 Jul 2026. Catat trade pertamamu begitu posisi ditutup.</p>
+          <button class="btn primary" id="btnAddTradeEmpty">+ Tambah Trade Pertama</button>
+        </div>
       </div>
     </div>
-    <div class="es-priority-grid" id="esPriorityGrid"></div>
-    <div class="es-priority-status" id="esPriorityStatus">Memindai otomatis...</div>
+
+    <!-- RIGHT COLUMN -->
+    <div>
+      <div class="card">
+        <div class="card-head">
+          <h2>Kalender P/L</h2>
+          <div class="cal-nav">
+            <button class="icon-btn" id="calPrev">‹</button>
+            <span class="cal-month num" id="calMonthLabel"></span>
+            <button class="icon-btn" id="calNext">›</button>
+          </div>
+        </div>
+        <div class="cal-grid" id="calDow"></div>
+        <div class="cal-grid" id="calGrid" style="margin-top:5px"></div>
+        <div class="cal-legend">
+          <span><i style="background:var(--profit-soft);border:1px solid rgba(79,158,130,.35)"></i>Profit</span>
+          <span><i style="background:var(--loss-soft);border:1px solid rgba(192,90,78,.35)"></i>Loss</span>
+          <span><i style="background:var(--surface);border:1px solid var(--border-soft)"></i>Tidak ada trade</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>Pola Emosi</h2></div>
+        <div id="emotionInsight">
+          <p style="font-size:12.5px;color:var(--ink-faint);margin:0">Belum ada data emosi. Insight akan muncul setelah kamu mencatat beberapa trade.</p>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <div class="es-sim-section">
-    <div class="es-sim-title">Simulasi Sinyal Prioritas</div>
-    <div class="es-sim-controls">
-      <label>Modal per Posisi ($)
-        <input type="number" id="esPsimModal" value="1000" min="10" step="10">
-      </label>
-      <label>Leverage (x)
-        <input type="number" id="esPsimLeverage" value="10" min="1" max="125" step="1">
-      </label>
-      <label>Sinyal Terpilih
-        <select id="esPsimSignalSelect"><option value="">&mdash; Pilih sinyal &mdash;</option></select>
-      </label>
-      <label class="es-sim-checkbox-label">Aktif
-        <input type="checkbox" id="esPsimToggle" checked>
-      </label>
-      <button id="esPsimOpenBtn">Open Posisi</button>
-    </div>
-    <div class="es-live-trade-box">
-      <div class="es-live-trade-title">Live Trading (Binance Testnet) &mdash; opsional</div>
-      <div class="es-live-trade-config">
-        <label>Backend URL
-          <input type="text" id="esLiveBackendUrl" placeholder="http://IP_VPS_KAMU:4000">
-        </label>
-        <label>App Token
-          <input type="password" id="esLiveAppToken" placeholder="token rahasia dari .env">
-        </label>
-        <button id="esLiveTradeBtn" type="button">Kirim Order Asli (Testnet)</button>
+  <div class="footer">
+    <span id="syncNote">Data tersimpan lokal di browser ini — belum tersambung otomatis ke MT5.</span>
+    <span class="actions">
+      <button class="btn small ghost" id="btnExport">Export JSON</button>
+      <button class="btn small ghost" id="btnImport">Import JSON</button>
+    </span>
+  </div>
+</div>
+
+<div class="jt-divider"><span class="line"></span><span class="label">Jurnal Kripto</span><span class="line"></span></div>
+
+<div class="wrap" style="padding-top:0;">
+
+  <header class="masthead">
+    <div class="brand-mark">
+      <div class="brand-glyph">&#8383;</div>
+      <div class="brand-text">
+        <div class="title">Kripto</div>
+        <div class="subtitle">Simulasi Sinyal Prioritas</div>
       </div>
-      <div class="es-live-trade-status" id="esLiveTradeStatus"></div>
     </div>
-    <div class="es-sim-preview" id="esPsimPreview"></div>
-    <div class="es-sim-status" id="esPsimStatus">Menunggu sinyal prioritas pertama...</div>
-    <div class="es-sim-summary" id="esPsimSummary"></div>
+    <div class="account-meta">
+      <div class="line" id="cryptoSyncNote">Memuat data dari Kripto Screener...</div>
+      <div class="line"><button class="btn small ghost" id="btnRefreshCrypto">&#8635; Refresh</button></div>
+    </div>
+  </header>
 
-    <div class="es-sim-table-label">Grafik Perkembangan Saldo</div>
-    <div class="es-psim-equity-wrap" id="esPsimEquityChart"></div>
+  <section class="kpis">
+    <div class="kpi"><div class="label">Total Trade</div><div class="value num" id="cTotal">0</div></div>
+    <div class="kpi"><div class="label">Win Rate</div><div class="value num" id="cWinrate">—</div></div>
+    <div class="kpi"><div class="label">Total P/L</div><div class="value num" id="cPL">$0.00</div></div>
+    <div class="kpi"><div class="label">Profit Factor</div><div class="value num" id="cPF">—</div></div>
+    <div class="kpi"><div class="label">Avg Win</div><div class="value num profit" id="cAvgWin">$0.00</div></div>
+    <div class="kpi"><div class="label">Avg Loss</div><div class="value num loss" id="cAvgLoss">$0.00</div></div>
+  </section>
 
-    <div class="es-sim-table-label">Posisi Terbuka</div>
-    <div class="es-sim-table-wrap">
-      <table class="es-sim-table">
-        <thead>
-          <tr><th>Sumber</th><th>Arah</th><th>Entry</th><th>SL</th><th>RISK SL ($)</th><th>TP1</th><th>TP2</th><th>Area TP</th><th>Harga Sekarang</th><th>Biaya Exchange</th><th>Biaya Margin</th><th>PnL ($)</th><th>PnL (%)</th><th>Aksi</th></tr>
-        </thead>
-        <tbody id="esPsimOpenTbody"></tbody>
-      </table>
+  <div class="grid">
+    <!-- LEFT COLUMN -->
+    <div>
+      <div class="card">
+        <div class="card-head">
+          <h2>Kurva P/L Kripto</h2>
+          <span class="hint" id="cChartHint">Belum ada transaksi</span>
+        </div>
+        <div class="chart-box"><svg id="cEquitySvg" viewBox="0 0 640 220" preserveAspectRatio="none"></svg></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>Riwayat Trade Kripto</h2></div>
+        <div class="table-scroll">
+          <table id="cTradeTable">
+            <thead>
+              <tr><th>Tanggal</th><th>Pair</th><th>TF</th><th>Arah</th><th>Alasan</th><th>P/L</th><th>Hasil</th></tr>
+            </thead>
+            <tbody id="cTradeTbody"></tbody>
+          </table>
+        </div>
+        <div id="cEmptyState" class="empty-state" style="display:none">
+          <div class="big">Belum ada trade kripto tercatat</div>
+          <p>Riwayat ini otomatis tersinkron dari Simulasi Sinyal Prioritas di Kripto Screener (termasuk order live testnet). Buka lalu tutup posisi di sana, lalu klik Refresh di sini.</p>
+        </div>
+      </div>
     </div>
 
-    <div class="es-sim-table-label">Riwayat Transaksi (terbaru dulu)</div>
-    <div class="es-sim-table-wrap">
-      <table class="es-sim-table">
-        <thead>
-          <tr><th>Sumber</th><th>Arah</th><th>Entry</th><th>Exit</th><th>Alasan</th><th>Status TP</th><th>Biaya Exchange</th><th>Biaya Margin</th><th>PnL ($)</th><th>PnL (%)</th><th>Waktu Exit</th></tr>
-        </thead>
-        <tbody id="esPsimHistTbody"></tbody>
-      </table>
-    </div>
+    <!-- RIGHT COLUMN -->
+    <div>
+      <div class="card">
+        <div class="card-head">
+          <h2>Kalender P/L Kripto</h2>
+          <div class="cal-nav">
+            <button class="icon-btn" id="cCalPrev">‹</button>
+            <span class="cal-month num" id="cCalMonthLabel"></span>
+            <button class="icon-btn" id="cCalNext">›</button>
+          </div>
+        </div>
+        <div class="cal-grid" id="cCalDow"></div>
+        <div class="cal-grid" id="cCalGrid" style="margin-top:5px"></div>
+      </div>
 
-    <div class="es-sim-reset-row">
-      <button id="esPsimResetBtn">Reset Simulasi</button>
+      <div class="card">
+        <div class="card-head"><h2>Ringkasan per Koin</h2></div>
+        <div id="cPairInsight">
+          <p style="font-size:12.5px;color:var(--ink-faint);margin:0">Belum ada data.</p>
+        </div>
+      </div>
     </div>
+  </div>
+</div>
 
+<!-- MODAL -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h2 id="modalTitle">Tambah Trade</h2>
+    <div class="modal-sub">Isi selengkap mungkin — semakin detail, semakin tajam evaluasinya nanti.</div>
+    <form id="tradeForm">
+      <input type="hidden" id="tradeId">
+      <div class="field-grid">
+        <div class="field">
+          <label for="tradeDate">Tanggal &amp; Jam</label>
+          <input type="datetime-local" id="tradeDate" required>
+        </div>
+        <div class="field">
+          <label for="tradePair">Pair</label>
+          <input type="text" id="tradePair" list="pairList" placeholder="XAUUSDc" required>
+          <datalist id="pairList">
+            <option value="XAUUSDc"><option value="EURUSDc"><option value="GBPUSDc">
+            <option value="USDJPYc"><option value="BTCUSDc"><option value="US30c">
+          </datalist>
+        </div>
+        <div class="field">
+          <label for="tradeDirection">Arah</label>
+          <select id="tradeDirection">
+            <option value="Buy">Buy</option>
+            <option value="Sell">Sell</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="tradeLot">Lot Size</label>
+          <input type="number" id="tradeLot" step="0.01" min="0" placeholder="0.02" required>
+        </div>
+        <div class="field">
+          <label for="tradeEntry">Harga Entry</label>
+          <input type="number" id="tradeEntry" step="any" placeholder="opsional">
+        </div>
+        <div class="field">
+          <label for="tradeExit">Harga Exit</label>
+          <input type="number" id="tradeExit" step="any" placeholder="opsional">
+        </div>
+        <div class="field full">
+          <label for="tradePL">Profit / Loss (USD)</label>
+          <input type="number" id="tradePL" step="0.01" placeholder="17.30 atau -12.50" required>
+        </div>
+        <div class="field full">
+          <label for="tradeReason">Alasan Entry / Setup</label>
+          <textarea id="tradeReason" placeholder="Cth: Break of structure H1 + retest order block"></textarea>
+        </div>
+        <div class="field">
+          <label for="tradeEmotionEntry">Emosi saat Entry</label>
+          <select id="tradeEmotionEntry">
+            <option>Tenang</option><option>Percaya Diri</option><option>Ragu-ragu</option>
+            <option>FOMO</option><option>Serakah</option><option>Balas Dendam</option>
+            <option>Netral</option><option value="__custom">Lainnya…</option>
+          </select>
+          <input type="text" id="tradeEmotionEntryCustom" placeholder="Tulis emosi lain" style="display:none;margin-top:6px">
+        </div>
+        <div class="field">
+          <label for="tradeEmotionEval">Emosi Evaluasi (setelah close)</label>
+          <select id="tradeEmotionEval">
+            <option>Puas</option><option>Lega</option><option>Bangga</option>
+            <option>Menyesal</option><option>Kecewa</option><option>Frustrasi</option>
+            <option>Netral</option><option value="__custom">Lainnya…</option>
+          </select>
+          <input type="text" id="tradeEmotionEvalCustom" placeholder="Tulis emosi lain" style="display:none;margin-top:6px">
+        </div>
+        <div class="field full">
+          <label for="tradeNotes">Catatan / Pelajaran</label>
+          <textarea id="tradeNotes" placeholder="Apa yang bisa diperbaiki dari trade ini?"></textarea>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn danger ghost" id="btnDelete" style="display:none">Hapus Trade</button>
+        <div class="right">
+          <button type="button" class="btn ghost" id="btnCancel">Batal</button>
+          <button type="submit" class="btn primary">Simpan</button>
+        </div>
+      </div>
+    </form>
   </div>
 </div>
 
 <script>
 (function(){
-  const BASE_SYMBOLS = [
-    // big cap-ish
-    'BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT','ADAUSDT','DOGEUSDT','TRXUSDT','TONUSDT','AVAXUSDT',
-    'LINKUSDT','DOTUSDT','LTCUSDT','SUIUSDT',
-    // low/mid cap-ish
-    'ATOMUSDT','NEARUSDT','APTUSDT','ARBUSDT','OPUSDT','INJUSDT','FTMUSDT','SANDUSDT','MANAUSDT','GALAUSDT',
-    'CHZUSDT','ENJUSDT','ONEUSDT','ZILUSDT','IOTAUSDT','ALGOUSDT','XLMUSDT','VETUSDT','FILUSDT','EGLDUSDT',
-    'THETAUSDT','XTZUSDT','EOSUSDT','KAVAUSDT','ROSEUSDT','CELOUSDT','WAVESUSDT','ANKRUSDT','DYDXUSDT','RUNEUSDT'
-  ];
+  var STORAGE_KEY = 'ledgerNoirTrades_v1';
+  var ACCOUNT = { startBalance: 200, startDate: '2026-07-11' };
 
-  // cadangan koin pengganti jika ada koin yang diblokir user (mis. chart TradingView-nya tidak ditemukan)
-  const RESERVE_SYMBOLS = [
-    'PEPEUSDT','SHIBUSDT','WIFUSDT','BONKUSDT','FETUSDT','RENDERUSDT','TIAUSDT','SEIUSDT','ORDIUSDT','JUPUSDT',
-    'PYTHUSDT','STXUSDT','IMXUSDT','GRTUSDT','AAVEUSDT','UNIUSDT','MKRUSDT','COMPUSDT','SNXUSDT','CRVUSDT'
-  ];
-
-  // dipakai untuk saran autocomplete saat menambah koin favorit
-  const FAV_SUGGESTION_POOL = Array.from(new Set([...BASE_SYMBOLS, ...RESERVE_SYMBOLS]));
-
-  const ACTIVE_SYMBOLS_KEY = 'emaScreenerActiveSymbols_v1';
-
-  function loadActiveSymbols(){
-    try{
-      const raw = localStorage.getItem(ACTIVE_SYMBOLS_KEY);
-      if(raw){
-        const arr = JSON.parse(raw);
-        if(Array.isArray(arr) && arr.length) return arr;
-      }
-    }catch(e){}
-    return BASE_SYMBOLS.slice();
+  function loadTrades(){
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
+    catch(e){ return []; }
+  }
+  function saveTrades(trades){
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(trades));
   }
 
-  function saveActiveSymbols(){
-    try{ localStorage.setItem(ACTIVE_SYMBOLS_KEY, JSON.stringify(activeSymbols)); }catch(e){}
+  var state = { trades: loadTrades(), calMonth: new Date(2026, 6, 1) };
+
+  function fmtMoney(n){
+    var s = (n<0?'-':'') + '$' + Math.abs(n).toFixed(2);
+    return s;
+  }
+  function fmtDate(iso){
+    var d = new Date(iso);
+    return d.toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'}) + ' ' +
+           d.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
   }
 
-  let activeSymbols = loadActiveSymbols();
-
-  function blockAndReplaceSymbol(symbol){
-    const idx = activeSymbols.indexOf(symbol);
-    if(idx === -1) return null;
-    const replacement = RESERVE_SYMBOLS.find(s => !activeSymbols.includes(s)) || null;
-    if(replacement){ activeSymbols.splice(idx, 1, replacement); }
-    else{ activeSymbols.splice(idx, 1); }
-    saveActiveSymbols();
-    return replacement;
+  function computeStats(trades){
+    var total = trades.length;
+    var wins = trades.filter(function(t){return t.pl>0;});
+    var losses = trades.filter(function(t){return t.pl<0;});
+    var totalPL = trades.reduce(function(a,t){return a+t.pl;},0);
+    var grossProfit = wins.reduce(function(a,t){return a+t.pl;},0);
+    var grossLoss = Math.abs(losses.reduce(function(a,t){return a+t.pl;},0));
+    var winrate = total? (wins.length/total*100).toFixed(1)+'%' : '—';
+    var pf = grossLoss>0 ? (grossProfit/grossLoss).toFixed(2) : (grossProfit>0?'∞':'—');
+    var avgWin = wins.length? grossProfit/wins.length : 0;
+    var avgLoss = losses.length? grossLoss/losses.length : 0;
+    return {total:total, wins:wins.length, losses:losses.length, totalPL:totalPL, winrate:winrate, pf:pf, avgWin:avgWin, avgLoss:avgLoss};
   }
 
-  const FALLBACK_BIGCAP = new Set(['BTC','ETH','BNB','SOL','XRP','ADA','DOGE','TRX','TON','AVAX','LINK','DOT','LTC','SUI','ATOM']);
+  function renderKPIs(){
+    var s = computeStats(state.trades);
+    document.getElementById('kTotal').textContent = s.total;
+    document.getElementById('kWinrate').textContent = s.winrate;
+    var plEl = document.getElementById('kPL');
+    plEl.textContent = fmtMoney(s.totalPL);
+    plEl.className = 'value num ' + (s.totalPL>0?'profit':s.totalPL<0?'loss':'');
+    document.getElementById('kPF').textContent = s.pf;
+    document.getElementById('kAvgWin').textContent = fmtMoney(s.avgWin);
+    document.getElementById('kAvgLoss').textContent = fmtMoney(-s.avgLoss);
+    document.getElementById('mBalance').textContent = (ACCOUNT.startBalance + s.totalPL).toFixed(2);
+  }
 
-  const grid = document.getElementById('esGrid');
-  const statusEl = document.getElementById('esStatus');
-  const symbolManagerBtn = document.getElementById('esSymbolManagerBtn');
-  const symbolManagerDropdown = document.getElementById('esSymbolManagerDropdown');
-  const subtitleEl = document.getElementById('esSubtitle');
-  const intervalSel = document.getElementById('esInterval');
-  const capSel = document.getElementById('esCap');
-  const typeSel = document.getElementById('esType');
-  const rsiSel = document.getElementById('esRsi');
-  const stochSel = document.getElementById('esStoch');
-  const refreshBtn = document.getElementById('esRefreshBtn');
+  function renderEquityCurve(){
+    var svg = document.getElementById('equitySvg');
+    var W=640,H=220,PAD=28;
+    var sorted = state.trades.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);});
+    var points = [{y:ACCOUNT.startBalance}];
+    var cum = ACCOUNT.startBalance;
+    sorted.forEach(function(t){ cum += t.pl; points.push({y:cum}); });
 
-  let capRank = {}; // SYMBOL -> rank number
-  let capRankLoaded = false;
-  let scanning = false;
+    var ys = points.map(function(p){return p.y;});
+    var minY = Math.min.apply(null, ys), maxY = Math.max.apply(null, ys);
+    if (minY===maxY){ minY-=10; maxY+=10; }
+    var rangeY = maxY-minY;
 
-  function ema(values, period){
-    const k = 2/(period+1);
-    const out = [values[0]];
-    for(let i=1;i<values.length;i++){
-      out.push(values[i]*k + out[i-1]*(1-k));
+    function xFor(i){ return points.length===1 ? W/2 : PAD + i*(W-2*PAD)/(points.length-1); }
+    function yFor(v){ return H-PAD - ((v-minY)/rangeY)*(H-2*PAD); }
+
+    var gridLines = '';
+    for(var g=0; g<=3; g++){
+      var gy = PAD + g*(H-2*PAD)/3;
+      gridLines += '<line x1="'+PAD+'" y1="'+gy+'" x2="'+(W-PAD)+'" y2="'+gy+'" stroke="var(--border-soft)" stroke-width="1"/>';
     }
-    return out;
+
+    var path = points.map(function(p,i){ return (i===0?'M':'L')+xFor(i).toFixed(1)+','+yFor(p.y).toFixed(1); }).join(' ');
+    var areaPath = path + ' L'+xFor(points.length-1).toFixed(1)+','+(H-PAD)+' L'+PAD+','+(H-PAD)+' Z';
+
+    var lastX = xFor(points.length-1), lastY = yFor(points[points.length-1].y);
+    var startX = xFor(0), startY = yFor(points[0].y);
+
+    svg.innerHTML =
+      '<defs><linearGradient id="eqFill" x1="0" y1="0" x2="0" y2="1">'+
+        '<stop offset="0%" stop-color="var(--accent)" stop-opacity="0.16"/>'+
+        '<stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/>'+
+      '</linearGradient></defs>'+
+      gridLines+
+      '<path d="'+areaPath+'" fill="url(#eqFill)" stroke="none"/>'+
+      '<path d="'+path+'" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>'+
+      '<circle cx="'+startX+'" cy="'+startY+'" r="3.5" fill="var(--ground)" stroke="var(--ink-faint)" stroke-width="1.5"/>'+
+      '<circle cx="'+lastX+'" cy="'+lastY+'" r="4.5" fill="var(--accent)"/>';
+
+    document.getElementById('chartHint').textContent =
+      sorted.length ? 'Saldo saat ini: ' + fmtMoney(cum) : 'Mulai dari $' + ACCOUNT.startBalance.toFixed(2) + ' — belum ada pergerakan';
   }
 
-  function rsi(values, period){
-    const out = new Array(values.length).fill(null);
-    if(values.length <= period) return out;
-    let gains = 0, losses = 0;
-    for(let i=1;i<=period;i++){
-      const diff = values[i]-values[i-1];
-      if(diff>=0) gains += diff; else losses -= diff;
-    }
-    let avgGain = gains/period, avgLoss = losses/period;
-    out[period] = avgLoss===0 ? 100 : 100 - (100/(1+avgGain/avgLoss));
-    for(let i=period+1;i<values.length;i++){
-      const diff = values[i]-values[i-1];
-      const gain = diff>0 ? diff : 0;
-      const loss = diff<0 ? -diff : 0;
-      avgGain = (avgGain*(period-1)+gain)/period;
-      avgLoss = (avgLoss*(period-1)+loss)/period;
-      out[i] = avgLoss===0 ? 100 : 100 - (100/(1+avgGain/avgLoss));
-    }
-    return out;
+  function emotionLabel(t, which){
+    return which==='entry' ? (t.emotionEntry||'—') : (t.emotionEval||'—');
   }
 
-  function rsiConditionOf(value){
-    if(value===null || value===undefined) return 'neutral';
-    if(value >= 70) return 'overbought';
-    if(value <= 30) return 'oversold';
-    return 'neutral';
-  }
-
-  function smoothSeries(values, period){
-    const out = new Array(values.length).fill(null);
-    for(let i=0;i<values.length;i++){
-      if(values[i]===null) continue;
-      let sum=0, count=0;
-      for(let j=i-period+1;j<=i;j++){
-        if(j>=0 && values[j]!==null){ sum+=values[j]; count++; }
-      }
-      out[i] = count===period ? sum/period : null;
-    }
-    return out;
-  }
-
-  function stochastic(highs, lows, closes, kPeriod, smoothK, dPeriod){
-    const rawK = new Array(closes.length).fill(null);
-    for(let i=kPeriod-1;i<closes.length;i++){
-      let hh = -Infinity, ll = Infinity;
-      for(let j=i-kPeriod+1;j<=i;j++){
-        if(highs[j]>hh) hh = highs[j];
-        if(lows[j]<ll) ll = lows[j];
-      }
-      const range = hh-ll;
-      rawK[i] = range===0 ? 50 : ((closes[i]-ll)/range)*100;
-    }
-    const k = smoothSeries(rawK, smoothK);
-    const d = smoothSeries(k, dPeriod);
-    return { k, d };
-  }
-
-  function stochConditionOf(value){
-    if(value===null || value===undefined) return 'neutral';
-    if(value >= 80) return 'overbought';
-    if(value <= 20) return 'oversold';
-    return 'neutral';
-  }
-
-  function detectCross(e9, e21, lookback){
-    for(let i=e9.length-1; i>=Math.max(1, e9.length-lookback); i--){
-      const prev = e9[i-1]-e21[i-1];
-      const curr = e9[i]-e21[i];
-      if(prev===0) continue;
-      if((prev>0 && curr<0) || (prev<0 && curr>0)){
-        return { type: curr>0 ? 'bullish':'bearish', candlesAgo: e9.length-1-i };
-      }
-    }
-    return null;
-  }
-
-  async function loadCapRanking(){
-    try{
-      const res = await fetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&page=1&sparkline=false');
-      if(!res.ok) throw new Error('cg fail');
-      const data = await res.json();
-      data.forEach(c=>{
-        const sym = (c.symbol||'').toUpperCase();
-        if(!(sym in capRank)) capRank[sym] = c.market_cap_rank;
-      });
-      capRankLoaded = true;
-    }catch(e){
-      capRankLoaded = false;
-    }
-  }
-
-  async function loadTickers(){
-    try{
-      const res = await fetch('https://api.binance.com/api/v3/ticker/24hr');
-      if(!res.ok) throw new Error('ticker fail');
-      const data = await res.json();
-      const map = {};
-      data.forEach(t=>{ map[t.symbol] = t; });
-      return map;
-    }catch(e){
-      return {};
-    }
-  }
-
-  async function fetchKlines(symbol, interval, limit=150){
-    const spotUrl = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`;
-    let res = await fetch(spotUrl);
-    let market = 'spot';
-    if(!res.ok){
-      // fallback: sebagian koin (mis. meme coin baru) cuma listing di Binance Futures, belum ada di Spot
-      const futuresUrl = `https://fapi.binance.com/fapi/v1/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`;
-      res = await fetch(futuresUrl);
-      market = 'futures';
-    }
-    if(!res.ok) throw new Error('klines fail: '+symbol);
-    const data = await res.json();
-    return {
-      opens: data.map(d=>parseFloat(d[1])),
-      closes: data.map(d=>parseFloat(d[4])),
-      highs: data.map(d=>parseFloat(d[2])),
-      lows: data.map(d=>parseFloat(d[3])),
-      times: data.map(d=>d[0]),
-      market
-    };
-  }
-
-  function capTierOf(symbol){
-    const base = symbol.replace('USDT','');
-    if(capRankLoaded && capRank[base]) return capRank[base] <= 15 ? 'big' : 'low';
-    return FALLBACK_BIGCAP.has(base) ? 'big' : 'low';
-  }
-
-  function rankOf(symbol){
-    const base = symbol.replace('USDT','');
-    if(capRankLoaded && capRank[base]) return capRank[base];
-    return FALLBACK_BIGCAP.has(base) ? 10 : 999;
-  }
-
-  function atr(highs, lows, closes, period){
-    const n = closes.length;
-    const tr = new Array(n).fill(0);
-    for(let i=0;i<n;i++){
-      if(i===0){ tr[i] = highs[i]-lows[i]; continue; }
-      tr[i] = Math.max(highs[i]-lows[i], Math.abs(highs[i]-closes[i-1]), Math.abs(lows[i]-closes[i-1]));
-    }
-    const out = new Array(n).fill(null);
-    if(n <= period) return out;
-    let sum = 0;
-    for(let i=1;i<=period;i++) sum += tr[i];
-    out[period] = sum/period;
-    for(let i=period+1;i<n;i++){
-      out[i] = (out[i-1]*(period-1)+tr[i])/period;
-    }
-    return out;
-  }
-
-  function findPivots(values, left, right, isHigh){
-    const pivots = [];
-    for(let i=left; i<values.length-right; i++){
-      let isPivot = true;
-      for(let j=i-left;j<=i+right;j++){
-        if(j===i) continue;
-        if(isHigh ? values[j] > values[i] : values[j] < values[i]){ isPivot = false; break; }
-      }
-      if(isPivot) pivots.push({ index: i, value: values[i] });
-    }
-    return pivots;
-  }
-
-  function findSupplyDemandZones(opens, closes, atrArr, impulseMult, maxZones){
-    const demand = [], supply = [];
-    for(let i=1;i<opens.length;i++){
-      if(atrArr[i]===null) continue;
-      const body = Math.abs(closes[i]-opens[i]);
-      const isBullImp = closes[i]>opens[i] && body > impulseMult*atrArr[i];
-      const isBearImp = closes[i]<opens[i] && body > impulseMult*atrArr[i];
-      if(isBullImp && closes[i-1] < opens[i-1]){
-        const mid = (Math.max(opens[i-1],closes[i-1]) + Math.min(opens[i-1],closes[i-1]))/2;
-        demand.push({ index: i-1, value: mid });
-      }
-      if(isBearImp && closes[i-1] > opens[i-1]){
-        const mid = (Math.max(opens[i-1],closes[i-1]) + Math.min(opens[i-1],closes[i-1]))/2;
-        supply.push({ index: i-1, value: mid });
-      }
-    }
-    return { demand: demand.slice(-maxZones), supply: supply.slice(-maxZones) };
-  }
-
-  function computeMomentum(opens, highs, lows, closes, bodyRatioMin, lookback){
-    const n = closes.length;
-    const bullish = new Array(n).fill(false);
-    const bearish = new Array(n).fill(false);
-    for(let i=lookback;i<n;i++){
-      const range = highs[i]-lows[i];
-      const bodyRatio = range>0 ? Math.abs(closes[i]-opens[i])/range : 0;
-      if(bodyRatio < bodyRatioMin) continue;
-      let prevHH = -Infinity, prevLL = Infinity;
-      for(let j=i-lookback;j<i;j++){
-        if(highs[j]>prevHH) prevHH = highs[j];
-        if(lows[j]<prevLL) prevLL = lows[j];
-      }
-      if(closes[i]>opens[i] && closes[i]>prevHH) bullish[i] = true;
-      if(closes[i]<opens[i] && closes[i]<prevLL) bearish[i] = true;
-    }
-    return { bullish, bearish };
-  }
-
-  function bollinger(closes, length, dev){
-    const n = closes.length;
-    const basis = new Array(n).fill(null);
-    const upper = new Array(n).fill(null);
-    const lower = new Array(n).fill(null);
-    for(let i=length-1;i<n;i++){
-      let sum = 0;
-      for(let j=i-length+1;j<=i;j++) sum += closes[j];
-      const mean = sum/length;
-      let variance = 0;
-      for(let j=i-length+1;j<=i;j++) variance += Math.pow(closes[j]-mean, 2);
-      const sd = Math.sqrt(variance/length);
-      basis[i] = mean;
-      upper[i] = mean + dev*sd;
-      lower[i] = mean - dev*sd;
-    }
-    return { basis, upper, lower };
-  }
-
-  const ZONE_TOUCH_ATR_MULT = 0.15;
-  const ZONE_NEAR_ATR_MULT = 0.75;
-
-  function zoneProximity(value, band, atrVal){
-    const dist = Math.abs(value-band);
-    if(!atrVal || atrVal<=0) return { ok:false, status:'n/a', dist };
-    if(dist <= atrVal*ZONE_TOUCH_ATR_MULT) return { ok:true, status:'menyentuh', dist };
-    if(dist <= atrVal*ZONE_NEAR_ATR_MULT) return { ok:true, status:'dekat', dist };
-    return { ok:false, status:'jauh', dist };
-  }
-
-  function nearestZone(zones, band){
-    if(!zones || !zones.length) return null;
-    let best = zones[0], bestDist = Math.abs(zones[0].value-band);
-    zones.forEach(z=>{
-      const d = Math.abs(z.value-band);
-      if(d<bestDist){ best=z; bestDist=d; }
-    });
-    return best;
-  }
-
-  function checkBBSide(lastHigh, lastLow, lastClose, bandValue, atrVal, isUpper){
-    if(bandValue===null || bandValue===undefined || !atrVal) return { ok:false, status:'n/a', dist:Infinity };
-    const touchedByWick = isUpper ? (lastHigh >= bandValue) : (lastLow <= bandValue);
-    if(touchedByWick) return { ok:true, status:'menyentuh', dist:0 };
-    return zoneProximity(lastClose, bandValue, atrVal);
-  }
-
-  function checkZoneNearBand(zones, bandValue, atrVal){
-    const z = nearestZone(zones, bandValue);
-    if(!z) return { ok:false, status:'tidak ada zona', zone:null, dist:Infinity };
-    const prox = zoneProximity(z.value, bandValue, atrVal);
-    return { ok:prox.ok, status:prox.status, zone:z, dist:prox.dist };
-  }
-
-  function computeFullIndicators(opens, highs, lows, closes){
-    const e9 = ema(closes, 9);
-    const e21 = ema(closes, 21);
-    const e200 = ema(closes, 200);
-    const bb = bollinger(closes, 20, 2.0);
-    const atrArr = atr(highs, lows, closes, 14);
-    const rsiArr = rsi(closes, 14);
-    const stoch = stochastic(highs, lows, closes, 14, 3, 3);
-    const lastAtr = atrArr[atrArr.length-1] || 0;
-    const pivotHighs = findPivots(highs, 10, 10, true).slice(-2);
-    const pivotLows = findPivots(lows, 10, 10, false).slice(-2);
-    const resZones = pivotHighs.map(p=>({ value: p.value, top: p.value + lastAtr*0.5, bottom: p.value - lastAtr*0.5 }));
-    const supZones = pivotLows.map(p=>({ value: p.value, top: p.value + lastAtr*0.5, bottom: p.value - lastAtr*0.5 }));
-    const sd = findSupplyDemandZones(opens, closes, atrArr, 1.5, 3);
-    const momentum = computeMomentum(opens, highs, lows, closes, 0.70, 5);
-    return { e9, e21, e200, bb, atrArr, rsiArr, stoch, resZones, supZones, demandZones: sd.demand, supplyZones: sd.supply, momentum };
-  }
-
-  function evaluateChecklist(ind, lastHigh, lastLow, lastClose){
-    const n = ind.e9.length;
-    const lastUpper = ind.bb.upper[n-1];
-    const lastLower = ind.bb.lower[n-1];
-    const lastAtrV = ind.atrArr[n-1] || 0;
-    const lastE9 = ind.e9[n-1], lastE21 = ind.e21[n-1];
-    const lastStochK = ind.stoch.k[ind.stoch.k.length-1];
-    const lastStochD = ind.stoch.d[ind.stoch.d.length-1];
-
-    const buyBB = checkBBSide(lastHigh, lastLow, lastClose, lastLower, lastAtrV, false);
-    const buySR = checkZoneNearBand(ind.supZones, lastLower, lastAtrV);
-    const buySD = checkZoneNearBand(ind.demandZones, lastLower, lastAtrV);
-
-    const sellBB = checkBBSide(lastHigh, lastLow, lastClose, lastUpper, lastAtrV, true);
-    const sellSR = checkZoneNearBand(ind.resZones, lastUpper, lastAtrV);
-    const sellSD = checkZoneNearBand(ind.supplyZones, lastUpper, lastAtrV);
-
-    const emaNote = (lastClose > lastE9 && lastClose > lastE21) ? 'above' : (lastClose < lastE9 && lastClose < lastE21) ? 'below' : 'mixed';
-    const stochCond = stochConditionOf(lastStochK);
-
-    return {
-      buy: { bb:buyBB, sr:buySR, sd:buySD, atr:lastAtrV, band:lastLower },
-      sell: { bb:sellBB, sr:sellSR, sd:sellSD, atr:lastAtrV, band:lastUpper },
-      emaNote, stochCond, stochK:lastStochK, stochD:lastStochD,
-      lastClose, lastUpper, lastLower
-    };
-  }
-
-  function qualifies3(dir){ return dir.bb.ok && dir.sr.ok && dir.sd.ok; }
-
-  function pickSlForBuy(dir){
-    const buffer = dir.atr*0.25;
-    if(dir.sr.ok && dir.sr.zone) return dir.sr.zone.bottom - buffer;
-    if(dir.sd.ok && dir.sd.zone) return dir.sd.zone.value - buffer;
-    return dir.band - dir.atr*0.5;
-  }
-  function pickSlForSell(dir){
-    const buffer = dir.atr*0.25;
-    if(dir.sr.ok && dir.sr.zone) return dir.sr.zone.top + buffer;
-    if(dir.sd.ok && dir.sd.zone) return dir.sd.zone.value + buffer;
-    return dir.band + dir.atr*0.5;
-  }
-
-  function lastMomentumSignal(momentum, withinCandles){
-    const n = momentum.bullish.length;
-    for(let i=n-1;i>=Math.max(0,n-withinCandles);i--){
-      if(momentum.bullish[i]) return { type:'bullish', candlesAgo: n-1-i };
-      if(momentum.bearish[i]) return { type:'bearish', candlesAgo: n-1-i };
-    }
-    return null;
-  }
-
-  function isPinBar(open, high, low, close, isBullish){
-    const body = Math.abs(close-open);
-    const range = high-low;
-    if(range<=0) return false;
-    const upperWick = high - Math.max(open, close);
-    const lowerWick = Math.min(open, close) - low;
-    if(isBullish) return lowerWick >= body*2 && lowerWick >= range*0.5 && upperWick <= body*1.1;
-    return upperWick >= body*2 && upperWick >= range*0.5 && lowerWick <= body*1.1;
-  }
-
-  function isEngulfing(prevOpen, prevClose, open, close, isBullish){
-    if(isBullish) return close>open && prevClose<prevOpen && close>=prevOpen && open<=prevClose;
-    return close<open && prevClose>prevOpen && close<=prevOpen && open>=prevClose;
-  }
-
-  function isRangingAtZone(highs, lows, zoneValue, atrVal, lookback){
-    if(!atrVal || atrVal<=0) return false;
-    const n = highs.length;
-    const start = Math.max(0, n-lookback);
-    const recentHighs = highs.slice(start);
-    const recentLows = lows.slice(start);
-    const rangeHigh = Math.max(...recentHighs);
-    const rangeLow = Math.min(...recentLows);
-    const rangeSize = rangeHigh-rangeLow;
-    const mid = (rangeHigh+rangeLow)/2;
-    const nearZone = Math.abs(mid - zoneValue) <= atrVal*1.0;
-    const isTight = rangeSize <= atrVal*1.5;
-    return nearZone && isTight;
-  }
-
-  async function checkEmaCrossOnTf(symbol, tfValue, signal){
-    try{
-      const { closes } = await fetchKlines(symbol, tfValue, 50);
-      if(closes.length < 22) return false;
-      const e9 = ema(closes, 9);
-      const e21 = ema(closes, 21);
-      const cross = detectCross(e9, e21, 5);
-      if(!cross) return false;
-      return signal==='BUY' ? cross.type==='bullish' : cross.type==='bearish';
-    }catch(e){
-      return false;
-    }
-  }
-
-  const FAV_EMA_CROSS_TF_LIST = ['1m','5m','15m','30m','1h','4h','1d'];
-
-  async function scanFavoriteEmaCrosses(symbol, currentTf, currentE9, currentE21){
-    const results = await Promise.all(FAV_EMA_CROSS_TF_LIST.map(async tf=>{
-      try{
-        let e9, e21;
-        if(tf === currentTf){
-          e9 = currentE9; e21 = currentE21;
-        } else {
-          const { closes } = await fetchKlines(symbol, tf, 60);
-          if(closes.length < 22) return null;
-          e9 = ema(closes, 9);
-          e21 = ema(closes, 21);
-        }
-        const cross = detectCross(e9, e21, 3);
-        if(!cross) return null;
-        return { tf, type: cross.type };
-      }catch(e){
-        return null;
-      }
-    }));
-    return results.filter(Boolean);
-  }
-
-  const FAV_CROSS_TF_SHORT_LABEL = { '1m':'1m', '5m':'5m', '15m':'15m', '30m':'30m', '1h':'1H', '4h':'4H', '1d':'1D' };
-  const favCrossStatusEl = document.getElementById('esFavCrossStatus');
-  const favCrossGridEl = document.getElementById('esFavCrossGrid');
-
-  async function computeFavoriteCrossCard(symbol, tfValue, tfLabel){
-    const { opens, highs, lows, closes } = await fetchKlines(symbol, tfValue, MAIN_KLINES_LIMIT);
-    const e9 = ema(closes, 9);
-    const e21 = ema(closes, 21);
-    const e200 = ema(closes, 200);
-    const cross = detectCross(e9, e21, LOOKBACK) || { type:'bearish', candlesAgo:0 };
-    const tickers = window.__esLastTickers || {};
-    const t = tickers[symbol];
-    const price = t ? parseFloat(t.lastPrice) : closes[closes.length-1];
-    const change24h = t ? parseFloat(t.priceChangePercent) : 0;
-    const rsiArr = rsi(closes, 14);
-    const rsiValue = rsiArr[rsiArr.length-1];
-    const stoch = stochastic(highs, lows, closes, 14, 3, 3);
-    const stochK = stoch.k[stoch.k.length-1];
-    const stochD = stoch.d[stoch.d.length-1];
-    const atrArr = atr(highs, lows, closes, 14);
-    const lastAtr = atrArr[atrArr.length-1] || 0;
-    const pivotHighs = findPivots(highs, 10, 10, true).slice(-2);
-    const pivotLows = findPivots(lows, 10, 10, false).slice(-2);
-    const resZones = pivotHighs.map(p=>({ value: p.value, top: p.value + lastAtr*0.5, bottom: p.value - lastAtr*0.5 }));
-    const supZones = pivotLows.map(p=>({ value: p.value, top: p.value + lastAtr*0.5, bottom: p.value - lastAtr*0.5 }));
-    const sd = findSupplyDemandZones(opens, closes, atrArr, 1.5, 3);
-    const momentum = computeMomentum(opens, highs, lows, closes, 0.70, 5);
-    const momentumSignal = lastMomentumSignal(momentum, 10);
-    const chartSvg = buildMiniChart({
-      opens, highs, lows, closes, e9, e21, e200, momentum,
-      crossIdx: e9.length-1-cross.candlesAgo,
-      resZones, supZones, demandZones: sd.demand, supplyZones: sd.supply
-    });
-    return {
-      symbol, tfValue, tfLabel, cross, price, change24h, chartSvg,
-      cap: capTierOf(symbol),
-      rsi: rsiValue===null||rsiValue===undefined ? null : rsiValue,
-      rsiCondition: rsiConditionOf(rsiValue),
-      stochK: stochK===null||stochK===undefined ? null : stochK,
-      stochD: stochD===null||stochD===undefined ? null : stochD,
-      stochCondition: stochConditionOf(stochK),
-      resZones, supZones, momentumSignal
-    };
-  }
-
-  function favoriteCrossCardHtml(r, i){
-    const chgClass = r.change24h >= 0 ? 'up' : 'down';
-    const chgSign = r.change24h >= 0 ? '+' : '';
-    const crossLabel = r.cross.type==='bullish' ? 'Golden Cross' : 'Death Cross';
-    const arrow = r.cross.type==='bullish' ? '&#8593;' : '&#8595;';
-    const ago = r.cross.candlesAgo===0 ? 'baru saja' : `${r.cross.candlesAgo} candle lalu`;
-    const rsiLabel = r.rsi===null ? 'RSI n/a' : `RSI ${r.rsi.toFixed(1)}${r.rsiCondition==='overbought'?' (OB)':r.rsiCondition==='oversold'?' (OS)':''}`;
-    const stochLabel = r.stochK===null ? 'Stoch n/a' : `K ${r.stochK.toFixed(1)}/D ${r.stochD===null?'-':r.stochD.toFixed(1)}${r.stochCondition==='overbought'?' (OB)':r.stochCondition==='oversold'?' (OS)':''}`;
-    const resNearest = r.resZones.length ? r.resZones[r.resZones.length-1].value : null;
-    const supNearest = r.supZones.length ? r.supZones[r.supZones.length-1].value : null;
-    const momCls = r.momentumSignal ? r.momentumSignal.type : 'none';
-    const momLabel = r.momentumSignal
-      ? `${r.momentumSignal.type==='bullish'?'Bullish':'Bearish'} • ${r.momentumSignal.candlesAgo===0?'baru saja':r.momentumSignal.candlesAgo+'c lalu'}`
-      : 'Tidak ada (10c)';
-    return `<div class="es-card" data-symbol="${r.symbol}" data-tf="${r.tfValue}">
-      <span class="es-card-fav-star" title="Koin favorit">&#9733;</span>
-      <div class="es-card-top">
-        <div><span class="es-rank">TF ${r.tfLabel}</span><span class="es-symbol">${r.symbol.replace('USDT','')}</span></div>
-        <span class="es-cap-tag">${r.cap==='big'?'BIG CAP':'LOW/MID CAP'}</span>
-      </div>
-      <div class="es-price-row">
-        <span class="es-price">$${fmtPrice(r.price)}</span>
-        <span class="es-chg ${chgClass}">${chgSign}${r.change24h.toFixed(2)}% 24h</span>
-      </div>
-      ${r.chartSvg}
-      <div class="es-sr-row">
-        <span class="res">R ${resNearest===null?'n/a':'$'+fmtPrice(resNearest)}</span>
-        <span class="sup">S ${supNearest===null?'n/a':'$'+fmtPrice(supNearest)}</span>
-      </div>
-      <div class="es-mom-row">
-        <span>Momentum</span>
-        <span class="es-mom-badge ${momCls}">${momLabel}</span>
-      </div>
-      <div class="es-cross-row">
-        <span class="es-cross-badge ${r.cross.type}">${arrow} ${crossLabel}</span>
-        <span class="es-ago">${ago}</span>
-      </div>
-      <div class="es-rsi-row">
-        <span>RSI (14)</span>
-        <span class="es-rsi-badge ${r.rsiCondition}">${rsiLabel}</span>
-      </div>
-      <div class="es-stoch-row">
-        <span>Stoch (14,3,3)</span>
-        <span class="es-stoch-badge ${r.stochCondition}">${stochLabel}</span>
-      </div>
-    </div>`;
-  }
-
-  async function renderFavoriteCrossGrid(crossHits, totalScanned){
-    if(crossHits.length===0){
-      favCrossGridEl.innerHTML = '';
-      favCrossStatusEl.classList.remove('error');
-      favCrossStatusEl.textContent = `Terakhir dipindai: ${new Date().toLocaleTimeString('id-ID')} • 0 koin dengan cross ditemukan dari ${totalScanned} dipindai.`;
+  function renderTable(){
+    var tbody = document.getElementById('tradeTbody');
+    var empty = document.getElementById('emptyState');
+    var sorted = state.trades.slice().sort(function(a,b){return new Date(b.date)-new Date(a.date);});
+    if (!sorted.length){
+      tbody.innerHTML = '';
+      document.getElementById('tradeTable').style.display='none';
+      empty.style.display='block';
       return;
     }
-    favCrossStatusEl.textContent = `Memindai ${crossHits.length} sinyal cross dari koin favorit...`;
-    const cards = await Promise.all(crossHits.map(h=>
-      computeFavoriteCrossCard(h.symbol, h.tf, FAV_CROSS_TF_SHORT_LABEL[h.tf] || h.tf).catch(()=>null)
-    ));
-    const valid = cards.filter(Boolean);
-    favCrossGridEl.innerHTML = valid.map((r,i)=>favoriteCrossCardHtml(r,i)).join('');
-    favCrossGridEl.querySelectorAll('.es-card').forEach(card=>{
-      card.addEventListener('click', ()=>{
-        openTradingView(card.getAttribute('data-symbol'), card.getAttribute('data-tf'));
-      });
-    });
-    const distinctCoins = new Set(crossHits.map(h=>h.symbol)).size;
-    favCrossStatusEl.classList.remove('error');
-    favCrossStatusEl.textContent = `Terakhir dipindai: ${new Date().toLocaleTimeString('id-ID')} • ${distinctCoins} koin dengan cross ditemukan dari ${totalScanned} dipindai.`;
-  }
+    document.getElementById('tradeTable').style.display='table';
+    empty.style.display='none';
 
-  const FAV_CROSS_SYMBOLS_KEY = 'emaScreenerFavCrossSymbols_v1';
-  const FAV_CROSS_SYMBOLS_MAX = 50;
-  let favCrossSymbols = [];
-  let favCrossScanning = false;
-  const favCrossManageEl = document.getElementById('esFavCrossManage');
-
-  function loadFavCrossSymbols(){
-    try{
-      const raw = localStorage.getItem(FAV_CROSS_SYMBOLS_KEY);
-      if(raw){
-        const parsed = JSON.parse(raw);
-        if(Array.isArray(parsed)){ favCrossSymbols = parsed.slice(0, FAV_CROSS_SYMBOLS_MAX); return; }
-      }
-    }catch(e){ /* fall through to default */ }
-    favCrossSymbols = FAVORITE_DEFAULT.slice();
-  }
-
-  function saveFavCrossSymbols(){
-    try{ localStorage.setItem(FAV_CROSS_SYMBOLS_KEY, JSON.stringify(favCrossSymbols)); }catch(e){ /* ignore */ }
-  }
-
-  function removeFavCrossSymbol(symbol){
-    favCrossSymbols = favCrossSymbols.filter(s=>s!==symbol);
-    saveFavCrossSymbols();
-    renderFavCrossManageUI();
-    scanFavoriteCrossSection();
-  }
-
-  function addFavCrossSymbol(rawInput){
-    let symbol = extractSymbolFromFavInput(rawInput);
-    if(!symbol) return;
-    if(!symbol.endsWith('USDT')) symbol += 'USDT';
-    if(favCrossSymbols.includes(symbol)) return;
-    if(favCrossSymbols.length >= FAV_CROSS_SYMBOLS_MAX) return;
-    favCrossSymbols.push(symbol);
-    saveFavCrossSymbols();
-    renderFavCrossManageUI();
-    scanFavoriteCrossSection();
-  }
-
-  function renderFavCrossManageUI(){
-    const chipsHtml = favCrossSymbols.map(symbol=>`
-      <div class="es-fav-cross-chip" data-symbol="${symbol}">
-        <span>${symbol.replace('USDT','')}</span>
-        <span class="es-fav-cross-chip-remove" data-symbol="${symbol}" title="Lepas dari daftar pindai cross">&#9733;</span>
-      </div>`).join('');
-    const addHtml = favCrossSymbols.length >= FAV_CROSS_SYMBOLS_MAX ? '' : `
-      <div class="es-fav-cross-chip-add">
-        <input type="text" class="es-fav-cross-add-input" placeholder="mis. SUIUSDT" autocomplete="off">
-        <div class="es-fav-suggest"></div>
-        <button type="button" class="es-fav-cross-add-btn">+ Tambah</button>
-      </div>`;
-    favCrossManageEl.innerHTML = chipsHtml + addHtml;
-
-    favCrossManageEl.querySelectorAll('.es-fav-cross-chip-remove').forEach(el=>{
-      el.addEventListener('click', ()=> removeFavCrossSymbol(el.getAttribute('data-symbol')));
-    });
-
-    const input = favCrossManageEl.querySelector('.es-fav-cross-add-input');
-    if(!input) return;
-    const suggestBox = favCrossManageEl.querySelector('.es-fav-suggest');
-    const btn = favCrossManageEl.querySelector('.es-fav-cross-add-btn');
-
-    function closeSuggestions(){
-      suggestBox.classList.remove('open');
-      suggestBox.innerHTML = '';
-    }
-    function updateSuggestions(){
-      const q = input.value.trim().toUpperCase();
-      if(!q || q.includes('TRADINGVIEW') || q.includes('HTTP')){ closeSuggestions(); return; }
-      const matches = FAV_SUGGESTION_POOL.filter(s=>{
-        const base = s.replace('USDT','');
-        return s.startsWith(q) || base.startsWith(q);
-      }).slice(0,6);
-      if(matches.length===0){ closeSuggestions(); return; }
-      suggestBox.innerHTML = matches.map(s=>`<div class="es-fav-suggest-item" data-symbol="${s}">${s}</div>`).join('');
-      suggestBox.classList.add('open');
-      suggestBox.querySelectorAll('.es-fav-suggest-item').forEach(item=>{
-        item.addEventListener('mousedown', (e)=>{
-          e.preventDefault();
-          input.value = item.getAttribute('data-symbol');
-          closeSuggestions();
-        });
-      });
-    }
-    input.addEventListener('input', updateSuggestions);
-    input.addEventListener('focus', updateSuggestions);
-    input.addEventListener('blur', ()=> setTimeout(closeSuggestions, 150));
-    input.addEventListener('keydown', (e)=>{
-      if(e.key==='Enter'){ addFavCrossSymbol(input.value); closeSuggestions(); }
-    });
-    btn.addEventListener('click', ()=>{
-      addFavCrossSymbol(input.value);
-      closeSuggestions();
-    });
-  }
-
-  async function scanFavoriteCrossSection(){
-    if(favCrossScanning) return;
-    favCrossScanning = true;
-    favCrossStatusEl.classList.remove('error');
-    favCrossStatusEl.textContent = 'Memindai koin fokus cross EMA...';
-
-    const perSymbol = await Promise.all(favCrossSymbols.map(async symbol=>{
-      try{
-        return await scanFavoriteEmaCrosses(symbol, null, null, null);
-      }catch(e){
-        return [];
-      }
-    }));
-    const crossHits = [];
-    perSymbol.forEach((crossNotes, i)=>{
-      const symbol = favCrossSymbols[i];
-      crossNotes.forEach(cn=>crossHits.push({ symbol, tf: cn.tf, type: cn.type }));
-    });
-    favCrossScanning = false;
-    renderFavoriteCrossGrid(crossHits, favCrossSymbols.length);
-  }
-
-  async function computeConfirmationNotes(cand){
-    const { opens, highs, lows, closes, signal, dir, symbol, tfValue } = cand;
-    const n = closes.length;
-    const isBullish = signal==='BUY';
-    const lastOpen = opens[n-1], lastHigh = highs[n-1], lastLow = lows[n-1], lastClose = closes[n-1];
-    const prevOpen = opens[n-2], prevClose = closes[n-2];
-
-    const pinbar = isPinBar(lastOpen, lastHigh, lastLow, lastClose, isBullish);
-    const engulfing = isEngulfing(prevOpen, prevClose, lastOpen, lastClose, isBullish);
-    const ranging = isRangingAtZone(highs, lows, dir.band, dir.atr, 6);
-
-    // cross EMA9/21 (1m/5m) cuma relevan sebagai konfirmasi TF lebih rendah untuk sinyal TF 5 menit ke atas
-    const showEmaCross = tfValue !== '1m';
-    let cross1m = null, cross5m = null;
-    if(showEmaCross){
-      [cross1m, cross5m] = await Promise.all([
-        checkEmaCrossOnTf(symbol, '1m', signal),
-        checkEmaCrossOnTf(symbol, '5m', signal)
-      ]);
-    }
-
-    const notes = { pinbar, cross1m, cross5m, engulfing, ranging, showEmaCross };
-    const checks = [pinbar, engulfing, ranging];
-    if(showEmaCross) checks.push(cross1m, cross5m);
-    const passCount = checks.filter(Boolean).length;
-    const highProbability = passCount >= 3;
-    return { notes, highProbability, passCount };
-  }
-
-  function buildMiniChart(data){
-    const { opens, highs, lows, closes, e9, e21, e200, bb, momentum, crossIdx, resZones, supZones, demandZones, supplyZones } = data;
-    const total = closes.length;
-    const N = Math.min(40, total);
-    const start = total - N;
-
-    const co = opens.slice(start), ch = highs.slice(start), cl = lows.slice(start), cc = closes.slice(start);
-    const s9 = e9.slice(start), s21 = e21.slice(start), s200 = e200.slice(start);
-    const mombull = momentum.bullish.slice(start), mombear = momentum.bearish.slice(start);
-    const sBBu = bb ? bb.upper.slice(start) : null, sBBl = bb ? bb.lower.slice(start) : null;
-
-    let vals = [...ch, ...cl, ...s9, ...s21, ...s200];
-    if(sBBu) sBBu.forEach(v=>{ if(v!==null) vals.push(v); });
-    if(sBBl) sBBl.forEach(v=>{ if(v!==null) vals.push(v); });
-    resZones.forEach(z=>{ vals.push(z.top, z.bottom); });
-    supZones.forEach(z=>{ vals.push(z.top, z.bottom); });
-    demandZones.forEach(z=>vals.push(z.value));
-    supplyZones.forEach(z=>vals.push(z.value));
-
-    const min = Math.min(...vals), max = Math.max(...vals);
-    const range = (max-min) || 1;
-    const w = 300, h = 160, padX=4, padY=6;
-
-    const xAt = (i) => padX + (i/(N<=1?1:N-1))*(w-padX*2);
-    const yAt = (v) => h-padY - ((v-min)/range)*(h-padY*2);
-    const candleW = Math.max(1.5, ((w-padX*2)/N) * 0.6);
-
-    let zonesHtml = '';
-    resZones.forEach((z,idx)=>{
-      const yTop = yAt(z.top), yBot = yAt(z.bottom);
-      zonesHtml += `<rect x="${padX}" y="${yTop.toFixed(1)}" width="${(w-padX*2).toFixed(1)}" height="${Math.max(1,(yBot-yTop)).toFixed(1)}" fill="var(--bear)" fill-opacity="0.14"/>`;
-      zonesHtml += `<text x="${(w-padX-2).toFixed(1)}" y="${(yTop+8).toFixed(1)}" font-size="7" fill="var(--bear)" text-anchor="end">R${idx+1}</text>`;
-    });
-    supZones.forEach((z,idx)=>{
-      const yTop = yAt(z.top), yBot = yAt(z.bottom);
-      zonesHtml += `<rect x="${padX}" y="${yTop.toFixed(1)}" width="${(w-padX*2).toFixed(1)}" height="${Math.max(1,(yBot-yTop)).toFixed(1)}" fill="var(--bull)" fill-opacity="0.14"/>`;
-      zonesHtml += `<text x="${(w-padX-2).toFixed(1)}" y="${(yBot-2).toFixed(1)}" font-size="7" fill="var(--bull)" text-anchor="end">S${idx+1}</text>`;
-    });
-
-    let sdHtml = '';
-    demandZones.forEach((z)=>{
-      const y = yAt(z.value);
-      sdHtml += `<line x1="${padX}" y1="${y.toFixed(1)}" x2="${(w-padX).toFixed(1)}" y2="${y.toFixed(1)}" stroke="var(--demand-c)" stroke-width="1" stroke-dasharray="3,2" opacity="0.85"/>`;
-      sdHtml += `<text x="${padX+2}" y="${(y-2).toFixed(1)}" font-size="7" fill="var(--demand-c)">Dmd</text>`;
-    });
-    supplyZones.forEach((z)=>{
-      const y = yAt(z.value);
-      sdHtml += `<line x1="${padX}" y1="${y.toFixed(1)}" x2="${(w-padX).toFixed(1)}" y2="${y.toFixed(1)}" stroke="var(--supply-c)" stroke-width="1" stroke-dasharray="3,2" opacity="0.85"/>`;
-      sdHtml += `<text x="${padX+2}" y="${(y-2).toFixed(1)}" font-size="7" fill="var(--supply-c)">Sply</text>`;
-    });
-
-    let candleHtml = '';
-    for(let i=0;i<N;i++){
-      const x = xAt(i);
-      const isUp = cc[i] >= co[i];
-      const color = isUp ? 'var(--bull)' : 'var(--bear)';
-      const yHigh = yAt(ch[i]), yLow = yAt(cl[i]);
-      const yOpen = yAt(co[i]), yClose = yAt(cc[i]);
-      const bodyTop = Math.min(yOpen, yClose), bodyBot = Math.max(yOpen, yClose);
-      const bodyH = Math.max(1, bodyBot-bodyTop);
-      candleHtml += `<line x1="${x.toFixed(1)}" y1="${yHigh.toFixed(1)}" x2="${x.toFixed(1)}" y2="${yLow.toFixed(1)}" stroke="${color}" stroke-width="1"/>`;
-      candleHtml += `<rect x="${(x-candleW/2).toFixed(1)}" y="${bodyTop.toFixed(1)}" width="${candleW.toFixed(1)}" height="${bodyH.toFixed(1)}" fill="${color}"/>`;
-      if(mombull[i]) candleHtml += `<circle cx="${x.toFixed(1)}" cy="${(yLow+6).toFixed(1)}" r="2" fill="var(--bull)"/>`;
-      if(mombear[i]) candleHtml += `<circle cx="${x.toFixed(1)}" cy="${(yHigh-6).toFixed(1)}" r="2" fill="var(--bear)"/>`;
-    }
-
-    const toLine = (arr, color) => {
-      const pts = [];
-      arr.forEach((v,i)=>{
-        if(v===null || v===undefined) return;
-        pts.push(`${xAt(i).toFixed(1)},${yAt(v).toFixed(1)}`);
-      });
-      if(pts.length < 2) return '';
-      return `<polyline points="${pts.join(' ')}" fill="none" stroke="${color}" stroke-width="1.3" opacity="0.9"/>`;
-    };
-    const emaHtml = toLine(s200, 'var(--ema200c)') + toLine(s21, 'var(--ema21c)') + toLine(s9, 'var(--ema9c)');
-    const bbHtml = (sBBu && sBBl) ? toLine(sBBu, 'var(--bbc)') + toLine(sBBl, 'var(--bbc)') : '';
-
-    let markerHtml = '';
-    if(crossIdx !== null){
-      const idxInSlice = crossIdx - start;
-      if(idxInSlice >= 0 && idxInSlice < N && s9[idxInSlice]!==null && s9[idxInSlice]!==undefined){
-        const mx = xAt(idxInSlice), my = yAt(s9[idxInSlice]);
-        markerHtml = `<circle cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="3" fill="var(--gold)"/>`;
-      }
-    }
-
-    return `<svg class="es-spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
-      ${zonesHtml}
-      ${sdHtml}
-      ${candleHtml}
-      ${bbHtml}
-      ${emaHtml}
-      ${markerHtml}
-    </svg>`;
-  }
-
-  function renderSkeletons(n){
-    grid.innerHTML = Array.from({length:n}).map(()=>'<div class="es-skel"></div>').join('');
-  }
-
-  function fmtPrice(p){
-    if(p >= 100) return p.toFixed(2);
-    if(p >= 1) return p.toFixed(4);
-    return p.toPrecision(4);
-  }
-
-  function render(results){
-    const capFilter = capSel.value;
-    const typeFilter = typeSel.value;
-    const rsiFilter = rsiSel.value;
-    const stochFilter = stochSel.value;
-
-    let filtered = results.filter(r=>{
-      if(capFilter!=='all' && r.cap!==capFilter) return false;
-      if(typeFilter!=='all' && r.cross.type!==typeFilter) return false;
-      if(rsiFilter!=='all' && r.rsiCondition!==rsiFilter) return false;
-      if(stochFilter!=='all' && r.stochCondition!==stochFilter) return false;
-      return true;
-    });
-
-    filtered.sort((a,b)=> a.cross.candlesAgo - b.cross.candlesAgo || rankOf(a.symbol)-rankOf(b.symbol));
-    const top5 = filtered.slice(0,5);
-
-    if(top5.length === 0){
-      grid.innerHTML = `<div class="es-empty">Tidak ada persilangan EMA 9/21 yang ditemukan pada filter &amp; timeframe ini dalam ${LOOKBACK} candle terakhir.<br/>Coba ganti timeframe atau filter cap/tipe cross/RSI/Stochastic.</div>`;
-      return [];
-    }
-
-    grid.innerHTML = top5.map((r,i)=>{
-      const fresh = r.cross.candlesAgo <= 1;
-      const chgClass = r.change24h >= 0 ? 'up' : 'down';
-      const chgSign = r.change24h >= 0 ? '+' : '';
-      const crossLabel = r.cross.type==='bullish' ? 'Golden Cross' : 'Death Cross';
-      const arrow = r.cross.type==='bullish' ? '&#8593;' : '&#8595;';
-      const ago = r.cross.candlesAgo===0 ? 'baru saja' : `${r.cross.candlesAgo} candle lalu`;
-      const rsiLabel = r.rsi===null ? 'RSI n/a' : `RSI ${r.rsi.toFixed(1)}${r.rsiCondition==='overbought'?' (OB)':r.rsiCondition==='oversold'?' (OS)':''}`;
-      const stochLabel = r.stochK===null ? 'Stoch n/a' : `K ${r.stochK.toFixed(1)}/D ${r.stochD===null?'-':r.stochD.toFixed(1)}${r.stochCondition==='overbought'?' (OB)':r.stochCondition==='oversold'?' (OS)':''}`;
-      const resNearest = r.resZones.length ? r.resZones[r.resZones.length-1].value : null;
-      const supNearest = r.supZones.length ? r.supZones[r.supZones.length-1].value : null;
-      const momCls = r.momentumSignal ? r.momentumSignal.type : 'none';
-      const momLabel = r.momentumSignal
-        ? `${r.momentumSignal.type==='bullish'?'Bullish':'Bearish'} • ${r.momentumSignal.candlesAgo===0?'baru saja':r.momentumSignal.candlesAgo+'c lalu'}`
-        : 'Tidak ada (10c)';
-      return `<div class="es-card ${fresh?'fresh':''}" data-symbol="${r.symbol}">
-        <div class="es-card-top">
-          <div><span class="es-rank">#${i+1}</span><span class="es-symbol">${r.symbol.replace('USDT','')}</span></div>
-          <span class="es-cap-tag">${r.cap==='big'?'BIG CAP':'LOW/MID CAP'}</span>
-        </div>
-        <div class="es-price-row">
-          <span class="es-price">$${fmtPrice(r.price)}</span>
-          <span class="es-chg ${chgClass}">${chgSign}${r.change24h.toFixed(2)}% 24h</span>
-        </div>
-        ${r.chartSvg}
-        <div class="es-sr-row">
-          <span class="res">R ${resNearest===null?'n/a':'$'+fmtPrice(resNearest)}</span>
-          <span class="sup">S ${supNearest===null?'n/a':'$'+fmtPrice(supNearest)}</span>
-        </div>
-        <div class="es-mom-row">
-          <span>Momentum</span>
-          <span class="es-mom-badge ${momCls}">${momLabel}</span>
-        </div>
-        <div class="es-cross-row">
-          <span class="es-cross-badge ${r.cross.type}">${arrow} ${crossLabel}</span>
-          <span class="es-ago">${ago}</span>
-        </div>
-        <div class="es-rsi-row">
-          <span>RSI (14)</span>
-          <span class="es-rsi-badge ${r.rsiCondition}">${rsiLabel}</span>
-        </div>
-        <div class="es-stoch-row">
-          <span>Stoch (14,3,3)</span>
-          <span class="es-stoch-badge ${r.stochCondition}">${stochLabel}</span>
-        </div>
-      </div>`;
+    tbody.innerHTML = sorted.map(function(t){
+      var result = t.pl>0?'win':t.pl<0?'loss':'be';
+      var resultLabel = t.pl>0?'WIN':t.pl<0?'LOSS':'BE';
+      return '<tr data-id="'+t.id+'">'+
+        '<td class="num">'+fmtDate(t.date)+'</td>'+
+        '<td>'+t.pair+'</td>'+
+        '<td><span class="dir '+t.direction.toLowerCase()+'">'+t.direction.toUpperCase()+'</span></td>'+
+        '<td class="num">'+t.lot.toFixed(2)+'</td>'+
+        '<td class="num" style="color:'+(t.pl>0?'var(--profit)':t.pl<0?'var(--loss)':'var(--ink-dim)')+'">'+fmtMoney(t.pl)+'</td>'+
+        '<td><span class="pill '+result+'">'+resultLabel+'</span></td>'+
+        '<td class="emo-chip">'+emotionLabel(t,'entry')+' → '+emotionLabel(t,'eval')+'</td>'+
+        '<td><div class="row-actions">'+
+          '<button class="icon-btn btn-edit" data-id="'+t.id+'" title="Edit">✎</button>'+
+          '<button class="icon-btn btn-del" data-id="'+t.id+'" title="Hapus">✕</button>'+
+        '</div></td>'+
+      '</tr>';
     }).join('');
 
-    grid.querySelectorAll('.es-card').forEach(card=>{
-      card.addEventListener('click', ()=>{
-        const sym = card.getAttribute('data-symbol');
-        openTradingView(sym);
+    Array.prototype.forEach.call(tbody.querySelectorAll('tr'), function(row){
+      row.addEventListener('click', function(e){
+        if (e.target.closest('.icon-btn')) return;
+        openModal(row.getAttribute('data-id'));
       });
     });
-
-    return top5;
+    Array.prototype.forEach.call(tbody.querySelectorAll('.btn-edit'), function(b){
+      b.addEventListener('click', function(e){ e.stopPropagation(); openModal(b.getAttribute('data-id')); });
+    });
+    Array.prototype.forEach.call(tbody.querySelectorAll('.btn-del'), function(b){
+      b.addEventListener('click', function(e){
+        e.stopPropagation();
+        if (confirm('Hapus trade ini?')){
+          state.trades = state.trades.filter(function(t){return t.id!==b.getAttribute('data-id');});
+          saveTrades(state.trades); renderAll();
+        }
+      });
+    });
   }
 
-  const LOOKBACK = 8;
-  const MAIN_KLINES_LIMIT = 300;
+  function renderCalendar(){
+    var dowEl = document.getElementById('calDow');
+    dowEl.innerHTML = ['Sen','Sel','Rab','Kam','Jum','Sab','Min'].map(function(d){
+      return '<div class="cal-dow">'+d+'</div>';
+    }).join('');
 
-  async function scan(){
-    if(scanning) return;
-    scanning = true;
-    refreshBtn.classList.add('spinning');
-    statusEl.classList.remove('error');
-    statusEl.textContent = 'Memindai ' + activeSymbols.length + ' pair...';
-    renderSkeletons(6);
+    var month = state.calMonth;
+    document.getElementById('calMonthLabel').textContent =
+      month.toLocaleDateString('id-ID',{month:'long',year:'numeric'});
 
-    const interval = intervalSel.value;
+    var firstDay = new Date(month.getFullYear(), month.getMonth(), 1);
+    var startOffset = (firstDay.getDay()+6)%7; // Monday-first
+    var daysInMonth = new Date(month.getFullYear(), month.getMonth()+1, 0).getDate();
 
-    if(!capRankLoaded){
-      await loadCapRanking();
+    var plByDay = {};
+    state.trades.forEach(function(t){
+      var d = new Date(t.date);
+      if (d.getFullYear()===month.getFullYear() && d.getMonth()===month.getMonth()){
+        var key = d.getDate();
+        plByDay[key] = (plByDay[key]||0) + t.pl;
+      }
+    });
+
+    var startDate = new Date(ACCOUNT.startDate+'T00:00:00');
+    var today = new Date();
+    var cells = '';
+    for (var i=0;i<startOffset;i++){ cells += '<div class="cal-cell blank"></div>'; }
+    for (var day=1; day<=daysInMonth; day++){
+      var cellDate = new Date(month.getFullYear(), month.getMonth(), day);
+      var cls = 'cal-cell';
+      if (cellDate < startDate) cls += ' before-start';
+      if (cellDate.toDateString()===today.toDateString()) cls += ' today';
+      var pl = plByDay[day];
+      var plHtml = '';
+      if (pl!==undefined){
+        cls += pl>=0 ? ' profit' : ' loss';
+        plHtml = '<div class="pl">'+(pl>=0?'+':'')+pl.toFixed(0)+'</div>';
+      }
+      cells += '<div class="'+cls+'"><div class="d">'+day+'</div>'+plHtml+'</div>';
     }
-    const tickers = await loadTickers();
+    document.getElementById('calGrid').innerHTML = cells;
+  }
 
-    const settled = await Promise.allSettled(activeSymbols.map(async (symbol)=>{
-      const { opens, closes, highs, lows, times } = await fetchKlines(symbol, interval, MAIN_KLINES_LIMIT);
-      const e9 = ema(closes, 9);
-      const e21 = ema(closes, 21);
-      const e200 = ema(closes, 200);
-      const cross = detectCross(e9, e21, LOOKBACK);
-      if(!cross) return null;
-      const t = tickers[symbol];
-      const price = t ? parseFloat(t.lastPrice) : closes[closes.length-1];
-      const change24h = t ? parseFloat(t.priceChangePercent) : 0;
-      const rsiArr = rsi(closes, 14);
-      const rsiValue = rsiArr[rsiArr.length-1];
-      const stoch = stochastic(highs, lows, closes, 14, 3, 3);
-      const stochK = stoch.k[stoch.k.length-1];
-      const stochD = stoch.d[stoch.d.length-1];
+  function renderEmotionInsight(){
+    var box = document.getElementById('emotionInsight');
+    if (!state.trades.length){
+      box.innerHTML = '<p style="font-size:12.5px;color:var(--ink-faint);margin:0">Belum ada data emosi. Insight akan muncul setelah kamu mencatat beberapa trade.</p>';
+      return;
+    }
+    var counts = {};
+    state.trades.forEach(function(t){
+      var k = t.emotionEntry || '—';
+      counts[k] = (counts[k]||0)+1;
+    });
+    var max = Math.max.apply(null, Object.values(counts));
+    var rows = Object.keys(counts).sort(function(a,b){return counts[b]-counts[a];}).map(function(k){
+      var pct = (counts[k]/max*100).toFixed(0);
+      return '<div class="emo-row"><span>'+k+'</span>'+
+        '<span class="emo-bar-track"><span class="emo-bar-fill" style="width:'+pct+'%"></span></span>'+
+        '<span class="num">'+counts[k]+'</span></div>';
+    }).join('');
+    box.innerHTML = '<div style="font-size:11px;color:var(--ink-faint);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em">Emosi saat Entry</div>' + rows;
+  }
 
-      const atrArr = atr(highs, lows, closes, 14);
-      const lastAtr = atrArr[atrArr.length-1] || 0;
-      const pivotHighs = findPivots(highs, 10, 10, true).slice(-2);
-      const pivotLows = findPivots(lows, 10, 10, false).slice(-2);
-      const resZones = pivotHighs.map(p=>({ value: p.value, top: p.value + lastAtr*0.5, bottom: p.value - lastAtr*0.5 }));
-      const supZones = pivotLows.map(p=>({ value: p.value, top: p.value + lastAtr*0.5, bottom: p.value - lastAtr*0.5 }));
-      const sd = findSupplyDemandZones(opens, closes, atrArr, 1.5, 3);
-      const momentum = computeMomentum(opens, highs, lows, closes, 0.70, 5);
-      const momentumSignal = lastMomentumSignal(momentum, 10);
+  function renderAll(){
+    renderKPIs(); renderEquityCurve(); renderTable(); renderCalendar(); renderEmotionInsight();
+  }
 
-      const chartSvg = buildMiniChart({
-        opens, highs, lows, closes, e9, e21, e200, momentum,
-        crossIdx: e9.length-1-cross.candlesAgo,
-        resZones, supZones, demandZones: sd.demand, supplyZones: sd.supply
-      });
+  // ---------- Modal ----------
+  var overlay = document.getElementById('modalOverlay');
+  var form = document.getElementById('tradeForm');
 
-      return {
-        symbol, cross, price, change24h, chartSvg,
-        cap: capTierOf(symbol),
-        rsi: rsiValue===null||rsiValue===undefined ? null : rsiValue,
-        rsiCondition: rsiConditionOf(rsiValue),
-        stochK: stochK===null||stochK===undefined ? null : stochK,
-        stochD: stochD===null||stochD===undefined ? null : stochD,
-        stochCondition: stochConditionOf(stochK),
-        resZones, supZones, momentumSignal,
-        closes, times, e9, e21, interval
+  function openModal(id){
+    form.reset();
+    document.getElementById('tradeEmotionEntryCustom').style.display='none';
+    document.getElementById('tradeEmotionEvalCustom').style.display='none';
+    if (id){
+      var t = state.trades.find(function(x){return x.id===id;});
+      document.getElementById('modalTitle').textContent = 'Edit Trade';
+      document.getElementById('tradeId').value = t.id;
+      document.getElementById('tradeDate').value = t.date;
+      document.getElementById('tradePair').value = t.pair;
+      document.getElementById('tradeDirection').value = t.direction;
+      document.getElementById('tradeLot').value = t.lot;
+      document.getElementById('tradeEntry').value = t.entry||'';
+      document.getElementById('tradeExit').value = t.exit||'';
+      document.getElementById('tradePL').value = t.pl;
+      document.getElementById('tradeReason').value = t.reason||'';
+      document.getElementById('tradeNotes').value = t.notes||'';
+      setSelectOrCustom('tradeEmotionEntry', t.emotionEntry);
+      setSelectOrCustom('tradeEmotionEval', t.emotionEval);
+      document.getElementById('btnDelete').style.display='inline-block';
+      document.getElementById('btnDelete').setAttribute('data-id', t.id);
+    } else {
+      document.getElementById('modalTitle').textContent = 'Tambah Trade';
+      document.getElementById('tradeId').value = '';
+      var now = new Date(); now.setMinutes(now.getMinutes()-now.getTimezoneOffset());
+      document.getElementById('tradeDate').value = now.toISOString().slice(0,16);
+      document.getElementById('btnDelete').style.display='none';
+    }
+    overlay.classList.add('open');
+  }
+  function setSelectOrCustom(selectId, value){
+    var sel = document.getElementById(selectId);
+    var customInput = document.getElementById(selectId+'Custom');
+    var found = Array.prototype.some.call(sel.options, function(o){return o.value===value || o.textContent===value;});
+    if (value && !found){
+      sel.value = '__custom'; customInput.style.display='block'; customInput.value = value;
+    } else {
+      sel.value = value || sel.options[0].value;
+    }
+  }
+  function closeModal(){ overlay.classList.remove('open'); }
+
+  document.getElementById('btnAddTrade').addEventListener('click', function(){ openModal(null); });
+  document.getElementById('btnAddTradeEmpty').addEventListener('click', function(){ openModal(null); });
+  document.getElementById('btnCancel').addEventListener('click', closeModal);
+  overlay.addEventListener('click', function(e){ if (e.target===overlay) closeModal(); });
+  document.addEventListener('keydown', function(e){ if (e.key==='Escape') closeModal(); });
+
+  ['tradeEmotionEntry','tradeEmotionEval'].forEach(function(id){
+    document.getElementById(id).addEventListener('change', function(){
+      var custom = document.getElementById(id+'Custom');
+      custom.style.display = this.value==='__custom' ? 'block' : 'none';
+    });
+  });
+
+  document.getElementById('btnDelete').addEventListener('click', function(){
+    var id = this.getAttribute('data-id');
+    if (confirm('Hapus trade ini?')){
+      state.trades = state.trades.filter(function(t){return t.id!==id;});
+      saveTrades(state.trades); closeModal(); renderAll();
+    }
+  });
+
+  form.addEventListener('submit', function(e){
+    e.preventDefault();
+    var id = document.getElementById('tradeId').value;
+    var emoEntry = document.getElementById('tradeEmotionEntry').value;
+    if (emoEntry==='__custom') emoEntry = document.getElementById('tradeEmotionEntryCustom').value || 'Lainnya';
+    var emoEval = document.getElementById('tradeEmotionEval').value;
+    if (emoEval==='__custom') emoEval = document.getElementById('tradeEmotionEvalCustom').value || 'Lainnya';
+
+    var trade = {
+      id: id || (Date.now()+'_'+Math.random().toString(36).slice(2,7)),
+      date: document.getElementById('tradeDate').value,
+      pair: document.getElementById('tradePair').value.trim(),
+      direction: document.getElementById('tradeDirection').value,
+      lot: parseFloat(document.getElementById('tradeLot').value)||0,
+      entry: parseFloat(document.getElementById('tradeEntry').value)||null,
+      exit: parseFloat(document.getElementById('tradeExit').value)||null,
+      pl: parseFloat(document.getElementById('tradePL').value)||0,
+      reason: document.getElementById('tradeReason').value.trim(),
+      emotionEntry: emoEntry,
+      emotionEval: emoEval,
+      notes: document.getElementById('tradeNotes').value.trim()
+    };
+
+    if (id){
+      state.trades = state.trades.map(function(t){ return t.id===id ? trade : t; });
+    } else {
+      state.trades.push(trade);
+    }
+    saveTrades(state.trades);
+    closeModal();
+    renderAll();
+  });
+
+  // ---------- Calendar nav ----------
+  document.getElementById('calPrev').addEventListener('click', function(){
+    state.calMonth = new Date(state.calMonth.getFullYear(), state.calMonth.getMonth()-1, 1);
+    renderCalendar();
+  });
+  document.getElementById('calNext').addEventListener('click', function(){
+    state.calMonth = new Date(state.calMonth.getFullYear(), state.calMonth.getMonth()+1, 1);
+    renderCalendar();
+  });
+
+  // ---------- Export / Import ----------
+  document.getElementById('btnExport').addEventListener('click', function(){
+    var blob = new Blob([JSON.stringify(state.trades, null, 2)], {type:'application/json'});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = 'ledger-noir-trades.json'; a.click();
+    URL.revokeObjectURL(url);
+  });
+  document.getElementById('btnImport').addEventListener('click', function(){
+    var input = document.createElement('input');
+    input.type = 'file'; input.accept = 'application/json';
+    input.addEventListener('change', function(){
+      var file = input.files[0]; if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function(){
+        try{
+          var imported = JSON.parse(reader.result);
+          if (Array.isArray(imported)){
+            state.trades = imported;
+            saveTrades(state.trades);
+            renderAll();
+          } else { alert('Format JSON tidak dikenali.'); }
+        } catch(e){ alert('Gagal membaca file JSON.'); }
       };
-    }));
+      reader.readAsText(file);
+    });
+    input.click();
+  });
 
-    const results = settled
-      .filter(s=>s.status==='fulfilled' && s.value)
-      .map(s=>s.value);
+  renderAll();
+})();
+</script>
 
-    const failed = settled.filter(s=>s.status==='rejected').length;
+<script>
+(function(){
+  var CRYPTO_SIM_KEY = 'emaScreenerPrioritySim_v1';
+  var cState = { trades: [], calMonth: new Date() };
 
-    scanning = false;
-    refreshBtn.classList.remove('spinning');
-
-    if(results.length===0 && failed === activeSymbols.length){
-      statusEl.classList.add('error');
-      statusEl.textContent = 'Gagal mengambil data dari Binance. Cek koneksi internet, atau kemungkinan Binance API diblokir di wilayah/jaringan Anda.';
-      grid.innerHTML = '';
-      return;
-    }
-
-    statusEl.textContent = `Terakhir dipindai: ${new Date().toLocaleTimeString('id-ID')} • ${results.length} koin dengan cross ditemukan dari ${activeSymbols.length} dipindai${failed?` (${failed} gagal dimuat)`:''}`;
-    render(results);
-
-    window.__esLastResults = results;
-    window.__esLastTickers = tickers;
-    monitorPrioritySimPositions(tickers);
-    renderPrioritySimUI(tickers);
-  }
-
-  const TV_INTERVAL_MAP = {
-    '1m':'1', '5m':'5', '15m':'15', '30m':'30', '1h':'60', '4h':'240', '1d':'D'
-  };
-
-  function openTradingView(symbol, overrideInterval, market){
-    const tf = overrideInterval || intervalSel.value;
-    const tvInterval = TV_INTERVAL_MAP[tf] || '60';
-    const tvSymbol = market==='futures' ? `${symbol}.P` : symbol;
-    const url = `https://www.tradingview.com/chart/?symbol=BINANCE:${tvSymbol}&interval=${tvInterval}`;
-    window.open(url, '_blank', 'noopener');
-  }
-
-  const BTC_TF_LIST = [
-    { value:'1m', label:'1m' }, { value:'5m', label:'5m' }, { value:'15m', label:'15m' }, { value:'30m', label:'30m' },
-    { value:'1h', label:'1H' }, { value:'4h', label:'4H' }, { value:'1d', label:'1D' }
-  ];
-  const btcTfStripEl = document.getElementById('esBtcTfStrip');
-  let btcTfScanning = false;
-
-  async function computeBtcTfStatus(tfValue){
+  function loadCryptoTrades(){
     try{
-      const { opens, highs, lows, closes } = await fetchKlines('BTCUSDT', tfValue, 250);
-      if(closes.length < 210) return { label:'n/a', cls:'none' };
-
-      const e9 = ema(closes, 9);
-      const e21 = ema(closes, 21);
-      const cross = detectCross(e9, e21, 2);
-      if(cross) return { label:'Cross EMA', cls: cross.type==='bullish' ? 'bull':'bear' };
-
-      const atrArr = atr(highs, lows, closes, 14);
-      const lastAtr = atrArr[atrArr.length-1] || 0;
-      const lastClose = closes[closes.length-1];
-
-      const pivotHighs = findPivots(highs, 10, 10, true).slice(-2);
-      const pivotLows = findPivots(lows, 10, 10, false).slice(-2);
-      const resZones = pivotHighs.map(p=>({ value:p.value, top:p.value+lastAtr*0.5, bottom:p.value-lastAtr*0.5 }));
-      const supZones = pivotLows.map(p=>({ value:p.value, top:p.value+lastAtr*0.5, bottom:p.value-lastAtr*0.5 }));
-      const nearRes = checkZoneNearBand(resZones, lastClose, lastAtr);
-      const nearSup = checkZoneNearBand(supZones, lastClose, lastAtr);
-      if(nearRes.ok || nearSup.ok) return { label:'Sentuh S/R', cls: nearRes.ok ? 'bear':'bull' };
-
-      const sd = findSupplyDemandZones(opens, closes, atrArr, 1.5, 3);
-      const nearSupply = checkZoneNearBand(sd.supply, lastClose, lastAtr);
-      const nearDemand = checkZoneNearBand(sd.demand, lastClose, lastAtr);
-      if(nearSupply.ok || nearDemand.ok) return { label:'Sentuh S/D', cls: nearSupply.ok ? 'bear':'bull' };
-
-      const bb = bollinger(closes, 20, 2.0);
-      const lastUpper = bb.upper[bb.upper.length-1];
-      const lastLower = bb.lower[bb.lower.length-1];
-      const lastHigh = highs[highs.length-1], lastLow = lows[lows.length-1];
-      const touchUpper = checkBBSide(lastHigh, lastLow, lastClose, lastUpper, lastAtr, true);
-      const touchLower = checkBBSide(lastHigh, lastLow, lastClose, lastLower, lastAtr, false);
-      if(touchUpper.ok) return { label:'Sentuh Upper BB', cls:'bear' };
-      if(touchLower.ok) return { label:'Sentuh Lower BB', cls:'bull' };
-
-      return { label:'-', cls:'none' };
-    }catch(e){
-      return { label:'Error', cls:'error' };
-    }
-  }
-
-  async function scanBtcTfStrip(){
-    if(btcTfScanning) return;
-    btcTfScanning = true;
-    try{
-      const results = await Promise.all(BTC_TF_LIST.map(tf => computeBtcTfStatus(tf.value)));
-      btcTfStripEl.innerHTML = BTC_TF_LIST.map((tf,i)=>{
-        const r = results[i];
-        return `<div class="es-btc-tf-box" data-tf="${tf.value}" title="Buka BTC ${tf.label} di TradingView">
-          <div class="es-btc-tf-box-label">BTC ${tf.label}</div>
-          <div class="es-btc-tf-box-status ${r.cls}">${r.label}</div>
-        </div>`;
-      }).join('');
-      btcTfStripEl.querySelectorAll('.es-btc-tf-box').forEach(box=>{
-        box.addEventListener('click', ()=>{
-          openTradingView('BTCUSDT', box.getAttribute('data-tf'));
-        });
+      var raw = localStorage.getItem(CRYPTO_SIM_KEY);
+      if(!raw) return [];
+      var data = JSON.parse(raw);
+      var history = data.history || [];
+      return history.map(function(t){
+        return {
+          date: t.exitTime,
+          pair: t.source ? t.source.replace('USDT','') : '?',
+          tf: t.tfLabel || '',
+          direction: t.dir || '',
+          pl: t.pnl || 0,
+          reason: t.reason || '',
+          venue: t.venue || 'sim'
+        };
       });
-    }finally{
-      btcTfScanning = false;
-    }
+    }catch(e){ return []; }
   }
 
-  function renderSymbolManagerDropdown(){
-    const results = window.__esLastResults || [];
-    if(results.length===0){
-      symbolManagerDropdown.innerHTML = `<div class="es-symbol-manager-empty">Belum ada koin hasil pindai. Jalankan pemindaian dulu.</div>`;
+  function fmtMoney(n){
+    return (n<0?'-':'') + '$' + Math.abs(n).toFixed(2);
+  }
+  function fmtDate(ms){
+    var d = new Date(ms);
+    return d.toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'}) + ' ' +
+           d.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
+  }
+
+  function computeStats(trades){
+    var total = trades.length;
+    var wins = trades.filter(function(t){return t.pl>0;});
+    var losses = trades.filter(function(t){return t.pl<0;});
+    var totalPL = trades.reduce(function(a,t){return a+t.pl;},0);
+    var grossProfit = wins.reduce(function(a,t){return a+t.pl;},0);
+    var grossLoss = Math.abs(losses.reduce(function(a,t){return a+t.pl;},0));
+    var winrate = total? (wins.length/total*100).toFixed(1)+'%' : '—';
+    var pf = grossLoss>0 ? (grossProfit/grossLoss).toFixed(2) : (grossProfit>0?'∞':'—');
+    var avgWin = wins.length? grossProfit/wins.length : 0;
+    var avgLoss = losses.length? grossLoss/losses.length : 0;
+    return {total:total, totalPL:totalPL, winrate:winrate, pf:pf, avgWin:avgWin, avgLoss:avgLoss};
+  }
+
+  function renderKPIs(){
+    var s = computeStats(cState.trades);
+    document.getElementById('cTotal').textContent = s.total;
+    document.getElementById('cWinrate').textContent = s.winrate;
+    var plEl = document.getElementById('cPL');
+    plEl.textContent = fmtMoney(s.totalPL);
+    plEl.className = 'value num ' + (s.totalPL>0?'profit':s.totalPL<0?'loss':'');
+    document.getElementById('cPF').textContent = s.pf;
+    document.getElementById('cAvgWin').textContent = fmtMoney(s.avgWin);
+    document.getElementById('cAvgLoss').textContent = fmtMoney(-s.avgLoss);
+  }
+
+  function renderEquityCurve(){
+    var svg = document.getElementById('cEquitySvg');
+    var W=640,H=220,PAD=28;
+    var sorted = cState.trades.slice().sort(function(a,b){return a.date-b.date;});
+    var points = [{y:0}];
+    var cum = 0;
+    sorted.forEach(function(t){ cum += t.pl; points.push({y:cum}); });
+
+    var ys = points.map(function(p){return p.y;});
+    var minY = Math.min.apply(null, ys), maxY = Math.max.apply(null, ys);
+    if (minY===maxY){ minY-=10; maxY+=10; }
+    var rangeY = maxY-minY;
+
+    function xFor(i){ return points.length===1 ? W/2 : PAD + i*(W-2*PAD)/(points.length-1); }
+    function yFor(v){ return H-PAD - ((v-minY)/rangeY)*(H-2*PAD); }
+
+    var gridLines = '';
+    for(var g=0; g<=3; g++){
+      var gy = PAD + g*(H-2*PAD)/3;
+      gridLines += '<line x1="'+PAD+'" y1="'+gy+'" x2="'+(W-PAD)+'" y2="'+gy+'" stroke="var(--border-soft)" stroke-width="1"/>';
+    }
+
+    var path = points.map(function(p,i){ return (i===0?'M':'L')+xFor(i).toFixed(1)+','+yFor(p.y).toFixed(1); }).join(' ');
+    var areaPath = path + ' L'+xFor(points.length-1).toFixed(1)+','+(H-PAD)+' L'+PAD+','+(H-PAD)+' Z';
+    var lastX = xFor(points.length-1), lastY = yFor(points[points.length-1].y);
+    var startX = xFor(0), startY = yFor(points[0].y);
+
+    svg.innerHTML =
+      '<defs><linearGradient id="cEqFill" x1="0" y1="0" x2="0" y2="1">'+
+        '<stop offset="0%" stop-color="var(--accent)" stop-opacity="0.16"/>'+
+        '<stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/>'+
+      '</linearGradient></defs>'+
+      gridLines+
+      '<path d="'+areaPath+'" fill="url(#cEqFill)" stroke="none"/>'+
+      '<path d="'+path+'" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>'+
+      '<circle cx="'+startX+'" cy="'+startY+'" r="3.5" fill="var(--ground)" stroke="var(--ink-faint)" stroke-width="1.5"/>'+
+      '<circle cx="'+lastX+'" cy="'+lastY+'" r="4.5" fill="var(--accent)"/>';
+
+    document.getElementById('cChartHint').textContent =
+      sorted.length ? 'Total P/L: ' + fmtMoney(cum) : 'Belum ada transaksi';
+  }
+
+  function renderTable(){
+    var tbody = document.getElementById('cTradeTbody');
+    var empty = document.getElementById('cEmptyState');
+    var sorted = cState.trades.slice().sort(function(a,b){return b.date-a.date;});
+    if (!sorted.length){
+      tbody.innerHTML = '';
+      document.getElementById('cTradeTable').style.display='none';
+      empty.style.display='block';
       return;
     }
-    symbolManagerDropdown.innerHTML = results.map(r=>{
-      const label = `${r.symbol.replace('USDT','')} (${r.interval||intervalSel.value})`;
-      return `<div class="es-symbol-manager-row">
-        <span class="es-symbol-manager-name" data-symbol="${r.symbol}" data-tf="${r.interval||''}">${label}</span>
-        <button type="button" class="es-symbol-manager-block" data-symbol="${r.symbol}">Blokir &amp; Ganti</button>
-      </div>`;
+    document.getElementById('cTradeTable').style.display='table';
+    empty.style.display='none';
+
+    tbody.innerHTML = sorted.map(function(t){
+      var result = t.pl>0?'win':t.pl<0?'loss':'be';
+      var resultLabel = t.pl>0?'WIN':t.pl<0?'LOSS':'BE';
+      var venueBadge = t.venue==='live-testnet' ? ' <span class="venue-badge">Testnet</span>' : '';
+      return '<tr>'+
+        '<td class="num">'+fmtDate(t.date)+'</td>'+
+        '<td>'+t.pair+venueBadge+'</td>'+
+        '<td>'+t.tf+'</td>'+
+        '<td><span class="dir '+t.direction.toLowerCase()+'">'+t.direction.toUpperCase()+'</span></td>'+
+        '<td class="emo-chip">'+t.reason+'</td>'+
+        '<td class="num" style="color:'+(t.pl>0?'var(--profit)':t.pl<0?'var(--loss)':'var(--ink-dim)')+'">'+fmtMoney(t.pl)+'</td>'+
+        '<td><span class="pill '+result+'">'+resultLabel+'</span></td>'+
+      '</tr>';
+    }).join('');
+  }
+
+  function renderCalendar(){
+    var dowEl = document.getElementById('cCalDow');
+    dowEl.innerHTML = ['Sen','Sel','Rab','Kam','Jum','Sab','Min'].map(function(d){
+      return '<div class="cal-dow">'+d+'</div>';
     }).join('');
 
-    symbolManagerDropdown.querySelectorAll('.es-symbol-manager-name').forEach(el=>{
-      el.addEventListener('click', ()=>{
-        openTradingView(el.getAttribute('data-symbol'), el.getAttribute('data-tf') || undefined);
-      });
+    var month = cState.calMonth;
+    document.getElementById('cCalMonthLabel').textContent =
+      month.toLocaleDateString('id-ID',{month:'long',year:'numeric'});
+
+    var firstDay = new Date(month.getFullYear(), month.getMonth(), 1);
+    var startOffset = (firstDay.getDay()+6)%7;
+    var daysInMonth = new Date(month.getFullYear(), month.getMonth()+1, 0).getDate();
+
+    var plByDay = {};
+    cState.trades.forEach(function(t){
+      var d = new Date(t.date);
+      if (d.getFullYear()===month.getFullYear() && d.getMonth()===month.getMonth()){
+        var key = d.getDate();
+        plByDay[key] = (plByDay[key]||0) + t.pl;
+      }
     });
-    symbolManagerDropdown.querySelectorAll('.es-symbol-manager-block').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
-        const symbol = btn.getAttribute('data-symbol');
-        const replacement = blockAndReplaceSymbol(symbol);
-        symbolManagerBtn.classList.remove('open');
-        symbolManagerDropdown.classList.remove('open');
-        statusEl.textContent = replacement
-          ? `${symbol} diblokir & diganti dengan ${replacement}. Memindai ulang...`
-          : `${symbol} diblokir dari daftar pindaian. Memindai ulang...`;
-        scan();
-      });
-    });
+
+    var today = new Date();
+    var cells = '';
+    for (var i=0;i<startOffset;i++){ cells += '<div class="cal-cell blank"></div>'; }
+    for (var day=1; day<=daysInMonth; day++){
+      var cellDate = new Date(month.getFullYear(), month.getMonth(), day);
+      var cls = 'cal-cell';
+      if (cellDate.toDateString()===today.toDateString()) cls += ' today';
+      var pl = plByDay[day];
+      var plHtml = '';
+      if (pl!==undefined){
+        cls += pl>=0 ? ' profit' : ' loss';
+        plHtml = '<div class="pl">'+(pl>=0?'+':'')+pl.toFixed(0)+'</div>';
+      }
+      cells += '<div class="'+cls+'"><div class="d">'+day+'</div>'+plHtml+'</div>';
+    }
+    document.getElementById('cCalGrid').innerHTML = cells;
   }
 
-  symbolManagerBtn.addEventListener('click', ()=>{
-    const willOpen = !symbolManagerDropdown.classList.contains('open');
-    if(willOpen) renderSymbolManagerDropdown();
-    symbolManagerBtn.classList.toggle('open', willOpen);
-    symbolManagerDropdown.classList.toggle('open', willOpen);
-  });
-
-  document.addEventListener('click', (e)=>{
-    if(!symbolManagerBtn.contains(e.target) && !symbolManagerDropdown.contains(e.target)){
-      symbolManagerBtn.classList.remove('open');
-      symbolManagerDropdown.classList.remove('open');
-    }
-  });
-
-  const PRIORITY_LIMIT = 5;
-  const PRIORITY_RISK_TIERS = {
-    high:   [ { value:'1m', label:'1m' }, { value:'5m', label:'5m' }, { value:'15m', label:'15m' } ],
-    medium: [ { value:'30m', label:'30m' }, { value:'1h', label:'1H' } ],
-    low:    [ { value:'4h', label:'4H' }, { value:'1d', label:'1D' } ]
-  };
-  const PRIORITY_RISK_LABEL = { high:'High', medium:'Medium', low:'Low' };
-
-  const priorityBtn = document.getElementById('esPriorityBtn');
-  const priorityStatusEl = document.getElementById('esPriorityStatus');
-  const priorityGrid = document.getElementById('esPriorityGrid');
-  const priorityRiskSel = document.getElementById('esPriorityRisk');
-  const priorityManagerBtn = document.getElementById('esPriorityManagerBtn');
-  const priorityManagerDropdown = document.getElementById('esPriorityManagerDropdown');
-
-  function renderPriorityManagerDropdown(){
-    const results = window.__esLastPriorityResults || [];
-    if(results.length===0){
-      priorityManagerDropdown.innerHTML = `<div class="es-symbol-manager-empty">Belum ada sinyal prioritas hasil pindai.</div>`;
+  function renderPairInsight(){
+    var box = document.getElementById('cPairInsight');
+    if (!cState.trades.length){
+      box.innerHTML = '<p style="font-size:12.5px;color:var(--ink-faint);margin:0">Belum ada data.</p>';
       return;
     }
-    priorityManagerDropdown.innerHTML = results.map(c=>{
-      const label = `${c.symbol.replace('USDT','')} (${c.tfLabel})`;
-      return `<div class="es-symbol-manager-row">
-        <span class="es-symbol-manager-name" data-symbol="${c.symbol}" data-tf="${c.tfValue||''}">${label}</span>
-        <button type="button" class="es-symbol-manager-block" data-symbol="${c.symbol}">Blokir &amp; Ganti</button>
-      </div>`;
+    var byPair = {};
+    cState.trades.forEach(function(t){
+      if(!byPair[t.pair]) byPair[t.pair] = { count:0, pl:0 };
+      byPair[t.pair].count++;
+      byPair[t.pair].pl += t.pl;
+    });
+    var maxAbs = Math.max.apply(null, Object.keys(byPair).map(function(k){return Math.abs(byPair[k].pl);})) || 1;
+    var rows = Object.keys(byPair).sort(function(a,b){return byPair[b].pl-byPair[a].pl;}).map(function(k){
+      var v = byPair[k];
+      var pct = (Math.abs(v.pl)/maxAbs*100).toFixed(0);
+      return '<div class="emo-row"><span>'+k+' ('+v.count+'x)</span>'+
+        '<span class="emo-bar-track"><span class="emo-bar-fill" style="width:'+pct+'%;background:'+(v.pl>=0?'var(--profit)':'var(--loss)')+'"></span></span>'+
+        '<span class="num" style="color:'+(v.pl>=0?'var(--profit)':'var(--loss)')+'">'+fmtMoney(v.pl)+'</span></div>';
     }).join('');
-
-    priorityManagerDropdown.querySelectorAll('.es-symbol-manager-name').forEach(el=>{
-      el.addEventListener('click', ()=>{
-        openTradingView(el.getAttribute('data-symbol'), el.getAttribute('data-tf') || undefined);
-      });
-    });
-    priorityManagerDropdown.querySelectorAll('.es-symbol-manager-block').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
-        const symbol = btn.getAttribute('data-symbol');
-        const replacement = blockAndReplaceSymbol(symbol);
-        priorityManagerBtn.classList.remove('open');
-        priorityManagerDropdown.classList.remove('open');
-        priorityStatusEl.classList.remove('error');
-        priorityStatusEl.textContent = replacement
-          ? `${symbol} diblokir & diganti dengan ${replacement}. Memindai ulang sinyal prioritas...`
-          : `${symbol} diblokir dari daftar pindaian. Memindai ulang sinyal prioritas...`;
-        findPrioritySignals();
-      });
-    });
+    box.innerHTML = rows;
   }
 
-  priorityManagerBtn.addEventListener('click', ()=>{
-    const willOpen = !priorityManagerDropdown.classList.contains('open');
-    if(willOpen) renderPriorityManagerDropdown();
-    priorityManagerBtn.classList.toggle('open', willOpen);
-    priorityManagerDropdown.classList.toggle('open', willOpen);
+  function renderCryptoAll(){
+    cState.trades = loadCryptoTrades();
+    document.getElementById('cryptoSyncNote').textContent = cState.trades.length
+      ? 'Tersinkron • ' + cState.trades.length + ' transaksi ditemukan.'
+      : 'Belum ada transaksi tersimpan di Kripto Screener.';
+    renderKPIs(); renderEquityCurve(); renderTable(); renderCalendar(); renderPairInsight();
+  }
+
+  document.getElementById('btnRefreshCrypto').addEventListener('click', renderCryptoAll);
+  document.getElementById('cCalPrev').addEventListener('click', function(){
+    cState.calMonth = new Date(cState.calMonth.getFullYear(), cState.calMonth.getMonth()-1, 1);
+    renderCalendar();
+  });
+  document.getElementById('cCalNext').addEventListener('click', function(){
+    cState.calMonth = new Date(cState.calMonth.getFullYear(), cState.calMonth.getMonth()+1, 1);
+    renderCalendar();
+  });
+  window.addEventListener('storage', function(e){
+    if(e.key === CRYPTO_SIM_KEY) renderCryptoAll();
   });
 
-  document.addEventListener('click', (e)=>{
-    if(!priorityManagerBtn.contains(e.target) && !priorityManagerDropdown.contains(e.target)){
-      priorityManagerBtn.classList.remove('open');
-      priorityManagerDropdown.classList.remove('open');
-    }
-  });
-
-  function getPriorityScanTfs(){
-    const risk = priorityRiskSel.value;
-    if(risk==='all'){
-      return [
-        ...PRIORITY_RISK_TIERS.high.map(tf=>({ ...tf, risk:'high' })),
-        ...PRIORITY_RISK_TIERS.medium.map(tf=>({ ...tf, risk:'medium' })),
-        ...PRIORITY_RISK_TIERS.low.map(tf=>({ ...tf, risk:'low' }))
-      ];
-    }
-    return (PRIORITY_RISK_TIERS[risk] || []).map(tf=>({ ...tf, risk }));
-  }
-
-  function renderPrioritySignals(top){
-    window.__esLastPriorityResults = top;
-    populatePsimSignalSelect();
-    priorityGrid.innerHTML = top.map((c,i)=>{
-      const signalCls = c.signal==='BUY' ? 'buy' : 'sell';
-      const bandLabel = c.signal==='BUY' ? 'Lower' : 'Upper';
-      const bandValue = c.signal==='BUY' ? c.evalRes.lastLower : c.evalRes.lastUpper;
-      const srZoneTxt = c.dir.sr.zone ? ` (zona $${fmtPrice(c.dir.sr.zone.value)})` : '';
-      const sdZoneTxt = c.dir.sd.zone ? ` (zona $${fmtPrice(c.dir.sd.zone.value)})` : '';
-      const emaNoteText = c.emaNote==='above' ? 'Harga di atas EMA9 &amp; EMA21' : c.emaNote==='below' ? 'Harga di bawah EMA9 &amp; EMA21' : 'Harga di antara EMA9 &amp; EMA21';
-      const stochText = c.stochK===null || c.stochK===undefined
-        ? 'Stochastic: n/a'
-        : `Stochastic: K ${c.stochK.toFixed(1)}${c.stochCond==='overbought'?' — Overbought':c.stochCond==='oversold'?' — Oversold':' — Netral'}`;
-      const riskLabel = PRIORITY_RISK_LABEL[c.risk] || c.risk;
-      const sl = c.signal==='BUY' ? pickSlForBuy(c.dir) : pickSlForSell(c.dir);
-      const riskDist = Math.abs(c.price - sl);
-      const riskPct = (riskDist / c.price) * 100;
-      const tp1 = c.signal==='BUY' ? c.price + riskDist : c.price - riskDist;
-      const tp2 = c.signal==='BUY' ? c.price + riskDist*2 : c.price - riskDist*2;
-      const cn = c.confirmNotes || {};
-      const passCount = c.passCount || 0;
-      const isWatch = passCount === 0;
-      const statusLabel = isWatch ? 'PANTAU' : (c.signal==='BUY' ? 'BUY NOW' : 'SELL NOW');
-      const statusCls = isWatch ? 'watch' : signalCls;
-      return `<div class="es-priority-card ${signalCls}" data-symbol="${c.symbol}" data-tf="${c.tfValue}" data-tflabel="${c.tfLabel}" data-price="${c.price}">
-        <div class="es-priority-card-top">
-          <span class="es-priority-rank">#${i+1}</span>
-          <span class="es-priority-symbol">${c.symbol.replace('USDT','')}</span>
-          <span class="es-priority-signal ${statusCls}">${statusLabel}</span>
-          ${c.highProbability ? '<span class="es-priority-hp-badge">HIGH PROBABILITY</span>' : ''}
-        </div>
-        <div class="es-priority-tf">Risk: <strong>${riskLabel}</strong> • TF ${c.tfLabel} • Harga $${fmtPrice(c.price)}</div>
-        <div class="es-checklist">
-          <div class="es-check-row ok"><span class="es-check-icon">&check;</span> BB ${bandLabel}: ${c.dir.bb.status} (band $${fmtPrice(bandValue)})</div>
-          <div class="es-check-row ok"><span class="es-check-icon">&check;</span> S/R: ${c.dir.sr.status}${srZoneTxt}</div>
-          <div class="es-check-row ok"><span class="es-check-icon">&check;</span> S/D: ${c.dir.sd.status}${sdZoneTxt}</div>
-        </div>
-        <div class="es-priority-levels">
-          <div class="es-priority-level-row">Area Entri: <strong>$${fmtPrice(c.price)}</strong></div>
-          <div class="es-priority-level-row invalid">Invalid Level (SL): <strong>$${fmtPrice(sl)}</strong></div>
-          <div class="es-priority-level-row">Take Profit: <strong>TP1 $${fmtPrice(tp1)}</strong> &bull; <strong>TP2 $${fmtPrice(tp2)}</strong></div>
-          <div class="es-priority-level-row">Risk: <strong>${riskPct.toFixed(2)}%</strong></div>
-        </div>
-        <div class="es-checklist es-confirm-notes">
-          <div class="es-check-row ${cn.pinbar?'ok':'fail'}"><span class="es-check-icon">${cn.pinbar?'&check;':'&#10007;'}</span> Pin Bar</div>
-          ${cn.showEmaCross ? `<div class="es-check-row ${cn.cross1m?'ok':'fail'}"><span class="es-check-icon">${cn.cross1m?'&check;':'&#10007;'}</span> Cross EMA9/21 TF 1m</div>
-          <div class="es-check-row ${cn.cross5m?'ok':'fail'}"><span class="es-check-icon">${cn.cross5m?'&check;':'&#10007;'}</span> Cross EMA9/21 TF 5m</div>` : ''}
-          <div class="es-check-row ${cn.engulfing?'ok':'fail'}"><span class="es-check-icon">${cn.engulfing?'&check;':'&#10007;'}</span> Engulfing</div>
-          <div class="es-check-row ${cn.ranging?'ok':'fail'}"><span class="es-check-icon">${cn.ranging?'&check;':'&#10007;'}</span> Ranging di area S/R</div>
-        </div>
-        <div class="es-priority-note">Note EMA9/21: ${emaNoteText}</div>
-        <div class="es-priority-note">Note ${stochText}</div>
-        <button class="es-priority-trade-btn" type="button">Pilih Sinyal Ini</button>
-      </div>`;
-    }).join('');
-
-    priorityGrid.querySelectorAll('.es-priority-card').forEach((card,i)=>{
-      const cand = top[i];
-      card.addEventListener('click', (e)=>{
-        if(e.target.classList.contains('es-priority-trade-btn')) return;
-        openTradingView(cand.symbol, cand.tfValue);
-      });
-      const tradeBtn = card.querySelector('.es-priority-trade-btn');
-      tradeBtn.addEventListener('click', (e)=>{
-        e.stopPropagation();
-        selectPrioritySimSignalFromCard(cand);
-      });
-    });
-  }
-
-  async function findPrioritySignals(){
-    const scanTfs = getPriorityScanTfs();
-    if(scanTfs.length===0){
-      priorityStatusEl.classList.add('error');
-      priorityStatusEl.textContent = 'Pilih level risk terlebih dahulu.';
-      return;
-    }
-
-    priorityBtn.disabled = true;
-    priorityStatusEl.classList.remove('error');
-    const tfLabels = scanTfs.map(tf=>tf.label).join('/');
-    priorityStatusEl.textContent = `Memindai ${activeSymbols.length} koin x ${scanTfs.length} timeframe (${tfLabels})... bisa memakan waktu beberapa detik.`;
-    priorityGrid.innerHTML = '';
-
-    try{
-      const tickers = await loadTickers();
-      let all = [];
-
-      for(const tf of scanTfs){
-        const settled = await Promise.allSettled(activeSymbols.map(async (symbol)=>{
-          const { opens, highs, lows, closes } = await fetchKlines(symbol, tf.value, 300);
-          if(closes.length < 210) return null;
-          const ind = computeFullIndicators(opens, highs, lows, closes);
-          const lastHigh = highs[highs.length-1], lastLow = lows[lows.length-1], lastClose = closes[closes.length-1];
-          const evalRes = evaluateChecklist(ind, lastHigh, lastLow, lastClose);
-          const t = tickers[symbol];
-          const price = t ? parseFloat(t.lastPrice) : lastClose;
-
-          const cands = [];
-          if(qualifies3(evalRes.buy)){
-            cands.push({ symbol, signal:'BUY', dir:evalRes.buy, price, emaNote:evalRes.emaNote, stochCond:evalRes.stochCond, stochK:evalRes.stochK, stochD:evalRes.stochD, evalRes,
-              tfValue: tf.value, tfLabel: tf.label, risk: tf.risk, opens, highs, lows, closes,
-              score: evalRes.buy.bb.dist+evalRes.buy.sr.dist+evalRes.buy.sd.dist });
-          }
-          if(qualifies3(evalRes.sell)){
-            cands.push({ symbol, signal:'SELL', dir:evalRes.sell, price, emaNote:evalRes.emaNote, stochCond:evalRes.stochCond, stochK:evalRes.stochK, stochD:evalRes.stochD, evalRes,
-              tfValue: tf.value, tfLabel: tf.label, risk: tf.risk, opens, highs, lows, closes,
-              score: evalRes.sell.bb.dist+evalRes.sell.sr.dist+evalRes.sell.sd.dist });
-          }
-          return cands.length ? cands : null;
-        }));
-
-        settled.forEach(s=>{ if(s.status==='fulfilled' && s.value) all = all.concat(s.value); });
-      }
-
-      const bestPerSymbol = {};
-      all.forEach(cand=>{
-        const existing = bestPerSymbol[cand.symbol];
-        if(!existing || cand.score < existing.score) bestPerSymbol[cand.symbol] = cand;
-      });
-      const deduped = Object.values(bestPerSymbol);
-      deduped.sort((a,b)=> a.score - b.score || rankOf(a.symbol)-rankOf(b.symbol));
-      const top = deduped.slice(0, PRIORITY_LIMIT);
-
-      if(top.length===0){
-        priorityStatusEl.textContent = `Tidak ada koin yang memenuhi ke-3 syarat wajib (BB + S/R + S/D) di timeframe ${tfLabels} saat ini.`;
-        priorityGrid.innerHTML = '';
-        priorityBtn.disabled = false;
-        return;
-      }
-
-      priorityStatusEl.textContent = `Ditemukan ${top.length} sinyal, memeriksa note konfirmasi tambahan...`;
-      await Promise.all(top.map(async (cand)=>{
-        const conf = await computeConfirmationNotes(cand);
-        cand.confirmNotes = conf.notes;
-        cand.highProbability = conf.highProbability;
-        cand.passCount = conf.passCount;
-      }));
-
-      renderPrioritySignals(top);
-      priorityStatusEl.textContent = `Ditemukan ${top.length} sinyal prioritas dari ${deduped.length} koin valid (${all.length} kandidat) • ${new Date().toLocaleTimeString('id-ID')}.`;
-      processPrioritySimFromPriority(tickers);
-    }catch(e){
-      priorityStatusEl.classList.add('error');
-      priorityStatusEl.textContent = 'Gagal memindai sinyal prioritas: data tidak dapat diambil.';
-    }finally{
-      priorityBtn.disabled = false;
-    }
-  }
-
-  const PRIORITY_SIM_KEY = 'emaScreenerPrioritySim_v1';
-  let prioritySimPositions = {};
-  let prioritySimHistory = [];
-
-  const psimModalInput = document.getElementById('esPsimModal');
-  const psimLeverageInput = document.getElementById('esPsimLeverage');
-  const psimSignalSelect = document.getElementById('esPsimSignalSelect');
-  const psimToggle = document.getElementById('esPsimToggle');
-  const psimOpenBtn = document.getElementById('esPsimOpenBtn');
-  const psimResetBtn = document.getElementById('esPsimResetBtn');
-  const psimPreviewEl = document.getElementById('esPsimPreview');
-  const psimStatusEl = document.getElementById('esPsimStatus');
-  const psimSummaryEl = document.getElementById('esPsimSummary');
-  const psimOpenTbody = document.getElementById('esPsimOpenTbody');
-  const psimHistTbody = document.getElementById('esPsimHistTbody');
-  const psimEquityChartEl = document.getElementById('esPsimEquityChart');
-  let psimSelectedCandidate = null;
-
-  const LIVE_TRADE_CONFIG_KEY = 'emaScreenerLiveTradeConfig_v1';
-  const liveBackendUrlInput = document.getElementById('esLiveBackendUrl');
-  const liveAppTokenInput = document.getElementById('esLiveAppToken');
-  const liveTradeBtn = document.getElementById('esLiveTradeBtn');
-  const liveTradeStatusEl = document.getElementById('esLiveTradeStatus');
-
-  function loadLiveTradeConfig(){
-    try{
-      const raw = localStorage.getItem(LIVE_TRADE_CONFIG_KEY);
-      if(!raw) return;
-      const cfg = JSON.parse(raw);
-      if(cfg.backendUrl) liveBackendUrlInput.value = cfg.backendUrl;
-      if(cfg.appToken) liveAppTokenInput.value = cfg.appToken;
-    }catch(e){}
-  }
-
-  function saveLiveTradeConfig(){
-    try{
-      localStorage.setItem(LIVE_TRADE_CONFIG_KEY, JSON.stringify({
-        backendUrl: liveBackendUrlInput.value.trim(),
-        appToken: liveAppTokenInput.value.trim()
-      }));
-    }catch(e){}
-  }
-
-  function roundToStep(value, step){
-    if(!step || step <= 0) return value;
-    const precision = Math.max(0, Math.round(-Math.log10(step)));
-    return (Math.floor(value / step) * step).toFixed(precision);
-  }
-
-  async function fetchSymbolFilters(symbol){
-    const res = await fetch(`https://testnet.binance.vision/api/v3/exchangeInfo?symbol=${symbol}`);
-    if(!res.ok) throw new Error('Gagal ambil exchangeInfo simbol');
-    const data = await res.json();
-    const filters = data.symbols[0].filters;
-    const lotSize = filters.find(f=>f.filterType==='LOT_SIZE');
-    const priceFilter = filters.find(f=>f.filterType==='PRICE_FILTER');
-    return {
-      stepSize: lotSize ? parseFloat(lotSize.stepSize) : null,
-      tickSize: priceFilter ? parseFloat(priceFilter.tickSize) : null
-    };
-  }
-
-  async function sendLiveTrade(cand){
-    const backendUrl = liveBackendUrlInput.value.trim().replace(/\/$/, '');
-    const appToken = liveAppTokenInput.value.trim();
-
-    if(!backendUrl || !appToken){
-      liveTradeStatusEl.classList.add('error');
-      liveTradeStatusEl.classList.remove('success');
-      liveTradeStatusEl.textContent = 'Isi dulu Backend URL dan App Token.';
-      return;
-    }
-
-    liveTradeBtn.disabled = true;
-    liveTradeStatusEl.classList.remove('error', 'success');
-    liveTradeStatusEl.textContent = 'Menyiapkan order (ambil aturan lot/harga simbol)...';
-
-    let quantityStr, tpStr, slStr;
-    try{
-      const entryPrice = cand.price;
-      const slRaw = cand.signal==='BUY' ? pickSlForBuy(cand.dir) : pickSlForSell(cand.dir);
-      const riskDist = Math.abs(entryPrice - slRaw);
-      const tpRaw = cand.signal==='BUY' ? entryPrice + riskDist : entryPrice - riskDist;
-      const margin = currentPsimMargin();
-      const quantityRaw = margin / entryPrice; // trading spot testnet: tidak ada leverage sungguhan
-
-      const { stepSize, tickSize } = await fetchSymbolFilters(cand.symbol);
-      quantityStr = stepSize ? roundToStep(quantityRaw, stepSize) : quantityRaw.toFixed(6);
-      tpStr = tickSize ? roundToStep(tpRaw, tickSize) : fmtPrice(tpRaw);
-      slStr = tickSize ? roundToStep(slRaw, tickSize) : fmtPrice(slRaw);
-
-      if(parseFloat(quantityStr) <= 0){
-        throw new Error('Modal terlalu kecil untuk lot minimum simbol ini.');
-      }
-    }catch(e){
-      liveTradeBtn.disabled = false;
-      liveTradeStatusEl.classList.add('error');
-      liveTradeStatusEl.textContent = `Gagal menyiapkan order: ${e.message}`;
-      return;
-    }
-
-    const confirmMsg = `Kirim order ASLI (Binance Testnet) untuk ${cand.symbol.replace('USDT','')} (TF ${cand.tfLabel}):\n\n`
-      + `Arah: ${cand.signal}\nQty: ${quantityStr}\nEntry: MARKET (~$${fmtPrice(cand.price)})\nTP: $${tpStr}\nSL: $${slStr}\n\n`
-      + `Ini order SUNGGUHAN ke akun testnet kamu (saldo palsu). Lanjutkan?`;
-    if(!window.confirm(confirmMsg)){
-      liveTradeBtn.disabled = false;
-      liveTradeStatusEl.textContent = '';
-      return;
-    }
-
-    liveTradeStatusEl.textContent = 'Mengirim order ke backend...';
-
-    try{
-      const res = await fetch(`${backendUrl}/api/trade/oco`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-App-Token': appToken },
-        body: JSON.stringify({
-          symbol: cand.symbol,
-          side: cand.signal,
-          quantity: quantityStr,
-          entryType: 'MARKET',
-          tp: tpStr,
-          sl: slStr
-        })
-      });
-      const data = await res.json();
-      if(!res.ok){
-        throw new Error((data && data.error) ? JSON.stringify(data.error) : `HTTP ${res.status}`);
-      }
-      const entryOrderId = data.entryOrder && data.entryOrder.orderId;
-      const ocoId = data.ocoOrder && data.ocoOrder.orderListId;
-      liveTradeStatusEl.classList.add('success');
-      liveTradeStatusEl.textContent = `Berhasil! Order ID entry: ${entryOrderId}, OCO ID: ${ocoId}`;
-
-      const liveKey = `${cand.symbol}_${cand.tfValue}_LIVE_${Date.now()}`;
-      recordLiveTestnetPosition(liveKey, cand, quantityStr, tpStr, slStr, Date.now(), { entryOrderId, ocoId });
-      renderPrioritySimUI(window.__esLastTickers||{});
-    }catch(e){
-      liveTradeStatusEl.classList.add('error');
-      liveTradeStatusEl.textContent = `Gagal kirim order: ${e.message}`;
-    }finally{
-      liveTradeBtn.disabled = false;
-    }
-  }
-
-  function loadPrioritySimState(){
-    try{
-      const raw = localStorage.getItem(PRIORITY_SIM_KEY);
-      if(!raw) return;
-      const data = JSON.parse(raw);
-      prioritySimPositions = data.positions || {};
-      prioritySimHistory = data.history || [];
-      // migrasi posisi lama (sebelum fitur TP1/TP2) yang cuma punya field "tp" tunggal
-      Object.keys(prioritySimPositions).forEach(key=>{
-        const pos = prioritySimPositions[key];
-        if(pos.tp1===undefined || pos.tp2===undefined){
-          const riskDist = Math.abs(pos.entryPrice - pos.sl);
-          pos.tp1 = pos.dir==='BUY' ? pos.entryPrice + riskDist : pos.entryPrice - riskDist;
-          pos.tp2 = pos.dir==='BUY' ? pos.entryPrice + riskDist*2 : pos.entryPrice - riskDist*2;
-        }
-        if(pos.tp1Hit===undefined) pos.tp1Hit = false;
-        if(pos.tp2Hit===undefined) pos.tp2Hit = false;
-        // migrasi posisi lama (sebelum fitur leverage) yang belum punya margin/leverage/qty terkunci
-        if(pos.qty===undefined || pos.margin===undefined || pos.leverage===undefined){
-          pos.margin = currentPsimMargin();
-          pos.leverage = currentPsimLeverage();
-          pos.qty = (pos.margin * pos.leverage) / pos.entryPrice;
-        }
-      });
-      savePrioritySimState();
-    }catch(e){
-      prioritySimPositions = {};
-      prioritySimHistory = [];
-    }
-  }
-
-  function savePrioritySimState(){
-    try{
-      localStorage.setItem(PRIORITY_SIM_KEY, JSON.stringify({ positions: prioritySimPositions, history: prioritySimHistory }));
-    }catch(e){ /* localStorage penuh/diblokir - abaikan, state tetap ada di memori */ }
-  }
-
-  const PSIM_EXCHANGE_FEE_RATE = 0.0004; // taker fee Binance Futures, 0.04% per sisi (buka & tutup)
-  const PSIM_FUNDING_RATE_PER_8H = 0.0001; // rata-rata funding rate Binance Futures, ~0.01% per 8 jam
-
-  function currentPsimMargin(){
-    return Math.max(parseFloat(psimModalInput.value) || 1000, 1);
-  }
-
-  function currentPsimLeverage(){
-    return Math.max(parseFloat(psimLeverageInput.value) || 1, 1);
-  }
-
-  function currentPsimQty(entryPrice){
-    const notional = currentPsimMargin() * currentPsimLeverage();
-    return notional / entryPrice;
-  }
-
-  function computePsimExchangeFee(entryPrice, exitPrice, qty){
-    return (entryPrice*qty + exitPrice*qty) * PSIM_EXCHANGE_FEE_RATE;
-  }
-
-  function computePsimMarginFee(entryPrice, qty, entryTime, exitTime){
-    const notional = entryPrice*qty;
-    const hoursHeld = Math.max(0, (exitTime - entryTime)) / 3600000;
-    const fundingIntervals = Math.floor(hoursHeld/8);
-    return notional * PSIM_FUNDING_RATE_PER_8H * fundingIntervals;
-  }
-
-  function openPrioritySimPosition(key, source, tfLabel, tfValue, dir, entryPrice, sl, tp1, tp2, time){
-    const margin = currentPsimMargin();
-    const leverage = currentPsimLeverage();
-    const qty = (margin * leverage) / entryPrice;
-    prioritySimPositions[key] = { key, source, tfLabel, tfValue, dir, entryPrice, entryTime: time, sl, tp1, tp2, tp1Hit:false, tp2Hit:false, margin, leverage, qty, venue:'sim' };
-    savePrioritySimState();
-  }
-
-  // Posisi order ASLI (Binance Testnet, dikirim lewat backend) - dicatat di tabel yang sama tapi
-  // ditandai venue:'live-testnet' supaya tidak ikut logic auto-close simulasi (TP/SL asli dikelola OCO di Binance).
-  function recordLiveTestnetPosition(key, cand, quantity, tp, sl, time, orderIds){
-    prioritySimPositions[key] = {
-      key, source: cand.symbol, tfLabel: cand.tfLabel, tfValue: cand.tfValue, dir: cand.signal,
-      entryPrice: cand.price, entryTime: time, sl: parseFloat(sl), tp1: parseFloat(tp), tp2: parseFloat(tp),
-      tp1Hit:false, tp2Hit:false, margin: currentPsimMargin(), leverage: 1, qty: parseFloat(quantity),
-      venue: 'live-testnet', liveOrderId: orderIds.entryOrderId, liveOcoId: orderIds.ocoId
-    };
-    savePrioritySimState();
-  }
-
-  function closePrioritySimPosition(key, exitPrice, time, reason){
-    const pos = prioritySimPositions[key];
-    if(!pos) return;
-    const qty = pos.qty;
-    const grossPnl = pos.dir==='BUY' ? (exitPrice-pos.entryPrice)*qty : (pos.entryPrice-exitPrice)*qty;
-    const exchangeFee = computePsimExchangeFee(pos.entryPrice, exitPrice, qty);
-    const marginFee = computePsimMarginFee(pos.entryPrice, qty, pos.entryTime, time);
-    const pnl = grossPnl - exchangeFee - marginFee;
-    const pnlPct = (pnl / pos.margin) * 100;
-    const tpStatus = pos.tp2Hit ? 'TP2' : (pos.tp1Hit ? 'BE/TP1' : '-');
-    prioritySimHistory.unshift({ source: pos.source, tfLabel: pos.tfLabel, tfValue: pos.tfValue, dir: pos.dir, entryPrice: pos.entryPrice, entryTime: pos.entryTime,
-      exitPrice, exitTime: time, reason, exchangeFee, marginFee, pnl, pnlPct, tpStatus, venue: pos.venue || 'sim' });
-    delete prioritySimPositions[key];
-    savePrioritySimState();
-  }
-
-  function manualClosePrioritySimPosition(key, tickers){
-    const pos = prioritySimPositions[key];
-    if(!pos) return;
-    const t = tickers[pos.source];
-    const price = t ? parseFloat(t.lastPrice) : pos.entryPrice;
-    closePrioritySimPosition(key, price, Date.now(), 'Manual Close');
-    renderPrioritySimUI(tickers);
-  }
-
-  function resetPrioritySim(){
-    prioritySimPositions = {};
-    prioritySimHistory = [];
-    localStorage.removeItem(PRIORITY_SIM_KEY);
-    renderPrioritySimUI(window.__esLastTickers||{});
-  }
-
-  function monitorPrioritySimPositions(tickers){
-    Object.keys(prioritySimPositions).forEach(key=>{
-      const pos = prioritySimPositions[key];
-      if(pos.venue === 'live-testnet') return; // TP/SL asli dikelola OCO order di Binance, bukan simulasi lokal
-      const t = tickers[pos.source];
-      const price = t ? parseFloat(t.lastPrice) : null;
-      if(price===null || price===undefined) return;
-
-      if(pos.dir==='BUY'){
-        if(!pos.tp1Hit && price >= pos.tp1){ pos.tp1Hit = true; savePrioritySimState(); }
-        if(!pos.tp2Hit && price >= pos.tp2){ pos.tp2Hit = true; savePrioritySimState(); }
-        if(pos.tp2Hit){ closePrioritySimPosition(key, pos.tp2, Date.now(), 'TP1-TP2'); return; }
-        if(pos.tp1Hit){
-          if(price <= pos.entryPrice){ closePrioritySimPosition(key, pos.entryPrice, Date.now(), 'BE/TP1'); return; }
-        } else if(price <= pos.sl){ closePrioritySimPosition(key, pos.sl, Date.now(), 'Stop Loss'); return; }
-      } else {
-        if(!pos.tp1Hit && price <= pos.tp1){ pos.tp1Hit = true; savePrioritySimState(); }
-        if(!pos.tp2Hit && price <= pos.tp2){ pos.tp2Hit = true; savePrioritySimState(); }
-        if(pos.tp2Hit){ closePrioritySimPosition(key, pos.tp2, Date.now(), 'TP1-TP2'); return; }
-        if(pos.tp1Hit){
-          if(price >= pos.entryPrice){ closePrioritySimPosition(key, pos.entryPrice, Date.now(), 'BE/TP1'); return; }
-        } else if(price >= pos.sl){ closePrioritySimPosition(key, pos.sl, Date.now(), 'Stop Loss'); return; }
-      }
-    });
-  }
-
-  function processPrioritySimFromPriority(freshTickers){
-    const activeTickers = (freshTickers && Object.keys(freshTickers).length) ? freshTickers : (window.__esLastTickers||{});
-    monitorPrioritySimPositions(activeTickers);
-    renderPrioritySimUI(activeTickers);
-  }
-
-  function populatePsimSignalSelect(){
-    const results = window.__esLastPriorityResults || [];
-    const prevKey = psimSelectedCandidate ? `${psimSelectedCandidate.symbol}_${psimSelectedCandidate.tfValue}` : null;
-    psimSignalSelect.innerHTML = '<option value="">&mdash; Pilih sinyal &mdash;</option>' + results.map((c,i)=>{
-      const label = `${c.symbol.replace('USDT','')} (${c.tfLabel}) — ${c.signal}`;
-      return `<option value="${i}">${label}</option>`;
-    }).join('');
-    if(prevKey){
-      const idx = results.findIndex(c=>`${c.symbol}_${c.tfValue}`===prevKey);
-      if(idx>=0){ psimSignalSelect.value = String(idx); psimSelectedCandidate = results[idx]; }
-      else{ psimSelectedCandidate = null; psimSignalSelect.value=''; }
-    }
-    renderPsimPreview();
-  }
-
-  function selectPsimSignalByIndex(idx){
-    const results = window.__esLastPriorityResults || [];
-    psimSelectedCandidate = (idx===''||idx===null||idx===undefined) ? null : (results[parseInt(idx,10)] || null);
-    renderPsimPreview();
-  }
-
-  function selectPrioritySimSignalFromCard(cand){
-    const results = window.__esLastPriorityResults || [];
-    const idx = results.findIndex(c=>c.symbol===cand.symbol && c.tfValue===cand.tfValue);
-    if(idx<0) return;
-    psimSignalSelect.value = String(idx);
-    selectPsimSignalByIndex(idx);
-    priorityStatusEl.classList.remove('error');
-    priorityStatusEl.textContent = `Sinyal ${cand.symbol.replace('USDT','')} (TF ${cand.tfLabel}) dipilih di Simulasi Sinyal Prioritas — cek preview lalu klik "Open Posisi".`;
-    document.querySelector('.es-sim-section').scrollIntoView({ behavior:'smooth', block:'start' });
-  }
-
-  function updatePsimOpenBtn(){
-    if(!psimSelectedCandidate){
-      psimOpenBtn.textContent = 'Open Posisi';
-      psimOpenBtn.classList.remove('sell');
-      return;
-    }
-    const isSell = psimSelectedCandidate.signal === 'SELL';
-    psimOpenBtn.textContent = isSell ? 'Open Sell' : 'Open Buy';
-    psimOpenBtn.classList.toggle('sell', isSell);
-  }
-
-  function renderPsimPreview(){
-    updatePsimOpenBtn();
-    if(!psimSelectedCandidate){
-      psimPreviewEl.innerHTML = `<div class="es-sim-preview-empty">Belum ada sinyal dipilih. Pilih dari dropdown "Sinyal Terpilih" atau klik "Pilih Sinyal Ini" di kartu Sinyal Prioritas.</div>`;
-      return;
-    }
-    const c = psimSelectedCandidate;
-    const entryPrice = c.price;
-    const sl = c.signal==='BUY' ? pickSlForBuy(c.dir) : pickSlForSell(c.dir);
-    const riskDist = Math.abs(entryPrice - sl);
-    const tp1 = c.signal==='BUY' ? entryPrice + riskDist : entryPrice - riskDist;
-    const tp2 = c.signal==='BUY' ? entryPrice + riskDist*2 : entryPrice - riskDist*2;
-
-    const margin = currentPsimMargin();
-    const leverage = currentPsimLeverage();
-    const qty = (margin * leverage) / entryPrice;
-
-    function scenario(exitPrice){
-      const gross = c.signal==='BUY' ? (exitPrice-entryPrice)*qty : (entryPrice-exitPrice)*qty;
-      const fee = computePsimExchangeFee(entryPrice, exitPrice, qty);
-      return { gross, fee, net: gross - fee };
-    }
-    const slS = scenario(sl), tp1S = scenario(tp1), tp2S = scenario(tp2);
-    const fundingPer8h = (margin * leverage) * PSIM_FUNDING_RATE_PER_8H;
-
-    const col = (label, price, s) => `
-      <div class="es-psim-preview-col">
-        <div class="es-psim-preview-label">${label}</div>
-        <div class="es-psim-preview-price">$${fmtPrice(price)}</div>
-        <div class="es-psim-preview-line">PnL Bersih: <span class="${s.net>=0?'pnl-pos':'pnl-neg'}">${s.net>=0?'+':''}$${s.net.toFixed(2)}</span></div>
-        <div class="es-psim-preview-line muted">Biaya Exchange: -$${s.fee.toFixed(2)}</div>
-      </div>`;
-
-    psimPreviewEl.innerHTML = `
-      <div class="es-psim-preview-head">
-        <strong>${c.symbol.replace('USDT','')} (${c.tfLabel})</strong> — ${c.signal} @ $${fmtPrice(entryPrice)}
-        &bull; Modal $${margin.toFixed(0)} &bull; Leverage ${leverage}x &bull; Qty ${qty.toFixed(6)}
-      </div>
-      <div class="es-psim-preview-grid">
-        ${col('SL', sl, slS)}
-        ${col('TP1', tp1, tp1S)}
-        ${col('TP2', tp2, tp2S)}
-      </div>
-      <div class="es-psim-preview-note">Estimasi Biaya Margin (funding): ~$${fundingPer8h.toFixed(2)} / 8 jam selama posisi terbuka (dipotong dari PnL saat posisi ditutup).</div>
-    `;
-  }
-
-  function handlePriorityTradeClick(cand){
-    if(!psimToggle.checked){
-      priorityStatusEl.classList.add('error');
-      priorityStatusEl.textContent = 'Centang "Aktif" di bagian Simulasi Sinyal Prioritas dulu sebelum trade.';
-      return;
-    }
-    const key = `${cand.symbol}_${cand.tfValue}_PRIO`;
-    if(prioritySimPositions[key]){
-      priorityStatusEl.classList.remove('error');
-      priorityStatusEl.textContent = `Sudah ada posisi terbuka untuk ${cand.symbol.replace('USDT','')} di TF ${cand.tfLabel}.`;
-      return;
-    }
-    const entryPrice = cand.price;
-    const sl = cand.signal==='BUY' ? pickSlForBuy(cand.dir) : pickSlForSell(cand.dir);
-
-    const slValid = cand.signal==='BUY' ? (sl < entryPrice) : (sl > entryPrice);
-    if(!slValid){
-      priorityStatusEl.classList.add('error');
-      priorityStatusEl.textContent = `Harga ${cand.symbol.replace('USDT','')} sudah bergerak melewati level SL sejak sinyal ini dipindai — tidak valid lagi untuk di-trade. Klik "Cari Sinyal Prioritas" untuk pindai ulang.`;
-      return;
-    }
-
-    const riskDist = Math.abs(entryPrice - sl);
-    const tp1 = cand.signal==='BUY' ? entryPrice + riskDist : entryPrice - riskDist;
-    const tp2 = cand.signal==='BUY' ? entryPrice + riskDist*2 : entryPrice - riskDist*2;
-    openPrioritySimPosition(key, cand.symbol, cand.tfLabel, cand.tfValue, cand.signal, entryPrice, sl, tp1, tp2, Date.now());
-    renderPrioritySimUI(window.__esLastTickers||{});
-    priorityStatusEl.classList.remove('error');
-    priorityStatusEl.textContent = `Posisi ${cand.signal} untuk ${cand.symbol.replace('USDT','')} (TF ${cand.tfLabel}) dibuka di simulasi.`;
-    psimSelectedCandidate = null;
-    psimSignalSelect.value = '';
-    renderPsimPreview();
-  }
-
-  function computeEquityCurve(){
-    const initialModal = Math.max(parseFloat(psimModalInput.value) || 1000, 1);
-    const chronological = prioritySimHistory.slice().reverse();
-    let balance = initialModal;
-    const points = [{ time: null, balance }];
-    chronological.forEach(t=>{
-      balance += t.pnl;
-      points.push({ time: t.exitTime, balance });
-    });
-    return points;
-  }
-
-  function buildEquityChart(points){
-    if(points.length < 2){
-      return `<div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);text-align:center;padding:24px 8px;">Belum ada transaksi selesai untuk digambar grafiknya.</div>`;
-    }
-    const w = 600, h = 150, padX = 10, padY = 12;
-    const balances = points.map(p=>p.balance);
-    const min = Math.min(...balances), max = Math.max(...balances);
-    const range = (max-min) || 1;
-    const n = points.length;
-    const xAt = (i) => padX + (i/(n-1))*(w-padX*2);
-    const yAt = (v) => h-padY - ((v-min)/range)*(h-padY*2);
-
-    const linePts = points.map((p,i)=> `${xAt(i).toFixed(1)},${yAt(p.balance).toFixed(1)}`).join(' ');
-    const areaPts = `${xAt(0).toFixed(1)},${(h-padY).toFixed(1)} ${linePts} ${xAt(n-1).toFixed(1)},${(h-padY).toFixed(1)}`;
-
-    const initial = balances[0], last = balances[balances.length-1];
-    const color = last>=initial ? 'var(--bull)' : 'var(--bear)';
-    const changePct = ((last-initial)/initial)*100;
-
-    return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="width:100%;height:150px;display:block;">
-      <polygon points="${areaPts}" fill="${color}" fill-opacity="0.12"/>
-      <polyline points="${linePts}" fill="none" stroke="${color}" stroke-width="2"/>
-    </svg>
-    <div style="display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:10.5px;color:var(--muted);margin-top:4px;">
-      <span>Modal Awal: $${initial.toFixed(2)}</span>
-      <span style="color:${color}">Saldo Saat Ini: $${last.toFixed(2)} (${changePct>=0?'+':''}${changePct.toFixed(2)}%)</span>
-    </div>`;
-  }
-
-  function renderPrioritySimUI(tickers){
-    const openList = Object.values(prioritySimPositions);
-    const totalPnl = prioritySimHistory.reduce((s,t)=>s+t.pnl,0);
-    const wins = prioritySimHistory.filter(t=>t.pnl>0).length;
-    const winRate = prioritySimHistory.length ? (wins/prioritySimHistory.length*100) : 0;
-
-    const openStats = openList.map(pos=>{
-      let price = tickers[pos.source] ? parseFloat(tickers[pos.source].lastPrice) : null;
-      if(price===null || price===undefined) price = pos.entryPrice;
-      const qty = pos.qty;
-      const grossFloatPnl = pos.dir==='BUY' ? (price-pos.entryPrice)*qty : (pos.entryPrice-price)*qty;
-      const exchangeFee = computePsimExchangeFee(pos.entryPrice, price, qty);
-      const marginFee = computePsimMarginFee(pos.entryPrice, qty, pos.entryTime, Date.now());
-      const floatPnl = grossFloatPnl - exchangeFee - marginFee;
-      const floatPct = (floatPnl / pos.margin) * 100;
-      const potentialSlPnl = pos.dir==='BUY' ? (pos.sl-pos.entryPrice)*qty : (pos.entryPrice-pos.sl)*qty;
-      return { pos, price, floatPnl, floatPct, potentialSlPnl, exchangeFee, marginFee };
-    });
-
-    const totalFloatingPnl = openStats.reduce((s,o)=>s+o.floatPnl, 0);
-
-    psimStatusEl.textContent = psimToggle.checked
-      ? `Simulasi aktif • ${openList.length} posisi terbuka, ${prioritySimHistory.length} transaksi selesai (tersimpan permanen).`
-      : `Simulasi nonaktif (tidak buka posisi baru) • ${openList.length} posisi terbuka masih dipantau.`;
-
-    psimSummaryEl.innerHTML = [
-      { label:'Posisi Terbuka', value:`${openList.length}` },
-      { label:'Total PnL Floating', value:`${totalFloatingPnl>=0?'+':''}$${totalFloatingPnl.toFixed(2)}`, cls: totalFloatingPnl>=0?'up':'down' },
-      { label:'Transaksi Selesai', value:`${prioritySimHistory.length}` },
-      { label:'Win Rate', value:`${winRate.toFixed(1)}%` },
-      { label:'Total PnL Realized', value:`${totalPnl>=0?'+':''}$${totalPnl.toFixed(2)}`, cls: totalPnl>=0?'up':'down' }
-    ].map(s=>`
-      <div class="es-sim-stat">
-        <div class="es-sim-stat-label">${s.label}</div>
-        <div class="es-sim-stat-value ${s.cls||''}">${s.value}</div>
-      </div>
-    `).join('');
-
-    psimEquityChartEl.innerHTML = buildEquityChart(computeEquityCurve());
-
-    const fmtTime = (ms)=> new Date(ms).toLocaleString('id-ID', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit' });
-
-    if(openStats.length===0){
-      psimOpenTbody.innerHTML = `<tr><td colspan="14" style="text-align:center;color:var(--muted);padding:14px;">Belum ada posisi terbuka.</td></tr>`;
-    } else {
-      psimOpenTbody.innerHTML = openStats.map(({pos, price, floatPnl, floatPct, potentialSlPnl, exchangeFee, marginFee})=>{
-        const pnlCls = floatPnl>=0 ? 'pnl-pos':'pnl-neg';
-        const arahCls = pos.dir==='BUY' ? 'arah-buy' : 'arah-sell';
-        const label = `${pos.source.replace('USDT','')} (${pos.tfLabel})`;
-        const venueBadge = pos.venue==='live-testnet' ? '<span class="es-venue-badge">Binance Testnet</span>' : '';
-        const riskSlDisplay = pos.tp1Hit ? 'BE/TP1' : `-$${Math.abs(potentialSlPnl).toFixed(2)}`;
-        const areaTpLabel = pos.tp2Hit ? 'Hit TP2' : (pos.tp1Hit ? 'Hit TP1' : '-');
-        const areaTpCls = (pos.tp1Hit || pos.tp2Hit) ? 'pnl-pos' : '';
-        const closeCls = floatPnl>=0 ? 'pnl-pos' : 'pnl-neg';
-        return `<tr>
-          <td><span class="es-psim-source-link" data-symbol="${pos.source}" data-tf="${pos.tfValue||''}">${label}</span>${venueBadge}</td>
-          <td class="${arahCls}">${pos.dir}</td>
-          <td>$${fmtPrice(pos.entryPrice)}</td>
-          <td>$${fmtPrice(pos.sl)}</td>
-          <td>${riskSlDisplay}</td>
-          <td>$${fmtPrice(pos.tp1)}</td>
-          <td>$${fmtPrice(pos.tp2)}</td>
-          <td class="${areaTpCls}">${areaTpLabel}</td>
-          <td class="${pnlCls}">$${fmtPrice(price)}</td>
-          <td>-$${exchangeFee.toFixed(2)}</td>
-          <td>-$${marginFee.toFixed(2)}</td>
-          <td class="${pnlCls}">${floatPnl>=0?'+':''}${floatPnl.toFixed(2)}</td>
-          <td class="${pnlCls}">${floatPct>=0?'+':''}${floatPct.toFixed(2)}%</td>
-          <td><button type="button" class="es-psim-close-btn ${closeCls}" data-key="${pos.key}">Close Posisi</button></td>
-        </tr>`;
-      }).join('');
-
-      psimOpenTbody.querySelectorAll('.es-psim-source-link').forEach(el=>{
-        el.addEventListener('click', ()=>{
-          const tf = el.getAttribute('data-tf');
-          openTradingView(el.getAttribute('data-symbol'), tf || undefined);
-        });
-      });
-
-      psimOpenTbody.querySelectorAll('.es-psim-close-btn').forEach(btn=>{
-        btn.addEventListener('click', ()=>{
-          manualClosePrioritySimPosition(btn.getAttribute('data-key'), tickers);
-        });
-      });
-    }
-
-    if(prioritySimHistory.length===0){
-      psimHistTbody.innerHTML = `<tr><td colspan="11" style="text-align:center;color:var(--muted);padding:14px;">Belum ada transaksi selesai.</td></tr>`;
-    } else {
-      psimHistTbody.innerHTML = prioritySimHistory.slice(0,50).map(t=>{
-        const pnlCls = t.pnl>=0 ? 'pnl-pos':'pnl-neg';
-        const arahCls = t.dir==='BUY' ? 'arah-buy' : 'arah-sell';
-        const label = `${t.source.replace('USDT','')} (${t.tfLabel})`;
-        const venueBadge = t.venue==='live-testnet' ? '<span class="es-venue-badge">Binance Testnet</span>' : '';
-        const tpStatusCls = t.tpStatus && t.tpStatus!=='-' ? 'pnl-pos' : '';
-        return `<tr>
-          <td><span class="es-psim-source-link" data-symbol="${t.source}" data-tf="${t.tfValue||''}">${label}</span>${venueBadge}</td>
-          <td class="${arahCls}">${t.dir}</td>
-          <td>$${fmtPrice(t.entryPrice)}</td>
-          <td>$${fmtPrice(t.exitPrice)}</td>
-          <td>${t.reason}</td>
-          <td class="${tpStatusCls}">${t.tpStatus || '-'}</td>
-          <td>-$${(t.exchangeFee||0).toFixed(2)}</td>
-          <td>-$${(t.marginFee||0).toFixed(2)}</td>
-          <td class="${pnlCls}">${t.pnl>=0?'+':''}${t.pnl.toFixed(2)}</td>
-          <td class="${pnlCls}">${t.pnlPct>=0?'+':''}${t.pnlPct.toFixed(2)}%</td>
-          <td>${fmtTime(t.exitTime)}</td>
-        </tr>`;
-      }).join('');
-
-      psimHistTbody.querySelectorAll('.es-psim-source-link').forEach(el=>{
-        el.addEventListener('click', ()=>{
-          const tf = el.getAttribute('data-tf');
-          openTradingView(el.getAttribute('data-symbol'), tf || undefined);
-        });
-      });
-    }
-  }
-
-  const FAVORITE_DEFAULT = ['BTCUSDT','ETHUSDT','SOLUSDT','HYPEUSDT','PENGUUSDT'];
-  const FAV_STORAGE_KEY = 'emaScreenerFavorites_v1';
-  const FAV_MAX_SLOTS = 50;
-  let favoriteSymbols = [];
-  let favScanning = false;
-
-  const favStatusEl = document.getElementById('esFavStatus');
-  const favGrid = document.getElementById('esFavGrid');
-
-  function loadFavorites(){
-    try{
-      const raw = localStorage.getItem(FAV_STORAGE_KEY);
-      if(raw){
-        const parsed = JSON.parse(raw);
-        if(Array.isArray(parsed)){ favoriteSymbols = parsed.slice(0,FAV_MAX_SLOTS); return; }
-      }
-    }catch(e){ /* fall through to default */ }
-    favoriteSymbols = FAVORITE_DEFAULT.slice();
-  }
-
-  function saveFavorites(){
-    try{ localStorage.setItem(FAV_STORAGE_KEY, JSON.stringify(favoriteSymbols)); }catch(e){ /* ignore */ }
-  }
-
-  function removeFavorite(symbol){
-    favoriteSymbols = favoriteSymbols.filter(s=>s!==symbol);
-    saveFavorites();
-    scanFavorites();
-  }
-
-  function extractSymbolFromFavInput(raw){
-    let text = (raw||'').trim();
-    if(!text) return '';
-    // link TradingView, mis. https://www.tradingview.com/chart/?symbol=BINANCE%3ASUIUSDT
-    const symbolParamMatch = text.match(/[?&]symbol=([^&]+)/i);
-    if(symbolParamMatch){
-      text = decodeURIComponent(symbolParamMatch[1]);
-    } else {
-      // link format https://www.tradingview.com/symbols/SUIUSDT/
-      const pathMatch = text.match(/tradingview\.com\/symbols\/([A-Za-z0-9]+)/i);
-      if(pathMatch) text = pathMatch[1];
-    }
-    text = text.split(':').pop(); // buang prefix exchange, mis. "BINANCE:"
-    text = text.replace(/\.P$/i, ''); // buang suffix kontrak futures, mis. ".P"
-    return text.toUpperCase().trim();
-  }
-
-  function addFavorite(rawInput){
-    let symbol = extractSymbolFromFavInput(rawInput);
-    if(!symbol) return;
-    if(!symbol.endsWith('USDT')) symbol += 'USDT';
-    if(favoriteSymbols.includes(symbol)) return;
-    if(favoriteSymbols.length >= FAV_MAX_SLOTS) return;
-    favoriteSymbols.push(symbol);
-    saveFavorites();
-    scanFavorites();
-  }
-
-  function classifyFavoriteSignal(evalRes){
-    const buyCount = [evalRes.buy.bb.ok, evalRes.buy.sr.ok, evalRes.buy.sd.ok].filter(Boolean).length;
-    const sellCount = [evalRes.sell.bb.ok, evalRes.sell.sr.ok, evalRes.sell.sd.ok].filter(Boolean).length;
-    if(buyCount===3) return { status:'BUY', dir: evalRes.buy };
-    if(sellCount===3) return { status:'SELL', dir: evalRes.sell };
-    return { status:'HOLD', dir: sellCount>buyCount ? evalRes.sell : evalRes.buy };
-  }
-
-  function renderFavoriteBox(symbol, data){
-    if(!data){
-      return `<div class="es-fav-box" data-symbol="${symbol}">
-        <span class="es-fav-star" data-symbol="${symbol}">&#9733;</span>
-        <div class="es-fav-symbol">${symbol.replace('USDT','')}</div>
-        <div class="es-fav-price">Memuat...</div>
-      </div>`;
-    }
-    if(data.error){
-      return `<div class="es-fav-box" data-symbol="${symbol}">
-        <span class="es-fav-star" data-symbol="${symbol}">&#9733;</span>
-        <div class="es-fav-symbol">${symbol.replace('USDT','')}</div>
-        <div class="es-fav-price" style="color:var(--bear); font-size:9.5px;">Tidak ditemukan di Binance</div>
-      </div>`;
-    }
-    const cls = data.status==='BUY' ? 'buy' : data.status==='SELL' ? 'sell' : 'hold';
-    const dir = data.dir;
-    const stochText = data.stochK===null ? 'Stoch n/a' : `Stoch K ${data.stochK.toFixed(1)}${data.stochCond==='overbought'?' (OB)':data.stochCond==='oversold'?' (OS)':''}`;
-    const chgVal = data.changeTf;
-    const chgHtml = (chgVal===null || chgVal===undefined) ? '' : ` <span class="es-fav-chg ${chgVal>=0?'up':'down'}">${chgVal>=0?'+':''}${chgVal.toFixed(2)}%</span>`;
-    return `<div class="es-fav-box ${cls}" data-symbol="${symbol}" data-market="${data.market||'spot'}">
-      <span class="es-fav-star" data-symbol="${symbol}" title="Hapus dari favorit">&#9733;</span>
-      <div class="es-fav-symbol">${symbol.replace('USDT','')}</div>
-      <div class="es-fav-price">$${fmtPrice(data.price)}${chgHtml}</div>
-      <span class="es-fav-signal-badge ${cls}">${data.status}</span>
-      <div class="es-checklist">
-        <div class="es-check-row ${dir.bb.ok?'ok':'fail'}"><span class="es-check-icon">${dir.bb.ok?'&check;':'&#10007;'}</span> BB: ${dir.bb.status}</div>
-        <div class="es-check-row ${dir.sr.ok?'ok':'fail'}"><span class="es-check-icon">${dir.sr.ok?'&check;':'&#10007;'}</span> S/R: ${dir.sr.status}</div>
-        <div class="es-check-row ${dir.sd.ok?'ok':'fail'}"><span class="es-check-icon">${dir.sd.ok?'&check;':'&#10007;'}</span> S/D: ${dir.sd.status}</div>
-      </div>
-      <div class="es-priority-note">${stochText}</div>
-    </div>`;
-  }
-
-  function renderEmptyFavSlot(){
-    return `<div class="es-fav-box es-fav-empty-slot">
-      <div class="es-fav-add-wrap">
-        <input type="text" class="es-fav-add-input" placeholder="mis. SUIUSDT atau link TradingView" autocomplete="off">
-        <div class="es-fav-suggest"></div>
-      </div>
-      <button class="es-fav-add-btn">+ Tambah Favorit</button>
-    </div>`;
-  }
-
-  function wireFavoriteBoxEvents(){
-    favGrid.querySelectorAll('.es-fav-star').forEach(star=>{
-      star.addEventListener('click', (e)=>{
-        e.stopPropagation();
-        removeFavorite(star.getAttribute('data-symbol'));
-      });
-    });
-    favGrid.querySelectorAll('.es-fav-empty-slot').forEach(slot=>{
-      const input = slot.querySelector('.es-fav-add-input');
-      const suggestBox = slot.querySelector('.es-fav-suggest');
-      const btn = slot.querySelector('.es-fav-add-btn');
-
-      function closeSuggestions(){
-        suggestBox.classList.remove('open');
-        suggestBox.innerHTML = '';
-      }
-
-      function updateSuggestions(){
-        const q = input.value.trim().toUpperCase();
-        if(!q || q.includes('TRADINGVIEW') || q.includes('HTTP')){ closeSuggestions(); return; }
-        const matches = FAV_SUGGESTION_POOL.filter(s=>{
-          const base = s.replace('USDT','');
-          return s.startsWith(q) || base.startsWith(q);
-        }).slice(0,6);
-        if(matches.length===0){ closeSuggestions(); return; }
-        suggestBox.innerHTML = matches.map(s=>`<div class="es-fav-suggest-item" data-symbol="${s}">${s}</div>`).join('');
-        suggestBox.classList.add('open');
-        suggestBox.querySelectorAll('.es-fav-suggest-item').forEach(item=>{
-          item.addEventListener('mousedown', (e)=>{
-            e.preventDefault();
-            input.value = item.getAttribute('data-symbol');
-            closeSuggestions();
-          });
-        });
-      }
-
-      input.addEventListener('input', updateSuggestions);
-      input.addEventListener('focus', updateSuggestions);
-      input.addEventListener('blur', ()=> setTimeout(closeSuggestions, 150));
-      input.addEventListener('keydown', (e)=>{
-        if(e.key==='Enter'){ addFavorite(input.value); closeSuggestions(); }
-      });
-      btn.addEventListener('click', ()=>{
-        addFavorite(input.value);
-        closeSuggestions();
-      });
-    });
-    favGrid.querySelectorAll('.es-fav-box:not(.es-fav-empty-slot)').forEach(box=>{
-      box.addEventListener('click', (e)=>{
-        if(e.target.classList.contains('es-fav-star')) return;
-        if(box.classList.contains('was-dragged')){ box.classList.remove('was-dragged'); return; }
-        openTradingView(box.getAttribute('data-symbol'), intervalSel.value, box.getAttribute('data-market'));
-      });
-
-      box.setAttribute('draggable', 'true');
-
-      let grabTimer = null;
-      const clearGrabTimer = ()=>{ clearTimeout(grabTimer); grabTimer = null; box.classList.remove('grab-ready'); };
-      box.addEventListener('mousedown', (e)=>{
-        if(e.target.classList.contains('es-fav-star')) return;
-        clearTimeout(grabTimer);
-        grabTimer = setTimeout(()=>{ box.classList.add('grab-ready'); }, 350);
-      });
-      box.addEventListener('mouseup', clearGrabTimer);
-      box.addEventListener('mouseleave', clearGrabTimer);
-
-      box.addEventListener('dragstart', (e)=>{
-        e.dataTransfer.setData('text/plain', box.getAttribute('data-symbol'));
-        e.dataTransfer.effectAllowed = 'move';
-        box.classList.add('dragging');
-      });
-      box.addEventListener('dragend', ()=>{
-        clearGrabTimer();
-        box.classList.remove('dragging');
-        box.classList.add('was-dragged');
-      });
-      box.addEventListener('dragover', (e)=>{
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        box.classList.add('drag-over');
-      });
-      box.addEventListener('dragleave', ()=>{
-        box.classList.remove('drag-over');
-      });
-      box.addEventListener('drop', (e)=>{
-        e.preventDefault();
-        box.classList.remove('drag-over');
-        const draggedSymbol = e.dataTransfer.getData('text/plain');
-        const targetSymbol = box.getAttribute('data-symbol');
-        if(!draggedSymbol || draggedSymbol===targetSymbol) return;
-        reorderFavorite(draggedSymbol, targetSymbol);
-      });
-    });
-  }
-
-  function reorderFavorite(draggedSymbol, targetSymbol){
-    const fromIdx = favoriteSymbols.indexOf(draggedSymbol);
-    const toIdx = favoriteSymbols.indexOf(targetSymbol);
-    if(fromIdx===-1 || toIdx===-1) return;
-    const movingBefore = fromIdx < toIdx;
-    favoriteSymbols.splice(fromIdx, 1);
-    favoriteSymbols.splice(favoriteSymbols.indexOf(targetSymbol) + (movingBefore?1:0), 0, draggedSymbol);
-    saveFavorites();
-
-    const draggedEl = favGrid.querySelector(`.es-fav-box[data-symbol="${draggedSymbol}"]`);
-    const targetEl = favGrid.querySelector(`.es-fav-box[data-symbol="${targetSymbol}"]`);
-    if(draggedEl && targetEl){
-      if(movingBefore) targetEl.after(draggedEl);
-      else targetEl.before(draggedEl);
-    }
-  }
-
-  async function scanFavorites(){
-    if(favScanning) return;
-    favScanning = true;
-    favStatusEl.classList.remove('error');
-    favStatusEl.textContent = 'Memindai koin favorit...';
-
-    const interval = intervalSel.value;
-    const boxesHtml = [];
-
-    for(let i=0;i<favoriteSymbols.length;i++){
-      const symbol = favoriteSymbols[i];
-      try{
-        const { opens, highs, lows, closes, market } = await fetchKlines(symbol, interval, 300);
-        const ind = computeFullIndicators(opens, highs, lows, closes);
-        const lastOpen = opens[opens.length-1];
-        const lastHigh = highs[highs.length-1], lastLow = lows[lows.length-1], lastClose = closes[closes.length-1];
-        const evalRes = evaluateChecklist(ind, lastHigh, lastLow, lastClose);
-        const cls = classifyFavoriteSignal(evalRes);
-        const changeTf = ((lastClose - lastOpen) / lastOpen) * 100;
-        boxesHtml.push(renderFavoriteBox(symbol, {
-          status: cls.status, dir: cls.dir, price: lastClose, market, changeTf,
-          stochCond: evalRes.stochCond, stochK: evalRes.stochK, stochD: evalRes.stochD
-        }));
-      }catch(e){
-        boxesHtml.push(renderFavoriteBox(symbol, { error:true }));
-      }
-    }
-    if(favoriteSymbols.length < FAV_MAX_SLOTS){
-      boxesHtml.push(renderEmptyFavSlot());
-    }
-
-    favGrid.innerHTML = boxesHtml.join('');
-    wireFavoriteBoxEvents();
-    favStatusEl.textContent = `Terakhir dipindai: ${new Date().toLocaleTimeString('id-ID')} • TF ${interval}.`;
-    favScanning = false;
-  }
-
-  capSel.addEventListener('change', ()=> render(window.__esLastResults||[]) );
-  typeSel.addEventListener('change', ()=> render(window.__esLastResults||[]) );
-  rsiSel.addEventListener('change', ()=> render(window.__esLastResults||[]) );
-  stochSel.addEventListener('change', ()=> render(window.__esLastResults||[]) );
-  intervalSel.addEventListener('change', ()=>{ scan(); scanFavorites(); });
-  refreshBtn.addEventListener('click', scan);
-  priorityBtn.addEventListener('click', findPrioritySignals);
-  priorityRiskSel.addEventListener('change', findPrioritySignals);
-  psimResetBtn.addEventListener('click', resetPrioritySim);
-  psimSignalSelect.addEventListener('change', ()=> selectPsimSignalByIndex(psimSignalSelect.value));
-  psimOpenBtn.addEventListener('click', ()=>{
-    if(!psimSelectedCandidate){
-      priorityStatusEl.classList.add('error');
-      priorityStatusEl.textContent = 'Pilih sinyal dulu di "Sinyal Terpilih" sebelum Open Posisi.';
-      return;
-    }
-    handlePriorityTradeClick(psimSelectedCandidate);
-  });
-  psimModalInput.addEventListener('input', renderPsimPreview);
-  psimLeverageInput.addEventListener('input', renderPsimPreview);
-
-  const PSIM_SETTINGS_KEY = 'emaScreenerPsimSettings_v1';
-
-  function loadPsimSettings(){
-    try{
-      const raw = localStorage.getItem(PSIM_SETTINGS_KEY);
-      if(!raw) return;
-      const s = JSON.parse(raw);
-      if(s.modal !== undefined) psimModalInput.value = s.modal;
-      if(s.leverage !== undefined) psimLeverageInput.value = s.leverage;
-      if(s.active !== undefined) psimToggle.checked = s.active;
-    }catch(e){}
-  }
-
-  function savePsimSettings(){
-    try{
-      localStorage.setItem(PSIM_SETTINGS_KEY, JSON.stringify({
-        modal: parseFloat(psimModalInput.value) || 1000,
-        leverage: parseFloat(psimLeverageInput.value) || 10,
-        active: psimToggle.checked
-      }));
-    }catch(e){}
-  }
-
-  psimModalInput.addEventListener('change', savePsimSettings);
-  psimLeverageInput.addEventListener('change', savePsimSettings);
-  psimToggle.addEventListener('change', savePsimSettings);
-  loadPsimSettings();
-
-  liveTradeBtn.addEventListener('click', ()=>{
-    if(!psimSelectedCandidate){
-      liveTradeStatusEl.classList.add('error');
-      liveTradeStatusEl.classList.remove('success');
-      liveTradeStatusEl.textContent = 'Pilih sinyal dulu di "Sinyal Terpilih" sebelum kirim order.';
-      return;
-    }
-    sendLiveTrade(psimSelectedCandidate);
-  });
-  liveBackendUrlInput.addEventListener('change', saveLiveTradeConfig);
-  liveAppTokenInput.addEventListener('change', saveLiveTradeConfig);
-  loadLiveTradeConfig();
-
-  function loadEconCalendarWidget(){
-    const container = document.getElementById('esEconCalendarBody');
-    container.innerHTML = '';
-    const script = document.createElement('script');
-    script.type = 'text/javascript';
-    script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-events.js';
-    script.async = true;
-    script.innerHTML = JSON.stringify({
-      width: '100%',
-      height: '100%',
-      colorTheme: 'dark',
-      isTransparent: false,
-      locale: 'en',
-      importanceFilter: '-1,0,1',
-      currencyFilter: 'USD'
-    });
-    container.appendChild(script);
-  }
-
-  const econCalendarPanel = document.getElementById('esEconCalendarPanel');
-  const econCalendarTrigger = document.getElementById('esEconCalendarTrigger');
-  econCalendarTrigger.addEventListener('click', (e)=>{
-    e.stopPropagation();
-    econCalendarPanel.classList.toggle('collapsed');
-  });
-  document.addEventListener('click', (e)=>{
-    if(!econCalendarPanel.contains(e.target)){
-      econCalendarPanel.classList.add('collapsed');
-    }
-  });
-
-  loadPrioritySimState();
-  renderPrioritySimUI({});
-  renderPsimPreview();
-  scan();
-  setInterval(scan, 90000);
-  loadFavorites();
-  scanFavorites();
-  setInterval(scanFavorites, 90000);
-  loadFavCrossSymbols();
-  renderFavCrossManageUI();
-  scanFavoriteCrossSection();
-  setInterval(scanFavoriteCrossSection, 90000);
-  scanBtcTfStrip();
-  setInterval(scanBtcTfStrip, 90000);
-  loadEconCalendarWidget();
-  findPrioritySignals();
+  renderCryptoAll();
 })();
 </script>
