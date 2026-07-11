@@ -1336,9 +1336,55 @@
     .es-priority-header{ flex-direction:column; align-items:stretch; }
     .es-priority-grid{ grid-template-columns: 1fr; }
   }
+
+  .es-auth-gate{
+    position:fixed; inset:0; z-index:9999; display:flex; align-items:center; justify-content:center;
+    background:var(--bg); font-family:var(--font-body);
+  }
+  .es-auth-box{
+    width:min(360px, 90vw); padding:32px 28px; background:var(--panel); border:1px solid var(--border);
+    border-radius:12px; text-align:center;
+  }
+  .es-auth-title{ font-family:var(--font-display); font-size:22px; color:var(--text); margin-bottom:6px; }
+  .es-auth-sub{ font-size:13px; color:var(--muted); margin-bottom:24px; }
+  .es-auth-google-btn{
+    width:100%; padding:12px 16px; border-radius:8px; border:1px solid var(--border); background:var(--panel-2);
+    color:var(--text); font-size:14px; font-weight:600; cursor:pointer; display:flex; align-items:center;
+    justify-content:center; gap:10px; transition:background 0.15s;
+  }
+  .es-auth-google-btn:hover{ background:var(--border); }
+  .es-auth-status{ margin-top:14px; font-size:12px; color:var(--muted); min-height:16px; }
+  .es-auth-status.error{ color:var(--bear); }
+  .es-user-bar{
+    display:flex; align-items:center; justify-content:flex-end; gap:10px; padding:6px 4px 12px; font-size:12px; color:var(--muted);
+  }
+  .es-user-bar img{ width:22px; height:22px; border-radius:50%; }
+  .es-user-signout-btn{
+    background:none; border:1px solid var(--border); color:var(--muted); border-radius:6px; padding:3px 9px;
+    font-size:11px; cursor:pointer;
+  }
+  .es-user-signout-btn:hover{ color:var(--text); border-color:var(--muted); }
 </style>
 
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+
+<div class="es-auth-gate" id="esAuthGate">
+  <div class="es-auth-box">
+    <div class="es-auth-title">Jadi Trader Tools</div>
+    <div class="es-auth-sub">Login untuk melanjutkan &mdash; histori &amp; pengaturan kamu tersinkron otomatis di semua device.</div>
+    <button type="button" class="es-auth-google-btn" id="esGoogleLoginBtn">Masuk dengan Google</button>
+    <div class="es-auth-status" id="esAuthStatus"></div>
+  </div>
+</div>
+
 <div class="ema-screener">
+  <div class="es-user-bar" id="esUserBar" style="display:none;">
+    <img id="esUserAvatar" src="" alt="">
+    <span id="esUserName"></span>
+    <button type="button" class="es-user-signout-btn" id="esSignOutBtn">Keluar</button>
+  </div>
   <div class="es-econ-calendar-panel collapsed" id="esEconCalendarPanel">
     <div class="es-econ-calendar-trigger" id="esEconCalendarTrigger">
       <span class="es-econ-calendar-trigger-dot"></span>
@@ -1518,6 +1564,112 @@
 
 <script>
 (function(){
+  // ===== Login Google + sinkronisasi cloud (Firebase) =====
+  // Khusus histori/pengaturan tool ini yang disinkronkan ke akun Google -
+  // Backend URL & App Token live trading SENGAJA TIDAK ikut disinkronkan
+  // (tetap lokal per-device) demi keamanan, sesuai keputusan user.
+  const esFirebaseConfig = {
+    apiKey: "AIzaSyB4cWVI-k3q16TmRCbM_lbJwgtjxIs_Weo",
+    authDomain: "jadi-trader-tools.firebaseapp.com",
+    projectId: "jadi-trader-tools",
+    storageBucket: "jadi-trader-tools.firebasestorage.app",
+    messagingSenderId: "171244479105",
+    appId: "1:171244479105:web:9b421850801b6678d8e380",
+    measurementId: "G-P3YCEC4XYX"
+  };
+  firebase.initializeApp(esFirebaseConfig);
+  const esAuth = firebase.auth();
+  const esDb = firebase.firestore();
+
+  // Kunci localStorage yang ikut disinkronkan ke cloud (histori trade, favorit,
+  // pengaturan) - LIVE_TRADE_CONFIG_KEY (Backend URL/App Token) sengaja tidak
+  // dimasukkan di sini.
+  const ES_CLOUD_SYNC_KEYS = [
+    'emaScreenerActiveSymbols_v1',
+    'emaScreenerFavCrossSymbols_v1',
+    'emaScreenerPrioritySim_v1',
+    'emaScreenerFavorites_v1',
+    'emaScreenerPsimSettings_v1'
+  ];
+
+  const esAuthGateEl = document.getElementById('esAuthGate');
+  const esAuthStatusEl = document.getElementById('esAuthStatus');
+  const esGoogleLoginBtn = document.getElementById('esGoogleLoginBtn');
+  const esUserBarEl = document.getElementById('esUserBar');
+  const esUserAvatarEl = document.getElementById('esUserAvatar');
+  const esUserNameEl = document.getElementById('esUserName');
+  const esSignOutBtn = document.getElementById('esSignOutBtn');
+  let esCloudSyncTimer = null;
+
+  function esLoadFromCloud(uid){
+    return esDb.collection('users').doc(uid).get().then(function(doc){
+      if(doc.exists){
+        const data = doc.data() || {};
+        ES_CLOUD_SYNC_KEYS.forEach(function(key){
+          if(typeof data[key] === 'string'){
+            try{ localStorage.setItem(key, data[key]); }catch(e){}
+          }
+        });
+      }
+    });
+  }
+
+  function esSaveToCloud(uid){
+    const payload = {};
+    ES_CLOUD_SYNC_KEYS.forEach(function(key){
+      const val = localStorage.getItem(key);
+      if(val !== null) payload[key] = val;
+    });
+    payload._updatedAt = Date.now();
+    return esDb.collection('users').doc(uid).set(payload, { merge: true });
+  }
+
+  esAuth.onAuthStateChanged(function(user){
+    if(user){
+      esAuthGateEl.style.display = 'none';
+      esUserBarEl.style.display = 'flex';
+      esUserAvatarEl.src = user.photoURL || '';
+      esUserNameEl.textContent = user.displayName || user.email || '';
+
+      // Cuma sinkron+reload SEKALI per sesi tab ini - biar tidak infinite reload
+      // (onAuthStateChanged juga bakal jalan lagi setelah reload karena sesi
+      // Google-nya masih login).
+      const syncedFlag = 'esCloudSynced_' + user.uid;
+      if(!sessionStorage.getItem(syncedFlag)){
+        esAuthStatusEl.textContent = 'Menyinkronkan data...';
+        esLoadFromCloud(user.uid).then(function(){
+          sessionStorage.setItem(syncedFlag, '1');
+          location.reload();
+        }).catch(function(){
+          sessionStorage.setItem(syncedFlag, '1');
+        });
+      }
+
+      if(esCloudSyncTimer) clearInterval(esCloudSyncTimer);
+      esCloudSyncTimer = setInterval(function(){ esSaveToCloud(user.uid); }, 15000);
+      window.addEventListener('beforeunload', function(){ esSaveToCloud(user.uid); });
+    } else {
+      esAuthGateEl.style.display = 'flex';
+      esUserBarEl.style.display = 'none';
+      if(esCloudSyncTimer) clearInterval(esCloudSyncTimer);
+    }
+  });
+
+  esGoogleLoginBtn.addEventListener('click', function(){
+    esAuthStatusEl.classList.remove('error');
+    esAuthStatusEl.textContent = 'Membuka login Google...';
+    const provider = new firebase.auth.GoogleAuthProvider();
+    esAuth.signInWithPopup(provider).catch(function(e){
+      esAuthStatusEl.classList.add('error');
+      esAuthStatusEl.textContent = 'Gagal login: ' + e.message;
+    });
+  });
+
+  esSignOutBtn.addEventListener('click', function(){
+    esAuth.signOut();
+  });
+  // ===== akhir bagian login + sinkronisasi =====
+
   const BASE_SYMBOLS = [
     // big cap-ish
     'BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT','ADAUSDT','DOGEUSDT','TRXUSDT','TONUSDT','AVAXUSDT',
