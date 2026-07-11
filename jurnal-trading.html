@@ -236,9 +236,39 @@
     .account-meta{text-align:left;}
     .masthead{flex-direction:column;align-items:flex-start;}
   }
+
+  .jt-viewer-bar{
+    display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;
+    padding:8px 12px; margin-bottom:10px; background:var(--surface); border:1px solid var(--border);
+    border-radius:8px; font-family:var(--font-body); font-size:12px; color:var(--ink-dim);
+  }
+  .jt-google-btn{
+    padding:6px 14px; border-radius:6px; border:1px solid var(--border); background:var(--surface-2);
+    color:var(--ink); font-size:12px; font-weight:600; cursor:pointer;
+  }
+  .jt-google-btn:hover{ background:var(--border); }
+  .jt-user-bar{ display:none; align-items:center; gap:8px; }
+  .jt-user-bar img{ width:20px; height:20px; border-radius:50%; }
+  .jt-signout-btn{
+    background:none; border:1px solid var(--border); color:var(--ink-dim); border-radius:6px; padding:3px 9px;
+    font-size:11px; cursor:pointer;
+  }
+  .jt-signout-btn:hover{ color:var(--ink); border-color:var(--ink-dim); }
 </style>
 
 <div class="wrap">
+
+  <div class="jt-viewer-bar">
+    <span id="jtViewerNote">Memuat...</span>
+    <div>
+      <button type="button" class="jt-google-btn" id="jtGoogleLoginBtn">Masuk dengan Google</button>
+      <span class="jt-user-bar" id="jtUserBar">
+        <img id="jtUserAvatar" src="" alt="">
+        <span id="jtUserName"></span>
+        <button type="button" class="jt-signout-btn" id="jtSignOutBtn">Keluar</button>
+      </span>
+    </div>
+  </div>
 
   <div class="jt-nav">
     <a href="ema-cross-screener_3.html" class="jt-nav-link">&larr; Kripto Screener</a>
@@ -1108,5 +1138,114 @@
   });
 
   renderCryptoAll();
+})();
+</script>
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script>
+(function(){
+  // ===== Login Google + jurnal "showcase" (Firebase) =====
+  // Belum login -> tampilkan data pemilik tool (OWNER_UID) sebagai contoh biar
+  // tidak kosong. Sudah login -> tampilkan data histori trade milik akun yang
+  // login itu sendiri (dari koleksi yang sama dipakai bareng screener kripto/XAU).
+  var jtFirebaseConfig = {
+    apiKey: "AIzaSyB4cWVI-k3q16TmRCbM_lbJwgtjxIs_Weo",
+    authDomain: "jadi-trader-tools.firebaseapp.com",
+    projectId: "jadi-trader-tools",
+    storageBucket: "jadi-trader-tools.firebasestorage.app",
+    messagingSenderId: "171244479105",
+    appId: "1:171244479105:web:9b421850801b6678d8e380",
+    measurementId: "G-P3YCEC4XYX"
+  };
+  firebase.initializeApp(jtFirebaseConfig);
+  var jtAuth = firebase.auth();
+  var jtDb = firebase.firestore();
+  var JT_OWNER_UID = 'EOrakx0QnSVgsi6BECSOXvUM9kG3';
+
+  // Dibaca untuk TAMPILAN jurnal (punya sendiri atau punya owner sebagai contoh).
+  var JT_READ_KEYS = ['ledgerNoirTrades_v1', 'emaScreenerPrioritySim_v1'];
+  // Ditulis balik ke cloud dari halaman jurnal ini - cuma histori forex, karena
+  // histori kripto (emaScreenerPrioritySim_v1) sudah disinkron sendiri oleh
+  // halaman Kripto Screener.
+  var JT_WRITE_KEYS = ['ledgerNoirTrades_v1'];
+
+  // Return true kalau ada data yang benar-benar berubah (dipakai buat mutuskan
+  // perlu reload atau tidak - supaya tiap load selalu cek cloud TANPA bikin
+  // reload berulang kalau datanya memang belum berubah dari device lain).
+  function jtApplyDocIfChanged(doc){
+    if(!doc.exists) return false;
+    var data = doc.data() || {};
+    var changed = false;
+    JT_READ_KEYS.forEach(function(key){
+      if(typeof data[key] === 'string' && data[key] !== localStorage.getItem(key)){
+        try{ localStorage.setItem(key, data[key]); }catch(e){}
+        changed = true;
+      }
+    });
+    return changed;
+  }
+
+  function jtSaveToCloud(uid){
+    var payload = {};
+    JT_WRITE_KEYS.forEach(function(key){
+      var val = localStorage.getItem(key);
+      if(val !== null) payload[key] = val;
+    });
+    payload._updatedAt = Date.now();
+    return jtDb.collection('users').doc(uid).set(payload, { merge: true });
+  }
+
+  var jtSyncTimer = null;
+  var jtLoginBtn = document.getElementById('jtGoogleLoginBtn');
+  var jtUserBarEl = document.getElementById('jtUserBar');
+  var jtUserAvatarEl = document.getElementById('jtUserAvatar');
+  var jtUserNameEl = document.getElementById('jtUserName');
+  var jtSignOutBtn = document.getElementById('jtSignOutBtn');
+  var jtViewerNoteEl = document.getElementById('jtViewerNote');
+
+  jtAuth.onAuthStateChanged(function(user){
+    if(user){
+      jtLoginBtn.style.display = 'none';
+      jtUserBarEl.style.display = 'inline-flex';
+      jtUserAvatarEl.src = user.photoURL || '';
+      jtUserNameEl.textContent = user.displayName || user.email || '';
+      jtViewerNoteEl.textContent = 'Menampilkan jurnal kamu sendiri.';
+
+      // Selalu cek data terbaru dari cloud tiap kali halaman dibuka/refresh -
+      // reload cuma terjadi kalau memang ada perubahan (dari device lain),
+      // supaya tidak reload berulang percuma kalau datanya sama saja.
+      jtDb.collection('users').doc(user.uid).get().then(function(doc){
+        if(jtApplyDocIfChanged(doc)) location.reload();
+      }).catch(function(){});
+
+      if(jtSyncTimer) clearInterval(jtSyncTimer);
+      jtSyncTimer = setInterval(function(){ jtSaveToCloud(user.uid); }, 15000);
+      window.addEventListener('beforeunload', function(){ jtSaveToCloud(user.uid); });
+    } else {
+      jtLoginBtn.style.display = 'inline-flex';
+      jtUserBarEl.style.display = 'none';
+      jtViewerNoteEl.textContent = 'Menampilkan jurnal contoh (punya pemilik tool ini). Login untuk lihat jurnal kamu sendiri.';
+
+      jtDb.collection('users').doc(JT_OWNER_UID).get().then(function(doc){
+        if(jtApplyDocIfChanged(doc)) location.reload();
+      }).catch(function(){});
+
+      if(jtSyncTimer) clearInterval(jtSyncTimer);
+    }
+  });
+
+  jtLoginBtn.addEventListener('click', function(){
+    var provider = new firebase.auth.GoogleAuthProvider();
+    jtAuth.signInWithPopup(provider).catch(function(e){
+      alert('Gagal login: ' + e.message);
+    });
+  });
+
+  jtSignOutBtn.addEventListener('click', function(){
+    jtAuth.signOut();
+  });
+  // ===== akhir bagian login + jurnal showcase =====
 })();
 </script>
