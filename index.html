@@ -228,6 +228,7 @@
     color:var(--accent);border:1px solid var(--accent-dim);border-radius:4px;
     padding:1px 5px;margin-left:6px;vertical-align:middle;
   }
+  .venue-badge.live{ color:var(--loss); border-color:var(--loss); }
 
   @media (prefers-reduced-motion:reduce){*{transition:none!important;}}
   @media (max-width:600px){
@@ -360,6 +361,7 @@
   </header>
 
   <section class="kpis">
+    <div class="kpi"><div class="label">Total Saldo (Binance)</div><div class="value num" id="cBalance">—</div></div>
     <div class="kpi"><div class="label">Total Trade</div><div class="value num" id="cTotal">0</div></div>
     <div class="kpi"><div class="label">Win Rate</div><div class="value num" id="cWinrate">—</div></div>
     <div class="kpi"><div class="label">Total P/L</div><div class="value num" id="cPL">$0.00</div></div>
@@ -391,7 +393,7 @@
         </div>
         <div id="cEmptyState" class="empty-state" style="display:none">
           <div class="big">Belum ada trade kripto tercatat</div>
-          <p>Riwayat ini otomatis tersinkron dari Simulasi Sinyal Prioritas di Kripto Screener (termasuk order live testnet). Buka lalu tutup posisi di sana, lalu klik Refresh di sini.</p>
+          <p>Riwayat ini khusus order yang benar-benar dikirim ke Binance (Live/Testnet) dari Simulasi Sinyal Prioritas di Kripto Screener - trade simulasi biasa tidak ikut ditampilkan di sini. Buka lalu tutup posisi live di sana, lalu klik Refresh di sini.</p>
         </div>
       </div>
     </div>
@@ -884,8 +886,32 @@
           reason: t.reason || '',
           venue: t.venue || 'sim'
         };
-      });
+      // Jurnal kripto ini khusus catatan trade yang BENERAN dikirim ke Binance
+      // (live/testnet) - trade simulasi biasa (venue 'sim') tidak ikut ditampilkan.
+      }).filter(function(t){ return t.venue==='live-real' || t.venue==='live-testnet'; });
     }catch(e){ return []; }
+  }
+
+  var LIVE_TRADE_CONFIG_KEY = 'emaScreenerLiveTradeConfig_v1';
+
+  function fetchBinanceBalance(){
+    var balEl = document.getElementById('cBalance');
+    try{
+      var raw = localStorage.getItem(LIVE_TRADE_CONFIG_KEY);
+      if(!raw){ balEl.textContent = 'Belum terhubung'; return; }
+      var cfg = JSON.parse(raw);
+      var backendUrl = (cfg.backendUrl||'').trim().replace(/\/$/, '');
+      var appToken = (cfg.appToken||'').trim();
+      if(!backendUrl || !appToken){ balEl.textContent = 'Belum terhubung'; return; }
+      balEl.textContent = 'Memuat...';
+      fetch(backendUrl + '/api/account', { headers: { 'X-App-Token': appToken } })
+        .then(function(res){ return res.json().then(function(data){ return { ok: res.ok, data: data }; }); })
+        .then(function(r){
+          if(!r.ok || !r.data || r.data.totalWalletBalance===undefined){ balEl.textContent = 'Gagal ambil saldo'; return; }
+          balEl.textContent = fmtMoney(parseFloat(r.data.totalWalletBalance));
+        })
+        .catch(function(){ balEl.textContent = 'Gagal ambil saldo'; });
+    }catch(e){ balEl.textContent = 'Gagal ambil saldo'; }
   }
 
   function fmtMoney(n){
@@ -981,7 +1007,8 @@
     tbody.innerHTML = sorted.map(function(t){
       var result = t.pl>0?'win':t.pl<0?'loss':'be';
       var resultLabel = t.pl>0?'WIN':t.pl<0?'LOSS':'BE';
-      var venueBadge = t.venue==='live-testnet' ? ' <span class="venue-badge">Testnet</span>' : '';
+      var venueBadge = t.venue==='live-real' ? ' <span class="venue-badge live">Binance Live</span>'
+        : t.venue==='live-testnet' ? ' <span class="venue-badge">Binance Testnet</span>' : '';
       return '<tr>'+
         '<td class="num">'+fmtDate(t.date)+'</td>'+
         '<td>'+t.pair+venueBadge+'</td>'+
@@ -1061,9 +1088,10 @@
   function renderCryptoAll(){
     cState.trades = loadCryptoTrades();
     document.getElementById('cryptoSyncNote').textContent = cState.trades.length
-      ? 'Tersinkron • ' + cState.trades.length + ' transaksi ditemukan.'
-      : 'Belum ada transaksi tersimpan di Kripto Screener.';
+      ? 'Tersinkron • ' + cState.trades.length + ' transaksi Binance ditemukan.'
+      : 'Belum ada transaksi Binance (live/testnet) tersimpan di Kripto Screener.';
     renderKPIs(); renderEquityCurve(); renderTable(); renderCalendar(); renderPairInsight();
+    fetchBinanceBalance();
   }
 
   document.getElementById('btnRefreshCrypto').addEventListener('click', renderCryptoAll);

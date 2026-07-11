@@ -1,40 +1,112 @@
 <style>
   :root{
-    --bg:#0A0E14;
-    --panel:#10161F;
-    --panel-2:#151D29;
-    --border:#232E3D;
-    --text:#E8EDF3;
-    --muted:#7C8BA0;
-    --dim:#4B5A70;
-    --bull:#3DE0C4;
-    --bull-dim:#1B4A44;
-    --bear:#FF6B5E;
-    --bear-dim:#4A2420;
-    --gold:#F2B84B;
+    --bg:#0b0c0f;
+    --panel:#131519;
+    --panel-2:#1b1e24;
+    --border:#262a31;
+    --text:#ece8de;
+    --muted:#9a9ca4;
+    --dim:#63656d;
+    --bull:#4f9e82;
+    --bull-dim:#1e3a30;
+    --bear:#c05a4e;
+    --bear-dim:#3a201c;
+    --gold:#c9a24b;
     --ema9c:#FF8A65;
     --ema21c:#FFD54F;
     --ema200c:#B39DDB;
-    --demand-c:#3DE0C4;
-    --supply-c:#FF6B5E;
+    --demand-c:#4f9e82;
+    --supply-c:#c05a4e;
     --bbc:#5C7CFA;
-    --font-display:'Space Grotesk', sans-serif;
-    --font-mono:'IBM Plex Mono', monospace;
-    --font-body:'IBM Plex Sans', sans-serif;
+    --font-display:Georgia,'Iowan Old Style','Palatino Linotype',serif;
+    --font-mono:'SF Mono','Cascadia Code',Consolas,'Roboto Mono',monospace;
+    --font-body:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
   }
 
-  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500&display=swap');
-
   * { box-sizing: border-box; }
+
+  html, body{
+    background: var(--bg);
+    margin:0;
+    padding:0;
+  }
 
   .ema-screener{
     background: var(--bg);
     color: var(--text);
     font-family: var(--font-body);
+    font-variant-numeric: tabular-nums;
     border-radius: 14px;
     padding: 22px 22px 26px;
     max-width: 100%;
     overflow-x: hidden;
+  }
+
+  .es-econ-calendar-panel{
+    position: fixed;
+    top: 90px;
+    right: 16px;
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+  }
+  .es-econ-calendar-trigger{
+    flex-shrink:0;
+    display:flex;
+    align-items:center;
+    gap:6px;
+    padding:6px 10px;
+    border-radius:20px;
+    background: var(--panel);
+    border:1px solid var(--border);
+    cursor:pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+  }
+  .es-econ-calendar-trigger:hover{ border-color:#8C231A; }
+  .es-econ-calendar-trigger-dot{
+    width:9px;
+    height:9px;
+    border-radius:50%;
+    background:#8C231A;
+    flex-shrink:0;
+  }
+  .es-econ-calendar-trigger-label{
+    font-family: var(--font-mono);
+    font-weight:600;
+    font-size:11px;
+    color: var(--text);
+    white-space:nowrap;
+  }
+  .es-econ-calendar-content{
+    width:320px;
+    height:420px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .es-econ-calendar-panel.collapsed .es-econ-calendar-content{ display:none; }
+  .es-econ-calendar-header{
+    padding:8px 12px;
+    border-bottom:1px solid var(--border);
+    font-family: var(--font-mono);
+    font-size:11.5px;
+    font-weight:600;
+    color: var(--text);
+    flex-shrink:0;
+  }
+  .es-econ-calendar-body{
+    flex:1;
+    overflow:hidden;
+  }
+  @media (max-width: 700px){
+    .es-econ-calendar-content{ width: 260px; height: 360px; }
+    .es-econ-calendar-panel{ top:70px; right:8px; }
   }
 
   .es-header{
@@ -128,8 +200,103 @@
   }
   .es-status.error{ color: var(--bear); }
 
-  .es-symbol-manager{ position:relative; margin: -6px 0 14px; }
+  .es-scan-toolbar{
+    display:flex;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:10px;
+    margin: -6px 0 14px;
+  }
+  .es-symbol-manager{ position:relative; }
   .es-symbol-manager-inline{ margin:0; }
+  .es-btc-tf-strip{
+    display:flex;
+    gap:6px;
+    flex-wrap:wrap;
+    margin-bottom:14px;
+  }
+  #esFavCrossStatus{
+    margin-top:0;
+  }
+  #esStatus{
+    margin-top:14px;
+  }
+  .es-fav-cross-manage{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+    align-items:center;
+    margin-top:14px;
+    margin-bottom:14px;
+  }
+  .es-fav-cross-chip{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    background: var(--panel);
+    border:1px solid var(--border);
+    border-radius:20px;
+    padding:4px 6px 4px 10px;
+    font-family: var(--font-mono);
+    font-size:11px;
+    color: var(--text);
+  }
+  .es-fav-cross-chip-remove{
+    cursor:pointer;
+    color: var(--gold);
+    font-size:13px;
+    line-height:1;
+    padding:2px;
+    user-select:none;
+  }
+  .es-fav-cross-chip-remove:hover{ opacity:0.7; }
+  .es-fav-cross-chip-add{
+    display:flex;
+    align-items:center;
+    gap:4px;
+    background: var(--panel);
+    border:1px dashed var(--border);
+    border-radius:20px;
+    padding:3px 6px 3px 10px;
+    position:relative;
+  }
+  .es-fav-cross-add-input{
+    background:none;
+    border:none;
+    outline:none;
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size:11px;
+    width:120px;
+  }
+  .es-fav-cross-add-btn{
+    background:none;
+    border:none;
+    color: var(--bull);
+    cursor:pointer;
+    font-size:11px;
+    font-weight:600;
+    font-family: var(--font-mono);
+    padding:2px 4px;
+  }
+  .es-fav-cross-add-btn:hover{ opacity:0.8; }
+  .es-btc-tf-box{
+    background: var(--panel);
+    border:1px solid var(--border);
+    border-radius:6px;
+    padding:4px 8px;
+    font-family: var(--font-mono);
+    text-align:center;
+    min-width:58px;
+    cursor:pointer;
+  }
+  .es-btc-tf-box:hover{ border-color: var(--dim); }
+  .es-btc-tf-box-label{ color: var(--muted); font-size:8.5px; margin-bottom:2px; }
+  .es-btc-tf-box-status{ font-weight:600; font-size:9.5px; white-space:nowrap; }
+  .es-btc-tf-box-status.bull{ color: var(--bull); }
+  .es-btc-tf-box-status.bear{ color: var(--bear); }
+  .es-btc-tf-box-status.none{ color: var(--dim); }
+  .es-btc-tf-box-status.error{ color: var(--bear); }
   .es-symbol-manager-btn{
     display:inline-flex;
     align-items:center;
@@ -242,6 +409,18 @@
     letter-spacing:.06em;
     padding:2px 6px;
     border-radius:0 0 5px 5px;
+  }
+  .es-card-fav-star{
+    position:absolute;
+    top:-1px; left:10px;
+    background: var(--gold);
+    color:#1A1200;
+    font-family: var(--font-mono);
+    font-size:11px;
+    font-weight:700;
+    padding:2px 6px;
+    border-radius:0 0 5px 5px;
+    line-height:1.2;
   }
 
   .es-card-top{
@@ -534,6 +713,21 @@
   }
   .es-priority-signal.buy{ background: var(--bull-dim); color: var(--bull); }
   .es-priority-signal.sell{ background: var(--bear-dim); color: var(--bear); }
+  .es-priority-signal.watch{ background: rgba(242,184,75,0.18); color: var(--gold); }
+
+  .es-priority-hp-badge{
+    font-family: var(--font-mono);
+    font-weight:700;
+    font-size:9.5px;
+    padding:3px 8px;
+    border-radius:6px;
+    letter-spacing:.03em;
+    background: var(--gold);
+    color:#1A1200;
+    white-space:nowrap;
+  }
+
+  .es-confirm-notes{ margin-top:2px; }
 
   .es-priority-tf, .es-priority-trend, .es-priority-stoch{
     font-family: var(--font-mono);
@@ -629,10 +823,18 @@
   .es-fav-status.error{ color: var(--bear); }
 
   .es-fav-grid{
-    display:grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    display:flex;
     gap:8px;
+    overflow-x:auto;
+    overflow-y:hidden;
+    padding-bottom:10px;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
   }
+  .es-fav-grid::-webkit-scrollbar{ height:8px; }
+  .es-fav-grid::-webkit-scrollbar-track{ background: var(--panel-2); border-radius:4px; }
+  .es-fav-grid::-webkit-scrollbar-thumb{ background: var(--border); border-radius:4px; }
+  .es-fav-grid::-webkit-scrollbar-thumb:hover{ background: var(--dim); }
   .es-fav-box{
     position:relative;
     background: var(--panel);
@@ -643,10 +845,16 @@
     flex-direction:column;
     gap:6px;
     cursor:pointer;
+    flex:0 0 155px;
+    scroll-snap-align: start;
   }
   .es-fav-box.buy{ border-color: var(--bull); }
   .es-fav-box.sell{ border-color: var(--bear); }
   .es-fav-box.hold{ border-color: var(--dim); }
+  .es-fav-box[draggable="true"]{ cursor: pointer; }
+  .es-fav-box[draggable="true"].grab-ready{ cursor: grab; }
+  .es-fav-box.dragging{ opacity: 0.4; cursor: grabbing; }
+  .es-fav-box.drag-over{ outline: 2px dashed var(--gold); outline-offset: 2px; }
 
   .es-fav-star{
     position:absolute;
@@ -671,6 +879,9 @@
     font-size:10px;
     color: var(--muted);
   }
+  .es-fav-chg{ font-weight:600; }
+  .es-fav-chg.up{ color: var(--bull); }
+  .es-fav-chg.down{ color: var(--bear); }
   .es-fav-signal-badge{
     font-family: var(--font-mono);
     font-weight:700;
@@ -799,6 +1010,175 @@
   }
   .es-sim-controls button:hover{ background: var(--bull-dim); }
   .es-sim-controls button:disabled{ opacity:.5; cursor:not-allowed; }
+  .es-sim-controls button.sell{ border-color: var(--bear); color: var(--bear); }
+  .es-sim-controls button.sell:hover{ background: var(--bear-dim); }
+
+  .es-live-trade-box{
+    background: var(--panel);
+    border:1px solid var(--gold);
+    border-radius:10px;
+    padding:12px 14px;
+    margin-top:12px;
+    margin-bottom:14px;
+  }
+  .es-live-trade-title-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:8px;
+    margin-bottom:10px;
+  }
+  .es-live-trade-title{
+    font-family: var(--font-mono);
+    font-weight:700;
+    font-size:11.5px;
+    color: var(--gold);
+    text-transform:uppercase;
+    letter-spacing:.03em;
+  }
+  .es-live-env-badge{
+    display:inline-flex;
+    align-items:center;
+    gap:5px;
+    font-family: var(--font-mono);
+    font-weight:700;
+    font-size:10.5px;
+    letter-spacing:.03em;
+    text-transform:uppercase;
+    padding:3px 9px;
+    border-radius:20px;
+    background: var(--panel-2);
+    border:1px solid var(--border);
+    color: var(--muted);
+  }
+  .es-live-env-badge.testnet{ border-color: var(--bull); color: var(--bull); background: var(--bull-dim); }
+  .es-live-env-badge.live{ border-color: var(--bear); color: var(--bear); background: var(--bear-dim); }
+  .es-live-env-badge.checking{ border-color: var(--gold); color: var(--gold); }
+  .es-live-trade-config{
+    display:flex;
+    gap:14px;
+    flex-wrap:wrap;
+    align-items:end;
+  }
+  .es-live-trade-config label{
+    display:flex;
+    flex-direction:column;
+    gap:5px;
+    font-family: var(--font-mono);
+    font-size:11px;
+    color:var(--muted);
+  }
+  .es-live-trade-config input{
+    background: var(--panel-2);
+    border:1px solid var(--border);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size:12.5px;
+    padding:7px 10px;
+    border-radius:8px;
+    outline:none;
+    width:220px;
+  }
+  .es-live-trade-config button{
+    background: var(--panel);
+    border:1px solid var(--gold);
+    color: var(--gold);
+    font-family: var(--font-mono);
+    font-weight:600;
+    font-size:12.5px;
+    padding:8px 14px;
+    border-radius:8px;
+    cursor:pointer;
+    height:34px;
+  }
+  .es-live-trade-config button:hover{ background: rgba(242,184,75,0.12); }
+  .es-live-trade-config button:disabled{ opacity:.5; cursor:not-allowed; }
+  .es-live-trade-status{
+    font-family: var(--font-mono);
+    font-size:11.5px;
+    color: var(--muted);
+    margin-top:8px;
+  }
+  .es-live-trade-status.error{ color: var(--bear); }
+  .es-live-trade-status.success{ color: var(--bull); }
+
+  .es-sim-reset-row{
+    display:flex;
+    justify-content:flex-end;
+    margin-top:14px;
+  }
+  .es-sim-reset-row button{
+    background: var(--panel);
+    border:1px solid var(--bear);
+    color: var(--bear);
+    font-family: var(--font-mono);
+    font-weight:600;
+    font-size:12.5px;
+    padding:8px 14px;
+    border-radius:8px;
+    cursor:pointer;
+    height:34px;
+  }
+  .es-sim-reset-row button:hover{ background: var(--bear-dim); }
+
+  .es-sim-preview{
+    background: var(--panel);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:12px 14px;
+    margin-bottom:14px;
+  }
+  .es-sim-preview-empty{
+    font-family: var(--font-mono);
+    font-size:12px;
+    color: var(--muted);
+  }
+  .es-psim-preview-head{
+    font-family: var(--font-mono);
+    font-size:12.5px;
+    color: var(--gold);
+    margin-bottom:10px;
+  }
+  .es-psim-preview-grid{
+    display:grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px,1fr));
+    gap:10px;
+    margin-bottom:10px;
+  }
+  .es-psim-preview-col{
+    background: var(--panel-2);
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:8px 10px;
+  }
+  .es-psim-preview-label{
+    font-family: var(--font-mono);
+    font-size:10px;
+    color: var(--muted);
+    text-transform:uppercase;
+    letter-spacing:.04em;
+    margin-bottom:4px;
+  }
+  .es-psim-preview-price{
+    font-family: var(--font-mono);
+    font-weight:700;
+    font-size:14px;
+    margin-bottom:6px;
+  }
+  .es-psim-preview-line{
+    font-family: var(--font-mono);
+    font-size:11px;
+    margin-top:2px;
+  }
+  .es-psim-preview-line.muted{ color: var(--muted); }
+  .es-psim-preview-line .pnl-pos{ color: var(--bull); }
+  .es-psim-preview-line .pnl-neg{ color: var(--bear); }
+  .es-psim-preview-note{
+    font-family: var(--font-mono);
+    font-size:11px;
+    color: var(--muted);
+  }
 
   .es-sim-status{
     font-family: var(--font-mono);
@@ -830,7 +1210,7 @@
     margin-bottom:4px;
   }
   .es-sim-stat-value{
-    font-family: var(--font-display);
+    font-family: var(--font-mono);
     font-weight:700;
     font-size:16px;
   }
@@ -874,6 +1254,10 @@
     border-radius:8px;
     margin-bottom:16px;
   }
+  .es-sim-table-wrap::-webkit-scrollbar{ width:8px; height:8px; }
+  .es-sim-table-wrap::-webkit-scrollbar-track{ background: var(--panel-2); border-radius:4px; }
+  .es-sim-table-wrap::-webkit-scrollbar-thumb{ background: var(--border); border-radius:4px; }
+  .es-sim-table-wrap::-webkit-scrollbar-thumb:hover{ background: var(--dim); }
   .es-sim-table{
     width:100%;
     border-collapse:collapse;
@@ -903,6 +1287,20 @@
   .es-sim-table td.pnl-neg{ color: var(--bear); }
   .es-psim-source-link{ cursor:pointer; }
   .es-psim-source-link:hover{ opacity:0.75; }
+  .es-venue-badge{
+    display:inline-block;
+    font-family: var(--font-mono);
+    font-size:8.5px;
+    font-weight:700;
+    color: var(--gold);
+    border:1px solid var(--gold);
+    border-radius:4px;
+    padding:1px 5px;
+    margin-left:6px;
+    letter-spacing:.02em;
+    vertical-align:middle;
+  }
+  .es-venue-badge.live{ color: var(--bear); border-color: var(--bear); }
   .es-psim-close-btn{
     background:none;
     border:1px solid currentColor;
@@ -926,11 +1324,6 @@
   }
 
   @media (max-width: 700px){
-    .es-fav-grid{ gap:5px; }
-    .es-fav-box{ padding:5px; gap:4px; }
-    .es-fav-symbol{ font-size:10px; }
-    .es-fav-price{ font-size:8px; }
-    .es-fav-signal-badge{ font-size:8px; padding:1px 5px; }
     .es-checklist{ padding:5px; }
     .es-check-row{ font-size:8px; }
     .es-priority-note{ font-size:8px; }
@@ -946,13 +1339,24 @@
 </style>
 
 <div class="ema-screener">
+  <div class="es-econ-calendar-panel collapsed" id="esEconCalendarPanel">
+    <div class="es-econ-calendar-trigger" id="esEconCalendarTrigger">
+      <span class="es-econ-calendar-trigger-dot"></span>
+      <span class="es-econ-calendar-trigger-label">News</span>
+    </div>
+    <div class="es-econ-calendar-content">
+      <div class="es-econ-calendar-header">Kalender Ekonomi</div>
+      <div class="es-econ-calendar-body" id="esEconCalendarBody"></div>
+    </div>
+  </div>
   <div class="es-header">
     <div>
-      <div class="es-title"><span class="dot"></span>EMA Cross Screener</div>
+      <div class="es-title"><span class="dot"></span>Jadi Trader Tools</div>
       <div class="es-sub" id="esSubtitle">memindai 40 pair USDT di Binance untuk persilangan EMA 9 / EMA 21</div>
     </div>
     <div class="es-controls">
       <a href="xauusd-priority-screener.html" class="es-nav-link">XAUUSD Screener &rarr;</a>
+      <a href="jurnal-trading.html" class="es-nav-link">Jurnal Trading &rarr;</a>
       <select id="esInterval">
         <option value="1m">1m</option>
         <option value="5m">5m</option>
@@ -990,18 +1394,28 @@
   </div>
 
   <div class="es-fav-section">
-    <div class="es-fav-title">5 Koin Favorit (Checklist Sinyal — Mengikuti TF di Atas)</div>
+    <div class="es-fav-title">Koin Favorit (maks. 50 — Checklist Sinyal, Mengikuti TF di Atas)</div>
     <div class="es-fav-status" id="esFavStatus">Memuat koin favorit...</div>
+    <div class="es-btc-tf-strip" id="esBtcTfStrip"></div>
     <div class="es-fav-grid" id="esFavGrid"></div>
   </div>
 
+  <div class="es-fav-cross-section">
+    <div class="es-fav-title">Koin Favorit — Cross EMA 9/21 (Semua Timeframe)</div>
+    <div class="es-status" id="esFavCrossStatus">Menunggu pindaian koin favorit pertama...</div>
+    <div class="es-fav-cross-manage" id="esFavCrossManage"></div>
+    <div class="es-grid" id="esFavCrossGrid"></div>
+  </div>
+
   <div class="es-status" id="esStatus">Memuat data...</div>
-  <div class="es-symbol-manager">
-    <button type="button" id="esSymbolManagerBtn" class="es-symbol-manager-btn">
-      <span>Ganti Chart / Kelola Koin</span>
-      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
-    </button>
-    <div class="es-symbol-manager-dropdown" id="esSymbolManagerDropdown"></div>
+  <div class="es-scan-toolbar">
+    <div class="es-symbol-manager">
+      <button type="button" id="esSymbolManagerBtn" class="es-symbol-manager-btn">
+        <span>Ganti Chart / Kelola Koin</span>
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="es-symbol-manager-dropdown" id="esSymbolManagerDropdown"></div>
+    </div>
   </div>
   <div class="es-grid" id="esGrid"></div>
 
@@ -1012,7 +1426,7 @@
     <div class="es-priority-controls">
       <select id="esPriorityRisk">
         <option value="all" selected>Semua Level Risk</option>
-        <option value="high">High Risk (TF 1m/5m)</option>
+        <option value="high">High Risk (TF 1m/5m/15m)</option>
         <option value="medium">Medium Risk (TF 30m/1H)</option>
         <option value="low">Low Risk (TF 4H/1D)</option>
       </select>
@@ -1033,13 +1447,42 @@
     <div class="es-sim-title">Simulasi Sinyal Prioritas</div>
     <div class="es-sim-controls">
       <label>Modal per Posisi ($)
-        <input type="number" id="esPsimModal" value="4000" min="10" step="10">
+        <input type="number" id="esPsimModal" value="1000" min="10" step="10">
+      </label>
+      <label>Leverage (x)
+        <input type="number" id="esPsimLeverage" value="10" min="1" max="125" step="1">
+      </label>
+      <label>Sinyal Terpilih
+        <select id="esPsimSignalSelect"><option value="">&mdash; Pilih sinyal &mdash;</option></select>
+      </label>
+      <label>SL Manual ($)
+        <input type="number" id="esPsimManualSl" placeholder="otomatis" step="any">
+      </label>
+      <label>TP Manual ($)
+        <input type="number" id="esPsimManualTp" placeholder="otomatis" step="any">
       </label>
       <label class="es-sim-checkbox-label">Aktif
         <input type="checkbox" id="esPsimToggle" checked>
       </label>
-      <button id="esPsimResetBtn">Reset Simulasi</button>
+      <button id="esPsimOpenBtn">Open Posisi</button>
     </div>
+    <div class="es-live-trade-box">
+      <div class="es-live-trade-title-row">
+        <div class="es-live-trade-title">Live Trading &mdash; opsional</div>
+        <span class="es-live-env-badge" id="esLiveEnvBadge">Belum terhubung</span>
+      </div>
+      <div class="es-live-trade-config">
+        <label>Backend URL
+          <input type="text" id="esLiveBackendUrl" placeholder="http://IP_VPS_KAMU:4000">
+        </label>
+        <label>App Token
+          <input type="password" id="esLiveAppToken" placeholder="token rahasia dari .env">
+        </label>
+        <button id="esLiveTradeBtn" type="button">Kirim Order Asli</button>
+      </div>
+      <div class="es-live-trade-status" id="esLiveTradeStatus"></div>
+    </div>
+    <div class="es-sim-preview" id="esPsimPreview"></div>
     <div class="es-sim-status" id="esPsimStatus">Menunggu sinyal prioritas pertama...</div>
     <div class="es-sim-summary" id="esPsimSummary"></div>
 
@@ -1050,7 +1493,7 @@
     <div class="es-sim-table-wrap">
       <table class="es-sim-table">
         <thead>
-          <tr><th>Sumber</th><th>Arah</th><th>Entry</th><th>SL</th><th>RISK SL ($)</th><th>TP1</th><th>TP2</th><th>Area TP</th><th>Harga Sekarang</th><th>PnL ($)</th><th>PnL (%)</th><th>Aksi</th></tr>
+          <tr><th>Sumber</th><th>Arah</th><th>Entry</th><th>SL</th><th>RISK SL ($)</th><th>TP1</th><th>TP2</th><th>Area TP</th><th>Harga Sekarang</th><th>Biaya Exchange</th><th>Funding Fee</th><th>PnL ($)</th><th>PNL Terealisasi</th><th>PnL (%)</th><th>Aksi</th></tr>
         </thead>
         <tbody id="esPsimOpenTbody"></tbody>
       </table>
@@ -1060,10 +1503,14 @@
     <div class="es-sim-table-wrap">
       <table class="es-sim-table">
         <thead>
-          <tr><th>Sumber</th><th>Arah</th><th>Entry</th><th>Exit</th><th>Alasan</th><th>Status TP</th><th>PnL ($)</th><th>PnL (%)</th><th>Waktu Exit</th></tr>
+          <tr><th>Sumber</th><th>Arah</th><th>Entry</th><th>Exit</th><th>Alasan</th><th>Status TP</th><th>Biaya Exchange</th><th>Biaya Margin</th><th>PnL ($)</th><th>PnL (%)</th><th>Waktu Exit</th></tr>
         </thead>
         <tbody id="esPsimHistTbody"></tbody>
       </table>
+    </div>
+
+    <div class="es-sim-reset-row">
+      <button id="esPsimResetBtn">Reset Simulasi</button>
     </div>
 
   </div>
@@ -1244,6 +1691,24 @@
       const data = await res.json();
       const map = {};
       data.forEach(t=>{ map[t.symbol] = t; });
+      return map;
+    }catch(e){
+      return {};
+    }
+  }
+
+  // Harga Spot (loadTickers di atas) beda dari harga Futures (basis/premium),
+  // kadang selisihnya lumayan - untuk posisi live yang beneran di Futures,
+  // pakai mark price Futures asli (dasar perhitungan PNL Binance sendiri),
+  // bukan harga Spot, supaya PNL yang tampil di tool cocok dengan Binance.
+  window.__esLiveMarkPrices = window.__esLiveMarkPrices || {};
+  async function loadFuturesMarkPrices(){
+    try{
+      const res = await fetch('https://fapi.binance.com/fapi/v1/premiumIndex');
+      if(!res.ok) throw new Error('futures mark price fail');
+      const data = await res.json();
+      const map = {};
+      data.forEach(t=>{ map[t.symbol] = parseFloat(t.markPrice); });
       return map;
     }catch(e){
       return {};
@@ -1468,6 +1933,65 @@
     return dir.band + dir.atr*0.5;
   }
 
+  // SL/TP otomatis: kalau candidate punya "dir" (dari checklist BB+S/R+S/D -
+  // Sinyal Prioritas & Koin Favorit), pakai level zona seperti biasa. Kalau
+  // cuma punya "atr" (candidate dari grid cross EMA9/21 biasa, tidak ada data
+  // zona), pakai jarak 1.5x ATR sebagai perkiraan. Kalau tidak ada dua-duanya,
+  // user WAJIB isi manual.
+  function getAutoSlTp(cand){
+    if(cand.dir){
+      const sl = cand.signal==='BUY' ? pickSlForBuy(cand.dir) : pickSlForSell(cand.dir);
+      const riskDist = Math.abs(cand.price - sl);
+      const tp = cand.signal==='BUY' ? cand.price + riskDist : cand.price - riskDist;
+      return { sl, tp };
+    }
+    if(typeof cand.atr === 'number' && cand.atr > 0){
+      const riskDist = cand.atr * 1.5;
+      const sl = cand.signal==='BUY' ? cand.price - riskDist : cand.price + riskDist;
+      const tp = cand.signal==='BUY' ? cand.price + riskDist : cand.price - riskDist;
+      return { sl, tp };
+    }
+    return { sl: null, tp: null };
+  }
+
+  // Gabungan otomatis + override manual dari input "SL Manual"/"TP Manual" -
+  // dipakai di semua tempat (preview, Open Posisi simulasi, Kirim Order Asli)
+  // supaya konsisten. Kalau field manual diisi (angka > 0), itu yang menang.
+  function getEffectiveSlTp(cand){
+    const auto = getAutoSlTp(cand);
+    const manualSlRaw = parseFloat(psimManualSlInput.value);
+    const manualTpRaw = parseFloat(psimManualTpInput.value);
+    const isManualSl = !isNaN(manualSlRaw) && manualSlRaw > 0;
+    const isManualTp = !isNaN(manualTpRaw) && manualTpRaw > 0;
+    return {
+      sl: isManualSl ? manualSlRaw : auto.sl,
+      tp: isManualTp ? manualTpRaw : auto.tp,
+      isManualSl, isManualTp,
+      isManual: isManualSl || isManualTp
+    };
+  }
+
+  // Registry gabungan semua sumber sinyal yang bisa dipilih untuk Simulasi/Live
+  // Trading: Sinyal Prioritas, Koin Favorit (BUY/SELL), dan grid cross EMA9/21
+  // biasa. Tiap sumber daftar ulang candidate-nya sendiri tiap kali pindai
+  // ulang (entri lama dari sumber itu dihapus dulu supaya tidak menumpuk data basi).
+  window.__esTradableSignals = window.__esTradableSignals || {};
+  const TRADABLE_SOURCE_LABEL = { priority:'Prioritas', favorite:'Favorit', cross:'Cross EMA', favcross:'Favorit Cross' };
+  function tradableUid(source, symbol, tfValue){ return `${source}_${symbol}_${tfValue}`; }
+  function registerTradableSignals(source, candidates){
+    Object.keys(window.__esTradableSignals).forEach(k=>{
+      if(window.__esTradableSignals[k].source===source) delete window.__esTradableSignals[k];
+    });
+    candidates.forEach(c=>{
+      const uid = tradableUid(source, c.symbol, c.tfValue);
+      window.__esTradableSignals[uid] = Object.assign({}, c, { source, _uid: uid });
+    });
+    if(typeof populatePsimSignalSelect === 'function') populatePsimSignalSelect();
+  }
+  function getTradableSignalsList(){
+    return Object.values(window.__esTradableSignals);
+  }
+
   function lastMomentumSignal(momentum, withinCandles){
     const n = momentum.bullish.length;
     for(let i=n-1;i>=Math.max(0,n-withinCandles);i--){
@@ -1475,6 +1999,350 @@
       if(momentum.bearish[i]) return { type:'bearish', candlesAgo: n-1-i };
     }
     return null;
+  }
+
+  function isPinBar(open, high, low, close, isBullish){
+    const body = Math.abs(close-open);
+    const range = high-low;
+    if(range<=0) return false;
+    const upperWick = high - Math.max(open, close);
+    const lowerWick = Math.min(open, close) - low;
+    if(isBullish) return lowerWick >= body*2 && lowerWick >= range*0.5 && upperWick <= body*1.1;
+    return upperWick >= body*2 && upperWick >= range*0.5 && lowerWick <= body*1.1;
+  }
+
+  function isEngulfing(prevOpen, prevClose, open, close, isBullish){
+    if(isBullish) return close>open && prevClose<prevOpen && close>=prevOpen && open<=prevClose;
+    return close<open && prevClose>prevOpen && close<=prevOpen && open>=prevClose;
+  }
+
+  function isRangingAtZone(highs, lows, zoneValue, atrVal, lookback){
+    if(!atrVal || atrVal<=0) return false;
+    const n = highs.length;
+    const start = Math.max(0, n-lookback);
+    const recentHighs = highs.slice(start);
+    const recentLows = lows.slice(start);
+    const rangeHigh = Math.max(...recentHighs);
+    const rangeLow = Math.min(...recentLows);
+    const rangeSize = rangeHigh-rangeLow;
+    const mid = (rangeHigh+rangeLow)/2;
+    const nearZone = Math.abs(mid - zoneValue) <= atrVal*1.0;
+    const isTight = rangeSize <= atrVal*1.5;
+    return nearZone && isTight;
+  }
+
+  async function checkEmaCrossOnTf(symbol, tfValue, signal){
+    try{
+      const { closes } = await fetchKlines(symbol, tfValue, 50);
+      if(closes.length < 22) return false;
+      const e9 = ema(closes, 9);
+      const e21 = ema(closes, 21);
+      const cross = detectCross(e9, e21, 5);
+      if(!cross) return false;
+      return signal==='BUY' ? cross.type==='bullish' : cross.type==='bearish';
+    }catch(e){
+      return false;
+    }
+  }
+
+  const FAV_EMA_CROSS_TF_LIST = ['1m','5m','15m','30m','1h','4h','1d'];
+
+  async function scanFavoriteEmaCrosses(symbol, currentTf, currentE9, currentE21){
+    const results = await Promise.all(FAV_EMA_CROSS_TF_LIST.map(async tf=>{
+      try{
+        let e9, e21;
+        if(tf === currentTf){
+          e9 = currentE9; e21 = currentE21;
+        } else {
+          const { closes } = await fetchKlines(symbol, tf, 60);
+          if(closes.length < 22) return null;
+          e9 = ema(closes, 9);
+          e21 = ema(closes, 21);
+        }
+        const cross = detectCross(e9, e21, 3);
+        if(!cross) return null;
+        return { tf, type: cross.type };
+      }catch(e){
+        return null;
+      }
+    }));
+    return results.filter(Boolean);
+  }
+
+  const FAV_CROSS_TF_SHORT_LABEL = { '1m':'1m', '5m':'5m', '15m':'15m', '30m':'30m', '1h':'1H', '4h':'4H', '1d':'1D' };
+  const favCrossStatusEl = document.getElementById('esFavCrossStatus');
+  const favCrossGridEl = document.getElementById('esFavCrossGrid');
+
+  async function computeFavoriteCrossCard(symbol, tfValue, tfLabel){
+    const { opens, highs, lows, closes } = await fetchKlines(symbol, tfValue, MAIN_KLINES_LIMIT);
+    const e9 = ema(closes, 9);
+    const e21 = ema(closes, 21);
+    const e200 = ema(closes, 200);
+    const cross = detectCross(e9, e21, LOOKBACK) || { type:'bearish', candlesAgo:0 };
+    const tickers = window.__esLastTickers || {};
+    const t = tickers[symbol];
+    const price = t ? parseFloat(t.lastPrice) : closes[closes.length-1];
+    const change24h = t ? parseFloat(t.priceChangePercent) : 0;
+    const rsiArr = rsi(closes, 14);
+    const rsiValue = rsiArr[rsiArr.length-1];
+    const stoch = stochastic(highs, lows, closes, 14, 3, 3);
+    const stochK = stoch.k[stoch.k.length-1];
+    const stochD = stoch.d[stoch.d.length-1];
+    const atrArr = atr(highs, lows, closes, 14);
+    const lastAtr = atrArr[atrArr.length-1] || 0;
+    const pivotHighs = findPivots(highs, 10, 10, true).slice(-2);
+    const pivotLows = findPivots(lows, 10, 10, false).slice(-2);
+    const resZones = pivotHighs.map(p=>({ value: p.value, top: p.value + lastAtr*0.5, bottom: p.value - lastAtr*0.5 }));
+    const supZones = pivotLows.map(p=>({ value: p.value, top: p.value + lastAtr*0.5, bottom: p.value - lastAtr*0.5 }));
+    const sd = findSupplyDemandZones(opens, closes, atrArr, 1.5, 3);
+    const momentum = computeMomentum(opens, highs, lows, closes, 0.70, 5);
+    const momentumSignal = lastMomentumSignal(momentum, 10);
+    const chartSvg = buildMiniChart({
+      opens, highs, lows, closes, e9, e21, e200, momentum,
+      crossIdx: e9.length-1-cross.candlesAgo,
+      resZones, supZones, demandZones: sd.demand, supplyZones: sd.supply
+    });
+    return {
+      symbol, tfValue, tfLabel, cross, price, change24h, chartSvg,
+      cap: capTierOf(symbol),
+      rsi: rsiValue===null||rsiValue===undefined ? null : rsiValue,
+      rsiCondition: rsiConditionOf(rsiValue),
+      stochK: stochK===null||stochK===undefined ? null : stochK,
+      stochD: stochD===null||stochD===undefined ? null : stochD,
+      stochCondition: stochConditionOf(stochK),
+      resZones, supZones, momentumSignal, atr: lastAtr
+    };
+  }
+
+  function favoriteCrossCardHtml(r, i){
+    const chgClass = r.change24h >= 0 ? 'up' : 'down';
+    const chgSign = r.change24h >= 0 ? '+' : '';
+    const crossLabel = r.cross.type==='bullish' ? 'Golden Cross' : 'Death Cross';
+    const arrow = r.cross.type==='bullish' ? '&#8593;' : '&#8595;';
+    const ago = r.cross.candlesAgo===0 ? 'baru saja' : `${r.cross.candlesAgo} candle lalu`;
+    const rsiLabel = r.rsi===null ? 'RSI n/a' : `RSI ${r.rsi.toFixed(1)}${r.rsiCondition==='overbought'?' (OB)':r.rsiCondition==='oversold'?' (OS)':''}`;
+    const stochLabel = r.stochK===null ? 'Stoch n/a' : `K ${r.stochK.toFixed(1)}/D ${r.stochD===null?'-':r.stochD.toFixed(1)}${r.stochCondition==='overbought'?' (OB)':r.stochCondition==='oversold'?' (OS)':''}`;
+    const resNearest = r.resZones.length ? r.resZones[r.resZones.length-1].value : null;
+    const supNearest = r.supZones.length ? r.supZones[r.supZones.length-1].value : null;
+    const momCls = r.momentumSignal ? r.momentumSignal.type : 'none';
+    const momLabel = r.momentumSignal
+      ? `${r.momentumSignal.type==='bullish'?'Bullish':'Bearish'} • ${r.momentumSignal.candlesAgo===0?'baru saja':r.momentumSignal.candlesAgo+'c lalu'}`
+      : 'Tidak ada (10c)';
+    return `<div class="es-card" data-symbol="${r.symbol}" data-tf="${r.tfValue}">
+      <span class="es-card-fav-star" title="Koin favorit">&#9733;</span>
+      <div class="es-card-top">
+        <div><span class="es-rank">TF ${r.tfLabel}</span><span class="es-symbol">${r.symbol.replace('USDT','')}</span></div>
+        <span class="es-cap-tag">${r.cap==='big'?'BIG CAP':'LOW/MID CAP'}</span>
+      </div>
+      <div class="es-price-row">
+        <span class="es-price">$${fmtPrice(r.price)}</span>
+        <span class="es-chg ${chgClass}">${chgSign}${r.change24h.toFixed(2)}% 24h</span>
+      </div>
+      ${r.chartSvg}
+      <div class="es-sr-row">
+        <span class="res">R ${resNearest===null?'n/a':'$'+fmtPrice(resNearest)}</span>
+        <span class="sup">S ${supNearest===null?'n/a':'$'+fmtPrice(supNearest)}</span>
+      </div>
+      <div class="es-mom-row">
+        <span>Momentum</span>
+        <span class="es-mom-badge ${momCls}">${momLabel}</span>
+      </div>
+      <div class="es-cross-row">
+        <span class="es-cross-badge ${r.cross.type}">${arrow} ${crossLabel}</span>
+        <span class="es-ago">${ago}</span>
+      </div>
+      <div class="es-rsi-row">
+        <span>RSI (14)</span>
+        <span class="es-rsi-badge ${r.rsiCondition}">${rsiLabel}</span>
+      </div>
+      <div class="es-stoch-row">
+        <span>Stoch (14,3,3)</span>
+        <span class="es-stoch-badge ${r.stochCondition}">${stochLabel}</span>
+      </div>
+      <button class="es-priority-trade-btn es-favcross-trade-btn" type="button" data-symbol="${r.symbol}" data-tf="${r.tfValue}">Pilih Sinyal Ini</button>
+    </div>`;
+  }
+
+  async function renderFavoriteCrossGrid(crossHits, totalScanned){
+    if(crossHits.length===0){
+      favCrossGridEl.innerHTML = '';
+      favCrossStatusEl.classList.remove('error');
+      favCrossStatusEl.textContent = `Terakhir dipindai: ${new Date().toLocaleTimeString('id-ID')} • 0 koin dengan cross ditemukan dari ${totalScanned} dipindai.`;
+      return;
+    }
+    favCrossStatusEl.textContent = `Memindai ${crossHits.length} sinyal cross dari koin favorit...`;
+    const cards = await Promise.all(crossHits.map(h=>
+      computeFavoriteCrossCard(h.symbol, h.tf, FAV_CROSS_TF_SHORT_LABEL[h.tf] || h.tf).catch(()=>null)
+    ));
+    const valid = cards.filter(Boolean);
+    favCrossGridEl.innerHTML = valid.map((r,i)=>favoriteCrossCardHtml(r,i)).join('');
+    favCrossGridEl.querySelectorAll('.es-card').forEach(card=>{
+      card.addEventListener('click', (e)=>{
+        if(e.target.classList.contains('es-favcross-trade-btn')) return;
+        openTradingView(card.getAttribute('data-symbol'), card.getAttribute('data-tf'));
+      });
+    });
+    favCrossGridEl.querySelectorAll('.es-favcross-trade-btn').forEach(btn=>{
+      btn.addEventListener('click', (e)=>{
+        e.stopPropagation();
+        selectTradableSignalByUid(tradableUid('favcross', btn.getAttribute('data-symbol'), btn.getAttribute('data-tf')));
+      });
+    });
+    registerTradableSignals('favcross', valid.map(r=>({
+      symbol: r.symbol, signal: r.cross.type==='bullish' ? 'BUY' : 'SELL', price: r.price, atr: r.atr,
+      tfValue: r.tfValue, tfLabel: r.tfLabel
+    })));
+    const distinctCoins = new Set(crossHits.map(h=>h.symbol)).size;
+    favCrossStatusEl.classList.remove('error');
+    favCrossStatusEl.textContent = `Terakhir dipindai: ${new Date().toLocaleTimeString('id-ID')} • ${distinctCoins} koin dengan cross ditemukan dari ${totalScanned} dipindai.`;
+  }
+
+  const FAV_CROSS_SYMBOLS_KEY = 'emaScreenerFavCrossSymbols_v1';
+  const FAV_CROSS_SYMBOLS_MAX = 50;
+  let favCrossSymbols = [];
+  let favCrossScanning = false;
+  const favCrossManageEl = document.getElementById('esFavCrossManage');
+
+  function loadFavCrossSymbols(){
+    try{
+      const raw = localStorage.getItem(FAV_CROSS_SYMBOLS_KEY);
+      if(raw){
+        const parsed = JSON.parse(raw);
+        if(Array.isArray(parsed)){ favCrossSymbols = parsed.slice(0, FAV_CROSS_SYMBOLS_MAX); return; }
+      }
+    }catch(e){ /* fall through to default */ }
+    favCrossSymbols = FAVORITE_DEFAULT.slice();
+  }
+
+  function saveFavCrossSymbols(){
+    try{ localStorage.setItem(FAV_CROSS_SYMBOLS_KEY, JSON.stringify(favCrossSymbols)); }catch(e){ /* ignore */ }
+  }
+
+  function removeFavCrossSymbol(symbol){
+    favCrossSymbols = favCrossSymbols.filter(s=>s!==symbol);
+    saveFavCrossSymbols();
+    renderFavCrossManageUI();
+    scanFavoriteCrossSection();
+  }
+
+  function addFavCrossSymbol(rawInput){
+    let symbol = extractSymbolFromFavInput(rawInput);
+    if(!symbol) return;
+    if(!symbol.endsWith('USDT')) symbol += 'USDT';
+    if(favCrossSymbols.includes(symbol)) return;
+    if(favCrossSymbols.length >= FAV_CROSS_SYMBOLS_MAX) return;
+    favCrossSymbols.push(symbol);
+    saveFavCrossSymbols();
+    renderFavCrossManageUI();
+    scanFavoriteCrossSection();
+  }
+
+  function renderFavCrossManageUI(){
+    const chipsHtml = favCrossSymbols.map(symbol=>`
+      <div class="es-fav-cross-chip" data-symbol="${symbol}">
+        <span>${symbol.replace('USDT','')}</span>
+        <span class="es-fav-cross-chip-remove" data-symbol="${symbol}" title="Lepas dari daftar pindai cross">&#9733;</span>
+      </div>`).join('');
+    const addHtml = favCrossSymbols.length >= FAV_CROSS_SYMBOLS_MAX ? '' : `
+      <div class="es-fav-cross-chip-add">
+        <input type="text" class="es-fav-cross-add-input" placeholder="mis. SUIUSDT" autocomplete="off">
+        <div class="es-fav-suggest"></div>
+        <button type="button" class="es-fav-cross-add-btn">+ Tambah</button>
+      </div>`;
+    favCrossManageEl.innerHTML = chipsHtml + addHtml;
+
+    favCrossManageEl.querySelectorAll('.es-fav-cross-chip-remove').forEach(el=>{
+      el.addEventListener('click', ()=> removeFavCrossSymbol(el.getAttribute('data-symbol')));
+    });
+
+    const input = favCrossManageEl.querySelector('.es-fav-cross-add-input');
+    if(!input) return;
+    const suggestBox = favCrossManageEl.querySelector('.es-fav-suggest');
+    const btn = favCrossManageEl.querySelector('.es-fav-cross-add-btn');
+
+    function closeSuggestions(){
+      suggestBox.classList.remove('open');
+      suggestBox.innerHTML = '';
+    }
+    function updateSuggestions(){
+      const q = input.value.trim().toUpperCase();
+      if(!q || q.includes('TRADINGVIEW') || q.includes('HTTP')){ closeSuggestions(); return; }
+      const matches = FAV_SUGGESTION_POOL.filter(s=>{
+        const base = s.replace('USDT','');
+        return s.startsWith(q) || base.startsWith(q);
+      }).slice(0,6);
+      if(matches.length===0){ closeSuggestions(); return; }
+      suggestBox.innerHTML = matches.map(s=>`<div class="es-fav-suggest-item" data-symbol="${s}">${s}</div>`).join('');
+      suggestBox.classList.add('open');
+      suggestBox.querySelectorAll('.es-fav-suggest-item').forEach(item=>{
+        item.addEventListener('mousedown', (e)=>{
+          e.preventDefault();
+          input.value = item.getAttribute('data-symbol');
+          closeSuggestions();
+        });
+      });
+    }
+    input.addEventListener('input', updateSuggestions);
+    input.addEventListener('focus', updateSuggestions);
+    input.addEventListener('blur', ()=> setTimeout(closeSuggestions, 150));
+    input.addEventListener('keydown', (e)=>{
+      if(e.key==='Enter'){ addFavCrossSymbol(input.value); closeSuggestions(); }
+    });
+    btn.addEventListener('click', ()=>{
+      addFavCrossSymbol(input.value);
+      closeSuggestions();
+    });
+  }
+
+  async function scanFavoriteCrossSection(){
+    if(favCrossScanning) return;
+    favCrossScanning = true;
+    favCrossStatusEl.classList.remove('error');
+    favCrossStatusEl.textContent = 'Memindai koin fokus cross EMA...';
+
+    const perSymbol = await Promise.all(favCrossSymbols.map(async symbol=>{
+      try{
+        return await scanFavoriteEmaCrosses(symbol, null, null, null);
+      }catch(e){
+        return [];
+      }
+    }));
+    const crossHits = [];
+    perSymbol.forEach((crossNotes, i)=>{
+      const symbol = favCrossSymbols[i];
+      crossNotes.forEach(cn=>crossHits.push({ symbol, tf: cn.tf, type: cn.type }));
+    });
+    favCrossScanning = false;
+    renderFavoriteCrossGrid(crossHits, favCrossSymbols.length);
+  }
+
+  async function computeConfirmationNotes(cand){
+    const { opens, highs, lows, closes, signal, dir, symbol, tfValue } = cand;
+    const n = closes.length;
+    const isBullish = signal==='BUY';
+    const lastOpen = opens[n-1], lastHigh = highs[n-1], lastLow = lows[n-1], lastClose = closes[n-1];
+    const prevOpen = opens[n-2], prevClose = closes[n-2];
+
+    const pinbar = isPinBar(lastOpen, lastHigh, lastLow, lastClose, isBullish);
+    const engulfing = isEngulfing(prevOpen, prevClose, lastOpen, lastClose, isBullish);
+    const ranging = isRangingAtZone(highs, lows, dir.band, dir.atr, 6);
+
+    // cross EMA9/21 (1m/5m) cuma relevan sebagai konfirmasi TF lebih rendah untuk sinyal TF 5 menit ke atas
+    const showEmaCross = tfValue !== '1m';
+    let cross1m = null, cross5m = null;
+    if(showEmaCross){
+      [cross1m, cross5m] = await Promise.all([
+        checkEmaCrossOnTf(symbol, '1m', signal),
+        checkEmaCrossOnTf(symbol, '5m', signal)
+      ]);
+    }
+
+    const notes = { pinbar, cross1m, cross5m, engulfing, ranging, showEmaCross };
+    const checks = [pinbar, engulfing, ranging];
+    if(showEmaCross) checks.push(cross1m, cross5m);
+    const passCount = checks.filter(Boolean).length;
+    const highProbability = passCount >= 3;
+    return { notes, highProbability, passCount };
   }
 
   function buildMiniChart(data){
@@ -1651,15 +2519,30 @@
           <span>Stoch (14,3,3)</span>
           <span class="es-stoch-badge ${r.stochCondition}">${stochLabel}</span>
         </div>
+        <button class="es-priority-trade-btn es-cross-trade-btn" type="button" data-symbol="${r.symbol}">Pilih Sinyal Ini</button>
       </div>`;
     }).join('');
 
     grid.querySelectorAll('.es-card').forEach(card=>{
-      card.addEventListener('click', ()=>{
+      card.addEventListener('click', (e)=>{
+        if(e.target.classList.contains('es-cross-trade-btn')) return;
         const sym = card.getAttribute('data-symbol');
         openTradingView(sym);
       });
     });
+
+    const crossTfValue = intervalSel.value;
+    const crossTfLabel = intervalSel.options[intervalSel.selectedIndex] ? intervalSel.options[intervalSel.selectedIndex].text : crossTfValue;
+    grid.querySelectorAll('.es-cross-trade-btn').forEach(btn=>{
+      btn.addEventListener('click', (e)=>{
+        e.stopPropagation();
+        selectTradableSignalByUid(tradableUid('cross', btn.getAttribute('data-symbol'), crossTfValue));
+      });
+    });
+    registerTradableSignals('cross', top5.map(r=>({
+      symbol: r.symbol, signal: r.cross.type==='bullish' ? 'BUY' : 'SELL', price: r.price, atr: r.atr,
+      tfValue: crossTfValue, tfLabel: crossTfLabel
+    })));
 
     return top5;
   }
@@ -1722,7 +2605,7 @@
         stochK: stochK===null||stochK===undefined ? null : stochK,
         stochD: stochD===null||stochD===undefined ? null : stochD,
         stochCondition: stochConditionOf(stochK),
-        resZones, supZones, momentumSignal,
+        resZones, supZones, momentumSignal, atr: lastAtr,
         closes, times, e9, e21, interval
       };
     }));
@@ -1762,6 +2645,77 @@
     const tvSymbol = market==='futures' ? `${symbol}.P` : symbol;
     const url = `https://www.tradingview.com/chart/?symbol=BINANCE:${tvSymbol}&interval=${tvInterval}`;
     window.open(url, '_blank', 'noopener');
+  }
+
+  const BTC_TF_LIST = [
+    { value:'1m', label:'1m' }, { value:'5m', label:'5m' }, { value:'15m', label:'15m' }, { value:'30m', label:'30m' },
+    { value:'1h', label:'1H' }, { value:'4h', label:'4H' }, { value:'1d', label:'1D' }
+  ];
+  const btcTfStripEl = document.getElementById('esBtcTfStrip');
+  let btcTfScanning = false;
+
+  async function computeBtcTfStatus(tfValue){
+    try{
+      const { opens, highs, lows, closes } = await fetchKlines('BTCUSDT', tfValue, 250);
+      if(closes.length < 210) return { label:'n/a', cls:'none' };
+
+      const e9 = ema(closes, 9);
+      const e21 = ema(closes, 21);
+      const cross = detectCross(e9, e21, 2);
+      if(cross) return { label:'Cross EMA', cls: cross.type==='bullish' ? 'bull':'bear' };
+
+      const atrArr = atr(highs, lows, closes, 14);
+      const lastAtr = atrArr[atrArr.length-1] || 0;
+      const lastClose = closes[closes.length-1];
+
+      const pivotHighs = findPivots(highs, 10, 10, true).slice(-2);
+      const pivotLows = findPivots(lows, 10, 10, false).slice(-2);
+      const resZones = pivotHighs.map(p=>({ value:p.value, top:p.value+lastAtr*0.5, bottom:p.value-lastAtr*0.5 }));
+      const supZones = pivotLows.map(p=>({ value:p.value, top:p.value+lastAtr*0.5, bottom:p.value-lastAtr*0.5 }));
+      const nearRes = checkZoneNearBand(resZones, lastClose, lastAtr);
+      const nearSup = checkZoneNearBand(supZones, lastClose, lastAtr);
+      if(nearRes.ok || nearSup.ok) return { label:'Sentuh S/R', cls: nearRes.ok ? 'bear':'bull' };
+
+      const sd = findSupplyDemandZones(opens, closes, atrArr, 1.5, 3);
+      const nearSupply = checkZoneNearBand(sd.supply, lastClose, lastAtr);
+      const nearDemand = checkZoneNearBand(sd.demand, lastClose, lastAtr);
+      if(nearSupply.ok || nearDemand.ok) return { label:'Sentuh S/D', cls: nearSupply.ok ? 'bear':'bull' };
+
+      const bb = bollinger(closes, 20, 2.0);
+      const lastUpper = bb.upper[bb.upper.length-1];
+      const lastLower = bb.lower[bb.lower.length-1];
+      const lastHigh = highs[highs.length-1], lastLow = lows[lows.length-1];
+      const touchUpper = checkBBSide(lastHigh, lastLow, lastClose, lastUpper, lastAtr, true);
+      const touchLower = checkBBSide(lastHigh, lastLow, lastClose, lastLower, lastAtr, false);
+      if(touchUpper.ok) return { label:'Sentuh Upper BB', cls:'bear' };
+      if(touchLower.ok) return { label:'Sentuh Lower BB', cls:'bull' };
+
+      return { label:'-', cls:'none' };
+    }catch(e){
+      return { label:'Error', cls:'error' };
+    }
+  }
+
+  async function scanBtcTfStrip(){
+    if(btcTfScanning) return;
+    btcTfScanning = true;
+    try{
+      const results = await Promise.all(BTC_TF_LIST.map(tf => computeBtcTfStatus(tf.value)));
+      btcTfStripEl.innerHTML = BTC_TF_LIST.map((tf,i)=>{
+        const r = results[i];
+        return `<div class="es-btc-tf-box" data-tf="${tf.value}" title="Buka BTC ${tf.label} di TradingView">
+          <div class="es-btc-tf-box-label">BTC ${tf.label}</div>
+          <div class="es-btc-tf-box-status ${r.cls}">${r.label}</div>
+        </div>`;
+      }).join('');
+      btcTfStripEl.querySelectorAll('.es-btc-tf-box').forEach(box=>{
+        box.addEventListener('click', ()=>{
+          openTradingView('BTCUSDT', box.getAttribute('data-tf'));
+        });
+      });
+    }finally{
+      btcTfScanning = false;
+    }
   }
 
   function renderSymbolManagerDropdown(){
@@ -1813,7 +2767,7 @@
 
   const PRIORITY_LIMIT = 5;
   const PRIORITY_RISK_TIERS = {
-    high:   [ { value:'1m', label:'1m' }, { value:'5m', label:'5m' } ],
+    high:   [ { value:'1m', label:'1m' }, { value:'5m', label:'5m' }, { value:'15m', label:'15m' } ],
     medium: [ { value:'30m', label:'30m' }, { value:'1h', label:'1H' } ],
     low:    [ { value:'4h', label:'4H' }, { value:'1d', label:'1D' } ]
   };
@@ -1888,6 +2842,7 @@
 
   function renderPrioritySignals(top){
     window.__esLastPriorityResults = top;
+    registerTradableSignals('priority', top);
     priorityGrid.innerHTML = top.map((c,i)=>{
       const signalCls = c.signal==='BUY' ? 'buy' : 'sell';
       const bandLabel = c.signal==='BUY' ? 'Lower' : 'Upper';
@@ -1904,11 +2859,17 @@
       const riskPct = (riskDist / c.price) * 100;
       const tp1 = c.signal==='BUY' ? c.price + riskDist : c.price - riskDist;
       const tp2 = c.signal==='BUY' ? c.price + riskDist*2 : c.price - riskDist*2;
+      const cn = c.confirmNotes || {};
+      const passCount = c.passCount || 0;
+      const isWatch = passCount === 0;
+      const statusLabel = isWatch ? 'PANTAU' : (c.signal==='BUY' ? 'BUY NOW' : 'SELL NOW');
+      const statusCls = isWatch ? 'watch' : signalCls;
       return `<div class="es-priority-card ${signalCls}" data-symbol="${c.symbol}" data-tf="${c.tfValue}" data-tflabel="${c.tfLabel}" data-price="${c.price}">
         <div class="es-priority-card-top">
           <span class="es-priority-rank">#${i+1}</span>
           <span class="es-priority-symbol">${c.symbol.replace('USDT','')}</span>
-          <span class="es-priority-signal ${signalCls}">${c.signal}</span>
+          <span class="es-priority-signal ${statusCls}">${statusLabel}</span>
+          ${c.highProbability ? '<span class="es-priority-hp-badge">HIGH PROBABILITY</span>' : ''}
         </div>
         <div class="es-priority-tf">Risk: <strong>${riskLabel}</strong> • TF ${c.tfLabel} • Harga $${fmtPrice(c.price)}</div>
         <div class="es-checklist">
@@ -1922,9 +2883,16 @@
           <div class="es-priority-level-row">Take Profit: <strong>TP1 $${fmtPrice(tp1)}</strong> &bull; <strong>TP2 $${fmtPrice(tp2)}</strong></div>
           <div class="es-priority-level-row">Risk: <strong>${riskPct.toFixed(2)}%</strong></div>
         </div>
+        <div class="es-checklist es-confirm-notes">
+          <div class="es-check-row ${cn.pinbar?'ok':'fail'}"><span class="es-check-icon">${cn.pinbar?'&check;':'&#10007;'}</span> Pin Bar</div>
+          ${cn.showEmaCross ? `<div class="es-check-row ${cn.cross1m?'ok':'fail'}"><span class="es-check-icon">${cn.cross1m?'&check;':'&#10007;'}</span> Cross EMA9/21 TF 1m</div>
+          <div class="es-check-row ${cn.cross5m?'ok':'fail'}"><span class="es-check-icon">${cn.cross5m?'&check;':'&#10007;'}</span> Cross EMA9/21 TF 5m</div>` : ''}
+          <div class="es-check-row ${cn.engulfing?'ok':'fail'}"><span class="es-check-icon">${cn.engulfing?'&check;':'&#10007;'}</span> Engulfing</div>
+          <div class="es-check-row ${cn.ranging?'ok':'fail'}"><span class="es-check-icon">${cn.ranging?'&check;':'&#10007;'}</span> Ranging di area S/R</div>
+        </div>
         <div class="es-priority-note">Note EMA9/21: ${emaNoteText}</div>
         <div class="es-priority-note">Note ${stochText}</div>
-        <button class="es-priority-trade-btn" type="button">Trade Sinyal Ini</button>
+        <button class="es-priority-trade-btn" type="button">Pilih Sinyal Ini</button>
       </div>`;
     }).join('');
 
@@ -1937,7 +2905,7 @@
       const tradeBtn = card.querySelector('.es-priority-trade-btn');
       tradeBtn.addEventListener('click', (e)=>{
         e.stopPropagation();
-        handlePriorityTradeClick(cand);
+        selectTradableSignalByUid(tradableUid('priority', cand.symbol, cand.tfValue));
       });
     });
   }
@@ -1973,12 +2941,12 @@
           const cands = [];
           if(qualifies3(evalRes.buy)){
             cands.push({ symbol, signal:'BUY', dir:evalRes.buy, price, emaNote:evalRes.emaNote, stochCond:evalRes.stochCond, stochK:evalRes.stochK, stochD:evalRes.stochD, evalRes,
-              tfValue: tf.value, tfLabel: tf.label, risk: tf.risk,
+              tfValue: tf.value, tfLabel: tf.label, risk: tf.risk, opens, highs, lows, closes,
               score: evalRes.buy.bb.dist+evalRes.buy.sr.dist+evalRes.buy.sd.dist });
           }
           if(qualifies3(evalRes.sell)){
             cands.push({ symbol, signal:'SELL', dir:evalRes.sell, price, emaNote:evalRes.emaNote, stochCond:evalRes.stochCond, stochK:evalRes.stochK, stochD:evalRes.stochD, evalRes,
-              tfValue: tf.value, tfLabel: tf.label, risk: tf.risk,
+              tfValue: tf.value, tfLabel: tf.label, risk: tf.risk, opens, highs, lows, closes,
               score: evalRes.sell.bb.dist+evalRes.sell.sr.dist+evalRes.sell.sd.dist });
           }
           return cands.length ? cands : null;
@@ -2003,6 +2971,14 @@
         return;
       }
 
+      priorityStatusEl.textContent = `Ditemukan ${top.length} sinyal, memeriksa note konfirmasi tambahan...`;
+      await Promise.all(top.map(async (cand)=>{
+        const conf = await computeConfirmationNotes(cand);
+        cand.confirmNotes = conf.notes;
+        cand.highProbability = conf.highProbability;
+        cand.passCount = conf.passCount;
+      }));
+
       renderPrioritySignals(top);
       priorityStatusEl.textContent = `Ditemukan ${top.length} sinyal prioritas dari ${deduped.length} koin valid (${all.length} kandidat) • ${new Date().toLocaleTimeString('id-ID')}.`;
       processPrioritySimFromPriority(tickers);
@@ -2019,13 +2995,274 @@
   let prioritySimHistory = [];
 
   const psimModalInput = document.getElementById('esPsimModal');
+  const psimLeverageInput = document.getElementById('esPsimLeverage');
+  const psimSignalSelect = document.getElementById('esPsimSignalSelect');
+  const psimManualSlInput = document.getElementById('esPsimManualSl');
+  const psimManualTpInput = document.getElementById('esPsimManualTp');
   const psimToggle = document.getElementById('esPsimToggle');
+  const psimOpenBtn = document.getElementById('esPsimOpenBtn');
   const psimResetBtn = document.getElementById('esPsimResetBtn');
+  const psimPreviewEl = document.getElementById('esPsimPreview');
   const psimStatusEl = document.getElementById('esPsimStatus');
   const psimSummaryEl = document.getElementById('esPsimSummary');
   const psimOpenTbody = document.getElementById('esPsimOpenTbody');
   const psimHistTbody = document.getElementById('esPsimHistTbody');
   const psimEquityChartEl = document.getElementById('esPsimEquityChart');
+  let psimSelectedCandidate = null;
+
+  const LIVE_TRADE_CONFIG_KEY = 'emaScreenerLiveTradeConfig_v1';
+  const liveBackendUrlInput = document.getElementById('esLiveBackendUrl');
+  const liveAppTokenInput = document.getElementById('esLiveAppToken');
+  const liveTradeBtn = document.getElementById('esLiveTradeBtn');
+  const liveTradeStatusEl = document.getElementById('esLiveTradeStatus');
+  const liveEnvBadgeEl = document.getElementById('esLiveEnvBadge');
+  let liveDetectedEnv = null; // 'testnet' | 'live' | null
+  let liveDetectedBaseUrl = '';
+
+  function loadLiveTradeConfig(){
+    try{
+      const raw = localStorage.getItem(LIVE_TRADE_CONFIG_KEY);
+      if(!raw) return;
+      const cfg = JSON.parse(raw);
+      if(cfg.backendUrl) liveBackendUrlInput.value = cfg.backendUrl;
+      if(cfg.appToken) liveAppTokenInput.value = cfg.appToken;
+    }catch(e){}
+  }
+
+  function saveLiveTradeConfig(){
+    try{
+      localStorage.setItem(LIVE_TRADE_CONFIG_KEY, JSON.stringify({
+        backendUrl: liveBackendUrlInput.value.trim(),
+        appToken: liveAppTokenInput.value.trim()
+      }));
+    }catch(e){}
+  }
+
+  async function detectLiveEnv(){
+    const backendUrl = liveBackendUrlInput.value.trim().replace(/\/$/, '');
+    if(!backendUrl){
+      liveDetectedEnv = null; liveDetectedBaseUrl = '';
+      liveEnvBadgeEl.className = 'es-live-env-badge';
+      liveEnvBadgeEl.textContent = 'Belum terhubung';
+      return;
+    }
+    liveEnvBadgeEl.className = 'es-live-env-badge checking';
+    liveEnvBadgeEl.textContent = 'Mengecek...';
+    try{
+      const res = await fetch(`${backendUrl}/api/health`);
+      const data = await res.json();
+      liveDetectedBaseUrl = data.baseUrl || '';
+      liveDetectedEnv = liveDetectedBaseUrl.includes('testnet') ? 'testnet' : 'live';
+      if(liveDetectedEnv === 'testnet'){
+        liveEnvBadgeEl.className = 'es-live-env-badge testnet';
+        liveEnvBadgeEl.textContent = '🧪 Testnet';
+      } else {
+        liveEnvBadgeEl.className = 'es-live-env-badge live';
+        liveEnvBadgeEl.textContent = '🔴 Live — Uang Asli';
+      }
+    }catch(e){
+      liveDetectedEnv = null; liveDetectedBaseUrl = '';
+      liveEnvBadgeEl.className = 'es-live-env-badge';
+      liveEnvBadgeEl.textContent = 'Gagal terhubung';
+    }
+  }
+
+  function roundToStep(value, step, precision){
+    // "precision" idealnya datang dari quantityPrecision/pricePrecision asli Binance
+    // (lihat fetchSymbolFilters) - itu sumber kebenaran yang pasti benar. Turunan
+    // dari -log10(step) cuma dipakai sebagai fallback kalau field itu tidak ada,
+    // karena untuk koin harga sangat kecil (mis. $0.005) rumus log10 gampang meleset.
+    const p = (precision != null) ? precision : Math.max(0, Math.round(-Math.log10(step)));
+    if(!step || step <= 0) return value.toFixed(p);
+    return (Math.floor(value / step) * step).toFixed(p);
+  }
+
+  async function fetchSymbolFilters(symbol){
+    const marketHost = liveDetectedEnv === 'live' ? 'https://fapi.binance.com' : 'https://testnet.binancefuture.com';
+    const res = await fetch(`${marketHost}/fapi/v1/exchangeInfo?symbol=${symbol}`);
+    if(!res.ok) throw new Error('Gagal ambil exchangeInfo simbol');
+    const data = await res.json();
+    // JANGAN asal ambil data.symbols[0] - endpoint ini kadang tidak benar-benar
+    // memfilter sesuai query ?symbol=, jadi index 0 bisa jadi simbol LAIN yang
+    // tidak ada hubungannya (pernah kejadian: ROSEUSDT dapat tickSize simbol lain,
+    // hampir kirim SL/TP salah total). Cari simbol yang cocok secara eksplisit.
+    const symbolInfo = (data.symbols || []).find(s => s.symbol === symbol);
+    if(!symbolInfo) throw new Error(`Simbol ${symbol} tidak ditemukan di exchangeInfo Binance Futures.`);
+    const filters = symbolInfo.filters;
+    // Order MARKET (entry) harus ikut MARKET_LOT_SIZE (kalau ada), bukan LOT_SIZE biasa -
+    // presisinya kadang beda dan Binance akan tolak (-1111) kalau salah pakai.
+    const marketLotSize = filters.find(f=>f.filterType==='MARKET_LOT_SIZE');
+    const lotSize = filters.find(f=>f.filterType==='LOT_SIZE');
+    const priceFilter = filters.find(f=>f.filterType==='PRICE_FILTER');
+    return {
+      stepSize: marketLotSize ? parseFloat(marketLotSize.stepSize) : (lotSize ? parseFloat(lotSize.stepSize) : null),
+      tickSize: priceFilter ? parseFloat(priceFilter.tickSize) : null,
+      // Field resmi dari Binance sendiri - jumlah desimal MAKSIMUM yang valid untuk
+      // simbol ini. Dipakai sebagai sumber kebenaran utama, bukan ditebak dari step.
+      quantityPrecision: typeof symbolInfo.quantityPrecision === 'number' ? symbolInfo.quantityPrecision : null,
+      pricePrecision: typeof symbolInfo.pricePrecision === 'number' ? symbolInfo.pricePrecision : null,
+      orderTypes: symbolInfo.orderTypes || []
+    };
+  }
+
+  async function sendLiveTrade(cand){
+    const backendUrl = liveBackendUrlInput.value.trim().replace(/\/$/, '');
+    const appToken = liveAppTokenInput.value.trim();
+
+    if(!backendUrl || !appToken){
+      liveTradeStatusEl.classList.add('error');
+      liveTradeStatusEl.classList.remove('success');
+      liveTradeStatusEl.textContent = 'Isi dulu Backend URL dan App Token.';
+      return;
+    }
+
+    liveTradeBtn.disabled = true;
+    await detectLiveEnv();
+    const env = liveDetectedEnv;
+    if(!env){
+      liveTradeBtn.disabled = false;
+      liveTradeStatusEl.classList.add('error');
+      liveTradeStatusEl.textContent = 'Tidak bisa memastikan status server (testnet/live). Cek Backend URL, lalu coba lagi.';
+      return;
+    }
+    liveTradeStatusEl.classList.remove('error', 'success');
+    liveTradeStatusEl.textContent = 'Menyiapkan order (ambil aturan lot/harga simbol)...';
+
+    let quantityStr, qty1Str, qty2Str, tp1Str, tp2Str, slStr, splitTp;
+    const leverage = currentPsimLeverage();
+    try{
+      const entryPrice = cand.price;
+      const { sl: slRaw, tp: tpRaw, isManualTp } = getEffectiveSlTp(cand);
+      if(slRaw===null || tpRaw===null){
+        throw new Error('Sinyal ini tidak punya SL/TP otomatis - isi dulu "SL Manual" & "TP Manual" sebelum kirim order.');
+      }
+      const margin = currentPsimMargin();
+      const quantityRaw = (margin * leverage) / entryPrice; // Futures: notional = margin x leverage
+
+      const { stepSize, tickSize, quantityPrecision, pricePrecision, orderTypes } = await fetchSymbolFilters(cand.symbol);
+
+      // Pengaman PALING PENTING: kalau simbol ini tidak mendukung STOP_MARKET /
+      // TAKE_PROFIT_MARKET, JANGAN kirim entry sama sekali - kejadian kemarin
+      // (SANDUSDT) entry berhasil tapi SL gagal terpasang, posisi sempat
+      // menggantung tanpa proteksi. Cek dulu SEBELUM entry, bukan sesudah.
+      if(!orderTypes.includes('STOP_MARKET') || !orderTypes.includes('TAKE_PROFIT_MARKET')){
+        throw new Error(`Simbol ${cand.symbol} tidak mendukung order STOP_MARKET/TAKE_PROFIT_MARKET otomatis di Binance `
+          + `(order type yang didukung: ${orderTypes.join(', ') || '-'}). Order dibatalkan sebelum entry - pilih simbol lain.`);
+      }
+
+      quantityStr = stepSize ? roundToStep(quantityRaw, stepSize, quantityPrecision) : quantityRaw.toFixed(quantityPrecision != null ? quantityPrecision : 6);
+      slStr = tickSize ? roundToStep(slRaw, tickSize, pricePrecision) : fmtPrice(slRaw);
+
+      if(parseFloat(quantityStr) <= 0){
+        throw new Error('Modal terlalu kecil untuk lot minimum simbol ini.');
+      }
+
+      // TP manual = satu target saja (full quantity). TP otomatis = displit jadi
+      // TP1 (1x risk, separuh qty) + TP2 (2x risk, separuh qty) - partial take-profit.
+      // Begitu TP1 kena, tool otomatis pindahkan SL ke breakeven untuk sisanya.
+      const riskDist = Math.abs(entryPrice - slRaw);
+      const tp1Raw = tpRaw;
+      splitTp = !isManualTp;
+      tp1Str = tickSize ? roundToStep(tp1Raw, tickSize, pricePrecision) : fmtPrice(tp1Raw);
+
+      if(splitTp){
+        const halfRaw = parseFloat(quantityStr) / 2;
+        qty1Str = stepSize ? roundToStep(halfRaw, stepSize, quantityPrecision) : halfRaw.toFixed(quantityPrecision != null ? quantityPrecision : 6);
+        const qty2Raw = parseFloat(quantityStr) - parseFloat(qty1Str);
+        qty2Str = qty2Raw.toFixed(quantityPrecision != null ? quantityPrecision : 6);
+        if(parseFloat(qty1Str) <= 0 || parseFloat(qty2Str) <= 0){
+          // Modal terlalu kecil buat displit 2 order - fallback ke 1 TP full quantity.
+          splitTp = false;
+          qty1Str = quantityStr; qty2Str = null; tp2Str = null;
+        } else {
+          const tp2Raw = cand.signal==='BUY' ? entryPrice + riskDist*2 : entryPrice - riskDist*2;
+          tp2Str = tickSize ? roundToStep(tp2Raw, tickSize, pricePrecision) : fmtPrice(tp2Raw);
+        }
+      } else {
+        qty1Str = quantityStr; qty2Str = null; tp2Str = null;
+      }
+
+      // Pengaman: kalau perhitungan TP/SL entah kenapa jadi 0 (atau sama persis
+      // dengan entry), JANGAN kirim order - posisi real tanpa SL/TP valid berbahaya.
+      if(parseFloat(tp1Str) <= 0 || parseFloat(slStr) <= 0 || (splitTp && parseFloat(tp2Str) <= 0)){
+        throw new Error(`Perhitungan TP/SL tidak valid (TP1:${tp1Str} TP2:${tp2Str} SL:${slStr}) - order dibatalkan demi keamanan. `
+          + `[debug] symbol:${cand.symbol} entryPrice:${entryPrice} slRaw:${slRaw} tpRaw:${tpRaw} tickSize:${tickSize} pricePrecision:${pricePrecision}`);
+      }
+    }catch(e){
+      liveTradeBtn.disabled = false;
+      liveTradeStatusEl.classList.add('error');
+      liveTradeStatusEl.textContent = `Gagal menyiapkan order: ${e.message}`;
+      return;
+    }
+
+    const envLabel = env === 'live' ? '🔴 LIVE — UANG ASLI' : '🧪 TESTNET (saldo palsu)';
+    const tpLines = splitTp
+      ? `TP1: $${tp1Str} (qty ${qty1Str})\nTP2: $${tp2Str} (qty ${qty2Str}) - SL otomatis pindah ke breakeven begitu TP1 kena`
+      : `TP: $${tp1Str}`;
+    const confirmMsg = `Kirim order ke Binance Futures [${envLabel}] untuk ${cand.symbol.replace('USDT','')} (TF ${cand.tfLabel}):\n\n`
+      + `Arah: ${cand.signal}\nLeverage: ${leverage}x\nQty: ${quantityStr}\nEntry: MARKET (~$${fmtPrice(cand.price)})\nSL: $${slStr}\n${tpLines}\n\n`
+      + (env === 'live'
+          ? 'PERINGATAN: ini memakai UANG ASLI dari akun Binance kamu dan tidak bisa dibatalkan setelah terkirim. Lanjutkan?'
+          : 'Ini order ke akun testnet kamu (saldo palsu). Lanjutkan?');
+    if(!window.confirm(confirmMsg)){
+      liveTradeBtn.disabled = false;
+      liveTradeStatusEl.textContent = '';
+      return;
+    }
+    if(env === 'live'){
+      const estNotional = (parseFloat(quantityStr) * cand.price).toFixed(2);
+      if(!window.confirm(`Konfirmasi terakhir: kirim order UANG ASLI senilai ~$${estNotional} sekarang?`)){
+        liveTradeBtn.disabled = false;
+        liveTradeStatusEl.textContent = '';
+        return;
+      }
+    }
+
+    liveTradeStatusEl.textContent = 'Mengirim order ke backend...';
+
+    try{
+      const res = await fetch(`${backendUrl}/api/trade/futures`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-App-Token': appToken },
+        body: JSON.stringify({
+          symbol: cand.symbol,
+          side: cand.signal,
+          quantity: quantityStr,
+          leverage,
+          sl: slStr,
+          tp1: tp1Str,
+          qty1: qty1Str,
+          tp2: tp2Str,
+          qty2: qty2Str
+        })
+      });
+      const data = await res.json();
+      if(!res.ok){
+        const stageLabel = data && data.stage ? `[gagal di: ${data.stage}] ` : '';
+        const paramsLabel = data && data.sentParams ? ` | dikirim: ${JSON.stringify(data.sentParams)}` : '';
+        throw new Error(stageLabel + ((data && data.error) ? JSON.stringify(data.error) : `HTTP ${res.status}`) + paramsLabel);
+      }
+      // slOrder/tp1Order/tp2Order sekarang lewat endpoint algoOrder Binance yang
+      // baru - ID-nya di field "algoId", bukan "orderId" seperti order biasa.
+      const entryOrderId = data.entryOrder && data.entryOrder.orderId;
+      const slOrderId = data.slOrder && (data.slOrder.orderId || data.slOrder.algoId);
+      const tp1OrderId = data.tp1Order && (data.tp1Order.orderId || data.tp1Order.algoId);
+      const tp2OrderId = data.tp2Order && (data.tp2Order.orderId || data.tp2Order.algoId);
+      const actualEntryPrice = data.entryOrder && parseFloat(data.entryOrder.avgPrice);
+      liveTradeStatusEl.classList.add('success');
+      liveTradeStatusEl.textContent = `Berhasil (${envLabel})! Entry: ${entryOrderId}, SL: ${slOrderId}, TP1: ${tp1OrderId}${tp2OrderId?`, TP2: ${tp2OrderId}`:''}`;
+
+      const liveKey = `${cand.symbol}_${cand.tfValue}_LIVE_${Date.now()}`;
+      recordLivePosition(liveKey, cand, quantityStr, qty1Str, qty2Str, tp1Str, tp2Str, slStr, Date.now(),
+        { entryOrderId, slOrderId, tp1OrderId, tp2OrderId }, env, actualEntryPrice);
+      renderPrioritySimUI(window.__esLastTickers||{});
+    }catch(e){
+      liveTradeStatusEl.classList.add('error');
+      liveTradeStatusEl.textContent = `Gagal kirim order: ${e.message}`;
+    }finally{
+      liveTradeBtn.disabled = false;
+    }
+  }
 
   function loadPrioritySimState(){
     try{
@@ -2044,6 +3281,12 @@
         }
         if(pos.tp1Hit===undefined) pos.tp1Hit = false;
         if(pos.tp2Hit===undefined) pos.tp2Hit = false;
+        // migrasi posisi lama (sebelum fitur leverage) yang belum punya margin/leverage/qty terkunci
+        if(pos.qty===undefined || pos.margin===undefined || pos.leverage===undefined){
+          pos.margin = currentPsimMargin();
+          pos.leverage = currentPsimLeverage();
+          pos.qty = (pos.margin * pos.leverage) / pos.entryPrice;
+        }
       });
       savePrioritySimState();
     }catch(e){
@@ -2058,25 +3301,91 @@
     }catch(e){ /* localStorage penuh/diblokir - abaikan, state tetap ada di memori */ }
   }
 
+  const PSIM_EXCHANGE_FEE_RATE = 0.0004; // taker fee Binance Futures, 0.04% per sisi (buka & tutup)
+  const PSIM_FUNDING_RATE_PER_8H = 0.0001; // rata-rata funding rate Binance Futures, ~0.01% per 8 jam
+
+  function currentPsimMargin(){
+    return Math.max(parseFloat(psimModalInput.value) || 1000, 1);
+  }
+
+  function currentPsimLeverage(){
+    return Math.max(parseFloat(psimLeverageInput.value) || 1, 1);
+  }
+
   function currentPsimQty(entryPrice){
-    const modal = Math.max(parseFloat(psimModalInput.value) || 4000, 1);
-    return modal / entryPrice;
+    const notional = currentPsimMargin() * currentPsimLeverage();
+    return notional / entryPrice;
+  }
+
+  function venueBadgeHtml(venue){
+    if(venue === 'live-real') return '<span class="es-venue-badge live">Binance Live</span>';
+    if(venue === 'live-testnet') return '<span class="es-venue-badge">Binance Testnet</span>';
+    return '';
+  }
+
+  function computePsimExchangeFee(entryPrice, exitPrice, qty){
+    return (entryPrice*qty + exitPrice*qty) * PSIM_EXCHANGE_FEE_RATE;
+  }
+
+  function computePsimMarginFee(entryPrice, qty, entryTime, exitTime){
+    const notional = entryPrice*qty;
+    const hoursHeld = Math.max(0, (exitTime - entryTime)) / 3600000;
+    const fundingIntervals = Math.floor(hoursHeld/8);
+    return notional * PSIM_FUNDING_RATE_PER_8H * fundingIntervals;
   }
 
   function openPrioritySimPosition(key, source, tfLabel, tfValue, dir, entryPrice, sl, tp1, tp2, time){
-    prioritySimPositions[key] = { key, source, tfLabel, tfValue, dir, entryPrice, entryTime: time, sl, tp1, tp2, tp1Hit:false, tp2Hit:false };
+    const margin = currentPsimMargin();
+    const leverage = currentPsimLeverage();
+    const qty = (margin * leverage) / entryPrice;
+    prioritySimPositions[key] = { key, source, tfLabel, tfValue, dir, entryPrice, entryTime: time, sl, tp1, tp2, tp1Hit:false, tp2Hit:false, margin, leverage, qty, venue:'sim' };
+    savePrioritySimState();
+  }
+
+  // Posisi order ASLI (dikirim lewat backend, testnet atau live) - dicatat di tabel yang sama tapi
+  // ditandai venue:'live-testnet'/'live-real' supaya tidak ikut logic auto-close simulasi (TP/SL asli dikelola OCO di Binance).
+  function recordLivePosition(key, cand, quantity, qty1, qty2, tp1, tp2, sl, time, orderIds, env, actualEntryPrice){
+    // Pakai harga eksekusi ASLI dari Binance (avgPrice hasil order MARKET) kalau
+    // ada - itu entry price sebenarnya yang dipakai Binance buat hitung PNL.
+    // cand.price cuma harga PERKIRAAN saat sinyal dipilih (sebelum order jalan),
+    // beda dari harga fill asli karena order MARKET pasti ada sedikit slip harga.
+    const entryPrice = (actualEntryPrice && actualEntryPrice > 0) ? actualEntryPrice : cand.price;
+    prioritySimPositions[key] = {
+      key, source: cand.symbol, tfLabel: cand.tfLabel, tfValue: cand.tfValue, dir: cand.signal,
+      entryPrice, entryTime: time, sl: parseFloat(sl), tp1: parseFloat(tp1), tp2: qty2 ? parseFloat(tp2) : parseFloat(tp1),
+      qty1: parseFloat(qty1), qty2: qty2 ? parseFloat(qty2) : null,
+      tp1Hit:false, tp2Hit:false, margin: currentPsimMargin(), leverage: currentPsimLeverage(), qty: parseFloat(quantity),
+      venue: env === 'live' ? 'live-real' : 'live-testnet',
+      liveOrderId: orderIds.entryOrderId, liveSlOrderId: orderIds.slOrderId,
+      liveTp1OrderId: orderIds.tp1OrderId, liveTp2OrderId: orderIds.tp2OrderId
+    };
     savePrioritySimState();
   }
 
   function closePrioritySimPosition(key, exitPrice, time, reason){
     const pos = prioritySimPositions[key];
     if(!pos) return;
-    const qty = currentPsimQty(pos.entryPrice);
-    const pnl = pos.dir==='BUY' ? (exitPrice-pos.entryPrice)*qty : (pos.entryPrice-exitPrice)*qty;
-    const pnlPct = ((exitPrice-pos.entryPrice)/pos.entryPrice) * (pos.dir==='BUY'?100:-100);
-    const tpStatus = pos.tp2Hit ? 'TP2' : (pos.tp1Hit ? 'BE/TP1' : '-');
+    const isLive = pos.venue==='live-real' || pos.venue==='live-testnet';
+    const qty = pos.qty;
+    // Pakai REALIZED_PNL & fee ASLI yang sudah tersinkron dari Binance kalau ada
+    // (posisi live) - bukan rumus perkiraan. REALIZED_PNL dari Binance sudah
+    // otomatis menjumlahkan SEMUA bagian (kalau kena TP1 dulu baru TP2/BE
+    // belakangan, jumlahnya sudah gabungan keduanya), jadi PNL histori tetap
+    // benar walau posisinya sempat dipecah 2 tahap.
+    const grossPnl = (isLive && pos.actualRealizedPnl !== undefined && pos.actualRealizedPnl !== null)
+      ? pos.actualRealizedPnl
+      : (pos.dir==='BUY' ? (exitPrice-pos.entryPrice)*qty : (pos.entryPrice-exitPrice)*qty);
+    const exchangeFee = (isLive && pos.actualCommission !== undefined) ? pos.actualCommission : computePsimExchangeFee(pos.entryPrice, exitPrice, qty);
+    const marginFee = (isLive && pos.actualFunding !== undefined) ? pos.actualFunding : computePsimMarginFee(pos.entryPrice, qty, pos.entryTime, time);
+    const pnl = grossPnl - exchangeFee - marginFee;
+    const pnlPct = (pnl / pos.margin) * 100;
+    const tpStatus = pos.tp2Hit ? 'TP1-TP2' : (pos.tp1Hit ? 'TP1-BE' : '-');
+    // Ditandai "verified" (centang di kolom Waktu Exit) kalau ini posisi Binance
+    // Live DAN datanya sudah benar-benar tersinkron dari Binance (bukan rumus
+    // perkiraan) sebelum ditutup - bukti angkanya cocok dengan Binance asli.
+    const verified = isLive && pos.venue==='live-real' && pos.actualRealizedPnl !== undefined && pos.actualRealizedPnl !== null;
     prioritySimHistory.unshift({ source: pos.source, tfLabel: pos.tfLabel, tfValue: pos.tfValue, dir: pos.dir, entryPrice: pos.entryPrice, entryTime: pos.entryTime,
-      exitPrice, exitTime: time, reason, pnl, pnlPct, tpStatus });
+      exitPrice, exitTime: time, reason, exchangeFee, marginFee, pnl, pnlPct, tpStatus, venue: pos.venue || 'sim', verified });
     delete prioritySimPositions[key];
     savePrioritySimState();
   }
@@ -2090,6 +3399,86 @@
     renderPrioritySimUI(tickers);
   }
 
+  // Posisi live (testnet/real) TIDAK BOLEH ditutup dengan cara di atas -
+  // itu cuma mengubah catatan lokal, posisi ASLI di Binance tetap terbuka.
+  // Ini benar-benar kirim perintah tutup ke Binance: batalkan SL/TP algo order
+  // yang masih pending, lalu MARKET reduceOnly untuk menutup sisa posisi.
+  // Ambil komisi/funding/REALIZED_PNL FINAL langsung dari Binance saat posisi
+  // baru saja ditutup - dipanggil di titik penutupan (bukan cuma andalan
+  // sinkronisasi berkala 12 detik yang bisa telat/belum sempat jalan kalau
+  // posisi ditutup cepat setelah dibuka).
+  async function syncFinalFeesAndPnl(pos, backendUrl, appToken){
+    try{
+      const res = await fetch(`${backendUrl}/api/income?since=${pos.entryTime}`, { headers: { 'X-App-Token': appToken } });
+      if(!res.ok) return false;
+      const data = await res.json();
+      const income = data.income || [];
+      let commission = 0, funding = 0, realizedPnl = 0, hasRealized = false;
+      income.forEach(function(inc){
+        if(inc.symbol !== pos.source) return;
+        if(parseInt(inc.time,10) < pos.entryTime) return;
+        const raw = parseFloat(inc.income) || 0;
+        if(inc.incomeType === 'COMMISSION') commission += Math.abs(raw);
+        else if(inc.incomeType === 'FUNDING_FEE') funding += Math.abs(raw);
+        else if(inc.incomeType === 'REALIZED_PNL'){ realizedPnl += raw; hasRealized = true; }
+      });
+      pos.actualCommission = commission;
+      pos.actualFunding = funding;
+      if(hasRealized) pos.actualRealizedPnl = realizedPnl;
+      return hasRealized;
+    }catch(e){ return false; }
+  }
+
+  async function closeLivePosition(key, tickers){
+    const pos = prioritySimPositions[key];
+    if(!pos) return;
+    const backendUrl = liveBackendUrlInput.value.trim().replace(/\/$/, '');
+    const appToken = liveAppTokenInput.value.trim();
+    if(!backendUrl || !appToken){
+      priorityStatusEl.classList.add('error');
+      priorityStatusEl.textContent = 'Isi dulu Backend URL dan App Token di bagian Live Trading sebelum menutup posisi live.';
+      return;
+    }
+    const envLabel = pos.venue === 'live-real' ? '🔴 LIVE — UANG ASLI' : '🧪 TESTNET';
+    if(!window.confirm(`Tutup posisi ${pos.source.replace('USDT','')} (${pos.dir}, qty ${pos.qty}) di Binance [${envLabel}] sekarang? Order MARKET akan dikirim untuk menutup seluruh posisi.`)){
+      return;
+    }
+    priorityStatusEl.classList.remove('error');
+    priorityStatusEl.textContent = `Menutup posisi ${pos.source.replace('USDT','')} di Binance...`;
+    try{
+      const res = await fetch(`${backendUrl}/api/trade/futures/close`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-App-Token': appToken },
+        body: JSON.stringify({ symbol: pos.source, side: pos.dir, quantity: pos.qty, slOrderId: pos.liveSlOrderId, tp1OrderId: pos.liveTp1OrderId, tp2OrderId: pos.liveTp2OrderId })
+      });
+      const data = await res.json();
+      if(!res.ok){
+        const stageLabel = data && data.stage ? `[gagal di: ${data.stage}] ` : '';
+        throw new Error(stageLabel + ((data && data.error) ? JSON.stringify(data.error) : `HTTP ${res.status}`));
+      }
+      const fillPrice = (data.closeOrder && parseFloat(data.closeOrder.avgPrice)) || null;
+      // Fallback HARUS pakai harga Futures (mark price), bukan Spot - kalau
+      // Binance belum sempat kasih avgPrice pasti di respons close order,
+      // jatuh ke harga Spot bisa beda tipis dari Futures (basis/premium),
+      // bikin exit price di tabel meleset dari yang sebenarnya di Binance.
+      const t = tickers[pos.source];
+      const fallbackPrice = window.__esLiveMarkPrices[pos.source] || (t ? parseFloat(t.lastPrice) : pos.entryPrice);
+      const exitPrice = (fillPrice && fillPrice > 0) ? fillPrice : fallbackPrice;
+      // Beri Binance sedikit waktu mencatat REALIZED_PNL sebelum ditanya, baru
+      // ambil data final-nya - supaya riwayat langsung tersinkron (centang ✓)
+      // tanpa perlu nunggu siklus sinkronisasi berkala berikutnya.
+      await new Promise(r=>setTimeout(r, 800));
+      await syncFinalFeesAndPnl(pos, backendUrl, appToken);
+      closePrioritySimPosition(key, exitPrice, Date.now(), 'Manual Close (Binance)');
+      renderPrioritySimUI(tickers);
+      priorityStatusEl.classList.remove('error');
+      priorityStatusEl.textContent = `Posisi ${pos.source.replace('USDT','')} berhasil ditutup di Binance.`;
+    }catch(e){
+      priorityStatusEl.classList.add('error');
+      priorityStatusEl.textContent = `Gagal menutup posisi di Binance: ${e.message}`;
+    }
+  }
+
   function resetPrioritySim(){
     prioritySimPositions = {};
     prioritySimHistory = [];
@@ -2100,6 +3489,7 @@
   function monitorPrioritySimPositions(tickers){
     Object.keys(prioritySimPositions).forEach(key=>{
       const pos = prioritySimPositions[key];
+      if(pos.venue === 'live-testnet' || pos.venue === 'live-real') return; // TP/SL asli dikelola OCO order di Binance, bukan simulasi lokal
       const t = tickers[pos.source];
       const price = t ? parseFloat(t.lastPrice) : null;
       if(price===null || price===undefined) return;
@@ -2128,20 +3518,122 @@
     renderPrioritySimUI(activeTickers);
   }
 
+  function populatePsimSignalSelect(){
+    const results = getTradableSignalsList();
+    const prevUid = psimSelectedCandidate ? psimSelectedCandidate._uid : null;
+    psimSignalSelect.innerHTML = '<option value="">&mdash; Pilih sinyal &mdash;</option>' + results.map(c=>{
+      const srcLabel = TRADABLE_SOURCE_LABEL[c.source] || c.source;
+      const label = `${c.symbol.replace('USDT','')} (${c.tfLabel}) — ${c.signal} [${srcLabel}]`;
+      return `<option value="${c._uid}">${label}</option>`;
+    }).join('');
+    if(prevUid){
+      const found = results.find(c=>c._uid===prevUid);
+      if(found){ psimSignalSelect.value = prevUid; psimSelectedCandidate = found; }
+      else{ psimSelectedCandidate = null; psimSignalSelect.value=''; }
+    }
+    renderPsimPreview();
+  }
+
+  function selectPsimSignalByUid(uid){
+    const results = getTradableSignalsList();
+    psimSelectedCandidate = (!uid) ? null : (results.find(c=>c._uid===uid) || null);
+    renderPsimPreview();
+  }
+
+  function selectTradableSignalByUid(uid){
+    const results = getTradableSignalsList();
+    const found = results.find(c=>c._uid===uid);
+    if(!found) return;
+    psimSignalSelect.value = uid;
+    selectPsimSignalByUid(uid);
+    priorityStatusEl.classList.remove('error');
+    priorityStatusEl.textContent = `Sinyal ${found.symbol.replace('USDT','')} (TF ${found.tfLabel}) dipilih di Simulasi Sinyal Prioritas — cek preview lalu klik "Open Posisi".`;
+    document.querySelector('.es-sim-section').scrollIntoView({ behavior:'smooth', block:'start' });
+  }
+
+  function updatePsimOpenBtn(){
+    if(!psimSelectedCandidate){
+      psimOpenBtn.textContent = 'Open Posisi';
+      psimOpenBtn.classList.remove('sell');
+      return;
+    }
+    const isSell = psimSelectedCandidate.signal === 'SELL';
+    psimOpenBtn.textContent = isSell ? 'Open Sell' : 'Open Buy';
+    psimOpenBtn.classList.toggle('sell', isSell);
+  }
+
+  function renderPsimPreview(){
+    updatePsimOpenBtn();
+    if(!psimSelectedCandidate){
+      psimPreviewEl.innerHTML = `<div class="es-sim-preview-empty">Belum ada sinyal dipilih. Pilih dari dropdown "Sinyal Terpilih" atau klik "Pilih Sinyal Ini" di kartu Sinyal Prioritas.</div>`;
+      return;
+    }
+    const c = psimSelectedCandidate;
+    const entryPrice = c.price;
+    const { sl, tp, isManualTp } = getEffectiveSlTp(c);
+    if(sl===null || tp===null){
+      psimPreviewEl.innerHTML = `<div class="es-sim-preview-empty">Sinyal ini tidak punya level SL/TP otomatis (bukan dari checklist atau grid cross) - isi dulu "SL Manual" &amp; "TP Manual" di atas.</div>`;
+      return;
+    }
+    const riskDist = Math.abs(entryPrice - sl);
+    const tp1 = tp;
+    // TP2 (tier kedua) cuma relevan kalau TP-nya otomatis (2x risk dari SL) -
+    // kalau TP manual, anggap satu target saja, tp2 disamakan dengan tp1.
+    const tp2 = isManualTp ? tp1 : (c.signal==='BUY' ? entryPrice + riskDist*2 : entryPrice - riskDist*2);
+
+    const margin = currentPsimMargin();
+    const leverage = currentPsimLeverage();
+    const qty = (margin * leverage) / entryPrice;
+
+    function scenario(exitPrice){
+      const gross = c.signal==='BUY' ? (exitPrice-entryPrice)*qty : (entryPrice-exitPrice)*qty;
+      const fee = computePsimExchangeFee(entryPrice, exitPrice, qty);
+      return { gross, fee, net: gross - fee };
+    }
+    const slS = scenario(sl), tp1S = scenario(tp1), tp2S = scenario(tp2);
+    const fundingPer8h = (margin * leverage) * PSIM_FUNDING_RATE_PER_8H;
+
+    const col = (label, price, s) => `
+      <div class="es-psim-preview-col">
+        <div class="es-psim-preview-label">${label}</div>
+        <div class="es-psim-preview-price">$${fmtPrice(price)}</div>
+        <div class="es-psim-preview-line">PnL Bersih: <span class="${s.net>=0?'pnl-pos':'pnl-neg'}">${s.net>=0?'+':''}$${s.net.toFixed(2)}</span></div>
+        <div class="es-psim-preview-line muted">Biaya Exchange: -$${s.fee.toFixed(2)}</div>
+      </div>`;
+
+    psimPreviewEl.innerHTML = `
+      <div class="es-psim-preview-head">
+        <strong>${c.symbol.replace('USDT','')} (${c.tfLabel})</strong> — ${c.signal} @ $${fmtPrice(entryPrice)}
+        &bull; Modal $${margin.toFixed(0)} &bull; Leverage ${leverage}x &bull; Qty ${qty.toFixed(6)}
+      </div>
+      <div class="es-psim-preview-grid">
+        ${col('SL', sl, slS)}
+        ${col('TP1', tp1, tp1S)}
+        ${col('TP2', tp2, tp2S)}
+      </div>
+      <div class="es-psim-preview-note">Estimasi Biaya Margin (funding): ~$${fundingPer8h.toFixed(2)} / 8 jam selama posisi terbuka (dipotong dari PnL saat posisi ditutup).</div>
+    `;
+  }
+
   function handlePriorityTradeClick(cand){
     if(!psimToggle.checked){
       priorityStatusEl.classList.add('error');
       priorityStatusEl.textContent = 'Centang "Aktif" di bagian Simulasi Sinyal Prioritas dulu sebelum trade.';
       return;
     }
-    const key = `${cand.symbol}_${cand.tfValue}_PRIO`;
+    const key = `${cand.symbol}_${cand.tfValue}_${cand.source||'PRIO'}`;
     if(prioritySimPositions[key]){
       priorityStatusEl.classList.remove('error');
       priorityStatusEl.textContent = `Sudah ada posisi terbuka untuk ${cand.symbol.replace('USDT','')} di TF ${cand.tfLabel}.`;
       return;
     }
     const entryPrice = cand.price;
-    const sl = cand.signal==='BUY' ? pickSlForBuy(cand.dir) : pickSlForSell(cand.dir);
+    const { sl, tp, isManualTp } = getEffectiveSlTp(cand);
+    if(sl===null || tp===null){
+      priorityStatusEl.classList.add('error');
+      priorityStatusEl.textContent = `Sinyal ini tidak punya SL/TP otomatis - isi dulu "SL Manual" & "TP Manual" sebelum Open Posisi.`;
+      return;
+    }
 
     const slValid = cand.signal==='BUY' ? (sl < entryPrice) : (sl > entryPrice);
     if(!slValid){
@@ -2151,16 +3643,19 @@
     }
 
     const riskDist = Math.abs(entryPrice - sl);
-    const tp1 = cand.signal==='BUY' ? entryPrice + riskDist : entryPrice - riskDist;
-    const tp2 = cand.signal==='BUY' ? entryPrice + riskDist*2 : entryPrice - riskDist*2;
+    const tp1 = tp;
+    const tp2 = isManualTp ? tp1 : (cand.signal==='BUY' ? entryPrice + riskDist*2 : entryPrice - riskDist*2);
     openPrioritySimPosition(key, cand.symbol, cand.tfLabel, cand.tfValue, cand.signal, entryPrice, sl, tp1, tp2, Date.now());
     renderPrioritySimUI(window.__esLastTickers||{});
     priorityStatusEl.classList.remove('error');
     priorityStatusEl.textContent = `Posisi ${cand.signal} untuk ${cand.symbol.replace('USDT','')} (TF ${cand.tfLabel}) dibuka di simulasi.`;
+    psimSelectedCandidate = null;
+    psimSignalSelect.value = '';
+    renderPsimPreview();
   }
 
   function computeEquityCurve(){
-    const initialModal = Math.max(parseFloat(psimModalInput.value) || 4000, 1);
+    const initialModal = Math.max(parseFloat(psimModalInput.value) || 1000, 1);
     const chronological = prioritySimHistory.slice().reverse();
     let balance = initialModal;
     const points = [{ time: null, balance }];
@@ -2207,13 +3702,29 @@
     const winRate = prioritySimHistory.length ? (wins/prioritySimHistory.length*100) : 0;
 
     const openStats = openList.map(pos=>{
-      let price = tickers[pos.source] ? parseFloat(tickers[pos.source].lastPrice) : null;
+      const isLive = pos.venue==='live-real' || pos.venue==='live-testnet';
+      let price = (isLive && window.__esLiveMarkPrices[pos.source])
+        ? window.__esLiveMarkPrices[pos.source]
+        : (tickers[pos.source] ? parseFloat(tickers[pos.source].lastPrice) : null);
       if(price===null || price===undefined) price = pos.entryPrice;
-      const qty = currentPsimQty(pos.entryPrice);
-      const floatPnl = pos.dir==='BUY' ? (price-pos.entryPrice)*qty : (pos.entryPrice-price)*qty;
-      const floatPct = ((price-pos.entryPrice)/pos.entryPrice)*(pos.dir==='BUY'?100:-100);
+      const qty = pos.qty;
+      // Untuk posisi live, pakai data ASLI dari Binance kalau sudah tersinkron
+      // (unrealized PNL mentah + komisi + funding fee sebenarnya) - bukan rumus
+      // perkiraan kita sendiri, supaya angkanya cocok dengan yang di Binance.
+      const grossFloatPnl = (isLive && pos.actualUnrealizedPnl !== undefined && pos.actualUnrealizedPnl !== null)
+        ? pos.actualUnrealizedPnl
+        : (pos.dir==='BUY' ? (price-pos.entryPrice)*qty : (pos.entryPrice-price)*qty);
+      const exchangeFee = (isLive && pos.actualCommission !== undefined) ? pos.actualCommission : computePsimExchangeFee(pos.entryPrice, price, qty);
+      const marginFee = (isLive && pos.actualFunding !== undefined) ? pos.actualFunding : computePsimMarginFee(pos.entryPrice, qty, pos.entryTime, Date.now());
+      // Untuk posisi LIVE, PNL($) di tabel Posisi Terbuka sengaja dibiarkan
+      // MENTAH (belum dikurangi biaya) supaya persis sama dengan angka floating
+      // yang tampil di Binance. Biaya baru dipotong nanti pas posisi ditutup
+      // (lihat closePrioritySimPosition). Posisi simulasi tetap pakai PNL bersih
+      // seperti biasa (tidak berubah).
+      const floatPnl = isLive ? grossFloatPnl : (grossFloatPnl - exchangeFee - marginFee);
+      const floatPct = (floatPnl / pos.margin) * 100;
       const potentialSlPnl = pos.dir==='BUY' ? (pos.sl-pos.entryPrice)*qty : (pos.entryPrice-pos.sl)*qty;
-      return { pos, price, floatPnl, floatPct, potentialSlPnl };
+      return { pos, price, floatPnl, floatPct, potentialSlPnl, exchangeFee, marginFee };
     });
 
     const totalFloatingPnl = openStats.reduce((s,o)=>s+o.floatPnl, 0);
@@ -2240,18 +3751,25 @@
     const fmtTime = (ms)=> new Date(ms).toLocaleString('id-ID', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit' });
 
     if(openStats.length===0){
-      psimOpenTbody.innerHTML = `<tr><td colspan="12" style="text-align:center;color:var(--muted);padding:14px;">Belum ada posisi terbuka.</td></tr>`;
+      psimOpenTbody.innerHTML = `<tr><td colspan="15" style="text-align:center;color:var(--muted);padding:14px;">Belum ada posisi terbuka.</td></tr>`;
     } else {
-      psimOpenTbody.innerHTML = openStats.map(({pos, price, floatPnl, floatPct, potentialSlPnl})=>{
+      psimOpenTbody.innerHTML = openStats.map(({pos, price, floatPnl, floatPct, potentialSlPnl, exchangeFee, marginFee})=>{
         const pnlCls = floatPnl>=0 ? 'pnl-pos':'pnl-neg';
         const arahCls = pos.dir==='BUY' ? 'arah-buy' : 'arah-sell';
         const label = `${pos.source.replace('USDT','')} (${pos.tfLabel})`;
+        const venueBadge = venueBadgeHtml(pos.venue);
         const riskSlDisplay = pos.tp1Hit ? 'BE/TP1' : `-$${Math.abs(potentialSlPnl).toFixed(2)}`;
         const areaTpLabel = pos.tp2Hit ? 'Hit TP2' : (pos.tp1Hit ? 'Hit TP1' : '-');
         const areaTpCls = (pos.tp1Hit || pos.tp2Hit) ? 'pnl-pos' : '';
+        // PNL Terealisasi: profit yang sudah benar-benar terkunci (misal dari
+        // TP1 yang sudah kena) - sinkron langsung dari Binance, terpisah dari
+        // PNL($) yang menampilkan floating mentah punya sisa posisi.
+        const hasRealized = pos.actualRealizedPnl !== undefined && pos.actualRealizedPnl !== null;
+        const realizedDisplay = hasRealized ? `${pos.actualRealizedPnl>=0?'+':''}$${pos.actualRealizedPnl.toFixed(2)}` : '-';
+        const realizedCls = hasRealized ? (pos.actualRealizedPnl>=0?'pnl-pos':'pnl-neg') : '';
         const closeCls = floatPnl>=0 ? 'pnl-pos' : 'pnl-neg';
         return `<tr>
-          <td><span class="es-psim-source-link" data-symbol="${pos.source}" data-tf="${pos.tfValue||''}">${label}</span></td>
+          <td><span class="es-psim-source-link" data-symbol="${pos.source}" data-tf="${pos.tfValue||''}">${label}</span>${venueBadge}</td>
           <td class="${arahCls}">${pos.dir}</td>
           <td>$${fmtPrice(pos.entryPrice)}</td>
           <td>$${fmtPrice(pos.sl)}</td>
@@ -2260,7 +3778,10 @@
           <td>$${fmtPrice(pos.tp2)}</td>
           <td class="${areaTpCls}">${areaTpLabel}</td>
           <td class="${pnlCls}">$${fmtPrice(price)}</td>
+          <td>-$${exchangeFee.toFixed(2)}</td>
+          <td>-$${marginFee.toFixed(2)}</td>
           <td class="${pnlCls}">${floatPnl>=0?'+':''}${floatPnl.toFixed(2)}</td>
+          <td class="${realizedCls}">${realizedDisplay}</td>
           <td class="${pnlCls}">${floatPct>=0?'+':''}${floatPct.toFixed(2)}%</td>
           <td><button type="button" class="es-psim-close-btn ${closeCls}" data-key="${pos.key}">Close Posisi</button></td>
         </tr>`;
@@ -2275,29 +3796,38 @@
 
       psimOpenTbody.querySelectorAll('.es-psim-close-btn').forEach(btn=>{
         btn.addEventListener('click', ()=>{
-          manualClosePrioritySimPosition(btn.getAttribute('data-key'), tickers);
+          const key = btn.getAttribute('data-key');
+          const pos = prioritySimPositions[key];
+          if(pos && (pos.venue==='live-real' || pos.venue==='live-testnet')){
+            closeLivePosition(key, tickers);
+          } else {
+            manualClosePrioritySimPosition(key, tickers);
+          }
         });
       });
     }
 
     if(prioritySimHistory.length===0){
-      psimHistTbody.innerHTML = `<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:14px;">Belum ada transaksi selesai.</td></tr>`;
+      psimHistTbody.innerHTML = `<tr><td colspan="11" style="text-align:center;color:var(--muted);padding:14px;">Belum ada transaksi selesai.</td></tr>`;
     } else {
       psimHistTbody.innerHTML = prioritySimHistory.slice(0,50).map(t=>{
         const pnlCls = t.pnl>=0 ? 'pnl-pos':'pnl-neg';
         const arahCls = t.dir==='BUY' ? 'arah-buy' : 'arah-sell';
         const label = `${t.source.replace('USDT','')} (${t.tfLabel})`;
+        const venueBadge = venueBadgeHtml(t.venue);
         const tpStatusCls = t.tpStatus && t.tpStatus!=='-' ? 'pnl-pos' : '';
         return `<tr>
-          <td><span class="es-psim-source-link" data-symbol="${t.source}" data-tf="${t.tfValue||''}">${label}</span></td>
+          <td><span class="es-psim-source-link" data-symbol="${t.source}" data-tf="${t.tfValue||''}">${label}</span>${venueBadge}</td>
           <td class="${arahCls}">${t.dir}</td>
           <td>$${fmtPrice(t.entryPrice)}</td>
           <td>$${fmtPrice(t.exitPrice)}</td>
           <td>${t.reason}</td>
           <td class="${tpStatusCls}">${t.tpStatus || '-'}</td>
+          <td>-$${(t.exchangeFee||0).toFixed(2)}</td>
+          <td>-$${(t.marginFee||0).toFixed(2)}</td>
           <td class="${pnlCls}">${t.pnl>=0?'+':''}${t.pnl.toFixed(2)}</td>
           <td class="${pnlCls}">${t.pnlPct>=0?'+':''}${t.pnlPct.toFixed(2)}%</td>
-          <td>${fmtTime(t.exitTime)}</td>
+          <td>${fmtTime(t.exitTime)} <span style="color:${t.venue==='live-real' && t.verified ? 'var(--bull)' : 'var(--muted)'};" title="${t.venue==='live-real' ? (t.verified ? 'Sudah sinkron dengan data Binance' : 'Belum sempat sinkron dengan Binance') : ''}">${t.venue==='live-real' && t.verified ? '&#10003;' : '-'}</span></td>
         </tr>`;
       }).join('');
 
@@ -2312,6 +3842,7 @@
 
   const FAVORITE_DEFAULT = ['BTCUSDT','ETHUSDT','SOLUSDT','HYPEUSDT','PENGUUSDT'];
   const FAV_STORAGE_KEY = 'emaScreenerFavorites_v1';
+  const FAV_MAX_SLOTS = 50;
   let favoriteSymbols = [];
   let favScanning = false;
 
@@ -2323,7 +3854,7 @@
       const raw = localStorage.getItem(FAV_STORAGE_KEY);
       if(raw){
         const parsed = JSON.parse(raw);
-        if(Array.isArray(parsed)){ favoriteSymbols = parsed.slice(0,5); return; }
+        if(Array.isArray(parsed)){ favoriteSymbols = parsed.slice(0,FAV_MAX_SLOTS); return; }
       }
     }catch(e){ /* fall through to default */ }
     favoriteSymbols = FAVORITE_DEFAULT.slice();
@@ -2361,7 +3892,7 @@
     if(!symbol) return;
     if(!symbol.endsWith('USDT')) symbol += 'USDT';
     if(favoriteSymbols.includes(symbol)) return;
-    if(favoriteSymbols.length >= 5) return;
+    if(favoriteSymbols.length >= FAV_MAX_SLOTS) return;
     favoriteSymbols.push(symbol);
     saveFavorites();
     scanFavorites();
@@ -2392,20 +3923,24 @@
     }
     const cls = data.status==='BUY' ? 'buy' : data.status==='SELL' ? 'sell' : 'hold';
     const dir = data.dir;
-    const emaNoteText = data.emaNote==='above' ? 'Harga di atas EMA9 &amp; EMA21' : data.emaNote==='below' ? 'Harga di bawah EMA9 &amp; EMA21' : 'Harga di antara EMA9/21';
     const stochText = data.stochK===null ? 'Stoch n/a' : `Stoch K ${data.stochK.toFixed(1)}${data.stochCond==='overbought'?' (OB)':data.stochCond==='oversold'?' (OS)':''}`;
+    const chgVal = data.changeTf;
+    const chgHtml = (chgVal===null || chgVal===undefined) ? '' : ` <span class="es-fav-chg ${chgVal>=0?'up':'down'}">${chgVal>=0?'+':''}${chgVal.toFixed(2)}%</span>`;
+    const tradeBtnHtml = (data.status==='BUY' || data.status==='SELL')
+      ? `<button class="es-priority-trade-btn es-fav-trade-btn" type="button" data-symbol="${symbol}" data-tf="${data.tfValue}">Pilih Sinyal Ini</button>`
+      : '';
     return `<div class="es-fav-box ${cls}" data-symbol="${symbol}" data-market="${data.market||'spot'}">
       <span class="es-fav-star" data-symbol="${symbol}" title="Hapus dari favorit">&#9733;</span>
       <div class="es-fav-symbol">${symbol.replace('USDT','')}</div>
-      <div class="es-fav-price">$${fmtPrice(data.price)}</div>
+      <div class="es-fav-price">$${fmtPrice(data.price)}${chgHtml}</div>
       <span class="es-fav-signal-badge ${cls}">${data.status}</span>
       <div class="es-checklist">
         <div class="es-check-row ${dir.bb.ok?'ok':'fail'}"><span class="es-check-icon">${dir.bb.ok?'&check;':'&#10007;'}</span> BB: ${dir.bb.status}</div>
         <div class="es-check-row ${dir.sr.ok?'ok':'fail'}"><span class="es-check-icon">${dir.sr.ok?'&check;':'&#10007;'}</span> S/R: ${dir.sr.status}</div>
         <div class="es-check-row ${dir.sd.ok?'ok':'fail'}"><span class="es-check-icon">${dir.sd.ok?'&check;':'&#10007;'}</span> S/D: ${dir.sd.status}</div>
       </div>
-      <div class="es-priority-note">${emaNoteText}</div>
       <div class="es-priority-note">${stochText}</div>
+      ${tradeBtnHtml}
     </div>`;
   }
 
@@ -2424,6 +3959,12 @@
       star.addEventListener('click', (e)=>{
         e.stopPropagation();
         removeFavorite(star.getAttribute('data-symbol'));
+      });
+    });
+    favGrid.querySelectorAll('.es-fav-trade-btn').forEach(btn=>{
+      btn.addEventListener('click', (e)=>{
+        e.stopPropagation();
+        selectTradableSignalByUid(tradableUid('favorite', btn.getAttribute('data-symbol'), btn.getAttribute('data-tf')));
       });
     });
     favGrid.querySelectorAll('.es-fav-empty-slot').forEach(slot=>{
@@ -2469,9 +4010,66 @@
     favGrid.querySelectorAll('.es-fav-box:not(.es-fav-empty-slot)').forEach(box=>{
       box.addEventListener('click', (e)=>{
         if(e.target.classList.contains('es-fav-star')) return;
+        if(box.classList.contains('was-dragged')){ box.classList.remove('was-dragged'); return; }
         openTradingView(box.getAttribute('data-symbol'), intervalSel.value, box.getAttribute('data-market'));
       });
+
+      box.setAttribute('draggable', 'true');
+
+      let grabTimer = null;
+      const clearGrabTimer = ()=>{ clearTimeout(grabTimer); grabTimer = null; box.classList.remove('grab-ready'); };
+      box.addEventListener('mousedown', (e)=>{
+        if(e.target.classList.contains('es-fav-star')) return;
+        clearTimeout(grabTimer);
+        grabTimer = setTimeout(()=>{ box.classList.add('grab-ready'); }, 350);
+      });
+      box.addEventListener('mouseup', clearGrabTimer);
+      box.addEventListener('mouseleave', clearGrabTimer);
+
+      box.addEventListener('dragstart', (e)=>{
+        e.dataTransfer.setData('text/plain', box.getAttribute('data-symbol'));
+        e.dataTransfer.effectAllowed = 'move';
+        box.classList.add('dragging');
+      });
+      box.addEventListener('dragend', ()=>{
+        clearGrabTimer();
+        box.classList.remove('dragging');
+        box.classList.add('was-dragged');
+      });
+      box.addEventListener('dragover', (e)=>{
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        box.classList.add('drag-over');
+      });
+      box.addEventListener('dragleave', ()=>{
+        box.classList.remove('drag-over');
+      });
+      box.addEventListener('drop', (e)=>{
+        e.preventDefault();
+        box.classList.remove('drag-over');
+        const draggedSymbol = e.dataTransfer.getData('text/plain');
+        const targetSymbol = box.getAttribute('data-symbol');
+        if(!draggedSymbol || draggedSymbol===targetSymbol) return;
+        reorderFavorite(draggedSymbol, targetSymbol);
+      });
     });
+  }
+
+  function reorderFavorite(draggedSymbol, targetSymbol){
+    const fromIdx = favoriteSymbols.indexOf(draggedSymbol);
+    const toIdx = favoriteSymbols.indexOf(targetSymbol);
+    if(fromIdx===-1 || toIdx===-1) return;
+    const movingBefore = fromIdx < toIdx;
+    favoriteSymbols.splice(fromIdx, 1);
+    favoriteSymbols.splice(favoriteSymbols.indexOf(targetSymbol) + (movingBefore?1:0), 0, draggedSymbol);
+    saveFavorites();
+
+    const draggedEl = favGrid.querySelector(`.es-fav-box[data-symbol="${draggedSymbol}"]`);
+    const targetEl = favGrid.querySelector(`.es-fav-box[data-symbol="${targetSymbol}"]`);
+    if(draggedEl && targetEl){
+      if(movingBefore) targetEl.after(draggedEl);
+      else targetEl.before(draggedEl);
+    }
   }
 
   async function scanFavorites(){
@@ -2481,28 +4079,39 @@
     favStatusEl.textContent = 'Memindai koin favorit...';
 
     const interval = intervalSel.value;
+    const tfLabel = intervalSel.options[intervalSel.selectedIndex] ? intervalSel.options[intervalSel.selectedIndex].text : interval;
     const boxesHtml = [];
+    const favTradableCandidates = [];
 
-    for(let i=0;i<5;i++){
+    for(let i=0;i<favoriteSymbols.length;i++){
       const symbol = favoriteSymbols[i];
-      if(!symbol){ boxesHtml.push(renderEmptyFavSlot()); continue; }
       try{
         const { opens, highs, lows, closes, market } = await fetchKlines(symbol, interval, 300);
         const ind = computeFullIndicators(opens, highs, lows, closes);
+        const lastOpen = opens[opens.length-1];
         const lastHigh = highs[highs.length-1], lastLow = lows[lows.length-1], lastClose = closes[closes.length-1];
         const evalRes = evaluateChecklist(ind, lastHigh, lastLow, lastClose);
         const cls = classifyFavoriteSignal(evalRes);
+        const changeTf = ((lastClose - lastOpen) / lastOpen) * 100;
         boxesHtml.push(renderFavoriteBox(symbol, {
-          status: cls.status, dir: cls.dir, price: lastClose, market,
-          emaNote: evalRes.emaNote, stochCond: evalRes.stochCond, stochK: evalRes.stochK, stochD: evalRes.stochD
+          status: cls.status, dir: cls.dir, price: lastClose, market, changeTf,
+          stochCond: evalRes.stochCond, stochK: evalRes.stochK, stochD: evalRes.stochD,
+          tfValue: interval, tfLabel
         }));
+        if(cls.status==='BUY' || cls.status==='SELL'){
+          favTradableCandidates.push({ symbol, signal: cls.status, dir: cls.dir, price: lastClose, tfValue: interval, tfLabel });
+        }
       }catch(e){
         boxesHtml.push(renderFavoriteBox(symbol, { error:true }));
       }
     }
+    if(favoriteSymbols.length < FAV_MAX_SLOTS){
+      boxesHtml.push(renderEmptyFavSlot());
+    }
 
     favGrid.innerHTML = boxesHtml.join('');
     wireFavoriteBoxEvents();
+    registerTradableSignals('favorite', favTradableCandidates);
     favStatusEl.textContent = `Terakhir dipindai: ${new Date().toLocaleTimeString('id-ID')} • TF ${interval}.`;
     favScanning = false;
   }
@@ -2516,14 +4125,235 @@
   priorityBtn.addEventListener('click', findPrioritySignals);
   priorityRiskSel.addEventListener('change', findPrioritySignals);
   psimResetBtn.addEventListener('click', resetPrioritySim);
+  psimSignalSelect.addEventListener('change', ()=> selectPsimSignalByUid(psimSignalSelect.value));
+  psimManualSlInput.addEventListener('input', renderPsimPreview);
+  psimManualTpInput.addEventListener('input', renderPsimPreview);
+  psimOpenBtn.addEventListener('click', ()=>{
+    if(!psimSelectedCandidate){
+      priorityStatusEl.classList.add('error');
+      priorityStatusEl.textContent = 'Pilih sinyal dulu di "Sinyal Terpilih" sebelum Open Posisi.';
+      return;
+    }
+    handlePriorityTradeClick(psimSelectedCandidate);
+  });
+  psimModalInput.addEventListener('input', renderPsimPreview);
+  psimLeverageInput.addEventListener('input', renderPsimPreview);
+
+  const PSIM_SETTINGS_KEY = 'emaScreenerPsimSettings_v1';
+
+  function loadPsimSettings(){
+    try{
+      const raw = localStorage.getItem(PSIM_SETTINGS_KEY);
+      if(!raw) return;
+      const s = JSON.parse(raw);
+      if(s.modal !== undefined) psimModalInput.value = s.modal;
+      if(s.leverage !== undefined) psimLeverageInput.value = s.leverage;
+      if(s.active !== undefined) psimToggle.checked = s.active;
+    }catch(e){}
+  }
+
+  function savePsimSettings(){
+    try{
+      localStorage.setItem(PSIM_SETTINGS_KEY, JSON.stringify({
+        modal: parseFloat(psimModalInput.value) || 1000,
+        leverage: parseFloat(psimLeverageInput.value) || 10,
+        active: psimToggle.checked
+      }));
+    }catch(e){}
+  }
+
+  psimModalInput.addEventListener('change', savePsimSettings);
+  psimLeverageInput.addEventListener('change', savePsimSettings);
+  psimToggle.addEventListener('change', savePsimSettings);
+  loadPsimSettings();
+
+  liveTradeBtn.addEventListener('click', ()=>{
+    if(!psimSelectedCandidate){
+      liveTradeStatusEl.classList.add('error');
+      liveTradeStatusEl.classList.remove('success');
+      liveTradeStatusEl.textContent = 'Pilih sinyal dulu di "Sinyal Terpilih" sebelum kirim order.';
+      return;
+    }
+    sendLiveTrade(psimSelectedCandidate);
+  });
+  liveBackendUrlInput.addEventListener('change', ()=>{ saveLiveTradeConfig(); detectLiveEnv(); });
+  liveAppTokenInput.addEventListener('change', saveLiveTradeConfig);
+  loadLiveTradeConfig();
+  detectLiveEnv();
+
+  function loadEconCalendarWidget(){
+    const container = document.getElementById('esEconCalendarBody');
+    container.innerHTML = '';
+    const script = document.createElement('script');
+    script.type = 'text/javascript';
+    script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-events.js';
+    script.async = true;
+    script.innerHTML = JSON.stringify({
+      width: '100%',
+      height: '100%',
+      colorTheme: 'dark',
+      isTransparent: false,
+      locale: 'en',
+      importanceFilter: '-1,0,1',
+      currencyFilter: 'USD'
+    });
+    container.appendChild(script);
+  }
+
+  const econCalendarPanel = document.getElementById('esEconCalendarPanel');
+  const econCalendarTrigger = document.getElementById('esEconCalendarTrigger');
+  econCalendarTrigger.addEventListener('click', (e)=>{
+    e.stopPropagation();
+    econCalendarPanel.classList.toggle('collapsed');
+  });
+  document.addEventListener('click', (e)=>{
+    if(!econCalendarPanel.contains(e.target)){
+      econCalendarPanel.classList.add('collapsed');
+    }
+  });
 
   loadPrioritySimState();
   renderPrioritySimUI({});
+  renderPsimPreview();
   scan();
   setInterval(scan, 90000);
   loadFavorites();
   scanFavorites();
   setInterval(scanFavorites, 90000);
+  loadFavCrossSymbols();
+  renderFavCrossManageUI();
+  scanFavoriteCrossSection();
+  setInterval(scanFavoriteCrossSection, 90000);
+  scanBtcTfStrip();
+  setInterval(scanBtcTfStrip, 90000);
+
+  // Posisi SIMULASI cukup ikut siklus scan 90 detik yang sudah ada (scan()
+  // sendiri sudah panggil monitorPrioritySimPositions + renderPrioritySimUI
+  // pakai harga Spot) - tidak perlu interval tambahan, biar tidak jadi beban.
+  // Posisi LIVE (Binance Live/Testnet) dapat perlakuan khusus: mark price
+  // Futures asli (premiumIndex, bobot cuma 10 dari limit 2400/menit Futures -
+  // bucket rate-limit-nya terpisah dari Spot) direfresh tiap 1 detik supaya
+  // PNL-nya terasa nyaris real-time.
+  setInterval(async ()=>{
+    const livePositions = Object.values(prioritySimPositions).filter(p=>p.venue==='live-real' || p.venue==='live-testnet');
+    if(livePositions.length===0) return;
+    const markPrices = await loadFuturesMarkPrices();
+    if(Object.keys(markPrices).length) window.__esLiveMarkPrices = markPrices;
+
+    // Tool cuma tahu posisi live "tertutup" kalau user klik Close Posisi manual -
+    // kalau Binance sendiri yang menutup (TP/SL ke-trigger otomatis), tool tidak
+    // tahu dan posisi bisa "menggantung" salah di tabel. Cek langsung ke Binance
+    // tiap detik: kalau posisi sudah tidak ada di sana, tutup juga di tabel kita,
+    // pakai TP/SL mana yang paling dekat dengan harga terakhir sebagai alasannya.
+    const backendUrl = liveBackendUrlInput.value.trim().replace(/\/$/, '');
+    const appToken = liveAppTokenInput.value.trim();
+    if(backendUrl && appToken){
+      try{
+        const res = await fetch(`${backendUrl}/api/positions`, { headers: { 'X-App-Token': appToken } });
+        if(res.ok){
+          const data = await res.json();
+          const posMap = {};
+          (data.positions||[]).forEach(p=>{ posMap[p.symbol] = p; });
+          livePositions.forEach(pos=>{
+            const bp = posMap[pos.source];
+            if(!bp) return;
+            if(Math.abs(bp.positionAmt) < 1e-8){
+              // Posisi sudah tidak ada sama sekali di Binance - tutup di tabel kita juga.
+              const lastPrice = window.__esLiveMarkPrices[pos.source] || pos.entryPrice;
+              const nearTp = pos.tp1Hit ? pos.tp2 : pos.tp1;
+              const hitTp = Math.abs(lastPrice - nearTp) <= Math.abs(lastPrice - pos.sl);
+              const exitPrice = hitTp ? nearTp : pos.sl;
+              if(pos.tp1Hit && hitTp) pos.tp2Hit = true; // TP1 lalu TP2 - status TP1-TP2
+              const reason = pos.tp1Hit
+                ? (hitTp ? 'TP1-TP2 (Binance)' : 'TP1-BE (Binance)')
+                : (hitTp ? 'TP1 (Binance)' : 'Stop Loss (Binance)');
+              // Ambil data final (komisi/funding/REALIZED_PNL) dulu dari Binance
+              // baru finalisasi - posisi ini sudah tertutup beberapa saat lalu di
+              // Binance (kedeteksi baru sekarang), jadi datanya harusnya sudah ada.
+              syncFinalFeesAndPnl(pos, backendUrl, appToken).finally(function(){
+                closePrioritySimPosition(pos.key, exitPrice, Date.now(), reason);
+                renderPrioritySimUI(window.__esLastTickers || {});
+              });
+              fetch(`${backendUrl}/api/trade/futures/cancel-pending`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-App-Token': appToken },
+                body: JSON.stringify({ symbol: pos.source, slOrderId: pos.liveSlOrderId, tp1OrderId: pos.liveTp1OrderId, tp2OrderId: pos.liveTp2OrderId })
+              }).catch(()=>{});
+            } else {
+              // Posisi masih terbuka - sinkron entry price & PNL mentah ASLI dari
+              // Binance, supaya tidak bergantung ke catatan lokal yang bisa meleset
+              // (mis. beda slip harga saat entry).
+              if(bp.entryPrice > 0) pos.entryPrice = bp.entryPrice;
+              pos.actualUnrealizedPnl = bp.unRealizedProfit;
+
+              // Deteksi TP1 sudah kena: posisi masih ada tapi ukurannya sudah
+              // menyusut ke sekitar qty2 (separuh sisa). Kalau iya, pindahkan SL
+              // ke breakeven untuk sisa posisi - supaya sisanya "tidak mungkin rugi".
+              if(!pos.tp1Hit && pos.qty2 && Math.abs(bp.positionAmt) <= pos.qty2 * 1.05){
+                pos.tp1Hit = true;
+                savePrioritySimState();
+                fetch(`${backendUrl}/api/trade/futures/move-sl-be`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', 'X-App-Token': appToken },
+                  body: JSON.stringify({ symbol: pos.source, side: pos.dir, quantity: pos.qty2, oldSlOrderId: pos.liveSlOrderId, breakevenPrice: pos.entryPrice })
+                }).then(function(r){ return r.json().then(function(d){ return { ok:r.ok, data:d }; }); })
+                  .then(function(r){
+                    if(r.ok && r.data.newSlOrder){
+                      pos.sl = pos.entryPrice;
+                      pos.liveSlOrderId = r.data.newSlOrder.orderId || r.data.newSlOrder.algoId;
+                      savePrioritySimState();
+                      renderPrioritySimUI(window.__esLastTickers || {});
+                    }
+                  }).catch(()=>{});
+              }
+            }
+          });
+        }
+      }catch(e){ /* gagal cek - coba lagi di interval berikutnya */ }
+    }
+
+    renderPrioritySimUI(window.__esLastTickers || {});
+  }, 1000);
+
+  // Sinkron biaya ASLI (exchange fee/komisi + funding fee) dari riwayat income
+  // Binance - endpoint ini lebih berat (bobot 30/panggilan) jadi direfresh
+  // lebih santai (12 detik), satu panggilan untuk SEMUA posisi live sekaligus
+  // (bukan per-posisi) biar hemat.
+  setInterval(async ()=>{
+    const livePositions = Object.values(prioritySimPositions).filter(p=>p.venue==='live-real' || p.venue==='live-testnet');
+    if(livePositions.length===0) return;
+    const backendUrl = liveBackendUrlInput.value.trim().replace(/\/$/, '');
+    const appToken = liveAppTokenInput.value.trim();
+    if(!backendUrl || !appToken) return;
+    const earliestEntry = Math.min.apply(null, livePositions.map(p=>p.entryTime));
+    try{
+      const res = await fetch(`${backendUrl}/api/income?since=${earliestEntry}`, { headers: { 'X-App-Token': appToken } });
+      if(!res.ok) return;
+      const data = await res.json();
+      const income = data.income || [];
+      livePositions.forEach(pos=>{
+        let commission = 0, funding = 0, realizedPnl = 0, hasRealized = false;
+        income.forEach(function(inc){
+          if(inc.symbol !== pos.source) return;
+          if(parseInt(inc.time,10) < pos.entryTime) return;
+          const raw = parseFloat(inc.income) || 0;
+          if(inc.incomeType === 'COMMISSION') commission += Math.abs(raw);
+          else if(inc.incomeType === 'FUNDING_FEE') funding += Math.abs(raw);
+          else if(inc.incomeType === 'REALIZED_PNL'){ realizedPnl += raw; hasRealized = true; }
+        });
+        pos.actualCommission = commission;
+        pos.actualFunding = funding;
+        // REALIZED_PNL dari Binance ini yang paling akurat - kalau posisi kena
+        // TP1 dulu (partial), lalu TP2/BE belakangan, jumlah ini otomatis sudah
+        // menggabungkan kedua bagian (Binance catat REALIZED_PNL tiap kali
+        // posisi berkurang/tertutup, sebagian atau penuh).
+        if(hasRealized) pos.actualRealizedPnl = realizedPnl;
+      });
+      renderPrioritySimUI(window.__esLastTickers || {});
+    }catch(e){ /* gagal ambil income - coba lagi di siklus berikutnya */ }
+  }, 12000);
+
+  loadEconCalendarWidget();
   findPrioritySignals();
 })();
 </script>
