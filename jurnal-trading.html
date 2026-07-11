@@ -120,6 +120,20 @@
 
   /* ---------- Trade table ---------- */
   .table-scroll{overflow-x:auto;}
+  .table-scroll.jt-hist-limited{ max-height:300px; overflow-y:auto; }
+  .jt-hist-controls{
+    display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px;
+  }
+  .jt-range-select{
+    font-family:var(--font-body); font-size:12px; padding:5px 8px; border-radius:6px;
+    border:1px solid var(--border); background:var(--surface-2); color:var(--ink);
+  }
+  .jt-custom-range{ display:none; align-items:center; gap:6px; }
+  .jt-custom-range.active{ display:flex; }
+  .jt-custom-range input[type="date"]{
+    font-family:var(--font-body); font-size:12px; padding:4px 6px; border-radius:6px;
+    border:1px solid var(--border); background:var(--surface-2); color:var(--ink);
+  }
   table{width:100%;border-collapse:collapse;font-size:13px;min-width:640px;}
   thead th{
     text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;
@@ -315,7 +329,22 @@
           <h2>Riwayat Trade</h2>
           <button class="btn primary" id="btnAddTrade">+ Tambah Trade</button>
         </div>
-        <div class="table-scroll">
+        <div class="jt-hist-controls">
+          <select class="jt-range-select" id="fRangeSelect">
+            <option value="all">Semua</option>
+            <option value="today">Hari Ini</option>
+            <option value="week">Minggu Lalu</option>
+            <option value="month">Bulan Lalu</option>
+            <option value="3months">3 Bulan Terakhir</option>
+            <option value="6months">6 Bulan Terakhir</option>
+            <option value="year">Tahun Lalu</option>
+            <option value="custom">Kustom</option>
+          </select>
+          <span class="jt-custom-range" id="fCustomRange">
+            <input type="date" id="fCustomFrom"> &mdash; <input type="date" id="fCustomTo">
+          </span>
+        </div>
+        <div class="table-scroll jt-hist-limited">
           <table id="tradeTable">
             <thead>
               <tr>
@@ -413,7 +442,22 @@
 
       <div class="card">
         <div class="card-head"><h2>Riwayat Trade Kripto</h2></div>
-        <div class="table-scroll">
+        <div class="jt-hist-controls">
+          <select class="jt-range-select" id="cRangeSelect">
+            <option value="all">Semua</option>
+            <option value="today">Hari Ini</option>
+            <option value="week">Minggu Lalu</option>
+            <option value="month">Bulan Lalu</option>
+            <option value="3months">3 Bulan Terakhir</option>
+            <option value="6months">6 Bulan Terakhir</option>
+            <option value="year">Tahun Lalu</option>
+            <option value="custom">Kustom</option>
+          </select>
+          <span class="jt-custom-range" id="cCustomRange">
+            <input type="date" id="cCustomFrom"> &mdash; <input type="date" id="cCustomTo">
+          </span>
+        </div>
+        <div class="table-scroll jt-hist-limited">
           <table id="cTradeTable">
             <thead>
               <tr><th>Tanggal</th><th>Pair</th><th>TF</th><th>Arah</th><th>Alasan</th><th>P/L</th><th>Hasil</th></tr>
@@ -633,10 +677,38 @@
     return which==='entry' ? (t.emotionEntry||'—') : (t.emotionEval||'—');
   }
 
+  function jtFilterByRange(trades, prefix){
+    var rangeEl = document.getElementById(prefix + 'RangeSelect');
+    var range = rangeEl ? rangeEl.value : 'all';
+    if(range === 'all') return trades;
+    var now = new Date();
+    var from = null, to = null;
+    if(range === 'custom'){
+      var fromVal = document.getElementById(prefix + 'CustomFrom').value;
+      var toVal = document.getElementById(prefix + 'CustomTo').value;
+      from = fromVal ? new Date(fromVal + 'T00:00:00') : null;
+      to = toVal ? new Date(toVal + 'T23:59:59') : null;
+    } else {
+      to = now;
+      from = new Date(now);
+      if(range === 'today'){ from.setHours(0,0,0,0); }
+      else {
+        var daysMap = { week:7, month:30, '3months':90, '6months':180, year:365 };
+        from.setDate(from.getDate() - daysMap[range]);
+      }
+    }
+    return trades.filter(function(t){
+      var d = new Date(t.date);
+      if(from && d < from) return false;
+      if(to && d > to) return false;
+      return true;
+    });
+  }
+
   function renderTable(){
     var tbody = document.getElementById('tradeTbody');
     var empty = document.getElementById('emptyState');
-    var sorted = state.trades.slice().sort(function(a,b){return new Date(b.date)-new Date(a.date);});
+    var sorted = jtFilterByRange(state.trades.slice(), 'f').sort(function(a,b){return new Date(b.date)-new Date(a.date);});
     if (!sorted.length){
       tbody.innerHTML = '';
       document.getElementById('tradeTable').style.display='none';
@@ -891,6 +963,13 @@
     input.click();
   });
 
+  document.getElementById('fRangeSelect').addEventListener('change', function(){
+    document.getElementById('fCustomRange').classList.toggle('active', this.value === 'custom');
+    renderTable();
+  });
+  document.getElementById('fCustomFrom').addEventListener('change', renderTable);
+  document.getElementById('fCustomTo').addEventListener('change', renderTable);
+
   renderAll();
 })();
 </script>
@@ -1021,10 +1100,38 @@
       sorted.length ? 'Total P/L: ' + fmtMoney(cum) : 'Belum ada transaksi';
   }
 
+  function jtFilterByRange(trades, prefix){
+    var rangeEl = document.getElementById(prefix + 'RangeSelect');
+    var range = rangeEl ? rangeEl.value : 'all';
+    if(range === 'all') return trades;
+    var now = new Date();
+    var from = null, to = null;
+    if(range === 'custom'){
+      var fromVal = document.getElementById(prefix + 'CustomFrom').value;
+      var toVal = document.getElementById(prefix + 'CustomTo').value;
+      from = fromVal ? new Date(fromVal + 'T00:00:00') : null;
+      to = toVal ? new Date(toVal + 'T23:59:59') : null;
+    } else {
+      to = now;
+      from = new Date(now);
+      if(range === 'today'){ from.setHours(0,0,0,0); }
+      else {
+        var daysMap = { week:7, month:30, '3months':90, '6months':180, year:365 };
+        from.setDate(from.getDate() - daysMap[range]);
+      }
+    }
+    return trades.filter(function(t){
+      var d = new Date(t.date);
+      if(from && d < from) return false;
+      if(to && d > to) return false;
+      return true;
+    });
+  }
+
   function renderTable(){
     var tbody = document.getElementById('cTradeTbody');
     var empty = document.getElementById('cEmptyState');
-    var sorted = cState.trades.slice().sort(function(a,b){return b.date-a.date;});
+    var sorted = jtFilterByRange(cState.trades.slice(), 'c').sort(function(a,b){return b.date-a.date;});
     if (!sorted.length){
       tbody.innerHTML = '';
       document.getElementById('cTradeTable').style.display='none';
@@ -1136,6 +1243,13 @@
   window.addEventListener('storage', function(e){
     if(e.key === CRYPTO_SIM_KEY) renderCryptoAll();
   });
+
+  document.getElementById('cRangeSelect').addEventListener('change', function(){
+    document.getElementById('cCustomRange').classList.toggle('active', this.value === 'custom');
+    renderTable();
+  });
+  document.getElementById('cCustomFrom').addEventListener('change', renderTable);
+  document.getElementById('cCustomTo').addEventListener('change', renderTable);
 
   renderCryptoAll();
 })();
