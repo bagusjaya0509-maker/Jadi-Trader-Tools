@@ -1,40 +1,112 @@
 <style>
   :root{
-    --bg:#0A0E14;
-    --panel:#10161F;
-    --panel-2:#151D29;
-    --border:#232E3D;
-    --text:#E8EDF3;
-    --muted:#7C8BA0;
-    --dim:#4B5A70;
-    --bull:#3DE0C4;
-    --bull-dim:#1B4A44;
-    --bear:#FF6B5E;
-    --bear-dim:#4A2420;
-    --gold:#F2B84B;
+    --bg:#0b0c0f;
+    --panel:#131519;
+    --panel-2:#1b1e24;
+    --border:#262a31;
+    --text:#ece8de;
+    --muted:#9a9ca4;
+    --dim:#63656d;
+    --bull:#4f9e82;
+    --bull-dim:#1e3a30;
+    --bear:#c05a4e;
+    --bear-dim:#3a201c;
+    --gold:#c9a24b;
     --ema9c:#FF8A65;
     --ema21c:#FFD54F;
     --ema200c:#B39DDB;
-    --demand-c:#3DE0C4;
-    --supply-c:#FF6B5E;
+    --demand-c:#4f9e82;
+    --supply-c:#c05a4e;
     --bbc:#5C7CFA;
-    --font-display:'Space Grotesk', sans-serif;
-    --font-mono:'IBM Plex Mono', monospace;
-    --font-body:'IBM Plex Sans', sans-serif;
+    --font-display:Georgia,'Iowan Old Style','Palatino Linotype',serif;
+    --font-mono:'SF Mono','Cascadia Code',Consolas,'Roboto Mono',monospace;
+    --font-body:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
   }
 
-  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500&display=swap');
-
   * { box-sizing: border-box; }
+
+  html, body{
+    background: var(--bg);
+    margin:0;
+    padding:0;
+  }
 
   .ema-screener{
     background: var(--bg);
     color: var(--text);
     font-family: var(--font-body);
+    font-variant-numeric: tabular-nums;
     border-radius: 14px;
     padding: 22px 22px 26px;
     max-width: 100%;
     overflow-x: hidden;
+  }
+
+  .es-econ-calendar-panel{
+    position: fixed;
+    top: 90px;
+    right: 16px;
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+  }
+  .es-econ-calendar-trigger{
+    flex-shrink:0;
+    display:flex;
+    align-items:center;
+    gap:6px;
+    padding:6px 10px;
+    border-radius:20px;
+    background: var(--panel);
+    border:1px solid var(--border);
+    cursor:pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+  }
+  .es-econ-calendar-trigger:hover{ border-color:#8C231A; }
+  .es-econ-calendar-trigger-dot{
+    width:9px;
+    height:9px;
+    border-radius:50%;
+    background:#8C231A;
+    flex-shrink:0;
+  }
+  .es-econ-calendar-trigger-label{
+    font-family: var(--font-mono);
+    font-weight:600;
+    font-size:11px;
+    color: var(--text);
+    white-space:nowrap;
+  }
+  .es-econ-calendar-content{
+    width:320px;
+    height:420px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .es-econ-calendar-panel.collapsed .es-econ-calendar-content{ display:none; }
+  .es-econ-calendar-header{
+    padding:8px 12px;
+    border-bottom:1px solid var(--border);
+    font-family: var(--font-mono);
+    font-size:11.5px;
+    font-weight:600;
+    color: var(--text);
+    flex-shrink:0;
+  }
+  .es-econ-calendar-body{
+    flex:1;
+    overflow:hidden;
+  }
+  @media (max-width: 700px){
+    .es-econ-calendar-content{ width: 260px; height: 360px; }
+    .es-econ-calendar-panel{ top:70px; right:8px; }
   }
 
   .es-header{
@@ -418,6 +490,21 @@
   }
   .es-priority-signal.buy{ background: var(--bull-dim); color: var(--bull); }
   .es-priority-signal.sell{ background: var(--bear-dim); color: var(--bear); }
+  .es-priority-signal.watch{ background: rgba(242,184,75,0.18); color: var(--gold); }
+
+  .es-priority-hp-badge{
+    font-family: var(--font-mono);
+    font-weight:700;
+    font-size:9.5px;
+    padding:3px 8px;
+    border-radius:6px;
+    letter-spacing:.03em;
+    background: var(--gold);
+    color:#1A1200;
+    white-space:nowrap;
+  }
+
+  .es-confirm-notes{ margin-top:2px; }
 
   .es-priority-tf{
     font-family: var(--font-mono);
@@ -643,7 +730,7 @@
     margin-bottom:4px;
   }
   .es-sim-stat-value{
-    font-family: var(--font-display);
+    font-family: var(--font-mono);
     font-weight:700;
     font-size:16px;
   }
@@ -670,6 +757,10 @@
     border-radius:8px;
     margin-bottom:16px;
   }
+  .es-sim-table-wrap::-webkit-scrollbar{ width:8px; height:8px; }
+  .es-sim-table-wrap::-webkit-scrollbar-track{ background: var(--panel-2); border-radius:4px; }
+  .es-sim-table-wrap::-webkit-scrollbar-thumb{ background: var(--border); border-radius:4px; }
+  .es-sim-table-wrap::-webkit-scrollbar-thumb:hover{ background: var(--dim); }
   .es-sim-table{
     width:100%;
     border-collapse:collapse;
@@ -726,14 +817,73 @@
     .es-check-row{ font-size:8px; }
     .es-priority-note{ font-size:8px; }
   }
+
+  .es-auth-gate{
+    position:fixed; inset:0; z-index:9999; display:flex; align-items:center; justify-content:center;
+    background:var(--bg); font-family:var(--font-body);
+  }
+  .es-auth-box{
+    width:min(360px, 90vw); padding:32px 28px; background:var(--panel); border:1px solid var(--border);
+    border-radius:12px; text-align:center;
+  }
+  .es-auth-title{ font-family:var(--font-display); font-size:22px; color:var(--text); margin-bottom:6px; }
+  .es-auth-sub{ font-size:13px; color:var(--muted); margin-bottom:24px; }
+  .es-auth-google-btn{
+    width:100%; padding:12px 16px; border-radius:8px; border:1px solid var(--border); background:var(--panel-2);
+    color:var(--text); font-size:14px; font-weight:600; cursor:pointer; display:flex; align-items:center;
+    justify-content:center; gap:10px; transition:background 0.15s;
+  }
+  .es-auth-google-btn:hover{ background:var(--border); }
+  .es-auth-status{ margin-top:14px; font-size:12px; color:var(--muted); min-height:16px; }
+  .es-auth-status.error{ color:var(--bear); }
+  .es-user-bar{
+    display:flex; align-items:center; justify-content:flex-end; gap:10px; padding:6px 4px 12px; font-size:12px; color:var(--muted);
+  }
+  .es-user-bar img{ width:22px; height:22px; border-radius:50%; }
+  .es-user-signout-btn{
+    background:none; border:1px solid var(--border); color:var(--muted); border-radius:6px; padding:3px 9px;
+    font-size:11px; cursor:pointer;
+  }
+  .es-user-signout-btn:hover{ color:var(--text); border-color:var(--muted); }
 </style>
 
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+
+<div class="es-auth-gate" id="esAuthGate">
+  <div class="es-auth-box">
+    <div class="es-auth-title">Jadi Trader Tools</div>
+    <div class="es-auth-sub">Login untuk melanjutkan &mdash; histori &amp; pengaturan kamu tersinkron otomatis di semua device.</div>
+    <button type="button" class="es-auth-google-btn" id="esGoogleLoginBtn">Masuk dengan Google</button>
+    <div class="es-auth-status" id="esAuthStatus"></div>
+  </div>
+</div>
+
 <div class="ema-screener">
+  <div class="es-user-bar" id="esUserBar" style="display:none;">
+    <img id="esUserAvatar" src="" alt="">
+    <span id="esUserName"></span>
+    <button type="button" class="es-user-signout-btn" id="esSignOutBtn">Keluar</button>
+  </div>
+  <div class="es-econ-calendar-panel collapsed" id="esEconCalendarPanel">
+    <div class="es-econ-calendar-trigger" id="esEconCalendarTrigger">
+      <span class="es-econ-calendar-trigger-dot"></span>
+      <span class="es-econ-calendar-trigger-label">News</span>
+    </div>
+    <div class="es-econ-calendar-content">
+      <div class="es-econ-calendar-header">Kalender Ekonomi</div>
+      <div class="es-econ-calendar-body" id="esEconCalendarBody"></div>
+    </div>
+  </div>
   <div class="es-header">
     <div>
       <div class="es-title"><span class="dot"></span>XAUUSD Priority Screener</div>
     </div>
-    <a href="ema-cross-screener_3.html" class="es-nav-link">&larr; Kripto Screener</a>
+    <div style="display:flex;gap:8px;">
+      <a href="ema-cross-screener_3.html" class="es-nav-link">&larr; Kripto Screener</a>
+      <a href="jurnal-trading.html" class="es-nav-link">Jurnal Trading &rarr;</a>
+    </div>
   </div>
 
   <div class="es-fav-section">
@@ -811,6 +961,102 @@
 
 <script>
 (function(){
+  // ===== Login Google + sinkronisasi cloud (Firebase) - sama seperti di
+  // ema-cross-screener_3.html, sesi login dibagi bareng (Firebase project
+  // sama, sesi Google tersimpan per-origin, bukan per-file). =====
+  const esFirebaseConfig = {
+    apiKey: "AIzaSyB4cWVI-k3q16TmRCbM_lbJwgtjxIs_Weo",
+    authDomain: "jadi-trader-tools.firebaseapp.com",
+    projectId: "jadi-trader-tools",
+    storageBucket: "jadi-trader-tools.firebasestorage.app",
+    messagingSenderId: "171244479105",
+    appId: "1:171244479105:web:9b421850801b6678d8e380",
+    measurementId: "G-P3YCEC4XYX"
+  };
+  firebase.initializeApp(esFirebaseConfig);
+  const esAuth = firebase.auth();
+  const esDb = firebase.firestore();
+
+  const ES_CLOUD_SYNC_KEYS = [
+    'xauScreenerFavTfs_v1',
+    'xauScreenerPrioritySim_v1'
+  ];
+
+  const esAuthGateEl = document.getElementById('esAuthGate');
+  const esAuthStatusEl = document.getElementById('esAuthStatus');
+  const esGoogleLoginBtn = document.getElementById('esGoogleLoginBtn');
+  const esUserBarEl = document.getElementById('esUserBar');
+  const esUserAvatarEl = document.getElementById('esUserAvatar');
+  const esUserNameEl = document.getElementById('esUserName');
+  const esSignOutBtn = document.getElementById('esSignOutBtn');
+  let esCloudSyncTimer = null;
+
+  function esLoadFromCloud(uid){
+    return esDb.collection('users').doc(uid).get().then(function(doc){
+      if(doc.exists){
+        const data = doc.data() || {};
+        ES_CLOUD_SYNC_KEYS.forEach(function(key){
+          if(typeof data[key] === 'string'){
+            try{ localStorage.setItem(key, data[key]); }catch(e){}
+          }
+        });
+      }
+    });
+  }
+
+  function esSaveToCloud(uid){
+    const payload = {};
+    ES_CLOUD_SYNC_KEYS.forEach(function(key){
+      const val = localStorage.getItem(key);
+      if(val !== null) payload[key] = val;
+    });
+    payload._updatedAt = Date.now();
+    return esDb.collection('users').doc(uid).set(payload, { merge: true });
+  }
+
+  esAuth.onAuthStateChanged(function(user){
+    if(user){
+      esAuthGateEl.style.display = 'none';
+      esUserBarEl.style.display = 'flex';
+      esUserAvatarEl.src = user.photoURL || '';
+      esUserNameEl.textContent = user.displayName || user.email || '';
+
+      const syncedFlag = 'esCloudSynced_' + user.uid;
+      if(!sessionStorage.getItem(syncedFlag)){
+        esAuthStatusEl.textContent = 'Menyinkronkan data...';
+        esLoadFromCloud(user.uid).then(function(){
+          sessionStorage.setItem(syncedFlag, '1');
+          location.reload();
+        }).catch(function(){
+          sessionStorage.setItem(syncedFlag, '1');
+        });
+      }
+
+      if(esCloudSyncTimer) clearInterval(esCloudSyncTimer);
+      esCloudSyncTimer = setInterval(function(){ esSaveToCloud(user.uid); }, 15000);
+      window.addEventListener('beforeunload', function(){ esSaveToCloud(user.uid); });
+    } else {
+      esAuthGateEl.style.display = 'flex';
+      esUserBarEl.style.display = 'none';
+      if(esCloudSyncTimer) clearInterval(esCloudSyncTimer);
+    }
+  });
+
+  esGoogleLoginBtn.addEventListener('click', function(){
+    esAuthStatusEl.classList.remove('error');
+    esAuthStatusEl.textContent = 'Membuka login Google...';
+    const provider = new firebase.auth.GoogleAuthProvider();
+    esAuth.signInWithPopup(provider).catch(function(e){
+      esAuthStatusEl.classList.add('error');
+      esAuthStatusEl.textContent = 'Gagal login: ' + e.message;
+    });
+  });
+
+  esSignOutBtn.addEventListener('click', function(){
+    esAuth.signOut();
+  });
+  // ===== akhir bagian login + sinkronisasi =====
+
   const XAU_SYMBOL = 'PAXGUSDT';
   const XAU_LABEL = 'XAUUSD';
   const PIP_SIZE = 0.1;
@@ -905,6 +1151,79 @@
       if(momentum.bearish[i]) return { type:'bearish', candlesAgo: n-1-i };
     }
     return null;
+  }
+
+  function isPinBar(open, high, low, close, isBullish){
+    const body = Math.abs(close-open);
+    const range = high-low;
+    if(range<=0) return false;
+    const upperWick = high - Math.max(open, close);
+    const lowerWick = Math.min(open, close) - low;
+    if(isBullish) return lowerWick >= body*2 && lowerWick >= range*0.5 && upperWick <= body*1.1;
+    return upperWick >= body*2 && upperWick >= range*0.5 && lowerWick <= body*1.1;
+  }
+
+  function isEngulfing(prevOpen, prevClose, open, close, isBullish){
+    if(isBullish) return close>open && prevClose<prevOpen && close>=prevOpen && open<=prevClose;
+    return close<open && prevClose>prevOpen && close<=prevOpen && open>=prevClose;
+  }
+
+  function isRangingAtZone(highs, lows, zoneValue, atrVal, lookback){
+    if(!atrVal || atrVal<=0) return false;
+    const n = highs.length;
+    const start = Math.max(0, n-lookback);
+    const recentHighs = highs.slice(start);
+    const recentLows = lows.slice(start);
+    const rangeHigh = Math.max(...recentHighs);
+    const rangeLow = Math.min(...recentLows);
+    const rangeSize = rangeHigh-rangeLow;
+    const mid = (rangeHigh+rangeLow)/2;
+    const nearZone = Math.abs(mid - zoneValue) <= atrVal*1.0;
+    const isTight = rangeSize <= atrVal*1.5;
+    return nearZone && isTight;
+  }
+
+  async function checkEmaCrossOnTf(tfValue, signal){
+    try{
+      const { closes } = await fetchKlines(XAU_SYMBOL, tfValue, 50);
+      if(closes.length < 22) return false;
+      const e9 = ema(closes, 9);
+      const e21 = ema(closes, 21);
+      const cross = detectCross(e9, e21, 5);
+      if(!cross) return false;
+      return signal==='BUY' ? cross.type==='bullish' : cross.type==='bearish';
+    }catch(e){
+      return false;
+    }
+  }
+
+  async function computeConfirmationNotes(cand){
+    const { opens, highs, lows, closes, signal, dir, tfValue } = cand;
+    const n = closes.length;
+    const isBullish = signal==='BUY';
+    const lastOpen = opens[n-1], lastHigh = highs[n-1], lastLow = lows[n-1], lastClose = closes[n-1];
+    const prevOpen = opens[n-2], prevClose = closes[n-2];
+
+    const pinbar = isPinBar(lastOpen, lastHigh, lastLow, lastClose, isBullish);
+    const engulfing = isEngulfing(prevOpen, prevClose, lastOpen, lastClose, isBullish);
+    const ranging = isRangingAtZone(highs, lows, dir.band, dir.atr, 6);
+
+    // cross EMA9/21 (1m/5m) cuma relevan sebagai konfirmasi TF lebih rendah untuk sinyal TF 5 menit ke atas
+    const showEmaCross = tfValue !== '1m';
+    let cross1m = null, cross5m = null;
+    if(showEmaCross){
+      [cross1m, cross5m] = await Promise.all([
+        checkEmaCrossOnTf('1m', signal),
+        checkEmaCrossOnTf('5m', signal)
+      ]);
+    }
+
+    const notes = { pinbar, cross1m, cross5m, engulfing, ranging, showEmaCross };
+    const checks = [pinbar, engulfing, ranging];
+    if(showEmaCross) checks.push(cross1m, cross5m);
+    const passCount = checks.filter(Boolean).length;
+    const highProbability = passCount >= 3;
+    return { notes, highProbability, passCount };
   }
 
   function stochConditionOf(value){
@@ -1558,11 +1877,17 @@
       const riskPips = riskDist / PIP_SIZE;
       const tp1 = c.signal==='BUY' ? c.price + riskDist : c.price - riskDist;
       const tp2 = c.signal==='BUY' ? c.price + riskDist*2 : c.price - riskDist*2;
+      const cn = c.confirmNotes || {};
+      const passCount = c.passCount || 0;
+      const isWatch = passCount === 0;
+      const statusLabel = isWatch ? 'PANTAU' : (c.signal==='BUY' ? 'BUY NOW' : 'SELL NOW');
+      const statusCls = isWatch ? 'watch' : signalCls;
       return `<div class="es-priority-card ${signalCls}">
         <div class="es-priority-card-top">
           <span class="es-priority-rank">#${i+1}</span>
           <span class="es-priority-symbol">${XAU_LABEL}</span>
-          <span class="es-priority-signal ${signalCls}">${c.signal}</span>
+          <span class="es-priority-signal ${statusCls}">${statusLabel}</span>
+          ${c.highProbability ? '<span class="es-priority-hp-badge">HIGH PROBABILITY</span>' : ''}
         </div>
         <div class="es-priority-tf">TF <strong>${c.tfLabel}</strong> • Harga $${fmtPrice(c.price)}</div>
         <div class="es-checklist">
@@ -1575,6 +1900,13 @@
           <div class="es-priority-level-row invalid">Invalid Level (SL): <strong>$${fmtPrice(sl)}</strong></div>
           <div class="es-priority-level-row">Take Profit: <strong>TP1 $${fmtPrice(tp1)}</strong> &bull; <strong>TP2 $${fmtPrice(tp2)}</strong></div>
           <div class="es-priority-level-row">Risk: <strong>${riskPips.toFixed(1)} pips</strong></div>
+        </div>
+        <div class="es-checklist es-confirm-notes">
+          <div class="es-check-row ${cn.pinbar?'ok':'fail'}"><span class="es-check-icon">${cn.pinbar?'&check;':'&#10007;'}</span> Pin Bar</div>
+          ${cn.showEmaCross ? `<div class="es-check-row ${cn.cross1m?'ok':'fail'}"><span class="es-check-icon">${cn.cross1m?'&check;':'&#10007;'}</span> Cross EMA9/21 TF 1m</div>
+          <div class="es-check-row ${cn.cross5m?'ok':'fail'}"><span class="es-check-icon">${cn.cross5m?'&check;':'&#10007;'}</span> Cross EMA9/21 TF 5m</div>` : ''}
+          <div class="es-check-row ${cn.engulfing?'ok':'fail'}"><span class="es-check-icon">${cn.engulfing?'&check;':'&#10007;'}</span> Engulfing</div>
+          <div class="es-check-row ${cn.ranging?'ok':'fail'}"><span class="es-check-icon">${cn.ranging?'&check;':'&#10007;'}</span> Ranging di area S/R</div>
         </div>
         <div class="es-priority-note">Note EMA9/21: ${emaNoteText}</div>
         <div class="es-priority-note">Note ${stochText}</div>
@@ -1635,11 +1967,11 @@
         const cands = [];
         if(qualifies3(evalRes.buy)){
           cands.push({ signal:'BUY', dir:evalRes.buy, price, emaNote:evalRes.emaNote, stochCond:evalRes.stochCond, stochK:evalRes.stochK, stochD:evalRes.stochD, evalRes,
-            tfValue: tf.value, tfLabel: tf.label, score: evalRes.buy.bb.dist+evalRes.buy.sr.dist+evalRes.buy.sd.dist });
+            tfValue: tf.value, tfLabel: tf.label, opens, highs, lows, closes, score: evalRes.buy.bb.dist+evalRes.buy.sr.dist+evalRes.buy.sd.dist });
         }
         if(qualifies3(evalRes.sell)){
           cands.push({ signal:'SELL', dir:evalRes.sell, price, emaNote:evalRes.emaNote, stochCond:evalRes.stochCond, stochK:evalRes.stochK, stochD:evalRes.stochD, evalRes,
-            tfValue: tf.value, tfLabel: tf.label, score: evalRes.sell.bb.dist+evalRes.sell.sr.dist+evalRes.sell.sd.dist });
+            tfValue: tf.value, tfLabel: tf.label, opens, highs, lows, closes, score: evalRes.sell.bb.dist+evalRes.sell.sr.dist+evalRes.sell.sd.dist });
         }
         return cands.length ? cands : null;
       }));
@@ -1657,6 +1989,13 @@
         priorityStatusEl.textContent = `Tidak ada timeframe yang memenuhi ke-3 syarat wajib (BB + S/R + S/D) untuk XAUUSD saat ini (${tfLabels}).`;
         priorityGrid.innerHTML = '';
       } else {
+        priorityStatusEl.textContent = `Ditemukan ${top.length} sinyal, memeriksa note konfirmasi tambahan...`;
+        await Promise.all(top.map(async (cand)=>{
+          const conf = await computeConfirmationNotes(cand);
+          cand.confirmNotes = conf.notes;
+          cand.highProbability = conf.highProbability;
+          cand.passCount = conf.passCount;
+        }));
         renderXauSignals(top);
         priorityStatusEl.textContent = `Ditemukan ${top.length} sinyal dari ${scanTfs.length} timeframe dipindai • ${new Date().toLocaleTimeString('id-ID')}.`;
       }
@@ -2006,6 +2345,37 @@
   priorityTfSel.addEventListener('change', findXauSignals);
   psimResetBtn.addEventListener('click', resetXauSim);
 
+  function loadEconCalendarWidget(){
+    const container = document.getElementById('esEconCalendarBody');
+    container.innerHTML = '';
+    const script = document.createElement('script');
+    script.type = 'text/javascript';
+    script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-events.js';
+    script.async = true;
+    script.innerHTML = JSON.stringify({
+      width: '100%',
+      height: '100%',
+      colorTheme: 'dark',
+      isTransparent: false,
+      locale: 'en',
+      importanceFilter: '-1,0,1',
+      currencyFilter: 'USD'
+    });
+    container.appendChild(script);
+  }
+
+  const econCalendarPanel = document.getElementById('esEconCalendarPanel');
+  const econCalendarTrigger = document.getElementById('esEconCalendarTrigger');
+  econCalendarTrigger.addEventListener('click', (e)=>{
+    e.stopPropagation();
+    econCalendarPanel.classList.toggle('collapsed');
+  });
+  document.addEventListener('click', (e)=>{
+    if(!econCalendarPanel.contains(e.target)){
+      econCalendarPanel.classList.add('collapsed');
+    }
+  });
+
   loadXauSimState();
   renderXauSimUI({});
   loadFavTfs();
@@ -2013,6 +2383,7 @@
   setInterval(scanFavTfs, 90000);
   scanXauCross();
   setInterval(scanXauCross, 90000);
+  loadEconCalendarWidget();
   findXauSignals();
   setInterval(findXauSignals, 90000);
 })();
