@@ -110,8 +110,18 @@
   .btn.danger:hover{border-color:var(--loss);color:var(--loss);}
 
   /* ---------- Equity chart ---------- */
-  .chart-box{width:100%;}
-  .chart-box svg{width:100%;height:220px;display:block;overflow:visible;}
+  .chart-box{width:100%; position:relative;}
+  .chart-box svg{width:100%;height:220px;display:block;overflow:visible;touch-action:none;cursor:crosshair;}
+  .chart-tooltip{
+    position:absolute; top:6px; padding:5px 10px; border-radius:6px; background:var(--surface-2);
+    border:1px solid var(--border); font-family:var(--font-mono); font-size:12px; color:var(--ink);
+    pointer-events:none; opacity:0; transition:opacity 0.1s; white-space:nowrap; transform:translateX(-50%);
+    z-index:5;
+  }
+  .chart-tooltip.active{ opacity:1; }
+  .chart-start-label{
+    font-family:var(--font-mono); font-size:10px; fill:var(--ink-faint);
+  }
   .chart-empty-note{
     display:flex;align-items:center;gap:8px;color:var(--ink-faint);font-size:12px;
     margin-top:10px;
@@ -321,7 +331,7 @@
           <h2>Kurva Ekuitas</h2>
           <span class="hint" id="chartHint">Mulai dari $200.00</span>
         </div>
-        <div class="chart-box"><svg id="equitySvg" viewBox="0 0 640 220" preserveAspectRatio="none"></svg></div>
+        <div class="chart-box"><svg id="equitySvg" viewBox="0 0 640 220" preserveAspectRatio="none"></svg><div class="chart-tooltip" id="equityTooltip"></div></div>
       </div>
 
       <div class="card">
@@ -437,7 +447,7 @@
           <h2>Kurva P/L Kripto</h2>
           <span class="hint" id="cChartHint">Belum ada transaksi</span>
         </div>
-        <div class="chart-box"><svg id="cEquitySvg" viewBox="0 0 640 220" preserveAspectRatio="none"></svg></div>
+        <div class="chart-box"><svg id="cEquitySvg" viewBox="0 0 640 220" preserveAspectRatio="none"></svg><div class="chart-tooltip" id="cEquityTooltip"></div></div>
       </div>
 
       <div class="card">
@@ -632,11 +642,12 @@
 
   function renderEquityCurve(){
     var svg = document.getElementById('equitySvg');
+    var tooltip = document.getElementById('equityTooltip');
     var W=640,H=220,PAD=28;
     var sorted = state.trades.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);});
-    var points = [{y:ACCOUNT.startBalance}];
+    var points = [{y:ACCOUNT.startBalance, date:ACCOUNT.startDate}];
     var cum = ACCOUNT.startBalance;
-    sorted.forEach(function(t){ cum += t.pl; points.push({y:cum}); });
+    sorted.forEach(function(t){ cum += t.pl; points.push({y:cum, date:t.date}); });
 
     var ys = points.map(function(p){return p.y;});
     var minY = Math.min.apply(null, ys), maxY = Math.max.apply(null, ys);
@@ -657,6 +668,7 @@
 
     var lastX = xFor(points.length-1), lastY = yFor(points[points.length-1].y);
     var startX = xFor(0), startY = yFor(points[0].y);
+    var startLabelY = startY - 10 < PAD ? startY + 16 : startY - 8;
 
     svg.innerHTML =
       '<defs><linearGradient id="eqFill" x1="0" y1="0" x2="0" y2="1">'+
@@ -667,10 +679,43 @@
       '<path d="'+areaPath+'" fill="url(#eqFill)" stroke="none"/>'+
       '<path d="'+path+'" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>'+
       '<circle cx="'+startX+'" cy="'+startY+'" r="3.5" fill="var(--ground)" stroke="var(--ink-faint)" stroke-width="1.5"/>'+
-      '<circle cx="'+lastX+'" cy="'+lastY+'" r="4.5" fill="var(--accent)"/>';
+      '<text x="'+(startX+4)+'" y="'+startLabelY+'" class="chart-start-label">'+fmtMoney(points[0].y)+'</text>'+
+      '<circle cx="'+lastX+'" cy="'+lastY+'" r="4.5" fill="var(--accent)"/>'+
+      '<line id="eqCrosshair" x1="0" y1="'+PAD+'" x2="0" y2="'+(H-PAD)+'" stroke="var(--ink-faint)" stroke-width="1" stroke-dasharray="3,3" opacity="0"/>'+
+      '<circle id="eqCrosshairDot" cx="0" cy="0" r="4" fill="var(--accent)" stroke="var(--ground)" stroke-width="1.5" opacity="0"/>';
 
     document.getElementById('chartHint').textContent =
       sorted.length ? 'Saldo saat ini: ' + fmtMoney(cum) : 'Mulai dari $' + ACCOUNT.startBalance.toFixed(2) + ' — belum ada pergerakan';
+
+    // ----- Interaksi tekan/geser: tampilkan saldo di titik yang ditunjuk -----
+    var crosshairLine = document.getElementById('eqCrosshair');
+    var crosshairDot = document.getElementById('eqCrosshairDot');
+    var isDown = false;
+
+    function updateCrosshair(clientX){
+      var rect = svg.getBoundingClientRect();
+      var relX = (clientX - rect.left) / rect.width * W;
+      var step = points.length>1 ? (W-2*PAD)/(points.length-1) : 0;
+      var idx = step>0 ? Math.round((relX-PAD)/step) : 0;
+      idx = Math.max(0, Math.min(points.length-1, idx));
+      var px = xFor(idx), py = yFor(points[idx].y);
+      crosshairLine.setAttribute('x1', px); crosshairLine.setAttribute('x2', px); crosshairLine.setAttribute('opacity', '1');
+      crosshairDot.setAttribute('cx', px); crosshairDot.setAttribute('cy', py); crosshairDot.setAttribute('opacity', '1');
+      tooltip.textContent = fmtMoney(points[idx].y) + (idx===0 ? ' • Awal' : ' • ' + fmtDate(points[idx].date));
+      tooltip.style.left = ((px / W) * 100) + '%';
+      tooltip.classList.add('active');
+    }
+    function hideCrosshair(){
+      crosshairLine.setAttribute('opacity', '0');
+      crosshairDot.setAttribute('opacity', '0');
+      tooltip.classList.remove('active');
+      isDown = false;
+    }
+    svg.onpointerdown = function(e){ isDown = true; svg.setPointerCapture(e.pointerId); updateCrosshair(e.clientX); };
+    svg.onpointermove = function(e){ if(isDown) updateCrosshair(e.clientX); };
+    svg.onpointerup = hideCrosshair;
+    svg.onpointercancel = hideCrosshair;
+    svg.onpointerleave = function(){ if(!isDown) hideCrosshair(); };
   }
 
   function emotionLabel(t, which){
@@ -1060,11 +1105,12 @@
 
   function renderEquityCurve(){
     var svg = document.getElementById('cEquitySvg');
+    var tooltip = document.getElementById('cEquityTooltip');
     var W=640,H=220,PAD=28;
     var sorted = cState.trades.slice().sort(function(a,b){return a.date-b.date;});
-    var points = [{y:0}];
+    var points = [{y:0, date:null}];
     var cum = 0;
-    sorted.forEach(function(t){ cum += t.pl; points.push({y:cum}); });
+    sorted.forEach(function(t){ cum += t.pl; points.push({y:cum, date:t.date}); });
 
     var ys = points.map(function(p){return p.y;});
     var minY = Math.min.apply(null, ys), maxY = Math.max.apply(null, ys);
@@ -1084,6 +1130,7 @@
     var areaPath = path + ' L'+xFor(points.length-1).toFixed(1)+','+(H-PAD)+' L'+PAD+','+(H-PAD)+' Z';
     var lastX = xFor(points.length-1), lastY = yFor(points[points.length-1].y);
     var startX = xFor(0), startY = yFor(points[0].y);
+    var startLabelY = startY - 10 < PAD ? startY + 16 : startY - 8;
 
     svg.innerHTML =
       '<defs><linearGradient id="cEqFill" x1="0" y1="0" x2="0" y2="1">'+
@@ -1094,10 +1141,43 @@
       '<path d="'+areaPath+'" fill="url(#cEqFill)" stroke="none"/>'+
       '<path d="'+path+'" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>'+
       '<circle cx="'+startX+'" cy="'+startY+'" r="3.5" fill="var(--ground)" stroke="var(--ink-faint)" stroke-width="1.5"/>'+
-      '<circle cx="'+lastX+'" cy="'+lastY+'" r="4.5" fill="var(--accent)"/>';
+      '<text x="'+(startX+4)+'" y="'+startLabelY+'" class="chart-start-label">'+fmtMoney(points[0].y)+'</text>'+
+      '<circle cx="'+lastX+'" cy="'+lastY+'" r="4.5" fill="var(--accent)"/>'+
+      '<line id="cEqCrosshair" x1="0" y1="'+PAD+'" x2="0" y2="'+(H-PAD)+'" stroke="var(--ink-faint)" stroke-width="1" stroke-dasharray="3,3" opacity="0"/>'+
+      '<circle id="cEqCrosshairDot" cx="0" cy="0" r="4" fill="var(--accent)" stroke="var(--ground)" stroke-width="1.5" opacity="0"/>';
 
     document.getElementById('cChartHint').textContent =
       sorted.length ? 'Total P/L: ' + fmtMoney(cum) : 'Belum ada transaksi';
+
+    // ----- Interaksi tekan/geser: tampilkan saldo di titik yang ditunjuk -----
+    var crosshairLine = document.getElementById('cEqCrosshair');
+    var crosshairDot = document.getElementById('cEqCrosshairDot');
+    var isDown = false;
+
+    function updateCrosshair(clientX){
+      var rect = svg.getBoundingClientRect();
+      var relX = (clientX - rect.left) / rect.width * W;
+      var step = points.length>1 ? (W-2*PAD)/(points.length-1) : 0;
+      var idx = step>0 ? Math.round((relX-PAD)/step) : 0;
+      idx = Math.max(0, Math.min(points.length-1, idx));
+      var px = xFor(idx), py = yFor(points[idx].y);
+      crosshairLine.setAttribute('x1', px); crosshairLine.setAttribute('x2', px); crosshairLine.setAttribute('opacity', '1');
+      crosshairDot.setAttribute('cx', px); crosshairDot.setAttribute('cy', py); crosshairDot.setAttribute('opacity', '1');
+      tooltip.textContent = fmtMoney(points[idx].y) + (idx===0 ? ' • Awal' : ' • ' + fmtDate(points[idx].date));
+      tooltip.style.left = ((px / W) * 100) + '%';
+      tooltip.classList.add('active');
+    }
+    function hideCrosshair(){
+      crosshairLine.setAttribute('opacity', '0');
+      crosshairDot.setAttribute('opacity', '0');
+      tooltip.classList.remove('active');
+      isDown = false;
+    }
+    svg.onpointerdown = function(e){ isDown = true; svg.setPointerCapture(e.pointerId); updateCrosshair(e.clientX); };
+    svg.onpointermove = function(e){ if(isDown) updateCrosshair(e.clientX); };
+    svg.onpointerup = hideCrosshair;
+    svg.onpointercancel = hideCrosshair;
+    svg.onpointerleave = function(){ if(!isDown) hideCrosshair(); };
   }
 
   function jtFilterByRange(trades, prefix){
