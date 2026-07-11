@@ -1171,14 +1171,20 @@
   // halaman Kripto Screener.
   var JT_WRITE_KEYS = ['ledgerNoirTrades_v1'];
 
-  function jtApplyDoc(doc){
-    if(!doc.exists) return;
+  // Return true kalau ada data yang benar-benar berubah (dipakai buat mutuskan
+  // perlu reload atau tidak - supaya tiap load selalu cek cloud TANPA bikin
+  // reload berulang kalau datanya memang belum berubah dari device lain).
+  function jtApplyDocIfChanged(doc){
+    if(!doc.exists) return false;
     var data = doc.data() || {};
+    var changed = false;
     JT_READ_KEYS.forEach(function(key){
-      if(typeof data[key] === 'string'){
+      if(typeof data[key] === 'string' && data[key] !== localStorage.getItem(key)){
         try{ localStorage.setItem(key, data[key]); }catch(e){}
+        changed = true;
       }
     });
+    return changed;
   }
 
   function jtSaveToCloud(uid){
@@ -1207,14 +1213,12 @@
       jtUserNameEl.textContent = user.displayName || user.email || '';
       jtViewerNoteEl.textContent = 'Menampilkan jurnal kamu sendiri.';
 
-      var flag = 'jtSynced_' + user.uid;
-      if(!sessionStorage.getItem(flag)){
-        jtDb.collection('users').doc(user.uid).get().then(function(doc){
-          jtApplyDoc(doc);
-          sessionStorage.setItem(flag, '1');
-          location.reload();
-        }).catch(function(){ sessionStorage.setItem(flag, '1'); });
-      }
+      // Selalu cek data terbaru dari cloud tiap kali halaman dibuka/refresh -
+      // reload cuma terjadi kalau memang ada perubahan (dari device lain),
+      // supaya tidak reload berulang percuma kalau datanya sama saja.
+      jtDb.collection('users').doc(user.uid).get().then(function(doc){
+        if(jtApplyDocIfChanged(doc)) location.reload();
+      }).catch(function(){});
 
       if(jtSyncTimer) clearInterval(jtSyncTimer);
       jtSyncTimer = setInterval(function(){ jtSaveToCloud(user.uid); }, 15000);
@@ -1224,14 +1228,9 @@
       jtUserBarEl.style.display = 'none';
       jtViewerNoteEl.textContent = 'Menampilkan jurnal contoh (punya pemilik tool ini). Login untuk lihat jurnal kamu sendiri.';
 
-      var ownerFlag = 'jtSyncedOwner';
-      if(!sessionStorage.getItem(ownerFlag)){
-        jtDb.collection('users').doc(JT_OWNER_UID).get().then(function(doc){
-          jtApplyDoc(doc);
-          sessionStorage.setItem(ownerFlag, '1');
-          location.reload();
-        }).catch(function(){ sessionStorage.setItem(ownerFlag, '1'); });
-      }
+      jtDb.collection('users').doc(JT_OWNER_UID).get().then(function(doc){
+        if(jtApplyDocIfChanged(doc)) location.reload();
+      }).catch(function(){});
 
       if(jtSyncTimer) clearInterval(jtSyncTimer);
     }

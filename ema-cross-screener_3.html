@@ -1603,14 +1603,17 @@
 
   function esLoadFromCloud(uid){
     return esDb.collection('users').doc(uid).get().then(function(doc){
+      let changed = false;
       if(doc.exists){
         const data = doc.data() || {};
         ES_CLOUD_SYNC_KEYS.forEach(function(key){
-          if(typeof data[key] === 'string'){
+          if(typeof data[key] === 'string' && data[key] !== localStorage.getItem(key)){
             try{ localStorage.setItem(key, data[key]); }catch(e){}
+            changed = true;
           }
         });
       }
+      return changed;
     });
   }
 
@@ -1631,19 +1634,17 @@
       esUserAvatarEl.src = user.photoURL || '';
       esUserNameEl.textContent = user.displayName || user.email || '';
 
-      // Cuma sinkron+reload SEKALI per sesi tab ini - biar tidak infinite reload
-      // (onAuthStateChanged juga bakal jalan lagi setelah reload karena sesi
-      // Google-nya masih login).
-      const syncedFlag = 'esCloudSynced_' + user.uid;
-      if(!sessionStorage.getItem(syncedFlag)){
-        esAuthStatusEl.textContent = 'Menyinkronkan data...';
-        esLoadFromCloud(user.uid).then(function(){
-          sessionStorage.setItem(syncedFlag, '1');
-          location.reload();
-        }).catch(function(){
-          sessionStorage.setItem(syncedFlag, '1');
-        });
-      }
+      // Selalu cek data terbaru dari cloud tiap kali halaman dibuka/refresh -
+      // reload cuma terjadi kalau memang ada perubahan (dari device lain),
+      // supaya tidak reload berulang percuma kalau datanya sama saja. Ini
+      // cuma jalan sekali di titik awal load halaman (onAuthStateChanged tidak
+      // nyala lagi selama halaman tetap terbuka), jadi aman - tidak akan
+      // menyela pemantauan posisi live yang sedang berjalan.
+      esAuthStatusEl.textContent = 'Menyinkronkan data...';
+      esLoadFromCloud(user.uid).then(function(changed){
+        esAuthStatusEl.textContent = '';
+        if(changed) location.reload();
+      }).catch(function(){ esAuthStatusEl.textContent = ''; });
 
       if(esCloudSyncTimer) clearInterval(esCloudSyncTimer);
       esCloudSyncTimer = setInterval(function(){ esSaveToCloud(user.uid); }, 15000);
