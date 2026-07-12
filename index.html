@@ -250,9 +250,11 @@
   .venue-badge{
     display:inline-block;font-family:var(--font-mono);font-size:8.5px;font-weight:700;
     color:var(--accent);border:1px solid var(--accent-dim);border-radius:4px;
-    padding:1px 5px;margin-left:6px;vertical-align:middle;
+    padding:1px 5px;vertical-align:middle;
   }
   .venue-badge.live{ color:#e0883a; border-color:#e0883a; }
+  .jt-pair-cell{ display:flex; align-items:center; gap:6px; }
+  .jt-pair-name{ display:inline-block; min-width:5ch; }
 
   @media (prefers-reduced-motion:reduce){*{transition:none!important;}}
   @media (max-width:600px){
@@ -1228,7 +1230,7 @@
         : t.venue==='live-testnet' ? ' <span class="venue-badge">Binance Testnet</span>' : '';
       return '<tr>'+
         '<td class="num">'+fmtDate(t.date)+'</td>'+
-        '<td>'+t.pair+venueBadge+'</td>'+
+        '<td><span class="jt-pair-cell"><span class="jt-pair-name">'+t.pair+'</span>'+venueBadge+'</span></td>'+
         '<td>'+t.tf+'</td>'+
         '<td><span class="dir '+t.direction.toLowerCase()+'">'+t.direction.toUpperCase()+'</span></td>'+
         '<td class="emo-chip">'+t.reason+'</td>'+
