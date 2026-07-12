@@ -1294,6 +1294,8 @@
   .es-sim-table td.pnl-neg{ color: var(--bear); }
   .es-psim-source-link{ cursor:pointer; }
   .es-psim-source-link:hover{ opacity:0.75; }
+  .es-sumber-cell{ display:flex; align-items:center; gap:0; }
+  .es-sumber-cell .es-psim-source-link{ display:inline-block; min-width:74px; }
   .es-venue-badge{
     display:inline-block;
     font-family: var(--font-mono);
@@ -1473,7 +1475,25 @@
 
   <div class="es-priority-section">
     <div class="es-priority-header">
-      <div class="es-priority-title">Sinyal Prioritas</div>
+      <div class="es-priority-title">Sinyal Prioritas ICT</div>
+    </div>
+    <div class="es-priority-controls">
+      <button id="esPriorityIctBtn" class="es-priority-btn">Cari Sinyal Prioritas ICT</button>
+      <div class="es-symbol-manager es-symbol-manager-inline">
+        <button type="button" id="esPriorityIctManagerBtn" class="es-symbol-manager-btn">
+          <span>Ganti Chart / Kelola Koin</span>
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <div class="es-symbol-manager-dropdown" id="esPriorityIctManagerDropdown"></div>
+      </div>
+    </div>
+    <div class="es-priority-grid" id="esPriorityIctGrid"></div>
+    <div class="es-priority-status" id="esPriorityIctStatus">Memindai otomatis...</div>
+  </div>
+
+  <div class="es-priority-section">
+    <div class="es-priority-header">
+      <div class="es-priority-title">Sinyal Prioritas BBMA</div>
     </div>
     <div class="es-priority-controls">
       <select id="esPriorityRisk">
@@ -2092,12 +2112,16 @@
     return dir.band + dir.atr*0.5;
   }
 
-  // SL/TP otomatis: kalau candidate punya "dir" (dari checklist BB+S/R+S/D -
-  // Sinyal Prioritas & Koin Favorit), pakai level zona seperti biasa. Kalau
-  // cuma punya "atr" (candidate dari grid cross EMA9/21 biasa, tidak ada data
-  // zona), pakai jarak 1.5x ATR sebagai perkiraan. Kalau tidak ada dua-duanya,
-  // user WAJIB isi manual.
+  // SL/TP otomatis: kalau candidate sudah punya .sl/.tp eksplisit (mis. Sinyal
+  // Prioritas ICT - SL dari ekor candle retest MSS), pakai itu langsung. Kalau
+  // punya "dir" (dari checklist BB+S/R+S/D - Sinyal Prioritas BBMA & Koin
+  // Favorit), pakai level zona seperti biasa. Kalau cuma punya "atr" (candidate
+  // dari grid cross EMA9/21 biasa, tidak ada data zona), pakai jarak 1.5x ATR
+  // sebagai perkiraan. Kalau tidak ada semuanya, user WAJIB isi manual.
   function getAutoSlTp(cand){
+    if(typeof cand.sl === 'number' && typeof cand.tp === 'number'){
+      return { sl: cand.sl, tp: cand.tp };
+    }
     if(cand.dir){
       const sl = cand.signal==='BUY' ? pickSlForBuy(cand.dir) : pickSlForSell(cand.dir);
       const riskDist = Math.abs(cand.price - sl);
@@ -2135,7 +2159,7 @@
   // biasa. Tiap sumber daftar ulang candidate-nya sendiri tiap kali pindai
   // ulang (entri lama dari sumber itu dihapus dulu supaya tidak menumpuk data basi).
   window.__esTradableSignals = window.__esTradableSignals || {};
-  const TRADABLE_SOURCE_LABEL = { priority:'Prioritas', favorite:'Favorit', cross:'Cross EMA', favcross:'Favorit Cross' };
+  const TRADABLE_SOURCE_LABEL = { priority:'Prioritas', favorite:'Favorit', cross:'Cross EMA', favcross:'Favorit Cross', ict:'Prioritas ICT' };
   function tradableUid(source, symbol, tfValue){ return `${source}_${symbol}_${tfValue}`; }
   function registerTradableSignals(source, candidates){
     Object.keys(window.__esTradableSignals).forEach(k=>{
@@ -3149,6 +3173,230 @@
     }
   }
 
+  // ═══════════════════════════════════════════════════════
+  // ████████  SINYAL PRIORITAS ICT (CRT: SWEEP + MSS + RETEST ENTRY)  ████████
+  // ═══════════════════════════════════════════════════════
+  // HTF 1 jam jadi acuan CRTH/CRTL (high/low candle 1H SEBELUMNYA, bukan yang
+  // masih berjalan). LTF 5 menit tempat kita cari sweep + MSS (swing break).
+  // Beda dengan model checklist BBMA: entry BUKAN langsung saat MSS, tapi
+  // BUY STOP/SELL STOP persis di garis level MSS itu, dipicu begitu ADA CANDLE
+  // 5 MENIT YANG RETEST (menyentuh balik) level itu. SL = ekor (wick) candle
+  // retest itu sendiri. TP1 = 1:1 dari jarak SL, TP2 = 1:2 (otomatis lewat
+  // getAutoSlTp/getEffectiveSlTp yang sudah menghitung TP2 = riskDist*2 di
+  // semua tempat lain, jadi tidak perlu dihitung ulang di sini).
+
+  const priorityIctBtn = document.getElementById('esPriorityIctBtn');
+  const priorityIctStatusEl = document.getElementById('esPriorityIctStatus');
+  const priorityIctGrid = document.getElementById('esPriorityIctGrid');
+  const priorityIctManagerBtn = document.getElementById('esPriorityIctManagerBtn');
+  const priorityIctManagerDropdown = document.getElementById('esPriorityIctManagerDropdown');
+
+  async function findIctSignalForSymbol(symbol){
+    // HTF 1 jam - ambil candle SEBELUMNYA (bukan yang masih berjalan) buat CRTH/CRTL
+    const htf = await fetchKlines(symbol, '1h', 3);
+    if(htf.highs.length < 2) return null;
+    const crth = htf.highs[htf.highs.length - 2];
+    const crtl = htf.lows[htf.lows.length - 2];
+    const htfOpenTime = htf.times[htf.times.length - 1];
+
+    // LTF 5 menit - cukup buat cakupan 1 periode 1H + buffer pivot
+    const ltf = await fetchKlines(symbol, '5m', 60);
+    const { highs, lows, closes, times } = ltf;
+    const n = closes.length;
+    if(n < 10) return null;
+
+    let startIdx = times.findIndex(t => t >= htfOpenTime);
+    if(startIdx === -1) startIdx = 0;
+
+    let sweptHigh = false, sweptLow = false;
+    for(let i=startIdx;i<n;i++){
+      if(highs[i] > crth) sweptHigh = true;
+      if(lows[i] < crtl) sweptLow = true;
+    }
+    if(!sweptHigh && !sweptLow) return null;
+
+    const pivotLR = 2;
+    const pivotHighs = findPivots(highs, pivotLR, pivotLR, true);
+    const pivotLows  = findPivots(lows,  pivotLR, pivotLR, false);
+    const lastPivotLow  = pivotLows.length  ? pivotLows[pivotLows.length-1]   : null;
+    const lastPivotHigh = pivotHighs.length ? pivotHighs[pivotHighs.length-1] : null;
+
+    // MSS turun: sweep CRTH dulu, baru close menembus swing low terakhir
+    if(sweptHigh && lastPivotLow){
+      let mssIdx = null;
+      for(let i=lastPivotLow.index+1;i<n;i++){
+        if(closes[i] < lastPivotLow.value){ mssIdx = i; break; }
+      }
+      if(mssIdx !== null){
+        const mssLevel = lastPivotLow.value;
+        for(let i=mssIdx+1;i<n;i++){
+          if(highs[i] >= mssLevel){
+            const entry = mssLevel, sl = highs[i], riskDist = sl - entry;
+            return { symbol, signal:'SELL', price: entry, sl, tp: entry - riskDist,
+                      tfValue:'5m', tfLabel:'5m (ICT 1H)', crth, crtl, mssLevel, armed:false };
+          }
+        }
+        return { symbol, signal:'SELL', price: mssLevel, sl:null, tp:null,
+                  tfValue:'5m', tfLabel:'5m (ICT 1H)', crth, crtl, mssLevel, armed:true };
+      }
+    }
+
+    // MSS naik: sweep CRTL dulu, baru close menembus swing high terakhir
+    if(sweptLow && lastPivotHigh){
+      let mssIdx = null;
+      for(let i=lastPivotHigh.index+1;i<n;i++){
+        if(closes[i] > lastPivotHigh.value){ mssIdx = i; break; }
+      }
+      if(mssIdx !== null){
+        const mssLevel = lastPivotHigh.value;
+        for(let i=mssIdx+1;i<n;i++){
+          if(lows[i] <= mssLevel){
+            const entry = mssLevel, sl = lows[i], riskDist = entry - sl;
+            return { symbol, signal:'BUY', price: entry, sl, tp: entry + riskDist,
+                      tfValue:'5m', tfLabel:'5m (ICT 1H)', crth, crtl, mssLevel, armed:false };
+          }
+        }
+        return { symbol, signal:'BUY', price: mssLevel, sl:null, tp:null,
+                  tfValue:'5m', tfLabel:'5m (ICT 1H)', crth, crtl, mssLevel, armed:true };
+      }
+    }
+
+    return null;
+  }
+
+  function renderPriorityIctSignals(top){
+    window.__esLastPriorityIctResults = top;
+    registerTradableSignals('ict', top.filter(c=>!c.armed));
+    priorityIctGrid.innerHTML = top.map((c,i)=>{
+      const signalCls = c.signal==='BUY' ? 'buy' : 'sell';
+      const isWatch = !!c.armed;
+      const statusLabel = isWatch ? 'PANTAU (Armed)' : (c.signal==='BUY' ? 'BUY NOW' : 'SELL NOW');
+      const statusCls = isWatch ? 'watch' : signalCls;
+      const riskDist = c.sl!=null ? Math.abs(c.price - c.sl) : null;
+      const tp2 = riskDist!=null ? (c.signal==='BUY' ? c.price + riskDist*2 : c.price - riskDist*2) : null;
+      const riskPct = riskDist!=null ? (riskDist / c.price) * 100 : null;
+      const sweepLabel = c.signal==='BUY' ? `Sweep CRTL: $${fmtPrice(c.crtl)}` : `Sweep CRTH: $${fmtPrice(c.crth)}`;
+      return `<div class="es-priority-card ${signalCls}" data-symbol="${c.symbol}" data-tf="${c.tfValue}" data-tflabel="${c.tfLabel}" data-price="${c.price}">
+        <div class="es-priority-card-top">
+          <span class="es-priority-rank">#${i+1}</span>
+          <span class="es-priority-symbol">${c.symbol.replace('USDT','')}</span>
+          <span class="es-priority-signal ${statusCls}">${statusLabel}</span>
+        </div>
+        <div class="es-priority-tf">ICT Scalping • HTF 1H / LTF 5m • Harga $${fmtPrice(c.price)}</div>
+        <div class="es-checklist">
+          <div class="es-check-row ok"><span class="es-check-icon">&check;</span> ${sweepLabel}</div>
+          <div class="es-check-row ok"><span class="es-check-icon">&check;</span> MSS ${c.signal==='BUY'?'Naik':'Turun'} @ $${fmtPrice(c.mssLevel)}</div>
+          <div class="es-check-row ${isWatch?'fail':'ok'}"><span class="es-check-icon">${isWatch?'&#10007;':'&check;'}</span> ${isWatch?'Menunggu retest ke garis MSS':'Retest garis MSS terkonfirmasi'}</div>
+        </div>
+        ${isWatch
+          ? `<div class="es-priority-note">Belum ada candle retest ke level MSS ($${fmtPrice(c.mssLevel)}) — entry ${c.signal==='BUY'?'Buy Stop':'Sell Stop'} akan aktif begitu ada retest.</div>`
+          : `<div class="es-priority-levels">
+              <div class="es-priority-level-row">Area Entri (${c.signal==='BUY'?'Buy Stop':'Sell Stop'}): <strong>$${fmtPrice(c.price)}</strong></div>
+              <div class="es-priority-level-row invalid">Invalid Level (SL): <strong>$${fmtPrice(c.sl)}</strong></div>
+              <div class="es-priority-level-row">Take Profit: <strong>TP1 $${fmtPrice(c.tp)}</strong> &bull; <strong>TP2 $${fmtPrice(tp2)}</strong></div>
+              <div class="es-priority-level-row">Risk: <strong>${riskPct.toFixed(2)}%</strong></div>
+            </div>`}
+        ${isWatch ? '' : '<button class="es-priority-trade-btn" type="button">Pilih Sinyal Ini</button>'}
+      </div>`;
+    }).join('');
+
+    priorityIctGrid.querySelectorAll('.es-priority-card').forEach((card,i)=>{
+      const cand = top[i];
+      card.addEventListener('click', (e)=>{
+        if(e.target.classList.contains('es-priority-trade-btn')) return;
+        openTradingView(cand.symbol, cand.tfValue);
+      });
+      const tradeBtn = card.querySelector('.es-priority-trade-btn');
+      if(tradeBtn){
+        tradeBtn.addEventListener('click', (e)=>{
+          e.stopPropagation();
+          selectTradableSignalByUid(tradableUid('ict', cand.symbol, cand.tfValue));
+        });
+      }
+    });
+  }
+
+  async function findPriorityIctSignals(){
+    priorityIctBtn.disabled = true;
+    priorityIctStatusEl.classList.remove('error');
+    priorityIctStatusEl.textContent = `Memindai ${activeSymbols.length} koin (ICT Scalping HTF 1H / LTF 5m)... bisa memakan waktu beberapa detik.`;
+    priorityIctGrid.innerHTML = '';
+
+    try{
+      const settled = await Promise.allSettled(activeSymbols.map(symbol => findIctSignalForSymbol(symbol)));
+      let all = [];
+      settled.forEach(s=>{ if(s.status==='fulfilled' && s.value) all.push(s.value); });
+
+      all.sort((a,b)=> (a.armed?1:0) - (b.armed?1:0) || rankOf(a.symbol)-rankOf(b.symbol));
+      const top = all.slice(0, PRIORITY_LIMIT);
+
+      if(top.length===0){
+        priorityIctStatusEl.textContent = `Tidak ada sinyal ICT (sweep + MSS) yang terdeteksi saat ini di ${activeSymbols.length} koin.`;
+        priorityIctGrid.innerHTML = '';
+        priorityIctBtn.disabled = false;
+        return;
+      }
+
+      renderPriorityIctSignals(top);
+      priorityIctStatusEl.textContent = `Ditemukan ${top.length} sinyal ICT dari ${all.length} kandidat • ${new Date().toLocaleTimeString('id-ID')}.`;
+    }catch(e){
+      priorityIctStatusEl.classList.add('error');
+      priorityIctStatusEl.textContent = 'Gagal memindai sinyal ICT: data tidak dapat diambil.';
+    }finally{
+      priorityIctBtn.disabled = false;
+    }
+  }
+
+  function renderPriorityIctManagerDropdown(){
+    const results = window.__esLastPriorityIctResults || [];
+    if(results.length===0){
+      priorityIctManagerDropdown.innerHTML = `<div class="es-symbol-manager-empty">Belum ada sinyal prioritas ICT hasil pindai.</div>`;
+      return;
+    }
+    priorityIctManagerDropdown.innerHTML = results.map(c=>{
+      const label = `${c.symbol.replace('USDT','')} (${c.tfLabel})`;
+      return `<div class="es-symbol-manager-row">
+        <span class="es-symbol-manager-name" data-symbol="${c.symbol}" data-tf="${c.tfValue||''}">${label}</span>
+        <button type="button" class="es-symbol-manager-block" data-symbol="${c.symbol}">Blokir &amp; Ganti</button>
+      </div>`;
+    }).join('');
+
+    priorityIctManagerDropdown.querySelectorAll('.es-symbol-manager-name').forEach(el=>{
+      el.addEventListener('click', ()=>{
+        openTradingView(el.getAttribute('data-symbol'), el.getAttribute('data-tf') || undefined);
+      });
+    });
+    priorityIctManagerDropdown.querySelectorAll('.es-symbol-manager-block').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const symbol = btn.getAttribute('data-symbol');
+        const replacement = blockAndReplaceSymbol(symbol);
+        priorityIctManagerBtn.classList.remove('open');
+        priorityIctManagerDropdown.classList.remove('open');
+        priorityIctStatusEl.classList.remove('error');
+        priorityIctStatusEl.textContent = replacement
+          ? `${symbol} diblokir & diganti dengan ${replacement}. Memindai ulang sinyal ICT...`
+          : `${symbol} diblokir dari daftar pindaian. Memindai ulang sinyal ICT...`;
+        findPriorityIctSignals();
+      });
+    });
+  }
+
+  priorityIctManagerBtn.addEventListener('click', ()=>{
+    const willOpen = !priorityIctManagerDropdown.classList.contains('open');
+    if(willOpen) renderPriorityIctManagerDropdown();
+    priorityIctManagerBtn.classList.toggle('open', willOpen);
+    priorityIctManagerDropdown.classList.toggle('open', willOpen);
+  });
+
+  document.addEventListener('click', (e)=>{
+    if(!priorityIctManagerBtn.contains(e.target) && !priorityIctManagerDropdown.contains(e.target)){
+      priorityIctManagerBtn.classList.remove('open');
+      priorityIctManagerDropdown.classList.remove('open');
+    }
+  });
+
+  priorityIctBtn.addEventListener('click', findPriorityIctSignals);
+
   const PRIORITY_SIM_KEY = 'emaScreenerPrioritySim_v1';
   let prioritySimPositions = {};
   let prioritySimHistory = [];
@@ -3928,7 +4176,7 @@
         const realizedCls = hasRealized ? (pos.actualRealizedPnl>=0?'pnl-pos':'pnl-neg') : '';
         const closeCls = floatPnl>=0 ? 'pnl-pos' : 'pnl-neg';
         return `<tr>
-          <td><span class="es-psim-source-link" data-symbol="${pos.source}" data-tf="${pos.tfValue||''}">${label}</span>${venueBadge}</td>
+          <td><div class="es-sumber-cell"><span class="es-psim-source-link" data-symbol="${pos.source}" data-tf="${pos.tfValue||''}">${label}</span>${venueBadge}</div></td>
           <td class="${arahCls}">${pos.dir}</td>
           <td>$${fmtPrice(pos.entryPrice)}</td>
           <td>$${fmtPrice(pos.sl)}</td>
@@ -3976,7 +4224,7 @@
         const venueBadge = venueBadgeHtml(t.venue);
         const tpStatusCls = t.tpStatus && t.tpStatus!=='-' ? 'pnl-pos' : '';
         return `<tr>
-          <td><span class="es-psim-source-link" data-symbol="${t.source}" data-tf="${t.tfValue||''}">${label}</span>${venueBadge}</td>
+          <td><div class="es-sumber-cell"><span class="es-psim-source-link" data-symbol="${t.source}" data-tf="${t.tfValue||''}">${label}</span>${venueBadge}</div></td>
           <td class="${arahCls}">${t.dir}</td>
           <td>$${fmtPrice(t.entryPrice)}</td>
           <td>$${fmtPrice(t.exitPrice)}</td>
@@ -4513,6 +4761,7 @@
   }, 12000);
 
   loadEconCalendarWidget();
+  findPriorityIctSignals();
   findPrioritySignals();
 })();
 </script>
