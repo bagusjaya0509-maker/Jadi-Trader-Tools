@@ -130,6 +130,11 @@
     align-items:center;
     gap:10px;
   }
+  .es-title-glyph{
+    width:32px;height:32px;border:1px solid var(--gold);border-radius:4px;
+    display:flex;align-items:center;justify-content:center;color:var(--gold);
+    font-family:var(--font-display);font-size:16px;font-weight:700;flex-shrink:0;
+  }
   .es-title .dot{
     width:9px;height:9px;border-radius:50%;
     background:var(--bull);
@@ -214,7 +219,7 @@
     display:flex;
     gap:6px;
     flex-wrap:wrap;
-    margin-top:20px;
+    margin-top:12px;
     margin-bottom:14px;
   }
   #esFavCrossStatus{
@@ -1399,7 +1404,7 @@
   </div>
   <div class="es-header">
     <div>
-      <div class="es-title"><span class="dot"></span>Jadi Trader Tools</div>
+      <div class="es-title"><span class="es-title-glyph">J</span><span class="dot"></span>Jadi Trader Tools</div>
       <div class="es-sub" id="esSubtitle"></div>
     </div>
     <div class="es-controls">
@@ -1442,7 +1447,6 @@
   </div>
 
   <div class="es-fav-section">
-    <div class="es-fav-title">Area Pantau koin Favorit</div>
     <div class="es-btc-tf-strip" id="esBtcTfStrip"></div>
     <div class="es-fav-grid" id="esFavGrid"></div>
     <div class="es-fav-status" id="esFavStatus">Memuat koin favorit...</div>
