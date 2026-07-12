@@ -1473,7 +1473,7 @@
   <div class="es-grid" id="esGrid"></div>
   <div class="es-status" id="esStatus">Memuat data...</div>
 
-  <div class="es-priority-section">
+  <div class="es-priority-section" style="display:none;">
     <div class="es-priority-header">
       <div class="es-priority-title">Sinyal Prioritas ICT</div>
     </div>
@@ -4867,7 +4867,11 @@
   }, 12000);
 
   loadEconCalendarWidget();
-  findPriorityIctSignals();
+  // Sinyal Prioritas ICT dimatikan sementara (section disembunyikan di HTML) -
+  // scan-nya lumayan berat (2x fetch klines per koin x semua koin aktif) dan
+  // sempat mengganggu. Kalau mau diaktifkan lagi: hapus display:none di
+  // .es-priority-section (yang judulnya "Sinyal Prioritas ICT") dan un-comment baris di bawah ini.
+  // findPriorityIctSignals();
   findPrioritySignals();
 })();
 </script>
