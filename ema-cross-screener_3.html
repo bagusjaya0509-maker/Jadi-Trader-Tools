@@ -1488,6 +1488,11 @@
       </div>
     </div>
     <div class="es-priority-grid" id="esPriorityIctGrid"></div>
+    <button type="button" id="esPriorityIctMoreBtn" class="es-symbol-manager-btn" style="display:none;margin:8px auto 0;">
+      <span id="esPriorityIctMoreLabel">Lihat Selengkapnya</span>
+      <svg id="esPriorityIctMoreArrow" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" style="transition:transform .2s;"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <div class="es-priority-grid" id="esPriorityIctMoreGrid" style="display:none;"></div>
     <div class="es-priority-status" id="esPriorityIctStatus">Memindai otomatis...</div>
   </div>
 
@@ -3191,6 +3196,17 @@
   const priorityIctGrid = document.getElementById('esPriorityIctGrid');
   const priorityIctManagerBtn = document.getElementById('esPriorityIctManagerBtn');
   const priorityIctManagerDropdown = document.getElementById('esPriorityIctManagerDropdown');
+  const priorityIctMoreBtn = document.getElementById('esPriorityIctMoreBtn');
+  const priorityIctMoreLabel = document.getElementById('esPriorityIctMoreLabel');
+  const priorityIctMoreArrow = document.getElementById('esPriorityIctMoreArrow');
+  const priorityIctMoreGrid = document.getElementById('esPriorityIctMoreGrid');
+
+  priorityIctMoreBtn.addEventListener('click', ()=>{
+    const willOpen = priorityIctMoreGrid.style.display === 'none';
+    priorityIctMoreGrid.style.display = willOpen ? '' : 'none';
+    priorityIctMoreArrow.style.transform = willOpen ? 'rotate(180deg)' : 'rotate(0deg)';
+    priorityIctMoreLabel.textContent = willOpen ? 'Sembunyikan' : 'Lihat Selengkapnya';
+  });
 
   // Klasifikasi 5 tahap per koin (dari paling matang ke paling awal):
   //   retest    - sweep + MSS + sudah ada candle retest -> entry BUY/SELL NOW (Entry/SL/TP1/TP2)
@@ -3301,56 +3317,62 @@
     nearbreak: 'DEKAT AREA BREAKOUT',
     ranging:   'RANGING'
   };
+  // Checklist progresif 0-4: tiap tahap berikutnya otomatis mencakup semua
+  // centang tahap sebelumnya (retest=4 centang, mss=3, sweep=2, nearbreak=1, ranging=0)
+  const ICT_STAGE_CHECKS = { retest:4, mss:3, sweep:2, nearbreak:1, ranging:0 };
 
-  function renderPriorityIctSignals(top){
-    window.__esLastPriorityIctResults = top;
-    registerTradableSignals('ict', top.filter(c=>c.stage==='retest'));
-    priorityIctGrid.innerHTML = top.map((c,i)=>{
-      const isRetest = c.stage==='retest';
-      const signalCls = c.signal==='BUY' ? 'buy' : c.signal==='SELL' ? 'sell' : '';
-      const statusLabel = isRetest ? (c.signal==='BUY' ? 'BUY NOW' : 'SELL NOW') : ICT_STAGE_LABEL[c.stage];
-      const statusCls = isRetest ? signalCls : 'watch';
-      const riskDist = c.sl!=null ? Math.abs(c.price - c.sl) : null;
-      const tp2 = riskDist!=null ? (c.signal==='BUY' ? c.price + riskDist*2 : c.price - riskDist*2) : null;
-      const riskPct = riskDist!=null ? (riskDist / c.price) * 100 : null;
+  // Bangun 1 kartu HTML. forceBtn=true -> tombol "Pilih Sinyal Ini" selalu ada
+  // (dipakai buat 7 kartu terdepan), kalau false tombol cuma muncul kalau
+  // stage-nya sudah "retest" (sudah punya SL/TP otomatis).
+  function buildIctCardHtml(c, i, forceBtn){
+    const isRetest = c.stage==='retest';
+    const checks = ICT_STAGE_CHECKS[c.stage];
+    const signalCls = c.signal==='BUY' ? 'buy' : c.signal==='SELL' ? 'sell' : '';
+    const statusLabel = isRetest ? (c.signal==='BUY' ? 'BUY NOW' : 'SELL NOW') : ICT_STAGE_LABEL[c.stage];
+    const statusCls = isRetest ? signalCls : 'watch';
+    const riskDist = c.sl!=null ? Math.abs(c.price - c.sl) : null;
+    const tp2 = riskDist!=null ? (c.signal==='BUY' ? c.price + riskDist*2 : c.price - riskDist*2) : null;
+    const riskPct = riskDist!=null ? (riskDist / c.price) * 100 : null;
+    const showBtn = forceBtn || isRetest;
 
-      // Dihitung lazy (cuma cabang yang benar-benar dipakai) - kalau ditulis sebagai
-      // object literal biasa, SEMUA template string ikut dievaluasi walau tidak
-      // dipakai (mis. mssLevel null di stage lain), dan itu bikin error terus.
-      function buildStageNote(){
-        if(c.stage==='mss') return `MSS ${c.signal==='BUY'?'Naik':'Turun'} sudah terkonfirmasi @ $${fmtPrice(c.mssLevel)} — menunggu candle retest ke garis itu untuk entry ${c.signal==='BUY'?'Buy Stop':'Sell Stop'}.`;
-        if(c.stage==='sweep') return `Harga baru saja sweep ${c.signal==='BUY'?'CRTL $'+fmtPrice(c.crtl):'CRTH $'+fmtPrice(c.crth)} — menunggu Market Structure Shift (MSS) di TF 5 menit untuk konfirmasi arah.`;
-        if(c.stage==='nearbreak') return `Harga sedang mendekati area ${c.signal==='BUY'?'CRTL (support) $'+fmtPrice(c.crtl):'CRTH (resistance) $'+fmtPrice(c.crth)} — berpotensi sweep sebentar lagi.`;
-        return `Harga masih di tengah range CRTH $${fmtPrice(c.crth)} — CRTL $${fmtPrice(c.crtl)}, belum ada tanda sweep/breakout.`;
-      }
+    // Dihitung lazy (cuma cabang yang benar-benar dipakai) - kalau ditulis sebagai
+    // object literal biasa, SEMUA template string ikut dievaluasi walau tidak
+    // dipakai (mis. mssLevel null di stage lain), dan itu bikin error terus.
+    function buildStageNote(){
+      if(c.stage==='mss') return `MSS ${c.signal==='BUY'?'Naik':'Turun'} sudah terkonfirmasi @ $${fmtPrice(c.mssLevel)} — menunggu candle retest ke garis itu untuk entry ${c.signal==='BUY'?'Buy Stop':'Sell Stop'}.`;
+      if(c.stage==='sweep') return `Harga baru saja sweep ${c.signal==='BUY'?'CRTL $'+fmtPrice(c.crtl):'CRTH $'+fmtPrice(c.crth)} — menunggu Market Structure Shift (MSS) di TF 5 menit untuk konfirmasi arah.`;
+      if(c.stage==='nearbreak') return `Harga sedang mendekati area ${c.signal==='BUY'?'CRTL (support) $'+fmtPrice(c.crtl):'CRTH (resistance) $'+fmtPrice(c.crth)} — berpotensi sweep sebentar lagi.`;
+      return `Harga masih di tengah range CRTH $${fmtPrice(c.crth)} — CRTL $${fmtPrice(c.crtl)}, belum ada tanda sweep/breakout.`;
+    }
 
-      return `<div class="es-priority-card ${signalCls}" data-symbol="${c.symbol}" data-tf="${c.tfValue}" data-tflabel="${c.tfLabel}" data-price="${c.price}">
-        <div class="es-priority-card-top">
-          <span class="es-priority-rank">#${i+1}</span>
-          <span class="es-priority-symbol">${c.symbol.replace('USDT','')}</span>
-          <span class="es-priority-signal ${statusCls}">${statusLabel}</span>
-        </div>
-        <div class="es-priority-tf">ICT Scalping • HTF 1H / LTF 5m • Harga $${fmtPrice(c.price)}</div>
-        <div class="es-checklist">
-          <div class="es-check-row ok"><span class="es-check-icon">&check;</span> CRTH: $${fmtPrice(c.crth)} &bull; CRTL: $${fmtPrice(c.crtl)}</div>
-          <div class="es-check-row ${c.stage==='ranging'?'fail':'ok'}"><span class="es-check-icon">${c.stage==='ranging'?'&#10007;':'&check;'}</span> Sweep: ${c.stage==='ranging'||c.stage==='nearbreak'?'Belum terjadi':'Sudah terjadi'}</div>
-          <div class="es-check-row ${(c.stage==='mss'||c.stage==='retest')?'ok':'fail'}"><span class="es-check-icon">${(c.stage==='mss'||c.stage==='retest')?'&check;':'&#10007;'}</span> MSS: ${(c.stage==='mss'||c.stage==='retest') ? ('@ $'+fmtPrice(c.mssLevel)) : 'Belum terjadi'}</div>
-          <div class="es-check-row ${isRetest?'ok':'fail'}"><span class="es-check-icon">${isRetest?'&check;':'&#10007;'}</span> Retest garis MSS: ${isRetest?'Terkonfirmasi':'Belum'}</div>
-        </div>
-        ${isRetest
-          ? `<div class="es-priority-levels">
-              <div class="es-priority-level-row">Area Entri (${c.signal==='BUY'?'Buy Stop':'Sell Stop'}): <strong>$${fmtPrice(c.price)}</strong></div>
-              <div class="es-priority-level-row invalid">Invalid Level (SL): <strong>$${fmtPrice(c.sl)}</strong></div>
-              <div class="es-priority-level-row">Take Profit: <strong>TP1 $${fmtPrice(c.tp)}</strong> &bull; <strong>TP2 $${fmtPrice(tp2)}</strong></div>
-              <div class="es-priority-level-row">Risk: <strong>${riskPct.toFixed(2)}%</strong></div>
-            </div>`
-          : `<div class="es-priority-note">${buildStageNote()}</div>`}
-        ${isRetest ? '<button class="es-priority-trade-btn" type="button">Pilih Sinyal Ini</button>' : ''}
-      </div>`;
-    }).join('');
+    return `<div class="es-priority-card ${signalCls}" data-symbol="${c.symbol}" data-tf="${c.tfValue}" data-tflabel="${c.tfLabel}" data-price="${c.price}">
+      <div class="es-priority-card-top">
+        <span class="es-priority-rank">#${i+1}</span>
+        <span class="es-priority-symbol">${c.symbol.replace('USDT','')}</span>
+        <span class="es-priority-signal ${statusCls}">${statusLabel}</span>
+      </div>
+      <div class="es-priority-tf">ICT Scalping • HTF 1H / LTF 5m • Harga $${fmtPrice(c.price)} • Checklist ${checks}/4</div>
+      <div class="es-checklist">
+        <div class="es-check-row ${checks>=1?'ok':'fail'}"><span class="es-check-icon">${checks>=1?'&check;':'&#10007;'}</span> Dekat Area Breakout (CRTH $${fmtPrice(c.crth)} / CRTL $${fmtPrice(c.crtl)})</div>
+        <div class="es-check-row ${checks>=2?'ok':'fail'}"><span class="es-check-icon">${checks>=2?'&check;':'&#10007;'}</span> Sweep ${checks>=2?'sudah terjadi':'belum terjadi'}</div>
+        <div class="es-check-row ${checks>=3?'ok':'fail'}"><span class="es-check-icon">${checks>=3?'&check;':'&#10007;'}</span> MSS ${checks>=3?('@ $'+fmtPrice(c.mssLevel)):'belum terjadi'}</div>
+        <div class="es-check-row ${checks>=4?'ok':'fail'}"><span class="es-check-icon">${checks>=4?'&check;':'&#10007;'}</span> Retest garis MSS ${checks>=4?'terkonfirmasi':'belum'}</div>
+      </div>
+      ${isRetest
+        ? `<div class="es-priority-levels">
+            <div class="es-priority-level-row">Area Entri (${c.signal==='BUY'?'Buy Stop':'Sell Stop'}): <strong>$${fmtPrice(c.price)}</strong></div>
+            <div class="es-priority-level-row invalid">Invalid Level (SL): <strong>$${fmtPrice(c.sl)}</strong></div>
+            <div class="es-priority-level-row">Take Profit: <strong>TP1 $${fmtPrice(c.tp)}</strong> &bull; <strong>TP2 $${fmtPrice(tp2)}</strong></div>
+            <div class="es-priority-level-row">Risk: <strong>${riskPct.toFixed(2)}%</strong></div>
+          </div>`
+        : `<div class="es-priority-note">${buildStageNote()}</div>`}
+      ${showBtn ? '<button class="es-priority-trade-btn" type="button">Pilih Sinyal Ini</button>' : ''}
+    </div>`;
+  }
 
-    priorityIctGrid.querySelectorAll('.es-priority-card').forEach((card,i)=>{
-      const cand = top[i];
+  function wireIctCards(gridEl, list){
+    gridEl.querySelectorAll('.es-priority-card').forEach((card,i)=>{
+      const cand = list[i];
       card.addEventListener('click', (e)=>{
         if(e.target.classList.contains('es-priority-trade-btn')) return;
         openTradingView(cand.symbol, cand.tfValue);
@@ -3365,6 +3387,27 @@
     });
   }
 
+  // front = maksimal 7 kartu terdepan (formasi 2x4-centang, 1x3-centang,
+  // 2x2-centang, 2x1-centang - lihat pemilihannya di findPriorityIctSignals).
+  // rest = sisa koin lain, disembunyikan di balik tombol "Lihat Selengkapnya".
+  function renderPriorityIctSignals(front, rest){
+    window.__esLastPriorityIctResults = front.concat(rest);
+    registerTradableSignals('ict', front);
+
+    priorityIctGrid.innerHTML = front.map((c,i)=>buildIctCardHtml(c, i, true)).join('');
+    wireIctCards(priorityIctGrid, front);
+
+    if(rest.length > 0){
+      priorityIctMoreBtn.style.display = '';
+      priorityIctMoreGrid.innerHTML = rest.map((c,i)=>buildIctCardHtml(c, front.length + i, false)).join('');
+      wireIctCards(priorityIctMoreGrid, rest);
+    } else {
+      priorityIctMoreBtn.style.display = 'none';
+      priorityIctMoreGrid.innerHTML = '';
+      priorityIctMoreGrid.style.display = 'none';
+    }
+  }
+
   async function findPriorityIctSignals(){
     priorityIctBtn.disabled = true;
     priorityIctStatusEl.classList.remove('error');
@@ -3376,22 +3419,32 @@
       let all = [];
       settled.forEach(s=>{ if(s.status==='fulfilled' && s.value) all.push(s.value); });
 
-      // Urutkan dari paling matang (retest siap entry) ke paling awal (ranging) -
-      // SEMUA koin ditampilkan (tidak dipotong PRIORITY_LIMIT) supaya mencakup
-      // sebanyak mungkin koin yang bisa dipindai screener.
+      // Urutkan dari paling matang (retest siap entry) ke paling awal (ranging).
       all.sort((a,b)=> (ICT_STAGE_RANK[a.stage]-ICT_STAGE_RANK[b.stage]) || rankOf(a.symbol)-rankOf(b.symbol));
-      const top = all;
 
-      if(top.length===0){
+      if(all.length===0){
         priorityIctStatusEl.textContent = `Tidak ada data yang bisa dipindai dari ${activeSymbols.length} koin saat ini.`;
         priorityIctGrid.innerHTML = '';
         priorityIctBtn.disabled = false;
         return;
       }
 
-      const retestCount = top.filter(c=>c.stage==='retest').length;
-      renderPriorityIctSignals(top);
-      priorityIctStatusEl.textContent = `Memindai ${top.length} dari ${activeSymbols.length} koin — ${retestCount} sinyal siap entry (retest terkonfirmasi) • ${new Date().toLocaleTimeString('id-ID')}.`;
+      // Formasi 7 kartu terdepan: 2 dengan checklist 4/4 (retest, kalau ada),
+      // 1 dengan 3/4 (mss), 2 dengan 2/4 (sweep), 2 dengan 1/4 (nearbreak).
+      // Kalau salah satu tingkat tidak punya cukup kandidat, tidak dipaksa
+      // (total front bisa kurang dari 7 kalau memang belum ada kandidatnya).
+      const FRONT_QUOTA = [ ['retest',2], ['mss',1], ['sweep',2], ['nearbreak',2] ];
+      const used = new Set();
+      let front = [];
+      FRONT_QUOTA.forEach(([stageName, take])=>{
+        const pool = all.filter(c=>c.stage===stageName && !used.has(c));
+        pool.slice(0, take).forEach(c=>{ front.push(c); used.add(c); });
+      });
+      const rest = all.filter(c=>!used.has(c));
+
+      const retestCount = all.filter(c=>c.stage==='retest').length;
+      renderPriorityIctSignals(front, rest);
+      priorityIctStatusEl.textContent = `Memindai ${all.length} dari ${activeSymbols.length} koin — ${retestCount} sinyal siap entry (retest terkonfirmasi), ${front.length} kartu ditampilkan di depan • ${new Date().toLocaleTimeString('id-ID')}.`;
     }catch(e){
       priorityIctStatusEl.classList.add('error');
       priorityIctStatusEl.textContent = `Gagal memindai sinyal ICT: ${e && e.message ? e.message : 'terjadi kesalahan tak terduga'}.`;
