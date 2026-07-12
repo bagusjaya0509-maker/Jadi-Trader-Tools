@@ -1524,7 +1524,7 @@
         <label>App Token
           <input type="password" id="esLiveAppToken" placeholder="token rahasia dari .env">
         </label>
-        <button id="esLiveTradeBtn" type="button">Kirim Order Asli</button>
+        <button id="esLiveTradeBtn" type="button">Kirim Real Order</button>
       </div>
       <div class="es-live-trade-status" id="esLiveTradeStatus"></div>
     </div>
@@ -3211,7 +3211,7 @@
         liveEnvBadgeEl.textContent = '🧪 Testnet';
       } else {
         liveEnvBadgeEl.className = 'es-live-env-badge live';
-        liveEnvBadgeEl.textContent = '🔴 Live — Uang Asli';
+        liveEnvBadgeEl.textContent = '🔴 Live - Real Order';
       }
     }catch(e){
       liveDetectedEnv = null; liveDetectedBaseUrl = '';
@@ -3348,7 +3348,7 @@
       return;
     }
 
-    const envLabel = env === 'live' ? '🔴 LIVE — UANG ASLI' : '🧪 TESTNET (saldo palsu)';
+    const envLabel = env === 'live' ? '🔴 LIVE - REAL ORDER' : '🧪 TESTNET (saldo palsu)';
     const tpLines = splitTp
       ? `TP1: $${tp1Str} (qty ${qty1Str})\nTP2: $${tp2Str} (qty ${qty2Str}) - SL otomatis pindah ke breakeven begitu TP1 kena`
       : `TP: $${tp1Str}`;
@@ -3592,7 +3592,7 @@
       priorityStatusEl.textContent = 'Isi dulu Backend URL dan App Token di bagian Live Trading sebelum menutup posisi live.';
       return;
     }
-    const envLabel = pos.venue === 'live-real' ? '🔴 LIVE — UANG ASLI' : '🧪 TESTNET';
+    const envLabel = pos.venue === 'live-real' ? '🔴 LIVE - REAL ORDER' : '🧪 TESTNET';
     if(!window.confirm(`Tutup posisi ${pos.source.replace('USDT','')} (${pos.dir}, qty ${pos.qty}) di Binance [${envLabel}] sekarang? Order MARKET akan dikirim untuk menutup seluruh posisi.`)){
       return;
     }
