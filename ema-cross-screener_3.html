@@ -3191,6 +3191,16 @@
   const priorityIctManagerBtn = document.getElementById('esPriorityIctManagerBtn');
   const priorityIctManagerDropdown = document.getElementById('esPriorityIctManagerDropdown');
 
+  // Klasifikasi 5 tahap per koin (dari paling matang ke paling awal):
+  //   retest    - sweep + MSS + sudah ada candle retest -> entry BUY/SELL NOW (Entry/SL/TP1/TP2)
+  //   mss       - sweep + MSS sudah kejadian, tinggal tunggu retest ke garisnya
+  //   sweep     - sweep sudah kejadian tapi MSS belum kejadian
+  //   nearbreak - belum sweep, tapi harga sudah dekat area CRTH/CRTL (pra-breakout)
+  //   ranging   - harga masih di tengah range CRTH-CRTL, belum ada tanda-tanda apapun
+  // Semua koin aktif SELALU dapat status (tidak ada yang di-skip) supaya screener
+  // mencakup semua koin yang bisa dipindai, bukan cuma yang sudah full setup.
+  const ICT_STAGE_RANK = { retest:0, mss:1, sweep:2, nearbreak:3, ranging:4 };
+
   async function findIctSignalForSymbol(symbol){
     // HTF 1 jam - ambil candle SEBELUMNYA (bukan yang masih berjalan) buat CRTH/CRTL
     const htf = await fetchKlines(symbol, '1h', 3);
@@ -3213,7 +3223,6 @@
       if(highs[i] > crth) sweptHigh = true;
       if(lows[i] < crtl) sweptLow = true;
     }
-    if(!sweptHigh && !sweptLow) return null;
 
     const pivotLR = 2;
     const pivotHighs = findPivots(highs, pivotLR, pivotLR, true);
@@ -3221,7 +3230,7 @@
     const lastPivotLow  = pivotLows.length  ? pivotLows[pivotLows.length-1]   : null;
     const lastPivotHigh = pivotHighs.length ? pivotHighs[pivotHighs.length-1] : null;
 
-    // MSS turun: sweep CRTH dulu, baru close menembus swing low terakhir
+    // ---- Sisi turun (SELL): sweep CRTH -> MSS -> retest ----
     if(sweptHigh && lastPivotLow){
       let mssIdx = null;
       for(let i=lastPivotLow.index+1;i<n;i++){
@@ -3232,16 +3241,16 @@
         for(let i=mssIdx+1;i<n;i++){
           if(highs[i] >= mssLevel){
             const entry = mssLevel, sl = highs[i], riskDist = sl - entry;
-            return { symbol, signal:'SELL', price: entry, sl, tp: entry - riskDist,
-                      tfValue:'5m', tfLabel:'5m (ICT 1H)', crth, crtl, mssLevel, armed:false };
+            return { symbol, stage:'retest', signal:'SELL', price: entry, sl, tp: entry - riskDist,
+                      tfValue:'5m', tfLabel:'5m (ICT 1H)', crth, crtl, mssLevel };
           }
         }
-        return { symbol, signal:'SELL', price: mssLevel, sl:null, tp:null,
-                  tfValue:'5m', tfLabel:'5m (ICT 1H)', crth, crtl, mssLevel, armed:true };
+        return { symbol, stage:'mss', signal:'SELL', price: mssLevel, sl:null, tp:null,
+                  tfValue:'5m', tfLabel:'5m (ICT 1H)', crth, crtl, mssLevel };
       }
     }
 
-    // MSS naik: sweep CRTL dulu, baru close menembus swing high terakhir
+    // ---- Sisi naik (BUY): sweep CRTL -> MSS -> retest ----
     if(sweptLow && lastPivotHigh){
       let mssIdx = null;
       for(let i=lastPivotHigh.index+1;i<n;i++){
@@ -3252,30 +3261,65 @@
         for(let i=mssIdx+1;i<n;i++){
           if(lows[i] <= mssLevel){
             const entry = mssLevel, sl = lows[i], riskDist = entry - sl;
-            return { symbol, signal:'BUY', price: entry, sl, tp: entry + riskDist,
-                      tfValue:'5m', tfLabel:'5m (ICT 1H)', crth, crtl, mssLevel, armed:false };
+            return { symbol, stage:'retest', signal:'BUY', price: entry, sl, tp: entry + riskDist,
+                      tfValue:'5m', tfLabel:'5m (ICT 1H)', crth, crtl, mssLevel };
           }
         }
-        return { symbol, signal:'BUY', price: mssLevel, sl:null, tp:null,
-                  tfValue:'5m', tfLabel:'5m (ICT 1H)', crth, crtl, mssLevel, armed:true };
+        return { symbol, stage:'mss', signal:'BUY', price: mssLevel, sl:null, tp:null,
+                  tfValue:'5m', tfLabel:'5m (ICT 1H)', crth, crtl, mssLevel };
       }
     }
 
-    return null;
+    // ---- Sudah sweep tapi MSS belum kejadian ----
+    if(sweptHigh) return { symbol, stage:'sweep', signal:'SELL', price: closes[n-1], sl:null, tp:null,
+                              tfValue:'5m', tfLabel:'5m (ICT 1H)', crth, crtl, mssLevel:null };
+    if(sweptLow)  return { symbol, stage:'sweep', signal:'BUY',  price: closes[n-1], sl:null, tp:null,
+                              tfValue:'5m', tfLabel:'5m (ICT 1H)', crth, crtl, mssLevel:null };
+
+    // ---- Belum sweep sama sekali - cek dekat area breakout (pra-breakout) atau ranging ----
+    const lastClose = closes[n-1];
+    const rangeSize = Math.max(crth - crtl, 0.0000001);
+    const nearTol = rangeSize * 0.1; // dekat = dalam 10% dari lebar range CRTH-CRTL
+    const distToTop = crth - lastClose;
+    const distToBot = lastClose - crtl;
+
+    if(distToTop <= nearTol || distToBot <= nearTol){
+      const nearSignal = distToTop <= distToBot ? 'SELL' : 'BUY';
+      return { symbol, stage:'nearbreak', signal:nearSignal, price: lastClose, sl:null, tp:null,
+                tfValue:'5m', tfLabel:'5m (ICT 1H)', crth, crtl, mssLevel:null };
+    }
+
+    return { symbol, stage:'ranging', signal:null, price: lastClose, sl:null, tp:null,
+              tfValue:'5m', tfLabel:'5m (ICT 1H)', crth, crtl, mssLevel:null };
   }
+
+  const ICT_STAGE_LABEL = {
+    retest:    null, // ditentukan dinamis (BUY NOW / SELL NOW)
+    mss:       'MSS BREAK (Menunggu Retest)',
+    sweep:     'SWEEP (Menunggu MSS)',
+    nearbreak: 'DEKAT AREA BREAKOUT',
+    ranging:   'RANGING'
+  };
 
   function renderPriorityIctSignals(top){
     window.__esLastPriorityIctResults = top;
-    registerTradableSignals('ict', top.filter(c=>!c.armed));
+    registerTradableSignals('ict', top.filter(c=>c.stage==='retest'));
     priorityIctGrid.innerHTML = top.map((c,i)=>{
-      const signalCls = c.signal==='BUY' ? 'buy' : 'sell';
-      const isWatch = !!c.armed;
-      const statusLabel = isWatch ? 'PANTAU (Armed)' : (c.signal==='BUY' ? 'BUY NOW' : 'SELL NOW');
-      const statusCls = isWatch ? 'watch' : signalCls;
+      const isRetest = c.stage==='retest';
+      const signalCls = c.signal==='BUY' ? 'buy' : c.signal==='SELL' ? 'sell' : '';
+      const statusLabel = isRetest ? (c.signal==='BUY' ? 'BUY NOW' : 'SELL NOW') : ICT_STAGE_LABEL[c.stage];
+      const statusCls = isRetest ? signalCls : 'watch';
       const riskDist = c.sl!=null ? Math.abs(c.price - c.sl) : null;
       const tp2 = riskDist!=null ? (c.signal==='BUY' ? c.price + riskDist*2 : c.price - riskDist*2) : null;
       const riskPct = riskDist!=null ? (riskDist / c.price) * 100 : null;
-      const sweepLabel = c.signal==='BUY' ? `Sweep CRTL: $${fmtPrice(c.crtl)}` : `Sweep CRTH: $${fmtPrice(c.crth)}`;
+
+      const stageNoteMap = {
+        mss: `MSS ${c.signal==='BUY'?'Naik':'Turun'} sudah terkonfirmasi @ $${fmtPrice(c.mssLevel)} — menunggu candle retest ke garis itu untuk entry ${c.signal==='BUY'?'Buy Stop':'Sell Stop'}.`,
+        sweep: `Harga baru saja sweep ${c.signal==='BUY'?'CRTL $'+fmtPrice(c.crtl):'CRTH $'+fmtPrice(c.crth)} — menunggu Market Structure Shift (MSS) di TF 5 menit untuk konfirmasi arah.`,
+        nearbreak: `Harga sedang mendekati area ${c.signal==='BUY'?'CRTL (support) $'+fmtPrice(c.crtl):'CRTH (resistance) $'+fmtPrice(c.crth)} — berpotensi sweep sebentar lagi.`,
+        ranging: `Harga masih di tengah range CRTH $${fmtPrice(c.crth)} — CRTL $${fmtPrice(c.crtl)}, belum ada tanda sweep/breakout.`
+      };
+
       return `<div class="es-priority-card ${signalCls}" data-symbol="${c.symbol}" data-tf="${c.tfValue}" data-tflabel="${c.tfLabel}" data-price="${c.price}">
         <div class="es-priority-card-top">
           <span class="es-priority-rank">#${i+1}</span>
@@ -3284,19 +3328,20 @@
         </div>
         <div class="es-priority-tf">ICT Scalping • HTF 1H / LTF 5m • Harga $${fmtPrice(c.price)}</div>
         <div class="es-checklist">
-          <div class="es-check-row ok"><span class="es-check-icon">&check;</span> ${sweepLabel}</div>
-          <div class="es-check-row ok"><span class="es-check-icon">&check;</span> MSS ${c.signal==='BUY'?'Naik':'Turun'} @ $${fmtPrice(c.mssLevel)}</div>
-          <div class="es-check-row ${isWatch?'fail':'ok'}"><span class="es-check-icon">${isWatch?'&#10007;':'&check;'}</span> ${isWatch?'Menunggu retest ke garis MSS':'Retest garis MSS terkonfirmasi'}</div>
+          <div class="es-check-row ok"><span class="es-check-icon">&check;</span> CRTH: $${fmtPrice(c.crth)} &bull; CRTL: $${fmtPrice(c.crtl)}</div>
+          <div class="es-check-row ${c.stage==='ranging'?'fail':'ok'}"><span class="es-check-icon">${c.stage==='ranging'?'&#10007;':'&check;'}</span> Sweep: ${c.stage==='ranging'||c.stage==='nearbreak'?'Belum terjadi':'Sudah terjadi'}</div>
+          <div class="es-check-row ${(c.stage==='mss'||c.stage==='retest')?'ok':'fail'}"><span class="es-check-icon">${(c.stage==='mss'||c.stage==='retest')?'&check;':'&#10007;'}</span> MSS: ${(c.stage==='mss'||c.stage==='retest') ? ('@ $'+fmtPrice(c.mssLevel)) : 'Belum terjadi'}</div>
+          <div class="es-check-row ${isRetest?'ok':'fail'}"><span class="es-check-icon">${isRetest?'&check;':'&#10007;'}</span> Retest garis MSS: ${isRetest?'Terkonfirmasi':'Belum'}</div>
         </div>
-        ${isWatch
-          ? `<div class="es-priority-note">Belum ada candle retest ke level MSS ($${fmtPrice(c.mssLevel)}) — entry ${c.signal==='BUY'?'Buy Stop':'Sell Stop'} akan aktif begitu ada retest.</div>`
-          : `<div class="es-priority-levels">
+        ${isRetest
+          ? `<div class="es-priority-levels">
               <div class="es-priority-level-row">Area Entri (${c.signal==='BUY'?'Buy Stop':'Sell Stop'}): <strong>$${fmtPrice(c.price)}</strong></div>
               <div class="es-priority-level-row invalid">Invalid Level (SL): <strong>$${fmtPrice(c.sl)}</strong></div>
               <div class="es-priority-level-row">Take Profit: <strong>TP1 $${fmtPrice(c.tp)}</strong> &bull; <strong>TP2 $${fmtPrice(tp2)}</strong></div>
               <div class="es-priority-level-row">Risk: <strong>${riskPct.toFixed(2)}%</strong></div>
-            </div>`}
-        ${isWatch ? '' : '<button class="es-priority-trade-btn" type="button">Pilih Sinyal Ini</button>'}
+            </div>`
+          : `<div class="es-priority-note">${stageNoteMap[c.stage]}</div>`}
+        ${isRetest ? '<button class="es-priority-trade-btn" type="button">Pilih Sinyal Ini</button>' : ''}
       </div>`;
     }).join('');
 
@@ -3327,18 +3372,22 @@
       let all = [];
       settled.forEach(s=>{ if(s.status==='fulfilled' && s.value) all.push(s.value); });
 
-      all.sort((a,b)=> (a.armed?1:0) - (b.armed?1:0) || rankOf(a.symbol)-rankOf(b.symbol));
-      const top = all.slice(0, PRIORITY_LIMIT);
+      // Urutkan dari paling matang (retest siap entry) ke paling awal (ranging) -
+      // SEMUA koin ditampilkan (tidak dipotong PRIORITY_LIMIT) supaya mencakup
+      // sebanyak mungkin koin yang bisa dipindai screener.
+      all.sort((a,b)=> (ICT_STAGE_RANK[a.stage]-ICT_STAGE_RANK[b.stage]) || rankOf(a.symbol)-rankOf(b.symbol));
+      const top = all;
 
       if(top.length===0){
-        priorityIctStatusEl.textContent = `Tidak ada sinyal ICT (sweep + MSS) yang terdeteksi saat ini di ${activeSymbols.length} koin.`;
+        priorityIctStatusEl.textContent = `Tidak ada data yang bisa dipindai dari ${activeSymbols.length} koin saat ini.`;
         priorityIctGrid.innerHTML = '';
         priorityIctBtn.disabled = false;
         return;
       }
 
+      const retestCount = top.filter(c=>c.stage==='retest').length;
       renderPriorityIctSignals(top);
-      priorityIctStatusEl.textContent = `Ditemukan ${top.length} sinyal ICT dari ${all.length} kandidat • ${new Date().toLocaleTimeString('id-ID')}.`;
+      priorityIctStatusEl.textContent = `Memindai ${top.length} dari ${activeSymbols.length} koin — ${retestCount} sinyal siap entry (retest terkonfirmasi) • ${new Date().toLocaleTimeString('id-ID')}.`;
     }catch(e){
       priorityIctStatusEl.classList.add('error');
       priorityIctStatusEl.textContent = 'Gagal memindai sinyal ICT: data tidak dapat diambil.';
