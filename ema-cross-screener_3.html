@@ -2630,6 +2630,7 @@
   }
 
   function fmtPrice(p){
+    if(typeof p !== 'number' || !isFinite(p)) return '—';
     if(p >= 100) return p.toFixed(2);
     if(p >= 1) return p.toFixed(4);
     return p.toPrecision(4);
@@ -3313,12 +3314,15 @@
       const tp2 = riskDist!=null ? (c.signal==='BUY' ? c.price + riskDist*2 : c.price - riskDist*2) : null;
       const riskPct = riskDist!=null ? (riskDist / c.price) * 100 : null;
 
-      const stageNoteMap = {
-        mss: `MSS ${c.signal==='BUY'?'Naik':'Turun'} sudah terkonfirmasi @ $${fmtPrice(c.mssLevel)} — menunggu candle retest ke garis itu untuk entry ${c.signal==='BUY'?'Buy Stop':'Sell Stop'}.`,
-        sweep: `Harga baru saja sweep ${c.signal==='BUY'?'CRTL $'+fmtPrice(c.crtl):'CRTH $'+fmtPrice(c.crth)} — menunggu Market Structure Shift (MSS) di TF 5 menit untuk konfirmasi arah.`,
-        nearbreak: `Harga sedang mendekati area ${c.signal==='BUY'?'CRTL (support) $'+fmtPrice(c.crtl):'CRTH (resistance) $'+fmtPrice(c.crth)} — berpotensi sweep sebentar lagi.`,
-        ranging: `Harga masih di tengah range CRTH $${fmtPrice(c.crth)} — CRTL $${fmtPrice(c.crtl)}, belum ada tanda sweep/breakout.`
-      };
+      // Dihitung lazy (cuma cabang yang benar-benar dipakai) - kalau ditulis sebagai
+      // object literal biasa, SEMUA template string ikut dievaluasi walau tidak
+      // dipakai (mis. mssLevel null di stage lain), dan itu bikin error terus.
+      function buildStageNote(){
+        if(c.stage==='mss') return `MSS ${c.signal==='BUY'?'Naik':'Turun'} sudah terkonfirmasi @ $${fmtPrice(c.mssLevel)} — menunggu candle retest ke garis itu untuk entry ${c.signal==='BUY'?'Buy Stop':'Sell Stop'}.`;
+        if(c.stage==='sweep') return `Harga baru saja sweep ${c.signal==='BUY'?'CRTL $'+fmtPrice(c.crtl):'CRTH $'+fmtPrice(c.crth)} — menunggu Market Structure Shift (MSS) di TF 5 menit untuk konfirmasi arah.`;
+        if(c.stage==='nearbreak') return `Harga sedang mendekati area ${c.signal==='BUY'?'CRTL (support) $'+fmtPrice(c.crtl):'CRTH (resistance) $'+fmtPrice(c.crth)} — berpotensi sweep sebentar lagi.`;
+        return `Harga masih di tengah range CRTH $${fmtPrice(c.crth)} — CRTL $${fmtPrice(c.crtl)}, belum ada tanda sweep/breakout.`;
+      }
 
       return `<div class="es-priority-card ${signalCls}" data-symbol="${c.symbol}" data-tf="${c.tfValue}" data-tflabel="${c.tfLabel}" data-price="${c.price}">
         <div class="es-priority-card-top">
@@ -3340,7 +3344,7 @@
               <div class="es-priority-level-row">Take Profit: <strong>TP1 $${fmtPrice(c.tp)}</strong> &bull; <strong>TP2 $${fmtPrice(tp2)}</strong></div>
               <div class="es-priority-level-row">Risk: <strong>${riskPct.toFixed(2)}%</strong></div>
             </div>`
-          : `<div class="es-priority-note">${stageNoteMap[c.stage]}</div>`}
+          : `<div class="es-priority-note">${buildStageNote()}</div>`}
         ${isRetest ? '<button class="es-priority-trade-btn" type="button">Pilih Sinyal Ini</button>' : ''}
       </div>`;
     }).join('');
@@ -3390,7 +3394,7 @@
       priorityIctStatusEl.textContent = `Memindai ${top.length} dari ${activeSymbols.length} koin — ${retestCount} sinyal siap entry (retest terkonfirmasi) • ${new Date().toLocaleTimeString('id-ID')}.`;
     }catch(e){
       priorityIctStatusEl.classList.add('error');
-      priorityIctStatusEl.textContent = 'Gagal memindai sinyal ICT: data tidak dapat diambil.';
+      priorityIctStatusEl.textContent = `Gagal memindai sinyal ICT: ${e && e.message ? e.message : 'terjadi kesalahan tak terduga'}.`;
     }finally{
       priorityIctBtn.disabled = false;
     }
