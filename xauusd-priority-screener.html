@@ -1056,7 +1056,7 @@
   });
   // ===== akhir bagian login + sinkronisasi =====
 
-  const XAU_SYMBOL = 'PAXGUSDT';
+  const XAU_SYMBOL = 'XAUTUSDT';
   const XAU_LABEL = 'XAUUSD';
   const PIP_SIZE = 0.1;
   const XAU_TFS = [
@@ -1232,12 +1232,14 @@
     return 'neutral';
   }
 
+  // XAU sekarang pakai XAUT (Tether Gold) dari Binance FUTURES sebagai sumber
+  // utama - Spot cuma cadangan kalau Futures kebetulan gagal diakses.
   async function fetchKlines(symbol, interval, limit=150){
-    const spotUrl = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`;
-    let res = await fetch(spotUrl);
+    const futuresUrl = `https://fapi.binance.com/fapi/v1/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`;
+    let res = await fetch(futuresUrl);
     if(!res.ok){
-      const futuresUrl = `https://fapi.binance.com/fapi/v1/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`;
-      res = await fetch(futuresUrl);
+      const spotUrl = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`;
+      res = await fetch(spotUrl);
     }
     if(!res.ok) throw new Error('klines fail: '+symbol);
     const data = await res.json();
@@ -1251,9 +1253,9 @@
   }
 
   async function fetchLastPrice(){
-    let res = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${XAU_SYMBOL}`);
+    let res = await fetch(`https://fapi.binance.com/fapi/v1/ticker/price?symbol=${XAU_SYMBOL}`);
     if(!res.ok){
-      res = await fetch(`https://fapi.binance.com/fapi/v1/ticker/price?symbol=${XAU_SYMBOL}`);
+      res = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${XAU_SYMBOL}`);
     }
     if(!res.ok) throw new Error('price fail');
     const data = await res.json();
@@ -1262,9 +1264,9 @@
 
   async function fetchTicker24h(){
     try{
-      let res = await fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${XAU_SYMBOL}`);
+      let res = await fetch(`https://fapi.binance.com/fapi/v1/ticker/24hr?symbol=${XAU_SYMBOL}`);
       if(!res.ok){
-        res = await fetch(`https://fapi.binance.com/fapi/v1/ticker/24hr?symbol=${XAU_SYMBOL}`);
+        res = await fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${XAU_SYMBOL}`);
       }
       if(!res.ok) return null;
       return await res.json();
