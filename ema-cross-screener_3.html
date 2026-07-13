@@ -1528,8 +1528,8 @@
       <select id="esPrioritySnrTf">
         <option value="medium" selected>Medium Risk (TF 15m/30m)</option>
         <option value="high">High Risk (TF 5m)</option>
-        <option value="low">Low Risk (TF 4H)</option>
-        <option value="all">Semua Risk (5m/15m/30m/4H)</option>
+        <option value="low">Low Risk (TF 1H/4H)</option>
+        <option value="all">Semua Risk (5m/15m/30m/1H/4H)</option>
       </select>
       <button id="esPrioritySnrBtn" class="es-priority-btn">Cari Sinyal Prioritas SNR</button>
       <div class="es-symbol-manager es-symbol-manager-inline">
@@ -3587,7 +3587,7 @@
   const SNR_RISK_TIERS = {
     high:   [ { value:'5m',  label:'5m' } ],
     medium: [ { value:'15m', label:'15m' }, { value:'30m', label:'30m' } ],
-    low:    [ { value:'4h',  label:'4H' } ]
+    low:    [ { value:'1h',  label:'1H' }, { value:'4h', label:'4H' } ]
   };
 
   const prioritySnrBtn = document.getElementById('esPrioritySnrBtn');
