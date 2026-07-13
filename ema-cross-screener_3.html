@@ -1520,6 +1520,32 @@
     <div class="es-priority-status" id="esPriorityStatus">Memindai otomatis...</div>
   </div>
 
+  <div class="es-priority-section">
+    <div class="es-priority-header">
+      <div class="es-priority-title">Sinyal Prioritas SNR</div>
+    </div>
+    <div class="es-priority-controls">
+      <select id="esPrioritySnrTf">
+        <option value="all" selected>Semua TF (5m/15m/30m/1H/4H)</option>
+        <option value="5m">TF 5m saja</option>
+        <option value="15m">TF 15m saja</option>
+        <option value="30m">TF 30m saja</option>
+        <option value="1h">TF 1H saja</option>
+        <option value="4h">TF 4H saja</option>
+      </select>
+      <button id="esPrioritySnrBtn" class="es-priority-btn">Cari Sinyal Prioritas SNR</button>
+      <div class="es-symbol-manager es-symbol-manager-inline">
+        <button type="button" id="esPrioritySnrManagerBtn" class="es-symbol-manager-btn">
+          <span>Ganti Chart / Kelola Koin</span>
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <div class="es-symbol-manager-dropdown" id="esPrioritySnrManagerDropdown"></div>
+      </div>
+    </div>
+    <div class="es-priority-grid" id="esPrioritySnrGrid"></div>
+    <div class="es-priority-status" id="esPrioritySnrStatus">Klik "Cari Sinyal Prioritas SNR" untuk memindai.</div>
+  </div>
+
   <div class="es-sim-section">
     <div class="es-sim-title">Simulasi - Entri Live Sinyal</div>
     <div class="es-sim-controls">
@@ -2164,7 +2190,7 @@
   // biasa. Tiap sumber daftar ulang candidate-nya sendiri tiap kali pindai
   // ulang (entri lama dari sumber itu dihapus dulu supaya tidak menumpuk data basi).
   window.__esTradableSignals = window.__esTradableSignals || {};
-  const TRADABLE_SOURCE_LABEL = { priority:'Prioritas', favorite:'Favorit', cross:'Cross EMA', favcross:'Favorit Cross', ict:'Prioritas ICT' };
+  const TRADABLE_SOURCE_LABEL = { priority:'Prioritas', favorite:'Favorit', cross:'Cross EMA', favcross:'Favorit Cross', ict:'Prioritas ICT', snr:'Prioritas SNR' };
   function tradableUid(source, symbol, tfValue){ return `${source}_${symbol}_${tfValue}`; }
   function registerTradableSignals(source, candidates){
     Object.keys(window.__esTradableSignals).forEach(k=>{
@@ -3502,6 +3528,250 @@
   });
 
   priorityIctBtn.addEventListener('click', findPriorityIctSignals);
+
+  // ═══════════════════════════════════════════════════════
+  // ████████  SINYAL PRIORITAS SNR (RETEST ZONA S/R, TF 15m & 30m)  ████████
+  // ═══════════════════════════════════════════════════════
+  // Diadaptasi dari Section 8 "Tanda Bintang Emas: Retest SNR" di Pine Script
+  // (BB SNR SND + Live SLTP Signal.pine): zona Resistance/Support (pivot 10-10,
+  // lebar zona ATR14*0.5) yang disentuh ulang (retest ke-2 kali atau lebih)
+  // oleh candle PENOLAKAN (wick lebih panjang dari body) -> SELL kalau retest
+  // Resistance, BUY kalau retest Support. Cuma dicek di TF 15 menit & 30 menit
+  // (sesuai permintaan - dua-duanya saja, tidak ada pilihan TF lain).
+  // SL/TP pakai fungsi yang SAMA dengan Sinyal Prioritas BBMA (pickSlForBuy/
+  // pickSlForSell/getAutoSlTp) - dir.sr.zone diisi dari zona SNR di atas.
+
+  const SNR_PRIORITY_TFS = [
+    { value:'5m',  label:'5m' },
+    { value:'15m', label:'15m' },
+    { value:'30m', label:'30m' },
+    { value:'1h',  label:'1H' },
+    { value:'4h',  label:'4H' }
+  ];
+
+  const prioritySnrBtn = document.getElementById('esPrioritySnrBtn');
+  const prioritySnrTfSel = document.getElementById('esPrioritySnrTf');
+  const prioritySnrStatusEl = document.getElementById('esPrioritySnrStatus');
+  const prioritySnrGrid = document.getElementById('esPrioritySnrGrid');
+  const prioritySnrManagerBtn = document.getElementById('esPrioritySnrManagerBtn');
+  const prioritySnrManagerDropdown = document.getElementById('esPrioritySnrManagerDropdown');
+
+  function getSnrPriorityTfs(){
+    const v = prioritySnrTfSel.value;
+    if(v==='all') return SNR_PRIORITY_TFS;
+    return SNR_PRIORITY_TFS.filter(tf=>tf.value===v);
+  }
+
+  // Cek retest zona S/R dengan candle penolakan di kline yang diberikan.
+  // Mengembalikan {signal, dir} kalau candle TERAKHIR adalah retest ke-2+,
+  // atau null kalau tidak ada sinyal saat ini.
+  function checkSnrRetestSignal(opens, highs, lows, closes){
+    const n = closes.length;
+    if(n < 30) return null;
+    const pivotL = 10, pivotR = 10;
+    const pivotHighs = findPivots(highs, pivotL, pivotR, true);
+    const pivotLows  = findPivots(lows,  pivotL, pivotR, false);
+    const lastRes = pivotHighs.length ? pivotHighs[pivotHighs.length-1] : null;
+    const lastSup = pivotLows.length  ? pivotLows[pivotLows.length-1]  : null;
+    const atrArr = atr(highs, lows, closes, 14);
+    const lastAtr = atrArr[n-1];
+    if(!lastAtr) return null;
+    const tol = lastAtr * 0.5;
+    const lastIdx = n-1;
+
+    if(lastRes){
+      const zoneTop = lastRes.value + tol, zoneBot = lastRes.value - tol;
+      let count = 0, signalNow = false;
+      for(let i=lastRes.index+1;i<n;i++){
+        const body = Math.abs(closes[i]-opens[i]);
+        const upperWick = highs[i] - Math.max(opens[i],closes[i]);
+        const touches = highs[i]>=zoneBot && highs[i]<=zoneTop;
+        if(touches && upperWick > body){
+          count++;
+          if(count>=2 && i===lastIdx) signalNow = true;
+        }
+      }
+      if(signalNow){
+        return { signal:'SELL', dir:{ sr:{ ok:true, zone:{ value:lastRes.value, top:zoneTop, bottom:zoneBot }, status:'Retest Resistance' }, sd:{ok:false}, atr:lastAtr, band:lastRes.value } };
+      }
+    }
+
+    if(lastSup){
+      const zoneTop = lastSup.value + tol, zoneBot = lastSup.value - tol;
+      let count = 0, signalNow = false;
+      for(let i=lastSup.index+1;i<n;i++){
+        const body = Math.abs(closes[i]-opens[i]);
+        const lowerWick = Math.min(opens[i],closes[i]) - lows[i];
+        const touches = lows[i]<=zoneTop && lows[i]>=zoneBot;
+        if(touches && lowerWick > body){
+          count++;
+          if(count>=2 && i===lastIdx) signalNow = true;
+        }
+      }
+      if(signalNow){
+        return { signal:'BUY', dir:{ sr:{ ok:true, zone:{ value:lastSup.value, top:zoneTop, bottom:zoneBot }, status:'Retest Support' }, sd:{ok:false}, atr:lastAtr, band:lastSup.value } };
+      }
+    }
+
+    return null;
+  }
+
+  // Cek KEDUA (atau TF yang dipilih) timeframe secara independen - kalau satu
+  // koin qualifies di TF 30m DAN TF 15m sekaligus, dua-duanya dikembalikan
+  // sebagai kandidat terpisah (tidak berhenti di TF pertama yang cocok).
+  async function findSnrPrioritySignalForSymbol(symbol, tickers, tfs){
+    const found = [];
+    for(const tf of tfs){
+      const { opens, highs, lows, closes } = await fetchKlines(symbol, tf.value, 200);
+      if(closes.length < 30) continue;
+      const res = checkSnrRetestSignal(opens, highs, lows, closes);
+      if(res){
+        const t = tickers[symbol];
+        const price = t ? parseFloat(t.lastPrice) : closes[closes.length-1];
+        found.push({ symbol, signal:res.signal, dir:res.dir, price, tfValue:tf.value, tfLabel:tf.label });
+      }
+    }
+    return found;
+  }
+
+  function renderPrioritySnrSignals(top){
+    window.__esLastPrioritySnrResults = top;
+    registerTradableSignals('snr', top);
+    prioritySnrGrid.innerHTML = top.map((c,i)=>{
+      const signalCls = c.signal==='BUY' ? 'buy' : 'sell';
+      const auto = getAutoSlTp(c);
+      const riskDist = auto.sl!=null ? Math.abs(c.price - auto.sl) : null;
+      const tp2 = riskDist!=null ? (c.signal==='BUY' ? c.price + riskDist*2 : c.price - riskDist*2) : null;
+      const riskPct = riskDist!=null ? (riskDist / c.price) * 100 : null;
+      return `<div class="es-priority-card ${signalCls}" data-symbol="${c.symbol}" data-tf="${c.tfValue}" data-tflabel="${c.tfLabel}" data-price="${c.price}">
+        <div class="es-priority-card-top">
+          <span class="es-priority-rank">#${i+1}</span>
+          <span class="es-priority-symbol">${c.symbol.replace('USDT','')}</span>
+          <span class="es-priority-signal ${signalCls}">${c.signal} NOW</span>
+        </div>
+        <div class="es-priority-tf">SNR Retest • TF ${c.tfLabel} • Harga $${fmtPrice(c.price)}</div>
+        <div class="es-checklist">
+          <div class="es-check-row ok"><span class="es-check-icon">&check;</span> ${c.dir.sr.status} (zona $${fmtPrice(c.dir.sr.zone.value)})</div>
+          <div class="es-check-row ok"><span class="es-check-icon">&check;</span> Retest ke-2+ dengan candle penolakan (wick &gt; body)</div>
+        </div>
+        <div class="es-priority-levels">
+          <div class="es-priority-level-row">Area Entri: <strong>$${fmtPrice(c.price)}</strong></div>
+          <div class="es-priority-level-row invalid">Invalid Level (SL): <strong>$${fmtPrice(auto.sl)}</strong></div>
+          <div class="es-priority-level-row">Take Profit: <strong>TP1 $${fmtPrice(auto.tp)}</strong> &bull; <strong>TP2 $${fmtPrice(tp2)}</strong></div>
+          <div class="es-priority-level-row">Risk: <strong>${riskPct.toFixed(2)}%</strong></div>
+        </div>
+        <button class="es-priority-trade-btn" type="button">Pilih Sinyal Ini</button>
+      </div>`;
+    }).join('');
+
+    prioritySnrGrid.querySelectorAll('.es-priority-card').forEach((card,i)=>{
+      const cand = top[i];
+      card.addEventListener('click', (e)=>{
+        if(e.target.classList.contains('es-priority-trade-btn')) return;
+        openTradingView(cand.symbol, cand.tfValue);
+      });
+      const tradeBtn = card.querySelector('.es-priority-trade-btn');
+      tradeBtn.addEventListener('click', (e)=>{
+        e.stopPropagation();
+        selectTradableSignalByUid(tradableUid('snr', cand.symbol, cand.tfValue));
+      });
+    });
+  }
+
+  async function findPrioritySnrSignals(){
+    const tfs = getSnrPriorityTfs();
+    if(tfs.length===0){
+      prioritySnrStatusEl.classList.add('error');
+      prioritySnrStatusEl.textContent = 'Pilih timeframe terlebih dahulu.';
+      return;
+    }
+
+    prioritySnrBtn.disabled = true;
+    prioritySnrStatusEl.classList.remove('error');
+    const tfLabels = tfs.map(tf=>tf.label).join(' & ');
+    prioritySnrStatusEl.textContent = `Memindai ${activeSymbols.length} koin (TF ${tfLabels})... bisa memakan waktu beberapa detik.`;
+    prioritySnrGrid.innerHTML = '';
+
+    try{
+      const tickers = await loadTickers();
+      const settled = await Promise.allSettled(activeSymbols.map(symbol => findSnrPrioritySignalForSymbol(symbol, tickers, tfs)));
+      // Setiap koin bisa menyumbang 0, 1, atau 2 kandidat (kalau qualifies di
+      // kedua TF sekaligus) - digabung semua, TIDAK dipotong/dibatasi jumlahnya.
+      let all = [];
+      settled.forEach(s=>{ if(s.status==='fulfilled' && s.value && s.value.length) all = all.concat(s.value); });
+
+      all.sort((a,b)=> rankOf(a.symbol)-rankOf(b.symbol) || a.tfValue.localeCompare(b.tfValue));
+      const top = all;
+
+      if(top.length===0){
+        prioritySnrStatusEl.textContent = `Tidak ada koin yang retest zona SNR (TF ${tfLabels}) saat ini dari ${activeSymbols.length} koin.`;
+        prioritySnrGrid.innerHTML = '';
+        prioritySnrBtn.disabled = false;
+        return;
+      }
+
+      renderPrioritySnrSignals(top);
+      prioritySnrStatusEl.textContent = `Ditemukan ${top.length} sinyal SNR dari ${activeSymbols.length} koin dipindai (TF ${tfLabels}) • ${new Date().toLocaleTimeString('id-ID')}.`;
+    }catch(e){
+      prioritySnrStatusEl.classList.add('error');
+      prioritySnrStatusEl.textContent = `Gagal memindai sinyal SNR: ${e && e.message ? e.message : 'terjadi kesalahan tak terduga'}.`;
+    }finally{
+      prioritySnrBtn.disabled = false;
+    }
+  }
+
+  function renderPrioritySnrManagerDropdown(){
+    const results = window.__esLastPrioritySnrResults || [];
+    if(results.length===0){
+      prioritySnrManagerDropdown.innerHTML = `<div class="es-symbol-manager-empty">Belum ada sinyal prioritas SNR hasil pindai.</div>`;
+      return;
+    }
+    prioritySnrManagerDropdown.innerHTML = results.map(c=>{
+      const label = `${c.symbol.replace('USDT','')} (${c.tfLabel})`;
+      return `<div class="es-symbol-manager-row">
+        <span class="es-symbol-manager-name" data-symbol="${c.symbol}" data-tf="${c.tfValue||''}">${label}</span>
+        <button type="button" class="es-symbol-manager-block" data-symbol="${c.symbol}">Blokir &amp; Ganti</button>
+      </div>`;
+    }).join('');
+
+    prioritySnrManagerDropdown.querySelectorAll('.es-symbol-manager-name').forEach(el=>{
+      el.addEventListener('click', ()=>{
+        openTradingView(el.getAttribute('data-symbol'), el.getAttribute('data-tf') || undefined);
+      });
+    });
+    prioritySnrManagerDropdown.querySelectorAll('.es-symbol-manager-block').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const symbol = btn.getAttribute('data-symbol');
+        const replacement = blockAndReplaceSymbol(symbol);
+        prioritySnrManagerBtn.classList.remove('open');
+        prioritySnrManagerDropdown.classList.remove('open');
+        prioritySnrStatusEl.classList.remove('error');
+        prioritySnrStatusEl.textContent = replacement
+          ? `${symbol} diblokir & diganti dengan ${replacement}. Memindai ulang sinyal SNR...`
+          : `${symbol} diblokir dari daftar pindaian. Memindai ulang sinyal SNR...`;
+        findPrioritySnrSignals();
+      });
+    });
+  }
+
+  prioritySnrManagerBtn.addEventListener('click', ()=>{
+    const willOpen = !prioritySnrManagerDropdown.classList.contains('open');
+    if(willOpen) renderPrioritySnrManagerDropdown();
+    prioritySnrManagerBtn.classList.toggle('open', willOpen);
+    prioritySnrManagerDropdown.classList.toggle('open', willOpen);
+  });
+
+  document.addEventListener('click', (e)=>{
+    if(!prioritySnrManagerBtn.contains(e.target) && !prioritySnrManagerDropdown.contains(e.target)){
+      prioritySnrManagerBtn.classList.remove('open');
+      prioritySnrManagerDropdown.classList.remove('open');
+    }
+  });
+
+  // Manual trigger saja (tombol) - TIDAK auto-scan tiap halaman dibuka, supaya
+  // tidak menambah beban seperti yang sempat terjadi di Sinyal Prioritas ICT.
+  prioritySnrBtn.addEventListener('click', findPrioritySnrSignals);
+  prioritySnrTfSel.addEventListener('change', findPrioritySnrSignals);
 
   const PRIORITY_SIM_KEY = 'emaScreenerPrioritySim_v1';
   let prioritySimPositions = {};
