@@ -5142,6 +5142,9 @@
   // sempat mengganggu. Kalau mau diaktifkan lagi: hapus display:none di
   // .es-priority-section (yang judulnya "Sinyal Prioritas ICT") dan un-comment baris di bawah ini.
   // findPriorityIctSignals();
-  findPrioritySignals();
+  // Sinyal Prioritas SNR dijalankan otomatis setelah Sinyal Prioritas BBMA
+  // selesai memindai (bukan bersamaan), supaya tidak membebani API dengan 2
+  // scan besar sekaligus di awal halaman dibuka.
+  findPrioritySignals().then(function(){ findPrioritySnrSignals(); });
 })();
 </script>
