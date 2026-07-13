@@ -1539,6 +1539,7 @@
         </button>
         <div class="es-symbol-manager-dropdown" id="esPrioritySnrManagerDropdown"></div>
       </div>
+      <div class="es-btc-tf-strip" id="esSnrBtcTfStrip"></div>
     </div>
     <div class="es-priority-grid" id="esPrioritySnrGrid"></div>
     <div class="es-priority-status" id="esPrioritySnrStatus">Klik "Cari Sinyal Prioritas SNR" untuk memindai.</div>
@@ -2928,6 +2929,47 @@
       });
     }finally{
       btcTfScanning = false;
+    }
+  }
+
+  // Strip status BTC per timeframe khusus Sinyal Prioritas SNR - beda dari
+  // esBtcTfStrip di atas (yang pakai prioritas Cross EMA > S/R > S/D > BB),
+  // strip ini SELALU pakai logic retest SNR (checkSnrRetestSignal) di semua
+  // timeframe, jadi labelnya konsisten dengan section Sinyal Prioritas SNR.
+  const snrBtcTfStripEl = document.getElementById('esSnrBtcTfStrip');
+  let snrBtcTfScanning = false;
+
+  async function computeSnrBtcTfStatus(tfValue){
+    try{
+      const { opens, highs, lows, closes } = await fetchKlines('BTCUSDT', tfValue, 200);
+      if(closes.length < 30) return { label:'n/a', cls:'none' };
+      const res = checkSnrRetestSignal(opens, highs, lows, closes);
+      if(!res) return { label:'-', cls:'none' };
+      return { label: res.dir.sr.status, cls: res.signal==='BUY' ? 'bull' : 'bear' };
+    }catch(e){
+      return { label:'Error', cls:'error' };
+    }
+  }
+
+  async function scanSnrBtcTfStrip(){
+    if(snrBtcTfScanning) return;
+    snrBtcTfScanning = true;
+    try{
+      const results = await Promise.all(BTC_TF_LIST.map(tf => computeSnrBtcTfStatus(tf.value)));
+      snrBtcTfStripEl.innerHTML = BTC_TF_LIST.map((tf,i)=>{
+        const r = results[i];
+        return `<div class="es-btc-tf-box" data-tf="${tf.value}" title="Buka BTC ${tf.label} di TradingView">
+          <div class="es-btc-tf-box-label">BTC ${tf.label}</div>
+          <div class="es-btc-tf-box-status ${r.cls}">${r.label}</div>
+        </div>`;
+      }).join('');
+      snrBtcTfStripEl.querySelectorAll('.es-btc-tf-box').forEach(box=>{
+        box.addEventListener('click', ()=>{
+          openTradingView('BTCUSDT', box.getAttribute('data-tf'));
+        });
+      });
+    }finally{
+      snrBtcTfScanning = false;
     }
   }
 
@@ -5145,5 +5187,7 @@
   // selesai memindai (bukan bersamaan), supaya tidak membebani API dengan 2
   // scan besar sekaligus di awal halaman dibuka.
   findPrioritySignals().then(function(){ findPrioritySnrSignals(); });
+  scanSnrBtcTfStrip();
+  setInterval(scanSnrBtcTfStrip, 90000);
 })();
 </script>
