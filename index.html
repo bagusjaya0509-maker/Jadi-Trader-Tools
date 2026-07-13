@@ -1237,12 +1237,13 @@
       var resultLabel = t.pl>0?'WIN':t.pl<0?'LOSS':'BE';
       var venueBadge = t.venue==='live-real' ? ' <span class="venue-badge live">Binance Live</span>'
         : t.venue==='live-testnet' ? ' <span class="venue-badge">Binance Testnet</span>' : '';
+      var reasonClean = (t.reason||'').replace(/\s*\(Binance\)/i, '');
       return '<tr>'+
         '<td class="num">'+fmtDate(t.date)+'</td>'+
         '<td><span class="jt-pair-cell"><span class="jt-pair-name">'+t.pair+'</span>'+venueBadge+'</span></td>'+
         '<td>'+t.tf+'</td>'+
         '<td><span class="dir '+t.direction.toLowerCase()+'">'+t.direction.toUpperCase()+'</span></td>'+
-        '<td class="emo-chip">'+t.reason+'</td>'+
+        '<td class="emo-chip">'+reasonClean+'</td>'+
         '<td class="num" style="color:'+(t.pl>0?'var(--profit)':t.pl<0?'var(--loss)':'var(--ink-dim)')+'">'+fmtMoney(t.pl)+'</td>'+
         '<td><span class="pill '+result+'">'+resultLabel+'</span></td>'+
       '</tr>';
