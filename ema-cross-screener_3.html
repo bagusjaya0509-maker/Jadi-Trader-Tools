@@ -4186,6 +4186,26 @@
     savePrioritySimState();
   }
 
+  // Partial close 50% posisi SIM begitu TP1 kesentuh: separuh qty direalisasi
+  // di harga TP1 sekarang juga (PNL-nya dibank di pos.realizedPnl), sisa 50%
+  // tetap terbuka dengan SL efektif di BE (entryPrice) sampai kena TP2 atau
+  // balik ke BE. Posisi LIVE tidak lewat sini (sudah ditangani OCO qty1/qty2
+  // asli di Binance lewat recordLivePosition).
+  function partialClosePrioritySimPosition(key, exitPrice, time){
+    const pos = prioritySimPositions[key];
+    if(!pos || pos.tp1Hit) return;
+    const closeQty = pos.qty / 2;
+    const grossPnl = pos.dir==='BUY' ? (exitPrice-pos.entryPrice)*closeQty : (pos.entryPrice-exitPrice)*closeQty;
+    const exchangeFee = computePsimExchangeFee(pos.entryPrice, exitPrice, closeQty);
+    const marginFee = computePsimMarginFee(pos.entryPrice, closeQty, pos.entryTime, time);
+    pos.realizedPnl = (pos.realizedPnl || 0) + (grossPnl - exchangeFee - marginFee);
+    pos.realizedExchangeFee = (pos.realizedExchangeFee || 0) + exchangeFee;
+    pos.realizedMarginFee = (pos.realizedMarginFee || 0) + marginFee;
+    pos.qty = pos.qty - closeQty;
+    pos.tp1Hit = true;
+    savePrioritySimState();
+  }
+
   function closePrioritySimPosition(key, exitPrice, time, reason){
     const pos = prioritySimPositions[key];
     if(!pos) return;
@@ -4199,9 +4219,15 @@
     const grossPnl = (isLive && pos.actualRealizedPnl !== undefined && pos.actualRealizedPnl !== null)
       ? pos.actualRealizedPnl
       : (pos.dir==='BUY' ? (exitPrice-pos.entryPrice)*qty : (pos.entryPrice-exitPrice)*qty);
-    const exchangeFee = (isLive && pos.actualCommission !== undefined) ? pos.actualCommission : computePsimExchangeFee(pos.entryPrice, exitPrice, qty);
-    const marginFee = (isLive && pos.actualFunding !== undefined) ? pos.actualFunding : computePsimMarginFee(pos.entryPrice, qty, pos.entryTime, time);
-    const pnl = grossPnl - exchangeFee - marginFee;
+    const legExchangeFee = (isLive && pos.actualCommission !== undefined) ? pos.actualCommission : computePsimExchangeFee(pos.entryPrice, exitPrice, qty);
+    const legMarginFee = (isLive && pos.actualFunding !== undefined) ? pos.actualFunding : computePsimMarginFee(pos.entryPrice, qty, pos.entryTime, time);
+    // Kalau posisi ini sempat di-partial-close di TP1 (lihat
+    // partialClosePrioritySimPosition), PNL & fee separuh pertama yang sudah
+    // "dibank" digabung di sini supaya riwayat transaksi mencatat TOTAL akhir
+    // (bukan cuma sisa separuh terakhir).
+    const exchangeFee = legExchangeFee + (pos.realizedExchangeFee || 0);
+    const marginFee = legMarginFee + (pos.realizedMarginFee || 0);
+    const pnl = (grossPnl - legExchangeFee - legMarginFee) + (pos.realizedPnl || 0);
     const pnlPct = (pnl / pos.margin) * 100;
     const tpStatus = pos.tp2Hit ? 'TP1-TP2' : (pos.tp1Hit ? 'TP1-BE' : '-');
     // Ditandai "verified" (centang di kolom Waktu Exit) kalau ini posisi Binance
@@ -4319,14 +4345,14 @@
       if(price===null || price===undefined) return;
 
       if(pos.dir==='BUY'){
-        if(!pos.tp1Hit && price >= pos.tp1){ pos.tp1Hit = true; savePrioritySimState(); }
+        if(!pos.tp1Hit && price >= pos.tp1){ partialClosePrioritySimPosition(key, pos.tp1, Date.now()); }
         if(!pos.tp2Hit && price >= pos.tp2){ pos.tp2Hit = true; savePrioritySimState(); }
         if(pos.tp2Hit){ closePrioritySimPosition(key, pos.tp2, Date.now(), 'TP1-TP2'); return; }
         if(pos.tp1Hit){
           if(price <= pos.entryPrice){ closePrioritySimPosition(key, pos.entryPrice, Date.now(), 'BE/TP1'); return; }
         } else if(price <= pos.sl){ closePrioritySimPosition(key, pos.sl, Date.now(), 'Stop Loss'); return; }
       } else {
-        if(!pos.tp1Hit && price <= pos.tp1){ pos.tp1Hit = true; savePrioritySimState(); }
+        if(!pos.tp1Hit && price <= pos.tp1){ partialClosePrioritySimPosition(key, pos.tp1, Date.now()); }
         if(!pos.tp2Hit && price <= pos.tp2){ pos.tp2Hit = true; savePrioritySimState(); }
         if(pos.tp2Hit){ closePrioritySimPosition(key, pos.tp2, Date.now(), 'TP1-TP2'); return; }
         if(pos.tp1Hit){
@@ -4585,12 +4611,16 @@
         const riskSlDisplay = pos.tp1Hit ? 'BE/TP1' : `-$${Math.abs(potentialSlPnl).toFixed(2)}`;
         const areaTpLabel = pos.tp2Hit ? 'Hit TP2' : (pos.tp1Hit ? 'Hit TP1' : '-');
         const areaTpCls = (pos.tp1Hit || pos.tp2Hit) ? 'pnl-pos' : '';
-        // PNL Terealisasi: profit yang sudah benar-benar terkunci (misal dari
-        // TP1 yang sudah kena) - sinkron langsung dari Binance, terpisah dari
-        // PNL($) yang menampilkan floating mentah punya sisa posisi.
-        const hasRealized = pos.actualRealizedPnl !== undefined && pos.actualRealizedPnl !== null;
-        const realizedDisplay = hasRealized ? `${pos.actualRealizedPnl>=0?'+':''}$${pos.actualRealizedPnl.toFixed(2)}` : '-';
-        const realizedCls = hasRealized ? (pos.actualRealizedPnl>=0?'pnl-pos':'pnl-neg') : '';
+        // PNL Terealisasi: profit yang sudah benar-benar terkunci - untuk posisi
+        // live disinkron langsung dari Binance (actualRealizedPnl), untuk posisi
+        // simulasi berasal dari partial close 50% di TP1 (pos.realizedPnl).
+        // Terpisah dari PNL($) yang cuma menampilkan floating sisa posisi.
+        const hasActualRealized = pos.actualRealizedPnl !== undefined && pos.actualRealizedPnl !== null;
+        const hasSimRealized = pos.realizedPnl !== undefined && pos.realizedPnl !== null;
+        const hasRealized = hasActualRealized || hasSimRealized;
+        const realizedValue = hasActualRealized ? pos.actualRealizedPnl : pos.realizedPnl;
+        const realizedDisplay = hasRealized ? `${realizedValue>=0?'+':''}$${realizedValue.toFixed(2)}` : '-';
+        const realizedCls = hasRealized ? (realizedValue>=0?'pnl-pos':'pnl-neg') : '';
         const closeCls = floatPnl>=0 ? 'pnl-pos' : 'pnl-neg';
         return `<tr>
           <td><div class="es-sumber-cell"><span class="es-psim-source-link" data-symbol="${pos.source}" data-tf="${pos.tfValue||''}">${label}</span>${venueBadge}</div></td>

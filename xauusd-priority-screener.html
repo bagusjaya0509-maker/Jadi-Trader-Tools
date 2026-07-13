@@ -705,7 +705,7 @@
     <div class="es-sim-table-wrap">
       <table class="es-sim-table">
         <thead>
-          <tr><th>Sumber</th><th>Arah</th><th>Lot</th><th>Entry</th><th>SL</th><th>RISK SL ($)</th><th>TP1</th><th>TP2</th><th>Area TP</th><th>Harga Sekarang</th><th>PnL ($)</th><th>PnL (Pips)</th><th>Aksi</th></tr>
+          <tr><th>Sumber</th><th>Arah</th><th>Lot</th><th>Entry</th><th>SL</th><th>RISK SL ($)</th><th>TP1</th><th>TP2</th><th>Area TP</th><th>Harga Sekarang</th><th>PnL ($)</th><th>PNL Terealisasi</th><th>PnL (Pips)</th><th>Aksi</th></tr>
         </thead>
         <tbody id="esPsimOpenTbody"></tbody>
       </table>
@@ -1125,12 +1125,30 @@
     saveXauSimState();
   }
 
+  // Partial close 50% lot begitu TP1 kesentuh: separuh lot direalisasi di
+  // harga TP1 sekarang juga (PNL-nya dibank di pos.realizedPnl), sisa 50%
+  // tetap terbuka dengan SL efektif di BE (entryPrice) sampai kena TP2 atau
+  // balik ke BE.
+  function partialCloseXauSimPosition(key, exitPrice, time){
+    const pos = xauSimPositions[key];
+    if(!pos || pos.tp1Hit) return;
+    const closeLot = pos.lot / 2;
+    const pipsMoved = ((exitPrice-pos.entryPrice)/PIP_SIZE) * (pos.dir==='BUY'?1:-1);
+    pos.realizedPnl = (pos.realizedPnl || 0) + (pipsMoved * PIP_VALUE_PER_LOT * closeLot);
+    pos.lot = pos.lot - closeLot;
+    pos.tp1Hit = true;
+    saveXauSimState();
+  }
+
   function closeXauSimPosition(key, exitPrice, time, reason){
     const pos = xauSimPositions[key];
     if(!pos) return;
     const lot = pos.lot;
     const pipsMoved = ((exitPrice-pos.entryPrice)/PIP_SIZE) * (pos.dir==='BUY'?1:-1);
-    const pnl = pipsMoved * PIP_VALUE_PER_LOT * lot;
+    // Kalau posisi ini sempat di-partial-close di TP1 (lihat
+    // partialCloseXauSimPosition), PNL separuh pertama yang sudah "dibank"
+    // digabung di sini supaya riwayat transaksi mencatat TOTAL akhir.
+    const pnl = (pipsMoved * PIP_VALUE_PER_LOT * lot) + (pos.realizedPnl || 0);
     const tpStatus = pos.tp2Hit ? 'TP2' : (pos.tp1Hit ? 'BE/TP1' : '-');
     xauSimHistory.unshift({ tfLabel: pos.tfLabel, tfValue: pos.tfValue, dir: pos.dir, entryPrice: pos.entryPrice, entryTime: pos.entryTime,
       exitPrice, exitTime: time, reason, pnl, pnlPips: pipsMoved, tpStatus, lot });
@@ -1162,14 +1180,14 @@
       if(price===null || price===undefined) return;
 
       if(pos.dir==='BUY'){
-        if(!pos.tp1Hit && price >= pos.tp1){ pos.tp1Hit = true; saveXauSimState(); }
+        if(!pos.tp1Hit && price >= pos.tp1){ partialCloseXauSimPosition(key, pos.tp1, Date.now()); }
         if(!pos.tp2Hit && price >= pos.tp2){ pos.tp2Hit = true; saveXauSimState(); }
         if(pos.tp2Hit){ closeXauSimPosition(key, pos.tp2, Date.now(), 'TP1-TP2'); return; }
         if(pos.tp1Hit){
           if(price <= pos.entryPrice){ closeXauSimPosition(key, pos.entryPrice, Date.now(), 'BE/TP1'); return; }
         } else if(price <= pos.sl){ closeXauSimPosition(key, pos.sl, Date.now(), 'Stop Loss'); return; }
       } else {
-        if(!pos.tp1Hit && price <= pos.tp1){ pos.tp1Hit = true; saveXauSimState(); }
+        if(!pos.tp1Hit && price <= pos.tp1){ partialCloseXauSimPosition(key, pos.tp1, Date.now()); }
         if(!pos.tp2Hit && price <= pos.tp2){ pos.tp2Hit = true; saveXauSimState(); }
         if(pos.tp2Hit){ closeXauSimPosition(key, pos.tp2, Date.now(), 'TP1-TP2'); return; }
         if(pos.tp1Hit){
@@ -1343,7 +1361,7 @@
     const fmtTime = (ms)=> new Date(ms).toLocaleString('id-ID', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit' });
 
     if(openStats.length===0){
-      psimOpenTbody.innerHTML = `<tr><td colspan="13" style="text-align:center;color:var(--muted);padding:14px;">Belum ada posisi terbuka.</td></tr>`;
+      psimOpenTbody.innerHTML = `<tr><td colspan="14" style="text-align:center;color:var(--muted);padding:14px;">Belum ada posisi terbuka.</td></tr>`;
     } else {
       psimOpenTbody.innerHTML = openStats.map(({pos, price, floatPnl, floatPips, potentialSlPnl, lot})=>{
         const pnlCls = floatPnl>=0 ? 'pnl-pos':'pnl-neg';
@@ -1353,6 +1371,11 @@
         const areaTpLabel = pos.tp2Hit ? 'Hit TP2' : (pos.tp1Hit ? 'Hit TP1' : '-');
         const areaTpCls = (pos.tp1Hit || pos.tp2Hit) ? 'pnl-pos' : '';
         const closeCls = floatPnl>=0 ? 'pnl-pos' : 'pnl-neg';
+        // PNL Terealisasi: profit yang sudah dibank dari partial close 50% di
+        // TP1 - terpisah dari PnL($) yang cuma floating sisa lot yang masih terbuka.
+        const hasRealized = pos.realizedPnl !== undefined && pos.realizedPnl !== null;
+        const realizedDisplay = hasRealized ? `${pos.realizedPnl>=0?'+':''}$${pos.realizedPnl.toFixed(2)}` : '-';
+        const realizedCls = hasRealized ? (pos.realizedPnl>=0?'pnl-pos':'pnl-neg') : '';
         return `<tr>
           <td><span class="es-psim-source-link" data-tf="${pos.tfValue||''}">${label}</span></td>
           <td class="${arahCls}">${pos.dir}</td>
@@ -1365,6 +1388,7 @@
           <td class="${areaTpCls}">${areaTpLabel}</td>
           <td class="${pnlCls}">$${fmtPrice(price)}</td>
           <td class="${pnlCls}">${floatPnl>=0?'+':''}${floatPnl.toFixed(2)}</td>
+          <td class="${realizedCls}">${realizedDisplay}</td>
           <td class="${pnlCls}">${floatPips>=0?'+':''}${floatPips.toFixed(1)} pips</td>
           <td><button type="button" class="es-psim-close-btn ${closeCls}" data-key="${pos.key}">Close Posisi</button></td>
         </tr>`;
