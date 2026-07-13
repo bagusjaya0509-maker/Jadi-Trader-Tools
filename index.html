@@ -1082,8 +1082,11 @@
   }
   function fmtDate(ms){
     var d = new Date(ms);
-    return d.toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'}) + ' ' +
-           d.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
+    var dd = String(d.getDate()).padStart(2,'0');
+    var mm = String(d.getMonth()+1).padStart(2,'0');
+    var hh = String(d.getHours()).padStart(2,'0');
+    var mi = String(d.getMinutes()).padStart(2,'0');
+    return dd+' - '+mm+' - '+d.getFullYear()+' | '+hh+'.'+mi;
   }
 
   function computeStats(trades){
