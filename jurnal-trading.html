@@ -131,6 +131,14 @@
   /* ---------- Trade table ---------- */
   .table-scroll{overflow-x:auto;}
   .table-scroll.jt-hist-limited{ max-height:300px; overflow-y:auto; }
+  .jt-insight-limited{ max-height:230px; overflow-y:auto; }
+
+  /* Scrollbar gelap - menyatu dengan latar, dipakai di semua area scroll (riwayat trade, ringkasan per koin, pola emosi) */
+  .table-scroll, .jt-insight-limited{ scrollbar-color: var(--border) var(--surface); scrollbar-width: thin; }
+  .table-scroll::-webkit-scrollbar, .jt-insight-limited::-webkit-scrollbar{ width:8px; height:8px; }
+  .table-scroll::-webkit-scrollbar-track, .jt-insight-limited::-webkit-scrollbar-track{ background:var(--surface); }
+  .table-scroll::-webkit-scrollbar-thumb, .jt-insight-limited::-webkit-scrollbar-thumb{ background:var(--border); border-radius:4px; }
+  .table-scroll::-webkit-scrollbar-thumb:hover, .jt-insight-limited::-webkit-scrollbar-thumb:hover{ background:var(--ink-faint); }
   .jt-hist-controls{
     display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px;
   }
@@ -397,7 +405,7 @@
 
       <div class="card">
         <div class="card-head"><h2>Pola Emosi</h2></div>
-        <div id="emotionInsight">
+        <div id="emotionInsight" class="jt-insight-limited">
           <p style="font-size:12.5px;color:var(--ink-faint);margin:0">Belum ada data emosi. Insight akan muncul setelah kamu mencatat beberapa trade.</p>
         </div>
       </div>
@@ -501,7 +509,7 @@
 
       <div class="card">
         <div class="card-head"><h2>Ringkasan per Koin</h2></div>
-        <div id="cPairInsight">
+        <div id="cPairInsight" class="jt-insight-limited">
           <p style="font-size:12.5px;color:var(--ink-faint);margin:0">Belum ada data.</p>
         </div>
       </div>
