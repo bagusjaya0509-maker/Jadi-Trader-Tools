@@ -1358,6 +1358,13 @@
     width:90px; background: var(--panel-2); border:1px solid var(--border);
     color: var(--text); font-family: var(--font-mono); font-size:11px;
     padding:3px 6px; border-radius:5px;
+    appearance: textfield;
+    -moz-appearance: textfield;
+  }
+  .es-psim-edit-form input::-webkit-outer-spin-button,
+  .es-psim-edit-form input::-webkit-inner-spin-button{
+    -webkit-appearance: none;
+    margin: 0;
   }
   .es-psim-edit-form-actions{ display:flex; gap:6px; margin-top:2px; }
   .es-psim-edit-form-actions button{
