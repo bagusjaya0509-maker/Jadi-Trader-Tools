@@ -2932,9 +2932,10 @@
   const btcTfStripEl = document.getElementById('esBtcTfStrip');
   let btcTfScanning = false;
 
-  async function computeBtcTfStatus(tfValue){
+  function computeBtcTfStatusFromKlines(klines){
     try{
-      const { opens, highs, lows, closes } = await fetchKlines('BTCUSDT', tfValue, 250);
+      if(!klines) throw new Error('fetch failed');
+      const { opens, highs, lows, closes } = klines;
       if(closes.length < 210) return { label:'n/a', cls:'none' };
 
       const e9 = ema(closes, 9);
@@ -2974,38 +2975,16 @@
     }
   }
 
-  async function scanBtcTfStrip(){
-    if(btcTfScanning) return;
-    btcTfScanning = true;
-    try{
-      const results = await Promise.all(BTC_TF_LIST.map(tf => computeBtcTfStatus(tf.value)));
-      btcTfStripEl.innerHTML = BTC_TF_LIST.map((tf,i)=>{
-        const r = results[i];
-        return `<div class="es-btc-tf-box" data-tf="${tf.value}" title="Buka BTC ${tf.label} di TradingView">
-          <div class="es-btc-tf-box-label">BTC ${tf.label}</div>
-          <div class="es-btc-tf-box-status ${r.cls}">${r.label}</div>
-        </div>`;
-      }).join('');
-      btcTfStripEl.querySelectorAll('.es-btc-tf-box').forEach(box=>{
-        box.addEventListener('click', ()=>{
-          openTradingView('BTCUSDT', box.getAttribute('data-tf'));
-        });
-      });
-    }finally{
-      btcTfScanning = false;
-    }
-  }
-
   // Strip status BTC per timeframe khusus Sinyal Prioritas SNR - beda dari
   // esBtcTfStrip di atas (yang pakai prioritas Cross EMA > S/R > S/D > BB),
   // strip ini SELALU pakai logic retest SNR (checkSnrRetestSignal) di semua
   // timeframe, jadi labelnya konsisten dengan section Sinyal Prioritas SNR.
   const snrBtcTfStripEl = document.getElementById('esSnrBtcTfStrip');
-  let snrBtcTfScanning = false;
 
-  async function computeSnrBtcTfStatus(tfValue){
+  function computeSnrBtcTfStatusFromKlines(klines){
     try{
-      const { opens, highs, lows, closes } = await fetchKlines('BTCUSDT', tfValue, 200);
+      if(!klines) throw new Error('fetch failed');
+      const { opens, highs, lows, closes } = klines;
       if(closes.length < 30) return { label:'n/a', cls:'none' };
       const res = checkSnrRetestSignal(opens, highs, lows, closes);
       if(!res) return { label:'-', cls:'none' };
@@ -3015,25 +2994,35 @@
     }
   }
 
-  async function scanSnrBtcTfStrip(){
-    if(snrBtcTfScanning) return;
-    snrBtcTfScanning = true;
-    try{
-      const results = await Promise.all(BTC_TF_LIST.map(tf => computeSnrBtcTfStatus(tf.value)));
-      snrBtcTfStripEl.innerHTML = BTC_TF_LIST.map((tf,i)=>{
-        const r = results[i];
-        return `<div class="es-btc-tf-box" data-tf="${tf.value}" title="Buka BTC ${tf.label} di TradingView">
-          <div class="es-btc-tf-box-label">BTC ${tf.label}</div>
-          <div class="es-btc-tf-box-status ${r.cls}">${r.label}</div>
-        </div>`;
-      }).join('');
-      snrBtcTfStripEl.querySelectorAll('.es-btc-tf-box').forEach(box=>{
-        box.addEventListener('click', ()=>{
-          openTradingView('BTCUSDT', box.getAttribute('data-tf'));
-        });
+  function renderBtcTfBoxes(container, results){
+    container.innerHTML = BTC_TF_LIST.map((tf,i)=>{
+      const r = results[i];
+      return `<div class="es-btc-tf-box" data-tf="${tf.value}" title="Buka BTC ${tf.label} di TradingView">
+        <div class="es-btc-tf-box-label">BTC ${tf.label}</div>
+        <div class="es-btc-tf-box-status ${r.cls}">${r.label}</div>
+      </div>`;
+    }).join('');
+    container.querySelectorAll('.es-btc-tf-box').forEach(box=>{
+      box.addEventListener('click', ()=>{
+        openTradingView('BTCUSDT', box.getAttribute('data-tf'));
       });
+    });
+  }
+
+  // Satu fungsi gabungan untuk KEDUA strip BTC (Cross EMA/S-R/S-D/BB di atas +
+  // SNR retest di bawah) - klines BTC per timeframe cuma diambil SEKALI lalu
+  // dipakai bareng untuk kedua strip, bukan fetch terpisah 2x. Sebelumnya
+  // dua strip ini masing-masing polling sendiri tiap 90 detik (dobel beban ke
+  // Binance untuk simbol yang sama) - digabung supaya beban API tidak dobel.
+  async function scanAllBtcTfStrips(){
+    if(btcTfScanning) return;
+    btcTfScanning = true;
+    try{
+      const klinesList = await Promise.all(BTC_TF_LIST.map(tf => fetchKlines('BTCUSDT', tf.value, 250).catch(()=>null)));
+      renderBtcTfBoxes(btcTfStripEl, klinesList.map(k => computeBtcTfStatusFromKlines(k)));
+      renderBtcTfBoxes(snrBtcTfStripEl, klinesList.map(k => computeSnrBtcTfStatusFromKlines(k)));
     }finally{
-      snrBtcTfScanning = false;
+      btcTfScanning = false;
     }
   }
 
@@ -5440,8 +5429,8 @@
   renderFavCrossManageUI();
   scanFavoriteCrossSection();
   setInterval(scanFavoriteCrossSection, 90000);
-  scanBtcTfStrip();
-  setInterval(scanBtcTfStrip, 90000);
+  scanAllBtcTfStrips();
+  setInterval(scanAllBtcTfStrips, 90000);
 
   // Posisi SIMULASI cukup ikut siklus scan 90 detik yang sudah ada (scan()
   // sendiri sudah panggil monitorPrioritySimPositions + renderPrioritySimUI
@@ -5640,7 +5629,5 @@
   // selesai memindai (bukan bersamaan), supaya tidak membebani API dengan 2
   // scan besar sekaligus di awal halaman dibuka.
   findPrioritySignals().then(function(){ findPrioritySnrSignals(); });
-  scanSnrBtcTfStrip();
-  setInterval(scanSnrBtcTfStrip, 90000);
 })();
 </script>
