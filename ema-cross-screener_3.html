@@ -1324,6 +1324,50 @@
   .es-psim-close-btn.pnl-pos{ color: var(--bull); }
   .es-psim-close-btn.pnl-neg{ color: var(--bear); }
 
+  .es-psim-action-cell{ display:flex; gap:6px; flex-wrap:wrap; }
+  .es-psim-edit-sltp-btn, .es-psim-cancel-order-btn{
+    background:none;
+    border:1px solid var(--gold);
+    color: var(--gold);
+    border-radius:4px;
+    padding:3px 9px;
+    font-family: var(--font-mono);
+    font-size:10.5px;
+    font-weight:600;
+    cursor:pointer;
+  }
+  .es-psim-edit-sltp-btn:hover, .es-psim-cancel-order-btn:hover{ opacity:0.75; }
+  .es-psim-pending-row{ opacity:0.85; }
+  .es-psim-pending-badge{
+    display:inline-block;
+    font-family: var(--font-mono);
+    font-size:8.5px;
+    font-weight:700;
+    color: var(--gold);
+    border:1px solid var(--gold);
+    border-radius:4px;
+    padding:1px 5px;
+    margin-left:4px;
+  }
+  .es-psim-edit-form{ display:flex; flex-direction:column; gap:4px; min-width:150px; }
+  .es-psim-edit-form label{
+    display:flex; justify-content:space-between; align-items:center; gap:6px;
+    font-family: var(--font-mono); font-size:10px; color: var(--muted);
+  }
+  .es-psim-edit-form input{
+    width:90px; background: var(--panel-2); border:1px solid var(--border);
+    color: var(--text); font-family: var(--font-mono); font-size:11px;
+    padding:3px 6px; border-radius:5px;
+  }
+  .es-psim-edit-form-actions{ display:flex; gap:6px; margin-top:2px; }
+  .es-psim-edit-form-actions button{
+    flex:1; border-radius:5px; padding:4px 6px; font-family: var(--font-mono);
+    font-size:10.5px; font-weight:600; cursor:pointer; border:1px solid var(--border);
+    background: var(--panel-2); color: var(--text);
+  }
+  .es-edit-save-btn{ border-color: var(--bull) !important; color: var(--bull) !important; }
+  .es-edit-cancel-btn:hover, .es-edit-save-btn:hover{ opacity:0.8; }
+
   .es-sim-note{
     margin-top:12px;
     font-family: var(--font-mono);
@@ -1557,11 +1601,31 @@
       <label>Sinyal Terpilih
         <select id="esPsimSignalSelect"><option value="">&mdash; Pilih sinyal &mdash;</option></select>
       </label>
+      <label title="Khusus Live Trading Binance - menentukan jenis order entry yang dikirim ke exchange">Opsi Order Manual (Live)
+        <select id="esLiveOrderType">
+          <option value="MARKET" selected>Otomatis (Market)</option>
+          <option value="BUY_LIMIT">Buy Limit</option>
+          <option value="SELL_LIMIT">Sell Limit</option>
+          <option value="BUY_STOP">Buy Stop</option>
+          <option value="SELL_STOP">Sell Stop</option>
+        </select>
+      </label>
+      <label id="esLiveEntryPriceLabel" style="display:none;">Harga Entry Manual ($)
+        <input type="number" id="esLiveEntryPriceManual" placeholder="harga limit/stop" step="any">
+      </label>
       <label>SL Manual ($)
         <input type="number" id="esPsimManualSl" placeholder="otomatis" step="any">
       </label>
       <label>TP Manual ($)
         <input type="number" id="esPsimManualTp" placeholder="otomatis" step="any">
+      </label>
+      <label title="Khusus Live Trading Binance - menentukan cara SL/TP1/TP2 ditangani setelah entry">Metode Entry (Live)
+        <select id="esLiveEntryMethod">
+          <option value="partial" selected>TP1 &amp; TP2 (partial 50% di TP1, SL ke BE)</option>
+          <option value="nopartial">TP1 &amp; TP2 (SL ke BE di TP1, tanpa partial 50%)</option>
+          <option value="tp1only">SL &amp; TP1 saja (tanpa TP2)</option>
+          <option value="tp2only">SL &amp; TP2 saja (tanpa TP1)</option>
+        </select>
       </label>
       <label class="es-sim-checkbox-label">Aktif
         <input type="checkbox" id="esPsimToggle" checked>
@@ -3823,6 +3887,10 @@
   const psimSignalSelect = document.getElementById('esPsimSignalSelect');
   const psimManualSlInput = document.getElementById('esPsimManualSl');
   const psimManualTpInput = document.getElementById('esPsimManualTp');
+  const liveOrderTypeSel = document.getElementById('esLiveOrderType');
+  const liveEntryPriceLabel = document.getElementById('esLiveEntryPriceLabel');
+  const liveEntryPriceManualInput = document.getElementById('esLiveEntryPriceManual');
+  const liveEntryMethodSel = document.getElementById('esLiveEntryMethod');
   const psimToggle = document.getElementById('esPsimToggle');
   const psimOpenBtn = document.getElementById('esPsimOpenBtn');
   const psimResetBtn = document.getElementById('esPsimResetBtn');
@@ -3842,6 +3910,63 @@
   const liveEnvBadgeEl = document.getElementById('esLiveEnvBadge');
   let liveDetectedEnv = null; // 'testnet' | 'live' | null
   let liveDetectedBaseUrl = '';
+
+  // Peta pilihan "Opsi Order Manual" -> entryType Binance + side yang dipaksa.
+  // Otomatis (Market) tidak memaksa side - ikut arah sinyal (cand.signal) seperti biasa.
+  const LIVE_ORDER_TYPE_MAP = {
+    MARKET:     { entryType: 'MARKET',      side: null,   label: 'Otomatis (Market)' },
+    BUY_LIMIT:  { entryType: 'LIMIT',       side: 'BUY',  label: 'Buy Limit' },
+    SELL_LIMIT: { entryType: 'LIMIT',       side: 'SELL', label: 'Sell Limit' },
+    BUY_STOP:   { entryType: 'STOP_MARKET', side: 'BUY',  label: 'Buy Stop' },
+    SELL_STOP:  { entryType: 'STOP_MARKET', side: 'SELL', label: 'Sell Stop' }
+  };
+  const LIVE_ENTRY_METHOD_LABEL = {
+    partial:   'TP1 & TP2 (partial 50% di TP1, SL ke BE)',
+    nopartial: 'TP1 & TP2 (SL ke BE di TP1, tanpa partial 50%)',
+    tp1only:   'SL & TP1 saja (tanpa TP2)',
+    tp2only:   'SL & TP2 saja (tanpa TP1)'
+  };
+
+  liveOrderTypeSel.addEventListener('change', ()=>{
+    const isManualPrice = liveOrderTypeSel.value !== 'MARKET';
+    liveEntryPriceLabel.style.display = isManualPrice ? '' : 'none';
+  });
+
+  // Validasi arah + kewajaran harga Order Type manual sebelum kirim order live -
+  // supaya kesalahan input (mis. pilih Sell Limit padahal sinyalnya BUY, atau
+  // Buy Limit dengan harga entry di ATAS harga pasar) ketahuan SEBELUM order
+  // terkirim ke Binance, bukan sesudah.
+  function validateLiveOrderInput(cand, orderTypeCfg, entryPriceUsed, slVal, tp1Val){
+    if(orderTypeCfg.side && orderTypeCfg.side !== cand.signal){
+      return { ok:false, message:`Jenis order "${orderTypeCfg.label}" cuma valid untuk sinyal ${orderTypeCfg.side} - sinyal ini ${cand.signal}. Pilih jenis order yang sesuai atau pilih "Otomatis (Market)".` };
+    }
+    if(orderTypeCfg.entryType !== 'MARKET'){
+      if(!entryPriceUsed || entryPriceUsed <= 0){
+        return { ok:false, message:'Isi dulu "Harga Entry Manual ($)" untuk jenis order Limit/Stop.' };
+      }
+      const marketPrice = cand.price;
+      if(orderTypeCfg.entryType==='LIMIT' && orderTypeCfg.side==='BUY' && entryPriceUsed >= marketPrice){
+        return { ok:false, message:`Buy Limit harus di BAWAH harga pasar saat ini ($${fmtPrice(marketPrice)}) - harga entry manual kamu ($${fmtPrice(entryPriceUsed)}) tidak sesuai. Salah input.` };
+      }
+      if(orderTypeCfg.entryType==='LIMIT' && orderTypeCfg.side==='SELL' && entryPriceUsed <= marketPrice){
+        return { ok:false, message:`Sell Limit harus di ATAS harga pasar saat ini ($${fmtPrice(marketPrice)}) - harga entry manual kamu ($${fmtPrice(entryPriceUsed)}) tidak sesuai. Salah input.` };
+      }
+      if(orderTypeCfg.entryType==='STOP_MARKET' && orderTypeCfg.side==='BUY' && entryPriceUsed <= marketPrice){
+        return { ok:false, message:`Buy Stop harus di ATAS harga pasar saat ini ($${fmtPrice(marketPrice)}) - harga entry manual kamu ($${fmtPrice(entryPriceUsed)}) tidak sesuai. Salah input.` };
+      }
+      if(orderTypeCfg.entryType==='STOP_MARKET' && orderTypeCfg.side==='SELL' && entryPriceUsed >= marketPrice){
+        return { ok:false, message:`Sell Stop harus di BAWAH harga pasar saat ini ($${fmtPrice(marketPrice)}) - harga entry manual kamu ($${fmtPrice(entryPriceUsed)}) tidak sesuai. Salah input.` };
+      }
+    }
+    const side = orderTypeCfg.side || cand.signal;
+    if(side==='BUY' && !(slVal < entryPriceUsed && tp1Val > entryPriceUsed)){
+      return { ok:false, message:`Untuk order BUY, SL Manual ($${fmtPrice(slVal)}) harus di BAWAH harga entry ($${fmtPrice(entryPriceUsed)}) dan TP Manual ($${fmtPrice(tp1Val)}) harus di ATASnya. SL/TP Manual tidak sesuai - salah input.` };
+    }
+    if(side==='SELL' && !(slVal > entryPriceUsed && tp1Val < entryPriceUsed)){
+      return { ok:false, message:`Untuk order SELL, SL Manual ($${fmtPrice(slVal)}) harus di ATAS harga entry ($${fmtPrice(entryPriceUsed)}) dan TP Manual ($${fmtPrice(tp1Val)}) harus di BAWAHnya. SL/TP Manual tidak sesuai - salah input.` };
+    }
+    return { ok:true, message:'' };
+  }
 
   function loadLiveTradeConfig(){
     try{
@@ -3952,16 +4077,24 @@
     liveTradeStatusEl.classList.remove('error', 'success');
     liveTradeStatusEl.textContent = 'Menyiapkan order (ambil aturan lot/harga simbol)...';
 
-    let quantityStr, qty1Str, qty2Str, tp1Str, tp2Str, slStr, splitTp;
+    const orderTypeCfg = LIVE_ORDER_TYPE_MAP[liveOrderTypeSel.value] || LIVE_ORDER_TYPE_MAP.MARKET;
+    const entryMethod = liveEntryMethodSel.value || 'partial';
+    const side = orderTypeCfg.side || cand.signal;
+
+    let quantityStr, qty1Str, qty2Str, tp1Str, tp2Str, slStr, splitTp, virtualTp1Str, entryPriceUsed;
     const leverage = currentPsimLeverage();
     try{
-      const entryPrice = cand.price;
+      entryPriceUsed = orderTypeCfg.entryType === 'MARKET' ? cand.price : parseFloat(liveEntryPriceManualInput.value);
       const { sl: slRaw, tp: tpRaw, isManualTp } = getEffectiveSlTp(cand);
       if(slRaw===null || tpRaw===null){
         throw new Error('Sinyal ini tidak punya SL/TP otomatis - isi dulu "SL Manual" & "TP Manual" sebelum kirim order.');
       }
+
+      const check = validateLiveOrderInput(cand, orderTypeCfg, entryPriceUsed, slRaw, tpRaw);
+      if(!check.ok) throw new Error(check.message);
+
       const margin = currentPsimMargin();
-      const quantityRaw = (margin * leverage) / entryPrice; // Futures: notional = margin x leverage
+      const quantityRaw = (margin * leverage) / entryPriceUsed; // Futures: notional = margin x leverage
 
       const { stepSize, tickSize, quantityPrecision, pricePrecision, orderTypes } = await fetchSymbolFilters(cand.symbol);
 
@@ -3973,6 +4106,9 @@
         throw new Error(`Simbol ${cand.symbol} tidak mendukung order STOP_MARKET/TAKE_PROFIT_MARKET otomatis di Binance `
           + `(order type yang didukung: ${orderTypes.join(', ') || '-'}). Order dibatalkan sebelum entry - pilih simbol lain.`);
       }
+      if(orderTypeCfg.entryType === 'LIMIT' && !orderTypes.includes('LIMIT')){
+        throw new Error(`Simbol ${cand.symbol} tidak mendukung order LIMIT di Binance. Order dibatalkan sebelum entry.`);
+      }
 
       quantityStr = stepSize ? roundToStep(quantityRaw, stepSize, quantityPrecision) : quantityRaw.toFixed(quantityPrecision != null ? quantityPrecision : 6);
       slStr = tickSize ? roundToStep(slRaw, tickSize, pricePrecision) : fmtPrice(slRaw);
@@ -3981,36 +4117,47 @@
         throw new Error('Modal terlalu kecil untuk lot minimum simbol ini.');
       }
 
-      // TP manual = satu target saja (full quantity). TP otomatis = displit jadi
-      // TP1 (1x risk, separuh qty) + TP2 (2x risk, separuh qty) - partial take-profit.
-      // Begitu TP1 kena, tool otomatis pindahkan SL ke breakeven untuk sisanya.
-      const riskDist = Math.abs(entryPrice - slRaw);
+      // TP1 (1x risk) & TP2 (2x risk) selalu dihitung dari sini - Metode Entry
+      // (partial/nopartial/tp1only/tp2only) yang menentukan order APA yang
+      // benar-benar dikirim ke Binance (lihat komentar per-cabang di bawah).
+      const riskDist = Math.abs(entryPriceUsed - slRaw);
       const tp1Raw = tpRaw;
-      splitTp = !isManualTp;
-      tp1Str = tickSize ? roundToStep(tp1Raw, tickSize, pricePrecision) : fmtPrice(tp1Raw);
+      const tp2Raw = side==='BUY' ? entryPriceUsed + riskDist*2 : entryPriceUsed - riskDist*2;
+      const tp1Fmt = tickSize ? roundToStep(tp1Raw, tickSize, pricePrecision) : fmtPrice(tp1Raw);
+      const tp2Fmt = tickSize ? roundToStep(tp2Raw, tickSize, pricePrecision) : fmtPrice(tp2Raw);
 
-      if(splitTp){
+      splitTp = false; virtualTp1Str = null;
+      if(entryMethod === 'partial'){
         const halfRaw = parseFloat(quantityStr) / 2;
-        qty1Str = stepSize ? roundToStep(halfRaw, stepSize, quantityPrecision) : halfRaw.toFixed(quantityPrecision != null ? quantityPrecision : 6);
-        const qty2Raw = parseFloat(quantityStr) - parseFloat(qty1Str);
-        qty2Str = qty2Raw.toFixed(quantityPrecision != null ? quantityPrecision : 6);
-        if(parseFloat(qty1Str) <= 0 || parseFloat(qty2Str) <= 0){
-          // Modal terlalu kecil buat displit 2 order - fallback ke 1 TP full quantity.
-          splitTp = false;
-          qty1Str = quantityStr; qty2Str = null; tp2Str = null;
+        const halfQtyStr = stepSize ? roundToStep(halfRaw, stepSize, quantityPrecision) : halfRaw.toFixed(quantityPrecision != null ? quantityPrecision : 6);
+        const qty2Raw = parseFloat(quantityStr) - parseFloat(halfQtyStr);
+        const qty2FromHalfStr = qty2Raw.toFixed(quantityPrecision != null ? quantityPrecision : 6);
+        if(parseFloat(halfQtyStr) <= 0 || parseFloat(qty2FromHalfStr) <= 0){
+          // Modal terlalu kecil buat displit 2 order - fallback ke 1 TP full quantity (seperti "tp1only").
+          tp1Str = tp1Fmt; qty1Str = quantityStr; qty2Str = null; tp2Str = null;
         } else {
-          const tp2Raw = cand.signal==='BUY' ? entryPrice + riskDist*2 : entryPrice - riskDist*2;
-          tp2Str = tickSize ? roundToStep(tp2Raw, tickSize, pricePrecision) : fmtPrice(tp2Raw);
+          splitTp = true;
+          tp1Str = tp1Fmt; qty1Str = halfQtyStr; tp2Str = tp2Fmt; qty2Str = qty2FromHalfStr;
         }
-      } else {
-        qty1Str = quantityStr; qty2Str = null; tp2Str = null;
+      } else if(entryMethod === 'nopartial'){
+        // TIDAK ada partial close - cuma SATU order TP dipasang (di harga TP2,
+        // full quantity). Level TP1 (1x risk) TIDAK dikirim sebagai order ke
+        // Binance sama sekali - cuma dipantau lokal (virtualTp1Str), begitu
+        // harga menyentuhnya tool otomatis memindahkan SL ke breakeven untuk
+        // FULL quantity (lihat sync loop periodik).
+        tp1Str = tp2Fmt; qty1Str = quantityStr; qty2Str = null; tp2Str = null;
+        virtualTp1Str = tp1Fmt;
+      } else if(entryMethod === 'tp1only'){
+        tp1Str = tp1Fmt; qty1Str = quantityStr; qty2Str = null; tp2Str = null;
+      } else { // 'tp2only'
+        tp1Str = tp2Fmt; qty1Str = quantityStr; qty2Str = null; tp2Str = null;
       }
 
       // Pengaman: kalau perhitungan TP/SL entah kenapa jadi 0 (atau sama persis
       // dengan entry), JANGAN kirim order - posisi real tanpa SL/TP valid berbahaya.
       if(parseFloat(tp1Str) <= 0 || parseFloat(slStr) <= 0 || (splitTp && parseFloat(tp2Str) <= 0)){
         throw new Error(`Perhitungan TP/SL tidak valid (TP1:${tp1Str} TP2:${tp2Str} SL:${slStr}) - order dibatalkan demi keamanan. `
-          + `[debug] symbol:${cand.symbol} entryPrice:${entryPrice} slRaw:${slRaw} tpRaw:${tpRaw} tickSize:${tickSize} pricePrecision:${pricePrecision}`);
+          + `[debug] symbol:${cand.symbol} entryPrice:${entryPriceUsed} slRaw:${slRaw} tpRaw:${tpRaw} tickSize:${tickSize} pricePrecision:${pricePrecision}`);
       }
     }catch(e){
       liveTradeBtn.disabled = false;
@@ -4022,9 +4169,14 @@
     const envLabel = env === 'live' ? '🔴 LIVE - REAL ORDER' : '🧪 TESTNET (saldo palsu)';
     const tpLines = splitTp
       ? `TP1: $${tp1Str} (qty ${qty1Str})\nTP2: $${tp2Str} (qty ${qty2Str}) - SL otomatis pindah ke breakeven begitu TP1 kena`
-      : `TP: $${tp1Str}`;
+      : (virtualTp1Str
+          ? `TP: $${tp1Str} (full qty) - SL otomatis pindah ke breakeven begitu harga sentuh $${virtualTp1Str} (tanpa partial close)`
+          : `TP: $${tp1Str}`);
+    const entryLine = orderTypeCfg.entryType === 'MARKET'
+      ? `Entry: MARKET (~$${fmtPrice(cand.price)})`
+      : `Entry: ${orderTypeCfg.label} @ $${fmtPrice(entryPriceUsed)} (order MENGGANTUNG sampai harga tersentuh)`;
     const confirmMsg = `Kirim order ke Binance Futures [${envLabel}] untuk ${cand.symbol.replace('USDT','')} (TF ${cand.tfLabel}):\n\n`
-      + `Arah: ${cand.signal}\nLeverage: ${leverage}x\nQty: ${quantityStr}\nEntry: MARKET (~$${fmtPrice(cand.price)})\nSL: $${slStr}\n${tpLines}\n\n`
+      + `Arah: ${side}\nJenis Order: ${orderTypeCfg.label}\nMetode Entry: ${LIVE_ENTRY_METHOD_LABEL[entryMethod]}\nLeverage: ${leverage}x\nQty: ${quantityStr}\n${entryLine}\nSL: $${slStr}\n${tpLines}\n\n`
       + (env === 'live'
           ? 'PERINGATAN: ini memakai UANG ASLI dari akun Binance kamu dan tidak bisa dibatalkan setelah terkirim. Lanjutkan?'
           : 'Ini order ke akun testnet kamu (saldo palsu). Lanjutkan?');
@@ -4034,7 +4186,7 @@
       return;
     }
     if(env === 'live'){
-      const estNotional = (parseFloat(quantityStr) * cand.price).toFixed(2);
+      const estNotional = (parseFloat(quantityStr) * entryPriceUsed).toFixed(2);
       if(!window.confirm(`Konfirmasi terakhir: kirim order UANG ASLI senilai ~$${estNotional} sekarang?`)){
         liveTradeBtn.disabled = false;
         liveTradeStatusEl.textContent = '';
@@ -4050,9 +4202,11 @@
         headers: { 'Content-Type': 'application/json', 'X-App-Token': appToken },
         body: JSON.stringify({
           symbol: cand.symbol,
-          side: cand.signal,
+          side,
           quantity: quantityStr,
           leverage,
+          entryType: orderTypeCfg.entryType,
+          entryPrice: orderTypeCfg.entryType === 'MARKET' ? undefined : entryPriceUsed,
           sl: slStr,
           tp1: tp1Str,
           qty1: qty1Str,
@@ -4066,19 +4220,33 @@
         const paramsLabel = data && data.sentParams ? ` | dikirim: ${JSON.stringify(data.sentParams)}` : '';
         throw new Error(stageLabel + ((data && data.error) ? JSON.stringify(data.error) : `HTTP ${res.status}`) + paramsLabel);
       }
-      // slOrder/tp1Order/tp2Order sekarang lewat endpoint algoOrder Binance yang
-      // baru - ID-nya di field "algoId", bukan "orderId" seperti order biasa.
-      const entryOrderId = data.entryOrder && data.entryOrder.orderId;
-      const slOrderId = data.slOrder && (data.slOrder.orderId || data.slOrder.algoId);
-      const tp1OrderId = data.tp1Order && (data.tp1Order.orderId || data.tp1Order.algoId);
-      const tp2OrderId = data.tp2Order && (data.tp2Order.orderId || data.tp2Order.algoId);
-      const actualEntryPrice = data.entryOrder && parseFloat(data.entryOrder.avgPrice);
-      liveTradeStatusEl.classList.add('success');
-      liveTradeStatusEl.textContent = `Berhasil (${envLabel})! Entry: ${entryOrderId}, SL: ${slOrderId}, TP1: ${tp1OrderId}${tp2OrderId?`, TP2: ${tp2OrderId}`:''}`;
 
       const liveKey = `${cand.symbol}_${cand.tfValue}_LIVE_${Date.now()}`;
-      recordLivePosition(liveKey, cand, quantityStr, qty1Str, qty2Str, tp1Str, tp2Str, slStr, Date.now(),
-        { entryOrderId, slOrderId, tp1OrderId, tp2OrderId }, env, actualEntryPrice);
+
+      if(data.pending){
+        // Entry LIMIT/STOP masih menggantung di Binance - belum ada posisi
+        // sama sekali, jadi SL/TP BELUM dipasang. Simpan sebagai posisi
+        // "pending" - sync loop periodik yang akan mendeteksi begitu order
+        // ini ke-fill (lewat /api/positions) lalu memasang SL/TP1/TP2-nya.
+        const entryOrderId = data.entryOrder && (data.entryOrder.orderId || data.entryOrder.algoId);
+        liveTradeStatusEl.classList.add('success');
+        liveTradeStatusEl.textContent = `Order ${orderTypeCfg.label} terkirim (${envLabel})! ID: ${entryOrderId}. Menunggu harga menyentuh $${fmtPrice(entryPriceUsed)}...`;
+        recordPendingLivePosition(liveKey, cand, side, quantityStr, qty1Str, qty2Str, tp1Str, tp2Str, slStr,
+          entryPriceUsed, orderTypeCfg, entryMethod, virtualTp1Str, Date.now(), entryOrderId, data.isAlgoEntry, env);
+      } else {
+        // slOrder/tp1Order/tp2Order sekarang lewat endpoint algoOrder Binance yang
+        // baru - ID-nya di field "algoId", bukan "orderId" seperti order biasa.
+        const entryOrderId = data.entryOrder && data.entryOrder.orderId;
+        const slOrderId = data.slOrder && (data.slOrder.orderId || data.slOrder.algoId);
+        const tp1OrderId = data.tp1Order && (data.tp1Order.orderId || data.tp1Order.algoId);
+        const tp2OrderId = data.tp2Order && (data.tp2Order.orderId || data.tp2Order.algoId);
+        const actualEntryPrice = data.entryOrder && parseFloat(data.entryOrder.avgPrice);
+        liveTradeStatusEl.classList.add('success');
+        liveTradeStatusEl.textContent = `Berhasil (${envLabel})! Entry: ${entryOrderId}, SL: ${slOrderId}, TP1: ${tp1OrderId}${tp2OrderId?`, TP2: ${tp2OrderId}`:''}`;
+
+        recordLivePosition(liveKey, cand, side, quantityStr, qty1Str, qty2Str, tp1Str, tp2Str, slStr, Date.now(),
+          { entryOrderId, slOrderId, tp1OrderId, tp2OrderId }, env, actualEntryPrice, entryMethod, virtualTp1Str);
+      }
       renderPrioritySimUI(window.__esLastTickers||{});
     }catch(e){
       liveTradeStatusEl.classList.add('error');
@@ -4168,20 +4336,41 @@
 
   // Posisi order ASLI (dikirim lewat backend, testnet atau live) - dicatat di tabel yang sama tapi
   // ditandai venue:'live-testnet'/'live-real' supaya tidak ikut logic auto-close simulasi (TP/SL asli dikelola OCO di Binance).
-  function recordLivePosition(key, cand, quantity, qty1, qty2, tp1, tp2, sl, time, orderIds, env, actualEntryPrice){
+  function recordLivePosition(key, cand, side, quantity, qty1, qty2, tp1, tp2, sl, time, orderIds, env, actualEntryPrice, entryMethod, virtualTp1){
     // Pakai harga eksekusi ASLI dari Binance (avgPrice hasil order MARKET) kalau
     // ada - itu entry price sebenarnya yang dipakai Binance buat hitung PNL.
     // cand.price cuma harga PERKIRAAN saat sinyal dipilih (sebelum order jalan),
     // beda dari harga fill asli karena order MARKET pasti ada sedikit slip harga.
     const entryPrice = (actualEntryPrice && actualEntryPrice > 0) ? actualEntryPrice : cand.price;
     prioritySimPositions[key] = {
-      key, source: cand.symbol, tfLabel: cand.tfLabel, tfValue: cand.tfValue, dir: cand.signal,
+      key, source: cand.symbol, tfLabel: cand.tfLabel, tfValue: cand.tfValue, dir: side,
       entryPrice, entryTime: time, sl: parseFloat(sl), tp1: parseFloat(tp1), tp2: qty2 ? parseFloat(tp2) : parseFloat(tp1),
       qty1: parseFloat(qty1), qty2: qty2 ? parseFloat(qty2) : null,
       tp1Hit:false, tp2Hit:false, margin: currentPsimMargin(), leverage: currentPsimLeverage(), qty: parseFloat(quantity),
       venue: env === 'live' ? 'live-real' : 'live-testnet',
       liveOrderId: orderIds.entryOrderId, liveSlOrderId: orderIds.slOrderId,
-      liveTp1OrderId: orderIds.tp1OrderId, liveTp2OrderId: orderIds.tp2OrderId
+      liveTp1OrderId: orderIds.tp1OrderId, liveTp2OrderId: orderIds.tp2OrderId,
+      entryMethod: entryMethod || 'partial', virtualTp1: virtualTp1 ? parseFloat(virtualTp1) : null
+    };
+    savePrioritySimState();
+  }
+
+  // Posisi entry LIMIT/STOP yang masih MENGGANTUNG di Binance (belum ada
+  // posisi terbuka sama sekali, jadi SL/TP1/TP2 belum dipasang). Disimpan di
+  // registry yang SAMA (prioritySimPositions) dengan flag pending:true, supaya
+  // muncul di tabel Posisi Terbuka juga - sync loop periodik yang akan
+  // mendeteksi begitu order ini ke-fill lalu memasang SL/TP-nya (lihat
+  // pollLivePositions).
+  function recordPendingLivePosition(key, cand, side, quantity, qty1, qty2, tp1, tp2, sl, entryPriceTarget, orderTypeCfg, entryMethod, virtualTp1, time, entryOrderId, isAlgoEntry, env){
+    prioritySimPositions[key] = {
+      key, source: cand.symbol, tfLabel: cand.tfLabel, tfValue: cand.tfValue, dir: side,
+      entryPrice: entryPriceTarget, entryTime: time, sl: parseFloat(sl), tp1: parseFloat(tp1), tp2: qty2 ? parseFloat(tp2) : parseFloat(tp1),
+      qty1: parseFloat(qty1), qty2: qty2 ? parseFloat(qty2) : null,
+      tp1Hit:false, tp2Hit:false, margin: currentPsimMargin(), leverage: currentPsimLeverage(), qty: parseFloat(quantity),
+      venue: env === 'live' ? 'live-real' : 'live-testnet',
+      liveOrderId: entryOrderId, liveSlOrderId: null, liveTp1OrderId: null, liveTp2OrderId: null,
+      entryMethod: entryMethod || 'partial', virtualTp1: virtualTp1 ? parseFloat(virtualTp1) : null,
+      pending: true, pendingOrderType: orderTypeCfg.label, pendingIsAlgo: !!isAlgoEntry
     };
     savePrioritySimState();
   }
@@ -4326,6 +4515,140 @@
     }catch(e){
       priorityStatusEl.classList.add('error');
       priorityStatusEl.textContent = `Gagal menutup posisi di Binance: ${e.message}`;
+    }
+  }
+
+  // Batalkan entry LIMIT/STOP yang masih MENGGANTUNG (belum ke-fill) di
+  // Binance - dipanggil dari tombol "Batalkan Order" pada baris pending di
+  // tabel Posisi Terbuka.
+  async function cancelPendingLiveOrder(key, tickers){
+    const pos = prioritySimPositions[key];
+    if(!pos || !pos.pending) return;
+    const backendUrl = liveBackendUrlInput.value.trim().replace(/\/$/, '');
+    const appToken = liveAppTokenInput.value.trim();
+    if(!backendUrl || !appToken){
+      priorityStatusEl.classList.add('error');
+      priorityStatusEl.textContent = 'Isi dulu Backend URL dan App Token di bagian Live Trading sebelum membatalkan order.';
+      return;
+    }
+    if(!window.confirm(`Batalkan order ${pos.pendingOrderType} untuk ${pos.source.replace('USDT','')} yang masih menggantung di Binance?`)) return;
+    try{
+      const res = await fetch(`${backendUrl}/api/trade/futures/cancel-order`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-App-Token': appToken },
+        body: JSON.stringify({ symbol: pos.source, orderId: pos.liveOrderId, isAlgo: pos.pendingIsAlgo })
+      });
+      const data = await res.json();
+      if(!res.ok) throw new Error((data && data.error) ? JSON.stringify(data.error) : `HTTP ${res.status}`);
+      delete prioritySimPositions[key];
+      savePrioritySimState();
+      renderPrioritySimUI(tickers || window.__esLastTickers || {});
+      priorityStatusEl.classList.remove('error');
+      priorityStatusEl.textContent = `Order ${pos.pendingOrderType} untuk ${pos.source.replace('USDT','')} berhasil dibatalkan.`;
+    }catch(e){
+      priorityStatusEl.classList.add('error');
+      priorityStatusEl.textContent = `Gagal membatalkan order: ${e.message}`;
+    }
+  }
+
+  // Form inline "Edit SL/TP" untuk posisi live yang masih terbuka dan belum
+  // kena TP1 (lihat syarat isLiveEditable di renderPrioritySimUI) - menimpa
+  // isi sel Aksi sementara dengan 3 input (SL/TP1/TP2 opsional) + tombol Simpan/Batal.
+  function showEditSlTpForm(key, actionTd){
+    const pos = prioritySimPositions[key];
+    if(!pos || !actionTd) return;
+    actionTd.innerHTML = `
+      <div class="es-psim-edit-form">
+        <label>SL <input type="number" class="es-edit-sl" value="${pos.sl}" step="any"></label>
+        <label>TP1 <input type="number" class="es-edit-tp1" value="${pos.tp1}" step="any"></label>
+        <label>TP2 <input type="number" class="es-edit-tp2" value="${pos.tp2!=null?pos.tp2:''}" step="any" placeholder="opsional"></label>
+        <div class="es-psim-edit-form-actions">
+          <button type="button" class="es-edit-save-btn">Simpan</button>
+          <button type="button" class="es-edit-cancel-btn">Batal</button>
+        </div>
+      </div>
+    `;
+    actionTd.querySelector('.es-edit-cancel-btn').addEventListener('click', ()=>{
+      renderPrioritySimUI(window.__esLastTickers || {});
+    });
+    actionTd.querySelector('.es-edit-save-btn').addEventListener('click', ()=>{
+      const newSl = parseFloat(actionTd.querySelector('.es-edit-sl').value);
+      const newTp1 = parseFloat(actionTd.querySelector('.es-edit-tp1').value);
+      const tp2Raw = actionTd.querySelector('.es-edit-tp2').value;
+      const newTp2 = tp2Raw === '' ? null : parseFloat(tp2Raw);
+      editLiveSlTp(key, newSl, newTp1, newTp2);
+    });
+  }
+
+  // Kirim perubahan SL/TP1/TP2 ke backend (endpoint /api/trade/futures/edit-sltp) -
+  // membatalkan order lama untuk level yang berubah lalu memasang yang baru di
+  // harga baru, quantity SAMA seperti saat posisi dibuka (qty1/qty2 asli).
+  async function editLiveSlTp(key, newSl, newTp1, newTp2){
+    const pos = prioritySimPositions[key];
+    if(!pos) return;
+    if(isNaN(newSl) || isNaN(newTp1) || newSl<=0 || newTp1<=0){
+      priorityStatusEl.classList.add('error');
+      priorityStatusEl.textContent = 'SL dan TP1 wajib diisi angka valid untuk Edit SL/TP.';
+      renderPrioritySimUI(window.__esLastTickers || {});
+      return;
+    }
+    if(pos.dir==='BUY' && !(newSl < pos.entryPrice && newTp1 > pos.entryPrice)){
+      priorityStatusEl.classList.add('error');
+      priorityStatusEl.textContent = `Untuk posisi BUY, SL harus di bawah entry ($${fmtPrice(pos.entryPrice)}) dan TP1 harus di atasnya. Salah input.`;
+      renderPrioritySimUI(window.__esLastTickers || {});
+      return;
+    }
+    if(pos.dir==='SELL' && !(newSl > pos.entryPrice && newTp1 < pos.entryPrice)){
+      priorityStatusEl.classList.add('error');
+      priorityStatusEl.textContent = `Untuk posisi SELL, SL harus di atas entry ($${fmtPrice(pos.entryPrice)}) dan TP1 harus di bawahnya. Salah input.`;
+      renderPrioritySimUI(window.__esLastTickers || {});
+      return;
+    }
+    const backendUrl = liveBackendUrlInput.value.trim().replace(/\/$/, '');
+    const appToken = liveAppTokenInput.value.trim();
+    if(!backendUrl || !appToken){
+      priorityStatusEl.classList.add('error');
+      priorityStatusEl.textContent = 'Isi dulu Backend URL dan App Token di bagian Live Trading sebelum mengubah SL/TP.';
+      renderPrioritySimUI(window.__esLastTickers || {});
+      return;
+    }
+    priorityStatusEl.classList.remove('error');
+    priorityStatusEl.textContent = `Mengubah SL/TP untuk ${pos.source.replace('USDT','')}...`;
+    try{
+      const body = {
+        symbol: pos.source, side: pos.dir,
+        sl: newSl, slQuantity: pos.qty, oldSlOrderId: pos.liveSlOrderId,
+        tp1: newTp1, tp1Quantity: pos.qty1, oldTp1OrderId: pos.liveTp1OrderId
+      };
+      if(newTp2 !== null && pos.qty2){
+        body.tp2 = newTp2; body.tp2Quantity = pos.qty2; body.oldTp2OrderId = pos.liveTp2OrderId;
+      }
+      const res = await fetch(`${backendUrl}/api/trade/futures/edit-sltp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-App-Token': appToken },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if(!res.ok){
+        const stageLabel = data && data.stage ? `[gagal di: ${data.stage}] ` : '';
+        throw new Error(stageLabel + ((data && data.error) ? JSON.stringify(data.error) : `HTTP ${res.status}`));
+      }
+      pos.sl = newSl;
+      pos.tp1 = newTp1;
+      if(data.slOrder) pos.liveSlOrderId = data.slOrder.orderId || data.slOrder.algoId;
+      if(data.tp1Order) pos.liveTp1OrderId = data.tp1Order.orderId || data.tp1Order.algoId;
+      if(newTp2 !== null && pos.qty2){
+        pos.tp2 = newTp2;
+        if(data.tp2Order) pos.liveTp2OrderId = data.tp2Order.orderId || data.tp2Order.algoId;
+      }
+      savePrioritySimState();
+      priorityStatusEl.classList.remove('error');
+      priorityStatusEl.textContent = `SL/TP untuk ${pos.source.replace('USDT','')} berhasil diubah.`;
+      renderPrioritySimUI(window.__esLastTickers || {});
+    }catch(e){
+      priorityStatusEl.classList.add('error');
+      priorityStatusEl.textContent = `Gagal mengubah SL/TP: ${e.message}`;
+      renderPrioritySimUI(window.__esLastTickers || {});
     }
   }
 
@@ -4551,7 +4874,8 @@
     const wins = prioritySimHistory.filter(t=>t.pnl>0).length;
     const winRate = prioritySimHistory.length ? (wins/prioritySimHistory.length*100) : 0;
 
-    const openStats = openList.map(pos=>{
+    const pendingList = openList.filter(p=>p.pending);
+    const openStats = openList.filter(p=>!p.pending).map(pos=>{
       const isLive = pos.venue==='live-real' || pos.venue==='live-testnet';
       let price = (isLive && window.__esLiveMarkPrices[pos.source])
         ? window.__esLiveMarkPrices[pos.source]
@@ -4600,10 +4924,33 @@
 
     const fmtTime = (ms)=> new Date(ms).toLocaleString('id-ID', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit' });
 
-    if(openStats.length===0){
+    const pendingRowsHtml = pendingList.map(pos=>{
+      const arahCls = pos.dir==='BUY' ? 'arah-buy' : 'arah-sell';
+      const label = `${pos.source.replace('USDT','')} (${pos.tfLabel})`;
+      const venueBadge = venueBadgeHtml(pos.venue);
+      return `<tr class="es-psim-pending-row">
+        <td><div class="es-sumber-cell"><span class="es-psim-source-link" data-symbol="${pos.source}" data-tf="${pos.tfValue||''}">${label}</span>${venueBadge}</div></td>
+        <td class="${arahCls}">${pos.dir}</td>
+        <td>$${fmtPrice(pos.entryPrice)} <span class="es-psim-pending-badge">MENGGANTUNG (${pos.pendingOrderType})</span></td>
+        <td>$${fmtPrice(pos.sl)}</td>
+        <td>-</td>
+        <td>$${fmtPrice(pos.tp1)}</td>
+        <td>${pos.tp2!=null ? '$'+fmtPrice(pos.tp2) : '-'}</td>
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
+        <td><button type="button" class="es-psim-cancel-order-btn" data-key="${pos.key}">Batalkan Order</button></td>
+      </tr>`;
+    }).join('');
+
+    if(openStats.length===0 && pendingList.length===0){
       psimOpenTbody.innerHTML = `<tr><td colspan="15" style="text-align:center;color:var(--muted);padding:14px;">Belum ada posisi terbuka.</td></tr>`;
     } else {
-      psimOpenTbody.innerHTML = openStats.map(({pos, price, floatPnl, floatPct, potentialSlPnl, exchangeFee, marginFee})=>{
+      psimOpenTbody.innerHTML = pendingRowsHtml + openStats.map(({pos, price, floatPnl, floatPct, potentialSlPnl, exchangeFee, marginFee})=>{
         const pnlCls = floatPnl>=0 ? 'pnl-pos':'pnl-neg';
         const arahCls = pos.dir==='BUY' ? 'arah-buy' : 'arah-sell';
         const label = `${pos.source.replace('USDT','')} (${pos.tfLabel})`;
@@ -4622,6 +4969,8 @@
         const realizedDisplay = hasRealized ? `${realizedValue>=0?'+':''}$${realizedValue.toFixed(2)}` : '-';
         const realizedCls = hasRealized ? (realizedValue>=0?'pnl-pos':'pnl-neg') : '';
         const closeCls = floatPnl>=0 ? 'pnl-pos' : 'pnl-neg';
+        const isLiveEditable = isLive && !pos.tp1Hit;
+        const editBtnHtml = isLiveEditable ? `<button type="button" class="es-psim-edit-sltp-btn" data-key="${pos.key}">Edit SL/TP</button>` : '';
         return `<tr>
           <td><div class="es-sumber-cell"><span class="es-psim-source-link" data-symbol="${pos.source}" data-tf="${pos.tfValue||''}">${label}</span>${venueBadge}</div></td>
           <td class="${arahCls}">${pos.dir}</td>
@@ -4637,7 +4986,7 @@
           <td class="${pnlCls}">${floatPnl>=0?'+':''}${floatPnl.toFixed(2)}</td>
           <td class="${realizedCls}">${realizedDisplay}</td>
           <td class="${pnlCls}">${floatPct>=0?'+':''}${floatPct.toFixed(2)}%</td>
-          <td><button type="button" class="es-psim-close-btn ${closeCls}" data-key="${pos.key}">Close Posisi</button></td>
+          <td class="es-psim-action-cell"><button type="button" class="es-psim-close-btn ${closeCls}" data-key="${pos.key}">Close Posisi</button>${editBtnHtml}</td>
         </tr>`;
       }).join('');
 
@@ -4657,6 +5006,19 @@
           } else {
             manualClosePrioritySimPosition(key, tickers);
           }
+        });
+      });
+
+      psimOpenTbody.querySelectorAll('.es-psim-edit-sltp-btn').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          const key = btn.getAttribute('data-key');
+          showEditSlTpForm(key, btn.closest('.es-psim-action-cell'));
+        });
+      });
+
+      psimOpenTbody.querySelectorAll('.es-psim-cancel-order-btn').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          cancelPendingLiveOrder(btn.getAttribute('data-key'), tickers);
         });
       });
     }
@@ -5111,6 +5473,40 @@
           livePositions.forEach(pos=>{
             const bp = posMap[pos.source];
             if(!bp) return;
+
+            // Entry LIMIT/STOP masih pending (belum ada posisi sama sekali) -
+            // begitu positionAmt di Binance berubah jadi non-nol (dan arahnya
+            // cocok dengan sisi entry), berarti order-nya sudah ke-fill.
+            // Pasang SL/TP1/TP2 SEKARANG lewat attach-sltp, pakai harga fill
+            // ASLI dari Binance (bp.entryPrice) sebagai entryPrice final.
+            if(pos.pending){
+              const filled = Math.abs(bp.positionAmt) > 1e-8 && (pos.dir==='BUY' ? bp.positionAmt > 0 : bp.positionAmt < 0);
+              if(!filled) return; // masih menggantung, cek lagi interval berikutnya
+              pos.entryPrice = bp.entryPrice > 0 ? bp.entryPrice : pos.entryPrice;
+              fetch(`${backendUrl}/api/trade/futures/attach-sltp`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-App-Token': appToken },
+                body: JSON.stringify({ symbol: pos.source, side: pos.dir, quantity: pos.qty, sl: pos.sl, tp1: pos.tp1, qty1: pos.qty1, tp2: pos.qty2 ? pos.tp2 : undefined, qty2: pos.qty2 || undefined })
+              }).then(function(r){ return r.json().then(function(d){ return { ok:r.ok, data:d }; }); })
+                .then(function(r){
+                  if(r.ok){
+                    pos.pending = false;
+                    pos.liveSlOrderId = r.data.slOrder && (r.data.slOrder.orderId || r.data.slOrder.algoId);
+                    pos.liveTp1OrderId = r.data.tp1Order && (r.data.tp1Order.orderId || r.data.tp1Order.algoId);
+                    pos.liveTp2OrderId = r.data.tp2Order && (r.data.tp2Order.orderId || r.data.tp2Order.algoId);
+                    savePrioritySimState();
+                    renderPrioritySimUI(window.__esLastTickers || {});
+                  } else {
+                    // GAGAL pasang SL/TP setelah entry ke-fill - ini BERBAHAYA (posisi
+                    // real terbuka tanpa proteksi). Tandai jelas di status supaya user
+                    // segera cek manual ke Binance.
+                    liveTradeStatusEl.classList.add('error');
+                    liveTradeStatusEl.textContent = `PERINGATAN: entry ${pos.source.replace('USDT','')} sudah ke-fill tapi GAGAL pasang SL/TP otomatis (${JSON.stringify(r.data.error||r.data)}) - CEK MANUAL SEKARANG di Binance!`;
+                  }
+                }).catch(()=>{});
+              return;
+            }
+
             if(Math.abs(bp.positionAmt) < 1e-8){
               // Posisi sudah tidak ada sama sekali di Binance - tutup di tabel kita juga.
               const lastPrice = window.__esLiveMarkPrices[pos.source] || pos.entryPrice;
@@ -5159,6 +5555,33 @@
                       renderPrioritySimUI(window.__esLastTickers || {});
                     }
                   }).catch(()=>{});
+              }
+
+              // Metode Entry "nopartial": TIDAK ADA order TP1 yang bisa dipakai
+              // buat deteksi lewat penyusutan qty (posisi tetap full quantity
+              // sampai TP2 kena) - jadi dipantau lewat MARK PRICE langsung
+              // menyentuh virtualTp1. Begitu kesentuh, pindahkan SL ke breakeven
+              // untuk FULL quantity (bukan qty2, karena tidak ada partial close).
+              if(!pos.tp1Hit && pos.entryMethod==='nopartial' && pos.virtualTp1){
+                const markPrice = window.__esLiveMarkPrices[pos.source];
+                const touched = markPrice!=null && (pos.dir==='BUY' ? markPrice >= pos.virtualTp1 : markPrice <= pos.virtualTp1);
+                if(touched){
+                  pos.tp1Hit = true;
+                  savePrioritySimState();
+                  fetch(`${backendUrl}/api/trade/futures/move-sl-be`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-App-Token': appToken },
+                    body: JSON.stringify({ symbol: pos.source, side: pos.dir, quantity: pos.qty, oldSlOrderId: pos.liveSlOrderId, breakevenPrice: pos.entryPrice })
+                  }).then(function(r){ return r.json().then(function(d){ return { ok:r.ok, data:d }; }); })
+                    .then(function(r){
+                      if(r.ok && r.data.newSlOrder){
+                        pos.sl = pos.entryPrice;
+                        pos.liveSlOrderId = r.data.newSlOrder.orderId || r.data.newSlOrder.algoId;
+                        savePrioritySimState();
+                        renderPrioritySimUI(window.__esLastTickers || {});
+                      }
+                    }).catch(()=>{});
+                }
               }
             }
           });
