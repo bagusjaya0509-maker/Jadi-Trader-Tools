@@ -48,6 +48,41 @@
     padding:7px 12px;border-radius:8px;text-decoration:none;
   }
   .jt-nav-link:hover{background:var(--accent-soft);}
+  .jt-news-wrap{ position:relative; }
+  .jt-news-trigger{ cursor:pointer; gap:6px; }
+  .jt-news-dot{
+    width:9px;height:9px;border-radius:50%;
+    background:var(--loss); flex-shrink:0;
+  }
+  .jt-news-panel{
+    display:none;
+    position:absolute;
+    top:calc(100% + 8px);
+    left:0;
+    z-index:50;
+    width:320px;
+    height:420px;
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:10px;
+    box-shadow:0 10px 30px rgba(0,0,0,0.45);
+    flex-direction:column;
+    overflow:hidden;
+  }
+  .jt-news-panel.open{ display:flex; }
+  .jt-news-header{
+    padding:8px 12px;
+    border-bottom:1px solid var(--border);
+    font-family:var(--font-mono);
+    font-size:11.5px;
+    font-weight:600;
+    color:var(--ink);
+    flex-shrink:0;
+  }
+  .jt-news-body{ flex:1; overflow:hidden; }
+  @media (max-width: 700px){
+    .jt-news-panel{ width:260px; height:360px; left:auto; right:0; }
+  }
 
   /* ---------- Header ---------- */
   .masthead{
@@ -314,6 +349,15 @@
       <div class="jt-nav">
         <a href="ema-cross-screener_3.html" class="jt-nav-link">Crypto Screener</a>
         <a href="xauusd-priority-screener.html" class="jt-nav-link">XAUUSD Screener</a>
+        <div class="jt-news-wrap">
+          <button type="button" class="jt-nav-link jt-news-trigger" id="jtNewsTrigger">
+            <span class="jt-news-dot"></span>News
+          </button>
+          <div class="jt-news-panel" id="jtNewsPanel">
+            <div class="jt-news-header">Kalender Ekonomi</div>
+            <div class="jt-news-body" id="jtNewsBody"></div>
+          </div>
+        </div>
       </div>
     </div>
     <div class="account-meta">
@@ -1452,5 +1496,47 @@
     jtAuth.signOut();
   });
   // ===== akhir bagian login + jurnal showcase =====
+})();
+</script>
+<script>
+(function(){
+  // Menu "News" - konsep sama seperti kalender ekonomi di Crypto Screener,
+  // cuma posisinya inline di sebelah tombol XAUUSD Screener (bukan mengambang
+  // di pojok layar), pakai widget TradingView Economic Calendar yang sama.
+  var jtNewsTrigger = document.getElementById('jtNewsTrigger');
+  var jtNewsPanel = document.getElementById('jtNewsPanel');
+  var jtNewsBody = document.getElementById('jtNewsBody');
+  var jtNewsLoaded = false;
+
+  function loadJtNewsWidget(){
+    if(jtNewsLoaded) return;
+    jtNewsLoaded = true;
+    var script = document.createElement('script');
+    script.type = 'text/javascript';
+    script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-events.js';
+    script.async = true;
+    script.innerHTML = JSON.stringify({
+      width: '100%',
+      height: '100%',
+      colorTheme: 'dark',
+      isTransparent: false,
+      locale: 'en',
+      importanceFilter: '-1,0,1',
+      currencyFilter: 'USD'
+    });
+    jtNewsBody.appendChild(script);
+  }
+
+  jtNewsTrigger.addEventListener('click', function(e){
+    e.stopPropagation();
+    var willOpen = !jtNewsPanel.classList.contains('open');
+    jtNewsPanel.classList.toggle('open', willOpen);
+    if(willOpen) loadJtNewsWidget();
+  });
+  document.addEventListener('click', function(e){
+    if(!jtNewsPanel.contains(e.target) && e.target !== jtNewsTrigger && !jtNewsTrigger.contains(e.target)){
+      jtNewsPanel.classList.remove('open');
+    }
+  });
 })();
 </script>
