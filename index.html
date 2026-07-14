@@ -48,6 +48,7 @@
     padding:7px 12px;border-radius:8px;text-decoration:none;
   }
   .jt-nav-link:hover{background:var(--accent-soft);}
+  .jt-news-line{ display:flex; align-items:center; justify-content:flex-end; gap:6px; }
   .jt-news-wrap{ position:relative; }
   .jt-news-trigger{
     cursor:pointer;
@@ -67,7 +68,7 @@
     display:none;
     position:absolute;
     top:calc(100% + 8px);
-    left:0;
+    right:0;
     z-index:50;
     width:320px;
     height:420px;
@@ -90,7 +91,7 @@
   }
   .jt-news-body{ flex:1; overflow:hidden; }
   @media (max-width: 700px){
-    .jt-news-panel{ width:260px; height:360px; left:auto; right:0; }
+    .jt-news-panel{ width:260px; height:360px; }
   }
 
   /* ---------- Header ---------- */
@@ -358,6 +359,12 @@
       <div class="jt-nav">
         <a href="ema-cross-screener_3.html" class="jt-nav-link">Crypto Screener</a>
         <a href="xauusd-priority-screener.html" class="jt-nav-link">XAUUSD Screener</a>
+      </div>
+    </div>
+    <div class="account-meta">
+      <div class="balance"><span class="cur">$</span><span id="mBalance" class="num">200.00</span></div>
+      <div class="line"><b>Exness-MT5Real20</b> · login •••7617 · leverage 1:2000</div>
+      <div class="line jt-news-line">
         <div class="jt-news-wrap">
           <button type="button" class="jt-nav-link jt-news-trigger" id="jtNewsTrigger">
             <span class="jt-news-dot"></span>News
@@ -367,12 +374,8 @@
             <div class="jt-news-body" id="jtNewsBody"></div>
           </div>
         </div>
+        <span>| Mulai trading: <b>Sabtu, 11 Jul 2026</b></span>
       </div>
-    </div>
-    <div class="account-meta">
-      <div class="balance"><span class="cur">$</span><span id="mBalance" class="num">200.00</span></div>
-      <div class="line"><b>Exness-MT5Real20</b> · login •••7617 · leverage 1:2000</div>
-      <div class="line">Mulai trading: <b>Sabtu, 11 Jul 2026</b></div>
     </div>
   </header>
 
