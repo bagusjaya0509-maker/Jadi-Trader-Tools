@@ -3906,6 +3906,13 @@
   // itu tidak balik ke angka lama tiap kali refresh 1 detik (mark price posisi
   // live) menggambar ulang form ini dari awal.
   let editingSlTpDraft = null;
+  // Key yang form Edit SL/TP-nya SUDAH benar-benar ter-render di DOM saat ini -
+  // dipakai renderPrioritySimUI untuk tahu kapan boleh SKIP membangun ulang
+  // seluruh tabel Posisi Terbuka (innerHTML replace menghancurkan fokus & isi
+  // input yang lagi diketik user, karena elemen <input>-nya dibuat ulang dari
+  // nol tiap kali). Beda dari editingSlTpKey (state yang DIINGINKAN) - kalau
+  // dua-duanya sama, berarti form sudah tampil benar, tidak perlu render ulang.
+  let editFormRenderedFor = null;
 
   const LIVE_TRADE_CONFIG_KEY = 'emaScreenerLiveTradeConfig_v1';
   const liveBackendUrlInput = document.getElementById('esLiveBackendUrl');
@@ -4884,6 +4891,14 @@
   }
 
   function renderPrioritySimUI(tickers){
+    // Kalau posisi yang sedang di-edit ternyata sudah tidak ada lagi (mis. TP/SL
+    // kena otomatis pas form Edit SL/TP masih kebuka), batalkan mode edit -
+    // supaya skip-render-guard di bawah tidak "membekukan" tabel selamanya
+    // menunjuk ke posisi yang sudah tertutup.
+    if(editingSlTpKey !== null && !prioritySimPositions[editingSlTpKey]){
+      editingSlTpKey = null;
+      editingSlTpDraft = null;
+    }
     const openList = Object.values(prioritySimPositions);
     const totalPnl = prioritySimHistory.reduce((s,t)=>s+t.pnl,0);
     const wins = prioritySimHistory.filter(t=>t.pnl>0).length;
@@ -4962,8 +4977,17 @@
       </tr>`;
     }).join('');
 
-    if(openStats.length===0 && pendingList.length===0){
+    // Kalau form Edit SL/TP untuk posisi ini SUDAH ter-render benar di DOM
+    // (editFormRenderedFor === editingSlTpKey), SKIP membangun ulang seluruh
+    // tabel Posisi Terbuka - innerHTML replace akan membuat elemen <input>
+    // baru dari nol tiap kali, yang menghancurkan fokus & isi ketikan user di
+    // tengah jalan (kelihatan seperti "tidak bisa dihapus/diketik" walau
+    // sebenarnya cuma fokusnya kelempar tiap refresh 1 detik).
+    if(editingSlTpKey !== null && editingSlTpKey === editFormRenderedFor){
+      // tidak apa-apa dilewati - form tetap seperti adanya, tidak disentuh.
+    } else if(openStats.length===0 && pendingList.length===0){
       psimOpenTbody.innerHTML = `<tr><td colspan="15" style="text-align:center;color:var(--muted);padding:14px;">Belum ada posisi terbuka.</td></tr>`;
+      editFormRenderedFor = editingSlTpKey;
     } else {
       psimOpenTbody.innerHTML = pendingRowsHtml + openStats.map(({pos, price, floatPnl, floatPct, potentialSlPnl, exchangeFee, marginFee, isLive})=>{
         const pnlCls = floatPnl>=0 ? 'pnl-pos':'pnl-neg';
@@ -5066,6 +5090,7 @@
           cancelPendingLiveOrder(btn.getAttribute('data-key'), tickers);
         });
       });
+      editFormRenderedFor = editingSlTpKey;
     }
 
     if(prioritySimHistory.length===0){
