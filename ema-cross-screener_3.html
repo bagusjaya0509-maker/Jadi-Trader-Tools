@@ -1004,7 +1004,7 @@
     width:150px;
   }
   .es-sim-controls input::placeholder{ color: var(--muted); font-size:11px; }
-  #esLiveOrderType, #esLiveEntryMethod{ color: var(--muted); font-size:11px; }
+  #esPsimSignalSelect, #esLiveOrderType, #esLiveEntryMethod{ color: var(--muted); font-size:11px; }
   .es-sim-controls button{
     background: var(--panel);
     border:1px solid var(--bull);
@@ -1024,11 +1024,20 @@
 
   .es-live-trade-box{
     background: var(--panel);
-    border:1px solid var(--gold);
+    border:1px solid var(--border);
     border-radius:10px;
     padding:12px 14px;
     margin-top:12px;
     margin-bottom:14px;
+    transition: border-color .2s ease, box-shadow .2s ease;
+  }
+  .es-live-trade-box.buy{
+    border-color: var(--bull);
+    box-shadow: 0 0 18px 2px var(--bull-dim);
+  }
+  .es-live-trade-box.sell{
+    border-color: var(--bear);
+    box-shadow: 0 0 18px 2px var(--bear-dim);
   }
   .es-live-trade-title-row{
     display:flex;
@@ -1681,7 +1690,7 @@
       </label>
       <button id="esPsimOpenBtn">Open Posisi</button>
     </div>
-    <div class="es-live-trade-box">
+    <div class="es-live-trade-box" id="esLiveTradeBox">
       <div class="es-live-trade-title-row">
         <div class="es-live-trade-title">Live Trading &mdash; opsional</div>
         <span class="es-live-env-badge" id="esLiveEnvBadge">Belum terhubung</span>
@@ -1774,12 +1783,40 @@
   const esUserNameEl = document.getElementById('esUserName');
   const esSignOutBtn = document.getElementById('esSignOutBtn');
   let esCloudSyncTimer = null;
+  let esCurrentUid = null;
+  const ES_LOCAL_DIRTY_KEY = 'emaScreenerLocalUpdatedAt_v1';
+
+  // Ditandai setiap kali salah satu key yang disinkron cloud berubah SECARA
+  // LOKAL (mis. buka/tutup/edit posisi live) - dipakai esLoadFromCloud supaya
+  // TIDAK menimpa perubahan lokal yang lebih baru dengan data cloud yang lebih
+  // lama (BUG yang bikin posisi live "hilang" walau belum ditutup di Binance -
+  // kejadian kalau refresh/buka device lain terjadi SEBELUM siklus sync 15
+  // detik sempat mengirim perubahan terbaru ke cloud).
+  function markEsCloudDirty(){
+    try{ localStorage.setItem(ES_LOCAL_DIRTY_KEY, String(Date.now())); }catch(e){}
+  }
+
+  // Dorong perubahan ke cloud SEKARANG JUGA (bukan nunggu siklus 15 detik) -
+  // dipanggil setelah aksi live trading yang penting (open/close/edit posisi)
+  // supaya jendela race di atas sekecil mungkin.
+  function esSyncNow(){
+    if(esCurrentUid) esSaveToCloud(esCurrentUid).catch(()=>{});
+  }
 
   function esLoadFromCloud(uid){
     return esDb.collection('users').doc(uid).get().then(function(doc){
       let changed = false;
       if(doc.exists){
         const data = doc.data() || {};
+        // Kalau ada perubahan LOKAL yang lebih baru dari snapshot cloud ini
+        // (mis. baru saja buka posisi tapi belum sempat ke-sync), JANGAN timpa
+        // lokal - sebaliknya dorong lokal ke cloud supaya cloud yang menyusul.
+        const localDirtyAt = parseInt(localStorage.getItem(ES_LOCAL_DIRTY_KEY) || '0', 10);
+        const cloudUpdatedAt = parseInt(data._updatedAt || 0, 10);
+        if(localDirtyAt && localDirtyAt > cloudUpdatedAt){
+          esSaveToCloud(uid).catch(()=>{});
+          return false;
+        }
         ES_CLOUD_SYNC_KEYS.forEach(function(key){
           if(typeof data[key] === 'string' && data[key] !== localStorage.getItem(key)){
             try{ localStorage.setItem(key, data[key]); }catch(e){}
@@ -1803,6 +1840,7 @@
 
   esAuth.onAuthStateChanged(function(user){
     if(user){
+      esCurrentUid = user.uid;
       esAuthGateEl.style.display = 'none';
       esUserBarEl.style.display = 'flex';
       esUserAvatarEl.src = user.photoURL || '';
@@ -1823,7 +1861,15 @@
       if(esCloudSyncTimer) clearInterval(esCloudSyncTimer);
       esCloudSyncTimer = setInterval(function(){ esSaveToCloud(user.uid); }, 15000);
       window.addEventListener('beforeunload', function(){ esSaveToCloud(user.uid); });
+      // beforeunload TIDAK bisa diandalkan buat nunggu network request async
+      // (browser bisa langsung lanjut unload sebelum Firestore selesai nulis) -
+      // visibilitychange (tab disembunyikan/pindah tab/pindah app) jauh lebih
+      // reliable buat kirim data terakhir sebelum user pindah dari halaman ini.
+      document.addEventListener('visibilitychange', function(){
+        if(document.visibilityState === 'hidden') esSaveToCloud(user.uid);
+      });
     } else {
+      esCurrentUid = null;
       esAuthGateEl.style.display = 'flex';
       esUserBarEl.style.display = 'none';
       if(esCloudSyncTimer) clearInterval(esCloudSyncTimer);
@@ -3940,6 +3986,7 @@
   const psimSettingsBtn = document.getElementById('esPsimSettingsBtn');
   const psimSettingsDropdown = document.getElementById('esPsimSettingsDropdown');
   const psimPreviewEl = document.getElementById('esPsimPreview');
+  const liveTradeBoxEl = document.getElementById('esLiveTradeBox');
   const psimSummaryEl = document.getElementById('esPsimSummary');
   const psimOpenTbody = document.getElementById('esPsimOpenTbody');
   const psimHistTbody = document.getElementById('esPsimHistTbody');
@@ -4116,6 +4163,23 @@
   }
 
   async function sendLiveTrade(cand){
+    // Binance (mode one-way, default) NETTING semua order untuk simbol yang
+    // SAMA jadi SATU posisi - tidak peduli TF berapa order itu berasal. Kalau
+    // sudah ada posisi live (atau order pending) untuk simbol ini di TF
+    // MANAPUN, JANGAN kirim order baru - itu cuma akan menambah/mengubah
+    // posisi Binance yang SAMA, sementara tool ini bakal mencatatnya sebagai
+    // posisi LOKAL YANG TERPISAH (beda TF) - membuat tabel "Posisi Terbuka"
+    // menampilkan 2 entri padahal Binance cuma punya 1 posisi asli untuk
+    // simbol itu (persis kejadian NEAR TF15m vs TF4H).
+    const existingLive = Object.values(prioritySimPositions).find(p =>
+      p.source === cand.symbol && (p.venue === 'live-real' || p.venue === 'live-testnet'));
+    if(existingLive){
+      liveTradeStatusEl.classList.add('error');
+      liveTradeStatusEl.classList.remove('success');
+      liveTradeStatusEl.textContent = `Sudah ada posisi/order live untuk ${cand.symbol.replace('USDT','')} (TF ${existingLive.tfLabel}) - Binance menggabungkan order simbol yang sama jadi satu posisi, jadi tidak bisa buka lagi di TF lain untuk simbol ini. Tutup/batalkan dulu yang sudah ada kalau mau ganti TF.`;
+      return;
+    }
+
     const backendUrl = liveBackendUrlInput.value.trim().replace(/\/$/, '');
     const appToken = liveAppTokenInput.value.trim();
 
@@ -4376,6 +4440,7 @@
   function savePrioritySimState(){
     try{
       localStorage.setItem(PRIORITY_SIM_KEY, JSON.stringify({ positions: prioritySimPositions, history: prioritySimHistory }));
+      markEsCloudDirty();
     }catch(e){ /* localStorage penuh/diblokir - abaikan, state tetap ada di memori */ }
   }
 
@@ -4452,6 +4517,7 @@
     };
     initSlPlusRatchet(prioritySimPositions[key]);
     savePrioritySimState();
+    esSyncNow(); // dorong ke cloud SEKARANG - posisi live baru dibuka, jangan tunggu siklus 15 detik
   }
 
   // Posisi entry LIMIT/STOP yang masih MENGGANTUNG di Binance (belum ada
@@ -4473,6 +4539,7 @@
     };
     initSlPlusRatchet(prioritySimPositions[key]);
     savePrioritySimState();
+    esSyncNow(); // dorong ke cloud SEKARANG - order pending baru dikirim, jangan tunggu siklus 15 detik
   }
 
   // Partial close 50% posisi SIM begitu TP1 kesentuh: separuh qty direalisasi
@@ -4527,6 +4594,7 @@
       exitPrice, exitTime: time, reason, exchangeFee, marginFee, pnl, pnlPct, tpStatus, venue: pos.venue || 'sim', verified });
     delete prioritySimPositions[key];
     savePrioritySimState();
+    esSyncNow(); // dorong ke cloud SEKARANG - posisi baru saja tertutup, jangan tunggu siklus 15 detik
   }
 
   function manualClosePrioritySimPosition(key, tickers){
@@ -4642,6 +4710,7 @@
       if(!res.ok) throw new Error((data && data.error) ? JSON.stringify(data.error) : `HTTP ${res.status}`);
       delete prioritySimPositions[key];
       savePrioritySimState();
+      esSyncNow();
       renderPrioritySimUI(tickers || window.__esLastTickers || {});
       priorityStatusEl.classList.remove('error');
       priorityStatusEl.textContent = `Order ${pos.pendingOrderType} untuk ${pos.source.replace('USDT','')} berhasil dibatalkan.`;
@@ -4750,6 +4819,7 @@
         if(data.tp2Order) pos.liveTp2OrderId = data.tp2Order.orderId || data.tp2Order.algoId;
       }
       savePrioritySimState();
+      esSyncNow();
       priorityStatusEl.classList.remove('error');
       priorityStatusEl.textContent = `SL/TP untuk ${pos.source.replace('USDT','')} berhasil diubah.`;
       editingSlTpKey = null;
@@ -4847,6 +4917,12 @@
 
   function renderPsimPreview(){
     updatePsimOpenBtn();
+    // Border box "Live Trading" ikut warna sinyal yang dipilih - hijau kalau
+    // BUY, merah kalau SELL, netral kalau belum ada yang dipilih.
+    liveTradeBoxEl.classList.remove('buy', 'sell');
+    if(psimSelectedCandidate){
+      liveTradeBoxEl.classList.add(psimSelectedCandidate.signal === 'SELL' ? 'sell' : 'buy');
+    }
     if(!psimSelectedCandidate){
       // Belum ada sinyal dipilih - kosongkan total tanpa kotak/border, biar
       // tidak ada label kosong menggantung di halaman.
