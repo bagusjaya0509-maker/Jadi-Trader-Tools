@@ -4887,7 +4887,7 @@
       const floatPnl = isLive ? grossFloatPnl : (grossFloatPnl - exchangeFee - marginFee);
       const floatPct = (floatPnl / pos.margin) * 100;
       const potentialSlPnl = pos.dir==='BUY' ? (pos.sl-pos.entryPrice)*qty : (pos.entryPrice-pos.sl)*qty;
-      return { pos, price, floatPnl, floatPct, potentialSlPnl, exchangeFee, marginFee };
+      return { pos, price, floatPnl, floatPct, potentialSlPnl, exchangeFee, marginFee, isLive };
     });
 
     const totalFloatingPnl = openStats.reduce((s,o)=>s+o.floatPnl, 0);
@@ -4939,7 +4939,7 @@
     if(openStats.length===0 && pendingList.length===0){
       psimOpenTbody.innerHTML = `<tr><td colspan="15" style="text-align:center;color:var(--muted);padding:14px;">Belum ada posisi terbuka.</td></tr>`;
     } else {
-      psimOpenTbody.innerHTML = pendingRowsHtml + openStats.map(({pos, price, floatPnl, floatPct, potentialSlPnl, exchangeFee, marginFee})=>{
+      psimOpenTbody.innerHTML = pendingRowsHtml + openStats.map(({pos, price, floatPnl, floatPct, potentialSlPnl, exchangeFee, marginFee, isLive})=>{
         const pnlCls = floatPnl>=0 ? 'pnl-pos':'pnl-neg';
         const arahCls = pos.dir==='BUY' ? 'arah-buy' : 'arah-sell';
         const label = `${pos.source.replace('USDT','')} (${pos.tfLabel})`;
