@@ -509,7 +509,7 @@
     <div>
       <div class="card">
         <div class="card-head">
-          <h2>Kurva P/L Kripto</h2>
+          <h2>Kurva Saldo Kripto</h2>
           <span class="hint" id="cChartHint">Belum ada transaksi</span>
         </div>
         <div class="chart-box"><svg id="cEquitySvg" viewBox="0 0 640 220" preserveAspectRatio="none"></svg><div class="chart-tooltip" id="cEquityTooltip"></div></div>
@@ -1111,6 +1111,11 @@
   }
 
   var LIVE_TRADE_CONFIG_KEY = 'emaScreenerLiveTradeConfig_v1';
+  // Saldo Binance ASLI terbaru (dari /api/account) - dipakai sebagai titik akhir
+  // Kurva Saldo Kripto (lihat renderEquityCurve). null selama belum berhasil
+  // diambil - chart sementara pakai fallback sampai ini terisi, lalu digambar
+  // ulang begitu saldo asli didapat.
+  var cCurrentBalance = null;
 
   function fetchBinanceBalance(){
     var balEl = document.getElementById('cBalance');
@@ -1126,7 +1131,9 @@
         .then(function(res){ return res.json().then(function(data){ return { ok: res.ok, data: data }; }); })
         .then(function(r){
           if(!r.ok || !r.data || r.data.totalWalletBalance===undefined){ balEl.textContent = 'Gagal ambil saldo'; return; }
-          balEl.textContent = fmtMoney(parseFloat(r.data.totalWalletBalance));
+          cCurrentBalance = parseFloat(r.data.totalWalletBalance);
+          balEl.textContent = fmtMoney(cCurrentBalance);
+          renderEquityCurve(); // gambar ulang - sekarang titik akhir kurva bisa dikunci ke saldo asli ini
         })
         .catch(function(){ balEl.textContent = 'Gagal ambil saldo'; });
     }catch(e){ balEl.textContent = 'Gagal ambil saldo'; }
@@ -1175,8 +1182,15 @@
     var tooltip = document.getElementById('cEquityTooltip');
     var W=640,H=220,PAD=28,PADL=48;
     var sorted = cState.trades.slice().sort(function(a,b){return a.date-b.date;});
-    var points = [{y:0, date:null}];
-    var cum = 0;
+    // Kurva SALDO (bukan cuma P/L mentah) - titik terakhir dikunci ke saldo
+    // Binance ASLI (cCurrentBalance dari /api/account), titik-titik sebelumnya
+    // dihitung mundur (saldo sekarang dikurangi P/L trade-trade SETELAHNYA).
+    // Kalau saldo asli belum sempat diambil, sementara pakai 0 sebagai anchor
+    // (nanti otomatis digambar ulang begitu fetchBinanceBalance selesai).
+    var totalPL = sorted.reduce(function(a,t){ return a+t.pl; }, 0);
+    var startBal = (cCurrentBalance!==null ? cCurrentBalance : totalPL) - totalPL;
+    var points = [{y:startBal, date:null}];
+    var cum = startBal;
     sorted.forEach(function(t){ cum += t.pl; points.push({y:cum, date:t.date}); });
 
     var ys = points.map(function(p){return p.y;});
@@ -1213,7 +1227,7 @@
       '<circle id="cEqCrosshairDot" cx="0" cy="0" r="4" fill="var(--accent)" stroke="var(--ground)" stroke-width="1.5" opacity="0"/>';
 
     document.getElementById('cChartHint').textContent =
-      sorted.length ? 'Total P/L: ' + fmtMoney(cum) : 'Belum ada transaksi';
+      sorted.length ? 'Saldo saat ini: ' + fmtMoney(cum) : 'Mulai dari ' + fmtMoney(startBal) + ' — belum ada transaksi';
 
     // ----- Interaksi tekan/geser: tampilkan saldo di titik yang ditunjuk -----
     var crosshairLine = document.getElementById('cEqCrosshair');
