@@ -4134,6 +4134,21 @@
     return (Math.floor(value / step) * step).toFixed(p);
   }
 
+  // Sebagian koin dengan harga per-unit sangat kecil (meme coin) dikontrakkan
+  // 1000x lipat di Binance FUTURES (kontraknya bernama "1000XXXUSDT"), beda
+  // dari Spot yang tetap pakai "XXXUSDT" biasa - screener ini nge-scan sinyal
+  // dari Spot (makanya cand.symbol = "PEPEUSDT" dst), tapi order live cuma
+  // bisa lewat Futures, jadi perlu diterjemahkan dulu ke nama kontrak yang
+  // benar sebelum dikirim ke Binance - kalau tidak, akan gagal dengan pesan
+  // "simbol tidak ditemukan di exchangeInfo Futures".
+  const FUTURES_SYMBOL_ALIASES = {
+    'PEPEUSDT': '1000PEPEUSDT', 'SHIBUSDT': '1000SHIBUSDT', 'BONKUSDT': '1000BONKUSDT',
+    'FLOKIUSDT': '1000FLOKIUSDT', 'XECUSDT': '1000XECUSDT', 'LUNCUSDT': '1000LUNCUSDT',
+    'RATSUSDT': '1000RATSUSDT', 'SATSUSDT': '1000SATSUSDT', 'CATUSDT': '1000CATUSDT',
+    'CHEEMSUSDT': '1000CHEEMSUSDT', 'WHYUSDT': '1000WHYUSDT', 'MOGUSDT': '1000MOGUSDT'
+  };
+  function toFuturesSymbol(symbol){ return FUTURES_SYMBOL_ALIASES[symbol] || symbol; }
+
   async function fetchSymbolFilters(symbol){
     const marketHost = liveDetectedEnv === 'live' ? 'https://fapi.binance.com' : 'https://testnet.binancefuture.com';
     const res = await fetch(`${marketHost}/fapi/v1/exchangeInfo?symbol=${symbol}`);
@@ -4163,6 +4178,14 @@
   }
 
   async function sendLiveTrade(cand){
+    // Sinyal di-scan dari data Spot (cand.symbol mis. "PEPEUSDT"), tapi
+    // sebagian koin harga-kecil dikontrakkan 1000x di FUTURES dengan nama
+    // BEDA (mis. "1000PEPEUSDT") - order live cuma bisa lewat Futures, jadi
+    // dari sini seterusnya cand.symbol diganti ke nama kontrak Futures yang
+    // benar supaya semua pengecekan/order/pencatatan konsisten pakai simbol
+    // yang benar-benar ada di Binance Futures.
+    cand = Object.assign({}, cand, { symbol: toFuturesSymbol(cand.symbol) });
+
     // Binance (mode one-way, default) NETTING semua order untuk simbol yang
     // SAMA jadi SATU posisi - tidak peduli TF berapa order itu berasal. Kalau
     // sudah ada posisi live (atau order pending) untuk simbol ini di TF
