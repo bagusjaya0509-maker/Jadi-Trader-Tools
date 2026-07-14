@@ -3895,6 +3895,10 @@
   // karena posisi LIVE di-render ulang tiap 1 detik (refresh mark price) -
   // tanpa state ini form akan langsung ketutup lagi begitu re-render jalan.
   let editingSlTpKey = null;
+  // Nilai yang lagi diketik user di form Edit SL/TP - dipakai supaya nilai
+  // itu tidak balik ke angka lama tiap kali refresh 1 detik (mark price posisi
+  // live) menggambar ulang form ini dari awal.
+  let editingSlTpDraft = null;
 
   const LIVE_TRADE_CONFIG_KEY = 'emaScreenerLiveTradeConfig_v1';
   const liveBackendUrlInput = document.getElementById('esLiveBackendUrl');
@@ -4553,11 +4557,19 @@
   // ter-render ulang selama editingSlTpKey masih menunjuk ke posisi ini,
   // bukan cuma tampil sekali lalu ketutup pas render berikutnya jalan.
   function buildEditSlTpFormHtml(pos){
+    // Pakai draft (nilai yang lagi diketik user) kalau ada punya posisi ini -
+    // BUKAN pos.sl/pos.tp1/pos.tp2 langsung, supaya angka yang sedang diketik
+    // tidak balik ke nilai lama tiap kali form ini ikut ter-render ulang oleh
+    // refresh 1 detik.
+    const draft = editingSlTpDraft || {};
+    const slVal = draft.sl !== undefined ? draft.sl : pos.sl;
+    const tp1Val = draft.tp1 !== undefined ? draft.tp1 : pos.tp1;
+    const tp2Val = draft.tp2 !== undefined ? draft.tp2 : (pos.tp2!=null?pos.tp2:'');
     return `
       <div class="es-psim-edit-form" data-key="${pos.key}">
-        <label>SL <input type="number" class="es-edit-sl" value="${pos.sl}" step="any"></label>
-        <label>TP1 <input type="number" class="es-edit-tp1" value="${pos.tp1}" step="any"></label>
-        <label>TP2 <input type="number" class="es-edit-tp2" value="${pos.tp2!=null?pos.tp2:''}" step="any" placeholder="opsional"></label>
+        <label>SL <input type="number" class="es-edit-sl" value="${slVal}" step="any"></label>
+        <label>TP1 <input type="number" class="es-edit-tp1" value="${tp1Val}" step="any"></label>
+        <label>TP2 <input type="number" class="es-edit-tp2" value="${tp2Val}" step="any" placeholder="opsional"></label>
         <div class="es-psim-edit-form-actions">
           <button type="button" class="es-edit-save-btn">Simpan</button>
           <button type="button" class="es-edit-cancel-btn">Batal</button>
@@ -4567,7 +4579,10 @@
   }
 
   function showEditSlTpForm(key){
+    const pos = prioritySimPositions[key];
+    if(!pos) return;
     editingSlTpKey = key;
+    editingSlTpDraft = { sl: pos.sl, tp1: pos.tp1, tp2: pos.tp2!=null?pos.tp2:'' };
     renderPrioritySimUI(window.__esLastTickers || {});
   }
 
@@ -4636,6 +4651,7 @@
       priorityStatusEl.classList.remove('error');
       priorityStatusEl.textContent = `SL/TP untuk ${pos.source.replace('USDT','')} berhasil diubah.`;
       editingSlTpKey = null;
+      editingSlTpDraft = null;
       renderPrioritySimUI(window.__esLastTickers || {});
     }catch(e){
       priorityStatusEl.classList.add('error');
@@ -5015,14 +5031,24 @@
 
       psimOpenTbody.querySelectorAll('.es-psim-edit-form').forEach(form=>{
         const key = form.getAttribute('data-key');
+        const slInput = form.querySelector('.es-edit-sl');
+        const tp1Input = form.querySelector('.es-edit-tp1');
+        const tp2Input = form.querySelector('.es-edit-tp2');
+        // Simpan tiap ketikan ke editingSlTpDraft - supaya kalau refresh 1 detik
+        // ikut menggambar ulang form ini di tengah user mengetik, nilainya tetap
+        // yang terakhir diketik (bukan balik ke pos.sl/tp1/tp2 lama).
+        slInput.addEventListener('input', ()=>{ editingSlTpDraft.sl = slInput.value; });
+        tp1Input.addEventListener('input', ()=>{ editingSlTpDraft.tp1 = tp1Input.value; });
+        tp2Input.addEventListener('input', ()=>{ editingSlTpDraft.tp2 = tp2Input.value; });
         form.querySelector('.es-edit-cancel-btn').addEventListener('click', ()=>{
           editingSlTpKey = null;
+          editingSlTpDraft = null;
           renderPrioritySimUI(window.__esLastTickers || {});
         });
         form.querySelector('.es-edit-save-btn').addEventListener('click', ()=>{
-          const newSl = parseFloat(form.querySelector('.es-edit-sl').value);
-          const newTp1 = parseFloat(form.querySelector('.es-edit-tp1').value);
-          const tp2Raw = form.querySelector('.es-edit-tp2').value;
+          const newSl = parseFloat(slInput.value);
+          const newTp1 = parseFloat(tp1Input.value);
+          const tp2Raw = tp2Input.value;
           const newTp2 = tp2Raw === '' ? null : parseFloat(tp2Raw);
           editLiveSlTp(key, newSl, newTp1, newTp2);
         });
