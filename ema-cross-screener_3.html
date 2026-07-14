@@ -1110,24 +1110,54 @@
   .es-live-trade-status.error{ color: var(--bear); }
   .es-live-trade-status.success{ color: var(--bull); }
 
-  .es-sim-reset-row{
+  .es-sim-table-header{
     display:flex;
-    justify-content:flex-end;
-    margin-top:14px;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:6px;
   }
-  .es-sim-reset-row button{
-    background: var(--panel);
-    border:1px solid var(--bear);
+  .es-sim-table-header .es-sim-table-label{ margin-bottom:0; }
+  .es-sim-settings{ position:relative; }
+  .es-sim-settings-btn{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    background:none;
+    border:none;
+    color: var(--muted);
+    padding:4px;
+    cursor:pointer;
+  }
+  .es-sim-settings-btn:hover{ color: var(--text); }
+  .es-sim-settings-dropdown{
+    display:none;
+    position:absolute;
+    top:calc(100% + 4px);
+    right:0;
+    z-index:20;
+    min-width:150px;
+    background: var(--panel-2);
+    border:1px solid var(--border);
+    border-radius:8px;
+    box-shadow: 0 10px 28px rgba(0,0,0,0.4);
+    padding:6px;
+  }
+  .es-sim-settings-dropdown.open{ display:block; }
+  .es-sim-settings-item{
+    display:block;
+    width:100%;
+    text-align:left;
+    background:none;
+    border:none;
     color: var(--bear);
     font-family: var(--font-mono);
     font-weight:600;
-    font-size:12.5px;
-    padding:8px 14px;
-    border-radius:8px;
+    font-size:12px;
+    padding:8px 10px;
+    border-radius:6px;
     cursor:pointer;
-    height:34px;
   }
-  .es-sim-reset-row button:hover{ background: var(--bear-dim); }
+  .es-sim-settings-item:hover{ background: var(--bear-dim); }
 
   .es-sim-preview{
     background: var(--panel);
@@ -1135,6 +1165,12 @@
     border-radius:10px;
     padding:12px 14px;
     margin-bottom:14px;
+  }
+  .es-sim-preview.es-sim-preview-hidden{
+    background:none;
+    border:none;
+    padding:0;
+    margin-bottom:0;
   }
   .es-sim-preview-empty{
     font-family: var(--font-mono);
@@ -1684,7 +1720,17 @@
       </table>
     </div>
 
-    <div class="es-sim-table-label">Riwayat Transaksi (terbaru dulu)</div>
+    <div class="es-sim-table-header">
+      <div class="es-sim-table-label">Riwayat Transaksi (terbaru dulu)</div>
+      <div class="es-sim-settings">
+        <button type="button" id="esPsimSettingsBtn" class="es-sim-settings-btn" title="Pengaturan">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        </button>
+        <div class="es-sim-settings-dropdown" id="esPsimSettingsDropdown">
+          <button type="button" id="esPsimResetBtn" class="es-sim-settings-item">Reset Simulasi</button>
+        </div>
+      </div>
+    </div>
     <div class="es-sim-table-wrap">
       <table class="es-sim-table">
         <thead>
@@ -1692,10 +1738,6 @@
         </thead>
         <tbody id="esPsimHistTbody"></tbody>
       </table>
-    </div>
-
-    <div class="es-sim-reset-row">
-      <button id="esPsimResetBtn">Reset Simulasi</button>
     </div>
 
   </div>
@@ -3902,6 +3944,8 @@
   const psimToggle = document.getElementById('esPsimToggle');
   const psimOpenBtn = document.getElementById('esPsimOpenBtn');
   const psimResetBtn = document.getElementById('esPsimResetBtn');
+  const psimSettingsBtn = document.getElementById('esPsimSettingsBtn');
+  const psimSettingsDropdown = document.getElementById('esPsimSettingsDropdown');
   const psimPreviewEl = document.getElementById('esPsimPreview');
   const psimStatusEl = document.getElementById('esPsimStatus');
   const psimSummaryEl = document.getElementById('esPsimSummary');
@@ -4772,9 +4816,13 @@
   function renderPsimPreview(){
     updatePsimOpenBtn();
     if(!psimSelectedCandidate){
-      psimPreviewEl.innerHTML = `<div class="es-sim-preview-empty">Belum ada sinyal dipilih. Pilih dari dropdown "Sinyal Terpilih" atau klik "Pilih Sinyal Ini" di kartu Sinyal Prioritas.</div>`;
+      // Belum ada sinyal dipilih - kosongkan total tanpa kotak/border, biar
+      // tidak ada label kosong menggantung di halaman.
+      psimPreviewEl.innerHTML = '';
+      psimPreviewEl.classList.add('es-sim-preview-hidden');
       return;
     }
+    psimPreviewEl.classList.remove('es-sim-preview-hidden');
     const c = psimSelectedCandidate;
     const entryPrice = c.price;
     const { sl, tp, isManualTp } = getEffectiveSlTp(c);
@@ -5422,7 +5470,19 @@
   refreshBtn.addEventListener('click', scan);
   priorityBtn.addEventListener('click', findPrioritySignals);
   priorityRiskSel.addEventListener('change', findPrioritySignals);
-  psimResetBtn.addEventListener('click', resetPrioritySim);
+  psimResetBtn.addEventListener('click', ()=>{
+    psimSettingsDropdown.classList.remove('open');
+    resetPrioritySim();
+  });
+  psimSettingsBtn.addEventListener('click', (e)=>{
+    e.stopPropagation();
+    psimSettingsDropdown.classList.toggle('open');
+  });
+  document.addEventListener('click', (e)=>{
+    if(!psimSettingsBtn.contains(e.target) && !psimSettingsDropdown.contains(e.target)){
+      psimSettingsDropdown.classList.remove('open');
+    }
+  });
   psimSignalSelect.addEventListener('change', ()=> selectPsimSignalByUid(psimSignalSelect.value));
   psimManualSlInput.addEventListener('input', renderPsimPreview);
   psimManualTpInput.addEventListener('input', renderPsimPreview);
