@@ -1325,7 +1325,7 @@
   .es-psim-close-btn.pnl-neg{ color: var(--bear); }
 
   .es-psim-action-cell{ display:flex; gap:6px; flex-wrap:wrap; }
-  .es-psim-edit-sltp-btn, .es-psim-cancel-order-btn{
+  .es-psim-cancel-order-btn{
     background:none;
     border:1px solid var(--gold);
     color: var(--gold);
@@ -1336,7 +1336,20 @@
     font-weight:600;
     cursor:pointer;
   }
-  .es-psim-edit-sltp-btn:hover, .es-psim-cancel-order-btn:hover{ opacity:0.75; }
+  .es-psim-cancel-order-btn:hover{ opacity:0.75; }
+  .es-psim-edit-sltp-btn{
+    background:none;
+    border:1px solid var(--gold);
+    color: var(--gold);
+    border-radius:4px;
+    padding:4px 6px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+  }
+  .es-psim-edit-sltp-btn:hover{ opacity:0.75; }
+  .es-psim-edit-sltp-btn svg{ display:block; }
   .es-psim-pending-row{ opacity:0.85; }
   .es-psim-pending-badge{
     display:inline-block;
@@ -5015,7 +5028,7 @@
         // (refresh mark price posisi live).
         const actionCellHtml = (isLiveEditable && pos.key===editingSlTpKey)
           ? buildEditSlTpFormHtml(pos)
-          : `<button type="button" class="es-psim-close-btn ${closeCls}" data-key="${pos.key}">Close Posisi</button>${isLiveEditable ? `<button type="button" class="es-psim-edit-sltp-btn" data-key="${pos.key}">Edit SL/TP</button>` : ''}`;
+          : `<button type="button" class="es-psim-close-btn ${closeCls}" data-key="${pos.key}">Close Posisi</button>${isLiveEditable ? `<button type="button" class="es-psim-edit-sltp-btn" data-key="${pos.key}" title="Edit SL/TP"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg></button>` : ''}`;
         return `<tr>
           <td><div class="es-sumber-cell"><span class="es-psim-source-link" data-symbol="${pos.source}" data-tf="${pos.tfValue||''}">${label}</span>${venueBadge}</div></td>
           <td class="${arahCls}">${pos.dir}</td>
