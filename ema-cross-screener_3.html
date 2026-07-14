@@ -1671,6 +1671,7 @@
           <option value="nopartial">TP1 &amp; TP2 (SL ke BE di TP1, tanpa partial 50%)</option>
           <option value="tp1only">SL &amp; TP1 saja (tanpa TP2)</option>
           <option value="tp2only">SL &amp; TP2 saja (tanpa TP1)</option>
+          <option value="slplus">SL+ (partial 50% di TP1, lalu SL naik tiap kelipatan risk)</option>
         </select>
       </label>
       <label class="es-sim-checkbox-label">Aktif
@@ -3981,7 +3982,8 @@
     partial:   'TP1 & TP2 (partial 50% di TP1, SL ke BE)',
     nopartial: 'TP1 & TP2 (SL ke BE di TP1, tanpa partial 50%)',
     tp1only:   'SL & TP1 saja (tanpa TP2)',
-    tp2only:   'SL & TP2 saja (tanpa TP1)'
+    tp2only:   'SL & TP2 saja (tanpa TP1)',
+    slplus:    'SL+ (partial 50% di TP1, lalu SL naik tiap kelipatan risk)'
   };
 
   liveOrderTypeSel.addEventListener('change', ()=>{
@@ -4206,13 +4208,31 @@
         virtualTp1Str = tp1Fmt;
       } else if(entryMethod === 'tp1only'){
         tp1Str = tp1Fmt; qty1Str = quantityStr; qty2Str = null; tp2Str = null;
-      } else { // 'tp2only'
+      } else if(entryMethod === 'tp2only'){
         tp1Str = tp2Fmt; qty1Str = quantityStr; qty2Str = null; tp2Str = null;
+      } else { // 'slplus'
+        // Sama seperti 'partial' untuk perhitungan qty1/qty2/TP1/TP2 - qty1 di
+        // TP1 dipasang sebagai order ASLI (partial close beneran, SL ke BE),
+        // tapi qty2/tp2 di sini TIDAK dikirim jadi order TP asli ke Binance
+        // (lihat request body di bawah) - cuma dipakai lokal sebagai level
+        // PERTAMA buat ratchet SL (lihat recordLivePosition/recordPendingLivePosition
+        // dan sync loop periodik). Sisa qty2 terus jalan tanpa TP tetap, SL-nya
+        // naik terus tiap kelipatan 1x risk tercapai.
+        const halfRaw = parseFloat(quantityStr) / 2;
+        const halfQtyStr = stepSize ? roundToStep(halfRaw, stepSize, quantityPrecision) : halfRaw.toFixed(quantityPrecision != null ? quantityPrecision : 6);
+        const qty2Raw = parseFloat(quantityStr) - parseFloat(halfQtyStr);
+        const qty2FromHalfStr = qty2Raw.toFixed(quantityPrecision != null ? quantityPrecision : 6);
+        if(parseFloat(halfQtyStr) <= 0 || parseFloat(qty2FromHalfStr) <= 0){
+          // Modal terlalu kecil buat displit - fallback ke 1 TP full quantity (seperti "tp1only", tanpa ratchet).
+          tp1Str = tp1Fmt; qty1Str = quantityStr; qty2Str = null; tp2Str = null;
+        } else {
+          tp1Str = tp1Fmt; qty1Str = halfQtyStr; tp2Str = tp2Fmt; qty2Str = qty2FromHalfStr;
+        }
       }
 
       // Pengaman: kalau perhitungan TP/SL entah kenapa jadi 0 (atau sama persis
       // dengan entry), JANGAN kirim order - posisi real tanpa SL/TP valid berbahaya.
-      if(parseFloat(tp1Str) <= 0 || parseFloat(slStr) <= 0 || (splitTp && parseFloat(tp2Str) <= 0)){
+      if(parseFloat(tp1Str) <= 0 || parseFloat(slStr) <= 0 || ((splitTp || (entryMethod==='slplus' && qty2Str)) && parseFloat(tp2Str) <= 0)){
         throw new Error(`Perhitungan TP/SL tidak valid (TP1:${tp1Str} TP2:${tp2Str} SL:${slStr}) - order dibatalkan demi keamanan. `
           + `[debug] symbol:${cand.symbol} entryPrice:${entryPriceUsed} slRaw:${slRaw} tpRaw:${tpRaw} tickSize:${tickSize} pricePrecision:${pricePrecision}`);
       }
@@ -4224,7 +4244,11 @@
     }
 
     const envLabel = env === 'live' ? '🔴 LIVE - REAL ORDER' : '🧪 TESTNET (saldo palsu)';
-    const tpLines = splitTp
+    const tpLines = entryMethod==='slplus'
+      ? (qty2Str
+          ? `TP1: $${tp1Str} (qty ${qty1Str}, partial close asli) - SL ke BE untuk sisa qty ${qty2Str}\nSetelah itu TIDAK ada TP tetap - SL terus naik tiap kelipatan 1x risk (mulai dari $${tp2Str}), posisi jalan sampai harga balik kena SL yang sudah naik`
+          : `TP: $${tp1Str} (modal terlalu kecil untuk displit - fallback tanpa ratchet)`)
+      : splitTp
       ? `TP1: $${tp1Str} (qty ${qty1Str})\nTP2: $${tp2Str} (qty ${qty2Str}) - SL otomatis pindah ke breakeven begitu TP1 kena`
       : (virtualTp1Str
           ? `TP: $${tp1Str} (full qty) - SL otomatis pindah ke breakeven begitu harga sentuh $${virtualTp1Str} (tanpa partial close)`
@@ -4267,8 +4291,11 @@
           sl: slStr,
           tp1: tp1Str,
           qty1: qty1Str,
-          tp2: tp2Str,
-          qty2: qty2Str
+          // SL+ sengaja TIDAK mengirim tp2/qty2 sebagai order asli ke Binance -
+          // qty2/tp2 di sini cuma dipakai lokal (disimpan di posisi) sebagai
+          // level pertama buat ratchet SL, bukan order TP beneran.
+          tp2: entryMethod==='slplus' ? undefined : tp2Str,
+          qty2: entryMethod==='slplus' ? undefined : qty2Str
         })
       });
       const data = await res.json();
@@ -4393,6 +4420,18 @@
 
   // Posisi order ASLI (dikirim lewat backend, testnet atau live) - dicatat di tabel yang sama tapi
   // ditandai venue:'live-testnet'/'live-real' supaya tidak ikut logic auto-close simulasi (TP/SL asli dikelola OCO di Binance).
+  // Inisialisasi state ratchet SL+ - cuma relevan untuk entryMethod 'slplus'
+  // yang benar-benar berhasil displit (qty2 ada). ratchetLockPrice = harga yang
+  // akan jadi SL BERIKUTNYA begitu ratchetNextPrice tersentuh; setelah itu
+  // ratchetLockPrice maju ke level yang baru tercapai, ratchetNextPrice maju
+  // satu kelipatan risk lagi - begitu terus tanpa batas (lihat sync loop periodik).
+  function initSlPlusRatchet(pos){
+    if(pos.entryMethod !== 'slplus' || !pos.qty2) return;
+    pos.riskDist = Math.abs(pos.tp1 - pos.entryPrice);
+    pos.ratchetLockPrice = pos.tp1;
+    pos.ratchetNextPrice = pos.tp2;
+  }
+
   function recordLivePosition(key, cand, side, quantity, qty1, qty2, tp1, tp2, sl, time, orderIds, env, actualEntryPrice, entryMethod, virtualTp1){
     // Pakai harga eksekusi ASLI dari Binance (avgPrice hasil order MARKET) kalau
     // ada - itu entry price sebenarnya yang dipakai Binance buat hitung PNL.
@@ -4409,6 +4448,7 @@
       liveTp1OrderId: orderIds.tp1OrderId, liveTp2OrderId: orderIds.tp2OrderId,
       entryMethod: entryMethod || 'partial', virtualTp1: virtualTp1 ? parseFloat(virtualTp1) : null
     };
+    initSlPlusRatchet(prioritySimPositions[key]);
     savePrioritySimState();
   }
 
@@ -4429,6 +4469,7 @@
       entryMethod: entryMethod || 'partial', virtualTp1: virtualTp1 ? parseFloat(virtualTp1) : null,
       pending: true, pendingOrderType: orderTypeCfg.label, pendingIsAlgo: !!isAlgoEntry
     };
+    initSlPlusRatchet(prioritySimPositions[key]);
     savePrioritySimState();
   }
 
@@ -5613,7 +5654,11 @@
               fetch(`${backendUrl}/api/trade/futures/attach-sltp`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-App-Token': appToken },
-                body: JSON.stringify({ symbol: pos.source, side: pos.dir, quantity: pos.qty, sl: pos.sl, tp1: pos.tp1, qty1: pos.qty1, tp2: pos.qty2 ? pos.tp2 : undefined, qty2: pos.qty2 || undefined })
+                // SL+ tidak pernah pasang order TP2 asli - qty2/tp2 di posisi ini
+                // cuma dipakai lokal buat ratchet (lihat initSlPlusRatchet).
+                body: JSON.stringify({ symbol: pos.source, side: pos.dir, quantity: pos.qty, sl: pos.sl, tp1: pos.tp1, qty1: pos.qty1,
+                  tp2: (pos.entryMethod!=='slplus' && pos.qty2) ? pos.tp2 : undefined,
+                  qty2: (pos.entryMethod!=='slplus' && pos.qty2) ? pos.qty2 : undefined })
               }).then(function(r){ return r.json().then(function(d){ return { ok:r.ok, data:d }; }); })
                 .then(function(r){
                   if(r.ok){
@@ -5637,13 +5682,25 @@
             if(Math.abs(bp.positionAmt) < 1e-8){
               // Posisi sudah tidak ada sama sekali di Binance - tutup di tabel kita juga.
               const lastPrice = window.__esLiveMarkPrices[pos.source] || pos.entryPrice;
-              const nearTp = pos.tp1Hit ? pos.tp2 : pos.tp1;
-              const hitTp = Math.abs(lastPrice - nearTp) <= Math.abs(lastPrice - pos.sl);
-              const exitPrice = hitTp ? nearTp : pos.sl;
-              if(pos.tp1Hit && hitTp) pos.tp2Hit = true; // TP1 lalu TP2 - status TP1-TP2
-              const reason = pos.tp1Hit
-                ? (hitTp ? 'TP1-TP2 (Binance)' : 'TP1-BE (Binance)')
-                : (hitTp ? 'TP1 (Binance)' : 'Stop Loss (Binance)');
+              // SL+ tidak pernah punya order TP asli setelah TP1 - begitu qty2
+              // habis, satu-satunya cara itu tertutup adalah SL (yang sudah
+              // naik lewat ratchet), jadi tidak perlu tebak-tebakan TP vs SL
+              // seperti metode lain.
+              let exitPrice, reason;
+              if(pos.entryMethod==='slplus' && pos.tp1Hit){
+                exitPrice = pos.sl;
+                reason = pos.ratchetLockPrice && pos.ratchetLockPrice !== pos.tp1
+                  ? 'SL+ Trailing Lock (Binance)'
+                  : 'TP1-BE (Binance)';
+              } else {
+                const nearTp = pos.tp1Hit ? pos.tp2 : pos.tp1;
+                const hitTp = Math.abs(lastPrice - nearTp) <= Math.abs(lastPrice - pos.sl);
+                exitPrice = hitTp ? nearTp : pos.sl;
+                if(pos.tp1Hit && hitTp) pos.tp2Hit = true; // TP1 lalu TP2 - status TP1-TP2
+                reason = pos.tp1Hit
+                  ? (hitTp ? 'TP1-TP2 (Binance)' : 'TP1-BE (Binance)')
+                  : (hitTp ? 'TP1 (Binance)' : 'Stop Loss (Binance)');
+              }
               // Ambil data final (komisi/funding/REALIZED_PNL) dulu dari Binance
               // baru finalisasi - posisi ini sudah tertutup beberapa saat lalu di
               // Binance (kedeteksi baru sekarang), jadi datanya harusnya sudah ada.
@@ -5708,6 +5765,44 @@
                         renderPrioritySimUI(window.__esLastTickers || {});
                       }
                     }).catch(()=>{});
+                }
+              }
+
+              // Metode Entry "SL+": begitu TP1 sudah kena (partial close asli,
+              // sisa qty2 SL-nya di BE), TIDAK ADA TP tetap lagi - tiap kali
+              // mark price mencapai ratchetNextPrice (level kelipatan risk
+              // berikutnya), SL dinaikkan ke ratchetLockPrice (level sebelumnya),
+              // lalu kedua penunjuk itu maju satu kelipatan lagi. Berulang tanpa
+              // batas sampai harga akhirnya balik arah dan kena SL yang sudah naik.
+              // Syarat pos.sl===pos.entryPrice (bukan cuma pos.tp1Hit) penting -
+              // mencegah race kalau harga meloncat lewat TP1 DAN level ratchet
+              // pertama dalam satu kali cek yang sama: tunggu sampai perpindahan
+              // SL ke BE beneran selesai (dikonfirmasi Binance) sebelum ratchet
+              // pertama boleh jalan, supaya tidak ada 2 request ganti-SL
+              // berbarengan yang bisa berakhir jadi 2 order SL aktif sekaligus.
+              if(pos.tp1Hit && pos.entryMethod==='slplus' && pos.ratchetNextPrice && !pos.ratchetPending && pos.sl===pos.entryPrice){
+                const markPrice = window.__esLiveMarkPrices[pos.source];
+                const touched = markPrice!=null && (pos.dir==='BUY' ? markPrice >= pos.ratchetNextPrice : markPrice <= pos.ratchetNextPrice);
+                if(touched){
+                  pos.ratchetPending = true;
+                  const newSl = pos.ratchetLockPrice;
+                  const reachedLevel = pos.ratchetNextPrice;
+                  const nextLevel = pos.dir==='BUY' ? reachedLevel + pos.riskDist : reachedLevel - pos.riskDist;
+                  fetch(`${backendUrl}/api/trade/futures/move-sl-be`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-App-Token': appToken },
+                    body: JSON.stringify({ symbol: pos.source, side: pos.dir, quantity: pos.qty2, oldSlOrderId: pos.liveSlOrderId, breakevenPrice: newSl })
+                  }).then(function(r){ return r.json().then(function(d){ return { ok:r.ok, data:d }; }); })
+                    .then(function(r){
+                      if(r.ok && r.data.newSlOrder){
+                        pos.sl = newSl;
+                        pos.liveSlOrderId = r.data.newSlOrder.orderId || r.data.newSlOrder.algoId;
+                        pos.ratchetLockPrice = reachedLevel;
+                        pos.ratchetNextPrice = nextLevel;
+                        savePrioritySimState();
+                        renderPrioritySimUI(window.__esLastTickers || {});
+                      }
+                    }).finally(function(){ pos.ratchetPending = false; });
                 }
               }
             }
