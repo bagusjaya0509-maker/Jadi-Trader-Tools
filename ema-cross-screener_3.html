@@ -1223,15 +1223,6 @@
     color: var(--muted);
   }
 
-  .es-sim-status{
-    font-family: var(--font-mono);
-    font-size:12px;
-    color: var(--muted);
-    margin-bottom:14px;
-    min-height:16px;
-  }
-  .es-sim-status.error{ color: var(--bear); }
-
   .es-sim-summary{
     display:grid;
     grid-template-columns: repeat(auto-fill, minmax(140px,1fr));
@@ -1704,7 +1695,6 @@
       <div class="es-live-trade-status" id="esLiveTradeStatus"></div>
     </div>
     <div class="es-sim-preview" id="esPsimPreview"></div>
-    <div class="es-sim-status" id="esPsimStatus">Menunggu sinyal prioritas pertama...</div>
     <div class="es-sim-summary" id="esPsimSummary"></div>
 
     <div class="es-sim-table-label">Grafik Perkembangan Saldo</div>
@@ -1721,7 +1711,7 @@
     </div>
 
     <div class="es-sim-table-header">
-      <div class="es-sim-table-label">Riwayat Transaksi (terbaru dulu)</div>
+      <div class="es-sim-table-label">Riwayat Transaksi</div>
       <div class="es-sim-settings">
         <button type="button" id="esPsimSettingsBtn" class="es-sim-settings-btn" title="Pengaturan">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
@@ -3947,7 +3937,6 @@
   const psimSettingsBtn = document.getElementById('esPsimSettingsBtn');
   const psimSettingsDropdown = document.getElementById('esPsimSettingsDropdown');
   const psimPreviewEl = document.getElementById('esPsimPreview');
-  const psimStatusEl = document.getElementById('esPsimStatus');
   const psimSummaryEl = document.getElementById('esPsimSummary');
   const psimOpenTbody = document.getElementById('esPsimOpenTbody');
   const psimHistTbody = document.getElementById('esPsimHistTbody');
@@ -4992,10 +4981,6 @@
     });
 
     const totalFloatingPnl = openStats.reduce((s,o)=>s+o.floatPnl, 0);
-
-    psimStatusEl.textContent = psimToggle.checked
-      ? `Simulasi aktif • ${openList.length} posisi terbuka, ${prioritySimHistory.length} transaksi selesai (tersimpan permanen).`
-      : `Simulasi nonaktif (tidak buka posisi baru) • ${openList.length} posisi terbuka masih dipantau.`;
 
     psimSummaryEl.innerHTML = [
       { label:'Posisi Terbuka', value:`${openList.length}` },
