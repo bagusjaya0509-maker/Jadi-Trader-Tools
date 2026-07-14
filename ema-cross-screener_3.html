@@ -3890,6 +3890,11 @@
   const psimHistTbody = document.getElementById('esPsimHistTbody');
   const psimEquityChartEl = document.getElementById('esPsimEquityChart');
   let psimSelectedCandidate = null;
+  // Key posisi yang form "Edit SL/TP"-nya lagi terbuka - HARUS disimpan di
+  // luar renderPrioritySimUI (bukan cuma dibangun sekali saat tombol diklik),
+  // karena posisi LIVE di-render ulang tiap 1 detik (refresh mark price) -
+  // tanpa state ini form akan langsung ketutup lagi begitu re-render jalan.
+  let editingSlTpKey = null;
 
   const LIVE_TRADE_CONFIG_KEY = 'emaScreenerLiveTradeConfig_v1';
   const liveBackendUrlInput = document.getElementById('esLiveBackendUrl');
@@ -4541,13 +4546,15 @@
   }
 
   // Form inline "Edit SL/TP" untuk posisi live yang masih terbuka dan belum
-  // kena TP1 (lihat syarat isLiveEditable di renderPrioritySimUI) - menimpa
-  // isi sel Aksi sementara dengan 3 input (SL/TP1/TP2 opsional) + tombol Simpan/Batal.
-  function showEditSlTpForm(key, actionTd){
-    const pos = prioritySimPositions[key];
-    if(!pos || !actionTd) return;
-    actionTd.innerHTML = `
-      <div class="es-psim-edit-form">
+  // kena TP1 (lihat syarat isLiveEditable di renderPrioritySimUI). Dibangun
+  // sebagai HTML string (bukan langsung ditimpa ke satu actionTd) supaya bisa
+  // dipakai ulang oleh renderPrioritySimUI sendiri - soalnya posisi live
+  // di-render ulang tiap 1 detik (refresh mark price), jadi form ini harus ikut
+  // ter-render ulang selama editingSlTpKey masih menunjuk ke posisi ini,
+  // bukan cuma tampil sekali lalu ketutup pas render berikutnya jalan.
+  function buildEditSlTpFormHtml(pos){
+    return `
+      <div class="es-psim-edit-form" data-key="${pos.key}">
         <label>SL <input type="number" class="es-edit-sl" value="${pos.sl}" step="any"></label>
         <label>TP1 <input type="number" class="es-edit-tp1" value="${pos.tp1}" step="any"></label>
         <label>TP2 <input type="number" class="es-edit-tp2" value="${pos.tp2!=null?pos.tp2:''}" step="any" placeholder="opsional"></label>
@@ -4557,16 +4564,11 @@
         </div>
       </div>
     `;
-    actionTd.querySelector('.es-edit-cancel-btn').addEventListener('click', ()=>{
-      renderPrioritySimUI(window.__esLastTickers || {});
-    });
-    actionTd.querySelector('.es-edit-save-btn').addEventListener('click', ()=>{
-      const newSl = parseFloat(actionTd.querySelector('.es-edit-sl').value);
-      const newTp1 = parseFloat(actionTd.querySelector('.es-edit-tp1').value);
-      const tp2Raw = actionTd.querySelector('.es-edit-tp2').value;
-      const newTp2 = tp2Raw === '' ? null : parseFloat(tp2Raw);
-      editLiveSlTp(key, newSl, newTp1, newTp2);
-    });
+  }
+
+  function showEditSlTpForm(key){
+    editingSlTpKey = key;
+    renderPrioritySimUI(window.__esLastTickers || {});
   }
 
   // Kirim perubahan SL/TP1/TP2 ke backend (endpoint /api/trade/futures/edit-sltp) -
@@ -4633,6 +4635,7 @@
       savePrioritySimState();
       priorityStatusEl.classList.remove('error');
       priorityStatusEl.textContent = `SL/TP untuk ${pos.source.replace('USDT','')} berhasil diubah.`;
+      editingSlTpKey = null;
       renderPrioritySimUI(window.__esLastTickers || {});
     }catch(e){
       priorityStatusEl.classList.add('error');
@@ -4959,7 +4962,13 @@
         const realizedCls = hasRealized ? (realizedValue>=0?'pnl-pos':'pnl-neg') : '';
         const closeCls = floatPnl>=0 ? 'pnl-pos' : 'pnl-neg';
         const isLiveEditable = isLive && !pos.tp1Hit;
-        const editBtnHtml = isLiveEditable ? `<button type="button" class="es-psim-edit-sltp-btn" data-key="${pos.key}">Edit SL/TP</button>` : '';
+        // Kalau posisi ini yang lagi dibuka form Edit SL/TP-nya (editingSlTpKey),
+        // tampilkan formnya langsung di sini alih-alih tombol Close/Edit biasa -
+        // supaya form tetap tampil walau baris ini di-render ulang tiap 1 detik
+        // (refresh mark price posisi live).
+        const actionCellHtml = (isLiveEditable && pos.key===editingSlTpKey)
+          ? buildEditSlTpFormHtml(pos)
+          : `<button type="button" class="es-psim-close-btn ${closeCls}" data-key="${pos.key}">Close Posisi</button>${isLiveEditable ? `<button type="button" class="es-psim-edit-sltp-btn" data-key="${pos.key}">Edit SL/TP</button>` : ''}`;
         return `<tr>
           <td><div class="es-sumber-cell"><span class="es-psim-source-link" data-symbol="${pos.source}" data-tf="${pos.tfValue||''}">${label}</span>${venueBadge}</div></td>
           <td class="${arahCls}">${pos.dir}</td>
@@ -4975,7 +4984,7 @@
           <td class="${pnlCls}">${floatPnl>=0?'+':''}${floatPnl.toFixed(2)}</td>
           <td class="${realizedCls}">${realizedDisplay}</td>
           <td class="${pnlCls}">${floatPct>=0?'+':''}${floatPct.toFixed(2)}%</td>
-          <td class="es-psim-action-cell"><button type="button" class="es-psim-close-btn ${closeCls}" data-key="${pos.key}">Close Posisi</button>${editBtnHtml}</td>
+          <td class="es-psim-action-cell">${actionCellHtml}</td>
         </tr>`;
       }).join('');
 
@@ -5000,8 +5009,22 @@
 
       psimOpenTbody.querySelectorAll('.es-psim-edit-sltp-btn').forEach(btn=>{
         btn.addEventListener('click', ()=>{
-          const key = btn.getAttribute('data-key');
-          showEditSlTpForm(key, btn.closest('.es-psim-action-cell'));
+          showEditSlTpForm(btn.getAttribute('data-key'));
+        });
+      });
+
+      psimOpenTbody.querySelectorAll('.es-psim-edit-form').forEach(form=>{
+        const key = form.getAttribute('data-key');
+        form.querySelector('.es-edit-cancel-btn').addEventListener('click', ()=>{
+          editingSlTpKey = null;
+          renderPrioritySimUI(window.__esLastTickers || {});
+        });
+        form.querySelector('.es-edit-save-btn').addEventListener('click', ()=>{
+          const newSl = parseFloat(form.querySelector('.es-edit-sl').value);
+          const newTp1 = parseFloat(form.querySelector('.es-edit-tp1').value);
+          const tp2Raw = form.querySelector('.es-edit-tp2').value;
+          const newTp2 = tp2Raw === '' ? null : parseFloat(tp2Raw);
+          editLiveSlTp(key, newSl, newTp1, newTp2);
         });
       });
 
