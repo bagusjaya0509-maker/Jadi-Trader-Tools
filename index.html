@@ -49,10 +49,19 @@
   }
   .jt-nav-link:hover{background:var(--accent-soft);}
   .jt-news-wrap{ position:relative; }
-  .jt-news-trigger{ cursor:pointer; gap:6px; }
+  .jt-news-trigger{
+    cursor:pointer;
+    gap:6px;
+    background:var(--surface);
+    border:1px solid var(--border);
+    color:var(--ink);
+    border-radius:20px;
+    box-shadow:0 4px 12px rgba(0,0,0,0.35);
+  }
+  .jt-news-trigger:hover{ background:var(--surface); border-color:#8C231A; }
   .jt-news-dot{
     width:9px;height:9px;border-radius:50%;
-    background:var(--loss); flex-shrink:0;
+    background:#8C231A; flex-shrink:0;
   }
   .jt-news-panel{
     display:none;
