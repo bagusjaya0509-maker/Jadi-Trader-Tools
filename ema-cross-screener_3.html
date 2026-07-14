@@ -1312,9 +1312,8 @@
   .es-venue-badge.live{ color: #e0883a; border-color: #e0883a; }
   .es-psim-close-btn{
     background:none;
-    border:1px solid currentColor;
-    border-radius:4px;
-    padding:3px 9px;
+    border:none;
+    padding:3px 4px;
     font-family: var(--font-mono);
     font-size:10.5px;
     font-weight:600;
@@ -1339,10 +1338,8 @@
   .es-psim-cancel-order-btn:hover{ opacity:0.75; }
   .es-psim-edit-sltp-btn{
     background:none;
-    border:1px solid var(--gold);
-    color: var(--gold);
-    border-radius:4px;
-    padding:4px 6px;
+    border:none;
+    padding:4px;
     display:inline-flex;
     align-items:center;
     justify-content:center;
@@ -1350,6 +1347,8 @@
   }
   .es-psim-edit-sltp-btn:hover{ opacity:0.75; }
   .es-psim-edit-sltp-btn svg{ display:block; }
+  .es-psim-edit-sltp-btn.pnl-pos{ color: var(--bull); }
+  .es-psim-edit-sltp-btn.pnl-neg{ color: var(--bear); }
   .es-psim-pending-row{ opacity:0.85; }
   .es-psim-pending-badge{
     display:inline-block;
@@ -5028,7 +5027,7 @@
         // (refresh mark price posisi live).
         const actionCellHtml = (isLiveEditable && pos.key===editingSlTpKey)
           ? buildEditSlTpFormHtml(pos)
-          : `<button type="button" class="es-psim-close-btn ${closeCls}" data-key="${pos.key}">Close Posisi</button>${isLiveEditable ? `<button type="button" class="es-psim-edit-sltp-btn" data-key="${pos.key}" title="Edit SL/TP"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg></button>` : ''}`;
+          : `<button type="button" class="es-psim-close-btn ${closeCls}" data-key="${pos.key}">Close Posisi</button>${isLiveEditable ? `<button type="button" class="es-psim-edit-sltp-btn ${closeCls}" data-key="${pos.key}" title="Edit SL/TP"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg></button>` : ''}`;
         return `<tr>
           <td><div class="es-sumber-cell"><span class="es-psim-source-link" data-symbol="${pos.source}" data-tf="${pos.tfValue||''}">${label}</span>${venueBadge}</div></td>
           <td class="${arahCls}">${pos.dir}</td>
