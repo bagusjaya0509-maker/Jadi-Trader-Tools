@@ -772,6 +772,72 @@
   }
   .es-priority-note strong{ color: var(--text); }
 
+  /* ===== Sinyal Prioritas AI ===== */
+  .es-ai-method-note{
+    font-family: var(--font-mono);
+    font-size:10.5px;
+    line-height:1.6;
+    color: var(--muted);
+    background: var(--panel);
+    border:1px solid var(--border);
+    border-left:2px solid var(--gold);
+    border-radius:6px;
+    padding:8px 10px;
+    margin:8px 0 4px;
+  }
+  .es-ai-method-note strong{ color: var(--gold); }
+  .es-ai-regime{
+    font-family: var(--font-mono);
+    font-size:10.5px;
+    display:flex;
+    align-items:center;
+    gap:6px;
+    white-space:nowrap;
+  }
+  .es-ai-regime-badge{
+    font-weight:700;
+    padding:3px 8px;
+    border-radius:6px;
+    border:1px solid currentColor;
+  }
+  .es-ai-regime-badge.bull{ color: var(--bull); }
+  .es-ai-regime-badge.bear{ color: var(--bear); }
+  .es-ai-regime-badge.neutral{ color: var(--gold); }
+  .es-ai-score-badge{
+    font-family: var(--font-mono);
+    font-weight:700;
+    font-size:10px;
+    padding:2px 7px;
+    border-radius:6px;
+    margin-left:auto;
+  }
+  .es-ai-score-badge.high{ background: var(--bull-dim); color: var(--bull); }
+  .es-ai-score-badge.mid{ background: rgba(242,184,75,0.18); color: var(--gold); }
+  .es-ai-reasons{
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+    margin-top:2px;
+  }
+  .es-ai-reason{
+    font-family: var(--font-mono);
+    font-size:9.5px;
+    line-height:1.5;
+    color: var(--muted);
+    display:flex;
+    gap:5px;
+    align-items:flex-start;
+  }
+  .es-ai-reason-icon{ flex-shrink:0; }
+  .es-ai-reason.ok .es-ai-reason-icon{ color: var(--bull); }
+  .es-ai-reason.warn .es-ai-reason-icon{ color: var(--gold); }
+  .es-ai-rr{
+    font-family: var(--font-mono);
+    font-size:10px;
+    color: var(--gold);
+    font-weight:600;
+  }
+
   .es-priority-levels{
     display:flex;
     flex-direction:column;
@@ -1646,6 +1712,36 @@
     <div class="es-priority-status" id="esPrioritySnrStatus">Klik "Cari Sinyal Prioritas SNR" untuk memindai.</div>
   </div>
 
+  <div class="es-priority-section">
+    <div class="es-priority-header">
+      <div class="es-priority-title">Sinyal Prioritas AI &mdash; Analisa Konfluensi</div>
+    </div>
+    <div class="es-ai-method-note">
+      Model konfluensi multi-timeframe: rezim BTC (makro) &rarr; tren 4H &rarr; pullback ke zona nilai 1H &rarr;
+      momentum berbalik &rarr; kekuatan relatif vs BTC. Hanya setup skor <strong>&ge;60</strong> yang ditampilkan,
+      diurutkan dari skor tertinggi (maks 5 koin).
+    </div>
+    <div class="es-priority-controls">
+      <select id="esPriorityAiBias">
+        <option value="auto" selected>Ikuti Rezim BTC (disarankan)</option>
+        <option value="both">Semua Arah (abaikan rezim)</option>
+        <option value="long">Hanya BUY</option>
+        <option value="short">Hanya SELL</option>
+      </select>
+      <button id="esPriorityAiBtn" class="es-priority-btn">Jalankan Analisa AI</button>
+      <div class="es-symbol-manager es-symbol-manager-inline">
+        <button type="button" id="esPriorityAiManagerBtn" class="es-symbol-manager-btn">
+          <span>Ganti Chart / Kelola Koin</span>
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <div class="es-symbol-manager-dropdown" id="esPriorityAiManagerDropdown"></div>
+      </div>
+      <div class="es-ai-regime" id="esAiRegime"></div>
+    </div>
+    <div class="es-priority-grid" id="esPriorityAiGrid"></div>
+    <div class="es-priority-status" id="esPriorityAiStatus">Klik "Jalankan Analisa AI" untuk memindai.</div>
+  </div>
+
   <div class="es-sim-section">
     <div class="es-sim-title">Simulasi - Entri Live Sinyal</div>
     <div class="es-sim-controls">
@@ -2105,6 +2201,7 @@
       closes: data.map(d=>parseFloat(d[4])),
       highs: data.map(d=>parseFloat(d[2])),
       lows: data.map(d=>parseFloat(d[3])),
+      volumes: data.map(d=>parseFloat(d[5])),
       times: data.map(d=>d[0]),
       market
     };
@@ -2353,7 +2450,7 @@
   // biasa. Tiap sumber daftar ulang candidate-nya sendiri tiap kali pindai
   // ulang (entri lama dari sumber itu dihapus dulu supaya tidak menumpuk data basi).
   window.__esTradableSignals = window.__esTradableSignals || {};
-  const TRADABLE_SOURCE_LABEL = { priority:'Prioritas', favorite:'Favorit', cross:'Cross EMA', favcross:'Favorit Cross', ict:'Prioritas ICT', snr:'Prioritas SNR' };
+  const TRADABLE_SOURCE_LABEL = { priority:'Prioritas', favorite:'Favorit', cross:'Cross EMA', favcross:'Favorit Cross', ict:'Prioritas ICT', snr:'Prioritas SNR', ai:'Prioritas AI' };
   function tradableUid(source, symbol, tfValue){ return `${source}_${symbol}_${tfValue}`; }
   function registerTradableSignals(source, candidates){
     Object.keys(window.__esTradableSignals).forEach(k=>{
@@ -3967,6 +4064,370 @@
   prioritySnrBtn.addEventListener('click', findPrioritySnrSignals);
   prioritySnrTfSel.addEventListener('change', findPrioritySnrSignals);
 
+  // ═══════════════════════════════════════════════════════
+  // ████████  SINYAL PRIORITAS AI - MODEL KONFLUENSI  ████████
+  // ═══════════════════════════════════════════════════════
+  // Kerangka analisa: trade SEARAH tren besar, masuk saat PULLBACK sudah
+  // kehabisan tenaga, disaring oleh rezim BTC (makro) dan kekuatan relatif.
+  // Beda filosofi dari 2 section lain: BBMA cari konfluensi indikator di satu
+  // TF, SNR cari retest zona - yang ini murni MODEL TREN + PULLBACK bertingkat
+  // 4H (arah) -> 1H (timing), plus penilaian berbobot 0-100 supaya bisa
+  // diranking (bukan cuma lolos/tidak lolos).
+  const AI_MIN_SCORE = 60;      // di bawah ini tidak ditampilkan sama sekali
+  const AI_MAX_RESULTS = 5;     // ambil 5 terbaik saja
+  const AI_MAX_RISK_PCT = 6;    // SL lebih jauh dari 6% dari harga = tolak (R:R jelek)
+
+  const priorityAiBtn = document.getElementById('esPriorityAiBtn');
+  const priorityAiBiasSel = document.getElementById('esPriorityAiBias');
+  const priorityAiStatusEl = document.getElementById('esPriorityAiStatus');
+  const priorityAiGrid = document.getElementById('esPriorityAiGrid');
+  const priorityAiManagerBtn = document.getElementById('esPriorityAiManagerBtn');
+  const priorityAiManagerDropdown = document.getElementById('esPriorityAiManagerDropdown');
+  const aiRegimeEl = document.getElementById('esAiRegime');
+
+  // --- Lapisan MAKRO: rezim BTC di 4H ---
+  // Altcoin sebagian besar bergerak mengikuti BTC. Long altcoin saat BTC
+  // ambruk = melawan arus utama, jadi rezim ini dipakai sebagai penyaring arah
+  // untuk SEMUA koin, bukan sekadar informasi tampilan.
+  function classifyBtcRegime(closes){
+    const n = closes.length;
+    if(n < 210) return { label:'Data kurang', bias:'both', score:0 };
+    const e50 = ema(closes,50), e200 = ema(closes,200);
+    const last = closes[n-1];
+    let s = 0;
+    if(last > e200[n-1]) s += 2; else s -= 2;
+    if(last > e50[n-1]) s += 1; else s -= 1;
+    if(e50[n-1] > e200[n-1]) s += 1; else s -= 1;
+    const slope = ((e50[n-1] - e50[n-11]) / e50[n-11]) * 100;
+    if(slope > 0.5) s += 1; else if(slope < -0.5) s -= 1;
+    if(s >= 3) return { label:'BTC Bullish', bias:'long', score:s };
+    if(s <= -3) return { label:'BTC Bearish', bias:'short', score:s };
+    return { label:'BTC Sideways', bias:'both', score:s };
+  }
+
+  // Kekuatan relatif: seberapa jauh koin ini mengungguli/tertinggal dari BTC
+  // pada periode yang sama. Dalam tren naik, pemimpin cenderung lanjut memimpin.
+  function relStrengthVsBtc(coinCloses, btcCloses, lookback){
+    const n = coinCloses.length, m = btcCloses.length;
+    if(n <= lookback || m <= lookback) return 0;
+    const c = (coinCloses[n-1] - coinCloses[n-1-lookback]) / coinCloses[n-1-lookback];
+    const b = (btcCloses[m-1] - btcCloses[m-1-lookback]) / btcCloses[m-1-lookback];
+    return (c - b) * 100;
+  }
+
+  // --- Inti penilaian per koin ---
+  // htf = klines 4H (menentukan ARAH), ltf = klines 1H (menentukan TIMING).
+  // Mengembalikan null kalau tidak memenuhi syarat dasar (tanpa tren jelas /
+  // R:R tidak masuk akal), atau objek kandidat lengkap dengan skor + alasan.
+  function analyzeAiSetup(symbol, htf, ltf, btcCloses4h, regime, price){
+    const H = htf.closes.length, L = ltf.closes.length;
+    if(H < 210 || L < 120) return null;
+
+    const reasons = [];
+    let score = 0;
+
+    // 1. ARAH dari tren 4H (bobot 25) - syarat mutlak, tanpa ini tidak trade.
+    const he50 = ema(htf.closes,50), he200 = ema(htf.closes,200);
+    const hLast = htf.closes[H-1];
+    const isUp = hLast > he200[H-1] && he50[H-1] > he200[H-1];
+    const isDown = hLast < he200[H-1] && he50[H-1] < he200[H-1];
+    if(!isUp && !isDown) return null; // 4H tidak punya tren bersih - lewati
+    const dir = isUp ? 'BUY' : 'SELL';
+    score += 25;
+    reasons.push({ level:'ok', text: isUp
+      ? 'Tren 4H naik: harga & EMA50 di atas EMA200'
+      : 'Tren 4H turun: harga & EMA50 di bawah EMA200' });
+
+    // 2. Keselarasan REZIM BTC (bobot 15) - searah rezim dapat penuh,
+    // sideways dapat separuh, melawan rezim dipotong keras.
+    if(regime.bias === 'both'){
+      score += 7;
+      reasons.push({ level:'warn', text:'BTC sideways - konfirmasi makro lemah' });
+    } else if((regime.bias === 'long' && dir === 'BUY') || (regime.bias === 'short' && dir === 'SELL')){
+      score += 15;
+      reasons.push({ level:'ok', text:'Searah rezim makro ' + regime.label });
+    } else {
+      score -= 15;
+      reasons.push({ level:'warn', text:'MELAWAN rezim ' + regime.label + ' - risiko lebih tinggi' });
+    }
+
+    // 3. PULLBACK ke zona nilai di 1H (bobot 20) - inti dari model ini:
+    // masuk saat harga mundur ke area EMA20-EMA50, bukan mengejar harga yang
+    // sudah lari jauh (yang bikin SL kejauhan & R:R jelek).
+    const le20 = ema(ltf.closes,20), le50 = ema(ltf.closes,50);
+    const lLast = ltf.closes[L-1];
+    const zoneHi = Math.max(le20[L-1], le50[L-1]);
+    const zoneLo = Math.min(le20[L-1], le50[L-1]);
+    const bandPad = (zoneHi - zoneLo) * 0.5 || (lLast * 0.004);
+    const inValueZone = lLast <= (zoneHi + bandPad) && lLast >= (zoneLo - bandPad);
+    if(inValueZone){
+      score += 20;
+      reasons.push({ level:'ok', text:'Pullback masuk zona nilai EMA20-50 (1H)' });
+    } else {
+      const stretched = dir === 'BUY' ? lLast > zoneHi + bandPad : lLast < zoneLo - bandPad;
+      if(stretched){
+        score += 4;
+        reasons.push({ level:'warn', text:'Harga sudah jauh dari zona nilai - entry kurang ideal' });
+      } else {
+        score += 10;
+        reasons.push({ level:'warn', text:'Harga menembus sisi berlawanan zona nilai' });
+      }
+    }
+
+    // 4. STRUKTUR belum rusak (bobot 15) - pullback sehat vs pembalikan tren.
+    // Untuk BUY: swing low terakhir 1H masih di atas swing low sebelumnya.
+    const pLows = findPivots(ltf.lows, 5, 5, false);
+    const pHighs = findPivots(ltf.highs, 5, 5, true);
+    let structureOk = false;
+    if(dir === 'BUY' && pLows.length >= 2){
+      structureOk = pLows[pLows.length-1].value > pLows[pLows.length-2].value;
+    } else if(dir === 'SELL' && pHighs.length >= 2){
+      structureOk = pHighs[pHighs.length-1].value < pHighs[pHighs.length-2].value;
+    }
+    if(structureOk){
+      score += 15;
+      reasons.push({ level:'ok', text: dir==='BUY' ? 'Struktur 1H masih higher-low' : 'Struktur 1H masih lower-high' });
+    } else {
+      reasons.push({ level:'warn', text:'Struktur 1H belum konfirmasi lanjutan tren' });
+    }
+
+    // 5. MOMENTUM berbalik searah tren (bobot 15) - bukti pullback sudah habis.
+    const rsiArr = rsi(ltf.closes, 14);
+    const rsiNow = rsiArr[L-1], rsiPrev = rsiArr[L-3];
+    let momentumOk = false;
+    if(rsiNow !== null && rsiPrev !== null){
+      momentumOk = dir === 'BUY' ? (rsiNow > rsiPrev && rsiNow > 40 && rsiNow < 68)
+                                 : (rsiNow < rsiPrev && rsiNow < 60 && rsiNow > 32);
+    }
+    if(momentumOk){
+      score += 15;
+      reasons.push({ level:'ok', text:'RSI 1H berbalik searah tren (' + rsiNow.toFixed(0) + ')' });
+    } else {
+      reasons.push({ level:'warn', text: rsiNow===null ? 'RSI tidak tersedia' : 'Momentum RSI belum berbalik (' + rsiNow.toFixed(0) + ')' });
+    }
+    // PENALTI MENGEJAR HARGA: RSI ekstrem searah entry artinya harga sudah lari
+    // jauh - masuk di sini justru kebalikan dari filosofi model ini (beli di
+    // diskon). Tanpa penalti eksplisit, faktor-faktor lain bisa menutupi ini
+    // dan menghasilkan skor tinggi palsu untuk setup yang sebenarnya telat.
+    if(rsiNow !== null && ((dir === 'BUY' && rsiNow > 78) || (dir === 'SELL' && rsiNow < 22))){
+      score -= 12;
+      reasons.push({ level:'warn', text:'RSI ekstrem (' + rsiNow.toFixed(0) + ') - harga sudah lari, berisiko mengejar' });
+    }
+
+    // 6. KEKUATAN RELATIF vs BTC (bobot 15) - pilih pemimpin, bukan yang tertinggal.
+    const rs = relStrengthVsBtc(htf.closes, btcCloses4h, 30);
+    const rsFavor = dir === 'BUY' ? rs : -rs;
+    if(rsFavor > 3){
+      score += 15;
+      reasons.push({ level:'ok', text:'Lebih kuat dari BTC (' + (rs>=0?'+':'') + rs.toFixed(1) + '% relatif)' });
+    } else if(rsFavor > -3){
+      score += 7;
+      reasons.push({ level:'warn', text:'Bergerak seiring BTC (' + (rs>=0?'+':'') + rs.toFixed(1) + '% relatif)' });
+    } else {
+      reasons.push({ level:'warn', text:'Lebih lemah dari BTC (' + (rs>=0?'+':'') + rs.toFixed(1) + '% relatif)' });
+    }
+
+    // 7. SANITASI VOLATILITAS (bobot 10) - buang yang terlalu liar (SL pasti
+    // kena noise) maupun yang mati (tidak akan sampai TP).
+    const atrArr = atr(ltf.highs, ltf.lows, ltf.closes, 14);
+    const atrNow = atrArr[L-1] || 0;
+    const atrPct = (atrNow / lLast) * 100;
+    if(atrPct >= 0.4 && atrPct <= 3.5){
+      score += 10;
+      reasons.push({ level:'ok', text:'Volatilitas sehat (ATR 1H ' + atrPct.toFixed(2) + '%)' });
+    } else {
+      reasons.push({ level:'warn', text: atrPct > 3.5
+        ? 'Volatilitas terlalu tinggi (ATR ' + atrPct.toFixed(2) + '%)'
+        : 'Volatilitas terlalu rendah (ATR ' + atrPct.toFixed(2) + '%)' });
+    }
+
+    // --- Level SL/TP berbasis STRUKTUR, bukan sekadar kelipatan ATR ---
+    // SL ditaruh di luar swing terakhir 1H + bantalan ATR, supaya invalidasi
+    // benar-benar berarti "struktur rusak", bukan kena noise biasa.
+    const lookSwing = 12;
+    const swingLow = Math.min.apply(null, ltf.lows.slice(-lookSwing));
+    const swingHigh = Math.max.apply(null, ltf.highs.slice(-lookSwing));
+    const sl = dir === 'BUY' ? swingLow - atrNow*0.3 : swingHigh + atrNow*0.3;
+    const risk = Math.abs(price - sl);
+    if(!(risk > 0)) return null;
+    const riskPct = (risk / price) * 100;
+    if(riskPct > AI_MAX_RISK_PCT) return null; // SL kejauhan - tolak
+
+    // TP1 diarahkan ke target struktur terdekat (pivot lawan arah), tapi
+    // dibatasi 1.2R-4R supaya tidak absurd; TP2 = 4R (runner).
+    let tp1 = dir === 'BUY' ? price + risk*2 : price - risk*2;
+    const oppPivots = dir === 'BUY' ? pHighs : pLows;
+    if(oppPivots.length){
+      const t = oppPivots[oppPivots.length-1].value;
+      const okRange = dir === 'BUY'
+        ? (t > price + risk*1.2 && t < price + risk*4)
+        : (t < price - risk*1.2 && t > price - risk*4);
+      if(okRange) tp1 = t;
+    }
+    const tp2 = dir === 'BUY' ? price + risk*4 : price - risk*4;
+    const rr = Math.abs(tp1 - price) / risk;
+
+    return {
+      symbol, signal: dir, price, score: Math.round(score), reasons,
+      sl, tp: tp1, tp2, risk, riskPct, rr, atrPct,
+      tfValue: '1h', tfLabel: '4H/1H'
+    };
+  }
+
+  function renderPriorityAiSignals(top){
+    window.__esLastPriorityAiResults = top;
+    registerTradableSignals('ai', top);
+    priorityAiGrid.innerHTML = top.map((c,i)=>{
+      const signalCls = c.signal==='BUY' ? 'buy' : 'sell';
+      const scoreCls = c.score >= 80 ? 'high' : 'mid';
+      const reasonsHtml = c.reasons.map(r=>
+        `<div class="es-ai-reason ${r.level}"><span class="es-ai-reason-icon">${r.level==='ok'?'&check;':'!'}</span><span>${r.text}</span></div>`
+      ).join('');
+      return `<div class="es-priority-card ${signalCls}" data-symbol="${c.symbol}" data-tf="${c.tfValue}">
+        <div class="es-priority-card-top">
+          <span class="es-priority-rank">#${i+1}</span>
+          <span class="es-priority-symbol">${c.symbol.replace('USDT','')}</span>
+          <span class="es-priority-signal ${signalCls}">${c.signal}</span>
+          <span class="es-ai-score-badge ${scoreCls}">SKOR ${c.score}</span>
+        </div>
+        <div class="es-priority-tf">Konfluensi ${c.tfLabel} &bull; Harga $${fmtPrice(c.price)}</div>
+        <div class="es-ai-reasons">${reasonsHtml}</div>
+        <div class="es-priority-levels">
+          <div class="es-priority-level-row">Area Entri: <strong>$${fmtPrice(c.price)}</strong></div>
+          <div class="es-priority-level-row invalid">Invalid Level (SL): <strong>$${fmtPrice(c.sl)}</strong></div>
+          <div class="es-priority-level-row">Take Profit: <strong>TP1 $${fmtPrice(c.tp)}</strong> &bull; <strong>TP2 $${fmtPrice(c.tp2)}</strong></div>
+          <div class="es-priority-level-row">Risk: <strong>${c.riskPct.toFixed(2)}%</strong> &bull; <span class="es-ai-rr">R:R 1:${c.rr.toFixed(1)}</span></div>
+        </div>
+        <button class="es-priority-trade-btn" type="button">Pilih Sinyal Ini</button>
+      </div>`;
+    }).join('');
+
+    priorityAiGrid.querySelectorAll('.es-priority-card').forEach((card,i)=>{
+      const cand = top[i];
+      card.addEventListener('click', (e)=>{
+        if(e.target.classList.contains('es-priority-trade-btn')) return;
+        openTradingView(cand.symbol, cand.tfValue);
+      });
+      card.querySelector('.es-priority-trade-btn').addEventListener('click', (e)=>{
+        e.stopPropagation();
+        selectTradableSignalByUid(tradableUid('ai', cand.symbol, cand.tfValue));
+      });
+    });
+  }
+
+  async function findPriorityAiSignals(){
+    priorityAiBtn.disabled = true;
+    priorityAiStatusEl.classList.remove('error');
+    priorityAiStatusEl.textContent = 'Membaca rezim pasar BTC...';
+    priorityAiGrid.innerHTML = '';
+    aiRegimeEl.innerHTML = '';
+
+    try{
+      const tickers = await loadTickers();
+
+      // Langkah 1: baca rezim BTC dulu - ini penyaring arah untuk semua koin.
+      const btc4h = await fetchKlines('BTCUSDT', '4h', 300);
+      let regime = classifyBtcRegime(btc4h.closes);
+
+      const biasChoice = priorityAiBiasSel.value;
+      if(biasChoice === 'both') regime = Object.assign({}, regime, { bias:'both' });
+      else if(biasChoice === 'long') regime = Object.assign({}, regime, { bias:'long' });
+      else if(biasChoice === 'short') regime = Object.assign({}, regime, { bias:'short' });
+
+      const regCls = regime.label.includes('Bullish') ? 'bull' : regime.label.includes('Bearish') ? 'bear' : 'neutral';
+      aiRegimeEl.innerHTML = `Rezim: <span class="es-ai-regime-badge ${regCls}">${regime.label}</span>`;
+
+      priorityAiStatusEl.textContent = `Menganalisa ${activeSymbols.length} koin (4H + 1H)... bisa memakan waktu beberapa detik.`;
+
+      // Langkah 2: ambil 4H semua koin dulu, baru 1H - dipisah per TF (pola yang
+      // sama dipakai Sinyal Prioritas BBMA) supaya tidak menembak ratusan
+      // request sekaligus ke Binance.
+      const htfSettled = await Promise.allSettled(
+        activeSymbols.map(s => fetchKlines(s, '4h', 300).then(k => ({ symbol:s, k })))
+      );
+      const htfMap = {};
+      htfSettled.forEach(r=>{ if(r.status==='fulfilled') htfMap[r.value.symbol] = r.value.k; });
+
+      const ltfSettled = await Promise.allSettled(
+        Object.keys(htfMap).map(s => fetchKlines(s, '1h', 300).then(k => ({ symbol:s, k })))
+      );
+
+      const candidates = [];
+      ltfSettled.forEach(r=>{
+        if(r.status !== 'fulfilled') return;
+        const symbol = r.value.symbol;
+        const htf = htfMap[symbol];
+        const ltf = r.value.k;
+        const t = tickers[symbol];
+        const price = t ? parseFloat(t.lastPrice) : ltf.closes[ltf.closes.length-1];
+        try{
+          const res = analyzeAiSetup(symbol, htf, ltf, btc4h.closes, regime, price);
+          if(res && res.score >= AI_MIN_SCORE) candidates.push(res);
+        }catch(e){ /* satu koin gagal dianalisa - lewati, jangan gagalkan semua */ }
+      });
+
+      candidates.sort((a,b)=> b.score - a.score || b.rr - a.rr);
+      const top = candidates.slice(0, AI_MAX_RESULTS);
+
+      if(top.length === 0){
+        priorityAiStatusEl.textContent = `Tidak ada setup yang lolos ambang skor ${AI_MIN_SCORE} dari ${activeSymbols.length} koin. `
+          + `Ini normal - model ini sengaja selektif, lebih baik tidak entry daripada entry paksa.`;
+        priorityAiGrid.innerHTML = '';
+        return;
+      }
+
+      renderPriorityAiSignals(top);
+      priorityAiStatusEl.textContent = `${top.length} setup terbaik dari ${candidates.length} kandidat lolos ambang `
+        + `(${activeSymbols.length} koin dianalisa) • ${new Date().toLocaleTimeString('id-ID')}.`;
+    }catch(e){
+      priorityAiStatusEl.classList.add('error');
+      priorityAiStatusEl.textContent = `Gagal menjalankan analisa AI: ${e && e.message ? e.message : 'terjadi kesalahan tak terduga'}.`;
+    }finally{
+      priorityAiBtn.disabled = false;
+    }
+  }
+
+  function renderPriorityAiManagerDropdown(){
+    const results = window.__esLastPriorityAiResults || [];
+    if(results.length===0){
+      priorityAiManagerDropdown.innerHTML = `<div class="es-symbol-manager-empty">Belum ada hasil analisa. Jalankan dulu analisanya.</div>`;
+      return;
+    }
+    priorityAiManagerDropdown.innerHTML = results.map(c=>`
+      <div class="es-symbol-manager-row">
+        <span class="es-symbol-manager-name" data-symbol="${c.symbol}" data-tf="${c.tfValue}">${c.symbol.replace('USDT','')} (${c.tfLabel})</span>
+        <button type="button" class="es-symbol-manager-remove" data-symbol="${c.symbol}">Ganti</button>
+      </div>
+    `).join('');
+    priorityAiManagerDropdown.querySelectorAll('.es-symbol-manager-name').forEach(el=>{
+      el.addEventListener('click', ()=> openTradingView(el.getAttribute('data-symbol'), el.getAttribute('data-tf')));
+    });
+    priorityAiManagerDropdown.querySelectorAll('.es-symbol-manager-remove').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        blockAndReplaceSymbol(btn.getAttribute('data-symbol'));
+        findPriorityAiSignals();
+      });
+    });
+  }
+
+  priorityAiManagerBtn.addEventListener('click', (e)=>{
+    e.stopPropagation();
+    const willOpen = !priorityAiManagerDropdown.classList.contains('open');
+    if(willOpen) renderPriorityAiManagerDropdown();
+    priorityAiManagerBtn.classList.toggle('open', willOpen);
+    priorityAiManagerDropdown.classList.toggle('open', willOpen);
+  });
+  document.addEventListener('click', (e)=>{
+    if(!priorityAiManagerBtn.contains(e.target) && !priorityAiManagerDropdown.contains(e.target)){
+      priorityAiManagerBtn.classList.remove('open');
+      priorityAiManagerDropdown.classList.remove('open');
+    }
+  });
+
+  // Manual trigger saja - analisa ini memakai 2 TF x semua koin, jadi sengaja
+  // TIDAK auto-scan saat halaman dibuka supaya tidak membebani API.
+  priorityAiBtn.addEventListener('click', findPriorityAiSignals);
+
   const PRIORITY_SIM_KEY = 'emaScreenerPrioritySim_v1';
   let prioritySimPositions = {};
   let prioritySimHistory = [];
@@ -4463,7 +4924,16 @@
   function savePrioritySimState(){
     try{
       localStorage.setItem(PRIORITY_SIM_KEY, JSON.stringify({ positions: prioritySimPositions, history: prioritySimHistory }));
-      markEsCloudDirty();
+      // PENTING: markEsCloudDirty() SENGAJA TIDAK dipanggil di sini - fungsi ini
+      // jalan untuk hal rutin juga (migrasi saat load halaman, update PnL tiap
+      // detik, dll), bukan cuma aksi live trading asli. Kalau dipanggil di sini,
+      // "penanda baru berubah" itu jadi HAMPIR SELALU "baru" di device manapun
+      // yang baru buka halaman - bikin device yang justru TIDAK punya perubahan
+      // apa pun malah mengira dirinya lebih baru dari cloud, lalu menimpa balik
+      // cloud dengan data lokalnya yang sebenarnya kosong/basi (bug yang bikin
+      // posisi live "hilang" dobel-arah). markEsCloudDirty() dipanggil terpisah,
+      // HANYA di titik aksi live trading asli (buka/tutup/edit/batal posisi) -
+      // lihat pemanggilannya berdampingan dengan esSyncNow().
     }catch(e){ /* localStorage penuh/diblokir - abaikan, state tetap ada di memori */ }
   }
 
@@ -4540,7 +5010,7 @@
     };
     initSlPlusRatchet(prioritySimPositions[key]);
     savePrioritySimState();
-    esSyncNow(); // dorong ke cloud SEKARANG - posisi live baru dibuka, jangan tunggu siklus 15 detik
+    markEsCloudDirty(); esSyncNow(); // dorong ke cloud SEKARANG - posisi live baru dibuka, jangan tunggu siklus 15 detik
   }
 
   // Posisi entry LIMIT/STOP yang masih MENGGANTUNG di Binance (belum ada
@@ -4562,7 +5032,7 @@
     };
     initSlPlusRatchet(prioritySimPositions[key]);
     savePrioritySimState();
-    esSyncNow(); // dorong ke cloud SEKARANG - order pending baru dikirim, jangan tunggu siklus 15 detik
+    markEsCloudDirty(); esSyncNow(); // dorong ke cloud SEKARANG - order pending baru dikirim, jangan tunggu siklus 15 detik
   }
 
   // Partial close 50% posisi SIM begitu TP1 kesentuh: separuh qty direalisasi
@@ -4617,7 +5087,7 @@
       exitPrice, exitTime: time, reason, exchangeFee, marginFee, pnl, pnlPct, tpStatus, venue: pos.venue || 'sim', verified });
     delete prioritySimPositions[key];
     savePrioritySimState();
-    esSyncNow(); // dorong ke cloud SEKARANG - posisi baru saja tertutup, jangan tunggu siklus 15 detik
+    markEsCloudDirty(); esSyncNow(); // dorong ke cloud SEKARANG - posisi baru saja tertutup, jangan tunggu siklus 15 detik
   }
 
   function manualClosePrioritySimPosition(key, tickers){
@@ -4733,7 +5203,7 @@
       if(!res.ok) throw new Error((data && data.error) ? JSON.stringify(data.error) : `HTTP ${res.status}`);
       delete prioritySimPositions[key];
       savePrioritySimState();
-      esSyncNow();
+      markEsCloudDirty(); esSyncNow();
       renderPrioritySimUI(tickers || window.__esLastTickers || {});
       priorityStatusEl.classList.remove('error');
       priorityStatusEl.textContent = `Order ${pos.pendingOrderType} untuk ${pos.source.replace('USDT','')} berhasil dibatalkan.`;
@@ -4842,7 +5312,7 @@
         if(data.tp2Order) pos.liveTp2OrderId = data.tp2Order.orderId || data.tp2Order.algoId;
       }
       savePrioritySimState();
-      esSyncNow();
+      markEsCloudDirty(); esSyncNow();
       priorityStatusEl.classList.remove('error');
       priorityStatusEl.textContent = `SL/TP untuk ${pos.source.replace('USDT','')} berhasil diubah.`;
       editingSlTpKey = null;
