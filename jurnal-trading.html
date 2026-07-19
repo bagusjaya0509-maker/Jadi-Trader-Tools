@@ -1,3 +1,4 @@
+<meta charset="utf-8">
 <title>Jadi Trader — Jurnal Trading</title>
 <style>
   :root{
@@ -247,6 +248,18 @@
   .cal-cell.today{box-shadow:0 0 0 1px var(--accent) inset;}
   .cal-cell .d{font-size:11px;}
   .cal-cell .pl{font-family:var(--font-mono);font-size:9.5px;margin-top:2px;font-variant-numeric:tabular-nums;}
+  .jt-sync-box{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
+  .jt-sync-note{font-size:10.5px;color:var(--ink-faint);font-family:var(--font-mono);}
+  .jt-sync-note.error{color:var(--loss);}
+  .jt-sync-note.ok{color:var(--profit);}
+  .jt-sync-btn{
+    background:var(--surface);border:1px solid var(--accent-dim);color:var(--accent);
+    font-family:var(--font-mono);font-size:11px;font-weight:600;
+    padding:5px 10px;border-radius:6px;cursor:pointer;white-space:nowrap;
+  }
+  .jt-sync-btn:hover{background:var(--accent-soft);}
+  .jt-sync-btn:disabled{opacity:.5;cursor:default;}
+  .venue-badge.binance-sync{border-color:var(--ink-faint);color:var(--ink-faint);}
   .cal-total{
     display:flex;align-items:center;justify-content:space-between;gap:10px;
     margin-top:10px;padding-top:10px;border-top:1px solid var(--border-soft);
@@ -530,7 +543,13 @@
       </div>
 
       <div class="card">
-        <div class="card-head"><h2>Riwayat Trade Kripto</h2></div>
+        <div class="card-head">
+          <h2>Riwayat Trade Kripto</h2>
+          <div class="jt-sync-box">
+            <span class="jt-sync-note" id="cBinanceSyncNote"></span>
+            <button type="button" class="jt-sync-btn" id="cBinanceSyncBtn">Sinkron Binance</button>
+          </div>
+        </div>
         <div class="jt-hist-controls">
           <select class="jt-range-select" id="cRangeSelect">
             <option value="all">Semua</option>
@@ -549,7 +568,7 @@
         <div class="table-scroll jt-hist-limited">
           <table id="cTradeTable">
             <thead>
-              <tr><th>Tanggal</th><th>Pair</th><th>TF</th><th>Arah</th><th>Alasan</th><th>P/L</th><th>Hasil</th></tr>
+              <tr><th>Tanggal</th><th>Pair</th><th>TF</th><th>Arah</th><th>Alasan</th><th>Fee</th><th>P/L Bersih</th><th>Hasil</th></tr>
             </thead>
             <tbody id="cTradeTbody"></tbody>
           </table>
@@ -1117,7 +1136,13 @@
   var CRYPTO_SIM_KEY = 'emaScreenerPrioritySim_v1';
   var cState = { trades: [], calMonth: new Date() };
 
-  function loadCryptoTrades(){
+  // Riwayat hasil sinkronisasi dari Binance (disimpan supaya tidak perlu
+  // menarik ulang tiap halaman dibuka).
+  var BINANCE_HIST_KEY = 'jtBinanceCryptoHistory_v1';
+
+  // Trade yang tercatat oleh TOOL sendiri (punya detail TF/arah/alasan yang
+  // tidak ada di data Binance).
+  function loadLocalToolTrades(){
     try{
       var raw = localStorage.getItem(CRYPTO_SIM_KEY);
       if(!raw) return [];
@@ -1130,6 +1155,7 @@
           tf: t.tfLabel || '',
           direction: t.dir || '',
           pl: t.pnl || 0,
+          fee: (t.exchangeFee || 0) + (t.marginFee || 0),
           reason: t.reason || '',
           venue: t.venue || 'sim'
         };
@@ -1137,6 +1163,136 @@
       // (live/testnet) - trade simulasi biasa (venue 'sim') tidak ikut ditampilkan.
       }).filter(function(t){ return t.venue==='live-real' || t.venue==='live-testnet'; });
     }catch(e){ return []; }
+  }
+
+  function loadBinanceHistCache(){
+    try{
+      var raw = localStorage.getItem(BINANCE_HIST_KEY);
+      if(!raw) return null;
+      var d = JSON.parse(raw);
+      return (d && Array.isArray(d.trades)) ? d : null;
+    }catch(e){ return null; }
+  }
+
+  // Ubah catatan income mentah Binance jadi baris "trade".
+  // Binance tidak menyimpan konsep "trade" utuh di endpoint ini - yang ada
+  // adalah aliran kejadian: REALIZED_PNL (saat posisi ditutup/dikurangi),
+  // COMMISSION (biaya per fill), dan FUNDING_FEE (biaya periodik selama posisi
+  // terbuka). Jadi harus direkonstruksi: tiap REALIZED_PNL = satu penutupan,
+  // dan biaya yang terkumpul sejak penutupan sebelumnya dibebankan ke situ.
+  // Mengembalikan { trades, feeBelumTertutup }.
+  // feeBelumTertutup = komisi/funding yang SUDAH dibayar tapi posisinya belum
+  // ditutup, jadi belum bisa dibebankan ke baris trade manapun. Angka ini
+  // sengaja DILAPORKAN (bukan dibuang diam-diam) supaya total di jurnal bisa
+  // direkonsiliasi dengan saldo Binance - kalau tidak, akan ada selisih yang
+  // tidak bisa dijelaskan.
+  function groupIncomeToTrades(income){
+    var perSimbol = {};
+    income.forEach(function(r){
+      var tipe = r.incomeType;
+      if(tipe !== 'REALIZED_PNL' && tipe !== 'COMMISSION' && tipe !== 'FUNDING_FEE') return;
+      if(!r.symbol) return;
+      (perSimbol[r.symbol] = perSimbol[r.symbol] || []).push({
+        tipe: tipe,
+        nilai: parseFloat(r.income) || 0,
+        waktu: parseInt(r.time, 10)
+      });
+    });
+
+    var hasil = [];
+    var feeBelumTertutup = 0;
+    Object.keys(perSimbol).forEach(function(sym){
+      var rec = perSimbol[sym].sort(function(a,b){ return a.waktu - b.waktu; });
+      var feeTertunda = 0;  // komisi + funding sejak penutupan terakhir
+      var i = 0;
+      while(i < rec.length){
+        if(rec[i].tipe !== 'REALIZED_PNL'){
+          feeTertunda += Math.abs(rec[i].nilai);
+          i++;
+          continue;
+        }
+        // Satu penutupan bisa terpecah jadi beberapa fill - kejadian dalam
+        // rentang 60 detik dianggap SATU trade supaya tidak jadi banyak baris.
+        var mulai = rec[i].waktu, akhir = rec[i].waktu, pnlKotor = 0;
+        while(i < rec.length && (rec[i].waktu - mulai) <= 60000){
+          if(rec[i].tipe === 'REALIZED_PNL'){ pnlKotor += rec[i].nilai; akhir = rec[i].waktu; }
+          else { feeTertunda += Math.abs(rec[i].nilai); }
+          i++;
+        }
+        hasil.push({
+          date: akhir,
+          pair: sym.replace('USDT',''),
+          tf: '',
+          direction: '',
+          plKotor: pnlKotor,
+          fee: feeTertunda,
+          pl: pnlKotor - feeTertunda,   // P/L BERSIH
+          reason: 'Sinkron Binance',
+          venue: 'binance-sync'
+        });
+        feeTertunda = 0;
+      }
+      // Sisa fee tanpa penutupan = posisi simbol ini masih terbuka.
+      feeBelumTertutup += feeTertunda;
+    });
+    return { trades: hasil, feeBelumTertutup: feeBelumTertutup };
+  }
+
+  // Gabungkan: data Binance jadi sumber kebenaran angka, data tool dipakai
+  // untuk memperkaya detail (TF/arah/alasan) pada baris yang cocok.
+  //
+  // Toleransi waktu dibuat LEBAR (12 jam) karena waktu yang dicatat tool adalah
+  // saat ia MENDETEKSI posisi tertutup (lewat polling) - kalau browser sempat
+  // ditutup saat posisi kena TP/SL, deteksinya baru terjadi jauh belakangan,
+  // sehingga selisihnya bisa berjam-jam dari waktu asli di Binance.
+  // Toleransi sempit membuat pencocokan gagal -> trade yang sama muncul DUA
+  // KALI (sekali versi tool, sekali versi Binance) dan menggelembungkan total.
+  function mergeTrades(lokal, binance, sejak){
+    var TOLERANSI = 12 * 60 * 60 * 1000;
+    var terpakai = {};
+    var hasil = binance.map(function(b){
+      // Ambil kandidat lokal TERDEKAT (bukan yang pertama ketemu) supaya
+      // pasangannya paling masuk akal saat ada beberapa trade di koin yang sama.
+      var pilih = -1, jarakTerdekat = Infinity;
+      for(var i = 0; i < lokal.length; i++){
+        if(terpakai[i]) continue;
+        if(lokal[i].pair !== b.pair) continue;
+        // Testnet = akun BERBEDA, tidak akan pernah ada di income akun live.
+        if(lokal[i].venue === 'live-testnet') continue;
+        var jarak = Math.abs(lokal[i].date - b.date);
+        if(jarak <= TOLERANSI && jarak < jarakTerdekat){ jarakTerdekat = jarak; pilih = i; }
+      }
+      if(pilih >= 0){
+        terpakai[pilih] = true;
+        return {
+          date: b.date, pair: b.pair,
+          tf: lokal[pilih].tf || '', direction: lokal[pilih].direction || '',
+          plKotor: b.plKotor, fee: b.fee, pl: b.pl,   // angka SELALU versi Binance
+          reason: lokal[pilih].reason || b.reason,
+          venue: lokal[pilih].venue || b.venue
+        };
+      }
+      return b;
+    });
+
+    lokal.forEach(function(l, i){
+      if(terpakai[i]) return;
+      // Testnet: akun berbeda, tidak akan pernah muncul di income live -> selalu tampilkan.
+      if(l.venue === 'live-testnet'){ hasil.push(l); return; }
+      // Live-real DI LUAR rentang sinkronisasi -> belum tercakup data Binance.
+      if(sejak && l.date < sejak){ hasil.push(l); return; }
+      // Sisanya (live-real di DALAM rentang tapi tidak cocok) sengaja TIDAK
+      // ditambahkan: transaksinya sudah pasti terwakili salah satu baris
+      // Binance, menambahkannya lagi cuma bikin baris dobel & total meleset.
+    });
+    return hasil;
+  }
+
+  function loadCryptoTrades(){
+    var lokal = loadLocalToolTrades();
+    var cache = loadBinanceHistCache();
+    if(!cache || !cache.trades.length) return lokal;
+    return mergeTrades(lokal, cache.trades, cache.sejak);
   }
 
   var LIVE_TRADE_CONFIG_KEY = 'emaScreenerLiveTradeConfig_v1';
@@ -1166,6 +1322,87 @@
         })
         .catch(function(){ balEl.textContent = 'Gagal ambil saldo'; });
     }catch(e){ balEl.textContent = 'Gagal ambil saldo'; }
+  }
+
+  function bacaKonfigBackend(){
+    try{
+      var raw = localStorage.getItem(LIVE_TRADE_CONFIG_KEY);
+      if(!raw) return null;
+      var cfg = JSON.parse(raw);
+      var url = (cfg.backendUrl||'').trim().replace(/\/$/, '');
+      var token = (cfg.appToken||'').trim();
+      if(!url || !token) return null;
+      return { url: url, token: token };
+    }catch(e){ return null; }
+  }
+
+  function setSyncNote(teks, jenis){
+    var el = document.getElementById('cBinanceSyncNote');
+    if(!el) return;
+    el.className = 'jt-sync-note' + (jenis ? ' ' + jenis : '');
+    el.textContent = teks;
+  }
+
+  // Tarik SELURUH riwayat dari Binance (bukan cuma trade yang lewat tool ini),
+  // rekonstruksi jadi baris trade, lalu simpan ke cache lokal.
+  // HARI_MUNDUR menentukan seberapa jauh ke belakang - Binance sendiri membatasi
+  // riwayat income sekitar 3 bulan ke belakang.
+  var SYNC_HARI_MUNDUR = 90;
+
+  function syncBinanceHistory(){
+    var cfg = bacaKonfigBackend();
+    var btn = document.getElementById('cBinanceSyncBtn');
+    if(!cfg){
+      setSyncNote('Isi Backend URL & App Token dulu di halaman Crypto Screener.', 'error');
+      return;
+    }
+    btn.disabled = true;
+    setSyncNote('Menarik riwayat dari Binance...');
+    var since = Date.now() - SYNC_HARI_MUNDUR * 24 * 60 * 60 * 1000;
+
+    fetch(cfg.url + '/api/income?all=1&since=' + since, { headers: { 'X-App-Token': cfg.token } })
+      .then(function(res){ return res.json().then(function(d){ return { ok: res.ok, data: d }; }); })
+      .then(function(r){
+        if(!r.ok || !r.data || !Array.isArray(r.data.income)){
+          var pesan = (r.data && r.data.error) ? JSON.stringify(r.data.error) : 'respons tidak dikenali';
+          throw new Error(pesan);
+        }
+        var income = r.data.income;
+        var olah = groupIncomeToTrades(income);
+        var trades = olah.trades;
+        localStorage.setItem(BINANCE_HIST_KEY, JSON.stringify({
+          trades: trades, syncAt: Date.now(), sejak: since,
+          jumlahIncome: income.length, feeBelumTertutup: olah.feeBelumTertutup
+        }));
+        renderCryptoAll();
+        if(trades.length === 0){
+          setSyncNote('Tersinkron, tapi tidak ada transaksi Futures ditemukan dalam ' + SYNC_HARI_MUNDUR + ' hari terakhir.', 'ok');
+        } else {
+          // Fee posisi terbuka dilaporkan terpisah supaya selisih antara total
+          // jurnal dan saldo Binance bisa dijelaskan, bukan jadi misteri.
+          var catatanFee = olah.feeBelumTertutup > 0.0001
+            ? ' • fee posisi masih terbuka: ' + fmtMoney(olah.feeBelumTertutup) + ' (belum dibebankan)'
+            : '';
+          setSyncNote('Tersinkron: ' + trades.length + ' transaksi dari ' + income.length + ' catatan Binance'
+            + (r.data.terpotong ? ' (data terpotong)' : '') + catatanFee + '.', 'ok');
+        }
+      })
+      .catch(function(e){
+        setSyncNote('Gagal sinkron: ' + e.message, 'error');
+      })
+      .finally(function(){ btn.disabled = false; });
+  }
+
+  function tampilkanInfoSyncTersimpan(){
+    var cache = loadBinanceHistCache();
+    if(!cache){
+      setSyncNote('Belum pernah disinkron dari Binance.');
+      return;
+    }
+    var d = new Date(cache.syncAt);
+    setSyncNote('Sinkron terakhir: ' + String(d.getDate()).padStart(2,'0') + '/' +
+      String(d.getMonth()+1).padStart(2,'0') + ' ' + String(d.getHours()).padStart(2,'0') + '.' +
+      String(d.getMinutes()).padStart(2,'0') + ' • ' + cache.trades.length + ' transaksi.');
   }
 
   function fmtMoney(n){
@@ -1334,14 +1571,18 @@
       var result = t.pl>0?'win':t.pl<0?'loss':'be';
       var resultLabel = t.pl>0?'WIN':t.pl<0?'LOSS':'BE';
       var venueBadge = t.venue==='live-real' ? ' <span class="venue-badge live">Binance Live</span>'
-        : t.venue==='live-testnet' ? ' <span class="venue-badge">Binance Testnet</span>' : '';
+        : t.venue==='live-testnet' ? ' <span class="venue-badge">Binance Testnet</span>'
+        : t.venue==='binance-sync' ? ' <span class="venue-badge binance-sync">Sinkron</span>' : '';
       var reasonClean = (t.reason||'').replace(/\s*\(Binance\)/i, '');
+      var arah = (t.direction||'').toUpperCase();
+      var fee = t.fee || 0;
       return '<tr>'+
         '<td class="num">'+fmtDate(t.date)+'</td>'+
         '<td><span class="jt-pair-cell"><span class="jt-pair-name">'+t.pair+'</span>'+venueBadge+'</span></td>'+
-        '<td>'+t.tf+'</td>'+
-        '<td><span class="dir '+t.direction.toLowerCase()+'">'+t.direction.toUpperCase()+'</span></td>'+
+        '<td>'+(t.tf || '—')+'</td>'+
+        '<td>'+(arah ? '<span class="dir '+arah.toLowerCase()+'">'+arah+'</span>' : '—')+'</td>'+
         '<td class="emo-chip">'+reasonClean+'</td>'+
+        '<td class="num" style="color:var(--ink-faint)">'+(fee ? '-'+fmtMoney(fee).replace('-','') : '—')+'</td>'+
         '<td class="num" style="color:'+(t.pl>0?'var(--profit)':t.pl<0?'var(--loss)':'var(--ink-dim)')+'">'+fmtMoney(t.pl)+'</td>'+
         '<td><span class="pill '+result+'">'+resultLabel+'</span></td>'+
       '</tr>';
@@ -1436,6 +1677,8 @@
   }
 
   document.getElementById('btnRefreshCrypto').addEventListener('click', renderCryptoAll);
+  document.getElementById('cBinanceSyncBtn').addEventListener('click', syncBinanceHistory);
+  tampilkanInfoSyncTersimpan();
   document.getElementById('cCalPrev').addEventListener('click', function(){
     cState.calMonth = new Date(cState.calMonth.getFullYear(), cState.calMonth.getMonth()-1, 1);
     renderCalendar();
