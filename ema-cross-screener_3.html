@@ -597,6 +597,42 @@
     padding-top:18px;
     border-top:1px solid var(--border);
   }
+
+  /* ===== Section yang bisa dilipat (hide) ===== */
+  /* Bukan sekadar sembunyi tampilan: section yang dilipat juga DILEWATI saat
+     pemindaian otomatis (lihat isSectionCollapsed di JS), jadi benar-benar
+     mengurangi beban request ke Binance - bukan cuma bikin halaman lebih pendek. */
+  .es-section-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    cursor:pointer;
+    user-select:none;
+  }
+  .es-section-toggle{
+    background:none;
+    border:none;
+    color: var(--muted);
+    padding:4px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    flex-shrink:0;
+  }
+  .es-section-toggle:hover{ color: var(--text); }
+  .es-section-toggle svg{ display:block; transition: transform .18s ease; }
+  .es-collapsed .es-section-toggle svg{ transform: rotate(-90deg); }
+  .es-collapsed .es-section-body{ display:none; }
+  .es-section-collapsed-note{
+    display:none;
+    font-family: var(--font-mono);
+    font-size:10.5px;
+    color: var(--dim);
+    margin-top:4px;
+  }
+  .es-collapsed .es-section-collapsed-note{ display:block; }
   .es-priority-header{
     display:flex;
     justify-content:space-between;
@@ -1621,11 +1657,19 @@
     <div class="es-fav-status" id="esFavStatus">Memuat koin favorit...</div>
   </div>
 
-  <div class="es-fav-cross-section">
-    <div class="es-fav-title">Sinyal Entry Koin Favorit</div>
-    <div class="es-fav-cross-manage" id="esFavCrossManage"></div>
-    <div class="es-grid" id="esFavCrossGrid"></div>
-    <div class="es-status" id="esFavCrossStatus">Menunggu pindaian koin favorit pertama...</div>
+  <div class="es-fav-cross-section es-collapsible" data-section="favcross">
+    <div class="es-fav-title es-section-head">
+      <span>Sinyal Entry Koin Favorit</span>
+      <button type="button" class="es-section-toggle" title="Sembunyikan / tampilkan section">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+    </div>
+    <div class="es-section-collapsed-note">Disembunyikan &bull; tidak ikut dipindai</div>
+    <div class="es-section-body">
+      <div class="es-fav-cross-manage" id="esFavCrossManage"></div>
+      <div class="es-grid" id="esFavCrossGrid"></div>
+      <div class="es-status" id="esFavCrossStatus">Menunggu pindaian koin favorit pertama...</div>
+    </div>
   </div>
 
   <div class="es-scan-toolbar">
@@ -1663,83 +1707,101 @@
     <div class="es-priority-status" id="esPriorityIctStatus">Memindai otomatis...</div>
   </div>
 
-  <div class="es-priority-section">
-    <div class="es-priority-header">
+  <div class="es-priority-section es-collapsible" data-section="bbma">
+    <div class="es-priority-header es-section-head">
       <div class="es-priority-title">Sinyal Prioritas BBMA</div>
+      <button type="button" class="es-section-toggle" title="Sembunyikan / tampilkan section">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
     </div>
-    <div class="es-priority-controls">
-      <select id="esPriorityRisk">
-        <option value="all" selected>Semua Level Risk</option>
-        <option value="high">High Risk (TF 1m/5m/15m)</option>
-        <option value="medium">Medium Risk (TF 30m/1H)</option>
-        <option value="low">Low Risk (TF 4H/1D)</option>
-      </select>
-      <button id="esPriorityBtn" class="es-priority-btn">Cari Sinyal Prioritas</button>
-      <div class="es-symbol-manager es-symbol-manager-inline">
-        <button type="button" id="esPriorityManagerBtn" class="es-symbol-manager-btn">
-          <span>Ganti Chart / Kelola Koin</span>
-          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
-        </button>
-        <div class="es-symbol-manager-dropdown" id="esPriorityManagerDropdown"></div>
+    <div class="es-section-collapsed-note">Disembunyikan &bull; tidak ikut dipindai otomatis</div>
+    <div class="es-section-body">
+      <div class="es-priority-controls">
+        <select id="esPriorityRisk">
+          <option value="all" selected>Semua Level Risk</option>
+          <option value="high">High Risk (TF 1m/5m/15m)</option>
+          <option value="medium">Medium Risk (TF 30m/1H)</option>
+          <option value="low">Low Risk (TF 4H/1D)</option>
+        </select>
+        <button id="esPriorityBtn" class="es-priority-btn">Cari Sinyal Prioritas</button>
+        <div class="es-symbol-manager es-symbol-manager-inline">
+          <button type="button" id="esPriorityManagerBtn" class="es-symbol-manager-btn">
+            <span>Ganti Chart / Kelola Koin</span>
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="es-symbol-manager-dropdown" id="esPriorityManagerDropdown"></div>
+        </div>
       </div>
+      <div class="es-priority-grid" id="esPriorityGrid"></div>
+      <div class="es-priority-status" id="esPriorityStatus">Memindai otomatis...</div>
     </div>
-    <div class="es-priority-grid" id="esPriorityGrid"></div>
-    <div class="es-priority-status" id="esPriorityStatus">Memindai otomatis...</div>
   </div>
 
-  <div class="es-priority-section">
-    <div class="es-priority-header">
+  <div class="es-priority-section es-collapsible" data-section="snr">
+    <div class="es-priority-header es-section-head">
       <div class="es-priority-title">Sinyal Prioritas SNR</div>
+      <button type="button" class="es-section-toggle" title="Sembunyikan / tampilkan section">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
     </div>
-    <div class="es-priority-controls">
-      <select id="esPrioritySnrTf">
-        <option value="medium" selected>Medium Risk (TF 15m/30m)</option>
-        <option value="high">High Risk (TF 5m)</option>
-        <option value="low">Low Risk (TF 1H/4H)</option>
-        <option value="all">Semua Risk (5m/15m/30m/1H/4H)</option>
-      </select>
-      <button id="esPrioritySnrBtn" class="es-priority-btn">Cari Sinyal Prioritas SNR</button>
-      <div class="es-symbol-manager es-symbol-manager-inline">
-        <button type="button" id="esPrioritySnrManagerBtn" class="es-symbol-manager-btn">
-          <span>Ganti Chart / Kelola Koin</span>
-          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
-        </button>
-        <div class="es-symbol-manager-dropdown" id="esPrioritySnrManagerDropdown"></div>
+    <div class="es-section-collapsed-note">Disembunyikan &bull; tidak ikut dipindai otomatis</div>
+    <div class="es-section-body">
+      <div class="es-priority-controls">
+        <select id="esPrioritySnrTf">
+          <option value="medium" selected>Medium Risk (TF 15m/30m)</option>
+          <option value="high">High Risk (TF 5m)</option>
+          <option value="low">Low Risk (TF 1H/4H)</option>
+          <option value="all">Semua Risk (5m/15m/30m/1H/4H)</option>
+        </select>
+        <button id="esPrioritySnrBtn" class="es-priority-btn">Cari Sinyal Prioritas SNR</button>
+        <div class="es-symbol-manager es-symbol-manager-inline">
+          <button type="button" id="esPrioritySnrManagerBtn" class="es-symbol-manager-btn">
+            <span>Ganti Chart / Kelola Koin</span>
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="es-symbol-manager-dropdown" id="esPrioritySnrManagerDropdown"></div>
+        </div>
+        <div class="es-btc-tf-strip" id="esSnrBtcTfStrip"></div>
       </div>
-      <div class="es-btc-tf-strip" id="esSnrBtcTfStrip"></div>
+      <div class="es-priority-grid" id="esPrioritySnrGrid"></div>
+      <div class="es-priority-status" id="esPrioritySnrStatus">Klik "Cari Sinyal Prioritas SNR" untuk memindai.</div>
     </div>
-    <div class="es-priority-grid" id="esPrioritySnrGrid"></div>
-    <div class="es-priority-status" id="esPrioritySnrStatus">Klik "Cari Sinyal Prioritas SNR" untuk memindai.</div>
   </div>
 
-  <div class="es-priority-section">
-    <div class="es-priority-header">
+  <div class="es-priority-section es-collapsible" data-section="ai">
+    <div class="es-priority-header es-section-head">
       <div class="es-priority-title">Sinyal Prioritas AI &mdash; Analisa Konfluensi</div>
+      <button type="button" class="es-section-toggle" title="Sembunyikan / tampilkan section">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
     </div>
-    <div class="es-ai-method-note">
-      Model konfluensi multi-timeframe: rezim BTC (makro) &rarr; tren 4H &rarr; pullback ke zona nilai 1H &rarr;
-      momentum berbalik &rarr; kekuatan relatif vs BTC. Hanya setup skor <strong>&ge;60</strong> yang ditampilkan,
-      diurutkan dari skor tertinggi (maks 5 koin).
-    </div>
-    <div class="es-priority-controls">
-      <select id="esPriorityAiBias">
-        <option value="auto" selected>Ikuti Rezim BTC (disarankan)</option>
-        <option value="both">Semua Arah (abaikan rezim)</option>
-        <option value="long">Hanya BUY</option>
-        <option value="short">Hanya SELL</option>
-      </select>
-      <button id="esPriorityAiBtn" class="es-priority-btn">Jalankan Analisa AI</button>
-      <div class="es-symbol-manager es-symbol-manager-inline">
-        <button type="button" id="esPriorityAiManagerBtn" class="es-symbol-manager-btn">
-          <span>Ganti Chart / Kelola Koin</span>
-          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
-        </button>
-        <div class="es-symbol-manager-dropdown" id="esPriorityAiManagerDropdown"></div>
+    <div class="es-section-collapsed-note">Disembunyikan &bull; tidak ikut dipindai</div>
+    <div class="es-section-body">
+      <div class="es-ai-method-note">
+        Model konfluensi multi-timeframe: rezim BTC (makro) &rarr; tren 4H &rarr; pullback ke zona nilai 1H &rarr;
+        momentum berbalik &rarr; kekuatan relatif vs BTC. Hanya setup skor <strong>&ge;60</strong> yang ditampilkan,
+        diurutkan dari skor tertinggi (maks 5 koin).
       </div>
-      <div class="es-ai-regime" id="esAiRegime"></div>
+      <div class="es-priority-controls">
+        <select id="esPriorityAiBias">
+          <option value="auto" selected>Ikuti Rezim BTC (disarankan)</option>
+          <option value="both">Semua Arah (abaikan rezim)</option>
+          <option value="long">Hanya BUY</option>
+          <option value="short">Hanya SELL</option>
+        </select>
+        <button id="esPriorityAiBtn" class="es-priority-btn">Jalankan Analisa AI</button>
+        <div class="es-symbol-manager es-symbol-manager-inline">
+          <button type="button" id="esPriorityAiManagerBtn" class="es-symbol-manager-btn">
+            <span>Ganti Chart / Kelola Koin</span>
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="es-symbol-manager-dropdown" id="esPriorityAiManagerDropdown"></div>
+        </div>
+        <div class="es-ai-regime" id="esAiRegime"></div>
+      </div>
+      <div class="es-priority-grid" id="esPriorityAiGrid"></div>
+      <div class="es-priority-status" id="esPriorityAiStatus">Klik "Jalankan Analisa AI" untuk memindai.</div>
     </div>
-    <div class="es-priority-grid" id="esPriorityAiGrid"></div>
-    <div class="es-priority-status" id="esPriorityAiStatus">Klik "Jalankan Analisa AI" untuk memindai.</div>
   </div>
 
   <div class="es-sim-section">
@@ -1987,20 +2049,35 @@
   });
   // ===== akhir bagian login + sinkronisasi =====
 
+  // 100 koin. Koin yang sudah delisting/ganti ticker di Binance akan gagal
+  // diambil datanya dan otomatis dilewati per-koin (tidak menggagalkan
+  // pindaian lain) - hapus saja lewat "Ganti Chart / Kelola Koin" kalau ada
+  // yang konsisten error, nanti diganti dari RESERVE_SYMBOLS di bawah.
   const BASE_SYMBOLS = [
     // big cap-ish
     'BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT','ADAUSDT','DOGEUSDT','TRXUSDT','TONUSDT','AVAXUSDT',
-    'LINKUSDT','DOTUSDT','LTCUSDT','SUIUSDT',
-    // low/mid cap-ish
-    'ATOMUSDT','NEARUSDT','APTUSDT','ARBUSDT','OPUSDT','INJUSDT','FTMUSDT','SANDUSDT','MANAUSDT','GALAUSDT',
-    'CHZUSDT','ENJUSDT','ONEUSDT','ZILUSDT','IOTAUSDT','ALGOUSDT','XLMUSDT','VETUSDT','FILUSDT','EGLDUSDT',
-    'THETAUSDT','XTZUSDT','EOSUSDT','KAVAUSDT','ROSEUSDT','CELOUSDT','WAVESUSDT','ANKRUSDT','DYDXUSDT','RUNEUSDT'
+    'LINKUSDT','DOTUSDT','LTCUSDT','SUIUSDT','BCHUSDT','HBARUSDT',
+    // mid cap
+    'ATOMUSDT','NEARUSDT','APTUSDT','ARBUSDT','OPUSDT','INJUSDT','SANDUSDT','MANAUSDT','GALAUSDT','CHZUSDT',
+    'ENJUSDT','ZILUSDT','IOTAUSDT','ALGOUSDT','XLMUSDT','VETUSDT','FILUSDT','EGLDUSDT','THETAUSDT','XTZUSDT',
+    'EOSUSDT','KAVAUSDT','ROSEUSDT','CELOUSDT','ANKRUSDT','DYDXUSDT','RUNEUSDT','ICPUSDT','LDOUSDT','ETCUSDT',
+    // defi / infra
+    'GRTUSDT','AAVEUSDT','UNIUSDT','MKRUSDT','COMPUSDT','SNXUSDT','CRVUSDT','STXUSDT','IMXUSDT','CAKEUSDT',
+    '1INCHUSDT','SUSHIUSDT','YFIUSDT','BATUSDT','KSMUSDT','NEOUSDT','STORJUSDT','LRCUSDT','WOOUSDT','GMTUSDT',
+    'MASKUSDT','ZECUSDT',
+    // gaming / metaverse / lainnya
+    'APEUSDT','AXSUSDT','TWTUSDT','PENDLEUSDT','ARUSDT','GMXUSDT',
+    // AI / narasi baru
+    'FETUSDT','RENDERUSDT','TIAUSDT','SEIUSDT','ORDIUSDT','JUPUSDT','PYTHUSDT','ARKMUSDT','ONDOUSDT','ENAUSDT',
+    'STRKUSDT','JTOUSDT','NOTUSDT','ZKUSDT','ZROUSDT','ETHFIUSDT','ALTUSDT','DYMUSDT','MANTAUSDT','AEVOUSDT',
+    // meme
+    'PEPEUSDT','SHIBUSDT','WIFUSDT','BONKUSDT','FLOKIUSDT','BOMEUSDT'
   ];
 
   // cadangan koin pengganti jika ada koin yang diblokir user (mis. chart TradingView-nya tidak ditemukan)
   const RESERVE_SYMBOLS = [
-    'PEPEUSDT','SHIBUSDT','WIFUSDT','BONKUSDT','FETUSDT','RENDERUSDT','TIAUSDT','SEIUSDT','ORDIUSDT','JUPUSDT',
-    'PYTHUSDT','STXUSDT','IMXUSDT','GRTUSDT','AAVEUSDT','UNIUSDT','MKRUSDT','COMPUSDT','SNXUSDT','CRVUSDT'
+    'WUSDT','IOUSDT','LISTAUSDT','BBUSDT','PIXELUSDT','PORTALUSDT','OMNIUSDT','SAGAUSDT','TNSRUSDT','REZUSDT',
+    'MEMEUSDT','C98USDT','CELRUSDT','COTIUSDT','DENTUSDT','HOTUSDT','ICXUSDT','ONTUSDT','SXPUSDT','TRBUSDT'
   ];
 
   // dipakai untuk saran autocomplete saat menambah koin favorit
@@ -2183,6 +2260,33 @@
       return {};
     }
   }
+
+  // Pembatas jumlah request yang berjalan BERSAMAAN. Dengan 100 koin,
+  // menembak semuanya sekaligus lewat Promise.allSettled (100+ koneksi serentak
+  // per timeframe) gampang memicu rate-limit Binance - responsnya jadi 418/429
+  // dan SELURUH pindaian gagal, bukan cuma melambat. Bentuk hasilnya sengaja
+  // dibuat sama persis dengan Promise.allSettled ({status, value/reason})
+  // supaya bisa langsung menggantikannya di pemanggil.
+  async function mapLimited(items, limit, fn){
+    const results = new Array(items.length);
+    let next = 0;
+    async function worker(){
+      while(next < items.length){
+        const i = next++;
+        try{ results[i] = { status:'fulfilled', value: await fn(items[i], i) }; }
+        catch(e){ results[i] = { status:'rejected', reason: e }; }
+      }
+    }
+    const pool = [];
+    for(let w = 0; w < Math.min(limit, items.length); w++) pool.push(worker());
+    await Promise.all(pool);
+    return results;
+  }
+  // Angka ini kompromi antara kecepatan dan aman dari rate-limit. Batas bobot
+  // Binance ~6000/menit; 100 koin x 7 TF = 700 request (~1400 bobot) masih jauh
+  // di bawahnya - yang perlu dijaga justru jumlah koneksi SERENTAK. Kalau suatu
+  // saat muncul error 418/429 lagi, turunkan angka ini (mis. ke 8).
+  const SCAN_CONCURRENCY = 12;
 
   async function fetchKlines(symbol, interval, limit=150){
     const spotUrl = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`;
@@ -2769,6 +2873,7 @@
   }
 
   async function scanFavoriteCrossSection(){
+    if(isSectionCollapsed('favcross')) return; // section dilipat - hemat request
     if(favCrossScanning) return;
     favCrossScanning = true;
     favCrossStatusEl.classList.remove('error');
@@ -3040,7 +3145,7 @@
     }
     const tickers = await loadTickers();
 
-    const settled = await Promise.allSettled(activeSymbols.map(async (symbol)=>{
+    const settled = await mapLimited(activeSymbols, SCAN_CONCURRENCY, async (symbol)=>{
       const { opens, closes, highs, lows, times } = await fetchKlines(symbol, interval, MAIN_KLINES_LIMIT);
       const e9 = ema(closes, 9);
       const e21 = ema(closes, 21);
@@ -3083,7 +3188,7 @@
         resZones, supZones, momentumSignal, atr: lastAtr,
         closes, times, e9, e21, interval
       };
-    }));
+    });
 
     const results = settled
       .filter(s=>s.status==='fulfilled' && s.value)
@@ -3416,6 +3521,7 @@
   }
 
   async function findPrioritySignals(){
+    if(isSectionCollapsed('bbma')) return; // section dilipat - hemat request
     const scanTfs = getPriorityScanTfs();
     if(scanTfs.length===0){
       priorityStatusEl.classList.add('error');
@@ -3432,9 +3538,14 @@
     try{
       const tickers = await loadTickers();
       let all = [];
+      // Dihitung supaya "tidak ada sinyal" bisa DIBEDAKAN dari "semua request
+      // gagal" - dua hal yang sangat berbeda artinya, tapi sebelumnya sama-sama
+      // menampilkan pesan "tidak ada koin yang memenuhi syarat" (menyesatkan:
+      // user bisa mengira pasar sedang sepi padahal koneksi/API-nya bermasalah).
+      let gagalAmbil = 0, totalPercobaan = 0;
 
       for(const tf of scanTfs){
-        const settled = await Promise.allSettled(activeSymbols.map(async (symbol)=>{
+        const settled = await mapLimited(activeSymbols, SCAN_CONCURRENCY, async (symbol)=>{
           const { opens, highs, lows, closes } = await fetchKlines(symbol, tf.value, 300);
           if(closes.length < 210) return null;
           const ind = computeFullIndicators(opens, highs, lows, closes);
@@ -3455,9 +3566,11 @@
               score: evalRes.sell.bb.dist+evalRes.sell.sr.dist+evalRes.sell.sd.dist });
           }
           return cands.length ? cands : null;
-        }));
+        });
 
         settled.forEach(s=>{ if(s.status==='fulfilled' && s.value) all = all.concat(s.value); });
+        gagalAmbil += settled.filter(s=>s.status==='rejected').length;
+        totalPercobaan += settled.length;
       }
 
       const bestPerSymbol = {};
@@ -3470,9 +3583,21 @@
       const top = deduped.slice(0, PRIORITY_LIMIT);
 
       if(top.length===0){
-        priorityStatusEl.textContent = `Tidak ada koin yang memenuhi ke-3 syarat wajib (BB + S/R + S/D) di timeframe ${tfLabels} saat ini.`;
         priorityGrid.innerHTML = '';
         priorityBtn.disabled = false;
+        // Bedakan "pasar memang sepi" dari "data gagal diambil" - kalau SEMUA
+        // percobaan gagal, ini bukan info pasar sama sekali dan tidak boleh
+        // dibaca sebagai "tidak ada peluang".
+        if(totalPercobaan > 0 && gagalAmbil === totalPercobaan){
+          priorityStatusEl.classList.add('error');
+          priorityStatusEl.textContent = `Gagal mengambil data untuk SEMUA ${activeSymbols.length} koin - ini BUKAN berarti tidak ada sinyal. `
+            + `Cek koneksi internet / kemungkinan Binance API diblokir di jaringan ini, lalu pindai ulang.`;
+        } else if(gagalAmbil > 0){
+          priorityStatusEl.textContent = `Tidak ada koin yang memenuhi ke-3 syarat wajib (BB + S/R + S/D) di timeframe ${tfLabels} saat ini `
+            + `— catatan: ${gagalAmbil} dari ${totalPercobaan} pengambilan data gagal, jadi hasil ini belum tentu lengkap.`;
+        } else {
+          priorityStatusEl.textContent = `Tidak ada koin yang memenuhi ke-3 syarat wajib (BB + S/R + S/D) di timeframe ${tfLabels} saat ini.`;
+        }
         return;
       }
 
@@ -3970,6 +4095,7 @@
   }
 
   async function findPrioritySnrSignals(){
+    if(isSectionCollapsed('snr')) return; // section dilipat - hemat request
     const tfs = getSnrPriorityTfs();
     if(tfs.length===0){
       prioritySnrStatusEl.classList.add('error');
@@ -3985,7 +4111,7 @@
 
     try{
       const tickers = await loadTickers();
-      const settled = await Promise.allSettled(activeSymbols.map(symbol => findSnrPrioritySignalForSymbol(symbol, tickers, tfs)));
+      const settled = await mapLimited(activeSymbols, SCAN_CONCURRENCY, symbol => findSnrPrioritySignalForSymbol(symbol, tickers, tfs));
       // Setiap koin bisa menyumbang 0, 1, atau 2 kandidat (kalau qualifies di
       // kedua TF sekaligus) - digabung semua, TIDAK dipotong/dibatasi jumlahnya.
       let all = [];
@@ -4316,6 +4442,7 @@
   }
 
   async function findPriorityAiSignals(){
+    if(isSectionCollapsed('ai')) return; // section dilipat - hemat request
     priorityAiBtn.disabled = true;
     priorityAiStatusEl.classList.remove('error');
     priorityAiStatusEl.textContent = 'Membaca rezim pasar BTC...';
@@ -4342,15 +4469,13 @@
       // Langkah 2: ambil 4H semua koin dulu, baru 1H - dipisah per TF (pola yang
       // sama dipakai Sinyal Prioritas BBMA) supaya tidak menembak ratusan
       // request sekaligus ke Binance.
-      const htfSettled = await Promise.allSettled(
-        activeSymbols.map(s => fetchKlines(s, '4h', 300).then(k => ({ symbol:s, k })))
-      );
+      const htfSettled = await mapLimited(activeSymbols, SCAN_CONCURRENCY,
+        s => fetchKlines(s, '4h', 300).then(k => ({ symbol:s, k })));
       const htfMap = {};
       htfSettled.forEach(r=>{ if(r.status==='fulfilled') htfMap[r.value.symbol] = r.value.k; });
 
-      const ltfSettled = await Promise.allSettled(
-        Object.keys(htfMap).map(s => fetchKlines(s, '1h', 300).then(k => ({ symbol:s, k })))
-      );
+      const ltfSettled = await mapLimited(Object.keys(htfMap), SCAN_CONCURRENCY,
+        s => fetchKlines(s, '1h', 300).then(k => ({ symbol:s, k })));
 
       const candidates = [];
       ltfSettled.forEach(r=>{
@@ -6166,6 +6291,68 @@
       econCalendarPanel.classList.add('collapsed');
     }
   });
+
+  // ═══════════════════════════════════════════════════════
+  // ████████  SECTION COLLAPSE (HIDE) + SKIP PEMINDAIAN  ████████
+  // ═══════════════════════════════════════════════════════
+  // Section yang dilipat TIDAK hanya disembunyikan tampilannya - fungsi
+  // pemindainya juga langsung berhenti di awal (lihat pemakaian
+  // isSectionCollapsed di scanFavoriteCrossSection/findPrioritySignals/
+  // findPrioritySnrSignals/findPriorityAiSignals). Ini yang benar-benar
+  // memangkas jumlah request ke Binance, bukan sekadar bikin halaman pendek.
+  const SECTION_COLLAPSE_KEY = 'emaScreenerCollapsedSections_v1';
+
+  function loadCollapsedSections(){
+    try{
+      const raw = localStorage.getItem(SECTION_COLLAPSE_KEY);
+      if(raw){
+        const arr = JSON.parse(raw);
+        if(Array.isArray(arr)) return new Set(arr);
+      }
+    }catch(e){}
+    return new Set();
+  }
+  let collapsedSections = loadCollapsedSections();
+
+  function saveCollapsedSections(){
+    try{ localStorage.setItem(SECTION_COLLAPSE_KEY, JSON.stringify([...collapsedSections])); }catch(e){}
+  }
+
+  // Dipakai fungsi-fungsi pemindai untuk berhenti lebih awal. Dideklarasikan
+  // sebagai function declaration supaya ter-hoist - aman dipanggil dari fungsi
+  // yang posisinya lebih atas di file ini.
+  function isSectionCollapsed(name){ return collapsedSections.has(name); }
+
+  function applySectionCollapseState(){
+    document.querySelectorAll('.es-collapsible').forEach(sec=>{
+      const name = sec.getAttribute('data-section');
+      sec.classList.toggle('es-collapsed', collapsedSections.has(name));
+    });
+  }
+
+  document.querySelectorAll('.es-collapsible').forEach(sec=>{
+    const name = sec.getAttribute('data-section');
+    const head = sec.querySelector('.es-section-head');
+    if(!head) return;
+    head.addEventListener('click', (e)=>{
+      // Klik pada kontrol di dalam header (mis. tombol/select) jangan ikut
+      // melipat section - hanya klik area judul/panah.
+      if(e.target.closest('button') && !e.target.closest('.es-section-toggle')) return;
+      if(e.target.closest('select') || e.target.closest('input')) return;
+      const nowCollapsed = !collapsedSections.has(name);
+      if(nowCollapsed) collapsedSections.add(name); else collapsedSections.delete(name);
+      saveCollapsedSections();
+      applySectionCollapseState();
+      // Baru dibuka kembali -> jalankan pemindaian sekali supaya isinya
+      // langsung terisi (tadinya dilewati selama dilipat).
+      if(!nowCollapsed){
+        if(name === 'favcross') scanFavoriteCrossSection();
+        else if(name === 'bbma') findPrioritySignals();
+        else if(name === 'snr') findPrioritySnrSignals();
+      }
+    });
+  });
+  applySectionCollapseState();
 
   loadPrioritySimState();
   renderPrioritySimUI({});
