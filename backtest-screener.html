@@ -1,0 +1,939 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jadi Trader — Backtest 3 Sinyal</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
+<style>
+  :root{
+    --bg:#0B0E11;
+    --panel:#151A21;
+    --panel-2:#1B222B;
+    --border:#242D38;
+    --text:#E9EDF2;
+    --muted:#8A97A6;
+    --dim:#5A6675;
+    --bull:#0ECB81;
+    --bull-dim:rgba(14,203,129,0.16);
+    --bear:#F6465D;
+    --bear-dim:rgba(246,70,93,0.16);
+    --gold:#F2B84B;
+    --font-body:'IBM Plex Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    --font-mono:'IBM Plex Mono','SF Mono',Consolas,monospace;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ background:var(--bg); margin:0; padding:0; }
+  body{
+    color:var(--text);
+    font-family:var(--font-body);
+    font-variant-numeric:tabular-nums;
+    padding:22px 20px 70px;
+  }
+
+  .bt-header{
+    display:flex; align-items:center; justify-content:space-between;
+    gap:14px; flex-wrap:wrap;
+    padding-bottom:14px; margin-bottom:16px;
+    border-bottom:1px solid var(--border);
+  }
+  .bt-title{ font-weight:700; font-size:21px; display:flex; align-items:center; gap:10px; }
+  .bt-title .dot{
+    width:9px; height:9px; border-radius:50%;
+    background:var(--gold); box-shadow:0 0 0 3px rgba(242,184,75,0.18);
+  }
+  .bt-sub{ font-family:var(--font-mono); font-size:11px; color:var(--muted); margin-top:3px; }
+  .bt-nav{ display:flex; gap:8px; flex-wrap:wrap; }
+  .bt-nav a{
+    background:var(--panel); border:1px solid var(--border); color:var(--muted);
+    font-family:var(--font-mono); font-size:11px; text-decoration:none;
+    padding:6px 11px; border-radius:7px;
+  }
+  .bt-nav a:hover{ color:var(--text); border-color:var(--dim); }
+
+  .bt-note{
+    background:var(--panel); border:1px solid var(--border); border-left:2px solid var(--gold);
+    border-radius:7px; padding:10px 12px; margin-bottom:16px;
+    font-family:var(--font-mono); font-size:10.5px; line-height:1.7; color:var(--muted);
+  }
+  .bt-note strong{ color:var(--gold); }
+  .bt-note code{ color:var(--text); }
+
+  .bt-controls{
+    display:flex; align-items:flex-end; gap:12px; flex-wrap:wrap; margin-bottom:14px;
+  }
+  .bt-controls label{
+    display:flex; flex-direction:column; gap:5px;
+    font-family:var(--font-mono); font-size:10.5px; color:var(--muted);
+  }
+  .bt-controls select, .bt-controls input{
+    background:var(--panel); border:1px solid var(--border); color:var(--text);
+    font-family:var(--font-mono); font-size:12px;
+    padding:7px 10px; border-radius:7px; outline:none; min-width:150px;
+  }
+  .bt-strats{ display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+  .bt-strat-check{
+    display:inline-flex; align-items:center; gap:6px;
+    font-family:var(--font-mono); font-size:11.5px; color:var(--text);
+    background:var(--panel); border:1px solid var(--border);
+    padding:7px 11px; border-radius:7px; cursor:pointer;
+  }
+  .bt-run-btn{
+    background:var(--panel); border:1px solid var(--gold); color:var(--gold);
+    font-family:var(--font-mono); font-size:12.5px; font-weight:600;
+    padding:8px 16px; border-radius:8px; cursor:pointer; height:36px;
+  }
+  .bt-run-btn:hover{ background:rgba(242,184,75,0.12); }
+  .bt-run-btn:disabled{ opacity:0.5; cursor:default; }
+
+  .bt-status{
+    font-family:var(--font-mono); font-size:11.5px; color:var(--muted);
+    margin-bottom:14px; min-height:17px;
+  }
+  .bt-status.error{ color:var(--bear); }
+  .bt-progress{
+    height:3px; background:var(--panel-2); border-radius:2px; overflow:hidden;
+    margin-bottom:16px; display:none;
+  }
+  .bt-progress.show{ display:block; }
+  .bt-progress-bar{ height:100%; width:0%; background:var(--gold); transition:width .2s ease; }
+
+  .bt-kpis{
+    display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr));
+    gap:10px; margin-bottom:18px;
+  }
+  .bt-kpi{
+    background:var(--panel); border:1px solid var(--border);
+    border-radius:9px; padding:12px 14px;
+  }
+  .bt-kpi-label{
+    font-family:var(--font-mono); font-size:9.5px; letter-spacing:.06em;
+    text-transform:uppercase; color:var(--dim); margin-bottom:5px;
+  }
+  .bt-kpi-value{ font-family:var(--font-mono); font-size:19px; font-weight:600; }
+  .bt-kpi-value.up{ color:var(--bull); }
+  .bt-kpi-value.down{ color:var(--bear); }
+
+  .bt-section-label{
+    font-family:var(--font-mono); font-size:11px; color:var(--muted);
+    margin:0 0 8px;
+  }
+  .bt-chart-wrap{
+    background:var(--panel); border:1px solid var(--border);
+    border-radius:9px; padding:12px; margin-bottom:20px;
+  }
+  .bt-chart-wrap svg{ width:100%; height:230px; display:block; }
+
+  .bt-table-wrap{
+    background:var(--panel); border:1px solid var(--border);
+    border-radius:9px; overflow:auto; margin-bottom:20px; max-height:520px;
+  }
+  table.bt-table{ width:100%; border-collapse:collapse; font-family:var(--font-mono); font-size:11px; }
+  table.bt-table thead th{
+    position:sticky; top:0; background:var(--panel-2); z-index:1;
+    text-align:left; padding:9px 11px; font-size:9.5px; letter-spacing:.05em;
+    text-transform:uppercase; color:var(--dim); border-bottom:1px solid var(--border);
+    white-space:nowrap;
+  }
+  table.bt-table tbody td{
+    padding:8px 11px; border-bottom:1px solid var(--border); white-space:nowrap;
+  }
+  table.bt-table tbody tr:last-child td{ border-bottom:none; }
+  table.bt-table tbody tr:hover{ background:rgba(255,255,255,0.03); }
+  .bt-pos{ color:var(--bull); }
+  .bt-neg{ color:var(--bear); }
+  .bt-flat{ color:var(--muted); }
+  .bt-badge{
+    display:inline-block; padding:2px 7px; border-radius:5px;
+    font-size:9.5px; font-weight:600;
+  }
+  .bt-badge.bbma{ background:rgba(242,184,75,0.16); color:var(--gold); }
+  .bt-badge.snr{ background:rgba(120,160,255,0.16); color:#7BA0FF; }
+  .bt-badge.ai{ background:rgba(180,120,255,0.16); color:#B478FF; }
+  .bt-badge.win{ background:var(--bull-dim); color:var(--bull); }
+  .bt-badge.loss{ background:var(--bear-dim); color:var(--bear); }
+  .bt-badge.be{ background:var(--panel-2); color:var(--muted); }
+  .bt-dir-buy{ color:var(--bull); font-weight:600; }
+  .bt-dir-sell{ color:var(--bear); font-weight:600; }
+
+  .bt-empty{
+    text-align:center; padding:34px 18px; color:var(--dim);
+    font-family:var(--font-mono); font-size:12px;
+  }
+</style>
+
+<div class="bt-header">
+  <div>
+    <div class="bt-title"><span class="dot"></span>Backtest 3 Sinyal</div>
+    <div class="bt-sub">Uji historis: BBMA &bull; SNR &bull; AI Konfluensi</div>
+  </div>
+  <div class="bt-nav">
+    <a href="ema-cross-screener_3.html">Crypto Screener</a>
+    <a href="jurnal-trading.html">Jurnal Trading</a>
+  </div>
+</div>
+
+<div class="bt-note">
+  Setiap sinyal yang muncul dianggap <strong>langsung dibuka posisinya</strong> &mdash;
+  modal <code>$1.000</code> per posisi, leverage <code>2x</code>, SL + TP1 + TP2
+  <strong>tanpa partial</strong> (begitu TP1 kena, SL pindah ke breakeven untuk sisa posisi).
+  Biaya taker <code>0,04%</code> per sisi ikut dihitung.<br>
+  Indikator dihitung <strong>hanya dari data sampai bar itu</strong>, dan pivot baru dipakai
+  setelah benar-benar terkonfirmasi &mdash; supaya hasilnya tidak "mengintip masa depan".
+  Kalau dalam satu bar harga menyentuh SL <em>dan</em> TP sekaligus, dianggap
+  <strong>SL yang kena duluan</strong> (asumsi paling pesimis).
+</div>
+
+<div class="bt-controls">
+  <label>Jumlah Koin
+    <select id="btCoins">
+      <option value="20">20 koin (paling cepat)</option>
+      <option value="30" selected>30 koin</option>
+      <option value="50">50 koin</option>
+      <option value="100">100 koin (paling lama)</option>
+    </select>
+  </label>
+  <label>Panjang Data
+    <select id="btBars">
+      <option value="300">300 bar 1H (~12 hari)</option>
+      <option value="600" selected>600 bar 1H (~25 hari)</option>
+      <option value="1000">1000 bar 1H (~41 hari)</option>
+    </select>
+  </label>
+  <div class="bt-strats">
+    <label class="bt-strat-check"><input type="checkbox" id="btStratBbma" checked> BBMA</label>
+    <label class="bt-strat-check"><input type="checkbox" id="btStratSnr" checked> SNR</label>
+    <label class="bt-strat-check"><input type="checkbox" id="btStratAi" checked> AI</label>
+  </div>
+  <button type="button" class="bt-run-btn" id="btRunBtn">Jalankan Backtest</button>
+</div>
+
+<div class="bt-progress" id="btProgress"><div class="bt-progress-bar" id="btProgressBar"></div></div>
+<div class="bt-status" id="btStatus">Atur cakupan lalu klik "Jalankan Backtest".</div>
+
+<div class="bt-kpis" id="btKpis"></div>
+
+<div class="bt-section-label">Perkembangan Saldo</div>
+<div class="bt-chart-wrap"><svg id="btEquitySvg" viewBox="0 0 800 230" preserveAspectRatio="none"></svg></div>
+
+<div class="bt-section-label">Perbandingan per Strategi</div>
+<div class="bt-table-wrap">
+  <table class="bt-table">
+    <thead><tr>
+      <th>Strategi</th><th>Trade</th><th>Win</th><th>Loss</th><th>BE</th>
+      <th>Winrate</th><th>Profit Factor</th><th>Total P/L</th><th>Rata Win</th><th>Rata Loss</th>
+    </tr></thead>
+    <tbody id="btStratTbody"><tr><td colspan="10" class="bt-empty">Belum ada hasil.</td></tr></tbody>
+  </table>
+</div>
+
+<div class="bt-section-label">Histori Transaksi</div>
+<div class="bt-table-wrap">
+  <table class="bt-table">
+    <thead><tr>
+      <th>Waktu Entry</th><th>Waktu Exit</th><th>Koin</th><th>Strategi</th><th>Arah</th>
+      <th>Entry</th><th>SL</th><th>TP1</th><th>TP2</th><th>Exit</th>
+      <th>Alasan</th><th>Fee</th><th>P/L</th><th>Hasil</th>
+    </tr></thead>
+    <tbody id="btTradeTbody"><tr><td colspan="14" class="bt-empty">Belum ada hasil.</td></tr></tbody>
+  </table>
+</div>
+
+<script>
+(function(){
+  // ═══════════════════════════════════════════════════════
+  // ████████  PARAMETER SIMULASI  ████████
+  // ═══════════════════════════════════════════════════════
+  const MODAL_PER_POSISI = 1000;   // $ per posisi
+  const LEVERAGE = 2;              // 2x
+  const FEE_PER_SISI = 0.0004;     // taker Binance Futures 0.04%, dikenakan saat buka & tutup
+  const KONKURENSI = 10;           // batas request bersamaan ke Binance
+
+  const SYMBOLS = [
+    'BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT','ADAUSDT','DOGEUSDT','TRXUSDT','TONUSDT','AVAXUSDT',
+    'LINKUSDT','DOTUSDT','LTCUSDT','SUIUSDT','BCHUSDT','HBARUSDT','ATOMUSDT','NEARUSDT','APTUSDT','ARBUSDT',
+    'OPUSDT','INJUSDT','SANDUSDT','MANAUSDT','GALAUSDT','CHZUSDT','ENJUSDT','ZILUSDT','IOTAUSDT','ALGOUSDT',
+    'XLMUSDT','VETUSDT','FILUSDT','EGLDUSDT','THETAUSDT','XTZUSDT','EOSUSDT','KAVAUSDT','ROSEUSDT','CELOUSDT',
+    'ANKRUSDT','DYDXUSDT','RUNEUSDT','ICPUSDT','LDOUSDT','ETCUSDT','GRTUSDT','AAVEUSDT','UNIUSDT','MKRUSDT',
+    'COMPUSDT','SNXUSDT','CRVUSDT','STXUSDT','IMXUSDT','CAKEUSDT','1INCHUSDT','SUSHIUSDT','YFIUSDT','BATUSDT',
+    'KSMUSDT','NEOUSDT','STORJUSDT','LRCUSDT','WOOUSDT','GMTUSDT','MASKUSDT','ZECUSDT','APEUSDT','AXSUSDT',
+    'TWTUSDT','PENDLEUSDT','ARUSDT','GMXUSDT','FETUSDT','RENDERUSDT','TIAUSDT','SEIUSDT','ORDIUSDT','JUPUSDT',
+    'PYTHUSDT','ARKMUSDT','ONDOUSDT','ENAUSDT','STRKUSDT','JTOUSDT','NOTUSDT','ZKUSDT','ZROUSDT','ETHFIUSDT',
+    'ALTUSDT','DYMUSDT','MANTAUSDT','AEVOUSDT','PEPEUSDT','SHIBUSDT','WIFUSDT','BONKUSDT','FLOKIUSDT','BOMEUSDT'
+  ];
+
+  // ═══════════════════════════════════════════════════════
+  // ████████  UTILITAS DATA  ████████
+  // ═══════════════════════════════════════════════════════
+  async function mapLimited(items, limit, fn){
+    const hasil = new Array(items.length);
+    let next = 0;
+    async function worker(){
+      while(next < items.length){
+        const i = next++;
+        try{ hasil[i] = { ok:true, value: await fn(items[i], i) }; }
+        catch(e){ hasil[i] = { ok:false, reason:e }; }
+      }
+    }
+    const pool = [];
+    for(let w=0; w<Math.min(limit, items.length); w++) pool.push(worker());
+    await Promise.all(pool);
+    return hasil;
+  }
+
+  async function fetchKlines(symbol, interval, limit){
+    const spot = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`;
+    let res = await fetch(spot);
+    if(!res.ok){
+      res = await fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`);
+    }
+    if(!res.ok) throw new Error('klines gagal: ' + symbol);
+    const d = await res.json();
+    return {
+      times:  d.map(x=>x[0]),
+      opens:  d.map(x=>parseFloat(x[1])),
+      highs:  d.map(x=>parseFloat(x[2])),
+      lows:   d.map(x=>parseFloat(x[3])),
+      closes: d.map(x=>parseFloat(x[4]))
+    };
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // ████████  INDIKATOR (semua kausal / tidak mengintip)  ████████
+  // ═══════════════════════════════════════════════════════
+  function ema(v, p){
+    const k = 2/(p+1), out = [v[0]];
+    for(let i=1;i<v.length;i++) out.push(v[i]*k + out[i-1]*(1-k));
+    return out;
+  }
+  function rsi(v, p){
+    const out = new Array(v.length).fill(null);
+    if(v.length <= p) return out;
+    let g=0, l=0;
+    for(let i=1;i<=p;i++){ const d=v[i]-v[i-1]; if(d>=0) g+=d; else l-=d; }
+    let ag=g/p, al=l/p;
+    out[p] = al===0 ? 100 : 100 - (100/(1+ag/al));
+    for(let i=p+1;i<v.length;i++){
+      const d=v[i]-v[i-1];
+      ag = (ag*(p-1) + (d>0?d:0))/p;
+      al = (al*(p-1) + (d<0?-d:0))/p;
+      out[i] = al===0 ? 100 : 100 - (100/(1+ag/al));
+    }
+    return out;
+  }
+  function atr(h, l, c, p){
+    const n=c.length, tr=new Array(n).fill(0);
+    for(let i=0;i<n;i++){
+      tr[i] = i===0 ? h[i]-l[i]
+        : Math.max(h[i]-l[i], Math.abs(h[i]-c[i-1]), Math.abs(l[i]-c[i-1]));
+    }
+    const out = new Array(n).fill(null);
+    if(n<=p) return out;
+    let s=0; for(let i=1;i<=p;i++) s+=tr[i];
+    out[p]=s/p;
+    for(let i=p+1;i<n;i++) out[i] = (out[i-1]*(p-1)+tr[i])/p;
+    return out;
+  }
+  function bollinger(c, len, dev){
+    const n=c.length, up=new Array(n).fill(null), lo=new Array(n).fill(null), mid=new Array(n).fill(null);
+    for(let i=len-1;i<n;i++){
+      let s=0; for(let j=i-len+1;j<=i;j++) s+=c[j];
+      const m=s/len;
+      let vsum=0; for(let j=i-len+1;j<=i;j++) vsum += Math.pow(c[j]-m,2);
+      const sd=Math.sqrt(vsum/len);
+      mid[i]=m; up[i]=m+dev*sd; lo[i]=m-dev*sd;
+    }
+    return { upper:up, lower:lo, basis:mid };
+  }
+  function findPivots(v, left, right, isHigh){
+    const out=[];
+    for(let i=left;i<v.length-right;i++){
+      let ok=true;
+      for(let j=i-left;j<=i+right;j++){
+        if(j===i) continue;
+        if(isHigh ? v[j]>v[i] : v[j]<v[i]){ ok=false; break; }
+      }
+      if(ok) out.push({ index:i, value:v[i] });
+    }
+    return out;
+  }
+
+  // INTI ANTI-MENGINTIP: sebuah pivot di index p baru BISA DIKETAHUI setelah
+  // `right` bar berikutnya terbentuk. Kalau dipakai lebih awal, backtest jadi
+  // tahu masa depan dan hasilnya palsu (terlalu bagus).
+  function pivotSampai(pivots, i, right){
+    const out=[];
+    for(let k=0;k<pivots.length;k++){
+      if(pivots[k].index + right <= i) out.push(pivots[k]); else break;
+    }
+    return out;
+  }
+
+  function zonaSupplyDemand(opens, closes, atrArr, mult, maxZona, sampai){
+    const demand=[], supply=[];
+    for(let i=1;i<=sampai;i++){
+      if(atrArr[i]==null) continue;
+      const body = Math.abs(closes[i]-opens[i]);
+      if(closes[i]>opens[i] && body > mult*atrArr[i] && closes[i-1]<opens[i-1]){
+        demand.push({ value:(Math.max(opens[i-1],closes[i-1])+Math.min(opens[i-1],closes[i-1]))/2 });
+      }
+      if(closes[i]<opens[i] && body > mult*atrArr[i] && closes[i-1]>opens[i-1]){
+        supply.push({ value:(Math.max(opens[i-1],closes[i-1])+Math.min(opens[i-1],closes[i-1]))/2 });
+      }
+    }
+    return { demand: demand.slice(-maxZona), supply: supply.slice(-maxZona) };
+  }
+
+  const SENTUH = 0.15, DEKAT = 0.75;
+  function dekatZona(nilai, band, a){
+    if(!a || a<=0) return { ok:false };
+    const d = Math.abs(nilai-band);
+    if(d <= a*SENTUH) return { ok:true };
+    if(d <= a*DEKAT)  return { ok:true };
+    return { ok:false };
+  }
+  function zonaTerdekat(zona, band){
+    if(!zona || !zona.length) return null;
+    let best=zona[0], bd=Math.abs(zona[0].value-band);
+    zona.forEach(z=>{ const d=Math.abs(z.value-band); if(d<bd){ best=z; bd=d; } });
+    return best;
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // ████████  DEFINISI SINYAL (dievaluasi di bar ke-i)  ████████
+  // ═══════════════════════════════════════════════════════
+
+  // --- 1. BBMA: harga menyentuh pita BB + ada zona S/R + ada zona S/D di sekitarnya ---
+  function sinyalBbma(d, i, pre){
+    const { opens, highs, lows, closes } = d;
+    const bbU = pre.bb.upper[i], bbL = pre.bb.lower[i], a = pre.atrArr[i];
+    if(bbU==null || bbL==null || !a) return null;
+
+    const ph = pivotSampai(pre.pivotHighs, i, 10).slice(-2);
+    const pl = pivotSampai(pre.pivotLows,  i, 10).slice(-2);
+    if(!ph.length && !pl.length) return null;
+    const sd = zonaSupplyDemand(opens, closes, pre.atrArr, 1.5, 3, i);
+
+    const c=closes[i], h=highs[i], l=lows[i];
+
+    // BUY: wick menyentuh pita bawah, ada support & demand dekat pita bawah
+    const sentuhBawah = l <= bbL || dekatZona(c, bbL, a).ok;
+    const supDekat = zonaTerdekat(pl, bbL);
+    const demDekat = zonaTerdekat(sd.demand, bbL);
+    if(sentuhBawah && supDekat && demDekat &&
+       dekatZona(supDekat.value, bbL, a).ok && dekatZona(demDekat.value, bbL, a).ok){
+      const sl = Math.min(supDekat.value, l) - a*0.25;
+      if(sl < c) return { arah:'BUY', sl:sl };
+    }
+
+    // SELL: cermin dari atas
+    const sentuhAtas = h >= bbU || dekatZona(c, bbU, a).ok;
+    const resDekat = zonaTerdekat(ph, bbU);
+    const supplyDekat = zonaTerdekat(sd.supply, bbU);
+    if(sentuhAtas && resDekat && supplyDekat &&
+       dekatZona(resDekat.value, bbU, a).ok && dekatZona(supplyDekat.value, bbU, a).ok){
+      const sl = Math.max(resDekat.value, h) + a*0.25;
+      if(sl > c) return { arah:'SELL', sl:sl };
+    }
+    return null;
+  }
+
+  // --- 2. SNR: retest ke-2+ zona pivot dengan candle penolakan (wick > body) ---
+  function sinyalSnr(d, i, pre){
+    const { opens, highs, lows, closes } = d;
+    const a = pre.atrArr[i];
+    if(!a) return null;
+    const tol = a*0.5;
+
+    const ph = pivotSampai(pre.pivotHighs, i, 10);
+    const pl = pivotSampai(pre.pivotLows,  i, 10);
+    const res = ph.length ? ph[ph.length-1] : null;
+    const sup = pl.length ? pl[pl.length-1] : null;
+
+    if(res){
+      const atas=res.value+tol, bawah=res.value-tol;
+      let n=0, kena=false;
+      for(let k=res.index+1;k<=i;k++){
+        const body=Math.abs(closes[k]-opens[k]);
+        const wick=highs[k]-Math.max(opens[k],closes[k]);
+        if(highs[k]>=bawah && highs[k]<=atas && wick>body){ n++; if(n>=2 && k===i) kena=true; }
+      }
+      if(kena){
+        const sl = atas + a*0.25;
+        if(sl > closes[i]) return { arah:'SELL', sl:sl };
+      }
+    }
+    if(sup){
+      const atas=sup.value+tol, bawah=sup.value-tol;
+      let n=0, kena=false;
+      for(let k=sup.index+1;k<=i;k++){
+        const body=Math.abs(closes[k]-opens[k]);
+        const wick=Math.min(opens[k],closes[k])-lows[k];
+        if(lows[k]<=atas && lows[k]>=bawah && wick>body){ n++; if(n>=2 && k===i) kena=true; }
+      }
+      if(kena){
+        const sl = bawah - a*0.25;
+        if(sl < closes[i]) return { arah:'BUY', sl:sl };
+      }
+    }
+    return null;
+  }
+
+  // --- 3. AI Konfluensi: tren 4H + pullback zona nilai 1H + momentum + struktur ---
+  // Skor 0-100, hanya >=60 yang dianggap sinyal (sama seperti di Crypto Screener).
+  function sinyalAi(d, i, pre, htf){
+    const { closes, highs, lows } = d;
+    // Bar 4H yang berlaku pada waktu bar 1H ini (tidak boleh pakai bar 4H
+    // yang belum selesai / belum terjadi).
+    const idx4h = htf.indexUntuk[i];
+    if(idx4h == null || idx4h < 210) return null;
+
+    const h50 = htf.e50[idx4h], h200 = htf.e200[idx4h], hc = htf.closes[idx4h];
+    const naik = hc > h200 && h50 > h200;
+    const turun = hc < h200 && h50 < h200;
+    if(!naik && !turun) return null;
+    const arah = naik ? 'BUY' : 'SELL';
+    let skor = 25;
+
+    // Rezim BTC (dipakai bersama untuk semua koin)
+    const rez = htf.rezim;
+    if(rez === 'both') skor += 7;
+    else if((rez==='long' && arah==='BUY') || (rez==='short' && arah==='SELL')) skor += 15;
+    else skor -= 15;
+
+    // Pullback ke zona nilai EMA20-50 (1H)
+    const e20=pre.e20[i], e50=pre.e50[i], c=closes[i];
+    const zHi=Math.max(e20,e50), zLo=Math.min(e20,e50);
+    const pad=(zHi-zLo)*0.5 || c*0.004;
+    if(c <= zHi+pad && c >= zLo-pad) skor += 20;
+    else if(arah==='BUY' ? c > zHi+pad : c < zLo-pad) skor += 4;
+    else skor += 10;
+
+    // Struktur belum rusak
+    const pl = pivotSampai(pre.pivotLows5,  i, 5);
+    const ph = pivotSampai(pre.pivotHighs5, i, 5);
+    if(arah==='BUY' && pl.length>=2 && pl[pl.length-1].value > pl[pl.length-2].value) skor += 15;
+    else if(arah==='SELL' && ph.length>=2 && ph[ph.length-1].value < ph[ph.length-2].value) skor += 15;
+
+    // Momentum RSI berbalik searah tren
+    const r=pre.rsiArr[i], rPrev=pre.rsiArr[i-2];
+    if(r!=null && rPrev!=null){
+      if(arah==='BUY' ? (r>rPrev && r>40 && r<68) : (r<rPrev && r<60 && r>32)) skor += 15;
+      if((arah==='BUY' && r>78) || (arah==='SELL' && r<22)) skor -= 12; // penalti mengejar harga
+    }
+
+    // Kekuatan relatif vs BTC (di 4H)
+    const rs = htf.relStrength(idx4h);
+    const rsPihak = arah==='BUY' ? rs : -rs;
+    if(rsPihak > 3) skor += 15; else if(rsPihak > -3) skor += 7;
+
+    // Volatilitas sehat
+    const a=pre.atrArr[i];
+    if(!a) return null;
+    const atrPct = (a/c)*100;
+    if(atrPct >= 0.4 && atrPct <= 3.5) skor += 10;
+
+    if(skor < 60) return null;
+
+    const look = 12;
+    const swingLow  = Math.min.apply(null, lows.slice(Math.max(0,i-look+1), i+1));
+    const swingHigh = Math.max.apply(null, highs.slice(Math.max(0,i-look+1), i+1));
+    const sl = arah==='BUY' ? swingLow - a*0.3 : swingHigh + a*0.3;
+    if(arah==='BUY' ? !(sl < c) : !(sl > c)) return null;
+    return { arah:arah, sl:sl, skor:Math.round(skor) };
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // ████████  SIMULATOR POSISI  ████████
+  // ═══════════════════════════════════════════════════════
+  // Aturan: SL / TP1 / TP2, TANPA partial. Begitu TP1 tersentuh, SL dipindah
+  // ke harga entry (breakeven) dan posisi PENUH dibiarkan jalan mengejar TP2.
+  function simulasikanTrade(d, iEntry, arah, sl, strategi, symbol){
+    const { times, highs, lows, closes } = d;
+    const entry = closes[iEntry];
+    const risk = Math.abs(entry - sl);
+    if(!(risk > 0)) return null;
+    const riskPct = (risk/entry)*100;
+    if(riskPct > 8) return null;          // SL kejauhan, tidak realistis
+    if(riskPct < 0.05) return null;       // SL terlalu rapat, pasti kena noise
+
+    const tp1 = arah==='BUY' ? entry + risk   : entry - risk;
+    const tp2 = arah==='BUY' ? entry + risk*2 : entry - risk*2;
+    const qty = (MODAL_PER_POSISI * LEVERAGE) / entry;
+
+    let tp1Kena = false;
+    let slAktif = sl;
+
+    for(let j=iEntry+1; j<d.closes.length; j++){
+      const hi = highs[j], lo = lows[j];
+
+      if(arah==='BUY'){
+        // Pesimis: kalau satu bar menyentuh SL dan TP sekaligus, SL dianggap duluan.
+        if(lo <= slAktif) return tutup(j, slAktif, tp1Kena ? 'BE setelah TP1' : 'Stop Loss');
+        if(!tp1Kena && hi >= tp1){ tp1Kena = true; slAktif = entry; }
+        if(tp1Kena && hi >= tp2) return tutup(j, tp2, 'TP2');
+      } else {
+        if(hi >= slAktif) return tutup(j, slAktif, tp1Kena ? 'BE setelah TP1' : 'Stop Loss');
+        if(!tp1Kena && lo <= tp1){ tp1Kena = true; slAktif = entry; }
+        if(tp1Kena && lo <= tp2) return tutup(j, tp2, 'TP2');
+      }
+    }
+    // Data habis, posisi masih terbuka -> tidak dihitung (tidak boleh menebak hasilnya)
+    return null;
+
+    function tutup(jExit, hargaExit, alasan){
+      const kotor = arah==='BUY' ? (hargaExit-entry)*qty : (entry-hargaExit)*qty;
+      const fee = (entry*qty + hargaExit*qty) * FEE_PER_SISI;
+      return {
+        symbol, strategi, arah,
+        waktuEntry: times[iEntry], waktuExit: times[jExit],
+        iEntry, iExit: jExit,
+        entry, sl, tp1, tp2, exit: hargaExit,
+        alasan, fee, pl: kotor - fee, tp1Kena
+      };
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // ████████  MESIN BACKTEST  ████████
+  // ═══════════════════════════════════════════════════════
+  function siapkanIndikator(d){
+    const { opens, highs, lows, closes } = d;
+    return {
+      bb: bollinger(closes, 20, 2.0),
+      atrArr: atr(highs, lows, closes, 14),
+      rsiArr: rsi(closes, 14),
+      e20: ema(closes, 20),
+      e50: ema(closes, 50),
+      pivotHighs: findPivots(highs, 10, 10, true),
+      pivotLows:  findPivots(lows,  10, 10, false),
+      pivotHighs5: findPivots(highs, 5, 5, true),
+      pivotLows5:  findPivots(lows,  5, 5, false)
+    };
+  }
+
+  function siapkanHtf(h4, d1h, btc4hCloses, rezim){
+    const e50 = ema(h4.closes, 50), e200 = ema(h4.closes, 200);
+    // Petakan tiap bar 1H ke bar 4H TERAKHIR YANG SUDAH SELESAI sebelum/pada
+    // waktu itu - supaya tidak memakai informasi 4H yang belum terbentuk.
+    const indexUntuk = new Array(d1h.times.length).fill(null);
+    let k = 0;
+    for(let i=0;i<d1h.times.length;i++){
+      while(k+1 < h4.times.length && h4.times[k+1] <= d1h.times[i]) k++;
+      indexUntuk[i] = h4.times[k] <= d1h.times[i] ? k : null;
+    }
+    return {
+      closes:h4.closes, e50, e200, indexUntuk, rezim,
+      relStrength: function(idx){
+        const lb = 30;
+        if(idx < lb || btc4hCloses.length <= lb) return 0;
+        const iB = Math.min(idx, btc4hCloses.length-1);
+        if(iB < lb) return 0;
+        const c = (h4.closes[idx]-h4.closes[idx-lb])/h4.closes[idx-lb];
+        const b = (btc4hCloses[iB]-btc4hCloses[iB-lb])/btc4hCloses[iB-lb];
+        return (c-b)*100;
+      }
+    };
+  }
+
+  function rezimBtc(closes){
+    const n=closes.length;
+    if(n<210) return 'both';
+    const e50=ema(closes,50), e200=ema(closes,200);
+    let s=0;
+    if(closes[n-1] > e200[n-1]) s+=2; else s-=2;
+    if(closes[n-1] > e50[n-1]) s+=1; else s-=1;
+    if(e50[n-1] > e200[n-1]) s+=1; else s-=1;
+    const slope = ((e50[n-1]-e50[n-11])/e50[n-11])*100;
+    if(slope>0.5) s+=1; else if(slope<-0.5) s-=1;
+    if(s>=3) return 'long';
+    if(s<=-3) return 'short';
+    return 'both';
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // ████████  UI  ████████
+  // ═══════════════════════════════════════════════════════
+  const elCoins=document.getElementById('btCoins');
+  const elBars=document.getElementById('btBars');
+  const elBbma=document.getElementById('btStratBbma');
+  const elSnr=document.getElementById('btStratSnr');
+  const elAi=document.getElementById('btStratAi');
+  const elRun=document.getElementById('btRunBtn');
+  const elStatus=document.getElementById('btStatus');
+  const elProg=document.getElementById('btProgress');
+  const elProgBar=document.getElementById('btProgressBar');
+  const elKpis=document.getElementById('btKpis');
+  const elStratTbody=document.getElementById('btStratTbody');
+  const elTradeTbody=document.getElementById('btTradeTbody');
+  const elSvg=document.getElementById('btEquitySvg');
+
+  function fmtUang(n){ return (n<0?'-':'') + '$' + Math.abs(n).toFixed(2); }
+  function fmtHarga(p){
+    if(!isFinite(p)) return '—';
+    if(p>=100) return p.toFixed(2);
+    if(p>=1) return p.toFixed(4);
+    return p.toPrecision(4);
+  }
+  function fmtWaktu(ms){
+    const d=new Date(ms);
+    return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+
+           ' '+String(d.getHours()).padStart(2,'0')+'.'+String(d.getMinutes()).padStart(2,'0');
+  }
+  function setProgress(p){
+    elProg.classList.add('show');
+    elProgBar.style.width = Math.round(p*100) + '%';
+  }
+
+  function hitungStat(trades){
+    const n=trades.length;
+    const win=trades.filter(t=>t.pl>0), loss=trades.filter(t=>t.pl<0), be=trades.filter(t=>t.pl===0);
+    const total=trades.reduce((a,t)=>a+t.pl,0);
+    const gp=win.reduce((a,t)=>a+t.pl,0), gl=Math.abs(loss.reduce((a,t)=>a+t.pl,0));
+    return {
+      n, win:win.length, loss:loss.length, be:be.length,
+      winrate: n ? (win.length/n*100) : 0,
+      total,
+      pf: gl>0 ? gp/gl : (gp>0?Infinity:0),
+      avgWin: win.length ? gp/win.length : 0,
+      avgLoss: loss.length ? gl/loss.length : 0
+    };
+  }
+
+  function renderKpis(trades){
+    const s = hitungStat(trades);
+    // Kurva saldo & drawdown dihitung urut waktu KELUAR posisi
+    const urut = trades.slice().sort((a,b)=>a.waktuExit-b.waktuExit);
+    let saldo = MODAL_PER_POSISI, puncak = saldo, ddMaks = 0;
+    urut.forEach(t=>{
+      saldo += t.pl;
+      if(saldo > puncak) puncak = saldo;
+      const dd = puncak>0 ? (puncak-saldo)/puncak*100 : 0;
+      if(dd > ddMaks) ddMaks = dd;
+    });
+    const totalFee = trades.reduce((a,t)=>a+t.fee,0);
+
+    const kartu = [
+      { l:'Total Trade', v:String(s.n) },
+      { l:'Winrate', v:s.n ? s.winrate.toFixed(1)+'%' : '—' },
+      { l:'Total P/L', v:fmtUang(s.total), c:s.total>=0?'up':'down' },
+      { l:'Profit Factor', v:s.pf===Infinity?'∞':s.pf.toFixed(2), c:s.pf>=1?'up':'down' },
+      { l:'Max Drawdown', v:ddMaks.toFixed(1)+'%', c:'down' },
+      { l:'Rata Win', v:fmtUang(s.avgWin), c:'up' },
+      { l:'Rata Loss', v:fmtUang(-s.avgLoss), c:'down' },
+      { l:'Total Fee', v:fmtUang(-totalFee) }
+    ];
+    elKpis.innerHTML = kartu.map(k=>
+      `<div class="bt-kpi"><div class="bt-kpi-label">${k.l}</div>
+       <div class="bt-kpi-value ${k.c||''}">${k.v}</div></div>`).join('');
+  }
+
+  function renderStrategi(trades){
+    const per = {};
+    trades.forEach(t=>{ (per[t.strategi]=per[t.strategi]||[]).push(t); });
+    const nama = { bbma:'BBMA', snr:'SNR', ai:'AI Konfluensi' };
+    const baris = Object.keys(per).map(k=>{
+      const s = hitungStat(per[k]);
+      return `<tr>
+        <td><span class="bt-badge ${k}">${nama[k]||k}</span></td>
+        <td>${s.n}</td>
+        <td class="bt-pos">${s.win}</td>
+        <td class="bt-neg">${s.loss}</td>
+        <td class="bt-flat">${s.be}</td>
+        <td>${s.winrate.toFixed(1)}%</td>
+        <td class="${s.pf>=1?'bt-pos':'bt-neg'}">${s.pf===Infinity?'∞':s.pf.toFixed(2)}</td>
+        <td class="${s.total>=0?'bt-pos':'bt-neg'}">${fmtUang(s.total)}</td>
+        <td class="bt-pos">${fmtUang(s.avgWin)}</td>
+        <td class="bt-neg">${fmtUang(-s.avgLoss)}</td>
+      </tr>`;
+    }).join('');
+    elStratTbody.innerHTML = baris || '<tr><td colspan="10" class="bt-empty">Tidak ada trade.</td></tr>';
+  }
+
+  function renderEquity(trades){
+    const urut = trades.slice().sort((a,b)=>a.waktuExit-b.waktuExit);
+    if(!urut.length){ elSvg.innerHTML=''; return; }
+    const W=800,H=230,PAD=26,PADL=58;
+    const titik=[{ y:MODAL_PER_POSISI, t:urut[0].waktuEntry }];
+    let saldo=MODAL_PER_POSISI;
+    urut.forEach(t=>{ saldo+=t.pl; titik.push({ y:saldo, t:t.waktuExit }); });
+
+    const ys=titik.map(p=>p.y);
+    let min=Math.min.apply(null,ys), max=Math.max.apply(null,ys);
+    if(min===max){ min-=10; max+=10; }
+    const rng=max-min;
+    const xAt=i=> titik.length===1 ? (PADL+W-PAD)/2 : PADL + i*(W-PADL-PAD)/(titik.length-1);
+    const yAt=v=> H-PAD - ((v-min)/rng)*(H-2*PAD);
+
+    let grid='';
+    for(let g=0;g<=3;g++){
+      const gy=PAD+g*(H-2*PAD)/3;
+      const nilai=max-(rng*g/3);
+      grid += `<line x1="${PADL}" y1="${gy}" x2="${W-PAD}" y2="${gy}" stroke="var(--border)" stroke-width="1"/>`;
+      grid += `<text x="${PADL-8}" y="${gy+3}" text-anchor="end" font-size="9" font-family="var(--font-mono)" fill="var(--dim)">$${nilai.toFixed(0)}</text>`;
+    }
+    const path=titik.map((p,i)=>(i===0?'M':'L')+xAt(i).toFixed(1)+','+yAt(p.y).toFixed(1)).join(' ');
+    const area=path+` L${xAt(titik.length-1).toFixed(1)},${H-PAD} L${PADL},${H-PAD} Z`;
+    const akhir=titik[titik.length-1].y;
+    const warna = akhir>=MODAL_PER_POSISI ? 'var(--bull)' : 'var(--bear)';
+
+    elSvg.innerHTML =
+      `<defs><linearGradient id="btFill" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="${warna}" stop-opacity="0.18"/>
+        <stop offset="100%" stop-color="${warna}" stop-opacity="0"/>
+      </linearGradient></defs>` + grid +
+      `<path d="${area}" fill="url(#btFill)"/>` +
+      `<path d="${path}" fill="none" stroke="${warna}" stroke-width="1.8" stroke-linejoin="round"/>` +
+      `<circle cx="${xAt(titik.length-1).toFixed(1)}" cy="${yAt(akhir).toFixed(1)}" r="3.5" fill="${warna}"/>`;
+  }
+
+  function renderTrades(trades){
+    const urut = trades.slice().sort((a,b)=>b.waktuExit-a.waktuExit);
+    if(!urut.length){
+      elTradeTbody.innerHTML='<tr><td colspan="14" class="bt-empty">Tidak ada trade.</td></tr>';
+      return;
+    }
+    const nama={ bbma:'BBMA', snr:'SNR', ai:'AI' };
+    elTradeTbody.innerHTML = urut.slice(0,400).map(t=>{
+      const hasil = t.pl>0?'win':t.pl<0?'loss':'be';
+      const label = t.pl>0?'WIN':t.pl<0?'LOSS':'BE';
+      return `<tr>
+        <td>${fmtWaktu(t.waktuEntry)}</td>
+        <td>${fmtWaktu(t.waktuExit)}</td>
+        <td>${t.symbol.replace('USDT','')}</td>
+        <td><span class="bt-badge ${t.strategi}">${nama[t.strategi]}</span></td>
+        <td class="${t.arah==='BUY'?'bt-dir-buy':'bt-dir-sell'}">${t.arah}</td>
+        <td>$${fmtHarga(t.entry)}</td>
+        <td>$${fmtHarga(t.sl)}</td>
+        <td>$${fmtHarga(t.tp1)}</td>
+        <td>$${fmtHarga(t.tp2)}</td>
+        <td>$${fmtHarga(t.exit)}</td>
+        <td class="bt-flat">${t.alasan}</td>
+        <td class="bt-flat">-${fmtUang(t.fee).replace('-','')}</td>
+        <td class="${t.pl>0?'bt-pos':t.pl<0?'bt-neg':'bt-flat'}">${fmtUang(t.pl)}</td>
+        <td><span class="bt-badge ${hasil}">${label}</span></td>
+      </tr>`;
+    }).join('') + (urut.length>400
+      ? `<tr><td colspan="14" class="bt-empty">Menampilkan 400 dari ${urut.length} transaksi (yang terbaru).</td></tr>`
+      : '');
+  }
+
+  // ═══════════════════════════════════════════════════════
+  async function jalankanBacktest(){
+    const jml = parseInt(elCoins.value,10);
+    const bars = parseInt(elBars.value,10);
+    const pakai = { bbma:elBbma.checked, snr:elSnr.checked, ai:elAi.checked };
+    if(!pakai.bbma && !pakai.snr && !pakai.ai){
+      elStatus.classList.add('error');
+      elStatus.textContent = 'Pilih minimal satu strategi.';
+      return;
+    }
+    const daftar = SYMBOLS.slice(0, jml);
+
+    elRun.disabled = true;
+    elStatus.classList.remove('error');
+    elStatus.textContent = 'Mengambil data BTC sebagai acuan rezim pasar...';
+    setProgress(0.02);
+
+    try{
+      // BTC 4H dipakai untuk rezim makro + pembanding kekuatan relatif
+      const btc4h = await fetchKlines('BTCUSDT','4h', Math.min(500, Math.ceil(bars/4)+260));
+      const rezim = rezimBtc(btc4h.closes);
+
+      elStatus.textContent = `Mengambil data ${daftar.length} koin (1H${pakai.ai?' + 4H':''})...`;
+
+      const perluHtf = pakai.ai;
+      const data1h = await mapLimited(daftar, KONKURENSI, async (s,idx)=>{
+        const r = await fetchKlines(s,'1h',bars);
+        setProgress(0.05 + 0.35*((idx+1)/daftar.length));
+        return r;
+      });
+      let data4h = [];
+      if(perluHtf){
+        data4h = await mapLimited(daftar, KONKURENSI, async (s,idx)=>{
+          const r = await fetchKlines(s,'4h', Math.min(500, Math.ceil(bars/4)+260));
+          setProgress(0.40 + 0.25*((idx+1)/daftar.length));
+          return r;
+        });
+      }
+
+      elStatus.textContent = 'Menjalankan simulasi bar-per-bar...';
+      const semuaTrade = [];
+      let gagal = 0;
+
+      for(let s=0;s<daftar.length;s++){
+        if(!data1h[s].ok){ gagal++; continue; }
+        const d = data1h[s].value;
+        if(d.closes.length < 250) continue;
+        const pre = siapkanIndikator(d);
+
+        let htf = null;
+        if(perluHtf && data4h[s] && data4h[s].ok && data4h[s].value.closes.length >= 210){
+          htf = siapkanHtf(data4h[s].value, d, btc4h.closes, rezim);
+        }
+
+        // Satu posisi per koin per strategi dalam satu waktu (tidak menumpuk)
+        const sibukSampai = { bbma:-1, snr:-1, ai:-1 };
+
+        for(let i=210; i<d.closes.length-1; i++){
+          if(pakai.bbma && i > sibukSampai.bbma){
+            const sig = sinyalBbma(d,i,pre);
+            if(sig){
+              const t = simulasikanTrade(d,i,sig.arah,sig.sl,'bbma',daftar[s]);
+              if(t){ semuaTrade.push(t); sibukSampai.bbma = t.iExit; }
+            }
+          }
+          if(pakai.snr && i > sibukSampai.snr){
+            const sig = sinyalSnr(d,i,pre);
+            if(sig){
+              const t = simulasikanTrade(d,i,sig.arah,sig.sl,'snr',daftar[s]);
+              if(t){ semuaTrade.push(t); sibukSampai.snr = t.iExit; }
+            }
+          }
+          if(pakai.ai && htf && i > sibukSampai.ai){
+            const sig = sinyalAi(d,i,pre,htf);
+            if(sig){
+              const t = simulasikanTrade(d,i,sig.arah,sig.sl,'ai',daftar[s]);
+              if(t){ semuaTrade.push(t); sibukSampai.ai = t.iExit; }
+            }
+          }
+        }
+        setProgress(0.65 + 0.34*((s+1)/daftar.length));
+        if(s % 5 === 0) await new Promise(r=>setTimeout(r,0)); // beri napas ke UI
+      }
+
+      setProgress(1);
+      renderKpis(semuaTrade);
+      renderStrategi(semuaTrade);
+      renderEquity(semuaTrade);
+      renderTrades(semuaTrade);
+
+      const periode = semuaTrade.length
+        ? (() => {
+            const a = Math.min.apply(null, semuaTrade.map(t=>t.waktuEntry));
+            const b = Math.max.apply(null, semuaTrade.map(t=>t.waktuExit));
+            return new Date(a).toLocaleDateString('id-ID') + ' - ' + new Date(b).toLocaleDateString('id-ID');
+          })()
+        : '-';
+
+      elStatus.textContent = semuaTrade.length
+        ? `Selesai: ${semuaTrade.length} transaksi dari ${daftar.length - gagal} koin • periode ${periode}` +
+          (gagal ? ` • ${gagal} koin gagal dimuat` : '') +
+          ` • rezim BTC saat ini: ${rezim==='long'?'Bullish':rezim==='short'?'Bearish':'Sideways'}`
+        : `Tidak ada satu pun sinyal yang memenuhi syarat pada ${daftar.length} koin & ${bars} bar terakhir.`;
+    }catch(e){
+      elStatus.classList.add('error');
+      elStatus.textContent = 'Gagal menjalankan backtest: ' + (e && e.message ? e.message : 'kesalahan tak terduga');
+    }finally{
+      elRun.disabled = false;
+      setTimeout(()=> elProg.classList.remove('show'), 600);
+    }
+  }
+
+  elRun.addEventListener('click', jalankanBacktest);
+
+  // Dibuka lewat konsol untuk keperluan pengujian otomatis
+  window.__btTest = {
+    simulasikanTrade, pivotSampai, findPivots, hitungStat,
+    ema, rsi, atr, bollinger,
+    sinyalBbma, sinyalSnr, siapkanIndikator, zonaSupplyDemand
+  };
+})();
+</script>
