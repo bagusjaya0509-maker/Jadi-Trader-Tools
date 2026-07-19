@@ -1,4 +1,5 @@
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Jadi Trader — Jurnal Trading</title>
 <style>
   :root{
@@ -38,7 +39,11 @@
 
   ::selection{background:var(--accent-soft);color:var(--ink);}
 
-  .wrap{max-width:1180px;margin:0 auto;padding:28px 24px 80px;}
+  /* Lebar isi jurnal. Sebelumnya dikunci 1180px sehingga menyisakan ruang
+     kosong lebar di layar besar - sekarang dilonggarkan supaya tabel & kalender
+     dapat ruang lebih. Tetap ada batas atas (1800px) agar di monitor ultra-wide
+     baris tabel tidak melar ekstrem sampai sulit dibaca. */
+  .wrap{max-width:1800px;margin:0 auto;padding:28px 24px 80px;}
 
   /* ---------- Nav ---------- */
   .jt-nav{display:flex;gap:10px;margin-left:16px;flex-wrap:wrap;}
@@ -318,7 +323,7 @@
 
   /* ---------- Divider between journals ---------- */
   .jt-divider{
-    max-width:1180px;margin:36px auto 6px;padding:0 24px;
+    max-width:1800px;margin:36px auto 6px;padding:0 24px;
     display:flex;align-items:center;gap:14px;
   }
   .jt-divider .line{flex:1;height:1px;background:var(--border);}

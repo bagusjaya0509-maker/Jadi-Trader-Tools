@@ -1,4 +1,5 @@
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
   :root{
@@ -624,16 +625,42 @@
   }
   .es-section-toggle:hover{ color: var(--text); }
   .es-section-toggle svg{ display:block; transition: transform .18s ease; }
-  .es-collapsed .es-section-toggle svg{ transform: rotate(-90deg); }
-  .es-collapsed .es-section-body{ display:none; }
-  .es-section-collapsed-note{
+  /* Dilipat = section HILANG SELURUHNYA (judul, isi, garis pemisah, dan
+     jaraknya) - bukan cuma isinya. Karena judulnya ikut hilang, tombol untuk
+     memunculkannya kembali dipindah ke deretan chip di atas (.es-hidden-sections). */
+  .es-collapsible.es-collapsed{ display:none; }
+
+  .es-hidden-sections{
     display:none;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:8px;
+    margin:16px 0 4px;
+    padding-top:14px;
+    border-top:1px solid var(--border);
+  }
+  .es-hidden-sections.show{ display:flex; }
+  .es-hidden-sections-label{
     font-family: var(--font-mono);
     font-size:10.5px;
     color: var(--dim);
-    margin-top:4px;
+    letter-spacing:.03em;
   }
-  .es-collapsed .es-section-collapsed-note{ display:block; }
+  .es-hidden-chip{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    background: var(--panel);
+    border:1px dashed var(--border);
+    color: var(--muted);
+    border-radius:20px;
+    padding:4px 11px;
+    font-family: var(--font-mono);
+    font-size:10.5px;
+    cursor:pointer;
+  }
+  .es-hidden-chip:hover{ color: var(--text); border-color: var(--dim); }
+  .es-hidden-chip svg{ display:block; flex-shrink:0; }
   .es-priority-header{
     display:flex;
     justify-content:space-between;
@@ -1658,14 +1685,18 @@
     <div class="es-fav-status" id="esFavStatus">Memuat koin favorit...</div>
   </div>
 
+  <!-- Deretan chip untuk memunculkan kembali section yang disembunyikan.
+       Diperlukan karena section yang disembunyikan hilang total (judul ikut
+       hilang), jadi tidak ada lagi panah di tempat asalnya untuk diklik. -->
+  <div class="es-hidden-sections" id="esHiddenSections"></div>
+
   <div class="es-fav-cross-section es-collapsible" data-section="favcross">
     <div class="es-fav-title es-section-head">
       <span>Sinyal Entry Koin Favorit</span>
-      <button type="button" class="es-section-toggle" title="Sembunyikan / tampilkan section">
+      <button type="button" class="es-section-toggle" title="Sembunyikan section">
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
       </button>
     </div>
-    <div class="es-section-collapsed-note">Disembunyikan &bull; tidak ikut dipindai</div>
     <div class="es-section-body">
       <div class="es-fav-cross-manage" id="esFavCrossManage"></div>
       <div class="es-grid" id="esFavCrossGrid"></div>
@@ -1711,11 +1742,10 @@
   <div class="es-priority-section es-collapsible" data-section="bbma">
     <div class="es-priority-header es-section-head">
       <div class="es-priority-title">Sinyal Prioritas BBMA</div>
-      <button type="button" class="es-section-toggle" title="Sembunyikan / tampilkan section">
+      <button type="button" class="es-section-toggle" title="Sembunyikan section">
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
       </button>
     </div>
-    <div class="es-section-collapsed-note">Disembunyikan &bull; tidak ikut dipindai otomatis</div>
     <div class="es-section-body">
       <div class="es-priority-controls">
         <select id="esPriorityRisk">
@@ -1741,11 +1771,10 @@
   <div class="es-priority-section es-collapsible" data-section="snr">
     <div class="es-priority-header es-section-head">
       <div class="es-priority-title">Sinyal Prioritas SNR</div>
-      <button type="button" class="es-section-toggle" title="Sembunyikan / tampilkan section">
+      <button type="button" class="es-section-toggle" title="Sembunyikan section">
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
       </button>
     </div>
-    <div class="es-section-collapsed-note">Disembunyikan &bull; tidak ikut dipindai otomatis</div>
     <div class="es-section-body">
       <div class="es-priority-controls">
         <select id="esPrioritySnrTf">
@@ -1772,11 +1801,10 @@
   <div class="es-priority-section es-collapsible" data-section="ai">
     <div class="es-priority-header es-section-head">
       <div class="es-priority-title">Sinyal Prioritas AI &mdash; Analisa Konfluensi</div>
-      <button type="button" class="es-section-toggle" title="Sembunyikan / tampilkan section">
+      <button type="button" class="es-section-toggle" title="Sembunyikan section">
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
       </button>
     </div>
-    <div class="es-section-collapsed-note">Disembunyikan &bull; tidak ikut dipindai</div>
     <div class="es-section-body">
       <div class="es-ai-method-note">
         Model konfluensi multi-timeframe: rezim BTC (makro) &rarr; tren 4H &rarr; pullback ke zona nilai 1H &rarr;
@@ -6324,11 +6352,52 @@
   // yang posisinya lebih atas di file ini.
   function isSectionCollapsed(name){ return collapsedSections.has(name); }
 
+  // Nama tampilan tiap section - dipakai di chip "munculkan kembali", karena
+  // saat disembunyikan judul aslinya sudah tidak ada di layar.
+  const SECTION_LABEL = {
+    favcross: 'Sinyal Entry Koin Favorit',
+    bbma:     'Sinyal Prioritas BBMA',
+    snr:      'Sinyal Prioritas SNR',
+    ai:       'Sinyal Prioritas AI'
+  };
+
+  function bukaSection(name){
+    collapsedSections.delete(name);
+    saveCollapsedSections();
+    applySectionCollapseState();
+    // Baru dimunculkan -> isinya masih kosong (tadi dilewati saat dilipat),
+    // jadi langsung dipindai sekali supaya tidak tampil kosong.
+    if(name === 'favcross') scanFavoriteCrossSection();
+    else if(name === 'bbma') findPrioritySignals();
+    else if(name === 'snr') findPrioritySnrSignals();
+  }
+
+  function renderHiddenSectionChips(){
+    const bar = document.getElementById('esHiddenSections');
+    if(!bar) return;
+    const tersembunyi = [...collapsedSections].filter(n => SECTION_LABEL[n]);
+    if(tersembunyi.length === 0){
+      bar.classList.remove('show');
+      bar.innerHTML = '';
+      return;
+    }
+    bar.classList.add('show');
+    bar.innerHTML = '<span class="es-hidden-sections-label">Section disembunyikan:</span>' +
+      tersembunyi.map(n => `<button type="button" class="es-hidden-chip" data-section="${n}" title="Munculkan kembali">
+        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+        ${SECTION_LABEL[n]}
+      </button>`).join('');
+    bar.querySelectorAll('.es-hidden-chip').forEach(btn=>{
+      btn.addEventListener('click', ()=> bukaSection(btn.getAttribute('data-section')));
+    });
+  }
+
   function applySectionCollapseState(){
     document.querySelectorAll('.es-collapsible').forEach(sec=>{
       const name = sec.getAttribute('data-section');
       sec.classList.toggle('es-collapsed', collapsedSections.has(name));
     });
+    renderHiddenSectionChips();
   }
 
   document.querySelectorAll('.es-collapsible').forEach(sec=>{
@@ -6337,20 +6406,15 @@
     if(!head) return;
     head.addEventListener('click', (e)=>{
       // Klik pada kontrol di dalam header (mis. tombol/select) jangan ikut
-      // melipat section - hanya klik area judul/panah.
+      // menyembunyikan section - hanya klik area judul/panah.
       if(e.target.closest('button') && !e.target.closest('.es-section-toggle')) return;
       if(e.target.closest('select') || e.target.closest('input')) return;
-      const nowCollapsed = !collapsedSections.has(name);
-      if(nowCollapsed) collapsedSections.add(name); else collapsedSections.delete(name);
+      // Header hanya bisa MENYEMBUNYIKAN - begitu tersembunyi, seluruh section
+      // (termasuk header ini) hilang dari layar, jadi untuk memunculkannya
+      // kembali dipakai chip di .es-hidden-sections (lihat bukaSection).
+      collapsedSections.add(name);
       saveCollapsedSections();
       applySectionCollapseState();
-      // Baru dibuka kembali -> jalankan pemindaian sekali supaya isinya
-      // langsung terisi (tadinya dilewati selama dilipat).
-      if(!nowCollapsed){
-        if(name === 'favcross') scanFavoriteCrossSection();
-        else if(name === 'bbma') findPrioritySignals();
-        else if(name === 'snr') findPrioritySnrSignals();
-      }
     });
   });
   applySectionCollapseState();
