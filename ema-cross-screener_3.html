@@ -837,19 +837,40 @@
   .es-priority-note strong{ color: var(--text); }
 
   /* ===== Sinyal Pantau Kripto ===== */
-  .es-pantau-badge{
-    font-family: var(--font-mono);
-    font-weight:700;
-    font-size:10px;
-    padding:3px 9px;
-    border-radius:6px;
-    letter-spacing:.03em;
-  }
   /* Hijau untuk pantau BUY, merah untuk pantau SELL */
-  .es-card.pantau.buy  .es-pantau-badge{ background: var(--bull-dim); color: var(--bull); }
-  .es-card.pantau.sell .es-pantau-badge{ background: var(--bear-dim); color: var(--bear); }
-  .es-card.pantau.buy { border-color: rgba(79,158,130,0.55); }  /* --bull  #4f9e82 */
-  .es-card.pantau.sell{ border-color: rgba(192,90,78,0.55); }   /* --bear  #c05a4e */
+  .es-pantau-foot{
+    display:flex;
+    align-items:flex-end;   /* ikon menempel pojok kanan BAWAH walau teks kiri 2 baris */
+    justify-content:space-between;
+    gap:8px;
+    margin-top:6px;
+  }
+  .es-pantau-pick{
+    flex-shrink:0;
+    background:none;
+    border:none;
+    padding:2px 4px;
+    font-size:15px;
+    line-height:1;
+    cursor:pointer;
+    opacity:.65;
+    transition:opacity .15s, transform .15s;
+  }
+  .es-pantau-pick:hover{ opacity:1; transform:scale(1.15); }
+  /* Kartu Pantau biasa: border netral seperti kartu lain - tanpa warna arah.
+     Hanya 3 teratas yang diberi glow, meniru .es-live-trade-box. */
+  .es-card.pantau.top3{
+    transition: border-color .2s ease, box-shadow .2s ease;
+    animation: pantauGlow 2.4s ease-in-out infinite;
+  }
+  .es-card.pantau.top3.buy { border-color: var(--bull); }
+  .es-card.pantau.top3.sell{ border-color: var(--bear); }
+  @keyframes pantauGlow{
+    0%,100%{ box-shadow:0 0 8px 0 var(--glow-c); }
+    50%    { box-shadow:0 0 20px 3px var(--glow-c); }
+  }
+  .es-card.pantau.top3.buy { --glow-c: var(--bull-dim); }
+  .es-card.pantau.top3.sell{ --glow-c: var(--bear-dim); }
 
   /* ===== Sinyal Prioritas AI ===== */
   .es-ai-regime{
@@ -2280,6 +2301,49 @@
     return { k, d };
   }
 
+  const SMI_K = 10, SMI_D = 3, SMI_EMA = 3;
+  const SMI_OB = 50, SMI_OS = -50;   // ambang overbought / oversold
+
+  // Stochastic Momentum Index - porting langsung dari Pine v6:
+  //   highestHigh = ta.highest(lengthK) ; lowestLow = ta.lowest(lengthK)
+  //   relativeRange = close - (highestHigh + lowestLow)/2
+  //   smi = 200 * emaEma(relativeRange, lengthD) / emaEma(highestHigh-lowestLow, lengthD)
+  // emaEma = EMA ganda (EMA dari EMA) dengan panjang yang sama.
+  // Rentangnya kira-kira -100..+100; overbought +40, oversold -40.
+  function smiSeries(highs, lows, closes, lengthK, lengthD, lengthEMA){
+    const n = closes.length;
+    const relRange = new Array(n).fill(null);
+    const hlRange  = new Array(n).fill(null);
+    for(let i=lengthK-1;i<n;i++){
+      let hh=-Infinity, ll=Infinity;
+      for(let j=i-lengthK+1;j<=i;j++){
+        if(highs[j]>hh) hh=highs[j];
+        if(lows[j]<ll)  ll=lows[j];
+      }
+      relRange[i] = closes[i] - (hh+ll)/2;
+      hlRange[i]  = hh-ll;
+    }
+    // EMA di file ini tidak mengenal null, jadi warm-up-nya dipotong dulu lalu
+    // hasilnya dikembalikan ke posisi index semula.
+    const mulai = lengthK-1;
+    if(mulai >= n) return { smi:new Array(n).fill(null), signal:new Array(n).fill(null) };
+    const emaEma = arr => ema(ema(arr, lengthD), lengthD);
+    const numer = emaEma(relRange.slice(mulai));
+    const denom = emaEma(hlRange.slice(mulai));
+    const inti  = numer.map((v,i)=> denom[i]===0 ? 0 : 200*(v/denom[i]));
+    const sig   = ema(inti, lengthEMA);
+    const smi=new Array(n).fill(null), signal=new Array(n).fill(null);
+    for(let i=0;i<inti.length;i++){ smi[mulai+i]=inti[i]; signal[mulai+i]=sig[i]; }
+    return { smi, signal };
+  }
+
+  function smiConditionOf(value){
+    if(value===null || value===undefined) return 'neutral';
+    if(value >= SMI_OB) return 'overbought';
+    if(value <= SMI_OS) return 'oversold';
+    return 'neutral';
+  }
+
   function stochConditionOf(value){
     if(value===null || value===undefined) return 'neutral';
     if(value >= 80) return 'overbought';
@@ -2779,7 +2843,6 @@
     const supZones = pivotLows.map(p=>({ value: p.value, top: p.value + lastAtr*0.5, bottom: p.value - lastAtr*0.5 }));
     const sd = findSupplyDemandZones(opens, closes, atrArr, 1.5, 3);
     const momentum = computeMomentum(opens, highs, lows, closes, 0.70, 5);
-    const momentumSignal = lastMomentumSignal(momentum, 10);
     const chartSvg = buildMiniChart({
       opens, highs, lows, closes, e9, e21, e200, momentum,
       crossIdx: e9.length-1-cross.candlesAgo,
@@ -3114,13 +3177,15 @@
     const emaHtml = noEma ? '' : toLine(s200, 'var(--ema200c)') + toLine(s21, 'var(--ema21c)') + toLine(s9, 'var(--ema9c)');
     const bbHtml = (sBBu && sBBl) ? toLine(sBBu, 'var(--bbc)') + toLine(sBBl, 'var(--bbc)') : '';
 
-    // Sub-panel Stochastic: garis batas 80/20, lalu %K dan %D.
+    // Sub-panel SMI: skala -100..+100, garis batas +40/-40 dan garis tengah 0,
+    // lalu SMI (biru) dan EMA-nya (oranye) - mengikuti Pine script aslinya.
     let stochHtml = '';
     if(stochPanel){
       const top = priceH + 4, bot = h - 5;
-      const sy = v => bot - (Math.max(0,Math.min(100,v))/100)*(bot-top);
+      const BATAS = 100;
+      const sy = v => bot - ((Math.max(-BATAS,Math.min(BATAS,v))+BATAS)/(BATAS*2))*(bot-top);
       const sk = stochPanel.k.slice(start), sd = stochPanel.d.slice(start);
-      const garis = (v,warna) => `<line x1="${padX}" y1="${sy(v).toFixed(1)}" x2="${(w-padX).toFixed(1)}" y2="${sy(v).toFixed(1)}" stroke="${warna}" stroke-width="0.8" stroke-dasharray="3,2" opacity="0.55"/>`;
+      const garis = (v,warna,putus) => `<line x1="${padX}" y1="${sy(v).toFixed(1)}" x2="${(w-padX).toFixed(1)}" y2="${sy(v).toFixed(1)}" stroke="${warna}" stroke-width="0.8"${putus?' stroke-dasharray="3,2"':''} opacity="0.55"/>`;
       const jalur = (arr,warna,tebal) => {
         const pts=[];
         arr.forEach((v,i)=>{ if(v===null||v===undefined) return; pts.push(`${xAt(i).toFixed(1)},${sy(v).toFixed(1)}`); });
@@ -3128,9 +3193,10 @@
       };
       stochHtml =
         `<line x1="0" y1="${priceH}" x2="${w}" y2="${priceH}" stroke="var(--border)" stroke-width="1"/>`
-        + garis(80,'var(--bear)') + garis(20,'var(--bull)')
-        + jalur(sd,'var(--gold)',1) + jalur(sk,'var(--text)',1.3)
-        + `<text x="${padX+2}" y="${(priceH+12).toFixed(1)}" font-size="7" fill="var(--muted)">Stoch 14,3,3</text>`;
+        + `<rect x="${padX}" y="${sy(SMI_OB).toFixed(1)}" width="${(w-padX*2).toFixed(1)}" height="${(sy(SMI_OS)-sy(SMI_OB)).toFixed(1)}" fill="#4A7BD8" fill-opacity="0.10"/>`
+        + garis(SMI_OB,'var(--bear)',true) + garis(SMI_OS,'var(--bull)',true) + garis(0,'var(--dim)',false)
+        + jalur(sd,'var(--gold)',1) + jalur(sk,'#4A7BD8',1.3)
+        + `<text x="${padX+2}" y="${(priceH+12).toFixed(1)}" font-size="7" fill="var(--muted)">SMI ${SMI_K},${SMI_D},${SMI_EMA}</text>`;
     }
 
     let markerHtml = '';
@@ -4112,32 +4178,32 @@
 
   const PANTAU_TF_LABEL = { '15m':'15m', '30m':'30m', '1h':'1H', '4h':'4H', '1d':'1D' };
 
-  function cekStochEkstrem(highs, lows, closes){
-    const st = stochastic(highs, lows, closes, 14, 3, 3);
-    const n = st.k.length;
-    const k = st.k[n-1], d = st.d[n-1], kPrev = st.k[n-2];
+  function cekSmiEkstrem(highs, lows, closes){
+    const st = smiSeries(highs, lows, closes, SMI_K, SMI_D, SMI_EMA);
+    const n = st.smi.length;
+    const k = st.smi[n-1], d = st.signal[n-1], kPrev = st.smi[n-2];
     if(k === null || k === undefined) return null;
 
     let kondisi = null;
-    if(k <= 20) kondisi = 'oversold';
-    else if(k >= 80) kondisi = 'overbought';
+    if(k <= SMI_OS) kondisi = 'oversold';
+    else if(k >= SMI_OB) kondisi = 'overbought';
     if(!kondisi) return null;
 
     // Arah yang DIPANTAU = arah pembalikan yang mungkin terjadi.
     const arah = kondisi === 'oversold' ? 'BUY' : 'SELL';
-    // Penanda tambahan: apakah %K sudah mulai berbalik meninggalkan area ekstrem?
+    // Penanda tambahan: apakah SMI sudah mulai berbalik meninggalkan area ekstrem?
     // Ini yang membedakan "masih meluncur" dari "mulai ada tanda balik".
     let mulaiBalik = false;
     if(kPrev !== null && kPrev !== undefined){
       mulaiBalik = kondisi === 'oversold' ? (k > kPrev) : (k < kPrev);
     }
-    return { kondisi, arah, k, d, mulaiBalik };
+    return { kondisi, arah, k, d, mulaiBalik, seri: st };
   }
 
   async function cariPantauUntukSimbol(symbol, tickers, tf){
     const { opens, highs, lows, closes } = await fetchKlines(symbol, tf, 200);
     if(closes.length < 40) return null;
-    const hasil = cekStochEkstrem(highs, lows, closes);
+    const hasil = cekSmiEkstrem(highs, lows, closes);
     if(!hasil) return null;
 
     const t = tickers[symbol];
@@ -4146,7 +4212,7 @@
     const a = atrArr[atrArr.length-1] || 0;
     if(!a) return null;
 
-    // Bahan kartu bergaya EMA cross, tapi hanya S/R + momentum + stochastic.
+    // Bahan kartu bergaya EMA cross, tapi hanya S/R + momentum + SMI.
     const pivotHighs = findPivots(highs, 10, 10, true).slice(-2);
     const pivotLows  = findPivots(lows,  10, 10, false).slice(-2);
     const resZones = pivotHighs.map(p=>({ value:p.value, top:p.value + a*0.5, bottom:p.value - a*0.5 }));
@@ -4154,11 +4220,10 @@
     const sd = findSupplyDemandZones(opens, closes, atrArr, 1.5, 3);
     const momentum = computeMomentum(opens, highs, lows, closes, 0.70, 5);
     const momentumSignal = lastMomentumSignal(momentum, 10);
-    const stochFull = stochastic(highs, lows, closes, 14, 3, 3);
     const chartSvg = buildMiniChart({
       opens, highs, lows, closes, momentum, noEma:true, crossIdx:null,
       resZones, supZones, demandZones: sd.demand, supplyZones: sd.supply,
-      stochPanel: { k: stochFull.k, d: stochFull.d }
+      stochPanel: { k: hasil.seri.smi, d: hasil.seri.signal }
     });
 
     // Ancang-ancang level: SL di luar swing terakhir + bantalan ATR, TP 1:2.
@@ -4176,7 +4241,7 @@
       kondisi: hasil.kondisi, stochK: hasil.k, stochD: hasil.d,
       mulaiBalik: hasil.mulaiBalik,
       riskPct: (risk/price)*100,
-      chartSvg, resZones, supZones, momentumSignal,
+      chartSvg, resZones, supZones,
       cap: capTierOf(symbol),
       change24h: t ? parseFloat(t.priceChangePercent) : 0
     };
@@ -4192,14 +4257,11 @@
       const chgSign = c.change24h >= 0 ? '+' : '';
       const resDekat = c.resZones.length ? c.resZones[c.resZones.length-1].value : null;
       const supDekat = c.supZones.length ? c.supZones[c.supZones.length-1].value : null;
-      const momCls = c.momentumSignal ? c.momentumSignal.type : 'none';
-      const momLabel = c.momentumSignal
-        ? `${c.momentumSignal.type==='bullish'?'Bullish':'Bearish'} &bull; ${c.momentumSignal.candlesAgo===0?'baru saja':c.momentumSignal.candlesAgo+'c lalu'}`
-        : 'Tidak ada (10c)';
-      const stochLabel = `K ${c.stochK.toFixed(1)}/D ${c.stochD===null?'-':c.stochD.toFixed(1)}`
+      const stochLabel = `SMI ${c.stochK.toFixed(1)} / EMA ${c.stochD===null?'-':c.stochD.toFixed(1)}`
         + (c.kondisi==='overbought'?' (OB)':' (OS)');
-      const balikLabel = c.mulaiBalik ? '&check; %K mulai berbalik' : '&#10007; %K belum berbalik';
-      return `<div class="es-card pantau ${cls}" data-symbol="${c.symbol}" data-tf="${c.tfValue}">
+      const balikLabel = c.mulaiBalik ? '&check; SMI mulai berbalik' : '&#10007; SMI belum berbalik';
+      const glow = i < 3 ? ' top3' : '';
+      return `<div class="es-card pantau ${cls}${glow}" data-symbol="${c.symbol}" data-tf="${c.tfValue}">
         <div class="es-card-top">
           <div><span class="es-rank">#${i+1} &bull; TF ${c.tfLabel}</span><span class="es-symbol">${c.symbol.replace('USDT','')}</span></div>
           <span class="es-cap-tag">${c.cap==='big'?'BIG CAP':'LOW/MID CAP'}</span>
@@ -4213,29 +4275,24 @@
           <span class="res">R ${resDekat===null?'n/a':'$'+fmtPrice(resDekat)}</span>
           <span class="sup">S ${supDekat===null?'n/a':'$'+fmtPrice(supDekat)}</span>
         </div>
-        <div class="es-mom-row">
-          <span>Momentum</span>
-          <span class="es-mom-badge ${momCls}">${momLabel}</span>
-        </div>
         <div class="es-stoch-row">
-          <span>Stoch (14,3,3)</span>
+          <span>SMI (${SMI_K},${SMI_D},${SMI_EMA})</span>
           <span class="es-stoch-badge ${c.kondisi}">${stochLabel}</span>
         </div>
-        <div class="es-mom-row">
-          <span class="es-pantau-badge">PANTAU ${c.signal}</span>
+        <div class="es-pantau-foot">
           <span class="es-ago">${kondisiTeks} &bull; ${balikLabel}</span>
+          <button class="es-pantau-pick" type="button" title="Pilih sinyal ini">&#128200;</button>
         </div>
-        <button class="es-priority-trade-btn" type="button">Pilih Sinyal Ini</button>
       </div>`;
     }).join('');
 
     pantauGrid.querySelectorAll('.es-card').forEach((card,i)=>{
       const cand = top[i];
       card.addEventListener('click', (e)=>{
-        if(e.target.classList.contains('es-priority-trade-btn')) return;
+        if(e.target.classList.contains('es-pantau-pick')) return;
         openTradingView(cand.symbol, cand.tfValue);
       });
-      card.querySelector('.es-priority-trade-btn').addEventListener('click', (e)=>{
+      card.querySelector('.es-pantau-pick').addEventListener('click', (e)=>{
         e.stopPropagation();
         selectTradableSignalByUid(tradableUid('pantau', cand.symbol, cand.tfValue));
       });
@@ -4262,15 +4319,15 @@
       let btcKondisi = null, btcK = null;
       if(mode === 'align'){
         const btc = await fetchKlines('BTCUSDT', tf, 200);
-        const stBtc = cekStochEkstrem(btc.highs, btc.lows, btc.closes);
-        const stAll = stochastic(btc.highs, btc.lows, btc.closes, 14, 3, 3);
-        btcK = stAll.k[stAll.k.length-1];
-        btcKondisi = stBtc ? stBtc.kondisi : null;
+        const seriBtc = smiSeries(btc.highs, btc.lows, btc.closes, SMI_K, SMI_D, SMI_EMA);
+        btcK = seriBtc.smi[seriBtc.smi.length-1];
+        btcKondisi = smiConditionOf(btcK);
+        if(btcKondisi === 'neutral') btcKondisi = null;
         const rc = btcKondisi === 'oversold' ? 'bull' : btcKondisi === 'overbought' ? 'bear' : 'neutral';
         const teks = btcKondisi === 'oversold' ? 'BTC Oversold' :
                      btcKondisi === 'overbought' ? 'BTC Overbought' : 'BTC Netral';
         pantauRegimeBadge.innerHTML = `Rezim: <span class="es-ai-regime-badge ${rc}">${teks}`
-          + (btcK==null ? '' : ` (K ${btcK.toFixed(1)})`) + `</span>`;
+          + (btcK==null ? '' : ` (SMI ${btcK.toFixed(1)})`) + `</span>`;
       }
 
       const settled = await mapLimited(activeSymbols, SCAN_CONCURRENCY,
@@ -4294,7 +4351,7 @@
       // makin kuat kalau K makin besar (95 > 85), oversold kebalikannya
       // (K 2 lebih ekstrem daripada K 18) - jadi keduanya disamakan dulu ke
       // satu skala "seberapa ekstrem" supaya daftar campuran tetap runut.
-      const ekstremitas = c => c.kondisi === 'overbought' ? c.stochK : (100 - c.stochK);
+      const ekstremitas = c => c.kondisi === 'overbought' ? c.stochK : -c.stochK;
       hasil.sort((a,b)=>
         ekstremitas(b) - ekstremitas(a) ||
         (b.mulaiBalik?1:0)-(a.mulaiBalik?1:0) ||
@@ -4303,9 +4360,9 @@
 
       if(hasil.length === 0){
         if(mode === 'align' && !btcKondisi){
-          pantauStatusEl.textContent = `BTC sedang tidak ekstrem (K ${btcK==null?'-':btcK.toFixed(1)}) di TF ${PANTAU_TF_LABEL[tf]||tf} — tidak ada sinyal.`;
+          pantauStatusEl.textContent = `BTC sedang tidak ekstrem (SMI ${btcK==null?'-':btcK.toFixed(1)}) di TF ${PANTAU_TF_LABEL[tf]||tf} — tidak ada sinyal.`;
         } else {
-          pantauStatusEl.textContent = `Tidak ada koin dengan Stochastic ekstrem (K ≤ 20 atau ≥ 80) di TF ${PANTAU_TF_LABEL[tf]||tf}`
+          pantauStatusEl.textContent = `Tidak ada koin dengan SMI ekstrem (SMI ≤ ${SMI_OS} atau ≥ ${SMI_OB}) di TF ${PANTAU_TF_LABEL[tf]||tf}`
             + (mode==='align' ? ` yang ikut ${btcKondisi==='oversold'?'oversold':'overbought'} seperti BTC` : '') + ` saat ini.`;
         }
         return;
