@@ -856,11 +856,13 @@
     font-size:10px;
     padding:3px 9px;
     border-radius:6px;
-    background: rgba(123,160,255,0.18);
-    color:#7BA0FF;
     letter-spacing:.03em;
   }
-  .es-priority-card.pantau{ border-color: rgba(123,160,255,0.45); }
+  /* Hijau untuk pantau BUY, merah untuk pantau SELL */
+  .es-priority-card.pantau.buy  .es-pantau-badge{ background: var(--bull-dim); color: var(--bull); }
+  .es-priority-card.pantau.sell .es-pantau-badge{ background: var(--bear-dim); color: var(--bear); }
+  .es-priority-card.pantau.buy { border-color: rgba(79,158,130,0.55); }  /* --bull  #4f9e82 */
+  .es-priority-card.pantau.sell{ border-color: rgba(192,90,78,0.55); }   /* --bear  #c05a4e */
   .es-stoch-val{
     font-family: var(--font-mono);
     font-size:10px;
@@ -1793,20 +1795,20 @@
       <div class="es-fav-cross-manage" id="esFavCrossManage"></div>
       <div class="es-grid" id="esFavCrossGrid"></div>
       <div class="es-status" id="esFavCrossStatus">Menunggu pindaian koin favorit pertama...</div>
-    </div>
-  </div>
 
-  <div class="es-scan-toolbar">
-    <div class="es-symbol-manager">
-      <button type="button" id="esSymbolManagerBtn" class="es-symbol-manager-btn">
-        <span>Ganti Chart / Kelola Koin</span>
-        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
-      </button>
-      <div class="es-symbol-manager-dropdown" id="esSymbolManagerDropdown"></div>
+      <div class="es-scan-toolbar">
+        <div class="es-symbol-manager">
+          <button type="button" id="esSymbolManagerBtn" class="es-symbol-manager-btn">
+            <span>Ganti Chart / Kelola Koin</span>
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="es-symbol-manager-dropdown" id="esSymbolManagerDropdown"></div>
+        </div>
+      </div>
+      <div class="es-grid" id="esGrid"></div>
+      <div class="es-status" id="esStatus">Memuat data...</div>
     </div>
   </div>
-  <div class="es-grid" id="esGrid"></div>
-  <div class="es-status" id="esStatus">Memuat data...</div>
 
   <div class="es-priority-section" style="display:none;">
     <div class="es-priority-header">
@@ -3280,6 +3282,9 @@
   const MAIN_KLINES_LIMIT = 300;
 
   async function scan(){
+    // Grid ini sekarang berada di dalam section "Sinyal Entry Koin Favorit" -
+    // kalau section-nya dilipat, jangan buang request ke Binance.
+    if(isSectionCollapsed('favcross')) return;
     if(scanning) return;
     scanning = true;
     refreshBtn.classList.add('spinning');
@@ -4281,8 +4286,7 @@
 
       if(hasil.length === 0){
         if(mode === 'align' && !btcKondisi){
-          pantauStatusEl.textContent = `BTC sendiri sedang tidak ekstrem (K ${btcK==null?'-':btcK.toFixed(1)}) di TF ${PANTAU_TF_LABEL[tf]||tf}, `
-            + `jadi belum ada rezim yang bisa diikuti. Ganti ke "Semua Arah" kalau tetap mau lihat koin yang ekstrem sendiri-sendiri.`;
+          pantauStatusEl.textContent = `BTC sedang tidak ekstrem (K ${btcK==null?'-':btcK.toFixed(1)}) di TF ${PANTAU_TF_LABEL[tf]||tf} — tidak ada sinyal.`;
         } else {
           pantauStatusEl.textContent = `Tidak ada koin dengan Stochastic ekstrem (K ≤ 20 atau ≥ 80) di TF ${PANTAU_TF_LABEL[tf]||tf}`
             + (mode==='align' ? ` yang ikut ${btcKondisi==='oversold'?'oversold':'overbought'} seperti BTC` : '') + ` saat ini.`;
@@ -6754,7 +6758,7 @@
     applySectionCollapseState();
     // Baru dimunculkan -> isinya masih kosong (tadi dilewati saat dilipat),
     // jadi langsung dipindai sekali supaya tidak tampil kosong.
-    if(name === 'favcross') scanFavoriteCrossSection();
+    if(name === 'favcross'){ scanFavoriteCrossSection(); scan(); }
     else if(name === 'bbma') findPrioritySignals();
     else if(name === 'snr') findPrioritySnrSignals();
   }
@@ -6820,6 +6824,14 @@
   setInterval(scanFavoriteCrossSection, 90000);
   scanAllBtcTfStrips();
   setInterval(scanAllBtcTfStrips, 90000);
+
+  // Sinyal AI dan Sinyal Pantau ikut jalan sekali saat halaman dibuka, tapi
+  // HANYA di setelan bawaan. Begitu filternya diubah sendiri, pemindaian balik
+  // jadi manual - supaya kombinasi berat tidak dipanggil diam-diam tiap refresh.
+  // Keduanya juga tidak jalan kalau section-nya sedang dilipat (dijaga di
+  // dalam fungsinya masing-masing).
+  if(priorityAiBiasSel.value === 'auto') findPriorityAiSignals();
+  if(pantauTfSel.value === '4h' && pantauRezimSel.value === 'all') cariSinyalPantau();
 
   // Posisi SIMULASI cukup ikut siklus scan 90 detik yang sudah ada (scan()
   // sendiri sudah panggil monitorPrioritySimPositions + renderPrioritySimUI
