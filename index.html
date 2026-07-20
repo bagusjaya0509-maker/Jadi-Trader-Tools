@@ -181,7 +181,11 @@
 
   /* ---------- Trade table ---------- */
   .table-scroll{overflow-x:auto;}
-  .table-scroll.jt-hist-limited{ max-height:300px; overflow-y:auto; }
+  /* Tinggi diatur agar memuat 12 baris riwayat sebelum mulai scroll.
+     Tabel XAU dan kripto beda tinggi barisnya (53px vs 42px), jadi dihitung
+     sendiri-sendiri: tinggi thead (24.5px) + 12 x tinggi baris. */
+  .table-scroll.jt-hist-limited{ max-height:664px; overflow-y:auto; }        /* XAU  : 24.5 + 12*53 = 660.5, dibulatkan ke atas */
+  .table-scroll.jt-hist-limited.jt-hist-kripto{ max-height:532px; }          /* Kripto: 24.5 + 12*42 = 528.5, dibulatkan ke atas */
   .jt-insight-limited{ max-height:230px; overflow-y:auto; }
 
   /* Scrollbar gelap - menyatu dengan latar, dipakai di semua area scroll (riwayat trade, ringkasan per koin, pola emosi) */
@@ -570,7 +574,7 @@
             <input type="date" id="cCustomFrom"> &mdash; <input type="date" id="cCustomTo">
           </span>
         </div>
-        <div class="table-scroll jt-hist-limited">
+        <div class="table-scroll jt-hist-limited jt-hist-kripto">
           <table id="cTradeTable">
             <thead>
               <tr><th>Tanggal</th><th>Pair</th><th>TF</th><th>Arah</th><th>Alasan</th><th>Fee</th><th>P/L Bersih</th><th>Hasil</th></tr>
