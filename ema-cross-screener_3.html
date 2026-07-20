@@ -185,8 +185,8 @@
   .es-toprow{
     display:flex;
     align-items:center;
-    justify-content:space-between;
-    gap:12px;
+    justify-content:flex-end;   /* nav menempel di sebelah kiri identitas user */
+    gap:10px;
     flex-wrap:wrap;
     padding-top:4px;
     margin-bottom:10px;
@@ -196,20 +196,21 @@
     gap:8px;
     flex-wrap:wrap;
   }
+  /* Gaya chip, mengikuti .es-hidden-chip - kecil dan tidak mencolok */
   .es-nav-link{
     display:inline-flex;
     align-items:center;
+    gap:6px;
     background: var(--panel);
-    border:1px solid var(--gold);
-    color: var(--gold);
+    border:1px dashed var(--border);
+    color: var(--muted);
+    border-radius:20px;
+    padding:4px 11px;
     font-family: var(--font-mono);
-    font-size:12px;
-    font-weight:600;
-    padding:8px 12px;
-    border-radius:8px;
+    font-size:10.5px;
     text-decoration:none;
   }
-  .es-nav-link:hover{ background: rgba(242,184,75,0.12); }
+  .es-nav-link:hover{ color: var(--text); border-color: var(--dim); }
 
   .es-status{
     font-family: var(--font-mono);
@@ -883,8 +884,8 @@
   /* Hijau untuk pantau BUY, merah untuk pantau SELL */
   .es-pantau-foot{
     display:flex;
-    align-items:flex-end;   /* ikon menempel pojok kanan BAWAH walau teks kiri 2 baris */
-    justify-content:space-between;
+    align-items:flex-end;
+    justify-content:flex-end;   /* tinggal ikon saja - rapat ke pojok kanan bawah */
     gap:8px;
     margin-top:6px;
   }
@@ -2360,7 +2361,7 @@
     return { k, d };
   }
 
-  const SMI_K = 10, SMI_D = 3, SMI_EMA = 3;
+  const SMI_K = 14, SMI_D = 3, SMI_EMA = 3;
   const SMI_OB = 50, SMI_OS = -50;   // ambang overbought / oversold
 
   // Stochastic Momentum Index - porting langsung dari Pine v6:
@@ -3151,6 +3152,10 @@
     return { notes, highProbability, passCount };
   }
 
+  // Penomor unik untuk id clipPath - tiap kartu punya SVG sendiri dan id yang
+  // kembar akan membuat semua kartu memakai clip milik kartu pertama.
+  let miniChartSeq = 0;
+
   function buildMiniChart(data){
     const { opens, highs, lows, closes, e9, e21, e200, bb, momentum, crossIdx, resZones, supZones, demandZones, supplyZones } = data;
     // noEma: gambar candle + zona saja, tanpa garis EMA (dipakai kartu Pantau).
@@ -3250,16 +3255,33 @@
         arr.forEach((v,i)=>{ if(v===null||v===undefined) return; pts.push(`${xAt(i).toFixed(1)},${sy(v).toFixed(1)}`); });
         return pts.length<2 ? '' : `<polyline points="${pts.join(' ')}" fill="none" stroke="${warna}" stroke-width="${tebal}"/>`;
       };
-      const lebar = (w-padX*2).toFixed(1);
-      const kotak = (v1,v2,warna,alpha) =>
-        `<rect x="${padX}" y="${sy(v1).toFixed(1)}" width="${lebar}" height="${Math.max(0,sy(v2)-sy(v1)).toFixed(1)}" fill="${warna}" fill-opacity="${alpha}"/>`;
+      // Isian ekstrem seperti TradingView: warna HANYA muncul di bagian yang
+      // garis SMI-nya benar-benar menembus +OB / -OS, bukan pita lurus selebar
+      // chart. Caranya: bikin satu poligon area antara garis SMI dan garis
+      // ambang, lalu potong (clip) dengan kotak yang cuma mencakup wilayah
+      // ekstremnya. Bagian yang menjulur balik ke zona netral ikut terpotong,
+      // jadi tepinya presisi mengikuti garis tanpa perlu menghitung titik potong.
+      const uid = 'smi' + (++miniChartSeq);
+      const isian = (ambang, sisi, warna, alpha) => {
+        const pts = [];
+        sk.forEach((v,i)=>{ if(v===null||v===undefined) return; pts.push([xAt(i), sy(v)]); });
+        if(pts.length < 2) return '';
+        const yA = sy(ambang);
+        // Tidak ada satu pun titik di wilayah ekstrem -> tidak usah gambar apa-apa.
+        const adaYangMenembus = pts.some(p => sisi === 'atas' ? p[1] < yA : p[1] > yA);
+        if(!adaYangMenembus) return '';
+        const d = `M${pts[0][0].toFixed(1)},${yA.toFixed(1)} `
+                + pts.map(p=>`L${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ')
+                + ` L${pts[pts.length-1][0].toFixed(1)},${yA.toFixed(1)} Z`;
+        const kY = sisi === 'atas' ? top : yA;
+        const kH = Math.max(0, sisi === 'atas' ? yA - top : bot - yA);
+        return `<clipPath id="${uid}${sisi}"><rect x="${padX}" y="${kY.toFixed(1)}" width="${(w-padX*2).toFixed(1)}" height="${kH.toFixed(1)}"/></clipPath>`
+             + `<path d="${d}" fill="${warna}" fill-opacity="${alpha}" clip-path="url(#${uid}${sisi})"/>`;
+      };
       stochHtml =
         `<line x1="0" y1="${priceH}" x2="${w}" y2="${priceH}" stroke="var(--border)" stroke-width="1"/>`
-        // Area OVERBOUGHT (di atas +OB) merah, OVERSOLD (di bawah -OS) hijau,
-        // dan pita netral di antaranya biru samar - seperti indikator SMI di TradingView.
-        + kotak(BATAS, SMI_OB, 'var(--bear)', 0.22)
-        + kotak(SMI_OB, SMI_OS, '#4A7BD8', 0.09)
-        + kotak(SMI_OS, -BATAS, 'var(--bull)', 0.22)
+        + isian(SMI_OB, 'atas',  'var(--bear)', 0.35)
+        + isian(SMI_OS, 'bawah', 'var(--bull)', 0.35)
         + garis(SMI_OB,'var(--bear)',true) + garis(SMI_OS,'var(--bull)',true) + garis(0,'var(--dim)',false)
         + jalur(sd,'var(--gold)',1) + jalur(sk,'#4A7BD8',1.3)
         + `<text x="${padX+2}" y="${(priceH+12).toFixed(1)}" font-size="7" fill="var(--muted)">SMI ${SMI_K},${SMI_D},${SMI_EMA}</text>`;
@@ -4319,14 +4341,12 @@
     registerTradableSignals('pantau', top);
     pantauGrid.innerHTML = top.map((c,i)=>{
       const cls = c.signal === 'BUY' ? 'buy' : 'sell';
-      const kondisiTeks = c.kondisi === 'oversold' ? 'Oversold' : 'Overbought';
       const chgCls = c.change24h >= 0 ? 'up' : 'down';
       const chgSign = c.change24h >= 0 ? '+' : '';
       const resDekat = c.resZones.length ? c.resZones[c.resZones.length-1].value : null;
       const supDekat = c.supZones.length ? c.supZones[c.supZones.length-1].value : null;
       const stochLabel = `SMI ${c.stochK.toFixed(1)} / EMA ${c.stochD===null?'-':c.stochD.toFixed(1)}`
         + (c.kondisi==='overbought'?' (OB)':' (OS)');
-      const balikLabel = c.mulaiBalik ? '&check; SMI mulai berbalik' : '&#10007; SMI belum berbalik';
       const glow = i < 3 ? ' top3' : '';
       return `<div class="es-card pantau ${cls}${glow}" data-symbol="${c.symbol}" data-tf="${c.tfValue}">
         <div class="es-card-top">
@@ -4347,7 +4367,6 @@
           <span class="es-stoch-badge ${c.kondisi}">${stochLabel}</span>
         </div>
         <div class="es-pantau-foot">
-          <span class="es-ago">${kondisiTeks} &bull; ${balikLabel}</span>
           <button class="es-pantau-pick" type="button" title="Pilih sinyal ini">&#128200;</button>
         </div>
       </div>`;
