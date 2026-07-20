@@ -115,6 +115,10 @@
   .es-econ-head-row{
     display:flex; align-items:center; justify-content:space-between; gap:8px;
   }
+  .es-econ-filter-row{
+    display:flex; gap:6px; margin-top:6px;
+  }
+  .es-econ-filter-row .es-econ-filter{ flex:1; min-width:0; }
   .es-econ-filter{
     background: var(--panel-2); border:1px solid var(--border); color: var(--muted);
     font-family: var(--font-mono); font-size:10px; padding:2px 6px; border-radius:6px;
@@ -1791,12 +1795,25 @@
     </div>
     <div class="es-econ-calendar-content">
       <div class="es-econ-calendar-header">
-        <div class="es-econ-head-row">
-          <span>Kalender Ekonomi</span>
+        <div class="es-econ-head-row">Kalender Ekonomi</div>
+        <div class="es-econ-filter-row">
+          <select class="es-econ-filter" id="esEconCur">
+            <option value="USD" selected>USD</option>
+            <option value="major">Major</option>
+            <option value="all">Semua</option>
+            <option value="EUR">EUR</option>
+            <option value="GBP">GBP</option>
+            <option value="JPY">JPY</option>
+            <option value="AUD">AUD</option>
+            <option value="CAD">CAD</option>
+            <option value="CHF">CHF</option>
+            <option value="NZD">NZD</option>
+            <option value="CNY">CNY</option>
+          </select>
           <select class="es-econ-filter" id="esEconFilter">
             <option value="high" selected>Dampak Tinggi</option>
             <option value="medium">Tinggi + Sedang</option>
-            <option value="all">Semua</option>
+            <option value="all">Semua Dampak</option>
           </select>
         </div>
       </div>
@@ -7103,24 +7120,28 @@
   // otomatis jatuh balik ke widget TradingView lama supaya panel News tidak
   // pernah kosong.
   const ECON_FILTER_KEY = 'emaScreenerEconFilter_v1';
+  const ECON_CUR_KEY = 'emaScreenerEconCur_v1';
   const ECON_REFRESH_MS = 10 * 60 * 1000;   // ambil ulang tiap 10 menit
   const ECON_SIAGA_MENIT = 60;              // <60 menit sebelum rilis = zona siaga
   let econEvents = null;
   let econGagal = false;
 
   const econFilterSel = document.getElementById('esEconFilter');
+  const econCurSel = document.getElementById('esEconCur');
   const econNextEl = document.getElementById('esEconNext');
   const econBodyEl = document.getElementById('esEconCalendarBody');
 
   try{
     const f = localStorage.getItem(ECON_FILTER_KEY);
     if(f && econFilterSel) econFilterSel.value = f;
+    const c = localStorage.getItem(ECON_CUR_KEY);
+    if(c && econCurSel) econCurSel.value = c;
   }catch(e){}
 
   function loadEconCalendarWidget(){
     econBodyEl.innerHTML = '';
     if(econNextEl) econNextEl.style.display = 'none';
-    if(econFilterSel) econFilterSel.style.display = 'none';
+    if(econFilterSel) econFilterSel.parentElement.style.display = 'none';
     const script = document.createElement('script');
     script.type = 'text/javascript';
     script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-events.js';
@@ -7138,6 +7159,19 @@
     if(mode === 'medium') return dampak === 'high' || dampak === 'medium';
     return dampak === 'high';
   }
+
+  // Default USD karena XAUUSD dan pair kripto ...USDT dua-duanya digerakkan
+  // rilis ekonomi Amerika. "Major" untuk yang mau lihat mata uang besar lain.
+  const ECON_MAJOR = ['USD','EUR','GBP','JPY','AUD','CAD','CHF','NZD'];
+
+  function econCurLolos(cur){
+    const mode = econCurSel ? econCurSel.value : 'USD';
+    if(mode === 'all') return true;
+    if(mode === 'major') return ECON_MAJOR.indexOf(cur) !== -1;
+    return cur === mode;
+  }
+
+  function econLolos(e){ return econDampakLolos(e.dampak) && econCurLolos(e.mataUang); }
 
   function econFmtSelisih(ms){
     if(ms < 0) return null;
@@ -7168,10 +7202,11 @@
   function renderEconNext(){
     if(!econNextEl || !econEvents) return;
     const now = Date.now();
-    const berikut = econEvents.find(e => e.dampak === 'high' && e.waktu > now);
+    const berikut = econEvents.find(e => e.dampak === 'high' && econCurLolos(e.mataUang) && e.waktu > now);
     if(!berikut){
       econNextEl.className = 'es-econ-next';
-      econNextEl.innerHTML = 'Tidak ada rilis dampak tinggi tersisa minggu ini.';
+      econNextEl.innerHTML = 'Tidak ada rilis dampak tinggi ' +
+        (econCurSel ? econCurSel.value : '') + ' tersisa minggu ini.';
       return;
     }
     const sisa = berikut.waktu - now;
@@ -7187,9 +7222,10 @@
   function renderEconList(){
     if(!econEvents) return;
     const now = Date.now();
-    const tampil = econEvents.filter(e => econDampakLolos(e.dampak));
+    const tampil = econEvents.filter(econLolos);
     if(tampil.length === 0){
-      econBodyEl.innerHTML = '<div class="es-econ-status">Tidak ada event yang cocok dengan filter ini.</div>';
+      econBodyEl.innerHTML = '<div class="es-econ-status">Tidak ada event ' +
+        (econCurSel ? econCurSel.value : '') + ' yang cocok dengan filter ini.</div>';
       return;
     }
     let html = '', hariTerakhir = '';
@@ -7239,7 +7275,7 @@
         econEvents = d.events;
         econGagal = false;
         if(econNextEl) econNextEl.style.display = '';
-        if(econFilterSel) econFilterSel.style.display = '';
+        if(econFilterSel) econFilterSel.parentElement.style.display = '';
         renderEcon();
       })
       .catch(function(){
@@ -7251,6 +7287,14 @@
           loadEconCalendarWidget();
         }
       });
+  }
+
+  if(econCurSel){
+    econCurSel.addEventListener('change', function(){
+      try{ localStorage.setItem(ECON_CUR_KEY, econCurSel.value); }catch(e){}
+      renderEcon();   // mata uang mempengaruhi daftar DAN hitung mundur
+    });
+    econCurSel.addEventListener('click', function(e){ e.stopPropagation(); });
   }
 
   if(econFilterSel){
