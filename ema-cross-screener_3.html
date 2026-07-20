@@ -1340,6 +1340,27 @@
     margin-bottom:6px;
   }
   .es-sim-table-header .es-sim-table-label{ margin-bottom:0; }
+  .es-sim-title-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+  }
+  .es-sync-dropdown{ min-width:230px; }
+  .es-sync-info{
+    font-family: var(--font-mono);
+    font-size:10.5px;
+    line-height:1.6;
+    color: var(--muted);
+    padding:8px 12px;
+    border-bottom:1px solid var(--border);
+    white-space:normal;
+  }
+  .es-sync-info b{ color: var(--text); }
+  .es-sync-info .ok{ color: var(--bull); }
+  .es-sync-info .warn{ color: var(--gold); }
+  .es-sync-info .err{ color: var(--bear); }
+  .es-sync-item:hover{ background: rgba(242,184,75,0.12); }
   .es-sim-settings{ position:relative; }
   .es-sim-settings-btn{
     display:inline-flex;
@@ -1963,7 +1984,17 @@
   </div>
 
   <div class="es-sim-section">
-    <div class="es-sim-title">Simulasi - Entri Live Sinyal</div>
+    <div class="es-sim-title-row">
+      <div class="es-sim-title">Simulasi - Entri Live Sinyal</div>
+      <div class="es-sim-settings">
+        <button type="button" id="esSyncBtn" class="es-sim-settings-btn" title="Simpan &amp; sinkronkan"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></button>
+        <div class="es-sim-settings-dropdown es-sync-dropdown" id="esSyncDropdown">
+          <div class="es-sync-info" id="esSyncInfo">Memeriksa status...</div>
+          <button type="button" id="esSyncSaveBtn" class="es-sim-settings-item es-sync-item">Simpan &amp; Sinkronkan Sekarang</button>
+          <button type="button" id="esSyncPullBtn" class="es-sim-settings-item es-sync-item">Muat Ulang dari Cloud</button>
+        </div>
+      </div>
+    </div>
     <div class="es-sim-controls">
       <label>Modal per Posisi ($)
         <input type="number" id="esPsimModal" value="1000" min="10" step="10">
@@ -2126,6 +2157,14 @@
     if(esCurrentUid) esSaveToCloud(esCurrentUid).catch(()=>{});
   }
 
+  // Dorong ke cloud hanya bila ada perubahan lokal yang belum tersimpan.
+  // Sinkron manual lewat gerigi tetap memakai esSaveToCloud langsung (paksa).
+  function esSaveJikaAdaPerubahan(uid){
+    const dirty = parseInt(localStorage.getItem(ES_LOCAL_DIRTY_KEY) || '0', 10);
+    if(!dirty) return Promise.resolve(false);
+    return esSaveToCloud(uid).then(function(){ return true; }).catch(function(){ return false; });
+  }
+
   function esLoadFromCloud(uid){
     return esDb.collection('users').doc(uid).get().then(function(doc){
       let changed = false;
@@ -2151,14 +2190,116 @@
     });
   }
 
+  const ES_LAST_SYNC_KEY = 'emaScreenerLastSyncAt_v1';
+
   function esSaveToCloud(uid){
     const payload = {};
     ES_CLOUD_SYNC_KEYS.forEach(function(key){
       const val = localStorage.getItem(key);
       if(val !== null) payload[key] = val;
     });
-    payload._updatedAt = Date.now();
-    return esDb.collection('users').doc(uid).set(payload, { merge: true });
+    const stempel = Date.now();
+    payload._updatedAt = stempel;
+    return esDb.collection('users').doc(uid).set(payload, { merge: true }).then(function(){
+      // PENTING: tanda "ada perubahan lokal belum tersimpan" HARUS dilunasi
+      // setelah berhasil tersimpan. Kalau tidak, stempel dirty lama terus
+      // menempel di device ini; lain kali device ini dibuka, syarat
+      // localDirtyAt > cloudUpdatedAt bisa terpenuhi lagi lalu device ini
+      // MENIMPA cloud dengan datanya sendiri yang sudah basi - inilah yang
+      // membuat posisi yang dibuka di device lain hilang.
+      try{
+        localStorage.setItem(ES_LOCAL_DIRTY_KEY, '0');
+        localStorage.setItem(ES_LAST_SYNC_KEY, String(stempel));
+      }catch(e){}
+      return stempel;
+    });
+  }
+
+  // ---- Gerigi "Simpan & Sinkronkan" di judul Simulasi ----------------------
+  // Tombol manual supaya kamu bisa MEMASTIKAN semuanya sudah naik ke cloud
+  // sebelum menutup device, tanpa menunggu siklus otomatis 15 detik.
+  const syncBtn = document.getElementById('esSyncBtn');
+  const syncDropdown = document.getElementById('esSyncDropdown');
+  const syncInfo = document.getElementById('esSyncInfo');
+  const syncSaveBtn = document.getElementById('esSyncSaveBtn');
+  const syncPullBtn = document.getElementById('esSyncPullBtn');
+
+  function jumlahPosisiTersimpan(){
+    try{
+      const raw = localStorage.getItem('emaScreenerPrioritySim_v1');
+      if(!raw) return 0;
+      const obj = JSON.parse(raw);
+      return Object.keys((obj && obj.positions) || {}).length;
+    }catch(e){ return 0; }
+  }
+
+  function waktuSingkat(ms){
+    if(!ms) return null;
+    const d = new Date(ms);
+    return d.toLocaleDateString('id-ID',{day:'2-digit',month:'short'}) + ' ' +
+           d.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
+  }
+
+  function perbaruiInfoSync(){
+    if(!syncInfo) return;
+    if(!esCurrentUid){
+      syncInfo.innerHTML = '<span class="err">Belum login</span> - data hanya tersimpan di device ini.';
+      return;
+    }
+    const dirty = parseInt(localStorage.getItem(ES_LOCAL_DIRTY_KEY) || '0', 10);
+    const last  = parseInt(localStorage.getItem(ES_LAST_SYNC_KEY) || '0', 10);
+    const nPos  = jumlahPosisiTersimpan();
+    const statusTeks = dirty > 0
+      ? '<span class="warn">Ada perubahan belum tersimpan</span>'
+      : '<span class="ok">Semua sudah tersimpan</span>';
+    syncInfo.innerHTML = statusTeks
+      + '<br>Posisi terbuka: <b>' + nPos + '</b>'
+      + '<br>Sinkron terakhir: <b>' + (waktuSingkat(last) || 'belum pernah') + '</b>';
+  }
+
+  function pasangTombolSync(){ perbaruiInfoSync(); }
+
+  if(syncBtn){
+    syncBtn.addEventListener('click', function(e){
+      e.stopPropagation();
+      perbaruiInfoSync();
+      syncDropdown.classList.toggle('open');
+    });
+    document.addEventListener('click', function(e){
+      if(syncDropdown.classList.contains('open') && !syncDropdown.contains(e.target) && e.target !== syncBtn){
+        syncDropdown.classList.remove('open');
+      }
+    });
+    syncSaveBtn.addEventListener('click', function(){
+      if(!esCurrentUid){ syncInfo.innerHTML = '<span class="err">Belum login - tidak bisa sinkron.</span>'; return; }
+      syncSaveBtn.disabled = true;
+      syncInfo.innerHTML = 'Menyimpan...';
+      esSaveToCloud(esCurrentUid).then(function(){
+        perbaruiInfoSync();
+        syncInfo.innerHTML = '<span class="ok">Tersimpan ke cloud.</span><br>' + syncInfo.innerHTML;
+      }).catch(function(err){
+        syncInfo.innerHTML = '<span class="err">Gagal menyimpan:</span> ' + (err && err.message ? err.message : 'kesalahan jaringan');
+      }).finally(function(){ syncSaveBtn.disabled = false; });
+    });
+    syncPullBtn.addEventListener('click', function(){
+      if(!esCurrentUid){ syncInfo.innerHTML = '<span class="err">Belum login - tidak bisa sinkron.</span>'; return; }
+      const nLokal = jumlahPosisiTersimpan();
+      const dirty = parseInt(localStorage.getItem(ES_LOCAL_DIRTY_KEY) || '0', 10);
+      // Menarik dari cloud MENIMPA data di device ini. Kalau device ini masih
+      // menyimpan perubahan yang belum naik, minta konfirmasi dulu - jangan
+      // sampai justru ini yang menghapus posisi yang baru dibuka di sini.
+      if(dirty > 0 && !window.confirm('Device ini masih punya perubahan yang belum tersimpan ke cloud ('
+          + nLokal + ' posisi terbuka). Menarik dari cloud akan MENIMPA data itu. Lanjutkan?')) return;
+      syncPullBtn.disabled = true;
+      syncInfo.innerHTML = 'Memuat dari cloud...';
+      esLoadFromCloud(esCurrentUid).then(function(changed){
+        if(changed){ location.reload(); return; }
+        perbaruiInfoSync();
+        syncInfo.innerHTML = '<span class="ok">Sudah sama dengan cloud.</span><br>' + syncInfo.innerHTML;
+      }).catch(function(err){
+        syncInfo.innerHTML = '<span class="err">Gagal memuat:</span> ' + (err && err.message ? err.message : 'kesalahan jaringan');
+      }).finally(function(){ syncPullBtn.disabled = false; });
+    });
   }
 
   esAuth.onAuthStateChanged(function(user){
@@ -2182,15 +2323,22 @@
       }).catch(function(){ esAuthStatusEl.textContent = ''; });
 
       if(esCloudSyncTimer) clearInterval(esCloudSyncTimer);
-      esCloudSyncTimer = setInterval(function(){ esSaveToCloud(user.uid); }, 15000);
-      window.addEventListener('beforeunload', function(){ esSaveToCloud(user.uid); });
+      // HANYA dorong ke cloud kalau device ini memang punya perubahan yang belum
+      // tersimpan. Sebelumnya dorongan ini tanpa syarat, jadi tab yang cuma
+      // ditinggal terbuka (mis. browser tablet di background) tetap menimpa
+      // cloud tiap 15 detik dengan isi localStorage-nya sendiri - itu yang
+      // menghapus posisi yang baru dibuka di device lain.
+      esCloudSyncTimer = setInterval(function(){ esSaveJikaAdaPerubahan(user.uid); }, 15000);
+      window.addEventListener('beforeunload', function(){ esSaveJikaAdaPerubahan(user.uid); });
       // beforeunload TIDAK bisa diandalkan buat nunggu network request async
       // (browser bisa langsung lanjut unload sebelum Firestore selesai nulis) -
       // visibilitychange (tab disembunyikan/pindah tab/pindah app) jauh lebih
       // reliable buat kirim data terakhir sebelum user pindah dari halaman ini.
       document.addEventListener('visibilitychange', function(){
-        if(document.visibilityState === 'hidden') esSaveToCloud(user.uid);
+        if(document.visibilityState === 'hidden') esSaveJikaAdaPerubahan(user.uid);
       });
+
+      pasangTombolSync();
     } else {
       esCurrentUid = null;
       esAuthGateEl.style.display = 'flex';
