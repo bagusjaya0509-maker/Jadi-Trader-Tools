@@ -182,11 +182,19 @@
   .es-refresh.spinning svg{ animation: spin 1s linear infinite; }
   @keyframes spin{ to{ transform: rotate(360deg); } }
 
+  .es-toprow{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    flex-wrap:wrap;
+    padding-top:4px;
+    margin-bottom:10px;
+  }
   .es-topnav{
     display:flex;
     gap:8px;
     flex-wrap:wrap;
-    margin-bottom:14px;
   }
   .es-nav-link{
     display:inline-flex;
@@ -474,6 +482,10 @@
   .es-chg.down{ color: var(--bear); }
 
   .es-spark{ width:100%; height:160px; display:block; }
+  /* Kartu Pantau punya sub-panel SMI 72px di bawah area harga 160px. Tinggi CSS
+     harus ikut jadi 232px - kalau tetap 160px, preserveAspectRatio="none" cuma
+     memampatkan seluruh chart, bukan menambah ruang panelnya. */
+  .es-card.pantau .es-spark{ height:232px; }
 
   .es-sr-row{
     display:flex;
@@ -692,6 +704,10 @@
     outline:none;
   }
   .es-priority-controls select:hover{ border-color: var(--dim); }
+  /* Baris filter Pantau jangan mepet ke kartu grafik di bawahnya */
+  [data-section="pantau"] .es-priority-controls{ margin:12px 0 16px; }
+  /* dan kartu jangan mepet ke scrollbar geser */
+  #esPantauGrid{ padding-bottom:16px; }
   /* Semua kontrol di baris ini disamakan tingginya (32px), font, padding, dan
      radius-nya - sebelumnya select, tombol, tombol kelola koin, dan badge rezim
      punya ukuran sendiri-sendiri sehingga barisnya terlihat bergerigi. */
@@ -1661,7 +1677,7 @@
   .es-auth-status{ margin-top:14px; font-size:12px; color:var(--muted); min-height:16px; }
   .es-auth-status.error{ color:var(--bear); }
   .es-user-bar{
-    display:flex; align-items:center; justify-content:flex-end; gap:10px; padding:6px 4px 12px; font-size:12px; color:var(--muted);
+    display:flex; align-items:center; justify-content:flex-end; gap:10px; font-size:12px; color:var(--muted);
   }
   .es-user-bar img{ width:22px; height:22px; border-radius:50%; }
   .es-user-signout-btn{
@@ -1685,10 +1701,16 @@
 </div>
 
 <div class="ema-screener">
-  <div class="es-user-bar" id="esUserBar" style="display:none;">
-    <img id="esUserAvatar" src="" alt="">
-    <span id="esUserName"></span>
-    <button type="button" class="es-user-signout-btn" id="esSignOutBtn">Keluar</button>
+  <div class="es-toprow">
+    <div class="es-topnav">
+      <a href="backtest-screener.html" class="es-nav-link">Backtest 3 Sinyal &rarr;</a>
+      <a href="jurnal-trading.html" class="es-nav-link">Jurnal Trading &rarr;</a>
+    </div>
+    <div class="es-user-bar" id="esUserBar" style="display:none;">
+      <img id="esUserAvatar" src="" alt="">
+      <span id="esUserName"></span>
+      <button type="button" class="es-user-signout-btn" id="esSignOutBtn">Keluar</button>
+    </div>
   </div>
   <div class="es-econ-calendar-panel collapsed" id="esEconCalendarPanel">
     <div class="es-econ-calendar-trigger" id="esEconCalendarTrigger">
@@ -1699,10 +1721,6 @@
       <div class="es-econ-calendar-header">Kalender Ekonomi</div>
       <div class="es-econ-calendar-body" id="esEconCalendarBody"></div>
     </div>
-  </div>
-  <div class="es-topnav">
-    <a href="backtest-screener.html" class="es-nav-link">Backtest 3 Sinyal &rarr;</a>
-    <a href="jurnal-trading.html" class="es-nav-link">Jurnal Trading &rarr;</a>
   </div>
   <div class="es-header">
     <div>
@@ -3160,7 +3178,7 @@
     const range = (max-min) || 1;
     // priceH = tinggi area harga. Kalau ada panel stochastic, SVG-nya
     // diperpanjang ke bawah - area harga tidak menyusut.
-    const w = 300, priceH = 160, panelH = stochPanel ? 46 : 0;
+    const w = 300, priceH = 160, panelH = stochPanel ? 72 : 0;
     const h = priceH + panelH, padX=4, padY=6;
 
     const xAt = (i) => padX + (i/(N<=1?1:N-1))*(w-padX*2);
@@ -3232,9 +3250,16 @@
         arr.forEach((v,i)=>{ if(v===null||v===undefined) return; pts.push(`${xAt(i).toFixed(1)},${sy(v).toFixed(1)}`); });
         return pts.length<2 ? '' : `<polyline points="${pts.join(' ')}" fill="none" stroke="${warna}" stroke-width="${tebal}"/>`;
       };
+      const lebar = (w-padX*2).toFixed(1);
+      const kotak = (v1,v2,warna,alpha) =>
+        `<rect x="${padX}" y="${sy(v1).toFixed(1)}" width="${lebar}" height="${Math.max(0,sy(v2)-sy(v1)).toFixed(1)}" fill="${warna}" fill-opacity="${alpha}"/>`;
       stochHtml =
         `<line x1="0" y1="${priceH}" x2="${w}" y2="${priceH}" stroke="var(--border)" stroke-width="1"/>`
-        + `<rect x="${padX}" y="${sy(SMI_OB).toFixed(1)}" width="${(w-padX*2).toFixed(1)}" height="${(sy(SMI_OS)-sy(SMI_OB)).toFixed(1)}" fill="#4A7BD8" fill-opacity="0.10"/>`
+        // Area OVERBOUGHT (di atas +OB) merah, OVERSOLD (di bawah -OS) hijau,
+        // dan pita netral di antaranya biru samar - seperti indikator SMI di TradingView.
+        + kotak(BATAS, SMI_OB, 'var(--bear)', 0.22)
+        + kotak(SMI_OB, SMI_OS, '#4A7BD8', 0.09)
+        + kotak(SMI_OS, -BATAS, 'var(--bull)', 0.22)
         + garis(SMI_OB,'var(--bear)',true) + garis(SMI_OS,'var(--bull)',true) + garis(0,'var(--dim)',false)
         + jalur(sd,'var(--gold)',1) + jalur(sk,'#4A7BD8',1.3)
         + `<text x="${padX+2}" y="${(priceH+12).toFixed(1)}" font-size="7" fill="var(--muted)">SMI ${SMI_K},${SMI_D},${SMI_EMA}</text>`;
