@@ -1134,7 +1134,21 @@
     width:150px;
   }
   .es-sim-controls input::placeholder{ color: var(--muted); font-size:11px; }
-  #esPsimSignalSelect, #esLiveOrderType, #esLiveEntryMethod{ color: var(--muted); font-size:11px; }
+  #esPsimSignalSelect, #esLiveOrderType, #esLiveEntryMethod, #esPsimDirOverride{ color: var(--muted); font-size:11px; }
+  /* Ditandai jelas saat arah dipaksa berlawanan dengan sinyal - ini keputusan
+     melawan analisa, jadi jangan sampai kelewat tidak terlihat. */
+  #esPsimDirOverride.dipaksa{ color: var(--gold); border-color: var(--gold); }
+  .es-arah-warning{
+    font-family: var(--font-mono);
+    font-size:10.5px;
+    line-height:1.6;
+    color: var(--gold);
+    background: rgba(242,184,75,0.10);
+    border:1px solid rgba(242,184,75,0.35);
+    border-radius:6px;
+    padding:7px 10px;
+    margin-bottom:9px;
+  }
   .es-sim-controls button{
     background: var(--panel);
     border:1px solid var(--bull);
@@ -1844,6 +1858,13 @@
       </label>
       <label>Sinyal Terpilih
         <select id="esPsimSignalSelect"><option value="">&mdash; Pilih sinyal &mdash;</option></select>
+      </label>
+      <label title="Paksa arah entry. Kalau dibalik dari sinyal, level SL/TP otomatis dicerminkan supaya tetap valid.">Arah Order
+        <select id="esPsimDirOverride">
+          <option value="auto" selected>Ikut Sinyal</option>
+          <option value="BUY">Paksa BUY</option>
+          <option value="SELL">Paksa SELL</option>
+        </select>
       </label>
       <label title="Khusus Live Trading Binance - menentukan jenis order entry yang dikirim ke exchange">Opsi Order Manual (Live)
         <select id="esLiveOrderType">
@@ -2576,6 +2597,27 @@
       isManualSl, isManualTp,
       isManual: isManualSl || isManualTp
     };
+  }
+
+  // ===== Paksa arah order (BUY/SELL) terlepas dari arah sinyal =====
+  // Dipakai kalau user mau entry berlawanan dengan sinyal. SL/TP TIDAK diubah
+  // otomatis - user mengisinya manual lewat "SL Manual"/"TP Manual". Validasi
+  // yang sudah ada (validateLiveOrderInput untuk live, cek slValid untuk
+  // simulasi) otomatis menolak kalau level-nya tidak sesuai arah yang dipilih.
+  function getArahEfektif(cand){
+    const v = psimDirOverrideSel.value;
+    return (v === 'BUY' || v === 'SELL') ? v : cand.signal;
+  }
+  function arahDipaksaBerlawanan(cand){
+    return !!cand && getArahEfektif(cand) !== cand.signal;
+  }
+  // Salinan kandidat dengan arah sudah diterapkan - dipakai di preview,
+  // Open Posisi (simulasi), dan Kirim Real Order supaya ketiganya konsisten.
+  function candDenganArah(cand){
+    if(!cand) return cand;
+    const arah = getArahEfektif(cand);
+    if(arah === cand.signal) return cand;
+    return Object.assign({}, cand, { signal: arah, _arahDipaksa: true });
   }
 
   // Registry gabungan semua sumber sinyal yang bisa dipilih untuk Simulasi/Live
@@ -4589,6 +4631,7 @@
   const psimModalInput = document.getElementById('esPsimModal');
   const psimLeverageInput = document.getElementById('esPsimLeverage');
   const psimSignalSelect = document.getElementById('esPsimSignalSelect');
+  const psimDirOverrideSel = document.getElementById('esPsimDirOverride');
   const psimManualSlInput = document.getElementById('esPsimManualSl');
   const psimManualTpInput = document.getElementById('esPsimManualTp');
   const liveOrderTypeSel = document.getElementById('esLiveOrderType');
@@ -4848,7 +4891,7 @@
     const leverage = currentPsimLeverage();
     try{
       entryPriceUsed = orderTypeCfg.entryType === 'MARKET' ? cand.price : parseFloat(liveEntryPriceManualInput.value);
-      const { sl: slRaw, tp: tpRaw, isManualTp } = getEffectiveSlTp(cand);
+      const { sl: slRaw, tp: tpRaw } = getEffectiveSlTp(cand);
       if(slRaw===null || tpRaw===null){
         throw new Error('Sinyal ini tidak punya SL/TP otomatis - isi dulu "SL Manual" & "TP Manual" sebelum kirim order.');
       }
@@ -5557,18 +5600,20 @@
       psimOpenBtn.classList.remove('sell');
       return;
     }
-    const isSell = psimSelectedCandidate.signal === 'SELL';
+    const isSell = getArahEfektif(psimSelectedCandidate) === 'SELL';
     psimOpenBtn.textContent = isSell ? 'Open Sell' : 'Open Buy';
     psimOpenBtn.classList.toggle('sell', isSell);
   }
 
   function renderPsimPreview(){
     updatePsimOpenBtn();
-    // Border box "Live Trading" ikut warna sinyal yang dipilih - hijau kalau
-    // BUY, merah kalau SELL, netral kalau belum ada yang dipilih.
+    // Tandai dropdown kalau arahnya sedang dipaksa berlawanan dengan sinyal.
+    psimDirOverrideSel.classList.toggle('dipaksa', arahDipaksaBerlawanan(psimSelectedCandidate));
+    // Border box "Live Trading" ikut arah EFEKTIF (hasil override), bukan arah
+    // sinyal asli - supaya warnanya cocok dengan order yang benar-benar dikirim.
     liveTradeBoxEl.classList.remove('buy', 'sell');
     if(psimSelectedCandidate){
-      liveTradeBoxEl.classList.add(psimSelectedCandidate.signal === 'SELL' ? 'sell' : 'buy');
+      liveTradeBoxEl.classList.add(getArahEfektif(psimSelectedCandidate) === 'SELL' ? 'sell' : 'buy');
     }
     if(!psimSelectedCandidate){
       // Belum ada sinyal dipilih - kosongkan total tanpa kotak/border, biar
@@ -5578,18 +5623,40 @@
       return;
     }
     psimPreviewEl.classList.remove('es-sim-preview-hidden');
-    const c = psimSelectedCandidate;
+    // Seluruh preview memakai arah EFEKTIF - jadi angka yang ditampilkan sama
+    // persis dengan order yang nanti benar-benar dikirim.
+    const c = candDenganArah(psimSelectedCandidate);
     const entryPrice = c.price;
-    const { sl, tp, isManualTp } = getEffectiveSlTp(c);
+    const { sl, tp } = getEffectiveSlTp(c);
     if(sl===null || tp===null){
       psimPreviewEl.innerHTML = `<div class="es-sim-preview-empty">Sinyal ini tidak punya level SL/TP otomatis (bukan dari checklist atau grid cross) - isi dulu "SL Manual" &amp; "TP Manual" di atas.</div>`;
+      return;
+    }
+    // Kalau arah dipaksa berlawanan, level SL/TP bawaan sinyal jadi terbalik
+    // posisinya (mis. SL sinyal SELL ada di ATAS harga - untuk BUY itu salah).
+    // Hentikan di sini dengan instruksi jelas, jangan tampilkan angka menyesatkan.
+    const levelValid = c.signal==='BUY' ? (sl < entryPrice && tp > entryPrice)
+                                        : (sl > entryPrice && tp < entryPrice);
+    if(!levelValid){
+      psimPreviewEl.innerHTML = `<div class="es-arah-warning">
+        Arah dipaksa <strong>${c.signal}</strong> (sinyal aslinya ${psimSelectedCandidate.signal}),
+        jadi level SL/TP bawaan sinyal tidak berlaku lagi.<br>
+        Isi <strong>SL Manual</strong> &amp; <strong>TP Manual</strong> sesuai arah ${c.signal}:
+        ${c.signal==='BUY'
+          ? 'SL di <strong>bawah</strong> harga ($'+fmtPrice(entryPrice)+') dan TP di <strong>atas</strong>nya.'
+          : 'SL di <strong>atas</strong> harga ($'+fmtPrice(entryPrice)+') dan TP di <strong>bawah</strong>nya.'}
+      </div>`;
       return;
     }
     const riskDist = Math.abs(entryPrice - sl);
     const tp1 = tp;
     // TP2 (tier kedua) cuma relevan kalau TP-nya otomatis (2x risk dari SL) -
     // kalau TP manual, anggap satu target saja, tp2 disamakan dengan tp1.
-    const tp2 = isManualTp ? tp1 : (c.signal==='BUY' ? entryPrice + riskDist*2 : entryPrice - riskDist*2);
+    // TP2 SELALU dihitung 2x jarak risiko - rumus yang sama persis dipakai saat
+    // mengirim order live (lihat sendLiveTrade). Dulu di sini TP2 disamakan
+    // dengan TP1 kalau TP diisi manual, padahal order yang dikirim tetap
+    // memasang TP2 di 2R: preview jadi berbeda dari kenyataan.
+    const tp2 = c.signal==='BUY' ? entryPrice + riskDist*2 : entryPrice - riskDist*2;
 
     const margin = currentPsimMargin();
     const leverage = currentPsimLeverage();
@@ -5638,7 +5705,7 @@
       return;
     }
     const entryPrice = cand.price;
-    const { sl, tp, isManualTp } = getEffectiveSlTp(cand);
+    const { sl, tp } = getEffectiveSlTp(cand);
     if(sl===null || tp===null){
       priorityStatusEl.classList.add('error');
       priorityStatusEl.textContent = `Sinyal ini tidak punya SL/TP otomatis - isi dulu "SL Manual" & "TP Manual" sebelum Open Posisi.`;
@@ -5654,7 +5721,9 @@
 
     const riskDist = Math.abs(entryPrice - sl);
     const tp1 = tp;
-    const tp2 = isManualTp ? tp1 : (cand.signal==='BUY' ? entryPrice + riskDist*2 : entryPrice - riskDist*2);
+    // Disamakan dengan preview & order live: TP2 selalu 2x jarak risiko, supaya
+    // posisi simulasi berperilaku sama dengan posisi live yang sebenarnya.
+    const tp2 = cand.signal==='BUY' ? entryPrice + riskDist*2 : entryPrice - riskDist*2;
     openPrioritySimPosition(key, cand.symbol, cand.tfLabel, cand.tfValue, cand.signal, entryPrice, sl, tp1, tp2, Date.now());
     renderPrioritySimUI(window.__esLastTickers||{});
     priorityStatusEl.classList.remove('error');
@@ -6235,6 +6304,7 @@
     }
   });
   psimSignalSelect.addEventListener('change', ()=> selectPsimSignalByUid(psimSignalSelect.value));
+  psimDirOverrideSel.addEventListener('change', renderPsimPreview);
   psimManualSlInput.addEventListener('input', renderPsimPreview);
   psimManualTpInput.addEventListener('input', renderPsimPreview);
   psimOpenBtn.addEventListener('click', ()=>{
@@ -6243,7 +6313,7 @@
       priorityStatusEl.textContent = 'Pilih sinyal dulu di "Sinyal Terpilih" sebelum Open Posisi.';
       return;
     }
-    handlePriorityTradeClick(psimSelectedCandidate);
+    handlePriorityTradeClick(candDenganArah(psimSelectedCandidate));
   });
   psimModalInput.addEventListener('input', renderPsimPreview);
   psimLeverageInput.addEventListener('input', renderPsimPreview);
@@ -6283,7 +6353,7 @@
       liveTradeStatusEl.textContent = 'Pilih sinyal dulu di "Sinyal Terpilih" sebelum kirim order.';
       return;
     }
-    sendLiveTrade(psimSelectedCandidate);
+    sendLiveTrade(candDenganArah(psimSelectedCandidate));
   });
   liveBackendUrlInput.addEventListener('change', ()=>{ saveLiveTradeConfig(); detectLiveEnv(); });
   liveAppTokenInput.addEventListener('change', saveLiveTradeConfig);
