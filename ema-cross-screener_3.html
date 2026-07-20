@@ -109,8 +109,54 @@
   }
   .es-econ-calendar-body{
     flex:1;
-    overflow:hidden;
+    overflow-y:auto;
+    overflow-x:hidden;
   }
+  .es-econ-head-row{
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+  }
+  .es-econ-filter{
+    background: var(--panel-2); border:1px solid var(--border); color: var(--muted);
+    font-family: var(--font-mono); font-size:10px; padding:2px 6px; border-radius:6px;
+    cursor:pointer; outline:none;
+  }
+  /* Hitung mundur ke rilis dampak-tinggi berikutnya */
+  .es-econ-next{
+    padding:8px 12px; border-bottom:1px solid var(--border);
+    font-family: var(--font-mono); font-size:10.5px; line-height:1.55; flex-shrink:0;
+  }
+  .es-econ-next.siaga{ background: rgba(192,90,78,0.14); }
+  .es-econ-next b{ color: var(--text); }
+  .es-econ-next .mundur{ color: var(--gold); font-weight:700; }
+  .es-econ-next .siaga-teks{ color: var(--bear); font-weight:700; }
+  .es-econ-day{
+    padding:5px 12px; background: var(--panel-2);
+    font-family: var(--font-mono); font-size:10px; color: var(--muted);
+    position:sticky; top:0; z-index:1;
+  }
+  .es-econ-item{
+    padding:7px 12px; border-bottom:1px solid var(--border);
+    font-family: var(--font-mono); font-size:10.5px; line-height:1.5;
+  }
+  .es-econ-item.lewat{ opacity:.45; }
+  .es-econ-item.high{ border-left:2px solid var(--bear); }
+  .es-econ-item.medium{ border-left:2px solid var(--gold); }
+  .es-econ-item.low{ border-left:2px solid var(--border); }
+  .es-econ-item.holiday{ border-left:2px solid var(--dim); }
+  .es-econ-item-top{ display:flex; align-items:baseline; gap:6px; }
+  .es-econ-jam{ color: var(--gold); flex-shrink:0; }
+  .es-econ-cur{ color: var(--muted); flex-shrink:0; }
+  .es-econ-judul{ color: var(--text); }
+  .es-econ-angka{ display:flex; gap:10px; margin-top:3px; color: var(--muted); flex-wrap:wrap; }
+  .es-econ-angka b{ color: var(--text); }
+  .es-econ-angka .naik{ color: var(--bull); }
+  .es-econ-angka .turun{ color: var(--bear); }
+  .es-econ-kejut{ margin-top:2px; font-size:10px; }
+  .es-econ-status{
+    padding:10px 12px; font-family: var(--font-mono); font-size:10.5px;
+    color: var(--muted); line-height:1.6;
+  }
+  .es-econ-status .err{ color: var(--bear); }
   @media (max-width: 700px){
     .es-econ-calendar-content{ width: 260px; height: 360px; }
     .es-econ-calendar-panel{ top:70px; right:8px; }
@@ -1744,7 +1790,17 @@
       <span class="es-econ-calendar-trigger-label">News</span>
     </div>
     <div class="es-econ-calendar-content">
-      <div class="es-econ-calendar-header">Kalender Ekonomi</div>
+      <div class="es-econ-calendar-header">
+        <div class="es-econ-head-row">
+          <span>Kalender Ekonomi</span>
+          <select class="es-econ-filter" id="esEconFilter">
+            <option value="high" selected>Dampak Tinggi</option>
+            <option value="medium">Tinggi + Sedang</option>
+            <option value="all">Semua</option>
+          </select>
+        </div>
+      </div>
+      <div class="es-econ-next" id="esEconNext"></div>
       <div class="es-econ-calendar-body" id="esEconCalendarBody"></div>
     </div>
   </div>
@@ -7038,24 +7094,178 @@
   loadLiveTradeConfig();
   detectLiveEnv();
 
+  // ═══════════════════════════════════════════════════════
+  // ████████  KALENDER EKONOMI (NFP / CPI / PPI / FOMC / dll)  ████████
+  // ═══════════════════════════════════════════════════════
+  // Data JSON diambil lewat backend sendiri (/api/news) - penyedia kalender
+  // memblokir permintaan langsung dari browser, dan lewat backend datanya
+  // di-cache 15 menit. Kalau backend belum dipasang / tidak bisa dihubungi,
+  // otomatis jatuh balik ke widget TradingView lama supaya panel News tidak
+  // pernah kosong.
+  const ECON_FILTER_KEY = 'emaScreenerEconFilter_v1';
+  const ECON_REFRESH_MS = 10 * 60 * 1000;   // ambil ulang tiap 10 menit
+  const ECON_SIAGA_MENIT = 60;              // <60 menit sebelum rilis = zona siaga
+  let econEvents = null;
+  let econGagal = false;
+
+  const econFilterSel = document.getElementById('esEconFilter');
+  const econNextEl = document.getElementById('esEconNext');
+  const econBodyEl = document.getElementById('esEconCalendarBody');
+
+  try{
+    const f = localStorage.getItem(ECON_FILTER_KEY);
+    if(f && econFilterSel) econFilterSel.value = f;
+  }catch(e){}
+
   function loadEconCalendarWidget(){
-    const container = document.getElementById('esEconCalendarBody');
-    container.innerHTML = '';
+    econBodyEl.innerHTML = '';
+    if(econNextEl) econNextEl.style.display = 'none';
+    if(econFilterSel) econFilterSel.style.display = 'none';
     const script = document.createElement('script');
     script.type = 'text/javascript';
     script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-events.js';
     script.async = true;
     script.innerHTML = JSON.stringify({
-      width: '100%',
-      height: '100%',
-      colorTheme: 'dark',
-      isTransparent: false,
-      locale: 'en',
-      importanceFilter: '-1,0,1',
-      currencyFilter: 'USD'
+      width: '100%', height: '100%', colorTheme: 'dark', isTransparent: false,
+      locale: 'en', importanceFilter: '-1,0,1', currencyFilter: 'USD'
     });
-    container.appendChild(script);
+    econBodyEl.appendChild(script);
   }
+
+  function econDampakLolos(dampak){
+    const mode = econFilterSel ? econFilterSel.value : 'high';
+    if(mode === 'all') return true;
+    if(mode === 'medium') return dampak === 'high' || dampak === 'medium';
+    return dampak === 'high';
+  }
+
+  function econFmtSelisih(ms){
+    if(ms < 0) return null;
+    const menit = Math.floor(ms / 60000);
+    const jam = Math.floor(menit / 60);
+    const hari = Math.floor(jam / 24);
+    if(hari >= 1) return hari + 'h ' + (jam % 24) + 'j';
+    if(jam >= 1)  return jam + 'j ' + (menit % 60) + 'm';
+    return menit + 'm';
+  }
+
+  // Kejutan = actual - forecast. Inilah yang menggerakkan harga, bukan angka
+  // actual-nya sendiri. Hanya dihitung kalau KEDUANYA angka - kalau salah satu
+  // kosong, tidak ada yang bisa disimpulkan.
+  function econKejutan(e){
+    if(e.actualNum === null || e.actualNum === undefined) return null;
+    if(e.forecastNum === null || e.forecastNum === undefined) return null;
+    const beda = e.actualNum - e.forecastNum;
+    if(beda === 0) return { arah: 'sama', teks: 'Sesuai perkiraan' };
+    const persen = e.forecastNum !== 0 ? Math.abs(beda / e.forecastNum) * 100 : null;
+    return {
+      arah: beda > 0 ? 'naik' : 'turun',
+      teks: (beda > 0 ? 'Di ATAS perkiraan' : 'Di BAWAH perkiraan')
+            + (persen !== null && isFinite(persen) ? ' (' + persen.toFixed(1) + '%)' : '')
+    };
+  }
+
+  function renderEconNext(){
+    if(!econNextEl || !econEvents) return;
+    const now = Date.now();
+    const berikut = econEvents.find(e => e.dampak === 'high' && e.waktu > now);
+    if(!berikut){
+      econNextEl.className = 'es-econ-next';
+      econNextEl.innerHTML = 'Tidak ada rilis dampak tinggi tersisa minggu ini.';
+      return;
+    }
+    const sisa = berikut.waktu - now;
+    const siaga = sisa <= ECON_SIAGA_MENIT * 60000;
+    econNextEl.className = 'es-econ-next' + (siaga ? ' siaga' : '');
+    const jam = new Date(berikut.waktu).toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'});
+    econNextEl.innerHTML =
+      'Berikutnya: <b>' + berikut.judul + '</b> (' + berikut.mataUang + ') pukul ' + jam
+      + '<br>Hitung mundur: <span class="mundur">' + econFmtSelisih(sisa) + '</span>'
+      + (siaga ? '<br><span class="siaga-teks">&#9888; Hindari buka posisi baru sekarang</span>' : '');
+  }
+
+  function renderEconList(){
+    if(!econEvents) return;
+    const now = Date.now();
+    const tampil = econEvents.filter(e => econDampakLolos(e.dampak));
+    if(tampil.length === 0){
+      econBodyEl.innerHTML = '<div class="es-econ-status">Tidak ada event yang cocok dengan filter ini.</div>';
+      return;
+    }
+    let html = '', hariTerakhir = '';
+    tampil.forEach(e => {
+      const d = new Date(e.waktu);
+      const hari = d.toLocaleDateString('id-ID', {weekday:'long', day:'2-digit', month:'short'});
+      if(hari !== hariTerakhir){
+        html += '<div class="es-econ-day">' + hari + '</div>';
+        hariTerakhir = hari;
+      }
+      const lewat = e.waktu < now;
+      const jam = d.toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'});
+      const kj = econKejutan(e);
+      const angka = [];
+      if(e.actual)   angka.push('<span>Act <b>' + e.actual + '</b></span>');
+      if(e.forecast) angka.push('<span>Fcst <b>' + e.forecast + '</b></span>');
+      if(e.previous) angka.push('<span>Prev <b>' + e.previous + '</b></span>');
+      const kelasKejut = kj ? (kj.arah === 'naik' ? 'naik' : kj.arah === 'turun' ? 'turun' : '') : '';
+      html += '<div class="es-econ-item ' + e.dampak + (lewat ? ' lewat' : '') + '">'
+        + '<div class="es-econ-item-top">'
+        +   '<span class="es-econ-jam">' + jam + '</span>'
+        +   '<span class="es-econ-cur">' + e.mataUang + '</span>'
+        +   '<span class="es-econ-judul">' + e.judul + '</span>'
+        + '</div>'
+        + (angka.length ? '<div class="es-econ-angka">' + angka.join('') + '</div>' : '')
+        + (kj ? '<div class="es-econ-kejut"><span class="' + kelasKejut + '">' + kj.teks + '</span></div>' : '')
+        + (!lewat && !e.actual ? '<div class="es-econ-kejut">Rilis dalam ' + (econFmtSelisih(e.waktu - now) || '-') + '</div>' : '')
+        + '</div>';
+    });
+    econBodyEl.innerHTML = html;
+  }
+
+  function renderEcon(){ renderEconNext(); renderEconList(); }
+
+  function ambilEconCalendar(){
+    // Backend URL diambil dari kolom konfigurasi Live Trading yang sudah ada -
+    // endpoint /api/news memang tidak butuh token, tapi alamatnya sama.
+    const base = liveBackendUrlInput && liveBackendUrlInput.value.trim()
+      ? liveBackendUrlInput.value.trim().replace(/\/+$/, '')
+      : null;
+    if(!base){ loadEconCalendarWidget(); return; }
+    if(!econEvents) econBodyEl.innerHTML = '<div class="es-econ-status">Memuat kalender...</div>';
+    fetch(base + '/api/news')
+      .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
+      .then(d => {
+        if(!d || !Array.isArray(d.events)) throw new Error('format tidak dikenali');
+        econEvents = d.events;
+        econGagal = false;
+        if(econNextEl) econNextEl.style.display = '';
+        if(econFilterSel) econFilterSel.style.display = '';
+        renderEcon();
+      })
+      .catch(function(){
+        // Sekali gagal -> pakai widget lama sebagai cadangan, jangan biarkan
+        // panel News kosong. Hanya dilakukan sekali supaya widget tidak
+        // dimuat ulang tiap siklus.
+        if(!econGagal){
+          econGagal = true;
+          loadEconCalendarWidget();
+        }
+      });
+  }
+
+  if(econFilterSel){
+    econFilterSel.addEventListener('change', function(){
+      try{ localStorage.setItem(ECON_FILTER_KEY, econFilterSel.value); }catch(e){}
+      renderEconList();
+    });
+    // Panel menutup kalau ada klik di luar; klik pada dropdown ini jangan
+    // dianggap "klik di luar".
+    econFilterSel.addEventListener('click', function(e){ e.stopPropagation(); });
+  }
+
+  // Hitung mundur diperbarui tiap 30 detik supaya angkanya hidup.
+  setInterval(function(){ if(econEvents) renderEconNext(); }, 30000);
+  setInterval(ambilEconCalendar, ECON_REFRESH_MS);
 
   const econCalendarPanel = document.getElementById('esEconCalendarPanel');
   const econCalendarTrigger = document.getElementById('esEconCalendarTrigger');
@@ -7514,7 +7724,7 @@
     }catch(e){ /* gagal ambil income - coba lagi di siklus berikutnya */ }
   }, 12000);
 
-  loadEconCalendarWidget();
+  ambilEconCalendar();
   // Sinyal Prioritas ICT dimatikan sementara (section disembunyikan di HTML) -
   // scan-nya lumayan berat (2x fetch klines per koin x semua koin aktif) dan
   // sempat mengganggu. Kalau mau diaktifkan lagi: hapus display:none di
