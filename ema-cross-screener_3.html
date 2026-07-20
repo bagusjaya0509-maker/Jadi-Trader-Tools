@@ -1757,13 +1757,13 @@
         <select id="esPantauTf">
           <option value="15m">TF 15 Menit</option>
           <option value="30m">TF 30 Menit</option>
-          <option value="1h" selected>TF 1 Jam</option>
-          <option value="4h">TF 4 Jam</option>
+          <option value="1h">TF 1 Jam</option>
+          <option value="4h" selected>TF 4 Jam</option>
           <option value="1d">TF Daily</option>
         </select>
         <select id="esPantauRezim">
           <option value="all" selected>Semua Arah</option>
-          <option value="align">Searah Rezim BTC</option>
+          <option value="align">Searah Stochastic BTC</option>
           <option value="oversold">Hanya Oversold (potensi BUY)</option>
           <option value="overbought">Hanya Overbought (potensi SELL)</option>
         </select>
@@ -4237,13 +4237,21 @@
     try{
       const tickers = await loadTickers();
 
-      // Rezim BTC dibaca dari 4H - dipakai kalau filter "Searah Rezim BTC" dipilih.
-      let regime = { label:'-', bias:'both' };
+      // Rezim BTC di section ini dibaca dari STOCHASTIC BTC di TF yang sama -
+      // bukan dari tren EMA - supaya sebanding apel ke apel dengan kondisi yang
+      // dipakai buat menyaring koinnya.
+      let btcKondisi = null, btcK = null;
       if(mode === 'align'){
-        const btc4h = await fetchKlines('BTCUSDT', '4h', 300);
-        regime = classifyBtcRegime(btc4h.closes);
-        const rc = regime.label.includes('Bullish') ? 'bull' : regime.label.includes('Bearish') ? 'bear' : 'neutral';
-        pantauRegimeBadge.innerHTML = `Rezim: <span class="es-ai-regime-badge ${rc}">${regime.label}</span>`;
+        const btc = await fetchKlines('BTCUSDT', tf, 200);
+        const stBtc = cekStochEkstrem(btc.highs, btc.lows, btc.closes);
+        const stAll = stochastic(btc.highs, btc.lows, btc.closes, 14, 3, 3);
+        btcK = stAll.k[stAll.k.length-1];
+        btcKondisi = stBtc ? stBtc.kondisi : null;
+        const rc = btcKondisi === 'oversold' ? 'bull' : btcKondisi === 'overbought' ? 'bear' : 'neutral';
+        const teks = btcKondisi === 'oversold' ? 'BTC Oversold' :
+                     btcKondisi === 'overbought' ? 'BTC Overbought' : 'BTC Netral';
+        pantauRegimeBadge.innerHTML = `Rezim: <span class="es-ai-regime-badge ${rc}">${teks}`
+          + (btcK==null ? '' : ` (K ${btcK.toFixed(1)})`) + `</span>`;
       }
 
       const settled = await mapLimited(activeSymbols, SCAN_CONCURRENCY,
@@ -4257,9 +4265,10 @@
       if(mode === 'oversold')       hasil = semua.filter(c=>c.kondisi==='oversold');
       else if(mode === 'overbought') hasil = semua.filter(c=>c.kondisi==='overbought');
       else if(mode === 'align'){
-        if(regime.bias === 'long')       hasil = semua.filter(c=>c.signal==='BUY');
-        else if(regime.bias === 'short') hasil = semua.filter(c=>c.signal==='SELL');
-        // rezim sideways -> tidak menyaring apa pun
+        // BTC overbought -> hanya koin overbought. BTC oversold -> hanya oversold.
+        // Kalau BTC sendiri tidak ekstrem, tidak ada rezim untuk diikuti, jadi
+        // tidak ada yang lolos - itu memang jawaban yang jujur, bukan bug.
+        hasil = btcKondisi ? semua.filter(c=>c.kondisi===btcKondisi) : [];
       }
 
       // Yang %K-nya sudah mulai berbalik ditaruh di atas - lebih layak dipantau
@@ -4271,8 +4280,13 @@
       );
 
       if(hasil.length === 0){
-        pantauStatusEl.textContent = `Tidak ada koin dengan Stochastic ekstrem (K ≤ 20 atau ≥ 80) di TF ${PANTAU_TF_LABEL[tf]||tf}`
-          + (mode==='align' ? ` yang searah rezim ${regime.label}` : '') + ` saat ini.`;
+        if(mode === 'align' && !btcKondisi){
+          pantauStatusEl.textContent = `BTC sendiri sedang tidak ekstrem (K ${btcK==null?'-':btcK.toFixed(1)}) di TF ${PANTAU_TF_LABEL[tf]||tf}, `
+            + `jadi belum ada rezim yang bisa diikuti. Ganti ke "Semua Arah" kalau tetap mau lihat koin yang ekstrem sendiri-sendiri.`;
+        } else {
+          pantauStatusEl.textContent = `Tidak ada koin dengan Stochastic ekstrem (K ≤ 20 atau ≥ 80) di TF ${PANTAU_TF_LABEL[tf]||tf}`
+            + (mode==='align' ? ` yang ikut ${btcKondisi==='oversold'?'oversold':'overbought'} seperti BTC` : '') + ` saat ini.`;
+        }
         return;
       }
 
