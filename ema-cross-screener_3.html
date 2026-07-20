@@ -837,19 +837,6 @@
   .es-priority-note strong{ color: var(--text); }
 
   /* ===== Sinyal Pantau Kripto ===== */
-  .es-pantau-note{
-    font-family: var(--font-mono);
-    font-size:10.5px;
-    line-height:1.6;
-    color: var(--muted);
-    background: var(--panel);
-    border:1px solid var(--border);
-    border-left:2px solid #7BA0FF;
-    border-radius:6px;
-    padding:8px 10px;
-    margin:8px 0 4px;
-  }
-  .es-pantau-note strong{ color: var(--text); }
   .es-pantau-badge{
     font-family: var(--font-mono);
     font-weight:700;
@@ -874,19 +861,6 @@
   .es-stoch-val.ob{ background: var(--bear-dim); color: var(--bear); }
 
   /* ===== Sinyal Prioritas AI ===== */
-  .es-ai-method-note{
-    font-family: var(--font-mono);
-    font-size:10.5px;
-    line-height:1.6;
-    color: var(--muted);
-    background: var(--panel);
-    border:1px solid var(--border);
-    border-left:2px solid var(--gold);
-    border-radius:6px;
-    padding:8px 10px;
-    margin:8px 0 4px;
-  }
-  .es-ai-method-note strong{ color: var(--gold); }
   .es-ai-regime{
     font-family: var(--font-mono);
     font-size:10.5px;
@@ -1749,12 +1723,6 @@
       </button>
     </div>
     <div class="es-section-body">
-      <div class="es-pantau-note">
-        Koin yang Stochastic-nya masuk area ekstrem: <strong>Oversold (K &le; 20)</strong> dipantau untuk
-        potensi BUY, <strong>Overbought (K &ge; 80)</strong> untuk potensi SELL.
-        Ini <strong>sinyal PANTAU</strong>, bukan aba-aba entry &mdash; stochastic ekstrem bisa bertahan lama
-        selama tren masih kuat. Tunggu konfirmasi pembalikan sebelum masuk.
-      </div>
       <div class="es-priority-controls">
         <select id="esPantauTf">
           <option value="15m">TF 15 Menit</option>
@@ -1764,8 +1732,8 @@
           <option value="1d">TF Daily</option>
         </select>
         <select id="esPantauRezim">
-          <option value="all" selected>Semua Arah</option>
-          <option value="align">Searah Stochastic BTC</option>
+          <option value="all">Semua Arah</option>
+          <option value="align" selected>Searah Stochastic BTC</option>
           <option value="oversold">Hanya Oversold (potensi BUY)</option>
           <option value="overbought">Hanya Overbought (potensi SELL)</option>
         </select>
@@ -1900,11 +1868,6 @@
       </button>
     </div>
     <div class="es-section-body">
-      <div class="es-ai-method-note">
-        Model konfluensi multi-timeframe: rezim BTC (makro) &rarr; tren 4H &rarr; pullback ke zona nilai 1H &rarr;
-        momentum berbalik &rarr; kekuatan relatif vs BTC. Hanya setup skor <strong>&ge;60</strong> yang ditampilkan,
-        diurutkan dari skor tertinggi (maks 5 koin).
-      </div>
       <div class="es-priority-controls">
         <select id="esPriorityAiBias">
           <option value="auto" selected>Ikuti Rezim BTC (disarankan)</option>
@@ -6831,7 +6794,7 @@
   // Keduanya juga tidak jalan kalau section-nya sedang dilipat (dijaga di
   // dalam fungsinya masing-masing).
   if(priorityAiBiasSel.value === 'auto') findPriorityAiSignals();
-  if(pantauTfSel.value === '4h' && pantauRezimSel.value === 'all') cariSinyalPantau();
+  if(pantauTfSel.value === '4h' && pantauRezimSel.value === 'align') cariSinyalPantau();
 
   // Posisi SIMULASI cukup ikut siklus scan 90 detik yang sudah ada (scan()
   // sendiri sudah panggil monitorPrioritySimPositions + renderPrioritySimUI
