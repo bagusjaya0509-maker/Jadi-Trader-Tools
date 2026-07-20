@@ -197,6 +197,15 @@
       <option value="1000">1000 bar 1H (~41 hari)</option>
     </select>
   </label>
+  <label>Metode Entry
+    <select id="btMetode">
+      <option value="nopartial" selected>TP1 &amp; TP2 (SL ke BE di TP1, tanpa partial 50%)</option>
+      <option value="partial">TP1 &amp; TP2 (partial 50% di TP1, SL ke BE)</option>
+      <option value="tp1only">SL &amp; TP1 saja (tanpa TP2)</option>
+      <option value="tp2only">SL &amp; TP2 saja (tanpa TP1)</option>
+      <option value="slplus">SL+ (partial 50% di TP1, lalu SL naik tiap kelipatan risk)</option>
+    </select>
+  </label>
   <div class="bt-strats">
     <label class="bt-strat-check"><input type="checkbox" id="btStratBbma" checked> BBMA</label>
     <label class="bt-strat-check"><input type="checkbox" id="btStratSnr" checked> SNR</label>
@@ -545,7 +554,17 @@
   // ═══════════════════════════════════════════════════════
   // Aturan: SL / TP1 / TP2, TANPA partial. Begitu TP1 tersentuh, SL dipindah
   // ke harga entry (breakeven) dan posisi PENUH dibiarkan jalan mengejar TP2.
-  function simulasikanTrade(d, iEntry, arah, sl, strategi, symbol){
+  // Metode entry - persis mengikuti opsi "Metode Entry (Live)" di crypto screener.
+  const METODE_LABEL = {
+    nopartial: 'TP1 & TP2 (SL ke BE di TP1, tanpa partial)',
+    partial:   'TP1 & TP2 (partial 50% di TP1, SL ke BE)',
+    tp1only:   'SL & TP1 saja',
+    tp2only:   'SL & TP2 saja',
+    slplus:    'SL+ (partial 50% di TP1, SL naik tiap 1R)'
+  };
+
+  function simulasikanTrade(d, iEntry, arah, sl, strategi, symbol, metode){
+    metode = metode || 'nopartial';
     const { times, highs, lows, closes } = d;
     const entry = closes[iEntry];
     const risk = Math.abs(entry - sl);
@@ -558,31 +577,70 @@
     const tp2 = arah==='BUY' ? entry + risk*2 : entry - risk*2;
     const qty = (MODAL_PER_POSISI * LEVERAGE) / entry;
 
-    let tp1Kena = false;
-    let slAktif = sl;
+    const pakaiTp1 = metode !== 'tp2only';               // tp2only lewati TP1 sepenuhnya
+    const pakaiTp2 = metode !== 'tp1only';               // tp1only tutup penuh di TP1
+    const partial  = metode === 'partial' || metode === 'slplus';
+    const ratchet  = metode === 'slplus';
+
+    // Kalau partial, setengah qty dilepas di TP1 dan sisanya jalan terus. qtySisa
+    // baru menyusut SETELAH TP1 benar-benar kena - kalau SL duluan, seluruh qty
+    // masih terbuka dan rugi dihitung penuh.
+    const qtyTp1  = partial ? qty*0.5 : 0;
+    let qtySisa   = qty;
+
+    let plPartial = 0;                                    // PnL kotor leg TP1
+    let feeAkum   = entry*qty*FEE_PER_SISI;               // fee masuk, qty penuh
+    let tp1Kena   = false;
+    let slAktif   = sl;
+    // SL+ : setelah TP1, tiap kali harga menyentuh level 1R berikutnya, SL
+    // dikunci naik ke level 1R sebelumnya. Tidak ada TP2 - posisi jalan sampai
+    // SL yang sudah naik itu kena.
+    let kunci = tp1, berikutnya = tp2;
 
     for(let j=iEntry+1; j<d.closes.length; j++){
       const hi = highs[j], lo = lows[j];
+      const kenaSl  = arah==='BUY' ? lo <= slAktif : hi >= slAktif;
+      const kenaTp1 = arah==='BUY' ? hi >= tp1     : lo <= tp1;
+      const kenaTp2 = arah==='BUY' ? hi >= tp2     : lo <= tp2;
 
-      if(arah==='BUY'){
-        // Pesimis: kalau satu bar menyentuh SL dan TP sekaligus, SL dianggap duluan.
-        if(lo <= slAktif) return tutup(j, slAktif, tp1Kena ? 'BE setelah TP1' : 'Stop Loss');
-        if(!tp1Kena && hi >= tp1){ tp1Kena = true; slAktif = entry; }
-        if(tp1Kena && hi >= tp2) return tutup(j, tp2, 'TP2');
-      } else {
-        if(hi >= slAktif) return tutup(j, slAktif, tp1Kena ? 'BE setelah TP1' : 'Stop Loss');
-        if(!tp1Kena && lo <= tp1){ tp1Kena = true; slAktif = entry; }
-        if(tp1Kena && lo <= tp2) return tutup(j, tp2, 'TP2');
+      // Pesimis: kalau satu bar menyentuh SL dan TP sekaligus, SL dianggap duluan.
+      if(kenaSl){
+        let alasan;
+        if(ratchet && slAktif !== sl && slAktif !== entry) alasan = 'SL+ terkunci profit';
+        else if(tp1Kena) alasan = 'BE setelah TP1';
+        else alasan = 'Stop Loss';
+        return tutup(j, slAktif, alasan);
+      }
+
+      if(pakaiTp1 && !tp1Kena && kenaTp1){
+        tp1Kena = true;
+        if(!pakaiTp2) return tutup(j, tp1, 'TP1');       // tp1only: selesai di sini
+        slAktif = entry;                                  // SL ke BE
+        if(partial){
+          plPartial += (arah==='BUY' ? tp1-entry : entry-tp1) * qtyTp1;
+          feeAkum   += tp1*qtyTp1*FEE_PER_SISI;           // fee keluar leg TP1
+          qtySisa   -= qtyTp1;                            // separuh posisi sudah dilepas
+        }
+      }
+
+      if(pakaiTp2 && (!pakaiTp1 || tp1Kena) && kenaTp2){
+        if(!ratchet) return tutup(j, tp2, 'TP2');
+        // SL+ tidak menutup di TP2 - malah menaikkan SL lalu terus berjalan.
+        while(arah==='BUY' ? hi >= berikutnya : lo <= berikutnya){
+          slAktif    = kunci;
+          kunci      = berikutnya;
+          berikutnya = arah==='BUY' ? berikutnya + risk : berikutnya - risk;
+        }
       }
     }
     // Data habis, posisi masih terbuka -> tidak dihitung (tidak boleh menebak hasilnya)
     return null;
 
     function tutup(jExit, hargaExit, alasan){
-      const kotor = arah==='BUY' ? (hargaExit-entry)*qty : (entry-hargaExit)*qty;
-      const fee = (entry*qty + hargaExit*qty) * FEE_PER_SISI;
+      const kotor = plPartial + (arah==='BUY' ? (hargaExit-entry) : (entry-hargaExit)) * qtySisa;
+      const fee   = feeAkum + hargaExit*qtySisa*FEE_PER_SISI;
       return {
-        symbol, strategi, arah,
+        symbol, strategi, arah, metode,
         waktuEntry: times[iEntry], waktuExit: times[jExit],
         iEntry, iExit: jExit,
         entry, sl, tp1, tp2, exit: hargaExit,
@@ -653,6 +711,7 @@
   // ═══════════════════════════════════════════════════════
   const elCoins=document.getElementById('btCoins');
   const elBars=document.getElementById('btBars');
+  const elMetode=document.getElementById('btMetode');
   const elBbma=document.getElementById('btStratBbma');
   const elSnr=document.getElementById('btStratSnr');
   const elAi=document.getElementById('btStratAi');
@@ -820,6 +879,7 @@
     const jml = parseInt(elCoins.value,10);
     const bars = parseInt(elBars.value,10);
     const pakai = { bbma:elBbma.checked, snr:elSnr.checked, ai:elAi.checked };
+    const metode = elMetode.value;
     if(!pakai.bbma && !pakai.snr && !pakai.ai){
       elStatus.classList.add('error');
       elStatus.textContent = 'Pilih minimal satu strategi.';
@@ -876,21 +936,21 @@
           if(pakai.bbma && i > sibukSampai.bbma){
             const sig = sinyalBbma(d,i,pre);
             if(sig){
-              const t = simulasikanTrade(d,i,sig.arah,sig.sl,'bbma',daftar[s]);
+              const t = simulasikanTrade(d,i,sig.arah,sig.sl,'bbma',daftar[s],metode);
               if(t){ semuaTrade.push(t); sibukSampai.bbma = t.iExit; }
             }
           }
           if(pakai.snr && i > sibukSampai.snr){
             const sig = sinyalSnr(d,i,pre);
             if(sig){
-              const t = simulasikanTrade(d,i,sig.arah,sig.sl,'snr',daftar[s]);
+              const t = simulasikanTrade(d,i,sig.arah,sig.sl,'snr',daftar[s],metode);
               if(t){ semuaTrade.push(t); sibukSampai.snr = t.iExit; }
             }
           }
           if(pakai.ai && htf && i > sibukSampai.ai){
             const sig = sinyalAi(d,i,pre,htf);
             if(sig){
-              const t = simulasikanTrade(d,i,sig.arah,sig.sl,'ai',daftar[s]);
+              const t = simulasikanTrade(d,i,sig.arah,sig.sl,'ai',daftar[s],metode);
               if(t){ semuaTrade.push(t); sibukSampai.ai = t.iExit; }
             }
           }
@@ -915,6 +975,7 @@
 
       elStatus.textContent = semuaTrade.length
         ? `Selesai: ${semuaTrade.length} transaksi dari ${daftar.length - gagal} koin • periode ${periode}` +
+          ` • metode: ${METODE_LABEL[metode]}` +
           (gagal ? ` • ${gagal} koin gagal dimuat` : '') +
           ` • rezim BTC saat ini: ${rezim==='long'?'Bullish':rezim==='short'?'Bearish':'Sideways'}`
         : `Tidak ada satu pun sinyal yang memenuhi syarat pada ${daftar.length} koin & ${bars} bar terakhir.`;

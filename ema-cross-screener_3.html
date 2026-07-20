@@ -836,6 +836,41 @@
   }
   .es-priority-note strong{ color: var(--text); }
 
+  /* ===== Sinyal Pantau Kripto ===== */
+  .es-pantau-note{
+    font-family: var(--font-mono);
+    font-size:10.5px;
+    line-height:1.6;
+    color: var(--muted);
+    background: var(--panel);
+    border:1px solid var(--border);
+    border-left:2px solid #7BA0FF;
+    border-radius:6px;
+    padding:8px 10px;
+    margin:8px 0 4px;
+  }
+  .es-pantau-note strong{ color: var(--text); }
+  .es-pantau-badge{
+    font-family: var(--font-mono);
+    font-weight:700;
+    font-size:10px;
+    padding:3px 9px;
+    border-radius:6px;
+    background: rgba(123,160,255,0.18);
+    color:#7BA0FF;
+    letter-spacing:.03em;
+  }
+  .es-priority-card.pantau{ border-color: rgba(123,160,255,0.45); }
+  .es-stoch-val{
+    font-family: var(--font-mono);
+    font-size:10px;
+    padding:2px 7px;
+    border-radius:5px;
+    margin-left:auto;
+  }
+  .es-stoch-val.os{ background: var(--bull-dim); color: var(--bull); }
+  .es-stoch-val.ob{ background: var(--bear-dim); color: var(--bear); }
+
   /* ===== Sinyal Prioritas AI ===== */
   .es-ai-method-note{
     font-family: var(--font-mono);
@@ -1703,6 +1738,49 @@
        Diperlukan karena section yang disembunyikan hilang total (judul ikut
        hilang), jadi tidak ada lagi panah di tempat asalnya untuk diklik. -->
   <div class="es-hidden-sections" id="esHiddenSections"></div>
+
+  <div class="es-priority-section es-collapsible" data-section="pantau">
+    <div class="es-priority-header es-section-head">
+      <div class="es-priority-title">Sinyal Pantau Kripto</div>
+      <button type="button" class="es-section-toggle" title="Sembunyikan section">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+    </div>
+    <div class="es-section-body">
+      <div class="es-pantau-note">
+        Koin yang Stochastic-nya masuk area ekstrem: <strong>Oversold (K &le; 20)</strong> dipantau untuk
+        potensi BUY, <strong>Overbought (K &ge; 80)</strong> untuk potensi SELL.
+        Ini <strong>sinyal PANTAU</strong>, bukan aba-aba entry &mdash; stochastic ekstrem bisa bertahan lama
+        selama tren masih kuat. Tunggu konfirmasi pembalikan sebelum masuk.
+      </div>
+      <div class="es-priority-controls">
+        <select id="esPantauTf">
+          <option value="15m">TF 15 Menit</option>
+          <option value="30m">TF 30 Menit</option>
+          <option value="1h" selected>TF 1 Jam</option>
+          <option value="4h">TF 4 Jam</option>
+          <option value="1d">TF Daily</option>
+        </select>
+        <select id="esPantauRezim">
+          <option value="all" selected>Semua Arah</option>
+          <option value="align">Searah Rezim BTC</option>
+          <option value="oversold">Hanya Oversold (potensi BUY)</option>
+          <option value="overbought">Hanya Overbought (potensi SELL)</option>
+        </select>
+        <button id="esPantauBtn" class="es-priority-btn">Cari Sinyal Pantau</button>
+        <div class="es-symbol-manager es-symbol-manager-inline">
+          <button type="button" id="esPantauManagerBtn" class="es-symbol-manager-btn">
+            <span>Ganti Chart / Kelola Koin</span>
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="es-symbol-manager-dropdown" id="esPantauManagerDropdown"></div>
+        </div>
+        <div class="es-ai-regime" id="esPantauRegimeBadge"></div>
+      </div>
+      <div class="es-priority-grid" id="esPantauGrid"></div>
+      <div class="es-priority-status" id="esPantauStatus">Klik "Cari Sinyal Pantau" untuk memindai.</div>
+    </div>
+  </div>
 
   <div class="es-fav-cross-section es-collapsible" data-section="favcross">
     <div class="es-fav-title es-section-head">
@@ -2625,7 +2703,7 @@
   // biasa. Tiap sumber daftar ulang candidate-nya sendiri tiap kali pindai
   // ulang (entri lama dari sumber itu dihapus dulu supaya tidak menumpuk data basi).
   window.__esTradableSignals = window.__esTradableSignals || {};
-  const TRADABLE_SOURCE_LABEL = { priority:'Prioritas', favorite:'Favorit', cross:'Cross EMA', favcross:'Favorit Cross', ict:'Prioritas ICT', snr:'Prioritas SNR', ai:'Prioritas AI' };
+  const TRADABLE_SOURCE_LABEL = { priority:'Prioritas', favorite:'Favorit', cross:'Cross EMA', favcross:'Favorit Cross', ict:'Prioritas ICT', snr:'Prioritas SNR', ai:'Prioritas AI', pantau:'Pantau' };
   function tradableUid(source, symbol, tfValue){ return `${source}_${symbol}_${tfValue}`; }
   function registerTradableSignals(source, candidates){
     Object.keys(window.__esTradableSignals).forEach(k=>{
@@ -4030,6 +4108,230 @@
   // Tingkatan risk sama seperti Sinyal Prioritas BBMA: High = TF cepat (5m),
   // Medium = TF menengah (15m/30m - ditampilkan default biar tidak kebanyakan),
   // Low = TF lambat (4H).
+  // ═══════════════════════════════════════════════════════
+  // ████████  SINYAL PANTAU KRIPTO (STOCHASTIC EKSTREM)  ████████
+  // ═══════════════════════════════════════════════════════
+  // Bukan aba-aba entry - ini daftar PANTAU. Stochastic ekstrem menandakan
+  // harga sudah meregang, tapi di tren kuat kondisi ini bisa bertahan lama
+  // ("overbought bisa makin overbought"). Karena itu labelnya PANTAU, dan
+  // level SL/TP yang disediakan hanya ancang-ancang berbasis ATR.
+  const pantauTfSel = document.getElementById('esPantauTf');
+  const pantauRezimSel = document.getElementById('esPantauRezim');
+  const pantauBtn = document.getElementById('esPantauBtn');
+  const pantauGrid = document.getElementById('esPantauGrid');
+  const pantauStatusEl = document.getElementById('esPantauStatus');
+  const pantauManagerBtn = document.getElementById('esPantauManagerBtn');
+  const pantauManagerDropdown = document.getElementById('esPantauManagerDropdown');
+  const pantauRegimeBadge = document.getElementById('esPantauRegimeBadge');
+
+  const PANTAU_TF_LABEL = { '15m':'15m', '30m':'30m', '1h':'1H', '4h':'4H', '1d':'1D' };
+
+  function cekStochEkstrem(highs, lows, closes){
+    const st = stochastic(highs, lows, closes, 14, 3, 3);
+    const n = st.k.length;
+    const k = st.k[n-1], d = st.d[n-1], kPrev = st.k[n-2];
+    if(k === null || k === undefined) return null;
+
+    let kondisi = null;
+    if(k <= 20) kondisi = 'oversold';
+    else if(k >= 80) kondisi = 'overbought';
+    if(!kondisi) return null;
+
+    // Arah yang DIPANTAU = arah pembalikan yang mungkin terjadi.
+    const arah = kondisi === 'oversold' ? 'BUY' : 'SELL';
+    // Penanda tambahan: apakah %K sudah mulai berbalik meninggalkan area ekstrem?
+    // Ini yang membedakan "masih meluncur" dari "mulai ada tanda balik".
+    let mulaiBalik = false;
+    if(kPrev !== null && kPrev !== undefined){
+      mulaiBalik = kondisi === 'oversold' ? (k > kPrev) : (k < kPrev);
+    }
+    return { kondisi, arah, k, d, mulaiBalik };
+  }
+
+  async function cariPantauUntukSimbol(symbol, tickers, tf){
+    const { highs, lows, closes } = await fetchKlines(symbol, tf, 200);
+    if(closes.length < 40) return null;
+    const hasil = cekStochEkstrem(highs, lows, closes);
+    if(!hasil) return null;
+
+    const t = tickers[symbol];
+    const price = t ? parseFloat(t.lastPrice) : closes[closes.length-1];
+    const atrArr = atr(highs, lows, closes, 14);
+    const a = atrArr[atrArr.length-1] || 0;
+    if(!a) return null;
+
+    // Ancang-ancang level: SL di luar swing terakhir + bantalan ATR, TP 1:2.
+    const look = 12;
+    const swingLow  = Math.min.apply(null, lows.slice(-look));
+    const swingHigh = Math.max.apply(null, highs.slice(-look));
+    const sl = hasil.arah === 'BUY' ? swingLow - a*0.3 : swingHigh + a*0.3;
+    const risk = Math.abs(price - sl);
+    if(!(risk > 0)) return null;
+    const tp = hasil.arah === 'BUY' ? price + risk*2 : price - risk*2;
+
+    return {
+      symbol, signal: hasil.arah, price, sl, tp,
+      tfValue: tf, tfLabel: PANTAU_TF_LABEL[tf] || tf,
+      kondisi: hasil.kondisi, stochK: hasil.k, stochD: hasil.d,
+      mulaiBalik: hasil.mulaiBalik,
+      riskPct: (risk/price)*100
+    };
+  }
+
+  function renderPantauSignals(top){
+    window.__esLastPantauResults = top;
+    registerTradableSignals('pantau', top);
+    pantauGrid.innerHTML = top.map((c,i)=>{
+      const cls = c.arahCls = c.signal === 'BUY' ? 'buy' : 'sell';
+      const stochCls = c.kondisi === 'oversold' ? 'os' : 'ob';
+      const kondisiTeks = c.kondisi === 'oversold' ? 'Oversold' : 'Overbought';
+      const balikTeks = c.mulaiBalik
+        ? `<div class="es-priority-note">&check; %K mulai berbalik meninggalkan area ekstrem</div>`
+        : `<div class="es-priority-note">&#10007; %K belum berbalik &mdash; masih bisa lanjut meregang</div>`;
+      return `<div class="es-priority-card pantau ${cls}" data-symbol="${c.symbol}" data-tf="${c.tfValue}">
+        <div class="es-priority-card-top">
+          <span class="es-priority-rank">#${i+1}</span>
+          <span class="es-priority-symbol">${c.symbol.replace('USDT','')}</span>
+          <span class="es-pantau-badge">PANTAU ${c.signal}</span>
+          <span class="es-stoch-val ${stochCls}">K ${c.stochK.toFixed(1)}</span>
+        </div>
+        <div class="es-priority-tf">${kondisiTeks} &bull; TF ${c.tfLabel} &bull; Harga $${fmtPrice(c.price)}</div>
+        <div class="es-checklist">
+          <div class="es-check-row ok"><span class="es-check-icon">&check;</span> Stochastic ${kondisiTeks} (K ${c.stochK.toFixed(1)} / D ${c.stochD===null?'-':c.stochD.toFixed(1)})</div>
+        </div>
+        ${balikTeks}
+        <div class="es-priority-levels">
+          <div class="es-priority-level-row">Area Entri: <strong>$${fmtPrice(c.price)}</strong></div>
+          <div class="es-priority-level-row invalid">Invalid Level (SL): <strong>$${fmtPrice(c.sl)}</strong></div>
+          <div class="es-priority-level-row">Take Profit: <strong>TP1 $${fmtPrice(c.tp)}</strong></div>
+          <div class="es-priority-level-row">Risk: <strong>${c.riskPct.toFixed(2)}%</strong></div>
+        </div>
+        <button class="es-priority-trade-btn" type="button">Pilih Sinyal Ini</button>
+      </div>`;
+    }).join('');
+
+    pantauGrid.querySelectorAll('.es-priority-card').forEach((card,i)=>{
+      const cand = top[i];
+      card.addEventListener('click', (e)=>{
+        if(e.target.classList.contains('es-priority-trade-btn')) return;
+        openTradingView(cand.symbol, cand.tfValue);
+      });
+      card.querySelector('.es-priority-trade-btn').addEventListener('click', (e)=>{
+        e.stopPropagation();
+        selectTradableSignalByUid(tradableUid('pantau', cand.symbol, cand.tfValue));
+      });
+    });
+  }
+
+  async function cariSinyalPantau(){
+    if(isSectionCollapsed('pantau')) return; // section dilipat - hemat request
+    const tf = pantauTfSel.value;
+    const mode = pantauRezimSel.value;
+
+    pantauBtn.disabled = true;
+    pantauStatusEl.classList.remove('error');
+    pantauGrid.innerHTML = '';
+    pantauRegimeBadge.innerHTML = '';
+    pantauStatusEl.textContent = `Memindai ${activeSymbols.length} koin (TF ${PANTAU_TF_LABEL[tf]||tf})...`;
+
+    try{
+      const tickers = await loadTickers();
+
+      // Rezim BTC dibaca dari 4H - dipakai kalau filter "Searah Rezim BTC" dipilih.
+      let regime = { label:'-', bias:'both' };
+      if(mode === 'align'){
+        const btc4h = await fetchKlines('BTCUSDT', '4h', 300);
+        regime = classifyBtcRegime(btc4h.closes);
+        const rc = regime.label.includes('Bullish') ? 'bull' : regime.label.includes('Bearish') ? 'bear' : 'neutral';
+        pantauRegimeBadge.innerHTML = `Rezim: <span class="es-ai-regime-badge ${rc}">${regime.label}</span>`;
+      }
+
+      const settled = await mapLimited(activeSymbols, SCAN_CONCURRENCY,
+        symbol => cariPantauUntukSimbol(symbol, tickers, tf));
+
+      let semua = [];
+      settled.forEach(s=>{ if(s.status==='fulfilled' && s.value) semua.push(s.value); });
+
+      // Terapkan filter
+      let hasil = semua;
+      if(mode === 'oversold')       hasil = semua.filter(c=>c.kondisi==='oversold');
+      else if(mode === 'overbought') hasil = semua.filter(c=>c.kondisi==='overbought');
+      else if(mode === 'align'){
+        if(regime.bias === 'long')       hasil = semua.filter(c=>c.signal==='BUY');
+        else if(regime.bias === 'short') hasil = semua.filter(c=>c.signal==='SELL');
+        // rezim sideways -> tidak menyaring apa pun
+      }
+
+      // Yang %K-nya sudah mulai berbalik ditaruh di atas - lebih layak dipantau
+      // daripada yang masih meluncur ke arah ekstrem.
+      hasil.sort((a,b)=>
+        (b.mulaiBalik?1:0)-(a.mulaiBalik?1:0) ||
+        (a.kondisi==='oversold' ? a.stochK-b.stochK : b.stochK-a.stochK) ||
+        rankOf(a.symbol)-rankOf(b.symbol)
+      );
+
+      if(hasil.length === 0){
+        pantauStatusEl.textContent = `Tidak ada koin dengan Stochastic ekstrem (K ≤ 20 atau ≥ 80) di TF ${PANTAU_TF_LABEL[tf]||tf}`
+          + (mode==='align' ? ` yang searah rezim ${regime.label}` : '') + ` saat ini.`;
+        return;
+      }
+
+      renderPantauSignals(hasil);
+      const nOs = hasil.filter(c=>c.kondisi==='oversold').length;
+      const nOb = hasil.length - nOs;
+      const nBalik = hasil.filter(c=>c.mulaiBalik).length;
+      pantauStatusEl.textContent = `${hasil.length} koin dipantau (${nOs} oversold, ${nOb} overbought) `
+        + `• ${nBalik} sudah mulai berbalik • TF ${PANTAU_TF_LABEL[tf]||tf} • ${new Date().toLocaleTimeString('id-ID')}.`;
+    }catch(e){
+      pantauStatusEl.classList.add('error');
+      pantauStatusEl.textContent = `Gagal memindai sinyal pantau: ${e && e.message ? e.message : 'kesalahan tak terduga'}.`;
+    }finally{
+      pantauBtn.disabled = false;
+    }
+  }
+
+  function renderPantauManagerDropdown(){
+    const results = window.__esLastPantauResults || [];
+    if(results.length===0){
+      pantauManagerDropdown.innerHTML = `<div class="es-symbol-manager-empty">Belum ada hasil. Jalankan pemindaian dulu.</div>`;
+      return;
+    }
+    pantauManagerDropdown.innerHTML = results.map(c=>`
+      <div class="es-symbol-manager-row">
+        <span class="es-symbol-manager-name" data-symbol="${c.symbol}" data-tf="${c.tfValue}">${c.symbol.replace('USDT','')} (${c.tfLabel})</span>
+        <button type="button" class="es-symbol-manager-remove" data-symbol="${c.symbol}">Ganti</button>
+      </div>
+    `).join('');
+    pantauManagerDropdown.querySelectorAll('.es-symbol-manager-name').forEach(el=>{
+      el.addEventListener('click', ()=> openTradingView(el.getAttribute('data-symbol'), el.getAttribute('data-tf')));
+    });
+    pantauManagerDropdown.querySelectorAll('.es-symbol-manager-remove').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        blockAndReplaceSymbol(btn.getAttribute('data-symbol'));
+        cariSinyalPantau();
+      });
+    });
+  }
+
+  pantauManagerBtn.addEventListener('click', (e)=>{
+    e.stopPropagation();
+    const willOpen = !pantauManagerDropdown.classList.contains('open');
+    if(willOpen) renderPantauManagerDropdown();
+    pantauManagerBtn.classList.toggle('open', willOpen);
+    pantauManagerDropdown.classList.toggle('open', willOpen);
+  });
+  document.addEventListener('click', (e)=>{
+    if(!pantauManagerBtn.contains(e.target) && !pantauManagerDropdown.contains(e.target)){
+      pantauManagerBtn.classList.remove('open');
+      pantauManagerDropdown.classList.remove('open');
+    }
+  });
+
+  // Manual trigger saja - tidak auto-scan saat halaman dibuka, biar tidak nambah beban.
+  pantauBtn.addEventListener('click', cariSinyalPantau);
+  pantauTfSel.addEventListener('change', cariSinyalPantau);
+  pantauRezimSel.addEventListener('change', cariSinyalPantau);
+
   const SNR_RISK_TIERS = {
     high:   [ { value:'5m',  label:'5m' } ],
     medium: [ { value:'15m', label:'15m' }, { value:'30m', label:'30m' } ],
@@ -6425,6 +6727,7 @@
   // Nama tampilan tiap section - dipakai di chip "munculkan kembali", karena
   // saat disembunyikan judul aslinya sudah tidak ada di layar.
   const SECTION_LABEL = {
+    pantau:   'Sinyal Pantau Kripto',
     favcross: 'Sinyal Entry Koin Favorit',
     bbma:     'Sinyal Prioritas BBMA',
     snr:      'Sinyal Prioritas SNR',
