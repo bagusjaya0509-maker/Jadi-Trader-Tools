@@ -118,9 +118,7 @@
     align-items:flex-start;
     gap:16px;
     flex-wrap:wrap;
-    margin-bottom:18px;
-    padding-bottom:16px;
-    border-bottom:1px solid var(--border);
+    margin-bottom:14px;
   }
 
   .es-title{
@@ -184,6 +182,12 @@
   .es-refresh.spinning svg{ animation: spin 1s linear infinite; }
   @keyframes spin{ to{ transform: rotate(360deg); } }
 
+  .es-topnav{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    margin-bottom:14px;
+  }
   .es-nav-link{
     display:inline-flex;
     align-items:center;
@@ -688,6 +692,29 @@
     outline:none;
   }
   .es-priority-controls select:hover{ border-color: var(--dim); }
+  /* Semua kontrol di baris ini disamakan tingginya (32px), font, padding, dan
+     radius-nya - sebelumnya select, tombol, tombol kelola koin, dan badge rezim
+     punya ukuran sendiri-sendiri sehingga barisnya terlihat bergerigi. */
+  .es-priority-controls select,
+  .es-priority-controls .es-priority-btn,
+  .es-priority-controls .es-symbol-manager-btn,
+  .es-priority-controls .es-ai-regime{
+    height:32px;
+    box-sizing:border-box;
+    font-size:12px;
+    padding:0 12px;
+    border-radius:8px;
+    display:inline-flex;
+    align-items:center;
+    line-height:1;
+  }
+  .es-priority-controls .es-ai-regime{
+    border:1px solid var(--border);
+    background: var(--panel);
+    color: var(--muted);
+    gap:6px;
+  }
+  .es-priority-controls .es-ai-regime:empty{ display:none; }   /* jangan sisakan kotak kosong */
   .es-priority-title{
     font-family: var(--font-display);
     font-weight:700;
@@ -957,6 +984,7 @@
   .es-priority-trade-btn:disabled{ opacity:.5; cursor:not-allowed; }
 
   .es-fav-section{
+    margin-top:16px;
     margin-bottom:22px;
     padding-bottom:18px;
     border-bottom:1px solid var(--border);
@@ -1672,14 +1700,26 @@
       <div class="es-econ-calendar-body" id="esEconCalendarBody"></div>
     </div>
   </div>
+  <div class="es-topnav">
+    <a href="backtest-screener.html" class="es-nav-link">Backtest 3 Sinyal &rarr;</a>
+    <a href="jurnal-trading.html" class="es-nav-link">Jurnal Trading &rarr;</a>
+  </div>
   <div class="es-header">
     <div>
       <div class="es-title"><span class="dot"></span>Jadi Trader Tools</div>
       <div class="es-sub" id="esSubtitle"></div>
     </div>
+  </div>
+
+  <div class="es-favorit-section es-collapsible" data-section="favorit">
+    <div class="es-fav-title es-section-head">
+      <span>Koin Favorit</span>
+      <button type="button" class="es-section-toggle" title="Sembunyikan section">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+    </div>
+    <div class="es-section-body">
     <div class="es-controls">
-      <a href="backtest-screener.html" class="es-nav-link">Backtest 3 Sinyal &rarr;</a>
-      <a href="jurnal-trading.html" class="es-nav-link">Jurnal Trading &rarr;</a>
       <select id="esInterval">
         <option value="1m">1m</option>
         <option value="5m">5m</option>
@@ -1714,12 +1754,13 @@
         Scan
       </button>
     </div>
-  </div>
 
-  <div class="es-fav-section">
-    <div class="es-btc-tf-strip" id="esBtcTfStrip"></div>
-    <div class="es-fav-grid" id="esFavGrid"></div>
-    <div class="es-fav-status" id="esFavStatus">Memuat koin favorit...</div>
+      <div class="es-fav-section">
+        <div class="es-btc-tf-strip" id="esBtcTfStrip"></div>
+        <div class="es-fav-grid" id="esFavGrid"></div>
+        <div class="es-fav-status" id="esFavStatus">Memuat koin favorit...</div>
+      </div>
+    </div>
   </div>
 
   <!-- Deretan chip untuk memunculkan kembali section yang disembunyikan.
@@ -3518,6 +3559,7 @@
   // dua strip ini masing-masing polling sendiri tiap 90 detik (dobel beban ke
   // Binance untuk simbol yang sama) - digabung supaya beban API tidak dobel.
   async function scanAllBtcTfStrips(){
+    if(isSectionCollapsed('favorit')) return;   // section dilipat - hemat request
     if(btcTfScanning) return;
     btcTfScanning = true;
     try{
@@ -6633,6 +6675,7 @@
   }
 
   async function scanFavorites(){
+    if(isSectionCollapsed('favorit')) return;   // section dilipat - hemat request
     if(favScanning) return;
     favScanning = true;
     favStatusEl.classList.remove('error');
@@ -6819,6 +6862,7 @@
   // Nama tampilan tiap section - dipakai di chip "munculkan kembali", karena
   // saat disembunyikan judul aslinya sudah tidak ada di layar.
   const SECTION_LABEL = {
+    favorit:  'Koin Favorit',
     pantau:   'Sinyal Pantau Kripto',
     favcross: 'Sinyal Entry Koin Favorit',
     bbma:     'Sinyal Prioritas BBMA',
@@ -6832,7 +6876,8 @@
     applySectionCollapseState();
     // Baru dimunculkan -> isinya masih kosong (tadi dilewati saat dilipat),
     // jadi langsung dipindai sekali supaya tidak tampil kosong.
-    if(name === 'favcross'){ scanFavoriteCrossSection(); scan(); }
+    if(name === 'favorit'){ scanFavorites(); scanAllBtcTfStrips(); }
+    else if(name === 'favcross'){ scanFavoriteCrossSection(); scan(); }
     else if(name === 'bbma') findPrioritySignals();
     else if(name === 'snr') findPrioritySnrSignals();
   }
