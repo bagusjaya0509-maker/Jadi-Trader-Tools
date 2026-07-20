@@ -2130,7 +2130,8 @@
     'emaScreenerFavCrossSymbols_v1',
     'emaScreenerPrioritySim_v1',
     'emaScreenerFavorites_v1',
-    'emaScreenerPsimSettings_v1'
+    'emaScreenerPsimSettings_v1',
+    'emaScreenerCollapsedSections_v1'
   ];
 
   const esAuthGateEl = document.getElementById('esAuthGate');
@@ -2150,8 +2151,27 @@
   // lama (BUG yang bikin posisi live "hilang" walau belum ditutup di Binance -
   // kejadian kalau refresh/buka device lain terjadi SEBELUM siklus sync 15
   // detik sempat mengirim perubahan terbaru ke cloud).
+  const ES_PUSH_PENDING_KEY = 'emaScreenerPushPending_v1';
+
+  // Dua penanda yang SENGAJA dipisah:
+  //  - ES_LOCAL_DIRTY_KEY  : "device ini punya perubahan yang lebih baru dari
+  //    cloud". HANYA diset oleh aksi live trading asli, karena penanda inilah
+  //    yang dipakai esLoadFromCloud untuk memutuskan boleh menimpa cloud. Kalau
+  //    diset oleh tulisan rutin, device yang tidak punya perubahan apa pun bisa
+  //    mengira dirinya lebih baru lalu menghapus data device lain.
+  //  - ES_PUSH_PENDING_KEY : "ada sesuatu yang belum naik ke cloud". Diset oleh
+  //    SEMUA perubahan setelan (daftar koin, favorit, setelan simulasi, section
+  //    yang disembunyikan). Cuma dipakai timer 15 detik untuk memutuskan perlu
+  //    mendorong atau tidak - tidak pernah dipakai untuk menimpa cloud.
   function markEsCloudDirty(){
-    try{ localStorage.setItem(ES_LOCAL_DIRTY_KEY, String(Date.now())); }catch(e){}
+    try{
+      localStorage.setItem(ES_LOCAL_DIRTY_KEY, String(Date.now()));
+      localStorage.setItem(ES_PUSH_PENDING_KEY, '1');
+    }catch(e){}
+  }
+
+  function tandaiPerluDidorong(){
+    try{ localStorage.setItem(ES_PUSH_PENDING_KEY, '1'); }catch(e){}
   }
 
   // Dorong perubahan ke cloud SEKARANG JUGA (bukan nunggu siklus 15 detik) -
@@ -2165,7 +2185,8 @@
   // Sinkron manual lewat gerigi tetap memakai esSaveToCloud langsung (paksa).
   function esSaveJikaAdaPerubahan(uid){
     const dirty = parseInt(localStorage.getItem(ES_LOCAL_DIRTY_KEY) || '0', 10);
-    if(!dirty) return Promise.resolve(false);
+    const perlu = localStorage.getItem(ES_PUSH_PENDING_KEY) === '1';
+    if(!dirty && !perlu) return Promise.resolve(false);
     return esSaveToCloud(uid).then(function(){ return true; }).catch(function(){ return false; });
   }
 
@@ -2213,6 +2234,7 @@
       // membuat posisi yang dibuka di device lain hilang.
       try{
         localStorage.setItem(ES_LOCAL_DIRTY_KEY, '0');
+        localStorage.setItem(ES_PUSH_PENDING_KEY, '0');
         localStorage.setItem(ES_LAST_SYNC_KEY, String(stempel));
       }catch(e){}
       return stempel;
@@ -2434,6 +2456,7 @@
 
   function saveActiveSymbols(){
     try{ localStorage.setItem(ACTIVE_SYMBOLS_KEY, JSON.stringify(activeSymbols)); }catch(e){}
+    tandaiPerluDidorong();
   }
 
   let activeSymbols = loadActiveSymbols();
@@ -3193,6 +3216,7 @@
 
   function saveFavCrossSymbols(){
     try{ localStorage.setItem(FAV_CROSS_SYMBOLS_KEY, JSON.stringify(favCrossSymbols)); }catch(e){ /* ignore */ }
+    tandaiPerluDidorong();
   }
 
   function removeFavCrossSymbol(symbol){
@@ -6679,6 +6703,7 @@
 
   function saveFavorites(){
     try{ localStorage.setItem(FAV_STORAGE_KEY, JSON.stringify(favoriteSymbols)); }catch(e){ /* ignore */ }
+    tandaiPerluDidorong();
   }
 
   function removeFavorite(symbol){
@@ -6991,6 +7016,7 @@
         active: psimToggle.checked
       }));
     }catch(e){}
+    tandaiPerluDidorong();
   }
 
   psimModalInput.addEventListener('change', savePsimSettings);
@@ -7146,6 +7172,7 @@
 
   function saveCollapsedSections(){
     try{ localStorage.setItem(SECTION_COLLAPSE_KEY, JSON.stringify([...collapsedSections])); }catch(e){}
+    tandaiPerluDidorong();
   }
 
   // Dipakai fungsi-fungsi pemindai untuk berhenti lebih awal. Dideklarasikan
