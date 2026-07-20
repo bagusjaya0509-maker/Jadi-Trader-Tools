@@ -846,19 +846,10 @@
     letter-spacing:.03em;
   }
   /* Hijau untuk pantau BUY, merah untuk pantau SELL */
-  .es-priority-card.pantau.buy  .es-pantau-badge{ background: var(--bull-dim); color: var(--bull); }
-  .es-priority-card.pantau.sell .es-pantau-badge{ background: var(--bear-dim); color: var(--bear); }
-  .es-priority-card.pantau.buy { border-color: rgba(79,158,130,0.55); }  /* --bull  #4f9e82 */
-  .es-priority-card.pantau.sell{ border-color: rgba(192,90,78,0.55); }   /* --bear  #c05a4e */
-  .es-stoch-val{
-    font-family: var(--font-mono);
-    font-size:10px;
-    padding:2px 7px;
-    border-radius:5px;
-    margin-left:auto;
-  }
-  .es-stoch-val.os{ background: var(--bull-dim); color: var(--bull); }
-  .es-stoch-val.ob{ background: var(--bear-dim); color: var(--bear); }
+  .es-card.pantau.buy  .es-pantau-badge{ background: var(--bull-dim); color: var(--bull); }
+  .es-card.pantau.sell .es-pantau-badge{ background: var(--bear-dim); color: var(--bear); }
+  .es-card.pantau.buy { border-color: rgba(79,158,130,0.55); }  /* --bull  #4f9e82 */
+  .es-card.pantau.sell{ border-color: rgba(192,90,78,0.55); }   /* --bear  #c05a4e */
 
   /* ===== Sinyal Prioritas AI ===== */
   .es-ai-regime{
@@ -1747,7 +1738,7 @@
         </div>
         <div class="es-ai-regime" id="esPantauRegimeBadge"></div>
       </div>
-      <div class="es-priority-grid" id="esPantauGrid"></div>
+      <div class="es-grid" id="esPantauGrid"></div>
       <div class="es-priority-status" id="esPantauStatus">Klik "Cari Sinyal Pantau" untuk memindai.</div>
     </div>
   </div>
@@ -3040,12 +3031,16 @@
 
   function buildMiniChart(data){
     const { opens, highs, lows, closes, e9, e21, e200, bb, momentum, crossIdx, resZones, supZones, demandZones, supplyZones } = data;
+    // noEma: gambar candle + zona saja, tanpa garis EMA (dipakai kartu Pantau).
+    // stochPanel: {k,d} -> tambahkan sub-panel Stochastic di bawah chart harga.
+    const noEma = !!data.noEma;
+    const stochPanel = data.stochPanel || null;
     const total = closes.length;
     const N = Math.min(40, total);
     const start = total - N;
 
     const co = opens.slice(start), ch = highs.slice(start), cl = lows.slice(start), cc = closes.slice(start);
-    const s9 = e9.slice(start), s21 = e21.slice(start), s200 = e200.slice(start);
+    const s9 = noEma ? [] : e9.slice(start), s21 = noEma ? [] : e21.slice(start), s200 = noEma ? [] : e200.slice(start);
     const mombull = momentum.bullish.slice(start), mombear = momentum.bearish.slice(start);
     const sBBu = bb ? bb.upper.slice(start) : null, sBBl = bb ? bb.lower.slice(start) : null;
 
@@ -3059,10 +3054,13 @@
 
     const min = Math.min(...vals), max = Math.max(...vals);
     const range = (max-min) || 1;
-    const w = 300, h = 160, padX=4, padY=6;
+    // priceH = tinggi area harga. Kalau ada panel stochastic, SVG-nya
+    // diperpanjang ke bawah - area harga tidak menyusut.
+    const w = 300, priceH = 160, panelH = stochPanel ? 46 : 0;
+    const h = priceH + panelH, padX=4, padY=6;
 
     const xAt = (i) => padX + (i/(N<=1?1:N-1))*(w-padX*2);
-    const yAt = (v) => h-padY - ((v-min)/range)*(h-padY*2);
+    const yAt = (v) => priceH-padY - ((v-min)/range)*(priceH-padY*2);
     const candleW = Math.max(1.5, ((w-padX*2)/N) * 0.6);
 
     let zonesHtml = '';
@@ -3113,11 +3111,30 @@
       if(pts.length < 2) return '';
       return `<polyline points="${pts.join(' ')}" fill="none" stroke="${color}" stroke-width="1.3" opacity="0.9"/>`;
     };
-    const emaHtml = toLine(s200, 'var(--ema200c)') + toLine(s21, 'var(--ema21c)') + toLine(s9, 'var(--ema9c)');
+    const emaHtml = noEma ? '' : toLine(s200, 'var(--ema200c)') + toLine(s21, 'var(--ema21c)') + toLine(s9, 'var(--ema9c)');
     const bbHtml = (sBBu && sBBl) ? toLine(sBBu, 'var(--bbc)') + toLine(sBBl, 'var(--bbc)') : '';
 
+    // Sub-panel Stochastic: garis batas 80/20, lalu %K dan %D.
+    let stochHtml = '';
+    if(stochPanel){
+      const top = priceH + 4, bot = h - 5;
+      const sy = v => bot - (Math.max(0,Math.min(100,v))/100)*(bot-top);
+      const sk = stochPanel.k.slice(start), sd = stochPanel.d.slice(start);
+      const garis = (v,warna) => `<line x1="${padX}" y1="${sy(v).toFixed(1)}" x2="${(w-padX).toFixed(1)}" y2="${sy(v).toFixed(1)}" stroke="${warna}" stroke-width="0.8" stroke-dasharray="3,2" opacity="0.55"/>`;
+      const jalur = (arr,warna,tebal) => {
+        const pts=[];
+        arr.forEach((v,i)=>{ if(v===null||v===undefined) return; pts.push(`${xAt(i).toFixed(1)},${sy(v).toFixed(1)}`); });
+        return pts.length<2 ? '' : `<polyline points="${pts.join(' ')}" fill="none" stroke="${warna}" stroke-width="${tebal}"/>`;
+      };
+      stochHtml =
+        `<line x1="0" y1="${priceH}" x2="${w}" y2="${priceH}" stroke="var(--border)" stroke-width="1"/>`
+        + garis(80,'var(--bear)') + garis(20,'var(--bull)')
+        + jalur(sd,'var(--gold)',1) + jalur(sk,'var(--text)',1.3)
+        + `<text x="${padX+2}" y="${(priceH+12).toFixed(1)}" font-size="7" fill="var(--muted)">Stoch 14,3,3</text>`;
+    }
+
     let markerHtml = '';
-    if(crossIdx !== null){
+    if(crossIdx !== null && !noEma){
       const idxInSlice = crossIdx - start;
       if(idxInSlice >= 0 && idxInSlice < N && s9[idxInSlice]!==null && s9[idxInSlice]!==undefined){
         const mx = xAt(idxInSlice), my = yAt(s9[idxInSlice]);
@@ -3132,6 +3149,7 @@
       ${bbHtml}
       ${emaHtml}
       ${markerHtml}
+      ${stochHtml}
     </svg>`;
   }
 
@@ -4117,7 +4135,7 @@
   }
 
   async function cariPantauUntukSimbol(symbol, tickers, tf){
-    const { highs, lows, closes } = await fetchKlines(symbol, tf, 200);
+    const { opens, highs, lows, closes } = await fetchKlines(symbol, tf, 200);
     if(closes.length < 40) return null;
     const hasil = cekStochEkstrem(highs, lows, closes);
     if(!hasil) return null;
@@ -4127,6 +4145,21 @@
     const atrArr = atr(highs, lows, closes, 14);
     const a = atrArr[atrArr.length-1] || 0;
     if(!a) return null;
+
+    // Bahan kartu bergaya EMA cross, tapi hanya S/R + momentum + stochastic.
+    const pivotHighs = findPivots(highs, 10, 10, true).slice(-2);
+    const pivotLows  = findPivots(lows,  10, 10, false).slice(-2);
+    const resZones = pivotHighs.map(p=>({ value:p.value, top:p.value + a*0.5, bottom:p.value - a*0.5 }));
+    const supZones = pivotLows.map(p=>({ value:p.value, top:p.value + a*0.5, bottom:p.value - a*0.5 }));
+    const sd = findSupplyDemandZones(opens, closes, atrArr, 1.5, 3);
+    const momentum = computeMomentum(opens, highs, lows, closes, 0.70, 5);
+    const momentumSignal = lastMomentumSignal(momentum, 10);
+    const stochFull = stochastic(highs, lows, closes, 14, 3, 3);
+    const chartSvg = buildMiniChart({
+      opens, highs, lows, closes, momentum, noEma:true, crossIdx:null,
+      resZones, supZones, demandZones: sd.demand, supplyZones: sd.supply,
+      stochPanel: { k: stochFull.k, d: stochFull.d }
+    });
 
     // Ancang-ancang level: SL di luar swing terakhir + bantalan ATR, TP 1:2.
     const look = 12;
@@ -4142,7 +4175,10 @@
       tfValue: tf, tfLabel: PANTAU_TF_LABEL[tf] || tf,
       kondisi: hasil.kondisi, stochK: hasil.k, stochD: hasil.d,
       mulaiBalik: hasil.mulaiBalik,
-      riskPct: (risk/price)*100
+      riskPct: (risk/price)*100,
+      chartSvg, resZones, supZones, momentumSignal,
+      cap: capTierOf(symbol),
+      change24h: t ? parseFloat(t.priceChangePercent) : 0
     };
   }
 
@@ -4150,35 +4186,50 @@
     window.__esLastPantauResults = top;
     registerTradableSignals('pantau', top);
     pantauGrid.innerHTML = top.map((c,i)=>{
-      const cls = c.arahCls = c.signal === 'BUY' ? 'buy' : 'sell';
-      const stochCls = c.kondisi === 'oversold' ? 'os' : 'ob';
+      const cls = c.signal === 'BUY' ? 'buy' : 'sell';
       const kondisiTeks = c.kondisi === 'oversold' ? 'Oversold' : 'Overbought';
-      const balikTeks = c.mulaiBalik
-        ? `<div class="es-priority-note">&check; %K mulai berbalik meninggalkan area ekstrem</div>`
-        : `<div class="es-priority-note">&#10007; %K belum berbalik &mdash; masih bisa lanjut meregang</div>`;
-      return `<div class="es-priority-card pantau ${cls}" data-symbol="${c.symbol}" data-tf="${c.tfValue}">
-        <div class="es-priority-card-top">
-          <span class="es-priority-rank">#${i+1}</span>
-          <span class="es-priority-symbol">${c.symbol.replace('USDT','')}</span>
+      const chgCls = c.change24h >= 0 ? 'up' : 'down';
+      const chgSign = c.change24h >= 0 ? '+' : '';
+      const resDekat = c.resZones.length ? c.resZones[c.resZones.length-1].value : null;
+      const supDekat = c.supZones.length ? c.supZones[c.supZones.length-1].value : null;
+      const momCls = c.momentumSignal ? c.momentumSignal.type : 'none';
+      const momLabel = c.momentumSignal
+        ? `${c.momentumSignal.type==='bullish'?'Bullish':'Bearish'} &bull; ${c.momentumSignal.candlesAgo===0?'baru saja':c.momentumSignal.candlesAgo+'c lalu'}`
+        : 'Tidak ada (10c)';
+      const stochLabel = `K ${c.stochK.toFixed(1)}/D ${c.stochD===null?'-':c.stochD.toFixed(1)}`
+        + (c.kondisi==='overbought'?' (OB)':' (OS)');
+      const balikLabel = c.mulaiBalik ? '&check; %K mulai berbalik' : '&#10007; %K belum berbalik';
+      return `<div class="es-card pantau ${cls}" data-symbol="${c.symbol}" data-tf="${c.tfValue}">
+        <div class="es-card-top">
+          <div><span class="es-rank">#${i+1} &bull; TF ${c.tfLabel}</span><span class="es-symbol">${c.symbol.replace('USDT','')}</span></div>
+          <span class="es-cap-tag">${c.cap==='big'?'BIG CAP':'LOW/MID CAP'}</span>
+        </div>
+        <div class="es-price-row">
+          <span class="es-price">$${fmtPrice(c.price)}</span>
+          <span class="es-chg ${chgCls}">${chgSign}${c.change24h.toFixed(2)}% 24h</span>
+        </div>
+        ${c.chartSvg}
+        <div class="es-sr-row">
+          <span class="res">R ${resDekat===null?'n/a':'$'+fmtPrice(resDekat)}</span>
+          <span class="sup">S ${supDekat===null?'n/a':'$'+fmtPrice(supDekat)}</span>
+        </div>
+        <div class="es-mom-row">
+          <span>Momentum</span>
+          <span class="es-mom-badge ${momCls}">${momLabel}</span>
+        </div>
+        <div class="es-stoch-row">
+          <span>Stoch (14,3,3)</span>
+          <span class="es-stoch-badge ${c.kondisi}">${stochLabel}</span>
+        </div>
+        <div class="es-mom-row">
           <span class="es-pantau-badge">PANTAU ${c.signal}</span>
-          <span class="es-stoch-val ${stochCls}">K ${c.stochK.toFixed(1)}</span>
-        </div>
-        <div class="es-priority-tf">${kondisiTeks} &bull; TF ${c.tfLabel} &bull; Harga $${fmtPrice(c.price)}</div>
-        <div class="es-checklist">
-          <div class="es-check-row ok"><span class="es-check-icon">&check;</span> Stochastic ${kondisiTeks} (K ${c.stochK.toFixed(1)} / D ${c.stochD===null?'-':c.stochD.toFixed(1)})</div>
-        </div>
-        ${balikTeks}
-        <div class="es-priority-levels">
-          <div class="es-priority-level-row">Area Entri: <strong>$${fmtPrice(c.price)}</strong></div>
-          <div class="es-priority-level-row invalid">Invalid Level (SL): <strong>$${fmtPrice(c.sl)}</strong></div>
-          <div class="es-priority-level-row">Take Profit: <strong>TP1 $${fmtPrice(c.tp)}</strong></div>
-          <div class="es-priority-level-row">Risk: <strong>${c.riskPct.toFixed(2)}%</strong></div>
+          <span class="es-ago">${kondisiTeks} &bull; ${balikLabel}</span>
         </div>
         <button class="es-priority-trade-btn" type="button">Pilih Sinyal Ini</button>
       </div>`;
     }).join('');
 
-    pantauGrid.querySelectorAll('.es-priority-card').forEach((card,i)=>{
+    pantauGrid.querySelectorAll('.es-card').forEach((card,i)=>{
       const cand = top[i];
       card.addEventListener('click', (e)=>{
         if(e.target.classList.contains('es-priority-trade-btn')) return;
@@ -4239,11 +4290,14 @@
         hasil = btcKondisi ? semua.filter(c=>c.kondisi===btcKondisi) : [];
       }
 
-      // Yang %K-nya sudah mulai berbalik ditaruh di atas - lebih layak dipantau
-      // daripada yang masih meluncur ke arah ekstrem.
+      // Urut dari kondisi PALING ekstrem ke yang paling ringan. Overbought
+      // makin kuat kalau K makin besar (95 > 85), oversold kebalikannya
+      // (K 2 lebih ekstrem daripada K 18) - jadi keduanya disamakan dulu ke
+      // satu skala "seberapa ekstrem" supaya daftar campuran tetap runut.
+      const ekstremitas = c => c.kondisi === 'overbought' ? c.stochK : (100 - c.stochK);
       hasil.sort((a,b)=>
+        ekstremitas(b) - ekstremitas(a) ||
         (b.mulaiBalik?1:0)-(a.mulaiBalik?1:0) ||
-        (a.kondisi==='oversold' ? a.stochK-b.stochK : b.stochK-a.stochK) ||
         rankOf(a.symbol)-rankOf(b.symbol)
       );
 
