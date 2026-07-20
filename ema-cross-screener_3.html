@@ -64,10 +64,14 @@
     border-radius:20px;
     background: var(--panel);
     border:1px solid var(--border);
-    cursor:pointer;
+    cursor:grab;
     box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+    touch-action:none;          /* tahan-geser di tablet tidak ikut men-scroll halaman */
+    user-select:none;
   }
   .es-econ-calendar-trigger:hover{ border-color:#8C231A; }
+  .es-econ-calendar-panel.dragging .es-econ-calendar-trigger{ cursor:grabbing; }
+  .es-econ-calendar-panel.dragging{ opacity:.9; }
   .es-econ-calendar-trigger-dot{
     width:9px;
     height:9px;
@@ -2398,14 +2402,33 @@
 
   const ACTIVE_SYMBOLS_KEY = 'emaScreenerActiveSymbols_v1';
 
+  // Daftar koin disimpan per-device. Device yang sudah dipakai SEBELUM daftar
+  // dinaikkan ke 100 masih menyimpan daftar lama (44 koin), dan daftar tersimpan
+  // itu menang atas BASE_SYMBOLS - jadi device tersebut tetap memindai 44 koin
+  // berapa pun isi kodenya. Migrasi di bawah menambahkan koin BASE yang belum
+  // ada ke daftar tersimpan, SEKALI saja, ditandai lewat key versi.
+  // Sengaja "menambah", bukan "mengganti": koin yang kamu tambahkan sendiri atau
+  // hasil ganti otomatis (RESERVE) tetap ikut, tidak terhapus.
+  const SYMBOLS_MIGRASI_KEY = 'emaScreenerSymbolsMigrasi_v1';
+
   function loadActiveSymbols(){
     try{
       const raw = localStorage.getItem(ACTIVE_SYMBOLS_KEY);
       if(raw){
         const arr = JSON.parse(raw);
-        if(Array.isArray(arr) && arr.length) return arr;
+        if(Array.isArray(arr) && arr.length){
+          if(localStorage.getItem(SYMBOLS_MIGRASI_KEY) === '1') return arr;
+          const gabung = arr.slice();
+          BASE_SYMBOLS.forEach(function(sym){ if(gabung.indexOf(sym) === -1) gabung.push(sym); });
+          try{
+            localStorage.setItem(SYMBOLS_MIGRASI_KEY, '1');
+            if(gabung.length !== arr.length) localStorage.setItem(ACTIVE_SYMBOLS_KEY, JSON.stringify(gabung));
+          }catch(e){}
+          return gabung;
+        }
       }
     }catch(e){}
+    try{ localStorage.setItem(SYMBOLS_MIGRASI_KEY, '1'); }catch(e){}
     return BASE_SYMBOLS.slice();
   }
 
@@ -7010,10 +7033,89 @@
 
   const econCalendarPanel = document.getElementById('esEconCalendarPanel');
   const econCalendarTrigger = document.getElementById('esEconCalendarTrigger');
+  // ---- Tombol News bisa digeser ke mana saja -------------------------------
+  // Pakai Pointer Events supaya mouse dan sentuhan (tablet) ditangani sekaligus.
+  // Geser >4px dianggap "memindahkan", bukan "klik" - tanpa ambang ini, tiap
+  // kali selesai menggeser panelnya ikut kebuka/ketutup.
+  const ECON_POS_KEY = 'emaScreenerEconPos_v1';
+  const GESER_MINIMAL = 4;
+  let geserAktif = false, sedangGeser = false;
+  let mulaiX = 0, mulaiY = 0, panelX = 0, panelY = 0;
+
+  function jepitKeLayar(x, y){
+    const r = econCalendarPanel.getBoundingClientRect();
+    const maxX = Math.max(0, window.innerWidth  - r.width);
+    const maxY = Math.max(0, window.innerHeight - r.height);
+    return { x: Math.min(Math.max(0, x), maxX), y: Math.min(Math.max(0, y), maxY) };
+  }
+
+  function terapkanPosisi(x, y){
+    const p = jepitKeLayar(x, y);
+    econCalendarPanel.style.left = p.x + 'px';
+    econCalendarPanel.style.top  = p.y + 'px';
+    econCalendarPanel.style.right = 'auto';
+    return p;
+  }
+
+  function muatPosisiEcon(){
+    try{
+      const raw = localStorage.getItem(ECON_POS_KEY);
+      if(!raw) return;
+      const p = JSON.parse(raw);
+      if(typeof p.x === 'number' && typeof p.y === 'number') terapkanPosisi(p.x, p.y);
+    }catch(e){}
+  }
+
+  function simpanPosisiEcon(x, y){
+    try{ localStorage.setItem(ECON_POS_KEY, JSON.stringify({ x, y })); }catch(e){}
+  }
+
+  econCalendarTrigger.addEventListener('pointerdown', (e)=>{
+    if(e.button !== undefined && e.button !== 0) return;   // klik kanan/tengah jangan dianggap geser
+    geserAktif = true; sedangGeser = false;
+    const r = econCalendarPanel.getBoundingClientRect();
+    panelX = r.left; panelY = r.top;
+    mulaiX = e.clientX; mulaiY = e.clientY;
+    econCalendarTrigger.setPointerCapture(e.pointerId);
+  });
+
+  econCalendarTrigger.addEventListener('pointermove', (e)=>{
+    if(!geserAktif) return;
+    const dx = e.clientX - mulaiX, dy = e.clientY - mulaiY;
+    if(!sedangGeser && Math.hypot(dx, dy) < GESER_MINIMAL) return;
+    if(!sedangGeser){ sedangGeser = true; econCalendarPanel.classList.add('dragging'); }
+    e.preventDefault();
+    terapkanPosisi(panelX + dx, panelY + dy);
+  });
+
+  function selesaiGeser(e){
+    if(!geserAktif) return;
+    geserAktif = false;
+    econCalendarPanel.classList.remove('dragging');
+    try{ econCalendarTrigger.releasePointerCapture(e.pointerId); }catch(err){}
+    if(sedangGeser){
+      const r = econCalendarPanel.getBoundingClientRect();
+      simpanPosisiEcon(r.left, r.top);
+    }
+  }
+  econCalendarTrigger.addEventListener('pointerup', selesaiGeser);
+  econCalendarTrigger.addEventListener('pointercancel', selesaiGeser);
+
+  // Kalau ukuran jendela berubah, tarik kembali tombol yang jadi di luar layar.
+  window.addEventListener('resize', ()=>{
+    if(!econCalendarPanel.style.left) return;
+    const r = econCalendarPanel.getBoundingClientRect();
+    const p = terapkanPosisi(r.left, r.top);
+    simpanPosisiEcon(p.x, p.y);
+  });
+
   econCalendarTrigger.addEventListener('click', (e)=>{
     e.stopPropagation();
+    if(sedangGeser){ sedangGeser = false; return; }   // baru saja digeser - jangan buka/tutup
     econCalendarPanel.classList.toggle('collapsed');
   });
+
+  muatPosisiEcon();
   document.addEventListener('click', (e)=>{
     if(!econCalendarPanel.contains(e.target)){
       econCalendarPanel.classList.add('collapsed');
