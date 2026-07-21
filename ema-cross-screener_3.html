@@ -1803,6 +1803,22 @@
   .es-auth-google-btn:hover{ background:var(--border); }
   .es-auth-status{ margin-top:14px; font-size:12px; color:var(--muted); min-height:16px; }
   .es-auth-status.error{ color:var(--bear); }
+  .es-auth-status.ok{ color:var(--bull); }
+  .es-activate-price{
+    font-family:var(--font-display); font-size:34px; font-weight:700; color:var(--gold);
+    margin:6px 0 20px;
+  }
+  .es-activate-price span{ font-family:var(--font-mono); font-size:12px; font-weight:400; color:var(--muted); }
+  .es-activate-code{
+    margin-top:16px; padding:12px; border:1px dashed var(--gold); border-radius:8px;
+    font-family:var(--font-mono); color:var(--gold); font-size:13px; line-height:1.6; word-break:break-all;
+  }
+  .es-activate-code b{ font-size:16px; letter-spacing:.08em; }
+  .es-activate-signout{
+    margin-top:18px; background:none; border:none; color:var(--muted); font-size:11px;
+    font-family:var(--font-mono); cursor:pointer; text-decoration:underline;
+  }
+  .es-activate-signout:hover{ color:var(--text); }
   .es-user-bar{
     display:flex; align-items:center; justify-content:flex-end; gap:10px; font-size:12px; color:var(--muted);
   }
@@ -1824,6 +1840,19 @@
     <div class="es-auth-sub">Login untuk melanjutkan &mdash; histori &amp; pengaturan kamu tersinkron otomatis di semua device.</div>
     <button type="button" class="es-auth-google-btn" id="esGoogleLoginBtn">Masuk dengan Google</button>
     <div class="es-auth-status" id="esAuthStatus"></div>
+  </div>
+</div>
+
+<!-- Gerbang aktivasi: muncul SETELAH login Google kalau akun belum jadi member. -->
+<div class="es-auth-gate" id="esActivateGate" style="display:none;">
+  <div class="es-auth-box">
+    <div class="es-auth-title">Aktivasi Akses</div>
+    <div class="es-auth-sub" id="esActivateSub">Akun kamu belum aktif. Dapatkan akses untuk memakai Jadi Trader Tools.</div>
+    <div class="es-activate-price">Rp 0<span>&nbsp;/ sementara gratis</span></div>
+    <button type="button" class="es-auth-google-btn es-activate-btn" id="esActivateBtn">Dapatkan Akses (Rp 0)</button>
+    <div class="es-activate-code" id="esActivateCode" style="display:none;"></div>
+    <div class="es-auth-status" id="esActivateStatus"></div>
+    <button type="button" class="es-activate-signout" id="esActivateSignOut">Keluar / ganti akun</button>
   </div>
 </div>
 
@@ -2281,6 +2310,58 @@
   const esAuthGateEl = document.getElementById('esAuthGate');
   const esAuthStatusEl = document.getElementById('esAuthStatus');
   const esGoogleLoginBtn = document.getElementById('esGoogleLoginBtn');
+
+  // ===== Gerbang aktivasi (keanggotaan) =====
+  // Saklar utama: kalau ada yang tidak beres, set false untuk membuka kunci
+  // seketika (semua yang login langsung masuk tanpa aktivasi).
+  const GATE_ENABLED = true;
+  const MEMBER_COLLECTION = 'members';
+  const esActivateGateEl = document.getElementById('esActivateGate');
+  const esActivateSubEl = document.getElementById('esActivateSub');
+  const esActivateBtn = document.getElementById('esActivateBtn');
+  const esActivateCodeEl = document.getElementById('esActivateCode');
+  const esActivateStatusEl = document.getElementById('esActivateStatus');
+  const esActivateSignOutBtn = document.getElementById('esActivateSignOut');
+
+  function buatKodeAkses(){
+    const c = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';   // tanpa 0/O/1/I yang mirip
+    const blok = () => Array.from({length:4}, ()=>c[Math.floor(Math.random()*c.length)]).join('');
+    return 'JT-' + blok() + '-' + blok();
+  }
+
+  // Cek apakah akun ini sudah member. Owner SELALU lolos (tanpa baca Firestore),
+  // jadi kamu tidak akan pernah terkunci walau Firestore/aturan bermasalah.
+  function cekKeanggotaan(user){
+    if(!GATE_ENABLED) return Promise.resolve(true);
+    if(esIsOwner) return Promise.resolve(true);
+    return esDb.collection(MEMBER_COLLECTION).doc(user.uid).get()
+      .then(function(doc){ return !!(doc.exists && doc.data() && doc.data().active === true); })
+      .catch(function(){ return false; });   // gagal cek -> belum member (aman, tidak buka paksa)
+  }
+
+  function tampilGerbangAktivasi(user){
+    esAuthGateEl.style.display = 'none';
+    esActivateGateEl.style.display = 'flex';
+    esUserBarEl.style.display = 'none';
+    esActivateSubEl.textContent = 'Login sebagai ' + (user.email || '-') + '. Akun belum aktif — dapatkan akses untuk mulai.';
+    esActivateCodeEl.style.display = 'none';
+    esActivateStatusEl.className = 'es-auth-status';
+    esActivateStatusEl.textContent = '';
+    esActivateBtn.disabled = false;
+  }
+
+  // Kirim kode ke email pengguna lewat backend (best-effort). Backend URL dibaca
+  // dari kolom konfigurasi Live Trading; kalau kosong/gagal, kode tetap tampil
+  // di layar jadi pengguna tidak pernah kehilangan kodenya.
+  function kirimEmailKode(email, kode){
+    const base = (liveBackendUrlInput && liveBackendUrlInput.value.trim())
+      ? liveBackendUrlInput.value.trim().replace(/\/+$/, '') : null;
+    if(!base || !email) return Promise.resolve(false);
+    return fetch(base + '/api/send-access-code', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email, code: kode })
+    }).then(function(r){ return r.ok; }).catch(function(){ return false; });
+  }
   const esUserBarEl = document.getElementById('esUserBar');
   const esUserAvatarEl = document.getElementById('esUserAvatar');
   const esUserNameEl = document.getElementById('esUserName');
@@ -2520,7 +2601,23 @@
     if(user){
       esCurrentUid = user.uid;
       esIsOwner = (user.email || '').trim().toLowerCase() === OWNER_EMAIL;
+      // Gerbang keanggotaan: hanya member (atau owner) yang boleh masuk aplikasi.
+      cekKeanggotaan(user).then(function(aktif){
+        if(aktif) masukAplikasi(user);
+        else tampilGerbangAktivasi(user);
+      });
+    } else {
+      esCurrentUid = null;
+      esAuthGateEl.style.display = 'flex';
+      esActivateGateEl.style.display = 'none';
+      esUserBarEl.style.display = 'none';
+      if(esCloudSyncTimer) clearInterval(esCloudSyncTimer);
+    }
+  });
+
+  function masukAplikasi(user){
       esAuthGateEl.style.display = 'none';
+      esActivateGateEl.style.display = 'none';
       esUserBarEl.style.display = 'flex';
       esUserAvatarEl.src = user.photoURL || '';
       esUserNameEl.textContent = user.displayName || user.email || '';
@@ -2562,13 +2659,7 @@
       });
 
       pasangTombolSync();
-    } else {
-      esCurrentUid = null;
-      esAuthGateEl.style.display = 'flex';
-      esUserBarEl.style.display = 'none';
-      if(esCloudSyncTimer) clearInterval(esCloudSyncTimer);
-    }
-  });
+  }
 
   esGoogleLoginBtn.addEventListener('click', function(){
     esAuthStatusEl.classList.remove('error');
@@ -2582,6 +2673,43 @@
 
   esSignOutBtn.addEventListener('click', function(){
     esAuth.signOut();
+  });
+
+  esActivateSignOutBtn.addEventListener('click', function(){
+    esActivateGateEl.style.display = 'none';
+    esAuth.signOut();
+  });
+
+  esActivateBtn.addEventListener('click', function(){
+    const user = esAuth.currentUser;
+    if(!user) return;
+    esActivateBtn.disabled = true;
+    esActivateStatusEl.className = 'es-auth-status';
+    esActivateStatusEl.textContent = 'Memproses aktivasi...';
+    const kode = buatKodeAkses();
+    // Catat keanggotaan di dokumen milik akun ini sendiri (diizinkan aturan
+    // Firestore untuk uid sendiri). Untuk tahap gratis ini cukup; saat berbayar
+    // nanti penulisan pindah ke sisi server (webhook pembayaran) supaya tidak
+    // bisa diaktifkan sendiri tanpa membayar.
+    esDb.collection(MEMBER_COLLECTION).doc(user.uid).set({
+      active: true, code: kode, email: user.email || '', plan: 'free', activatedAt: Date.now()
+    }, { merge: true }).then(function(){
+      esActivateCodeEl.style.display = 'block';
+      esActivateCodeEl.innerHTML = 'Kode akses kamu:<br><b>' + kode + '</b>';
+      esActivateStatusEl.className = 'es-auth-status ok';
+      esActivateStatusEl.textContent = 'Akses aktif! Membuka aplikasi...';
+      // Kirim ke email (best-effort - tidak menghalangi masuk kalau gagal).
+      kirimEmailKode(user.email, kode).then(function(terkirim){
+        if(terkirim && esActivateCodeEl.style.display !== 'none'){
+          esActivateCodeEl.innerHTML += '<br><span style="color:var(--muted);font-size:11px">Dikirim juga ke ' + (user.email||'email kamu') + '</span>';
+        }
+      });
+      setTimeout(function(){ masukAplikasi(user); }, 1800);
+    }).catch(function(e){
+      esActivateStatusEl.className = 'es-auth-status error';
+      esActivateStatusEl.textContent = 'Gagal aktivasi: ' + (e && e.message ? e.message : 'coba lagi');
+      esActivateBtn.disabled = false;
+    });
   });
   // ===== akhir bagian login + sinkronisasi =====
 
