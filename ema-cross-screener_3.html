@@ -980,30 +980,43 @@
   }
   .es-pantau-pick{
     flex-shrink:0;
-    background:none;
-    border:none;
-    padding:2px 4px;
-    font-size:15px;
+    border:1px solid transparent;
+    border-radius:6px;
+    padding:5px 12px;
+    font-family: var(--font-mono);
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:.04em;
     line-height:1;
     cursor:pointer;
-    opacity:.65;
-    transition:opacity .15s, transform .15s;
+    transition:filter .15s, transform .1s;
   }
-  .es-pantau-pick:hover{ opacity:1; transform:scale(1.15); }
+  .es-pantau-pick.buy { background: var(--bull-dim); color: var(--bull); border-color: rgba(79,158,130,0.5); }
+  .es-pantau-pick.sell{ background: var(--bear-dim); color: var(--bear); border-color: rgba(192,90,78,0.5); }
+  .es-pantau-pick:hover{ filter:brightness(1.25); }
+  .es-pantau-pick:active{ transform:scale(0.96); }
   /* Kartu Pantau biasa: border netral seperti kartu lain - tanpa warna arah.
      Hanya 3 teratas yang diberi glow, meniru .es-live-trade-box. */
   .es-card.pantau.top3{
     transition: border-color .2s ease, box-shadow .2s ease;
-    animation: pantauGlow 2.4s ease-in-out infinite;
+    animation: pantauGlow 3s ease-in-out infinite;
   }
   /* Border 3 koin terbaik DISAMAKAN dengan kartu lain (netral). Yang
-     membedakan cuma CAHAYA di belakangnya - merah untuk SELL, hijau BUY. */
+     membedakan cuma CAHAYA di belakangnya - merah untuk SELL, hijau BUY.
+     Denyutnya BERGANTIAN: kartu 1 menyala, lalu 2, lalu 3, kembali ke 1 -
+     lewat animation-delay 1 detik antar kartu (siklus 3 detik). Amplitudonya
+     kecil: dari tanpa glow ke glow paling kecil, tidak melebar. */
+  .es-card.pantau.top3:nth-child(1){ animation-delay: 0s; }
+  .es-card.pantau.top3:nth-child(2){ animation-delay: 1s; }
+  .es-card.pantau.top3:nth-child(3){ animation-delay: 2s; }
   @keyframes pantauGlow{
-    0%,100%{ box-shadow:0 0 10px 1px var(--glow-c); }
-    50%    { box-shadow:0 0 24px 5px var(--glow-c); }
+    0%   { box-shadow:0 0 0 0 transparent; }
+    16%  { box-shadow:0 0 10px 1px var(--glow-c); }   /* puncak = glow terkecil */
+    33%  { box-shadow:0 0 0 0 transparent; }
+    100% { box-shadow:0 0 0 0 transparent; }          /* padam sampai giliran berikutnya */
   }
-  .es-card.pantau.top3.buy { --glow-c: rgba(79,158,130,0.75); }   /* --bull */
-  .es-card.pantau.top3.sell{ --glow-c: rgba(192,90,78,0.75); }    /* --bear */
+  .es-card.pantau.top3.buy { --glow-c: rgba(79,158,130,0.85); }   /* --bull */
+  .es-card.pantau.top3.sell{ --glow-c: rgba(192,90,78,0.85); }    /* --bear */
 
   /* ===== Sinyal Prioritas AI ===== */
   .es-ai-regime{
@@ -4746,7 +4759,7 @@
           <span class="es-stoch-badge ${c.kondisi}">${stochLabel}</span>
         </div>
         <div class="es-pantau-foot">
-          <button class="es-pantau-pick" type="button" title="Pilih sinyal ini">&#128200;</button>
+          <button class="es-pantau-pick ${cls}" type="button" title="Pilih sinyal ini">${c.signal} NOW</button>
         </div>
       </div>`;
     }).join('');
