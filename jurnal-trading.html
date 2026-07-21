@@ -188,7 +188,7 @@
   .table-scroll.jt-hist-limited{ max-height:452px; overflow-y:auto; }        /* XAU  : 24.5 + 8*53 = 448.5, dibulatkan ke atas */
   .table-scroll.jt-hist-limited.jt-hist-kripto{ max-height:532px; }          /* Kripto: 24.5 + 12*42 = 528.5, dibulatkan ke atas */
   .jt-insight-limited{ max-height:230px; overflow-y:auto; }
-  .jt-insight-koin{ max-height:430px; overflow-y:auto; }   /* 12 koin x ~35.8px */
+  .jt-insight-koin{ max-height:324px; overflow-y:auto; }   /* 9 koin x ~35.8px */
 
   /* Scrollbar gelap - menyatu dengan latar, dipakai di semua area scroll (riwayat trade, ringkasan per koin, pola emosi) */
   .table-scroll, .jt-insight-limited{ scrollbar-color: var(--border) var(--surface); scrollbar-width: thin; }
@@ -399,7 +399,7 @@
     </div>
     <div class="account-meta">
       <div class="balance"><span class="cur">$</span><span id="mBalance" class="num">200.00</span></div>
-      <div class="line"><b>Exness-MT5Real20</b> · login •••7617 · leverage 1:2000</div>
+      <div class="line"><b>Bybit-Live-7</b> · login •••4989 · leverage 1:500</div>
       <div class="line jt-news-line">
         <div class="jt-news-wrap">
           <button type="button" class="jt-nav-link jt-news-trigger" id="jtNewsTrigger">
@@ -700,7 +700,7 @@
 <script>
 (function(){
   var STORAGE_KEY = 'ledgerNoirTrades_v1';
-  var ACCOUNT = { startBalance: 200, startDate: '2026-07-11' };
+  var ACCOUNT = { startBalance: 270.02, startDate: '2026-07-11' };  // 284.02 (balance MT5 Bybit) - 14
 
   function loadTrades(){
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
