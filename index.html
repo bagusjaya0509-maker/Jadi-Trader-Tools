@@ -44,6 +44,7 @@
      dapat ruang lebih. Tetap ada batas atas (1800px) agar di monitor ultra-wide
      baris tabel tidak melar ekstrem sampai sulit dibaca. */
   .wrap{max-width:1800px;margin:0 auto;padding:28px 24px 80px;}
+  .wrap.jt-wrap-xau{ padding-bottom:16px; }   /* rapatkan divider Jurnal Kripto ke tombol Export/Import */
 
   /* ---------- Nav ---------- */
   .jt-nav{display:flex;gap:10px;margin-left:16px;flex-wrap:wrap;}
@@ -184,9 +185,10 @@
   /* Tinggi diatur agar memuat 12 baris riwayat sebelum mulai scroll.
      Tabel XAU dan kripto beda tinggi barisnya (53px vs 42px), jadi dihitung
      sendiri-sendiri: tinggi thead (24.5px) + 12 x tinggi baris. */
-  .table-scroll.jt-hist-limited{ max-height:664px; overflow-y:auto; }        /* XAU  : 24.5 + 12*53 = 660.5, dibulatkan ke atas */
+  .table-scroll.jt-hist-limited{ max-height:452px; overflow-y:auto; }        /* XAU  : 24.5 + 8*53 = 448.5, dibulatkan ke atas */
   .table-scroll.jt-hist-limited.jt-hist-kripto{ max-height:532px; }          /* Kripto: 24.5 + 12*42 = 528.5, dibulatkan ke atas */
   .jt-insight-limited{ max-height:230px; overflow-y:auto; }
+  .jt-insight-koin{ max-height:430px; overflow-y:auto; }   /* 12 koin x ~35.8px */
 
   /* Scrollbar gelap - menyatu dengan latar, dipakai di semua area scroll (riwayat trade, ringkasan per koin, pola emosi) */
   .table-scroll, .jt-insight-limited{ scrollbar-color: var(--border) var(--surface); scrollbar-width: thin; }
@@ -327,7 +329,7 @@
 
   /* ---------- Divider between journals ---------- */
   .jt-divider{
-    max-width:1800px;margin:36px auto 6px;padding:0 24px;
+    max-width:1800px;margin:14px auto 6px;padding:0 24px;
     display:flex;align-items:center;gap:14px;
   }
   .jt-divider .line{flex:1;height:1px;background:var(--border);}
@@ -370,7 +372,7 @@
   .jt-signout-btn:hover{ color:var(--ink); border-color:var(--ink-dim); }
 </style>
 
-<div class="wrap">
+<div class="wrap jt-wrap-xau">
 
   <div class="jt-viewer-bar">
     <span id="jtViewerNote">Memuat...</span>
@@ -607,7 +609,7 @@
 
       <div class="card">
         <div class="card-head"><h2>Ringkasan per Koin</h2></div>
-        <div id="cPairInsight" class="jt-insight-limited">
+        <div id="cPairInsight" class="jt-insight-limited jt-insight-koin">
           <p style="font-size:12.5px;color:var(--ink-faint);margin:0">Belum ada data.</p>
         </div>
       </div>
