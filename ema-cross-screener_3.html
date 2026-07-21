@@ -185,8 +185,19 @@
     font-family: var(--font-display);
     letter-spacing:-0.01em;
     display:flex;
-    align-items:center;      /* buletan hijau sejajar tengah tulisan */
+    align-items:stretch;     /* kotak emas ikut setinggi blok tulisan */
     gap:12px;
+  }
+  /* Kotak emas persegi panjang membungkus buletan hijau. Tingginya mengikuti
+     tinggi tulisan (Jadi Trader + Tools), lebarnya sempit supaya jadi portrait. */
+  .es-title-badge{
+    flex-shrink:0;
+    width:22px;
+    border:1.5px solid var(--gold);
+    border-radius:5px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
   }
   .es-title-text{
     display:flex;
@@ -781,9 +792,12 @@
   }
   .es-priority-controls select:hover{ border-color: var(--dim); }
   /* Baris filter Pantau jangan mepet ke kartu grafik di bawahnya */
-  [data-section="pantau"] .es-priority-controls{ margin:12px 0 16px; }
+  [data-section="pantau"] .es-priority-controls{ margin:12px 0 2px; }
   /* dan kartu jangan mepet ke scrollbar geser */
-  #esPantauGrid{ padding-bottom:16px; }
+  /* Ruang untuk cahaya 3 koin terbaik (kalau tidak, terpotong kontainer scroll).
+     scroll-snap dimatikan di sini - kalau tidak, grid auto-geser sejauh padding
+     kiri saat dimuat sehingga cahaya kartu paling kiri ikut terpotong. */
+  #esPantauGrid{ padding:22px 18px; scroll-snap-type:none; }
   /* Semua kontrol di baris ini disamakan tingginya (32px), font, padding, dan
      radius-nya - sebelumnya select, tombol, tombol kelola koin, dan badge rezim
      punya ukuran sendiri-sendiri sehingga barisnya terlihat bergerigi. */
@@ -1637,7 +1651,7 @@
   .es-sim-table td.pnl-neg{ color: var(--bear); }
   .es-psim-source-link{ cursor:pointer; }
   .es-psim-source-link:hover{ opacity:0.75; }
-  .es-sumber-cell{ display:flex; align-items:center; gap:0; }
+  .es-sumber-cell{ display:flex; align-items:center; gap:0; flex-wrap:wrap; }
   .es-sumber-cell .es-psim-source-link{ display:inline-block; min-width:74px; }
   .es-venue-badge{
     display:inline-block;
@@ -1645,14 +1659,20 @@
     font-size:8.5px;
     font-weight:700;
     color: var(--gold);
-    border:1px solid var(--gold);
-    border-radius:4px;
-    padding:1px 5px;
     margin-left:6px;
     letter-spacing:.02em;
     vertical-align:middle;
   }
-  .es-venue-badge.live{ color: #e0883a; border-color: #e0883a; }
+  .es-venue-badge.live{ color: #e0883a; }
+  .es-src-star{
+    display:inline-block; margin-left:6px; font-size:11px; line-height:1;
+    vertical-align:middle; cursor:help;
+  }
+  .es-src-star.ai{ color:#9C6BFF; }      /* ungu - AI konfluensi */
+  .es-src-star.snr{ color:#4A9BE0; }      /* biru - SNR */
+  .es-src-star.bbma{ color:#E0C24A; }     /* kuning - BBMA */
+  .es-src-star.pantau{ color:var(--gold); }  /* emas - Pantau */
+  .es-src-star.lain{ color:var(--dim); }
   .es-psim-close-btn{
     background:none;
     border:none;
@@ -1842,7 +1862,7 @@
   <div class="es-header">
     <div>
       <div class="es-title">
-        <span class="dot"></span>
+        <span class="es-title-badge"><span class="dot"></span></span>
         <span class="es-title-text">
           <span class="es-title-main">Jadi Trader</span>
           <span class="es-title-sub">Tools</span>
@@ -5989,6 +6009,24 @@
     return notional / entryPrice;
   }
 
+  // Bintang berwarna penanda dari sinyal mana posisi ini berasal. Warna:
+  // ungu=AI konfluensi, biru=SNR, kuning=BBMA, emas=Pantau. Hover -> keterangan.
+  const ES_SIGNAL_STAR = {
+    ai:       { cls:'ai',    label:'Sinyal AI Konfluensi' },
+    snr:      { cls:'snr',   label:'Sinyal SNR' },
+    priority: { cls:'bbma',  label:'Sinyal BBMA' },
+    pantau:   { cls:'pantau',label:'Sinyal Pantau Kripto' },
+    favcross: { cls:'lain',  label:'Sinyal Entry Koin Favorit' },
+    cross:    { cls:'lain',  label:'Sinyal Cross EMA' },
+    favorite: { cls:'lain',  label:'Sinyal Koin Favorit' },
+    ict:      { cls:'lain',  label:'Sinyal Prioritas ICT' }
+  };
+  function signalStarHtml(signalType){
+    const s = ES_SIGNAL_STAR[signalType];
+    if(!s) return '';
+    return '<span class="es-src-star ' + s.cls + '" title="' + s.label + '">&#9733;</span>';
+  }
+
   function venueBadgeHtml(venue){
     if(venue === 'live-real') return '<span class="es-venue-badge live">Binance Live</span>';
     if(venue === 'live-testnet') return '<span class="es-venue-badge">Binance Testnet</span>';
@@ -6006,11 +6044,11 @@
     return notional * PSIM_FUNDING_RATE_PER_8H * fundingIntervals;
   }
 
-  function openPrioritySimPosition(key, source, tfLabel, tfValue, dir, entryPrice, sl, tp1, tp2, time){
+  function openPrioritySimPosition(key, source, tfLabel, tfValue, dir, entryPrice, sl, tp1, tp2, time, signalType){
     const margin = currentPsimMargin();
     const leverage = currentPsimLeverage();
     const qty = (margin * leverage) / entryPrice;
-    prioritySimPositions[key] = { key, source, tfLabel, tfValue, dir, entryPrice, entryTime: time, sl, tp1, tp2, tp1Hit:false, tp2Hit:false, margin, leverage, qty, venue:'sim' };
+    prioritySimPositions[key] = { key, source, tfLabel, tfValue, dir, entryPrice, entryTime: time, sl, tp1, tp2, tp1Hit:false, tp2Hit:false, margin, leverage, qty, venue:'sim', signalType: signalType || null };
     savePrioritySimState();
   }
 
@@ -6042,7 +6080,8 @@
       venue: env === 'live' ? 'live-real' : 'live-testnet',
       liveOrderId: orderIds.entryOrderId, liveSlOrderId: orderIds.slOrderId,
       liveTp1OrderId: orderIds.tp1OrderId, liveTp2OrderId: orderIds.tp2OrderId,
-      entryMethod: entryMethod || 'partial', virtualTp1: virtualTp1 ? parseFloat(virtualTp1) : null
+      entryMethod: entryMethod || 'partial', virtualTp1: virtualTp1 ? parseFloat(virtualTp1) : null,
+      signalType: cand.source || null
     };
     initSlPlusRatchet(prioritySimPositions[key]);
     savePrioritySimState();
@@ -6064,7 +6103,8 @@
       venue: env === 'live' ? 'live-real' : 'live-testnet',
       liveOrderId: entryOrderId, liveSlOrderId: null, liveTp1OrderId: null, liveTp2OrderId: null,
       entryMethod: entryMethod || 'partial', virtualTp1: virtualTp1 ? parseFloat(virtualTp1) : null,
-      pending: true, pendingOrderType: orderTypeCfg.label, pendingIsAlgo: !!isAlgoEntry
+      pending: true, pendingOrderType: orderTypeCfg.label, pendingIsAlgo: !!isAlgoEntry,
+      signalType: cand.source || null
     };
     initSlPlusRatchet(prioritySimPositions[key]);
     savePrioritySimState();
@@ -6120,7 +6160,7 @@
     // perkiraan) sebelum ditutup - bukti angkanya cocok dengan Binance asli.
     const verified = isLive && pos.venue==='live-real' && pos.actualRealizedPnl !== undefined && pos.actualRealizedPnl !== null;
     prioritySimHistory.unshift({ source: pos.source, tfLabel: pos.tfLabel, tfValue: pos.tfValue, dir: pos.dir, entryPrice: pos.entryPrice, entryTime: pos.entryTime,
-      exitPrice, exitTime: time, reason, exchangeFee, marginFee, pnl, pnlPct, tpStatus, venue: pos.venue || 'sim', verified });
+      exitPrice, exitTime: time, reason, exchangeFee, marginFee, pnl, pnlPct, tpStatus, venue: pos.venue || 'sim', verified, signalType: pos.signalType || null });
     delete prioritySimPositions[key];
     savePrioritySimState();
     markEsCloudDirty(); esSyncNow(); // dorong ke cloud SEKARANG - posisi baru saja tertutup, jangan tunggu siklus 15 detik
@@ -6563,7 +6603,7 @@
     // Disamakan dengan preview & order live: TP2 selalu 2x jarak risiko, supaya
     // posisi simulasi berperilaku sama dengan posisi live yang sebenarnya.
     const tp2 = cand.signal==='BUY' ? entryPrice + riskDist*2 : entryPrice - riskDist*2;
-    openPrioritySimPosition(key, cand.symbol, cand.tfLabel, cand.tfValue, cand.signal, entryPrice, sl, tp1, tp2, Date.now());
+    openPrioritySimPosition(key, cand.symbol, cand.tfLabel, cand.tfValue, cand.signal, entryPrice, sl, tp1, tp2, Date.now(), cand.source);
     renderPrioritySimUI(window.__esLastTickers||{});
     priorityStatusEl.classList.remove('error');
     priorityStatusEl.textContent = `Posisi ${cand.signal} untuk ${cand.symbol.replace('USDT','')} (TF ${cand.tfLabel}) dibuka di simulasi.`;
@@ -6675,10 +6715,10 @@
 
     const pendingRowsHtml = pendingList.map(pos=>{
       const arahCls = pos.dir==='BUY' ? 'arah-buy' : 'arah-sell';
-      const label = `${pos.source.replace('USDT','')} (${pos.tfLabel})`;
+      const label = `${pos.source.replace('USDT','')}`;
       const venueBadge = venueBadgeHtml(pos.venue);
       return `<tr class="es-psim-pending-row">
-        <td><div class="es-sumber-cell"><span class="es-psim-source-link" data-symbol="${pos.source}" data-tf="${pos.tfValue||''}">${label}</span>${venueBadge}</div></td>
+        <td><div class="es-sumber-cell"><span class="es-psim-source-link" data-symbol="${pos.source}" data-tf="${pos.tfValue||''}">${label}</span>${signalStarHtml(pos.signalType)}${venueBadge}</div></td>
         <td class="${arahCls}">${pos.dir}</td>
         <td>$${fmtPrice(pos.entryPrice)} <span class="es-psim-pending-badge">MENGGANTUNG (${pos.pendingOrderType})</span></td>
         <td>$${fmtPrice(pos.sl)}</td>
@@ -6711,7 +6751,7 @@
       psimOpenTbody.innerHTML = pendingRowsHtml + openStats.map(({pos, price, floatPnl, floatPct, potentialSlPnl, exchangeFee, marginFee, isLive})=>{
         const pnlCls = floatPnl>=0 ? 'pnl-pos':'pnl-neg';
         const arahCls = pos.dir==='BUY' ? 'arah-buy' : 'arah-sell';
-        const label = `${pos.source.replace('USDT','')} (${pos.tfLabel})`;
+        const label = `${pos.source.replace('USDT','')}`;
         const venueBadge = venueBadgeHtml(pos.venue);
         const riskSlDisplay = pos.tp1Hit ? 'BE/TP1' : `-$${Math.abs(potentialSlPnl).toFixed(2)}`;
         const areaTpLabel = pos.tp2Hit ? 'Hit TP2' : (pos.tp1Hit ? 'Hit TP1' : '-');
@@ -6736,7 +6776,7 @@
           ? buildEditSlTpFormHtml(pos)
           : `<button type="button" class="es-psim-close-btn ${closeCls}" data-key="${pos.key}">Close Posisi</button>${isLiveEditable ? `<button type="button" class="es-psim-edit-sltp-btn ${closeCls}" data-key="${pos.key}" title="Edit SL/TP"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg></button>` : ''}`;
         return `<tr>
-          <td><div class="es-sumber-cell"><span class="es-psim-source-link" data-symbol="${pos.source}" data-tf="${pos.tfValue||''}">${label}</span>${venueBadge}</div></td>
+          <td><div class="es-sumber-cell"><span class="es-psim-source-link" data-symbol="${pos.source}" data-tf="${pos.tfValue||''}">${label}</span>${signalStarHtml(pos.signalType)}${venueBadge}</div></td>
           <td class="${arahCls}">${pos.dir}</td>
           <td>$${fmtPrice(pos.entryPrice)}</td>
           <td>$${fmtPrice(pos.sl)}</td>
@@ -6818,11 +6858,11 @@
       psimHistTbody.innerHTML = prioritySimHistory.slice(0,50).map(t=>{
         const pnlCls = t.pnl>=0 ? 'pnl-pos':'pnl-neg';
         const arahCls = t.dir==='BUY' ? 'arah-buy' : 'arah-sell';
-        const label = `${t.source.replace('USDT','')} (${t.tfLabel})`;
+        const label = `${t.source.replace('USDT','')}`;
         const venueBadge = venueBadgeHtml(t.venue);
         const tpStatusCls = t.tpStatus && t.tpStatus!=='-' ? 'pnl-pos' : '';
         return `<tr>
-          <td><div class="es-sumber-cell"><span class="es-psim-source-link" data-symbol="${t.source}" data-tf="${t.tfValue||''}">${label}</span>${venueBadge}</div></td>
+          <td><div class="es-sumber-cell"><span class="es-psim-source-link" data-symbol="${t.source}" data-tf="${t.tfValue||''}">${label}</span>${signalStarHtml(t.signalType)}${venueBadge}</div></td>
           <td class="${arahCls}">${t.dir}</td>
           <td>$${fmtPrice(t.entryPrice)}</td>
           <td>$${fmtPrice(t.exitPrice)}</td>
