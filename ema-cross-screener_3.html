@@ -111,7 +111,13 @@
     flex:1;
     overflow-y:auto;
     overflow-x:hidden;
+    scrollbar-width:thin;
+    scrollbar-color: var(--border) var(--panel-2);
   }
+  .es-econ-calendar-body::-webkit-scrollbar{ width:8px; }
+  .es-econ-calendar-body::-webkit-scrollbar-track{ background: var(--panel-2); border-radius:4px; }
+  .es-econ-calendar-body::-webkit-scrollbar-thumb{ background: var(--border); border-radius:4px; }
+  .es-econ-calendar-body::-webkit-scrollbar-thumb:hover{ background: var(--dim); }
   .es-econ-head-row{
     display:flex; align-items:center; justify-content:space-between; gap:8px;
   }
@@ -7322,18 +7328,25 @@
   let geserAktif = false, sedangGeser = false;
   let mulaiX = 0, mulaiY = 0, panelX = 0, panelY = 0;
 
-  function jepitKeLayar(x, y){
-    const r = econCalendarPanel.getBoundingClientRect();
-    const maxX = Math.max(0, window.innerWidth  - r.width);
-    const maxY = Math.max(0, window.innerHeight - r.height);
-    return { x: Math.min(Math.max(0, x), maxX), y: Math.min(Math.max(0, y), maxY) };
+  // Posisi disimpan sebagai jarak dari tepi KANAN & ATAS layar, bukan kiri.
+  // Panel dijangkar dari kanan (align-items:flex-end), jadi saat kalender
+  // dibuka isinya melebar KE KIRI dan tombolnya tetap diam - kalau dijangkar
+  // dari kiri, tombol ikut terdorong ke kanan sejauh lebar konten tiap dibuka.
+  function jepitKeLayar(right, top){
+    // Ukur dari tombolnya (lebarnya tetap), bukan panel yang lebarnya berubah
+    // saat kalender buka/tutup.
+    const rt = econCalendarTrigger.getBoundingClientRect();
+    const maxRight = Math.max(0, window.innerWidth  - rt.width);
+    const maxTop   = Math.max(0, window.innerHeight - rt.height);
+    return { right: Math.min(Math.max(0, right), maxRight),
+             top:   Math.min(Math.max(0, top),   maxTop) };
   }
 
-  function terapkanPosisi(x, y){
-    const p = jepitKeLayar(x, y);
-    econCalendarPanel.style.left = p.x + 'px';
-    econCalendarPanel.style.top  = p.y + 'px';
-    econCalendarPanel.style.right = 'auto';
+  function terapkanPosisi(right, top){
+    const p = jepitKeLayar(right, top);
+    econCalendarPanel.style.right = p.right + 'px';
+    econCalendarPanel.style.top   = p.top + 'px';
+    econCalendarPanel.style.left  = 'auto';
     return p;
   }
 
@@ -7342,19 +7355,28 @@
       const raw = localStorage.getItem(ECON_POS_KEY);
       if(!raw) return;
       const p = JSON.parse(raw);
-      if(typeof p.x === 'number' && typeof p.y === 'number') terapkanPosisi(p.x, p.y);
+      if(typeof p.right === 'number' && typeof p.top === 'number'){
+        terapkanPosisi(p.right, p.top);
+      } else if(typeof p.x === 'number' && typeof p.y === 'number'){
+        // Format lama (berbasis kiri) - konversi ke berbasis kanan lalu tulis
+        // balik supaya tidak dikonversi ulang tiap refresh.
+        const rt = econCalendarTrigger.getBoundingClientRect();
+        const q = terapkanPosisi(window.innerWidth - (p.x + rt.width), p.y);
+        simpanPosisiEcon(q.right, q.top);
+      }
     }catch(e){}
   }
 
-  function simpanPosisiEcon(x, y){
-    try{ localStorage.setItem(ECON_POS_KEY, JSON.stringify({ x, y })); }catch(e){}
+  function simpanPosisiEcon(right, top){
+    try{ localStorage.setItem(ECON_POS_KEY, JSON.stringify({ right, top })); }catch(e){}
   }
 
   econCalendarTrigger.addEventListener('pointerdown', (e)=>{
     if(e.button !== undefined && e.button !== 0) return;   // klik kanan/tengah jangan dianggap geser
     geserAktif = true; sedangGeser = false;
-    const r = econCalendarPanel.getBoundingClientRect();
-    panelX = r.left; panelY = r.top;
+    const rt = econCalendarTrigger.getBoundingClientRect();
+    // panelX di sini = jarak tepi kanan tombol ke tepi kanan layar
+    panelX = window.innerWidth - rt.right; panelY = rt.top;
     mulaiX = e.clientX; mulaiY = e.clientY;
     econCalendarTrigger.setPointerCapture(e.pointerId);
   });
@@ -7365,7 +7387,8 @@
     if(!sedangGeser && Math.hypot(dx, dy) < GESER_MINIMAL) return;
     if(!sedangGeser){ sedangGeser = true; econCalendarPanel.classList.add('dragging'); }
     e.preventDefault();
-    terapkanPosisi(panelX + dx, panelY + dy);
+    // geser ke kanan (dx>0) MENGURANGI jarak dari kanan
+    terapkanPosisi(panelX - dx, panelY + dy);
   });
 
   function selesaiGeser(e){
@@ -7374,8 +7397,8 @@
     econCalendarPanel.classList.remove('dragging');
     try{ econCalendarTrigger.releasePointerCapture(e.pointerId); }catch(err){}
     if(sedangGeser){
-      const r = econCalendarPanel.getBoundingClientRect();
-      simpanPosisiEcon(r.left, r.top);
+      const rt = econCalendarTrigger.getBoundingClientRect();
+      simpanPosisiEcon(window.innerWidth - rt.right, rt.top);
     }
   }
   econCalendarTrigger.addEventListener('pointerup', selesaiGeser);
@@ -7383,10 +7406,10 @@
 
   // Kalau ukuran jendela berubah, tarik kembali tombol yang jadi di luar layar.
   window.addEventListener('resize', ()=>{
-    if(!econCalendarPanel.style.left) return;
-    const r = econCalendarPanel.getBoundingClientRect();
-    const p = terapkanPosisi(r.left, r.top);
-    simpanPosisiEcon(p.x, p.y);
+    if(econCalendarPanel.style.right === '' || econCalendarPanel.style.right === 'auto') return;
+    const rt = econCalendarTrigger.getBoundingClientRect();
+    const p = terapkanPosisi(window.innerWidth - rt.right, rt.top);
+    simpanPosisiEcon(p.right, p.top);
   });
 
   econCalendarTrigger.addEventListener('click', (e)=>{
