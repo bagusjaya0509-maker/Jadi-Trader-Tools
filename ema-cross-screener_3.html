@@ -183,12 +183,27 @@
 
   .es-title{
     font-family: var(--font-display);
-    font-weight:700;
-    font-size:22px;
     letter-spacing:-0.01em;
     display:flex;
-    align-items:flex-start;
-    gap:10px;
+    align-items:center;      /* buletan hijau sejajar tengah tulisan */
+    gap:12px;
+  }
+  .es-title-text{
+    display:flex;
+    flex-direction:column;
+    line-height:1.02;         /* "Tools" tepat di bawah "Jadi Trader" */
+  }
+  .es-title-main{
+    font-weight:700;
+    font-size:27px;
+  }
+  .es-title-sub{
+    font-weight:600;
+    font-size:14px;
+    color: var(--muted);
+    letter-spacing:0.16em;
+    text-transform:uppercase;
+    margin-top:1px;
   }
   .es-title-glyph{
     width:40px;height:40px;border:1px solid var(--gold);border-radius:4px;
@@ -248,8 +263,8 @@
     justify-content:flex-end;   /* nav menempel di sebelah kiri identitas user */
     gap:10px;
     flex-wrap:wrap;
-    padding-top:4px;
-    margin-bottom:10px;
+    padding-top:2px;
+    margin-bottom:4px;
   }
   .es-topnav{
     display:flex;
@@ -967,14 +982,14 @@
     transition: border-color .2s ease, box-shadow .2s ease;
     animation: pantauGlow 2.4s ease-in-out infinite;
   }
-  .es-card.pantau.top3.buy { border-color: var(--bull); }
-  .es-card.pantau.top3.sell{ border-color: var(--bear); }
+  /* Border 3 koin terbaik DISAMAKAN dengan kartu lain (netral). Yang
+     membedakan cuma CAHAYA di belakangnya - merah untuk SELL, hijau BUY. */
   @keyframes pantauGlow{
-    0%,100%{ box-shadow:0 0 8px 0 var(--glow-c); }
-    50%    { box-shadow:0 0 20px 3px var(--glow-c); }
+    0%,100%{ box-shadow:0 0 10px 1px var(--glow-c); }
+    50%    { box-shadow:0 0 24px 5px var(--glow-c); }
   }
-  .es-card.pantau.top3.buy { --glow-c: var(--bull-dim); }
-  .es-card.pantau.top3.sell{ --glow-c: var(--bear-dim); }
+  .es-card.pantau.top3.buy { --glow-c: rgba(79,158,130,0.75); }   /* --bull */
+  .es-card.pantau.top3.sell{ --glow-c: rgba(192,90,78,0.75); }    /* --bear */
 
   /* ===== Sinyal Prioritas AI ===== */
   .es-ai-regime{
@@ -986,10 +1001,7 @@
     white-space:nowrap;
   }
   .es-ai-regime-badge{
-    font-weight:700;
-    padding:3px 8px;
-    border-radius:6px;
-    border:1px solid currentColor;
+    font-weight:700;   /* tanpa kotak/outline - cukup teks berwarna */
   }
   .es-ai-regime-badge.bull{ color: var(--bull); }
   .es-ai-regime-badge.bear{ color: var(--bear); }
@@ -1829,7 +1841,13 @@
   </div>
   <div class="es-header">
     <div>
-      <div class="es-title"><span class="dot"></span>Jadi Trader Tools</div>
+      <div class="es-title">
+        <span class="dot"></span>
+        <span class="es-title-text">
+          <span class="es-title-main">Jadi Trader</span>
+          <span class="es-title-sub">Tools</span>
+        </span>
+      </div>
       <div class="es-sub" id="esSubtitle"></div>
     </div>
   </div>
@@ -2213,6 +2231,20 @@
     'emaScreenerCollapsedSections_v1'
   ];
 
+  // Layout default untuk pengguna BARU: kunci-kunci tata letak SAJA (daftar
+  // koin, favorit, setelan sim, section yang disembunyikan) - TANPA posisi
+  // trade (emaScreenerPrioritySim_v1). Pemilik menerbitkan layoutnya; pengguna
+  // baru mewarisinya SEKALI saat pertama login, lalu bebas mengubah sendiri.
+  const OWNER_EMAIL = 'bagusjaya0509@gmail.com';
+  const ES_LAYOUT_KEYS = [
+    'emaScreenerActiveSymbols_v1',
+    'emaScreenerFavCrossSymbols_v1',
+    'emaScreenerFavorites_v1',
+    'emaScreenerPsimSettings_v1',
+    'emaScreenerCollapsedSections_v1'
+  ];
+  let esIsOwner = false;
+
   const esAuthGateEl = document.getElementById('esAuthGate');
   const esAuthStatusEl = document.getElementById('esAuthStatus');
   const esGoogleLoginBtn = document.getElementById('esGoogleLoginBtn');
@@ -2316,8 +2348,49 @@
         localStorage.setItem(ES_PUSH_PENDING_KEY, '0');
         localStorage.setItem(ES_LAST_SYNC_KEY, String(stempel));
       }catch(e){}
+      // Pemilik: tiap kali layoutnya tersimpan, terbitkan juga sebagai default
+      // untuk pengguna baru (auto-publish). Fire-and-forget - gagal di sini
+      // tidak boleh mengganggu simpan utama.
+      if(esIsOwner) esPublishLayoutDefault().catch(function(){});
       return stempel;
     });
+  }
+
+  // Kunci layout mana pun yang punya isinya dianggap "sudah punya layout".
+  function esAdaLayoutTersimpan(data){
+    if(!data) return false;
+    return ES_LAYOUT_KEYS.some(function(k){ return typeof data[k] === 'string'; });
+  }
+
+  // Pemilik menerbitkan layout-nya ke dokumen bersama config/defaultLayout.
+  function esPublishLayoutDefault(){
+    const payload = {};
+    ES_LAYOUT_KEYS.forEach(function(k){
+      const v = localStorage.getItem(k);
+      if(v !== null) payload[k] = v;
+    });
+    payload._updatedAt = Date.now();
+    return esDb.collection('config').doc('defaultLayout').set(payload, { merge: true });
+  }
+
+  // Pengguna BARU non-owner: tanam layout default ke localStorage + dokumennya
+  // sendiri, sekali saja. Posisi trade TIDAK ikut (tetap kosong).
+  function esSeedLayoutDefault(uid){
+    return esDb.collection('config').doc('defaultLayout').get().then(function(doc){
+      if(!doc.exists) return false;
+      const data = doc.data() || {};
+      let changed = false;
+      ES_LAYOUT_KEYS.forEach(function(k){
+        if(typeof data[k] === 'string'){
+          try{ localStorage.setItem(k, data[k]); changed = true; }catch(e){}
+        }
+      });
+      if(changed){
+        tandaiPerluDidorong();
+        esSaveToCloud(uid).catch(function(){});
+      }
+      return changed;
+    }).catch(function(){ return false; });
   }
 
   // ---- Gerigi "Simpan & Sinkronkan" di judul Simulasi ----------------------
@@ -2359,7 +2432,10 @@
       : '<span class="ok">Semua sudah tersimpan</span>';
     syncInfo.innerHTML = statusTeks
       + '<br>Posisi terbuka: <b>' + nPos + '</b>'
-      + '<br>Sinkron terakhir: <b>' + (waktuSingkat(last) || 'belum pernah') + '</b>';
+      + '<br>Sinkron terakhir: <b>' + (waktuSingkat(last) || 'belum pernah') + '</b>'
+      + (esIsOwner
+          ? '<br><span class="ok">Layout ini jadi default untuk pengguna baru</span>'
+          : '');
   }
 
   function pasangTombolSync(){ perbaruiInfoSync(); }
@@ -2410,6 +2486,7 @@
   esAuth.onAuthStateChanged(function(user){
     if(user){
       esCurrentUid = user.uid;
+      esIsOwner = (user.email || '').trim().toLowerCase() === OWNER_EMAIL;
       esAuthGateEl.style.display = 'none';
       esUserBarEl.style.display = 'flex';
       esUserAvatarEl.src = user.photoURL || '';
@@ -2422,9 +2499,17 @@
       // nyala lagi selama halaman tetap terbuka), jadi aman - tidak akan
       // menyela pemantauan posisi live yang sedang berjalan.
       esAuthStatusEl.textContent = 'Menyinkronkan data...';
-      esLoadFromCloud(user.uid).then(function(changed){
+      esDb.collection('users').doc(user.uid).get().then(function(doc){
+        const punyaLayout = doc.exists && esAdaLayoutTersimpan(doc.data());
+        // Pengguna BARU (bukan pemilik, belum punya layout apa pun) -> warisi
+        // layout default sekali. Kalau berhasil, reload supaya tampilan ikut.
+        if(!esIsOwner && !punyaLayout){
+          return esSeedLayoutDefault(user.uid);   // true kalau ada default yang ditanam
+        }
+        return esLoadFromCloud(user.uid);          // true kalau ada perubahan dari device lain
+      }).then(function(changed){
         esAuthStatusEl.textContent = '';
-        if(changed) location.reload();
+        if(changed === true) location.reload();    // satu reload, apa pun jalurnya
       }).catch(function(){ esAuthStatusEl.textContent = ''; });
 
       if(esCloudSyncTimer) clearInterval(esCloudSyncTimer);
