@@ -151,6 +151,8 @@
   .bt-badge.pantau{ background:rgba(242,184,75,0.16); color:var(--gold); }
   .bt-badge.sync{ background:var(--panel-2); color:var(--muted); }
   .bt-badge.sim{ background:var(--panel-2); color:var(--muted); }
+  .bt-badge.venue-demo{ background:var(--panel-2); color:var(--muted); }
+  .bt-badge.venue-live{ background:rgba(224,136,58,0.16); color:#e0883a; }
   .bt-badge.win{ background:var(--bull-dim); color:var(--bull); }
   .bt-badge.loss{ background:var(--bear-dim); color:var(--bear); }
   .bt-badge.be{ background:var(--panel-2); color:var(--muted); }
@@ -976,6 +978,11 @@
       `<circle cx="${xAt(titik.length-1).toFixed(1)}" cy="${yAt(akhir).toFixed(1)}" r="3.5" fill="${warna}"/>`;
   }
 
+  function venueBadgeBt(venue){
+    return venue==='live-real'
+      ? '<span class="bt-badge venue-live">Binance Live</span>'
+      : '<span class="bt-badge venue-demo">Demo</span>';
+  }
   const NAMA_SUMBER = { bbma:'BBMA', snr:'SNR', ai:'AI', pantau:'Pantau', crosshunter:'Parallel', sync:'Sinkron', sim:'Simulasi' };
 
   function renderTrades(trades){
@@ -991,7 +998,7 @@
         <td>${fmtWaktu(t.waktuExit)}</td>
         <td>${t.symbol.replace('USDT','')}</td>
         <td class="bt-flat">${t.tfLabel||'-'}</td>
-        <td><span class="bt-badge ${t.strategi}">${NAMA_SUMBER[t.strategi]||t.strategi}</span></td>
+        <td><span class="bt-badge ${t.strategi}">${NAMA_SUMBER[t.strategi]||t.strategi}</span> ${venueBadgeBt(t.venue)}</td>
         <td class="${t.arah==='BUY'?'bt-dir-buy':'bt-dir-sell'}">${t.arah}</td>
         <td>$${fmtHarga(t.entry)}</td>
         <td>$${fmtHarga(t.exit)}</td>
@@ -1010,7 +1017,6 @@
     const el = document.getElementById('btOpenTbody');
     if(!posisi.length){ el.innerHTML='<tr><td colspan="9" class="bt-empty">Belum ada posisi terbuka.</td></tr>'; return; }
     el.innerHTML = posisi.map(p=>{
-      const venue = p.venue==='live-real'?'Live':p.venue==='live-testnet'?'Testnet':'Simulasi';
       return `<tr>
         <td>${(p.source||'').replace('USDT','')}</td>
         <td class="bt-flat">${p.tfLabel||'-'}</td>
@@ -1020,7 +1026,7 @@
         <td>$${fmtHarga(p.sl)}</td>
         <td>$${fmtHarga(p.tp1)}</td>
         <td>$${p.tp2!=null?fmtHarga(p.tp2):'-'}</td>
-        <td class="bt-flat">${venue}</td>
+        <td>${venueBadgeBt(p.venue)}</td>
       </tr>`;
     }).join('');
   }

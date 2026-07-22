@@ -794,7 +794,9 @@
   }
   .es-priority-controls select:hover{ border-color: var(--dim); }
   /* Baris filter Pantau jangan mepet ke kartu grafik di bawahnya */
-  [data-section="pantau"] .es-priority-controls{ margin:12px 0 2px; }
+  /* Section Pantau (paling atas) - garis pembatas & header dihapus, margin dirapikan */
+  .es-pantau-top{ border-top:none !important; margin-top:6px !important; padding-top:0 !important; }
+  [data-section="pantau"] .es-priority-controls{ margin:2px 0 2px; }
   /* dan kartu jangan mepet ke scrollbar geser */
   /* Ruang untuk cahaya 3 koin terbaik (kalau tidak, terpotong kontainer scroll).
      scroll-snap dimatikan di sini - kalau tidak, grid auto-geser sejauh padding
@@ -1100,6 +1102,25 @@
   }
   .es-priority-trade-btn:hover{ background: rgba(242,184,75,0.12); }
   .es-priority-trade-btn:disabled{ opacity:.5; cursor:not-allowed; }
+  /* Tombol aksi ikut arah sinyal: BUY hijau, SELL merah */
+  .es-priority-trade-btn.buy { border-color: var(--bull); color: var(--bull); }
+  .es-priority-trade-btn.sell{ border-color: var(--bear); color: var(--bear); }
+  .es-priority-trade-btn.buy:hover { background: var(--bull-dim); }
+  .es-priority-trade-btn.sell:hover{ background: var(--bear-dim); }
+
+  /* Tombol "Cari Sinyal Parallel": teks putih, border standar, cahaya kedap-kedip
+     bergantian merah <-> hijau. */
+  #esChBtn{
+    color:#fff;
+    border-color: var(--border);
+    background: var(--panel);
+    animation: chScanGlow 1.6s ease-in-out infinite;
+  }
+  #esChBtn:hover{ background: var(--panel-2); }
+  @keyframes chScanGlow{
+    0%,100%{ box-shadow:0 0 9px 1px rgba(192,90,78,0.75); }   /* merah (--bear) */
+    50%    { box-shadow:0 0 9px 1px rgba(79,158,130,0.75); }  /* hijau (--bull) */
+  }
 
   .es-fav-section{
     margin-top:16px;
@@ -1260,7 +1281,7 @@
 
   .es-sim-section{
     margin-top:24px;
-    padding-top:18px;
+    padding-top:12px;
     border-top:1px solid var(--border);
   }
   .es-sim-title{
@@ -1444,7 +1465,7 @@
   .es-sim-title-row{
     display:flex;
     align-items:center;
-    justify-content:space-between;
+    justify-content:flex-end;
     gap:12px;
   }
   .es-sync-dropdown{ min-width:230px; }
@@ -1679,6 +1700,7 @@
     vertical-align:middle;
   }
   .es-venue-badge.live{ color: #e0883a; }
+  .es-venue-badge.demo{ color: var(--muted); }
   .es-src-star{
     display:inline-block; margin-left:6px; font-size:11px; line-height:1;
     vertical-align:middle; cursor:help;
@@ -1971,13 +1993,7 @@
   </div>
 
 
-  <div class="es-priority-section es-collapsible" data-section="pantau">
-    <div class="es-priority-header es-section-head">
-      <div class="es-priority-title">Sinyal Pantau Kripto</div>
-      <button type="button" class="es-section-toggle" title="Sembunyikan section">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
-      </button>
-    </div>
+  <div class="es-priority-section es-collapsible es-pantau-top" data-section="pantau">
     <div class="es-section-body">
       <div class="es-priority-controls">
         <select id="esPantauTf">
@@ -2182,7 +2198,6 @@
 
   <div class="es-sim-section">
     <div class="es-sim-title-row">
-      <div class="es-sim-title">Simulasi - Entri Live Sinyal</div>
       <div class="es-sim-settings">
         <button type="button" id="esSyncBtn" class="es-sim-settings-btn" title="Simpan &amp; sinkronkan"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></button>
         <div class="es-sim-settings-dropdown es-sync-dropdown" id="esSyncDropdown">
@@ -2239,7 +2254,7 @@
       <label class="es-sim-checkbox-label">Aktif
         <input type="checkbox" id="esPsimToggle" checked>
       </label>
-      <button id="esPsimOpenBtn">Open Posisi</button>
+      <button id="esPsimOpenBtn">Open Posisi Demo</button>
     </div>
     <div class="es-live-trade-box" id="esLiveTradeBox">
       <div class="es-live-trade-title-row">
@@ -4349,7 +4364,7 @@
         </div>
         <div class="es-priority-note">Note EMA9/21: ${emaNoteText}</div>
         <div class="es-priority-note">Note ${stochText}</div>
-        <button class="es-priority-trade-btn" type="button">Pilih Sinyal Ini</button>
+        <button class="es-priority-trade-btn ${signalCls}" type="button">${c.signal} NOW</button>
       </div>`;
     }).join('');
 
@@ -5328,7 +5343,7 @@
           <div class="es-priority-level-row">Take Profit: <strong>TP1 $${fmtPrice(c.tp)}</strong> &bull; <strong>TP2 $${fmtPrice(tp2)}</strong></div>
           <div class="es-priority-level-row">Risk: <strong>${c.riskPct.toFixed(2)}%</strong></div>
         </div>
-        <button class="es-priority-trade-btn" type="button">Pilih Sinyal Ini</button>
+        <button class="es-priority-trade-btn ${signalCls}" type="button">${c.signal} NOW</button>
       </div>`;
     }).join('');
     chGrid.querySelectorAll('.es-priority-card').forEach((card,i)=>{
@@ -5427,7 +5442,7 @@
           <div class="es-priority-level-row">Take Profit: <strong>TP1 $${fmtPrice(auto.tp)}</strong> &bull; <strong>TP2 $${fmtPrice(tp2)}</strong></div>
           <div class="es-priority-level-row">Risk: <strong>${riskPct.toFixed(2)}%</strong></div>
         </div>
-        <button class="es-priority-trade-btn" type="button">Pilih Sinyal Ini</button>
+        <button class="es-priority-trade-btn ${signalCls}" type="button">${c.signal} NOW</button>
       </div>`;
     }).join('');
 
@@ -5775,7 +5790,7 @@
           <div class="es-priority-level-row">Take Profit: <strong>TP1 $${fmtPrice(c.tp)}</strong> &bull; <strong>TP2 $${fmtPrice(c.tp2)}</strong></div>
           <div class="es-priority-level-row">Risk: <strong>${c.riskPct.toFixed(2)}%</strong> &bull; <span class="es-ai-rr">R:R 1:${c.rr.toFixed(1)}</span></div>
         </div>
-        <button class="es-priority-trade-btn" type="button">Pilih Sinyal Ini</button>
+        <button class="es-priority-trade-btn ${signalCls}" type="button">${c.signal} NOW</button>
       </div>`;
     }).join('');
 
@@ -6452,7 +6467,7 @@
   function venueBadgeHtml(venue){
     if(venue === 'live-real') return '<span class="es-venue-badge live">Binance Live</span>';
     if(venue === 'live-testnet') return '<span class="es-venue-badge">Binance Testnet</span>';
-    return '';
+    return '<span class="es-venue-badge demo">Demo</span>';   // simulasi & lainnya
   }
 
   function computePsimExchangeFee(entryPrice, exitPrice, qty){
@@ -6897,12 +6912,12 @@
 
   function updatePsimOpenBtn(){
     if(!psimSelectedCandidate){
-      psimOpenBtn.textContent = 'Open Posisi';
+      psimOpenBtn.textContent = 'Open Posisi Demo';
       psimOpenBtn.classList.remove('sell');
       return;
     }
     const isSell = getArahEfektif(psimSelectedCandidate) === 'SELL';
-    psimOpenBtn.textContent = isSell ? 'Open Sell' : 'Open Buy';
+    psimOpenBtn.textContent = isSell ? 'Open Sell Demo' : 'Open Buy Demo';
     psimOpenBtn.classList.toggle('sell', isSell);
   }
 
@@ -8029,24 +8044,12 @@
   }
 
   function renderHiddenSectionChips(){
+    // Panel "Signal Beta Version" DINONAKTIFKAN total (tidak dipakai sementara).
+    // Tidak melakukan apa pun & tidak menyentuh jaringan - jadi tidak berpengaruh
+    // ke rate limit maupun kelancaran halaman. Mekanisme hemat-request tetap ada:
+    // section yang kebetulan ter-collapse tetap dilewati pemindainya (isSectionCollapsed).
     const bar = document.getElementById('esHiddenSections');
-    if(!bar) return;
-    const tersembunyi = [...collapsedSections].filter(n => SECTION_LABEL[n]);
-    // Terkunci: hanya pemilik yang melihat panel "Signal Beta Version".
-    if(!esIsOwner || tersembunyi.length === 0){
-      bar.classList.remove('show');
-      bar.innerHTML = '';
-      return;
-    }
-    bar.classList.add('show');
-    bar.innerHTML = '<span class="es-hidden-sections-label">Signal Beta Version</span>' +
-      tersembunyi.map(n => `<button type="button" class="es-hidden-chip" data-section="${n}" title="Munculkan kembali">
-        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
-        ${SECTION_LABEL[n]}
-      </button>`).join('');
-    bar.querySelectorAll('.es-hidden-chip').forEach(btn=>{
-      btn.addEventListener('click', ()=> bukaSection(btn.getAttribute('data-section')));
-    });
+    if(bar){ bar.classList.remove('show'); bar.innerHTML = ''; }
   }
 
   function applySectionCollapseState(){
