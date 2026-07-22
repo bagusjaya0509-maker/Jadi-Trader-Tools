@@ -1630,6 +1630,11 @@
     color: var(--muted);
     margin-bottom:6px;
   }
+  /* Label "Buka Posisi Baru" - dipisah dari tabel Posisi Terbuka di atasnya */
+  .es-open-pos-label{
+    margin-top:22px; padding-top:16px; border-top:1px solid var(--border);
+    color: var(--text); font-weight:600;
+  }
   .es-psim-equity-wrap{
     background: var(--panel);
     border:1px solid var(--border);
@@ -2207,6 +2212,18 @@
         </div>
       </div>
     </div>
+
+    <div class="es-sim-table-label">Posisi Terbuka</div>
+    <div class="es-sim-table-wrap">
+      <table class="es-sim-table">
+        <thead>
+          <tr><th>Sumber</th><th>Arah</th><th>Entry</th><th>SL</th><th>RISK SL ($)</th><th>TP1</th><th>TP2</th><th>Area TP</th><th>Harga Sekarang</th><th>Biaya Exchange</th><th>Funding Fee</th><th>PnL ($)</th><th>PNL Terealisasi</th><th>PnL (%)</th><th>Aksi</th></tr>
+        </thead>
+        <tbody id="esPsimOpenTbody"></tbody>
+      </table>
+    </div>
+
+    <div class="es-sim-table-label es-open-pos-label">Buka Posisi Baru</div>
     <div class="es-sim-controls">
       <label>Modal per Posisi ($)
         <input type="number" id="esPsimModal" value="1000" min="10" step="10">
@@ -2274,19 +2291,6 @@
     </div>
     <div class="es-sim-preview" id="esPsimPreview"></div>
     <div class="es-sim-summary" id="esPsimSummary"></div>
-
-    <div class="es-sim-table-label">Grafik Perkembangan Saldo</div>
-    <div class="es-psim-equity-wrap" id="esPsimEquityChart"></div>
-
-    <div class="es-sim-table-label">Posisi Terbuka</div>
-    <div class="es-sim-table-wrap">
-      <table class="es-sim-table">
-        <thead>
-          <tr><th>Sumber</th><th>Arah</th><th>Entry</th><th>SL</th><th>RISK SL ($)</th><th>TP1</th><th>TP2</th><th>Area TP</th><th>Harga Sekarang</th><th>Biaya Exchange</th><th>Funding Fee</th><th>PnL ($)</th><th>PNL Terealisasi</th><th>PnL (%)</th><th>Aksi</th></tr>
-        </thead>
-        <tbody id="esPsimOpenTbody"></tbody>
-      </table>
-    </div>
 
     <div class="es-sim-table-header">
       <div class="es-sim-table-label">Riwayat Transaksi</div>
@@ -7146,7 +7150,7 @@
       </div>
     `).join('');
 
-    psimEquityChartEl.innerHTML = buildEquityChart(computeEquityCurve());
+    if(psimEquityChartEl) psimEquityChartEl.innerHTML = buildEquityChart(computeEquityCurve());
 
     const fmtTime = (ms)=> new Date(ms).toLocaleString('id-ID', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit' });
 
