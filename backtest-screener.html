@@ -211,7 +211,7 @@
     <label class="bt-strat-check"><input type="checkbox" id="btStratBbma" checked> BBMA</label>
     <label class="bt-strat-check"><input type="checkbox" id="btStratSnr" checked> SNR</label>
     <label class="bt-strat-check"><input type="checkbox" id="btStratAi" checked> AI</label>
-    <label class="bt-strat-check"><input type="checkbox" id="btStratCh" checked> Cross Hunter</label>
+    <label class="bt-strat-check"><input type="checkbox" id="btStratCh" checked> Parallel</label>
   </div>
   <button type="button" class="bt-run-btn" id="btRunBtn">Jalankan Backtest</button>
 </div>
@@ -446,40 +446,93 @@
     return { line, signal: ema(line, sig) };
   }
 
-  // --- 4. CROSS HUNTER: cross EMA9/21 + RSI + MACD, disaring bias SMI 4H ---
-  function sinyalCrossHunter(d, i, pre, htf){
-    const { highs, lows, closes } = d;
-    const e9=pre.e9, e21=pre.e21;
-    if(e9[i]==null || e21[i]==null || e9[i-1]==null || e21[i-1]==null) return null;
-    let arah=null;
-    if(e9[i-1] <= e21[i-1] && e9[i] > e21[i]) arah='BUY';
-    else if(e9[i-1] >= e21[i-1] && e9[i] < e21[i]) arah='SELL';
-    if(!arah) return null;
-    const r=pre.rsiArr[i], ml=pre.macd.line[i], sg=pre.macd.signal[i];
-    if(r==null || ml==null || sg==null) return null;
-    if(arah==='BUY'  && !(r>50 && ml>sg)) return null;
-    if(arah==='SELL' && !(r<50 && ml<sg)) return null;
-    // bias SMI 4H: OB(>=40)->hanya SELL, OS(<=-40)->hanya BUY
-    if(htf){
-      const idx4h=htf.indexUntuk[i];
-      if(idx4h!=null && htf.smi[idx4h]!=null){
-        const sv=htf.smi[idx4h];
-        if(sv>=40 && arah==='BUY') return null;
-        if(sv<=-40 && arah==='SELL') return null;
-      }
+  // --- 4. PARALLEL SIGNAL: sentuh garis channel paralel -> BUY/SELL ---
+  // Auto Parallel Channel (port Pine). Channel dihitung ulang tiap ada pivot
+  // 5/5 baru yang konfirmasi (anti-mengintip) lalu dipakai sampai pivot berikut.
+  function detectParallelChannel(highs, lows, closes, atrArr, opt){
+    opt = opt || {};
+    const left=opt.left||5, right=opt.right||5, lookback=opt.lookback||150;
+    const minTouches=opt.minTouches||2, minMid=opt.minMid||2, tolMult=opt.tolMult||0.5;
+    const n=closes.length, endBar=(opt.endBar!=null?opt.endBar:n-1);
+    if(endBar < left+right+5) return null;
+    const atrE=atrArr[endBar]; if(atrE==null||!(atrE>0)) return null;
+    const tol=atrE*tolMult;
+    const phBars=[],phPrices=[],plBars=[],plPrices=[];
+    const startScan=Math.max(left,endBar-lookback);
+    for(let pp=startScan; pp<=endBar-right; pp++){
+      let isH=true,isL=true;
+      for(let j=pp-left;j<=pp+right;j++){ if(j===pp)continue; if(highs[j]>highs[pp])isH=false; if(lows[j]<lows[pp])isL=false; }
+      if(isH){ phBars.push(pp); phPrices.push(highs[pp]); }
+      if(isL){ plBars.push(pp); plPrices.push(lows[pp]); }
     }
-    const a=pre.atrArr[i]; if(!a) return null;
-    const c=closes[i], buf=a*0.3;
+    let uptrend=false,downtrend=false;
+    if(plPrices.length>=2) uptrend=plPrices[plPrices.length-1]>plPrices[plPrices.length-2];
+    if(phPrices.length>=2) downtrend=phPrices[phPrices.length-1]<phPrices[phPrices.length-2];
+    const useHigh=downtrend||!uptrend;
+    const aBars=useHigh?phBars:plBars, aPrices=useHigh?phPrices:plPrices;
+    const anchorSeries=useHigh?highs:lows, oppSeries=useHigh?lows:highs;
+    if(aBars.length<3) return null;
+    let bestI=-1,bestJ=-1,bestTouches=-1;
+    for(let j=aBars.length-1;j>=2;j--) for(let i=j-1;i>=0;i--){
+      const b1=aBars[i],p1=aPrices[i],b2=aBars[j],p2=aPrices[j]; if(b2===b1)continue;
+      const slope=(p2-p1)/(b2-b1); let valid=true,touches=0;
+      for(let k=b1;k<=endBar;k++){ const v=anchorSeries[k],lv=p1+slope*(k-b1),diff=useHigh?(v-lv):(lv-v);
+        if(diff>tol)valid=false; if(Math.abs(v-lv)<=tol)touches++; }
+      if(valid&&touches>=minTouches&&touches>bestTouches){bestTouches=touches;bestI=i;bestJ=j;}
+    }
+    if(bestI<0) return null;
+    const xb1=aBars[bestI],xp1=aPrices[bestI],xslope=(aPrices[bestJ]-xp1)/(aBars[bestJ]-xb1);
+    let extreme=useHigh?10e10:-10e10,extBar=xb1;
+    for(let k=xb1;k<=endBar;k++){ if(useHigh?oppSeries[k]<extreme:oppSeries[k]>extreme){extreme=oppSeries[k];extBar=k;} }
+    const projExt=xp1+xslope*(extBar-xb1);
+    let bestOffset=useHigh?(projExt-extreme):(extreme-projExt),bestOT=-1,bestOC=null,bestOCT=-1;
+    for(let k=xb1;k<=endBar;k++){
+      const projK=xp1+xslope*(k-xb1),candOffset=useHigh?(projK-oppSeries[k]):(oppSeries[k]-projK);
+      let valid2=true,t2=0,tMid=0;
+      for(let m=xb1;m<=endBar;m++){ const om=oppSeries[m],anch=xp1+xslope*(m-xb1),opp=useHigh?(anch-candOffset):(anch+candOffset);
+        const dd=useHigh?(om-opp):(opp-om); if(dd<-tol)valid2=false; if(Math.abs(om-opp)<=tol)t2++;
+        const mid=(anch+opp)/2; if(Math.abs(closes[m]-mid)<=tol)tMid++; }
+      if(valid2&&t2>bestOT){bestOT=t2;bestOffset=candOffset;}
+      if(valid2&&tMid>=minMid&&t2>bestOCT){bestOCT=t2;bestOC=candOffset;}
+    }
+    const offset=(bestOC==null)?bestOffset:bestOC;
+    return { slope:xslope, xb1, upperXp1:useHigh?xp1:xp1+offset, lowerXp1:useHigh?xp1-offset:xp1 };
+  }
+
+  // Geometri channel per-bar (recompute hanya saat pivot 5/5 konfirmasi).
+  function channelPerBar(d, atrArr){
+    const n=d.closes.length, arr=new Array(n).fill(null); let cur=null;
+    for(let i=20;i<n;i++){
+      const pp=i-5; let isPiv=false;
+      if(pp>=5){ let isH=true,isL=true; for(let j=pp-5;j<=pp+5;j++){ if(j===pp)continue; if(d.highs[j]>d.highs[pp])isH=false; if(d.lows[j]<d.lows[pp])isL=false; } isPiv=isH||isL; }
+      if(isPiv || cur===null) cur=detectParallelChannel(d.highs,d.lows,d.closes,atrArr,{endBar:i});
+      arr[i]=cur;
+    }
+    return arr;
+  }
+
+  function sinyalCrossHunter(d, i, pre){
+    const { highs, lows, closes } = d;
+    const ch = pre.channel ? pre.channel[i] : null;
+    const a = pre.atrArr[i];
+    if(!ch || !a || i < ch.xb1) return null;
+    const tol=a*0.6;
+    const up=ch.upperXp1+ch.slope*(i-ch.xb1), lo=ch.lowerXp1+ch.slope*(i-ch.xb1);
+    let arah=null;
+    if(highs[i] >= up-tol && closes[i] < up) arah='SELL';
+    else if(lows[i] <= lo+tol && closes[i] > lo) arah='BUY';
+    if(!arah) return null;
+    const c=closes[i], buf=a*0.5;
     let sl;
     if(arah==='SELL'){
-      const res=pivotSampai(pre.pivotHighs, i, 10).slice(-2).map(x=>x.value);
+      const res=pivotSampai(pre.pivotHighs,i,10).slice(-2).map(x=>x.value);
       const lvl=res.length?Math.max.apply(null,res):null;
-      sl=(lvl!=null && lvl>c) ? lvl+buf : Math.max.apply(null,highs.slice(Math.max(0,i-12),i+1))+buf;
+      sl=(lvl!=null && lvl>c)?lvl+buf:Math.max.apply(null,highs.slice(Math.max(0,i-15),i+1))+buf;
       if(sl<=c) return null;
     } else {
-      const sup=pivotSampai(pre.pivotLows, i, 10).slice(-2).map(x=>x.value);
+      const sup=pivotSampai(pre.pivotLows,i,10).slice(-2).map(x=>x.value);
       const lvl=sup.length?Math.min.apply(null,sup):null;
-      sl=(lvl!=null && lvl<c) ? lvl-buf : Math.min.apply(null,lows.slice(Math.max(0,i-12),i+1))-buf;
+      sl=(lvl!=null && lvl<c)?lvl-buf:Math.min.apply(null,lows.slice(Math.max(0,i-15),i+1))-buf;
       if(sl>=c) return null;
     }
     return { arah, sl };
@@ -740,6 +793,7 @@
       macd: macd(closes),
       pivotHighs: findPivots(highs, 10, 10, true),
       pivotLows:  findPivots(lows,  10, 10, false),
+      channel: channelPerBar(d, atr(highs, lows, closes, 14)),
       pivotHighs5: findPivots(highs, 5, 5, true),
       pivotLows5:  findPivots(lows,  5, 5, false)
     };
@@ -867,7 +921,7 @@
   function renderStrategi(trades){
     const per = {};
     trades.forEach(t=>{ (per[t.strategi]=per[t.strategi]||[]).push(t); });
-    const nama = { bbma:'BBMA', snr:'SNR', ai:'AI Konfluensi', crosshunter:'Cross Hunter' };
+    const nama = { bbma:'BBMA', snr:'SNR', ai:'AI Konfluensi', crosshunter:'Parallel' };
     const baris = Object.keys(per).map(k=>{
       const s = hitungStat(per[k]);
       return `<tr>
@@ -929,7 +983,7 @@
       elTradeTbody.innerHTML='<tr><td colspan="14" class="bt-empty">Tidak ada trade.</td></tr>';
       return;
     }
-    const nama={ bbma:'BBMA', snr:'SNR', ai:'AI', crosshunter:'Cross Hunter' };
+    const nama={ bbma:'BBMA', snr:'SNR', ai:'AI', crosshunter:'Parallel' };
     elTradeTbody.innerHTML = urut.slice(0,400).map(t=>{
       const hasil = t.pl>0?'win':t.pl<0?'loss':'be';
       const label = t.pl>0?'WIN':t.pl<0?'LOSS':'BE';
@@ -979,7 +1033,7 @@
 
       elStatus.textContent = `Mengambil data ${daftar.length} koin (1H${pakai.ai?' + 4H':''})...`;
 
-      const perluHtf = pakai.ai || pakai.ch;
+      const perluHtf = pakai.ai;
       const data1h = await mapLimited(daftar, KONKURENSI, async (s,idx)=>{
         const r = await fetchKlines(s,'1h',bars);
         setProgress(0.05 + 0.35*((idx+1)/daftar.length));
@@ -1035,7 +1089,7 @@
             }
           }
           if(pakai.ch && i > sibukSampai.ch){
-            const sig = sinyalCrossHunter(d,i,pre,htf);
+            const sig = sinyalCrossHunter(d,i,pre);
             if(sig){
               const t = simulasikanTrade(d,i,sig.arah,sig.sl,'crosshunter',daftar[s],metode);
               if(t){ semuaTrade.push(t); sibukSampai.ch = t.iExit; }

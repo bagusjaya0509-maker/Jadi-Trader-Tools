@@ -1685,7 +1685,7 @@
   .es-src-star.snr{ color:#4A9BE0; }      /* biru - SNR */
   .es-src-star.bbma{ color:#E0C24A; }     /* kuning - BBMA */
   .es-src-star.pantau{ color:var(--gold); }  /* emas - Pantau */
-  .es-src-star.crosshunter{ color:#3FC7C7; }  /* cyan - Cross Hunter */
+  .es-src-star.crosshunter{ color:#3FC7C7; }  /* cyan - Parallel Signal */
   .es-src-star.lain{ color:var(--dim); }
   .es-psim-close-btn{
     background:none;
@@ -2011,7 +2011,7 @@
 
   <div class="es-priority-section es-collapsible" data-section="crosshunter">
     <div class="es-priority-header es-section-head">
-      <div class="es-priority-title">Sinyal Cross Hunter</div>
+      <div class="es-priority-title">Parallel Signal</div>
       <button type="button" class="es-section-toggle" title="Sembunyikan section">
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
       </button>
@@ -2019,11 +2019,16 @@
     <div class="es-section-body">
       <div class="es-priority-controls">
         <select id="esChTf">
+          <option value="1m">TF 1 Menit</option>
+          <option value="5m">TF 5 Menit</option>
           <option value="15m" selected>TF 15 Menit</option>
           <option value="30m">TF 30 Menit</option>
           <option value="1h">TF 1 Jam</option>
+          <option value="4h">TF 4 Jam</option>
+          <option value="1d">TF Daily</option>
+          <option value="1w">TF Weekly</option>
         </select>
-        <button id="esChBtn" class="es-priority-btn">Cari Sinyal Cross Hunter</button>
+        <button id="esChBtn" class="es-priority-btn">Cari Sinyal Parallel</button>
         <div class="es-symbol-manager es-symbol-manager-inline">
           <button type="button" id="esChManagerBtn" class="es-symbol-manager-btn">
             <span>Ganti Chart / Kelola Koin</span>
@@ -2034,7 +2039,7 @@
         <div class="es-ai-regime" id="esChSmiBadge"></div>
       </div>
       <div class="es-priority-grid" id="esChGrid"></div>
-      <div class="es-priority-status" id="esChStatus">Klik "Cari Sinyal Cross Hunter" untuk memindai.</div>
+      <div class="es-priority-status" id="esChStatus">Klik "Cari Sinyal Parallel" untuk memindai.</div>
     </div>
   </div>
 
@@ -3332,7 +3337,7 @@
   // biasa. Tiap sumber daftar ulang candidate-nya sendiri tiap kali pindai
   // ulang (entri lama dari sumber itu dihapus dulu supaya tidak menumpuk data basi).
   window.__esTradableSignals = window.__esTradableSignals || {};
-  const TRADABLE_SOURCE_LABEL = { priority:'Prioritas', favorite:'Favorit', cross:'Cross EMA', favcross:'Favorit Cross', ict:'Prioritas ICT', snr:'Prioritas SNR', ai:'Prioritas AI', pantau:'Pantau', crosshunter:'Cross Hunter' };
+  const TRADABLE_SOURCE_LABEL = { priority:'Prioritas', favorite:'Favorit', cross:'Cross EMA', favcross:'Favorit Cross', ict:'Prioritas ICT', snr:'Prioritas SNR', ai:'Prioritas AI', pantau:'Pantau', crosshunter:'Parallel' };
   function tradableUid(source, symbol, tfValue){ return `${source}_${symbol}_${tfValue}`; }
   function registerTradableSignals(source, candidates){
     Object.keys(window.__esTradableSignals).forEach(k=>{
@@ -5152,12 +5157,13 @@
   }
 
   // ═══════════════════════════════════════════════════════
-  // ████████  SINYAL CROSS HUNTER  ████████
+  // ████████  PARALLEL SIGNAL (Auto Parallel Channel)  ████████
   // ═══════════════════════════════════════════════════════
-  // Konsep dari Pine "Scalping + SMI Filter": cross EMA 9/21 + konfirmasi
-  // RSI & MACD, disaring bias SMI di TF tinggi (4H). Entry saat cross candle
-  // yang sudah tutup. SL di luar SNR TF terkait (SELL = resistan teratas,
-  // BUY = support terbawah). Note konfirmasi menampilkan cross di TF 5m/15m/30m.
+  // Port dari Pine "Jadi Trader Indikator" Section 10+11: channel paralel
+  // otomatis dari pivot high/low. Candle yang menyentuh garis UPPER channel ->
+  // SELL, menyentuh garis LOWER -> BUY (close balik ke dalam channel). SL di
+  // resistan teratas (SELL) / support terbawah (BUY), dilebihkan sedikit dari
+  // zona SNR. Aktif di TF 1m/5m/15m/30m/1h/4h/D/W.
   const chTfSel = document.getElementById('esChTf');
   const chBtn = document.getElementById('esChBtn');
   const chGrid = document.getElementById('esChGrid');
@@ -5166,129 +5172,132 @@
   const chManagerBtn = document.getElementById('esChManagerBtn');
   const chManagerDropdown = document.getElementById('esChManagerDropdown');
 
-  const CH_TF_LABEL = { '5m':'5m', '15m':'15m', '30m':'30m', '1h':'1H', '4h':'4H' };
-  const CH_KONFIRMASI_TF = ['5m','15m','30m'];  // TF untuk note konfirmasi cross
-  const CH_FRESH = 2;      // cross utama harus terjadi dalam 2 candle terakhir
-  const CH_KONF_WINDOW = 4; // cross konfirmasi TF lain masih dihitung "searah" dalam 4 candle
+  const CH_TF_LABEL = { '1m':'1m','5m':'5m','15m':'15m','30m':'30m','1h':'1H','4h':'4H','1d':'D','1w':'W' };
+  const PC_SIG_TOL_MULT = 0.6;   // toleransi sentuh garis channel (x ATR)
 
-  function macd(closes, fast, slow, sig){
-    fast=fast||12; slow=slow||26; sig=sig||9;
-    const ef = ema(closes, fast), es = ema(closes, slow);
-    const line = closes.map((_,i)=> ef[i]-es[i]);
-    const signal = ema(line, sig);
-    return { line, signal };
-  }
-
-  // Arah cross tepat di index i (memakai candle i vs i-1 yang sudah tutup).
-  function crossDiIndex(e9, e21, i){
-    if(i<1) return null;
-    if(e9[i-1] <= e21[i-1] && e9[i] > e21[i]) return 'BUY';
-    if(e9[i-1] >= e21[i-1] && e9[i] < e21[i]) return 'SELL';
-    return null;
-  }
-  // Cross terbaru dalam `within` candle terakhir yang sudah tutup -> {dir, barsAgo}.
-  // idxTerakhir = index candle terakhir yang dianggap "sudah tutup".
-  function crossTerbaru(e9, e21, idxTerakhir, within){
-    for(let b=0; b<within; b++){
-      const i = idxTerakhir - b;
-      const d = crossDiIndex(e9, e21, i);
-      if(d) return { dir:d, barsAgo:b };
+  // ---- Auto Parallel Channel: {slope, xb1, upperXp1, lowerXp1} atau null ----
+  function detectParallelChannel(highs, lows, closes, atrArr, opt){
+    opt = opt || {};
+    const left = opt.left||5, right = opt.right||5, lookback = opt.lookback||150;
+    const minTouches = opt.minTouches||2, minMid = opt.minMid||2, tolMult = opt.tolMult||0.5;
+    const n = closes.length;
+    const endBar = (opt.endBar!=null ? opt.endBar : n-1);
+    if(endBar < left+right+5) return null;
+    const atrE = atrArr[endBar];
+    if(atrE==null || !(atrE>0)) return null;
+    const tol = atrE * tolMult;
+    const phBars=[], phPrices=[], plBars=[], plPrices=[];
+    const startScan = Math.max(left, endBar - lookback);
+    for(let p=startScan; p<=endBar-right; p++){
+      let isH=true, isL=true;
+      for(let j=p-left; j<=p+right; j++){
+        if(j===p) continue;
+        if(highs[j] > highs[p]) isH=false;
+        if(lows[j]  < lows[p])  isL=false;
+      }
+      if(isH){ phBars.push(p); phPrices.push(highs[p]); }
+      if(isL){ plBars.push(p); plPrices.push(lows[p]); }
     }
-    return null;
-  }
-
-  async function findCrossHunterSignalForSymbol(symbol, tickers, tf){
-    // Kumpulkan TF unik yang perlu diambil: konfirmasi 5m/15m/30m + TF terpilih + 4H bias.
-    const tfSet = Array.from(new Set(CH_KONFIRMASI_TF.concat([tf, '4h'])));
-    const data = {};
-    for(const t of tfSet){
-      try{ data[t] = await fetchKlines(symbol, t, 250); }catch(e){ return null; }
-    }
-    const d = data[tf];
-    if(!d || d.closes.length < 60) return null;
-
-    // Bar terakhir yang SUDAH tutup: candle terakhir dari Binance masih berjalan,
-    // jadi patokan cross = candle sebelum yang terakhir.
-    const idxClosed = d.closes.length - 2;
-
-    const e9 = ema(d.closes, 9), e21 = ema(d.closes, 21);
-    const rsiArr = rsi(d.closes, 14);
-    const mac = macd(d.closes);
-
-    // Cross utama di TF terpilih, harus fresh (dalam CH_FRESH candle tutup terakhir).
-    const cx = crossTerbaru(e9, e21, idxClosed, CH_FRESH);
-    if(!cx) return null;
-    const arah = cx.dir;
-
-    // Konfirmasi RSI & MACD di candle tutup terakhir.
-    const rsiNow = rsiArr[idxClosed];
-    const macNow = mac.line[idxClosed], sigNow = mac.signal[idxClosed];
-    if(rsiNow==null || macNow==null || sigNow==null) return null;
-    const rsiOk = arah==='BUY' ? rsiNow > 50 : rsiNow < 50;
-    const macdOk = arah==='BUY' ? macNow > sigNow : macNow < sigNow;
-    if(!rsiOk || !macdOk) return null;
-
-    // Bias SMI 4H (dari kode Pine): OB (>=40) -> hanya SELL, OS (<=-40) -> hanya BUY.
-    const h4 = data['4h'];
-    let smiBias = 'netral', smiVal = null, allow = true;
-    if(h4 && h4.closes.length >= 40){
-      const st = smiSeries(h4.highs, h4.lows, h4.closes, 14, 3, 3);
-      smiVal = st.smi[st.smi.length - 2];   // 4H candle tutup terakhir
-      if(smiVal != null){
-        if(smiVal >= 40){ smiBias = 'overbought'; allow = (arah === 'SELL'); }
-        else if(smiVal <= -40){ smiBias = 'oversold'; allow = (arah === 'BUY'); }
+    let uptrend=false, downtrend=false;
+    if(plPrices.length>=2) uptrend = plPrices[plPrices.length-1] > plPrices[plPrices.length-2];
+    if(phPrices.length>=2) downtrend = phPrices[phPrices.length-1] < phPrices[phPrices.length-2];
+    const useHigh = downtrend || !uptrend;
+    const aBars   = useHigh ? phBars   : plBars;
+    const aPrices = useHigh ? phPrices : plPrices;
+    const anchorSeries = useHigh ? highs : lows;
+    const oppSeries    = useHigh ? lows  : highs;
+    if(aBars.length < 3) return null;
+    let bestI=-1, bestJ=-1, bestTouches=-1;
+    for(let j=aBars.length-1; j>=2; j--){
+      for(let i=j-1; i>=0; i--){
+        const b1=aBars[i], p1=aPrices[i], b2=aBars[j], p2=aPrices[j];
+        if(b2===b1) continue;
+        const slope=(p2-p1)/(b2-b1);
+        let valid=true, touches=0;
+        for(let k=b1; k<=endBar; k++){
+          const v = anchorSeries[k];
+          const lineVal = p1 + slope*(k-b1);
+          const diff = useHigh ? (v - lineVal) : (lineVal - v);
+          if(diff > tol) valid=false;
+          if(Math.abs(v-lineVal) <= tol) touches++;
+        }
+        if(valid && touches>=minTouches && touches>bestTouches){ bestTouches=touches; bestI=i; bestJ=j; }
       }
     }
-    if(!allow) return null;   // ditolak bias SMI 4H
+    if(bestI<0) return null;
+    const xb1=aBars[bestI], xp1=aPrices[bestI];
+    const xslope=(aPrices[bestJ]-xp1)/(aBars[bestJ]-xb1);
+    let extreme = useHigh ? 10e10 : -10e10, extBar=xb1;
+    for(let k=xb1; k<=endBar; k++){
+      if(useHigh ? oppSeries[k]<extreme : oppSeries[k]>extreme){ extreme=oppSeries[k]; extBar=k; }
+    }
+    const projAtExt = xp1 + xslope*(extBar-xb1);
+    let bestOffset = useHigh ? (projAtExt - extreme) : (extreme - projAtExt);
+    let bestOffsetTouches=-1, bestOffsetC=null, bestOffsetCTouches=-1;
+    for(let k=xb1; k<=endBar; k++){
+      const projAtK = xp1 + xslope*(k-xb1);
+      const candOffset = useHigh ? (projAtK - oppSeries[k]) : (oppSeries[k] - projAtK);
+      let valid2=true, touches2=0, touchesMid=0;
+      for(let m=xb1; m<=endBar; m++){
+        const om = oppSeries[m];
+        const anchorAtM = xp1 + xslope*(m-xb1);
+        const oppAtM = useHigh ? (anchorAtM - candOffset) : (anchorAtM + candOffset);
+        const diff2 = useHigh ? (om - oppAtM) : (oppAtM - om);
+        if(diff2 < -tol) valid2=false;
+        if(Math.abs(om-oppAtM) <= tol) touches2++;
+        const midAtM = (anchorAtM + oppAtM)/2;
+        if(Math.abs(closes[m]-midAtM) <= tol) touchesMid++;
+      }
+      if(valid2 && touches2>bestOffsetTouches){ bestOffsetTouches=touches2; bestOffset=candOffset; }
+      if(valid2 && touchesMid>=minMid && touches2>bestOffsetCTouches){ bestOffsetCTouches=touches2; bestOffsetC=candOffset; }
+    }
+    const offset = (bestOffsetC==null) ? bestOffset : bestOffsetC;
+    return { slope:xslope, xb1, upperXp1: useHigh ? xp1 : xp1+offset, lowerXp1: useHigh ? xp1-offset : xp1 };
+  }
+  function pcUpperAt(ch, b){ return ch.upperXp1 + ch.slope*(b - ch.xb1); }
+  function pcLowerAt(ch, b){ return ch.lowerXp1 + ch.slope*(b - ch.xb1); }
 
-    // Note konfirmasi: apakah ada cross SEARAH di TF 5m/15m/30m (dalam window).
-    const konfirmasi = {};
-    CH_KONFIRMASI_TF.forEach(t=>{
-      const dt = data[t];
-      if(!dt || dt.closes.length < 40){ konfirmasi[t] = false; return; }
-      const ke9 = ema(dt.closes, 9), ke21 = ema(dt.closes, 21);
-      const kc = crossTerbaru(ke9, ke21, dt.closes.length - 2, CH_KONF_WINDOW);
-      konfirmasi[t] = !!(kc && kc.dir === arah);
-    });
+  async function findCrossHunterSignalForSymbol(symbol, tickers, tf){
+    let d;
+    try{ d = await fetchKlines(symbol, tf, 250); }catch(e){ return null; }
+    if(!d || d.closes.length < 60) return null;
+    const atrArr = atr(d.highs, d.lows, d.closes, 14);
+    // Bar terakhir yang SUDAH tutup (candle terakhir Binance masih berjalan).
+    const sb = d.closes.length - 2;
+    const ch = detectParallelChannel(d.highs, d.lows, d.closes, atrArr, { endBar: sb });
+    if(!ch) return null;
+    if(sb < ch.xb1) return null;
+    const tol = (atrArr[sb] || d.closes[sb]*0.005) * PC_SIG_TOL_MULT;
+    const up = pcUpperAt(ch, sb), lo = pcLowerAt(ch, sb);
+    let arah = null, sentuh = '';
+    if(d.highs[sb] >= up - tol && d.closes[sb] < up){ arah='SELL'; sentuh='UPPER'; }
+    else if(d.lows[sb] <= lo + tol && d.closes[sb] > lo){ arah='BUY'; sentuh='LOWER'; }
+    if(!arah) return null;
 
-    // Entry = harga terkini. SL dari SNR TF terpilih: SELL = resistan TERATAS,
-    // BUY = support TERBAWAH (masing-masing dari maksimal 2 pivot terakhir).
     const t = tickers[symbol];
     const price = t ? parseFloat(t.lastPrice) : d.closes[d.closes.length-1];
-    const atrArr = atr(d.highs, d.lows, d.closes, 14);
-    const a = atrArr[atrArr.length-1] || (price * 0.005);
-    const buffer = a * 0.3;
-
+    const a = atrArr[atrArr.length-1] || (price*0.005);
+    const buffer = a * 0.5;   // "dilebihkan sedikit dari area SNR"
+    // SL dari SNR: SELL = resistan TERATAS + buffer, BUY = support TERBAWAH - buffer.
     let sl;
     if(arah === 'SELL'){
       const res = findPivots(d.highs, 10, 10, true).slice(-2).map(p=>p.value);
-      const level = res.length ? Math.max.apply(null, res) : null;   // resistan teratas
-      sl = (level != null && level > price) ? level + buffer
-           : Math.max.apply(null, d.highs.slice(-12)) + buffer;
+      const lvl = res.length ? Math.max.apply(null, res) : null;
+      sl = (lvl!=null && lvl>price) ? lvl + buffer : Math.max.apply(null, d.highs.slice(-15)) + buffer;
     } else {
       const sup = findPivots(d.lows, 10, 10, false).slice(-2).map(p=>p.value);
-      const level = sup.length ? Math.min.apply(null, sup) : null;   // support terbawah
-      sl = (level != null && level < price) ? level - buffer
-           : Math.min.apply(null, d.lows.slice(-12)) - buffer;
+      const lvl = sup.length ? Math.min.apply(null, sup) : null;
+      sl = (lvl!=null && lvl<price) ? lvl - buffer : Math.min.apply(null, d.lows.slice(-15)) - buffer;
     }
     const risk = Math.abs(price - sl);
     if(!(risk > 0)) return null;
-    const riskPct = (risk / price) * 100;
-    if(riskPct > 10 || riskPct < 0.03) return null;   // SL tidak masuk akal
-    const tp = arah === 'BUY' ? price + risk*2 : price - risk*2;
+    const riskPct = (risk/price)*100;
+    if(riskPct > 12 || riskPct < 0.03) return null;
+    const tp = arah==='BUY' ? price + risk*2 : price - risk*2;
+    const chArah = ch.slope > 0 ? 'naik' : ch.slope < 0 ? 'turun' : 'datar';
 
-    return {
-      symbol, signal: arah, price, sl, tp,
-      tfValue: tf, tfLabel: CH_TF_LABEL[tf] || tf,
-      barsAgo: cx.barsAgo, konfirmasi, smiBias, smiVal, riskPct
-    };
-  }
-
-  function chSmiNote(bias, val){
-    const v = val==null ? '-' : val.toFixed(1);
-    if(bias === 'overbought') return { cls:'sell', text:`SMI 4H Overbought (${v}) &rarr; bias SELL` };
-    if(bias === 'oversold')  return { cls:'buy',  text:`SMI 4H Oversold (${v}) &rarr; bias BUY` };
-    return { cls:'', text:`SMI 4H Netral (${v}) &rarr; BUY & SELL` };
+    return { symbol, signal: arah, price, sl, tp, tfValue: tf, tfLabel: CH_TF_LABEL[tf]||tf,
+             sentuh, chArah, riskPct };
   }
 
   function renderCrossHunterSignals(top){
@@ -5298,21 +5307,18 @@
       const signalCls = c.signal==='BUY' ? 'buy' : 'sell';
       const riskDist = Math.abs(c.price - c.sl);
       const tp2 = c.signal==='BUY' ? c.price + riskDist*2 : c.price - riskDist*2;
-      const smi = chSmiNote(c.smiBias, c.smiVal);
-      const row = (label, ok) => `<div class="es-check-row ${ok?'ok':'fail'}">`
-        + `<span class="es-check-icon">${ok?'&check;':'&times;'}</span> ${label}</div>`;
+      const garis = c.sentuh === 'UPPER' ? 'UPPER (atas)' : 'LOWER (bawah)';
       return `<div class="es-priority-card ${signalCls}" data-symbol="${c.symbol}" data-tf="${c.tfValue}" data-tflabel="${c.tfLabel}" data-price="${c.price}">
         <div class="es-priority-card-top">
           <span class="es-priority-rank">#${i+1}</span>
           <span class="es-priority-symbol">${c.symbol.replace('USDT','')}</span>
           <span class="es-priority-signal ${signalCls}">${c.signal} NOW</span>
         </div>
-        <div class="es-priority-tf">Cross EMA 9/21 &bull; TF ${c.tfLabel} &bull; Harga $${fmtPrice(c.price)}</div>
+        <div class="es-priority-tf">Parallel Channel &bull; TF ${c.tfLabel} &bull; Harga $${fmtPrice(c.price)}</div>
         <div class="es-checklist">
-          ${row('Cross TF 5 menit', c.konfirmasi['5m'])}
-          ${row('Cross TF 15 menit', c.konfirmasi['15m'])}
-          ${row('Cross TF 30 menit', c.konfirmasi['30m'])}
-          <div class="es-check-row ok"><span class="es-check-icon" style="color:${smi.cls==='sell'?'var(--bear)':smi.cls==='buy'?'var(--bull)':'var(--gold)'}">&bull;</span> ${smi.text}</div>
+          <div class="es-check-row ok"><span class="es-check-icon">&check;</span> Sentuh garis ${garis} channel</div>
+          <div class="es-check-row ok"><span class="es-check-icon">&check;</span> Close balik ke dalam channel</div>
+          <div class="es-check-row ok"><span class="es-check-icon">&bull;</span> Arah channel: ${c.chArah}</div>
         </div>
         <div class="es-priority-levels">
           <div class="es-priority-level-row">Area Entri: <strong>$${fmtPrice(c.price)}</strong></div>
@@ -5323,7 +5329,6 @@
         <button class="es-priority-trade-btn" type="button">Pilih Sinyal Ini</button>
       </div>`;
     }).join('');
-
     chGrid.querySelectorAll('.es-priority-card').forEach((card,i)=>{
       const cand = top[i];
       card.addEventListener('click', (e)=>{
@@ -5338,31 +5343,30 @@
   }
 
   async function findCrossHunterSignals(){
-    if(isSectionCollapsed('crosshunter')) return;   // section dilipat - hemat request
+    if(isSectionCollapsed('crosshunter')) return;
     const tf = chTfSel.value;
     chBtn.disabled = true;
     chStatusEl.classList.remove('error');
-    chStatusEl.textContent = `Memindai ${activeSymbols.length} koin (cross TF ${CH_TF_LABEL[tf]||tf} + konfirmasi 5m/15m/30m + bias SMI 4H)...`;
+    chStatusEl.textContent = `Memindai ${activeSymbols.length} koin (parallel channel TF ${CH_TF_LABEL[tf]||tf})...`;
     chGrid.innerHTML = '';
-    chSmiBadge.innerHTML = 'Filter: <span class="es-ai-regime-badge neutral">SMI 4H</span>';
+    chSmiBadge.innerHTML = '';
     try{
       const tickers = await loadTickers();
       const settled = await mapLimited(activeSymbols, SCAN_CONCURRENCY, s => findCrossHunterSignalForSymbol(s, tickers, tf));
       let all = [];
       settled.forEach(s=>{ if(s.status==='fulfilled' && s.value) all.push(s.value); });
-      // Yang cross-nya paling baru (barsAgo kecil) di atas, lalu urut kapitalisasi.
-      all.sort((a,b)=> a.barsAgo - b.barsAgo || rankOf(a.symbol)-rankOf(b.symbol));
+      all.sort((a,b)=> rankOf(a.symbol)-rankOf(b.symbol));
       if(all.length === 0){
-        chStatusEl.textContent = `Tidak ada sinyal Cross Hunter (TF ${CH_TF_LABEL[tf]||tf}) yang lolos filter saat ini dari ${activeSymbols.length} koin.`;
+        chStatusEl.textContent = `Tidak ada sinyal Parallel (TF ${CH_TF_LABEL[tf]||tf}) yang menyentuh channel saat ini dari ${activeSymbols.length} koin.`;
         chBtn.disabled = false;
         return;
       }
       renderCrossHunterSignals(all);
       const nBuy = all.filter(c=>c.signal==='BUY').length;
-      chStatusEl.textContent = `Ditemukan ${all.length} sinyal Cross Hunter (${nBuy} BUY, ${all.length-nBuy} SELL) dari ${activeSymbols.length} koin • TF ${CH_TF_LABEL[tf]||tf} • ${new Date().toLocaleTimeString('id-ID')}.`;
+      chStatusEl.textContent = `Ditemukan ${all.length} sinyal Parallel (${nBuy} BUY, ${all.length-nBuy} SELL) dari ${activeSymbols.length} koin • TF ${CH_TF_LABEL[tf]||tf} • ${new Date().toLocaleTimeString('id-ID')}.`;
     }catch(e){
       chStatusEl.classList.add('error');
-      chStatusEl.textContent = `Gagal memindai Cross Hunter: ${e && e.message ? e.message : 'kesalahan tak terduga'}.`;
+      chStatusEl.textContent = `Gagal memindai Parallel Signal: ${e && e.message ? e.message : 'kesalahan tak terduga'}.`;
     }finally{
       chBtn.disabled = false;
     }
@@ -5392,6 +5396,7 @@
   chBtn.addEventListener('click', findCrossHunterSignals);
   chManagerBtn.addEventListener('click', (e)=>{ e.stopPropagation(); renderChManagerDropdown(); chManagerDropdown.classList.toggle('open'); });
   document.addEventListener('click', (e)=>{ if(!chManagerDropdown.contains(e.target) && e.target!==chManagerBtn && !chManagerBtn.contains(e.target)) chManagerDropdown.classList.remove('open'); });
+
 
 
   function renderPrioritySnrSignals(top){
@@ -6430,7 +6435,7 @@
     snr:      { cls:'snr',   label:'Sinyal SNR' },
     priority: { cls:'bbma',  label:'Sinyal BBMA' },
     pantau:   { cls:'pantau',label:'Sinyal Pantau Kripto' },
-    crosshunter:{ cls:'crosshunter',label:'Sinyal Cross Hunter' },
+    crosshunter:{ cls:'crosshunter',label:'Parallel Signal' },
     favcross: { cls:'lain',  label:'Sinyal Entry Koin Favorit' },
     cross:    { cls:'lain',  label:'Sinyal Cross EMA' },
     favorite: { cls:'lain',  label:'Sinyal Koin Favorit' },
@@ -8002,7 +8007,7 @@
   const SECTION_LABEL = {
     favorit:  'Koin Favorit',
     pantau:   'Sinyal Pantau Kripto',
-    crosshunter: 'Sinyal Cross Hunter',
+    crosshunter: 'Parallel Signal',
     favcross: 'Sinyal Entry Koin Favorit',
     bbma:     'Sinyal Prioritas BBMA',
     snr:      'Sinyal Prioritas SNR',
