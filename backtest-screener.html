@@ -147,6 +147,7 @@
   .bt-badge.bbma{ background:rgba(242,184,75,0.16); color:var(--gold); }
   .bt-badge.snr{ background:rgba(120,160,255,0.16); color:#7BA0FF; }
   .bt-badge.ai{ background:rgba(180,120,255,0.16); color:#B478FF; }
+  .bt-badge.crosshunter{ background:rgba(63,199,199,0.16); color:#3FC7C7; }
   .bt-badge.win{ background:var(--bull-dim); color:var(--bull); }
   .bt-badge.loss{ background:var(--bear-dim); color:var(--bear); }
   .bt-badge.be{ background:var(--panel-2); color:var(--muted); }
@@ -210,6 +211,7 @@
     <label class="bt-strat-check"><input type="checkbox" id="btStratBbma" checked> BBMA</label>
     <label class="bt-strat-check"><input type="checkbox" id="btStratSnr" checked> SNR</label>
     <label class="bt-strat-check"><input type="checkbox" id="btStratAi" checked> AI</label>
+    <label class="bt-strat-check"><input type="checkbox" id="btStratCh" checked> Cross Hunter</label>
   </div>
   <button type="button" class="bt-run-btn" id="btRunBtn">Jalankan Backtest</button>
 </div>
@@ -410,6 +412,79 @@
   // ═══════════════════════════════════════════════════════
 
   // --- 1. BBMA: harga menyentuh pita BB + ada zona S/R + ada zona S/D di sekitarnya ---
+  function smiSeries(highs, lows, closes, lengthK, lengthD, lengthEMA){
+    const n = closes.length;
+    const relRange = new Array(n).fill(null);
+    const hlRange  = new Array(n).fill(null);
+    for(let i=lengthK-1;i<n;i++){
+      let hh=-Infinity, ll=Infinity;
+      for(let j=i-lengthK+1;j<=i;j++){
+        if(highs[j]>hh) hh=highs[j];
+        if(lows[j]<ll)  ll=lows[j];
+      }
+      relRange[i] = closes[i] - (hh+ll)/2;
+      hlRange[i]  = hh-ll;
+    }
+    // EMA di file ini tidak mengenal null, jadi warm-up-nya dipotong dulu lalu
+    // hasilnya dikembalikan ke posisi index semula.
+    const mulai = lengthK-1;
+    if(mulai >= n) return { smi:new Array(n).fill(null), signal:new Array(n).fill(null) };
+    const emaEma = arr => ema(ema(arr, lengthD), lengthD);
+    const numer = emaEma(relRange.slice(mulai));
+    const denom = emaEma(hlRange.slice(mulai));
+    const inti  = numer.map((v,i)=> denom[i]===0 ? 0 : 200*(v/denom[i]));
+    const sig   = ema(inti, lengthEMA);
+    const smi=new Array(n).fill(null), signal=new Array(n).fill(null);
+    for(let i=0;i<inti.length;i++){ smi[mulai+i]=inti[i]; signal[mulai+i]=sig[i]; }
+    return { smi, signal };
+  }
+
+  function macd(closes, fast, slow, sig){
+    fast=fast||12; slow=slow||26; sig=sig||9;
+    const ef=ema(closes,fast), es=ema(closes,slow);
+    const line=closes.map((_,k)=> ef[k]-es[k]);
+    return { line, signal: ema(line, sig) };
+  }
+
+  // --- 4. CROSS HUNTER: cross EMA9/21 + RSI + MACD, disaring bias SMI 4H ---
+  function sinyalCrossHunter(d, i, pre, htf){
+    const { highs, lows, closes } = d;
+    const e9=pre.e9, e21=pre.e21;
+    if(e9[i]==null || e21[i]==null || e9[i-1]==null || e21[i-1]==null) return null;
+    let arah=null;
+    if(e9[i-1] <= e21[i-1] && e9[i] > e21[i]) arah='BUY';
+    else if(e9[i-1] >= e21[i-1] && e9[i] < e21[i]) arah='SELL';
+    if(!arah) return null;
+    const r=pre.rsiArr[i], ml=pre.macd.line[i], sg=pre.macd.signal[i];
+    if(r==null || ml==null || sg==null) return null;
+    if(arah==='BUY'  && !(r>50 && ml>sg)) return null;
+    if(arah==='SELL' && !(r<50 && ml<sg)) return null;
+    // bias SMI 4H: OB(>=40)->hanya SELL, OS(<=-40)->hanya BUY
+    if(htf){
+      const idx4h=htf.indexUntuk[i];
+      if(idx4h!=null && htf.smi[idx4h]!=null){
+        const sv=htf.smi[idx4h];
+        if(sv>=40 && arah==='BUY') return null;
+        if(sv<=-40 && arah==='SELL') return null;
+      }
+    }
+    const a=pre.atrArr[i]; if(!a) return null;
+    const c=closes[i], buf=a*0.3;
+    let sl;
+    if(arah==='SELL'){
+      const res=pivotSampai(pre.pivotHighs, i, 10).slice(-2).map(x=>x.value);
+      const lvl=res.length?Math.max.apply(null,res):null;
+      sl=(lvl!=null && lvl>c) ? lvl+buf : Math.max.apply(null,highs.slice(Math.max(0,i-12),i+1))+buf;
+      if(sl<=c) return null;
+    } else {
+      const sup=pivotSampai(pre.pivotLows, i, 10).slice(-2).map(x=>x.value);
+      const lvl=sup.length?Math.min.apply(null,sup):null;
+      sl=(lvl!=null && lvl<c) ? lvl-buf : Math.min.apply(null,lows.slice(Math.max(0,i-12),i+1))-buf;
+      if(sl>=c) return null;
+    }
+    return { arah, sl };
+  }
+
   function sinyalBbma(d, i, pre){
     const { opens, highs, lows, closes } = d;
     const bbU = pre.bb.upper[i], bbL = pre.bb.lower[i], a = pre.atrArr[i];
@@ -660,6 +735,9 @@
       rsiArr: rsi(closes, 14),
       e20: ema(closes, 20),
       e50: ema(closes, 50),
+      e9:  ema(closes, 9),
+      e21: ema(closes, 21),
+      macd: macd(closes),
       pivotHighs: findPivots(highs, 10, 10, true),
       pivotLows:  findPivots(lows,  10, 10, false),
       pivotHighs5: findPivots(highs, 5, 5, true),
@@ -669,6 +747,7 @@
 
   function siapkanHtf(h4, d1h, btc4hCloses, rezim){
     const e50 = ema(h4.closes, 50), e200 = ema(h4.closes, 200);
+    const smiH = smiSeries(h4.highs, h4.lows, h4.closes, 14, 3, 3).smi;
     // Petakan tiap bar 1H ke bar 4H TERAKHIR YANG SUDAH SELESAI sebelum/pada
     // waktu itu - supaya tidak memakai informasi 4H yang belum terbentuk.
     const indexUntuk = new Array(d1h.times.length).fill(null);
@@ -678,7 +757,7 @@
       indexUntuk[i] = h4.times[k] <= d1h.times[i] ? k : null;
     }
     return {
-      closes:h4.closes, e50, e200, indexUntuk, rezim,
+      closes:h4.closes, e50, e200, smi:smiH, indexUntuk, rezim,
       relStrength: function(idx){
         const lb = 30;
         if(idx < lb || btc4hCloses.length <= lb) return 0;
@@ -715,6 +794,7 @@
   const elBbma=document.getElementById('btStratBbma');
   const elSnr=document.getElementById('btStratSnr');
   const elAi=document.getElementById('btStratAi');
+  const elCh=document.getElementById('btStratCh');
   const elRun=document.getElementById('btRunBtn');
   const elStatus=document.getElementById('btStatus');
   const elProg=document.getElementById('btProgress');
@@ -787,7 +867,7 @@
   function renderStrategi(trades){
     const per = {};
     trades.forEach(t=>{ (per[t.strategi]=per[t.strategi]||[]).push(t); });
-    const nama = { bbma:'BBMA', snr:'SNR', ai:'AI Konfluensi' };
+    const nama = { bbma:'BBMA', snr:'SNR', ai:'AI Konfluensi', crosshunter:'Cross Hunter' };
     const baris = Object.keys(per).map(k=>{
       const s = hitungStat(per[k]);
       return `<tr>
@@ -849,7 +929,7 @@
       elTradeTbody.innerHTML='<tr><td colspan="14" class="bt-empty">Tidak ada trade.</td></tr>';
       return;
     }
-    const nama={ bbma:'BBMA', snr:'SNR', ai:'AI' };
+    const nama={ bbma:'BBMA', snr:'SNR', ai:'AI', crosshunter:'Cross Hunter' };
     elTradeTbody.innerHTML = urut.slice(0,400).map(t=>{
       const hasil = t.pl>0?'win':t.pl<0?'loss':'be';
       const label = t.pl>0?'WIN':t.pl<0?'LOSS':'BE';
@@ -878,9 +958,9 @@
   async function jalankanBacktest(){
     const jml = parseInt(elCoins.value,10);
     const bars = parseInt(elBars.value,10);
-    const pakai = { bbma:elBbma.checked, snr:elSnr.checked, ai:elAi.checked };
+    const pakai = { bbma:elBbma.checked, snr:elSnr.checked, ai:elAi.checked, ch:elCh.checked };
     const metode = elMetode.value;
-    if(!pakai.bbma && !pakai.snr && !pakai.ai){
+    if(!pakai.bbma && !pakai.snr && !pakai.ai && !pakai.ch){
       elStatus.classList.add('error');
       elStatus.textContent = 'Pilih minimal satu strategi.';
       return;
@@ -899,7 +979,7 @@
 
       elStatus.textContent = `Mengambil data ${daftar.length} koin (1H${pakai.ai?' + 4H':''})...`;
 
-      const perluHtf = pakai.ai;
+      const perluHtf = pakai.ai || pakai.ch;
       const data1h = await mapLimited(daftar, KONKURENSI, async (s,idx)=>{
         const r = await fetchKlines(s,'1h',bars);
         setProgress(0.05 + 0.35*((idx+1)/daftar.length));
@@ -930,7 +1010,7 @@
         }
 
         // Satu posisi per koin per strategi dalam satu waktu (tidak menumpuk)
-        const sibukSampai = { bbma:-1, snr:-1, ai:-1 };
+        const sibukSampai = { bbma:-1, snr:-1, ai:-1, ch:-1 };
 
         for(let i=210; i<d.closes.length-1; i++){
           if(pakai.bbma && i > sibukSampai.bbma){
@@ -952,6 +1032,13 @@
             if(sig){
               const t = simulasikanTrade(d,i,sig.arah,sig.sl,'ai',daftar[s],metode);
               if(t){ semuaTrade.push(t); sibukSampai.ai = t.iExit; }
+            }
+          }
+          if(pakai.ch && i > sibukSampai.ch){
+            const sig = sinyalCrossHunter(d,i,pre,htf);
+            if(sig){
+              const t = simulasikanTrade(d,i,sig.arah,sig.sl,'crosshunter',daftar[s],metode);
+              if(t){ semuaTrade.push(t); sibukSampai.ch = t.iExit; }
             }
           }
         }

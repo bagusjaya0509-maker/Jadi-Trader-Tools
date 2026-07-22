@@ -1685,6 +1685,7 @@
   .es-src-star.snr{ color:#4A9BE0; }      /* biru - SNR */
   .es-src-star.bbma{ color:#E0C24A; }     /* kuning - BBMA */
   .es-src-star.pantau{ color:var(--gold); }  /* emas - Pantau */
+  .es-src-star.crosshunter{ color:#3FC7C7; }  /* cyan - Cross Hunter */
   .es-src-star.lain{ color:var(--dim); }
   .es-psim-close-btn{
     background:none;
@@ -2005,6 +2006,35 @@
       </div>
       <div class="es-grid" id="esPantauGrid"></div>
       <div class="es-priority-status" id="esPantauStatus">Klik "Cari Sinyal Pantau" untuk memindai.</div>
+    </div>
+  </div>
+
+  <div class="es-priority-section es-collapsible" data-section="crosshunter">
+    <div class="es-priority-header es-section-head">
+      <div class="es-priority-title">Sinyal Cross Hunter</div>
+      <button type="button" class="es-section-toggle" title="Sembunyikan section">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+    </div>
+    <div class="es-section-body">
+      <div class="es-priority-controls">
+        <select id="esChTf">
+          <option value="15m" selected>TF 15 Menit</option>
+          <option value="30m">TF 30 Menit</option>
+          <option value="1h">TF 1 Jam</option>
+        </select>
+        <button id="esChBtn" class="es-priority-btn">Cari Sinyal Cross Hunter</button>
+        <div class="es-symbol-manager es-symbol-manager-inline">
+          <button type="button" id="esChManagerBtn" class="es-symbol-manager-btn">
+            <span>Ganti Chart / Kelola Koin</span>
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="es-symbol-manager-dropdown" id="esChManagerDropdown"></div>
+        </div>
+        <div class="es-ai-regime" id="esChSmiBadge"></div>
+      </div>
+      <div class="es-priority-grid" id="esChGrid"></div>
+      <div class="es-priority-status" id="esChStatus">Klik "Cari Sinyal Cross Hunter" untuk memindai.</div>
     </div>
   </div>
 
@@ -3302,7 +3332,7 @@
   // biasa. Tiap sumber daftar ulang candidate-nya sendiri tiap kali pindai
   // ulang (entri lama dari sumber itu dihapus dulu supaya tidak menumpuk data basi).
   window.__esTradableSignals = window.__esTradableSignals || {};
-  const TRADABLE_SOURCE_LABEL = { priority:'Prioritas', favorite:'Favorit', cross:'Cross EMA', favcross:'Favorit Cross', ict:'Prioritas ICT', snr:'Prioritas SNR', ai:'Prioritas AI', pantau:'Pantau' };
+  const TRADABLE_SOURCE_LABEL = { priority:'Prioritas', favorite:'Favorit', cross:'Cross EMA', favcross:'Favorit Cross', ict:'Prioritas ICT', snr:'Prioritas SNR', ai:'Prioritas AI', pantau:'Pantau', crosshunter:'Cross Hunter' };
   function tradableUid(source, symbol, tfValue){ return `${source}_${symbol}_${tfValue}`; }
   function registerTradableSignals(source, candidates){
     Object.keys(window.__esTradableSignals).forEach(k=>{
@@ -5121,6 +5151,249 @@
     return found;
   }
 
+  // ═══════════════════════════════════════════════════════
+  // ████████  SINYAL CROSS HUNTER  ████████
+  // ═══════════════════════════════════════════════════════
+  // Konsep dari Pine "Scalping + SMI Filter": cross EMA 9/21 + konfirmasi
+  // RSI & MACD, disaring bias SMI di TF tinggi (4H). Entry saat cross candle
+  // yang sudah tutup. SL di luar SNR TF terkait (SELL = resistan teratas,
+  // BUY = support terbawah). Note konfirmasi menampilkan cross di TF 5m/15m/30m.
+  const chTfSel = document.getElementById('esChTf');
+  const chBtn = document.getElementById('esChBtn');
+  const chGrid = document.getElementById('esChGrid');
+  const chStatusEl = document.getElementById('esChStatus');
+  const chSmiBadge = document.getElementById('esChSmiBadge');
+  const chManagerBtn = document.getElementById('esChManagerBtn');
+  const chManagerDropdown = document.getElementById('esChManagerDropdown');
+
+  const CH_TF_LABEL = { '5m':'5m', '15m':'15m', '30m':'30m', '1h':'1H', '4h':'4H' };
+  const CH_KONFIRMASI_TF = ['5m','15m','30m'];  // TF untuk note konfirmasi cross
+  const CH_FRESH = 2;      // cross utama harus terjadi dalam 2 candle terakhir
+  const CH_KONF_WINDOW = 4; // cross konfirmasi TF lain masih dihitung "searah" dalam 4 candle
+
+  function macd(closes, fast, slow, sig){
+    fast=fast||12; slow=slow||26; sig=sig||9;
+    const ef = ema(closes, fast), es = ema(closes, slow);
+    const line = closes.map((_,i)=> ef[i]-es[i]);
+    const signal = ema(line, sig);
+    return { line, signal };
+  }
+
+  // Arah cross tepat di index i (memakai candle i vs i-1 yang sudah tutup).
+  function crossDiIndex(e9, e21, i){
+    if(i<1) return null;
+    if(e9[i-1] <= e21[i-1] && e9[i] > e21[i]) return 'BUY';
+    if(e9[i-1] >= e21[i-1] && e9[i] < e21[i]) return 'SELL';
+    return null;
+  }
+  // Cross terbaru dalam `within` candle terakhir yang sudah tutup -> {dir, barsAgo}.
+  // idxTerakhir = index candle terakhir yang dianggap "sudah tutup".
+  function crossTerbaru(e9, e21, idxTerakhir, within){
+    for(let b=0; b<within; b++){
+      const i = idxTerakhir - b;
+      const d = crossDiIndex(e9, e21, i);
+      if(d) return { dir:d, barsAgo:b };
+    }
+    return null;
+  }
+
+  async function findCrossHunterSignalForSymbol(symbol, tickers, tf){
+    // Kumpulkan TF unik yang perlu diambil: konfirmasi 5m/15m/30m + TF terpilih + 4H bias.
+    const tfSet = Array.from(new Set(CH_KONFIRMASI_TF.concat([tf, '4h'])));
+    const data = {};
+    for(const t of tfSet){
+      try{ data[t] = await fetchKlines(symbol, t, 250); }catch(e){ return null; }
+    }
+    const d = data[tf];
+    if(!d || d.closes.length < 60) return null;
+
+    // Bar terakhir yang SUDAH tutup: candle terakhir dari Binance masih berjalan,
+    // jadi patokan cross = candle sebelum yang terakhir.
+    const idxClosed = d.closes.length - 2;
+
+    const e9 = ema(d.closes, 9), e21 = ema(d.closes, 21);
+    const rsiArr = rsi(d.closes, 14);
+    const mac = macd(d.closes);
+
+    // Cross utama di TF terpilih, harus fresh (dalam CH_FRESH candle tutup terakhir).
+    const cx = crossTerbaru(e9, e21, idxClosed, CH_FRESH);
+    if(!cx) return null;
+    const arah = cx.dir;
+
+    // Konfirmasi RSI & MACD di candle tutup terakhir.
+    const rsiNow = rsiArr[idxClosed];
+    const macNow = mac.line[idxClosed], sigNow = mac.signal[idxClosed];
+    if(rsiNow==null || macNow==null || sigNow==null) return null;
+    const rsiOk = arah==='BUY' ? rsiNow > 50 : rsiNow < 50;
+    const macdOk = arah==='BUY' ? macNow > sigNow : macNow < sigNow;
+    if(!rsiOk || !macdOk) return null;
+
+    // Bias SMI 4H (dari kode Pine): OB (>=40) -> hanya SELL, OS (<=-40) -> hanya BUY.
+    const h4 = data['4h'];
+    let smiBias = 'netral', smiVal = null, allow = true;
+    if(h4 && h4.closes.length >= 40){
+      const st = smiSeries(h4.highs, h4.lows, h4.closes, 14, 3, 3);
+      smiVal = st.smi[st.smi.length - 2];   // 4H candle tutup terakhir
+      if(smiVal != null){
+        if(smiVal >= 40){ smiBias = 'overbought'; allow = (arah === 'SELL'); }
+        else if(smiVal <= -40){ smiBias = 'oversold'; allow = (arah === 'BUY'); }
+      }
+    }
+    if(!allow) return null;   // ditolak bias SMI 4H
+
+    // Note konfirmasi: apakah ada cross SEARAH di TF 5m/15m/30m (dalam window).
+    const konfirmasi = {};
+    CH_KONFIRMASI_TF.forEach(t=>{
+      const dt = data[t];
+      if(!dt || dt.closes.length < 40){ konfirmasi[t] = false; return; }
+      const ke9 = ema(dt.closes, 9), ke21 = ema(dt.closes, 21);
+      const kc = crossTerbaru(ke9, ke21, dt.closes.length - 2, CH_KONF_WINDOW);
+      konfirmasi[t] = !!(kc && kc.dir === arah);
+    });
+
+    // Entry = harga terkini. SL dari SNR TF terpilih: SELL = resistan TERATAS,
+    // BUY = support TERBAWAH (masing-masing dari maksimal 2 pivot terakhir).
+    const t = tickers[symbol];
+    const price = t ? parseFloat(t.lastPrice) : d.closes[d.closes.length-1];
+    const atrArr = atr(d.highs, d.lows, d.closes, 14);
+    const a = atrArr[atrArr.length-1] || (price * 0.005);
+    const buffer = a * 0.3;
+
+    let sl;
+    if(arah === 'SELL'){
+      const res = findPivots(d.highs, 10, 10, true).slice(-2).map(p=>p.value);
+      const level = res.length ? Math.max.apply(null, res) : null;   // resistan teratas
+      sl = (level != null && level > price) ? level + buffer
+           : Math.max.apply(null, d.highs.slice(-12)) + buffer;
+    } else {
+      const sup = findPivots(d.lows, 10, 10, false).slice(-2).map(p=>p.value);
+      const level = sup.length ? Math.min.apply(null, sup) : null;   // support terbawah
+      sl = (level != null && level < price) ? level - buffer
+           : Math.min.apply(null, d.lows.slice(-12)) - buffer;
+    }
+    const risk = Math.abs(price - sl);
+    if(!(risk > 0)) return null;
+    const riskPct = (risk / price) * 100;
+    if(riskPct > 10 || riskPct < 0.03) return null;   // SL tidak masuk akal
+    const tp = arah === 'BUY' ? price + risk*2 : price - risk*2;
+
+    return {
+      symbol, signal: arah, price, sl, tp,
+      tfValue: tf, tfLabel: CH_TF_LABEL[tf] || tf,
+      barsAgo: cx.barsAgo, konfirmasi, smiBias, smiVal, riskPct
+    };
+  }
+
+  function chSmiNote(bias, val){
+    const v = val==null ? '-' : val.toFixed(1);
+    if(bias === 'overbought') return { cls:'sell', text:`SMI 4H Overbought (${v}) &rarr; bias SELL` };
+    if(bias === 'oversold')  return { cls:'buy',  text:`SMI 4H Oversold (${v}) &rarr; bias BUY` };
+    return { cls:'', text:`SMI 4H Netral (${v}) &rarr; BUY & SELL` };
+  }
+
+  function renderCrossHunterSignals(top){
+    window.__esLastCrossHunterResults = top;
+    registerTradableSignals('crosshunter', top);
+    chGrid.innerHTML = top.map((c,i)=>{
+      const signalCls = c.signal==='BUY' ? 'buy' : 'sell';
+      const riskDist = Math.abs(c.price - c.sl);
+      const tp2 = c.signal==='BUY' ? c.price + riskDist*2 : c.price - riskDist*2;
+      const smi = chSmiNote(c.smiBias, c.smiVal);
+      const row = (label, ok) => `<div class="es-check-row ${ok?'ok':'fail'}">`
+        + `<span class="es-check-icon">${ok?'&check;':'&times;'}</span> ${label}</div>`;
+      return `<div class="es-priority-card ${signalCls}" data-symbol="${c.symbol}" data-tf="${c.tfValue}" data-tflabel="${c.tfLabel}" data-price="${c.price}">
+        <div class="es-priority-card-top">
+          <span class="es-priority-rank">#${i+1}</span>
+          <span class="es-priority-symbol">${c.symbol.replace('USDT','')}</span>
+          <span class="es-priority-signal ${signalCls}">${c.signal} NOW</span>
+        </div>
+        <div class="es-priority-tf">Cross EMA 9/21 &bull; TF ${c.tfLabel} &bull; Harga $${fmtPrice(c.price)}</div>
+        <div class="es-checklist">
+          ${row('Cross TF 5 menit', c.konfirmasi['5m'])}
+          ${row('Cross TF 15 menit', c.konfirmasi['15m'])}
+          ${row('Cross TF 30 menit', c.konfirmasi['30m'])}
+          <div class="es-check-row ok"><span class="es-check-icon" style="color:${smi.cls==='sell'?'var(--bear)':smi.cls==='buy'?'var(--bull)':'var(--gold)'}">&bull;</span> ${smi.text}</div>
+        </div>
+        <div class="es-priority-levels">
+          <div class="es-priority-level-row">Area Entri: <strong>$${fmtPrice(c.price)}</strong></div>
+          <div class="es-priority-level-row invalid">Invalid Level (SL): <strong>$${fmtPrice(c.sl)}</strong></div>
+          <div class="es-priority-level-row">Take Profit: <strong>TP1 $${fmtPrice(c.tp)}</strong> &bull; <strong>TP2 $${fmtPrice(tp2)}</strong></div>
+          <div class="es-priority-level-row">Risk: <strong>${c.riskPct.toFixed(2)}%</strong></div>
+        </div>
+        <button class="es-priority-trade-btn" type="button">Pilih Sinyal Ini</button>
+      </div>`;
+    }).join('');
+
+    chGrid.querySelectorAll('.es-priority-card').forEach((card,i)=>{
+      const cand = top[i];
+      card.addEventListener('click', (e)=>{
+        if(e.target.classList.contains('es-priority-trade-btn')) return;
+        openTradingView(cand.symbol, cand.tfValue);
+      });
+      card.querySelector('.es-priority-trade-btn').addEventListener('click', (e)=>{
+        e.stopPropagation();
+        selectTradableSignalByUid(tradableUid('crosshunter', cand.symbol, cand.tfValue));
+      });
+    });
+  }
+
+  async function findCrossHunterSignals(){
+    if(isSectionCollapsed('crosshunter')) return;   // section dilipat - hemat request
+    const tf = chTfSel.value;
+    chBtn.disabled = true;
+    chStatusEl.classList.remove('error');
+    chStatusEl.textContent = `Memindai ${activeSymbols.length} koin (cross TF ${CH_TF_LABEL[tf]||tf} + konfirmasi 5m/15m/30m + bias SMI 4H)...`;
+    chGrid.innerHTML = '';
+    chSmiBadge.innerHTML = 'Filter: <span class="es-ai-regime-badge neutral">SMI 4H</span>';
+    try{
+      const tickers = await loadTickers();
+      const settled = await mapLimited(activeSymbols, SCAN_CONCURRENCY, s => findCrossHunterSignalForSymbol(s, tickers, tf));
+      let all = [];
+      settled.forEach(s=>{ if(s.status==='fulfilled' && s.value) all.push(s.value); });
+      // Yang cross-nya paling baru (barsAgo kecil) di atas, lalu urut kapitalisasi.
+      all.sort((a,b)=> a.barsAgo - b.barsAgo || rankOf(a.symbol)-rankOf(b.symbol));
+      if(all.length === 0){
+        chStatusEl.textContent = `Tidak ada sinyal Cross Hunter (TF ${CH_TF_LABEL[tf]||tf}) yang lolos filter saat ini dari ${activeSymbols.length} koin.`;
+        chBtn.disabled = false;
+        return;
+      }
+      renderCrossHunterSignals(all);
+      const nBuy = all.filter(c=>c.signal==='BUY').length;
+      chStatusEl.textContent = `Ditemukan ${all.length} sinyal Cross Hunter (${nBuy} BUY, ${all.length-nBuy} SELL) dari ${activeSymbols.length} koin • TF ${CH_TF_LABEL[tf]||tf} • ${new Date().toLocaleTimeString('id-ID')}.`;
+    }catch(e){
+      chStatusEl.classList.add('error');
+      chStatusEl.textContent = `Gagal memindai Cross Hunter: ${e && e.message ? e.message : 'kesalahan tak terduga'}.`;
+    }finally{
+      chBtn.disabled = false;
+    }
+  }
+
+  function renderChManagerDropdown(){
+    const results = window.__esLastCrossHunterResults || [];
+    if(results.length===0){
+      chManagerDropdown.innerHTML = `<div class="es-symbol-manager-empty">Belum ada hasil. Jalankan pemindaian dulu.</div>`;
+      return;
+    }
+    chManagerDropdown.innerHTML = results.map(c=>{
+      const label = `${c.symbol.replace('USDT','')} (${c.tfLabel})`;
+      return `<div class="es-symbol-manager-row">
+        <span class="es-symbol-manager-name" data-symbol="${c.symbol}" data-tf="${c.tfValue||''}">${label}</span>
+        <button type="button" class="es-symbol-manager-block" data-symbol="${c.symbol}">Blokir &amp; Ganti</button>
+      </div>`;
+    }).join('');
+    chManagerDropdown.querySelectorAll('.es-symbol-manager-name').forEach(el=>{
+      el.addEventListener('click', ()=> openTradingView(el.getAttribute('data-symbol'), el.getAttribute('data-tf') || undefined));
+    });
+    chManagerDropdown.querySelectorAll('.es-symbol-manager-block').forEach(btn=>{
+      btn.addEventListener('click', ()=>{ blockAndReplaceSymbol(btn.getAttribute('data-symbol')); findCrossHunterSignals(); });
+    });
+  }
+
+  chBtn.addEventListener('click', findCrossHunterSignals);
+  chManagerBtn.addEventListener('click', (e)=>{ e.stopPropagation(); renderChManagerDropdown(); chManagerDropdown.classList.toggle('open'); });
+  document.addEventListener('click', (e)=>{ if(!chManagerDropdown.contains(e.target) && e.target!==chManagerBtn && !chManagerBtn.contains(e.target)) chManagerDropdown.classList.remove('open'); });
+
+
   function renderPrioritySnrSignals(top){
     window.__esLastPrioritySnrResults = top;
     registerTradableSignals('snr', top);
@@ -6157,6 +6430,7 @@
     snr:      { cls:'snr',   label:'Sinyal SNR' },
     priority: { cls:'bbma',  label:'Sinyal BBMA' },
     pantau:   { cls:'pantau',label:'Sinyal Pantau Kripto' },
+    crosshunter:{ cls:'crosshunter',label:'Sinyal Cross Hunter' },
     favcross: { cls:'lain',  label:'Sinyal Entry Koin Favorit' },
     cross:    { cls:'lain',  label:'Sinyal Cross EMA' },
     favorite: { cls:'lain',  label:'Sinyal Koin Favorit' },
@@ -7728,6 +8002,7 @@
   const SECTION_LABEL = {
     favorit:  'Koin Favorit',
     pantau:   'Sinyal Pantau Kripto',
+    crosshunter: 'Sinyal Cross Hunter',
     favcross: 'Sinyal Entry Koin Favorit',
     bbma:     'Sinyal Prioritas BBMA',
     snr:      'Sinyal Prioritas SNR',
