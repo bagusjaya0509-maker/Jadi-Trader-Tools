@@ -733,14 +733,16 @@
      memunculkannya kembali dipindah ke deretan chip di atas (.es-hidden-sections). */
   .es-collapsible.es-collapsed{ display:none; }
 
+  /* "Signal Beta Version" - hanya pemilik. Ditaruh di kanan header, sejajar
+     baris "Tools" (align-self flex-end), di atas garis section pertama. */
   .es-hidden-sections{
     display:none;
     flex-wrap:wrap;
     align-items:center;
+    justify-content:flex-end;
+    align-self:flex-end;
     gap:8px;
-    margin:16px 0 4px;
-    padding-top:14px;
-    border-top:1px solid var(--border);
+    max-width:60%;
   }
   .es-hidden-sections.show{ display:flex; }
   .es-hidden-sections-label{
@@ -1860,7 +1862,7 @@
 <div class="ema-screener">
   <div class="es-toprow">
     <div class="es-topnav">
-      <a href="backtest-screener.html" class="es-nav-link">Backtest 3 Sinyal &rarr;</a>
+      <a href="backtest-screener.html" class="es-nav-link">Laporan Backtest &rarr;</a>
       <a href="jurnal-trading.html" class="es-nav-link">Jurnal Trading &rarr;</a>
     </div>
     <div class="es-user-bar" id="esUserBar" style="display:none;">
@@ -1913,6 +1915,7 @@
       </div>
       <div class="es-sub" id="esSubtitle"></div>
     </div>
+    <div class="es-hidden-sections" id="esHiddenSections"></div>
   </div>
 
   <div class="es-favorit-section es-collapsible" data-section="favorit">
@@ -1967,10 +1970,6 @@
     </div>
   </div>
 
-  <!-- Deretan chip untuk memunculkan kembali section yang disembunyikan.
-       Diperlukan karena section yang disembunyikan hilang total (judul ikut
-       hilang), jadi tidak ada lagi panah di tempat asalnya untuk diklik. -->
-  <div class="es-hidden-sections" id="esHiddenSections"></div>
 
   <div class="es-priority-section es-collapsible" data-section="pantau">
     <div class="es-priority-header es-section-head">
@@ -2694,6 +2693,9 @@
       });
 
       pasangTombolSync();
+      // Panel "Signal Beta Version" hanya untuk pemilik - render ulang setelah
+      // esIsOwner terisi (saat init tadi masih false, jadi panelnya belum tampil).
+      if(typeof renderHiddenSectionChips === 'function') renderHiddenSectionChips();
   }
 
   esGoogleLoginBtn.addEventListener('click', function(){
@@ -8030,13 +8032,14 @@
     const bar = document.getElementById('esHiddenSections');
     if(!bar) return;
     const tersembunyi = [...collapsedSections].filter(n => SECTION_LABEL[n]);
-    if(tersembunyi.length === 0){
+    // Terkunci: hanya pemilik yang melihat panel "Signal Beta Version".
+    if(!esIsOwner || tersembunyi.length === 0){
       bar.classList.remove('show');
       bar.innerHTML = '';
       return;
     }
     bar.classList.add('show');
-    bar.innerHTML = '<span class="es-hidden-sections-label">Section disembunyikan:</span>' +
+    bar.innerHTML = '<span class="es-hidden-sections-label">Signal Beta Version</span>' +
       tersembunyi.map(n => `<button type="button" class="es-hidden-chip" data-section="${n}" title="Munculkan kembali">
         <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
         ${SECTION_LABEL[n]}
