@@ -1,6 +1,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Jadi Trader — Backtest 3 Sinyal</title>
+<title>Jadi Trader — Laporan Backtest</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
 <style>
   :root{
@@ -148,6 +148,9 @@
   .bt-badge.snr{ background:rgba(120,160,255,0.16); color:#7BA0FF; }
   .bt-badge.ai{ background:rgba(180,120,255,0.16); color:#B478FF; }
   .bt-badge.crosshunter{ background:rgba(63,199,199,0.16); color:#3FC7C7; }
+  .bt-badge.pantau{ background:rgba(242,184,75,0.16); color:var(--gold); }
+  .bt-badge.sync{ background:var(--panel-2); color:var(--muted); }
+  .bt-badge.sim{ background:var(--panel-2); color:var(--muted); }
   .bt-badge.win{ background:var(--bull-dim); color:var(--bull); }
   .bt-badge.loss{ background:var(--bear-dim); color:var(--bear); }
   .bt-badge.be{ background:var(--panel-2); color:var(--muted); }
@@ -162,8 +165,8 @@
 
 <div class="bt-header">
   <div>
-    <div class="bt-title"><span class="dot"></span>Backtest 3 Sinyal</div>
-    <div class="bt-sub">Uji historis: BBMA &bull; SNR &bull; AI Konfluensi</div>
+    <div class="bt-title"><span class="dot"></span>Laporan Backtest</div>
+    <div class="bt-sub">Rekap trade simulasi &amp; live dari Crypto Screener</div>
   </div>
   <div class="bt-nav">
     <a href="ema-cross-screener_3.html">Crypto Screener</a>
@@ -172,63 +175,60 @@
 </div>
 
 <div class="bt-note">
-  Setiap sinyal yang muncul dianggap <strong>langsung dibuka posisinya</strong> &mdash;
-  modal <code>$1.000</code> per posisi, leverage <code>2x</code>, SL + TP1 + TP2
-  <strong>tanpa partial</strong> (begitu TP1 kena, SL pindah ke breakeven untuk sisa posisi).
-  Biaya taker <code>0,04%</code> per sisi ikut dihitung.<br>
-  Indikator dihitung <strong>hanya dari data sampai bar itu</strong>, dan pivot baru dipakai
-  setelah benar-benar terkonfirmasi &mdash; supaya hasilnya tidak "mengintip masa depan".
-  Kalau dalam satu bar harga menyentuh SL <em>dan</em> TP sekaligus, dianggap
-  <strong>SL yang kena duluan</strong> (asumsi paling pesimis).
+  Halaman ini <strong>bukan backtest ke belakang</strong> lagi. Isinya adalah
+  <strong>rekap nyata dari posisi yang kamu buka di Crypto Screener</strong> &mdash;
+  begitu sebuah posisi ditutup (kena TP/SL/BE atau ditutup manual/Binance), ia masuk ke
+  <code>Riwayat Transaksi</code> dan langsung dihitung di sini: winrate, profit factor,
+  kurva saldo, dan rincian per sumber sinyal (BBMA / SNR / AI / Pantau / Parallel).
+  Data dibaca dari penyimpanan yang <strong>sama</strong> dengan Crypto Screener, jadi
+  <strong>buka Crypto Screener dulu</strong> di perangkat ini supaya datanya termuat.
 </div>
 
 <div class="bt-controls">
-  <label>Jumlah Koin
-    <select id="btCoins">
-      <option value="20">20 koin (paling cepat)</option>
-      <option value="30" selected>30 koin</option>
-      <option value="50">50 koin</option>
-      <option value="100">100 koin (paling lama)</option>
+  <label>Filter Sumber
+    <select id="btFilterSumber">
+      <option value="all" selected>Semua Sumber</option>
+      <option value="crosshunter">Parallel</option>
+      <option value="ai">AI Konfluensi</option>
+      <option value="snr">SNR</option>
+      <option value="bbma">BBMA</option>
+      <option value="pantau">Pantau</option>
+      <option value="sync">Sinkron Binance</option>
     </select>
   </label>
-  <label>Panjang Data
-    <select id="btBars">
-      <option value="300">300 bar 1H (~12 hari)</option>
-      <option value="600" selected>600 bar 1H (~25 hari)</option>
-      <option value="1000">1000 bar 1H (~41 hari)</option>
+  <label>Venue
+    <select id="btFilterVenue">
+      <option value="all" selected>Semua</option>
+      <option value="sim">Simulasi</option>
+      <option value="live">Live (real)</option>
     </select>
   </label>
-  <label>Metode Entry
-    <select id="btMetode">
-      <option value="nopartial" selected>TP1 &amp; TP2 (SL ke BE di TP1, tanpa partial 50%)</option>
-      <option value="partial">TP1 &amp; TP2 (partial 50% di TP1, SL ke BE)</option>
-      <option value="tp1only">SL &amp; TP1 saja (tanpa TP2)</option>
-      <option value="tp2only">SL &amp; TP2 saja (tanpa TP1)</option>
-      <option value="slplus">SL+ (partial 50% di TP1, lalu SL naik tiap kelipatan risk)</option>
-    </select>
-  </label>
-  <div class="bt-strats">
-    <label class="bt-strat-check"><input type="checkbox" id="btStratBbma" checked> BBMA</label>
-    <label class="bt-strat-check"><input type="checkbox" id="btStratSnr" checked> SNR</label>
-    <label class="bt-strat-check"><input type="checkbox" id="btStratAi" checked> AI</label>
-    <label class="bt-strat-check"><input type="checkbox" id="btStratCh" checked> Parallel</label>
-  </div>
-  <button type="button" class="bt-run-btn" id="btRunBtn">Jalankan Backtest</button>
+  <button type="button" class="bt-run-btn" id="btRunBtn">Muat Ulang Data</button>
 </div>
 
 <div class="bt-progress" id="btProgress"><div class="bt-progress-bar" id="btProgressBar"></div></div>
-<div class="bt-status" id="btStatus">Atur cakupan lalu klik "Jalankan Backtest".</div>
+<div class="bt-status" id="btStatus">Memuat data dari Crypto Screener...</div>
 
 <div class="bt-kpis" id="btKpis"></div>
+
+<div class="bt-section-label">Posisi Terbuka Saat Ini</div>
+<div class="bt-table-wrap">
+  <table class="bt-table">
+    <thead><tr>
+      <th>Koin</th><th>TF</th><th>Sumber</th><th>Arah</th><th>Entry</th><th>SL</th><th>TP1</th><th>TP2</th><th>Venue</th>
+    </tr></thead>
+    <tbody id="btOpenTbody"><tr><td colspan="9" class="bt-empty">Belum ada posisi terbuka.</td></tr></tbody>
+  </table>
+</div>
 
 <div class="bt-section-label">Perkembangan Saldo</div>
 <div class="bt-chart-wrap"><svg id="btEquitySvg" viewBox="0 0 800 230" preserveAspectRatio="none"></svg></div>
 
-<div class="bt-section-label">Perbandingan per Strategi</div>
+<div class="bt-section-label">Perbandingan per Sumber Sinyal</div>
 <div class="bt-table-wrap">
   <table class="bt-table">
     <thead><tr>
-      <th>Strategi</th><th>Trade</th><th>Win</th><th>Loss</th><th>BE</th>
+      <th>Sumber</th><th>Trade</th><th>Win</th><th>Loss</th><th>BE</th>
       <th>Winrate</th><th>Profit Factor</th><th>Total P/L</th><th>Rata Win</th><th>Rata Loss</th>
     </tr></thead>
     <tbody id="btStratTbody"><tr><td colspan="10" class="bt-empty">Belum ada hasil.</td></tr></tbody>
@@ -239,11 +239,10 @@
 <div class="bt-table-wrap">
   <table class="bt-table">
     <thead><tr>
-      <th>Waktu Entry</th><th>Waktu Exit</th><th>Koin</th><th>Strategi</th><th>Arah</th>
-      <th>Entry</th><th>SL</th><th>TP1</th><th>TP2</th><th>Exit</th>
-      <th>Alasan</th><th>Fee</th><th>P/L</th><th>Hasil</th>
+      <th>Waktu Exit</th><th>Koin</th><th>TF</th><th>Sumber</th><th>Arah</th>
+      <th>Entry</th><th>Exit</th><th>Alasan</th><th>Fee</th><th>P/L ($)</th><th>P/L (%)</th><th>Hasil</th>
     </tr></thead>
-    <tbody id="btTradeTbody"><tr><td colspan="14" class="bt-empty">Belum ada hasil.</td></tr></tbody>
+    <tbody id="btTradeTbody"><tr><td colspan="12" class="bt-empty">Belum ada hasil.</td></tr></tbody>
   </table>
 </div>
 
@@ -921,7 +920,7 @@
   function renderStrategi(trades){
     const per = {};
     trades.forEach(t=>{ (per[t.strategi]=per[t.strategi]||[]).push(t); });
-    const nama = { bbma:'BBMA', snr:'SNR', ai:'AI Konfluensi', crosshunter:'Parallel' };
+    const nama = { bbma:'BBMA', snr:'SNR', ai:'AI Konfluensi', pantau:'Pantau', crosshunter:'Parallel', sync:'Sinkron Binance', sim:'Simulasi' };
     const baris = Object.keys(per).map(k=>{
       const s = hitungStat(per[k]);
       return `<tr>
@@ -977,159 +976,128 @@
       `<circle cx="${xAt(titik.length-1).toFixed(1)}" cy="${yAt(akhir).toFixed(1)}" r="3.5" fill="${warna}"/>`;
   }
 
+  const NAMA_SUMBER = { bbma:'BBMA', snr:'SNR', ai:'AI', pantau:'Pantau', crosshunter:'Parallel', sync:'Sinkron', sim:'Simulasi' };
+
   function renderTrades(trades){
     const urut = trades.slice().sort((a,b)=>b.waktuExit-a.waktuExit);
     if(!urut.length){
-      elTradeTbody.innerHTML='<tr><td colspan="14" class="bt-empty">Tidak ada trade.</td></tr>';
+      elTradeTbody.innerHTML='<tr><td colspan="12" class="bt-empty">Tidak ada transaksi.</td></tr>';
       return;
     }
-    const nama={ bbma:'BBMA', snr:'SNR', ai:'AI', crosshunter:'Parallel' };
     elTradeTbody.innerHTML = urut.slice(0,400).map(t=>{
       const hasil = t.pl>0?'win':t.pl<0?'loss':'be';
       const label = t.pl>0?'WIN':t.pl<0?'LOSS':'BE';
       return `<tr>
-        <td>${fmtWaktu(t.waktuEntry)}</td>
         <td>${fmtWaktu(t.waktuExit)}</td>
         <td>${t.symbol.replace('USDT','')}</td>
-        <td><span class="bt-badge ${t.strategi}">${nama[t.strategi]}</span></td>
+        <td class="bt-flat">${t.tfLabel||'-'}</td>
+        <td><span class="bt-badge ${t.strategi}">${NAMA_SUMBER[t.strategi]||t.strategi}</span></td>
         <td class="${t.arah==='BUY'?'bt-dir-buy':'bt-dir-sell'}">${t.arah}</td>
         <td>$${fmtHarga(t.entry)}</td>
-        <td>$${fmtHarga(t.sl)}</td>
-        <td>$${fmtHarga(t.tp1)}</td>
-        <td>$${fmtHarga(t.tp2)}</td>
         <td>$${fmtHarga(t.exit)}</td>
-        <td class="bt-flat">${t.alasan}</td>
+        <td class="bt-flat">${t.alasan||'-'}</td>
         <td class="bt-flat">-${fmtUang(t.fee).replace('-','')}</td>
         <td class="${t.pl>0?'bt-pos':t.pl<0?'bt-neg':'bt-flat'}">${fmtUang(t.pl)}</td>
+        <td class="${t.plPct>0?'bt-pos':t.plPct<0?'bt-neg':'bt-flat'}">${t.plPct==null?'-':(t.plPct>=0?'+':'')+t.plPct.toFixed(2)+'%'}</td>
         <td><span class="bt-badge ${hasil}">${label}</span></td>
       </tr>`;
     }).join('') + (urut.length>400
-      ? `<tr><td colspan="14" class="bt-empty">Menampilkan 400 dari ${urut.length} transaksi (yang terbaru).</td></tr>`
+      ? `<tr><td colspan="12" class="bt-empty">Menampilkan 400 dari ${urut.length} transaksi (yang terbaru).</td></tr>`
       : '');
   }
 
-  // ═══════════════════════════════════════════════════════
-  async function jalankanBacktest(){
-    const jml = parseInt(elCoins.value,10);
-    const bars = parseInt(elBars.value,10);
-    const pakai = { bbma:elBbma.checked, snr:elSnr.checked, ai:elAi.checked, ch:elCh.checked };
-    const metode = elMetode.value;
-    if(!pakai.bbma && !pakai.snr && !pakai.ai && !pakai.ch){
-      elStatus.classList.add('error');
-      elStatus.textContent = 'Pilih minimal satu strategi.';
-      return;
-    }
-    const daftar = SYMBOLS.slice(0, jml);
-
-    elRun.disabled = true;
-    elStatus.classList.remove('error');
-    elStatus.textContent = 'Mengambil data BTC sebagai acuan rezim pasar...';
-    setProgress(0.02);
-
-    try{
-      // BTC 4H dipakai untuk rezim makro + pembanding kekuatan relatif
-      const btc4h = await fetchKlines('BTCUSDT','4h', Math.min(500, Math.ceil(bars/4)+260));
-      const rezim = rezimBtc(btc4h.closes);
-
-      elStatus.textContent = `Mengambil data ${daftar.length} koin (1H${pakai.ai?' + 4H':''})...`;
-
-      const perluHtf = pakai.ai;
-      const data1h = await mapLimited(daftar, KONKURENSI, async (s,idx)=>{
-        const r = await fetchKlines(s,'1h',bars);
-        setProgress(0.05 + 0.35*((idx+1)/daftar.length));
-        return r;
-      });
-      let data4h = [];
-      if(perluHtf){
-        data4h = await mapLimited(daftar, KONKURENSI, async (s,idx)=>{
-          const r = await fetchKlines(s,'4h', Math.min(500, Math.ceil(bars/4)+260));
-          setProgress(0.40 + 0.25*((idx+1)/daftar.length));
-          return r;
-        });
-      }
-
-      elStatus.textContent = 'Menjalankan simulasi bar-per-bar...';
-      const semuaTrade = [];
-      let gagal = 0;
-
-      for(let s=0;s<daftar.length;s++){
-        if(!data1h[s].ok){ gagal++; continue; }
-        const d = data1h[s].value;
-        if(d.closes.length < 250) continue;
-        const pre = siapkanIndikator(d);
-
-        let htf = null;
-        if(perluHtf && data4h[s] && data4h[s].ok && data4h[s].value.closes.length >= 210){
-          htf = siapkanHtf(data4h[s].value, d, btc4h.closes, rezim);
-        }
-
-        // Satu posisi per koin per strategi dalam satu waktu (tidak menumpuk)
-        const sibukSampai = { bbma:-1, snr:-1, ai:-1, ch:-1 };
-
-        for(let i=210; i<d.closes.length-1; i++){
-          if(pakai.bbma && i > sibukSampai.bbma){
-            const sig = sinyalBbma(d,i,pre);
-            if(sig){
-              const t = simulasikanTrade(d,i,sig.arah,sig.sl,'bbma',daftar[s],metode);
-              if(t){ semuaTrade.push(t); sibukSampai.bbma = t.iExit; }
-            }
-          }
-          if(pakai.snr && i > sibukSampai.snr){
-            const sig = sinyalSnr(d,i,pre);
-            if(sig){
-              const t = simulasikanTrade(d,i,sig.arah,sig.sl,'snr',daftar[s],metode);
-              if(t){ semuaTrade.push(t); sibukSampai.snr = t.iExit; }
-            }
-          }
-          if(pakai.ai && htf && i > sibukSampai.ai){
-            const sig = sinyalAi(d,i,pre,htf);
-            if(sig){
-              const t = simulasikanTrade(d,i,sig.arah,sig.sl,'ai',daftar[s],metode);
-              if(t){ semuaTrade.push(t); sibukSampai.ai = t.iExit; }
-            }
-          }
-          if(pakai.ch && i > sibukSampai.ch){
-            const sig = sinyalCrossHunter(d,i,pre);
-            if(sig){
-              const t = simulasikanTrade(d,i,sig.arah,sig.sl,'crosshunter',daftar[s],metode);
-              if(t){ semuaTrade.push(t); sibukSampai.ch = t.iExit; }
-            }
-          }
-        }
-        setProgress(0.65 + 0.34*((s+1)/daftar.length));
-        if(s % 5 === 0) await new Promise(r=>setTimeout(r,0)); // beri napas ke UI
-      }
-
-      setProgress(1);
-      renderKpis(semuaTrade);
-      renderStrategi(semuaTrade);
-      renderEquity(semuaTrade);
-      renderTrades(semuaTrade);
-
-      const periode = semuaTrade.length
-        ? (() => {
-            const a = Math.min.apply(null, semuaTrade.map(t=>t.waktuEntry));
-            const b = Math.max.apply(null, semuaTrade.map(t=>t.waktuExit));
-            return new Date(a).toLocaleDateString('id-ID') + ' - ' + new Date(b).toLocaleDateString('id-ID');
-          })()
-        : '-';
-
-      elStatus.textContent = semuaTrade.length
-        ? `Selesai: ${semuaTrade.length} transaksi dari ${daftar.length - gagal} koin • periode ${periode}` +
-          ` • metode: ${METODE_LABEL[metode]}` +
-          (gagal ? ` • ${gagal} koin gagal dimuat` : '') +
-          ` • rezim BTC saat ini: ${rezim==='long'?'Bullish':rezim==='short'?'Bearish':'Sideways'}`
-        : `Tidak ada satu pun sinyal yang memenuhi syarat pada ${daftar.length} koin & ${bars} bar terakhir.`;
-    }catch(e){
-      elStatus.classList.add('error');
-      elStatus.textContent = 'Gagal menjalankan backtest: ' + (e && e.message ? e.message : 'kesalahan tak terduga');
-    }finally{
-      elRun.disabled = false;
-      setTimeout(()=> elProg.classList.remove('show'), 600);
-    }
+  function renderPosisiTerbuka(posisi){
+    const el = document.getElementById('btOpenTbody');
+    if(!posisi.length){ el.innerHTML='<tr><td colspan="9" class="bt-empty">Belum ada posisi terbuka.</td></tr>'; return; }
+    el.innerHTML = posisi.map(p=>{
+      const venue = p.venue==='live-real'?'Live':p.venue==='live-testnet'?'Testnet':'Simulasi';
+      return `<tr>
+        <td>${(p.source||'').replace('USDT','')}</td>
+        <td class="bt-flat">${p.tfLabel||'-'}</td>
+        <td><span class="bt-badge ${p.signalType||'sim'}">${NAMA_SUMBER[p.signalType]||'-'}</span></td>
+        <td class="${p.dir==='BUY'?'bt-dir-buy':'bt-dir-sell'}">${p.dir}</td>
+        <td>$${fmtHarga(p.entryPrice)}</td>
+        <td>$${fmtHarga(p.sl)}</td>
+        <td>$${fmtHarga(p.tp1)}</td>
+        <td>$${p.tp2!=null?fmtHarga(p.tp2):'-'}</td>
+        <td class="bt-flat">${venue}</td>
+      </tr>`;
+    }).join('');
   }
 
-  elRun.addEventListener('click', jalankanBacktest);
+
+  // ═══════════════════════════════════════════════════════
+  // ████████  MUAT DATA DARI CRYPTO SCREENER (localStorage)  ████████
+  // ═══════════════════════════════════════════════════════
+  const PSIM_KEY = 'emaScreenerPrioritySim_v1';
+
+  // Ubah 1 entri riwayat screener -> bentuk trade yang dipakai renderer.
+  function keTrade(h){
+    let strategi = h.signalType;
+    if(!strategi){ strategi = (h.venue==='binance-sync') ? 'sync' : 'sim'; }
+    return {
+      symbol: h.source || '-',
+      strategi,
+      arah: h.dir,
+      tfLabel: h.tfLabel,
+      waktuEntry: h.entryTime,
+      waktuExit: h.exitTime || h.entryTime,
+      entry: h.entryPrice,
+      exit: h.exitPrice,
+      alasan: h.reason || h.tpStatus || '-',
+      fee: (h.exchangeFee||0) + (h.marginFee||0),
+      pl: (typeof h.pnl==='number') ? h.pnl : 0,
+      plPct: (typeof h.pnlPct==='number') ? h.pnlPct : null,
+      venue: h.venue
+    };
+  }
+
+  function cocokFilter(t, sumber, venue){
+    if(sumber!=='all' && t.strategi!==sumber) return false;
+    if(venue==='sim'  && !(t.venue==='sim' || t.venue==null)) return false;
+    if(venue==='live' && t.venue!=='live-real') return false;
+    return true;
+  }
+
+  function muatDariScreener(){
+    elRun.disabled = true;
+    let obj = null;
+    try{ const raw = localStorage.getItem(PSIM_KEY); if(raw) obj = JSON.parse(raw); }catch(e){ obj=null; }
+    const historyAll = (obj && Array.isArray(obj.history)) ? obj.history : [];
+    const posisiAll  = (obj && obj.positions) ? Object.values(obj.positions) : [];
+    const sumber = document.getElementById('btFilterSumber').value;
+    const venue  = document.getElementById('btFilterVenue').value;
+
+    let trades = historyAll.map(keTrade).filter(t=> t.waktuExit && cocokFilter(t, sumber, venue));
+
+    // Posisi terbuka ikut filter sumber (venue posisi terbuka = live/sim).
+    let posisi = posisiAll.filter(p=>{
+      if(sumber!=='all' && (p.signalType||'sim')!==sumber) return false;
+      if(venue==='sim'  && !(p.venue==='sim')) return false;
+      if(venue==='live' && p.venue!=='live-real') return false;
+      return true;
+    });
+
+    renderKpis(trades);
+    renderEquity(trades);
+    renderStrategi(trades);
+    renderTrades(trades);
+    renderPosisiTerbuka(posisi);
+
+    if(!obj){
+      elStatus.classList.add('error');
+      elStatus.textContent = 'Data belum termuat. Buka Crypto Screener dulu di perangkat ini (localStorage kosong).';
+    } else {
+      elStatus.classList.remove('error');
+      elStatus.textContent = `${trades.length} transaksi selesai • ${posisi.length} posisi terbuka • diperbarui ${new Date().toLocaleTimeString('id-ID')}.`;
+    }
+    elRun.disabled = false;
+  }
+
+  elRun.addEventListener('click', muatDariScreener);
+  document.getElementById('btFilterSumber').addEventListener('change', muatDariScreener);
+  document.getElementById('btFilterVenue').addEventListener('change', muatDariScreener);
+  muatDariScreener();   // otomatis muat saat halaman dibuka
 
   // Dibuka lewat konsol untuk keperluan pengujian otomatis
   window.__btTest = {
