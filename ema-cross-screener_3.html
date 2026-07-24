@@ -1427,19 +1427,22 @@
 
   /* Ikon cari koin di kiri "Sinyal Terpilih" + popover pencarian. */
   .es-signal-pick-wrap{ position:relative; display:flex; align-items:center; gap:6px; }
-  .es-coin-search-btn{
+  /* Ikon kaca pembesar TANPA outline - polos seperti ikon gear "setting" (abu).
+     Pakai #id supaya menang atas ".es-sim-controls button" yang memberi kotak. */
+  #esCoinSearchBtn{
     flex-shrink:0;
-    width:32px; height:32px;
     display:inline-flex; align-items:center; justify-content:center;
-    background: var(--panel);
-    border:1px solid var(--border);
+    background:none;
+    border:none;
+    border-radius:0;
     color: var(--muted);
-    border-radius:8px;
     cursor:pointer;
-    padding:0;
+    padding:4px;
+    width:auto; height:auto;
   }
-  .es-coin-search-btn:hover{ color: var(--text); border-color: var(--gold); }
-  .es-coin-search-btn.active{ color: var(--gold); border-color: var(--gold); }
+  #esCoinSearchBtn:hover{ color: var(--text); background:none; }
+  #esCoinSearchBtn.active{ color: var(--gold); }
+  #esCoinSearchBtn svg{ width:17px; height:17px; flex:0 0 auto; display:block; }
   .es-coin-search-pop{
     display:none;
     position:absolute; top:calc(100% + 6px); left:0; z-index:40;
@@ -2405,7 +2408,7 @@
       <input type="number" id="esPsimLeverage" min="1" max="125" step="1" placeholder="Leverage (x)" title="Leverage (x)">
       <div class="es-signal-pick-wrap">
         <button type="button" id="esCoinSearchBtn" class="es-coin-search-btn" title="Cari koin untuk ditradingkan (mis. BTC/USDT)">
-          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6.5"></circle><line x1="21" y1="21" x2="15.5" y2="15.5"></line></svg>
         </button>
         <select id="esPsimSignalSelect" title="Sinyal Terpilih"><option value="" disabled selected hidden>Sinyal Terpilih</option></select>
         <div class="es-coin-search-pop" id="esCoinSearchPop">
