@@ -923,6 +923,22 @@
   .es-priority-signal.sell{ background: var(--bear-dim); color: var(--bear); }
   .es-priority-signal.watch{ background: rgba(242,184,75,0.18); color: var(--gold); }
 
+  /* Parallel Signal: tombol BUY/SELL NOW (dulu badge di pojok atas) sekarang di
+     pojok kanan bawah kartu, meniru posisi tombol pick di kartu Sinyal Pantau. */
+  .es-ch-foot{
+    display:flex;
+    justify-content:flex-end;
+    margin-top:10px;
+  }
+  .es-ch-pick{
+    border:none;
+    cursor:pointer;
+    line-height:1;
+    transition:filter .15s, transform .1s;
+  }
+  .es-ch-pick:hover{ filter:brightness(1.25); }
+  .es-ch-pick:active{ transform:scale(0.96); }
+
   .es-priority-hp-badge{
     font-family: var(--font-mono);
     font-weight:700;
@@ -1036,7 +1052,7 @@
   }
   .es-ai-regime-badge.bull{ color: var(--bull); }
   .es-ai-regime-badge.bear{ color: var(--bear); }
-  .es-ai-regime-badge.neutral{ color: var(--gold); }
+  .es-ai-regime-badge.neutral{ color: #fff; }
   .es-ai-score-badge{
     font-family: var(--font-mono);
     font-weight:700;
@@ -1121,6 +1137,33 @@
     0%,100%{ box-shadow:0 0 9px 1px rgba(192,90,78,0.75); }   /* merah (--bear) */
     50%    { box-shadow:0 0 9px 1px rgba(79,158,130,0.75); }  /* hijau (--bull) */
   }
+
+  /* Tombol "Kirim Real Order" & "Cari Sinyal Pantau": teks putih + border standar
+     dengan cahaya kedap-kedip merah<->hijau, sama seperti "Cari Sinyal Parallel". */
+  #esLiveTradeBtn, #esPantauBtn{
+    color:#fff !important;
+    border-color: var(--border) !important;
+    background: var(--panel) !important;
+    animation: chScanGlow 1.6s ease-in-out infinite;
+  }
+  #esLiveTradeBtn:hover, #esPantauBtn:hover{ background: var(--panel-2) !important; }
+
+  /* Tombol "Open Posisi Demo": outline abu standar (dipindah ke sebelah kanan
+     tombol Kirim Real Order, di dalam box Live Trading). */
+  #esPsimOpenBtn{
+    background: var(--panel);
+    border:1px solid var(--border);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-weight:600;
+    font-size:12.5px;
+    padding:8px 14px;
+    border-radius:8px;
+    cursor:pointer;
+    height:34px;
+  }
+  #esPsimOpenBtn:hover{ background: var(--panel-2); }
+  #esPsimOpenBtn:disabled{ opacity:.5; cursor:not-allowed; }
 
   .es-fav-section{
     margin-top:16px;
@@ -1595,6 +1638,8 @@
     gap:10px;
     margin-bottom:16px;
   }
+  /* Ringkasan (Posisi Terbuka, Total PnL, dll) dipindah ke atas judul "Posisi Terbuka" */
+  .es-sim-summary-top{ margin-top:2px; margin-bottom:14px; }
   .es-sim-stat{
     background: var(--panel);
     border:1px solid var(--border);
@@ -2214,6 +2259,7 @@
       </div>
     </div>
 
+    <div class="es-sim-summary es-sim-summary-top" id="esPsimSummary"></div>
     <div class="es-sim-table-label">Posisi Terbuka</div>
     <div class="es-sim-table-wrap">
       <table class="es-sim-table">
@@ -2244,8 +2290,8 @@
         <option value="SELL_STOP">Sell Stop</option>
       </select>
       <input type="number" id="esLiveEntryPriceManual" placeholder="Harga Entry Manual ($)" title="Harga Entry Manual ($)" step="any" style="display:none;">
-      <input type="number" id="esPsimManualSl" placeholder="SL Manual ($)" title="SL Manual ($)" step="any">
-      <input type="number" id="esPsimManualTp" placeholder="TP Manual ($)" title="TP Manual ($)" step="any">
+      <input type="number" id="esPsimManualSl" placeholder="SL Manual" title="SL Manual ($)" step="any">
+      <input type="number" id="esPsimManualTp" placeholder="TP Manual" title="TP Manual ($)" step="any">
       <select id="esLiveEntryMethod" title="Metode Entry (Live) - cara SL/TP1/TP2 ditangani setelah entry">
         <option value="" disabled selected hidden>Metode Entry (Live)</option>
         <option value="partial">TP1 &amp; TP2 (partial 50% di TP1, SL ke BE)</option>
@@ -2257,7 +2303,6 @@
       <label class="es-sim-checkbox-label">Aktif
         <input type="checkbox" id="esPsimToggle" checked>
       </label>
-      <button id="esPsimOpenBtn">Open Posisi Demo</button>
     </div>
     <div class="es-live-trade-box" id="esLiveTradeBox">
       <div class="es-live-trade-title-row">
@@ -2272,11 +2317,11 @@
           <input type="password" id="esLiveAppToken" placeholder="token rahasia dari .env">
         </label>
         <button id="esLiveTradeBtn" type="button">Kirim Real Order</button>
+        <button id="esPsimOpenBtn" type="button">Open Posisi Demo</button>
       </div>
       <div class="es-live-trade-status" id="esLiveTradeStatus"></div>
     </div>
     <div class="es-sim-preview" id="esPsimPreview"></div>
-    <div class="es-sim-summary" id="esPsimSummary"></div>
 
     <div class="es-sim-table-header">
       <div class="es-sim-table-label">Riwayat Transaksi</div>
@@ -5264,6 +5309,22 @@
   function pcUpperAt(ch, b){ return ch.upperXp1 + ch.slope*(b - ch.xb1); }
   function pcLowerAt(ch, b){ return ch.lowerXp1 + ch.slope*(b - ch.xb1); }
 
+  // Band channel AKTIF untuk sinyal, mengikuti posisi harga. Kalau harga menembus
+  // channel utama, referensi geser ke Duplikat 1 (selebar channel di sisi break);
+  // kalau tembus lebih jauh lagi, geser ke Duplikat 2. Ini yang membuat sinyal
+  // selalu dinilai terhadap band tempat harga berada SEKARANG - bukan channel lama
+  // yang sudah ditinggalkan (antisipasi sinyal salah). Nilai dikembalikan dalam
+  // bentuk ANCHOR (di bar xb1); proyeksikan sendiri dgn slope.
+  function sigBand(ch, closeVal, b){
+    const w = ch.upperXp1 - ch.lowerXp1;
+    const up1 = pcUpperAt(ch, b), lo1 = pcLowerAt(ch, b);
+    if(closeVal > up1 + w) return { u: ch.upperXp1 + 2*w, l: ch.upperXp1 + w,   band:'Duplikat 2 (atas)' };
+    if(closeVal > up1)     return { u: ch.upperXp1 + w,   l: ch.upperXp1,       band:'Duplikat 1 (atas)' };
+    if(closeVal < lo1 - w) return { u: ch.lowerXp1 - w,   l: ch.lowerXp1 - 2*w, band:'Duplikat 2 (bawah)' };
+    if(closeVal < lo1)     return { u: ch.lowerXp1,       l: ch.lowerXp1 - w,   band:'Duplikat 1 (bawah)' };
+    return { u: ch.upperXp1, l: ch.lowerXp1, band:'Channel Utama' };
+  }
+
   async function findCrossHunterSignalForSymbol(symbol, tickers, tf){
     let d;
     try{ d = await fetchKlines(symbol, tf, 250); }catch(e){ return null; }
@@ -5275,7 +5336,10 @@
     if(!ch) return null;
     if(sb < ch.xb1) return null;
     const tol = (atrArr[sb] || d.closes[sb]*0.005) * PC_SIG_TOL_MULT;
-    const up = pcUpperAt(ch, sb), lo = pcLowerAt(ch, sb);
+    // Band aktif mengikuti posisi harga: channel utama / duplikat 1 / duplikat 2.
+    const bnd = sigBand(ch, d.closes[sb], sb);
+    const up = bnd.u + ch.slope*(sb - ch.xb1);
+    const lo = bnd.l + ch.slope*(sb - ch.xb1);
     let arah = null, sentuh = '';
     if(d.highs[sb] >= up - tol && d.closes[sb] < up){ arah='SELL'; sentuh='UPPER'; }
     else if(d.lows[sb] <= lo + tol && d.closes[sb] > lo){ arah='BUY'; sentuh='LOWER'; }
@@ -5304,7 +5368,7 @@
     const chArah = ch.slope > 0 ? 'naik' : ch.slope < 0 ? 'turun' : 'datar';
 
     return { symbol, signal: arah, price, sl, tp, tfValue: tf, tfLabel: CH_TF_LABEL[tf]||tf,
-             sentuh, chArah, riskPct };
+             sentuh, chArah, chBand: bnd.band, riskPct };
   }
 
   function renderCrossHunterSignals(top){
@@ -5319,12 +5383,12 @@
         <div class="es-priority-card-top">
           <span class="es-priority-rank">#${i+1}</span>
           <span class="es-priority-symbol">${c.symbol.replace('USDT','')}</span>
-          <span class="es-priority-signal ${signalCls}">${c.signal} NOW</span>
         </div>
         <div class="es-priority-tf">Parallel Channel &bull; TF ${c.tfLabel} &bull; Harga $${fmtPrice(c.price)}</div>
         <div class="es-checklist">
           <div class="es-check-row ok"><span class="es-check-icon">&check;</span> Sentuh garis ${garis} channel</div>
           <div class="es-check-row ok"><span class="es-check-icon">&check;</span> Close balik ke dalam channel</div>
+          <div class="es-check-row ok"><span class="es-check-icon">&bull;</span> Band aktif: ${c.chBand||'Channel Utama'}</div>
           <div class="es-check-row ok"><span class="es-check-icon">&bull;</span> Arah channel: ${c.chArah}</div>
         </div>
         <div class="es-priority-levels">
@@ -5333,16 +5397,18 @@
           <div class="es-priority-level-row">Take Profit: <strong>TP1 $${fmtPrice(c.tp)}</strong> &bull; <strong>TP2 $${fmtPrice(tp2)}</strong></div>
           <div class="es-priority-level-row">Risk: <strong>${c.riskPct.toFixed(2)}%</strong></div>
         </div>
-        <button class="es-priority-trade-btn ${signalCls}" type="button">${c.signal} NOW</button>
+        <div class="es-ch-foot">
+          <button class="es-priority-signal es-ch-pick ${signalCls}" type="button" title="Pilih sinyal ini">${c.signal} NOW</button>
+        </div>
       </div>`;
     }).join('');
     chGrid.querySelectorAll('.es-priority-card').forEach((card,i)=>{
       const cand = top[i];
       card.addEventListener('click', (e)=>{
-        if(e.target.classList.contains('es-priority-trade-btn')) return;
+        if(e.target.classList.contains('es-ch-pick')) return;
         openTradingView(cand.symbol, cand.tfValue);
       });
-      card.querySelector('.es-priority-trade-btn').addEventListener('click', (e)=>{
+      card.querySelector('.es-ch-pick').addEventListener('click', (e)=>{
         e.stopPropagation();
         selectTradableSignalByUid(tradableUid('crosshunter', cand.symbol, cand.tfValue));
       });
@@ -6365,6 +6431,7 @@
         recordLivePosition(liveKey, cand, side, quantityStr, qty1Str, qty2Str, tp1Str, tp2Str, slStr, Date.now(),
           { entryOrderId, slOrderId, tp1OrderId, tp2OrderId }, env, actualEntryPrice, entryMethod, virtualTp1Str);
       }
+      resetManualSlTp();
       renderPrioritySimUI(window.__esLastTickers||{});
     }catch(e){
       liveTradeStatusEl.classList.add('error');
@@ -7038,7 +7105,15 @@
     priorityStatusEl.textContent = `Posisi ${cand.signal} untuk ${cand.symbol.replace('USDT','')} (TF ${cand.tfLabel}) dibuka di simulasi.`;
     psimSelectedCandidate = null;
     psimSignalSelect.value = '';
+    resetManualSlTp();
     renderPsimPreview();
+  }
+
+  // Kosongkan input SL/TP manual setelah posisi dibuka, supaya kembali ke tampilan
+  // placeholder ("SL Manual"/"TP Manual") dan tidak terbawa ke entry berikutnya.
+  function resetManualSlTp(){
+    if(psimManualSlInput) psimManualSlInput.value = '';
+    if(psimManualTpInput) psimManualTpInput.value = '';
   }
 
   function computeEquityCurve(){

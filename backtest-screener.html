@@ -518,7 +518,19 @@
     const a = pre.atrArr[i];
     if(!ch || !a || i < ch.xb1) return null;
     const tol=a*0.6;
-    const up=ch.upperXp1+ch.slope*(i-ch.xb1), lo=ch.lowerXp1+ch.slope*(i-ch.xb1);
+    // Band aktif ikut posisi harga: channel utama / duplikat 1 / duplikat 2.
+    // Kalau harga menembus channel utama, referensi sinyal geser ke band duplikat
+    // di sisi break (selebar channel), lalu ke duplikat 2 kalau tembus lebih jauh -
+    // supaya sinyal dinilai terhadap band tempat harga berada sekarang.
+    const w=ch.upperXp1-ch.lowerXp1;
+    const up1=ch.upperXp1+ch.slope*(i-ch.xb1), lo1=ch.lowerXp1+ch.slope*(i-ch.xb1);
+    let sigU, sigL;
+    if(closes[i] > up1+w){ sigU=ch.upperXp1+2*w; sigL=ch.upperXp1+w; }
+    else if(closes[i] > up1){ sigU=ch.upperXp1+w; sigL=ch.upperXp1; }
+    else if(closes[i] < lo1-w){ sigU=ch.lowerXp1-w; sigL=ch.lowerXp1-2*w; }
+    else if(closes[i] < lo1){ sigU=ch.lowerXp1; sigL=ch.lowerXp1-w; }
+    else { sigU=ch.upperXp1; sigL=ch.lowerXp1; }
+    const up=sigU+ch.slope*(i-ch.xb1), lo=sigL+ch.slope*(i-ch.xb1);
     let arah=null;
     if(highs[i] >= up-tol && closes[i] < up) arah='SELL';
     else if(lows[i] <= lo+tol && closes[i] > lo) arah='BUY';
