@@ -1371,6 +1371,46 @@
     width:150px;
   }
   .es-sim-controls input::placeholder{ color: var(--muted); font-size:11px; }
+
+  /* Ikon cari koin di kiri "Sinyal Terpilih" + popover pencarian. */
+  .es-signal-pick-wrap{ position:relative; display:flex; align-items:center; gap:6px; }
+  .es-coin-search-btn{
+    flex-shrink:0;
+    width:32px; height:32px;
+    display:inline-flex; align-items:center; justify-content:center;
+    background: var(--panel);
+    border:1px solid var(--border);
+    color: var(--muted);
+    border-radius:8px;
+    cursor:pointer;
+    padding:0;
+  }
+  .es-coin-search-btn:hover{ color: var(--text); border-color: var(--gold); }
+  .es-coin-search-btn.active{ color: var(--gold); border-color: var(--gold); }
+  .es-coin-search-pop{
+    display:none;
+    position:absolute; top:calc(100% + 6px); left:0; z-index:40;
+    width:220px;
+    background: var(--panel);
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:8px;
+    box-shadow:0 10px 26px rgba(0,0,0,0.5);
+  }
+  .es-coin-search-pop.open{ display:block; }
+  #esCoinSearchInput{
+    width:100%; box-sizing:border-box;
+    background: var(--panel-2);
+    border:1px solid var(--border);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size:12px;
+    padding:7px 9px;
+    border-radius:6px;
+    outline:none;
+  }
+  .es-coin-suggest{ margin-top:6px; max-height:180px; overflow-y:auto; }
+  .es-coin-suggest:empty{ display:none; }
   #esPsimSignalSelect, #esLiveOrderType, #esLiveEntryMethod, #esPsimDirOverride{ color: var(--muted); font-size:11px; }
   /* Ditandai jelas saat arah dipaksa berlawanan dengan sinyal - ini keputusan
      melawan analisa, jadi jangan sampai kelewat tidak terlihat. */
@@ -2290,7 +2330,16 @@
     <div class="es-sim-controls">
       <input type="number" id="esPsimModal" min="10" step="10" placeholder="Modal per Posisi ($)" title="Modal per Posisi ($)">
       <input type="number" id="esPsimLeverage" min="1" max="125" step="1" placeholder="Leverage (x)" title="Leverage (x)">
-      <select id="esPsimSignalSelect" title="Sinyal Terpilih"><option value="" disabled selected hidden>Sinyal Terpilih</option></select>
+      <div class="es-signal-pick-wrap">
+        <button type="button" id="esCoinSearchBtn" class="es-coin-search-btn" title="Cari koin untuk ditradingkan (mis. BTC/USDT)">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        </button>
+        <select id="esPsimSignalSelect" title="Sinyal Terpilih"><option value="" disabled selected hidden>Sinyal Terpilih</option></select>
+        <div class="es-coin-search-pop" id="esCoinSearchPop">
+          <input type="text" id="esCoinSearchInput" placeholder="Cari koin, mis. BTC/USDT" autocomplete="off">
+          <div class="es-coin-suggest" id="esCoinSearchSuggest"></div>
+        </div>
+      </div>
       <select id="esPsimDirOverride" title="Arah Order - paksa arah entry. Kalau dibalik dari sinyal, level SL/TP otomatis dicerminkan.">
         <option value="" disabled selected hidden>Arah Order</option>
         <option value="auto">Ikut Sinyal</option>
@@ -3405,7 +3454,7 @@
   // biasa. Tiap sumber daftar ulang candidate-nya sendiri tiap kali pindai
   // ulang (entri lama dari sumber itu dihapus dulu supaya tidak menumpuk data basi).
   window.__esTradableSignals = window.__esTradableSignals || {};
-  const TRADABLE_SOURCE_LABEL = { priority:'Prioritas', favorite:'Favorit', cross:'Cross EMA', favcross:'Favorit Cross', ict:'Prioritas ICT', snr:'Prioritas SNR', ai:'Prioritas AI', pantau:'Pantau', crosshunter:'Parallel' };
+  const TRADABLE_SOURCE_LABEL = { priority:'Prioritas', favorite:'Favorit', cross:'Cross EMA', favcross:'Favorit Cross', ict:'Prioritas ICT', snr:'Prioritas SNR', ai:'Prioritas AI', pantau:'Pantau', crosshunter:'Parallel', manual:'Koin Manual' };
   function tradableUid(source, symbol, tfValue){ return `${source}_${symbol}_${tfValue}`; }
   function registerTradableSignals(source, candidates){
     Object.keys(window.__esTradableSignals).forEach(k=>{
@@ -6529,7 +6578,8 @@
     favcross: { cls:'lain',  label:'Sinyal Entry Koin Favorit' },
     cross:    { cls:'lain',  label:'Sinyal Cross EMA' },
     favorite: { cls:'lain',  label:'Sinyal Koin Favorit' },
-    ict:      { cls:'lain',  label:'Sinyal Prioritas ICT' }
+    ict:      { cls:'lain',  label:'Sinyal Prioritas ICT' },
+    manual:   { cls:'lain',  label:'Koin Manual (Cari)' }
   };
   function signalStarHtml(signalType){
     const s = ES_SIGNAL_STAR[signalType];
@@ -7716,6 +7766,82 @@
   });
   psimModalInput.addEventListener('input', renderPsimPreview);
   psimLeverageInput.addEventListener('input', renderPsimPreview);
+
+  // ═══════════════════════════════════════════════════════
+  // ████████  CARI KOIN MANUAL (ikon 🔍 di kiri "Sinyal Terpilih")  ████████
+  // ═══════════════════════════════════════════════════════
+  // Ketik koin (mis. "BTC/USDT" atau "btc"), pilih dari saran → koin itu dijadikan
+  // sinyal MANUAL memakai harga live-nya, lalu masuk ke "Sinyal Terpilih" untuk
+  // ditradingkan. Arah + SL/TP diisi sendiri lewat "Arah Order" & "SL/TP Manual".
+  const coinSearchBtn = document.getElementById('esCoinSearchBtn');
+  const coinSearchPop = document.getElementById('esCoinSearchPop');
+  const coinSearchInput = document.getElementById('esCoinSearchInput');
+  const coinSearchSuggest = document.getElementById('esCoinSearchSuggest');
+
+  function normalizeCoinQuery(q){ return String(q||'').toUpperCase().replace(/[^A-Z0-9]/g,''); }
+  function coinSearchMatches(q){
+    const nq = normalizeCoinQuery(q);
+    if(!nq) return [];
+    return FAV_SUGGESTION_POOL.filter(s=>{
+      const base = s.replace('USDT','');
+      return s.startsWith(nq) || base.startsWith(nq);
+    }).slice(0,8);
+  }
+  async function fetchCoinLastPrice(symbol){
+    const t = (window.__esLastTickers||{})[symbol];
+    if(t && t.lastPrice && parseFloat(t.lastPrice)>0) return parseFloat(t.lastPrice);
+    let res = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${symbol}`);
+    if(!res.ok) res = await fetch(`https://fapi.binance.com/fapi/v1/ticker/price?symbol=${symbol}`);
+    if(!res.ok) throw new Error('koin tidak ditemukan di Binance');
+    const d = await res.json();
+    const p = parseFloat(d.price);
+    if(!(p>0)) throw new Error('harga tidak valid');
+    return p;
+  }
+  async function pilihKoinManual(symbolRaw){
+    let symbol = normalizeCoinQuery(symbolRaw);
+    if(!symbol) return;
+    if(!symbol.endsWith('USDT')) symbol += 'USDT';
+    const nama = symbol.replace('USDT','');
+    priorityStatusEl.classList.remove('error');
+    priorityStatusEl.textContent = `Mengambil harga ${nama}...`;
+    try{
+      const price = await fetchCoinLastPrice(symbol);
+      const uid = tradableUid('manual', symbol, '');
+      window.__esTradableSignals[uid] = { symbol, tfValue:'', tfLabel:'Manual', signal:'BUY', price, source:'manual', _uid:uid };
+      populatePsimSignalSelect();
+      selectTradableSignalByUid(uid);
+      priorityStatusEl.classList.remove('error');
+      priorityStatusEl.textContent = `Koin ${nama} dipilih (harga $${fmtPrice(price)}). Set "Arah Order" + "SL Manual"/"TP Manual" lalu klik Open.`;
+    }catch(e){
+      priorityStatusEl.classList.add('error');
+      priorityStatusEl.textContent = `Gagal cari koin ${nama}: ${e.message}`;
+    }
+  }
+  function renderCoinSuggest(){
+    const matches = coinSearchMatches(coinSearchInput.value);
+    coinSearchSuggest.innerHTML = matches.map(s=>
+      `<div class="es-fav-suggest-item" data-symbol="${s}">${s.replace('USDT','')}/USDT</div>`).join('');
+    coinSearchSuggest.querySelectorAll('.es-fav-suggest-item').forEach(it=>{
+      it.addEventListener('mousedown', (e)=>{ e.preventDefault(); closeCoinSearch(); pilihKoinManual(it.getAttribute('data-symbol')); });
+    });
+  }
+  function openCoinSearch(){ coinSearchPop.classList.add('open'); coinSearchBtn.classList.add('active'); coinSearchInput.focus(); renderCoinSuggest(); }
+  function closeCoinSearch(){ coinSearchPop.classList.remove('open'); coinSearchBtn.classList.remove('active'); coinSearchSuggest.innerHTML=''; }
+  if(coinSearchBtn){
+    coinSearchBtn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      coinSearchPop.classList.contains('open') ? closeCoinSearch() : openCoinSearch();
+    });
+    coinSearchInput.addEventListener('input', renderCoinSuggest);
+    coinSearchInput.addEventListener('keydown', (e)=>{
+      if(e.key==='Enter'){ e.preventDefault(); const m=coinSearchMatches(coinSearchInput.value); const pick=m[0]||coinSearchInput.value; closeCoinSearch(); pilihKoinManual(pick); }
+      else if(e.key==='Escape'){ closeCoinSearch(); }
+    });
+    document.addEventListener('click', (e)=>{
+      if(coinSearchPop.classList.contains('open') && !coinSearchPop.contains(e.target) && !coinSearchBtn.contains(e.target)) closeCoinSearch();
+    });
+  }
 
   const PSIM_SETTINGS_KEY = 'emaScreenerPsimSettings_v1';
 
