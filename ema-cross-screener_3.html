@@ -1057,6 +1057,7 @@
   .es-ai-regime-badge.bull{ color: var(--bull); }
   .es-ai-regime-badge.bear{ color: var(--bear); }
   .es-ai-regime-badge.neutral{ color: #fff; }
+  .es-ch-regime-tf{ color: var(--muted); font-size:10.5px; }
   .es-ai-score-badge{
     font-family: var(--font-mono);
     font-weight:700;
@@ -5478,6 +5479,40 @@
     });
   }
 
+  // ===== Rezim BTC untuk Parallel Signal =====
+  // Mengikuti TF yang sedang dipilih: hitung parallel channel BTC di TF itu, arah
+  // rezim = kemiringan channel (naik -> BUY, turun -> SELL, datar -> Netral). Jadi
+  // kalau user pilih TF 30m, rezim menunjukkan arah BTC di 30m. Dipakai sebagai
+  // acuan bias arah entry. Selalu ditampilkan (default) & ikut berubah saat TF ganti.
+  let chBtcRegimeReq = 0;
+  async function updateChBtcRegime(tf){
+    tf = tf || chTfSel.value;
+    const reqId = ++chBtcRegimeReq;
+    chSmiBadge.innerHTML = `Rezim BTC: <span class="es-ai-regime-badge neutral">memuat…</span>`;
+    try{
+      const d = await fetchKlines('BTCUSDT', tf, 250);
+      if(reqId !== chBtcRegimeReq) return;               // TF berubah lagi -> abaikan hasil basi
+      const atrArr = atr(d.highs, d.lows, d.closes, 14);
+      const sb = d.closes.length - 2;
+      const ch = detectParallelChannel(d.highs, d.lows, d.closes, atrArr, { endBar: sb });
+      const tfLbl = CH_TF_LABEL[tf] || tf;
+      if(!ch){
+        window.__esChBtcRegime = null;
+        chSmiBadge.innerHTML = `Rezim BTC: <span class="es-ai-regime-badge neutral">Netral</span> <span class="es-ch-regime-tf">(TF ${tfLbl})</span>`;
+        return;
+      }
+      const dir = ch.slope > 0 ? 'BUY' : ch.slope < 0 ? 'SELL' : 'NEUTRAL';
+      window.__esChBtcRegime = { dir, tf };
+      const cls  = dir==='BUY' ? 'bull' : dir==='SELL' ? 'bear' : 'neutral';
+      const teks = dir==='BUY' ? 'BTC BUY' : dir==='SELL' ? 'BTC SELL' : 'BTC Netral';
+      chSmiBadge.innerHTML = `Rezim BTC: <span class="es-ai-regime-badge ${cls}">${teks}</span> <span class="es-ch-regime-tf">(TF ${tfLbl})</span>`;
+    }catch(e){
+      if(reqId !== chBtcRegimeReq) return;
+      window.__esChBtcRegime = null;
+      chSmiBadge.innerHTML = `Rezim BTC: <span class="es-ai-regime-badge neutral">n/a</span>`;
+    }
+  }
+
   async function findCrossHunterSignals(){
     if(isSectionCollapsed('crosshunter')) return;
     const tf = chTfSel.value;
@@ -5485,7 +5520,7 @@
     chStatusEl.classList.remove('error');
     chStatusEl.textContent = `Memindai ${activeSymbols.length} koin (parallel channel TF ${CH_TF_LABEL[tf]||tf})...`;
     chGrid.innerHTML = '';
-    chSmiBadge.innerHTML = '';
+    updateChBtcRegime(tf);   // rezim BTC ikut TF yang dipindai
     try{
       const tickers = await loadTickers();
       const settled = await mapLimited(activeSymbols, SCAN_CONCURRENCY, s => findCrossHunterSignalForSymbol(s, tickers, tf));
@@ -5530,6 +5565,10 @@
   }
 
   chBtn.addEventListener('click', findCrossHunterSignals);
+  // Rezim BTC ikut TF: perbarui tiap ganti TF, dan tampilkan sekali di awal (default).
+  // Ditunda 1 tick supaya state collapse section sudah siap saat dicek (hindari TDZ).
+  chTfSel.addEventListener('change', ()=> updateChBtcRegime());
+  setTimeout(()=>{ try{ if(!isSectionCollapsed('crosshunter')) updateChBtcRegime(); }catch(e){} }, 0);
   chManagerBtn.addEventListener('click', (e)=>{ e.stopPropagation(); renderChManagerDropdown(); chManagerDropdown.classList.toggle('open'); });
   document.addEventListener('click', (e)=>{ if(!chManagerDropdown.contains(e.target) && e.target!==chManagerBtn && !chManagerBtn.contains(e.target)) chManagerDropdown.classList.remove('open'); });
 
