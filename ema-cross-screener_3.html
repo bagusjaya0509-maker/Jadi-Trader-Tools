@@ -923,13 +923,8 @@
   .es-priority-signal.sell{ background: var(--bear-dim); color: var(--bear); }
   .es-priority-signal.watch{ background: rgba(242,184,75,0.18); color: var(--gold); }
 
-  /* Parallel Signal: tombol BUY/SELL NOW (dulu badge di pojok atas) sekarang di
-     pojok kanan bawah kartu, meniru posisi tombol pick di kartu Sinyal Pantau. */
-  .es-ch-foot{
-    display:flex;
-    justify-content:flex-end;
-    margin-top:10px;
-  }
+  /* Parallel Signal: badge BUY/SELL NOW di pojok kanan atas kartu dijadikan tombol
+     yang bisa diklik untuk memilih sinyal (tampilan tetap seperti badge semula). */
   .es-ch-pick{
     border:none;
     cursor:pointer;
@@ -938,6 +933,15 @@
   }
   .es-ch-pick:hover{ filter:brightness(1.25); }
   .es-ch-pick:active{ transform:scale(0.96); }
+
+  /* Panah spinner (atas/bawah) di input SL/TP Manual: bikin gelap/abu supaya tidak
+     kontras putih. color-scheme:light bikin browser menggambar panahnya gelap,
+     sementara latar & teks input tetap gelap karena di-set eksplisit di atas. */
+  #esPsimManualSl, #esPsimManualTp{ color-scheme: light; }
+  #esPsimManualSl::-webkit-inner-spin-button,
+  #esPsimManualSl::-webkit-outer-spin-button,
+  #esPsimManualTp::-webkit-inner-spin-button,
+  #esPsimManualTp::-webkit-outer-spin-button{ filter: brightness(0.45); opacity:.85; }
 
   .es-priority-hp-badge{
     font-family: var(--font-mono);
@@ -1448,7 +1452,19 @@
     color: var(--muted);
   }
   .es-live-env-badge.testnet{ border-color: var(--bull); color: var(--bull); background: var(--bull-dim); }
-  .es-live-env-badge.live{ border-color: var(--bear); color: var(--bear); background: var(--bear-dim); }
+  /* "🔴 Live - Real Order": tanpa outline & tanpa latar - hanya titik merah + teks
+     yang kedap-kedip (hilang-muncul) tiap ~1,2 detik sebagai penanda mode live. */
+  .es-live-env-badge.live{
+    border:none;
+    background: transparent;
+    color: var(--bear);
+    padding:3px 0;
+    animation: liveBadgeBlink 1.2s ease-in-out infinite;
+  }
+  @keyframes liveBadgeBlink{
+    0%,100%{ opacity:1; }
+    50%    { opacity:.12; }
+  }
   .es-live-env-badge.checking{ border-color: var(--gold); color: var(--gold); }
   .es-live-trade-config{
     display:flex;
@@ -2316,8 +2332,8 @@
         <label>App Token
           <input type="password" id="esLiveAppToken" placeholder="token rahasia dari .env">
         </label>
-        <button id="esLiveTradeBtn" type="button">Kirim Real Order</button>
-        <button id="esPsimOpenBtn" type="button">Open Posisi Demo</button>
+        <button id="esLiveTradeBtn" type="button">Open Real Order</button>
+        <button id="esPsimOpenBtn" type="button">Open Demo Order</button>
       </div>
       <div class="es-live-trade-status" id="esLiveTradeStatus"></div>
     </div>
@@ -5383,6 +5399,7 @@
         <div class="es-priority-card-top">
           <span class="es-priority-rank">#${i+1}</span>
           <span class="es-priority-symbol">${c.symbol.replace('USDT','')}</span>
+          <button class="es-priority-signal es-ch-pick ${signalCls}" type="button" title="Pilih sinyal ini">${c.signal} NOW</button>
         </div>
         <div class="es-priority-tf">Parallel Channel &bull; TF ${c.tfLabel} &bull; Harga $${fmtPrice(c.price)}</div>
         <div class="es-checklist">
@@ -5396,9 +5413,6 @@
           <div class="es-priority-level-row invalid">Invalid Level (SL): <strong>$${fmtPrice(c.sl)}</strong></div>
           <div class="es-priority-level-row">Take Profit: <strong>TP1 $${fmtPrice(c.tp)}</strong> &bull; <strong>TP2 $${fmtPrice(tp2)}</strong></div>
           <div class="es-priority-level-row">Risk: <strong>${c.riskPct.toFixed(2)}%</strong></div>
-        </div>
-        <div class="es-ch-foot">
-          <button class="es-priority-signal es-ch-pick ${signalCls}" type="button" title="Pilih sinyal ini">${c.signal} NOW</button>
         </div>
       </div>`;
     }).join('');
@@ -6971,12 +6985,12 @@
 
   function updatePsimOpenBtn(){
     if(!psimSelectedCandidate){
-      psimOpenBtn.textContent = 'Open Posisi Demo';
+      psimOpenBtn.textContent = 'Open Demo Order';
       psimOpenBtn.classList.remove('sell');
       return;
     }
     const isSell = getArahEfektif(psimSelectedCandidate) === 'SELL';
-    psimOpenBtn.textContent = isSell ? 'Open Sell Demo' : 'Open Buy Demo';
+    psimOpenBtn.textContent = isSell ? 'Open Demo Sell' : 'Open Demo Buy';
     psimOpenBtn.classList.toggle('sell', isSell);
   }
 
