@@ -1630,10 +1630,11 @@
     color: var(--muted);
     margin-bottom:6px;
   }
-  /* Label "Buka Posisi Baru" - dipisah dari tabel Posisi Terbuka di atasnya */
+  /* Judul "Entry Area" - ukuran sama dengan judul section (Parallel Signal) */
   .es-open-pos-label{
     margin-top:22px; padding-top:16px; border-top:1px solid var(--border);
-    color: var(--text); font-weight:600;
+    margin-bottom:12px;
+    font-family: var(--font-display); font-weight:700; font-size:17px; color: var(--text);
   }
   .es-psim-equity-wrap{
     background: var(--panel);
@@ -2223,51 +2224,36 @@
       </table>
     </div>
 
-    <div class="es-sim-table-label es-open-pos-label">Buka Posisi Baru</div>
+    <div class="es-open-pos-label">Entry Area</div>
     <div class="es-sim-controls">
-      <label>Modal per Posisi ($)
-        <input type="number" id="esPsimModal" value="1000" min="10" step="10">
-      </label>
-      <label>Leverage (x)
-        <input type="number" id="esPsimLeverage" value="10" min="1" max="125" step="1">
-      </label>
-      <label>Sinyal Terpilih
-        <select id="esPsimSignalSelect"><option value="">&mdash; Pilih sinyal &mdash;</option></select>
-      </label>
-      <label title="Paksa arah entry. Kalau dibalik dari sinyal, level SL/TP otomatis dicerminkan supaya tetap valid.">Arah Order
-        <select id="esPsimDirOverride">
-          <option value="auto" selected>Ikut Sinyal</option>
-          <option value="BUY">Paksa BUY</option>
-          <option value="SELL">Paksa SELL</option>
-        </select>
-      </label>
-      <label title="Khusus Live Trading Binance - menentukan jenis order entry yang dikirim ke exchange">Opsi Order Manual (Live)
-        <select id="esLiveOrderType">
-          <option value="MARKET" selected>Otomatis (Market)</option>
-          <option value="BUY_LIMIT">Buy Limit</option>
-          <option value="SELL_LIMIT">Sell Limit</option>
-          <option value="BUY_STOP">Buy Stop</option>
-          <option value="SELL_STOP">Sell Stop</option>
-        </select>
-      </label>
-      <label id="esLiveEntryPriceLabel" style="display:none;">Harga Entry Manual ($)
-        <input type="number" id="esLiveEntryPriceManual" placeholder="harga limit/stop" step="any">
-      </label>
-      <label>SL Manual ($)
-        <input type="number" id="esPsimManualSl" placeholder="otomatis" step="any">
-      </label>
-      <label>TP Manual ($)
-        <input type="number" id="esPsimManualTp" placeholder="otomatis" step="any">
-      </label>
-      <label title="Khusus Live Trading Binance - menentukan cara SL/TP1/TP2 ditangani setelah entry">Metode Entry (Live)
-        <select id="esLiveEntryMethod">
-          <option value="partial" selected>TP1 &amp; TP2 (partial 50% di TP1, SL ke BE)</option>
-          <option value="nopartial">TP1 &amp; TP2 (SL ke BE di TP1, tanpa partial 50%)</option>
-          <option value="tp1only">SL &amp; TP1 saja (tanpa TP2)</option>
-          <option value="tp2only">SL &amp; TP2 saja (tanpa TP1)</option>
-          <option value="slplus">SL+ (partial 50% di TP1, lalu SL naik tiap kelipatan risk)</option>
-        </select>
-      </label>
+      <input type="number" id="esPsimModal" min="10" step="10" placeholder="Modal per Posisi ($)" title="Modal per Posisi ($)">
+      <input type="number" id="esPsimLeverage" min="1" max="125" step="1" placeholder="Leverage (x)" title="Leverage (x)">
+      <select id="esPsimSignalSelect" title="Sinyal Terpilih"><option value="" disabled selected hidden>Sinyal Terpilih</option></select>
+      <select id="esPsimDirOverride" title="Arah Order - paksa arah entry. Kalau dibalik dari sinyal, level SL/TP otomatis dicerminkan.">
+        <option value="" disabled selected hidden>Arah Order</option>
+        <option value="auto">Ikut Sinyal</option>
+        <option value="BUY">Paksa BUY</option>
+        <option value="SELL">Paksa SELL</option>
+      </select>
+      <select id="esLiveOrderType" title="Opsi Order Manual (Live) - jenis order entry ke exchange">
+        <option value="" disabled selected hidden>Opsi Order Manual (Live)</option>
+        <option value="MARKET">Otomatis (Market)</option>
+        <option value="BUY_LIMIT">Buy Limit</option>
+        <option value="SELL_LIMIT">Sell Limit</option>
+        <option value="BUY_STOP">Buy Stop</option>
+        <option value="SELL_STOP">Sell Stop</option>
+      </select>
+      <input type="number" id="esLiveEntryPriceManual" placeholder="Harga Entry Manual ($)" title="Harga Entry Manual ($)" step="any" style="display:none;">
+      <input type="number" id="esPsimManualSl" placeholder="SL Manual ($)" title="SL Manual ($)" step="any">
+      <input type="number" id="esPsimManualTp" placeholder="TP Manual ($)" title="TP Manual ($)" step="any">
+      <select id="esLiveEntryMethod" title="Metode Entry (Live) - cara SL/TP1/TP2 ditangani setelah entry">
+        <option value="" disabled selected hidden>Metode Entry (Live)</option>
+        <option value="partial">TP1 &amp; TP2 (partial 50% di TP1, SL ke BE)</option>
+        <option value="nopartial">TP1 &amp; TP2 (SL ke BE di TP1, tanpa partial 50%)</option>
+        <option value="tp1only">SL &amp; TP1 saja (tanpa TP2)</option>
+        <option value="tp2only">SL &amp; TP2 saja (tanpa TP1)</option>
+        <option value="slplus">SL+ (partial 50% di TP1, lalu SL naik tiap kelipatan risk)</option>
+      </select>
       <label class="es-sim-checkbox-label">Aktif
         <input type="checkbox" id="esPsimToggle" checked>
       </label>
@@ -5934,7 +5920,7 @@
   const psimManualSlInput = document.getElementById('esPsimManualSl');
   const psimManualTpInput = document.getElementById('esPsimManualTp');
   const liveOrderTypeSel = document.getElementById('esLiveOrderType');
-  const liveEntryPriceLabel = document.getElementById('esLiveEntryPriceLabel');
+  const liveEntryPriceLabel = document.getElementById('esLiveEntryPriceManual'); // input berdiri sendiri sekarang
   const liveEntryPriceManualInput = document.getElementById('esLiveEntryPriceManual');
   const liveEntryMethodSel = document.getElementById('esLiveEntryMethod');
   const psimToggle = document.getElementById('esPsimToggle');
@@ -5993,8 +5979,10 @@
   };
 
   liveOrderTypeSel.addEventListener('change', ()=>{
-    const isManualPrice = liveOrderTypeSel.value !== 'MARKET';
+    const v = liveOrderTypeSel.value;
+    const isManualPrice = !!v && v !== 'MARKET';   // "" (placeholder) dianggap Market
     liveEntryPriceLabel.style.display = isManualPrice ? '' : 'none';
+    savePsimSettings();
   });
 
   // Validasi arah + kewajaran harga Order Type manual sebelum kirim order live -
@@ -6441,7 +6429,7 @@
   }
 
   function currentPsimLeverage(){
-    return Math.max(parseFloat(psimLeverageInput.value) || 1, 1);
+    return Math.max(parseFloat(psimLeverageInput.value) || 10, 1);
   }
 
   function currentPsimQty(entryPrice){
@@ -6884,7 +6872,7 @@
   function populatePsimSignalSelect(){
     const results = getTradableSignalsList();
     const prevUid = psimSelectedCandidate ? psimSelectedCandidate._uid : null;
-    psimSignalSelect.innerHTML = '<option value="">&mdash; Pilih sinyal &mdash;</option>' + results.map(c=>{
+    psimSignalSelect.innerHTML = '<option value="" disabled selected hidden>Sinyal Terpilih</option>' + results.map(c=>{
       const srcLabel = TRADABLE_SOURCE_LABEL[c.source] || c.source;
       const label = `${c.symbol.replace('USDT','')} (${c.tfLabel}) — ${c.signal} [${srcLabel}]`;
       return `<option value="${c._uid}">${label}</option>`;
@@ -7647,18 +7635,24 @@
       const raw = localStorage.getItem(PSIM_SETTINGS_KEY);
       if(!raw) return;
       const s = JSON.parse(raw);
-      if(s.modal !== undefined) psimModalInput.value = s.modal;
-      if(s.leverage !== undefined) psimLeverageInput.value = s.leverage;
+      if(s.modal) psimModalInput.value = s.modal;
+      if(s.leverage) psimLeverageInput.value = s.leverage;
       if(s.active !== undefined) psimToggle.checked = s.active;
+      if(s.dirOverride) psimDirOverrideSel.value = s.dirOverride;
+      if(s.orderType) liveOrderTypeSel.value = s.orderType;
+      if(s.entryMethod) liveEntryMethodSel.value = s.entryMethod;
     }catch(e){}
   }
 
   function savePsimSettings(){
     try{
       localStorage.setItem(PSIM_SETTINGS_KEY, JSON.stringify({
-        modal: parseFloat(psimModalInput.value) || 1000,
-        leverage: parseFloat(psimLeverageInput.value) || 10,
-        active: psimToggle.checked
+        modal: psimModalInput.value,
+        leverage: psimLeverageInput.value,
+        active: psimToggle.checked,
+        dirOverride: psimDirOverrideSel.value,
+        orderType: liveOrderTypeSel.value,
+        entryMethod: liveEntryMethodSel.value
       }));
     }catch(e){}
     tandaiPerluDidorong();
@@ -7667,7 +7661,11 @@
   psimModalInput.addEventListener('change', savePsimSettings);
   psimLeverageInput.addEventListener('change', savePsimSettings);
   psimToggle.addEventListener('change', savePsimSettings);
+  psimDirOverrideSel.addEventListener('change', savePsimSettings);
+  liveEntryMethodSel.addEventListener('change', savePsimSettings);
   loadPsimSettings();
+  // Setelah restore, sinkronkan tampilan field harga entry manual dgn order type.
+  (function(){ const v=liveOrderTypeSel.value; liveEntryPriceLabel.style.display = (!!v && v!=='MARKET') ? '' : 'none'; })();
 
   liveTradeBtn.addEventListener('click', ()=>{
     if(!psimSelectedCandidate){
@@ -8048,12 +8046,20 @@
   }
 
   function renderHiddenSectionChips(){
-    // Panel "Signal Beta Version" DINONAKTIFKAN total (tidak dipakai sementara).
-    // Tidak melakukan apa pun & tidak menyentuh jaringan - jadi tidak berpengaruh
-    // ke rate limit maupun kelancaran halaman. Mekanisme hemat-request tetap ada:
-    // section yang kebetulan ter-collapse tetap dilewati pemindainya (isSectionCollapsed).
+    // Panel "Signal Beta Version" umum dinonaktifkan, KECUALI untuk Parallel
+    // Signal: kalau Parallel disembunyikan, chip untuk memunculkannya kembali
+    // tetap tampil (kalau tidak, section-nya hilang total tanpa cara balik).
     const bar = document.getElementById('esHiddenSections');
-    if(bar){ bar.classList.remove('show'); bar.innerHTML = ''; }
+    if(!bar) return;
+    if(!collapsedSections.has('crosshunter')){
+      bar.classList.remove('show'); bar.innerHTML = ''; return;
+    }
+    bar.classList.add('show');
+    bar.innerHTML = '<span class="es-hidden-sections-label">Tampilkan kembali:</span>'
+      + '<button type="button" class="es-hidden-chip" data-section="crosshunter" title="Munculkan kembali">'
+      + '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>'
+      + ' Parallel Signal</button>';
+    bar.querySelector('.es-hidden-chip').addEventListener('click', ()=> bukaSection('crosshunter'));
   }
 
   function applySectionCollapseState(){
