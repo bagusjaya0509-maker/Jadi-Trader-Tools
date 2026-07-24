@@ -87,6 +87,9 @@
     white-space:nowrap;
   }
   .es-econ-calendar-content{
+    position:absolute;               /* keluar dari alur -> buka/tutup tak menggeser tombol */
+    top: calc(100% + 8px);
+    right: 0;                        /* melebar ke KIRI dari tepi kanan tombol */
     width:320px;
     height:420px;
     background: var(--panel);
@@ -118,6 +121,53 @@
   .es-econ-calendar-body::-webkit-scrollbar-track{ background: var(--panel-2); border-radius:4px; }
   .es-econ-calendar-body::-webkit-scrollbar-thumb{ background: var(--border); border-radius:4px; }
   .es-econ-calendar-body::-webkit-scrollbar-thumb:hover{ background: var(--dim); }
+  /* ===== Pop-up pengingat News ===== */
+  .es-news-pop-overlay{
+    display:none;
+    position:fixed; inset:0; z-index:120;
+    background: rgba(0,0,0,0.55);
+    align-items:center; justify-content:center;
+    padding:16px;
+  }
+  .es-news-pop-overlay.open{ display:flex; }
+  .es-news-pop-card{
+    width:min(420px, 100%);
+    background: var(--panel);
+    border:1px solid var(--bear);
+    border-radius:12px;
+    box-shadow:0 18px 50px rgba(0,0,0,0.6);
+    padding:18px 18px 16px;
+  }
+  .es-news-pop-title{
+    font-family: var(--font-display);
+    font-weight:700;
+    font-size:16px;
+    color: var(--bear);
+    margin-bottom:12px;
+  }
+  .es-news-pop-body{ display:flex; flex-direction:column; gap:8px; margin-bottom:14px; }
+  .es-news-pop-row{
+    display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+    font-family: var(--font-mono); font-size:12px;
+    background: var(--panel-2);
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:8px 10px;
+  }
+  .es-news-pop-jam{ font-weight:700; color: var(--text); }
+  .es-news-pop-cur{ color: var(--gold); font-weight:700; }
+  .es-news-pop-judul{ color: var(--text); flex:1; min-width:120px; }
+  .es-news-pop-sisa{ color: var(--muted); font-size:11px; }
+  .es-news-pop-close{
+    display:block; width:100%;
+    background: var(--panel-2);
+    border:1px solid var(--border);
+    color: var(--text);
+    font-family: var(--font-mono); font-weight:600; font-size:12.5px;
+    padding:9px 14px; border-radius:8px; cursor:pointer;
+  }
+  .es-news-pop-close:hover{ background: var(--panel); border-color: var(--bear); }
+
   .es-econ-head-row{
     display:flex; align-items:center; justify-content:space-between; gap:8px;
   }
@@ -178,7 +228,9 @@
     align-items:flex-start;
     gap:16px;
     flex-wrap:wrap;
-    margin-bottom:14px;
+    padding-bottom:14px;
+    border-bottom:1px solid var(--border);   /* garis section di bawah "Jadi Trader Tools" */
+    margin-bottom:18px;
   }
 
   .es-title{
@@ -796,6 +848,8 @@
   /* Baris filter Pantau jangan mepet ke kartu grafik di bawahnya */
   /* Section Pantau (paling atas) - garis pembatas & header dihapus, margin dirapikan */
   .es-pantau-top{ border-top:none !important; margin-top:6px !important; padding-top:0 !important; }
+  /* Judul "Area Pantau" - ukuran sama dengan judul section (Parallel Signal) */
+  .es-pantau-title{ margin-bottom:12px; }
   [data-section="pantau"] .es-priority-controls{ margin:2px 0 2px; }
   /* dan kartu jangan mepet ke scrollbar geser */
   /* Ruang untuk cahaya 3 koin terbaik (kalau tidak, terpotong kontainer scroll).
@@ -934,14 +988,12 @@
   .es-ch-pick:hover{ filter:brightness(1.25); }
   .es-ch-pick:active{ transform:scale(0.96); }
 
-  /* Panah spinner (atas/bawah) di input SL/TP Manual: bikin gelap/abu supaya tidak
-     kontras putih. color-scheme:light bikin browser menggambar panahnya gelap,
-     sementara latar & teks input tetap gelap karena di-set eksplisit di atas. */
-  #esPsimManualSl, #esPsimManualTp{ color-scheme: light; }
+  /* SL/TP Manual: hilangkan panah spinner atas/bawah - diisi manual saja. */
   #esPsimManualSl::-webkit-inner-spin-button,
   #esPsimManualSl::-webkit-outer-spin-button,
   #esPsimManualTp::-webkit-inner-spin-button,
-  #esPsimManualTp::-webkit-outer-spin-button{ filter: brightness(0.45); opacity:.85; }
+  #esPsimManualTp::-webkit-outer-spin-button{ -webkit-appearance:none; appearance:none; margin:0; }
+  #esPsimManualSl, #esPsimManualTp{ -moz-appearance:textfield; appearance:textfield; }
 
   .es-priority-hp-badge{
     font-family: var(--font-mono);
@@ -1413,6 +1465,15 @@
   .es-coin-suggest{ margin-top:6px; max-height:180px; overflow-y:auto; }
   .es-coin-suggest:empty{ display:none; }
   #esPsimSignalSelect, #esLiveOrderType, #esLiveEntryMethod, #esPsimDirOverride{ color: var(--muted); font-size:11px; }
+  /* Caret (segitiga ke bawah) dropdown ini ditaruh agak ke kiri (tidak mepet tepi
+     kanan) pakai caret custom + jarak dari tepi kanan. */
+  #esPsimSignalSelect, #esLiveOrderType, #esLiveEntryMethod, #esPsimDirOverride{
+    -webkit-appearance:none; -moz-appearance:none; appearance:none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%238b93a1' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>");
+    background-repeat:no-repeat;
+    background-position: right 20px center;
+    padding-right:38px;
+  }
   /* Ditandai jelas saat arah dipaksa berlawanan dengan sinyal - ini keputusan
      melawan analisa, jadi jangan sampai kelewat tidak terlihat. */
   #esPsimDirOverride.dipaksa{ color: var(--gold); border-color: var(--gold); }
@@ -2034,6 +2095,16 @@
       <div class="es-econ-calendar-body" id="esEconCalendarBody"></div>
     </div>
   </div>
+
+  <!-- Pop-up pengingat News: muncul saat buka web & 10 menit sebelum tiap rilis dampak tinggi -->
+  <div class="es-news-pop-overlay" id="esNewsPopup">
+    <div class="es-news-pop-card">
+      <div class="es-news-pop-title" id="esNewsPopupTitle">&#9888; Pengingat News</div>
+      <div class="es-news-pop-body" id="esNewsPopupBody"></div>
+      <button type="button" class="es-news-pop-close" id="esNewsPopupClose">Tutup</button>
+    </div>
+  </div>
+
   <div class="es-header">
     <div>
       <div class="es-title">
@@ -2102,6 +2173,7 @@
 
 
   <div class="es-priority-section es-collapsible es-pantau-top" data-section="pantau">
+    <div class="es-priority-title es-pantau-title">Area Pantau</div>
     <div class="es-section-body">
       <div class="es-priority-controls">
         <select id="esPantauTf">
@@ -8084,6 +8156,82 @@
 
   function renderEcon(){ renderEconNext(); renderEconList(); }
 
+  // ═══════════════════════════════════════════════════════
+  // ████████  POP-UP PENGINGAT NEWS  ████████
+  // ═══════════════════════════════════════════════════════
+  // Muncul (1) saat web dibuka, dan (2) 10 menit menjelang tiap rilis dampak
+  // tinggi. User bisa menutupnya; pengingat 10-menit dijadwalkan per event.
+  const NEWS_LEAD_MS = 10 * 60 * 1000;
+  const newsPopupEl      = document.getElementById('esNewsPopup');
+  const newsPopupTitleEl = document.getElementById('esNewsPopupTitle');
+  const newsPopupBodyEl  = document.getElementById('esNewsPopupBody');
+  const newsPopupCloseEl = document.getElementById('esNewsPopupClose');
+  let newsReminderTimers = [];
+  const newsReminderShown = new Set();
+  let newsPopupPembukaanTampil = false;
+
+  function newsEventKey(e){ return e.waktu + '|' + e.judul; }
+
+  function newsHighImpactMendatang(){
+    if(!econEvents) return [];
+    const now = Date.now();
+    return econEvents
+      .filter(e => e.dampak === 'high' && econCurLolos(e.mataUang) && e.waktu > now)
+      .sort((a,b)=> a.waktu - b.waktu);
+  }
+
+  function showNewsPopup(events, alasan){
+    if(!newsPopupEl || !events || !events.length) return;
+    const now = Date.now();
+    newsPopupTitleEl.innerHTML = (alasan === '10menit')
+      ? '&#9888; 10 Menit Menjelang News'
+      : '&#9888; Pengingat News Berdampak Tinggi';
+    newsPopupBodyEl.innerHTML = events.map(e=>{
+      const jam = new Date(e.waktu).toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'});
+      const sisa = econFmtSelisih(e.waktu - now) || '-';
+      return '<div class="es-news-pop-row">'
+        + '<span class="es-news-pop-jam">' + jam + '</span>'
+        + '<span class="es-news-pop-cur">' + e.mataUang + '</span>'
+        + '<span class="es-news-pop-judul">' + e.judul + '</span>'
+        + '<span class="es-news-pop-sisa">dalam ' + sisa + '</span>'
+        + '</div>';
+    }).join('');
+    newsPopupEl.classList.add('open');
+  }
+  function tutupNewsPopup(){ if(newsPopupEl) newsPopupEl.classList.remove('open'); }
+
+  function setupNewsReminders(){
+    newsReminderTimers.forEach(t => clearTimeout(t));
+    newsReminderTimers = [];
+    const highs = newsHighImpactMendatang();
+    // (1) Pop-up saat web dibuka - sekali saja per sesi.
+    if(!newsPopupPembukaanTampil && highs.length){
+      newsPopupPembukaanTampil = true;
+      showNewsPopup(highs.slice(0, 4), 'pembukaan');
+    }
+    // (2) Jadwalkan pengingat 10 menit sebelum tiap event.
+    const now = Date.now();
+    highs.forEach(e=>{
+      const key = newsEventKey(e);
+      if(newsReminderShown.has(key)) return;
+      const delay = (e.waktu - NEWS_LEAD_MS) - now;
+      if(delay > 0){
+        const t = setTimeout(()=>{
+          if(newsReminderShown.has(key)) return;
+          newsReminderShown.add(key);
+          showNewsPopup([e], '10menit');
+        }, delay);
+        newsReminderTimers.push(t);
+      } else if(e.waktu > now){
+        // sudah <10 menit & belum pernah ditampilkan -> tampilkan sekarang
+        newsReminderShown.add(key);
+        showNewsPopup([e], '10menit');
+      }
+    });
+  }
+  if(newsPopupCloseEl) newsPopupCloseEl.addEventListener('click', tutupNewsPopup);
+  if(newsPopupEl) newsPopupEl.addEventListener('click', (e)=>{ if(e.target === newsPopupEl) tutupNewsPopup(); });
+
   function ambilEconCalendar(){
     // Backend URL diambil dari kolom konfigurasi Live Trading yang sudah ada -
     // endpoint /api/news memang tidak butuh token, tapi alamatnya sama.
@@ -8101,6 +8249,7 @@
         if(econNextEl) econNextEl.style.display = '';
         if(econFilterSel) econFilterSel.parentElement.style.display = '';
         renderEcon();
+        setupNewsReminders();
       })
       .catch(function(){
         // Sekali gagal -> pakai widget lama sebagai cadangan, jangan biarkan
@@ -8146,55 +8295,60 @@
   let geserAktif = false, sedangGeser = false;
   let mulaiX = 0, mulaiY = 0, panelX = 0, panelY = 0;
 
-  // Posisi disimpan sebagai jarak dari tepi KANAN & ATAS layar, bukan kiri.
-  // Panel dijangkar dari kanan (align-items:flex-end), jadi saat kalender
-  // dibuka isinya melebar KE KIRI dan tombolnya tetap diam - kalau dijangkar
-  // dari kiri, tombol ikut terdorong ke kanan sejauh lebar konten tiap dibuka.
-  function jepitKeLayar(right, top){
-    // Ukur dari tombolnya (lebarnya tetap), bukan panel yang lebarnya berubah
-    // saat kalender buka/tutup.
+  // Posisi dijangkar dari tepi KIRI & ATAS layar (px tetap) supaya tombol News
+  // TIDAK ikut bergerak saat ukuran window diubah. Konten kalender diposisikan
+  // absolut (lihat CSS) sehingga buka/tutup kalender tidak menggeser tombolnya.
+  function jepitKeLayar(left, top){
     const rt = econCalendarTrigger.getBoundingClientRect();
-    const maxRight = Math.max(0, window.innerWidth  - rt.width);
-    const maxTop   = Math.max(0, window.innerHeight - rt.height);
-    return { right: Math.min(Math.max(0, right), maxRight),
-             top:   Math.min(Math.max(0, top),   maxTop) };
+    const maxLeft = Math.max(0, window.innerWidth  - rt.width);
+    const maxTop  = Math.max(0, window.innerHeight - rt.height);
+    return { left: Math.min(Math.max(0, left), maxLeft),
+             top:  Math.min(Math.max(0, top),  maxTop) };
   }
 
-  function terapkanPosisi(right, top){
-    const p = jepitKeLayar(right, top);
-    econCalendarPanel.style.right = p.right + 'px';
+  function terapkanPosisi(left, top){
+    const p = jepitKeLayar(left, top);
+    econCalendarPanel.style.left  = p.left + 'px';
     econCalendarPanel.style.top   = p.top + 'px';
-    econCalendarPanel.style.left  = 'auto';
+    econCalendarPanel.style.right = 'auto';
     return p;
   }
 
-  function muatPosisiEcon(){
-    try{
-      const raw = localStorage.getItem(ECON_POS_KEY);
-      if(!raw) return;
-      const p = JSON.parse(raw);
-      if(typeof p.right === 'number' && typeof p.top === 'number'){
-        terapkanPosisi(p.right, p.top);
-      } else if(typeof p.x === 'number' && typeof p.y === 'number'){
-        // Format lama (berbasis kiri) - konversi ke berbasis kanan lalu tulis
-        // balik supaya tidak dikonversi ulang tiap refresh.
-        const rt = econCalendarTrigger.getBoundingClientRect();
-        const q = terapkanPosisi(window.innerWidth - (p.x + rt.width), p.y);
-        simpanPosisiEcon(q.right, q.top);
-      }
-    }catch(e){}
+  function simpanPosisiEcon(left, top){
+    try{ localStorage.setItem(ECON_POS_KEY, JSON.stringify({ left, top })); }catch(e){}
   }
 
-  function simpanPosisiEcon(right, top){
-    try{ localStorage.setItem(ECON_POS_KEY, JSON.stringify({ right, top })); }catch(e){}
+  function muatPosisiEcon(){
+    let applied = false;
+    try{
+      const raw = localStorage.getItem(ECON_POS_KEY);
+      if(raw){
+        const p = JSON.parse(raw);
+        const rt = econCalendarTrigger.getBoundingClientRect();
+        if(typeof p.left === 'number' && typeof p.top === 'number'){
+          terapkanPosisi(p.left, p.top); applied = true;
+        } else if(typeof p.right === 'number' && typeof p.top === 'number'){
+          // format lama (berbasis kanan) -> konversi ke berbasis kiri
+          const q = terapkanPosisi(window.innerWidth - p.right - rt.width, p.top);
+          simpanPosisiEcon(q.left, q.top); applied = true;
+        } else if(typeof p.x === 'number' && typeof p.y === 'number'){
+          const q = terapkanPosisi(p.x, p.y); simpanPosisiEcon(q.left, q.top); applied = true;
+        }
+      }
+    }catch(e){}
+    // Belum ada posisi tersimpan: bekukan posisi default (CSS right:16px) menjadi
+    // berbasis kiri supaya tetap diam saat window di-resize.
+    if(!applied){
+      const rt = econCalendarTrigger.getBoundingClientRect();
+      terapkanPosisi(rt.left, rt.top);
+    }
   }
 
   econCalendarTrigger.addEventListener('pointerdown', (e)=>{
     if(e.button !== undefined && e.button !== 0) return;   // klik kanan/tengah jangan dianggap geser
     geserAktif = true; sedangGeser = false;
     const rt = econCalendarTrigger.getBoundingClientRect();
-    // panelX di sini = jarak tepi kanan tombol ke tepi kanan layar
-    panelX = window.innerWidth - rt.right; panelY = rt.top;
+    panelX = rt.left; panelY = rt.top;                     // jangkar dari kiri
     mulaiX = e.clientX; mulaiY = e.clientY;
     econCalendarTrigger.setPointerCapture(e.pointerId);
   });
@@ -8205,8 +8359,7 @@
     if(!sedangGeser && Math.hypot(dx, dy) < GESER_MINIMAL) return;
     if(!sedangGeser){ sedangGeser = true; econCalendarPanel.classList.add('dragging'); }
     e.preventDefault();
-    // geser ke kanan (dx>0) MENGURANGI jarak dari kanan
-    terapkanPosisi(panelX - dx, panelY + dy);
+    terapkanPosisi(panelX + dx, panelY + dy);
   });
 
   function selesaiGeser(e){
@@ -8216,18 +8369,18 @@
     try{ econCalendarTrigger.releasePointerCapture(e.pointerId); }catch(err){}
     if(sedangGeser){
       const rt = econCalendarTrigger.getBoundingClientRect();
-      simpanPosisiEcon(window.innerWidth - rt.right, rt.top);
+      simpanPosisiEcon(rt.left, rt.top);
     }
   }
   econCalendarTrigger.addEventListener('pointerup', selesaiGeser);
   econCalendarTrigger.addEventListener('pointercancel', selesaiGeser);
 
-  // Kalau ukuran jendela berubah, tarik kembali tombol yang jadi di luar layar.
+  // Saat window di-resize: pertahankan posisi kiri/atas (tombol tetap DIAM),
+  // hanya ditarik balik kalau sampai keluar layar.
   window.addEventListener('resize', ()=>{
-    if(econCalendarPanel.style.right === '' || econCalendarPanel.style.right === 'auto') return;
     const rt = econCalendarTrigger.getBoundingClientRect();
-    const p = terapkanPosisi(window.innerWidth - rt.right, rt.top);
-    simpanPosisiEcon(p.right, p.top);
+    const p = terapkanPosisi(rt.left, rt.top);
+    simpanPosisiEcon(p.left, p.top);
   });
 
   econCalendarTrigger.addEventListener('click', (e)=>{
