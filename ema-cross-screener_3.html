@@ -2025,6 +2025,34 @@
     font-size:11px; cursor:pointer;
   }
   .es-user-signout-btn:hover{ color:var(--text); border-color:var(--muted); }
+  /* Ikon restart: hapus seluruh data transaksi milik akun yang sedang login */
+  .es-user-reset-btn{
+    display:inline-flex; align-items:center; justify-content:center;
+    background:none; border:1px solid var(--border); color:var(--muted);
+    border-radius:6px; padding:3px 6px; cursor:pointer;
+  }
+  .es-user-reset-btn:hover{ color:var(--bear); border-color:var(--bear); }
+  .es-reset-overlay{
+    display:none; position:fixed; inset:0; z-index:200;
+    background:rgba(0,0,0,0.6); align-items:center; justify-content:center; padding:16px;
+  }
+  .es-reset-overlay.open{ display:flex; }
+  .es-reset-card{
+    width:min(430px,100%); background:var(--panel); border:1px solid var(--bear);
+    border-radius:12px; padding:18px; box-shadow:0 18px 50px rgba(0,0,0,0.6);
+  }
+  .es-reset-title{ font-family:var(--font-display); font-weight:700; font-size:16px; color:var(--bear); margin-bottom:10px; }
+  .es-reset-body{ font-family:var(--font-mono); font-size:11.5px; line-height:1.7; color:var(--text); margin-bottom:16px; }
+  .es-reset-actions{ display:flex; gap:8px; }
+  .es-reset-actions button{
+    flex:1; font-family:var(--font-mono); font-weight:600; font-size:12.5px;
+    padding:9px 14px; border-radius:8px; cursor:pointer;
+    background:var(--panel-2); border:1px solid var(--border); color:var(--text);
+  }
+  .es-reset-actions button.no:hover{ border-color:var(--muted); }
+  .es-reset-actions button.yes{ border-color:var(--bear); color:var(--bear); }
+  .es-reset-actions button.yes:hover{ background:var(--bear-dim); }
+  .es-reset-actions button:disabled{ opacity:.6; cursor:not-allowed; }
 </style>
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
@@ -2062,7 +2090,28 @@
     <div class="es-user-bar" id="esUserBar" style="display:none;">
       <img id="esUserAvatar" src="" alt="">
       <span id="esUserName"></span>
+      <button type="button" class="es-user-reset-btn" id="esResetDataBtn" title="Hapus semua data transaksi">
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
+      </button>
       <button type="button" class="es-user-signout-btn" id="esSignOutBtn">Keluar</button>
+    </div>
+  </div>
+
+  <!-- Konfirmasi hapus seluruh data transaksi -->
+  <div class="es-reset-overlay" id="esResetModal">
+    <div class="es-reset-card">
+      <div class="es-reset-title">Hapus Seluruh Data Transaksi?</div>
+      <div class="es-reset-body">
+        Ini akan menghapus <b>semua</b> riwayat trading kamu:<br>
+        &bull; Posisi terbuka &amp; riwayat transaksi Crypto Screener<br>
+        &bull; Jurnal trading (XAUUSD / forex)<br>
+        &bull; Riwayat kripto Binance di jurnal<br><br>
+        Data akun lain tidak terpengaruh. <b>Tindakan ini tidak bisa dibatalkan.</b>
+      </div>
+      <div class="es-reset-actions">
+        <button type="button" class="no" id="esResetNo">Tidak</button>
+        <button type="button" class="yes" id="esResetYes">Ya, Hapus Semua</button>
+      </div>
     </div>
   </div>
   <div class="es-econ-calendar-panel collapsed" id="esEconCalendarPanel">
@@ -2726,7 +2775,12 @@
       });
       if(changed){
         tandaiPerluDidorong();
-        esSaveToCloud(uid).catch(function(){});
+        // TUNGGU tulisan ke cloud selesai sebelum lanjut (pemanggil akan reload).
+        // Kalau tidak ditunggu, reload memutus permintaan yang masih jalan -
+        // dokumen user tetap tanpa layout, jadi seeding terpicu lagi tiap load:
+        // itulah yang membuat halaman refresh terus-menerus.
+        return esSaveToCloud(uid).then(function(){ return true; })
+                                 .catch(function(){ return true; });
       }
       return changed;
     }).catch(function(){ return false; });
@@ -2840,6 +2894,51 @@
     }
   });
 
+  // ═══════════════════════════════════════════════════════
+  // ████████  RESET SELURUH DATA TRANSAKSI  ████████
+  // ═══════════════════════════════════════════════════════
+  // Tool ini dipakai banyak user, jadi tiap user harus bisa memulai bersih.
+  // Data dikosongkan di localStorage LALU didorong ke dokumen cloud milik uid
+  // ybs - kalau hanya dihapus lokal, data lama di cloud akan tertarik balik
+  // saat halaman dibuka lagi (atau dari device lain).
+  let esResetTerpasang = false;
+  function pasangResetData(uid){
+    if(esResetTerpasang) return;
+    esResetTerpasang = true;
+    const btn   = document.getElementById('esResetDataBtn');
+    const modal = document.getElementById('esResetModal');
+    const btnNo = document.getElementById('esResetNo');
+    const btnYa = document.getElementById('esResetYes');
+    if(!btn || !modal) return;
+
+    btn.addEventListener('click', ()=> modal.classList.add('open'));
+    btnNo.addEventListener('click', ()=> modal.classList.remove('open'));
+    modal.addEventListener('click', (e)=>{ if(e.target === modal) modal.classList.remove('open'); });
+
+    btnYa.addEventListener('click', ()=>{
+      btnYa.disabled = true; btnNo.disabled = true; btnYa.textContent = 'Menghapus...';
+      const simKosong = JSON.stringify({ positions:{}, history:[] });
+      // Dikosongkan (bukan dihapus) supaya nilai kosongnya ikut naik ke cloud.
+      try{
+        localStorage.setItem(PRIORITY_SIM_KEY, simKosong);
+        localStorage.setItem('ledgerNoirTrades_v1', '[]');
+        localStorage.setItem('jtBinanceCryptoHistory_v1', '[]');
+      }catch(e){}
+      // Bersihkan juga state di memori supaya tampilan langsung kosong.
+      prioritySimPositions = {};
+      prioritySimHistory = [];
+      try{ renderPrioritySimUI(window.__esLastTickers||{}); }catch(e){}
+      esDb.collection('users').doc(uid).set({
+        emaScreenerPrioritySim_v1: simKosong,
+        ledgerNoirTrades_v1: '[]',
+        jtBinanceCryptoHistory_v1: '[]',
+        _updatedAt: Date.now()
+      }, { merge: true })
+        .then(function(){ location.reload(); })
+        .catch(function(){ location.reload(); });   // lokal sudah bersih; sync berkala menyusul
+    });
+  }
+
   function masukAplikasi(user){
       esAuthGateEl.style.display = 'none';
       esActivateGateEl.style.display = 'none';
@@ -2864,7 +2963,21 @@
         return esLoadFromCloud(user.uid);          // true kalau ada perubahan dari device lain
       }).then(function(changed){
         esAuthStatusEl.textContent = '';
-        if(changed === true) location.reload();    // satu reload, apa pun jalurnya
+        // Reload PALING BANYAK SEKALI per tab. Tanpa pengaman ini, kondisi apa pun
+        // yang membuat "changed" selalu true (mis. tulisan cloud gagal, atau ada
+        // nilai yang selalu berbeda dari cloud) bikin halaman refresh tanpa henti.
+        if(changed === true){
+          let sudah = null;
+          try{ sudah = sessionStorage.getItem('esReloadedOnce'); }catch(e){}
+          if(!sudah){
+            try{ sessionStorage.setItem('esReloadedOnce', '1'); }catch(e){}
+            location.reload();
+            return;
+          }
+        }
+        // Pemilik: terbitkan layout sebagai default untuk pengguna baru tiap kali
+        // login, tidak menunggu ada perubahan data dulu.
+        if(esIsOwner) esPublishLayoutDefault().catch(function(){});
       }).catch(function(){ esAuthStatusEl.textContent = ''; });
 
       if(esCloudSyncTimer) clearInterval(esCloudSyncTimer);
@@ -2884,6 +2997,7 @@
       });
 
       pasangTombolSync();
+      pasangResetData(user.uid);
       // Panel "Signal Beta Version" hanya untuk pemilik - render ulang setelah
       // esIsOwner terisi (saat init tadi masih false, jadi panelnya belum tampil).
       if(typeof renderHiddenSectionChips === 'function') renderHiddenSectionChips();
@@ -3186,6 +3300,21 @@
   }
 
   async function loadTickers(){
+    // Lewat backend dulu (lihat catatan di fetchKlines), lalu Binance langsung.
+    const base = esMarketBase();
+    if(base){
+      try{
+        const r = await fetch(`${base}/api/tickers`);
+        if(r.ok){
+          const j = await r.json();
+          if(j && Array.isArray(j.data)){
+            const map = {};
+            j.data.forEach(t=>{ map[t.symbol] = t; });
+            return map;
+          }
+        }
+      }catch(e){}
+    }
     try{
       const res = await fetch('https://api.binance.com/api/v3/ticker/24hr');
       if(!res.ok) throw new Error('ticker fail');
@@ -3243,18 +3372,53 @@
   // saat muncul error 418/429 lagi, turunkan angka ini (mis. ke 8).
   const SCAN_CONCURRENCY = 12;
 
+  // ===== Sumber data pasar =====
+  // Binance diblokir sebagian ISP (mis. di Indonesia), sehingga permintaan
+  // LANGSUNG dari browser gagal ("Failed to fetch") dan web tampil kosong walau
+  // akun sudah aktif. Karena itu data pasar diambil lewat backend (VPS) yang
+  // meneruskannya - endpoint publik, tanpa token. Kalau user mengisi Backend URL
+  // sendiri, itu yang dipakai; kalau tidak, pakai proxy bawaan. Kalau backend
+  // gagal, otomatis jatuh balik ke Binance langsung (buat yang tidak diblokir).
+  const MARKET_PROXY_DEFAULT = 'https://103-253-145-38.sslip.io';
+  function esMarketBase(){
+    try{
+      const raw = localStorage.getItem('emaScreenerLiveTradeConfig_v1');
+      if(raw){
+        const cfg = JSON.parse(raw);
+        const u = (cfg && cfg.backendUrl ? String(cfg.backendUrl) : '').trim().replace(/\/+$/,'');
+        // http:// tidak bisa dipanggil dari halaman https (mixed content) - lewati
+        if(u && !(location.protocol === 'https:' && u.startsWith('http://'))) return u;
+      }
+    }catch(e){}
+    return MARKET_PROXY_DEFAULT;
+  }
+
   async function fetchKlines(symbol, interval, limit=150){
-    const spotUrl = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`;
-    let res = await fetch(spotUrl);
-    let market = 'spot';
-    if(!res.ok){
-      // fallback: sebagian koin (mis. meme coin baru) cuma listing di Binance Futures, belum ada di Spot
-      const futuresUrl = `https://fapi.binance.com/fapi/v1/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`;
-      res = await fetch(futuresUrl);
-      market = 'futures';
+    let data = null, market = 'spot';
+    // 1) Lewat backend/proxy dulu
+    const base = esMarketBase();
+    if(base){
+      try{
+        const r = await fetch(`${base}/api/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`);
+        if(r.ok){
+          const j = await r.json();
+          if(j && Array.isArray(j.data)){ data = j.data; market = j.market || 'spot'; }
+        }
+      }catch(e){}
     }
-    if(!res.ok) throw new Error('klines fail: '+symbol);
-    const data = await res.json();
+    // 2) Kalau backend gagal: Binance langsung (spot -> futures)
+    if(!data){
+      try{
+        let res = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`);
+        market = 'spot';
+        if(!res.ok){
+          res = await fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`);
+          market = 'futures';
+        }
+        if(!res.ok) throw new Error('klines fail: '+symbol);
+        data = await res.json();
+      }catch(e){ throw new Error('klines fail: '+symbol); }
+    }
     return {
       opens: data.map(d=>parseFloat(d[1])),
       closes: data.map(d=>parseFloat(d[4])),
@@ -7983,6 +8147,18 @@
   async function fetchCoinLastPrice(symbol){
     const t = (window.__esLastTickers||{})[symbol];
     if(t && t.lastPrice && parseFloat(t.lastPrice)>0) return parseFloat(t.lastPrice);
+    // Lewat backend dulu (lihat catatan di fetchKlines), lalu Binance langsung.
+    const base = esMarketBase();
+    if(base){
+      try{
+        const r = await fetch(`${base}/api/ticker-price?symbol=${symbol}`);
+        if(r.ok){
+          const j = await r.json();
+          const pp = j && j.data ? parseFloat(j.data.price) : NaN;
+          if(pp>0) return pp;
+        }
+      }catch(e){}
+    }
     let res = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${symbol}`);
     if(!res.ok) res = await fetch(`https://fapi.binance.com/fapi/v1/ticker/price?symbol=${symbol}`);
     if(!res.ok) throw new Error('koin tidak ditemukan di Binance');
