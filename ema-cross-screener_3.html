@@ -2998,6 +2998,20 @@
 
       pasangTombolSync();
       pasangResetData(user.uid);
+
+      // Kunci lama (satu untuk semua akun di device ini) memuat token uang asli.
+      // Pemilik: pindahkan ke kunci ber-uid miliknya. Akun lain: HAPUS - jangan
+      // sampai token pemilik ikut terbaca/terpakai oleh akun lain di device yang
+      // sama. Setelah itu muat konfigurasi milik akun yang sedang login.
+      try{
+        const legacy = localStorage.getItem(LIVE_TRADE_CONFIG_KEY);
+        if(legacy){
+          if(esIsOwner) localStorage.setItem(LIVE_TRADE_CONFIG_KEY + '::' + user.uid, legacy);
+          localStorage.removeItem(LIVE_TRADE_CONFIG_KEY);
+        }
+      }catch(e){}
+      loadLiveTradeConfig();
+      detectLiveEnv();
       // Panel "Signal Beta Version" hanya untuk pemilik - render ulang setelah
       // esIsOwner terisi (saat init tadi masih false, jadi panelnya belum tampil).
       if(typeof renderHiddenSectionChips === 'function') renderHiddenSectionChips();
@@ -3014,6 +3028,13 @@
   });
 
   esSignOutBtn.addEventListener('click', function(){
+    // Kosongkan kolom Backend URL / App Token dari layar begitu keluar - jangan
+    // sampai token akun ini masih terpampang saat orang lain login di device ini.
+    try{
+      esCurrentUid = null;
+      if(liveBackendUrlInput) liveBackendUrlInput.value = '';
+      if(liveAppTokenInput) liveAppTokenInput.value = '';
+    }catch(e){}
     esAuth.signOut();
   });
 
@@ -3099,25 +3120,62 @@
   // Sengaja "menambah", bukan "mengganti": koin yang kamu tambahkan sendiri atau
   // hasil ganti otomatis (RESERVE) tetap ikut, tidak terhapus.
   const SYMBOLS_MIGRASI_KEY = 'emaScreenerSymbolsMigrasi_v1';
+  const BLOCKED_SYMBOLS_KEY = 'emaScreenerBlockedSymbols_v1';
+
+  // Koin yang SENGAJA dibuang user lewat "Blokir & Ganti" - disimpan terpisah
+  // supaya penggabungan daftar tidak menghidupkannya kembali.
+  function muatSimbolDiblokir(){
+    try{
+      const arr = JSON.parse(localStorage.getItem(BLOCKED_SYMBOLS_KEY) || '[]');
+      return Array.isArray(arr) ? arr : [];
+    }catch(e){ return []; }
+  }
+  function catatSimbolDiblokir(symbol){
+    try{
+      const arr = muatSimbolDiblokir();
+      if(arr.indexOf(symbol) === -1){
+        arr.push(symbol);
+        localStorage.setItem(BLOCKED_SYMBOLS_KEY, JSON.stringify(arr));
+      }
+    }catch(e){}
+  }
+
+  // Sidik jari daftar koin bawaan. Dulu penandanya cuma '1' (sekali pakai), jadi
+  // begitu daftar di kode bertambah (44 -> 100), device lama TIDAK pernah ikut
+  // bertambah - selamanya memindai daftar lamanya. Dengan sidik jari, setiap
+  // perubahan daftar di kode otomatis memicu penggabungan ulang sekali.
+  function sidikJariBaseSymbols(){
+    const s = BASE_SYMBOLS.join(',');
+    let h = 0;
+    for(let i=0;i<s.length;i++){ h = ((h<<5) - h + s.charCodeAt(i)) | 0; }
+    return BASE_SYMBOLS.length + ':' + (h>>>0).toString(36);
+  }
 
   function loadActiveSymbols(){
+    const cap = sidikJariBaseSymbols();
     try{
       const raw = localStorage.getItem(ACTIVE_SYMBOLS_KEY);
       if(raw){
         const arr = JSON.parse(raw);
         if(Array.isArray(arr) && arr.length){
-          if(localStorage.getItem(SYMBOLS_MIGRASI_KEY) === '1') return arr;
+          if(localStorage.getItem(SYMBOLS_MIGRASI_KEY) === cap) return arr;
+          const diblokir = muatSimbolDiblokir();
           const gabung = arr.slice();
-          BASE_SYMBOLS.forEach(function(sym){ if(gabung.indexOf(sym) === -1) gabung.push(sym); });
+          BASE_SYMBOLS.forEach(function(sym){
+            if(gabung.indexOf(sym) === -1 && diblokir.indexOf(sym) === -1) gabung.push(sym);
+          });
           try{
-            localStorage.setItem(SYMBOLS_MIGRASI_KEY, '1');
-            if(gabung.length !== arr.length) localStorage.setItem(ACTIVE_SYMBOLS_KEY, JSON.stringify(gabung));
+            localStorage.setItem(SYMBOLS_MIGRASI_KEY, cap);
+            if(gabung.length !== arr.length){
+              localStorage.setItem(ACTIVE_SYMBOLS_KEY, JSON.stringify(gabung));
+              tandaiPerluDidorong();   // daftar berubah -> ikut naik ke cloud
+            }
           }catch(e){}
           return gabung;
         }
       }
     }catch(e){}
-    try{ localStorage.setItem(SYMBOLS_MIGRASI_KEY, '1'); }catch(e){}
+    try{ localStorage.setItem(SYMBOLS_MIGRASI_KEY, cap); }catch(e){}
     return BASE_SYMBOLS.slice();
   }
 
@@ -3134,6 +3192,9 @@
     const replacement = RESERVE_SYMBOLS.find(s => !activeSymbols.includes(s)) || null;
     if(replacement){ activeSymbols.splice(idx, 1, replacement); }
     else{ activeSymbols.splice(idx, 1); }
+    // Catat sebagai koin yang SENGAJA dibuang, supaya penggabungan daftar koin
+    // (saat daftar bawaan di kode bertambah) tidak menghidupkannya kembali.
+    catatSimbolDiblokir(symbol);
     saveActiveSymbols();
     return replacement;
   }
@@ -3382,7 +3443,11 @@
   const MARKET_PROXY_DEFAULT = 'https://103-253-145-38.sslip.io';
   function esMarketBase(){
     try{
-      const raw = localStorage.getItem('emaScreenerLiveTradeConfig_v1');
+      // Ikut scope uid (lihat liveCfgKey) - tanpa ini, backend milik akun lain
+      // di device yang sama ikut terbaca.
+      const raw = esCurrentUid
+        ? localStorage.getItem('emaScreenerLiveTradeConfig_v1::' + esCurrentUid)
+        : null;
       if(raw){
         const cfg = JSON.parse(raw);
         const u = (cfg && cfg.backendUrl ? String(cfg.backendUrl) : '').trim().replace(/\/+$/,'');
@@ -6507,9 +6572,21 @@
     return { ok:true, message:'' };
   }
 
+  // Backend URL + App Token = kunci ke akun Binance UANG ASLI. Dulu disimpan
+  // dengan SATU kunci per-device, sehingga siapa pun yang login di browser yang
+  // sama mewarisi token pemilik dan bisa mengirim order sungguhan. Sekarang
+  // kunci penyimpanan di-scope ke uid, jadi tiap akun hanya melihat miliknya
+  // sendiri. Tetap TIDAK ikut cloud-sync (token tidak boleh keluar dari device).
+  function liveCfgKey(){
+    return esCurrentUid ? (LIVE_TRADE_CONFIG_KEY + '::' + esCurrentUid) : null;
+  }
   function loadLiveTradeConfig(){
+    liveBackendUrlInput.value = '';
+    liveAppTokenInput.value = '';
+    const key = liveCfgKey();
+    if(!key) return;                      // belum login -> jangan tampilkan apa pun
     try{
-      const raw = localStorage.getItem(LIVE_TRADE_CONFIG_KEY);
+      const raw = localStorage.getItem(key);
       if(!raw) return;
       const cfg = JSON.parse(raw);
       if(cfg.backendUrl) liveBackendUrlInput.value = cfg.backendUrl;
@@ -6518,8 +6595,10 @@
   }
 
   function saveLiveTradeConfig(){
+    const key = liveCfgKey();
+    if(!key) return;                      // belum login -> jangan simpan token
     try{
-      localStorage.setItem(LIVE_TRADE_CONFIG_KEY, JSON.stringify({
+      localStorage.setItem(key, JSON.stringify({
         backendUrl: liveBackendUrlInput.value.trim(),
         appToken: liveAppTokenInput.value.trim()
       }));
