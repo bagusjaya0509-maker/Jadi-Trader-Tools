@@ -5492,15 +5492,25 @@
 
     // ── Section 11: pindai ke belakang, cari SELL terbaru (sentuh UPPER, close balik
     //    ke bawah garis) & BUY terbaru (sentuh LOWER, close balik ke atas garis).
+    // Candle acuan = candle PANTULAN (pivot) yang PERTAMA menyentuh/hampir menyentuh
+    // garis lalu close balik ke dalam - BUKAN sekadar candle yang kebetulan dekat garis
+    // (mis. garis yang naik "mengejar" harga). Jadi:
+    //   BUY  = pivot LOW  (low <= tetangga) menyentuh garis LOWER, close di atas garis.
+    //   SELL = pivot HIGH (high >= tetangga) menyentuh garis UPPER, close di bawah garis.
+    // Butuh 1 candle setelahnya utk konfirmasi pantulan, jadi sinyal paling cepat muncul
+    // di candle ke-1 sesudah sentuh. Hitungan "fresh" dimulai dari candle pantulan ini.
     const maxScan = Math.min(PC_SIG_SCANBACK, B);
     let sellIdx = -1, buyIdx = -1;
     for(let i=0; i<=maxScan; i++){
       const b = B - i;
       if(b < ch.xb1) break;
+      if(b < 1 || b >= d.closes.length - 1) continue;   // butuh tetangga b-1 & b+1 utk pivot
       const upLvl = sigUpperXp1 + ch.slope*(b - ch.xb1);
       const loLvl = sigLowerXp1 + ch.slope*(b - ch.xb1);
-      if(sellIdx < 0 && d.highs[b] >= (upLvl - tol) && d.closes[b] < upLvl) sellIdx = i;
-      if(buyIdx  < 0 && d.lows[b]  <= (loLvl + tol) && d.closes[b] > loLvl) buyIdx = i;
+      const pivotHigh = d.highs[b] >= d.highs[b-1] && d.highs[b] >= d.highs[b+1];
+      const pivotLow  = d.lows[b]  <= d.lows[b-1]  && d.lows[b]  <= d.lows[b+1];
+      if(sellIdx < 0 && pivotHigh && d.highs[b] >= (upLvl - tol) && d.closes[b] < upLvl) sellIdx = i;
+      if(buyIdx  < 0 && pivotLow  && d.lows[b]  <= (loLvl + tol) && d.closes[b] > loLvl) buyIdx = i;
       if(sellIdx >= 0 && buyIdx >= 0) break;
     }
     let arah = null, sentuh = '', sigIdx = -1;
@@ -5545,9 +5555,11 @@
       const riskDist = Math.abs(c.price - c.sl);
       const tp2 = c.signal==='BUY' ? c.price + riskDist*2 : c.price - riskDist*2;
       const garis = c.sentuh === 'UPPER' ? 'UPPER (atas)' : 'LOWER (bawah)';
-      const candleTeks = (c.chSigIdx === 0 || c.chSigIdx == null)
-        ? 'Candle ini (baru menyentuh garis)'
-        : `Candle ke-${c.chSigIdx} setelah menyentuh garis`;
+      const candleTeks = (c.chSigIdx == null)
+        ? 'Baru menyentuh garis'
+        : (c.chSigIdx <= 1
+            ? 'Candle ke-1 sesudah pantul garis (baru)'
+            : `Candle ke-${c.chSigIdx} sesudah pantul garis`);
       return `<div class="es-priority-card ${signalCls}" data-symbol="${c.symbol}" data-tf="${c.tfValue}" data-tflabel="${c.tfLabel}" data-price="${c.price}">
         <div class="es-priority-card-top">
           <span class="es-priority-rank">#${i+1}</span>
