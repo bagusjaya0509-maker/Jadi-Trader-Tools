@@ -5367,6 +5367,8 @@
 
   const CH_TF_LABEL = { '1m':'1m','5m':'5m','15m':'15m','30m':'30m','1h':'1H','4h':'4H','1d':'D','1w':'W' };
   const PC_SIG_TOL_MULT = 0.6;   // toleransi sentuh garis channel (x ATR)
+  const PC_SIG_SCANBACK = 200;   // sejauh mana ke belakang dicek sentuhan (Pine: pcSigScanBack)
+  const PC_SIG_FRESH    = 1;     // sinyal dianggap "sekarang" kalau sentuhan di bar ke-0 (live) atau ke-1
 
   // ---- Auto Parallel Channel: {slope, xb1, upperXp1, lowerXp1} atau null ----
   function detectParallelChannel(highs, lows, closes, atrArr, opt){
@@ -5450,41 +5452,63 @@
   function pcUpperAt(ch, b){ return ch.upperXp1 + ch.slope*(b - ch.xb1); }
   function pcLowerAt(ch, b){ return ch.lowerXp1 + ch.slope*(b - ch.xb1); }
 
-  // Band channel AKTIF untuk sinyal, mengikuti posisi harga. Kalau harga menembus
-  // channel utama, referensi geser ke Duplikat 1 (selebar channel di sisi break);
-  // kalau tembus lebih jauh lagi, geser ke Duplikat 2. Ini yang membuat sinyal
-  // selalu dinilai terhadap band tempat harga berada SEKARANG - bukan channel lama
-  // yang sudah ditinggalkan (antisipasi sinyal salah). Nilai dikembalikan dalam
-  // bentuk ANCHOR (di bar xb1); proyeksikan sendiri dgn slope.
-  function sigBand(ch, closeVal, b){
-    const w = ch.upperXp1 - ch.lowerXp1;
-    const up1 = pcUpperAt(ch, b), lo1 = pcLowerAt(ch, b);
-    if(closeVal > up1 + w) return { u: ch.upperXp1 + 2*w, l: ch.upperXp1 + w,   band:'Duplikat 2 (atas)' };
-    if(closeVal > up1)     return { u: ch.upperXp1 + w,   l: ch.upperXp1,       band:'Duplikat 1 (atas)' };
-    if(closeVal < lo1 - w) return { u: ch.lowerXp1 - w,   l: ch.lowerXp1 - 2*w, band:'Duplikat 2 (bawah)' };
-    if(closeVal < lo1)     return { u: ch.lowerXp1,       l: ch.lowerXp1 - w,   band:'Duplikat 1 (bawah)' };
-    return { u: ch.upperXp1, l: ch.lowerXp1, band:'Channel Utama' };
-  }
-
   async function findCrossHunterSignalForSymbol(symbol, tickers, tf){
     let d;
     try{ d = await fetchKlines(symbol, tf, 250); }catch(e){ return null; }
     if(!d || d.closes.length < 60) return null;
     const atrArr = atr(d.highs, d.lows, d.closes, 14);
-    // Bar terakhir yang SUDAH tutup (candle terakhir Binance masih berjalan).
-    const sb = d.closes.length - 2;
-    const ch = detectParallelChannel(d.highs, d.lows, d.closes, atrArr, { endBar: sb });
+    // Bar acuan = bar TERAKHIR (sama dengan bar_index di Pine). Pine menentukan band
+    // sinyal dari posisi close bar terakhir, LALU memindai ke belakang mencari
+    // sentuhan terbaru terhadap band itu. Persis Section "STATE BREAKOUT" + 11.
+    const B = d.closes.length - 1;
+    const ch = detectParallelChannel(d.highs, d.lows, d.closes, atrArr, { endBar: B });
     if(!ch) return null;
-    if(sb < ch.xb1) return null;
-    const tol = (atrArr[sb] || d.closes[sb]*0.005) * PC_SIG_TOL_MULT;
-    // Band aktif mengikuti posisi harga: channel utama / duplikat 1 / duplikat 2.
-    const bnd = sigBand(ch, d.closes[sb], sb);
-    const up = bnd.u + ch.slope*(sb - ch.xb1);
-    const lo = bnd.l + ch.slope*(sb - ch.xb1);
-    let arah = null, sentuh = '';
-    if(d.highs[sb] >= up - tol && d.closes[sb] < up){ arah='SELL'; sentuh='UPPER'; }
-    else if(d.lows[sb] <= lo + tol && d.closes[sb] > lo){ arah='BUY'; sentuh='LOWER'; }
+    if(B < ch.xb1) return null;
+    const w = ch.upperXp1 - ch.lowerXp1;
+    if(!(w > 0)) return null;
+    const tol = (atrArr[B] || d.closes[B]*0.005) * PC_SIG_TOL_MULT;
+
+    // ── STATE BREAKOUT (Pine baris 722-742): band aktif ditentukan dari close bar
+    //    terakhir. Break ATAS → geser ke Duplikat 1/2 di atas; break BAWAH → di bawah.
+    const up1Now = pcUpperAt(ch, B), lo1Now = pcLowerAt(ch, B);
+    const closeB = d.closes[B];
+    const brokeUpRaw   = closeB > up1Now;
+    const brokeDownRaw = closeB < lo1Now;
+    const levelUp   = brokeUpRaw   ? Math.min(2, Math.floor((closeB - up1Now)/w) + 1) : 0;
+    const levelDown = brokeDownRaw ? Math.min(2, Math.floor((lo1Now - closeB)/w) + 1) : 0;
+    const pcBrokeUp = levelUp > 0, pcBrokeDown = levelDown > 0;
+    const useCh2 = pcBrokeUp || pcBrokeDown;
+    let sigUpperXp1, sigLowerXp1, bandName;
+    if(!useCh2){
+      sigUpperXp1 = ch.upperXp1; sigLowerXp1 = ch.lowerXp1; bandName = 'Channel Utama';
+    } else if(pcBrokeUp){
+      sigUpperXp1 = ch.upperXp1 + levelUp*w; sigLowerXp1 = ch.upperXp1 + (levelUp-1)*w;
+      bandName = levelUp >= 2 ? 'Duplikat 2 (atas)' : 'Duplikat 1 (atas)';
+    } else {
+      sigUpperXp1 = ch.lowerXp1 - (levelDown-1)*w; sigLowerXp1 = ch.lowerXp1 - levelDown*w;
+      bandName = levelDown >= 2 ? 'Duplikat 2 (bawah)' : 'Duplikat 1 (bawah)';
+    }
+
+    // ── Section 11: pindai ke belakang, cari SELL terbaru (sentuh UPPER, close balik
+    //    ke bawah garis) & BUY terbaru (sentuh LOWER, close balik ke atas garis).
+    const maxScan = Math.min(PC_SIG_SCANBACK, B);
+    let sellIdx = -1, buyIdx = -1;
+    for(let i=0; i<=maxScan; i++){
+      const b = B - i;
+      if(b < ch.xb1) break;
+      const upLvl = sigUpperXp1 + ch.slope*(b - ch.xb1);
+      const loLvl = sigLowerXp1 + ch.slope*(b - ch.xb1);
+      if(sellIdx < 0 && d.highs[b] >= (upLvl - tol) && d.closes[b] < upLvl) sellIdx = i;
+      if(buyIdx  < 0 && d.lows[b]  <= (loLvl + tol) && d.closes[b] > loLvl) buyIdx = i;
+      if(sellIdx >= 0 && buyIdx >= 0) break;
+    }
+    let arah = null, sentuh = '', sigIdx = -1;
+    if(sellIdx >= 0 && (buyIdx < 0 || sellIdx <= buyIdx)){ arah='SELL'; sentuh='UPPER'; sigIdx=sellIdx; }
+    else if(buyIdx >= 0){ arah='BUY'; sentuh='LOWER'; sigIdx=buyIdx; }
     if(!arah) return null;
+    // Screener hanya menampilkan setup yang MASIH baru (sentuhan di bar terakhir / live).
+    if(sigIdx > PC_SIG_FRESH) return null;
+    const bnd = { band: bandName };
 
     const t = tickers[symbol];
     const price = t ? parseFloat(t.lastPrice) : d.closes[d.closes.length-1];
