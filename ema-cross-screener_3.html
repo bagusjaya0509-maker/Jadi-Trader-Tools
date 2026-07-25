@@ -5388,9 +5388,11 @@
       let isH=true, isL=true;
       for(let j=p-left; j<=p+right; j++){
         if(j===p) continue;
-        // strict spt ta.pivothigh/pivotlow Pine: nilai seri (tie) TIDAK dihitung pivot
-        if(highs[j] >= highs[p]) isH=false;
-        if(lows[j]  <= lows[p])  isL=false;
+        // LOOSE spt ta.pivothigh/pivotlow Pine: hanya tetangga yang BENAR-BENAR lebih
+        // tinggi/rendah yang membatalkan pivot; nilai seri (tie) tetap dihitung pivot.
+        // Diverifikasi vs label Pine asli (CHZ 15m & ARB 1H) - versi strict meleset.
+        if(highs[j] > highs[p]) isH=false;
+        if(lows[j]  < lows[p])  isL=false;
       }
       if(isH){ phBars.push(p); phPrices.push(highs[p]); }
       if(isL){ plBars.push(p); plPrices.push(lows[p]); }
@@ -5454,23 +5456,23 @@
   function pcUpperAt(ch, b){ return ch.upperXp1 + ch.slope*(b - ch.xb1); }
   function pcLowerAt(ch, b){ return ch.lowerXp1 + ch.slope*(b - ch.xb1); }
 
-  // Bar KONFIRMASI pivot terakhir. Di Pine, blok channel (Section 10) hanya jalan
-  // saat `not na(ph) or not na(pl)` - yaitu HANYA ketika ada pivot baru terkonfirmasi.
-  // Geometri channel disimpan di var dan dipakai apa adanya sampai pivot berikutnya.
-  // Jadi channel yang TAMPAK di chart = hasil hitung di bar ini, bukan di bar terakhir.
-  // Diverifikasi lewat data chart TradingView asli (ARB 1H): hitung di bar ini -> SELL
-  // (cocok dgn label Pine), hitung di bar terakhir -> BUY (keliru).
-  function lastPivotConfirmBar(highs, lows, from, left, right){
-    for(let p = from - right; p >= left; p--){
+  // Bar-bar KONFIRMASI pivot (terbaru dulu). Di Pine, blok channel (Section 10) hanya
+  // jalan saat `not na(ph) or not na(pl)` - yaitu HANYA ketika ada pivot baru
+  // terkonfirmasi - dan geometrinya hanya di-update kalau perhitungan BERHASIL
+  // (bestI >= 0). Kalau gagal, channel LAMA tetap dipakai. Jadi channel yang tampak
+  // di chart = hasil hitung SUKSES terakhir, bukan hitungan di bar terakhir.
+  function pivotConfirmBarsDesc(highs, lows, from, left, right, maxN){
+    const out = [];
+    for(let p = from - right; p >= left && out.length < maxN; p--){
       let isH=true, isL=true;
       for(let j=p-left; j<=p+right; j++){
         if(j===p) continue;
-        if(highs[j] >= highs[p]) isH=false;
-        if(lows[j]  <= lows[p])  isL=false;
+        if(highs[j] > highs[p]) isH=false;
+        if(lows[j]  < lows[p])  isL=false;
       }
-      if(isH || isL) return p + right;
+      if(isH || isL) out.push(p + right);
     }
-    return from;
+    return out;
   }
 
   async function findCrossHunterSignalForSymbol(symbol, tickers, tf){
@@ -5480,9 +5482,15 @@
     const atrArr = atr(d.highs, d.lows, d.closes, 14);
     // Bar acuan = bar TERAKHIR (bar_index Pine) untuk band & pemindaian sentuhan.
     const B = d.closes.length - 1;
-    // Channel dihitung di bar konfirmasi pivot terakhir (repaint Pine), bukan di B.
-    const chEndBar = lastPivotConfirmBar(d.highs, d.lows, B, 5, 5);
-    const ch = detectParallelChannel(d.highs, d.lows, d.closes, atrArr, { endBar: chEndBar });
+    // Channel dihitung di bar konfirmasi pivot SUKSES terakhir (repaint Pine), bukan
+    // di B. Mundur maksimal 5 titik konfirmasi kalau perhitungan gagal, meniru Pine
+    // yang mempertahankan channel lama saat hitungan tidak menghasilkan pasangan valid.
+    const chBars = pivotConfirmBarsDesc(d.highs, d.lows, B, 5, 5, 5);
+    if(!chBars.length) chBars.push(B);
+    let ch = null;
+    for(let i=0; i<chBars.length && !ch; i++){
+      ch = detectParallelChannel(d.highs, d.lows, d.closes, atrArr, { endBar: chBars[i] });
+    }
     if(!ch) return null;
     if(B < ch.xb1) return null;
     const w = ch.upperXp1 - ch.lowerXp1;
