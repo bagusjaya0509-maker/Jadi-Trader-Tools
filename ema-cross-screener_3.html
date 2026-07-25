@@ -5388,8 +5388,9 @@
       let isH=true, isL=true;
       for(let j=p-left; j<=p+right; j++){
         if(j===p) continue;
-        if(highs[j] > highs[p]) isH=false;
-        if(lows[j]  < lows[p])  isL=false;
+        // strict spt ta.pivothigh/pivotlow Pine: nilai seri (tie) TIDAK dihitung pivot
+        if(highs[j] >= highs[p]) isH=false;
+        if(lows[j]  <= lows[p])  isL=false;
       }
       if(isH){ phBars.push(p); phPrices.push(highs[p]); }
       if(isL){ plBars.push(p); plPrices.push(lows[p]); }
@@ -5546,9 +5547,14 @@
     if(riskPct > 12 || riskPct < 0.03) return null;
     const tp = arah==='BUY' ? price + risk*2 : price - risk*2;
     const chArah = ch.slope > 0 ? 'naik' : ch.slope < 0 ? 'turun' : 'datar';
+    // DEBUG (sementara): harga garis channel UTAMA di bar terakhir - utk dibandingkan
+    // dgn garis channel di Pine (hover garis atas/bawah channel di candle terakhir).
+    const chUpNow = pcUpperAt(ch, B);
+    const chLoNow = pcLowerAt(ch, B);
 
     return { symbol, signal: arah, price, sl, tp, tfValue: tf, tfLabel: CH_TF_LABEL[tf]||tf,
-             sentuh, chArah, chBand: bnd.band, chSigIdx: sigIdx, riskPct };
+             sentuh, chArah, chBand: bnd.band, chSigIdx: sigIdx, riskPct,
+             chUpNow, chLoNow };
   }
 
   function renderCrossHunterSignals(top){
@@ -5577,6 +5583,7 @@
           <div class="es-check-row ok"><span class="es-check-icon">&check;</span> ${candleTeks}</div>
           <div class="es-check-row ok"><span class="es-check-icon">&bull;</span> Band aktif: ${c.chBand||'Channel Utama'}</div>
           <div class="es-check-row ok"><span class="es-check-icon">&bull;</span> Arah channel: ${c.chArah}</div>
+          <div class="es-check-row ok" style="color:var(--muted)"><span class="es-check-icon">&bull;</span> [debug] Garis channel: Atas $${fmtPrice(c.chUpNow)} • Bawah $${fmtPrice(c.chLoNow)}</div>
         </div>
         <div class="es-priority-levels">
           <div class="es-priority-level-row">Area Entri: <strong>$${fmtPrice(c.price)}</strong></div>
