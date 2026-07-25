@@ -3165,11 +3165,20 @@
             if(gabung.indexOf(sym) === -1 && diblokir.indexOf(sym) === -1) gabung.push(sym);
           });
           try{
-            localStorage.setItem(SYMBOLS_MIGRASI_KEY, cap);
             if(gabung.length !== arr.length){
               localStorage.setItem(ACTIVE_SYMBOLS_KEY, JSON.stringify(gabung));
-              tandaiPerluDidorong();   // daftar berubah -> ikut naik ke cloud
+              // Tandai LEBIH BARU dari cloud. tandaiPerluDidorong() saja tidak
+              // cukup: ia cuma menyetel "pending", sedangkan yang dipakai untuk
+              // memutuskan lokal-vs-cloud adalah stempel waktu ES_LOCAL_DIRTY_KEY.
+              // Tanpa stempel ini, snapshot cloud yang lama (daftar 44 koin)
+              // menimpa balik hasil penggabungan, lalu penanda migrasi terlanjur
+              // ter-set sehingga daftar tidak pernah bertambah lagi.
+              localStorage.setItem(ES_LOCAL_DIRTY_KEY, String(Date.now()));
+              tandaiPerluDidorong();
             }
+            // Penanda migrasi ditulis TERAKHIR - kalau penyimpanan di atas gagal,
+            // penggabungan masih bisa dicoba lagi pada pemuatan berikutnya.
+            localStorage.setItem(SYMBOLS_MIGRASI_KEY, cap);
           }catch(e){}
           return gabung;
         }
