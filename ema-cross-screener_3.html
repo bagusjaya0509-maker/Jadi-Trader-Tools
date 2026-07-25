@@ -5454,16 +5454,35 @@
   function pcUpperAt(ch, b){ return ch.upperXp1 + ch.slope*(b - ch.xb1); }
   function pcLowerAt(ch, b){ return ch.lowerXp1 + ch.slope*(b - ch.xb1); }
 
+  // Bar KONFIRMASI pivot terakhir. Di Pine, blok channel (Section 10) hanya jalan
+  // saat `not na(ph) or not na(pl)` - yaitu HANYA ketika ada pivot baru terkonfirmasi.
+  // Geometri channel disimpan di var dan dipakai apa adanya sampai pivot berikutnya.
+  // Jadi channel yang TAMPAK di chart = hasil hitung di bar ini, bukan di bar terakhir.
+  // Diverifikasi lewat data chart TradingView asli (ARB 1H): hitung di bar ini -> SELL
+  // (cocok dgn label Pine), hitung di bar terakhir -> BUY (keliru).
+  function lastPivotConfirmBar(highs, lows, from, left, right){
+    for(let p = from - right; p >= left; p--){
+      let isH=true, isL=true;
+      for(let j=p-left; j<=p+right; j++){
+        if(j===p) continue;
+        if(highs[j] >= highs[p]) isH=false;
+        if(lows[j]  <= lows[p])  isL=false;
+      }
+      if(isH || isL) return p + right;
+    }
+    return from;
+  }
+
   async function findCrossHunterSignalForSymbol(symbol, tickers, tf){
     let d;
     try{ d = await fetchKlines(symbol, tf, 250); }catch(e){ return null; }
     if(!d || d.closes.length < 60) return null;
     const atrArr = atr(d.highs, d.lows, d.closes, 14);
-    // Bar acuan = bar TERAKHIR (sama dengan bar_index di Pine). Pine menentukan band
-    // sinyal dari posisi close bar terakhir, LALU memindai ke belakang mencari
-    // sentuhan terbaru terhadap band itu. Persis Section "STATE BREAKOUT" + 11.
+    // Bar acuan = bar TERAKHIR (bar_index Pine) untuk band & pemindaian sentuhan.
     const B = d.closes.length - 1;
-    const ch = detectParallelChannel(d.highs, d.lows, d.closes, atrArr, { endBar: B });
+    // Channel dihitung di bar konfirmasi pivot terakhir (repaint Pine), bukan di B.
+    const chEndBar = lastPivotConfirmBar(d.highs, d.lows, B, 5, 5);
+    const ch = detectParallelChannel(d.highs, d.lows, d.closes, atrArr, { endBar: chEndBar });
     if(!ch) return null;
     if(B < ch.xb1) return null;
     const w = ch.upperXp1 - ch.lowerXp1;
