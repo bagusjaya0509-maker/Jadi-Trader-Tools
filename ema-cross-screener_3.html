@@ -5499,18 +5499,22 @@
     //   SELL = pivot HIGH (high >= tetangga) menyentuh garis UPPER, close di bawah garis.
     // Butuh 1 candle setelahnya utk konfirmasi pantulan, jadi sinyal paling cepat muncul
     // di candle ke-1 sesudah sentuh. Hitungan "fresh" dimulai dari candle pantulan ini.
+    // Fungsi bantu: apakah candle b MENYENTUH garis band aktif (dgn toleransi tol).
+    const touchLo = (b)=>{ const L = sigLowerXp1 + ch.slope*(b - ch.xb1); return d.lows[b]  <= (L + tol) && d.closes[b] > L; };
+    const touchHi = (b)=>{ const U = sigUpperXp1 + ch.slope*(b - ch.xb1); return d.highs[b] >= (U - tol) && d.closes[b] < U; };
     const maxScan = Math.min(PC_SIG_SCANBACK, B);
     let sellIdx = -1, buyIdx = -1;
     for(let i=0; i<=maxScan; i++){
       const b = B - i;
       if(b < ch.xb1) break;
-      if(b < 1 || b >= d.closes.length - 1) continue;   // butuh tetangga b-1 & b+1 utk pivot
-      const upLvl = sigUpperXp1 + ch.slope*(b - ch.xb1);
-      const loLvl = sigLowerXp1 + ch.slope*(b - ch.xb1);
+      if(b < 2 || b >= d.closes.length - 1) continue;   // butuh b-1 (onset) & b+1 (pivot)
       const pivotHigh = d.highs[b] >= d.highs[b-1] && d.highs[b] >= d.highs[b+1];
       const pivotLow  = d.lows[b]  <= d.lows[b-1]  && d.lows[b]  <= d.lows[b+1];
-      if(sellIdx < 0 && pivotHigh && d.highs[b] >= (upLvl - tol) && d.closes[b] < upLvl) sellIdx = i;
-      if(buyIdx  < 0 && pivotLow  && d.lows[b]  <= (loLvl + tol) && d.closes[b] > loLvl) buyIdx = i;
+      // "sentuhan PERTAMA" (onset): candle b menyentuh TAPI candle sebelumnya (b-1) BELUM.
+      // Menyaring kasus garis yang naik terus menempel ke harga (sentuhan beruntun) -
+      // yang seperti itu onset-nya jauh di belakang, jadi tidak lolos filter fresh.
+      if(sellIdx < 0 && pivotHigh && touchHi(b) && !touchHi(b-1)) sellIdx = i;
+      if(buyIdx  < 0 && pivotLow  && touchLo(b) && !touchLo(b-1)) buyIdx = i;
       if(sellIdx >= 0 && buyIdx >= 0) break;
     }
     let arah = null, sentuh = '', sigIdx = -1;
