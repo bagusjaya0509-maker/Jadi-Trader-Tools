@@ -3158,12 +3158,22 @@
       if(raw){
         const arr = JSON.parse(raw);
         if(Array.isArray(arr) && arr.length){
-          if(localStorage.getItem(SYMBOLS_MIGRASI_KEY) === cap) return arr;
+          // Penentu utama BUKAN penanda migrasi, melainkan kenyataan: adakah koin
+          // bawaan yang belum ada di daftar dan tidak sengaja diblokir? Memakai
+          // penanda saja rapuh - percobaan gabung yang gagal (mis. hasilnya keburu
+          // ditimpa snapshot cloud lama) tetap menyetel penanda, sehingga
+          // penggabungan tidak pernah dicoba lagi dan daftar mandek selamanya.
           const diblokir = muatSimbolDiblokir();
-          const gabung = arr.slice();
-          BASE_SYMBOLS.forEach(function(sym){
-            if(gabung.indexOf(sym) === -1 && diblokir.indexOf(sym) === -1) gabung.push(sym);
+          const kurang = BASE_SYMBOLS.filter(function(sym){
+            return arr.indexOf(sym) === -1 && diblokir.indexOf(sym) === -1;
           });
+          if(kurang.length === 0){
+            if(localStorage.getItem(SYMBOLS_MIGRASI_KEY) !== cap){
+              try{ localStorage.setItem(SYMBOLS_MIGRASI_KEY, cap); }catch(e){}
+            }
+            return arr;
+          }
+          const gabung = arr.concat(kurang);
           try{
             if(gabung.length !== arr.length){
               localStorage.setItem(ACTIVE_SYMBOLS_KEY, JSON.stringify(gabung));
