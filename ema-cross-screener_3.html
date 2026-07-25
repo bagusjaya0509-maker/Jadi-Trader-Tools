@@ -5368,7 +5368,8 @@
   const CH_TF_LABEL = { '1m':'1m','5m':'5m','15m':'15m','30m':'30m','1h':'1H','4h':'4H','1d':'D','1w':'W' };
   const PC_SIG_TOL_MULT = 0.6;   // toleransi sentuh garis channel (x ATR)
   const PC_SIG_SCANBACK = 200;   // sejauh mana ke belakang dicek sentuhan (Pine: pcSigScanBack)
-  const PC_SIG_FRESH    = 1;     // sinyal dianggap "sekarang" kalau sentuhan di bar ke-0 (live) atau ke-1
+  const PC_SIG_FRESH    = 2;     // sinyal boleh muncul kalau sentuhan garis terjadi di candle
+                                 // saat ini (baru sentuh) s/d MAKSIMAL candle ke-2 sesudahnya.
 
   // ---- Auto Parallel Channel: {slope, xb1, upperXp1, lowerXp1} atau null ----
   function detectParallelChannel(highs, lows, closes, atrArr, opt){
@@ -5533,7 +5534,7 @@
     const chArah = ch.slope > 0 ? 'naik' : ch.slope < 0 ? 'turun' : 'datar';
 
     return { symbol, signal: arah, price, sl, tp, tfValue: tf, tfLabel: CH_TF_LABEL[tf]||tf,
-             sentuh, chArah, chBand: bnd.band, riskPct };
+             sentuh, chArah, chBand: bnd.band, chSigIdx: sigIdx, riskPct };
   }
 
   function renderCrossHunterSignals(top){
@@ -5544,6 +5545,9 @@
       const riskDist = Math.abs(c.price - c.sl);
       const tp2 = c.signal==='BUY' ? c.price + riskDist*2 : c.price - riskDist*2;
       const garis = c.sentuh === 'UPPER' ? 'UPPER (atas)' : 'LOWER (bawah)';
+      const candleTeks = (c.chSigIdx === 0 || c.chSigIdx == null)
+        ? 'Candle ini (baru menyentuh garis)'
+        : `Candle ke-${c.chSigIdx} setelah menyentuh garis`;
       return `<div class="es-priority-card ${signalCls}" data-symbol="${c.symbol}" data-tf="${c.tfValue}" data-tflabel="${c.tfLabel}" data-price="${c.price}">
         <div class="es-priority-card-top">
           <span class="es-priority-rank">#${i+1}</span>
@@ -5554,6 +5558,7 @@
         <div class="es-checklist">
           <div class="es-check-row ok"><span class="es-check-icon">&check;</span> Sentuh garis ${garis} channel</div>
           <div class="es-check-row ok"><span class="es-check-icon">&check;</span> Close balik ke dalam channel</div>
+          <div class="es-check-row ok"><span class="es-check-icon">&check;</span> ${candleTeks}</div>
           <div class="es-check-row ok"><span class="es-check-icon">&bull;</span> Band aktif: ${c.chBand||'Channel Utama'}</div>
           <div class="es-check-row ok"><span class="es-check-icon">&bull;</span> Arah channel: ${c.chArah}</div>
         </div>
