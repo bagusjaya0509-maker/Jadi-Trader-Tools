@@ -1440,6 +1440,20 @@
   }
 
   var LIVE_TRADE_CONFIG_KEY = 'emaScreenerLiveTradeConfig_v1';
+  // Backend URL + App Token kini disimpan TERPISAH PER AKUN oleh Crypto Screener
+  // (kunci '<key>::<uid>'), supaya orang lain yang login di device yang sama
+  // tidak mewarisi token uang asli milik kita. Halaman ini harus ikut membaca
+  // kunci ber-uid itu - kalau tetap membaca kunci lama, saldo Binance jadi
+  // "Belum terhubung" walau di screener sudah terisi.
+  function ambilRawKonfigLive(){
+    var uid = window.__jtUid || null;
+    if(uid){
+      var v = localStorage.getItem(LIVE_TRADE_CONFIG_KEY + '::' + uid);
+      if(v) return v;
+    }
+    // Cadangan: kunci lama (device yang belum sempat dimigrasi screener).
+    return localStorage.getItem(LIVE_TRADE_CONFIG_KEY);
+  }
   // Saldo Binance ASLI terbaru (dari /api/account) - dipakai sebagai titik akhir
   // Kurva Saldo Kripto (lihat renderEquityCurve). null selama belum berhasil
   // diambil - chart sementara pakai fallback sampai ini terisi, lalu digambar
@@ -1449,7 +1463,7 @@
   function fetchBinanceBalance(){
     var balEl = document.getElementById('cBalance');
     try{
-      var raw = localStorage.getItem(LIVE_TRADE_CONFIG_KEY);
+      var raw = ambilRawKonfigLive();
       if(!raw){ balEl.textContent = 'Belum terhubung'; return; }
       var cfg = JSON.parse(raw);
       var backendUrl = (cfg.backendUrl||'').trim().replace(/\/$/, '');
@@ -1467,10 +1481,13 @@
         .catch(function(){ balEl.textContent = 'Gagal ambil saldo'; });
     }catch(e){ balEl.textContent = 'Gagal ambil saldo'; }
   }
+  // Dipanggil ulang oleh bagian login begitu uid diketahui - saat pertama kali
+  // fungsi ini jalan, Firebase belum selesai autentikasi jadi uid masih kosong.
+  window.__jtMuatSaldoBinance = fetchBinanceBalance;
 
   function bacaKonfigBackend(){
     try{
-      var raw = localStorage.getItem(LIVE_TRADE_CONFIG_KEY);
+      var raw = ambilRawKonfigLive();
       if(!raw) return null;
       var cfg = JSON.parse(raw);
       var url = (cfg.backendUrl||'').trim().replace(/\/$/, '');
@@ -2030,12 +2047,19 @@
       // tersimpan di akun user ini sendiri, bukan cuma di browser) ----
       pasangAksiAkun(user.uid);
 
+      // Backend URL/App Token disimpan per-akun ('<key>::<uid>'). uid baru
+      // diketahui di sini, jadi saldo Binance dimuat ulang sekarang - kalau tidak,
+      // panggilan pertama tadi selalu berakhir "Belum terhubung".
+      window.__jtUid = user.uid;
+      if(typeof window.__jtMuatSaldoBinance === 'function') window.__jtMuatSaldoBinance();
+
       if(jtSyncTimer) clearInterval(jtSyncTimer);
       jtSyncTimer = setInterval(function(){ jtSaveToCloud(user.uid); }, 15000);
       window.addEventListener('beforeunload', function(){ jtSaveToCloud(user.uid); });
     } else {
       jtLoginBtn.style.display = 'inline-flex';
       jtUserBarEl.style.display = 'none';
+      window.__jtUid = null;   // jangan sampai token akun sebelumnya masih terbaca
       jtViewerNoteEl.textContent = 'Menampilkan jurnal contoh (punya pemilik tool ini). Login untuk lihat jurnal kamu sendiri.';
       // Tombol tetap dipasang walau belum login supaya tidak "mati" tanpa
       // penjelasan - hasilnya disimpan lokal, dan naik ke cloud setelah login.
