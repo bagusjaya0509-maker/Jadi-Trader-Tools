@@ -8874,11 +8874,12 @@
   if(newsPopupEl) newsPopupEl.addEventListener('click', (e)=>{ if(e.target === newsPopupEl) tutupNewsPopup(); });
 
   function ambilEconCalendar(){
-    // Backend URL diambil dari kolom konfigurasi Live Trading yang sudah ada -
-    // endpoint /api/news memang tidak butuh token, tapi alamatnya sama.
-    const base = liveBackendUrlInput && liveBackendUrlInput.value.trim()
-      ? liveBackendUrlInput.value.trim().replace(/\/+$/, '')
-      : null;
+    // /api/news adalah endpoint PUBLIK (tidak butuh token), jadi pakai sumber
+    // yang sama dengan data pasar: Backend URL milik user kalau diisi, kalau
+    // tidak pakai proxy bawaan. Sebelumnya ini hanya membaca kolom Backend URL -
+    // begitu kolomnya kosong (mis. setelah token dipisah per akun), panel News
+    // jatuh ke widget TradingView bawaan yang tampilannya polos.
+    const base = esMarketBase();
     if(!base){ loadEconCalendarWidget(); return; }
     if(!econEvents) econBodyEl.innerHTML = '<div class="es-econ-status">Memuat kalender...</div>';
     fetch(base + '/api/news')
