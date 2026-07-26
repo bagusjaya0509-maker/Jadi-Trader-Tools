@@ -192,26 +192,38 @@
 
   /* Kolom kiri jadi flex supaya kotak Posisi Terbuka bisa didorong ke bawah,
      sehingga garis bawahnya sejajar dengan garis bawah kalender di kolom kanan. */
-  .jt-col-kiri{display:flex;flex-direction:column;height:100%;}
-  .jt-col-kiri > .card:first-child{margin-bottom:20px;}
-  .jt-openpos-card{
-    margin-top:auto;margin-bottom:0;
-    /* setengah lebar kalender: kolom kiri 1.7fr, kalender 1fr -> 0.5/1.7 = 29.4% */
-    width:29.4%;min-width:230px;box-sizing:border-box;
+  /* align-self:stretch mengalahkan align-items:start milik .grid, supaya kolom ini
+     setinggi kalender di kanan - baru flex:1 pada kotak posisi bisa mengisi sisa. */
+  .jt-col-kiri{display:flex;flex-direction:column;align-self:stretch;}
+  .jt-col-kiri > .card:first-child{margin-bottom:20px !important;}
+  /* Kolom kanan ikut meregang & kartu kalender mengisi tingginya, supaya garis
+     bawah kalender sejajar dengan garis bawah kotak Posisi Terbuka - sisi mana
+     pun yang lebih tinggi, keduanya berakhir di garis yang sama. */
+  .jt-col-kanan{display:flex;flex-direction:column;align-self:stretch;}
+  .jt-col-kanan > .card{flex:1;margin-bottom:0;}
+  /* Selebar kurva ekuitas, dan MENGISI sisa ruang sampai garis bawah kalender
+     supaya jarak atas & bawahnya seimbang. */
+  /* Spesifisitas sengaja dinaikkan (.card.jt-openpos-card): aturan .card umum
+     dideklarasikan SETELAH blok ini, jadi selektor satu kelas akan kalah. */
+  .jt-col-kiri > .card.jt-openpos-card{
+    flex:1;display:flex;flex-direction:column;
+    margin-top:0;margin-bottom:0;width:100%;box-sizing:border-box;
   }
-  @media (max-width:920px){ .jt-openpos-card{width:100%;} }
-  .jt-openpos-list{max-height:150px;overflow-y:auto;}
+  .jt-openpos-list{flex:1;overflow-y:auto;min-height:90px;}
   .jt-openpos-kosong{font-size:12.5px;color:var(--ink-faint);margin:0;}
-  .jt-openpos-row{
-    display:flex;align-items:center;justify-content:space-between;gap:8px;
-    font-family:var(--font-mono);font-size:11.5px;
-    padding:6px 0;border-bottom:1px solid var(--border-soft);
+  .jt-openpos-table{width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:11.5px;}
+  .jt-openpos-table th{
+    text-align:left;font-weight:500;font-size:10px;text-transform:uppercase;letter-spacing:.05em;
+    color:var(--ink-faint);padding:0 8px 6px 0;border-bottom:1px solid var(--border-soft);white-space:nowrap;
   }
-  .jt-openpos-row:last-child{border-bottom:none;}
+  .jt-openpos-table td{padding:7px 8px 7px 0;border-bottom:1px solid var(--border-soft);white-space:nowrap;}
+  .jt-openpos-table tr:last-child td{border-bottom:none;}
   .jt-openpos-sym{color:var(--ink);font-weight:600;}
-  .jt-openpos-dir{font-size:10px;padding:1px 5px;border-radius:4px;}
+  .jt-openpos-dir{font-size:10px;padding:1px 5px;border-radius:4px;margin-left:6px;}
   .jt-openpos-dir.buy{color:var(--profit);background:var(--profit-soft);}
   .jt-openpos-dir.sell{color:var(--loss);background:var(--loss-soft);}
+  .jt-openpos-sl{color:var(--loss);}
+  .jt-openpos-tp{color:var(--profit);}
   /* Riwayat trade kripto memanjang penuh di bawah grid */
   .jt-riwayat-penuh > .card{margin-top:20px;}
   /* Dropdown emosi & alasan entry di dalam baris riwayat */
@@ -667,7 +679,7 @@
     </div>
 
     <!-- RIGHT COLUMN -->
-    <div>
+    <div class="jt-col-kanan">
       <div class="card">
         <div class="card-head">
           <h2>Kalender P/L Kripto</h2>
@@ -2063,17 +2075,65 @@
       box.innerHTML = '<p class="jt-openpos-kosong">Tidak ada posisi terbuka.</p>';
       return;
     }
-    box.innerHTML = posisi.map(function(t){
-      var sym = String(t.source || '').replace('USDT','');
-      var dir = String(t.dir || '').toUpperCase();
-      var kelas = dir === 'BUY' ? 'buy' : 'sell';
-      var tf = t.tfLabel ? (' &middot; ' + t.tfLabel) : '';
-      return '<div class="jt-openpos-row">'
-        + '<span><span class="jt-openpos-sym">' + sym + '</span>'
-        + '<span class="jt-openpos-dir ' + kelas + '" style="margin-left:6px">' + dir + '</span></span>'
-        + '<span style="color:var(--ink-faint)">' + fmtMoney(t.entryPrice) + tf + '</span>'
-        + '</div>';
-    }).join('');
+    // Harga terakhir dipakai untuk PnL berjalan. Diambil dari proxy data pasar
+    // (endpoint publik, tanpa token) - kalau gagal, kolom PnL diisi "—" saja.
+    var harga = window.__jtHargaPasar || {};
+    box.innerHTML =
+      '<table class="jt-openpos-table"><thead><tr>'
+      + '<th>Pair</th><th>TF</th><th>Entry</th><th>SL</th><th>TP1</th><th>TP2</th><th>Harga</th><th>PnL</th>'
+      + '</tr></thead><tbody>'
+      + posisi.map(function(t){
+          var sym = String(t.source || '').replace('USDT','');
+          var dir = String(t.dir || '').toUpperCase();
+          var kelas = dir === 'BUY' ? 'buy' : 'sell';
+          var kini = harga[t.source];
+          var pnl = null;
+          if(kini != null && t.entryPrice && t.qty){
+            pnl = (kini - t.entryPrice) * t.qty * (dir === 'BUY' ? 1 : -1);
+          }
+          var warnaPnl = pnl == null ? 'var(--ink-faint)'
+                        : pnl > 0 ? 'var(--profit)' : pnl < 0 ? 'var(--loss)' : 'var(--ink-dim)';
+          return '<tr>'
+            + '<td><span class="jt-openpos-sym">' + sym + '</span>'
+            +     '<span class="jt-openpos-dir ' + kelas + '">' + dir + '</span></td>'
+            + '<td style="color:var(--ink-faint)">' + (t.tfLabel || '—') + '</td>'
+            + '<td>' + fmtMoney(t.entryPrice) + '</td>'
+            + '<td class="jt-openpos-sl">' + (t.sl != null ? fmtMoney(t.sl) : '—') + '</td>'
+            + '<td class="jt-openpos-tp">' + (t.tp1 != null ? fmtMoney(t.tp1) : '—') + '</td>'
+            + '<td class="jt-openpos-tp">' + (t.tp2 != null ? fmtMoney(t.tp2) : '—') + '</td>'
+            + '<td>' + (kini != null ? fmtMoney(kini) : '—') + '</td>'
+            + '<td style="color:' + warnaPnl + '">' + (pnl != null ? fmtMoney(pnl) : '—') + '</td>'
+            + '</tr>';
+        }).join('')
+      + '</tbody></table>';
+  }
+
+  // Ambil harga pasar terakhir untuk semua simbol yang sedang punya posisi,
+  // lalu gambar ulang kotak posisi supaya kolom Harga & PnL terisi.
+  function muatHargaPosisiTerbuka(){
+    var simbol = [];
+    try{
+      var raw = localStorage.getItem(CRYPTO_SIM_KEY);
+      if(raw){
+        var p = (JSON.parse(raw) || {}).positions || {};
+        simbol = Object.keys(p).map(function(k){ return p[k] && p[k].source; }).filter(Boolean);
+      }
+    }catch(e){}
+    if(!simbol.length) return;
+    var base = 'https://103-253-145-38.sslip.io';
+    var cfg = null;
+    try{ cfg = JSON.parse(ambilRawKonfigLive() || 'null'); }catch(e){}
+    if(cfg && cfg.backendUrl) base = String(cfg.backendUrl).trim().replace(/\/+$/,'');
+    fetch(base + '/api/tickers')
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(j){
+        if(!j || !Array.isArray(j.data)) return;
+        var peta = {};
+        j.data.forEach(function(t){ peta[t.symbol] = parseFloat(t.lastPrice); });
+        window.__jtHargaPasar = peta;
+        renderOpenPositions();
+      })
+      .catch(function(){});
   }
 
   function renderCryptoAll(){
@@ -2083,6 +2143,7 @@
       : 'Belum ada transaksi Binance (live/testnet) tersimpan di Kripto Screener.';
     renderKPIs(); renderEquityCurve(); renderTable(); renderCalendar(); renderPairInsight();
     renderOpenPositions();
+    muatHargaPosisiTerbuka();
     fetchBinanceBalance();
   }
 
