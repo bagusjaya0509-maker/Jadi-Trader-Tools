@@ -992,7 +992,14 @@
   function renderEquityCurve(){
     var svg = document.getElementById('equitySvg');
     var tooltip = document.getElementById('equityTooltip');
-    var W=640,H=220,PAD=28,PADL=48;
+    // Lebar viewBox disamakan dengan lebar ASLI elemen di layar. Sebelumnya
+    // dipatok 640 sementara SVG memakai preserveAspectRatio="none", sehingga
+    // gambar (termasuk TEKS angka saldo) ikut dilebarkan secara horizontal dan
+    // angkanya terlihat gepeng/melar. Dengan viewBox yang cocok, tidak ada
+    // peregangan sama sekali.
+    var W = Math.max(320, Math.round(svg.clientWidth || svg.getBoundingClientRect().width || 640));
+    var H=220,PAD=28,PADL=48;
+    svg.setAttribute("viewBox", "0 0 " + W + " " + H);
     var sorted = state.trades.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);});
     var points = [{y:ACCOUNT.startBalance, date:ACCOUNT.startDate}];
     var cum = ACCOUNT.startBalance;
@@ -1236,8 +1243,13 @@
   }
 
   function renderAll(){
+    state.trades = loadTrades();   // ambil ulang dari localStorage (bisa baru diperbarui dari cloud)
     renderKPIs(); renderEquityCurve(); renderTable(); renderCalendar(); renderEmotionInsight();
   }
+  // Dipakai bagian sinkronisasi: begitu data cloud tiba, gambar ulang tanpa
+  // reload halaman (reload bisa terblokir pengaman anti-loop, dan itu yang bikin
+  // jurnal masih menampilkan data lama saat dibuka langsung).
+  window.__jtRenderXau = renderAll;
 
   // ---------- Modal ----------
   var overlay = document.getElementById('modalOverlay');
@@ -1386,6 +1398,12 @@
   document.getElementById('fCustomTo').addEventListener('change', renderTable);
 
   renderAll();
+  // Saat renderAll() pertama jalan, SVG belum di-layout (lebar 0) sehingga
+  // viewBox jatuh ke nilai cadangan dan grafik/teks jadi melar. Gambar ulang
+  // setelah layout siap, dan tiap kali ukuran jendela berubah.
+  requestAnimationFrame(function(){ renderEquityCurve(); });
+  window.addEventListener("load", function(){ renderEquityCurve(); });
+  window.addEventListener("resize", function(){ renderEquityCurve(); });
 })();
 </script>
 
@@ -1475,7 +1493,9 @@
           pl: t.pnl || 0,
           fee: (t.exchangeFee || 0) + (t.marginFee || 0),
           reason: t.reason || '',
-          venue: t.venue || 'sim'
+          venue: t.venue || 'sim',
+          // Catatan yang diisi lewat pop-up konfirmasi sebelum entry di screener.
+          preEmosi: t.preEmosi || '', preAlasan: t.preAlasan || ''
         };
       // Jurnal kripto ini khusus catatan trade yang BENERAN dikirim ke Binance
       // (live/testnet) - trade simulasi biasa (venue 'sim') tidak ikut ditampilkan.
@@ -1752,15 +1772,19 @@
   // riwayat income sekitar 3 bulan ke belakang.
   var SYNC_HARI_MUNDUR = 90;
 
-  function syncBinanceHistory(){
+  // senyap = dipanggil oleh auto-sinkron berkala: jangan kunci tombol dan jangan
+  // menimpa catatan status dengan "Menarik riwayat..." tiap kali jalan.
+  function syncBinanceHistory(senyap){
     var cfg = bacaKonfigBackend();
     var btn = document.getElementById('cBinanceSyncBtn');
     if(!cfg){
-      setSyncNote('Isi Backend URL & App Token dulu di halaman Crypto Screener.', 'error');
+      if(!senyap) setSyncNote('Isi Backend URL & App Token dulu di halaman Crypto Screener.', 'error');
       return;
     }
-    btn.disabled = true;
-    setSyncNote('Menarik riwayat dari Binance...');
+    if(!senyap){
+      btn.disabled = true;
+      setSyncNote('Menarik riwayat dari Binance...');
+    }
     var since = Date.now() - SYNC_HARI_MUNDUR * 24 * 60 * 60 * 1000;
 
     fetch(cfg.url + '/api/income?all=1&since=' + since, { headers: { 'X-App-Token': cfg.token } })
@@ -1779,21 +1803,21 @@
         }));
         renderCryptoAll();
         if(trades.length === 0){
-          setSyncNote('Tersinkron, tapi tidak ada transaksi Futures ditemukan dalam ' + SYNC_HARI_MUNDUR + ' hari terakhir.', 'ok');
+          if(!senyap) setSyncNote('Tersinkron, tapi tidak ada transaksi Futures ditemukan dalam ' + SYNC_HARI_MUNDUR + ' hari terakhir.', 'ok');
         } else {
           // Fee posisi terbuka dilaporkan terpisah supaya selisih antara total
           // jurnal dan saldo Binance bisa dijelaskan, bukan jadi misteri.
           var catatanFee = olah.feeBelumTertutup > 0.0001
             ? ' • fee posisi masih terbuka: ' + fmtMoney(olah.feeBelumTertutup) + ' (belum dibebankan)'
             : '';
-          setSyncNote('Tersinkron: ' + trades.length + ' transaksi dari ' + income.length + ' catatan Binance'
+          if(!senyap) setSyncNote('Tersinkron: ' + trades.length + ' transaksi dari ' + income.length + ' catatan Binance'
             + (r.data.terpotong ? ' (data terpotong)' : '') + catatanFee + '.', 'ok');
         }
       })
       .catch(function(e){
-        setSyncNote('Gagal sinkron: ' + e.message, 'error');
+        if(!senyap) setSyncNote('Gagal sinkron: ' + e.message, 'error');
       })
-      .finally(function(){ btn.disabled = false; });
+      .finally(function(){ if(!senyap) btn.disabled = false; });
   }
 
   function tampilkanInfoSyncTersimpan(){
@@ -1849,7 +1873,14 @@
   function renderEquityCurve(){
     var svg = document.getElementById('cEquitySvg');
     var tooltip = document.getElementById('cEquityTooltip');
-    var W=640,H=220,PAD=28,PADL=48;
+    // Lebar viewBox disamakan dengan lebar ASLI elemen di layar. Sebelumnya
+    // dipatok 640 sementara SVG memakai preserveAspectRatio="none", sehingga
+    // gambar (termasuk TEKS angka saldo) ikut dilebarkan secara horizontal dan
+    // angkanya terlihat gepeng/melar. Dengan viewBox yang cocok, tidak ada
+    // peregangan sama sekali.
+    var W = Math.max(320, Math.round(svg.clientWidth || svg.getBoundingClientRect().width || 640));
+    var H=220,PAD=28,PADL=48;
+    svg.setAttribute("viewBox", "0 0 " + W + " " + H);
     var sorted = cState.trades.slice().sort(function(a,b){return a.date-b.date;});
     // Kurva SALDO (bukan cuma P/L mentah) - titik terakhir dikunci ke saldo
     // Binance ASLI (cCurrentBalance dari /api/account), titik-titik sebelumnya
@@ -1980,7 +2011,15 @@
     var catatan = muatCatatanKripto();
     tbody.innerHTML = sorted.map(function(t){
       var kunci = kunciTrade(t);
-      var cat = catatan[kunci] || {};
+      // Catatan manual (diisi lewat ikon pensil) MENANG atas catatan otomatis
+      // yang tercatat saat konfirmasi sebelum entry di Crypto Screener - jadi
+      // hasil edit di sini tidak tertimpa balik oleh data bawaan trade-nya.
+      var otomatis = { emosi: t.preEmosi || '', alasan: t.preAlasan || '' };
+      var manual = catatan[kunci] || {};
+      var cat = {
+        emosi: manual.emosi || otomatis.emosi,
+        alasan: manual.alasan || otomatis.alasan
+      };
       var result = t.pl>0?'win':t.pl<0?'loss':'be';
       var resultLabel = t.pl>0?'WIN':t.pl<0?'LOSS':'BE';
       var venueBadge = t.venue==='live-real' ? ' <span class="venue-badge live">Binance Live</span>'
@@ -2192,6 +2231,7 @@
     muatHargaPosisiTerbuka();
     fetchBinanceBalance();
   }
+  window.__jtRenderKripto = renderCryptoAll;
 
   // ---- Pop-up catatan trade kripto (ikon pensil di tiap baris) ----
   var noteModal = document.getElementById('jtNoteModal');
@@ -2244,6 +2284,22 @@
     renderOpenPositions();
     muatHargaPosisiTerbuka();
   }, 10000);
+
+  // Auto-sinkron riwayat dari Binance tanpa perlu klik "Sinkron Binance".
+  // Tiap 45 detik: cukup cepat supaya posisi yang baru tertutup langsung turun
+  // ke Riwayat Trade Kripto dengan angka yang sama seperti di Binance, tapi
+  // tidak boros - endpoint /api/income bobotnya berat (30 per panggilan) dan
+  // dipakai bersama screener. Mode senyap: tombol & catatan status tidak
+  // diganggu. Dilewati kalau tab sedang tidak terlihat, biar tidak jalan sia-sia.
+  setInterval(function(){
+    if(document.visibilityState === 'hidden') return;
+    syncBinanceHistory(true);
+  }, 45000);
+  // Begitu tab dibuka kembali, tarik sekali supaya langsung terbaru.
+  document.addEventListener('visibilitychange', function(){
+    if(document.visibilityState === 'visible') syncBinanceHistory(true);
+  });
+  setTimeout(function(){ syncBinanceHistory(true); }, 2500);   // sekali saat halaman dibuka
   // Perubahan dari TAB LAIN (screener) langsung terpantul ke sini.
   window.addEventListener('storage', function(e){
     if(e.key === CRYPTO_SIM_KEY){ renderOpenPositions(); muatHargaPosisiTerbuka(); }
@@ -2272,6 +2328,9 @@
   document.getElementById('cCustomTo').addEventListener('change', renderTable);
 
   renderCryptoAll();
+  requestAnimationFrame(function(){ renderEquityCurve(); });
+  window.addEventListener("load", function(){ renderEquityCurve(); });
+  window.addEventListener("resize", function(){ renderEquityCurve(); });
 })();
 </script>
 
@@ -2445,15 +2504,13 @@
       // reload cuma terjadi kalau memang ada perubahan (dari device lain),
       // supaya tidak reload berulang percuma kalau datanya sama saja.
       jtDb.collection('users').doc(user.uid).get().then(function(doc){
-        // Reload PALING BANYAK SEKALI per tab - tanpa pengaman ini, kondisi apa pun
-        // yang membuat "changed" selalu true bikin halaman refresh tanpa henti.
+        // Data cloud diterapkan lalu halaman DIGAMBAR ULANG - bukan di-reload.
+        // Reload dulu dipakai, tapi terhalang pengaman anti-loop sehingga jurnal
+        // tetap menampilkan data lama saat dibuka langsung (baru benar setelah
+        // mampir ke Crypto Screener). Render ulang lebih cepat & tanpa kedip.
         if(jtApplyDocIfChanged(doc)){
-          var sudah = null;
-          try{ sudah = sessionStorage.getItem('jtReloadedOnce'); }catch(e){}
-          if(!sudah){
-            try{ sessionStorage.setItem('jtReloadedOnce', '1'); }catch(e){}
-            location.reload();
-          }
+          try{ if(typeof window.__jtRenderXau === 'function') window.__jtRenderXau(); }catch(e){}
+          try{ if(typeof window.__jtRenderKripto === 'function') window.__jtRenderKripto(); }catch(e){}
         }
       }).catch(function(){});
 

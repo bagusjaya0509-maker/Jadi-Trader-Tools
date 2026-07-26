@@ -2053,6 +2053,36 @@
   .es-reset-actions button.yes{ border-color:var(--bear); color:var(--bear); }
   .es-reset-actions button.yes:hover{ background:var(--bear-dim); }
   .es-reset-actions button:disabled{ opacity:.6; cursor:not-allowed; }
+
+  /* ===== Konfirmasi sebelum Open Real Order ===== */
+  .es-preorder-card{ border-color: var(--gold); width:min(460px,100%); }
+  .es-preorder-title{ font-family:var(--font-display); font-weight:700; font-size:16px; color:var(--gold); margin-bottom:4px; }
+  .es-preorder-sub{ font-family:var(--font-mono); font-size:11px; color:var(--muted); line-height:1.6; margin-bottom:14px; }
+  .es-preorder-field{ display:flex; flex-direction:column; gap:5px; margin-bottom:11px; }
+  .es-preorder-field label{ font-family:var(--font-mono); font-size:10.5px; color:var(--muted); }
+  .es-preorder-field select, .es-preorder-field input, .es-preorder-kelola-box textarea{
+    width:100%; box-sizing:border-box;
+    background:var(--panel-2); border:1px solid var(--border); color:var(--text);
+    font-family:var(--font-mono); font-size:12px; padding:7px 9px; border-radius:6px; outline:none;
+  }
+  .es-preorder-field select:focus, .es-preorder-field input:focus{ border-color:var(--gold); }
+  .es-preorder-kelola{
+    background:none; border:none; color:var(--muted); cursor:pointer;
+    font-family:var(--font-mono); font-size:10.5px; padding:2px 0; margin-bottom:8px;
+  }
+  .es-preorder-kelola:hover{ color:var(--text); }
+  .es-preorder-kelola-box{ display:none; margin-bottom:12px; }
+  .es-preorder-kelola-box.open{ display:block; }
+  .es-preorder-kelola-note{ font-family:var(--font-mono); font-size:10px; color:var(--dim); margin-bottom:6px; line-height:1.5; }
+  .es-preorder-kelola-box textarea{ resize:vertical; line-height:1.6; }
+  .es-preorder-kelola-aksi{ display:flex; gap:8px; margin-top:8px; }
+  .es-preorder-kelola-aksi button{
+    flex:1; background:var(--panel-2); border:1px solid var(--border); color:var(--text);
+    font-family:var(--font-mono); font-size:11px; padding:6px 10px; border-radius:6px; cursor:pointer;
+  }
+  .es-preorder-kelola-aksi button:hover{ border-color:var(--gold); color:var(--gold); }
+  .es-reset-actions button.es-preorder-kirim{ border-color:var(--bull); color:var(--bull); }
+  .es-reset-actions button.es-preorder-kirim:hover{ background:var(--bull-dim); }
 </style>
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
@@ -2094,6 +2124,38 @@
         <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
       </button>
       <button type="button" class="es-user-signout-btn" id="esSignOutBtn">Keluar</button>
+    </div>
+  </div>
+
+  <!-- Konfirmasi sebelum kirim order asli: catat emosi & alasan entry -->
+  <div class="es-reset-overlay" id="esPreOrderModal">
+    <div class="es-reset-card es-preorder-card">
+      <div class="es-preorder-title">Konfirmasi Sebelum Entry</div>
+      <div class="es-preorder-sub" id="esPreOrderInfo">—</div>
+      <div class="es-preorder-field">
+        <label for="esPreEmosi">Emosi kamu sekarang</label>
+        <select id="esPreEmosi"></select>
+        <input type="text" id="esPreEmosiLain" placeholder="Tulis emosi lain" style="display:none;">
+      </div>
+      <div class="es-preorder-field">
+        <label for="esPreAlasan">Alasan Entry / Setup</label>
+        <select id="esPreAlasan"></select>
+        <input type="text" id="esPreAlasanLain" placeholder="Tulis alasan lain" style="display:none;">
+      </div>
+      <button type="button" class="es-preorder-kelola" id="esPreKelola">&#9881; Kelola daftar alasan</button>
+      <div class="es-preorder-kelola-box" id="esPreKelolaBox">
+        <div class="es-preorder-kelola-note">Satu alasan per baris. Ini dipakai di dropdown "Alasan Entry".</div>
+        <textarea id="esPreAlasanEditor" rows="7" spellcheck="false"></textarea>
+        <div class="es-preorder-kelola-aksi">
+          <button type="button" id="esPreAlasanReset">Kembalikan bawaan</button>
+          <button type="button" id="esPreAlasanSimpan">Simpan daftar</button>
+        </div>
+      </div>
+      <div class="es-reset-actions">
+        <button type="button" class="no" id="esPreBatal">Batal</button>
+        <button type="button" class="no" id="esPreSkip">Skip</button>
+        <button type="button" class="yes es-preorder-kirim" id="esPreKirim">Kirim Order</button>
+      </div>
     </div>
   </div>
 
@@ -7162,16 +7224,28 @@
     // cand.price cuma harga PERKIRAAN saat sinyal dipilih (sebelum order jalan),
     // beda dari harga fill asli karena order MARKET pasti ada sedikit slip harga.
     const entryPrice = (actualEntryPrice && actualEntryPrice > 0) ? actualEntryPrice : cand.price;
+    // TP1/TP2 yang DICATAT harus mencerminkan level sebenarnya, jangan menyalin
+    // TP1 ke TP2 saat metode entry cuma punya satu order TP - itu yang bikin
+    // kolom TP1 & TP2 tampil kembar (angka sama persis) di Posisi Terbuka.
+    //  - partial / slplus : dua level asli (1x dan 2x risiko)
+    //  - nopartial        : order TP dipasang di 2x, level 1x cuma dipantau lokal
+    //                       (virtualTp1) untuk memindahkan SL ke BE -> tampilkan
+    //                       1x sebagai TP1 dan 2x sebagai TP2
+    //  - tp1only/tp2only  : hanya satu level -> TP2 dikosongkan (tampil "-")
+    const tp1Num = virtualTp1 ? parseFloat(virtualTp1) : parseFloat(tp1);
+    const tp2Num = qty2 ? parseFloat(tp2) : (virtualTp1 ? parseFloat(tp1) : null);
     prioritySimPositions[key] = {
       key, source: cand.symbol, tfLabel: cand.tfLabel, tfValue: cand.tfValue, dir: side,
-      entryPrice, entryTime: time, sl: parseFloat(sl), tp1: parseFloat(tp1), tp2: qty2 ? parseFloat(tp2) : parseFloat(tp1),
+      entryPrice, entryTime: time, sl: parseFloat(sl), tp1: tp1Num, tp2: tp2Num,
       qty1: parseFloat(qty1), qty2: qty2 ? parseFloat(qty2) : null,
       tp1Hit:false, tp2Hit:false, margin: currentPsimMargin(), leverage: currentPsimLeverage(), qty: parseFloat(quantity),
       venue: env === 'live' ? 'live-real' : 'live-testnet',
       liveOrderId: orderIds.entryOrderId, liveSlOrderId: orderIds.slOrderId,
       liveTp1OrderId: orderIds.tp1OrderId, liveTp2OrderId: orderIds.tp2OrderId,
       entryMethod: entryMethod || 'partial', virtualTp1: virtualTp1 ? parseFloat(virtualTp1) : null,
-      signalType: cand.source || null
+      signalType: cand.source || null,
+      // Catatan dari pop-up konfirmasi sebelum entry (kosong kalau ditekan Skip).
+      preEmosi: cand.preEmosi || '', preAlasan: cand.preAlasan || ''
     };
     initSlPlusRatchet(prioritySimPositions[key]);
     savePrioritySimState();
@@ -7187,14 +7261,20 @@
   function recordPendingLivePosition(key, cand, side, quantity, qty1, qty2, tp1, tp2, sl, entryPriceTarget, orderTypeCfg, entryMethod, virtualTp1, time, entryOrderId, isAlgoEntry, env){
     prioritySimPositions[key] = {
       key, source: cand.symbol, tfLabel: cand.tfLabel, tfValue: cand.tfValue, dir: side,
-      entryPrice: entryPriceTarget, entryTime: time, sl: parseFloat(sl), tp1: parseFloat(tp1), tp2: qty2 ? parseFloat(tp2) : parseFloat(tp1),
+      // Sama seperti recordLivePosition: jangan menyalin TP1 ke TP2 kalau memang
+      // cuma ada satu level TP (lihat catatan lengkap di sana).
+      entryPrice: entryPriceTarget, entryTime: time, sl: parseFloat(sl),
+      tp1: virtualTp1 ? parseFloat(virtualTp1) : parseFloat(tp1),
+      tp2: qty2 ? parseFloat(tp2) : (virtualTp1 ? parseFloat(tp1) : null),
       qty1: parseFloat(qty1), qty2: qty2 ? parseFloat(qty2) : null,
       tp1Hit:false, tp2Hit:false, margin: currentPsimMargin(), leverage: currentPsimLeverage(), qty: parseFloat(quantity),
       venue: env === 'live' ? 'live-real' : 'live-testnet',
       liveOrderId: entryOrderId, liveSlOrderId: null, liveTp1OrderId: null, liveTp2OrderId: null,
       entryMethod: entryMethod || 'partial', virtualTp1: virtualTp1 ? parseFloat(virtualTp1) : null,
       pending: true, pendingOrderType: orderTypeCfg.label, pendingIsAlgo: !!isAlgoEntry,
-      signalType: cand.source || null
+      signalType: cand.source || null,
+      // Catatan konfirmasi ikut dibawa juga untuk order yang masih menggantung.
+      preEmosi: cand.preEmosi || '', preAlasan: cand.preAlasan || ''
     };
     initSlPlusRatchet(prioritySimPositions[key]);
     savePrioritySimState();
@@ -7249,8 +7329,18 @@
     // Live DAN datanya sudah benar-benar tersinkron dari Binance (bukan rumus
     // perkiraan) sebelum ditutup - bukti angkanya cocok dengan Binance asli.
     const verified = isLive && pos.venue==='live-real' && pos.actualRealizedPnl !== undefined && pos.actualRealizedPnl !== null;
+    // SL yang sudah digeser ke area untung (BE+, trailing SL+, atau diedit
+    // manual) tetap "tersentuh SL", tapi menyebutnya "Stop Loss" menyesatkan -
+    // di riwayat terlihat kena SL padahal PNL-nya plus. Label disesuaikan dengan
+    // hasil sebenarnya supaya cocok dengan yang tercatat di Binance.
+    let reasonFinal = reason;
+    if(/stop loss/i.test(String(reason)) && pnl > 0){
+      reasonFinal = isLive ? 'SL Profit (Binance)' : 'SL Profit';
+    }
     prioritySimHistory.unshift({ source: pos.source, tfLabel: pos.tfLabel, tfValue: pos.tfValue, dir: pos.dir, entryPrice: pos.entryPrice, entryTime: pos.entryTime,
-      exitPrice, exitTime: time, reason, exchangeFee, marginFee, pnl, pnlPct, tpStatus, venue: pos.venue || 'sim', verified, signalType: pos.signalType || null });
+      exitPrice, exitTime: time, reason: reasonFinal, exchangeFee, marginFee, pnl, pnlPct, tpStatus, venue: pos.venue || 'sim', verified, signalType: pos.signalType || null,
+      // Ikut dibawa ke riwayat -> dibaca halaman Jurnal Trading.
+      preEmosi: pos.preEmosi || '', preAlasan: pos.preAlasan || '' });
     delete prioritySimPositions[key];
     savePrioritySimState();
     markEsCloudDirty(); esSyncNow(); // dorong ke cloud SEKARANG - posisi baru saja tertutup, jangan tunggu siklus 15 detik
@@ -8436,6 +8526,105 @@
   // Setelah restore, sinkronkan tampilan field harga entry manual dgn order type.
   (function(){ const v=liveOrderTypeSel.value; liveEntryPriceLabel.style.display = (!!v && v!=='MARKET') ? '' : 'none'; })();
 
+  // ═══════════════════════════════════════════════════════
+  // ████████  KONFIRMASI SEBELUM ORDER ASLI  ████████
+  // ═══════════════════════════════════════════════════════
+  // Sebelum uang beneran dikirim, berhenti sejenak: catat emosi & alasan entry.
+  // Selain jadi rem terhadap entry impulsif, catatan ini ikut tersimpan bersama
+  // posisi lalu muncul di Riwayat Trade Kripto pada halaman Jurnal Trading.
+  // Tombol "Skip" tetap disediakan supaya tidak menghalangi saat buru-buru.
+  const PRE_EMOSI = ['Tenang','Percaya Diri','Fokus','Ragu-ragu','FOMO','Serakah','Takut','Balas Dendam'];
+  const PRE_ALASAN_KEY = 'emaScreenerAlasanEntry_v1';
+  const PRE_ALASAN_BAWAAN = [
+    'Sentuh garis bawah channel (BUY)',
+    'Sentuh garis atas channel (SELL)',
+    'Pantulan Duplikat 1',
+    'Pantulan Duplikat 2',
+    'Searah arah channel',
+    'Searah rezim BTC',
+    'SMI Oversold',
+    'SMI Overbought',
+    'Retest support/resisten',
+    'Breakout terkonfirmasi',
+    'Konfluensi beberapa sinyal'
+  ];
+  function muatAlasanEntry(){
+    try{
+      const raw = localStorage.getItem(PRE_ALASAN_KEY);
+      if(raw){
+        const arr = JSON.parse(raw);
+        if(Array.isArray(arr) && arr.length) return arr;
+      }
+    }catch(e){}
+    return PRE_ALASAN_BAWAAN.slice();
+  }
+  function simpanAlasanEntry(arr){
+    try{ localStorage.setItem(PRE_ALASAN_KEY, JSON.stringify(arr)); }catch(e){}
+    markEsCloudDirty();
+  }
+
+  const preModal = document.getElementById('esPreOrderModal');
+  const preEmosi = document.getElementById('esPreEmosi');
+  const preAlasan = document.getElementById('esPreAlasan');
+  const preEmosiLain = document.getElementById('esPreEmosiLain');
+  const preAlasanLain = document.getElementById('esPreAlasanLain');
+  const preKelolaBox = document.getElementById('esPreKelolaBox');
+  const preAlasanEditor = document.getElementById('esPreAlasanEditor');
+  let preCand = null;
+
+  function isiSelectPre(el, daftar, pakaiLain){
+    el.innerHTML = '<option value="">— pilih —</option>'
+      + daftar.map(v=>`<option value="${String(v).replace(/"/g,'&quot;')}">${v}</option>`).join('')
+      + (pakaiLain ? '<option value="__lain">Lainnya (tulis)…</option>' : '');
+  }
+  function toggleLain(sel, inp){
+    const lain = sel.value === '__lain';
+    inp.style.display = lain ? '' : 'none';
+    if(lain) inp.focus();
+  }
+  preEmosi.addEventListener('change', ()=> toggleLain(preEmosi, preEmosiLain));
+  preAlasan.addEventListener('change', ()=> toggleLain(preAlasan, preAlasanLain));
+
+  document.getElementById('esPreKelola').addEventListener('click', ()=>{
+    preKelolaBox.classList.toggle('open');
+    if(preKelolaBox.classList.contains('open')) preAlasanEditor.value = muatAlasanEntry().join('\n');
+  });
+  document.getElementById('esPreAlasanSimpan').addEventListener('click', ()=>{
+    const arr = preAlasanEditor.value.split('\n').map(s=>s.trim()).filter(Boolean);
+    if(!arr.length) return;
+    simpanAlasanEntry(arr);
+    isiSelectPre(preAlasan, arr, true);
+    preKelolaBox.classList.remove('open');
+  });
+  document.getElementById('esPreAlasanReset').addEventListener('click', ()=>{
+    simpanAlasanEntry(PRE_ALASAN_BAWAAN.slice());
+    preAlasanEditor.value = PRE_ALASAN_BAWAAN.join('\n');
+    isiSelectPre(preAlasan, PRE_ALASAN_BAWAAN, true);
+  });
+
+  function tutupPreModal(){ preModal.classList.remove('open'); preKelolaBox.classList.remove('open'); }
+  document.getElementById('esPreBatal').addEventListener('click', tutupPreModal);
+  preModal.addEventListener('click', (e)=>{ if(e.target === preModal) tutupPreModal(); });
+
+  function kirimDenganCatatan(catatan){
+    tutupPreModal();
+    if(!preCand) return;
+    // Catatan ditempelkan ke kandidat -> ikut tersimpan di posisi (lihat
+    // recordLivePosition) -> muncul di riwayat & Jurnal Trading.
+    const cand = Object.assign({}, preCand, {
+      preEmosi: catatan ? catatan.emosi : '',
+      preAlasan: catatan ? catatan.alasan : ''
+    });
+    preCand = null;
+    sendLiveTrade(cand);
+  }
+  document.getElementById('esPreSkip').addEventListener('click', ()=> kirimDenganCatatan(null));
+  document.getElementById('esPreKirim').addEventListener('click', ()=>{
+    const emosi = preEmosi.value === '__lain' ? preEmosiLain.value.trim() : preEmosi.value;
+    const alasan = preAlasan.value === '__lain' ? preAlasanLain.value.trim() : preAlasan.value;
+    kirimDenganCatatan({ emosi, alasan });
+  });
+
   liveTradeBtn.addEventListener('click', ()=>{
     if(!psimSelectedCandidate){
       liveTradeStatusEl.classList.add('error');
@@ -8443,7 +8632,16 @@
       liveTradeStatusEl.textContent = 'Pilih sinyal dulu di "Sinyal Terpilih" sebelum kirim order.';
       return;
     }
-    sendLiveTrade(candDenganArah(psimSelectedCandidate));
+    preCand = candDenganArah(psimSelectedCandidate);
+    const arah = getArahEfektif(psimSelectedCandidate);
+    document.getElementById('esPreOrderInfo').innerHTML =
+      `<b>${preCand.symbol.replace('USDT','')}</b> &bull; ${arah} &bull; TF ${preCand.tfLabel}`
+      + ` &bull; Modal $${currentPsimMargin()} &times; ${currentPsimLeverage()}x`;
+    isiSelectPre(preEmosi, PRE_EMOSI, true);
+    isiSelectPre(preAlasan, muatAlasanEntry(), true);
+    preEmosiLain.value = ''; preAlasanLain.value = '';
+    toggleLain(preEmosi, preEmosiLain); toggleLain(preAlasan, preAlasanLain);
+    preModal.classList.add('open');
   });
   liveBackendUrlInput.addEventListener('change', ()=>{ saveLiveTradeConfig(); detectLiveEnv(); });
   liveAppTokenInput.addEventListener('change', saveLiveTradeConfig);
