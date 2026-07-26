@@ -3526,6 +3526,22 @@
     return FALLBACK_BIGCAP.has(base) ? 10 : 999;
   }
 
+  // Prioritas urutan untuk koin FAVORIT (yang dibintangi di section Koin
+  // Favorit): 0 = favorit -> selalu tampil paling depan, 1 = bukan favorit.
+  // Dipakai sebagai kunci sort PERTAMA di Area Pantau & Parallel Signal supaya
+  // koin yang sedang kamu pantau tidak tenggelam di antara 100 koin lain.
+  // Daftar favorit dibaca dari localStorage (bukan variabel yang baru terisi
+  // belakangan), jadi tetap benar walau dipanggil sebelum init favorit.
+  function favPrioritas(symbol){
+    let daftar = null;
+    try{
+      const raw = localStorage.getItem('emaScreenerFavorites_v1');
+      if(raw){ const p = JSON.parse(raw); if(Array.isArray(p)) daftar = p; }
+    }catch(e){}
+    if(!daftar) daftar = (typeof favoriteSymbols !== 'undefined' && Array.isArray(favoriteSymbols)) ? favoriteSymbols : [];
+    return daftar.indexOf(symbol) === -1 ? 1 : 0;
+  }
+
   function atr(highs, lows, closes, period){
     const n = closes.length;
     const tr = new Array(n).fill(0);
@@ -5435,6 +5451,10 @@
       // satu skala "seberapa ekstrem" supaya daftar campuran tetap runut.
       const ekstremitas = c => c.kondisi === 'overbought' ? c.stochK : -c.stochK;
       hasil.sort((a,b)=>
+        // Koin favorit (yang dibintangi) selalu di urutan paling depan - itu
+        // koin yang memang sedang kamu pantau, jadi jangan sampai tenggelam di
+        // antara 100 koin lain. Sisanya tetap urut berdasarkan ekstremitas SMI.
+        favPrioritas(a.symbol) - favPrioritas(b.symbol) ||
         ekstremitas(b) - ekstremitas(a) ||
         (b.mulaiBalik?1:0)-(a.mulaiBalik?1:0) ||
         rankOf(a.symbol)-rankOf(b.symbol)
@@ -5966,7 +5986,9 @@
       const settled = await mapLimited(activeSymbols, SCAN_CONCURRENCY, s => findCrossHunterSignalForSymbol(s, tickers, tf));
       let all = [];
       settled.forEach(s=>{ if(s.status==='fulfilled' && s.value) all.push(s.value); });
-      all.sort((a,b)=> rankOf(a.symbol)-rankOf(b.symbol));
+      // Koin favorit (dibintangi) naik ke urutan paling depan - lihat catatan di
+      // favPrioritas. Sisanya tetap urut berdasarkan kapitalisasi.
+      all.sort((a,b)=> favPrioritas(a.symbol)-favPrioritas(b.symbol) || rankOf(a.symbol)-rankOf(b.symbol));
       if(all.length === 0){
         chStatusEl.textContent = `Tidak ada sinyal Parallel (TF ${CH_TF_LABEL[tf]||tf}) yang menyentuh channel saat ini dari ${activeSymbols.length} koin.`;
         chBtn.disabled = false;
@@ -6986,6 +7008,21 @@
 
         recordLivePosition(liveKey, cand, side, quantityStr, qty1Str, qty2Str, tp1Str, tp2Str, slStr, Date.now(),
           { entryOrderId, slOrderId, tp1OrderId, tp2OrderId }, env, actualEntryPrice, entryMethod, virtualTp1Str);
+        // Komisi entry sudah dipotong Binance SEKARANG JUGA. Tarik income-nya
+        // seketika (jangan menunggu siklus 12 detik) supaya kolom "PNL
+        // Terealisasi" langsung menampilkan biaya aslinya, bukan 0.00 / "-".
+        // Diberi jeda kecil karena catatan income di Binance muncul sesaat
+        // setelah order ter-fill; dicoba dua kali untuk berjaga-jaga.
+        [1200, 4000].forEach(function(jeda){
+          setTimeout(function(){
+            const p = prioritySimPositions[liveKey];
+            if(!p) return;
+            syncFinalFeesAndPnl(p, backendUrl, appToken).then(function(){
+              savePrioritySimState();
+              renderPrioritySimUI(window.__esLastTickers || {});
+            }).catch(function(){});
+          }, jeda);
+        });
       }
       resetManualSlTp();
       renderPrioritySimUI(window.__esLastTickers||{});
@@ -8885,14 +8922,14 @@
 
   document.querySelectorAll('.es-collapsible').forEach(sec=>{
     const name = sec.getAttribute('data-section');
-    const head = sec.querySelector('.es-section-head');
-    if(!head) return;
-    head.addEventListener('click', (e)=>{
-      // Klik pada kontrol di dalam header (mis. tombol/select) jangan ikut
-      // menyembunyikan section - hanya klik area judul/panah.
-      if(e.target.closest('button') && !e.target.closest('.es-section-toggle')) return;
-      if(e.target.closest('select') || e.target.closest('input')) return;
-      // Header hanya bisa MENYEMBUNYIKAN - begitu tersembunyi, seluruh section
+    // HANYA tombol segitiga yang menyembunyikan section. Sebelumnya listener
+    // dipasang di SELURUH header, jadi mengklik judul (atau area kosong di
+    // header) ikut menyembunyikan - gampang kejadian tidak sengaja.
+    const toggle = sec.querySelector('.es-section-toggle');
+    if(!toggle) return;
+    toggle.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      // Tombol ini hanya MENYEMBUNYIKAN - begitu tersembunyi, seluruh section
       // (termasuk header ini) hilang dari layar, jadi untuk memunculkannya
       // kembali dipakai chip di .es-hidden-sections (lihat bukaSection).
       collapsedSections.add(name);
