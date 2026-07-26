@@ -1,5 +1,34 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="jt-versi" content="202607261532">
+<script>
+/* ── Penjaga versi ────────────────────────────────────────────────────────────
+   GitHub Pages menyuruh browser menyimpan HTML di cache beberapa menit, jadi
+   "muat ulang" sering menyajikan salinan LAMA - tampilan seolah kembali ke versi
+   sebelumnya dan koneksi saldo ikut terlihat putus. Blok ini mengambil ulang
+   halaman yang sama TANPA cache, membandingkan nomor versinya, lalu memuat ulang
+   sekali saja kalau ternyata yang tampil sudah usang. Dijaga sessionStorage
+   supaya tidak pernah berulang (anti-loop). */
+(function(){
+  var VERSI_TAMPIL = "202607261532";
+  try{
+    if(sessionStorage.getItem("jtVersiDicek") === VERSI_TAMPIL) return;
+    fetch(location.pathname + "?_v=" + Date.now(), { cache: "no-store" })
+      .then(function(r){ return r.ok ? r.text() : null; })
+      .then(function(t){
+        if(!t) return;
+        var m = t.match(/name="jt-versi" content="([^"]+)"/);
+        if(!m) return;
+        try{ sessionStorage.setItem("jtVersiDicek", m[1]); }catch(e){}
+        if(m[1] !== VERSI_TAMPIL) location.reload();
+      })
+      .catch(function(){});
+  }catch(e){}
+})();
+</script>
 <title>Jadi Trader — Jurnal Trading</title>
 <style>
   :root{
@@ -2503,6 +2532,16 @@
       // Selalu cek data terbaru dari cloud tiap kali halaman dibuka/refresh -
       // reload cuma terjadi kalau memang ada perubahan (dari device lain),
       // supaya tidak reload berulang percuma kalau datanya sama saja.
+      // Kalau layar sebelumnya menampilkan jurnal PEMILIK (mode pratinjau untuk
+      // pengunjung), bersihkan dulu sebelum data akun sendiri dimuat - kalau
+      // tidak, trade pemilik bisa ikut terdorong ke akun user ini.
+      try{
+        if(localStorage.getItem('jtDataPratinjauPemilik') === '1'){
+          JT_READ_KEYS.forEach(function(k){ try{ localStorage.removeItem(k); }catch(e){} });
+          localStorage.removeItem('jtDataPratinjauPemilik');
+        }
+      }catch(e){}
+
       jtDb.collection('users').doc(user.uid).get().then(function(doc){
         // Data cloud diterapkan lalu halaman DIGAMBAR ULANG - bukan di-reload.
         // Reload dulu dipakai, tapi terhalang pengaman anti-loop sehingga jurnal
@@ -2541,8 +2580,20 @@
       // penjelasan - hasilnya disimpan lokal, dan naik ke cloud setelah login.
       pasangAksiAkun(null);
 
+      // Pengunjung yang belum login tetap melihat jurnal TERBARU milik pemilik.
+      // Dulu memakai location.reload() - sama seperti di cabang sudah-login, itu
+      // gagal (reload bisa terhalang) sehingga data pemilik masuk ke localStorage
+      // tapi layar tidak pernah digambar ulang -> fiturnya seolah hilang.
+      // Sekarang cukup gambar ulang, jadi selalu tampil tanpa kedip.
       jtDb.collection('users').doc(JT_OWNER_UID).get().then(function(doc){
-        if(jtApplyDocIfChanged(doc)) location.reload();
+        if(jtApplyDocIfChanged(doc)){
+          // Ditandai sebagai data PINJAMAN. Kalau nanti pengunjung ini login,
+          // data pemilik dibersihkan dulu supaya tidak ikut terdorong ke akun
+          // mereka sendiri (lihat cabang sudah-login di atas).
+          try{ localStorage.setItem('jtDataPratinjauPemilik', '1'); }catch(e){}
+          try{ if(typeof window.__jtRenderXau === 'function') window.__jtRenderXau(); }catch(e){}
+          try{ if(typeof window.__jtRenderKripto === 'function') window.__jtRenderKripto(); }catch(e){}
+        }
       }).catch(function(){});
 
       if(jtSyncTimer) clearInterval(jtSyncTimer);

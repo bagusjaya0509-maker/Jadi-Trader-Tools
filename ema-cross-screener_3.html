@@ -1,5 +1,29 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="jt-versi" content="202607261532">
+<script>
+/* Penjaga versi - lihat catatan lengkap di jurnal-trading.html. Mencegah browser
+   menyajikan HTML lama dari cache saat halaman dimuat ulang. */
+(function(){
+  var VERSI_TAMPIL = "202607261532";
+  try{
+    if(sessionStorage.getItem("jtVersiDicek") === VERSI_TAMPIL) return;
+    fetch(location.pathname + "?_v=" + Date.now(), { cache: "no-store" })
+      .then(function(r){ return r.ok ? r.text() : null; })
+      .then(function(t){
+        if(!t) return;
+        var m = t.match(/name="jt-versi" content="([^"]+)"/);
+        if(!m) return;
+        try{ sessionStorage.setItem("jtVersiDicek", m[1]); }catch(e){}
+        if(m[1] !== VERSI_TAMPIL) location.reload();
+      })
+      .catch(function(){});
+  }catch(e){}
+})();
+</script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
   :root{
@@ -5396,7 +5420,8 @@
     const sl = hasil.arah === 'BUY' ? swingLow - a*0.3 : swingHigh + a*0.3;
     const risk = Math.abs(price - sl);
     if(!(risk > 0)) return null;
-    const tp = hasil.arah === 'BUY' ? price + risk*2 : price - risk*2;
+    // TP1 = 1x risiko (1:1 dengan SL) - lihat catatan di sinyal Parallel.
+    const tp = hasil.arah === 'BUY' ? price + risk : price - risk;
 
     return {
       symbol, signal: hasil.arah, price, sl, tp,
@@ -5902,7 +5927,11 @@
     if(!(risk > 0)) return null;
     const riskPct = (risk/price)*100;
     if(riskPct > 12 || riskPct < 0.03) return null;
-    const tp = arah==='BUY' ? price + risk*2 : price - risk*2;
+    // TP1 = 1x risiko (1:1 dengan SL). TP2 dihitung 2x risiko di tempat lain
+    // (kartu sinyal & pengiriman order). Dulu di sini dipakai risk*2, jadi TP1
+    // sudah berada di level TP2 - akibatnya kolom TP1 & TP2 menampilkan angka
+    // yang sama persis, baik di kartu sinyal, Posisi Terbuka, maupun jurnal.
+    const tp = arah==='BUY' ? price + risk : price - risk;
     const chArah = ch.slope > 0 ? 'naik' : ch.slope < 0 ? 'turun' : 'datar';
     // DEBUG (sementara): harga garis channel UTAMA di bar terakhir - utk dibandingkan
     // dgn garis channel di Pine (hover garis atas/bawah channel di candle terakhir).
