@@ -123,16 +123,22 @@
   .account-meta .line b{color:var(--ink-dim);font-weight:600;}
 
   /* ---------- Aksi akun: isi data & reset ---------- */
-  /* Tombol Connect/Disconnect saldo Binance di KPI */
+  /* Label Connect/Disconnect di samping kanan "Total Saldo": tanpa outline,
+     berkedip hilang-muncul + cahaya bergantian merah/hijau, seperti penanda
+     "Live - Real Order" dan tombol "Open Real Order" di Crypto Screener. */
   .jt-conn-btn{
-    display:inline-flex;align-items:center;gap:4px;vertical-align:middle;margin-left:7px;
-    background:var(--surface-2);border:1px solid var(--border);color:var(--ink-dim);
-    font-family:var(--font-mono);font-size:9.5px;
-    padding:2px 6px;border-radius:5px;cursor:pointer;
+    display:inline-flex;align-items:center;vertical-align:middle;margin-left:8px;
+    background:none;border:none;border-radius:4px;padding:1px 4px;cursor:pointer;
+    color:var(--ink-dim);font-family:var(--font-mono);font-size:9.5px;
+    letter-spacing:.04em;text-transform:uppercase;
+    animation: jtConnBlink 1.2s ease-in-out infinite, jtConnGlow 1.6s ease-in-out infinite;
   }
-  .jt-conn-btn:hover{color:var(--ink);border-color:var(--ink-dim);}
-  .jt-conn-btn.on{color:#4f9e82;border-color:#4f9e82;}
-  .jt-conn-btn.on:hover{color:#c05a4e;border-color:#c05a4e;}
+  .jt-conn-btn.on{color:#4f9e82;}
+  @keyframes jtConnBlink{ 0%,100%{opacity:1} 50%{opacity:.15} }
+  @keyframes jtConnGlow{
+    0%,100%{ box-shadow:0 0 8px 1px rgba(192,90,78,.75); }   /* merah */
+    50%    { box-shadow:0 0 8px 1px rgba(79,158,130,.75); }  /* hijau */
+  }
 
   .jt-acct-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:6px;flex-wrap:wrap;}
   .jt-acct-btn{
@@ -227,13 +233,13 @@
   /* Riwayat trade kripto memanjang penuh di bawah grid */
   .jt-riwayat-penuh > .card{margin-top:20px;}
   /* Dropdown emosi & alasan entry di dalam baris riwayat */
-  .jt-note-select{
+  .jt-modal-field select{
     background:var(--surface-2);border:1px solid var(--border);color:var(--ink-dim);
     font-family:var(--font-mono);font-size:10.5px;
-    padding:3px 5px;border-radius:5px;outline:none;max-width:170px;
+    padding:3px 5px;border-radius:5px;outline:none;width:100%;box-sizing:border-box;
   }
-  .jt-note-select:hover{border-color:var(--ink-faint);}
-  .jt-note-select:focus{border-color:var(--accent);color:var(--ink);}
+  .jt-modal-field select:hover{border-color:var(--ink-faint);}
+  .jt-modal-field select:focus{border-color:var(--accent);color:var(--ink);}
   .jt-alasan-cell{font-size:11.5px;color:var(--ink-dim);max-width:220px;}
 
   .card{
@@ -639,9 +645,8 @@
 
   <section class="kpis">
     <div class="kpi">
-      <div class="label">Total Saldo (Binance)
+      <div class="label">Total Saldo
         <button type="button" class="jt-conn-btn" id="jtConnBtn" title="Sambungkan ke backend Binance">
-          <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 0 1 0 10h-2"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
           <span id="jtConnLabel">Connect</span>
         </button>
       </div>
@@ -724,7 +729,7 @@
         <div class="table-scroll jt-hist-limited jt-hist-kripto">
           <table id="cTradeTable">
             <thead>
-              <tr><th>Tanggal</th><th>Pair</th><th>TF</th><th>Arah</th><th>Emosi</th><th>Alasan Entry / Setup</th><th>Alasan Exit</th><th>Fee</th><th>P/L Bersih</th><th>Hasil</th></tr>
+              <tr><th>Tanggal</th><th>Pair</th><th>TF</th><th>Arah</th><th>Emosi</th><th>Alasan Entry / Setup</th><th>Alasan Exit</th><th>Fee</th><th>P/L Bersih</th><th>Hasil</th><th></th></tr>
             </thead>
             <tbody id="cTradeTbody"></tbody>
           </table>
@@ -846,6 +851,28 @@
     <div class="jt-modal-actions">
       <button type="button" class="no" id="jtAccCancel">Batal</button>
       <button type="button" class="simpan" id="jtAccSave">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- Dialog: isi emosi & alasan entry untuk satu trade kripto -->
+<div class="jt-modal" id="jtNoteModal">
+  <div class="jt-modal-card">
+    <div class="jt-modal-title">Catatan Trade</div>
+    <div class="jt-modal-sub" id="jtNoteSub">—</div>
+    <div class="jt-modal-field">
+      <label for="jtNoteEmosi">Emosi saat Entry</label>
+      <select id="jtNoteEmosi"></select>
+      <input type="text" id="jtNoteEmosiLain" placeholder="Tulis emosi lain" style="display:none;margin-top:6px">
+    </div>
+    <div class="jt-modal-field">
+      <label for="jtNoteAlasan">Alasan Entry / Setup</label>
+      <select id="jtNoteAlasan"></select>
+      <input type="text" id="jtNoteAlasanLain" placeholder="Tulis alasan lain" style="display:none;margin-top:6px">
+    </div>
+    <div class="jt-modal-actions">
+      <button type="button" class="no" id="jtNoteCancel">Batal</button>
+      <button type="button" class="simpan" id="jtNoteSave">Simpan</button>
     </div>
   </div>
 </div>
@@ -1408,13 +1435,12 @@
       'Retest support/resisten'
     ]]
   ];
-  function selectCatatan(jenis, kunci, nilai){
-    var html = '<select class="jt-note-select" data-jenis="'+jenis+'" data-kunci="'+
-               String(kunci).replace(/"/g,'&quot;')+'">';
-    html += '<option value="">—</option>';
+  // Isi <select> di dalam modal catatan. Tampilan utama tabel sengaja cuma teks -
+  // pengisian lewat pop-up (ikon pensil), sama seperti jurnal XAU.
+  function isiSelectCatatan(el, jenis, nilai){
+    var html = '<option value="">—</option>';
     function opt(v){
-      var sel = (v === nilai) ? ' selected' : '';
-      return '<option value="'+v.replace(/"/g,'&quot;')+'"'+sel+'>'+v+'</option>';
+      return '<option value="'+String(v).replace(/"/g,'&quot;')+'"'+(v===nilai?' selected':'')+'>'+v+'</option>';
     }
     if(jenis === 'emosi'){
       EMOSI_OPSI.forEach(function(v){ html += opt(v); });
@@ -1425,11 +1451,11 @@
         html += '</optgroup>';
       });
     }
-    // Nilai custom yang sudah pernah diisi tetap muncul & terpilih
     var bawaan = jenis==='emosi' ? EMOSI_OPSI : ALASAN_OPSI.reduce(function(a,g){ return a.concat(g[1]); },[]);
     if(nilai && bawaan.indexOf(nilai) === -1) html += opt(nilai);
-    html += '<option value="__lain">Lainnya (tulis)…</option></select>';
-    return html;
+    html += '<option value="__lain">Lainnya (tulis)…</option>';
+    el.innerHTML = html;
+    if(nilai && bawaan.indexOf(nilai) === -1) el.value = nilai;
   }
 
   // Trade yang tercatat oleh TOOL sendiri (punya detail TF/arah/alasan yang
@@ -1953,6 +1979,8 @@
 
     var catatan = muatCatatanKripto();
     tbody.innerHTML = sorted.map(function(t){
+      var kunci = kunciTrade(t);
+      var cat = catatan[kunci] || {};
       var result = t.pl>0?'win':t.pl<0?'loss':'be';
       var resultLabel = t.pl>0?'WIN':t.pl<0?'LOSS':'BE';
       var venueBadge = t.venue==='live-real' ? ' <span class="venue-badge live">Binance Live</span>'
@@ -1966,12 +1994,15 @@
         '<td><span class="jt-pair-cell"><span class="jt-pair-name">'+t.pair+'</span>'+venueBadge+'</span></td>'+
         '<td>'+(t.tf || '—')+'</td>'+
         '<td>'+(arah ? '<span class="dir '+arah.toLowerCase()+'">'+arah+'</span>' : '—')+'</td>'+
-        '<td>'+selectCatatan('emosi', kunciTrade(t), (catatan[kunciTrade(t)]||{}).emosi || '')+'</td>'+
-        '<td>'+selectCatatan('alasan', kunciTrade(t), (catatan[kunciTrade(t)]||{}).alasan || '')+'</td>'+
+        '<td class="emo-chip">'+(cat.emosi || '—')+'</td>'+
+        '<td class="jt-alasan-cell">'+(cat.alasan || '—')+'</td>'+
         '<td class="emo-chip">'+reasonClean+'</td>'+
         '<td class="num" style="color:var(--ink-faint)">'+(fee ? '-'+fmtMoney(fee).replace('-','') : '—')+'</td>'+
         '<td class="num" style="color:'+(t.pl>0?'var(--profit)':t.pl<0?'var(--loss)':'var(--ink-dim)')+'">'+fmtMoney(t.pl)+'</td>'+
         '<td><span class="pill '+result+'">'+resultLabel+'</span></td>'+
+        '<td><div class="row-actions">'+
+          '<button class="icon-btn c-btn-note" data-kunci="'+String(kunci).replace(/"/g,'&quot;')+'" title="Isi emosi & alasan entry">✎</button>'+
+        '</div></td>'+
       '</tr>';
     }).join('');
   }
@@ -2147,21 +2178,47 @@
     fetchBinanceBalance();
   }
 
-  // Simpan emosi / alasan entry yang dipilih di baris riwayat kripto.
-  document.getElementById('cTradeTbody').addEventListener('change', function(e){
-    var el = e.target;
-    if(!el.classList || !el.classList.contains('jt-note-select')) return;
-    var jenis = el.getAttribute('data-jenis');
-    var kunci = el.getAttribute('data-kunci');
-    var nilai = el.value;
-    if(nilai === '__lain'){
-      var isi = window.prompt(jenis === 'emosi' ? 'Tulis emosi kamu:' : 'Tulis alasan entry / setup:');
-      if(isi === null || !isi.trim()){ renderTable(); return; }   // batal -> kembalikan pilihan semula
-      nilai = isi.trim();
-    }
-    var patch = {};
-    patch[jenis === 'emosi' ? 'emosi' : 'alasan'] = nilai;
-    simpanCatatanKripto(kunci, patch);
+  // ---- Pop-up catatan trade kripto (ikon pensil di tiap baris) ----
+  var noteModal = document.getElementById('jtNoteModal');
+  var noteKunci = null;
+  var selEmosi = document.getElementById('jtNoteEmosi');
+  var selAlasan = document.getElementById('jtNoteAlasan');
+  var inpEmosi = document.getElementById('jtNoteEmosiLain');
+  var inpAlasan = document.getElementById('jtNoteAlasanLain');
+
+  function tampilkanIsianLain(sel, inp){
+    var lain = sel.value === '__lain';
+    inp.style.display = lain ? '' : 'none';
+    if(lain) inp.focus();
+  }
+  selEmosi.addEventListener('change', function(){ tampilkanIsianLain(selEmosi, inpEmosi); });
+  selAlasan.addEventListener('change', function(){ tampilkanIsianLain(selAlasan, inpAlasan); });
+
+  document.getElementById('cTradeTbody').addEventListener('click', function(e){
+    var btn = e.target.closest ? e.target.closest('.c-btn-note') : null;
+    if(!btn) return;
+    noteKunci = btn.getAttribute('data-kunci');
+    var cat = (muatCatatanKripto()[noteKunci]) || {};
+    var bagian = String(noteKunci || '').split('|');
+    document.getElementById('jtNoteSub').textContent =
+      bagian[0] + ' • ' + (bagian[2] || '') + ' • ' + fmtDate(Number(bagian[1]) || bagian[1]);
+    isiSelectCatatan(selEmosi, 'emosi', cat.emosi || '');
+    isiSelectCatatan(selAlasan, 'alasan', cat.alasan || '');
+    inpEmosi.value = ''; inpAlasan.value = '';
+    tampilkanIsianLain(selEmosi, inpEmosi);
+    tampilkanIsianLain(selAlasan, inpAlasan);
+    noteModal.classList.add('open');
+  });
+
+  document.getElementById('jtNoteCancel').addEventListener('click', function(){ noteModal.classList.remove('open'); });
+  noteModal.addEventListener('click', function(e){ if(e.target === noteModal) noteModal.classList.remove('open'); });
+
+  document.getElementById('jtNoteSave').addEventListener('click', function(){
+    if(!noteKunci) return;
+    var emosi = selEmosi.value === '__lain' ? inpEmosi.value.trim() : selEmosi.value;
+    var alasan = selAlasan.value === '__lain' ? inpAlasan.value.trim() : selAlasan.value;
+    simpanCatatanKripto(noteKunci, { emosi: emosi, alasan: alasan });
+    noteModal.classList.remove('open');
     renderTable();
   });
 

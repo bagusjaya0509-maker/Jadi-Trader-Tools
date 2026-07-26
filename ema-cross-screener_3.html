@@ -7253,7 +7253,13 @@
       });
       pos.actualCommission = commission;
       pos.actualFunding = funding;
-      if(hasRealized) pos.actualRealizedPnl = realizedPnl;
+      // Sama seperti sinkron berkala: biaya yang sudah terpotong ikut dianggap
+      // terealisasi, supaya nilainya sama dengan yang tercatat di Binance.
+      if(hasRealized || commission > 0 || funding > 0){
+        pos.actualRealizedPnl = realizedPnl - commission - funding;
+      }
+      // Nilai balik tetap khusus REALIZED_PNL - dipakai untuk mendeteksi posisi
+      // benar-benar tertutup, jangan sampai ikut true cuma karena ada komisi.
       return hasRealized;
     }catch(e){ return false; }
   }
@@ -7817,15 +7823,21 @@
         const riskSlDisplay = pos.tp1Hit ? 'BE/TP1' : `-$${Math.abs(potentialSlPnl).toFixed(2)}`;
         const areaTpLabel = pos.tp2Hit ? 'Hit TP2' : (pos.tp1Hit ? 'Hit TP1' : '-');
         const areaTpCls = (pos.tp1Hit || pos.tp2Hit) ? 'pnl-pos' : '';
-        // PNL Terealisasi: profit yang sudah benar-benar terkunci - untuk posisi
-        // live disinkron langsung dari Binance (actualRealizedPnl), untuk posisi
-        // simulasi berasal dari partial close 50% di TP1 (pos.realizedPnl).
+        // PNL Terealisasi: nilai yang sudah benar-benar terbukukan di akun.
+        // Posisi LIVE: disinkron dari Binance tiap 12 detik (actualRealizedPnl =
+        // REALIZED_PNL dikurangi komisi & funding). Sejak order dibuka kolom ini
+        // sudah terisi biaya entry-nya (negatif kecil), lalu bertambah begitu
+        // TP1/TP2 kena - jadi angkanya selalu sama dengan catatan Binance.
+        // Posisi SIMULASI: dari partial close 50% di TP1 (pos.realizedPnl).
         // Terpisah dari PNL($) yang cuma menampilkan floating sisa posisi.
         const hasActualRealized = pos.actualRealizedPnl !== undefined && pos.actualRealizedPnl !== null;
         const hasSimRealized = pos.realizedPnl !== undefined && pos.realizedPnl !== null;
         const hasRealized = hasActualRealized || hasSimRealized;
         const realizedValue = hasActualRealized ? pos.actualRealizedPnl : pos.realizedPnl;
-        const realizedDisplay = hasRealized ? `${realizedValue>=0?'+':''}$${realizedValue.toFixed(2)}` : '-';
+        // Format minus di depan tanda dolar (-$0.26), bukan $-0.26.
+        const realizedDisplay = hasRealized
+          ? `${realizedValue>=0?'+$':'-$'}${Math.abs(realizedValue).toFixed(2)}`
+          : '-';
         const realizedCls = hasRealized ? (realizedValue>=0?'pnl-pos':'pnl-neg') : '';
         const closeCls = floatPnl>=0 ? 'pnl-pos' : 'pnl-neg';
         const isLiveEditable = isLive && !pos.tp1Hit;
@@ -9148,7 +9160,13 @@
         // TP1 dulu (partial), lalu TP2/BE belakangan, jumlah ini otomatis sudah
         // menggabungkan kedua bagian (Binance catat REALIZED_PNL tiap kali
         // posisi berkurang/tertutup, sebagian atau penuh).
-        if(hasRealized) pos.actualRealizedPnl = realizedPnl;
+        // Komisi & funding SUDAH benar-benar terpotong sejak order dibuka, jadi
+        // ikut dihitung sebagai bagian yang sudah terealisasi - dengan begitu
+        // kolom "PNL Terealisasi" sudah terisi (biaya entry) sambil menunggu
+        // TP1/TP2, bukan menampilkan "-" seolah belum ada apa-apa.
+        if(hasRealized || commission > 0 || funding > 0){
+          pos.actualRealizedPnl = realizedPnl - commission - funding;
+        }
       });
       renderPrioritySimUI(window.__esLastTickers || {});
     }catch(e){ /* gagal ambil income - coba lagi di siklus berikutnya */ }
