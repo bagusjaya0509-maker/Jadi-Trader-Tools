@@ -3,12 +3,12 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202607261532">
+<meta name="jt-versi" content="202607271640">
 <script>
 /* Penjaga versi - lihat catatan lengkap di jurnal-trading.html. Mencegah browser
    menyajikan HTML lama dari cache saat halaman dimuat ulang. */
 (function(){
-  var VERSI_TAMPIL = "202607261532";
+  var VERSI_TAMPIL = "202607271640";
   try{
     if(sessionStorage.getItem("jtVersiDicek") === VERSI_TAMPIL) return;
     fetch(location.pathname + "?_v=" + Date.now(), { cache: "no-store" })
@@ -631,6 +631,32 @@
     border:1px solid var(--border);
     padding:2px 6px;
     border-radius:5px;
+  }
+
+  /* Bintang favorit di pojok kanan atas kotak sinyal (Area Pantau & Parallel
+     Signal). Diklik -> koin masuk/keluar daftar favorit, dan kotaknya langsung
+     lompat ke urutan paling depan karena status favorit adalah kunci sort
+     PERTAMA di kedua section itu. Redup kalau belum difavoritkan, emas menyala
+     kalau sudah - jadi status koin kebaca sekali lihat tanpa buka daftar. */
+  .es-card-top-right{
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  .es-sig-star{
+    font-size:15px;
+    line-height:1;
+    cursor:pointer;
+    user-select:none;
+    color: var(--dim);
+    opacity:.5;
+    transition: color .15s ease, opacity .15s ease, transform .15s ease;
+  }
+  .es-sig-star:hover{ opacity:1; transform:scale(1.18); }
+  .es-sig-star.on{
+    color: var(--gold);
+    opacity:1;
+    text-shadow:0 0 6px rgba(212,175,55,.55);
   }
 
   .es-price-row{
@@ -5447,10 +5473,14 @@
       const stochLabel = `SMI ${c.stochK.toFixed(1)} / EMA ${c.stochD===null?'-':c.stochD.toFixed(1)}`
         + (c.kondisi==='overbought'?' (OB)':' (OS)');
       const glow = i < 3 ? ' top3' : '';
+      const fav = favPrioritas(c.symbol) === 0;
       return `<div class="es-card pantau ${cls}${glow}" data-symbol="${c.symbol}" data-tf="${c.tfValue}">
         <div class="es-card-top">
           <div><span class="es-rank">#${i+1} &bull; TF ${c.tfLabel}</span><span class="es-symbol">${c.symbol.replace('USDT','')}</span></div>
-          <span class="es-cap-tag">${c.cap==='big'?'BIG CAP':'LOW/MID CAP'}</span>
+          <div class="es-card-top-right">
+            <span class="es-cap-tag">${c.cap==='big'?'BIG CAP':'LOW/MID CAP'}</span>
+            <span class="es-sig-star${fav?' on':''}" data-symbol="${c.symbol}" title="${fav?'Hapus dari koin favorit':'Jadikan koin favorit (naik ke urutan depan)'}">&#9733;</span>
+          </div>
         </div>
         <div class="es-price-row">
           <span class="es-price">$${fmtPrice(c.price)}</span>
@@ -5475,13 +5505,42 @@
       const cand = top[i];
       card.addEventListener('click', (e)=>{
         if(e.target.classList.contains('es-pantau-pick')) return;
+        if(e.target.classList.contains('es-sig-star')) return;
         openTradingView(cand.symbol, cand.tfValue);
       });
       card.querySelector('.es-pantau-pick').addEventListener('click', (e)=>{
         e.stopPropagation();
         selectTradableSignalByUid(tradableUid('pantau', cand.symbol, cand.tfValue));
       });
+      // Bintang: masuk/keluar favorit lalu daftar LANGSUNG diurut ulang di
+      // tempat - tidak perlu pindai ulang (data hasilnya sudah ada di tangan),
+      // jadi kotak yang baru dibintangi langsung melompat ke depan.
+      const bintang = card.querySelector('.es-sig-star');
+      if(bintang) bintang.addEventListener('click', (e)=>{
+        e.stopPropagation();
+        toggleFavorite(cand.symbol);
+        renderPantauSignals(urutkanHasilPantau(top));
+      });
     });
+  }
+
+  // Urutan Area Pantau dipakai di dua tempat (sesudah pindai, dan sesudah
+  // bintang diklik), jadi aturannya ditaruh di satu fungsi supaya tidak bisa
+  // berbeda antara keduanya.
+  function urutkanHasilPantau(list){
+    // Overbought makin kuat kalau K makin besar (95 > 85), oversold kebalikannya
+    // (K 2 lebih ekstrem daripada K 18) - keduanya disamakan dulu ke satu skala
+    // "seberapa ekstrem" supaya daftar campuran tetap runut.
+    const ekstremitas = c => c.kondisi === 'overbought' ? c.stochK : -c.stochK;
+    return list.slice().sort((a,b)=>
+      // Koin favorit (yang dibintangi) selalu di urutan paling depan - itu koin
+      // yang memang sedang kamu pantau, jadi jangan sampai tenggelam di antara
+      // 100 koin lain. Sisanya tetap urut berdasarkan ekstremitas SMI.
+      favPrioritas(a.symbol) - favPrioritas(b.symbol) ||
+      ekstremitas(b) - ekstremitas(a) ||
+      (b.mulaiBalik?1:0)-(a.mulaiBalik?1:0) ||
+      rankOf(a.symbol)-rankOf(b.symbol)
+    );
   }
 
   async function cariSinyalPantau(){
@@ -5532,20 +5591,10 @@
         hasil = btcKondisi ? semua.filter(c=>c.kondisi===btcKondisi) : [];
       }
 
-      // Urut dari kondisi PALING ekstrem ke yang paling ringan. Overbought
-      // makin kuat kalau K makin besar (95 > 85), oversold kebalikannya
-      // (K 2 lebih ekstrem daripada K 18) - jadi keduanya disamakan dulu ke
-      // satu skala "seberapa ekstrem" supaya daftar campuran tetap runut.
-      const ekstremitas = c => c.kondisi === 'overbought' ? c.stochK : -c.stochK;
-      hasil.sort((a,b)=>
-        // Koin favorit (yang dibintangi) selalu di urutan paling depan - itu
-        // koin yang memang sedang kamu pantau, jadi jangan sampai tenggelam di
-        // antara 100 koin lain. Sisanya tetap urut berdasarkan ekstremitas SMI.
-        favPrioritas(a.symbol) - favPrioritas(b.symbol) ||
-        ekstremitas(b) - ekstremitas(a) ||
-        (b.mulaiBalik?1:0)-(a.mulaiBalik?1:0) ||
-        rankOf(a.symbol)-rankOf(b.symbol)
-      );
+      // Urut dari kondisi PALING ekstrem ke yang paling ringan, favorit di
+      // depan - aturannya ada di urutkanHasilPantau supaya sama persis dengan
+      // pengurutan ulang saat bintang diklik.
+      hasil = urutkanHasilPantau(hasil);
 
       if(hasil.length === 0){
         if(mode === 'align' && !btcKondisi){
@@ -5956,10 +6005,12 @@
         : (c.chSigIdx <= 1
             ? 'Candle ke-1 sesudah pantul garis (baru)'
             : `Candle ke-${c.chSigIdx} sesudah pantul garis`);
+      const fav = favPrioritas(c.symbol) === 0;
       return `<div class="es-priority-card ${signalCls}" data-symbol="${c.symbol}" data-tf="${c.tfValue}" data-tflabel="${c.tfLabel}" data-price="${c.price}">
         <div class="es-priority-card-top">
           <span class="es-priority-rank">#${i+1}</span>
           <span class="es-priority-symbol">${c.symbol.replace('USDT','')}</span>
+          <span class="es-sig-star${fav?' on':''}" data-symbol="${c.symbol}" title="${fav?'Hapus dari koin favorit':'Jadikan koin favorit (naik ke urutan depan)'}">&#9733;</span>
           <button class="es-priority-signal es-ch-pick ${signalCls}" type="button" title="Pilih sinyal ini">${c.signal} NOW</button>
         </div>
         <div class="es-priority-tf">Parallel Channel &bull; TF ${c.tfLabel} &bull; Harga $${fmtPrice(c.price)}</div>
@@ -5983,13 +6034,28 @@
       const cand = top[i];
       card.addEventListener('click', (e)=>{
         if(e.target.classList.contains('es-ch-pick')) return;
+        if(e.target.classList.contains('es-sig-star')) return;
         openTradingView(cand.symbol, cand.tfValue);
       });
       card.querySelector('.es-ch-pick').addEventListener('click', (e)=>{
         e.stopPropagation();
         selectTradableSignalByUid(tradableUid('crosshunter', cand.symbol, cand.tfValue));
       });
+      // Sama seperti Area Pantau: bintang -> favorit -> urut ulang di tempat.
+      const bintang = card.querySelector('.es-sig-star');
+      if(bintang) bintang.addEventListener('click', (e)=>{
+        e.stopPropagation();
+        toggleFavorite(cand.symbol);
+        renderCrossHunterSignals(urutkanHasilParallel(top));
+      });
     });
+  }
+
+  // Urutan Parallel Signal: favorit dulu, sisanya menurut kapitalisasi.
+  function urutkanHasilParallel(list){
+    return list.slice().sort((a,b)=>
+      favPrioritas(a.symbol)-favPrioritas(b.symbol) || rankOf(a.symbol)-rankOf(b.symbol)
+    );
   }
 
   // ===== Rezim BTC untuk Parallel Signal =====
@@ -6079,7 +6145,7 @@
       settled.forEach(s=>{ if(s.status==='fulfilled' && s.value) all.push(s.value); });
       // Koin favorit (dibintangi) naik ke urutan paling depan - lihat catatan di
       // favPrioritas. Sisanya tetap urut berdasarkan kapitalisasi.
-      all.sort((a,b)=> favPrioritas(a.symbol)-favPrioritas(b.symbol) || rankOf(a.symbol)-rankOf(b.symbol));
+      all = urutkanHasilParallel(all);
       if(all.length === 0){
         chStatusEl.textContent = `Tidak ada sinyal Parallel (TF ${CH_TF_LABEL[tf]||tf}) yang menyentuh channel saat ini dari ${activeSymbols.length} koin.`;
         chBtn.disabled = false;
@@ -8143,6 +8209,24 @@
     favoriteSymbols = favoriteSymbols.filter(s=>s!==symbol);
     saveFavorites();
     scanFavorites();
+  }
+
+  // Dipakai bintang di kotak Area Pantau & Parallel Signal. Sengaja lewat
+  // favoriteSymbols + saveFavorites (bukan tulis localStorage langsung) supaya
+  // panel "Koin Favorit" tetap satu sumber kebenaran: kalau key-nya belum ada,
+  // loadFavorites sudah mengisinya dengan daftar bawaan, jadi menstar satu koin
+  // tidak menghapus favorit bawaan.
+  function toggleFavorite(symbol){
+    if(!symbol) return false;
+    if(favoriteSymbols.includes(symbol)){
+      favoriteSymbols = favoriteSymbols.filter(s=>s!==symbol);
+    } else {
+      if(favoriteSymbols.length >= FAV_MAX_SLOTS) return false;   // slot penuh
+      favoriteSymbols.push(symbol);
+    }
+    saveFavorites();
+    scanFavorites();
+    return true;
   }
 
   function extractSymbolFromFavInput(raw){

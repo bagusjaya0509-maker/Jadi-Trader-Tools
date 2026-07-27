@@ -3,7 +3,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202607261532">
+<meta name="jt-versi" content="202607271640">
 <script>
 /* ── Penjaga versi ────────────────────────────────────────────────────────────
    GitHub Pages menyuruh browser menyimpan HTML di cache beberapa menit, jadi
@@ -13,7 +13,7 @@
    sekali saja kalau ternyata yang tampil sudah usang. Dijaga sessionStorage
    supaya tidak pernah berulang (anti-loop). */
 (function(){
-  var VERSI_TAMPIL = "202607261532";
+  var VERSI_TAMPIL = "202607271640";
   try{
     if(sessionStorage.getItem("jtVersiDicek") === VERSI_TAMPIL) return;
     fetch(location.pathname + "?_v=" + Date.now(), { cache: "no-store" })
@@ -582,9 +582,9 @@
         </div>
         <div class="jt-hist-controls">
           <select class="jt-range-select" id="fRangeSelect">
-            <option value="all">Semua</option>
+            <option value="all" selected>Semua</option>
             <option value="today">Hari Ini</option>
-            <option value="week" selected>Minggu Lalu</option>
+            <option value="week">Minggu Lalu</option>
             <option value="month">Bulan Lalu</option>
             <option value="3months">3 Bulan Terakhir</option>
             <option value="6months">6 Bulan Terakhir</option>
@@ -2416,7 +2416,52 @@
       if(val !== null) payload[key] = val;
     });
     payload._updatedAt = Date.now();
-    return jtDb.collection('users').doc(uid).set(payload, { merge: true });
+    return jtDb.collection('users').doc(uid).set(payload, { merge: true })
+      .then(function(){
+        // Tiap kali jurnal pemilik tersimpan, salinan publiknya ikut diperbarui
+        // supaya pengunjung selalu melihat versi terbaru. Fire-and-forget:
+        // gagal menerbitkan tidak boleh menggagalkan simpan utama.
+        if(uid === JT_OWNER_UID) jtPublishShowcase().catch(function(){});
+      });
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // ████████  JURNAL CONTOH UNTUK PENGUNJUNG  ████████
+  // ═══════════════════════════════════════════════════════
+  // Aturan Firestore melarang siapa pun membaca users/<uid> milik orang lain -
+  // dan memang harus begitu. Akibatnya pengunjung yang belum login TIDAK PERNAH
+  // bisa membaca dokumen pemilik: permintaannya ditolak (permission-denied) dan
+  // dulu error itu ditelan diam-diam, jadi jurnal contoh tampak kosong tanpa
+  // penjelasan. Sekarang pemilik MENYALIN sendiri jurnalnya ke satu dokumen
+  // publik khusus tampilan, dan dokumen itulah yang dibaca pengunjung - dokumen
+  // pribadi pemilik tetap tertutup rapat.
+  var JT_SHOWCASE_COL = 'public';
+  var JT_SHOWCASE_DOC = 'jurnalShowcase';
+
+  function jtShowcaseRef(){
+    return jtDb.collection(JT_SHOWCASE_COL).doc(JT_SHOWCASE_DOC);
+  }
+
+  // Nomor login akun broker tidak perlu ikut tersiar ke publik - sisanya
+  // (saldo awal, tanggal mulai, leverage) memang dibutuhkan buat menggambar
+  // kurva ekuitas, jadi tetap ikut.
+  function jtProfilAmanUntukPublik(raw){
+    try{
+      var p = JSON.parse(raw || '{}') || {};
+      if(p.login) p.login = '';
+      return JSON.stringify(p);
+    }catch(e){ return raw; }
+  }
+
+  function jtPublishShowcase(){
+    var payload = {};
+    JT_READ_KEYS.forEach(function(key){
+      var val = localStorage.getItem(key);
+      if(val === null) return;
+      payload[key] = (key === 'jtAccountProfile_v1') ? jtProfilAmanUntukPublik(val) : val;
+    });
+    payload._updatedAt = Date.now();
+    return jtShowcaseRef().set(payload, { merge: true });
   }
 
   // ═══════════════════════════════════════════════════════
@@ -2551,6 +2596,10 @@
           try{ if(typeof window.__jtRenderXau === 'function') window.__jtRenderXau(); }catch(e){}
           try{ if(typeof window.__jtRenderKripto === 'function') window.__jtRenderKripto(); }catch(e){}
         }
+        // Pemilik: terbitkan salinan publiknya SESUDAH data cloud diterapkan,
+        // bukan sebelum - kalau sebelum, yang naik ke publik bisa versi lokal
+        // yang basi (mis. baru buka browser lain).
+        if(user.uid === JT_OWNER_UID) jtPublishShowcase().catch(function(){});
       }).catch(function(){});
 
       // ---- Tombol "Isi Data Akun" & "Reset Data" (butuh uid supaya hasilnya
@@ -2580,12 +2629,15 @@
       // penjelasan - hasilnya disimpan lokal, dan naik ke cloud setelah login.
       pasangAksiAkun(null);
 
-      // Pengunjung yang belum login tetap melihat jurnal TERBARU milik pemilik.
-      // Dulu memakai location.reload() - sama seperti di cabang sudah-login, itu
-      // gagal (reload bisa terhalang) sehingga data pemilik masuk ke localStorage
-      // tapi layar tidak pernah digambar ulang -> fiturnya seolah hilang.
-      // Sekarang cukup gambar ulang, jadi selalu tampil tanpa kedip.
-      jtDb.collection('users').doc(JT_OWNER_UID).get().then(function(doc){
+      // Pengunjung yang belum login tetap melihat jurnal TERBARU milik pemilik,
+      // dibaca dari dokumen PUBLIK - bukan dari users/<uid> pemilik, karena
+      // dokumen itu tertutup aturan Firestore dan permintaannya selalu ditolak
+      // (itulah sebab jurnal contoh selama ini kosong).
+      jtShowcaseRef().get().then(function(doc){
+        if(!doc.exists){
+          jtViewerNoteEl.textContent = 'Jurnal contoh belum diterbitkan pemilik. Login untuk lihat jurnal kamu sendiri.';
+          return;
+        }
         if(jtApplyDocIfChanged(doc)){
           // Ditandai sebagai data PINJAMAN. Kalau nanti pengunjung ini login,
           // data pemilik dibersihkan dulu supaya tidak ikut terdorong ke akun
@@ -2594,7 +2646,13 @@
           try{ if(typeof window.__jtRenderXau === 'function') window.__jtRenderXau(); }catch(e){}
           try{ if(typeof window.__jtRenderKripto === 'function') window.__jtRenderKripto(); }catch(e){}
         }
-      }).catch(function(){});
+      }).catch(function(err){
+        // Kegagalan DITAMPILKAN, tidak ditelan diam-diam. Versi lama memakai
+        // .catch(function(){}) kosong, jadi saat aturan Firestore menolak baca,
+        // layar cuma kosong tanpa satu pun petunjuk kenapa.
+        var kode = (err && err.code) ? err.code : 'gagal';
+        jtViewerNoteEl.textContent = 'Jurnal contoh tidak bisa dimuat (' + kode + '). Login untuk lihat jurnal kamu sendiri.';
+      });
 
       if(jtSyncTimer) clearInterval(jtSyncTimer);
     }
