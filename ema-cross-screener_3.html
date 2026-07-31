@@ -3,12 +3,12 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202607271640">
+<meta name="jt-versi" content="202607281105">
 <script>
 /* Penjaga versi - lihat catatan lengkap di jurnal-trading.html. Mencegah browser
    menyajikan HTML lama dari cache saat halaman dimuat ulang. */
 (function(){
-  var VERSI_TAMPIL = "202607271640";
+  var VERSI_TAMPIL = "202607281105";
   try{
     if(sessionStorage.getItem("jtVersiDicek") === VERSI_TAMPIL) return;
     fetch(location.pathname + "?_v=" + Date.now(), { cache: "no-store" })
@@ -69,15 +69,16 @@
     overflow-x: hidden;
   }
 
+  /* Tombol News duduk DI DALAM baris kontrol Area Pantau (di sebelah kanan
+     "Ganti Chart / Kelola Koin") dan tidak bisa digeser ke mana-mana. Dulu ia
+     panel mengambang berbasis position:fixed yang bisa ditarik-tarik; posisinya
+     jadi berpindah-pindah dan sering menutupi isi halaman. */
   .es-econ-calendar-panel{
-    position: fixed;
-    top: 90px;
-    right: 16px;
+    position: relative;
     z-index: 50;
-    display: flex;
+    display: inline-flex;
     flex-direction: column;
-    align-items: flex-end;
-    gap: 8px;
+    align-items: flex-start;
   }
   .es-econ-calendar-trigger{
     flex-shrink:0;
@@ -88,14 +89,10 @@
     border-radius:20px;
     background: var(--panel);
     border:1px solid var(--border);
-    cursor:grab;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.35);
-    touch-action:none;          /* tahan-geser di tablet tidak ikut men-scroll halaman */
+    cursor:pointer;
     user-select:none;
   }
   .es-econ-calendar-trigger:hover{ border-color:#8C231A; }
-  .es-econ-calendar-panel.dragging .es-econ-calendar-trigger{ cursor:grabbing; }
-  .es-econ-calendar-panel.dragging{ opacity:.9; }
   .es-econ-calendar-trigger-dot{
     width:9px;
     height:9px;
@@ -113,8 +110,11 @@
   .es-econ-calendar-content{
     position:absolute;               /* keluar dari alur -> buka/tutup tak menggeser tombol */
     top: calc(100% + 8px);
-    right: 0;                        /* melebar ke KIRI dari tepi kanan tombol */
+    left: 0;                         /* melebar ke KANAN dari tepi kiri tombol */
     width:320px;
+    max-width: min(320px, calc(100vw - 32px));
+    /* Kalau ruang di kanan tidak cukup, panel dibalik jadi rata-kanan (lihat
+       posisiKalenderNews di JS) supaya tidak terpotong tepi layar. */
     height:420px;
     background: var(--panel);
     border: 1px solid var(--border);
@@ -125,6 +125,7 @@
     overflow: hidden;
   }
   .es-econ-calendar-panel.collapsed .es-econ-calendar-content{ display:none; }
+  .es-econ-calendar-panel.rata-kanan .es-econ-calendar-content{ left:auto; right:0; }
   .es-econ-calendar-header{
     padding:8px 12px;
     border-bottom:1px solid var(--border);
@@ -243,7 +244,6 @@
   .es-econ-status .err{ color: var(--bear); }
   @media (max-width: 700px){
     .es-econ-calendar-content{ width: 260px; height: 360px; }
-    .es-econ-calendar-panel{ top:70px; right:8px; }
   }
 
   .es-header{
@@ -2040,6 +2040,19 @@
     width:min(360px, 90vw); padding:32px 28px; background:var(--panel); border:1px solid var(--border);
     border-radius:12px; text-align:center;
   }
+  /* Spinner "sedang memeriksa sesi" - tampil sampai Firebase memastikan status
+     login, supaya pindah halaman tidak berkedip menampilkan kotak login. */
+  .es-auth-loading{ display:flex; align-items:center; justify-content:center; }
+  .es-auth-spinner{
+    width:34px; height:34px; border-radius:50%;
+    border:3px solid var(--border);
+    border-top-color: var(--gold);
+    animation: esAuthSpin 0.75s linear infinite;
+  }
+  @keyframes esAuthSpin{ to{ transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce){
+    .es-auth-spinner{ animation-duration: 2s; }
+  }
   .es-auth-title{ font-family:var(--font-display); font-size:22px; color:var(--text); margin-bottom:6px; }
   .es-auth-sub{ font-size:13px; color:var(--muted); margin-bottom:24px; }
   .es-auth-google-btn{
@@ -2140,7 +2153,14 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 
 <div class="es-auth-gate" id="esAuthGate">
-  <div class="es-auth-box">
+  <!-- Sesi Firebase baru diketahui setelah onAuthStateChanged menyala (~1 detik).
+       Sebelum itu kotak login TIDAK boleh tampil - user yang sebenarnya SUDAH
+       login akan melihat kedipan "Masuk dengan Google" tiap pindah halaman,
+       seolah sesinya hilang. Jadi yang tampil dulu cuma spinner. -->
+  <div class="es-auth-loading" id="esAuthLoading">
+    <div class="es-auth-spinner"></div>
+  </div>
+  <div class="es-auth-box" id="esAuthBox" style="display:none;">
     <div class="es-auth-title">Jadi Trader Tools</div>
     <div class="es-auth-sub">Login untuk melanjutkan &mdash; histori &amp; pengaturan kamu tersinkron otomatis di semua device.</div>
     <button type="button" class="es-auth-google-btn" id="esGoogleLoginBtn">Masuk dengan Google</button>
@@ -2226,40 +2246,6 @@
       </div>
     </div>
   </div>
-  <div class="es-econ-calendar-panel collapsed" id="esEconCalendarPanel">
-    <div class="es-econ-calendar-trigger" id="esEconCalendarTrigger">
-      <span class="es-econ-calendar-trigger-dot"></span>
-      <span class="es-econ-calendar-trigger-label">News</span>
-    </div>
-    <div class="es-econ-calendar-content">
-      <div class="es-econ-calendar-header">
-        <div class="es-econ-head-row">Kalender Ekonomi</div>
-        <div class="es-econ-filter-row">
-          <select class="es-econ-filter" id="esEconCur">
-            <option value="USD" selected>USD</option>
-            <option value="major">Major</option>
-            <option value="all">Semua</option>
-            <option value="EUR">EUR</option>
-            <option value="GBP">GBP</option>
-            <option value="JPY">JPY</option>
-            <option value="AUD">AUD</option>
-            <option value="CAD">CAD</option>
-            <option value="CHF">CHF</option>
-            <option value="NZD">NZD</option>
-            <option value="CNY">CNY</option>
-          </select>
-          <select class="es-econ-filter" id="esEconFilter">
-            <option value="high" selected>Dampak Tinggi</option>
-            <option value="medium">Tinggi + Sedang</option>
-            <option value="all">Semua Dampak</option>
-          </select>
-        </div>
-      </div>
-      <div class="es-econ-next" id="esEconNext"></div>
-      <div class="es-econ-calendar-body" id="esEconCalendarBody"></div>
-    </div>
-  </div>
-
   <!-- Pop-up pengingat News: muncul saat buka web & 10 menit sebelum tiap rilis dampak tinggi -->
   <div class="es-news-pop-overlay" id="esNewsPopup">
     <div class="es-news-pop-card">
@@ -2361,6 +2347,39 @@
           </button>
           <div class="es-symbol-manager-dropdown" id="esPantauManagerDropdown"></div>
         </div>
+        <div class="es-econ-calendar-panel collapsed" id="esEconCalendarPanel">
+          <div class="es-econ-calendar-trigger" id="esEconCalendarTrigger">
+            <span class="es-econ-calendar-trigger-dot"></span>
+            <span class="es-econ-calendar-trigger-label">News</span>
+          </div>
+          <div class="es-econ-calendar-content">
+            <div class="es-econ-calendar-header">
+              <div class="es-econ-head-row">Kalender Ekonomi</div>
+              <div class="es-econ-filter-row">
+                <select class="es-econ-filter" id="esEconCur">
+                  <option value="USD" selected>USD</option>
+                  <option value="major">Major</option>
+                  <option value="all">Semua</option>
+                  <option value="EUR">EUR</option>
+                  <option value="GBP">GBP</option>
+                  <option value="JPY">JPY</option>
+                  <option value="AUD">AUD</option>
+                  <option value="CAD">CAD</option>
+                  <option value="CHF">CHF</option>
+                  <option value="NZD">NZD</option>
+                  <option value="CNY">CNY</option>
+                </select>
+                <select class="es-econ-filter" id="esEconFilter">
+                  <option value="high" selected>Dampak Tinggi</option>
+                  <option value="medium">Tinggi + Sedang</option>
+                  <option value="all">Semua Dampak</option>
+                </select>
+              </div>
+            </div>
+            <div class="es-econ-next" id="esEconNext"></div>
+            <div class="es-econ-calendar-body" id="esEconCalendarBody"></div>
+          </div>
+        </div>
         <div class="es-ai-regime" id="esPantauRegimeBadge"></div>
       </div>
       <div class="es-grid" id="esPantauGrid"></div>
@@ -2380,12 +2399,17 @@
         <select id="esChTf">
           <option value="1m">TF 1 Menit</option>
           <option value="5m">TF 5 Menit</option>
-          <option value="15m" selected>TF 15 Menit</option>
+          <option value="15m">TF 15 Menit</option>
           <option value="30m">TF 30 Menit</option>
           <option value="1h">TF 1 Jam</option>
-          <option value="4h">TF 4 Jam</option>
+          <option value="4h" selected>TF 4 Jam</option>
           <option value="1d">TF Daily</option>
           <option value="1w">TF Weekly</option>
+        </select>
+        <select id="esChSnrFilter" title="Saring sinyal berdasarkan ada/tidaknya level Support-Resisten di titik sentuh channel">
+          <option value="all" selected>Semua Sinyal</option>
+          <option value="snr">Sentuh SNR (channel + level S/R)</option>
+          <option value="only">Parallel Only (tanpa S/R)</option>
         </select>
         <button id="esChBtn" class="es-priority-btn">Cari Sinyal Parallel</button>
         <div class="es-symbol-manager es-symbol-manager-inline">
@@ -2696,6 +2720,21 @@
   const esAuthGateEl = document.getElementById('esAuthGate');
   const esAuthStatusEl = document.getElementById('esAuthStatus');
   const esGoogleLoginBtn = document.getElementById('esGoogleLoginBtn');
+  const esAuthLoadingEl = document.getElementById('esAuthLoading');
+  const esAuthBoxEl = document.getElementById('esAuthBox');
+
+  // Ganti spinner jadi kotak login. Dipanggil HANYA setelah Firebase memastikan
+  // tidak ada sesi aktif - kalau dipanggil lebih awal, user yang sudah login
+  // sempat melihat tombol "Masuk dengan Google" berkedip tiap pindah halaman.
+  function tampilkanKotakLogin(){
+    if(esAuthLoadingEl) esAuthLoadingEl.style.display = 'none';
+    if(esAuthBoxEl) esAuthBoxEl.style.display = 'block';
+  }
+  // Jaring pengaman: kalau Firebase tidak pernah menjawab (offline / gstatic
+  // diblokir), jangan tinggalkan user menatap spinner selamanya.
+  setTimeout(function(){
+    if(esAuthGateEl && esAuthGateEl.style.display !== 'none') tampilkanKotakLogin();
+  }, 6000);
 
   // ===== Gerbang aktivasi (keanggotaan) =====
   // Saklar utama: kalau ada yang tidak beres, set false untuk membuka kunci
@@ -3000,6 +3039,9 @@
     } else {
       esCurrentUid = null;
       esAuthGateEl.style.display = 'flex';
+      // Baru SEKARANG status login benar-benar diketahui: spinner diganti kotak
+      // login. Sebelum titik ini kotaknya sengaja disembunyikan (lihat markup).
+      tampilkanKotakLogin();
       esActivateGateEl.style.display = 'none';
       esUserBarEl.style.display = 'none';
       if(esCloudSyncTimer) clearInterval(esCloudSyncTimer);
@@ -5762,6 +5804,7 @@
   // resistan teratas (SELL) / support terbawah (BUY), dilebihkan sedikit dari
   // zona SNR. Aktif di TF 1m/5m/15m/30m/1h/4h/D/W.
   const chTfSel = document.getElementById('esChTf');
+  const chSnrFilterSel = document.getElementById('esChSnrFilter');
   const chBtn = document.getElementById('esChBtn');
   const chGrid = document.getElementById('esChGrid');
   const chStatusEl = document.getElementById('esChStatus');
@@ -5987,9 +6030,24 @@
     const chUpNow = pcUpperAt(ch, B);
     const chLoNow = pcLowerAt(ch, B);
 
+    // ── Konfluensi S/R ────────────────────────────────────────────────────
+    // Sentuhan garis channel jadi jauh lebih bermutu kalau KEBETULAN jatuh di
+    // level support/resisten yang sudah teruji. Di sini dicek apakah harga
+    // entry berada dalam jangkauan zona swing terdekat (toleransi 0.5 ATR,
+    // sama seperti lebar zona yang dipakai section lain). Hasilnya dipakai
+    // filter "Sentuh SNR" / "Parallel Only" - sinyalnya sendiri tidak berubah.
+    const zonaPivotHi = findPivots(d.highs, 10, 10, true).slice(-3)
+      .map(p=>({ value:p.value, top:p.value + a*0.5, bottom:p.value - a*0.5 }));
+    const zonaPivotLo = findPivots(d.lows, 10, 10, false).slice(-3)
+      .map(p=>({ value:p.value, top:p.value + a*0.5, bottom:p.value - a*0.5 }));
+    // BUY memantul dari bawah -> yang relevan support; SELL sebaliknya.
+    const cekSnr = checkZoneNearBand(arah==='BUY' ? zonaPivotLo : zonaPivotHi, price, a);
+    const snrOk = !!cekSnr.ok;
+    const snrLevel = cekSnr.zone ? cekSnr.zone.value : null;
+
     return { symbol, signal: arah, price, sl, tp, tfValue: tf, tfLabel: CH_TF_LABEL[tf]||tf,
              sentuh, chArah, chBand: bnd.band, chSigIdx: sigIdx, riskPct,
-             chUpNow, chLoNow };
+             chUpNow, chLoNow, snrOk, snrLevel };
   }
 
   function renderCrossHunterSignals(top){
@@ -6018,6 +6076,9 @@
           <div class="es-check-row ok"><span class="es-check-icon">&check;</span> Sentuh garis ${garis} channel</div>
           <div class="es-check-row ok"><span class="es-check-icon">&check;</span> Close balik ke dalam channel</div>
           <div class="es-check-row ok"><span class="es-check-icon">&check;</span> ${candleTeks}</div>
+          <div class="es-check-row ${c.snrOk?'ok':'fail'}"><span class="es-check-icon">${c.snrOk?'&check;':'&#10007;'}</span> ${c.snrOk
+            ? 'Sentuh SNR: ada level ' + (c.signal==='BUY'?'support':'resisten') + ' di $' + fmtPrice(c.snrLevel)
+            : 'Sentuh SNR: tidak ada level S/R di titik ini'}</div>
           <div class="es-check-row ok"><span class="es-check-icon">&bull;</span> Band aktif: ${c.chBand||'Channel Utama'}</div>
           <div class="es-check-row ok"><span class="es-check-icon">&bull;</span> Arah channel: ${c.chArah}</div>
           <div class="es-check-row ok" style="color:var(--muted)"><span class="es-check-icon">&bull;</span> [debug] Garis channel: Atas $${fmtPrice(c.chUpNow)} • Bawah $${fmtPrice(c.chLoNow)}</div>
@@ -6130,6 +6191,45 @@
     }
   }
 
+  // Hasil pemindaian TERAKHIR yang belum tersaring, plus konteksnya. Dipakai
+  // supaya mengubah filter S/R terasa instan (menyaring ulang daftar yang sudah
+  // ada) alih-alih memicu pemindaian 100 koin dari nol.
+  let chHasilMentah = [];
+  let chKoinDipindai = 0;
+  let chTfDipindai = null;
+
+  // Saring hasil menurut konfluensi S/R lalu gambar ulang grid + status.
+  // "Semua Sinyal" tidak menyaring apa pun, jadi perilakunya sama persis
+  // seperti sebelum filter ini ada.
+  function terapkanFilterSnr(){
+    const tf = chTfDipindai || chTfSel.value;
+    const tfLbl = CH_TF_LABEL[tf] || tf;
+    const mode = chSnrFilterSel ? chSnrFilterSel.value : 'all';
+    const total = chHasilMentah.length;
+    let hasil = chHasilMentah;
+    if(mode === 'snr')       hasil = hasil.filter(c => c.snrOk);
+    else if(mode === 'only') hasil = hasil.filter(c => !c.snrOk);
+    // Koin favorit (dibintangi) naik ke urutan paling depan - lihat catatan di
+    // favPrioritas. Sisanya tetap urut berdasarkan kapitalisasi.
+    hasil = urutkanHasilParallel(hasil);
+
+    const label = mode === 'snr'  ? ' yang juga menyentuh level S/R'
+                : mode === 'only' ? ' murni channel (tanpa level S/R)' : '';
+    if(hasil.length === 0){
+      chGrid.innerHTML = '';
+      window.__esLastCrossHunterResults = [];
+      chStatusEl.textContent = (total === 0 || mode === 'all')
+        ? `Tidak ada sinyal Parallel (TF ${tfLbl}) yang menyentuh channel saat ini dari ${chKoinDipindai} koin.`
+        : `Dari ${total} sinyal Parallel (TF ${tfLbl}), tidak ada${label}. Pilih "Semua Sinyal" untuk melihat semuanya.`;
+      return;
+    }
+    renderCrossHunterSignals(hasil);
+    const nBuy = hasil.filter(c=>c.signal==='BUY').length;
+    chStatusEl.textContent = `Ditemukan ${hasil.length} sinyal Parallel${label} (${nBuy} BUY, ${hasil.length-nBuy} SELL)`
+      + (mode === 'all' ? '' : ` dari ${total} sinyal`)
+      + ` • ${chKoinDipindai} koin • TF ${tfLbl} • ${new Date().toLocaleTimeString('id-ID')}.`;
+  }
+
   async function findCrossHunterSignals(){
     if(isSectionCollapsed('crosshunter')) return;
     const tf = chTfSel.value;
@@ -6143,17 +6243,12 @@
       const settled = await mapLimited(activeSymbols, SCAN_CONCURRENCY, s => findCrossHunterSignalForSymbol(s, tickers, tf));
       let all = [];
       settled.forEach(s=>{ if(s.status==='fulfilled' && s.value) all.push(s.value); });
-      // Koin favorit (dibintangi) naik ke urutan paling depan - lihat catatan di
-      // favPrioritas. Sisanya tetap urut berdasarkan kapitalisasi.
-      all = urutkanHasilParallel(all);
-      if(all.length === 0){
-        chStatusEl.textContent = `Tidak ada sinyal Parallel (TF ${CH_TF_LABEL[tf]||tf}) yang menyentuh channel saat ini dari ${activeSymbols.length} koin.`;
-        chBtn.disabled = false;
-        return;
-      }
-      renderCrossHunterSignals(all);
-      const nBuy = all.filter(c=>c.signal==='BUY').length;
-      chStatusEl.textContent = `Ditemukan ${all.length} sinyal Parallel (${nBuy} BUY, ${all.length-nBuy} SELL) dari ${activeSymbols.length} koin • TF ${CH_TF_LABEL[tf]||tf} • ${new Date().toLocaleTimeString('id-ID')}.`;
+      // Simpan hasil MENTAH (belum tersaring) supaya ganti filter S/R cukup
+      // menyaring ulang di tempat - tidak perlu memindai 100 koin lagi.
+      chHasilMentah = all;
+      chKoinDipindai = activeSymbols.length;
+      chTfDipindai = tf;
+      terapkanFilterSnr();
     }catch(e){
       chStatusEl.classList.add('error');
       chStatusEl.textContent = `Gagal memindai Parallel Signal: ${e && e.message ? e.message : 'kesalahan tak terduga'}.`;
@@ -6187,6 +6282,11 @@
   // Rezim BTC ikut TF: perbarui tiap ganti TF, dan tampilkan sekali di awal (default).
   // Ditunda 1 tick supaya state collapse section sudah siap saat dicek (hindari TDZ).
   chTfSel.addEventListener('change', ()=> updateChBtcRegime());
+  // Ganti filter S/R = saring ulang hasil yang SUDAH ada (instan). Kalau belum
+  // pernah memindai, tidak ada yang bisa disaring - biarkan status apa adanya.
+  if(chSnrFilterSel) chSnrFilterSel.addEventListener('change', ()=>{
+    if(chHasilMentah.length || chTfDipindai) terapkanFilterSnr();
+  });
   setTimeout(()=>{ try{ if(!isSectionCollapsed('crosshunter')) updateChBtcRegime(); }catch(e){} }, 0);
   chManagerBtn.addEventListener('click', (e)=>{ e.stopPropagation(); renderChManagerDropdown(); chManagerDropdown.classList.toggle('open'); });
   document.addEventListener('click', (e)=>{ if(!chManagerDropdown.contains(e.target) && e.target!==chManagerBtn && !chManagerBtn.contains(e.target)) chManagerDropdown.classList.remove('open'); });
@@ -7838,6 +7938,14 @@
         <div class="es-psim-preview-line muted">Biaya Exchange: -$${s.fee.toFixed(2)}</div>
       </div>`;
 
+    // Metode entry menentukan target mana yang BENAR-BENAR dipasang di exchange.
+    // Kalau "SL & TP2 saja", TP1 tidak pernah dikirim - menampilkan kotaknya
+    // cuma bikin bingung (seolah ada dua target padahal cuma satu). Jadi kotak
+    // target yang tidak terpakai disembunyikan, bukan sekadar diredupkan.
+    const metode = liveEntryMethodSel.value || 'partial';
+    const pakaiTp1 = metode !== 'tp2only';
+    const pakaiTp2 = metode !== 'tp1only';
+
     psimPreviewEl.innerHTML = `
       <div class="es-psim-preview-head">
         <strong>${c.symbol.replace('USDT','')} (${c.tfLabel})</strong> — ${c.signal} @ $${fmtPrice(entryPrice)}
@@ -7845,8 +7953,8 @@
       </div>
       <div class="es-psim-preview-grid">
         ${col('SL', sl, slS)}
-        ${col('TP1', tp1, tp1S)}
-        ${col('TP2', tp2, tp2S)}
+        ${pakaiTp1 ? col('TP1', tp1, tp1S) : ''}
+        ${pakaiTp2 ? col('TP2', tp2, tp2S) : ''}
       </div>
       <div class="es-psim-preview-note">Estimasi Biaya Margin (funding): ~$${fundingPer8h.toFixed(2)} / 8 jam selama posisi terbuka (dipotong dari PnL saat posisi ditutup).</div>
     `;
@@ -8635,6 +8743,9 @@
   psimToggle.addEventListener('change', savePsimSettings);
   psimDirOverrideSel.addEventListener('change', savePsimSettings);
   liveEntryMethodSel.addEventListener('change', savePsimSettings);
+  // Preview ikut berubah: kotak TP yang tidak dipakai metode ini harus langsung
+  // hilang, bukan baru saat sinyal dipilih ulang.
+  liveEntryMethodSel.addEventListener('change', renderPsimPreview);
   loadPsimSettings();
   // Setelah restore, sinkronkan tampilan field harga entry manual dgn order type.
   (function(){ const v=liveOrderTypeSel.value; liveEntryPriceLabel.style.display = (!!v && v!=='MARKET') ? '' : 'none'; })();
@@ -9041,110 +9152,32 @@
 
   const econCalendarPanel = document.getElementById('esEconCalendarPanel');
   const econCalendarTrigger = document.getElementById('esEconCalendarTrigger');
-  // ---- Tombol News bisa digeser ke mana saja -------------------------------
-  // Pakai Pointer Events supaya mouse dan sentuhan (tablet) ditangani sekaligus.
-  // Geser >4px dianggap "memindahkan", bukan "klik" - tanpa ambang ini, tiap
-  // kali selesai menggeser panelnya ikut kebuka/ketutup.
-  const ECON_POS_KEY = 'emaScreenerEconPos_v1';
-  const GESER_MINIMAL = 4;
-  let geserAktif = false, sedangGeser = false;
-  let mulaiX = 0, mulaiY = 0, panelX = 0, panelY = 0;
-
-  // Posisi dijangkar dari tepi KIRI & ATAS layar (px tetap) supaya tombol News
-  // TIDAK ikut bergerak saat ukuran window diubah. Konten kalender diposisikan
-  // absolut (lihat CSS) sehingga buka/tutup kalender tidak menggeser tombolnya.
-  function jepitKeLayar(left, top){
-    const rt = econCalendarTrigger.getBoundingClientRect();
-    const maxLeft = Math.max(0, window.innerWidth  - rt.width);
-    const maxTop  = Math.max(0, window.innerHeight - rt.height);
-    return { left: Math.min(Math.max(0, left), maxLeft),
-             top:  Math.min(Math.max(0, top),  maxTop) };
-  }
-
-  function terapkanPosisi(left, top){
-    const p = jepitKeLayar(left, top);
-    econCalendarPanel.style.left  = p.left + 'px';
-    econCalendarPanel.style.top   = p.top + 'px';
-    econCalendarPanel.style.right = 'auto';
-    return p;
-  }
-
-  function simpanPosisiEcon(left, top){
-    try{ localStorage.setItem(ECON_POS_KEY, JSON.stringify({ left, top })); }catch(e){}
-  }
-
-  function muatPosisiEcon(){
-    let applied = false;
-    try{
-      const raw = localStorage.getItem(ECON_POS_KEY);
-      if(raw){
-        const p = JSON.parse(raw);
-        const rt = econCalendarTrigger.getBoundingClientRect();
-        if(typeof p.left === 'number' && typeof p.top === 'number'){
-          terapkanPosisi(p.left, p.top); applied = true;
-        } else if(typeof p.right === 'number' && typeof p.top === 'number'){
-          // format lama (berbasis kanan) -> konversi ke berbasis kiri
-          const q = terapkanPosisi(window.innerWidth - p.right - rt.width, p.top);
-          simpanPosisiEcon(q.left, q.top); applied = true;
-        } else if(typeof p.x === 'number' && typeof p.y === 'number'){
-          const q = terapkanPosisi(p.x, p.y); simpanPosisiEcon(q.left, q.top); applied = true;
-        }
-      }
-    }catch(e){}
-    // Belum ada posisi tersimpan: bekukan posisi default (CSS right:16px) menjadi
-    // berbasis kiri supaya tetap diam saat window di-resize.
-    if(!applied){
-      const rt = econCalendarTrigger.getBoundingClientRect();
-      terapkanPosisi(rt.left, rt.top);
+  // Tombol News DIAM di tempatnya (di baris kontrol Area Pantau). Kode geser
+  // (pointerdown/move/up + simpan-muat posisi) sudah dibuang: tombolnya bukan
+  // lagi panel mengambang, jadi tidak ada yang perlu dipindah-pindah.
+  // Tombolnya kini duduk di tengah baris kontrol, jadi panel 320px yang melebar
+  // ke kanan bisa terpotong tepi layar di window sempit. Diukur saat dibuka:
+  // kalau tidak muat, panel dibalik jadi rata-kanan terhadap tombol.
+  function posisiKalenderNews(){
+    const isi = econCalendarPanel.querySelector('.es-econ-calendar-content');
+    if(!isi) return;
+    econCalendarPanel.classList.remove('rata-kanan');
+    const kiri = econCalendarTrigger.getBoundingClientRect().left;
+    if(kiri + isi.getBoundingClientRect().width > window.innerWidth - 8){
+      econCalendarPanel.classList.add('rata-kanan');
     }
   }
-
-  econCalendarTrigger.addEventListener('pointerdown', (e)=>{
-    if(e.button !== undefined && e.button !== 0) return;   // klik kanan/tengah jangan dianggap geser
-    geserAktif = true; sedangGeser = false;
-    const rt = econCalendarTrigger.getBoundingClientRect();
-    panelX = rt.left; panelY = rt.top;                     // jangkar dari kiri
-    mulaiX = e.clientX; mulaiY = e.clientY;
-    econCalendarTrigger.setPointerCapture(e.pointerId);
-  });
-
-  econCalendarTrigger.addEventListener('pointermove', (e)=>{
-    if(!geserAktif) return;
-    const dx = e.clientX - mulaiX, dy = e.clientY - mulaiY;
-    if(!sedangGeser && Math.hypot(dx, dy) < GESER_MINIMAL) return;
-    if(!sedangGeser){ sedangGeser = true; econCalendarPanel.classList.add('dragging'); }
-    e.preventDefault();
-    terapkanPosisi(panelX + dx, panelY + dy);
-  });
-
-  function selesaiGeser(e){
-    if(!geserAktif) return;
-    geserAktif = false;
-    econCalendarPanel.classList.remove('dragging');
-    try{ econCalendarTrigger.releasePointerCapture(e.pointerId); }catch(err){}
-    if(sedangGeser){
-      const rt = econCalendarTrigger.getBoundingClientRect();
-      simpanPosisiEcon(rt.left, rt.top);
-    }
-  }
-  econCalendarTrigger.addEventListener('pointerup', selesaiGeser);
-  econCalendarTrigger.addEventListener('pointercancel', selesaiGeser);
-
-  // Saat window di-resize: pertahankan posisi kiri/atas (tombol tetap DIAM),
-  // hanya ditarik balik kalau sampai keluar layar.
-  window.addEventListener('resize', ()=>{
-    const rt = econCalendarTrigger.getBoundingClientRect();
-    const p = terapkanPosisi(rt.left, rt.top);
-    simpanPosisiEcon(p.left, p.top);
-  });
 
   econCalendarTrigger.addEventListener('click', (e)=>{
     e.stopPropagation();
-    if(sedangGeser){ sedangGeser = false; return; }   // baru saja digeser - jangan buka/tutup
+    const akanBuka = econCalendarPanel.classList.contains('collapsed');
     econCalendarPanel.classList.toggle('collapsed');
+    if(akanBuka) posisiKalenderNews();
+  });
+  window.addEventListener('resize', ()=>{
+    if(!econCalendarPanel.classList.contains('collapsed')) posisiKalenderNews();
   });
 
-  muatPosisiEcon();
   document.addEventListener('click', (e)=>{
     if(!econCalendarPanel.contains(e.target)){
       econCalendarPanel.classList.add('collapsed');

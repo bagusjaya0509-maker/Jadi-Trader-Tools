@@ -3,7 +3,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202607271640">
+<meta name="jt-versi" content="202607281105">
 <script>
 /* ── Penjaga versi ────────────────────────────────────────────────────────────
    GitHub Pages menyuruh browser menyimpan HTML di cache beberapa menit, jadi
@@ -13,7 +13,7 @@
    sekali saja kalau ternyata yang tampil sudah usang. Dijaga sessionStorage
    supaya tidak pernah berulang (anti-loop). */
 (function(){
-  var VERSI_TAMPIL = "202607271640";
+  var VERSI_TAMPIL = "202607281105";
   try{
     if(sessionStorage.getItem("jtVersiDicek") === VERSI_TAMPIL) return;
     fetch(location.pathname + "?_v=" + Date.now(), { cache: "no-store" })
@@ -258,6 +258,16 @@
   .jt-openpos-dir.sell{color:var(--loss);background:var(--loss-soft);}
   .jt-openpos-sl{color:var(--loss);}
   .jt-openpos-tp{color:var(--profit);}
+  /* Order LIMIT/STOP yang masih antre: dibuat sedikit redup + diberi label jenis
+     ordernya, dan kolom PnL-nya diisi keterangan (bukan angka) supaya tidak
+     terbaca seolah posisinya sudah berjalan. */
+  .jt-openpos-pending{opacity:.78;}
+  .jt-openpos-badge{
+    font-family:var(--font-mono);font-size:9px;letter-spacing:.03em;
+    color:var(--accent);border:1px solid var(--accent);
+    padding:1px 5px;border-radius:4px;margin-left:6px;white-space:nowrap;
+  }
+  .jt-openpos-gantung{color:var(--ink-faint);font-style:italic;font-size:10.5px;}
   /* Riwayat trade kripto memanjang penuh di bawah grid */
   .jt-riwayat-penuh > .card{margin-top:20px;}
   /* Dropdown emosi & alasan entry di dalam baris riwayat */
@@ -1636,7 +1646,14 @@
           tf: lokal[pilih].tf || '', direction: lokal[pilih].direction || '',
           plKotor: b.plKotor, fee: b.fee, pl: b.pl,   // angka SELALU versi Binance
           reason: lokal[pilih].reason || b.reason,
-          venue: lokal[pilih].venue || b.venue
+          venue: lokal[pilih].venue || b.venue,
+          // Emosi & alasan entry yang dipilih di pop-up konfirmasi sebelum entry
+          // HARUS ikut terbawa. Sebelumnya dua field ini tidak disalin di sini,
+          // jadi justru pada baris yang paling penting (live-real yang cocok
+          // dengan data Binance) kolom "Alasan Entry / Setup" selalu kosong -
+          // padahal alasannya sudah diisi waktu buka posisi di Crypto Screener.
+          preEmosi: lokal[pilih].preEmosi || '',
+          preAlasan: lokal[pilih].preAlasan || ''
         };
       }
       return b;
@@ -2181,7 +2198,16 @@
         posisi = Object.keys(p).map(function(k){ return p[k]; }).filter(Boolean);
       }
     }catch(e){}
-    if(hint) hint.textContent = posisi.length ? (posisi.length + ' posisi') : '—';
+    // Order yang masih menggantung dihitung terpisah - kalau digabung, "3 posisi"
+    // terbaca seolah semuanya sudah jalan padahal sebagian baru antre.
+    var nGantung = posisi.filter(function(p){ return p && p.pending; }).length;
+    var nJalan = posisi.length - nGantung;
+    if(hint){
+      hint.textContent = !posisi.length ? '—'
+        : (nJalan ? nJalan + ' posisi' : '')
+          + (nJalan && nGantung ? ' • ' : '')
+          + (nGantung ? nGantung + ' order menggantung' : '');
+    }
     if(!posisi.length){
       box.innerHTML = '<p class="jt-openpos-kosong">Tidak ada posisi terbuka.</p>';
       return;
@@ -2198,17 +2224,29 @@
           var dir = String(t.dir || '').toUpperCase();
           var kelas = dir === 'BUY' ? 'buy' : 'sell';
           var kini = harga[t.source];
+          // Order LIMIT/STOP yang masih MENGGANTUNG belum jadi posisi: belum ada
+          // qty yang benar-benar terisi, jadi menghitung PnL untuknya keliru -
+          // angka seperti "+1.20" itu semu, seolah sudah ada untung padahal
+          // ordernya belum tersentuh harga sama sekali. Baris begini diberi
+          // keterangan jenis ordernya saja, kolom PnL dikosongkan.
+          var menggantung = !!t.pending;
           var pnl = null;
-          if(kini != null && t.entryPrice && t.qty){
+          if(!menggantung && kini != null && t.entryPrice && t.qty){
             pnl = (kini - t.entryPrice) * t.qty * (dir === 'BUY' ? 1 : -1);
           }
           var warnaPnl = pnl == null ? 'var(--ink-faint)'
                         : pnl > 0 ? 'var(--profit)' : pnl < 0 ? 'var(--loss)' : 'var(--ink-dim)';
           // Size Order = modal per posisi x leverage (nilai notional yang dipakai).
           var size = (t.margin != null && t.leverage != null) ? (t.margin * t.leverage) : null;
-          return '<tr>'
+          var labelGantung = t.pendingOrderType || 'Limit Order';
+          var selPnl = menggantung
+            ? '<td class="jt-openpos-gantung">Menunggu harga</td>'
+            : '<td style="color:' + warnaPnl + '">' + (pnl != null ? fmtMoney(pnl) : '—') + '</td>';
+          return '<tr' + (menggantung ? ' class="jt-openpos-pending"' : '') + '>'
             + '<td><span class="jt-openpos-sym">' + sym + '</span>'
-            +     '<span class="jt-openpos-dir ' + kelas + '">' + dir + '</span></td>'
+            +     '<span class="jt-openpos-dir ' + kelas + '">' + dir + '</span>'
+            +     (menggantung ? '<span class="jt-openpos-badge">' + labelGantung + '</span>' : '')
+            + '</td>'
             + '<td style="color:var(--ink-faint)">' + (t.tfLabel || '—') + '</td>'
             + '<td>' + (size != null ? fmtMoney(size) : '—') + '</td>'
             + '<td>' + fmtHarga(t.entryPrice) + '</td>'
@@ -2216,7 +2254,7 @@
             + '<td class="jt-openpos-tp">' + fmtHarga(t.tp1) + '</td>'
             + '<td class="jt-openpos-tp">' + fmtHarga(t.tp2) + '</td>'
             + '<td>' + fmtHarga(kini) + '</td>'
-            + '<td style="color:' + warnaPnl + '">' + (pnl != null ? fmtMoney(pnl) : '—') + '</td>'
+            + selPnl
             + '</tr>';
         }).join('')
       + '</tbody></table>';
