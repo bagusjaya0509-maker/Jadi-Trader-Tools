@@ -8,13 +8,21 @@
   Halaman depan situs.
 
   DULU file ini adalah SALINAN penuh jurnal-trading.html, dan itu sumber masalah:
-  tiap kali jurnal diperbarui, salinan di sini ikut harus di-upload ulang. Kalau
-  lupa, orang yang membuka alamat root situs melihat versi lama - persis yang
-  terjadi (layout lama, data kosong, fitur baru tidak ada) walau jurnal-trading.html
-  sendiri sudah ter-update.
+  tiap kali jurnal diperbarui, salinan di sini harus ikut di-upload. Sekali lupa,
+  siapa pun yang membuka alamat root melihat versi lama - persis yang terjadi
+  (layout lama, data kosong, fitur baru hilang) walau jurnal-trading.html sendiri
+  sudah ter-update.
 
-  Sekarang index.html cuma MENERUSKAN ke jurnal-trading.html, jadi tidak ada lagi
-  salinan yang bisa tertinggal. Query string (mis. ?v=3) ikut dibawa.
+  Sekarang file ini TIDAK PUNYA ISI SENDIRI - cuma meneruskan. Jadi secara
+  bentuk tidak mungkin lagi tertinggal: mengubah jurnal otomatis mengubah apa
+  yang dilihat pengunjung di alamat root, tanpa file ini perlu disentuh.
+
+  Satu celah yang tersisa dulu: penerusan bisa mendarat di jurnal versi CACHE.
+  Karena itu di bawah nomor versi jurnal dibaca langsung dari servernya (tanpa
+  cache) lalu ikut dibawa sebagai penanda di URL tujuan - browser jadi terpaksa
+  mengambil salinan yang benar-benar baru. Nomor versinya TIDAK ditulis di file
+  ini, melainkan diambil saat itu juga, supaya tidak ada angka yang harus
+  dirawat di dua tempat.
 -->
 <style>
   html,body{height:100%;margin:0;background:#0b0c0f;color:#9a9ca4;
@@ -23,17 +31,50 @@
   .judul{font-family:Georgia,serif;font-size:22px;color:#ece8de;}
   .info{font-size:13px;}
   a{color:#c9a24b;}
+  .putar{width:26px;height:26px;border-radius:50%;border:3px solid #262a31;
+    border-top-color:#c9a24b;animation:putar .75s linear infinite;}
+  @keyframes putar{to{transform:rotate(360deg)}}
 </style>
 <div class="wrap">
   <div class="judul">Jadi Trader Tools</div>
+  <div class="putar"></div>
   <div class="info">Membuka Jurnal Trading…</div>
   <div class="info"><a id="manual" href="jurnal-trading.html">Klik di sini kalau tidak berpindah otomatis</a></div>
 </div>
 <script>
 (function(){
-  var tujuan = 'jurnal-trading.html' + (location.search || '') + (location.hash || '');
-  document.getElementById('manual').href = tujuan;
-  // replace() supaya tombol "kembali" tidak terjebak memantul ke sini lagi.
-  location.replace(tujuan);
+  var TUJUAN = 'jurnal-trading.html';
+  var dasar = TUJUAN + (location.search || '') + (location.hash || '');
+  document.getElementById('manual').href = dasar;
+
+  // Pindah SEKALI saja. replace() dipakai supaya tombol "kembali" tidak
+  // terjebak memantul ke halaman ini lagi.
+  var sudah = false;
+  function pindah(url){
+    if(sudah) return;
+    sudah = true;
+    location.replace(url);
+  }
+
+  // Jaring pengaman: kalau pembacaan versi lambat/gagal (offline, server
+  // rewel), jangan biarkan pengunjung menatap spinner - teruskan apa adanya.
+  var pengaman = setTimeout(function(){ pindah(dasar); }, 2500);
+
+  // Ambil nomor versi jurnal langsung dari server, lewati cache, lalu bawa
+  // sebagai penanda supaya yang termuat dijamin versi itu - bukan salinan lama
+  // yang masih nyangkut di cache browser atau CDN GitHub Pages.
+  fetch(TUJUAN + '?_cek=' + Date.now(), { cache: 'no-store' })
+    .then(function(r){ return r.ok ? r.text() : null; })
+    .then(function(t){
+      clearTimeout(pengaman);
+      var m = t && t.match(/name="jt-versi" content="([^"]+)"/);
+      if(!m){ pindah(dasar); return; }
+      var pisah = location.search ? '&' : '?';
+      pindah(TUJUAN + (location.search || '') + pisah + '_v=' + m[1] + (location.hash || ''));
+    })
+    .catch(function(){
+      clearTimeout(pengaman);
+      pindah(dasar);
+    });
 })();
 </script>
