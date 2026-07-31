@@ -3,12 +3,12 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202607281440">
+<meta name="jt-versi" content="202607290930">
 <script>
 /* Penjaga versi - lihat catatan lengkap di jurnal-trading.html. Mencegah browser
    menyajikan HTML lama dari cache saat halaman dimuat ulang. */
 (function(){
-  var VERSI_TAMPIL = "202607281440";
+  var VERSI_TAMPIL = "202607290930";
   var KUNCI_OK    = "jtVersiOk";      // versi yang sudah dipastikan benar-benar termuat
   var KUNCI_PAKSA = "jtVersiPaksa";   // versi yang sudah pernah dipaksa muat ulang
   try{
@@ -2049,6 +2049,93 @@
     .es-priority-grid{ grid-template-columns: 1fr; }
   }
 
+  /* ══════════════════════════════════════════════════════════════════════
+     TAMPILAN HP (≤ 820px)
+     ══════════════════════════════════════════════════════════════════════
+     Sasarannya bukan sekadar "muat", tapi ENAK DIPAKAI dengan jempol:
+     tidak ada scroll ke samping di tingkat halaman, kolom kontrol jadi dua
+     per baris (bukan satu per baris yang bikin halaman kepanjangan), kartu
+     sinyal dilebarkan supaya isinya kebaca, dan tabel lebar tetap digeser
+     di dalam kotaknya sendiri. */
+  @media (max-width: 820px){
+    /* Safari/Chrome di HP sering membesarkan teks sendiri di blok panjang -
+       hasilnya ukuran huruf jadi belang. Dikunci ke ukuran yang kita tulis. */
+    html{ -webkit-text-size-adjust:100%; text-size-adjust:100%; }
+
+    .ema-screener{ padding:14px 12px 20px; border-radius:0; }
+
+    /* Baris atas & header: rata kiri, tidak dipaksa berdesakan di kanan. */
+    .es-toprow{ justify-content:flex-start; gap:8px; }
+    .es-header{ flex-direction:column; gap:10px; }
+
+    /* ---- Baris kontrol tiap section ----
+       Dua kontrol per baris. Tanpa min-width:0, elemen flex menolak menyusut
+       di bawah lebar isinya sehingga tetap turun satu-satu per baris. */
+    .es-priority-controls{ gap:8px; }
+    .es-priority-controls > select,
+    .es-priority-controls > .es-priority-btn,
+    .es-priority-controls > .es-symbol-manager{
+      flex:1 1 calc(50% - 4px);
+      min-width:0;
+    }
+    .es-priority-controls > .es-symbol-manager .es-symbol-manager-btn{ width:100%; }
+    /* Label panjang ("Ganti Chart / Kelola Koin") dikecilkan sedikit supaya
+       muat satu baris di setengah lebar layar - kalau membungkus dua baris,
+       tinggi tombolnya tidak lagi sejajar dengan tetangganya. */
+    .es-priority-controls .es-symbol-manager-btn{
+      font-size:10px; letter-spacing:0; padding-left:6px; padding-right:6px; gap:3px;
+      white-space:nowrap;
+    }
+    /* Badge rezim mengambil sisa ruang, tombol News duduk di sebelah kanannya -
+       tetap bersebelahan seperti di desktop, tidak menghabiskan satu baris
+       sendiri-sendiri. */
+    .es-priority-controls > .es-ai-regime{ flex:1 1 auto; justify-content:flex-start; }
+    .es-econ-calendar-panel{ flex:0 0 auto; align-items:stretch; }
+    .es-econ-calendar-trigger{ justify-content:center; }
+    /* Judul section + segitiga sembunyikan tetap SEBARIS. Aturan ≤480px
+       menjadikannya kolom, dan itu membuat segitiganya melayang di tengah
+       seolah tombol tersendiri. */
+    .es-priority-header{ flex-direction:row; align-items:center; justify-content:space-between; }
+    .es-econ-calendar-content{
+      width: calc(100vw - 24px);
+      max-width: calc(100vw - 24px);
+      height:min(70vh, 420px);
+    }
+
+    /* ---- Kartu sinyal ----
+       Satu kartu hampir selebar layar: digeser mendatar seperti sebelumnya,
+       tapi isinya sekarang kebaca tanpa menyipitkan mata. */
+    .es-card{ flex:0 0 86vw; }
+    .es-fav-box{ flex:0 0 46vw; }
+    #esPantauGrid{ padding:16px 10px; }
+    .es-priority-grid{ grid-template-columns:1fr; }
+
+    /* ---- Tabel lebar ----
+       Tetap digeser DI DALAM kotaknya (bukan memaksa halaman ikut melebar),
+       dengan momentum khas HP supaya terasa wajar. */
+    .es-sim-table-wrap{ -webkit-overflow-scrolling:touch; }
+
+    /* ---- Kolom isian ---- */
+    .es-sim-controls{ gap:10px; }
+    .es-live-trade-config{ flex-direction:column; align-items:stretch; }
+    .es-live-trade-config label,
+    .es-live-trade-config button{ width:100%; }
+
+    /* iOS otomatis MEN-ZOOM halaman saat kolom isian difokus kalau hurufnya
+       di bawah 16px - halaman jadi melenceng dan harus dizoom balik manual.
+       16px di sini bukan pilihan gaya, itu ambang yang mematikan zoom paksa. */
+    input, select, textarea{ font-size:16px !important; }
+    /* Sasaran sentuh jempol: 38px cukup nyaman tanpa bikin barisnya bengkak. */
+    .es-priority-controls select,
+    .es-priority-controls .es-priority-btn,
+    .es-priority-controls .es-symbol-manager-btn,
+    .es-priority-controls .es-ai-regime{ height:38px; }
+
+    /* ---- Pop-up ---- */
+    .es-reset-card, .es-preorder-card, .es-news-pop-card{ width:100%; max-width:100%; }
+    .es-coin-search-pop{ width: calc(100vw - 32px); }
+  }
+
   .es-auth-gate{
     position:fixed; inset:0; z-index:9999; display:flex; align-items:center; justify-content:center;
     background:var(--bg); font-family:var(--font-body);
@@ -3188,14 +3275,60 @@
       if(typeof renderHiddenSectionChips === 'function') renderHiddenSectionChips();
   }
 
+  // ── Login yang juga jalan di HP ──────────────────────────────────────────
+  // signInWithPopup butuh jendela pop-up. Di browser HP pop-up sering diblokir
+  // atau langsung ditutup, jadi login TIDAK PERNAH selesai dan aplikasi terkunci
+  // di gerbang login - inilah sebabnya screener "cuma jalan kalau mode desktop".
+  // Alur REDIRECT tidak butuh pop-up sama sekali, jadi dipakai di layar sentuh;
+  // di desktop pop-up tetap dipakai (lebih enak, tidak meninggalkan halaman),
+  // dengan redirect sebagai cadangan kalau pop-up ternyata diblokir juga.
+  function esLayarSentuh(){
+    try{
+      return window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 820;
+    }catch(e){ return window.innerWidth < 820; }
+  }
+  const ES_POPUP_GAGAL = [
+    'auth/popup-blocked',
+    'auth/popup-closed-by-user',
+    'auth/cancelled-popup-request',
+    'auth/operation-not-supported-in-this-environment',
+    'auth/web-storage-unsupported'
+  ];
+
   esGoogleLoginBtn.addEventListener('click', function(){
     esAuthStatusEl.classList.remove('error');
-    esAuthStatusEl.textContent = 'Membuka login Google...';
     const provider = new firebase.auth.GoogleAuthProvider();
+
+    if(esLayarSentuh()){
+      esAuthStatusEl.textContent = 'Mengalihkan ke login Google...';
+      esAuth.signInWithRedirect(provider).catch(function(e){
+        esAuthStatusEl.classList.add('error');
+        esAuthStatusEl.textContent = 'Gagal login: ' + e.message;
+      });
+      return;
+    }
+
+    esAuthStatusEl.textContent = 'Membuka login Google...';
     esAuth.signInWithPopup(provider).catch(function(e){
+      const kode = (e && e.code) || '';
+      if(ES_POPUP_GAGAL.indexOf(kode) !== -1){
+        esAuthStatusEl.textContent = 'Pop-up diblokir - mengalihkan ke login Google...';
+        return esAuth.signInWithRedirect(provider);
+      }
+      throw e;
+    }).catch(function(e){
       esAuthStatusEl.classList.add('error');
-      esAuthStatusEl.textContent = 'Gagal login: ' + e.message;
+      esAuthStatusEl.textContent = 'Gagal login: ' + (e && e.message ? e.message : 'tidak diketahui');
     });
+  });
+
+  // Sepulang dari alur redirect: kalau gagal, kegagalannya HARUS terlihat -
+  // kalau ditelan diam-diam, user cuma kembali ke gerbang login tanpa penjelasan
+  // dan mengira toolnya rusak.
+  esAuth.getRedirectResult().catch(function(e){
+    esAuthStatusEl.classList.add('error');
+    esAuthStatusEl.textContent = 'Gagal login: ' + (e && e.message ? e.message : 'tidak diketahui');
+    tampilkanKotakLogin();
   });
 
   esSignOutBtn.addEventListener('click', function(){

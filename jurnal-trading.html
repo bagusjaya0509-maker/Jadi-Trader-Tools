@@ -3,7 +3,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202607281105">
+<meta name="jt-versi" content="202607290930">
 <script>
 /* ── Penjaga versi ────────────────────────────────────────────────────────────
    GitHub Pages menyuruh browser menyimpan HTML di cache beberapa menit, jadi
@@ -13,7 +13,7 @@
    sekali saja kalau ternyata yang tampil sudah usang. Dijaga sessionStorage
    supaya tidak pernah berulang (anti-loop). */
 (function(){
-  var VERSI_TAMPIL = "202607281105";
+  var VERSI_TAMPIL = "202607290930";
   var KUNCI_OK    = "jtVersiOk";      // versi yang sudah dipastikan benar-benar termuat
   var KUNCI_PAKSA = "jtVersiPaksa";   // versi yang sudah pernah dipaksa muat ulang
   try{
@@ -245,6 +245,17 @@
      sehingga garis bawahnya sejajar dengan garis bawah kalender di kolom kanan. */
   /* align-self:stretch mengalahkan align-items:start milik .grid, supaya kolom ini
      setinggi kalender di kanan - baru flex:1 pada kotak posisi bisa mengisi sisa. */
+  /* min-width:0 WAJIB di sini. Bawaan anak grid adalah min-width:auto, artinya
+     kolom menolak menyusut di bawah lebar isi terlebarnya - dan isinya memuat
+     tabel ber-min-width 640px. Akibatnya di layar sempit kolom tetap ~686px,
+     mendorong seluruh halaman melebar dan memunculkan scroll ke samping
+     (persis "berantakan" yang terlihat di HP). Dengan min-width:0 kolom boleh
+     menyusut mengikuti layar, dan tabel lebarnya digeser di dalam kotaknya
+     sendiri lewat .table-scroll.
+     Sengaja menyasar SEMUA anak langsung .grid, bukan cuma .jt-col-kiri/kanan:
+     kolom di section XAU adalah div polos tanpa kelas, jadi kalau hanya kelas
+     itu yang diperbaiki, kalender XAU tetap memaksa halaman melebar. */
+  .grid > *{min-width:0;}
   .jt-col-kiri{display:flex;flex-direction:column;align-self:stretch;}
   .jt-col-kiri > .card:first-child{margin-bottom:20px !important;}
   /* Kolom kanan ikut meregang & kartu kalender mengisi tingginya, supaya garis
@@ -509,6 +520,69 @@
     .field-grid{grid-template-columns:1fr;}
     .account-meta{text-align:left;}
     .masthead{flex-direction:column;align-items:flex-start;}
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     TAMPILAN HP (≤ 820px)
+     ══════════════════════════════════════════════════════════════════════
+     Kuncinya sudah ditangani min-width:0 pada kolom grid di atas (itu yang
+     bikin halaman melebar). Sisanya merapikan kepadatan: kartu & tabel
+     dirapatkan, KPI jadi dua kolom, kalender dikecilkan, dan kolom isian
+     dibuat cukup besar untuk jempol. */
+  @media (max-width:820px){
+    html{-webkit-text-size-adjust:100%;text-size-adjust:100%;}
+    body{padding:14px 12px;}
+
+    /* Identitas akun & saldo pindah ke bawah judul, rata kiri. */
+    .masthead{flex-direction:column;align-items:flex-start;gap:14px;padding-bottom:16px;margin-bottom:16px;}
+    .account-meta{text-align:left;width:100%;}
+    .account-meta .balance{font-size:24px;}
+    /* Logo + judul tetap sebaris, tapi tombol navigasi turun ke baris sendiri.
+       Kalau dipaksa satu baris bertiga, judulnya terjepit sampai "Jadi Trader"
+       pecah jadi dua baris dan logonya jadi tidak sejajar. */
+    .brand-mark{flex-wrap:wrap;align-items:center;gap:10px;}
+    .brand-text{flex:1 1 auto;min-width:0;}
+    .brand-text .title{font-size:21px;white-space:nowrap;}
+    .jt-nav{flex:1 1 100%;flex-wrap:wrap;}
+
+    /* Dua KPI per baris - satu per baris bikin strip-nya kepanjangan,
+       tiga terlalu sempit untuk angka berdigit banyak. */
+    .kpis{grid-template-columns:repeat(2,1fr);margin-bottom:16px;}
+    .kpi{padding:12px 12px;}
+    .kpi .value{font-size:17px;}
+
+    .card{padding:14px 12px;}
+    .grid{gap:14px;}
+    /* Di layar sempit kolom ditumpuk, jadi tidak ada lagi "sejajar kiri-kanan"
+       yang perlu dipaksakan - tinggi dibiarkan mengikuti isinya masing-masing. */
+    .jt-col-kiri, .jt-col-kanan{align-self:auto;}
+    .jt-col-kanan > .card{flex:none;margin-bottom:0;}
+    .jt-col-kiri > .card.jt-openpos-card{flex:none;}
+
+    /* Tabel lebar: digeser DI DALAM kotaknya, dengan momentum khas HP.
+       Batas tinggi dilonggarkan supaya tidak ada dua scrollbar bertumpuk
+       (dalam kotak dan halaman) yang saling rebutan sentuhan. */
+    .table-scroll{-webkit-overflow-scrolling:touch;}
+    .table-scroll.jt-hist-limited,
+    .table-scroll.jt-hist-limited.jt-hist-kripto{max-height:60vh;}
+
+    .jt-hist-controls{flex-wrap:wrap;gap:8px;}
+    .card-head{flex-wrap:wrap;gap:10px;}
+
+    /* Kalender: sel lebih kecil supaya 7 kolom tetap muat tanpa terpotong. */
+    .cal-grid{gap:3px;}
+    .cal-cell{font-size:10px;}
+    .cal-cell .pl{font-size:8.5px;}
+
+    /* Pop-up memenuhi lebar layar - kotak sempit di tengah layar HP susah diisi. */
+    .modal, .jt-modal-card{width:100%;max-width:100%;}
+    .modal-actions, .jt-modal-actions{flex-wrap:wrap;}
+
+    /* iOS MEN-ZOOM paksa saat kolom isian difokus kalau hurufnya di bawah 16px,
+       dan halaman jadi melenceng. 16px di sini bukan pilihan gaya - itu ambang
+       yang mematikan zoom paksa tersebut. */
+    input, select, textarea{font-size:16px !important;}
+    .btn, .jt-google-btn, .icon-btn{min-height:34px;}
   }
 
   .jt-viewer-bar{
@@ -2713,11 +2787,44 @@
     }
   });
 
+  // ── Login yang juga jalan di HP ──────────────────────────────────────────
+  // signInWithPopup butuh jendela pop-up, dan di browser HP pop-up sering
+  // diblokir atau langsung ditutup sehingga login tidak pernah selesai. Alur
+  // REDIRECT tidak butuh pop-up, jadi dipakai di layar sentuh; desktop tetap
+  // pakai pop-up (tidak meninggalkan halaman) dengan redirect sebagai cadangan.
+  function jtLayarSentuh(){
+    try{
+      return window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 820;
+    }catch(e){ return window.innerWidth < 820; }
+  }
+  var JT_POPUP_GAGAL = [
+    'auth/popup-blocked',
+    'auth/popup-closed-by-user',
+    'auth/cancelled-popup-request',
+    'auth/operation-not-supported-in-this-environment',
+    'auth/web-storage-unsupported'
+  ];
+
   jtLoginBtn.addEventListener('click', function(){
     var provider = new firebase.auth.GoogleAuthProvider();
+    if(jtLayarSentuh()){
+      jtAuth.signInWithRedirect(provider).catch(function(e){
+        alert('Gagal login: ' + e.message);
+      });
+      return;
+    }
     jtAuth.signInWithPopup(provider).catch(function(e){
-      alert('Gagal login: ' + e.message);
+      var kode = (e && e.code) || '';
+      if(JT_POPUP_GAGAL.indexOf(kode) !== -1) return jtAuth.signInWithRedirect(provider);
+      throw e;
+    }).catch(function(e){
+      alert('Gagal login: ' + (e && e.message ? e.message : 'tidak diketahui'));
     });
+  });
+
+  // Sepulang dari alur redirect - kegagalan jangan ditelan diam-diam.
+  jtAuth.getRedirectResult().catch(function(e){
+    jtViewerNoteEl.textContent = 'Gagal login: ' + (e && e.message ? e.message : 'tidak diketahui');
   });
 
   jtSignOutBtn.addEventListener('click', function(){
