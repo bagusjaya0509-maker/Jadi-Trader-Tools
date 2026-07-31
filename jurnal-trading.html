@@ -3,7 +3,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202607290930">
+<meta name="jt-versi" content="202608011130">
 <script>
 /* ── Penjaga versi ────────────────────────────────────────────────────────────
    GitHub Pages menyuruh browser menyimpan HTML di cache beberapa menit, jadi
@@ -13,7 +13,7 @@
    sekali saja kalau ternyata yang tampil sudah usang. Dijaga sessionStorage
    supaya tidak pernah berulang (anti-loop). */
 (function(){
-  var VERSI_TAMPIL = "202607290930";
+  var VERSI_TAMPIL = "202608011130";
   var KUNCI_OK    = "jtVersiOk";      // versi yang sudah dipastikan benar-benar termuat
   var KUNCI_PAKSA = "jtVersiPaksa";   // versi yang sudah pernah dipaksa muat ulang
   try{
@@ -93,7 +93,15 @@
   .wrap.jt-wrap-xau{ padding-bottom:16px; }   /* rapatkan divider Jurnal Kripto ke tombol Export/Import */
 
   /* ---------- Nav ---------- */
-  .jt-nav{display:flex;gap:10px;margin-left:16px;flex-wrap:wrap;}
+  .jt-nav-wrap{position:relative;margin-left:16px;}
+  /* Tombol titik tiga hanya muncul di layar HP - lihat blok ≤820px. */
+  .jt-nav-toggle{
+    display:none;background:transparent;border:1px solid var(--border);color:var(--ink-dim);
+    width:32px;height:32px;border-radius:6px;cursor:pointer;line-height:1;
+    font-size:18px;padding:0;
+  }
+  .jt-nav-toggle:hover{border-color:var(--accent);color:var(--accent);}
+  .jt-nav{display:flex;gap:10px;flex-wrap:wrap;}
   .jt-nav-link{
     display:inline-flex;align-items:center;
     background:var(--surface);border:1px solid var(--accent-dim);color:var(--accent);
@@ -540,10 +548,26 @@
     /* Logo + judul tetap sebaris, tapi tombol navigasi turun ke baris sendiri.
        Kalau dipaksa satu baris bertiga, judulnya terjepit sampai "Jadi Trader"
        pecah jadi dua baris dan logonya jadi tidak sejajar. */
-    .brand-mark{flex-wrap:wrap;align-items:center;gap:10px;}
+    .brand-mark{flex-wrap:nowrap;align-items:center;gap:10px;}
     .brand-text{flex:1 1 auto;min-width:0;}
     .brand-text .title{font-size:21px;white-space:nowrap;}
-    .jt-nav{flex:1 1 100%;flex-wrap:wrap;}
+
+    /* Tautan halaman masuk ke balik tombol titik tiga di pojok kanan atas.
+       Panelnya position:absolute supaya buka/tutup tidak menggeser apa pun
+       di sekitarnya - header tidak "melompat" saat menu dibuka. */
+    .jt-nav-wrap{margin-left:auto;flex:0 0 auto;}
+    .jt-nav-toggle{display:block;}
+    .jt-nav{
+      display:none;position:absolute;top:calc(100% + 6px);right:0;z-index:60;
+      flex-direction:column;gap:0;min-width:172px;
+      background:var(--surface);border:1px solid var(--border);border-radius:8px;
+      box-shadow:0 12px 30px rgba(0,0,0,.5);overflow:hidden;
+    }
+    .jt-nav.open{display:flex;}
+    .jt-nav .jt-nav-link{
+      border:0;border-radius:0;padding:11px 14px;text-align:left;white-space:nowrap;
+    }
+    .jt-nav .jt-nav-link + .jt-nav-link{border-top:1px solid var(--border);}
 
     /* Dua KPI per baris - satu per baris bikin strip-nya kepanjangan,
        tiga terlalu sempit untuk angka berdigit banyak. */
@@ -625,9 +649,17 @@
         <div class="title">Jadi Trader</div>
         <div class="subtitle">Jurnal Trading Pribadi</div>
       </div>
-      <div class="jt-nav">
-        <a href="ema-cross-screener_3.html" class="jt-nav-link">Crypto Screener</a>
-        <a href="backtest-screener.html" class="jt-nav-link">Laporan Backtest</a>
+      <!-- Di layar HP kedua tautan ini disembunyikan ke balik tombol titik tiga
+           (lihat blok CSS ≤820px). Elemennya TIDAK diduplikat - .jt-nav yang
+           sama berubah peran jadi panel dropdown, jadi tidak ada dua versi
+           tautan yang bisa berbeda isi. -->
+      <div class="jt-nav-wrap">
+        <button type="button" class="jt-nav-toggle" id="jtNavToggle"
+                aria-label="Menu halaman" aria-expanded="false">&#8942;</button>
+        <div class="jt-nav" id="jtNav">
+          <a href="ema-cross-screener_3.html" class="jt-nav-link">Crypto Screener</a>
+          <a href="backtest-screener.html" class="jt-nav-link">Laporan Backtest</a>
+        </div>
       </div>
     </div>
     <div class="account-meta">
@@ -1127,7 +1159,11 @@
     // gambar (termasuk TEKS angka saldo) ikut dilebarkan secara horizontal dan
     // angkanya terlihat gepeng/melar. Dengan viewBox yang cocok, tidak ada
     // peregangan sama sekali.
-    var W = Math.max(320, Math.round(svg.clientWidth || svg.getBoundingClientRect().width || 640));
+    var W = Math.max(200, Math.round(svg.clientWidth || svg.getBoundingClientRect().width || 640));
+    // Ambang 320 dulu dipakai di sini menjadi bug sendiri di HP: SVG-nya cuma
+    // ~277px, tapi viewBox dipaksa 320, dan karena preserveAspectRatio="none"
+    // seluruh gambar (termasuk angka saldo) ikut diregangkan ~15%. Ambangnya
+    // diturunkan ke 200 supaya viewBox benar-benar mengikuti lebar aslinya.
     var H=220,PAD=28,PADL=48;
     svg.setAttribute("viewBox", "0 0 " + W + " " + H);
     var sorted = state.trades.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);});
@@ -2015,7 +2051,11 @@
     // gambar (termasuk TEKS angka saldo) ikut dilebarkan secara horizontal dan
     // angkanya terlihat gepeng/melar. Dengan viewBox yang cocok, tidak ada
     // peregangan sama sekali.
-    var W = Math.max(320, Math.round(svg.clientWidth || svg.getBoundingClientRect().width || 640));
+    var W = Math.max(200, Math.round(svg.clientWidth || svg.getBoundingClientRect().width || 640));
+    // Ambang 320 dulu dipakai di sini menjadi bug sendiri di HP: SVG-nya cuma
+    // ~277px, tapi viewBox dipaksa 320, dan karena preserveAspectRatio="none"
+    // seluruh gambar (termasuk angka saldo) ikut diregangkan ~15%. Ambangnya
+    // diturunkan ke 200 supaya viewBox benar-benar mengikuti lebar aslinya.
     var H=220,PAD=28,PADL=48;
     svg.setAttribute("viewBox", "0 0 " + W + " " + H);
     var sorted = cState.trades.slice().sort(function(a,b){return a.date-b.date;});
@@ -2835,6 +2875,30 @@
 </script>
 <script>
 (function(){
+  // ---- Menu titik tiga (hanya berfungsi di tampilan HP) ----
+  // Di desktop tautannya tampil apa adanya dan tombol ini tersembunyi lewat
+  // CSS, jadi kode di sini tidak perlu tahu-menahu soal lebar layar.
+  var jtNavToggle = document.getElementById('jtNavToggle');
+  var jtNavPanel = document.getElementById('jtNav');
+  if(jtNavToggle && jtNavPanel){
+    var setNav = function(buka){
+      jtNavPanel.classList.toggle('open', buka);
+      jtNavToggle.setAttribute('aria-expanded', buka ? 'true' : 'false');
+    };
+    jtNavToggle.addEventListener('click', function(e){
+      e.stopPropagation();
+      setNav(!jtNavPanel.classList.contains('open'));
+    });
+    // Sentuh di mana pun di luar menu -> tutup. Tanpa ini menu bisa menggantung
+    // terbuka dan menutupi isi halaman di layar sempit.
+    document.addEventListener('click', function(e){
+      if(!jtNavPanel.contains(e.target) && e.target !== jtNavToggle) setNav(false);
+    });
+    document.addEventListener('keydown', function(e){
+      if(e.key === 'Escape') setNav(false);
+    });
+  }
+
   // Menu "News" - konsep sama seperti kalender ekonomi di Crypto Screener,
   // cuma posisinya inline di sebelah tombol XAUUSD Screener (bukan mengambang
   // di pojok layar), pakai widget TradingView Economic Calendar yang sama.
