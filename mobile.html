@@ -1,0 +1,1393 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="jt-versi" content="202608011600">
+<meta name="theme-color" content="#0b0c0f">
+<title>Jadi Trader — Mobile</title>
+<script>
+/* Penjaga versi - sama seperti halaman lain. */
+(function(){
+  var VERSI_TAMPIL = "202608011600";
+  var KUNCI_OK = "jtVersiOk", KUNCI_PAKSA = "jtVersiPaksa";
+  try{
+    if(sessionStorage.getItem(KUNCI_OK) === VERSI_TAMPIL) return;
+    fetch(location.pathname + "?_v=" + Date.now(), { cache: "no-store" })
+      .then(function(r){ return r.ok ? r.text() : null; })
+      .then(function(t){
+        if(!t) return;
+        var m = t.match(/name="jt-versi" content="([^"]+)"/);
+        if(!m) return;
+        if(m[1] === VERSI_TAMPIL){ try{ sessionStorage.setItem(KUNCI_OK, VERSI_TAMPIL); }catch(e){} return; }
+        if(sessionStorage.getItem(KUNCI_PAKSA) === m[1]) return;
+        try{ sessionStorage.setItem(KUNCI_PAKSA, m[1]); }catch(e){}
+        try{
+          var u = new URL(location.href); u.searchParams.set("_v", m[1]); location.replace(u.toString());
+        }catch(e){ location.reload(); }
+      }).catch(function(){});
+  }catch(e){}
+})();
+</script>
+
+<style>
+  :root{
+    --bg:#0b0c0f; --panel:#15171c; --panel-2:#1b1e24; --border:#262a31;
+    --text:#ece8de; --muted:#9a9ca4; --dim:#63656d;
+    --gold:#c9a24b; --bull:#4f9e82; --bear:#c2544d;
+    --bull-soft:rgba(79,158,130,.14); --bear-soft:rgba(194,84,77,.14);
+    --font-body:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    --font-mono:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;
+    --font-display:Georgia,'Times New Roman',serif;
+    --nav-h:58px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html{-webkit-text-size-adjust:100%;text-size-adjust:100%;}
+  body{
+    margin:0;background:var(--bg);color:var(--text);font-family:var(--font-body);
+    font-size:14px;line-height:1.45;
+    padding-bottom:calc(var(--nav-h) + env(safe-area-inset-bottom,0px));
+  }
+  input,select,textarea,button{font-family:inherit;}
+  /* 16px mematikan zoom-paksa iOS saat kolom isian difokus. */
+  input,select,textarea{font-size:16px;}
+
+  /* ── Gerbang login ───────────────────────────────────────────────── */
+  .gate{position:fixed;inset:0;z-index:999;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:24px;}
+  .gate-spin{width:34px;height:34px;border-radius:50%;border:3px solid var(--border);border-top-color:var(--gold);animation:spin .75s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .gate-box{display:none;width:100%;max-width:340px;text-align:center;background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:28px 22px;}
+  .gate-box h1{font-family:var(--font-display);font-size:21px;margin:0 0 6px;font-weight:400;}
+  .gate-box p{color:var(--muted);font-size:13px;margin:0 0 20px;}
+  .gate-btn{width:100%;padding:13px;border-radius:9px;border:1px solid var(--border);background:var(--panel-2);color:var(--text);font-size:15px;font-weight:600;}
+  .gate-note{margin-top:12px;font-size:12px;color:var(--muted);min-height:16px;}
+  .gate-note.err{color:var(--bear);}
+
+  /* ── Kerangka ────────────────────────────────────────────────────── */
+  .view{display:none;padding:12px 12px 6px;}
+  .view.on{display:block;}
+  .topbar{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:10px 12px;position:sticky;top:0;z-index:20;
+    background:var(--bg);border-bottom:1px solid var(--border);
+  }
+  .topbar .judul{font-family:var(--font-display);font-size:17px;}
+  .topbar .aksi{display:flex;gap:8px;align-items:center;}
+  .ikon-btn{background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:6px 9px;font-size:12px;}
+  .ikon-btn:active{border-color:var(--gold);color:var(--gold);}
+
+  /* ── Kartu & elemen umum ─────────────────────────────────────────── */
+  .kartu{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px;}
+  .kartu-judul{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-bottom:10px;}
+  .kosong{color:var(--dim);font-size:12.5px;text-align:center;padding:18px 8px;}
+  .num{font-family:var(--font-mono);font-variant-numeric:tabular-nums;}
+  .naik{color:var(--bull);} .turun{color:var(--bear);}
+
+  /* Portofolio */
+  .porto-usd{font-family:var(--font-mono);font-size:34px;font-weight:600;letter-spacing:-.02em;}
+  .porto-usd .sat{font-size:15px;color:var(--muted);margin-left:5px;}
+  .porto-idr{color:var(--muted);font-size:13px;font-family:var(--font-mono);margin-top:2px;}
+  .porto-pnl{font-size:12.5px;margin-top:7px;font-family:var(--font-mono);}
+  .porto-pecah{display:flex;gap:10px;margin-top:14px;}
+  .porto-pecah > div{flex:1;background:var(--panel-2);border-radius:9px;padding:10px 11px;}
+  .porto-pecah .lbl{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);}
+  .porto-pecah .val{font-family:var(--font-mono);font-size:16px;margin-top:3px;}
+
+  /* Berita (menggantikan spanduk) */
+  .berita-kepala{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+  .berita-kepala .tag{display:flex;align-items:center;gap:6px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);}
+  .titik-merah{width:8px;height:8px;border-radius:50%;background:#8C231A;flex:0 0 auto;}
+  .berita-baris{display:flex;gap:10px;padding:9px 0;border-top:1px solid var(--border);}
+  .berita-baris:first-of-type{border-top:0;}
+  .berita-jam{font-family:var(--font-mono);font-size:11px;color:var(--gold);flex:0 0 46px;padding-top:1px;}
+  .berita-isi{flex:1;min-width:0;}
+  .berita-judul{font-size:12.5px;line-height:1.35;}
+  .berita-meta{font-size:10.5px;color:var(--dim);margin-top:2px;font-family:var(--font-mono);}
+  .dampak{display:inline-block;padding:0 5px;border-radius:4px;font-size:9px;font-weight:700;margin-left:5px;}
+  .dampak.tinggi{background:var(--bear-soft);color:var(--bear);}
+  .dampak.sedang{background:rgba(201,162,75,.15);color:var(--gold);}
+
+  /* Strip tab dalam (Posisi / XAU / Kripto / Kalender) */
+  .strip{
+    display:flex;gap:18px;overflow-x:auto;padding:2px 0 10px;margin-bottom:2px;
+    border-bottom:1px solid var(--border);scrollbar-width:none;
+  }
+  .strip::-webkit-scrollbar{display:none;}
+  .strip button{
+    background:none;border:0;padding:4px 0;color:var(--dim);font-size:14px;font-weight:600;
+    white-space:nowrap;position:relative;
+  }
+  .strip button.on{color:var(--text);}
+  .strip button.on::after{
+    content:'';position:absolute;left:0;right:0;bottom:-11px;height:2px;background:var(--gold);border-radius:2px;
+  }
+  .panel-dalam{display:none;padding-top:12px;}
+  .panel-dalam.on{display:block;}
+
+  /* Baris daftar ala aplikasi bursa */
+  .baris{
+    display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--border);
+  }
+  .baris:last-child{border-bottom:0;}
+  .baris-kiri{flex:1;min-width:0;}
+  .baris-koin{font-size:15px;font-weight:600;}
+  .baris-koin .pair{color:var(--dim);font-size:11.5px;font-weight:400;}
+  .baris-sub{font-size:10.5px;color:var(--dim);font-family:var(--font-mono);margin-top:2px;}
+  .baris-tengah{text-align:right;font-family:var(--font-mono);}
+  .baris-harga{font-size:14px;}
+  .baris-harga-sub{font-size:10.5px;color:var(--dim);margin-top:2px;}
+  .lencana{
+    min-width:74px;text-align:center;border-radius:6px;padding:6px 8px;
+    font-family:var(--font-mono);font-size:12.5px;font-weight:600;color:#fff;
+  }
+  .lencana.beli{background:#2e7d63;} .lencana.jual{background:#b3413a;}
+  .lencana.netral{background:var(--panel-2);color:var(--muted);}
+  .tf-chip{
+    display:inline-block;background:var(--panel-2);color:var(--muted);
+    border-radius:4px;padding:0 5px;font-size:9.5px;font-family:var(--font-mono);margin-left:5px;
+  }
+
+  /* Tabel ringkas (riwayat) */
+  .ringkas{width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:11px;}
+  .ringkas th{
+    text-align:left;color:var(--dim);font-weight:400;font-size:9.5px;letter-spacing:.06em;
+    text-transform:uppercase;padding:0 6px 7px 0;border-bottom:1px solid var(--border);
+  }
+  .ringkas td{padding:7px 6px 7px 0;border-bottom:1px solid var(--border);vertical-align:top;}
+  .ringkas tr:last-child td{border-bottom:0;}
+  .ringkas .kanan{text-align:right;}
+  .lihat-lagi{
+    width:100%;margin-top:10px;padding:9px;border-radius:8px;background:var(--panel-2);
+    border:1px solid var(--border);color:var(--muted);font-size:12px;
+  }
+  .lihat-lagi:active{color:var(--gold);border-color:var(--gold);}
+
+  /* Statistik kecil 2x2 */
+  .stat-kisi{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:9px;overflow:hidden;margin-bottom:12px;}
+  .stat-kisi > div{background:var(--panel);padding:10px 11px;}
+  .stat-kisi .lbl{font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);}
+  .stat-kisi .val{font-family:var(--font-mono);font-size:15px;margin-top:3px;}
+
+  /* Kalender P/L */
+  .kal-kepala{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+  .kal-kepala button{background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;width:26px;height:26px;}
+  .kal-nama{font-family:var(--font-mono);font-size:12px;}
+  .kal-kisi{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;}
+  .kal-dow{text-align:center;font-size:9px;color:var(--dim);padding-bottom:3px;}
+  .kal-sel{aspect-ratio:1;border-radius:5px;background:var(--panel-2);display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:var(--font-mono);}
+  .kal-sel.kosong{background:transparent;}
+  .kal-sel .d{font-size:10px;color:var(--muted);}
+  .kal-sel .p{font-size:8px;margin-top:1px;}
+  .kal-sel.untung{background:var(--bull-soft);} .kal-sel.untung .p{color:var(--bull);}
+  .kal-sel.rugi{background:var(--bear-soft);} .kal-sel.rugi .p{color:var(--bear);}
+
+  /* Kurva */
+  .kurva-kotak{width:100%;height:150px;}
+  .kurva-kotak svg{width:100%;height:100%;display:block;}
+
+  /* Entry / order */
+  .beli-jual{display:flex;gap:0;border-radius:9px;overflow:hidden;margin-bottom:12px;}
+  .beli-jual button{flex:1;padding:11px;border:0;background:var(--panel-2);color:var(--muted);font-size:14px;font-weight:600;}
+  .beli-jual button.on.beli{background:#2e7d63;color:#fff;}
+  .beli-jual button.on.jual{background:#b3413a;color:#fff;}
+  .form-baris{display:flex;gap:10px;margin-bottom:10px;}
+  .form-baris > *{flex:1;min-width:0;}
+  .isian{
+    width:100%;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;
+    color:var(--text);padding:11px 12px;
+  }
+  .isian::placeholder{color:var(--dim);}
+  .isian-lbl{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin-bottom:4px;}
+  .entry-kisi{display:flex;gap:10px;align-items:flex-start;}
+  .entry-form{flex:1 1 58%;min-width:0;}
+  .entry-samping{flex:1 1 42%;min-width:0;}
+  .tp-kotak{background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:10px;margin-bottom:8px;}
+  .tp-kotak .nm{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);}
+  .tp-kotak .hg{font-family:var(--font-mono);font-size:14px;margin-top:3px;}
+  .tp-kotak .pn{font-family:var(--font-mono);font-size:11px;margin-top:2px;}
+  .tombol-utama{
+    width:100%;padding:14px;border:0;border-radius:9px;font-size:15px;font-weight:700;color:#fff;margin-top:4px;
+  }
+  .tombol-utama.beli{background:#2e7d63;} .tombol-utama.jual{background:#b3413a;}
+  .tombol-kedua{
+    width:100%;padding:12px;border:1px solid var(--border);border-radius:9px;background:var(--panel-2);
+    color:var(--muted);font-size:13px;margin-top:8px;
+  }
+  .catatan{font-size:11.5px;color:var(--dim);line-height:1.5;margin-top:10px;}
+  .catatan.err{color:var(--bear);}
+  .catatan.ok{color:var(--bull);}
+
+  /* Bilah bawah */
+  .bawah{
+    position:fixed;left:0;right:0;bottom:0;z-index:50;
+    display:flex;background:var(--panel);border-top:1px solid var(--border);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  .bawah button{
+    flex:1;background:none;border:0;padding:8px 2px 7px;color:var(--dim);
+    display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;
+  }
+  .bawah button.on{color:var(--gold);}
+  .bawah svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;}
+  .memuat{color:var(--dim);font-size:12px;text-align:center;padding:16px;}
+</style>
+
+<!-- Gerbang login -->
+<div class="gate" id="gate">
+  <div class="gate-spin" id="gateSpin"></div>
+  <div class="gate-box" id="gateBox">
+    <h1>Jadi Trader</h1>
+    <p>Login untuk membuka jurnal &amp; screener kamu.</p>
+    <button type="button" class="gate-btn" id="btnLogin">Masuk dengan Google</button>
+    <div class="gate-note" id="gateNote"></div>
+  </div>
+</div>
+
+<!-- ══════════════ BERANDA ══════════════ -->
+<section class="view on" id="v-beranda">
+  <div class="topbar">
+    <div class="judul">Beranda</div>
+    <div class="aksi">
+      <span class="num" id="namaUser" style="font-size:11px;color:var(--muted)"></span>
+      <button type="button" class="ikon-btn" id="btnKeDesktop" title="Buka tampilan desktop">Desktop</button>
+      <button type="button" class="ikon-btn" id="btnKeluar">Keluar</button>
+    </div>
+  </div>
+
+  <div class="kartu">
+    <div class="kartu-judul">Estimasi Total Nilai</div>
+    <div class="porto-usd"><span id="portoUsd">0.00</span><span class="sat">USD</span></div>
+    <div class="porto-idr" id="portoIdr">≈ Rp 0</div>
+    <div class="porto-pnl" id="portoPnl">PnL Keseluruhan: —</div>
+    <div class="porto-pecah">
+      <div><div class="lbl">XAUUSD</div><div class="val" id="portoXau">$0.00</div></div>
+      <div><div class="lbl">Kripto</div><div class="val" id="portoKripto">$0.00</div></div>
+    </div>
+  </div>
+
+  <div class="kartu">
+    <div class="berita-kepala">
+      <div class="tag"><span class="titik-merah"></span> Berita Ekonomi</div>
+      <button type="button" class="ikon-btn" id="btnMuatBerita">Muat ulang</button>
+    </div>
+    <div id="beritaIsi"><div class="memuat">Memuat berita…</div></div>
+  </div>
+
+  <div class="strip" id="stripBeranda">
+    <button type="button" class="on" data-panel="posisi">Posisi Terbuka</button>
+    <button type="button" data-panel="xau">XAUUSD</button>
+    <button type="button" data-panel="kripto">Kripto</button>
+    <button type="button" data-panel="kalender">Kalender &amp; Kurva</button>
+  </div>
+
+  <div class="panel-dalam on" id="p-posisi"></div>
+
+  <div class="panel-dalam" id="p-xau">
+    <div class="stat-kisi" id="statXau"></div>
+    <div class="kartu">
+      <div class="kartu-judul">Riwayat Trade XAUUSD</div>
+      <div id="riwayatXau"></div>
+    </div>
+  </div>
+
+  <div class="panel-dalam" id="p-kripto">
+    <div class="stat-kisi" id="statKripto"></div>
+    <div class="kartu">
+      <div class="kartu-judul">Jurnal Trade Kripto</div>
+      <div id="riwayatKripto"></div>
+    </div>
+  </div>
+
+  <div class="panel-dalam" id="p-kalender">
+    <div class="kartu">
+      <div class="kal-kepala">
+        <button type="button" id="kalPrev">‹</button>
+        <div class="kal-nama" id="kalNama">—</div>
+        <button type="button" id="kalNext">›</button>
+      </div>
+      <div class="kal-kisi" id="kalDow"></div>
+      <div class="kal-kisi" id="kalKisi" style="margin-top:3px"></div>
+      <div class="baris" style="border-bottom:0;padding-bottom:0">
+        <div class="baris-kiri" style="font-size:11.5px;color:var(--muted)">Total Bulan Ini</div>
+        <div class="baris-tengah num" id="kalTotal">—</div>
+      </div>
+    </div>
+    <div class="kartu">
+      <div class="kartu-judul">Kurva Ekuitas — XAUUSD</div>
+      <div class="kurva-kotak"><svg id="kurvaXau" preserveAspectRatio="none"></svg></div>
+    </div>
+    <div class="kartu">
+      <div class="kartu-judul">Kurva Ekuitas — Kripto</div>
+      <div class="kurva-kotak"><svg id="kurvaKripto" preserveAspectRatio="none"></svg></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════ PASAR (Area Pantau) ══════════════ -->
+<section class="view" id="v-pasar">
+  <div class="topbar">
+    <div class="judul">Area Pantau</div>
+    <div class="aksi">
+      <select class="ikon-btn" id="pantauTf" style="padding:6px 8px">
+        <option value="15m">15m</option><option value="30m">30m</option>
+        <option value="1h">1H</option><option value="4h" selected>4H</option>
+        <option value="1d">1D</option>
+      </select>
+      <button type="button" class="ikon-btn" id="btnPantau">Pindai</button>
+    </div>
+  </div>
+  <div class="kartu" style="padding:10px 14px">
+    <select class="isian" id="pantauRezim" style="padding:9px 10px">
+      <option value="all">Semua Arah</option>
+      <option value="align" selected>Searah Stochastic BTC</option>
+      <option value="oversold">Hanya Oversold (potensi BUY)</option>
+      <option value="overbought">Hanya Overbought (potensi SELL)</option>
+    </select>
+    <div class="catatan" id="pantauStatus">Tekan “Pindai” untuk mulai.</div>
+  </div>
+  <div class="kartu" id="pantauDaftar"><div class="kosong">Belum ada hasil.</div></div>
+</section>
+
+<!-- ══════════════ ENTRY ══════════════ -->
+<section class="view" id="v-entry">
+  <div class="topbar">
+    <div class="judul">Entry Area</div>
+    <div class="aksi"><span class="num" id="entryHargaLive" style="font-size:12px;color:var(--muted)"></span></div>
+  </div>
+
+  <div class="kartu">
+    <div class="beli-jual">
+      <button type="button" class="beli on" id="btnArahBeli">Beli / Long</button>
+      <button type="button" class="jual" id="btnArahJual">Jual / Short</button>
+    </div>
+
+    <div class="entry-kisi">
+      <div class="entry-form">
+        <div class="isian-lbl">Koin</div>
+        <input class="isian" id="entryKoin" placeholder="mis. BTCUSDT" autocomplete="off" style="margin-bottom:10px">
+
+        <div class="isian-lbl">Harga Entry (USDT)</div>
+        <input class="isian" id="entryHarga" type="number" step="any" placeholder="harga pasar" style="margin-bottom:10px">
+
+        <div class="isian-lbl">Modal (USDT)</div>
+        <input class="isian" id="entryModal" type="number" step="any" placeholder="100" style="margin-bottom:10px">
+
+        <div class="isian-lbl">Leverage (x)</div>
+        <input class="isian" id="entryLev" type="number" step="1" min="1" max="125" placeholder="10" style="margin-bottom:10px">
+
+        <div class="isian-lbl">Stop Loss</div>
+        <input class="isian" id="entrySl" type="number" step="any" placeholder="harga SL">
+      </div>
+
+      <div class="entry-samping">
+        <div class="isian-lbl" style="margin-bottom:6px">Target</div>
+        <div class="tp-kotak">
+          <div class="nm">TP1 · 1:1</div>
+          <div class="hg" id="tp1Harga">—</div>
+          <div class="pn naik" id="tp1Pnl">—</div>
+        </div>
+        <div class="tp-kotak">
+          <div class="nm">TP2 · 1:2</div>
+          <div class="hg" id="tp2Harga">—</div>
+          <div class="pn naik" id="tp2Pnl">—</div>
+        </div>
+        <div class="tp-kotak" style="border-color:var(--bear)">
+          <div class="nm">Risiko di SL</div>
+          <div class="hg" id="slHarga">—</div>
+          <div class="pn turun" id="slPnl">—</div>
+        </div>
+        <div class="tp-kotak">
+          <div class="nm">Size Order</div>
+          <div class="hg" id="entrySize">—</div>
+          <div class="pn" style="color:var(--muted)" id="entryQty">—</div>
+        </div>
+      </div>
+    </div>
+
+    <button type="button" class="tombol-utama beli" id="btnOpenDemo">Open Demo Order</button>
+    <button type="button" class="tombol-kedua" id="btnKeScreener">Open Real Order → buka Crypto Screener</button>
+    <div class="catatan" id="entryCatatan"></div>
+  </div>
+</section>
+
+<!-- ══════════════ SINYAL PARALLEL ══════════════ -->
+<section class="view" id="v-sinyal">
+  <div class="topbar">
+    <div class="judul">Parallel Signal</div>
+    <div class="aksi">
+      <select class="ikon-btn" id="chTf" style="padding:6px 8px">
+        <option value="15m">15m</option><option value="30m">30m</option>
+        <option value="1h">1H</option><option value="4h" selected>4H</option>
+        <option value="1d">1D</option>
+      </select>
+      <button type="button" class="ikon-btn" id="btnCh">Pindai</button>
+    </div>
+  </div>
+  <div class="kartu" style="padding:10px 14px">
+    <select class="isian" id="chFilter" style="padding:9px 10px">
+      <option value="all" selected>Semua Sinyal</option>
+      <option value="snr">Sentuh SNR</option>
+      <option value="only">Parallel Only</option>
+    </select>
+    <div class="catatan" id="chStatus">Tekan “Pindai” untuk mulai.</div>
+  </div>
+  <div class="kartu" id="chDaftar"><div class="kosong">Belum ada hasil.</div></div>
+</section>
+
+<!-- ══════════════ ASET ══════════════ -->
+<section class="view" id="v-aset">
+  <div class="topbar"><div class="judul">Aset</div></div>
+
+  <div class="kartu">
+    <div class="kartu-judul">Estimasi Total Nilai</div>
+    <div class="porto-usd"><span id="asetTotal">0.00</span><span class="sat">USD</span></div>
+    <div class="porto-idr" id="asetIdr">≈ Rp 0</div>
+    <div class="porto-pnl" id="asetPnl">—</div>
+    <div class="kurva-kotak" style="height:130px;margin-top:12px">
+      <svg id="kurvaAset" preserveAspectRatio="none"></svg>
+    </div>
+  </div>
+
+  <div class="kartu">
+    <div class="kartu-judul">Akun</div>
+    <div class="baris">
+      <div class="baris-kiri">
+        <div class="baris-koin">XAUUSD</div>
+        <div class="baris-sub" id="asetXauSub">—</div>
+      </div>
+      <div class="baris-tengah">
+        <div class="baris-harga num" id="asetXauSaldo">$0.00</div>
+        <div class="baris-harga-sub num" id="asetXauIdr">Rp 0</div>
+      </div>
+    </div>
+    <div class="baris">
+      <div class="baris-kiri">
+        <div class="baris-koin">Kripto</div>
+        <div class="baris-sub" id="asetKriptoSub">—</div>
+      </div>
+      <div class="baris-tengah">
+        <div class="baris-harga num" id="asetKriptoSaldo">$0.00</div>
+        <div class="baris-harga-sub num" id="asetKriptoIdr">Rp 0</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="kartu">
+    <div class="kartu-judul">Ringkasan P/L</div>
+    <div class="stat-kisi" id="statAset"></div>
+  </div>
+</section>
+
+<!-- ══════════════ BILAH BAWAH ══════════════ -->
+<nav class="bawah" id="bilahBawah">
+  <button type="button" class="on" data-view="beranda">
+    <svg viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>Beranda</button>
+  <button type="button" data-view="pasar">
+    <svg viewBox="0 0 24 24"><path d="M3 17l5-6 4 4 5-7 4 5"/></svg>Pasar</button>
+  <button type="button" data-view="entry">
+    <svg viewBox="0 0 24 24"><path d="M12 3v18"/><path d="M7 8l5-5 5 5"/><path d="M17 16l-5 5-5-5"/></svg>Entry</button>
+  <button type="button" data-view="sinyal">
+    <svg viewBox="0 0 24 24"><path d="M4 16l6-8 4 5 6-9"/><path d="M4 20h16"/></svg>Sinyal</button>
+  <button type="button" data-view="aset">
+    <svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/></svg>Aset</button>
+</nav>
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="jt-scan-core.js"></script>
+<script>
+(function(){
+"use strict";
+
+/* ══════════════════════════════════════════════════════════════════════
+   Kunci penyimpanan - SAMA PERSIS dengan jurnal & screener, supaya data
+   yang muncul di HP adalah data yang sama, bukan salinan terpisah.
+   ══════════════════════════════════════════════════════════════════════ */
+var K_XAU     = 'ledgerNoirTrades_v1';
+var K_SIM     = 'emaScreenerPrioritySim_v1';
+var K_PROFIL  = 'jtAccountProfile_v1';
+var K_BINHIST = 'jtBinanceCryptoHistory_v1';
+var K_KOIN    = 'emaScreenerActiveSymbols_v1';
+var PROXY     = 'https://103-253-145-38.sslip.io';
+var BACA_KEYS = [K_XAU, K_SIM, K_PROFIL, 'jtCryptoNotes_v1'];
+
+var uid = null, kursIdr = 18000, saldoBinance = null;
+
+/* ---------- util ---------- */
+function el(id){ return document.getElementById(id); }
+function J(raw, bawaan){ try{ var v = JSON.parse(raw); return v == null ? bawaan : v; }catch(e){ return bawaan; } }
+function baca(k, bawaan){ return J(localStorage.getItem(k), bawaan); }
+function uang(n){
+  if(n == null || !isFinite(n)) return '—';
+  return (n < 0 ? '-$' : '$') + Math.abs(n).toFixed(2);
+}
+function rupiah(n){
+  if(n == null || !isFinite(n)) return 'Rp 0';
+  return 'Rp ' + Math.round(n).toLocaleString('id-ID');
+}
+function warnaKelas(n){ return n > 0 ? 'naik' : n < 0 ? 'turun' : ''; }
+function tanggalPendek(t){
+  var d = new Date(t);
+  if(isNaN(d)) return '—';
+  return d.toLocaleDateString('id-ID', { day:'2-digit', month:'short' }) + ' ' +
+         d.toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit' });
+}
+var HG = (window.JTScan && JTScan.fmtPrice) ? JTScan.fmtPrice : function(p){ return p == null ? '—' : String(p); };
+
+/* ══════════════════════════════════════════════════════════════════════
+   DATA
+   ══════════════════════════════════════════════════════════════════════ */
+function profilXau(){
+  var p = baca(K_PROFIL, {}) || {};
+  return {
+    broker: p.broker || '—',
+    leverage: p.leverage || '—',
+    saldoAwal: typeof p.startBalance === 'number' ? p.startBalance : 0,
+    mulai: p.startDate || ''
+  };
+}
+function tradeXau(){
+  var a = baca(K_XAU, []);
+  return Array.isArray(a) ? a.slice().sort(function(x,y){ return new Date(y.date) - new Date(x.date); }) : [];
+}
+/* Riwayat kripto: trade LIVE yang dicatat tool, diperkaya catatan pra-entry.
+   Sengaja meniru loadLocalToolTrades di jurnal supaya angkanya sejalan. */
+function tradeKripto(){
+  var d = baca(K_SIM, {}) || {};
+  var h = Array.isArray(d.history) ? d.history : [];
+  return h.filter(function(t){ return t.venue === 'live-real' || t.venue === 'live-testnet'; })
+    .map(function(t){
+      return {
+        waktu: t.exitTime, pair: (t.source||'').replace('USDT',''), tf: t.tfLabel || '',
+        arah: (t.dir||'').toUpperCase(),
+        pnl: (t.pnl||0), alasan: t.reason || '',
+        emosi: t.preEmosi || '', setup: t.preAlasan || ''
+      };
+    })
+    .sort(function(a,b){ return b.waktu - a.waktu; });
+}
+function posisiTerbuka(){
+  var d = baca(K_SIM, {}) || {};
+  var p = d.positions || {};
+  return Object.keys(p).map(function(k){ return p[k]; }).filter(Boolean);
+}
+
+function statistik(list, ambilPnl){
+  var n = list.length, menang = 0, untung = 0, rugi = 0, total = 0;
+  list.forEach(function(t){
+    var v = ambilPnl(t);
+    total += v;
+    if(v > 0){ menang++; untung += v; } else if(v < 0){ rugi += Math.abs(v); }
+  });
+  return {
+    jumlah: n, total: total,
+    winrate: n ? (menang / n * 100) : null,
+    pf: rugi > 0 ? (untung / rugi) : (untung > 0 ? Infinity : null),
+    avgWin: menang ? untung / menang : 0,
+    avgLoss: (n - menang) ? rugi / (n - menang) : 0
+  };
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   BERANDA
+   ══════════════════════════════════════════════════════════════════════ */
+function saldoXauSekarang(){
+  var p = profilXau();
+  return p.saldoAwal + tradeXau().reduce(function(a,t){ return a + (t.pl || 0); }, 0);
+}
+function saldoKriptoSekarang(){
+  // Saldo Binance ASLI kalau sudah berhasil diambil; kalau belum, jumlah PnL.
+  if(saldoBinance != null) return saldoBinance;
+  return tradeKripto().reduce(function(a,t){ return a + t.pnl; }, 0);
+}
+
+function gambarPortofolio(){
+  var x = saldoXauSekarang(), k = saldoKriptoSekarang(), tot = x + k;
+  el('portoUsd').textContent = tot.toFixed(2);
+  el('portoIdr').textContent = '≈ ' + rupiah(tot * kursIdr);
+  el('portoXau').textContent = uang(x);
+  el('portoKripto').textContent = uang(k);
+
+  var pnlX = tradeXau().reduce(function(a,t){ return a + (t.pl||0); }, 0);
+  var pnlK = tradeKripto().reduce(function(a,t){ return a + t.pnl; }, 0);
+  var pnl = pnlX + pnlK;
+  var e = el('portoPnl');
+  e.className = 'porto-pnl ' + warnaKelas(pnl);
+  e.textContent = 'PnL Keseluruhan: ' + (pnl >= 0 ? '+' : '') + uang(pnl).replace('$','') + ' USD';
+
+  // Salinan di tab Aset
+  el('asetTotal').textContent = tot.toFixed(2);
+  el('asetIdr').textContent = '≈ ' + rupiah(tot * kursIdr);
+  var ap = el('asetPnl');
+  ap.className = 'porto-pnl ' + warnaKelas(pnl);
+  ap.textContent = (pnl >= 0 ? '+' : '') + uang(pnl).replace('$','') + ' USD keseluruhan';
+  el('asetXauSaldo').textContent = uang(x);
+  el('asetXauIdr').textContent = rupiah(x * kursIdr);
+  el('asetKriptoSaldo').textContent = uang(k);
+  el('asetKriptoIdr').textContent = rupiah(k * kursIdr);
+  var pr = profilXau();
+  el('asetXauSub').textContent = pr.broker + ' · leverage ' + pr.leverage;
+  el('asetKriptoSub').textContent = saldoBinance != null ? 'Binance Futures · tersambung' : 'Binance · belum tersambung';
+}
+
+/* ---------- Posisi terbuka ---------- */
+function gambarPosisi(){
+  var pos = posisiTerbuka();
+  var wadah = el('p-posisi');
+  if(!pos.length){
+    wadah.innerHTML = '<div class="kartu"><div class="kosong">Tidak ada posisi terbuka.</div></div>';
+    return;
+  }
+  var harga = window.__hargaPasar || {};
+  var html = '<div class="kartu">';
+  pos.forEach(function(t){
+    var sym = String(t.source||'').replace('USDT','');
+    var arah = String(t.dir||'').toUpperCase();
+    var kini = harga[t.source];
+    var gantung = !!t.pending;
+    var pnl = null;
+    if(!gantung && kini != null && t.entryPrice && t.qty){
+      pnl = (kini - t.entryPrice) * t.qty * (arah === 'BUY' ? 1 : -1);
+    }
+    var size = (t.margin != null && t.leverage != null) ? (t.margin * t.leverage) : null;
+    html += '<div class="baris">'
+      + '<div class="baris-kiri">'
+        + '<div class="baris-koin">' + sym + '<span class="tf-chip">' + (t.tfLabel||'—') + '</span></div>'
+        + '<div class="baris-sub">Entry ' + HG(t.entryPrice) + ' · SL ' + HG(t.sl)
+          + ' · TP1 ' + HG(t.tp1) + ' · TP2 ' + HG(t.tp2) + '</div>'
+        + '<div class="baris-sub">Size ' + (size != null ? uang(size) : '—')
+          + (gantung ? ' · <span style="color:var(--gold)">' + (t.pendingOrderType || 'Menggantung') + '</span>' : '')
+          + '</div>'
+      + '</div>'
+      + '<div class="baris-tengah">'
+        + '<div class="baris-harga">' + (kini != null ? HG(kini) : '—') + '</div>'
+        + '<div class="baris-harga-sub ' + (gantung ? '' : warnaKelas(pnl)) + '">'
+          + (gantung ? 'menunggu harga' : (pnl != null ? uang(pnl) : '—')) + '</div>'
+      + '</div>'
+      + '<div class="lencana ' + (arah === 'BUY' ? 'beli' : 'jual') + '">' + arah + '</div>'
+      + '</div>';
+  });
+  wadah.innerHTML = html + '</div>';
+}
+
+/* ---------- Riwayat ringkas + "lihat lebih banyak" ---------- */
+var BATAS_AWAL = 6;
+function gambarRiwayat(wadahId, baris, kolom, kunciBuka){
+  var buka = window['__buka_' + kunciBuka] === true;
+  var tampil = buka ? baris : baris.slice(0, BATAS_AWAL);
+  var w = el(wadahId);
+  if(!baris.length){ w.innerHTML = '<div class="kosong">Belum ada trade tercatat.</div>'; return; }
+  var html = '<table class="ringkas"><thead><tr>'
+    + kolom.map(function(k){ return '<th' + (k.kanan ? ' class="kanan"' : '') + '>' + k.judul + '</th>'; }).join('')
+    + '</tr></thead><tbody>'
+    + tampil.map(function(r){
+        return '<tr>' + kolom.map(function(k){
+          return '<td' + (k.kanan ? ' class="kanan"' : '') + '>' + k.isi(r) + '</td>';
+        }).join('') + '</tr>';
+      }).join('')
+    + '</tbody></table>';
+  if(baris.length > BATAS_AWAL){
+    html += '<button type="button" class="lihat-lagi" data-buka="' + kunciBuka + '">'
+      + (buka ? 'Tampilkan lebih sedikit' : 'Lihat lebih banyak (' + (baris.length - BATAS_AWAL) + ' lagi)')
+      + '</button>';
+  }
+  w.innerHTML = html;
+  var tb = w.querySelector('.lihat-lagi');
+  if(tb) tb.addEventListener('click', function(){
+    window['__buka_' + kunciBuka] = !buka;
+    gambarBerandaData();
+  });
+}
+
+function isiStat(wadahId, s, labelTotal){
+  el(wadahId).innerHTML =
+      '<div><div class="lbl">Total Trade</div><div class="val">' + s.jumlah + '</div></div>'
+    + '<div><div class="lbl">Win Rate</div><div class="val">' + (s.winrate == null ? '—' : s.winrate.toFixed(1) + '%') + '</div></div>'
+    + '<div><div class="lbl">' + labelTotal + '</div><div class="val ' + warnaKelas(s.total) + '">' + uang(s.total) + '</div></div>'
+    + '<div><div class="lbl">Profit Factor</div><div class="val">' + (s.pf == null ? '—' : (s.pf === Infinity ? '∞' : s.pf.toFixed(2))) + '</div></div>';
+}
+
+function gambarBerandaData(){
+  gambarPortofolio();
+  gambarPosisi();
+
+  var xau = tradeXau();
+  isiStat('statXau', statistik(xau, function(t){ return t.pl || 0; }), 'Total P/L');
+  gambarRiwayat('riwayatXau', xau, [
+    { judul:'Tgl', isi:function(t){ return tanggalPendek(t.date); } },
+    { judul:'Arah', isi:function(t){
+        var a = String(t.direction||t.dir||'').toUpperCase();
+        return a ? '<span class="' + (a === 'BUY' ? 'naik' : 'turun') + '">' + a + '</span>' : '—'; } },
+    { judul:'Setup', isi:function(t){ return t.preAlasan || t.setup || t.reason || '—'; } },
+    { judul:'P/L', kanan:true, isi:function(t){
+        var v = t.pl || 0; return '<span class="' + warnaKelas(v) + '">' + uang(v) + '</span>'; } }
+  ], 'xau');
+
+  var kr = tradeKripto();
+  isiStat('statKripto', statistik(kr, function(t){ return t.pnl; }), 'Total P/L');
+  gambarRiwayat('riwayatKripto', kr, [
+    { judul:'Tgl', isi:function(t){ return tanggalPendek(t.waktu); } },
+    { judul:'Koin', isi:function(t){ return t.pair + '<span class="tf-chip">' + (t.tf||'—') + '</span>'; } },
+    { judul:'Setup', isi:function(t){ return t.setup || t.alasan || '—'; } },
+    { judul:'P/L', kanan:true, isi:function(t){
+        return '<span class="' + warnaKelas(t.pnl) + '">' + uang(t.pnl) + '</span>'; } }
+  ], 'kripto');
+
+  var sAset = statistik(xau, function(t){ return t.pl || 0; });
+  var kAset = statistik(kr, function(t){ return t.pnl; });
+  el('statAset').innerHTML =
+      '<div><div class="lbl">P/L XAUUSD</div><div class="val ' + warnaKelas(sAset.total) + '">' + uang(sAset.total) + '</div></div>'
+    + '<div><div class="lbl">P/L Kripto</div><div class="val ' + warnaKelas(kAset.total) + '">' + uang(kAset.total) + '</div></div>'
+    + '<div><div class="lbl">Trade XAU</div><div class="val">' + sAset.jumlah + '</div></div>'
+    + '<div><div class="lbl">Trade Kripto</div><div class="val">' + kAset.jumlah + '</div></div>';
+
+  gambarKalender();
+  gambarKurva('kurvaXau', kurvaTitikXau());
+  gambarKurva('kurvaKripto', kurvaTitikKripto());
+  gambarKurva('kurvaAset', kurvaTitikGabungan());
+}
+
+/* ---------- Kalender P/L (XAU + kripto digabung) ---------- */
+var kalBulan = new Date();
+function plPerHari(bulan){
+  var peta = {};
+  function masuk(waktu, v){
+    var d = new Date(waktu);
+    if(d.getFullYear() === bulan.getFullYear() && d.getMonth() === bulan.getMonth()){
+      peta[d.getDate()] = (peta[d.getDate()] || 0) + v;
+    }
+  }
+  tradeXau().forEach(function(t){ masuk(t.date, t.pl || 0); });
+  tradeKripto().forEach(function(t){ masuk(t.waktu, t.pnl); });
+  return peta;
+}
+function gambarKalender(){
+  el('kalDow').innerHTML = ['S','S','R','K','J','S','M']
+    .map(function(d){ return '<div class="kal-dow">' + d + '</div>'; }).join('');
+  el('kalNama').textContent = kalBulan.toLocaleDateString('id-ID', { month:'long', year:'numeric' });
+
+  var pertama = new Date(kalBulan.getFullYear(), kalBulan.getMonth(), 1);
+  var geser = (pertama.getDay() + 6) % 7;                       // Senin = 0
+  var jml = new Date(kalBulan.getFullYear(), kalBulan.getMonth()+1, 0).getDate();
+  var peta = plPerHari(kalBulan);
+
+  var sel = '';
+  for(var i = 0; i < geser; i++) sel += '<div class="kal-sel kosong"></div>';
+  for(var d = 1; d <= jml; d++){
+    var v = peta[d];
+    var cls = 'kal-sel' + (v === undefined ? '' : (v >= 0 ? ' untung' : ' rugi'));
+    sel += '<div class="' + cls + '"><div class="d">' + d + '</div>'
+        + (v === undefined ? '' : '<div class="p">' + (v >= 0 ? '+' : '') + v.toFixed(0) + '</div>')
+        + '</div>';
+  }
+  el('kalKisi').innerHTML = sel;
+
+  var total = Object.keys(peta).reduce(function(a,k){ return a + peta[k]; }, 0);
+  var t = el('kalTotal');
+  t.className = 'baris-tengah num ' + warnaKelas(total);
+  t.textContent = Object.keys(peta).length ? uang(total) : '—';
+}
+
+/* ---------- Kurva ekuitas ---------- */
+function kurvaTitikXau(){
+  var p = profilXau(), jalan = p.saldoAwal, titik = [jalan];
+  tradeXau().slice().reverse().forEach(function(t){ jalan += (t.pl || 0); titik.push(jalan); });
+  return titik;
+}
+function kurvaTitikKripto(){
+  var jalan = 0, titik = [0];
+  tradeKripto().slice().reverse().forEach(function(t){ jalan += t.pnl; titik.push(jalan); });
+  return titik;
+}
+function kurvaTitikGabungan(){
+  var x = kurvaTitikXau(), k = kurvaTitikKripto();
+  var n = Math.max(x.length, k.length), out = [];
+  for(var i = 0; i < n; i++){
+    out.push((x[Math.min(i, x.length-1)] || 0) + (k[Math.min(i, k.length-1)] || 0));
+  }
+  return out;
+}
+function gambarKurva(id, titik){
+  var svg = el(id);
+  if(!svg) return;
+  var W = Math.max(120, Math.round(svg.clientWidth || svg.getBoundingClientRect().width || 320));
+  var H = Math.max(80, Math.round(svg.clientHeight || 150));
+  svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+  if(titik.length < 2){
+    svg.innerHTML = '<text x="' + (W/2) + '" y="' + (H/2) + '" fill="#63656d" font-size="11" text-anchor="middle">Belum ada data</text>';
+    return;
+  }
+  var PAD = 10, min = Math.min.apply(null, titik), max = Math.max.apply(null, titik);
+  var rentang = (max - min) || 1;
+  var xs = function(i){ return PAD + (i / (titik.length - 1)) * (W - PAD*2); };
+  var ys = function(v){ return H - PAD - ((v - min) / rentang) * (H - PAD*2); };
+  var d = titik.map(function(v,i){ return (i ? 'L' : 'M') + xs(i).toFixed(1) + ' ' + ys(v).toFixed(1); }).join(' ');
+  var naik = titik[titik.length-1] >= titik[0];
+  var warna = naik ? '#4f9e82' : '#c2544d';
+  var isi = d + ' L' + xs(titik.length-1).toFixed(1) + ' ' + (H-PAD) + ' L' + xs(0).toFixed(1) + ' ' + (H-PAD) + ' Z';
+  svg.innerHTML =
+      '<defs><linearGradient id="g' + id + '" x1="0" y1="0" x2="0" y2="1">'
+    + '<stop offset="0%" stop-color="' + warna + '" stop-opacity=".35"/>'
+    + '<stop offset="100%" stop-color="' + warna + '" stop-opacity="0"/></linearGradient></defs>'
+    + '<path d="' + isi + '" fill="url(#g' + id + ')"/>'
+    + '<path d="' + d + '" fill="none" stroke="' + warna + '" stroke-width="1.8"/>';
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   BERITA (kalender ekonomi lewat proxy - sama seperti screener)
+   ══════════════════════════════════════════════════════════════════════ */
+/* Memakai endpoint yang SAMA dengan panel News di screener: /api/news
+   (publik, tanpa token) dengan bentuk { events: [{waktu, judul, dampak,
+   mataUang}] }. Sempat salah tebak nama endpoint & nama kolomnya, sehingga
+   kotak berita macet di "Memuat berita…". */
+function muatBerita(){
+  var w = el('beritaIsi');
+  w.innerHTML = '<div class="memuat">Memuat berita…</div>';
+  fetch(PROXY + '/api/news')
+    .then(function(r){ return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+    .then(function(d){
+      var ev = (d && Array.isArray(d.events)) ? d.events : null;
+      if(!ev || !ev.length){
+        w.innerHTML = '<div class="kosong">Tidak ada agenda berita saat ini.</div>';
+        return;
+      }
+      var sekarang = Date.now();
+      // Yang akan datang dulu; kalau semua sudah lewat, tampilkan yang terakhir.
+      var mendatang = ev.filter(function(e){ return e.waktu > sekarang - 3600e3; })
+                        .sort(function(a,b){ return a.waktu - b.waktu; });
+      var pilih = (mendatang.length ? mendatang : ev.slice().sort(function(a,b){ return b.waktu - a.waktu; }))
+                    .slice(0, 6);
+      w.innerHTML = pilih.map(function(e){
+        var t = new Date(e.waktu);
+        var jam = isNaN(t) ? '--:--' : t.toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit' });
+        var dLbl = e.dampak === 'high'   ? '<span class="dampak tinggi">TINGGI</span>'
+                 : e.dampak === 'medium' ? '<span class="dampak sedang">SEDANG</span>' : '';
+        return '<div class="berita-baris">'
+          + '<div class="berita-jam">' + jam + '</div>'
+          + '<div class="berita-isi">'
+            + '<div class="berita-judul">' + (e.judul || 'Agenda') + dLbl + '</div>'
+            + '<div class="berita-meta">' + (e.mataUang || '') + '</div>'
+          + '</div></div>';
+      }).join('');
+    })
+    .catch(function(){
+      w.innerHTML = '<div class="kosong">Berita tidak bisa dimuat (backend tidak terjangkau).</div>';
+    });
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   HARGA PASAR
+   ══════════════════════════════════════════════════════════════════════ */
+function muatTicker(){
+  return fetch(PROXY + '/api/tickers')
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(j){
+      if(!j || !Array.isArray(j.data)) return null;
+      var peta = {};
+      j.data.forEach(function(t){ peta[t.symbol] = t; });
+      window.__hargaPasarPenuh = peta;
+      var h = {};
+      Object.keys(peta).forEach(function(s){ h[s] = parseFloat(peta[s].lastPrice); });
+      window.__hargaPasar = h;
+      return peta;
+    })
+    .catch(function(){ return null; });
+}
+
+function ambilKlines(symbol, interval, limit){
+  return fetch(PROXY + '/api/klines?symbol=' + symbol + '&interval=' + interval + '&limit=' + (limit||250))
+    .then(function(r){ if(!r.ok) throw new Error('klines'); return r.json(); })
+    .then(function(j){
+      var d = (j && j.data) || [];
+      if(!d.length) throw new Error('klines kosong');
+      return {
+        opens:  d.map(function(x){ return parseFloat(x[1]); }),
+        highs:  d.map(function(x){ return parseFloat(x[2]); }),
+        lows:   d.map(function(x){ return parseFloat(x[3]); }),
+        closes: d.map(function(x){ return parseFloat(x[4]); })
+      };
+    });
+}
+
+function daftarKoin(){
+  var a = baca(K_KOIN, null);
+  if(Array.isArray(a) && a.length) return a;
+  return ['BTCUSDT','ETHUSDT','SOLUSDT','BNBUSDT','XRPUSDT','DOGEUSDT','ADAUSDT','LINKUSDT',
+          'AVAXUSDT','DOTUSDT','TONUSDT','TRXUSDT','SUIUSDT','NEARUSDT','APTUSDT','ARBUSDT'];
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   PASAR — Area Pantau (SMI ekstrem), memakai jt-scan-core.js
+   ══════════════════════════════════════════════════════════════════════ */
+var pantauJalan = false;
+function pindaiPantau(){
+  if(pantauJalan || !window.JTScan) return;
+  pantauJalan = true;
+  var tf = el('pantauTf').value, mode = el('pantauRezim').value;
+  var koin = daftarKoin();
+  el('btnPantau').disabled = true;
+  el('pantauStatus').className = 'catatan';
+  el('pantauStatus').textContent = 'Memindai ' + koin.length + ' koin (TF ' + tf + ')…';
+
+  var btcKondisi = null;
+  // Ticker dipastikan ada SEBELUM memindai - dari sinilah harga terakhir dan
+  // perubahan 24 jam diambil. Tanpa ini kolom persennya kosong kalau pemindaian
+  // dijalankan sebelum muatan awal selesai.
+  var siapTicker = window.__hargaPasarPenuh ? Promise.resolve() : muatTicker();
+  var awal = siapTicker.then(function(){
+    if(mode !== 'align') return null;
+    // Rezim BTC dibaca dari SMI BTC di TF yang sama - apel ke apel dengan
+    // kondisi yang dipakai menyaring koinnya.
+    return ambilKlines('BTCUSDT', tf, 250).then(function(d){
+      var s = JTScan.smiSeries(d.highs, d.lows, d.closes, JTScan.SMI_K, JTScan.SMI_D, JTScan.SMI_EMA);
+      var k = s.smi[s.smi.length-1];
+      btcKondisi = JTScan.smiConditionOf(k);
+      if(btcKondisi === 'neutral') btcKondisi = null;
+    }).catch(function(){});
+  });
+
+  awal.then(function(){
+    return JTScan.mapLimited(koin, 6, function(sym){
+      return ambilKlines(sym, tf, 250).then(function(d){
+        var s = JTScan.smiSeries(d.highs, d.lows, d.closes, JTScan.SMI_K, JTScan.SMI_D, JTScan.SMI_EMA);
+        var k = s.smi[s.smi.length-1], sig = s.signal[s.signal.length-1];
+        var kondisi = JTScan.smiConditionOf(k);
+        if(kondisi === 'neutral') return null;
+        var tk = (window.__hargaPasarPenuh || {})[sym];
+        return {
+          symbol: sym, stochK: k, stochD: sig, kondisi: kondisi,
+          harga: tk ? parseFloat(tk.lastPrice) : d.closes[d.closes.length-1],
+          ubah24: tk ? parseFloat(tk.priceChangePercent) : null,
+          mulaiBalik: (sig != null) && (kondisi === 'oversold' ? k > sig : k < sig)
+        };
+      }).catch(function(){ return null; });
+    });
+  }).then(function(hasil){
+    var semua = [];
+    hasil.forEach(function(r){ if(r.status === 'fulfilled' && r.value) semua.push(r.value); });
+    var pilih = semua;
+    if(mode === 'oversold')        pilih = semua.filter(function(c){ return c.kondisi === 'oversold'; });
+    else if(mode === 'overbought') pilih = semua.filter(function(c){ return c.kondisi === 'overbought'; });
+    else if(mode === 'align')      pilih = btcKondisi ? semua.filter(function(c){ return c.kondisi === btcKondisi; }) : [];
+
+    var ekstrem = function(c){ return c.kondisi === 'overbought' ? c.stochK : -c.stochK; };
+    pilih.sort(function(a,b){ return ekstrem(b) - ekstrem(a); });
+
+    if(!pilih.length){
+      el('pantauDaftar').innerHTML = '<div class="kosong">Tidak ada koin dengan SMI ekstrem'
+        + (mode === 'align' && !btcKondisi ? ' — BTC sedang tidak ekstrem, jadi tidak ada rezim untuk diikuti.' : '.')
+        + '</div>';
+      el('pantauStatus').textContent = 'Selesai · tidak ada yang lolos filter.';
+    } else {
+      el('pantauDaftar').innerHTML = pilih.map(function(c){
+        var beli = c.kondisi === 'oversold';
+        return '<div class="baris">'
+          + '<div class="baris-kiri">'
+            + '<div class="baris-koin">' + c.symbol.replace('USDT','')
+              + '<span class="pair"> / USDT</span><span class="tf-chip">' + tf + '</span></div>'
+            + '<div class="baris-sub">SMI ' + c.stochK.toFixed(1)
+              + ' · ' + (beli ? 'Oversold' : 'Overbought')
+              + (c.mulaiBalik ? ' · mulai berbalik' : '') + '</div>'
+          + '</div>'
+          + '<div class="baris-tengah">'
+            + '<div class="baris-harga">' + HG(c.harga) + '</div>'
+            + '<div class="baris-harga-sub ' + warnaKelas(c.ubah24) + '">'
+              + (c.ubah24 == null ? '—' : (c.ubah24 >= 0 ? '+' : '') + c.ubah24.toFixed(2) + '%') + '</div>'
+          + '</div>'
+          + '<div class="lencana ' + (beli ? 'beli' : 'jual') + '">' + (beli ? 'BUY' : 'SELL') + '</div>'
+          + '</div>';
+      }).join('');
+      var nOs = pilih.filter(function(c){ return c.kondisi === 'oversold'; }).length;
+      el('pantauStatus').textContent = pilih.length + ' koin lolos (' + nOs + ' oversold, '
+        + (pilih.length - nOs) + ' overbought) · dari ' + koin.length + ' koin · TF ' + tf
+        + (mode === 'align' && btcKondisi ? ' · rezim BTC ' + btcKondisi : '')
+        + ' · ' + new Date().toLocaleTimeString('id-ID');
+    }
+  }).catch(function(e){
+    el('pantauStatus').className = 'catatan err';
+    el('pantauStatus').textContent = 'Gagal memindai: ' + (e && e.message ? e.message : 'kesalahan tak terduga');
+  }).then(function(){
+    pantauJalan = false;
+    el('btnPantau').disabled = false;
+  });
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   SINYAL — Parallel Channel, memakai detektor yang SAMA dengan screener
+   ══════════════════════════════════════════════════════════════════════ */
+var chJalan = false, chMentah = [], chTfDipakai = null, chJmlKoin = 0;
+
+function cariSinyalParallel(sym, tf){
+  return ambilKlines(sym, tf, 250).then(function(d){
+    if(d.closes.length < 60) return null;
+    var atrArr = JTScan.atr(d.highs, d.lows, d.closes, 14);
+    var B = d.closes.length - 1;
+    var bars = JTScan.pivotConfirmBarsDesc(d.highs, d.lows, B, 5, 5, 5);
+    if(!bars.length) bars = [B];
+    var ch = null;
+    for(var i = 0; i < bars.length && !ch; i++){
+      ch = JTScan.detectParallelChannel(d.highs, d.lows, d.closes, atrArr, { endBar: bars[i] });
+    }
+    if(!ch || B < ch.xb1) return null;
+
+    var up = JTScan.pcUpperAt(ch, B), lo = JTScan.pcLowerAt(ch, B);
+    var a = atrArr[atrArr.length-1] || (d.closes[B] * 0.005);
+    var tol = a * JTScan.PC_SIG_TOL_MULT;
+    var c = d.closes[B], hi = d.highs[B], low = d.lows[B];
+
+    var arah = null, sentuh = '';
+    if(Math.abs(low - lo) <= tol || low <= lo){ arah = 'BUY'; sentuh = 'LOWER'; }
+    else if(Math.abs(hi - up) <= tol || hi >= up){ arah = 'SELL'; sentuh = 'UPPER'; }
+    if(!arah) return null;
+
+    var tk = (window.__hargaPasarPenuh || {})[sym];
+    var harga = tk ? parseFloat(tk.lastPrice) : c;
+    var buffer = a * 0.5, sl;
+    if(arah === 'SELL'){
+      var res = JTScan.findPivots(d.highs, 10, 10, true).slice(-2).map(function(p){ return p.value; });
+      var lvlR = res.length ? Math.max.apply(null, res) : null;
+      sl = (lvlR != null && lvlR > harga) ? lvlR + buffer : Math.max.apply(null, d.highs.slice(-15)) + buffer;
+    } else {
+      var sup = JTScan.findPivots(d.lows, 10, 10, false).slice(-2).map(function(p){ return p.value; });
+      var lvlS = sup.length ? Math.min.apply(null, sup) : null;
+      sl = (lvlS != null && lvlS < harga) ? lvlS - buffer : Math.min.apply(null, d.lows.slice(-15)) - buffer;
+    }
+    var risk = Math.abs(harga - sl);
+    if(!(risk > 0)) return null;
+    var riskPct = risk / harga * 100;
+    if(riskPct > 12 || riskPct < 0.03) return null;
+
+    // Konfluensi S/R - dipakai filter "Sentuh SNR" / "Parallel Only".
+    var zonaHi = JTScan.findPivots(d.highs, 10, 10, true).slice(-3);
+    var zonaLo = JTScan.findPivots(d.lows, 10, 10, false).slice(-3);
+    var zona = (arah === 'BUY' ? zonaLo : zonaHi);
+    var dekat = null;
+    zona.forEach(function(z){
+      var jarak = Math.abs(z.value - harga);
+      if(jarak <= a * 0.5 && (dekat === null || jarak < Math.abs(dekat - harga))) dekat = z.value;
+    });
+
+    return {
+      symbol: sym, arah: arah, sentuh: sentuh, harga: harga, sl: sl,
+      tp1: arah === 'BUY' ? harga + risk : harga - risk,
+      tp2: arah === 'BUY' ? harga + risk*2 : harga - risk*2,
+      riskPct: riskPct, snrOk: dekat !== null, snrLevel: dekat,
+      arahChannel: ch.slope > 0 ? 'naik' : ch.slope < 0 ? 'turun' : 'datar'
+    };
+  }).catch(function(){ return null; });
+}
+
+function gambarSinyal(){
+  var mode = el('chFilter').value;
+  var pilih = chMentah;
+  if(mode === 'snr')       pilih = chMentah.filter(function(c){ return c.snrOk; });
+  else if(mode === 'only') pilih = chMentah.filter(function(c){ return !c.snrOk; });
+
+  if(!pilih.length){
+    el('chDaftar').innerHTML = '<div class="kosong">'
+      + (chMentah.length ? 'Tidak ada sinyal yang cocok dengan filter ini.' : 'Tidak ada sinyal Parallel saat ini.')
+      + '</div>';
+  } else {
+    el('chDaftar').innerHTML = pilih.map(function(c){
+      var beli = c.arah === 'BUY';
+      return '<div class="baris">'
+        + '<div class="baris-kiri">'
+          + '<div class="baris-koin">' + c.symbol.replace('USDT','')
+            + '<span class="pair"> / USDT</span><span class="tf-chip">' + chTfDipakai + '</span></div>'
+          + '<div class="baris-sub">SL ' + HG(c.sl) + ' · TP1 ' + HG(c.tp1) + ' · TP2 ' + HG(c.tp2) + '</div>'
+          + '<div class="baris-sub">Risk ' + c.riskPct.toFixed(2) + '% · channel ' + c.arahChannel
+            + (c.snrOk ? ' · <span style="color:var(--gold)">sentuh S/R</span>' : '') + '</div>'
+        + '</div>'
+        + '<div class="baris-tengah"><div class="baris-harga">' + HG(c.harga) + '</div></div>'
+        + '<div class="lencana ' + (beli ? 'beli' : 'jual') + '">' + c.arah + '</div>'
+        + '</div>';
+    }).join('');
+  }
+  var lbl = mode === 'snr' ? ' (sentuh S/R)' : mode === 'only' ? ' (tanpa S/R)' : '';
+  el('chStatus').textContent = pilih.length + ' sinyal' + lbl + ' dari ' + chMentah.length
+    + ' · ' + chJmlKoin + ' koin · TF ' + chTfDipakai + ' · ' + new Date().toLocaleTimeString('id-ID');
+}
+
+function pindaiParallel(){
+  if(chJalan || !window.JTScan) return;
+  chJalan = true;
+  var tf = el('chTf').value, koin = daftarKoin();
+  chTfDipakai = tf; chJmlKoin = koin.length;
+  el('btnCh').disabled = true;
+  el('chStatus').className = 'catatan';
+  el('chStatus').textContent = 'Memindai ' + koin.length + ' koin (TF ' + tf + ')…';
+
+  JTScan.mapLimited(koin, 6, function(s){ return cariSinyalParallel(s, tf); })
+    .then(function(hasil){
+      chMentah = [];
+      hasil.forEach(function(r){ if(r.status === 'fulfilled' && r.value) chMentah.push(r.value); });
+      gambarSinyal();
+    })
+    .catch(function(e){
+      el('chStatus').className = 'catatan err';
+      el('chStatus').textContent = 'Gagal memindai: ' + (e && e.message ? e.message : 'kesalahan');
+    })
+    .then(function(){ chJalan = false; el('btnCh').disabled = false; });
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   ENTRY AREA
+   ══════════════════════════════════════════════════════════════════════ */
+var entryArah = 'BUY';
+function hitungEntry(){
+  var koin = (el('entryKoin').value || '').trim().toUpperCase();
+  var harga = parseFloat(el('entryHarga').value);
+  var modal = parseFloat(el('entryModal').value);
+  var lev = parseFloat(el('entryLev').value);
+  var sl = parseFloat(el('entrySl').value);
+
+  if(koin && !harga && window.__hargaPasar && window.__hargaPasar[koin]){
+    harga = window.__hargaPasar[koin];
+    el('entryHargaLive').textContent = koin + ' ' + HG(harga);
+  }
+  var kosong = function(){
+    ['tp1Harga','tp2Harga','slHarga','entrySize','tp1Pnl','tp2Pnl','slPnl','entryQty']
+      .forEach(function(id){ el(id).textContent = '—'; });
+  };
+  if(!isFinite(harga) || !isFinite(sl) || !isFinite(modal) || !isFinite(lev) || harga <= 0 || modal <= 0 || lev <= 0){
+    kosong(); return null;
+  }
+  var arahBenar = entryArah === 'BUY' ? sl < harga : sl > harga;
+  if(!arahBenar){
+    kosong();
+    el('entryCatatan').className = 'catatan err';
+    el('entryCatatan').textContent = entryArah === 'BUY'
+      ? 'Untuk BUY, Stop Loss harus DI BAWAH harga entry.'
+      : 'Untuk SELL, Stop Loss harus DI ATAS harga entry.';
+    return null;
+  }
+  el('entryCatatan').className = 'catatan';
+  el('entryCatatan').textContent = '';
+
+  var risk = Math.abs(harga - sl);
+  var qty = (modal * lev) / harga;
+  var tp1 = entryArah === 'BUY' ? harga + risk : harga - risk;
+  var tp2 = entryArah === 'BUY' ? harga + risk*2 : harga - risk*2;
+  var arahKali = entryArah === 'BUY' ? 1 : -1;
+  var pnl = function(exit){ return (exit - harga) * qty * arahKali; };
+
+  el('tp1Harga').textContent = HG(tp1);
+  el('tp2Harga').textContent = HG(tp2);
+  el('slHarga').textContent = HG(sl);
+  el('tp1Pnl').textContent = '+' + uang(pnl(tp1)).replace('$','') + ' USD';
+  el('tp2Pnl').textContent = '+' + uang(pnl(tp2)).replace('$','') + ' USD';
+  el('slPnl').textContent = uang(pnl(sl)) ;
+  el('entrySize').textContent = uang(modal * lev);
+  el('entryQty').textContent = 'Qty ' + qty.toFixed(6);
+
+  return { koin: koin, harga: harga, sl: sl, tp1: tp1, tp2: tp2, modal: modal, lev: lev, qty: qty };
+}
+
+function openDemo(){
+  var d = hitungEntry();
+  if(!d || !d.koin){
+    el('entryCatatan').className = 'catatan err';
+    el('entryCatatan').textContent = 'Lengkapi koin, harga, modal, leverage, dan SL dulu.';
+    return;
+  }
+  var sim = baca(K_SIM, { positions:{}, history:[] });
+  if(!sim.positions) sim.positions = {};
+  if(!sim.history) sim.history = [];
+  var kunci = d.koin + '_mobile_' + Date.now();
+  sim.positions[kunci] = {
+    key: kunci, source: d.koin, tfLabel: 'Manual', tfValue: '', dir: entryArah,
+    entryPrice: d.harga, entryTime: Date.now(), sl: d.sl, tp1: d.tp1, tp2: d.tp2,
+    qty: d.qty, qty1: d.qty/2, qty2: d.qty/2, tp1Hit:false, tp2Hit:false,
+    margin: d.modal, leverage: d.lev, venue: 'sim', signalType: 'manual'
+  };
+  try{ localStorage.setItem(K_SIM, JSON.stringify(sim)); }catch(e){}
+  simpanKeCloud();
+  el('entryCatatan').className = 'catatan ok';
+  el('entryCatatan').textContent = 'Posisi demo ' + entryArah + ' ' + d.koin + ' dicatat. Lihat di Beranda → Posisi Terbuka.';
+  gambarBerandaData();
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   FIREBASE + SINKRON
+   ══════════════════════════════════════════════════════════════════════ */
+firebase.initializeApp({
+  apiKey: "AIzaSyB4cWVI-k3q16TmRCbM_lbJwgtjxIs_Weo",
+  authDomain: "jadi-trader-tools.firebaseapp.com",
+  projectId: "jadi-trader-tools",
+  storageBucket: "jadi-trader-tools.firebasestorage.app",
+  messagingSenderId: "171244479105",
+  appId: "1:171244479105:web:9b421850801b6678d8e380"
+});
+var auth = firebase.auth(), db = firebase.firestore();
+auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(function(){});
+
+function simpanKeCloud(){
+  if(!uid) return;
+  var payload = { _updatedAt: Date.now() };
+  payload[K_SIM] = localStorage.getItem(K_SIM) || '';
+  db.collection('users').doc(uid).set(payload, { merge:true }).catch(function(){});
+}
+
+function tarikDariCloud(){
+  if(!uid) return Promise.resolve();
+  return db.collection('users').doc(uid).get().then(function(doc){
+    if(!doc.exists) return;
+    var data = doc.data() || {};
+    BACA_KEYS.forEach(function(k){
+      if(typeof data[k] === 'string') { try{ localStorage.setItem(k, data[k]); }catch(e){} }
+    });
+    if(typeof data[K_KOIN] === 'string'){ try{ localStorage.setItem(K_KOIN, data[K_KOIN]); }catch(e){} }
+  }).catch(function(){});
+}
+
+/* Saldo Binance lewat backend milik user (butuh App Token). */
+function muatSaldoBinance(){
+  if(!uid) return Promise.resolve();
+  var cfg = J(localStorage.getItem('emaScreenerLiveTradeConfig_v1::' + uid), null);
+  if(!cfg || !cfg.appToken) return Promise.resolve();
+  var base = (cfg.backendUrl ? String(cfg.backendUrl).trim().replace(/\/+$/,'') : PROXY);
+  return fetch(base + '/api/account', { headers: { 'x-app-token': cfg.appToken } })
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(j){
+      var s = j && (j.totalWalletBalance || (j.data && j.data.totalWalletBalance));
+      if(s != null && isFinite(parseFloat(s))) saldoBinance = parseFloat(s);
+    })
+    .catch(function(){});
+}
+
+var spin = el('gateSpin'), kotak = el('gateBox'), gate = el('gate');
+function tampilLogin(){ spin.style.display = 'none'; kotak.style.display = 'block'; }
+
+el('btnLogin').addEventListener('click', function(){
+  var note = el('gateNote');
+  note.className = 'gate-note';
+  note.textContent = 'Membuka login Google…';
+  var p = new firebase.auth.GoogleAuthProvider();
+  // Pop-up dulu (termasuk di HP) - alur redirect putus di browser HP karena
+  // authDomain kita beda origin dengan situsnya. Lihat catatan panjang di
+  // ema-cross-screener_3.html.
+  auth.signInWithPopup(p).catch(function(e){
+    var k = (e && e.code) || '';
+    if(k === 'auth/popup-closed-by-user' || k === 'auth/cancelled-popup-request'){ note.textContent = ''; return; }
+    if(k === 'auth/popup-blocked' || k === 'auth/operation-not-supported-in-this-environment'){
+      try{ sessionStorage.setItem('mbCobaRedirect','1'); }catch(err){}
+      return auth.signInWithRedirect(p);
+    }
+    throw e;
+  }).catch(function(e){
+    note.className = 'gate-note err';
+    note.textContent = 'Gagal login: ' + (e && e.message ? e.message : 'tidak diketahui');
+  });
+});
+
+auth.getRedirectResult().then(function(h){
+  var c = null; try{ c = sessionStorage.getItem('mbCobaRedirect'); }catch(e){}
+  if(c === '1'){
+    try{ sessionStorage.removeItem('mbCobaRedirect'); }catch(e){}
+    if(!h || !h.user){
+      el('gateNote').className = 'gate-note err';
+      el('gateNote').textContent = 'Login lewat pengalihan gagal disimpan browser ini. Izinkan pop-up, lalu coba lagi.';
+      tampilLogin();
+    }
+  }
+}).catch(function(){});
+
+el('btnKeluar').addEventListener('click', function(){ auth.signOut(); });
+// ?desktop=1 supaya index.html tidak memantulkan balik ke sini.
+el('btnKeDesktop').addEventListener('click', function(){ location.href = 'jurnal-trading.html?desktop=1'; });
+
+auth.onAuthStateChanged(function(user){
+  if(!user){
+    uid = null;
+    gate.style.display = 'flex';
+    tampilLogin();
+    return;
+  }
+  uid = user.uid;
+  el('namaUser').textContent = user.displayName || user.email || '';
+  gate.style.display = 'none';
+
+  tarikDariCloud()
+    .then(function(){ return Promise.all([ muatTicker(), muatSaldoBinance() ]); })
+    .then(function(){
+      gambarBerandaData();
+      muatBerita();
+    });
+});
+
+// Jaring pengaman: jangan biarkan spinner berputar selamanya kalau Firebase
+// tidak pernah menjawab. Hanya berlaku kalau memang belum ada sesi.
+setTimeout(function(){ if(!uid) tampilLogin(); }, 6000);
+
+/* ══════════════════════════════════════════════════════════════════════
+   NAVIGASI
+   ══════════════════════════════════════════════════════════════════════ */
+el('bilahBawah').addEventListener('click', function(e){
+  var b = e.target.closest('button[data-view]');
+  if(!b) return;
+  var nama = b.getAttribute('data-view');
+  [].forEach.call(document.querySelectorAll('.view'), function(v){ v.classList.remove('on'); });
+  [].forEach.call(el('bilahBawah').querySelectorAll('button'), function(x){ x.classList.remove('on'); });
+  el('v-' + nama).classList.add('on');
+  b.classList.add('on');
+  window.scrollTo(0, 0);
+  // Kurva perlu digambar ulang saat panelnya baru terlihat - sebelum itu
+  // lebar SVG-nya 0 sehingga viewBox-nya salah.
+  if(nama === 'beranda' || nama === 'aset') setTimeout(gambarBerandaData, 30);
+});
+
+el('stripBeranda').addEventListener('click', function(e){
+  var b = e.target.closest('button[data-panel]');
+  if(!b) return;
+  [].forEach.call(el('stripBeranda').querySelectorAll('button'), function(x){ x.classList.remove('on'); });
+  [].forEach.call(document.querySelectorAll('.panel-dalam'), function(p){ p.classList.remove('on'); });
+  b.classList.add('on');
+  el('p-' + b.getAttribute('data-panel')).classList.add('on');
+  if(b.getAttribute('data-panel') === 'kalender') setTimeout(function(){
+    gambarKurva('kurvaXau', kurvaTitikXau());
+    gambarKurva('kurvaKripto', kurvaTitikKripto());
+  }, 30);
+});
+
+/* ---------- pengikat kontrol ---------- */
+el('btnPantau').addEventListener('click', pindaiPantau);
+el('pantauRezim').addEventListener('change', function(){ if(!pantauJalan) pindaiPantau(); });
+el('btnCh').addEventListener('click', pindaiParallel);
+el('chFilter').addEventListener('change', function(){ if(chMentah.length) gambarSinyal(); });
+el('btnMuatBerita').addEventListener('click', muatBerita);
+el('kalPrev').addEventListener('click', function(){ kalBulan = new Date(kalBulan.getFullYear(), kalBulan.getMonth()-1, 1); gambarKalender(); });
+el('kalNext').addEventListener('click', function(){ kalBulan = new Date(kalBulan.getFullYear(), kalBulan.getMonth()+1, 1); gambarKalender(); });
+
+el('btnArahBeli').addEventListener('click', function(){
+  entryArah = 'BUY';
+  el('btnArahBeli').classList.add('on'); el('btnArahJual').classList.remove('on');
+  el('btnOpenDemo').className = 'tombol-utama beli';
+  hitungEntry();
+});
+el('btnArahJual').addEventListener('click', function(){
+  entryArah = 'SELL';
+  el('btnArahJual').classList.add('on'); el('btnArahBeli').classList.remove('on');
+  el('btnOpenDemo').className = 'tombol-utama jual';
+  hitungEntry();
+});
+['entryKoin','entryHarga','entryModal','entryLev','entrySl'].forEach(function(id){
+  el(id).addEventListener('input', hitungEntry);
+});
+el('btnOpenDemo').addEventListener('click', openDemo);
+el('btnKeScreener').addEventListener('click', function(){ location.href = 'ema-cross-screener_3.html'; });
+
+window.addEventListener('resize', function(){
+  gambarKurva('kurvaXau', kurvaTitikXau());
+  gambarKurva('kurvaKripto', kurvaTitikKripto());
+  gambarKurva('kurvaAset', kurvaTitikGabungan());
+});
+
+// Harga posisi terbuka disegarkan berkala supaya PnL berjalan hidup.
+setInterval(function(){
+  if(!uid) return;
+  muatTicker().then(function(){ gambarPosisi(); gambarPortofolio(); });
+}, 30000);
+
+})();
+</script>

@@ -11,12 +11,12 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202608011130">
+<meta name="jt-versi" content="202608011600">
 <script>
 /* Penjaga versi - lihat catatan lengkap di jurnal-trading.html. Mencegah browser
    menyajikan HTML lama dari cache saat halaman dimuat ulang. */
 (function(){
-  var VERSI_TAMPIL = "202608011130";
+  var VERSI_TAMPIL = "202608011600";
   var KUNCI_OK    = "jtVersiOk";      // versi yang sudah dipastikan benar-benar termuat
   var KUNCI_PAKSA = "jtVersiPaksa";   // versi yang sudah pernah dipaksa muat ulang
   try{
@@ -2840,7 +2840,13 @@
   }
   // Jaring pengaman: kalau Firebase tidak pernah menjawab (offline / gstatic
   // diblokir), jangan tinggalkan user menatap spinner selamanya.
+  //
+  // TAPI hanya kalau memang belum ada sesi. Di jaringan HP, pemeriksaan
+  // keanggotaan (baca Firestore) sering butuh lebih dari 6 detik - tanpa syarat
+  // ini, orang yang SUDAH login tetap disodori kotak "Masuk dengan Google"
+  // dan mengira sesinya hilang lagi.
   setTimeout(function(){
+    if(esCurrentUid) return;                      // sesi sudah ketemu, biarkan spinner
     if(esAuthGateEl && esAuthGateEl.style.display !== 'none') tampilkanKotakLogin();
   }, 6000);
 
@@ -3286,11 +3292,6 @@
   // Alur REDIRECT tidak butuh pop-up sama sekali, jadi dipakai di layar sentuh;
   // di desktop pop-up tetap dipakai (lebih enak, tidak meninggalkan halaman),
   // dengan redirect sebagai cadangan kalau pop-up ternyata diblokir juga.
-  function esLayarSentuh(){
-    try{
-      return window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 820;
-    }catch(e){ return window.innerWidth < 820; }
-  }
   const ES_POPUP_GAGAL = [
     'auth/popup-blocked',
     'auth/popup-closed-by-user',
@@ -3299,24 +3300,37 @@
     'auth/web-storage-unsupported'
   ];
 
+  // Sesi disimpan di penyimpanan LOKAL origin ini (bukan sesi tab), supaya
+  // bertahan setelah tab ditutup / HP dikunci. Kalau browser melarang
+  // (mode privat ketat), Firebase otomatis turun ke tingkat yang diizinkan.
+  esAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(function(){});
+
   esGoogleLoginBtn.addEventListener('click', function(){
     esAuthStatusEl.classList.remove('error');
+    esAuthStatusEl.textContent = 'Membuka login Google...';
     const provider = new firebase.auth.GoogleAuthProvider();
 
-    if(esLayarSentuh()){
-      esAuthStatusEl.textContent = 'Mengalihkan ke login Google...';
-      esAuth.signInWithRedirect(provider).catch(function(e){
-        esAuthStatusEl.classList.add('error');
-        esAuthStatusEl.textContent = 'Gagal login: ' + e.message;
-      });
-      return;
-    }
-
-    esAuthStatusEl.textContent = 'Membuka login Google...';
+    // POP-UP dipakai lebih dulu, termasuk di HP.
+    //
+    // Sempat dibalik (HP -> signInWithRedirect) dan itu KELIRU: authDomain kita
+    // (jadi-trader-tools.firebaseapp.com) beda origin dengan situsnya
+    // (github.io). Alur redirect menitipkan state di penyimpanan milik domain
+    // auth tersebut, dan browser HP modern (Safari ITP, Chrome tanpa cookie
+    // pihak ketiga) memblokirnya - sepulang dari Google state-nya hilang,
+    // sesi tidak pernah terbentuk, dan halaman meminta login LAGI tanpa henti.
+    // Pop-up tidak punya masalah itu: kredensialnya dikirim balik ke halaman
+    // ini lalu disimpan di origin kita sendiri.
     esAuth.signInWithPopup(provider).catch(function(e){
       const kode = (e && e.code) || '';
+      // Pengguna menutup pop-up sendiri = bukan kegagalan, jangan lakukan apa-apa.
+      if(kode === 'auth/popup-closed-by-user' || kode === 'auth/cancelled-popup-request'){
+        esAuthStatusEl.textContent = '';
+        return;
+      }
+      // Pop-up benar-benar tidak tersedia -> redirect sebagai jalan terakhir.
       if(ES_POPUP_GAGAL.indexOf(kode) !== -1){
         esAuthStatusEl.textContent = 'Pop-up diblokir - mengalihkan ke login Google...';
+        try{ sessionStorage.setItem('esCobaRedirect', '1'); }catch(err){}
         return esAuth.signInWithRedirect(provider);
       }
       throw e;
@@ -3326,10 +3340,26 @@
     });
   });
 
-  // Sepulang dari alur redirect: kalau gagal, kegagalannya HARUS terlihat -
-  // kalau ditelan diam-diam, user cuma kembali ke gerbang login tanpa penjelasan
-  // dan mengira toolnya rusak.
-  esAuth.getRedirectResult().catch(function(e){
+  // Sepulang dari alur redirect. Dua hal ditangani:
+  //  1) error nyata -> ditampilkan, jangan ditelan diam-diam;
+  //  2) kembali TANPA sesi (hasilnya null padahal tadi memang dialihkan) ->
+  //     ini gejala khas browser memblokir penyimpanan domain auth. Diberi tahu
+  //     apa adanya, supaya tidak terlihat seperti "tombol login tidak berfungsi"
+  //     dan user tidak menekan login berkali-kali tanpa hasil.
+  esAuth.getRedirectResult().then(function(hasil){
+    let dicoba = null;
+    try{ dicoba = sessionStorage.getItem('esCobaRedirect'); }catch(e){}
+    if(dicoba === '1'){
+      try{ sessionStorage.removeItem('esCobaRedirect'); }catch(e){}
+      if(!hasil || !hasil.user){
+        esAuthStatusEl.classList.add('error');
+        esAuthStatusEl.textContent = 'Login lewat pengalihan gagal disimpan browser ini. '
+          + 'Izinkan pop-up untuk situs ini, lalu coba lagi.';
+        tampilkanKotakLogin();
+      }
+    }
+  }).catch(function(e){
+    try{ sessionStorage.removeItem('esCobaRedirect'); }catch(err){}
     esAuthStatusEl.classList.add('error');
     esAuthStatusEl.textContent = 'Gagal login: ' + (e && e.message ? e.message : 'tidak diketahui');
     tampilkanKotakLogin();

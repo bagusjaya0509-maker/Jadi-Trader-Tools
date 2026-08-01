@@ -43,7 +43,19 @@
 </div>
 <script>
 (function(){
-  var TUJUAN = 'jurnal-trading.html';
+  // HP diarahkan ke versi mobile (mobile.html), desktop tetap ke jurnal.
+  // Deteksi pakai pointer kasar + lebar layar: keduanya dipakai bersama supaya
+  // tablet berlayar lebar tetap dapat tampilan desktop yang lebih lega.
+  // ?desktop=1 memaksa versi desktop, ?mobile=1 memaksa versi HP - berguna
+  // kalau deteksinya salah tebak di suatu perangkat.
+  function hp(){
+    if(/[?&]desktop=1/.test(location.search)) return false;
+    if(/[?&]mobile=1/.test(location.search)) return true;
+    try{
+      return window.matchMedia('(pointer: coarse)').matches && window.innerWidth < 820;
+    }catch(e){ return window.innerWidth < 820; }
+  }
+  var TUJUAN = hp() ? 'mobile.html' : 'jurnal-trading.html';
   var dasar = TUJUAN + (location.search || '') + (location.hash || '');
   document.getElementById('manual').href = dasar;
 

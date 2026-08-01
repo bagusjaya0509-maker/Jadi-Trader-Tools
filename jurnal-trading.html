@@ -3,7 +3,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202608011130">
+<meta name="jt-versi" content="202608011600">
 <script>
 /* ── Penjaga versi ────────────────────────────────────────────────────────────
    GitHub Pages menyuruh browser menyimpan HTML di cache beberapa menit, jadi
@@ -13,7 +13,7 @@
    sekali saja kalau ternyata yang tampil sudah usang. Dijaga sessionStorage
    supaya tidak pernah berulang (anti-loop). */
 (function(){
-  var VERSI_TAMPIL = "202608011130";
+  var VERSI_TAMPIL = "202608011600";
   var KUNCI_OK    = "jtVersiOk";      // versi yang sudah dipastikan benar-benar termuat
   var KUNCI_PAKSA = "jtVersiPaksa";   // versi yang sudah pernah dipaksa muat ulang
   try{
@@ -2832,38 +2832,51 @@
   // diblokir atau langsung ditutup sehingga login tidak pernah selesai. Alur
   // REDIRECT tidak butuh pop-up, jadi dipakai di layar sentuh; desktop tetap
   // pakai pop-up (tidak meninggalkan halaman) dengan redirect sebagai cadangan.
-  function jtLayarSentuh(){
-    try{
-      return window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 820;
-    }catch(e){ return window.innerWidth < 820; }
-  }
   var JT_POPUP_GAGAL = [
     'auth/popup-blocked',
-    'auth/popup-closed-by-user',
-    'auth/cancelled-popup-request',
     'auth/operation-not-supported-in-this-environment',
     'auth/web-storage-unsupported'
   ];
 
+  // Sesi disimpan di penyimpanan LOKAL origin ini supaya bertahan setelah tab
+  // ditutup / HP dikunci.
+  jtAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(function(){});
+
   jtLoginBtn.addEventListener('click', function(){
     var provider = new firebase.auth.GoogleAuthProvider();
-    if(jtLayarSentuh()){
-      jtAuth.signInWithRedirect(provider).catch(function(e){
-        alert('Gagal login: ' + e.message);
-      });
-      return;
-    }
+    // POP-UP dulu, termasuk di HP - alasannya sama seperti di Crypto Screener:
+    // authDomain kita beda origin dengan situsnya, dan alur redirect menitipkan
+    // state di penyimpanan domain auth itu. Browser HP modern memblokirnya,
+    // sehingga sepulang dari Google sesinya hilang dan halaman minta login lagi
+    // berulang-ulang. Pop-up mengirim kredensialnya balik ke halaman ini.
     jtAuth.signInWithPopup(provider).catch(function(e){
       var kode = (e && e.code) || '';
-      if(JT_POPUP_GAGAL.indexOf(kode) !== -1) return jtAuth.signInWithRedirect(provider);
+      if(kode === 'auth/popup-closed-by-user' || kode === 'auth/cancelled-popup-request') return;
+      if(JT_POPUP_GAGAL.indexOf(kode) !== -1){
+        try{ sessionStorage.setItem('jtCobaRedirect', '1'); }catch(err){}
+        return jtAuth.signInWithRedirect(provider);
+      }
       throw e;
     }).catch(function(e){
       alert('Gagal login: ' + (e && e.message ? e.message : 'tidak diketahui'));
     });
   });
 
-  // Sepulang dari alur redirect - kegagalan jangan ditelan diam-diam.
-  jtAuth.getRedirectResult().catch(function(e){
+  // Sepulang dari alur redirect - kegagalan jangan ditelan diam-diam, termasuk
+  // kasus "kembali tanpa sesi" yang khas kalau browser memblokir penyimpanan
+  // domain auth.
+  jtAuth.getRedirectResult().then(function(hasil){
+    var dicoba = null;
+    try{ dicoba = sessionStorage.getItem('jtCobaRedirect'); }catch(e){}
+    if(dicoba === '1'){
+      try{ sessionStorage.removeItem('jtCobaRedirect'); }catch(e){}
+      if(!hasil || !hasil.user){
+        jtViewerNoteEl.textContent = 'Login lewat pengalihan gagal disimpan browser ini. '
+          + 'Izinkan pop-up untuk situs ini, lalu coba lagi.';
+      }
+    }
+  }).catch(function(e){
+    try{ sessionStorage.removeItem('jtCobaRedirect'); }catch(err){}
     jtViewerNoteEl.textContent = 'Gagal login: ' + (e && e.message ? e.message : 'tidak diketahui');
   });
 
