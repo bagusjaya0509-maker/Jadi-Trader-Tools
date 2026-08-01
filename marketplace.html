@@ -1,0 +1,1131 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="jt-versi" content="202608020900">
+<title>Jadi Trader — Marketplace</title>
+<script>
+/* Penjaga versi - sama seperti halaman lain. */
+(function(){
+  var V = "202608020900", OK = "jtVersiOk", PAKSA = "jtVersiPaksa";
+  try{
+    if(sessionStorage.getItem(OK) === V) return;
+    fetch(location.pathname + "?_v=" + Date.now(), { cache: "no-store" })
+      .then(function(r){ return r.ok ? r.text() : null; })
+      .then(function(t){
+        if(!t) return;
+        var m = t.match(/name="jt-versi" content="([^"]+)"/);
+        if(!m) return;
+        if(m[1] === V){ try{ sessionStorage.setItem(OK, V); }catch(e){} return; }
+        if(sessionStorage.getItem(PAKSA) === m[1]) return;
+        try{ sessionStorage.setItem(PAKSA, m[1]); }catch(e){}
+        try{ var u = new URL(location.href); u.searchParams.set("_v", m[1]); location.replace(u.toString()); }
+        catch(e){ location.reload(); }
+      }).catch(function(){});
+  }catch(e){}
+})();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+
+<style>
+  :root{
+    --bg:#0b0c0f; --panel:#15171c; --panel-2:#1b1e24; --border:#262a31;
+    --text:#ece8de; --muted:#9a9ca4; --dim:#63656d;
+    --gold:#c9a24b; --gold-soft:rgba(201,162,75,.12);
+    --bull:#4f9e82; --bear:#c2544d;
+    --font-body:'IBM Plex Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    --font-mono:'IBM Plex Mono','SF Mono',Consolas,'Roboto Mono',monospace;
+    --font-display:Georgia,'Iowan Old Style','Palatino Linotype',serif;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html{-webkit-text-size-adjust:100%;}
+  body{
+    margin:0;background:var(--bg);color:var(--text);font-family:var(--font-body);
+    font-size:14px;line-height:1.55;padding:22px 18px 60px;
+  }
+  .wrap{max-width:1120px;margin:0 auto;}
+  a{color:var(--gold);}
+  input,select,textarea,button{font-family:inherit;font-size:14px;}
+  @media (max-width:820px){ body{padding:14px 12px 48px;} input,select,textarea{font-size:16px;} }
+
+  /* ── Kepala ── */
+  .masthead{
+    display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap;
+    padding-bottom:18px;margin-bottom:22px;border-bottom:1px solid var(--border);
+  }
+  .brand{display:flex;align-items:center;gap:12px;}
+  .glyph{
+    width:44px;height:44px;border:1px solid var(--gold);border-radius:3px;flex:0 0 auto;
+    display:flex;align-items:center;justify-content:center;color:var(--gold);
+    font-family:var(--font-display);font-size:22px;
+  }
+  .brand .t{font-family:var(--font-display);font-size:24px;line-height:1.1;}
+  .brand .s{font-size:11px;color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:2px;}
+  .nav{display:flex;gap:8px;flex-wrap:wrap;}
+  .nav a,.nav button{
+    padding:7px 13px;border:1px solid var(--border);border-radius:7px;background:var(--panel);
+    color:var(--muted);text-decoration:none;font-size:12.5px;cursor:pointer;
+  }
+  .nav a:hover,.nav button:hover{border-color:var(--gold);color:var(--gold);}
+
+  /* ── Kartu produk ── */
+  .kisi{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;}
+  .produk{
+    background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px;
+    display:flex;flex-direction:column;gap:10px;position:relative;overflow:hidden;
+  }
+  .produk.premium{border-color:var(--gold);}
+  .produk.premium::before{
+    content:'PREMIUM';position:absolute;top:12px;right:-30px;transform:rotate(45deg);
+    background:var(--gold);color:#1a1200;font-family:var(--font-mono);font-size:9px;font-weight:700;
+    letter-spacing:.1em;padding:3px 34px;
+  }
+  .produk h3{margin:0;font-family:var(--font-display);font-size:19px;font-weight:400;padding-right:60px;}
+  .produk .versi{font-family:var(--font-mono);font-size:10.5px;color:var(--dim);}
+  .produk .ringkas{color:var(--muted);font-size:13px;flex:1;}
+  .harga{font-family:var(--font-mono);font-size:21px;color:var(--gold);}
+  .harga .gratis{color:var(--bull);}
+  .harga small{font-size:11px;color:var(--dim);font-weight:400;}
+  .aksi{display:flex;gap:8px;flex-wrap:wrap;}
+  .tbl{
+    padding:9px 15px;border-radius:8px;border:1px solid var(--border);background:var(--panel-2);
+    color:var(--text);cursor:pointer;font-size:13px;
+  }
+  .tbl:hover{border-color:var(--gold);}
+  .tbl.utama{background:var(--gold);color:#1a1200;border-color:var(--gold);font-weight:600;}
+  .tbl.utama:hover{filter:brightness(1.08);}
+  .tbl:disabled{opacity:.5;cursor:not-allowed;}
+
+  /* ── Bagian umum ── */
+  .bagian{margin-top:34px;}
+  .bagian > h2{
+    font-family:var(--font-display);font-size:20px;font-weight:400;margin:0 0 4px;
+  }
+  .bagian > .sub{color:var(--muted);font-size:13px;margin-bottom:16px;}
+  .kartu{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:14px;}
+  .kartu h3{margin:0 0 10px;font-size:15px;}
+  .label{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--dim);margin-bottom:5px;}
+  .isian{
+    width:100%;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;
+    color:var(--text);padding:10px 12px;
+  }
+  .isian:focus{outline:none;border-color:var(--gold);}
+  .baris2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  @media (max-width:600px){ .baris2{grid-template-columns:1fr;} }
+  .catat{font-size:12px;color:var(--muted);line-height:1.6;}
+  .catat.err{color:var(--bear);} .catat.ok{color:var(--bull);}
+  .mono{font-family:var(--font-mono);}
+
+  /* ── Detail produk ── */
+  .tirai{
+    display:none;position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.72);
+    padding:24px 14px;overflow-y:auto;
+  }
+  .tirai.on{display:block;}
+  .lembar{
+    max-width:820px;margin:0 auto;background:var(--panel);border:1px solid var(--border);
+    border-radius:14px;padding:22px;
+  }
+  .lembar-kepala{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:6px;}
+  .lembar h2{margin:0;font-family:var(--font-display);font-size:23px;font-weight:400;}
+  .tutup{background:none;border:1px solid var(--border);color:var(--muted);border-radius:7px;padding:5px 11px;cursor:pointer;}
+  .fitur{list-style:none;padding:0;margin:0;display:grid;gap:10px;}
+  .fitur li{display:flex;gap:10px;align-items:flex-start;}
+  .fitur .no{
+    flex:0 0 22px;height:22px;border-radius:6px;background:var(--gold-soft);color:var(--gold);
+    display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:11px;
+  }
+  .fitur .jd{font-weight:600;font-size:13.5px;}
+  .fitur .ket{color:var(--muted);font-size:12.5px;}
+  .galeri{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-top:8px;}
+  .galeri img{width:100%;border-radius:8px;border:1px solid var(--border);display:block;}
+  .galeri .kosong{
+    grid-column:1/-1;color:var(--dim);font-size:12px;text-align:center;padding:18px;
+    border:1px dashed var(--border);border-radius:8px;
+  }
+
+  /* ── Animasi peraga ── */
+  .peraga{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:12px;}
+  .peraga .jd{font-size:12px;color:var(--muted);margin-bottom:8px;}
+  .peraga svg{width:100%;height:170px;display:block;}
+  .lilin-naik{fill:#4f9e82;stroke:#4f9e82;}
+  .lilin-turun{fill:#c2544d;stroke:#c2544d;}
+  @keyframes garisMuncul{ to{ stroke-dashoffset:0; } }
+  @keyframes labelMuncul{ 0%,55%{opacity:0;transform:translateY(6px);} 70%,100%{opacity:1;transform:translateY(0);} }
+  @keyframes kedip{ 0%,100%{opacity:.25;} 50%{opacity:.75;} }
+  @keyframes geserKanan{ from{transform:translateX(-14px);opacity:0;} to{transform:translateX(0);opacity:1;} }
+  .anim-garis{ stroke-dasharray:600; stroke-dashoffset:600; animation:garisMuncul 2.4s ease forwards; }
+  .anim-label{ animation:labelMuncul 3.2s ease forwards; }
+  .anim-zona{ animation:kedip 3s ease-in-out infinite; }
+  .anim-geser{ animation:geserKanan 1.4s ease forwards; }
+
+  /* ── Panduan ── */
+  .langkah{display:flex;gap:12px;padding:12px 0;border-top:1px solid var(--border);}
+  .langkah:first-child{border-top:0;}
+  .langkah .n{
+    flex:0 0 26px;height:26px;border-radius:50%;background:var(--gold-soft);color:var(--gold);
+    display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:12px;
+  }
+  .langkah .isi{flex:1;min-width:0;}
+  .langkah .isi b{display:block;margin-bottom:2px;}
+  .langkah .isi span{color:var(--muted);font-size:12.5px;}
+
+  /* ── Panel owner ── */
+  #panelOwner{display:none;}
+  .tabel{width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:11.5px;}
+  .tabel th{text-align:left;color:var(--dim);font-weight:400;font-size:10px;letter-spacing:.06em;
+    text-transform:uppercase;padding:0 8px 7px 0;border-bottom:1px solid var(--border);}
+  .tabel td{padding:8px 8px 8px 0;border-bottom:1px solid var(--border);vertical-align:top;}
+  .kode-besar{
+    font-family:var(--font-mono);font-size:19px;letter-spacing:.08em;color:var(--gold);
+    background:var(--panel-2);border:1px dashed var(--gold);border-radius:8px;
+    padding:12px;text-align:center;margin:10px 0;word-break:break-all;
+  }
+  .surat{
+    background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:14px;
+    font-family:var(--font-mono);font-size:11.5px;line-height:1.75;white-space:pre-wrap;color:var(--muted);
+  }
+</style>
+
+<div class="wrap">
+  <header class="masthead">
+    <div class="brand">
+      <div class="glyph">J</div>
+      <div>
+        <div class="t">Marketplace</div>
+        <div class="s">Indikator &amp; Tools Jadi Trader</div>
+      </div>
+    </div>
+    <nav class="nav">
+      <a href="jurnal-trading.html">Jurnal Trading</a>
+      <a href="ema-cross-screener_3.html">Crypto Screener</a>
+      <button type="button" id="btnLogin">Masuk</button>
+      <span class="mono" id="infoUser" style="font-size:11px;color:var(--muted);align-self:center"></span>
+    </nav>
+  </header>
+
+  <div class="bagian" style="margin-top:0">
+    <h2>Produk</h2>
+    <div class="sub">Indikator TradingView siap pakai. Yang gratis bisa langsung diunduh; yang premium dikirim dengan kode lisensi atas nama pembeli.</div>
+    <div class="kisi" id="kisiProduk"></div>
+  </div>
+
+  <!-- ══════════ PANDUAN PASANG ══════════ -->
+  <div class="bagian">
+    <h2>Cara Pasang Indikator</h2>
+    <div class="sub">Berlaku untuk semua indikator di sini. Sekali paham, sisanya sama saja.</div>
+    <div class="kartu">
+      <div class="langkah"><div class="n">1</div><div class="isi">
+        <b>Buka TradingView &amp; masuk ke chart</b>
+        <span>Login di tradingview.com, buka chart pair yang mau dipakai (mis. XAUUSD atau BTCUSDT).</span>
+      </div></div>
+      <div class="langkah"><div class="n">2</div><div class="isi">
+        <b>Buka Pine Editor</b>
+        <span>Di bagian bawah layar ada tab <b>Pine Editor</b>. Klik untuk membukanya. Kalau tidak terlihat, klik menu titik-tiga di panel bawah lalu pilih Pine Editor.</span>
+      </div></div>
+      <div class="langkah"><div class="n">3</div><div class="isi">
+        <b>Buat indikator kosong</b>
+        <span>Klik <b>Open</b> → <b>New indicator</b>. Akan muncul contoh script bawaan. Blok semuanya (Ctrl+A) lalu hapus.</span>
+      </div></div>
+      <div class="langkah"><div class="n">4</div><div class="isi">
+        <b>Tempel isi file .txt yang kamu unduh</b>
+        <span>Buka file .txt dari sini, salin SELURUH isinya (Ctrl+A lalu Ctrl+C), tempel ke Pine Editor yang sudah kosong tadi.</span>
+      </div></div>
+      <div class="langkah"><div class="n">5</div><div class="isi">
+        <b>Simpan &amp; tambahkan ke chart</b>
+        <span>Klik <b>Save</b> (beri nama bebas), lalu klik <b>Add to chart</b>. Indikator langsung tampil.</span>
+      </div></div>
+      <div class="langkah"><div class="n">6</div><div class="isi">
+        <b>Atur lewat ikon gerigi</b>
+        <span>Arahkan kursor ke nama indikator di pojok kiri atas chart → ikon gerigi → semua pengaturan (warna, timeframe, sensitivitas) ada di situ.</span>
+      </div></div>
+      <div class="langkah"><div class="n">7</div><div class="isi">
+        <b>Khusus premium: jangan ubah baris ber-ID</b>
+        <span>Script premium memuat kode lisensi atas namamu. Mengubah/menghapusnya tidak membuat indikator berhenti bekerja, tapi melanggar lisensi yang kamu setujui saat registrasi.</span>
+      </div></div>
+    </div>
+  </div>
+
+  <!-- ══════════ PANEL OWNER ══════════ -->
+  <div class="bagian" id="panelOwner">
+    <h2>Panel Pemilik</h2>
+    <div class="sub">Hanya terlihat oleh akun pemilik. Semua perubahan di sini langsung tampil ke pengunjung.</div>
+
+    <div class="kartu">
+      <h3>Tambah / Ubah Produk</h3>
+      <div class="baris2">
+        <div>
+          <div class="label">Pilih produk</div>
+          <select class="isian" id="ownPilih"><option value="">— produk baru —</option></select>
+        </div>
+        <div>
+          <div class="label">ID produk (huruf kecil, tanpa spasi)</div>
+          <input class="isian" id="ownId" placeholder="mis. smi-indikator">
+        </div>
+      </div>
+      <div style="height:12px"></div>
+      <div class="baris2">
+        <div><div class="label">Nama produk</div><input class="isian" id="ownNama"></div>
+        <div><div class="label">Versi / label</div><input class="isian" id="ownVersi" placeholder="mis. Pine v6 · TradingView"></div>
+      </div>
+      <div style="height:12px"></div>
+      <div class="baris2">
+        <div><div class="label">Harga (USD, 0 = gratis)</div><input class="isian" id="ownHarga" type="number" step="1" min="0"></div>
+        <div><div class="label">Nama file .txt</div><input class="isian" id="ownBerkas" placeholder="marketplace-produk/xxx.txt"></div>
+      </div>
+      <div style="height:12px"></div>
+      <div><div class="label">Ringkasan (1 kalimat, tampil di kartu)</div><input class="isian" id="ownRingkas"></div>
+      <div style="height:12px"></div>
+      <div><div class="label">Penjelasan lengkap (tampil di detail)</div><textarea class="isian" id="ownDetail" rows="4"></textarea></div>
+      <div style="height:12px"></div>
+      <div><div class="label">Fitur — satu per baris, format: Judul | keterangan</div><textarea class="isian" id="ownFitur" rows="5"></textarea></div>
+      <div style="height:12px"></div>
+      <div><div class="label">URL gambar — satu per baris</div><textarea class="isian" id="ownGambar" rows="3" placeholder="https://..."></textarea></div>
+      <div style="height:12px"></div>
+      <div><div class="label">Link pembayaran Lynk.id (khusus produk berbayar)</div><input class="isian" id="ownLynk" placeholder="https://lynk.id/..."></div>
+      <div style="height:14px"></div>
+      <div class="aksi">
+        <button type="button" class="tbl utama" id="ownSimpan">Simpan Produk</button>
+        <button type="button" class="tbl" id="ownHapus">Hapus Produk Ini</button>
+        <button type="button" class="tbl" id="ownReset">Kembalikan ke Bawaan</button>
+      </div>
+      <div class="catat" id="ownStatus" style="margin-top:10px"></div>
+    </div>
+
+    <div class="kartu">
+      <h3>Aktivasi Pembeli</h3>
+      <div class="catat" style="margin-bottom:10px">
+        Pembeli membayar lewat Lynk lalu mengirimkan <b>Kode Lisensi</b>-nya kepadamu. Tempel kodenya di sini
+        dan klik Aktifkan — halaman pembeli otomatis membuka unduhan indikatornya.
+      </div>
+      <div class="baris2">
+        <div><div class="label">Kode lisensi pembeli</div><input class="isian mono" id="ownKode" placeholder="JT3-XXXX-XXXX-XXXX"></div>
+        <div><div class="label">Catatan (opsional)</div><input class="isian" id="ownCatatan" placeholder="nama / tgl bayar"></div>
+      </div>
+      <div style="height:12px"></div>
+      <button type="button" class="tbl utama" id="ownAktifkan">Aktifkan Kode</button>
+      <div class="catat" id="ownAktifStatus" style="margin-top:10px"></div>
+      <div style="height:14px"></div>
+      <div class="label">Kode aktif</div>
+      <table class="tabel"><thead><tr><th>Sidik Kode</th><th>Catatan</th><th>Tanggal</th><th></th></tr></thead>
+      <tbody id="ownDaftarAktif"></tbody></table>
+    </div>
+
+    <div class="kartu">
+      <h3>Pelacak Kebocoran</h3>
+      <div class="catat" style="margin-bottom:10px">
+        Menemukan script kamu beredar? Tempel isinya di sini. Penanda lisensi disisipkan di beberapa titik berbeda,
+        jadi biasanya masih bisa terbaca walau sebagiannya sudah dihapus orang.
+      </div>
+      <textarea class="isian mono" id="lacakIsi" rows="6" placeholder="tempel seluruh isi script yang dicurigai…"></textarea>
+      <div style="height:12px"></div>
+      <button type="button" class="tbl utama" id="btnLacak">Lacak Pemiliknya</button>
+      <div class="catat" id="lacakHasil" style="margin-top:12px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ TIRAI DETAIL PRODUK ══════════ -->
+<div class="tirai" id="tirai">
+  <div class="lembar">
+    <div class="lembar-kepala">
+      <div>
+        <h2 id="dtNama">—</h2>
+        <div class="mono" style="font-size:11px;color:var(--dim)" id="dtVersi"></div>
+      </div>
+      <button type="button" class="tutup" id="dtTutup">Tutup ✕</button>
+    </div>
+
+    <div class="harga" id="dtHarga" style="margin:10px 0 16px"></div>
+    <div class="catat" id="dtDetail" style="font-size:13px;margin-bottom:18px"></div>
+
+    <div id="dtPeraga"></div>
+
+    <div class="label" style="margin-top:18px">Fitur</div>
+    <ul class="fitur" id="dtFitur"></ul>
+
+    <div class="label" style="margin-top:20px">Tangkapan Layar</div>
+    <div class="galeri" id="dtGaleri"></div>
+
+    <!-- Area beli / unduh -->
+    <div id="dtBeli" style="margin-top:22px"></div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script>
+(function(){
+"use strict";
+
+var OWNER_UID = 'EOrakx0QnSVgsi6BECSOXvUM9kG3';
+var DOK_PUBLIK = { col:'public', doc:'marketplace' };
+var uid = null, isOwner = false;
+
+function el(id){ return document.getElementById(id); }
+function J(s, d){ try{ var v = JSON.parse(s); return v == null ? d : v; }catch(e){ return d; } }
+function esc(s){
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   KATALOG PRODUK
+   ══════════════════════════════════════════════════════════════════
+   Disimpan di Firestore public/marketplace: bisa dibaca siapa saja,
+   hanya pemilik yang boleh menulis - aturan yang SUDAH ada (dipakai
+   jurnal showcase), jadi tidak perlu mengubah rules lagi.
+   Kalau dokumennya belum ada, dipakai daftar bawaan di bawah ini
+   supaya halaman tidak pernah kosong. */
+var BAWAAN = [
+  {
+    id:'jadi-trader-v3', nama:'Jadi Trader V3', versi:'Pine v6 · overlay · semua timeframe',
+    harga:50, berkas:'marketplace-produk/jadi-trader-v3.txt', premium:true,
+    ringkas:'Satu indikator berisi Auto Parallel Channel + duplikat breakout, zona SNR & Supply-Demand multi-timeframe, momentum candle, dan sinyal BUY/SELL otomatis.',
+    detail:'Indikator utama Jadi Trader. Dibangun dari cara kerja yang sama yang dipakai di Crypto Screener: channel paralel digambar otomatis dari pivot, lalu saat harga menembusnya channel duplikat ditempel persis di sisi breakout sehingga kamu selalu punya garis acuan berikutnya. Sinyal BUY/SELL tidak dinilai saat candle masih berjalan — setiap channel berubah bentuk, seluruh sentuhan dipindai ulang ke belakang memakai geometri channel yang SEDANG terlihat, sehingga label sinyalnya selalu cocok dengan garis di layar.',
+    fitur:[
+      'Auto Parallel Channel|Digambar otomatis dari pivot high/low, dengan pemilihan offset yang mengutamakan garis tengah yang sudah di-retest — bukan sekadar menempel di titik paling ekstrem.',
+      'Duplikat Channel 1 & 2|Begitu harga menembus channel, duplikat dengan kemiringan & lebar identik ditempel pas di sisi breakout. Tembus lagi, muncul duplikat kedua. Sinyal ikut berpindah ke band tempat harga berada.',
+      'Sinyal BUY/SELL sentuh channel|Sentuh garis bawah lalu close balik ke dalam → BUY. Sentuh garis atas lalu close balik → SELL. Dipindai ulang tiap channel berubah, jadi label tidak pernah "nyangkut" di posisi lama.',
+      'Zona SNR otomatis|Support & resistance dari pivot, lebar zona mengikuti ATR. Di TF 1m & 5m, zona diambil dari TF 4 jam supaya acuannya tetap besar.',
+      'Supply & Demand|Order block dari candle impulsif, digambar sebagai garis + label, juga di-import dari TF 4 jam saat kamu di TF kecil.',
+      'Momentum Candle Breakout|Candle berbadan tebal (≥70% range) yang menembus high/low beberapa candle sebelumnya diwarnai otomatis, lengkap dengan alert.',
+      'Sinyal SNR retest|Bintang BUY/SELL muncul di sentuhan KEDUA ke zona yang sama, khusus candle penolakan (ekor lebih panjang dari badan).',
+      'Liquidity Sweep|Menandai saat wick menembus zona lalu close balik — likuiditas sudah diambil, area jadi lebih aman untuk entry.',
+      'Alert siap pakai|Semua sinyal punya alertcondition, tinggal dipasang di TradingView.'
+    ],
+    gambar:[], lynk:''
+  },
+  {
+    id:'news-gap-hunter-v2', nama:'News & GAP Hunter V2', versi:'Pine v5 · overlay · XAUUSD/Forex',
+    harga:0, berkas:'marketplace-produk/news-gap-hunter-v2.txt', premium:false,
+    ringkas:'Menandai jam rilis berita besar AS (NFP, CPI, PPI, FOMC, dll) langsung di chart, plus pengukur gap Jumat→Senin lengkap dengan estimasi P/L.',
+    detail:'Tanggal rilis di indikator ini bukan hasil rumus "Jumat pertama", melainkan ditulis satu per satu dari kalender resmi BLS dan Federal Reserve — termasuk periode kacau saat government shutdown AS (Okt 2025–awal 2026) ketika ada rilis yang tertunda, digabung dua bulan, bahkan dibatalkan total. Untuk bulan-bulan berikutnya tersedia kolom tambahan manual di tiap kategori.',
+    fitur:[
+      'Sepuluh kategori berita|NFP, CPI, PPI, FOMC, Unemployment Rate, Jobless Claims mingguan, Federal Funds Rate, ISM Manufacturing, ISM Services, dan S&P Global Flash PMI — masing-masing punya warna & label sendiri.',
+      'Tanggal historis asli|Ditulis manual dari sumber resmi, bukan perkiraan. Termasuk rilis yang tertunda/digabung akibat shutdown.',
+      'Label bertingkat|Label yang jamnya bertabrakan (mis. NFP & Unemployment Rate yang selalu barengan) ditumpuk bertingkat supaya tidak saling menutupi.',
+      'Penanda market open Senin|Highlight otomatis hari Senin beserta garis gap dari close Jumat ke open Senin.',
+      'Kalkulasi P/L gap|Selisih gap langsung dihitung jadi pip dan estimasi profit/loss untuk dua ukuran lot sekaligus.',
+      'Kolom tambahan manual|Tiap kategori punya 2–4 slot tanggal tambahan supaya kamu bisa isi sendiri rilis bulan berikutnya tanpa menyentuh kode.'
+    ],
+    gambar:[], lynk:''
+  },
+  {
+    id:'smi-indikator', nama:'Stochastic Momentum Index (SMI)', versi:'Pine v6 · panel terpisah',
+    harga:0, berkas:'marketplace-produk/smi-indikator.txt', premium:false,
+    ringkas:'Versi SMI yang dipakai di Area Pantau Crypto Screener — dengan garis EMA pembanding dan gradasi overbought/oversold.',
+    detail:'SMI mengukur posisi harga terhadap TITIK TENGAH rentang tertinggi–terendah, bukan terhadap batas bawahnya seperti Stochastic biasa. Hasilnya bergerak di kisaran -100 sampai +100 dan jauh lebih halus, sehingga sinyal jenuh beli/jenuh jual tidak secepat itu berubah-ubah. Ini indikator yang sama persis yang dipakai menyaring koin di Area Pantau.',
+    fitur:[
+      'Skala -100 s/d +100|Titik nol berarti harga persis di tengah rentang — jauh lebih mudah dibaca daripada 0–100 milik Stochastic biasa.',
+      'Garis EMA pembanding|Persilangan SMI dengan EMA-nya dipakai sebagai tanda awal pembalikan arah.',
+      'Gradasi jenuh|Area di atas +40 dan di bawah -40 diberi gradasi warna supaya kondisi ekstrem langsung kelihatan tanpa membaca angka.',
+      'Panjang bisa diatur|%K, %D, dan panjang EMA semuanya bisa diubah dari menu pengaturan.'
+    ],
+    gambar:[], lynk:''
+  }
+];
+
+var produk = BAWAAN.slice();
+var kodeAktif = [];      // daftar sidik kode yang sudah dibayar (publik, tanpa identitas)
+
+/* ══════════════════════════════════════════════════════════════════
+   ANIMASI PERAGA — bagaimana indikatornya bekerja
+   ══════════════════════════════════════════════════════════════════ */
+function lilin(x, o, c, h, l){
+  var naik = c < o;                         // koordinat SVG: y kecil = harga tinggi
+  var kelas = naik ? 'lilin-naik' : 'lilin-turun';
+  return '<line x1="'+x+'" y1="'+h+'" x2="'+x+'" y2="'+l+'" class="'+kelas+'" stroke-width="1"/>'
+       + '<rect x="'+(x-3)+'" y="'+Math.min(o,c)+'" width="6" height="'+Math.max(2,Math.abs(c-o))+'" class="'+kelas+'"/>';
+}
+
+var PERAGA = {
+  'jadi-trader-v3': [
+    { jd:'Channel digambar otomatis dari pivot — sentuh garis bawah, close balik ke dalam → BUY',
+      svg:function(){
+        var s = '<svg viewBox="0 0 420 170">';
+        s += '<line x1="10" y1="40" x2="410" y2="20" stroke="#787B86" stroke-width="1.4" class="anim-garis"/>';
+        s += '<line x1="10" y1="120" x2="410" y2="100" stroke="#787B86" stroke-width="1.4" class="anim-garis"/>';
+        s += '<line x1="10" y1="80" x2="410" y2="60" stroke="#787B86" stroke-width="1" stroke-dasharray="5 5" opacity=".5"/>';
+        s += '<polygon points="10,40 410,20 410,100 10,120" fill="#4f9e82" opacity=".05"/>';
+        var d = [[40,70,62,64,78],[70,64,80,58,88],[100,80,95,72,104],[130,95,108,88,112],
+                 [160,108,116,100,124],[190,116,110,104,120],[220,110,100,94,116],[250,100,92,86,106]];
+        d.forEach(function(k){ s += lilin(k[0],k[1],k[2],k[3],k[4]); });
+        s += '<g class="anim-label"><circle cx="160" cy="124" r="4" fill="#4f9e82"/>'
+           + '<rect x="136" y="132" width="48" height="16" rx="4" fill="#4f9e82"/>'
+           + '<text x="160" y="144" fill="#fff" font-size="10" font-family="monospace" text-anchor="middle">BUY</text></g>';
+        return s + '</svg>';
+      } },
+    { jd:'Harga menembus channel → duplikat dengan lebar & kemiringan sama ditempel di sisi breakout',
+      svg:function(){
+        var s = '<svg viewBox="0 0 420 170">';
+        s += '<polygon points="10,90 410,70 410,150 10,170" fill="#4f9e82" opacity=".04"/>';
+        s += '<line x1="10" y1="90" x2="410" y2="70" stroke="#787B86" stroke-width="1.4"/>';
+        s += '<line x1="10" y1="150" x2="410" y2="130" stroke="#787B86" stroke-width="1.4"/>';
+        s += '<g class="anim-geser">';
+        s += '<polygon points="200,80 410,70 410,-10 200,0" fill="#c9a24b" opacity=".07"/>';
+        s += '<line x1="200" y1="80" x2="410" y2="70" stroke="#c9a24b" stroke-width="1.4" stroke-dasharray="4 3"/>';
+        s += '<line x1="200" y1="0" x2="410" y2="-10" stroke="#c9a24b" stroke-width="1.4" stroke-dasharray="4 3"/>';
+        s += '<text x="300" y="42" fill="#c9a24b" font-size="10" font-family="monospace" text-anchor="middle">Duplikat 1</text>';
+        s += '</g>';
+        var d = [[60,130,122,116,136],[90,122,112,106,128],[120,112,100,94,118],[150,100,88,82,104],
+                 [180,88,74,68,92],[210,74,60,54,80],[240,60,48,42,66]];
+        d.forEach(function(k){ s += lilin(k[0],k[1],k[2],k[3],k[4]); });
+        return s + '</svg>';
+      } },
+    { jd:'Zona SNR & Supply-Demand — di TF kecil, zonanya diambil dari TF 4 jam',
+      svg:function(){
+        var s = '<svg viewBox="0 0 420 170">';
+        s += '<rect x="10" y="26" width="400" height="24" fill="#8B0000" opacity=".28" class="anim-zona"/>';
+        s += '<text x="16" y="42" fill="#c2544d" font-size="9" font-family="monospace">R1 (4h)</text>';
+        s += '<rect x="10" y="118" width="400" height="24" fill="#1A3A2A" opacity=".55" class="anim-zona"/>';
+        s += '<text x="16" y="134" fill="#4f9e82" font-size="9" font-family="monospace">S1 (4h)</text>';
+        s += '<line x1="10" y1="86" x2="410" y2="86" stroke="#3D0000" stroke-width="1"/>';
+        s += '<text x="330" y="82" fill="#8a6a6a" font-size="9" font-family="monospace">Demand Zone</text>';
+        var d = [[50,110,100,94,116],[80,100,112,96,120],[110,112,124,108,132],[140,124,114,108,130],
+                 [170,114,96,90,120],[200,96,72,64,102],[230,72,50,42,80],[260,50,62,44,70]];
+        d.forEach(function(k){ s += lilin(k[0],k[1],k[2],k[3],k[4]); });
+        return s + '</svg>';
+      } }
+  ],
+  'news-gap-hunter-v2': [
+    { jd:'Jam rilis berita besar disorot otomatis, dengan label bertingkat saat jamnya bertabrakan',
+      svg:function(){
+        var s = '<svg viewBox="0 0 420 170">';
+        s += '<rect x="150" y="0" width="60" height="170" fill="#e08b2a" opacity=".16" class="anim-zona"/>';
+        s += '<g class="anim-label">';
+        s += '<rect x="152" y="8" width="34" height="14" rx="3" fill="#e08b2a"/>';
+        s += '<text x="169" y="19" fill="#fff" font-size="9" font-family="monospace" text-anchor="middle">NFP</text>';
+        s += '<rect x="152" y="26" width="34" height="14" rx="3" fill="#b048a8"/>';
+        s += '<text x="169" y="37" fill="#fff" font-size="9" font-family="monospace" text-anchor="middle">UNR</text>';
+        s += '</g>';
+        var d = [[40,110,104,98,116],[70,104,108,100,114],[100,108,102,96,112],[130,102,106,98,110],
+                 [165,106,60,52,112],[195,60,74,54,84],[230,74,66,58,80],[260,66,70,60,78]];
+        d.forEach(function(k){ s += lilin(k[0],k[1],k[2],k[3],k[4]); });
+        return s + '</svg>';
+      } },
+    { jd:'Gap Jumat → Senin diukur otomatis: jarak pip + estimasi profit/loss per lot',
+      svg:function(){
+        var s = '<svg viewBox="0 0 420 170">';
+        var d = [[40,100,94,88,106],[70,94,98,90,104],[100,98,92,86,102]];
+        d.forEach(function(k){ s += lilin(k[0],k[1],k[2],k[3],k[4]); });
+        s += '<line x1="100" y1="92" x2="180" y2="52" stroke="#4f9e82" stroke-width="1.6" stroke-dasharray="5 4" class="anim-garis"/>';
+        var d2 = [[180,52,44,38,58],[210,44,50,40,56],[240,50,42,36,54],[270,42,48,38,52]];
+        d2.forEach(function(k){ s += lilin(k[0],k[1],k[2],k[3],k[4]); });
+        s += '<g class="anim-label"><rect x="188" y="66" width="148" height="42" rx="5" fill="#4f9e82"/>'
+           + '<text x="196" y="80" fill="#fff" font-size="9" font-family="monospace">Gap: +40.0 pips</text>'
+           + '<text x="196" y="92" fill="#fff" font-size="9" font-family="monospace">P/L (0.10 lot): +$40.00</text>'
+           + '<text x="196" y="104" fill="#fff" font-size="9" font-family="monospace">P/L (0.20 lot): +$80.00</text></g>';
+        return s + '</svg>';
+      } }
+  ],
+  'smi-indikator': [
+    { jd:'SMI mengukur posisi harga terhadap TITIK TENGAH rentang — skala -100 sampai +100',
+      svg:function(){
+        var s = '<svg viewBox="0 0 420 170">';
+        s += '<rect x="10" y="30" width="400" height="45" fill="#4caf4f" opacity=".10"/>';
+        s += '<rect x="10" y="95" width="400" height="45" fill="#c2544d" opacity=".10"/>';
+        s += '<line x1="10" y1="30" x2="410" y2="30" stroke="#4f9e82" stroke-width="1" stroke-dasharray="4 4"/>';
+        s += '<text x="14" y="26" fill="#4f9e82" font-size="9" font-family="monospace">+40 jenuh beli</text>';
+        s += '<line x1="10" y1="140" x2="410" y2="140" stroke="#c2544d" stroke-width="1" stroke-dasharray="4 4"/>';
+        s += '<text x="14" y="152" fill="#c2544d" font-size="9" font-family="monospace">-40 jenuh jual</text>';
+        s += '<line x1="10" y1="85" x2="410" y2="85" stroke="#63656d" stroke-width="1" opacity=".6"/>';
+        s += '<path d="M10 60 C 60 20, 110 30, 150 70 S 230 150, 280 132 S 360 50, 410 44" fill="none" stroke="#3b82f6" stroke-width="2" class="anim-garis"/>';
+        s += '<path d="M10 72 C 60 40, 110 46, 150 82 S 230 140, 280 126 S 360 66, 410 56" fill="none" stroke="#e08b2a" stroke-width="1.6" opacity=".9" class="anim-garis"/>';
+        s += '<g class="anim-label"><circle cx="280" cy="132" r="4" fill="#4f9e82"/>'
+           + '<text x="292" y="136" fill="#4f9e82" font-size="9" font-family="monospace">SMI memotong EMA → balik arah</text></g>';
+        return s + '</svg>';
+      } }
+  ]
+};
+
+/* ══════════════════════════════════════════════════════════════════
+   KODE LISENSI & PENYISIPAN KE PINE SCRIPT
+   ══════════════════════════════════════════════════════════════════ */
+var ABJAD = '3479ACDEFHJKLMNPQRTUVWXY';   // tanpa huruf/angka yang mirip (0/O, 1/I, S/5, B/8, G/6, Z/2)
+
+function sha256Hex(teks){
+  var data = new TextEncoder().encode(teks);
+  return crypto.subtle.digest('SHA-256', data).then(function(buf){
+    return Array.prototype.map.call(new Uint8Array(buf),
+      function(b){ return ('0' + b.toString(16)).slice(-2); }).join('');
+  });
+}
+
+/* Kode lisensi dibuat DETERMINISTIK dari identitas pembeli. Artinya orang
+   yang sama akan selalu mendapat kode yang sama - jadi kalau dia kehilangan
+   filenya, tinggal isi ulang form dan kodenya kembali, tanpa perlu database. */
+function buatKode(nama, email, hp){
+  var benih = 'jaditrader|v3|' + nama.trim().toLowerCase() + '|'
+            + email.trim().toLowerCase() + '|' + hp.replace(/[^0-9]/g,'');
+  return sha256Hex(benih).then(function(hex){
+    var out = '';
+    for(var i = 0; i < 12; i++){
+      out += ABJAD.charAt(parseInt(hex.substr(i*2, 2), 16) % ABJAD.length);
+    }
+    return 'JT3-' + out.substr(0,4) + '-' + out.substr(4,4) + '-' + out.substr(8,4);
+  });
+}
+
+/* Sidik kode = 10 hex pertama dari SHA-256 kodenya. Ini yang diterbitkan ke
+   dokumen PUBLIK saat pemilik mengaktifkan pembelian - kodenya sendiri (apalagi
+   nama/email/HP pembeli) TIDAK pernah ikut terbit. */
+function sidikKode(kode){
+  return sha256Hex('sidik|' + kode).then(function(h){ return h.substr(0, 10); });
+}
+
+/* ── Penyisipan penanda ke dalam Pine Script ──────────────────────
+   Ditaruh di BEBERAPA titik berbeda dan dibuat menyerupai catatan build
+   biasa, supaya kalau satu dihapus, sisanya masih bisa melacak. Semuanya
+   berupa komentar & satu konstanta yang tidak dipakai - tidak mengubah
+   perilaku indikator sama sekali. */
+function sisipkanPenanda(sumber, kode){
+  var inti = kode.replace(/^JT3-/, '').replace(/-/g, '');   // 12 karakter
+  var a = inti.substr(0,4), b = inti.substr(4,4), c = inti.substr(8,4);
+  // Akhiran baris sumber diikuti apa adanya (berkas Pine kita CRLF). Kalau
+  // dicampur LF, berkasnya jadi belang saat dibuka di editor Windows.
+  var eol = sumber.indexOf('\r\n') >= 0 ? '\r\n' : '\n';
+  var baris = sumber.split(/\r?\n/);
+  var stempel = new Date().toISOString().slice(0,10).replace(/-/g,'');
+
+  // Titik 1: menyamar sebagai penanda build, tepat sesudah //@version
+  var iVer = baris.findIndex(function(l){ return l.indexOf('//@version') === 0; });
+  if(iVer < 0) iVer = 0;
+  baris.splice(iVer + 1, 0, '// build ' + stempel + '.' + a.toLowerCase() + ' — dist ' + b.toLowerCase());
+
+  // Titik 2: konstanta yang terlihat wajar, disisipkan sesudah baris indicator()
+  var iInd = baris.findIndex(function(l){ return l.indexOf('indicator(') >= 0; });
+  if(iInd >= 0){
+    baris.splice(iInd + 1, 0,
+      '',
+      '// revisi internal — jangan diubah',
+      '_rev = "' + a + c + '"');
+  }
+
+  // Titik 3: menyamar sebagai catatan revisi di tengah script
+  var tengah = Math.floor(baris.length * 0.55);
+  for(var i = tengah; i < baris.length; i++){
+    if(baris[i].indexOf('// ═══') === 0){ tengah = i; break; }
+  }
+  baris.splice(tengah, 0, '// ref-' + b.toLowerCase() + c.toLowerCase() + ' (' + stempel + ')');
+
+  // Titik 4: di ujung berkas
+  baris.push('');
+  baris.push('// © Jadi Trader — lisensi personal ' + kode);
+  baris.push('// ' + stempel + '-' + a.toLowerCase() + b.toLowerCase() + c.toLowerCase());
+  return baris.join(eol);
+}
+
+/* Kebalikannya: kumpulkan potongan apa pun yang masih tersisa di script. */
+function bacaPenanda(teks){
+  var potong = { a:null, b:null, c:null, penuh:null, titik:0 };
+  var m;
+  m = teks.match(/JT3-([A-Z0-9]{4})-([A-Z0-9]{4})-([A-Z0-9]{4})/);
+  if(m){ potong.penuh = m[0]; potong.a = m[1]; potong.b = m[2]; potong.c = m[3]; potong.titik++; }
+  m = teks.match(/\/\/ build \d{8}\.([a-z0-9]{4}) — dist ([a-z0-9]{4})/);
+  if(m){ potong.a = potong.a || m[1].toUpperCase(); potong.b = potong.b || m[2].toUpperCase(); potong.titik++; }
+  m = teks.match(/_rev\s*=\s*"([A-Z0-9]{8})"/);
+  if(m){ potong.a = potong.a || m[1].substr(0,4); potong.c = potong.c || m[1].substr(4,4); potong.titik++; }
+  m = teks.match(/\/\/ ref-([a-z0-9]{8})\s/);
+  if(m){ potong.b = potong.b || m[1].substr(0,4).toUpperCase(); potong.c = potong.c || m[1].substr(4,4).toUpperCase(); potong.titik++; }
+  m = teks.match(/\/\/ \d{8}-([a-z0-9]{12})/);
+  if(m){
+    var s = m[1].toUpperCase();
+    potong.a = potong.a || s.substr(0,4); potong.b = potong.b || s.substr(4,4); potong.c = potong.c || s.substr(8,4);
+    potong.titik++;
+  }
+  if(!potong.penuh && potong.a && potong.b && potong.c){
+    potong.penuh = 'JT3-' + potong.a + '-' + potong.b + '-' + potong.c;
+  }
+  return potong;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   SURAT LISENSI
+   ══════════════════════════════════════════════════════════════════ */
+function suratLisensi(d){
+  var tgl = new Date().toLocaleDateString('id-ID', { day:'numeric', month:'long', year:'numeric' });
+  return ''
++ 'SURAT LISENSI PENGGUNAAN INDIKATOR\n'
++ '══════════════════════════════════════════════════\n\n'
++ 'Produk        : ' + d.produk + '\n'
++ 'Kode Lisensi  : ' + d.kode + '\n'
++ 'Tanggal Terbit: ' + tgl + '\n\n'
++ 'DIBERIKAN KEPADA\n'
++ 'Nama          : ' + d.nama + '\n'
++ 'Email         : ' + d.email + '\n'
++ 'No. Telepon   : ' + d.hp + '\n\n'
++ 'KETENTUAN\n'
++ '1. Lisensi ini bersifat PERSONAL dan hanya berlaku untuk satu orang,\n'
++ '   yaitu pemegang nama di atas. Lisensi tidak dapat dipindahtangankan,\n'
++ '   dijual kembali, disewakan, maupun dipakai bersama-sama.\n'
++ '2. Pemegang lisensi boleh memasang indikator ini di akun TradingView\n'
++ '   miliknya sendiri, pada perangkat sebanyak yang ia butuhkan.\n'
++ '3. Pemegang lisensi DILARANG menyebarluaskan, membagikan, mengunggah\n'
++ '   ulang, atau mempublikasikan kode sumber indikator ini, baik utuh\n'
++ '   maupun sebagian, dengan atau tanpa imbalan.\n'
++ '4. Salinan indikator ini memuat penanda unik yang terhubung dengan\n'
++ '   identitas di atas dan tersimpan di beberapa titik dalam kode. Bila\n'
++ '   kode ini ditemukan beredar tanpa izin, penanda tersebut dipakai\n'
++ '   untuk menelusuri sumber penyebarannya.\n'
++ '5. Pelanggaran ketentuan nomor 3 mengakibatkan lisensi ini gugur\n'
++ '   seketika tanpa pengembalian dana, dan penerbit berhak menempuh\n'
++ '   upaya hukum atas pelanggaran hak cipta sesuai peraturan yang\n'
++ '   berlaku di Republik Indonesia, antara lain Undang-Undang Nomor 28\n'
++ '   Tahun 2014 tentang Hak Cipta.\n'
++ '6. Indikator ini adalah ALAT BANTU ANALISIS, bukan ajakan membeli atau\n'
++ '   menjual, bukan jaminan keuntungan, dan bukan nasihat keuangan.\n'
++ '   Seluruh keputusan dan risiko transaksi sepenuhnya ada pada\n'
++ '   pemegang lisensi.\n\n'
++ 'Dengan mengunduh dan memakai berkas indikator ini, pemegang lisensi\n'
++ 'dianggap telah membaca, memahami, dan menyetujui seluruh ketentuan\n'
++ 'di atas.\n\n'
++ '══════════════════════════════════════════════════\n'
++ 'Diterbitkan oleh: Jadi Trader\n'
++ 'Simpan surat ini bersama berkas indikatormu sebagai bukti kepemilikan.\n';
+}
+
+function unduhTeks(namaBerkas, isi){
+  var b = new Blob([isi], { type:'text/plain;charset=utf-8' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(b);
+  a.download = namaBerkas;
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 400);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   TAMPILAN
+   ══════════════════════════════════════════════════════════════════ */
+function gambarKatalog(){
+  el('kisiProduk').innerHTML = produk.map(function(p){
+    var gratis = !(Number(p.harga) > 0);
+    return '<div class="produk' + (gratis ? '' : ' premium') + '">'
+      + '<h3>' + esc(p.nama) + '</h3>'
+      + '<div class="versi">' + esc(p.versi || '') + '</div>'
+      + '<div class="ringkas">' + esc(p.ringkas || '') + '</div>'
+      + '<div class="harga">' + (gratis
+          ? '<span class="gratis">Gratis</span>'
+          : '$' + Number(p.harga) + ' <small>sekali bayar</small>') + '</div>'
+      + '<div class="aksi">'
+        + '<button type="button" class="tbl utama" data-detail="' + esc(p.id) + '">Lihat Detail</button>'
+        + (gratis ? '<button type="button" class="tbl" data-unduh="' + esc(p.id) + '">Unduh</button>' : '')
+      + '</div></div>';
+  }).join('');
+}
+
+var produkAktif = null;
+
+function bukaDetail(id){
+  var p = produk.find(function(x){ return x.id === id; });
+  if(!p) return;
+  produkAktif = p;
+  var gratis = !(Number(p.harga) > 0);
+
+  el('dtNama').textContent = p.nama;
+  el('dtVersi').textContent = p.versi || '';
+  el('dtHarga').innerHTML = gratis ? '<span class="gratis">Gratis</span>'
+    : '$' + Number(p.harga) + ' <small>sekali bayar · lisensi personal</small>';
+  el('dtDetail').textContent = p.detail || p.ringkas || '';
+
+  var per = PERAGA[p.id] || [];
+  el('dtPeraga').innerHTML = per.map(function(x){
+    return '<div class="peraga"><div class="jd">' + esc(x.jd) + '</div>' + x.svg() + '</div>';
+  }).join('');
+
+  var fitur = (p.fitur || []).map(function(f, i){
+    var bagi = String(f).split('|');
+    return '<li><div class="no">' + (i+1) + '</div><div><div class="jd">' + esc(bagi[0]) + '</div>'
+      + '<div class="ket">' + esc(bagi[1] || '') + '</div></div></li>';
+  }).join('');
+  el('dtFitur').innerHTML = fitur || '<li class="ket">Belum ada rincian fitur.</li>';
+
+  var gbr = (p.gambar || []).filter(Boolean);
+  el('dtGaleri').innerHTML = gbr.length
+    ? gbr.map(function(u){ return '<img src="' + esc(u) + '" alt="" loading="lazy">'; }).join('')
+    : '<div class="kosong">Belum ada tangkapan layar. Pemilik bisa menambahkannya lewat Panel Pemilik.</div>';
+
+  gambarAreaBeli(p);
+  el('tirai').classList.add('on');
+  document.body.style.overflow = 'hidden';
+}
+
+function gambarAreaBeli(p){
+  var w = el('dtBeli');
+  if(!(Number(p.harga) > 0)){
+    w.innerHTML = '<button type="button" class="tbl utama" data-unduh="' + esc(p.id) + '">Unduh Indikator (.txt)</button>'
+      + '<div class="catat" style="margin-top:10px">Gratis. Ikuti panduan pasang di halaman utama setelah mengunduh.</div>';
+    return;
+  }
+  w.innerHTML =
+      '<div class="label">Beli — Lisensi Personal</div>'
+    + '<div class="catat" style="margin-bottom:12px">Isi data di bawah untuk membuat <b>Kode Lisensi</b> atas namamu. '
+      + 'Kode ini yang nanti tertanam di dalam indikatormu.</div>'
+    + '<div class="baris2">'
+      + '<div><div class="label">Nama lengkap</div><input class="isian" id="bliNama"></div>'
+      + '<div><div class="label">Email</div><input class="isian" id="bliEmail" type="email"></div>'
+    + '</div><div style="height:12px"></div>'
+    + '<div><div class="label">No. HP / WhatsApp</div><input class="isian" id="bliHp" inputmode="tel"></div>'
+    + '<div style="height:14px"></div>'
+    + '<label style="display:flex;gap:9px;align-items:flex-start;font-size:12.5px;color:var(--muted);cursor:pointer">'
+      + '<input type="checkbox" id="bliSetuju" style="margin-top:3px">'
+      + '<span>Saya menyetujui ketentuan lisensi personal: indikator ini untuk saya sendiri, '
+        + 'tidak akan saya sebarluaskan, dan saya memahami salinan saya memuat penanda unik yang terhubung dengan identitas saya.</span>'
+    + '</label>'
+    + '<div style="height:14px"></div>'
+    + '<button type="button" class="tbl utama" id="bliBuat">Buat Kode Lisensi</button>'
+    + '<div id="bliHasil"></div>';
+
+  el('bliBuat').addEventListener('click', function(){ prosesBeli(p); });
+
+  // Kalau pembeli sudah pernah mengisi di perangkat ini, kembalikan datanya.
+  var simpan = J(localStorage.getItem('mpPembeli_' + p.id), null);
+  if(simpan){
+    el('bliNama').value = simpan.nama || '';
+    el('bliEmail').value = simpan.email || '';
+    el('bliHp').value = simpan.hp || '';
+    el('bliSetuju').checked = true;
+    if(simpan.kode) tampilkanKode(p, simpan);
+  }
+}
+
+function prosesBeli(p){
+  var nama = el('bliNama').value.trim();
+  var email = el('bliEmail').value.trim();
+  var hp = el('bliHp').value.trim();
+  var hasil = el('bliHasil');
+  if(!nama || !email || !hp){
+    hasil.innerHTML = '<div class="catat err" style="margin-top:10px">Nama, email, dan no HP wajib diisi.</div>';
+    return;
+  }
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){
+    hasil.innerHTML = '<div class="catat err" style="margin-top:10px">Format email belum benar.</div>';
+    return;
+  }
+  if(!el('bliSetuju').checked){
+    hasil.innerHTML = '<div class="catat err" style="margin-top:10px">Centang persetujuan lisensi dulu.</div>';
+    return;
+  }
+  hasil.innerHTML = '<div class="catat" style="margin-top:10px">Membuat kode…</div>';
+  buatKode(nama, email, hp).then(function(kode){
+    var d = { nama:nama, email:email, hp:hp, kode:kode, produk:p.nama, tgl:Date.now() };
+    try{ localStorage.setItem('mpPembeli_' + p.id, JSON.stringify(d)); }catch(e){}
+    tampilkanKode(p, d);
+  });
+}
+
+function tampilkanKode(p, d){
+  var hasil = el('bliHasil');
+  var lynk = p.lynk || '';
+  hasil.innerHTML =
+      '<div class="label" style="margin-top:18px">Kode Lisensi Kamu</div>'
+    + '<div class="kode-besar">' + esc(d.kode) + '</div>'
+    + '<div class="catat">Simpan kode ini. Kode dibuat dari data yang kamu isi, jadi kalau hilang tinggal isi ulang '
+      + 'form yang sama dan kodenya akan kembali persis sama.</div>'
+    + '<div style="height:16px"></div>'
+    + '<div class="label">Langkah Pembayaran</div>'
+    + '<div class="langkah"><div class="n">1</div><div class="isi"><b>Bayar $' + Number(p.harga) + '</b>'
+      + '<span>' + (lynk
+          ? 'Klik tombol di bawah untuk membuka halaman pembayaran (e-wallet / QRIS lewat Lynk.id).'
+          : 'Link pembayaran belum dipasang pemilik. Hubungi penjual untuk cara bayarnya.') + '</span></div></div>'
+    + '<div class="langkah"><div class="n">2</div><div class="isi"><b>Kirim kode lisensimu ke penjual</b>'
+      + '<span>Sertakan kode <span class="mono">' + esc(d.kode) + '</span> beserta bukti bayar.</span></div></div>'
+    + '<div class="langkah"><div class="n">3</div><div class="isi"><b>Tunggu aktivasi</b>'
+      + '<span>Begitu penjual mengaktifkan, tombol unduh di halaman ini terbuka sendiri. Klik <b>Cek Status</b> untuk menyegarkan.</span></div></div>'
+    + '<div class="aksi" style="margin-top:14px">'
+      + (lynk ? '<a class="tbl utama" href="' + esc(lynk) + '" target="_blank" rel="noopener">Bayar via Lynk.id</a>' : '')
+      + '<button type="button" class="tbl" id="bliCek">Cek Status</button>'
+      + '<button type="button" class="tbl" id="bliSurat">Lihat Surat Lisensi</button>'
+    + '</div>'
+    + '<div id="bliUnduh" style="margin-top:14px"></div>'
+    + '<div id="bliSuratIsi"></div>';
+
+  el('bliCek').addEventListener('click', function(){ cekAktivasi(p, d, true); });
+  el('bliSurat').addEventListener('click', function(){
+    var w = el('bliSuratIsi');
+    if(w.innerHTML){ w.innerHTML = ''; return; }
+    w.innerHTML = '<div class="label" style="margin-top:16px">Surat Lisensi</div>'
+      + '<div class="surat">' + esc(suratLisensi(d)) + '</div>'
+      + '<div style="height:10px"></div>'
+      + '<button type="button" class="tbl" id="bliSuratUnduh">Unduh Surat (.txt)</button>';
+    el('bliSuratUnduh').addEventListener('click', function(){
+      unduhTeks('Surat-Lisensi-' + d.kode + '.txt', suratLisensi(d));
+    });
+  });
+
+  cekAktivasi(p, d, false);
+}
+
+function cekAktivasi(p, d, kabari){
+  var w = el('bliUnduh');
+  sidikKode(d.kode).then(function(sidik){
+    if(kodeAktif.indexOf(sidik) < 0){
+      w.innerHTML = '<div class="catat">Status: <b style="color:var(--gold)">menunggu aktivasi</b>'
+        + (kabari ? ' — belum aktif. Pastikan penjual sudah menerima kode &amp; bukti bayarmu.' : '') + '</div>';
+      return;
+    }
+    w.innerHTML = '<div class="catat ok">Status: <b>aktif</b> — indikatormu siap diunduh.</div>'
+      + '<div style="height:10px"></div>'
+      + '<button type="button" class="tbl utama" id="bliUnduhBtn">Unduh Indikator Ber-lisensi (.txt)</button>';
+    el('bliUnduhBtn').addEventListener('click', function(){
+      var b = el('bliUnduhBtn');
+      b.disabled = true; b.textContent = 'Menyiapkan…';
+      fetch(p.berkas + '?t=' + Date.now())
+        .then(function(r){ if(!r.ok) throw new Error('berkas tidak ditemukan'); return r.text(); })
+        .then(function(src){
+          unduhTeks(p.id + '-' + d.kode + '.txt', sisipkanPenanda(src, d.kode));
+          unduhTeks('Surat-Lisensi-' + d.kode + '.txt', suratLisensi(d));
+          b.disabled = false; b.textContent = 'Unduh Ulang';
+        })
+        .catch(function(e){
+          b.disabled = false; b.textContent = 'Unduh Indikator Ber-lisensi (.txt)';
+          alert('Gagal menyiapkan berkas: ' + e.message);
+        });
+    });
+  });
+}
+
+/* Unduh produk gratis - tanpa penanda, tanpa registrasi. */
+document.addEventListener('click', function(e){
+  var d = e.target.closest('[data-detail]');
+  if(d){ bukaDetail(d.getAttribute('data-detail')); return; }
+  var u = e.target.closest('[data-unduh]');
+  if(u){
+    var p = produk.find(function(x){ return x.id === u.getAttribute('data-unduh'); });
+    if(!p) return;
+    fetch(p.berkas + '?t=' + Date.now())
+      .then(function(r){ if(!r.ok) throw new Error('berkas tidak ditemukan'); return r.text(); })
+      .then(function(src){ unduhTeks(p.id + '.txt', src); })
+      .catch(function(err){ alert('Gagal mengunduh: ' + err.message); });
+  }
+});
+
+el('dtTutup').addEventListener('click', function(){
+  el('tirai').classList.remove('on');
+  document.body.style.overflow = '';
+});
+el('tirai').addEventListener('click', function(e){
+  if(e.target === el('tirai')){ el('tirai').classList.remove('on'); document.body.style.overflow = ''; }
+});
+
+/* ══════════════════════════════════════════════════════════════════
+   FIREBASE
+   ══════════════════════════════════════════════════════════════════ */
+firebase.initializeApp({
+  apiKey: "AIzaSyB4cWVI-k3q16TmRCbM_lbJwgtjxIs_Weo",
+  authDomain: "jadi-trader-tools.firebaseapp.com",
+  projectId: "jadi-trader-tools",
+  storageBucket: "jadi-trader-tools.firebasestorage.app",
+  messagingSenderId: "171244479105",
+  appId: "1:171244479105:web:9b421850801b6678d8e380"
+});
+var auth = firebase.auth(), db = firebase.firestore();
+auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(function(){});
+
+function muatKatalog(){
+  return db.collection(DOK_PUBLIK.col).doc(DOK_PUBLIK.doc).get().then(function(doc){
+    if(doc.exists){
+      var d = doc.data() || {};
+      var daftar = J(d.produk, null);
+      if(Array.isArray(daftar) && daftar.length) produk = daftar;
+      var aktif = J(d.aktif, null);
+      if(Array.isArray(aktif)) kodeAktif = aktif.map(function(x){ return x.sidik; });
+      window.__mpAktifPenuh = Array.isArray(aktif) ? aktif : [];
+    }
+  }).catch(function(){}).then(function(){ gambarKatalog(); });
+}
+
+function simpanKatalog(){
+  return db.collection(DOK_PUBLIK.col).doc(DOK_PUBLIK.doc).set({
+    produk: JSON.stringify(produk),
+    aktif: JSON.stringify(window.__mpAktifPenuh || []),
+    _updatedAt: Date.now()
+  }, { merge:true });
+}
+
+el('btnLogin').addEventListener('click', function(){
+  var p = new firebase.auth.GoogleAuthProvider();
+  // Pop-up dulu (alasan lengkap ada di ema-cross-screener_3.html).
+  auth.signInWithPopup(p).catch(function(e){
+    var k = (e && e.code) || '';
+    if(k === 'auth/popup-closed-by-user' || k === 'auth/cancelled-popup-request') return;
+    if(k === 'auth/popup-blocked') return auth.signInWithRedirect(p);
+    throw e;
+  }).catch(function(e){ alert('Gagal login: ' + (e && e.message ? e.message : 'tidak diketahui')); });
+});
+
+auth.onAuthStateChanged(function(user){
+  uid = user ? user.uid : null;
+  isOwner = uid === OWNER_UID;
+  el('btnLogin').style.display = user ? 'none' : '';
+  el('infoUser').textContent = user ? (user.displayName || user.email || '') : '';
+  el('panelOwner').style.display = isOwner ? '' : 'none';
+  if(isOwner) siapkanPanelOwner();
+});
+
+/* ══════════════════════════════════════════════════════════════════
+   PANEL OWNER
+   ══════════════════════════════════════════════════════════════════ */
+var ownerSiap = false;
+function siapkanPanelOwner(){
+  if(ownerSiap) return;
+  ownerSiap = true;
+
+  function isiDropdown(){
+    el('ownPilih').innerHTML = '<option value="">— produk baru —</option>'
+      + produk.map(function(p){ return '<option value="' + esc(p.id) + '">' + esc(p.nama) + '</option>'; }).join('');
+  }
+  function isiForm(p){
+    el('ownId').value = p ? p.id : '';
+    el('ownNama').value = p ? p.nama : '';
+    el('ownVersi').value = p ? (p.versi||'') : '';
+    el('ownHarga').value = p ? Number(p.harga||0) : 0;
+    el('ownBerkas').value = p ? (p.berkas||'') : 'marketplace-produk/';
+    el('ownRingkas').value = p ? (p.ringkas||'') : '';
+    el('ownDetail').value = p ? (p.detail||'') : '';
+    el('ownFitur').value = p ? (p.fitur||[]).join('\n') : '';
+    el('ownGambar').value = p ? (p.gambar||[]).join('\n') : '';
+    el('ownLynk').value = p ? (p.lynk||'') : '';
+  }
+  isiDropdown(); isiForm(null);
+
+  el('ownPilih').addEventListener('change', function(){
+    var p = produk.find(function(x){ return x.id === el('ownPilih').value; });
+    isiForm(p || null);
+  });
+
+  el('ownSimpan').addEventListener('click', function(){
+    var id = el('ownId').value.trim().toLowerCase().replace(/[^a-z0-9-]/g,'');
+    if(!id || !el('ownNama').value.trim()){
+      el('ownStatus').className = 'catat err';
+      el('ownStatus').textContent = 'ID dan Nama produk wajib diisi.';
+      return;
+    }
+    var baru = {
+      id:id, nama:el('ownNama').value.trim(), versi:el('ownVersi').value.trim(),
+      harga:Number(el('ownHarga').value) || 0, berkas:el('ownBerkas').value.trim(),
+      ringkas:el('ownRingkas').value.trim(), detail:el('ownDetail').value.trim(),
+      fitur:el('ownFitur').value.split('\n').map(function(s){ return s.trim(); }).filter(Boolean),
+      gambar:el('ownGambar').value.split('\n').map(function(s){ return s.trim(); }).filter(Boolean),
+      lynk:el('ownLynk').value.trim()
+    };
+    baru.premium = baru.harga > 0;
+    var i = produk.findIndex(function(x){ return x.id === id; });
+    if(i >= 0) produk[i] = baru; else produk.push(baru);
+    simpanKatalog().then(function(){
+      gambarKatalog(); isiDropdown();
+      el('ownStatus').className = 'catat ok';
+      el('ownStatus').textContent = 'Tersimpan & langsung tampil ke pengunjung.';
+    }).catch(function(e){
+      el('ownStatus').className = 'catat err';
+      el('ownStatus').textContent = 'Gagal menyimpan: ' + e.message;
+    });
+  });
+
+  el('ownHapus').addEventListener('click', function(){
+    var id = el('ownId').value.trim();
+    if(!id) return;
+    if(!confirm('Hapus produk "' + id + '" dari marketplace?')) return;
+    produk = produk.filter(function(x){ return x.id !== id; });
+    simpanKatalog().then(function(){
+      gambarKatalog(); isiDropdown(); isiForm(null);
+      el('ownStatus').className = 'catat ok';
+      el('ownStatus').textContent = 'Produk dihapus.';
+    });
+  });
+
+  el('ownReset').addEventListener('click', function(){
+    if(!confirm('Kembalikan katalog ke daftar bawaan (3 indikator)? Perubahanmu akan hilang.')) return;
+    produk = BAWAAN.slice();
+    simpanKatalog().then(function(){
+      gambarKatalog(); isiDropdown(); isiForm(null);
+      el('ownStatus').className = 'catat ok';
+      el('ownStatus').textContent = 'Katalog dikembalikan ke bawaan.';
+    });
+  });
+
+  function gambarAktif(){
+    var d = window.__mpAktifPenuh || [];
+    el('ownDaftarAktif').innerHTML = d.length ? d.map(function(x, i){
+      return '<tr><td>' + esc(x.sidik) + '</td><td>' + esc(x.catatan||'—') + '</td>'
+        + '<td>' + new Date(x.tgl||0).toLocaleDateString('id-ID') + '</td>'
+        + '<td><button type="button" class="tbl" data-cabut="' + i + '" style="padding:3px 9px;font-size:11px">Cabut</button></td></tr>';
+    }).join('') : '<tr><td colspan="4" style="color:var(--dim)">Belum ada kode aktif.</td></tr>';
+  }
+  gambarAktif();
+
+  el('ownDaftarAktif').addEventListener('click', function(e){
+    var b = e.target.closest('[data-cabut]');
+    if(!b) return;
+    var i = Number(b.getAttribute('data-cabut'));
+    if(!confirm('Cabut aktivasi ini? Pembeli tidak bisa mengunduh lagi.')) return;
+    var d = window.__mpAktifPenuh || [];
+    d.splice(i, 1);
+    window.__mpAktifPenuh = d;
+    kodeAktif = d.map(function(x){ return x.sidik; });
+    simpanKatalog().then(gambarAktif);
+  });
+
+  el('ownAktifkan').addEventListener('click', function(){
+    var kode = el('ownKode').value.trim().toUpperCase();
+    if(!/^JT3-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(kode)){
+      el('ownAktifStatus').className = 'catat err';
+      el('ownAktifStatus').textContent = 'Format kode belum benar. Contoh: JT3-A4KM-7XQD-HN9F';
+      return;
+    }
+    sidikKode(kode).then(function(sidik){
+      var d = window.__mpAktifPenuh || [];
+      if(d.some(function(x){ return x.sidik === sidik; })){
+        el('ownAktifStatus').className = 'catat';
+        el('ownAktifStatus').textContent = 'Kode ini sudah aktif sebelumnya.';
+        return;
+      }
+      // Yang terbit ke dokumen publik HANYA sidiknya - kode asli & identitas
+      // pembeli tidak pernah ikut naik.
+      d.push({ sidik:sidik, catatan:el('ownCatatan').value.trim(), tgl:Date.now() });
+      window.__mpAktifPenuh = d;
+      kodeAktif = d.map(function(x){ return x.sidik; });
+      return simpanKatalog().then(function(){
+        el('ownAktifStatus').className = 'catat ok';
+        el('ownAktifStatus').textContent = 'Kode diaktifkan. Pembeli tinggal klik "Cek Status" di halamannya.';
+        el('ownKode').value = ''; el('ownCatatan').value = '';
+        gambarAktif();
+      });
+    }).catch(function(e){
+      el('ownAktifStatus').className = 'catat err';
+      el('ownAktifStatus').textContent = 'Gagal: ' + e.message;
+    });
+  });
+
+  el('btnLacak').addEventListener('click', function(){
+    var teks = el('lacakIsi').value;
+    var w = el('lacakHasil');
+    if(!teks.trim()){ w.className = 'catat err'; w.textContent = 'Tempel dulu isi script-nya.'; return; }
+    var p = bacaPenanda(teks);
+    if(!p.titik){
+      w.className = 'catat err';
+      w.innerHTML = 'Tidak ditemukan penanda sama sekali. Kemungkinan: script ini bukan terbitan kita, '
+        + 'atau seluruh penandanya sudah dibersihkan.';
+      return;
+    }
+    var utuh = p.a && p.b && p.c;
+    w.className = utuh ? 'catat ok' : 'catat';
+    w.innerHTML = '<b>' + p.titik + ' penanda</b> masih terbaca di script ini.<br>'
+      + 'Potongan: ' + (p.a || '????') + ' · ' + (p.b || '????') + ' · ' + (p.c || '????') + '<br>'
+      + (utuh
+          ? 'Kode lisensi lengkap: <span class="mono" style="color:var(--gold);font-size:14px">' + esc(p.penuh) + '</span><br>'
+            + 'Cocokkan kode ini dengan catatan pembelimu untuk tahu siapa pemegangnya.'
+          : 'Kode belum lengkap, tapi potongan yang tersisa tetap bisa mempersempit pencarian '
+            + 'kalau dicocokkan dengan daftar pembelimu.');
+  });
+}
+
+/* Mulai */
+muatKatalog();
+
+})();
+</script>
