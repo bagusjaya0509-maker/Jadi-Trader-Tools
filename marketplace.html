@@ -3,12 +3,12 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202608020900">
+<meta name="jt-versi" content="202608021100">
 <title>Jadi Trader — Marketplace</title>
 <script>
 /* Penjaga versi - sama seperti halaman lain. */
 (function(){
-  var V = "202608020900", OK = "jtVersiOk", PAKSA = "jtVersiPaksa";
+  var V = "202608021100", OK = "jtVersiOk", PAKSA = "jtVersiPaksa";
   try{
     if(sessionStorage.getItem(OK) === V) return;
     fetch(location.pathname + "?_v=" + Date.now(), { cache: "no-store" })
@@ -243,8 +243,8 @@
         <span>Arahkan kursor ke nama indikator di pojok kiri atas chart → ikon gerigi → semua pengaturan (warna, timeframe, sensitivitas) ada di situ.</span>
       </div></div>
       <div class="langkah"><div class="n">7</div><div class="isi">
-        <b>Khusus premium: jangan ubah baris ber-ID</b>
-        <span>Script premium memuat kode lisensi atas namamu. Mengubah/menghapusnya tidak membuat indikator berhenti bekerja, tapi melanggar lisensi yang kamu setujui saat registrasi.</span>
+        <b>Simpan berkas .txt aslinya</b>
+        <span>Kalau suatu saat script di TradingView tidak sengaja terhapus atau ter-edit, kamu tinggal menempel ulang dari berkas asli tanpa perlu mengunduh lagi.</span>
       </div></div>
     </div>
   </div>
@@ -613,9 +613,12 @@ function sisipkanPenanda(sumber, kode){
   }
   baris.splice(tengah, 0, '// ref-' + b.toLowerCase() + c.toLowerCase() + ' (' + stempel + ')');
 
-  // Titik 4: di ujung berkas
+  // Titik 4: di ujung berkas.
+  // Sengaja TIDAK menuliskan kodenya secara utuh maupun kata "lisensi" -
+  // dulu ada baris "© Jadi Trader — lisensi personal JT3-…" yang terlalu
+  // mencolok dan jadi sasaran hapus pertama. Sekarang keempat titik sama-sama
+  // menyerupai catatan build biasa; kodenya direkonstruksi dari potongannya.
   baris.push('');
-  baris.push('// © Jadi Trader — lisensi personal ' + kode);
   baris.push('// ' + stempel + '-' + a.toLowerCase() + b.toLowerCase() + c.toLowerCase());
   return baris.join(eol);
 }
@@ -668,10 +671,15 @@ function suratLisensi(d){
 + '3. Pemegang lisensi DILARANG menyebarluaskan, membagikan, mengunggah\n'
 + '   ulang, atau mempublikasikan kode sumber indikator ini, baik utuh\n'
 + '   maupun sebagian, dengan atau tanpa imbalan.\n'
-+ '4. Salinan indikator ini memuat penanda unik yang terhubung dengan\n'
-+ '   identitas di atas dan tersimpan di beberapa titik dalam kode. Bila\n'
-+ '   kode ini ditemukan beredar tanpa izin, penanda tersebut dipakai\n'
-+ '   untuk menelusuri sumber penyebarannya.\n'
+/* Pasal ini SENGAJA dipertahankan (walau tampilan jual sudah tidak lagi
+   menyebut soal penanda): tanpa satu pun klausul penelusuran, pemegang
+   lisensi bisa berdalih tidak pernah menyetujui salinannya ditelusuri —
+   dan justru itu yang melemahkan posisi hukum saat menindak pembocor.
+   Kalimatnya dibuat umum, tidak membocorkan cara kerjanya. */
++ '4. Setiap salinan indikator ini diterbitkan khusus untuk satu pemegang\n'
++ '   lisensi dan tercatat pada penerbit. Bila kode sumber indikator ini\n'
++ '   ditemukan beredar tanpa izin, penerbit berhak menelusuri asal\n'
++ '   salinan tersebut dan menindaklanjutinya.\n'
 + '5. Pelanggaran ketentuan nomor 3 mengakibatkan lisensi ini gugur\n'
 + '   seketika tanpa pengembalian dana, dan penerbit berhak menempuh\n'
 + '   upaya hukum atas pelanggaran hak cipta sesuai peraturan yang\n'
@@ -763,8 +771,8 @@ function gambarAreaBeli(p){
   }
   w.innerHTML =
       '<div class="label">Beli — Lisensi Personal</div>'
-    + '<div class="catat" style="margin-bottom:12px">Isi data di bawah untuk membuat <b>Kode Lisensi</b> atas namamu. '
-      + 'Kode ini yang nanti tertanam di dalam indikatormu.</div>'
+    + '<div class="catat" style="margin-bottom:12px">Isi data di bawah untuk menerbitkan lisensi atas namamu. '
+      + 'Nomor lisensi ini yang dipakai penjual untuk mengaktifkan unduhanmu.</div>'
     + '<div class="baris2">'
       + '<div><div class="label">Nama lengkap</div><input class="isian" id="bliNama"></div>'
       + '<div><div class="label">Email</div><input class="isian" id="bliEmail" type="email"></div>'
@@ -773,8 +781,8 @@ function gambarAreaBeli(p){
     + '<div style="height:14px"></div>'
     + '<label style="display:flex;gap:9px;align-items:flex-start;font-size:12.5px;color:var(--muted);cursor:pointer">'
       + '<input type="checkbox" id="bliSetuju" style="margin-top:3px">'
-      + '<span>Saya menyetujui ketentuan lisensi personal: indikator ini untuk saya sendiri, '
-        + 'tidak akan saya sebarluaskan, dan saya memahami salinan saya memuat penanda unik yang terhubung dengan identitas saya.</span>'
+      + '<span>Saya menyetujui ketentuan lisensi personal: indikator ini untuk saya sendiri '
+        + 'dan tidak akan saya sebarluaskan, salin ulang, atau jual kembali.</span>'
     + '</label>'
     + '<div style="height:14px"></div>'
     + '<button type="button" class="tbl utama" id="bliBuat">Buat Kode Lisensi</button>'
@@ -875,9 +883,17 @@ function cekAktivasi(p, d, kabari){
       var b = el('bliUnduhBtn');
       b.disabled = true; b.textContent = 'Menyiapkan…';
       fetch(p.berkas + '?t=' + Date.now())
-        .then(function(r){ if(!r.ok) throw new Error('berkas tidak ditemukan'); return r.text(); })
+        .then(function(r){
+        // Pesan harus menyebut PATH-nya. Penyebab paling sering: folder
+        // marketplace-produk/ belum ikut ter-upload ke hosting, dan pesan
+        // "gagal mengunduh" saja tidak memberi petunjuk apa pun.
+        if(!r.ok) throw new Error('berkas tidak ditemukan (HTTP ' + r.status + ') di: ' + p.berkas);
+        return r.text();
+      })
         .then(function(src){
-          unduhTeks(p.id + '-' + d.kode + '.txt', sisipkanPenanda(src, d.kode));
+          // Nama berkas TIDAK memuat kode - berkas bernama "…-JT3-XXXX-….txt"
+          // otomatis memberi tahu pembeli bahwa salinannya ditandai.
+          unduhTeks(p.id + '.txt', sisipkanPenanda(src, d.kode));
           unduhTeks('Surat-Lisensi-' + d.kode + '.txt', suratLisensi(d));
           b.disabled = false; b.textContent = 'Unduh Ulang';
         })
@@ -898,7 +914,13 @@ document.addEventListener('click', function(e){
     var p = produk.find(function(x){ return x.id === u.getAttribute('data-unduh'); });
     if(!p) return;
     fetch(p.berkas + '?t=' + Date.now())
-      .then(function(r){ if(!r.ok) throw new Error('berkas tidak ditemukan'); return r.text(); })
+      .then(function(r){
+        // Pesan harus menyebut PATH-nya. Penyebab paling sering: folder
+        // marketplace-produk/ belum ikut ter-upload ke hosting, dan pesan
+        // "gagal mengunduh" saja tidak memberi petunjuk apa pun.
+        if(!r.ok) throw new Error('berkas tidak ditemukan (HTTP ' + r.status + ') di: ' + p.berkas);
+        return r.text();
+      })
       .then(function(src){ unduhTeks(p.id + '.txt', src); })
       .catch(function(err){ alert('Gagal mengunduh: ' + err.message); });
   }
