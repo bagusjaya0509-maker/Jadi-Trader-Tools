@@ -3,12 +3,12 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202608021900">
+<meta name="jt-versi" content="202608022030">
 <title>Jadi Trader — Marketplace</title>
 <script>
 /* Penjaga versi - sama seperti halaman lain. */
 (function(){
-  var V = "202608021900", OK = "jtVersiOk", PAKSA = "jtVersiPaksa";
+  var V = "202608022030", OK = "jtVersiOk", PAKSA = "jtVersiPaksa";
   try{
     if(sessionStorage.getItem(OK) === V) return;
     fetch(location.pathname + "?_v=" + Date.now(), { cache: "no-store" })
@@ -1774,7 +1774,14 @@ function muatKatalog(){
       var daftar = J(d.produk, null);
       if(Array.isArray(daftar) && daftar.length) produk = daftar;
     }
-  }).catch(function(){}).then(function(){ gambarKatalog(); });
+  }).catch(function(){}).then(function(){
+    gambarKatalog();
+    // Katalog dan login berjalan paralel. Kalau login selesai LEBIH DULU,
+    // dropdown panel pemilik sempat terisi daftar bawaan lalu tidak pernah
+    // diperbarui - produk hasil suntinganmu sendiri jadi tidak muncul di situ
+    // sampai halaman dimuat ulang. Karena itu dropdown disegarkan di sini.
+    if(typeof window.__mpSegarkanDropdown === 'function') window.__mpSegarkanDropdown();
+  });
 }
 
 function simpanKatalog(){
@@ -1800,7 +1807,11 @@ auth.onAuthStateChanged(function(user){
   isOwner = uid === OWNER_UID;
   el('btnLogin').style.display = user ? 'none' : '';
   el('infoUser').textContent = user ? (user.displayName || user.email || '') : '';
-  el('panelOwner').style.display = isOwner ? '' : 'none';
+  // HARUS 'block', bukan ''. Elemen ini disembunyikan lewat aturan CSS
+  // (#panelOwner{display:none}); menyetel style.display='' cuma MENGHAPUS gaya
+  // inline sehingga aturan CSS itu berlaku lagi - panelnya tidak pernah muncul
+  // walau yang login memang pemilik.
+  el('panelOwner').style.display = isOwner ? 'block' : 'none';
   if(isOwner) siapkanPanelOwner();
 });
 
@@ -1829,6 +1840,8 @@ function siapkanPanelOwner(){
     el('ownLynk').value = p ? (p.lynk||'') : '';
   }
   isiDropdown(); isiForm(null);
+  // Dipanggil ulang oleh muatKatalog kalau katalog selesai SESUDAH login.
+  window.__mpSegarkanDropdown = isiDropdown;
 
   el('ownPilih').addEventListener('change', function(){
     var p = produk.find(function(x){ return x.id === el('ownPilih').value; });
