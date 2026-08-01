@@ -11,12 +11,12 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202608011600">
+<meta name="jt-versi" content="202608011830">
 <script>
 /* Penjaga versi - lihat catatan lengkap di jurnal-trading.html. Mencegah browser
    menyajikan HTML lama dari cache saat halaman dimuat ulang. */
 (function(){
-  var VERSI_TAMPIL = "202608011600";
+  var VERSI_TAMPIL = "202608011830";
   var KUNCI_OK    = "jtVersiOk";      // versi yang sudah dipastikan benar-benar termuat
   var KUNCI_PAKSA = "jtVersiPaksa";   // versi yang sudah pernah dipaksa muat ulang
   try{
@@ -8144,30 +8144,51 @@
     `;
   }
 
+  // Pesan hasil Open Demo Order HARUS muncul di dekat tombolnya.
+  //
+  // Dulu semuanya ditulis ke priorityStatusEl - itu status milik section "Sinyal
+  // Prioritas" yang letaknya ~2800px DI ATAS tombol, dan isinya rutin ditimpa
+  // oleh hasil pindaian section itu sendiri. Jadi tiap kali order demo ditolak
+  // (mis. arah dipaksa berlawanan tanpa SL/TP manual), layar di sekitar tombol
+  // tidak menampilkan apa pun - terlihat seperti "tombolnya tidak berfungsi".
+  function pesanEntry(teks, gagal){
+    if(liveTradeStatusEl){
+      liveTradeStatusEl.textContent = teks;
+      liveTradeStatusEl.style.color = gagal ? 'var(--bear)' : 'var(--bull)';
+    }
+    // Tetap ditulis juga di status lama supaya riwayat pesannya tidak berubah
+    // bagi yang sudah terbiasa melihat ke sana.
+    if(priorityStatusEl){
+      priorityStatusEl.classList.toggle('error', !!gagal);
+      priorityStatusEl.textContent = teks;
+    }
+  }
+
   function handlePriorityTradeClick(cand){
     if(!psimToggle.checked){
-      priorityStatusEl.classList.add('error');
-      priorityStatusEl.textContent = 'Centang "Aktif" di bagian Simulasi Sinyal Prioritas dulu sebelum trade.';
+      pesanEntry('Centang "Aktif" di bagian Simulasi Sinyal Prioritas dulu sebelum trade.', true);
       return;
     }
     const key = `${cand.symbol}_${cand.tfValue}_${cand.source||'PRIO'}`;
     if(prioritySimPositions[key]){
-      priorityStatusEl.classList.remove('error');
-      priorityStatusEl.textContent = `Sudah ada posisi terbuka untuk ${cand.symbol.replace('USDT','')} di TF ${cand.tfLabel}.`;
+      pesanEntry(`Sudah ada posisi terbuka untuk ${cand.symbol.replace('USDT','')} di TF ${cand.tfLabel}.`, true);
       return;
     }
     const entryPrice = cand.price;
     const { sl, tp } = getEffectiveSlTp(cand);
     if(sl===null || tp===null){
-      priorityStatusEl.classList.add('error');
-      priorityStatusEl.textContent = `Sinyal ini tidak punya SL/TP otomatis - isi dulu "SL Manual" & "TP Manual" sebelum Open Posisi.`;
+      pesanEntry('Sinyal ini belum punya SL/TP - isi dulu kolom "SL Manual" & "TP Manual" di atas, baru Open Order.', true);
       return;
     }
 
     const slValid = cand.signal==='BUY' ? (sl < entryPrice) : (sl > entryPrice);
     if(!slValid){
-      priorityStatusEl.classList.add('error');
-      priorityStatusEl.textContent = `Harga ${cand.symbol.replace('USDT','')} sudah bergerak melewati level SL sejak sinyal ini dipindai — tidak valid lagi untuk di-trade. Klik "Cari Sinyal Prioritas" untuk pindai ulang.`;
+      // Dua sebab berbeda, dan penjelasannya harus berbeda juga - kalau arah
+      // sengaja dipaksa, menyuruh "pindai ulang" itu saran yang menyesatkan.
+      const dipaksa = psimSelectedCandidate && psimSelectedCandidate.signal !== cand.signal;
+      pesanEntry(dipaksa
+        ? `Arah dipaksa ${cand.signal} (sinyal aslinya ${psimSelectedCandidate.signal}), jadi SL/TP bawaan sinyal tidak berlaku. Isi "SL Manual" & "TP Manual" sesuai arah ${cand.signal}: SL di ${cand.signal==='BUY'?'bawah':'atas'} harga $${fmtPrice(entryPrice)}.`
+        : `Harga ${cand.symbol.replace('USDT','')} sudah melewati level SL sejak sinyal dipindai - tidak valid lagi. Pindai ulang dulu.`, true);
       return;
     }
 
@@ -8177,9 +8198,19 @@
     // posisi simulasi berperilaku sama dengan posisi live yang sebenarnya.
     const tp2 = cand.signal==='BUY' ? entryPrice + riskDist*2 : entryPrice - riskDist*2;
     openPrioritySimPosition(key, cand.symbol, cand.tfLabel, cand.tfValue, cand.signal, entryPrice, sl, tp1, tp2, Date.now(), cand.source);
+    // WAJIB: buka posisi demo itu aksi user sungguhan, jadi harus ditandai &
+    // didorong ke cloud SEKARANG - sama seperti posisi live (lihat
+    // recordLivePosition) dan sama seperti saat posisi DITUTUP.
+    //
+    // Tanpa ini posisinya cuma mendarat di localStorage: savePrioritySimState
+    // sengaja tidak menandai "ada perubahan lokal" (ia juga jalan untuk hal
+    // rutin seperti update PnL tiap detik). Akibatnya saat halaman dimuat ulang,
+    // esLoadFromCloud melihat lokal TIDAK lebih baru dari cloud lalu menimpanya
+    // dengan snapshot cloud yang belum memuat posisi ini - dan order demo yang
+    // baru dibuka HILANG begitu di-refresh.
+    markEsCloudDirty(); esSyncNow();
     renderPrioritySimUI(window.__esLastTickers||{});
-    priorityStatusEl.classList.remove('error');
-    priorityStatusEl.textContent = `Posisi ${cand.signal} untuk ${cand.symbol.replace('USDT','')} (TF ${cand.tfLabel}) dibuka di simulasi.`;
+    pesanEntry(`Posisi demo ${cand.signal} ${cand.symbol.replace('USDT','')} (TF ${cand.tfLabel}) dibuka & tersimpan.`, false);
     psimSelectedCandidate = null;
     psimSignalSelect.value = '';
     resetManualSlTp();
@@ -8795,8 +8826,7 @@
   psimManualTpInput.addEventListener('input', renderPsimPreview);
   psimOpenBtn.addEventListener('click', ()=>{
     if(!psimSelectedCandidate){
-      priorityStatusEl.classList.add('error');
-      priorityStatusEl.textContent = 'Pilih sinyal dulu di "Sinyal Terpilih" sebelum Open Posisi.';
+      pesanEntry('Pilih sinyal dulu di "Sinyal Terpilih" sebelum Open Order.', true);
       return;
     }
     handlePriorityTradeClick(candDenganArah(psimSelectedCandidate));

@@ -3,13 +3,13 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202608011600">
+<meta name="jt-versi" content="202608012000">
 <meta name="theme-color" content="#0b0c0f">
 <title>Jadi Trader — Mobile</title>
 <script>
 /* Penjaga versi - sama seperti halaman lain. */
 (function(){
-  var VERSI_TAMPIL = "202608011600";
+  var VERSI_TAMPIL = "202608012000";
   var KUNCI_OK = "jtVersiOk", KUNCI_PAKSA = "jtVersiPaksa";
   try{
     if(sessionStorage.getItem(KUNCI_OK) === VERSI_TAMPIL) return;
@@ -30,15 +30,24 @@
 })();
 </script>
 
+<!-- Font yang SAMA dengan versi desktop (screener memakai IBM Plex Sans/Mono).
+     Sebelumnya halaman ini jatuh ke font bawaan sistem, jadi bentuk huruf &
+     lebar angkanya terlihat berbeda dari desktop. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+
 <style>
   :root{
     --bg:#0b0c0f; --panel:#15171c; --panel-2:#1b1e24; --border:#262a31;
     --text:#ece8de; --muted:#9a9ca4; --dim:#63656d;
     --gold:#c9a24b; --bull:#4f9e82; --bear:#c2544d;
     --bull-soft:rgba(79,158,130,.14); --bear-soft:rgba(194,84,77,.14);
-    --font-body:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
-    --font-mono:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;
-    --font-display:Georgia,'Times New Roman',serif;
+    /* Disamakan persis dengan desktop: body & mono ikut screener (IBM Plex),
+       display ikut jurnal (Georgia) - itu yang dipakai judul "Jadi Trader". */
+    --font-body:'IBM Plex Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    --font-mono:'IBM Plex Mono','SF Mono','Cascadia Code',Consolas,'Roboto Mono',monospace;
+    --font-display:Georgia,'Iowan Old Style','Palatino Linotype',serif;
     --nav-h:58px;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
@@ -97,8 +106,19 @@
   .berita-kepala{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
   .berita-kepala .tag{display:flex;align-items:center;gap:6px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);}
   .titik-merah{width:8px;height:8px;border-radius:50%;background:#8C231A;flex:0 0 auto;}
+  .berita-filter{
+    display:none;gap:10px;flex-direction:column;
+    padding:10px;margin-bottom:10px;border:1px solid var(--border);border-radius:9px;background:var(--panel-2);
+  }
+  .berita-filter.on{display:flex;}
+  /* Pemisah hari, supaya jelas berita mana yang hari ini dan mana yang besok. */
+  .berita-hari{
+    font-family:var(--font-mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--dim);padding:10px 0 4px;border-top:1px solid var(--border);
+  }
+  .berita-hari:first-child{border-top:0;padding-top:2px;}
   .berita-baris{display:flex;gap:10px;padding:9px 0;border-top:1px solid var(--border);}
-  .berita-baris:first-of-type{border-top:0;}
+  .berita-hari + .berita-baris{border-top:0;}
   .berita-jam{font-family:var(--font-mono);font-size:11px;color:var(--gold);flex:0 0 46px;padding-top:1px;}
   .berita-isi{flex:1;min-width:0;}
   .berita-judul{font-size:12.5px;line-height:1.35;}
@@ -108,14 +128,19 @@
   .dampak.sedang{background:rgba(201,162,75,.15);color:var(--gold);}
 
   /* Strip tab dalam (Posisi / XAU / Kripto / Kalender) */
+  /* Empat tab dibagi rata dalam satu baris - TIDAK bisa digeser.
+     Versi sebelumnya memakai overflow-x:auto sehingga isinya lebih lebar dari
+     layar; tahan-geser sedikit saja membuat seluruh strip ikut bergeser dan
+     terasa "goyang". Grid 4 kolom menghapus penyebabnya, bukan menutupinya. */
   .strip{
-    display:flex;gap:18px;overflow-x:auto;padding:2px 0 10px;margin-bottom:2px;
-    border-bottom:1px solid var(--border);scrollbar-width:none;
+    display:grid;grid-template-columns:repeat(4,1fr);gap:4px;
+    padding:2px 0 10px;margin-bottom:2px;border-bottom:1px solid var(--border);
+    overflow:visible;touch-action:pan-y;
   }
-  .strip::-webkit-scrollbar{display:none;}
   .strip button{
-    background:none;border:0;padding:4px 0;color:var(--dim);font-size:14px;font-weight:600;
-    white-space:nowrap;position:relative;
+    background:none;border:0;padding:4px 0;color:var(--dim);
+    font-size:12px;font-weight:600;letter-spacing:-.01em;
+    white-space:nowrap;position:relative;text-align:center;
   }
   .strip button.on{color:var(--text);}
   .strip button.on::after{
@@ -268,16 +293,38 @@
   <div class="kartu">
     <div class="berita-kepala">
       <div class="tag"><span class="titik-merah"></span> Berita Ekonomi</div>
-      <button type="button" class="ikon-btn" id="btnMuatBerita">Muat ulang</button>
+      <button type="button" class="ikon-btn" id="btnMuatBerita" aria-expanded="false">Muat ulang ▾</button>
+    </div>
+    <!-- Panel filter: dibuka lewat tombol "Muat ulang" sesuai permintaan,
+         supaya kepala kartunya tetap ringkas. -->
+    <div class="berita-filter" id="beritaFilter">
+      <div>
+        <div class="isian-lbl">Rentang tanggal</div>
+        <select class="isian" id="beritaRentang">
+          <option value="1">Hari ini</option>
+          <option value="3" selected>3 hari ke depan</option>
+          <option value="7">7 hari ke depan</option>
+          <option value="0">Semua</option>
+        </select>
+      </div>
+      <div>
+        <div class="isian-lbl">Dampak</div>
+        <select class="isian" id="beritaDampak">
+          <option value="high">Tinggi saja</option>
+          <option value="medium" selected>Tinggi + Sedang</option>
+          <option value="all">Semua dampak</option>
+        </select>
+      </div>
+      <button type="button" class="tombol-kedua" id="btnSegarkanBerita" style="margin-top:0">Segarkan sekarang</button>
     </div>
     <div id="beritaIsi"><div class="memuat">Memuat berita…</div></div>
   </div>
 
   <div class="strip" id="stripBeranda">
-    <button type="button" class="on" data-panel="posisi">Posisi Terbuka</button>
+    <button type="button" class="on" data-panel="posisi">Posisi</button>
     <button type="button" data-panel="xau">XAUUSD</button>
     <button type="button" data-panel="kripto">Kripto</button>
-    <button type="button" data-panel="kalender">Kalender &amp; Kurva</button>
+    <button type="button" data-panel="kalender">Kalender</button>
   </div>
 
   <div class="panel-dalam on" id="p-posisi"></div>
@@ -841,38 +888,91 @@ function gambarKurva(id, titik){
    (publik, tanpa token) dengan bentuk { events: [{waktu, judul, dampak,
    mataUang}] }. Sempat salah tebak nama endpoint & nama kolomnya, sehingga
    kotak berita macet di "Memuat berita…". */
+var beritaMentah = null;   // hasil fetch terakhir, supaya ganti filter tidak perlu ambil ulang
+
+function labelHari(t){
+  var d = new Date(t); d.setHours(0,0,0,0);
+  var kini = new Date(); kini.setHours(0,0,0,0);
+  var selisih = Math.round((d - kini) / 86400000);
+  var tgl = new Date(t).toLocaleDateString('id-ID', { weekday:'long', day:'numeric', month:'short' });
+  if(selisih === 0) return 'Hari ini · ' + tgl;
+  if(selisih === 1) return 'Besok · ' + tgl;
+  if(selisih === -1) return 'Kemarin · ' + tgl;
+  return tgl;
+}
+
+/* Saring + gambar dari data yang sudah ada. Dipisah dari pengambilan supaya
+   mengganti filter terasa instan dan tidak membebani backend. */
+function gambarBerita(){
+  var w = el('beritaIsi');
+  if(!beritaMentah){ w.innerHTML = '<div class="kosong">Belum ada data berita.</div>'; return; }
+
+  var hari = parseInt(el('beritaRentang').value, 10);
+  var dampak = el('beritaDampak').value;
+  var sekarang = Date.now();
+  var batas = hari > 0 ? (sekarang + hari * 86400000) : Infinity;
+
+  var lolosDampak = function(e){
+    if(dampak === 'high')   return e.dampak === 'high';
+    if(dampak === 'medium') return e.dampak === 'high' || e.dampak === 'medium';
+    return true;
+  };
+
+  var pilih = beritaMentah.filter(function(e){
+    return e.waktu > sekarang - 3600e3 && e.waktu <= batas && lolosDampak(e);
+  }).sort(function(a,b){ return a.waktu - b.waktu; }).slice(0, 25);
+
+  // Feed di backend bisa TERTINGGAL (mis. agendanya berhenti beberapa hari lalu).
+  // Kalau begitu, jangan cuma bilang "tidak ada" - tampilkan agenda terakhir yang
+  // ada beserta peringatan bahwa datanya sudah basi, supaya jelas ini soal sumber
+  // datanya, bukan filternya salah pilih.
+  var catatanBasi = '';
+  if(!pilih.length){
+    var lampau = beritaMentah.filter(lolosDampak)
+      .sort(function(a,b){ return b.waktu - a.waktu; }).slice(0, 8);
+    if(!lampau.length){
+      w.innerHTML = '<div class="kosong">Tidak ada agenda yang cocok dengan filter ini.</div>';
+      return;
+    }
+    var terbaru = new Date(lampau[0].waktu);
+    catatanBasi = '<div class="kosong" style="text-align:left;padding:8px 0 2px;color:var(--gold)">'
+      + 'Belum ada agenda mendatang — data berita di backend terakhir sampai '
+      + terbaru.toLocaleDateString('id-ID', { day:'numeric', month:'long', year:'numeric' })
+      + '. Yang di bawah ini agenda yang sudah lewat.</div>';
+    pilih = lampau.sort(function(a,b){ return a.waktu - b.waktu; });
+  }
+
+  var hariTerakhir = '', html = catatanBasi;
+  pilih.forEach(function(e){
+    var lbl = labelHari(e.waktu);
+    if(lbl !== hariTerakhir){ html += '<div class="berita-hari">' + lbl + '</div>'; hariTerakhir = lbl; }
+    var t = new Date(e.waktu);
+    var jam = isNaN(t) ? '--:--' : t.toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit' });
+    var dLbl = e.dampak === 'high'   ? '<span class="dampak tinggi">TINGGI</span>'
+             : e.dampak === 'medium' ? '<span class="dampak sedang">SEDANG</span>' : '';
+    html += '<div class="berita-baris">'
+      + '<div class="berita-jam">' + jam + '</div>'
+      + '<div class="berita-isi">'
+        + '<div class="berita-judul">' + (e.judul || 'Agenda') + dLbl + '</div>'
+        + '<div class="berita-meta">' + (e.mataUang || '') + '</div>'
+      + '</div></div>';
+  });
+  w.innerHTML = html;
+}
+
 function muatBerita(){
   var w = el('beritaIsi');
   w.innerHTML = '<div class="memuat">Memuat berita…</div>';
-  fetch(PROXY + '/api/news')
+  return fetch(PROXY + '/api/news')
     .then(function(r){ return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
     .then(function(d){
-      var ev = (d && Array.isArray(d.events)) ? d.events : null;
-      if(!ev || !ev.length){
-        w.innerHTML = '<div class="kosong">Tidak ada agenda berita saat ini.</div>';
-        return;
-      }
-      var sekarang = Date.now();
-      // Yang akan datang dulu; kalau semua sudah lewat, tampilkan yang terakhir.
-      var mendatang = ev.filter(function(e){ return e.waktu > sekarang - 3600e3; })
-                        .sort(function(a,b){ return a.waktu - b.waktu; });
-      var pilih = (mendatang.length ? mendatang : ev.slice().sort(function(a,b){ return b.waktu - a.waktu; }))
-                    .slice(0, 6);
-      w.innerHTML = pilih.map(function(e){
-        var t = new Date(e.waktu);
-        var jam = isNaN(t) ? '--:--' : t.toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit' });
-        var dLbl = e.dampak === 'high'   ? '<span class="dampak tinggi">TINGGI</span>'
-                 : e.dampak === 'medium' ? '<span class="dampak sedang">SEDANG</span>' : '';
-        return '<div class="berita-baris">'
-          + '<div class="berita-jam">' + jam + '</div>'
-          + '<div class="berita-isi">'
-            + '<div class="berita-judul">' + (e.judul || 'Agenda') + dLbl + '</div>'
-            + '<div class="berita-meta">' + (e.mataUang || '') + '</div>'
-          + '</div></div>';
-      }).join('');
+      beritaMentah = (d && Array.isArray(d.events)) ? d.events : [];
+      gambarBerita();
     })
-    .catch(function(){
-      w.innerHTML = '<div class="kosong">Berita tidak bisa dimuat (backend tidak terjangkau).</div>';
+    .catch(function(err){
+      beritaMentah = null;
+      w.innerHTML = '<div class="kosong">Berita tidak bisa dimuat ('
+        + (err && err.message ? err.message : 'backend tidak terjangkau') + ').</div>';
     });
 }
 
@@ -920,9 +1020,26 @@ function daftarKoin(){
 /* ══════════════════════════════════════════════════════════════════════
    PASAR — Area Pantau (SMI ekstrem), memakai jt-scan-core.js
    ══════════════════════════════════════════════════════════════════════ */
-var pantauJalan = false;
+/* Kalau jt-scan-core.js gagal dimuat, SEMUA pemindaian mustahil jalan.
+   Versi sebelumnya cuma `return` diam-diam - layarnya tinggal "Belum ada hasil"
+   selamanya tanpa satu pun petunjuk. Sekarang penyebabnya dikatakan. */
+function coreSiap(idStatus, idDaftar){
+  if(window.JTScan && typeof JTScan.detectParallelChannel === 'function') return true;
+  var s = el(idStatus), d = el(idDaftar);
+  if(s){
+    s.className = 'catatan err';
+    s.textContent = 'Mesin pemindai (jt-scan-core.js) tidak termuat. Pastikan file itu ikut ter-upload '
+      + 'di folder yang sama dengan mobile.html, lalu muat ulang halaman.';
+  }
+  if(d) d.innerHTML = '<div class="kosong">Pemindaian tidak bisa dijalankan.</div>';
+  return false;
+}
+
+var pantauJalan = false, pantauPernah = false;
 function pindaiPantau(){
-  if(pantauJalan || !window.JTScan) return;
+  if(pantauJalan) return;
+  if(!coreSiap('pantauStatus', 'pantauDaftar')) return;
+  pantauPernah = true;
   pantauJalan = true;
   var tf = el('pantauTf').value, mode = el('pantauRezim').value;
   var koin = daftarKoin();
@@ -1109,8 +1226,11 @@ function gambarSinyal(){
     + ' · ' + chJmlKoin + ' koin · TF ' + chTfDipakai + ' · ' + new Date().toLocaleTimeString('id-ID');
 }
 
+var chPernah = false;
 function pindaiParallel(){
-  if(chJalan || !window.JTScan) return;
+  if(chJalan) return;
+  if(!coreSiap('chStatus', 'chDaftar')) return;
+  chPernah = true;
   chJalan = true;
   var tf = el('chTf').value, koin = daftarKoin();
   chTfDipakai = tf; chJmlKoin = koin.length;
@@ -1335,6 +1455,11 @@ el('bilahBawah').addEventListener('click', function(e){
   // Kurva perlu digambar ulang saat panelnya baru terlihat - sebelum itu
   // lebar SVG-nya 0 sehingga viewBox-nya salah.
   if(nama === 'beranda' || nama === 'aset') setTimeout(gambarBerandaData, 30);
+  // Pindai sendiri saat tab dibuka PERTAMA kali - membuka tab lalu disambut
+  // daftar kosong terbaca seperti "tidak ada sinyal", padahal belum dipindai.
+  // Pemindaian berikutnya tetap manual supaya kuota backend tidak terbakar.
+  if(nama === 'pasar'  && !pantauPernah) setTimeout(pindaiPantau, 60);
+  if(nama === 'sinyal' && !chPernah)     setTimeout(pindaiParallel, 60);
 });
 
 el('stripBeranda').addEventListener('click', function(e){
@@ -1355,7 +1480,20 @@ el('btnPantau').addEventListener('click', pindaiPantau);
 el('pantauRezim').addEventListener('change', function(){ if(!pantauJalan) pindaiPantau(); });
 el('btnCh').addEventListener('click', pindaiParallel);
 el('chFilter').addEventListener('change', function(){ if(chMentah.length) gambarSinyal(); });
-el('btnMuatBerita').addEventListener('click', muatBerita);
+// Tombol "Muat ulang" membuka panel filter (tanggal + dampak); pengambilan
+// ulang datanya lewat tombol di dalam panel. Beritanya sendiri sudah dimuat
+// otomatis saat halaman siap - tidak perlu ditekan dulu.
+el('btnMuatBerita').addEventListener('click', function(){
+  var p = el('beritaFilter');
+  var buka = !p.classList.contains('on');
+  p.classList.toggle('on', buka);
+  el('btnMuatBerita').setAttribute('aria-expanded', buka ? 'true' : 'false');
+  el('btnMuatBerita').textContent = buka ? 'Muat ulang ▴' : 'Muat ulang ▾';
+});
+el('btnSegarkanBerita').addEventListener('click', function(){ muatBerita(); });
+// Ganti filter = saring ulang data yang sudah ada, tanpa memanggil backend lagi.
+el('beritaRentang').addEventListener('change', gambarBerita);
+el('beritaDampak').addEventListener('change', gambarBerita);
 el('kalPrev').addEventListener('click', function(){ kalBulan = new Date(kalBulan.getFullYear(), kalBulan.getMonth()-1, 1); gambarKalender(); });
 el('kalNext').addEventListener('click', function(){ kalBulan = new Date(kalBulan.getFullYear(), kalBulan.getMonth()+1, 1); gambarKalender(); });
 
