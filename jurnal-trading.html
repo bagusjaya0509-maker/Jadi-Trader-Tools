@@ -1112,7 +1112,11 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify(trades));
   }
 
-  var state = { trades: loadTrades(), calMonth: new Date(2026, 6, 1) };
+  // calMonth SEBELUMNYA dipatok new Date(2026, 6, 1) - Juli 2026. Akibatnya
+  // kalender XAU tidak pernah berpindah bulan sendiri: masuk Agustus pun masih
+  // menampilkan Juli. Kalender kripto memakai new Date() dan memang benar, jadi
+  // disamakan ke situ.
+  var state = { trades: loadTrades(), calMonth: new Date() };
 
   function fmtMoney(n){
     var s = (n<0?'-':'') + '$' + Math.abs(n).toFixed(2);

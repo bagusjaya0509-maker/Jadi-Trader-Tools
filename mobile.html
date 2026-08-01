@@ -3,13 +3,13 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202608012000">
+<meta name="jt-versi" content="202608012330">
 <meta name="theme-color" content="#0b0c0f">
 <title>Jadi Trader — Mobile</title>
 <script>
 /* Penjaga versi - sama seperti halaman lain. */
 (function(){
-  var VERSI_TAMPIL = "202608012000";
+  var VERSI_TAMPIL = "202608012330";
   var KUNCI_OK = "jtVersiOk", KUNCI_PAKSA = "jtVersiPaksa";
   try{
     if(sessionStorage.getItem(KUNCI_OK) === VERSI_TAMPIL) return;
@@ -161,12 +161,29 @@
   .baris-tengah{text-align:right;font-family:var(--font-mono);}
   .baris-harga{font-size:14px;}
   .baris-harga-sub{font-size:10.5px;color:var(--dim);margin-top:2px;}
+  /* Lencana berwarna = tempat ANGKA yang paling dicari (PnL / harga), bukan
+     tulisan BUY/SELL. Arahnya cukup jadi teks kecil di baris koin. */
   .lencana{
-    min-width:74px;text-align:center;border-radius:6px;padding:6px 8px;
+    min-width:78px;text-align:center;border-radius:6px;padding:6px 8px;
     font-family:var(--font-mono);font-size:12.5px;font-weight:600;color:#fff;
   }
   .lencana.beli{background:#2e7d63;} .lencana.jual{background:#b3413a;}
   .lencana.netral{background:var(--panel-2);color:var(--muted);}
+  /* Arah dalam ukuran kecil, menempel di sebelah nama koin. */
+  .arah-kecil{
+    font-family:var(--font-mono);font-size:9.5px;font-weight:600;letter-spacing:.04em;
+    padding:1px 5px;border-radius:4px;margin-left:6px;vertical-align:middle;
+  }
+  .arah-kecil.beli{color:var(--bull);background:var(--bull-soft);}
+  .arah-kecil.jual{color:var(--bear);background:var(--bear-soft);}
+  /* P/L di tabel riwayat memakai bentuk yang sama dengan lencana posisi. */
+  .pl-lencana{
+    display:inline-block;min-width:62px;text-align:center;border-radius:5px;
+    padding:3px 6px;font-family:var(--font-mono);font-size:10.5px;font-weight:600;color:#fff;
+  }
+  .pl-lencana.untung{background:#2e7d63;}
+  .pl-lencana.rugi{background:#b3413a;}
+  .pl-lencana.rata{background:var(--panel-2);color:var(--muted);}
   .tf-chip{
     display:inline-block;background:var(--panel-2);color:var(--muted);
     border-radius:4px;padding:0 5px;font-size:9.5px;font-family:var(--font-mono);margin-left:5px;
@@ -243,10 +260,21 @@
   .catatan.ok{color:var(--bull);}
 
   /* Bilah bawah */
+  /* position:fixed saja TIDAK cukup di browser HP: saat scroll dilempar kencang
+     (momentum), Safari/Chrome iOS sempat melepas elemen fixed dari posisinya
+     sehingga bilah ini terlihat "ikut naik" ke atas layar. Memaksanya jadi
+     lapisan komposit sendiri (translateZ + will-change) membuat posisinya
+     dihitung GPU dan tidak lagi ikut terseret arus scroll. */
   .bawah{
     position:fixed;left:0;right:0;bottom:0;z-index:50;
     display:flex;background:var(--panel);border-top:1px solid var(--border);
     padding-bottom:env(safe-area-inset-bottom,0px);
+    transform:translateZ(0);
+    -webkit-transform:translate3d(0,0,0);
+    will-change:transform;
+    backface-visibility:hidden;
+    -webkit-backface-visibility:hidden;
+    contain:layout paint;
   }
   .bawah button{
     flex:1;background:none;border:0;padding:8px 2px 7px;color:var(--dim);
@@ -451,8 +479,10 @@
       </div>
     </div>
 
-    <button type="button" class="tombol-utama beli" id="btnOpenDemo">Open Demo Order</button>
-    <button type="button" class="tombol-kedua" id="btnKeScreener">Open Real Order → buka Crypto Screener</button>
+    <!-- Urutan sengaja: Open Real Order jadi tombol utama berwarna, Open Demo
+         Order jadi tombol sekunder gelap di bawahnya. -->
+    <button type="button" class="tombol-utama beli" id="btnOpenReal">Open Real Order</button>
+    <button type="button" class="tombol-kedua" id="btnOpenDemo">Open Demo Order</button>
     <div class="catatan" id="entryCatatan"></div>
   </div>
 </section>
@@ -574,6 +604,12 @@ function rupiah(n){
   return 'Rp ' + Math.round(n).toLocaleString('id-ID');
 }
 function warnaKelas(n){ return n > 0 ? 'naik' : n < 0 ? 'turun' : ''; }
+// P/L dibungkus lencana berlatar warna - bentuknya sama dengan lencana di
+// Posisi Terbuka, supaya untung/rugi terbaca sekali lihat tanpa membaca angka.
+function lencanaPl(n){
+  var k = n > 0 ? 'untung' : n < 0 ? 'rugi' : 'rata';
+  return '<span class="pl-lencana ' + k + '">' + uang(n) + '</span>';
+}
 function tanggalPendek(t){
   var d = new Date(t);
   if(isNaN(d)) return '—';
@@ -698,9 +734,15 @@ function gambarPosisi(){
       pnl = (kini - t.entryPrice) * t.qty * (arah === 'BUY' ? 1 : -1);
     }
     var size = (t.margin != null && t.leverage != null) ? (t.margin * t.leverage) : null;
+    // Lencana berwarna sekarang memuat PnL (angka yang paling dicari); arah
+    // BUY/SELL turun jadi label kecil di sebelah nama koin.
+    var kelasLencana = gantung ? 'netral' : (pnl == null ? 'netral' : (pnl > 0 ? 'beli' : pnl < 0 ? 'jual' : 'netral'));
+    var isiLencana  = gantung ? 'ANTRE' : (pnl != null ? uang(pnl) : '—');
     html += '<div class="baris">'
       + '<div class="baris-kiri">'
-        + '<div class="baris-koin">' + sym + '<span class="tf-chip">' + (t.tfLabel||'—') + '</span></div>'
+        + '<div class="baris-koin">' + sym
+          + '<span class="arah-kecil ' + (arah === 'BUY' ? 'beli' : 'jual') + '">' + arah + '</span>'
+          + '<span class="tf-chip">' + (t.tfLabel||'—') + '</span></div>'
         + '<div class="baris-sub">Entry ' + HG(t.entryPrice) + ' · SL ' + HG(t.sl)
           + ' · TP1 ' + HG(t.tp1) + ' · TP2 ' + HG(t.tp2) + '</div>'
         + '<div class="baris-sub">Size ' + (size != null ? uang(size) : '—')
@@ -709,10 +751,9 @@ function gambarPosisi(){
       + '</div>'
       + '<div class="baris-tengah">'
         + '<div class="baris-harga">' + (kini != null ? HG(kini) : '—') + '</div>'
-        + '<div class="baris-harga-sub ' + (gantung ? '' : warnaKelas(pnl)) + '">'
-          + (gantung ? 'menunggu harga' : (pnl != null ? uang(pnl) : '—')) + '</div>'
+        + '<div class="baris-harga-sub">' + (gantung ? 'menunggu harga' : 'harga kini') + '</div>'
       + '</div>'
-      + '<div class="lencana ' + (arah === 'BUY' ? 'beli' : 'jual') + '">' + arah + '</div>'
+      + '<div class="lencana ' + kelasLencana + '">' + isiLencana + '</div>'
       + '</div>';
   });
   wadah.innerHTML = html + '</div>';
@@ -767,8 +808,7 @@ function gambarBerandaData(){
         var a = String(t.direction||t.dir||'').toUpperCase();
         return a ? '<span class="' + (a === 'BUY' ? 'naik' : 'turun') + '">' + a + '</span>' : '—'; } },
     { judul:'Setup', isi:function(t){ return t.preAlasan || t.setup || t.reason || '—'; } },
-    { judul:'P/L', kanan:true, isi:function(t){
-        var v = t.pl || 0; return '<span class="' + warnaKelas(v) + '">' + uang(v) + '</span>'; } }
+    { judul:'P/L', kanan:true, isi:function(t){ return lencanaPl(t.pl || 0); } }
   ], 'xau');
 
   var kr = tradeKripto();
@@ -777,8 +817,7 @@ function gambarBerandaData(){
     { judul:'Tgl', isi:function(t){ return tanggalPendek(t.waktu); } },
     { judul:'Koin', isi:function(t){ return t.pair + '<span class="tf-chip">' + (t.tf||'—') + '</span>'; } },
     { judul:'Setup', isi:function(t){ return t.setup || t.alasan || '—'; } },
-    { judul:'P/L', kanan:true, isi:function(t){
-        return '<span class="' + warnaKelas(t.pnl) + '">' + uang(t.pnl) + '</span>'; } }
+    { judul:'P/L', kanan:true, isi:function(t){ return lencanaPl(t.pnl); } }
   ], 'kripto');
 
   var sAset = statistik(xau, function(t){ return t.pl || 0; });
@@ -842,9 +881,17 @@ function kurvaTitikXau(){
   tradeXau().slice().reverse().forEach(function(t){ jalan += (t.pl || 0); titik.push(jalan); });
   return titik;
 }
+/* Kurva kripto sekarang menggambar SALDO, bukan PnL kumulatif dari nol.
+   Titik akhir dikunci ke saldo Binance asli (kalau sudah terambil) lalu titik
+   awalnya dihitung mundur - cara yang sama dipakai jurnal desktop, sehingga
+   angka di kedua tampilan sejalan. Kalau saldo asli belum ada, dipakai 0
+   sebagai jangkar supaya bentuk kurvanya tetap benar. */
 function kurvaTitikKripto(){
-  var jalan = 0, titik = [0];
-  tradeKripto().slice().reverse().forEach(function(t){ jalan += t.pnl; titik.push(jalan); });
+  var trades = tradeKripto().slice().reverse();       // kronologis
+  var totalPnl = trades.reduce(function(a,t){ return a + t.pnl; }, 0);
+  var awal = (saldoBinance != null) ? (saldoBinance - totalPnl) : 0;
+  var jalan = awal, titik = [awal];
+  trades.forEach(function(t){ jalan += t.pnl; titik.push(jalan); });
   return titik;
 }
 function kurvaTitikGabungan(){
@@ -865,20 +912,53 @@ function gambarKurva(id, titik){
     svg.innerHTML = '<text x="' + (W/2) + '" y="' + (H/2) + '" fill="#63656d" font-size="11" text-anchor="middle">Belum ada data</text>';
     return;
   }
-  var PAD = 10, min = Math.min.apply(null, titik), max = Math.max.apply(null, titik);
+  // Ruang atas/bawah dilebihkan supaya label angka tidak terpotong tepi.
+  var PAD = 10, PADY = 20;
+  var min = Math.min.apply(null, titik), max = Math.max.apply(null, titik);
   var rentang = (max - min) || 1;
   var xs = function(i){ return PAD + (i / (titik.length - 1)) * (W - PAD*2); };
-  var ys = function(v){ return H - PAD - ((v - min) / rentang) * (H - PAD*2); };
+  var ys = function(v){ return H - PADY - ((v - min) / rentang) * (H - PADY*2); };
   var d = titik.map(function(v,i){ return (i ? 'L' : 'M') + xs(i).toFixed(1) + ' ' + ys(v).toFixed(1); }).join(' ');
   var naik = titik[titik.length-1] >= titik[0];
   var warna = naik ? '#4f9e82' : '#c2544d';
-  var isi = d + ' L' + xs(titik.length-1).toFixed(1) + ' ' + (H-PAD) + ' L' + xs(0).toFixed(1) + ' ' + (H-PAD) + ' Z';
+  var isi = d + ' L' + xs(titik.length-1).toFixed(1) + ' ' + (H-PADY) + ' L' + xs(0).toFixed(1) + ' ' + (H-PADY) + ' Z';
+
+  // Penanda titik TERTINGGI & TERENDAH beserta angkanya - tanpa ini kurvanya
+  // cuma garis tanpa skala, tidak kelihatan berada di kisaran saldo berapa.
+  var iMax = titik.indexOf(max), iMin = titik.indexOf(min);
+  function penanda(i, v, diAtas){
+    var x = xs(i), y = ys(v);
+    // Jaga teks tetap di dalam kanvas saat titiknya di ujung kiri/kanan.
+    var anchor = x < 46 ? 'start' : (x > W - 46 ? 'end' : 'middle');
+    var tx = x < 46 ? PAD : (x > W - 46 ? W - PAD : x);
+    return '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="2.6" fill="' + warna + '"/>'
+      + '<text x="' + tx.toFixed(1) + '" y="' + (diAtas ? (y - 7) : (y + 13)).toFixed(1) + '"'
+      + ' fill="#9a9ca4" font-size="9.5" font-family="ui-monospace,monospace" text-anchor="' + anchor + '">'
+      + uang(v) + '</text>';
+  }
+  var label = '';
+  if(max !== min){ label = penanda(iMax, max, true) + penanda(iMin, min, false); }
+  else { label = penanda(0, max, true); }
+
+  // Saldo AWAL & AKHIR ditulis kecil di sudut, jadi jelas kurvanya bermula
+  // dari angka berapa. Kalau titik ekstrem KEBETULAN berada di ujung, labelnya
+  // dilewati - kalau tidak, dua tulisan bertumpuk di sudut yang sama.
+  var iAkhir = titik.length - 1;
+  var sudut = '';
+  if(iMax !== 0 && iMin !== 0){
+    sudut += '<text x="' + PAD + '" y="11" fill="#63656d" font-size="9" font-family="ui-monospace,monospace">Awal ' + uang(titik[0]) + '</text>';
+  }
+  if(iMax !== iAkhir && iMin !== iAkhir){
+    sudut += '<text x="' + (W - PAD) + '" y="11" fill="#63656d" font-size="9" font-family="ui-monospace,monospace" text-anchor="end">Kini ' + uang(titik[iAkhir]) + '</text>';
+  }
+
   svg.innerHTML =
       '<defs><linearGradient id="g' + id + '" x1="0" y1="0" x2="0" y2="1">'
     + '<stop offset="0%" stop-color="' + warna + '" stop-opacity=".35"/>'
     + '<stop offset="100%" stop-color="' + warna + '" stop-opacity="0"/></linearGradient></defs>'
     + '<path d="' + isi + '" fill="url(#g' + id + ')"/>'
-    + '<path d="' + d + '" fill="none" stroke="' + warna + '" stroke-width="1.8"/>';
+    + '<path d="' + d + '" fill="none" stroke="' + warna + '" stroke-width="1.8"/>'
+    + label + sudut;
 }
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -1099,7 +1179,8 @@ function pindaiPantau(){
     } else {
       el('pantauDaftar').innerHTML = pilih.map(function(c){
         var beli = c.kondisi === 'oversold';
-        return '<div class="baris">'
+        return '<div class="baris" data-pilih="1" data-symbol="' + c.symbol + '"'
+          + ' data-harga="' + c.harga + '" data-arah="' + (beli ? 'BUY' : 'SELL') + '" data-asal="Area Pantau">'
           + '<div class="baris-kiri">'
             + '<div class="baris-koin">' + c.symbol.replace('USDT','')
               + '<span class="pair"> / USDT</span><span class="tf-chip">' + tf + '</span></div>'
@@ -1208,7 +1289,8 @@ function gambarSinyal(){
   } else {
     el('chDaftar').innerHTML = pilih.map(function(c){
       var beli = c.arah === 'BUY';
-      return '<div class="baris">'
+      return '<div class="baris" data-pilih="1" data-symbol="' + c.symbol + '"'
+        + ' data-harga="' + c.harga + '" data-sl="' + c.sl + '" data-arah="' + c.arah + '" data-asal="Parallel Signal">'
         + '<div class="baris-kiri">'
           + '<div class="baris-koin">' + c.symbol.replace('USDT','')
             + '<span class="pair"> / USDT</span><span class="tf-chip">' + chTfDipakai + '</span></div>'
@@ -1255,6 +1337,38 @@ function pindaiParallel(){
    ENTRY AREA
    ══════════════════════════════════════════════════════════════════════ */
 var entryArah = 'BUY';
+
+/* Dipanggil saat baris di Pasar / Sinyal disentuh: isikan datanya ke Entry Area
+   lalu pindah ke tab itu - meniru "Pilih Sinyal Ini" di desktop, yang di versi
+   HP sebelumnya belum ada sama sekali (barisnya cuma bisa dilihat). */
+function bawaKeEntry(d){
+  entryArah = d.arah === 'SELL' ? 'SELL' : 'BUY';
+  el('btnArahBeli').classList.toggle('on', entryArah === 'BUY');
+  el('btnArahJual').classList.toggle('on', entryArah === 'SELL');
+  el('entryKoin').value  = d.symbol || '';
+  el('entryHarga').value = d.harga != null ? d.harga : '';
+  el('entrySl').value    = d.sl != null ? d.sl : '';
+  if(!el('entryModal').value) el('entryModal').value = 100;
+  if(!el('entryLev').value)   el('entryLev').value   = 10;
+  perbaruiTombolArah();
+  hitungEntry();
+  // pindah tab
+  [].forEach.call(document.querySelectorAll('.view'), function(v){ v.classList.remove('on'); });
+  [].forEach.call(el('bilahBawah').querySelectorAll('button'), function(x){ x.classList.remove('on'); });
+  el('v-entry').classList.add('on');
+  el('bilahBawah').querySelector('button[data-view="entry"]').classList.add('on');
+  window.scrollTo(0, 0);
+  var c = el('entryCatatan');
+  c.className = 'catatan ok';
+  c.textContent = 'Data ' + (d.symbol||'').replace('USDT','') + ' dimuat dari '
+    + (d.asal || 'sinyal') + '. Periksa modal & leverage, lalu Open Order.';
+}
+
+function perbaruiTombolArah(){
+  var beli = entryArah === 'BUY';
+  el('btnOpenReal').className = 'tombol-utama ' + (beli ? 'beli' : 'jual');
+  el('btnOpenDemo').className = 'tombol-kedua';
+}
 function hitungEntry(){
   var koin = (el('entryKoin').value || '').trim().toUpperCase();
   var harga = parseFloat(el('entryHarga').value);
@@ -1329,6 +1443,136 @@ function openDemo(){
 }
 
 /* ══════════════════════════════════════════════════════════════════════
+   OPEN REAL ORDER
+   ══════════════════════════════════════════════════════════════════════
+   Memakai endpoint & bentuk payload yang SAMA PERSIS dengan screener desktop
+   (POST /api/trade/futures + header X-App-Token). Yang tidak boleh asal:
+   Binance MENOLAK order kalau jumlah desimal qty/harga tidak sesuai aturan
+   simbolnya - jadi presisi diambil dari /api/symbol-filters seperti desktop,
+   bukan ditebak. */
+/* Presisi qty/harga TIDAK BOLEH DITEBAK. Binance menolak order (-1111) kalau
+   jumlah desimalnya tidak sesuai aturan simbol, dan tiap koin beda-beda
+   (PENGU qty 0 desimal, BTC 3, harga bisa 2 sampai 8 desimal). Desktop
+   mengambilnya dari fapi.binance.com/exchangeInfo secara LANGSUNG - dan itu
+   justru yang diblokir ISP di HP, alasan seluruh proxy ini ada.
+
+   Jadi di sini dicoba lewat backend. Kalau backend belum menyediakannya,
+   fungsi ini mengembalikan null dan pengiriman order DIBATALKAN dengan pesan
+   jelas - jauh lebih baik daripada mengirim order berpresisi salah. */
+function ambilFilterSimbol(cfg, symbol){
+  return fetch(cfg.url + '/api/symbol-filters?symbol=' + symbol, { headers: { 'X-App-Token': cfg.token } })
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(j){
+      if(!j || j.quantityPrecision == null || j.pricePrecision == null) return null;
+      return { quantityPrecision: j.quantityPrecision, pricePrecision: j.pricePrecision };
+    })
+    .catch(function(){ return null; });
+}
+function bulat(nilai, desimal){ return Number(nilai).toFixed(Math.max(0, desimal)); }
+
+function openReal(){
+  var c = el('entryCatatan');
+  var d = hitungEntry();
+  if(!d || !d.koin){
+    c.className = 'catatan err';
+    c.textContent = 'Lengkapi koin, harga, modal, leverage, dan SL dulu.';
+    return;
+  }
+  var cfg = konfigLive();
+  if(!cfg){
+    c.className = 'catatan err';
+    c.textContent = 'Belum tersambung ke backend. Isi Backend URL & App Token dulu lewat Crypto Screener (desktop), '
+      + 'atau tombol Connect di jurnal - konfigurasinya otomatis terpakai di sini.';
+    return;
+  }
+
+  var tombol = el('btnOpenReal');
+  tombol.disabled = true;
+  c.className = 'catatan';
+  c.textContent = 'Menyiapkan order…';
+
+  ambilFilterSimbol(cfg, d.koin).then(function(f){
+    if(!f){
+      throw new Error('Backend belum menyediakan /api/symbol-filters, jadi presisi qty/harga '
+        + d.koin + ' tidak bisa dipastikan. Order SENGAJA tidak dikirim daripada ditolak Binance '
+        + 'atau terkirim dengan angka salah. Pakai Crypto Screener desktop dulu untuk order asli.');
+    }
+    var qp = f.quantityPrecision;
+    var pp = f.pricePrecision;
+    var qtyStr = bulat(d.qty, qp);
+    var qtySetengah = bulat(d.qty / 2, qp);
+    var slStr  = bulat(d.sl, pp);
+    var tp1Str = bulat(d.tp1, pp);
+    var tp2Str = bulat(d.tp2, pp);
+
+    if(!(parseFloat(qtyStr) > 0)){
+      throw new Error('Qty hasil pembulatan jadi 0 - modal/leverage terlalu kecil untuk ' + d.koin + '.');
+    }
+
+    var nilai = (parseFloat(qtyStr) * d.harga).toFixed(2);
+    // Dua konfirmasi, sama seperti desktop. Ini UANG ASLI.
+    if(!window.confirm('Kirim order UANG ASLI ke Binance Futures:\n\n'
+        + d.koin + '\nArah: ' + entryArah + '\nQty: ' + qtyStr + '\nLeverage: ' + d.lev + 'x\n'
+        + 'Entry: ' + HG(d.harga) + '\nSL: ' + slStr + '\nTP1: ' + tp1Str + '\nTP2: ' + tp2Str
+        + '\n\nNilai posisi ~$' + nilai + '. Lanjutkan?')){
+      throw new Error('__batal__');
+    }
+    if(!window.confirm('Konfirmasi terakhir: kirim order UANG ASLI senilai ~$' + nilai + ' sekarang?')){
+      throw new Error('__batal__');
+    }
+
+    c.textContent = 'Mengirim order ke backend…';
+    return fetch(cfg.url + '/api/trade/futures', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-App-Token': cfg.token },
+      body: JSON.stringify({
+        symbol: d.koin, side: entryArah, quantity: qtyStr, leverage: d.lev,
+        entryType: 'MARKET', sl: slStr,
+        tp1: tp1Str, qty1: qtySetengah,
+        tp2: tp2Str, qty2: qtySetengah
+      })
+    }).then(function(res){
+      return res.json().then(function(j){ return { ok: res.ok, status: res.status, data: j }; });
+    }).then(function(r){
+      if(!r.ok){
+        var pesan = (r.data && r.data.error) ? JSON.stringify(r.data.error) : ('HTTP ' + r.status);
+        var tahap = (r.data && r.data.stage) ? '[gagal di: ' + r.data.stage + '] ' : '';
+        throw new Error(tahap + pesan);
+      }
+      // Catat posisinya memakai bentuk yang sama dengan screener supaya muncul
+      // di Posisi Terbuka (dan ikut terbaca jurnal desktop).
+      var sim = baca(K_SIM, { positions:{}, history:[] });
+      if(!sim.positions) sim.positions = {};
+      var kunci = d.koin + '_mobile_LIVE_' + Date.now();
+      sim.positions[kunci] = {
+        key: kunci, source: d.koin, tfLabel: 'Mobile', tfValue: '', dir: entryArah,
+        entryPrice: (r.data && r.data.avgPrice) ? parseFloat(r.data.avgPrice) : d.harga,
+        entryTime: Date.now(),
+        sl: parseFloat(slStr), tp1: parseFloat(tp1Str), tp2: parseFloat(tp2Str),
+        qty: parseFloat(qtyStr), qty1: parseFloat(qtySetengah), qty2: parseFloat(qtySetengah),
+        tp1Hit:false, tp2Hit:false, margin: d.modal, leverage: d.lev,
+        venue: 'live-real', signalType: 'manual',
+        liveOrderId: (r.data && r.data.entryOrderId) || null,
+        entryMethod: 'partial'
+      };
+      try{ localStorage.setItem(K_SIM, JSON.stringify(sim)); }catch(e){}
+      simpanKeCloud();
+      c.className = 'catatan ok';
+      c.textContent = 'Order ASLI ' + entryArah + ' ' + d.koin.replace('USDT','') + ' terkirim & tercatat.';
+      muatSaldoBinance().then(gambarBerandaData);
+    });
+  }).catch(function(err){
+    if(err && err.message === '__batal__'){
+      c.className = 'catatan';
+      c.textContent = 'Order dibatalkan.';
+      return;
+    }
+    c.className = 'catatan err';
+    c.textContent = 'Gagal kirim order: ' + (err && err.message ? err.message : 'kesalahan tak terduga');
+  }).then(function(){ tombol.disabled = false; });
+}
+
+/* ══════════════════════════════════════════════════════════════════════
    FIREBASE + SINKRON
    ══════════════════════════════════════════════════════════════════════ */
 firebase.initializeApp({
@@ -1361,19 +1605,41 @@ function tarikDariCloud(){
   }).catch(function(){});
 }
 
+/* Konfigurasi backend dibaca dari TIGA sumber, urutan sama persis dengan
+   jurnal desktop (ambilRawKonfigLive). Versi sebelumnya cuma membaca satu
+   kunci milik screener - kalau koneksinya dulu disimpan lewat tombol Connect
+   di jurnal, konfigurasinya tidak ketemu, saldo Binance tidak pernah terambil,
+   dan Beranda menampilkan angka jumlah-PnL yang tidak sama dengan saldo asli. */
+function konfigLive(){
+  var sumber = [];
+  if(uid) sumber.push('jtBinanceConn_v1::' + uid);            // 1) koneksi jurnal
+  if(uid) sumber.push('emaScreenerLiveTradeConfig_v1::' + uid); // 2) screener per-akun
+  sumber.push('emaScreenerLiveTradeConfig_v1');                 // 3) kunci lama
+  for(var i = 0; i < sumber.length; i++){
+    var cfg = J(localStorage.getItem(sumber[i]), null);
+    if(!cfg) continue;
+    var url = (cfg.backendUrl || '').trim().replace(/\/+$/, '');
+    var token = (cfg.appToken || '').trim();
+    if(url && token) return { url: url, token: token };
+  }
+  return null;
+}
+
 /* Saldo Binance lewat backend milik user (butuh App Token). */
 function muatSaldoBinance(){
-  if(!uid) return Promise.resolve();
-  var cfg = J(localStorage.getItem('emaScreenerLiveTradeConfig_v1::' + uid), null);
-  if(!cfg || !cfg.appToken) return Promise.resolve();
-  var base = (cfg.backendUrl ? String(cfg.backendUrl).trim().replace(/\/+$/,'') : PROXY);
-  return fetch(base + '/api/account', { headers: { 'x-app-token': cfg.appToken } })
+  var cfg = konfigLive();
+  if(!cfg){ saldoBinance = null; return Promise.resolve(); }
+  // Header 'X-App-Token' dengan ejaan yang sama seperti jurnal & screener.
+  return fetch(cfg.url + '/api/account', { headers: { 'X-App-Token': cfg.token } })
     .then(function(r){ return r.ok ? r.json() : null; })
     .then(function(j){
-      var s = j && (j.totalWalletBalance || (j.data && j.data.totalWalletBalance));
-      if(s != null && isFinite(parseFloat(s))) saldoBinance = parseFloat(s);
+      if(j && j.totalWalletBalance !== undefined && isFinite(parseFloat(j.totalWalletBalance))){
+        saldoBinance = parseFloat(j.totalWalletBalance);
+      } else {
+        saldoBinance = null;
+      }
     })
-    .catch(function(){});
+    .catch(function(){ saldoBinance = null; });
 }
 
 var spin = el('gateSpin'), kotak = el('gateBox'), gate = el('gate');
@@ -1500,20 +1766,34 @@ el('kalNext').addEventListener('click', function(){ kalBulan = new Date(kalBulan
 el('btnArahBeli').addEventListener('click', function(){
   entryArah = 'BUY';
   el('btnArahBeli').classList.add('on'); el('btnArahJual').classList.remove('on');
-  el('btnOpenDemo').className = 'tombol-utama beli';
-  hitungEntry();
+  perbaruiTombolArah(); hitungEntry();
 });
 el('btnArahJual').addEventListener('click', function(){
   entryArah = 'SELL';
   el('btnArahJual').classList.add('on'); el('btnArahBeli').classList.remove('on');
-  el('btnOpenDemo').className = 'tombol-utama jual';
-  hitungEntry();
+  perbaruiTombolArah(); hitungEntry();
+});
+
+// Sentuh baris di Pasar / Sinyal -> data pindah ke Entry Area.
+['pantauDaftar','chDaftar'].forEach(function(id){
+  el(id).addEventListener('click', function(e){
+    var b = e.target.closest('[data-pilih]');
+    if(!b) return;
+    bawaKeEntry({
+      symbol: b.getAttribute('data-symbol'),
+      harga:  parseFloat(b.getAttribute('data-harga')),
+      sl:     b.getAttribute('data-sl') ? parseFloat(b.getAttribute('data-sl')) : null,
+      arah:   b.getAttribute('data-arah'),
+      asal:   b.getAttribute('data-asal')
+    });
+  });
 });
 ['entryKoin','entryHarga','entryModal','entryLev','entrySl'].forEach(function(id){
   el(id).addEventListener('input', hitungEntry);
 });
 el('btnOpenDemo').addEventListener('click', openDemo);
-el('btnKeScreener').addEventListener('click', function(){ location.href = 'ema-cross-screener_3.html'; });
+el('btnOpenReal').addEventListener('click', openReal);
+perbaruiTombolArah();
 
 window.addEventListener('resize', function(){
   gambarKurva('kurvaXau', kurvaTitikXau());
