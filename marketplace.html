@@ -3,12 +3,12 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202608021100">
+<meta name="jt-versi" content="202608021900">
 <title>Jadi Trader — Marketplace</title>
 <script>
 /* Penjaga versi - sama seperti halaman lain. */
 (function(){
-  var V = "202608021100", OK = "jtVersiOk", PAKSA = "jtVersiPaksa";
+  var V = "202608021900", OK = "jtVersiOk", PAKSA = "jtVersiPaksa";
   try{
     if(sessionStorage.getItem(OK) === V) return;
     fetch(location.pathname + "?_v=" + Date.now(), { cache: "no-store" })
@@ -285,6 +285,37 @@
       <div style="height:12px"></div>
       <div><div class="label">URL gambar — satu per baris</div><textarea class="isian" id="ownGambar" rows="3" placeholder="https://..."></textarea></div>
       <div style="height:12px"></div>
+
+      <!-- ── Alat potong & unggah tangkapan layar ────────────────────────
+           Tangkapan layar mentah selalu memuat bilah browser, toolbar kiri,
+           dan panel watchlist kanan. Itu yang bikin terlihat "belum jadi".
+           Alat ini memotongnya sebelum diunggah, jadi tidak perlu aplikasi
+           lain dan tidak perlu hosting gambar terpisah. -->
+      <div class="kartu" style="background:var(--panel-2);margin-bottom:0">
+        <h3 style="margin-bottom:6px">Potong &amp; Unggah Tangkapan Layar</h3>
+        <div class="catat" style="margin-bottom:10px">
+          Pilih berkas gambar → tarik kotak di atas gambar untuk memilih bagian chart saja
+          (buang bilah browser, toolbar kiri, dan panel kanan) → Unggah. URL-nya otomatis
+          masuk ke kolom di atas.
+        </div>
+        <input type="file" class="isian" id="gbrBerkas" accept="image/png,image/jpeg,image/webp">
+        <div id="gbrArea" style="display:none;margin-top:12px">
+          <div class="label">Tarik untuk memilih area — seret tepi/sudut untuk menyesuaikan</div>
+          <div id="gbrPanggung" style="position:relative;display:inline-block;max-width:100%;
+               border:1px solid var(--border);border-radius:8px;overflow:hidden;background:#000">
+            <canvas id="gbrKanvas" style="display:block;max-width:100%;cursor:crosshair"></canvas>
+            <div id="gbrKotak" style="position:absolute;border:2px solid var(--gold);
+                 box-shadow:0 0 0 9999px rgba(0,0,0,.55);display:none;cursor:move"></div>
+          </div>
+          <div class="aksi" style="margin-top:10px">
+            <button type="button" class="tbl" id="gbrAuto">Potong Otomatis (buang bilah &amp; panel)</button>
+            <button type="button" class="tbl" id="gbrPenuh">Pilih Seluruh Gambar</button>
+            <button type="button" class="tbl utama" id="gbrUnggah">Unggah</button>
+          </div>
+          <div class="catat" id="gbrStatus" style="margin-top:8px"></div>
+        </div>
+      </div>
+      <div style="height:12px"></div>
       <div><div class="label">Link pembayaran Lynk.id (khusus produk berbayar)</div><input class="isian" id="ownLynk" placeholder="https://lynk.id/..."></div>
       <div style="height:14px"></div>
       <div class="aksi">
@@ -364,9 +395,30 @@
 
 var OWNER_UID = 'EOrakx0QnSVgsi6BECSOXvUM9kG3';
 var DOK_PUBLIK = { col:'public', doc:'marketplace' };
+// Server lisensi & penyaji kode premium. Sumber indikator berbayar HANYA ada
+// di sini - tidak di repo publik, tidak di halaman ini.
+var BACKEND = 'https://103-253-145-38.sslip.io';
 var uid = null, isOwner = false;
 
 function el(id){ return document.getElementById(id); }
+
+/* Backend URL + App Token milik PEMILIK, dibaca dari konfigurasi yang sudah
+   ada di perangkat (disimpan oleh Crypto Screener / jurnal). Token tidak
+   pernah diketik ulang di halaman ini. */
+function konfigBackend(){
+  var sumber = [];
+  if(uid) sumber.push('jtBinanceConn_v1::' + uid);
+  if(uid) sumber.push('emaScreenerLiveTradeConfig_v1::' + uid);
+  sumber.push('emaScreenerLiveTradeConfig_v1');
+  for(var i = 0; i < sumber.length; i++){
+    var cfg = J(localStorage.getItem(sumber[i]), null);
+    if(!cfg) continue;
+    var url = (cfg.backendUrl || '').trim().replace(/\/+$/, '');
+    var token = (cfg.appToken || '').trim();
+    if(token) return { url: url || BACKEND, token: token };
+  }
+  return null;
+}
 function J(s, d){ try{ var v = JSON.parse(s); return v == null ? d : v; }catch(e){ return d; } }
 function esc(s){
   return String(s == null ? '' : s)
@@ -430,8 +482,720 @@ var BAWAAN = [
   }
 ];
 
+/* ══════════════════════════════════════════════════════════════════
+   SUMBER PRODUK GRATIS — ditanam langsung di halaman
+   ══════════════════════════════════════════════════════════════════
+   Dulu diambil lewat fetch ke marketplace-produk/*.txt dan berakhir
+   HTTP 404 kalau foldernya belum ikut ter-upload. Ditanam di sini,
+   tidak ada lagi berkas terpisah yang bisa ketinggalan.
+   Yang PREMIUM sengaja TIDAK ada di sini - ia dilayani backend dan
+   hanya keluar untuk lisensi yang sudah aktif. */
+var SUMBER_GRATIS = {
+  'news-gap-hunter-v2': `//@version=5
+indicator("News & GAP Hunter Indikator", overlay=true, max_lines_count=500, max_labels_count=500)
+
+// ================================================================
+// BAGIAN 1: MARKET OPEN HARI SENIN
+// ================================================================
+grpMon    = "1) Market Open Hari Senin"
+enableMon = input.bool(true, "Aktifkan Marker Market Open Senin", group=grpMon)
+tzMon     = input.string("GMT+3", "Timezone Market/Broker", group=grpMon,
+     tooltip="Sesuaikan dengan timezone server broker Anda, contoh: GMT+2, GMT+3, GMT+7, atau Etc/UTC")
+showMonBg = input.bool(true, "Tampilkan Highlight Background Hari Senin", group=grpMon)
+monBgColor= input.color(color.new(color.blue, 90), "Warna Background Senin", group=grpMon)
+
+isMondayDay   = enableMon and dayofweek(time, tzMon) == dayofweek.monday
+isMarketOpen  = isMondayDay and dayofweek(time[1], tzMon) != dayofweek.monday
+
+bgcolor(showMonBg and isMondayDay ? monBgColor : na, title="Highlight Hari Senin")
+
+alertcondition(isMarketOpen, title="XAUUSD Market Open (Senin)",
+     message="Market XAUUSD baru saja dibuka hari Senin")
+
+// ================================================================
+// BAGIAN 2: PENGATURAN UMUM BERITA (NFP / CPI / PPI / FOMC / UNR)
+// ================================================================
+// CATATAN PENTING:
+// Semua tanggal rilis NFP, CPI, PPI, FOMC, dan Unemployment Rate di
+// bagian 3-7 di bawah adalah DATA AKTUAL/HISTORIS (bukan perkiraan/
+// rumus) dari Januari 2025 sampai rilis terbaru per Juli 2026,
+// diambil langsung dari kalender resmi US Bureau of Labor Statistics
+// (bls.gov/schedule) untuk NFP/CPI/PPI/Unemployment Rate, dan dari
+// Federal Reserve (federalreserve.gov/monetarypolicy/fomccalendars.htm)
+// untuk FOMC. Ini dibuat manual karena:
+//  1) Jadwal rilis sempat sangat kacau akibat government shutdown AS
+//     (Okt 2025 - awal 2026) -> ada yang tertunda, ada yang dibatalkan
+//     total, ada yang digabung 2 bulan sekaligus.
+//  2) Bahkan di luar periode shutdown, BLS TIDAK selalu rilis di
+//     "Jumat pertama" bulan itu -> misal NFP data April 2026 dirilis
+//     Jumat KEDUA (8 Mei 2026), bukan Jumat pertama (1 Mei 2026).
+// Jadi rumus otomatis "Jumat pertama" tidak bisa diandalkan penuh,
+// makanya semua tanggal di bawah ditulis manual & sudah dicek satu
+// per satu ke rilis resmi BLS / Federal Reserve.
+// Timezone rilis NFP/CPI/PPI/Unemployment Rate selalu Eastern Time.
+// Timezone rilis statement FOMC juga Eastern Time, jam 14:00 (2 PM)
+// pada HARI KEDUA tiap pertemuan (bukan jam 08:30 seperti data BLS).
+// ================================================================
+grpGen     = "2) Pengaturan Umum Berita"
+tzNews     = input.string("America/New_York", "Timezone Rilis Berita (default waktu AS)", group=grpGen,
+     tooltip="Rilis NFP/CPI/PPI/FOMC/Unemployment Rate selalu mengacu ke waktu Amerika (Eastern Time). Biarkan default kecuali paham konsekuensinya.")
+windowMin  = input.int(60, "Durasi Highlight (menit)", minval=1, maxval=240, group=grpGen)
+showNewsBg = input.bool(true, "Tampilkan Highlight Background Berita", group=grpGen)
+markerSizeOpt = input.string("Besar", "Ukuran Teks Marker Berita", options=["Sedang", "Besar", "Sangat Besar"], group=grpGen)
+markerSize    = markerSizeOpt == "Sedang" ? size.normal : markerSizeOpt == "Besar" ? size.large : size.huge
+newsCandleColor = input.color(color.new(color.purple, 0), "Warna Candle Saat Ada Berita (NFP/CPI/PPI/FOMC/UNR/JC)", group=grpGen,
+     tooltip="Semua candle saat rilis NFP, CPI, PPI, FOMC, Unemployment Rate, maupun Unemployment Claims mingguan akan diwarnai warna yang SAMA (default ungu), supaya karakteristik pergerakan candle-nya lebih mudah dibandingkan terlepas dari jenis beritanya.")
+
+winMs = windowMin * 60 * 1000
+
+// Fungsi bantu: cek apakah waktu candle saat ini berada dalam window
+// sekitar salah satu tanggal rilis di dalam array tanggal
+f_inNewsWindow(t, arr, ms) =>
+    found = false
+    for i = 0 to array.size(arr) - 1
+        d = array.get(arr, i)
+        if t >= d and t < d + ms
+            found := true
+    found
+
+// ================================================================
+// BAGIAN 3: NFP (Non-Farm Payroll) - DATA AKTUAL Jan 2025 - Jun 2026
+// ================================================================
+// Sumber: BLS Employment Situation news release & schedule resmi
+// (bls.gov/schedule/news_release/empsit.htm).
+// - Data Sep 2025 tertunda dari jadwal awal (3 Okt) ke 20 Nov 2025
+//   akibat government shutdown.
+// - Data Okt 2025 TIDAK PERNAH dirilis terpisah -> digabung dengan
+//   data Nov 2025, dirilis bareng 16 Des 2025.
+// ================================================================
+grpNFP     = "3) NFP (Non-Farm Payroll)"
+enableNFP  = input.bool(true, "Aktifkan Highlight NFP", group=grpNFP)
+nfpBgColor = input.color(color.new(color.orange, 85), "Warna Background NFP", group=grpNFP)
+
+var array<int> nfpDates = array.from(
+     timestamp(tzNews, 2025, 2, 7, 8, 30),   // Data Jan 2025
+     timestamp(tzNews, 2025, 3, 7, 8, 30),   // Data Feb 2025
+     timestamp(tzNews, 2025, 4, 4, 8, 30),   // Data Mar 2025
+     timestamp(tzNews, 2025, 5, 2, 8, 30),   // Data Apr 2025
+     timestamp(tzNews, 2025, 6, 6, 8, 30),   // Data May 2025
+     timestamp(tzNews, 2025, 7, 3, 8, 30),   // Data Jun 2025 (dimajukan, 4 Juli 2025 jatuh Jumat)
+     timestamp(tzNews, 2025, 8, 1, 8, 30),   // Data Jul 2025
+     timestamp(tzNews, 2025, 9, 5, 8, 30),   // Data Aug 2025
+     timestamp(tzNews, 2025, 11, 20, 8, 30), // Data Sep 2025 (tertunda shutdown, awalnya 3 Okt)
+     timestamp(tzNews, 2025, 12, 16, 8, 30), // Data Okt+Nov 2025 (digabung, Okt tak pernah rilis sendiri)
+     timestamp(tzNews, 2026, 1, 9, 8, 30),   // Data Dec 2025
+     timestamp(tzNews, 2026, 2, 11, 8, 30),  // Data Jan 2026
+     timestamp(tzNews, 2026, 3, 6, 8, 30),   // Data Feb 2026
+     timestamp(tzNews, 2026, 4, 3, 8, 30),   // Data Mar 2026
+     timestamp(tzNews, 2026, 5, 8, 8, 30),   // Data Apr 2026 (Jumat KEDUA, bukan pertama)
+     timestamp(tzNews, 2026, 6, 5, 8, 30),   // Data May 2026
+     timestamp(tzNews, 2026, 7, 2, 8, 30))   // Data Jun 2026 (dimajukan, 4 Juli 2026 jatuh Sabtu)
+
+grpNFPExtra = "3b) NFP - Tambahan Manual (isi sendiri utk bulan berikutnya)"
+nfpEx1_on = input.bool(false, "Tambahan 1 (cth: Jul 2026 data -> 7 Agu 2026)", group=grpNFPExtra, inline="nfpex1")
+nfpEx1_t  = input.time(timestamp("2026-08-07 08:30"), "", group=grpNFPExtra, inline="nfpex1")
+nfpEx2_on = input.bool(false, "Tambahan 2", group=grpNFPExtra, inline="nfpex2")
+nfpEx2_t  = input.time(timestamp("2026-09-04 08:30"), "", group=grpNFPExtra, inline="nfpex2")
+nfpEx3_on = input.bool(false, "Tambahan 3", group=grpNFPExtra, inline="nfpex3")
+nfpEx3_t  = input.time(timestamp("2026-10-02 08:30"), "", group=grpNFPExtra, inline="nfpex3")
+nfpEx4_on = input.bool(false, "Tambahan 4", group=grpNFPExtra, inline="nfpex4")
+nfpEx4_t  = input.time(timestamp("2026-11-06 08:30"), "", group=grpNFPExtra, inline="nfpex4")
+
+isNFP = enableNFP and (f_inNewsWindow(time, nfpDates, winMs) or
+     (nfpEx1_on and time >= nfpEx1_t and time < nfpEx1_t + winMs) or
+     (nfpEx2_on and time >= nfpEx2_t and time < nfpEx2_t + winMs) or
+     (nfpEx3_on and time >= nfpEx3_t and time < nfpEx3_t + winMs) or
+     (nfpEx4_on and time >= nfpEx4_t and time < nfpEx4_t + winMs))
+
+// ================================================================
+// BAGIAN 4: CPI (Consumer Price Index) - DATA AKTUAL Jan 2025 - Jun 2026
+// ================================================================
+// Sumber: BLS CPI news release & schedule resmi
+// (bls.gov/schedule/news_release/cpi.htm).
+// - Data Sep 2025 dimajukan ke 24 Okt 2025 (rilis khusus di luar
+//   jadwal normal, untuk kebutuhan perhitungan COLA Social Security).
+// - Data Okt 2025 TIDAK PERNAH DIRILIS SAMA SEKALI (dibatalkan total
+//   akibat shutdown).
+// - Data Nov 2025 tertunda dari 10 Des ke 18 Des 2025.
+// - Data Jan 2026 tertunda dari 11 Feb ke 13 Feb 2026.
+// ================================================================
+grpCPI     = "4) CPI (Consumer Price Index)"
+enableCPI  = input.bool(true, "Aktifkan Highlight CPI", group=grpCPI)
+cpiBgColor = input.color(color.new(color.green, 85), "Warna Background CPI", group=grpCPI)
+
+var array<int> cpiDates = array.from(
+     timestamp(tzNews, 2025, 2, 12, 8, 30),  // Data Jan 2025
+     timestamp(tzNews, 2025, 3, 12, 8, 30),  // Data Feb 2025
+     timestamp(tzNews, 2025, 4, 10, 8, 30),  // Data Mar 2025
+     timestamp(tzNews, 2025, 5, 13, 8, 30),  // Data Apr 2025
+     timestamp(tzNews, 2025, 6, 11, 8, 30),  // Data May 2025
+     timestamp(tzNews, 2025, 7, 15, 8, 30),  // Data Jun 2025
+     timestamp(tzNews, 2025, 8, 12, 8, 30),  // Data Jul 2025
+     timestamp(tzNews, 2025, 9, 11, 8, 30),  // Data Aug 2025
+     timestamp(tzNews, 2025, 10, 24, 8, 30), // Data Sep 2025 (dimajukan khusus utk COLA)
+     // Data Okt 2025: TIDAK PERNAH DIRILIS (dibatalkan akibat shutdown)
+     timestamp(tzNews, 2025, 12, 18, 8, 30), // Data Nov 2025 (tertunda dari 10 Des)
+     timestamp(tzNews, 2026, 1, 13, 8, 30),  // Data Dec 2025
+     timestamp(tzNews, 2026, 2, 13, 8, 30),  // Data Jan 2026 (tertunda dari 11 Feb)
+     timestamp(tzNews, 2026, 3, 11, 8, 30),  // Data Feb 2026
+     timestamp(tzNews, 2026, 4, 10, 8, 30),  // Data Mar 2026
+     timestamp(tzNews, 2026, 5, 12, 8, 30),  // Data Apr 2026
+     timestamp(tzNews, 2026, 6, 10, 8, 30),  // Data May 2026
+     timestamp(tzNews, 2026, 7, 14, 8, 30))  // Data Jun 2026
+
+grpCPIExtra = "4b) CPI - Tambahan Manual (isi sendiri utk bulan berikutnya)"
+cpiEx1_on = input.bool(false, "Tambahan 1 (cth: Jul 2026 data -> 12 Agu 2026)", group=grpCPIExtra, inline="cpiex1")
+cpiEx1_t  = input.time(timestamp("2026-08-12 08:30"), "", group=grpCPIExtra, inline="cpiex1")
+cpiEx2_on = input.bool(false, "Tambahan 2", group=grpCPIExtra, inline="cpiex2")
+cpiEx2_t  = input.time(timestamp("2026-09-11 08:30"), "", group=grpCPIExtra, inline="cpiex2")
+cpiEx3_on = input.bool(false, "Tambahan 3", group=grpCPIExtra, inline="cpiex3")
+cpiEx3_t  = input.time(timestamp("2026-10-14 08:30"), "", group=grpCPIExtra, inline="cpiex3")
+cpiEx4_on = input.bool(false, "Tambahan 4", group=grpCPIExtra, inline="cpiex4")
+cpiEx4_t  = input.time(timestamp("2026-11-10 08:30"), "", group=grpCPIExtra, inline="cpiex4")
+
+isCPI = enableCPI and (f_inNewsWindow(time, cpiDates, winMs) or
+     (cpiEx1_on and time >= cpiEx1_t and time < cpiEx1_t + winMs) or
+     (cpiEx2_on and time >= cpiEx2_t and time < cpiEx2_t + winMs) or
+     (cpiEx3_on and time >= cpiEx3_t and time < cpiEx3_t + winMs) or
+     (cpiEx4_on and time >= cpiEx4_t and time < cpiEx4_t + winMs))
+
+// ================================================================
+// BAGIAN 5: PPI (Producer Price Index) - DATA AKTUAL Jan 2025 - Jun 2026
+// ================================================================
+// Sumber: BLS PPI news release & schedule resmi
+// (bls.gov/schedule/news_release/ppi.htm).
+// - Data Sep 2025 tertunda dari jadwal awal (16 Okt) ke 25 Nov 2025.
+// - Data Okt 2025 TIDAK dirilis terpisah -> digabung dengan data
+//   Nov 2025, dirilis bareng 14 Jan 2026 (juga tertunda dari 11 Des).
+// - Data Dec 2025 tertunda dari 14 Jan ke 30 Jan 2026.
+// ================================================================
+grpPPI     = "5) PPI (Producer Price Index)"
+enablePPI  = input.bool(true, "Aktifkan Highlight PPI", group=grpPPI)
+ppiBgColor = input.color(color.new(color.red, 85), "Warna Background PPI", group=grpPPI)
+
+var array<int> ppiDates = array.from(
+     timestamp(tzNews, 2025, 2, 13, 8, 30),  // Data Jan 2025
+     timestamp(tzNews, 2025, 3, 13, 8, 30),  // Data Feb 2025
+     timestamp(tzNews, 2025, 4, 11, 8, 30),  // Data Mar 2025
+     timestamp(tzNews, 2025, 5, 15, 8, 30),  // Data Apr 2025
+     timestamp(tzNews, 2025, 6, 12, 8, 30),  // Data May 2025
+     timestamp(tzNews, 2025, 7, 16, 8, 30),  // Data Jun 2025
+     timestamp(tzNews, 2025, 8, 14, 8, 30),  // Data Jul 2025
+     timestamp(tzNews, 2025, 9, 10, 8, 30),  // Data Aug 2025
+     timestamp(tzNews, 2025, 11, 25, 8, 30), // Data Sep 2025 (tertunda dari 16 Okt)
+     // Data Okt 2025: digabung dengan rilis data Nov 2025 di bawah ini
+     timestamp(tzNews, 2026, 1, 14, 8, 30),  // Data Okt+Nov 2025 (digabung, tertunda dari 11 Des)
+     timestamp(tzNews, 2026, 1, 30, 8, 30),  // Data Dec 2025 (tertunda dari 14 Jan)
+     timestamp(tzNews, 2026, 2, 27, 8, 30),  // Data Jan 2026
+     timestamp(tzNews, 2026, 3, 18, 8, 30),  // Data Feb 2026
+     timestamp(tzNews, 2026, 4, 14, 8, 30),  // Data Mar 2026
+     timestamp(tzNews, 2026, 5, 13, 8, 30),  // Data Apr 2026
+     timestamp(tzNews, 2026, 6, 11, 8, 30),  // Data May 2026
+     timestamp(tzNews, 2026, 7, 15, 8, 30))  // Data Jun 2026
+
+grpPPIExtra = "5b) PPI - Tambahan Manual (isi sendiri utk bulan berikutnya)"
+ppiEx1_on = input.bool(false, "Tambahan 1 (cth: Jul 2026 data -> 13 Agu 2026)", group=grpPPIExtra, inline="ppiex1")
+ppiEx1_t  = input.time(timestamp("2026-08-13 08:30"), "", group=grpPPIExtra, inline="ppiex1")
+ppiEx2_on = input.bool(false, "Tambahan 2", group=grpPPIExtra, inline="ppiex2")
+ppiEx2_t  = input.time(timestamp("2026-09-10 08:30"), "", group=grpPPIExtra, inline="ppiex2")
+ppiEx3_on = input.bool(false, "Tambahan 3", group=grpPPIExtra, inline="ppiex3")
+ppiEx3_t  = input.time(timestamp("2026-10-15 08:30"), "", group=grpPPIExtra, inline="ppiex3")
+ppiEx4_on = input.bool(false, "Tambahan 4", group=grpPPIExtra, inline="ppiex4")
+ppiEx4_t  = input.time(timestamp("2026-11-13 08:30"), "", group=grpPPIExtra, inline="ppiex4")
+
+isPPI = enablePPI and (f_inNewsWindow(time, ppiDates, winMs) or
+     (ppiEx1_on and time >= ppiEx1_t and time < ppiEx1_t + winMs) or
+     (ppiEx2_on and time >= ppiEx2_t and time < ppiEx2_t + winMs) or
+     (ppiEx3_on and time >= ppiEx3_t and time < ppiEx3_t + winMs) or
+     (ppiEx4_on and time >= ppiEx4_t and time < ppiEx4_t + winMs))
+
+// ================================================================
+// BAGIAN 6: FOMC (Federal Reserve Interest Rate Decision) - DATA
+// AKTUAL pertemuan Jan 2025 - Jun 2026
+// ================================================================
+// Sumber: Federal Reserve, FOMC meeting calendar resmi
+// (federalreserve.gov/monetarypolicy/fomccalendars.htm).
+// - Statement kebijakan SELALU dirilis jam 14:00 ET (2 siang) pada
+//   HARI KEDUA tiap pertemuan 2 hari -> BUKAN jam 08:30 seperti
+//   rilis data BLS (NFP/CPI/PPI/Unemployment Rate).
+// - Setiap pertemuan Maret/Juni/September/Desember juga disertai
+//   Summary of Economic Projections (dot plot) -> reaksi pasar
+//   biasanya lebih besar di 4 pertemuan ini.
+// - Jadwal 2025 & 2026 sudah dikonfirmasi resmi oleh Federal Reserve
+//   sejak Agustus 2024, jadi tidak ada gangguan shutdown seperti
+//   jadwal BLS.
+// ================================================================
+grpFOMC    = "6) FOMC (Federal Reserve Interest Rate Decision)"
+enableFOMC = input.bool(true, "Aktifkan Highlight FOMC", group=grpFOMC)
+fomcBgColor= input.color(color.new(color.blue, 85), "Warna Background FOMC", group=grpFOMC)
+
+var array<int> fomcDates = array.from(
+     timestamp(tzNews, 2025, 1, 29, 14, 0),  // Statement pertemuan 28-29 Jan 2025
+     timestamp(tzNews, 2025, 3, 19, 14, 0),  // Statement pertemuan 18-19 Mar 2025
+     timestamp(tzNews, 2025, 5, 7, 14, 0),   // Statement pertemuan 6-7 Mei 2025
+     timestamp(tzNews, 2025, 6, 18, 14, 0),  // Statement pertemuan 17-18 Jun 2025
+     timestamp(tzNews, 2025, 7, 30, 14, 0),  // Statement pertemuan 29-30 Jul 2025
+     timestamp(tzNews, 2025, 9, 17, 14, 0),  // Statement pertemuan 16-17 Sep 2025
+     timestamp(tzNews, 2025, 10, 29, 14, 0), // Statement pertemuan 28-29 Okt 2025
+     timestamp(tzNews, 2025, 12, 10, 14, 0), // Statement pertemuan 9-10 Des 2025
+     timestamp(tzNews, 2026, 1, 28, 14, 0),  // Statement pertemuan 27-28 Jan 2026
+     timestamp(tzNews, 2026, 3, 18, 14, 0),  // Statement pertemuan 17-18 Mar 2026
+     timestamp(tzNews, 2026, 4, 29, 14, 0),  // Statement pertemuan 28-29 Apr 2026
+     timestamp(tzNews, 2026, 6, 17, 14, 0))  // Statement pertemuan 16-17 Jun 2026
+
+grpFOMCExtra = "6b) FOMC - Tambahan Manual (pertemuan berikutnya, sudah dijadwalkan resmi)"
+fomcEx1_on = input.bool(false, "Tambahan 1 (pertemuan 28-29 Jul 2026)", group=grpFOMCExtra, inline="fomcex1")
+fomcEx1_t  = input.time(timestamp("2026-07-29 14:00"), "", group=grpFOMCExtra, inline="fomcex1")
+fomcEx2_on = input.bool(false, "Tambahan 2 (pertemuan 15-16 Sep 2026)", group=grpFOMCExtra, inline="fomcex2")
+fomcEx2_t  = input.time(timestamp("2026-09-16 14:00"), "", group=grpFOMCExtra, inline="fomcex2")
+fomcEx3_on = input.bool(false, "Tambahan 3 (pertemuan 27-28 Okt 2026)", group=grpFOMCExtra, inline="fomcex3")
+fomcEx3_t  = input.time(timestamp("2026-10-28 14:00"), "", group=grpFOMCExtra, inline="fomcex3")
+fomcEx4_on = input.bool(false, "Tambahan 4 (pertemuan 8-9 Des 2026)", group=grpFOMCExtra, inline="fomcex4")
+fomcEx4_t  = input.time(timestamp("2026-12-09 14:00"), "", group=grpFOMCExtra, inline="fomcex4")
+
+isFOMC = enableFOMC and (f_inNewsWindow(time, fomcDates, winMs) or
+     (fomcEx1_on and time >= fomcEx1_t and time < fomcEx1_t + winMs) or
+     (fomcEx2_on and time >= fomcEx2_t and time < fomcEx2_t + winMs) or
+     (fomcEx3_on and time >= fomcEx3_t and time < fomcEx3_t + winMs) or
+     (fomcEx4_on and time >= fomcEx4_t and time < fomcEx4_t + winMs))
+
+// ================================================================
+// BAGIAN 7: UNEMPLOYMENT RATE - DATA AKTUAL Jan 2025 - Jun 2026
+// ================================================================
+// CATATAN PENTING: Unemployment Rate BUKAN rilis terpisah -> angka
+// ini keluar BERSAMAAN dengan NFP, karena keduanya berasal dari
+// laporan yang SAMA PERSIS: "Employment Situation Report" milik BLS
+// (bls.gov/schedule/news_release/empsit.htm). Makanya seluruh
+// tanggal & jam (08:30 ET) di bawah ini IDENTIK dengan tanggal NFP
+// di Bagian 3. Dipisah jadi kategori sendiri di sini supaya kamu
+// bisa kasih label & warna sendiri, dan bandingkan reaksi candle-nya
+// terlepas dari NFP -- misalnya kalau suatu saat kamu ingin
+// menonaktifkan salah satunya saja untuk analisis.
+// ================================================================
+grpUNR    = "7) Unemployment Rate"
+enableUNR = input.bool(true, "Aktifkan Highlight Unemployment Rate", group=grpUNR)
+unrBgColor= input.color(color.new(color.fuchsia, 85), "Warna Background Unemployment Rate", group=grpUNR)
+
+var array<int> unrDates = array.from(
+     timestamp(tzNews, 2025, 2, 7, 8, 30),   // Data Jan 2025 (sama dgn tgl NFP)
+     timestamp(tzNews, 2025, 3, 7, 8, 30),   // Data Feb 2025
+     timestamp(tzNews, 2025, 4, 4, 8, 30),   // Data Mar 2025
+     timestamp(tzNews, 2025, 5, 2, 8, 30),   // Data Apr 2025
+     timestamp(tzNews, 2025, 6, 6, 8, 30),   // Data May 2025
+     timestamp(tzNews, 2025, 7, 3, 8, 30),   // Data Jun 2025
+     timestamp(tzNews, 2025, 8, 1, 8, 30),   // Data Jul 2025
+     timestamp(tzNews, 2025, 9, 5, 8, 30),   // Data Aug 2025
+     timestamp(tzNews, 2025, 11, 20, 8, 30), // Data Sep 2025 (tertunda shutdown)
+     timestamp(tzNews, 2025, 12, 16, 8, 30), // Data Okt+Nov 2025 (digabung)
+     timestamp(tzNews, 2026, 1, 9, 8, 30),   // Data Dec 2025
+     timestamp(tzNews, 2026, 2, 11, 8, 30),  // Data Jan 2026
+     timestamp(tzNews, 2026, 3, 6, 8, 30),   // Data Feb 2026
+     timestamp(tzNews, 2026, 4, 3, 8, 30),   // Data Mar 2026
+     timestamp(tzNews, 2026, 5, 8, 8, 30),   // Data Apr 2026
+     timestamp(tzNews, 2026, 6, 5, 8, 30),   // Data May 2026
+     timestamp(tzNews, 2026, 7, 2, 8, 30))   // Data Jun 2026
+
+grpUNRExtra = "7b) Unemployment Rate - Tambahan Manual (samakan dgn tanggal NFP di 3b)"
+unrEx1_on = input.bool(false, "Tambahan 1", group=grpUNRExtra, inline="unrex1")
+unrEx1_t  = input.time(timestamp("2026-08-07 08:30"), "", group=grpUNRExtra, inline="unrex1")
+unrEx2_on = input.bool(false, "Tambahan 2", group=grpUNRExtra, inline="unrex2")
+unrEx2_t  = input.time(timestamp("2026-09-04 08:30"), "", group=grpUNRExtra, inline="unrex2")
+unrEx3_on = input.bool(false, "Tambahan 3", group=grpUNRExtra, inline="unrex3")
+unrEx3_t  = input.time(timestamp("2026-10-02 08:30"), "", group=grpUNRExtra, inline="unrex3")
+unrEx4_on = input.bool(false, "Tambahan 4", group=grpUNRExtra, inline="unrex4")
+unrEx4_t  = input.time(timestamp("2026-11-06 08:30"), "", group=grpUNRExtra, inline="unrex4")
+
+isUNR = enableUNR and (f_inNewsWindow(time, unrDates, winMs) or
+     (unrEx1_on and time >= unrEx1_t and time < unrEx1_t + winMs) or
+     (unrEx2_on and time >= unrEx2_t and time < unrEx2_t + winMs) or
+     (unrEx3_on and time >= unrEx3_t and time < unrEx3_t + winMs) or
+     (unrEx4_on and time >= unrEx4_t and time < unrEx4_t + winMs))
+
+// ================================================================
+// BAGIAN 8: UNEMPLOYMENT CLAIMS / INITIAL JOBLESS CLAIMS (MINGGUAN)
+// ================================================================
+// Sumber: US Department of Labor, Employment & Training Administration
+// (oui.doleta.gov/unemploy) - "UI Weekly Claims News Release".
+// BEDA dengan Unemployment Rate di Bagian 7: ini laporan MINGGUAN
+// terpisah dari NFP, SELALU rilis hari Kamis jam 08:30 ET, KECUALI
+// hari Kamis itu jatuh di hari libur federal -> menurut aturan resmi
+// DOL, rilis digeser ke hari kerja berikutnya (biasanya Jumat),
+// KECUALI minggu Thanksgiving yang khusus digeser ke Rabu (karena
+// pasar libur penuh hari Kamis & setengah hari Jumat).
+// Karena ini mingguan & polanya tetap, TIDAK perlu diisi manual tiap
+// bulan seperti NFP/CPI/PPI -> otomatis jalan terus berdasarkan
+// rumus "setiap hari Kamis", kecuali di tanggal libur federal di
+// bawah ini (sudah dicek satu per satu) dan di periode shutdown
+// pemerintah AS (Okt-Nov 2025) saat rilis sempat kacau/dirapel.
+// ================================================================
+grpJC     = "8) Unemployment Claims / Initial Jobless Claims (Mingguan)"
+enableJC  = input.bool(true, "Aktifkan Highlight Unemployment Claims", group=grpJC)
+jcBgColor = input.color(color.new(color.teal, 85), "Warna Background Unemployment Claims", group=grpJC)
+
+// Tanggal Kamis yang TIDAK ada rilis normal karena libur federal
+// (dipakai untuk membatalkan hasil rumus "setiap Kamis" di tanggal ini)
+var array<int> jcHolidaySkip = array.from(
+     timestamp(tzNews, 2025, 6, 19, 8, 30),  // Juneteenth (Kamis) -> geser ke Jumat 20 Jun 2025
+     timestamp(tzNews, 2025, 11, 27, 8, 30), // Thanksgiving (Kamis) -> geser ke Rabu 26 Nov 2025
+     timestamp(tzNews, 2025, 12, 25, 8, 30), // Christmas (Kamis) -> geser ke Jumat 26 Des 2025
+     timestamp(tzNews, 2026, 1, 1, 8, 30))   // New Year's Day (Kamis) -> geser ke Jumat 2 Jan 2026
+
+// Tanggal pengganti aktual untuk libur-libur di atas
+var array<int> jcHolidayShift = array.from(
+     timestamp(tzNews, 2025, 6, 20, 8, 30),  // Rilis pengganti Juneteenth
+     timestamp(tzNews, 2025, 11, 26, 8, 30), // Rilis pengganti Thanksgiving
+     timestamp(tzNews, 2025, 12, 26, 8, 30), // Rilis pengganti Christmas
+     timestamp(tzNews, 2026, 1, 2, 8, 30))   // Rilis pengganti New Year's Day
+
+grpJCBlackout = "8b) Unemployment Claims - Blackout Shutdown (opsional)"
+enableJCBlackout = input.bool(true, "Nonaktifkan highlight otomatis selama periode shutdown AS", group=grpJCBlackout,
+     tooltip="Selama shutdown pemerintah AS awal Okt - pertengahan Nov 2025, rilis mingguan sempat tertunda & dirapel jadi tidak mengikuti pola 'setiap Kamis' normal. Nonaktifkan opsi ini kalau kamu punya tanggal rilis rapelan yang lebih presisi dan mau menambahkannya sendiri secara manual.")
+jcBlackoutStart = input.time(timestamp("2025-10-02 00:00"), "Mulai Blackout", group=grpJCBlackout, inline="jcblackout")
+jcBlackoutEnd   = input.time(timestamp("2025-11-13 23:59"), "Selesai Blackout", group=grpJCBlackout, inline="jcblackout")
+
+grpJCExtra = "8c) Unemployment Claims - Tambahan Manual (opsional, utk periode setelah Jul 2026 atau koreksi)"
+jcSkipEx1_on  = input.bool(false, "Batalkan Kamis ini (skip)", group=grpJCExtra, inline="jcskipex1")
+jcSkipEx1_t   = input.time(timestamp("2026-11-26 08:30"), "", group=grpJCExtra, inline="jcskipex1")
+jcShiftEx1_on = input.bool(false, "Tambahkan rilis pengganti", group=grpJCExtra, inline="jcshiftex1")
+jcShiftEx1_t  = input.time(timestamp("2026-11-25 08:30"), "", group=grpJCExtra, inline="jcshiftex1")
+
+// Cek apakah bar saat ini persis hari Kamis, jam window highlight (mulai 08:30 ET)
+jcMinutesET   = hour(time, tzNews) * 60 + minute(time, tzNews)
+jcReleaseMin  = 8 * 60 + 30
+isJCTimeWindow = jcMinutesET >= jcReleaseMin and jcMinutesET < jcReleaseMin + windowMin
+isJCThursday   = dayofweek(time, tzNews) == dayofweek.thursday
+
+isJCSkipped  = f_inNewsWindow(time, jcHolidaySkip, winMs) or (jcSkipEx1_on and time >= jcSkipEx1_t and time < jcSkipEx1_t + winMs)
+isJCShiftDay = f_inNewsWindow(time, jcHolidayShift, winMs) or (jcShiftEx1_on and time >= jcShiftEx1_t and time < jcShiftEx1_t + winMs)
+isJCBlackout = enableJCBlackout and time >= jcBlackoutStart and time <= jcBlackoutEnd
+
+isJC = enableJC and (((isJCTimeWindow and isJCThursday and not isJCSkipped) or isJCShiftDay) and not isJCBlackout)
+
+// ================================================================
+// BAGIAN 9: FEDERAL FUNDS RATE
+// ================================================================
+// CATATAN PENTING: Federal Funds Rate BUKAN rilis terpisah dari FOMC
+// di Bagian 6 -> angka suku bunga ini diumumkan BERSAMAAN dengan FOMC
+// Statement, di menit yang PERSIS SAMA (14:00 ET hari kedua tiap
+// pertemuan). Di kalender berita (spt ForexFactory) memang ditulis
+// sebagai 2 baris terpisah ("Federal Funds Rate" & "FOMC Statement")
+// tapi datang dari satu momen rilis yang sama -> makanya seluruh
+// tanggal & jam di bawah IDENTIK dengan array fomcDates di Bagian 6.
+// Dipisah jadi kategori sendiri supaya kamu bisa kasih label & warna
+// sendiri buat angka suku bunganya secara spesifik (misal buat
+// menandai kapan terjadi rate cut/hike vs sekadar hold).
+// ================================================================
+grpFFR    = "9) Federal Funds Rate"
+enableFFR = input.bool(true, "Aktifkan Highlight Federal Funds Rate", group=grpFFR)
+ffrBgColor= input.color(color.new(color.yellow, 85), "Warna Background Federal Funds Rate", group=grpFFR)
+
+var array<int> ffrDates = array.from(
+     timestamp(tzNews, 2025, 1, 29, 14, 0),  // sama dgn statement pertemuan 28-29 Jan 2025
+     timestamp(tzNews, 2025, 3, 19, 14, 0),  // 18-19 Mar 2025
+     timestamp(tzNews, 2025, 5, 7, 14, 0),   // 6-7 Mei 2025
+     timestamp(tzNews, 2025, 6, 18, 14, 0),  // 17-18 Jun 2025
+     timestamp(tzNews, 2025, 7, 30, 14, 0),  // 29-30 Jul 2025
+     timestamp(tzNews, 2025, 9, 17, 14, 0),  // 16-17 Sep 2025
+     timestamp(tzNews, 2025, 10, 29, 14, 0), // 28-29 Okt 2025
+     timestamp(tzNews, 2025, 12, 10, 14, 0), // 9-10 Des 2025
+     timestamp(tzNews, 2026, 1, 28, 14, 0),  // 27-28 Jan 2026
+     timestamp(tzNews, 2026, 3, 18, 14, 0),  // 17-18 Mar 2026
+     timestamp(tzNews, 2026, 4, 29, 14, 0),  // 28-29 Apr 2026
+     timestamp(tzNews, 2026, 6, 17, 14, 0))  // 16-17 Jun 2026
+
+grpFFRExtra = "9b) Federal Funds Rate - Tambahan Manual (samakan dgn tanggal FOMC di 6b)"
+ffrEx1_on = input.bool(false, "Tambahan 1 (pertemuan 28-29 Jul 2026)", group=grpFFRExtra, inline="ffrex1")
+ffrEx1_t  = input.time(timestamp("2026-07-29 14:00"), "", group=grpFFRExtra, inline="ffrex1")
+ffrEx2_on = input.bool(false, "Tambahan 2 (pertemuan 15-16 Sep 2026)", group=grpFFRExtra, inline="ffrex2")
+ffrEx2_t  = input.time(timestamp("2026-09-16 14:00"), "", group=grpFFRExtra, inline="ffrex2")
+ffrEx3_on = input.bool(false, "Tambahan 3 (pertemuan 27-28 Okt 2026)", group=grpFFRExtra, inline="ffrex3")
+ffrEx3_t  = input.time(timestamp("2026-10-28 14:00"), "", group=grpFFRExtra, inline="ffrex3")
+ffrEx4_on = input.bool(false, "Tambahan 4 (pertemuan 8-9 Des 2026)", group=grpFFRExtra, inline="ffrex4")
+ffrEx4_t  = input.time(timestamp("2026-12-09 14:00"), "", group=grpFFRExtra, inline="ffrex4")
+
+isFFR = enableFFR and (f_inNewsWindow(time, ffrDates, winMs) or
+     (ffrEx1_on and time >= ffrEx1_t and time < ffrEx1_t + winMs) or
+     (ffrEx2_on and time >= ffrEx2_t and time < ffrEx2_t + winMs) or
+     (ffrEx3_on and time >= ffrEx3_t and time < ffrEx3_t + winMs) or
+     (ffrEx4_on and time >= ffrEx4_t and time < ffrEx4_t + winMs))
+
+// ================================================================
+// BAGIAN 10: ISM MANUFACTURING PMI
+// ================================================================
+// Sumber: Institute for Supply Management (ismworld.org/.../rob-report-calendar).
+// Rilis di HARI KERJA PERTAMA tiap bulan, jam 10:00 ET. ISM adalah
+// organisasi swasta (BUKAN lembaga pemerintah), jadi rilisnya TIDAK
+// terdampak shutdown pemerintah AS Okt-Nov 2025 -> tetap jalan normal
+// sepanjang periode itu. Pengecualian: bulan Januari biasanya digeser
+// ke hari kerja ke-2/ke-3 karena ISM sendiri libur lebih panjang di
+// awal tahun (bukan cuma 1 Jan).
+// ================================================================
+grpISMM     = "10) ISM Manufacturing PMI"
+enableISMM  = input.bool(true, "Aktifkan Highlight ISM Manufacturing PMI", group=grpISMM)
+ismmBgColor = input.color(color.new(color.maroon, 85), "Warna Background ISM Manufacturing PMI", group=grpISMM)
+
+var array<int> ismmDates = array.from(
+     timestamp(tzNews, 2025, 1, 3, 10, 0),   // Data Des 2024 (digeser krn libur ISM awal tahun)
+     timestamp(tzNews, 2025, 2, 3, 10, 0),   // Data Jan 2025
+     timestamp(tzNews, 2025, 3, 3, 10, 0),   // Data Feb 2025
+     timestamp(tzNews, 2025, 4, 1, 10, 0),   // Data Mar 2025
+     timestamp(tzNews, 2025, 5, 1, 10, 0),   // Data Apr 2025
+     timestamp(tzNews, 2025, 6, 2, 10, 0),   // Data May 2025
+     timestamp(tzNews, 2025, 7, 1, 10, 0),   // Data Jun 2025
+     timestamp(tzNews, 2025, 8, 1, 10, 0),   // Data Jul 2025
+     timestamp(tzNews, 2025, 9, 2, 10, 0),   // Data Aug 2025 (digeser krn Labor Day 1 Sep)
+     timestamp(tzNews, 2025, 10, 1, 10, 0),  // Data Sep 2025 (tetap normal walau shutdown, ISM swasta)
+     timestamp(tzNews, 2025, 11, 3, 10, 0),  // Data Oct 2025
+     timestamp(tzNews, 2025, 12, 1, 10, 0),  // Data Nov 2025
+     timestamp(tzNews, 2026, 1, 5, 10, 0),   // Data Dec 2025 (digeser krn libur ISM awal tahun)
+     timestamp(tzNews, 2026, 2, 2, 10, 0),   // Data Jan 2026
+     timestamp(tzNews, 2026, 3, 2, 10, 0),   // Data Feb 2026
+     timestamp(tzNews, 2026, 4, 1, 10, 0),   // Data Mar 2026
+     timestamp(tzNews, 2026, 5, 1, 10, 0),   // Data Apr 2026
+     timestamp(tzNews, 2026, 6, 1, 10, 0),   // Data May 2026
+     timestamp(tzNews, 2026, 7, 1, 10, 0))   // Data Jun 2026
+
+grpISMMExtra = "10b) ISM Manufacturing PMI - Tambahan Manual"
+ismmEx1_on = input.bool(false, "Tambahan 1 (cth: Data Jul 2026 -> 3 Agu 2026)", group=grpISMMExtra, inline="ismmex1")
+ismmEx1_t  = input.time(timestamp("2026-08-03 10:00"), "", group=grpISMMExtra, inline="ismmex1")
+ismmEx2_on = input.bool(false, "Tambahan 2 (cth: Data Aug 2026 -> 1 Sep 2026)", group=grpISMMExtra, inline="ismmex2")
+ismmEx2_t  = input.time(timestamp("2026-09-01 10:00"), "", group=grpISMMExtra, inline="ismmex2")
+
+isISMM = enableISMM and (f_inNewsWindow(time, ismmDates, winMs) or
+     (ismmEx1_on and time >= ismmEx1_t and time < ismmEx1_t + winMs) or
+     (ismmEx2_on and time >= ismmEx2_t and time < ismmEx2_t + winMs))
+
+// ================================================================
+// BAGIAN 11: ISM SERVICES PMI
+// ================================================================
+// Sumber sama dengan Bagian 12 (ISM), rilis di HARI KERJA KETIGA
+// tiap bulan, jam 10:00 ET. Sama seperti Manufacturing, tidak
+// terdampak shutdown pemerintah AS karena ISM organisasi swasta.
+// ================================================================
+grpISMS     = "11) ISM Services PMI"
+enableISMS  = input.bool(true, "Aktifkan Highlight ISM Services PMI", group=grpISMS)
+ismsBgColor = input.color(color.new(color.lime, 85), "Warna Background ISM Services PMI", group=grpISMS)
+
+var array<int> ismsDates = array.from(
+     timestamp(tzNews, 2025, 1, 7, 10, 0),   // Data Des 2024
+     timestamp(tzNews, 2025, 2, 5, 10, 0),   // Data Jan 2025
+     timestamp(tzNews, 2025, 3, 5, 10, 0),   // Data Feb 2025
+     timestamp(tzNews, 2025, 4, 3, 10, 0),   // Data Mar 2025
+     timestamp(tzNews, 2025, 5, 5, 10, 0),   // Data Apr 2025
+     timestamp(tzNews, 2025, 6, 4, 10, 0),   // Data May 2025
+     timestamp(tzNews, 2025, 7, 3, 10, 0),   // Data Jun 2025
+     timestamp(tzNews, 2025, 8, 5, 10, 0),   // Data Jul 2025
+     timestamp(tzNews, 2025, 9, 4, 10, 0),   // Data Aug 2025 (digeser krn Labor Day)
+     timestamp(tzNews, 2025, 10, 3, 10, 0),  // Data Sep 2025
+     timestamp(tzNews, 2025, 11, 5, 10, 0),  // Data Oct 2025
+     timestamp(tzNews, 2025, 12, 3, 10, 0),  // Data Nov 2025
+     timestamp(tzNews, 2026, 1, 7, 10, 0),   // Data Dec 2025
+     timestamp(tzNews, 2026, 2, 4, 10, 0),   // Data Jan 2026
+     timestamp(tzNews, 2026, 3, 4, 10, 0),   // Data Feb 2026
+     timestamp(tzNews, 2026, 4, 3, 10, 0),   // Data Mar 2026
+     timestamp(tzNews, 2026, 5, 5, 10, 0),   // Data Apr 2026
+     timestamp(tzNews, 2026, 6, 3, 10, 0),   // Data May 2026
+     timestamp(tzNews, 2026, 7, 6, 10, 0))   // Data Jun 2026 (digeser krn 4 Jul diobservasi Jum 3 Jul)
+
+grpISMSExtra = "11b) ISM Services PMI - Tambahan Manual"
+ismsEx1_on = input.bool(false, "Tambahan 1 (cth: Data Jul 2026 -> 5 Agu 2026)", group=grpISMSExtra, inline="ismsex1")
+ismsEx1_t  = input.time(timestamp("2026-08-05 10:00"), "", group=grpISMSExtra, inline="ismsex1")
+ismsEx2_on = input.bool(false, "Tambahan 2 (cth: Data Aug 2026 -> 3 Sep 2026)", group=grpISMSExtra, inline="ismsex2")
+ismsEx2_t  = input.time(timestamp("2026-09-03 10:00"), "", group=grpISMSExtra, inline="ismsex2")
+
+isISMS = enableISMS and (f_inNewsWindow(time, ismsDates, winMs) or
+     (ismsEx1_on and time >= ismsEx1_t and time < ismsEx1_t + winMs) or
+     (ismsEx2_on and time >= ismsEx2_t and time < ismsEx2_t + winMs))
+
+// ================================================================
+// BAGIAN 12: S&P GLOBAL FLASH PMI (MANUFACTURING + SERVICES)
+// ================================================================
+// Sumber: S&P Global Market Intelligence (pmi.spglobal.com), release
+// calendar resmi. Flash Manufacturing PMI & Flash Services PMI AS
+// rilis di MENIT YANG SAMA PERSIS (09:45 ET) -> makanya digabung jadi
+// satu kategori seperti pola UNR/FFR sebelumnya, bukan dipisah.
+// CATATAN JUJUR: tanggal Jan-Apr 2025 & Jun-Jul 2025 belum berhasil
+// saya verifikasi ke sumber resmi (kalender S&P Global baru saya
+// dapat mulai dari data Mei 2025 dst), jadi BELUM saya masukkan --
+// silakan tambahkan sendiri lewat "14b" di bawah kalau kamu butuh
+// histori sampai ke bulan-bulan itu.
+// ================================================================
+grpPMIF    = "12) S&P Global Flash PMI"
+enablePMIF = input.bool(true, "Aktifkan Highlight S&P Global Flash PMI", group=grpPMIF)
+pmifBgColor= input.color(color.new(color.navy, 85), "Warna Background S&P Global Flash PMI", group=grpPMIF)
+
+var array<int> pmifDates = array.from(
+     timestamp(tzNews, 2025, 5, 22, 9, 45),  // Flash PMI Mei 2025
+     timestamp(tzNews, 2025, 8, 21, 9, 45),  // Flash PMI Agu 2025
+     timestamp(tzNews, 2025, 9, 23, 9, 45),  // Flash PMI Sep 2025
+     timestamp(tzNews, 2025, 10, 24, 9, 45), // Flash PMI Okt 2025
+     timestamp(tzNews, 2025, 11, 21, 9, 45), // Flash PMI Nov 2025
+     timestamp(tzNews, 2025, 12, 16, 9, 45), // Flash PMI Des 2025
+     timestamp(tzNews, 2026, 1, 23, 9, 45),  // Flash PMI Jan 2026
+     timestamp(tzNews, 2026, 2, 20, 9, 45),  // Flash PMI Feb 2026
+     timestamp(tzNews, 2026, 3, 24, 9, 45),  // Flash PMI Mar 2026
+     timestamp(tzNews, 2026, 4, 23, 9, 45),  // Flash PMI Apr 2026
+     timestamp(tzNews, 2026, 5, 21, 9, 45),  // Flash PMI May 2026
+     timestamp(tzNews, 2026, 6, 23, 9, 45),  // Flash PMI Jun 2026
+     timestamp(tzNews, 2026, 7, 24, 9, 45))  // Flash PMI Jul 2026
+
+grpPMIFExtra = "12b) S&P Global Flash PMI - Tambahan Manual (termasuk utk histori Jan-Apr & Jun-Jul 2025 yg belum ada)"
+pmifEx1_on = input.bool(false, "Tambahan 1", group=grpPMIFExtra, inline="pmifex1")
+pmifEx1_t  = input.time(timestamp("2026-08-21 09:45"), "", group=grpPMIFExtra, inline="pmifex1")
+pmifEx2_on = input.bool(false, "Tambahan 2", group=grpPMIFExtra, inline="pmifex2")
+pmifEx2_t  = input.time(timestamp("2026-09-23 09:45"), "", group=grpPMIFExtra, inline="pmifex2")
+
+isPMIF = enablePMIF and (f_inNewsWindow(time, pmifDates, winMs) or
+     (pmifEx1_on and time >= pmifEx1_t and time < pmifEx1_t + winMs) or
+     (pmifEx2_on and time >= pmifEx2_t and time < pmifEx2_t + winMs))
+
+// ================================================================
+// WARNA & MARKER GABUNGAN NFP / CPI / PPI / FOMC / UNR / UNEMPLOYMENT
+// CLAIMS / FEDERAL FUNDS RATE / PMI (ISM-M, ISM-S, FLASH)
+// ================================================================
+isNewsTime = isNFP or isCPI or isPPI or isFOMC or isUNR or isJC or isFFR or isISMM or isISMS or isPMIF
+
+// Urutan gambar background: Unemployment Claims -> PMI (ISM-M/ISM-S/
+// Flash) -> CPI -> PPI -> Federal Funds Rate -> FOMC -> Unemployment
+// Rate -> NFP paling akhir -> kalau ada beberapa rilis bertabrakan di
+// jam yang sama (misalnya NFP & Unemployment Rate, atau FOMC & Federal
+// Funds Rate, yang memang SELALU bertabrakan), yang "utama" (NFP /
+// FOMC) tetap paling terlihat karena itu yang biasanya paling
+// berdampak ke market.
+bgcolor(showNewsBg and isJC ? jcBgColor : na, title="Highlight Unemployment Claims")
+bgcolor(showNewsBg and isISMM ? ismmBgColor : na, title="Highlight ISM Manufacturing PMI")
+bgcolor(showNewsBg and isISMS ? ismsBgColor : na, title="Highlight ISM Services PMI")
+bgcolor(showNewsBg and isPMIF ? pmifBgColor : na, title="Highlight S&P Global Flash PMI")
+bgcolor(showNewsBg and isCPI ? cpiBgColor : na, title="Highlight CPI")
+bgcolor(showNewsBg and isPPI ? ppiBgColor : na, title="Highlight PPI")
+bgcolor(showNewsBg and isFFR ? ffrBgColor : na, title="Highlight Federal Funds Rate")
+bgcolor(showNewsBg and isFOMC ? fomcBgColor : na, title="Highlight FOMC")
+bgcolor(showNewsBg and isUNR ? unrBgColor : na, title="Highlight Unemployment Rate")
+bgcolor(showNewsBg and isNFP ? nfpBgColor : na, title="Highlight NFP")
+
+newsLabelGap  = ta.atr(14) * 1.5
+
+if isNFP and not isNFP[1]
+    label.new(bar_index, high + newsLabelGap, "NFP", style=label.style_label_down, color=color.orange, textcolor=color.white, size=markerSize)
+if isCPI and not isCPI[1]
+    label.new(bar_index, high + newsLabelGap, "CPI", style=label.style_label_down, color=color.green, textcolor=color.white, size=markerSize)
+if isPPI and not isPPI[1]
+    label.new(bar_index, high + newsLabelGap, "PPI", style=label.style_label_down, color=color.red, textcolor=color.white, size=markerSize)
+if isFOMC and not isFOMC[1]
+    label.new(bar_index, high + newsLabelGap, "FOMC", style=label.style_label_down, color=color.blue, textcolor=color.white, size=markerSize)
+if isUNR and not isUNR[1]
+    // Label ini digeser lebih tinggi (gap x1.8) karena Unemployment Rate
+    // SELALU rilis di jam & tanggal yang sama persis dengan NFP, jadi
+    // labelnya perlu ditumpuk di atas label NFP supaya tidak bertabrakan.
+    label.new(bar_index, high + newsLabelGap * 1.8, "UNR", style=label.style_label_down, color=color.fuchsia, textcolor=color.white, size=markerSize)
+if isFFR and not isFFR[1]
+    // Label ini juga digeser ke tier gap x1.8 (sama dgn UNR) karena
+    // Federal Funds Rate SELALU rilis bareng FOMC -> tidak akan
+    // bentrok dgn UNR karena beda tanggal (FOMC vs minggu NFP).
+    label.new(bar_index, high + newsLabelGap * 1.8, "FFR", style=label.style_label_down, color=color.yellow, textcolor=color.black, size=markerSize)
+if isJC and not isJC[1]
+    // Label ini digeser lebih tinggi lagi (gap x2.6) sebagai jaga-jaga,
+    // karena Unemployment Claims rilis tiap Kamis jam 08:30 ET -- jam
+    // yang sama dengan CPI/PPI kalau kebetulan CPI/PPI jatuh di hari
+    // Kamis, supaya labelnya tidak numpuk di posisi yang sama.
+    label.new(bar_index, high + newsLabelGap * 2.6, "JC", style=label.style_label_down, color=color.teal, textcolor=color.white, size=markerSize)
+if isISMM and not isISMM[1]
+    label.new(bar_index, high + newsLabelGap * 3.4, "ISM-M", style=label.style_label_down, color=color.maroon, textcolor=color.white, size=markerSize)
+if isISMS and not isISMS[1]
+    label.new(bar_index, high + newsLabelGap * 4.2, "ISM-S", style=label.style_label_down, color=color.lime, textcolor=color.black, size=markerSize)
+if isPMIF and not isPMIF[1]
+    label.new(bar_index, high + newsLabelGap * 5.0, "PMI-F", style=label.style_label_down, color=color.navy, textcolor=color.white, size=markerSize)
+
+// Semua candle saat ada berita (NFP/CPI/PPI/FOMC/UNR/Unemployment
+// Claims/Federal Funds Rate/PMI) diwarnai warna yang SAMA (default
+// ungu) -> supaya karakteristik pergerakan candle-nya lebih mudah
+// dibandingkan, terlepas dari jenis beritanya.
+barcolor(isNewsTime ? newsCandleColor : na, title="Warna Candle Saat Berita")
+
+// ================================================================
+// BAGIAN 13: PENGUKUR GAP (JUMAT CLOSE -> SENIN OPEN)
+// ================================================================
+grpPip     = "13) Pengukur Gap Jumat-Senin"
+enablePip  = input.bool(true, "Aktifkan Pengukur Gap", group=grpPip)
+pipSize    = input.float(0.1, "Nilai 1 Pip (untuk XAUUSD umumnya 0.1 atau 0.01, sesuaikan dengan broker)", minval=0.0001, step=0.01, group=grpPip)
+pipLineStyle = input.string("Putus-putus", "Gaya Garis Gap", options=["Putus-putus", "Solid", "Titik-titik"], group=grpPip)
+
+lineStyleVal = pipLineStyle == "Solid" ? line.style_solid : pipLineStyle == "Titik-titik" ? line.style_dotted : line.style_dashed
+
+// ================================================================
+// BAGIAN 14: KALKULASI PROFIT/LOSS DARI GAP (BERDASARKAN LOT SIZE)
+// ================================================================
+// CATATAN:
+// - XAUUSD standar: 1 lot = 100 troy ounce -> tiap pergerakan harga
+//   $1 bernilai $100 untuk 1 lot (jadi $10 untuk 0.10 lot).
+// - Kalau pakai akun cent, sesuaikan "Contract Size" di bawah
+//   dengan ketentuan broker Anda (biasanya tetap 100, tapi
+//   nilai profit akan otomatis dikonversi broker ke cent).
+// ================================================================
+grpProfit    = "14) Kalkulasi Profit/Loss dari Gap"
+enableProfit = input.bool(true, "Aktifkan Kalkulasi Profit/Loss", group=grpProfit)
+lotSize      = input.float(0.10, "Lot Size 1", minval=0.01, step=0.01, group=grpProfit)
+lotSize2     = input.float(0.20, "Lot Size 2", minval=0.01, step=0.01, group=grpProfit)
+contractSize = input.float(100, "Contract Size (Standar XAUUSD = 100 oz/lot)", minval=1, group=grpProfit,
+     tooltip="Standar broker forex umumnya 100. Untuk broker/akun lain, cek spesifikasi kontrak XAUUSD Anda.")
+
+// Gambar garis gap untuk setiap Senin di chart
+if enablePip and isMarketOpen
+    fridayClosePrice = close[1]
+    mondayOpenPrice = open
+    priceDiff = mondayOpenPrice - fridayClosePrice
+    pipDistance = priceDiff / pipSize
+
+    pipColor = pipDistance > 0 ? color.new(color.green, 0) : pipDistance < 0 ? color.new(color.red, 0) : color.new(color.gray, 0)
+    pipText  = (pipDistance >= 0 ? "+" : "") + str.tostring(pipDistance, "#.##") + " pips"
+
+    // Profit/Loss = selisih harga x contract size x lot size
+    // (jika gap naik = posisi BUY untung, posisi SELL rugi, dan sebaliknya)
+    profitUSD  = priceDiff * contractSize * lotSize
+    profitUSD2 = priceDiff * contractSize * lotSize2
+    profitColor = profitUSD > 0 ? color.new(color.green, 0) : profitUSD < 0 ? color.new(color.red, 0) : color.new(color.gray, 0)
+    profitText = enableProfit ?
+                 "\\nP/L (" + str.tostring(lotSize, "#.##") + " lot): " + (profitUSD >= 0 ? "+$" : "-$") + str.tostring(math.abs(profitUSD), "#.##") +
+                 "\\nP/L (" + str.tostring(lotSize2, "#.##") + " lot): " + (profitUSD2 >= 0 ? "+$" : "-$") + str.tostring(math.abs(profitUSD2), "#.##") : ""
+
+    line.new(bar_index[1], fridayClosePrice, bar_index, mondayOpenPrice, color=pipColor, width=2, style=lineStyleVal)
+    label.new(bar_index, mondayOpenPrice, "Gap: " + pipText + "\\n" + str.tostring(fridayClosePrice, format.mintick) + " → " + str.tostring(mondayOpenPrice, format.mintick) + profitText,
+                 style=label.style_label_left, color=pipColor, textcolor=color.white, size=size.small)
+`,
+  'smi-indikator': `//@version=6
+indicator("Stochastic Momentum Index", "SMI", timeframe = "", timeframe_gaps = true)
+
+lengthK   = input.int(10, "%K Length",  minval = 1, maxval = 15000)
+lengthD   = input.int(3,  "%D Length",  minval = 1, maxval = 4999)
+lengthEMA = input.int(3,  "EMA Length", minval = 1, maxval = 4999)
+
+emaEma(source, length) => ta.ema(ta.ema(source, length), length)
+
+highestHigh = ta.highest(lengthK)
+lowestLow =   ta.lowest(lengthK)
+highestLowestRange = highestHigh - lowestLow
+relativeRange = close - (highestHigh + lowestLow) / 2
+smi = 200 * (emaEma(relativeRange, lengthD) / emaEma(highestLowestRange, lengthD))
+
+smiPlot = plot(smi, "SMI", color = color.blue)
+plot(ta.ema(smi, lengthEMA), "SMI-based EMA", color = color.orange)
+
+overbought = hline(40, "Overbought Line")
+oversold   = hline(-40, "Oversold Line")
+fill(overbought, oversold, title = "Background", color = color.new(color.blue, 90))
+hline(0, "Middle Line", color = color.new(color.gray, 50))
+
+
+midLinePlot = plot(0, color = na, editable = false, display = display.none)
+fill(smiPlot, midLinePlot, 120,  40,   top_color = color.new(#4caf4f, 50),    bottom_color = color.new(color.green, 100), title = "Overbought Gradient Fill")
+fill(smiPlot, midLinePlot, -40, -120,  top_color = color.new(color.red, 100), bottom_color = color.new(color.red, 50),    title = "Oversold Gradient Fill")`
+};
+
 var produk = BAWAAN.slice();
-var kodeAktif = [];      // daftar sidik kode yang sudah dibayar (publik, tanpa identitas)
+/* Daftar lisensi aktif TIDAK lagi disimpan di sini. Sumber kebenarannya
+   backend (lihat /api/lisensi/*) - dialah yang menjaga gerbang penyajian kode
+   premium, jadi kalau daftarnya ada di dua tempat, yang satu pasti akan
+   ketinggalan dan gerbangnya jadi tidak konsisten. */
 
 /* ══════════════════════════════════════════════════════════════════
    ANIMASI PERAGA — bagaimana indikatornya bekerja
@@ -697,6 +1461,58 @@ function suratLisensi(d){
 + 'Simpan surat ini bersama berkas indikatormu sebagai bukti kepemilikan.\n';
 }
 
+/* Kotak salin — pengganti unduhan berkas.
+   Pembeli menempel langsung ke Pine Editor, jadi tidak ada berkas yang bisa
+   404, tidak ada folder yang bisa lupa di-upload, dan tidak ada berkas
+   nyangkut di folder Download orang. */
+function kotakSalin(wadahId, judul, isi, namaBerkas){
+  var w = el(wadahId);
+  w.innerHTML =
+      '<div class="label" style="margin-top:16px">' + esc(judul) + '</div>'
+    + '<div class="aksi" style="margin-bottom:8px">'
+      + '<button type="button" class="tbl utama" data-salin="' + wadahId + '">Salin Semua Kode</button>'
+      + '<button type="button" class="tbl" data-simpan="' + wadahId + '">Simpan sebagai .txt</button>'
+    + '</div>'
+    + '<textarea class="isian mono" readonly rows="10" id="' + wadahId + '_teks" '
+      + 'style="font-size:11px;line-height:1.45;white-space:pre;overflow-wrap:normal;overflow-x:auto"></textarea>'
+    + '<div class="catat" style="margin-top:8px">Klik <b>Salin Semua Kode</b>, lalu tempel ke Pine Editor '
+      + 'TradingView yang sudah dikosongkan. Ikuti panduan pasang di halaman utama.</div>';
+  // Isi lewat .value, bukan innerHTML - kode Pine memuat < dan > yang akan
+  // dianggap tag kalau ditempel sebagai HTML.
+  el(wadahId + '_teks').value = isi;
+  w.setAttribute('data-berkas', namaBerkas || 'indikator.txt');
+}
+
+document.addEventListener('click', function(e){
+  var s = e.target.closest('[data-salin]');
+  if(s){
+    var id = s.getAttribute('data-salin');
+    var ta = el(id + '_teks');
+    var teks = ta.value;
+    var selesai = function(){
+      var asli = s.textContent;
+      s.textContent = 'Tersalin ✓';
+      setTimeout(function(){ s.textContent = asli; }, 1800);
+    };
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(teks).then(selesai, function(){
+        // Sebagian browser HP menolak clipboard API tanpa HTTPS - pakai cara lama.
+        ta.removeAttribute('readonly'); ta.select(); document.execCommand('copy');
+        ta.setAttribute('readonly',''); selesai();
+      });
+    } else {
+      ta.removeAttribute('readonly'); ta.select(); document.execCommand('copy');
+      ta.setAttribute('readonly',''); selesai();
+    }
+    return;
+  }
+  var v = e.target.closest('[data-simpan]');
+  if(v){
+    var wid = v.getAttribute('data-simpan');
+    unduhTeks(el(wid).getAttribute('data-berkas') || 'indikator.txt', el(wid + '_teks').value);
+  }
+});
+
 function unduhTeks(namaBerkas, isi){
   var b = new Blob([isi], { type:'text/plain;charset=utf-8' });
   var a = document.createElement('a');
@@ -721,7 +1537,7 @@ function gambarKatalog(){
           : '$' + Number(p.harga) + ' <small>sekali bayar</small>') + '</div>'
       + '<div class="aksi">'
         + '<button type="button" class="tbl utama" data-detail="' + esc(p.id) + '">Lihat Detail</button>'
-        + (gratis ? '<button type="button" class="tbl" data-unduh="' + esc(p.id) + '">Unduh</button>' : '')
+        + (gratis ? '<button type="button" class="tbl" data-unduh="' + esc(p.id) + '">Lihat Kode</button>' : '')
       + '</div></div>';
   }).join('');
 }
@@ -765,8 +1581,14 @@ function bukaDetail(id){
 function gambarAreaBeli(p){
   var w = el('dtBeli');
   if(!(Number(p.harga) > 0)){
-    w.innerHTML = '<button type="button" class="tbl utama" data-unduh="' + esc(p.id) + '">Unduh Indikator (.txt)</button>'
-      + '<div class="catat" style="margin-top:10px">Gratis. Ikuti panduan pasang di halaman utama setelah mengunduh.</div>';
+    var src = SUMBER_GRATIS[p.id];
+    if(src){
+      w.innerHTML = '<div id="kodeGratis"></div>';
+      kotakSalin('kodeGratis', 'Kode Indikator — tinggal salin', src, p.id + '.txt');
+    } else {
+      w.innerHTML = '<div class="catat err">Kode indikator ini belum tersedia di halaman. '
+        + 'Hubungi penjual.</div>';
+    }
     return;
   }
   w.innerHTML =
@@ -868,62 +1690,57 @@ function tampilkanKode(p, d){
   cekAktivasi(p, d, false);
 }
 
+/* Status & pengambilan produk premium ditanya langsung ke BACKEND.
+   Sumber premium tidak pernah ada di halaman maupun di repo publik - kalau
+   ada, indikator $50 tinggal dibaca lewat "view source" tanpa bayar. */
 function cekAktivasi(p, d, kabari){
   var w = el('bliUnduh');
+  w.innerHTML = '<div class="catat">Mengecek status…</div>';
   sidikKode(d.kode).then(function(sidik){
-    if(kodeAktif.indexOf(sidik) < 0){
+    return fetch(BACKEND + '/api/lisensi/cek?sidik=' + sidik)
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(j){ return !!(j && j.aktif); });
+  }).then(function(aktif){
+    if(!aktif){
       w.innerHTML = '<div class="catat">Status: <b style="color:var(--gold)">menunggu aktivasi</b>'
         + (kabari ? ' — belum aktif. Pastikan penjual sudah menerima kode &amp; bukti bayarmu.' : '') + '</div>';
       return;
     }
-    w.innerHTML = '<div class="catat ok">Status: <b>aktif</b> — indikatormu siap diunduh.</div>'
+    w.innerHTML = '<div class="catat ok">Status: <b>aktif</b> — kode indikatormu siap.</div>'
       + '<div style="height:10px"></div>'
-      + '<button type="button" class="tbl utama" id="bliUnduhBtn">Unduh Indikator Ber-lisensi (.txt)</button>';
-    el('bliUnduhBtn').addEventListener('click', function(){
-      var b = el('bliUnduhBtn');
+      + '<button type="button" class="tbl utama" id="bliAmbil">Tampilkan Kode Indikator</button>'
+      + '<div id="kodePremium"></div>';
+    el('bliAmbil').addEventListener('click', function(){
+      var b = el('bliAmbil');
       b.disabled = true; b.textContent = 'Menyiapkan…';
-      fetch(p.berkas + '?t=' + Date.now())
+      fetch(BACKEND + '/api/produk?id=' + encodeURIComponent(p.id) + '&kode=' + encodeURIComponent(d.kode))
         .then(function(r){
-        // Pesan harus menyebut PATH-nya. Penyebab paling sering: folder
-        // marketplace-produk/ belum ikut ter-upload ke hosting, dan pesan
-        // "gagal mengunduh" saja tidak memberi petunjuk apa pun.
-        if(!r.ok) throw new Error('berkas tidak ditemukan (HTTP ' + r.status + ') di: ' + p.berkas);
-        return r.text();
-      })
-        .then(function(src){
-          // Nama berkas TIDAK memuat kode - berkas bernama "…-JT3-XXXX-….txt"
-          // otomatis memberi tahu pembeli bahwa salinannya ditandai.
-          unduhTeks(p.id + '.txt', sisipkanPenanda(src, d.kode));
-          unduhTeks('Surat-Lisensi-' + d.kode + '.txt', suratLisensi(d));
-          b.disabled = false; b.textContent = 'Unduh Ulang';
+          return r.json().then(function(j){
+            if(!r.ok) throw new Error((j && j.error) || ('HTTP ' + r.status));
+            return j;
+          });
+        })
+        .then(function(j){
+          kotakSalin('kodePremium', 'Kode Indikator — tinggal salin', j.kode, p.id + '.txt');
+          b.style.display = 'none';
         })
         .catch(function(e){
-          b.disabled = false; b.textContent = 'Unduh Indikator Ber-lisensi (.txt)';
-          alert('Gagal menyiapkan berkas: ' + e.message);
+          b.disabled = false; b.textContent = 'Tampilkan Kode Indikator';
+          el('kodePremium').innerHTML = '<div class="catat err" style="margin-top:10px">Gagal: ' + esc(e.message) + '</div>';
         });
     });
+  }).catch(function(){
+    w.innerHTML = '<div class="catat err">Tidak bisa menghubungi server lisensi. Coba lagi sebentar.</div>';
   });
 }
 
-/* Unduh produk gratis - tanpa penanda, tanpa registrasi. */
+/* Tombol "Unduh" di kartu produk gratis langsung membuka detailnya, karena
+   di situlah kotak salin kodenya berada. Tidak ada lagi pengambilan berkas. */
 document.addEventListener('click', function(e){
   var d = e.target.closest('[data-detail]');
   if(d){ bukaDetail(d.getAttribute('data-detail')); return; }
   var u = e.target.closest('[data-unduh]');
-  if(u){
-    var p = produk.find(function(x){ return x.id === u.getAttribute('data-unduh'); });
-    if(!p) return;
-    fetch(p.berkas + '?t=' + Date.now())
-      .then(function(r){
-        // Pesan harus menyebut PATH-nya. Penyebab paling sering: folder
-        // marketplace-produk/ belum ikut ter-upload ke hosting, dan pesan
-        // "gagal mengunduh" saja tidak memberi petunjuk apa pun.
-        if(!r.ok) throw new Error('berkas tidak ditemukan (HTTP ' + r.status + ') di: ' + p.berkas);
-        return r.text();
-      })
-      .then(function(src){ unduhTeks(p.id + '.txt', src); })
-      .catch(function(err){ alert('Gagal mengunduh: ' + err.message); });
-  }
+  if(u){ bukaDetail(u.getAttribute('data-unduh')); }
 });
 
 el('dtTutup').addEventListener('click', function(){
@@ -952,11 +1769,10 @@ function muatKatalog(){
   return db.collection(DOK_PUBLIK.col).doc(DOK_PUBLIK.doc).get().then(function(doc){
     if(doc.exists){
       var d = doc.data() || {};
+      // Firestore hanya menyimpan KATALOG (nama, harga, gambar, dst).
+      // Daftar lisensi aktif ada di backend.
       var daftar = J(d.produk, null);
       if(Array.isArray(daftar) && daftar.length) produk = daftar;
-      var aktif = J(d.aktif, null);
-      if(Array.isArray(aktif)) kodeAktif = aktif.map(function(x){ return x.sidik; });
-      window.__mpAktifPenuh = Array.isArray(aktif) ? aktif : [];
     }
   }).catch(function(){}).then(function(){ gambarKatalog(); });
 }
@@ -964,7 +1780,6 @@ function muatKatalog(){
 function simpanKatalog(){
   return db.collection(DOK_PUBLIK.col).doc(DOK_PUBLIK.doc).set({
     produk: JSON.stringify(produk),
-    aktif: JSON.stringify(window.__mpAktifPenuh || []),
     _updatedAt: Date.now()
   }, { merge:true });
 }
@@ -1070,57 +1885,220 @@ function siapkanPanelOwner(){
     });
   });
 
+  // Daftar kode aktif dibaca dari BACKEND (sumber kebenaran gerbang unduhan).
+  var daftarAktif = [];
   function gambarAktif(){
-    var d = window.__mpAktifPenuh || [];
-    el('ownDaftarAktif').innerHTML = d.length ? d.map(function(x, i){
+    el('ownDaftarAktif').innerHTML = daftarAktif.length ? daftarAktif.map(function(x){
       return '<tr><td>' + esc(x.sidik) + '</td><td>' + esc(x.catatan||'—') + '</td>'
         + '<td>' + new Date(x.tgl||0).toLocaleDateString('id-ID') + '</td>'
-        + '<td><button type="button" class="tbl" data-cabut="' + i + '" style="padding:3px 9px;font-size:11px">Cabut</button></td></tr>';
-    }).join('') : '<tr><td colspan="4" style="color:var(--dim)">Belum ada kode aktif.</td></tr>';
+        + '<td><button type=\"button\" class=\"tbl\" data-cabut=\"' + esc(x.sidik) + '\" style=\"padding:3px 9px;font-size:11px\">Cabut</button></td></tr>';
+    }).join('') : '<tr><td colspan=\"4\" style=\"color:var(--dim)\">Belum ada kode aktif.</td></tr>';
   }
-  gambarAktif();
+  function muatDaftarAktif(){
+    var cfg = konfigBackend();
+    if(!cfg){ daftarAktif = []; gambarAktif(); return; }
+    fetch(cfg.url + '/api/lisensi/daftar', { headers:{ 'X-App-Token':cfg.token } })
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(j){ daftarAktif = (j && j.aktif) || []; gambarAktif(); })
+      .catch(function(){ gambarAktif(); });
+  }
+  muatDaftarAktif();
 
   el('ownDaftarAktif').addEventListener('click', function(e){
     var b = e.target.closest('[data-cabut]');
     if(!b) return;
-    var i = Number(b.getAttribute('data-cabut'));
-    if(!confirm('Cabut aktivasi ini? Pembeli tidak bisa mengunduh lagi.')) return;
-    var d = window.__mpAktifPenuh || [];
-    d.splice(i, 1);
-    window.__mpAktifPenuh = d;
-    kodeAktif = d.map(function(x){ return x.sidik; });
-    simpanKatalog().then(gambarAktif);
+    if(!confirm('Cabut aktivasi ini? Pembeli tidak bisa mengambil kodenya lagi.')) return;
+    var cfg = konfigBackend();
+    if(!cfg) return;
+    fetch(cfg.url + '/api/lisensi/cabut', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'X-App-Token':cfg.token },
+      body: JSON.stringify({ sidik: b.getAttribute('data-cabut') })
+    }).then(muatDaftarAktif).catch(function(){});
   });
 
   el('ownAktifkan').addEventListener('click', function(){
     var kode = el('ownKode').value.trim().toUpperCase();
+    var st = el('ownAktifStatus');
     if(!/^JT3-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(kode)){
-      el('ownAktifStatus').className = 'catat err';
-      el('ownAktifStatus').textContent = 'Format kode belum benar. Contoh: JT3-A4KM-7XQD-HN9F';
+      st.className = 'catat err';
+      st.textContent = 'Format kode belum benar. Contoh: JT3-A4KM-7XQD-HN9F';
       return;
     }
-    sidikKode(kode).then(function(sidik){
-      var d = window.__mpAktifPenuh || [];
-      if(d.some(function(x){ return x.sidik === sidik; })){
-        el('ownAktifStatus').className = 'catat';
-        el('ownAktifStatus').textContent = 'Kode ini sudah aktif sebelumnya.';
-        return;
-      }
-      // Yang terbit ke dokumen publik HANYA sidiknya - kode asli & identitas
-      // pembeli tidak pernah ikut naik.
-      d.push({ sidik:sidik, catatan:el('ownCatatan').value.trim(), tgl:Date.now() });
-      window.__mpAktifPenuh = d;
-      kodeAktif = d.map(function(x){ return x.sidik; });
-      return simpanKatalog().then(function(){
-        el('ownAktifStatus').className = 'catat ok';
-        el('ownAktifStatus').textContent = 'Kode diaktifkan. Pembeli tinggal klik "Cek Status" di halamannya.';
-        el('ownKode').value = ''; el('ownCatatan').value = '';
-        gambarAktif();
+    var cfg = konfigBackend();
+    if(!cfg){
+      st.className = 'catat err';
+      st.textContent = 'App Token belum ada di perangkat ini. Buka Crypto Screener sekali dan isi Backend URL & App Token, '
+        + 'lalu kembali ke sini — konfigurasinya otomatis terpakai.';
+      return;
+    }
+    st.className = 'catat';
+    st.textContent = 'Mengaktifkan…';
+    // Aktivasi dicatat di BACKEND, bukan Firestore: backend yang menjaga
+    // gerbang unduhan, jadi dialah yang harus tahu kode mana yang sah.
+    fetch(cfg.url + '/api/lisensi/aktifkan', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'X-App-Token':cfg.token },
+      body: JSON.stringify({ kode:kode, catatan:el('ownCatatan').value.trim() })
+    }).then(function(r){
+      return r.json().then(function(j){
+        if(!r.ok) throw new Error((j && j.error) || ('HTTP ' + r.status));
+        return j;
       });
+    }).then(function(j){
+      st.className = 'catat ok';
+      st.textContent = j.sudahAda ? 'Kode ini memang sudah aktif sebelumnya.'
+        : 'Kode diaktifkan. Pembeli tinggal klik "Cek Status" di halamannya.';
+      el('ownKode').value = ''; el('ownCatatan').value = '';
+      muatDaftarAktif();
     }).catch(function(e){
-      el('ownAktifStatus').className = 'catat err';
-      el('ownAktifStatus').textContent = 'Gagal: ' + e.message;
+      st.className = 'catat err';
+      st.textContent = 'Gagal: ' + e.message;
     });
+  });
+
+  /* ── Alat potong & unggah gambar ────────────────────────────────────
+     Semua pemotongan terjadi di kanvas peramban; yang dikirim ke server
+     sudah berupa gambar terpotong, bukan tangkapan layar mentah. */
+  var gbrImg = null, gbrSkala = 1;
+  var pilih = { x:0, y:0, w:0, h:0 };   // koordinat pada ukuran ASLI gambar
+
+  function gbrGambarUlang(){
+    var k = el('gbrKanvas');
+    if(!gbrImg) return;
+    var lebarTampil = Math.min(gbrImg.width, 900);
+    gbrSkala = lebarTampil / gbrImg.width;
+    k.width = gbrImg.width; k.height = gbrImg.height;
+    k.style.width = lebarTampil + 'px';
+    k.getContext('2d').drawImage(gbrImg, 0, 0);
+    gbrTampilkanKotak();
+  }
+  function gbrTampilkanKotak(){
+    var b = el('gbrKotak');
+    if(!(pilih.w > 0 && pilih.h > 0)){ b.style.display = 'none'; return; }
+    b.style.display = 'block';
+    b.style.left   = (pilih.x * gbrSkala) + 'px';
+    b.style.top    = (pilih.y * gbrSkala) + 'px';
+    b.style.width  = (pilih.w * gbrSkala) + 'px';
+    b.style.height = (pilih.h * gbrSkala) + 'px';
+    el('gbrStatus').className = 'catat';
+    el('gbrStatus').textContent = 'Area terpilih: ' + Math.round(pilih.w) + ' × ' + Math.round(pilih.h) + ' piksel.';
+  }
+
+  el('gbrBerkas').addEventListener('change', function(){
+    var f = this.files && this.files[0];
+    if(!f) return;
+    var img = new Image();
+    img.onload = function(){
+      gbrImg = img;
+      el('gbrArea').style.display = 'block';
+      gbrPotongOtomatis();
+      gbrGambarUlang();
+    };
+    img.onerror = function(){
+      el('gbrStatus').className = 'catat err';
+      el('gbrStatus').textContent = 'Berkas tidak bisa dibaca sebagai gambar.';
+    };
+    img.src = URL.createObjectURL(f);
+  });
+
+  /* Tebakan awal untuk tangkapan layar TradingView di layar lebar:
+     buang bilah browser di atas, toolbar gambar di kiri, panel watchlist di
+     kanan, dan bilah tugas di bawah. Angkanya proporsi, bukan piksel mati,
+     supaya tetap masuk akal di resolusi berbeda. Tetap bisa digeser manual -
+     ini cuma titik mulai, bukan keputusan akhir. */
+  function gbrPotongOtomatis(){
+    if(!gbrImg) return;
+    var W = gbrImg.width, H = gbrImg.height;
+    var kiri  = Math.round(W * 0.022);
+    var kanan = Math.round(W * 0.098);
+    var atas  = Math.round(H * 0.150);
+    var bawah = Math.round(H * 0.055);
+    pilih = { x:kiri, y:atas, w:W - kiri - kanan, h:H - atas - bawah };
+    gbrTampilkanKotak();
+  }
+  el('gbrAuto').addEventListener('click', function(){ gbrPotongOtomatis(); });
+  el('gbrPenuh').addEventListener('click', function(){
+    if(!gbrImg) return;
+    pilih = { x:0, y:0, w:gbrImg.width, h:gbrImg.height };
+    gbrTampilkanKotak();
+  });
+
+  // Tarik di atas kanvas = pilih area baru.
+  (function(){
+    var k = el('gbrKanvas'), seret = false, x0 = 0, y0 = 0;
+    function koord(e){
+      var r = k.getBoundingClientRect();
+      var cx = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
+      var cy = (e.touches ? e.touches[0].clientY : e.clientY) - r.top;
+      return { x: cx / gbrSkala, y: cy / gbrSkala };
+    }
+    function mulai(e){ if(!gbrImg) return; seret = true; var p = koord(e); x0 = p.x; y0 = p.y; e.preventDefault(); }
+    function gerak(e){
+      if(!seret) return;
+      var p = koord(e);
+      pilih = {
+        x: Math.max(0, Math.min(x0, p.x)),
+        y: Math.max(0, Math.min(y0, p.y)),
+        w: Math.min(gbrImg.width,  Math.abs(p.x - x0)),
+        h: Math.min(gbrImg.height, Math.abs(p.y - y0))
+      };
+      gbrTampilkanKotak();
+      e.preventDefault();
+    }
+    function henti(){ seret = false; }
+    k.addEventListener('mousedown', mulai);
+    window.addEventListener('mousemove', gerak);
+    window.addEventListener('mouseup', henti);
+    k.addEventListener('touchstart', mulai, { passive:false });
+    window.addEventListener('touchmove', gerak, { passive:false });
+    window.addEventListener('touchend', henti);
+  })();
+
+  el('gbrUnggah').addEventListener('click', function(){
+    var st = el('gbrStatus');
+    if(!gbrImg || !(pilih.w > 10 && pilih.h > 10)){
+      st.className = 'catat err'; st.textContent = 'Pilih dulu areanya.'; return;
+    }
+    var cfg = konfigBackend();
+    if(!cfg){
+      st.className = 'catat err';
+      st.textContent = 'App Token belum ada di perangkat ini. Buka Crypto Screener sekali untuk mengisinya.';
+      return;
+    }
+    var c = document.createElement('canvas');
+    // Dibatasi 1600px supaya berkasnya ringan dibuka pengunjung; chart tetap tajam.
+    var skala = Math.min(1, 1600 / pilih.w);
+    c.width = Math.round(pilih.w * skala);
+    c.height = Math.round(pilih.h * skala);
+    c.getContext('2d').drawImage(gbrImg, pilih.x, pilih.y, pilih.w, pilih.h, 0, 0, c.width, c.height);
+    var dataUrl = c.toDataURL('image/jpeg', 0.9);
+
+    st.className = 'catat';
+    st.textContent = 'Mengunggah (' + Math.round(dataUrl.length / 1024) + ' KB)…';
+    var b = el('gbrUnggah'); b.disabled = true;
+    fetch(cfg.url + '/api/gambar', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'X-App-Token':cfg.token },
+      body: JSON.stringify({ nama: el('ownId').value || 'produk', dataUrl: dataUrl })
+    }).then(function(r){
+      return r.json().then(function(j){
+        if(!r.ok) throw new Error((j && j.error) || ('HTTP ' + r.status));
+        return j;
+      });
+    }).then(function(j){
+      var kolom = el('ownGambar');
+      kolom.value = (kolom.value.trim() ? kolom.value.trim() + '\n' : '') + j.url;
+      st.className = 'catat ok';
+      st.textContent = 'Terunggah (' + Math.round(j.ukuran/1024) + ' KB). URL sudah masuk ke kolom gambar — '
+        + 'jangan lupa klik "Simpan Produk".';
+      el('gbrBerkas').value = '';
+      el('gbrArea').style.display = 'none';
+      gbrImg = null;
+    }).catch(function(e){
+      st.className = 'catat err';
+      st.textContent = 'Gagal unggah: ' + e.message;
+    }).then(function(){ b.disabled = false; });
   });
 
   el('btnLacak').addEventListener('click', function(){
