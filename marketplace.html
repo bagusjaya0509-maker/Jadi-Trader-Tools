@@ -3,12 +3,12 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202608030900">
+<meta name="jt-versi" content="202608031100">
 <title>Jadi Trader — Marketplace</title>
 <script>
 /* Penjaga versi - sama seperti halaman lain. */
 (function(){
-  var V = "202608030900", OK = "jtVersiOk", PAKSA = "jtVersiPaksa";
+  var V = "202608031100", OK = "jtVersiOk", PAKSA = "jtVersiPaksa";
   try{
     if(sessionStorage.getItem(OK) === V) return;
     fetch(location.pathname + "?_v=" + Date.now(), { cache: "no-store" })
@@ -160,8 +160,72 @@
   }
   .fitur .jd{font-weight:600;font-size:13.5px;}
   .fitur .ket{color:var(--muted);font-size:12.5px;}
-  .galeri{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-top:8px;}
-  .galeri img{width:100%;border-radius:8px;border:1px solid var(--border);display:block;}
+  .galeri{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(200px,100%),1fr));gap:10px;margin-top:8px;}
+  .galeri img{
+    width:100%;border-radius:8px;border:1px solid var(--border);display:block;
+    cursor:zoom-in;transition:border-color .15s ease, transform .15s ease;
+  }
+  .galeri img:hover{border-color:var(--gold);transform:translateY(-2px);}
+
+  /* ── Lightbox: tangkapan layar dilihat besar ────────────────────────
+     Gambar chart penuh angka; dipajang kecil di kartu detail praktis tidak
+     terbaca. Diklik -> tampil sebesar layar, dan kalau ada beberapa bisa
+     digeser kiri/kanan. */
+  .lb{
+    display:none;position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.93);
+    align-items:center;justify-content:center;
+  }
+  .lb.on{display:flex;}
+  .lb img{max-width:96vw;max-height:86vh;border-radius:8px;display:block;}
+  .lb-tutup{
+    position:absolute;top:14px;right:16px;width:40px;height:40px;border-radius:50%;
+    background:rgba(0,0,0,.6);border:1px solid var(--border);color:var(--text);
+    font-size:20px;line-height:1;cursor:pointer;
+  }
+  .lb-nav{
+    position:absolute;top:50%;transform:translateY(-50%);
+    width:46px;height:64px;border-radius:8px;background:rgba(0,0,0,.55);
+    border:1px solid var(--border);color:var(--text);font-size:24px;cursor:pointer;
+  }
+  .lb-nav:hover{border-color:var(--gold);color:var(--gold);}
+  .lb-prev{left:12px;} .lb-next{right:12px;}
+  .lb-hitung{
+    position:absolute;bottom:18px;left:50%;transform:translateX(-50%);
+    font-family:var(--font-mono);font-size:12px;color:var(--muted);
+    background:rgba(0,0,0,.6);padding:5px 12px;border-radius:20px;
+  }
+  @media (max-width:600px){
+    .lb-nav{width:38px;height:52px;font-size:20px;}
+    .lb img{max-width:98vw;}
+  }
+
+  /* ── Petak gambar di Panel Pemilik ──────────────────────────────── */
+  .gbr-petak{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(150px,100%),1fr));gap:10px;margin-top:8px;}
+  .gbr-sel{position:relative;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--panel);}
+  .gbr-sel img{width:100%;height:96px;object-fit:cover;display:block;}
+  .gbr-sel .nm{
+    font-family:var(--font-mono);font-size:9px;color:var(--dim);
+    padding:4px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .gbr-sel .x{
+    position:absolute;top:5px;right:5px;width:22px;height:22px;border-radius:50%;
+    background:rgba(0,0,0,.72);border:1px solid var(--bear);color:var(--bear);
+    font-size:13px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  }
+  .gbr-sel .x:hover{background:var(--bear);color:#fff;}
+  .gbr-kosong{color:var(--dim);font-size:12px;padding:14px;border:1px dashed var(--border);border-radius:8px;text-align:center;}
+
+  /* Notifikasi mengambang - muncul di pojok bawah lalu hilang sendiri. */
+  .toast{
+    position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(16px);
+    z-index:400;background:var(--panel);border:1px solid var(--bull);
+    color:var(--text);padding:12px 18px;border-radius:10px;font-size:13px;
+    box-shadow:0 12px 34px rgba(0,0,0,.55);opacity:0;pointer-events:none;
+    transition:opacity .22s ease, transform .22s ease;max-width:92vw;
+  }
+  .toast.on{opacity:1;transform:translateX(-50%) translateY(0);}
+  .toast.gagal{border-color:var(--bear);}
+  .toast b{color:var(--bull);} .toast.gagal b{color:var(--bear);}
   .galeri .kosong{
     grid-column:1/-1;color:var(--dim);font-size:12px;text-align:center;padding:18px;
     border:1px dashed var(--border);border-radius:8px;
@@ -303,7 +367,18 @@
       <div style="height:12px"></div>
       <div><div class="label">Fitur — satu per baris, format: Judul | keterangan</div><textarea class="isian" id="ownFitur" rows="5"></textarea></div>
       <div style="height:12px"></div>
-      <div><div class="label">URL gambar — satu per baris</div><textarea class="isian" id="ownGambar" rows="3" placeholder="https://..."></textarea></div>
+      <div>
+        <div class="label">Gambar produk</div>
+        <!-- Pratinjau nyata, bukan cuma daftar URL. Daftar teks tidak
+             memberi tahu gambar mana yang mana, dan menghapus satu berarti
+             memilih baris yang benar secara manual - gampang salah. -->
+        <div class="gbr-petak" id="ownGbrPetak"></div>
+        <div style="height:8px"></div>
+        <details>
+          <summary class="label" style="cursor:pointer;margin-bottom:6px">Lihat / sunting URL manual</summary>
+          <textarea class="isian" id="ownGambar" rows="3" placeholder="https://..."></textarea>
+        </details>
+      </div>
       <div style="height:12px"></div>
 
       <!-- ── Alat potong & unggah tangkapan layar ────────────────────────
@@ -379,6 +454,17 @@
   </div>
 </div>
 
+<!-- ══════════ LIGHTBOX GAMBAR ══════════ -->
+<div class="lb" id="lb">
+  <button type="button" class="lb-tutup" id="lbTutup" aria-label="Tutup">&times;</button>
+  <button type="button" class="lb-nav lb-prev" id="lbPrev" aria-label="Sebelumnya">&lsaquo;</button>
+  <img id="lbImg" src="" alt="">
+  <button type="button" class="lb-nav lb-next" id="lbNext" aria-label="Berikutnya">&rsaquo;</button>
+  <div class="lb-hitung" id="lbHitung"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
 <!-- ══════════ TIRAI DETAIL PRODUK ══════════ -->
 <div class="tirai" id="tirai">
   <div class="lembar">
@@ -427,6 +513,17 @@ function el(id){ return document.getElementById(id); }
    membalas halaman HTML; kalau langsung di-.json(), yang muncul ke user cuma
    "Unexpected token '<'" - pesan yang sama sekali tidak menyebut masalahnya.
    Di sini status HTTP-nya yang dilaporkan, itu jauh lebih berguna. */
+/* Notifikasi mengambang. Pesan di baris kecil di bawah tombol gampang
+   terlewat - apalagi kalau halaman sedang tergulir jauh dari tombolnya. */
+var toastTimer = null;
+function toast(pesan, gagal){
+  var t = el('toast');
+  t.innerHTML = (gagal ? '<b>Gagal</b> — ' : '<b>Berhasil</b> — ') + esc(pesan);
+  t.className = 'toast on' + (gagal ? ' gagal' : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){ t.className = 'toast' + (gagal ? ' gagal' : ''); }, gagal ? 6000 : 4000);
+}
+
 function bacaJson(r){
   return r.text().then(function(t){
     try{
@@ -1608,8 +1705,12 @@ function bukaDetail(id){
   el('dtFitur').innerHTML = fitur || '<li class="ket">Belum ada rincian fitur.</li>';
 
   var gbr = (p.gambar || []).filter(Boolean);
+  lbDaftar = gbr;                                  // dipakai lightbox untuk geser antar gambar
   el('dtGaleri').innerHTML = gbr.length
-    ? gbr.map(function(u){ return '<img src="' + esc(u) + '" alt="" loading="lazy">'; }).join('')
+    ? gbr.map(function(u, i){
+        return '<img src="' + esc(u) + '" alt="Tangkapan layar ' + (i+1) + '" loading="lazy" '
+             + 'data-lb="' + i + '" title="Klik untuk perbesar">';
+      }).join('')
     : '<div class="kosong">Belum ada tangkapan layar. Pemilik bisa menambahkannya lewat Panel Pemilik.</div>';
 
   gambarAreaBeli(p);
@@ -1782,6 +1883,52 @@ document.addEventListener('click', function(e){
   if(u){ bukaDetail(u.getAttribute('data-unduh')); }
 });
 
+/* ══════════════════════════════════════════════════════════════════
+   LIGHTBOX
+   ══════════════════════════════════════════════════════════════════ */
+var lbDaftar = [], lbIdx = 0;
+
+function lbBuka(i){
+  if(!lbDaftar.length) return;
+  lbIdx = (i + lbDaftar.length) % lbDaftar.length;
+  el('lbImg').src = lbDaftar[lbIdx];
+  el('lbHitung').textContent = (lbIdx + 1) + ' / ' + lbDaftar.length;
+  // Tombol geser disembunyikan kalau memang cuma ada satu gambar.
+  var banyak = lbDaftar.length > 1;
+  el('lbPrev').style.display = banyak ? '' : 'none';
+  el('lbNext').style.display = banyak ? '' : 'none';
+  el('lbHitung').style.display = banyak ? '' : 'none';
+  el('lb').classList.add('on');
+}
+function lbTutup(){ el('lb').classList.remove('on'); el('lbImg').src = ''; }
+
+el('dtGaleri').addEventListener('click', function(e){
+  var g = e.target.closest('[data-lb]');
+  if(g) lbBuka(Number(g.getAttribute('data-lb')));
+});
+el('lbTutup').addEventListener('click', lbTutup);
+el('lbPrev').addEventListener('click', function(e){ e.stopPropagation(); lbBuka(lbIdx - 1); });
+el('lbNext').addEventListener('click', function(e){ e.stopPropagation(); lbBuka(lbIdx + 1); });
+// Klik latar (bukan gambar/tombol) = tutup.
+el('lb').addEventListener('click', function(e){ if(e.target === el('lb')) lbTutup(); });
+document.addEventListener('keydown', function(e){
+  if(!el('lb').classList.contains('on')) return;
+  if(e.key === 'Escape') lbTutup();
+  else if(e.key === 'ArrowLeft') lbBuka(lbIdx - 1);
+  else if(e.key === 'ArrowRight') lbBuka(lbIdx + 1);
+});
+// Geser jari di HP.
+(function(){
+  var x0 = null;
+  el('lb').addEventListener('touchstart', function(e){ x0 = e.touches[0].clientX; }, { passive:true });
+  el('lb').addEventListener('touchend', function(e){
+    if(x0 === null) return;
+    var d = e.changedTouches[0].clientX - x0;
+    if(Math.abs(d) > 45) lbBuka(lbIdx + (d < 0 ? 1 : -1));
+    x0 = null;
+  }, { passive:true });
+})();
+
 el('dtTutup').addEventListener('click', function(){
   el('tirai').classList.remove('on');
   document.body.style.overflow = '';
@@ -1878,13 +2025,54 @@ function siapkanPanelOwner(){
     el('ownGambar').value = p ? (p.gambar||[]).join('\n') : '';
     el('ownLynk').value = p ? (p.lynk||'') : '';
   }
-  isiDropdown(); isiForm(null);
+  /* Petak pratinjau gambar produk yang sedang disunting. Sumbernya tetap
+     kolom URL (satu sumber kebenaran) - petak ini cuma menggambarkannya. */
+  function gambarPetak(){
+    var daftar = el('ownGambar').value.split('\n').map(function(s){ return s.trim(); }).filter(Boolean);
+    el('ownGbrPetak').innerHTML = daftar.length
+      ? daftar.map(function(u, i){
+          return '<div class="gbr-sel">'
+            + '<button type="button" class="x" data-buang="' + i + '" title="Hapus gambar ini">&times;</button>'
+            + '<img src="' + esc(u) + '" alt="" loading="lazy">'
+            + '<div class="nm">' + esc(u.split('/').pop()) + '</div>'
+            + '</div>';
+        }).join('')
+      : '<div class="gbr-kosong">Belum ada gambar. Unggah lewat kotak di bawah.</div>';
+  }
+  window.__mpGambarPetak = gambarPetak;
+
+  el('ownGbrPetak').addEventListener('click', function(e){
+    var b = e.target.closest('[data-buang]');
+    if(!b) return;
+    var i = Number(b.getAttribute('data-buang'));
+    var daftar = el('ownGambar').value.split('\n').map(function(s){ return s.trim(); }).filter(Boolean);
+    var url = daftar[i];
+    if(!confirm('Hapus gambar ini dari produk?\n\n' + (url || '').split('/').pop())) return;
+    daftar.splice(i, 1);
+    el('ownGambar').value = daftar.join('\n');
+    gambarPetak();
+    // Hapus juga berkasnya di server supaya tidak menumpuk jadi sampah.
+    var cfg = konfigBackend();
+    if(cfg && url && url.indexOf('/gambar/') >= 0){
+      fetch(cfg.url + '/api/gambar/hapus', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json', 'X-App-Token':cfg.token },
+        body: JSON.stringify({ berkas: url.split('/').pop() })
+      }).catch(function(){});
+    }
+    el('ownStatus').className = 'catat ok';
+    el('ownStatus').textContent = 'Gambar dihapus. Klik "Simpan Produk" supaya perubahannya tersimpan.';
+  });
+  el('ownGambar').addEventListener('input', gambarPetak);
+
+  isiDropdown(); isiForm(null); gambarPetak();
   // Dipanggil ulang oleh muatKatalog kalau katalog selesai SESUDAH login.
   window.__mpSegarkanDropdown = isiDropdown;
 
   el('ownPilih').addEventListener('change', function(){
     var p = produk.find(function(x){ return x.id === el('ownPilih').value; });
     isiForm(p || null);
+    gambarPetak();               // petak ikut berganti saat produk lain dipilih
   });
 
   el('ownSimpan').addEventListener('click', function(){
@@ -1909,6 +2097,7 @@ function siapkanPanelOwner(){
       gambarKatalog(); isiDropdown();
       el('ownStatus').className = 'catat ok';
       el('ownStatus').textContent = 'Tersimpan & langsung tampil ke pengunjung.';
+      toast('Produk tersimpan dan langsung tampil ke pengunjung.');
     }).catch(function(e){
       el('ownStatus').className = 'catat err';
       el('ownStatus').textContent = 'Gagal menyimpan: ' + e.message;
@@ -2141,15 +2330,17 @@ function siapkanPanelOwner(){
     }).then(function(j){
       var kolom = el('ownGambar');
       kolom.value = (kolom.value.trim() ? kolom.value.trim() + '\n' : '') + j.url;
+      if(typeof window.__mpGambarPetak === 'function') window.__mpGambarPetak();
       st.className = 'catat ok';
-      st.textContent = 'Terunggah (' + Math.round(j.ukuran/1024) + ' KB). URL sudah masuk ke kolom gambar — '
-        + 'jangan lupa klik "Simpan Produk".';
+      st.textContent = 'Terunggah (' + Math.round(j.ukuran/1024) + ' KB). Jangan lupa klik "Simpan Produk".';
+      toast('Gambar terunggah (' + Math.round(j.ukuran/1024) + ' KB). Klik "Simpan Produk" agar tampil ke pembeli.');
       el('gbrBerkas').value = '';
       el('gbrArea').style.display = 'none';
       gbrImg = null;
     }).catch(function(e){
       st.className = 'catat err';
       st.textContent = 'Gagal unggah: ' + e.message;
+      toast(e.message, true);
     }).then(function(){ b.disabled = false; });
   });
 

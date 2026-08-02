@@ -157,6 +157,13 @@
   .baris-kiri{flex:1;min-width:0;}
   .baris-koin{font-size:15px;font-weight:600;}
   .baris-koin .pair{color:var(--dim);font-size:11.5px;font-weight:400;}
+  /* Nama koin = tautan ke TradingView. Diberi garis putus-putus samar supaya
+     ketahuan bisa disentuh, tanpa berubah jadi tautan biru mencolok. */
+  .tv-tautan{
+    color:inherit;text-decoration:none;border-bottom:1px dashed var(--dim);
+    padding-bottom:1px;cursor:pointer;
+  }
+  .tv-tautan:active{color:var(--gold);border-bottom-color:var(--gold);}
   .baris-sub{font-size:10.5px;color:var(--dim);font-family:var(--font-mono);margin-top:2px;}
   .baris-tengah{text-align:right;font-family:var(--font-mono);}
   .baris-harga{font-size:14px;}
@@ -561,8 +568,11 @@
     <svg viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>Beranda</button>
   <button type="button" data-view="pasar">
     <svg viewBox="0 0 24 24"><path d="M3 17l5-6 4 4 5-7 4 5"/></svg>Pasar</button>
+  <!-- Ikon Entry: bidikan (target + garis silang). Panah atas-bawah yang lama
+       terbaca sebagai "geser/urutkan", bukan "pasang order". -->
   <button type="button" data-view="entry">
-    <svg viewBox="0 0 24 24"><path d="M12 3v18"/><path d="M7 8l5-5 5 5"/><path d="M17 16l-5 5-5-5"/></svg>Entry</button>
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="3"/>
+      <path d="M12 1.5v3"/><path d="M12 19.5v3"/><path d="M1.5 12h3"/><path d="M19.5 12h3"/></svg>Entry</button>
   <button type="button" data-view="sinyal">
     <svg viewBox="0 0 24 24"><path d="M4 16l6-8 4 5 6-9"/><path d="M4 20h16"/></svg>Sinyal</button>
   <button type="button" data-view="aset">
@@ -617,6 +627,34 @@ function tanggalPendek(t){
          d.toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit' });
 }
 var HG = (window.JTScan && JTScan.fmtPrice) ? JTScan.fmtPrice : function(p){ return p == null ? '—' : String(p); };
+
+/* ── Tautan ke TradingView ──────────────────────────────────────────
+   Simbol kripto dibuka sebagai pasangan BINANCE, XAUUSD sebagai OANDA -
+   sama seperti yang dipakai screener desktop. TF ikut dipetakan supaya
+   chart-nya langsung terbuka di timeframe sinyalnya. */
+var TF_TV = { '1m':'1', '5m':'5', '15m':'15', '30m':'30', '1h':'60', '4h':'240', '1d':'D', '1w':'W',
+              '1H':'60', '4H':'240', '1D':'D', '1W':'W', '30M':'30', '15M':'15' };
+function urlTradingView(simbol, tf){
+  var s = String(simbol || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if(!s) return null;
+  var tiker = /USDT$/.test(s) ? 'BINANCE:' + s
+            : (s === 'XAUUSD' || s === 'GOLD') ? 'OANDA:XAUUSD'
+            : s;
+  var u = 'https://www.tradingview.com/chart/?symbol=' + encodeURIComponent(tiker);
+  var iv = TF_TV[tf] || TF_TV[String(tf || '').toLowerCase()];
+  if(iv) u += '&interval=' + iv;
+  return u;
+}
+function tautanTv(teksTampil, simbol, tf){
+  var u = urlTradingView(simbol, tf);
+  if(!u) return teksTampil;
+  return '<a class="tv-tautan" href="' + u + '" target="_blank" rel="noopener" '
+       + 'data-tv="1" title="Buka di TradingView">' + teksTampil + '</a>';
+}
+// Sentuhan pada tautan TV jangan ikut memicu aksi baris (mis. pindah ke Entry).
+document.addEventListener('click', function(e){
+  if(e.target.closest('[data-tv]')) e.stopPropagation();
+}, true);
 
 /* ══════════════════════════════════════════════════════════════════════
    DATA
@@ -740,7 +778,7 @@ function gambarPosisi(){
     var isiLencana  = gantung ? 'ANTRE' : (pnl != null ? uang(pnl) : '—');
     html += '<div class="baris">'
       + '<div class="baris-kiri">'
-        + '<div class="baris-koin">' + sym
+        + '<div class="baris-koin">' + tautanTv(sym, t.source, t.tfValue || t.tfLabel)
           + '<span class="arah-kecil ' + (arah === 'BUY' ? 'beli' : 'jual') + '">' + arah + '</span>'
           + '<span class="tf-chip">' + (t.tfLabel||'—') + '</span></div>'
         + '<div class="baris-sub">Entry ' + HG(t.entryPrice) + ' · SL ' + HG(t.sl)
@@ -803,7 +841,9 @@ function gambarBerandaData(){
   var xau = tradeXau();
   isiStat('statXau', statistik(xau, function(t){ return t.pl || 0; }), 'Total P/L');
   gambarRiwayat('riwayatXau', xau, [
-    { judul:'Tgl', isi:function(t){ return tanggalPendek(t.date); } },
+    // Riwayat XAU selalu instrumen yang sama, jadi tanggalnya yang dijadikan
+    // tautan ke chart XAUUSD - tidak ada kolom koin di tabel ini.
+    { judul:'Tgl', isi:function(t){ return tautanTv(tanggalPendek(t.date), 'XAUUSD', t.tf); } },
     { judul:'Arah', isi:function(t){
         var a = String(t.direction||t.dir||'').toUpperCase();
         return a ? '<span class="' + (a === 'BUY' ? 'naik' : 'turun') + '">' + a + '</span>' : '—'; } },
@@ -815,7 +855,8 @@ function gambarBerandaData(){
   isiStat('statKripto', statistik(kr, function(t){ return t.pnl; }), 'Total P/L');
   gambarRiwayat('riwayatKripto', kr, [
     { judul:'Tgl', isi:function(t){ return tanggalPendek(t.waktu); } },
-    { judul:'Koin', isi:function(t){ return t.pair + '<span class="tf-chip">' + (t.tf||'—') + '</span>'; } },
+    { judul:'Koin', isi:function(t){
+        return tautanTv(t.pair, t.pair + 'USDT', t.tf) + '<span class="tf-chip">' + (t.tf||'—') + '</span>'; } },
     { judul:'Setup', isi:function(t){ return t.setup || t.alasan || '—'; } },
     { judul:'P/L', kanan:true, isi:function(t){ return lencanaPl(t.pnl); } }
   ], 'kripto');
@@ -1182,7 +1223,7 @@ function pindaiPantau(){
         return '<div class="baris" data-pilih="1" data-symbol="' + c.symbol + '"'
           + ' data-harga="' + c.harga + '" data-arah="' + (beli ? 'BUY' : 'SELL') + '" data-asal="Area Pantau">'
           + '<div class="baris-kiri">'
-            + '<div class="baris-koin">' + c.symbol.replace('USDT','')
+            + '<div class="baris-koin">' + tautanTv(c.symbol.replace('USDT',''), c.symbol, tf)
               + '<span class="pair"> / USDT</span><span class="tf-chip">' + tf + '</span></div>'
             + '<div class="baris-sub">SMI ' + c.stochK.toFixed(1)
               + ' · ' + (beli ? 'Oversold' : 'Overbought')
@@ -1292,7 +1333,7 @@ function gambarSinyal(){
       return '<div class="baris" data-pilih="1" data-symbol="' + c.symbol + '"'
         + ' data-harga="' + c.harga + '" data-sl="' + c.sl + '" data-arah="' + c.arah + '" data-asal="Parallel Signal">'
         + '<div class="baris-kiri">'
-          + '<div class="baris-koin">' + c.symbol.replace('USDT','')
+          + '<div class="baris-koin">' + tautanTv(c.symbol.replace('USDT',''), c.symbol, chTfDipakai)
             + '<span class="pair"> / USDT</span><span class="tf-chip">' + chTfDipakai + '</span></div>'
           + '<div class="baris-sub">SL ' + HG(c.sl) + ' · TP1 ' + HG(c.tp1) + ' · TP2 ' + HG(c.tp2) + '</div>'
           + '<div class="baris-sub">Risk ' + c.riskPct.toFixed(2) + '% · channel ' + c.arahChannel
