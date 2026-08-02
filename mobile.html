@@ -341,7 +341,8 @@
         <div class="isian-lbl">Rentang tanggal</div>
         <select class="isian" id="beritaRentang">
           <option value="1">Hari ini</option>
-          <option value="3" selected>3 hari ke depan</option>
+          <option value="2" selected>2 hari ke depan</option>
+          <option value="3">3 hari ke depan</option>
           <option value="7">7 hari ke depan</option>
           <option value="0">Semua</option>
         </select>
@@ -960,8 +961,9 @@ function gambarKurva(id, titik){
     svg.innerHTML = '<text x="' + (W/2) + '" y="' + (H/2) + '" fill="#63656d" font-size="11" text-anchor="middle">Belum ada data</text>';
     return;
   }
-  // Ruang atas/bawah dilebihkan supaya label angka tidak terpotong tepi.
-  var PAD = 10, PADY = 20;
+  // JALUR ATAS (0..JALUR_ATAS px) dipesan KHUSUS untuk label sudut
+  // "Awal"/"Kini". Label titik ekstrem tidak boleh masuk ke situ.
+  var PAD = 10, PADY = 24, JALUR_ATAS = 20;
   var min = Math.min.apply(null, titik), max = Math.max.apply(null, titik);
   var rentang = (max - min) || 1;
   var xs = function(i){ return PAD + (i / (titik.length - 1)) * (W - PAD*2); };
@@ -974,31 +976,30 @@ function gambarKurva(id, titik){
   // Penanda titik TERTINGGI & TERENDAH beserta angkanya - tanpa ini kurvanya
   // cuma garis tanpa skala, tidak kelihatan berada di kisaran saldo berapa.
   var iMax = titik.indexOf(max), iMin = titik.indexOf(min);
-  function penanda(i, v, diAtas){
+  function penanda(i, v){
     var x = xs(i), y = ys(v);
     // Jaga teks tetap di dalam kanvas saat titiknya di ujung kiri/kanan.
     var anchor = x < 46 ? 'start' : (x > W - 46 ? 'end' : 'middle');
     var tx = x < 46 ? PAD : (x > W - 46 ? W - PAD : x);
+    // Sisi label ditentukan POSISI, bukan jenis titiknya. Kalau titiknya dekat
+    // tepi atas, labelnya ditaruh DI BAWAH supaya tidak masuk jalur label
+    // sudut. Versi lama memilih sisi berdasarkan indeks (max selalu di atas)
+    // sehingga puncak yang kebetulan dekat kiri/kanan atas tetap menabrak
+    // tulisan "Awal"/"Kini".
+    var ty = (y - 8 < JALUR_ATAS + 8) ? (y + 14) : (y - 8);
     return '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="2.6" fill="' + warna + '"/>'
-      + '<text x="' + tx.toFixed(1) + '" y="' + (diAtas ? (y - 7) : (y + 13)).toFixed(1) + '"'
+      + '<text x="' + tx.toFixed(1) + '" y="' + ty.toFixed(1) + '"'
       + ' fill="#9a9ca4" font-size="9.5" font-family="ui-monospace,monospace" text-anchor="' + anchor + '">'
       + uang(v) + '</text>';
   }
-  var label = '';
-  if(max !== min){ label = penanda(iMax, max, true) + penanda(iMin, min, false); }
-  else { label = penanda(0, max, true); }
+  var label = (max !== min) ? (penanda(iMax, max) + penanda(iMin, min)) : penanda(0, max);
 
-  // Saldo AWAL & AKHIR ditulis kecil di sudut, jadi jelas kurvanya bermula
-  // dari angka berapa. Kalau titik ekstrem KEBETULAN berada di ujung, labelnya
-  // dilewati - kalau tidak, dua tulisan bertumpuk di sudut yang sama.
+  // Saldo AWAL & AKHIR di sudut. Sekarang selalu digambar: jalur atas sudah
+  // dipesan khusus untuk keduanya, jadi tidak mungkin lagi tertimpa label titik.
   var iAkhir = titik.length - 1;
-  var sudut = '';
-  if(iMax !== 0 && iMin !== 0){
-    sudut += '<text x="' + PAD + '" y="11" fill="#63656d" font-size="9" font-family="ui-monospace,monospace">Awal ' + uang(titik[0]) + '</text>';
-  }
-  if(iMax !== iAkhir && iMin !== iAkhir){
-    sudut += '<text x="' + (W - PAD) + '" y="11" fill="#63656d" font-size="9" font-family="ui-monospace,monospace" text-anchor="end">Kini ' + uang(titik[iAkhir]) + '</text>';
-  }
+  var sudut =
+      '<text x="' + PAD + '" y="12" fill="#63656d" font-size="9" font-family="ui-monospace,monospace">Awal ' + uang(titik[0]) + '</text>'
+    + '<text x="' + (W - PAD) + '" y="12" fill="#63656d" font-size="9" font-family="ui-monospace,monospace" text-anchor="end">Kini ' + uang(titik[iAkhir]) + '</text>';
 
   svg.innerHTML =
       '<defs><linearGradient id="g' + id + '" x1="0" y1="0" x2="0" y2="1">'
