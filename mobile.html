@@ -368,11 +368,12 @@
 
   <div class="panel-dalam on" id="p-posisi"></div>
 
-  <!-- Tabel riwayat Trade-Fi dihapus dari tampilan HP: rinciannya sudah ada
-       lengkap di jurnal desktop, dan di layar HP tabel itu lebih banyak
-       menyita ruang daripada memberi informasi. Statistiknya tetap. -->
   <div class="panel-dalam" id="p-xau">
     <div class="stat-kisi" id="statXau"></div>
+    <div class="kartu">
+      <div class="kartu-judul">Riwayat Trade-Fi</div>
+      <div id="riwayatXau"></div>
+    </div>
   </div>
 
   <div class="panel-dalam" id="p-kripto">
@@ -843,10 +844,18 @@ function gambarBerandaData(){
   gambarPortofolio();
   gambarPosisi();
 
-  // Statistik Trade-Fi tetap dihitung; tabel riwayatnya tidak digambar lagi
-  // di HP (elemennya memang sudah dihapus dari markup).
   var xau = tradeXau();
   isiStat('statXau', statistik(xau, function(t){ return t.pl || 0; }), 'Total P/L');
+  // Tanggal ditulis polos - TANPA tautan TradingView. Riwayat Trade-Fi selalu
+  // instrumen yang sama, jadi tautan di tiap baris tidak menambah apa pun.
+  gambarRiwayat('riwayatXau', xau, [
+    { judul:'Tgl', isi:function(t){ return tanggalPendek(t.date); } },
+    { judul:'Arah', isi:function(t){
+        var a = String(t.direction||t.dir||'').toUpperCase();
+        return a ? '<span class="' + (a === 'BUY' ? 'naik' : 'turun') + '">' + a + '</span>' : '—'; } },
+    { judul:'Setup', isi:function(t){ return t.preAlasan || t.setup || t.reason || '—'; } },
+    { judul:'P/L', kanan:true, isi:function(t){ return lencanaPl(t.pl || 0); } }
+  ], 'xau');
 
   var kr = tradeKripto();
   isiStat('statKripto', statistik(kr, function(t){ return t.pnl; }), 'Total P/L');
