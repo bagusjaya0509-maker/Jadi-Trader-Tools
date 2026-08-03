@@ -3,13 +3,13 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202608020900">
+<meta name="jt-versi" content="202608032100">
 <meta name="theme-color" content="#0b0c0f">
 <title>Jadi Trader — Mobile</title>
 <script>
 /* Penjaga versi - sama seperti halaman lain. */
 (function(){
-  var VERSI_TAMPIL = "202608020900";
+  var VERSI_TAMPIL = "202608032100";
   var KUNCI_OK = "jtVersiOk", KUNCI_PAKSA = "jtVersiPaksa";
   try{
     if(sessionStorage.getItem(KUNCI_OK) === VERSI_TAMPIL) return;
@@ -235,8 +235,22 @@
   .kal-sel.rugi{background:var(--bear-soft);} .kal-sel.rugi .p{color:var(--bear);}
 
   /* Kurva */
-  .kurva-kotak{width:100%;height:150px;}
-  .kurva-kotak svg{width:100%;height:100%;display:block;}
+  /* position:relative -> jangkar untuk gelembung saldo saat kurvanya ditekan.
+     touch-action:none supaya menggeser jari di atas kurva menggerakkan
+     penunjuk, bukan menggulung halaman. */
+  .kurva-kotak{width:100%;height:150px;position:relative;}
+  .kurva-kotak svg{width:100%;height:100%;display:block;touch-action:none;}
+  /* Ditaruh di BAWAH, bukan di atas: jalur atas sudah dipakai label sudut
+     "Awal"/"Kini", dan gelembung yang lebar akan menabraknya. Pita bawah
+     setinggi PADY selalu kosong dari garis kurva, jadi aman. */
+  .kurva-tip{
+    position:absolute;bottom:2px;left:50%;transform:translateX(-50%);
+    padding:4px 9px;border-radius:6px;background:var(--panel-2);
+    border:1px solid var(--border);font-family:var(--font-mono);font-size:11px;
+    color:var(--text);pointer-events:none;opacity:0;transition:opacity .1s;
+    white-space:nowrap;z-index:5;
+  }
+  .kurva-tip.on{opacity:1;}
 
   /* Entry / order */
   .beli-jual{display:flex;gap:0;border-radius:9px;overflow:hidden;margin-bottom:12px;}
@@ -951,6 +965,10 @@ function kurvaTitikGabungan(){
   }
   return out;
 }
+// Jarak tepi kiri/kanan kurva. Dipakai bersama oleh penggambar dan penunjuk
+// tekan - kalau keduanya punya angka sendiri, titik yang ditunjuk bisa meleset.
+var PAD_KURVA = 10;
+
 function gambarKurva(id, titik){
   var svg = el(id);
   if(!svg) return;
@@ -959,11 +977,15 @@ function gambarKurva(id, titik){
   svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
   if(titik.length < 2){
     svg.innerHTML = '<text x="' + (W/2) + '" y="' + (H/2) + '" fill="#63656d" font-size="11" text-anchor="middle">Belum ada data</text>';
+    // Penunjuk dari gambar sebelumnya harus dicabut - kalau tidak, menekan
+    // kotak kosong masih memunculkan gelembung berisi saldo lama.
+    svg.onpointerdown = svg.onpointermove = svg.onpointerup = null;
+    svg.onpointercancel = svg.onpointerleave = null;
+    var tipLama = svg.parentNode && svg.parentNode.querySelector('.kurva-tip');
+    if(tipLama) tipLama.classList.remove('on');
     return;
   }
-  // JALUR ATAS (0..JALUR_ATAS px) dipesan KHUSUS untuk label sudut
-  // "Awal"/"Kini". Label titik ekstrem tidak boleh masuk ke situ.
-  var PAD = 10, PADY = 24, JALUR_ATAS = 20;
+  var PAD = PAD_KURVA, PADY = 24;
   var min = Math.min.apply(null, titik), max = Math.max.apply(null, titik);
   var rentang = (max - min) || 1;
   var xs = function(i){ return PAD + (i / (titik.length - 1)) * (W - PAD*2); };
@@ -973,29 +995,11 @@ function gambarKurva(id, titik){
   var warna = naik ? '#4f9e82' : '#c2544d';
   var isi = d + ' L' + xs(titik.length-1).toFixed(1) + ' ' + (H-PADY) + ' L' + xs(0).toFixed(1) + ' ' + (H-PADY) + ' Z';
 
-  // Penanda titik TERTINGGI & TERENDAH beserta angkanya - tanpa ini kurvanya
-  // cuma garis tanpa skala, tidak kelihatan berada di kisaran saldo berapa.
-  var iMax = titik.indexOf(max), iMin = titik.indexOf(min);
-  function penanda(i, v){
-    var x = xs(i), y = ys(v);
-    // Jaga teks tetap di dalam kanvas saat titiknya di ujung kiri/kanan.
-    var anchor = x < 46 ? 'start' : (x > W - 46 ? 'end' : 'middle');
-    var tx = x < 46 ? PAD : (x > W - 46 ? W - PAD : x);
-    // Sisi label ditentukan POSISI, bukan jenis titiknya. Kalau titiknya dekat
-    // tepi atas, labelnya ditaruh DI BAWAH supaya tidak masuk jalur label
-    // sudut. Versi lama memilih sisi berdasarkan indeks (max selalu di atas)
-    // sehingga puncak yang kebetulan dekat kiri/kanan atas tetap menabrak
-    // tulisan "Awal"/"Kini".
-    var ty = (y - 8 < JALUR_ATAS + 8) ? (y + 14) : (y - 8);
-    return '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="2.6" fill="' + warna + '"/>'
-      + '<text x="' + tx.toFixed(1) + '" y="' + ty.toFixed(1) + '"'
-      + ' fill="#9a9ca4" font-size="9.5" font-family="ui-monospace,monospace" text-anchor="' + anchor + '">'
-      + uang(v) + '</text>';
-  }
-  var label = (max !== min) ? (penanda(iMax, max) + penanda(iMin, min)) : penanda(0, max);
-
-  // Saldo AWAL & AKHIR di sudut. Sekarang selalu digambar: jalur atas sudah
-  // dipesan khusus untuk keduanya, jadi tidak mungkin lagi tertimpa label titik.
+  // Angka saldo di titik puncak & lembah SENGAJA tidak digambar lagi. Di layar
+  // selebar HP dua angka itu selalu berdesakan dengan garisnya sendiri dan
+  // dengan label sudut. Sebagai gantinya kurvanya bisa DITEKAN: saldo di titik
+  // yang ditunjuk muncul di gelembung - cara yang sama dipakai kurva ekuitas
+  // di jurnal, jadi tidak ada angka yang hilang, hanya pindah tempat.
   var iAkhir = titik.length - 1;
   var sudut =
       '<text x="' + PAD + '" y="12" fill="#63656d" font-size="9" font-family="ui-monospace,monospace">Awal ' + uang(titik[0]) + '</text>'
@@ -1007,7 +1011,66 @@ function gambarKurva(id, titik){
     + '<stop offset="100%" stop-color="' + warna + '" stop-opacity="0"/></linearGradient></defs>'
     + '<path d="' + isi + '" fill="url(#g' + id + ')"/>'
     + '<path d="' + d + '" fill="none" stroke="' + warna + '" stroke-width="1.8"/>'
-    + label + sudut;
+    + sudut
+    + '<line class="kv-garis" x1="0" y1="' + PADY + '" x2="0" y2="' + (H - PADY) + '"'
+    + ' stroke="#63656d" stroke-width="1" stroke-dasharray="3,3" opacity="0"/>'
+    + '<circle class="kv-titik" cx="0" cy="0" r="4" fill="' + warna + '" stroke="var(--bg)" stroke-width="1.5" opacity="0"/>';
+
+  pasangPenunjukKurva(svg, titik, xs, ys, W);
+}
+
+/* Penunjuk tekan-geser di atas kurva. Dipisah dari gambarKurva supaya
+   pemasangannya sekali jalan tiap kurva digambar ulang, dan supaya ketiga
+   kurva (Trade-Fi, Kripto, Aset) berperilaku persis sama. */
+function pasangPenunjukKurva(svg, titik, xs, ys, W){
+  var kotak = svg.parentNode;
+  if(!kotak) return;
+  var tip = kotak.querySelector('.kurva-tip');
+  if(!tip){
+    tip = document.createElement('div');
+    tip.className = 'kurva-tip';
+    kotak.appendChild(tip);
+  }
+  var garis = svg.querySelector('.kv-garis');
+  var bulat = svg.querySelector('.kv-titik');
+  var ditekan = false;
+
+  function tunjuk(clientX){
+    var r = svg.getBoundingClientRect();
+    if(!r.width) return;
+    // viewBox lebarnya = lebar piksel svg, jadi pemetaannya 1:1.
+    var relX = (clientX - r.left) / r.width * W;
+    var langkah = (W - PAD_KURVA*2) / (titik.length - 1);
+    var i = Math.round((relX - PAD_KURVA) / langkah);
+    i = Math.max(0, Math.min(titik.length - 1, i));
+    var x = xs(i), y = ys(titik[i]);
+    garis.setAttribute('x1', x.toFixed(1)); garis.setAttribute('x2', x.toFixed(1));
+    garis.setAttribute('opacity', '1');
+    bulat.setAttribute('cx', x.toFixed(1)); bulat.setAttribute('cy', y.toFixed(1));
+    bulat.setAttribute('opacity', '1');
+    tip.textContent = uang(titik[i])
+      + (i === 0 ? ' · Awal' : (i === titik.length - 1 ? ' · Kini' : ' · ke-' + i));
+    // Digencet ke tengah supaya gelembungnya tidak terpotong tepi layar.
+    var pct = Math.max(20, Math.min(80, (x / W) * 100));
+    tip.style.left = pct.toFixed(1) + '%';
+    tip.classList.add('on');
+  }
+  function lepas(){
+    garis.setAttribute('opacity', '0');
+    bulat.setAttribute('opacity', '0');
+    tip.classList.remove('on');
+    ditekan = false;
+  }
+
+  svg.onpointerdown = function(e){
+    ditekan = true;
+    try{ svg.setPointerCapture(e.pointerId); }catch(err){}
+    tunjuk(e.clientX);
+  };
+  svg.onpointermove = function(e){ if(ditekan) tunjuk(e.clientX); };
+  svg.onpointerup = lepas;
+  svg.onpointercancel = lepas;
+  svg.onpointerleave = function(){ if(!ditekan) lepas(); };
 }
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -1018,6 +1081,33 @@ function gambarKurva(id, titik){
    mataUang}] }. Sempat salah tebak nama endpoint & nama kolomnya, sehingga
    kotak berita macet di "Memuat berita…". */
 var beritaMentah = null;   // hasil fetch terakhir, supaya ganti filter tidak perlu ambil ulang
+
+/* Setelan filter berita disimpan per peramban. Bawaannya 2 hari ke depan;
+   begitu diubah - misalnya ke "Hari ini" - pilihan itu yang dipakai lagi di
+   sesi berikutnya, tidak balik sendiri ke 2 hari. Sengaja di localStorage,
+   bukan di awan: ini preferensi tampilan, bukan data trading. */
+var K_BERITA = 'jtMobileBerita_v1';
+
+function simpanSetelanBerita(){
+  try{
+    localStorage.setItem(K_BERITA, JSON.stringify({
+      rentang: el('beritaRentang').value,
+      dampak:  el('beritaDampak').value
+    }));
+  }catch(e){}
+}
+function terapkanSetelanBerita(){
+  var s = baca(K_BERITA, null);
+  if(!s) return;                       // belum pernah diubah -> pakai bawaan 2 hari
+  var r = el('beritaRentang'), d = el('beritaDampak');
+  // Hanya dipakai kalau nilainya masih ada di daftar pilihan - supaya setelan
+  // lama tidak menyisakan <select> kosong kalau opsinya pernah diubah.
+  function sah(sel, v){
+    return [].some.call(sel.options, function(o){ return o.value === v; });
+  }
+  if(s.rentang != null && sah(r, s.rentang)) r.value = s.rentang;
+  if(s.dampak  != null && sah(d, s.dampak))  d.value = s.dampak;
+}
 
 function labelHari(t){
   var d = new Date(t); d.setHours(0,0,0,0);
@@ -1747,6 +1837,7 @@ auth.onAuthStateChanged(function(user){
     .then(function(){ return Promise.all([ muatTicker(), muatSaldoBinance() ]); })
     .then(function(){
       gambarBerandaData();
+      terapkanSetelanBerita();   // pilihan sesi sebelumnya, sebelum berita digambar
       muatBerita();
     });
 });
@@ -1807,8 +1898,9 @@ el('btnMuatBerita').addEventListener('click', function(){
 });
 el('btnSegarkanBerita').addEventListener('click', function(){ muatBerita(); });
 // Ganti filter = saring ulang data yang sudah ada, tanpa memanggil backend lagi.
-el('beritaRentang').addEventListener('change', gambarBerita);
-el('beritaDampak').addEventListener('change', gambarBerita);
+// Pilihannya sekaligus disimpan supaya terpakai lagi di sesi berikutnya.
+el('beritaRentang').addEventListener('change', function(){ simpanSetelanBerita(); gambarBerita(); });
+el('beritaDampak').addEventListener('change', function(){ simpanSetelanBerita(); gambarBerita(); });
 el('kalPrev').addEventListener('click', function(){ kalBulan = new Date(kalBulan.getFullYear(), kalBulan.getMonth()-1, 1); gambarKalender(); });
 el('kalNext').addEventListener('click', function(){ kalBulan = new Date(kalBulan.getFullYear(), kalBulan.getMonth()+1, 1); gambarKalender(); });
 
