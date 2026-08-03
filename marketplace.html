@@ -3,12 +3,12 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202608031100">
+<meta name="jt-versi" content="202608040900">
 <title>Jadi Trader — Marketplace</title>
 <script>
 /* Penjaga versi - sama seperti halaman lain. */
 (function(){
-  var V = "202608031100", OK = "jtVersiOk", PAKSA = "jtVersiPaksa";
+  var V = "202608040900", OK = "jtVersiOk", PAKSA = "jtVersiPaksa";
   try{
     if(sessionStorage.getItem(OK) === V) return;
     fetch(location.pathname + "?_v=" + Date.now(), { cache: "no-store" })
@@ -235,6 +235,11 @@
   .peraga{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:12px;}
   .peraga .jd{font-size:12px;color:var(--muted);margin-bottom:8px;}
   .peraga svg{width:100%;height:170px;display:block;}
+  /* Peraga animasi (kanvas 1280x720) - lebarnya ikut kotak, tingginya
+     menyesuaikan sendiri karena rasio kanvas dipertahankan. */
+  .peraga-kanvas{
+    width:100%;height:auto;display:block;border-radius:8px;background:#0b0c0f;
+  }
   .lilin-naik{fill:#4f9e82;stroke:#4f9e82;}
   .lilin-turun{fill:#c2544d;stroke:#c2544d;}
   @keyframes garisMuncul{ to{ stroke-dashoffset:0; } }
@@ -495,6 +500,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<!-- Mesin animasi peraga - dipakai bersama dengan animasi-indikator.html
+     supaya yang dilihat pembeli sama persis dengan videonya. -->
+<script src="jt-peraga.js"></script>
 <script>
 (function(){
 "use strict";
@@ -1680,6 +1688,84 @@ function gambarKatalog(){
 
 var produkAktif = null;
 
+/* ══════════════════════════════════════════════════════════════════
+   PERAGA ANIMASI DI DETAIL PRODUK
+   ══════════════════════════════════════════════════════════════════
+   Produk premium memakai animasi kanvas dari jt-peraga.js - berkas yang
+   SAMA dipakai halaman perekam video, jadi apa yang dilihat calon pembeli
+   di sini persis sama dengan videonya. Produk lain tetap memakai peraga
+   SVG ringan di PERAGA. */
+var pemutarPeraga = [];      // {kanvas, adegan, mulai}
+var rafPeraga = null;
+var pengamatPeraga = null;
+
+function hentikanPeraga(){
+  if(rafPeraga){ cancelAnimationFrame(rafPeraga); rafPeraga = null; }
+  if(pengamatPeraga){ pengamatPeraga.disconnect(); pengamatPeraga = null; }
+  pemutarPeraga = [];
+}
+
+function bingkaiPeraga(){
+  var ada = false;
+  var kini = performance.now();
+  pemutarPeraga.forEach(function(p){
+    if(!p.terlihat) return;
+    ada = true;
+    var t = ((kini - p.mulai) / 1000) % JTPeraga.DUR;   // berulang terus
+    p.adegan.gambar(t);
+    // bilah kemajuan tipis di bawah
+    var g = p.kanvas.getContext('2d'), W = p.kanvas.width, H = p.kanvas.height;
+    g.fillStyle = 'rgba(255,255,255,.10)'; g.fillRect(56, H-16, W-112, 4);
+    g.fillStyle = '#c9a24b'; g.fillRect(56, H-16, (W-112) * (t/JTPeraga.DUR), 4);
+  });
+  rafPeraga = requestAnimationFrame(bingkaiPeraga);
+  if(!ada && !pemutarPeraga.length){ cancelAnimationFrame(rafPeraga); rafPeraga = null; }
+}
+
+function gambarPeraga(p){
+  hentikanPeraga();
+  var w = el('dtPeraga');
+
+  // Animasi kanvas hanya untuk produk yang punya peraganya (premium).
+  if(p.id === 'jadi-trader-v3' && window.JTPeraga){
+    w.innerHTML = JTPeraga.JUDUL.map(function(jd, i){
+      return '<div class="peraga"><div class="jd">' + esc(jd) + '</div>'
+           + '<canvas class="peraga-kanvas" width="1280" height="720" data-adegan="' + i + '"></canvas></div>';
+    }).join('');
+
+    [].forEach.call(w.querySelectorAll('.peraga-kanvas'), function(k){
+      var i = Number(k.getAttribute('data-adegan'));
+      var mesin = JTPeraga.buat(k);
+      var item = { kanvas:k, adegan:mesin.adegan[i], mulai:performance.now(), terlihat:false };
+      pemutarPeraga.push(item);
+      mesin.adegan[i].gambar(0);      // bingkai pertama supaya tidak kosong
+    });
+
+    // Hanya yang sedang terlihat yang dianimasikan - tiga animasi sekaligus
+    // membakar CPU tanpa ada yang menontonnya.
+    if('IntersectionObserver' in window){
+      pengamatPeraga = new IntersectionObserver(function(entri){
+        entri.forEach(function(e){
+          var it = pemutarPeraga.filter(function(x){ return x.kanvas === e.target; })[0];
+          if(!it) return;
+          if(e.isIntersecting && !it.terlihat) it.mulai = performance.now();  // mulai dari awal
+          it.terlihat = e.isIntersecting;
+        });
+      }, { threshold: 0.35 });
+      pemutarPeraga.forEach(function(it){ pengamatPeraga.observe(it.kanvas); });
+    } else {
+      pemutarPeraga.forEach(function(it){ it.terlihat = true; });
+    }
+    if(!rafPeraga) bingkaiPeraga();
+    return;
+  }
+
+  var per = PERAGA[p.id] || [];
+  w.innerHTML = per.map(function(x){
+    return '<div class="peraga"><div class="jd">' + esc(x.jd) + '</div>' + x.svg() + '</div>';
+  }).join('');
+}
+
 function bukaDetail(id){
   var p = produk.find(function(x){ return x.id === id; });
   if(!p) return;
@@ -1692,10 +1778,7 @@ function bukaDetail(id){
     : '$' + Number(p.harga) + ' <small>sekali bayar · lisensi personal</small>';
   el('dtDetail').textContent = p.detail || p.ringkas || '';
 
-  var per = PERAGA[p.id] || [];
-  el('dtPeraga').innerHTML = per.map(function(x){
-    return '<div class="peraga"><div class="jd">' + esc(x.jd) + '</div>' + x.svg() + '</div>';
-  }).join('');
+  gambarPeraga(p);
 
   var fitur = (p.fitur || []).map(function(f, i){
     var bagi = String(f).split('|');
@@ -1929,12 +2012,17 @@ document.addEventListener('keydown', function(e){
   }, { passive:true });
 })();
 
-el('dtTutup').addEventListener('click', function(){
+// Menutup detail HARUS menghentikan animasi - kalau tidak, rAF-nya terus
+// berjalan di latar dan membakar CPU (terasa sekali di HP: panas & boros).
+function tutupDetail(){
   el('tirai').classList.remove('on');
   document.body.style.overflow = '';
-});
-el('tirai').addEventListener('click', function(e){
-  if(e.target === el('tirai')){ el('tirai').classList.remove('on'); document.body.style.overflow = ''; }
+  hentikanPeraga();
+}
+el('dtTutup').addEventListener('click', tutupDetail);
+el('tirai').addEventListener('click', function(e){ if(e.target === el('tirai')) tutupDetail(); });
+document.addEventListener('keydown', function(e){
+  if(e.key === 'Escape' && el('tirai').classList.contains('on') && !el('lb').classList.contains('on')) tutupDetail();
 });
 
 /* ══════════════════════════════════════════════════════════════════

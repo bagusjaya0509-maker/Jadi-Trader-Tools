@@ -1,0 +1,198 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jadi Trader — Animasi Cara Kerja Indikator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --bg:#0b0c0f; --panel:#15171c; --panel-2:#1b1e24; --border:#262a31;
+    --text:#ece8de; --muted:#9a9ca4; --dim:#63656d; --gold:#c9a24b;
+    --bull:#4f9e82; --bear:#c2544d;
+    --font-body:'IBM Plex Sans',-apple-system,'Segoe UI',Roboto,Arial,sans-serif;
+    --font-mono:'IBM Plex Mono','SF Mono',Consolas,monospace;
+    --font-display:Georgia,'Iowan Old Style',serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;background:var(--bg);color:var(--text);font-family:var(--font-body);
+    padding:clamp(12px,2.2vw,24px);
+  }
+  .wrap{max-width:1180px;margin:0 auto;}
+  h1{font-family:var(--font-display);font-size:23px;font-weight:400;margin:0 0 4px;}
+  .sub{color:var(--muted);font-size:13px;margin-bottom:18px;}
+  .tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+  .tabs button{
+    padding:9px 15px;border:1px solid var(--border);border-radius:8px;background:var(--panel);
+    color:var(--muted);font-size:13px;cursor:pointer;
+  }
+  .tabs button.on{border-color:var(--gold);color:var(--gold);background:var(--panel-2);}
+  .layar{
+    background:#000;border:1px solid var(--border);border-radius:12px;overflow:hidden;
+    line-height:0;
+  }
+  canvas{width:100%;height:auto;display:block;}
+  .kendali{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:12px;}
+  .kendali button{
+    padding:10px 16px;border-radius:8px;border:1px solid var(--border);background:var(--panel-2);
+    color:var(--text);font-size:13px;cursor:pointer;
+  }
+  .kendali button.utama{background:var(--gold);color:#1a1200;border-color:var(--gold);font-weight:600;}
+  .kendali button:disabled{opacity:.5;cursor:not-allowed;}
+  .waktu{font-family:var(--font-mono);font-size:12px;color:var(--muted);}
+  .catat{font-size:12.5px;color:var(--muted);line-height:1.65;margin-top:14px;}
+  .catat b{color:var(--text);}
+  .rekam-status{font-family:var(--font-mono);font-size:12px;color:var(--gold);}
+</style>
+
+<div class="wrap">
+  <h1>Animasi Cara Kerja Indikator</h1>
+  <div class="sub">Tiga peraga 30 detik. Bisa dipasang langsung di halaman produk, atau direkam jadi berkas video.</div>
+
+  <div class="tabs" id="tabs">
+    <button class="on" data-scene="0">1 · Parallel Channel &amp; Duplikat</button>
+    <button data-scene="1">2 · SNR &amp; Supply-Demand</button>
+    <button data-scene="2">3 · Momentum &amp; EMA</button>
+  </div>
+
+  <div class="layar"><canvas id="kanvas" width="1280" height="720"></canvas></div>
+
+  <div class="kendali">
+    <button class="utama" id="btnMain">▶ Putar</button>
+    <button id="btnUlang">⟲ Ulang</button>
+    <button id="btnRekam">● Rekam 30 detik → unduh .webm</button>
+    <span class="waktu" id="waktu">0.0s / 30.0s</span>
+    <span class="rekam-status" id="rekamStatus"></span>
+  </div>
+
+  <div class="catat" id="ket"></div>
+</div>
+
+<script src="jt-peraga.js"></script>
+<script>
+(function(){
+"use strict";
+
+var K = document.getElementById('kanvas');
+var g = K.getContext('2d');
+var W = K.width, H = K.height;
+var DUR = 30;                      // detik per adegan
+
+/* Semua adegan & perkakas gambarnya ada di jt-peraga.js - berkas yang SAMA
+   dipakai marketplace.html. Ditaruh terpisah supaya animasi yang direkam
+   jadi video dan yang dipajang di halaman jualan tidak mungkin berbeda. */
+var mesin = JTPeraga.buat(K);
+var ADEGAN = mesin.adegan;
+var NAMA = JTPeraga.NAMA;
+var KET = [
+  "<b>Video 1 — Parallel Channel &amp; Duplikat.</b> Channel digambar otomatis dari pivot. Saat harga menembusnya, duplikat dengan kemiringan &amp; lebar identik ditempel pas di sisi breakout, dan acuan sinyal ikut berpindah ke band tempat harga berada.",
+  "<b>Video 2 — SNR &amp; Supply-Demand.</b> Zona support/resisten ditarik dari pivot dengan lebar mengikuti ATR. Sinyal SNR baru muncul pada sentuhan KEDUA ke zona yang sama, dan hanya pada candle penolakan (ekor lebih panjang dari badan).",
+  "<b>Video 3 — Momentum &amp; EMA.</b> Candle momentum menandai dorongan awal. Selama harga bertahan di atas kedua garis EMA, tren dianggap masih kuat dan posisi boleh dibiarkan berjalan. Begitu harga menutup di bawah EMA kedua, dorongannya habis — saatnya mengamankan profit."
+];
+function jepit(v,a,b){ return v<a?a:(v>b?b:v); }
+
+/* ══════════════════════════════════════════════════════════════════
+   PEMUTAR
+   ══════════════════════════════════════════════════════════════════ */
+var aktif = 0, mulai = 0, jalan = false, tBeku = 0, rafId = null;
+
+function gambarPada(t){
+  ADEGAN[aktif].gambar(jepit(t, 0, DUR));
+  // bilah kemajuan
+  g.fillStyle = 'rgba(255,255,255,.10)'; g.fillRect(56, H-16, W-112, 4);
+  g.fillStyle = '#c9a24b'; g.fillRect(56, H-16, (W-112) * jepit(t/DUR,0,1), 4);
+  document.getElementById('waktu').textContent = jepit(t,0,DUR).toFixed(1) + 's / ' + DUR.toFixed(1) + 's';
+}
+
+function bingkai(){
+  if(!jalan) return;
+  var t = (performance.now() - mulai) / 1000;
+  if(t >= DUR){
+    gambarPada(DUR); jalan = false; tBeku = DUR;
+    document.getElementById('btnMain').textContent = '▶ Putar';
+    return;
+  }
+  gambarPada(t);
+  rafId = requestAnimationFrame(bingkai);
+}
+
+function putar(){
+  if(jalan){
+    jalan = false;
+    tBeku = (performance.now() - mulai) / 1000;
+    cancelAnimationFrame(rafId);
+    document.getElementById('btnMain').textContent = '▶ Putar';
+    return;
+  }
+  if(tBeku >= DUR) tBeku = 0;
+  mulai = performance.now() - tBeku*1000;
+  jalan = true;
+  document.getElementById('btnMain').textContent = '❚❚ Jeda';
+  bingkai();
+}
+
+function ulang(){
+  cancelAnimationFrame(rafId);
+  jalan = false; tBeku = 0;
+  document.getElementById('btnMain').textContent = '▶ Putar';
+  gambarPada(0);
+}
+
+function pilihAdegan(i){
+  aktif = i;
+  [].forEach.call(document.querySelectorAll('#tabs button'), function(b, j){
+    b.classList.toggle('on', j === i);
+  });
+  document.getElementById('ket').innerHTML = KET[i];
+  ulang();
+}
+
+document.getElementById('tabs').addEventListener('click', function(e){
+  var b = e.target.closest('button[data-scene]');
+  if(b) pilihAdegan(Number(b.getAttribute('data-scene')));
+});
+document.getElementById('btnMain').addEventListener('click', putar);
+document.getElementById('btnUlang').addEventListener('click', ulang);
+
+/* ── Rekam jadi berkas video ──────────────────────────────────────
+   Kanvas direkam apa adanya lewat MediaRecorder, jadi hasilnya berkas
+   .webm sungguhan yang bisa diunggah ke mana saja. Tidak ada proses di
+   server - semuanya di peramban. */
+document.getElementById('btnRekam').addEventListener('click', function(){
+  var st = document.getElementById('rekamStatus');
+  if(typeof MediaRecorder === 'undefined' || !K.captureStream){
+    st.textContent = 'Peramban ini tidak mendukung perekaman kanvas. Pakai Chrome/Edge terbaru.';
+    return;
+  }
+  var jenis = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm']
+    .filter(function(m){ return MediaRecorder.isTypeSupported(m); })[0];
+  if(!jenis){ st.textContent = 'Format webm tidak didukung peramban ini.'; return; }
+
+  var stream = K.captureStream(30);
+  var rec = new MediaRecorder(stream, { mimeType: jenis, videoBitsPerSecond: 5000000 });
+  var potong = [];
+  rec.ondataavailable = function(e){ if(e.data.size) potong.push(e.data); };
+  rec.onstop = function(){
+    var blob = new Blob(potong, { type:'video/webm' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'jaditrader-' + NAMA[aktif] + '.webm';
+    document.body.appendChild(a); a.click();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 500);
+    st.textContent = 'Selesai — ' + (blob.size/1048576).toFixed(1) + ' MB terunduh.';
+    document.getElementById('btnRekam').disabled = false;
+  };
+
+  document.getElementById('btnRekam').disabled = true;
+  ulang();
+  rec.start();
+  st.textContent = 'Merekam…';
+  putar();
+  // Direkam sedikit lebih lama dari 30 detik supaya bingkai terakhir ikut.
+  setTimeout(function(){ if(rec.state !== 'inactive') rec.stop(); }, (DUR + 0.6) * 1000);
+});
+
+pilihAdegan(0);
+
+})();
+</script>
