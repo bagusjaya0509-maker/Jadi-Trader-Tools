@@ -7,7 +7,7 @@
    bisa menyimpang diam-diam.
 
    Kalau logika di screener berubah, jalankan lagi:  node buat-scan-core.js
-   Dibuat: 2026-08-01T00:51:58.617Z
+   Dibuat: 2026-08-03T10:38:48.259Z
    ════════════════════════════════════════════════════════════════════════ */
 window.JTScan = (function(){
   "use strict";
@@ -218,6 +218,37 @@ window.JTScan = (function(){
     return out;
   }
   
+  function snrTouchH4M5(h4, kandilM5){
+    const atrArr = atr(h4.highs, h4.lows, h4.closes, 14);
+    const a = atrArr[atrArr.length - 1];
+    if(!(a > 0)) return null;
+    const tol = a * 0.5;
+     const res = findPivots(h4.highs, 10, 10, true ).slice(-2).map(p => p.value);
+    const sup = findPivots(h4.lows,  10, 10, false).slice(-2).map(p => p.value);
+     const o = kandilM5.open, hi = kandilM5.high, lo = kandilM5.low, c = kandilM5.close;
+    const body = Math.abs(c - o);
+    const wickAtas = hi - Math.max(o, c);
+    const wickBawah = Math.min(o, c) - lo;
+     let terbaik = null;
+    res.forEach(lvl => {
+      if(hi >= lvl - tol && hi <= lvl + tol){
+        const jarak = Math.abs(hi - lvl);
+        if(!terbaik || jarak < terbaik.jarak){
+          terbaik = { sisi:'R', level:lvl, jarak, arah:'SELL', tolak: wickAtas > body, tol };
+        }
+      }
+    });
+    sup.forEach(lvl => {
+      if(lo <= lvl + tol && lo >= lvl - tol){
+        const jarak = Math.abs(lo - lvl);
+        if(!terbaik || jarak < terbaik.jarak){
+          terbaik = { sisi:'S', level:lvl, jarak, arah:'BUY', tolak: wickBawah > body, tol };
+        }
+      }
+    });
+    return terbaik;
+  }
+  
   async function mapLimited(items, limit, fn){
     const results = new Array(items.length);
     let next = 0;
@@ -236,16 +267,11 @@ window.JTScan = (function(){
 
   return {
     fmtPrice: fmtPrice, ema: ema, stochastic: stochastic,
-    smiSeries: smiSeries, smiConditionOf: smiConditionOf,
-    atr: atr, findPivots: findPivots,
-    detectParallelChannel: detectParallelChannel,
-    pivotConfirmBarsDesc: pivotConfirmBarsDesc,
-    pcUpperAt: pcUpperAt, pcLowerAt: pcLowerAt,
-    mapLimited: mapLimited,
-    SMI_K: SMI_K, SMI_D: SMI_D, SMI_EMA: SMI_EMA,
-    SMI_OB: SMI_OB, SMI_OS: SMI_OS,
-    PC_SIG_TOL_MULT: PC_SIG_TOL_MULT,
-    PC_SIG_SCANBACK: PC_SIG_SCANBACK,
-    PC_SIG_FRESH: PC_SIG_FRESH
+    smiSeries: smiSeries, smiConditionOf: smiConditionOf, atr: atr,
+    findPivots: findPivots, detectParallelChannel: detectParallelChannel, pivotConfirmBarsDesc: pivotConfirmBarsDesc,
+    snrTouchH4M5: snrTouchH4M5, mapLimited: mapLimited, pcUpperAt: pcUpperAt,
+    pcLowerAt: pcLowerAt, SMI_K: SMI_K, SMI_D: SMI_D,
+    SMI_EMA: SMI_EMA, SMI_OB: SMI_OB, SMI_OS: SMI_OS,
+    PC_SIG_TOL_MULT: PC_SIG_TOL_MULT, PC_SIG_SCANBACK: PC_SIG_SCANBACK, PC_SIG_FRESH: PC_SIG_FRESH
   };
 })();

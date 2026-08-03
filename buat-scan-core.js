@@ -29,6 +29,7 @@ const eol = src.includes('\r\n') ? '\r\n' : '\n';
 const FUNGSI = [
   'fmtPrice', 'ema', 'stochastic', 'smiSeries', 'smiConditionOf',
   'atr', 'findPivots', 'detectParallelChannel', 'pivotConfirmBarsDesc',
+  'snrTouchH4M5',
   'mapLimited'
 ];
 
@@ -86,6 +87,26 @@ const bagian = [];
 BARIS_LITERAL.forEach(a => bagian.push(ambilBaris(a).trim()));
 FUNGSI.forEach(n => bagian.push(ambilFungsi(n).replace(/^\s{2}/gm, '')));
 
+/* Daftar ekspor DITURUNKAN dari FUNGSI, tidak diketik ulang. Dulu keduanya
+   ditulis terpisah, dan menambah satu fungsi ke FUNGSI tanpa menambahnya ke
+   daftar ekspor menghasilkan file yang lolos cek sintaks tapi fungsinya tidak
+   bisa dipanggil dari luar. */
+const EKSPOR_LITERAL = [
+  'pcUpperAt', 'pcLowerAt',
+  'SMI_K', 'SMI_D', 'SMI_EMA', 'SMI_OB', 'SMI_OS',
+  'PC_SIG_TOL_MULT', 'PC_SIG_SCANBACK', 'PC_SIG_FRESH'
+];
+const SEMUA_EKSPOR = FUNGSI.concat(EKSPOR_LITERAL);
+
+function barisEkspor(){
+  const baris = [];
+  for(let i = 0; i < SEMUA_EKSPOR.length; i += 3){
+    const potong = SEMUA_EKSPOR.slice(i, i + 3).map(n => n + ': ' + n);
+    baris.push('    ' + potong.join(', ') + (i + 3 < SEMUA_EKSPOR.length ? ',' : ''));
+  }
+  return baris;
+}
+
 const keluaran = [
   '/* ════════════════════════════════════════════════════════════════════════',
   '   jt-scan-core.js — JANGAN DIEDIT LANGSUNG.',
@@ -106,26 +127,26 @@ const keluaran = [
   + eol + eol
   + [
     '  return {',
-    '    fmtPrice: fmtPrice, ema: ema, stochastic: stochastic,',
-    '    smiSeries: smiSeries, smiConditionOf: smiConditionOf,',
-    '    atr: atr, findPivots: findPivots,',
-    '    detectParallelChannel: detectParallelChannel,',
-    '    pivotConfirmBarsDesc: pivotConfirmBarsDesc,',
-    '    pcUpperAt: pcUpperAt, pcLowerAt: pcLowerAt,',
-    '    mapLimited: mapLimited,',
-    '    SMI_K: SMI_K, SMI_D: SMI_D, SMI_EMA: SMI_EMA,',
-    '    SMI_OB: SMI_OB, SMI_OS: SMI_OS,',
-    '    PC_SIG_TOL_MULT: PC_SIG_TOL_MULT,',
-    '    PC_SIG_SCANBACK: PC_SIG_SCANBACK,',
-    '    PC_SIG_FRESH: PC_SIG_FRESH',
+    ...barisEkspor(),
     '  };',
     '})();'
   ].join(eol) + eol;
 
 fs.writeFileSync(TUJUAN, keluaran);
 
-// Pastikan hasilnya benar-benar bisa di-parse sebelum dianggap sukses.
-new (require('vm').Script)(keluaran.replace('window.JTScan', 'var JTScan'));
+/* Pastikan hasilnya benar-benar bisa DIJALANKAN, bukan cuma di-parse, dan
+   setiap nama yang dijanjikan memang keluar dari modulnya. Versi lama hanya
+   memeriksa sintaks - jadi waktu snrTouchH4M5 ditambahkan ke FUNGSI tapi
+   daftar ekspornya (yang dulu diketik tangan, terpisah) belum, generatornya
+   melapor "sukses" padahal halaman mobile memanggil fungsi yang tidak ada. */
+const vm = require('vm');
+const kotak = { window: {} };
+vm.createContext(kotak);
+new vm.Script(keluaran).runInContext(kotak);
+const jadi = kotak.window.JTScan;
+const hilang = SEMUA_EKSPOR.filter(n => jadi[n] === undefined);
+if (hilang.length) throw new Error('tidak terekspor: ' + hilang.join(', '));
 
 console.log('jt-scan-core.js dibuat: ' + keluaran.length + ' byte');
 console.log('fungsi: ' + FUNGSI.join(', '));
+console.log('ekspor terverifikasi: ' + SEMUA_EKSPOR.length + ' nama');
