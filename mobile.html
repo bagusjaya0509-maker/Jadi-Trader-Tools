@@ -3,13 +3,13 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202608032100">
+<meta name="jt-versi" content="202608032230">
 <meta name="theme-color" content="#0b0c0f">
 <title>Jadi Trader — Mobile</title>
 <script>
 /* Penjaga versi - sama seperti halaman lain. */
 (function(){
-  var VERSI_TAMPIL = "202608032100";
+  var VERSI_TAMPIL = "202608032230";
   var KUNCI_OK = "jtVersiOk", KUNCI_PAKSA = "jtVersiPaksa";
   try{
     if(sessionStorage.getItem(KUNCI_OK) === VERSI_TAMPIL) return;
@@ -443,6 +443,14 @@
       <option value="align" selected>Searah Stochastic BTC</option>
       <option value="oversold">Hanya Oversold (potensi BUY)</option>
       <option value="overbought">Hanya Overbought (potensi SELL)</option>
+    </select>
+    <!-- Saringan kedua: candle M5 yang sedang menyentuh zona SNR 4 jam.
+         Susunan yang sama dipakai indikator Jadi Trader V3 - di TF 1m/5m
+         zona SNR lokal disembunyikan dan diganti zona dari TF 240. -->
+    <select class="isian" id="pantauSnr" style="padding:9px 10px;margin-top:8px">
+      <option value="off" selected>Tanpa filter SNR</option>
+      <option value="sentuh">Candle M5 menyentuh SNR 4 jam</option>
+      <option value="tolak">…dan candle-nya menolak (wick &gt; body)</option>
     </select>
     <div class="catatan" id="pantauStatus">Tekan “Pindai” untuk mulai.</div>
   </div>
@@ -1254,6 +1262,62 @@ function coreSiap(idStatus, idDaftar){
   return false;
 }
 
+/* ---------- Sentuh zona SNR 4 jam pada candle M5 ----------
+   Terjemahan langsung dari indikator Jadi Trader V3, bukan tafsiran sendiri:
+
+     Section 4 - zona SNR dibentuk dari ta.pivothigh/ta.pivotlow(10,10),
+       disimpan maksimal 2 per sisi (srMaxZones), lebarnya ta.atr(14)*0.5
+       (srAtrMult). Di TF 1 & 5 menit zona lokalnya DISEMBUNYIKAN dan yang
+       dipakai zona hasil request.security(..., "240", ...) - persis kenapa
+       di sini 4 jam yang dihitung, lalu diadu dengan candle 5 menit.
+     Section 8 - "sentuh" berarti EKOR candle masuk ke dalam pita zona:
+       resistance dinilai dari high, support dari low. Candle yang menembus
+       habis zonanya bukan sentuhan - itu sweep, urusan Section 9.
+       Candle penolakan = wick sisi itu lebih panjang dari body.
+
+   Yang diperiksa candle M5 TERAKHIR (masih berjalan), karena pertanyaannya
+   "sedang menyentuh", bukan "pernah menyentuh". */
+function cekSnrH4M5(sym){
+  return Promise.all([
+    ambilKlines(sym, '4h', 250),
+    ambilKlines(sym, '5m', 5)
+  ]).then(function(r){
+    var h4 = r[0], m5 = r[1];
+    var atrArr = JTScan.atr(h4.highs, h4.lows, h4.closes, 14);
+    var a = atrArr[atrArr.length - 1];
+    if(!(a > 0)) return null;
+    var tol = a * 0.5;
+
+    var res = JTScan.findPivots(h4.highs, 10, 10, true ).slice(-2).map(function(p){ return p.value; });
+    var sup = JTScan.findPivots(h4.lows,  10, 10, false).slice(-2).map(function(p){ return p.value; });
+
+    var i = m5.closes.length - 1;
+    var o = m5.opens[i], hi = m5.highs[i], lo = m5.lows[i], c = m5.closes[i];
+    var body = Math.abs(c - o);
+    var wickAtas = hi - Math.max(o, c);
+    var wickBawah = Math.min(o, c) - lo;
+
+    var terbaik = null;
+    res.forEach(function(lvl){
+      if(hi >= lvl - tol && hi <= lvl + tol){
+        var jarak = Math.abs(hi - lvl);
+        if(!terbaik || jarak < terbaik.jarak){
+          terbaik = { sisi:'R', level:lvl, jarak:jarak, arah:'SELL', tolak: wickAtas > body };
+        }
+      }
+    });
+    sup.forEach(function(lvl){
+      if(lo <= lvl + tol && lo >= lvl - tol){
+        var jarak = Math.abs(lo - lvl);
+        if(!terbaik || jarak < terbaik.jarak){
+          terbaik = { sisi:'S', level:lvl, jarak:jarak, arah:'BUY', tolak: wickBawah > body };
+        }
+      }
+    });
+    return terbaik;
+  });
+}
+
 var pantauJalan = false, pantauPernah = false;
 function pindaiPantau(){
   if(pantauJalan) return;
@@ -1310,9 +1374,37 @@ function pindaiPantau(){
     var ekstrem = function(c){ return c.kondisi === 'overbought' ? c.stochK : -c.stochK; };
     pilih.sort(function(a,b){ return ekstrem(b) - ekstrem(a); });
 
+    // Saringan SNR dijalankan SESUDAH saringan SMI, jadi yang ditarik klines
+    // 4 jam + 5 menitnya cuma koin yang sudah lolos - bukan seluruh daftar.
+    // Urutan sebaliknya berarti 2 permintaan tambahan per koin untuk koin yang
+    // toh akan dibuang.
+    var snrMode = el('pantauSnr').value;
+    var nSebelumSnr = pilih.length;
+    if(snrMode === 'off' || !pilih.length) return { pilih: pilih, snrMode: snrMode, nSebelumSnr: nSebelumSnr };
+
+    el('pantauStatus').textContent = 'Mengecek sentuhan SNR 4 jam di candle M5 (' + pilih.length + ' koin)…';
+    return JTScan.mapLimited(pilih, 4, function(c){
+      return cekSnrH4M5(c.symbol).then(function(s){ c.snr = s; }).catch(function(){ c.snr = null; });
+    }).then(function(){
+      return {
+        pilih: pilih.filter(function(c){
+          if(!c.snr) return false;
+          return snrMode === 'tolak' ? c.snr.tolak : true;
+        }),
+        snrMode: snrMode, nSebelumSnr: nSebelumSnr
+      };
+    });
+  }).then(function(hasilAkhir){
+    var pilih = hasilAkhir.pilih, snrMode = hasilAkhir.snrMode, nSebelumSnr = hasilAkhir.nSebelumSnr;
+    var snrAktif = snrMode !== 'off';
+
     if(!pilih.length){
-      el('pantauDaftar').innerHTML = '<div class="kosong">Tidak ada koin dengan SMI ekstrem'
-        + (mode === 'align' && !btcKondisi ? ' — BTC sedang tidak ekstrem, jadi tidak ada rezim untuk diikuti.' : '.')
+      el('pantauDaftar').innerHTML = '<div class="kosong">'
+        + (snrAktif && nSebelumSnr
+            ? 'Ada ' + nSebelumSnr + ' koin dengan SMI ekstrem, tapi tidak ada yang candle M5-nya '
+              + (snrMode === 'tolak' ? 'menolak di ' : 'sedang menyentuh ') + 'zona SNR 4 jam.'
+            : 'Tidak ada koin dengan SMI ekstrem'
+              + (mode === 'align' && !btcKondisi ? ' — BTC sedang tidak ekstrem, jadi tidak ada rezim untuk diikuti.' : '.'))
         + '</div>';
       el('pantauStatus').textContent = 'Selesai · tidak ada yang lolos filter.';
     } else {
@@ -1325,7 +1417,17 @@ function pindaiPantau(){
               + '<span class="pair"> / USDT</span><span class="tf-chip">' + tf + '</span></div>'
             + '<div class="baris-sub">SMI ' + c.stochK.toFixed(1)
               + ' · ' + (beli ? 'Oversold' : 'Overbought')
-              + (c.mulaiBalik ? ' · mulai berbalik' : '') + '</div>'
+              + (c.mulaiBalik ? ' · mulai berbalik' : '')
+              + (c.snr
+                  ? ' · <span style="color:var(--gold)">' + (c.snr.sisi === 'R' ? 'R' : 'S')
+                    + ' 4H ' + HG(c.snr.level) + '</span>'
+                    + (c.snr.tolak ? ' · candle menolak' : '')
+                    // Zona resistance condong SELL, support condong BUY. Kalau
+                    // arahnya berlawanan dengan SMI, itu bukan alasan membuang
+                    // barisnya - tapi harus kelihatan, bukan disembunyikan.
+                    + (c.snr.arah !== (beli ? 'BUY' : 'SELL') ? ' · <span style="color:var(--bear)">lawan arah SMI</span>' : '')
+                  : '')
+              + '</div>'
           + '</div>'
           + '<div class="baris-tengah">'
             + '<div class="baris-harga">' + HG(c.harga) + '</div>'
@@ -1339,6 +1441,8 @@ function pindaiPantau(){
       el('pantauStatus').textContent = pilih.length + ' koin lolos (' + nOs + ' oversold, '
         + (pilih.length - nOs) + ' overbought) · dari ' + koin.length + ' koin · TF ' + tf
         + (mode === 'align' && btcKondisi ? ' · rezim BTC ' + btcKondisi : '')
+        + (snrAktif ? ' · SNR 4H di M5' + (snrMode === 'tolak' ? ' + candle menolak' : '')
+                    + ' (' + pilih.length + ' dari ' + nSebelumSnr + ')' : '')
         + ' · ' + new Date().toLocaleTimeString('id-ID');
     }
   }).catch(function(e){
@@ -1884,6 +1988,9 @@ el('stripBeranda').addEventListener('click', function(e){
 /* ---------- pengikat kontrol ---------- */
 el('btnPantau').addEventListener('click', pindaiPantau);
 el('pantauRezim').addEventListener('change', function(){ if(!pantauJalan) pindaiPantau(); });
+// Filter SNR butuh klines 4 jam + 5 menit yang belum pernah diambil, jadi
+// mengubahnya berarti memindai ulang - tidak bisa cuma menyaring hasil lama.
+el('pantauSnr').addEventListener('change', function(){ if(!pantauJalan) pindaiPantau(); });
 el('btnCh').addEventListener('click', pindaiParallel);
 el('chFilter').addEventListener('change', function(){ if(chMentah.length) gambarSinyal(); });
 // Tombol "Muat ulang" membuka panel filter (tanggal + dampak); pengambilan
