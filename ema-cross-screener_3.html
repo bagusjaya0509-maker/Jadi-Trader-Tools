@@ -11,12 +11,12 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202608032230">
+<meta name="jt-versi" content="202608040030">
 <script>
 /* Penjaga versi - lihat catatan lengkap di jurnal-trading.html. Mencegah browser
    menyajikan HTML lama dari cache saat halaman dimuat ulang. */
 (function(){
-  var VERSI_TAMPIL = "202608032230";
+  var VERSI_TAMPIL = "202608040030";
   var KUNCI_OK    = "jtVersiOk";      // versi yang sudah dipastikan benar-benar termuat
   var KUNCI_PAKSA = "jtVersiPaksa";   // versi yang sudah pernah dipaksa muat ulang
   try{
@@ -5716,6 +5716,36 @@
     return terbaik;
   }
 
+  /* ── SL di luar kotak SNR + setengah tinggi kotaknya ──────────────────
+     Kotak SNR = level pivot ± ATR*0.5 (srAtrMult di Jadi Trader V3), jadi
+     TINGGI kotaknya = ATR. Setengah tinggi itu = ATR*0.5.
+
+       BUY  : SL = (level - ATR*0.5) - ATR*0.5 = level - ATR
+       SELL : SL = (level + ATR*0.5) + ATR*0.5 = level + ATR
+
+     Kenapa dilebihkan: tepat di bawah support / di atas resistance adalah
+     tempat stop orang menumpuk, dan harga rutin menyapunya dengan ekor
+     sebentar sebelum berbalik (liquidity sweep - Section 9 di V3 malah
+     menjadikannya SINYAL). SL yang berhenti persis di tepi kotak jadi kena
+     sapuan itu terus padahal arahnya belum tentu salah.
+
+     Cadangan kalau tidak ada pivot yang memenuhi syarat: swing 15 bar
+     terakhir, dengan kelebihan yang SAMA - swing extreme juga disapu. */
+  function slFromSnrZone(arah, price, highs, lows, atrNow){
+    const tolZona = atrNow * 0.5;    // setengah LEBAR kotak -> tepi kotak
+    const sapuan  = atrNow * 0.5;    // setengah TINGGI kotak -> ruang sweep
+    if(arah === 'SELL'){
+      const res = findPivots(highs, 10, 10, true).slice(-2).map(p => p.value);
+      const lvl = res.length ? Math.max.apply(null, res) : null;
+      const dasar = (lvl != null && lvl > price) ? lvl : Math.max.apply(null, highs.slice(-15));
+      return dasar + tolZona + sapuan;
+    }
+    const sup = findPivots(lows, 10, 10, false).slice(-2).map(p => p.value);
+    const lvl = sup.length ? Math.min.apply(null, sup) : null;
+    const dasar = (lvl != null && lvl < price) ? lvl : Math.min.apply(null, lows.slice(-15));
+    return dasar - tolZona - sapuan;
+  }
+
   // Yang diperiksa candle M5 TERAKHIR (masih berjalan) - pertanyaannya
   // "sedang menyentuh", bukan "pernah menyentuh".
   async function cekSnrH4M5(symbol){
@@ -5756,11 +5786,11 @@
       stochPanel: { k: hasil.seri.smi, d: hasil.seri.signal }
     });
 
-    // Ancang-ancang level: SL di luar swing terakhir + bantalan ATR, TP 1:2.
-    const look = 12;
-    const swingLow  = Math.min.apply(null, lows.slice(-look));
-    const swingHigh = Math.max.apply(null, highs.slice(-look));
-    const sl = hasil.arah === 'BUY' ? swingLow - a*0.3 : swingHigh + a*0.3;
+    // Ancang-ancang level: SL di luar kotak SNR + setengah tinggi kotaknya,
+    // sama persis dengan sinyal Parallel. Sebelumnya di sini dipakai swing 12
+    // bar + 0.3 ATR - lebih rapat dan tidak berhubungan dengan zona yang
+    // justru jadi alasan memantau koinnya.
+    const sl = slFromSnrZone(hasil.arah, price, highs, lows, a);
     const risk = Math.abs(price - sl);
     if(!(risk > 0)) return null;
     // TP1 = 1x risiko (1:1 dengan SL) - lihat catatan di sinyal Parallel.
@@ -6309,18 +6339,8 @@
     const t = tickers[symbol];
     const price = t ? parseFloat(t.lastPrice) : d.closes[d.closes.length-1];
     const a = atrArr[atrArr.length-1] || (price*0.005);
-    const buffer = a * 0.5;   // "dilebihkan sedikit dari area SNR"
-    // SL dari SNR: SELL = resistan TERATAS + buffer, BUY = support TERBAWAH - buffer.
-    let sl;
-    if(arah === 'SELL'){
-      const res = findPivots(d.highs, 10, 10, true).slice(-2).map(p=>p.value);
-      const lvl = res.length ? Math.max.apply(null, res) : null;
-      sl = (lvl!=null && lvl>price) ? lvl + buffer : Math.max.apply(null, d.highs.slice(-15)) + buffer;
-    } else {
-      const sup = findPivots(d.lows, 10, 10, false).slice(-2).map(p=>p.value);
-      const lvl = sup.length ? Math.min.apply(null, sup) : null;
-      sl = (lvl!=null && lvl<price) ? lvl - buffer : Math.min.apply(null, d.lows.slice(-15)) - buffer;
-    }
+    // SL di luar kotak SNR + setengah tinggi kotaknya (ruang liquidity sweep).
+    const sl = slFromSnrZone(arah, price, d.highs, d.lows, a);
     const risk = Math.abs(price - sl);
     if(!(risk > 0)) return null;
     const riskPct = (risk/price)*100;

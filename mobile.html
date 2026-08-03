@@ -3,13 +3,13 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202608032230">
+<meta name="jt-versi" content="202608040030">
 <meta name="theme-color" content="#0b0c0f">
 <title>Jadi Trader — Mobile</title>
 <script>
 /* Penjaga versi - sama seperti halaman lain. */
 (function(){
-  var VERSI_TAMPIL = "202608032230";
+  var VERSI_TAMPIL = "202608040030";
   var KUNCI_OK = "jtVersiOk", KUNCI_PAKSA = "jtVersiPaksa";
   try{
     if(sessionStorage.getItem(KUNCI_OK) === VERSI_TAMPIL) return;
@@ -1263,17 +1263,10 @@ function coreSiap(idStatus, idDaftar){
 }
 
 /* ---------- Sentuh zona SNR 4 jam pada candle M5 ----------
-   Terjemahan langsung dari indikator Jadi Trader V3, bukan tafsiran sendiri:
-
-     Section 4 - zona SNR dibentuk dari ta.pivothigh/ta.pivotlow(10,10),
-       disimpan maksimal 2 per sisi (srMaxZones), lebarnya ta.atr(14)*0.5
-       (srAtrMult). Di TF 1 & 5 menit zona lokalnya DISEMBUNYIKAN dan yang
-       dipakai zona hasil request.security(..., "240", ...) - persis kenapa
-       di sini 4 jam yang dihitung, lalu diadu dengan candle 5 menit.
-     Section 8 - "sentuh" berarti EKOR candle masuk ke dalam pita zona:
-       resistance dinilai dari high, support dari low. Candle yang menembus
-       habis zonanya bukan sentuhan - itu sweep, urusan Section 9.
-       Candle penolakan = wick sisi itu lebih panjang dari body.
+   Aturannya ditulis di JTScan.snrTouchH4M5 (lihat jt-scan-core.js) - terjemahan
+   langsung Section 4 & 8 indikator Jadi Trader V3: zona dari pivot 10/10 di TF
+   4 jam, 2 zona per sisi, lebar pita ATR(14)*0.5, dan "sentuh" berarti ekor
+   candle masuk ke dalam pita (bukan menembus habis - itu sweep).
 
    Yang diperiksa candle M5 TERAKHIR (masih berjalan), karena pertanyaannya
    "sedang menyentuh", bukan "pernah menyentuh". */
@@ -1283,38 +1276,13 @@ function cekSnrH4M5(sym){
     ambilKlines(sym, '5m', 5)
   ]).then(function(r){
     var h4 = r[0], m5 = r[1];
-    var atrArr = JTScan.atr(h4.highs, h4.lows, h4.closes, 14);
-    var a = atrArr[atrArr.length - 1];
-    if(!(a > 0)) return null;
-    var tol = a * 0.5;
-
-    var res = JTScan.findPivots(h4.highs, 10, 10, true ).slice(-2).map(function(p){ return p.value; });
-    var sup = JTScan.findPivots(h4.lows,  10, 10, false).slice(-2).map(function(p){ return p.value; });
-
     var i = m5.closes.length - 1;
-    var o = m5.opens[i], hi = m5.highs[i], lo = m5.lows[i], c = m5.closes[i];
-    var body = Math.abs(c - o);
-    var wickAtas = hi - Math.max(o, c);
-    var wickBawah = Math.min(o, c) - lo;
-
-    var terbaik = null;
-    res.forEach(function(lvl){
-      if(hi >= lvl - tol && hi <= lvl + tol){
-        var jarak = Math.abs(hi - lvl);
-        if(!terbaik || jarak < terbaik.jarak){
-          terbaik = { sisi:'R', level:lvl, jarak:jarak, arah:'SELL', tolak: wickAtas > body };
-        }
-      }
+    if(i < 0) return null;
+    // Hitungannya sendiri ada di jt-scan-core.js (disalin dari screener lewat
+    // buat-scan-core.js), jadi mustahil beda antara HP dan layar besar.
+    return JTScan.snrTouchH4M5(h4, {
+      open: m5.opens[i], high: m5.highs[i], low: m5.lows[i], close: m5.closes[i]
     });
-    sup.forEach(function(lvl){
-      if(lo <= lvl + tol && lo >= lvl - tol){
-        var jarak = Math.abs(lo - lvl);
-        if(!terbaik || jarak < terbaik.jarak){
-          terbaik = { sisi:'S', level:lvl, jarak:jarak, arah:'BUY', tolak: wickBawah > body };
-        }
-      }
-    });
-    return terbaik;
   });
 }
 
@@ -1355,9 +1323,20 @@ function pindaiPantau(){
         var kondisi = JTScan.smiConditionOf(k);
         if(kondisi === 'neutral') return null;
         var tk = (window.__hargaPasarPenuh || {})[sym];
+        var harga = tk ? parseFloat(tk.lastPrice) : d.closes[d.closes.length-1];
+        var arah = kondisi === 'oversold' ? 'BUY' : 'SELL';
+        // SL ikut aturan yang sama dengan Parallel: di luar kotak SNR plus
+        // setengah tinggi kotaknya. Sebelumnya baris Pantau tidak membawa SL
+        // sama sekali, jadi kolom SL di Entry harus diisi tangan tiap kali.
+        var atrArr = JTScan.atr(d.highs, d.lows, d.closes, 14);
+        var a = atrArr[atrArr.length-1] || (harga * 0.005);
+        var sl = JTScan.slFromSnrZone(arah, harga, d.highs, d.lows, a);
+        var risk = Math.abs(harga - sl);
         return {
           symbol: sym, stochK: k, stochD: sig, kondisi: kondisi,
-          harga: tk ? parseFloat(tk.lastPrice) : d.closes[d.closes.length-1],
+          harga: harga,
+          sl: (risk > 0) ? sl : null,
+          riskPct: (risk > 0) ? (risk / harga * 100) : null,
           ubah24: tk ? parseFloat(tk.priceChangePercent) : null,
           mulaiBalik: (sig != null) && (kondisi === 'oversold' ? k > sig : k < sig)
         };
@@ -1411,13 +1390,17 @@ function pindaiPantau(){
       el('pantauDaftar').innerHTML = pilih.map(function(c){
         var beli = c.kondisi === 'oversold';
         return '<div class="baris" data-pilih="1" data-symbol="' + c.symbol + '"'
-          + ' data-harga="' + c.harga + '" data-arah="' + (beli ? 'BUY' : 'SELL') + '" data-asal="Area Pantau">'
+          + ' data-harga="' + c.harga + '"'
+          + (c.sl != null ? ' data-sl="' + c.sl + '"' : '')
+          + ' data-arah="' + (beli ? 'BUY' : 'SELL') + '" data-asal="Area Pantau">'
           + '<div class="baris-kiri">'
             + '<div class="baris-koin">' + tautanTv(c.symbol.replace('USDT',''), c.symbol, tf)
               + '<span class="pair"> / USDT</span><span class="tf-chip">' + tf + '</span></div>'
             + '<div class="baris-sub">SMI ' + c.stochK.toFixed(1)
               + ' · ' + (beli ? 'Oversold' : 'Overbought')
               + (c.mulaiBalik ? ' · mulai berbalik' : '')
+              + (c.sl != null ? ' · SL ' + HG(c.sl)
+                  + (c.riskPct != null ? ' (' + c.riskPct.toFixed(1) + '%)' : '') : '')
               + (c.snr
                   ? ' · <span style="color:var(--gold)">' + (c.snr.sisi === 'R' ? 'R' : 'S')
                     + ' 4H ' + HG(c.snr.level) + '</span>'
@@ -1484,16 +1467,9 @@ function cariSinyalParallel(sym, tf){
 
     var tk = (window.__hargaPasarPenuh || {})[sym];
     var harga = tk ? parseFloat(tk.lastPrice) : c;
-    var buffer = a * 0.5, sl;
-    if(arah === 'SELL'){
-      var res = JTScan.findPivots(d.highs, 10, 10, true).slice(-2).map(function(p){ return p.value; });
-      var lvlR = res.length ? Math.max.apply(null, res) : null;
-      sl = (lvlR != null && lvlR > harga) ? lvlR + buffer : Math.max.apply(null, d.highs.slice(-15)) + buffer;
-    } else {
-      var sup = JTScan.findPivots(d.lows, 10, 10, false).slice(-2).map(function(p){ return p.value; });
-      var lvlS = sup.length ? Math.min.apply(null, sup) : null;
-      sl = (lvlS != null && lvlS < harga) ? lvlS - buffer : Math.min.apply(null, d.lows.slice(-15)) - buffer;
-    }
+    // SL di luar kotak SNR + setengah tinggi kotaknya (ruang liquidity sweep).
+    // Aturannya ada di jt-scan-core.js, dipakai bareng screener.
+    var sl = JTScan.slFromSnrZone(arah, harga, d.highs, d.lows, a);
     var risk = Math.abs(harga - sl);
     if(!(risk > 0)) return null;
     var riskPct = risk / harga * 100;
