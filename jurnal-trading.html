@@ -3,7 +3,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202608040530">
+<meta name="jt-versi" content="202608041030">
 <script>
 /* ── Penjaga versi ────────────────────────────────────────────────────────────
    GitHub Pages menyuruh browser menyimpan HTML di cache beberapa menit, jadi
@@ -13,7 +13,7 @@
    sekali saja kalau ternyata yang tampil sudah usang. Dijaga sessionStorage
    supaya tidak pernah berulang (anti-loop). */
 (function(){
-  var VERSI_TAMPIL = "202608040530";
+  var VERSI_TAMPIL = "202608041030";
   var KUNCI_OK    = "jtVersiOk";      // versi yang sudah dipastikan benar-benar termuat
   var KUNCI_PAKSA = "jtVersiPaksa";   // versi yang sudah pernah dipaksa muat ulang
   try{
@@ -696,6 +696,15 @@
     <div class="kpi"><div class="label">Avg Win</div><div class="value num profit" id="kAvgWin">$0.00</div></div>
     <div class="kpi"><div class="label">Avg Loss</div><div class="value num loss" id="kAvgLoss">$0.00</div></div>
   </section>
+
+  <!-- ══════════ SAMBUNGAN MT5 (BACA-SAJA) ══════════ -->
+  <div class="card" id="mt5Kartu">
+    <div class="card-head">
+      <h2>Sambungan MetaTrader 5</h2>
+      <span class="hint" id="mt5Status">Memeriksa…</span>
+    </div>
+    <div id="mt5Isi"></div>
+  </div>
 
   <div class="grid">
     <!-- LEFT COLUMN -->
@@ -2583,6 +2592,161 @@
     return changed;
   }
 
+  /* ══════════════════════════════════════════════════════════════════════
+     SAMBUNGAN MT5 (BACA-SAJA)
+     ══════════════════════════════════════════════════════════════════════
+     Data MT5 masuk lewat EA JadiTraderSync yang dipasang pengguna di
+     terminalnya sendiri; halaman ini cuma MEMBACA hasilnya dari backend.
+     Tidak ada password broker yang disimpan di mana pun. */
+  var JT_MT5_BACKEND = 'https://103-253-145-38.sslip.io';
+  var jtMt5Timer = null;
+
+  function mt5Kepala(){
+    return (typeof JTLangganan !== 'undefined') ? JTLangganan.kepalaAuth() : {};
+  }
+
+  /* Akun sen (Exness "USC", banyak broker lain pakai istilah cent account)
+     melaporkan angka dalam SEN. 37.954,89 USC itu $379,55 - kalau disalin
+     mentah, semua angka jurnal meleset 100 kali lipat. Konversi dikerjakan
+     di sini, satu tempat, supaya tidak ada bagian yang lupa. */
+  function mt5KeUsd(nilai, mataUang){
+    var n = Number(nilai);
+    if(!isFinite(n)) return 0;
+    var m = String(mataUang || '').toUpperCase();
+    // Mata uang sen selalu berakhiran C: USC (sen USD), EUC (sen EUR), dst.
+    if(m.length === 3 && m.charAt(2) === 'C') return n / 100;
+    return n;
+  }
+
+  // Tiap broker menempeli akhiran sendiri: XAUUSDc, XAUUSD.m, XAUUSDmicro.
+  // Untuk mencocokkan dengan catatan jurnal, akhirannya dilepas dulu.
+  function mt5SimbolPokok(s){
+    return String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/(C|M|MICRO|PRO|ECN|RAW)$/, '');
+  }
+
+  function mt5Uang(n){
+    var v = Number(n) || 0;
+    return (v < 0 ? '-$' : '$') + Math.abs(v).toFixed(2);
+  }
+
+  function mt5Muat(){
+    var st = document.getElementById('mt5Status');
+    var isi = document.getElementById('mt5Isi');
+    if(!st || !isi) return;
+    fetch(JT_MT5_BACKEND + '/api/mt5/status', { headers: mt5Kepala() })
+      .then(function(r){ return r.json().catch(function(){ return null; }); })
+      .then(function(j){
+        if(!j || !j.ok){ st.textContent = 'Tidak bisa dihubungi'; return; }
+        mt5Gambar(j);
+      })
+      .catch(function(){ st.textContent = 'Server tidak merespons'; });
+  }
+
+  function mt5Gambar(j){
+    var st = document.getElementById('mt5Status');
+    var isi = document.getElementById('mt5Isi');
+    var d = j.data;
+
+    if(!j.terhubung || !d){
+      st.textContent = 'Belum tersambung';
+      isi.innerHTML =
+          '<p style="font-size:13px;line-height:1.7;margin:0 0 12px">'
+        + 'Pasang EA <b>JadiTraderSync</b> di MetaTrader 5 kamu, lalu tempel Kode Pasangan di bawah. '
+        + 'EA-nya <b>baca-saja</b> — tidak bisa membuka atau menutup order apa pun.</p>'
+        + '<div style="font-family:var(--font-mono);font-size:18px;letter-spacing:1px;margin-bottom:10px">'
+        +   (j.kode ? j.kode : '<span style="font-size:13px;letter-spacing:0">belum dibuat</span>')
+        + '</div>'
+        + '<button class="btn" id="mt5BtnKode">' + (j.kode ? 'Buat Kode Baru' : 'Buat Kode Pasangan') + '</button>'
+        + '<ol style="font-size:12.5px;line-height:1.9;color:var(--ink-faint);margin:14px 0 0;padding-left:18px">'
+        +   '<li>Salin <b>JadiTraderSync.ex5</b> ke folder <b>MQL5/Experts</b> (File → Open Data Folder)</li>'
+        +   '<li>Tools → Options → Expert Advisors → centang <b>Allow WebRequest</b>, tambahkan '
+        +       '<span style="font-family:var(--font-mono)">' + JT_MT5_BACKEND + '</span></li>'
+        +   '<li>Seret EA ke chart mana saja</li>'
+        +   '<li>Tempel Kode Pasangan di kolom <b>KodePasangan</b></li>'
+        + '</ol>'
+        + (j.kode ? '' : '<p style="font-size:12px;color:var(--ink-faint);margin-top:10px">'
+              + 'Kalau EA sudah jalan tapi status ini tetap "belum tersambung" lebih dari 1 menit, '
+              + 'lihat tulisan di pojok kiri atas chart — EA menampilkan alasannya di situ.</p>');
+      var b = document.getElementById('mt5BtnKode');
+      if(b) b.addEventListener('click', mt5KodeBaru);
+      return;
+    }
+
+    var mu = d.akun.mataUang;
+    var lalu = Math.round((Date.now() - d.diterima) / 1000);
+    st.textContent = 'Tersambung · ' + (lalu < 60 ? lalu + ' detik lalu' : Math.round(lalu/60) + ' menit lalu');
+
+    var pos = d.posisi || [];
+    var totalProfit = pos.reduce(function(a,p){ return a + mt5KeUsd(p.profit, mu) + mt5KeUsd(p.swap, mu); }, 0);
+    var tanpaSl = pos.filter(function(p){ return !Number(p.sl); }).length;
+
+    var baris = pos.map(function(p){
+      return '<tr>'
+        + '<td>' + (p.simbol || '') + '</td>'
+        + '<td class="' + (p.arah === 'BUY' ? 'profit' : 'loss') + '">' + p.arah + '</td>'
+        + '<td class="num">' + Number(p.lot).toFixed(2) + '</td>'
+        + '<td class="num">' + Number(p.hargaBuka).toFixed(3) + '</td>'
+        + '<td class="num">' + (Number(p.sl) ? Number(p.sl).toFixed(3)
+              : '<span class="loss">tanpa SL</span>') + '</td>'
+        + '<td class="num ' + (mt5KeUsd(p.profit,mu) >= 0 ? 'profit' : 'loss') + '">'
+        +   mt5Uang(mt5KeUsd(p.profit, mu) + mt5KeUsd(p.swap, mu)) + '</td>'
+        + '</tr>';
+    }).join('');
+
+    isi.innerHTML =
+        '<div class="kpi-row" style="margin-bottom:14px">'
+      +   '<div class="kpi"><div class="label">Akun</div><div class="value num" style="font-size:15px">'
+      +     d.akun.login + '</div></div>'
+      +   '<div class="kpi"><div class="label">Saldo</div><div class="value num">'
+      +     mt5Uang(mt5KeUsd(d.akun.saldo, mu)) + '</div></div>'
+      +   '<div class="kpi"><div class="label">Ekuitas</div><div class="value num">'
+      +     mt5Uang(mt5KeUsd(d.akun.ekuitas, mu)) + '</div></div>'
+      +   '<div class="kpi"><div class="label">P/L Terbuka</div><div class="value num '
+      +     (totalProfit >= 0 ? 'profit' : 'loss') + '">' + mt5Uang(totalProfit) + '</div></div>'
+      + '</div>'
+      + '<p style="font-size:12px;color:var(--ink-faint);margin:0 0 12px">'
+      +   d.akun.broker + ' · ' + d.akun.server + ' · akun ' + (d.akun.jenis || '?')
+      +   (mu && mu.length === 3 && mu.charAt(2) === 'C'
+            ? ' · <b>akun sen (' + mu + ')</b> — semua angka di atas sudah dikonversi ke USD'
+            : ' · ' + mu)
+      + '</p>'
+      + (pos.length
+          ? '<div class="table-scroll"><table><thead><tr><th>Simbol</th><th>Arah</th><th>Lot</th>'
+            + '<th>Buka</th><th>SL</th><th>P/L</th></tr></thead><tbody>' + baris + '</tbody></table></div>'
+          : '<p style="font-size:13px;color:var(--ink-faint)">Tidak ada posisi terbuka.</p>')
+      + (tanpaSl
+          ? '<p class="loss" style="font-size:12.5px;margin-top:10px">'
+            + tanpaSl + ' dari ' + pos.length + ' posisi terbuka tidak punya Stop Loss.</p>'
+          : '')
+      + '<p style="font-size:12px;color:var(--ink-faint);margin-top:12px">'
+      +   (d.riwayat || []).length + ' trade tertutup tersimpan dari MT5'
+      +   (d.riwayatDari
+            ? ', mulai ' + new Date(d.riwayatDari * 1000).toLocaleDateString('id-ID',
+                { day:'numeric', month:'long', year:'numeric' })
+            : '')
+      +   '. Trade sebelum tanggal itu sengaja tidak diambil, jadi catatan manual '
+      +   'bulan-bulan sebelumnya tidak tersentuh sama sekali. '
+      +   'Belum dimasukkan ke Riwayat Trade di bawah — itu langkah terpisah supaya '
+      +   'catatan manualmu tidak tertimpa tanpa persetujuan.</p>'
+      + '<button class="btn" id="mt5BtnPutus" style="margin-top:10px">Putuskan Sambungan</button>';
+
+    var bp = document.getElementById('mt5BtnPutus');
+    if(bp) bp.addEventListener('click', function(){
+      if(!confirm('Putuskan sambungan MT5? Kode Pasangan lama jadi tidak berlaku dan EA harus diisi kode baru.')) return;
+      fetch(JT_MT5_BACKEND + '/api/mt5/putus', { method:'POST', headers: mt5Kepala() })
+        .then(function(){ mt5Muat(); });
+    });
+  }
+
+  function mt5KodeBaru(){
+    var b = document.getElementById('mt5BtnKode');
+    if(b) b.disabled = true;
+    fetch(JT_MT5_BACKEND + '/api/mt5/kode', { method:'POST', headers: mt5Kepala() })
+      .then(function(r){ return r.json(); })
+      .then(function(){ mt5Muat(); })
+      .catch(function(){ if(b) b.disabled = false; });
+  }
+
   /* Beri tahu SEKALI bahwa jurnal sedang baca-saja, lalu ubah catatan di bawah
      bilah pengguna. Tanpa ini, penyimpanan otomatis tiap 15 detik akan gagal
      diam-diam dan orang mengira catatannya tersimpan padahal tidak. */
@@ -2827,6 +2991,10 @@
       // kalau belum, biarkan user menekan Connect sekali; setelah itu tersimpan.
       if(typeof window.__jtPasangTombolConnect === 'function') window.__jtPasangTombolConnect();
       if(typeof window.__jtMuatSaldoBinance === 'function') window.__jtMuatSaldoBinance();
+
+      mt5Muat();
+      if(jtMt5Timer) clearInterval(jtMt5Timer);
+      jtMt5Timer = setInterval(mt5Muat, 30000);
 
       if(jtSyncTimer) clearInterval(jtSyncTimer);
       jtSyncTimer = setInterval(function(){ jtSaveToCloud(user.uid); }, 15000);
