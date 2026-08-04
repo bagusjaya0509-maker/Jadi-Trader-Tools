@@ -11,12 +11,12 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202608040330">
+<meta name="jt-versi" content="202608040530">
 <script>
 /* Penjaga versi - lihat catatan lengkap di jurnal-trading.html. Mencegah browser
    menyajikan HTML lama dari cache saat halaman dimuat ulang. */
 (function(){
-  var VERSI_TAMPIL = "202608040330";
+  var VERSI_TAMPIL = "202608040530";
   var KUNCI_OK    = "jtVersiOk";      // versi yang sudah dipastikan benar-benar termuat
   var KUNCI_PAKSA = "jtVersiPaksa";   // versi yang sudah pernah dipaksa muat ulang
   try{
@@ -3086,8 +3086,17 @@
         // Kalau tidak ditunggu, reload memutus permintaan yang masih jalan -
         // dokumen user tetap tanpa layout, jadi seeding terpicu lagi tiap load:
         // itulah yang membuat halaman refresh terus-menerus.
+        //
+        // Tulisan GAGAL -> kembalikan false, JANGAN true. Sejak jurnal dijaga
+        // langganan, penolakan izin jadi kemungkinan yang wajar, dan me-reload
+        // sesudah tulisan ditolak tidak memperbaiki apa pun: kegagalan yang
+        // sama akan terulang, sementara pengguna melihat halaman yang seolah
+        // menggantung lalu balik sendiri ke layar login.
         return esSaveToCloud(uid).then(function(){ return true; })
-                                 .catch(function(){ return true; });
+                                 .catch(function(e){
+                                   if(window.console) console.warn('[seed layout] tulisan cloud ditolak:', e && e.message);
+                                   return false;
+                                 });
       }
       return changed;
     }).catch(function(){ return false; });
@@ -3259,17 +3268,23 @@
       esUserAvatarEl.src = user.photoURL || '';
       esUserNameEl.textContent = user.displayName || user.email || '';
 
-      // Status langganan: dibaca (dan masa cobanya dibuat kalau belum ada)
-      // sekali di titik ini, lalu lencananya menempel di bilah pengguna.
+      /* Status langganan HARUS selesai sebelum apa pun menulis ke users/{uid}.
+         Aturan Firestore mensyaratkan dokumen langganan/{uid} sudah ada; kalau
+         penulisan pertama mendahului pembuatannya, tulisan itu ditolak. Dulu
+         keduanya saya jalankan paralel - untuk email BARU, penanaman layout
+         default kalah cepat, ditolak, lalu halamannya reload sendiri persis
+         sesudah aktivasi. Akun pemilik tidak kena karena dikecualikan aturan,
+         jadi bugnya cuma kelihatan waktu mencoba akun baru. */
+      var siapLangganan = Promise.resolve();
       if(typeof JTLangganan !== 'undefined'){
-        JTLangganan.muat(esDb, user).then(function(st){
+        siapLangganan = JTLangganan.muat(esDb, user).then(function(st){
           var lama = esUserBarEl.querySelector('.jtl-lencana');
           if(lama) lama.remove();
           JTLangganan.pasangLencana(esUserBarEl);
           // Sekali saja saat masuk: kalau sudah habis, katakan langsung supaya
           // orang tidak menekan tombol pindai dulu baru tahu.
           if(st && st.status === 'habis') JTLangganan.tampilDinding();
-        });
+        }).catch(function(){});
       }
 
       // Selalu cek data terbaru dari cloud tiap kali halaman dibuka/refresh -
@@ -3279,7 +3294,9 @@
       // nyala lagi selama halaman tetap terbuka), jadi aman - tidak akan
       // menyela pemantauan posisi live yang sedang berjalan.
       esAuthStatusEl.textContent = 'Menyinkronkan data...';
-      esDb.collection('users').doc(user.uid).get().then(function(doc){
+      siapLangganan.then(function(){
+        return esDb.collection('users').doc(user.uid).get();
+      }).then(function(doc){
         const punyaLayout = doc.exists && esAdaLayoutTersimpan(doc.data());
         // Pengguna BARU (bukan pemilik, belum punya layout apa pun) -> warisi
         // layout default sekali. Kalau berhasil, reload supaya tampilan ikut.

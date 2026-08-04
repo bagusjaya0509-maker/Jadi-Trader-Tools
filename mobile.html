@@ -3,13 +3,13 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202608040330">
+<meta name="jt-versi" content="202608040530">
 <meta name="theme-color" content="#0b0c0f">
 <title>Jadi Trader — Mobile</title>
 <script>
 /* Penjaga versi - sama seperti halaman lain. */
 (function(){
-  var VERSI_TAMPIL = "202608040330";
+  var VERSI_TAMPIL = "202608040530";
   var KUNCI_OK = "jtVersiOk", KUNCI_PAKSA = "jtVersiPaksa";
   try{
     if(sessionStorage.getItem(KUNCI_OK) === VERSI_TAMPIL) return;
@@ -1923,18 +1923,22 @@ auth.onAuthStateChanged(function(user){
   el('namaUser').textContent = user.displayName || user.email || '';
   gate.style.display = 'none';
 
-  // Status langganan + lencana sisa hari di sebelah nama.
+  // Status langganan HARUS selesai lebih dulu: aturan Firestore menolak tulisan
+  // ke users/{uid} selama dokumen langganan/{uid} belum ada, dan sinkronisasi
+  // ke cloud bisa jalan tak lama sesudah ini. Lihat catatan panjang di screener.
+  var siapLangganan = Promise.resolve();
   if(typeof JTLangganan !== 'undefined'){
-    JTLangganan.muat(db, user).then(function(st){
+    siapLangganan = JTLangganan.muat(db, user).then(function(st){
       var induk = el('namaUser').parentNode;
       var lama = induk.querySelector('.jtl-lencana');
       if(lama) lama.remove();
       JTLangganan.pasangLencana(induk);
       if(st && st.status === 'habis') JTLangganan.tampilDinding();
-    });
+    }).catch(function(){});
   }
 
-  tarikDariCloud()
+  siapLangganan
+    .then(function(){ return tarikDariCloud(); })
     .then(function(){ return Promise.all([ muatTicker(), muatSaldoBinance() ]); })
     .then(function(){
       gambarBerandaData();

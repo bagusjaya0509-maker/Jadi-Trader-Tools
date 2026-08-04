@@ -94,11 +94,15 @@ window.JTLangganan = (function(){
     }
     var ref = db.collection('langganan').doc(user.uid);
     return ref.get().then(function(d){
-      if(d.exists) return d;
+      if(d.exists) return d.data() || {};
+      // Dokumen baru dibuat. TIDAK dibaca ulang: nilai "mulai" yang barusan
+      // ditulis pasti waktu server saat ini, selisihnya dengan jam lokal cuma
+      // milidetik - tidak sepadan dengan satu perjalanan bolak-balik tambahan
+      // di jalur login, yang justru paling terasa lambat bagi pengguna baru.
       return ref.set({ mulai: firebase.firestore.FieldValue.serverTimestamp() })
-        .then(function(){ return ref.get(); });
-    }).then(function(d){
-      kondisi = hitung(d.data() || {});
+        .then(function(){ return { mulai: Date.now() }; });
+    }).then(function(data){
+      kondisi = hitung(data);
       return kondisi;
     }).catch(function(e){
       // Lihat catatan GAGAL-TERBUKA di kepala berkas.
