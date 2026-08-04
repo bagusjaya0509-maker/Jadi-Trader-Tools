@@ -3,7 +3,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202608042030">
+<meta name="jt-versi" content="202608042200">
 <script>
 /* ── Penjaga versi ────────────────────────────────────────────────────────────
    GitHub Pages menyuruh browser menyimpan HTML di cache beberapa menit, jadi
@@ -13,7 +13,7 @@
    sekali saja kalau ternyata yang tampil sudah usang. Dijaga sessionStorage
    supaya tidak pernah berulang (anti-loop). */
 (function(){
-  var VERSI_TAMPIL = "202608042030";
+  var VERSI_TAMPIL = "202608042200";
   var KUNCI_OK    = "jtVersiOk";      // versi yang sudah dipastikan benar-benar termuat
   var KUNCI_PAKSA = "jtVersiPaksa";   // versi yang sudah pernah dipaksa muat ulang
   try{
@@ -2567,7 +2567,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="jt-langganan.js"></script>
+<script src="jt-langganan.js?v=202608042200"></script>
 <script>
 (function(){
   // ===== Login Google + jurnal "showcase" (Firebase) =====
@@ -2693,10 +2693,25 @@
     }
 
     st.textContent = 'Memeriksa…';
-    // Menunggu ID token benar-benar siap. Versi sebelumnya memakai token yang
-    // tersimpan apa adanya, dan tepat sesudah login token itu belum ada -
-    // permintaannya berangkat tanpa jati diri lalu dijawab 401.
-    JTLangganan.kepalaAuthTunggu(jtAuth)
+
+    /* Menunggu ID token benar-benar siap. Versi sebelumnya memakai token yang
+       tersimpan apa adanya, dan tepat sesudah login token itu belum ada -
+       permintaannya berangkat tanpa jati diri lalu dijawab 401.
+
+       Cadangan ke kepalaAuth() dipasang karena berkas JS bersama bisa saja
+       masih versi lama di cache peramban. Tanpa cadangan ini, memanggil fungsi
+       yang belum ada melempar TypeError di luar rantai promise, dan layarnya
+       berhenti di "Memeriksa..." tanpa sepatah pesan pun - kegagalan paling
+       membingungkan yang mungkin terjadi. */
+    var siapKepala;
+    if(typeof JTLangganan.kepalaAuthTunggu === 'function'){
+      siapKepala = JTLangganan.kepalaAuthTunggu(jtAuth);
+    } else {
+      if(window.console) console.warn('[mt5] jt-langganan.js masih versi lama (cache) - pakai cara lama');
+      siapKepala = Promise.resolve(JTLangganan.kepalaAuth());
+    }
+
+    siapKepala
       .then(function(kepala){
         return fetch(JT_MT5_BACKEND + '/api/mt5/status', { headers: kepala });
       })

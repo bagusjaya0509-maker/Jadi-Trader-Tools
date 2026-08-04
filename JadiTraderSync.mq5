@@ -112,7 +112,11 @@ void Lbl(string nama, int x, int y, string teks, color warna, int ukuran)
    ObjectSetInteger(0, n, OBJPROP_YDISTANCE, y);
    ObjectSetInteger(0, n, OBJPROP_FONTSIZE, ukuran);
    ObjectSetInteger(0, n, OBJPROP_COLOR, warna);
-   ObjectSetString(0, n, OBJPROP_TEXT, teks);
+   // Teks KOSONG tidak boleh dikirim: MT5 menampilkan nama bawaan objek
+   // ("Label") kalau OBJPROP_TEXT diisi string kosong. Yang muncul di layar
+   // jadi deretan tulisan "Label" - kelihatan seperti kerusakan padahal cuma
+   // baris yang memang tidak terpakai. Satu spasi membuatnya benar-benar kosong.
+   ObjectSetString(0, n, OBJPROP_TEXT, (StringLen(teks) == 0 ? " " : teks));
 }
 
 void BuatDasbor()
