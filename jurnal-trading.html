@@ -3,7 +3,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202608041600">
+<meta name="jt-versi" content="202608041830">
 <script>
 /* ── Penjaga versi ────────────────────────────────────────────────────────────
    GitHub Pages menyuruh browser menyimpan HTML di cache beberapa menit, jadi
@@ -13,7 +13,7 @@
    sekali saja kalau ternyata yang tampil sudah usang. Dijaga sessionStorage
    supaya tidak pernah berulang (anti-loop). */
 (function(){
-  var VERSI_TAMPIL = "202608041600";
+  var VERSI_TAMPIL = "202608041830";
   var KUNCI_OK    = "jtVersiOk";      // versi yang sudah dipastikan benar-benar termuat
   var KUNCI_PAKSA = "jtVersiPaksa";   // versi yang sudah pernah dipaksa muat ulang
   try{
@@ -2708,6 +2708,9 @@
         if(j === null) return;
         if(!j || !j.ok){ st.textContent = 'Tidak bisa dihubungi'; mt5SetTombol(false, false); return; }
         mt5SetTombol(!!j.terhubung, !!j.data);
+        // Sinkron dijalankan SEBELUM menggambar, supaya angka di panel dan di
+        // Riwayat Trade tidak pernah terlihat berbeda satu siklus.
+        if(j.data) mt5SinkronJurnal(j.data);
         mt5Gambar(j);
       })
       .catch(function(){ st.textContent = 'Server tidak merespons'; mt5SetTombol(false, false); });
@@ -2790,15 +2793,15 @@
             + tanpaSl + ' dari ' + pos.length + ' posisi terbuka tidak punya Stop Loss.</p>'
           : '')
       + '<p style="font-size:12px;color:var(--ink-faint);margin-top:12px">'
-      +   (d.riwayat || []).length + ' trade tertutup tersimpan dari MT5'
+      +   (d.ringkas || []).length + ' baris ringkasan sudah masuk ke Riwayat Trade '
+      +   '(satu baris per hari / pair / arah, digabung dari '
+      +   (d.riwayat || []).length + ' order MT5)'
       +   (d.riwayatDari
             ? ', mulai ' + new Date(d.riwayatDari * 1000).toLocaleDateString('id-ID',
                 { day:'numeric', month:'long', year:'numeric' })
             : '')
       +   '. Trade sebelum tanggal itu sengaja tidak diambil, jadi catatan manual '
-      +   'bulan-bulan sebelumnya tidak tersentuh sama sekali. '
-      +   'Belum dimasukkan ke Riwayat Trade di bawah — itu langkah terpisah supaya '
-      +   'catatan manualmu tidak tertimpa tanpa persetujuan.</p>'
+      +   'bulan-bulan sebelumnya tidak tersentuh sama sekali.</p>'
       + '<button class="btn" id="mt5BtnPutus" style="margin-top:10px">Putuskan Sambungan</button>';
 
     var bp = document.getElementById('mt5BtnPutus');
@@ -2807,6 +2810,76 @@
       fetch(JT_MT5_BACKEND + '/api/mt5/putus', { method:'POST', headers: mt5Kepala() })
         .then(function(){ mt5Muat(); });
     });
+  }
+
+  /* ── Sinkron ringkasan MT5 ke Riwayat Trade (otomatis) ────────────────
+     EA sudah mengelompokkan trade jadi satu baris per (tanggal + pair + arah).
+     Di sini baris itu dimasukkan ke jurnal tanpa pratinjau, sesuai permintaan.
+
+     Yang membuat ini aman diulang terus-menerus:
+       • Kunci grup disimpan di kolom mt5Grup. Sinkron berikutnya MENCARI kunci
+         itu dan MEMPERBARUI barisnya, bukan menambah baris baru. Jadi dijalankan
+         tiap 30 detik pun jumlah barisnya tidak bertambah.
+       • Kelompok hari ini memang berubah sepanjang hari (tiap ada posisi
+         tertutup, lot dan P/L-nya bertambah) - itu sebabnya harus diperbarui
+         di tempat, bukan ditambahkan.
+       • Baris tanpa mt5Grup TIDAK PERNAH disentuh. Catatan manualmu aman.
+       • Kolom yang kamu isi sendiri (alasan, emosi, catatan) dipertahankan saat
+         barisnya diperbarui - yang ditimpa hanya angka dari MT5. */
+  function mt5SinkronJurnal(d){
+    if(!d || !Array.isArray(d.ringkas) || !d.ringkas.length) return 0;
+    var mu = d.akun ? d.akun.mataUang : '';
+    var trades = state.trades || [];
+    var indeks = {};
+    trades.forEach(function(t, i){ if(t.mt5Grup) indeks[t.mt5Grup] = i; });
+
+    var baru = 0, diperbarui = 0;
+    d.ringkas.forEach(function(g){
+      if(!g || !g.kunci || !g.tanggal) return;
+      var pl = mt5KeUsd(g.pl, mu);
+      var lot = Number(g.lot) || 0;
+      var arah = (g.arah === 'BUY') ? 'Buy' : 'Sell';
+      var catatan = g.jumlah + ' order ' + arah.toLowerCase() + ' di ' + g.simbol
+                  + ' pada ' + g.tanggal + ' (gabungan otomatis dari MT5)';
+
+      var i = indeks[g.kunci];
+      if(i === undefined){
+        trades.push({
+          id: 'mt5g_' + g.kunci.replace(/[^A-Za-z0-9]/g, '_'),
+          mt5Grup: g.kunci,
+          // Jam 23:59 supaya urutannya jatuh di akhir hari itu - ringkasan
+          // memang mewakili seluruh hari, bukan satu jam tertentu.
+          date: g.tanggal + 'T23:59',
+          pair: String(g.simbol || ''),
+          direction: arah,
+          lot: lot,
+          entry: null,
+          exit: null,
+          pl: pl,
+          reason: '',
+          emotionEntry: '',
+          emotionEval: '',
+          notes: catatan
+        });
+        baru++;
+      } else {
+        var t = trades[i];
+        if(t.lot !== lot || t.pl !== pl){
+          t.lot = lot;
+          t.pl = pl;
+          t.notes = catatan;
+          diperbarui++;
+        }
+      }
+    });
+
+    if(baru || diperbarui){
+      state.trades = trades;
+      saveTrades(state.trades);
+      renderAll();
+      if(window.__jtUid) jtSaveToCloud(window.__jtUid);
+    }
+    return baru + diperbarui;
   }
 
   // Dipasang SEKARANG, bukan menunggu login selesai. Kalau menunggu, tombolnya
