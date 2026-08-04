@@ -137,6 +137,29 @@ window.JTLangganan = (function(){
     return h;
   }
 
+  /* Versi yang MENUNGGU tokennya siap.
+
+     onIdTokenChanged menyalakan callback-nya lalu getIdToken() masih berjalan
+     asinkron di belakang. Permintaan yang dikirim tepat sesudah login karena
+     itu hampir selalu berangkat TANPA Authorization dan dijawab 401 - lalu
+     pengguna melihat "sesi belum siap" padahal tidak ada yang salah, cuma
+     kecepatan. Fungsi ini mengambil tokennya langsung dari currentUser kalau
+     yang tersimpan belum ada, jadi balapannya hilang.
+
+     Dipakai untuk permintaan yang jarang dan penting (status MT5). Untuk fetch
+     data pasar yang ratusan kali per pemindaian, kepalaAuth() yang sinkron
+     tetap lebih tepat - di titik itu tokennya sudah pasti ada. */
+  function kepalaAuthTunggu(auth, tambahan){
+    var h = tambahan ? Object.assign({}, tambahan) : {};
+    if(tokenKini){ h.Authorization = 'Bearer ' + tokenKini; return Promise.resolve(h); }
+    var u = auth && auth.currentUser;
+    if(!u) return Promise.resolve(h);
+    return u.getIdToken().then(function(t){
+      if(t){ tokenKini = t; h.Authorization = 'Bearer ' + t; }
+      return h;
+    }).catch(function(){ return h; });
+  }
+
   /* Terjemahkan penolakan backend jadi tindakan yang benar. Dipanggil halaman
      saat fetch data pasar membalas 401/402. */
   function tanganiTolakan(resp){
@@ -293,6 +316,7 @@ window.JTLangganan = (function(){
     boleh: boleh,
     pantauToken: pantauToken,
     kepalaAuth: kepalaAuth,
+    kepalaAuthTunggu: kepalaAuthTunggu,
     tanganiTolakan: tanganiTolakan,
     tampilDinding: tampilDinding,
     pasangLencana: pasangLencana,

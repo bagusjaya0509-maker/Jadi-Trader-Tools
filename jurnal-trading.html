@@ -3,7 +3,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202608041830">
+<meta name="jt-versi" content="202608042030">
 <script>
 /* ── Penjaga versi ────────────────────────────────────────────────────────────
    GitHub Pages menyuruh browser menyimpan HTML di cache beberapa menit, jadi
@@ -13,7 +13,7 @@
    sekali saja kalau ternyata yang tampil sudah usang. Dijaga sessionStorage
    supaya tidak pernah berulang (anti-loop). */
 (function(){
-  var VERSI_TAMPIL = "202608041830";
+  var VERSI_TAMPIL = "202608042030";
   var KUNCI_OK    = "jtVersiOk";      // versi yang sudah dipastikan benar-benar termuat
   var KUNCI_PAKSA = "jtVersiPaksa";   // versi yang sudah pernah dipaksa muat ulang
   try{
@@ -2693,12 +2693,18 @@
     }
 
     st.textContent = 'Memeriksa…';
-    fetch(JT_MT5_BACKEND + '/api/mt5/status', { headers: mt5Kepala() })
+    // Menunggu ID token benar-benar siap. Versi sebelumnya memakai token yang
+    // tersimpan apa adanya, dan tepat sesudah login token itu belum ada -
+    // permintaannya berangkat tanpa jati diri lalu dijawab 401.
+    JTLangganan.kepalaAuthTunggu(jtAuth)
+      .then(function(kepala){
+        return fetch(JT_MT5_BACKEND + '/api/mt5/status', { headers: kepala });
+      })
       .then(function(r){
         if(r.status === 401){
           st.textContent = 'Sesi belum siap';
-          isi.innerHTML = '<p style="font-size:13px;line-height:1.7">Sesi login belum sepenuhnya siap. '
-            + 'Tunggu beberapa detik lalu buka lagi jendela ini.</p>';
+          isi.innerHTML = '<p style="font-size:13px;line-height:1.7">Sesi login belum diterima server. '
+            + 'Coba muat ulang halaman; kalau tetap begini, keluar lalu login lagi.</p>';
           mt5SetTombol(false, false);
           return null;
         }
@@ -2708,12 +2714,28 @@
         if(j === null) return;
         if(!j || !j.ok){ st.textContent = 'Tidak bisa dihubungi'; mt5SetTombol(false, false); return; }
         mt5SetTombol(!!j.terhubung, !!j.data);
-        // Sinkron dijalankan SEBELUM menggambar, supaya angka di panel dan di
-        // Riwayat Trade tidak pernah terlihat berbeda satu siklus.
-        if(j.data) mt5SinkronJurnal(j.data);
-        mt5Gambar(j);
+        // Sinkron dan penggambaran dibungkus terpisah. Sebelumnya keduanya ada
+        // di dalam rantai yang sama dengan fetch, jadi SALAH KETIK di kode
+        // penggambaran pun dilaporkan sebagai "Server tidak merespons" - pesan
+        // yang menuduh jaringan padahal masalahnya di sini.
+        try{
+          if(j.data) mt5SinkronJurnal(j.data);
+          mt5Gambar(j);
+        }catch(e){
+          st.textContent = 'Gagal menampilkan data';
+          isi.innerHTML = '<p style="font-size:13px;color:var(--loss)">Kesalahan di halaman: '
+            + (e && e.message ? e.message : e) + '</p>';
+          if(window.console) console.error('[mt5] gagal menggambar:', e);
+        }
       })
-      .catch(function(){ st.textContent = 'Server tidak merespons'; mt5SetTombol(false, false); });
+      .catch(function(e){
+        // Sampai di sini hanya kalau permintaannya sendiri gagal berangkat.
+        st.textContent = 'Server tidak merespons';
+        isi.innerHTML = '<p style="font-size:13px;color:var(--loss)">Tidak bisa menghubungi server: '
+          + (e && e.message ? e.message : e) + '</p>';
+        mt5SetTombol(false, false);
+        if(window.console) console.error('[mt5] fetch gagal:', e);
+      });
   }
 
   function mt5Gambar(j){
