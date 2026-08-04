@@ -3,7 +3,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202608011600">
+<meta name="jt-versi" content="202608040330">
 <script>
 /* ── Penjaga versi ────────────────────────────────────────────────────────────
    GitHub Pages menyuruh browser menyimpan HTML di cache beberapa menit, jadi
@@ -13,7 +13,7 @@
    sekali saja kalau ternyata yang tampil sudah usang. Dijaga sessionStorage
    supaya tidak pernah berulang (anti-loop). */
 (function(){
-  var VERSI_TAMPIL = "202608011600";
+  var VERSI_TAMPIL = "202608040330";
   var KUNCI_OK    = "jtVersiOk";      // versi yang sudah dipastikan benar-benar termuat
   var KUNCI_PAKSA = "jtVersiPaksa";   // versi yang sudah pernah dipaksa muat ulang
   try{
@@ -2539,6 +2539,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="jt-langganan.js"></script>
 <script>
 (function(){
   // ===== Login Google + jurnal "showcase" (Firebase) =====
@@ -2582,7 +2583,29 @@
     return changed;
   }
 
+  /* Beri tahu SEKALI bahwa jurnal sedang baca-saja, lalu ubah catatan di bawah
+     bilah pengguna. Tanpa ini, penyimpanan otomatis tiap 15 detik akan gagal
+     diam-diam dan orang mengira catatannya tersimpan padahal tidak. */
+  var jtBacaSajaDiberitahu = false;
+  function jtTandaiBacaSaja(){
+    if(jtViewerNoteEl){
+      jtViewerNoteEl.textContent = 'Masa coba habis — jurnal hanya bisa dibaca. '
+        + 'Catatan lamamu tetap tersimpan.';
+    }
+    if(jtBacaSajaDiberitahu) return;
+    jtBacaSajaDiberitahu = true;
+    if(typeof JTLangganan !== 'undefined') JTLangganan.tampilDinding('Jurnal Trading');
+  }
+
   function jtSaveToCloud(uid){
+    // Langganan habis -> jurnal jadi BACA-SAJA. Catatan lama tetap utuh di
+    // cloud dan tetap tampil; yang berhenti hanya penyimpanan perubahan baru.
+    // Aturan Firestore juga menolaknya di sisi server - pemeriksaan di sini
+    // cuma supaya pesannya jelas, bukan error izin mentah.
+    if(typeof JTLangganan !== 'undefined' && !JTLangganan.aktif()){
+      jtTandaiBacaSaja();
+      return Promise.resolve(false);
+    }
     var payload = {};
     JT_WRITE_KEYS.forEach(function(key){
       var val = localStorage.getItem(key);
@@ -2739,6 +2762,8 @@
   var jtSignOutBtn = document.getElementById('jtSignOutBtn');
   var jtViewerNoteEl = document.getElementById('jtViewerNote');
 
+    if(typeof JTLangganan !== 'undefined') JTLangganan.pantauToken(jtAuth);
+
   jtAuth.onAuthStateChanged(function(user){
     if(user){
       jtLoginBtn.style.display = 'none';
@@ -2746,6 +2771,15 @@
       jtUserAvatarEl.src = user.photoURL || '';
       jtUserNameEl.textContent = user.displayName || user.email || '';
       jtViewerNoteEl.textContent = 'Menampilkan jurnal kamu sendiri.';
+
+      if(typeof JTLangganan !== 'undefined'){
+        JTLangganan.muat(jtDb, user).then(function(st){
+          var lama = jtUserBarEl.querySelector('.jtl-lencana');
+          if(lama) lama.remove();
+          JTLangganan.pasangLencana(jtUserBarEl);
+          if(st && st.status === 'habis') jtTandaiBacaSaja();
+        });
+      }
 
       // Selalu cek data terbaru dari cloud tiap kali halaman dibuka/refresh -
       // reload cuma terjadi kalau memang ada perubahan (dari device lain),

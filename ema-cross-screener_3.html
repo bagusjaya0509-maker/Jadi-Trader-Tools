@@ -11,12 +11,12 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202608040030">
+<meta name="jt-versi" content="202608040330">
 <script>
 /* Penjaga versi - lihat catatan lengkap di jurnal-trading.html. Mencegah browser
    menyajikan HTML lama dari cache saat halaman dimuat ulang. */
 (function(){
-  var VERSI_TAMPIL = "202608040030";
+  var VERSI_TAMPIL = "202608040330";
   var KUNCI_OK    = "jtVersiOk";      // versi yang sudah dipastikan benar-benar termuat
   var KUNCI_PAKSA = "jtVersiPaksa";   // versi yang sudah pernah dipaksa muat ulang
   try{
@@ -2280,6 +2280,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="jt-langganan.js"></script>
 
 <div class="es-auth-gate" id="esAuthGate">
   <!-- Sesi Firebase baru diketahui setelah onAuthStateChanged menyala (~1 detik).
@@ -2896,6 +2897,21 @@
 
   // Cek apakah akun ini sudah member. Owner SELALU lolos (tanpa baca Firestore),
   // jadi kamu tidak akan pernah terkunci walau Firestore/aturan bermasalah.
+  /* ── Penjaga fitur berbayar ───────────────────────────────────────────
+     Dipanggil di pintu masuk SETIAP pemindaian. Ditaruh di dalam fungsinya,
+     bukan di addEventListener, supaya jalur lain (ganti TF, ganti filter,
+     pindai ulang sesudah ganti koin) ikut terjaga - kalau hanya tombolnya
+     yang dijaga, mengubah dropdown saja sudah cukup untuk melewatinya.
+
+     Kalau jt-langganan.js tidak termuat, jangan mengunci apa pun: penegakan
+     yang sesungguhnya ada di aturan Firestore dan di backend, sedangkan
+     mengunci gara-gara satu berkas gagal diunduh hanya menyusahkan orang
+     yang sudah bayar. */
+  function izinSinyal(){
+    if(typeof JTLangganan === 'undefined') return true;
+    return JTLangganan.boleh('Sinyal &amp; Pemindaian');
+  }
+
   function cekKeanggotaan(user){
     if(!GATE_ENABLED) return Promise.resolve(true);
     if(esIsOwner) return Promise.resolve(true);
@@ -3167,6 +3183,9 @@
     });
   }
 
+    // Token dipantau sejak awal supaya fetch data pasar selalu membawa jati diri.
+  if(typeof JTLangganan !== 'undefined') JTLangganan.pantauToken(esAuth);
+
   esAuth.onAuthStateChanged(function(user){
     if(user){
       esCurrentUid = user.uid;
@@ -3239,6 +3258,19 @@
       esUserBarEl.style.display = 'flex';
       esUserAvatarEl.src = user.photoURL || '';
       esUserNameEl.textContent = user.displayName || user.email || '';
+
+      // Status langganan: dibaca (dan masa cobanya dibuat kalau belum ada)
+      // sekali di titik ini, lalu lencananya menempel di bilah pengguna.
+      if(typeof JTLangganan !== 'undefined'){
+        JTLangganan.muat(esDb, user).then(function(st){
+          var lama = esUserBarEl.querySelector('.jtl-lencana');
+          if(lama) lama.remove();
+          JTLangganan.pasangLencana(esUserBarEl);
+          // Sekali saja saat masuk: kalau sudah habis, katakan langsung supaya
+          // orang tidak menekan tombol pindai dulu baru tahu.
+          if(st && st.status === 'habis') JTLangganan.tampilDinding();
+        });
+      }
 
       // Selalu cek data terbaru dari cloud tiap kali halaman dibuka/refresh -
       // reload cuma terjadi kalau memang ada perubahan (dari device lain),
@@ -3748,7 +3780,7 @@
     const base = esMarketBase();
     if(base){
       try{
-        const r = await fetch(`${base}/api/tickers`);
+        const r = await fetch(`${base}/api/tickers`, { headers: (typeof JTLangganan !== 'undefined' ? JTLangganan.kepalaAuth() : {}) });
         if(r.ok){
           const j = await r.json();
           if(j && Array.isArray(j.data)){
@@ -3847,7 +3879,7 @@
     const base = esMarketBase();
     if(base){
       try{
-        const r = await fetch(`${base}/api/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`);
+        const r = await fetch(`${base}/api/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`, { headers: (typeof JTLangganan !== 'undefined' ? JTLangganan.kepalaAuth() : {}) });
         if(r.ok){
           const j = await r.json();
           if(j && Array.isArray(j.data)){ data = j.data; market = j.market || 'spot'; }
@@ -4793,6 +4825,8 @@
   const MAIN_KLINES_LIMIT = 300;
 
   async function scan(){
+
+    if(!izinSinyal()) return;
     // Grid ini sekarang berada di dalam section "Sinyal Entry Koin Favorit" -
     // kalau section-nya dilipat, jangan buang request ke Binance.
     if(isSectionCollapsed('favcross')) return;
@@ -5187,6 +5221,8 @@
   }
 
   async function findPrioritySignals(){
+
+    if(!izinSinyal()) return;
     if(isSectionCollapsed('bbma')) return; // section dilipat - hemat request
     const scanTfs = getPriorityScanTfs();
     if(scanTfs.length===0){
@@ -5516,6 +5552,8 @@
   }
 
   async function findPriorityIctSignals(){
+
+    if(!izinSinyal()) return;
     priorityIctBtn.disabled = true;
     priorityIctStatusEl.classList.remove('error');
     priorityIctStatusEl.textContent = `Memindai ${activeSymbols.length} koin (ICT Scalping HTF 1H / LTF 5m)... bisa memakan waktu beberapa detik.`;
@@ -5896,6 +5934,8 @@
   }
 
   async function cariSinyalPantau(){
+
+    if(!izinSinyal()) return;
     if(isSectionCollapsed('pantau')) return; // section dilipat - hemat request
     const tf = pantauTfSel.value;
     const mode = pantauRezimSel.value;
@@ -6557,6 +6597,8 @@
   }
 
   async function findCrossHunterSignals(){
+
+    if(!izinSinyal()) return;
     if(isSectionCollapsed('crosshunter')) return;
     const tf = chTfSel.value;
     chBtn.disabled = true;
@@ -6664,6 +6706,8 @@
   }
 
   async function findPrioritySnrSignals(){
+
+    if(!izinSinyal()) return;
     if(isSectionCollapsed('snr')) return; // section dilipat - hemat request
     const tfs = getSnrPriorityTfs();
     if(tfs.length===0){
@@ -7011,6 +7055,8 @@
   }
 
   async function findPriorityAiSignals(){
+
+    if(!izinSinyal()) return;
     if(isSectionCollapsed('ai')) return; // section dilipat - hemat request
     priorityAiBtn.disabled = true;
     priorityAiStatusEl.classList.remove('error');
@@ -9003,7 +9049,7 @@
     const base = esMarketBase();
     if(base){
       try{
-        const r = await fetch(`${base}/api/ticker-price?symbol=${symbol}`);
+        const r = await fetch(`${base}/api/ticker-price?symbol=${symbol}`, { headers: (typeof JTLangganan !== 'undefined' ? JTLangganan.kepalaAuth() : {}) });
         if(r.ok){
           const j = await r.json();
           const pp = j && j.data ? parseFloat(j.data.price) : NaN;

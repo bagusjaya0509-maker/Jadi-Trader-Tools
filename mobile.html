@@ -3,13 +3,13 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202608040030">
+<meta name="jt-versi" content="202608040330">
 <meta name="theme-color" content="#0b0c0f">
 <title>Jadi Trader — Mobile</title>
 <script>
 /* Penjaga versi - sama seperti halaman lain. */
 (function(){
-  var VERSI_TAMPIL = "202608040030";
+  var VERSI_TAMPIL = "202608040330";
   var KUNCI_OK = "jtVersiOk", KUNCI_PAKSA = "jtVersiPaksa";
   try{
     if(sessionStorage.getItem(KUNCI_OK) === VERSI_TAMPIL) return;
@@ -610,6 +610,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script src="jt-scan-core.js"></script>
+<script src="jt-langganan.js"></script>
 <script>
 (function(){
 "use strict";
@@ -1207,7 +1208,7 @@ function muatBerita(){
    HARGA PASAR
    ══════════════════════════════════════════════════════════════════════ */
 function muatTicker(){
-  return fetch(PROXY + '/api/tickers')
+  return fetch(PROXY + '/api/tickers', { headers: (typeof JTLangganan !== 'undefined' ? JTLangganan.kepalaAuth() : {}) })
     .then(function(r){ return r.ok ? r.json() : null; })
     .then(function(j){
       if(!j || !Array.isArray(j.data)) return null;
@@ -1223,7 +1224,7 @@ function muatTicker(){
 }
 
 function ambilKlines(symbol, interval, limit){
-  return fetch(PROXY + '/api/klines?symbol=' + symbol + '&interval=' + interval + '&limit=' + (limit||250))
+  return fetch(PROXY + '/api/klines?symbol=' + symbol + '&interval=' + interval + '&limit=' + (limit||250), { headers: (typeof JTLangganan !== 'undefined' ? JTLangganan.kepalaAuth() : {}) })
     .then(function(r){ if(!r.ok) throw new Error('klines'); return r.json(); })
     .then(function(j){
       var d = (j && j.data) || [];
@@ -1286,8 +1287,15 @@ function cekSnrH4M5(sym){
   });
 }
 
+/* Penjaga fitur berbayar - lihat catatan yang sama di screener. Ditaruh di
+   dalam fungsinya supaya jalur lain (ganti TF, ganti filter) ikut terjaga. */
+function izinSinyal(){
+  if(typeof JTLangganan === 'undefined') return true;
+  return JTLangganan.boleh('Sinyal & Pemindaian');
+}
 var pantauJalan = false, pantauPernah = false;
 function pindaiPantau(){
+  if(!izinSinyal()) return;
   if(pantauJalan) return;
   if(!coreSiap('pantauStatus', 'pantauDaftar')) return;
   pantauPernah = true;
@@ -1529,6 +1537,7 @@ function gambarSinyal(){
 
 var chPernah = false;
 function pindaiParallel(){
+  if(!izinSinyal()) return;
   if(chJalan) return;
   if(!coreSiap('chStatus', 'chDaftar')) return;
   chPernah = true;
@@ -1902,6 +1911,7 @@ el('btnKeluar').addEventListener('click', function(){ auth.signOut(); });
 // ?desktop=1 supaya index.html tidak memantulkan balik ke sini.
 el('btnKeDesktop').addEventListener('click', function(){ location.href = 'jurnal-trading.html?desktop=1'; });
 
+if(typeof JTLangganan !== 'undefined') JTLangganan.pantauToken(auth);
 auth.onAuthStateChanged(function(user){
   if(!user){
     uid = null;
@@ -1912,6 +1922,17 @@ auth.onAuthStateChanged(function(user){
   uid = user.uid;
   el('namaUser').textContent = user.displayName || user.email || '';
   gate.style.display = 'none';
+
+  // Status langganan + lencana sisa hari di sebelah nama.
+  if(typeof JTLangganan !== 'undefined'){
+    JTLangganan.muat(db, user).then(function(st){
+      var induk = el('namaUser').parentNode;
+      var lama = induk.querySelector('.jtl-lencana');
+      if(lama) lama.remove();
+      JTLangganan.pasangLencana(induk);
+      if(st && st.status === 'habis') JTLangganan.tampilDinding();
+    });
+  }
 
   tarikDariCloud()
     .then(function(){ return Promise.all([ muatTicker(), muatSaldoBinance() ]); })
