@@ -3,7 +3,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202608042200">
+<meta name="jt-versi" content="202608042330">
 <script>
 /* ── Penjaga versi ────────────────────────────────────────────────────────────
    GitHub Pages menyuruh browser menyimpan HTML di cache beberapa menit, jadi
@@ -13,7 +13,7 @@
    sekali saja kalau ternyata yang tampil sudah usang. Dijaga sessionStorage
    supaya tidak pernah berulang (anti-loop). */
 (function(){
-  var VERSI_TAMPIL = "202608042200";
+  var VERSI_TAMPIL = "202608042330";
   var KUNCI_OK    = "jtVersiOk";      // versi yang sudah dipastikan benar-benar termuat
   var KUNCI_PAKSA = "jtVersiPaksa";   // versi yang sudah pernah dipaksa muat ulang
   try{
@@ -1449,6 +1449,19 @@
   // jurnal masih menampilkan data lama saat dibuka langsung).
   window.__jtRenderXau = renderAll;
 
+  /* Jembatan untuk sinkronisasi MT5. Halaman ini terbagi jadi beberapa blok
+     <script> terpisah, dan `state` hanya hidup di blok INI - blok lain tidak
+     bisa menyentuhnya sama sekali. Sempat saya tulis `state.trades` langsung
+     dari blok MT5 dan hasilnya "state is not defined": kode yang benar, tapi
+     di ruang lingkup yang salah. Jalur resminya lewat window, sama seperti
+     __jtRenderXau di atas. */
+  window.__jtAmbilTrades = function(){ return state.trades || []; };
+  window.__jtSimpanTrades = function(daftar){
+    state.trades = daftar;
+    saveTrades(state.trades);
+    renderAll();
+  };
+
   // ---------- Modal ----------
   var overlay = document.getElementById('modalOverlay');
   var form = document.getElementById('tradeForm');
@@ -2567,7 +2580,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="jt-langganan.js?v=202608042200"></script>
+<script src="jt-langganan.js?v=202608042330"></script>
 <script>
 (function(){
   // ===== Login Google + jurnal "showcase" (Firebase) =====
@@ -2865,8 +2878,13 @@
          barisnya diperbarui - yang ditimpa hanya angka dari MT5. */
   function mt5SinkronJurnal(d){
     if(!d || !Array.isArray(d.ringkas) || !d.ringkas.length) return 0;
+    // `state` hidup di blok <script> lain - lihat catatan di __jtAmbilTrades.
+    if(typeof window.__jtAmbilTrades !== 'function'){
+      if(window.console) console.warn('[mt5] jembatan jurnal belum siap, sinkron dilewati');
+      return 0;
+    }
     var mu = d.akun ? d.akun.mataUang : '';
-    var trades = state.trades || [];
+    var trades = window.__jtAmbilTrades();
     var indeks = {};
     trades.forEach(function(t, i){ if(t.mt5Grup) indeks[t.mt5Grup] = i; });
 
@@ -2911,9 +2929,7 @@
     });
 
     if(baru || diperbarui){
-      state.trades = trades;
-      saveTrades(state.trades);
-      renderAll();
+      window.__jtSimpanTrades(trades);   // simpan + gambar ulang, di blok pemiliknya
       if(window.__jtUid) jtSaveToCloud(window.__jtUid);
     }
     return baru + diperbarui;
