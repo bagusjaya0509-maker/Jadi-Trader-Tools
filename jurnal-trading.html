@@ -3,7 +3,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202608042330">
+<meta name="jt-versi" content="202608050100">
 <script>
 /* ── Penjaga versi ────────────────────────────────────────────────────────────
    GitHub Pages menyuruh browser menyimpan HTML di cache beberapa menit, jadi
@@ -13,7 +13,7 @@
    sekali saja kalau ternyata yang tampil sudah usang. Dijaga sessionStorage
    supaya tidak pernah berulang (anti-loop). */
 (function(){
-  var VERSI_TAMPIL = "202608042330";
+  var VERSI_TAMPIL = "202608050100";
   var KUNCI_OK    = "jtVersiOk";      // versi yang sudah dipastikan benar-benar termuat
   var KUNCI_PAKSA = "jtVersiPaksa";   // versi yang sudah pernah dipaksa muat ulang
   try{
@@ -1553,7 +1553,17 @@
     };
 
     if (id){
-      state.trades = state.trades.map(function(t){ return t.id===id ? trade : t; });
+      /* DIGABUNG ke baris lama, bukan menimpanya bulat-bulat.
+
+         Objek `trade` di atas dirakit ulang dari isian formulir saja, jadi
+         kolom yang TIDAK ada di formulir akan hilang kalau dipakai menimpa.
+         Yang paling berakibat: mt5Grup, penanda kelompok baris hasil sinkron
+         MT5. Begitu penanda itu hilang, sinkron berikutnya tidak mengenali
+         barisnya lagi lalu membuat baris baru - jadi satu trade tampil dua
+         kali setiap kali orang menyunting emosi atau alasan entry. */
+      state.trades = state.trades.map(function(t){
+        return t.id === id ? Object.assign({}, t, trade) : t;
+      });
     } else {
       state.trades.push(trade);
     }
@@ -2580,7 +2590,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="jt-langganan.js?v=202608042330"></script>
+<script src="jt-langganan.js?v=202608050100"></script>
 <script>
 (function(){
   // ===== Login Google + jurnal "showcase" (Firebase) =====
@@ -2922,7 +2932,13 @@
         if(t.lot !== lot || t.pl !== pl){
           t.lot = lot;
           t.pl = pl;
-          t.notes = catatan;
+          /* Catatan HANYA ditimpa kalau isinya masih tulisan otomatis. Kalau
+             kamu sudah menggantinya sendiri, biarkan - kalau tidak, tulisanmu
+             lenyap diam-diam tiap kali ada posisi baru tertutup di hari yang
+             sama. Alasan entry & emosi memang tidak pernah disentuh di sini. */
+          if(!t.notes || /\(gabungan otomatis dari MT5\)\s*$/.test(t.notes)){
+            t.notes = catatan;
+          }
           diperbarui++;
         }
       }
