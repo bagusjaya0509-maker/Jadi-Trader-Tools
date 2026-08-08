@@ -11,12 +11,12 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202608081800">
+<meta name="jt-versi" content="202608082100">
 <script>
 /* Penjaga versi - lihat catatan lengkap di jurnal-trading.html. Mencegah browser
    menyajikan HTML lama dari cache saat halaman dimuat ulang. */
 (function(){
-  var VERSI_TAMPIL = "202608081800";
+  var VERSI_TAMPIL = "202608082100";
   var KUNCI_OK    = "jtVersiOk";      // versi yang sudah dipastikan benar-benar termuat
   var KUNCI_PAKSA = "jtVersiPaksa";   // versi yang sudah pernah dipaksa muat ulang
   try{
@@ -1595,6 +1595,40 @@
   }
   .es-coin-suggest{ margin-top:6px; max-height:180px; overflow-y:auto; }
   .es-coin-suggest:empty{ display:none; }
+  /* Pesan hasil pemilihan koin manual. Dulu pesan ini menumpang di status
+     section Sinyal Prioritas BBMA; begitu section itu dihapus, elemennya null
+     dan BARIS PERTAMA pilihKoinManual() melempar - jadi mengetik "xaut" lalu
+     memilihnya terlihat "tidak ada respons" padahal koinnya ada. */
+  .es-coin-pick-status{
+    grid-column:1 / -1;
+    font-family: var(--font-mono); font-size:11px;
+    color: var(--muted); margin:2px 0 0;
+  }
+  .es-coin-pick-status:empty{ display:none; }
+  .es-coin-pick-status.error{ color: var(--bear); }
+
+  /* Ikon cari koin di Area Pantau - memakai ulang gaya popover milik pencarian
+     koin di panel Live Trading, jadi keduanya terasa satu benda yang sama. */
+  .es-pantau-cari-wrap{ position:relative; display:inline-flex; align-items:center; }
+  #esPantauCariBtn{
+    flex-shrink:0;
+    display:inline-flex; align-items:center; justify-content:center;
+    background:none; border:none; border-radius:0;
+    color: var(--muted); cursor:pointer; padding:4px;
+    width:auto; height:auto;
+    transition:color .15s;
+  }
+  #esPantauCariBtn:hover{ color: var(--text); background:none; }
+  #esPantauCariBtn.active{ color: var(--gold); }
+  #esPantauCariBtn svg{ width:17px; height:17px; flex:0 0 auto; display:block; }
+  #esPantauCariInput{
+    width:100%; box-sizing:border-box;
+    background: var(--panel-2); border:1px solid var(--border);
+    color: var(--text); font-family: var(--font-mono); font-size:12px;
+    padding:7px 9px; border-radius:6px; outline:none;
+  }
+  /* Kotak hasil pencarian ditandai supaya jelas ini bukan hasil pindaian. */
+  .es-card.es-kartu-dicari{ border-color: var(--gold); }
   #esPsimSignalSelect, #esLiveOrderType, #esLiveEntryMethod, #esPsimDirOverride{ color: var(--muted); font-size:11px; }
   /* Caret (segitiga ke bawah) dropdown ini ditaruh agak ke kiri (tidak mepet tepi
      kanan) pakai caret custom + jarak dari tepi kanan. */
@@ -2329,8 +2363,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="jt-langganan.js?v=202608081800"></script>
-<script src="jt-lapor.js?v=202608081800"></script>
+<script src="jt-langganan.js?v=202608082100"></script>
+<script src="jt-lapor.js?v=202608082100"></script>
 
 <div class="es-auth-gate" id="esAuthGate">
   <!-- Sesi Firebase baru diketahui setelah onAuthStateChanged menyala (~1 detik).
@@ -2490,6 +2524,18 @@
           <option value="oversold">Hanya Oversold (potensi BUY)</option>
           <option value="overbought">Hanya Overbought (potensi SELL)</option>
         </select>
+        <!-- Ikon cari koin, di KIRI tombol pindai. Gunanya bukan menyaring hasil
+             pindaian, tapi memunculkan kotak pantau untuk satu koin yang mungkin
+             tidak ikut terpindai sama sekali. -->
+        <div class="es-pantau-cari-wrap">
+          <button type="button" id="esPantauCariBtn" class="es-coin-search-btn" title="Cari koin dan tampilkan kotak pantaunya">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6.5"></circle><line x1="21" y1="21" x2="15.5" y2="15.5"></line></svg>
+          </button>
+          <div class="es-coin-search-pop" id="esPantauCariPop">
+            <input type="text" id="esPantauCariInput" placeholder="Cari koin, mis. XAUT" autocomplete="off">
+            <div class="es-coin-suggest" id="esPantauCariSuggest"></div>
+          </div>
+        </div>
         <button id="esPantauBtn" class="es-priority-btn">Cari Sinyal Pantau</button>
         <div class="es-ai-regime" id="esPantauRegimeBadge"></div>
         <div class="es-econ-calendar-panel collapsed" id="esEconCalendarPanel">
@@ -2531,25 +2577,10 @@
     </div>
   </div>
 
-  <div class="es-priority-section es-collapsible" data-section="snr">
-    <div class="es-priority-header es-section-head">
-      <div class="es-priority-title">Sinyal Prioritas</div>
-      <button type="button" class="es-section-toggle" title="Sembunyikan section">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
-      </button>
-    </div>
-    <div class="es-section-body">
-      <!-- Tanpa dropdown apa pun. Syarat sinyalnya cuma SATU dan terkunci:
-           candle M5 menyentuh zona SNR 4 jam, DAN SMI 4 jam sedang overbought
-           atau oversold. Tidak ada yang bisa disetel, jadi tidak ada yang perlu
-           ditampilkan sebagai pilihan. -->
-      <div class="es-priority-controls">
-        <button id="esPrioritySnrBtn" class="es-priority-btn">Cari Sinyal Prioritas</button>
-      </div>
-      <div class="es-priority-grid" id="esPrioritySnrGrid"></div>
-      <div class="es-priority-status" id="esPrioritySnrStatus">Klik "Cari Sinyal Prioritas" untuk memindai.</div>
-    </div>
-  </div>
+  <!-- Section "Sinyal Prioritas" dulu berdiri sendiri di sini. Sekarang jadi
+       salah satu MODE di dropdown filter Parallel Signal di bawah, karena
+       keduanya menjawab pertanyaan yang sama ("sinyal mana yang layak dilihat
+       sekarang") dan dua section terpisah cuma memaksa mata bolak-balik. -->
   <div class="es-priority-section es-collapsible" data-section="crosshunter">
     <div class="es-priority-header es-section-head">
       <div class="es-priority-title">Parallel Signal</div>
@@ -2570,8 +2601,13 @@
           <option value="4h" selected>TF 4 Jam</option>
           <option value="1d">TF Daily</option>
         </select>
-        <select id="esChSnrFilter" title="Saring sinyal berdasarkan ada/tidaknya level Support-Resisten di titik sentuh channel">
-          <option value="all" selected>Semua Sinyal</option>
+        <!-- Tiga mode, dan yang PERTAMA bukan sekadar saringan: "Sinyal SNR H4"
+             memakai pemindaian yang sama sekali berbeda (SMI 4 jam + sentuhan
+             candle M5 ke zona SNR 4 jam), bukan hasil parallel yang disaring.
+             Karena itu pindah ke mode ini selalu memicu pindai ulang, sementara
+             pindah antara dua mode sisanya cukup menyaring hasil yang sudah ada. -->
+        <select id="esChSnrFilter" title="Pilih jenis sinyal yang dicari">
+          <option value="snrh4" selected>Sinyal SNR H4</option>
           <option value="snr">Sentuh SNR (channel + level S/R)</option>
           <option value="only">Parallel Only (tanpa S/R)</option>
         </select>
@@ -2579,7 +2615,7 @@
         <div class="es-ai-regime" id="esChSmiBadge"></div>
       </div>
       <div class="es-priority-grid" id="esChGrid"></div>
-      <div class="es-priority-status" id="esChStatus">Klik "Cari Sinyal Parallel" untuk memindai.</div>
+      <div class="es-priority-status" id="esChStatus">Klik "Cari Sinyal SNR H4" untuk memindai (SMI 4 jam + sentuh SNR di M5).</div>
     </div>
   </div>
 
@@ -2693,6 +2729,7 @@
       </div>
       <div class="es-live-trade-status" id="esLiveTradeStatus"></div>
     </div>
+    <div class="es-coin-pick-status" id="esCoinPickStatus"></div>
     <div class="es-sim-preview" id="esPsimPreview"></div>
 
     <div class="es-sim-table-header">
@@ -2969,6 +3006,50 @@
   }
 
   // Pemilik menerbitkan layout-nya ke dokumen bersama config/defaultLayout.
+  /* ── Siaran posisi terbuka pemilik ────────────────────────────────────────
+     Jurnal milik pengguna lain tidak bisa - dan tidak boleh - membaca dokumen
+     pribadi pemilik. Jadi pemilik menyalin sendiri ringkasan posisi yang sedang
+     BERJALAN ke satu dokumen publik, persis pola yang sudah dipakai jurnal
+     contoh (public/jurnalShowcase).
+
+     Yang disiarkan sengaja TIDAK termasuk ukuran posisi, margin, leverage,
+     maupun PnL dalam dolar: ketiganya membocorkan besar akun, dan tidak satu pun
+     dibutuhkan untuk mengikuti sinyalnya. Yang dikirim cuma simbol, arah, entry,
+     SL, TP, dan waktu buka - dari situ jurnal siapa pun bisa menghitung sendiri
+     pergerakan harganya secara langsung, tanpa perlu halaman ini terbuka. */
+  var esSiaranPosisiTerakhir = '';
+  function esTerbitkanPosisiTerbuka(){
+    if(!esIsOwner) return;
+    if(typeof prioritySimPositions === 'undefined') return;
+    var daftar = Object.keys(prioritySimPositions).map(function(k){
+      return prioritySimPositions[k];
+    }).filter(function(p){
+      // Hanya posisi LIVE yang sudah benar-benar terisi. Simulasi tidak
+      // disiarkan (bukan posisi sungguhan), pending juga tidak (belum jadi).
+      return p && !p.pending && (p.venue === 'live-real' || p.venue === 'live-testnet');
+    }).map(function(p){
+      return {
+        simbol: p.source,
+        arah: p.dir,
+        entry: p.entryPrice,
+        sl: p.sl,
+        tp: p.tp,
+        buka: p.entryTime,
+        tf: p.tfLabel || ''
+      };
+    }).sort(function(a,b){ return a.buka - b.buka; });
+
+    // Ditulis HANYA kalau isinya berubah. renderPrioritySimUI dipanggil tiap
+    // detik untuk menyegarkan mark price; menulis tiap detik akan menghabiskan
+    // kuota tulis Firestore untuk data yang sebetulnya sama saja.
+    var sidik = JSON.stringify(daftar);
+    if(sidik === esSiaranPosisiTerakhir) return;
+    esSiaranPosisiTerakhir = sidik;
+    esDb.collection('public').doc('posisiTerbuka')
+      .set({ posisi: daftar, _updatedAt: Date.now() })
+      .catch(function(){ esSiaranPosisiTerakhir = ''; });   // gagal -> coba lagi siklus berikutnya
+  }
+
   function esPublishLayoutDefault(){
     const payload = {};
     ES_LAYOUT_KEYS.forEach(function(k){
@@ -5744,11 +5825,29 @@
     });
   }
 
-  async function cariPantauUntukSimbol(symbol, tickers, tf){
+  /* paksa=true dipakai oleh pencarian koin: kotaknya tetap digambar walau SMI
+     belum ekstrem. Tanpa ini, mencari koin yang sedang tenang selalu berakhir
+     "tidak ditemukan" - padahal yang ditanya bukan "apakah ini sinyal", tapi
+     "tolong tunjukkan koin ini". */
+  async function cariPantauUntukSimbol(symbol, tickers, tf, paksa){
     const { opens, highs, lows, closes } = await fetchKlines(symbol, tf, 200);
     if(closes.length < 40) return null;
-    const hasil = cekSmiEkstrem(highs, lows, closes);
-    if(!hasil) return null;
+    let hasil = cekSmiEkstrem(highs, lows, closes);
+    if(!hasil){
+      if(!paksa) return null;
+      const st = smiSeries(highs, lows, closes, SMI_K, SMI_D, SMI_EMA);
+      const n = st.smi.length;
+      const k = st.smi[n-1], d = st.signal[n-1];
+      if(k === null || k === undefined) return null;
+      // Belum ekstrem -> tidak ada pembalikan yang dipantau. Arahnya diambil
+      // dari posisi SMI terhadap EMA-nya sekadar supaya kartu punya sisi, dan
+      // kondisinya ditandai 'netral' supaya tidak menyamar jadi sinyal.
+      hasil = {
+        kondisi: 'netral',
+        arah: (d !== null && d !== undefined && k < d) ? 'SELL' : 'BUY',
+        k, d, mulaiBalik: false, seri: st
+      };
+    }
 
     const t = tickers[symbol];
     const price = t ? parseFloat(t.lastPrice) : closes[closes.length-1];
@@ -5802,10 +5901,13 @@
       const resDekat = c.resZones.length ? c.resZones[c.resZones.length-1].value : null;
       const supDekat = c.supZones.length ? c.supZones[c.supZones.length-1].value : null;
       const stochLabel = `SMI ${c.stochK.toFixed(1)} / EMA ${c.stochD===null?'-':c.stochD.toFixed(1)}`
-        + (c.kondisi==='overbought'?' (OB)':' (OS)');
+        + (c.kondisi==='overbought' ? ' (OB)' : c.kondisi==='oversold' ? ' (OS)' : ' (netral)');
       const glow = i < 3 ? ' top3' : '';
       const fav = favPrioritas(c.symbol) === 0;
-      return `<div class="es-card pantau ${cls}${glow}" data-symbol="${c.symbol}" data-tf="${c.tfValue}">
+      // Kotak hasil pencarian tidak ikut sorotan "top 3": urutannya bukan hasil
+      // peringkat, jadi menyorotinya akan menyesatkan.
+      const dicari = c.dicari ? ' es-kartu-dicari' : '';
+      return `<div class="es-card pantau ${cls}${c.dicari?'':glow}${dicari}" data-symbol="${c.symbol}" data-tf="${c.tfValue}">
         <div class="es-card-top">
           <div><span class="es-rank">#${i+1} &bull; TF ${c.tfLabel}</span><span class="es-symbol">${c.symbol.replace('USDT','')}</span></div>
           <div class="es-card-top-right">
@@ -5965,12 +6067,118 @@
   pantauTfSel.addEventListener('change', cariSinyalPantau);
   pantauRezimSel.addEventListener('change', cariSinyalPantau);
 
+  /* ── Cari koin di Area Pantau ────────────────────────────────────────────
+     Beda tujuan dari pencarian koin di panel Live Trading: yang itu memilih
+     koin untuk DIORDER, yang ini menampilkan KOTAK PANTAU-nya - lengkap dengan
+     mini chart, zona S/R, dan SMI - untuk satu koin yang mungkin tidak masuk
+     hasil pindaian (entah karena SMI-nya belum ekstrem, atau karena tidak ada
+     di daftar koin aktif sama sekali).
+
+     Kotaknya DITEMPELKAN di depan hasil yang sudah ada, bukan menggantinya.
+     Mengganti berarti hasil pindaian yang barusan dikerjakan hilang hanya
+     karena satu koin dicari. */
+  const pantauCariBtn = document.getElementById('esPantauCariBtn');
+  const pantauCariPop = document.getElementById('esPantauCariPop');
+  const pantauCariInput = document.getElementById('esPantauCariInput');
+  const pantauCariSuggest = document.getElementById('esPantauCariSuggest');
+
+  function tutupCariPantau(){
+    if(!pantauCariPop) return;
+    pantauCariPop.classList.remove('open');
+    pantauCariBtn.classList.remove('active');
+    pantauCariSuggest.innerHTML = '';
+  }
+
+  function gambarSaranPantau(){
+    const nq = normalizeCoinQuery(pantauCariInput.value);
+    const cocok = !nq ? [] : FAV_SUGGESTION_POOL.filter(s =>
+      s.startsWith(nq) || s.replace('USDT','').startsWith(nq)).slice(0, 8);
+    pantauCariSuggest.innerHTML = cocok.map(s =>
+      `<div class="es-fav-suggest-item" data-symbol="${s}">${s.replace('USDT','')}/USDT</div>`).join('');
+    pantauCariSuggest.querySelectorAll('.es-fav-suggest-item').forEach(it=>{
+      it.addEventListener('mousedown', (e)=>{
+        e.preventDefault();
+        tutupCariPantau();
+        tampilkanKotakPantau(it.getAttribute('data-symbol'));
+      });
+    });
+  }
+
+  async function tampilkanKotakPantau(symbolRaw){
+    let symbol = normalizeCoinQuery(symbolRaw);
+    if(!symbol) return;
+    if(!symbol.endsWith('USDT')) symbol += 'USDT';
+    const nama = symbol.replace('USDT','');
+    const tf = pantauTfSel.value;
+
+    pantauStatusEl.classList.remove('error');
+    pantauStatusEl.textContent = `Mengambil data ${nama} di TF ${PANTAU_TF_LABEL[tf]||tf}...`;
+    try{
+      const tickers = await loadTickers();
+      const kartu = await cariPantauUntukSimbol(symbol, tickers, tf, true);
+      if(!kartu) throw new Error('data candle tidak cukup untuk digambar');
+
+      // Sentuhan SNR 4 jam ikut ditampilkan kalau ada - baris yang sama dipakai
+      // hasil pindaian, jadi kotaknya benar-benar identik, bukan versi ringkas.
+      try{ kartu.snr = await cekSnrH4M5(symbol); }catch(e){}
+      kartu.dicari = true;
+
+      const lama = (window.__esLastPantauResults || []).filter(c => c.symbol !== symbol);
+      renderPantauSignals([kartu].concat(lama));
+      pantauStatusEl.textContent = `${nama} ditampilkan di depan`
+        + (kartu.kondisi === 'netral'
+            ? ' (SMI belum ekstrem - ini bukan sinyal, cuma tampilan koinnya).'
+            : ` (SMI ${kartu.kondisi}).`);
+    }catch(e){
+      pantauStatusEl.classList.add('error');
+      pantauStatusEl.textContent = `Gagal menampilkan ${nama}: ${e && e.message ? e.message : 'kesalahan tak terduga'}.`;
+    }
+  }
+
+  if(pantauCariBtn){
+    pantauCariBtn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      if(pantauCariPop.classList.contains('open')) return tutupCariPantau();
+      pantauCariPop.classList.add('open');
+      pantauCariBtn.classList.add('active');
+      pantauCariInput.focus();
+      gambarSaranPantau();
+    });
+    pantauCariInput.addEventListener('input', gambarSaranPantau);
+    pantauCariInput.addEventListener('keydown', (e)=>{
+      if(e.key === 'Enter'){
+        e.preventDefault();
+        const nq = normalizeCoinQuery(pantauCariInput.value);
+        const cocok = FAV_SUGGESTION_POOL.filter(s =>
+          s.startsWith(nq) || s.replace('USDT','').startsWith(nq));
+        // Kalau tidak ada di daftar saran, ketikannya tetap dicoba apa adanya -
+        // daftar saran bukan daftar koin yang ada di Binance.
+        const pilih = cocok[0] || pantauCariInput.value;
+        tutupCariPantau();
+        tampilkanKotakPantau(pilih);
+      } else if(e.key === 'Escape') tutupCariPantau();
+    });
+    document.addEventListener('click', (e)=>{
+      if(pantauCariPop.classList.contains('open')
+         && !pantauCariPop.contains(e.target)
+         && !pantauCariBtn.contains(e.target)) tutupCariPantau();
+    });
+  }
+
   // SNR_RISK_TIERS & getSnrPriorityTfs dihapus: timeframe sinyal SNR sekarang
   // TERKUNCI di 4 jam (untuk SMI) + 5 menit (untuk sentuhan zona), jadi tidak
   // ada lagi yang bisa dipilih.
-  const prioritySnrBtn = document.getElementById('esPrioritySnrBtn');
-  const prioritySnrStatusEl = document.getElementById('esPrioritySnrStatus');
-  const prioritySnrGrid = document.getElementById('esPrioritySnrGrid');
+  /* Sinyal SNR sekarang salah satu MODE di dalam Parallel Signal, bukan section
+     sendiri - jadi tombol, status, dan grid-nya memang milik Parallel. Nama
+     variabelnya sengaja dipertahankan supaya seluruh isi findPrioritySnrSignals
+     tidak perlu disentuh; yang berubah cuma ke mana ketiganya menunjuk.
+
+     Dideklarasikan lewat getElementById yang SAMA dengan milik Parallel, bukan
+     alias ke chBtn/chStatusEl/chGrid, karena ketiga const itu baru muncul
+     ratusan baris di bawah sini (TDZ). */
+  const prioritySnrBtn = document.getElementById('esChBtn');
+  const prioritySnrStatusEl = document.getElementById('esChStatus');
+  const prioritySnrGrid = document.getElementById('esChGrid');
 
   // Cek retest zona S/R dengan candle penolakan di kline yang diberikan.
   // Mengembalikan {signal, dir} kalau candle TERAKHIR adalah retest ke-2+,
@@ -6332,6 +6540,7 @@
 
   function renderCrossHunterSignals(top){
     window.__esLastCrossHunterResults = top;
+    chModeTergambar = 'parallel';
     registerTradableSignals('crosshunter', top);
     chGrid.innerHTML = top.map((c,i)=>{
       const signalCls = c.signal==='BUY' ? 'buy' : 'sell';
@@ -6356,12 +6565,13 @@
           <div class="es-check-row ok"><span class="es-check-icon">&check;</span> Sentuh garis ${garis} channel</div>
           <div class="es-check-row ok"><span class="es-check-icon">&check;</span> Close balik ke dalam channel</div>
           <div class="es-check-row ok"><span class="es-check-icon">&check;</span> ${candleTeks}</div>
-          <div class="es-check-row ${c.snrOk?'ok':'fail'}"><span class="es-check-icon">${c.snrOk?'&check;':'&#10007;'}</span> ${c.snrOk
-            ? 'Sentuh SNR: ada level ' + (c.signal==='BUY'?'support':'resisten') + ' di $' + fmtPrice(c.snrLevel)
-            : 'Sentuh SNR: tidak ada level S/R di titik ini'}</div>
+          <!-- Baris "Sentuh SNR" dibuang: ada/tidaknya level S/R adalah yang
+               MEMBEDAKAN kedua mode di dropdown, bukan syarat sinyal parallel.
+               Menampilkannya sebagai ceklist membuatnya terlihat seperti syarat
+               yang gagal, padahal di mode "Parallel Only" justru itu yang dicari.
+               Baris [debug] garis channel juga ikut dibuang. -->
           <div class="es-check-row ok"><span class="es-check-icon">&bull;</span> Band aktif: ${c.chBand||'Channel Utama'}</div>
           <div class="es-check-row ok"><span class="es-check-icon">&bull;</span> Arah channel: ${c.chArah}</div>
-          <div class="es-check-row ok" style="color:var(--muted)"><span class="es-check-icon">&bull;</span> [debug] Garis channel: Atas $${fmtPrice(c.chUpNow)} • Bawah $${fmtPrice(c.chLoNow)}</div>
         </div>
         <div class="es-priority-levels">
           <div class="es-priority-level-row">Area Entri: <strong>$${fmtPrice(c.price)}</strong></div>
@@ -6477,43 +6687,67 @@
   let chHasilMentah = [];
   let chKoinDipindai = 0;
   let chTfDipindai = null;
+  // Mode yang sedang TERGAMBAR di grid - belum tentu sama dengan yang dipilih
+  // di dropdown, dan itu justru intinya: kartu SNR H4 tidak boleh tertinggal
+  // di layar setelah dropdown pindah ke mode parallel.
+  let chModeTergambar = null;
 
   // Saring hasil menurut konfluensi S/R lalu gambar ulang grid + status.
   // "Semua Sinyal" tidak menyaring apa pun, jadi perilakunya sama persis
   // seperti sebelum filter ini ada.
+  function modeSinyal(){ return chSnrFilterSel ? chSnrFilterSel.value : 'snrh4'; }
+
+  /* Mode "Sinyal SNR H4" tidak memakai TF apa pun: timeframe-nya terkunci di
+     4 jam (zona) + M5 (sentuhan). Dropdown TF dimatikan supaya tidak terlihat
+     seolah bisa disetel padahal diabaikan. */
+  function selaraskanKontrolCh(){
+    const snrH4 = modeSinyal() === 'snrh4';
+    if(chTfSel){
+      chTfSel.disabled = snrH4;
+      chTfSel.title = snrH4
+        ? 'Mode Sinyal SNR H4 terkunci di 4 jam (zona) + M5 (sentuhan) - TF tidak dipakai'
+        : '';
+    }
+    if(chBtn) chBtn.textContent = snrH4 ? 'Cari Sinyal SNR H4' : 'Cari Sinyal Parallel';
+    if(chSmiBadge) chSmiBadge.style.display = snrH4 ? 'none' : '';
+  }
+
   function terapkanFilterSnr(){
     const tf = chTfDipindai || chTfSel.value;
     const tfLbl = CH_TF_LABEL[tf] || tf;
-    const mode = chSnrFilterSel ? chSnrFilterSel.value : 'all';
+    const mode = modeSinyal();
     const total = chHasilMentah.length;
-    let hasil = chHasilMentah;
-    if(mode === 'snr')       hasil = hasil.filter(c => c.snrOk);
-    else if(mode === 'only') hasil = hasil.filter(c => !c.snrOk);
+    let hasil = mode === 'snr' ? chHasilMentah.filter(c => c.snrOk)
+                               : chHasilMentah.filter(c => !c.snrOk);
     // Koin favorit (dibintangi) naik ke urutan paling depan - lihat catatan di
     // favPrioritas. Sisanya tetap urut berdasarkan kapitalisasi.
     hasil = urutkanHasilParallel(hasil);
 
-    const label = mode === 'snr'  ? ' yang juga menyentuh level S/R'
-                : mode === 'only' ? ' murni channel (tanpa level S/R)' : '';
+    const label = mode === 'snr' ? ' yang juga menyentuh level S/R'
+                                 : ' murni channel (tanpa level S/R)';
     if(hasil.length === 0){
       chGrid.innerHTML = '';
       window.__esLastCrossHunterResults = [];
-      chStatusEl.textContent = (total === 0 || mode === 'all')
+      chStatusEl.textContent = total === 0
         ? `Tidak ada sinyal Parallel (TF ${tfLbl}) yang menyentuh channel saat ini dari ${chKoinDipindai} koin.`
-        : `Dari ${total} sinyal Parallel (TF ${tfLbl}), tidak ada${label}. Pilih "Semua Sinyal" untuk melihat semuanya.`;
+        : `Dari ${total} sinyal Parallel (TF ${tfLbl}), tidak ada${label}.`;
       return;
     }
     renderCrossHunterSignals(hasil);
     const nBuy = hasil.filter(c=>c.signal==='BUY').length;
     chStatusEl.textContent = `Ditemukan ${hasil.length} sinyal Parallel${label} (${nBuy} BUY, ${hasil.length-nBuy} SELL)`
-      + (mode === 'all' ? '' : ` dari ${total} sinyal`)
-      + ` • ${chKoinDipindai} koin • TF ${tfLbl} • ${new Date().toLocaleTimeString('id-ID')}.`;
+      + ` dari ${total} sinyal • ${chKoinDipindai} koin • TF ${tfLbl} • ${new Date().toLocaleTimeString('id-ID')}.`;
   }
 
   async function findCrossHunterSignals(){
 
     if(!izinSinyal()) return;
     if(isSectionCollapsed('crosshunter')) return;
+
+    // Mode SNR H4 memakai pemindaian sendiri - bukan hasil parallel yang
+    // disaring, jadi dialihkan sebelum apa pun dari jalur parallel dikerjakan.
+    if(modeSinyal() === 'snrh4') return findPrioritySnrSignals();
+
     const tf = chTfSel.value;
     chBtn.disabled = true;
     chStatusEl.classList.remove('error');
@@ -6544,19 +6778,48 @@
   // Rezim BTC ikut TF: perbarui tiap ganti TF, dan tampilkan sekali di awal (default).
   // Ditunda 1 tick supaya state collapse section sudah siap saat dicek (hindari TDZ).
   chTfSel.addEventListener('change', ()=> updateChBtcRegime());
-  // Ganti filter S/R = saring ulang hasil yang SUDAH ada (instan). Kalau belum
-  // pernah memindai, tidak ada yang bisa disaring - biarkan status apa adanya.
+
   if(chSnrFilterSel) chSnrFilterSel.addEventListener('change', ()=>{
+    selaraskanKontrolCh();
+    const mode = modeSinyal();
+    const pindahJenis = (mode === 'snrh4') !== (chModeTergambar === 'snrh4');
+
+    /* Dua mode parallel berbagi satu hasil pemindaian, jadi bertukar di antara
+       keduanya cukup menyaring ulang di tempat - instan, tanpa 100 permintaan.
+
+       Berpindah ke ATAU dari SNR H4 lain ceritanya: datanya beda jenis, jadi
+       kartu yang sedang tampil tidak berlaku lagi dan harus dibersihkan. Kalau
+       dibiarkan, layar menampilkan kartu SNR sementara tombolnya sudah berbunyi
+       "Cari Sinyal Parallel" - terlihat seperti hasil pindaian yang salah.
+       Sengaja TIDAK memindai sendiri: satu pemindaian 100 koin tidak pantas
+       dipicu oleh perubahan dropdown yang mungkin cuma salah pilih. */
+    if(mode === 'snrh4' || pindahJenis){
+      chGrid.innerHTML = '';
+      window.__esLastCrossHunterResults = [];
+      chModeTergambar = null;
+      chStatusEl.classList.remove('error');
+      chStatusEl.textContent = mode === 'snrh4'
+        ? 'Klik "Cari Sinyal SNR H4" untuk memindai (SMI 4 jam + sentuh SNR di M5).'
+        : 'Klik "Cari Sinyal Parallel" untuk memindai.';
+      return;
+    }
     if(chHasilMentah.length || chTfDipindai) terapkanFilterSnr();
+    else chStatusEl.textContent = 'Klik "Cari Sinyal Parallel" untuk memindai.';
   });
-  setTimeout(()=>{ try{ if(!isSectionCollapsed('crosshunter')) updateChBtcRegime(); }catch(e){} }, 0);
+
+  selaraskanKontrolCh();
+  setTimeout(()=>{ try{ if(!isSectionCollapsed('crosshunter') && modeSinyal() !== 'snrh4') updateChBtcRegime(); }catch(e){} }, 0);
 
 
 
+  /* Menggambar ke chGrid - grid milik Parallel Signal - karena section SNR
+     sendiri sudah tidak ada. Kartunya tetap kartu SNR (isi ceklist & levelnya
+     beda dari kartu parallel), cuma tempat tinggalnya yang pindah. */
   function renderPrioritySnrSignals(top){
     window.__esLastPrioritySnrResults = top;
+    chModeTergambar = 'snrh4';
     registerTradableSignals('snr', top);
-    prioritySnrGrid.innerHTML = top.map((c,i)=>{
+    chGrid.innerHTML = top.map((c,i)=>{
       const signalCls = c.signal==='BUY' ? 'buy' : 'sell';
       // SL & TP1 sudah dihitung saat pemindaian (aturan kotak SNR + setengah
       // tingginya), jadi tidak perlu lewat getAutoSlTp lagi. TP2 = 2x risiko.
@@ -6565,6 +6828,10 @@
       const sisi = c.snr.sisi === 'R' ? 'resisten' : 'support';
       const fav = favPrioritas(c.symbol) === 0;
       const chg = c.change24h >= 0 ? '+' + c.change24h.toFixed(2) : c.change24h.toFixed(2);
+      // Pemindaian memang hanya meloloskan yang ekstrem, jadi baris ini praktis
+      // selalu tercentang. Tetap dihitung, bukan ditulis "&check;" mati - kalau
+      // syaratnya suatu saat dilonggarkan, ceklistnya ikut jujur sendiri.
+      const ekstrem = c.kondisi === 'oversold' || c.kondisi === 'overbought';
       return `<div class="es-priority-card ${signalCls}" data-symbol="${c.symbol}" data-tf="${c.tfValue}" data-tflabel="${c.tfLabel}" data-price="${c.price}">
         <div class="es-priority-card-top">
           <span class="es-priority-rank">#${i+1}</span>
@@ -6574,11 +6841,10 @@
         </div>
         <div class="es-priority-tf">SNR 4 Jam di M5 &bull; Harga $${fmtPrice(c.price)} &bull; ${chg}% 24h</div>
         <div class="es-checklist">
-          <div class="es-check-row ok"><span class="es-check-icon">&check;</span> SMI 4 jam ${c.kondisi === 'oversold' ? 'oversold' : 'overbought'} (${c.stochK.toFixed(1)})</div>
-          <div class="es-check-row ${c.mulaiBalik?'ok':'fail'}"><span class="es-check-icon">${c.mulaiBalik?'&check;':'&#10007;'}</span> ${c.mulaiBalik ? 'SMI sudah mulai berbalik' : 'SMI belum berbalik (masih meluncur)'}</div>
+          <div class="es-check-row ${ekstrem?'ok':'fail'}"><span class="es-check-icon">${ekstrem?'&check;':'&#10007;'}</span> ${ekstrem
+            ? `SMI 4 jam ${c.kondisi === 'oversold' ? 'oversold' : 'overbought'} (${c.stochK.toFixed(1)})`
+            : `SMI 4 jam belum ekstrem (${c.stochK.toFixed(1)})`}</div>
           <div class="es-check-row ok"><span class="es-check-icon">&check;</span> Candle M5 menyentuh zona ${sisi} 4 jam di $${fmtPrice(c.snr.level)}</div>
-          <div class="es-check-row ${c.snr.tolak?'ok':'fail'}"><span class="es-check-icon">${c.snr.tolak?'&check;':'&#10007;'}</span> ${c.snr.tolak ? 'Candle menolak (wick lebih panjang dari body)' : 'Bukan candle penolakan (body lebih panjang dari wick)'}</div>
-          <div class="es-check-row ${c.searah?'ok':'fail'}"><span class="es-check-icon">${c.searah?'&check;':'&#10007;'}</span> ${c.searah ? 'Sisi zona searah dengan SMI' : 'Sisi zona BERLAWANAN dengan SMI'}</div>
           <div class="es-check-row ok" style="color:var(--muted)"><span class="es-check-icon">&bull;</span> Lebar zona: &plusmn;$${fmtPrice(c.snr.tol)} (ATR 4 jam &times; 0,5)</div>
         </div>
         <div class="es-priority-levels">
@@ -6590,13 +6856,16 @@
       </div>`;
     }).join('');
 
-    prioritySnrGrid.querySelectorAll('.es-priority-card').forEach((card,i)=>{
+    chGrid.querySelectorAll('.es-priority-card').forEach((card,i)=>{
       const cand = top[i];
       card.addEventListener('click', (e)=>{
         if(e.target.classList.contains('es-snr-pick')) return;
         if(e.target.classList.contains('es-sig-star')) return;
-        // Chart dibuka di M5 - itu timeframe tempat sentuhannya terlihat.
-        openTradingView(cand.symbol, '5m');
+        // Chart dibuka di 4 JAM, bukan M5. M5 memang timeframe tempat sentuhan
+        // terjadi, tapi yang perlu dinilai sebelum entry adalah zonanya - dan
+        // zona itu digambar dari struktur 4 jam. Membuka M5 langsung membuang
+        // konteks yang justru jadi alasan sinyalnya muncul.
+        openTradingView(cand.symbol, '4h');
       });
       card.querySelector('.es-snr-pick').addEventListener('click', (e)=>{
         e.stopPropagation();
@@ -6628,7 +6897,8 @@
   async function findPrioritySnrSignals(){
 
     if(!izinSinyal()) return;
-    if(isSectionCollapsed('snr')) return; // section dilipat - hemat request
+    // Section-nya sekarang Parallel Signal - mode ini menumpang di sana.
+    if(isSectionCollapsed('crosshunter')) return;
 
     // Tidak ada saringan lagi: syaratnya cuma SATU dan terkunci -
     // candle M5 menyentuh zona SNR 4 jam + SMI 4 jam overbought/oversold.
@@ -6697,13 +6967,11 @@
 
 
 
-  /* Yang ini lebih parah dari dua saudaranya: prioritySnrManagerBtn tidak
-     pernah dideklarasikan sama sekali, jadi setiap klik melempar
-     ReferenceError - bukan cuma TypeError. */
-
-  // Manual trigger saja (tombol) - TIDAK auto-scan tiap halaman dibuka, supaya
-  // tidak menambah beban seperti yang sempat terjadi di Sinyal Prioritas ICT.
-  prioritySnrBtn.addEventListener('click', findPrioritySnrSignals);
+  /* Tidak ada pemasangan listener di sini lagi. Tombolnya kini SATU dan milik
+     Parallel Signal (chBtn), dan findCrossHunterSignals yang memutuskan mau
+     menjalankan pemindaian parallel atau mengalihkan ke pemindaian SNR H4.
+     Memasang listener kedua di tombol yang sama akan menjalankan KEDUA
+     pemindaian sekaligus tiap kali diklik. */
 
   // ═══════════════════════════════════════════════════════
   // ████████  SINYAL PRIORITAS AI - MODEL KONFLUENSI  ████████
@@ -7918,16 +8186,14 @@
     const backendUrl = liveBackendUrlInput.value.trim().replace(/\/$/, '');
     const appToken = liveAppTokenInput.value.trim();
     if(!backendUrl || !appToken){
-      priorityStatusEl.classList.add('error');
-      priorityStatusEl.textContent = 'Isi dulu Backend URL dan App Token di bagian Live Trading sebelum menutup posisi live.';
+      pesanEntry('Isi dulu Backend URL dan App Token di bagian Live Trading sebelum menutup posisi live.', true);
       return;
     }
     const envLabel = pos.venue === 'live-real' ? '🔴 LIVE - REAL ORDER' : '🧪 TESTNET';
     if(!window.confirm(`Tutup posisi ${pos.source.replace('USDT','')} (${pos.dir}, qty ${pos.qty}) di Binance [${envLabel}] sekarang? Order MARKET akan dikirim untuk menutup seluruh posisi.`)){
       return;
     }
-    priorityStatusEl.classList.remove('error');
-    priorityStatusEl.textContent = `Menutup posisi ${pos.source.replace('USDT','')} di Binance...`;
+    pesanEntry(`Menutup posisi ${pos.source.replace('USDT','')} di Binance...`);
     try{
       const res = await fetch(`${backendUrl}/api/trade/futures/close`, {
         method: 'POST',
@@ -7954,11 +8220,9 @@
       await syncFinalFeesAndPnl(pos, backendUrl, appToken);
       closePrioritySimPosition(key, exitPrice, Date.now(), 'Manual Close (Binance)');
       renderPrioritySimUI(tickers);
-      priorityStatusEl.classList.remove('error');
-      priorityStatusEl.textContent = `Posisi ${pos.source.replace('USDT','')} berhasil ditutup di Binance.`;
+      pesanEntry(`Posisi ${pos.source.replace('USDT','')} berhasil ditutup di Binance.`);
     }catch(e){
-      priorityStatusEl.classList.add('error');
-      priorityStatusEl.textContent = `Gagal menutup posisi di Binance: ${e.message}`;
+      pesanEntry(`Gagal menutup posisi di Binance: ${e.message}`, true);
     }
   }
 
@@ -7971,8 +8235,7 @@
     const backendUrl = liveBackendUrlInput.value.trim().replace(/\/$/, '');
     const appToken = liveAppTokenInput.value.trim();
     if(!backendUrl || !appToken){
-      priorityStatusEl.classList.add('error');
-      priorityStatusEl.textContent = 'Isi dulu Backend URL dan App Token di bagian Live Trading sebelum membatalkan order.';
+      pesanEntry('Isi dulu Backend URL dan App Token di bagian Live Trading sebelum membatalkan order.', true);
       return;
     }
     if(!window.confirm(`Batalkan order ${pos.pendingOrderType} untuk ${pos.source.replace('USDT','')} yang masih menggantung di Binance?`)) return;
@@ -7988,11 +8251,9 @@
       savePrioritySimState();
       markEsCloudDirty(); esSyncNow();
       renderPrioritySimUI(tickers || window.__esLastTickers || {});
-      priorityStatusEl.classList.remove('error');
-      priorityStatusEl.textContent = `Order ${pos.pendingOrderType} untuk ${pos.source.replace('USDT','')} berhasil dibatalkan.`;
+      pesanEntry(`Order ${pos.pendingOrderType} untuk ${pos.source.replace('USDT','')} berhasil dibatalkan.`);
     }catch(e){
-      priorityStatusEl.classList.add('error');
-      priorityStatusEl.textContent = `Gagal membatalkan order: ${e.message}`;
+      pesanEntry(`Gagal membatalkan order: ${e.message}`, true);
     }
   }
 
@@ -8040,33 +8301,28 @@
     const pos = prioritySimPositions[key];
     if(!pos) return;
     if(isNaN(newSl) || isNaN(newTp1) || newSl<=0 || newTp1<=0){
-      priorityStatusEl.classList.add('error');
-      priorityStatusEl.textContent = 'SL dan TP1 wajib diisi angka valid untuk Edit SL/TP.';
+      pesanEntry('SL dan TP1 wajib diisi angka valid untuk Edit SL/TP.', true);
       renderPrioritySimUI(window.__esLastTickers || {});
       return;
     }
     if(pos.dir==='BUY' && !(newSl < pos.entryPrice && newTp1 > pos.entryPrice)){
-      priorityStatusEl.classList.add('error');
-      priorityStatusEl.textContent = `Untuk posisi BUY, SL harus di bawah entry ($${fmtPrice(pos.entryPrice)}) dan TP1 harus di atasnya. Salah input.`;
+      pesanEntry(`Untuk posisi BUY, SL harus di bawah entry ($${fmtPrice(pos.entryPrice)}) dan TP1 harus di atasnya. Salah input.`, true);
       renderPrioritySimUI(window.__esLastTickers || {});
       return;
     }
     if(pos.dir==='SELL' && !(newSl > pos.entryPrice && newTp1 < pos.entryPrice)){
-      priorityStatusEl.classList.add('error');
-      priorityStatusEl.textContent = `Untuk posisi SELL, SL harus di atas entry ($${fmtPrice(pos.entryPrice)}) dan TP1 harus di bawahnya. Salah input.`;
+      pesanEntry(`Untuk posisi SELL, SL harus di atas entry ($${fmtPrice(pos.entryPrice)}) dan TP1 harus di bawahnya. Salah input.`, true);
       renderPrioritySimUI(window.__esLastTickers || {});
       return;
     }
     const backendUrl = liveBackendUrlInput.value.trim().replace(/\/$/, '');
     const appToken = liveAppTokenInput.value.trim();
     if(!backendUrl || !appToken){
-      priorityStatusEl.classList.add('error');
-      priorityStatusEl.textContent = 'Isi dulu Backend URL dan App Token di bagian Live Trading sebelum mengubah SL/TP.';
+      pesanEntry('Isi dulu Backend URL dan App Token di bagian Live Trading sebelum mengubah SL/TP.', true);
       renderPrioritySimUI(window.__esLastTickers || {});
       return;
     }
-    priorityStatusEl.classList.remove('error');
-    priorityStatusEl.textContent = `Mengubah SL/TP untuk ${pos.source.replace('USDT','')}...`;
+    pesanEntry(`Mengubah SL/TP untuk ${pos.source.replace('USDT','')}...`);
     try{
       const body = {
         symbol: pos.source, side: pos.dir,
@@ -8096,14 +8352,12 @@
       }
       savePrioritySimState();
       markEsCloudDirty(); esSyncNow();
-      priorityStatusEl.classList.remove('error');
-      priorityStatusEl.textContent = `SL/TP untuk ${pos.source.replace('USDT','')} berhasil diubah.`;
+      pesanEntry(`SL/TP untuk ${pos.source.replace('USDT','')} berhasil diubah.`);
       editingSlTpKey = null;
       editingSlTpDraft = null;
       renderPrioritySimUI(window.__esLastTickers || {});
     }catch(e){
-      priorityStatusEl.classList.add('error');
-      priorityStatusEl.textContent = `Gagal mengubah SL/TP: ${e.message}`;
+      pesanEntry(`Gagal mengubah SL/TP: ${e.message}`, true);
       renderPrioritySimUI(window.__esLastTickers || {});
     }
   }
@@ -8175,8 +8429,7 @@
     if(!found) return;
     psimSignalSelect.value = uid;
     selectPsimSignalByUid(uid);
-    priorityStatusEl.classList.remove('error');
-    priorityStatusEl.textContent = `Sinyal ${found.symbol.replace('USDT','')} (TF ${found.tfLabel}) dipilih di Simulasi Sinyal Prioritas — cek preview lalu klik "Open Posisi".`;
+    pesanEntry(`Sinyal ${found.symbol.replace('USDT','')} (TF ${found.tfLabel}) dipilih di Simulasi Sinyal Prioritas — cek preview lalu klik "Open Posisi".`);
     document.querySelector('.es-sim-section').scrollIntoView({ behavior:'smooth', block:'start' });
   }
 
@@ -8286,24 +8539,22 @@
     `;
   }
 
-  // Pesan hasil Open Demo Order HARUS muncul di dekat tombolnya.
-  //
-  // Dulu semuanya ditulis ke priorityStatusEl - itu status milik section "Sinyal
-  // Prioritas" yang letaknya ~2800px DI ATAS tombol, dan isinya rutin ditimpa
-  // oleh hasil pindaian section itu sendiri. Jadi tiap kali order demo ditolak
-  // (mis. arah dipaksa berlawanan tanpa SL/TP manual), layar di sekitar tombol
-  // tidak menampilkan apa pun - terlihat seperti "tombolnya tidak berfungsi".
+  /* Satu-satunya tempat menulis status untuk SEMUA aksi Live Trading: buka,
+     tutup, batalkan pending, ubah SL/TP, dan pemilihan sinyal.
+
+     Dulu sebagian ditulis ke priorityStatusEl - status milik section "Sinyal
+     Prioritas BBMA". Dua masalah, yang kedua jauh lebih parah:
+
+     1. Letaknya ~2800px DI ATAS tombol dan rutin ditimpa hasil pindaian section
+        itu sendiri, jadi penolakan order tidak terlihat di dekat tombolnya.
+     2. Setelah section itu dihapus, elemennya null - dan baris PERTAMA
+        closeLivePosition() serta editLiveSlTp() adalah tulisan status. Artinya
+        menutup posisi live melempar SEBELUM permintaan ke Binance terkirim:
+        tombolnya diam, dan posisi uang sungguhan tetap terbuka. */
   function pesanEntry(teks, gagal){
-    if(liveTradeStatusEl){
-      liveTradeStatusEl.textContent = teks;
-      liveTradeStatusEl.style.color = gagal ? 'var(--bear)' : 'var(--bull)';
-    }
-    // Tetap ditulis juga di status lama supaya riwayat pesannya tidak berubah
-    // bagi yang sudah terbiasa melihat ke sana.
-    if(priorityStatusEl){
-      priorityStatusEl.classList.toggle('error', !!gagal);
-      priorityStatusEl.textContent = teks;
-    }
+    if(!liveTradeStatusEl) return;
+    liveTradeStatusEl.textContent = teks;
+    liveTradeStatusEl.style.color = gagal ? 'var(--bear)' : 'var(--bull)';
   }
 
   function handlePriorityTradeClick(cand){
@@ -8464,6 +8715,11 @@
     `).join('');
 
     if(psimEquityChartEl) psimEquityChartEl.innerHTML = buildEquityChart(computeEquityCurve());
+
+    // Siarkan posisi terbuka (khusus pemilik). Ditaruh di sini karena fungsi ini
+    // sudah dipanggil setiap kali posisi dibuka, ditutup, atau SL/TP-nya diubah -
+    // jadi tidak perlu timer sendiri.
+    try{ esTerbitkanPosisiTerbuka(); }catch(e){}
 
     const fmtTime = (ms)=> new Date(ms).toLocaleString('id-ID', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit' });
 
@@ -9019,24 +9275,28 @@
     if(!(p>0)) throw new Error('harga tidak valid');
     return p;
   }
+  const coinPickStatusEl = document.getElementById('esCoinPickStatus');
+  function pesanPilihKoin(teks, gagal){
+    if(!coinPickStatusEl) return;
+    coinPickStatusEl.classList.toggle('error', !!gagal);
+    coinPickStatusEl.textContent = teks || '';
+  }
+
   async function pilihKoinManual(symbolRaw){
     let symbol = normalizeCoinQuery(symbolRaw);
     if(!symbol) return;
     if(!symbol.endsWith('USDT')) symbol += 'USDT';
     const nama = symbol.replace('USDT','');
-    priorityStatusEl.classList.remove('error');
-    priorityStatusEl.textContent = `Mengambil harga ${nama}...`;
+    pesanPilihKoin(`Mengambil harga ${nama}...`);
     try{
       const price = await fetchCoinLastPrice(symbol);
       const uid = tradableUid('manual', symbol, '');
       window.__esTradableSignals[uid] = { symbol, tfValue:'', tfLabel:'Manual', signal:'BUY', price, source:'manual', _uid:uid };
       populatePsimSignalSelect();
       selectTradableSignalByUid(uid);
-      priorityStatusEl.classList.remove('error');
-      priorityStatusEl.textContent = `Koin ${nama} dipilih (harga $${fmtPrice(price)}). Set "Arah Order" + "SL Manual"/"TP Manual" lalu klik Open.`;
+      pesanPilihKoin(`Koin ${nama} dipilih (harga $${fmtPrice(price)}). Set "Arah Order" + "SL Manual"/"TP Manual" lalu klik Open.`);
     }catch(e){
-      priorityStatusEl.classList.add('error');
-      priorityStatusEl.textContent = `Gagal cari koin ${nama}: ${e.message}`;
+      pesanPilihKoin(`Gagal cari koin ${nama}: ${e.message}`, true);
     }
   }
   function renderCoinSuggest(){
@@ -9580,7 +9840,6 @@
   // yang tidak ada lagi, dan mengkliknya tidak melakukan apa-apa.
   const SECTION_LABEL = {
     pantau:   'Sinyal Pantau Kripto',
-    snr:      'Sinyal Prioritas',
     crosshunter: 'Parallel Signal'
   };
 
@@ -9593,7 +9852,6 @@
     // Hanya tiga section yang tersisa. Cabang favorit/favcross/bbma dibuang
     // bersama section-nya - memanggilnya cuma menghasilkan error diam.
     if(name === 'pantau') cariSinyalPantau();
-    else if(name === 'snr') findPrioritySnrSignals();
     else if(name === 'crosshunter') findCrossHunterSignals();
   }
 
@@ -9624,21 +9882,15 @@
     });
   }
 
-  /* Pemulihan sekali jalan untuk Sinyal SNR.
-
-     Section-nya pernah disembunyikan waktu belum ada cara memunculkannya lagi,
-     dan statusnya tersimpan di cloud - jadi tetap hilang walau kodenya sudah
-     diperbaiki. Penanda di localStorage memastikan ini hanya jalan SEKALI:
-     kalau nanti kamu sengaja menyembunyikannya lagi, ia tetap tersembunyi. */
-  (function pulihkanSnrSekali(){
-    const PENANDA = 'esSnrDipulihkan_v1';
+  /* Section 'snr' sudah tidak ada - isinya jadi salah satu mode di Parallel.
+     Statusnya mungkin masih tersimpan di localStorage/cloud sebagai
+     "disembunyikan"; kalau dibiarkan, nama itu terus ikut terkirim ke cloud
+     selamanya dan menjadi sampah yang tidak pernah bisa dibersihkan sendiri. */
+  (function buangSectionSnrLama(){
     try{
-      if(localStorage.getItem(PENANDA)) return;
-      localStorage.setItem(PENANDA, '1');
-      if(collapsedSections.has('snr')){
-        collapsedSections.delete('snr');
-        saveCollapsedSections();
-      }
+      if(!collapsedSections.has('snr')) return;
+      collapsedSections.delete('snr');
+      saveCollapsedSections();
     }catch(e){}
   })();
 
@@ -9680,10 +9932,12 @@
      Satu listener di document, bukan per kartu: isi grid diganti tiap kali
      memindai, dan listener per kartu berarti memasang ulang terus-menerus. */
   (function pasangMenuKoin(){
-    const GRID = { esPantauGrid:'pantau', esPrioritySnrGrid:'snr', esChGrid:'crosshunter' };
+    const GRID = { esPantauGrid:'pantau', esChGrid:'crosshunter' };
+    // Grid Parallel sekarang bisa berisi kartu parallel ATAU kartu SNR H4;
+    // findCrossHunterSignals sendiri yang memilih pemindaian sesuai mode aktif,
+    // jadi satu pintu ini sudah benar untuk keduanya.
     const PINDAI = {
       pantau: () => cariSinyalPantau(),
-      snr: () => findPrioritySnrSignals(),
       crosshunter: () => findCrossHunterSignals()
     };
 
@@ -9732,8 +9986,7 @@
       if(aksi === 'ganti'){
         const pengganti = blockAndReplaceSymbol(simbol);
         const st = document.getElementById(
-          bagian === 'pantau' ? 'esPantauStatus'
-          : bagian === 'snr'  ? 'esPrioritySnrStatus' : 'esChStatus');
+          bagian === 'pantau' ? 'esPantauStatus' : 'esChStatus');
         if(st){
           st.classList.remove('error');
           st.textContent = pengganti

@@ -1,13 +1,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta name="jt-versi" content="202608081800">
+<meta name="jt-versi" content="202608082100">
 <meta name="robots" content="noindex, nofollow">
 <title>Jadi Trader — Panel Pemilik</title>
 <script>
 /* Penjaga versi - sama seperti halaman lain. */
 (function(){
-  var VERSI_TAMPIL = "202608081800";
+  var VERSI_TAMPIL = "202608082100";
   var KUNCI_OK = "jtVersiOkPemilik", KUNCI_PAKSA = "jtVersiPaksaPemilik";
   try{
     if(sessionStorage.getItem(KUNCI_OK) === VERSI_TAMPIL) return;
@@ -441,6 +441,39 @@
         </div>
         <div style="height:var(--s2)"></div>
         <div><label class="label" for="prodLynk">Link pembayaran Lynk.id</label><input class="isian" id="prodLynk" placeholder="https://lynk.id/..."></div>
+
+        <div style="height:var(--s3)"></div>
+        <div style="border-top:1px solid var(--border);padding-top:var(--s3)">
+          <span class="label">Sumber produk — kode yang diterima pembeli</span>
+          <div class="catat" style="margin-bottom:var(--s2)">
+            Disimpan di VPS, tidak pernah masuk repo publik. Tempel kodenya, atau pilih berkas
+            (<code>.mq5</code> / <code>.ex5</code> untuk EA MetaTrader). Nama berkasnya otomatis
+            mengikuti <strong>ID produk</strong> di atas.
+          </div>
+          <div class="baris2">
+            <div>
+              <label class="label" for="srcJenis">Jenis</label>
+              <select class="isian" id="srcJenis">
+                <option value="txt">Teks / Pine (.txt)</option>
+                <option value="mq5">Sumber MQL5 (.mq5)</option>
+                <option value="ex5">EA terkompilasi (.ex5)</option>
+              </select>
+            </div>
+            <div>
+              <label class="label" for="srcBerkas">Atau pilih berkas</label>
+              <input type="file" class="isian" id="srcBerkas" accept=".txt,.mq5,.ex5,text/plain">
+            </div>
+          </div>
+          <div style="height:var(--s2)"></div>
+          <div><label class="label" for="srcTeks">Tempel kode di sini</label>
+            <textarea class="isian mono" id="srcTeks" rows="6" placeholder="//@version=6&#10;indicator(...)"></textarea></div>
+          <div style="height:var(--s2)"></div>
+          <button type="button" class="tbl utama" id="btnUnggahSumber">Unggah Sumber</button>
+          <div class="catat" id="srcStatus" style="margin-top:var(--s1)"></div>
+          <div style="height:var(--s2)"></div>
+          <div class="gulung" style="max-height:170px;overflow-y:auto" id="srcDaftar"></div>
+        </div>
+
         <div style="height:var(--s3)"></div>
         <button type="button" class="tbl utama" id="btnSimpanProduk">Simpan Produk</button>
         <button type="button" class="tbl" id="btnHapusProduk">Hapus Produk Ini</button>
@@ -455,8 +488,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="jt-langganan.js?v=202608081800"></script>
-<script src="jt-lapor.js?v=202608081800"></script>
+<script src="jt-langganan.js?v=202608082100"></script>
+<script src="jt-lapor.js?v=202608082100"></script>
 
 <script>
 (function(){
@@ -963,6 +996,74 @@ el('prodUnggah').addEventListener('change', function(){
   fr.readAsDataURL(f);
 });
 
+/* ── Unggah sumber produk ──────────────────────────────────────────────────
+   Ini yang dulu tidak ada, dan karena itu kotak unduhan EA JadiTraderSync tidak
+   pernah bisa muncul di marketplace: katalognya bisa dibuat, tapi berkas yang
+   diunduh pembeli tidak punya jalan untuk sampai ke VPS. */
+function muatDaftarSumber(){
+  return ambil('/api/produk/sumber').then(function(j){
+    var d = (j && j.sumber) || [];
+    if(!d.length){ el('srcDaftar').innerHTML = '<div class="catat">Belum ada sumber terpasang.</div>'; return; }
+    el('srcDaftar').innerHTML =
+        '<table><thead><tr><th>Berkas</th><th class="num">Ukuran</th><th>Diperbarui</th></tr></thead><tbody>'
+      + d.map(function(x){
+          return '<tr><td class="mono" style="font-size:11px">' + esc(x.berkas) + '</td>'
+            + '<td class="num">' + (x.ukuran > 1024 ? (x.ukuran/1024).toFixed(1) + ' KB' : x.ukuran + ' B') + '</td>'
+            + '<td class="mono" style="font-size:10.5px">' + esc(waktuSingkat(x.tgl)) + '</td></tr>';
+        }).join('')
+      + '</tbody></table>';
+  }).catch(function(e){
+    el('srcDaftar').innerHTML = '<div class="catat">Gagal memuat: ' + esc(e.message) + '</div>';
+  });
+}
+
+// Memilih berkas ikut menyetel jenisnya dari ekstensi - salah pilih jenis
+// menghasilkan berkas dengan ekstensi yang tidak cocok, dan pembeli baru sadar
+// saat MetaTrader menolaknya.
+el('srcBerkas').addEventListener('change', function(){
+  var f = el('srcBerkas').files[0];
+  if(!f) return;
+  var ext = (f.name.split('.').pop() || '').toLowerCase();
+  if(ext === 'mq5' || ext === 'ex5' || ext === 'txt') el('srcJenis').value = ext;
+  el('srcStatus').textContent = 'Berkas dipilih: ' + f.name + ' (' + (f.size/1024).toFixed(1) + ' KB). '
+    + 'Klik "Unggah Sumber" untuk mengirim.';
+});
+
+el('btnUnggahSumber').addEventListener('click', function(){
+  var id = el('prodId').value.trim().toLowerCase().replace(/[^a-z0-9-]/g,'');
+  if(!id){ el('srcStatus').textContent = 'Isi dulu ID produk di atas — nama berkasnya ikut ID itu.'; return; }
+  var jenis = el('srcJenis').value;
+  var f = el('srcBerkas').files[0];
+  var teks = el('srcTeks').value;
+
+  if(!f && !teks.trim()){ el('srcStatus').textContent = 'Belum ada isi: tempel kode, atau pilih berkas.'; return; }
+  // .ex5 itu biner - tidak ada bentuk teks yang masuk akal untuk ditempel.
+  if(jenis === 'ex5' && !f){ el('srcStatus').textContent = '.ex5 adalah berkas biner — harus lewat "pilih berkas", tidak bisa ditempel.'; return; }
+
+  el('btnUnggahSumber').disabled = true;
+  el('srcStatus').textContent = 'Mengunggah…';
+
+  var siap = f
+    ? new Promise(function(res, rej){
+        var fr = new FileReader();
+        fr.onload = function(){ res({ id:id, jenis:jenis, base64: String(fr.result).split(',')[1] || '' }); };
+        fr.onerror = function(){ rej(new Error('berkas tidak terbaca')); };
+        fr.readAsDataURL(f);
+      })
+    : Promise.resolve({ id:id, jenis:jenis, teks:teks });
+
+  siap.then(function(badan){
+    return ambil('/api/produk/unggah', { method:'POST', body: JSON.stringify(badan) });
+  }).then(function(j){
+    el('srcStatus').textContent = 'Tersimpan sebagai ' + j.berkas + ' (' + (j.ukuran/1024).toFixed(1) + ' KB) di VPS.';
+    el('srcBerkas').value = ''; el('srcTeks').value = '';
+    toast('Sumber produk terunggah.');
+    return muatDaftarSumber();
+  }).catch(function(e){
+    el('srcStatus').textContent = 'Gagal: ' + e.message;
+  }).then(function(){ el('btnUnggahSumber').disabled = false; });
+});
+
 el('btnSimpanProduk').addEventListener('click', function(){
   var id = el('prodId').value.trim().toLowerCase().replace(/[^a-z0-9-]/g,'');
   if(!id){ el('prodStatus').textContent = 'ID produk wajib diisi.'; return; }
@@ -1085,7 +1186,8 @@ function muatSemua(){
     return muatProduk();
   }
 
-  return Promise.all([ muatTrafik(), muatVps(), muatLapor(), muatKlien(), muatJual(), muatLisensi(), muatProduk() ])
+  return Promise.all([ muatTrafik(), muatVps(), muatLapor(), muatKlien(), muatJual(),
+                       muatLisensi(), muatProduk(), muatDaftarSumber() ])
     .then(hitungKpi);
 }
 

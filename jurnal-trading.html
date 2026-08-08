@@ -3,7 +3,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202608081800">
+<meta name="jt-versi" content="202608082100">
 <script>
 /* ── Penjaga versi ────────────────────────────────────────────────────────────
    GitHub Pages menyuruh browser menyimpan HTML di cache beberapa menit, jadi
@@ -13,7 +13,7 @@
    sekali saja kalau ternyata yang tampil sudah usang. Dijaga sessionStorage
    supaya tidak pernah berulang (anti-loop). */
 (function(){
-  var VERSI_TAMPIL = "202608081800";
+  var VERSI_TAMPIL = "202608082100";
   var KUNCI_OK    = "jtVersiOk";      // versi yang sudah dipastikan benar-benar termuat
   var KUNCI_PAKSA = "jtVersiPaksa";   // versi yang sudah pernah dipaksa muat ulang
   try{
@@ -304,6 +304,10 @@
     padding:1px 5px;border-radius:4px;margin-left:6px;white-space:nowrap;
   }
   .jt-openpos-gantung{color:var(--ink-faint);font-style:italic;font-size:10.5px;}
+  /* Baris posisi milik pemilik: dibedakan supaya tidak tertukar dengan posisi
+     sendiri - isinya memang beda (tanpa size, PnL dalam persen). */
+  .jt-openpos-pemilik{background:rgba(201,162,75,.05);}
+  .jt-badge-pemilik{color:var(--gold, #c9a24b);border-color:var(--gold, #c9a24b);}
   /* Riwayat trade kripto memanjang penuh di bawah grid */
   .jt-riwayat-penuh > .card{margin-top:20px;}
   /* Dropdown emosi & alasan entry di dalam baris riwayat */
@@ -2421,13 +2425,25 @@
     // terbaca seolah semuanya sudah jalan padahal sebagian baru antre.
     var nGantung = posisi.filter(function(p){ return p && p.pending; }).length;
     var nJalan = posisi.length - nGantung;
+
+    /* Posisi milik PEMILIK, disiarkan dari Kripto Screener ke dokumen publik.
+       Ditempelkan di bawah posisi sendiri supaya siapa pun - termasuk yang belum
+       punya posisi apa pun - tetap bisa melihat apa yang sedang berjalan.
+
+       Pemilik sendiri dilewati: dia sudah melihat versi lokalnya yang lebih
+       lengkap (ada size & PnL dolar), dan menampilkan keduanya cuma jadi baris
+       kembar untuk posisi yang sama. */
+    var pemilik = (window.__jtPosisiPemilik || []).filter(function(p){ return p && p.simbol; });
+    if(window.__jtSayaPemilik) pemilik = [];
+
     if(hint){
-      hint.textContent = !posisi.length ? '—'
-        : (nJalan ? nJalan + ' posisi' : '')
-          + (nJalan && nGantung ? ' • ' : '')
-          + (nGantung ? nGantung + ' order menggantung' : '');
+      var bagian = [];
+      if(nJalan) bagian.push(nJalan + ' posisi');
+      if(nGantung) bagian.push(nGantung + ' order menggantung');
+      if(pemilik.length) bagian.push(pemilik.length + ' dari pemilik');
+      hint.textContent = bagian.length ? bagian.join(' • ') : '—';
     }
-    if(!posisi.length){
+    if(!posisi.length && !pemilik.length){
       box.innerHTML = '<p class="jt-openpos-kosong">Tidak ada posisi terbuka.</p>';
       return;
     }
@@ -2476,8 +2492,41 @@
             + selPnl
             + '</tr>';
         }).join('')
+      + pemilik.map(function(t){
+          var sym = String(t.simbol || '').replace('USDT','');
+          var dir = String(t.arah || '').toUpperCase();
+          var kelas = dir === 'BUY' ? 'buy' : 'sell';
+          var kini = harga[t.simbol];
+          /* PnL ditampilkan sebagai PERSEN gerak harga, bukan dolar - dan itu
+             disengaja: yang disiarkan pemilik memang tidak memuat ukuran posisi
+             atau leverage, karena keduanya membocorkan besar akunnya. Persen
+             gerak harga adalah yang benar-benar bisa diikuti orang lain dengan
+             ukuran posisinya masing-masing. */
+          var gerak = null;
+          if(kini != null && t.entry) gerak = ((kini - t.entry) / t.entry) * 100 * (dir === 'BUY' ? 1 : -1);
+          var warna = gerak == null ? 'var(--ink-faint)'
+                    : gerak > 0 ? 'var(--profit)' : gerak < 0 ? 'var(--loss)' : 'var(--ink-dim)';
+          return '<tr class="jt-openpos-pemilik">'
+            + '<td><span class="jt-openpos-sym">' + sym + '</span>'
+            +     '<span class="jt-openpos-dir ' + kelas + '">' + dir + '</span>'
+            +     '<span class="jt-openpos-badge jt-badge-pemilik">Pemilik</span>'
+            + '</td>'
+            + '<td style="color:var(--ink-faint)">' + (t.tf || '—') + '</td>'
+            + '<td style="color:var(--ink-faint)">—</td>'
+            + '<td>' + fmtHarga(t.entry) + '</td>'
+            + '<td class="jt-openpos-sl">' + fmtHarga(t.sl) + '</td>'
+            + '<td class="jt-openpos-tp">' + fmtHarga(t.tp) + '</td>'
+            + '<td class="jt-openpos-tp">—</td>'
+            + '<td>' + fmtHarga(kini) + '</td>'
+            + '<td style="color:' + warna + '">'
+            +   (gerak != null ? (gerak >= 0 ? '+' : '') + gerak.toFixed(2) + '%' : '—') + '</td>'
+            + '</tr>';
+        }).join('')
       + '</tbody></table>';
   }
+  // Dipanggil dari blok script lain (yang memegang Firestore) - variabel tidak
+  // dibagi antar blok <script>, jadi jembatannya lewat window.
+  window.__jtRenderOpenPositions = renderOpenPositions;
 
   // Ambil harga pasar terakhir untuk semua simbol yang sedang punya posisi,
   // lalu gambar ulang kotak posisi supaya kolom Harga & PnL terisi.
@@ -2490,6 +2539,9 @@
         simbol = Object.keys(p).map(function(k){ return p[k] && p[k].source; }).filter(Boolean);
       }
     }catch(e){}
+    // Simbol milik pemilik ikut dihitung: tanpa ini, barisnya tampil tapi kolom
+    // Harga & PnL selamanya "—" bagi pengguna yang tidak punya posisi sendiri.
+    (window.__jtPosisiPemilik || []).forEach(function(p){ if(p && p.simbol) simbol.push(p.simbol); });
     if(!simbol.length) return;
     var base = 'https://103-253-145-38.sslip.io';
     var cfg = null;
@@ -2506,6 +2558,7 @@
       })
       .catch(function(){});
   }
+  window.__jtMuatHargaPosisi = muatHargaPosisiTerbuka;
 
   function renderCryptoAll(){
     cState.trades = loadCryptoTrades();
@@ -2623,8 +2676,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="jt-langganan.js?v=202608081800"></script>
-<script src="jt-lapor.js?v=202608081800"></script>
+<script src="jt-langganan.js?v=202608082100"></script>
+<script src="jt-lapor.js?v=202608082100"></script>
 <script>
 (function(){
   // ===== Login Google + jurnal "showcase" (Firebase) =====
@@ -2644,6 +2697,38 @@
   var jtAuth = firebase.auth();
   var jtDb = firebase.firestore();
   var JT_OWNER_UID = 'EOrakx0QnSVgsi6BECSOXvUM9kG3';
+
+  /* ── Posisi terbuka pemilik ────────────────────────────────────────────────
+     Disiarkan Kripto Screener ke public/posisiTerbuka. Dipantau lewat
+     onSnapshot, bukan diambil sekali: begitu pemilik membuka atau menutup
+     posisi, tabelnya ikut berubah tanpa perlu halaman ini dimuat ulang.
+
+     Tanpa login pun tetap terbaca - aturan Firestore untuk public/{docId}
+     memang "boleh dibaca siapa saja, ditulis hanya oleh pemilik", jadi tidak
+     ada aturan baru yang perlu dipublikasikan untuk fitur ini.
+
+     Harga & PnL-nya dihitung di sisi pembaca dari harga pasar terkini, jadi
+     tetap bergerak walaupun halaman screener pemilik sedang tertutup. */
+  window.__jtPosisiPemilik = window.__jtPosisiPemilik || [];
+  (function pantauPosisiPemilik(){
+    function terapkan(daftar){
+      window.__jtPosisiPemilik = Array.isArray(daftar) ? daftar : [];
+      if(typeof window.__jtMuatHargaPosisi === 'function') window.__jtMuatHargaPosisi();
+      if(typeof window.__jtRenderOpenPositions === 'function') window.__jtRenderOpenPositions();
+    }
+    try{
+      jtDb.collection('public').doc('posisiTerbuka').onSnapshot(function(doc){
+        terapkan(doc.exists ? (doc.data() || {}).posisi : []);
+      }, function(){ /* gagal baca -> biarkan kosong, bukan error di layar */ });
+    }catch(e){}
+
+    // Harga disegarkan berkala supaya kolom PnL bergerak. Dokumennya sendiri
+    // tidak ikut diminta ulang - itu tugas onSnapshot di atas.
+    setInterval(function(){
+      if(!(window.__jtPosisiPemilik || []).length) return;
+      if(typeof window.__jtMuatHargaPosisi === 'function') window.__jtMuatHargaPosisi();
+    }, 20000);
+  })();
 
   // Dibaca untuk TAMPILAN jurnal (punya sendiri atau punya owner sebagai contoh).
   var JT_READ_KEYS = ['ledgerNoirTrades_v1', 'emaScreenerPrioritySim_v1', 'jtAccountProfile_v1', 'jtCryptoNotes_v1'];
@@ -3374,6 +3459,11 @@
   if(typeof JTLapor !== "undefined") JTLapor.init({ halaman: "jurnal" });
 
   jtAuth.onAuthStateChanged(function(user){
+    // Pemilik melihat posisinya sendiri dari data lokal (lengkap dengan size &
+    // PnL dolar), jadi baris siarannya dilewati supaya tidak kembar.
+    window.__jtSayaPemilik = !!(user && user.uid === JT_OWNER_UID);
+    if(typeof window.__jtRenderOpenPositions === 'function') window.__jtRenderOpenPositions();
+
     if(user){
       jtLoginBtn.style.display = 'none';
       jtUserBarEl.style.display = 'inline-flex';
