@@ -3,7 +3,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202608050100">
+<meta name="jt-versi" content="202608050500">
 <script>
 /* ── Penjaga versi ────────────────────────────────────────────────────────────
    GitHub Pages menyuruh browser menyimpan HTML di cache beberapa menit, jadi
@@ -13,7 +13,7 @@
    sekali saja kalau ternyata yang tampil sudah usang. Dijaga sessionStorage
    supaya tidak pernah berulang (anti-loop). */
 (function(){
-  var VERSI_TAMPIL = "202608050100";
+  var VERSI_TAMPIL = "202608050500";
   var KUNCI_OK    = "jtVersiOk";      // versi yang sudah dipastikan benar-benar termuat
   var KUNCI_PAKSA = "jtVersiPaksa";   // versi yang sudah pernah dipaksa muat ulang
   try{
@@ -2590,7 +2590,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="jt-langganan.js?v=202608050100"></script>
+<script src="jt-langganan.js?v=202608050500"></script>
 <script>
 (function(){
   // ===== Login Google + jurnal "showcase" (Firebase) =====
@@ -2979,6 +2979,56 @@
     if(typeof JTLangganan !== 'undefined') JTLangganan.tampilDinding('Jurnal Trading');
   }
 
+  /* ══════════════════════════════════════════════════════════════════════
+     SINKRONISASI ANTAR PERANGKAT
+     ══════════════════════════════════════════════════════════════════════
+     Versi lama MENDORONG isi localStorage ke cloud tiap 15 detik TANPA SYARAT.
+     Akibatnya: perangkat mana pun yang jurnalnya sedang terbuka - walau cuma
+     ditinggal menganggur di tablet - menimpa cloud dengan salinannya sendiri
+     dua puluh kali per menit. Kamu menyunting di komputer, tablet yang masih
+     terbuka mendorong salinan LAMA-nya, dan suntinganmu hilang. Itu sebabnya
+     jurnalmu terasa "berubah-ubah sendiri".
+
+     Sekarang tiga aturan:
+       1. DORONG hanya kalau perangkat ini benar-benar punya perubahan.
+          Dibandingkan terhadap cuplikan nilai terakhir yang tersinkron - jadi
+          tidak perlu menandai tiap tempat penyuntingan satu per satu, dan
+          tidak ada yang bisa terlewat.
+       2. Sebelum menulis, cloud DIBACA dulu. Kalau ternyata sudah lebih baru
+          (perangkat lain menyimpan sesudah kita), isinya DIGABUNG per id trade
+          - bukan ditimpa. Tidak ada trade yang bisa lenyap.
+       3. TARIK saat halaman kembali dilihat (ganti tab, buka lagi dari layar
+          terkunci). Itu momen paling wajar orang berpindah perangkat. */
+  var jtCuplikan = null;      // nilai localStorage saat terakhir tersinkron
+
+  function jtSetCuplikan(){
+    jtCuplikan = {};
+    JT_WRITE_KEYS.forEach(function(k){ jtCuplikan[k] = localStorage.getItem(k); });
+  }
+
+  function jtAdaPerubahanLokal(){
+    if(!jtCuplikan) return false;   // belum pernah sinkron -> jangan asal dorong
+    for(var i = 0; i < JT_WRITE_KEYS.length; i++){
+      var k = JT_WRITE_KEYS[i];
+      if(localStorage.getItem(k) !== jtCuplikan[k]) return true;
+    }
+    return false;
+  }
+
+  // Gabung dua daftar trade berdasarkan id. Milik PERANGKAT INI menang kalau
+  // id-nya sama - dialah yang sedang dipakai orangnya. Yang hanya ada di salah
+  // satu sisi tetap ikut, jadi tidak ada baris yang hilang.
+  function jtGabungTrades(punyaCloud, punyaKita){
+    var peta = {};
+    (punyaCloud || []).forEach(function(t){ if(t && t.id) peta[t.id] = t; });
+    (punyaKita || []).forEach(function(t){ if(t && t.id) peta[t.id] = t; });
+    return Object.keys(peta).map(function(k){ return peta[k]; });
+  }
+
+  function jtUrai(teks, bawaan){
+    try{ var v = JSON.parse(teks); return v == null ? bawaan : v; }catch(e){ return bawaan; }
+  }
+
   function jtSaveToCloud(uid){
     // Langganan habis -> jurnal jadi BACA-SAJA. Catatan lama tetap utuh di
     // cloud dan tetap tampil; yang berhenti hanya penyimpanan perubahan baru.
@@ -2988,19 +3038,92 @@
       jtTandaiBacaSaja();
       return Promise.resolve(false);
     }
-    var payload = {};
-    JT_WRITE_KEYS.forEach(function(key){
-      var val = localStorage.getItem(key);
-      if(val !== null) payload[key] = val;
-    });
-    payload._updatedAt = Date.now();
-    return jtDb.collection('users').doc(uid).set(payload, { merge: true })
-      .then(function(){
+    var ref = jtDb.collection('users').doc(uid);
+
+    return ref.get().then(function(doc){
+      var awan = doc.exists ? (doc.data() || {}) : {};
+      var adaGabungan = false;
+
+      var payload = {};
+      JT_WRITE_KEYS.forEach(function(key){
+        var kita = localStorage.getItem(key);
+        if(kita === null) return;
+
+        /* Yang menentukan "cloud sudah berubah" adalah ISI-nya, dibandingkan
+           terhadap nilai yang terakhir kita lihat - BUKAN stempel waktu.
+
+           Versi pertama saya memakai _updatedAt, dan itu punya lubang nyata:
+           dua perangkat yang menyimpan dalam milidetik yang sama menghasilkan
+           stempel identik, perbandingannya jadi buta, dan trade dari salah satu
+           perangkat lenyap. Ketahuan waktu diuji, bukan waktu dipakai. Dengan
+           membandingkan isi, tidak ada jam yang perlu dipercaya. */
+        var awanBerubah = jtCuplikan
+                       && typeof awan[key] === 'string'
+                       && awan[key] !== jtCuplikan[key];
+
+        if(awanBerubah && awan[key] !== kita){
+          adaGabungan = true;
+          // Perangkat lain menyimpan sesudah sinkron terakhir kita.
+          if(key === 'ledgerNoirTrades_v1'){
+            var gab = jtGabungTrades(jtUrai(awan[key], []), jtUrai(kita, []));
+            kita = JSON.stringify(gab);
+            try{ localStorage.setItem(key, kita); }catch(e){}
+          } else {
+            // Setelan & catatan: gabung dangkal, milik kita menang per kolom.
+            var g2 = Object.assign({}, jtUrai(awan[key], {}), jtUrai(kita, {}));
+            kita = JSON.stringify(g2);
+            try{ localStorage.setItem(key, kita); }catch(e){}
+          }
+        }
+        payload[key] = kita;
+      });
+
+      // _updatedAt tetap ditulis sebagai jejak untuk manusia, tapi TIDAK
+      // dipakai lagi untuk mengambil keputusan apa pun.
+      payload._updatedAt = Date.now();
+      return ref.set(payload, { merge: true }).then(function(){
+        jtSetCuplikan();
+        if(adaGabungan && typeof window.__jtRenderXau === 'function'){
+          // Hasil penggabungan harus terlihat, bukan cuma tersimpan.
+          try{ window.__jtRenderXau(); }catch(e){}
+          try{ if(typeof window.__jtRenderKripto === 'function') window.__jtRenderKripto(); }catch(e){}
+        }
         // Tiap kali jurnal pemilik tersimpan, salinan publiknya ikut diperbarui
         // supaya pengunjung selalu melihat versi terbaru. Fire-and-forget:
         // gagal menerbitkan tidak boleh menggagalkan simpan utama.
         if(uid === JT_OWNER_UID) jtPublishShowcase().catch(function(){});
+        return true;
       });
+    });
+  }
+
+  // Dorong HANYA kalau ada yang berubah di perangkat ini.
+  function jtDorongJikaBerubah(uid){
+    if(!uid || !jtAdaPerubahanLokal()) return Promise.resolve(false);
+    return jtSaveToCloud(uid).catch(function(e){
+      if(window.console) console.warn('[sinkron] gagal mendorong:', e && e.message);
+      return false;
+    });
+  }
+
+  // Tarik dari cloud. Dipakai saat halaman kembali dilihat, supaya tab yang
+  // ditinggal terbuka tidak menampilkan (dan mendorong) data basi.
+  function jtTarikDariCloud(uid){
+    if(!uid) return Promise.resolve(false);
+    if(jtAdaPerubahanLokal()) return Promise.resolve(false);  // jangan timpa suntingan yang belum naik
+    return jtDb.collection('users').doc(uid).get().then(function(doc){
+      if(!doc.exists) return false;
+      // jtApplyDocIfChanged sudah membandingkan isi per kunci dan hanya
+      // menerapkan yang benar-benar beda - tidak perlu penjaga stempel waktu
+      // di depannya, yang justru bisa salah saat jam dua perangkat berbeda.
+      var berubah = jtApplyDocIfChanged(doc);
+      jtSetCuplikan();
+      if(berubah){
+        try{ if(typeof window.__jtRenderXau === 'function') window.__jtRenderXau(); }catch(e){}
+        try{ if(typeof window.__jtRenderKripto === 'function') window.__jtRenderKripto(); }catch(e){}
+      }
+      return berubah;
+    }).catch(function(){ return false; });
   }
 
   // ═══════════════════════════════════════════════════════
@@ -3190,6 +3313,12 @@
           try{ if(typeof window.__jtRenderXau === 'function') window.__jtRenderXau(); }catch(e){}
           try{ if(typeof window.__jtRenderKripto === 'function') window.__jtRenderKripto(); }catch(e){}
         }
+        /* Titik awal sinkronisasi ditetapkan DI SINI, sesudah data cloud
+           diterapkan. Sebelum baris ini jtCuplikan masih null, dan itu memang
+           disengaja: selama belum tahu isi cloud, perangkat ini tidak boleh
+           menganggap dirinya "punya perubahan" lalu mendorong apa pun. */
+        jtSetCuplikan();
+
         // Pemilik: terbitkan salinan publiknya SESUDAH data cloud diterapkan,
         // bukan sebelum - kalau sebelum, yang naik ke publik bisa versi lokal
         // yang basi (mis. baru buka browser lain).
@@ -3218,8 +3347,21 @@
       jtMt5Timer = setInterval(mt5Muat, 30000);
 
       if(jtSyncTimer) clearInterval(jtSyncTimer);
-      jtSyncTimer = setInterval(function(){ jtSaveToCloud(user.uid); }, 15000);
-      window.addEventListener('beforeunload', function(){ jtSaveToCloud(user.uid); });
+      // Hanya mendorong kalau perangkat INI punya perubahan. Tab yang cuma
+      // ditinggal terbuka sekarang benar-benar diam, tidak lagi menimpa cloud.
+      jtSyncTimer = setInterval(function(){ jtDorongJikaBerubah(user.uid); }, 15000);
+      window.addEventListener('beforeunload', function(){ jtDorongJikaBerubah(user.uid); });
+
+      /* Kembali melihat halaman = momen orang berpindah perangkat. Yang belum
+         naik didorong dulu, baru menarik yang terbaru - urutannya penting,
+         kebalikannya akan menimpa suntingan yang belum sempat tersimpan. */
+      document.addEventListener('visibilitychange', function(){
+        if(document.visibilityState !== 'visible') { jtDorongJikaBerubah(user.uid); return; }
+        jtDorongJikaBerubah(user.uid).then(function(){ return jtTarikDariCloud(user.uid); });
+      });
+      window.addEventListener('focus', function(){
+        jtDorongJikaBerubah(user.uid).then(function(){ return jtTarikDariCloud(user.uid); });
+      });
     } else {
       jtLoginBtn.style.display = 'inline-flex';
       jtUserBarEl.style.display = 'none';
