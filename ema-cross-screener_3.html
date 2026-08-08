@@ -11,12 +11,12 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202608050700">
+<meta name="jt-versi" content="202608051000">
 <script>
 /* Penjaga versi - lihat catatan lengkap di jurnal-trading.html. Mencegah browser
    menyajikan HTML lama dari cache saat halaman dimuat ulang. */
 (function(){
-  var VERSI_TAMPIL = "202608050700";
+  var VERSI_TAMPIL = "202608051000";
   var KUNCI_OK    = "jtVersiOk";      // versi yang sudah dipastikan benar-benar termuat
   var KUNCI_PAKSA = "jtVersiPaksa";   // versi yang sudah pernah dipaksa muat ulang
   try{
@@ -2280,7 +2280,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="jt-langganan.js?v=202608050700"></script>
+<script src="jt-langganan.js?v=202608051000"></script>
 
 <div class="es-auth-gate" id="esAuthGate">
   <!-- Sesi Firebase baru diketahui setelah onAuthStateChanged menyala (~1 detik).
@@ -2642,20 +2642,29 @@
 
   <div class="es-priority-section es-collapsible" data-section="snr">
     <div class="es-priority-header es-section-head">
-      <div class="es-priority-title">Sinyal Prioritas SNR</div>
+      <div class="es-priority-title">Sinyal SNR &mdash; SMI 4 Jam + Sentuh SNR di M5</div>
       <button type="button" class="es-section-toggle" title="Sembunyikan section">
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
       </button>
     </div>
     <div class="es-section-body">
       <div class="es-priority-controls">
-        <select id="esPrioritySnrTf">
-          <option value="medium" selected>Medium Risk (TF 15m/30m)</option>
-          <option value="high">High Risk (TF 5m)</option>
-          <option value="low">Low Risk (TF 1H/4H)</option>
-          <option value="all">Semua Risk (5m/15m/30m/1H/4H)</option>
+        <!-- Tidak ada lagi pilihan timeframe: TF-nya sudah TERKUNCI oleh logika
+             sinyalnya sendiri - SMI dibaca di 4 jam, sentuhan zona dinilai di
+             candle 5 menit. Membiarkan dropdown TF di sini cuma memberi kesan
+             bisa diubah padahal tidak berpengaruh apa-apa. -->
+        <select id="esPrioritySnrRezim" title="Saring arah sinyal berdasarkan kondisi SMI">
+          <option value="align" selected>Searah SMI BTC</option>
+          <option value="all">Semua Arah</option>
+          <option value="oversold">Hanya Oversold (potensi BUY)</option>
+          <option value="overbought">Hanya Overbought (potensi SELL)</option>
         </select>
-        <button id="esPrioritySnrBtn" class="es-priority-btn">Cari Sinyal Prioritas SNR</button>
+        <select id="esPrioritySnrKetat" title="Seberapa ketat syarat sentuhan zona SNR-nya">
+          <option value="sentuh" selected>Candle M5 menyentuh zona</option>
+          <option value="tolak">…dan candle-nya menolak (wick &gt; body)</option>
+          <option value="searah">…dan sisi zona searah SMI</option>
+        </select>
+        <button id="esPrioritySnrBtn" class="es-priority-btn">Cari Sinyal SNR</button>
         <div class="es-symbol-manager es-symbol-manager-inline">
           <button type="button" id="esPrioritySnrManagerBtn" class="es-symbol-manager-btn">
             <span>Ganti Chart / Kelola Koin</span>
@@ -6098,24 +6107,16 @@
   // mengubahnya berarti memindai ulang - bukan sekadar menyaring hasil lama.
   pantauSnrSel.addEventListener('change', cariSinyalPantau);
 
-  const SNR_RISK_TIERS = {
-    high:   [ { value:'5m',  label:'5m' } ],
-    medium: [ { value:'15m', label:'15m' }, { value:'30m', label:'30m' } ],
-    low:    [ { value:'1h',  label:'1H' }, { value:'4h', label:'4H' } ]
-  };
-
+  // SNR_RISK_TIERS & getSnrPriorityTfs dihapus: timeframe sinyal SNR sekarang
+  // TERKUNCI di 4 jam (untuk SMI) + 5 menit (untuk sentuhan zona), jadi tidak
+  // ada lagi yang bisa dipilih.
   const prioritySnrBtn = document.getElementById('esPrioritySnrBtn');
-  const prioritySnrTfSel = document.getElementById('esPrioritySnrTf');
+  const prioritySnrRezimSel = document.getElementById('esPrioritySnrRezim');
+  const prioritySnrKetatSel = document.getElementById('esPrioritySnrKetat');
   const prioritySnrStatusEl = document.getElementById('esPrioritySnrStatus');
   const prioritySnrGrid = document.getElementById('esPrioritySnrGrid');
   const prioritySnrManagerBtn = document.getElementById('esPrioritySnrManagerBtn');
   const prioritySnrManagerDropdown = document.getElementById('esPrioritySnrManagerDropdown');
-
-  function getSnrPriorityTfs(){
-    const v = prioritySnrTfSel.value;
-    if(v==='all') return [...SNR_RISK_TIERS.high, ...SNR_RISK_TIERS.medium, ...SNR_RISK_TIERS.low];
-    return SNR_RISK_TIERS[v] || [];
-  }
 
   // Cek retest zona S/R dengan candle penolakan di kline yang diberikan.
   // Mengembalikan {signal, dir} kalau candle TERAKHIR adalah retest ke-2+,
@@ -6171,22 +6172,65 @@
     return null;
   }
 
-  // Cek KEDUA (atau TF yang dipilih) timeframe secara independen - kalau satu
-  // koin qualifies di TF 30m DAN TF 15m sekaligus, dua-duanya dikembalikan
-  // sebagai kandidat terpisah (tidak berhenti di TF pertama yang cocok).
-  async function findSnrPrioritySignalForSymbol(symbol, tickers, tfs){
-    const found = [];
-    for(const tf of tfs){
-      const { opens, highs, lows, closes } = await fetchKlines(symbol, tf.value, 200);
-      if(closes.length < 30) continue;
-      const res = checkSnrRetestSignal(opens, highs, lows, closes);
-      if(res){
-        const t = tickers[symbol];
-        const price = t ? parseFloat(t.lastPrice) : closes[closes.length-1];
-        found.push({ symbol, signal:res.signal, dir:res.dir, price, tfValue:tf.value, tfLabel:tf.label });
-      }
-    }
-    return found;
+  /* ── Sinyal SNR: SMI 4 jam + sentuhan zona SNR 4 jam di candle M5 ──────
+     Dua syarat, keduanya wajib:
+
+       1. SMI di TF 4 JAM sedang ekstrem (oversold -> arah BUY, overbought ->
+          SELL). Ini persis mesin yang dipakai Area Pantau, bukan tiruan -
+          fungsi cekSmiEkstrem yang sama.
+       2. Candle 5 MENIT yang sedang berjalan menyentuh zona SNR yang ditarik
+          dari TF 4 jam. Ini JTScan/snrTouchH4M5, susunan yang sama dipakai
+          indikator Jadi Trader V3 (zona lokal disembunyikan di TF rendah dan
+          diganti zona 4 jam).
+
+     Jadi arah datang dari kondisi besar (4 jam), sedangkan waktu masuknya dari
+     sentuhan halus (5 menit). Timeframe-nya TERKUNCI - tidak ada dropdown TF,
+     karena mengubahnya akan membatalkan gagasan sinyalnya sendiri. */
+  const SNR_TF_SMI = '4h';
+
+  async function cariSinyalSnrH4M5(symbol, tickers){
+    // SMI di 4 jam
+    const h4 = await fetchKlines(symbol, SNR_TF_SMI, 250);
+    if(h4.closes.length < 40) return null;
+    const smi = cekSmiEkstrem(h4.highs, h4.lows, h4.closes);
+    if(!smi) return null;                      // tidak ekstrem -> bukan kandidat
+
+    // Sentuhan zona SNR 4 jam oleh candle 5 menit yang sedang berjalan
+    const m5 = await fetchKlines(symbol, '5m', 5);
+    const i = m5.closes.length - 1;
+    if(i < 0) return null;
+    const sentuh = snrTouchH4M5(h4, {
+      open: m5.opens[i], high: m5.highs[i], low: m5.lows[i], close: m5.closes[i]
+    });
+    if(!sentuh) return null;                   // tidak menyentuh -> bukan kandidat
+
+    const t = tickers[symbol];
+    const price = t ? parseFloat(t.lastPrice) : m5.closes[i];
+    const atrArr = atr(h4.highs, h4.lows, h4.closes, 14);
+    const a = atrArr[atrArr.length - 1] || (price * 0.005);
+
+    // SL memakai aturan yang SAMA dengan Pantau & Parallel: di luar kotak SNR
+    // ditambah setengah tinggi kotaknya, supaya sapuan likuiditas tidak
+    // otomatis mengenainya.
+    const sl = slFromSnrZone(smi.arah, price, h4.highs, h4.lows, a);
+    const risk = Math.abs(price - sl);
+    if(!(risk > 0)) return null;
+    const riskPct = (risk / price) * 100;
+    if(riskPct > 12 || riskPct < 0.03) return null;
+
+    return {
+      symbol, signal: smi.arah, price,
+      sl, tp: smi.arah === 'BUY' ? price + risk : price - risk,
+      riskPct,
+      tfValue: '5m', tfLabel: 'M5 / SMI 4H',
+      kondisi: smi.kondisi, stochK: smi.k, mulaiBalik: smi.mulaiBalik,
+      snr: sentuh,
+      // Sisi zona dan arah SMI bisa berlawanan: SMI oversold tapi yang tersentuh
+      // justru resisten. Itu bukan alasan membuang kandidatnya - tapi harus
+      // kelihatan, dan bisa disaring lewat pilihan "sisi zona searah SMI".
+      searah: sentuh.arah === smi.arah,
+      change24h: t ? parseFloat(t.priceChangePercent) : 0
+    };
   }
 
   // ═══════════════════════════════════════════════════════
@@ -6684,82 +6728,133 @@
     registerTradableSignals('snr', top);
     prioritySnrGrid.innerHTML = top.map((c,i)=>{
       const signalCls = c.signal==='BUY' ? 'buy' : 'sell';
-      const auto = getAutoSlTp(c);
-      const riskDist = auto.sl!=null ? Math.abs(c.price - auto.sl) : null;
-      const tp2 = riskDist!=null ? (c.signal==='BUY' ? c.price + riskDist*2 : c.price - riskDist*2) : null;
-      const riskPct = riskDist!=null ? (riskDist / c.price) * 100 : null;
+      // SL & TP1 sudah dihitung saat pemindaian (aturan kotak SNR + setengah
+      // tingginya), jadi tidak perlu lewat getAutoSlTp lagi. TP2 = 2x risiko.
+      const riskDist = Math.abs(c.price - c.sl);
+      const tp2 = c.signal==='BUY' ? c.price + riskDist*2 : c.price - riskDist*2;
+      const sisi = c.snr.sisi === 'R' ? 'resisten' : 'support';
+      const fav = favPrioritas(c.symbol) === 0;
+      const chg = c.change24h >= 0 ? '+' + c.change24h.toFixed(2) : c.change24h.toFixed(2);
       return `<div class="es-priority-card ${signalCls}" data-symbol="${c.symbol}" data-tf="${c.tfValue}" data-tflabel="${c.tfLabel}" data-price="${c.price}">
         <div class="es-priority-card-top">
           <span class="es-priority-rank">#${i+1}</span>
           <span class="es-priority-symbol">${c.symbol.replace('USDT','')}</span>
-          <span class="es-priority-signal ${signalCls}">${c.signal} NOW</span>
+          <span class="es-sig-star${fav?' on':''}" data-symbol="${c.symbol}" title="${fav?'Hapus dari koin favorit':'Jadikan koin favorit (naik ke urutan depan)'}">&#9733;</span>
+          <button class="es-priority-signal es-snr-pick ${signalCls}" type="button" title="Pilih sinyal ini">${c.signal} NOW</button>
         </div>
-        <div class="es-priority-tf">SNR Retest • TF ${c.tfLabel} • Harga $${fmtPrice(c.price)}</div>
+        <div class="es-priority-tf">SNR 4 Jam di M5 &bull; Harga $${fmtPrice(c.price)} &bull; ${chg}% 24h</div>
         <div class="es-checklist">
-          <div class="es-check-row ok"><span class="es-check-icon">&check;</span> ${c.dir.sr.status} (zona $${fmtPrice(c.dir.sr.zone.value)})</div>
-          <div class="es-check-row ok"><span class="es-check-icon">&check;</span> Retest ke-2+ dengan candle penolakan (wick &gt; body)</div>
+          <div class="es-check-row ok"><span class="es-check-icon">&check;</span> SMI 4 jam ${c.kondisi === 'oversold' ? 'oversold' : 'overbought'} (${c.stochK.toFixed(1)})</div>
+          <div class="es-check-row ${c.mulaiBalik?'ok':'fail'}"><span class="es-check-icon">${c.mulaiBalik?'&check;':'&#10007;'}</span> ${c.mulaiBalik ? 'SMI sudah mulai berbalik' : 'SMI belum berbalik (masih meluncur)'}</div>
+          <div class="es-check-row ok"><span class="es-check-icon">&check;</span> Candle M5 menyentuh zona ${sisi} 4 jam di $${fmtPrice(c.snr.level)}</div>
+          <div class="es-check-row ${c.snr.tolak?'ok':'fail'}"><span class="es-check-icon">${c.snr.tolak?'&check;':'&#10007;'}</span> ${c.snr.tolak ? 'Candle menolak (wick lebih panjang dari body)' : 'Bukan candle penolakan (body lebih panjang dari wick)'}</div>
+          <div class="es-check-row ${c.searah?'ok':'fail'}"><span class="es-check-icon">${c.searah?'&check;':'&#10007;'}</span> ${c.searah ? 'Sisi zona searah dengan SMI' : 'Sisi zona BERLAWANAN dengan SMI'}</div>
+          <div class="es-check-row ok" style="color:var(--muted)"><span class="es-check-icon">&bull;</span> Lebar zona: &plusmn;$${fmtPrice(c.snr.tol)} (ATR 4 jam &times; 0,5)</div>
         </div>
         <div class="es-priority-levels">
           <div class="es-priority-level-row">Area Entri: <strong>$${fmtPrice(c.price)}</strong></div>
-          <div class="es-priority-level-row invalid">Invalid Level (SL): <strong>$${fmtPrice(auto.sl)}</strong></div>
-          <div class="es-priority-level-row">Take Profit: <strong>TP1 $${fmtPrice(auto.tp)}</strong> &bull; <strong>TP2 $${fmtPrice(tp2)}</strong></div>
-          <div class="es-priority-level-row">Risk: <strong>${riskPct.toFixed(2)}%</strong></div>
+          <div class="es-priority-level-row invalid">Invalid Level (SL): <strong>$${fmtPrice(c.sl)}</strong></div>
+          <div class="es-priority-level-row">Take Profit: <strong>TP1 $${fmtPrice(c.tp)}</strong> &bull; <strong>TP2 $${fmtPrice(tp2)}</strong></div>
+          <div class="es-priority-level-row">Risk: <strong>${c.riskPct.toFixed(2)}%</strong></div>
         </div>
-        <button class="es-priority-trade-btn ${signalCls}" type="button">${c.signal} NOW</button>
       </div>`;
     }).join('');
 
     prioritySnrGrid.querySelectorAll('.es-priority-card').forEach((card,i)=>{
       const cand = top[i];
       card.addEventListener('click', (e)=>{
-        if(e.target.classList.contains('es-priority-trade-btn')) return;
-        openTradingView(cand.symbol, cand.tfValue);
+        if(e.target.classList.contains('es-snr-pick')) return;
+        if(e.target.classList.contains('es-sig-star')) return;
+        // Chart dibuka di M5 - itu timeframe tempat sentuhannya terlihat.
+        openTradingView(cand.symbol, '5m');
       });
-      const tradeBtn = card.querySelector('.es-priority-trade-btn');
-      tradeBtn.addEventListener('click', (e)=>{
+      card.querySelector('.es-snr-pick').addEventListener('click', (e)=>{
         e.stopPropagation();
         selectTradableSignalByUid(tradableUid('snr', cand.symbol, cand.tfValue));
       });
+      const bintang = card.querySelector('.es-sig-star');
+      if(bintang) bintang.addEventListener('click', (e)=>{
+        e.stopPropagation();
+        toggleFavorite(cand.symbol);
+        renderPrioritySnrSignals(urutkanHasilSnr(top));
+      });
     });
+  }
+
+  // Urutan dipisah ke fungsi sendiri supaya sama persis antara sesudah pindai
+  // dan sesudah bintang diklik - pola yang sama dipakai Pantau & Parallel.
+  function urutkanHasilSnr(list){
+    const ekstremitas = c => c.kondisi === 'overbought' ? c.stochK : -c.stochK;
+    return list.slice().sort((a,b)=>
+      favPrioritas(a.symbol) - favPrioritas(b.symbol) ||
+      // Yang sisi zonanya searah SMI naik duluan - itu kandidat paling bersih.
+      (b.searah?1:0) - (a.searah?1:0) ||
+      (b.snr.tolak?1:0) - (a.snr.tolak?1:0) ||
+      ekstremitas(b) - ekstremitas(a) ||
+      rankOf(a.symbol) - rankOf(b.symbol)
+    );
   }
 
   async function findPrioritySnrSignals(){
 
     if(!izinSinyal()) return;
     if(isSectionCollapsed('snr')) return; // section dilipat - hemat request
-    const tfs = getSnrPriorityTfs();
-    if(tfs.length===0){
-      prioritySnrStatusEl.classList.add('error');
-      prioritySnrStatusEl.textContent = 'Pilih timeframe terlebih dahulu.';
-      return;
-    }
+
+    const rezim = prioritySnrRezimSel ? prioritySnrRezimSel.value : 'all';
+    const ketat = prioritySnrKetatSel ? prioritySnrKetatSel.value : 'sentuh';
 
     prioritySnrBtn.disabled = true;
     prioritySnrStatusEl.classList.remove('error');
-    const tfLabels = tfs.map(tf=>tf.label).join(' & ');
-    prioritySnrStatusEl.textContent = `Memindai ${activeSymbols.length} koin (TF ${tfLabels})... bisa memakan waktu beberapa detik.`;
+    prioritySnrStatusEl.textContent = `Memindai ${activeSymbols.length} koin (SMI 4 jam + sentuh SNR di M5)... bisa memakan waktu beberapa detik.`;
     prioritySnrGrid.innerHTML = '';
 
     try{
       const tickers = await loadTickers();
-      const settled = await mapLimited(activeSymbols, SCAN_CONCURRENCY, symbol => findSnrPrioritySignalForSymbol(symbol, tickers, tfs));
-      // Setiap koin bisa menyumbang 0, 1, atau 2 kandidat (kalau qualifies di
-      // kedua TF sekaligus) - digabung semua, TIDAK dipotong/dibatasi jumlahnya.
-      let all = [];
-      settled.forEach(s=>{ if(s.status==='fulfilled' && s.value && s.value.length) all = all.concat(s.value); });
 
-      all.sort((a,b)=> rankOf(a.symbol)-rankOf(b.symbol) || a.tfValue.localeCompare(b.tfValue));
-      const top = all;
+      // Rezim BTC dibaca dari SMI BTC di TF yang SAMA (4 jam) - apel ke apel
+      // dengan syarat yang dipakai menyaring koinnya.
+      let btcKondisi = null, btcK = null;
+      if(rezim === 'align'){
+        const btc = await fetchKlines('BTCUSDT', SNR_TF_SMI, 250);
+        const s = smiSeries(btc.highs, btc.lows, btc.closes, SMI_K, SMI_D, SMI_EMA);
+        btcK = s.smi[s.smi.length-1];
+        btcKondisi = smiConditionOf(btcK);
+        if(btcKondisi === 'neutral') btcKondisi = null;
+      }
+
+      const settled = await mapLimited(activeSymbols, SCAN_CONCURRENCY,
+        symbol => cariSinyalSnrH4M5(symbol, tickers));
+
+      let all = [];
+      settled.forEach(s=>{ if(s.status==='fulfilled' && s.value) all.push(s.value); });
+      const nSebelumSaring = all.length;
+
+      if(rezim === 'oversold')        all = all.filter(c => c.kondisi === 'oversold');
+      else if(rezim === 'overbought') all = all.filter(c => c.kondisi === 'overbought');
+      else if(rezim === 'align')      all = btcKondisi ? all.filter(c => c.kondisi === btcKondisi) : [];
+
+      if(ketat === 'tolak')        all = all.filter(c => c.snr.tolak);
+      else if(ketat === 'searah')  all = all.filter(c => c.snr.tolak && c.searah);
+
+      const top = urutkanHasilSnr(all);
 
       if(top.length===0){
-        prioritySnrStatusEl.textContent = `Tidak ada koin yang retest zona SNR (TF ${tfLabels}) saat ini dari ${activeSymbols.length} koin.`;
+        prioritySnrStatusEl.textContent = nSebelumSaring
+          ? `${nSebelumSaring} koin menyentuh zona SNR 4 jam, tapi tidak ada yang lolos saringan yang dipilih.`
+          : (rezim === 'align' && !btcKondisi
+              ? `BTC sedang tidak ekstrem (SMI ${btcK==null?'-':btcK.toFixed(1)}) di TF 4 jam — tidak ada rezim untuk diikuti.`
+              : `Tidak ada koin yang SMI 4 jam-nya ekstrem sekaligus candle M5-nya menyentuh zona SNR 4 jam, dari ${activeSymbols.length} koin.`);
         prioritySnrGrid.innerHTML = '';
         prioritySnrBtn.disabled = false;
         return;
       }
 
       renderPrioritySnrSignals(top);
-      prioritySnrStatusEl.textContent = `Ditemukan ${top.length} sinyal SNR dari ${activeSymbols.length} koin dipindai (TF ${tfLabels}) • ${new Date().toLocaleTimeString('id-ID')}.`;
+      const nSearah = top.filter(c => c.searah).length;
+      prioritySnrStatusEl.textContent = `${top.length} sinyal SNR dari ${activeSymbols.length} koin`
+        + ` • ${nSearah} sisi zonanya searah SMI`
+        + (rezim === 'align' && btcKondisi ? ` • rezim BTC ${btcKondisi}` : '')
+        + ` • ${new Date().toLocaleTimeString('id-ID')}.`;
     }catch(e){
       prioritySnrStatusEl.classList.add('error');
       prioritySnrStatusEl.textContent = `Gagal memindai sinyal SNR: ${e && e.message ? e.message : 'terjadi kesalahan tak terduga'}.`;
@@ -6819,7 +6914,10 @@
   // Manual trigger saja (tombol) - TIDAK auto-scan tiap halaman dibuka, supaya
   // tidak menambah beban seperti yang sempat terjadi di Sinyal Prioritas ICT.
   prioritySnrBtn.addEventListener('click', findPrioritySnrSignals);
-  prioritySnrTfSel.addEventListener('change', findPrioritySnrSignals);
+  // Kedua saringan butuh klines yang belum tentu sudah diambil, jadi
+  // mengubahnya berarti memindai ulang - bukan sekadar menyaring hasil lama.
+  prioritySnrRezimSel.addEventListener('change', findPrioritySnrSignals);
+  prioritySnrKetatSel.addEventListener('change', findPrioritySnrSignals);
 
   // ═══════════════════════════════════════════════════════
   // ████████  SINYAL PRIORITAS AI - MODEL KONFLUENSI  ████████
