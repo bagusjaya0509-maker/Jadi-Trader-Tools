@@ -11,12 +11,12 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202608051200">
+<meta name="jt-versi" content="202608081200">
 <script>
 /* Penjaga versi - lihat catatan lengkap di jurnal-trading.html. Mencegah browser
    menyajikan HTML lama dari cache saat halaman dimuat ulang. */
 (function(){
-  var VERSI_TAMPIL = "202608051200";
+  var VERSI_TAMPIL = "202608081200";
   var KUNCI_OK    = "jtVersiOk";      // versi yang sudah dipastikan benar-benar termuat
   var KUNCI_PAKSA = "jtVersiPaksa";   // versi yang sudah pernah dipaksa muat ulang
   try{
@@ -1075,14 +1075,46 @@
 
   /* Parallel Signal: badge BUY/SELL NOW di pojok kanan atas kartu dijadikan tombol
      yang bisa diklik untuk memilih sinyal (tampilan tetap seperti badge semula). */
-  .es-ch-pick{
+  /* Sinyal Prioritas (.es-snr-pick) memakai gaya yang SAMA dengan Parallel.
+     Sebelumnya hanya .es-ch-pick yang punya aturan ini, jadi tombol BUY/SELL di
+     section SNR tampil polos tanpa efek hover/tekan - beda sendiri. */
+  .es-ch-pick, .es-snr-pick{
     border:none;
     cursor:pointer;
     line-height:1;
     transition:filter .15s, transform .1s;
   }
-  .es-ch-pick:hover{ filter:brightness(1.25); }
-  .es-ch-pick:active{ transform:scale(0.96); }
+  .es-ch-pick:hover, .es-snr-pick:hover{ filter:brightness(1.25); }
+  .es-ch-pick:active, .es-snr-pick:active{ transform:scale(0.96); }
+
+  /* Menu klik-kanan pada kartu sinyal - pengganti tombol "Ganti Chart / Kelola
+     Koin" yang dulu nongkrong di bilah kendali tiap section. Ditaruh di kartunya
+     langsung karena di situlah koinnya terlihat: tidak perlu mencari namanya
+     lagi di daftar terpisah. */
+  .es-koin-menu{
+    position:fixed; z-index:9999; display:none;
+    min-width:210px; padding:5px;
+    background:var(--panel-2, #1b1e24);
+    border:1px solid var(--border, #262a31);
+    border-radius:9px;
+    box-shadow:0 10px 28px rgba(0,0,0,.55);
+    font-size:12.5px;
+  }
+  .es-koin-menu.open{ display:block; }
+  .es-koin-menu-judul{
+    padding:6px 9px 7px; margin-bottom:3px;
+    border-bottom:1px solid var(--border, #262a31);
+    color:var(--muted, #9a9ca4); font-size:11px;
+    font-family:var(--font-mono, monospace);
+  }
+  .es-koin-menu button{
+    display:block; width:100%; text-align:left;
+    padding:8px 9px; border:0; border-radius:6px;
+    background:transparent; color:var(--text, #ece8de);
+    cursor:pointer; font-size:12.5px;
+  }
+  .es-koin-menu button:hover{ background:rgba(255,255,255,.06); }
+  .es-koin-menu button.bahaya:hover{ background:rgba(192,90,78,.16); color:var(--bear, #c25a4e); }
 
   /* SL/TP Manual: hilangkan panah spinner atas/bawah - diisi manual saja. */
   #esPsimManualSl::-webkit-inner-spin-button,
@@ -2280,7 +2312,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="jt-langganan.js?v=202608051200"></script>
+<script src="jt-langganan.js?v=202608081200"></script>
 
 <div class="es-auth-gate" id="esAuthGate">
   <!-- Sesi Firebase baru diketahui setelah onAuthStateChanged menyala (~1 detik).
@@ -2399,57 +2431,6 @@
     <div class="es-hidden-sections" id="esHiddenSections"></div>
   </div>
 
-  <div class="es-favorit-section es-collapsible" data-section="favorit">
-    <div class="es-fav-title es-section-head">
-      <span>Koin Favorit</span>
-      <button type="button" class="es-section-toggle" title="Sembunyikan section">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
-      </button>
-    </div>
-    <div class="es-section-body">
-    <div class="es-controls">
-      <select id="esInterval">
-        <option value="1m">1m</option>
-        <option value="5m">5m</option>
-        <option value="15m">15m</option>
-        <option value="30m">30m</option>
-        <option value="1h" selected>1H</option>
-        <option value="4h">4H</option>
-        <option value="1d">1D</option>
-      </select>
-      <select id="esCap">
-        <option value="all" selected>Semua Cap</option>
-        <option value="big">Big Cap</option>
-        <option value="low">Low/Mid Cap</option>
-      </select>
-      <select id="esType">
-        <option value="all" selected>Semua Cross</option>
-        <option value="bullish">Golden Cross</option>
-        <option value="bearish">Death Cross</option>
-      </select>
-      <select id="esRsi">
-        <option value="all" selected>Semua RSI</option>
-        <option value="overbought">Overbought (RSI&ge;70)</option>
-        <option value="oversold">Oversold (RSI&le;30)</option>
-      </select>
-      <select id="esStoch">
-        <option value="all" selected>Semua Stochastic</option>
-        <option value="overbought">Overbought (K&ge;80)</option>
-        <option value="oversold">Oversold (K&le;20)</option>
-      </select>
-      <button id="esRefreshBtn" class="es-refresh">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 3v6h-6"/></svg>
-        Scan
-      </button>
-    </div>
-
-      <div class="es-fav-section">
-        <div class="es-btc-tf-strip" id="esBtcTfStrip"></div>
-        <div class="es-fav-grid" id="esFavGrid"></div>
-        <div class="es-fav-status" id="esFavStatus">Memuat koin favorit...</div>
-      </div>
-    </div>
-  </div>
 
 
   <div class="es-priority-section es-collapsible es-pantau-top" data-section="pantau">
@@ -2469,19 +2450,7 @@
           <option value="oversold">Hanya Oversold (potensi BUY)</option>
           <option value="overbought">Hanya Overbought (potensi SELL)</option>
         </select>
-        <select id="esPantauSnr" title="Saring koin yang candle 5 menitnya sedang menyentuh zona SNR dari TF 4 jam — susunan yang sama dipakai indikator Jadi Trader V3">
-          <option value="off" selected>Tanpa filter SNR</option>
-          <option value="sentuh">Candle M5 menyentuh SNR 4 Jam</option>
-          <option value="tolak">SNR 4 Jam + candle menolak</option>
-        </select>
         <button id="esPantauBtn" class="es-priority-btn">Cari Sinyal Pantau</button>
-        <div class="es-symbol-manager es-symbol-manager-inline">
-          <button type="button" id="esPantauManagerBtn" class="es-symbol-manager-btn">
-            <span>Ganti Chart / Kelola Koin</span>
-            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
-          </button>
-          <div class="es-symbol-manager-dropdown" id="esPantauManagerDropdown"></div>
-        </div>
         <div class="es-ai-regime" id="esPantauRegimeBadge"></div>
         <div class="es-econ-calendar-panel collapsed" id="esEconCalendarPanel">
           <div class="es-econ-calendar-trigger" id="esEconCalendarTrigger">
@@ -2522,6 +2491,25 @@
     </div>
   </div>
 
+  <div class="es-priority-section es-collapsible" data-section="snr">
+    <div class="es-priority-header es-section-head">
+      <div class="es-priority-title">Sinyal Prioritas</div>
+      <button type="button" class="es-section-toggle" title="Sembunyikan section">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+    </div>
+    <div class="es-section-body">
+      <!-- Tanpa dropdown apa pun. Syarat sinyalnya cuma SATU dan terkunci:
+           candle M5 menyentuh zona SNR 4 jam, DAN SMI 4 jam sedang overbought
+           atau oversold. Tidak ada yang bisa disetel, jadi tidak ada yang perlu
+           ditampilkan sebagai pilihan. -->
+      <div class="es-priority-controls">
+        <button id="esPrioritySnrBtn" class="es-priority-btn">Cari Sinyal Prioritas</button>
+      </div>
+      <div class="es-priority-grid" id="esPrioritySnrGrid"></div>
+      <div class="es-priority-status" id="esPrioritySnrStatus">Klik "Cari Sinyal Prioritas" untuk memindai.</div>
+    </div>
+  </div>
   <div class="es-priority-section es-collapsible" data-section="crosshunter">
     <div class="es-priority-header es-section-head">
       <div class="es-priority-title">Parallel Signal</div>
@@ -2548,13 +2536,6 @@
           <option value="only">Parallel Only (tanpa S/R)</option>
         </select>
         <button id="esChBtn" class="es-priority-btn">Cari Sinyal Parallel</button>
-        <div class="es-symbol-manager es-symbol-manager-inline">
-          <button type="button" id="esChManagerBtn" class="es-symbol-manager-btn">
-            <span>Ganti Chart / Kelola Koin</span>
-            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
-          </button>
-          <div class="es-symbol-manager-dropdown" id="esChManagerDropdown"></div>
-        </div>
         <div class="es-ai-regime" id="esChSmiBadge"></div>
       </div>
       <div class="es-priority-grid" id="esChGrid"></div>
@@ -2562,31 +2543,6 @@
     </div>
   </div>
 
-  <div class="es-fav-cross-section es-collapsible" data-section="favcross">
-    <div class="es-fav-title es-section-head">
-      <span>Sinyal Entry Koin Favorit</span>
-      <button type="button" class="es-section-toggle" title="Sembunyikan section">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
-      </button>
-    </div>
-    <div class="es-section-body">
-      <div class="es-fav-cross-manage" id="esFavCrossManage"></div>
-      <div class="es-grid" id="esFavCrossGrid"></div>
-      <div class="es-status" id="esFavCrossStatus">Menunggu pindaian koin favorit pertama...</div>
-
-      <div class="es-scan-toolbar">
-        <div class="es-symbol-manager">
-          <button type="button" id="esSymbolManagerBtn" class="es-symbol-manager-btn">
-            <span>Ganti Chart / Kelola Koin</span>
-            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
-          </button>
-          <div class="es-symbol-manager-dropdown" id="esSymbolManagerDropdown"></div>
-        </div>
-      </div>
-      <div class="es-grid" id="esGrid"></div>
-      <div class="es-status" id="esStatus">Memuat data...</div>
-    </div>
-  </div>
 
   <div class="es-priority-section" style="display:none;">
     <div class="es-priority-header">
@@ -2611,103 +2567,8 @@
     <div class="es-priority-status" id="esPriorityIctStatus">Memindai otomatis...</div>
   </div>
 
-  <div class="es-priority-section es-collapsible" data-section="bbma">
-    <div class="es-priority-header es-section-head">
-      <div class="es-priority-title">Sinyal Prioritas BBMA</div>
-      <button type="button" class="es-section-toggle" title="Sembunyikan section">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
-      </button>
-    </div>
-    <div class="es-section-body">
-      <div class="es-priority-controls">
-        <select id="esPriorityRisk">
-          <option value="all" selected>Semua Level Risk</option>
-          <option value="high">High Risk (TF 1m/5m/15m)</option>
-          <option value="medium">Medium Risk (TF 30m/1H)</option>
-          <option value="low">Low Risk (TF 4H/1D)</option>
-        </select>
-        <button id="esPriorityBtn" class="es-priority-btn">Cari Sinyal Prioritas</button>
-        <div class="es-symbol-manager es-symbol-manager-inline">
-          <button type="button" id="esPriorityManagerBtn" class="es-symbol-manager-btn">
-            <span>Ganti Chart / Kelola Koin</span>
-            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
-          </button>
-          <div class="es-symbol-manager-dropdown" id="esPriorityManagerDropdown"></div>
-        </div>
-      </div>
-      <div class="es-priority-grid" id="esPriorityGrid"></div>
-      <div class="es-priority-status" id="esPriorityStatus">Memindai otomatis...</div>
-    </div>
-  </div>
 
-  <div class="es-priority-section es-collapsible" data-section="snr">
-    <div class="es-priority-header es-section-head">
-      <div class="es-priority-title">Sinyal SNR &mdash; SMI 4 Jam + Sentuh SNR di M5</div>
-      <button type="button" class="es-section-toggle" title="Sembunyikan section">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
-      </button>
-    </div>
-    <div class="es-section-body">
-      <div class="es-priority-controls">
-        <!-- Tidak ada lagi pilihan timeframe: TF-nya sudah TERKUNCI oleh logika
-             sinyalnya sendiri - SMI dibaca di 4 jam, sentuhan zona dinilai di
-             candle 5 menit. Membiarkan dropdown TF di sini cuma memberi kesan
-             bisa diubah padahal tidak berpengaruh apa-apa. -->
-        <select id="esPrioritySnrRezim" title="Saring arah sinyal berdasarkan kondisi SMI">
-          <option value="align" selected>Searah SMI BTC</option>
-          <option value="all">Semua Arah</option>
-          <option value="oversold">Hanya Oversold (potensi BUY)</option>
-          <option value="overbought">Hanya Overbought (potensi SELL)</option>
-        </select>
-        <select id="esPrioritySnrKetat" title="Seberapa ketat syarat sentuhan zona SNR-nya">
-          <option value="sentuh" selected>Candle M5 menyentuh zona</option>
-          <option value="tolak">…dan candle-nya menolak (wick &gt; body)</option>
-          <option value="searah">…dan sisi zona searah SMI</option>
-        </select>
-        <button id="esPrioritySnrBtn" class="es-priority-btn">Cari Sinyal SNR</button>
-        <div class="es-symbol-manager es-symbol-manager-inline">
-          <button type="button" id="esPrioritySnrManagerBtn" class="es-symbol-manager-btn">
-            <span>Ganti Chart / Kelola Koin</span>
-            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
-          </button>
-          <div class="es-symbol-manager-dropdown" id="esPrioritySnrManagerDropdown"></div>
-        </div>
-        <div class="es-btc-tf-strip" id="esSnrBtcTfStrip"></div>
-      </div>
-      <div class="es-priority-grid" id="esPrioritySnrGrid"></div>
-      <div class="es-priority-status" id="esPrioritySnrStatus">Klik "Cari Sinyal Prioritas SNR" untuk memindai.</div>
-    </div>
-  </div>
 
-  <div class="es-priority-section es-collapsible" data-section="ai">
-    <div class="es-priority-header es-section-head">
-      <div class="es-priority-title">Sinyal Prioritas AI &mdash; Analisa Konfluensi</div>
-      <button type="button" class="es-section-toggle" title="Sembunyikan section">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
-      </button>
-    </div>
-    <div class="es-section-body">
-      <div class="es-priority-controls">
-        <select id="esPriorityAiBias">
-          <option value="auto" selected>Ikuti Rezim BTC (disarankan)</option>
-          <option value="both">Semua Arah (abaikan rezim)</option>
-          <option value="long">Hanya BUY</option>
-          <option value="short">Hanya SELL</option>
-        </select>
-        <button id="esPriorityAiBtn" class="es-priority-btn">Jalankan Analisa AI</button>
-        <div class="es-symbol-manager es-symbol-manager-inline">
-          <button type="button" id="esPriorityAiManagerBtn" class="es-symbol-manager-btn">
-            <span>Ganti Chart / Kelola Koin</span>
-            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
-          </button>
-          <div class="es-symbol-manager-dropdown" id="esPriorityAiManagerDropdown"></div>
-        </div>
-        <div class="es-ai-regime" id="esAiRegime"></div>
-      </div>
-      <div class="es-priority-grid" id="esPriorityAiGrid"></div>
-      <div class="es-priority-status" id="esPriorityAiStatus">Klik "Jalankan Analisa AI" untuk memindai.</div>
-    </div>
-  </div>
 
   <div class="es-sim-section">
     <div class="es-sim-title-row">
@@ -5088,12 +4949,6 @@
     });
   }
 
-  symbolManagerBtn.addEventListener('click', ()=>{
-    const willOpen = !symbolManagerDropdown.classList.contains('open');
-    if(willOpen) renderSymbolManagerDropdown();
-    symbolManagerBtn.classList.toggle('open', willOpen);
-    symbolManagerDropdown.classList.toggle('open', willOpen);
-  });
 
   document.addEventListener('click', (e)=>{
     if(!symbolManagerBtn.contains(e.target) && !symbolManagerDropdown.contains(e.target)){
@@ -5151,12 +5006,6 @@
     });
   }
 
-  priorityManagerBtn.addEventListener('click', ()=>{
-    const willOpen = !priorityManagerDropdown.classList.contains('open');
-    if(willOpen) renderPriorityManagerDropdown();
-    priorityManagerBtn.classList.toggle('open', willOpen);
-    priorityManagerDropdown.classList.toggle('open', willOpen);
-  });
 
   document.addEventListener('click', (e)=>{
     if(!priorityManagerBtn.contains(e.target) && !priorityManagerDropdown.contains(e.target)){
@@ -5699,12 +5548,9 @@
   // level SL/TP yang disediakan hanya ancang-ancang berbasis ATR.
   const pantauTfSel = document.getElementById('esPantauTf');
   const pantauRezimSel = document.getElementById('esPantauRezim');
-  const pantauSnrSel = document.getElementById('esPantauSnr');
   const pantauBtn = document.getElementById('esPantauBtn');
   const pantauGrid = document.getElementById('esPantauGrid');
   const pantauStatusEl = document.getElementById('esPantauStatus');
-  const pantauManagerBtn = document.getElementById('esPantauManagerBtn');
-  const pantauManagerDropdown = document.getElementById('esPantauManagerDropdown');
   const pantauRegimeBadge = document.getElementById('esPantauRegimeBadge');
 
   const PANTAU_TF_LABEL = { '15m':'15m', '30m':'30m', '1h':'1H', '4h':'4H', '1d':'1D' };
@@ -6010,32 +5856,13 @@
         hasil = btcKondisi ? semua.filter(c=>c.kondisi===btcKondisi) : [];
       }
 
-      // Saringan SNR jalan SESUDAH saringan SMI, jadi klines 4 jam + 5 menit
-      // cuma ditarik untuk koin yang sudah lolos - bukan seluruh daftar aktif
-      // (yang bisa ratusan koin). Urutan sebaliknya = 2 permintaan tambahan
-      // per koin untuk koin yang toh akan dibuang.
-      const snrMode = pantauSnrSel.value;
-      const nSebelumSnr = hasil.length;
-      if(snrMode !== 'off' && hasil.length){
-        pantauStatusEl.textContent = `Mengecek sentuhan SNR 4 Jam di candle M5 (${hasil.length} koin)...`;
-        await mapLimited(hasil, SCAN_CONCURRENCY, async c => {
-          // Koin yang klines-nya gagal diambil tidak boleh lolos diam-diam -
-          // "tidak tahu" bukan "menyentuh".
-          try{ c.snr = await cekSnrH4M5(c.symbol); }catch(e){ c.snr = null; }
-        });
-        hasil = hasil.filter(c => c.snr && (snrMode === 'tolak' ? c.snr.tolak : true));
-      }
-
       // Urut dari kondisi PALING ekstrem ke yang paling ringan, favorit di
       // depan - aturannya ada di urutkanHasilPantau supaya sama persis dengan
       // pengurutan ulang saat bintang diklik.
       hasil = urutkanHasilPantau(hasil);
 
       if(hasil.length === 0){
-        if(snrMode !== 'off' && nSebelumSnr){
-          pantauStatusEl.textContent = `${nSebelumSnr} koin lolos saringan SMI, tapi tidak ada yang candle M5-nya `
-            + (snrMode === 'tolak' ? 'menolak di zona SNR 4 Jam' : 'sedang menyentuh zona SNR 4 Jam') + `.`;
-        } else if(mode === 'align' && !btcKondisi){
+        if(mode === 'align' && !btcKondisi){
           pantauStatusEl.textContent = `BTC sedang tidak ekstrem (SMI ${btcK==null?'-':btcK.toFixed(1)}) di TF ${PANTAU_TF_LABEL[tf]||tf} — tidak ada sinyal.`;
         } else {
           pantauStatusEl.textContent = `Tidak ada koin dengan SMI ekstrem (SMI ≤ ${SMI_OS} atau ≥ ${SMI_OB}) di TF ${PANTAU_TF_LABEL[tf]||tf}`
@@ -6050,9 +5877,6 @@
       const nBalik = hasil.filter(c=>c.mulaiBalik).length;
       pantauStatusEl.textContent = `${hasil.length} koin dipantau (${nOs} oversold, ${nOb} overbought) `
         + `• ${nBalik} sudah mulai berbalik • TF ${PANTAU_TF_LABEL[tf]||tf}`
-        + (snrMode !== 'off'
-            ? ` • SNR 4 Jam di M5${snrMode === 'tolak' ? ' + candle menolak' : ''} (${hasil.length} dari ${nSebelumSnr})`
-            : ``)
         + ` • ${new Date().toLocaleTimeString('id-ID')}.`;
     }catch(e){
       pantauStatusEl.classList.add('error');
@@ -6062,61 +5886,18 @@
     }
   }
 
-  function renderPantauManagerDropdown(){
-    const results = window.__esLastPantauResults || [];
-    if(results.length===0){
-      pantauManagerDropdown.innerHTML = `<div class="es-symbol-manager-empty">Belum ada hasil. Jalankan pemindaian dulu.</div>`;
-      return;
-    }
-    pantauManagerDropdown.innerHTML = results.map(c=>`
-      <div class="es-symbol-manager-row">
-        <span class="es-symbol-manager-name" data-symbol="${c.symbol}" data-tf="${c.tfValue}">${c.symbol.replace('USDT','')} (${c.tfLabel})</span>
-        <button type="button" class="es-symbol-manager-remove" data-symbol="${c.symbol}">Ganti</button>
-      </div>
-    `).join('');
-    pantauManagerDropdown.querySelectorAll('.es-symbol-manager-name').forEach(el=>{
-      el.addEventListener('click', ()=> openTradingView(el.getAttribute('data-symbol'), el.getAttribute('data-tf')));
-    });
-    pantauManagerDropdown.querySelectorAll('.es-symbol-manager-remove').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
-        blockAndReplaceSymbol(btn.getAttribute('data-symbol'));
-        cariSinyalPantau();
-      });
-    });
-  }
-
-  pantauManagerBtn.addEventListener('click', (e)=>{
-    e.stopPropagation();
-    const willOpen = !pantauManagerDropdown.classList.contains('open');
-    if(willOpen) renderPantauManagerDropdown();
-    pantauManagerBtn.classList.toggle('open', willOpen);
-    pantauManagerDropdown.classList.toggle('open', willOpen);
-  });
-  document.addEventListener('click', (e)=>{
-    if(!pantauManagerBtn.contains(e.target) && !pantauManagerDropdown.contains(e.target)){
-      pantauManagerBtn.classList.remove('open');
-      pantauManagerDropdown.classList.remove('open');
-    }
-  });
 
   // Manual trigger saja - tidak auto-scan saat halaman dibuka, biar tidak nambah beban.
   pantauBtn.addEventListener('click', cariSinyalPantau);
   pantauTfSel.addEventListener('change', cariSinyalPantau);
   pantauRezimSel.addEventListener('change', cariSinyalPantau);
-  // Filter SNR butuh klines 4 jam + 5 menit yang belum pernah diambil, jadi
-  // mengubahnya berarti memindai ulang - bukan sekadar menyaring hasil lama.
-  pantauSnrSel.addEventListener('change', cariSinyalPantau);
 
   // SNR_RISK_TIERS & getSnrPriorityTfs dihapus: timeframe sinyal SNR sekarang
   // TERKUNCI di 4 jam (untuk SMI) + 5 menit (untuk sentuhan zona), jadi tidak
   // ada lagi yang bisa dipilih.
   const prioritySnrBtn = document.getElementById('esPrioritySnrBtn');
-  const prioritySnrRezimSel = document.getElementById('esPrioritySnrRezim');
-  const prioritySnrKetatSel = document.getElementById('esPrioritySnrKetat');
   const prioritySnrStatusEl = document.getElementById('esPrioritySnrStatus');
   const prioritySnrGrid = document.getElementById('esPrioritySnrGrid');
-  const prioritySnrManagerBtn = document.getElementById('esPrioritySnrManagerBtn');
-  const prioritySnrManagerDropdown = document.getElementById('esPrioritySnrManagerDropdown');
 
   // Cek retest zona S/R dengan candle penolakan di kline yang diberikan.
   // Mengembalikan {signal, dir} kalau candle TERAKHIR adalah retest ke-2+,
@@ -6247,8 +6028,6 @@
   const chGrid = document.getElementById('esChGrid');
   const chStatusEl = document.getElementById('esChStatus');
   const chSmiBadge = document.getElementById('esChSmiBadge');
-  const chManagerBtn = document.getElementById('esChManagerBtn');
-  const chManagerDropdown = document.getElementById('esChManagerDropdown');
 
   const CH_TF_LABEL = { '1m':'1m','5m':'5m','15m':'15m','30m':'30m','1h':'1H','4h':'4H','1d':'D','1w':'W' };
   const PC_SIG_TOL_MULT = 0.6;   // toleransi sentuh garis channel (x ATR)
@@ -6687,26 +6466,6 @@
     }
   }
 
-  function renderChManagerDropdown(){
-    const results = window.__esLastCrossHunterResults || [];
-    if(results.length===0){
-      chManagerDropdown.innerHTML = `<div class="es-symbol-manager-empty">Belum ada hasil. Jalankan pemindaian dulu.</div>`;
-      return;
-    }
-    chManagerDropdown.innerHTML = results.map(c=>{
-      const label = `${c.symbol.replace('USDT','')} (${c.tfLabel})`;
-      return `<div class="es-symbol-manager-row">
-        <span class="es-symbol-manager-name" data-symbol="${c.symbol}" data-tf="${c.tfValue||''}">${label}</span>
-        <button type="button" class="es-symbol-manager-block" data-symbol="${c.symbol}">Blokir &amp; Ganti</button>
-      </div>`;
-    }).join('');
-    chManagerDropdown.querySelectorAll('.es-symbol-manager-name').forEach(el=>{
-      el.addEventListener('click', ()=> openTradingView(el.getAttribute('data-symbol'), el.getAttribute('data-tf') || undefined));
-    });
-    chManagerDropdown.querySelectorAll('.es-symbol-manager-block').forEach(btn=>{
-      btn.addEventListener('click', ()=>{ blockAndReplaceSymbol(btn.getAttribute('data-symbol')); findCrossHunterSignals(); });
-    });
-  }
 
   chBtn.addEventListener('click', findCrossHunterSignals);
   // Rezim BTC ikut TF: perbarui tiap ganti TF, dan tampilkan sekali di awal (default).
@@ -6718,8 +6477,6 @@
     if(chHasilMentah.length || chTfDipindai) terapkanFilterSnr();
   });
   setTimeout(()=>{ try{ if(!isSectionCollapsed('crosshunter')) updateChBtcRegime(); }catch(e){} }, 0);
-  chManagerBtn.addEventListener('click', (e)=>{ e.stopPropagation(); renderChManagerDropdown(); chManagerDropdown.classList.toggle('open'); });
-  document.addEventListener('click', (e)=>{ if(!chManagerDropdown.contains(e.target) && e.target!==chManagerBtn && !chManagerBtn.contains(e.target)) chManagerDropdown.classList.remove('open'); });
 
 
 
@@ -6800,8 +6557,10 @@
     if(!izinSinyal()) return;
     if(isSectionCollapsed('snr')) return; // section dilipat - hemat request
 
-    const rezim = prioritySnrRezimSel ? prioritySnrRezimSel.value : 'all';
-    const ketat = prioritySnrKetatSel ? prioritySnrKetatSel.value : 'sentuh';
+    // Tidak ada saringan lagi: syaratnya cuma SATU dan terkunci -
+    // candle M5 menyentuh zona SNR 4 jam + SMI 4 jam overbought/oversold.
+    const rezim = 'all';
+    const ketat = 'sentuh';
 
     prioritySnrBtn.disabled = true;
     prioritySnrStatusEl.classList.remove('error');
@@ -6863,46 +6622,7 @@
     }
   }
 
-  function renderPrioritySnrManagerDropdown(){
-    const results = window.__esLastPrioritySnrResults || [];
-    if(results.length===0){
-      prioritySnrManagerDropdown.innerHTML = `<div class="es-symbol-manager-empty">Belum ada sinyal prioritas SNR hasil pindai.</div>`;
-      return;
-    }
-    prioritySnrManagerDropdown.innerHTML = results.map(c=>{
-      const label = `${c.symbol.replace('USDT','')} (${c.tfLabel})`;
-      return `<div class="es-symbol-manager-row">
-        <span class="es-symbol-manager-name" data-symbol="${c.symbol}" data-tf="${c.tfValue||''}">${label}</span>
-        <button type="button" class="es-symbol-manager-block" data-symbol="${c.symbol}">Blokir &amp; Ganti</button>
-      </div>`;
-    }).join('');
 
-    prioritySnrManagerDropdown.querySelectorAll('.es-symbol-manager-name').forEach(el=>{
-      el.addEventListener('click', ()=>{
-        openTradingView(el.getAttribute('data-symbol'), el.getAttribute('data-tf') || undefined);
-      });
-    });
-    prioritySnrManagerDropdown.querySelectorAll('.es-symbol-manager-block').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
-        const symbol = btn.getAttribute('data-symbol');
-        const replacement = blockAndReplaceSymbol(symbol);
-        prioritySnrManagerBtn.classList.remove('open');
-        prioritySnrManagerDropdown.classList.remove('open');
-        prioritySnrStatusEl.classList.remove('error');
-        prioritySnrStatusEl.textContent = replacement
-          ? `${symbol} diblokir & diganti dengan ${replacement}. Memindai ulang sinyal SNR...`
-          : `${symbol} diblokir dari daftar pindaian. Memindai ulang sinyal SNR...`;
-        findPrioritySnrSignals();
-      });
-    });
-  }
-
-  prioritySnrManagerBtn.addEventListener('click', ()=>{
-    const willOpen = !prioritySnrManagerDropdown.classList.contains('open');
-    if(willOpen) renderPrioritySnrManagerDropdown();
-    prioritySnrManagerBtn.classList.toggle('open', willOpen);
-    prioritySnrManagerDropdown.classList.toggle('open', willOpen);
-  });
 
   document.addEventListener('click', (e)=>{
     if(!prioritySnrManagerBtn.contains(e.target) && !prioritySnrManagerDropdown.contains(e.target)){
@@ -6914,10 +6634,6 @@
   // Manual trigger saja (tombol) - TIDAK auto-scan tiap halaman dibuka, supaya
   // tidak menambah beban seperti yang sempat terjadi di Sinyal Prioritas ICT.
   prioritySnrBtn.addEventListener('click', findPrioritySnrSignals);
-  // Kedua saringan butuh klines yang belum tentu sudah diambil, jadi
-  // mengubahnya berarti memindai ulang - bukan sekadar menyaring hasil lama.
-  prioritySnrRezimSel.addEventListener('change', findPrioritySnrSignals);
-  prioritySnrKetatSel.addEventListener('change', findPrioritySnrSignals);
 
   // ═══════════════════════════════════════════════════════
   // ████████  SINYAL PRIORITAS AI - MODEL KONFLUENSI  ████████
@@ -7266,13 +6982,6 @@
     });
   }
 
-  priorityAiManagerBtn.addEventListener('click', (e)=>{
-    e.stopPropagation();
-    const willOpen = !priorityAiManagerDropdown.classList.contains('open');
-    if(willOpen) renderPriorityAiManagerDropdown();
-    priorityAiManagerBtn.classList.toggle('open', willOpen);
-    priorityAiManagerDropdown.classList.toggle('open', willOpen);
-  });
   document.addEventListener('click', (e)=>{
     if(!priorityAiManagerBtn.contains(e.target) && !priorityAiManagerDropdown.contains(e.target)){
       priorityAiManagerBtn.classList.remove('open');
@@ -7282,7 +6991,6 @@
 
   // Manual trigger saja - analisa ini memakai 2 TF x semua koin, jadi sengaja
   // TIDAK auto-scan saat halaman dibuka supaya tidak membebani API.
-  priorityAiBtn.addEventListener('click', findPriorityAiSignals);
 
   const PRIORITY_SIM_KEY = 'emaScreenerPrioritySim_v1';
   let prioritySimPositions = {};
@@ -9164,14 +8872,6 @@
     favScanning = false;
   }
 
-  capSel.addEventListener('change', ()=> render(window.__esLastResults||[]) );
-  typeSel.addEventListener('change', ()=> render(window.__esLastResults||[]) );
-  rsiSel.addEventListener('change', ()=> render(window.__esLastResults||[]) );
-  stochSel.addEventListener('change', ()=> render(window.__esLastResults||[]) );
-  intervalSel.addEventListener('change', ()=>{ scan(); scanFavorites(); });
-  refreshBtn.addEventListener('click', scan);
-  priorityBtn.addEventListener('click', findPrioritySignals);
-  priorityRiskSel.addEventListener('change', findPrioritySignals);
   psimResetBtn.addEventListener('click', ()=>{
     psimSettingsDropdown.classList.remove('open');
     resetPrioritySim();
@@ -9797,14 +9497,14 @@
 
   // Nama tampilan tiap section - dipakai di chip "munculkan kembali", karena
   // saat disembunyikan judul aslinya sudah tidak ada di layar.
+  // Hanya section yang MASIH ADA. Nama section yang sudah dihapus harus ikut
+  // dibuang dari sini - kalau tidak, statusnya yang lama tersimpan di
+  // localStorage/cloud tetap memunculkan chip "tampilkan kembali" untuk sesuatu
+  // yang tidak ada lagi, dan mengkliknya tidak melakukan apa-apa.
   const SECTION_LABEL = {
-    favorit:  'Koin Favorit',
     pantau:   'Sinyal Pantau Kripto',
-    crosshunter: 'Parallel Signal',
-    favcross: 'Sinyal Entry Koin Favorit',
-    bbma:     'Sinyal Prioritas BBMA',
-    snr:      'Sinyal Prioritas SNR',
-    ai:       'Sinyal Prioritas AI'
+    snr:      'Sinyal Prioritas',
+    crosshunter: 'Parallel Signal'
   };
 
   function bukaSection(name){
@@ -9891,27 +9591,108 @@
   });
   applySectionCollapseState();
 
+  /* ── Klik kanan di kartu sinyal -> ganti koin ─────────────────────────
+     Menggantikan tombol "Ganti Chart / Kelola Koin" yang dulu ada di tiap
+     section. Tombol itu membuka daftar terpisah, jadi untuk membuang satu koin
+     kamu harus mencarinya lagi di daftar - padahal kartunya sudah di depan mata.
+
+     Satu listener di document, bukan per kartu: isi grid diganti tiap kali
+     memindai, dan listener per kartu berarti memasang ulang terus-menerus. */
+  (function pasangMenuKoin(){
+    const GRID = { esPantauGrid:'pantau', esPrioritySnrGrid:'snr', esChGrid:'crosshunter' };
+    const PINDAI = {
+      pantau: () => cariSinyalPantau(),
+      snr: () => findPrioritySnrSignals(),
+      crosshunter: () => findCrossHunterSignals()
+    };
+
+    const menu = document.createElement('div');
+    menu.className = 'es-koin-menu';
+    document.body.appendChild(menu);
+
+    let simbolAktif = null, bagianAktif = null;
+    const tutup = () => { menu.classList.remove('open'); simbolAktif = null; };
+
+    document.addEventListener('contextmenu', (e) => {
+      const kartu = e.target.closest('[data-symbol]');
+      if(!kartu) return tutup();
+      const induk = kartu.parentElement;
+      const bagian = induk && GRID[induk.id];
+      if(!bagian) return tutup();
+
+      e.preventDefault();
+      simbolAktif = kartu.getAttribute('data-symbol');
+      bagianAktif = bagian;
+
+      menu.innerHTML =
+          '<div class="es-koin-menu-judul">' + simbolAktif.replace('USDT','') + '</div>'
+        + '<button type="button" data-aksi="chart">Buka di TradingView</button>'
+        + '<button type="button" data-aksi="ganti" class="bahaya">Hilangkan &amp; ganti koin ini</button>';
+
+      // Dijepit ke dalam layar - tanpa ini menu di kartu paling kanan/bawah
+      // terpotong dan tombolnya tidak bisa diklik.
+      menu.classList.add('open');
+      const r = menu.getBoundingClientRect();
+      const x = Math.min(e.clientX, window.innerWidth  - r.width  - 8);
+      const y = Math.min(e.clientY, window.innerHeight - r.height - 8);
+      menu.style.left = Math.max(8, x) + 'px';
+      menu.style.top  = Math.max(8, y) + 'px';
+    });
+
+    menu.addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-aksi]');
+      if(!b || !simbolAktif) return;
+      const aksi = b.getAttribute('data-aksi');
+      const simbol = simbolAktif, bagian = bagianAktif;
+      tutup();
+
+      if(aksi === 'chart'){ openTradingView(simbol); return; }
+
+      if(aksi === 'ganti'){
+        const pengganti = blockAndReplaceSymbol(simbol);
+        const st = document.getElementById(
+          bagian === 'pantau' ? 'esPantauStatus'
+          : bagian === 'snr'  ? 'esPrioritySnrStatus' : 'esChStatus');
+        if(st){
+          st.classList.remove('error');
+          st.textContent = pengganti
+            ? simbol + ' dibuang, diganti ' + pengganti + '. Memindai ulang…'
+            : simbol + ' dibuang dari daftar pindaian. Memindai ulang…';
+        }
+        const f = PINDAI[bagian];
+        if(f) f();
+      }
+    });
+
+    document.addEventListener('click', tutup);
+    document.addEventListener('scroll', tutup, true);
+    window.addEventListener('resize', tutup);
+    document.addEventListener('keydown', (e) => { if(e.key === 'Escape') tutup(); });
+  })();
+
   loadPrioritySimState();
   renderPrioritySimUI({});
   renderPsimPreview();
-  scan();
-  setInterval(scan, 90000);
+
+  /* scan(), scanFavorites(), scanFavoriteCrossSection(), dan
+     scanAllBtcTfStrips() DIBUANG dari sini bersama section pemiliknya
+     (Koin Favorit, Sinyal Entry Koin Favorit, grid Cross EMA, strip BTC).
+
+     Bukan sekadar tidak berguna: elemen yang mereka tulis sudah tidak ada,
+     jadi pemanggilan pertamanya melempar dan SELURUH baris sesudahnya -
+     termasuk pemindaian Pantau/Prioritas/Parallel yang otomatis - tidak
+     pernah jalan. Menghapus markup tanpa menghapus pemanggilnya adalah
+     cara paling halus untuk mematikan separuh halaman tanpa pesan apa pun. */
+
+  // Bintang favorit di kartu sinyal tetap dipakai untuk urutan, jadi daftarnya
+  // masih perlu dimuat walau section-nya sendiri sudah tidak ada.
   loadFavorites();
-  scanFavorites();
-  setInterval(scanFavorites, 90000);
-  loadFavCrossSymbols();
-  renderFavCrossManageUI();
-  scanFavoriteCrossSection();
-  setInterval(scanFavoriteCrossSection, 90000);
-  scanAllBtcTfStrips();
-  setInterval(scanAllBtcTfStrips, 90000);
 
   // Sinyal AI dan Sinyal Pantau ikut jalan sekali saat halaman dibuka, tapi
   // HANYA di setelan bawaan. Begitu filternya diubah sendiri, pemindaian balik
   // jadi manual - supaya kombinasi berat tidak dipanggil diam-diam tiap refresh.
   // Keduanya juga tidak jalan kalau section-nya sedang dilipat (dijaga di
   // dalam fungsinya masing-masing).
-  if(priorityAiBiasSel.value === 'auto') findPriorityAiSignals();
   if(pantauTfSel.value === '4h' && pantauRezimSel.value === 'align') cariSinyalPantau();
 
   // Posisi SIMULASI cukup ikut siklus scan 90 detik yang sudah ada (scan()
