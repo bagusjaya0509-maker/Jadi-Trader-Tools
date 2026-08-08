@@ -11,12 +11,12 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202608040530">
+<meta name="jt-versi" content="202608050700">
 <script>
 /* Penjaga versi - lihat catatan lengkap di jurnal-trading.html. Mencegah browser
    menyajikan HTML lama dari cache saat halaman dimuat ulang. */
 (function(){
-  var VERSI_TAMPIL = "202608040530";
+  var VERSI_TAMPIL = "202608050700";
   var KUNCI_OK    = "jtVersiOk";      // versi yang sudah dipastikan benar-benar termuat
   var KUNCI_PAKSA = "jtVersiPaksa";   // versi yang sudah pernah dipaksa muat ulang
   try{
@@ -2280,7 +2280,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="jt-langganan.js?v=202608040530"></script>
+<script src="jt-langganan.js?v=202608050700"></script>
 
 <div class="es-auth-gate" id="esAuthGate">
   <!-- Sesi Firebase baru diketahui setelah onAuthStateChanged menyala (~1 detik).
@@ -2531,15 +2531,16 @@
     </div>
     <div class="es-section-body">
       <div class="es-priority-controls">
+        <!-- 1m, 5m, dan Weekly sengaja dibuang. Di TF sangat cepat, channel
+             terbentuk lalu batal dalam hitungan menit sehingga sinyalnya lebih
+             banyak derau daripada isi; Weekly terlalu lambat untuk cara pakai
+             tool ini. -->
         <select id="esChTf">
-          <option value="1m">TF 1 Menit</option>
-          <option value="5m">TF 5 Menit</option>
           <option value="15m">TF 15 Menit</option>
           <option value="30m">TF 30 Menit</option>
           <option value="1h">TF 1 Jam</option>
           <option value="4h" selected>TF 4 Jam</option>
           <option value="1d">TF Daily</option>
-          <option value="1w">TF Weekly</option>
         </select>
         <select id="esChSnrFilter" title="Saring sinyal berdasarkan ada/tidaknya level Support-Resisten di titik sentuh channel">
           <option value="all" selected>Semua Sinyal</option>
@@ -7935,7 +7936,9 @@
     if(!pos) return;
     const t = tickers[pos.source];
     const price = t ? parseFloat(t.lastPrice) : pos.entryPrice;
-    closePrioritySimPosition(key, price, Date.now(), 'Manual Close');
+    // Dibedakan dari "Tutup Manual (aplikasi Binance)" supaya nanti kelihatan
+    // kebiasaanmu: menutup dari alat sendiri atau dari HP di tengah jalan.
+    closePrioritySimPosition(key, price, Date.now(), 'Tutup Manual (web)');
     renderPrioritySimUI(tickers);
   }
 
@@ -7947,6 +7950,65 @@
   // baru saja ditutup - dipanggil di titik penutupan (bukan cuma andalan
   // sinkronisasi berkala 12 detik yang bisa telat/belum sempat jalan kalau
   // posisi ditutup cepat setelah dibuka).
+  /* Cari tahu APA yang benar-benar menutup posisi ini, dari fill asli Binance.
+
+     Tiap fill membawa orderId. Kita sudah menyimpan orderId SL/TP milik kita
+     sendiri saat memasangnya, jadi tinggal dicocokkan:
+       cocok SL          -> memang kena Stop Loss
+       cocok TP1 / TP2   -> memang kena Take Profit
+       tidak cocok apa pun -> ditutup dari tempat lain, hampir selalu berarti
+                              ditutup manual lewat aplikasi Binance
+
+     Harga keluarnya juga diambil dari fill sungguhan (rata-rata tertimbang
+     kalau terisi beberapa kali), bukan dari harga pasar terakhir seperti dulu.
+
+     Kalau permintaannya gagal, kita TIDAK kembali menebak: label yang jujur
+     adalah "tidak diketahui". Keterangan yang salah lebih merugikan daripada
+     keterangan yang mengaku tidak tahu - jurnal ini dipakai untuk evaluasi. */
+  async function tanyaPenutupAsli(pos, backendUrl, appToken){
+    const cadangan = {
+      exitPrice: window.__esLiveMarkPrices[pos.source] || pos.entryPrice,
+      reason: 'Tertutup di Binance (sebab tidak terbaca)',
+      tp2Kena: false
+    };
+    if(!backendUrl || !appToken) return cadangan;
+    try{
+      const sejak = (pos.entryTime || Date.now() - 86400000) - 60000;
+      const r = await fetch(`${backendUrl}/api/user-trades?symbol=${pos.source}&since=${sejak}`,
+                            { headers: { 'X-App-Token': appToken } });
+      const j = await r.json();
+      if(!r.ok || !j || !Array.isArray(j.trades) || !j.trades.length) return cadangan;
+
+      // Fill yang MENUTUP posisi punya realizedPnl != 0. Fill pembuka selalu 0.
+      const penutup = j.trades.filter(t => Math.abs(t.realizedPnl) > 1e-12);
+      if(!penutup.length) return cadangan;
+
+      const idSl  = String(pos.liveSlOrderId  || '');
+      const idTp1 = String(pos.liveTp1OrderId || '');
+      const idTp2 = String(pos.liveTp2OrderId || '');
+
+      // Harga keluar = rata-rata tertimbang seluruh fill penutup.
+      let totQty = 0, totNilai = 0;
+      penutup.forEach(t => { totQty += t.qty; totNilai += t.price * t.qty; });
+      const exitPrice = totQty > 0 ? (totNilai / totQty) : cadangan.exitPrice;
+
+      const ids = penutup.map(t => t.orderId);
+      const kenaSl  = ids.some(id => id && id === idSl);
+      const kenaTp1 = ids.some(id => id && id === idTp1);
+      const kenaTp2 = ids.some(id => id && id === idTp2);
+
+      let reason;
+      if(kenaTp2)      reason = 'TP2 (Binance)';
+      else if(kenaTp1) reason = pos.tp1Hit ? 'TP1-TP2 (Binance)' : 'TP1 (Binance)';
+      else if(kenaSl)  reason = pos.tp1Hit ? 'TP1-BE (Binance)' : 'Stop Loss (Binance)';
+      else             reason = 'Tutup Manual (aplikasi Binance)';
+
+      return { exitPrice, reason, tp2Kena: kenaTp2 || (kenaTp1 && pos.tp1Hit) };
+    }catch(e){
+      return cadangan;
+    }
+  }
+
   async function syncFinalFeesAndPnl(pos, backendUrl, appToken){
     try{
       const res = await fetch(`${backendUrl}/api/income?since=${pos.entryTime}`, { headers: { 'X-App-Token': appToken } });
@@ -9801,27 +9863,17 @@
               // habis, satu-satunya cara itu tertutup adalah SL (yang sudah
               // naik lewat ratchet), jadi tidak perlu tebak-tebakan TP vs SL
               // seperti metode lain.
-              let exitPrice, reason;
-              if(pos.entryMethod==='slplus' && pos.tp1Hit){
-                exitPrice = pos.sl;
-                reason = pos.ratchetLockPrice && pos.ratchetLockPrice !== pos.tp1
-                  ? 'SL+ Trailing Lock (Binance)'
-                  : 'TP1-BE (Binance)';
-              } else {
-                const nearTp = pos.tp1Hit ? pos.tp2 : pos.tp1;
-                const hitTp = Math.abs(lastPrice - nearTp) <= Math.abs(lastPrice - pos.sl);
-                exitPrice = hitTp ? nearTp : pos.sl;
-                if(pos.tp1Hit && hitTp) pos.tp2Hit = true; // TP1 lalu TP2 - status TP1-TP2
-                reason = pos.tp1Hit
-                  ? (hitTp ? 'TP1-TP2 (Binance)' : 'TP1-BE (Binance)')
-                  : (hitTp ? 'TP1 (Binance)' : 'Stop Loss (Binance)');
-              }
-              // Ambil data final (komisi/funding/REALIZED_PNL) dulu dari Binance
-              // baru finalisasi - posisi ini sudah tertutup beberapa saat lalu di
-              // Binance (kedeteksi baru sekarang), jadi datanya harusnya sudah ada.
-              syncFinalFeesAndPnl(pos, backendUrl, appToken).finally(function(){
-                closePrioritySimPosition(pos.key, exitPrice, Date.now(), reason);
-                renderPrioritySimUI(window.__esLastTickers || {});
+              // Tanya Binance APA yang benar-benar menutupnya, jangan menebak.
+              // Tebakan lama ("harga terakhir lebih dekat ke TP atau ke SL")
+              // selalu menuliskan TP atau SL walaupun posisinya ditutup manual
+              // dari aplikasi Binance - jurnal jadi berisi keterangan palsu.
+              tanyaPenutupAsli(pos, backendUrl, appToken).then(function(fakta){
+                const exitPrice = fakta.exitPrice;
+                if(fakta.tp2Kena) pos.tp2Hit = true;
+                syncFinalFeesAndPnl(pos, backendUrl, appToken).finally(function(){
+                  closePrioritySimPosition(pos.key, exitPrice, Date.now(), fakta.reason);
+                  renderPrioritySimUI(window.__esLastTickers || {});
+                });
               });
               fetch(`${backendUrl}/api/trade/futures/cancel-pending`, {
                 method: 'POST',

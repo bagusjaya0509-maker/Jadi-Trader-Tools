@@ -3,7 +3,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202608050500">
+<meta name="jt-versi" content="202608050700">
 <script>
 /* ── Penjaga versi ────────────────────────────────────────────────────────────
    GitHub Pages menyuruh browser menyimpan HTML di cache beberapa menit, jadi
@@ -13,7 +13,7 @@
    sekali saja kalau ternyata yang tampil sudah usang. Dijaga sessionStorage
    supaya tidak pernah berulang (anti-loop). */
 (function(){
-  var VERSI_TAMPIL = "202608050500";
+  var VERSI_TAMPIL = "202608050700";
   var KUNCI_OK    = "jtVersiOk";      // versi yang sudah dipastikan benar-benar termuat
   var KUNCI_PAKSA = "jtVersiPaksa";   // versi yang sudah pernah dipaksa muat ulang
   try{
@@ -2590,7 +2590,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="jt-langganan.js?v=202608050500"></script>
+<script src="jt-langganan.js?v=202608050700"></script>
 <script>
 (function(){
   // ===== Login Google + jurnal "showcase" (Firebase) =====
@@ -2621,13 +2621,81 @@
   // Return true kalau ada data yang benar-benar berubah (dipakai buat mutuskan
   // perlu reload atau tidak - supaya tiap load selalu cek cloud TANPA bikin
   // reload berulang kalau datanya memang belum berubah dari device lain).
+  /* Gabungkan data Simulasi/Live kripto milik screener.
+
+     Kunci ini menyimpan DUA hal sekaligus: `positions` (posisi yang masih
+     terbuka) dan `history` (riwayat tertutup, lengkap dengan arah, TF, alasan
+     entry, dan emosi). Halaman jurnal MEMBACANYA tapi tidak memilikinya -
+     yang menulis adalah Crypto Screener.
+
+     Dulu isinya ditimpa bulat-bulat dengan salinan cloud. Akibatnya: posisi
+     yang baru dibuka di perangkat ini bisa lenyap tertimpa salinan lama, dan
+     karena riwayat ikut tertimpa, baris hasil sinkron Binance kehilangan
+     arah/alasan/TF-nya - muncul telanjang berlabel "Sinkron". Itu dua keluhan
+     yang sebenarnya berasal dari satu sebab yang sama.
+
+     Aturan penggabungan:
+       • Riwayat  : disatukan. Tidak ada catatan yang boleh hilang.
+       • Posisi   : posisi lokal HANYA dibuang kalau riwayat cloud membuktikan
+                    ia sudah ditutup (cocok source + entryTime). Tanpa bukti
+                    itu, posisi dipertahankan - lebih baik satu posisi tampil
+                    sesaat lebih lama daripada lenyap tanpa jejak.
+       • Setelan  : milik perangkat ini yang dipakai; itu punya screener lokal. */
+  /* Nama kuncinya ditulis ulang di sini dengan sengaja. CRYPTO_SIM_KEY yang
+     asli hidup di blok <script> LAIN dan tidak terjangkau dari sini - persis
+     jebakan yang bikin "state is not defined" kemarin. Kalau suatu saat nama
+     kuncinya berubah, dua tempat ini harus ikut berubah; itu harga yang jauh
+     lebih murah daripada halaman yang mati diam-diam. */
+  var JT_KUNCI_SIM_KRIPTO = 'emaScreenerPrioritySim_v1';
+
+  function jtKunciRiwayatKripto(h){
+    return String(h && h.source || '') + '|' + String(h && h.entryTime || h && h.exitTime || '');
+  }
+
+  function jtGabungSimKripto(teksAwan, teksLokal){
+    var awan = jtUrai(teksAwan, null);
+    var lokal = jtUrai(teksLokal, null);
+    if(!awan) return teksLokal;
+    if(!lokal) return teksAwan;
+
+    var riwayat = {};
+    (Array.isArray(awan.history) ? awan.history : []).forEach(function(h){ riwayat[jtKunciRiwayatKripto(h)] = h; });
+    (Array.isArray(lokal.history) ? lokal.history : []).forEach(function(h){ riwayat[jtKunciRiwayatKripto(h)] = h; });
+    var gabRiwayat = Object.keys(riwayat).map(function(k){ return riwayat[k]; })
+      .sort(function(a, b){ return (Number(b.exitTime) || 0) - (Number(a.exitTime) || 0); });
+
+    // Sudah tertutup menurut SIAPA PUN -> posisinya memang tidak terbuka lagi.
+    var sudahTutup = {};
+    gabRiwayat.forEach(function(h){ sudahTutup[jtKunciRiwayatKripto(h)] = true; });
+
+    var posisi = {};
+    var salin = function(sumber){
+      Object.keys(sumber || {}).forEach(function(k){
+        var p = sumber[k];
+        if(!p) return;
+        if(sudahTutup[String(p.source || '') + '|' + String(p.entryTime || '')]) return;
+        posisi[k] = p;
+      });
+    };
+    salin(awan.positions);
+    salin(lokal.positions);   // milik perangkat ini menang kalau kuncinya sama
+
+    var hasil = Object.assign({}, awan, lokal);   // setelan: lokal menang
+    hasil.history = gabRiwayat;
+    hasil.positions = posisi;
+    return JSON.stringify(hasil);
+  }
+
   function jtApplyDocIfChanged(doc){
     if(!doc.exists) return false;
     var data = doc.data() || {};
     var changed = false;
     JT_READ_KEYS.forEach(function(key){
-      if(typeof data[key] === 'string' && data[key] !== localStorage.getItem(key)){
-        try{ localStorage.setItem(key, data[key]); }catch(e){}
+      if(typeof data[key] !== 'string') return;
+      var lokal = localStorage.getItem(key);
+      var baru = (key === JT_KUNCI_SIM_KRIPTO) ? jtGabungSimKripto(data[key], lokal) : data[key];
+      if(baru !== lokal){
+        try{ localStorage.setItem(key, baru); }catch(e){}
         changed = true;
       }
     });
