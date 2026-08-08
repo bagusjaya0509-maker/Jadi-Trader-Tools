@@ -11,12 +11,12 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202608051000">
+<meta name="jt-versi" content="202608051200">
 <script>
 /* Penjaga versi - lihat catatan lengkap di jurnal-trading.html. Mencegah browser
    menyajikan HTML lama dari cache saat halaman dimuat ulang. */
 (function(){
-  var VERSI_TAMPIL = "202608051000";
+  var VERSI_TAMPIL = "202608051200";
   var KUNCI_OK    = "jtVersiOk";      // versi yang sudah dipastikan benar-benar termuat
   var KUNCI_PAKSA = "jtVersiPaksa";   // versi yang sudah pernah dipaksa muat ulang
   try{
@@ -2280,7 +2280,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="jt-langganan.js?v=202608051000"></script>
+<script src="jt-langganan.js?v=202608051200"></script>
 
 <div class="es-auth-gate" id="esAuthGate">
   <!-- Sesi Firebase baru diketahui setelah onAuthStateChanged menyala (~1 detik).
@@ -9820,21 +9820,49 @@
   }
 
   function renderHiddenSectionChips(){
-    // Panel "Signal Beta Version" umum dinonaktifkan, KECUALI untuk Parallel
-    // Signal: kalau Parallel disembunyikan, chip untuk memunculkannya kembali
-    // tetap tampil (kalau tidak, section-nya hilang total tanpa cara balik).
+    /* Chip "tampilkan kembali" untuk SEMUA section yang disembunyikan.
+
+       Dulu chip ini hanya dibuat untuk Parallel Signal. Akibatnya section lain
+       yang sekali disembunyikan HILANG PERMANEN dari layar - tidak ada tombol,
+       tidak ada menu, dan statusnya ikut tersinkron ke cloud sehingga hilang
+       juga di semua perangkat lain. Itulah yang terjadi pada Sinyal SNR.
+       Tombol yang bisa menyembunyikan sesuatu wajib punya pasangan yang bisa
+       memunculkannya lagi. */
     const bar = document.getElementById('esHiddenSections');
     if(!bar) return;
-    if(!collapsedSections.has('crosshunter')){
+    const tersembunyi = Object.keys(SECTION_LABEL).filter(n => collapsedSections.has(n));
+    if(!tersembunyi.length){
       bar.classList.remove('show'); bar.innerHTML = ''; return;
     }
     bar.classList.add('show');
     bar.innerHTML = '<span class="es-hidden-sections-label">Tampilkan kembali:</span>'
-      + '<button type="button" class="es-hidden-chip" data-section="crosshunter" title="Munculkan kembali">'
-      + '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>'
-      + ' Parallel Signal</button>';
-    bar.querySelector('.es-hidden-chip').addEventListener('click', ()=> bukaSection('crosshunter'));
+      + tersembunyi.map(n =>
+          '<button type="button" class="es-hidden-chip" data-section="' + n + '" title="Munculkan kembali">'
+          + '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg> '
+          + SECTION_LABEL[n] + '</button>'
+        ).join('');
+    bar.querySelectorAll('.es-hidden-chip').forEach(btn => {
+      btn.addEventListener('click', ()=> bukaSection(btn.getAttribute('data-section')));
+    });
   }
+
+  /* Pemulihan sekali jalan untuk Sinyal SNR.
+
+     Section-nya pernah disembunyikan waktu belum ada cara memunculkannya lagi,
+     dan statusnya tersimpan di cloud - jadi tetap hilang walau kodenya sudah
+     diperbaiki. Penanda di localStorage memastikan ini hanya jalan SEKALI:
+     kalau nanti kamu sengaja menyembunyikannya lagi, ia tetap tersembunyi. */
+  (function pulihkanSnrSekali(){
+    const PENANDA = 'esSnrDipulihkan_v1';
+    try{
+      if(localStorage.getItem(PENANDA)) return;
+      localStorage.setItem(PENANDA, '1');
+      if(collapsedSections.has('snr')){
+        collapsedSections.delete('snr');
+        saveCollapsedSections();
+      }
+    }catch(e){}
+  })();
 
   function applySectionCollapseState(){
     document.querySelectorAll('.es-collapsible').forEach(sec=>{
