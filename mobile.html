@@ -3,13 +3,13 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202608040530">
+<meta name="jt-versi" content="202608081500">
 <meta name="theme-color" content="#0b0c0f">
 <title>Jadi Trader — Mobile</title>
 <script>
 /* Penjaga versi - sama seperti halaman lain. */
 (function(){
-  var VERSI_TAMPIL = "202608040530";
+  var VERSI_TAMPIL = "202608081500";
   var KUNCI_OK = "jtVersiOk", KUNCI_PAKSA = "jtVersiPaksa";
   try{
     if(sessionStorage.getItem(KUNCI_OK) === VERSI_TAMPIL) return;
@@ -444,14 +444,6 @@
       <option value="oversold">Hanya Oversold (potensi BUY)</option>
       <option value="overbought">Hanya Overbought (potensi SELL)</option>
     </select>
-    <!-- Saringan kedua: candle M5 yang sedang menyentuh zona SNR 4 jam.
-         Susunan yang sama dipakai indikator Jadi Trader V3 - di TF 1m/5m
-         zona SNR lokal disembunyikan dan diganti zona dari TF 240. -->
-    <select class="isian" id="pantauSnr" style="padding:9px 10px;margin-top:8px">
-      <option value="off" selected>Tanpa filter SNR</option>
-      <option value="sentuh">Candle M5 menyentuh SNR 4 jam</option>
-      <option value="tolak">…dan candle-nya menolak (wick &gt; body)</option>
-    </select>
     <div class="catatan" id="pantauStatus">Tekan “Pindai” untuk mulai.</div>
   </div>
   <div class="kartu" id="pantauDaftar"><div class="kosong">Belum ada hasil.</div></div>
@@ -609,8 +601,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="jt-scan-core.js?v=202608040530"></script>
-<script src="jt-langganan.js?v=202608040530"></script>
+<script src="jt-scan-core.js?v=202608081500"></script>
+<script src="jt-langganan.js?v=202608081500"></script>
+<script src="jt-lapor.js?v=202608081500"></script>
 <script>
 (function(){
 "use strict";
@@ -1241,8 +1234,11 @@ function ambilKlines(symbol, interval, limit){
 function daftarKoin(){
   var a = baca(K_KOIN, null);
   if(Array.isArray(a) && a.length) return a;
+  // Logam mulia di Binance Futures ikut dipindai, sama seperti daftar bawaan
+  // di screener desktop. Diverifikasi berstatus TRADING lewat exchangeInfo.
   return ['BTCUSDT','ETHUSDT','SOLUSDT','BNBUSDT','XRPUSDT','DOGEUSDT','ADAUSDT','LINKUSDT',
-          'AVAXUSDT','DOTUSDT','TONUSDT','TRXUSDT','SUIUSDT','NEARUSDT','APTUSDT','ARBUSDT'];
+          'AVAXUSDT','DOTUSDT','TONUSDT','TRXUSDT','SUIUSDT','NEARUSDT','APTUSDT','ARBUSDT',
+          'XAUTUSDT','XAGUSDT','XAUUSDT','PAXGUSDT'];
 }
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -1361,26 +1357,10 @@ function pindaiPantau(){
     var ekstrem = function(c){ return c.kondisi === 'overbought' ? c.stochK : -c.stochK; };
     pilih.sort(function(a,b){ return ekstrem(b) - ekstrem(a); });
 
-    // Saringan SNR dijalankan SESUDAH saringan SMI, jadi yang ditarik klines
-    // 4 jam + 5 menitnya cuma koin yang sudah lolos - bukan seluruh daftar.
-    // Urutan sebaliknya berarti 2 permintaan tambahan per koin untuk koin yang
-    // toh akan dibuang.
-    var snrMode = el('pantauSnr').value;
-    var nSebelumSnr = pilih.length;
-    if(snrMode === 'off' || !pilih.length) return { pilih: pilih, snrMode: snrMode, nSebelumSnr: nSebelumSnr };
-
-    el('pantauStatus').textContent = 'Mengecek sentuhan SNR 4 jam di candle M5 (' + pilih.length + ' koin)…';
-    return JTScan.mapLimited(pilih, 4, function(c){
-      return cekSnrH4M5(c.symbol).then(function(s){ c.snr = s; }).catch(function(){ c.snr = null; });
-    }).then(function(){
-      return {
-        pilih: pilih.filter(function(c){
-          if(!c.snr) return false;
-          return snrMode === 'tolak' ? c.snr.tolak : true;
-        }),
-        snrMode: snrMode, nSebelumSnr: nSebelumSnr
-      };
-    });
+    // Saringan SNR dibuang dari Area Pantau, disamakan dengan desktop:
+    // syarat "sentuh SNR" sekarang jadi milik section Sinyal Prioritas
+    // tersendiri, bukan saringan tambahan di sini.
+    return { pilih: pilih, snrMode: 'off', nSebelumSnr: pilih.length };
   }).then(function(hasilAkhir){
     var pilih = hasilAkhir.pilih, snrMode = hasilAkhir.snrMode, nSebelumSnr = hasilAkhir.nSebelumSnr;
     var snrAktif = snrMode !== 'off';
@@ -1912,6 +1892,7 @@ el('btnKeluar').addEventListener('click', function(){ auth.signOut(); });
 el('btnKeDesktop').addEventListener('click', function(){ location.href = 'jurnal-trading.html?desktop=1'; });
 
 if(typeof JTLangganan !== 'undefined') JTLangganan.pantauToken(auth);
+if(typeof JTLapor !== "undefined") JTLapor.init({ halaman: "mobile" });
 auth.onAuthStateChanged(function(user){
   if(!user){
     uid = null;
@@ -1991,7 +1972,6 @@ el('btnPantau').addEventListener('click', pindaiPantau);
 el('pantauRezim').addEventListener('change', function(){ if(!pantauJalan) pindaiPantau(); });
 // Filter SNR butuh klines 4 jam + 5 menit yang belum pernah diambil, jadi
 // mengubahnya berarti memindai ulang - tidak bisa cuma menyaring hasil lama.
-el('pantauSnr').addEventListener('change', function(){ if(!pantauJalan) pindaiPantau(); });
 el('btnCh').addEventListener('click', pindaiParallel);
 el('chFilter').addEventListener('change', function(){ if(chMentah.length) gambarSinyal(); });
 // Tombol "Muat ulang" membuka panel filter (tanggal + dampak); pengambilan
