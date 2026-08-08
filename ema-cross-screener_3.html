@@ -11,12 +11,12 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202608081500">
+<meta name="jt-versi" content="202608081800">
 <script>
 /* Penjaga versi - lihat catatan lengkap di jurnal-trading.html. Mencegah browser
    menyajikan HTML lama dari cache saat halaman dimuat ulang. */
 (function(){
-  var VERSI_TAMPIL = "202608081500";
+  var VERSI_TAMPIL = "202608081800";
   var KUNCI_OK    = "jtVersiOk";      // versi yang sudah dipastikan benar-benar termuat
   var KUNCI_PAKSA = "jtVersiPaksa";   // versi yang sudah pernah dipaksa muat ulang
   try{
@@ -2329,8 +2329,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="jt-langganan.js?v=202608081500"></script>
-<script src="jt-lapor.js?v=202608081500"></script>
+<script src="jt-langganan.js?v=202608081800"></script>
+<script src="jt-lapor.js?v=202608081800"></script>
 
 <div class="es-auth-gate" id="esAuthGate">
   <!-- Sesi Firebase baru diketahui setelah onAuthStateChanged menyala (~1 detik).
@@ -2366,6 +2366,7 @@
     <div class="es-topnav">
       <a href="marketplace.html" class="es-nav-link">Marketplace &rarr;</a>
       <a href="jurnal-trading.html" class="es-nav-link">Jurnal Trading &rarr;</a>
+      <a href="pemilik.html" class="es-nav-link" id="esNavPemilik" style="display:none;color:var(--gold)">Panel Pemilik &rarr;</a>
     </div>
     <div class="es-user-bar" id="esUserBar" style="display:none;">
       <img id="esUserAvatar" src="" alt="">
@@ -3177,6 +3178,14 @@
       esUserBarEl.style.display = 'flex';
       esUserAvatarEl.src = user.photoURL || '';
       esUserNameEl.textContent = user.displayName || user.email || '';
+
+      // Pintu masuk Panel Pemilik. Menyembunyikannya di sini cuma soal
+      // kerapian tampilan - halaman itu sendiri yang menolak akun lain, dan
+      // datanya tetap butuh App Token yang tidak ada di repo publik.
+      var navPemilik = document.getElementById('esNavPemilik');
+      if(navPemilik && typeof JTLangganan !== 'undefined' && user.uid === JTLangganan.OWNER_UID){
+        navPemilik.style.display = '';
+      }
 
       /* Status langganan HARUS selesai sebelum apa pun menulis ke users/{uid}.
          Aturan Firestore mensyaratkan dokumen langganan/{uid} sudah ada; kalau
@@ -4445,6 +4454,10 @@
   }
 
   async function scanFavoriteCrossSection(){
+    // Section ini sudah dihapus dari halaman. Tanpa penjaga ini,
+    // pemanggilan yang tersisa menabrak elemen null dan melempar error
+    // yang tidak kelihatan di layar - cuma muncul di laporan otomatis.
+    if(!(favCrossGridEl && favCrossStatusEl)) return;
     if(isSectionCollapsed('favcross')) return; // section dilipat - hemat request
     if(favCrossScanning) return;
     favCrossScanning = true;
@@ -4663,6 +4676,10 @@
   }
 
   function render(results){
+    // Section ini sudah dihapus dari halaman. Tanpa penjaga ini,
+    // pemanggilan yang tersisa menabrak elemen null dan melempar error
+    // yang tidak kelihatan di layar - cuma muncul di laporan otomatis.
+    if(!(grid && statusEl && intervalSel && capSel && typeSel && rsiSel && stochSel)) return;
     const capFilter = capSel.value;
     const typeFilter = typeSel.value;
     const rsiFilter = rsiSel.value;
@@ -4761,6 +4778,10 @@
   const MAIN_KLINES_LIMIT = 300;
 
   async function scan(){
+    // Section ini sudah dihapus dari halaman. Tanpa penjaga ini,
+    // pemanggilan yang tersisa menabrak elemen null dan melempar error
+    // yang tidak kelihatan di layar - cuma muncul di laporan otomatis.
+    if(!(grid && statusEl && refreshBtn && intervalSel)) return;
 
     if(!izinSinyal()) return;
     // Grid ini sekarang berada di dalam section "Sinyal Entry Koin Favorit" -
@@ -4955,6 +4976,10 @@
   // dua strip ini masing-masing polling sendiri tiap 90 detik (dobel beban ke
   // Binance untuk simbol yang sama) - digabung supaya beban API tidak dobel.
   async function scanAllBtcTfStrips(){
+    // Section ini sudah dihapus dari halaman. Tanpa penjaga ini,
+    // pemanggilan yang tersisa menabrak elemen null dan melempar error
+    // yang tidak kelihatan di layar - cuma muncul di laporan otomatis.
+    if(!(btcTfStripEl || snrBtcTfStripEl)) return;
     if(isSectionCollapsed('favorit')) return;   // section dilipat - hemat request
     if(btcTfScanning) return;
     btcTfScanning = true;
@@ -5001,12 +5026,10 @@
   }
 
 
-  document.addEventListener('click', (e)=>{
-    if(!symbolManagerBtn.contains(e.target) && !symbolManagerDropdown.contains(e.target)){
-      symbolManagerBtn.classList.remove('open');
-      symbolManagerDropdown.classList.remove('open');
-    }
-  });
+  /* Penutup-otomatis dropdown "Kelola Koin" dibuang bersama tombolnya. Yang
+     tertinggal di sini dulu melempar TypeError di SETIAP klik di halaman -
+     tombolnya sudah tidak ada, jadi symbolManagerBtn selalu null. Ketahuan
+     dari laporan error otomatis, bukan dari mencoba-coba. */
 
   const PRIORITY_LIMIT = 5;
   const PRIORITY_RISK_TIERS = {
@@ -5058,12 +5081,7 @@
   }
 
 
-  document.addEventListener('click', (e)=>{
-    if(!priorityManagerBtn.contains(e.target) && !priorityManagerDropdown.contains(e.target)){
-      priorityManagerBtn.classList.remove('open');
-      priorityManagerDropdown.classList.remove('open');
-    }
-  });
+  // Dibuang karena alasan yang sama seperti versi "Kelola Koin" di atas.
 
   function getPriorityScanTfs(){
     const risk = priorityRiskSel.value;
@@ -5148,6 +5166,10 @@
   }
 
   async function findPrioritySignals(){
+    // Section ini sudah dihapus dari halaman. Tanpa penjaga ini,
+    // pemanggilan yang tersisa menabrak elemen null dan melempar error
+    // yang tidak kelihatan di layar - cuma muncul di laporan otomatis.
+    if(!(priorityGrid && priorityStatusEl && priorityRiskSel && priorityBtn)) return;
 
     if(!izinSinyal()) return;
     if(isSectionCollapsed('bbma')) return; // section dilipat - hemat request
@@ -6675,12 +6697,9 @@
 
 
 
-  document.addEventListener('click', (e)=>{
-    if(!prioritySnrManagerBtn.contains(e.target) && !prioritySnrManagerDropdown.contains(e.target)){
-      prioritySnrManagerBtn.classList.remove('open');
-      prioritySnrManagerDropdown.classList.remove('open');
-    }
-  });
+  /* Yang ini lebih parah dari dua saudaranya: prioritySnrManagerBtn tidak
+     pernah dideklarasikan sama sekali, jadi setiap klik melempar
+     ReferenceError - bukan cuma TypeError. */
 
   // Manual trigger saja (tombol) - TIDAK auto-scan tiap halaman dibuka, supaya
   // tidak menambah beban seperti yang sempat terjadi di Sinyal Prioritas ICT.
@@ -6938,6 +6957,10 @@
   }
 
   async function findPriorityAiSignals(){
+    // Section ini sudah dihapus dari halaman. Tanpa penjaga ini,
+    // pemanggilan yang tersisa menabrak elemen null dan melempar error
+    // yang tidak kelihatan di layar - cuma muncul di laporan otomatis.
+    if(!(priorityAiGrid && priorityAiStatusEl && priorityAiBiasSel && priorityAiBtn)) return;
 
     if(!izinSinyal()) return;
     if(isSectionCollapsed('ai')) return; // section dilipat - hemat request
@@ -7033,12 +7056,7 @@
     });
   }
 
-  document.addEventListener('click', (e)=>{
-    if(!priorityAiManagerBtn.contains(e.target) && !priorityAiManagerDropdown.contains(e.target)){
-      priorityAiManagerBtn.classList.remove('open');
-      priorityAiManagerDropdown.classList.remove('open');
-    }
-  });
+  // Sisa dari section AI yang sudah dihapus - ikut dibuang.
 
   // Manual trigger saja - analisa ini memakai 2 TF x semua koin, jadi sengaja
   // TIDAK auto-scan saat halaman dibuka supaya tidak membebani API.
@@ -8761,6 +8779,10 @@
   }
 
   function wireFavoriteBoxEvents(){
+    // Section ini sudah dihapus dari halaman. Tanpa penjaga ini,
+    // pemanggilan yang tersisa menabrak elemen null dan melempar error
+    // yang tidak kelihatan di layar - cuma muncul di laporan otomatis.
+    if(!(favGrid && intervalSel)) return;
     favGrid.querySelectorAll('.es-fav-star').forEach(star=>{
       star.addEventListener('click', (e)=>{
         e.stopPropagation();
@@ -8879,6 +8901,10 @@
   }
 
   async function scanFavorites(){
+    // Section ini sudah dihapus dari halaman. Tanpa penjaga ini,
+    // pemanggilan yang tersisa menabrak elemen null dan melempar error
+    // yang tidak kelihatan di layar - cuma muncul di laporan otomatis.
+    if(!(favGrid && favStatusEl && intervalSel)) return;
     if(isSectionCollapsed('favorit')) return;   // section dilipat - hemat request
     if(favScanning) return;
     favScanning = true;
@@ -9564,10 +9590,11 @@
     applySectionCollapseState();
     // Baru dimunculkan -> isinya masih kosong (tadi dilewati saat dilipat),
     // jadi langsung dipindai sekali supaya tidak tampil kosong.
-    if(name === 'favorit'){ scanFavorites(); scanAllBtcTfStrips(); }
-    else if(name === 'favcross'){ scanFavoriteCrossSection(); scan(); }
-    else if(name === 'bbma') findPrioritySignals();
+    // Hanya tiga section yang tersisa. Cabang favorit/favcross/bbma dibuang
+    // bersama section-nya - memanggilnya cuma menghasilkan error diam.
+    if(name === 'pantau') cariSinyalPantau();
     else if(name === 'snr') findPrioritySnrSignals();
+    else if(name === 'crosshunter') findCrossHunterSignals();
   }
 
   function renderHiddenSectionChips(){
@@ -9992,9 +10019,14 @@
   // sempat mengganggu. Kalau mau diaktifkan lagi: hapus display:none di
   // .es-priority-section (yang judulnya "Sinyal Prioritas ICT") dan un-comment baris di bawah ini.
   // findPriorityIctSignals();
-  // Sinyal Prioritas SNR dijalankan otomatis setelah Sinyal Prioritas BBMA
-  // selesai memindai (bukan bersamaan), supaya tidak membebani API dengan 2
-  // scan besar sekaligus di awal halaman dibuka.
-  findPrioritySignals().then(function(){ findPrioritySnrSignals(); });
+  /* Dulu baris ini berbunyi:
+         findPrioritySignals().then(function(){ findPrioritySnrSignals(); });
+     yaitu "pindai SNR setelah BBMA selesai". Section BBMA sudah dihapus, jadi
+     findPrioritySignals() langsung menabrak elemen yang tidak ada dan promise-
+     nya ditolak - dan karena ditolak, .then() tidak pernah jalan sehingga
+     Sinyal Prioritas TIDAK PERNAH dipindai otomatis. Gagalnya diam-diam:
+     satu-satunya jejak adalah "Promise ditolak" di laporan error otomatis.
+     Sekarang SNR dipanggil langsung, tanpa perantara. */
+  findPrioritySnrSignals();
 })();
 </script>

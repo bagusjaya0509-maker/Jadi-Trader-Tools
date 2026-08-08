@@ -103,6 +103,18 @@ window.JTLangganan = (function(){
         .then(function(){ return { mulai: Date.now() }; });
     }).then(function(data){
       kondisi = hitung(data);
+      // Catat kehadiran klien ke backend supaya halaman Pemilik punya daftar
+      // email terdaftar. Emailnya diambil backend dari ID token yang sudah
+      // diverifikasi - bukan dari kiriman halaman ini.
+      try{
+        if(typeof JTLapor !== 'undefined'){
+          fetch(JTLapor.BACKEND + '/api/klien/hadir', {
+            method: 'POST',
+            headers: kepalaAuth({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify({ nama: (user.displayName || '') })
+          }).catch(function(){});
+        }
+      }catch(e){}
       return kondisi;
     }).catch(function(e){
       // Lihat catatan GAGAL-TERBUKA di kepala berkas.
