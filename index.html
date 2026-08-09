@@ -1,92 +1,522 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
-<title>Jadi Trader — Jurnal Trading</title>
-<!--
-  Halaman depan situs.
+<meta name="jt-versi" content="V2-202608091100">
+<meta name="description" content="Jadi Trader Tools — screener kripto, jurnal trading, dan jembatan MT5 dalam satu terminal.">
+<title>Jadi Trader — Terminal Trading</title>
 
-  DULU file ini adalah SALINAN penuh jurnal-trading.html, dan itu sumber masalah:
-  tiap kali jurnal diperbarui, salinan di sini harus ikut di-upload. Sekali lupa,
-  siapa pun yang membuka alamat root melihat versi lama - persis yang terjadi
-  (layout lama, data kosong, fitur baru hilang) walau jurnal-trading.html sendiri
-  sudah ter-update.
-
-  Sekarang file ini TIDAK PUNYA ISI SENDIRI - cuma meneruskan. Jadi secara
-  bentuk tidak mungkin lagi tertinggal: mengubah jurnal otomatis mengubah apa
-  yang dilihat pengunjung di alamat root, tanpa file ini perlu disentuh.
-
-  Satu celah yang tersisa dulu: penerusan bisa mendarat di jurnal versi CACHE.
-  Karena itu di bawah nomor versi jurnal dibaca langsung dari servernya (tanpa
-  cache) lalu ikut dibawa sebagai penanda di URL tujuan - browser jadi terpaksa
-  mengambil salinan yang benar-benar baru. Nomor versinya TIDAK ditulis di file
-  ini, melainkan diambil saat itu juga, supaya tidak ada angka yang harus
-  dirawat di dua tempat.
--->
-<style>
-  html,body{height:100%;margin:0;background:#0b0c0f;color:#9a9ca4;
-    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;}
-  .wrap{height:100%;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;}
-  .judul{font-family:Georgia,serif;font-size:22px;color:#ece8de;}
-  .info{font-size:13px;}
-  a{color:#c9a24b;}
-  .putar{width:26px;height:26px;border-radius:50%;border:3px solid #262a31;
-    border-top-color:#c9a24b;animation:putar .75s linear infinite;}
-  @keyframes putar{to{transform:rotate(360deg)}}
-</style>
-<div class="wrap">
-  <div class="judul">Jadi Trader Tools</div>
-  <div class="putar"></div>
-  <div class="info">Membuka Jurnal Trading…</div>
-  <div class="info"><a id="manual" href="jurnal-trading.html">Klik di sini kalau tidak berpindah otomatis</a></div>
-</div>
 <script>
+/* ══ PENGALIHAN HP ══════════════════════════════════════════════════════════
+   Berkas ini menggantikan index.html lama, dan index.html lama itu BUKAN
+   halaman - ia pengalih: HP dikirim ke mobile.html, desktop ke jurnal.
+
+   Kalau tugas itu tidak diambil alih di sini, aplikasi mobile 5-tab jadi tidak
+   pernah terjangkau dari alamat utama, dan pengguna HP mendarat di Beranda
+   desktop yang tombolnya menuju screener - halaman yang memang dikunci
+   `viewport width=1280` alias tidak dipakai di HP.
+
+   Logikanya disalin apa adanya dari index.html lama supaya perilakunya sama
+   persis, termasuk ?desktop=1 / ?mobile=1 untuk memaksa salah satu versi.
+   Dijalankan sebelum apa pun digambar supaya tidak ada kedipan. */
 (function(){
-  // HP diarahkan ke versi mobile (mobile.html), desktop tetap ke jurnal.
-  // Deteksi pakai pointer kasar + lebar layar: keduanya dipakai bersama supaya
-  // tablet berlayar lebar tetap dapat tampilan desktop yang lebih lega.
-  // ?desktop=1 memaksa versi desktop, ?mobile=1 memaksa versi HP - berguna
-  // kalau deteksinya salah tebak di suatu perangkat.
   function hp(){
     if(/[?&]desktop=1/.test(location.search)) return false;
     if(/[?&]mobile=1/.test(location.search)) return true;
-    try{
-      return window.matchMedia('(pointer: coarse)').matches && window.innerWidth < 820;
-    }catch(e){ return window.innerWidth < 820; }
+    try{ return window.matchMedia('(pointer: coarse)').matches && window.innerWidth < 820; }
+    catch(e){ return window.innerWidth < 820; }
   }
-  var TUJUAN = hp() ? 'mobile.html' : 'jurnal-trading.html';
-  var dasar = TUJUAN + (location.search || '') + (location.hash || '');
-  document.getElementById('manual').href = dasar;
+  if(hp()) location.replace('mobile.html' + (location.search || '') + (location.hash || ''));
+})();
+</script>
 
-  // Pindah SEKALI saja. replace() dipakai supaya tombol "kembali" tidak
-  // terjebak memantul ke halaman ini lagi.
-  var sudah = false;
-  function pindah(url){
-    if(sudah) return;
-    sudah = true;
-    location.replace(url);
+<link rel="stylesheet" href="v2-tema.css?v=202608091100">
+
+<style>
+/* ══════════════════════════════════════════════════════════════════════════
+   BERANDA
+   Hero dua kolom: pernyataan di kiri, bukti di kanan.
+
+   Kolom kanan sengaja berisi ANGKA HIDUP, bukan ilustrasi. Untuk produk
+   trading, satu panel berisi saldo dan winrate sungguhan lebih meyakinkan
+   daripada gambar apa pun - dan itu menjawab checklist poin 05 tanpa perlu
+   satu foto stok pun.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Bilah atas ── */
+.atas{ position:relative; z-index:3; padding: var(--v2-r4) clamp(20px,4vw,56px) 0; }
+.atas-dalam{ max-width:1320px; margin:0 auto; display:flex; align-items:center;
+             justify-content:space-between; gap:var(--v2-r4); }
+.atas-merek{ display:flex; align-items:center; gap:10px; text-decoration:none; }
+.atas-merek .tanda{
+  width:30px; height:30px; border-radius:8px; flex:0 0 auto;
+  display:flex; align-items:center; justify-content:center;
+  background:linear-gradient(135deg,var(--v2-emas),#8a6c28);
+  font-family:var(--v2-display); font-weight:700; font-size:14px; color:#0b0c0f;
+}
+.atas-merek .teks{ display:flex; flex-direction:column; line-height:1.15; }
+.atas-merek .teks b{ font-family:var(--v2-display); font-weight:600; font-size:14px;
+                     letter-spacing:-.02em; color:var(--v2-kertas); }
+.atas-merek .teks i{ font-family:var(--v2-angka); font-style:normal; font-size:9.5px;
+                     letter-spacing:.14em; text-transform:uppercase; color:var(--v2-kertas-3); }
+.atas-kanan{ display:flex; align-items:center; gap:var(--v2-r3); flex-wrap:wrap; justify-content:flex-end; }
+.atas-nama{ font-size:12.5px; color:var(--v2-kertas-2); }
+/* Avatar: bulat, dan kalau fotonya gagal dimuat, inisial yang tampil. */
+.atas-foto{ width:28px; height:28px; border-radius:50%; object-fit:cover;
+            border:1px solid var(--v2-garis); background:var(--v2-panel-2); }
+.atas-inisial{
+  width:28px; height:28px; border-radius:50%; flex:0 0 auto;
+  display:flex; align-items:center; justify-content:center;
+  background:var(--v2-panel-3); border:1px solid var(--v2-garis);
+  font-family:var(--v2-display); font-weight:600; font-size:12px; color:var(--v2-emas);
+}
+.atas-tautan{ background:none; border:none; padding:0; cursor:pointer;
+              font-family:var(--v2-teks); font-size:12.5px; color:var(--v2-kertas-3);
+              transition:color var(--v2-cepat); }
+.atas-tautan:hover{ color:var(--v2-emas); }
+
+.hero{ position:relative; z-index:2; padding: clamp(32px,5vh,64px) clamp(20px,4vw,56px) var(--v2-r8); }
+.hero-dalam{ max-width:1320px; margin:0 auto; display:grid; gap: clamp(32px,5vw,64px);
+             grid-template-columns: 1fr; align-items:start; }
+/* min-width:0 WAJIB pada anak grid.
+   Bawaannya min-width:auto, artinya kolom tidak boleh menyusut lebih kecil
+   dari isinya. Marquee di kolom kanan memakai white-space:nowrap, jadi
+   "isinya" selebar seluruh daftar posisi - kolomnya membengkak melewati tepi
+   layar dan panelnya terpotong. Ini penyebab persis potongan di tangkapan
+   layar; overflow:hidden pada marquee tidak menolong karena yang membengkak
+   kolom gridnya, bukan marquee-nya. */
+.hero-dalam > *{ min-width:0; }
+@media (min-width:1180px){ .hero-dalam{ grid-template-columns: 1.12fr .88fr; } }
+
+/* ── Kiri ── */
+.hero-judul{
+  font-family: var(--v2-display);
+  font-size: var(--v2-t-4xl);
+  font-weight:600;
+  letter-spacing: var(--v2-lacak-ketat);
+  line-height:.94;
+  margin: var(--v2-r5) 0 0;
+}
+/* Baris kedua diberi gradien ke emas. SATU baris saja - kalau seluruh judul
+   diberi gradien, tidak ada lagi yang ditonjolkan. */
+.hero-judul .sorot{
+  background: linear-gradient(120deg, var(--v2-kertas) 20%, var(--v2-emas-terang) 65%, var(--v2-emas) 100%);
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+}
+.hero-teks{ max-width:min(52ch,100%); margin: var(--v2-r5) 0 0;
+            font-size: var(--v2-t-md); line-height:1.72; color: var(--v2-kertas-2); }
+.hero-aksi{ display:flex; flex-wrap:wrap; gap: var(--v2-r3); margin-top: var(--v2-r6); }
+
+.hero-tanda{ display:flex; flex-wrap:wrap; gap: var(--v2-r5) var(--v2-r7); margin-top: var(--v2-r7);
+             padding-top: var(--v2-r5); border-top:1px solid var(--v2-garis); }
+
+/* ── Kanan ── */
+.panel-kaca{ padding: clamp(22px,3vw,32px); }
+.panel-kaca + .panel-kaca{ margin-top: var(--v2-r4); }
+
+.pk-kepala{ display:flex; align-items:center; gap: var(--v2-r3); }
+.pk-ikon{
+  width:46px; height:46px; flex:0 0 auto; border-radius:14px;
+  display:flex; align-items:center; justify-content:center;
+  background: rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.13);
+  color: var(--v2-emas);
+}
+.pk-ikon svg{ width:21px; height:21px; }
+.pk-saldo{ font-family:var(--v2-angka); font-variant-numeric:tabular-nums;
+           font-size: clamp(26px,3.4vw,34px); font-weight:500; letter-spacing:-.02em; line-height:1.06; }
+.pk-saldo-label{ font-family:var(--v2-angka); font-size:var(--v2-t-xs);
+                 letter-spacing:var(--v2-lacak-lebar); text-transform:uppercase; color:var(--v2-kertas-3); }
+
+.pk-baris{ display:flex; justify-content:space-between; align-items:baseline;
+           font-size:var(--v2-t-sm); margin-bottom: var(--v2-r2); }
+.pk-baris .kiri{ color: var(--v2-kertas-2); }
+.pk-baris .kanan{ font-family:var(--v2-angka); font-variant-numeric:tabular-nums; color: var(--v2-kertas); }
+
+.pk-pisah{ height:1px; background: rgba(255,255,255,.09); margin: var(--v2-r5) 0; }
+
+/* Tiga statistik dengan pemisah vertikal. Grid 5 kolom (3 nilai + 2 garis)
+   supaya garisnya benar-benar di tengah, bukan hasil menebak margin.
+
+   Napas atas-bawahnya dibuat eksplisit: sebelumnya angka profit/lose nyaris
+   menempel ke garis pemisah di atas dan ke deretan pil di bawah, jadi ketiga
+   blok itu terbaca sebagai satu gumpalan. */
+.pk-tiga{ display:grid; grid-template-columns: 1fr 1px 1fr 1px 1fr;
+          gap: var(--v2-r3); text-align:center; padding: var(--v2-r2) 0; }
+.pk-tiga .garis{ background: rgba(255,255,255,.09); }
+.pk-tiga .nilai{ font-family:var(--v2-angka); font-variant-numeric:tabular-nums;
+                 font-size:var(--v2-t-lg); font-weight:500; letter-spacing:-.015em;
+                 line-height:1.25; }
+.pk-tiga .nama{ font-family:var(--v2-angka); font-size:9.5px; letter-spacing:.11em;
+                text-transform:uppercase; color:var(--v2-kertas-3); margin-top:5px; }
+.naik{ color: var(--v2-naik); } .turun{ color: var(--v2-turun); }
+
+.pk-pil{ display:flex; flex-wrap:wrap; gap: var(--v2-r2); margin-top: var(--v2-r6); }
+
+/* ── Marquee posisi ── */
+.mq-judul{ display:flex; align-items:center; justify-content:space-between; gap:var(--v2-r3);
+           padding: 0 clamp(22px,3vw,32px) var(--v2-r4); }
+.mq-butir{
+  display:inline-flex; align-items:center; gap:10px; padding:9px 15px;
+  border:1px solid rgba(255,255,255,.09); border-radius: var(--v2-bulat-p);
+  background: rgba(255,255,255,.03);
+}
+.mq-butir .sim{ font-family:var(--v2-display); font-weight:600; font-size:14px; letter-spacing:-.01em; }
+.mq-butir .arah{ font-family:var(--v2-angka); font-size:9.5px; letter-spacing:.09em;
+                 padding:2px 7px; border-radius:4px; }
+.mq-butir .arah.beli{ color:var(--v2-naik); background:var(--v2-naik-kabut); }
+.mq-butir .arah.jual{ color:var(--v2-turun); background:var(--v2-turun-kabut); }
+.mq-butir .gerak{ font-family:var(--v2-angka); font-variant-numeric:tabular-nums; font-size:12.5px; }
+.mq-kosong{ padding: 0 clamp(22px,3vw,32px) var(--v2-r5); font-size:var(--v2-t-sm); color:var(--v2-kertas-3); }
+
+/* ── Pita etalase ── */
+.pita{
+  position:relative; z-index:2; margin: 0 auto; max-width:1320px;
+  padding: var(--v2-r3) clamp(20px,4vw,56px) 0;
+}
+.pita-dalam{
+  display:flex; align-items:center; gap: var(--v2-r3); flex-wrap:wrap;
+  padding: var(--v2-r3) var(--v2-r4);
+  border:1px solid var(--v2-emas-garis); background: var(--v2-emas-kabut);
+  border-radius: var(--v2-bulat); font-size: var(--v2-t-sm); color: var(--v2-kertas-2);
+}
+.pita-dalam strong{ color: var(--v2-emas); font-weight:600; }
+
+/* ── HP ──
+   Bukan versi desktop yang dikecilkan: judul turun drastis, panel kaca jadi
+   kartu biasa (blur berat di HP mahal dan sering patah), dan tiga statistik
+   berubah jadi tiga baris agar angkanya tidak terpotong. */
+@media (max-width:640px){
+  .hero{ padding-top: var(--v2-r7); }
+  .hero-judul{ line-height:1.0; }
+  .hero-aksi .v2-tbl{ flex:1 1 100%; }
+  .hero-tanda{ gap: var(--v2-r4) var(--v2-r5); }
+  .v2-kaca{ backdrop-filter:none; -webkit-backdrop-filter:none; background: var(--v2-panel); }
+  .pk-tiga{ grid-template-columns:1fr; gap:var(--v2-r3); text-align:left; }
+  .pk-tiga .garis{ display:none; }
+  .pk-tiga > div:not(.garis){ display:flex; justify-content:space-between; align-items:baseline; }
+  .pk-tiga .nama{ margin-top:0; }
+}
+</style>
+
+<body data-v2-halaman="home">
+
+<!-- Bilah atas khusus Beranda. Tanpa sidebar, ini satu-satunya tempat untuk
+     masuk/keluar — dan sengaja setipis mungkin supaya tidak menjelma jadi
+     navigasi kedua. -->
+<header class="atas">
+  <div class="atas-dalam">
+    <a class="atas-merek" href="index.html">
+      <span class="tanda">JT</span>
+      <span class="teks"><b>Jadi Trader</b><i>Tools</i></span>
+    </a>
+    <div class="atas-kanan" id="atasKanan"></div>
+  </div>
+</header>
+
+<main>
+  <div class="pita" id="pita" style="display:none">
+    <div class="pita-dalam">
+      <span class="v2-denyut"></span>
+      <span id="pitaTeks"></span>
+    </div>
+  </div>
+
+  <section class="hero">
+    <div class="hero-dalam">
+
+      <!-- ══ KIRI ══ -->
+      <div>
+        <div class="v2-masuk v2-tunda-1">
+          <span class="v2-pil emas">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true"><path d="M12 2l2.9 6.3 6.9.8-5.1 4.7 1.4 6.8L12 17.3 5.9 20.6l1.4-6.8L2.2 9.1l6.9-.8z"/></svg>
+            Terminal Trading Mandiri
+          </span>
+        </div>
+
+        <h1 class="hero-judul v2-masuk v2-tunda-2">
+          Baca pasar<br>
+          <span class="sorot">tanpa menebak</span><br>
+          lalu catat semuanya.
+        </h1>
+
+        <p class="hero-teks v2-masuk v2-tunda-3">
+          Satu terminal untuk memindai ratusan pair, mengeksekusi lewat akunmu sendiri,
+          dan mengisi jurnal tanpa kamu mengetik apa pun. Sinyalnya punya alasan yang bisa
+          dibaca — bukan panah yang muncul entah dari mana.
+        </p>
+
+        <div class="hero-aksi v2-masuk v2-tunda-4">
+          <a class="v2-tbl utama" href="dashboard.html">
+            Buka Dashboard
+            <svg class="panah" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
+          </a>
+          <a class="v2-tbl hantu" href="ema-cross-screener_3.html">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20h18"/><path d="M6 20V10"/><path d="M11 20V4"/><path d="M16 20v-7"/></svg>
+            Lihat Screener
+          </a>
+        </div>
+
+        <div class="hero-tanda v2-masuk v2-tunda-5">
+          <div><div class="v2-stat-nilai" id="tdKoin">—</div><div class="v2-stat-label">Pair dipindai</div></div>
+          <div><div class="v2-stat-nilai" id="tdTrade">—</div><div class="v2-stat-label">Transaksi tercatat</div></div>
+          <div><div class="v2-stat-nilai" id="tdPosisi">—</div><div class="v2-stat-label">Posisi berjalan</div></div>
+        </div>
+      </div>
+
+      <!-- ══ KANAN ══ -->
+      <div>
+        <!-- Panel statistik. Menggantikan "150+ Projects Delivered" pada
+             komponen aslinya: saldo, winrate, total rugi, total profit. -->
+        <div class="v2-kaca panel-kaca v2-masuk v2-tunda-3">
+          <div class="pk-kepala">
+            <div class="pk-ikon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-3-3-4 4"/></svg>
+            </div>
+            <div>
+              <div class="pk-saldo" id="stSaldo">—</div>
+              <div class="pk-saldo-label">Total Saldo</div>
+            </div>
+          </div>
+
+          <div style="margin-top:var(--v2-r6)">
+            <div class="pk-baris">
+              <span class="kiri">Winrate</span>
+              <span class="kanan" id="stWinrateTeks">—</span>
+            </div>
+            <div class="v2-bilah naik"><i id="stWinrateBilah" style="width:0%"></i></div>
+          </div>
+
+          <div class="pk-pisah"></div>
+
+          <div class="pk-tiga">
+            <div><div class="nilai naik" id="stProfit">—</div><div class="nama">Total Profit</div></div>
+            <div class="garis"></div>
+            <div><div class="nilai turun" id="stRugi">—</div><div class="nama">Total Lose</div></div>
+            <div class="garis"></div>
+            <div><div class="nilai" id="stBersih">—</div><div class="nama">P/L Bersih</div></div>
+          </div>
+
+          <div class="pk-pil" id="pilStatus">
+            <span class="v2-pil"><span class="v2-denyut"></span> MEMUAT</span>
+          </div>
+        </div>
+
+        <!-- Marquee. Menggantikan "Trusted by Industry Leaders": yang lewat
+             di sini adalah posisi yang benar-benar sedang terbuka. -->
+        <div class="v2-kaca v2-masuk v2-tunda-4" style="padding-top:clamp(22px,3vw,32px);padding-bottom:clamp(22px,3vw,32px)">
+          <div class="mq-judul">
+            <span class="v2-label">Posisi Sedang Berjalan</span>
+            <span class="v2-label" id="mqWaktu"></span>
+          </div>
+          <div class="v2-marquee-bingkai" id="mqBingkai" style="display:none">
+            <div class="v2-marquee" id="mqIsi"></div>
+          </div>
+          <div class="mq-kosong" id="mqKosong">Tidak ada posisi terbuka saat ini.</div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+</main>
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="jt-langganan.js"></script>
+<script src="v2-data.js?v=202608091100"></script>
+<script src="v2-cangkang.js?v=202608091100" defer></script>
+
+<script>
+(function(){
+  'use strict';
+  var F = V2Data.fmt;
+
+  firebase.initializeApp({
+    apiKey: "AIzaSyB4cWVI-k3q16TmRCbM_lbJwgtjxIs_Weo",
+    authDomain: "jadi-trader-tools.firebaseapp.com",
+    projectId: "jadi-trader-tools",
+    storageBucket: "jadi-trader-tools.firebasestorage.app",
+    messagingSenderId: "171244479105",
+    appId: "1:171244479105:web:9b421850801b6678d8e380"
+  });
+  var auth = firebase.auth(), db = firebase.firestore();
+  auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(function(){});
+
+  function el(id){ return document.getElementById(id); }
+
+  function gambarStat(d){
+    var s = d.stat;
+    el('stSaldo').textContent = F.uang(s.saldo);
+    el('stSaldo').className = 'pk-saldo';
+
+    el('stWinrateTeks').textContent = s.winrate === null ? 'belum ada data' : F.persen(s.winrate);
+    el('stWinrateBilah').style.width = (s.winrate === null ? 0 : Math.max(0, Math.min(100, s.winrate))) + '%';
+
+    el('stProfit').textContent = s.untung > 0 ? F.uang(s.untung, true) : '—';
+    el('stRugi').textContent   = s.rugi   > 0 ? '-' + F.uang(s.rugi)   : '—';
+
+    var b = el('stBersih');
+    b.textContent = s.jumlah ? F.uang(s.bersih, true) : '—';
+    b.className = 'nilai' + (s.bersih > 0 ? ' naik' : s.bersih < 0 ? ' turun' : '');
+
+    el('tdTrade').textContent = s.jumlah || '0';
+    el('tdPosisi').textContent = d.posisi.length;
   }
 
-  // Jaring pengaman: kalau pembacaan versi lambat/gagal (offline, server
-  // rewel), jangan biarkan pengunjung menatap spinner - teruskan apa adanya.
-  var pengaman = setTimeout(function(){ pindah(dasar); }, 2500);
+  /* Pil ACTIVE / PREMIUM. Diminta: "sudah pas, tinggal disesuaikan
+     berdasarkan apakah user sudah bayar premium atau tidak". */
+  function gambarPil(kondisi, pemilik){
+    var w = el('pilStatus'), h = '';
+    h += '<span class="v2-pil naik"><span class="v2-denyut"></span> AKTIF</span>';
+    if(pemilik){
+      h += '<span class="v2-pil emas">'
+        +  '<svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor"><path d="M3 7l4.5 3L12 4l4.5 6L21 7l-1.6 10H4.6z"/></svg>'
+        +  ' PEMILIK</span>';
+    } else if(kondisi && kondisi.aktif && kondisi.status !== 'coba'){
+      h += '<span class="v2-pil emas">'
+        +  '<svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor"><path d="M3 7l4.5 3L12 4l4.5 6L21 7l-1.6 10H4.6z"/></svg>'
+        +  ' PREMIUM</span>';
+    } else if(kondisi && kondisi.status === 'coba'){
+      h += '<span class="v2-pil">MASA COBA</span>';
+    } else {
+      h += '<span class="v2-pil">GRATIS</span>';
+    }
+    w.innerHTML = h;
+  }
 
-  // Ambil nomor versi jurnal langsung dari server, lewati cache, lalu bawa
-  // sebagai penanda supaya yang termuat dijamin versi itu - bukan salinan lama
-  // yang masih nyangkut di cache browser atau CDN GitHub Pages.
-  fetch(TUJUAN + '?_cek=' + Date.now(), { cache: 'no-store' })
-    .then(function(r){ return r.ok ? r.text() : null; })
-    .then(function(t){
-      clearTimeout(pengaman);
-      var m = t && t.match(/name="jt-versi" content="([^"]+)"/);
-      if(!m){ pindah(dasar); return; }
-      var pisah = location.search ? '&' : '?';
-      pindah(TUJUAN + (location.search || '') + pisah + '_v=' + m[1] + (location.hash || ''));
-    })
-    .catch(function(){
-      clearTimeout(pengaman);
-      pindah(dasar);
+  function gambarMarquee(posisi, harga){
+    var bingkai = el('mqBingkai'), isi = el('mqIsi'), kosong = el('mqKosong');
+    if(!posisi.length){
+      bingkai.style.display = 'none';
+      kosong.style.display = '';
+      return;
+    }
+    kosong.style.display = 'none';
+    bingkai.style.display = '';
+
+    function butir(p){
+      var nama = String(p.simbol||'').replace('USDT','');
+      var arah = String(p.arah||'').toUpperCase();
+      var kini = harga[p.simbol];
+      var gerak = (kini != null && p.entry) ? ((kini - p.entry) / p.entry) * 100 * (arah === 'BUY' ? 1 : -1) : null;
+      var kelasGerak = gerak == null ? '' : gerak >= 0 ? 'naik' : 'turun';
+      return '<span class="mq-butir">'
+        + '<span class="sim">' + nama + '</span>'
+        + '<span class="arah ' + (arah === 'BUY' ? 'beli' : 'jual') + '">' + arah + '</span>'
+        + '<span class="gerak ' + kelasGerak + '">'
+        +   (gerak == null ? '—' : (gerak >= 0 ? '+' : '') + gerak.toFixed(2) + '%')
+        + '</span>'
+        + '</span>';
+    }
+    // Digandakan supaya gulungannya menyambung tanpa lompatan di ujung.
+    var satu = posisi.map(butir).join('');
+    isi.innerHTML = satu + satu;
+    el('mqWaktu').textContent = new Date().toLocaleTimeString('id-ID');
+  }
+
+  function segarkanHarga(d){
+    return V2Data.ambilHarga().then(function(h){ gambarMarquee(d.posisi, h); return h; });
+  }
+
+  var dataKini = null;
+
+  function muat(user){
+    var pemilik = !!(user && user.uid === V2Data.OWNER_UID);
+    if(window.V2Cangkang) V2Cangkang.setPemilik(pemilik);
+
+    var siapKondisi = Promise.resolve(null);
+    if(user && typeof JTLangganan !== 'undefined'){
+      siapKondisi = JTLangganan.muat(db, user).catch(function(){ return null; });
+    }
+
+    return siapKondisi.then(function(kondisi){
+      var premium = pemilik || !!(kondisi && kondisi.aktif);
+      gambarPil(kondisi, pemilik);
+
+      /* Etalase dipakai kalau BUKAN premium, atau kalau premium tapi datanya
+         sendiri masih kosong. Yang kedua penting: pengguna baru yang belum
+         punya satu pun transaksi tidak boleh disambut dashboard nol semua -
+         itu terbaca seperti tool yang rusak, bukan tool yang baru. */
+      var pribadi = premium ? V2Data.pribadi() : null;
+      var perluEtalase = !premium || !pribadi || pribadi.stat.jumlah === 0;
+
+      if(!perluEtalase){
+        el('pita').style.display = 'none';
+        return pribadi;
+      }
+      return V2Data.etalase(db).then(function(et){
+        el('pita').style.display = '';
+        el('pitaTeks').innerHTML = premium
+          ? 'Datamu belum ada. Yang tampil di bawah adalah <strong>data pemilik</strong> sebagai contoh — akan berganti sendiri begitu transaksi pertamamu tercatat.'
+          : 'Kamu sedang melihat <strong>data nyata milik pemilik</strong> sebagai etalase. Angkanya bergerak sungguhan, bukan tangkapan layar.';
+        return et;
+      });
+    }).then(function(d){
+      dataKini = d;
+      gambarStat(d);
+      return segarkanHarga(d);
+    }).catch(function(e){
+      el('pita').style.display = '';
+      el('pitaTeks').textContent = 'Gagal memuat data: ' + (e && e.message ? e.message : 'kesalahan tak terduga');
     });
+  }
+
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){
+    return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]; }); }
+
+  function gambarBilahAtas(user){
+    var w = el('atasKanan');
+    if(!user){
+      w.innerHTML = '<button type="button" class="v2-tbl hantu" id="btnMasuk" '
+        + 'style="padding:9px 18px;font-size:13px">Masuk dengan Google</button>';
+      el('btnMasuk').addEventListener('click', function(){
+        auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(function(){});
+      });
+      return;
+    }
+    var nama = user.displayName || user.email || 'Akun';
+    var inisial = String(nama).trim().charAt(0).toUpperCase() || '?';
+    w.innerHTML =
+        '<span class="atas-inisial" id="atasInisial">' + esc(inisial) + '</span>'
+      + '<span class="atas-nama">' + esc(nama) + '</span>'
+      + '<button type="button" class="atas-tautan" id="btnKeluar">Keluar</button>';
+    pasangFoto(el('atasInisial'), user);
+    el('btnKeluar').addEventListener('click', function(){ auth.signOut(); });
+  }
+
+  /* Foto profil Google.
+     Dua hal yang membuatnya gagal muncul, dan keduanya ditangani di sini:
+       1. lh3.googleusercontent.com menolak permintaan yang membawa header
+          Referer dari asal yang tidak dikenal - termasuk localhost. Tanpa
+          referrerPolicy="no-referrer" gambarnya balas 403 dan kotaknya kosong.
+       2. Sebagian akun memang TIDAK punya photoURL sama sekali. Itu bukan
+          error, jadi yang tampil inisialnya - bukan ikon rusak.
+     Elemen inisial diganti oleh <img> hanya SETELAH gambarnya benar-benar
+     berhasil dimuat, jadi tidak pernah ada jeda kotak kosong. */
+  function pasangFoto(elemenInisial, user){
+    var url = user && user.photoURL;
+    if(!url || !elemenInisial) return;
+    var img = new Image();
+    img.referrerPolicy = 'no-referrer';
+    img.onload = function(){
+      img.className = 'atas-foto';
+      img.alt = '';
+      if(elemenInisial.parentNode) elemenInisial.parentNode.replaceChild(img, elemenInisial);
+    };
+    img.onerror = function(){ /* biarkan inisial yang tampil */ };
+    img.src = url;
+  }
+
+  auth.onAuthStateChanged(function(user){
+    gambarBilahAtas(user);
+    muat(user);
+  });
+
+  // Harga disegarkan berkala supaya persen di marquee bergerak sendiri.
+  setInterval(function(){ if(dataKini) segarkanHarga(dataKini); }, 20000);
+
+  // Jumlah pair yang dipindai dibaca dari daftar koin aktif milik screener.
+  try{
+    var aktif = JSON.parse(localStorage.getItem('emaScreenerActiveSymbols_v1') || 'null');
+    el('tdKoin').textContent = (Array.isArray(aktif) && aktif.length) ? aktif.length : '100+';
+  }catch(e){ el('tdKoin').textContent = '100+'; }
 })();
 </script>

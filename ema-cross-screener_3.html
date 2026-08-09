@@ -1,4 +1,5 @@
 <meta charset="utf-8">
+<meta name="v2-halaman" content="screener">
 <!-- SENGAJA bukan width=device-width.
      Screener ini padat: 100 koin, tabel belasan kolom, kartu grafik. Diperas ke
      lebar HP hasilnya tidak terbaca. Jadi halaman dipaksa dirender pada kanvas
@@ -11,12 +12,12 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202608090100">
+<meta name="jt-versi" content="202608091100">
 <script>
 /* Penjaga versi - lihat catatan lengkap di jurnal-trading.html. Mencegah browser
    menyajikan HTML lama dari cache saat halaman dimuat ulang. */
 (function(){
-  var VERSI_TAMPIL = "202608090100";
+  var VERSI_TAMPIL = "202608091100";
   var KUNCI_OK    = "jtVersiOk";      // versi yang sudah dipastikan benar-benar termuat
   var KUNCI_PAKSA = "jtVersiPaksa";   // versi yang sudah pernah dipaksa muat ulang
   try{
@@ -2372,11 +2373,18 @@
   .es-reset-actions button.es-preorder-kirim:hover{ background:var(--bull-dim); }
 </style>
 
+<!-- ══ TEMA V2 PREMIUM ══
+     Ditaruh SESUDAH <style> halaman ini dengan sengaja: kedua berkas
+     mendefinisikan token di :root, jadi yang belakangan yang menang.
+     Menaruhnya di atas berarti temanya tidak berpengaruh sama sekali. -->
+<link rel="stylesheet" href="v2-tema.css?v=202608091100">
+
+
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="jt-langganan.js?v=202608090100"></script>
-<script src="jt-lapor.js?v=202608090100"></script>
+<script src="jt-langganan.js?v=202608091100"></script>
+<script src="jt-lapor.js?v=202608091100"></script>
 
 <div class="es-auth-gate" id="esAuthGate">
   <!-- Sesi Firebase baru diketahui setelah onAuthStateChanged menyala (~1 detik).
@@ -2409,11 +2417,11 @@
 
 <div class="ema-screener">
   <div class="es-toprow">
-    <div class="es-topnav">
-      <a href="marketplace.html" class="es-nav-link">Marketplace &rarr;</a>
-      <a href="jurnal-trading.html" class="es-nav-link">Jurnal Trading &rarr;</a>
-      <a href="pemilik.html" class="es-nav-link" id="esNavPemilik" style="display:none;color:var(--gold)">Panel Pemilik &rarr;</a>
-    </div>
+    <!-- Tautan Marketplace, Jurnal, dan Panel Pemilik dibuang dari sini:
+         ketiganya sudah ada di sidebar kiri. Wadahnya dibiarkan (kosong)
+         supaya .es-toprow tetap punya dua sisi dan bilah pengguna tetap
+         terdorong ke kanan. -->
+    <div class="es-topnav"></div>
     <div class="es-user-bar" id="esUserBar" style="display:none;">
       <img id="esUserAvatar" src="" alt="">
       <span id="esUserName"></span>
@@ -3269,15 +3277,22 @@
       esAuthGateEl.style.display = 'none';
       esActivateGateEl.style.display = 'none';
       esUserBarEl.style.display = 'flex';
+            // Google (lh3.googleusercontent.com) menolak permintaan gambar yang
+      // membawa header Referer dari asal tak dikenal - termasuk localhost -
+      // dan membalas 403, jadi avatarnya kosong. referrerPolicy mematikan
+      // header itu. Avatar disembunyikan kalau akunnya memang tak berfoto.
+      esUserAvatarEl.referrerPolicy = 'no-referrer';
+      esUserAvatarEl.onerror = function(){ this.style.display = 'none'; };
+      esUserAvatarEl.style.display = user.photoURL ? '' : 'none';
       esUserAvatarEl.src = user.photoURL || '';
       esUserNameEl.textContent = user.displayName || user.email || '';
 
-      // Pintu masuk Panel Pemilik. Menyembunyikannya di sini cuma soal
-      // kerapian tampilan - halaman itu sendiri yang menolak akun lain, dan
-      // datanya tetap butuh App Token yang tidak ada di repo publik.
-      var navPemilik = document.getElementById('esNavPemilik');
-      if(navPemilik && typeof JTLangganan !== 'undefined' && user.uid === JTLangganan.OWNER_UID){
-        navPemilik.style.display = '';
+      /* Pintu masuk Panel Pemilik sekarang ada di sidebar, bukan di sini.
+         Cangkang yang memunculkannya - dan seperti sebelumnya, itu cuma soal
+         kerapian tampilan: halaman Pemilik sendiri yang menolak akun lain,
+         dan datanya tetap butuh App Token yang tidak ada di repo publik. */
+      if(window.V2Cangkang && typeof JTLangganan !== 'undefined'){
+        V2Cangkang.setPemilik(user.uid === JTLangganan.OWNER_UID);
       }
 
       /* Status langganan HARUS selesai sebelum apa pun menulis ke users/{uid}.
@@ -10377,3 +10392,4 @@
   findPrioritySnrSignals();
 })();
 </script>
+<script src="v2-cangkang.js?v=202608091100" defer></script>

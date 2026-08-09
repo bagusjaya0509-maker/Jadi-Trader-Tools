@@ -1,9 +1,10 @@
 <meta charset="utf-8">
+<meta name="v2-halaman" content="jurnal">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202608082100">
+<meta name="jt-versi" content="202608091100">
 <script>
 /* ── Penjaga versi ────────────────────────────────────────────────────────────
    GitHub Pages menyuruh browser menyimpan HTML di cache beberapa menit, jadi
@@ -13,7 +14,7 @@
    sekali saja kalau ternyata yang tampil sudah usang. Dijaga sessionStorage
    supaya tidak pernah berulang (anti-loop). */
 (function(){
-  var VERSI_TAMPIL = "202608082100";
+  var VERSI_TAMPIL = "202608091100";
   var KUNCI_OK    = "jtVersiOk";      // versi yang sudah dipastikan benar-benar termuat
   var KUNCI_PAKSA = "jtVersiPaksa";   // versi yang sudah pernah dipaksa muat ulang
   try{
@@ -657,6 +658,13 @@
   .jt-signout-btn:hover{ color:var(--ink); border-color:var(--ink-dim); }
 </style>
 
+<!-- ══ TEMA V2 PREMIUM ══
+     Ditaruh SESUDAH <style> halaman ini dengan sengaja: kedua berkas
+     mendefinisikan token di :root, jadi yang belakangan yang menang.
+     Menaruhnya di atas berarti temanya tidak berpengaruh sama sekali. -->
+<link rel="stylesheet" href="v2-tema.css?v=202608091100">
+
+
 <div class="wrap jt-wrap-xau">
 
   <div class="jt-viewer-bar">
@@ -682,14 +690,9 @@
            (lihat blok CSS ≤820px). Elemennya TIDAK diduplikat - .jt-nav yang
            sama berubah peran jadi panel dropdown, jadi tidak ada dua versi
            tautan yang bisa berbeda isi. -->
-      <div class="jt-nav-wrap">
-        <button type="button" class="jt-nav-toggle" id="jtNavToggle"
-                aria-label="Menu halaman" aria-expanded="false">&#8942;</button>
-        <div class="jt-nav" id="jtNav">
-          <a href="ema-cross-screener_3.html" class="jt-nav-link">Crypto Screener</a>
-          <a href="marketplace.html" class="jt-nav-link">Marketplace</a>
-        </div>
-      </div>
+      <!-- Menu halaman dibuang: Crypto Screener & Marketplace sudah ada di
+           sidebar kiri. Tombol titik-tiga ikut hilang bersamanya - tombol
+           yang membuka menu kosong lebih membingungkan daripada tidak ada. -->
     </div>
     <div class="account-meta">
       <div class="balance"><span class="cur">$</span><span id="mBalance" class="num">200.00</span></div>
@@ -2676,8 +2679,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="jt-langganan.js?v=202608082100"></script>
-<script src="jt-lapor.js?v=202608082100"></script>
+<script src="jt-langganan.js?v=202608091100"></script>
+<script src="jt-lapor.js?v=202608091100"></script>
 <script>
 (function(){
   // ===== Login Google + jurnal "showcase" (Firebase) =====
@@ -3467,6 +3470,13 @@
     if(user){
       jtLoginBtn.style.display = 'none';
       jtUserBarEl.style.display = 'inline-flex';
+            // Google (lh3.googleusercontent.com) menolak permintaan gambar yang
+      // membawa header Referer dari asal tak dikenal - termasuk localhost -
+      // dan membalas 403, jadi avatarnya kosong. referrerPolicy mematikan
+      // header itu. Avatar disembunyikan kalau akunnya memang tak berfoto.
+      jtUserAvatarEl.referrerPolicy = 'no-referrer';
+      jtUserAvatarEl.onerror = function(){ this.style.display = 'none'; };
+      jtUserAvatarEl.style.display = user.photoURL ? '' : 'none';
       jtUserAvatarEl.src = user.photoURL || '';
       jtUserNameEl.textContent = user.displayName || user.email || '';
       jtViewerNoteEl.textContent = 'Menampilkan jurnal kamu sendiri.';
@@ -3656,29 +3666,10 @@
 </script>
 <script>
 (function(){
-  // ---- Menu titik tiga (hanya berfungsi di tampilan HP) ----
-  // Di desktop tautannya tampil apa adanya dan tombol ini tersembunyi lewat
-  // CSS, jadi kode di sini tidak perlu tahu-menahu soal lebar layar.
-  var jtNavToggle = document.getElementById('jtNavToggle');
-  var jtNavPanel = document.getElementById('jtNav');
-  if(jtNavToggle && jtNavPanel){
-    var setNav = function(buka){
-      jtNavPanel.classList.toggle('open', buka);
-      jtNavToggle.setAttribute('aria-expanded', buka ? 'true' : 'false');
-    };
-    jtNavToggle.addEventListener('click', function(e){
-      e.stopPropagation();
-      setNav(!jtNavPanel.classList.contains('open'));
-    });
-    // Sentuh di mana pun di luar menu -> tutup. Tanpa ini menu bisa menggantung
-    // terbuka dan menutupi isi halaman di layar sempit.
-    document.addEventListener('click', function(e){
-      if(!jtNavPanel.contains(e.target) && e.target !== jtNavToggle) setNav(false);
-    });
-    document.addEventListener('keydown', function(e){
-      if(e.key === 'Escape') setNav(false);
-    });
-  }
+  /* Menu titik-tiga dibuang bersama tautannya - navigasi halaman sekarang di
+     sidebar. Dihapus, bukan sekadar dibiarkan: listener yang menunggu elemen
+     yang tidak pernah ada persis jenis sisa yang dulu bikin error diam-diam
+     di screener. */
 
   // Menu "News" - konsep sama seperti kalender ekonomi di Crypto Screener,
   // cuma posisinya inline di sebelah tombol XAUUSD Screener (bukan mengambang
@@ -3720,3 +3711,4 @@
   });
 })();
 </script>
+<script src="v2-cangkang.js?v=202608091100" defer></script>

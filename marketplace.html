@@ -1,14 +1,15 @@
 <meta charset="utf-8">
+<meta name="v2-halaman" content="marketplace">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202608090100">
+<meta name="jt-versi" content="202608091100">
 <title>Jadi Trader — Marketplace</title>
 <script>
 /* Penjaga versi - sama seperti halaman lain. */
 (function(){
-  var V = "202608090100", OK = "jtVersiOk", PAKSA = "jtVersiPaksa";
+  var V = "202608091100", OK = "jtVersiOk", PAKSA = "jtVersiPaksa";
   try{
     if(sessionStorage.getItem(OK) === V) return;
     fetch(location.pathname + "?_v=" + Date.now(), { cache: "no-store" })
@@ -278,6 +279,13 @@
     font-family:var(--font-mono);font-size:11.5px;line-height:1.75;white-space:pre-wrap;color:var(--muted);
   }
 </style>
+
+<!-- ══ TEMA V2 PREMIUM ══
+     Ditaruh SESUDAH <style> halaman ini dengan sengaja: kedua berkas
+     mendefinisikan token di :root, jadi yang belakangan yang menang.
+     Menaruhnya di atas berarti temanya tidak berpengaruh sama sekali. -->
+<link rel="stylesheet" href="v2-tema.css?v=202608091100">
+
 
 <div class="wrap">
   <header class="masthead">
@@ -2467,7 +2475,18 @@ function muatKatalog(){
            permanen, hapus entri-nya dari daftar `produk` di berkas ini. */
         var adaId = {};
         daftar.forEach(function(p){ if(p && p.id) adaId[p.id] = true; });
-        var bawaanTertinggal = produk.filter(function(p){ return !adaId[p.id]; });
+
+        /* Produk yang ada di TEMPAT SAMPAH tidak boleh dihidupkan lagi oleh
+           penggabungan ini. Tanpa penjagaan ini, membuang produk bawaan lewat
+           Panel Pemilik tidak ada gunanya: id-nya hilang dari katalog Firestore,
+           lalu penggabungan menganggapnya "belum ada" dan memasangnya kembali. */
+        var diSampah = {};
+        try{
+          var s = J(d.sampah, null);
+          if(Array.isArray(s)) s.forEach(function(p){ if(p && p.id) diSampah[p.id] = true; });
+        }catch(e){}
+
+        var bawaanTertinggal = produk.filter(function(p){ return !adaId[p.id] && !diSampah[p.id]; });
         produk = daftar.concat(bawaanTertinggal);
       }
     }
@@ -2519,3 +2538,4 @@ muatKatalog();
 
 })();
 </script>
+<script src="v2-cangkang.js?v=202608091100" defer></script>

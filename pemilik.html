@@ -1,13 +1,14 @@
 <meta charset="utf-8">
+<meta name="v2-halaman" content="pemilik">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta name="jt-versi" content="202608090100">
+<meta name="jt-versi" content="202608091100">
 <meta name="robots" content="noindex, nofollow">
 <title>Jadi Trader — Panel Pemilik</title>
 <script>
 /* Penjaga versi - sama seperti halaman lain. */
 (function(){
-  var VERSI_TAMPIL = "202608090100";
+  var VERSI_TAMPIL = "202608091100";
   var KUNCI_OK = "jtVersiOkPemilik", KUNCI_PAKSA = "jtVersiPaksaPemilik";
   try{
     if(sessionStorage.getItem(KUNCI_OK) === VERSI_TAMPIL) return;
@@ -182,6 +183,34 @@
   @media (max-width:640px){ .baris2{grid-template-columns:1fr;} }
   .catat{font-size:11.5px;color:var(--muted);line-height:1.65;}
 
+  /* ── Daftar produk + tempat sampah ─────────────────────────────────── */
+  .prod-daftar{display:flex;flex-wrap:wrap;gap:var(--s2);margin-top:var(--s1);}
+  .prod-daftar:empty::after{content:'Belum ada produk.';font-size:11.5px;color:var(--muted);}
+  .prod-cip{
+    display:inline-flex;align-items:center;gap:9px;
+    background:var(--panel-2);border:1px solid var(--border);border-radius:8px;
+    padding:7px 8px 7px 12px;
+    transition:border-color .18s, background .18s;
+  }
+  .prod-cip:hover{border-color:var(--gold);}
+  .prod-cip .nm{font-size:12.5px;color:var(--text);}
+  .prod-cip .hrg{font-family:var(--mono);font-size:10.5px;color:var(--gold);}
+  .prod-cip .hrg.gratis{color:var(--bull);}
+  .prod-cip button{
+    display:inline-flex;align-items:center;justify-content:center;
+    width:22px;height:22px;flex:0 0 auto;
+    background:none;border:1px solid transparent;border-radius:50%;
+    color:var(--muted);cursor:pointer;font-size:14px;line-height:1;
+    transition:color .18s, border-color .18s, background .18s;
+  }
+  .prod-cip button:hover{color:var(--bear);border-color:var(--bear);}
+  .prod-cip button.pulih:hover{color:var(--bull);border-color:var(--bull);}
+  /* Sampah dibuat jelas berbeda supaya tidak tertukar dengan yang tayang. */
+  .prod-daftar.sampah .prod-cip{opacity:.62;border-style:dashed;}
+  .prod-daftar.sampah .prod-cip .nm{text-decoration:line-through;}
+  .prod-daftar.sampah:empty::after{content:'Tempat sampah kosong.';}
+  @media (pointer:coarse){ .prod-cip button{width:34px;height:34px;} }
+
   /* ── Grafik trafik ── */
   .grafik-kotak{width:100%;height:190px;position:relative;}
   .grafik-kotak svg{width:100%;height:100%;display:block;overflow:visible;}
@@ -255,6 +284,13 @@
     *{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;}
   }
 </style>
+
+<!-- ══ TEMA V2 PREMIUM ══
+     Ditaruh SESUDAH <style> halaman ini dengan sengaja: kedua berkas
+     mendefinisikan token di :root, jadi yang belakangan yang menang.
+     Menaruhnya di atas berarti temanya tidak berpengaruh sama sekali. -->
+<link rel="stylesheet" href="v2-tema.css?v=202608091100">
+
 
 <!-- ══════════ GERBANG ══════════ -->
 <div class="gerbang" id="gerbang">
@@ -414,6 +450,19 @@
         <select class="isian" id="prodPilih" style="width:auto;min-width:190px"><option value="">— produk baru —</option></select>
       </div>
       <div class="panel-isi">
+        <!-- Daftar produk dengan tombol silang. Dropdown di atas cuma untuk
+             MENYUNTING; menghapus lewat dropdown berarti harus memilih dulu
+             lalu mencari tombol hapus di ujung form - jauh dari yang mau
+             dibuang. Di sini silangnya menempel pada produknya sendiri. -->
+        <span class="label">Produk tayang</span>
+        <div id="prodDaftar" class="prod-daftar"></div>
+
+        <div id="prodSampahBungkus" style="display:none;margin-top:var(--s3)">
+          <span class="label">Tempat sampah — belum benar-benar hilang</span>
+          <div id="prodSampah" class="prod-daftar sampah"></div>
+        </div>
+
+        <div style="height:var(--s3)"></div>
         <div class="baris2">
           <div><label class="label" for="prodId">ID produk</label><input class="isian" id="prodId" placeholder="smi-indikator"></div>
           <div><label class="label" for="prodNama">Nama produk</label><input class="isian" id="prodNama"></div>
@@ -490,8 +539,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="jt-langganan.js?v=202608090100"></script>
-<script src="jt-lapor.js?v=202608090100"></script>
+<script src="jt-langganan.js?v=202608091100"></script>
+<script src="jt-lapor.js?v=202608091100"></script>
 
 <script>
 (function(){
@@ -901,22 +950,27 @@ el('btnAktifkan').addEventListener('click', function(){
    persis format yang dibaca marketplace.html. Kalau di sini ditulis sebagai
    array asli, marketplace akan mem-parse array itu sebagai teks dan katalognya
    kosong di mata pengunjung. */
-var katalog = [];
+var katalog = [], sampah = [];
 function refProduk(){ return db.collection(DOK_PUBLIK.col).doc(DOK_PUBLIK.doc); }
 
 function muatProduk(){
   return refProduk().get().then(function(d){
-    katalog = [];
+    katalog = []; sampah = [];
     if(d.exists){
-      var mentah = (d.data() || {}).produk;
+      var data = d.data() || {};
       try{
-        var v = typeof mentah === 'string' ? JSON.parse(mentah) : mentah;
+        var v = typeof data.produk === 'string' ? JSON.parse(data.produk) : data.produk;
         if(Array.isArray(v)) katalog = v;
+      }catch(e){}
+      try{
+        var s = typeof data.sampah === 'string' ? JSON.parse(data.sampah) : data.sampah;
+        if(Array.isArray(s)) sampah = s;
       }catch(e){}
     }
     var s = el('prodPilih');
     s.innerHTML = '<option value="">— produk baru —</option>'
       + katalog.map(function(p){ return '<option value="' + esc(p.id) + '">' + esc(p.nama||p.id) + '</option>'; }).join('');
+    gambarDaftarProduk();
     return katalog;
   }).catch(function(e){
     el('prodStatus').textContent = 'Gagal memuat katalog: ' + e.message;
@@ -924,9 +978,85 @@ function muatProduk(){
   });
 }
 
-function simpanKatalog(daftar){
-  return refProduk().set({ produk: JSON.stringify(daftar), _updatedAt: Date.now() }, { merge:true });
+/* Katalog dan sampah ditulis BERSAMAAN dalam satu operasi.
+
+   Kalau dipisah jadi dua tulisan, ada jeda di mana produk sudah hilang dari
+   katalog tapi belum masuk sampah - dan kalau tulisan kedua gagal (koneksi
+   putus, tab ditutup), produknya lenyap tanpa jejak. Justru itu yang mau
+   dihindari dengan adanya tempat sampah. */
+function simpanKatalog(daftar, daftarSampah){
+  var muatan = { produk: JSON.stringify(daftar), _updatedAt: Date.now() };
+  if(daftarSampah) muatan.sampah = JSON.stringify(daftarSampah);
+  return refProduk().set(muatan, { merge:true });
 }
+
+function cipProduk(p, mode){
+  var gratis = !(Number(p.harga) > 0);
+  return '<span class="prod-cip">'
+    + '<span class="nm">' + esc(p.nama || p.id) + '</span>'
+    + '<span class="hrg' + (gratis ? ' gratis' : '') + '">' + (gratis ? 'FREE' : '$' + Number(p.harga)) + '</span>'
+    + (mode === 'sampah'
+        ? '<button type="button" class="pulih" data-pulih="' + esc(p.id) + '" title="Pulihkan produk ini">&#8630;</button>'
+          + '<button type="button" data-musnah="' + esc(p.id) + '" title="Hapus permanen">&times;</button>'
+        : '<button type="button" data-buang="' + esc(p.id) + '" title="Buang ke tempat sampah">&times;</button>')
+    + '</span>';
+}
+
+function gambarDaftarProduk(){
+  el('prodDaftar').innerHTML = katalog.map(function(p){ return cipProduk(p, 'tayang'); }).join('');
+  el('prodSampahBungkus').style.display = sampah.length ? '' : 'none';
+  el('prodSampah').innerHTML = sampah.map(function(p){ return cipProduk(p, 'sampah'); }).join('');
+}
+
+// Satu listener di pembungkusnya, bukan per tombol: isinya digambar ulang tiap
+// kali ada perubahan, dan listener per tombol berarti memasang ulang terus.
+el('prodDaftar').addEventListener('click', function(e){
+  var b = e.target.closest('[data-buang]');
+  if(!b) return;
+  var id = b.getAttribute('data-buang');
+  var p = katalog.find(function(x){ return x.id === id; });
+  if(!p) return;
+  // Tanpa confirm(): itulah gunanya tempat sampah. Konfirmasi untuk aksi yang
+  // bisa dibatalkan cuma menambah klik tanpa menambah keamanan.
+  var sisa = katalog.filter(function(x){ return x.id !== id; });
+  var barunya = [Object.assign({}, p, { _dibuang: Date.now() })].concat(sampah);
+  el('prodStatus').textContent = 'Membuang ' + (p.nama || id) + '…';
+  simpanKatalog(sisa, barunya).then(function(){
+    el('prodStatus').textContent = (p.nama || id) + ' dipindah ke tempat sampah — masih bisa dipulihkan.';
+    toast('Produk dibuang ke tempat sampah.');
+    return muatProduk();
+  }).catch(function(err){ el('prodStatus').textContent = 'Gagal membuang: ' + err.message; });
+});
+
+el('prodSampah').addEventListener('click', function(e){
+  var pulih = e.target.closest('[data-pulih]');
+  var musnah = e.target.closest('[data-musnah]');
+  if(!pulih && !musnah) return;
+  var id = (pulih || musnah).getAttribute(pulih ? 'data-pulih' : 'data-musnah');
+  var p = sampah.find(function(x){ return x.id === id; });
+  if(!p) return;
+
+  if(pulih){
+    var bersih = Object.assign({}, p);
+    delete bersih._dibuang;
+    simpanKatalog(katalog.concat([bersih]), sampah.filter(function(x){ return x.id !== id; }))
+      .then(function(){
+        el('prodStatus').textContent = (p.nama || id) + ' dipulihkan dan tayang lagi.';
+        toast('Produk dipulihkan.');
+        return muatProduk();
+      }).catch(function(err){ el('prodStatus').textContent = 'Gagal memulihkan: ' + err.message; });
+    return;
+  }
+
+  // Hapus permanen: INI yang butuh konfirmasi, karena tidak ada jalan pulang.
+  if(!confirm('Hapus permanen "' + (p.nama || id) + '"?\n\nEntri katalognya hilang untuk selamanya.\n'
+    + 'Berkas sumber di VPS TIDAK ikut terhapus — itu dihapus terpisah.')) return;
+  simpanKatalog(katalog, sampah.filter(function(x){ return x.id !== id; }))
+    .then(function(){
+      el('prodStatus').textContent = (p.nama || id) + ' dihapus permanen.';
+      return muatProduk();
+    }).catch(function(err){ el('prodStatus').textContent = 'Gagal menghapus: ' + err.message; });
+});
 
 function isiFormProduk(p){
   p = p || {};
@@ -1102,13 +1232,22 @@ el('btnSimpanProduk').addEventListener('click', function(){
     .then(function(){ el('btnSimpanProduk').disabled = false; });
 });
 
+// Tombol lama di ujung form. Sekarang lewat tempat sampah juga - satu jalur
+// pembuangan, bukan dua yang berperilaku beda.
 el('btnHapusProduk').addEventListener('click', function(){
   var id = el('prodId').value.trim();
   if(!id) return;
-  if(!confirm('Hapus produk "' + id + '" dari marketplace?')) return;
-  simpanKatalog(katalog.filter(function(x){ return x.id !== id; }))
-    .then(function(){ isiFormProduk(null); toast('Produk dihapus.'); return muatProduk(); })
-    .catch(function(e){ el('prodStatus').textContent = 'Gagal: ' + e.message; });
+  var p = katalog.find(function(x){ return x.id === id; });
+  if(!p){ el('prodStatus').textContent = 'Produk "' + id + '" tidak ada di katalog.'; return; }
+  simpanKatalog(
+    katalog.filter(function(x){ return x.id !== id; }),
+    [Object.assign({}, p, { _dibuang: Date.now() })].concat(sampah)
+  ).then(function(){
+    isiFormProduk(null);
+    el('prodStatus').textContent = (p.nama || id) + ' dipindah ke tempat sampah — masih bisa dipulihkan.';
+    toast('Produk dibuang ke tempat sampah.');
+    return muatProduk();
+  }).catch(function(e){ el('prodStatus').textContent = 'Gagal: ' + e.message; });
 });
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -1234,3 +1373,4 @@ setTimeout(function(){
 
 })();
 </script>
+<script src="v2-cangkang.js?v=202608091100" defer></script>

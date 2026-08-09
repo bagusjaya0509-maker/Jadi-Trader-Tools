@@ -1,0 +1,438 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="jt-versi" content="V2-202608091100">
+<title>Jadi Trader — Dashboard</title>
+
+<link rel="stylesheet" href="v2-tema.css?v=202608091100">
+
+<style>
+/* ══════════════════════════════════════════════════════════════════════════
+   DASHBOARD
+   Susunan mengikuti Efferd Dashboard 2: baris KPI di atas, dua grafik besar,
+   lalu tabel-tabel. Yang diubah adalah ISINYA - "Active users / Revenue /
+   Conversion" diganti angka yang benar-benar berarti untuk trader.
+
+   Kerapatan sengaja lebih tinggi dari Beranda. Beranda itu halaman untuk
+   diyakinkan; ini halaman untuk dibaca berkali-kali sehari.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.dsb{ position:relative; z-index:2; padding: var(--v2-r5) clamp(16px,3vw,32px) var(--v2-r8); max-width:1560px; margin:0 auto; }
+
+.dsb-kepala{ display:flex; align-items:flex-end; justify-content:space-between;
+             gap:var(--v2-r4); flex-wrap:wrap; margin-bottom:var(--v2-r5); }
+.dsb-kepala h1{ font-size: var(--v2-t-xl); }
+.dsb-kepala .sub{ font-size:var(--v2-t-sm); color:var(--v2-kertas-2); margin-top:5px; }
+
+/* Grid 12 kolom. Semua panel memakai span-* supaya susunannya bisa diubah
+   tanpa menyentuh CSS masing-masing panel. */
+.dsb-grid{ display:grid; grid-template-columns:repeat(12,1fr); gap:var(--v2-r4); }
+.span-3{ grid-column:span 3; } .span-4{ grid-column:span 4; }
+.span-5{ grid-column:span 5; } .span-6{ grid-column:span 6; }
+.span-7{ grid-column:span 7; } .span-8{ grid-column:span 8; } .span-12{ grid-column:span 12; }
+@media (max-width:1200px){ .span-3{ grid-column:span 6; } .span-4,.span-5,.span-7,.span-8{ grid-column:span 12; } }
+@media (max-width:760px){ .dsb-grid > *{ grid-column:span 12 !important; } }
+
+.kpi{ padding: var(--v2-r4) var(--v2-r5); }
+.kpi .label{ font-family:var(--v2-angka); font-size:var(--v2-t-xs); letter-spacing:var(--v2-lacak-lebar);
+             text-transform:uppercase; color:var(--v2-kertas-3); }
+.kpi .nilai{ font-family:var(--v2-angka); font-variant-numeric:tabular-nums;
+             font-size: clamp(24px,2.6vw,30px); font-weight:500; letter-spacing:-.025em;
+             line-height:1.12; margin-top:7px; }
+.kpi .kaki{ font-size:11.5px; color:var(--v2-kertas-3); margin-top:6px; display:flex; align-items:center; gap:5px; }
+
+.panel-kepala{ display:flex; align-items:center; justify-content:space-between; gap:var(--v2-r3);
+               padding: var(--v2-r4) var(--v2-r5); border-bottom:1px solid var(--v2-garis); }
+.panel-kepala h2{ font-size:var(--v2-t-md); }
+.panel-isi{ padding: var(--v2-r5); }
+
+.tab-baris{ display:flex; gap:3px; background:var(--v2-panel-2); padding:3px; border-radius:8px; }
+.tab{ background:none; border:none; color:var(--v2-kertas-3); cursor:pointer;
+      font-family:var(--v2-angka); font-size:11px; letter-spacing:.05em; text-transform:uppercase;
+      padding:6px 12px; border-radius:6px; transition:background var(--v2-cepat), color var(--v2-cepat); }
+.tab:hover{ color:var(--v2-kertas); }
+.tab.on{ background:var(--v2-panel-3); color:var(--v2-emas); }
+
+.grafik-kotak{ position:relative; width:100%; height:280px; }
+.grafik-kotak svg{ width:100%; height:100%; display:block; overflow:visible; }
+.g-tip{ position:absolute; pointer-events:none; opacity:0; transform:translate(-50%,-130%);
+        background:var(--v2-panel-3); border:1px solid var(--v2-garis); border-radius:7px;
+        padding:6px 10px; font-family:var(--v2-angka); font-size:11px; white-space:nowrap;
+        transition:opacity var(--v2-cepat); z-index:5; }
+.g-tip.on{ opacity:1; }
+
+.kosong{ padding: var(--v2-r6) 0; text-align:center; font-size:var(--v2-t-sm); color:var(--v2-kertas-3); }
+
+.bar-baris{ display:flex; align-items:center; gap:var(--v2-r3); margin-bottom:var(--v2-r3); }
+.bar-baris .nm{ flex:0 0 92px; font-size:12px; color:var(--v2-kertas-2); }
+.bar-baris .bar{ flex:1; }
+.bar-baris .vl{ flex:0 0 auto; font-family:var(--v2-angka); font-variant-numeric:tabular-nums;
+                font-size:12px; color:var(--v2-kertas); }
+
+@media (max-width:640px){
+  .panel-isi{ padding: var(--v2-r4); }
+  .grafik-kotak{ height:210px; }
+}
+</style>
+
+<body data-v2-halaman="dashboard">
+
+<main class="dsb">
+  <div class="dsb-kepala">
+    <div>
+      <h1>Dashboard</h1>
+      <div class="sub" id="dsbSub">Memuat…</div>
+    </div>
+    <!-- Tombol Screener & Jurnal dibuang: keduanya sudah ada di sidebar kiri,
+         dan navigasi yang sama muncul dua kali cuma menambah beban baca. -->
+  </div>
+
+  <div class="dsb-grid">
+    <div class="v2-kartu kpi span-3 v2-masuk v2-tunda-1">
+      <div class="label">Total Saldo</div>
+      <div class="nilai" id="kSaldo">—</div>
+      <div class="kaki" id="kSaldoKaki">—</div>
+    </div>
+    <div class="v2-kartu kpi span-3 v2-masuk v2-tunda-2">
+      <div class="label">Winrate</div>
+      <div class="nilai" id="kWinrate">—</div>
+      <div class="kaki" id="kWinrateKaki">—</div>
+    </div>
+    <div class="v2-kartu kpi span-3 v2-masuk v2-tunda-3">
+      <div class="label">P/L Bersih</div>
+      <div class="nilai" id="kBersih">—</div>
+      <div class="kaki" id="kBersihKaki">—</div>
+    </div>
+    <div class="v2-kartu kpi span-3 v2-masuk v2-tunda-4">
+      <div class="label">Profit Factor</div>
+      <div class="nilai" id="kPF">—</div>
+      <div class="kaki" id="kPFKaki">—</div>
+    </div>
+
+    <section class="v2-kartu span-8 v2-masuk v2-tunda-3">
+      <div class="panel-kepala">
+        <div>
+          <h2>Kurva Ekuitas</h2>
+          <div style="font-size:11.5px;color:var(--v2-kertas-3);margin-top:3px" id="ekHint">—</div>
+        </div>
+      </div>
+      <div class="panel-isi">
+        <div class="grafik-kotak">
+          <svg id="ekSvg" viewBox="0 0 900 280" preserveAspectRatio="none" role="img" aria-label="Kurva ekuitas"></svg>
+          <div class="g-tip" id="ekTip"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Rincian per sumber. Ada di sini supaya penggabungan Forex + Kripto
+         bisa DIPERIKSA: kalau total di atas terasa salah, tabel ini langsung
+         menunjukkan sisi mana yang menyimpang. -->
+    <section class="v2-kartu span-4 v2-masuk v2-tunda-4">
+      <div class="panel-kepala"><h2>Forex &amp; Kripto</h2></div>
+      <div class="panel-isi" style="padding-top:var(--v2-r3)">
+        <div class="v2-gulung" id="rincianIsi"><div class="kosong">Memuat…</div></div>
+      </div>
+    </section>
+
+    <section class="v2-kartu span-4 v2-masuk v2-tunda-4">
+      <div class="panel-kepala"><h2>Menang vs Kalah</h2></div>
+      <div class="panel-isi" id="mkIsi">
+        <div class="kosong">Memuat…</div>
+      </div>
+    </section>
+
+    <section class="v2-kartu span-8 v2-masuk v2-tunda-4">
+      <div class="panel-kepala">
+        <h2>Posisi Terbuka</h2>
+        <span class="v2-label" id="posHint">—</span>
+      </div>
+      <div class="panel-isi" style="padding-top:var(--v2-r3)">
+        <div class="v2-gulung" id="posIsi"><div class="kosong">Memuat…</div></div>
+      </div>
+    </section>
+
+    <section class="v2-kartu span-4 v2-masuk v2-tunda-5">
+      <div class="panel-kepala">
+        <h2>Transaksi Terakhir</h2>
+        <span class="v2-label" id="rwHint">—</span>
+      </div>
+      <div class="panel-isi" style="padding-top:var(--v2-r3)">
+        <div class="v2-gulung" id="rwIsi"><div class="kosong">Memuat…</div></div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="jt-langganan.js"></script>
+<script src="v2-data.js?v=202608091100"></script>
+<script src="v2-cangkang.js?v=202608091100" defer></script>
+
+<script>
+(function(){
+  'use strict';
+  var F = V2Data.fmt;
+  function el(id){ return document.getElementById(id); }
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){
+    return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]; }); }
+
+  firebase.initializeApp({
+    apiKey: "AIzaSyB4cWVI-k3q16TmRCbM_lbJwgtjxIs_Weo",
+    authDomain: "jadi-trader-tools.firebaseapp.com",
+    projectId: "jadi-trader-tools",
+    storageBucket: "jadi-trader-tools.firebasestorage.app",
+    messagingSenderId: "171244479105",
+    appId: "1:171244479105:web:9b421850801b6678d8e380"
+  });
+  var auth = firebase.auth(), db = firebase.firestore();
+  auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(function(){});
+
+  /* ── Kurva ekuitas ─────────────────────────────────────────────────────
+     SVG tulisan tangan, bukan pustaka grafik. Untuk satu garis dengan <1000
+     titik, memuat 300 KB Chart.js hanya menambah waktu muat - dan checklist
+     poin 08 menghitung waktu muat sebagai bagian dari "terasa mahal". */
+  function gambarKurva(titik){
+    var svg = el('ekSvg'), tip = el('ekTip');
+    svg.innerHTML = '';
+    if(titik.length < 2){
+      el('ekHint').textContent = 'Belum cukup transaksi untuk menggambar kurva.';
+      return;
+    }
+    var W = 900, H = 280, pad = { a: 16, b: 26, ki: 8, ka: 8 };
+    var nilai = titik.map(function(t){ return t.nilai; });
+    var min = Math.min.apply(null, nilai), max = Math.max.apply(null, nilai);
+    if(min === max){ min -= 1; max += 1; }
+    var rentang = max - min, bantal = rentang * 0.12;
+    min -= bantal; max += bantal; rentang = max - min;
+
+    function X(i){ return pad.ki + (i / (titik.length - 1)) * (W - pad.ki - pad.ka); }
+    function Y(v){ return pad.a + (1 - (v - min) / rentang) * (H - pad.a - pad.b); }
+
+    var naik = titik[titik.length-1].nilai >= titik[0].nilai;
+    var warna = naik ? 'var(--v2-naik)' : 'var(--v2-turun)';
+
+    var d = titik.map(function(t,i){ return (i ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(t.nilai).toFixed(1); }).join(' ');
+    var area = d + ' L' + X(titik.length-1).toFixed(1) + ' ' + (H - pad.b) + ' L' + X(0).toFixed(1) + ' ' + (H - pad.b) + ' Z';
+
+    var ns = 'http://www.w3.org/2000/svg';
+    var def = document.createElementNS(ns,'defs');
+    def.innerHTML = '<linearGradient id="ekGrad" x1="0" y1="0" x2="0" y2="1">'
+      + '<stop offset="0%" stop-color="' + (naik ? '#4f9e82' : '#c2544d') + '" stop-opacity=".26"/>'
+      + '<stop offset="100%" stop-color="' + (naik ? '#4f9e82' : '#c2544d') + '" stop-opacity="0"/></linearGradient>';
+    svg.appendChild(def);
+
+    // Garis bantu horizontal - tiga saja. Lebih dari itu jadi kertas grafik.
+    [0, .5, 1].forEach(function(f){
+      var y = pad.a + f * (H - pad.a - pad.b);
+      var l = document.createElementNS(ns,'line');
+      l.setAttribute('x1', pad.ki); l.setAttribute('x2', W - pad.ka);
+      l.setAttribute('y1', y); l.setAttribute('y2', y);
+      l.setAttribute('stroke', 'rgba(255,255,255,.055)'); l.setAttribute('stroke-width','1');
+      svg.appendChild(l);
+    });
+
+    var a = document.createElementNS(ns,'path');
+    a.setAttribute('d', area); a.setAttribute('fill','url(#ekGrad)');
+    svg.appendChild(a);
+
+    var p = document.createElementNS(ns,'path');
+    p.setAttribute('d', d); p.setAttribute('fill','none');
+    p.setAttribute('stroke', warna); p.setAttribute('stroke-width','2');
+    p.setAttribute('stroke-linejoin','round'); p.setAttribute('stroke-linecap','round');
+    svg.appendChild(p);
+
+    var titikAkhir = document.createElementNS(ns,'circle');
+    titikAkhir.setAttribute('cx', X(titik.length-1)); titikAkhir.setAttribute('cy', Y(titik[titik.length-1].nilai));
+    titikAkhir.setAttribute('r','3.5'); titikAkhir.setAttribute('fill', warna);
+    svg.appendChild(titikAkhir);
+
+    el('ekHint').textContent = titik.length - 1 + ' transaksi • dari '
+      + F.uang(titik[0].nilai) + ' ke ' + F.uang(titik[titik.length-1].nilai);
+
+    // Tooltip: dicari titik terdekat dari posisi kursor.
+    var kotak = svg.parentElement;
+    kotak.addEventListener('pointermove', function(e){
+      var r = svg.getBoundingClientRect();
+      var fx = (e.clientX - r.left) / r.width;
+      var i = Math.round(fx * (titik.length - 1));
+      i = Math.max(0, Math.min(titik.length - 1, i));
+      tip.textContent = F.uang(titik[i].nilai) + (titik[i].waktu ? ' · ' + new Date(titik[i].waktu).toLocaleDateString('id-ID') : '');
+      tip.style.left = (X(i) / W * 100) + '%';
+      tip.style.top = (Y(titik[i].nilai) / H * 100) + '%';
+      tip.classList.add('on');
+    });
+    kotak.addEventListener('pointerleave', function(){ tip.classList.remove('on'); });
+  }
+
+  function gambarKpi(d){
+    var s = d.stat;
+    el('kSaldo').textContent = F.uang(s.saldo);
+    el('kSaldoKaki').textContent = s.jumlah + ' transaksi tercatat';
+
+    el('kWinrate').textContent = s.winrate === null ? '—' : F.persen(s.winrate);
+    el('kWinrate').className = 'nilai' + (s.winrate === null ? '' : s.winrate >= 50 ? ' naik' : ' turun');
+    el('kWinrateKaki').textContent = s.menang + ' menang · ' + s.kalah + ' kalah';
+
+    el('kBersih').textContent = s.jumlah ? F.uang(s.bersih, true) : '—';
+    el('kBersih').className = 'nilai' + (s.bersih > 0 ? ' naik' : s.bersih < 0 ? ' turun' : '');
+    el('kBersihKaki').textContent = F.uang(s.untung, true) + ' / -' + F.uang(s.rugi);
+
+    /* Profit factor tak hingga terjadi kalau belum pernah rugi sama sekali.
+       Menuliskannya sebagai "Infinity" jelas salah; "∞" jujur dan singkat. */
+    var pf = s.faktorProfit;
+    el('kPF').textContent = pf === null ? '—' : (pf === Infinity ? '∞' : pf.toFixed(2));
+    el('kPF').className = 'nilai' + (pf === null ? '' : (pf >= 1 ? ' naik' : ' turun'));
+    el('kPFKaki').textContent = pf === null ? 'belum ada data'
+      : pf === Infinity ? 'belum pernah rugi' : (pf >= 1 ? 'di atas titik impas' : 'di bawah titik impas');
+  }
+
+  function gambarRincian(d){
+    var w = el('rincianIsi'), r = d.rincian, s = d.stat;
+    function baris(nama, x, catatan){
+      return '<tr>'
+        + '<td>' + nama + '<div style="font-size:10.5px;color:var(--v2-kertas-3)">' + catatan + '</div></td>'
+        + '<td class="angka">' + x.jumlah + '</td>'
+        + '<td class="angka">' + (x.winrate === null ? '—' : F.persen(x.winrate)) + '</td>'
+        + '<td class="angka ' + (x.bersih > 0 ? 'naik' : x.bersih < 0 ? 'turun' : '') + '">'
+        +   (x.jumlah ? F.uang(x.bersih, true) : '—') + '</td>'
+        + '</tr>';
+    }
+    w.innerHTML = '<table class="v2-tabel"><thead><tr>'
+      + '<th>Sumber</th><th class="angka">Trade</th><th class="angka">WR</th><th class="angka">P/L</th>'
+      + '</tr></thead><tbody>'
+      + baris('Forex', r.forex, 'MT5 · jurnal')
+      + baris('Kripto', r.kripto, 'Binance · screener')
+      + '<tr style="border-top:1px solid var(--v2-garis)">'
+      +   '<td><strong>Gabungan</strong><div style="font-size:10.5px;color:var(--v2-kertas-3)">saldo awal ' + F.uang(d.saldoAwal) + '</div></td>'
+      +   '<td class="angka"><strong>' + s.jumlah + '</strong></td>'
+      +   '<td class="angka"><strong>' + (s.winrate === null ? '—' : F.persen(s.winrate)) + '</strong></td>'
+      +   '<td class="angka ' + (s.bersih > 0 ? 'naik' : s.bersih < 0 ? 'turun' : '') + '"><strong>'
+      +     (s.jumlah ? F.uang(s.bersih, true) : '—') + '</strong></td>'
+      + '</tr>'
+      + '</tbody></table>';
+  }
+
+  function gambarMenangKalah(d){
+    var s = d.stat, w = el('mkIsi');
+    if(!s.jumlah){ w.innerHTML = '<div class="kosong">Belum ada transaksi selesai.</div>'; return; }
+    var maks = Math.max(s.menang, s.kalah) || 1;
+    var maksNilai = Math.max(s.untung, s.rugi) || 1;
+    function baris(nm, val, lebar, kelas, teks){
+      return '<div class="bar-baris">'
+        + '<span class="nm">' + nm + '</span>'
+        + '<span class="bar"><span class="v2-bilah' + (kelas === 'naik' ? ' naik' : '') + '">'
+        +   '<i style="width:' + lebar + '%' + (kelas === 'turun' ? ';background:linear-gradient(90deg,var(--v2-turun),#d97b73)' : '') + '"></i>'
+        + '</span></span>'
+        + '<span class="vl">' + teks + '</span></div>';
+    }
+    w.innerHTML =
+        baris('Menang', s.menang, (s.menang/maks)*100, 'naik', s.menang)
+      + baris('Kalah',  s.kalah,  (s.kalah/maks)*100,  'turun', s.kalah)
+      + '<div style="height:1px;background:var(--v2-garis);margin:var(--v2-r4) 0"></div>'
+      + baris('Profit', s.untung, (s.untung/maksNilai)*100, 'naik', F.uang(s.untung))
+      + baris('Lose',   s.rugi,   (s.rugi/maksNilai)*100,   'turun', F.uang(s.rugi))
+      + '<div style="margin-top:var(--v2-r4);font-size:11.5px;color:var(--v2-kertas-3);line-height:1.6">'
+      +   'Rata-rata menang ' + F.uang(s.rerataMenang) + ' · rata-rata kalah ' + F.uang(s.rerataKalah) + '.'
+      + '</div>';
+  }
+
+  function gambarPosisi(d, harga){
+    var w = el('posIsi');
+    if(!d.posisi.length){
+      w.innerHTML = '<div class="kosong">Tidak ada posisi terbuka.</div>';
+      el('posHint').textContent = '0 posisi';
+      return;
+    }
+    el('posHint').textContent = d.posisi.length + ' posisi';
+    w.innerHTML = '<table class="v2-tabel"><thead><tr>'
+      + '<th>Pair</th><th>TF</th><th class="angka">Entry</th><th class="angka">SL</th>'
+      + '<th class="angka">TP</th><th class="angka">Harga</th><th class="angka">Gerak</th>'
+      + '</tr></thead><tbody>'
+      + d.posisi.map(function(p){
+          var arah = String(p.arah||'').toUpperCase();
+          var kini = harga[p.simbol];
+          var gerak = (kini != null && p.entry) ? ((kini - p.entry) / p.entry) * 100 * (arah === 'BUY' ? 1 : -1) : null;
+          var kelas = gerak == null ? '' : gerak >= 0 ? 'naik' : 'turun';
+          return '<tr>'
+            + '<td><span style="font-family:var(--v2-display);font-weight:600">' + esc(String(p.simbol||'').replace('USDT','')) + '</span> '
+            +     '<span class="v2-pil ' + (arah === 'BUY' ? 'naik' : 'turun') + '" style="padding:1px 7px;font-size:9.5px">' + esc(arah) + '</span></td>'
+            + '<td style="color:var(--v2-kertas-3)">' + esc(p.tf || '—') + '</td>'
+            + '<td class="angka">' + F.harga(p.entry) + '</td>'
+            + '<td class="angka" style="color:var(--v2-turun)">' + F.harga(p.sl) + '</td>'
+            + '<td class="angka" style="color:var(--v2-naik)">' + F.harga(p.tp) + '</td>'
+            + '<td class="angka">' + F.harga(kini) + '</td>'
+            + '<td class="angka ' + kelas + '">' + (gerak == null ? '—' : (gerak >= 0 ? '+' : '') + gerak.toFixed(2) + '%') + '</td>'
+            + '</tr>';
+        }).join('')
+      + '</tbody></table>';
+  }
+
+  function gambarRiwayat(d){
+    var w = el('rwIsi');
+    var r = d.riwayat.slice().sort(function(a,b){ return (b.waktuTutup||0) - (a.waktuTutup||0); }).slice(0, 12);
+    if(!r.length){ w.innerHTML = '<div class="kosong">Belum ada transaksi.</div>'; el('rwHint').textContent = '0'; return; }
+    el('rwHint').textContent = d.riwayat.length + ' total';
+    w.innerHTML = '<table class="v2-tabel"><thead><tr><th>Waktu</th><th class="angka">P/L</th></tr></thead><tbody>'
+      + r.map(function(t){
+          var tg = t.waktuTutup ? new Date(t.waktuTutup) : null;
+          var vd = tg && !isNaN(tg.getTime());
+          return '<tr>'
+            + '<td style="color:var(--v2-kertas-2)">' + (vd ? tg.toLocaleDateString('id-ID',{day:'2-digit',month:'short'}) : '—') + '</td>'
+            + '<td class="angka ' + (t.pnl >= 0 ? 'naik' : 'turun') + '">' + F.uang(t.pnl, true) + '</td>'
+            + '</tr>';
+        }).join('')
+      + '</tbody></table>';
+  }
+
+  var dataKini = null;
+
+  function muat(user){
+    var pemilik = !!(user && user.uid === V2Data.OWNER_UID);
+    if(window.V2Cangkang) V2Cangkang.setPemilik(pemilik);
+
+    var siap = Promise.resolve(null);
+    if(user && typeof JTLangganan !== 'undefined'){
+      siap = JTLangganan.muat(db, user).catch(function(){ return null; });
+    }
+
+    return siap.then(function(kondisi){
+      var premium = pemilik || !!(kondisi && kondisi.aktif);
+      var pribadi = premium ? V2Data.pribadi() : null;
+      if(pribadi && pribadi.stat.jumlah > 0){
+        el('dsbSub').textContent = 'Data akunmu sendiri.';
+        return pribadi;
+      }
+      return V2Data.etalase(db).then(function(et){
+        el('dsbSub').innerHTML = premium
+          ? 'Datamu belum ada — menampilkan <strong style="color:var(--v2-emas)">data pemilik</strong> sebagai contoh.'
+          : 'Menampilkan <strong style="color:var(--v2-emas)">data pemilik</strong> sebagai etalase.';
+        return et;
+      });
+    }).then(function(d){
+      dataKini = d;
+      gambarKpi(d);
+      gambarKurva(d.kurva);
+      gambarRincian(d);
+      gambarMenangKalah(d);
+      gambarRiwayat(d);
+      return V2Data.ambilHarga().then(function(h){ gambarPosisi(d, h); });
+    }).catch(function(e){
+      el('dsbSub').textContent = 'Gagal memuat: ' + (e && e.message ? e.message : 'kesalahan tak terduga');
+    });
+  }
+
+  auth.onAuthStateChanged(function(user){
+    muat(user);
+    if(window.V2Cangkang){
+      V2Cangkang.kaki(user
+        ? '<strong style="color:var(--v2-kertas)">' + esc(user.displayName || user.email || 'Masuk') + '</strong>'
+        : 'Belum masuk');
+    }
+  });
+
+  setInterval(function(){
+    if(dataKini) V2Data.ambilHarga().then(function(h){ gambarPosisi(dataKini, h); });
+  }, 20000);
+})();
+</script>
