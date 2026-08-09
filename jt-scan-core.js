@@ -7,7 +7,7 @@
    bisa menyimpang diam-diam.
 
    Kalau logika di screener berubah, jalankan lagi:  node buat-scan-core.js
-   Dibuat: 2026-08-03T10:38:48.259Z
+   Dibuat: 2026-08-03T10:51:25.361Z
    ════════════════════════════════════════════════════════════════════════ */
 window.JTScan = (function(){
   "use strict";
@@ -249,6 +249,21 @@ window.JTScan = (function(){
     return terbaik;
   }
   
+  function slFromSnrZone(arah, price, highs, lows, atrNow){
+    const tolZona = atrNow * 0.5;    // setengah LEBAR kotak -> tepi kotak
+    const sapuan  = atrNow * 0.5;    // setengah TINGGI kotak -> ruang sweep
+    if(arah === 'SELL'){
+      const res = findPivots(highs, 10, 10, true).slice(-2).map(p => p.value);
+      const lvl = res.length ? Math.max.apply(null, res) : null;
+      const dasar = (lvl != null && lvl > price) ? lvl : Math.max.apply(null, highs.slice(-15));
+      return dasar + tolZona + sapuan;
+    }
+    const sup = findPivots(lows, 10, 10, false).slice(-2).map(p => p.value);
+    const lvl = sup.length ? Math.min.apply(null, sup) : null;
+    const dasar = (lvl != null && lvl < price) ? lvl : Math.min.apply(null, lows.slice(-15));
+    return dasar - tolZona - sapuan;
+  }
+  
   async function mapLimited(items, limit, fn){
     const results = new Array(items.length);
     let next = 0;
@@ -269,9 +284,10 @@ window.JTScan = (function(){
     fmtPrice: fmtPrice, ema: ema, stochastic: stochastic,
     smiSeries: smiSeries, smiConditionOf: smiConditionOf, atr: atr,
     findPivots: findPivots, detectParallelChannel: detectParallelChannel, pivotConfirmBarsDesc: pivotConfirmBarsDesc,
-    snrTouchH4M5: snrTouchH4M5, mapLimited: mapLimited, pcUpperAt: pcUpperAt,
-    pcLowerAt: pcLowerAt, SMI_K: SMI_K, SMI_D: SMI_D,
-    SMI_EMA: SMI_EMA, SMI_OB: SMI_OB, SMI_OS: SMI_OS,
-    PC_SIG_TOL_MULT: PC_SIG_TOL_MULT, PC_SIG_SCANBACK: PC_SIG_SCANBACK, PC_SIG_FRESH: PC_SIG_FRESH
+    snrTouchH4M5: snrTouchH4M5, slFromSnrZone: slFromSnrZone, mapLimited: mapLimited,
+    pcUpperAt: pcUpperAt, pcLowerAt: pcLowerAt, SMI_K: SMI_K,
+    SMI_D: SMI_D, SMI_EMA: SMI_EMA, SMI_OB: SMI_OB,
+    SMI_OS: SMI_OS, PC_SIG_TOL_MULT: PC_SIG_TOL_MULT, PC_SIG_SCANBACK: PC_SIG_SCANBACK,
+    PC_SIG_FRESH: PC_SIG_FRESH
   };
 })();

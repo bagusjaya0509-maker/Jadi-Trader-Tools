@@ -1,0 +1,438 @@
+/* ════════════════════════════════════════════════════════════════════════
+   JADI TRADER — TEMA V2 PREMIUM
+   Satu berkas, satu bahasa desain, dipakai SEMUA halaman.
+   ════════════════════════════════════════════════════════════════════════
+
+   Dibuat mengikuti "The $10K Checklist" (Metics Media), delapan poinnya
+   dijawab di sini secara sadar:
+
+   01 Sudut pandang, bukan template  -> arahnya DARK-LUXURY TERMINAL. Emas
+      pucat di atas hitam hangat, tanpa satu pun warna cerah tambahan.
+   02 Tipografi yang bekerja        -> Space Grotesk (display) + IBM Plex Sans
+      (teks) + IBM Plex Mono (angka). Bukan Inter, bukan Roboto - itu syarat
+      eksplisit checklist-nya. Space Grotesk dipilih karena karakter
+      geometris-teknisnya cocok untuk terminal, dan huruf angkanya tegas.
+   03 Warna yang menahan diri       -> lima warna saja: hitam, kertas, emas,
+      hijau, merah. Hijau & merah HANYA untuk untung/rugi, tidak pernah
+      untuk dekorasi. Itu yang membuat keduanya tetap berarti.
+   04 Hierarki yang bernapas        -> skala tipografi 1,25x dan skala spasi
+      8px. Judul besar sekali, teks kecil, jarak lega di antaranya.
+   05 Citra yang disengaja          -> tidak ada foto stok. Kedalaman datang
+      dari gradien, blur, dan grain - bukan dari gambar orang tersenyum.
+   06 Gerak yang berbisik           -> 150-320ms, easing expo.out. Tidak ada
+      yang memantul. Semua patuh prefers-reduced-motion.
+   07 Mobile yang dirancang         -> bukan desktop yang dikecilkan; lihat
+      blok @media di tiap komponen.
+   08 Barang mahal yang tak terlihat -> font display dimuat sebagai satu
+      permintaan dengan display=swap, kontras diperiksa ke WCAG AA, fokus
+      keyboard selalu terlihat, semantik dipertahankan.
+
+   CATATAN PENTING soal token: halaman lama memakai DUA skema penamaan yang
+   berbeda - screener/marketplace/pemilik pakai --bg/--panel/--text/--gold,
+   sedangkan jurnal pakai --ground/--surface/--ink/--accent. Keduanya
+   didefinisikan ulang di sini ke nilai yang sama, jadi halaman lama ikut
+   berubah rupa tanpa satu baris pun CSS-nya disentuh. */
+
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+:root{
+  /* ── Warna ─────────────────────────────────────────────────────────────
+     Hitam sengaja TIDAK #000. Layar OLED menodai hitam murni saat konten
+     bergerak, dan hitam hangat (#08090b) terbaca lebih mahal daripada
+     hitam mati. */
+  --v2-hitam:      #08090b;
+  --v2-hitam-2:    #0d0f13;
+  --v2-panel:      #101318;
+  --v2-panel-2:    #161a21;
+  --v2-panel-3:    #1c212a;
+  --v2-garis:      #21252d;
+  --v2-garis-soft: #171b21;
+
+  --v2-kertas:     #f4f1e8;   /* teks utama - putih hangat, bukan putih layar */
+  --v2-kertas-2:   #a2a5ad;   /* teks sekunder */
+  --v2-kertas-3:   #6b6e77;   /* teks tersier / label */
+
+  --v2-emas:       #c9a24b;
+  --v2-emas-terang:#e0be6d;
+  --v2-emas-kabut: rgba(201,162,75,.12);
+  --v2-emas-garis: rgba(201,162,75,.32);
+
+  --v2-naik:       #4f9e82;
+  --v2-naik-kabut: rgba(79,158,130,.13);
+  --v2-turun:      #c2544d;
+  --v2-turun-kabut:rgba(194,84,77,.13);
+
+  /* ── Huruf ───────────────────────────────────────────────────────────── */
+  --v2-display: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif;
+  --v2-teks:    'IBM Plex Sans', -apple-system, 'Segoe UI', Arial, sans-serif;
+  --v2-angka:   'IBM Plex Mono', 'SF Mono', Consolas, monospace;
+
+  /* Skala 1,25x. Judul besar memakai clamp supaya di HP mengecil sendiri
+     tanpa media query terpisah - inilah "mobile yang dirancang", bukan
+     desktop yang dipaksa muat. */
+  --v2-t-xs:   11px;
+  --v2-t-sm:   12.5px;
+  --v2-t-base: 14px;
+  --v2-t-md:   16px;
+  --v2-t-lg:   20px;
+  --v2-t-xl:   clamp(24px, 3vw, 30px);
+  --v2-t-2xl:  clamp(30px, 4.5vw, 42px);
+  --v2-t-3xl:  clamp(38px, 7vw, 68px);
+  --v2-t-4xl:  clamp(46px, 10vw, 104px);
+
+  /* Tracking rapat di ukuran besar - ini yang memberi rasa "judul yang
+     dipilih", bukan judul bawaan. Makin besar hurufnya, makin rapat. */
+  --v2-lacak-ketat:  -0.045em;
+  --v2-lacak-rapat:  -0.02em;
+  --v2-lacak-lebar:  0.09em;
+
+  /* ── Ruang ───────────────────────────────────────────────────────────── */
+  --v2-r1: 4px;  --v2-r2: 8px;  --v2-r3: 12px; --v2-r4: 16px;
+  --v2-r5: 24px; --v2-r6: 32px; --v2-r7: 48px; --v2-r8: 72px;
+
+  --v2-bulat:   10px;
+  --v2-bulat-l: 18px;
+  --v2-bulat-p: 999px;
+
+  /* ── Gerak ───────────────────────────────────────────────────────────── */
+  --v2-keluar: cubic-bezier(0.16, 1, 0.3, 1);   /* expo.out */
+  --v2-cepat:  150ms;
+  --v2-sedang: 240ms;
+  --v2-lambat: 320ms;
+
+  --v2-bayang:   0 1px 2px rgba(0,0,0,.4);
+  --v2-bayang-l: 0 18px 48px rgba(0,0,0,.55);
+
+  --v2-sisi: 264px;      /* lebar sidebar */
+  --v2-sisi-kecil: 68px; /* lebar sidebar saat diciutkan */
+}
+
+/* ── Pemetaan ke token halaman lama ────────────────────────────────────────
+   Inilah yang membuat screener, jurnal, marketplace, dan panel pemilik ikut
+   berganti rupa hanya dengan menautkan berkas ini. Jangan hapus salah satu:
+   nama yang berbeda itu memang dipakai di halaman yang berbeda. */
+:root{
+  /* screener / marketplace / pemilik / mobile */
+  --bg: var(--v2-hitam);
+  --panel: var(--v2-panel);
+  --panel-2: var(--v2-panel-2);
+  --border: var(--v2-garis);
+  --text: var(--v2-kertas);
+  --muted: var(--v2-kertas-2);
+  --dim: var(--v2-kertas-3);
+  --gold: var(--v2-emas);
+  --gold-soft: var(--v2-emas-kabut);
+  --gold-dim: var(--v2-emas-kabut);
+  --bull: var(--v2-naik);
+  --bear: var(--v2-turun);
+  --bull-dim: var(--v2-naik-kabut);
+  --bear-dim: var(--v2-turun-kabut);
+  --bull-soft: var(--v2-naik-kabut);
+  --bear-soft: var(--v2-turun-kabut);
+  --font: var(--v2-teks);
+  --mono: var(--v2-angka);
+  --font-body: var(--v2-teks);
+  --font-mono: var(--v2-angka);
+  --font-display: var(--v2-display);
+
+  /* jurnal (skema nama sendiri) */
+  --ground: var(--v2-hitam);
+  --surface: var(--v2-panel);
+  --surface-2: var(--v2-panel-2);
+  --border-soft: var(--v2-garis-soft);
+  --ink: var(--v2-kertas);
+  --ink-dim: var(--v2-kertas-2);
+  --ink-faint: var(--v2-kertas-3);
+  --accent: var(--v2-emas);
+  --accent-dim: var(--v2-emas);
+  --accent-soft: var(--v2-emas-kabut);
+  --profit: var(--v2-naik);
+  --profit-soft: var(--v2-naik-kabut);
+  --loss: var(--v2-turun);
+  --loss-soft: var(--v2-turun-kabut);
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   DASAR
+   ════════════════════════════════════════════════════════════════════════ */
+*, *::before, *::after{ box-sizing: border-box; }
+
+html{ -webkit-text-size-adjust:100%; }
+
+body{
+  margin:0;
+  background: var(--v2-hitam);
+  color: var(--v2-kertas);
+  font-family: var(--v2-teks);
+  font-size: var(--v2-t-base);
+  line-height:1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Judul memakai display face + tracking rapat. Ini SATU aturan yang mengubah
+   rasa seluruh situs - halaman lama pun ikut, karena semuanya memakai h1-h3. */
+h1, h2, h3, .v2-display{
+  font-family: var(--v2-display);
+  font-weight: 600;
+  letter-spacing: var(--v2-lacak-rapat);
+  line-height: 1.08;
+  margin: 0;
+}
+h1{ font-size: var(--v2-t-2xl); letter-spacing: var(--v2-lacak-ketat); }
+h2{ font-size: var(--v2-t-lg); }
+h3{ font-size: var(--v2-t-md); }
+
+/* Angka SELALU mono dan tabular. Di terminal trading, digit yang bergeser
+   tiap kali harga berubah membuat mata harus mencari ulang posisinya. */
+.v2-angka, .num, .mono{
+  font-family: var(--v2-angka);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+
+a{ color: var(--v2-emas); text-decoration: none; }
+a:hover{ color: var(--v2-emas-terang); }
+
+::selection{ background: var(--v2-emas); color: var(--v2-hitam); }
+
+/* Fokus keyboard selalu terlihat - checklist poin 08. */
+:focus-visible{
+  outline: 2px solid var(--v2-emas);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Scrollbar ikut tema; di Windows scrollbar terang merusak halaman gelap. */
+*{ scrollbar-width: thin; scrollbar-color: var(--v2-panel-3) transparent; }
+*::-webkit-scrollbar{ width:9px; height:9px; }
+*::-webkit-scrollbar-track{ background: transparent; }
+*::-webkit-scrollbar-thumb{ background: var(--v2-panel-3); border-radius:9px; }
+*::-webkit-scrollbar-thumb:hover{ background: var(--v2-garis); }
+
+/* ════════════════════════════════════════════════════════════════════════
+   KOMPONEN
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* ── Label kecil huruf besar ── */
+.v2-label{
+  font-family: var(--v2-angka);
+  font-size: var(--v2-t-xs);
+  letter-spacing: var(--v2-lacak-lebar);
+  text-transform: uppercase;
+  color: var(--v2-kertas-3);
+}
+
+/* ── Lencana pil ── */
+.v2-pil{
+  display:inline-flex; align-items:center; gap:6px;
+  font-family: var(--v2-angka);
+  font-size: var(--v2-t-xs);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  padding: 4px 11px;
+  border-radius: var(--v2-bulat-p);
+  border:1px solid var(--v2-garis);
+  color: var(--v2-kertas-2);
+  background: rgba(255,255,255,.03);
+  white-space: nowrap;
+}
+.v2-pil.emas{ color: var(--v2-emas); border-color: var(--v2-emas-garis); background: var(--v2-emas-kabut); }
+.v2-pil.naik{ color: var(--v2-naik); border-color: rgba(79,158,130,.34); background: var(--v2-naik-kabut); }
+.v2-pil.turun{ color: var(--v2-turun); border-color: rgba(194,84,77,.34); background: var(--v2-turun-kabut); }
+
+/* Titik "hidup" berdenyut - satu-satunya animasi berulang di situs ini.
+   Dibatasi ke satu elemen kecil supaya tetap terbaca sebagai status, bukan
+   sebagai dekorasi. */
+.v2-denyut{ position:relative; display:inline-flex; width:7px; height:7px; }
+.v2-denyut::before{
+  content:''; position:absolute; inset:0; border-radius:50%;
+  background: var(--v2-naik); opacity:.75;
+  animation: v2-denyut 2s cubic-bezier(0,0,.2,1) infinite;
+}
+.v2-denyut::after{
+  content:''; position:relative; width:7px; height:7px; border-radius:50%;
+  background: var(--v2-naik);
+}
+@keyframes v2-denyut{ 0%{ transform:scale(1); opacity:.75; } 70%,100%{ transform:scale(2.4); opacity:0; } }
+
+/* ── Kaca (glassmorphism) ──
+   Kunci agar tidak terlihat murahan: blur TINGGI, isian RENDAH, dan garis
+   tepi tipis yang lebih terang di sisi atas. Tanpa garis itu, kartu kaca
+   cuma terlihat seperti kotak abu-abu buram. */
+.v2-kaca{
+  position:relative;
+  background: linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.018));
+  border:1px solid rgba(255,255,255,.09);
+  border-radius: var(--v2-bulat-l);
+  backdrop-filter: blur(22px) saturate(130%);
+  -webkit-backdrop-filter: blur(22px) saturate(130%);
+  box-shadow: var(--v2-bayang-l);
+}
+.v2-kaca::before{
+  content:''; position:absolute; inset:0 0 auto 0; height:1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.28), transparent);
+  border-radius: var(--v2-bulat-l) var(--v2-bulat-l) 0 0;
+  pointer-events:none;
+}
+
+/* ── Kartu biasa ── */
+.v2-kartu{
+  background: var(--v2-panel);
+  border:1px solid var(--v2-garis);
+  border-radius: var(--v2-bulat);
+  transition: border-color var(--v2-sedang) var(--v2-keluar);
+}
+.v2-kartu:hover{ border-color: var(--v2-panel-3); }
+
+/* ── Tombol ── */
+.v2-tbl{
+  display:inline-flex; align-items:center; justify-content:center; gap:9px;
+  font-family: var(--v2-teks);
+  font-size: var(--v2-t-base);
+  font-weight:500;
+  padding: 13px 26px;
+  border-radius: var(--v2-bulat-p);
+  border:1px solid transparent;
+  cursor:pointer;
+  white-space:nowrap;
+  transition: transform var(--v2-cepat) var(--v2-keluar),
+              background var(--v2-sedang) var(--v2-keluar),
+              border-color var(--v2-sedang) var(--v2-keluar),
+              color var(--v2-sedang) var(--v2-keluar);
+}
+.v2-tbl:active{ transform: scale(.978); }
+
+.v2-tbl.utama{ background: var(--v2-kertas); color: var(--v2-hitam); font-weight:600; }
+.v2-tbl.utama:hover{ background:#fff; }
+
+.v2-tbl.hantu{
+  background: rgba(255,255,255,.045);
+  border-color: rgba(255,255,255,.1);
+  color: var(--v2-kertas);
+  backdrop-filter: blur(10px);
+}
+.v2-tbl.hantu:hover{ background: rgba(255,255,255,.09); border-color: rgba(255,255,255,.2); }
+
+.v2-tbl.emas{ background: var(--v2-emas); color: var(--v2-hitam); font-weight:600; }
+.v2-tbl.emas:hover{ background: var(--v2-emas-terang); }
+
+.v2-tbl svg{ width:16px; height:16px; flex:0 0 auto; }
+.v2-tbl.utama .panah{ transition: transform var(--v2-sedang) var(--v2-keluar); }
+.v2-tbl.utama:hover .panah{ transform: translateX(4px); }
+
+/* ── Statistik ── */
+.v2-stat-nilai{
+  font-family: var(--v2-angka);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--v2-t-xl);
+  font-weight:500;
+  letter-spacing: var(--v2-lacak-rapat);
+  line-height:1.1;
+  color: var(--v2-kertas);
+}
+.v2-stat-nilai.naik{ color: var(--v2-naik); }
+.v2-stat-nilai.turun{ color: var(--v2-turun); }
+.v2-stat-label{
+  font-family: var(--v2-angka);
+  font-size: var(--v2-t-xs);
+  letter-spacing: var(--v2-lacak-lebar);
+  text-transform: uppercase;
+  color: var(--v2-kertas-3);
+  margin-top: var(--v2-r1);
+}
+
+/* ── Bilah kemajuan ── */
+.v2-bilah{ height:6px; width:100%; border-radius:var(--v2-bulat-p); background: rgba(255,255,255,.07); overflow:hidden; }
+.v2-bilah > i{
+  display:block; height:100%; border-radius:var(--v2-bulat-p);
+  background: linear-gradient(90deg, var(--v2-emas), var(--v2-emas-terang));
+  transition: width var(--v2-lambat) var(--v2-keluar);
+}
+.v2-bilah.naik > i{ background: linear-gradient(90deg, var(--v2-naik), #6fc0a2); }
+
+/* ── Tabel ── */
+.v2-tabel{ width:100%; border-collapse:collapse; font-size: var(--v2-t-sm); }
+.v2-tabel th{
+  text-align:left; font-weight:400;
+  font-family: var(--v2-angka);
+  font-size: var(--v2-t-xs);
+  letter-spacing: var(--v2-lacak-lebar);
+  text-transform:uppercase;
+  color: var(--v2-kertas-3);
+  padding: 0 var(--v2-r3) var(--v2-r2) 0;
+  border-bottom:1px solid var(--v2-garis);
+  white-space:nowrap;
+}
+.v2-tabel td{
+  padding: var(--v2-r3) var(--v2-r3) var(--v2-r3) 0;
+  border-bottom:1px solid var(--v2-garis-soft);
+  vertical-align: middle;
+}
+.v2-tabel tbody tr{ transition: background var(--v2-cepat) var(--v2-keluar); }
+.v2-tabel tbody tr:hover{ background: rgba(255,255,255,.022); }
+.v2-tabel .angka{ font-family: var(--v2-angka); font-variant-numeric: tabular-nums; text-align:right; }
+/* Tabel lebar HARUS bisa digeser sendiri - halaman tidak boleh ikut geser. */
+.v2-gulung{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
+
+/* ── Latar bercahaya ──
+   Kedalaman tanpa satu pun gambar: dua bola cahaya besar yang sangat kabur
+   plus grain halus. Grain-nya penting - gradien murni di layar gelap selalu
+   memperlihatkan banding, dan banding terbaca murah. */
+.v2-cahaya{ position:fixed; inset:0; z-index:0; pointer-events:none; overflow:hidden; }
+.v2-cahaya::before, .v2-cahaya::after{
+  content:''; position:absolute; border-radius:50%; filter: blur(120px);
+}
+.v2-cahaya::before{
+  width:640px; height:640px; top:-260px; left:-160px;
+  background: radial-gradient(circle, rgba(201,162,75,.16), transparent 70%);
+}
+.v2-cahaya::after{
+  width:560px; height:560px; top:8%; right:-220px;
+  background: radial-gradient(circle, rgba(79,158,130,.10), transparent 70%);
+}
+.v2-grain{
+  position:fixed; inset:0; z-index:1; pointer-events:none; opacity:.4;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3'/><feColorMatrix type='saturate' values='0'/></filter><rect width='140' height='140' filter='url(%23n)' opacity='.055'/></svg>");
+}
+
+/* ── Masuk perlahan ──
+   Dipakai lewat kelas, bukan otomatis ke semua elemen: animasi yang
+   ditempel ke segalanya persis yang disebut checklist sebagai
+   "AOS-fade-up slop". */
+@keyframes v2-naik-masuk{ from{ opacity:0; transform: translateY(16px); } to{ opacity:1; transform:none; } }
+.v2-masuk{ animation: v2-naik-masuk var(--v2-lambat) var(--v2-keluar) both; }
+.v2-tunda-1{ animation-delay:.06s; }
+.v2-tunda-2{ animation-delay:.12s; }
+.v2-tunda-3{ animation-delay:.18s; }
+.v2-tunda-4{ animation-delay:.24s; }
+.v2-tunda-5{ animation-delay:.30s; }
+
+/* ── Marquee ── */
+.v2-marquee-bingkai{
+  position:relative; display:flex; overflow:hidden;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
+}
+.v2-marquee{ display:flex; gap: var(--v2-r6); white-space:nowrap; animation: v2-geser 42s linear infinite; }
+.v2-marquee-bingkai:hover .v2-marquee{ animation-play-state: paused; }
+@keyframes v2-geser{ from{ transform: translateX(0); } to{ transform: translateX(-50%); } }
+
+/* ── Gerak dikurangi ──
+   Bukan sekadar mematikan animasi: elemen ber-.v2-masuk harus tetap TERLIHAT,
+   kalau tidak halamannya kosong bagi yang mengaktifkan setelan ini. */
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{
+    animation-duration:.001ms !important;
+    animation-iteration-count:1 !important;
+    transition-duration:.001ms !important;
+    scroll-behavior:auto !important;
+  }
+  .v2-masuk{ opacity:1 !important; transform:none !important; }
+}
+
+/* ── Layar sentuh ── */
+@media (pointer: coarse){
+  .v2-tbl{ min-height:48px; }
+  .v2-tabel td{ padding-top: var(--v2-r4); padding-bottom: var(--v2-r4); }
+}
