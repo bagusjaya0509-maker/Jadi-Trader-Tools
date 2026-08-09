@@ -11,12 +11,12 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202608082100">
+<meta name="jt-versi" content="202608090100">
 <script>
 /* Penjaga versi - lihat catatan lengkap di jurnal-trading.html. Mencegah browser
    menyajikan HTML lama dari cache saat halaman dimuat ulang. */
 (function(){
-  var VERSI_TAMPIL = "202608082100";
+  var VERSI_TAMPIL = "202608090100";
   var KUNCI_OK    = "jtVersiOk";      // versi yang sudah dipastikan benar-benar termuat
   var KUNCI_PAKSA = "jtVersiPaksa";   // versi yang sudah pernah dipaksa muat ulang
   try{
@@ -657,6 +657,9 @@
     padding:2px 6px;
     border-radius:5px;
   }
+  /* Saham/ETF dibedakan warnanya: jam dagangnya beda dari kripto, dan itu
+     mengubah cara membaca kartunya (lihat catatan di daftar TRADFI_SYMBOLS). */
+  .es-cap-tag.tradfi{ color: var(--gold); border-color: rgba(201,162,75,.5); }
 
   /* Bintang favorit di pojok kanan atas kotak sinyal (Area Pantau & Parallel
      Signal). Diklik -> koin masuk/keluar daftar favorit, dan kotaknya langsung
@@ -1629,6 +1632,15 @@
   }
   /* Kotak hasil pencarian ditandai supaya jelas ini bukan hasil pindaian. */
   .es-card.es-kartu-dicari{ border-color: var(--gold); }
+  /* Tombol pembatal di dalam pesan status - satu-satunya jalan pulang kalau
+     koin salah dibuang lewat klik kanan. */
+  .es-pulih-koin{
+    margin-left:8px; padding:2px 9px;
+    background:none; border:1px solid var(--gold); border-radius:5px;
+    color: var(--gold); font-family: var(--font-mono); font-size:10.5px;
+    cursor:pointer; transition:background .15s, color .15s;
+  }
+  .es-pulih-koin:hover{ background: var(--gold); color:#0b0c0f; }
   #esPsimSignalSelect, #esLiveOrderType, #esLiveEntryMethod, #esPsimDirOverride{ color: var(--muted); font-size:11px; }
   /* Caret (segitiga ke bawah) dropdown ini ditaruh agak ke kiri (tidak mepet tepi
      kanan) pakai caret custom + jarak dari tepi kanan. */
@@ -2363,8 +2375,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="jt-langganan.js?v=202608082100"></script>
-<script src="jt-lapor.js?v=202608082100"></script>
+<script src="jt-langganan.js?v=202608090100"></script>
+<script src="jt-lapor.js?v=202608090100"></script>
 
 <div class="es-auth-gate" id="esAuthGate">
   <!-- Sesi Firebase baru diketahui setelah onAuthStateChanged menyala (~1 detik).
@@ -3520,7 +3532,26 @@
          PAXGUSDT - PAX Gold
        Ikut dipindai seperti koin lain, jadi otomatis dapat kartu + mini chart
        di Area Pantau, Sinyal Prioritas, dan Parallel. */
-    'XAUTUSDT','XAGUSDT','XAUUSDT','PAXGUSDT'
+    'XAUTUSDT','XAGUSDT','XAUUSDT','PAXGUSDT',
+
+    /* ── TradFi: perpetual saham & ETF di Binance Futures ──────────────────
+       Diverifikasi lewat fapi/v1/exchangeInfo + ticker/24hr - semuanya TRADING
+       dengan harga yang cocok dengan pasar aslinya (AAPL ~$312, NVDA ~$225,
+       SPY ~$774, QQQ ~$724) dan kline 4 jam yang utuh.
+
+       DUA HAL YANG PERLU DIINGAT SAAT MEMBACANYA:
+
+       1. Bursa saham TUTUP di akhir pekan dan di luar jam dagang New York,
+          sementara perpetual-nya jalan 24/7. Di jam tutup, harganya nyaris
+          diam - lihat saja kisaran 4 jam yang cuma beberapa sen. SMI dan ATR
+          jadi tidak berarti banyak di jam-jam itu, dan sinyal yang muncul dari
+          rentang sedatar itu tidak layak dipercaya.
+
+       2. SPXUSDT SENGAJA TIDAK DIMASUKKAN. Namanya menggoda, tapi harganya
+          $0,32 - itu memecoin SPX6900, bukan indeks S&P 500. Memasukkannya
+          berarti memajang "indeks saham" palsu di antara yang asli. */
+    'AAPLUSDT','TSLAUSDT','NVDAUSDT','MSFTUSDT','GOOGLUSDT','AMZNUSDT','METAUSDT',
+    'SPYUSDT','QQQUSDT','COINUSDT','MSTRUSDT'
   ];
 
   // cadangan koin pengganti jika ada koin yang diblokir user (mis. chart TradingView-nya tidak ditemukan)
@@ -3561,6 +3592,13 @@
       }
     }catch(e){}
   }
+  function hapusSimbolDiblokir(symbol){
+    try{
+      const arr = muatSimbolDiblokir().filter(function(s){ return s !== symbol; });
+      localStorage.setItem(BLOCKED_SYMBOLS_KEY, JSON.stringify(arr));
+    }catch(e){}
+  }
+  function simbolDiblokir(symbol){ return muatSimbolDiblokir().indexOf(symbol) >= 0; }
 
   // Sidik jari daftar koin bawaan. Dulu penandanya cuma '1' (sekali pakai), jadi
   // begitu daftar di kode bertambah (44 -> 100), device lama TIDAK pernah ikut
@@ -3628,14 +3666,23 @@
   let activeSymbols = loadActiveSymbols();
 
   function blockAndReplaceSymbol(symbol){
+    /* Pencatatan blokir dilakukan LEBIH DULU dan tanpa syarat.
+
+       Dulu fungsi ini keluar duluan (return null) kalau simbolnya tidak ada di
+       activeSymbols - dan itu persis keadaan koin yang dimunculkan lewat
+       pencarian manual: ia sengaja BUKAN bagian daftar pindaian. Akibatnya
+       "hilangkan koin" pada kartu hasil pencarian tidak mencatat apa pun, dan
+       koin yang sama muncul lagi begitu dicari ulang. */
+    catatSimbolDiblokir(symbol);
+
     const idx = activeSymbols.indexOf(symbol);
-    if(idx === -1) return null;
+    if(idx === -1){
+      saveActiveSymbols();   // daftar blokirnya tetap perlu ikut tersinkron
+      return null;
+    }
     const replacement = RESERVE_SYMBOLS.find(s => !activeSymbols.includes(s)) || null;
     if(replacement){ activeSymbols.splice(idx, 1, replacement); }
     else{ activeSymbols.splice(idx, 1); }
-    // Catat sebagai koin yang SENGAJA dibuang, supaya penggabungan daftar koin
-    // (saat daftar bawaan di kode bertambah) tidak menghidupkannya kembali.
-    catatSimbolDiblokir(symbol);
     saveActiveSymbols();
     return replacement;
   }
@@ -3936,7 +3983,17 @@
     };
   }
 
+  /* Perpetual saham & ETF. Dipisah dari kripto karena peringkat kapitalisasi
+     yang dipakai kartu berasal dari CoinGecko - di sana Apple tentu tidak ada,
+     jadi tanpa daftar ini AAPL akan dilabeli "LOW/MID CAP". */
+  const TRADFI_SYMBOLS = new Set([
+    'AAPLUSDT','TSLAUSDT','NVDAUSDT','MSFTUSDT','GOOGLUSDT','AMZNUSDT','METAUSDT',
+    'SPYUSDT','QQQUSDT','COINUSDT','MSTRUSDT'
+  ]);
+  function adalahTradfi(symbol){ return TRADFI_SYMBOLS.has(symbol); }
+
   function capTierOf(symbol){
+    if(adalahTradfi(symbol)) return 'tradfi';
     const base = symbol.replace('USDT','');
     if(capRankLoaded && capRank[base]) return capRank[base] <= 15 ? 'big' : 'low';
     return FALLBACK_BIGCAP.has(base) ? 'big' : 'low';
@@ -5911,7 +5968,7 @@
         <div class="es-card-top">
           <div><span class="es-rank">#${i+1} &bull; TF ${c.tfLabel}</span><span class="es-symbol">${c.symbol.replace('USDT','')}</span></div>
           <div class="es-card-top-right">
-            <span class="es-cap-tag">${c.cap==='big'?'BIG CAP':'LOW/MID CAP'}</span>
+            <span class="es-cap-tag${c.cap==='tradfi'?' tradfi':''}">${c.cap==='tradfi'?'SAHAM / ETF':c.cap==='big'?'BIG CAP':'LOW/MID CAP'}</span>
             <span class="es-sig-star${fav?' on':''}" data-symbol="${c.symbol}" title="${fav?'Hapus dari koin favorit':'Jadikan koin favorit (naik ke urutan depan)'}">&#9733;</span>
           </div>
         </div>
@@ -6110,6 +6167,30 @@
     if(!symbol.endsWith('USDT')) symbol += 'USDT';
     const nama = symbol.replace('USDT','');
     const tf = pantauTfSel.value;
+
+    /* Koin yang sudah kamu buang lewat klik kanan tidak dimunculkan lagi -
+       kalau tidak, "hilangkan koin" cuma bertahan sampai pencarian berikutnya.
+
+       Tapi keputusan itu harus bisa dibatalkan: tanpa jalan pulang, satu klik
+       kanan yang salah membuat koinnya tidak bisa ditampilkan lagi selamanya
+       (daftar blokir ini bahkan ikut tersinkron ke perangkat lain). Jadi
+       pesannya membawa tombol pemulihnya sendiri. */
+    if(simbolDiblokir(symbol)){
+      pantauStatusEl.classList.add('error');
+      pantauStatusEl.innerHTML = nama + ' ada di daftar koin yang kamu buang, jadi tidak ditampilkan. '
+        + '<button type="button" class="es-pulih-koin" data-symbol="' + symbol + '">Pulihkan ' + nama + '</button>';
+      const tb = pantauStatusEl.querySelector('.es-pulih-koin');
+      if(tb) tb.addEventListener('click', function(){
+        hapusSimbolDiblokir(symbol);
+        // Dikembalikan juga ke daftar pindaian kalau memang koin bawaan.
+        if(BASE_SYMBOLS.indexOf(symbol) >= 0 && activeSymbols.indexOf(symbol) === -1){
+          activeSymbols.push(symbol);
+        }
+        saveActiveSymbols();
+        tampilkanKotakPantau(symbol);
+      });
+      return;
+    }
 
     pantauStatusEl.classList.remove('error');
     pantauStatusEl.textContent = `Mengambil data ${nama} di TF ${PANTAU_TF_LABEL[tf]||tf}...`;
@@ -9985,13 +10066,26 @@
 
       if(aksi === 'ganti'){
         const pengganti = blockAndReplaceSymbol(simbol);
+
+        /* Kartunya dibuang dari layar SEKARANG, tidak menunggu hasil pindai.
+
+           Pemindaian ulang butuh belasan detik, dan selama itu kartu yang
+           barusan "dihilangkan" masih terpampang - terbaca seperti tombolnya
+           tidak berfungsi. Untuk kartu hasil pencarian manual malah lebih
+           buruk: koinnya memang bukan bagian daftar pindaian, jadi menunggu
+           hasil pindai pun kartunya tidak pernah tersentuh. */
+        if(bagian === 'pantau' && typeof window.__esLastPantauResults !== 'undefined'){
+          const sisa = (window.__esLastPantauResults || []).filter(function(c){ return c.symbol !== simbol; });
+          if(sisa.length !== (window.__esLastPantauResults || []).length) renderPantauSignals(sisa);
+        }
+
         const st = document.getElementById(
           bagian === 'pantau' ? 'esPantauStatus' : 'esChStatus');
         if(st){
           st.classList.remove('error');
           st.textContent = pengganti
             ? simbol + ' dibuang, diganti ' + pengganti + '. Memindai ulang…'
-            : simbol + ' dibuang dari daftar pindaian. Memindai ulang…';
+            : simbol + ' dibuang. Memindai ulang…';
         }
         const f = PINDAI[bagian];
         if(f) f();

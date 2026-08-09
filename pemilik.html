@@ -1,13 +1,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta name="jt-versi" content="202608082100">
+<meta name="jt-versi" content="202608090100">
 <meta name="robots" content="noindex, nofollow">
 <title>Jadi Trader — Panel Pemilik</title>
 <script>
 /* Penjaga versi - sama seperti halaman lain. */
 (function(){
-  var VERSI_TAMPIL = "202608082100";
+  var VERSI_TAMPIL = "202608090100";
   var KUNCI_OK = "jtVersiOkPemilik", KUNCI_PAKSA = "jtVersiPaksaPemilik";
   try{
     if(sessionStorage.getItem(KUNCI_OK) === VERSI_TAMPIL) return;
@@ -449,6 +449,8 @@
             Disimpan di VPS, tidak pernah masuk repo publik. Tempel kodenya, atau pilih berkas
             (<code>.mq5</code> / <code>.ex5</code> untuk EA MetaTrader). Nama berkasnya otomatis
             mengikuti <strong>ID produk</strong> di atas.
+            <br>Kalau <strong>Harga = 0</strong>, sumbernya ditandai gratis dan langsung bisa
+            disalin pengunjung tanpa lisensi. Harga di atas 0 tetap terkunci di balik kode lisensi.
           </div>
           <div class="baris2">
             <div>
@@ -488,8 +490,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="jt-langganan.js?v=202608082100"></script>
-<script src="jt-lapor.js?v=202608082100"></script>
+<script src="jt-langganan.js?v=202608090100"></script>
+<script src="jt-lapor.js?v=202608090100"></script>
 
 <script>
 (function(){
@@ -1043,19 +1045,24 @@ el('btnUnggahSumber').addEventListener('click', function(){
   el('btnUnggahSumber').disabled = true;
   el('srcStatus').textContent = 'Mengunggah…';
 
+  // Gratis/tidaknya ditentukan harga di form - backend tidak punya katalog,
+  // jadi dia perlu diberi tahu secara eksplisit.
+  var gratis = (Number(el('prodHarga').value) || 0) <= 0;
+
   var siap = f
     ? new Promise(function(res, rej){
         var fr = new FileReader();
-        fr.onload = function(){ res({ id:id, jenis:jenis, base64: String(fr.result).split(',')[1] || '' }); };
+        fr.onload = function(){ res({ id:id, jenis:jenis, gratis:gratis, base64: String(fr.result).split(',')[1] || '' }); };
         fr.onerror = function(){ rej(new Error('berkas tidak terbaca')); };
         fr.readAsDataURL(f);
       })
-    : Promise.resolve({ id:id, jenis:jenis, teks:teks });
+    : Promise.resolve({ id:id, jenis:jenis, gratis:gratis, teks:teks });
 
   siap.then(function(badan){
     return ambil('/api/produk/unggah', { method:'POST', body: JSON.stringify(badan) });
   }).then(function(j){
-    el('srcStatus').textContent = 'Tersimpan sebagai ' + j.berkas + ' (' + (j.ukuran/1024).toFixed(1) + ' KB) di VPS.';
+    el('srcStatus').textContent = 'Tersimpan sebagai ' + j.berkas + ' (' + (j.ukuran/1024).toFixed(1) + ' KB) di VPS'
+      + (j.gratis ? ' — ditandai GRATIS, langsung bisa disalin pengunjung.' : ' — terkunci di balik kode lisensi.');
     el('srcBerkas').value = ''; el('srcTeks').value = '';
     toast('Sumber produk terunggah.');
     return muatDaftarSumber();

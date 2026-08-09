@@ -3,12 +3,12 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202608082100">
+<meta name="jt-versi" content="202608090100">
 <title>Jadi Trader — Marketplace</title>
 <script>
 /* Penjaga versi - sama seperti halaman lain. */
 (function(){
-  var V = "202608082100", OK = "jtVersiOk", PAKSA = "jtVersiPaksa";
+  var V = "202608090100", OK = "jtVersiOk", PAKSA = "jtVersiPaksa";
   try{
     if(sessionStorage.getItem(OK) === V) return;
     fetch(location.pathname + "?_v=" + Date.now(), { cache: "no-store" })
@@ -898,6 +898,27 @@ var BAWAAN = [
       'Panjang bisa diatur|%K, %D, dan panjang EMA semuanya bisa diubah dari menu pengaturan.'
     ],
     gambar:[], lynk:''
+  },
+  {
+    /* Sumbernya TIDAK ditanam di halaman ini - berkasnya ada di VPS dan diambil
+       lewat /api/produk/gratis. Ini produk pertama yang memakai jalur itu.
+       `unduhan:'ex5'` memunculkan tombol unduh berkas terkompilasi di bawah
+       kotak salin, untuk yang tidak mau repot meng-compile sendiri. */
+    id:'jadi-trader-sync', nama:'Jadi Trader Sync (EA MT5)', versi:'MQL5 · Expert Advisor · MetaTrader 5',
+    harga:0, berkas:'jadi-trader-sync.mq5', premium:false,
+    unduhan:'ex5',
+    unduhanCatatan:'Berkas .ex5 sudah dikompilasi — tinggal taruh di folder MQL5/Experts, tanpa perlu membuka MetaEditor.',
+    ringkas:'Menyambungkan akun MetaTrader 5 ke Jurnal Trading: saldo, posisi terbuka, dan riwayat trade terisi sendiri. BACA-SAJA — tidak pernah mengirim order.',
+    detail:'Mengisi jurnal dengan tangan itu pekerjaan yang paling gampang ditunda, dan begitu tertunda seminggu biasanya tidak pernah dikejar lagi. EA ini menghapus pekerjaan itu: pasang sekali di chart mana pun, isi Kode Pasangan dari halaman jurnalmu, dan sejak itu jurnalmu terisi sendiri selama MT5 terbuka.\n\nYang perlu kamu tahu sebelum memasang apa pun di akun sungguhan: EA ini tidak punya SATU PUN fungsi perdagangan. Tidak ada OrderSend, tidak ada modifikasi posisi, tidak ada penutupan. Sumbernya dibagikan terbuka di halaman ini justru supaya klaim itu bisa kamu periksa sendiri, bukan sekadar dipercaya — cari saja kata "OrderSend" di dalamnya.\n\nRiwayat tidak dikirim mentah-mentah. Deal digabung per hari, per pair, per arah, jadi satu hari yang berisi 212 baris eksekusi masuk ke jurnal sebagai beberapa baris yang benar-benar berarti — "4 Agustus, XAUUSDc, BUY, 0,14 lot, +$1,32". Kalau di hari yang sama ada BUY dan SELL di pair yang sama, keduanya tetap terpisah: itu dua keputusan trading yang berbeda dan tidak boleh dijumlahkan.',
+    fitur:[
+      'Baca-saja, bisa diperiksa|Tidak ada fungsi perdagangan sama sekali di dalam sumbernya. Kode lengkapnya ada di halaman ini — silakan cari sendiri kata "OrderSend" sebelum memasangnya di akun sungguhan.',
+      'Dashboard di chart|Status sambungan, waktu pengiriman terakhir, jumlah posisi, dan ringkasan riwayat harian tampil langsung di chart — jadi kamu tahu EA-nya bekerja tanpa membuka tab Experts.',
+      'Riwayat dikelompokkan per hari, pair, dan arah|Ratusan deal mentah diringkas jadi baris yang benar-benar dibaca. BUY dan SELL di pair yang sama tetap terpisah.',
+      'Batas tanggal yang keras|MulaiDariTanggal menahan EA agar tidak menyentuh catatan bulan-bulan sebelumnya yang sudah kamu isi tangan.',
+      'Akun sen ditangani benar|Akun cent (mata uang USC) melaporkan saldo 100x lipat. Mata uang akun ikut dikirim, jadi konversinya bisa dilakukan dan saldo jurnalmu tidak meleset seratus kali.',
+      'Tidak butuh VPS|Cukup MetaTrader di komputermu sendiri. Selama chart-nya terbuka, jurnal terisi; kalau MT5 ditutup, pengiriman berhenti lalu lanjut lagi begitu dibuka.'
+    ],
+    gambar:[], lynk:''
   }
 ];
 
@@ -1627,6 +1648,87 @@ function lilin(x, o, c, h, l){
 }
 
 var PERAGA = {
+  /* EA sinkronisasi jurnal. Yang perlu dijelaskan di sini bukan pola harga,
+     melainkan ALIRAN DATA-nya - dan arah panahnya satu-satunya poin penting:
+     MT5 -> jurnal, tidak pernah sebaliknya. */
+  'jadi-trader-sync': [
+    { jd:'MT5 mengirim ke jurnal — satu arah, tidak pernah sebaliknya',
+      svg:function(){
+        var s = '<svg viewBox="0 0 420 170">';
+        // kotak MT5
+        s += '<rect x="18" y="52" width="118" height="66" rx="8" fill="#15171c" stroke="#787B86" stroke-width="1.2"/>';
+        s += '<text x="77" y="80" fill="#e8e9ed" font-size="12" font-family="monospace" text-anchor="middle">MetaTrader 5</text>';
+        s += '<text x="77" y="98" fill="#787B86" font-size="9" font-family="monospace" text-anchor="middle">akun kamu</text>';
+        // kotak jurnal
+        s += '<rect x="284" y="52" width="118" height="66" rx="8" fill="#15171c" stroke="#c9a24b" stroke-width="1.2"/>';
+        s += '<text x="343" y="80" fill="#c9a24b" font-size="12" font-family="monospace" text-anchor="middle">Jurnal</text>';
+        s += '<text x="343" y="98" fill="#787B86" font-size="9" font-family="monospace" text-anchor="middle">terisi sendiri</text>';
+        // aliran data
+        s += '<line x1="140" y1="85" x2="278" y2="85" stroke="#4f9e82" stroke-width="1.4" stroke-dasharray="6 4" class="anim-garis"/>';
+        s += '<polygon points="278,85 268,80 268,90" fill="#4f9e82"/>';
+        s += '<g class="anim-label">';
+        s += '<text x="209" y="72" fill="#4f9e82" font-size="9" font-family="monospace" text-anchor="middle">saldo · posisi · riwayat</text>';
+        s += '<text x="209" y="106" fill="#787B86" font-size="9" font-family="monospace" text-anchor="middle">tiap 20 detik</text>';
+        s += '</g>';
+        // arah balik yang dicoret
+        s += '<line x1="150" y1="140" x2="270" y2="140" stroke="#c2544d" stroke-width="1.2" opacity=".65"/>';
+        s += '<polygon points="150,140 160,135 160,145" fill="#c2544d" opacity=".65"/>';
+        s += '<line x1="196" y1="132" x2="224" y2="148" stroke="#c2544d" stroke-width="2"/>';
+        s += '<line x1="224" y1="132" x2="196" y2="148" stroke="#c2544d" stroke-width="2"/>';
+        s += '<text x="210" y="164" fill="#c2544d" font-size="9" font-family="monospace" text-anchor="middle">tidak ada order dikirim balik</text>';
+        return s + '</svg>';
+      } },
+    { jd:'Ratusan deal mentah diringkas jadi baris yang benar-benar dibaca',
+      svg:function(){
+        var s = '<svg viewBox="0 0 420 170">';
+        s += '<text x="14" y="20" fill="#787B86" font-size="9" font-family="monospace">DEAL MENTAH DARI MT5</text>';
+        var m = ['XAUUSDc BUY 0.02  +0.19','XAUUSDc BUY 0.04  +0.41','XAUUSDc BUY 0.03  -0.12',
+                 'XAUUSDc BUY 0.05  +0.84','XAUUSDc SELL 0.02 -0.31'];
+        m.forEach(function(t,i){
+          s += '<rect x="14" y="'+(28+i*17)+'" width="150" height="13" rx="3" fill="#1a1c22"/>';
+          s += '<text x="20" y="'+(38+i*17)+'" fill="#787B86" font-size="7.5" font-family="monospace">'+t+'</text>';
+        });
+        s += '<text x="14" y="132" fill="#787B86" font-size="8" font-family="monospace">…212 baris</text>';
+        // panah ringkas
+        s += '<line x1="176" y1="72" x2="228" y2="72" stroke="#c9a24b" stroke-width="1.4" class="anim-garis"/>';
+        s += '<polygon points="228,72 218,67 218,77" fill="#c9a24b"/>';
+        s += '<text x="202" y="62" fill="#c9a24b" font-size="8" font-family="monospace" text-anchor="middle">gabung</text>';
+        // hasil
+        s += '<text x="240" y="20" fill="#c9a24b" font-size="9" font-family="monospace">MASUK JURNAL</text>';
+        s += '<g class="anim-label">';
+        s += '<rect x="240" y="28" width="166" height="26" rx="4" fill="#1A3A2A" stroke="#4f9e82" stroke-width=".8"/>';
+        s += '<text x="248" y="40" fill="#e8e9ed" font-size="8" font-family="monospace">4 Agu · XAUUSDc · BUY</text>';
+        s += '<text x="248" y="50" fill="#4f9e82" font-size="8" font-family="monospace">0.14 lot · +$1.32</text>';
+        s += '<rect x="240" y="60" width="166" height="26" rx="4" fill="#3A1A1A" stroke="#c2544d" stroke-width=".8"/>';
+        s += '<text x="248" y="72" fill="#e8e9ed" font-size="8" font-family="monospace">4 Agu · XAUUSDc · SELL</text>';
+        s += '<text x="248" y="82" fill="#c2544d" font-size="8" font-family="monospace">0.02 lot · -$0.31</text>';
+        s += '</g>';
+        s += '<text x="240" y="104" fill="#787B86" font-size="8" font-family="monospace">BUY &amp; SELL tetap terpisah —</text>';
+        s += '<text x="240" y="116" fill="#787B86" font-size="8" font-family="monospace">itu dua keputusan berbeda.</text>';
+        return s + '</svg>';
+      } },
+    { jd:'Dashboard di chart — kelihatan bekerja atau tidak, tanpa membuka tab Experts',
+      svg:function(){
+        var s = '<svg viewBox="0 0 420 170">';
+        s += '<rect x="10" y="12" width="400" height="146" rx="6" fill="#0e1014" stroke="#2a2d35" stroke-width="1"/>';
+        var d = [[54,120,108,100,126],[80,108,96,90,114],[106,96,102,90,110],[132,102,88,82,108],
+                 [158,88,80,74,94],[184,80,86,74,92],[210,86,72,66,92]];
+        d.forEach(function(k){ s += lilin(k[0],k[1],k[2],k[3],k[4]); });
+        // panel dashboard
+        s += '<rect x="238" y="24" width="160" height="122" rx="5" fill="rgba(11,12,15,.92)" stroke="#c9a24b" stroke-width="1"/>';
+        s += '<text x="248" y="40" fill="#c9a24b" font-size="9" font-family="monospace">JADI TRADER SYNC</text>';
+        s += '<line x1="248" y1="46" x2="388" y2="46" stroke="#2a2d35" stroke-width="1"/>';
+        var baris = [['Status','TERSAMBUNG','#4f9e82'],['Kirim terakhir','3 dtk lalu','#e8e9ed'],
+                     ['Posisi terbuka','2','#e8e9ed'],['Riwayat hari ini','5 baris','#e8e9ed'],
+                     ['Saldo','$1,284.50','#c9a24b']];
+        baris.forEach(function(b,i){
+          s += '<text x="248" y="'+(62+i*16)+'" fill="#787B86" font-size="8" font-family="monospace">'+b[0]+'</text>';
+          s += '<text x="388" y="'+(62+i*16)+'" fill="'+b[2]+'" font-size="8" font-family="monospace" text-anchor="end">'+b[1]+'</text>';
+        });
+        s += '<circle cx="380" cy="37" r="3.5" fill="#4f9e82" class="anim-zona"/>';
+        return s + '</svg>';
+      } }
+  ],
   'jadi-trader-v3': [
     { jd:'Channel digambar otomatis dari pivot — sentuh garis bawah, close balik ke dalam → BUY',
       svg:function(){
@@ -2083,10 +2185,39 @@ function gambarAreaBeli(p){
     if(src){
       w.innerHTML = '<div id="kodeGratis"></div>';
       kotakSalin('kodeGratis', 'Kode Indikator — tinggal salin', src, p.id + '.txt');
-    } else {
-      w.innerHTML = '<div class="catat err">Kode indikator ini belum tersedia di halaman. '
-        + 'Hubungi penjual.</div>';
+      return;
     }
+    /* Tidak ada di halaman -> tanya server.
+
+       Dulu bagian ini langsung menyerah dengan "belum tersedia di halaman", dan
+       itu berarti setiap produk gratis yang ditambahkan lewat Panel Pemilik
+       PASTI kosong: katalognya bisa dibuat dari web, tapi kodenya cuma bisa
+       ditambah dengan mengedit HTML ini lalu mengunggahnya ulang. Sekarang
+       sumbernya boleh tinggal di VPS. */
+    w.innerHTML = '<div class="catat">Mengambil kode dari server…</div>';
+    var jenis = /\.mq5$/i.test(p.berkas || '') ? 'mq5' : 'txt';
+    fetch(BACKEND + '/api/produk/gratis?id=' + encodeURIComponent(p.id) + '&jenis=' + jenis)
+      .then(function(r){ return bacaJson(r).then(function(j){
+        if(!r.ok) throw new Error((j && j.error) || ('HTTP ' + r.status));
+        return j;
+      }); })
+      .then(function(j){
+        w.innerHTML = '<div id="kodeGratis"></div>' + (p.unduhan ? '<div id="unduhBiner"></div>' : '');
+        kotakSalin('kodeGratis', 'Kode Sumber — tinggal salin', j.kode, p.id + '.' + jenis);
+        if(p.unduhan){
+          el('unduhBiner').innerHTML =
+              '<div style="height:16px"></div>'
+            + '<div class="label">Atau unduh versi siap pakai</div>'
+            + '<div class="catat" style="margin-bottom:10px">' + esc(p.unduhanCatatan || '') + '</div>'
+            + '<a class="tbl utama" style="display:inline-block;text-decoration:none" '
+            +   'href="' + BACKEND + '/api/produk/berkas?id=' + encodeURIComponent(p.id) + '&jenis=' + esc(p.unduhan) + '">'
+            +   'Unduh .' + esc(p.unduhan) + '</a>';
+        }
+      })
+      .catch(function(e){
+        w.innerHTML = '<div class="catat err">Kode belum tersedia: ' + esc(e.message) + '<br>'
+          + 'Pemilik perlu mengunggah sumbernya lewat Panel Pemilik &rarr; Sumber Produk.</div>';
+      });
     return;
   }
   w.innerHTML =
@@ -2321,7 +2452,24 @@ function muatKatalog(){
       // Firestore hanya menyimpan KATALOG (nama, harga, gambar, dst).
       // Daftar lisensi aktif ada di backend.
       var daftar = J(d.produk, null);
-      if(Array.isArray(daftar) && daftar.length) produk = daftar;
+      if(Array.isArray(daftar) && daftar.length){
+        /* Katalog Firestore MENANG, tapi produk bawaan yang id-nya tidak ada di
+           sana tetap ikut tampil.
+
+           Dulu katalog Firestore mengganti daftar bawaan seluruhnya. Akibatnya
+           sekali kamu menyimpan satu produk lewat Panel Pemilik, katalog di
+           kode ini mati total - produk bawaan baru yang ditambahkan lewat
+           pembaruan halaman tidak akan pernah muncul, karena Firestore tidak
+           tahu produk itu ada.
+
+           Konsekuensi yang harus diterima: produk bawaan yang sengaja kamu
+           hapus dari Panel Pemilik akan muncul lagi. Untuk membuangnya
+           permanen, hapus entri-nya dari daftar `produk` di berkas ini. */
+        var adaId = {};
+        daftar.forEach(function(p){ if(p && p.id) adaId[p.id] = true; });
+        var bawaanTertinggal = produk.filter(function(p){ return !adaId[p.id]; });
+        produk = daftar.concat(bawaanTertinggal);
+      }
     }
   }).catch(function(){}).then(function(){
     gambarKatalog();
