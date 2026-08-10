@@ -1,15 +1,16 @@
+import { useMemo } from 'react';
 import {
-  BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, Legend,
+  BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell,
 } from 'recharts';
 import { Wallet, Percent, TrendingUp, Scale, Clock } from 'lucide-react';
 import { Panel, PanelHead, KartuKpi, BadgeTren, TipGrafik, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn, uang, persen, harga } from '@/lib/utils';
-import { statGabungan, statPer } from '@/lib/hitung';
+import { statGabungan, statPer, plPerBulan, saldoBulanIni } from '@/lib/hitung';
 import { AKTIVITAS } from '@/data/contoh';
 import { useRiwayat, usePosisi, useSaldoAwal } from '@/lib/data';
 import { useHargaPasar } from '@/lib/harga';
 import { LabelContoh } from '@/components/gerbang';
-import { TRADING_BULANAN, SALDO_PER_TANGGAL, POSISI_MT5 } from '@/data/porto';
+import { POSISI_MT5 } from '@/data/porto';
 
 /* ════════════════════════════════════════════════════════════════════════
    DASHBOARD
@@ -53,12 +54,24 @@ export function Dashboard() {
   const forex = statPer(RIWAYAT, 'forex');
   const kripto = statPer(RIWAYAT, 'kripto');
 
-  const bulanIni = TRADING_BULANAN[TRADING_BULANAN.length - 1];
-  const bulanLalu = TRADING_BULANAN[TRADING_BULANAN.length - 2];
+  /* Bulan dan kurva saldo DIHITUNG dari transaksi, tidak lagi dari daftar
+     yang ditulis tangan di data/porto.ts. Daftar itu berisi Maret–Agustus
+     dengan angka karangan, jadi akun yang transaksinya baru mulai bulan ini
+     tetap menampilkan lima bulan riwayat yang tidak pernah terjadi. */
+  const perBulan = useMemo(() => plPerBulan(RIWAYAT), [RIWAYAT]);
+  const kurvaSaldo = useMemo(() => saldoBulanIni(RIWAYAT, saldoAwal), [RIWAYAT, saldoAwal]);
 
-  const akhirLalu = SALDO_PER_TANGGAL[SALDO_PER_TANGGAL.length - 1].bulanLalu;
-  const akhirIni = SALDO_PER_TANGGAL[SALDO_PER_TANGGAL.length - 1].bulanIni;
-  const selisihSaldo = ((akhirIni - akhirLalu) / akhirLalu) * 100;
+  const bulanIni = perBulan[perBulan.length - 1];
+  const bulanLalu = perBulan[perBulan.length - 2];
+  /* Tanpa bulan pembanding, tren tidak bisa dihitung — dan menampilkan 0%
+     akan terbaca sebagai "tidak berubah", bukan "belum ada pembandingnya". */
+  const trenBulan = bulanIni && bulanLalu && Math.abs(bulanLalu.pnl) > 0.005
+    ? Number((((bulanIni.pnl - bulanLalu.pnl) / Math.abs(bulanLalu.pnl)) * 100).toFixed(1))
+    : null;
+
+  const awalKurva = kurvaSaldo[0]?.saldo ?? saldoAwal;
+  const akhirKurva = kurvaSaldo[kurvaSaldo.length - 1]?.saldo ?? saldoAwal;
+  const selisihSaldo = awalKurva ? ((akhirKurva - awalKurva) / Math.abs(awalKurva)) * 100 : 0;
 
   const pnlMt5 = POSISI_MT5.reduce((s, p) => s + p.pnl, 0);
 
@@ -83,12 +96,14 @@ export function Dashboard() {
         <Panel>
           <PanelHead
             judul="Hasil Trading Bulanan"
-            sub="P/L per bulan, enam bulan terakhir."
-            kanan={<BadgeTren nilai={Number((((bulanIni.pnl - bulanLalu.pnl) / Math.abs(bulanLalu.pnl)) * 100).toFixed(1))} />}
+            sub={perBulan.length
+              ? `P/L per bulan · ${perBulan.length} bulan dengan transaksi`
+              : 'Belum ada transaksi.'}
+            kanan={trenBulan === null ? undefined : <BadgeTren nilai={trenBulan} />}
           />
           <div className="h-[260px] px-2 pb-4">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={TRADING_BULANAN} margin={{ top: 8, right: 12, left: 4, bottom: 0 }}>
+              <BarChart data={perBulan} margin={{ top: 8, right: 12, left: 4, bottom: 0 }}>
                 <CartesianGrid vertical={false} stroke="rgba(255,255,255,.05)" />
                 <XAxis dataKey="bulan" tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} width={44}
@@ -98,8 +113,8 @@ export function Dashboard() {
                     terlihat sama dengan bulan untung hanya karena tingginya
                     kebetulan mirip. */}
                 <Bar dataKey="pnl" name="P/L" radius={[4, 4, 0, 0]} maxBarSize={44}>
-                  {TRADING_BULANAN.map((b) => (
-                    <Cell key={b.bulan} fill={b.pnl >= 0 ? '#10b981' : '#ef4444'} fillOpacity={0.85} />
+                  {perBulan.map((b) => (
+                    <Cell key={b.kunci} fill={b.pnl >= 0 ? '#10b981' : '#ef4444'} fillOpacity={0.85} />
                   ))}
                 </Bar>
               </BarChart>
@@ -109,22 +124,19 @@ export function Dashboard() {
 
         <Panel>
           <PanelHead
-            judul="Saldo Bulan Lalu vs Bulan Ini"
-            sub="Dibandingkan per tanggal, bukan per total — supaya kelihatan di titik mana mulai menyimpang."
-            kanan={<BadgeTren nilai={Number(selisihSaldo.toFixed(1))} />}
+            judul="Saldo Bulan Ini"
+            sub="Saldo berjalan per tanggal, dihitung dari transaksi jurnal."
+            kanan={kurvaSaldo.length > 1 ? <BadgeTren nilai={Number(selisihSaldo.toFixed(1))} /> : undefined}
           />
           <div className="h-[260px] px-2 pb-4">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={SALDO_PER_TANGGAL} margin={{ top: 8, right: 12, left: 4, bottom: 0 }}>
+              <LineChart data={kurvaSaldo} margin={{ top: 8, right: 12, left: 4, bottom: 0 }}>
                 <CartesianGrid vertical={false} stroke="rgba(255,255,255,.05)" />
-                <XAxis dataKey="tgl" tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} minTickGap={20} />
+                <XAxis dataKey="label" tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} minTickGap={20} />
                 <YAxis tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} width={44}
                        tickFormatter={(v) => `$${v}`} domain={['dataMin - 10', 'dataMax + 10']} />
                 <Tooltip content={<TipGrafik />} cursor={{ stroke: 'rgba(255,255,255,.12)' }} />
-                <Legend wrapperStyle={{ fontSize: 11, color: '#71717a' }} iconType="plainline" iconSize={14} />
-                <Line type="monotone" dataKey="bulanLalu" name="Bulan lalu" stroke="#71717a" strokeWidth={1.5}
-                      strokeDasharray="4 3" dot={false} />
-                <Line type="monotone" dataKey="bulanIni" name="Bulan ini" stroke="#fafafa" strokeWidth={1.8} dot={false} />
+                <Line type="monotone" dataKey="saldo" name="Saldo" stroke="#fafafa" strokeWidth={1.8} dot={false} />
               </LineChart>
             </ResponsiveContainer>
           </div>

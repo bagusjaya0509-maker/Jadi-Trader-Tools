@@ -1,12 +1,14 @@
 import { useMemo } from 'react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-import { Plus, Pencil, Bitcoin, CandlestickChart } from 'lucide-react';
+import { Plus, Pencil, Bitcoin, CandlestickChart, Link2, Link2Off } from 'lucide-react';
 import { Panel, PanelHead, KartuKpi, BadgeTren, TipGrafik, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn, uang, persen, tanggalPendek } from '@/lib/utils';
 import { statGabungan, kurvaEkuitas, plPerHari } from '@/lib/hitung';
 import { useRiwayat, useSaldoAwal } from '@/lib/data';
 import { LabelContoh } from '@/components/gerbang';
 import type { Trade } from '@/data/contoh';
+import { useAkunMt5, useAkunBinance, type StatusAkun } from '@/lib/akun';
+import { Link } from 'react-router-dom';
 
 /* ════════════════════════════════════════════════════════════════════════
    JOURNAL — DUA jurnal terpisah dalam satu halaman
@@ -81,14 +83,79 @@ function Kalender({ pl }: { pl: Map<string, number> }) {
   );
 }
 
+/** Kotak saldo dengan status sambungan — ikon rantai seperti V2.
+ *
+ *  Dua angka sengaja dipisah: SALDO JURNAL dihitung dari transaksi yang
+ *  tercatat, SALDO BROKER datang dari MT5/Binance. Keduanya jarang sama
+ *  persis (deposit, penarikan, biaya yang tidak masuk jurnal), dan
+ *  menampilkan satu angka saja menyembunyikan selisih yang justru paling
+ *  perlu diketahui. */
+function KartuSaldo({ judul, saldoJurnal, akun, keIntegrasi }: {
+  judul: string; saldoJurnal: number; akun: StatusAkun; keIntegrasi: string;
+}) {
+  const nyambung = akun.terhubung === true;
+  const memeriksa = akun.terhubung === null;
+  const selisih = nyambung && akun.saldo !== null ? akun.saldo - saldoJurnal : null;
+
+  return (
+    <Panel className="p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[12.5px] text-zinc-500">{judul}</div>
+          <div className="angka mt-2 text-[28px] font-semibold leading-none tracking-tight text-zinc-100">
+            {uang(nyambung && akun.saldo !== null ? akun.saldo : saldoJurnal)}
+          </div>
+          <div className="mt-2.5 text-[12px] text-zinc-500">
+            {nyambung ? `dari broker · jurnal ${uang(saldoJurnal)}` : 'dihitung dari jurnal'}
+          </div>
+        </div>
+
+        {/* Belum tersambung -> tautan, bukan sekadar label. Badge yang cuma
+            memberi tahu tanpa memberi jalan keluar menyuruh orang mencari
+            sendiri halaman mana yang harus dibuka. */}
+        {nyambung ? (
+          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-emerald-500/10 px-2 py-1 text-[11px] font-medium text-emerald-400">
+            <Link2 className="size-3.5" strokeWidth={2.2} /> Connected
+          </span>
+        ) : (
+          <Link
+            to={keIntegrasi}
+            title={akun.ket}
+            className={cn(
+              'inline-flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium transition-colors',
+              memeriksa ? 'bg-zinc-700/30 text-zinc-400' : 'bg-zinc-700/30 text-zinc-300 hover:bg-zinc-700/50'
+            )}
+          >
+            <Link2Off className="size-3.5" strokeWidth={2.2} /> {memeriksa ? 'Memeriksa…' : 'Connect'}
+          </Link>
+        )}
+      </div>
+
+      {selisih !== null && Math.abs(selisih) >= 0.01 && (
+        <div className="mt-3 border-t border-zinc-800/60 pt-2.5 text-[11.5px] text-zinc-500">
+          Selisih broker vs jurnal{' '}
+          <span className={cn('angka', selisih >= 0 ? 'text-emerald-500' : 'text-red-400')}>
+            {uang(selisih, true)}
+          </span>
+          {' '}— biasanya deposit, penarikan, atau biaya yang belum tercatat.
+        </div>
+      )}
+      {!nyambung && !memeriksa && (
+        <div className="mt-3 border-t border-zinc-800/60 pt-2.5 text-[11.5px] text-zinc-600">{akun.ket}</div>
+      )}
+    </Panel>
+  );
+}
+
 /** Satu blok jurnal lengkap: KPI, kurva ekuitas, kalender, riwayat, emosi.
  *
  *  Dipakai dua kali dengan daftar transaksi berbeda. Menuliskannya dua kali
  *  akan membuat kedua jurnal berbeda diam-diam dalam dua putaran revisi —
  *  persis yang terjadi pada `statPer` sebelum diperbaiki. */
-function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien }: {
+function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun, labelSaldo, keIntegrasi }: {
   judul: string; ket: string; Ikon: typeof Bitcoin;
   trade: Trade[]; saldoAwal: number; warna: string; idGradien: string;
+  akun: StatusAkun; labelSaldo: string; keIntegrasi: string;
 }) {
   const stat = statGabungan(trade, saldoAwal);
   const kurva = useMemo(() => kurvaEkuitas(trade, saldoAwal), [trade, saldoAwal]);
@@ -121,7 +188,8 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien }: {
         </Panel>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+            <KartuSaldo judul={labelSaldo} saldoJurnal={stat.saldo} akun={akun} keIntegrasi={keIntegrasi} />
             <KartuKpi label="Total trade" nilai={String(stat.jumlah)} catatan={`${stat.menang} menang · ${stat.kalah} kalah`} />
             <KartuKpi label="Win rate" nilai={persen(stat.winrate)} catatan="dari transaksi selesai" />
             <KartuKpi label="Net P/L" nilai={uang(stat.bersih, true)}
@@ -243,30 +311,18 @@ export default function Jurnal() {
 
   const forex = useMemo(() => RIWAYAT.filter((t) => t.sumber === 'forex'), [RIWAYAT]);
   const kripto = useMemo(() => RIWAYAT.filter((t) => t.sumber === 'kripto'), [RIWAYAT]);
-  const gabungan = statGabungan(RIWAYAT, saldoAwal);
+  const mt5 = useAkunMt5();
+  const binance = useAkunBinance();
 
   return (
     <div className="p-4 sm:p-6">
       {contoh && <div className="mb-4"><LabelContoh tampil /></div>}
 
-      {/* Ringkasan gabungan di puncak — angka yang SAMA dengan Dashboard,
-          karena keduanya menjumlahkan array yang sama. Ditaruh di sini
-          supaya jelas bahwa kedua jurnal di bawah adalah pecahannya. */}
-      <Panel className="p-5">
-        <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
-          <span className="text-[12.5px] text-zinc-500">Gabungan</span>
-          <span className="angka text-[20px] font-semibold text-zinc-100">{uang(gabungan.saldo)}</span>
-          <span className={cn('angka text-[13px]', gabungan.bersih >= 0 ? 'text-emerald-500' : 'text-red-400')}>
-            {uang(gabungan.bersih, true)}
-          </span>
-          <span className="text-[12px] text-zinc-500">
-            {gabungan.jumlah} transaksi · winrate {persen(gabungan.winrate)}
-          </span>
-          <span className="ml-auto text-[11.5px] text-zinc-600">
-            saldo awal {uang(saldoAwal)} · Trade-Fi {forex.length} + Kripto {kripto.length}
-          </span>
-        </div>
-      </Panel>
+      {/* Tidak ada ringkasan gabungan di sini. Konsepnya jurnal TERPISAH:
+          angka gabungan tempatnya di Dashboard, dan menaruhnya juga di sini
+          membuat orang membaca satu angka besar lalu mengira kedua blok di
+          bawahnya adalah rinciannya — padahal masing-masing punya saldo
+          brokernya sendiri yang tidak selalu berjumlah demikian. */}
 
       {/* Saldo awal dibebankan ke blok Trade-Fi saja, dan nol untuk kripto.
           Kalau keduanya diberi saldo awal penuh, jumlah kedua kurva ekuitas
@@ -276,12 +332,14 @@ export default function Jurnal() {
         judul="Jurnal Trade-Fi" ket="Forex & XAU lewat MetaTrader 5"
         Ikon={CandlestickChart} trade={forex} saldoAwal={saldoAwal}
         warna="text-amber-400" idGradien="gEqForex"
+        akun={mt5} labelSaldo="Saldo MetaTrader 5" keIntegrasi="/integrasi"
       />
 
       <BlokJurnal
         judul="Jurnal Kripto" ket="Binance Futures lewat Screener"
         Ikon={Bitcoin} trade={kripto} saldoAwal={0}
         warna="text-emerald-400" idGradien="gEqKripto"
+        akun={binance} labelSaldo="Saldo Binance Futures" keIntegrasi="/integrasi"
       />
     </div>
   );

@@ -82,6 +82,86 @@ export function kurvaEkuitas(trade: Trade[], saldoAwal = SALDO_AWAL): TitikEkuit
   return titik;
 }
 
+export interface Bulan { bulan: string; kunci: string; pnl: number; trade: number }
+
+const NAMA_BULAN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+
+/** P/L per bulan, dihitung dari transaksi yang benar-benar ada.
+ *
+ *  Sebelumnya Dashboard memakai daftar bulan yang ditulis tangan di
+ *  `data/porto.ts` — Maret sampai Agustus dengan angka karangan. Akibatnya
+ *  grafiknya menampilkan lima bulan riwayat untuk akun yang transaksinya
+ *  baru mulai bulan ini, dan tidak ada satu pun tanda bahwa itu bukan data
+ *  sungguhan.
+ *
+ *  Bulan yang tidak punya transaksi TIDAK dibuat-buat. Yang dikembalikan
+ *  hanya rentang dari transaksi pertama sampai terakhir; bulan kosong di
+ *  tengahnya tetap muncul dengan nol supaya sumbu waktunya tidak melompat,
+ *  tapi bulan sebelum transaksi pertama tidak pernah ada. */
+export function plPerBulan(trade: Trade[], maksBulan = 12): Bulan[] {
+  const sah = trade.filter((t) => Number.isFinite(t.pnl) && t.waktu > 0);
+  if (!sah.length) return [];
+
+  const peta = new Map<string, { pnl: number; trade: number }>();
+  for (const t of sah) {
+    const d = new Date(t.waktu);
+    const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const p = peta.get(k) ?? { pnl: 0, trade: 0 };
+    peta.set(k, { pnl: p.pnl + t.pnl, trade: p.trade + 1 });
+  }
+
+  const kunci = [...peta.keys()].sort();
+  const [thA, blA] = kunci[0].split('-').map(Number);
+  const [thZ, blZ] = kunci[kunci.length - 1].split('-').map(Number);
+
+  const out: Bulan[] = [];
+  for (let th = thA, bl = blA; th < thZ || (th === thZ && bl <= blZ); ) {
+    const k = `${th}-${String(bl).padStart(2, '0')}`;
+    const d = peta.get(k);
+    out.push({
+      kunci: k,
+      bulan: NAMA_BULAN[bl - 1],
+      pnl: Number((d?.pnl ?? 0).toFixed(2)),
+      trade: d?.trade ?? 0,
+    });
+    bl++; if (bl > 12) { bl = 1; th++; }
+  }
+  return out.slice(-maksBulan);
+}
+
+export interface TitikSaldo { label: string; saldo: number }
+
+/** Saldo harian sepanjang bulan berjalan, dari saldo awal + P/L kumulatif.
+ *
+ *  Menggantikan `SALDO_PER_TANGGAL` yang juga ditulis tangan. Titik hanya
+ *  dibuat sampai HARI INI — menggambar sisa bulan sebagai garis datar
+ *  membuat grafiknya terlihat seperti akun yang berhenti bergerak. */
+export function saldoBulanIni(trade: Trade[], saldoAwal: number): TitikSaldo[] {
+  const kini = new Date();
+  const th = kini.getFullYear(), bl = kini.getMonth();
+  const awalBulan = new Date(th, bl, 1).getTime();
+
+  const sebelum = trade
+    .filter((t) => t.waktu < awalBulan)
+    .reduce((s, t) => s + t.pnl, 0);
+
+  const perHari = new Map<number, number>();
+  for (const t of trade) {
+    if (t.waktu < awalBulan) continue;
+    const d = new Date(t.waktu);
+    if (d.getFullYear() !== th || d.getMonth() !== bl) continue;
+    perHari.set(d.getDate(), (perHari.get(d.getDate()) ?? 0) + t.pnl);
+  }
+
+  const out: TitikSaldo[] = [];
+  let jalan = saldoAwal + sebelum;
+  for (let h = 1; h <= kini.getDate(); h++) {
+    jalan += perHari.get(h) ?? 0;
+    out.push({ label: String(h), saldo: Number(jalan.toFixed(2)) });
+  }
+  return out;
+}
+
 /** P/L per hari untuk kalender & grafik batang. */
 export function plPerHari(trade: Trade[]) {
   const peta = new Map<string, number>();

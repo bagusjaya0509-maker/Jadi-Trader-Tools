@@ -59,26 +59,94 @@ function kandidat(): string[] {
    `#esHiddenSections` (chip untuk memunculkan kembali section yang dilipat)
    sengaja TIDAK ikut disembunyikan — ia fungsional, bukan hiasan. */
 const CSS_TANPA_CANGKANG = `
+  /* ─────────────────────────────────────────────────────────────────────
+     SEMUA di berkas ini hanya menyentuh TAMPILAN, tidak satu pun logic.
+     Yang diubah: huruf, warna, radius, dan tiga elemen yang disembunyikan.
+     Berkas V2-nya sendiri TIDAK disunting sama sekali — ia tetap utuh dan
+     tetap benar saat dibuka sebagai halaman berdiri sendiri.
+     ───────────────────────────────────────────────────────────────────── */
+
   /* Lebar sidebar dinolkan DI SUMBERNYA, bukan dilawan di hilir.
-     Cangkang V2 menulis \`body{padding-left:var(--v2-sisi)}\` dan
-     \`body.v2-ciut{padding-left:var(--v2-sisi-kecil)}\`. Menimpanya dengan
-     \`padding-left:0!important\` berarti bertaruh pada urutan cascade dan
-     spesifisitas; mengosongkan variabelnya membuat kedua aturan itu
-     menghitung 0 dengan sendirinya — tidak ada yang perlu dikalahkan. */
+     Cangkang V2 menulis \`body{padding-left:var(--v2-sisi)}\`; mengosongkan
+     variabelnya membuat aturan itu menghitung 0 dengan sendirinya — tidak
+     ada yang perlu dikalahkan lewat spesifisitas. */
   :root { --v2-sisi: 0px !important; --v2-sisi-kecil: 0px !important; }
 
-  /* sidebar, laci, dan kaki halaman milik V2 */
+  /* Cangkang V2: sidebar, laci, kaki halaman */
   .v2-sisi, .v2-tirai, .v2-buka-laci, #v2Kaki { display: none !important; }
   body, body.v2-ciut { padding-left: 0 !important; }
 
-  /* bilah pengguna (avatar, nama, Keluar) — V3 sudah punya di bilah atasnya */
+  /* Bilah pengguna & judul aplikasi — V3 sudah punya keduanya */
   .es-toprow, .es-user-bar { display: none !important; }
-
-  /* judul besar "Jadi Trader Tools" — nama aplikasinya sudah ada di sidebar V3 */
   .es-header .es-title { display: none !important; }
 
-  /* tanpa sidebar, isi halaman tidak perlu lagi disisakan ruang kiri */
-  .ema-screener { padding-left: 14px !important; padding-right: 14px !important; }
+  /* Backend URL & App Token di Area Entry — tempatnya di Integrations.
+     Disembunyikan lewat induk labelnya supaya label ikut hilang, bukan
+     menyisakan tulisan yang menggantung tanpa kolom isian. */
+  .es-live-trade-config label:has(#esLiveBackendUrl),
+  .es-live-trade-config label:has(#esLiveAppToken) { display: none !important; }
+
+  /* ── Huruf & warna mengikuti V3 ── */
+  :root {
+    --v2-radius: 12px;
+  }
+  body, .ema-screener, .es-header, button, input, select, textarea {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+  }
+  /* Angka tetap tabular seperti di seluruh V3 — digit yang bergeser tiap
+     harga berubah memaksa mata mencari ulang posisinya. */
+  .es-price, .es-num, .angka, .es-sim-table td, .es-priority-levels,
+  .es-card-price, .es-val { font-variant-numeric: tabular-nums !important; }
+
+  .ema-screener { background: #09090b !important; color: #fafafa !important; }
+
+  /* Panel & kartu: radius, garis, dan latar disamakan dengan Panel V3 */
+  .es-priority-section, .es-card, .es-priority-card, .es-sim-wrap,
+  .es-panel, .es-box, .es-news-pop {
+    border-radius: 12px !important;
+    border-color: rgba(39,39,42,.8) !important;
+    background: rgba(24,24,27,.4) !important;
+  }
+
+  /* Kontrol: tinggi, radius, dan warna sama dengan <Pilih> di V3 */
+  .ema-screener select, .ema-screener input[type="text"], .ema-screener input[type="number"] {
+    height: 36px !important;
+    border-radius: 6px !important;
+    border: 1px solid #27272a !important;
+    background: rgba(24,24,27,.6) !important;
+    color: #d4d4d8 !important;
+    font-size: 12.5px !important;
+  }
+  .ema-screener button {
+    border-radius: 6px !important;
+    font-size: 12px !important;
+  }
+  /* Tombol utama V3 = putih dengan teks gelap */
+  .es-scan-btn, .es-priority-scan-btn, .es-pantau-scan-btn {
+    background: #fafafa !important;
+    color: #09090b !important;
+    border: none !important;
+    font-weight: 500 !important;
+  }
+
+  /* Judul section disamakan dengan PanelHead V3 */
+  .es-section-head, .es-priority-header {
+    font-size: 15px !important;
+    font-weight: 600 !important;
+    letter-spacing: -.01em !important;
+    color: #fafafa !important;
+  }
+
+  /* Hijau/merah disamakan dengan emerald-500 / red-400 milik V3 supaya
+     BUY di dalam bingkai tidak berbeda warna dengan BUY di luar bingkai. */
+  .es-buy, .es-long, .profit, .es-up { color: #10b981 !important; }
+  .es-sell, .es-short, .loss, .es-down { color: #f87171 !important; }
+
+  /* Scrollbar tipis seperti sisa aplikasi */
+  * { scrollbar-width: thin; scrollbar-color: #3f3f46 transparent; }
+  *::-webkit-scrollbar { width: 9px; height: 9px; }
+  *::-webkit-scrollbar-thumb { background: #27272a; border-radius: 9px; }
+  *::-webkit-scrollbar-track { background: transparent; }
 `;
 
 export default function ScreenerV2() {
@@ -216,15 +284,7 @@ export default function ScreenerV2() {
         )}
       </div>
 
-      {alamat && (
-        <a
-          href={alamat} target="_blank" rel="noreferrer"
-          title="Buka screener di tab sendiri"
-          className="absolute right-4 top-3 z-10 flex items-center gap-1.5 rounded-md border border-zinc-700 bg-zinc-900/90 px-2.5 py-1.5 text-[11.5px] text-zinc-300 backdrop-blur transition-colors hover:border-zinc-600 hover:text-zinc-100"
-        >
-          <ExternalLink className="size-3" /> Tab baru
-        </a>
-      )}
+
     </div>
   );
 }
