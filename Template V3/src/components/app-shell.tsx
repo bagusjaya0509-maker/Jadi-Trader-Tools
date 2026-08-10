@@ -50,6 +50,7 @@ const NAV = [
 const JUDUL: Record<string, string> = {
   '/dashboard': 'Dashboard',
   '/screener': 'Screener Entry',
+  '/screener-react': 'Screener Entry (React)',
   '/chart': 'Chart & Backtest',
   '/jurnal': 'Journal',
   '/personal': 'Personal Area',

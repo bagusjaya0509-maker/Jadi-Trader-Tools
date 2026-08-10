@@ -62,7 +62,12 @@ function muat<T>(impor: () => Promise<T>): Promise<T> {
 }
 
 const Dashboard     = lazy(() => muat(() => import('@/components/dashboard').then((m) => ({ default: m.Dashboard }))));
-const Screener      = lazy(() => muat(() => import('@/halaman/Screener')));
+/* #/screener menampilkan screener V2 yang ASLI, ditanam apa adanya.
+   Versi React-nya masih ada di halaman/Screener.tsx dan bisa dibuka di
+   #/screener-react — berguna untuk membandingkan, dan pemindainya
+   (lib/pindai.ts) tetap dipakai kalau nanti ada section yang diport. */
+const Screener      = lazy(() => muat(() => import('@/halaman/ScreenerV2')));
+const ScreenerReact = lazy(() => muat(() => import('@/halaman/Screener')));
 const ChartBacktest = lazy(() => muat(() => import('@/halaman/Chart')));
 const Jurnal        = lazy(() => muat(() => import('@/halaman/Jurnal')));
 const PersonalArea  = lazy(() => muat(() => import('@/halaman/PersonalArea')));
@@ -131,7 +136,8 @@ export default function App() {
           <Route path="/" element={<Beranda />} />
           <Route element={<Kerangka />}>
             <Route path="/dashboard"   element={<Dashboard />} />
-            <Route path="/screener"    element={<Screener />} />
+            <Route path="/screener"        element={<Screener />} />
+            <Route path="/screener-react"  element={<ScreenerReact />} />
             <Route path="/chart"       element={<ChartBacktest />} />
             <Route path="/jurnal"      element={<Jurnal />} />
             <Route path="/personal"    element={<PersonalArea />} />

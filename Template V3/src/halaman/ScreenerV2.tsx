@@ -1,0 +1,158 @@
+import { useEffect, useState } from 'react';
+import { Loader2, ExternalLink, TriangleAlert, RotateCcw } from 'lucide-react';
+
+/* ════════════════════════════════════════════════════════════════════════
+   SCREENER ENTRY — screener V2 yang ASLI, ditanam apa adanya
+   ════════════════════════════════════════════════════════════════════════
+   Halaman ini sengaja TIDAK menggambar ulang apa pun. Yang tampil adalah
+   `ema-cross-screener_3.html` milik V2 — seluruh delapan section-nya, semua
+   setelan, semua logic, dan design aslinya, tanpa satu baris pun diubah.
+
+   Kenapa ditanam, bukan diport:
+   Screener V2 itu 494 kB dengan delapan section — Sinyal Entry Koin Favorit,
+   Cross Hunter, BBMA, AI, News, panel simulasi, panel live trading, dan strip
+   rezim BTC. Menulis ulang semuanya ke React berarti setiap putaran revisi
+   ada saja yang terlewat, dan itulah keluhan yang membuat halaman ini
+   diputuskan begini. Ditanam, tidak ada yang bisa terlewat — karena tidak
+   ada yang disalin.
+
+   Bonus yang sebenarnya lebih penting: memperbarui screener V2 langsung
+   mengubah halaman ini juga. Tidak ada dua salinan yang bisa menyimpang.
+
+   ── KENAPA SAMA-DOMAIN PENTING ─────────────────────────────────────────
+   Firebase menyimpan sesi login di IndexedDB per-origin. Kalau V2 ditanam
+   dari domain lain, orang yang sudah masuk di V3 akan diminta masuk lagi di
+   dalam bingkainya — dua login untuk satu aplikasi. Karena itu alamat
+   sama-domain dicoba lebih dulu, dan GitHub Pages cuma jadi jaring terakhir.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/** Alamat cadangan terakhir. TIDAK ikut diperiksa lebih dulu, dan itu
+ *  disengaja: ia lintas-domain, jadi `fetch` akan diblokir CORS walaupun
+ *  berkasnya ada. Iframe tidak butuh CORS — memeriksanya justru membuat
+ *  alamat yang sebenarnya bisa dipakai dianggap gagal. */
+const CADANGAN = 'https://bagusjaya0509-maker.github.io/Jadi-Trader-Tools/ema-cross-screener_3.html';
+
+/** Kandidat SAMA-DOMAIN, diurut dari yang paling diinginkan. Satu build yang
+ *  sama bekerja di GitHub Pages maupun VPS tanpa perlu tahu ia sedang
+ *  berjalan di mana. */
+function kandidat(): string[] {
+  const asal = window.location.origin;
+  const jalur = window.location.pathname.replace(/\/[^/]*$/, '');       // …/v3
+  const induk = jalur.replace(/\/v3\/?$/, '');                          // …
+  return [...new Set([
+    `${asal}${induk}/ema-cross-screener_3.html`,   // GitHub Pages: /Jadi-Trader-Tools/
+    `${asal}/v2/ema-cross-screener_3.html`,        // VPS: /v2/
+    `${asal}/ema-cross-screener_3.html`,           // kalau V3 ada di akar
+  ])];
+}
+
+export default function ScreenerV2() {
+  const [alamat, setAlamat] = useState<string | null>(null);
+  const [gagal, setGagal] = useState(false);
+  const [siap, setSiap] = useState(false);
+  const [ronde, setRonde] = useState(0);
+
+  useEffect(() => {
+    let hidup = true;
+    (async () => {
+      setGagal(false); setSiap(false); setAlamat(null);
+      for (const u of kandidat()) {
+        try {
+          /* HEAD, bukan GET: berkasnya 494 kB dan kita cuma perlu tahu ia
+             ada. Mengunduhnya dua kali (sekali untuk mengecek, sekali oleh
+             iframe) memboroskan kuota orang yang memakai data seluler. */
+          const r = await fetch(u, { method: 'HEAD' });
+          if (!hidup) return;
+          if (r.ok) { setAlamat(u); return; }
+        } catch {
+          /* Berkasnya tidak ada di alamat ini — lanjut, bukan menyerah. */
+        }
+      }
+      /* Tidak ada yang sama-domain. Pakai cadangan tanpa diperiksa: iframe
+         tidak butuh CORS, jadi ia tetap bisa memuatnya walaupun `fetch`
+         tidak akan pernah bisa membuktikannya lebih dulu. Konsekuensinya
+         login di dalam bingkai jadi terpisah — itu harga yang dibayar, dan
+         lebih baik daripada halaman kosong. */
+      if (hidup) setAlamat(CADANGAN);
+    })();
+    return () => { hidup = false; };
+  }, [ronde]);
+
+  /* Iframe lintas-domain tidak memberi tahu kalau isinya gagal dimuat —
+     `onError` hampir tidak pernah terpanggil, dan `onLoad` tetap menyala
+     untuk halaman error. Jadi kegagalan diukur dari waktu: kalau setelah
+     15 detik bingkainya belum juga selesai, yang dilihat orang adalah layar
+     kosong tanpa penjelasan, dan itu yang harus diganti dengan pesan. */
+  useEffect(() => {
+    if (!alamat || siap) return;
+    const t = setTimeout(() => setGagal(true), 15_000);
+    return () => clearTimeout(t);
+  }, [alamat, siap]);
+
+  if (gagal) {
+    return (
+      <div className="flex min-h-[70vh] flex-col items-center justify-center gap-3 p-6 text-center">
+        <TriangleAlert className="size-6 text-amber-500" strokeWidth={1.9} />
+        <div className="text-[14px] text-zinc-200">Screener tidak bisa dimuat</div>
+        <p className="max-w-md text-[12.5px] leading-relaxed text-zinc-500">
+          Berkas <code className="rounded bg-zinc-800 px-1.5 py-0.5 text-[11.5px]">ema-cross-screener_3.html</code> tidak
+          ditemukan di alamat mana pun yang dicoba. Kalau ini di VPS, pastikan foldernya sudah diunggah ke{' '}
+          <code className="rounded bg-zinc-800 px-1.5 py-0.5 text-[11.5px]">/root/v2</code>.
+        </p>
+        <div className="mt-1 flex flex-wrap justify-center gap-2">
+          <button
+            onClick={() => setRonde((v) => v + 1)}
+            className="flex cursor-pointer items-center gap-1.5 rounded-md bg-zinc-100 px-3.5 py-2 text-[12.5px] font-medium text-zinc-950 transition-colors hover:bg-white"
+          >
+            <RotateCcw className="size-3.5" /> Coba lagi
+          </button>
+          <a
+            href="https://bagusjaya0509-maker.github.io/Jadi-Trader-Tools/ema-cross-screener_3.html"
+            target="_blank" rel="noreferrer"
+            className="flex items-center gap-1.5 rounded-md border border-zinc-800 px-3.5 py-2 text-[12.5px] text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100"
+          >
+            Buka di tab baru <ExternalLink className="size-3.5" />
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative">
+      {/* Tinggi dihitung dari tinggi layar dikurangi bilah atas (56 px).
+          Memakai h-full tidak bekerja: induknya tidak punya tinggi pasti,
+          dan iframe tanpa tinggi runtuh jadi nol piksel. */}
+      <div style={{ height: 'calc(100vh - 56px)' }}>
+        {!siap && (
+          <div className="absolute inset-0 flex items-center justify-center gap-2.5 text-[13px] text-zinc-500">
+            <Loader2 className="size-4 animate-spin" /> Memuat screener…
+          </div>
+        )}
+        {alamat && (
+          <iframe
+            src={alamat}
+            title="Crypto Screener"
+            onLoad={() => setSiap(true)}
+            className="block h-full w-full border-0"
+            /* allow-same-origin WAJIB: tanpa itu Firebase di dalam bingkai
+               tidak bisa membaca IndexedDB, dan orang yang sudah masuk di V3
+               diminta masuk lagi di sini. */
+            sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms allow-downloads allow-modals"
+            allow="clipboard-write"
+          />
+        )}
+      </div>
+
+      {alamat && (
+        <a
+          href={alamat} target="_blank" rel="noreferrer"
+          title="Buka screener di tab sendiri"
+          className="absolute right-4 top-3 z-10 flex items-center gap-1.5 rounded-md border border-zinc-700 bg-zinc-900/90 px-2.5 py-1.5 text-[11.5px] text-zinc-300 backdrop-blur transition-colors hover:border-zinc-600 hover:text-zinc-100"
+        >
+          <ExternalLink className="size-3" /> Tab baru
+        </a>
+      )}
+    </div>
+  );
+}
