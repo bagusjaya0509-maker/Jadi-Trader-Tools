@@ -18,7 +18,8 @@ npm run rilis   # bangun + periksa + buka folder yang tinggal diunggah
 |---|---|
 | `/` | Beranda — hero glassmorphism, tanpa sidebar |
 | `#/dashboard` | KPI gabungan, hasil bulanan, saldo lalu vs kini, posisi kripto & MT5 |
-| `#/screener` | Pemindaian pasar nyata — Area Pantau + Parallel Signal + 4 KPI + Area Entry |
+| `#/screener` | **Screener V2 asli, ditanam apa adanya** — semua 8 section |
+| `#/screener-react` | Versi React (Area Pantau + Parallel + 4 KPI + Area Entry), pembanding |
 | `#/chart` | Chart lilin + editor indikator + backtest |
 | `#/jurnal` | Equity curve, kalender P/L, riwayat, pola emosi |
 | `#/personal` | Pelacak portofolio — pie, perkembangan, arus kas |
@@ -81,6 +82,15 @@ mengembalikan Beranda ke 1,4 MB — periksa dengan `npm run rilis`.
 `src/lib/data.ts` yang menerjemahkan. Layar tidak tahu — dan tidak perlu tahu —
 apakah datanya dari contoh atau dari server.
 
+**`#/screener` MENANAM screener V2, tidak menggambar ulang.** Halaman itu
+menampilkan `ema-cross-screener_3.html` lewat iframe — seluruh 8 section,
+semua setelan, semua logic, design aslinya. Menulis ulang 494 kB ke React
+berarti tiap putaran revisi ada yang terlewat; ditanam, tidak ada yang bisa
+terlewat karena tidak ada yang disalin. Alamatnya dicari otomatis, SAMA-DOMAIN
+lebih dulu: Firebase menyimpan sesi login per-origin, jadi bingkai dari domain
+lain memaksa orang masuk dua kali. Di VPS, V2 disajikan di `/v2` (rute
+`express.static` di `server.js`); di GitHub Pages ia sudah ada di akar repo.
+
 **`src/lib/jt-scan-core.ts` adalah SALINAN VERBATIM, jangan ditulis ulang.**
 Isinya inti perhitungan milik V2 (SMI, ATR, pivot, parallel channel, sentuhan
 SNR, penempatan SL). Kalau V3 menghitungnya sendiri, cepat atau lambat kedua
@@ -104,11 +114,15 @@ sendiri-sendiri tanpa ada yang memberi tahu.
   0 berkas gagal muat, refresh di `#/jurnal` tetap jalan
 - Hero: badge, judul, deskripsi baru; grafik porto; 2 thn / winrate / PNL;
   marquee 12 ikon koin; kedua tombol nge-link
-- Screener: **memindai pasar sungguhan** lewat proxy VPS. Diuji langsung —
-  7 sinyal Area Pantau & 5 Parallel dari 40 koin, 112 permintaan, 0 gagal.
-  Pantau = mini chart + ceklist (tanpa angka order) · Parallel = ceklist +
-  area entry (tanpa grafik) · 4 KPI **di bawah** Parallel Signal
-- Bintang, hapus koin, tambah koin: bekerja dan tersimpan (diuji satu per satu)
+- `#/screener`: screener V2 termuat di dalam bingkai SAMA-DOMAIN di VPS
+  (`/v2/ema-cross-screener_3.html`). Isinya diperiksa langsung — News CPI,
+  Area Pantau + semua filter TF/arah, rezim BTC, Parallel Signal 3 mode,
+  sinyal nyata (TWT BUY, SMI 4h −69,1)
+- `#/screener-react`: memindai 115 koin lewat proxy VPS, 23 kartu Area Pantau
+  menggulir mendatar, 207 permintaan, 0 gagal. Bintang/hapus/tambah koin
+  bekerja & tersimpan
+- **Jurnal dipecah dua** (Trade-Fi & Kripto), dan penjumlahannya COCOK dengan
+  Dashboard: 29 (+$70,80) + 94 (−$120,47) = 123 transaksi, −$49,67
 - Penjaga order: `Open Real Order` tanpa token → alert + tautan `#/integrasi`;
   setelah token disimpan → alert tidak muncul, badge jadi "VPS tersambung"
 - Peraga V3: tirai `−420 → 0` px, pemutar `0 → 420` px seiring, badge BUY
