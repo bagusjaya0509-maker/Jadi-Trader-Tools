@@ -1,8 +1,9 @@
 # Template V3 — Jadi Trader Tools
 
 React + TypeScript + Tailwind v4 + struktur shadcn.
-**Tersambung Firebase** (Auth Google + Firestore skema V3) sejak 10 Agustus
-2026. Belum tersambung: Binance, VPS, MT5.
+**Tersambung Firebase** (Auth Google + Firestore skema V3) dan **memindai
+pasar sungguhan** lewat proxy VPS, sejak 10 Agustus 2026.
+Belum tersambung: pengiriman order Binance, MT5.
 
 Langkah rilis & apa yang harus disiapkan sendiri: `Catatan/Panduan Rilis V3.md`.
 
@@ -17,7 +18,7 @@ npm run rilis   # bangun + periksa + buka folder yang tinggal diunggah
 |---|---|
 | `/` | Beranda — hero glassmorphism, tanpa sidebar |
 | `#/dashboard` | KPI gabungan, hasil bulanan, saldo lalu vs kini, posisi kripto & MT5 |
-| `#/screener` | Area Pantau (ceklist) + Parallel Signal (ceklist + area entry) + 4 KPI + Area Entry |
+| `#/screener` | Pemindaian pasar nyata — Area Pantau + Parallel Signal + 4 KPI + Area Entry |
 | `#/chart` | Chart lilin + editor indikator + backtest |
 | `#/jurnal` | Equity curve, kalender P/L, riwayat, pola emosi |
 | `#/personal` | Pelacak portofolio — pie, perkembangan, arus kas |
@@ -80,6 +81,18 @@ mengembalikan Beranda ke 1,4 MB — periksa dengan `npm run rilis`.
 `src/lib/data.ts` yang menerjemahkan. Layar tidak tahu — dan tidak perlu tahu —
 apakah datanya dari contoh atau dari server.
 
+**`src/lib/jt-scan-core.ts` adalah SALINAN VERBATIM, jangan ditulis ulang.**
+Isinya inti perhitungan milik V2 (SMI, ATR, pivot, parallel channel, sentuhan
+SNR, penempatan SL). Kalau V3 menghitungnya sendiri, cepat atau lambat kedua
+versi memberi sinyal berbeda untuk koin yang sama dan tidak ada cara tahu mana
+yang benar. `src/lib/pindai.ts` hanya mengorkestrasi: ambil data, panggil
+rumusnya, susun jadi kartu.
+
+**Kunci localStorage screener SAMA dengan V2** (`emaScreenerFavorites_v1`,
+`emaScreenerActiveSymbols_v1`). Koin yang dibintangi di satu versi langsung
+terlihat di versi lain. Memakai kunci baru akan membuat keduanya punya daftar
+sendiri-sendiri tanpa ada yang memberi tahu.
+
 ## Terverifikasi
 
 - `tsc -b --force` bersih · `npm run build` sukses
@@ -91,8 +104,11 @@ apakah datanya dari contoh atau dari server.
   0 berkas gagal muat, refresh di `#/jurnal` tetap jalan
 - Hero: badge, judul, deskripsi baru; grafik porto; 2 thn / winrate / PNL;
   marquee 12 ikon koin; kedua tombol nge-link
-- Screener: Pantau = mini chart + ceklist (tanpa angka order) · Parallel =
-  ceklist + area entry (tanpa grafik) · 4 KPI **di bawah** Parallel Signal
+- Screener: **memindai pasar sungguhan** lewat proxy VPS. Diuji langsung —
+  7 sinyal Area Pantau & 5 Parallel dari 40 koin, 112 permintaan, 0 gagal.
+  Pantau = mini chart + ceklist (tanpa angka order) · Parallel = ceklist +
+  area entry (tanpa grafik) · 4 KPI **di bawah** Parallel Signal
+- Bintang, hapus koin, tambah koin: bekerja dan tersimpan (diuji satu per satu)
 - Penjaga order: `Open Real Order` tanpa token → alert + tautan `#/integrasi`;
   setelah token disimpan → alert tidak muncul, badge jadi "VPS tersambung"
 - Peraga V3: tirai `−420 → 0` px, pemutar `0 → 420` px seiring, badge BUY
@@ -104,14 +120,13 @@ apakah datanya dari contoh atau dari server.
 
 - **Mesin backtest sungguhan.** Angka hasilnya masih contoh.
 - **Penerjemah Pine/MQL5.** Editor sudah ada, penerjemahnya belum.
-- **Backend VPS & MT5.** Firebase sudah tersambung; Binance/VPS/MT5 belum.
+- **Pengiriman order & MT5.** Data pasar sudah lewat VPS; order belum dikirim.
 - **Parser Excel** di Personal Area. Tombolnya ada, pembacanya belum.
 - **Tombol "Uji Sambungan" belum memanggil `/api/health`.** Yang sudah nyata:
   URL dan token benar-benar tersimpan dan dibaca penjaga order.
 - **Tangkapan layar tutorial digambar SVG**, bukan foto layar asli. Tata letak
   Binance berubah tiap beberapa bulan, dan tangkapan layar terminal sendiri
   hampir selalu memuat sesuatu yang tidak boleh dilihat orang.
-- **Harga pasar terkini.** Kolom Harga & Gerak di tabel posisi memakai harga
-  entry — harga terkini milik pasar, bukan Firestore. Proxy `/api/ticker-price`
-  di VPS sudah ada, tinggal disambungkan.
-- **Kartu sinyal Screener, Marketplace, dan Traffic & Sales** masih data contoh.
+- **Traffic & Sales** masih data contoh — butuh rute VPS `/api/kunjungan` dll.
+- **Panel simulasi & order sungguhan** belum mengirim ke Binance; tombolnya ada,
+  pengirimnya belum.
