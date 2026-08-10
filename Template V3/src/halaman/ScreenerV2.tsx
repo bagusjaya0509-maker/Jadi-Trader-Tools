@@ -46,6 +46,41 @@ function kandidat(): string[] {
   ])];
 }
 
+/* ── Menyembunyikan cangkang V2 di dalam bingkai ──────────────────────────
+   Halaman V2 membawa sidebar, bilah pengguna, dan judul besarnya sendiri.
+   Di dalam V3 ketiganya jadi kembar: dua sidebar, dua avatar, dua nama
+   aplikasi. Yang dibuang HANYA pembungkusnya — seluruh isi screener,
+   setelan, dan logic-nya tetap utuh apa adanya.
+
+   Disuntikkan sebagai CSS, bukan dengan menyunting berkas V2-nya. Berkas
+   itu juga dipakai sebagai halaman berdiri sendiri di alamat aslinya, dan
+   di sana sidebar-nya justru dibutuhkan.
+
+   `#esHiddenSections` (chip untuk memunculkan kembali section yang dilipat)
+   sengaja TIDAK ikut disembunyikan — ia fungsional, bukan hiasan. */
+const CSS_TANPA_CANGKANG = `
+  /* Lebar sidebar dinolkan DI SUMBERNYA, bukan dilawan di hilir.
+     Cangkang V2 menulis \`body{padding-left:var(--v2-sisi)}\` dan
+     \`body.v2-ciut{padding-left:var(--v2-sisi-kecil)}\`. Menimpanya dengan
+     \`padding-left:0!important\` berarti bertaruh pada urutan cascade dan
+     spesifisitas; mengosongkan variabelnya membuat kedua aturan itu
+     menghitung 0 dengan sendirinya — tidak ada yang perlu dikalahkan. */
+  :root { --v2-sisi: 0px !important; --v2-sisi-kecil: 0px !important; }
+
+  /* sidebar, laci, dan kaki halaman milik V2 */
+  .v2-sisi, .v2-tirai, .v2-buka-laci, #v2Kaki { display: none !important; }
+  body, body.v2-ciut { padding-left: 0 !important; }
+
+  /* bilah pengguna (avatar, nama, Keluar) — V3 sudah punya di bilah atasnya */
+  .es-toprow, .es-user-bar { display: none !important; }
+
+  /* judul besar "Jadi Trader Tools" — nama aplikasinya sudah ada di sidebar V3 */
+  .es-header .es-title { display: none !important; }
+
+  /* tanpa sidebar, isi halaman tidak perlu lagi disisakan ruang kiri */
+  .ema-screener { padding-left: 14px !important; padding-right: 14px !important; }
+`;
+
 export default function ScreenerV2() {
   const [alamat, setAlamat] = useState<string | null>(null);
   const [gagal, setGagal] = useState(false);
@@ -133,7 +168,44 @@ export default function ScreenerV2() {
           <iframe
             src={alamat}
             title="Crypto Screener"
-            onLoad={() => setSiap(true)}
+            onLoad={(e) => {
+              setSiap(true);
+              /* Hanya bisa kalau sama-domain. Kalau bingkainya terpaksa
+                 memakai alamat cadangan lintas-domain, akses ini melempar —
+                 dan itu tidak apa-apa: screener-nya tetap jalan, cuma
+                 cangkang V2-nya ikut kelihatan. */
+              try {
+                const d = (e.currentTarget as HTMLIFrameElement).contentDocument;
+                if (!d) return;
+                if (!d.getElementById('jt-v3-tanpa-cangkang')) {
+                  const s = d.createElement('style');
+                  s.id = 'jt-v3-tanpa-cangkang';
+                  s.textContent = CSS_TANPA_CANGKANG;
+                  (d.head || d.documentElement).appendChild(s);
+                }
+                /* Padding kiri body diatur langsung di elemennya, bukan lewat
+                   stylesheet. Aturan `body{padding-left:0!important}` di CSS
+                   di atas terbukti TIDAK menang — isi halaman tetap mulai di
+                   68 px (lebar sidebar yang sudah disembunyikan). Gaya inline
+                   ber-!important adalah satu-satunya yang pasti menang, dan
+                   ini bukan tempat untuk menebak-nebak cascade. */
+                const pasang = () => {
+                  d.body?.style.setProperty('padding-left', '0', 'important');
+                  d.body?.style.setProperty('padding-right', '0', 'important');
+                };
+                pasang();
+                /* Cangkang V2 mengubah padding lagi saat sidebar dilipat atau
+                   layar diputar. Pengamat ini mengembalikannya tanpa perlu
+                   tahu kapan itu terjadi. */
+                if (d.body) {
+                  new MutationObserver(pasang).observe(d.body, {
+                    attributes: true, attributeFilter: ['style', 'class'],
+                  });
+                }
+              } catch {
+                /* lintas-domain — biarkan apa adanya */
+              }
+            }}
             className="block h-full w-full border-0"
             /* allow-same-origin WAJIB: tanpa itu Firebase di dalam bingkai
                tidak bisa membaca IndexedDB, dan orang yang sudah masuk di V3
