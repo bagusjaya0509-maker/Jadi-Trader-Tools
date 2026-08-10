@@ -3048,14 +3048,28 @@
       // disiarkan (bukan posisi sungguhan), pending juga tidak (belum jadi).
       return p && !p.pending && (p.venue === 'live-real' || p.venue === 'live-testnet');
     }).map(function(p){
+      /* `tp` diambil dari tp1, BUKAN dari p.tp.
+         ─────────────────────────────────────────────────────────────────
+         Objek posisi tidak pernah punya field bernama `tp` - yang ada tp1
+         dan tp2. Versi sebelumnya menulis `tp: p.tp`, jadi nilainya selalu
+         undefined, dan Firestore MENOLAK dokumen yang punya field bernilai
+         undefined dengan melempar error. Error itu ditangkap catch di bawah
+         lalu dibuang tanpa jejak, sehingga siarannya tidak pernah berhasil
+         satu kali pun sejak fitur ini dibuat - tanpa satu pun pesan di
+         konsol yang bisa menjelaskannya.
+
+         Angka dinormalkan dengan Number() dan dijamin bukan undefined,
+         karena satu field undefined saja menggagalkan SELURUH dokumen. */
+      function angka(v){ var n = Number(v); return isFinite(n) ? n : null; }
       return {
-        simbol: p.source,
-        arah: p.dir,
-        entry: p.entryPrice,
-        sl: p.sl,
-        tp: p.tp,
-        buka: p.entryTime,
-        tf: p.tfLabel || ''
+        simbol: String(p.source || ''),
+        arah: String(p.dir || ''),
+        entry: angka(p.entryPrice),
+        sl: angka(p.sl),
+        tp: angka(p.tp1),
+        tp2: angka(p.tp2),
+        buka: angka(p.entryTime),
+        tf: String(p.tfLabel || '')
       };
     }).sort(function(a,b){ return a.buka - b.buka; });
 
@@ -3067,7 +3081,15 @@
     esSiaranPosisiTerakhir = sidik;
     esDb.collection('public').doc('posisiTerbuka')
       .set({ posisi: daftar, _updatedAt: Date.now() })
-      .catch(function(){ esSiaranPosisiTerakhir = ''; });   // gagal -> coba lagi siklus berikutnya
+      .catch(function(e){
+        esSiaranPosisiTerakhir = '';   // gagal -> coba lagi siklus berikutnya
+        /* Dulu error di sini dibuang diam-diam, dan itulah sebabnya bug
+           `tp: undefined` bertahan berbulan-bulan tanpa ketahuan: siarannya
+           gagal setiap kali, tapi tidak ada satu pun tanda di layar maupun
+           konsol. Sekarang dicatat - satu baris peringatan tiap beberapa
+           detik jauh lebih murah daripada fitur yang mati tanpa suara. */
+        console.warn('[posisiTerbuka] gagal disiarkan:', e && e.message ? e.message : e);
+      });
   }
 
   function esPublishLayoutDefault(){

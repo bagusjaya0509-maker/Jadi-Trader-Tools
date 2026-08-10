@@ -1,0 +1,13 @@
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Kunci akun layanan Firebase tidak boleh ikut, walaupun tidak pernah
+# ditaruh di folder ini. Baris ini penjaga terakhir kalau suatu saat
+# tersalin ke sini tanpa sengaja.
+*firebase-adminsdk*.json
+kunci-firebase.json
+.env
+.env.*
+dev.log
+*.log

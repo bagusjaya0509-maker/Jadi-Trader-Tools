@@ -1,0 +1,298 @@
+import { Link } from "react-router-dom";
+import { ArrowRight, LineChart, Wallet, Crown, Star } from "lucide-react";
+import { PORTO_BULANAN, rupiahRingkas } from "@/data/porto";
+
+/* ── Grafik portofolio hero, digambar tangan ──────────────────────────────
+   Dulu ini <AreaChart> Recharts, dan itu menyeret 115 kB (gzip) ke HALAMAN
+   DEPAN — halaman yang paling sering dibuka orang yang belum tentu masuk.
+
+   Yang ditampilkan cuma satu garis mulus tanpa sumbu, tooltip, atau
+   interaksi apa pun. Semua yang membuat Recharts layak dipakai tidak
+   terpakai di sini. Ini keputusan yang sama dengan chart lilin di halaman
+   Chart: pustaka grafik dibayar per kilobyte, bukan per fitur yang dipakai.
+   Halaman lain tetap memakai Recharts — di sana tooltip dan legenda memang
+   dibutuhkan, dan potongannya dimuat hanya saat halamannya dibuka. */
+function GrafikPorto() {
+  const W = 300, H = 80, pad = 4;
+  const nilai = PORTO_BULANAN.map((b) => b.porto);
+  const min = Math.min(...nilai), max = Math.max(...nilai);
+  const rentang = max - min || 1;
+  const X = (i: number) => (i / (nilai.length - 1)) * W;
+  const Y = (v: number) => pad + (1 - (v - min) / rentang) * (H - pad * 2);
+
+  /* Kurva Catmull-Rom disederhanakan jadi Bezier kubik. Garis lurus antar
+     titik terlihat seperti gigi gergaji pada 12 titik di lebar 300 px. */
+  const titik = nilai.map((v, i) => [X(i), Y(v)] as const);
+  let d = `M${titik[0][0]},${titik[0][1]}`;
+  for (let i = 0; i < titik.length - 1; i++) {
+    const [x0, y0] = titik[Math.max(0, i - 1)];
+    const [x1, y1] = titik[i];
+    const [x2, y2] = titik[i + 1];
+    const [x3, y3] = titik[Math.min(titik.length - 1, i + 2)];
+    d += ` C${x1 + (x2 - x0) / 6},${y1 + (y2 - y0) / 6} ${x2 - (x3 - x1) / 6},${y2 - (y3 - y1) / 6} ${x2},${y2}`;
+  }
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="h-full w-full" aria-hidden>
+      <defs>
+        <linearGradient id="gradPortoHero" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#ffcd75" stopOpacity={0.35} />
+          <stop offset="100%" stopColor="#ffcd75" stopOpacity={0} />
+        </linearGradient>
+      </defs>
+      <path d={`${d} L${W},${H} L0,${H} Z`} fill="url(#gradPortoHero)" />
+      {/* vectorEffect: tanpa ini garisnya ikut melar saat preserveAspectRatio
+          none meregangkan viewBox ke lebar panel. */}
+      <path d={d} fill="none" stroke="#ffcd75" strokeWidth={1.8}
+            vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+import { RIWAYAT, POSISI_TERBUKA } from "@/data/contoh";
+import { statGabungan } from "@/lib/hitung";
+
+import { uang, persen } from "@/lib/utils";
+
+/* ── Ikon koin ─────────────────────────────────────────────────────────────
+   Lucide tidak punya logo kripto, dan mengunduh logo asli berarti bergantung
+   pada aset pihak lain yang bisa hilang kapan saja (persis yang baru saja
+   terjadi pada gambar latar). Jadi dipakai monogram bulat berwarna khas tiap
+   koin — terbaca sebagai ikon, tidak pernah gagal dimuat, dan tetap konsisten
+   kalau nanti ada koin baru. */
+const WARNA_KOIN: Record<string, string> = {
+  BTC: "#f7931a", ETH: "#8a92b2", SOL: "#14f195", ADA: "#0033ad",
+  XAUT: "#d4af37", BOME: "#e35c2b", SEI: "#9e1f19", LTC: "#a6a9aa",
+  AAPL: "#a2aaad", NVDA: "#76b900", XAUUSD: "#d4af37", PEPE: "#4a9c2d",
+};
+
+function IkonKoin({ simbol }: { simbol: string }) {
+  const nama = simbol.replace("USDT", "").replace("c", "");
+  const warna = WARNA_KOIN[nama] ?? "#71717a";
+  return (
+    <span
+      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[9.5px] font-bold text-white ring-1 ring-white/15"
+      style={{ background: `linear-gradient(140deg, ${warna}, ${warna}66)` }}
+      aria-hidden
+    >
+      {nama.slice(0, 3)}
+    </span>
+  );
+}
+
+const StatItem = ({ value, label }: { value: string; label: string }) => (
+  <div className="flex flex-col items-center justify-center transition-transform hover:-translate-y-1 cursor-default">
+    <span className="text-xl font-bold text-white sm:text-2xl">{value}</span>
+    <span className="text-[10px] uppercase tracking-wider text-zinc-500 font-medium sm:text-xs">{label}</span>
+  </div>
+);
+
+export default function HeroSection() {
+  /* Hero sengaja memakai angka PAMERAN, bukan data pengguna yang sedang
+     masuk. Dua alasan, dan yang kedua lebih menentukan:
+
+       1. Ini halaman pemasaran. Pengunjung yang belum punya akun justru
+          mayoritasnya, dan menampilkan jurnal kosong milik mereka sendiri
+          bukan cara memperkenalkan produk.
+       2. Menariknya dari Firestore berarti ±450 kB pustaka ikut diunduh
+          SETIAP orang yang membuka halaman depan — termasuk yang cuma
+          melihat sekilas. Angka yang sama bisa didapat tanpa itu.
+
+     Kalau nanti mau angka sungguhan di sini, ambil `public/jurnalShowcase`
+     lewat `fetch()` biasa ke REST API Firestore — dokumen itu boleh dibaca
+     publik, dan cara itu tidak menambah satu kilobyte pun ke bundel. */
+  const stat = statGabungan(RIWAYAT);
+  const portoKini = PORTO_BULANAN[PORTO_BULANAN.length - 1].porto;
+  const portoAwal = PORTO_BULANAN[0].porto;
+  const tumbuh = ((portoKini - portoAwal) / portoAwal) * 100;
+
+  return (
+    <div className="relative w-full bg-zinc-950 text-white overflow-hidden font-sans">
+      <style>{`
+        @keyframes fadeSlideIn {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes marquee {
+          from { transform: translateX(0); }
+          to { transform: translateX(-50%); }
+        }
+        .animate-fade-in { animation: fadeSlideIn 0.8s ease-out forwards; opacity: 0; }
+        .animate-marquee { animation: marquee 40s linear infinite; }
+        .delay-100 { animation-delay: 0.1s; }
+        .delay-200 { animation-delay: 0.2s; }
+        .delay-300 { animation-delay: 0.3s; }
+        .delay-400 { animation-delay: 0.4s; }
+        .delay-500 { animation-delay: 0.5s; }
+      `}</style>
+
+      {/* Latar disalin ke public/hero-bg.webp — tidak lagi menunjuk bucket
+          Supabase milik pembuat aslinya, yang di perambanmu diblokir dan yang
+          isinya bisa hilang kapan saja. */}
+      <div
+        className="absolute inset-0 z-0 bg-[url('/hero-bg.webp')] bg-cover bg-center opacity-40"
+        style={{
+          maskImage: "linear-gradient(180deg, transparent, black 0%, black 70%, transparent)",
+          WebkitMaskImage: "linear-gradient(180deg, transparent, black 0%, black 70%, transparent)",
+        }}
+      />
+
+      <div className="relative z-10 mx-auto max-w-7xl px-4 pt-24 pb-12 sm:px-6 md:pt-32 md:pb-20 lg:px-8">
+        <div className="grid grid-cols-1 gap-12 lg:grid-cols-12 lg:gap-8 items-start">
+
+          {/* --- LEFT COLUMN --- */}
+          <div className="lg:col-span-7 flex flex-col justify-center space-y-8 pt-8">
+
+            <div className="animate-fade-in delay-100">
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 backdrop-blur-md transition-colors hover:bg-white/10">
+                <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-zinc-300 flex items-center gap-2">
+                  Jadi Trader Tools
+                  <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" />
+                </span>
+              </div>
+            </div>
+
+            {/* Judul dipecah tiga baris, dan gradien emas hanya di SATU baris.
+                Kalau seluruh judul diberi gradien, tidak ada lagi yang
+                ditonjolkan — semuanya sama-sama berteriak. */}
+            <h1
+              className="animate-fade-in delay-200 text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-medium tracking-tighter leading-[0.95]"
+              style={{
+                maskImage: "linear-gradient(180deg, black 0%, black 80%, transparent 100%)",
+                WebkitMaskImage: "linear-gradient(180deg, black 0%, black 80%, transparent 100%)"
+              }}
+            >
+              Setidaknya kalau<br />
+              <span className="bg-gradient-to-br from-white via-white to-[#ffcd75] bg-clip-text text-transparent">
+                belum profit
+              </span><br />
+              jangan sampai Lose.
+            </h1>
+
+            <p className="animate-fade-in delay-300 max-w-xl text-lg text-zinc-400 leading-relaxed">
+              Satu trade yang terukur lebih baik daripada banyak trade asal-asalan.
+              Jadi buat trading plan terbaikmu dari sini untuk bisa{" "}
+              <span className="text-zinc-200">Jadi Trader Profitable!</span>
+            </p>
+
+            <div className="animate-fade-in delay-400 flex flex-col sm:flex-row gap-4">
+              <Link
+                to="/dashboard"
+                className="group inline-flex items-center justify-center gap-2 rounded-full bg-white px-8 py-4 text-sm font-semibold text-zinc-950 transition-all hover:scale-[1.02] hover:bg-zinc-200 active:scale-[0.98]"
+              >
+                View Portfolio
+                <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+              </Link>
+
+              <Link
+                to="/screener"
+                className="group inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 px-8 py-4 text-sm font-semibold text-white backdrop-blur-sm transition-colors hover:bg-white/10 hover:border-white/20"
+              >
+                <LineChart className="w-4 h-4" />
+                Open Screener
+              </Link>
+            </div>
+          </div>
+
+          {/* --- RIGHT COLUMN --- */}
+          <div className="lg:col-span-5 space-y-6 lg:mt-12">
+
+            {/* Stats Card */}
+            <div className="animate-fade-in delay-500 relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur-xl shadow-2xl">
+              <div className="absolute top-0 right-0 -mr-16 -mt-16 h-64 w-64 rounded-full bg-white/5 blur-3xl pointer-events-none" />
+
+              <div className="relative z-10">
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/20">
+                    <Wallet className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <div className="text-3xl font-bold tracking-tight text-white">{rupiahRingkas(portoKini)}</div>
+                    <div className="text-sm text-zinc-400">Total Portofolio</div>
+                  </div>
+                </div>
+
+                {/* Menggantikan bilah "Client Satisfaction": grafik porto 12
+                    bulan. Bilah kemajuan cuma bisa bilang "98%"; garis ini
+                    bilang ARAH — dan arah itu yang sebenarnya dibeli orang. */}
+                <div className="mb-6">
+                  <div className="flex justify-between text-sm mb-2">
+                    <span className="text-zinc-400">Total Portofolio</span>
+                    <span className={tumbuh >= 0 ? "text-emerald-400 font-medium" : "text-red-400 font-medium"}>
+                      {tumbuh >= 0 ? "+" : ""}{tumbuh.toFixed(1)}% <span className="text-zinc-500 font-normal">12 bln</span>
+                    </span>
+                  </div>
+                  <div className="h-20 w-full">
+                    <GrafikPorto />
+                  </div>
+                </div>
+
+                <div className="h-px w-full bg-white/10 mb-6" />
+
+                <div className="grid grid-cols-3 gap-4 text-center">
+                  <StatItem value="2 thn" label="Pakai Tools" />
+                  <div className="w-px h-full bg-white/10 mx-auto" />
+                  <StatItem value={persen(stat.winrate)} label="Winrate" />
+                  <div className="w-px h-full bg-white/10 mx-auto" />
+                  <StatItem value={uang(stat.bersih, true)} label="PNL" />
+                </div>
+
+                <div className="mt-8 flex flex-wrap gap-2">
+                  <div className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-medium tracking-wide text-zinc-300">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                    </span>
+                    ACTIVE
+                  </div>
+                  <div className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-medium tracking-wide text-zinc-300">
+                    <Crown className="w-3 h-3 text-yellow-500" />
+                    PREMIUM
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Marquee: posisi yang sedang terbuka, bukan logo klien */}
+            <div className="animate-fade-in delay-500 relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 py-8 backdrop-blur-xl">
+              <h3 className="mb-6 px-8 text-sm font-medium text-zinc-400">
+                Posisi Sedang Terbuka
+                <span className="ml-2 text-zinc-600">{POSISI_TERBUKA.length}</span>
+              </h3>
+
+              <div
+                className="relative flex overflow-hidden"
+                style={{
+                  maskImage: "linear-gradient(to right, transparent, black 20%, black 80%, transparent)",
+                  WebkitMaskImage: "linear-gradient(to right, transparent, black 20%, black 80%, transparent)"
+                }}
+              >
+                <div className="animate-marquee flex gap-10 whitespace-nowrap px-4">
+                  {[...POSISI_TERBUKA, ...POSISI_TERBUKA, ...POSISI_TERBUKA].map((p, i) => {
+                    const gerak = ((p.hargaKini - p.entry) / p.entry) * 100 * (p.arah === "BUY" ? 1 : -1);
+                    return (
+                      <div key={i} className="flex items-center gap-2.5 transition-all hover:scale-105 cursor-default">
+                        <IkonKoin simbol={p.simbol} />
+                        <span className="text-lg font-bold text-white tracking-tight">
+                          {p.simbol.replace("USDT", "")}
+                        </span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                          p.arah === "BUY" ? "bg-emerald-500/15 text-emerald-400" : "bg-red-500/15 text-red-400"
+                        }`}>
+                          {p.arah}
+                        </span>
+                        <span className={`text-sm tabular-nums ${gerak >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                          {gerak >= 0 ? "+" : ""}{gerak.toFixed(2)}%
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

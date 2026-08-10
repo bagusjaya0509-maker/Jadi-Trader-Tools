@@ -1,0 +1,119 @@
+@import "tailwindcss";
+
+/* ════════════════════════════════════════════════════════════════════════
+   DESAIN #3 — mengikuti Efferd Dashboard 2
+   ════════════════════════════════════════════════════════════════════════
+   Sengaja TIDAK mendaftarkan token warna sendiri. Kedua komponen acuan
+   (glassmorphism-trust-hero dan Efferd) ditulis memakai palet bawaan
+   Tailwind — zinc-950, zinc-400, white/10, green-500. Menambahkan token
+   sendiri di atasnya cuma membuka peluang keduanya bentrok, dan permintaannya
+   jelas: jangan ubah apa pun dari desain aslinya.
+
+   Yang diatur di sini cuma tiga: huruf, latar dasar, dan hal-hal yang memang
+   tidak dibawa komponen (scrollbar, fokus, gerak-dikurangi).
+   ════════════════════════════════════════════════════════════════════════ */
+
+@theme {
+  /* Efferd memakai grotesk netral. Space Grotesk dipertahankan untuk angka
+     besar & judul karena karakternya paling dekat, sementara badan teks
+     memakai Inter — di sini Inter memang pilihan yang tepat, bukan bawaan
+     malas: acuan desainnya jelas berbasis grotesk netral. */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-display: 'Space Grotesk', 'Inter', sans-serif;
+  --font-mono: 'IBM Plex Mono', 'SF Mono', Consolas, monospace;
+
+  --animate-masuk: masuk 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes masuk {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: none; }
+}
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--color-zinc-950);
+  color: var(--color-zinc-100);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Angka selalu tabular — di terminal trading, digit yang bergeser tiap kali
+   harga berubah memaksa mata mencari ulang posisinya. */
+.angka { font-variant-numeric: tabular-nums; }
+
+::selection { background: #ffcd75; color: #09090b; }
+
+:focus-visible {
+  outline: 2px solid #ffcd75;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+* { scrollbar-width: thin; scrollbar-color: var(--color-zinc-700) transparent; }
+*::-webkit-scrollbar { width: 9px; height: 9px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background: var(--color-zinc-800); border-radius: 9px; }
+*::-webkit-scrollbar-thumb:hover { background: var(--color-zinc-700); }
+
+/* ════════════════════════════════════════════════════════════════════════
+   PERAGA PRODUK — gerak dengan CSS, bukan SMIL
+   ════════════════════════════════════════════════════════════════════════
+   Versi sebelumnya memakai <animate> SMIL dan dilaporkan "tidak bergerak".
+   Penyebabnya bukan sintaks yang salah — SMIL-nya benar — melainkan bahwa
+   SMIL berhenti diam-diam di sejumlah keadaan (tab tidak dikomposit, SVG
+   dipakai ulang lewat <use>, beberapa mesin peramban tertanam), dan
+   kegagalannya tidak meninggalkan satu baris pun di konsol.
+
+   transform, opacity, dan stroke-dashoffset lewat CSS berjalan lewat jalur
+   animasi biasa yang sama dengan seluruh antarmuka lain di aplikasi ini.
+   Kalau ini ikut mati, hover dan transisi sidebar juga mati — dan itu jauh
+   lebih mudah disadari daripada satu kotak peraga yang membeku.
+
+   Semuanya memakai transform/opacity saja: keduanya tidak memicu layout,
+   jadi empat peraga yang berputar bersamaan tetap 60 fps.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* Tirai menyapu ke kanan sambil memunculkan lilin, lalu diam 28% durasi
+   sebelum mengulang. Tanpa jeda itu, peraga terbaca berkedip. */
+@keyframes peraga-tirai   { 0% { transform: translateX(-420px); } 72%, 100% { transform: translateX(0); } }
+@keyframes peraga-pemutar { 0% { transform: translateX(0); }      72%, 100% { transform: translateX(420px); } }
+@keyframes peraga-sinyal  { 0%, 35.5% { opacity: 0; } 40%, 96% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes peraga-denyut  { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.9); opacity: .35; } }
+@keyframes peraga-paket   { 0% { transform: translateX(0); opacity: 0; } 10%, 85% { opacity: 1; } 100% { transform: translateX(126px); opacity: 0; } }
+@keyframes peraga-zona    { 0%, 100% { opacity: .2; } 50% { opacity: .34; } }
+@keyframes peraga-gambar  { 0% { stroke-dashoffset: 100; } 70%, 100% { stroke-dashoffset: 0; } }
+@keyframes peraga-kursor  { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+.peraga-tirai   { animation: peraga-tirai   6s linear infinite; }
+.peraga-pemutar { animation: peraga-pemutar 6s linear infinite; }
+.peraga-sinyal  { animation: peraga-sinyal  6s linear infinite; }
+.peraga-paket   { animation: peraga-paket   2.4s linear infinite; }
+.peraga-zona    { animation: peraga-zona    3s ease-in-out infinite; }
+.peraga-zona-b  { animation: peraga-zona    3s ease-in-out 1.5s infinite; }
+.peraga-gambar  { animation: peraga-gambar  6s linear infinite; }
+.peraga-kursor  { animation: peraga-kursor  1.1s step-end infinite; }
+
+/* fill-box supaya lingkaran membesar dari pusatnya sendiri, bukan dari sudut
+   kiri-atas viewBox — tanpa baris ini denyutnya melompat ke pojok. */
+.peraga-denyut {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: peraga-denyut 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+  /* Elemen ber-animasi-masuk harus tetap TERLIHAT, bukan sekadar berhenti —
+     komponen hero memakai `opacity: 0` sebagai keadaan awal, jadi tanpa baris
+     ini seluruh hero kosong bagi yang menyalakan setelan ini. */
+  .animate-fade-in, [class*="animate-"] { opacity: 1 !important; transform: none !important; }
+}

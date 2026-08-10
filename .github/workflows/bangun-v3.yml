@@ -1,0 +1,83 @@
+# ════════════════════════════════════════════════════════════════════════
+# BANGUN & TERBITKAN V3 OTOMATIS
+# ════════════════════════════════════════════════════════════════════════
+# Taruh berkas ini di repo sebagai:  .github/workflows/bangun-v3.yml
+#
+# Kenapa ini layak dipasang: situs ini selama ini diunggah lewat antarmuka
+# web GitHub. Cara itu tidak punya pengaman apa pun — tidak ada yang memberi
+# tahu kalau satu berkas terlewat, dan berkas di assets/ namanya berubah tiap
+# build. Satu berkas tertinggal = halaman blank tanpa pesan error.
+#
+# Dengan workflow ini, yang diunggah adalah SUMBER-nya. Hasil build dibuat
+# GitHub sendiri, jadi mustahil ada yang terlewat.
+#
+# ── YANG DILAKUKAN ─────────────────────────────────────────────────────
+# Membangun Template V3, lalu menaruh hasilnya di folder v3/ pada branch
+# yang sama. Situs HTML di akar TIDAK disentuh — keduanya tetap hidup.
+#
+# Sengaja TIDAK memakai actions/deploy-pages: aksi itu mengganti SELURUH
+# situs dengan artefak yang diunggahnya, jadi halaman HTML lama akan hilang.
+# ════════════════════════════════════════════════════════════════════════
+
+name: Bangun V3
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Template V3/**'
+      - '.github/workflows/bangun-v3.yml'
+  workflow_dispatch:        # bisa dijalankan manual dari tab Actions
+
+# Menulis balik ke repo, jadi butuh izin tulis.
+permissions:
+  contents: write
+
+# Kalau ada dua push beruntun, yang lama dibatalkan — tanpa ini keduanya
+# menulis ke folder yang sama dan bisa saling menimpa.
+concurrency:
+  group: bangun-v3
+  cancel-in-progress: true
+
+jobs:
+  bangun:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: 'Template V3/package-lock.json'
+
+      # `npm ci` bukan `npm install`: ci memakai package-lock apa adanya,
+      # jadi hasil build di GitHub sama persis dengan yang diuji di komputer.
+      - name: Pasang dependensi
+        working-directory: 'Template V3'
+        run: npm ci
+
+      - name: Bangun
+        working-directory: 'Template V3'
+        run: npm run build
+
+      # Folder v3/ dikosongkan dulu. Nama berkas di assets/ berhash dan
+      # berubah tiap build; tanpa dibersihkan, sisa build lama menumpuk
+      # selamanya dan repo membengkak tanpa ada yang memakainya.
+      - name: Pindahkan hasil ke v3/
+        run: |
+          rm -rf v3
+          mkdir -p v3
+          cp -r "Template V3/dist/." v3/
+
+      - name: Commit kalau ada yang berubah
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add v3
+          if git diff --staged --quiet; then
+            echo "Tidak ada perubahan pada hasil build."
+          else
+            git commit -m "Bangun V3 otomatis dari ${GITHUB_SHA::7}"
+            git push
+          fi
