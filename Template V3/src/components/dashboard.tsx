@@ -47,8 +47,11 @@ export function Dashboard() {
   const POSISI_TERBUKA = posisiMentah.map((p) => ({ ...p, hargaKini: hargaPasar[p.simbol] ?? p.hargaKini }));
   const saldoAwal = useSaldoAwal();
   const stat = statGabungan(RIWAYAT, saldoAwal);
-  const forex = statPer('forex');
-  const kripto = statPer('kripto');
+  /* Rincian dari daftar yang SAMA dengan totalnya. Dashboard adalah
+     penjumlahan jurnal Trade-Fi dan Kripto — kalau ketiganya tidak berasal
+     dari satu array, angkanya pasti berselisih cepat atau lambat. */
+  const forex = statPer(RIWAYAT, 'forex');
+  const kripto = statPer(RIWAYAT, 'kripto');
 
   const bulanIni = TRADING_BULANAN[TRADING_BULANAN.length - 1];
   const bulanLalu = TRADING_BULANAN[TRADING_BULANAN.length - 2];

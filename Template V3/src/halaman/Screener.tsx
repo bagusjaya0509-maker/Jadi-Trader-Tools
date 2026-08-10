@@ -51,10 +51,12 @@ const MODE: { v: ModeParallel; t: string }[] = [
   { v: 'only', t: 'Parallel Only' },
 ];
 
-/** Berapa koin yang dipindai sekali jalan. Memindai 120 koin × 3 timeframe
- *  berarti ratusan permintaan dan menit-menit menunggu; 40 sudah cukup
- *  untuk menemukan yang menarik, dan hasilnya keluar di bawah 20 detik. */
-const BATAS_PINDAI = 40;
+/** Semua koin aktif dipindai — 115 bawaan, ditambah yang kamu cari sendiri.
+ *  Sempat dibatasi 40 demi kecepatan, dan itu keliru: koin yang tidak ikut
+ *  dipindai tidak akan pernah memunculkan sinyal, dan tidak ada satu pun
+ *  tanda di layar bahwa ia dilewati. Screener yang diam-diam melewatkan
+ *  dua pertiga pasar lebih buruk daripada screener yang lambat. */
+const BATAS_PINDAI = Infinity;
 
 function Pilih({ nilai, opsi, onChange, mati }: {
   nilai: string; opsi: { v: string; t: string }[]; onChange: (v: string) => void; mati?: boolean;
@@ -162,8 +164,10 @@ function KartuPantau({ s, urutan, favorit, onBintang, onHapus }: {
   onBintang: () => void; onHapus: () => void;
 }) {
   const beli = s.arah === 'BUY';
+  /* Lebar tetap + shrink-0: di dalam baris flex yang menggulir, kartu tanpa
+     lebar akan diremas sampai isinya tidak terbaca. */
   return (
-    <Panel className="overflow-hidden">
+    <Panel className="w-[290px] shrink-0 overflow-hidden">
       <KepalaKartu s={s} urutan={urutan} favorit={favorit} onBintang={onBintang} onHapus={onHapus} />
 
       <div className="border-b border-zinc-800/60 bg-zinc-950/40 px-2 pt-2">
@@ -295,7 +299,7 @@ export default function Screener() {
   const daftarPindai = useMemo(() => {
     const fav = aktif.filter((s) => favSet.has(s));
     const sisa = aktif.filter((s) => !favSet.has(s));
-    return [...fav, ...sisa].slice(0, BATAS_PINDAI);
+    return Number.isFinite(BATAS_PINDAI) ? [...fav, ...sisa].slice(0, BATAS_PINDAI) : [...fav, ...sisa];
   }, [aktif, favSet]);
 
   const berjalan = useRef(false);
@@ -408,7 +412,11 @@ export default function Screener() {
               : `Tidak ada koin dengan SMI ${tf} di wilayah ekstrem saat ini.`}
           />
         ) : (
-          <div className="grid grid-cols-1 gap-4 px-5 pb-5 sm:grid-cols-2 xl:grid-cols-4">
+          /* Gulir mendatar, bukan grid yang terus turun. Area Pantau bisa
+             menghasilkan puluhan kartu sekaligus; dibiarkan menumpuk ke bawah,
+             ia mendorong Parallel Signal dan Area Entry keluar layar — bagian
+             yang justru dipakai untuk entry jadi tidak terlihat sama sekali. */
+          <div className="flex gap-4 overflow-x-auto px-5 pb-5">
             {pantauTampil.map((s, i) => (
               <KartuPantau
                 key={s.simbol} s={s} urutan={i + 1}

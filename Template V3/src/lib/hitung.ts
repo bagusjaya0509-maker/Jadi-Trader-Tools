@@ -1,4 +1,4 @@
-import { RIWAYAT, SALDO_AWAL, type Trade, type Sumber } from '@/data/contoh';
+import { SALDO_AWAL, type Trade, type Sumber } from '@/data/contoh';
 
 /* ════════════════════════════════════════════════════════════════════════
    SATU SUMBER PERHITUNGAN
@@ -52,8 +52,15 @@ export function statGabungan(trade: Trade[], saldoAwal = SALDO_AWAL): Stat {
   };
 }
 
-export function statPer(sumber: Sumber, saldoAwal = 0) {
-  return statGabungan(RIWAYAT.filter((t) => t.sumber === sumber), saldoAwal);
+/** Statistik satu sumber saja (forex / kripto).
+ *
+ *  Daftar transaksinya WAJIB dioper, tidak boleh diambil dari impor contoh.
+ *  Versi sebelumnya membaca `RIWAYAT` bawaan berkas ini, sehingga Dashboard
+ *  menampilkan total dari data hidup tapi rincian forex/kripto dari data
+ *  contoh — bagian-bagiannya tidak pernah menjumlah ke totalnya, dan tidak
+ *  ada satu pun tanda di layar bahwa keduanya datang dari sumber berbeda. */
+export function statPer(trade: Trade[], sumber: Sumber, saldoAwal = 0) {
+  return statGabungan(trade.filter((t) => t.sumber === sumber), saldoAwal);
 }
 
 export interface TitikEkuitas { i: number; nilai: number; label: string }
