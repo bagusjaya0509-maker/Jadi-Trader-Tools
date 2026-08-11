@@ -45,11 +45,7 @@ export interface AksiOrder {
    dan panel ini tidak perlu tahu apa pun tentang cara menggambar.
    ════════════════════════════════════════════════════════════════════════ */
 
-const KELAS_ISIAN =
-  'h-8 w-full rounded-md border border-zinc-800 bg-zinc-900/60 px-2 text-[12px] text-zinc-200 ' +
-  'outline-none transition-colors hover:border-zinc-700 focus-visible:border-zinc-600';
-
-export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, aturAksi, aturKendali, aturMulai, usulSl, usulTp, tanpaBingkai = false, tampil = true }: {
+export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, aturAksi, aturKendali, aturMulai, demoSetelan, usulSl, usulTp, tanpaBingkai = false, tampil = true }: {
   lilin: Lilin;
   simbol: string;
   tf: string;
@@ -74,6 +70,8 @@ export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, aturAks
      berisi tombol "Mulai Replay" — dua tekanan untuk satu maksud, dan yang
      pertama tidak menghasilkan apa pun selain panel. */
   aturMulai?: (f: (() => void) | null) => void;
+  /** Modal, % risiko, dan usulan SL/RR — diedit dari tiket pojok chart. */
+  demoSetelan: { modal: number; risikoPersen: number; kaliAtr: number; rr: number };
   /* false = komponennya tetap TERPASANG tapi tidak menggambar apa pun.
      Dipasang terus supaya tombol BUY/SELL di pojok chart tersedia sejak
      halaman dibuka — menyembunyikannya sampai tombol Replay ditekan berarti
@@ -82,10 +80,10 @@ export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, aturAks
 }) {
   const [main, setMain] = useState(false);
   const [cepat, setCepat] = useState(4);
-  const [modal, setModal] = useState(1000);
-  const [risikoPersen, setRisikoPersen] = useState(1);
-  const [kaliAtr, setKaliAtr] = useState(1.5);
-  const [rr, setRr] = useState(2);
+  /* Setelan demo hidup di HALAMAN, bukan di sini — tiket pojok yang
+     mengeditnya, dan panel ini tinggal memakainya. Dua salinan setelan
+     untuk satu order adalah cara pasti membuat keduanya berselisih. */
+  const { modal, risikoPersen, kaliAtr, rr } = demoSetelan;
 
   const [posisi, setPosisi] = useState<PosisiReplay | null>(null);
   /* Pending order demo: satu saja pada satu waktu, sama seperti posisinya. */
@@ -110,7 +108,6 @@ export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, aturAks
     const s = bacaSesi(simbol, tf);
     setPosisi(s?.posisi ?? null);
     setTrade(s?.trade ?? []);
-    setModal(s?.modal ?? 1000);
     setMain(false);
     if (s?.idx != null) setIdx(s.idx);
   }, [simbol, tf, setIdx]);
@@ -421,39 +418,14 @@ export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, aturAks
      dan panel yang muncul hanya untuk menanyakan hal yang sama sekali lagi
      mendorong grafiknya ke atas layar tanpa menambah apa pun. */
   if (!tampil || !hidup) return null;
+  /* Setelannya sudah pindah ke tiket pojok. Panel bawah tinggal punya satu
+     alasan hidup: pesan terakhir dan catatan latihan — kalau dua-duanya
+     kosong, tidak ada yang perlu digambar. */
+  if (!pesan && trade.length === 0) return null;
 
   return (
     <Bungkus kelas="mt-4 border-emerald-500/25" anak={<>
-      {/* Setelan risiko + hasil latihan.
-          ──────────────────────────────────────────────────────────────
-          Kendali putarnya sekarang ada DI DALAM grafik, dan tiket ordernya
-          di pojok chart. Yang tersisa di bawah cuma yang memang tidak
-          mendesak: ukuran risiko, dan catatan latihan yang sudah selesai. */}
-      <div className="px-5 py-4">
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <div>
-            <label className="mb-1 block text-[11px] text-zinc-500">Modal ($)</label>
-            <input type="number" value={modal} onChange={(e) => setModal(Number(e.target.value) || 0)} className={cn(KELAS_ISIAN, 'angka')} />
-          </div>
-          <div>
-            <label className="mb-1 block text-[11px] text-zinc-500">Risiko (%)</label>
-            <input type="number" step={0.25} value={risikoPersen} onChange={(e) => setRisikoPersen(Number(e.target.value) || 0)} className={cn(KELAS_ISIAN, 'angka')} />
-          </div>
-          <div>
-            <label className="mb-1 block text-[11px] text-zinc-500">Usulan SL (× ATR)</label>
-            <input type="number" step={0.1} value={kaliAtr} onChange={(e) => setKaliAtr(Number(e.target.value) || 0)} className={cn(KELAS_ISIAN, 'angka')} />
-          </div>
-          <div>
-            <label className="mb-1 block text-[11px] text-zinc-500">Usulan R : R</label>
-            <input type="number" step={0.5} value={rr} onChange={(e) => setRr(Number(e.target.value) || 0)} className={cn(KELAS_ISIAN, 'angka')} />
-          </div>
-        </div>
-        <p className="mt-2 text-[11.5px] leading-relaxed text-zinc-600">
-          Dua yang kanan hanya mengisi tiket saat pertama dibuka. Yang berlaku
-          adalah angka terakhir setelah garisnya digeser di chart.
-        </p>
-        {pesan && <div className="mt-2 text-[12px] text-zinc-400">{pesan}</div>}
-      </div>
+      {pesan && <div className="px-5 py-3 text-[12px] text-zinc-400">{pesan}</div>}
 
       {/* Hasil latihan */}
       {trade.length > 0 && (

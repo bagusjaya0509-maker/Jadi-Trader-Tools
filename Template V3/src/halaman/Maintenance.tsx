@@ -3,7 +3,8 @@ import { Upload, Trash2, RotateCcw, Plus, FileCode2, Image as ImageIcon, ShieldA
 import { Panel, PanelHead, KartuKpi, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn } from '@/lib/utils';
 import { useProduk, simpanKatalogProduk } from '@/lib/data';
-import { unggahGambar, keDataUrl } from '@/lib/admin';
+import { unggahGambar, keDataUrl, useLisensi, cabutLisensi } from '@/lib/admin';
+import { tanggalPendek } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 import { PanelLisensi } from '@/components/panel-lisensi';
 import { PanelKesehatan } from '@/components/panel-kesehatan';
@@ -19,6 +20,75 @@ import { PanelKesehatan } from '@/components/panel-kesehatan';
    keduanya berarti tombol hapus produk selalu berada satu klik dari tempat
    kamu memeriksa penjualan.
    ════════════════════════════════════════════════════════════════════════ */
+
+/* ── Lisensi aktif NYATA dari backend ────────────────────────────────────
+   Menggantikan dua baris prototipe yang dulu ditulis tangan di sini —
+   lisensi yang baru disetujui lewat panel Permintaan tidak pernah muncul,
+   dan itu terbaca sebagai "fiturnya belum jalan" padahal backend-nya sudah.
+   Cabut memanggil rute yang sama dengan V2. */
+function PanelLisensiAktif() {
+  const { data, memuat, galat, muatUlang } = useLisensi();
+  const [sibuk, setSibuk] = useState('');
+  const [pesan, setPesan] = useState('');
+
+  async function cabut(sidik: string) {
+    if (!confirm(`Cabut lisensi ${sidik}?\n\nPembelinya tidak bisa lagi membuka sumber produk dengan kode ini.`)) return;
+    setSibuk(sidik); setPesan('');
+    try {
+      await cabutLisensi(sidik);
+      setPesan(`Lisensi ${sidik} dicabut.`);
+      muatUlang();
+    } catch (e) {
+      setPesan('Gagal: ' + (e instanceof Error ? e.message : 'tidak diketahui'));
+    } finally { setSibuk(''); }
+  }
+
+  return (
+    <Panel className="mt-4">
+      <PanelHead
+        judul="Lisensi Aktif"
+        sub={`Kode yang sudah diaktifkan untuk pembeli · ${data.length} aktif.`}
+        kanan={
+          <button onClick={muatUlang} aria-label="Segarkan"
+            className="cursor-pointer rounded p-1 text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-200">
+            <RotateCcw className={cn('size-3.5', memuat && 'animate-spin')} />
+          </button>
+        }
+      />
+      <div className="px-5 pb-5">
+        {galat && <p className="mb-3 text-[12px] text-amber-300/90">{galat}</p>}
+        {pesan && <p className="mb-3 text-[12px] text-zinc-400">{pesan}</p>}
+        {data.length === 0 && !memuat ? (
+          <p className="py-4 text-center text-[12.5px] text-zinc-600">
+            Belum ada lisensi aktif. Menyetujui permintaan di panel atas akan menambahkannya ke sini.
+          </p>
+        ) : (
+          <TabelBungkus>
+            <Tabel>
+              <thead><tr><Th>Sidik kode</Th><Th>Produk</Th><Th>Catatan</Th><Th>Aktif sejak</Th><Th /></tr></thead>
+              <tbody>
+                {data.map((l) => (
+                  <Tr key={l.sidik}>
+                    <Td className="angka text-zinc-300">{l.sidik}</Td>
+                    <Td className="text-zinc-400">{l.produk || '—'}</Td>
+                    <Td className="text-zinc-400">{l.catatan || '—'}</Td>
+                    <Td className="whitespace-nowrap text-zinc-500">{l.tgl ? tanggalPendek(l.tgl) : '—'}</Td>
+                    <Td className="text-right">
+                      <button onClick={() => void cabut(l.sidik)} disabled={sibuk === l.sidik}
+                        className="cursor-pointer rounded border border-zinc-800 px-2 py-0.5 text-[11px] text-zinc-400 transition-colors hover:border-red-500/40 hover:text-red-400 disabled:opacity-50">
+                        {sibuk === l.sidik ? 'Mencabut…' : 'Cabut'}
+                      </button>
+                    </Td>
+                  </Tr>
+                ))}
+              </tbody>
+            </Tabel>
+          </TabelBungkus>
+        )}
+      </div>
+    </Panel>
+  );
+}
 
 export default function Maintenance() {
   /* Katalog NYATA dari Firestore, bukan salinan data contoh.
@@ -393,37 +463,7 @@ export default function Maintenance() {
         </div>
       </div>
 
-      <Panel className="mt-4">
-        <PanelHead judul="Lisensi Aktif" sub="Kode yang sudah diaktifkan untuk pembeli." />
-        <div className="px-5 pb-5">
-          <TabelBungkus>
-            <Tabel>
-              <thead><tr><Th>Sidik kode</Th><Th>Produk</Th><Th>Catatan</Th><Th>Aktif sejak</Th><Th /></tr></thead>
-              <tbody>
-                {[
-                  ['7669d6a058', 'jadi-trader-v3', 'Andi Pratama', '2 hari lalu'],
-                  ['3b1c9e4d72', 'jadi-trader-v3', 'Budi Santoso', '11 hari lalu'],
-                ].map(([sidik, produk, catatan, tgl]) => (
-                  <Tr key={sidik}>
-                    <Td className="angka text-zinc-300">{sidik}</Td>
-                    <Td className="text-zinc-400">{produk}</Td>
-                    <Td className="text-zinc-400">{catatan}</Td>
-                    <Td className="text-zinc-500">{tgl}</Td>
-                    <Td className="text-right">
-                      <button className="cursor-pointer rounded border border-zinc-800 px-2 py-0.5 text-[11px] text-zinc-400 transition-colors hover:border-red-500/40 hover:text-red-400">
-                        Cabut
-                      </button>
-                    </Td>
-                  </Tr>
-                ))}
-              </tbody>
-            </Tabel>
-          </TabelBungkus>
-          <p className="mt-3 text-[11.5px] text-zinc-600">
-            Prototipe — tombol di halaman ini belum menyentuh backend.
-          </p>
-        </div>
-      </Panel>
+      <PanelLisensiAktif />
 
       <PanelLisensi />
     </div>

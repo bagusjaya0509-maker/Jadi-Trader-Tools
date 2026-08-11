@@ -119,6 +119,9 @@ export default function ChartBacktest() {
      garis chart dihitung dari angka yang SAMA dengan yang akan dikirim. */
   const [nyataSetelan, setNyataSetelan] = useState<{ modal: number; leverage: number; metode: MetodeTp }>(
     { modal: 100, leverage: 4, metode: 'partial' });
+  /* Setelan latihan — dulu di panel bawah yang baru muncul saat replay;
+     order demo tidak bergantung replay, jadi setelannya ikut tiket. */
+  const [demoSetelan, setDemoSetelan] = useState({ modal: 1000, risikoPersen: 1, kaliAtr: 1.5, rr: 2 });
   const [sibukNyata, setSibukNyata] = useState(false);
   const [kabarNyata, setKabarNyata] = useState('');
   const mulaiReplay = useRef<(() => void) | null>(null);
@@ -494,7 +497,7 @@ export default function ChartBacktest() {
         <div className="border-t border-zinc-800/80 px-2 pb-2">
           {lilin.times.length > 0
             ? <ChartLilin lilin={lilin} garis={garis} trade={replayIdx === null ? hasil?.trade : undefined}
-                          tinggi={tampilSmi ? 620 : 500} hingga={replayIdx ?? undefined} smi={smi}
+                          tinggi={tampilSmi ? 680 : 560} hingga={replayIdx ?? undefined} smi={smi}
                           garisHarga={[...garisHarga, ...garisZona]}
                           onKlikBar={replayIdx === null ? undefined : setReplayIdx}
                           garisSeret={garisSeret}
@@ -502,6 +505,9 @@ export default function ChartBacktest() {
                             if (id === 'entry') entryDigeser.current = true;
                             setRencana((r) => ({ ...r, [id]: h }));
                           }}
+                          segmen={pine?.segmen}
+                          penandaPine={pine?.penanda}
+                          kotakPine={pine?.kotak}
                           mundur={DURASI_TF[tf] ? jamMundur(detik) : undefined}
                           hamparanBawah={kendaliReplay}
                           pojok={aksi ? (
@@ -529,7 +535,14 @@ export default function ChartBacktest() {
                                 const u = aksi.usul(arah);
                                 if (u) setRencana({ entry: u.entry, sl: u.sl || undefined, tp: u.tp || undefined });
                               }}
-                              onUbah={setRencana}
+                              onUbah={(r) => {
+                                /* Entry yang DIKETIK sama sengajanya dengan
+                                   yang diseret — dua-duanya keputusan, dan
+                                   penyusul harga otomatis harus berhenti
+                                   menimpanya. */
+                                if (r.entry !== rencana.entry) entryDigeser.current = true;
+                                setRencana(r);
+                              }}
                               onBatal={() => { setDraf(null); setKabarNyata(''); }}
                               onKirim={() => {
                                 const { entry, sl, tp } = rencana;
@@ -557,6 +570,7 @@ export default function ChartBacktest() {
                                 setDraf(null);
                               }}
                               nyataSetelan={nyataSetelan} aturNyata={setNyataSetelan}
+                              demoSetelan={demoSetelan} aturDemo={setDemoSetelan}
                               sibukNyata={sibukNyata} kabar={kabarNyata || undefined}
                               onTutup={aksi.tutup} mati={aksi.mati} />
                           ) : undefined} />
@@ -574,6 +588,7 @@ export default function ChartBacktest() {
             BUY/SELL di pojok chart tersedia sejak halaman dibuka. */}
         <div className={cn(replayIdx !== null ? 'border-t border-zinc-800/80' : 'hidden')}>
           <PanelReplay lilin={lilin} simbol={simbol} tf={tf} idx={replayIdx}
+                       demoSetelan={demoSetelan}
                        setIdx={setReplayIdx} aturGaris={setGarisHarga}
                        aturAksi={setAksi} aturKendali={setKendaliReplay}
                        aturMulai={simpanMulai}
@@ -583,7 +598,7 @@ export default function ChartBacktest() {
         </div>
       </Panel>
 
-      <PanelPine lilin={lilin} aturHasil={setPine} />
+      <PanelPine lilin={lilin} tf={tf} aturHasil={setPine} />
 
       {/* ── Setelan uji ── */}
       <Panel className="mt-4">

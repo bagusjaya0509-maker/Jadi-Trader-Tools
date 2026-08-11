@@ -33,7 +33,7 @@ const KUNCI_TUTUP = 'jt.pojokTutup';
 export function PojokOrder({
   posisi, hargaKini, draf, rencana, mode, jenis, risiko, tunda, onBatalTunda,
   onPilih, onUbah, onKirim, onBatal, onTutup, onGantiMode, mati,
-  nyataSetelan, aturNyata, sibukNyata, kabar,
+  nyataSetelan, aturNyata, sibukNyata, kabar, demoSetelan, aturDemo,
 }: {
   posisi: { arah: 'BUY' | 'SELL'; masuk: number; sl: number; tp: number; pnl: number; risiko: number; unit: number } | null;
   hargaKini?: number;
@@ -62,6 +62,11 @@ export function PojokOrder({
   sibukNyata?: boolean;
   /** Kabar terakhir dari pengiriman order (sukses/gagal/pending). */
   kabar?: string;
+  /** Setelan demo — modal, % risiko, usulan SL×ATR dan R:R. Dulu di panel
+   *  bawah yang cuma muncul saat replay; order demo tidak bergantung pada
+   *  replay, jadi setelannya pun tidak boleh. */
+  demoSetelan?: { modal: number; risikoPersen: number; kaliAtr: number; rr: number };
+  aturDemo?: (s: { modal: number; risikoPersen: number; kaliAtr: number; rr: number }) => void;
 }) {
   const nyata = mode === 'real';
   /* Terlipat atau terbuka — pilihan yang diingat. Saat ada tiket, posisi,
@@ -176,6 +181,38 @@ export function PojokOrder({
           <Isian k="tp" label="TP" warna="#10b981" />
         </div>
 
+        {/* Ukuran latihan diatur DI SINI, bukan di panel bawah replay —
+            order demo bisa dibuka tanpa menyentuh tombol replay sama
+            sekali, jadi setelannya harus ikut tiketnya. */}
+        {!nyata && demoSetelan && aturDemo && (
+          <div className="mt-1.5 flex items-end gap-1.5">
+            <label className="block">
+              <span className="mb-0.5 block text-[9.5px] uppercase tracking-wide text-zinc-500">Modal $</span>
+              <input value={demoSetelan.modal || ''} inputMode="decimal"
+                     onChange={(e) => aturDemo({ ...demoSetelan, modal: Number(e.target.value) || 0 })}
+                     className={cn(KELAS_ISIAN, 'angka w-[64px]')} />
+            </label>
+            <label className="block">
+              <span className="mb-0.5 block text-[9.5px] uppercase tracking-wide text-zinc-500">Risk %</span>
+              <input value={demoSetelan.risikoPersen || ''} inputMode="decimal"
+                     onChange={(e) => aturDemo({ ...demoSetelan, risikoPersen: Number(e.target.value) || 0 })}
+                     className={cn(KELAS_ISIAN, 'angka w-[52px]')} />
+            </label>
+            <label className="block">
+              <span className="mb-0.5 block text-[9.5px] uppercase tracking-wide text-zinc-500">SL ×ATR</span>
+              <input value={demoSetelan.kaliAtr || ''} inputMode="decimal"
+                     onChange={(e) => aturDemo({ ...demoSetelan, kaliAtr: Number(e.target.value) || 0 })}
+                     className={cn(KELAS_ISIAN, 'angka w-[52px]')} />
+            </label>
+            <label className="block">
+              <span className="mb-0.5 block text-[9.5px] uppercase tracking-wide text-zinc-500">R : R</span>
+              <input value={demoSetelan.rr || ''} inputMode="decimal"
+                     onChange={(e) => aturDemo({ ...demoSetelan, rr: Number(e.target.value) || 0 })}
+                     className={cn(KELAS_ISIAN, 'angka w-[48px]')} />
+            </label>
+          </div>
+        )}
+
         {/* Order sungguhan butuh UKURANNYA di tempat yang sama dengan
             levelnya — modal, leverage, dan metode TP yang persis sama
             dengan Area Entry. Tanpa ini tiketnya cuma setengah keputusan. */}
@@ -210,13 +247,32 @@ export function PojokOrder({
               {rr ? rr.toFixed(2) : '—'}
             </span>
           </span>
-          {risiko !== undefined && rr !== null && (
-            <span className="text-[10.5px] text-zinc-500">
-              <span className="angka text-red-400">-{uang(risiko)}</span>
-              {' / '}
-              <span className="angka text-emerald-400">+{uang(risiko * rr)}</span>
-            </span>
-          )}
+          {(() => {
+            /* REAL: dolar dari ukuran order yang SEBENARNYA — qty = modal ×
+               leverage / entry, dikali jarak harga. Angka risiko demo (persen
+               dari modal latihan) di sini menyesatkan: ia bukan uang yang
+               akan bergerak. */
+            if (nyata && nyataSetelan && entry && sl && tp) {
+              const qty = (nyataSetelan.modal * nyataSetelan.leverage) / entry;
+              return (
+                <span className="text-[10.5px] text-zinc-500">
+                  <span className="angka text-red-400">-{uang(qty * Math.abs(entry - sl))}</span>
+                  {' / '}
+                  <span className="angka text-emerald-400">+{uang(qty * Math.abs(tp - entry))}</span>
+                </span>
+              );
+            }
+            if (!nyata && risiko !== undefined && rr !== null) {
+              return (
+                <span className="text-[10.5px] text-zinc-500">
+                  <span className="angka text-red-400">-{uang(risiko)}</span>
+                  {' / '}
+                  <span className="angka text-emerald-400">+{uang(risiko * rr)}</span>
+                </span>
+              );
+            }
+            return null;
+          })()}
           <button onClick={onKirim} disabled={!arahBenar || mati || sibukNyata}
             title={arahBenar ? undefined : 'SL dan TP harus berada di sisi yang benar terhadap entry'}
             className={cn('ml-auto flex cursor-pointer items-center gap-1 rounded px-2.5 py-1 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40',

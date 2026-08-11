@@ -6,6 +6,7 @@ import {
 import type { Lilin } from '@/lib/pasar';
 import { cn, harga as fHarga } from '@/lib/utils';
 import type { TradeUji } from '@/lib/backtest';
+import type { SegmenPine, PenandaPine, KotakPine } from '@/lib/pine-bar';
 
 /* ════════════════════════════════════════════════════════════════════════
    CHART LILIN
@@ -61,7 +62,7 @@ export interface GarisSeret {
 
 export function ChartLilin({
   lilin, garis, trade, tinggi = 420, hingga, garisHarga, onKlikBar, smi, mundur, pojok,
-  garisSeret, onSeret, hamparanBawah,
+  garisSeret, onSeret, hamparanBawah, segmen, penandaPine, kotakPine,
 }: {
   lilin: Lilin;
   garis?: Garis[];
@@ -88,6 +89,12 @@ export function ChartLilin({
   /** Panel yang ditumpangkan di bagian bawah area harga — dipakai kendali
    *  replay, supaya ia menyatu dengan grafik alih-alih memanjangkan halaman. */
   hamparanBawah?: React.ReactNode;
+  /** Trendline miring dari Pine (line.new) — bar → waktu di sini. */
+  segmen?: SegmenPine[];
+  /** Label BUY/SELL dari Pine (label.new / plotshape). */
+  penandaPine?: PenandaPine[];
+  /** Kotak zona dari Pine (box.new) — digambar sebagai tepi atas + bawah. */
+  kotakPine?: KotakPine[];
 }) {
   const kotak = useRef<HTMLDivElement>(null);
   const chart = useRef<IChartApi | null>(null);
@@ -236,6 +243,57 @@ export function ChartLilin({
     });
   }, [garis, lilin, hingga]);
 
+  /* ── Trendline & kotak dari Pine ───────────────────────────────────
+     line.new Pine memakai KOORDINAT BAR; lightweight-charts memakai waktu.
+     Bar di dalam data dipetakan langsung; bar di masa depan (garis yang
+     diperpanjang ke kanan) diekstrapolasi dari durasi timeframe — chart
+     menerima stempel waktu masa depan sebagai ruang kosong. */
+  const seriPine = useRef<ISeriesApi<'Line'>[]>([]);
+  useEffect(() => {
+    const c = chart.current;
+    if (!c) return;
+    seriPine.current.forEach((s) => { try { c.removeSeries(s); } catch { /* lepas */ } });
+    seriPine.current = [];
+    if (!lilin.times.length) return;
+    const n = lilin.times.length;
+    const tfMs = n > 1 ? lilin.times[1] - lilin.times[0] : 3_600_000;
+    const waktuBar = (x: number) => {
+      const b = Math.round(x);
+      const ms = b < n ? lilin.times[Math.max(0, b)] : lilin.times[n - 1] + (b - (n - 1)) * tfMs;
+      return Math.floor(ms / 1000) as Time;
+    };
+    const gambarGaris = (x1: number, y1: number, x2: number, y2: number, warna: string, lebar: number, gaya: 'solid' | 'dashed' | 'dotted') => {
+      if (x1 === x2) return;
+      let [a, va, b, vb] = x1 < x2 ? [x1, y1, x2, y2] : [x2, y2, x1, y1];
+      const s = c.addSeries(LineSeries, {
+        color: warna, lineWidth: Math.min(4, Math.max(1, Math.round(lebar))) as 1 | 2 | 3 | 4,
+        lineStyle: gaya === 'dashed' ? 2 : gaya === 'dotted' ? 1 : 0,
+        priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
+      });
+      /* Titik antara ikut digambar supaya garisnya lurus melintasi bar —
+         dua titik saja cukup untuk lightweight-charts, tapi bar renggang
+         (whitespace masa depan) butuh titik nyata di tiap ujung. */
+      const kemiringan = (vb - va) / (b - a);
+      const data: { time: Time; value: number }[] = [];
+      for (let x = Math.max(0, Math.floor(a)); x <= b; x++) {
+        data.push({ time: waktuBar(x), value: va + kemiringan * (x - a) });
+      }
+      if (data.length >= 2) { s.setData(data); seriPine.current.push(s); }
+      else { try { c.removeSeries(s); } catch { /* kosong */ } }
+    };
+    (segmen ?? []).forEach((g) => {
+      let { x1, y1, x2, y2 } = g;
+      const kemiringan = x2 !== x1 ? (y2 - y1) / (x2 - x1) : 0;
+      if (g.perpanjang === 'left' || g.perpanjang === 'both') { y1 = y1 + kemiringan * (0 - x1); x1 = 0; }
+      if (g.perpanjang === 'right' || g.perpanjang === 'both') { const xr = n - 1 + 15; y2 = y2 + kemiringan * (xr - x2); x2 = xr; }
+      gambarGaris(x1, y1, x2, y2, g.warna, g.lebar, g.gaya);
+    });
+    (kotakPine ?? []).forEach((k) => {
+      gambarGaris(k.kiri, k.atas, k.kanan, k.atas, k.garis, 1, 'solid');
+      gambarGaris(k.kiri, k.bawah, k.kanan, k.bawah, k.garis, 1, 'solid');
+    });
+  }, [segmen, kotakPine, lilin]);
+
   /* Penanda entry & exit tiap trade hasil backtest */
   useEffect(() => {
     if (!seri.current) return;
@@ -259,9 +317,22 @@ export function ChartLilin({
         shape: 'circle' as const,
         text: t.sebab,
       },
-    ]).sort((a, b) => (a.time as number) - (b.time as number));
+    ]);
+    /* Label Pine ikut lewat plugin penanda yang sama — satu saluran untuk
+       semua tanda di atas lilin. */
+    (penandaPine ?? []).forEach((m) => {
+      if (m.bar < 0 || m.bar >= lilin.times.length) return;
+      tanda.push({
+        time: Math.floor(lilin.times[m.bar] / 1000) as Time,
+        position: (m.posisi === 'bawah' ? 'belowBar' : 'aboveBar') as 'belowBar' | 'aboveBar',
+        color: m.warna,
+        shape: (m.posisi === 'bawah' ? 'arrowUp' : 'arrowDown') as 'arrowUp' | 'arrowDown',
+        text: m.teks.split('\n')[0].slice(0, 18),
+      });
+    });
+    tanda.sort((a, b) => (a.time as number) - (b.time as number));
     p.setMarkers(tanda);
-  }, [trade]);
+  }, [trade, penandaPine, lilin]);
 
   /* ── Menempelkan hamparan ke skala harga ───────────────────────────
      Posisinya ditulis LANGSUNG ke gaya elemennya di dalam

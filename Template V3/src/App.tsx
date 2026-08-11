@@ -80,6 +80,35 @@ const Billing       = lazy(() => muat(() => import('@/halaman/Billing')));
 const Dokumentasi   = lazy(() => muat(() => import('@/halaman/Dokumentasi')));
 const Changelog     = lazy(() => muat(() => import('@/halaman/Changelog')));
 
+/* ── Pramuat halaman lain SAAT SENGGANG ─────────────────────────────────
+   Tiap halaman adalah potongan JS terpisah yang baru diunduh saat pertama
+   dikunjungi — itulah jeda "pindah halaman kok lama" yang terasa, apalagi
+   lewat CDN GitHub Pages. Setelah halaman pertama tenang, sisanya ditarik
+   diam-diam di waktu senggang; kunjungan berikutnya tinggal membuka berkas
+   yang sudah ada di cache. Kegagalan diabaikan — ini percepatan, bukan
+   keharusan, dan halaman yang gagal dipramuat tetap termuat normal saat
+   benar-benar dibuka. */
+if (typeof window !== 'undefined') {
+  const pramuat = () => {
+    [
+      () => import('@/components/dashboard'),
+      () => import('@/halaman/Jurnal'),
+      () => import('@/halaman/Chart'),
+      () => import('@/halaman/ScreenerV2'),
+      () => import('@/halaman/Marketplace'),
+      () => import('@/halaman/Integrasi'),
+      () => import('@/halaman/PersonalArea'),
+      () => import('@/halaman/Maintenance'),
+      () => import('@/halaman/Pemilik'),
+    ].forEach((f, i) => setTimeout(() => { f().catch(() => { /* nanti saat dibuka */ }); }, i * 400));
+  };
+  if ('requestIdleCallback' in window) {
+    window.requestIdleCallback(() => setTimeout(pramuat, 2000), { timeout: 8000 });
+  } else {
+    setTimeout(pramuat, 5000);
+  }
+}
+
 function KeAtas() {
   const { pathname } = useLocation();
   useEffect(() => { window.scrollTo(0, 0); }, [pathname]);

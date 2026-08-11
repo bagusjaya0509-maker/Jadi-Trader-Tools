@@ -17,8 +17,9 @@ import type { Lilin } from '@/lib/pasar';
 
 const KUNCI = 'jt.pineKode';
 
-export function PanelPine({ lilin, aturHasil }: {
+export function PanelPine({ lilin, tf = '4h', aturHasil }: {
   lilin: Lilin;
+  tf?: string;
   aturHasil: (h: HasilPine | null) => void;
 }) {
   const [kode, setKode] = useState(() => {
@@ -34,12 +35,16 @@ export function PanelPine({ lilin, aturHasil }: {
 
   function jalankan() {
     if (!lilin.closes.length) return;
-    const h = jalankanPine(kode, lilin);
+    const h = jalankanPine(kode, lilin, tf);
     setHasil(h);
     /* Plot tetap dikirim ke chart meski ADA galat: skrip sepuluh baris yang
        satu barisnya salah masih menghasilkan sembilan garis yang benar, dan
-       membuang semuanya membuat perbaikan jadi menebak dalam gelap. */
-    aturHasil(h.plot.length ? h : null);
+       membuang semuanya membuat perbaikan jadi menebak dalam gelap.
+       Trendline, label, dan kotak dari mesin per-bar dihitung sebagai
+       keluaran juga — skrip macam Break&Retest tidak punya plot() sama
+       sekali, seluruh keluarannya garis dan label. */
+    const adaKeluaran = h.plot.length || h.segmen?.length || h.penanda?.length || h.kotak?.length;
+    aturHasil(adaKeluaran ? h : null);
   }
 
   function bersihkan() {
@@ -88,11 +93,16 @@ export function PanelPine({ lilin, aturHasil }: {
 
           {hasil && (
             <div className="mt-3 space-y-2">
-              {hasil.plot.length > 0 && (
+              {(hasil.plot.length > 0 || (hasil.segmen?.length ?? 0) > 0 || (hasil.penanda?.length ?? 0) > 0) && (
                 <div className="flex items-start gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/[0.04] p-3">
                   <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-500" />
                   <div className="text-[12.5px] text-zinc-300">
-                    {hasil.plot.length} garis digambar:{' '}
+                    {[
+                      hasil.plot.length ? `${hasil.plot.length} garis` : '',
+                      hasil.segmen?.length ? `${hasil.segmen.length} trendline` : '',
+                      hasil.penanda?.length ? `${hasil.penanda.length} label` : '',
+                      hasil.kotak?.length ? `${hasil.kotak.length} kotak` : '',
+                    ].filter(Boolean).join(' · ')} digambar:{' '}
                     {hasil.plot.map((p) => (
                       <span key={p.judul} className="mr-2 inline-flex items-center gap-1">
                         <span className="size-2 rounded-sm" style={{ background: p.warna }} />
