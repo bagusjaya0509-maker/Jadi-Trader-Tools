@@ -12,12 +12,12 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202608110900">
+<meta name="jt-versi" content="202608111400">
 <script>
 /* Penjaga versi - lihat catatan lengkap di jurnal-trading.html. Mencegah browser
    menyajikan HTML lama dari cache saat halaman dimuat ulang. */
 (function(){
-  var VERSI_TAMPIL = "202608110900";
+  var VERSI_TAMPIL = "202608111400";
   var KUNCI_OK    = "jtVersiOk";      // versi yang sudah dipastikan benar-benar termuat
   var KUNCI_PAKSA = "jtVersiPaksa";   // versi yang sudah pernah dipaksa muat ulang
   try{
@@ -6001,7 +6001,7 @@
       // Kotak hasil pencarian tidak ikut sorotan "top 3": urutannya bukan hasil
       // peringkat, jadi menyorotinya akan menyesatkan.
       const dicari = c.dicari ? ' es-kartu-dicari' : '';
-      return `<div class="es-card pantau ${cls}${c.dicari?'':glow}${dicari}" data-symbol="${c.symbol}" data-tf="${c.tfValue}">
+      return `<div class="es-card pantau ${cls}${c.dicari?'':glow}${dicari}" data-symbol="${c.symbol}" data-tf="${c.tfValue}" data-price="${c.price}" data-sl="${c.sl != null ? c.sl : ''}" data-tp="${c.tp != null ? c.tp : ''}" data-arah="${c.signal || ''}">
         <div class="es-card-top">
           <div><span class="es-rank">#${i+1} &bull; TF ${c.tfLabel}</span><span class="es-symbol">${c.symbol.replace('USDT','')}</span></div>
           <div class="es-card-top-right">
@@ -10071,7 +10071,7 @@
       return window.location.origin + '/v3/#/chart' + q;
     }
 
-    let simbolAktif = null, bagianAktif = null;
+    let simbolAktif = null, bagianAktif = null, kartuAktifEl = null;
     const tutup = () => { menu.classList.remove('open'); simbolAktif = null; };
 
     document.addEventListener('contextmenu', (e) => {
@@ -10084,6 +10084,7 @@
       e.preventDefault();
       simbolAktif = kartu.getAttribute('data-symbol');
       bagianAktif = bagian;
+      kartuAktifEl = kartu;
 
       menu.innerHTML =
           '<div class="es-koin-menu-judul">' + simbolAktif.replace('USDT','') + '</div>'
@@ -10127,10 +10128,17 @@
            perlu menyalin dua angka dengan tangan tepat saat sedang
            memutuskan. Kartu tanpa level (mis. Area Pantau) mengirim kosong,
            dan halaman Chart membiarkan kotaknya kosong. */
-        var kartuAktif = document.querySelector('[data-symbol="' + simbol + '"][data-sl]');
+        var kartuAktif = (kartuAktifEl && kartuAktifEl.hasAttribute('data-sl'))
+          ? kartuAktifEl
+          : document.querySelector('[data-symbol="' + simbol + '"][data-sl]');
         var sl = kartuAktif ? kartuAktif.getAttribute('data-sl') : '';
         var tp = kartuAktif ? kartuAktif.getAttribute('data-tp') : '';
         var arah = kartuAktif ? kartuAktif.getAttribute('data-arah') : '';
+        /* Timeframe milik KARTUNYA menang atas pilihan dropdown — sinyal 4
+           jam harus terbuka di chart 4 jam, apa pun yang sedang dipilih di
+           atas. */
+        var tfKartu = kartuAktif ? kartuAktif.getAttribute('data-tf') : '';
+        if(tfKartu) tf = tfKartu;
         if(window.parent !== window){
           try{
             window.parent.postMessage({ jt: 'buka-chart', simbol: simbol, tf: tf, sl: sl, tp: tp, arah: arah }, window.location.origin);

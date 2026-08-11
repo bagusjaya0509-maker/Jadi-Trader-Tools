@@ -60,6 +60,12 @@ function kandidat(): string[] {
    `#esHiddenSections` (chip untuk memunculkan kembali section yang dilipat)
    sengaja TIDAK ikut disembunyikan — ia fungsional, bukan hiasan. */
 const CSS_TANPA_CANGKANG = `
+  /* Spinner emas "memeriksa sesi" milik V2 disembunyikan di sini — V3 sudah
+     menampilkan loadernya sendiri, dan dua indikator memuat untuk satu
+     halaman terbaca sebagai dua hal yang sedang rusak. Berlaku HANYA saat
+     ditempel; V2 yang berdiri sendiri tetap memakai spinnernya. */
+  .es-auth-loading{ display:none !important; }
+
   /* ─────────────────────────────────────────────────────────────────────
      SEMUA di berkas ini hanya menyentuh TAMPILAN, tidak satu pun logic.
      Yang diubah: huruf, warna, radius, dan tiga elemen yang disembunyikan.

@@ -24,6 +24,25 @@ export interface Garis { nama: string; nilai: (number | null)[]; warna: string }
 
 export interface GarisHarga { harga: number; warna: string; label: string }
 
+/* ── Tinggi panel SMI ──────────────────────────────────────────────────
+   Bawaannya 80 px — cukup untuk membaca arah dan silangnya, dan tidak
+   bertabrakan dengan kendali replay yang menumpang di dasar area harga.
+
+   Tinggi yang DIPILIH orangnya (menyeret pembatas panel) menang atas
+   bawaan dan bertahan melintasi muat ulang. Efek yang menggambar ulang SMI
+   berjalan tiap kali data disegarkan; tanpa penyimpanan ini, setiap
+   penyegaran mengembalikan tinggi panel ke bawaan — persis bug "saya sudah
+   atur kok balik sendiri". */
+const KUNCI_TINGGI_SMI = 'jt.tinggiSmi';
+const TINGGI_SMI_BAWAAN = 80;
+
+function bacaTinggiSmi(): number {
+  try {
+    const n = Number(localStorage.getItem(KUNCI_TINGGI_SMI));
+    return n >= 40 && n <= 400 ? n : TINGGI_SMI_BAWAAN;
+  } catch { return TINGGI_SMI_BAWAAN; }
+}
+
 /** Garis yang bisa DIGESER: entry, SL, TP.
  *
  *  Digambar sebagai elemen DOM di atas kanvas, bukan sebagai price line
@@ -35,6 +54,8 @@ export interface GarisSeret {
   harga: number;
   warna: string;
   label: string;
+  /** Keterangan di belakang harga: risiko dolar, jenis order. */
+  ket?: string;
   bisaSeret?: boolean;
 }
 
@@ -178,7 +199,7 @@ export function ChartLilin({
         axisLabelVisible: false, title: '',
       }));
     }
-    try { c.panes()[1]?.setHeight(110); } catch { /* versi tanpa panes API */ }
+    try { c.panes()[1]?.setHeight(tinggiSmi.current); } catch { /* versi tanpa panes API */ }
   }, [smi, lilin, hingga]);
 
   /* Garis indikator */
@@ -240,6 +261,7 @@ export function ChartLilin({
 
      Menulis style.top di dalam rAF membuat label dan kanvas bergerak pada
      frame yang SAMA, dan React tidak dilibatkan sama sekali. */
+  const tinggiSmi = useRef(bacaTinggiSmi());
   const labelRef = useRef<HTMLDivElement>(null);
   const garisRef = useRef<Map<string, HTMLDivElement>>(new Map());
   const hamparanRef = useRef<HTMLDivElement>(null);
@@ -290,6 +312,31 @@ export function ChartLilin({
        skalanya — panel yang menutupi angka harga membuat satu-satunya hal
        yang selalu ingin dibaca jadi tidak terbaca. */
     if (hamparanRef.current) hamparanRef.current.style.right = (lebar + 4) + 'px';
+
+    /* Tinggi panel SMI dibaca balik dari chart-nya.
+       ──────────────────────────────────────────────────────────────────
+       lightweight-charts tidak memberi tahu saat pembatas panel diseret,
+       jadi satu-satunya cara tahu adalah membacanya. Nilai yang berubah
+       berarti orangnya baru menyeret — simpan, supaya jadi bawaannya
+       sendiri untuk seterusnya. Kendali replay ikut digeser supaya tetap
+       duduk di atas panel SMI, bukan di belakangnya. */
+    try {
+      const panes = c.panes();
+      if (panes.length > 1) {
+        const h = panes[1].getHeight();
+        /* h = 0 berarti panelnya BELUM diukur (tab latar, frame pertama) —
+           bukan berarti panelnya setipis nol. Jangan simpan, jangan geser. */
+        if (h >= 40) {
+          if (Math.abs(h - tinggiSmi.current) > 1) {
+            tinggiSmi.current = h;
+            try { localStorage.setItem(KUNCI_TINGGI_SMI, String(Math.round(h))); } catch { /* privat */ }
+          }
+          if (hamparanRef.current) hamparanRef.current.style.bottom = (h + 36) + 'px';
+        }
+      } else if (hamparanRef.current) {
+        hamparanRef.current.style.bottom = '34px';
+      }
+    } catch { /* versi tanpa panes API */ }
   }, []);
 
   /* Dipasang SEKALI segera setelah menggambar, di luar rAF.
@@ -402,7 +449,7 @@ export function ChartLilin({
             }} />
             <span className="angka mr-0.5 shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-zinc-950 shadow"
                   style={{ background: g.warna }}>
-              {g.label} {fHarga(g.harga)}
+              {g.label} {fHarga(g.harga)}{g.ket ? ` ${g.ket}` : ''}
             </span>
           </div>
         );
@@ -414,7 +461,7 @@ export function ChartLilin({
           terpisah di bawah chart — latarnya tembus supaya menyatu dengan
           grafiknya. */}
       {hamparanBawah && (
-        <div ref={hamparanRef} className="absolute left-2 z-20" style={{ bottom: smi ? 132 : 34 }}>
+        <div ref={hamparanRef} className="absolute left-2 z-20" style={{ bottom: smi ? 120 : 34 }}>
           {hamparanBawah}
         </div>
       )}

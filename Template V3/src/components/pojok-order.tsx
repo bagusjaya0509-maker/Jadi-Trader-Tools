@@ -1,4 +1,5 @@
-import { TrendingUp, TrendingDown, X, Check, Ban } from 'lucide-react';
+import { useState } from 'react';
+import { TrendingUp, TrendingDown, X, Check, Ban, CandlestickChart, Minus, Hourglass } from 'lucide-react';
 import { cn, uang, harga as fHarga } from '@/lib/utils';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -26,12 +27,21 @@ const KELAS_ISIAN =
   'h-7 w-full rounded border border-zinc-700 bg-zinc-900 px-1.5 text-[11px] text-zinc-100 ' +
   'outline-none transition-colors focus-visible:border-zinc-500';
 
+const KUNCI_TUTUP = 'jt.pojokTutup';
+
 export function PojokOrder({
-  posisi, hargaKini, draf, rencana, mode,
+  posisi, hargaKini, draf, rencana, mode, jenis, risiko, tunda, onBatalTunda,
   onPilih, onUbah, onKirim, onBatal, onTutup, onGantiMode, mati,
 }: {
-  posisi: { arah: 'BUY' | 'SELL'; masuk: number; sl: number; tp: number; pnl: number } | null;
+  posisi: { arah: 'BUY' | 'SELL'; masuk: number; sl: number; tp: number; pnl: number; risiko: number; unit: number } | null;
   hargaKini?: number;
+  /** Label jenis order hasil letak garis entry: "Market", "Buy Limit", dst. */
+  jenis?: string;
+  /** Risiko dolar menurut setelan saat ini. */
+  risiko?: number;
+  /** Pending order demo yang sedang menunggu harganya tersentuh. */
+  tunda?: { arah: 'BUY' | 'SELL'; jenis: 'MARKET' | 'LIMIT' | 'STOP'; entry: number; sl: number; tp: number } | null;
+  onBatalTunda?: () => void;
   /** Arah tiket yang sedang disusun. null = belum ada tiket. */
   draf: 'BUY' | 'SELL' | null;
   rencana: RencanaOrder;
@@ -45,6 +55,16 @@ export function PojokOrder({
   mati?: boolean;
 }) {
   const nyata = mode === 'real';
+  /* Terlipat atau terbuka — pilihan yang diingat. Saat ada tiket, posisi,
+     atau pending, panelnya SELALU tampil: keadaan yang sedang membawa uang
+     tidak boleh tersembunyi di balik ikon. */
+  const [tutupPanel, setTutupPanel] = useState(() => {
+    try { return localStorage.getItem(KUNCI_TUTUP) === '1'; } catch { return false; }
+  });
+  function aturTutup(v: boolean) {
+    setTutupPanel(v);
+    try { localStorage.setItem(KUNCI_TUTUP, v ? '1' : '0'); } catch { /* privat */ }
+  }
 
   const Lencana = (
     <button onClick={() => onGantiMode(nyata ? 'demo' : 'real')}
@@ -55,6 +75,24 @@ export function PojokOrder({
       {nyata ? 'REAL' : 'DEMO'}
     </button>
   );
+
+  /* ── Pending order menunggu ────────────────────────────────────────── */
+  if (tunda) {
+    return (
+      <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-zinc-900/90 px-2 py-1.5 backdrop-blur-sm">
+        {Lencana}
+        <Hourglass className="size-3.5 text-amber-400" />
+        <span className="text-[11px] text-amber-200/90">
+          {tunda.arah === 'BUY' ? 'Buy' : 'Sell'} {tunda.jenis === 'STOP' ? 'Stop' : 'Limit'}{' '}
+          <span className="angka">{fHarga(tunda.entry)}</span> menunggu
+        </span>
+        <button onClick={onBatalTunda} title="Batalkan pending order"
+          className="flex cursor-pointer items-center gap-1 rounded border border-zinc-700 px-1.5 py-0.5 text-[10.5px] text-zinc-300 transition-colors hover:border-zinc-500">
+          <Ban className="size-3" /> Batal
+        </button>
+      </div>
+    );
+  }
 
   /* ── Posisi sudah berjalan ─────────────────────────────────────────── */
   if (posisi) {
@@ -111,6 +149,15 @@ export function PojokOrder({
             draf === 'BUY' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400')}>
             {draf}
           </span>
+          {/* Jenis order MENGIKUTI letak garis entry — geser ke atas harga
+              dan tulisannya berubah sendiri. Keterangan inilah cara orangnya
+              tahu seretan barusan mengubah jenis ordernya. */}
+          {jenis && (
+            <span className={cn('rounded px-1.5 py-0.5 text-[9.5px] font-medium',
+              jenis === 'Market' ? 'bg-zinc-800 text-zinc-300' : 'bg-amber-500/15 text-amber-300')}>
+              {jenis}
+            </span>
+          )}
           <span className="text-[10.5px] text-zinc-500">geser garisnya di chart</span>
         </div>
 
@@ -126,6 +173,13 @@ export function PojokOrder({
               {rr ? rr.toFixed(2) : '—'}
             </span>
           </span>
+          {risiko !== undefined && rr !== null && (
+            <span className="text-[10.5px] text-zinc-500">
+              <span className="angka text-red-400">-{uang(risiko)}</span>
+              {' / '}
+              <span className="angka text-emerald-400">+{uang(risiko * rr)}</span>
+            </span>
+          )}
           <button onClick={onKirim} disabled={!arahBenar || mati}
             title={arahBenar ? undefined : 'SL dan TP harus berada di sisi yang benar terhadap entry'}
             className={cn('ml-auto flex cursor-pointer items-center gap-1 rounded px-2.5 py-1 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40',
@@ -142,7 +196,17 @@ export function PojokOrder({
     );
   }
 
-  /* ── Diam: pilih arah ──────────────────────────────────────────────── */
+  /* ── Diam terlipat: cuma ikon ──────────────────────────────────────── */
+  if (tutupPanel) {
+    return (
+      <button onClick={() => aturTutup(false)} title="Buka panel order"
+        className="flex size-8 cursor-pointer items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900/85 text-zinc-400 backdrop-blur-sm transition-colors hover:border-zinc-600 hover:text-zinc-100">
+        <CandlestickChart className="size-4" />
+      </button>
+    );
+  }
+
+  /* ── Diam terbuka: pilih arah ──────────────────────────────────────── */
   return (
     <div className="flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900/85 px-1.5 py-1.5 backdrop-blur-sm">
       {Lencana}
@@ -157,6 +221,10 @@ export function PojokOrder({
       {hargaKini !== undefined && (
         <span className="angka px-1 text-[11px] text-zinc-500">{fHarga(hargaKini)}</span>
       )}
+      <button onClick={() => aturTutup(true)} title="Lipat jadi ikon"
+        className="flex size-6 cursor-pointer items-center justify-center rounded text-zinc-600 transition-colors hover:text-zinc-300">
+        <Minus className="size-3.5" />
+      </button>
     </div>
   );
 }

@@ -283,12 +283,20 @@ function PanelPosisiJurnal({ sumber }: { sumber: Sumber }) {
 /** Catatan evaluasi satu baris. Warnanya menyampaikan nada sebelum
  *  kalimatnya dibaca — dan itu penting, karena kotak ini dibaca sekilas. */
 function CatatanKecil({ c }: { c: { nada: 'baik' | 'awas' | 'buruk'; teks: string } }) {
+  /* Kalimatnya abu-abu seperti teks penjelas lain; hanya ANGKA di dalamnya
+     yang diwarnai menurut nadanya. Satu paragraf penuh berwarna membuat
+     panel terlihat seperti peringatan, padahal isinya cuma keterangan —
+     dan warna yang dipakai di mana-mana berhenti berarti apa-apa. */
+  const warnaAngka =
+    c.nada === 'baik' ? 'text-emerald-500' : c.nada === 'buruk' ? 'text-red-400' : 'text-amber-400';
+  const potongan = c.teks.split(/(\$?-?\d[\d.,]*%?(?:x|×)?)/g);
   return (
-    <p className={cn('mt-1.5 text-[11px] leading-relaxed',
-      c.nada === 'baik' ? 'text-emerald-500/80'
-        : c.nada === 'buruk' ? 'text-red-400/85'
-        : 'text-amber-400/85')}>
-      {c.teks}
+    <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
+      {potongan.map((s, i) =>
+        /^\$?-?\d/.test(s)
+          ? <span key={i} className={cn('angka', warnaAngka)}>{s}</span>
+          : <span key={i}>{s}</span>
+      )}
     </p>
   );
 }
@@ -318,7 +326,8 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
      layering membuka puluhan order kecil untuk satu keputusan, dan tabel yang
      menampilkan tiap layer tidak bisa dibaca. Kripto tidak dirangkum: di sana
      satu baris memang satu posisi. */
-  const [rangkum, setRangkum] = useState(sumber !== 'kripto');
+  const rangkum = sumber !== 'kripto';
+  const [menuSinkron, setMenuSinkron] = useState(false);
   const barisTabel = useMemo(
     () => (rangkum ? rangkumLayering(trade) : trade.map((x) => ({ ...x, lapis: 1 }))),
     [rangkum, trade]
@@ -478,7 +487,8 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
                 {uang(stat.bersih, true)}
               </div>
               <div className="mt-2 text-[11.5px] text-zinc-500">
-                untung {uang(stat.untung)} · rugi {uang(stat.rugi)}
+                untung <span className="angka text-emerald-500">{uang(stat.untung)}</span>
+                {' · '}rugi <span className="angka text-red-400">{uang(stat.rugi)}</span>
               </div>
               {catPnl && (
                 <div className="mt-2.5 border-t border-zinc-800/60 pt-2.5">
@@ -508,8 +518,13 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
               menyusut, chart mempertahankan lebar lamanya, dan panelnya
               menonjol keluar kolom. Tanpa `min-w-0` tata letak ini hanya
               rapi di lebar tempat ia pertama kali digambar. */}
-          <div className="mt-4 grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
-            <div className="min-w-0 space-y-4 lg:col-span-2">
+          {/* TANPA items-start: item grid dibiarkan meregang setinggi baris,
+              jadi tepi bawah kalender selalu sejajar dengan tepi bawah panel
+              posisi terbuka — berapa pun lebar jendelanya. Dengan items-start
+              tiap panel berhenti setinggi isinya sendiri, dan begitu jendela
+              diubah keduanya berakhir compang-camping. */}
+          <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <div className="flex min-w-0 flex-col gap-4 lg:col-span-2">
             <Panel>
               <PanelHead
                 judul="Kurva Ekuitas"
@@ -554,12 +569,12 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
               </div>
             </Panel>
 
-            <PanelPosisiJurnal sumber={sumber} />
+            <div className="grow"><PanelPosisiJurnal sumber={sumber} /></div>
             </div>
 
-            <Panel className="min-w-0">
+            <Panel className="flex min-w-0 flex-col">
               <PanelHead judul="Kalender P/L" sub="Klik panah atau nama bulan untuk berpindah." />
-              <div className="px-5 pb-5"><Kalender pl={pl} /></div>
+              <div className="flex grow flex-col justify-start px-5 pb-5"><Kalender pl={pl} /></div>
             </Panel>
 
             <Panel className="min-w-0 lg:col-span-2">
@@ -570,18 +585,13 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
                   : `${Math.min(200, trade.length)} transaksi terakhir dari ${trade.length}.`}
                 kanan={
                   <span className="flex items-center gap-2">
-                  {/* Sinkron MT5 hanya di jurnal Trade-Fi — jurnal kripto sudah
-                      terisi sendiri lewat screener V2. */}
-                  {sumber !== 'kripto' && (
-                    <label title="Gabungkan order layering pada pair, arah, dan hari yang sama"
-                      className="flex cursor-pointer items-center gap-1.5 text-[11.5px] text-zinc-400">
-                      <input type="checkbox" checked={rangkum} onChange={(e) => setRangkum(e.target.checked)}
-                             className="size-3.5 cursor-pointer accent-zinc-200" />
-                      Rangkum layer
-                    </label>
-                  )}
+                  {/* Rangkum layering berjalan tanpa saklar di layar — akun cent
+                      dengan layering memang harus dirangkum, dan centang yang
+                      dipampang cuma menambah satu keputusan yang tidak pernah
+                      perlu diambil. Saklar auto-sinkron pindah ke KLIK KANAN
+                      pada tombol Sinkron MT5: opsi, bukan kendali utama. */}
                   {sumber === 'forex' && (
-                    <>
+                    <span className="relative flex items-center gap-2">
                       <select value={sejak} onChange={(e) => aturSejak(e.target.value)}
                         title="Seberapa jauh ke belakang yang diambil"
                         className="h-[30px] cursor-pointer rounded-md border border-zinc-800 bg-zinc-900/60 px-2 text-[11.5px] text-zinc-300 outline-none">
@@ -590,19 +600,29 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
                         <option value="180">6 bulan</option>
                         <option value="0">Semua</option>
                       </select>
-                      <label title="Tarik sendiri tiap 5 menit selama halaman terbuka"
-                        className="flex cursor-pointer items-center gap-1.5 text-[11.5px] text-zinc-400">
-                        <input type="checkbox" checked={otomatis} onChange={(e) => aturOtomatis(e.target.checked)}
-                               className="size-3.5 cursor-pointer accent-zinc-200" />
-                        Auto
-                      </label>
                       <button onClick={() => void tarikDariMt5()} disabled={!bisaTulis || sinkron.sibuk}
-                        title="Tarik transaksi tertutup dari MetaTrader 5 sekarang"
+                        onContextMenu={(e) => { e.preventDefault(); setMenuSinkron((v) => !v); }}
+                        title="Klik: tarik sekarang · Klik kanan: opsi auto-sinkron"
                         className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100 disabled:cursor-not-allowed disabled:opacity-50">
                         <RefreshCw className={cn('size-3.5', sinkron.sibuk && 'animate-spin')} />
                         {sinkron.sibuk ? 'Menarik…' : 'Sinkron MT5'}
+                        {otomatis && <span className="size-1.5 rounded-full bg-emerald-500" title="Auto-sinkron menyala" />}
                       </button>
-                    </>
+                      {menuSinkron && (
+                        <div className="absolute right-0 top-[36px] z-20 w-56 rounded-lg border border-zinc-800 bg-zinc-950 p-3 shadow-xl">
+                          <label className="flex cursor-pointer items-center gap-2 text-[12px] text-zinc-300">
+                            <input type="checkbox" checked={otomatis}
+                                   onChange={(e) => { aturOtomatis(e.target.checked); setMenuSinkron(false); }}
+                                   className="size-3.5 cursor-pointer accent-zinc-200" />
+                            Auto-sinkron tiap 5 menit
+                          </label>
+                          <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-600">
+                            Berjalan selama halaman ini terbuka. Titik hijau di
+                            tombol menandakan sedang menyala.
+                          </p>
+                        </div>
+                      )}
+                    </span>
                   )}
                   <button onClick={() => setModal('baru')} disabled={!bisaTulis}
                     title={bisaTulis ? undefined : 'Masuk dulu untuk menambah catatan'}

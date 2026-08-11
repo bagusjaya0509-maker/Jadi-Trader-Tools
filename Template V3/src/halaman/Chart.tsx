@@ -4,7 +4,7 @@ import { Play, Loader2, RefreshCw, Radio, TriangleAlert, History } from 'lucide-
 import { Panel, PanelHead, KartuKpi, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn, uang, persen, harga, tanggalPendek } from '@/lib/utils';
 import { ChartLilin, type Garis, type GarisHarga, type GarisSeret } from '@/components/chart-lilin';
-import { PanelReplay, type AksiOrder } from '@/components/panel-replay';
+import { PanelReplay, type AksiOrder, type JenisEntry } from '@/components/panel-replay';
 import { PojokOrder } from '@/components/pojok-order';
 import { KotakOrderNyata } from '@/components/kotak-order-nyata';
 import { PanelPine } from '@/components/panel-pine';
@@ -118,7 +118,7 @@ export default function ChartBacktest() {
   /* Tiket order SUNGGUHAN yang sudah dikonfirmasi arahnya di chart, menunggu
      konfirmasi kedua berisi angka. Uang sungguhan tidak berangkat dari satu
      tombol di atas grafik. */
-  const [tiketNyata, setTiketNyata] = useState<{ arah: 'BUY' | 'SELL'; sl: number; tp: number } | null>(null);
+  const [tiketNyata, setTiketNyata] = useState<{ arah: 'BUY' | 'SELL'; sl: number; tp: number; entry: number; jenis: JenisEntry } | null>(null);
   const mulaiReplay = useRef<(() => void) | null>(null);
   /* Stabil dengan sengaja: fungsi baru tiap render akan memicu ulang efek
      yang memasangnya di panel replay, dan efek itu memanggil setState. */
@@ -181,7 +181,7 @@ export default function ChartBacktest() {
     let hidup = true;
     async function tarik() {
       try {
-        const l = await ambilKlines(simbol, tf, 500);
+        const l = await ambilKlines(simbol, tf, 500, true);
         if (!hidup) return;
         if (!l.closes.length) { setGalat('Data tidak diterima. Proxy VPS mungkin sedang tidak menjawab.'); }
         else { setLilin(l); setGalat(''); }
@@ -197,7 +197,10 @@ export default function ChartBacktest() {
        tengah putar-ulang akan menggeser arti setiap indeks — posisi yang
        dibuka di bar 300 tiba-tiba menunjuk lilin yang berbeda. */
     if (replayIdx !== null) return () => { hidup = false; };
-    const jam = setInterval(tarik, 15_000);
+    /* 3 detik, bukan 15: chart yang sedang ditatap harus bergerak seperti
+       pasar, dan bebannya sudah dihitung di lib/pasar.ts — 3% dari jatah
+       rate limit Binance untuk satu chart. */
+    const jam = setInterval(tarik, 3_000);
     return () => { hidup = false; clearInterval(jam); };
   }, [simbol, tf, segar, replayIdx !== null]);
 
@@ -268,16 +271,74 @@ export default function ChartBacktest() {
   /* Posisi yang sedang terbuka MENANG atas rencana: kalau sudah masuk, yang
      digambar adalah level posisinya, bukan rancangan sebelumnya. */
   const aksiPosisi = aksi?.posisi ?? null;
+  const aksiTunda = aksi?.tunda ?? null;
+
+  /* Begitu posisinya SELESAI — SL kena, TP kena, atau ditutup manual — semua
+     garisnya ikut hilang. Garis order yang sudah mati tapi masih tergambar
+     akan terbaca sebagai order yang masih hidup, dan itu lebih menyesatkan
+     daripada chart kosong. */
+  const adaPosisiSebelumnya = useRef(false);
+  useEffect(() => {
+    if (adaPosisiSebelumnya.current && !aksiPosisi) {
+      setRencana({});
+      setDraf(null);
+      entryDigeser.current = false;
+    }
+    adaPosisiSebelumnya.current = !!aksiPosisi;
+  }, [aksiPosisi]);
+
+  /* ── Jenis order dari LETAK garis entry ────────────────────────────
+     Entry di harga pasar = Market. BUY di atas pasar = Buy Stop (mengejar
+     tembusan), BUY di bawah = Buy Limit (menunggu diskon); SELL kebalikan
+     persisnya. Aturan yang sama dengan bursa mana pun — dan karena jenisnya
+     mengikuti seretan, menyeret garis entry ADALAH cara memilih jenis. */
+  const jenisEntry: JenisEntry = useMemo(() => {
+    const market = aksi?.hargaKini;
+    const e = rencana.entry;
+    if (!draf || !e || !market) return 'MARKET';
+    if (Math.abs(e - market) / market < 0.0005) return 'MARKET';
+    if (draf === 'BUY') return e > market ? 'STOP' : 'LIMIT';
+    return e < market ? 'STOP' : 'LIMIT';
+  }, [draf, rencana.entry, aksi?.hargaKini]);
+  const labelJenis = jenisEntry === 'MARKET' ? 'Market'
+    : `${draf === 'BUY' ? 'Buy' : 'Sell'} ${jenisEntry === 'STOP' ? 'Stop' : 'Limit'}`;
   const garisSeret: GarisSeret[] = useMemo(() => {
     const sumber = aksiPosisi
       ? { entry: aksiPosisi.masuk, sl: aksiPosisi.sl, tp: aksiPosisi.tp }
+      : aksiTunda
+      ? { entry: aksiTunda.entry, sl: aksiTunda.sl, tp: aksiTunda.tp }
       : rencana;
+    const kunci = !!aksiPosisi || !!aksiTunda;
     const g: GarisSeret[] = [];
-    if (sumber.entry) g.push({ id: 'entry', harga: sumber.entry, warna: '#d4d4d8', label: 'Entry', bisaSeret: !aksiPosisi });
-    if (sumber.sl) g.push({ id: 'sl', harga: sumber.sl, warna: '#f87171', label: 'SL', bisaSeret: !aksiPosisi });
-    if (sumber.tp) g.push({ id: 'tp', harga: sumber.tp, warna: '#10b981', label: 'TP', bisaSeret: !aksiPosisi });
+
+    /* Risiko & imbalan DITULIS DI GARISNYA.
+       ─────────────────────────────────────────────────────────────────
+       SL bukan sekadar harga — ia jumlah uang yang hilang kalau tersentuh.
+       Untuk posisi yang sudah jalan, angkanya dari ukuran posisi
+       sesungguhnya; untuk tiket yang sedang disusun, dari setelan risiko.
+       Menaruhnya di label garis berarti menyeret garis LANGSUNG terlihat
+       akibatnya dalam dolar, bukan cuma dalam harga. */
+    const e = sumber.entry, s = sumber.sl, tpN = sumber.tp;
+    let ketSl = '', ketTp = '';
+    if (e && s && tpN) {
+      if (aksiPosisi) {
+        ketSl = `· -${uang(aksiPosisi.risiko)}`;
+        ketTp = `· +${uang(aksiPosisi.unit * Math.abs(tpN - aksiPosisi.masuk))}`;
+      } else if (aksi) {
+        const r = aksi.risiko;
+        ketSl = `· -${uang(r)}`;
+        ketTp = `· +${uang(r * (Math.abs(tpN - e) / Math.abs(e - s)))}`;
+      }
+    }
+    const ketEntry = aksiTunda
+      ? `· ${aksiTunda.arah === 'BUY' ? 'Buy' : 'Sell'} ${aksiTunda.jenis === 'STOP' ? 'Stop' : 'Limit'} menunggu`
+      : draf ? `· ${labelJenis}` : '';
+
+    if (sumber.entry) g.push({ id: 'entry', harga: sumber.entry, warna: '#d4d4d8', label: 'Entry', ket: ketEntry, bisaSeret: !kunci });
+    if (sumber.sl) g.push({ id: 'sl', harga: sumber.sl, warna: '#f87171', label: 'SL', ket: ketSl, bisaSeret: !kunci });
+    if (sumber.tp) g.push({ id: 'tp', harga: sumber.tp, warna: '#10b981', label: 'TP', ket: ketTp, bisaSeret: !kunci });
     return g;
-  }, [aksiPosisi, rencana]);
+  }, [aksiPosisi, aksiTunda, rencana, aksi, draf, labelJenis]);
 
   const terakhir = lilin.closes[lilin.closes.length - 1];
   const sebelumnya = lilin.closes[lilin.closes.length - 2];
@@ -382,7 +443,7 @@ export default function ChartBacktest() {
 
           <div className="ml-auto flex items-center gap-3">
             <span className={cn('flex items-center gap-1.5 text-[11px]', memuat ? 'text-zinc-600' : 'text-emerald-500')}>
-              <Radio className="size-3" /> {memuat ? 'memuat' : 'live · 15 dtk'}
+              <Radio className="size-3" /> {memuat ? 'memuat' : 'live · 3 dtk'}
             </span>
             <button onClick={() => setSegar((n) => n + 1)}
               className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100">
@@ -439,6 +500,8 @@ export default function ChartBacktest() {
                             <PojokOrder
                               posisi={aksi.posisi} hargaKini={aksi.hargaKini}
                               draf={draf} rencana={rencana} mode={aksi.mode}
+                              jenis={labelJenis} risiko={aksi.risiko}
+                              tunda={aksiTunda} onBatalTunda={aksi.batalTunda}
                               onGantiMode={(m) => { aksi.gantiMode(m); setTiketNyata(null); }}
                               onPilih={(arah) => {
                                 setDraf(arah);
@@ -463,8 +526,12 @@ export default function ChartBacktest() {
                               onKirim={() => {
                                 const { entry, sl, tp } = rencana;
                                 if (!draf || !entry || !sl || !tp) return;
-                                if (aksi.mode === 'real') { setTiketNyata({ arah: draf, sl, tp }); setDraf(null); return; }
-                                aksi.kirim(draf, { entry, sl, tp });
+                                if (aksi.mode === 'real') {
+                                  setTiketNyata({ arah: draf, sl, tp, entry, jenis: jenisEntry });
+                                  setDraf(null);
+                                  return;
+                                }
+                                aksi.kirim(draf, { entry, sl, tp }, jenisEntry);
                                 setDraf(null);
                               }}
                               onTutup={aksi.tutup} mati={aksi.mati} />
@@ -490,6 +557,7 @@ export default function ChartBacktest() {
             <KotakOrderNyata simbol={simbol} hargaKini={terakhir}
                              arahTerkunci={tiketNyata.arah}
                              slAwal={tiketNyata.sl} tpAwal={tiketNyata.tp}
+                             entryAwal={tiketNyata.entry} jenisAwal={tiketNyata.jenis}
                              onBatal={() => setTiketNyata(null)} />
           </div>
         )}

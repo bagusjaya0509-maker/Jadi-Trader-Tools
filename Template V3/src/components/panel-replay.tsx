@@ -13,14 +13,23 @@ import {
 import { simpanTrade } from '@/lib/tulis-jurnal';
 import type { GarisHarga } from '@/components/chart-lilin';
 
+export type JenisEntry = 'MARKET' | 'LIMIT' | 'STOP';
+
 export interface AksiOrder {
-  posisi: { arah: 'BUY' | 'SELL'; masuk: number; sl: number; tp: number; pnl: number } | null;
+  posisi: { arah: 'BUY' | 'SELL'; masuk: number; sl: number; tp: number; pnl: number; risiko: number; unit: number } | null;
+  /** Order demo yang MENGGANTUNG menunggu harga menyentuh entry-nya. */
+  tunda: { arah: 'BUY' | 'SELL'; jenis: JenisEntry; entry: number; sl: number; tp: number } | null;
+  batalTunda: () => void;
+  /** Risiko dolar menurut setelan modal & % risiko saat ini — dipakai label
+   *  garis SL/TP untuk menyebut berapa uang yang dipertaruhkan. */
+  risiko: number;
   hargaKini?: number;
   /** Level USULAN untuk arah tertentu — dipakai saat tiket baru dibuka.
    *  Sekadar titik awal: yang berlaku adalah angka setelah digeser. */
   usul: (arah: 'BUY' | 'SELL') => { entry: number; sl: number; tp: number } | null;
-  /** Kirim order dengan level yang SUDAH ditetapkan orangnya. */
-  kirim: (arah: 'BUY' | 'SELL', level: { entry: number; sl: number; tp: number }) => void;
+  /** Kirim order dengan level yang SUDAH ditetapkan orangnya. Jenis selain
+   *  MARKET menggantung sampai harganya tersentuh — persis pending order. */
+  kirim: (arah: 'BUY' | 'SELL', level: { entry: number; sl: number; tp: number }, jenis: JenisEntry) => void;
   tutup: () => void;
   mati: boolean;
   mode: 'demo' | 'real';
@@ -79,6 +88,8 @@ export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, aturAks
   const [rr, setRr] = useState(2);
 
   const [posisi, setPosisi] = useState<PosisiReplay | null>(null);
+  /* Pending order demo: satu saja pada satu waktu, sama seperti posisinya. */
+  const [tunda, setTunda] = useState<{ arah: 'BUY' | 'SELL'; jenis: JenisEntry; entry: number; sl: number; tp: number } | null>(null);
   const [trade, setTrade] = useState<TradeReplay[]>([]);
   const [pesan, setPesan] = useState('');
   const [menyimpan, setMenyimpan] = useState(false);
@@ -146,6 +157,31 @@ export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, aturAks
     setPesan(`${kena.kena} kena di ${fHarga(kena.harga)} — ${uang(pnl, true)}`);
   }, [idx, posisi, lilin]);
 
+  /* Bar aktif: bar replay kalau sedang berjalan, bar TERAKHIR kalau tidak —
+     dipakai pending, aksi, dan pembuka posisi supaya ketiganya sepakat. */
+  const idxAktif = idx ?? Math.max(0, lilin.closes.length - 1);
+  const hargaAktif = lilin.closes[idxAktif];
+
+  /* ── Pending order diperiksa tiap bar maju ─────────────────────────
+     BUY STOP terpicu saat high menyentuh entry (menembus ke atas), BUY
+     LIMIT saat low menyentuhnya (turun dulu baru diambil) — dan kebalikan
+     persisnya untuk SELL. Terisi di harga ENTRY, bukan di close bar: itulah
+     harga yang diminta ordernya. */
+  useEffect(() => {
+    if (!tunda || posisi || !lilin.closes.length) return;
+    const i = idxAktif;
+    const kena = tunda.arah === 'BUY'
+      ? (tunda.jenis === 'STOP' ? lilin.highs[i] >= tunda.entry : lilin.lows[i] <= tunda.entry)
+      : (tunda.jenis === 'STOP' ? lilin.lows[i] <= tunda.entry : lilin.highs[i] >= tunda.entry);
+    if (!kena) return;
+    const risiko = (modal + ringkas.bersih) * (risikoPersen / 100);
+    const unit = risiko / Math.abs(tunda.entry - tunda.sl);
+    setPosisi({ id: 'p' + Date.now(), arah: tunda.arah, masukIdx: i, masuk: tunda.entry, sl: tunda.sl, tp: tunda.tp, unit, risiko });
+    setTunda(null);
+    setPesan(`${tunda.jenis === 'STOP' ? 'Stop' : 'Limit'} terisi — ${tunda.arah} di ${fHarga(tunda.entry)}`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idxAktif, tunda, posisi, lilin]);
+
   /* Aksi dikirim ke halaman tiap kali keadaannya berubah. */
   /* Tombol BUY/SELL SELALU tersedia, bahkan sebelum replay dimulai.
      ────────────────────────────────────────────────────────────────────
@@ -158,8 +194,6 @@ export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, aturAks
      Mode `real` tidak mengirim aksi: order sungguhan punya kotaknya sendiri
      dengan konfirmasi yang menyebut angka, dan tombol satu-klik di pojok
      chart bukan tempat untuk uang sungguhan. */
-  const idxAktif = idx ?? Math.max(0, lilin.closes.length - 1);
-  const hargaAktif = lilin.closes[idxAktif];
 
   useEffect(() => {
     if (!aturAksi) return;
@@ -167,15 +201,19 @@ export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, aturAks
     aturAksi({
       posisi: mode === 'demo' && posisi
         ? { arah: posisi.arah, masuk: posisi.masuk, sl: posisi.sl, tp: posisi.tp,
-            pnl: hargaAktif === undefined ? 0 : hitungPnl(posisi, hargaAktif) }
+            pnl: hargaAktif === undefined ? 0 : hitungPnl(posisi, hargaAktif),
+            risiko: posisi.risiko, unit: posisi.unit }
         : null,
+      tunda: mode === 'demo' ? tunda : null,
+      batalTunda: () => { setTunda(null); setPesan('Pending order dibatalkan.'); },
+      risiko: (modal + ringkas.bersih) * (risikoPersen / 100),
       hargaKini: hargaAktif,
       usul, kirim: buka, tutup: tutupManual, mati: false,
       mode, gantiMode: setMode,
     });
     return () => aturAksi(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, idx, posisi, hargaAktif, lilin.closes.length, aturAksi, kaliAtr, rr, usulSl, usulTp]);
+  }, [mode, idx, posisi, tunda, hargaAktif, lilin.closes.length, aturAksi, kaliAtr, rr, usulSl, usulTp, modal, risikoPersen, ringkas.bersih]);
 
   /* Garis entry/SL/TP dikirim ke chart. */
   useEffect(() => {
@@ -231,10 +269,18 @@ export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, aturAks
   /* Order berangkat dengan level yang SUDAH ditetapkan di tiket — termasuk
      hasil menggeser garisnya di chart. Menghitung ulang SL di sini akan
      membuang keputusan yang baru saja diambil orangnya. */
-  function buka(arah: 'BUY' | 'SELL', level: { entry: number; sl: number; tp: number }) {
+  function buka(arah: 'BUY' | 'SELL', level: { entry: number; sl: number; tp: number }, jenis: JenisEntry = 'MARKET') {
     if (posisi || !lilin.closes.length) return;
     const { entry, sl, tp } = level;
     if (!entry || !sl || !tp) { setPesan('Entry, SL, dan TP harus terisi.'); return; }
+    if (jenis !== 'MARKET') {
+      /* Entry jauh dari pasar = order MENGGANTUNG. Posisinya baru lahir saat
+         harga benar-benar menyentuh entry — membukanya sekarang di harga
+         pasar berarti mengeksekusi order yang tidak pernah diminta. */
+      setTunda({ arah, jenis, entry, sl, tp });
+      setPesan(`${arah} ${jenis === 'STOP' ? 'Stop' : 'Limit'} dipasang di ${fHarga(entry)} — menunggu harga menyentuhnya.`);
+      return;
+    }
     const risiko = (modal + ringkas.bersih) * (risikoPersen / 100);
     const unit = risiko / Math.abs(entry - sl);
     setPosisi({ id: 'p' + Date.now(), arah, masukIdx: idxAktif, masuk: entry, sl, tp, unit, risiko });

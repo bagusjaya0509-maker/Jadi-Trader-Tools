@@ -37,13 +37,22 @@ const KOSONG: Lilin = { opens: [], highs: [], lows: [], closes: [], times: [] };
 const simpanan = new Map<string, { waktu: number; isi: Lilin }>();
 const UMUR_MS = 15_000;
 
-export async function ambilKlines(simbol: string, tf: string, batas = 200): Promise<Lilin> {
+/* `segar` = jalur cepat untuk SATU chart yang sedang ditatap.
+   ──────────────────────────────────────────────────────────────────────
+   Pemindaian screener meminta puluhan simbol sekaligus — cache 15 detik di
+   sana adalah pelindung, bukan penghambat. Chart live kebalikannya: satu
+   simbol, satu penonton, dan 15 detik terasa seperti harga yang membeku.
+   Jalur segar memakai umur cache 2,5 detik dan meminta backend melewati
+   cache server-nya (fresh=1). Beban: satu chart @3 dtk = 20 permintaan per
+   menit — Binance mengizinkan 1200 bobot per menit, klines berbobot 2,
+   jadi ini 3% dari jatah. */
+export async function ambilKlines(simbol: string, tf: string, batas = 200, segar = false): Promise<Lilin> {
   const kunci = `${simbol}|${tf}|${batas}`;
   const ada = simpanan.get(kunci);
-  if (ada && Date.now() - ada.waktu < UMUR_MS) return ada.isi;
+  if (ada && Date.now() - ada.waktu < (segar ? 2_500 : UMUR_MS)) return ada.isi;
 
   try {
-    const r = await fetch(`${dasar()}/api/klines?symbol=${encodeURIComponent(simbol)}&interval=${tf}&limit=${batas}`);
+    const r = await fetch(`${dasar()}/api/klines?symbol=${encodeURIComponent(simbol)}&interval=${tf}&limit=${batas}${segar ? '&fresh=1' : ''}`);
     if (!r.ok) return KOSONG;
     const j = await r.json();
     /* Backend membungkus balasan Binance jadi {ok, data}. Bentuk mentah
