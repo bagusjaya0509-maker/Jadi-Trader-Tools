@@ -1,8 +1,11 @@
 import { smiSeries, atr, findPivots, SMI_K, SMI_D, SMI_EMA } from '@/lib/jt-scan-core';
 import type { Lilin } from '@/lib/pasar';
-import { butuhPerBar, jalankanPineBar, type SegmenPine, type PenandaPine, type KotakPine } from '@/lib/pine-bar';
+import {
+  butuhPerBar, jalankanPineBar,
+  type SegmenPine, type PenandaPine, type KotakPine, type IsianPine, type InputPine,
+} from '@/lib/pine-bar';
 
-export type { SegmenPine, PenandaPine, KotakPine } from '@/lib/pine-bar';
+export type { SegmenPine, PenandaPine, KotakPine, IsianPine, InputPine } from '@/lib/pine-bar';
 
 /* ════════════════════════════════════════════════════════════════════════
    PENERJEMAH PINE SCRIPT — SUBSET
@@ -62,6 +65,10 @@ export interface HasilPine {
   segmen?: SegmenPine[];
   penanda?: PenandaPine[];
   kotak?: KotakPine[];
+  /** Isian antar-garis (linefill) — pewarna tengah channel paralel. */
+  isian?: IsianPine[];
+  /** input.* yang ditemukan skrip — bahan panel setelan ala TradingView. */
+  input?: InputPine[];
 }
 
 const WARNA: Record<string, string> = {
@@ -479,7 +486,8 @@ class Pengurai {
 const DILEWATI = /^\s*(\/\/|indicator\s*\(|study\s*\(|strategy\s*\(|import\s|\/\/@|$)/;
 const OSILATOR = /rsi|smi|stoch|macd|momentum|osc/i;
 
-export function jalankanPine(kode: string, l: Lilin, tf = '4h'): HasilPine {
+export function jalankanPine(kode: string, l: Lilin, tf = '4h',
+                             setelan?: Record<string, number | boolean | string>): HasilPine {
   /* ── Dua mesin, satu pintu ─────────────────────────────────────────
      Skrip dengan `if`/`for`/`var`/`:=`/array/line.new memakai model
      eksekusi per-bar milik Pine — model vektor di bawah tidak akan pernah
@@ -487,7 +495,7 @@ export function jalankanPine(kode: string, l: Lilin, tf = '4h'): HasilPine {
      Skrip semacam itu dialihkan ke mesin per-bar; skrip indikator
      sederhana tetap lewat jalur vektor yang lebih cepat. */
   if (butuhPerBar(kode)) {
-    const h = jalankanPineBar(kode, l, tf);
+    const h = jalankanPineBar(kode, l, tf, setelan ?? {});
     return {
       plot: h.plotSeri.map((p) => ({
         judul: p.judul, warna: p.warna, nilai: p.nilai,
@@ -499,6 +507,8 @@ export function jalankanPine(kode: string, l: Lilin, tf = '4h'): HasilPine {
       segmen: h.segmen,
       penanda: h.penanda,
       kotak: h.kotak,
+      isian: h.isian,
+      input: h.input,
     };
   }
 

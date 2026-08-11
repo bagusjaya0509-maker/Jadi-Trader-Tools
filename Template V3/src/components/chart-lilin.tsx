@@ -6,7 +6,8 @@ import {
 import type { Lilin } from '@/lib/pasar';
 import { cn, harga as fHarga } from '@/lib/utils';
 import type { TradeUji } from '@/lib/backtest';
-import type { SegmenPine, PenandaPine, KotakPine } from '@/lib/pine-bar';
+import type { SegmenPine, PenandaPine, KotakPine, IsianPine } from '@/lib/pine-bar';
+import { PenggambarIsi } from '@/lib/plugin-isi';
 
 /* ════════════════════════════════════════════════════════════════════════
    CHART LILIN
@@ -62,7 +63,7 @@ export interface GarisSeret {
 
 export function ChartLilin({
   lilin, garis, trade, tinggi = 420, hingga, garisHarga, onKlikBar, smi, mundur, pojok,
-  garisSeret, onSeret, hamparanBawah, segmen, penandaPine, kotakPine,
+  garisSeret, onSeret, hamparanBawah, segmen, penandaPine, kotakPine, isianPine,
 }: {
   lilin: Lilin;
   garis?: Garis[];
@@ -93,8 +94,10 @@ export function ChartLilin({
   segmen?: SegmenPine[];
   /** Label BUY/SELL dari Pine (label.new / plotshape). */
   penandaPine?: PenandaPine[];
-  /** Kotak zona dari Pine (box.new) — digambar sebagai tepi atas + bawah. */
+  /** Kotak zona dari Pine (box.new) — isi + bingkainya di kanvas. */
   kotakPine?: KotakPine[];
+  /** Isian antar dua garis (linefill) — pewarna tengah channel paralel. */
+  isianPine?: IsianPine[];
 }) {
   const kotak = useRef<HTMLDivElement>(null);
   const chart = useRef<IChartApi | null>(null);
@@ -103,6 +106,7 @@ export function ChartLilin({
   const penanda = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
   const seriSmi = useRef<ISeriesApi<'Line'>[]>([]);
   const garisPos = useRef<IPriceLine[]>([]);
+  const isiPine = useRef<PenggambarIsi | null>(null);
   /* Handler klik disimpan di ref supaya langganannya dipasang SEKALI.
      Melanggan ulang tiap render menumpuk pendengar di chart yang sama. */
   const klikRef = useRef(onKlikBar);
@@ -138,11 +142,17 @@ export function ChartLilin({
       borderUpColor: '#10b981', borderDownColor: '#f87171',
       wickUpColor: '#10b981', wickDownColor: '#f87171',
     });
+    /* Penggambar isian — zona S/R terisi warna dan pewarna tengah channel,
+       digambar LANGSUNG di kanvas panel harga lewat primitive. Seri garis
+       tidak bisa mengisi bidang di antara dua garis miring; kanvas bisa. */
+    const prim = new PenggambarIsi();
+    seri.current.attachPrimitive(prim);
+    isiPine.current = prim;
     c.subscribeClick((p) => {
       if (klikRef.current && typeof p.logical === 'number') klikRef.current(Math.round(p.logical));
     });
 
-    return () => { c.remove(); chart.current = null; seri.current = null; seriGaris.current = []; penanda.current = null; garisPos.current = []; };
+    return () => { c.remove(); chart.current = null; seri.current = null; seriGaris.current = []; penanda.current = null; garisPos.current = []; isiPine.current = null; };
   }, []);
 
   /* Data lilin */
@@ -254,7 +264,7 @@ export function ChartLilin({
     if (!c) return;
     seriPine.current.forEach((s) => { try { c.removeSeries(s); } catch { /* lepas */ } });
     seriPine.current = [];
-    if (!lilin.times.length) return;
+    if (!lilin.times.length) { isiPine.current?.setData([], []); return; }
     const n = lilin.times.length;
     const tfMs = n > 1 ? lilin.times[1] - lilin.times[0] : 3_600_000;
     const waktuBar = (x: number) => {
@@ -288,11 +298,27 @@ export function ChartLilin({
       if (g.perpanjang === 'right' || g.perpanjang === 'both') { const xr = n - 1 + 15; y2 = y2 + kemiringan * (xr - x2); x2 = xr; }
       gambarGaris(x1, y1, x2, y2, g.warna, g.lebar, g.gaya);
     });
-    (kotakPine ?? []).forEach((k) => {
-      gambarGaris(k.kiri, k.atas, k.kanan, k.atas, k.garis, 1, 'solid');
-      gambarGaris(k.kiri, k.bawah, k.kanan, k.bawah, k.garis, 1, 'solid');
-    });
-  }, [segmen, kotakPine, lilin]);
+    /* Kotak & isian BUKAN seri garis — mereka bidang, dan bidang digambar
+       sebagai bidang: primitive kanvas mengisi persegi/poligonnya di bawah
+       lilin, persis zona Supply/Demand dan fill channel di TradingView.
+       Model lama (dua garis tepi per kotak) itulah sumber "garis putih
+       misterius": zona yang kehilangan isinya. */
+    isiPine.current?.setData(
+      (kotakPine ?? []).map((k) => ({ b1: k.kiri, b2: k.kanan, atas: k.atas, bawah: k.bawah, isi: k.warna, tepi: k.garis })),
+      (isianPine ?? []).map((f) => {
+        let { x2, y2a, y2b } = f;
+        if (f.perpanjang === 'right' && x2 > f.x1) {
+          const xr = n - 1 + 15;
+          if (xr > x2) {
+            y2a = y2a + ((y2a - f.y1a) / (x2 - f.x1)) * (xr - x2);
+            y2b = y2b + ((y2b - f.y1b) / (x2 - f.x1)) * (xr - x2);
+            x2 = xr;
+          }
+        }
+        return { x1: f.x1, ya1: f.y1a, yb1: f.y1b, x2, ya2: y2a, yb2: y2b, warna: f.warna };
+      })
+    );
+  }, [segmen, kotakPine, isianPine, lilin]);
 
   /* Penanda entry & exit tiap trade hasil backtest */
   useEffect(() => {

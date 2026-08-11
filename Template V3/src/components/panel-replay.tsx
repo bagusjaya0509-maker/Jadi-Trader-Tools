@@ -30,7 +30,7 @@ export interface AksiOrder {
   /** Kirim order dengan level yang SUDAH ditetapkan orangnya. Jenis selain
    *  MARKET menggantung sampai harganya tersentuh — persis pending order.
    *  Catatan (emosi + alasan) ikut dibawa sampai ke jurnal. */
-  kirim: (arah: 'BUY' | 'SELL', level: { entry: number; sl: number; tp: number }, jenis: JenisEntry, catatan?: { emosi: string; alasan: string }) => void;
+  kirim: (arah: 'BUY' | 'SELL', level: { entry: number; sl: number; tp: number }, jenis: JenisEntry, catatan?: { emosi: string; alasan: string }, qty?: number) => void;
   tutup: () => void;
   mati: boolean;
   mode: 'demo' | 'real';
@@ -88,7 +88,7 @@ export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, aturAks
 
   const [posisi, setPosisi] = useState<PosisiReplay | null>(null);
   /* Pending order demo: satu saja pada satu waktu, sama seperti posisinya. */
-  const [tunda, setTunda] = useState<{ arah: 'BUY' | 'SELL'; jenis: JenisEntry; entry: number; sl: number; tp: number } | null>(null);
+  const [tunda, setTunda] = useState<{ arah: 'BUY' | 'SELL'; jenis: JenisEntry; entry: number; sl: number; tp: number; qty?: number } | null>(null);
   const [trade, setTrade] = useState<TradeReplay[]>([]);
   const [pesan, setPesan] = useState('');
   const [menyimpan, setMenyimpan] = useState(false);
@@ -172,8 +172,10 @@ export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, aturAks
       ? (tunda.jenis === 'STOP' ? lilin.highs[i] >= tunda.entry : lilin.lows[i] <= tunda.entry)
       : (tunda.jenis === 'STOP' ? lilin.lows[i] <= tunda.entry : lilin.highs[i] >= tunda.entry);
     if (!kena) return;
-    const risiko = (modal + ringkas.bersih) * (risikoPersen / 100);
-    const unit = risiko / Math.abs(tunda.entry - tunda.sl);
+    /* Qty dari tiket (jangkar ala position tool) menang; tanpa itu jatuh
+       ke model %risiko lama. */
+    const unit = tunda.qty ?? ((modal + ringkas.bersih) * (risikoPersen / 100)) / Math.abs(tunda.entry - tunda.sl);
+    const risiko = unit * Math.abs(tunda.entry - tunda.sl);
     setPosisi({ id: 'p' + Date.now(), arah: tunda.arah, masukIdx: i, masuk: tunda.entry, sl: tunda.sl, tp: tunda.tp, unit, risiko });
     setTunda(null);
     setPesan(`${tunda.jenis === 'STOP' ? 'Stop' : 'Limit'} terisi — ${tunda.arah} di ${fHarga(tunda.entry)}`);
@@ -267,7 +269,7 @@ export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, aturAks
   /* Order berangkat dengan level yang SUDAH ditetapkan di tiket — termasuk
      hasil menggeser garisnya di chart. Menghitung ulang SL di sini akan
      membuang keputusan yang baru saja diambil orangnya. */
-  function buka(arah: 'BUY' | 'SELL', level: { entry: number; sl: number; tp: number }, jenis: JenisEntry = 'MARKET', catatan?: { emosi: string; alasan: string }) {
+  function buka(arah: 'BUY' | 'SELL', level: { entry: number; sl: number; tp: number }, jenis: JenisEntry = 'MARKET', catatan?: { emosi: string; alasan: string }, qty?: number) {
     if (posisi || !lilin.closes.length) return;
     const { entry, sl, tp } = level;
     if (!entry || !sl || !tp) { setPesan('Entry, SL, dan TP harus terisi.'); return; }
@@ -275,13 +277,16 @@ export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, aturAks
       /* Entry jauh dari pasar = order MENGGANTUNG. Posisinya baru lahir saat
          harga benar-benar menyentuh entry — membukanya sekarang di harga
          pasar berarti mengeksekusi order yang tidak pernah diminta. */
-      setTunda({ arah, jenis, entry, sl, tp });
+      setTunda({ arah, jenis, entry, sl, tp, qty });
       void catatan; /* pending demo: catatan menyusul saat terisi — disederhanakan */
       setPesan(`${arah} ${jenis === 'STOP' ? 'Stop' : 'Limit'} dipasang di ${fHarga(entry)} — menunggu harga menyentuhnya.`);
       return;
     }
-    const risiko = (modal + ringkas.bersih) * (risikoPersen / 100);
-    const unit = risiko / Math.abs(entry - sl);
+    /* Qty beku dari tiket = dolar yang TADI terpampang di garisnya; risiko
+       dihitung darinya supaya jurnal mencatat angka yang sama dengan yang
+       dilihat sebelum menekan Kirim. */
+    const unit = qty ?? ((modal + ringkas.bersih) * (risikoPersen / 100)) / Math.abs(entry - sl);
+    const risiko = unit * Math.abs(entry - sl);
     setPosisi({ id: 'p' + Date.now(), arah, masukIdx: idxAktif, masuk: entry, sl, tp, unit, risiko,
                 emosi: catatan?.emosi, alasan: catatan?.alasan });
     setPesan(`${arah} di ${fHarga(entry)} · SL ${fHarga(sl)} · TP ${fHarga(tp)} · risiko ${uang(risiko)}`);

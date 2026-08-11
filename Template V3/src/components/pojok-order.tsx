@@ -34,7 +34,7 @@ export function PojokOrder({
   posisi, hargaKini, draf, rencana, mode, jenis, risiko, tunda, onBatalTunda,
   onPilih, onUbah, onKirim, onBatal, onTutup, onGantiMode, mati,
   nyataSetelan, aturNyata, sibukNyata, kabar, demoSetelan, aturDemo,
-  catatan, aturCatatan,
+  catatan, aturCatatan, qtyDemo,
 }: {
   posisi: { arah: 'BUY' | 'SELL'; masuk: number; sl: number; tp: number; pnl: number; risiko: number; unit: number } | null;
   hargaKini?: number;
@@ -42,6 +42,9 @@ export function PojokOrder({
   jenis?: string;
   /** Risiko dolar menurut setelan saat ini. */
   risiko?: number;
+  /** Qty demo yang dibekukan saat tiket dibuka — dolar risiko/imbalan
+   *  dihitung darinya, jadi menggeser garis MENGUBAH angkanya. */
+  qtyDemo?: number;
   /** Pending order demo yang sedang menunggu harganya tersentuh. */
   tunda?: { arah: 'BUY' | 'SELL'; jenis: 'MARKET' | 'LIMIT' | 'STOP'; entry: number; sl: number; tp: number } | null;
   onBatalTunda?: () => void;
@@ -289,14 +292,22 @@ export function PojokOrder({
                 </span>
               );
             }
-            if (!nyata && risiko !== undefined && rr !== null) {
-              return (
-                <span className="text-[10.5px] text-zinc-500">
-                  <span className="angka text-red-400">-{uang(risiko)}</span>
-                  {' / '}
-                  <span className="angka text-emerald-400">+{uang(risiko * rr)}</span>
-                </span>
-              );
+            if (!nyata && risk > 0 && reward > 0) {
+              /* Qty beku dari jangkar tiket: dolarnya MENGIKUTI garis. SL
+                 yang ditarik menjauh menampilkan risiko lebih besar — bukan
+                 angka %modal yang membeku berapa pun garisnya digeser. */
+              const q = qtyDemo && isFinite(qtyDemo) && qtyDemo > 0
+                ? qtyDemo
+                : (risiko !== undefined ? risiko / risk : 0);
+              if (q > 0) {
+                return (
+                  <span className="text-[10.5px] text-zinc-500">
+                    <span className="angka text-red-400">-{uang(q * risk)}</span>
+                    {' / '}
+                    <span className="angka text-emerald-400">+{uang(q * reward)}</span>
+                  </span>
+                );
+              }
             }
             return null;
           })()}

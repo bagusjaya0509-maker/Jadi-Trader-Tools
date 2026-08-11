@@ -44,13 +44,33 @@ export interface PenandaPine {
   bar: number; harga: number; teks: string; warna: string;
   posisi: 'atas' | 'bawah';
 }
-export interface KotakPine { kiri: number; atas: number; kanan: number; bawah: number; warna: string; garis: string }
+export interface KotakPine {
+  kiri: number; atas: number; kanan: number; bawah: number;
+  /* null = tidak digambar. Warna `na` di Pine berarti TAK TERLIHAT, bukan
+     "pakai warna bawaan" — kotak isi-saja tampil tanpa bingkai, kotak
+     bingkai-saja tampil tanpa isi. */
+  warna: string | null; garis: string | null;
+}
+/** Isian antar dua garis (linefill) — pewarna tengah channel paralel. */
+export interface IsianPine {
+  x1: number; y1a: number; y1b: number; x2: number; y2a: number; y2b: number;
+  warna: string; perpanjang: 'none' | 'right';
+}
+/** Satu input.* yang ditemukan di skrip — bahan panel setelan di UI. */
+export interface InputPine {
+  kunci: string; judul: string; grup: string;
+  jenis: 'int' | 'float' | 'bool' | 'color' | 'string' | 'lain';
+  bawaan: number | boolean | string | null;
+  pilihan?: string[];
+}
 
 export interface HasilPineBar {
   plotSeri: { judul: string; warna: string; nilai: (number | null)[] }[];
   segmen: SegmenPine[];
   penanda: PenandaPine[];
   kotak: KotakPine[];
+  isian: IsianPine[];
+  input: InputPine[];
   hline: { nilai: number; warna: string }[];
   galat: string[];
   dilewati: string[];
@@ -83,6 +103,7 @@ type Ekspr =
   | { j: 'bin'; op: string; a: Ekspr; b: Ekspr }
   | { j: 'ternary'; c: Ekspr; a: Ekspr; b: Ekspr }
   | { j: 'riwayat'; a: Ekspr; i: Ekspr }
+  | { j: 'larik'; isi: Ekspr[] }
   | { j: 'panggil'; nama: string; arg: Ekspr[]; namaArg: Record<string, Ekspr> };
 
 type Stmt =
@@ -189,6 +210,21 @@ class Pengurai {
       if (!this.ambil(')')) this.err('kurung tutup hilang');
       return e;
     }
+    /* Larik literal [a, b, c] — bentuk yang dipakai options= milik
+       input.string. Aman dari tabrakan dengan riwayat x[n]: riwayat hanya
+       muncul SETELAH sebuah atom, ini di posisi atom. */
+    if (this.ambil('[')) {
+      const isi: Ekspr[] = [];
+      if (!this.ambil(']')) {
+        for (;;) {
+          isi.push(this.ternary());
+          if (this.ambil(',')) continue;
+          if (this.ambil(']')) break;
+          this.err('koma atau ] hilang di larik');
+        }
+      }
+      return { j: 'larik', isi };
+    }
     const c = this.t[this.pos];
     /* Warna heksadesimal literal — color.new(#8B0000, 70) adalah bentuk
        yang benar-benar dipakai orang di input.color. Nilainya string warna,
@@ -244,7 +280,7 @@ function uraiBlok(baris: { teks: string; no: number; indent: number }[], mulai: 
     const isi = b.teks;
     /* Baris yang murni kosmetik/di luar jangkauan panel dicatat, bukan
        digalatkan — skrip tetap jalan tanpa mereka. */
-    if (/^(table\.|linefill\.|alertcondition\s*\(|alert\s*\(|barcolor\s*\(|bgcolor\s*\(|fill\s*\()/.test(isi)) {
+    if (/^(table\.|alertcondition\s*\(|alert\s*\(|barcolor\s*\(|bgcolor\s*\(|fill\s*\()/.test(isi)) {
       dilewati.push(`baris ${b.no}: ${isi.slice(0, 44)} — dilewati (kosmetik/di luar panel)`);
       i++;
       continue;
@@ -383,8 +419,11 @@ class Mesin {
   hlines: { nilai: number; warna: string }[] = [];
   cacheTa = new Map<string, (number | null)[]>();
   dilewatiSekali = new Set<string>();
+  daftarInput: InputPine[] = [];
+  private inputKunci = new Set<string>();
 
-  constructor(private l: Lilin, private n: number, public dilewati: string[], private tf: string) {}
+  constructor(private l: Lilin, private n: number, public dilewati: string[], private tf: string,
+              private setelan: Record<string, number | boolean | string> = {}) {}
 
   private err(baris: number, p: string): never { throw new GalatBaris(baris, p); }
 
@@ -518,6 +557,7 @@ class Mesin {
         this.err(baris, 'riwayat [n] hanya untuk deret bawaan atau variabel');
         break;
       }
+      case 'larik': return { jenis: 'array', isi: e.isi.map((x) => this.eval(x, baris)) };
       case 'panggil': return this.panggil(e, baris);
     }
   }
@@ -564,6 +604,17 @@ class Mesin {
     const arg = (i: number) => (i >= 0 && i < e.arg.length ? this.eval(e.arg[i], baris) : null);
     const nArg = (i: number) => this.angka(arg(i));
     const dapat = (nm: string, i: number): Nilai => (e.namaArg[nm] ? this.eval(e.namaArg[nm], baris) : arg(i));
+    /* Warna argumen punya TIGA keadaan yang berbeda artinya:
+       tidak ditulis → warna bawaan; ditulis string → warna itu;
+       ditulis na → null = JANGAN digambar. Pola lama `?? bawaan` menghapus
+       keadaan ketiga — garis yang diminta tak terlihat malah tampil kelabu
+       pucat. Itulah "garis putih misterius" di sekitar zona S/R. */
+    const warnaOpsi = (nm: string, i: number, bawaan: string | null): string | null => {
+      const ada = nm in e.namaArg || (i >= 0 && i < e.arg.length);
+      if (!ada) return bawaan;
+      const v = dapat(nm, i);
+      return typeof v === 'string' ? v : null;
+    };
     const l = this.l;
 
     switch (e.nama) {
@@ -583,13 +634,45 @@ class Mesin {
       case 'math.pow': { const x = nArg(0), y = nArg(1); return x == null || y == null ? null : Math.pow(x, y); }
       case 'math.avg': { const xs = e.arg.map((_, i) => nArg(i)).filter((x): x is number => x != null); return xs.length ? xs.reduce((s, x) => s + x, 0) / xs.length : null; }
 
-      /* ── input.* → nilai bawaan ── */
+      /* ── input.* — bawaan skrip ATAU setelan orangnya ────────────────
+         Tiap input DIDAFTAR (judul, jenis, grup, bawaan) supaya panel Pine
+         bisa menggambar dialog setelannya sendiri seperti TradingView —
+         centang tampilkan sinyal, ganti warna, ubah periode — tanpa
+         menyunting skripnya. Nilai yang dipilih orangnya menang. */
       case 'input': case 'input.int': case 'input.float': case 'input.bool':
-      case 'input.string': case 'input.timeframe': case 'input.source':
-        return dapat('defval', 0);
-      case 'input.color': {
-        const v = dapat('defval', 0);
-        return typeof v === 'string' ? v : '#a1a1aa';
+      case 'input.string': case 'input.timeframe': case 'input.source': case 'input.color': {
+        const mentah = dapat('defval', 0);
+        const bawaan = e.nama === 'input.color'
+          ? (typeof mentah === 'string' ? mentah : '#a1a1aa')
+          : mentah;
+        const judulV = dapat('title', 1);
+        const judul = typeof judulV === 'string' ? judulV : '';
+        const kunci = judul || `baris ${baris}`;
+        if (!this.inputKunci.has(kunci)) {
+          this.inputKunci.add(kunci);
+          const grupV = e.namaArg.group ? this.eval(e.namaArg.group, baris) : null;
+          const pilV = e.namaArg.options ? this.eval(e.namaArg.options, baris) : null;
+          const jenis: InputPine['jenis'] =
+            e.nama === 'input.bool' ? 'bool'
+            : e.nama === 'input.int' ? 'int'
+            : e.nama === 'input.float' ? 'float'
+            : e.nama === 'input.color' ? 'color'
+            : e.nama === 'input.string' ? 'string'
+            : e.nama === 'input'
+              ? (typeof bawaan === 'boolean' ? 'bool' : typeof bawaan === 'string' ? 'string' : 'float')
+              : 'lain';
+          this.daftarInput.push({
+            kunci, judul: judul || kunci,
+            grup: typeof grupV === 'string' ? grupV : '',
+            jenis,
+            bawaan: bawaan !== null && typeof bawaan === 'object' ? null : bawaan,
+            pilihan: pilV !== null && typeof pilV === 'object' && 'isi' in (pilV as NilaiArray)
+              ? (pilV as NilaiArray).isi.filter((x): x is string => typeof x === 'string')
+              : undefined,
+          });
+        }
+        const atur = this.setelan[kunci];
+        return atur !== undefined ? atur : bawaan;
       }
 
       /* ── warna ── */
@@ -686,7 +769,7 @@ class Mesin {
           data: {
             x1: dapat('x1', 0), y1: dapat('y1', 1), x2: dapat('x2', 2), y2: dapat('y2', 3),
             extend: dapat('extend', -1) ?? 'extend.none',
-            color: dapat('color', -1) ?? '#a1a1aa',
+            color: warnaOpsi('color', -1, '#a1a1aa'),
             width: dapat('width', -1) ?? 1,
             style: dapat('style', -1) ?? 'line.style_solid',
           },
@@ -705,6 +788,17 @@ class Mesin {
         const g = r?.jenis === 'line' ? this.gambar.get(r.id) : undefined;
         if (g) { g.data.x1 = arg(1); g.data.y1 = arg(2); }
         return null;
+      }
+      /* line.copy — duplikat garis: beginilah skrip channel membuat garis
+         paralelnya. Salinannya mandiri; mengubah salinan tidak menyentuh
+         aslinya, persis Pine. */
+      case 'line.copy': case 'label.copy': case 'box.copy': {
+        const r = arg(0) as RefGambar;
+        const g = r && typeof r === 'object' && 'id' in r ? this.gambar.get(r.id) : undefined;
+        if (!g) return null;
+        const id = this.idGambar++;
+        this.gambar.set(id, { jenis: g.jenis, data: { ...g.data } });
+        return { jenis: g.jenis as RefGambar['jenis'], id };
       }
       case 'label.new': {
         const id = this.idGambar++;
@@ -725,8 +819,8 @@ class Mesin {
           jenis: 'box',
           data: {
             left: dapat('left', 0), top: dapat('top', 1), right: dapat('right', 2), bottom: dapat('bottom', 3),
-            bgcolor: dapat('bgcolor', -1) ?? 'rgba(160,160,160,.15)',
-            border_color: dapat('border_color', -1) ?? '#a1a1aa',
+            bgcolor: warnaOpsi('bgcolor', -1, 'rgba(160,160,160,.15)'),
+            border_color: warnaOpsi('border_color', -1, '#a1a1aa'),
           },
         });
         return { jenis: 'box', id };
@@ -751,7 +845,19 @@ class Mesin {
         }
         return arg(2);
       }
-      case 'linefill.new': return { jenis: 'linefill', id: this.idGambar++ };
+      /* linefill.new(garisA, garisB, warna) — ISI di antara dua garis:
+         beginilah channel paralel diwarnai tengahnya di TradingView.
+         Referensi garisnya disimpan; penerjemahan ke poligon terjadi di
+         akhir, saat kedua garisnya sudah selesai di-refit. */
+      case 'linefill.new': {
+        const id = this.idGambar++;
+        this.gambar.set(id, {
+          jenis: 'linefill',
+          data: { a: arg(0), b: arg(1), color: warnaOpsi('color', 2, 'rgba(96,165,250,.10)') },
+        });
+        return { jenis: 'linefill', id };
+      }
+      case 'linefill.delete': { const r = arg(0) as RefGambar; if (r?.jenis === 'linefill') this.gambar.delete(r.id); return null; }
 
       /* ── keluaran ── */
       case 'plot': {
@@ -763,6 +869,12 @@ class Mesin {
           p = { warna: typeof warnaV === 'string' ? warnaV : '#fbbf24', nilai: new Array(this.n).fill(null) };
           this.plotNilai.set(judul, p);
         }
+        if (typeof warnaV === 'string') p.warna = warnaV;
+        /* plot(x, color = kondisi ? warna : na): warna na berarti bar ini
+           DISEMBUNYIKAN — begitulah plot bersyarat dibuat di Pine. Menaruh
+           nilainya dengan warna bawaan menggambar garis yang di TradingView
+           tidak pernah ada. */
+        if ('color' in e.namaArg && warnaV == null) return null;
         p.nilai[this.bar] = this.angka(arg(0));
         return null;
       }
@@ -798,7 +910,7 @@ class Mesin {
       /* ── diabaikan dengan sadar ── */
       case 'indicator': case 'study': case 'strategy':
       case 'alert': case 'alertcondition': case 'bgcolor': case 'barcolor': case 'fill':
-      case 'table.cell': case 'table.clear': case 'linefill.delete':
+      case 'table.cell': case 'table.clear':
         if (!this.dilewatiSekali.has(e.nama)) {
           this.dilewatiSekali.add(e.nama);
           this.dilewati.push(`${e.nama}() — dilewati (kosmetik/peringatan di luar panel)`);
@@ -864,7 +976,8 @@ export function butuhPerBar(kode: string): boolean {
 }
 
 /* ── Titik masuk ─────────────────────────────────────────────────────── */
-export function jalankanPineBar(kode: string, l: Lilin, tf = '4h'): HasilPineBar {
+export function jalankanPineBar(kode: string, l: Lilin, tf = '4h',
+                                setelan: Record<string, number | boolean | string> = {}): HasilPineBar {
   const n = l.closes.length;
   const galat: string[] = [];
   const dilewati: string[] = [];
@@ -904,15 +1017,15 @@ export function jalankanPineBar(kode: string, l: Lilin, tf = '4h'): HasilPineBar
     ).stmt;
   } catch (e) {
     const g = e instanceof GalatBaris ? `baris ${e.baris}: ${e.message}` : (e instanceof Error ? e.message : 'gagal diurai');
-    return { plotSeri: [], segmen: [], penanda: [], kotak: [], hline: [], galat: [g], dilewati };
+    return { plotSeri: [], segmen: [], penanda: [], kotak: [], isian: [], input: [], hline: [], galat: [g], dilewati };
   }
 
-  const mesin = new Mesin(l, n, dilewati, tf);
+  const mesin = new Mesin(l, n, dilewati, tf, setelan);
   const namaTugas = new Set<string>();
   const kumpulNama = (ss: Stmt[]) => ss.forEach((s) => {
     if (s.j === 'tugas') namaTugas.add(s.nama);
     if (s.j === 'if') s.cabang.forEach((c) => kumpulNama(c.isi));
-    if (s.j === 'for') kumpulNama(s.isi);
+    if (s.j === 'for' || s.j === 'while') kumpulNama(s.isi);
   });
   kumpulNama(program);
 
@@ -939,17 +1052,22 @@ export function jalankanPineBar(kode: string, l: Lilin, tf = '4h'): HasilPineBar
   /* ── Objek gambar → bentuk chart kita ─────────────────────────────── */
   const segmen: SegmenPine[] = [];
   const kotak: KotakPine[] = [];
+  const isian: IsianPine[] = [];
   for (const g of mesin.gambar.values()) {
     const d = g.data;
     const num = (v: Nilai) => (typeof v === 'number' && isFinite(v) ? v : null);
     if (g.jenis === 'line') {
       const x1 = num(d.x1), y1 = num(d.y1), x2 = num(d.x2), y2 = num(d.y2);
       if (x1 == null || y1 == null || x2 == null || y2 == null) continue;
+      /* Warna na = garis yang sengaja tak terlihat (pegangan linefill,
+         atau garis yang disembunyikan bersyarat) — dilewati, bukan
+         dikelabukan. */
+      if (typeof d.color !== 'string') continue;
       const gayaS = String(d.style ?? '');
       const ext = String(d.extend ?? '');
       segmen.push({
         x1, y1, x2, y2,
-        warna: typeof d.color === 'string' ? d.color : '#a1a1aa',
+        warna: d.color,
         lebar: num(d.width) ?? 1,
         gaya: gayaS.includes('dash') ? 'dashed' : gayaS.includes('dot') ? 'dotted' : 'solid',
         perpanjang: ext.includes('both') ? 'both' : ext.includes('left') ? 'left' : ext.includes('right') ? 'right' : 'none',
@@ -967,10 +1085,34 @@ export function jalankanPineBar(kode: string, l: Lilin, tf = '4h'): HasilPineBar
     } else if (g.jenis === 'box') {
       const kiri = num(d.left), atas = num(d.top), kanan = num(d.right), bawah = num(d.bottom);
       if (kiri == null || atas == null || kanan == null || bawah == null) continue;
-      kotak.push({
-        kiri, atas, kanan, bawah,
-        warna: typeof d.bgcolor === 'string' ? d.bgcolor : 'rgba(160,160,160,.15)',
-        garis: typeof d.border_color === 'string' ? d.border_color : '#a1a1aa',
+      const warnaIsi = typeof d.bgcolor === 'string' ? d.bgcolor : null;
+      const warnaTepi = typeof d.border_color === 'string' ? d.border_color : null;
+      if (warnaIsi === null && warnaTepi === null) continue;
+      kotak.push({ kiri, atas, kanan, bawah, warna: warnaIsi, garis: warnaTepi });
+    } else if (g.jenis === 'linefill') {
+      /* Poligon di antara dua garis. Garis yang sudah dihapus skripnya
+         membuat isiannya ikut hilang — persis TradingView. */
+      const amb = (r: Nilai) => (r && typeof r === 'object' && 'id' in r ? mesin.gambar.get((r as RefGambar).id) : undefined);
+      const ga = amb(d.a), gb = amb(d.b);
+      const warna = typeof d.color === 'string' ? d.color : null;
+      if (!ga || !gb || ga.jenis !== 'line' || gb.jenis !== 'line' || !warna) continue;
+      const ax1 = num(ga.data.x1), ay1 = num(ga.data.y1), ax2 = num(ga.data.x2), ay2 = num(ga.data.y2);
+      const bx1 = num(gb.data.x1), by1 = num(gb.data.y1), bx2 = num(gb.data.x2), by2 = num(gb.data.y2);
+      if (ax1 == null || ay1 == null || ax2 == null || ay2 == null
+        || bx1 == null || by1 == null || bx2 == null || by2 == null) continue;
+      const xAwal = Math.min(ax1, bx1), xAkhir = Math.max(ax2, bx2);
+      if (xAkhir <= xAwal) continue;
+      const nilaiDi = (x1: number, y1: number, x2: number, y2: number, x: number) =>
+        x2 === x1 ? y1 : y1 + ((y2 - y1) / (x2 - x1)) * (x - x1);
+      const extA = String(ga.data.extend ?? ''), extB = String(gb.data.extend ?? '');
+      isian.push({
+        x1: xAwal,
+        y1a: nilaiDi(ax1, ay1, ax2, ay2, xAwal), y1b: nilaiDi(bx1, by1, bx2, by2, xAwal),
+        x2: xAkhir,
+        y2a: nilaiDi(ax1, ay1, ax2, ay2, xAkhir), y2b: nilaiDi(bx1, by1, bx2, by2, xAkhir),
+        warna,
+        perpanjang: extA.includes('right') || extA.includes('both') || extB.includes('right') || extB.includes('both')
+          ? 'right' : 'none',
       });
     }
   }
@@ -980,6 +1122,8 @@ export function jalankanPineBar(kode: string, l: Lilin, tf = '4h'): HasilPineBar
     segmen,
     penanda: mesin.penanda,
     kotak,
+    isian,
+    input: mesin.daftarInput,
     hline: mesin.hlines,
     galat,
     dilewati,

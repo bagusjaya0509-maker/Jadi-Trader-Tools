@@ -132,10 +132,30 @@ export default function ChartBacktest() {
      yang rusak. Level hasil seretan tangan tidak disentuh: begitu orangnya
      menggeser sendiri, usulannya berhenti ikut campur. */
   const seretTangan = useRef(false);
+  /* ── Qty demo DIJANGKARKAN, bukan dihitung ulang tiap seretan ────────
+     Model lama: risiko dolar = modal × %risiko, titik — angkanya membeku
+     di -$10 walau garis SL ditarik dua kali lebih jauh, karena ukuran
+     posisinya diam-diam menyusut mengimbangi. Model sekarang meniru
+     position tool TradingView: qty dibekukan saat tiket dibuka (risiko ÷
+     jarak SL saat itu), dan MENGGESER garis mengubah dolarnya — SL menjauh
+     berarti risiko membesar. Mengubah modal/%risiko/SL×ATR menjangkarkan
+     ulang; menyeret garis tidak. */
+  const qtyDemo = useRef(0);
+  const jangkarQty = useCallback((e?: number, s?: number, risikoD?: number) => {
+    if (e && s && e !== s && risikoD) qtyDemo.current = risikoD / Math.abs(e - s);
+  }, []);
+  useEffect(() => {
+    if (!draf || !aksi || aksi.mode !== 'demo') return;
+    jangkarQty(rencana.entry ?? aksi.hargaKini, rencana.sl, aksi.risiko);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draf, demoSetelan.modal, demoSetelan.risikoPersen]);
   useEffect(() => {
     if (!draf || !aksi || aksi.mode !== 'demo' || seretTangan.current) return;
     const u = aksi.usul(draf);
-    if (u && u.sl && u.tp) setRencana((r) => ({ ...r, sl: u.sl, tp: u.tp }));
+    if (u && u.sl && u.tp) {
+      setRencana((r) => ({ ...r, sl: u.sl, tp: u.tp }));
+      jangkarQty(u.entry, u.sl, aksi.risiko);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [demoSetelan.kaliAtr, demoSetelan.rr]);
   const [sibukNyata, setSibukNyata] = useState(false);
@@ -352,9 +372,17 @@ export default function ChartBacktest() {
         ketSl = `· -${uang(qty * Math.abs(e - s))}`;
         ketTp = `· +${uang(qty * Math.abs(tpN - e))}`;
       } else if (aksi) {
-        const r = aksi.risiko;
-        ketSl = `· -${uang(r)}`;
-        ketTp = `· +${uang(r * (Math.abs(tpN - e) / Math.abs(e - s)))}`;
+        /* Qty beku dari jangkar tiket — dolarnya MENGIKUTI garis yang
+           digeser, seperti position tool TradingView. */
+        const q = qtyDemo.current;
+        if (q > 0) {
+          ketSl = `· -${uang(q * Math.abs(e - s))}`;
+          ketTp = `· +${uang(q * Math.abs(tpN - e))}`;
+        } else {
+          const r = aksi.risiko;
+          ketSl = `· -${uang(r)}`;
+          ketTp = `· +${uang(r * (Math.abs(tpN - e) / Math.abs(e - s)))}`;
+        }
       }
     }
     const ketEntry = aksiTunda
@@ -404,7 +432,30 @@ export default function ChartBacktest() {
     window.addEventListener('resize', ukur);
     return () => window.removeEventListener('resize', ukur);
   }, []);
-  const tinggiChart = Math.max(520, tinggiLayar - (tampilSmi ? 258 : 218));
+  /* Tinggi yang DISERET orangnya menang dan diingat — pegangannya di bawah
+     chart; dilepas berarti dikunci jadi bawaan berikutnya. Tanpa seretan
+     tersimpan, bawaannya dihitung supaya tepi bawah panel chart jatuh
+     sejajar tautan "Learn more" di sidebar — tidak melewatinya. */
+  const [tinggiManual, setTinggiManual] = useState<number | null>(() => {
+    try {
+      const v = Number(localStorage.getItem('jt.tinggiChart'));
+      return v >= 360 && v <= 1600 ? v : null;
+    } catch { return null; }
+  });
+  const tinggiChart = tinggiManual ?? Math.max(460, tinggiLayar - (tampilSmi ? 343 : 303));
+  const mulaiSeretTinggi = useCallback((e: React.PointerEvent) => {
+    e.preventDefault();
+    const awalY = e.clientY, awalT = tinggiChart;
+    const jepit = (x: number) => Math.min(1600, Math.max(360, x));
+    const gerak = (ev: PointerEvent) => setTinggiManual(jepit(awalT + (ev.clientY - awalY)));
+    const lepas = (ev: PointerEvent) => {
+      window.removeEventListener('pointermove', gerak);
+      window.removeEventListener('pointerup', lepas);
+      try { localStorage.setItem('jt.tinggiChart', String(Math.round(jepit(awalT + (ev.clientY - awalY))))); } catch { /* privat */ }
+    };
+    window.addEventListener('pointermove', gerak);
+    window.addEventListener('pointerup', lepas);
+  }, [tinggiChart]);
 
   /* ── Kunci remount chart ───────────────────────────────────────────
      Ganti simbol/timeframe atau tombol Segarkan MEMBANGUN ULANG komponen
@@ -545,6 +596,7 @@ export default function ChartBacktest() {
                             setRencana((r) => ({ ...r, [id]: h }));
                           }}
                           segmen={pine?.segmen}
+                          isianPine={pine?.isian}
                           penandaPine={pine?.penanda}
                           kotakPine={pine?.kotak}
                           mundur={DURASI_TF[tf] ? jamMundur(detik) : undefined}
@@ -553,7 +605,7 @@ export default function ChartBacktest() {
                             <PojokOrder
                               posisi={aksi.posisi} hargaKini={aksi.hargaKini}
                               draf={draf} rencana={rencana} mode={aksi.mode}
-                              jenis={labelJenis} risiko={aksi.risiko}
+                              jenis={labelJenis} risiko={aksi.risiko} qtyDemo={qtyDemo.current}
                               tunda={aksiTunda} onBatalTunda={aksi.batalTunda}
                               onGantiMode={(m) => { aksi.gantiMode(m); setKabarNyata(''); }}
                               onPilih={(arah) => {
@@ -607,7 +659,7 @@ export default function ChartBacktest() {
                                   }).finally(() => setSibukNyata(false));
                                   return;
                                 }
-                                aksi.kirim(draf, { entry, sl, tp }, jenisEntry, catatanTiket);
+                                aksi.kirim(draf, { entry, sl, tp }, jenisEntry, catatanTiket, qtyDemo.current || undefined);
                                 setDraf(null);
                               }}
                               nyataSetelan={nyataSetelan} aturNyata={setNyataSetelan}
@@ -619,6 +671,14 @@ export default function ChartBacktest() {
             : <div className="flex h-[440px] items-center justify-center text-[12.5px] text-zinc-600">
                 {memuat ? 'Memuat lilin…' : 'Tidak ada data untuk simbol ini.'}
               </div>}
+          {/* Pegangan tinggi chart: diseret = diatur, dilepas = dikunci dan
+              diingat sebagai bawaan, klik dua kali = kembali otomatis. */}
+          <div onPointerDown={mulaiSeretTinggi}
+               onDoubleClick={() => { setTinggiManual(null); try { localStorage.removeItem('jt.tinggiChart'); } catch { /* privat */ } }}
+               title="Seret untuk mengatur tinggi chart — dilepas, ukurannya diingat. Klik dua kali: kembali otomatis."
+               className="group flex h-3 w-full cursor-ns-resize items-center justify-center">
+            <div className="h-[3px] w-16 rounded-full bg-zinc-800 transition-colors group-hover:bg-zinc-500" />
+          </div>
         </div>
         <div className="border-t border-zinc-800/80 px-4 py-2.5 text-[11.5px] text-zinc-600">
           {lilin.times.length} lilin · {simbol} {TF.find((x) => x.nilai === tf)?.label} · lewat proxy VPS
