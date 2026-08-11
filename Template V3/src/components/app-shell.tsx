@@ -280,65 +280,6 @@ function Bantuan({ ciut }: { ciut: boolean }) {
   );
 }
 
-/* Popup berita di halaman portofolio.
- *
- *  Lonceng memindahkan berita ke dalam dropdown, dan itu perbaikan — tapi
- *  dropdown hanya terbuka kalau seseorang menyadari ada yang perlu dibuka.
- *  Personal Area adalah halaman yang paling lama dipandangi tanpa diklik,
- *  jadi di sinilah berita berdampak tinggi harus datang sendiri.
- *
- *  Hanya dampak TINGGI yang muncul, dan hanya sekali per sesi peramban.
- *  Toast yang muncul tiap kali pindah halaman berhenti dibaca dalam sehari. */
-function PopupNews() {
-  const { pathname } = useLocation();
-  const [tampil, setTampil] = useState(false);
-  const penting = NEWS.filter((n) => n.dampak === 'tinggi');
-
-  useEffect(() => {
-    /* Halaman screener, BUKAN Personal Area. Berita berdampak tinggi berguna
-       tepat saat orang sedang mencari entry — di halaman catatan kekayaan
-       pribadi ia cuma menutupi isi yang sedang dibaca. */
-    if (pathname !== '/screener' || penting.length === 0) return;
-    let sudah = false;
-    try { sudah = sessionStorage.getItem('jt.newsPopup') === '1'; } catch { /* mode privat */ }
-    if (sudah) return;
-    const t = setTimeout(() => {
-      setTampil(true);
-      try { sessionStorage.setItem('jt.newsPopup', '1'); } catch { /* abaikan */ }
-    }, 700);
-    return () => clearTimeout(t);
-  }, [pathname, penting.length]);
-
-  if (!tampil) return null;
-
-  return (
-    <div
-      role="status"
-      className="fixed bottom-4 right-4 z-[60] w-[min(340px,calc(100vw-2rem))] overflow-hidden rounded-xl border border-amber-500/30 bg-zinc-950 shadow-2xl"
-    >
-      <div className="flex items-center gap-2 border-b border-zinc-800 px-4 py-2.5">
-        <Newspaper className="size-3.5 text-amber-400" strokeWidth={2} />
-        <span className="text-[12.5px] font-medium text-zinc-100">Berita berdampak tinggi</span>
-        <button onClick={() => setTampil(false)} aria-label="Tutup"
-          className="ml-auto cursor-pointer text-zinc-600 transition-colors hover:text-zinc-300">
-          <X className="size-3.5" />
-        </button>
-      </div>
-      <div className="max-h-[240px] overflow-y-auto">
-        {penting.map((n) => (
-          <div key={n.id} className="border-b border-zinc-800/50 px-4 py-3 last:border-0">
-            <div className="flex items-center gap-2 text-[11px]">
-              <span className="angka text-zinc-500">{n.mata}</span>
-              <span className="ml-auto text-zinc-600">{n.waktu}</span>
-            </div>
-            <div className="mt-1 text-[12.5px] text-zinc-200">{n.judul}</div>
-            {n.detail && <div className="mt-0.5 text-[11.5px] leading-relaxed text-zinc-500">{n.detail}</div>}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [laci, setLaci] = useState(false);
@@ -517,7 +458,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <main className="min-w-0 flex-1">{children}</main>
       </div>
 
-      <PopupNews />
     </div>
   );
 }

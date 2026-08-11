@@ -28,6 +28,11 @@ export interface Trade {
   sumber: Sumber;
   emosi?: string;
   alasan?: string;
+  /** Nilai order dalam USD: margin x leverage untuk kripto, dan
+   *  lot x ukuran kontrak untuk forex. Undefined kalau datanya tidak
+   *  menyertakan margin/leverage — lebih baik kosong daripada ditebak. */
+  nilaiOrder?: number;
+  leverage?: number;
 }
 
 export interface Posisi {

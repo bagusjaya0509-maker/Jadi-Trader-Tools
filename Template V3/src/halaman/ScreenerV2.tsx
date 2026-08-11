@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Loader2, ExternalLink, TriangleAlert, RotateCcw } from 'lucide-react';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -199,6 +200,27 @@ const CSS_TANPA_CANGKANG = `
 `;
 
 export default function ScreenerV2() {
+  const arahkan = useNavigate();
+
+  /* Pesan dari dalam bingkai: "buka simbol ini di Chart & Backtest".
+     ──────────────────────────────────────────────────────────────────────
+     Asal pengirim DIPERIKSA. Tanpa pemeriksaan itu, situs mana pun yang
+     kebetulan membingkai halaman ini bisa menyuruhnya berpindah halaman —
+     dan pemeriksaan asal adalah satu-satunya hal yang membedakan pesan dari
+     tempelan kita sendiri dengan pesan dari orang lain. */
+  useEffect(() => {
+    const dengar = (e: MessageEvent) => {
+      if (e.origin !== window.location.origin) return;
+      const d = e.data;
+      if (!d || d.jt !== 'buka-chart' || typeof d.simbol !== 'string') return;
+      const q = new URLSearchParams({ simbol: d.simbol });
+      if (typeof d.tf === 'string' && d.tf) q.set('tf', d.tf);
+      arahkan(`/chart?${q}`);
+    };
+    window.addEventListener('message', dengar);
+    return () => window.removeEventListener('message', dengar);
+  }, [arahkan]);
+
   const [alamat, setAlamat] = useState<string | null>(null);
   const [gagal, setGagal] = useState(false);
   const [siap, setSiap] = useState(false);

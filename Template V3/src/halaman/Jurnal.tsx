@@ -442,7 +442,7 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
             <Panel className="lg:col-span-2">
               <PanelHead
                 judul="Riwayat Trade"
-                sub={`40 transaksi terakhir dari ${trade.length}.`}
+                sub={`${Math.min(200, trade.length)} transaksi terakhir dari ${trade.length}.`}
                 kanan={
                   <span className="flex items-center gap-2">
                   {/* Sinkron MT5 hanya di jurnal Trade-Fi — jurnal kripto sudah
@@ -490,17 +490,26 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
                     <thead className="sticky top-0 bg-zinc-950">
                       <tr>
                         <Th>Tanggal</Th><Th>Pair</Th><Th>Arah</Th>
-                        <Th className="text-right">Lot/Qty</Th><Th className="text-right">P/L</Th>
+                        <Th className="text-right">Lot/Qty</Th>
+                        <Th className="text-right">Nilai Order</Th>
+                        <Th className="text-right">P/L</Th>
                         <Th>Emosi</Th><Th>Setup</Th><Th />
                       </tr>
                     </thead>
                     <tbody>
-                      {[...trade].sort((a, b) => b.waktu - a.waktu).slice(0, 40).map((t) => (
+                      {[...trade].sort((a, b) => b.waktu - a.waktu).slice(0, 200).map((t) => (
                         <Tr key={t.id}>
                           <Td className="whitespace-nowrap text-zinc-500">{tanggalPendek(t.waktu)}</Td>
                           <Td className="whitespace-nowrap text-zinc-200">{t.pair}</Td>
                           <Td><span className={cn('text-[11.5px]', t.arah === 'BUY' ? 'text-emerald-500' : 'text-red-400')}>{t.arah}</span></Td>
                           <Td className="angka text-right text-zinc-400">{t.lot}</Td>
+                          {/* Nilai order = margin x leverage, dalam dolar.
+                              Tanda hubung berarti dokumennya tidak menyimpan
+                              margin/leverage — bukan berarti nol. */}
+                          <Td className="angka whitespace-nowrap text-right text-zinc-400">
+                            {t.nilaiOrder ? uang(t.nilaiOrder) : '—'}
+                            {t.leverage ? <span className="ml-1 text-[10.5px] text-zinc-600">{t.leverage}×</span> : null}
+                          </Td>
                           <Td className={cn('angka text-right', t.pnl >= 0 ? 'text-emerald-500' : 'text-red-400')}>{uang(t.pnl, true)}</Td>
                           <Td className="whitespace-nowrap text-[12px] text-zinc-400">{t.emosi}</Td>
                           <Td className="max-w-[150px] truncate text-[12px] text-zinc-500" title={t.alasan}>{t.alasan}</Td>

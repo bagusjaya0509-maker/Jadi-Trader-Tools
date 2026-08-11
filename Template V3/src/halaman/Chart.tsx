@@ -1,11 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Play, Loader2, RefreshCw, Radio, TriangleAlert, Timer } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { Play, Loader2, RefreshCw, Radio, TriangleAlert, Timer, History } from 'lucide-react';
 import { Panel, PanelHead, KartuKpi, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn, uang, persen, harga, tanggalPendek } from '@/lib/utils';
 import { ChartLilin, type Garis, type GarisHarga } from '@/components/chart-lilin';
 import { PanelReplay } from '@/components/panel-replay';
 import { ambilKlines, type Lilin } from '@/lib/pasar';
-import { jalankanUji, garisIndikator, SETELAN_BAWAAN, type Setelan, type HasilUji } from '@/lib/backtest';
+import {
+  jalankanUji, garisIndikator, zonaSnr, SETELAN_BAWAAN,
+  type Setelan, type HasilUji,
+} from '@/lib/backtest';
 import { SIMBOL_DASAR } from '@/lib/simbol';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -68,8 +72,24 @@ function Angka({ label, nilai, atur, langkah = 1, min = 0 }: {
 }
 
 export default function ChartBacktest() {
-  const [simbol, setSimbol] = useState('BTCUSDT');
-  const [tf, setTf] = useState('4h');
+  /* Simbol & timeframe boleh datang dari alamatnya: `#/chart?simbol=ETHUSDT`.
+     Itulah yang dipakai menu klik-kanan di Screener Entry untuk membuka koin
+     tertentu di sini, dan juga yang membuat halaman ini bisa ditandai. */
+  const [cari] = useSearchParams();
+  const [simbol, setSimbol] = useState(() => (cari.get('simbol') || 'BTCUSDT').toUpperCase());
+  const [tf, setTf] = useState(() => {
+    const t = (cari.get('tf') || '4h').toLowerCase();
+    return ['5m', '15m', '1h', '4h', '1d'].includes(t) ? t : '4h';
+  });
+
+  /* Alamat yang berubah saat halaman sudah terbuka ikut diikuti — klik kanan
+     di screener dua kali berturut-turut harus berpindah dua kali. */
+  useEffect(() => {
+    const s = cari.get('simbol');
+    if (s) setSimbol(s.toUpperCase());
+    const x = (cari.get('tf') || '').toLowerCase();
+    if (x && ['5m', '15m', '1h', '4h', '1d'].includes(x)) setTf(x);
+  }, [cari]);
   const [lilin, setLilin] = useState<Lilin>({ opens: [], highs: [], lows: [], closes: [], times: [] });
   const [memuat, setMemuat] = useState(true);
   const [galat, setGalat] = useState('');
@@ -80,6 +100,14 @@ export default function ChartBacktest() {
   /* null = replay mati. Angkanya indeks bar terakhir yang boleh tampil. */
   const [replayIdx, setReplayIdx] = useState<number | null>(null);
   const [garisHarga, setGarisHarga] = useState<GarisHarga[]>([]);
+  /* Panel replay hidup DI DALAM panel grafik, muncul lewat ikon. Sebagai
+     panel terpisah ia mendorong grafik ke atas layar setiap kali dibuka —
+     dan grafik yang bergeser saat sedang dibaca adalah gangguan, bukan
+     tata letak. */
+  const [bukaReplay, setBukaReplay] = useState(false);
+  /* Zona SNR dari logika yang sama dengan screener. Dimatikan secara bawaan:
+     empat garis mendatar di chart yang belum dibaca cuma menutupi lilinnya. */
+  const [tampilSnr, setTampilSnr] = useState(false);
 
   /* ── Data realtime ──────────────────────────────────────────────────
      Ditarik ulang tiap 15 detik, sama dengan umur cache di lib/pasar.ts —
@@ -125,6 +153,14 @@ export default function ChartBacktest() {
       { nama: `EMA ${set.emaLambat}`, nilai: g.lambat ?? [], warna: '#60a5fa' },
     ];
   }, [lilin, set]);
+
+  /* Zona dihitung sampai bar yang SEDANG tampil, bukan sampai bar terakhir.
+     Selama replay, menggambar zona dari data masa depan adalah cara paling
+     halus untuk membuat latihannya berbohong. */
+  const zona = useMemo(
+    () => (tampilSnr && lilin.closes.length ? zonaSnr(lilin, replayIdx ?? undefined) : []),
+    [tampilSnr, lilin, replayIdx]
+  );
 
   const terakhir = lilin.closes[lilin.closes.length - 1];
   const sebelumnya = lilin.closes[lilin.closes.length - 2];
@@ -215,6 +251,21 @@ export default function ChartBacktest() {
               className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100">
               <RefreshCw className={cn('size-3.5', memuat && 'animate-spin')} /> Segarkan
             </button>
+            <label title="Zona support & resisten dari logika yang sama dengan Screener Entry"
+              className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-700">
+              <input type="checkbox" checked={tampilSnr} onChange={(e) => setTampilSnr(e.target.checked)}
+                     className="size-3.5 cursor-pointer accent-zinc-200" />
+              Zona SNR
+            </label>
+            <button onClick={() => setBukaReplay((v) => !v)}
+              title={bukaReplay ? 'Sembunyikan panel replay' : 'Buka panel replay'}
+              className={cn('flex cursor-pointer items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[12px] transition-colors',
+                replayIdx !== null
+                  ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400'
+                  : 'border-zinc-800 text-zinc-300 hover:border-zinc-700 hover:text-zinc-100')}>
+              <History className="size-3.5" /> Replay
+              {replayIdx !== null && <span className="angka text-[10.5px]">bar {replayIdx + 1}</span>}
+            </button>
           </div>
         </div>
 
@@ -228,7 +279,15 @@ export default function ChartBacktest() {
         <div className="border-t border-zinc-800/80 px-2 pb-2">
           {lilin.times.length > 0
             ? <ChartLilin lilin={lilin} garis={garis} trade={replayIdx === null ? hasil?.trade : undefined}
-                          tinggi={440} hingga={replayIdx ?? undefined} garisHarga={garisHarga}
+                          tinggi={440} hingga={replayIdx ?? undefined}
+                          garisHarga={[
+                            ...garisHarga,
+                            ...zona.map((z) => ({
+                              harga: z.harga,
+                              warna: z.jenis === 'resisten' ? 'rgba(248,113,113,.55)' : 'rgba(16,185,129,.55)',
+                              label: z.jenis === 'resisten' ? 'R' : 'S',
+                            })),
+                          ]}
                           onKlikBar={replayIdx === null ? undefined : setReplayIdx} />
             : <div className="flex h-[440px] items-center justify-center text-[12.5px] text-zinc-600">
                 {memuat ? 'Memuat lilin…' : 'Tidak ada data untuk simbol ini.'}
@@ -238,10 +297,15 @@ export default function ChartBacktest() {
           {lilin.times.length} lilin · {simbol} {TF.find((x) => x.nilai === tf)?.label} · lewat proxy VPS
           {hasil?.trade.length ? ` · ${hasil.trade.length} penanda trade` : ''}
         </div>
-      </Panel>
 
-      <PanelReplay lilin={lilin} simbol={simbol} idx={replayIdx}
-                   setIdx={setReplayIdx} aturGaris={setGarisHarga} />
+        {(bukaReplay || replayIdx !== null) && (
+          <div className="border-t border-zinc-800/80">
+            <PanelReplay lilin={lilin} simbol={simbol} tf={tf} idx={replayIdx}
+                         setIdx={setReplayIdx} aturGaris={setGarisHarga}
+                         tanpaBingkai />
+          </div>
+        )}
+      </Panel>
 
       {/* ── Setelan uji ── */}
       <Panel className="mt-4">

@@ -107,3 +107,50 @@ export function ringkasReplay(trade: TradeReplay[], modal: number): RingkasRepla
     ekuitas: modal + bersih,
   };
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   MENYIMPAN SESI REPLAY
+   ════════════════════════════════════════════════════════════════════════
+   Posisi yang sedang terbuka dan trade yang sudah tercatat bertahan setelah
+   halaman disegarkan, dan hanya hilang kalau dihapus sendiri. Alasannya
+   sederhana: menutup tab tidak seharusnya menghapus catatan latihan, sama
+   seperti menutup tab tidak menghapus jurnal.
+
+   Disimpan per SIMBOL + TIMEFRAME. Satu penyimpanan bersama akan membuat
+   posisi BTC 4 jam muncul di chart ETH 5 menit, dan indeks barnya menunjuk
+   waktu yang sama sekali berbeda.
+   ════════════════════════════════════════════════════════════════════════ */
+
+export interface SesiReplay {
+  idx: number | null;
+  posisi: PosisiReplay | null;
+  trade: TradeReplay[];
+  modal: number;
+}
+
+const AWALAN = 'jt.replay.';
+
+const kunciSesi = (simbol: string, tf: string) => `${AWALAN}${simbol}.${tf}`;
+
+export function bacaSesi(simbol: string, tf: string): SesiReplay | null {
+  try {
+    const mentah = localStorage.getItem(kunciSesi(simbol, tf));
+    if (!mentah) return null;
+    const s = JSON.parse(mentah);
+    return {
+      idx: typeof s.idx === 'number' ? s.idx : null,
+      posisi: s.posisi ?? null,
+      trade: Array.isArray(s.trade) ? s.trade : [],
+      modal: Number(s.modal) || 1000,
+    };
+  } catch { return null; }
+}
+
+export function simpanSesi(simbol: string, tf: string, s: SesiReplay) {
+  try { localStorage.setItem(kunciSesi(simbol, tf), JSON.stringify(s)); }
+  catch { /* mode privat / kuota — sesi cukup hidup di memori halaman */ }
+}
+
+export function hapusSesi(simbol: string, tf: string) {
+  try { localStorage.removeItem(kunciSesi(simbol, tf)); } catch { /* abaikan */ }
+}

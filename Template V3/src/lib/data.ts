@@ -41,7 +41,7 @@ import {
  *  halaman dibuka adalah ribuan pembacaan Firestore untuk tabel yang cuma
  *  menampilkan 40 baris terakhir. 600 per sumber sudah lebih dari cukup
  *  untuk kalender, kurva ekuitas, dan seluruh statistik di halaman ini. */
-const BATAS_PER_SUMBER = 600;
+const BATAS_PER_SUMBER = 2000;
 
 /* Berkas ini hanya diimpor halaman-halaman yang dimuat malas, jadi impor
    statis Firestore di atas TIDAK ikut ke jalur muat awal. getFirestore aman
@@ -73,6 +73,18 @@ function keTrade(id: string, d: DocumentData): Trade {
     sumber,
     emosi: d.psikologi?.emosiMasuk ?? undefined,
     alasan: d.psikologi?.alasanMasuk ?? d.sebabKeluar ?? undefined,
+    /* NILAI ORDER, bukan margin. Yang ditanyakan orang saat melihat riwayat
+       adalah "posisi ini sebesar apa" — dan jawabannya margin DIKALI
+       leverage, bukan modal yang dipakai. Posisi $100 dengan leverage 4×
+       bergerak seperti posisi $400.
+
+       Kalau margin/leverage tidak ada di dokumennya, dibiarkan undefined:
+       menebaknya dari qty x harga entry akan salah untuk transaksi yang
+       sebagian TP-nya sudah kena. */
+    nilaiOrder: n(d.ukuran?.margin) && n(d.ukuran?.leverage)
+      ? n(d.ukuran.margin) * n(d.ukuran.leverage)
+      : undefined,
+    leverage: n(d.ukuran?.leverage) || undefined,
   };
 }
 

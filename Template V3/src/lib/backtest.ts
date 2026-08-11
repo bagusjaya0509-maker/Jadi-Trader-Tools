@@ -1,4 +1,4 @@
-import { ema, smiSeries, atr, SMI_K, SMI_D, SMI_EMA, SMI_OB, SMI_OS } from '@/lib/jt-scan-core';
+import { ema, smiSeries, atr, findPivots, SMI_K, SMI_D, SMI_EMA, SMI_OB, SMI_OS } from '@/lib/jt-scan-core';
 import type { Lilin } from '@/lib/pasar';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -220,4 +220,53 @@ export function garisIndikator(l: Lilin, s: Setelan) {
     };
   }
   return { cepat: null, lambat: null };
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   LOGIKA SINYAL DI ATAS CHART
+   ════════════════════════════════════════════════════════════════════════
+   Zona SNR dan penanda SMI digambar dengan fungsi yang SAMA dengan screener
+   (jt-scan-core), jadi yang terlihat di sini adalah zona yang sama persis
+   dengan yang dipakai kartu sinyal — bukan versi mirip yang dihitung ulang.
+   ════════════════════════════════════════════════════════════════════════ */
+
+export interface ZonaSnr { harga: number; jenis: 'support' | 'resisten' }
+
+/** Zona SNR dari pivot: puncak jadi resisten, lembah jadi support.
+ *
+ *  Hanya zona TERDEKAT dari harga sekarang yang dikembalikan (masing-masing
+ *  dua). Menggambar sepuluh garis membuat chartnya jadi kertas bergaris —
+ *  yang menentukan keputusan cuma zona yang sedang didekati. */
+export function zonaSnr(l: Lilin, batasIdx?: number): ZonaSnr[] {
+  const n = batasIdx === undefined ? l.closes.length : Math.min(l.closes.length, batasIdx + 1);
+  if (n < 30) return [];
+  /* `findPivots(values, left, right, isHigh)` — satu deret per panggilan,
+     bukan highs & lows sekaligus. Tanda `isHigh` yang menentukan arah
+     perbandingannya. */
+  const kini = l.closes[n - 1];
+  const puncak = findPivots(l.highs.slice(0, n), 5, 5, true) as { index: number; value: number }[];
+  const lembah = findPivots(l.lows.slice(0, n), 5, 5, false) as { index: number; value: number }[];
+
+  const atas = puncak
+    .map((x) => x.value)
+    .filter((x) => isFinite(x) && x > kini)
+    .sort((a, b) => a - b)
+    .slice(0, 2)
+    .map((harga): ZonaSnr => ({ harga, jenis: 'resisten' }));
+
+  const bawah = lembah
+    .map((x) => x.value)
+    .filter((x) => isFinite(x) && x < kini)
+    .sort((a, b) => b - a)
+    .slice(0, 2)
+    .map((harga): ZonaSnr => ({ harga, jenis: 'support' }));
+
+  return [...atas, ...bawah];
+}
+
+/** Garis SMI untuk panel bawah — dikembalikan sebagai deret biasa supaya
+ *  penggambarnya tidak perlu tahu apa pun tentang cara menghitungnya. */
+export function deretSmi(l: Lilin) {
+  const s = smiSeries(l.highs, l.lows, l.closes, SMI_K, SMI_D, SMI_EMA);
+  return { smi: s?.smi ?? [], signal: s?.signal ?? [] };
 }

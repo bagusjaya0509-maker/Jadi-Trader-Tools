@@ -314,7 +314,14 @@ export default function PersonalArea() {
             }
           />
           <div className="px-5 pb-5">
-            <TabelBungkus className="max-h-[420px] overflow-y-auto">
+            {/* Tanpa tinggi maksimum.
+                ──────────────────────────────────────────────────────────
+                `max-h-[420px]` membuat daftarnya bergulir di dalam kotak
+                sendiri sementara halaman di bawahnya masih kosong — barisnya
+                terlihat terpotong padahal ruangnya ada. Daftar aset panjangnya
+                belasan baris, bukan ribuan; membiarkannya memanjang jauh lebih
+                mudah dibaca daripada dua bilah gulir bersarang. */}
+            <TabelBungkus>
               <Tabel>
                 <thead className="sticky top-0 bg-zinc-950">
                   <tr><Th>Pos</Th><Th>Jenis</Th><Th className="text-right">Nilai</Th><Th className="text-right">Porsi</Th></tr>

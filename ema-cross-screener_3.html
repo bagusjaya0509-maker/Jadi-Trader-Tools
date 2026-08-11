@@ -12,12 +12,12 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202608110300">
+<meta name="jt-versi" content="202608110600">
 <script>
 /* Penjaga versi - lihat catatan lengkap di jurnal-trading.html. Mencegah browser
    menyajikan HTML lama dari cache saat halaman dimuat ulang. */
 (function(){
-  var VERSI_TAMPIL = "202608110300";
+  var VERSI_TAMPIL = "202608110600";
   var KUNCI_OK    = "jtVersiOk";      // versi yang sudah dipastikan benar-benar termuat
   var KUNCI_PAKSA = "jtVersiPaksa";   // versi yang sudah pernah dipaksa muat ulang
   try{
@@ -10080,6 +10080,7 @@
       menu.innerHTML =
           '<div class="es-koin-menu-judul">' + simbolAktif.replace('USDT','') + '</div>'
         + '<button type="button" data-aksi="chart">Buka di TradingView</button>'
+        + '<button type="button" data-aksi="chartjt">Buka di Chart &amp; Backtest</button>'
         + '<button type="button" data-aksi="ganti" class="bahaya">Hilangkan &amp; ganti koin ini</button>';
 
       // Dijepit ke dalam layar - tanpa ini menu di kartu paling kanan/bawah
@@ -10100,6 +10101,30 @@
       tutup();
 
       if(aksi === 'chart'){ openTradingView(simbol); return; }
+
+      /* Buka di halaman Chart & Backtest milik V3.
+         ──────────────────────────────────────────────────────────────────
+         Halaman ini bisa berdiri sendiri ATAU ditempel di dalam V3. Kalau
+         di dalam bingkai, cukup memberi tahu induknya lewat postMessage -
+         induknya yang tahu cara berpindah halaman tanpa memuat ulang apa
+         pun. Kalau berdiri sendiri, buka tab baru ke alamat V3.
+
+         Tujuan postMessage dibatasi ke asal induknya sendiri, bukan '*':
+         pesan yang dikirim ke '*' bisa dibaca situs mana pun yang kebetulan
+         membingkai halaman ini. */
+      if(aksi === 'chartjt'){
+        var tf = (typeof intervalSel !== 'undefined' && intervalSel) ? intervalSel.value : '4h';
+        if(window.parent !== window){
+          try{
+            window.parent.postMessage({ jt: 'buka-chart', simbol: simbol, tf: tf }, window.location.origin);
+          }catch(e){
+            window.open(window.location.origin + '/v3/#/chart?simbol=' + encodeURIComponent(simbol) + '&tf=' + encodeURIComponent(tf), '_blank');
+          }
+        } else {
+          window.open(window.location.origin + '/v3/#/chart?simbol=' + encodeURIComponent(simbol) + '&tf=' + encodeURIComponent(tf), '_blank');
+        }
+        return;
+      }
 
       if(aksi === 'ganti'){
         const pengganti = blockAndReplaceSymbol(simbol);

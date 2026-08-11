@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Play, Pause, SkipForward, RotateCcw, TrendingUp, TrendingDown, X, Save, Loader2,
+  Play, Pause, SkipForward, RotateCcw, TrendingUp, TrendingDown, X, Save, Loader2, Trash2,
 } from 'lucide-react';
 import { Panel, PanelHead, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn, uang, persen, harga as fHarga, tanggalPendek } from '@/lib/utils';
 import type { Lilin } from '@/lib/pasar';
 import {
   KECEPATAN, usulSlTp, periksaKena, hitungPnl, ringkasReplay,
+  bacaSesi, simpanSesi, hapusSesi,
   type PosisiReplay, type TradeReplay,
 } from '@/lib/replay';
 import { simpanTrade } from '@/lib/tulis-jurnal';
 import type { GarisHarga } from '@/components/chart-lilin';
+import { KotakOrderNyata } from '@/components/kotak-order-nyata';
 
 /* ════════════════════════════════════════════════════════════════════════
    PANEL REPLAY
@@ -25,12 +27,16 @@ const KELAS_ISIAN =
   'h-8 w-full rounded-md border border-zinc-800 bg-zinc-900/60 px-2 text-[12px] text-zinc-200 ' +
   'outline-none transition-colors hover:border-zinc-700 focus-visible:border-zinc-600';
 
-export function PanelReplay({ lilin, simbol, idx, setIdx, aturGaris }: {
+export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, tanpaBingkai = false }: {
   lilin: Lilin;
   simbol: string;
+  tf: string;
   idx: number | null;
   setIdx: (n: number | null) => void;
   aturGaris: (g: GarisHarga[]) => void;
+  /* Dipakai saat panel ini berada DI DALAM panel grafik: tanpa border dan
+     tanpa margin sendiri, karena pembungkusnya sudah menyediakan keduanya. */
+  tanpaBingkai?: boolean;
 }) {
   const [main, setMain] = useState(false);
   const [cepat, setCepat] = useState(4);
@@ -43,6 +49,35 @@ export function PanelReplay({ lilin, simbol, idx, setIdx, aturGaris }: {
   const [trade, setTrade] = useState<TradeReplay[]>([]);
   const [pesan, setPesan] = useState('');
   const [menyimpan, setMenyimpan] = useState(false);
+  /* 'demo' = latihan di atas bar replay. 'real' = order sungguhan ke Binance
+     lewat VPS sendiri. Dipisah tegas, dan bawaannya demo — halaman latihan
+     yang diam-diam bisa mengirim uang sungguhan adalah rancangan yang salah. */
+  const [mode, setMode] = useState<'demo' | 'real'>('demo');
+
+  /* ── Pulihkan sesi ──────────────────────────────────────────────────
+     Dijalankan saat simbol/timeframe berganti, bukan sekali di awal:
+     tiap pasangan simbol+TF punya sesinya sendiri, dan berpindah ke BTC 4
+     jam harus memunculkan posisi BTC 4 jam, bukan sisa dari ETH 5 menit. */
+  const dimuat = useRef('');
+  useEffect(() => {
+    const kunci = `${simbol}|${tf}`;
+    if (dimuat.current === kunci) return;
+    dimuat.current = kunci;
+    const s = bacaSesi(simbol, tf);
+    setPosisi(s?.posisi ?? null);
+    setTrade(s?.trade ?? []);
+    setModal(s?.modal ?? 1000);
+    setMain(false);
+    if (s?.idx != null) setIdx(s.idx);
+  }, [simbol, tf, setIdx]);
+
+  /* Simpan tiap kali ada yang berubah. Sesi replay kecil (puluhan baris),
+     jadi menulisnya utuh lebih sederhana dan lebih aman daripada menambal
+     sebagian — dan tidak ada jalur yang bisa lupa ikut menyimpan. */
+  useEffect(() => {
+    if (dimuat.current !== `${simbol}|${tf}`) return;
+    simpanSesi(simbol, tf, { idx, posisi, trade, modal });
+  }, [simbol, tf, idx, posisi, trade, modal]);
 
   const ringkas = ringkasReplay(trade, modal);
   const hidup = idx !== null;
@@ -88,15 +123,28 @@ export function PanelReplay({ lilin, simbol, idx, setIdx, aturGaris }: {
     ] : []);
   }, [posisi, aturGaris]);
 
+  /* Mulai di 60% data: cukup bar di belakang untuk indikator matang, dan
+     masih menyisakan 40% untuk dijalankan.
+
+     Trade yang sudah tercatat TIDAK dihapus di sini. Memulai ulang putarannya
+     bukan alasan untuk membuang catatan latihan — itu perbuatan terpisah,
+     dan tombolnya ada sendiri. */
   const mulai = useCallback(() => {
-    /* Mulai di 60% data: cukup bar di belakang untuk indikator matang, dan
-       masih menyisakan 40% untuk dijalankan. */
     setIdx(Math.floor(lilin.closes.length * 0.6));
-    setTrade([]); setPosisi(null); setPesan(''); setMain(false);
+    setPosisi(null); setPesan(''); setMain(false);
   }, [lilin.closes.length, setIdx]);
 
+  function bersihkan() {
+    if (!confirm(`Hapus ${trade.length} catatan latihan untuk ${simbol} ${tf}?\n\nPosisi yang sedang terbuka ikut dibatalkan.`)) return;
+    setTrade([]); setPosisi(null); setPesan('Catatan latihan dihapus.');
+    hapusSesi(simbol, tf);
+  }
+
+  /* Keluar TIDAK membatalkan posisi. Menutup panelnya bukan pernyataan
+     bahwa posisinya ditutup — posisi tetap terbuka dan menunggu, persis
+     seperti kalau kamu menutup tab. */
   const keluar = useCallback(() => {
-    setIdx(null); setMain(false); setPosisi(null); aturGaris([]);
+    setIdx(null); setMain(false); aturGaris([]);
   }, [setIdx, aturGaris]);
 
   function buka(arah: 'BUY' | 'SELL') {
@@ -166,9 +214,12 @@ export function PanelReplay({ lilin, simbol, idx, setIdx, aturGaris }: {
     return () => window.removeEventListener('keydown', k);
   });
 
+  const Bungkus = ({ anak, kelas }: { anak: React.ReactNode; kelas?: string }) =>
+    tanpaBingkai ? <div>{anak}</div> : <Panel className={kelas}>{anak}</Panel>;
+
   if (!hidup) {
     return (
-      <Panel className="mt-4">
+      <Bungkus kelas="mt-4" anak={<>
         <PanelHead
           judul="Replay"
           sub="Putar ulang pasar bar demi bar, lalu latih entry-nya."
@@ -189,12 +240,12 @@ export function PanelReplay({ lilin, simbol, idx, setIdx, aturGaris }: {
             Klik bar mana pun di chart untuk melompat ke situ.
           </span>
         </p>
-      </Panel>
+      </>} />
     );
   }
 
   return (
-    <Panel className="mt-4 border-emerald-500/25">
+    <Bungkus kelas="mt-4 border-emerald-500/25" anak={<>
       <PanelHead
         judul="Replay berjalan"
         sub={`Bar ${idx + 1} dari ${lilin.closes.length} · ${tanggalPendek(lilin.times[idx])}`}
@@ -242,6 +293,31 @@ export function PanelReplay({ lilin, simbol, idx, setIdx, aturGaris }: {
 
       {/* Eksekusi */}
       <div className="border-t border-zinc-800/80 px-5 py-4">
+        {/* Pilihan mode. Order sungguhan TIDAK memakai bar replay: ia dikirim
+            ke pasar sekarang, di harga sekarang. Menempatkan keduanya di
+            saklar yang sama membuat perbedaan itu terlihat, bukan tersembunyi. */}
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <div className="flex overflow-hidden rounded-md border border-zinc-800">
+            {([['demo', 'Demo order'], ['real', 'Real order']] as const).map(([m, label]) => (
+              <button key={m} onClick={() => setMode(m)}
+                className={cn('cursor-pointer px-3 py-1.5 text-[11.5px] transition-colors',
+                  mode === m
+                    ? (m === 'real' ? 'bg-red-500/20 text-red-300' : 'bg-zinc-100 text-zinc-950')
+                    : 'text-zinc-400 hover:text-zinc-200')}>
+                {label}
+              </button>
+            ))}
+          </div>
+          <span className="text-[11.5px] text-zinc-600">
+            {mode === 'demo'
+              ? 'Latihan di atas bar replay — tidak ada uang yang bergerak.'
+              : 'Dikirim ke Binance lewat VPS-mu, di harga pasar sekarang.'}
+          </span>
+        </div>
+
+        {mode === 'real' ? (
+          <KotakOrderNyata simbol={simbol} hargaKini={lilin.closes[lilin.closes.length - 1]} />
+        ) : (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-6">
           <div>
             <label className="mb-1 block text-[11px] text-zinc-500">Modal ($)</label>
@@ -278,8 +354,9 @@ export function PanelReplay({ lilin, simbol, idx, setIdx, aturGaris }: {
             </>
           )}
         </div>
+        )}
 
-        {posisi && (
+        {mode === 'demo' && posisi && (
           <div className="mt-3 flex flex-wrap items-center gap-4 rounded-lg border border-zinc-800/60 p-3 text-[12px]">
             <span className={cn('rounded px-1.5 py-0.5 text-[10px]',
               posisi.arah === 'BUY' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-400')}>
@@ -320,11 +397,17 @@ export function PanelReplay({ lilin, simbol, idx, setIdx, aturGaris }: {
                 {ringkas.faktorProfit === null ? '—' : ringkas.faktorProfit === Infinity ? '∞' : ringkas.faktorProfit.toFixed(2)}
               </span>
             </span>
-            <button onClick={() => void simpanKeJurnal()} disabled={menyimpan}
-              className="ml-auto flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100 disabled:opacity-50">
-              {menyimpan ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
-              Simpan ke jurnal
-            </button>
+            <span className="ml-auto flex items-center gap-2">
+              <button onClick={bersihkan}
+                className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 py-1.5 text-[12px] text-zinc-500 transition-colors hover:border-red-500/30 hover:text-red-400">
+                <Trash2 className="size-3.5" /> Hapus catatan
+              </button>
+              <button onClick={() => void simpanKeJurnal()} disabled={menyimpan}
+                className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100 disabled:opacity-50">
+                {menyimpan ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
+                Simpan ke jurnal
+              </button>
+            </span>
           </div>
 
           <TabelBungkus className="max-h-[220px] overflow-y-auto">
@@ -356,6 +439,6 @@ export function PanelReplay({ lilin, simbol, idx, setIdx, aturGaris }: {
           </TabelBungkus>
         </div>
       )}
-    </Panel>
+    </>} />
   );
 }
