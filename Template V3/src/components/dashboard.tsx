@@ -150,6 +150,7 @@ export function Dashboard() {
       bersih: Number(stat.bersih.toFixed(2)),
       kurva: kurvaSaldo.map((x) => x.saldo),
       tumbuh: Number(selisihSaldo.toFixed(1)),
+      sejak: Math.min(...RIWAYAT.map((t) => t.waktu).filter((x) => x > 0)),
     };
     const sidik = JSON.stringify(r);
     if (sidik === sidikTerbit.current) return;

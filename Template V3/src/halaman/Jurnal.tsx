@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { Plus, Pencil, Bitcoin, CandlestickChart, Link2, Link2Off, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Panel, PanelHead, BadgeTren, TipGrafik, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
@@ -270,6 +270,12 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
     try { localStorage.setItem('jtSinkronOtomatis', v ? '1' : '0'); } catch { /* idem */ }
   };
 
+  const jamPesan = useRef<number | undefined>(undefined);
+  const bersihkanPesan = useCallback(() => {
+    window.clearTimeout(jamPesan.current);
+    jamPesan.current = window.setTimeout(() => setSinkron((s) => ({ ...s, pesan: '' })), 12_000);
+  }, []);
+
   const tarikDariMt5 = useCallback(async (diam = false) => {
     if (!diam) setSinkron({ sibuk: true, pesan: '' });
     try {
@@ -283,6 +289,11 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
       const jangkauan = h.terlama
         ? `Riwayat yang dikirim EA: ${tanggalPendek(h.terlama)} – ${tanggalPendek(h.terbaru)}.`
         : '';
+      /* Pesannya hilang sendiri setelah 12 detik. Catatan hasil sinkron
+         berguna tepat sesudah tombolnya ditekan; menetap di atas tabel
+         selamanya ia cuma memakan tinggi panel untuk kabar yang sudah
+         dibaca. */
+      bersihkanPesan();
       setSinkron({
         sibuk: false,
         pesan: [
@@ -294,9 +305,12 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
         ].filter(Boolean).join(' '),
       });
     } catch (e) {
-      if (!diam) setSinkron({ sibuk: false, pesan: e instanceof Error ? e.message : 'Gagal menarik riwayat' });
+      if (!diam) {
+        bersihkanPesan();
+        setSinkron({ sibuk: false, pesan: e instanceof Error ? e.message : 'Gagal menarik riwayat' });
+      }
     }
-  }, [trade, sejak]);
+  }, [trade, sejak, bersihkanPesan]);
 
   /* Sinkron otomatis: sekali saat halaman dibuka, lalu tiap 5 menit.
      Bukan tiap 30 detik — riwayat trade yang sudah tertutup tidak berubah,
@@ -427,8 +441,13 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
                     <YAxis tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} width={48}
                            tickFormatter={(v) => `$${v}`} domain={['dataMin - 8', 'dataMax + 8']} />
                     <Tooltip content={<TipGrafik />} cursor={{ stroke: 'rgba(255,255,255,.12)' }} />
+                    {/* `baseValue="dataMin"` — isian turun sampai DASAR kotak.
+                        Bawaannya 0, dan karena sumbunya dimulai di sekitar
+                        $267 titik nol itu jauh di bawah layar: isiannya
+                        digambar ke luar area gambar, jadi yang terlihat cuma
+                        garis tanpa gradasi dan kurvanya terkesan menggantung. */}
                     <Area type="monotone" dataKey="nilai" name="Ekuitas" stroke="#fafafa" strokeWidth={1.8}
-                          fill={`url(#${idGradien})`} dot={false} />
+                          fill={`url(#${idGradien})`} dot={false} baseValue="dataMin" />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>

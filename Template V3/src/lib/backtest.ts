@@ -230,38 +230,43 @@ export function garisIndikator(l: Lilin, s: Setelan) {
    dengan yang dipakai kartu sinyal — bukan versi mirip yang dihitung ulang.
    ════════════════════════════════════════════════════════════════════════ */
 
-export interface ZonaSnr { harga: number; jenis: 'support' | 'resisten' }
+export interface Zona { nilai: number; atas: number; bawah: number }
+export interface ZonaSnrPenuh { resisten: Zona | null; support: Zona | null; atr: number }
 
-/** Zona SNR dari pivot: puncak jadi resisten, lembah jadi support.
+/** Zona SNR — SALINAN PERSIS logika `checkSnrRetestSignal` di screener V2.
  *
- *  Hanya zona TERDEKAT dari harga sekarang yang dikembalikan (masing-masing
- *  dua). Menggambar sepuluh garis membuat chartnya jadi kertas bergaris —
- *  yang menentukan keputusan cuma zona yang sedang didekati. */
-export function zonaSnr(l: Lilin, batasIdx?: number): ZonaSnr[] {
+ *  Yang penting bukan "ada pivot di sini", melainkan ZONA di sekitar pivot
+ *  terakhir: pivot ± 0,5 ATR. Itulah yang digambar kartu Area Pantau sebagai
+ *  pita, dan itulah yang dipakai menilai sentuhan — sebuah garis tunggal
+ *  tidak pernah tersentuh persis, jadi memakai garis membuat separuh sinyal
+ *  hilang tanpa sebab yang terlihat.
+ *
+ *  Pivot kiri/kanan 10, bukan 5. Angka itu bukan selera: dengan 5, riak kecil
+ *  ikut terhitung pivot dan zonanya berpindah tiap beberapa bar.
+ */
+export function zonaSnr(l: Lilin, batasIdx?: number): ZonaSnrPenuh {
   const n = batasIdx === undefined ? l.closes.length : Math.min(l.closes.length, batasIdx + 1);
-  if (n < 30) return [];
-  /* `findPivots(values, left, right, isHigh)` — satu deret per panggilan,
-     bukan highs & lows sekaligus. Tanda `isHigh` yang menentukan arah
-     perbandingannya. */
-  const kini = l.closes[n - 1];
-  const puncak = findPivots(l.highs.slice(0, n), 5, 5, true) as { index: number; value: number }[];
-  const lembah = findPivots(l.lows.slice(0, n), 5, 5, false) as { index: number; value: number }[];
+  const kosong: ZonaSnrPenuh = { resisten: null, support: null, atr: 0 };
+  if (n < 30) return kosong;
 
-  const atas = puncak
-    .map((x) => x.value)
-    .filter((x) => isFinite(x) && x > kini)
-    .sort((a, b) => a - b)
-    .slice(0, 2)
-    .map((harga): ZonaSnr => ({ harga, jenis: 'resisten' }));
+  const highs = l.highs.slice(0, n);
+  const lows = l.lows.slice(0, n);
+  const closes = l.closes.slice(0, n);
 
-  const bawah = lembah
-    .map((x) => x.value)
-    .filter((x) => isFinite(x) && x < kini)
-    .sort((a, b) => b - a)
-    .slice(0, 2)
-    .map((harga): ZonaSnr => ({ harga, jenis: 'support' }));
+  const puncak = findPivots(highs, 10, 10, true) as { index: number; value: number }[];
+  const lembah = findPivots(lows, 10, 10, false) as { index: number; value: number }[];
+  const a = atr(highs, lows, closes, 14)[n - 1];
+  if (!isFinite(a) || a <= 0) return kosong;
 
-  return [...atas, ...bawah];
+  const tol = a * 0.5;
+  const buat = (p?: { value: number }): Zona | null =>
+    p ? { nilai: p.value, atas: p.value + tol, bawah: p.value - tol } : null;
+
+  return {
+    resisten: buat(puncak[puncak.length - 1]),
+    support: buat(lembah[lembah.length - 1]),
+    atr: a,
+  };
 }
 
 /** Garis SMI untuk panel bawah — dikembalikan sebagai deret biasa supaya

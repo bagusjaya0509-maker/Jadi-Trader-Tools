@@ -77,6 +77,21 @@ function IkonKoin({ simbol }: { simbol: string }) {
   );
 }
 
+/** "2 bln", "1 thn 3 bln" — sejak transaksi paling lama.
+ *
+ *  Diukur dari DATA, bukan dari tanggal yang ditulis tangan: transaksi
+ *  pertama adalah bukti paling awal bahwa alat ini benar-benar dipakai. */
+function lamaPakai(sejak: number) {
+  if (!sejak) return '—';
+  const hari = Math.floor((Date.now() - sejak) / 86_400_000);
+  if (hari < 1) return 'hari ini';
+  if (hari < 30) return `${hari} hari`;
+  const bulan = Math.floor(hari / 30);
+  if (bulan < 12) return `${bulan} bln`;
+  const thn = Math.floor(bulan / 12), sisa = bulan % 12;
+  return sisa ? `${thn} thn ${sisa} bln` : `${thn} thn`;
+}
+
 const StatItem = ({ value, label }: { value: string; label: string }) => (
   <div className="flex flex-col items-center justify-center transition-transform hover:-translate-y-1 cursor-default">
     <span className="text-xl font-bold text-white sm:text-2xl">{value}</span>
@@ -201,8 +216,15 @@ export default function HeroSection() {
                     <Wallet className="h-6 w-6 text-white" />
                   </div>
                   <div>
+                    {/* `saldo`, BUKAN titik terakhir kurva.
+                        ────────────────────────────────────────────────────
+                        Kurva itu saldo berjalan BULAN INI; titik akhirnya
+                        bukan total saldo. Karena itu halaman depan sempat
+                        menulis $290 sementara Dashboard menulis $808 — dua
+                        angka yang keduanya benar untuk pertanyaan berbeda,
+                        dan yang ditanyakan di sini adalah total saldonya. */}
                     <div className="angka text-3xl font-bold tracking-tight text-white">
-                      {pameran.siap ? uang(pameran.kurva[pameran.kurva.length - 1]) : '—'}
+                      {pameran.siap ? uang(pameran.saldo) : '—'}
                     </div>
                     <div className="text-sm text-zinc-400">Total Saldo</div>
                   </div>
@@ -234,7 +256,7 @@ export default function HeroSection() {
                 <div className="h-px w-full bg-white/10 mb-6" />
 
                 <div className="grid grid-cols-3 gap-4 text-center">
-                  <StatItem value={pameran.siap ? String(pameran.jumlah) : '—'} label="Transaksi" />
+                  <StatItem value={lamaPakai(pameran.sejak)} label="Dipakai" />
                   <div className="w-px h-full bg-white/10 mx-auto" />
                   <StatItem value={pameran.siap ? persen(pameran.winrate) : '—'} label="Winrate" />
                   <div className="w-px h-full bg-white/10 mx-auto" />

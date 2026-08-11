@@ -23,7 +23,7 @@ export interface Garis { nama: string; nilai: (number | null)[]; warna: string }
 
 export interface GarisHarga { harga: number; warna: string; label: string }
 
-export function ChartLilin({ lilin, garis, trade, tinggi = 420, hingga, garisHarga, onKlikBar }: {
+export function ChartLilin({ lilin, garis, trade, tinggi = 420, hingga, garisHarga, onKlikBar, smi }: {
   lilin: Lilin;
   garis?: Garis[];
   trade?: TradeUji[];
@@ -36,12 +36,15 @@ export function ChartLilin({ lilin, garis, trade, tinggi = 420, hingga, garisHar
   garisHarga?: GarisHarga[];
   /** Klik pada chart -> indeks bar. Dipakai untuk memulai replay dari situ. */
   onKlikBar?: (idx: number) => void;
+  /** Deret SMI + garis sinyalnya, digambar di panel bawah. */
+  smi?: { smi: (number | null)[]; signal: (number | null)[] } | null;
 }) {
   const kotak = useRef<HTMLDivElement>(null);
   const chart = useRef<IChartApi | null>(null);
   const seri = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const seriGaris = useRef<ISeriesApi<'Line'>[]>([]);
   const penanda = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
+  const seriSmi = useRef<ISeriesApi<'Line'>[]>([]);
   const garisPos = useRef<IPriceLine[]>([]);
   /* Handler klik disimpan di ref supaya langganannya dipasang SEKALI.
      Melanggan ulang tiap render menumpuk pendengar di chart yang sama. */
@@ -107,6 +110,47 @@ export function ChartLilin({ lilin, garis, trade, tinggi = 420, hingga, garisHar
       lineStyle: 2, axisLabelVisible: true, title: g.label,
     }));
   }, [garisHarga]);
+
+  /* ── Panel SMI ──────────────────────────────────────────────────────
+     Panel TERPISAH (paneIndex 1), bukan ditumpuk di atas harga: SMI bergerak
+     di rentang -100..100 sementara harga di puluhan ribu, dan menggabungkan
+     keduanya di satu sumbu membuat salah satunya jadi garis lurus. */
+  useEffect(() => {
+    const c = chart.current;
+    if (!c) return;
+    seriSmi.current.forEach((s) => { try { c.removeSeries(s); } catch { /* sudah lepas */ } });
+    seriSmi.current = [];
+    if (!smi || !lilin.times.length) return;
+
+    const batas = hingga === undefined ? lilin.times.length : Math.max(1, Math.min(lilin.times.length, hingga + 1));
+    const buat = (nilai: (number | null)[], warna: string, tebal: 1 | 2) => {
+      const s = c.addSeries(LineSeries, {
+        color: warna, lineWidth: tebal, priceLineVisible: false, lastValueVisible: false,
+      }, 1);
+      s.setData(
+        lilin.times.slice(0, batas)
+          .map((t, i) => ({ time: Math.floor(t / 1000) as Time, value: nilai[i] }))
+          .filter((x): x is { time: Time; value: number } => x.value != null && isFinite(x.value))
+      );
+      seriSmi.current.push(s);
+    };
+    buat(smi.smi, '#fbbf24', 2);
+    buat(smi.signal, '#60a5fa', 1);
+
+    /* Ambang jenuh +50 / -50 — angka yang SAMA dengan SMI_OB dan SMI_OS di
+       jt-scan-core, yaitu ambang yang dipakai kartu sinyal untuk menyebut
+       sebuah koin overbought atau oversold. Garis di sini harus sama persis
+       dengan ambang di sana, kalau tidak chart dan kartu akan berbeda
+       pendapat tentang koin yang sama. */
+    const acuan = seriSmi.current[0];
+    if (acuan) {
+      [50, -50].forEach((v) => acuan.createPriceLine({
+        price: v, color: 'rgba(255,255,255,.14)', lineWidth: 1, lineStyle: 2,
+        axisLabelVisible: false, title: '',
+      }));
+    }
+    try { c.panes()[1]?.setHeight(110); } catch { /* versi tanpa panes API */ }
+  }, [smi, lilin, hingga]);
 
   /* Garis indikator */
   useEffect(() => {

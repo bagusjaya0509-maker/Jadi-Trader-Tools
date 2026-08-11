@@ -440,6 +440,9 @@ export interface RingkasanAkun {
   /** Kurva saldo ringkas — maksimal 60 titik supaya dokumennya tetap kecil. */
   kurva: number[];
   tumbuh: number;
+  /** Waktu transaksi PALING LAMA — dipakai halaman depan untuk mengatakan
+   *  sudah berapa lama tools ini dipakai, bukan sekadar berapa transaksi. */
+  sejak: number;
 }
 
 export async function terbitkanRingkasan(r: RingkasanAkun) {

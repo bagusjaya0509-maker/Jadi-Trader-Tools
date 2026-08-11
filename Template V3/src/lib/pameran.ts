@@ -30,9 +30,13 @@ export interface AngkaPameran {
   /** Kurva saldo kumulatif, untuk grafik hero. */
   kurva: number[];
   tumbuh: number;
+  /** Total saldo — angka yang SAMA dengan kartu Total Saldo di Dashboard. */
+  saldo: number;
+  /** Transaksi paling lama; 0 kalau tidak diketahui. */
+  sejak: number;
 }
 
-const KOSONG: AngkaPameran = { siap: false, jumlah: 0, winrate: 0, bersih: 0, kurva: [], tumbuh: 0 };
+const KOSONG: AngkaPameran = { siap: false, jumlah: 0, winrate: 0, bersih: 0, kurva: [], tumbuh: 0, saldo: 0, sejak: 0 };
 
 /** Firestore REST membungkus tiap nilai dalam objek bertipe. */
 function nilai(f: any): any {
@@ -68,6 +72,8 @@ export function useAngkaPameran(): AngkaPameran {
           bersih: Number(nilai(f.bersih)) || 0,
           kurva: kurva.length > 1 ? kurva : [Number(nilai(f.saldo)) || 0],
           tumbuh: Number(nilai(f.tumbuh)) || 0,
+          saldo: Number(nilai(f.saldo)) || 0,
+          sejak: Number(nilai(f.sejak)) || 0,
         });
       })
       /* Belum ada ringkasan (mis. pemiliknya belum pernah membuka Dashboard
@@ -142,6 +148,8 @@ function muatDariShowcase(
           bersih,
           kurva: kurva.length > 1 ? kurva : [saldoAwal, jalan],
           tumbuh,
+          saldo: jalan,
+          sejak: baris[0]?.waktu ?? 0,
         });
       })
       .catch(() => { /* hero tetap tampil tanpa angka */ });

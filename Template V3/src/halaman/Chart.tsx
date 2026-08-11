@@ -7,7 +7,7 @@ import { ChartLilin, type Garis, type GarisHarga } from '@/components/chart-lili
 import { PanelReplay } from '@/components/panel-replay';
 import { ambilKlines, type Lilin } from '@/lib/pasar';
 import {
-  jalankanUji, garisIndikator, zonaSnr, SETELAN_BAWAAN,
+  jalankanUji, garisIndikator, zonaSnr, deretSmi, SETELAN_BAWAAN,
   type Setelan, type HasilUji,
 } from '@/lib/backtest';
 import { SIMBOL_DASAR } from '@/lib/simbol';
@@ -108,6 +108,7 @@ export default function ChartBacktest() {
   /* Zona SNR dari logika yang sama dengan screener. Dimatikan secara bawaan:
      empat garis mendatar di chart yang belum dibaca cuma menutupi lilinnya. */
   const [tampilSnr, setTampilSnr] = useState(false);
+  const [tampilSmi, setTampilSmi] = useState(true);
 
   /* ── Data realtime ──────────────────────────────────────────────────
      Ditarik ulang tiap 15 detik, sama dengan umur cache di lib/pasar.ts —
@@ -158,8 +159,33 @@ export default function ChartBacktest() {
      Selama replay, menggambar zona dari data masa depan adalah cara paling
      halus untuk membuat latihannya berbohong. */
   const zona = useMemo(
-    () => (tampilSnr && lilin.closes.length ? zonaSnr(lilin, replayIdx ?? undefined) : []),
+    () => (tampilSnr && lilin.closes.length ? zonaSnr(lilin, replayIdx ?? undefined) : null),
     [tampilSnr, lilin, replayIdx]
+  );
+
+  /* Zona digambar sebagai TIGA garis per sisi: batas atas, nilai pivotnya,
+     dan batas bawah. Pita utuh butuh seri area tersendiri; tiga garis tipis
+     menyampaikan hal yang sama dengan sepersepuluh kerumitannya, dan batas
+     itulah yang sebenarnya dibaca saat menilai sentuhan. */
+  const garisZona = useMemo(() => {
+    if (!zona) return [];
+    const g: GarisHarga[] = [];
+    if (zona.resisten) {
+      g.push({ harga: zona.resisten.atas, warna: 'rgba(248,113,113,.28)', label: '' });
+      g.push({ harga: zona.resisten.nilai, warna: 'rgba(248,113,113,.7)', label: 'R' });
+      g.push({ harga: zona.resisten.bawah, warna: 'rgba(248,113,113,.28)', label: '' });
+    }
+    if (zona.support) {
+      g.push({ harga: zona.support.atas, warna: 'rgba(16,185,129,.28)', label: '' });
+      g.push({ harga: zona.support.nilai, warna: 'rgba(16,185,129,.7)', label: 'S' });
+      g.push({ harga: zona.support.bawah, warna: 'rgba(16,185,129,.28)', label: '' });
+    }
+    return g;
+  }, [zona]);
+
+  const smi = useMemo(
+    () => (tampilSmi && lilin.closes.length >= 30 ? deretSmi(lilin) : null),
+    [tampilSmi, lilin]
   );
 
   const terakhir = lilin.closes[lilin.closes.length - 1];
@@ -257,6 +283,12 @@ export default function ChartBacktest() {
                      className="size-3.5 cursor-pointer accent-zinc-200" />
               Zona SNR
             </label>
+            <label title="Panel SMI di bawah chart — perhitungan yang sama dengan Screener Entry"
+              className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-700">
+              <input type="checkbox" checked={tampilSmi} onChange={(e) => setTampilSmi(e.target.checked)}
+                     className="size-3.5 cursor-pointer accent-zinc-200" />
+              SMI
+            </label>
             <button onClick={() => setBukaReplay((v) => !v)}
               title={bukaReplay ? 'Sembunyikan panel replay' : 'Buka panel replay'}
               className={cn('flex cursor-pointer items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[12px] transition-colors',
@@ -279,15 +311,8 @@ export default function ChartBacktest() {
         <div className="border-t border-zinc-800/80 px-2 pb-2">
           {lilin.times.length > 0
             ? <ChartLilin lilin={lilin} garis={garis} trade={replayIdx === null ? hasil?.trade : undefined}
-                          tinggi={440} hingga={replayIdx ?? undefined}
-                          garisHarga={[
-                            ...garisHarga,
-                            ...zona.map((z) => ({
-                              harga: z.harga,
-                              warna: z.jenis === 'resisten' ? 'rgba(248,113,113,.55)' : 'rgba(16,185,129,.55)',
-                              label: z.jenis === 'resisten' ? 'R' : 'S',
-                            })),
-                          ]}
+                          tinggi={tampilSmi ? 620 : 500} hingga={replayIdx ?? undefined} smi={smi}
+                          garisHarga={[...garisHarga, ...garisZona]}
                           onKlikBar={replayIdx === null ? undefined : setReplayIdx} />
             : <div className="flex h-[440px] items-center justify-center text-[12.5px] text-zinc-600">
                 {memuat ? 'Memuat lilin…' : 'Tidak ada data untuk simbol ini.'}
