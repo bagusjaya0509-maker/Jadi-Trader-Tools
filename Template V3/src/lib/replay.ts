@@ -25,6 +25,9 @@ import type { Lilin } from '@/lib/pasar';
    ════════════════════════════════════════════════════════════════════════ */
 
 export interface PosisiReplay {
+  /** Emosi & alasan yang diisi di tiket — ikut tercatat ke jurnal. */
+  emosi?: string;
+  alasan?: string;
   id: string;
   arah: 'BUY' | 'SELL';
   masukIdx: number;

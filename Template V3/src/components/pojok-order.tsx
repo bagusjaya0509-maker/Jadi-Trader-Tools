@@ -34,6 +34,7 @@ export function PojokOrder({
   posisi, hargaKini, draf, rencana, mode, jenis, risiko, tunda, onBatalTunda,
   onPilih, onUbah, onKirim, onBatal, onTutup, onGantiMode, mati,
   nyataSetelan, aturNyata, sibukNyata, kabar, demoSetelan, aturDemo,
+  catatan, aturCatatan,
 }: {
   posisi: { arah: 'BUY' | 'SELL'; masuk: number; sl: number; tp: number; pnl: number; risiko: number; unit: number } | null;
   hargaKini?: number;
@@ -67,6 +68,10 @@ export function PojokOrder({
    *  replay, jadi setelannya pun tidak boleh. */
   demoSetelan?: { modal: number; risikoPersen: number; kaliAtr: number; rr: number };
   aturDemo?: (s: { modal: number; risikoPersen: number; kaliAtr: number; rr: number }) => void;
+  /** Emosi + alasan yang akan tercatat di jurnal — diisi SEBELUM Kirim.
+   *  Jurnal tanpa alasan entry adalah daftar angka, bukan bahan evaluasi. */
+  catatan?: { emosi: string; alasan: string };
+  aturCatatan?: (c: { emosi: string; alasan: string }) => void;
 }) {
   const nyata = mode === 'real';
   /* Terlipat atau terbuka — pilihan yang diingat. Saat ada tiket, posisi,
@@ -180,6 +185,28 @@ export function PojokOrder({
           <Isian k="sl" label="SL" warna="#f87171" />
           <Isian k="tp" label="TP" warna="#10b981" />
         </div>
+
+        {catatan && aturCatatan && (
+          <div className="mt-1.5 flex items-end gap-1.5">
+            <label className="block">
+              <span className="mb-0.5 block text-[9.5px] uppercase tracking-wide text-zinc-500">Emosi</span>
+              <select value={catatan.emosi}
+                      onChange={(e) => aturCatatan({ ...catatan, emosi: e.target.value })}
+                      className={cn(KELAS_ISIAN, 'w-[104px] cursor-pointer')}>
+                {['Netral', 'Percaya Diri', 'Tenang', 'Ragu-ragu', 'FOMO', 'Panik', 'Balas Dendam'].map((e) => (
+                  <option key={e}>{e}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block grow">
+              <span className="mb-0.5 block text-[9.5px] uppercase tracking-wide text-zinc-500">Alasan / setup</span>
+              <input value={catatan.alasan}
+                     onChange={(e) => aturCatatan({ ...catatan, alasan: e.target.value })}
+                     placeholder="cth: retest support 4H"
+                     className={cn(KELAS_ISIAN, 'w-full min-w-[140px]')} />
+            </label>
+          </div>
+        )}
 
         {/* Ukuran latihan diatur DI SINI, bukan di panel bawah replay —
             order demo bisa dibuka tanpa menyentuh tombol replay sama

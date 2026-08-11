@@ -42,6 +42,9 @@ export interface PermintaanNyata {
   sl: number;
   tp: number;
   metode: MetodeTp;
+  /** Emosi & alasan dari tiket — masuk record posisi screener dan jurnal. */
+  emosi?: string;
+  alasan?: string;
 }
 
 function keStep(n: number, step: number, presisi: number | null) {
@@ -159,7 +162,7 @@ export async function kirimOrderNyata(p: PermintaanNyata): Promise<{ pesan: stri
       liveTp1OrderId: j.tp1Order?.orderId ?? null,
       liveTp2OrderId: j.tp2Order?.orderId ?? null,
       entryMethod: p.metode, virtualTp1: p.metode === 'nopartial' ? Number(tp1Fmt) : null,
-      signalType: 'chart-backtest', preEmosi: '', preAlasan: 'Order dari Chart & Backtest V3',
+      signalType: 'chart-backtest', preEmosi: p.emosi || '', preAlasan: p.alasan || 'Order dari Chart & Backtest V3',
       ...(j.pending ? { pending: true, entryPriceTarget: p.entry, isAlgoEntry: !!j.isAlgoEntry } : {}),
     };
     localStorage.setItem(KUNCI_PSIM, JSON.stringify(simpanan));

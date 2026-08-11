@@ -11,7 +11,7 @@ import type { Trade, Sumber } from '@/data/contoh';
 import { useAkunMt5, useAkunBinance, type StatusAkun } from '@/lib/akun';
 import { ModalTrade } from '@/components/modal-trade';
 import { KotakArus } from '@/components/kotak-arus';
-import { useArusKas, arusBersih, sinkronRiwayatMt5, type Arus } from '@/lib/tulis-jurnal';
+import { useArusKas, arusBersih, sinkronRiwayatMt5, sinkronRiwayatBinance, type Arus } from '@/lib/tulis-jurnal';
 import { bacaStatistik, bacaPnl } from '@/lib/catatan-stat';
 import { Link } from 'react-router-dom';
 
@@ -158,7 +158,10 @@ function KartuSaldo({ judul, saldoJurnal, akun, keIntegrasi }: {
 }) {
   const nyambung = akun.terhubung === true;
   const memeriksa = akun.terhubung === null;
-  const selisih = nyambung && akun.saldo !== null ? akun.saldo - saldoJurnal : null;
+  /* Saldo broker dipakai selama ADA — termasuk laporan terakhir EA yang
+     sedang mati. Sumbernya disebut jujur di baris keterangan. */
+  const adaSaldoBroker = akun.saldo !== null;
+  const selisih = adaSaldoBroker ? akun.saldo! - saldoJurnal : null;
 
   return (
     <Panel className="p-5">
@@ -166,10 +169,12 @@ function KartuSaldo({ judul, saldoJurnal, akun, keIntegrasi }: {
         <div className="min-w-0">
           <div className="text-[12.5px] text-zinc-500">{judul}</div>
           <div className="angka mt-2 text-[28px] font-semibold leading-none tracking-tight text-zinc-100">
-            {uang(nyambung && akun.saldo !== null ? akun.saldo : saldoJurnal)}
+            {uang(adaSaldoBroker ? akun.saldo! : saldoJurnal)}
           </div>
           <div className="mt-2.5 text-[12px] text-zinc-500">
-            {nyambung ? `dari broker · jurnal ${uang(saldoJurnal)}` : 'dihitung dari jurnal'}
+            {nyambung ? `dari broker · jurnal ${uang(saldoJurnal)}`
+              : adaSaldoBroker ? `laporan terakhir EA · jurnal ${uang(saldoJurnal)}`
+              : 'dihitung dari jurnal'}
           </div>
         </div>
 
@@ -306,11 +311,16 @@ function CatatanKecil({ c }: { c: { nada: 'baik' | 'awas' | 'buruk'; teks: strin
  *  Dipakai dua kali dengan daftar transaksi berbeda. Menuliskannya dua kali
  *  akan membuat kedua jurnal berbeda diam-diam dalam dua putaran revisi —
  *  persis yang terjadi pada `statPer` sebelum diperbaiki. */
-function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun, labelSaldo, keIntegrasi, sumber, arus, bisaTulis, contoh = false }: {
+function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun, labelSaldo, keIntegrasi, sumber, arus, bisaTulis, contoh = false, pemisah = false, tanpaEmosi = false }: {
   judul: string; ket: string; Ikon: typeof Bitcoin;
   trade: Trade[]; saldoAwal: number; warna: string; idGradien: string;
   akun: StatusAkun; labelSaldo: string; keIntegrasi: string;
   sumber: Sumber; arus: Arus[]; bisaTulis: boolean; contoh?: boolean;
+  /** Garis pemisah tebal di atas judul — menandai pergantian jurnal. */
+  pemisah?: boolean;
+  /** Kripto: pola emosinya sudah terwakili di Trade-Fi; riwayatnya yang
+   *  butuh lebar penuh karena berisi ratusan baris sinkron. */
+  tanpaEmosi?: boolean;
 }) {
   /* Setoran & penarikan masuk ke SALDO, bukan ke P/L — jadi ia digabung ke
      saldo awal, bukan ke daftar transaksi. Kalau ikut ke transaksi, menyetor
@@ -410,6 +420,31 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
     const jam = setInterval(() => void tarikDariMt5(true), 5 * 60_000);
     return () => clearInterval(jam);
   }, [otomatis, bisaTulis, sumber, tarikDariMt5]);
+
+  /* ── Auto-sinkron Binance untuk jurnal KRIPTO ─────────────────────────
+     Order yang ditutup lewat aplikasi Binance tidak pernah lewat layar
+     kita, jadi jurnalnya bolong tanpa ada yang salah pencet apa pun.
+     Tiap 5 menit (dan sekali saat halaman dibuka) fill sungguhan ditarik
+     dari /api/user-trades; ID dokumennya deterministic (bin<orderId>),
+     jadi pengulangan tidak menggandakan baris. */
+  const [pesanBin, setPesanBin] = useState('');
+  useEffect(() => {
+    if (!bisaTulis || sumber !== 'kripto') return;
+    let hidup = true;
+    const jalan = async () => {
+      const sudahAda = new Set(trade.map((t) => t.id));
+      const terbaru = trade.reduce((s, t) => Math.max(s, t.waktu), 0);
+      const sejak = terbaru > 0 ? terbaru - 3_600_000 : Date.now() - 7 * 86_400_000;
+      const h = await sinkronRiwayatBinance(sudahAda, sejak);
+      if (!hidup) return;
+      if (h.galat) setPesanBin('');
+      else if (h.masuk > 0) setPesanBin(`${h.masuk} transaksi baru dari Binance masuk otomatis.`);
+    };
+    void jalan();
+    const jam = setInterval(() => void jalan(), 5 * 60_000);
+    return () => { hidup = false; clearInterval(jam); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bisaTulis, sumber, trade.length]);
   const pl = useMemo(() => plPerHari(trade), [trade]);
 
   const emosi = useMemo(() => {
@@ -426,6 +461,9 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
 
   return (
     <section className="mt-6 first:mt-0">
+      {/* Garis pemisah tebal — dua jurnal di satu halaman butuh batas yang
+          terlihat dari jauh, bukan sekadar jarak kosong. */}
+      {pemisah && <div className="mb-6 border-t-2 border-zinc-800" />}
       <div className="mb-3 flex items-center gap-2.5">
         <Ikon className={cn('size-4', warna)} strokeWidth={1.9} />
         <h2 className="text-[15px] font-semibold tracking-tight text-zinc-100">{judul}</h2>
@@ -582,7 +620,7 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
               <div className="flex grow flex-col justify-start px-5 pb-5"><Kalender pl={pl} /></div>
             </Panel>
 
-            <Panel className="min-w-0 lg:col-span-2">
+            <Panel className={cn('min-w-0', tanpaEmosi ? 'lg:col-span-3' : 'lg:col-span-2')}>
               <PanelHead
                 judul="Riwayat Trade"
                 sub={rangkum && barisTabel.length !== trade.length
@@ -643,6 +681,11 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
                     {sinkron.pesan}
                   </div>
                 )}
+                {pesanBin && sumber === 'kripto' && (
+                  <div className="mb-3 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-2 text-[12px] text-emerald-400/90">
+                    {pesanBin}
+                  </div>
+                )}
                 <TabelBungkus className="max-h-[380px] overflow-y-auto">
                   <Tabel>
                     <thead className="sticky top-0 bg-zinc-950">
@@ -694,6 +737,7 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
               </div>
             </Panel>
 
+            {!tanpaEmosi && (
             <Panel>
               <PanelHead judul="Pola Emosi" sub="Emosi saat entry vs hasilnya." />
               <div className="px-5 pb-5">
@@ -716,6 +760,7 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
                 )}
               </div>
             </Panel>
+            )}
 
           </div>
         </>
@@ -774,7 +819,7 @@ export default function Jurnal() {
         sumber="forex" arus={arus} bisaTulis={bisaTulis}
       />
 
-      <BlokJurnal
+      <BlokJurnal pemisah tanpaEmosi
         judul="Jurnal Kripto" ket="Binance Futures lewat Screener"
         Ikon={Bitcoin} trade={kripto} saldoAwal={0}
         warna="text-emerald-400" idGradien="gEqKripto"

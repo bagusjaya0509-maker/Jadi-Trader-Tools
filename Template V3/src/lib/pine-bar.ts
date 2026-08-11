@@ -297,13 +297,20 @@ function uraiBlok(baris: { teks: string; no: number; indent: number }[], mulai: 
       continue;
     }
 
-    /* Penetapan: [var] [tipe] nama = / := ekspresi */
-    const tM = /^(var\s+)?(?:(?:float|int|bool|color|string|line|label|box|table|array<[A-Za-z]+>|array)\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*(:?=)(?!=)\s*(.+)$/.exec(isi);
+    /* Penetapan: [var] [tipe] nama = / := / += / -= / *= / /= ekspresi.
+       Bentuk gabungan diurai jadi `nama = nama <op> (ekspresi)` — semantik
+       yang sama, tanpa cabang baru di mesinnya. */
+    const tM = /^(var\s+)?(?:(?:float|int|bool|color|string|line|label|box|table|array<[A-Za-z]+>|array)\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*(:=|[+\-*/]?=)(?!=)\s*(.+)$/.exec(isi);
     if (tM && !/^(if|for|else)\b/.test(isi)) {
+      const op = tM[3];
+      let ekspresi: Ekspr = new Pengurai(tM[4], b.no).urai();
+      if (op.length === 2 && op !== ':=') {
+        ekspresi = { j: 'bin', op: op[0], a: { j: 'nama', v: tM[2] }, b: ekspresi };
+      }
       stmt.push({
         j: 'tugas', nama: tM[2],
-        e: new Pengurai(tM[4], b.no).urai(),
-        deklarasiVar: !!tM[1], ulang: tM[3] === ':=', baris: b.no,
+        e: ekspresi,
+        deklarasiVar: !!tM[1], ulang: op === ':=', baris: b.no,
       });
       i++;
       continue;

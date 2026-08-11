@@ -122,6 +122,9 @@ export default function ChartBacktest() {
   /* Setelan latihan — dulu di panel bawah yang baru muncul saat replay;
      order demo tidak bergantung replay, jadi setelannya ikut tiket. */
   const [demoSetelan, setDemoSetelan] = useState({ modal: 1000, risikoPersen: 1, kaliAtr: 1.5, rr: 2 });
+  /* Emosi & alasan diisi SEBELUM kirim — masuk jurnal (demo) dan record
+     posisi screener (real). Jurnal tanpa alasan cuma daftar angka. */
+  const [catatanTiket, setCatatanTiket] = useState({ emosi: 'Netral', alasan: '' });
 
   /* Mengubah SL ×ATR / R:R saat tiket TERBUKA langsung menggeser garisnya —
      setelan yang baru berlaku untuk tiket berikutnya terasa seperti setelan
@@ -572,6 +575,7 @@ export default function ChartBacktest() {
                                     modal: nyataSetelan.modal, leverage: nyataSetelan.leverage,
                                     entry: jenisEntry === 'MARKET' ? (aksi.hargaKini ?? entry) : entry,
                                     jenis: jenisEntry, sl, tp, metode: nyataSetelan.metode,
+                                    emosi: catatanTiket.emosi, alasan: catatanTiket.alasan,
                                   }).then((h) => {
                                     setKabarNyata(h.pesan);
                                     if (h.pesan !== 'Dibatalkan.') { setDraf(null); setRencana({}); }
@@ -580,11 +584,12 @@ export default function ChartBacktest() {
                                   }).finally(() => setSibukNyata(false));
                                   return;
                                 }
-                                aksi.kirim(draf, { entry, sl, tp }, jenisEntry);
+                                aksi.kirim(draf, { entry, sl, tp }, jenisEntry, catatanTiket);
                                 setDraf(null);
                               }}
                               nyataSetelan={nyataSetelan} aturNyata={setNyataSetelan}
                               demoSetelan={demoSetelan} aturDemo={setDemoSetelan}
+                              catatan={catatanTiket} aturCatatan={setCatatanTiket}
                               sibukNyata={sibukNyata} kabar={kabarNyata || undefined}
                               onTutup={aksi.tutup} mati={aksi.mati} />
                           ) : undefined} />

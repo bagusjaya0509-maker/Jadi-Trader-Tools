@@ -28,8 +28,9 @@ export interface AksiOrder {
    *  Sekadar titik awal: yang berlaku adalah angka setelah digeser. */
   usul: (arah: 'BUY' | 'SELL') => { entry: number; sl: number; tp: number } | null;
   /** Kirim order dengan level yang SUDAH ditetapkan orangnya. Jenis selain
-   *  MARKET menggantung sampai harganya tersentuh — persis pending order. */
-  kirim: (arah: 'BUY' | 'SELL', level: { entry: number; sl: number; tp: number }, jenis: JenisEntry) => void;
+   *  MARKET menggantung sampai harganya tersentuh — persis pending order.
+   *  Catatan (emosi + alasan) ikut dibawa sampai ke jurnal. */
+  kirim: (arah: 'BUY' | 'SELL', level: { entry: number; sl: number; tp: number }, jenis: JenisEntry, catatan?: { emosi: string; alasan: string }) => void;
   tutup: () => void;
   mati: boolean;
   mode: 'demo' | 'real';
@@ -266,7 +267,7 @@ export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, aturAks
   /* Order berangkat dengan level yang SUDAH ditetapkan di tiket — termasuk
      hasil menggeser garisnya di chart. Menghitung ulang SL di sini akan
      membuang keputusan yang baru saja diambil orangnya. */
-  function buka(arah: 'BUY' | 'SELL', level: { entry: number; sl: number; tp: number }, jenis: JenisEntry = 'MARKET') {
+  function buka(arah: 'BUY' | 'SELL', level: { entry: number; sl: number; tp: number }, jenis: JenisEntry = 'MARKET', catatan?: { emosi: string; alasan: string }) {
     if (posisi || !lilin.closes.length) return;
     const { entry, sl, tp } = level;
     if (!entry || !sl || !tp) { setPesan('Entry, SL, dan TP harus terisi.'); return; }
@@ -275,12 +276,14 @@ export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, aturAks
          harga benar-benar menyentuh entry — membukanya sekarang di harga
          pasar berarti mengeksekusi order yang tidak pernah diminta. */
       setTunda({ arah, jenis, entry, sl, tp });
+      void catatan; /* pending demo: catatan menyusul saat terisi — disederhanakan */
       setPesan(`${arah} ${jenis === 'STOP' ? 'Stop' : 'Limit'} dipasang di ${fHarga(entry)} — menunggu harga menyentuhnya.`);
       return;
     }
     const risiko = (modal + ringkas.bersih) * (risikoPersen / 100);
     const unit = risiko / Math.abs(entry - sl);
-    setPosisi({ id: 'p' + Date.now(), arah, masukIdx: idxAktif, masuk: entry, sl, tp, unit, risiko });
+    setPosisi({ id: 'p' + Date.now(), arah, masukIdx: idxAktif, masuk: entry, sl, tp, unit, risiko,
+                emosi: catatan?.emosi, alasan: catatan?.alasan });
     setPesan(`${arah} di ${fHarga(entry)} · SL ${fHarga(sl)} · TP ${fHarga(tp)} · risiko ${uang(risiko)}`);
   }
 
@@ -311,8 +314,8 @@ export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, aturAks
           lot: Number(t.unit.toFixed(6)),
           masukHarga: t.masuk, keluarHarga: t.keluar, pnl: t.pnl,
           waktu: t.keluarWaktu,
-          emosiMasuk: 'Netral', emosiEvaluasi: 'Netral',
-          alasan: `Latihan replay · keluar ${t.sebab}`,
+          emosiMasuk: t.emosi || 'Netral', emosiEvaluasi: t.emosi || 'Netral',
+          alasan: t.alasan ? `${t.alasan} · keluar ${t.sebab}` : `Latihan replay · keluar ${t.sebab}`,
           catatan: `Replay ${simbol} — bukan transaksi sungguhan.`,
         });
       }

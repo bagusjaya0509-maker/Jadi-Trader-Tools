@@ -98,10 +98,15 @@ export function useAkunMt5(): StatusAkun {
         if (!r.ok) { setSt({ ...BELUM, terhubung: false, ket: 'Backend tidak menjawab' }); return; }
         const j = await r.json();
         const akun = j?.data?.akun;
-        if (!j?.terhubung || !akun) {
+        /* EA yang MATI bukan akun yang hilang. Server tetap menyimpan
+           laporan terakhirnya, jadi saldo terakhir itulah yang dipakai —
+           kembali ke hitungan jurnal (~$300) setiap MT5 ditutup membuat
+           angkanya melompat dua kali sehari tanpa satu pun transaksi. */
+        if (!akun) {
           setSt({ ...BELUM, terhubung: false, ket: j?.kode ? `Kode ${j.kode} — EA belum melapor` : 'EA belum terpasang' });
           return;
         }
+        const eaHidup = !!j?.terhubung;
         const mu = akun.mataUang ?? null;
         /* Profit tiap posisi ikut dikonversi. Akun ini bermata uang USC
            (sen), jadi tanpa pembagian 100 satu posisi rugi -50,60 sen
@@ -120,12 +125,17 @@ export function useAkunMt5(): StatusAkun {
           waktuBuka: (Number(p.waktuBuka) || 0) * 1000,
         }));
         setSt({
-          terhubung: true,
+          terhubung: eaHidup,
           saldo: keUsd(Number(akun.saldo) || 0, mu),
           ekuitas: keUsd(Number(akun.ekuitas) || 0, mu),
           mataUang: mu,
-          ket: akun.login ? `Akun ${akun.login} · ${akun.broker ?? ''}`.trim() : 'MetaTrader 5',
-          posisi,
+          ket: eaHidup
+            ? (akun.login ? `Akun ${akun.login} · ${akun.broker ?? ''}`.trim() : 'MetaTrader 5')
+            : 'EA offline — saldo dari laporan terakhir',
+          /* Posisi TIDAK ditampilkan saat EA mati: saldo terakhir tetap
+             benar sampai ada transaksi, tapi posisi terbuka bisa sudah
+             berubah tanpa kita tahu. */
+          posisi: eaHidup ? posisi : [],
         });
       } catch {
         if (hidup) setSt({ ...BELUM, terhubung: false, ket: 'Tidak bisa menghubungi backend' });

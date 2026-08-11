@@ -163,6 +163,81 @@ export function arusBersih(daftar: Arus[], sumber: Sumber) {
 }
 
 /* ════════════════════════════════════════════════════════════════════════
+   SINKRON RIWAYAT BINANCE — jurnal kripto
+   ════════════════════════════════════════════════════════════════════════
+   Order yang DITUTUP DI LUAR situs (aplikasi Binance, web Binance) tidak
+   pernah lewat layar kita, jadi satu-satunya sumber kebenarannya adalah
+   Binance sendiri. /api/income menyebut simbol mana yang punya REALIZED_PNL
+   sejak titik waktu tertentu; /api/user-trades per simbol memberi fill
+   aslinya — arah, qty, harga, dan pnl per orderId.
+
+   ID dokumen = bin<orderId>, jadi sinkron boleh diulang kapan pun tanpa
+   menggandakan baris — setDoc menimpa dirinya sendiri.
+   ════════════════════════════════════════════════════════════════════════ */
+
+export interface HasilSinkronBin { masuk: number; dilewati: number; galat: string | null }
+
+export async function sinkronRiwayatBinance(sudahAda: Set<string>, sejakMs: number): Promise<HasilSinkronBin> {
+  const { bacaKoneksi, koneksiLengkap } = await import('@/lib/koneksi');
+  const k = bacaKoneksi();
+  if (!koneksiLengkap(k)) return { masuk: 0, dilewati: 0, galat: 'Backend URL & App Token belum dipasang di Integrations' };
+  const dasar = k.url.trim().replace(/\/+$/, '');
+  const kepala = { 'X-App-Token': k.token.trim() };
+
+  try {
+    const ri = await fetch(dasar + '/api/income?since=' + sejakMs, { headers: kepala });
+    const ji = await ri.json();
+    if (!ri.ok) return { masuk: 0, dilewati: 0, galat: ji.error || ('income menjawab ' + ri.status) };
+    const simbolKena = [...new Set(
+      (ji.income ?? [])
+        .filter((x: any) => x.incomeType === 'REALIZED_PNL' && Number(x.income) !== 0)
+        .map((x: any) => String(x.symbol))
+    )] as string[];
+    if (!simbolKena.length) return { masuk: 0, dilewati: 0, galat: null };
+
+    let masuk = 0, dilewati = 0;
+    for (const simbol of simbolKena) {
+      const rt = await fetch(dasar + '/api/user-trades?symbol=' + simbol + '&since=' + sejakMs, { headers: kepala });
+      const jt = await rt.json();
+      if (!rt.ok) continue;
+      const fills: any[] = jt.trades ?? jt ?? [];
+      /* Fill dikelompokkan per orderId — satu order penutup bisa terisi
+         beberapa kali, dan itu SATU baris jurnal, bukan tiga. */
+      const per = new Map<string, any[]>();
+      for (const f of fills) {
+        if (Number(f.realizedPnl) === 0) continue; /* fill pembuka */
+        const kunci = String(f.orderId);
+        if (!per.has(kunci)) per.set(kunci, []);
+        per.get(kunci)!.push(f);
+      }
+      for (const [orderId, grup] of per) {
+        const id = 'bin' + orderId;
+        if (sudahAda.has(id)) { dilewati++; continue; }
+        const qty = grup.reduce((s, f) => s + Number(f.qty), 0);
+        const pnl = grup.reduce((s, f) => s + Number(f.realizedPnl), 0);
+        const hargaKeluar = grup.reduce((s, f) => s + Number(f.price) * Number(f.qty), 0) / (qty || 1);
+        const waktu = Math.max(...grup.map((f) => Number(f.time)));
+        /* Sisi fill penutup BUY berarti posisinya SELL — arah jurnal adalah
+           arah POSISINYA. */
+        const arah = grup[0].side === 'BUY' ? 'SELL' : 'BUY';
+        await simpanTrade({
+          id, sumber: 'kripto', pair: simbol, arah,
+          lot: Number(qty.toFixed(6)),
+          masukHarga: 0, keluarHarga: Number(hargaKeluar.toFixed(6)),
+          pnl: Number(pnl.toFixed(4)), waktu,
+          emosiMasuk: 'Netral', emosiEvaluasi: 'Netral',
+          alasan: 'Sinkron Binance', catatan: 'Ditutup di Binance (' + orderId + ')',
+        });
+        masuk++;
+      }
+    }
+    return { masuk, dilewati, galat: null };
+  } catch (e) {
+    return { masuk: 0, dilewati: 0, galat: e instanceof Error ? e.message : 'gagal sinkron' };
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════════
    SINKRON RIWAYAT MT5
    ════════════════════════════════════════════════════════════════════════
    Jurnal Trade-Fi berhenti terisi setelah 9 Agustus, dan penyebabnya bukan
