@@ -442,7 +442,7 @@ export default function Marketplace() {
               {kabarUlasan && <div className="mt-2 text-[11.5px] text-zinc-400">{kabarUlasan}</div>}
             </div>
 
-            <a href="#" className="flex items-center gap-3 rounded-lg border border-indigo-500/25 bg-indigo-500/[0.06] p-4 transition-colors hover:border-indigo-500/40">
+            <a href="https://discord.gg/zcEMgxwY4" target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-lg border border-indigo-500/25 bg-indigo-500/[0.06] p-4 transition-colors hover:border-indigo-500/40">
               <MessageCircle className="size-5 shrink-0 text-indigo-400" strokeWidth={1.8} />
               <div className="min-w-0">
                 <div className="text-[13px] text-zinc-100">Diskusi di Discord</div>
