@@ -100,12 +100,18 @@ const CSS_TANPA_CANGKANG = `
 
   .ema-screener { background: #09090b !important; color: #fafafa !important; }
 
-  /* Panel & kartu: radius, garis, dan latar disamakan dengan Panel V3 */
+  /* Panel & kartu: HANYA radius yang diseragamkan.
+     ────────────────────────────────────────────────────────────────────
+     Sempat di sini ada 'border-color' dan 'background' dengan !important,
+     dan itu menghapus warna hijau/merah pada kartu sinyal — padahal warna
+     itulah isi utamanya: BUY dan SELL dibedakan sebelum tulisannya dibaca.
+
+     Warna netralnya sudah ikut V3 lewat variabel '--panel' dan '--border'
+     di blok bawah, jadi tidak ada yang perlu dipaksa di sini. Aksen yang
+     memang disengaja V2 dibiarkan hidup. */
   .es-priority-section, .es-card, .es-priority-card, .es-sim-wrap,
   .es-panel, .es-box, .es-news-pop {
     border-radius: 12px !important;
-    border-color: rgba(39,39,42,.8) !important;
-    background: rgba(24,24,27,.4) !important;
   }
 
   /* Kontrol: tinggi, radius, dan warna sama dengan <Pilih> di V3 */

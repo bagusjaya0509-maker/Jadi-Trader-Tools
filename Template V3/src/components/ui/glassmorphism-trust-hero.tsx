@@ -204,7 +204,7 @@ export default function HeroSection() {
                     <div className="angka text-3xl font-bold tracking-tight text-white">
                       {pameran.siap ? uang(pameran.kurva[pameran.kurva.length - 1]) : '—'}
                     </div>
-                    <div className="text-sm text-zinc-400">Saldo Jurnal Pameran</div>
+                    <div className="text-sm text-zinc-400">Total Saldo</div>
                   </div>
                 </div>
 
@@ -218,7 +218,7 @@ export default function HeroSection() {
                     pembaca yang paham berhenti percaya. */}
                 <div className="mb-6">
                   <div className="flex justify-between text-sm mb-2">
-                    <span className="text-zinc-400">Kurva Saldo</span>
+                    <span className="text-zinc-400">Perkembangan akun</span>
                     {pameran.siap && (
                       <span className={pameran.tumbuh >= 0 ? "text-emerald-400 font-medium" : "text-red-400 font-medium"}>
                         {pameran.tumbuh >= 0 ? "+" : ""}{pameran.tumbuh.toFixed(1)}%{' '}

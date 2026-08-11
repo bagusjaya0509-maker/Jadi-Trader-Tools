@@ -84,15 +84,47 @@ function usePenutupLuar<T extends HTMLElement>(saatTutup: () => void) {
   return ref;
 }
 
+/* ── Penanda sudah dibaca ────────────────────────────────────────────────
+   Lencana merah yang tidak pernah hilang berhenti berarti apa-apa: setelah
+   dua hari orang tidak lagi bisa membedakan "ada yang baru" dari "ikon ini
+   memang begitu".
+
+   Disimpan di localStorage, bukan Firestore. Yang dicatat adalah SUDAH
+   DIBACA DI PERANGKAT INI — dan itu memang milik perangkatnya; membuka di
+   ponsel tidak seharusnya menandai apa yang dilihat di laptop sebagai sudah
+   dibaca oleh orang yang berbeda.
+
+   Yang disimpan penanda tiap butir, bukan cuma jumlahnya: kalau cuma
+   jumlahnya, satu berita baru yang masuk akan langsung terhitung sudah
+   dibaca karena totalnya kebetulan sama. */
+function useSudahDibaca(kunci: string, id: string[]) {
+  const [dibaca, setDibaca] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem(kunci) ?? '[]')); }
+    catch { return new Set(); }
+  });
+
+  const tandai = () => {
+    const baru = new Set([...dibaca, ...id]);
+    setDibaca(baru);
+    try { localStorage.setItem(kunci, JSON.stringify([...baru])); } catch { /* mode privat */ }
+  };
+
+  const belum = id.filter((x) => !dibaca.has(x)).length;
+  return { belum, tandai };
+}
+
 function Lonceng() {
   const [buka, setBuka] = useState(false);
   const ref = usePenutupLuar<HTMLDivElement>(() => setBuka(false));
-  const belum = NEWS.filter((n) => n.baru).length;
+  const { belum, tandai } = useSudahDibaca(
+    'jt.newsDibaca',
+    NEWS.filter((n) => n.baru).map((n) => n.judul)
+  );
 
   return (
     <div className="relative" ref={ref}>
       <button
-        onClick={() => setBuka((v) => !v)}
+        onClick={() => { setBuka((v) => !v); tandai(); }}
         aria-label="Berita pasar"
         className="relative cursor-pointer text-zinc-400 transition-colors hover:text-zinc-100"
       >
@@ -140,12 +172,15 @@ function Lonceng() {
 function Pesan() {
   const [buka, setBuka] = useState(false);
   const ref = usePenutupLuar<HTMLDivElement>(() => setBuka(false));
-  const belum = PESAN.filter((p) => p.baru).length;
+  const { belum, tandai } = useSudahDibaca(
+    'jt.pesanDibaca',
+    PESAN.filter((p) => p.baru).map((p) => p.judul)
+  );
 
   return (
     <div className="relative" ref={ref}>
       <button
-        onClick={() => setBuka((v) => !v)}
+        onClick={() => { setBuka((v) => !v); tandai(); }}
         aria-label="Pemberitahuan"
         className="relative cursor-pointer text-zinc-400 transition-colors hover:text-zinc-100"
       >
@@ -260,7 +295,10 @@ function PopupNews() {
   const penting = NEWS.filter((n) => n.dampak === 'tinggi');
 
   useEffect(() => {
-    if (pathname !== '/personal' || penting.length === 0) return;
+    /* Halaman screener, BUKAN Personal Area. Berita berdampak tinggi berguna
+       tepat saat orang sedang mencari entry — di halaman catatan kekayaan
+       pribadi ia cuma menutupi isi yang sedang dibaca. */
+    if (pathname !== '/screener' || penting.length === 0) return;
     let sudah = false;
     try { sudah = sessionStorage.getItem('jt.newsPopup') === '1'; } catch { /* mode privat */ }
     if (sudah) return;

@@ -62,8 +62,21 @@ export function TombolMasuk({ penuh }: { penuh?: boolean }) {
 
 /** Avatar + menu. Menggantikan bulatan abu-abu mati di bilah atas. */
 export function MenuPengguna() {
-  const { pengguna, langganan, keluar, pemilik } = useAuth();
+  const { pengguna, langganan, keluar, pemilik, memuat } = useAuth();
   const [buka, setBuka] = useState(false);
+
+  /* Selama auth belum menjawab, TIDAK menampilkan apa pun yang menyimpulkan.
+     ──────────────────────────────────────────────────────────────────────
+     Firebase memulihkan sesi dari IndexedDB secara asinkron; selama ~300 ms
+     pertama `pengguna` masih null meski orangnya sudah masuk. Menampilkan
+     "Masuk dengan Google" di jeda itu membuat tombol login berkedip tiap
+     kali halaman disegarkan — dan sekilas terlihat seperti sesi yang putus.
+
+     Bulatan abu berukuran sama dengan avatar menahan tempatnya, jadi tidak
+     ada yang bergeser saat fotonya datang. */
+  if (memuat) {
+    return <span className="size-7 shrink-0 animate-pulse rounded-full bg-zinc-800" aria-hidden />;
+  }
 
   if (!pengguna) return <TombolMasuk />;
 

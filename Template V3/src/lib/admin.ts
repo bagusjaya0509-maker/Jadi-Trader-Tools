@@ -396,6 +396,9 @@ export interface PermintaanLisensi {
   status: 'baru' | 'disetujui' | 'ditolak';
   waktu: number;
   kode?: string;
+  /** Sidik kode setelah disetujui — inilah yang menautkan permintaan ini
+   *  dengan barisnya di daftar lisensi aktif. */
+  sidik?: string;
 }
 
 export function usePermintaanLisensi(): Hasil<PermintaanLisensi[]> {
@@ -411,6 +414,7 @@ export function usePermintaanLisensi(): Hasil<PermintaanLisensi[]> {
       status: x.status === 'disetujui' ? 'disetujui' : x.status === 'ditolak' ? 'ditolak' : 'baru',
       waktu: Number(x.waktu) || 0,
       kode: x.kode ? String(x.kode) : undefined,
+      sidik: x.sidik ? String(x.sidik) : undefined,
     })), []);
 }
 

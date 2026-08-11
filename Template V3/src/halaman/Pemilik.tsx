@@ -8,6 +8,7 @@ import { cn, uang, tanggalPendek } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 import {
   useTrafik, useKlien, usePenjualan, useLaporan, useLisensi, useStatusVps,
+  usePermintaanLisensi,
   catatPenjualan, hapusPenjualan, tandaiLaporan, cabutLisensi,
 } from '@/lib/admin';
 
@@ -56,6 +57,11 @@ export default function Pemilik() {
   const laporan = useLaporan();
   const lisensi = useLisensi();
   const vps = useStatusVps();
+  /* Permintaan lisensi dipakai untuk menautkan tiap kode aktif ke pembelinya.
+     Kode yang tidak punya pasangan permintaan berarti diaktifkan tangan lewat
+     panel V2 — biasanya uji coba, dan itu perlu terlihat sebagai apa adanya
+     alih-alih tercampur dengan pembelian sungguhan. */
+  const permintaan = usePermintaanLisensi();
 
   const [pesan, setPesan] = useState('');
   const [form, setForm] = useState({ produk: '', pembeli: '', nilai: '', catatan: '' });
@@ -410,12 +416,26 @@ export default function Pemilik() {
           {lisensi.data.length > 0 && (
             <TabelBungkus>
               <Tabel>
-                <thead><tr><Th>Produk</Th><Th>Catatan</Th><Th>Sidik</Th><Th>Aktif sejak</Th><Th /></tr></thead>
+                <thead><tr><Th>Produk</Th><Th>Pemilik</Th><Th>Asal</Th><Th>Sidik</Th><Th>Aktif sejak</Th><Th /></tr></thead>
                 <tbody>
-                  {lisensi.data.map((l) => (
+                  {lisensi.data.map((l) => {
+                    const dariMinta = permintaan.data.find((x) => x.sidik === l.sidik || (x.status === 'disetujui' && x.email && x.email === l.catatan));
+                    return (
                     <Tr key={l.sidik}>
                       <Td className="text-zinc-300">{l.produk}</Td>
-                      <Td className="text-zinc-400">{l.catatan || '—'}</Td>
+                      <Td className="text-zinc-400">{dariMinta?.email || l.catatan || '—'}</Td>
+                      <Td>
+                        {dariMinta ? (
+                          <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] text-emerald-500">
+                            permintaan disetujui
+                          </span>
+                        ) : (
+                          <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-500"
+                                title="Diaktifkan langsung lewat panel, tanpa permintaan dari pembeli — biasanya uji coba">
+                            aktivasi manual
+                          </span>
+                        )}
+                      </Td>
                       {/* Sidik, bukan kodenya. Backend memang tidak pernah
                           menyimpan kode aslinya — hanya hash-nya. */}
                       <Td className="angka text-zinc-600">{l.sidik}</Td>
@@ -432,11 +452,17 @@ export default function Pemilik() {
                         </button>
                       </Td>
                     </Tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </Tabel>
             </TabelBungkus>
           )}
+          <p className="mt-3 text-[11.5px] leading-relaxed text-zinc-600">
+            Backend hanya menyimpan SIDIK kodenya, bukan kode aslinya — bocornya berkas lisensi
+            tidak membuat siapa pun bisa mengunduh produk. Kode yang bisa dibaca ulang hanya ada
+            di baris permintaan yang disetujui, di halaman Maintenance.
+          </p>
         </div>
       </Panel>
     </div>

@@ -405,3 +405,36 @@ export function useSaldoAwal(): number {
 
   return saldo;
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   RINGKASAN AKUN UNTUK HALAMAN DEPAN
+   ════════════════════════════════════════════════════════════════════════
+   Hero halaman depan menampilkan saldo, jumlah transaksi, winrate, dan PNL.
+   Sebelum ini ia menghitungnya sendiri dari `public/jurnalShowcase` — jurnal
+   mentah versi V2 yang terakhir diperbarui saat V2 masih dipakai, sehingga
+   angkanya perlahan menyimpang dari Dashboard.
+
+   Sekarang Dashboard-lah yang MENERBITKAN ringkasannya, jadi keduanya
+   membaca hasil hitungan yang sama persis. Ditulis hanya oleh pemilik, dan
+   hanya kalau isinya benar-benar berubah — halaman depan tidak boleh
+   membebani kuota tulis setiap kali dashboard dibuka.
+   ════════════════════════════════════════════════════════════════════════ */
+
+export interface RingkasanAkun {
+  saldo: number;
+  jumlah: number;
+  winrate: number;
+  bersih: number;
+  /** Kurva saldo ringkas — maksimal 60 titik supaya dokumennya tetap kecil. */
+  kurva: number[];
+  tumbuh: number;
+}
+
+export async function terbitkanRingkasan(r: RingkasanAkun) {
+  const { setDoc } = await import('firebase/firestore');
+  await setDoc(doc(db, 'public', 'ringkasanAkun'), {
+    ...r,
+    kurva: r.kurva.slice(-60).map((x) => Number(x.toFixed(2))),
+    _updatedAt: Date.now(),
+  }, { merge: true });
+}

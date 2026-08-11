@@ -47,12 +47,46 @@ function nilai(f: any): any {
 export function useAngkaPameran(): AngkaPameran {
   const [angka, setAngka] = useState<AngkaPameran>(KOSONG);
 
+  /* Sumber UTAMA: `public/ringkasanAkun` — hasil hitungan Dashboard yang
+     diterbitkan pemilik. Membaca angka yang sudah jadi berarti halaman depan
+     dan Dashboard tidak mungkin berselisih; menghitung ulang di sini dari
+     jurnal mentah adalah cara paling pasti untuk berselisih perlahan. */
   useEffect(() => {
     let hidup = true;
-    fetch(DOK)
+    fetch(DOK.replace('jurnalShowcase', 'ringkasanAkun'))
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
       .then((j) => {
         if (!hidup) return;
+        const f = j?.fields ?? {};
+        const jumlah = Number(nilai(f.jumlah)) || 0;
+        if (!jumlah) throw new Error('kosong');
+        const kurva = (f.kurva?.arrayValue?.values ?? []).map((v: any) => Number(nilai(v)) || 0);
+        setAngka({
+          siap: true,
+          jumlah,
+          winrate: Number(nilai(f.winrate)) || 0,
+          bersih: Number(nilai(f.bersih)) || 0,
+          kurva: kurva.length > 1 ? kurva : [Number(nilai(f.saldo)) || 0],
+          tumbuh: Number(nilai(f.tumbuh)) || 0,
+        });
+      })
+      /* Belum ada ringkasan (mis. pemiliknya belum pernah membuka Dashboard
+         sejak fitur ini ada) — jatuh ke jurnal pameran seperti sebelumnya. */
+      .catch(() => { if (hidup) void muatDariShowcase(setAngka, () => hidup); });
+    return () => { hidup = false; };
+  }, []);
+
+  return angka;
+}
+
+function muatDariShowcase(
+  setAngka: (a: AngkaPameran) => void,
+  masihHidup: () => boolean,
+) {
+  return fetch(DOK)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((j) => {
+        if (!masihHidup()) return;
         const f = j?.fields ?? {};
         /* Dua jurnal, dua bentuk — dan keduanya harus dibaca apa adanya,
            bukan ditebak:
@@ -111,10 +145,6 @@ export function useAngkaPameran(): AngkaPameran {
         });
       })
       .catch(() => { /* hero tetap tampil tanpa angka */ });
-    return () => { hidup = false; };
-  }, []);
-
-  return angka;
 }
 
 /* ── Posisi terbuka untuk marquee halaman depan ──────────────────────────

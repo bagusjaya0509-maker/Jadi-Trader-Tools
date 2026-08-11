@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell,
 } from 'recharts';
@@ -7,10 +7,12 @@ import { Panel, PanelHead, KartuKpi, BadgeTren, TipGrafik, TabelBungkus, Tabel, 
 import { cn, uang, persen, harga, tanggalPendek } from '@/lib/utils';
 import { statGabungan, statPer, plPerBulan, saldoBulanIni } from '@/lib/hitung';
 
-import { useRiwayat, usePosisi, useSaldoAwal } from '@/lib/data';
+import { useRiwayat, usePosisi, useSaldoAwal, terbitkanRingkasan } from '@/lib/data';
+import { useAuth } from '@/lib/auth';
 import { useHargaPasar } from '@/lib/harga';
 import { LabelContoh } from '@/components/gerbang';
 import { useAkunMt5, useAkunBinance } from '@/lib/akun';
+import { useArusKas, arusBersih } from '@/lib/tulis-jurnal';
 import { PanelEvaluasi } from '@/components/panel-evaluasi';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -62,22 +64,37 @@ export function Dashboard() {
   const hargaPasar = useHargaPasar(posisiMentah.map((p) => p.simbol));
   const POSISI_TERBUKA = posisiMentah.map((p) => ({ ...p, hargaKini: hargaPasar[p.simbol] ?? p.hargaKini }));
   const saldoAwal = useSaldoAwal();
-  const stat = statGabungan(RIWAYAT, saldoAwal);
+
+  /* SETORAN & PENARIKAN ikut dihitung, persis seperti di halaman Jurnal.
+     ──────────────────────────────────────────────────────────────────────
+     Jurnal memakai `saldoAwal + arusBersih(...)` sebagai modal; dashboard
+     dulu hanya `saldoAwal`. Begitu ada satu setoran saja, kedua halaman
+     langsung berselisih — dan selisihnya terbaca sebagai "dashboardnya
+     tidak sinkron", padahal keduanya benar menurut rumusnya masing-masing.
+
+     Arus kas dibebankan ke sumbernya sendiri, sama seperti di Jurnal:
+     setoran MT5 tidak boleh menaikkan saldo kripto. */
+  const { data: arus } = useArusKas();
+  const arusForex = arusBersih(arus, 'forex');
+  const arusKripto = arusBersih(arus, 'kripto');
+  const modalTotal = saldoAwal + arusForex + arusKripto;
+
+  const stat = statGabungan(RIWAYAT, modalTotal);
   /* Rincian dari daftar yang SAMA dengan totalnya. Dashboard adalah
      penjumlahan jurnal Trade-Fi dan Kripto — kalau ketiganya tidak berasal
      dari satu array, angkanya pasti berselisih cepat atau lambat. */
   /* Saldo awal dibebankan ke Trade-Fi saja, PERSIS seperti di halaman Jurnal.
      Kalau dibebankan ke keduanya ia terhitung dua kali, dan penjumlahan dua
      jurnal tidak akan pernah sama dengan total di dashboard. */
-  const forex = statPer(RIWAYAT, 'forex', saldoAwal);
-  const kripto = statPer(RIWAYAT, 'kripto', 0);
+  const forex = statPer(RIWAYAT, 'forex', saldoAwal + arusForex);
+  const kripto = statPer(RIWAYAT, 'kripto', arusKripto);
 
   /* Bulan dan kurva saldo DIHITUNG dari transaksi, tidak lagi dari daftar
      yang ditulis tangan di data/porto.ts. Daftar itu berisi Maret–Agustus
      dengan angka karangan, jadi akun yang transaksinya baru mulai bulan ini
      tetap menampilkan lima bulan riwayat yang tidak pernah terjadi. */
   const perBulan = useMemo(() => plPerBulan(RIWAYAT), [RIWAYAT]);
-  const kurvaSaldo = useMemo(() => saldoBulanIni(RIWAYAT, saldoAwal), [RIWAYAT, saldoAwal]);
+  const kurvaSaldo = useMemo(() => saldoBulanIni(RIWAYAT, modalTotal), [RIWAYAT, modalTotal]);
 
   const bulanIni = perBulan[perBulan.length - 1];
   const bulanLalu = perBulan[perBulan.length - 2];
@@ -117,6 +134,31 @@ export function Dashboard() {
   const pnlKripto = POSISI_TERBUKA.some((p) => p.pnlFloat !== undefined)
     ? POSISI_TERBUKA.reduce((s, p) => s + (p.pnlFloat ?? 0), 0)
     : null;
+
+  /* ── Terbitkan ringkasan untuk halaman depan ──────────────────────
+     Hanya pemilik, hanya kalau isinya berubah, dan ditunda 2 detik supaya
+     perubahan yang datang beruntun (saldo broker menyusul beberapa ratus
+     milidetik setelah jurnal) cuma menghasilkan satu tulisan. */
+  const { pemilik } = useAuth();
+  const sidikTerbit = useRef('');
+  useEffect(() => {
+    if (!pemilik || !RIWAYAT.length) return;
+    const r = {
+      saldo: Number(totalSaldo.toFixed(2)),
+      jumlah: stat.jumlah,
+      winrate: Number((stat.winrate ?? 0).toFixed(1)),
+      bersih: Number(stat.bersih.toFixed(2)),
+      kurva: kurvaSaldo.map((x) => x.saldo),
+      tumbuh: Number(selisihSaldo.toFixed(1)),
+    };
+    const sidik = JSON.stringify(r);
+    if (sidik === sidikTerbit.current) return;
+    const j = setTimeout(() => {
+      sidikTerbit.current = sidik;
+      void terbitkanRingkasan(r).catch((e) => console.warn('ringkasan tidak terbit:', e));
+    }, 2000);
+    return () => clearTimeout(j);
+  }, [pemilik, RIWAYAT.length, totalSaldo, stat, kurvaSaldo, selisihSaldo]);
 
   /* Aktivitas dirakit dari KEJADIAN NYATA: transaksi terakhir yang ditutup,
      posisi yang sedang terbuka, dan status sambungan. Daftar sebelumnya

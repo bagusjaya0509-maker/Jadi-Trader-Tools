@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { Plus, Pencil, Bitcoin, CandlestickChart, Link2, Link2Off, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
-import { Panel, PanelHead, KartuKpi, BadgeTren, TipGrafik, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
+import { Panel, PanelHead, BadgeTren, TipGrafik, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn, uang, persen, tanggalPendek } from '@/lib/utils';
 import { statGabungan, kurvaEkuitas, plPerHari } from '@/lib/hitung';
 import { useRiwayat, useSaldoAwal } from '@/lib/data';
@@ -12,6 +12,7 @@ import { useAkunMt5, useAkunBinance, type StatusAkun } from '@/lib/akun';
 import { ModalTrade } from '@/components/modal-trade';
 import { KotakArus } from '@/components/kotak-arus';
 import { useArusKas, arusBersih, sinkronRiwayatMt5, type Arus } from '@/lib/tulis-jurnal';
+import { bacaStatistik, bacaPnl } from '@/lib/catatan-stat';
 import { Link } from 'react-router-dom';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -209,6 +210,19 @@ function KartuSaldo({ judul, saldoJurnal, akun, keIntegrasi }: {
   );
 }
 
+/** Catatan evaluasi satu baris. Warnanya menyampaikan nada sebelum
+ *  kalimatnya dibaca — dan itu penting, karena kotak ini dibaca sekilas. */
+function CatatanKecil({ c }: { c: { nada: 'baik' | 'awas' | 'buruk'; teks: string } }) {
+  return (
+    <p className={cn('mt-1.5 text-[11px] leading-relaxed',
+      c.nada === 'baik' ? 'text-emerald-500/80'
+        : c.nada === 'buruk' ? 'text-red-400/85'
+        : 'text-amber-400/85')}>
+      {c.teks}
+    </p>
+  );
+}
+
 /** Satu blok jurnal lengkap: KPI, kurva ekuitas, kalender, riwayat, emosi.
  *
  *  Dipakai dua kali dengan daftar transaksi berbeda. Menuliskannya dua kali
@@ -230,6 +244,12 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
   /* null = tertutup, 'baru' = tambah, objek Trade = sunting. Satu state untuk
      tiga keadaan; dua boolean terpisah selalu bisa menyala berbarengan. */
   const [modal, setModal] = useState<'baru' | Trade | null>(null);
+
+  /* Catatan evaluasi dihitung dari daftar transaksi yang SAMA dengan
+     statistiknya. Kalau keduanya berasal dari sumber berbeda, kalimatnya
+     bisa menyebut angka yang tidak ada di kotak sebelahnya. */
+  const catStat = useMemo(() => bacaStatistik(stat), [stat]);
+  const catPnl = useMemo(() => bacaPnl(trade, stat), [trade, stat]);
   const [sinkron, setSinkron] = useState<{ sibuk: boolean; pesan: string }>({ sibuk: false, pesan: '' });
   /* Rentang & mode disimpan di perangkat: keduanya preferensi, bukan data.
      Menyimpannya di Firestore berarti satu tulisan tiap kali orang mengganti
@@ -328,32 +348,51 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <KartuSaldo judul={labelSaldo} saldoJurnal={stat.saldo} akun={akun} keIntegrasi={keIntegrasi} />
 
+            {/* Dua angka di atas, satu di bawah — bukan tiga sejajar.
+                Tiga kolom sama besar membuat ketiganya terbaca sederajat,
+                padahal profit factor adalah kesimpulan dari dua yang lain.
+                Menaruhnya di baris sendiri dengan catatan evaluasi membuat
+                kotaknya punya arah baca, bukan sekadar rata. */}
             <Panel className="p-5">
               <div className="text-[12.5px] text-zinc-500">Statistik</div>
-              <div className="mt-2 grid grid-cols-3 gap-2">
+              <div className="mt-2 grid grid-cols-2 gap-2">
                 <div>
-                  <div className="angka text-[19px] font-semibold leading-none tracking-tight text-zinc-100">{stat.jumlah}</div>
+                  <div className="angka text-[21px] font-semibold leading-none tracking-tight text-zinc-100">{stat.jumlah}</div>
                   <div className="mt-1 text-[11px] text-zinc-500">trade</div>
                 </div>
                 <div>
-                  <div className="angka text-[19px] font-semibold leading-none tracking-tight text-zinc-100">{persen(stat.winrate)}</div>
-                  <div className="mt-1 text-[11px] text-zinc-500">win rate</div>
-                </div>
-                <div>
-                  <div className="angka text-[19px] font-semibold leading-none tracking-tight text-zinc-100">
-                    {stat.faktorProfit === null ? '—' : stat.faktorProfit === Infinity ? '∞' : stat.faktorProfit.toFixed(2)}
+                  <div className="angka text-[21px] font-semibold leading-none tracking-tight text-zinc-100">{persen(stat.winrate)}</div>
+                  <div className="mt-1 text-[11px] text-zinc-500">
+                    win rate <span className="text-zinc-600">· {stat.menang}/{stat.kalah}</span>
                   </div>
-                  <div className="mt-1 text-[11px] text-zinc-500">profit factor</div>
                 </div>
               </div>
-              <div className="mt-2.5 text-[11.5px] text-zinc-600">
-                {stat.menang} menang · {stat.kalah} kalah
+              <div className="mt-3 border-t border-zinc-800/60 pt-2.5">
+                <div className="flex items-baseline gap-2">
+                  <span className="angka text-[19px] font-semibold leading-none tracking-tight text-zinc-100">
+                    {stat.faktorProfit === null ? '—' : stat.faktorProfit === Infinity ? '∞' : stat.faktorProfit.toFixed(2)}
+                  </span>
+                  <span className="text-[11px] text-zinc-500">profit factor</span>
+                </div>
+                {catStat && <CatatanKecil c={catStat} />}
               </div>
             </Panel>
 
-            <KartuKpi label="Net P/L" nilai={uang(stat.bersih, true)}
-                      warna={stat.bersih >= 0 ? 'text-emerald-500' : 'text-red-400'}
-                      catatan={`untung ${uang(stat.untung)} · rugi ${uang(stat.rugi)}`} />
+            <Panel className="p-5">
+              <div className="text-[12.5px] text-zinc-500">Net P/L</div>
+              <div className={cn('angka mt-2 text-[28px] font-semibold leading-none tracking-tight',
+                stat.bersih >= 0 ? 'text-emerald-500' : 'text-red-400')}>
+                {uang(stat.bersih, true)}
+              </div>
+              <div className="mt-2 text-[11.5px] text-zinc-500">
+                untung {uang(stat.untung)} · rugi {uang(stat.rugi)}
+              </div>
+              {catPnl && (
+                <div className="mt-2.5 border-t border-zinc-800/60 pt-2.5">
+                  <CatatanKecil c={catPnl} />
+                </div>
+              )}
+            </Panel>
 
             <KotakArus sumber={sumber} arus={arus} bisaTulis={bisaTulis} ringkas />
           </div>
@@ -379,8 +418,12 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
                       </linearGradient>
                     </defs>
                     <CartesianGrid vertical={false} stroke="rgba(255,255,255,.05)" />
+                    {/* `interval="preserveStartEnd"` menahan label pertama dan
+                        terakhir tetap tampil; tanpa itu Recharts membuang
+                        keduanya saat padat, dan rentang tanggalnya jadi tidak
+                        terbaca sama sekali. */}
                     <XAxis dataKey="label" tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false}
-                           minTickGap={48} height={26} dy={6} />
+                           minTickGap={48} height={30} dy={10} interval="preserveStartEnd" />
                     <YAxis tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} width={48}
                            tickFormatter={(v) => `$${v}`} domain={['dataMin - 8', 'dataMax + 8']} />
                     <Tooltip content={<TipGrafik />} cursor={{ stroke: 'rgba(255,255,255,.12)' }} />

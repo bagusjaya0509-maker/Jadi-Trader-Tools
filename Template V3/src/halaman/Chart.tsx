@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Play, Loader2, RefreshCw, Radio, TriangleAlert, Timer } from 'lucide-react';
 import { Panel, PanelHead, KartuKpi, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn, uang, persen, harga, tanggalPendek } from '@/lib/utils';
-import { ChartLilin, type Garis } from '@/components/chart-lilin';
+import { ChartLilin, type Garis, type GarisHarga } from '@/components/chart-lilin';
+import { PanelReplay } from '@/components/panel-replay';
 import { ambilKlines, type Lilin } from '@/lib/pasar';
 import { jalankanUji, garisIndikator, SETELAN_BAWAAN, type Setelan, type HasilUji } from '@/lib/backtest';
 import { SIMBOL_DASAR } from '@/lib/simbol';
@@ -76,6 +77,9 @@ export default function ChartBacktest() {
   const [set, setSet] = useState<Setelan>(SETELAN_BAWAAN);
   const [hasil, setHasil] = useState<HasilUji | null>(null);
   const [uji, setUji] = useState(false);
+  /* null = replay mati. Angkanya indeks bar terakhir yang boleh tampil. */
+  const [replayIdx, setReplayIdx] = useState<number | null>(null);
+  const [garisHarga, setGarisHarga] = useState<GarisHarga[]>([]);
 
   /* ── Data realtime ──────────────────────────────────────────────────
      Ditarik ulang tiap 15 detik, sama dengan umur cache di lib/pasar.ts —
@@ -96,14 +100,22 @@ export default function ChartBacktest() {
     }
     setMemuat(true);
     void tarik();
+    /* Selama replay, data TIDAK disegarkan. Array lilin yang berganti di
+       tengah putar-ulang akan menggeser arti setiap indeks — posisi yang
+       dibuka di bar 300 tiba-tiba menunjuk lilin yang berbeda. */
+    if (replayIdx !== null) return () => { hidup = false; };
     const jam = setInterval(tarik, 15_000);
     return () => { hidup = false; clearInterval(jam); };
-  }, [simbol, tf, segar]);
+  }, [simbol, tf, segar, replayIdx !== null]);
 
   /* Hasil backtest DIBUANG saat simbol/timeframe/setelan berubah. Tabel
      trade dari BTC 4 jam yang masih terpampang di bawah chart ETH 5 menit
      adalah cara paling halus untuk salah membaca hasil. */
   useEffect(() => { setHasil(null); }, [simbol, tf, set]);
+  /* Ganti simbol atau timeframe = keluar dari replay. Melanjutkan replay di
+     atas deret lilin yang berbeda berarti setiap indeks menunjuk waktu yang
+     lain, dan posisi yang sedang terbuka jadi tidak punya arti. */
+  useEffect(() => { setReplayIdx(null); setGarisHarga([]); }, [simbol, tf]);
 
   const garis: Garis[] = useMemo(() => {
     if (set.strategi !== 'ema' || !lilin.closes.length) return [];
@@ -215,7 +227,9 @@ export default function ChartBacktest() {
 
         <div className="border-t border-zinc-800/80 px-2 pb-2">
           {lilin.times.length > 0
-            ? <ChartLilin lilin={lilin} garis={garis} trade={hasil?.trade} tinggi={440} />
+            ? <ChartLilin lilin={lilin} garis={garis} trade={replayIdx === null ? hasil?.trade : undefined}
+                          tinggi={440} hingga={replayIdx ?? undefined} garisHarga={garisHarga}
+                          onKlikBar={replayIdx === null ? undefined : setReplayIdx} />
             : <div className="flex h-[440px] items-center justify-center text-[12.5px] text-zinc-600">
                 {memuat ? 'Memuat lilin…' : 'Tidak ada data untuk simbol ini.'}
               </div>}
@@ -225,6 +239,9 @@ export default function ChartBacktest() {
           {hasil?.trade.length ? ` · ${hasil.trade.length} penanda trade` : ''}
         </div>
       </Panel>
+
+      <PanelReplay lilin={lilin} simbol={simbol} idx={replayIdx}
+                   setIdx={setReplayIdx} aturGaris={setGarisHarga} />
 
       {/* ── Setelan uji ── */}
       <Panel className="mt-4">

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import {
   createChart, CandlestickSeries, LineSeries, createSeriesMarkers,
-  type IChartApi, type ISeriesApi, type ISeriesMarkersPluginApi, type Time,
+  type IChartApi, type ISeriesApi, type ISeriesMarkersPluginApi, type IPriceLine, type Time,
 } from 'lightweight-charts';
 import type { Lilin } from '@/lib/pasar';
 import type { TradeUji } from '@/lib/backtest';
@@ -21,17 +21,32 @@ import type { TradeUji } from '@/lib/backtest';
 
 export interface Garis { nama: string; nilai: (number | null)[]; warna: string }
 
-export function ChartLilin({ lilin, garis, trade, tinggi = 420 }: {
+export interface GarisHarga { harga: number; warna: string; label: string }
+
+export function ChartLilin({ lilin, garis, trade, tinggi = 420, hingga, garisHarga, onKlikBar }: {
   lilin: Lilin;
   garis?: Garis[];
   trade?: TradeUji[];
   tinggi?: number;
+  /* Gambar hanya sampai indeks ini — dipakai mode replay. `undefined` berarti
+     seluruhnya. Pemotongan terjadi di SINI, bukan di pemanggil, supaya
+     indikator dan penanda ikut terpotong pada batas yang sama persis. */
+  hingga?: number;
+  /** Garis horizontal (entry, SL, TP) untuk posisi yang sedang dibuka. */
+  garisHarga?: GarisHarga[];
+  /** Klik pada chart -> indeks bar. Dipakai untuk memulai replay dari situ. */
+  onKlikBar?: (idx: number) => void;
 }) {
   const kotak = useRef<HTMLDivElement>(null);
   const chart = useRef<IChartApi | null>(null);
   const seri = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const seriGaris = useRef<ISeriesApi<'Line'>[]>([]);
   const penanda = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
+  const garisPos = useRef<IPriceLine[]>([]);
+  /* Handler klik disimpan di ref supaya langganannya dipasang SEKALI.
+     Melanggan ulang tiap render menumpuk pendengar di chart yang sama. */
+  const klikRef = useRef(onKlikBar);
+  klikRef.current = onKlikBar;
 
   /* Chart dibuat SEKALI. Membuatnya ulang tiap data berubah akan mengembalikan
      zoom dan posisi geser ke awal setiap 15 detik — dan chart yang melompat
@@ -63,19 +78,35 @@ export function ChartLilin({ lilin, garis, trade, tinggi = 420 }: {
       borderUpColor: '#10b981', borderDownColor: '#f87171',
       wickUpColor: '#10b981', wickDownColor: '#f87171',
     });
-    return () => { c.remove(); chart.current = null; seri.current = null; seriGaris.current = []; penanda.current = null; };
+    c.subscribeClick((p) => {
+      if (klikRef.current && typeof p.logical === 'number') klikRef.current(Math.round(p.logical));
+    });
+
+    return () => { c.remove(); chart.current = null; seri.current = null; seriGaris.current = []; penanda.current = null; garisPos.current = []; };
   }, []);
 
   /* Data lilin */
   useEffect(() => {
     if (!seri.current || !lilin.times.length) return;
-    seri.current.setData(lilin.times.map((t, i) => ({
+    const batas = hingga === undefined ? lilin.times.length : Math.max(1, Math.min(lilin.times.length, hingga + 1));
+    seri.current.setData(lilin.times.slice(0, batas).map((t, i) => ({
       /* lightweight-charts memakai DETIK, bukan milidetik. Mengirim ms
          menaruh setiap lilin di tahun 58.000 dan sumbunya jadi kosong. */
       time: Math.floor(t / 1000) as Time,
       open: lilin.opens[i], high: lilin.highs[i], low: lilin.lows[i], close: lilin.closes[i],
     })));
-  }, [lilin]);
+  }, [lilin, hingga]);
+
+  /* Garis harga posisi (entry / SL / TP) */
+  useEffect(() => {
+    const s = seri.current;
+    if (!s) return;
+    garisPos.current.forEach((g) => s.removePriceLine(g));
+    garisPos.current = (garisHarga ?? []).map((g) => s.createPriceLine({
+      price: g.harga, color: g.warna, lineWidth: 1,
+      lineStyle: 2, axisLabelVisible: true, title: g.label,
+    }));
+  }, [garisHarga]);
 
   /* Garis indikator */
   useEffect(() => {
@@ -87,14 +118,15 @@ export function ChartLilin({ lilin, garis, trade, tinggi = 420 }: {
       const s = c.addSeries(LineSeries, {
         color: g.warna, lineWidth: 1, priceLineVisible: false, lastValueVisible: false,
       });
+      const batas = hingga === undefined ? lilin.times.length : Math.max(1, Math.min(lilin.times.length, hingga + 1));
       s.setData(
-        lilin.times
+        lilin.times.slice(0, batas)
           .map((t, i) => ({ time: Math.floor(t / 1000) as Time, value: g.nilai[i] }))
           .filter((x): x is { time: Time; value: number } => x.value != null && isFinite(x.value))
       );
       seriGaris.current.push(s);
     });
-  }, [garis, lilin]);
+  }, [garis, lilin, hingga]);
 
   /* Penanda entry & exit tiap trade hasil backtest */
   useEffect(() => {
