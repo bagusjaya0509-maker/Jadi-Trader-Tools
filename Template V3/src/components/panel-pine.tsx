@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Code2, Play, Trash2, TriangleAlert, CheckCircle2, RotateCcw } from 'lucide-react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { cn } from '@/lib/utils';
@@ -17,9 +17,13 @@ import type { Lilin } from '@/lib/pasar';
 
 const KUNCI = 'jt.pineKode';
 
-export function PanelPine({ lilin, tf = '4h', aturHasil }: {
+export function PanelPine({ lilin, tf = '4h', hingga, aturHasil }: {
   lilin: Lilin;
   tf?: string;
+  /** Batas bar replay — skrip dihitung ulang HANYA sampai bar ini, jadi
+   *  garis dan kotaknya mengikuti replay seperti indikator sungguhan,
+   *  bukan gambar mati dari data penuh. */
+  hingga?: number;
   aturHasil: (h: HasilPine | null) => void;
 }) {
   const [kode, setKode] = useState(() => {
@@ -33,9 +37,21 @@ export function PanelPine({ lilin, tf = '4h', aturHasil }: {
     try { localStorage.setItem(KUNCI, v); } catch { /* mode privat */ }
   }
 
+  /* Lilin dipotong di batas replay SEBELUM skrip jalan — barstate.islast
+     jatuh di bar replay, persis perilaku indikator saat bar itu "sekarang". */
+  function potong(l: Lilin, batas?: number): Lilin {
+    if (batas === undefined || batas >= l.closes.length - 1) return l;
+    const n = batas + 1;
+    return {
+      opens: l.opens.slice(0, n), highs: l.highs.slice(0, n),
+      lows: l.lows.slice(0, n), closes: l.closes.slice(0, n),
+      times: l.times.slice(0, n),
+    };
+  }
+
   function jalankan() {
     if (!lilin.closes.length) return;
-    const h = jalankanPine(kode, lilin, tf);
+    const h = jalankanPine(kode, potong(lilin, hingga), tf);
     setHasil(h);
     /* Plot tetap dikirim ke chart meski ADA galat: skrip sepuluh baris yang
        satu barisnya salah masih menghasilkan sembilan garis yang benar, dan
@@ -51,6 +67,24 @@ export function PanelPine({ lilin, tf = '4h', aturHasil }: {
     setHasil(null);
     aturHasil(null);
   }
+
+  /* ── Ikut replay ────────────────────────────────────────────────────
+     Selama skrip sedang terpasang, tiap bar replay maju memicu hitung
+     ulang — di-debounce 250 ms supaya kecepatan 10×/30× tidak menumpuk
+     ratusan eksekusi skrip 963 baris. */
+  const hasilAktif = useRef(false);
+  hasilAktif.current = hasil !== null && (hasil.plot.length > 0 || (hasil.segmen?.length ?? 0) > 0 || (hasil.penanda?.length ?? 0) > 0 || (hasil.kotak?.length ?? 0) > 0);
+  useEffect(() => {
+    if (!hasilAktif.current || !lilin.closes.length) return;
+    const jeda = setTimeout(() => {
+      const h = jalankanPine(kode, potong(lilin, hingga), tf);
+      setHasil(h);
+      const ada = h.plot.length || h.segmen?.length || h.penanda?.length || h.kotak?.length;
+      aturHasil(ada ? h : null);
+    }, 250);
+    return () => clearTimeout(jeda);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hingga, lilin]);
 
   return (
     <Panel className="mt-4">

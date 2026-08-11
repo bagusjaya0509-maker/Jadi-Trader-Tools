@@ -296,17 +296,31 @@ export default function Marketplace() {
           judul="Products"
           sub="Indikator TradingView dan Expert Advisor MetaTrader yang dipakai di terminal ini."
         />
-        <div className="grid grid-cols-1 gap-4 px-5 pb-5 sm:grid-cols-2 xl:grid-cols-4">
+        {/* Kolom MENGIKUTI jumlah produk (maks 4). Empat kolom dengan tiga
+            produk menyisakan satu lubang kosong permanen di kanan — kartu
+            yang melebar mengisi barisnya jauh lebih enak dilihat daripada
+            rongga yang tidak pernah terisi. */}
+        <div className={cn('grid grid-cols-1 gap-4 px-5 pb-5 sm:grid-cols-2',
+          PRODUK.length >= 4 ? 'xl:grid-cols-4' : PRODUK.length === 3 ? 'xl:grid-cols-3' : '')}>
           {PRODUK.map((p) => (
             <Panel key={p.id} className={cn('flex flex-col overflow-hidden', p.premium && 'border-amber-500/30')}>
               {/* Sampul = gambar pertama katalog, diatur di Maintenance.
                   Tinggi tetap dan `object-cover`: gambar dengan rasio
                   bermacam-macam tidak boleh membuat kartu-kartu di satu baris
                   jadi berbeda tinggi. */}
-              {p.gambar?.[0] && (
+              {p.gambar?.[0] ? (
                 <img src={p.gambar[0]} alt="" loading="lazy"
                      className="-mt-px h-[132px] w-full bg-zinc-900 object-cover"
                      onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+              ) : (
+                /* Produk tanpa sampul memakai kepala buatan setinggi sampul —
+                   kartu di satu baris harus sebangun, dan kepala bertuliskan
+                   nama jauh lebih baik daripada rongga kosong. */
+                <div className="-mt-px flex h-[132px] w-full items-center justify-center bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-800">
+                  <span className="px-6 text-center text-[15px] font-semibold tracking-tight text-zinc-600">
+                    {p.nama}
+                  </span>
+                </div>
               )}
               <div className="flex flex-1 flex-col p-5">
               <div className="flex items-start justify-between gap-2">

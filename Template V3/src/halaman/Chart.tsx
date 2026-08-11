@@ -103,6 +103,7 @@ export default function ChartBacktest() {
   const [memuat, setMemuat] = useState(true);
   const [galat, setGalat] = useState('');
   const [segar, setSegar] = useState(0);
+  const [kunciChart, setKunciChart] = useState(0);
   const [set, setSet] = useState<Setelan>(SETELAN_BAWAAN);
   const [hasil, setHasil] = useState<HasilUji | null>(null);
   const [uji, setUji] = useState(false);
@@ -392,6 +393,27 @@ export default function ChartBacktest() {
   }
 
   const [detik, setDetik] = useState(0);
+
+  /* ── Tinggi chart mengikuti LAYAR ──────────────────────────────────
+     Angka tetap (680) menyisakan rongga di monitor tinggi dan meluber di
+     laptop. Tingginya dihitung dari viewport dikurangi bilah-bilah di atas
+     chart — tepi bawah panel jadi jatuh di sekitar akhir sidebar. */
+  const [tinggiLayar, setTinggiLayar] = useState(() => (typeof window === 'undefined' ? 800 : window.innerHeight));
+  useEffect(() => {
+    const ukur = () => setTinggiLayar(window.innerHeight);
+    window.addEventListener('resize', ukur);
+    return () => window.removeEventListener('resize', ukur);
+  }, []);
+  const tinggiChart = Math.max(520, tinggiLayar - (tampilSmi ? 258 : 218));
+
+  /* ── Kunci remount chart ───────────────────────────────────────────
+     Ganti simbol/timeframe atau tombol Segarkan MEMBANGUN ULANG komponen
+     chart seutuhnya. Pernah ada keadaan chart kosong yang tidak bisa
+     dipulihkan kecuali refresh halaman penuh — seri yang setengah terlepas
+     di dalam lightweight-charts. Daripada memburu setiap jalur yang bisa
+     meninggalkan seri yatim, remount memusnahkan seluruh kelasnya: kanvas
+     baru, seri baru, nol keadaan sisa. Zoom memang ikut hilang — untuk
+     simbol yang baru diganti itu justru yang diharapkan. */
   useEffect(() => {
     const durasi = DURASI_TF[tf] ?? 0;
     if (!durasi) return;
@@ -471,7 +493,7 @@ export default function ChartBacktest() {
             <span className={cn('flex items-center gap-1.5 text-[11px]', memuat ? 'text-zinc-600' : 'text-emerald-500')}>
               <Radio className="size-3" /> {memuat ? 'memuat' : 'live · 3 dtk'}
             </span>
-            <button onClick={() => setSegar((n) => n + 1)}
+            <button onClick={() => { setSegar((n) => n + 1); setKunciChart((n) => n + 1); }}
               className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100">
               <RefreshCw className={cn('size-3.5', memuat && 'animate-spin')} /> Segarkan
             </button>
@@ -511,8 +533,9 @@ export default function ChartBacktest() {
 
         <div className="border-t border-zinc-800/80 px-2 pb-2">
           {lilin.times.length > 0
-            ? <ChartLilin lilin={lilin} garis={garis} trade={replayIdx === null ? hasil?.trade : undefined}
-                          tinggi={tampilSmi ? 680 : 560} hingga={replayIdx ?? undefined} smi={smi}
+            ? <ChartLilin key={`${simbol}|${tf}|${kunciChart}`}
+                          lilin={lilin} garis={garis} trade={replayIdx === null ? hasil?.trade : undefined}
+                          tinggi={tinggiChart} hingga={replayIdx ?? undefined} smi={smi}
                           garisHarga={[...garisHarga, ...garisZona]}
                           onKlikBar={replayIdx === null ? undefined : setReplayIdx}
                           garisSeret={garisSeret}
@@ -617,7 +640,7 @@ export default function ChartBacktest() {
         </div>
       </Panel>
 
-      <PanelPine lilin={lilin} tf={tf} aturHasil={setPine} />
+      <PanelPine lilin={lilin} tf={tf} hingga={replayIdx ?? undefined} aturHasil={setPine} />
 
       {/* ── Setelan uji ── */}
       <Panel className="mt-4">
