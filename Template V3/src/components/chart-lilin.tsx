@@ -1,9 +1,10 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   createChart, CandlestickSeries, LineSeries, createSeriesMarkers,
   type IChartApi, type ISeriesApi, type ISeriesMarkersPluginApi, type IPriceLine, type Time,
 } from 'lightweight-charts';
 import type { Lilin } from '@/lib/pasar';
+import { cn, harga as fHarga } from '@/lib/utils';
 import type { TradeUji } from '@/lib/backtest';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -23,7 +24,24 @@ export interface Garis { nama: string; nilai: (number | null)[]; warna: string }
 
 export interface GarisHarga { harga: number; warna: string; label: string }
 
-export function ChartLilin({ lilin, garis, trade, tinggi = 420, hingga, garisHarga, onKlikBar, smi, mundur, pojok }: {
+/** Garis yang bisa DIGESER: entry, SL, TP.
+ *
+ *  Digambar sebagai elemen DOM di atas kanvas, bukan sebagai price line
+ *  bawaan lightweight-charts. Alasannya satu: price line bawaan tidak bisa
+ *  diseret sama sekali, dan menggesernya adalah cara paling wajar mengubah
+ *  level sebelum order dikirim. */
+export interface GarisSeret {
+  id: 'entry' | 'sl' | 'tp';
+  harga: number;
+  warna: string;
+  label: string;
+  bisaSeret?: boolean;
+}
+
+export function ChartLilin({
+  lilin, garis, trade, tinggi = 420, hingga, garisHarga, onKlikBar, smi, mundur, pojok,
+  garisSeret, onSeret, hamparanBawah,
+}: {
   lilin: Lilin;
   garis?: Garis[];
   trade?: TradeUji[];
@@ -42,6 +60,13 @@ export function ChartLilin({ lilin, garis, trade, tinggi = 420, hingga, garisHar
   mundur?: string;
   /** Isi pojok kiri atas chart — dipakai panel BUY/SELL. */
   pojok?: React.ReactNode;
+  /** Garis entry/SL/TP yang bisa digeser. */
+  garisSeret?: GarisSeret[];
+  /** Dipanggil saat sebuah garis selesai digeser. */
+  onSeret?: (id: GarisSeret['id'], harga: number) => void;
+  /** Panel yang ditumpangkan di bagian bawah area harga — dipakai kendali
+   *  replay, supaya ia menyatu dengan grafik alih-alih memanjangkan halaman. */
+  hamparanBawah?: React.ReactNode;
 }) {
   const kotak = useRef<HTMLDivElement>(null);
   const chart = useRef<IChartApi | null>(null);
@@ -203,24 +228,135 @@ export function ChartLilin({ lilin, garis, trade, tinggi = 420, hingga, garisHar
     p.setMarkers(tanda);
   }, [trade]);
 
+  /* ── Menerjemahkan harga -> koordinat layar ────────────────────────
+     Dipakai label harga dan garis seret. Disegarkan tiap 200 ms, bukan
+     dihitung sekali: skala harga bergeser saat orang men-zoom, menggeser,
+     atau saat lilin baru masuk — dan tidak ada satu peristiwa pun yang
+     menandai semuanya. Satu panggilan `priceToCoordinate` per 200 ms terlalu
+     murah untuk diperdebatkan. */
+  const [koordinat, setKoordinat] = useState<Record<string, number>>({});
+  const seret = useRef<{ id: string; mulaiY: number } | null>(null);
+
+  const hargaDariY = useCallback((y: number) => {
+    const s = seri.current;
+    if (!s || !kotak.current) return null;
+    const rect = kotak.current.getBoundingClientRect();
+    const v = s.coordinateToPrice(y - rect.top);
+    return typeof v === 'number' && isFinite(v) ? v : null;
+  }, []);
+
+  useEffect(() => {
+    const hitung = () => {
+      const s = seri.current;
+      if (!s) return;
+      const out: Record<string, number> = {};
+      (garisSeret ?? []).forEach((g) => {
+        const y = s.priceToCoordinate(g.harga);
+        if (typeof y === 'number') out[g.id] = y;
+      });
+      const t = lilin.closes.length
+        ? s.priceToCoordinate(lilin.closes[(hingga === undefined ? lilin.closes.length : Math.min(lilin.closes.length, hingga + 1)) - 1])
+        : null;
+      if (typeof t === 'number') out.__harga = t;
+      setKoordinat(out);
+    };
+    hitung();
+    const jam = setInterval(hitung, 200);
+    return () => clearInterval(jam);
+  }, [garisSeret, lilin, hingga]);
+
+  /* ── Menyeret ──────────────────────────────────────────────────────
+     Pendengar dipasang di window, bukan di garisnya: kalau kursor keluar
+     dari garis setipis 1 px saat digeser cepat — dan itu selalu terjadi —
+     seretannya akan putus di tengah jalan. */
+  useEffect(() => {
+    if (!onSeret) return;
+    const gerak = (e: MouseEvent) => {
+      if (!seret.current) return;
+      e.preventDefault();
+      const h = hargaDariY(e.clientY);
+      if (h !== null) onSeret(seret.current.id as GarisSeret['id'], h);
+    };
+    const lepas = () => {
+      if (!seret.current) return;
+      seret.current = null;
+      document.body.style.cursor = '';
+      /* Interaksi chart dinyalakan lagi — dimatikan saat mulai menyeret
+         supaya menggeser garis tidak ikut menggeser grafiknya. */
+      chart.current?.applyOptions({ handleScroll: true, handleScale: true });
+    };
+    window.addEventListener('mousemove', gerak);
+    window.addEventListener('mouseup', lepas);
+    return () => {
+      window.removeEventListener('mousemove', gerak);
+      window.removeEventListener('mouseup', lepas);
+    };
+  }, [onSeret, hargaDariY]);
+
+  function mulaiSeret(id: string, e: React.MouseEvent) {
+    if (!onSeret) return;
+    e.preventDefault();
+    e.stopPropagation();
+    seret.current = { id, mulaiY: e.clientY };
+    document.body.style.cursor = 'ns-resize';
+    chart.current?.applyOptions({ handleScroll: false, handleScale: false });
+  }
+
+  const hargaTerakhir = lilin.closes.length
+    ? lilin.closes[(hingga === undefined ? lilin.closes.length : Math.min(lilin.closes.length, hingga + 1)) - 1]
+    : undefined;
+
   return (
     <div className="relative">
       <div ref={kotak} style={{ height: tinggi }} className="w-full" />
 
-      {/* Hitung mundur MENEMPEL di sisi skala harga, sejajar label harga
-          terakhir — sama seperti TradingView. Ditumpangkan sebagai elemen
-          biasa, bukan digambar ke kanvas: lightweight-charts tidak punya
-          jalan untuk menambah label di sana, dan menggambarnya sendiri
-          berarti ikut mengurus posisi tiap kali skalanya bergeser. */}
-      {mundur && (
-        <div className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 pr-1">
-          <span className="angka rounded bg-zinc-800/95 px-1.5 py-0.5 text-[10.5px] tabular-nums text-zinc-300 ring-1 ring-zinc-700">
-            {mundur}
-          </span>
+      {/* Harga + hitung mundur dalam SATU kotak, menempel di garis harga —
+          sama seperti TradingView. Dua kotak terpisah bergeser sendiri-sendiri
+          saat skalanya berubah dan terbaca sebagai dua hal yang tak
+          berhubungan; yang sebenarnya terjadi adalah satu hal: harga sekarang,
+          dan berapa lama lagi lilinnya menutup. */}
+      {mundur && hargaTerakhir !== undefined && koordinat.__harga !== undefined && (
+        <div className="pointer-events-none absolute right-0 z-10 pr-0.5"
+             style={{ top: koordinat.__harga, transform: 'translateY(-50%)' }}>
+          <div className="flex flex-col items-end rounded bg-zinc-100 px-1.5 py-0.5 leading-tight text-zinc-950 shadow">
+            <span className="angka text-[10.5px] font-medium tabular-nums">{fHarga(hargaTerakhir)}</span>
+            <span className="angka text-[9.5px] tabular-nums opacity-70">{mundur}</span>
+          </div>
         </div>
       )}
 
-      {pojok && <div className="absolute left-2 top-2 z-10">{pojok}</div>}
+      {/* Garis entry / SL / TP yang bisa digeser. */}
+      {(garisSeret ?? []).map((g) => {
+        const y = koordinat[g.id];
+        if (y === undefined) return null;
+        const bisa = g.bisaSeret !== false && !!onSeret;
+        return (
+          <div key={g.id}
+               className={cn('absolute left-0 right-0 z-10 flex items-center',
+                 bisa ? 'cursor-ns-resize' : 'pointer-events-none')}
+               style={{ top: y, transform: 'translateY(-50%)', height: 14 }}
+               onMouseDown={bisa ? (e) => mulaiSeret(g.id, e) : undefined}>
+            <div className="h-px flex-1" style={{
+              background: `repeating-linear-gradient(90deg, ${g.warna} 0 6px, transparent 6px 11px)`,
+            }} />
+            <span className="angka mr-0.5 shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-zinc-950 shadow"
+                  style={{ background: g.warna }}>
+              {g.label} {fHarga(g.harga)}
+            </span>
+          </div>
+        );
+      })}
+
+      {pojok && <div className="absolute left-2 top-2 z-20">{pojok}</div>}
+
+      {/* Kendali replay ditumpangkan di dasar area harga, bukan di panel
+          terpisah di bawah chart — latarnya tembus supaya menyatu dengan
+          grafiknya. */}
+      {hamparanBawah && (
+        <div className="absolute inset-x-2 z-20" style={{ bottom: smi ? 132 : 34 }}>
+          {hamparanBawah}
+        </div>
+      )}
     </div>
   );
 }

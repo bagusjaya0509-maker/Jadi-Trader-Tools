@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Play, Loader2, RefreshCw, Radio, TriangleAlert, History } from 'lucide-react';
 import { Panel, PanelHead, KartuKpi, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn, uang, persen, harga, tanggalPendek } from '@/lib/utils';
-import { ChartLilin, type Garis, type GarisHarga } from '@/components/chart-lilin';
+import { ChartLilin, type Garis, type GarisHarga, type GarisSeret } from '@/components/chart-lilin';
 import { PanelReplay, type AksiOrder } from '@/components/panel-replay';
 import { PojokOrder } from '@/components/pojok-order';
 import { PanelPine } from '@/components/panel-pine';
@@ -110,12 +110,48 @@ export default function ChartBacktest() {
   const [garisHarga, setGarisHarga] = useState<GarisHarga[]>([]);
   const [aksi, setAksi] = useState<AksiOrder | null>(null);
   const [pine, setPine] = useState<HasilPine | null>(null);
+  const [kendaliReplay, setKendaliReplay] = useState<React.ReactNode>(null);
 
   /* SL & TP dari kartu screener, dibaca dari alamat. Dipakai sekali sebagai
      usulan saat membuka posisi replay — bukan dipaksakan, karena arah yang
      dipilih orangnya bisa berbeda dengan arah kartunya. */
-  const usulSl = Number(cari.get('sl')) || undefined;
-  const usulTp = Number(cari.get('tp')) || undefined;
+  /* ── LEVEL RENCANA ──────────────────────────────────────────────────
+     Entry, SL, dan TP yang tergambar di chart dan BISA DIGESER. Isinya bisa
+     datang dari tiga tempat: kartu screener lewat alamat, posisi replay yang
+     sedang terbuka, atau seretan orangnya sendiri.
+
+     Angka terakhir setelah digeser itulah yang dipakai saat order dikirim —
+     jadi menggeser garis di chart adalah cara mengubah level, bukan sekadar
+     hiasan yang terpisah dari kotak isian. */
+  const [rencana, setRencana] = useState<{ entry?: number; sl?: number; tp?: number }>({});
+
+  /* Level dari alamat dipasang SEKALI per kombinasi yang datang. Kalau
+     dipasang tiap render, seretan orangnya akan terlempar balik ke angka
+     kartu setiap kali komponennya menggambar ulang. */
+  const dipasang = useRef('');
+  useEffect(() => {
+    const sl = Number(cari.get('sl')) || undefined;
+    const tp = Number(cari.get('tp')) || undefined;
+    const kunci = `${simbol}|${sl ?? ''}|${tp ?? ''}`;
+    if (dipasang.current === kunci) return;
+    dipasang.current = kunci;
+    if (sl || tp) {
+      setRencana({ entry: lilin.closes[lilin.closes.length - 1] || undefined, sl, tp });
+    }
+  }, [cari, simbol, lilin]);
+
+  /* Entry menyusul harga terakhir selama belum ada posisi dan belum digeser
+     sendiri — supaya garisnya tidak menggantung jauh dari lilin terbaru. */
+  const entryDigeser = useRef(false);
+  useEffect(() => {
+    if (entryDigeser.current || aksiPosisi) return;
+    const h = lilin.closes[lilin.closes.length - 1];
+    if (h && (rencana.sl || rencana.tp)) setRencana((r) => ({ ...r, entry: h }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lilin.closes.length]);
+
+  const usulSl = rencana.sl;
+  const usulTp = rencana.tp;
   /* Panel replay hidup DI DALAM panel grafik, muncul lewat ikon. Sebagai
      panel terpisah ia mendorong grafik ke atas layar setiap kali dibuka —
      dan grafik yang bergeser saat sedang dibaca adalah gangguan, bukan
@@ -221,6 +257,20 @@ export default function ChartBacktest() {
     }
     return tampilSmi && lilin.closes.length >= 30 ? deretSmi(lilin) : null;
   }, [tampilSmi, lilin, pine]);
+
+  /* Posisi yang sedang terbuka MENANG atas rencana: kalau sudah masuk, yang
+     digambar adalah level posisinya, bukan rancangan sebelumnya. */
+  const aksiPosisi = aksi?.posisi ?? null;
+  const garisSeret: GarisSeret[] = useMemo(() => {
+    const sumber = aksiPosisi
+      ? { entry: aksiPosisi.masuk, sl: aksiPosisi.sl, tp: aksiPosisi.tp }
+      : rencana;
+    const g: GarisSeret[] = [];
+    if (sumber.entry) g.push({ id: 'entry', harga: sumber.entry, warna: '#d4d4d8', label: 'Entry', bisaSeret: !aksiPosisi });
+    if (sumber.sl) g.push({ id: 'sl', harga: sumber.sl, warna: '#f87171', label: 'SL', bisaSeret: !aksiPosisi });
+    if (sumber.tp) g.push({ id: 'tp', harga: sumber.tp, warna: '#10b981', label: 'TP', bisaSeret: !aksiPosisi });
+    return g;
+  }, [aksiPosisi, rencana]);
 
   const terakhir = lilin.closes[lilin.closes.length - 1];
   const sebelumnya = lilin.closes[lilin.closes.length - 2];
@@ -339,7 +389,13 @@ export default function ChartBacktest() {
                           tinggi={tampilSmi ? 620 : 500} hingga={replayIdx ?? undefined} smi={smi}
                           garisHarga={[...garisHarga, ...garisZona]}
                           onKlikBar={replayIdx === null ? undefined : setReplayIdx}
+                          garisSeret={garisSeret}
+                          onSeret={(id, h) => {
+                            if (id === 'entry') entryDigeser.current = true;
+                            setRencana((r) => ({ ...r, [id]: h }));
+                          }}
                           mundur={DURASI_TF[tf] ? jamMundur(detik) : undefined}
+                          hamparanBawah={kendaliReplay}
                           pojok={aksi ? (
                             <PojokOrder posisi={aksi.posisi} hargaKini={aksi.hargaKini}
                                         onBuka={aksi.buka} onTutup={aksi.tutup} mati={aksi.mati} />
@@ -353,14 +409,17 @@ export default function ChartBacktest() {
           {hasil?.trade.length ? ` · ${hasil.trade.length} penanda trade` : ''}
         </div>
 
-        {(bukaReplay || replayIdx !== null) && (
-          <div className="border-t border-zinc-800/80">
-            <PanelReplay lilin={lilin} simbol={simbol} tf={tf} idx={replayIdx}
-                         setIdx={setReplayIdx} aturGaris={setGarisHarga}
-                         aturAksi={setAksi} usulSl={usulSl} usulTp={usulTp}
-                         tanpaBingkai />
-          </div>
-        )}
+        {/* SELALU terpasang, tampil hanya saat dibuka. Efeknya tetap jalan
+            meski tidak menggambar apa pun — itulah yang membuat tombol
+            BUY/SELL di pojok chart tersedia sejak halaman dibuka. */}
+        <div className={cn(bukaReplay || replayIdx !== null ? 'border-t border-zinc-800/80' : 'hidden')}>
+          <PanelReplay lilin={lilin} simbol={simbol} tf={tf} idx={replayIdx}
+                       setIdx={setReplayIdx} aturGaris={setGarisHarga}
+                       aturAksi={setAksi} aturKendali={setKendaliReplay}
+                       usulSl={usulSl} usulTp={usulTp}
+                       tampil={bukaReplay || replayIdx !== null}
+                       tanpaBingkai />
+        </div>
       </Panel>
 
       <PanelPine lilin={lilin} aturHasil={setPine} />

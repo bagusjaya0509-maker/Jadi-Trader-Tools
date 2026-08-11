@@ -13,16 +13,25 @@ import { cn, uang, harga as fHarga } from '@/lib/utils';
    yang ada di sini hanya perbuatan yang harus cepat.
    ════════════════════════════════════════════════════════════════════════ */
 
-export function PojokOrder({ posisi, hargaKini, onBuka, onTutup, mati }: {
+export function PojokOrder({ posisi, hargaKini, onBuka, onTutup, mati, label = 'DEMO' }: {
   posisi: { arah: 'BUY' | 'SELL'; masuk: number; sl: number; tp: number; pnl: number } | null;
   hargaKini?: number;
   onBuka: (arah: 'BUY' | 'SELL') => void;
   onTutup: () => void;
   mati?: boolean;
+  /* Label mode. Tombol di pojok chart hanya untuk DEMO — order sungguhan
+     punya kotaknya sendiri dengan konfirmasi berisi angka, dan satu klik di
+     atas grafik bukan tempat untuk uang sungguhan. Labelnya tetap ada supaya
+     tidak ada yang perlu menebak sedang di mode apa. */
+  label?: 'DEMO' | 'REAL';
 }) {
   if (posisi) {
     return (
       <div className="flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900/90 px-2 py-1.5 backdrop-blur-sm">
+        <span className={cn('rounded px-1.5 py-0.5 text-[9.5px] font-semibold tracking-wide',
+          label === 'REAL' ? 'bg-red-500/20 text-red-300' : 'bg-zinc-800 text-zinc-400')}>
+          {label}
+        </span>
         <span className={cn('rounded px-1.5 py-0.5 text-[10px] font-semibold',
           posisi.arah === 'BUY' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400')}>
           {posisi.arah}
@@ -41,6 +50,10 @@ export function PojokOrder({ posisi, hargaKini, onBuka, onTutup, mati }: {
 
   return (
     <div className="flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900/85 px-1.5 py-1.5 backdrop-blur-sm">
+      <span className={cn('rounded px-1.5 py-0.5 text-[9.5px] font-semibold tracking-wide',
+        label === 'REAL' ? 'bg-red-500/20 text-red-300' : 'bg-zinc-800 text-zinc-400')}>
+        {label}
+      </span>
       <button onClick={() => onBuka('BUY')} disabled={mati}
         className="flex cursor-pointer items-center gap-1 rounded bg-emerald-500/20 px-2.5 py-1 text-[11.5px] font-semibold text-emerald-300 transition-colors hover:bg-emerald-500/30 disabled:cursor-not-allowed disabled:opacity-40">
         <TrendingUp className="size-3.5" /> BUY
