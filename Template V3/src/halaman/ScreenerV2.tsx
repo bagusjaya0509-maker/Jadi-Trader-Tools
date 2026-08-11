@@ -215,6 +215,14 @@ export default function ScreenerV2() {
       if (!d || d.jt !== 'buka-chart' || typeof d.simbol !== 'string') return;
       const q = new URLSearchParams({ simbol: d.simbol });
       if (typeof d.tf === 'string' && d.tf) q.set('tf', d.tf);
+      /* SL/TP ikut kalau kartunya punya. Nilainya diperiksa sebagai angka,
+         bukan diteruskan apa adanya: pesan dari dalam bingkai tetap masukan
+         dari luar, dan alamat halaman bukan tempat untuk teks sembarang. */
+      for (const k of ['sl', 'tp'] as const) {
+        const n = Number(d[k]);
+        if (isFinite(n) && n > 0) q.set(k, String(n));
+      }
+      if (d.arah === 'BUY' || d.arah === 'SELL') q.set('arah', d.arah);
       arahkan(`/chart?${q}`);
     };
     window.addEventListener('message', dengar);

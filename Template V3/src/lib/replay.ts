@@ -154,3 +154,31 @@ export function simpanSesi(simbol: string, tf: string, s: SesiReplay) {
 export function hapusSesi(simbol: string, tf: string) {
   try { localStorage.removeItem(kunciSesi(simbol, tf)); } catch { /* abaikan */ }
 }
+
+/* ── Setelan halaman Chart ───────────────────────────────────────────────
+   Simbol, timeframe, indikator yang menyala, dan setelan backtest bertahan
+   setelah refresh. Membuka halaman lalu harus memilih ulang BTCUSDT, 4 jam,
+   centang SNR, centang SMI — tiap kali — adalah pekerjaan yang tidak pernah
+   menghasilkan apa pun.
+
+   Di localStorage, bukan Firestore: ini preferensi tampilan perangkat ini,
+   dan menyimpannya di server berarti satu tulisan tiap kali dropdown
+   disentuh. */
+export interface SetelanChart {
+  simbol: string;
+  tf: string;
+  snr: boolean;
+  smi: boolean;
+}
+
+const KUNCI_SETELAN = 'jt.chartSetelan';
+
+export function bacaSetelanChart(): Partial<SetelanChart> {
+  try { return JSON.parse(localStorage.getItem(KUNCI_SETELAN) ?? '{}'); }
+  catch { return {}; }
+}
+
+export function simpanSetelanChart(s: SetelanChart) {
+  try { localStorage.setItem(KUNCI_SETELAN, JSON.stringify(s)); }
+  catch { /* mode privat — setelan cukup hidup di halaman ini */ }
+}

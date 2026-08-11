@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Play, Loader2, RefreshCw, Radio, TriangleAlert, Timer, History } from 'lucide-react';
+import { Play, Loader2, RefreshCw, Radio, TriangleAlert, History } from 'lucide-react';
 import { Panel, PanelHead, KartuKpi, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn, uang, persen, harga, tanggalPendek } from '@/lib/utils';
 import { ChartLilin, type Garis, type GarisHarga } from '@/components/chart-lilin';
-import { PanelReplay } from '@/components/panel-replay';
+import { PanelReplay, type AksiOrder } from '@/components/panel-replay';
+import { PojokOrder } from '@/components/pojok-order';
+import { PanelPine } from '@/components/panel-pine';
+import type { HasilPine } from '@/lib/pine';
+import { bacaSetelanChart, simpanSetelanChart } from '@/lib/replay';
 import { ambilKlines, type Lilin } from '@/lib/pasar';
 import {
   jalankanUji, garisIndikator, zonaSnr, deretSmi, SETELAN_BAWAAN,
@@ -76,9 +80,13 @@ export default function ChartBacktest() {
      Itulah yang dipakai menu klik-kanan di Screener Entry untuk membuka koin
      tertentu di sini, dan juga yang membuat halaman ini bisa ditandai. */
   const [cari] = useSearchParams();
-  const [simbol, setSimbol] = useState(() => (cari.get('simbol') || 'BTCUSDT').toUpperCase());
+  /* Urutan sumber: ALAMAT dulu, lalu setelan tersimpan, baru bawaan.
+     Alamat menang karena ia perbuatan yang baru saja dilakukan — klik kanan
+     di screener harus membuka koin yang diklik, bukan koin kemarin. */
+  const awal = bacaSetelanChart();
+  const [simbol, setSimbol] = useState(() => (cari.get('simbol') || awal.simbol || 'BTCUSDT').toUpperCase());
   const [tf, setTf] = useState(() => {
-    const t = (cari.get('tf') || '4h').toLowerCase();
+    const t = (cari.get('tf') || awal.tf || '4h').toLowerCase();
     return ['5m', '15m', '1h', '4h', '1d'].includes(t) ? t : '4h';
   });
 
@@ -100,6 +108,14 @@ export default function ChartBacktest() {
   /* null = replay mati. Angkanya indeks bar terakhir yang boleh tampil. */
   const [replayIdx, setReplayIdx] = useState<number | null>(null);
   const [garisHarga, setGarisHarga] = useState<GarisHarga[]>([]);
+  const [aksi, setAksi] = useState<AksiOrder | null>(null);
+  const [pine, setPine] = useState<HasilPine | null>(null);
+
+  /* SL & TP dari kartu screener, dibaca dari alamat. Dipakai sekali sebagai
+     usulan saat membuka posisi replay — bukan dipaksakan, karena arah yang
+     dipilih orangnya bisa berbeda dengan arah kartunya. */
+  const usulSl = Number(cari.get('sl')) || undefined;
+  const usulTp = Number(cari.get('tp')) || undefined;
   /* Panel replay hidup DI DALAM panel grafik, muncul lewat ikon. Sebagai
      panel terpisah ia mendorong grafik ke atas layar setiap kali dibuka —
      dan grafik yang bergeser saat sedang dibaca adalah gangguan, bukan
@@ -107,8 +123,13 @@ export default function ChartBacktest() {
   const [bukaReplay, setBukaReplay] = useState(false);
   /* Zona SNR dari logika yang sama dengan screener. Dimatikan secara bawaan:
      empat garis mendatar di chart yang belum dibaca cuma menutupi lilinnya. */
-  const [tampilSnr, setTampilSnr] = useState(false);
-  const [tampilSmi, setTampilSmi] = useState(true);
+  const [tampilSnr, setTampilSnr] = useState(awal.snr ?? false);
+  const [tampilSmi, setTampilSmi] = useState(awal.smi ?? true);
+
+  /* Simpan tiap kali salah satunya berubah. */
+  useEffect(() => {
+    simpanSetelanChart({ simbol, tf, snr: tampilSnr, smi: tampilSmi });
+  }, [simbol, tf, tampilSnr, tampilSmi]);
 
   /* ── Data realtime ──────────────────────────────────────────────────
      Ditarik ulang tiap 15 detik, sama dengan umur cache di lib/pasar.ts —
@@ -147,13 +168,20 @@ export default function ChartBacktest() {
   useEffect(() => { setReplayIdx(null); setGarisHarga([]); }, [simbol, tf]);
 
   const garis: Garis[] = useMemo(() => {
-    if (set.strategi !== 'ema' || !lilin.closes.length) return [];
-    const g = garisIndikator(lilin, set);
-    return [
-      { nama: `EMA ${set.emaCepat}`, nilai: g.cepat ?? [], warna: '#fbbf24' },
-      { nama: `EMA ${set.emaLambat}`, nilai: g.lambat ?? [], warna: '#60a5fa' },
-    ];
-  }, [lilin, set]);
+    const keluar: Garis[] = [];
+    if (set.strategi === 'ema' && lilin.closes.length) {
+      const g = garisIndikator(lilin, set);
+      keluar.push({ nama: `EMA ${set.emaCepat}`, nilai: g.cepat ?? [], warna: '#fbbf24' });
+      keluar.push({ nama: `EMA ${set.emaLambat}`, nilai: g.lambat ?? [], warna: '#60a5fa' });
+    }
+    /* Garis dari Pine ikut di panel harga; yang bersifat osilator (RSI, SMI)
+       dikirim ke panel bawah lewat jalur `smi`. Memisahkannya di sini, bukan
+       di penerjemah, supaya penerjemah tidak perlu tahu apa pun tentang cara
+       menggambar. */
+    (pine?.plot ?? []).filter((p) => !p.osilator)
+      .forEach((p) => keluar.push({ nama: p.judul, nilai: p.nilai, warna: p.warna }));
+    return keluar;
+  }, [lilin, set, pine]);
 
   /* Zona dihitung sampai bar yang SEDANG tampil, bukan sampai bar terakhir.
      Selama replay, menggambar zona dari data masa depan adalah cara paling
@@ -183,10 +211,16 @@ export default function ChartBacktest() {
     return g;
   }, [zona]);
 
-  const smi = useMemo(
-    () => (tampilSmi && lilin.closes.length >= 30 ? deretSmi(lilin) : null),
-    [tampilSmi, lilin]
-  );
+  const smi = useMemo(() => {
+    /* Osilator dari Pine MENGGANTI panel SMI bawaan saat ada — dua osilator
+       di satu panel dengan skala berbeda tidak bisa dibaca, dan yang baru
+       saja dijalankan orangnya adalah yang ingin dilihatnya. */
+    const dariPine = (pine?.plot ?? []).filter((p) => p.osilator);
+    if (dariPine.length) {
+      return { smi: dariPine[0].nilai, signal: dariPine[1]?.nilai ?? [] };
+    }
+    return tampilSmi && lilin.closes.length >= 30 ? deretSmi(lilin) : null;
+  }, [tampilSmi, lilin, pine]);
 
   const terakhir = lilin.closes[lilin.closes.length - 1];
   const sebelumnya = lilin.closes[lilin.closes.length - 2];
@@ -255,18 +289,9 @@ export default function ChartBacktest() {
                 {gerak >= 0 ? '+' : ''}{gerak.toFixed(2)}%
               </span>
             )}
-            {/* Sisa waktu lilin berjalan — seperti di TradingView. Yang
-                dijawabnya satu pertanyaan yang selalu ditanyakan sebelum
-                entry: "masih berapa lama sebelum lilin ini menutup?" */}
-            {DURASI_TF[tf] && (
-              <span className="mb-1 flex items-center gap-1.5 rounded border border-zinc-800 px-2 py-0.5">
-                <Timer className="size-3 text-zinc-500" />
-                <span className={cn('angka text-[12.5px] tabular-nums',
-                  detik <= 60 ? 'text-amber-400' : 'text-zinc-300')}>
-                  {jamMundur(detik)}
-                </span>
-              </span>
-            )}
+            {/* Hitung mundurnya sekarang MENEMPEL di sisi skala harga di dalam
+                chart, sejajar label harga — sama seperti TradingView. Di
+                bilah atas ia jauh dari tempat mata sedang berada. */}
           </div>
 
           <div className="ml-auto flex items-center gap-3">
@@ -313,7 +338,12 @@ export default function ChartBacktest() {
             ? <ChartLilin lilin={lilin} garis={garis} trade={replayIdx === null ? hasil?.trade : undefined}
                           tinggi={tampilSmi ? 620 : 500} hingga={replayIdx ?? undefined} smi={smi}
                           garisHarga={[...garisHarga, ...garisZona]}
-                          onKlikBar={replayIdx === null ? undefined : setReplayIdx} />
+                          onKlikBar={replayIdx === null ? undefined : setReplayIdx}
+                          mundur={DURASI_TF[tf] ? jamMundur(detik) : undefined}
+                          pojok={aksi ? (
+                            <PojokOrder posisi={aksi.posisi} hargaKini={aksi.hargaKini}
+                                        onBuka={aksi.buka} onTutup={aksi.tutup} mati={aksi.mati} />
+                          ) : undefined} />
             : <div className="flex h-[440px] items-center justify-center text-[12.5px] text-zinc-600">
                 {memuat ? 'Memuat lilin…' : 'Tidak ada data untuk simbol ini.'}
               </div>}
@@ -327,10 +357,13 @@ export default function ChartBacktest() {
           <div className="border-t border-zinc-800/80">
             <PanelReplay lilin={lilin} simbol={simbol} tf={tf} idx={replayIdx}
                          setIdx={setReplayIdx} aturGaris={setGarisHarga}
+                         aturAksi={setAksi} usulSl={usulSl} usulTp={usulTp}
                          tanpaBingkai />
           </div>
         )}
       </Panel>
+
+      <PanelPine lilin={lilin} aturHasil={setPine} />
 
       {/* ── Setelan uji ── */}
       <Panel className="mt-4">

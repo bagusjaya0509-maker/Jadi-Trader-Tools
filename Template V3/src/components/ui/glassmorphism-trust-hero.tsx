@@ -82,14 +82,28 @@ function IkonKoin({ simbol }: { simbol: string }) {
  *  Diukur dari DATA, bukan dari tanggal yang ditulis tangan: transaksi
  *  pertama adalah bukti paling awal bahwa alat ini benar-benar dipakai. */
 function lamaPakai(sejak: number) {
-  if (!sejak) return '—';
+  /* Naik bertahap: hari -> minggu -> bulan -> tahun. Satuannya berganti
+     tepat saat satuan lama berhenti berarti — "45 hari" masih terbaca, "400
+     hari" tidak lagi.
+
+     Tidak pernah mengembalikan tanda hubung. Kalau stempelnya belum ada,
+     jawabannya "baru mulai" — itu tetap kalimat yang benar, sementara "—"
+     terbaca sebagai sesuatu yang rusak. */
+  if (!sejak || !isFinite(sejak)) return 'baru mulai';
   const hari = Math.floor((Date.now() - sejak) / 86_400_000);
   if (hari < 1) return 'hari ini';
-  if (hari < 30) return `${hari} hari`;
-  const bulan = Math.floor(hari / 30);
-  if (bulan < 12) return `${bulan} bln`;
-  const thn = Math.floor(bulan / 12), sisa = bulan % 12;
-  return sisa ? `${thn} thn ${sisa} bln` : `${thn} thn`;
+  if (hari < 7) return `${hari} hari`;
+  if (hari < 30) {
+    const mgg = Math.floor(hari / 7);
+    return `${mgg} minggu`;
+  }
+  if (hari < 365) {
+    const bulan = Math.floor(hari / 30);
+    return `${bulan} bulan`;
+  }
+  const thn = Math.floor(hari / 365);
+  const sisaBulan = Math.floor((hari % 365) / 30);
+  return sisaBulan ? `${thn} thn ${sisaBulan} bln` : `${thn} tahun`;
 }
 
 const StatItem = ({ value, label }: { value: string; label: string }) => (
@@ -244,7 +258,9 @@ export default function HeroSection() {
                     {pameran.siap && (
                       <span className={pameran.tumbuh >= 0 ? "text-emerald-400 font-medium" : "text-red-400 font-medium"}>
                         {pameran.tumbuh >= 0 ? "+" : ""}{pameran.tumbuh.toFixed(1)}%{' '}
-                        <span className="text-zinc-500 font-normal">{pameran.jumlah} transaksi</span>
+                        <span className={pameran.bersih >= 0 ? 'font-normal text-emerald-400/90' : 'font-normal text-red-400/90'}>
+                          {uang(pameran.bersih, true)}
+                        </span>
                       </span>
                     )}
                   </div>
@@ -260,7 +276,7 @@ export default function HeroSection() {
                   <div className="w-px h-full bg-white/10 mx-auto" />
                   <StatItem value={pameran.siap ? persen(pameran.winrate) : '—'} label="Winrate" />
                   <div className="w-px h-full bg-white/10 mx-auto" />
-                  <StatItem value={pameran.siap ? uang(pameran.bersih, true) : '—'} label="PNL" />
+                  <StatItem value={pameran.siap ? pameran.jumlah.toLocaleString('id-ID') : '—'} label="Transaksi" />
                 </div>
 
                 <div className="mt-8 flex flex-wrap gap-2">

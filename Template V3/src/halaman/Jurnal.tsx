@@ -3,8 +3,8 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianG
 import { Plus, Pencil, Bitcoin, CandlestickChart, Link2, Link2Off, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Panel, PanelHead, BadgeTren, TipGrafik, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn, uang, persen, tanggalPendek } from '@/lib/utils';
-import { statGabungan, kurvaEkuitas, plPerHari } from '@/lib/hitung';
-import { useRiwayat, useSaldoAwal } from '@/lib/data';
+import { statGabungan, kurvaEkuitas, plPerHari, rangkumLayering } from '@/lib/hitung';
+import { useRiwayat, useSaldoAwal, usePosisi } from '@/lib/data';
 import { LabelContoh } from '@/components/gerbang';
 import { useAuth } from '@/lib/auth';
 import type { Trade, Sumber } from '@/data/contoh';
@@ -210,6 +210,76 @@ function KartuSaldo({ judul, saldoJurnal, akun, keIntegrasi }: {
   );
 }
 
+/** Posisi yang SEDANG terbuka untuk sumber ini.
+ *
+ *  Kripto dari `public/posisiTerbuka` (dan dari bursa langsung kalau App
+ *  Token ada); Trade-Fi dari laporan EA. Dua sumber berbeda, satu tampilan —
+ *  yang ditanyakan sama: apa yang sedang berjalan sekarang. */
+function PanelPosisiJurnal({ sumber }: { sumber: Sumber }) {
+  const { data: posisiKripto } = usePosisi();
+  const mt5 = useAkunMt5();
+
+  const baris = sumber === 'kripto'
+    ? posisiKripto.map((p) => ({
+        kunci: p.id, simbol: p.simbol, arah: p.arah,
+        ket: p.tf && p.tf !== '—' ? p.tf : p.venue,
+        pnl: p.pnlFloat,
+      }))
+    : mt5.posisi.map((p) => ({
+        kunci: p.tiket, simbol: p.simbol, arah: p.arah,
+        ket: `${p.lot} lot`,
+        pnl: p.profit,
+      }));
+
+  const total = baris.some((b) => b.pnl !== undefined)
+    ? baris.reduce((s, b) => s + (b.pnl ?? 0), 0)
+    : null;
+
+  return (
+    <Panel>
+      <PanelHead
+        judul="Posisi Terbuka"
+        sub={sumber === 'kripto' ? 'Berjalan di Binance.' : 'Berjalan di MetaTrader 5.'}
+        kanan={
+          total === null
+            ? <span className="text-[11.5px] text-zinc-500">{baris.length} posisi</span>
+            : <span className={cn('angka text-[12.5px]', total >= 0 ? 'text-emerald-500' : 'text-red-400')}>
+                {uang(total, true)}
+              </span>
+        }
+      />
+      <div className="px-5 pb-5">
+        {baris.length === 0 ? (
+          <div className="py-5 text-center text-[12.5px] text-zinc-600">
+            {sumber === 'kripto' ? 'Tidak ada posisi kripto terbuka.' : mt5.terhubung === true ? 'Tidak ada posisi MT5 terbuka.' : mt5.ket}
+          </div>
+        ) : (
+          <div className="max-h-[190px] space-y-2 overflow-y-auto">
+            {baris.map((b) => (
+              <div key={b.kunci} className="flex items-center justify-between gap-2 rounded-lg border border-zinc-800/60 px-3 py-2">
+                <span className="flex min-w-0 items-center gap-2">
+                  <span className="truncate text-[12.5px] text-zinc-200">{b.simbol}</span>
+                  <span className={cn('rounded px-1.5 py-0.5 text-[10px]',
+                    b.arah === 'BUY' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-400')}>
+                    {b.arah}
+                  </span>
+                  <span className="truncate text-[11px] text-zinc-600">{b.ket}</span>
+                </span>
+                {/* Tanda hubung berarti PnL berjalannya tidak disiarkan —
+                    bukan berarti nol. */}
+                <span className={cn('angka shrink-0 text-[12px]',
+                  b.pnl === undefined ? 'text-zinc-600' : b.pnl >= 0 ? 'text-emerald-500' : 'text-red-400')}>
+                  {b.pnl === undefined ? '—' : uang(b.pnl, true)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </Panel>
+  );
+}
+
 /** Catatan evaluasi satu baris. Warnanya menyampaikan nada sebelum
  *  kalimatnya dibaca — dan itu penting, karena kotak ini dibaca sekilas. */
 function CatatanKecil({ c }: { c: { nada: 'baik' | 'awas' | 'buruk'; teks: string } }) {
@@ -244,6 +314,15 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
   /* null = tertutup, 'baru' = tambah, objek Trade = sunting. Satu state untuk
      tiga keadaan; dua boolean terpisah selalu bisa menyala berbarengan. */
   const [modal, setModal] = useState<'baru' | Trade | null>(null);
+  /* Rangkum layering — bawaannya MENYALA untuk Trade-Fi. Akun cent dengan
+     layering membuka puluhan order kecil untuk satu keputusan, dan tabel yang
+     menampilkan tiap layer tidak bisa dibaca. Kripto tidak dirangkum: di sana
+     satu baris memang satu posisi. */
+  const [rangkum, setRangkum] = useState(sumber !== 'kripto');
+  const barisTabel = useMemo(
+    () => (rangkum ? rangkumLayering(trade) : trade.map((x) => ({ ...x, lapis: 1 }))),
+    [rangkum, trade]
+  );
 
   /* Catatan evaluasi dihitung dari daftar transaksi yang SAMA dengan
      statistiknya. Kalau keduanya berasal dari sumber berbeda, kalimatnya
@@ -411,8 +490,19 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
             <KotakArus sumber={sumber} arus={arus} bisaTulis={bisaTulis} ringkas />
           </div>
 
-          <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <Panel className="lg:col-span-2">
+          {/* Kolom kiri jadi TUMPUKAN, bukan satu panel tinggi.
+              ────────────────────────────────────────────────────────────
+              Sebelumnya kurva ekuitas dipaksa setinggi kalender di
+              sebelahnya, jadi grafiknya duduk di sepertiga atas dengan dua
+              pertiga kosong di bawahnya. Grafik yang tingginya ditentukan
+              tetangganya, bukan oleh isinya sendiri, selalu berakhir begitu.
+
+              Sekarang kurva memakai tinggi secukupnya, dan sisa ruangnya
+              diisi panel posisi terbuka — yang memang ingin dilihat
+              berdampingan dengan kurva. */}
+          <div className="mt-4 grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
+            <div className="space-y-4 lg:col-span-2">
+            <Panel>
               <PanelHead
                 judul="Kurva Ekuitas"
                 sub={`Dari ${uang(saldoAwal)} ke ${uang(stat.saldo)} · ${trade.length} transaksi.`}
@@ -453,6 +543,9 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
               </div>
             </Panel>
 
+            <PanelPosisiJurnal sumber={sumber} />
+            </div>
+
             <Panel>
               <PanelHead judul="Kalender P/L" sub="Klik panah atau nama bulan untuk berpindah." />
               <div className="px-5 pb-5"><Kalender pl={pl} /></div>
@@ -461,11 +554,21 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
             <Panel className="lg:col-span-2">
               <PanelHead
                 judul="Riwayat Trade"
-                sub={`${Math.min(200, trade.length)} transaksi terakhir dari ${trade.length}.`}
+                sub={rangkum && barisTabel.length !== trade.length
+                  ? `${Math.min(200, barisTabel.length)} baris dari ${barisTabel.length} — ${trade.length} transaksi asli dirangkum per pair, arah, dan hari.`
+                  : `${Math.min(200, trade.length)} transaksi terakhir dari ${trade.length}.`}
                 kanan={
                   <span className="flex items-center gap-2">
                   {/* Sinkron MT5 hanya di jurnal Trade-Fi — jurnal kripto sudah
                       terisi sendiri lewat screener V2. */}
+                  {sumber !== 'kripto' && (
+                    <label title="Gabungkan order layering pada pair, arah, dan hari yang sama"
+                      className="flex cursor-pointer items-center gap-1.5 text-[11.5px] text-zinc-400">
+                      <input type="checkbox" checked={rangkum} onChange={(e) => setRangkum(e.target.checked)}
+                             className="size-3.5 cursor-pointer accent-zinc-200" />
+                      Rangkum layer
+                    </label>
+                  )}
                   {sumber === 'forex' && (
                     <>
                       <select value={sejak} onChange={(e) => aturSejak(e.target.value)}
@@ -516,10 +619,18 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
                       </tr>
                     </thead>
                     <tbody>
-                      {[...trade].sort((a, b) => b.waktu - a.waktu).slice(0, 200).map((t) => (
+                      {[...barisTabel].sort((a, b) => b.waktu - a.waktu).slice(0, 200).map((t) => (
                         <Tr key={t.id}>
                           <Td className="whitespace-nowrap text-zinc-500">{tanggalPendek(t.waktu)}</Td>
-                          <Td className="whitespace-nowrap text-zinc-200">{t.pair}</Td>
+                          <Td className="whitespace-nowrap text-zinc-200">
+                            {t.pair}
+                            {t.lapis > 1 && (
+                              <span className="ml-1.5 rounded bg-zinc-800 px-1 py-0.5 text-[9.5px] text-zinc-400"
+                                    title={`${t.lapis} order digabung`}>
+                                {t.lapis}×
+                              </span>
+                            )}
+                          </Td>
                           <Td><span className={cn('text-[11.5px]', t.arah === 'BUY' ? 'text-emerald-500' : 'text-red-400')}>{t.arah}</span></Td>
                           <Td className="angka text-right text-zinc-400">{t.lot}</Td>
                           {/* Nilai order = margin x leverage, dalam dolar.

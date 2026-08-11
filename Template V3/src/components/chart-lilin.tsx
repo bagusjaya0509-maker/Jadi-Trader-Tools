@@ -23,7 +23,7 @@ export interface Garis { nama: string; nilai: (number | null)[]; warna: string }
 
 export interface GarisHarga { harga: number; warna: string; label: string }
 
-export function ChartLilin({ lilin, garis, trade, tinggi = 420, hingga, garisHarga, onKlikBar, smi }: {
+export function ChartLilin({ lilin, garis, trade, tinggi = 420, hingga, garisHarga, onKlikBar, smi, mundur, pojok }: {
   lilin: Lilin;
   garis?: Garis[];
   trade?: TradeUji[];
@@ -38,6 +38,10 @@ export function ChartLilin({ lilin, garis, trade, tinggi = 420, hingga, garisHar
   onKlikBar?: (idx: number) => void;
   /** Deret SMI + garis sinyalnya, digambar di panel bawah. */
   smi?: { smi: (number | null)[]; signal: (number | null)[] } | null;
+  /** Sisa waktu lilin berjalan, ditempel di sisi harga seperti TradingView. */
+  mundur?: string;
+  /** Isi pojok kiri atas chart — dipakai panel BUY/SELL. */
+  pojok?: React.ReactNode;
 }) {
   const kotak = useRef<HTMLDivElement>(null);
   const chart = useRef<IChartApi | null>(null);
@@ -199,5 +203,24 @@ export function ChartLilin({ lilin, garis, trade, tinggi = 420, hingga, garisHar
     p.setMarkers(tanda);
   }, [trade]);
 
-  return <div ref={kotak} style={{ height: tinggi }} className="w-full" />;
+  return (
+    <div className="relative">
+      <div ref={kotak} style={{ height: tinggi }} className="w-full" />
+
+      {/* Hitung mundur MENEMPEL di sisi skala harga, sejajar label harga
+          terakhir — sama seperti TradingView. Ditumpangkan sebagai elemen
+          biasa, bukan digambar ke kanvas: lightweight-charts tidak punya
+          jalan untuk menambah label di sana, dan menggambarnya sendiri
+          berarti ikut mengurus posisi tiap kali skalanya bergeser. */}
+      {mundur && (
+        <div className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 pr-1">
+          <span className="angka rounded bg-zinc-800/95 px-1.5 py-0.5 text-[10.5px] tabular-nums text-zinc-300 ring-1 ring-zinc-700">
+            {mundur}
+          </span>
+        </div>
+      )}
+
+      {pojok && <div className="absolute left-2 top-2 z-10">{pojok}</div>}
+    </div>
+  );
 }

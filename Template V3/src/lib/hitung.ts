@@ -171,3 +171,56 @@ export function plPerHari(trade: Trade[]) {
   });
   return peta;
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   RANGKUM LAYERING
+   ════════════════════════════════════════════════════════════════════════
+   Akun cent dengan layering membuka puluhan order kecil pada pair yang sama,
+   arah yang sama, di hari yang sama — dan itu SATU keputusan, bukan puluhan.
+   Menampilkannya sebagai puluhan baris membuat tabel riwayat tidak bisa
+   dibaca, dan lebih buruk: setiap ukuran yang dihitung per-transaksi
+   (winrate, konsistensi risiko, overtrading) jadi mengukur jumlah layer
+   alih-alih jumlah keputusan.
+
+   Dirangkum di sisi TAMPILAN saja. Dokumen aslinya di Firestore tetap satu
+   per tiket — merangkum di sumbernya berarti kehilangan kemampuan
+   menelusuri kembali ke transaksi broker yang sebenarnya.
+   ════════════════════════════════════════════════════════════════════════ */
+
+export interface TradeRangkum extends Trade {
+  /** Berapa transaksi asli yang menyusun baris ini. 1 = tidak dirangkum. */
+  lapis: number;
+}
+
+function kunciHariLokal(ms: number) {
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
+export function rangkumLayering(trade: Trade[]): TradeRangkum[] {
+  const peta = new Map<string, TradeRangkum>();
+
+  for (const t of trade) {
+    const k = `${t.pair}|${t.arah}|${kunciHariLokal(t.waktu)}`;
+    const ada = peta.get(k);
+    if (!ada) {
+      peta.set(k, { ...t, lapis: 1 });
+      continue;
+    }
+    ada.lapis += 1;
+    ada.lot = Number((ada.lot + t.lot).toFixed(6));
+    ada.pnl += t.pnl;
+    /* Waktu yang disimpan adalah yang PALING AKHIR — layering ditutup
+       bertahap, dan yang menandai selesainya keputusan itu adalah penutupan
+       terakhirnya. */
+    if (t.waktu > ada.waktu) ada.waktu = t.waktu;
+    if (t.nilaiOrder) ada.nilaiOrder = (ada.nilaiOrder ?? 0) + t.nilaiOrder;
+    /* Alasan & emosi diambil dari layer pertama yang punya — layer
+       berikutnya biasanya tanpa catatan karena ia lanjutan, bukan entri
+       baru. */
+    if (!ada.alasan && t.alasan) ada.alasan = t.alasan;
+    if (!ada.emosi && t.emosi) ada.emosi = t.emosi;
+  }
+
+  return [...peta.values()].map((x) => ({ ...x, pnl: Number(x.pnl.toFixed(2)) }));
+}

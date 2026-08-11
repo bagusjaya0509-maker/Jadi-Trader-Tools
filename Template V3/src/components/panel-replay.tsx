@@ -12,6 +12,14 @@ import {
 } from '@/lib/replay';
 import { simpanTrade } from '@/lib/tulis-jurnal';
 import type { GarisHarga } from '@/components/chart-lilin';
+
+export interface AksiOrder {
+  posisi: { arah: 'BUY' | 'SELL'; masuk: number; sl: number; tp: number; pnl: number } | null;
+  hargaKini?: number;
+  buka: (arah: 'BUY' | 'SELL') => void;
+  tutup: () => void;
+  mati: boolean;
+}
 import { KotakOrderNyata } from '@/components/kotak-order-nyata';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -27,13 +35,22 @@ const KELAS_ISIAN =
   'h-8 w-full rounded-md border border-zinc-800 bg-zinc-900/60 px-2 text-[12px] text-zinc-200 ' +
   'outline-none transition-colors hover:border-zinc-700 focus-visible:border-zinc-600';
 
-export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, tanpaBingkai = false }: {
+export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, aturAksi, usulSl, usulTp, tanpaBingkai = false }: {
   lilin: Lilin;
   simbol: string;
   tf: string;
   idx: number | null;
   setIdx: (n: number | null) => void;
   aturGaris: (g: GarisHarga[]) => void;
+  /* Aksi BUY/SELL diangkat ke halaman supaya tombolnya bisa dipasang di
+     POJOK CHART. Saat mengambil keputusan mata sedang di grafik, dan
+     memindahkan pandangan ke bawah layar adalah tempat paling sering orang
+     salah tekan arah. */
+  aturAksi?: (a: AksiOrder | null) => void;
+  /* SL & TP usulan dari kartu screener — mengisi kotak sekali, saat pertama
+     kali halaman dibuka dari sana. */
+  usulSl?: number;
+  usulTp?: number;
   /* Dipakai saat panel ini berada DI DALAM panel grafik: tanpa border dan
      tanpa margin sendiri, karena pembungkusnya sudah menyediakan keduanya. */
   tanpaBingkai?: boolean;
@@ -114,6 +131,22 @@ export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, tanpaBi
     setPesan(`${kena.kena} kena di ${fHarga(kena.harga)} — ${uang(pnl, true)}`);
   }, [idx, posisi, lilin]);
 
+  /* Aksi dikirim ke halaman tiap kali keadaannya berubah. */
+  useEffect(() => {
+    if (!aturAksi) return;
+    if (mode !== 'demo' || idx === null) { aturAksi(null); return; }
+    aturAksi({
+      posisi: posisi
+        ? { arah: posisi.arah, masuk: posisi.masuk, sl: posisi.sl, tp: posisi.tp,
+            pnl: hargaKini === undefined ? 0 : hitungPnl(posisi, hargaKini) }
+        : null,
+      hargaKini,
+      buka, tutup: tutupManual, mati: false,
+    });
+    return () => aturAksi(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, idx, posisi, hargaKini, aturAksi]);
+
   /* Garis entry/SL/TP dikirim ke chart. */
   useEffect(() => {
     aturGaris(posisi ? [
@@ -150,7 +183,15 @@ export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, tanpaBi
   function buka(arah: 'BUY' | 'SELL') {
     if (idx === null || posisi) return;
     const h = lilin.closes[idx];
-    const { sl, tp } = usulSlTp(lilin, idx, arah, kaliAtr, rr);
+    /* Level dari kartu screener dipakai kalau ada DAN masih masuk akal untuk
+       arah yang dipilih — SL di atas harga untuk BUY berarti kartunya untuk
+       arah sebaliknya, dan memakainya akan membuka posisi yang langsung
+       salah. Kalau tidak dipakai, jatuh ke usulan ATR. */
+    const sahUsul = usulSl && usulTp
+      && (arah === 'BUY' ? usulSl < h && usulTp > h : usulSl > h && usulTp < h);
+    const dariAtr = usulSlTp(lilin, idx, arah, kaliAtr, rr);
+    const sl = sahUsul ? usulSl! : dariAtr.sl;
+    const tp = sahUsul ? usulTp! : dariAtr.tp;
     if (!sl || !tp) { setPesan('ATR belum matang di bar ini — maju beberapa bar dulu.'); return; }
     const risiko = (modal + ringkas.bersih) * (risikoPersen / 100);
     const unit = risiko / Math.abs(h - sl);
