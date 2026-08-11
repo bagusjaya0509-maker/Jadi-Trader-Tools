@@ -1,8 +1,9 @@
-import { doc, setDoc, deleteDoc, collection, onSnapshot, Timestamp } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc, collection, onSnapshot, Timestamp, writeBatch } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import { db } from '@/lib/data';
 import { auth } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth';
+import { bacaKoneksi } from '@/lib/koneksi';
 import type { Sumber } from '@/data/contoh';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -149,4 +150,96 @@ export function arusBersih(daftar: Arus[], sumber: Sumber) {
   return daftar
     .filter((a) => a.sumber === sumber)
     .reduce((s, a) => s + (a.jenis === 'setor' ? a.nilai : -a.nilai), 0);
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   SINKRON RIWAYAT MT5
+   ════════════════════════════════════════════════════════════════════════
+   Jurnal Trade-Fi berhenti terisi setelah 9 Agustus, dan penyebabnya bukan
+   EA-nya: EA sudah mengirim 1131 transaksi tertutup ke backend dan terus
+   mengirim. Yang tidak ada adalah yang MEMBACANYA.
+
+   Jurnal forex di V2 memang selalu diketik tangan — sinkron otomatis di sana
+   hanya ada untuk Binance. Jadi transaksi MT5 tidak pernah punya jalan masuk
+   ke jurnal kecuali diketik ulang satu per satu.
+
+   Fungsi ini menutup jalur itu. Tidak ada berkas EA baru yang perlu dipasang.
+   ════════════════════════════════════════════════════════════════════════ */
+
+const PROXY_BAWAAN = 'https://103-253-145-38.sslip.io';
+
+export interface HasilSinkron {
+  ditemukan: number;
+  ditambah: number;
+  dilewati: number;
+}
+
+export async function sinkronRiwayatMt5(sudahAda: Set<string>): Promise<HasilSinkron> {
+  const u = auth.currentUser;
+  if (!u) throw new Error('Masuk dulu dengan akun Google.');
+
+  const dasar = (bacaKoneksi().url.trim() || PROXY_BAWAAN).replace(/\/+$/, '');
+  const token = await u.getIdToken();
+  const r = await fetch(`${dasar}/api/mt5/status`, { headers: { Authorization: 'Bearer ' + token } });
+  if (!r.ok) throw new Error(`Backend menjawab ${r.status}`);
+  const j = await r.json();
+
+  const riwayat: any[] = j?.data?.riwayat ?? [];
+  if (!riwayat.length) {
+    throw new Error(j?.terhubung
+      ? 'EA tersambung tapi belum mengirim riwayat. Tunggu satu siklus (20 detik) lalu coba lagi.'
+      : 'EA belum melapor. Pastikan Algo Trading menyala di MT5.');
+  }
+
+  /* Akun sen: nilainya harus dibagi 100, sama seperti saldo dan posisi. */
+  const mu: string | null = j?.data?.akun?.mataUang ?? null;
+  const sen = !!mu && /cent|USC/i.test(mu);
+
+  /* Firestore membatasi satu batch 500 operasi. Riwayat 1131 baris pada
+     sinkron pertama akan melewatinya dan SELURUH batch ditolak — jadi
+     dipecah, bukan diharapkan muat. */
+  const BATAS = 400;
+  let ditambah = 0, dilewati = 0;
+  let batch = writeBatch(db);
+  let dalamBatch = 0;
+
+  for (const t of riwayat) {
+    /* Id dari nomor tiket broker. Itulah yang membuat sinkron ulang aman:
+       transaksi yang sama selalu menghasilkan id yang sama, jadi menekan
+       tombolnya dua kali tidak menggandakan apa pun. */
+    const tiket = String(t.tiket ?? '');
+    if (!tiket) { dilewati++; continue; }
+    const id = `mt5-${tiket}`;
+    if (sudahAda.has(id)) { dilewati++; continue; }
+
+    const laba = Number(t.labaBersih ?? t.profit) || 0;
+    const simbol = String(t.simbol ?? '');
+    /* EA mengirim detik, Firestore menyimpan milidetik. */
+    const waktu = (Number(t.waktuTutup) || 0) * 1000;
+    if (!waktu) { dilewati++; continue; }
+
+    batch.set(doc(db, 'users', u.uid, 'transaksi', id), {
+      simbol,
+      arah: t.arah === 'SELL' ? 'SELL' : 'BUY',
+      /* XAU dipisahkan dari forex biasa — V2 memakai `xau` sebagai sumber
+         tersendiri, dan pembaca V3 sudah memperlakukan keduanya sebagai
+         Trade-Fi. Menyeragamkannya di sini akan membuat data lama dan data
+         baru bercerita beda tentang transaksi yang sejenis. */
+      sumber: /^XAU/i.test(simbol) ? 'xau' : 'forex',
+      ukuran: { lot: Number(t.lot) || 0 },
+      keluarHarga: Number(t.hargaTutup) || 0,
+      pnl: sen ? laba / 100 : laba,
+      masukWaktu: Timestamp.fromMillis(waktu),
+      keluarWaktu: Timestamp.fromMillis(waktu),
+      sebabKeluar: String(t.komentar ?? '').trim() || 'Ditutup di MT5',
+      _asal: 'mt5.riwayat',
+      _tiket: tiket,
+    }, { merge: true });
+
+    ditambah++; dalamBatch++;
+    if (dalamBatch >= BATAS) { await batch.commit(); batch = writeBatch(db); dalamBatch = 0; }
+  }
+
+  if (dalamBatch > 0) await batch.commit();
+  return { ditemukan: riwayat.length, ditambah, dilewati };
 }

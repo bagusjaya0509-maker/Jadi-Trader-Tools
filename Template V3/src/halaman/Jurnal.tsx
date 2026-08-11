@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-import { Plus, Pencil, Bitcoin, CandlestickChart, Link2, Link2Off } from 'lucide-react';
+import { Plus, Pencil, Bitcoin, CandlestickChart, Link2, Link2Off, RefreshCw } from 'lucide-react';
 import { Panel, PanelHead, KartuKpi, BadgeTren, TipGrafik, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn, uang, persen, tanggalPendek } from '@/lib/utils';
 import { statGabungan, kurvaEkuitas, plPerHari } from '@/lib/hitung';
@@ -11,7 +11,7 @@ import type { Trade, Sumber } from '@/data/contoh';
 import { useAkunMt5, useAkunBinance, type StatusAkun } from '@/lib/akun';
 import { ModalTrade } from '@/components/modal-trade';
 import { KotakArus } from '@/components/kotak-arus';
-import { useArusKas, arusBersih, type Arus } from '@/lib/tulis-jurnal';
+import { useArusKas, arusBersih, sinkronRiwayatMt5, type Arus } from '@/lib/tulis-jurnal';
 import { Link } from 'react-router-dom';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -172,6 +172,26 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
   /* null = tertutup, 'baru' = tambah, objek Trade = sunting. Satu state untuk
      tiga keadaan; dua boolean terpisah selalu bisa menyala berbarengan. */
   const [modal, setModal] = useState<'baru' | Trade | null>(null);
+  const [sinkron, setSinkron] = useState<{ sibuk: boolean; pesan: string }>({ sibuk: false, pesan: '' });
+
+  async function tarikDariMt5() {
+    setSinkron({ sibuk: true, pesan: '' });
+    try {
+      /* Id yang sudah ada dikirim sebagai himpunan supaya penyaringan terjadi
+         SEBELUM menulis. Menulis ulang 1131 dokumen tiap sinkron akan
+         menghabiskan kuota tulis untuk data yang sudah sama persis. */
+      const sudah = new Set(trade.map((x) => x.id));
+      const h = await sinkronRiwayatMt5(sudah);
+      setSinkron({
+        sibuk: false,
+        pesan: h.ditambah
+          ? `${h.ditambah} transaksi baru masuk jurnal (dari ${h.ditemukan} riwayat MT5).`
+          : `Sudah mutakhir — ${h.ditemukan} riwayat MT5, semuanya sudah ada di jurnal.`,
+      });
+    } catch (e) {
+      setSinkron({ sibuk: false, pesan: e instanceof Error ? e.message : 'Gagal menarik riwayat' });
+    }
+  }
   const pl = useMemo(() => plPerHari(trade), [trade]);
 
   const emosi = useMemo(() => {
@@ -256,14 +276,31 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
                 judul="Riwayat Trade"
                 sub={`40 transaksi terakhir dari ${trade.length}.`}
                 kanan={
+                  <span className="flex items-center gap-2">
+                  {/* Sinkron MT5 hanya di jurnal Trade-Fi — jurnal kripto sudah
+                      terisi sendiri lewat screener V2. */}
+                  {sumber === 'forex' && (
+                    <button onClick={() => void tarikDariMt5()} disabled={!bisaTulis || sinkron.sibuk}
+                      title="Tarik transaksi tertutup dari MetaTrader 5"
+                      className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100 disabled:cursor-not-allowed disabled:opacity-50">
+                      <RefreshCw className={cn('size-3.5', sinkron.sibuk && 'animate-spin')} />
+                      {sinkron.sibuk ? 'Menarik…' : 'Sinkron MT5'}
+                    </button>
+                  )}
                   <button onClick={() => setModal('baru')} disabled={!bisaTulis}
                     title={bisaTulis ? undefined : 'Masuk dulu untuk menambah catatan'}
                     className="flex cursor-pointer items-center gap-1.5 rounded-md bg-zinc-100 px-3 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50">
                     <Plus className="size-3.5" /> Tambah
                   </button>
+                  </span>
                 }
               />
               <div className="px-5 pb-5">
+                {sinkron.pesan && (
+                  <div className="mb-3 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-2 text-[12px] text-zinc-400">
+                    {sinkron.pesan}
+                  </div>
+                )}
                 <TabelBungkus className="max-h-[380px] overflow-y-auto">
                   <Tabel>
                     <thead className="sticky top-0 bg-zinc-950">
