@@ -25,14 +25,24 @@ const KELAS_ISIAN =
   'h-8 w-full rounded-md border border-zinc-800 bg-zinc-900/60 px-2 text-[12px] text-zinc-200 ' +
   'outline-none transition-colors hover:border-zinc-700 focus-visible:border-zinc-600';
 
-export function KotakOrderNyata({ simbol, hargaKini }: { simbol: string; hargaKini?: number }) {
+export function KotakOrderNyata({ simbol, hargaKini, arahTerkunci, slAwal, tpAwal, onBatal }: {
+  simbol: string;
+  hargaKini?: number;
+  /* Arah yang SUDAH dipilih di tiket chart. Kalau ada, kotak ini tidak lagi
+     menawarkan dua tombol — menawarkan arah lagi setelah arahnya dipilih
+     adalah kesempatan kedua untuk salah tekan, bukan keleluasaan. */
+  arahTerkunci?: 'BUY' | 'SELL';
+  slAwal?: number;
+  tpAwal?: number;
+  onBatal?: () => void;
+}) {
   const koneksi = bacaKoneksi();
   const siap = koneksiLengkap(koneksi);
 
   const [modal, setModal] = useState(100);
   const [leverage, setLeverage] = useState(4);
-  const [sl, setSl] = useState('');
-  const [tp, setTp] = useState('');
+  const [sl, setSl] = useState(slAwal ? String(slAwal) : '');
+  const [tp, setTp] = useState(tpAwal ? String(tpAwal) : '');
   const [sibuk, setSibuk] = useState(false);
   const [kabar, setKabar] = useState('');
   const [gagal, setGagal] = useState(false);
@@ -95,10 +105,18 @@ export function KotakOrderNyata({ simbol, hargaKini }: { simbol: string; hargaKi
     <div className="rounded-lg border border-red-500/25 bg-red-500/[0.03] p-3">
       <div className="mb-2.5 flex items-center gap-2">
         <Radio className="size-3.5 text-red-400" />
-        <span className="text-[11.5px] font-medium uppercase tracking-wider text-red-400">Live · order sungguhan</span>
+        <span className="text-[11.5px] font-medium uppercase tracking-wider text-red-400">
+          Live · order sungguhan{arahTerkunci ? ` · ${arahTerkunci} ${simbol}` : ''}
+        </span>
         <span className="ml-auto text-[11.5px] text-zinc-500">
           Nilai order <span className="angka text-zinc-300">{uang(nilaiOrder)}</span>
         </span>
+        {onBatal && (
+          <button onClick={onBatal}
+            className="cursor-pointer rounded border border-zinc-700 px-2 py-0.5 text-[11px] text-zinc-400 transition-colors hover:border-zinc-500 hover:text-zinc-200">
+            Batal
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-6">
@@ -118,14 +136,26 @@ export function KotakOrderNyata({ simbol, hargaKini }: { simbol: string; hargaKi
           <label className="mb-1 block text-[11px] text-zinc-500">TP (opsional)</label>
           <input value={tp} onChange={(e) => setTp(e.target.value)} inputMode="decimal" className={cn(KELAS_ISIAN, 'angka')} />
         </div>
-        <button onClick={() => void kirim('BUY')} disabled={sibuk}
-          className="mt-[18px] flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-md bg-emerald-500/20 text-[12px] font-semibold text-emerald-300 transition-colors hover:bg-emerald-500/30 disabled:opacity-50">
-          {sibuk ? <Loader2 className="size-3.5 animate-spin" /> : null} BUY
-        </button>
-        <button onClick={() => void kirim('SELL')} disabled={sibuk}
-          className="mt-[18px] flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-md bg-red-500/20 text-[12px] font-semibold text-red-300 transition-colors hover:bg-red-500/30 disabled:opacity-50">
-          {sibuk ? <Loader2 className="size-3.5 animate-spin" /> : null} SELL
-        </button>
+        {arahTerkunci ? (
+          <button onClick={() => void kirim(arahTerkunci)} disabled={sibuk}
+            className={cn('mt-[18px] flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-md text-[12px] font-semibold transition-colors disabled:opacity-50 sm:col-span-2',
+              arahTerkunci === 'BUY'
+                ? 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30'
+                : 'bg-red-500/20 text-red-300 hover:bg-red-500/30')}>
+            {sibuk ? <Loader2 className="size-3.5 animate-spin" /> : null} Kirim {arahTerkunci} sungguhan
+          </button>
+        ) : (
+          <>
+            <button onClick={() => void kirim('BUY')} disabled={sibuk}
+              className="mt-[18px] flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-md bg-emerald-500/20 text-[12px] font-semibold text-emerald-300 transition-colors hover:bg-emerald-500/30 disabled:opacity-50">
+              {sibuk ? <Loader2 className="size-3.5 animate-spin" /> : null} BUY
+            </button>
+            <button onClick={() => void kirim('SELL')} disabled={sibuk}
+              className="mt-[18px] flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-md bg-red-500/20 text-[12px] font-semibold text-red-300 transition-colors hover:bg-red-500/30 disabled:opacity-50">
+              {sibuk ? <Loader2 className="size-3.5 animate-spin" /> : null} SELL
+            </button>
+          </>
+        )}
       </div>
 
       {kabar && (

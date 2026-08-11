@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Play, Loader2, RefreshCw, Radio, TriangleAlert, History } from 'lucide-react';
 import { Panel, PanelHead, KartuKpi, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
@@ -6,6 +6,7 @@ import { cn, uang, persen, harga, tanggalPendek } from '@/lib/utils';
 import { ChartLilin, type Garis, type GarisHarga, type GarisSeret } from '@/components/chart-lilin';
 import { PanelReplay, type AksiOrder } from '@/components/panel-replay';
 import { PojokOrder } from '@/components/pojok-order';
+import { KotakOrderNyata } from '@/components/kotak-order-nyata';
 import { PanelPine } from '@/components/panel-pine';
 import type { HasilPine } from '@/lib/pine';
 import { bacaSetelanChart, simpanSetelanChart } from '@/lib/replay';
@@ -111,6 +112,17 @@ export default function ChartBacktest() {
   const [aksi, setAksi] = useState<AksiOrder | null>(null);
   const [pine, setPine] = useState<HasilPine | null>(null);
   const [kendaliReplay, setKendaliReplay] = useState<React.ReactNode>(null);
+  /* Arah tiket yang sedang disusun. null = belum ada tiket, chart cuma
+     menggambar rencana dari kartu screener kalau ada. */
+  const [draf, setDraf] = useState<'BUY' | 'SELL' | null>(null);
+  /* Tiket order SUNGGUHAN yang sudah dikonfirmasi arahnya di chart, menunggu
+     konfirmasi kedua berisi angka. Uang sungguhan tidak berangkat dari satu
+     tombol di atas grafik. */
+  const [tiketNyata, setTiketNyata] = useState<{ arah: 'BUY' | 'SELL'; sl: number; tp: number } | null>(null);
+  const mulaiReplay = useRef<(() => void) | null>(null);
+  /* Stabil dengan sengaja: fungsi baru tiap render akan memicu ulang efek
+     yang memasangnya di panel replay, dan efek itu memanggil setState. */
+  const simpanMulai = useCallback((f: (() => void) | null) => { mulaiReplay.current = f; }, []);
 
   /* SL & TP dari kartu screener, dibaca dari alamat. Dipakai sekali sebagai
      usulan saat membuka posisi replay — bukan dipaksakan, karena arah yang
@@ -152,11 +164,6 @@ export default function ChartBacktest() {
 
   const usulSl = rencana.sl;
   const usulTp = rencana.tp;
-  /* Panel replay hidup DI DALAM panel grafik, muncul lewat ikon. Sebagai
-     panel terpisah ia mendorong grafik ke atas layar setiap kali dibuka —
-     dan grafik yang bergeser saat sedang dibaca adalah gangguan, bukan
-     tata letak. */
-  const [bukaReplay, setBukaReplay] = useState(false);
   /* Zona SNR dari logika yang sama dengan screener. Dimatikan secara bawaan:
      empat garis mendatar di chart yang belum dibaca cuma menutupi lilinnya. */
   const [tampilSnr, setTampilSnr] = useState(awal.snr ?? false);
@@ -285,6 +292,18 @@ export default function ChartBacktest() {
      Batas lilin di Binance selalu kelipatan bulat dari durasinya sejak
      epoch (00:00, 04:00, 08:00 untuk 4 jam), jadi sisa waktunya bisa
      dihitung tanpa tahu kapan lilin terakhir dibuka. */
+  /* Teks yang sedang diketik di kotak simbol, terpisah dari simbol aktif. */
+  const [ketik, setKetik] = useState(simbol);
+  useEffect(() => { setKetik(simbol); }, [simbol]);
+  function komitSimbol() {
+    const v = ketik.trim().toUpperCase();
+    /* Bentuk yang jelas bukan simbol tidak dikirim ke proxy sama sekali;
+       kotaknya dikembalikan ke simbol yang sedang tampil supaya tidak ada
+       yang mengira grafiknya sedang menampilkan apa yang tertulis. */
+    if (!/^[A-Z0-9]{5,15}$/.test(v)) { setKetik(simbol); return; }
+    if (v !== simbol) setSimbol(v);
+  }
+
   const [detik, setDetik] = useState(0);
   useEffect(() => {
     const durasi = DURASI_TF[tf] ?? 0;
@@ -313,8 +332,25 @@ export default function ChartBacktest() {
         <div className="flex flex-wrap items-end gap-3 p-4">
           <div className="min-w-[168px]">
             <label className="mb-1 block text-[11px] text-zinc-500">Simbol</label>
-            <input list="simbolChart" value={simbol}
-                   onChange={(e) => setSimbol(e.target.value.toUpperCase())}
+            {/* Diketik dulu, DIKOMIT belakangan.
+                ──────────────────────────────────────────────────────────
+                Sebelumnya tiap huruf langsung jadi simbol aktif: mengetik
+                "ETHUSDT" menembakkan tujuh permintaan ke proxy, enam di
+                antaranya untuk simbol yang tidak ada ("E", "ET", "ETH"…).
+                Yang terlihat adalah halaman tersendat lalu grafiknya hilang
+                diganti pesan galat — bukan karena pencariannya rusak, tapi
+                karena setiap ketukan diperlakukan sebagai keputusan. */}
+            <input list="simbolChart" value={ketik}
+                   onChange={(e) => {
+                     const v = e.target.value.toUpperCase();
+                     setKetik(v);
+                     /* Memilih dari daftar langsung berlaku — itu memang
+                        sebuah pilihan, bukan setengah kata. */
+                     if (SIMBOL_DASAR.includes(v)) setSimbol(v);
+                   }}
+                   onKeyDown={(e) => { if (e.key === 'Enter') komitSimbol(); }}
+                   onBlur={komitSimbol}
+                   placeholder="BTCUSDT"
                    className={cn(KELAS_ISIAN, 'angka')} />
             <datalist id="simbolChart">
               {SIMBOL_DASAR.map((s) => <option key={s} value={s} />)}
@@ -364,8 +400,11 @@ export default function ChartBacktest() {
                      className="size-3.5 cursor-pointer accent-zinc-200" />
               SMI
             </label>
-            <button onClick={() => setBukaReplay((v) => !v)}
-              title={bukaReplay ? 'Sembunyikan panel replay' : 'Buka panel replay'}
+            <button onClick={() => {
+                if (replayIdx !== null) { setReplayIdx(null); return; }
+                mulaiReplay.current?.();
+              }}
+              title={replayIdx !== null ? 'Keluar dari replay' : 'Mulai replay dari 60% data'}
               className={cn('flex cursor-pointer items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[12px] transition-colors',
                 replayIdx !== null
                   ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400'
@@ -397,8 +436,38 @@ export default function ChartBacktest() {
                           mundur={DURASI_TF[tf] ? jamMundur(detik) : undefined}
                           hamparanBawah={kendaliReplay}
                           pojok={aksi ? (
-                            <PojokOrder posisi={aksi.posisi} hargaKini={aksi.hargaKini}
-                                        onBuka={aksi.buka} onTutup={aksi.tutup} mati={aksi.mati} />
+                            <PojokOrder
+                              posisi={aksi.posisi} hargaKini={aksi.hargaKini}
+                              draf={draf} rencana={rencana} mode={aksi.mode}
+                              onGantiMode={(m) => { aksi.gantiMode(m); setTiketNyata(null); }}
+                              onPilih={(arah) => {
+                                setDraf(arah);
+                                setTiketNyata(null);
+                                /* Level yang SUDAH dipasang orangnya dipertahankan
+                                   selama masih benar sisinya untuk arah ini.
+                                   Menimpanya dengan usulan ATR akan membuang
+                                   angka dari kartu screener yang baru saja
+                                   diklik — dan itu justru alasan halaman ini
+                                   dibuka. */
+                                const e = rencana.entry ?? aksi.hargaKini;
+                                const sisiBenar = e && rencana.sl && rencana.tp
+                                  && (arah === 'BUY'
+                                    ? rencana.sl < e && rencana.tp > e
+                                    : rencana.sl > e && rencana.tp < e);
+                                if (sisiBenar) { setRencana((r) => ({ ...r, entry: e })); return; }
+                                const u = aksi.usul(arah);
+                                if (u) setRencana({ entry: u.entry, sl: u.sl || undefined, tp: u.tp || undefined });
+                              }}
+                              onUbah={setRencana}
+                              onBatal={() => { setDraf(null); setTiketNyata(null); }}
+                              onKirim={() => {
+                                const { entry, sl, tp } = rencana;
+                                if (!draf || !entry || !sl || !tp) return;
+                                if (aksi.mode === 'real') { setTiketNyata({ arah: draf, sl, tp }); setDraf(null); return; }
+                                aksi.kirim(draf, { entry, sl, tp });
+                                setDraf(null);
+                              }}
+                              onTutup={aksi.tutup} mati={aksi.mati} />
                           ) : undefined} />
             : <div className="flex h-[440px] items-center justify-center text-[12.5px] text-zinc-600">
                 {memuat ? 'Memuat lilin…' : 'Tidak ada data untuk simbol ini.'}
@@ -412,12 +481,26 @@ export default function ChartBacktest() {
         {/* SELALU terpasang, tampil hanya saat dibuka. Efeknya tetap jalan
             meski tidak menggambar apa pun — itulah yang membuat tombol
             BUY/SELL di pojok chart tersedia sejak halaman dibuka. */}
-        <div className={cn(bukaReplay || replayIdx !== null ? 'border-t border-zinc-800/80' : 'hidden')}>
+        {/* Tiket order SUNGGUHAN — langkah kedua, dengan konfirmasi berisi
+            angka. Arah dan level sudah dipilih di chart; yang tersisa di sini
+            adalah ukuran uangnya, dan itu tidak boleh berangkat dari satu
+            tombol kecil di atas grafik. */}
+        {tiketNyata && (
+          <div className="border-t border-zinc-800/80 p-4">
+            <KotakOrderNyata simbol={simbol} hargaKini={terakhir}
+                             arahTerkunci={tiketNyata.arah}
+                             slAwal={tiketNyata.sl} tpAwal={tiketNyata.tp}
+                             onBatal={() => setTiketNyata(null)} />
+          </div>
+        )}
+
+        <div className={cn(replayIdx !== null ? 'border-t border-zinc-800/80' : 'hidden')}>
           <PanelReplay lilin={lilin} simbol={simbol} tf={tf} idx={replayIdx}
                        setIdx={setReplayIdx} aturGaris={setGarisHarga}
                        aturAksi={setAksi} aturKendali={setKendaliReplay}
+                       aturMulai={simpanMulai}
                        usulSl={usulSl} usulTp={usulTp}
-                       tampil={bukaReplay || replayIdx !== null}
+                       tampil={replayIdx !== null}
                        tanpaBingkai />
         </div>
       </Panel>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import {
   createChart, CandlestickSeries, LineSeries, createSeriesMarkers,
   type IChartApi, type ISeriesApi, type ISeriesMarkersPluginApi, type IPriceLine, type Time,
@@ -228,14 +228,28 @@ export function ChartLilin({
     p.setMarkers(tanda);
   }, [trade]);
 
-  /* ── Menerjemahkan harga -> koordinat layar ────────────────────────
-     Dipakai label harga dan garis seret. Disegarkan tiap 200 ms, bukan
-     dihitung sekali: skala harga bergeser saat orang men-zoom, menggeser,
-     atau saat lilin baru masuk — dan tidak ada satu peristiwa pun yang
-     menandai semuanya. Satu panggilan `priceToCoordinate` per 200 ms terlalu
-     murah untuk diperdebatkan. */
-  const [koordinat, setKoordinat] = useState<Record<string, number>>({});
+  /* ── Menempelkan hamparan ke skala harga ───────────────────────────
+     Posisinya ditulis LANGSUNG ke gaya elemennya di dalam
+     requestAnimationFrame, bukan lewat state React.
+
+     Sebelumnya ini setInterval 200 ms yang memanggil setState. Dua akibatnya
+     terasa keduanya: label bergerak dalam langkah 200 ms sementara kanvasnya
+     bergerak tiap frame — jadi saat grafik digeser naik-turun labelnya
+     tertinggal di belakang dan terlihat lepas dari harganya; dan tiap
+     perpindahan memaksa React menggambar ulang seluruh chart.
+
+     Menulis style.top di dalam rAF membuat label dan kanvas bergerak pada
+     frame yang SAMA, dan React tidak dilibatkan sama sekali. */
+  const labelRef = useRef<HTMLDivElement>(null);
+  const garisRef = useRef<Map<string, HTMLDivElement>>(new Map());
+  const hamparanRef = useRef<HTMLDivElement>(null);
   const seret = useRef<{ id: string; mulaiY: number } | null>(null);
+
+  /* Nilai terbaru dibaca dari ref di dalam rAF. Kalau dibaca dari closure,
+     loopnya harus dipasang ulang tiap render — dan itu mengalahkan
+     tujuannya. */
+  const acuan = useRef({ garisSeret, lilin, hingga });
+  acuan.current = { garisSeret, lilin, hingga };
 
   const hargaDariY = useCallback((y: number) => {
     const s = seri.current;
@@ -245,25 +259,63 @@ export function ChartLilin({
     return typeof v === 'number' && isFinite(v) ? v : null;
   }, []);
 
-  useEffect(() => {
-    const hitung = () => {
-      const s = seri.current;
-      if (!s) return;
-      const out: Record<string, number> = {};
-      (garisSeret ?? []).forEach((g) => {
-        const y = s.priceToCoordinate(g.harga);
-        if (typeof y === 'number') out[g.id] = y;
-      });
-      const t = lilin.closes.length
-        ? s.priceToCoordinate(lilin.closes[(hingga === undefined ? lilin.closes.length : Math.min(lilin.closes.length, hingga + 1)) - 1])
-        : null;
-      if (typeof t === 'number') out.__harga = t;
-      setKoordinat(out);
+  const pasang = useCallback(() => {
+    const s = seri.current, c = chart.current;
+    if (!s || !c) return;
+    const { garisSeret: gs, lilin: l, hingga: hg } = acuan.current;
+
+    /* Lebar skala harga dibaca tiap kali, bukan sekali: ia berubah sendiri
+       begitu angkanya bertambah satu digit. */
+    let lebar = 0;
+    try { lebar = c.priceScale('right').width(); } catch { /* versi lama */ }
+
+    const taruh = (el: HTMLDivElement | undefined | null, nilai: number | undefined) => {
+      if (!el) return;
+      const y = nilai === undefined ? null : s.priceToCoordinate(nilai);
+      if (typeof y === 'number' && isFinite(y)) {
+        el.style.top = y + 'px';
+        el.style.visibility = 'visible';
+      } else {
+        el.style.visibility = 'hidden';
+      }
     };
-    hitung();
-    const jam = setInterval(hitung, 200);
-    return () => clearInterval(jam);
-  }, [garisSeret, lilin, hingga]);
+
+    (gs ?? []).forEach((g) => taruh(garisRef.current.get(g.id), g.harga));
+
+    const n = hg === undefined ? l.closes.length : Math.min(l.closes.length, hg + 1);
+    taruh(labelRef.current, l.closes[n - 1]);
+    if (labelRef.current && lebar) labelRef.current.style.width = lebar + 'px';
+
+    /* Kendali replay berhenti tepat di garis harga, tidak menerobos ke bawah
+       skalanya — panel yang menutupi angka harga membuat satu-satunya hal
+       yang selalu ingin dibaca jadi tidak terbaca. */
+    if (hamparanRef.current) hamparanRef.current.style.right = (lebar + 4) + 'px';
+  }, []);
+
+  /* Dipasang SEKALI segera setelah menggambar, di luar rAF.
+     ────────────────────────────────────────────────────────────────────
+     requestAnimationFrame berhenti total saat tabnya tidak terlihat. Tanpa
+     panggilan langsung ini, membuka halaman di tab latar lalu berpindah ke
+     sana akan menampilkan garis dan label yang belum punya posisi. */
+  useEffect(pasang, [pasang, garisSeret, lilin, hingga, mundur, smi]);
+
+  useEffect(() => {
+    let raf = 0;
+    const tik = () => { raf = requestAnimationFrame(tik); pasang(); };
+    raf = requestAnimationFrame(tik);
+    /* Tab yang kembali terlihat memasang ulang segera — rAF baru bangun satu
+       frame kemudian, dan satu frame dengan label di tempat lama sudah cukup
+       untuk terlihat seperti label yang lepas. */
+    const bangun = () => { if (!document.hidden) pasang(); };
+    document.addEventListener('visibilitychange', bangun);
+    return () => { cancelAnimationFrame(raf); document.removeEventListener('visibilitychange', bangun); };
+  }, [pasang]);
+
+  /* Label harga bawaan dimatikan saat kita menggambar penggantinya sendiri —
+     dua label di tempat yang sama saling menimpa. */
+  useEffect(() => {
+    seri.current?.applyOptions({ lastValueVisible: !mundur });
+  }, [mundur]);
 
   /* ── Menyeret ──────────────────────────────────────────────────────
      Pendengar dipasang di window, bukan di garisnya: kalau kursor keluar
@@ -302,39 +354,48 @@ export function ChartLilin({
     chart.current?.applyOptions({ handleScroll: false, handleScale: false });
   }
 
-  const hargaTerakhir = lilin.closes.length
-    ? lilin.closes[(hingga === undefined ? lilin.closes.length : Math.min(lilin.closes.length, hingga + 1)) - 1]
-    : undefined;
+  const idxAkhir = (hingga === undefined ? lilin.closes.length : Math.min(lilin.closes.length, hingga + 1)) - 1;
+  const hargaTerakhir = idxAkhir >= 0 ? lilin.closes[idxAkhir] : undefined;
+  /* Warna mengikuti arah lilin terakhir — aturan yang SAMA dengan label
+     bawaan lightweight-charts yang baru saja dimatikan. Menggantinya dengan
+     satu warna tetap justru membuat penggantinya terlihat seperti tempelan,
+     karena ia jadi satu-satunya hal di chart yang tidak ikut aturan. */
+  const naik = idxAkhir >= 0 && lilin.closes[idxAkhir] >= lilin.opens[idxAkhir];
 
   return (
     <div className="relative">
       <div ref={kotak} style={{ height: tinggi }} className="w-full" />
 
-      {/* Harga + hitung mundur dalam SATU kotak, menempel di garis harga —
-          sama seperti TradingView. Dua kotak terpisah bergeser sendiri-sendiri
-          saat skalanya berubah dan terbaca sebagai dua hal yang tak
-          berhubungan; yang sebenarnya terjadi adalah satu hal: harga sekarang,
-          dan berapa lama lagi lilinnya menutup. */}
-      {mundur && hargaTerakhir !== undefined && koordinat.__harga !== undefined && (
-        <div className="pointer-events-none absolute right-0 z-10 pr-0.5"
-             style={{ top: koordinat.__harga, transform: 'translateY(-50%)' }}>
-          <div className="flex flex-col items-end rounded bg-zinc-100 px-1.5 py-0.5 leading-tight text-zinc-950 shadow">
-            <span className="angka text-[10.5px] font-medium tabular-nums">{fHarga(hargaTerakhir)}</span>
-            <span className="angka text-[9.5px] tabular-nums opacity-70">{mundur}</span>
-          </div>
+      {/* Hitung mundur DI DALAM label harga, bukan di sebelahnya.
+          ────────────────────────────────────────────────────────────────
+          Ini MENGGANTI label bawaan lightweight-charts, bukan menumpuk di
+          atasnya: lebarnya diambil dari lebar skala harga yang sebenarnya,
+          dan posisinya ditulis tiap frame — jadi ia menempati tempat yang
+          sama persis dengan label yang tadi dimatikan. Itulah beda
+          "tertanam" dengan "tempelan": bukan warnanya, tapi apakah ia
+          bergerak pada frame yang sama dengan kanvasnya. */}
+      {mundur && hargaTerakhir !== undefined && (
+        <div ref={labelRef}
+             className={cn('angka pointer-events-none absolute right-0 z-10 px-1 py-[3px] text-center leading-[1.15] tabular-nums',
+               naik ? 'bg-emerald-500 text-zinc-950' : 'bg-red-400 text-zinc-950')}
+             style={{ transform: 'translateY(-50%)', visibility: 'hidden' }}>
+          <div className="text-[10.5px] font-medium">{fHarga(hargaTerakhir)}</div>
+          <div className="text-[9.5px] opacity-75">{mundur}</div>
         </div>
       )}
 
       {/* Garis entry / SL / TP yang bisa digeser. */}
       {(garisSeret ?? []).map((g) => {
-        const y = koordinat[g.id];
-        if (y === undefined) return null;
         const bisa = g.bisaSeret !== false && !!onSeret;
         return (
           <div key={g.id}
+               ref={(el) => {
+                 if (el) garisRef.current.set(g.id, el);
+                 else garisRef.current.delete(g.id);
+               }}
                className={cn('absolute left-0 right-0 z-10 flex items-center',
                  bisa ? 'cursor-ns-resize' : 'pointer-events-none')}
-               style={{ top: y, transform: 'translateY(-50%)', height: 14 }}
+               style={{ transform: 'translateY(-50%)', height: 14, visibility: 'hidden' }}
                onMouseDown={bisa ? (e) => mulaiSeret(g.id, e) : undefined}>
             <div className="h-px flex-1" style={{
               background: `repeating-linear-gradient(90deg, ${g.warna} 0 6px, transparent 6px 11px)`,
@@ -353,7 +414,7 @@ export function ChartLilin({
           terpisah di bawah chart — latarnya tembus supaya menyatu dengan
           grafiknya. */}
       {hamparanBawah && (
-        <div className="absolute inset-x-2 z-20" style={{ bottom: smi ? 132 : 34 }}>
+        <div ref={hamparanRef} className="absolute left-2 z-20" style={{ bottom: smi ? 132 : 34 }}>
           {hamparanBawah}
         </div>
       )}

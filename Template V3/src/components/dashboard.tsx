@@ -5,7 +5,7 @@ import {
 import { Wallet, Percent, TrendingUp, Scale, Clock } from 'lucide-react';
 import { Panel, PanelHead, KartuKpi, BadgeTren, TipGrafik, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn, uang, persen, harga, tanggalPendek } from '@/lib/utils';
-import { statGabungan, statPer, plPerBulan, saldoBulanIni } from '@/lib/hitung';
+import { statGabungan, statPer, plPerBulan, saldoDuaBulan, type Bulan } from '@/lib/hitung';
 
 import { useRiwayat, usePosisi, useSaldoAwal, terbitkanRingkasan } from '@/lib/data';
 import { useAuth } from '@/lib/auth';
@@ -44,16 +44,27 @@ function lalu(ms: number) {
   return hari < 30 ? `${hari} hari lalu` : tanggalPendek(ms);
 }
 
-function TipUang({ active, payload, label }: any) {
+
+/* Tooltip bulanan: total DAN rinciannya per jurnal.
+   ──────────────────────────────────────────────────────────────────────
+   Ditulis sendiri, bukan memakai TipUang bersama, karena yang perlu
+   dijawab di sini adalah pertanyaan yang cuma muncul di panel ini:
+   "kenapa angkanya beda dengan kalender jurnal saya?" */
+function TipBulan({ active, payload }: { active?: boolean; payload?: { payload: Bulan }[] }) {
   if (!active || !payload?.length) return null;
+  const b = payload[0].payload;
+  const baris = (nama: string, n: number) => (
+    <div className="flex items-center justify-between gap-6">
+      <span className="text-zinc-500">{nama}</span>
+      <span className={cn('angka', n >= 0 ? 'text-emerald-500' : 'text-red-400')}>{uang(n, true)}</span>
+    </div>
+  );
   return (
-    <div className="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 shadow-xl">
-      <div className="text-[11px] text-zinc-500">{label}</div>
-      {payload.map((p: any) => (
-        <div key={p.dataKey} className="angka text-[12.5px]" style={{ color: p.color }}>
-          {p.name}: {uang(p.value, true)}
-        </div>
-      ))}
+    <div className="rounded-lg border border-zinc-800 bg-zinc-950/95 px-3 py-2 text-[12px] shadow-lg backdrop-blur-sm">
+      <div className="mb-1.5 text-zinc-300">{b.bulan} · {b.trade} transaksi</div>
+      {baris('Trade-Fi', b.forex)}
+      {baris('Kripto', b.kripto)}
+      <div className="mt-1.5 border-t border-zinc-800 pt-1.5">{baris('Gabungan', b.pnl)}</div>
     </div>
   );
 }
@@ -94,7 +105,7 @@ export function Dashboard() {
      dengan angka karangan, jadi akun yang transaksinya baru mulai bulan ini
      tetap menampilkan lima bulan riwayat yang tidak pernah terjadi. */
   const perBulan = useMemo(() => plPerBulan(RIWAYAT), [RIWAYAT]);
-  const kurvaSaldo = useMemo(() => saldoBulanIni(RIWAYAT, modalTotal), [RIWAYAT, modalTotal]);
+  const kurvaSaldo = useMemo(() => saldoDuaBulan(RIWAYAT, modalTotal), [RIWAYAT, modalTotal]);
 
   const bulanIni = perBulan[perBulan.length - 1];
   const bulanLalu = perBulan[perBulan.length - 2];
@@ -104,8 +115,10 @@ export function Dashboard() {
     ? Number((((bulanIni.pnl - bulanLalu.pnl) / Math.abs(bulanLalu.pnl)) * 100).toFixed(1))
     : null;
 
-  const awalKurva = kurvaSaldo[0]?.saldo ?? saldoAwal;
-  const akhirKurva = kurvaSaldo[kurvaSaldo.length - 1]?.saldo ?? saldoAwal;
+  const titikIni = kurvaSaldo.filter((k) => k.ini !== null);
+  const adaBulanLalu = kurvaSaldo.some((k) => k.lalu !== null);
+  const awalKurva = titikIni[0]?.ini ?? saldoAwal;
+  const akhirKurva = titikIni[titikIni.length - 1]?.ini ?? saldoAwal;
   const selisihSaldo = awalKurva ? ((akhirKurva - awalKurva) / Math.abs(awalKurva)) * 100 : 0;
 
   /* Posisi MT5 NYATA dari EA, bukan tiga baris contoh yang ditulis di
@@ -148,7 +161,7 @@ export function Dashboard() {
       jumlah: stat.jumlah,
       winrate: Number((stat.winrate ?? 0).toFixed(1)),
       bersih: Number(stat.bersih.toFixed(2)),
-      kurva: kurvaSaldo.map((x) => x.saldo),
+      kurva: titikIni.map((x) => x.ini as number),
       tumbuh: Number(selisihSaldo.toFixed(1)),
       sejak: Math.min(...RIWAYAT.map((t) => t.waktu).filter((x) => x > 0)),
     };
@@ -210,23 +223,27 @@ export function Dashboard() {
       </div>
 
       {/* ── Dua grafik ── */}
-      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="mt-4 grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
         <Panel>
           <PanelHead
             judul="Hasil Trading Bulanan"
             sub={perBulan.length
-              ? `P/L per bulan · ${perBulan.length} bulan dengan transaksi`
+              ? `Trade-Fi + Kripto digabung · ${perBulan.length} bulan dengan transaksi`
               : 'Belum ada transaksi.'}
             kanan={trenBulan === null ? undefined : <BadgeTren nilai={trenBulan} />}
           />
-          <div className="h-[260px] px-2 pb-4">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-[220px] px-2 pb-4 sm:h-[260px]">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <BarChart data={perBulan} margin={{ top: 8, right: 12, left: 4, bottom: 0 }}>
                 <CartesianGrid vertical={false} stroke="rgba(255,255,255,.05)" />
                 <XAxis dataKey="bulan" tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} width={44}
                        tickFormatter={(v) => `$${v}`} />
-                <Tooltip cursor={{ fill: 'rgba(255,255,255,.04)' }} content={<TipUang />} />
+                {/* Tooltip yang MENYEBUT rinciannya. Batang di sini adalah
+                    Trade-Fi + Kripto; kalender di halaman Jurnal menampilkan
+                    satu jurnal saja. Keduanya benar — dan tanpa rincian yang
+                    bisa dibaca, selisihnya terbaca sebagai angka yang salah. */}
+                <Tooltip cursor={{ fill: 'rgba(255,255,255,.04)' }} content={<TipBulan />} />
                 {/* Warna batang mengikuti tanda P/L — bulan rugi tidak boleh
                     terlihat sama dengan bulan untung hanya karena tingginya
                     kebetulan mirip. */}
@@ -243,18 +260,27 @@ export function Dashboard() {
         <Panel>
           <PanelHead
             judul="Saldo Bulan Ini"
-            sub="Saldo berjalan per tanggal, dihitung dari transaksi jurnal."
-            kanan={kurvaSaldo.length > 1 ? <BadgeTren nilai={Number(selisihSaldo.toFixed(1))} /> : undefined}
+            sub={adaBulanLalu
+              ? 'Putih = bulan ini · abu putus-putus = bulan lalu pada tanggal yang sama.'
+              : 'Saldo berjalan per tanggal. Bulan lalu belum ada transaksinya, jadi belum ada pembanding.'}
+            kanan={titikIni.length > 1 ? <BadgeTren nilai={Number(selisihSaldo.toFixed(1))} /> : undefined}
           />
-          <div className="h-[260px] px-2 pb-4">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-[220px] px-2 pb-4 sm:h-[260px]">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <LineChart data={kurvaSaldo} margin={{ top: 8, right: 12, left: 4, bottom: 0 }}>
                 <CartesianGrid vertical={false} stroke="rgba(255,255,255,.05)" />
                 <XAxis dataKey="label" tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} minTickGap={20} />
                 <YAxis tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} width={44}
                        tickFormatter={(v) => `$${v}`} domain={['dataMin - 10', 'dataMax + 10']} />
                 <Tooltip content={<TipGrafik />} cursor={{ stroke: 'rgba(255,255,255,.12)' }} />
-                <Line type="monotone" dataKey="saldo" name="Saldo" stroke="#fafafa" strokeWidth={1.8} dot={false} />
+                {/* Bulan lalu digambar DULU supaya garis bulan ini ada di
+                    atasnya — yang sedang berjalan adalah yang dibaca. */}
+                {adaBulanLalu && (
+                  <Line type="monotone" dataKey="lalu" name="Bulan lalu" stroke="#71717a" strokeWidth={1.4}
+                        strokeDasharray="4 4" dot={false} connectNulls />
+                )}
+                <Line type="monotone" dataKey="ini" name="Bulan ini" stroke="#fafafa" strokeWidth={1.8}
+                      dot={false} connectNulls />
               </LineChart>
             </ResponsiveContainer>
           </div>

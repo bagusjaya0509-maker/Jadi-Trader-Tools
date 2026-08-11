@@ -500,16 +500,27 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
               Sekarang kurva memakai tinggi secukupnya, dan sisa ruangnya
               diisi panel posisi terbuka — yang memang ingin dilihat
               berdampingan dengan kurva. */}
+          {/* `min-w-0` BUKAN hiasan.
+              ────────────────────────────────────────────────────────────
+              Item grid bawaannya `min-width: auto`, artinya ia menolak
+              menyusut lebih kecil dari isinya. Recharts mengukur lebar dari
+              induknya, jadi begitu jendela dikecilkan induknya tidak ikut
+              menyusut, chart mempertahankan lebar lamanya, dan panelnya
+              menonjol keluar kolom. Tanpa `min-w-0` tata letak ini hanya
+              rapi di lebar tempat ia pertama kali digambar. */}
           <div className="mt-4 grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
-            <div className="space-y-4 lg:col-span-2">
+            <div className="min-w-0 space-y-4 lg:col-span-2">
             <Panel>
               <PanelHead
                 judul="Kurva Ekuitas"
                 sub={`Dari ${uang(saldoAwal)} ke ${uang(stat.saldo)} · ${trade.length} transaksi.`}
                 kanan={saldoAwal > 0 ? <BadgeTren nilai={Number(((stat.bersih / saldoAwal) * 100).toFixed(1))} /> : undefined}
               />
-              <div className="h-[280px] px-2 pb-2">
-                <ResponsiveContainer width="100%" height="100%">
+              {/* Tinggi ikut lebar layar: 280 px di layar lebar terasa pas,
+                  tapi di jendela sempit grafiknya jadi kotak tinggi yang
+                  memaksa gulir. */}
+              <div className="h-[220px] px-2 pb-2 sm:h-[280px]">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                   {/* `bottom: 4` + XAxis setinggi 26 px membuat labelnya duduk
                       di dasar kotak, bukan melayang di tengah ruang kosong.
                       Sebelumnya bottom 0 dengan pb-4 di pembungkusnya: sumbu
@@ -546,12 +557,12 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
             <PanelPosisiJurnal sumber={sumber} />
             </div>
 
-            <Panel>
+            <Panel className="min-w-0">
               <PanelHead judul="Kalender P/L" sub="Klik panah atau nama bulan untuk berpindah." />
               <div className="px-5 pb-5"><Kalender pl={pl} /></div>
             </Panel>
 
-            <Panel className="lg:col-span-2">
+            <Panel className="min-w-0 lg:col-span-2">
               <PanelHead
                 judul="Riwayat Trade"
                 sub={rangkum && barisTabel.length !== trade.length

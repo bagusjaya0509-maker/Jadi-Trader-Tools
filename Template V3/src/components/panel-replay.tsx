@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Play, Pause, SkipForward, RotateCcw, TrendingUp, TrendingDown, X, Save, Loader2, Trash2,
+  Play, Pause, SkipForward, RotateCcw, X, Save, Loader2, Trash2,
 } from 'lucide-react';
-import { Panel, PanelHead, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
+import { Panel, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn, uang, persen, harga as fHarga, tanggalPendek } from '@/lib/utils';
 import type { Lilin } from '@/lib/pasar';
 import {
@@ -16,11 +16,16 @@ import type { GarisHarga } from '@/components/chart-lilin';
 export interface AksiOrder {
   posisi: { arah: 'BUY' | 'SELL'; masuk: number; sl: number; tp: number; pnl: number } | null;
   hargaKini?: number;
-  buka: (arah: 'BUY' | 'SELL') => void;
+  /** Level USULAN untuk arah tertentu — dipakai saat tiket baru dibuka.
+   *  Sekadar titik awal: yang berlaku adalah angka setelah digeser. */
+  usul: (arah: 'BUY' | 'SELL') => { entry: number; sl: number; tp: number } | null;
+  /** Kirim order dengan level yang SUDAH ditetapkan orangnya. */
+  kirim: (arah: 'BUY' | 'SELL', level: { entry: number; sl: number; tp: number }) => void;
   tutup: () => void;
   mati: boolean;
+  mode: 'demo' | 'real';
+  gantiMode: (m: 'demo' | 'real') => void;
 }
-import { KotakOrderNyata } from '@/components/kotak-order-nyata';
 
 /* ════════════════════════════════════════════════════════════════════════
    PANEL REPLAY
@@ -35,7 +40,7 @@ const KELAS_ISIAN =
   'h-8 w-full rounded-md border border-zinc-800 bg-zinc-900/60 px-2 text-[12px] text-zinc-200 ' +
   'outline-none transition-colors hover:border-zinc-700 focus-visible:border-zinc-600';
 
-export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, aturAksi, aturKendali, usulSl, usulTp, tanpaBingkai = false, tampil = true }: {
+export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, aturAksi, aturKendali, aturMulai, usulSl, usulTp, tanpaBingkai = false, tampil = true }: {
   lilin: Lilin;
   simbol: string;
   tf: string;
@@ -56,6 +61,10 @@ export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, aturAks
   tanpaBingkai?: boolean;
   /* Kendali putar dikirim ke halaman untuk ditumpangkan DI ATAS grafik. */
   aturKendali?: (k: React.ReactNode | null) => void;
+  /* Tombol Replay di bilah atas memanggil ini. Dulu ia cuma membuka panel
+     berisi tombol "Mulai Replay" — dua tekanan untuk satu maksud, dan yang
+     pertama tidak menghasilkan apa pun selain panel. */
+  aturMulai?: (f: (() => void) | null) => void;
   /* false = komponennya tetap TERPASANG tapi tidak menggambar apa pun.
      Dipasang terus supaya tombol BUY/SELL di pojok chart tersedia sejak
      halaman dibuka — menyembunyikannya sampai tombol Replay ditekan berarti
@@ -105,7 +114,6 @@ export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, aturAks
 
   const ringkas = ringkasReplay(trade, modal);
   const hidup = idx !== null;
-  const hargaKini = hidup ? lilin.closes[idx] : undefined;
 
   /* ── Jalan otomatis ─────────────────────────────────────────────────
      Interval, bukan requestAnimationFrame: yang diinginkan adalah satu bar
@@ -155,18 +163,19 @@ export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, aturAks
 
   useEffect(() => {
     if (!aturAksi) return;
-    if (mode !== 'demo' || !lilin.closes.length) { aturAksi(null); return; }
+    if (!lilin.closes.length) { aturAksi(null); return; }
     aturAksi({
-      posisi: posisi
+      posisi: mode === 'demo' && posisi
         ? { arah: posisi.arah, masuk: posisi.masuk, sl: posisi.sl, tp: posisi.tp,
             pnl: hargaAktif === undefined ? 0 : hitungPnl(posisi, hargaAktif) }
         : null,
       hargaKini: hargaAktif,
-      buka, tutup: tutupManual, mati: false,
+      usul, kirim: buka, tutup: tutupManual, mati: false,
+      mode, gantiMode: setMode,
     });
     return () => aturAksi(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, idx, posisi, hargaAktif, lilin.closes.length, aturAksi]);
+  }, [mode, idx, posisi, hargaAktif, lilin.closes.length, aturAksi, kaliAtr, rr, usulSl, usulTp]);
 
   /* Garis entry/SL/TP dikirim ke chart. */
   useEffect(() => {
@@ -201,23 +210,35 @@ export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, aturAks
     setIdx(null); setMain(false); aturGaris([]);
   }, [setIdx, aturGaris]);
 
-  function buka(arah: 'BUY' | 'SELL') {
-    if (posisi || !lilin.closes.length) return;
+  /* Usulan level saat tiket dibuka — TITIK AWAL, bukan keputusan.
+     ──────────────────────────────────────────────────────────────────────
+     Level dari kartu screener dipakai kalau ada DAN masih masuk akal untuk
+     arah yang dipilih: SL di atas harga untuk BUY berarti kartunya untuk
+     arah sebaliknya, dan memakainya akan mengusulkan posisi yang langsung
+     salah. Kalau tidak dipakai, jatuh ke usulan ATR. */
+  function usul(arah: 'BUY' | 'SELL') {
+    if (!lilin.closes.length) return null;
     const h = lilin.closes[idxAktif];
-    /* Level dari kartu screener dipakai kalau ada DAN masih masuk akal untuk
-       arah yang dipilih — SL di atas harga untuk BUY berarti kartunya untuk
-       arah sebaliknya, dan memakainya akan membuka posisi yang langsung
-       salah. Kalau tidak dipakai, jatuh ke usulan ATR. */
     const sahUsul = usulSl && usulTp
       && (arah === 'BUY' ? usulSl < h && usulTp > h : usulSl > h && usulTp < h);
     const dariAtr = usulSlTp(lilin, idxAktif, arah, kaliAtr, rr);
     const sl = sahUsul ? usulSl! : dariAtr.sl;
     const tp = sahUsul ? usulTp! : dariAtr.tp;
-    if (!sl || !tp) { setPesan('ATR belum matang di bar ini — maju beberapa bar dulu.'); return; }
+    if (!sl || !tp) return { entry: h, sl: 0, tp: 0 };
+    return { entry: h, sl, tp };
+  }
+
+  /* Order berangkat dengan level yang SUDAH ditetapkan di tiket — termasuk
+     hasil menggeser garisnya di chart. Menghitung ulang SL di sini akan
+     membuang keputusan yang baru saja diambil orangnya. */
+  function buka(arah: 'BUY' | 'SELL', level: { entry: number; sl: number; tp: number }) {
+    if (posisi || !lilin.closes.length) return;
+    const { entry, sl, tp } = level;
+    if (!entry || !sl || !tp) { setPesan('Entry, SL, dan TP harus terisi.'); return; }
     const risiko = (modal + ringkas.bersih) * (risikoPersen / 100);
-    const unit = risiko / Math.abs(h - sl);
-    setPosisi({ id: 'p' + Date.now(), arah, masukIdx: idxAktif, masuk: h, sl, tp, unit, risiko });
-    setPesan(`${arah} di ${fHarga(h)} · SL ${fHarga(sl)} · TP ${fHarga(tp)}`);
+    const unit = risiko / Math.abs(entry - sl);
+    setPosisi({ id: 'p' + Date.now(), arah, masukIdx: idxAktif, masuk: entry, sl, tp, unit, risiko });
+    setPesan(`${arah} di ${fHarga(entry)} · SL ${fHarga(sl)} · TP ${fHarga(tp)} · risiko ${uang(risiko)}`);
   }
 
   function tutupManual() {
@@ -281,22 +302,21 @@ export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, aturAks
      mata bolak-balik antara grafik dan tombol untuk satu perbuatan yang
      sama. */
   const kendali = idx === null ? null : (
-    <div className="rounded-lg border border-zinc-800/80 bg-zinc-950/80 px-3 py-2 backdrop-blur-sm">
-{/* Kendali putar */}
-      <div className="flex flex-wrap items-center gap-2">
+    <div>
+      <div className="flex flex-wrap items-center gap-1.5">
         <button onClick={() => setMain(!main)}
-          className="flex size-9 cursor-pointer items-center justify-center rounded-md bg-zinc-100 text-zinc-950 transition-colors hover:bg-white">
+          className="flex size-8 cursor-pointer items-center justify-center rounded-md bg-zinc-100 text-zinc-950 transition-colors hover:bg-white">
           {main ? <Pause className="size-4" /> : <Play className="size-4" />}
         </button>
         <button onClick={majuSatu} title="Maju satu bar (→)"
-          className="flex size-9 cursor-pointer items-center justify-center rounded-md border border-zinc-800 text-zinc-300 transition-colors hover:border-zinc-700">
+          className="flex size-8 cursor-pointer items-center justify-center rounded-md border border-zinc-700/70 bg-zinc-900/70 text-zinc-300 transition-colors hover:border-zinc-600">
           <SkipForward className="size-4" />
         </button>
         <button onClick={mulai} title="Ulang dari awal"
-          className="flex size-9 cursor-pointer items-center justify-center rounded-md border border-zinc-800 text-zinc-400 transition-colors hover:border-zinc-700 hover:text-zinc-200">
+          className="flex size-8 cursor-pointer items-center justify-center rounded-md border border-zinc-700/70 bg-zinc-900/70 text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200">
           <RotateCcw className="size-4" />
         </button>
-        <div className="flex overflow-hidden rounded-md border border-zinc-800">
+        <div className="flex overflow-hidden rounded-md border border-zinc-700/70 bg-zinc-900/70">
           {KECEPATAN.map((k) => (
             <button key={k.x} onClick={() => setCepat(k.x)}
               className={cn('cursor-pointer px-2 py-1.5 text-[11.5px] transition-colors',
@@ -305,95 +325,66 @@ export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, aturAks
             </button>
           ))}
         </div>
-        <span className="ml-auto text-[11.5px] text-zinc-600">spasi = main/jeda · → = maju</span>
+        <span className="angka rounded bg-zinc-900/70 px-2 py-1 text-[11px] text-zinc-400">
+          bar {idx + 1}/{lilin.closes.length} · {tanggalPendek(lilin.times[idx])}
+        </span>
+        <button onClick={keluar} title="Keluar dari replay"
+          className="ml-auto flex cursor-pointer items-center gap-1 rounded-md border border-zinc-700/70 bg-zinc-900/70 px-2 py-1.5 text-[11.5px] text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200">
+          <X className="size-3.5" /> Keluar
+        </button>
       </div>
 
       {/* Bilah kemajuan — juga berfungsi sebagai penggeser */}
       <input type="range" min={20} max={lilin.closes.length - 1} value={idx}
              onChange={(e) => setIdx(Number(e.target.value))}
              aria-label="Posisi replay"
-             className="mt-3 w-full cursor-pointer accent-zinc-200" />
+             className="mt-2 w-full cursor-pointer accent-zinc-200" />
     </div>
   );
 
+  /* Dikirim ulang HANYA saat isinya benar-benar berubah.
+     ──────────────────────────────────────────────────────────────────────
+     Efek ini dulu tanpa daftar dependensi sama sekali, jadi ia jalan tiap
+     render dan memanggil `aturKendali` dengan simpul JSX yang selalu baru.
+     Simpul baru = state halaman berubah = halaman menggambar ulang = panel
+     ini menggambar ulang = efeknya jalan lagi. Gelung tanpa ujung, dan React
+     menghentikannya dengan "Maximum update depth exceeded".
+
+     Tandanya berisi SEMUA nilai yang dibaca `kendali`. Kalau ada yang
+     tertinggal, tombolnya akan memakai nilai basi — jadi daftar ini harus
+     ikut diperbarui setiap kali isinya bertambah. */
+  const tandaKendali = `${idx}|${main}|${cepat}|${lilin.closes.length}|${lilin.times[idx ?? 0] ?? 0}`;
   useEffect(() => {
     aturKendali?.(kendali);
     return () => aturKendali?.(null);
-  });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tandaKendali, aturKendali]);
+
+  useEffect(() => {
+    aturMulai?.(mulai);
+    return () => aturMulai?.(null);
+  }, [aturMulai, mulai]);
 
   const Bungkus = ({ anak, kelas }: { anak: React.ReactNode; kelas?: string }) =>
     tanpaBingkai ? <div>{anak}</div> : <Panel className={kelas}>{anak}</Panel>;
 
-  if (!tampil) return null;
-
-  if (!hidup) {
-    return (
-      <Bungkus kelas="mt-4" anak={<>
-        <PanelHead
-          judul="Replay"
-          sub="Putar ulang pasar bar demi bar, lalu latih entry-nya."
-          kanan={
-            <button onClick={mulai} disabled={lilin.closes.length < 80}
-              className="flex cursor-pointer items-center gap-2 rounded-md bg-zinc-100 px-3.5 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50">
-              <Play className="size-3.5" /> Mulai Replay
-            </button>
-          }
-        />
-        <p className="px-5 pb-5 text-[12px] leading-relaxed text-zinc-500">
-          Chart berhenti di satu titik lalu berjalan maju satu bar per waktu — bar berikutnya
-          <span className="text-zinc-400"> tidak terlihat</span>, persis seperti pasar berjalan.
-          Buka BUY/SELL dengan SL &amp; TP, dan saat harga menyentuh salah satunya posisinya
-          tercatat sendiri lengkap dengan hasilnya.
-          <span className="mt-1.5 block text-zinc-600">
-            Indikator digambar di TradingView; yang dilatih di sini eksekusinya.
-            Klik bar mana pun di chart untuk melompat ke situ.
-          </span>
-        </p>
-      </>} />
-    );
-  }
+  /* Keadaan DIAM tidak menggambar apa pun.
+     ──────────────────────────────────────────────────────────────────────
+     Dulu di sini ada panel berisi tombol "Mulai Replay". Panel itu adalah
+     langkah kosong: tombol Replay di bilah atas sudah menyatakan maksudnya,
+     dan panel yang muncul hanya untuk menanyakan hal yang sama sekali lagi
+     mendorong grafiknya ke atas layar tanpa menambah apa pun. */
+  if (!tampil || !hidup) return null;
 
   return (
     <Bungkus kelas="mt-4 border-emerald-500/25" anak={<>
-      <PanelHead
-        judul="Replay berjalan"
-        sub={`Bar ${idx + 1} dari ${lilin.closes.length} · ${tanggalPendek(lilin.times[idx])}`}
-        kanan={
-          <button onClick={keluar}
-            className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 py-1.5 text-[12px] text-zinc-400 transition-colors hover:border-zinc-700 hover:text-zinc-200">
-            <X className="size-3.5" /> Keluar
-          </button>
-        }
-      />
-
-      {/* Eksekusi */}
-      <div className="border-t border-zinc-800/80 px-5 py-4">
-        {/* Pilihan mode. Order sungguhan TIDAK memakai bar replay: ia dikirim
-            ke pasar sekarang, di harga sekarang. Menempatkan keduanya di
-            saklar yang sama membuat perbedaan itu terlihat, bukan tersembunyi. */}
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <div className="flex overflow-hidden rounded-md border border-zinc-800">
-            {([['demo', 'Demo order'], ['real', 'Real order']] as const).map(([m, label]) => (
-              <button key={m} onClick={() => setMode(m)}
-                className={cn('cursor-pointer px-3 py-1.5 text-[11.5px] transition-colors',
-                  mode === m
-                    ? (m === 'real' ? 'bg-red-500/20 text-red-300' : 'bg-zinc-100 text-zinc-950')
-                    : 'text-zinc-400 hover:text-zinc-200')}>
-                {label}
-              </button>
-            ))}
-          </div>
-          <span className="text-[11.5px] text-zinc-600">
-            {mode === 'demo'
-              ? 'Latihan di atas bar replay — tidak ada uang yang bergerak.'
-              : 'Dikirim ke Binance lewat VPS-mu, di harga pasar sekarang.'}
-          </span>
-        </div>
-
-        {mode === 'real' ? (
-          <KotakOrderNyata simbol={simbol} hargaKini={lilin.closes[lilin.closes.length - 1]} />
-        ) : (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-6">
+      {/* Setelan risiko + hasil latihan.
+          ──────────────────────────────────────────────────────────────
+          Kendali putarnya sekarang ada DI DALAM grafik, dan tiket ordernya
+          di pojok chart. Yang tersisa di bawah cuma yang memang tidak
+          mendesak: ukuran risiko, dan catatan latihan yang sudah selesai. */}
+      <div className="px-5 py-4">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <div>
             <label className="mb-1 block text-[11px] text-zinc-500">Modal ($)</label>
             <input type="number" value={modal} onChange={(e) => setModal(Number(e.target.value) || 0)} className={cn(KELAS_ISIAN, 'angka')} />
@@ -403,55 +394,18 @@ export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, aturAks
             <input type="number" step={0.25} value={risikoPersen} onChange={(e) => setRisikoPersen(Number(e.target.value) || 0)} className={cn(KELAS_ISIAN, 'angka')} />
           </div>
           <div>
-            <label className="mb-1 block text-[11px] text-zinc-500">SL (× ATR)</label>
+            <label className="mb-1 block text-[11px] text-zinc-500">Usulan SL (× ATR)</label>
             <input type="number" step={0.1} value={kaliAtr} onChange={(e) => setKaliAtr(Number(e.target.value) || 0)} className={cn(KELAS_ISIAN, 'angka')} />
           </div>
           <div>
-            <label className="mb-1 block text-[11px] text-zinc-500">R : R</label>
+            <label className="mb-1 block text-[11px] text-zinc-500">Usulan R : R</label>
             <input type="number" step={0.5} value={rr} onChange={(e) => setRr(Number(e.target.value) || 0)} className={cn(KELAS_ISIAN, 'angka')} />
           </div>
-
-          {posisi ? (
-            <button onClick={tutupManual}
-              className="mt-[18px] flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-zinc-700 bg-zinc-800 text-[12px] font-medium text-zinc-100 transition-colors hover:bg-zinc-700 sm:col-span-2">
-              Tutup posisi di {fHarga(hargaKini ?? 0)}
-            </button>
-          ) : (
-            <>
-              <button onClick={() => buka('BUY')}
-                className="mt-[18px] flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-md bg-emerald-500/15 text-[12px] font-semibold text-emerald-400 transition-colors hover:bg-emerald-500/25">
-                <TrendingUp className="size-3.5" /> BUY
-              </button>
-              <button onClick={() => buka('SELL')}
-                className="mt-[18px] flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-md bg-red-500/15 text-[12px] font-semibold text-red-400 transition-colors hover:bg-red-500/25">
-                <TrendingDown className="size-3.5" /> SELL
-              </button>
-            </>
-          )}
         </div>
-        )}
-
-        {mode === 'demo' && posisi && (
-          <div className="mt-3 flex flex-wrap items-center gap-4 rounded-lg border border-zinc-800/60 p-3 text-[12px]">
-            <span className={cn('rounded px-1.5 py-0.5 text-[10px]',
-              posisi.arah === 'BUY' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-400')}>
-              {posisi.arah}
-            </span>
-            <span className="text-zinc-500">Entry <span className="angka text-zinc-300">{fHarga(posisi.masuk)}</span></span>
-            <span className="text-zinc-500">SL <span className="angka text-red-400">{fHarga(posisi.sl)}</span></span>
-            <span className="text-zinc-500">TP <span className="angka text-emerald-500">{fHarga(posisi.tp)}</span></span>
-            <span className="text-zinc-500">Risiko <span className="angka text-zinc-300">{uang(posisi.risiko)}</span></span>
-            {hargaKini !== undefined && (
-              <span className="ml-auto text-zinc-500">
-                Floating{' '}
-                <span className={cn('angka', hitungPnl(posisi, hargaKini) >= 0 ? 'text-emerald-500' : 'text-red-400')}>
-                  {uang(hitungPnl(posisi, hargaKini), true)}
-                </span>
-              </span>
-            )}
-          </div>
-        )}
-
+        <p className="mt-2 text-[11.5px] leading-relaxed text-zinc-600">
+          Dua yang kanan hanya mengisi tiket saat pertama dibuka. Yang berlaku
+          adalah angka terakhir setelah garisnya digeser di chart.
+        </p>
         {pesan && <div className="mt-2 text-[12px] text-zinc-400">{pesan}</div>}
       </div>
 

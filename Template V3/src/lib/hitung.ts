@@ -82,7 +82,13 @@ export function kurvaEkuitas(trade: Trade[], saldoAwal = SALDO_AWAL): TitikEkuit
   return titik;
 }
 
-export interface Bulan { bulan: string; kunci: string; pnl: number; trade: number }
+export interface Bulan {
+  bulan: string; kunci: string; pnl: number; trade: number;
+  /** Rincian yang menyusun `pnl`. Dashboard adalah PENJUMLAHAN dua jurnal;
+   *  tanpa rinciannya, angkanya tidak bisa dicocokkan dengan kalender di
+   *  halaman Jurnal yang selalu menampilkan satu jurnal saja. */
+  forex: number; kripto: number;
+}
 
 const NAMA_BULAN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 
@@ -102,12 +108,23 @@ export function plPerBulan(trade: Trade[], maksBulan = 12): Bulan[] {
   const sah = trade.filter((t) => Number.isFinite(t.pnl) && t.waktu > 0);
   if (!sah.length) return [];
 
-  const peta = new Map<string, { pnl: number; trade: number }>();
+  /* Dirinci per SUMBER, bukan cuma totalnya.
+     ────────────────────────────────────────────────────────────────────
+     Batang di dashboard adalah penjumlahan jurnal Trade-Fi dan Kripto,
+     sementara kalender di halaman Jurnal hanya menampilkan satu jurnal.
+     Keduanya benar, tapi angkanya berbeda — dan tanpa rinciannya yang
+     terbaca, selisih itu terbaca sebagai "dashboardnya salah". */
+  const peta = new Map<string, { pnl: number; trade: number; forex: number; kripto: number }>();
   for (const t of sah) {
     const d = new Date(t.waktu);
     const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    const p = peta.get(k) ?? { pnl: 0, trade: 0 };
-    peta.set(k, { pnl: p.pnl + t.pnl, trade: p.trade + 1 });
+    const p = peta.get(k) ?? { pnl: 0, trade: 0, forex: 0, kripto: 0 };
+    peta.set(k, {
+      pnl: p.pnl + t.pnl,
+      trade: p.trade + 1,
+      forex: p.forex + (t.sumber === 'forex' ? t.pnl : 0),
+      kripto: p.kripto + (t.sumber === 'forex' ? 0 : t.pnl),
+    });
   }
 
   const kunci = [...peta.keys()].sort();
@@ -123,6 +140,8 @@ export function plPerBulan(trade: Trade[], maksBulan = 12): Bulan[] {
       bulan: NAMA_BULAN[bl - 1],
       pnl: Number((d?.pnl ?? 0).toFixed(2)),
       trade: d?.trade ?? 0,
+      forex: Number((d?.forex ?? 0).toFixed(2)),
+      kripto: Number((d?.kripto ?? 0).toFixed(2)),
     });
     bl++; if (bl > 12) { bl = 1; th++; }
   }
@@ -130,6 +149,9 @@ export function plPerBulan(trade: Trade[], maksBulan = 12): Bulan[] {
 }
 
 export interface TitikSaldo { label: string; saldo: number }
+
+/** Satu tanggal, dua bulan. `null` = bulan itu belum/tidak sampai tanggal ini. */
+export interface TitikBanding { label: string; ini: number | null; lalu: number | null }
 
 /** Saldo harian sepanjang bulan berjalan, dari saldo awal + P/L kumulatif.
  *
@@ -158,6 +180,61 @@ export function saldoBulanIni(trade: Trade[], saldoAwal: number): TitikSaldo[] {
   for (let h = 1; h <= kini.getDate(); h++) {
     jalan += perHari.get(h) ?? 0;
     out.push({ label: String(h), saldo: Number(jalan.toFixed(2)) });
+  }
+  return out;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   SALDO BULAN INI vs BULAN LALU
+   ════════════════════════════════════════════════════════════════════════
+   Satu garis saja tidak menjawab pertanyaan yang sebenarnya diajukan orang
+   saat melihat panel ini: "bulan ini lebih baik atau lebih buruk?" Untuk
+   menjawabnya butuh pembanding, dan pembanding yang masuk akal adalah bulan
+   sebelumnya pada TANGGAL YANG SAMA — tanggal 10 dibandingkan tanggal 10,
+   bukan bulan penuh melawan sepuluh hari.
+
+   Keduanya dimulai dari saldo di AWAL bulannya masing-masing, jadi yang
+   dibandingkan adalah jalannya bulan, bukan tinggi saldo mutlaknya.
+   ════════════════════════════════════════════════════════════════════════ */
+export function saldoDuaBulan(trade: Trade[], saldoAwal: number): TitikBanding[] {
+  const kini = new Date();
+  const th = kini.getFullYear(), bl = kini.getMonth();
+  const awalIni = new Date(th, bl, 1).getTime();
+  const awalLalu = new Date(th, bl - 1, 1).getTime();
+  const hariLalu = new Date(th, bl, 0).getDate();
+
+  const jumlahSebelum = (batas: number) =>
+    trade.filter((t) => t.waktu < batas).reduce((s, t) => s + t.pnl, 0);
+
+  const perHari = (mulai: number, selesai: number) => {
+    const m = new Map<number, number>();
+    for (const t of trade) {
+      if (t.waktu < mulai || t.waktu >= selesai) continue;
+      const d = new Date(t.waktu).getDate();
+      m.set(d, (m.get(d) ?? 0) + t.pnl);
+    }
+    return m;
+  };
+
+  const hIni = perHari(awalIni, Date.now() + 86_400_000);
+  const hLalu = perHari(awalLalu, awalIni);
+
+  let jIni = saldoAwal + jumlahSebelum(awalIni);
+  let jLalu = saldoAwal + jumlahSebelum(awalLalu);
+
+  const out: TitikBanding[] = [];
+  const maks = Math.max(kini.getDate(), hLalu.size ? hariLalu : 0);
+  for (let h = 1; h <= maks; h++) {
+    jIni += hIni.get(h) ?? 0;
+    jLalu += hLalu.get(h) ?? 0;
+    out.push({
+      label: String(h),
+      ini: h <= kini.getDate() ? Number(jIni.toFixed(2)) : null,
+      /* Bulan lalu digambar hanya kalau memang ADA transaksinya. Garis datar
+         sepanjang bulan pada akun yang belum trading bukan pembanding —
+         itu cuma garis yang terlihat seperti data. */
+      lalu: hLalu.size && h <= hariLalu ? Number(jLalu.toFixed(2)) : null,
+    });
   }
   return out;
 }
