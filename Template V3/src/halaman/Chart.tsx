@@ -1,289 +1,301 @@
-import { useMemo, useState } from 'react';
-import { Play, Upload, Code2, Crosshair, Minus, TrendingUp, Type, Trash2 } from 'lucide-react';
-import { Panel, PanelHead, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
-import { cn, uang, persen } from '@/lib/utils';
-import { buatLilin, HASIL_BACKTEST, type Lilin } from '@/data/porto';
+import { useEffect, useMemo, useState } from 'react';
+import { Play, Loader2, RefreshCw, Radio, TriangleAlert } from 'lucide-react';
+import { Panel, PanelHead, KartuKpi, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
+import { cn, uang, persen, harga, tanggalPendek } from '@/lib/utils';
+import { ChartLilin, type Garis } from '@/components/chart-lilin';
+import { ambilKlines, type Lilin } from '@/lib/pasar';
+import { jalankanUji, garisIndikator, SETELAN_BAWAAN, type Setelan, type HasilUji } from '@/lib/backtest';
+import { SIMBOL_DASAR } from '@/lib/simbol';
 
 /* ════════════════════════════════════════════════════════════════════════
    CHART & BACKTEST
    ════════════════════════════════════════════════════════════════════════
-   Lilin digambar dengan SVG tulisan tangan, bukan pustaka chart.
+   Halaman ini dulu prototipe seluruhnya: lilin random-walk berseed tetap,
+   panel hasil berisi angka contoh, tombol "Jalankan Backtest" tanpa
+   penanganan klik. Sekarang ketiganya sungguhan.
 
-   Alasannya bukan gengsi: Recharts tidak punya candlestick bawaan, dan
-   pustaka chart keuangan yang lengkap (lightweight-charts, dsb) menambah
-   ratusan kilobyte untuk sesuatu yang di sini masih prototipe. SVG langsung
-   memberi kendali penuh atas skala harga, dan itu yang paling menentukan
-   apakah sebuah chart terasa benar.
+   Datanya lewat proxy VPS yang sama dengan screener — bukan langsung ke
+   Binance, yang diblokir sebagian ISP Indonesia. Indikatornya dihitung
+   dengan fungsi yang SAMA dengan screener (jt-scan-core), jadi sinyal yang
+   terlihat di sini adalah sinyal yang sama dengan yang muncul di Screener
+   Entry. Kalau keduanya memakai perhitungan terpisah, selisihnya cuma soal
+   waktu dan tidak akan ada yang tahu mana yang benar.
 
-   YANG BELUM ADA — dan ini disengaja, bukan terlewat:
-     · Mesin backtest sungguhan. Angka di panel hasil masih contoh.
-     · Penerjemah Pine/MQL5. Kotak editor sudah ada, penerjemahnya belum.
-     · Data pasar nyata. Lilinnya random-walk dengan seed tetap.
+   BATAS YANG DIAKUI TERBUKA: ini backtest KRIPTO. Menguji EA MetaTrader
+   butuh Strategy Tester MT5, yang berjalan di Windows dan bukan di halaman
+   web — jalur itu menunggu VPS Windows tersendiri.
    ════════════════════════════════════════════════════════════════════════ */
 
-const TF = ['5m', '15m', '1H', '4H', '1D'];
-const ALAT = [
-  { Ikon: Crosshair, nama: 'Kursor' },
-  { Ikon: Minus, nama: 'Garis horizontal' },
-  { Ikon: TrendingUp, nama: 'Garis tren' },
-  { Ikon: Type, nama: 'Teks' },
-  { Ikon: Trash2, nama: 'Hapus semua' },
+const TF = [
+  { nilai: '5m', label: '5 Menit' },
+  { nilai: '15m', label: '15 Menit' },
+  { nilai: '1h', label: '1 Jam' },
+  { nilai: '4h', label: '4 Jam' },
+  { nilai: '1d', label: 'Harian' },
 ];
 
-function Lilinan({ data }: { data: Lilin[] }) {
-  const W = 1200, H = 460, padKanan = 62, padBawah = 26, padAtas = 10;
+const KELAS_ISIAN =
+  'h-9 w-full rounded-md border border-zinc-800 bg-zinc-900/60 px-2.5 text-[12.5px] text-zinc-200 ' +
+  'outline-none transition-colors hover:border-zinc-700 focus-visible:border-zinc-600';
 
-  const { min, max } = useMemo(() => {
-    const lo = Math.min(...data.map((d) => d.l));
-    const hi = Math.max(...data.map((d) => d.h));
-    const bantal = (hi - lo) * 0.08;
-    return { min: lo - bantal, max: hi + bantal };
-  }, [data]);
-
-  const lebarArea = W - padKanan;
-  const lebarLilin = lebarArea / data.length;
-  const badan = Math.max(1.5, lebarLilin * 0.62);
-  const Y = (v: number) => padAtas + (1 - (v - min) / (max - min)) * (H - padAtas - padBawah);
-  const X = (i: number) => i * lebarLilin + lebarLilin / 2;
-
-  // Empat garis harga saja. Grid penuh berubah jadi kertas milimeter.
-  const garis = Array.from({ length: 5 }, (_, i) => min + ((max - min) / 4) * i);
-
+function Angka({ label, nilai, atur, langkah = 1, min = 0 }: {
+  label: string; nilai: number; atur: (n: number) => void; langkah?: number; min?: number;
+}) {
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 'clamp(300px, 46vh, 460px)' }} role="img" aria-label="Grafik lilin">
-      {garis.map((g, i) => (
-        <g key={i}>
-          <line x1={0} x2={lebarArea} y1={Y(g)} y2={Y(g)} stroke="rgba(255,255,255,.05)" strokeWidth={1} />
-          <text x={lebarArea + 8} y={Y(g) + 3.5} fill="#71717a" fontSize={10} fontFamily="IBM Plex Mono">
-            {g.toFixed(0)}
-          </text>
-        </g>
-      ))}
-
-      {data.map((d, i) => {
-        const naik = d.c >= d.o;
-        const warna = naik ? '#10b981' : '#ef4444';
-        const atas = Y(Math.max(d.o, d.c));
-        const tinggi = Math.max(1, Math.abs(Y(d.o) - Y(d.c)));
-        return (
-          <g key={i}>
-            <line x1={X(i)} x2={X(i)} y1={Y(d.h)} y2={Y(d.l)} stroke={warna} strokeWidth={1} />
-            <rect x={X(i) - badan / 2} y={atas} width={badan} height={tinggi} fill={warna} />
-          </g>
-        );
-      })}
-
-      {/* Harga terakhir — garis putus + label, seperti chart sungguhan */}
-      <line x1={0} x2={lebarArea} y1={Y(data[data.length - 1].c)} y2={Y(data[data.length - 1].c)}
-            stroke="#fafafa" strokeWidth={1} strokeDasharray="4 4" opacity={0.5} />
-      <rect x={lebarArea + 2} y={Y(data[data.length - 1].c) - 9} width={58} height={18} rx={3} fill="#fafafa" />
-      <text x={lebarArea + 31} y={Y(data[data.length - 1].c) + 4} fill="#09090b" fontSize={10}
-            fontFamily="IBM Plex Mono" textAnchor="middle">
-        {data[data.length - 1].c.toFixed(0)}
-      </text>
-    </svg>
+    <div>
+      <label className="mb-1 block text-[11px] text-zinc-500">{label}</label>
+      <input type="number" value={nilai} step={langkah} min={min}
+             onChange={(e) => atur(Number(e.target.value))}
+             className={cn(KELAS_ISIAN, 'angka')} />
+    </div>
   );
 }
 
 export default function ChartBacktest() {
-  const [tf, setTf] = useState('4H');
-  const [alatAktif, setAlatAktif] = useState('Kursor');
-  const [jalan, setJalan] = useState(false);
-  const [adaHasil, setAdaHasil] = useState(false);
-  const data = useMemo(() => buatLilin(160), []);
-  const H = HASIL_BACKTEST;
+  const [simbol, setSimbol] = useState('BTCUSDT');
+  const [tf, setTf] = useState('4h');
+  const [lilin, setLilin] = useState<Lilin>({ opens: [], highs: [], lows: [], closes: [], times: [] });
+  const [memuat, setMemuat] = useState(true);
+  const [galat, setGalat] = useState('');
+  const [segar, setSegar] = useState(0);
+  const [set, setSet] = useState<Setelan>(SETELAN_BAWAAN);
+  const [hasil, setHasil] = useState<HasilUji | null>(null);
+  const [uji, setUji] = useState(false);
+
+  /* ── Data realtime ──────────────────────────────────────────────────
+     Ditarik ulang tiap 15 detik, sama dengan umur cache di lib/pasar.ts —
+     memintanya lebih sering hanya akan menerima salinan cache yang sama. */
+  useEffect(() => {
+    let hidup = true;
+    async function tarik() {
+      try {
+        const l = await ambilKlines(simbol, tf, 500);
+        if (!hidup) return;
+        if (!l.closes.length) { setGalat('Data tidak diterima. Proxy VPS mungkin sedang tidak menjawab.'); }
+        else { setLilin(l); setGalat(''); }
+      } catch (e) {
+        if (hidup) setGalat(e instanceof Error ? e.message : 'Gagal mengambil data');
+      } finally {
+        if (hidup) setMemuat(false);
+      }
+    }
+    setMemuat(true);
+    void tarik();
+    const jam = setInterval(tarik, 15_000);
+    return () => { hidup = false; clearInterval(jam); };
+  }, [simbol, tf, segar]);
+
+  /* Hasil backtest DIBUANG saat simbol/timeframe/setelan berubah. Tabel
+     trade dari BTC 4 jam yang masih terpampang di bawah chart ETH 5 menit
+     adalah cara paling halus untuk salah membaca hasil. */
+  useEffect(() => { setHasil(null); }, [simbol, tf, set]);
+
+  const garis: Garis[] = useMemo(() => {
+    if (set.strategi !== 'ema' || !lilin.closes.length) return [];
+    const g = garisIndikator(lilin, set);
+    return [
+      { nama: `EMA ${set.emaCepat}`, nilai: g.cepat ?? [], warna: '#fbbf24' },
+      { nama: `EMA ${set.emaLambat}`, nilai: g.lambat ?? [], warna: '#60a5fa' },
+    ];
+  }, [lilin, set]);
+
+  const terakhir = lilin.closes[lilin.closes.length - 1];
+  const sebelumnya = lilin.closes[lilin.closes.length - 2];
+  const gerak = terakhir && sebelumnya ? ((terakhir - sebelumnya) / sebelumnya) * 100 : 0;
 
   function jalankan() {
-    setJalan(true);
-    // Jeda sengaja: memberi umpan balik bahwa sesuatu sedang dikerjakan.
-    // Diganti pemanggilan mesin backtest sungguhan nanti.
-    setTimeout(() => { setJalan(false); setAdaHasil(true); }, 1200);
+    setUji(true);
+    /* Beri satu bingkai supaya tombolnya sempat menampilkan keadaan sibuk.
+       500 lilin selesai dalam belasan milidetik, dan tombol yang berubah
+       lalu kembali dalam satu frame terlihat seperti tidak ditekan. */
+    setTimeout(() => {
+      setHasil(jalankanUji(lilin, set));
+      setUji(false);
+    }, 30);
   }
 
   return (
     <div className="p-4 sm:p-6">
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_340px]">
-        {/* ── Chart ── */}
-        <Panel className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2 border-b border-zinc-800/80 p-3">
-            <span className="px-1 text-[15px] font-semibold tracking-tight text-zinc-100">BTCUSDT</span>
-            <span className="angka text-[13px] text-emerald-500">
-              {data[data.length - 1].c.toFixed(2)}
+      {/* ── Bilah kendali ── */}
+      <Panel>
+        <div className="flex flex-wrap items-end gap-3 p-4">
+          <div className="min-w-[168px]">
+            <label className="mb-1 block text-[11px] text-zinc-500">Simbol</label>
+            <input list="simbolChart" value={simbol}
+                   onChange={(e) => setSimbol(e.target.value.toUpperCase())}
+                   className={cn(KELAS_ISIAN, 'angka')} />
+            <datalist id="simbolChart">
+              {SIMBOL_DASAR.map((s) => <option key={s} value={s} />)}
+            </datalist>
+          </div>
+          <div className="min-w-[120px]">
+            <label className="mb-1 block text-[11px] text-zinc-500">Timeframe</label>
+            <select value={tf} onChange={(e) => setTf(e.target.value)} className={cn(KELAS_ISIAN, 'cursor-pointer')}>
+              {TF.map((x) => <option key={x.nilai} value={x.nilai}>{x.label}</option>)}
+            </select>
+          </div>
+
+          <div className="flex items-end gap-3">
+            <div>
+              <div className="text-[11px] text-zinc-500">Harga terakhir</div>
+              <div className="angka text-[19px] font-semibold leading-tight text-zinc-100">
+                {terakhir ? harga(terakhir) : '—'}
+              </div>
+            </div>
+            {terakhir && (
+              <span className={cn('angka mb-1 text-[12.5px]', gerak >= 0 ? 'text-emerald-500' : 'text-red-400')}>
+                {gerak >= 0 ? '+' : ''}{gerak.toFixed(2)}%
+              </span>
+            )}
+          </div>
+
+          <div className="ml-auto flex items-center gap-3">
+            <span className={cn('flex items-center gap-1.5 text-[11px]', memuat ? 'text-zinc-600' : 'text-emerald-500')}>
+              <Radio className="size-3" /> {memuat ? 'memuat' : 'live · 15 dtk'}
             </span>
-
-            <div className="ml-2 flex gap-0.5 rounded-md bg-zinc-900 p-0.5">
-              {TF.map((t) => (
-                <button key={t} onClick={() => setTf(t)}
-                  className={cn(
-                    'cursor-pointer rounded px-2.5 py-1 text-[11.5px] transition-colors',
-                    tf === t ? 'bg-zinc-800 text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'
-                  )}>
-                  {t}
-                </button>
-              ))}
-            </div>
-
-            <div className="ml-auto flex gap-0.5 rounded-md bg-zinc-900 p-0.5">
-              {ALAT.map(({ Ikon, nama }) => (
-                <button key={nama} onClick={() => setAlatAktif(nama)} title={nama} aria-label={nama}
-                  className={cn(
-                    'cursor-pointer rounded p-1.5 transition-colors',
-                    alatAktif === nama ? 'bg-zinc-800 text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'
-                  )}>
-                  <Ikon className="size-3.5" strokeWidth={1.8} />
-                </button>
-              ))}
-            </div>
+            <button onClick={() => setSegar((n) => n + 1)}
+              className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100">
+              <RefreshCw className={cn('size-3.5', memuat && 'animate-spin')} /> Segarkan
+            </button>
           </div>
-
-          <div className="overflow-x-auto p-2">
-            <Lilinan data={data} />
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3 border-t border-zinc-800/80 px-4 py-2.5 text-[11.5px] text-zinc-500">
-            <span>160 lilin</span>
-            <span>·</span>
-            <span>TF {tf}</span>
-            <span>·</span>
-            <span>Alat: {alatAktif}</span>
-            <span className="ml-auto rounded bg-zinc-800/60 px-2 py-0.5 text-zinc-400">data contoh</span>
-          </div>
-        </Panel>
-
-        {/* ── Kanan: indikator + backtest ── */}
-        <div className="min-w-0 space-y-4">
-          <Panel>
-            <PanelHead judul="Indikator" sub="Tempel kode, lalu pasang ke chart." />
-            <div className="space-y-3 px-5 pb-5">
-              <div className="flex gap-2">
-                <select className="h-9 flex-1 cursor-pointer rounded-md border border-zinc-800 bg-zinc-900/60 px-2.5 text-[12.5px] text-zinc-300 outline-none">
-                  <option>Pine Script (TradingView)</option>
-                  <option>MQL5 (MetaTrader 5)</option>
-                </select>
-                <button className="flex cursor-pointer items-center rounded-md border border-zinc-800 px-2.5 text-zinc-400 transition-colors hover:border-zinc-700 hover:text-zinc-100" aria-label="Unggah berkas">
-                  <Upload className="size-3.5" />
-                </button>
-              </div>
-
-              <textarea
-                rows={7}
-                spellCheck={false}
-                defaultValue={'//@version=6\nindicator("Jadi Trader V3", overlay=true)\n\n// Tempel kode indikatormu di sini.\n// Setelah dipasang, sinyalnya digambar di chart\n// dan ikut dihitung saat backtest dijalankan.'}
-                className="w-full resize-y rounded-md border border-zinc-800 bg-zinc-900/60 p-3 font-mono text-[11.5px]
-                           leading-relaxed text-zinc-300 outline-none transition-colors
-                           hover:border-zinc-700 focus-visible:border-zinc-600"
-              />
-
-              <button className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-md border border-zinc-800 py-2 text-[12.5px] text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100">
-                <Code2 className="size-3.5" /> Pasang ke chart
-              </button>
-
-              <div className="space-y-1.5">
-                {[
-                  ['Jadi Trader V3', true],
-                  ['SMI (14, 3, 3)', true],
-                  ['EMA 9 / 21', false],
-                ].map(([nama, aktif]) => (
-                  <label key={nama as string} className="flex cursor-pointer items-center gap-2.5 rounded-md border border-zinc-800/60 px-3 py-2 text-[12.5px] transition-colors hover:border-zinc-700">
-                    <input type="checkbox" defaultChecked={aktif as boolean} className="accent-zinc-100" />
-                    <span className="text-zinc-300">{nama}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          </Panel>
-
-          <Panel>
-            <PanelHead judul="Backtest" sub="Uji indikator pada rentang yang tampil." />
-            <div className="space-y-3 px-5 pb-5">
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="mb-1 block text-[11px] text-zinc-500">Modal awal</label>
-                  <input defaultValue="1000" inputMode="numeric"
-                    className="h-9 w-full rounded-md border border-zinc-800 bg-zinc-900/60 px-2.5 font-mono text-[12.5px] text-zinc-100 outline-none hover:border-zinc-700 focus-visible:border-zinc-600" />
-                </div>
-                <div>
-                  <label className="mb-1 block text-[11px] text-zinc-500">Risiko / trade</label>
-                  <input defaultValue="1%"
-                    className="h-9 w-full rounded-md border border-zinc-800 bg-zinc-900/60 px-2.5 font-mono text-[12.5px] text-zinc-100 outline-none hover:border-zinc-700 focus-visible:border-zinc-600" />
-                </div>
-              </div>
-
-              <button
-                onClick={jalankan}
-                disabled={jalan}
-                className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-md bg-zinc-100 py-2.5 text-[13px] font-semibold text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <Play className="size-3.5 fill-current" />
-                {jalan ? 'Menjalankan…' : 'Jalankan Backtest'}
-              </button>
-
-              {!adaHasil ? (
-                <p className="pt-1 text-center text-[11.5px] leading-relaxed text-zinc-600">
-                  Belum ada hasil. Jalankan backtest untuk melihat laporan
-                  keuntungan, kerugian, dan winrate.
-                </p>
-              ) : (
-                <div className="space-y-2 rounded-lg border border-zinc-800/60 p-3">
-                  {[
-                    ['Total trade', String(H.totalTrade), ''],
-                    ['Menang / Kalah', `${H.menang} / ${H.kalah}`, ''],
-                    ['Winrate', persen(H.winrate), H.winrate >= 50 ? 'text-emerald-500' : 'text-red-400'],
-                    ['Profit factor', H.profitFactor.toFixed(2), H.profitFactor >= 1 ? 'text-emerald-500' : 'text-red-400'],
-                    ['Net P/L', uang(H.netPnl, true), H.netPnl >= 0 ? 'text-emerald-500' : 'text-red-400'],
-                    ['Max drawdown', uang(H.maxDrawdown), 'text-red-400'],
-                    ['Rata-rata menang', uang(H.rerataMenang), 'text-emerald-500'],
-                    ['Rata-rata kalah', uang(H.rerataKalah), 'text-red-400'],
-                  ].map(([k, v, w]) => (
-                    <div key={k} className="flex justify-between border-b border-zinc-800/40 pb-1.5 text-[12.5px] last:border-0 last:pb-0">
-                      <span className="text-zinc-500">{k}</span>
-                      <span className={cn('angka', w || 'text-zinc-200')}>{v}</span>
-                    </div>
-                  ))}
-                  <div className="pt-1 text-[10.5px] text-zinc-600">
-                    Angka contoh — mesin backtest sungguhan belum tersambung.
-                  </div>
-                </div>
-              )}
-            </div>
-          </Panel>
         </div>
-      </div>
 
-      {adaHasil && (
-        <Panel className="mt-4">
-          <PanelHead judul="Daftar Trade Backtest" sub="Setiap entry dan exit yang dihasilkan indikator." />
-          <div className="px-5 pb-5">
-            <TabelBungkus className="max-h-[300px] overflow-y-auto">
-              <Tabel>
-                <thead className="sticky top-0 bg-zinc-950">
-                  <tr><Th>#</Th><Th>Arah</Th><Th className="text-right">Entry</Th><Th className="text-right">Exit</Th>
-                      <Th className="text-right">P/L</Th><Th>Sebab keluar</Th></tr>
-                </thead>
-                <tbody>
-                  {Array.from({ length: 12 }, (_, i) => {
-                    const menang = i % 3 !== 1;
-                    const entry = 63200 + i * 180;
-                    const keluar = entry * (menang ? 1.014 : 0.991);
-                    return (
-                      <Tr key={i}>
-                        <Td className="text-zinc-500">{i + 1}</Td>
-                        <Td><span className={i % 2 ? 'text-red-400' : 'text-emerald-500'}>{i % 2 ? 'SELL' : 'BUY'}</span></Td>
-                        <Td className="angka text-right text-zinc-300">{entry.toFixed(0)}</Td>
-                        <Td className="angka text-right text-zinc-300">{keluar.toFixed(0)}</Td>
-                        <Td className={cn('angka text-right', menang ? 'text-emerald-500' : 'text-red-400')}>
-                          {uang(menang ? 92.15 : -71.8, true)}
-                        </Td>
-                        <Td className="text-[12px] text-zinc-500">{menang ? 'Take profit' : 'Stop loss'}</Td>
-                      </Tr>
-                    );
-                  })}
-                </tbody>
-              </Tabel>
-            </TabelBungkus>
+        {galat && (
+          <div className="flex items-start gap-2 border-t border-zinc-800/80 px-4 py-3">
+            <TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-500" />
+            <span className="text-[12.5px] text-amber-200/90">{galat}</span>
           </div>
-        </Panel>
+        )}
+
+        <div className="border-t border-zinc-800/80 px-2 pb-2">
+          {lilin.times.length > 0
+            ? <ChartLilin lilin={lilin} garis={garis} trade={hasil?.trade} tinggi={440} />
+            : <div className="flex h-[440px] items-center justify-center text-[12.5px] text-zinc-600">
+                {memuat ? 'Memuat lilin…' : 'Tidak ada data untuk simbol ini.'}
+              </div>}
+        </div>
+        <div className="border-t border-zinc-800/80 px-4 py-2.5 text-[11.5px] text-zinc-600">
+          {lilin.times.length} lilin · {simbol} {TF.find((x) => x.nilai === tf)?.label} · lewat proxy VPS
+          {hasil?.trade.length ? ` · ${hasil.trade.length} penanda trade` : ''}
+        </div>
+      </Panel>
+
+      {/* ── Setelan uji ── */}
+      <Panel className="mt-4">
+        <PanelHead
+          judul="Backtest"
+          sub="Dihitung dengan indikator yang sama persis dengan Screener Entry."
+          kanan={
+            <button onClick={jalankan} disabled={uji || lilin.closes.length < 60}
+              className="flex cursor-pointer items-center gap-2 rounded-md bg-zinc-100 px-3.5 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50">
+              {uji ? <Loader2 className="size-3.5 animate-spin" /> : <Play className="size-3.5" />}
+              Jalankan Backtest
+            </button>
+          }
+        />
+        <div className="grid grid-cols-2 gap-3 px-5 pb-5 sm:grid-cols-4 xl:grid-cols-7">
+          <div>
+            <label className="mb-1 block text-[11px] text-zinc-500">Strategi</label>
+            <select value={set.strategi} onChange={(e) => setSet({ ...set, strategi: e.target.value as Setelan['strategi'] })}
+                    className={cn(KELAS_ISIAN, 'cursor-pointer')}>
+              <option value="smi">SMI dari zona jenuh</option>
+              <option value="ema">Silang EMA</option>
+            </select>
+          </div>
+          {set.strategi === 'ema' && (
+            <>
+              <Angka label="EMA cepat" nilai={set.emaCepat} atur={(n) => setSet({ ...set, emaCepat: n })} min={2} />
+              <Angka label="EMA lambat" nilai={set.emaLambat} atur={(n) => setSet({ ...set, emaLambat: n })} min={3} />
+            </>
+          )}
+          <Angka label="SL (× ATR)" nilai={set.slAtr} atur={(n) => setSet({ ...set, slAtr: n })} langkah={0.1} />
+          <Angka label="Risk : Reward" nilai={set.rr} atur={(n) => setSet({ ...set, rr: n })} langkah={0.5} />
+          <Angka label="Modal ($)" nilai={set.modal} atur={(n) => setSet({ ...set, modal: n })} langkah={100} />
+          <Angka label="Risiko / trade (%)" nilai={set.risikoPersen} atur={(n) => setSet({ ...set, risikoPersen: n })} langkah={0.25} />
+          <Angka label="Biaya (%)" nilai={set.biayaPersen} atur={(n) => setSet({ ...set, biayaPersen: n })} langkah={0.01} />
+        </div>
+
+        {/* Asumsi ditulis di layar, bukan disembunyikan di kode. Backtest tanpa
+            asumsi yang terbaca adalah angka tanpa arti. */}
+        <div className="border-t border-zinc-800/80 px-5 py-3 text-[11.5px] leading-relaxed text-zinc-600">
+          Entry di harga <span className="text-zinc-400">open lilin berikutnya</span> setelah sinyal, bukan di
+          close lilin sinyalnya. SL/TP diperiksa terhadap high/low tiap lilin; kalau satu lilin menyentuh
+          keduanya, yang dianggap kena adalah <span className="text-zinc-400">SL</span> — data lilin tidak tahu
+          mana yang lebih dulu, dan menebak yang menguntungkan membuat setiap hasil terlalu bagus.
+        </div>
+      </Panel>
+
+      {/* ── Hasil ── */}
+      {hasil && (
+        hasil.catatan ? (
+          <Panel className="mt-4 px-5 py-6 text-center text-[12.5px] text-zinc-500">{hasil.catatan}</Panel>
+        ) : (
+          <>
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+              <KartuKpi label="Total Trade" nilai={String(hasil.jumlah)}
+                        catatan={`${hasil.menang} menang · ${hasil.kalah} kalah`} />
+              <KartuKpi label="Winrate" nilai={persen(hasil.winrate)} catatan="dari transaksi selesai" />
+              <KartuKpi label="P/L Bersih" nilai={uang(hasil.bersih, true)}
+                        warna={hasil.bersih >= 0 ? 'text-emerald-500' : 'text-red-400'}
+                        catatan={`modal ${uang(set.modal)} → ${uang(hasil.ekuitasAkhir)}`} />
+              <KartuKpi label="Profit Factor"
+                        nilai={hasil.faktorProfit === null ? '—' : hasil.faktorProfit === Infinity ? '∞' : hasil.faktorProfit.toFixed(2)}
+                        catatan="gross profit / gross loss" />
+              <KartuKpi label="Max Drawdown" nilai={`${hasil.drawdown.toFixed(1)}%`}
+                        warna={hasil.drawdown > 10 ? 'text-red-400' : undefined}
+                        catatan="penurunan terdalam dari puncak" />
+            </div>
+
+            <Panel className="mt-4">
+              <PanelHead judul="Daftar Trade" sub={`${hasil.jumlah} transaksi — penandanya ikut tergambar di chart.`} />
+              <div className="px-5 pb-5">
+                <TabelBungkus className="max-h-[380px] overflow-y-auto">
+                  <Tabel>
+                    <thead className="sticky top-0 bg-zinc-950">
+                      <tr>
+                        <Th>#</Th><Th>Masuk</Th><Th>Arah</Th>
+                        <Th className="text-right">Entry</Th><Th className="text-right">Keluar</Th>
+                        <Th>Sebab</Th><Th className="text-right">P/L</Th><Th className="text-right">Ekuitas</Th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {hasil.trade.map((t) => (
+                        <Tr key={t.no}>
+                          <Td className="angka text-zinc-600">{t.no}</Td>
+                          <Td className="whitespace-nowrap text-zinc-500">{tanggalPendek(t.masukWaktu)}</Td>
+                          <Td><span className={cn('text-[11.5px]', t.arah === 'BUY' ? 'text-emerald-500' : 'text-red-400')}>{t.arah}</span></Td>
+                          <Td className="angka text-right text-zinc-400">{harga(t.masuk)}</Td>
+                          <Td className="angka text-right text-zinc-400">{harga(t.keluar)}</Td>
+                          <Td><span className={cn('rounded px-1.5 py-0.5 text-[10px]',
+                            t.sebab === 'TP' ? 'bg-emerald-500/10 text-emerald-500'
+                              : t.sebab === 'SL' ? 'bg-red-500/10 text-red-400'
+                              : 'bg-zinc-800 text-zinc-400')}>{t.sebab}</span></Td>
+                          <Td className={cn('angka text-right', t.pnl >= 0 ? 'text-emerald-500' : 'text-red-400')}>
+                            {uang(t.pnl, true)}
+                          </Td>
+                          <Td className="angka text-right text-zinc-300">{uang(t.ekuitas)}</Td>
+                        </Tr>
+                      ))}
+                    </tbody>
+                  </Tabel>
+                </TabelBungkus>
+              </div>
+            </Panel>
+          </>
+        )
       )}
+
+      {/* Batas yang diakui terbuka — supaya tidak ada yang mengira EA MT5-nya
+          bisa diuji di sini lalu kecewa setelah mencoba. */}
+      <Panel className="mt-4 px-5 py-4">
+        <div className="text-[12.5px] text-zinc-400">Menguji EA MetaTrader 5</div>
+        <p className="mt-1 text-[12px] leading-relaxed text-zinc-600">
+          Backtest di halaman ini berjalan untuk pasar kripto lewat proxy VPS. Menguji Expert Advisor
+          MetaTrader butuh Strategy Tester MT5, yang berjalan di Windows dan tidak bisa dijalankan dari
+          halaman web — jalurnya adalah VPS Windows tersendiri yang menjalankan MT5 plus jembatan
+          perintah. Itu tahap berikutnya, bukan sesuatu yang tersembunyi di balik tombol ini.
+        </p>
+      </Panel>
     </div>
   );
 }
