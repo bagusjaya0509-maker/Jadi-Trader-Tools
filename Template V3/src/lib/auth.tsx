@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import {
-  onAuthStateChanged, signInWithPopup, signInWithRedirect, signOut,
+  onAuthStateChanged, signInWithPopup, signInWithRedirect, signInWithCustomToken, signOut,
   type User,
 } from 'firebase/auth';
 import { app, auth, penyediaGoogle, UID_PEMILIK } from '@/lib/firebase';
@@ -24,6 +24,19 @@ import { app, auth, penyediaGoogle, UID_PEMILIK } from '@/lib/firebase';
    membiarkan jalan — penjagaan sesungguhnya tetap di sisi server, yang akan
    menolak tulisan kalau memang tidak berhak.
    ════════════════════════════════════════════════════════════════════════ */
+
+/* ── Login Discord: token kustom datang lewat hash ──────────────────────
+   Backend VPS menyelesaikan OAuth Discord lalu mengarahkan balik ke sini
+   dengan `#discord=<token>`. Diproses SEKALI di muat modul, sebelum router
+   sempat menganggapnya alamat halaman — token sekali pakai tidak boleh
+   nyangkut di riwayat peramban. */
+if (typeof window !== 'undefined' && window.location.hash.startsWith('#discord=')) {
+  const token = decodeURIComponent(window.location.hash.slice(9));
+  window.history.replaceState(null, '', window.location.pathname + '#/dashboard');
+  signInWithCustomToken(auth, token).catch((e) => {
+    console.error('Login Discord gagal:', e);
+  });
+}
 
 const HARI_COBA = 30;
 const MS_HARI = 86_400_000;

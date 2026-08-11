@@ -31,6 +31,8 @@ export const METODE_TP: { nilai: MetodeTp; label: string }[] = [
 
 export interface PermintaanNyata {
   simbol: string;
+  /** Timeframe chart saat order dikirim — dipakai catatan posisi screener. */
+  tf?: string;
   arah: 'BUY' | 'SELL';
   modal: number;
   leverage: number;
@@ -130,6 +132,38 @@ export async function kirimOrderNyata(p: PermintaanNyata): Promise<{ pesan: stri
     const tahap = j.stage ? `[gagal di: ${j.stage}] ` : '';
     throw new Error(tahap + (j.error ? JSON.stringify(j.error).slice(0, 200) : `Backend menjawab ${r.status}`));
   }
+
+  /* ── Catat ke registry posisi Screener Entry ──────────────────────
+     V2 menampilkan tabel Posisi Terbuka dari `emaScreenerPrioritySim_v1`
+     di localStorage — dan karena tempelan V2 berbagi origin dengan V3,
+     menulis di sini membuat order dari halaman Chart LANGSUNG muncul di
+     screener, ikut tersinkron ke cloud V2, dan ikut dikelola pemantau
+     BE/ratchet-nya. Bentuk record menyalin recordLivePosition V2. */
+  try {
+    const KUNCI_PSIM = 'emaScreenerPrioritySim_v1';
+    const simpanan = JSON.parse(localStorage.getItem(KUNCI_PSIM) || '{"positions":{},"history":[]}');
+    simpanan.positions = simpanan.positions || {};
+    const key = p.simbol + '_' + (p.tf || '4h') + '_LIVE_' + Date.now();
+    const tp1Num = (p.metode === 'nopartial') ? Number(tp1Fmt) : Number(tp1Kirim);
+    const tp2Num = qty2Kirim ? Number(tp2Kirim) : (p.metode === 'nopartial' ? Number(tp2Fmt) : null);
+    simpanan.positions[key] = {
+      key, source: p.simbol, tfLabel: p.tf || '4h', tfValue: p.tf || '4h', dir: p.arah,
+      entryPrice: p.entry, entryTime: Date.now(),
+      sl: Number(slStr), tp1: tp1Num, tp2: tp2Num,
+      qty1: Number(qty1), qty2: qty2Kirim ? Number(qty2Kirim) : null,
+      tp1Hit: false, tp2Hit: false,
+      margin: p.modal, leverage: p.leverage, qty: Number(qtyStr),
+      venue: 'live-real',
+      liveOrderId: j.entryOrder?.orderId ?? j.entryOrderId ?? null,
+      liveSlOrderId: j.slOrder?.orderId ?? null,
+      liveTp1OrderId: j.tp1Order?.orderId ?? null,
+      liveTp2OrderId: j.tp2Order?.orderId ?? null,
+      entryMethod: p.metode, virtualTp1: p.metode === 'nopartial' ? Number(tp1Fmt) : null,
+      signalType: 'chart-backtest', preEmosi: '', preAlasan: 'Order dari Chart & Backtest V3',
+      ...(j.pending ? { pending: true, entryPriceTarget: p.entry, isAlgoEntry: !!j.isAlgoEntry } : {}),
+    };
+    localStorage.setItem(KUNCI_PSIM, JSON.stringify(simpanan));
+  } catch { /* localStorage penuh/privat — ordernya sendiri sudah terkirim */ }
 
   if (j.pending) {
     mulaiPantau({ simbol: p.simbol, arah: p.arah, qty: qtyStr, sl: slStr, tp1: tp1Kirim, qty1, tp2: tp2Kirim, qty2: qty2Kirim });

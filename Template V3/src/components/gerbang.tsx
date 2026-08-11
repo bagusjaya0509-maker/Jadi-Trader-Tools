@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { LogOut, ChevronRight, TriangleAlert, Eye, Loader2 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
+import { discordSiap, mulaiLoginDiscord } from '@/lib/analisa';
 import { cn } from '@/lib/utils';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -33,6 +34,8 @@ function IkonGoogle({ kelas = 'size-4' }: { kelas?: string }) {
 export function TombolMasuk({ penuh }: { penuh?: boolean }) {
   const { masuk, galat } = useAuth();
   const [jalan, setJalan] = useState(false);
+  const [adaDiscord, setAdaDiscord] = useState(false);
+  useEffect(() => { void discordSiap().then(setAdaDiscord); }, []);
 
   async function klik() {
     setJalan(true);
@@ -53,6 +56,18 @@ export function TombolMasuk({ penuh }: { penuh?: boolean }) {
         {jalan ? <Loader2 className="size-4 animate-spin" /> : <IkonGoogle />}
         {jalan ? 'Membuka…' : 'Masuk dengan Google'}
       </button>
+      {/* Discord hanya tampil kalau backend menyatakan siap — fitur yang
+          belum dikonfigurasi bukan tombol yang boleh gagal saat diklik. */}
+      {adaDiscord && (
+        <button onClick={mulaiLoginDiscord}
+          className={cn(
+            'mt-2 flex cursor-pointer items-center justify-center gap-2 rounded-md border border-[#5865F2]/40',
+            'bg-[#5865F2]/10 px-3.5 py-2 text-[12.5px] font-medium text-[#8b93f8] transition-colors hover:bg-[#5865F2]/20',
+            penuh && 'w-full py-2.5'
+          )}>
+          Masuk dengan Discord
+        </button>
+      )}
       {galat && (
         <p className="mt-2 text-[11.5px] leading-relaxed text-red-400">{galat}</p>
       )}

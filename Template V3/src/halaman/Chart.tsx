@@ -122,6 +122,18 @@ export default function ChartBacktest() {
   /* Setelan latihan — dulu di panel bawah yang baru muncul saat replay;
      order demo tidak bergantung replay, jadi setelannya ikut tiket. */
   const [demoSetelan, setDemoSetelan] = useState({ modal: 1000, risikoPersen: 1, kaliAtr: 1.5, rr: 2 });
+
+  /* Mengubah SL ×ATR / R:R saat tiket TERBUKA langsung menggeser garisnya —
+     setelan yang baru berlaku untuk tiket berikutnya terasa seperti setelan
+     yang rusak. Level hasil seretan tangan tidak disentuh: begitu orangnya
+     menggeser sendiri, usulannya berhenti ikut campur. */
+  const seretTangan = useRef(false);
+  useEffect(() => {
+    if (!draf || !aksi || aksi.mode !== 'demo' || seretTangan.current) return;
+    const u = aksi.usul(draf);
+    if (u && u.sl && u.tp) setRencana((r) => ({ ...r, sl: u.sl, tp: u.tp }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [demoSetelan.kaliAtr, demoSetelan.rr]);
   const [sibukNyata, setSibukNyata] = useState(false);
   const [kabarNyata, setKabarNyata] = useState('');
   const mulaiReplay = useRef<(() => void) | null>(null);
@@ -503,6 +515,7 @@ export default function ChartBacktest() {
                           garisSeret={garisSeret}
                           onSeret={(id, h) => {
                             if (id === 'entry') entryDigeser.current = true;
+                            seretTangan.current = true;
                             setRencana((r) => ({ ...r, [id]: h }));
                           }}
                           segmen={pine?.segmen}
@@ -520,6 +533,7 @@ export default function ChartBacktest() {
                               onPilih={(arah) => {
                                 setDraf(arah);
                                 setKabarNyata('');
+                                seretTangan.current = false;
                                 /* Level yang SUDAH dipasang orangnya dipertahankan
                                    selama masih benar sisinya untuk arah ini.
                                    Menimpanya dengan usulan ATR akan membuang
@@ -554,7 +568,7 @@ export default function ChartBacktest() {
                                      simbol tanpa STOP_MARKET. */
                                   setSibukNyata(true); setKabarNyata('');
                                   void kirimOrderNyata({
-                                    simbol, arah: draf,
+                                    simbol, tf, arah: draf,
                                     modal: nyataSetelan.modal, leverage: nyataSetelan.leverage,
                                     entry: jenisEntry === 'MARKET' ? (aksi.hargaKini ?? entry) : entry,
                                     jenis: jenisEntry, sl, tp, metode: nyataSetelan.metode,

@@ -4,7 +4,7 @@ import {
   LayoutGrid, BarChart3, Briefcase, Users, Plug, CandlestickChart,
   Wallet, TrendingUp, Wrench, CreditCard, LifeBuoy, BookOpen,
   PanelLeft, Bell, Mail, X, Sparkles, MessageCircle, Send, AtSign,
-  AlertTriangle, Newspaper, ChevronRight,
+  AlertTriangle, Newspaper, ChevronRight, Copy,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
@@ -36,6 +36,7 @@ const NAV = [
       { ke: '/personal',    label: 'Personal Area',    Ikon: Wallet },
       { ke: '/chart',       label: 'Chart & Backtest', Ikon: CandlestickChart },
       { ke: '/marketplace', label: 'Marketplace',      Ikon: Users },
+      { ke: '/copy',        label: 'Copy Trading',     Ikon: Copy },
       { ke: '/integrasi',   label: 'Integrations',     Ikon: Plug },
     ],
   },
@@ -56,6 +57,7 @@ const JUDUL: Record<string, string> = {
   '/chart': 'Chart & Backtest',
   '/jurnal': 'Journal',
   '/personal': 'Personal Area',
+  '/copy': 'Copy Trading',
   '/marketplace': 'Marketplace',
   '/integrasi': 'Integrations',
   '/pemilik': 'Traffic & Sales',

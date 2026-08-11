@@ -79,6 +79,7 @@ const Maintenance   = lazy(() => muat(() => import('@/halaman/Maintenance')));
 const Billing       = lazy(() => muat(() => import('@/halaman/Billing')));
 const Dokumentasi   = lazy(() => muat(() => import('@/halaman/Dokumentasi')));
 const Changelog     = lazy(() => muat(() => import('@/halaman/Changelog')));
+const CopyTrading   = lazy(() => muat(() => import('@/halaman/Analisa')));
 
 /* ── Pramuat halaman lain SAAT SENGGANG ─────────────────────────────────
    Tiap halaman adalah potongan JS terpisah yang baru diunduh saat pertama
@@ -96,6 +97,7 @@ if (typeof window !== 'undefined') {
       () => import('@/halaman/Chart'),
       () => import('@/halaman/ScreenerV2'),
       () => import('@/halaman/Marketplace'),
+      () => import('@/halaman/Analisa'),
       () => import('@/halaman/Integrasi'),
       () => import('@/halaman/PersonalArea'),
       () => import('@/halaman/Maintenance'),
@@ -184,6 +186,7 @@ export default function App() {
             <Route path="/jurnal"      element={<Jurnal />} />
             <Route path="/personal"    element={<PersonalArea />} />
             <Route path="/marketplace" element={<Marketplace />} />
+            <Route path="/copy"        element={<CopyTrading />} />
             <Route path="/integrasi"   element={<Integrasi />} />
             <Route path="/pemilik"     element={<Pemilik />} />
             <Route path="/maintenance" element={<Maintenance />} />

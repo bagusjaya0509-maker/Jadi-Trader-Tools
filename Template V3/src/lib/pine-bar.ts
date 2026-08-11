@@ -188,6 +188,13 @@ class Pengurai {
       return e;
     }
     const c = this.t[this.pos];
+    /* Warna heksadesimal literal — color.new(#8B0000, 70) adalah bentuk
+       yang benar-benar dipakai orang di input.color. Nilainya string warna,
+       sama seperti color.red. */
+    if (c === '#') {
+      const hex = /^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?/.exec(this.t.slice(this.pos));
+      if (hex) { this.pos += hex[0].length; return { j: 'teks', v: hex[0].slice(0, 7) }; }
+    }
     if (c === '"' || c === "'") {
       let j = this.pos + 1;
       while (j < this.t.length && this.t[j] !== c) j++;
