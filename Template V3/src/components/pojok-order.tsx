@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { TrendingUp, TrendingDown, X, Check, Ban, CandlestickChart, Minus, Hourglass } from 'lucide-react';
 import { cn, uang, harga as fHarga } from '@/lib/utils';
+import { METODE_TP, type MetodeTp } from '@/lib/order-nyata';
 
 /* ════════════════════════════════════════════════════════════════════════
    TIKET ORDER DI POJOK CHART
@@ -32,6 +33,7 @@ const KUNCI_TUTUP = 'jt.pojokTutup';
 export function PojokOrder({
   posisi, hargaKini, draf, rencana, mode, jenis, risiko, tunda, onBatalTunda,
   onPilih, onUbah, onKirim, onBatal, onTutup, onGantiMode, mati,
+  nyataSetelan, aturNyata, sibukNyata, kabar,
 }: {
   posisi: { arah: 'BUY' | 'SELL'; masuk: number; sl: number; tp: number; pnl: number; risiko: number; unit: number } | null;
   hargaKini?: number;
@@ -53,6 +55,13 @@ export function PojokOrder({
   onTutup: () => void;
   onGantiMode: (m: 'demo' | 'real') => void;
   mati?: boolean;
+  /** Setelan order sungguhan — modal, leverage, metode TP. Diangkat ke
+   *  halaman supaya label risiko di garis chart memakai angka yang sama. */
+  nyataSetelan?: { modal: number; leverage: number; metode: MetodeTp };
+  aturNyata?: (s: { modal: number; leverage: number; metode: MetodeTp }) => void;
+  sibukNyata?: boolean;
+  /** Kabar terakhir dari pengiriman order (sukses/gagal/pending). */
+  kabar?: string;
 }) {
   const nyata = mode === 'real';
   /* Terlipat atau terbuka — pilihan yang diingat. Saat ada tiket, posisi,
@@ -167,6 +176,34 @@ export function PojokOrder({
           <Isian k="tp" label="TP" warna="#10b981" />
         </div>
 
+        {/* Order sungguhan butuh UKURANNYA di tempat yang sama dengan
+            levelnya — modal, leverage, dan metode TP yang persis sama
+            dengan Area Entry. Tanpa ini tiketnya cuma setengah keputusan. */}
+        {nyata && nyataSetelan && aturNyata && (
+          <div className="mt-1.5 flex items-end gap-1.5">
+            <label className="block">
+              <span className="mb-0.5 block text-[9.5px] uppercase tracking-wide text-zinc-500">Modal $</span>
+              <input value={nyataSetelan.modal || ''} inputMode="decimal"
+                     onChange={(e) => aturNyata({ ...nyataSetelan, modal: Number(e.target.value) || 0 })}
+                     className={cn(KELAS_ISIAN, 'angka w-[64px]')} />
+            </label>
+            <label className="block">
+              <span className="mb-0.5 block text-[9.5px] uppercase tracking-wide text-zinc-500">Lev</span>
+              <input value={nyataSetelan.leverage || ''} inputMode="numeric"
+                     onChange={(e) => aturNyata({ ...nyataSetelan, leverage: Number(e.target.value) || 1 })}
+                     className={cn(KELAS_ISIAN, 'angka w-[44px]')} />
+            </label>
+            <label className="block grow">
+              <span className="mb-0.5 block text-[9.5px] uppercase tracking-wide text-zinc-500">Metode TP</span>
+              <select value={nyataSetelan.metode}
+                      onChange={(e) => aturNyata({ ...nyataSetelan, metode: e.target.value as MetodeTp })}
+                      className={cn(KELAS_ISIAN, 'w-full max-w-[190px] cursor-pointer')}>
+                {METODE_TP.map((m) => <option key={m.nilai} value={m.nilai}>{m.label}</option>)}
+              </select>
+            </label>
+          </div>
+        )}
+
         <div className="mt-1.5 flex items-center gap-2">
           <span className="text-[10.5px] text-zinc-500">
             R:R <span className={cn('angka', rr && rr >= 1.5 ? 'text-emerald-400' : 'text-zinc-300')}>
@@ -180,18 +217,19 @@ export function PojokOrder({
               <span className="angka text-emerald-400">+{uang(risiko * rr)}</span>
             </span>
           )}
-          <button onClick={onKirim} disabled={!arahBenar || mati}
+          <button onClick={onKirim} disabled={!arahBenar || mati || sibukNyata}
             title={arahBenar ? undefined : 'SL dan TP harus berada di sisi yang benar terhadap entry'}
             className={cn('ml-auto flex cursor-pointer items-center gap-1 rounded px-2.5 py-1 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40',
               nyata ? 'bg-red-500/25 text-red-200 hover:bg-red-500/35'
                     : 'bg-zinc-100 text-zinc-950 hover:bg-white')}>
-            <Check className="size-3" /> {nyata ? 'Kirim order' : 'Kirim'}
+            <Check className="size-3" /> {sibukNyata ? 'Mengirim…' : nyata ? 'Kirim order' : 'Kirim'}
           </button>
           <button onClick={onBatal} title="Batalkan tiket"
             className="flex cursor-pointer items-center gap-1 rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-400 transition-colors hover:border-zinc-500 hover:text-zinc-200">
             <Ban className="size-3" /> Batal
           </button>
         </div>
+        {kabar && <div className="mt-1.5 max-w-[320px] text-[10.5px] leading-relaxed text-zinc-400">{kabar}</div>}
       </div>
     );
   }
@@ -225,6 +263,9 @@ export function PojokOrder({
         className="flex size-6 cursor-pointer items-center justify-center rounded text-zinc-600 transition-colors hover:text-zinc-300">
         <Minus className="size-3.5" />
       </button>
+      {kabar && (
+        <span className="max-w-[260px] px-1 text-[10.5px] leading-tight text-zinc-400">{kabar}</span>
+      )}
     </div>
   );
 }

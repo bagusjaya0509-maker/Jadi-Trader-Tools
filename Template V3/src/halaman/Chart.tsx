@@ -6,7 +6,7 @@ import { cn, uang, persen, harga, tanggalPendek } from '@/lib/utils';
 import { ChartLilin, type Garis, type GarisHarga, type GarisSeret } from '@/components/chart-lilin';
 import { PanelReplay, type AksiOrder, type JenisEntry } from '@/components/panel-replay';
 import { PojokOrder } from '@/components/pojok-order';
-import { KotakOrderNyata } from '@/components/kotak-order-nyata';
+import { kirimOrderNyata, type MetodeTp } from '@/lib/order-nyata';
 import { PanelPine } from '@/components/panel-pine';
 import type { HasilPine } from '@/lib/pine';
 import { bacaSetelanChart, simpanSetelanChart } from '@/lib/replay';
@@ -115,10 +115,12 @@ export default function ChartBacktest() {
   /* Arah tiket yang sedang disusun. null = belum ada tiket, chart cuma
      menggambar rencana dari kartu screener kalau ada. */
   const [draf, setDraf] = useState<'BUY' | 'SELL' | null>(null);
-  /* Tiket order SUNGGUHAN yang sudah dikonfirmasi arahnya di chart, menunggu
-     konfirmasi kedua berisi angka. Uang sungguhan tidak berangkat dari satu
-     tombol di atas grafik. */
-  const [tiketNyata, setTiketNyata] = useState<{ arah: 'BUY' | 'SELL'; sl: number; tp: number; entry: number; jenis: JenisEntry } | null>(null);
+  /* Setelan order sungguhan — hidup di halaman supaya label risiko di
+     garis chart dihitung dari angka yang SAMA dengan yang akan dikirim. */
+  const [nyataSetelan, setNyataSetelan] = useState<{ modal: number; leverage: number; metode: MetodeTp }>(
+    { modal: 100, leverage: 4, metode: 'partial' });
+  const [sibukNyata, setSibukNyata] = useState(false);
+  const [kabarNyata, setKabarNyata] = useState('');
   const mulaiReplay = useRef<(() => void) | null>(null);
   /* Stabil dengan sengaja: fungsi baru tiap render akan memicu ulang efek
      yang memasangnya di panel replay, dan efek itu memanggil setState. */
@@ -324,6 +326,12 @@ export default function ChartBacktest() {
       if (aksiPosisi) {
         ketSl = `· -${uang(aksiPosisi.risiko)}`;
         ketTp = `· +${uang(aksiPosisi.unit * Math.abs(tpN - aksiPosisi.masuk))}`;
+      } else if (aksi?.mode === 'real') {
+        /* Mode REAL: dolar dari ukuran order yang SEBENARNYA akan dikirim —
+           qty = modal × leverage / entry, bukan dari setelan risiko demo. */
+        const qty = (nyataSetelan.modal * nyataSetelan.leverage) / e;
+        ketSl = `· -${uang(qty * Math.abs(e - s))}`;
+        ketTp = `· +${uang(qty * Math.abs(tpN - e))}`;
       } else if (aksi) {
         const r = aksi.risiko;
         ketSl = `· -${uang(r)}`;
@@ -338,7 +346,7 @@ export default function ChartBacktest() {
     if (sumber.sl) g.push({ id: 'sl', harga: sumber.sl, warna: '#f87171', label: 'SL', ket: ketSl, bisaSeret: !kunci });
     if (sumber.tp) g.push({ id: 'tp', harga: sumber.tp, warna: '#10b981', label: 'TP', ket: ketTp, bisaSeret: !kunci });
     return g;
-  }, [aksiPosisi, aksiTunda, rencana, aksi, draf, labelJenis]);
+  }, [aksiPosisi, aksiTunda, rencana, aksi, draf, labelJenis, nyataSetelan]);
 
   const terakhir = lilin.closes[lilin.closes.length - 1];
   const sebelumnya = lilin.closes[lilin.closes.length - 2];
@@ -502,10 +510,10 @@ export default function ChartBacktest() {
                               draf={draf} rencana={rencana} mode={aksi.mode}
                               jenis={labelJenis} risiko={aksi.risiko}
                               tunda={aksiTunda} onBatalTunda={aksi.batalTunda}
-                              onGantiMode={(m) => { aksi.gantiMode(m); setTiketNyata(null); }}
+                              onGantiMode={(m) => { aksi.gantiMode(m); setKabarNyata(''); }}
                               onPilih={(arah) => {
                                 setDraf(arah);
-                                setTiketNyata(null);
+                                setKabarNyata('');
                                 /* Level yang SUDAH dipasang orangnya dipertahankan
                                    selama masih benar sisinya untuk arah ini.
                                    Menimpanya dengan usulan ATR akan membuang
@@ -522,18 +530,34 @@ export default function ChartBacktest() {
                                 if (u) setRencana({ entry: u.entry, sl: u.sl || undefined, tp: u.tp || undefined });
                               }}
                               onUbah={setRencana}
-                              onBatal={() => { setDraf(null); setTiketNyata(null); }}
+                              onBatal={() => { setDraf(null); setKabarNyata(''); }}
                               onKirim={() => {
                                 const { entry, sl, tp } = rencana;
                                 if (!draf || !entry || !sl || !tp) return;
                                 if (aksi.mode === 'real') {
-                                  setTiketNyata({ arah: draf, sl, tp, entry, jenis: jenisEntry });
-                                  setDraf(null);
+                                  /* Konfirmasi berisi angka ada DI DALAM
+                                     kirimOrderNyata — jalur yang sama persis
+                                     dengan Area Entry V2, termasuk pengaman
+                                     simbol tanpa STOP_MARKET. */
+                                  setSibukNyata(true); setKabarNyata('');
+                                  void kirimOrderNyata({
+                                    simbol, arah: draf,
+                                    modal: nyataSetelan.modal, leverage: nyataSetelan.leverage,
+                                    entry: jenisEntry === 'MARKET' ? (aksi.hargaKini ?? entry) : entry,
+                                    jenis: jenisEntry, sl, tp, metode: nyataSetelan.metode,
+                                  }).then((h) => {
+                                    setKabarNyata(h.pesan);
+                                    if (h.pesan !== 'Dibatalkan.') { setDraf(null); setRencana({}); }
+                                  }).catch((e) => {
+                                    setKabarNyata(e instanceof Error ? e.message : 'Gagal mengirim order');
+                                  }).finally(() => setSibukNyata(false));
                                   return;
                                 }
                                 aksi.kirim(draf, { entry, sl, tp }, jenisEntry);
                                 setDraf(null);
                               }}
+                              nyataSetelan={nyataSetelan} aturNyata={setNyataSetelan}
+                              sibukNyata={sibukNyata} kabar={kabarNyata || undefined}
                               onTutup={aksi.tutup} mati={aksi.mati} />
                           ) : undefined} />
             : <div className="flex h-[440px] items-center justify-center text-[12.5px] text-zinc-600">
@@ -548,20 +572,6 @@ export default function ChartBacktest() {
         {/* SELALU terpasang, tampil hanya saat dibuka. Efeknya tetap jalan
             meski tidak menggambar apa pun — itulah yang membuat tombol
             BUY/SELL di pojok chart tersedia sejak halaman dibuka. */}
-        {/* Tiket order SUNGGUHAN — langkah kedua, dengan konfirmasi berisi
-            angka. Arah dan level sudah dipilih di chart; yang tersisa di sini
-            adalah ukuran uangnya, dan itu tidak boleh berangkat dari satu
-            tombol kecil di atas grafik. */}
-        {tiketNyata && (
-          <div className="border-t border-zinc-800/80 p-4">
-            <KotakOrderNyata simbol={simbol} hargaKini={terakhir}
-                             arahTerkunci={tiketNyata.arah}
-                             slAwal={tiketNyata.sl} tpAwal={tiketNyata.tp}
-                             entryAwal={tiketNyata.entry} jenisAwal={tiketNyata.jenis}
-                             onBatal={() => setTiketNyata(null)} />
-          </div>
-        )}
-
         <div className={cn(replayIdx !== null ? 'border-t border-zinc-800/80' : 'hidden')}>
           <PanelReplay lilin={lilin} simbol={simbol} tf={tf} idx={replayIdx}
                        setIdx={setReplayIdx} aturGaris={setGarisHarga}

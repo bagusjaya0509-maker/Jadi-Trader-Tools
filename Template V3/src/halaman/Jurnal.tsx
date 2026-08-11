@@ -570,7 +570,11 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
               </div>
             </Panel>
 
-            <div className="grow"><PanelPosisiJurnal sumber={sumber} /></div>
+            {/* [&>div]:h-full — PanelPosisiJurnal membungkus dirinya dengan
+                Panel sendiri; tanpa ini pembungkusnya meregang tapi kartunya
+                tetap pendek, dan tepi bawah kolom kiri tidak pernah bertemu
+                tepi bawah kalender. */}
+            <div className="grow [&>div]:h-full"><PanelPosisiJurnal sumber={sumber} /></div>
             </div>
 
             <Panel className="flex min-w-0 flex-col">

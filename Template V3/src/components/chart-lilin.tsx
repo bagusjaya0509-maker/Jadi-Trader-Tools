@@ -165,6 +165,12 @@ export function ChartLilin({
      Panel TERPISAH (paneIndex 1), bukan ditumpuk di atas harga: SMI bergerak
      di rentang -100..100 sementara harga di puluhan ribu, dan menggabungkan
      keduanya di satu sumbu membuat salah satunya jadi garis lurus. */
+  /* Seri SMI dibuat saat indikatornya MENYALA — sekali, bukan tiap bar.
+     ──────────────────────────────────────────────────────────────────────
+     Efek lama membongkar-pasang seri setiap `hingga` berubah — sekali per
+     bar replay. Tiap bongkar-pasang membuat panel 1 lenyap sekejap lalu
+     lahir lagi dengan tinggi bawaan, dan pembatas panelnya tampak meloncat
+     naik-turun sepanjang replay. Datanya sendiri cukup di-setData. */
   useEffect(() => {
     const c = chart.current;
     if (!c) return;
@@ -172,20 +178,14 @@ export function ChartLilin({
     seriSmi.current = [];
     if (!smi || !lilin.times.length) return;
 
-    const batas = hingga === undefined ? lilin.times.length : Math.max(1, Math.min(lilin.times.length, hingga + 1));
-    const buat = (nilai: (number | null)[], warna: string, tebal: 1 | 2) => {
+    const buat = (warna: string, tebal: 1 | 2) => {
       const s = c.addSeries(LineSeries, {
         color: warna, lineWidth: tebal, priceLineVisible: false, lastValueVisible: false,
       }, 1);
-      s.setData(
-        lilin.times.slice(0, batas)
-          .map((t, i) => ({ time: Math.floor(t / 1000) as Time, value: nilai[i] }))
-          .filter((x): x is { time: Time; value: number } => x.value != null && isFinite(x.value))
-      );
       seriSmi.current.push(s);
     };
-    buat(smi.smi, '#fbbf24', 2);
-    buat(smi.signal, '#60a5fa', 1);
+    buat('#fbbf24', 2);
+    buat('#60a5fa', 1);
 
     /* Ambang jenuh +50 / -50 — angka yang SAMA dengan SMI_OB dan SMI_OS di
        jt-scan-core, yaitu ambang yang dipakai kartu sinyal untuk menyebut
@@ -200,6 +200,20 @@ export function ChartLilin({
       }));
     }
     try { c.panes()[1]?.setHeight(tinggiSmi.current); } catch { /* versi tanpa panes API */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [smi === null, lilin.times.length === 0]);
+
+  /* Data SMI dipotong lewat setData pada seri yang SAMA — pembatas panel
+     tidak tersentuh, jadi ia diam selama replay berjalan bar demi bar. */
+  useEffect(() => {
+    if (!smi || seriSmi.current.length < 2 || !lilin.times.length) return;
+    const batas = hingga === undefined ? lilin.times.length : Math.max(1, Math.min(lilin.times.length, hingga + 1));
+    const isi = (nilai: (number | null)[]) =>
+      lilin.times.slice(0, batas)
+        .map((t, i) => ({ time: Math.floor(t / 1000) as Time, value: nilai[i] }))
+        .filter((x): x is { time: Time; value: number } => x.value != null && isFinite(x.value));
+    seriSmi.current[0].setData(isi(smi.smi));
+    seriSmi.current[1].setData(isi(smi.signal));
   }, [smi, lilin, hingga]);
 
   /* Garis indikator */
@@ -266,6 +280,10 @@ export function ChartLilin({
   const garisRef = useRef<Map<string, HTMLDivElement>>(new Map());
   const hamparanRef = useRef<HTMLDivElement>(null);
   const seret = useRef<{ id: string; mulaiY: number } | null>(null);
+  /* Tinggi panel harga, diisi pasang() saat terbaca. Penjepit seret dan
+     penyembunyi label memakai angka yang SAMA — kalau tidak, harga hasil
+     jepitan bisa jatuh di wilayah yang penyembunyinya anggap "di luar". */
+  const paneHargaRef = useRef(0);
 
   /* Nilai terbaru dibaca dari ref di dalam rAF. Kalau dibaca dari closure,
      loopnya harus dipasang ulang tiap render — dan itu mengalahkan
@@ -277,7 +295,13 @@ export function ChartLilin({
     const s = seri.current;
     if (!s || !kotak.current) return null;
     const rect = kotak.current.getBoundingClientRect();
-    const v = s.coordinateToPrice(y - rect.top);
+    /* DIJEPIT ke panel harga. Tanpa penjepit, seretan yang lewat tepi chart
+       terus menghasilkan harga — garisnya mengikuti kursor ke panel SMI dan
+       ke panel-panel di bawahnya. Batasnya bukan layar; batasnya panel
+       harga. */
+    const paneH = paneHargaRef.current || rect.height;
+    const yRel = Math.min(Math.max(y - rect.top, 2), paneH - 2);
+    const v = s.coordinateToPrice(yRel);
     return typeof v === 'number' && isFinite(v) ? v : null;
   }, []);
 
@@ -291,10 +315,19 @@ export function ChartLilin({
     let lebar = 0;
     try { lebar = c.priceScale('right').width(); } catch { /* versi lama */ }
 
+    try {
+      const h0 = c.panes()[0].getHeight();
+      if (h0 > 0) paneHargaRef.current = h0;
+    } catch { /* versi lama */ }
+    const paneHarga = paneHargaRef.current;
+
     const taruh = (el: HTMLDivElement | undefined | null, nilai: number | undefined) => {
       if (!el) return;
       const y = nilai === undefined ? null : s.priceToCoordinate(nilai);
-      if (typeof y === 'number' && isFinite(y)) {
+      /* Label yang harganya di luar jendela zoom DISEMBUNYIKAN, bukan
+         digambar nyasar di panel sebelah. Garis SL yang menempel di panel
+         backtest bukan informasi; itu kebocoran tata letak. */
+      if (typeof y === 'number' && isFinite(y) && y >= -2 && (!paneHarga || y <= paneHarga + 2)) {
         el.style.top = y + 'px';
         el.style.visibility = 'visible';
       } else {
@@ -410,7 +443,7 @@ export function ChartLilin({
   const naik = idxAkhir >= 0 && lilin.closes[idxAkhir] >= lilin.opens[idxAkhir];
 
   return (
-    <div className="relative">
+    <div className="relative overflow-hidden">
       <div ref={kotak} style={{ height: tinggi }} className="w-full" />
 
       {/* Hitung mundur DI DALAM label harga, bukan di sebelahnya.
@@ -460,8 +493,11 @@ export function ChartLilin({
       {/* Kendali replay ditumpangkan di dasar area harga, bukan di panel
           terpisah di bawah chart — latarnya tembus supaya menyatu dengan
           grafiknya. */}
+      {/* left-14: logo atribusi TradingView duduk di pojok kiri bawah panel
+          harga, dan lisensi lightweight-charts mensyaratkan ia terlihat —
+          kendalinya yang minggir, bukan logonya. */}
       {hamparanBawah && (
-        <div ref={hamparanRef} className="absolute left-2 z-20" style={{ bottom: smi ? 120 : 34 }}>
+        <div ref={hamparanRef} className="absolute left-14 z-20" style={{ bottom: smi ? 120 : 34 }}>
           {hamparanBawah}
         </div>
       )}
