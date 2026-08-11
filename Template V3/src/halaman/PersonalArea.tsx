@@ -3,10 +3,11 @@ import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
 } from 'recharts';
-import { Plus, RefreshCw, Wallet, TrendingUp, Banknote, Scale, Radio, Trash2, Loader2 } from 'lucide-react';
+import { Plus, RefreshCw, Wallet, TrendingUp, Banknote, Scale, Radio, Trash2, Loader2, Upload } from 'lucide-react';
 import { Panel, PanelHead, KartuKpi, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn } from '@/lib/utils';
-import { WARNA_KATEGORI, rupiah, rupiahRingkas, type KategoriAset } from '@/data/porto';
+import { warnaKategori, rupiah, rupiahRingkas, type KategoriAset } from '@/data/porto';
+import { ModalImporPorto } from '@/components/modal-impor-porto';
 import { usePorto, bawaan, idBaru, type PosAset } from '@/lib/porto';
 import { useHargaPasar } from '@/lib/harga';
 import { useAuth } from '@/lib/auth';
@@ -36,8 +37,10 @@ export default function PersonalArea() {
   const { isi, memuat, galat, kosong, simpan } = usePorto();
   const [pesan, setPesan] = useState('');
   const [sibuk, setSibuk] = useState(false);
-  const [baru, setBaru] = useState<{ nama: string; nilai: string; kategori: KategoriAset; simbol: string }>(
-    { nama: '', nilai: '', kategori: 'Bank', simbol: '' });
+  /* `kategori` string, bukan KategoriAset: enam kategori bawaan tidak akan
+     pernah cukup. Yang bawaan tetap jadi saran cepat lewat <datalist>. */
+  const [baru, setBaru] = useState({ nama: '', nilai: '', kategori: 'Bank', simbol: '' });
+  const [imporBuka, setImporBuka] = useState(false);
 
   /* Harga sungguhan dari proxy VPS, bukan angka acak. `harga` di sini adalah
      harga SEKARANG; yang disimpan bersama pos adalah harga saat dicatat, jadi
@@ -74,10 +77,17 @@ export default function PersonalArea() {
     .filter((a) => a.kategori !== 'Emas' && a.kategori !== 'Sekuritas')
     .reduce((s, a) => s + a.nilaiKini, 0);
 
-  const perKategori = KATEGORI.map((k) => ({
-    nama: k,
-    nilai: asetHidup.filter((a) => a.kategori === k).reduce((s, a) => s + a.nilaiKini, 0),
-  })).filter((k) => k.nilai > 0);
+  /* Kategori diambil dari DATA, bukan dari daftar tetap. Kategori buatan
+     sendiri ("Tanah", "Piutang") harus ikut muncul di grafik komposisi —
+     kalau tidak, jumlah irisan pai tidak akan sama dengan aset kotor. */
+  const perKategori = useMemo(() => {
+    const peta = new Map<string, number>();
+    asetHidup.forEach((a) => peta.set(a.kategori, (peta.get(a.kategori) ?? 0) + a.nilaiKini));
+    return [...peta.entries()]
+      .map(([nama, nilai]) => ({ nama, nilai }))
+      .filter((k) => k.nilai > 0)
+      .sort((a, b) => b.nilai - a.nilai);
+  }, [asetHidup]);
 
   /* Riwayat bulanan DICATAT, bukan dikarang. Tiap kali halaman dibuka, porto
      bersih bulan berjalan ditulis ulang — jadi grafiknya tumbuh sejak hari
@@ -127,9 +137,10 @@ export default function PersonalArea() {
        membuat "nilai kini" punya arti — tanpanya pos bersimbol cuma angka
        tetap dengan lencana "live" yang menipu. */
     const pos: PosAset = {
-      id: idBaru(), nama: baru.nama.trim(), nilai, kategori: baru.kategori,
+      id: idBaru(), nama: baru.nama.trim(), nilai, kategori: baru.kategori.trim(),
       ...(sim ? { simbol: sim, ...(hargaPasar[sim] ? { hargaCatat: hargaPasar[sim] } : {}) } : {}),
     };
+    if (!pos.kategori.trim()) pos.kategori = 'Lainnya';
     void jalankan(() => simpan({ ...isi, aset: [...isi.aset, pos] }), `${pos.nama} tersimpan.`)
       .then(() => setBaru({ nama: '', nilai: '', kategori: 'Bank', simbol: '' }));
   }
@@ -166,6 +177,10 @@ export default function PersonalArea() {
       {/* Tawaran isi awal — hanya kalau memang belum ada apa-apa, dan hanya
           sebagai TAWARAN. Menulisnya sendiri diam-diam berarti menaruh
           portofolio orang lain di akun seseorang tanpa dia minta. */}
+      {imporBuka && (
+        <ModalImporPorto isi={isi} simpan={simpan} tutup={() => setImporBuka(false)} />
+      )}
+
       {!memuat && pengguna && isi.aset.length === 0 && (
         <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-900/60 px-4 py-3">
           <span className="text-[12.5px] text-zinc-400">Belum ada pos tercatat.</span>
@@ -202,7 +217,7 @@ export default function PersonalArea() {
                     isAnimationActive={false}
                   >
                     {perKategori.map((k) => (
-                      <Cell key={k.nama} fill={WARNA_KATEGORI[k.nama as KategoriAset]} />
+                      <Cell key={k.nama} fill={warnaKategori(k.nama)} />
                     ))}
                   </Pie>
                   <Tooltip
@@ -224,7 +239,7 @@ export default function PersonalArea() {
             <div className="space-y-1.5">
               {perKategori.map((k) => (
                 <div key={k.nama} className="flex items-center gap-2.5 text-[12.5px]">
-                  <span className="size-2.5 shrink-0 rounded-sm" style={{ background: WARNA_KATEGORI[k.nama as KategoriAset] }} />
+                  <span className="size-2.5 shrink-0 rounded-sm" style={{ background: warnaKategori(k.nama) }} />
                   <span className="flex-1 text-zinc-400">{k.nama}</span>
                   <span className="angka text-zinc-300">{((k.nilai / totalAset) * 100).toFixed(1)}%</span>
                   <span className="angka w-24 text-right text-zinc-500">{rupiahRingkas(k.nilai)}</span>
@@ -326,7 +341,7 @@ export default function PersonalArea() {
                       </Td>
                       <Td>
                         <span className="flex items-center gap-1.5 text-[12px] text-zinc-500">
-                          <span className="size-2 rounded-sm" style={{ background: WARNA_KATEGORI[a.kategori] }} />
+                          <span className="size-2 rounded-sm" style={{ background: warnaKategori(a.kategori) }} />
                           {a.kategori}
                         </span>
                       </Td>
@@ -358,7 +373,13 @@ export default function PersonalArea() {
                 berkas apa pun — memilih berkas lalu tidak terjadi apa-apa
                 terbaca sebagai kerusakan, dan menyisakannya berarti terus
                 menjanjikan sesuatu yang tidak ada. */}
-            <PanelHead judul="Tambah Pos" sub="Ketik satu pos; tersimpan di akunmu." />
+            <PanelHead judul="Tambah Pos" sub="Ketik satu pos, atau impor sekaligus dari lembar."
+              kanan={
+                <button onClick={() => setImporBuka(true)} disabled={!pengguna}
+                  className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 py-1.5 text-[11.5px] text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100 disabled:cursor-not-allowed disabled:opacity-50">
+                  <Upload className="size-3.5" /> Impor
+                </button>
+              } />
             <div className="space-y-3 px-5 pb-5">
               <div id="isiManual" className="rounded-lg border border-zinc-800/60 p-3">
                 <div className="space-y-2">
@@ -369,11 +390,19 @@ export default function PersonalArea() {
                     <input value={baru.nilai} onChange={(e) => setBaru({ ...baru, nilai: e.target.value })}
                       placeholder="Nilai (Rp)" inputMode="numeric" disabled={!pengguna}
                       className="angka h-9 w-full rounded-md border border-zinc-800 bg-zinc-900/60 px-3 text-[12.5px] text-zinc-100 outline-none transition-colors placeholder:text-zinc-600 hover:border-zinc-700 focus-visible:border-zinc-600 disabled:opacity-50" />
-                    <select value={baru.kategori} onChange={(e) => setBaru({ ...baru, kategori: e.target.value as KategoriAset })}
-                      disabled={!pengguna}
-                      className="h-9 w-full cursor-pointer rounded-md border border-zinc-800 bg-zinc-900/60 px-2 text-[12.5px] text-zinc-300 outline-none disabled:opacity-50">
-                      {KATEGORI.map((k) => <option key={k} value={k}>{k}</option>)}
-                    </select>
+                    {/* Input berdaftar-saran, bukan <select>. Enam pilihan
+                        tetap memaksa "Tanah" atau "Piutang" masuk ke kategori
+                        yang salah, dan salah kategori diam-diam merusak grafik
+                        komposisi tanpa terlihat sebagai kesalahan. */}
+                    <input list="katPorto" value={baru.kategori}
+                      onChange={(e) => setBaru({ ...baru, kategori: e.target.value })}
+                      placeholder="Jenis" disabled={!pengguna}
+                      className="h-9 w-full rounded-md border border-zinc-800 bg-zinc-900/60 px-2 text-[12.5px] text-zinc-300 outline-none transition-colors placeholder:text-zinc-600 hover:border-zinc-700 focus-visible:border-zinc-600 disabled:opacity-50" />
+                    <datalist id="katPorto">
+                      {[...new Set([...KATEGORI, ...isi.aset.map((a) => a.kategori)])].map((k) => (
+                        <option key={k} value={k} />
+                      ))}
+                    </datalist>
                   </div>
                   <input value={baru.simbol} onChange={(e) => setBaru({ ...baru, simbol: e.target.value })}
                     placeholder="Simbol pasar (opsional), mis. BTCUSDT" disabled={!pengguna}

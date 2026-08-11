@@ -3,15 +3,13 @@ import {
   Check, Crown, Download, Copy, X, Star, MessageCircle, ExternalLink, KeyRound, Loader2, Trash2,
 } from 'lucide-react';
 import { PeragaProduk } from '@/components/peraga-produk';
-import { Panel, PanelHead, KartuKpi } from '@/components/efferd-ui';
-import { cn, uang, tanggalPendek } from '@/lib/utils';
+import { Panel, PanelHead } from '@/components/efferd-ui';
+import { cn, tanggalPendek } from '@/lib/utils';
 import { type Produk } from '@/data/contoh';
 import { useProduk } from '@/lib/data';
 import { useAuth } from '@/lib/auth';
 import { useUlasan, kirimUlasan, hapusUlasan } from '@/lib/ulasan';
-import {
-  useLisensi, usePenjualan, ambilSumberGratis, ambilSumberBerlisensi, tautanBerkas,
-} from '@/lib/admin';
+import { ambilSumberGratis, ambilSumberBerlisensi, tautanBerkas } from '@/lib/admin';
 
 /* Kode lisensi pembeli disimpan di perangkatnya sendiri. Mengetiknya ulang
    tiap kali ingin mengambil versi baru adalah gesekan yang tidak perlu — dan
@@ -112,8 +110,6 @@ export default function Marketplace() {
   const [aktif, setAktif] = useState<Produk | null>(null);
   const { data: PRODUK } = useProduk();
   const { pengguna, pemilik } = useAuth();
-  const lisensi = useLisensi();
-  const penjualan = usePenjualan();
   const ulasan = useUlasan();
 
   const [bintang, setBintang] = useState(5);
@@ -121,7 +117,6 @@ export default function Marketplace() {
   const [kirimSibuk, setKirimSibuk] = useState(false);
   const [kabarUlasan, setKabarUlasan] = useState('');
 
-  const pendapatan = penjualan.data.reduce((s, x) => s + x.nilai, 0);
   const rerata = ulasan.data.length
     ? ulasan.data.reduce((s, u) => s + u.bintang, 0) / ulasan.data.length
     : 0;
@@ -139,27 +134,30 @@ export default function Marketplace() {
 
   return (
     <div className="p-4 sm:p-6">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <KartuKpi label="Produk tayang"   nilai={String(PRODUK.length)} catatan={`${PRODUK.filter((p) => p.premium).length} premium · ${PRODUK.filter((p) => !p.premium).length} gratis`} />
-        <KartuKpi label="Ulasan" nilai={String(ulasan.data.length)}
-                  catatan={ulasan.data.length ? `rata-rata ${rerata.toFixed(1)} dari 5` : 'belum ada ulasan'} />
-        {/* Dua kartu terakhir butuh App Token — angkanya memang cuma milik
-            pemilik. Menampilkan "—" untuk pengunjung jauh lebih jujur
-            daripada angka tetap yang terbaca seperti fakta. */}
-        <KartuKpi label="Lisensi aktif" nilai={pemilik ? String(lisensi.data.length) : '—'}
-                  catatan={pemilik ? 'kode yang sedang berlaku' : 'khusus pemilik'} />
-        <KartuKpi label="Pendapatan" nilai={pemilik ? uang(pendapatan) : '—'}
-                  catatan={pemilik ? `${penjualan.data.length} penjualan tercatat` : 'khusus pemilik'} />
-      </div>
+      {/* Baris KPI dibuang. Halaman ini dilihat calon pembeli, dan tiga dari
+          empat kartunya adalah angka dapur: berapa lisensi aktif, berapa
+          pendapatan. Itu milik Traffic & Sales, bukan etalase — dan kartu
+          "khusus pemilik" yang isinya cuma tanda hubung tidak memberi apa pun
+          kepada pengunjung selain kebingungan. */}
 
-      <Panel className="mt-4">
+      <Panel>
         <PanelHead
           judul="Products"
           sub="Indikator TradingView dan Expert Advisor MetaTrader yang dipakai di terminal ini."
         />
         <div className="grid grid-cols-1 gap-4 px-5 pb-5 sm:grid-cols-2 xl:grid-cols-4">
           {PRODUK.map((p) => (
-            <Panel key={p.id} className={cn('flex flex-col p-5', p.premium && 'border-amber-500/30')}>
+            <Panel key={p.id} className={cn('flex flex-col overflow-hidden', p.premium && 'border-amber-500/30')}>
+              {/* Sampul = gambar pertama katalog, diatur di Maintenance.
+                  Tinggi tetap dan `object-cover`: gambar dengan rasio
+                  bermacam-macam tidak boleh membuat kartu-kartu di satu baris
+                  jadi berbeda tinggi. */}
+              {p.gambar?.[0] && (
+                <img src={p.gambar[0]} alt="" loading="lazy"
+                     className="-mt-px h-[132px] w-full bg-zinc-900 object-cover"
+                     onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+              )}
+              <div className="flex flex-1 flex-col p-5">
               <div className="flex items-start justify-between gap-2">
                 <h3 className="text-[15px] font-semibold tracking-tight text-zinc-100">{p.nama}</h3>
                 {p.premium && <Crown className="size-4 shrink-0 text-amber-400" />}
@@ -179,6 +177,7 @@ export default function Marketplace() {
                 >
                   Detail
                 </button>
+              </div>
               </div>
             </Panel>
           ))}
@@ -213,10 +212,25 @@ export default function Marketplace() {
             {ulasan.data.map((u) => (
               <div key={u.id} className="rounded-lg border border-zinc-800/60 p-4">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="flex size-7 items-center justify-center rounded-full bg-zinc-800 text-[11px] font-semibold text-zinc-300">
-                    {u.nama.charAt(0).toUpperCase()}
+                  {/* Foto profil Google kalau ada, huruf awal kalau tidak.
+                      `referrerPolicy` wajib: tanpa itu Google menolak melayani
+                      gambarnya dari domain lain dan yang muncul ikon rusak. */}
+                  {u.foto ? (
+                    <img src={u.foto} alt="" width={28} height={28} loading="lazy"
+                         referrerPolicy="no-referrer"
+                         className="size-7 shrink-0 rounded-full bg-zinc-800 object-cover"
+                         onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                  ) : (
+                    <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-[11px] font-semibold text-zinc-300">
+                      {u.nama.charAt(0).toUpperCase()}
+                    </span>
+                  )}
+                  <span className="min-w-0">
+                    <span className="block text-[13px] leading-tight text-zinc-200">{u.nama}</span>
+                    {/* Alamatnya sudah tersamar SEJAK DITULIS, bukan disamarkan
+                        di sini — dokumen ulasan dibaca publik. */}
+                    {u.email && <span className="angka block text-[10.5px] leading-tight text-zinc-600">{u.email}</span>}
                   </span>
-                  <span className="text-[13px] text-zinc-200">{u.nama}</span>
                   <span className="flex items-center gap-0.5">
                     {[1, 2, 3, 4, 5].map((i) => (
                       <Star key={i} className={cn('size-3', i <= u.bintang ? 'fill-amber-400 text-amber-400' : 'text-zinc-700')} />

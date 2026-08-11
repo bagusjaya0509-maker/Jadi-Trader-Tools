@@ -11,6 +11,7 @@ import { useRiwayat, usePosisi, useSaldoAwal } from '@/lib/data';
 import { useHargaPasar } from '@/lib/harga';
 import { LabelContoh } from '@/components/gerbang';
 import { useAkunMt5, useAkunBinance } from '@/lib/akun';
+import { PanelEvaluasi } from '@/components/panel-evaluasi';
 
 /* ════════════════════════════════════════════════════════════════════════
    DASHBOARD
@@ -110,6 +111,12 @@ export function Dashboard() {
   ].filter(Boolean);
   const POSISI_MT5 = mt5.posisi;
   const pnlMt5 = POSISI_MT5.reduce((s, p) => s + p.profit, 0);
+  /* null = tidak ada satu pun posisi yang membawa PnL dari bursa. Menjumlahkan
+     `undefined` jadi 0 akan menampilkan "$0,00" — angka yang terbaca sebagai
+     "impas" padahal artinya "tidak tahu". */
+  const pnlKripto = POSISI_TERBUKA.some((p) => p.pnlFloat !== undefined)
+    ? POSISI_TERBUKA.reduce((s, p) => s + (p.pnlFloat ?? 0), 0)
+    : null;
 
   /* Aktivitas dirakit dari KEJADIAN NYATA: transaksi terakhir yang ditutup,
      posisi yang sedang terbuka, dan status sambungan. Daftar sebelumnya
@@ -217,13 +224,23 @@ export function Dashboard() {
           <PanelHead
             judul="Posisi Terbuka — Kripto"
             sub="Order yang sedang berjalan di Binance."
-            kanan={<span className="text-[11.5px] text-zinc-500">{POSISI_TERBUKA.length} posisi</span>}
+            kanan={
+              /* Total PnL floating kripto — pasangan dari angka yang sama di
+                 panel Trade-Fi sebelah. Tanpa ini dua panel yang berdampingan
+                 menjawab pertanyaan yang sama dengan cara berbeda. */
+              pnlKripto === null
+                ? <span className="text-[11.5px] text-zinc-500">{POSISI_TERBUKA.length} posisi</span>
+                : <span className={cn('angka text-[12.5px]', pnlKripto >= 0 ? 'text-emerald-500' : 'text-red-400')}>
+                    {uang(pnlKripto, true)}
+                  </span>
+            }
           />
           <div className="px-5 pb-5">
             <TabelBungkus>
               <Tabel>
                 <thead>
-                  <tr><Th>Pair</Th><Th className="text-right">Entry</Th><Th className="text-right">Gerak</Th></tr>
+                  <tr><Th>Pair</Th><Th className="text-right">Size</Th><Th className="text-right">Entry</Th>
+                      <Th className="text-right">Gerak</Th><Th className="text-right">P/L</Th></tr>
                 </thead>
                 <tbody>
                   {POSISI_TERBUKA.map((p) => {
@@ -237,9 +254,21 @@ export function Dashboard() {
                           </span>
                           <div className="text-[10.5px] text-zinc-600">{p.venue} · {p.tf}</div>
                         </Td>
+                        {/* Size dan P/L hanya ada kalau datanya dari bursa.
+                            Dokumen publik sengaja tidak menyiarkan keduanya —
+                            ukuran posisi membocorkan besar akun. Tanda hubung
+                            berarti "tidak disiarkan", bukan "nol". */}
+                        <Td className="angka text-right text-zinc-400">
+                          {p.jumlah ? p.jumlah.toLocaleString('id-ID', { maximumFractionDigits: 4 }) : '—'}
+                        </Td>
                         <Td className="angka text-right text-zinc-400">{harga(p.entry)}</Td>
                         <Td className={cn('angka text-right', gerak >= 0 ? 'text-emerald-500' : 'text-red-400')}>
                           {gerak >= 0 ? '+' : ''}{gerak.toFixed(2)}%
+                        </Td>
+                        <Td className={cn('angka text-right',
+                          p.pnlFloat === undefined ? 'text-zinc-600'
+                            : p.pnlFloat >= 0 ? 'text-emerald-500' : 'text-red-400')}>
+                          {p.pnlFloat === undefined ? '—' : uang(p.pnlFloat, true)}
                         </Td>
                       </Tr>
                     );
@@ -314,6 +343,8 @@ export function Dashboard() {
           </div>
         </Panel>
       </div>
+
+      <PanelEvaluasi trade={RIWAYAT} saldoAwal={saldoAwal} />
 
       {/* Rincian sumber — supaya angka gabungan di atas bisa DIPERIKSA */}
       <Panel className="mt-4">

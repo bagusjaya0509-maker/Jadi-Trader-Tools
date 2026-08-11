@@ -182,12 +182,13 @@ export function usePosisi(): HasilData<Posisi[]> {
     return bursa.map((b): Posisi => {
       const p = dariPublik.get(b.simbol);
       return p
-        ? { ...p, arah: b.arah, entry: b.entry || p.entry }
+        ? { ...p, arah: b.arah, entry: b.entry || p.entry, jumlah: b.jumlah, pnlFloat: b.pnl }
         : {
             id: `bursa-${b.simbol}`,
             simbol: b.simbol, arah: b.arah, tf: '—',
             entry: b.entry, sl: 0, tp: 0, hargaKini: b.entry,
             venue: 'Binance Live', buka: 0,
+            jumlah: b.jumlah, pnlFloat: b.pnl,
           };
     });
   }, [aktif, bursa, data]);
@@ -264,6 +265,16 @@ export function useProduk(): HasilProduk {
         const mentah = s.data()?.produk;
         try {
           const daftar = typeof mentah === 'string' ? JSON.parse(mentah) : mentah;
+          /* `mentah` (katalog apa adanya, untuk Maintenance) diperbarui bahkan
+             saat katalognya KOSONG. Sebelumnya seluruh blok ini dijaga
+             `daftar.length`, jadi menghapus produk terakhir tidak pernah
+             sampai ke layar: daftarnya tetap menampilkan produk yang sudah
+             tidak ada, dan tombol hapusnya terlihat rusak.
+
+             Yang tetap dijaga `length` hanyalah `data` — daftar untuk etalase.
+             Di sana katalog kosong memang lebih baik diganti contoh daripada
+             halaman jualan yang benar-benar kosong. */
+          if (Array.isArray(daftar)) setMentah(daftar);
           if (Array.isArray(daftar) && daftar.length) {
             setData(daftar.map((p: any): Produk => ({
               id: String(p.id ?? ''),
@@ -279,7 +290,6 @@ export function useProduk(): HasilProduk {
               berkas: p.berkas ? String(p.berkas) : undefined,
               unduhan: p.unduhan === 'ex5' || p.unduhan === 'mq5' ? p.unduhan : undefined,
             })));
-            setMentah(daftar);
             setContoh(false);
           }
         } catch (e) {

@@ -18,8 +18,19 @@
      besar & judul karena karakternya paling dekat, sementara badan teks
      memakai Inter — di sini Inter memang pilihan yang tepat, bukan bawaan
      malas: acuan desainnya jelas berbasis grotesk netral. */
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-display: 'Space Grotesk', 'Inter', sans-serif;
+  /* IBM Plex Sans, BUKAN Inter.
+     ──────────────────────────────────────────────────────────────────────
+     index.html memuat Space Grotesk + IBM Plex Sans + IBM Plex Mono dari
+     Google Fonts — Inter tidak pernah ikut diminta. Jadi selama ini seluruh
+     badan teks V3 jatuh ke Segoe UI, sementara tempelan screener V2 (yang
+     memuat IBM Plex Sans lewat v2-tema.css) tampil dengan huruf yang benar.
+     Itulah sebabnya kedua bagian terasa memakai huruf berbeda: memang
+     berbeda, dan yang salah justru sisi V3-nya.
+
+     Diperbaiki dengan meminta huruf yang sudah diunduh, bukan menambah satu
+     unduhan lagi untuk Inter. */
+  --font-sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-display: 'Space Grotesk', 'IBM Plex Sans', sans-serif;
   --font-mono: 'IBM Plex Mono', 'SF Mono', Consolas, monospace;
 
   --animate-masuk: masuk 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;

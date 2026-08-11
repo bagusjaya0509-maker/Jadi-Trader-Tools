@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 import { MenuPengguna, PitaLangganan } from '@/components/gerbang';
 import { NEWS, PESAN, CHANGELOG } from '@/data/notifikasi';
+import { LogoJT } from '@/components/logo-jt';
 
 /* ════════════════════════════════════════════════════════════════════════
    APP SHELL — rekonstruksi Efferd Dashboard 2
@@ -306,6 +307,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation();
   const { pemilik } = useAuth();
   const judul = JUDUL[pathname] ?? 'Dashboard';
+  /* Ikon halaman diambil dari tabel NAV yang sama dengan sidebar, jadi
+     keduanya tidak bisa berbeda. Menyimpan daftar ikon kedua di sini akan
+     berselisih dengan sidebar pada penambahan menu berikutnya. */
+  const IkonHalaman = NAV.flatMap((g) => g.butir).find((b) => b.ke === pathname)?.Ikon ?? LayoutGrid;
 
   /* Lebar >= 768px dilacak di JS karena posisi sidebar diatur inline —
      media query CSS tidak bisa menyentuh inline style. */
@@ -344,12 +349,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         )}
       >
         <div className="flex h-14 items-center gap-2.5 px-4">
-          <LayoutGrid className="size-[18px] shrink-0 text-zinc-100" strokeWidth={2} />
-          {!ciut && (
-            <span className="truncate font-semibold tracking-tight">
-              Jadi Trader <span className="text-zinc-500">Tools</span>
-            </span>
-          )}
+          {/* Merek mengarah ke beranda. Logo yang tidak bisa diklik adalah
+              salah satu hal pertama yang dicoba orang saat ingin keluar dari
+              sebuah aplikasi — dan tidak terjadi apa-apa selalu terbaca
+              sebagai rusak. `to="/"` bukan `href`: HashRouter menangani ini
+              tanpa memuat ulang seluruh aplikasi. */}
+          <Link to="/" title="Ke halaman depan"
+                className="flex min-w-0 items-center gap-2.5 transition-opacity hover:opacity-80">
+            <LogoJT className="size-[19px] shrink-0 text-zinc-100" />
+            {!ciut && (
+              <span className="truncate font-semibold tracking-tight">
+                Jadi Trader <span className="text-zinc-500">Tools</span>
+              </span>
+            )}
+          </Link>
           <button onClick={() => setLaci(false)} aria-label="Tutup menu"
             className="ml-auto cursor-pointer text-zinc-500 hover:text-zinc-100 md:hidden">
             <X className="size-4" />
@@ -427,7 +440,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </button>
 
           <div className="flex items-center gap-2">
-            <LayoutGrid className="size-4 text-zinc-400" strokeWidth={1.8} />
+            {/* Ikonnya mengikuti halaman yang sedang dibuka, bukan LayoutGrid
+                untuk semuanya. Ikon yang tidak pernah berubah bukan penanda —
+                ia cuma hiasan yang membuat setiap halaman terlihat seperti
+                Dashboard. */}
+            <IkonHalaman className="size-4 text-zinc-400" strokeWidth={1.8} />
             <span className="text-[13px] font-medium">{judul}</span>
           </div>
 

@@ -164,3 +164,18 @@ export function rupiah(n: number) {
   if (!isFinite(n)) return '—';
   return `Rp ${Math.round(n).toLocaleString('id-ID')}`;
 }
+
+/** Warna untuk kategori APA PUN, termasuk yang dibuat sendiri pengguna.
+ *
+ *  Kategori bawaan memakai warnanya masing-masing; yang lain diberi warna
+ *  tetap dari hash namanya. Tetap, bukan acak: kategori yang berganti warna
+ *  tiap kali halaman dimuat membuat grafik komposisi tidak bisa dibaca. */
+const PALET_LAIN = ['#8b5cf6', '#06b6d4', '#f472b6', '#84cc16', '#f97316', '#14b8a6'];
+
+export function warnaKategori(nama: string): string {
+  const bawaan = (WARNA_KATEGORI as Record<string, string>)[nama];
+  if (bawaan) return bawaan;
+  let h = 0;
+  for (let i = 0; i < nama.length; i++) h = (h * 31 + nama.charCodeAt(i)) >>> 0;
+  return PALET_LAIN[h % PALET_LAIN.length];
+}

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/data';
 import { useAuth } from '@/lib/auth';
-import { ASET, KEWAJIBAN, type KategoriAset } from '@/data/porto';
+import { ASET, KEWAJIBAN } from '@/data/porto';
 
 /* ════════════════════════════════════════════════════════════════════════
    PORTOFOLIO PRIBADI — penyimpanan nyata
@@ -25,7 +25,10 @@ export interface PosAset {
   id: string;
   nama: string;
   nilai: number;
-  kategori: KategoriAset;
+  /* String, bukan `KategoriAset`. Enam kategori bawaan tidak akan pernah
+     cukup — orang punya reksa dana, tanah, piutang, koperasi. Yang bawaan
+     tetap jadi pilihan cepat di layar; sisanya diketik sendiri. */
+  kategori: string;
   /** Simbol pasar, kalau nilainya ikut bergerak (mis. BTCUSDT). */
   simbol?: string;
   /** Harga simbol saat pos ini dicatat. Titik nol untuk menghitung nilai

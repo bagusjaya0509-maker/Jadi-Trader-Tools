@@ -41,6 +41,12 @@ export interface Posisi {
   hargaKini: number;
   venue: 'Binance Live' | 'Simulasi' | 'MT5';
   buka: number;
+  /** Ukuran posisi dalam koin. Hanya terisi kalau datanya dari bursa —
+   *  `public/posisiTerbuka` sengaja TIDAK menyiarkannya karena ukuran posisi
+   *  membocorkan besar akun. */
+  jumlah?: number;
+  /** PnL berjalan dalam USD, langsung dari bursa. */
+  pnlFloat?: number;
 }
 
 const HARI = 86_400_000;

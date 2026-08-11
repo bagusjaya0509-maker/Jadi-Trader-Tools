@@ -3,6 +3,7 @@ import { Upload, Trash2, RotateCcw, Plus, FileCode2, Image as ImageIcon, ShieldA
 import { Panel, PanelHead, KartuKpi, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn } from '@/lib/utils';
 import { useProduk, simpanKatalogProduk } from '@/lib/data';
+import { unggahGambar, keDataUrl } from '@/lib/admin';
 import { useAuth } from '@/lib/auth';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -35,6 +36,77 @@ export default function Maintenance() {
   const [pesan, setPesan] = useState('');
   const [menyimpan, setMenyimpan] = useState(false);
 
+  /* Formulir sunting. `pilih` menyimpan id produk yang sedang disunting;
+     string kosong berarti "produk baru". Sebelumnya seluruh formulir ini
+     memakai input tak terkendali tanpa satu pun handler — mengetik apa pun
+     di sana lalu menekan "Simpan produk" tidak pernah terjadi apa-apa. */
+  const [pilih, setPilih] = useState('');
+  const [form, setForm] = useState({ id: '', nama: '', harga: '', versi: '', ringkas: '', fitur: '', sampul: '' });
+  const [unggahSibuk, setUnggahSibuk] = useState(false);
+
+  function muatKeForm(id: string) {
+    setPilih(id);
+    const p = tayang.find((x) => x.id === id);
+    if (!p) { setForm({ id: '', nama: '', harga: '', versi: '', ringkas: '', fitur: '', sampul: '' }); return; }
+    setForm({
+      id: String(p.id ?? ''),
+      nama: String(p.nama ?? ''),
+      harga: String(p.harga ?? 0),
+      versi: String(p.versi ?? ''),
+      ringkas: String(p.ringkas ?? ''),
+      fitur: Array.isArray(p.fitur) ? p.fitur.join('\n') : '',
+      /* Sampul = gambar PERTAMA. Katalog tidak punya field sampul terpisah,
+         dan menambahkannya berarti V2 yang membaca dokumen yang sama harus
+         ikut diubah. Kesepakatan "yang pertama adalah sampul" tidak menuntut
+         perubahan apa pun di sisi V2. */
+      sampul: Array.isArray(p.gambar) && p.gambar.length ? String(p.gambar[0]) : '',
+    });
+  }
+
+  async function pilihSampul(berkas: File | undefined) {
+    if (!berkas) return;
+    setUnggahSibuk(true); setPesan('');
+    try {
+      const url = await unggahGambar(await keDataUrl(berkas), form.id || 'sampul');
+      setForm((f) => ({ ...f, sampul: url }));
+      setPesan('Sampul terunggah. Tekan "Simpan produk" supaya ikut tersimpan di katalog.');
+    } catch (e) {
+      setPesan('Gagal mengunggah sampul: ' + (e instanceof Error ? e.message : 'tidak diketahui'));
+    } finally { setUnggahSibuk(false); }
+  }
+
+  async function simpanProduk() {
+    const id = form.id.trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
+    if (!id) { setPesan('ID produk wajib diisi (huruf kecil, angka, tanda hubung).'); return; }
+    if (!form.nama.trim()) { setPesan('Nama produk wajib diisi.'); return; }
+
+    const lama = tayang.find((x) => x.id === (pilih || id));
+    /* Sebar dari objek lama, bukan menyusun dari nol: katalog nyata punya
+       field yang tidak ada di formulir ini (detail, lynk, berkas, unduhan),
+       dan menulis ulang tanpanya akan melucutinya diam-diam. */
+    const baru = {
+      ...(lama ?? {}),
+      id, nama: form.nama.trim(),
+      harga: Number(form.harga) || 0,
+      versi: form.versi.trim(),
+      ringkas: form.ringkas.trim(),
+      fitur: form.fitur.split('\n').map((s) => s.trim()).filter(Boolean),
+      premium: (Number(form.harga) || 0) > 0,
+      gambar: form.sampul
+        ? [form.sampul, ...(Array.isArray(lama?.gambar) ? lama.gambar.slice(1) : [])]
+        : (Array.isArray(lama?.gambar) ? lama.gambar : []),
+    };
+
+    const daftar = lama
+      ? tayang.map((x) => (x.id === lama.id ? baru : x))
+      : [...tayang, baru];
+
+    if (await simpan(daftar, sampah, `${baru.nama} tersimpan.`)) {
+      setTayang(daftar);
+      setPilih(id);
+    }
+  }
+
   /* Katalog DAN tempat sampah sama-sama datang dari server, jadi keduanya
      ikut segar setiap kali dokumennya berubah — termasuk saat panel pemilik
      V2 mengubahnya dari tab lain. */
@@ -46,10 +118,21 @@ export default function Maintenance() {
      yang mengubah layar tanpa mengubah server — persis kekeliruan yang
      membuat penghapusan terasa berhasil padahal tidak. */
   async function simpan(daftarBaru: any[], sampahBaru: any[], kabar: string) {
-    if (!pemilik) { setPesan('Hanya pemilik yang boleh mengubah katalog.'); return false; }
+    if (!pemilik) {
+      setPesan('Hanya pemilik yang boleh mengubah katalog. Masuk dengan akun pemilik dulu.');
+      return false;
+    }
     setMenyimpan(true);
     try {
-      await simpanKatalogProduk(daftarBaru, sampahBaru);
+      /* Batas waktu 15 detik. `setDoc` baru selesai saat SERVER menjawab, dan
+         kalau jaringannya putus ia menunggu tanpa batas — tombolnya terkunci
+         selamanya tanpa satu pun pesan. Menunggu selamanya dan gagal terlihat
+         sama persis di layar; yang membedakan cuma ada tidaknya kalimat ini. */
+      await Promise.race([
+        simpanKatalogProduk(daftarBaru, sampahBaru),
+        new Promise((_, tolak) => setTimeout(
+          () => tolak(new Error('server tidak menjawab dalam 15 detik — periksa koneksi, lalu coba lagi')), 15_000)),
+      ]);
       setPesan(kabar);
       return true;
     } catch (e) {
@@ -104,7 +187,12 @@ export default function Maintenance() {
       </div>
 
       {pesan && (
-        <div className="mt-4 rounded-lg border border-zinc-800 bg-zinc-900/60 px-4 py-2.5 text-[12.5px] text-zinc-300">
+        /* Gagal dan berhasil TIDAK boleh terlihat sama. Pesan abu-abu seragam
+           adalah salah satu sebab kegagalan penyimpanan lewat begitu saja. */
+        <div className={cn('mt-4 rounded-lg border px-4 py-2.5 text-[12.5px]',
+          /gagal|hanya pemilik/i.test(pesan)
+            ? 'border-amber-500/30 bg-amber-500/5 text-amber-200/90'
+            : 'border-zinc-800 bg-zinc-900/60 text-zinc-300')}>
           {pesan}
         </div>
       )}
@@ -116,7 +204,8 @@ export default function Maintenance() {
             judul="Kelola Produk"
             sub="Klik ✕ memindahkan ke tempat sampah, bukan menghapus."
             kanan={
-              <button className="flex cursor-pointer items-center gap-1.5 rounded-md bg-zinc-100 px-3 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white">
+              <button onClick={() => muatKeForm('')} disabled={!pemilik}
+                className="flex cursor-pointer items-center gap-1.5 rounded-md bg-zinc-100 px-3 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50">
                 <Plus className="size-3.5" /> Produk baru
               </button>
             }
@@ -132,7 +221,9 @@ export default function Maintenance() {
                     {p.harga === 0 ? 'FREE' : `$${p.harga}`}
                   </span>
                   <button onClick={() => void buang(p.id)} disabled={menyimpan || !pemilik}
-                    title={pemilik ? undefined : "Hanya pemilik yang boleh mengubah katalog"}
+                    title={pemilik
+                      ? (menyimpan ? 'Sedang menyimpan…' : `Buang ${p.nama}`)
+                      : 'Hanya pemilik yang boleh mengubah katalog'}
                     aria-label={`Buang ${p.nama}`}
                     className="flex size-5 cursor-pointer items-center justify-center rounded-full text-zinc-600 transition-colors hover:bg-red-500/10 hover:text-red-400">
                     ×
@@ -165,38 +256,84 @@ export default function Maintenance() {
             )}
 
             <div className="mt-6 border-t border-zinc-800/60 pt-5">
-              <div className="mb-3 text-[11.5px] font-medium uppercase tracking-wider text-zinc-500">
-                Sunting produk
+              <div className="mb-3 flex flex-wrap items-center gap-3">
+                <span className="text-[11.5px] font-medium uppercase tracking-wider text-zinc-500">Sunting produk</span>
+                <select value={pilih} onChange={(e) => muatKeForm(e.target.value)}
+                  className="h-8 cursor-pointer rounded-md border border-zinc-800 bg-zinc-900/60 px-2 text-[12px] text-zinc-300 outline-none">
+                  <option value="">— produk baru —</option>
+                  {tayang.map((x) => <option key={x.id} value={x.id}>{x.nama}</option>)}
+                </select>
               </div>
+
+              {/* Sampul produk. Gambarnya disimpan di VPS, bukan di Firestore:
+                  satu dokumen dibatasi 1 MiB dan satu tangkapan layar saja
+                  sudah melewatinya. */}
+              <div className="mb-3 flex flex-wrap items-center gap-3">
+                <div className="flex h-[68px] w-[120px] shrink-0 items-center justify-center overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/60">
+                  {form.sampul
+                    ? <img src={form.sampul} alt="Sampul produk" className="size-full object-cover"
+                           onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                    : <ImageIcon className="size-5 text-zinc-700" strokeWidth={1.8} />}
+                </div>
+                <div>
+                  <label className={cn('inline-flex items-center gap-1.5 rounded-md border border-zinc-800 px-3 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100',
+                    pemilik && !unggahSibuk ? 'cursor-pointer' : 'cursor-not-allowed opacity-50')}>
+                    <Upload className="size-3.5" /> {unggahSibuk ? 'Mengunggah…' : 'Pilih sampul'}
+                    <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden"
+                           disabled={!pemilik || unggahSibuk}
+                           onChange={(e) => void pilihSampul(e.target.files?.[0])} />
+                  </label>
+                  {form.sampul && (
+                    <button onClick={() => setForm((f) => ({ ...f, sampul: '' }))}
+                      className="ml-2 cursor-pointer text-[11.5px] text-zinc-500 underline-offset-2 hover:text-red-400 hover:underline">
+                      hapus sampul
+                    </button>
+                  )}
+                  <div className="mt-1 text-[11px] text-zinc-600">PNG / JPG / WebP, maksimal 8 MB. Tampil sebagai gambar kartu di Marketplace.</div>
+                </div>
+              </div>
+
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
                   <label className="mb-1 block text-[11px] text-zinc-500">ID produk</label>
-                  <input placeholder="jadi-trader-v3"
-                    className="h-9 w-full rounded-md border border-zinc-800 bg-zinc-900/60 px-3 font-mono text-[12.5px] text-zinc-100 outline-none placeholder:text-zinc-600 hover:border-zinc-700 focus-visible:border-zinc-600" />
+                  <input value={form.id} onChange={(e) => setForm({ ...form, id: e.target.value })}
+                    placeholder="jadi-trader-v3" disabled={!pemilik}
+                    className="h-9 w-full rounded-md border border-zinc-800 bg-zinc-900/60 px-3 font-mono text-[12.5px] text-zinc-100 outline-none placeholder:text-zinc-600 hover:border-zinc-700 focus-visible:border-zinc-600 disabled:opacity-50" />
                 </div>
                 <div>
                   <label className="mb-1 block text-[11px] text-zinc-500">Nama produk</label>
-                  <input placeholder="Jadi Trader V3"
-                    className="h-9 w-full rounded-md border border-zinc-800 bg-zinc-900/60 px-3 text-[12.5px] text-zinc-100 outline-none placeholder:text-zinc-600 hover:border-zinc-700 focus-visible:border-zinc-600" />
+                  <input value={form.nama} onChange={(e) => setForm({ ...form, nama: e.target.value })}
+                    placeholder="Jadi Trader V3" disabled={!pemilik}
+                    className="h-9 w-full rounded-md border border-zinc-800 bg-zinc-900/60 px-3 text-[12.5px] text-zinc-100 outline-none placeholder:text-zinc-600 hover:border-zinc-700 focus-visible:border-zinc-600 disabled:opacity-50" />
                 </div>
                 <div>
                   <label className="mb-1 block text-[11px] text-zinc-500">Harga (0 = gratis)</label>
-                  <input placeholder="50" inputMode="numeric"
-                    className="h-9 w-full rounded-md border border-zinc-800 bg-zinc-900/60 px-3 font-mono text-[12.5px] text-zinc-100 outline-none placeholder:text-zinc-600 hover:border-zinc-700 focus-visible:border-zinc-600" />
+                  <input value={form.harga} onChange={(e) => setForm({ ...form, harga: e.target.value })}
+                    placeholder="50" inputMode="numeric" disabled={!pemilik}
+                    className="h-9 w-full rounded-md border border-zinc-800 bg-zinc-900/60 px-3 font-mono text-[12.5px] text-zinc-100 outline-none placeholder:text-zinc-600 hover:border-zinc-700 focus-visible:border-zinc-600 disabled:opacity-50" />
                 </div>
                 <div>
                   <label className="mb-1 block text-[11px] text-zinc-500">Versi / label</label>
-                  <input placeholder="Pine v6 · overlay"
-                    className="h-9 w-full rounded-md border border-zinc-800 bg-zinc-900/60 px-3 text-[12.5px] text-zinc-100 outline-none placeholder:text-zinc-600 hover:border-zinc-700 focus-visible:border-zinc-600" />
+                  <input value={form.versi} onChange={(e) => setForm({ ...form, versi: e.target.value })}
+                    placeholder="Pine v6 · overlay" disabled={!pemilik}
+                    className="h-9 w-full rounded-md border border-zinc-800 bg-zinc-900/60 px-3 text-[12.5px] text-zinc-100 outline-none placeholder:text-zinc-600 hover:border-zinc-700 focus-visible:border-zinc-600 disabled:opacity-50" />
                 </div>
               </div>
               <div className="mt-3">
-                <label className="mb-1 block text-[11px] text-zinc-500">Fitur — satu per baris, format Judul|keterangan</label>
-                <textarea rows={3}
-                  className="w-full resize-y rounded-md border border-zinc-800 bg-zinc-900/60 p-3 text-[12.5px] text-zinc-100 outline-none hover:border-zinc-700 focus-visible:border-zinc-600" />
+                <label className="mb-1 block text-[11px] text-zinc-500">Ringkasan — muncul di kartu produk</label>
+                <textarea rows={2} value={form.ringkas} onChange={(e) => setForm({ ...form, ringkas: e.target.value })}
+                  disabled={!pemilik}
+                  className="w-full resize-y rounded-md border border-zinc-800 bg-zinc-900/60 p-3 text-[12.5px] text-zinc-100 outline-none hover:border-zinc-700 focus-visible:border-zinc-600 disabled:opacity-50" />
               </div>
-              <button className="mt-3 cursor-pointer rounded-md bg-zinc-100 px-4 py-2 text-[12.5px] font-medium text-zinc-950 transition-colors hover:bg-white">
-                Simpan produk
+              <div className="mt-3">
+                <label className="mb-1 block text-[11px] text-zinc-500">Fitur — satu per baris, format Judul|keterangan</label>
+                <textarea rows={3} value={form.fitur} onChange={(e) => setForm({ ...form, fitur: e.target.value })}
+                  disabled={!pemilik}
+                  className="w-full resize-y rounded-md border border-zinc-800 bg-zinc-900/60 p-3 text-[12.5px] text-zinc-100 outline-none hover:border-zinc-700 focus-visible:border-zinc-600 disabled:opacity-50" />
+              </div>
+              <button onClick={() => void simpanProduk()} disabled={menyimpan || !pemilik}
+                className="mt-3 cursor-pointer rounded-md bg-zinc-100 px-4 py-2 text-[12.5px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50">
+                {menyimpan ? 'Menyimpan…' : pilih ? 'Simpan perubahan' : 'Tambah produk'}
               </button>
             </div>
           </div>

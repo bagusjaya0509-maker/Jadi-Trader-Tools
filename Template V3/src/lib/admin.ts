@@ -352,3 +352,29 @@ export function usePosisiBinance(): { data: PosisiBursa[]; aktif: boolean } {
 
   return { data, aktif };
 }
+
+/** Unggah satu gambar ke VPS, dapat URL publiknya.
+ *
+ *  Gambar TIDAK disimpan di Firestore. Satu dokumen dibatasi 1 MiB, dan
+ *  satu tangkapan layar chart saja sudah melewatinya — katalognya akan
+ *  berhenti bisa disimpan sama sekali begitu ada dua produk bergambar. */
+export async function unggahGambar(dataUrl: string, nama: string) {
+  const j = await kirim('/api/gambar', { dataUrl, nama });
+  return String(j.url ?? '');
+}
+
+/** Berkas -> data URL, supaya bisa dikirim sebagai JSON.
+ *
+ *  Batas 8 MB ditegakkan juga di server; diperiksa di sini supaya orang tahu
+ *  sebelum menunggu unggahan yang pasti ditolak. */
+export function keDataUrl(berkas: File): Promise<string> {
+  if (berkas.size > 8 * 1024 * 1024) {
+    return Promise.reject(new Error(`Gambar ${(berkas.size / 1048576).toFixed(1)} MB, batasnya 8 MB`));
+  }
+  return new Promise((selesai, tolak) => {
+    const r = new FileReader();
+    r.onload = () => selesai(String(r.result));
+    r.onerror = () => tolak(new Error('Gagal membaca berkas'));
+    r.readAsDataURL(berkas);
+  });
+}

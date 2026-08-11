@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { Plus, Pencil, Bitcoin, CandlestickChart, Link2, Link2Off } from 'lucide-react';
 import { Panel, PanelHead, KartuKpi, BadgeTren, TipGrafik, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
@@ -6,8 +6,12 @@ import { cn, uang, persen, tanggalPendek } from '@/lib/utils';
 import { statGabungan, kurvaEkuitas, plPerHari } from '@/lib/hitung';
 import { useRiwayat, useSaldoAwal } from '@/lib/data';
 import { LabelContoh } from '@/components/gerbang';
-import type { Trade } from '@/data/contoh';
+import { useAuth } from '@/lib/auth';
+import type { Trade, Sumber } from '@/data/contoh';
 import { useAkunMt5, useAkunBinance, type StatusAkun } from '@/lib/akun';
+import { ModalTrade } from '@/components/modal-trade';
+import { KotakArus } from '@/components/kotak-arus';
+import { useArusKas, arusBersih, type Arus } from '@/lib/tulis-jurnal';
 import { Link } from 'react-router-dom';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -152,13 +156,22 @@ function KartuSaldo({ judul, saldoJurnal, akun, keIntegrasi }: {
  *  Dipakai dua kali dengan daftar transaksi berbeda. Menuliskannya dua kali
  *  akan membuat kedua jurnal berbeda diam-diam dalam dua putaran revisi —
  *  persis yang terjadi pada `statPer` sebelum diperbaiki. */
-function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun, labelSaldo, keIntegrasi }: {
+function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun, labelSaldo, keIntegrasi, sumber, arus, bisaTulis }: {
   judul: string; ket: string; Ikon: typeof Bitcoin;
   trade: Trade[]; saldoAwal: number; warna: string; idGradien: string;
   akun: StatusAkun; labelSaldo: string; keIntegrasi: string;
+  sumber: Sumber; arus: Arus[]; bisaTulis: boolean;
 }) {
-  const stat = statGabungan(trade, saldoAwal);
-  const kurva = useMemo(() => kurvaEkuitas(trade, saldoAwal), [trade, saldoAwal]);
+  /* Setoran & penarikan masuk ke SALDO, bukan ke P/L — jadi ia digabung ke
+     saldo awal, bukan ke daftar transaksi. Kalau ikut ke transaksi, menyetor
+     uang akan terbaca sebagai trade yang menang. */
+  const modalAwal = saldoAwal + arusBersih(arus, sumber);
+  const stat = statGabungan(trade, modalAwal);
+  const kurva = useMemo(() => kurvaEkuitas(trade, modalAwal), [trade, modalAwal]);
+
+  /* null = tertutup, 'baru' = tambah, objek Trade = sunting. Satu state untuk
+     tiga keadaan; dua boolean terpisah selalu bisa menyala berbarengan. */
+  const [modal, setModal] = useState<'baru' | Trade | null>(null);
   const pl = useMemo(() => plPerHari(trade), [trade]);
 
   const emosi = useMemo(() => {
@@ -207,9 +220,13 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
                 sub={`Dari ${uang(saldoAwal)} ke ${uang(stat.saldo)} · ${trade.length} transaksi.`}
                 kanan={saldoAwal > 0 ? <BadgeTren nilai={Number(((stat.bersih / saldoAwal) * 100).toFixed(1))} /> : undefined}
               />
-              <div className="h-[280px] px-2 pb-4">
+              <div className="h-[280px] px-2 pb-2">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={kurva} margin={{ top: 8, right: 12, left: 4, bottom: 0 }}>
+                  {/* `bottom: 4` + XAxis setinggi 26 px membuat labelnya duduk
+                      di dasar kotak, bukan melayang di tengah ruang kosong.
+                      Sebelumnya bottom 0 dengan pb-4 di pembungkusnya: sumbu
+                      berhenti lebih awal, lalu ada 16 px kosong di bawahnya. */}
+                  <AreaChart data={kurva} margin={{ top: 8, right: 12, left: 4, bottom: 4 }}>
                     <defs>
                       <linearGradient id={idGradien} x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor="#fafafa" stopOpacity={0.22} />
@@ -217,7 +234,8 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
                       </linearGradient>
                     </defs>
                     <CartesianGrid vertical={false} stroke="rgba(255,255,255,.05)" />
-                    <XAxis dataKey="label" tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} minTickGap={48} />
+                    <XAxis dataKey="label" tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false}
+                           minTickGap={48} height={26} dy={6} />
                     <YAxis tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} width={48}
                            tickFormatter={(v) => `$${v}`} domain={['dataMin - 8', 'dataMax + 8']} />
                     <Tooltip content={<TipGrafik />} cursor={{ stroke: 'rgba(255,255,255,.12)' }} />
@@ -238,7 +256,9 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
                 judul="Riwayat Trade"
                 sub={`40 transaksi terakhir dari ${trade.length}.`}
                 kanan={
-                  <button className="flex cursor-pointer items-center gap-1.5 rounded-md bg-zinc-100 px-3 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white">
+                  <button onClick={() => setModal('baru')} disabled={!bisaTulis}
+                    title={bisaTulis ? undefined : 'Masuk dulu untuk menambah catatan'}
+                    className="flex cursor-pointer items-center gap-1.5 rounded-md bg-zinc-100 px-3 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50">
                     <Plus className="size-3.5" /> Tambah
                   </button>
                 }
@@ -264,7 +284,9 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
                           <Td className="whitespace-nowrap text-[12px] text-zinc-400">{t.emosi}</Td>
                           <Td className="max-w-[150px] truncate text-[12px] text-zinc-500" title={t.alasan}>{t.alasan}</Td>
                           <Td>
-                            <button className="cursor-pointer text-zinc-600 transition-colors hover:text-zinc-200" aria-label="Sunting">
+                            <button onClick={() => setModal(t)} disabled={!bisaTulis}
+                              className="cursor-pointer text-zinc-600 transition-colors hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
+                              aria-label={`Sunting ${t.pair}`}>
                               <Pencil className="size-3.5" />
                             </button>
                           </Td>
@@ -298,8 +320,24 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
                 )}
               </div>
             </Panel>
+
+            <KotakArus sumber={sumber} arus={arus} bisaTulis={bisaTulis} />
           </div>
         </>
+      )}
+
+      {/* Blok kosong pun boleh menambah transaksi — justru di situlah orang
+          paling butuh tombolnya. Tombol di kepala tabel tidak terlihat kalau
+          tabelnya belum ada. */}
+      {kosong && bisaTulis && (
+        <button onClick={() => setModal('baru')}
+          className="mt-3 flex cursor-pointer items-center gap-1.5 rounded-md bg-zinc-100 px-3 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white">
+          <Plus className="size-3.5" /> Tambah transaksi pertama
+        </button>
+      )}
+
+      {modal && (
+        <ModalTrade sumber={sumber} trade={modal === 'baru' ? null : modal} tutup={() => setModal(null)} />
       )}
     </section>
   );
@@ -308,6 +346,11 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
 export default function Jurnal() {
   const { data: RIWAYAT, contoh } = useRiwayat();
   const saldoAwal = useSaldoAwal();
+  const { pengguna } = useAuth();
+  const { data: arus } = useArusKas();
+  /* Menulis butuh akun sendiri. Pengunjung yang belum masuk sedang melihat
+     data contoh — tombol simpan di situ akan menulis ke ruang hampa. */
+  const bisaTulis = !!pengguna;
 
   const forex = useMemo(() => RIWAYAT.filter((t) => t.sumber === 'forex'), [RIWAYAT]);
   const kripto = useMemo(() => RIWAYAT.filter((t) => t.sumber === 'kripto'), [RIWAYAT]);
@@ -333,6 +376,7 @@ export default function Jurnal() {
         Ikon={CandlestickChart} trade={forex} saldoAwal={saldoAwal}
         warna="text-amber-400" idGradien="gEqForex"
         akun={mt5} labelSaldo="Saldo MetaTrader 5" keIntegrasi="/integrasi"
+        sumber="forex" arus={arus} bisaTulis={bisaTulis}
       />
 
       <BlokJurnal
@@ -340,6 +384,7 @@ export default function Jurnal() {
         Ikon={Bitcoin} trade={kripto} saldoAwal={0}
         warna="text-emerald-400" idGradien="gEqKripto"
         akun={binance} labelSaldo="Saldo Binance Futures" keIntegrasi="/integrasi"
+        sumber="kripto" arus={arus} bisaTulis={bisaTulis}
       />
     </div>
   );

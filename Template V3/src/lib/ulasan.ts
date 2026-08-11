@@ -32,6 +32,10 @@ export interface Ulasan {
   isi: string;
   produk: string;
   waktu: number;
+  /** Foto profil Google. Kosong kalau akunnya tidak punya. */
+  foto: string;
+  /** Email yang SUDAH disensor sebelum ditulis — lihat catatan di `samarkan`. */
+  email: string;
 }
 
 export function useUlasan(): { data: Ulasan[]; memuat: boolean; galat: string | null } {
@@ -54,6 +58,8 @@ export function useUlasan(): { data: Ulasan[]; memuat: boolean; galat: string | 
             bintang: Math.min(5, Math.max(1, Number(v.bintang) || 0)),
             isi: String(v.isi ?? ''),
             produk: String(v.produk ?? ''),
+            foto: String(v.foto ?? ''),
+            email: String(v.email ?? ''),
             /* serverTimestamp() masih null sesaat setelah ditulis, sebelum
                server menjawab. Jatuh ke sekarang supaya ulasannya tidak
                melompat ke tahun 1970 selama satu detik itu. */
@@ -69,6 +75,22 @@ export function useUlasan(): { data: Ulasan[]; memuat: boolean; galat: string | 
   return { data, memuat, galat };
 }
 
+/** "bagusjaya0509@gmail.com" -> "bag•••••09@gmail.com".
+ *
+ *  Disensor DI SINI, sebelum ditulis — bukan saat ditampilkan. Alamat lengkap
+ *  yang tersimpan di dokumen publik tetap bisa dibaca siapa pun lewat konsol
+ *  peramban, dan menyensornya di layar cuma menyembunyikannya dari mata,
+ *  bukan dari pengumpul alamat email.
+ *
+ *  Yang disisakan cukup untuk dikenali pemiliknya sendiri dan cukup untuk
+ *  terlihat sebagai alamat sungguhan, tapi tidak cukup untuk dikirimi surat. */
+export function samarkan(email: string) {
+  const [nama, domain] = email.split('@');
+  if (!nama || !domain) return '';
+  if (nama.length <= 4) return `${nama[0]}•••@${domain}`;
+  return `${nama.slice(0, 3)}${'•'.repeat(Math.min(5, nama.length - 5))}${nama.slice(-2)}@${domain}`;
+}
+
 export async function kirimUlasan(u: { bintang: number; isi: string; produk: string }) {
   const p = auth.currentUser;
   if (!p) throw new Error('Masuk dulu untuk menulis ulasan.');
@@ -80,6 +102,8 @@ export async function kirimUlasan(u: { bintang: number; isi: string; produk: str
     bintang: u.bintang,
     isi: u.isi.trim().slice(0, 600),
     produk: u.produk,
+    foto: p.photoURL ?? '',
+    email: samarkan(p.email ?? ''),
     /* Waktu server, bukan waktu perangkat. Jam yang salah di satu laptop
        tidak boleh menaruh ulasan di puncak daftar selamanya. */
     waktu: serverTimestamp(),
