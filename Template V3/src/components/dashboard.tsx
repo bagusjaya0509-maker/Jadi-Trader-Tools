@@ -4,13 +4,13 @@ import {
 } from 'recharts';
 import { Wallet, Percent, TrendingUp, Scale, Clock } from 'lucide-react';
 import { Panel, PanelHead, KartuKpi, BadgeTren, TipGrafik, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
-import { cn, uang, persen, harga } from '@/lib/utils';
+import { cn, uang, persen, harga, tanggalPendek } from '@/lib/utils';
 import { statGabungan, statPer, plPerBulan, saldoBulanIni } from '@/lib/hitung';
-import { AKTIVITAS } from '@/data/contoh';
+
 import { useRiwayat, usePosisi, useSaldoAwal } from '@/lib/data';
 import { useHargaPasar } from '@/lib/harga';
 import { LabelContoh } from '@/components/gerbang';
-import { POSISI_MT5 } from '@/data/porto';
+import { useAkunMt5, useAkunBinance } from '@/lib/akun';
 
 /* ════════════════════════════════════════════════════════════════════════
    DASHBOARD
@@ -26,6 +26,20 @@ import { POSISI_MT5 } from '@/data/porto';
      Billing health  -> Order terbuka MT5 (trade-fi)
      Activity        -> tetap, tapi khusus aktivitas pengguna ini
    ════════════════════════════════════════════════════════════════════════ */
+
+/** Waktu relatif. Stempel mentah ("1786106780000") tidak berarti apa-apa
+ *  bagi pembaca; yang ingin diketahui adalah seberapa baru kejadiannya. */
+function lalu(ms: number) {
+  if (!ms) return '';
+  const d = Math.max(0, Date.now() - ms);
+  const menit = Math.floor(d / 60_000);
+  if (menit < 1) return 'baru saja';
+  if (menit < 60) return `${menit} menit lalu`;
+  const jam = Math.floor(menit / 60);
+  if (jam < 24) return `${jam} jam lalu`;
+  const hari = Math.floor(jam / 24);
+  return hari < 30 ? `${hari} hari lalu` : tanggalPendek(ms);
+}
 
 function TipUang({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
@@ -51,8 +65,11 @@ export function Dashboard() {
   /* Rincian dari daftar yang SAMA dengan totalnya. Dashboard adalah
      penjumlahan jurnal Trade-Fi dan Kripto — kalau ketiganya tidak berasal
      dari satu array, angkanya pasti berselisih cepat atau lambat. */
-  const forex = statPer(RIWAYAT, 'forex');
-  const kripto = statPer(RIWAYAT, 'kripto');
+  /* Saldo awal dibebankan ke Trade-Fi saja, PERSIS seperti di halaman Jurnal.
+     Kalau dibebankan ke keduanya ia terhitung dua kali, dan penjumlahan dua
+     jurnal tidak akan pernah sama dengan total di dashboard. */
+  const forex = statPer(RIWAYAT, 'forex', saldoAwal);
+  const kripto = statPer(RIWAYAT, 'kripto', 0);
 
   /* Bulan dan kurva saldo DIHITUNG dari transaksi, tidak lagi dari daftar
      yang ditulis tangan di data/porto.ts. Daftar itu berisi Maret–Agustus
@@ -73,14 +90,65 @@ export function Dashboard() {
   const akhirKurva = kurvaSaldo[kurvaSaldo.length - 1]?.saldo ?? saldoAwal;
   const selisihSaldo = awalKurva ? ((akhirKurva - awalKurva) / Math.abs(awalKurva)) * 100 : 0;
 
-  const pnlMt5 = POSISI_MT5.reduce((s, p) => s + p.pnl, 0);
+  /* Posisi MT5 NYATA dari EA, bukan tiga baris contoh yang ditulis di
+     data/porto.ts. Profitnya sudah dikonversi dari akun sen di lib/akun.ts. */
+  const mt5 = useAkunMt5();
+  const binance = useAkunBinance();
+
+  /* TOTAL SALDO = saldo jurnal Trade-Fi + saldo jurnal Kripto, dengan aturan
+     yang SAMA dengan kartu saldo di halaman Jurnal: kalau brokernya
+     tersambung, angka broker yang dipakai; kalau tidak, hasil hitungan
+     jurnal. Sebelumnya dashboard selalu memakai hitungan jurnal, jadi ia
+     berselisih dengan jurnal begitu MT5 atau Binance tersambung — dua
+     halaman menyebut hal yang sama dengan dua angka berbeda. */
+  const saldoForex = mt5.terhubung === true && mt5.saldo !== null ? mt5.saldo : forex.saldo;
+  const saldoKripto = binance.terhubung === true && binance.saldo !== null ? binance.saldo : kripto.saldo;
+  const totalSaldo = saldoForex + saldoKripto;
+  const sumberSaldo = [
+    mt5.terhubung === true ? 'MT5' : null,
+    binance.terhubung === true ? 'Binance' : null,
+  ].filter(Boolean);
+  const POSISI_MT5 = mt5.posisi;
+  const pnlMt5 = POSISI_MT5.reduce((s, p) => s + p.profit, 0);
+
+  /* Aktivitas dirakit dari KEJADIAN NYATA: transaksi terakhir yang ditutup,
+     posisi yang sedang terbuka, dan status sambungan. Daftar sebelumnya
+     ditulis tangan ("Klien baru mendaftar: sinta.dewi") dan tidak pernah
+     berubah — panel yang selalu menampilkan hal yang sama berhenti dibaca
+     dalam sehari, dan lebih buruk: ia terlihat seperti kabar sungguhan. */
+  const aktivitas = useMemo(() => {
+    const keluar: { teks: string; waktu: number }[] = [];
+
+    [...RIWAYAT].sort((a, b) => b.waktu - a.waktu).slice(0, 4).forEach((t) => {
+      keluar.push({
+        teks: `${t.pair} ${t.arah} ditutup ${uang(t.pnl, true)}`,
+        waktu: t.waktu,
+      });
+    });
+
+    POSISI_TERBUKA.slice(0, 2).forEach((p) => {
+      keluar.push({ teks: `Posisi ${p.simbol} ${p.arah} terbuka di ${p.venue}`, waktu: p.buka });
+    });
+
+    if (mt5.terhubung === true) {
+      keluar.push({ teks: `EA JadiTraderSync melapor — ${POSISI_MT5.length} posisi MT5 terbuka`, waktu: Date.now() });
+    }
+    if (binance.terhubung === true) {
+      keluar.push({ teks: 'Binance Futures tersambung lewat proxy VPS', waktu: Date.now() });
+    }
+
+    return keluar.sort((a, b) => b.waktu - a.waktu).slice(0, 6);
+  }, [RIWAYAT, POSISI_TERBUKA, POSISI_MT5.length, mt5.terhubung, binance.terhubung]);
 
   return (
     <div className="p-4 sm:p-6">
       {contoh && <div className="mb-4"><LabelContoh tampil /></div>}
       {/* ── KPI: gabungan kripto + trade-fi ── */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <KartuKpi label="Total Saldo"   nilai={uang(stat.saldo)} catatan={`${stat.jumlah} transaksi · kripto + trade-fi`} Ikon={Wallet} />
+        <KartuKpi label="Total Saldo"   nilai={uang(totalSaldo)}
+                  catatan={`Trade-Fi ${uang(saldoForex)} + Kripto ${uang(saldoKripto)}`
+                    + (sumberSaldo.length ? ` · live ${sumberSaldo.join(' & ')}` : '')}
+                  Ikon={Wallet} />
         <KartuKpi label="Winrate"       nilai={persen(stat.winrate)} catatan={`${stat.menang} menang · ${stat.kalah} kalah`} Ikon={Percent} />
         <KartuKpi label="P/L Bersih"    nilai={uang(stat.bersih, true)} catatan={`${uang(stat.untung, true)} / -${uang(stat.rugi)}`} Ikon={TrendingUp} />
         <KartuKpi
@@ -193,25 +261,33 @@ export function Dashboard() {
             }
           />
           <div className="space-y-2.5 px-5 pb-5">
+            {POSISI_MT5.length === 0 && (
+              <div className="px-1 py-6 text-center text-[12.5px] text-zinc-500">
+                {mt5.terhubung === true ? 'Tidak ada posisi MT5 terbuka.' : mt5.ket}
+              </div>
+            )}
             {POSISI_MT5.map((p) => (
               <div key={p.tiket} className="rounded-lg border border-zinc-800/60 p-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-[13px] text-zinc-200">{p.pair}</span>
+                    <span className="text-[13px] text-zinc-200">{p.simbol}</span>
                     <span className={cn('rounded px-1.5 py-0.5 text-[10px]',
                       p.arah === 'BUY' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-400')}>
                       {p.arah}
                     </span>
                     <span className="angka text-[11px] text-zinc-600">{p.lot} lot</span>
                   </div>
-                  <span className={cn('angka text-[12.5px]', p.pnl >= 0 ? 'text-emerald-500' : 'text-red-400')}>
-                    {uang(p.pnl, true)}
+                  <span className={cn('angka text-[12.5px]', p.profit >= 0 ? 'text-emerald-500' : 'text-red-400')}>
+                    {uang(p.profit, true)}
                   </span>
                 </div>
                 <div className="mt-1.5 flex gap-4 text-[11px] text-zinc-500">
-                  <span>Entry <span className="angka text-zinc-400">{p.entry}</span></span>
-                  <span>SL <span className="angka text-red-400/80">{p.sl}</span></span>
-                  <span>TP <span className="angka text-emerald-500/80">{p.tp}</span></span>
+                  <span>Entry <span className="angka text-zinc-400">{harga(p.hargaBuka)}</span></span>
+                  <span>Kini <span className="angka text-zinc-400">{harga(p.hargaKini)}</span></span>
+                  {/* SL/TP 0 berarti TIDAK DIPASANG, bukan "di harga nol".
+                      Menampilkan "0" untuk itu keliru dan menyesatkan. */}
+                  <span>SL <span className="angka text-red-400/80">{p.sl ? harga(p.sl) : '—'}</span></span>
+                  <span>TP <span className="angka text-emerald-500/80">{p.tp ? harga(p.tp) : '—'}</span></span>
                 </div>
               </div>
             ))}
@@ -221,14 +297,17 @@ export function Dashboard() {
         <Panel>
           <PanelHead judul="Activity" sub="Kejadian terakhir di akunmu." />
           <div className="px-5 pb-5">
-            {AKTIVITAS.map((a, i) => (
+            {aktivitas.length === 0 && (
+              <div className="py-6 text-center text-[12.5px] text-zinc-500">Belum ada kejadian.</div>
+            )}
+            {aktivitas.map((a, i) => (
               <div key={i} className="flex gap-3 py-2.5">
                 <div className="mt-1 flex size-6 shrink-0 items-center justify-center rounded-full border border-zinc-800 bg-zinc-900">
                   <Clock className="size-3 text-zinc-500" strokeWidth={2} />
                 </div>
                 <div className="min-w-0">
                   <div className="text-[13px] text-zinc-200">{a.teks}</div>
-                  <div className="text-[11.5px] text-zinc-500">{a.waktu}</div>
+                  <div className="text-[11.5px] text-zinc-500">{lalu(a.waktu)}</div>
                 </div>
               </div>
             ))}
@@ -244,10 +323,11 @@ export function Dashboard() {
             <Tabel>
               <thead>
                 <tr><Th>Sumber</Th><Th className="text-right">Trade</Th><Th className="text-right">Winrate</Th>
-                    <Th className="text-right">Profit</Th><Th className="text-right">Loss</Th><Th className="text-right">Bersih</Th></tr>
+                    <Th className="text-right">Profit</Th><Th className="text-right">Loss</Th><Th className="text-right">Bersih</Th>
+                    <Th className="text-right">Saldo</Th></tr>
               </thead>
               <tbody>
-                {[['Trade-Fi (MT5)', forex], ['Kripto (Binance)', kripto]].map(([nama, s]: any) => (
+                {[['Trade-Fi (MT5)', forex, saldoForex], ['Kripto (Binance)', kripto, saldoKripto]].map(([nama, s, sal]: any) => (
                   <Tr key={nama}>
                     <Td className="text-zinc-300">{nama}</Td>
                     <Td className="angka text-right text-zinc-400">{s.jumlah}</Td>
@@ -257,6 +337,7 @@ export function Dashboard() {
                     <Td className={cn('angka text-right', s.bersih >= 0 ? 'text-emerald-500' : 'text-red-400')}>
                       {uang(s.bersih, true)}
                     </Td>
+                    <Td className="angka text-right text-zinc-300">{uang(sal)}</Td>
                   </Tr>
                 ))}
                 <Tr className="border-t border-zinc-800">
@@ -268,6 +349,7 @@ export function Dashboard() {
                   <Td className={cn('angka text-right font-medium', stat.bersih >= 0 ? 'text-emerald-500' : 'text-red-400')}>
                     {uang(stat.bersih, true)}
                   </Td>
+                  <Td className="angka text-right font-medium text-zinc-100">{uang(totalSaldo)}</Td>
                 </Tr>
               </tbody>
             </Tabel>

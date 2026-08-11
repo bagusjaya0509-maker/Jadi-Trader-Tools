@@ -8,6 +8,7 @@ import { Panel, PanelHead, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/
 import { TutorialVps } from '@/components/tutorial-vps';
 import { cn } from '@/lib/utils';
 import { bacaKoneksi, simpanKoneksi, hapusKoneksi, koneksiLengkap } from '@/lib/koneksi';
+import { useKodeMt5, useAkunMt5 } from '@/lib/akun';
 
 /* ════════════════════════════════════════════════════════════════════════
    INTEGRATIONS — sambungan ke MetaTrader 5 dan Binance
@@ -141,8 +142,15 @@ function Langkah({ no, judul, anak }: { no: number; judul: string; anak: React.R
 }
 
 export default function Integrasi() {
-  const [kodeMt5] = useState('JT-4F2A-91C7');
-  const [mt5Tersambung, setMt5Tersambung] = useState(true);
+  /* Kode pasangan ASLI dari backend, bukan contoh.
+     Sebelumnya baris ini berisi `useState('JT-4F2A-91C7')` — kode yang
+     ditulis mati di sini. Awalannya salah (backend membuat `JTM5-…`) DAN
+     ia tidak pernah terdaftar, jadi EA yang memakainya selalu ditolak
+     400 "Kode Pasangan tidak valid". */
+  const kodeM = useKodeMt5();
+  const statusMt5 = useAkunMt5();
+  const kodeMt5 = kodeM.kode;
+  const mt5Tersambung = statusMt5.terhubung === true;
   const [lihatToken, setLihatToken] = useState(false);
   const [disalin, setDisalin] = useState(false);
 
@@ -230,25 +238,46 @@ export default function Integrasi() {
               </div>
               <div className="flex gap-2">
                 <div className="angka flex h-10 flex-1 items-center rounded-md border border-zinc-800 bg-zinc-900/60 px-3 text-[14px] tracking-[0.14em] text-zinc-100">
-                  {kodeMt5}
+                  {kodeM.memuat ? <span className="text-[12.5px] tracking-normal text-zinc-500">Memuat…</span>
+                    : kodeMt5 ?? <span className="text-[12.5px] tracking-normal text-zinc-500">Belum ada — tekan tombol di kanan</span>}
                 </div>
                 <button
-                  onClick={() => salin(kodeMt5)}
+                  disabled={!kodeMt5}
+                  onClick={() => kodeMt5 && salin(kodeMt5)}
                   className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-3 text-[12.5px] text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100"
                 >
                   <Copy className="size-3.5" />
                   {disalin ? 'Tersalin' : 'Salin'}
                 </button>
                 <button
-                  className="flex cursor-pointer items-center rounded-md border border-zinc-800 px-3 text-zinc-400 transition-colors hover:border-zinc-700 hover:text-zinc-100"
+                  onClick={() => void kodeM.buatBaru()}
+                  disabled={kodeM.memuat}
+                  className="flex cursor-pointer items-center rounded-md border border-zinc-800 px-3 text-zinc-400 transition-colors hover:border-zinc-700 hover:text-zinc-100 disabled:opacity-40"
+                  title={kodeMt5 ? "Buat kode baru — EA yang sekarang akan terputus" : "Buat kode pasangan"}
                   aria-label="Buat kode baru"
                 >
-                  <RefreshCw className="size-3.5" />
+                  <RefreshCw className={cn("size-3.5", kodeM.memuat && "animate-spin")} />
                 </button>
               </div>
-              <p className="mt-1.5 text-[11.5px] text-zinc-600">
+              <p className="mt-1.5 text-[11.5px] leading-relaxed text-zinc-600">
                 Kode ini yang diisi di input <span className="text-zinc-400">KodePasangan</span> pada EA.
+                Bentuknya selalu <span className="angka text-zinc-400">JTM5-XXXX-XXXX</span> — kalau EA
+                menjawab <span className="text-zinc-400">Kode Pasangan tidak valid</span>, kodenya bukan
+                dari sini.
               </p>
+              {kodeM.galat && (
+                <p className="mt-1.5 text-[11.5px] text-red-400">{kodeM.galat}</p>
+              )}
+              {!kodeM.memuat && !kodeMt5 && !kodeM.galat && (
+                <p className="mt-1.5 text-[11.5px] text-amber-400">
+                  Belum punya kode. Tekan tombol putar di atas untuk membuatnya.
+                </p>
+              )}
+              {statusMt5.terhubung === true && (
+                <p className="mt-1.5 text-[11.5px] text-emerald-400">
+                  EA melapor — {statusMt5.ket}, saldo {statusMt5.saldo?.toFixed(2)} {statusMt5.mataUang}
+                </p>
+              )}
             </div>
 
             <div className="rounded-lg border border-zinc-800/60 p-4">
@@ -277,10 +306,11 @@ export default function Integrasi() {
                 <Download className="size-3.5" /> Unduh EA
               </button>
               <button
-                onClick={() => setMt5Tersambung((v) => !v)}
-                className="flex cursor-pointer items-center gap-2 rounded-md border border-zinc-800 px-3.5 py-2 text-[12.5px] text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100"
+                onClick={() => void (kodeMt5 ? kodeM.putus() : kodeM.buatBaru())}
+                disabled={kodeM.memuat}
+                className="flex cursor-pointer items-center gap-2 rounded-md border border-zinc-800 px-3.5 py-2 text-[12.5px] text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100 disabled:opacity-40"
               >
-                {mt5Tersambung ? <><Link2Off className="size-3.5" /> Putuskan</> : <><Plug className="size-3.5" /> Sambungkan</>}
+                {kodeMt5 ? <><Link2Off className="size-3.5" /> Putuskan</> : <><Plug className="size-3.5" /> Sambungkan</>}
               </button>
             </div>
           </div>

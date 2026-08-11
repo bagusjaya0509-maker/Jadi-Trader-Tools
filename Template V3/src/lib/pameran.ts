@@ -1,0 +1,158 @@
+import { useEffect, useState } from 'react';
+
+/* ════════════════════════════════════════════════════════════════════════
+   ANGKA PAMERAN HALAMAN DEPAN
+   ════════════════════════════════════════════════════════════════════════
+   Hero menampilkan winrate, PNL, dan pertumbuhan porto. Sampai sekarang
+   ketiganya diambil dari `data/contoh.ts` dan `data/porto.ts` — angka
+   karangan yang dipajang di halaman jualan sebagai rekam jejak.
+
+   Sumber sungguhannya sudah ada: `public/jurnalShowcase`, dokumen publik
+   berisi jurnal yang memang sengaja dipamerkan. Yang dipakai di sini bukan
+   SDK Firestore melainkan REST API biasa lewat `fetch`, dan itu bukan
+   kerewelan: mengimpor SDK-nya menyeret ±450 kB ke halaman yang paling
+   sering dibuka orang yang belum tentu masuk. Satu permintaan HTTP
+   memberikan angka yang sama tanpa satu kilobyte tambahan di bundel.
+
+   Kalau dokumennya belum ada atau jaringannya gagal, hero tetap tampil —
+   angkanya saja yang kosong. Halaman depan tidak boleh gagal karena satu
+   permintaan yang bersifat hiasan.
+   ════════════════════════════════════════════════════════════════════════ */
+
+const PROYEK = 'jadi-trader-tools';
+const DOK = `https://firestore.googleapis.com/v1/projects/${PROYEK}/databases/(default)/documents/public/jurnalShowcase`;
+
+export interface AngkaPameran {
+  siap: boolean;
+  jumlah: number;
+  winrate: number;
+  bersih: number;
+  /** Kurva saldo kumulatif, untuk grafik hero. */
+  kurva: number[];
+  tumbuh: number;
+}
+
+const KOSONG: AngkaPameran = { siap: false, jumlah: 0, winrate: 0, bersih: 0, kurva: [], tumbuh: 0 };
+
+/** Firestore REST membungkus tiap nilai dalam objek bertipe. */
+function nilai(f: any): any {
+  if (f == null) return null;
+  if (f.stringValue !== undefined) return f.stringValue;
+  if (f.integerValue !== undefined) return Number(f.integerValue);
+  if (f.doubleValue !== undefined) return f.doubleValue;
+  if (f.booleanValue !== undefined) return f.booleanValue;
+  return null;
+}
+
+export function useAngkaPameran(): AngkaPameran {
+  const [angka, setAngka] = useState<AngkaPameran>(KOSONG);
+
+  useEffect(() => {
+    let hidup = true;
+    fetch(DOK)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((j) => {
+        if (!hidup) return;
+        const f = j?.fields ?? {};
+        /* Dua jurnal, dua bentuk — dan keduanya harus dibaca apa adanya,
+           bukan ditebak:
+
+             · ledgerNoirTrades_v1        array; PnL di `pl`, waktu di `date`
+                                          sebagai teks ISO ("2026-07-11T23:16")
+             · emaScreenerPrioritySim_v1  objek; transaksi selesai ada di
+                                          `.history`, PnL di `pnl`, waktu di
+                                          `exitTime` (milidetik)
+
+           `jtCryptoNotes_v1` SENGAJA dilewati: isinya catatan per koin, bukan
+           transaksi, dan menjumlahkannya akan menghitung ganda. */
+        const baris: { pnl: number; waktu: number }[] = [];
+
+        try {
+          const forex = JSON.parse(nilai(f.ledgerNoirTrades_v1) ?? '[]');
+          if (Array.isArray(forex)) forex.forEach((x: any) => {
+            const pnl = Number(x.pl);
+            if (isFinite(pnl)) baris.push({ pnl, waktu: Date.parse(x.date) || 0 });
+          });
+        } catch { /* satu jurnal rusak tidak boleh menjatuhkan yang lain */ }
+
+        try {
+          const sim = JSON.parse(nilai(f.emaScreenerPrioritySim_v1) ?? '{}');
+          const riwayat = Array.isArray(sim?.history) ? sim.history : [];
+          riwayat.forEach((x: any) => {
+            const pnl = Number(x.pnl);
+            if (isFinite(pnl)) baris.push({ pnl, waktu: Number(x.exitTime) || 0 });
+          });
+        } catch { /* idem */ }
+
+        if (!baris.length) { setAngka(KOSONG); return; }
+
+        baris.sort((a, b) => a.waktu - b.waktu);
+        const menang = baris.filter((b) => b.pnl > 0).length;
+        const bersih = baris.reduce((s, b) => s + b.pnl, 0);
+
+        /* Saldo awal dari profil yang tersimpan di dokumen yang sama; kalau
+           tidak ada, kurva dimulai dari nol dan pertumbuhannya tidak
+           dihitung — persentase dengan penyebut karangan lebih menyesatkan
+           daripada tidak ada persentase. */
+        let saldoAwal = 0;
+        try { saldoAwal = Number(JSON.parse(nilai(f.jtAccountProfile_v1) ?? '{}').startBalance) || 0; } catch { /* profil belum ada */ }
+
+        let jalan = saldoAwal;
+        const kurva = baris.map((b) => (jalan += b.pnl));
+        const tumbuh = saldoAwal > 0 ? ((jalan - saldoAwal) / saldoAwal) * 100 : 0;
+
+        setAngka({
+          siap: true,
+          jumlah: baris.length,
+          winrate: (menang / baris.length) * 100,
+          bersih,
+          kurva: kurva.length > 1 ? kurva : [saldoAwal, jalan],
+          tumbuh,
+        });
+      })
+      .catch(() => { /* hero tetap tampil tanpa angka */ });
+    return () => { hidup = false; };
+  }, []);
+
+  return angka;
+}
+
+/* ── Posisi terbuka untuk marquee halaman depan ──────────────────────────
+   Sumbernya `public/posisiTerbuka` — dokumen yang sama dengan yang dipakai
+   Dashboard, dan memang publik supaya pengunjung bisa melihat posisi pemilik.
+
+   Diambil lewat REST karena alasan yang sama dengan angka pameran di atas:
+   halaman depan tidak boleh membayar 450 kB untuk satu daftar pendek. */
+export interface PosisiPameran {
+  simbol: string;
+  arah: 'BUY' | 'SELL';
+  entry: number;
+  tf: string;
+}
+
+export function usePosisiPameran(): PosisiPameran[] {
+  const [daftar, setDaftar] = useState<PosisiPameran[]>([]);
+
+  useEffect(() => {
+    let hidup = true;
+    fetch(DOK.replace('jurnalShowcase', 'posisiTerbuka'))
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((j) => {
+        if (!hidup) return;
+        const arr = j?.fields?.posisi?.arrayValue?.values ?? [];
+        setDaftar(arr.map((v: any) => {
+          const f = v?.mapValue?.fields ?? {};
+          return {
+            simbol: String(nilai(f.simbol) ?? ''),
+            arah: nilai(f.arah) === 'SELL' ? 'SELL' : 'BUY',
+            entry: Number(nilai(f.entry)) || 0,
+            tf: String(nilai(f.tf) ?? ''),
+          };
+        }).filter((p: PosisiPameran) => p.simbol));
+      })
+      .catch(() => { /* marquee kosong lebih baik daripada marquee karangan */ });
+    return () => { hidup = false; };
+  }, []);
+
+  return daftar;
+}

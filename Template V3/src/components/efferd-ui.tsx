@@ -77,6 +77,7 @@ export function KartuKpi({
   label,
   nilai,
   delta,
+  deltaSufiks,
   catatan,
   Ikon,
   warna,
@@ -84,6 +85,10 @@ export function KartuKpi({
   label: string;
   nilai: string;
   delta?: number;
+  /** Apa yang dibandingkan. Bawaannya "vs last week", dan itu keliru untuk
+   *  kartu yang membandingkan hari ini dengan kemarin — angka benar dengan
+   *  keterangan salah tetap salah. */
+  deltaSufiks?: string;
   catatan?: string;
   /* LucideIcon, bukan ComponentType buatan sendiri: komponen lucide
      dibungkus forwardRef dan propTypes-nya lebih longgar, jadi tipe manual
@@ -101,7 +106,7 @@ export function KartuKpi({
           </div>
           <div className="mt-2.5">
             {typeof delta === 'number'
-              ? <Delta nilai={delta} />
+              ? <Delta nilai={delta} sufiks={deltaSufiks} />
               : <span className="text-[12px] text-zinc-500">{catatan}</span>}
           </div>
         </div>

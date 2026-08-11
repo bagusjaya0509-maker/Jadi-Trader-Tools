@@ -2,6 +2,7 @@ import { HashRouter, Routes, Route, Navigate, Outlet, useLocation } from 'react-
 import { useEffect, lazy, Suspense } from 'react';
 import { Loader2 } from 'lucide-react';
 import { PenyediaAuth } from '@/lib/auth';
+import { catatKunjungan } from '@/lib/admin';
 import { AppShell } from '@/components/app-shell';
 import HeroSection from '@/components/ui/glassmorphism-trust-hero';
 
@@ -82,6 +83,18 @@ const Changelog     = lazy(() => muat(() => import('@/halaman/Changelog')));
 function KeAtas() {
   const { pathname } = useLocation();
   useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
+
+  /* Catat kunjungan ke backend — inilah yang mengisi grafik trafik dan
+     "Halaman paling ramai" di Traffic & Sales. V2 sudah melakukannya lewat
+     jt-lapor.js sejak lama; V3 belum sama sekali, jadi setiap kunjungan ke
+     versi baru ini tidak pernah terhitung di mana pun.
+
+     Dipasang di sini, bukan di tiap halaman: satu tempat berarti halaman
+     yang ditambahkan besok ikut terhitung tanpa perlu diingat. */
+  useEffect(() => {
+    const halaman = pathname === '/' ? 'v3-beranda' : 'v3-' + pathname.replace(/^\/+/, '');
+    catatKunjungan(halaman);
+  }, [pathname]);
 
   /* Penanda dibersihkan setelah satu rute berhasil dimuat. Kalau dibiarkan,
      kegagalan berikutnya di sesi yang sama — misalnya deploy kedua di hari

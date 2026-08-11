@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   getFirestore, collection, doc, onSnapshot, orderBy, limit, query, Timestamp,
   type DocumentData,
 } from 'firebase/firestore';
 import { app } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth';
+import { usePosisiBinance } from '@/lib/admin';
 import {
   RIWAYAT, POSISI_TERBUKA, SALDO_AWAL, PRODUK,
   type Trade, type Posisi, type Sumber, type Produk,
@@ -39,7 +40,7 @@ const BATAS_TRANSAKSI = 400;
 /* Berkas ini hanya diimpor halaman-halaman yang dimuat malas, jadi impor
    statis Firestore di atas TIDAK ikut ke jalur muat awal. getFirestore aman
    dipanggil lagi di sini — Firebase mengembalikan instans yang sama. */
-const db = getFirestore(app);
+export const db = getFirestore(app);
 
 function ms(v: unknown): number {
   if (v instanceof Timestamp) return v.toMillis();
@@ -69,26 +70,6 @@ function keTrade(id: string, d: DocumentData): Trade {
   };
 }
 
-function kePosisi(id: string, d: DocumentData): Posisi {
-  const venue: Posisi['venue'] =
-    d.venue === 'sim' ? 'Simulasi' : d.venue === 'mt5' ? 'MT5' : 'Binance Live';
-  return {
-    id,
-    simbol: d.simbol ?? '',
-    arah: d.arah === 'SELL' ? 'SELL' : 'BUY',
-    tf: d.tf ?? '—',
-    entry: n(d.masukHarga),
-    sl: n(d.sl),
-    tp: n(d.tp1),
-    /* Harga terkini tidak disimpan di Firestore — ia milik pasar, bukan
-       milik kita. Sampai proxy harga tersambung, entry dipakai sebagai
-       tempat berdiri supaya kolom "gerak" menampilkan 0,00% dan bukan
-       angka karangan. */
-    hargaKini: n(d.masukHarga),
-    venue,
-    buka: ms(d.masukWaktu),
-  };
-}
 
 export interface Ringkasan {
   jumlah: number;
@@ -133,23 +114,87 @@ export function useRiwayat(): HasilData<Trade[]> {
   return { data, memuat: memuat || memuatAuth, contoh: !pengguna, galat };
 }
 
+/** Satu baris `public/posisiTerbuka` -> bentuk `Posisi`. */
+function kePosisiPublik(p: any, i: number): Posisi {
+  return {
+    id: `${p.simbol ?? '?'}-${p.buka ?? i}`,
+    simbol: String(p.simbol ?? ''),
+    arah: p.arah === 'SELL' ? 'SELL' : 'BUY',
+    tf: String(p.tf ?? '—'),
+    entry: n(p.entry),
+    sl: n(p.sl),
+    tp: n(p.tp),
+    hargaKini: n(p.entry),
+    venue: 'Binance Live',
+    buka: n(p.buka),
+  };
+}
+
+/** Posisi yang SEDANG terbuka di Binance.
+ *
+ *  Sumbernya `public/posisiTerbuka`, yang ditulis ulang oleh screener V2
+ *  setiap kali posisi dibuka atau ditutup — jadi isinya selalu sama dengan
+ *  `/api/positions` milik Binance.
+ *
+ *  Sebelumnya halaman ini membaca `users/{uid}/posisi`, dan itulah sumber
+ *  keluhan "posisi terbuka kripto tidak sesuai": subkoleksi itu diisi sekali
+ *  saat migrasi dari `prioritySim.positions` — posisi SIMULASI, bukan posisi
+ *  nyata — lalu tidak pernah diperbarui lagi. Ia menampilkan LTCUSDT, ONEUSDT,
+ *  SEIUSDT sementara yang benar-benar terbuka di bursa adalah RUNEUSDT,
+ *  ENJUSDT, ONEUSDT.
+ *
+ *  Dokumen ini juga sengaja publik: pengunjung yang belum berlangganan tetap
+ *  bisa melihat posisi pemilik — itu memang bagian dari etalasenya. */
 export function usePosisi(): HasilData<Posisi[]> {
   const { pengguna, memuat: memuatAuth } = useAuth();
   const [data, setData] = useState<Posisi[]>(POSISI_TERBUKA);
   const [memuat, setMemuat] = useState(true);
   const [galat, setGalat] = useState<string | null>(null);
+  const [ada, setAda] = useState(false);
 
   useEffect(() => {
-    if (memuatAuth) return;
-    if (!pengguna) { setData(POSISI_TERBUKA); setMemuat(false); return; }
     setMemuat(true);
-    return onSnapshot(collection(db, 'users', pengguna.uid, 'posisi'),
-      (s) => { setData(s.docs.map((d) => kePosisi(d.id, d.data()))); setMemuat(false); setGalat(null); },
-      (e) => { console.warn('posisi:', e); setGalat(e.message); setMemuat(false); }
+    return onSnapshot(doc(db, 'public', 'posisiTerbuka'),
+      (s) => {
+        const daftar = s.exists() ? (s.data()?.posisi ?? []) : [];
+        setData(Array.isArray(daftar) ? daftar.map(kePosisiPublik) : []);
+        setAda(s.exists());
+        setMemuat(false); setGalat(null);
+      },
+      (e) => { console.warn('posisiTerbuka:', e); setGalat(e.message); setMemuat(false); }
     );
-  }, [pengguna, memuatAuth]);
+  }, []);
 
-  return { data, memuat: memuat || memuatAuth, contoh: !pengguna, galat };
+  /* Bursa adalah pemutus terakhir — kalau App Token ada, Binance yang bicara.
+     `public/posisiTerbuka` hanya memuat posisi yang dibuka lewat screener V2
+     DAN hanya diperbarui selama halaman itu terbuka; posisi yang dibuka dari
+     aplikasi Binance tidak pernah sampai ke sana.
+
+     Yang dipertahankan dari dokumen publik: SL, TP, timeframe, dan waktu
+     buka. Binance tidak mengirimkan keempatnya di rute posisi, jadi
+     mengganti begitu saja akan menukar data yang lebih lengkap dengan yang
+     lebih benar — padahal keduanya bisa dipakai bersama. */
+  const { data: bursa, aktif } = usePosisiBinance();
+
+  const gabungan = useMemo(() => {
+    if (!aktif) return data;
+    const dariPublik = new Map(data.map((p) => [p.simbol, p]));
+    return bursa.map((b): Posisi => {
+      const p = dariPublik.get(b.simbol);
+      return p
+        ? { ...p, arah: b.arah, entry: b.entry || p.entry }
+        : {
+            id: `bursa-${b.simbol}`,
+            simbol: b.simbol, arah: b.arah, tf: '—',
+            entry: b.entry, sl: 0, tp: 0, hargaKini: b.entry,
+            venue: 'Binance Live', buka: 0,
+          };
+    });
+  }, [aktif, bursa, data]);
+
+  /* `contoh` berarti "ini bukan datamu, ini contoh". Dokumen publik itu data
+     sungguhan, jadi labelnya hanya muncul kalau dokumennya memang belum ada. */
+  return { data: gabungan, memuat: memuat || memuatAuth, contoh: !ada && !pengguna, galat };
 }
 
 /** Ringkasan pra-hitung. Satu pembacaan, bukan 400.
@@ -184,8 +229,25 @@ export function useRingkasan(): HasilData<Ringkasan | null> {
  *  Isinya disimpan sebagai STRING JSON di field `produk`, bukan array. Itu
  *  bentuk yang ditulis panel pemilik V2, dan mengubahnya berarti memutus
  *  halaman yang sekarang tayang — jadi dibaca apa adanya, diurai di sini. */
-export function useProduk(): HasilData<Produk[]> {
+export interface HasilProduk extends HasilData<Produk[]> {
+  /** Objek katalog APA ADANYA dari Firestore.
+   *
+   *  Dipakai saat menulis balik. Katalog nyata punya field yang tidak ada di
+   *  antarmuka `Produk` (dan bisa bertambah kapan saja lewat panel V2);
+   *  menulis ulang dari bentuk yang sudah dipetakan akan diam-diam membuang
+   *  field yang tidak dikenali — menghapus SATU produk bisa melucuti
+   *  tangkapan layar dan tautan beli milik semua produk lain. */
+  mentah: any[];
+  /** Tempat sampah, apa adanya. Panel pemilik V2 menyimpannya di dokumen yang
+   *  sama (field `sampah`), jadi V3 harus membacanya dari sana juga — kalau
+   *  tidak, produk yang dibuang lewat V2 akan hilang tanpa jejak di V3. */
+  sampahMentah: any[];
+}
+
+export function useProduk(): HasilProduk {
   const [data, setData] = useState<Produk[]>(PRODUK);
+  const [mentah, setMentah] = useState<any[]>([]);
+  const [sampahMentah, setSampahMentah] = useState<any[]>([]);
   const [memuat, setMemuat] = useState(true);
   const [contoh, setContoh] = useState(true);
   const [galat, setGalat] = useState<string | null>(null);
@@ -194,6 +256,11 @@ export function useProduk(): HasilData<Produk[]> {
     return onSnapshot(doc(db, 'public', 'marketplace'),
       (s) => {
         setMemuat(false);
+        try {
+          const s2 = s.data()?.sampah;
+          const buang = typeof s2 === 'string' ? JSON.parse(s2) : s2;
+          setSampahMentah(Array.isArray(buang) ? buang : []);
+        } catch { setSampahMentah([]); }
         const mentah = s.data()?.produk;
         try {
           const daftar = typeof mentah === 'string' ? JSON.parse(mentah) : mentah;
@@ -210,7 +277,9 @@ export function useProduk(): HasilData<Produk[]> {
               gambar: Array.isArray(p.gambar) ? p.gambar.map(String) : undefined,
               lynk: p.lynk ? String(p.lynk) : undefined,
               berkas: p.berkas ? String(p.berkas) : undefined,
+              unduhan: p.unduhan === 'ex5' || p.unduhan === 'mq5' ? p.unduhan : undefined,
             })));
+            setMentah(daftar);
             setContoh(false);
           }
         } catch (e) {
@@ -224,7 +293,35 @@ export function useProduk(): HasilData<Produk[]> {
     );
   }, []);
 
-  return { data, memuat, contoh, galat };
+  return { data, mentah, sampahMentah, memuat, contoh, galat };
+}
+
+/** Menulis katalog Marketplace kembali ke `public/marketplace`.
+ *
+ *  Formatnya HARUS sama dengan yang ditulis panel pemilik V2: field `produk`
+ *  berisi STRING JSON, bukan array. Menulis array akan membuat halaman V2
+ *  yang sekarang tayang berhenti membaca katalognya — dua aplikasi memakai
+ *  dokumen yang sama, jadi bentuknya tidak boleh diubah sepihak.
+ *
+ *  Hanya pemilik yang diizinkan menulis (aturan `public/{docId}`), jadi
+ *  panggilan ini akan ditolak untuk siapa pun selain dia. */
+/** Tulis katalog + tempat sampah ke `public/marketplace`.
+ *
+ *  Bentuknya PERSIS seperti yang ditulis panel pemilik V2 (`pemilik.html`
+ *  fungsi `simpanKatalog`): dua field JSON string, `merge: true`. Dua panel
+ *  yang menulis dokumen yang sama harus sepakat soal bentuknya — kalau V3
+ *  menulis array biasa sementara V2 menulis string, salah satunya akan
+ *  membaca katalog kosong dan mengira semua produknya hilang.
+ *
+ *  Tempat sampah ikut ditulis. Tanpa itu, produk yang dibuang lenyap dari
+ *  katalog TAPI tidak tersimpan di mana pun — jadi menyegarkan halaman
+ *  menghapusnya untuk selamanya, padahal tombolnya menjanjikan bisa
+ *  dipulihkan. */
+export async function simpanKatalogProduk(produk: any[], sampah?: any[]): Promise<void> {
+  const { setDoc } = await import('firebase/firestore');
+  const muatan: Record<string, unknown> = { produk: JSON.stringify(produk), _updatedAt: Date.now() };
+  if (sampah) muatan.sampah = JSON.stringify(sampah);
+  await setDoc(doc(db, 'public', 'marketplace'), muatan, { merge: true });
 }
 
 /** Saldo awal dari profil V2 (`jtAccountProfile_v1`), yang masih tersimpan di

@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { ArrowRight, LineChart, Wallet, Crown, Star } from "lucide-react";
-import { PORTO_BULANAN, rupiahRingkas } from "@/data/porto";
+import { useAngkaPameran, usePosisiPameran } from "@/lib/pameran";
 
 /* ── Grafik portofolio hero, digambar tangan ──────────────────────────────
    Dulu ini <AreaChart> Recharts, dan itu menyeret 115 kB (gzip) ke HALAMAN
@@ -12,9 +12,9 @@ import { PORTO_BULANAN, rupiahRingkas } from "@/data/porto";
    Chart: pustaka grafik dibayar per kilobyte, bukan per fitur yang dipakai.
    Halaman lain tetap memakai Recharts — di sana tooltip dan legenda memang
    dibutuhkan, dan potongannya dimuat hanya saat halamannya dibuka. */
-function GrafikPorto() {
+function GrafikPorto({ nilai }: { nilai: number[] }) {
   const W = 300, H = 80, pad = 4;
-  const nilai = PORTO_BULANAN.map((b) => b.porto);
+  if (nilai.length < 2) return null;
   const min = Math.min(...nilai), max = Math.max(...nilai);
   const rentang = max - min || 1;
   const X = (i: number) => (i / (nilai.length - 1)) * W;
@@ -48,8 +48,6 @@ function GrafikPorto() {
     </svg>
   );
 }
-import { RIWAYAT, POSISI_TERBUKA } from "@/data/contoh";
-import { statGabungan } from "@/lib/hitung";
 
 import { uang, persen } from "@/lib/utils";
 
@@ -87,23 +85,20 @@ const StatItem = ({ value, label }: { value: string; label: string }) => (
 );
 
 export default function HeroSection() {
-  /* Hero sengaja memakai angka PAMERAN, bukan data pengguna yang sedang
-     masuk. Dua alasan, dan yang kedua lebih menentukan:
+  /* Hero memakai angka PAMERAN — jurnal yang memang sengaja dipublikasikan
+     di `public/jurnalShowcase` — bukan data pengguna yang sedang masuk.
+     Halaman ini halaman pemasaran; menampilkan jurnal kosong milik
+     pengunjung baru bukan cara memperkenalkan produk.
 
-       1. Ini halaman pemasaran. Pengunjung yang belum punya akun justru
-          mayoritasnya, dan menampilkan jurnal kosong milik mereka sendiri
-          bukan cara memperkenalkan produk.
-       2. Menariknya dari Firestore berarti ±450 kB pustaka ikut diunduh
-          SETIAP orang yang membuka halaman depan — termasuk yang cuma
-          melihat sekilas. Angka yang sama bisa didapat tanpa itu.
+     Yang berubah: angkanya sekarang SUNGGUHAN. Sebelum ini winrate, PNL,
+     dan pertumbuhan porto diambil dari data/contoh.ts dan data/porto.ts —
+     rekam jejak karangan yang dipajang di halaman jualan produk trading.
 
-     Kalau nanti mau angka sungguhan di sini, ambil `public/jurnalShowcase`
-     lewat `fetch()` biasa ke REST API Firestore — dokumen itu boleh dibaca
-     publik, dan cara itu tidak menambah satu kilobyte pun ke bundel. */
-  const stat = statGabungan(RIWAYAT);
-  const portoKini = PORTO_BULANAN[PORTO_BULANAN.length - 1].porto;
-  const portoAwal = PORTO_BULANAN[0].porto;
-  const tumbuh = ((portoKini - portoAwal) / portoAwal) * 100;
+     Diambil lewat REST API Firestore dengan `fetch` biasa, bukan SDK: SDK-nya
+     menyeret ±450 kB ke halaman yang paling sering dibuka orang yang belum
+     tentu masuk, untuk angka yang bisa didapat dengan satu permintaan. */
+  const pameran = useAngkaPameran();
+  const posisi = usePosisiPameran();
 
   return (
     <div className="relative w-full bg-zinc-950 text-white overflow-hidden font-sans">
@@ -206,34 +201,44 @@ export default function HeroSection() {
                     <Wallet className="h-6 w-6 text-white" />
                   </div>
                   <div>
-                    <div className="text-3xl font-bold tracking-tight text-white">{rupiahRingkas(portoKini)}</div>
-                    <div className="text-sm text-zinc-400">Total Portofolio</div>
+                    <div className="angka text-3xl font-bold tracking-tight text-white">
+                      {pameran.siap ? uang(pameran.kurva[pameran.kurva.length - 1]) : '—'}
+                    </div>
+                    <div className="text-sm text-zinc-400">Saldo Jurnal Pameran</div>
                   </div>
                 </div>
 
-                {/* Menggantikan bilah "Client Satisfaction": grafik porto 12
-                    bulan. Bilah kemajuan cuma bisa bilang "98%"; garis ini
-                    bilang ARAH — dan arah itu yang sebenarnya dibeli orang. */}
+                {/* Menggantikan bilah "Client Satisfaction": kurva saldo
+                    jurnal. Bilah kemajuan cuma bisa bilang "98%"; garis ini
+                    bilang ARAH — dan arah itu yang sebenarnya dibeli orang.
+
+                    Kurvanya mengikuti transaksi sungguhan, jadi ia boleh
+                    turun. Grafik yang selalu naik ke kanan atas di halaman
+                    depan produk trading adalah hal pertama yang membuat
+                    pembaca yang paham berhenti percaya. */}
                 <div className="mb-6">
                   <div className="flex justify-between text-sm mb-2">
-                    <span className="text-zinc-400">Total Portofolio</span>
-                    <span className={tumbuh >= 0 ? "text-emerald-400 font-medium" : "text-red-400 font-medium"}>
-                      {tumbuh >= 0 ? "+" : ""}{tumbuh.toFixed(1)}% <span className="text-zinc-500 font-normal">12 bln</span>
-                    </span>
+                    <span className="text-zinc-400">Kurva Saldo</span>
+                    {pameran.siap && (
+                      <span className={pameran.tumbuh >= 0 ? "text-emerald-400 font-medium" : "text-red-400 font-medium"}>
+                        {pameran.tumbuh >= 0 ? "+" : ""}{pameran.tumbuh.toFixed(1)}%{' '}
+                        <span className="text-zinc-500 font-normal">{pameran.jumlah} transaksi</span>
+                      </span>
+                    )}
                   </div>
                   <div className="h-20 w-full">
-                    <GrafikPorto />
+                    <GrafikPorto nilai={pameran.kurva} />
                   </div>
                 </div>
 
                 <div className="h-px w-full bg-white/10 mb-6" />
 
                 <div className="grid grid-cols-3 gap-4 text-center">
-                  <StatItem value="2 thn" label="Pakai Tools" />
+                  <StatItem value={pameran.siap ? String(pameran.jumlah) : '—'} label="Transaksi" />
                   <div className="w-px h-full bg-white/10 mx-auto" />
-                  <StatItem value={persen(stat.winrate)} label="Winrate" />
+                  <StatItem value={pameran.siap ? persen(pameran.winrate) : '—'} label="Winrate" />
                   <div className="w-px h-full bg-white/10 mx-auto" />
-                  <StatItem value={uang(stat.bersih, true)} label="PNL" />
+                  <StatItem value={pameran.siap ? uang(pameran.bersih, true) : '—'} label="PNL" />
                 </div>
 
                 <div className="mt-8 flex flex-wrap gap-2">
@@ -256,7 +261,7 @@ export default function HeroSection() {
             <div className="animate-fade-in delay-500 relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 py-8 backdrop-blur-xl">
               <h3 className="mb-6 px-8 text-sm font-medium text-zinc-400">
                 Posisi Sedang Terbuka
-                <span className="ml-2 text-zinc-600">{POSISI_TERBUKA.length}</span>
+                <span className="ml-2 text-zinc-600">{posisi.length}</span>
               </h3>
 
               <div
@@ -267,25 +272,29 @@ export default function HeroSection() {
                 }}
               >
                 <div className="animate-marquee flex gap-10 whitespace-nowrap px-4">
-                  {[...POSISI_TERBUKA, ...POSISI_TERBUKA, ...POSISI_TERBUKA].map((p, i) => {
-                    const gerak = ((p.hargaKini - p.entry) / p.entry) * 100 * (p.arah === "BUY" ? 1 : -1);
-                    return (
-                      <div key={i} className="flex items-center gap-2.5 transition-all hover:scale-105 cursor-default">
-                        <IkonKoin simbol={p.simbol} />
-                        <span className="text-lg font-bold text-white tracking-tight">
-                          {p.simbol.replace("USDT", "")}
-                        </span>
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${
-                          p.arah === "BUY" ? "bg-emerald-500/15 text-emerald-400" : "bg-red-500/15 text-red-400"
-                        }`}>
-                          {p.arah}
-                        </span>
-                        <span className={`text-sm tabular-nums ${gerak >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                          {gerak >= 0 ? "+" : ""}{gerak.toFixed(2)}%
-                        </span>
-                      </div>
-                    );
-                  })}
+                  {posisi.length === 0 && (
+                    <span className="px-4 text-sm text-zinc-600">Tidak ada posisi terbuka saat ini.</span>
+                  )}
+                  {/* Diulang tiga kali supaya marquee-nya tidak pernah putus.
+                      Yang TIDAK ditampilkan: persentase pergerakan. Harga
+                      terkini butuh proxy berbayar yang memang tidak terbuka
+                      untuk pengunjung yang belum masuk, dan menghitungnya dari
+                      harga entry berarti selalu menulis "+0,00%" — angka yang
+                      terlihat seperti fakta padahal cuma tanda "tidak tahu". */}
+                  {[...posisi, ...posisi, ...posisi].map((p, i) => (
+                    <div key={i} className="flex items-center gap-2.5 transition-all hover:scale-105 cursor-default">
+                      <IkonKoin simbol={p.simbol} />
+                      <span className="text-lg font-bold text-white tracking-tight">
+                        {p.simbol.replace("USDT", "")}
+                      </span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                        p.arah === "BUY" ? "bg-emerald-500/15 text-emerald-400" : "bg-red-500/15 text-red-400"
+                      }`}>
+                        {p.arah}
+                      </span>
+                      <span className="text-sm tabular-nums text-zinc-400">{p.tf}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>

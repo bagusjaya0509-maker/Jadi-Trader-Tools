@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { bacaKoneksi } from '@/lib/koneksi';
 
@@ -27,6 +28,20 @@ function dasar() {
   return (url || PROXY_BAWAAN).replace(/\/+$/, '');
 }
 
+export interface PosisiBroker {
+  tiket: string;
+  simbol: string;
+  arah: 'BUY' | 'SELL';
+  lot: number;
+  hargaBuka: number;
+  hargaKini: number;
+  sl: number;
+  tp: number;
+  /** Sudah dikonversi ke USD — akun sen dibagi 100. */
+  profit: number;
+  waktuBuka: number;
+}
+
 export interface StatusAkun {
   /** null = belum diketahui (masih memeriksa). */
   terhubung: boolean | null;
@@ -35,9 +50,11 @@ export interface StatusAkun {
   ekuitas: number | null;
   mataUang: string | null;
   ket: string;
+  /** Posisi yang sedang terbuka di broker. Kosong kalau tidak tersambung. */
+  posisi: PosisiBroker[];
 }
 
-const BELUM: StatusAkun = { terhubung: null, saldo: null, ekuitas: null, mataUang: null, ket: 'Memeriksa…' };
+const BELUM: StatusAkun = { terhubung: null, saldo: null, ekuitas: null, mataUang: null, ket: 'Memeriksa…', posisi: [] };
 
 /** Akun sen dibagi 100. Tanpa ini akun cent terlihat 100× lebih besar —
  *  kekeliruan yang sama sudah pernah diperbaiki di jurnal V2. */
@@ -70,12 +87,29 @@ export function useAkunMt5(): StatusAkun {
           return;
         }
         const mu = akun.mataUang ?? null;
+        /* Profit tiap posisi ikut dikonversi. Akun ini bermata uang USC
+           (sen), jadi tanpa pembagian 100 satu posisi rugi -50,60 sen
+           terbaca sebagai rugi $50,60 — hampir seratus kali lipat. */
+        const posisi: PosisiBroker[] = (j?.data?.posisi ?? []).map((p: any) => ({
+          tiket: String(p.tiket ?? ''),
+          simbol: String(p.simbol ?? ''),
+          arah: p.arah === 'SELL' ? 'SELL' : 'BUY',
+          lot: Number(p.lot) || 0,
+          hargaBuka: Number(p.hargaBuka) || 0,
+          hargaKini: Number(p.hargaKini) || 0,
+          sl: Number(p.sl) || 0,
+          tp: Number(p.tp) || 0,
+          profit: keUsd((Number(p.profit) || 0) + (Number(p.swap) || 0), mu),
+          /* EA mengirim detik, bukan milidetik. */
+          waktuBuka: (Number(p.waktuBuka) || 0) * 1000,
+        }));
         setSt({
           terhubung: true,
           saldo: keUsd(Number(akun.saldo) || 0, mu),
           ekuitas: keUsd(Number(akun.ekuitas) || 0, mu),
           mataUang: mu,
-          ket: akun.login ? `Akun ${akun.login}` : 'MetaTrader 5',
+          ket: akun.login ? `Akun ${akun.login} · ${akun.broker ?? ''}`.trim() : 'MetaTrader 5',
+          posisi,
         });
       } catch {
         if (hidup) setSt({ ...BELUM, terhubung: false, ket: 'Tidak bisa menghubungi backend' });
@@ -88,6 +122,93 @@ export function useAkunMt5(): StatusAkun {
   }, []);
 
   return st;
+}
+
+/* ── Kode pasangan MT5 ────────────────────────────────────────────────────
+   Kode dibaca dari `/api/mt5/status`, TIDAK dibuat saat halaman dibuka.
+
+   `POST /api/mt5/kode` memutar kodenya — kode lama dibuang dan EA yang
+   sedang berjalan langsung terputus. Kalau dipanggil tiap kali halaman
+   Integrations dibuka, sambungan MT5 putus setiap kali orang melihatnya.
+   Jadi POST hanya dilakukan saat tombol "Buat kode baru" ditekan.
+
+   Bentuk kodenya `JTM5-XXXX-XXXX`, divalidasi backend dengan regex ketat.
+   Halaman ini sebelumnya menampilkan `JT-4F2A-91C7` yang ditulis mati di
+   kode — awalannya salah DAN tidak pernah terdaftar, jadi EA yang memakainya
+   selalu ditolak 400 "Kode Pasangan tidak valid". */
+export interface KodeMt5 {
+  kode: string | null;
+  memuat: boolean;
+  galat: string | null;
+  buatBaru: () => Promise<void>;
+  putus: () => Promise<void>;
+  segarkan: () => Promise<void>;
+}
+
+export function useKodeMt5(): KodeMt5 {
+  const [kode, setKode] = useState<string | null>(null);
+  const [memuat, setMemuat] = useState(true);
+  const [galat, setGalat] = useState<string | null>(null);
+
+  async function panggil(jalur: string, metode: 'GET' | 'POST') {
+    const u = auth.currentUser;
+    if (!u) throw new Error('Masuk dulu dengan akun Google.');
+    const token = await u.getIdToken();
+    const r = await fetch(`${dasar()}${jalur}`, {
+      method: metode,
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: metode === 'POST' ? '{}' : undefined,
+    });
+    if (!r.ok) throw new Error(`Backend menjawab ${r.status}`);
+    return r.json();
+  }
+
+  const segarkan = useCallback(async () => {
+    setMemuat(true); setGalat(null);
+    try {
+      const j = await panggil('/api/mt5/status', 'GET');
+      setKode(j?.kode ?? null);
+    } catch (e) {
+      setGalat(e instanceof Error ? e.message : 'Gagal membaca kode');
+      setKode(null);
+    } finally {
+      setMemuat(false);
+    }
+  }, []);
+
+  const buatBaru = useCallback(async () => {
+    setMemuat(true); setGalat(null);
+    try {
+      const j = await panggil('/api/mt5/kode', 'POST');
+      setKode(j?.kode ?? null);
+    } catch (e) {
+      setGalat(e instanceof Error ? e.message : 'Gagal membuat kode');
+    } finally {
+      setMemuat(false);
+    }
+  }, []);
+
+  const putus = useCallback(async () => {
+    setMemuat(true); setGalat(null);
+    try {
+      await panggil('/api/mt5/putus', 'POST');
+      setKode(null);
+    } catch (e) {
+      setGalat(e instanceof Error ? e.message : 'Gagal memutus');
+    } finally {
+      setMemuat(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const lepas = onAuthStateChanged(auth, (u) => {
+      if (u) void segarkan();
+      else { setKode(null); setMemuat(false); setGalat(null); }
+    });
+    return lepas;
+  }, [segarkan]);
+
+  return { kode, memuat, galat, buatBaru, putus, segarkan };
 }
 
 export function useAkunBinance(): StatusAkun {
@@ -114,7 +235,16 @@ export function useAkunBinance(): StatusAkun {
         const saldo = Number(j?.totalWalletBalance);
         const ekuitas = Number(j?.totalMarginBalance ?? j?.totalWalletBalance);
         if (!isFinite(saldo)) { setSt({ ...BELUM, terhubung: false, ket: 'Balasan tidak dikenali' }); return; }
-        setSt({ terhubung: true, saldo, ekuitas: isFinite(ekuitas) ? ekuitas : saldo, mataUang: 'USDT', ket: 'Binance Futures' });
+        /* Posisi Binance TIDAK diambil dari sini. `/api/account` memang
+           membawa `positions`, tapi ratusan baris dengan qty 0 untuk setiap
+           simbol yang pernah disentuh — menyaringnya di sisi layar berarti
+           mengunduh ratusan kilobyte tiap 30 detik. Posisi kripto yang
+           dipakai V3 datang dari Firestore, yang memang sudah menyimpan
+           hanya yang benar-benar terbuka. */
+        setSt({
+          terhubung: true, saldo, ekuitas: isFinite(ekuitas) ? ekuitas : saldo,
+          mataUang: 'USDT', ket: 'Binance Futures', posisi: [],
+        });
       } catch {
         if (hidup) setSt({ ...BELUM, terhubung: false, ket: 'Tidak bisa menghubungi backend' });
       }

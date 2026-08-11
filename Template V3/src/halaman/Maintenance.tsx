@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Upload, Trash2, RotateCcw, Plus, FileCode2, Image as ImageIcon, ShieldAlert } from 'lucide-react';
 import { Panel, PanelHead, KartuKpi, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn } from '@/lib/utils';
-import { PRODUK } from '@/data/contoh';
+import { useProduk, simpanKatalogProduk } from '@/lib/data';
+import { useAuth } from '@/lib/auth';
 
 /* ════════════════════════════════════════════════════════════════════════
    MAINTENANCE — khusus pemilik
@@ -17,33 +18,80 @@ import { PRODUK } from '@/data/contoh';
    ════════════════════════════════════════════════════════════════════════ */
 
 export default function Maintenance() {
-  const [tayang, setTayang] = useState(PRODUK.map((p) => ({ id: p.id, nama: p.nama, harga: p.harga })));
-  const [sampah, setSampah] = useState<{ id: string; nama: string; harga: number }[]>([]);
-  const [pesan, setPesan] = useState('');
+  /* Katalog NYATA dari Firestore, bukan salinan data contoh.
+     Sebelumnya halaman ini memulai dari `PRODUK` dan menyimpan perubahannya
+     di useState saja — jadi menghapus produk terlihat berhasil, tapi tidak
+     pernah menyentuh apa pun, dan katalognya pulih sendiri setelah refresh.
 
-  function buang(id: string) {
+     Yang disimpan adalah objek MENTAH dari Firestore, bukan hasil pemetaan.
+     Katalog nyata punya field yang tidak ada di antarmuka `Produk` (detail,
+     gambar, lynk, berkas); menulis ulang dari bentuk yang sudah dipetakan
+     akan melucuti tangkapan layar dan tautan beli milik produk lain. */
+  const { mentah, sampahMentah, memuat } = useProduk();
+  const { pemilik } = useAuth();
+
+  const [tayang, setTayang] = useState<any[]>([]);
+  const [sampah, setSampah] = useState<any[]>([]);
+  const [pesan, setPesan] = useState('');
+  const [menyimpan, setMenyimpan] = useState(false);
+
+  /* Katalog DAN tempat sampah sama-sama datang dari server, jadi keduanya
+     ikut segar setiap kali dokumennya berubah — termasuk saat panel pemilik
+     V2 mengubahnya dari tab lain. */
+  useEffect(() => {
+    if (!memuat) { setTayang(mentah); setSampah(sampahMentah); }
+  }, [mentah, sampahMentah, memuat]);
+
+  /* Satu-satunya penulis. Semua aksi memanggil ini supaya tidak ada jalur
+     yang mengubah layar tanpa mengubah server — persis kekeliruan yang
+     membuat penghapusan terasa berhasil padahal tidak. */
+  async function simpan(daftarBaru: any[], sampahBaru: any[], kabar: string) {
+    if (!pemilik) { setPesan('Hanya pemilik yang boleh mengubah katalog.'); return false; }
+    setMenyimpan(true);
+    try {
+      await simpanKatalogProduk(daftarBaru, sampahBaru);
+      setPesan(kabar);
+      return true;
+    } catch (e) {
+      setPesan('Gagal menyimpan ke server: ' + (e instanceof Error ? e.message : 'tidak diketahui'));
+      return false;
+    } finally {
+      setMenyimpan(false);
+    }
+  }
+
+  /* Tiap aksi menulis ke server DULU, layar menyusul kalau berhasil.
+     Urutan itu penting: kalau layar diubah lebih dulu lalu simpan gagal,
+     orang melihat produknya hilang padahal masih tayang untuk pembeli. */
+  async function buang(id: string) {
     const p = tayang.find((x) => x.id === id);
     if (!p) return;
-    setTayang((t) => t.filter((x) => x.id !== id));
-    setSampah((s) => [p, ...s]);
+    const sisa = tayang.filter((x) => x.id !== id);
+    const sampahBaru = [p, ...sampah];
     // Tanpa confirm(): itulah gunanya tempat sampah. Konfirmasi untuk aksi
     // yang bisa dibatalkan cuma menambah klik tanpa menambah keamanan.
-    setPesan(`${p.nama} dipindah ke tempat sampah — masih bisa dipulihkan.`);
+    if (await simpan(sisa, sampahBaru, `${p.nama} dipindah ke tempat sampah — masih bisa dipulihkan.`)) {
+      setTayang(sisa);
+      setSampah(sampahBaru);
+    }
   }
-  function pulihkan(id: string) {
+  async function pulihkan(id: string) {
     const p = sampah.find((x) => x.id === id);
     if (!p) return;
-    setSampah((s) => s.filter((x) => x.id !== id));
-    setTayang((t) => [...t, p]);
-    setPesan(`${p.nama} dipulihkan dan tayang lagi.`);
+    const baru = [...tayang, p];
+    const sampahBaru = sampah.filter((x) => x.id !== id);
+    if (await simpan(baru, sampahBaru, `${p.nama} dipulihkan dan tayang lagi.`)) {
+      setSampah(sampahBaru);
+      setTayang(baru);
+    }
   }
-  function musnahkan(id: string) {
+  async function musnahkan(id: string) {
     const p = sampah.find((x) => x.id === id);
     if (!p) return;
     // INI yang butuh konfirmasi — tidak ada jalan pulang.
     if (!confirm(`Hapus permanen "${p.nama}"?\n\nEntri katalognya hilang untuk selamanya.\nBerkas sumber di server TIDAK ikut terhapus.`)) return;
-    setSampah((s) => s.filter((x) => x.id !== id));
-    setPesan(`${p.nama} dihapus permanen.`);
+    const sampahBaru = sampah.filter((x) => x.id !== id);
+    if (await simpan(tayang, sampahBaru, `${p.nama} dihapus permanen.`)) setSampah(sampahBaru);
   }
 
   return (
@@ -83,7 +131,9 @@ export default function Maintenance() {
                   <span className={cn('angka text-[11px]', p.harga === 0 ? 'text-emerald-500' : 'text-amber-400')}>
                     {p.harga === 0 ? 'FREE' : `$${p.harga}`}
                   </span>
-                  <button onClick={() => buang(p.id)} aria-label={`Buang ${p.nama}`}
+                  <button onClick={() => void buang(p.id)} disabled={menyimpan || !pemilik}
+                    title={pemilik ? undefined : "Hanya pemilik yang boleh mengubah katalog"}
+                    aria-label={`Buang ${p.nama}`}
                     className="flex size-5 cursor-pointer items-center justify-center rounded-full text-zinc-600 transition-colors hover:bg-red-500/10 hover:text-red-400">
                     ×
                   </button>
@@ -100,11 +150,11 @@ export default function Maintenance() {
                   {sampah.map((p) => (
                     <span key={p.id} className="inline-flex items-center gap-2.5 rounded-lg border border-dashed border-zinc-800 bg-zinc-900/30 py-1.5 pl-3 pr-2 text-[12.5px] opacity-70">
                       <span className="text-zinc-400 line-through">{p.nama}</span>
-                      <button onClick={() => pulihkan(p.id)} aria-label={`Pulihkan ${p.nama}`}
+                      <button onClick={() => void pulihkan(p.id)} disabled={menyimpan} aria-label={`Pulihkan ${p.nama}`}
                         className="flex size-5 cursor-pointer items-center justify-center rounded-full text-zinc-500 transition-colors hover:bg-emerald-500/10 hover:text-emerald-400">
                         <RotateCcw className="size-3" />
                       </button>
-                      <button onClick={() => musnahkan(p.id)} aria-label={`Hapus permanen ${p.nama}`}
+                      <button onClick={() => void musnahkan(p.id)} disabled={menyimpan} aria-label={`Hapus permanen ${p.nama}`}
                         className="flex size-5 cursor-pointer items-center justify-center rounded-full text-zinc-500 transition-colors hover:bg-red-500/10 hover:text-red-400">
                         <Trash2 className="size-3" />
                       </button>

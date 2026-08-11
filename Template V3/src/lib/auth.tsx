@@ -114,6 +114,12 @@ export function PenyediaAuth({ children }: { children: React.ReactNode }) {
     return onAuthStateChanged(auth, async (u) => {
       setPengguna(u);
       if (u) {
+        /* Catat kehadiran ke backend supaya halaman Traffic & Sales punya
+           daftar klien. Emailnya diambil backend dari ID token yang sudah
+           diverifikasi, jadi halaman ini tidak bisa mendaftarkan email orang
+           lain. Sengaja tidak di-await: daftar klien tidak boleh menahan
+           tampilnya aplikasi. */
+        void import('@/lib/admin').then((m) => m.catatKlienHadir());
         try {
           setLangganan(await bacaAtauBuatLangganan(u.uid));
         } catch (e) {

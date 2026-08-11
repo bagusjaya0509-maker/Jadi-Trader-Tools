@@ -149,6 +149,10 @@ export interface Produk {
   gambar?: string[];
   lynk?: string;
   berkas?: string;
+  /** Ekstensi berkas terkompilasi yang boleh diunduh ('ex5' | 'mq5').
+   *  Kosong berarti produknya hanya berupa sumber teks — dan tombol unduh
+   *  tidak boleh muncul, karena tidak ada berkas untuk diunduh. */
+  unduhan?: 'ex5' | 'mq5';
 }
 
 export const PRODUK: Produk[] = [

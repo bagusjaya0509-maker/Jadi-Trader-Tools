@@ -1,0 +1,354 @@
+import { useCallback, useEffect, useState } from 'react';
+import { auth } from '@/lib/firebase';
+import { bacaKoneksi } from '@/lib/koneksi';
+
+/* ════════════════════════════════════════════════════════════════════════
+   DATA PEMILIK — trafik, klien, penjualan, laporan, lisensi, status VPS
+   ════════════════════════════════════════════════════════════════════════
+   Semuanya sudah ada di backend VPS sejak V2; halaman Traffic & Sales cuma
+   belum pernah menanyakannya. Sampai sekarang halaman itu menampilkan
+   `KLIEN`, `PENJUALAN`, `LAPORAN`, `VPS`, dan `TRAFIK` dari data/contoh.ts —
+   angka karangan yang tidak pernah berubah, di halaman yang justru dipakai
+   untuk mengambil keputusan.
+
+   Enam rute di bawah ini dijaga `X-App-Token`, bukan login Firebase: token
+   itu milik VPS pemiliknya sendiri. Jadi tanpa App Token di Integrations,
+   halaman ini memang tidak bisa menampilkan apa-apa — dan lebih baik
+   mengatakannya daripada diam-diam jatuh ke data contoh.
+   ════════════════════════════════════════════════════════════════════════ */
+
+const PROXY_BAWAAN = 'https://103-253-145-38.sslip.io';
+/** Sama dengan jeda di lib/akun.ts — dua panel yang menanyakan hal yang
+ *  sama tidak boleh menyegarkan diri pada irama berbeda. */
+const JEDA_MS = 30_000;
+
+function dasar() {
+  const url = bacaKoneksi().url.trim();
+  return (url || PROXY_BAWAAN).replace(/\/+$/, '');
+}
+
+export interface Hasil<T> {
+  data: T;
+  memuat: boolean;
+  galat: string | null;
+  muatUlang: () => void;
+}
+
+/** Satu pola untuk keenam rute: ambil, urai, dan sediakan `muatUlang` supaya
+ *  panel bisa menyegarkan diri setelah menulis sesuatu. */
+function useRute<T>(jalur: string, ambilData: (j: any) => T, awal: T): Hasil<T> {
+  const [data, setData] = useState<T>(awal);
+  const [memuat, setMemuat] = useState(true);
+  const [galat, setGalat] = useState<string | null>(null);
+  const [putaran, setPutaran] = useState(0);
+  const { token } = bacaKoneksi();
+
+  useEffect(() => {
+    let hidup = true;
+    if (!token.trim()) {
+      setMemuat(false);
+      setGalat('App Token belum diisi di Integrations');
+      return;
+    }
+    setMemuat(true);
+    fetch(`${dasar()}${jalur}`, { headers: { 'X-App-Token': token.trim() } })
+      .then(async (r) => {
+        if (r.status === 401) throw new Error('App Token ditolak');
+        if (!r.ok) throw new Error(`Backend menjawab ${r.status}`);
+        return r.json();
+      })
+      .then((j) => { if (hidup) { setData(ambilData(j)); setGalat(null); setMemuat(false); } })
+      .catch((e) => { if (hidup) { setGalat(e.message); setMemuat(false); } });
+    return () => { hidup = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jalur, token, putaran]);
+
+  const muatUlang = useCallback(() => setPutaran((n) => n + 1), []);
+  return { data, memuat, galat, muatUlang };
+}
+
+/* ── Trafik ──────────────────────────────────────────────────────────── */
+export interface HariTrafik {
+  hari: string;
+  label: string;
+  total: number;
+  unik: number;
+  halaman: Record<string, number>;
+}
+
+export function useTrafik(): Hasil<HariTrafik[]> {
+  return useRute('/api/kunjungan/ringkas', (j) =>
+    (j?.harian ?? []).map((h: any): HariTrafik => ({
+      hari: String(h.hari),
+      /* "2026-08-10" -> "10 Agu". Sumbu grafik dengan tanggal ISO penuh
+         saling tindih begitu ada lebih dari sepuluh hari. */
+      label: new Date(h.hari + 'T00:00:00').toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }),
+      total: Number(h.total) || 0,
+      unik: Number(h.unik) || 0,
+      halaman: h.halaman ?? {},
+    })), []);
+}
+
+/* ── Klien ───────────────────────────────────────────────────────────── */
+export interface Klien {
+  uid: string; email: string; nama: string;
+  kunjungan: number; pertama: number; terakhir: number;
+}
+
+export function useKlien(): Hasil<Klien[]> {
+  return useRute('/api/klien/daftar', (j) =>
+    (j?.klien ?? []).map((k: any): Klien => ({
+      uid: String(k.uid ?? ''),
+      email: String(k.email ?? ''),
+      nama: String(k.nama ?? ''),
+      kunjungan: Number(k.kunjungan) || 0,
+      pertama: Number(k.pertama) || 0,
+      terakhir: Number(k.terakhir) || 0,
+    })), []);
+}
+
+/* ── Penjualan ───────────────────────────────────────────────────────── */
+export interface Penjualan {
+  id: string; produk: string; pembeli: string;
+  nilai: number; catatan: string; waktu: number;
+}
+
+export function usePenjualan(): Hasil<Penjualan[]> {
+  return useRute('/api/penjualan/daftar', (j) =>
+    (j?.penjualan ?? []).map((p: any): Penjualan => ({
+      id: String(p.id ?? ''),
+      produk: String(p.produk ?? ''),
+      pembeli: String(p.pembeli ?? ''),
+      nilai: Number(p.nilai) || 0,
+      catatan: String(p.catatan ?? ''),
+      waktu: Number(p.waktu) || 0,
+    })), []);
+}
+
+/* ── Laporan bug & error ─────────────────────────────────────────────── */
+export interface Laporan {
+  id: string; jenis: string; pesan: string; halaman: string;
+  email: string; status: string; waktu: number;
+}
+
+export function useLaporan(): Hasil<Laporan[]> {
+  return useRute('/api/lapor/daftar', (j) =>
+    (j?.laporan ?? []).map((l: any): Laporan => ({
+      id: String(l.id ?? ''),
+      jenis: String(l.jenis ?? 'lain'),
+      pesan: String(l.pesan ?? ''),
+      halaman: String(l.halaman ?? ''),
+      email: String(l.email ?? ''),
+      status: String(l.status ?? 'baru'),
+      waktu: Number(l.waktu) || 0,
+    })), []);
+}
+
+/* ── Lisensi aktif ───────────────────────────────────────────────────── */
+export interface Lisensi { sidik: string; produk: string; catatan: string; tgl: number; }
+
+export function useLisensi(): Hasil<Lisensi[]> {
+  return useRute('/api/lisensi/daftar', (j) =>
+    (j?.aktif ?? []).map((x: any): Lisensi => ({
+      sidik: String(x.sidik ?? ''),
+      produk: String(x.produk ?? ''),
+      catatan: String(x.catatan ?? ''),
+      tgl: Number(x.tgl) || 0,
+    })), []);
+}
+
+/* ── Status VPS ──────────────────────────────────────────────────────── */
+export interface StatusVps {
+  waktuHidupDetik: number; waktuHidupMesinDetik: number;
+  ramTotalMb: number; ramBebasMb: number; ramProsesMb: number;
+  beban: number[]; cpu: number; node: string; gerbangLangganan: boolean;
+}
+
+const VPS_KOSONG: StatusVps = {
+  waktuHidupDetik: 0, waktuHidupMesinDetik: 0, ramTotalMb: 0, ramBebasMb: 0,
+  ramProsesMb: 0, beban: [], cpu: 0, node: '', gerbangLangganan: false,
+};
+
+export function useStatusVps(): Hasil<StatusVps> {
+  return useRute('/api/status-vps', (j): StatusVps => ({
+    waktuHidupDetik: Number(j?.waktuHidupDetik) || 0,
+    waktuHidupMesinDetik: Number(j?.waktuHidupMesinDetik) || 0,
+    ramTotalMb: Number(j?.ramTotalMb) || 0,
+    ramBebasMb: Number(j?.ramBebasMb) || 0,
+    ramProsesMb: Number(j?.ramProsesMb) || 0,
+    beban: Array.isArray(j?.beban) ? j.beban.map(Number) : [],
+    cpu: Number(j?.cpu) || 0,
+    node: String(j?.node ?? ''),
+    gerbangLangganan: !!j?.gerbangLangganan,
+  }), VPS_KOSONG);
+}
+
+/* ── Menulis ─────────────────────────────────────────────────────────── */
+
+async function kirim(jalur: string, muatan: unknown) {
+  const { token } = bacaKoneksi();
+  if (!token.trim()) throw new Error('App Token belum diisi di Integrations');
+  const r = await fetch(`${dasar()}${jalur}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-App-Token': token.trim() },
+    body: JSON.stringify(muatan),
+  });
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? `Backend menjawab ${r.status}`);
+  return r.json();
+}
+
+export const catatPenjualan = (p: { produk: string; pembeli: string; nilai: number; catatan?: string }) =>
+  kirim('/api/penjualan', p);
+export const hapusPenjualan = (id: string) => kirim('/api/penjualan/hapus', { id });
+export const tandaiLaporan = (id: string, status: string) => kirim('/api/lapor/status', { id, status });
+export const cabutLisensi = (sidik: string) => kirim('/api/lisensi/cabut', { sidik });
+
+/* ════════════════════════════════════════════════════════════════════════
+   PELAPORAN BALIK — supaya V3 ikut terhitung
+   ════════════════════════════════════════════════════════════════════════
+   Grafik trafik dan daftar klien di halaman Pemilik diisi oleh halaman yang
+   MELAPOR. V2 melapor lewat jt-lapor.js dan jt-langganan.js; V3 sama sekali
+   tidak — jadi selama ini setiap kunjungan ke V3 tidak pernah muncul di
+   angka mana pun, dan grafiknya perlahan jadi laporan tentang V2 saja.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/** Catat satu kunjungan halaman. Sekali per sesi per halaman — tanpa penjaga
+ *  ini setiap refresh ikut terhitung dan angkanya berhenti berarti apa-apa.
+ *  Sengaja tidak memakai App Token: pengunjung biasa tidak punya. */
+export function catatKunjungan(halaman: string) {
+  const kunci = 'jtKunjungan::v3::' + halaman;
+  try {
+    if (sessionStorage.getItem(kunci)) return;
+    sessionStorage.setItem(kunci, '1');
+  } catch { /* mode privat — biarkan terhitung daripada tidak sama sekali */ }
+  fetch(`${dasar()}/api/kunjungan`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ halaman }),
+  }).catch(() => {});
+}
+
+/** Catat kehadiran klien yang login. Email diambil backend dari ID token yang
+ *  sudah diverifikasi — halaman ini tidak bisa mendaftarkan email orang lain. */
+export async function catatKlienHadir() {
+  const u = auth.currentUser;
+  if (!u) return;
+  const kunci = 'jtKlienHadir::' + u.uid;
+  try {
+    if (sessionStorage.getItem(kunci)) return;
+    sessionStorage.setItem(kunci, '1');
+  } catch { /* sama seperti di atas */ }
+  try {
+    const token = await u.getIdToken();
+    await fetch(`${dasar()}/api/klien/hadir`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ nama: u.displayName ?? '' }),
+    });
+  } catch { /* pencatatan gagal tidak boleh mengganggu apa pun */ }
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   PRODUK — ambil sumber & berkas
+   ════════════════════════════════════════════════════════════════════════
+   Rute-rute ini PUBLIK (tanpa App Token): yang menjaganya adalah lisensi,
+   bukan token pemilik. Pembeli tidak punya App Token dan tidak boleh punya.
+
+   Tiga jalur, tiga gerbang berbeda:
+     · /api/produk/gratis  — hanya untuk produk bertanda `.gratis`
+     · /api/produk         — sumber teks premium, butuh kode lisensi aktif;
+                             kode pembeli disisipkan sebagai penanda
+     · /api/produk/berkas  — .ex5 biner; gratis kalau ditandai gratis,
+                             kalau tidak butuh kode lisensi
+   ════════════════════════════════════════════════════════════════════════ */
+
+/** Sumber produk gratis. */
+export async function ambilSumberGratis(id: string, jenis: 'txt' | 'mq5' = 'txt') {
+  const r = await fetch(`${dasar()}/api/produk/gratis?id=${encodeURIComponent(id)}&jenis=${jenis}`);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error ?? `Backend menjawab ${r.status}`);
+  return String(j.kode ?? '');
+}
+
+/** Sumber produk premium, dengan kode lisensi pembeli. */
+export async function ambilSumberBerlisensi(id: string, kode: string) {
+  const r = await fetch(`${dasar()}/api/produk?id=${encodeURIComponent(id)}&kode=${encodeURIComponent(kode)}`);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error ?? `Backend menjawab ${r.status}`);
+  return String(j.kode ?? '');
+}
+
+/** Tautan unduh berkas biner. Dipakai sebagai href, bukan fetch — `res.download`
+ *  mengirim header Content-Disposition, dan browser yang menanganinya. */
+export function tautanBerkas(id: string, kode = '', jenis: 'ex5' | 'mq5' = 'ex5') {
+  const q = new URLSearchParams({ id, jenis });
+  if (kode) q.set('kode', kode);
+  return `${dasar()}/api/produk/berkas?${q}`;
+}
+
+/** Cek satu kode lisensi. Backend hanya menerima SIDIK-nya lewat rute publik
+ *  `/api/lisensi/cek`, tapi sidik dihitung dari kode — dan perhitungannya ada
+ *  di server. Jadi yang dipakai di sini adalah percobaan mengambil sumbernya:
+ *  berhasil berarti lisensinya aktif. */
+export async function ujiLisensi(id: string, kode: string) {
+  try { await ambilSumberBerlisensi(id, kode); return { aktif: true, ket: 'Lisensi aktif' }; }
+  catch (e) { return { aktif: false, ket: e instanceof Error ? e.message : 'Gagal memeriksa' }; }
+}
+
+/* ── Posisi terbuka langsung dari Binance ────────────────────────────────
+   `public/posisiTerbuka` hanya berisi posisi yang DIBUKA lewat screener V2,
+   dan hanya diperbarui selama halaman itu terbuka. Posisi yang dibuka dari
+   aplikasi Binance tidak pernah masuk ke sana — itulah kenapa dashboard
+   pernah menampilkan dua posisi sementara di bursa ada tiga.
+
+   Rute ini menjawab dari bursanya langsung, jadi ia selalu benar. Syaratnya
+   App Token, yang cuma dimiliki pemilik VPS-nya; pengunjung tetap memakai
+   dokumen publik. */
+export interface PosisiBursa {
+  simbol: string;
+  arah: 'BUY' | 'SELL';
+  jumlah: number;
+  entry: number;
+  pnl: number;
+}
+
+export function usePosisiBinance(): { data: PosisiBursa[]; aktif: boolean } {
+  const [data, setData] = useState<PosisiBursa[]>([]);
+  const [aktif, setAktif] = useState(false);
+  const { token } = bacaKoneksi();
+
+  useEffect(() => {
+    if (!token.trim()) { setAktif(false); setData([]); return; }
+    let hidup = true;
+
+    async function ambil() {
+      try {
+        const r = await fetch(`${dasar()}/api/positions`, { headers: { 'X-App-Token': token.trim() } });
+        if (!r.ok) throw new Error(String(r.status));
+        const j = await r.json();
+        if (!hidup) return;
+        /* Binance mengirim SATU baris untuk setiap simbol yang pernah
+           disentuh — 858 baris untuk tiga posisi. Yang qty-nya nol bukan
+           posisi; menampilkannya berarti daftar sepanjang ratusan baris. */
+        setData((j.positions ?? [])
+          .filter((p: any) => Math.abs(Number(p.positionAmt)) > 0)
+          .map((p: any): PosisiBursa => ({
+            simbol: String(p.symbol ?? ''),
+            arah: Number(p.positionAmt) > 0 ? 'BUY' : 'SELL',
+            jumlah: Math.abs(Number(p.positionAmt)) || 0,
+            entry: Number(p.entryPrice) || 0,
+            pnl: Number(p.unRealizedProfit) || 0,
+          })));
+        setAktif(true);
+      } catch {
+        if (hidup) { setAktif(false); }
+      }
+    }
+
+    void ambil();
+    const jam = setInterval(ambil, JEDA_MS);
+    return () => { hidup = false; clearInterval(jam); };
+  }, [token]);
+
+  return { data, aktif };
+}
