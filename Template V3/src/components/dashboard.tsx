@@ -10,7 +10,7 @@ import { statGabungan, statPer, plPerBulan, saldoDuaBulan, type Bulan } from '@/
 import { useRiwayat, usePosisi, useSaldoAwal, terbitkanRingkasan } from '@/lib/data';
 import { useAuth } from '@/lib/auth';
 import { useHargaPasar } from '@/lib/harga';
-import { LabelContoh } from '@/components/gerbang';
+import { LabelContoh, SpandukContoh } from '@/components/gerbang';
 import { useAkunMt5, useAkunBinance } from '@/lib/akun';
 import { useArusKas, arusBersih } from '@/lib/tulis-jurnal';
 import { PanelEvaluasi } from '@/components/panel-evaluasi';
@@ -105,7 +105,9 @@ export function Dashboard() {
      dengan angka karangan, jadi akun yang transaksinya baru mulai bulan ini
      tetap menampilkan lima bulan riwayat yang tidak pernah terjadi. */
   const perBulan = useMemo(() => plPerBulan(RIWAYAT), [RIWAYAT]);
-  const kurvaSaldo = useMemo(() => saldoDuaBulan(RIWAYAT, modalTotal), [RIWAYAT, modalTotal]);
+  /* Basisnya saldo awal SAJA — setoran/penarikan masuk sebagai peristiwa
+     bertanggal di dalam kurva, bukan digelontorkan ke titik awal. */
+  const kurvaSaldo = useMemo(() => saldoDuaBulan(RIWAYAT, saldoAwal, arus), [RIWAYAT, saldoAwal, arus]);
 
   const bulanIni = perBulan[perBulan.length - 1];
   const bulanLalu = perBulan[perBulan.length - 2];
@@ -205,6 +207,7 @@ export function Dashboard() {
 
   return (
     <div className="p-4 sm:p-6">
+      <SpandukContoh contoh={contoh} />
       {contoh && <div className="mb-4"><LabelContoh tampil /></div>}
       {/* ── KPI: gabungan kripto + trade-fi ── */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">

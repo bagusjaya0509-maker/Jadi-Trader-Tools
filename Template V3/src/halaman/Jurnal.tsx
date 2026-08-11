@@ -5,7 +5,7 @@ import { Panel, PanelHead, BadgeTren, TipGrafik, TabelBungkus, Tabel, Th, Td, Tr
 import { cn, uang, persen, tanggalPendek } from '@/lib/utils';
 import { statGabungan, kurvaEkuitas, plPerHari, rangkumLayering } from '@/lib/hitung';
 import { useRiwayat, useSaldoAwal, usePosisi } from '@/lib/data';
-import { LabelContoh } from '@/components/gerbang';
+import { LabelContoh, SpandukContoh } from '@/components/gerbang';
 import { useAuth } from '@/lib/auth';
 import type { Trade, Sumber } from '@/data/contoh';
 import { useAkunMt5, useAkunBinance, type StatusAkun } from '@/lib/akun';
@@ -306,11 +306,11 @@ function CatatanKecil({ c }: { c: { nada: 'baik' | 'awas' | 'buruk'; teks: strin
  *  Dipakai dua kali dengan daftar transaksi berbeda. Menuliskannya dua kali
  *  akan membuat kedua jurnal berbeda diam-diam dalam dua putaran revisi —
  *  persis yang terjadi pada `statPer` sebelum diperbaiki. */
-function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun, labelSaldo, keIntegrasi, sumber, arus, bisaTulis }: {
+function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun, labelSaldo, keIntegrasi, sumber, arus, bisaTulis, contoh = false }: {
   judul: string; ket: string; Ikon: typeof Bitcoin;
   trade: Trade[]; saldoAwal: number; warna: string; idGradien: string;
   akun: StatusAkun; labelSaldo: string; keIntegrasi: string;
-  sumber: Sumber; arus: Arus[]; bisaTulis: boolean;
+  sumber: Sumber; arus: Arus[]; bisaTulis: boolean; contoh?: boolean;
 }) {
   /* Setoran & penarikan masuk ke SALDO, bukan ke P/L — jadi ia digabung ke
      saldo awal, bukan ke daftar transaksi. Kalau ikut ke transaksi, menyetor
@@ -433,6 +433,7 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
         <span className="angka ml-auto text-[12px] text-zinc-600">{trade.length} transaksi</span>
       </div>
 
+      <SpandukContoh contoh={contoh} />
       {kosong ? (
         <Panel className="px-5 py-10 text-center text-[13px] text-zinc-500">
           Belum ada transaksi {judul.toLowerCase()}.

@@ -8,6 +8,7 @@ import { cn, tanggalPendek } from '@/lib/utils';
 import { type Produk } from '@/data/contoh';
 import { useProduk } from '@/lib/data';
 import { useAuth } from '@/lib/auth';
+import { suratLisensi, sisipkanPenanda, unduhTeks } from '@/lib/surat-lisensi';
 import { useUlasan, kirimUlasan, hapusUlasan } from '@/lib/ulasan';
 import {
   ambilSumberGratis, ambilSumberBerlisensi, tautanBerkas,
@@ -40,18 +41,36 @@ function AmbilSumber({ produk }: { produk: Produk }) {
   const [sibuk, setSibuk] = useState(false);
   const [kabar, setKabar] = useState('');
   const [gagal, setGagal] = useState(false);
+  /* Persetujuan HARUS diklik sebelum kode premium keluar — pasal larangan
+     menyebarluaskan tidak berarti apa-apa kalau tidak pernah disetujui. */
+  const [setuju, setSetuju] = useState(false);
+  const [surat, setSurat] = useState<string | null>(null);
+  const [bukaSurat, setBukaSurat] = useState(false);
+  const { pengguna } = useAuth();
   const gratis = produk.harga === 0;
 
   async function ambil() {
     setSibuk(true); setKabar(''); setGagal(false);
     try {
       const rapi = kode.trim().toUpperCase();
-      const isi = gratis
+      const mentah = gratis
         ? await ambilSumberGratis(produk.id, jenisSumber(produk.berkas))
         : await ambilSumberBerlisensi(produk.id, rapi);
+      /* Salinan premium DITANDAI dengan kode lisensinya — empat titik yang
+         menyamar sebagai catatan build, identik dengan V2, supaya salinan
+         yang beredar bisa ditelusuri kembali ke pemegang lisensinya. */
+      const isi = gratis ? mentah : sisipkanPenanda(mentah, rapi);
       await navigator.clipboard.writeText(isi);
-      if (!gratis) { try { localStorage.setItem(KUNCI_LISENSI, rapi); } catch { /* mode privat */ } }
-      setKabar(`Tersalin — ${isi.length.toLocaleString('id-ID')} karakter. Tempel di Pine Editor TradingView.`);
+      if (!gratis) {
+        try { localStorage.setItem(KUNCI_LISENSI, rapi); } catch { /* mode privat */ }
+        setSurat(suratLisensi({
+          produk: produk.nama, kode: rapi,
+          nama: pengguna?.displayName || pengguna?.email?.split('@')[0] || 'Pemegang lisensi',
+          email: pengguna?.email || '-',
+        }));
+      }
+      setKabar(`Tersalin — ${isi.length.toLocaleString('id-ID')} karakter. Tempel di Pine Editor TradingView.`
+        + (gratis ? '' : ' Salinan ini memuat penanda lisensimu.'));
     } catch (e) {
       setGagal(true);
       const asli = e instanceof Error ? e.message : 'Gagal mengambil sumber';
@@ -82,10 +101,19 @@ function AmbilSumber({ produk }: { produk: Produk }) {
           <div className="mt-1.5 text-[11.5px] text-zinc-600">
             Kode diberikan penjual setelah pembayaran diterima.
           </div>
+          <label className="mt-3 flex max-w-[560px] cursor-pointer items-start gap-2 text-[12px] leading-relaxed text-zinc-400">
+            <input type="checkbox" checked={setuju} onChange={(e) => setSetuju(e.target.checked)}
+                   className="mt-0.5 size-3.5 cursor-pointer accent-zinc-200" />
+            <span>
+              Saya memahami lisensi ini <b>personal</b> dan setuju untuk <b>tidak menyebarluaskan</b>{' '}
+              kode ini dalam bentuk apa pun. Setiap salinan tercatat pada penerbit dan dapat
+              ditelusuri bila ditemukan beredar.
+            </span>
+          </label>
         </div>
       )}
       <div className="flex flex-wrap gap-3">
-        <button onClick={() => void ambil()} disabled={sibuk || (!gratis && kode.trim().length < 8)}
+        <button onClick={() => void ambil()} disabled={sibuk || (!gratis && (kode.trim().length < 8 || !setuju))}
           className="flex cursor-pointer items-center gap-2 rounded-full bg-zinc-100 px-6 py-3 text-[13px] font-semibold
                      text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50">
           {sibuk ? <Loader2 className="size-4 animate-spin" /> : gratis ? <Copy className="size-4" /> : <KeyRound className="size-4" />}
@@ -104,6 +132,30 @@ function AmbilSumber({ produk }: { produk: Produk }) {
       </div>
       {kabar && (
         <div className={cn('mt-3 text-[12.5px]', gagal ? 'text-amber-300/90' : 'text-emerald-500')}>{kabar}</div>
+      )}
+
+      {surat && (
+        <div className="mt-4 rounded-lg border border-zinc-800/70 p-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-[12.5px] font-medium text-zinc-200">Surat Lisensi</span>
+            <span className="text-[11.5px] text-zinc-600">bukti kepemilikan atas nama akunmu</span>
+            <span className="ml-auto flex gap-2">
+              <button onClick={() => setBukaSurat((v) => !v)}
+                className="cursor-pointer rounded-md border border-zinc-800 px-2.5 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-700">
+                {bukaSurat ? 'Sembunyikan' : 'Lihat surat'}
+              </button>
+              <button onClick={() => unduhTeks(`Surat-Lisensi-${kode.trim().toUpperCase()}.txt`, surat)}
+                className="cursor-pointer rounded-md bg-zinc-100 px-2.5 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white">
+                Unduh .txt
+              </button>
+            </span>
+          </div>
+          {bukaSurat && (
+            <pre className="angka mt-3 max-h-[320px] overflow-auto whitespace-pre-wrap rounded-md border border-zinc-800/60 bg-zinc-950/60 p-3 text-[11px] leading-relaxed text-zinc-400">
+{surat}
+            </pre>
+          )}
+        </div>
       )}
     </div>
   );

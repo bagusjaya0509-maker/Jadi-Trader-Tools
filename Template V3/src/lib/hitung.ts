@@ -196,22 +196,36 @@ export function saldoBulanIni(trade: Trade[], saldoAwal: number): TitikSaldo[] {
    Keduanya dimulai dari saldo di AWAL bulannya masing-masing, jadi yang
    dibandingkan adalah jalannya bulan, bukan tinggi saldo mutlaknya.
    ════════════════════════════════════════════════════════════════════════ */
-export function saldoDuaBulan(trade: Trade[], saldoAwal: number): TitikBanding[] {
+/** Setoran/penarikan yang ikut menggerakkan saldo — bentuk minimum dari
+ *  `Arus` di tulis-jurnal, ditulis di sini supaya hitung.ts tidak perlu
+ *  mengimpor modul Firestore. */
+export interface ArusRingkas { jenis: 'setor' | 'tarik'; nilai: number; waktu: number }
+
+export function saldoDuaBulan(trade: Trade[], saldoAwal: number, arus: ArusRingkas[] = []): TitikBanding[] {
   const kini = new Date();
   const th = kini.getFullYear(), bl = kini.getMonth();
   const awalIni = new Date(th, bl, 1).getTime();
   const awalLalu = new Date(th, bl - 1, 1).getTime();
   const hariLalu = new Date(th, bl, 0).getDate();
 
+  /* Top-up dan penarikan DIPERLAKUKAN SEBAGAI PERISTIWA BERTANGGAL, sama
+     seperti transaksi. Menjumlahkannya sekaligus di saldo awal membuat
+     setoran kemarin ikut menaikkan saldo awal bulan — dan kurvanya
+     berbohong tentang kapan uangnya benar-benar masuk. */
+  const peristiwa = [
+    ...trade.map((t) => ({ waktu: t.waktu, nilai: t.pnl })),
+    ...arus.map((a) => ({ waktu: a.waktu, nilai: a.jenis === 'setor' ? a.nilai : -a.nilai })),
+  ];
+
   const jumlahSebelum = (batas: number) =>
-    trade.filter((t) => t.waktu < batas).reduce((s, t) => s + t.pnl, 0);
+    peristiwa.filter((x) => x.waktu < batas).reduce((s, x) => s + x.nilai, 0);
 
   const perHari = (mulai: number, selesai: number) => {
     const m = new Map<number, number>();
-    for (const t of trade) {
-      if (t.waktu < mulai || t.waktu >= selesai) continue;
-      const d = new Date(t.waktu).getDate();
-      m.set(d, (m.get(d) ?? 0) + t.pnl);
+    for (const x of peristiwa) {
+      if (x.waktu < mulai || x.waktu >= selesai) continue;
+      const d = new Date(x.waktu).getDate();
+      m.set(d, (m.get(d) ?? 0) + x.nilai);
     }
     return m;
   };

@@ -111,6 +111,12 @@ export interface HasilData<T> {
 export function useRiwayat(): HasilData<Trade[]> {
   const { pengguna, memuat: memuatAuth } = useAuth();
   const [data, setData] = useState<Trade[]>(RIWAYAT);
+  const [, setVersiPilihan] = useState(0);
+  useEffect(() => {
+    const naik = () => setVersiPilihan((v) => v + 1);
+    window.addEventListener('jt:pilihan-contoh', naik);
+    return () => window.removeEventListener('jt:pilihan-contoh', naik);
+  }, []);
   const [memuat, setMemuat] = useState(true);
   const [galat, setGalat] = useState<string | null>(null);
 
@@ -175,7 +181,35 @@ export function useRiwayat(): HasilData<Trade[]> {
     return () => lepas.forEach((f) => f());
   }, [pengguna, memuatAuth]);
 
-  return { data, memuat: memuat || memuatAuth, contoh: !pengguna, galat };
+  /* AKUN BARU tidak disambut halaman kosong.
+     ────────────────────────────────────────────────────────────────────
+     Selesai memuat dan hasilnya nol transaksi berarti orangnya baru —
+     dan dashboard yang seluruhnya nol tidak menjelaskan apa pun tentang
+     apa yang akan ia dapat. Data contoh dipasang (berlabel), sampai ia
+     memilih mulai kosong lewat spanduk, atau transaksi pertamanya masuk. */
+  const kosongBaru =
+    !!pengguna && !memuat && !memuatAuth && !galat && data.length === 0 &&
+    bacaPilihanContoh(pengguna.uid) !== 'kosong';
+
+  return {
+    data: kosongBaru ? RIWAYAT : data,
+    memuat: memuat || memuatAuth,
+    contoh: !pengguna || kosongBaru,
+    galat,
+  };
+}
+
+/* Pilihan pengguna atas data contoh: 'kosong' = mulai dari nol,
+   'biarkan' = tetap tampilkan contoh (spanduknya saja yang hilang). */
+export function bacaPilihanContoh(uid: string): 'kosong' | 'biarkan' | null {
+  try {
+    const v = localStorage.getItem(`jt.pilihanContoh.${uid}`);
+    return v === 'kosong' || v === 'biarkan' ? v : null;
+  } catch { return null; }
+}
+export function simpanPilihanContoh(uid: string, v: 'kosong' | 'biarkan') {
+  try { localStorage.setItem(`jt.pilihanContoh.${uid}`, v); } catch { /* privat */ }
+  window.dispatchEvent(new CustomEvent('jt:pilihan-contoh'));
 }
 
 /** Satu baris `public/posisiTerbuka` -> bentuk `Posisi`. */

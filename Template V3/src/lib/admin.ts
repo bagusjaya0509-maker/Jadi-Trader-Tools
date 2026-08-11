@@ -163,11 +163,17 @@ export interface StatusVps {
   waktuHidupDetik: number; waktuHidupMesinDetik: number;
   ramTotalMb: number; ramBebasMb: number; ramProsesMb: number;
   beban: number[]; cpu: number; node: string; gerbangLangganan: boolean;
+  disk: { totalMb: number; terpakaiMb: number; persen: number } | null;
+  permintaan: {
+    sejak: number; total: number; perMenit: number;
+    tolakanAuth: number; kena429: number; galat5xx: number;
+  } | null;
 }
 
 const VPS_KOSONG: StatusVps = {
   waktuHidupDetik: 0, waktuHidupMesinDetik: 0, ramTotalMb: 0, ramBebasMb: 0,
   ramProsesMb: 0, beban: [], cpu: 0, node: '', gerbangLangganan: false,
+  disk: null, permintaan: null,
 };
 
 export function useStatusVps(): Hasil<StatusVps> {
@@ -181,6 +187,19 @@ export function useStatusVps(): Hasil<StatusVps> {
     cpu: Number(j?.cpu) || 0,
     node: String(j?.node ?? ''),
     gerbangLangganan: !!j?.gerbangLangganan,
+    disk: j?.disk ? {
+      totalMb: Number(j.disk.totalMb) || 0,
+      terpakaiMb: Number(j.disk.terpakaiMb) || 0,
+      persen: Number(j.disk.persen) || 0,
+    } : null,
+    permintaan: j?.permintaan ? {
+      sejak: Number(j.permintaan.sejak) || 0,
+      total: Number(j.permintaan.total) || 0,
+      perMenit: Number(j.permintaan.perMenit) || 0,
+      tolakanAuth: Number(j.permintaan.tolakanAuth) || 0,
+      kena429: Number(j.permintaan.kena429) || 0,
+      galat5xx: Number(j.permintaan.galat5xx) || 0,
+    } : null,
   }), VPS_KOSONG);
 }
 

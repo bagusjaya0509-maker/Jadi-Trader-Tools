@@ -1,4 +1,4 @@
-import { ema, smiSeries, atr, findPivots, SMI_K, SMI_D, SMI_EMA } from '@/lib/jt-scan-core';
+import { smiSeries, atr, findPivots, SMI_K, SMI_D, SMI_EMA } from '@/lib/jt-scan-core';
 import type { Lilin } from '@/lib/pasar';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -68,8 +68,6 @@ const PALET_URUT = ['#fbbf24', '#60a5fa', '#10b981', '#f87171', '#a78bfa', '#22d
 
 /* ── Pembantu deret ──────────────────────────────────────────────────── */
 
-const bersih = (d: Deret): number[] => d.map((x) => (x == null || !isFinite(x) ? NaN : x));
-
 function geser(d: Deret, n: number): Deret {
   if (n <= 0) return d;
   return d.map((_, i) => (i - n >= 0 ? d[i - n] : null));
@@ -101,6 +99,31 @@ function sma(d: Deret, p: number): Deret {
     antre.push(v); jum += v; hitung++;
     if (hitung > p) { jum -= antre.shift()!; hitung--; }
     if (hitung === p) out[i] = jum / p;
+  }
+  return out;
+}
+
+/* EMA yang TAHAN NULL — dipakai ta.ema untuk deret hasil ekspresi.
+   ────────────────────────────────────────────────────────────────────────
+   Implementasi scan-core menerima array angka murni (screener selalu
+   mengumpankan closes utuh), tapi deret dari ekspresi Pine hampir selalu
+   berawalan null: ta.highest(x, n) kosong di n-1 bar pertama, dan NaN yang
+   masuk EMA scan-core menular ke SELURUH hasil. Di sini benihnya SMA dari p
+   nilai sah pertama — persis aturan ta.ema di Pine. */
+function emaDeret(d: Deret, p: number): Deret {
+  const out: Deret = new Array(d.length).fill(null);
+  const alfa = 2 / (p + 1);
+  let sebelum: number | null = null, jum = 0, hitung = 0;
+  for (let i = 0; i < d.length; i++) {
+    const v = d[i];
+    if (v == null || !isFinite(v)) continue;
+    if (sebelum === null) {
+      jum += v; hitung++;
+      if (hitung === p) { sebelum = jum / p; out[i] = sebelum; }
+    } else {
+      sebelum = sebelum + alfa * (v - sebelum);
+      out[i] = sebelum;
+    }
   }
   return out;
 }
@@ -254,6 +277,17 @@ class Pengurai {
       return this.riwayat(d);
     }
 
+    /* String — muncul sebagai judul/argumen input. Nilainya bukan deret,
+       jadi di posisi ekspresi ia dibaca sebagai NaN yang sah: skrip yang
+       menaruh string di tengah aritmetika memang tidak menghasilkan angka. */
+    if (this.lihat('"') || this.lihat("'")) {
+      const kutip = this.teks[this.pos];
+      let j = this.pos + 1;
+      while (j < this.teks.length && this.teks[j] !== kutip) j++;
+      this.pos = j + 1;
+      return this.riwayat(konstanta(NaN, this.n));
+    }
+
     /* Angka */
     const angka = /^-?\d+(\.\d+)?/.exec(this.teks.slice(this.pos));
     if (angka) { this.pos += angka[0].length; return this.riwayat(konstanta(Number(angka[0]), this.n)); }
@@ -265,6 +299,15 @@ class Pengurai {
     const id = nama[0];
 
     if (this.lihat('(')) return this.riwayat(this.panggil(id));
+
+    if (id === 'true') return this.riwayat(konstanta(1, this.n));
+    if (id === 'false') return this.riwayat(konstanta(0, this.n));
+    /* Warna & enum tampilan yang nyasar ke posisi ekspresi (color.red,
+       display.none, format.price) tidak menghentikan skrip — mereka bukan
+       angka, dan NaN adalah jawaban paling jujur untuk itu. */
+    if (/^(color|display|format|location|shape|size|plot\.style|hline\.style|line\.style|extend|xloc|yloc)\./.test(id)) {
+      return this.riwayat(konstanta(NaN, this.n));
+    }
 
     const v = this.lingkup.get(id);
     if (!v) throw new Error(`variabel "${id}" belum didefinisikan`);
@@ -282,22 +325,61 @@ class Pengurai {
     return geser(d, Number(isi[0]));
   }
 
+  /* Melompati SATU nilai argumen tanpa menafsirkannya — dipakai untuk
+     argumen bernama (minval=1, color=color.new(...)) yang tidak mengubah
+     deret apa pun. Kurung dan string di dalamnya dihormati supaya koma
+     milik pemanggilan bersarang tidak dikira pemisah argumen. */
+  private lompatiNilai() {
+    let dalam = 0;
+    while (this.pos < this.teks.length) {
+      const c = this.teks[this.pos];
+      if (c === '"' || c === "'") {
+        const kutip = c; this.pos++;
+        while (this.pos < this.teks.length && this.teks[this.pos] !== kutip) this.pos++;
+        this.pos++;
+        continue;
+      }
+      if (c === '(' || c === '[') dalam++;
+      else if (c === ')' || c === ']') { if (dalam === 0) return; dalam--; }
+      else if (c === ',' && dalam === 0) return;
+      this.pos++;
+    }
+  }
+
   private argumen(): Deret[] {
     if (!this.ambil('(')) throw new Error('kurung buka hilang');
     const arg: Deret[] = [];
     if (this.ambil(')')) return arg;
     for (;;) {
-      /* Argumen bernama (`title=...`) diabaikan di sini — plot() menanganinya
-         sendiri sebelum ekspresi diurai. */
-      arg.push(this.banding());
+      this.lewatiSpasi();
+      /* Argumen BERNAMA (title=, minval=, color=, display=) dilompati:
+         semuanya metadata tampilan atau batasan editor, bukan angka yang
+         mengubah deret. Menolaknya berarti menolak hampir semua skrip
+         TradingView asli — yang selalu menulis argumen dengan nama. */
+      const bernama = /^([A-Za-z_][A-Za-z0-9_]*)\s*=(?!=)/.exec(this.teks.slice(this.pos));
+      if (bernama) {
+        this.pos += bernama[0].length;
+        this.lompatiNilai();
+        arg.push(konstanta(NaN, this.n));
+      } else if (this.lihat('"') || this.lihat("'")) {
+        /* String posisi (judul) — dicatat sebagai NaN; plot() membaca judul
+           lewat jalur teksnya sendiri. */
+        const kutip = this.teks[this.pos];
+        let j = this.pos + 1;
+        while (j < this.teks.length && this.teks[j] !== kutip) j++;
+        this.pos = j + 1;
+        arg.push(konstanta(NaN, this.n));
+      } else {
+        arg.push(this.banding());
+      }
       if (this.ambil(',')) continue;
       if (this.ambil(')')) return arg;
       throw new Error('koma atau kurung tutup hilang');
     }
   }
 
-  private bulat(d: Deret, namaFungsi: string): number {
-    const v = d.find((x) => x != null);
+  private bulat(d: Deret | undefined, namaFungsi: string): number {
+    const v = d?.find((x) => x != null && isFinite(x));
     if (v == null || !isFinite(v)) throw new Error(`${namaFungsi}: panjang periode harus angka`);
     return Math.max(1, Math.round(v));
   }
@@ -309,7 +391,7 @@ class Pengurai {
 
     switch (id) {
       case 'ta.sma': return sma(satu(), this.bulat(a[1], id));
-      case 'ta.ema': return ema(bersih(satu()), this.bulat(a[1], id)) as Deret;
+      case 'ta.ema': return emaDeret(satu(), this.bulat(a[1], id));
       case 'ta.rma': return rma(satu(), this.bulat(a[1], id));
       case 'ta.wma': return wma(satu(), this.bulat(a[1], id));
       case 'ta.rsi': return rsi(satu(), this.bulat(a[1], id));
@@ -329,6 +411,30 @@ class Pengurai {
           petakan2(a[0], a[1], (x, y) => (x < y ? 1 : 0)),
           geser(petakan2(a[0], a[1], (x, y) => (x < y ? 1 : 0)), 1),
           (kini, lalu) => (kini === 1 && lalu === 0 ? 1 : 0)
+        );
+
+      /* input.* mengembalikan nilai BAWAANNYA — di TradingView nilainya bisa
+         diubah lewat dialog setelan; di sini dialognya adalah mengedit
+         angka default-nya langsung di skrip. */
+      case 'input': case 'input.int': case 'input.float': case 'input.bool':
+      case 'input.source': case 'input.string': case 'input.timeframe':
+        return satu();
+
+      case 'math.round': return satu().map((x) => (x == null ? null : Math.round(x)));
+      case 'math.floor': return satu().map((x) => (x == null ? null : Math.floor(x)));
+      case 'math.ceil': return satu().map((x) => (x == null ? null : Math.ceil(x)));
+      case 'math.sqrt': return satu().map((x) => (x == null || x < 0 ? null : Math.sqrt(x)));
+      case 'math.pow': return petakan2(a[0], a[1], (x, y) => Math.pow(x, y));
+      case 'math.avg': {
+        let acc = a[0] ?? konstanta(NaN, n);
+        for (let k = 1; k < a.length; k++) acc = petakan2(acc, a[k], (x, y) => x + y);
+        return acc.map((x) => (x == null ? null : x / a.length));
+      }
+      case 'ta.cross':
+        return petakan2(
+          petakan2(a[0], a[1], (x, y) => (x > y ? 1 : 0)),
+          geser(petakan2(a[0], a[1], (x, y) => (x > y ? 1 : 0)), 1),
+          (kini, lalu) => (kini !== lalu ? 1 : 0)
         );
 
       case 'math.abs': return satu().map((x) => (x == null ? null : Math.abs(x)));
@@ -392,12 +498,66 @@ export function jalankanPine(kode: string, l: Lilin): HasilPine {
   const galat: string[] = [];
   const dilewati: string[] = [];
 
-  const baris = kode.split(/\r?\n/);
-  baris.forEach((mentah, i) => {
-    const b = mentah.replace(/\/\/.*$/, '').trim();
+  /* ── Penyambung baris ────────────────────────────────────────────────
+     Skrip TradingView asli membiarkan pemanggilan panjang melipat ke bawah
+     (fill(a, b,\n  color = ...)). Baris dengan kurung yang belum seimbang
+     digabung dengan baris berikutnya sebelum diurai — tanpa ini setiap
+     potongan lanjutannya jadi satu galat yang membingungkan. */
+  const mentahSemua = kode.split(/\r?\n/);
+  const baris: { teks: string; no: number }[] = [];
+  for (let i = 0; i < mentahSemua.length; i++) {
+    let t = mentahSemua[i];
+    const no = i + 1;
+    const hitung = (s: string) => {
+      let d = 0, dalamStr: string | null = null;
+      for (const c of s.replace(/\/\/.*$/, '')) {
+        if (dalamStr) { if (c === dalamStr) dalamStr = null; continue; }
+        if (c === '"' || c === "'") dalamStr = c;
+        else if (c === '(' || c === '[') d++;
+        else if (c === ')' || c === ']') d--;
+      }
+      return d;
+    };
+    let saldo = hitung(t);
+    while (saldo > 0 && i + 1 < mentahSemua.length) {
+      i++;
+      t += ' ' + mentahSemua[i].trim();
+      saldo += hitung(mentahSemua[i]);
+    }
+    baris.push({ teks: t, no });
+  }
+
+  /* Baris GAMBAR & PERINGATAN dilewati tanpa dianggap galat: fill, bgcolor,
+     plotshape, line.new, label, box, table, alert — semuanya kosmetik atau
+     di luar kemampuan panel harga kita. Skrip yang memakainya tetap jalan;
+     garisnya saja yang tidak ikut. */
+  const HANYA_GAMBAR = /^(fill|bgcolor|plotshape|plotchar|plotcandle|plotbar|barcolor|bgFill|alertcondition|alert|line\.|label\.|box\.|table\.|array\.|matrix\.|strategy\.)/;
+
+  baris.forEach(({ teks: mentah, no: nomorBaris }) => {
+    const i = nomorBaris - 1;
+    void i;
+    let b = mentah.replace(/\/\/.*$/, '').trim();
     if (!b || DILEWATI.test(mentah)) return;
 
+    /* `var float x = ...`, `float x = ...` — kata kunci deklarasi dilepas;
+       yang penting namanya dan ekspresinya. */
+    b = b.replace(/^var\s+/, '').replace(/^(float|int|bool|color|string|series\s+float|series\s+int)\s+(?=[A-Za-z_])/, '');
+
     try {
+      if (HANYA_GAMBAR.test(b)) {
+        dilewati.push(`baris ${nomorBaris}: ${b.slice(0, 48)} — perintah gambar/peringatan, dilewati`);
+        return;
+      }
+
+      /* `x = plot(...)` dan `x = hline(...)` — di Pine hasilnya objek plot
+         yang dipakai fill(); fill dilewati, jadi variabelnya cukup dicatat
+         sebagai nilai hline/NaN supaya baris berikutnya tidak tersandung. */
+      const tugasPlot = /^([A-Za-z_][A-Za-z0-9_]*)\s*:?=\s*(plot|hline)\s*\(/.exec(b);
+      if (tugasPlot) {
+        lingkup.set(tugasPlot[1], konstanta(NaN, n));
+        b = b.slice(b.indexOf('=') + 1).trim();
+      }
+
       if (b.startsWith('plot(') || b.startsWith('hline(')) {
         const isHline = b.startsWith('hline(');
         const dalam = b.slice(b.indexOf('(') + 1, b.lastIndexOf(')'));
@@ -412,18 +572,29 @@ export function jalankanPine(kode: string, l: Lilin): HasilPine {
         }
         bagian.push(dalam.slice(mulai));
 
-        let judul = '', warna = '';
+        let judul = '', warna = '', sembunyi = false;
         const ekspresi = bagian[0].trim();
         bagian.slice(1).forEach((s) => {
-          const j = /title\s*=\s*["']([^"']*)["']/.exec(s);
+          const st = s.trim();
+          /* Judul boleh bernama (title="SMI") ATAU posisi ("SMI"). */
+          const j = /title\s*=\s*["']([^"']*)["']/.exec(st);
           if (j) judul = j[1];
-          const w = /color\s*=\s*(?:color\.)?([a-z]+)/i.exec(s);
-          if (w) warna = WARNA[w[1].toLowerCase()] ?? '';
+          else if (/^["'][^"']*["']$/.test(st) && !judul) judul = st.slice(1, -1);
+          /* Warna: color.red, color=color.red, color=color.new(color.red, 40),
+             color=#26a69a — semuanya bentuk yang benar-benar dipakai orang. */
+          const w = /color\s*[=(]\s*(?:color\.new\s*\(\s*)?color\.([a-z]+)/i.exec(st)
+                 ?? /^color\.([a-z]+)$/i.exec(st);
+          if (w) warna = WARNA[w[1].toLowerCase()] ?? warna;
+          const hex = /color\s*=\s*(#[0-9a-fA-F]{6})/.exec(st);
+          if (hex) warna = hex[1];
+          if (/display\s*=\s*display\.none/.test(st)) sembunyi = true;
         });
+        /* plot(x, display=display.none) memang MINTA tidak digambar. */
+        if (sembunyi) return;
 
         const nilai = new Pengurai(lingkup, n, l).urai(ekspresi);
         if (isHline) {
-          const v = nilai.find((x) => x != null);
+          const v = nilai.find((x) => x != null && isFinite(x));
           if (v != null) hline.push({ nilai: v, warna: warna || 'rgba(255,255,255,.2)' });
           return;
         }
@@ -443,9 +614,9 @@ export function jalankanPine(kode: string, l: Lilin): HasilPine {
         return;
       }
 
-      dilewati.push(`baris ${i + 1}: ${b.slice(0, 60)}`);
+      dilewati.push(`baris ${nomorBaris}: ${b.slice(0, 60)}`);
     } catch (e) {
-      galat.push(`baris ${i + 1}: ${e instanceof Error ? e.message : 'gagal diurai'}`);
+      galat.push(`baris ${nomorBaris}: ${e instanceof Error ? e.message : 'gagal diurai'}`);
     }
   });
 

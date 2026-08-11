@@ -191,3 +191,38 @@ export function LabelContoh({ tampil }: { tampil: boolean }) {
     </span>
   );
 }
+
+
+/* ── Spanduk data contoh untuk akun baru ─────────────────────────────────
+   Muncul HANYA saat pengguna sudah login tapi jurnalnya masih kosong dan
+   layarnya sedang menampilkan data contoh. Dua pilihan, dua akibat yang
+   jelas — dan keduanya bisa diubah lagi nanti dengan menambah/menghapus
+   transaksi, jadi tidak ada yang permanen di sini. */
+import { useAuth as useAuthGerbang } from '@/lib/auth';
+import { bacaPilihanContoh, simpanPilihanContoh } from '@/lib/data';
+import { useState as useStateGerbang } from 'react';
+
+export function SpandukContoh({ contoh }: { contoh: boolean }) {
+  const { pengguna } = useAuthGerbang();
+  const [, setV] = useStateGerbang(0);
+  if (!contoh || !pengguna) return null;
+  if (bacaPilihanContoh(pengguna.uid) !== null) return null;
+  const pilih = (p: 'kosong' | 'biarkan') => { simpanPilihanContoh(pengguna.uid, p); setV((x) => x + 1); };
+  return (
+    <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-sky-500/25 bg-sky-500/[0.05] px-4 py-3">
+      <span className="text-[12.5px] text-sky-200/90">
+        Akunmu masih kosong, jadi halaman ini menampilkan <b>data contoh</b> dulu.
+      </span>
+      <span className="ml-auto flex gap-2">
+        <button onClick={() => pilih('kosong')}
+          className="cursor-pointer rounded-md border border-zinc-700 px-3 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-500">
+          Mulai dengan data kosong
+        </button>
+        <button onClick={() => pilih('biarkan')}
+          className="cursor-pointer rounded-md bg-zinc-100 px-3 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white">
+          Biarkan contohnya
+        </button>
+      </span>
+    </div>
+  );
+}

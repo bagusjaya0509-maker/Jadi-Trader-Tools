@@ -6,6 +6,7 @@ import { useProduk, simpanKatalogProduk } from '@/lib/data';
 import { unggahGambar, keDataUrl } from '@/lib/admin';
 import { useAuth } from '@/lib/auth';
 import { PanelLisensi } from '@/components/panel-lisensi';
+import { PanelKesehatan } from '@/components/panel-kesehatan';
 
 /* ════════════════════════════════════════════════════════════════════════
    MAINTENANCE — khusus pemilik
@@ -180,6 +181,7 @@ export default function Maintenance() {
 
   return (
     <div className="p-4 sm:p-6">
+      <PanelKesehatan />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KartuKpi label="Produk tayang" nilai={String(tayang.length)} catatan="terlihat pengunjung" />
         <KartuKpi label="Di tempat sampah" nilai={String(sampah.length)} catatan="bisa dipulihkan" />

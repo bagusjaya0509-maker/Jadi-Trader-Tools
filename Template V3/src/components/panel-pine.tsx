@@ -129,12 +129,14 @@ export function PanelPine({ lilin, aturHasil }: {
 
           {/* Batasnya ditulis TERBUKA, bukan ditemukan sendiri saat gagal. */}
           <div className="mt-3 border-t border-zinc-800/60 pt-3 text-[11.5px] leading-relaxed text-zinc-600">
-            <span className="text-zinc-400">Yang didukung:</span> penetapan variabel, aritmetika,
-            perbandingan, riwayat <span className="font-mono">[n]</span>, sumber harga
-            (<span className="font-mono">open high low close hl2 hlc3 ohlc4</span>),{' '}
+            <span className="text-zinc-400">Yang didukung:</span> penetapan variabel (termasuk{' '}
+            <span className="font-mono">var</span> dan argumen bernama), <span className="font-mono">input.*</span>{' '}
+            (memakai nilai bawaannya), aritmetika, perbandingan, riwayat <span className="font-mono">[n]</span>,
+            sumber harga (<span className="font-mono">open high low close hl2 hlc3 ohlc4</span>),{' '}
             <span className="font-mono">ta.sma ema rma wma atr rsi stdev highest lowest change
-            crossover crossunder</span>, <span className="font-mono">math.abs max min</span>,{' '}
-            <span className="font-mono">nz</span>, plus fungsi khusus{' '}
+            cross crossover crossunder</span>, <span className="font-mono">math.*</span>,{' '}
+            <span className="font-mono">nz</span>, judul & warna dari argumen plot (termasuk{' '}
+            <span className="font-mono">color.new</span>), plus fungsi khusus{' '}
             <span className="font-mono">jt.smi() jt.smiSignal() jt.pivotHigh(l,r) jt.pivotLow(l,r)</span>{' '}
             yang memakai perhitungan sama persis dengan Screener Entry. Keluaran lewat{' '}
             <span className="font-mono">plot()</span> dan <span className="font-mono">hline()</span>.
@@ -142,6 +144,8 @@ export function PanelPine({ lilin, aturHasil }: {
               <span className="text-zinc-400">Yang belum:</span>{' '}
               <span className="font-mono">request.security</span>, <span className="font-mono">strategy.*</span>,
               percabangan <span className="font-mono">if</span>, perulangan, larik, dan tipe kustom.
+              Perintah gambar (<span className="font-mono">fill bgcolor plotshape line.new label box</span>)
+              dilewati tanpa menghentikan skrip — garis utamanya tetap tergambar.
               Baris yang memakainya ditolak dengan menyebut nomor barisnya — bukan diam-diam
               menghasilkan angka yang salah, karena indikator yang salah tanpa suara jauh lebih
               berbahaya daripada indikator yang menolak jalan.

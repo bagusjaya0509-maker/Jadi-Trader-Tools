@@ -14,8 +14,38 @@ import { useEffect, useState } from 'react';
    kami memegang kunci akun Binance orang lain.
    ════════════════════════════════════════════════════════════════════════ */
 
-const KUNCI = 'jt.koneksiBinance';
+/* KUNCINYA PER AKUN, BUKAN PER PERANGKAT.
+   ──────────────────────────────────────────────────────────────────────
+   Dulu kuncinya satu untuk seluruh peramban — dan begitu dua akun bergantian
+   login di perangkat yang sama, akun kedua mewarisi Backend URL + App Token
+   milik akun pertama. Token itu kunci ke uang sungguhan; ia harus mengikuti
+   ORANGNYA, bukan mesinnya.
+
+   Simpanan lama (tanpa uid) dipindahkan ke akun pertama yang login setelah
+   pembaruan ini, lalu kuncinya dihapus — pemilik simpanan lama hampir pasti
+   orang yang sedang memegang perangkatnya. */
+const KUNCI_LAMA = 'jt.koneksiBinance';
+const kunciUntuk = (uid: string) => `jt.koneksiBinance.${uid}`;
 const ACARA = 'jt:koneksi-berubah';
+
+let uidKini: string | null = null;
+import('firebase/auth').then(({ onAuthStateChanged }) =>
+  import('@/lib/firebase').then(({ auth }) =>
+    onAuthStateChanged(auth, (u) => {
+      uidKini = u ? u.uid : null;
+      if (uidKini) {
+        try {
+          const lama = window.localStorage.getItem(KUNCI_LAMA);
+          if (lama && !window.localStorage.getItem(kunciUntuk(uidKini))) {
+            window.localStorage.setItem(kunciUntuk(uidKini), lama);
+          }
+          if (lama) window.localStorage.removeItem(KUNCI_LAMA);
+        } catch { /* privat */ }
+      }
+      window.dispatchEvent(new CustomEvent(ACARA));
+    })
+  )
+).catch(() => { /* firebase belum siap — status tetap kosong */ });
 
 export interface Koneksi {
   url: string;
@@ -26,8 +56,11 @@ const KOSONG: Koneksi = { url: '', token: '' };
 
 export function bacaKoneksi(): Koneksi {
   if (typeof window === 'undefined') return KOSONG;
+  /* Belum login = tidak ada koneksi. Menampilkan token siapa pun kepada
+     layar tanpa pemiliknya adalah kebocoran, bukan kenyamanan. */
+  if (!uidKini) return KOSONG;
   try {
-    const mentah = window.localStorage.getItem(KUNCI);
+    const mentah = window.localStorage.getItem(kunciUntuk(uidKini));
     if (!mentah) return KOSONG;
     const isi = JSON.parse(mentah);
     return { url: String(isi.url ?? ''), token: String(isi.token ?? '') };
@@ -38,7 +71,7 @@ export function bacaKoneksi(): Koneksi {
 
 export function simpanKoneksi(k: Koneksi) {
   try {
-    window.localStorage.setItem(KUNCI, JSON.stringify(k));
+    if (uidKini) window.localStorage.setItem(kunciUntuk(uidKini), JSON.stringify(k));
   } catch {
     /* mode privat / kuota penuh — status cukup hidup di memori halaman ini */
   }
@@ -47,7 +80,7 @@ export function simpanKoneksi(k: Koneksi) {
 
 export function hapusKoneksi() {
   try {
-    window.localStorage.removeItem(KUNCI);
+    if (uidKini) window.localStorage.removeItem(kunciUntuk(uidKini));
   } catch { /* abaikan */ }
   window.dispatchEvent(new CustomEvent(ACARA));
 }
