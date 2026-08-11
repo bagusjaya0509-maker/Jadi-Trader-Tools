@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  getFirestore, collection, doc, onSnapshot, orderBy, limit, query, Timestamp,
+  getFirestore, collection, doc, onSnapshot, orderBy, limit, query, where, Timestamp,
   type DocumentData,
 } from 'firebase/firestore';
 import { app } from '@/lib/firebase';
@@ -35,7 +35,13 @@ import {
    jujur, bukan menyamarkannya sebagai milik pengunjung.
    ════════════════════════════════════════════════════════════════════════ */
 
-const BATAS_TRANSAKSI = 400;
+/** Batas PER SUMBER, bukan batas total.
+ *
+ *  Riwayat MT5 sendiri bisa ribuan baris; membacanya seluruhnya tiap kali
+ *  halaman dibuka adalah ribuan pembacaan Firestore untuk tabel yang cuma
+ *  menampilkan 40 baris terakhir. 600 per sumber sudah lebih dari cukup
+ *  untuk kalender, kurva ekuitas, dan seluruh statistik di halaman ini. */
+const BATAS_PER_SUMBER = 600;
 
 /* Berkas ini hanya diimpor halaman-halaman yang dimuat malas, jadi impor
    statis Firestore di atas TIDAK ikut ke jalur muat awal. getFirestore aman
@@ -100,15 +106,61 @@ export function useRiwayat(): HasilData<Trade[]> {
     if (memuatAuth) return;
     if (!pengguna) { setData(RIWAYAT); setMemuat(false); return; }
     setMemuat(true);
-    const q = query(
-      collection(db, 'users', pengguna.uid, 'transaksi'),
-      orderBy('keluarWaktu', 'desc'),
-      limit(BATAS_TRANSAKSI)
+    /* SATU KUERI PER SUMBER, bukan satu kueri untuk semuanya.
+       ──────────────────────────────────────────────────────────────────
+       Sebelumnya: satu kueri `orderBy keluarWaktu desc limit 400`. Begitu
+       sinkron MT5 memasukkan ~1100 transaksi forex, 400 baris terbaru
+       SELURUHNYA milik MT5 — dan jurnal kripto berubah jadi "0 transaksi"
+       padahal datanya utuh di Firestore. Pola Emosi ikut kosong karena
+       catatan emosi ada di transaksi kripto & manual yang terdorong keluar.
+
+       Batas per sumber membuat satu sumber tidak bisa menelan jatah yang
+       lain, berapa pun banyaknya data yang masuk nanti. */
+    const sumber = ['kripto', 'forex', 'xau'];
+    const perSumber = new Map<string, Trade[]>();
+    let sisaMuat = sumber.length;
+
+    /* KENAPA `kunciUrut`, BUKAN where(sumber) + orderBy(keluarWaktu)
+       ──────────────────────────────────────────────────────────────────
+       Gabungan filter kesamaan dan pengurutan pada field BERBEDA menuntut
+       indeks komposit, dan akun layanan yang kita punya tidak berhak
+       membuatnya — jadi jurnalnya akan kosong sampai ada yang membuka
+       konsol Firebase dan mengklik tautan di pesan error.
+
+       `kunciUrut` menyatukan keduanya jadi satu field: "forex#1786282935000".
+       Rentang DAN pengurutan terjadi pada field yang sama, dan itu dilayani
+       indeks satu-field yang dibuat Firestore otomatis. Tidak ada yang perlu
+       dibuat, tidak ada yang perlu diklik.
+
+       Stempel waktunya dipadkan 13 digit supaya urutan teks sama dengan
+       urutan angka — tanpa padding, "999" berada di atas "1786282935000". */
+    const lepas = sumber.map((s) =>
+      onSnapshot(
+        query(
+          collection(db, 'users', pengguna.uid, 'transaksi'),
+          where('kunciUrut', '>=', `${s}#`),
+          where('kunciUrut', '<=', `${s}#`),
+          orderBy('kunciUrut', 'desc'),
+          limit(BATAS_PER_SUMBER)
+        ),
+        (snap) => {
+          perSumber.set(s, snap.docs.map((d) => keTrade(d.id, d.data())));
+          setData([...perSumber.values()].flat());
+          if (sisaMuat > 0) { sisaMuat--; if (sisaMuat === 0) setMemuat(false); }
+          setGalat(null);
+        },
+        (e) => {
+          /* Kueri gabungan (where + orderBy) butuh indeks komposit. Kalau
+             belum ada, Firestore mengirim pesan yang MEMUAT tautan untuk
+             membuatnya — ditampilkan apa adanya karena itulah satu-satunya
+             cara pemiliknya tahu apa yang harus diklik. */
+          console.warn(`riwayat ${s}:`, e);
+          setGalat(e.message);
+          if (sisaMuat > 0) { sisaMuat--; if (sisaMuat === 0) setMemuat(false); }
+        }
+      )
     );
-    return onSnapshot(q,
-      (s) => { setData(s.docs.map((d) => keTrade(d.id, d.data()))); setMemuat(false); setGalat(null); },
-      (e) => { console.warn('riwayat:', e); setGalat(e.message); setMemuat(false); }
-    );
+    return () => lepas.forEach((f) => f());
   }, [pengguna, memuatAuth]);
 
   return { data, memuat: memuat || memuatAuth, contoh: !pengguna, galat };

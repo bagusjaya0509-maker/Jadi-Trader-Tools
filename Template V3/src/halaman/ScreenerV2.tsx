@@ -149,7 +149,22 @@ const CSS_TANPA_CANGKANG = `
      yang jelas berbeda dari latar rata V3 di sekelilingnya, dan justru
      menegaskan bahwa isi bingkai ini "halaman lain". */
   .v2-cahaya, .v2-grain { display: none !important; }
-  body { background: #09090b !important; }
+
+  /* Latar abu yang tersisa datang dari variabel tema V2, bukan dari satu
+     elemen — '--bg' dan '--panel'-nya beberapa tingkat lebih terang daripada
+     zinc-950 milik V3. Diselaraskan DI SUMBERNYA supaya setiap elemen yang
+     memakainya ikut benar, tanpa perlu memburu selektor satu per satu. */
+  :root, .ema-screener {
+    --bg: #09090b !important;
+    --bg-2: #09090b !important;
+    --panel: rgba(24,24,27,.4) !important;
+    --panel-2: rgba(24,24,27,.6) !important;
+    --border: rgba(39,39,42,.8) !important;
+  }
+  html, body, .ema-screener, .es-main, .es-wrap, .es-content {
+    background: #09090b !important;
+    background-image: none !important;
+  }
 
   /* ── Bayangan jatuh di tiap section dihapus ──
      V2 memakai 'box-shadow: 0 10px 30px rgba(0,0,0,.45)' untuk mengangkat
@@ -165,28 +180,10 @@ const CSS_TANPA_CANGKANG = `
     box-shadow: none !important;
   }
 
-  /* ── Kotak Live Trading: bercahaya, bukan bergaris ──
-     Ini satu-satunya tempat di halaman yang mengirim uang sungguhan, dan
-     pembedanya harus terasa sebelum dibaca. Garis tipis terlihat sama
-     dengan belasan kotak lain; cahaya tidak.
-
-     Cahayanya berdenyut pelan — bukan untuk cantik, tapi supaya tetap
-     terlihat setelah mata terbiasa. Warna statis apa pun akan hilang dari
-     perhatian dalam dua menit. */
-  .es-live-trade-config {
-    border: 1px solid rgba(16,185,129,.45) !important;
-    background: radial-gradient(120% 140% at 50% 0%, rgba(16,185,129,.10), rgba(24,24,27,.5) 62%) !important;
-    box-shadow: 0 0 22px 2px rgba(16,185,129,.16), inset 0 1px 0 rgba(255,255,255,.04) !important;
-    animation: jtHidupCahaya 3.6s ease-in-out infinite !important;
-  }
-  @keyframes jtHidupCahaya {
-    0%, 100% { box-shadow: 0 0 18px 1px rgba(16,185,129,.13), inset 0 1px 0 rgba(255,255,255,.04); }
-    50%      { box-shadow: 0 0 30px 4px rgba(16,185,129,.26), inset 0 1px 0 rgba(255,255,255,.06); }
-  }
-  /* Yang tidak suka gerakan tetap dapat kotaknya, hanya tanpa denyut. */
-  @media (prefers-reduced-motion: reduce) {
-    .es-live-trade-config { animation: none !important; }
-  }
+  /* Kotak Live Trading DIBIARKAN seperti aslinya di V2.
+     Sempat saya beri cahaya berdenyut; hasilnya lebih ramai, bukan lebih
+     jelas — dan gaya aslinya sudah membedakan diri dengan cukup. Tidak ada
+     aturan untuk '.es-live-trade-config' di sini, dan itu disengaja. */
 
   /* Scrollbar tipis seperti sisa aplikasi */
   * { scrollbar-width: thin; scrollbar-color: #3f3f46 transparent; }

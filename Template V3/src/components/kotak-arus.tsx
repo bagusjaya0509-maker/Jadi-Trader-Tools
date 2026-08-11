@@ -22,8 +22,12 @@ const KELAS_ISIAN =
   'h-9 w-full rounded-md border border-zinc-800 bg-zinc-900/60 px-3 text-[12.5px] text-zinc-100 ' +
   'outline-none transition-colors placeholder:text-zinc-600 hover:border-zinc-700 focus-visible:border-zinc-600';
 
-export function KotakArus({ sumber, arus, bisaTulis }: {
+export function KotakArus({ sumber, arus, bisaTulis, ringkas = false }: {
   sumber: Sumber; arus: Arus[]; bisaTulis: boolean;
+  /* `ringkas` = versi sempit yang muat di baris KPI: satu baris isian dan
+     riwayat yang lebih pendek. Bukan komponen terpisah — dua salinan tata
+     letak untuk isi yang sama pasti berselisih dalam dua putaran revisi. */
+  ringkas?: boolean;
 }) {
   const [jenis, setJenis] = useState<'setor' | 'tarik'>('setor');
   const [nilai, setNilai] = useState('');
@@ -50,23 +54,32 @@ export function KotakArus({ sumber, arus, bisaTulis }: {
   }
 
   return (
-    <Panel>
-      <PanelHead
-        judul="Setoran & Penarikan"
-        sub="Uang masuk dan keluar — tidak dihitung sebagai profit."
-        kanan={
+    <Panel className={ringkas ? 'p-5' : undefined}>
+      {ringkas ? (
+        <div className="mb-2.5 flex items-baseline justify-between gap-2">
+          <span className="text-[12.5px] text-zinc-500">Setoran &amp; Penarikan</span>
           <span className={cn('angka text-[12.5px]', bersih >= 0 ? 'text-emerald-500' : 'text-red-400')}>
             {uang(bersih, true)}
           </span>
-        }
-      />
-      <div className="px-5 pb-5">
-        <div className="mb-3 flex gap-3 text-[11.5px]">
+        </div>
+      ) : (
+        <PanelHead
+          judul="Setoran & Penarikan"
+          sub="Uang masuk dan keluar — tidak dihitung sebagai profit."
+          kanan={
+            <span className={cn('angka text-[12.5px]', bersih >= 0 ? 'text-emerald-500' : 'text-red-400')}>
+              {uang(bersih, true)}
+            </span>
+          }
+        />
+      )}
+      <div className={ringkas ? undefined : 'px-5 pb-5'}>
+        <div className={cn('flex gap-3 text-[11.5px]', ringkas ? 'mb-2' : 'mb-3')}>
           <span className="text-zinc-500">Masuk <span className="angka text-emerald-500">{uang(totalSetor)}</span></span>
           <span className="text-zinc-500">Keluar <span className="angka text-red-400">{uang(totalTarik)}</span></span>
         </div>
 
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
+        <div className={cn('grid gap-2', ringkas ? 'grid-cols-2' : 'grid-cols-1 sm:grid-cols-4')}>
           <div className="flex overflow-hidden rounded-md border border-zinc-800">
             {(['setor', 'tarik'] as const).map((j) => (
               <button key={j} onClick={() => setJenis(j)} disabled={!bisaTulis}
@@ -79,8 +92,10 @@ export function KotakArus({ sumber, arus, bisaTulis }: {
           </div>
           <input value={nilai} onChange={(e) => setNilai(e.target.value)} inputMode="decimal"
                  placeholder="Nilai ($)" disabled={!bisaTulis} className={cn(KELAS_ISIAN, 'angka')} />
-          <input value={catatan} onChange={(e) => setCatatan(e.target.value)}
-                 placeholder="Catatan (opsional)" disabled={!bisaTulis} className={KELAS_ISIAN} />
+          {!ringkas && (
+            <input value={catatan} onChange={(e) => setCatatan(e.target.value)}
+                   placeholder="Catatan (opsional)" disabled={!bisaTulis} className={KELAS_ISIAN} />
+          )}
           <button onClick={() => void tambah()} disabled={sibuk || !bisaTulis}
             className="flex h-9 cursor-pointer items-center justify-center gap-2 rounded-md bg-zinc-100 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50">
             {sibuk && <Loader2 className="size-3.5 animate-spin" />} Catat
@@ -90,7 +105,7 @@ export function KotakArus({ sumber, arus, bisaTulis }: {
         {pesan && <div className="mt-2 text-[11.5px] text-zinc-400">{pesan}</div>}
 
         {milikku.length > 0 && (
-          <div className="mt-3 max-h-[160px] overflow-y-auto">
+          <div className={cn('mt-3 overflow-y-auto', ringkas ? 'max-h-[86px]' : 'max-h-[160px]')}>
             {milikku.map((a) => (
               <div key={a.id} className="flex items-center justify-between border-b border-zinc-800/50 py-2 text-[12.5px]">
                 <span className="flex min-w-0 items-center gap-2">

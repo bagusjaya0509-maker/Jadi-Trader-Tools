@@ -39,6 +39,15 @@ export interface MasukanTrade {
   catatan: string;
 }
 
+/** Kunci gabungan sumber + waktu, dipakai untuk mengurutkan per sumber
+ *  tanpa indeks komposit. Lihat catatan panjang di lib/data.ts.
+ *
+ *  13 digit cukup sampai tahun 2286; setelah itu padding perlu ditambah,
+ *  dan sampai saat itu urutan teksnya sama persis dengan urutan angkanya. */
+export function kunciUrut(sumber: string, waktuMs: number) {
+  return `${sumber}#${String(Math.max(0, Math.floor(waktuMs))).padStart(13, '0')}`;
+}
+
 function butuhUid() {
   const u = auth.currentUser;
   if (!u) throw new Error('Masuk dulu dengan akun Google.');
@@ -72,6 +81,7 @@ export async function simpanTrade(m: MasukanTrade) {
       alasanMasuk: m.alasan,
       catatan: m.catatan,
     },
+    kunciUrut: kunciUrut(m.sumber, m.waktu),
     _asal: 'manual-v3',
   }, { merge: true });
   return id;
@@ -174,7 +184,20 @@ export interface HasilSinkron {
   dilewati: number;
 }
 
-export async function sinkronRiwayatMt5(sudahAda: Set<string>): Promise<HasilSinkron> {
+export interface HasilSinkron2 extends HasilSinkron {
+  /** Transaksi terlama & terbaru yang DIKIRIM EA, bukan yang tersimpan.
+   *  Dipakai untuk mengatakan terus terang seberapa jauh riwayat MT5-nya
+   *  benar-benar mencapai — kalau EA cuma mengirim 30 hari terakhir, tidak
+   *  ada tombol di halaman ini yang bisa memunculkan bulan Juli. */
+  terlama: number;
+  terbaru: number;
+  diluarRentang: number;
+}
+
+export async function sinkronRiwayatMt5(
+  sudahAda: Set<string>,
+  sejakMs = 0,
+): Promise<HasilSinkron2> {
   const u = auth.currentUser;
   if (!u) throw new Error('Masuk dulu dengan akun Google.');
 
@@ -199,7 +222,8 @@ export async function sinkronRiwayatMt5(sudahAda: Set<string>): Promise<HasilSin
      sinkron pertama akan melewatinya dan SELURUH batch ditolak — jadi
      dipecah, bukan diharapkan muat. */
   const BATAS = 400;
-  let ditambah = 0, dilewati = 0;
+  let ditambah = 0, dilewati = 0, diluarRentang = 0;
+  let terlama = Infinity, terbaru = 0;
   let batch = writeBatch(db);
   let dalamBatch = 0;
 
@@ -217,6 +241,12 @@ export async function sinkronRiwayatMt5(sudahAda: Set<string>): Promise<HasilSin
     /* EA mengirim detik, Firestore menyimpan milidetik. */
     const waktu = (Number(t.waktuTutup) || 0) * 1000;
     if (!waktu) { dilewati++; continue; }
+    terlama = Math.min(terlama, waktu);
+    terbaru = Math.max(terbaru, waktu);
+    /* Penyaringan rentang terjadi SESUDAH terlama/terbaru dicatat — supaya
+       kita tetap bisa memberi tahu sejauh mana riwayat EA sebenarnya
+       mencapai, bukan sejauh mana yang kebetulan diminta. */
+    if (sejakMs && waktu < sejakMs) { diluarRentang++; continue; }
 
     batch.set(doc(db, 'users', u.uid, 'transaksi', id), {
       simbol,
@@ -232,6 +262,7 @@ export async function sinkronRiwayatMt5(sudahAda: Set<string>): Promise<HasilSin
       masukWaktu: Timestamp.fromMillis(waktu),
       keluarWaktu: Timestamp.fromMillis(waktu),
       sebabKeluar: String(t.komentar ?? '').trim() || 'Ditutup di MT5',
+      kunciUrut: kunciUrut(/^XAU/i.test(simbol) ? 'xau' : 'forex', waktu),
       _asal: 'mt5.riwayat',
       _tiket: tiket,
     }, { merge: true });
@@ -241,5 +272,8 @@ export async function sinkronRiwayatMt5(sudahAda: Set<string>): Promise<HasilSin
   }
 
   if (dalamBatch > 0) await batch.commit();
-  return { ditemukan: riwayat.length, ditambah, dilewati };
+  return {
+    ditemukan: riwayat.length, ditambah, dilewati, diluarRentang,
+    terlama: isFinite(terlama) ? terlama : 0, terbaru,
+  };
 }

@@ -65,16 +65,32 @@ function keUsd(nilai: number, mataUang: string | null) {
 
 export function useAkunMt5(): StatusAkun {
   const [st, setSt] = useState<StatusAkun>(BELUM);
+  /* Auth Firebase memulihkan sesi dari IndexedDB SECARA ASINKRON. Selama
+     ~300 ms pertama sesudah refresh, `auth.currentUser` masih null meski
+     orangnya jelas sudah masuk.
+
+     Efek ini dulu berdependensi `[]` dan langsung memanggil periksa(), jadi
+     tiap refresh statusnya jatuh ke "belum tersambung" — lalu pulih sendiri
+     saat interval 30 detik berikutnya jalan. Itulah kedipan connect/putus
+     dan saldo yang berubah lalu kembali lagi.
+
+     Sekarang pemeriksaan menunggu onAuthStateChanged. Tidak ada tebakan di
+     antaranya: sebelum auth menjawab, statusnya tetap "Memeriksa…". */
+  const [siapaUid, setSiapaUid] = useState<string | null | undefined>(undefined);
+
+  useEffect(() => onAuthStateChanged(auth, (u) => setSiapaUid(u ? u.uid : null)), []);
 
   useEffect(() => {
     let hidup = true;
+    if (siapaUid === undefined) return;          // auth belum menjawab
+    if (siapaUid === null) {
+      setSt({ ...BELUM, terhubung: false, ket: 'Masuk dulu untuk menyambungkan' });
+      return;
+    }
 
     async function periksa() {
       const u = auth.currentUser;
-      if (!u) {
-        if (hidup) setSt({ ...BELUM, terhubung: false, ket: 'Masuk dulu untuk menyambungkan' });
-        return;
-      }
+      if (!u) return;
       try {
         const token = await u.getIdToken();
         const r = await fetch(`${dasar()}/api/mt5/status`, { headers: { Authorization: 'Bearer ' + token } });
@@ -116,10 +132,10 @@ export function useAkunMt5(): StatusAkun {
       }
     }
 
-    periksa();
+    void periksa();
     const jam = setInterval(periksa, JEDA_MS);
     return () => { hidup = false; clearInterval(jam); };
-  }, []);
+  }, [siapaUid]);
 
   return st;
 }

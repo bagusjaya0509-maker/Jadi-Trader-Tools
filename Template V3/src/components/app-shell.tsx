@@ -11,6 +11,7 @@ import { useAuth } from '@/lib/auth';
 import { MenuPengguna, PitaLangganan } from '@/components/gerbang';
 import { NEWS, PESAN, CHANGELOG } from '@/data/notifikasi';
 import { LogoJT } from '@/components/logo-jt';
+import { usePermintaanLisensi } from '@/lib/admin';
 
 /* ════════════════════════════════════════════════════════════════════════
    APP SHELL — rekonstruksi Efferd Dashboard 2
@@ -312,6 +313,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
      berselisih dengan sidebar pada penambahan menu berikutnya. */
   const IkonHalaman = NAV.flatMap((g) => g.butir).find((b) => b.ke === pathname)?.Ikon ?? LayoutGrid;
 
+  /* Permintaan lisensi yang belum diputus. Hanya ditanyakan kalau yang login
+     memang pemilik — rutenya butuh App Token, dan memanggilnya untuk semua
+     orang berarti satu permintaan gagal di tiap halaman untuk semua
+     pengunjung. */
+  const { data: permintaan } = usePermintaanLisensi();
+  const lisensiBaru = pemilik ? permintaan.filter((x) => x.status === 'baru').length : 0;
+
   /* Lebar >= 768px dilacak di JS karena posisi sidebar diatur inline —
      media query CSS tidak bisa menyentuh inline style. */
   const [lebarMd, setLebarMd] = useState(
@@ -385,7 +393,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     isActive ? 'bg-zinc-800/70 text-zinc-100' : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100'
                   )}
                 >
-                  <Ikon className="size-4 shrink-0" strokeWidth={1.8} />
+                  {/* Lencana merah di pojok kiri-atas ikon, bukan di ujung
+                      kanan baris: saat sidebar diciutkan yang tersisa hanya
+                      ikonnya, dan lencana yang menempel pada baris akan ikut
+                      hilang justru ketika ia paling dibutuhkan. */}
+                  <span className="relative shrink-0">
+                    <Ikon className="size-4" strokeWidth={1.8} />
+                    {ke === '/maintenance' && lisensiBaru > 0 && (
+                      <span className="absolute -left-1.5 -top-1 flex min-w-[15px] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-semibold leading-[15px] text-white">
+                        {lisensiBaru > 9 ? '9+' : lisensiBaru}
+                      </span>
+                    )}
+                  </span>
                   {!ciut && <span>{label}</span>}
                 </NavLink>
               ))}

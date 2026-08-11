@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { useProduk, simpanKatalogProduk } from '@/lib/data';
 import { unggahGambar, keDataUrl } from '@/lib/admin';
 import { useAuth } from '@/lib/auth';
+import { PanelLisensi } from '@/components/panel-lisensi';
 
 /* ════════════════════════════════════════════════════════════════════════
    MAINTENANCE — khusus pemilik
@@ -421,6 +422,8 @@ export default function Maintenance() {
           </p>
         </div>
       </Panel>
+
+      <PanelLisensi />
     </div>
   );
 }

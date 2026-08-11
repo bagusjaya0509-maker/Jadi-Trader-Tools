@@ -12,12 +12,12 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="jt-versi" content="202608091100">
+<meta name="jt-versi" content="202608110300">
 <script>
 /* Penjaga versi - lihat catatan lengkap di jurnal-trading.html. Mencegah browser
    menyajikan HTML lama dari cache saat halaman dimuat ulang. */
 (function(){
-  var VERSI_TAMPIL = "202608091100";
+  var VERSI_TAMPIL = "202608110300";
   var KUNCI_OK    = "jtVersiOk";      // versi yang sudah dipastikan benar-benar termuat
   var KUNCI_PAKSA = "jtVersiPaksa";   // versi yang sudah pernah dipaksa muat ulang
   try{
@@ -10410,8 +10410,17 @@
      nya ditolak - dan karena ditolak, .then() tidak pernah jalan sehingga
      Sinyal Prioritas TIDAK PERNAH dipindai otomatis. Gagalnya diam-diam:
      satu-satunya jejak adalah "Promise ditolak" di laporan error otomatis.
-     Sekarang SNR dipanggil langsung, tanpa perantara. */
-  findPrioritySnrSignals();
+     Sekarang SNR dipanggil langsung, tanpa perantara.
+
+     11 Agu 2026 - DIMATIKAN LAGI, kali ini dengan sengaja dan tercatat.
+     Pindaian ini mengambil klines 4 jam DAN 5 menit untuk SETIAP koin aktif
+     (115 koin = 230 permintaan) tepat saat halaman dibuka, sebelum orangnya
+     sempat melihat apa pun. Halaman jadi berat di detik-detik pertama, dan
+     hampir selalu untuk hasil yang belum tentu dilihat.
+
+     Tombol "Cari Sinyal SNR H4" sudah ada di sebelah judul sectionnya, dan
+     status di bawahnya sekarang mengatakan apa yang harus diklik. */
+  // findPrioritySnrSignals();
 })();
 </script>
 <script src="v2-cangkang.js?v=202608091100" defer></script>

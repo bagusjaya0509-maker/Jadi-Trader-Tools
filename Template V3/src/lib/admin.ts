@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { bacaKoneksi } from '@/lib/koneksi';
 
@@ -377,4 +378,82 @@ export function keDataUrl(berkas: File): Promise<string> {
     r.onerror = () => tolak(new Error('Gagal membaca berkas'));
     r.readAsDataURL(berkas);
   });
+}
+
+/* ── Permintaan lisensi ──────────────────────────────────────────────────
+   Pembeli mengirim permintaan, pemilik menyetujui, dan penyetujuan itulah
+   yang MENERBITKAN kodenya. Sebelum ini satu-satunya jalur adalah pemilik
+   mengetik kode lalu mengaktifkannya sendiri — pembelinya tidak punya cara
+   memberi tahu bahwa ia sudah membayar selain lewat WhatsApp. */
+export interface PermintaanLisensi {
+  id: string;
+  uid: string;
+  email: string;
+  nama: string;
+  produk: string;
+  catatan: string;
+  bukti: string;
+  status: 'baru' | 'disetujui' | 'ditolak';
+  waktu: number;
+  kode?: string;
+}
+
+export function usePermintaanLisensi(): Hasil<PermintaanLisensi[]> {
+  return useRute('/api/lisensi/permintaan', (j) =>
+    (j?.permintaan ?? []).map((x: any): PermintaanLisensi => ({
+      id: String(x.id ?? ''),
+      uid: String(x.uid ?? ''),
+      email: String(x.email ?? ''),
+      nama: String(x.nama ?? ''),
+      produk: String(x.produk ?? ''),
+      catatan: String(x.catatan ?? ''),
+      bukti: String(x.bukti ?? ''),
+      status: x.status === 'disetujui' ? 'disetujui' : x.status === 'ditolak' ? 'ditolak' : 'baru',
+      waktu: Number(x.waktu) || 0,
+      kode: x.kode ? String(x.kode) : undefined,
+    })), []);
+}
+
+export const putuskanLisensi = (id: string, tindakan: 'setujui' | 'tolak', kode?: string) =>
+  kirim('/api/lisensi/permintaan/putuskan', { id, tindakan, ...(kode ? { kode } : {}) });
+
+/** Kirim permintaan aktivasi. Butuh login — emailnya diambil backend dari
+ *  ID token yang sudah diverifikasi, bukan dari kiriman halaman ini. */
+export async function mintaLisensi(p: { produk: string; nama?: string; catatan?: string; bukti?: string }) {
+  const u = auth.currentUser;
+  if (!u) throw new Error('Masuk dulu dengan akun Google.');
+  const token = await u.getIdToken();
+  const r = await fetch(`${dasar()}/api/lisensi/minta`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+    body: JSON.stringify(p),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error ?? `Backend menjawab ${r.status}`);
+  return j as { ok: boolean; id: string; sudahAda?: boolean };
+}
+
+/** Permintaan milik pengguna yang sedang masuk — termasuk kodenya kalau
+ *  sudah disetujui. Dipakai halaman Marketplace supaya pembeli tahu di mana
+ *  posisinya tanpa perlu bertanya. */
+export function usePermintaanSaya(): { data: PermintaanLisensi[]; muatUlang: () => void } {
+  const [data, setData] = useState<PermintaanLisensi[]>([]);
+  const [putaran, setPutaran] = useState(0);
+
+  useEffect(() => {
+    let hidup = true;
+    const lepas = onAuthStateChanged(auth, async (u) => {
+      if (!u) { setData([]); return; }
+      try {
+        const token = await u.getIdToken();
+        const r = await fetch(`${dasar()}/api/lisensi/minta/saya`, { headers: { Authorization: 'Bearer ' + token } });
+        if (!r.ok) return;
+        const j = await r.json();
+        if (hidup) setData(j?.permintaan ?? []);
+      } catch { /* tidak apa-apa — panelnya cuma tidak menampilkan status */ }
+    });
+    return () => { hidup = false; lepas(); };
+  }, [putaran]);
+
+  return { data, muatUlang: () => setPutaran((n) => n + 1) };
 }

@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-import { Plus, Pencil, Bitcoin, CandlestickChart, Link2, Link2Off, RefreshCw } from 'lucide-react';
+import { Plus, Pencil, Bitcoin, CandlestickChart, Link2, Link2Off, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Panel, PanelHead, KartuKpi, BadgeTren, TipGrafik, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn, uang, persen, tanggalPendek } from '@/lib/utils';
 import { statGabungan, kurvaEkuitas, plPerHari } from '@/lib/hitung';
@@ -30,9 +30,26 @@ import { Link } from 'react-router-dom';
    ════════════════════════════════════════════════════════════════════════ */
 
 function Kalender({ pl }: { pl: Map<string, number> }) {
-  const kini = new Date();
-  const tahun = kini.getFullYear();
-  const bulan = kini.getMonth();
+  /* Bulan yang sedang dilihat, sebagai offset dari bulan berjalan.
+     0 = bulan ini, -1 = bulan lalu. Menyimpan offset, bukan objek Date,
+     membuat "maju/mundur satu bulan" tidak perlu memikirkan panjang bulan
+     maupun pergantian tahun — Date(tahun, bulan-1, 1) sudah benar sendiri
+     bahkan untuk Januari. */
+  const [geserBulan, setGeserBulan] = useState(0);
+
+  /* Bulan-bulan yang BENAR-BENAR punya transaksi, dari data. Dipakai untuk
+     tombol lompat: menawarkan Maret yang kosong sama saja dengan menyuruh
+     orang menebak-nebak di mana datanya. */
+  const bulanBerisi = useMemo(() => {
+    const set = new Set<string>();
+    pl.forEach((_, kunci) => set.add(kunci.slice(0, 7)));
+    return [...set].sort();
+  }, [pl]);
+
+  const acuan = new Date();
+  const dilihat = new Date(acuan.getFullYear(), acuan.getMonth() + geserBulan, 1);
+  const tahun = dilihat.getFullYear();
+  const bulan = dilihat.getMonth();
   const jmlHari = new Date(tahun, bulan + 1, 0).getDate();
   const geser = (new Date(tahun, bulan, 1).getDay() + 6) % 7;
   const maks = Math.max(1, ...[...pl.values()].map(Math.abs));
@@ -41,13 +58,54 @@ function Kalender({ pl }: { pl: Map<string, number> }) {
     ...Array(geser).fill(null),
     ...Array.from({ length: jmlHari }, (_, i) => ({
       hari: i + 1,
-      nilai: pl.get(new Date(tahun, bulan, i + 1).toISOString().slice(0, 10)),
+      /* Kunci tanggal LOKAL, bukan toISOString(). toISOString() mengubah ke
+         UTC, jadi tanggal 1 jam 00:00 WIB jatuh ke tanggal 30 bulan lalu —
+         dan seluruh kalender bergeser satu hari. */
+      nilai: pl.get(`${tahun}-${String(bulan + 1).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`),
     })),
   ];
   const total = sel.reduce((s, c) => s + (c?.nilai ?? 0), 0);
 
+  const kunciDilihat = `${tahun}-${String(bulan + 1).padStart(2, '0')}`;
+  const adaData = bulanBerisi.includes(kunciDilihat);
+
   return (
     <div>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <button onClick={() => setGeserBulan((n) => n - 1)} aria-label="Bulan sebelumnya"
+          className="cursor-pointer rounded p-1 text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-200">
+          <ChevronLeft className="size-4" />
+        </button>
+        <span className="text-[12.5px] text-zinc-300">
+          {dilihat.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}
+          {!adaData && <span className="ml-1.5 text-[11px] text-zinc-600">· kosong</span>}
+        </span>
+        <button onClick={() => setGeserBulan((n) => Math.min(0, n + 1))} disabled={geserBulan >= 0}
+          aria-label="Bulan berikutnya"
+          className="cursor-pointer rounded p-1 text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-30">
+          <ChevronRight className="size-4" />
+        </button>
+      </div>
+
+      {/* Lompat langsung ke bulan yang ada isinya. Menekan panah enam kali
+          untuk sampai ke Juli adalah gesekan yang tidak perlu ketika
+          daftarnya sudah kita punya. */}
+      {bulanBerisi.length > 1 && (
+        <div className="mb-3 flex flex-wrap gap-1">
+          {bulanBerisi.map((b) => {
+            const [y, m] = b.split('-').map(Number);
+            const off = (y - acuan.getFullYear()) * 12 + (m - 1 - acuan.getMonth());
+            return (
+              <button key={b} onClick={() => setGeserBulan(off)}
+                className={cn('cursor-pointer rounded px-1.5 py-0.5 text-[10.5px] transition-colors',
+                  off === geserBulan ? 'bg-zinc-100 text-zinc-950' : 'border border-zinc-800 text-zinc-500 hover:text-zinc-200')}>
+                {new Date(y, m - 1, 1).toLocaleDateString('id-ID', { month: 'short', year: '2-digit' })}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       <div className="mb-2 grid grid-cols-7 gap-1">
         {['S', 'S', 'R', 'K', 'J', 'S', 'M'].map((d, i) => (
           <div key={i} className="text-center text-[10.5px] text-zinc-600">{d}</div>
@@ -173,25 +231,63 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
      tiga keadaan; dua boolean terpisah selalu bisa menyala berbarengan. */
   const [modal, setModal] = useState<'baru' | Trade | null>(null);
   const [sinkron, setSinkron] = useState<{ sibuk: boolean; pesan: string }>({ sibuk: false, pesan: '' });
+  /* Rentang & mode disimpan di perangkat: keduanya preferensi, bukan data.
+     Menyimpannya di Firestore berarti satu tulisan tiap kali orang mengganti
+     pilihan di dropdown. */
+  const [sejak, setSejak] = useState(() => {
+    try { return localStorage.getItem('jtSinkronSejak') ?? '0'; } catch { return '0'; }
+  });
+  const [otomatis, setOtomatis] = useState(() => {
+    try { return localStorage.getItem('jtSinkronOtomatis') === '1'; } catch { return false; }
+  });
 
-  async function tarikDariMt5() {
-    setSinkron({ sibuk: true, pesan: '' });
+  const aturSejak = (v: string) => {
+    setSejak(v);
+    try { localStorage.setItem('jtSinkronSejak', v); } catch { /* mode privat */ }
+  };
+  const aturOtomatis = (v: boolean) => {
+    setOtomatis(v);
+    try { localStorage.setItem('jtSinkronOtomatis', v ? '1' : '0'); } catch { /* idem */ }
+  };
+
+  const tarikDariMt5 = useCallback(async (diam = false) => {
+    if (!diam) setSinkron({ sibuk: true, pesan: '' });
     try {
       /* Id yang sudah ada dikirim sebagai himpunan supaya penyaringan terjadi
-         SEBELUM menulis. Menulis ulang 1131 dokumen tiap sinkron akan
+         SEBELUM menulis. Menulis ulang ratusan dokumen tiap sinkron akan
          menghabiskan kuota tulis untuk data yang sudah sama persis. */
       const sudah = new Set(trade.map((x) => x.id));
-      const h = await sinkronRiwayatMt5(sudah);
+      const batas = sejak === '0' ? 0 : Date.now() - Number(sejak) * 86_400_000;
+      const h = await sinkronRiwayatMt5(sudah, batas);
+
+      const jangkauan = h.terlama
+        ? `Riwayat yang dikirim EA: ${tanggalPendek(h.terlama)} – ${tanggalPendek(h.terbaru)}.`
+        : '';
       setSinkron({
         sibuk: false,
-        pesan: h.ditambah
-          ? `${h.ditambah} transaksi baru masuk jurnal (dari ${h.ditemukan} riwayat MT5).`
-          : `Sudah mutakhir — ${h.ditemukan} riwayat MT5, semuanya sudah ada di jurnal.`,
+        pesan: [
+          h.ditambah
+            ? `${h.ditambah} transaksi baru masuk jurnal.`
+            : 'Sudah mutakhir — tidak ada transaksi baru.',
+          h.diluarRentang ? `${h.diluarRentang} di luar rentang yang dipilih.` : '',
+          jangkauan,
+        ].filter(Boolean).join(' '),
       });
     } catch (e) {
-      setSinkron({ sibuk: false, pesan: e instanceof Error ? e.message : 'Gagal menarik riwayat' });
+      if (!diam) setSinkron({ sibuk: false, pesan: e instanceof Error ? e.message : 'Gagal menarik riwayat' });
     }
-  }
+  }, [trade, sejak]);
+
+  /* Sinkron otomatis: sekali saat halaman dibuka, lalu tiap 5 menit.
+     Bukan tiap 30 detik — riwayat trade yang sudah tertutup tidak berubah,
+     dan menariknya tiap setengah menit cuma membebani backend untuk jawaban
+     yang hampir selalu "tidak ada yang baru". */
+  useEffect(() => {
+    if (!otomatis || !bisaTulis || sumber !== 'forex') return;
+    void tarikDariMt5(true);
+    const jam = setInterval(() => void tarikDariMt5(true), 5 * 60_000);
+    return () => clearInterval(jam);
+  }, [otomatis, bisaTulis, sumber, tarikDariMt5]);
   const pl = useMemo(() => plPerHari(trade), [trade]);
 
   const emosi = useMemo(() => {
@@ -221,16 +317,45 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
         </Panel>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          {/* Empat kolom, bukan lima.
+              ────────────────────────────────────────────────────────────
+              Total trade, win rate, dan profit factor digabung jadi SATU
+              kartu ringkas — ketiganya menjawab pertanyaan yang sama
+              ("seberapa sering menang, seberapa besar bandingannya") dan
+              memisahkannya cuma menghabiskan lebar. Ruang yang tersisa
+              dipakai kotak Setoran & Penarikan, yang tempatnya memang di
+              sini: ia bagian dari saldo, bukan catatan tambahan di bawah. */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <KartuSaldo judul={labelSaldo} saldoJurnal={stat.saldo} akun={akun} keIntegrasi={keIntegrasi} />
-            <KartuKpi label="Total trade" nilai={String(stat.jumlah)} catatan={`${stat.menang} menang · ${stat.kalah} kalah`} />
-            <KartuKpi label="Win rate" nilai={persen(stat.winrate)} catatan="dari transaksi selesai" />
+
+            <Panel className="p-5">
+              <div className="text-[12.5px] text-zinc-500">Statistik</div>
+              <div className="mt-2 grid grid-cols-3 gap-2">
+                <div>
+                  <div className="angka text-[19px] font-semibold leading-none tracking-tight text-zinc-100">{stat.jumlah}</div>
+                  <div className="mt-1 text-[11px] text-zinc-500">trade</div>
+                </div>
+                <div>
+                  <div className="angka text-[19px] font-semibold leading-none tracking-tight text-zinc-100">{persen(stat.winrate)}</div>
+                  <div className="mt-1 text-[11px] text-zinc-500">win rate</div>
+                </div>
+                <div>
+                  <div className="angka text-[19px] font-semibold leading-none tracking-tight text-zinc-100">
+                    {stat.faktorProfit === null ? '—' : stat.faktorProfit === Infinity ? '∞' : stat.faktorProfit.toFixed(2)}
+                  </div>
+                  <div className="mt-1 text-[11px] text-zinc-500">profit factor</div>
+                </div>
+              </div>
+              <div className="mt-2.5 text-[11.5px] text-zinc-600">
+                {stat.menang} menang · {stat.kalah} kalah
+              </div>
+            </Panel>
+
             <KartuKpi label="Net P/L" nilai={uang(stat.bersih, true)}
                       warna={stat.bersih >= 0 ? 'text-emerald-500' : 'text-red-400'}
                       catatan={`untung ${uang(stat.untung)} · rugi ${uang(stat.rugi)}`} />
-            <KartuKpi label="Profit factor"
-                      nilai={stat.faktorProfit === null ? '—' : stat.faktorProfit === Infinity ? '∞' : stat.faktorProfit.toFixed(2)}
-                      catatan="gross profit / gross loss" />
+
+            <KotakArus sumber={sumber} arus={arus} bisaTulis={bisaTulis} ringkas />
           </div>
 
           <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -267,7 +392,7 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
             </Panel>
 
             <Panel>
-              <PanelHead judul="Kalender P/L" sub={new Date().toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })} />
+              <PanelHead judul="Kalender P/L" sub="Klik panah atau nama bulan untuk berpindah." />
               <div className="px-5 pb-5"><Kalender pl={pl} /></div>
             </Panel>
 
@@ -280,12 +405,28 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
                   {/* Sinkron MT5 hanya di jurnal Trade-Fi — jurnal kripto sudah
                       terisi sendiri lewat screener V2. */}
                   {sumber === 'forex' && (
-                    <button onClick={() => void tarikDariMt5()} disabled={!bisaTulis || sinkron.sibuk}
-                      title="Tarik transaksi tertutup dari MetaTrader 5"
-                      className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100 disabled:cursor-not-allowed disabled:opacity-50">
-                      <RefreshCw className={cn('size-3.5', sinkron.sibuk && 'animate-spin')} />
-                      {sinkron.sibuk ? 'Menarik…' : 'Sinkron MT5'}
-                    </button>
+                    <>
+                      <select value={sejak} onChange={(e) => aturSejak(e.target.value)}
+                        title="Seberapa jauh ke belakang yang diambil"
+                        className="h-[30px] cursor-pointer rounded-md border border-zinc-800 bg-zinc-900/60 px-2 text-[11.5px] text-zinc-300 outline-none">
+                        <option value="30">30 hari</option>
+                        <option value="90">90 hari</option>
+                        <option value="180">6 bulan</option>
+                        <option value="0">Semua</option>
+                      </select>
+                      <label title="Tarik sendiri tiap 5 menit selama halaman terbuka"
+                        className="flex cursor-pointer items-center gap-1.5 text-[11.5px] text-zinc-400">
+                        <input type="checkbox" checked={otomatis} onChange={(e) => aturOtomatis(e.target.checked)}
+                               className="size-3.5 cursor-pointer accent-zinc-200" />
+                        Auto
+                      </label>
+                      <button onClick={() => void tarikDariMt5()} disabled={!bisaTulis || sinkron.sibuk}
+                        title="Tarik transaksi tertutup dari MetaTrader 5 sekarang"
+                        className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100 disabled:cursor-not-allowed disabled:opacity-50">
+                        <RefreshCw className={cn('size-3.5', sinkron.sibuk && 'animate-spin')} />
+                        {sinkron.sibuk ? 'Menarik…' : 'Sinkron MT5'}
+                      </button>
+                    </>
                   )}
                   <button onClick={() => setModal('baru')} disabled={!bisaTulis}
                     title={bisaTulis ? undefined : 'Masuk dulu untuk menambah catatan'}
@@ -358,7 +499,6 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
               </div>
             </Panel>
 
-            <KotakArus sumber={sumber} arus={arus} bisaTulis={bisaTulis} />
           </div>
         </>
       )}

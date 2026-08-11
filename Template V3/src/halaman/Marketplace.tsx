@@ -9,7 +9,10 @@ import { type Produk } from '@/data/contoh';
 import { useProduk } from '@/lib/data';
 import { useAuth } from '@/lib/auth';
 import { useUlasan, kirimUlasan, hapusUlasan } from '@/lib/ulasan';
-import { ambilSumberGratis, ambilSumberBerlisensi, tautanBerkas } from '@/lib/admin';
+import {
+  ambilSumberGratis, ambilSumberBerlisensi, tautanBerkas,
+  mintaLisensi, usePermintaanSaya,
+} from '@/lib/admin';
 
 /* Kode lisensi pembeli disimpan di perangkatnya sendiri. Mengetiknya ulang
    tiap kali ingin mengambil versi baru adalah gesekan yang tidak perlu — dan
@@ -103,6 +106,102 @@ function AmbilSumber({ produk }: { produk: Produk }) {
         <div className={cn('mt-3 text-[12.5px]', gagal ? 'text-amber-300/90' : 'text-emerald-500')}>{kabar}</div>
       )}
     </div>
+  );
+}
+
+/* ── Minta kode aktivasi ──────────────────────────────────────────────────
+   Sebelum ini kotaknya cuma menunjuk ke toko lalu berhenti: pembeli yang
+   sudah membayar tidak punya cara memberi tahu penjualnya selain WhatsApp,
+   dan yang lewat WhatsApp gampang terlewat.
+
+   Permintaan yang dikirim di sini muncul di panel Maintenance milik pemilik,
+   lengkap dengan lencana merah di menunya. Menyetujui di sana menerbitkan
+   kodenya sekaligus mengaktifkannya. */
+function MintaKode({ produk, lynk }: { produk: string; lynk?: string }) {
+  const { pengguna } = useAuth();
+  const { data: punyaku, muatUlang } = usePermintaanSaya();
+  const [catatan, setCatatan] = useState('');
+  const [bukti, setBukti] = useState('');
+  const [sibuk, setSibuk] = useState(false);
+  const [kabar, setKabar] = useState('');
+
+  const milikProduk = punyaku.find((x) => x.produk === produk);
+
+  async function kirimMinta() {
+    setSibuk(true); setKabar('');
+    try {
+      const j = await mintaLisensi({ produk, catatan: catatan.trim(), bukti: bukti.trim() });
+      setKabar(j.sudahAda
+        ? 'Permintaanmu sudah tercatat sebelumnya dan masih menunggu persetujuan.'
+        : 'Permintaan terkirim. Kodenya muncul di sini begitu penjual menyetujui.');
+      setCatatan(''); setBukti('');
+      muatUlang();
+    } catch (e) {
+      setKabar(e instanceof Error ? e.message : 'Gagal mengirim');
+    } finally { setSibuk(false); }
+  }
+
+  return (
+    <Panel className="mt-5 border-amber-500/25 bg-amber-500/[0.04] p-5">
+      <div className="mb-2 flex items-center gap-2">
+        <Crown className="size-4 text-amber-400" />
+        <span className="font-semibold text-zinc-100">Belum punya kode?</span>
+      </div>
+
+      {milikProduk?.status === 'disetujui' && milikProduk.kode ? (
+        <>
+          <p className="mb-3 text-[12.5px] leading-relaxed text-zinc-400">
+            Permintaanmu sudah disetujui. Ini kodenya — salin ke kotak di atas.
+          </p>
+          <button onClick={() => void navigator.clipboard.writeText(milikProduk.kode!)}
+            className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-4 py-2">
+            <Copy className="size-3.5 text-amber-300" />
+            <span className="angka text-[13px] tracking-wide text-amber-200">{milikProduk.kode}</span>
+          </button>
+        </>
+      ) : milikProduk?.status === 'baru' ? (
+        <p className="text-[12.5px] leading-relaxed text-zinc-400">
+          Permintaanmu sedang menunggu persetujuan penjual. Kodenya akan muncul di sini —
+          tidak perlu mengirim ulang.
+        </p>
+      ) : (
+        <>
+          <p className="mb-3 text-[12.5px] leading-relaxed text-zinc-400">
+            Beli lisensinya di toko, lalu kirim permintaan aktivasi di bawah. Penjual akan
+            menerbitkan kode <span className="angka">JT3-XXXX-XXXX-XXXX</span> untukmu.
+          </p>
+          {lynk && (
+            <a href={lynk} target="_blank" rel="noreferrer"
+               className="mb-4 inline-flex items-center gap-2 rounded-full bg-amber-500/15 px-5 py-2.5 text-[12.5px]
+                          font-semibold text-amber-300 transition-colors hover:bg-amber-500/25">
+              Beli di toko <ExternalLink className="size-3.5" />
+            </a>
+          )}
+          {milikProduk?.status === 'ditolak' && (
+            <div className="mb-3 text-[12px] text-amber-300/90">
+              Permintaan sebelumnya ditolak. Kamu bisa mengirim lagi dengan keterangan yang lebih lengkap.
+            </div>
+          )}
+          <div className="grid gap-2 sm:grid-cols-2">
+            <input value={bukti} onChange={(e) => setBukti(e.target.value)}
+              placeholder="Bukti bayar (nomor order / tautan)" disabled={!pengguna}
+              className="h-10 rounded-md border border-zinc-800 bg-zinc-900/60 px-3 text-[13px] text-zinc-100 outline-none transition-colors placeholder:text-zinc-600 focus-visible:border-zinc-600 disabled:opacity-50" />
+            <input value={catatan} onChange={(e) => setCatatan(e.target.value)}
+              placeholder="Catatan (opsional)" disabled={!pengguna}
+              className="h-10 rounded-md border border-zinc-800 bg-zinc-900/60 px-3 text-[13px] text-zinc-100 outline-none transition-colors placeholder:text-zinc-600 focus-visible:border-zinc-600 disabled:opacity-50" />
+          </div>
+          <button onClick={() => void kirimMinta()} disabled={sibuk || !pengguna}
+            title={pengguna ? undefined : 'Masuk dulu — emailmu diambil dari akun yang login'}
+            className="mt-3 flex cursor-pointer items-center gap-2 rounded-md bg-zinc-100 px-4 py-2 text-[12.5px] font-semibold text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50">
+            {sibuk && <Loader2 className="size-3.5 animate-spin" />} Minta kode aktivasi
+          </button>
+          {!pengguna && (
+            <div className="mt-2 text-[11.5px] text-zinc-500">Masuk dulu supaya penjual tahu permintaan ini dari siapa.</div>
+          )}
+        </>
+      )}
+      {kabar && <div className="mt-3 text-[12.5px] text-zinc-400">{kabar}</div>}
+    </Panel>
   );
 }
 
@@ -372,23 +471,7 @@ export default function Marketplace() {
               {/* Pengambilan sumber — gratis maupun berlisensi. */}
               <AmbilSumber produk={aktif} />
 
-              {aktif.harga > 0 && aktif.lynk && (
-                <Panel className="mt-5 border-amber-500/25 bg-amber-500/[0.04] p-5">
-                  <div className="mb-2 flex items-center gap-2">
-                    <Crown className="size-4 text-amber-400" />
-                    <span className="font-semibold text-zinc-100">Belum punya kode?</span>
-                  </div>
-                  <p className="mb-4 text-[12.5px] leading-relaxed text-zinc-400">
-                    Beli lisensinya di toko. Setelah pembayaran diterima, penjual mengirimkan
-                    kode <span className="angka">JT3-XXXX-XXXX-XXXX</span> yang kamu masukkan di atas.
-                  </p>
-                  <a href={aktif.lynk} target="_blank" rel="noreferrer"
-                     className="inline-flex items-center gap-2 rounded-full bg-amber-500/15 px-5 py-2.5 text-[12.5px]
-                                font-semibold text-amber-300 transition-colors hover:bg-amber-500/25">
-                    Beli di toko <ExternalLink className="size-3.5" />
-                  </a>
-                </Panel>
-              )}
+              {aktif.harga > 0 && <MintaKode produk={aktif.id} lynk={aktif.lynk} />}
             </div>
           </Panel>
         </div>

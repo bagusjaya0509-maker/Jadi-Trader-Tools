@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Play, Loader2, RefreshCw, Radio, TriangleAlert } from 'lucide-react';
+import { Play, Loader2, RefreshCw, Radio, TriangleAlert, Timer } from 'lucide-react';
 import { Panel, PanelHead, KartuKpi, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn, uang, persen, harga, tanggalPendek } from '@/lib/utils';
 import { ChartLilin, type Garis } from '@/components/chart-lilin';
@@ -33,6 +33,21 @@ const TF = [
   { nilai: '4h', label: '4 Jam' },
   { nilai: '1d', label: 'Harian' },
 ];
+
+/** Durasi tiap timeframe dalam milidetik. */
+const DURASI_TF: Record<string, number> = {
+  '5m': 5 * 60_000, '15m': 15 * 60_000, '1h': 3_600_000,
+  '4h': 4 * 3_600_000, '1d': 24 * 3_600_000,
+};
+
+/** 3725 -> "1:02:05". Jam disembunyikan kalau nol — "0:02:05" membuat mata
+ *  membaca angka yang tidak membawa informasi apa pun. */
+function jamMundur(detikTotal: number) {
+  const d = Math.floor(detikTotal);
+  const j = Math.floor(d / 3600), m = Math.floor((d % 3600) / 60), s = d % 60;
+  const dua = (n: number) => String(n).padStart(2, '0');
+  return j > 0 ? `${j}:${dua(m)}:${dua(s)}` : `${m}:${dua(s)}`;
+}
 
 const KELAS_ISIAN =
   'h-9 w-full rounded-md border border-zinc-800 bg-zinc-900/60 px-2.5 text-[12.5px] text-zinc-200 ' +
@@ -103,6 +118,25 @@ export default function ChartBacktest() {
   const sebelumnya = lilin.closes[lilin.closes.length - 2];
   const gerak = terakhir && sebelumnya ? ((terakhir - sebelumnya) / sebelumnya) * 100 : 0;
 
+  /* ── Hitung mundur penutupan lilin ──────────────────────────────────
+     Dihitung dari JAM SEKARANG, bukan dari waktu lilin terakhir. Klines
+     yang kita terima disegarkan tiap 15 detik; kalau hitung mundurnya
+     bersandar pada stempel lilin, angkanya akan melompat 15 detik sekali
+     alih-alih berdetak.
+
+     Batas lilin di Binance selalu kelipatan bulat dari durasinya sejak
+     epoch (00:00, 04:00, 08:00 untuk 4 jam), jadi sisa waktunya bisa
+     dihitung tanpa tahu kapan lilin terakhir dibuka. */
+  const [detik, setDetik] = useState(0);
+  useEffect(() => {
+    const durasi = DURASI_TF[tf] ?? 0;
+    if (!durasi) return;
+    const hitung = () => setDetik(Math.max(0, durasi - (Date.now() % durasi)) / 1000);
+    hitung();
+    const jam = setInterval(hitung, 1000);
+    return () => clearInterval(jam);
+  }, [tf]);
+
   function jalankan() {
     setUji(true);
     /* Beri satu bingkai supaya tombolnya sempat menampilkan keadaan sibuk.
@@ -145,6 +179,18 @@ export default function ChartBacktest() {
             {terakhir && (
               <span className={cn('angka mb-1 text-[12.5px]', gerak >= 0 ? 'text-emerald-500' : 'text-red-400')}>
                 {gerak >= 0 ? '+' : ''}{gerak.toFixed(2)}%
+              </span>
+            )}
+            {/* Sisa waktu lilin berjalan — seperti di TradingView. Yang
+                dijawabnya satu pertanyaan yang selalu ditanyakan sebelum
+                entry: "masih berapa lama sebelum lilin ini menutup?" */}
+            {DURASI_TF[tf] && (
+              <span className="mb-1 flex items-center gap-1.5 rounded border border-zinc-800 px-2 py-0.5">
+                <Timer className="size-3 text-zinc-500" />
+                <span className={cn('angka text-[12.5px] tabular-nums',
+                  detik <= 60 ? 'text-amber-400' : 'text-zinc-300')}>
+                  {jamMundur(detik)}
+                </span>
               </span>
             )}
           </div>
