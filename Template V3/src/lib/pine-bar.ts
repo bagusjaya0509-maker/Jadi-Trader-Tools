@@ -30,8 +30,9 @@ import type { Lilin } from '@/lib/pasar';
                   plot, plotshape, hline → diterjemahkan ke chart kita;
                   table.*, alert*, linefill.* → dicatat lalu dilewati
 
-   BATAS YANG DIAKUI TERBUKA: request.security, strategi, fungsi multi-
-   baris, matrix, dan while belum ada — barisnya ditolak dengan nomor.
+   BATAS YANG DIAKUI TERBUKA: strategy.*, matrix, dan while belum ada —
+   barisnya ditolak dengan nomor. request.security dievaluasi di timeframe
+   chart (bukan TF yang diminta), dengan catatan yang menyebutkannya.
    ════════════════════════════════════════════════════════════════════════ */
 
 export interface SegmenPine {
@@ -89,8 +90,9 @@ type Stmt =
   | { j: 'ekspresi'; e: Ekspr; baris: number }
   | { j: 'if'; cabang: { kondisi: Ekspr | null; isi: Stmt[] }[]; baris: number }
   | { j: 'for'; nama: string; dari: Ekspr; ke: Ekspr; langkah: Ekspr | null; isi: Stmt[]; baris: number }
+  | { j: 'while'; kondisi: Ekspr; isi: Stmt[]; baris: number }
   | { j: 'break'; baris: number } | { j: 'continue'; baris: number }
-  | { j: 'fungsi'; nama: string; param: string[]; e: Ekspr; baris: number };
+  | { j: 'fungsi'; nama: string; param: string[]; e: Ekspr | null; isi: Stmt[]; baris: number };
 
 class GalatBaris extends Error { constructor(public baris: number, pesan: string) { super(pesan); } }
 
@@ -268,6 +270,14 @@ function uraiBlok(baris: { teks: string; no: number; indent: number }[], mulai: 
       continue;
     }
 
+    const whileM = /^while\s+(.+)$/.exec(isi);
+    if (whileM) {
+      const dalam = uraiBlok(baris, i + 1, b.indent, dilewati);
+      stmt.push({ j: 'while', kondisi: new Pengurai(whileM[1], b.no).urai(), isi: dalam.stmt, baris: b.no });
+      i = dalam.lanjut;
+      continue;
+    }
+
     const forM = /^for\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+?)\s+to\s+(.+?)(?:\s+by\s+(.+))?$/.exec(isi);
     if (forM) {
       const dalam = uraiBlok(baris, i + 1, b.indent, dilewati);
@@ -285,22 +295,30 @@ function uraiBlok(baris: { teks: string; no: number; indent: number }[], mulai: 
     if (isi === 'break') { stmt.push({ j: 'break', baris: b.no }); i++; continue; }
     if (isi === 'continue') { stmt.push({ j: 'continue', baris: b.no }); i++; continue; }
 
-    /* Fungsi satu-baris: nama(p1, p2) => ekspresi */
-    const fnM = /^([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]*)\)\s*=>\s*(.+)$/.exec(isi);
+    /* Fungsi buatan skrip — dua bentuk yang sama-sama dipakai orang:
+       satu-baris  : nama(p) => ekspresi
+       multi-baris : nama(p) =>            <- tidak ada apa pun setelah =>
+                         pernyataan...     <- blok menjorok
+       Nilai baliknya (kalau ada) adalah pernyataan TERAKHIR badan —
+       aturan Pine yang sebenarnya. */
+    const fnM = /^([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]*)\)\s*=>\s*(.*)$/.exec(isi);
     if (fnM) {
-      stmt.push({
-        j: 'fungsi', nama: fnM[1],
-        param: fnM[2].split(',').map((s) => s.trim()).filter(Boolean),
-        e: new Pengurai(fnM[3], b.no).urai(), baris: b.no,
-      });
-      i++;
+      const param = fnM[2].split(',').map((s) => s.trim().replace(/^(?:series\s+)?(?:float|int|bool|color|string|line|label|box|array<[A-Za-z]+>)\s+/, '')).filter(Boolean);
+      if (fnM[3].trim()) {
+        stmt.push({ j: 'fungsi', nama: fnM[1], param, e: new Pengurai(fnM[3], b.no).urai(), isi: [], baris: b.no });
+        i++;
+      } else {
+        const dalam = uraiBlok(baris, i + 1, b.indent, dilewati);
+        stmt.push({ j: 'fungsi', nama: fnM[1], param, e: null, isi: dalam.stmt, baris: b.no });
+        i = dalam.lanjut;
+      }
       continue;
     }
 
     /* Penetapan: [var] [tipe] nama = / := / += / -= / *= / /= ekspresi.
        Bentuk gabungan diurai jadi `nama = nama <op> (ekspresi)` — semantik
        yang sama, tanpa cabang baru di mesinnya. */
-    const tM = /^(var\s+)?(?:(?:float|int|bool|color|string|line|label|box|table|array<[A-Za-z]+>|array)\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*(:=|[+\-*/]?=)(?!=)\s*(.+)$/.exec(isi);
+    const tM = /^(var\s+)?(?:(?:float|int|bool|color|string|linefill|line|label|box|table|polyline|array<[A-Za-z]+>|array)\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*(:=|[+\-*/]?=)(?!=)\s*(.+)$/.exec(isi);
     if (tM && !/^(if|for|else)\b/.test(isi)) {
       const op = tM[3];
       let ekspresi: Ekspr = new Pengurai(tM[4], b.no).urai();
@@ -354,11 +372,12 @@ function pivotDeret(sumber: number[], kiri: number, kanan: number, tinggi: boole
 class Mesin {
   varPersisten = new Map<string, Nilai>();
   lingkup = new Map<string, Nilai>();
-  fungsi = new Map<string, { param: string[]; e: Ekspr }>();
+  fungsi = new Map<string, { param: string[]; e: Ekspr | null; isi: Stmt[] }>();
   riwayat = new Map<string, Nilai[]>();
   gambar = new Map<number, { jenis: string; data: Record<string, Nilai> }>();
   idGambar = 1;
   bar = 0;
+  kedalamanFungsi = 0;
   plotNilai = new Map<string, { warna: string; nilai: (number | null)[] }>();
   penanda: PenandaPine[] = [];
   hlines: { nilai: number; warna: string }[] = [];
@@ -384,7 +403,7 @@ class Mesin {
   jalankanStmt(daftar: Stmt[]): 'break' | 'continue' | null {
     for (const s of daftar) {
       switch (s.j) {
-        case 'fungsi': this.fungsi.set(s.nama, { param: s.param, e: s.e }); break;
+        case 'fungsi': this.fungsi.set(s.nama, { param: s.param, e: s.e, isi: s.isi }); break;
         case 'tugas': {
           if (s.deklarasiVar) {
             if (!this.varPersisten.has(s.nama)) this.varPersisten.set(s.nama, this.eval(s.e, s.baris));
@@ -420,6 +439,15 @@ class Mesin {
           for (let i = dari; langkah > 0 ? i <= ke : i >= ke; i += langkah) {
             if (++jaga > 20000) this.err(s.baris, 'perulangan terlalu panjang (>20000)');
             this.lingkup.set(s.nama, i);
+            const r = this.jalankanStmt(s.isi);
+            if (r === 'break') break;
+          }
+          break;
+        }
+        case 'while': {
+          let jaga = 0;
+          while (this.benar(this.eval(s.kondisi, s.baris))) {
+            if (++jaga > 20000) this.err(s.baris, 'while terlalu panjang (>20000)');
             const r = this.jalankanStmt(s.isi);
             if (r === 'break') break;
           }
@@ -704,7 +732,25 @@ class Mesin {
         return { jenis: 'box', id };
       }
       case 'box.delete': { const r = arg(0) as RefGambar; if (r?.jenis === 'box') this.gambar.delete(r.id); return null; }
+
+      /* Setter gambar — satu penangan untuk seluruh keluarga set_*. Skrip
+         yang menggambar kotak lalu mengubah teks/tepinya tiap bar memakai
+         ini terus-menerus; menolak satu setter berarti menolak skripnya. */
+      /* Ditangani lewat pola di bawah switch — set_* apa pun. */
       case 'table.new': return { jenis: 'table', id: this.idGambar++ };
+
+      /* request.security: dievaluasi di TIMEFRAME CHART, bukan timeframe
+         yang diminta — halaman ini hanya memegang satu deret lilin. Hasilnya
+         BERBEDA dari TradingView di bagian yang memang multi-timeframe;
+         itu disebut terbuka di catatan, bukan disembunyikan. Menolaknya
+         sama sekali membuat seluruh skrip mati karena satu baris. */
+      case 'request.security': {
+        if (!this.dilewatiSekali.has('request.security')) {
+          this.dilewatiSekali.add('request.security');
+          this.dilewati.push('request.security() — dievaluasi di timeframe chart (bukan TF yang diminta); hasil bagian multi-TF akan berbeda dari TradingView');
+        }
+        return arg(2);
+      }
       case 'linefill.new': return { jenis: 'linefill', id: this.idGambar++ };
 
       /* ── keluaran ── */
@@ -760,13 +806,51 @@ class Mesin {
         return null;
     }
 
-    /* Fungsi buatan skrip */
+    /* Setter gambar generik: (line|label|box).set_<apa pun>. Keluarga ini
+       puluhan anggotanya dan skrip nyata memakai kombinasi yang berbeda-
+       beda; mendaftar satu-satu berarti selalu ketinggalan satu. Properti
+       yang tidak dikenal penggambar cukup tersimpan tanpa efek — lebih baik
+       daripada menghentikan skrip. */
+    const setM = /^(line|label|box)\.set_([a-z0-9_]+)$/.exec(e.nama);
+    if (setM) {
+      const r = arg(0) as RefGambar;
+      const g = r && typeof r === 'object' && 'id' in r ? this.gambar.get(r.id) : undefined;
+      if (g) {
+        const prop = setM[2];
+        if (prop === 'xy') { g.data.x = arg(1); g.data.y = arg(2); }
+        else if (prop === 'lefttop') { g.data.left = arg(1); g.data.top = arg(2); }
+        else if (prop === 'rightbottom') { g.data.right = arg(1); g.data.bottom = arg(2); }
+        else g.data[prop] = arg(1);
+      }
+      return null;
+    }
+    /* Getter gambar generik — get_x1/get_price dsb. */
+    const getM = /^(line|label|box)\.get_([a-z0-9_]+)$/.exec(e.nama);
+    if (getM) {
+      const r = arg(0) as RefGambar;
+      const g = r && typeof r === 'object' && 'id' in r ? this.gambar.get(r.id) : undefined;
+      return g ? (g.data[getM[2]] ?? null) : null;
+    }
+
+    /* Fungsi buatan skrip — parameter dibayangi lalu dipulihkan; badan
+       multi-baris dijalankan sebagai pernyataan, nilai baliknya nilai
+       pernyataan terakhir (ekspresi atau penetapan), meniru Pine. */
     const f = this.fungsi.get(e.nama);
     if (f) {
+      if (++this.kedalamanFungsi > 40) { this.kedalamanFungsi = 0; this.err(baris, 'fungsi terlalu dalam (rekursif?)'); }
       const simpan = f.param.map((p) => [p, this.lingkup.get(p)] as const);
       f.param.forEach((p, i) => this.lingkup.set(p, arg(i)));
-      const hasil = this.eval(f.e, baris);
+      let hasil: Nilai = null;
+      if (f.e) {
+        hasil = this.eval(f.e, baris);
+      } else if (f.isi.length) {
+        const akhir = f.isi[f.isi.length - 1];
+        this.jalankanStmt(f.isi.slice(0, -1));
+        if (akhir.j === 'ekspresi') hasil = this.eval(akhir.e, baris);
+        else { this.jalankanStmt([akhir]); hasil = akhir.j === 'tugas' ? (this.lingkup.get(akhir.nama) ?? null) : null; }
+      }
       simpan.forEach(([p, v]) => (v === undefined ? this.lingkup.delete(p) : this.lingkup.set(p, v)));
+      this.kedalamanFungsi--;
       return hasil;
     }
 

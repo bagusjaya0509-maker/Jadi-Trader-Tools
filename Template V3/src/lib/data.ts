@@ -117,6 +117,11 @@ export function useRiwayat(): HasilData<Trade[]> {
     window.addEventListener('jt:pilihan-contoh', naik);
     return () => window.removeEventListener('jt:pilihan-contoh', naik);
   }, []);
+
+  /* Contoh NYATA dari akun pemilik — sekali muat, dipakai saat layar butuh
+     data contoh (belum login, atau akun baru yang masih kosong). */
+  const [contohNyata, setContohNyata] = useState<Trade[] | null>(null);
+  useEffect(() => { void ambilContohNyata().then(setContohNyata); }, []);
   const [memuat, setMemuat] = useState(true);
   const [galat, setGalat] = useState<string | null>(null);
 
@@ -191,10 +196,12 @@ export function useRiwayat(): HasilData<Trade[]> {
     !!pengguna && !memuat && !memuatAuth && !galat && data.length === 0 &&
     bacaPilihanContoh(pengguna.uid) !== 'kosong';
 
+  const pakaiContoh = !pengguna || kosongBaru;
   return {
-    data: kosongBaru ? RIWAYAT : data,
+    /* Prioritas contoh: transaksi NYATA pemilik > contoh statis. */
+    data: pakaiContoh ? (contohNyata ?? RIWAYAT) : data,
     memuat: memuat || memuatAuth,
-    contoh: !pengguna || kosongBaru,
+    contoh: pakaiContoh,
     galat,
   };
 }
@@ -479,11 +486,50 @@ export interface RingkasanAkun {
   sejak: number;
 }
 
-export async function terbitkanRingkasan(r: RingkasanAkun) {
+export async function terbitkanRingkasan(r: RingkasanAkun, trade?: Trade[]) {
   const { setDoc } = await import('firebase/firestore');
   await setDoc(doc(db, 'public', 'ringkasanAkun'), {
     ...r,
     kurva: r.kurva.slice(-60).map((x) => Number(x.toFixed(2))),
+    /* Transaksi pemilik (dipadatkan) ikut terbit sebagai DATA CONTOH untuk
+       akun baru — halaman kosong tidak menjelaskan apa pun tentang apa yang
+       akan didapat. Hanya field yang dipakai layar; tanpa catatan pribadi. */
+    ...(trade ? {
+      contohTrade: trade.slice(0, 150).map((t) => ({
+        p: t.pair, a: t.arah, s: t.sumber, w: t.waktu,
+        n: Number(t.pnl.toFixed(2)), l: t.lot ?? 0,
+        e: t.emosi ?? '', u: t.alasan ?? '',
+      })),
+    } : {}),
     _updatedAt: Date.now(),
   }, { merge: true });
+}
+
+/* Data contoh NYATA milik pemilik, dibaca akun baru & mode pameran.
+   Dimuat sekali per sesi; kalau dokumennya belum ada (pemilik belum pernah
+   membuka dashboard sejak fitur ini), jatuh ke contoh statis. */
+let contohNyataCache: Trade[] | null | undefined;
+export async function ambilContohNyata(): Promise<Trade[] | null> {
+  if (contohNyataCache !== undefined) return contohNyataCache;
+  try {
+    const { getDoc } = await import('firebase/firestore');
+    const s = await getDoc(doc(db, 'public', 'ringkasanAkun'));
+    const mentah = s.data()?.contohTrade;
+    if (!Array.isArray(mentah) || !mentah.length) { contohNyataCache = null; return null; }
+    contohNyataCache = mentah.map((x: any, i: number): Trade => ({
+      id: 'pub' + i,
+      pair: String(x.p ?? ''),
+      arah: x.a === 'SELL' ? 'SELL' : 'BUY',
+      sumber: x.s === 'forex' ? 'forex' : 'kripto',
+      waktu: Number(x.w) || 0,
+      pnl: Number(x.n) || 0,
+      lot: Number(x.l) || 0,
+      emosi: String(x.e ?? ''),
+      alasan: String(x.u ?? ''),
+    } as Trade));
+    return contohNyataCache;
+  } catch {
+    contohNyataCache = null;
+    return null;
+  }
 }

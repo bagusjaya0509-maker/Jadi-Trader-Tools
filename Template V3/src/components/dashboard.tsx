@@ -171,7 +171,7 @@ export function Dashboard() {
     if (sidik === sidikTerbit.current) return;
     const j = setTimeout(() => {
       sidikTerbit.current = sidik;
-      void terbitkanRingkasan(r).catch((e) => console.warn('ringkasan tidak terbit:', e));
+      void terbitkanRingkasan(r, RIWAYAT).catch((e) => console.warn('ringkasan tidak terbit:', e));
     }, 2000);
     return () => clearTimeout(j);
   }, [pemilik, RIWAYAT.length, totalSaldo, stat, kurvaSaldo, selisihSaldo]);
