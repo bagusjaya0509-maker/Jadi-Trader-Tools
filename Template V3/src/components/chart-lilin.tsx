@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import {
   createChart, CandlestickSeries, LineSeries, createSeriesMarkers,
-  type IChartApi, type ISeriesApi, type ISeriesMarkersPluginApi, type IPriceLine, type Time,
+  type IChartApi, type ISeriesApi, type ISeriesMarkersPluginApi, type IPriceLine, type Logical, type Time,
 } from 'lightweight-charts';
 import type { Lilin } from '@/lib/pasar';
 import { cn, harga as fHarga } from '@/lib/utils';
@@ -65,7 +65,7 @@ export interface GarisSeret {
 export function ChartLilin({
   lilin, garis, trade, tinggi = 420, hingga, garisHarga, onKlikBar, smi, mundur, pojok,
   garisSeret, onSeret, onHapusGaris, hamparanBawah, segmen, penandaPine, kotakPine, isianPine,
-  alat, onAlatSelesai, gambarAlat,
+  alat, onAlatSelesai, gambarAlat, gambarPilih, onPilihGambar, garisBayang,
 }: {
   lilin: Lilin;
   garis?: Garis[];
@@ -108,6 +108,12 @@ export function ChartLilin({
   onAlatSelesai?: (g: Omit<GambarAlat, 'id'>) => void;
   /** Gambar tangan yang sudah jadi — ukur, fib, kotak. */
   gambarAlat?: GambarAlat[];
+  /** Gambar yang sedang terpilih (bingkai + pegangan). */
+  gambarPilih?: string | null;
+  /** Klik pada gambar memilihnya; klik ruang kosong membatalkan. */
+  onPilihGambar?: (id: string | null) => void;
+  /** Garis bayang posisi broker — entry + PnL berjalan, tidak bisa digeser. */
+  garisBayang?: { id: string; harga: number; warna: string; label: string; ket?: string }[];
 }) {
   const kotak = useRef<HTMLDivElement>(null);
   const chart = useRef<IChartApi | null>(null);
@@ -403,6 +409,53 @@ export function ChartLilin({
     if (kotak.current) kotak.current.style.cursor = alat ? 'crosshair' : '';
   }, [alat]);
 
+  useEffect(() => { alatPrim.current?.setPilih(gambarPilih ?? null); }, [gambarPilih]);
+
+  /* ── Memilih gambar dengan klik (mode kursor biasa) ─────────────────
+     Klik = mousedown+mouseup yang nyaris tidak bergerak; seretan panning
+     chart bukan pilihan. Uji-kenanya kotak pembatas berpelonggar 8 px —
+     garis setipis 1 px mustahil diklik persis. */
+  const acuanPilih = useRef({ alat, gambarAlat });
+  acuanPilih.current = { alat, gambarAlat };
+  useEffect(() => {
+    if (!onPilihGambar) return;
+    const el = kotak.current;
+    if (!el) return;
+    let awal: { x: number; y: number } | null = null;
+    const turun = (e: MouseEvent) => { awal = { x: e.clientX, y: e.clientY }; };
+    const klik = (e: MouseEvent) => {
+      const { alat: a, gambarAlat: gs } = acuanPilih.current;
+      if (a) return;
+      if (awal && Math.hypot(e.clientX - awal.x, e.clientY - awal.y) > 5) return;
+      const c = chart.current, s = seri.current;
+      if (!c || !s) return;
+      const rect = el.getBoundingClientRect();
+      const px = e.clientX - rect.left, py = e.clientY - rect.top;
+      const X = (t: number): number | null => {
+        const x = c.timeScale().timeToCoordinate(Math.floor(t / 1000) as Time);
+        if (x != null) return x;
+        const times = acuan.current.lilin.times;
+        if (times.length < 2) return null;
+        const tfMs = times[1] - times[0];
+        return c.timeScale().logicalToCoordinate((times.length - 1 + (t - times[times.length - 1]) / tfMs) as Logical);
+      };
+      let kena: string | null = null;
+      const daftar = gs ?? [];
+      for (let i = daftar.length - 1; i >= 0; i--) {
+        const g = daftar[i];
+        const x1 = X(g.t1), x2 = X(g.t2);
+        const y1 = s.priceToCoordinate(g.h1), y2 = s.priceToCoordinate(g.h2);
+        if (x1 == null || x2 == null || y1 == null || y2 == null) continue;
+        if (px >= Math.min(x1, x2) - 8 && px <= Math.max(x1, x2) + 8
+          && py >= Math.min(y1, y2) - 8 && py <= Math.max(y1, y2) + 8) { kena = g.id; break; }
+      }
+      onPilihGambar(kena);
+    };
+    el.addEventListener('mousedown', turun);
+    el.addEventListener('click', klik);
+    return () => { el.removeEventListener('mousedown', turun); el.removeEventListener('click', klik); };
+  }, [onPilihGambar]);
+
   const tarikAlat = useRef<{ t1: number; h1: number } | null>(null);
   useEffect(() => {
     if (!alat || !onAlatSelesai) return;
@@ -495,8 +548,8 @@ export function ChartLilin({
   /* Nilai terbaru dibaca dari ref di dalam rAF. Kalau dibaca dari closure,
      loopnya harus dipasang ulang tiap render — dan itu mengalahkan
      tujuannya. */
-  const acuan = useRef({ garisSeret, lilin, hingga });
-  acuan.current = { garisSeret, lilin, hingga };
+  const acuan = useRef({ garisSeret, lilin, hingga, garisBayang });
+  acuan.current = { garisSeret, lilin, hingga, garisBayang };
 
   const hargaDariY = useCallback((y: number) => {
     const s = seri.current;
@@ -515,7 +568,7 @@ export function ChartLilin({
   const pasang = useCallback(() => {
     const s = seri.current, c = chart.current;
     if (!s || !c) return;
-    const { garisSeret: gs, lilin: l, hingga: hg } = acuan.current;
+    const { garisSeret: gs, lilin: l, hingga: hg, garisBayang: gb } = acuan.current;
 
     /* Lebar skala harga dibaca tiap kali, bukan sekali: ia berubah sendiri
        begitu angkanya bertambah satu digit. */
@@ -542,7 +595,7 @@ export function ChartLilin({
       }
     };
 
-    (gs ?? []).forEach((g) => taruh(garisRef.current.get(g.id), g.harga));
+    [...(gs ?? []), ...(gb ?? [])].forEach((g) => taruh(garisRef.current.get(g.id), g.harga));
 
     /* Garis order berhenti DI TEPI skala harga, tidak menerobos ke bawah
        angka-angkanya. Elemen DOM membentang selebar komponen; tanpa batas
@@ -710,6 +763,26 @@ export function ChartLilin({
           </div>
         );
       })}
+
+      {/* Bayang posisi MT5 — garis entry tipis + PnL berjalan. Tidak bisa
+          digeser dan tidak menghalangi klik: levelnya milik broker. */}
+      {(garisBayang ?? []).map((g) => (
+        <div key={g.id}
+             ref={(el) => {
+               if (el) garisRef.current.set(g.id, el);
+               else garisRef.current.delete(g.id);
+             }}
+             className="pointer-events-none absolute left-0 right-0 z-10 flex items-center"
+             style={{ transform: 'translateY(-50%)', height: 14, visibility: 'hidden' }}>
+          <div className="h-px flex-1 opacity-60" style={{
+            background: `repeating-linear-gradient(90deg, ${g.warna} 0 3px, transparent 3px 7px)`,
+          }} />
+          <span className="angka mr-0.5 shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-zinc-950 opacity-90 shadow"
+                style={{ background: g.warna }}>
+            {g.label}{g.ket ? ` ${g.ket}` : ''}
+          </span>
+        </div>
+      ))}
 
       {pojok && <div className="absolute left-2 top-2 z-20">{pojok}</div>}
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { bacaKoneksi } from '@/lib/koneksi';
@@ -101,6 +101,7 @@ export function useAkunMt5(): StatusAkun {
      Sekarang pemeriksaan menunggu onAuthStateChanged. Tidak ada tebakan di
      antaranya: sebelum auth menjawab, statusnya tetap "Memeriksa…". */
   const [siapaUid, setSiapaUid] = useState<string | null | undefined>(undefined);
+  const gagalBeruntun = useRef(0);
 
   useEffect(() => onAuthStateChanged(auth, (u) => setSiapaUid(u ? u.uid : null)), []);
 
@@ -112,6 +113,17 @@ export function useAkunMt5(): StatusAkun {
       return;
     }
 
+    /* Kegagalan TUNGGAL (kuota Google cegukan, jaringan tersendat, server
+       baru restart) TIDAK mengosongkan panel — posisi yang berkedip
+       hilang-muncul tiap 30 detik jauh lebih menyesatkan daripada angka
+       yang telat semenit. Baru setelah TIGA kegagalan beruntun keadaan
+       buruknya diakui di layar. */
+    const gagalLunak = (buat: () => StatusAkun) => {
+      gagalBeruntun.current++;
+      if (gagalBeruntun.current < 3) return;
+      setSt(buat());
+    };
+
     async function periksa() {
       const u = auth.currentUser;
       if (!u) return;
@@ -119,7 +131,7 @@ export function useAkunMt5(): StatusAkun {
         const token = await u.getIdToken();
         const r = await fetch(`${dasar()}/api/mt5/status`, { headers: { Authorization: 'Bearer ' + token } });
         if (!hidup) return;
-        if (!r.ok) { setSt(dariSimpanan(u.uid, 'Backend tidak menjawab') ?? { ...BELUM, terhubung: false, ket: 'Backend tidak menjawab' }); return; }
+        if (!r.ok) { gagalLunak(() => dariSimpanan(u.uid, 'Backend tidak menjawab') ?? { ...BELUM, terhubung: false, ket: 'Backend tidak menjawab' }); return; }
         const j = await r.json();
         const akun = j?.data?.akun;
         /* EA yang MATI bukan akun yang hilang. Server tetap menyimpan
@@ -127,10 +139,11 @@ export function useAkunMt5(): StatusAkun {
            kembali ke hitungan jurnal (~$300) setiap MT5 ditutup membuat
            angkanya melompat dua kali sehari tanpa satu pun transaksi. */
         if (!akun) {
-          setSt(dariSimpanan(u.uid, 'EA offline')
+          gagalLunak(() => dariSimpanan(u.uid, 'EA offline')
             ?? { ...BELUM, terhubung: false, ket: j?.kode ? `Kode ${j.kode} — EA belum melapor` : 'EA belum terpasang' });
           return;
         }
+        gagalBeruntun.current = 0;
         const eaHidup = !!j?.terhubung;
         const mu = akun.mataUang ?? null;
         /* Profit tiap posisi ikut dikonversi. Akun ini bermata uang USC
@@ -168,7 +181,7 @@ export function useAkunMt5(): StatusAkun {
           posisi: eaHidup ? posisi : [],
         });
       } catch {
-        if (hidup) setSt(dariSimpanan(auth.currentUser?.uid ?? '', 'Backend tak terjangkau')
+        if (hidup) gagalLunak(() => dariSimpanan(auth.currentUser?.uid ?? '', 'Backend tak terjangkau')
           ?? { ...BELUM, terhubung: false, ket: 'Tidak bisa menghubungi backend' });
       }
     }

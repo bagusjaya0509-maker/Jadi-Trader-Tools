@@ -19,8 +19,12 @@ import { useEffect, useState } from 'react';
    permintaan yang bersifat hiasan.
    ════════════════════════════════════════════════════════════════════════ */
 
-const PROYEK = 'jadi-trader-tools';
-const DOK = `https://firestore.googleapis.com/v1/projects/${PROYEK}/databases/(default)/documents/public/jurnalShowcase`;
+/* Lewat CACHE VPS, bukan Firestore langsung. Kuota baca Firestore pernah
+   HABIS (429) dan halaman depan tampil kosong: setiap pengunjung membaca
+   Firestore sendiri-sendiri, dan kuotanya milik bersama. VPS menyegarkan
+   sekali per menit untuk SEMUA pengunjung, dan menyajikan salinan terakhir
+   yang baik bahkan saat kuota hulu sedang habis. */
+const DOK = 'https://103-253-145-38.sslip.io/api/publik/jurnalShowcase';
 
 export interface AngkaPameran {
   siap: boolean;

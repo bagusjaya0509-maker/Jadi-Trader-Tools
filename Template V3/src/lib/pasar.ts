@@ -106,6 +106,15 @@ export async function daftarSimbolMt5(): Promise<string[]> {
   } catch { return []; }
 }
 
+/** Tick MT5 terakhir per simbol dasar — harga watchlist Trade-Fi. */
+export async function hargaTickMt5(): Promise<Record<string, { bid: number; waktu: number }>> {
+  try {
+    const r = await fetch(`${dasar()}/api/mt5/simbol`);
+    const j = await r.json();
+    return j?.harga && typeof j.harga === 'object' ? j.harga : {};
+  } catch { return {}; }
+}
+
 export interface Ticker { lastPrice: number; ubah24j: number }
 
 let tickerCache: { waktu: number; isi: Record<string, Ticker> } | null = null;

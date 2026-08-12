@@ -80,6 +80,7 @@ const Billing       = lazy(() => muat(() => import('@/halaman/Billing')));
 const Dokumentasi   = lazy(() => muat(() => import('@/halaman/Dokumentasi')));
 const Changelog     = lazy(() => muat(() => import('@/halaman/Changelog')));
 const CopyTrading   = lazy(() => muat(() => import('@/halaman/Analisa')));
+const Markas        = lazy(() => muat(() => import('@/halaman/Markas')));
 
 /* ── Pramuat halaman lain SAAT SENGGANG ─────────────────────────────────
    Tiap halaman adalah potongan JS terpisah yang baru diunduh saat pertama
@@ -178,6 +179,9 @@ export default function App() {
         <KeAtas />
         <Routes>
           <Route path="/" element={<Beranda />} />
+          {/* Markas Agen SENGAJA di luar kerangka terminal — halaman
+              terpisah untuk pusat kendali agen AI, bukan bagian dasbor. */}
+          <Route path="/markas" element={<Markas />} />
           <Route element={<Kerangka />}>
             <Route path="/dashboard"   element={<Dashboard />} />
             <Route path="/screener"        element={<Screener />} />

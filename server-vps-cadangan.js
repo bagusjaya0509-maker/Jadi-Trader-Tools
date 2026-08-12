@@ -1751,9 +1751,39 @@ app.post('/api/mt5/tick', batasLaju, (req, res) => {
   res.json({ ok: true });
 });
 
-// --- Web: daftar simbol MT5 yang datanya ada — mengisi pilihan chart ---
+// --- Web: daftar simbol MT5 + tick terakhirnya — pilihan chart & watchlist ---
 app.get('/api/mt5/simbol', batasLaju, (req, res) => {
-  res.json({ ok: true, simbol: Object.keys(mt5KlinesBaca()) });
+  res.json({ ok: true, simbol: Object.keys(mt5KlinesBaca()), harga: MT5_TICK });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   CACHE DOKUMEN PUBLIK FIRESTORE
+   ══════════════════════════════════════════════════════════════════════════
+   Kuota baca Firestore PERNAH HABIS (429) dan halaman depan tampil kosong —
+   setiap pengunjung membaca Firestore langsung, dan kuotanya milik bersama.
+   Sekarang pengunjung membaca VPS: satu penyegaran per menit menggantikan
+   satu baca per pengunjung, dan salinan TERAKHIR YANG BAIK tetap disajikan
+   saat kuota di hulu sedang habis. Halaman depan tidak boleh kosong hanya
+   karena Google sedang menghitung ulang jatah kita.
+   ══════════════════════════════════════════════════════════════════════════ */
+const PUBLIK_CACHE = {};
+const PUBLIK_BOLEH = ['ringkasanAkun', 'posisiTerbuka', 'jurnalShowcase'];
+app.get('/api/publik/:dok', batasLaju, async (req, res) => {
+  const dok = String(req.params.dok || '').replace(/[^A-Za-z0-9]/g, '');
+  if (PUBLIK_BOLEH.indexOf(dok) < 0) return res.status(404).json({ error: 'dokumen tidak dikenal' });
+  const c = PUBLIK_CACHE[dok];
+  if (c && Date.now() - c.waktu < 60000) return res.json(c.isi);
+  try {
+    const r = await axios.get(
+      'https://firestore.googleapis.com/v1/projects/jadi-trader-tools/databases/(default)/documents/public/' + dok,
+      { timeout: 10000 });
+    PUBLIK_CACHE[dok] = { waktu: Date.now(), isi: r.data };
+    res.json(r.data);
+  } catch (e) {
+    if (c) return res.json(c.isi);   // hulu 429 → salinan terakhir yang baik
+    const status = (e.response && e.response.status) || 502;
+    res.status(status).json({ error: 'Firestore menjawab ' + status });
+  }
 });
 
 // --- Web: baca OHLC MT5 — bentuk balasannya SAMA dengan /api/klines ---

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Play, Loader2, RefreshCw, Radio, TriangleAlert, History,
-  Layers, ChevronDown, Settings2, Code2, X, Ruler, Rows3, Square, Eraser,
+  Layers, ChevronDown, Settings2, Code2, X, Ruler, Rows3, Square, Eraser, Minus,
 } from 'lucide-react';
 import { Panel, PanelHead, KartuKpi, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn, uang, persen, harga, tanggalPendek } from '@/lib/utils';
@@ -157,6 +157,34 @@ export default function ChartBacktest() {
        seretan chart berikutnya jadi kotak yang tidak diminta. */
     setAlat(null);
   }, [simbol, tf]);
+  /* Gambar TERPILIH: klik gambarnya di mode kursor biasa, hapus dengan
+     Delete/Backspace, batal pilih dengan Escape. */
+  const [gambarPilih, setGambarPilih] = useState<string | null>(null);
+  useEffect(() => { setGambarPilih(null); }, [simbol, tf, alat]);
+  useEffect(() => {
+    const tekan = (e: KeyboardEvent) => {
+      const t = document.activeElement?.tagName;
+      if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT') return;
+      if ((e.key === 'Delete' || e.key === 'Backspace') && gambarPilih) {
+        setGambarAlat((d) => {
+          const b = d.filter((g) => g.id !== gambarPilih);
+          try { localStorage.setItem(`jt.alat.${simbol}|${tf}`, JSON.stringify(b)); } catch { /* privat */ }
+          return b;
+        });
+        setGambarPilih(null);
+      }
+      if (e.key === 'Escape') setGambarPilih(null);
+    };
+    window.addEventListener('keydown', tekan);
+    return () => window.removeEventListener('keydown', tekan);
+  }, [gambarPilih, simbol, tf]);
+  const [alatTutup, setAlatTutup] = useState(() => {
+    try { return localStorage.getItem('jt.alatTutup') === '1'; } catch { return false; }
+  });
+  function aturAlatTutup(v: boolean) {
+    setAlatTutup(v);
+    try { localStorage.setItem('jt.alatTutup', v ? '1' : '0'); } catch { /* privat */ }
+  }
   function bukaDock(t: 'editor' | 'input') {
     setDockTab(t); setDockBuka(true); setWatchBuka(false); setMenuInd(false);
   }
@@ -186,22 +214,26 @@ export default function ChartBacktest() {
      posisinya hidup (dibuka dari web ataupun MT5), hilang sendiri saat
      SL/TP kena atau ditutup dari mana pun. */
   const akunMt5 = useAkunMt5();
-  const posisiMt5Chart = useMemo(() => {
-    if (!simbol.startsWith('MT5:')) return null;
-    const dasarS = simbol.slice(4);
-    return akunMt5.posisi.find((p) => p.simbol.toUpperCase().indexOf(dasarS) === 0) ?? null;
-  }, [simbol, akunMt5.posisi]);
   const nilaiLotMt5 = simbol.startsWith('MT5:') ? (bacaSpekMt5(simbol.slice(4)) ?? 100) : 0;
-  /* Posisi MT5 yang BARU SAJA lenyap (SL/TP kena atau ditutup) menyapu
-     garis rencananya juga — garis order yang sudah mati harus ikut mati. */
-  const jejakPosMt5 = useRef<{ simbol: string; ada: boolean }>({ simbol: '', ada: false });
-  useEffect(() => {
-    const j = jejakPosMt5.current;
-    if (j.simbol === simbol && j.ada && !posisiMt5Chart) {
-      setRencana({}); setDraf(null); entryDigeser.current = false;
-    }
-    jejakPosMt5.current = { simbol, ada: !!posisiMt5Chart };
-  }, [posisiMt5Chart, simbol]);
+  /* ── Bayang posisi MT5 — ala garis posisi MetaTrader ────────────────
+     Setiap posisi terbuka di simbol ini tampil sebagai SATU garis entry
+     tipis dengan PnL BERJALAN di labelnya. Bukan pengganti garis tiket:
+     rencana entry/SL/TP tetap bebas dipakai untuk LAYERING — menyusun
+     posisi berikutnya selagi yang lama berjalan. Garisnya hilang sendiri
+     saat posisinya tutup, dari SL/TP maupun tangan, dari web maupun MT5. */
+  const garisBayang = useMemo(() => {
+    if (!simbol.startsWith('MT5:')) return [];
+    const dasarS = simbol.slice(4);
+    return akunMt5.posisi
+      .filter((p) => p.simbol.toUpperCase().indexOf(dasarS) === 0)
+      .map((p) => ({
+        id: 'mt5-' + p.tiket,
+        harga: p.hargaBuka,
+        warna: p.arah === 'BUY' ? '#10b981' : '#f87171',
+        label: `#${p.tiket} ${p.arah} ${p.lot}`,
+        ket: `· ${p.profit >= 0 ? '+' : ''}${uang(p.profit)}`,
+      }));
+  }, [simbol, akunMt5.posisi]);
 
   /* Mengubah SL ×ATR / R:R saat tiket TERBUKA langsung menggeser garisnya —
      setelan yang baru berlaku untuk tiket berikutnya terasa seperti setelan
@@ -424,15 +456,12 @@ export default function ChartBacktest() {
   const labelJenis = jenisEntry === 'MARKET' ? 'Market'
     : `${draf === 'BUY' ? 'Buy' : 'Sell'} ${jenisEntry === 'STOP' ? 'Stop' : 'Limit'}`;
   const garisSeret: GarisSeret[] = useMemo(() => {
-    const posMt5 = aksi?.mode === 'real' ? posisiMt5Chart : null;
     const sumber = aksiPosisi
       ? { entry: aksiPosisi.masuk, sl: aksiPosisi.sl, tp: aksiPosisi.tp }
-      : posMt5
-      ? { entry: posMt5.hargaBuka, sl: posMt5.sl || undefined, tp: posMt5.tp || undefined }
       : aksiTunda
       ? { entry: aksiTunda.entry, sl: aksiTunda.sl, tp: aksiTunda.tp }
       : rencana;
-    const kunci = !!aksiPosisi || !!aksiTunda || !!posMt5;
+    const kunci = !!aksiPosisi || !!aksiTunda;
     const g: GarisSeret[] = [];
 
     /* Risiko & imbalan DITULIS DI GARISNYA.
@@ -448,11 +477,6 @@ export default function ChartBacktest() {
       if (aksiPosisi) {
         ketSl = `· -${uang(aksiPosisi.risiko)}`;
         ketTp = `· +${uang(aksiPosisi.unit * Math.abs(tpN - aksiPosisi.masuk))}`;
-      } else if (posMt5) {
-        /* Posisi MT5 hidup: dolar dari lot × nilai-per-lot yang dilaporkan
-           EA (akun sen sudah dikonversi di EA-nya). */
-        ketSl = `· -${uang(posMt5.lot * nilaiLotMt5 * Math.abs(e - s))}`;
-        ketTp = `· +${uang(posMt5.lot * nilaiLotMt5 * Math.abs(tpN - e))}`;
       } else if (aksi?.mode === 'real' && simbol.startsWith('MT5:')) {
         /* Tiket MT5 yang sedang disusun: lot × nilai per lot. */
         ketSl = `· -${uang(lotMt5 * nilaiLotMt5 * Math.abs(e - s))}`;
@@ -477,9 +501,7 @@ export default function ChartBacktest() {
         }
       }
     }
-    const ketEntry = posMt5
-      ? `· MT5 #${posMt5.tiket} · ${posMt5.arah} ${posMt5.lot} lot`
-      : aksiTunda
+    const ketEntry = aksiTunda
       ? `· ${aksiTunda.arah === 'BUY' ? 'Buy' : 'Sell'} ${aksiTunda.jenis === 'STOP' ? 'Stop' : 'Limit'} menunggu`
       : draf ? `· ${labelJenis}` : '';
 
@@ -487,7 +509,7 @@ export default function ChartBacktest() {
     if (sumber.sl) g.push({ id: 'sl', harga: sumber.sl, warna: '#f87171', label: 'SL', ket: ketSl, bisaSeret: !kunci });
     if (sumber.tp) g.push({ id: 'tp', harga: sumber.tp, warna: '#10b981', label: 'TP', ket: ketTp, bisaSeret: !kunci });
     return g;
-  }, [aksiPosisi, aksiTunda, rencana, aksi, draf, labelJenis, nyataSetelan, posisiMt5Chart, lotMt5, nilaiLotMt5, simbol]);
+  }, [aksiPosisi, aksiTunda, rencana, aksi, draf, labelJenis, nyataSetelan, lotMt5, nilaiLotMt5, simbol]);
 
   const terakhir = lilin.closes[lilin.closes.length - 1];
   const sebelumnya = lilin.closes[lilin.closes.length - 2];
@@ -601,7 +623,7 @@ export default function ChartBacktest() {
                      setKetik(v);
                      /* Memilih dari daftar langsung berlaku — itu memang
                         sebuah pilihan, bukan setengah kata. */
-                     if (SIMBOL_DASAR.includes(v)) setSimbol(v);
+                     if (SIMBOL_DASAR.includes(v) || simbolMt5.some((s) => 'MT5:' + s === v)) setSimbol(v);
                    }}
                    onKeyDown={(e) => { if (e.key === 'Enter') komitSimbol(); }}
                    onBlur={komitSimbol}
@@ -767,6 +789,9 @@ export default function ChartBacktest() {
                           alat={alat}
                           onAlatSelesai={tambahGambar}
                           gambarAlat={gambarAlat}
+                          gambarPilih={gambarPilih}
+                          onPilihGambar={setGambarPilih}
+                          garisBayang={garisBayang}
                           mundur={DURASI_TF[tf] ? jamMundur(detik) : undefined}
                           hamparanBawah={kendaliReplay}
                           pojok={aksi ? (
@@ -930,7 +955,16 @@ export default function ChartBacktest() {
             )}
           </div>
 
-          {/* ── Alat gambar — bilah tegak di tepi kiri, ala TradingView ── */}
+          {/* ── Alat gambar — bilah tegak yang bisa DILIPAT ─────────
+              Klik gambar (mode kursor) untuk memilihnya, Delete untuk
+              menghapus; penghapus menghapus yang terpilih dulu, semuanya
+              kalau tidak ada yang terpilih. */}
+          {alatTutup ? (
+            <button onClick={() => aturAlatTutup(false)} title="Buka bilah alat gambar"
+              className="absolute left-2 top-1/2 z-20 flex size-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-lg border border-zinc-800/80 bg-zinc-950/85 text-zinc-500 backdrop-blur-sm transition-colors hover:text-zinc-200">
+              <Ruler className="size-3.5" />
+            </button>
+          ) : (
           <div className="absolute left-2 top-1/2 z-20 flex -translate-y-1/2 flex-col gap-0.5 rounded-lg border border-zinc-800/80 bg-zinc-950/85 p-1 backdrop-blur-sm">
             {([
               ['ukur', Ruler, 'Ukur % kenaikan / penurunan — klik lalu tarik'],
@@ -945,16 +979,31 @@ export default function ChartBacktest() {
             ))}
             <button
               onClick={() => {
+                if (gambarPilih) {
+                  setGambarAlat((d) => {
+                    const b = d.filter((g) => g.id !== gambarPilih);
+                    try { localStorage.setItem(`jt.alat.${simbol}|${tf}`, JSON.stringify(b)); } catch { /* privat */ }
+                    return b;
+                  });
+                  setGambarPilih(null);
+                  return;
+                }
                 if (!gambarAlat.length) return;
                 if (!confirm(`Hapus ${gambarAlat.length} gambar di ${simbol} ${tf}?`)) return;
                 setGambarAlat([]);
                 try { localStorage.setItem(`jt.alat.${simbol}|${tf}`, '[]'); } catch { /* privat */ }
               }}
-              disabled={!gambarAlat.length} title="Hapus semua gambar di simbol & timeframe ini"
+              disabled={!gambarAlat.length && !gambarPilih}
+              title={gambarPilih ? 'Hapus gambar terpilih (Delete)' : 'Hapus semua gambar di simbol & timeframe ini'}
               className="flex size-7 cursor-pointer items-center justify-center rounded text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-35">
               <Eraser className="size-3.5" />
             </button>
+            <button onClick={() => aturAlatTutup(true)} title="Lipat bilah alat"
+              className="flex size-7 cursor-pointer items-center justify-center rounded text-zinc-600 transition-colors hover:bg-zinc-800 hover:text-zinc-300">
+              <Minus className="size-3.5" />
+            </button>
           </div>
+          )}
 
           {/* Dock Pine & watchlist SELALU terpasang (autorun skrip aktif dan
               harga watchlist hidup di dalamnya); yang berganti hanya

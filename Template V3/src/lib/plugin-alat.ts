@@ -49,6 +49,7 @@ export class PenggambarAlat implements ISeriesPrimitive<Time> {
   private minta: (() => void) | null = null;
   private gambar: GambarAlat[] = [];
   private pratinjau: Omit<GambarAlat, 'id'> | null = null;
+  private pilih: string | null = null;
   private meta: MetaAlat = { tAkhir: 0, tfMs: 3_600_000, n: 0 };
 
   attached(p: SeriesAttachedParameter<Time>) {
@@ -67,6 +68,11 @@ export class PenggambarAlat implements ISeriesPrimitive<Time> {
 
   setPratinjau(p: Omit<GambarAlat, 'id'> | null) {
     this.pratinjau = p;
+    this.minta?.();
+  }
+
+  setPilih(id: string | null) {
+    this.pilih = id;
     this.minta?.();
   }
 
@@ -102,6 +108,24 @@ export class PenggambarAlat implements ISeriesPrimitive<Time> {
               const y1 = Y(g.h1), y2 = Y(g.h2);
               if (x1 == null || x2 == null || y1 == null || y2 == null) continue;
               const kiri = Math.min(x1, x2), kanan = Math.max(x1, x2);
+
+              /* Gambar TERPILIH diberi bingkai putus-putus + empat pegangan
+                 sudut — tanda "yang ini yang akan terhapus kalau kamu
+                 menekan Delete". */
+              if ('id' in g && g.id && g.id === this.pilih) {
+                const bA = Math.min(y1, y2) - 5, bB = Math.max(y1, y2) + 5;
+                ctx.save();
+                ctx.setLineDash([4, 3]);
+                ctx.strokeStyle = 'rgba(250,250,250,.85)';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(kiri - 5, bA, (kanan - kiri) + 10, bB - bA);
+                ctx.setLineDash([]);
+                ctx.fillStyle = '#fafafa';
+                for (const [hx, hy] of [[kiri - 5, bA], [kanan + 5, bA], [kiri - 5, bB], [kanan + 5, bB]]) {
+                  ctx.fillRect(hx - 2.5, hy - 2.5, 5, 5);
+                }
+                ctx.restore();
+              }
 
               if (g.jenis === 'kotak') {
                 const atas = Math.min(y1, y2), bawah = Math.max(y1, y2);
