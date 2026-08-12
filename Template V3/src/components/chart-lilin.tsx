@@ -469,6 +469,16 @@ export function ChartLilin({
         const x1 = X(g.t1), x2 = X(g.t2);
         const y1 = s.priceToCoordinate(g.h1), y2 = s.priceToCoordinate(g.h2);
         if (x1 == null || x2 == null || y1 == null || y2 == null) continue;
+        if (g.jenis === 'garis') {
+          /* Garis tren diagonal: kotak pembatasnya luas — yang diuji JARAK
+             ke ruasnya, supaya hanya klik di dekat garisnya yang memilih,
+             bukan seluruh area segitiga kosong di sekitarnya. */
+          const dx = x2 - x1, dy = y2 - y1;
+          const pj = dx * dx + dy * dy;
+          const t = pj ? Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / pj)) : 0;
+          if (Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy)) <= 7) { kena = g.id; break; }
+          continue;
+        }
         if (px >= Math.min(x1, x2) - 8 && px <= Math.max(x1, x2) + 8
           && py >= Math.min(y1, y2) - 8 && py <= Math.max(y1, y2) + 8) { kena = g.id; break; }
       }

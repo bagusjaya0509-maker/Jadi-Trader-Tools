@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Play, Loader2, RefreshCw, Radio, TriangleAlert, History,
-  Layers, ChevronDown, Settings2, Code2, X, Ruler, Rows3, Square, Eraser, Minus,
+  Layers, ChevronDown, Settings2, Code2, X, Ruler, Rows3, Square, Eraser, Minus, TrendingUp,
 } from 'lucide-react';
 import { Panel, PanelHead, KartuKpi, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn, uang, persen, harga, tanggalPendek } from '@/lib/utils';
@@ -208,7 +208,17 @@ export default function ChartBacktest() {
   /* Simbol MT5 yang tersedia — EA yang dipasang di chart pair lain otomatis
      menambah daftar ini, tanpa menyentuh kode web. */
   const [simbolMt5, setSimbolMt5] = useState<string[]>(['XAUUSD']);
-  useEffect(() => { void daftarSimbolMt5().then((d) => { if (d.length) setSimbolMt5(d); }); }, []);
+  useEffect(() => {
+    let hidup = true;
+    const tarik = () => void daftarSimbolMt5().then((d) => { if (hidup && d.length) setSimbolMt5(d); });
+    tarik();
+    /* Disegarkan berkala, bukan sekali: EA yang BARU dipasang di chart MT5
+       lain mendaftarkan simbolnya sendiri ke server — tanpa penyegaran,
+       daftar pilihan di sini beku sejak halaman dibuka dan simbol barunya
+       "tidak ada" sampai orangnya memuat ulang. */
+    const jam = setInterval(tarik, 30_000);
+    return () => { hidup = false; clearInterval(jam); };
+  }, []);
   /* Posisi MT5 yang sedang terbuka di simbol chart ini — sumber garis
      entry/SL/TP mode REAL. Garisnya milik BROKER: tetap ada selama
      posisinya hidup (dibuka dari web ataupun MT5), hilang sendiri saat
@@ -990,6 +1000,7 @@ export default function ChartBacktest() {
           ) : (
           <div className="absolute left-2 top-1/2 z-20 flex -translate-y-1/2 flex-col gap-0.5 rounded-lg border border-zinc-800/80 bg-zinc-950/85 p-1 backdrop-blur-sm">
             {([
+              ['garis', TrendingUp, 'Garis tren — tarik dari titik ke titik'],
               ['ukur', Ruler, 'Ukur % kenaikan / penurunan — klik lalu tarik'],
               ['fib', Rows3, 'Fibonacci retracement — tarik dari swing ke swing'],
               ['kotak', Square, 'Kotak SNR manual — tarik membentuk zonanya'],

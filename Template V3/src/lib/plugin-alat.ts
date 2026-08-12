@@ -3,7 +3,7 @@ import type {
 } from 'lightweight-charts';
 
 /* ════════════════════════════════════════════════════════════════════════
-   ALAT GAMBAR CHART — ukur %, fibonacci, kotak SNR
+   ALAT GAMBAR CHART — garis tren, ukur %, fibonacci, kotak SNR
    ════════════════════════════════════════════════════════════════════════
    Primitive kanvas kedua di samping penggambar isian Pine. Yang ini milik
    TANGAN orangnya: garis pengukur persentase, fibonacci retracement, dan
@@ -18,7 +18,7 @@ import type {
    bar terakhir + durasi timeframe.
    ════════════════════════════════════════════════════════════════════════ */
 
-export type JenisAlat = 'ukur' | 'fib' | 'kotak';
+export type JenisAlat = 'ukur' | 'fib' | 'kotak' | 'garis';
 
 export interface GambarAlat {
   id: string;
@@ -125,6 +125,25 @@ export class PenggambarAlat implements ISeriesPrimitive<Time> {
                   ctx.fillRect(hx - 2.5, hy - 2.5, 5, 5);
                 }
                 ctx.restore();
+              }
+
+              if (g.jenis === 'garis') {
+                /* Garis tren: ruas lurus dari titik ke titik, dengan titik
+                   kecil di kedua ujung sebagai pegangan visual. Biru muda —
+                   warna yang belum dipakai ukur (hijau/merah), fib (emas),
+                   maupun kotak (kelabu), jadi trendline langsung dikenali. */
+                ctx.strokeStyle = 'rgba(96,165,250,.95)';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+                ctx.stroke();
+                ctx.fillStyle = 'rgba(96,165,250,.95)';
+                for (const [ux, uy] of [[x1, y1], [x2, y2]]) {
+                  ctx.beginPath();
+                  ctx.arc(ux, uy, 2.2, 0, Math.PI * 2);
+                  ctx.fill();
+                }
+                continue;
               }
 
               if (g.jenis === 'kotak') {
