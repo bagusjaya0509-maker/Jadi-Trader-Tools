@@ -486,6 +486,37 @@ class Pengurai {
 const DILEWATI = /^\s*(\/\/|indicator\s*\(|study\s*\(|strategy\s*\(|import\s|\/\/@|$)/;
 const OSILATOR = /rsi|smi|stoch|macd|momentum|osc/i;
 
+/** `overlay=` dari deklarasi `indicator()` / `study()` / `strategy()`.
+ *
+ *  KENAPA INI PENTING: baris deklarasi selama ini DILEWATI mentah-mentah,
+ *  jadi satu-satunya penentu "ini osilator atau bukan" adalah tebakan nama
+ *  plot lewat regex di atas. Regex itu tidak punya batas kata — judul yang
+ *  memuat "osc" atau "smi" di tengah kata pun ikut kena — dan akibatnya
+ *  indikator OVERLAY seperti Jadi Trader V3 dianggap punya osilator, lalu
+ *  merebut panel bawah dari SMI yang sedang dipakai orangnya.
+ *
+ *  Skripnya sendiri sudah menyatakan tempatnya. Membacanya jauh lebih
+ *  benar daripada menebak dari nama.
+ *
+ *  null = tidak dinyatakan; pemanggil boleh kembali menebak. */
+function bacaOverlay(kode: string): boolean | null {
+  const m = /^\s*(?:indicator|study|strategy)\s*\(([\s\S]*?)\)\s*$/m.exec(kode);
+  if (!m) return null;
+  const o = /overlay\s*=\s*(true|false)/i.exec(m[1]);
+  return o ? o[1].toLowerCase() === 'true' : null;
+}
+
+/** Apakah satu plot digambar di panel bawah.
+ *
+ *  overlay=true  -> TIDAK PERNAH, apa pun namanya.
+ *  overlay=false -> selalu, karena itu memang maksud skripnya.
+ *  tidak dinyatakan -> tebak dari namanya, seperti sebelumnya. */
+function apaOsilator(overlay: boolean | null, judul: string): boolean {
+  if (overlay === true) return false;
+  if (overlay === false) return true;
+  return OSILATOR.test(judul);
+}
+
 export function jalankanPine(kode: string, l: Lilin, tf = '4h',
                              setelan?: Record<string, number | boolean | string>): HasilPine {
   /* ── Dua mesin, satu pintu ─────────────────────────────────────────
@@ -494,12 +525,13 @@ export function jalankanPine(kode: string, l: Lilin, tf = '4h',
      menjalankannya dengan benar, cuma menolaknya baris demi baris.
      Skrip semacam itu dialihkan ke mesin per-bar; skrip indikator
      sederhana tetap lewat jalur vektor yang lebih cepat. */
+  const overlay = bacaOverlay(kode);
   if (butuhPerBar(kode)) {
     const h = jalankanPineBar(kode, l, tf, setelan ?? {});
     return {
       plot: h.plotSeri.map((p) => ({
         judul: p.judul, warna: p.warna, nilai: p.nilai,
-        osilator: OSILATOR.test(p.judul),
+        osilator: apaOsilator(overlay, p.judul),
       })),
       hline: h.hline,
       galat: h.galat,
@@ -641,7 +673,7 @@ export function jalankanPine(kode: string, l: Lilin, tf = '4h',
           judul: judul || ekspresi.slice(0, 24),
           warna: warna || PALET_URUT[plot.length % PALET_URUT.length],
           nilai,
-          osilator: OSILATOR.test(judul || ekspresi),
+          osilator: apaOsilator(overlay, judul || ekspresi),
         });
         return;
       }
