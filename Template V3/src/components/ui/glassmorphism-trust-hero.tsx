@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, LineChart, Wallet, Crown, Pencil, Check, X, RotateCcw } from "lucide-react";
+import { ArrowRight, LineChart, Wallet, Crown, Check, X, RotateCcw } from "lucide-react";
 import { useAngkaPameran, usePosisiPameran } from "@/lib/pameran";
 import { JUDUL_BERANDA, SUB_BERANDA, bacaTeksLokal, simpanTeksLokal } from "@/lib/teks-beranda";
 
@@ -106,6 +106,25 @@ function lamaPakai(sejak: number) {
   const thn = Math.floor(hari / 365);
   const sisaBulan = Math.floor((hari % 365) / 30);
   return sisaBulan ? `${thn} thn ${sisaBulan} bln` : `${thn} tahun`;
+}
+
+/* ── Pena bulu + matahari ────────────────────────────────────────────────
+   Mengikuti logo rujukan pemilik: lingkaran jingga di belakang, bulu gelap
+   menyilang di depannya, coretan tinta di bawah. Bulunya diberi tepi terang
+   karena latarnya gelap — siluet hitam murni akan lenyap di sana. */
+function IkonPena({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 26 26" className={className} aria-hidden>
+      <circle cx="16.5" cy="8.5" r="7" fill="#f59e0b" />
+      <g transform="translate(2 3)">
+        <path d="M18.24 10.24a6 6 0 0 0-8.49-8.49L3 8.5V17h8.5z"
+              fill="#18181b" stroke="#fafafa" strokeWidth="1.1" strokeLinejoin="round" />
+        <line x1="14" y1="6" x2="0.5" y2="19.5" stroke="#fafafa" strokeWidth="1.1" strokeLinecap="round" />
+      </g>
+      <path d="M2.5 23.5c2.6 1 4.6-.9 7.6-.2 1.6.4 2.6.2 3.4-.4"
+            fill="none" stroke="#f59e0b" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
 }
 
 const StatItem = ({ value, label }: { value: string; label: string }) => (
@@ -220,14 +239,14 @@ export default function HeroSection() {
               <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 backdrop-blur-md transition-colors hover:bg-white/10">
                 <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-zinc-300 flex items-center gap-2">
                   Jadi Trader Journey
-                  {/* Pensil, bukan bintang: judul dan subjudul halaman ini
+                  {/* Pena, bukan bintang: judul dan subjudul halaman ini
                       BISA DIUBAH — diklik, disunting di tempat, tersimpan
                       sebagai bawaan perangkat ini. */}
                   <button
                     onClick={() => { setDraf({ judul: teks.judul, sub: teks.sub }); setSunting(true); }}
                     title="Ubah judul & subjudul halaman ini"
-                    className="cursor-pointer text-yellow-400 transition-transform hover:scale-110">
-                    <Pencil className="w-3.5 h-3.5" />
+                    className="cursor-pointer transition-transform hover:scale-110">
+                    <IkonPena className="w-5 h-5" />
                   </button>
                 </span>
               </div>

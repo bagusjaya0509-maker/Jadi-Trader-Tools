@@ -577,7 +577,20 @@ class Mesin {
       case 'volume': return 0;
       case 'barstate.islast': return this.bar === this.n - 1;
       case 'barstate.isconfirmed': return true;
-      case 'timeframe.period': return this.tf;
+      /* FORMAT TRADINGVIEW, bukan format kita: skrip menulis
+         `timeframe.period == "60"` untuk 1 jam dan `"15"` untuk 15 menit.
+         Mengembalikan "1h" membuat SEMUA gerbang timeframe skrip tertutup
+         diam-diam — duplikat channel dan EMA khusus TF kecil tidak pernah
+         tergambar, tanpa satu pun galat. */
+      case 'timeframe.period': {
+        const m = /^(\d+)m$/.exec(this.tf);
+        if (m) return m[1];
+        const h = /^(\d+)h$/.exec(this.tf);
+        if (h) return String(Number(h[1]) * 60);
+        if (this.tf === '1d') return 'D';
+        if (this.tf === '1w') return 'W';
+        return this.tf;
+      }
       case 'timeframe.isdaily': return this.tf === '1d' || this.tf === 'D';
       case 'timeframe.isweekly': return this.tf === '1w' || this.tf === 'W';
       case 'timeframe.isintraday': return !['1d', 'D', '1w', 'W'].includes(this.tf);
