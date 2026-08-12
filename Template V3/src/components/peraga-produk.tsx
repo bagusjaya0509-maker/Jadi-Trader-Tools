@@ -197,9 +197,84 @@ function PeragaSmi() {
   );
 }
 
+/** Trade-Fi Sync v2: dua arah, dan geser SL/TP dari chart web.
+ *
+ *  Sengaja DIBEDAKAN dari peraga EA v1 di atas. Yang v1 justru menekankan
+ *  "tidak ada order dikirim balik" — kalau produk ini memakai gambar yang
+ *  sama, ia menjanjikan hal yang berlawanan dengan isinya. */
+function PeragaTradeFi() {
+  return (
+    <Bingkai judul="Dua arah — perintah dari web dieksekusi di MT5, hasilnya dilaporkan balik">
+      <rect x="24" y="46" width="118" height="58" rx="8" fill="#18181b" stroke="#ffcd75" strokeWidth="1.2" />
+      <text x="83" y="72" fill="#ffcd75" fontSize="11.5" fontFamily="IBM Plex Mono" textAnchor="middle">Halaman Chart</text>
+      <text x="83" y="88" fill="#71717a" fontSize="8.5" fontFamily="IBM Plex Mono" textAnchor="middle">browser</text>
+
+      <rect x="278" y="46" width="118" height="58" rx="8" fill="#18181b" stroke="#3f3f46" strokeWidth="1.2" />
+      <text x="337" y="72" fill="#e4e4e7" fontSize="11.5" fontFamily="IBM Plex Mono" textAnchor="middle">MetaTrader 5</text>
+      <text x="337" y="88" fill="#71717a" fontSize="8.5" fontFamily="IBM Plex Mono" textAnchor="middle">akun kamu</text>
+
+      {/* Perintah berangkat */}
+      <line x1="146" y1="64" x2="272" y2="64" stroke="#10b981" strokeWidth="1.4" strokeDasharray="6 4" opacity=".5" />
+      <polygon points="272,64 262,59 262,69" fill="#10b981" />
+      <text x="209" y="54" fill="#10b981" fontSize="8.5" fontFamily="IBM Plex Mono" textAnchor="middle">BUKA · UBAH · TUTUP</text>
+      <circle className="peraga-paket" cx="146" cy="64" r="3" fill="#10b981" opacity="0" />
+
+      {/* Hasil kembali */}
+      <line x1="146" y1="90" x2="272" y2="90" stroke="#ffcd75" strokeWidth="1.4" strokeDasharray="6 4" opacity=".5" />
+      <polygon points="146,90 156,85 156,95" fill="#ffcd75" />
+      <text x="209" y="104" fill="#ffcd75" fontSize="8.5" fontFamily="IBM Plex Mono" textAnchor="middle">tiket · saldo · posisi</text>
+      <circle className="peraga-paket-balik" cx="272" cy="90" r="3" fill="#ffcd75" opacity="0" />
+
+      <text x="210" y="136" fill="#71717a" fontSize="8.5" fontFamily="IBM Plex Mono" textAnchor="middle">
+        kredensial broker tidak pernah meninggalkan komputermu
+      </text>
+    </Bingkai>
+  );
+}
+
+/** Seret SL di chart web, tekan Kirim, EA memasangnya di MT5. */
+function PeragaGeserSlTp() {
+  return (
+    <Bingkai judul="Geser SL/TP di chart, tekan Kirim — EA yang memasangnya di posisi aslinya">
+      {/* Sumbu harga di kanan, seperti chart aslinya. */}
+      <line x1="352" y1="10" x2="352" y2="140" stroke="#27272a" strokeWidth="1" />
+
+      <line x1="14" y1="52" x2="352" y2="52" stroke="#10b981" strokeWidth="1.2" strokeDasharray="5 4" opacity=".7" />
+      <rect x="352" y="45" width="56" height="14" rx="2" fill="#10b981" />
+      <text x="380" y="55" fill="#09090b" fontSize="8.5" fontFamily="IBM Plex Mono" textAnchor="middle">TP</text>
+
+      <line x1="14" y1="78" x2="352" y2="78" stroke="#e4e4e7" strokeWidth="1.2" opacity=".55" />
+      <text x="18" y="74" fill="#e4e4e7" fontSize="8.5" fontFamily="IBM Plex Mono" opacity=".8">BUY 0.01</text>
+
+      {/* Garis SL yang diseret naik — bersama label sumbunya. */}
+      <g className="peraga-seret">
+        <line x1="14" y1="118" x2="352" y2="118" stroke="#ef4444" strokeWidth="1.2" strokeDasharray="5 4" opacity=".8" />
+        <rect x="352" y="111" width="56" height="14" rx="2" fill="#ef4444" />
+        <text x="380" y="121" fill="#09090b" fontSize="8.5" fontFamily="IBM Plex Mono" textAnchor="middle">SL</text>
+        <circle cx="120" cy="118" r="3.5" fill="#ef4444" />
+      </g>
+
+      {/* Tombol Kirim muncul setelah seretannya berhenti. */}
+      <g className="peraga-sinyal">
+        <rect x="140" y="86" width="104" height="18" rx="9" fill="#fafafa" />
+        <text x="192" y="99" fill="#09090b" fontSize="9" fontFamily="IBM Plex Mono" textAnchor="middle" fontWeight="600">
+          Kirim SL/TP → MT5
+        </text>
+      </g>
+    </Bingkai>
+  );
+}
+
+/* Kunci peta HARUS sama dengan id di katalog Firestore, bukan dengan nama
+   produknya. Indikator V3 tayang dengan id `jadi-traderindicator-v3`;
+   selama kuncinya ditulis `jadi-trader-v3`, peraganya tidak pernah
+   ketemu dan halaman detailnya berkata "belum ada peraga". Keduanya
+   didaftarkan supaya id lama pun tetap terlayani. */
 const PETA: Record<string, React.ReactNode> = {
+  'jadi-traderindicator-v3': <><PeragaChannel /><PeragaSnr /></>,
   'jadi-trader-v3': <><PeragaChannel /><PeragaSnr /></>,
   'jadi-trader-sync': <PeragaSync />,
+  'trade-fi-sync-v2': <><PeragaTradeFi /><PeragaGeserSlTp /></>,
   'smi-indikator': <PeragaSmi />,
   'news-gap-hunter-v2': <PeragaSnr />,
 };

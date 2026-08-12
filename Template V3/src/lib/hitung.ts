@@ -209,6 +209,11 @@ export function saldoDuaBulan(
    *  kartu saldo di Jurnal (broker kalau tersambung, hitungan jurnal kalau
    *  tidak). Kalau diisi, kurvanya dijangkarkan ke sana.
    *
+   *  Saat dijangkarkan, `arus` sebaiknya dikosongkan: saldo broker SUDAH
+   *  memuat setoran dan penarikan, jadi memasukkannya lagi sebagai
+   *  peristiwa harian menghitungnya dua kali dan menggeser hari-hari
+   *  sebelumnya sebesar nilai setoran itu.
+   *
    *  KENAPA PERLU: kurva ini menumpuk P/L di atas `saldoAwal`, sebuah angka
    *  asumsi dari profil. Saldo broker tidak pernah persis sama dengan
    *  asumsi itu — ada swap, komisi, setoran yang tidak tercatat di jurnal —

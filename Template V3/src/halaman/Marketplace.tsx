@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import {
   Check, Crown, Download, Copy, X, Star, MessageCircle, ExternalLink, KeyRound, Loader2, Trash2,
+  GripHorizontal,
 } from 'lucide-react';
 import { PeragaProduk } from '@/components/peraga-produk';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { cn, tanggalPendek } from '@/lib/utils';
 import { type Produk } from '@/data/contoh';
-import { useProduk } from '@/lib/data';
+import { useProduk, simpanKatalogProduk } from '@/lib/data';
 import { useAuth } from '@/lib/auth';
 import { suratLisensi, sisipkanPenanda, unduhTeks } from '@/lib/surat-lisensi';
 import { useUlasan, kirimUlasan, hapusUlasan } from '@/lib/ulasan';
@@ -46,6 +47,16 @@ function AmbilSumber({ produk }: { produk: Produk }) {
   const [setuju, setSetuju] = useState(false);
   const [surat, setSurat] = useState<string | null>(null);
   const [bukaSurat, setBukaSurat] = useState(false);
+  /* Lisensi TERBUKTI aktif — bukan sekadar "kodenya sudah diketik".
+     ────────────────────────────────────────────────────────────────────
+     Tombol unduh dulu selalu tampil, bahkan dengan kolom kode kosong.
+     Servernya memang menolak (400 "Kode lisensi tidak valid"), jadi tidak
+     ada berkas yang pernah bocor — tapi tampilannya berkata sebaliknya:
+     produk berbayar terlihat seperti bisa langsung diunduh, dan yang
+     mengkliknya disambut JSON error alih-alih berkasnya.
+     Sekarang tombolnya baru muncul setelah server benar-benar meloloskan
+     kode itu sekali — bukti aktif, bukan janji. */
+  const [terbuka, setTerbuka] = useState(false);
   const { pengguna } = useAuth();
   const gratis = produk.harga === 0;
 
@@ -69,7 +80,13 @@ function AmbilSumber({ produk }: { produk: Produk }) {
           email: pengguna?.email || '-',
         }));
       }
-      setKabar(`Tersalin — ${isi.length.toLocaleString('id-ID')} karakter. Tempel di Pine Editor TradingView.`
+      setTerbuka(true);
+      /* Tujuan tempelnya ikut jenis produknya: menyuruh pemilik EA MQL5
+         membuka Pine Editor TradingView adalah petunjuk yang salah alamat. */
+      const tujuan = produk.unduhan === 'mq5' || produk.unduhan === 'ex5'
+        ? 'Tempel di MetaEditor lalu Compile (F7).'
+        : 'Tempel di Pine Editor TradingView.';
+      setKabar(`Tersalin — ${isi.length.toLocaleString('id-ID')} karakter. ${tujuan}`
         + (gratis ? '' : ' Salinan ini memuat penanda lisensimu.'));
     } catch (e) {
       setGagal(true);
@@ -92,7 +109,7 @@ function AmbilSumber({ produk }: { produk: Produk }) {
         <div className="mb-3">
           <label className="mb-1.5 block text-[11px] text-zinc-500">Kode lisensi</label>
           <input
-            value={kode} onChange={(e) => setKode(e.target.value)}
+            value={kode} onChange={(e) => { setKode(e.target.value); setTerbuka(false); }}
             placeholder="JT3-XXXX-XXXX-XXXX" spellCheck={false}
             className="angka h-10 w-full max-w-[280px] rounded-md border border-zinc-800 bg-zinc-900/60 px-3 text-[13px]
                        uppercase tracking-wide text-zinc-100 outline-none transition-colors
@@ -119,10 +136,11 @@ function AmbilSumber({ produk }: { produk: Produk }) {
           {sibuk ? <Loader2 className="size-4 animate-spin" /> : gratis ? <Copy className="size-4" /> : <KeyRound className="size-4" />}
           {gratis ? 'Salin Kode' : 'Buka & Salin Kode'}
         </button>
-        {/* Berkas biner (.ex5) tidak bisa disalin sebagai teks, jadi jalurnya
-            unduhan langsung. Hanya muncul kalau katalog memang menyatakan
-            produknya punya versi terkompilasi. */}
-        {produk.unduhan && (
+        {/* Berkas biner (.ex5/.mq5) tidak bisa disalin sebagai teks, jadi
+            jalurnya unduhan langsung. Muncul kalau katalog menyatakan
+            produknya punya berkas — DAN, untuk produk berbayar, hanya
+            setelah lisensinya terbukti aktif lewat tombol di sebelah. */}
+        {produk.unduhan && (gratis || terbuka) && (
           <a href={tautanBerkas(produk.id, gratis ? '' : kode.trim().toUpperCase(), produk.unduhan)}
              className="flex cursor-pointer items-center gap-2 rounded-full border border-zinc-800 bg-zinc-900/60 px-6 py-3
                         text-[13px] font-semibold text-zinc-100 transition-colors hover:border-zinc-700">
@@ -259,8 +277,44 @@ function MintaKode({ produk, lynk }: { produk: string; lynk?: string }) {
 
 export default function Marketplace() {
   const [aktif, setAktif] = useState<Produk | null>(null);
-  const { data: PRODUK } = useProduk();
+  const { data: PRODUK, mentah } = useProduk();
   const { pengguna, pemilik } = useAuth();
+
+  /* ── Urutan kartu: milik pemilik, diatur dengan menyeret ──────────────
+     Aturan penempatan otomatis (produk premium baru duduk di kanan premium
+     terakhir) cuma menentukan posisi AWAL. Selebihnya etalase adalah
+     keputusan dagang, dan yang paling tahu urutannya adalah pemiliknya.
+
+     Yang disimpan array MENTAH, bukan bentuk yang sudah dipetakan: katalog
+     nyata membawa field yang tidak dikenal antarmuka `Produk` (sampul,
+     tautan toko), dan menulis ulang dari hasil pemetaan akan melucutinya
+     dari SEMUA produk sekaligus. Seret dimatikan kalau bentuk mentahnya
+     tidak sepadan dengan yang tampil — misalnya saat katalog gagal dibaca
+     dan layar sedang menampilkan contoh. */
+  const [seret, setSeret] = useState<string | null>(null);
+  const [sasaran, setSasaran] = useState<string | null>(null);
+  const [kabarUrut, setKabarUrut] = useState('');
+  const bisaUrut = !!pemilik && mentah.length === PRODUK.length && mentah.length > 1;
+
+  async function jatuhkan(idTujuan: string) {
+    const dariId = seret;
+    setSeret(null); setSasaran(null);
+    if (!bisaUrut || !dariId || dariId === idTujuan) return;
+    const urut = [...mentah];
+    const dari = urut.findIndex((p) => String(p?.id) === dariId);
+    const ke = urut.findIndex((p) => String(p?.id) === idTujuan);
+    if (dari < 0 || ke < 0) return;
+    const [pindah] = urut.splice(dari, 1);
+    urut.splice(ke, 0, pindah);
+    setKabarUrut('Menyimpan urutan…');
+    try {
+      await simpanKatalogProduk(urut);
+      setKabarUrut('Urutan tersimpan.');
+      setTimeout(() => setKabarUrut(''), 2500);
+    } catch (e) {
+      setKabarUrut(e instanceof Error ? e.message : 'Gagal menyimpan urutan');
+    }
+  }
   const ulasan = useUlasan();
 
   const [bintang, setBintang] = useState(5);
@@ -295,7 +349,13 @@ export default function Marketplace() {
         <PanelHead
           judul="Products"
           sub="Indikator TradingView dan Expert Advisor MetaTrader yang dipakai di terminal ini."
+          kanan={bisaUrut ? (
+            <span className="flex items-center gap-1.5 text-[11px] text-zinc-500">
+              <GripHorizontal className="size-3.5" /> seret kartu untuk mengatur urutan
+            </span>
+          ) : undefined}
         />
+        {kabarUrut && <div className="px-5 pb-2 text-[11.5px] text-zinc-500">{kabarUrut}</div>}
         {/* Kolom MENGIKUTI jumlah produk (maks 4). Empat kolom dengan tiga
             produk menyisakan satu lubang kosong permanen di kanan — kartu
             yang melebar mengisi barisnya jauh lebih enak dilihat daripada
@@ -303,7 +363,16 @@ export default function Marketplace() {
         <div className={cn('grid grid-cols-1 gap-4 px-5 pb-5 sm:grid-cols-2',
           PRODUK.length >= 4 ? 'xl:grid-cols-4' : PRODUK.length === 3 ? 'xl:grid-cols-3' : '')}>
           {PRODUK.map((p) => (
-            <Panel key={p.id} className={cn('flex flex-col overflow-hidden', p.premium && 'border-amber-500/30')}>
+            <Panel key={p.id}
+                   draggable={bisaUrut}
+                   onDragStart={() => setSeret(p.id)}
+                   onDragOver={bisaUrut ? (e) => { e.preventDefault(); setSasaran(p.id); } : undefined}
+                   onDrop={bisaUrut ? (e) => { e.preventDefault(); void jatuhkan(p.id); } : undefined}
+                   onDragEnd={() => { setSeret(null); setSasaran(null); }}
+                   className={cn('flex flex-col overflow-hidden', p.premium && 'border-amber-500/30',
+                     bisaUrut && 'cursor-grab',
+                     seret === p.id && 'opacity-40',
+                     sasaran === p.id && seret && seret !== p.id && 'ring-2 ring-zinc-100')}>
               {/* Sampul = gambar pertama katalog, diatur di Maintenance.
                   Tinggi tetap dan `object-cover`: gambar dengan rasio
                   bermacam-macam tidak boleh membuat kartu-kartu di satu baris

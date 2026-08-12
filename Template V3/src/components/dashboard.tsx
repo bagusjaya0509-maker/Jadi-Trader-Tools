@@ -139,19 +139,20 @@ export function Dashboard() {
     binance.terhubung === true ? 'Binance' : null,
   ].filter(Boolean);
 
-  /* Kurva saldo DIJANGKARKAN ke `totalSaldo` — angka yang sama persis dengan
-     kartu Total Saldo di atasnya dan kartu saldo di halaman Jurnal.
+  /* Kurva saldo BERANGKAT DARI `totalSaldo`, angka yang sama persis dengan
+     kartu Total Saldo di atasnya dan kartu saldo di halaman Jurnal — saldo
+     broker kalau MT5/Binance tersambung, hitungan jurnal kalau tidak.
      ──────────────────────────────────────────────────────────────────────
-     Sebelumnya ia menumpuk P/L di atas `saldoAwal` dari profil, sebuah
-     asumsi. Begitu MT5 atau Binance tersambung, saldo sungguhannya berbeda
-     (swap, komisi, setoran yang tidak lewat jurnal), dan ujung kurva ini
-     tidak pernah bertemu dengan angka yang tertulis besar-besar di
-     sebelahnya — persis keluhan "saldo bulan ini tidak sesuai jurnal".
-     Yang digeser cuma titik acuannya; naik-turun hariannya tetap dari
-     transaksi. Karena itu ia harus dihitung SETELAH totalSaldo diketahui. */
+     Setoran & penarikan SENGAJA TIDAK IKUT. Saldo broker sudah memuat uang
+     yang masuk dan keluar; menambahkannya lagi sebagai peristiwa di kurva
+     berarti menghitungnya dua kali, dan hari-hari sebelumnya jadi meleset
+     sebesar setoran itu. Yang menggerakkan kurva cuma P/L transaksi —
+     satu-satunya hal yang belum terkandung di titik acuannya.
+
+     Harus dihitung SETELAH totalSaldo diketahui, karena ia titik jangkarnya. */
   const kurvaSaldo = useMemo(
-    () => saldoDuaBulan(RIWAYAT, saldoAwal, arus, totalSaldo),
-    [RIWAYAT, saldoAwal, arus, totalSaldo]
+    () => saldoDuaBulan(RIWAYAT, saldoAwal, [], totalSaldo),
+    [RIWAYAT, saldoAwal, totalSaldo]
   );
   const titikIni = kurvaSaldo.filter((k) => k.ini !== null);
   const adaBulanLalu = kurvaSaldo.some((k) => k.lalu !== null);
