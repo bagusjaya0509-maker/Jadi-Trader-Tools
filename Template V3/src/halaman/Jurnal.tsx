@@ -2,13 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { Plus, Pencil, Bitcoin, CandlestickChart, Link2, Link2Off, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Panel, PanelHead, BadgeTren, TipGrafik, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
-import { cn, uang, persen, tanggalPendek } from '@/lib/utils';
+import { cn, uang, persen, tanggalPendek, harga as fHarga } from '@/lib/utils';
 import { statGabungan, kurvaEkuitas, plPerHari, rangkumLayering } from '@/lib/hitung';
 import { useRiwayat, useSaldoAwal, usePosisi } from '@/lib/data';
 import { LabelContoh, SpandukContoh } from '@/components/gerbang';
 import { useAuth } from '@/lib/auth';
 import type { Trade, Sumber } from '@/data/contoh';
 import { useAkunMt5, useAkunBinance, type StatusAkun } from '@/lib/akun';
+import { useEmosiPosisi, EMOSI } from '@/lib/emosi-posisi';
 import { ModalTrade } from '@/components/modal-trade';
 import { KotakArus } from '@/components/kotak-arus';
 import { useArusKas, arusBersih, sinkronRiwayatMt5, sinkronRiwayatBinance, type Arus } from '@/lib/tulis-jurnal';
@@ -224,16 +225,29 @@ function PanelPosisiJurnal({ sumber }: { sumber: Sumber }) {
   const { data: posisiKripto } = usePosisi();
   const mt5 = useAkunMt5();
 
+  const emosiPos = useEmosiPosisi();
+
+  /* Ukuran, entry, SL, dan TP ikut ditampilkan — tanpa keempatnya, panel
+     ini cuma memberi tahu ADA posisi, bukan posisi seperti apa. Kripto
+     memakai jumlah koin (size order), Trade-Fi memakai lot; keduanya
+     ditulis dengan satuannya sendiri karena "0,05" tanpa satuan berarti
+     dua hal yang sangat berbeda di dua pasar itu. */
   const baris = sumber === 'kripto'
     ? posisiKripto.map((p) => ({
         kunci: p.id, simbol: p.simbol, arah: p.arah,
         ket: p.tf && p.tf !== '—' ? p.tf : p.venue,
+        ukuran: p.jumlah ? `${p.jumlah} ${p.simbol.replace(/USDT$/, '')}` : '',
+        entry: p.entry, sl: p.sl, tp: p.tp,
         pnl: p.pnlFloat,
+        tiket: undefined as string | undefined,
       }))
     : mt5.posisi.map((p) => ({
         kunci: p.tiket, simbol: p.simbol, arah: p.arah,
-        ket: `${p.lot} lot`,
+        ket: `#${p.tiket}`,
+        ukuran: `${p.lot} lot`,
+        entry: p.hargaBuka, sl: p.sl, tp: p.tp,
         pnl: p.profit,
+        tiket: p.tiket as string | undefined,
       }));
 
   const total = baris.some((b) => b.pnl !== undefined)
@@ -261,21 +275,51 @@ function PanelPosisiJurnal({ sumber }: { sumber: Sumber }) {
         ) : (
           <div className="gulir-senyap max-h-[190px] space-y-2 overflow-y-auto">
             {baris.map((b) => (
-              <div key={b.kunci} className="flex items-center justify-between gap-2 rounded-lg border border-zinc-800/60 px-3 py-2">
-                <span className="flex min-w-0 items-center gap-2">
-                  <span className="truncate text-[12.5px] text-zinc-200">{b.simbol}</span>
-                  <span className={cn('rounded px-1.5 py-0.5 text-[10px]',
-                    b.arah === 'BUY' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-400')}>
-                    {b.arah}
+              <div key={b.kunci} className="rounded-lg border border-zinc-800/60 px-3 py-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="truncate text-[12.5px] text-zinc-200">{b.simbol}</span>
+                    <span className={cn('rounded px-1.5 py-0.5 text-[10px]',
+                      b.arah === 'BUY' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-400')}>
+                      {b.arah}
+                    </span>
+                    {b.ukuran && <span className="angka shrink-0 text-[11px] text-zinc-400">{b.ukuran}</span>}
+                    <span className="truncate text-[11px] text-zinc-600">{b.ket}</span>
                   </span>
-                  <span className="truncate text-[11px] text-zinc-600">{b.ket}</span>
-                </span>
-                {/* Tanda hubung berarti PnL berjalannya tidak disiarkan —
-                    bukan berarti nol. */}
-                <span className={cn('angka shrink-0 text-[12px]',
-                  b.pnl === undefined ? 'text-zinc-600' : b.pnl >= 0 ? 'text-emerald-500' : 'text-red-400')}>
-                  {b.pnl === undefined ? '—' : uang(b.pnl, true)}
-                </span>
+                  {/* Tanda hubung berarti PnL berjalannya tidak disiarkan —
+                      bukan berarti nol. */}
+                  <span className={cn('angka shrink-0 text-[12px]',
+                    b.pnl === undefined ? 'text-zinc-600' : b.pnl >= 0 ? 'text-emerald-500' : 'text-red-400')}>
+                    {b.pnl === undefined ? '—' : uang(b.pnl, true)}
+                  </span>
+                </div>
+
+                {/* Baris kedua: level yang sedang menjaga uangnya, lalu emosi.
+                    SL/TP bernilai 0 berarti BELUM DIPASANG — ditulis apa
+                    adanya, karena posisi tanpa stop adalah hal yang justru
+                    harus terlihat, bukan disamarkan jadi tanda hubung. */}
+                <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+                  <span className="text-zinc-600">masuk <span className="angka text-zinc-400">{fHarga(b.entry)}</span></span>
+                  <span className="text-zinc-600">SL{' '}
+                    <span className={cn('angka', b.sl > 0 ? 'text-red-400/90' : 'text-amber-400/80')}>
+                      {b.sl > 0 ? fHarga(b.sl) : 'belum dipasang'}
+                    </span>
+                  </span>
+                  <span className="text-zinc-600">TP{' '}
+                    <span className={cn('angka', b.tp > 0 ? 'text-emerald-500/90' : 'text-zinc-600')}>
+                      {b.tp > 0 ? fHarga(b.tp) : '—'}
+                    </span>
+                  </span>
+                  <select
+                    value={emosiPos.peta[b.kunci] ?? ''}
+                    disabled={!emosiPos.bisaTulis}
+                    onChange={(e) => { void emosiPos.simpan(b.kunci, e.target.value, b.tiket).catch(() => {}); }}
+                    title="Emosi saat posisi ini berjalan — ikut tercatat di riwayat order saat ditutup"
+                    className="ml-auto h-6 cursor-pointer rounded border border-zinc-800 bg-zinc-900 px-1 text-[10.5px] text-zinc-300 outline-none disabled:cursor-not-allowed disabled:opacity-50">
+                    <option value="">emosi…</option>
+                    {EMOSI.map((e) => <option key={e} value={e}>{e}</option>)}
+                  </select>
+                </div>
               </div>
             ))}
           </div>

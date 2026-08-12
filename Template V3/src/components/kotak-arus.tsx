@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ArrowDownToLine, ArrowUpFromLine, Trash2, Loader2 } from 'lucide-react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { cn, uang, tanggalPendek } from '@/lib/utils';
@@ -34,6 +34,14 @@ export function KotakArus({ sumber, arus, bisaTulis, ringkas = false }: {
   const [catatan, setCatatan] = useState('');
   const [sibuk, setSibuk] = useState(false);
   const [pesan, setPesan] = useState('');
+  /* Kabar mengambang menutupi kolom di sebelahnya, jadi ia harus pergi
+     sendiri — kabar sukses yang menetap selamanya berubah jadi penghalang
+     isian berikutnya. */
+  useEffect(() => {
+    if (!pesan) return;
+    const j = setTimeout(() => setPesan(''), 3500);
+    return () => clearTimeout(j);
+  }, [pesan]);
 
   const milikku = arus.filter((a) => a.sumber === sumber);
   const bersih = arusBersih(arus, sumber);
@@ -99,13 +107,26 @@ export function KotakArus({ sumber, arus, bisaTulis, ringkas = false }: {
             <input value={catatan} onChange={(e) => setCatatan(e.target.value)}
                    placeholder="Catatan (opsional)" disabled={!bisaTulis} className={KELAS_ISIAN} />
           )}
-          <button onClick={() => void tambah()} disabled={sibuk || !bisaTulis}
-            className="flex h-9 cursor-pointer items-center justify-center gap-2 rounded-md bg-zinc-100 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50">
-            {sibuk && <Loader2 className="size-3.5 animate-spin" />} Catat
-          </button>
+          {/* Kabar hasil MENGAMBANG di kiri tombol, bukan baris baru di
+              bawahnya. Baris baru menambah tinggi panel tiap kali sesuatu
+              dicatat — panel yang melompat naik-turun tiap simpan terasa
+              seperti halaman yang goyah. Karena ia absolut, tata letaknya
+              tidak bergeser sepiksel pun; ia menutupi kolom di sebelahnya
+              beberapa detik, lalu hilang sendiri. */}
+          <div className="relative">
+            <button onClick={() => void tambah()} disabled={sibuk || !bisaTulis}
+              className="flex h-9 w-full cursor-pointer items-center justify-center gap-2 rounded-md bg-zinc-100 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50">
+              {sibuk && <Loader2 className="size-3.5 animate-spin" />} Catat
+            </button>
+            {pesan && (
+              <span className="pointer-events-none absolute right-full top-1/2 mr-2 max-w-[220px] -translate-y-1/2 truncate
+                               rounded-md border border-zinc-800 bg-zinc-950/95 px-2 py-1 text-[11px] text-zinc-300 shadow-lg"
+                    title={pesan}>
+                {pesan}
+              </span>
+            )}
+          </div>
         </div>
-
-        {pesan && <div className="mt-2 text-[11.5px] text-zinc-400">{pesan}</div>}
 
         {/* SATU baris terlihat, sisanya digulir.
             ────────────────────────────────────────────────────────────────

@@ -345,7 +345,18 @@ export function Dashboard() {
                           <span className={cn('ml-1.5 text-[10.5px]', p.arah === 'BUY' ? 'text-emerald-500' : 'text-red-400')}>
                             {p.arah}
                           </span>
-                          <div className="text-[10.5px] text-zinc-600">{p.venue} · {p.tf}</div>
+                          {/* SL & TP menumpang baris keterangan, bukan jadi dua
+                            kolom baru: tabel ini sudah lima kolom di panel
+                            setengah lebar. SL yang belum dipasang ditulis
+                            terang-terangan — itu justru yang harus terlihat. */}
+                        <div className="text-[10.5px] text-zinc-600">
+                          {p.venue} · {p.tf}
+                          {' · SL '}
+                          <span className={cn('angka', p.sl > 0 ? 'text-red-400/80' : 'text-amber-400/80')}>
+                            {p.sl > 0 ? harga(p.sl) : 'belum'}
+                          </span>
+                          {p.tp > 0 && <> · TP <span className="angka text-emerald-500/80">{harga(p.tp)}</span></>}
+                        </div>
                         </Td>
                         {/* Size dan P/L hanya ada kalau datanya dari bursa.
                             Dokumen publik sengaja tidak menyiarkan keduanya —
