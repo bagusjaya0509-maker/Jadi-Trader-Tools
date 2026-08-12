@@ -108,21 +108,33 @@ function lamaPakai(sejak: number) {
   return sisaBulan ? `${thn} thn ${sisaBulan} bln` : `${thn} tahun`;
 }
 
-/* ── Pena bulu + matahari ────────────────────────────────────────────────
-   Mengikuti logo rujukan pemilik: lingkaran jingga di belakang, bulu gelap
-   menyilang di depannya, coretan tinta di bawah. Bulunya diberi tepi terang
-   karena latarnya gelap — siluet hitam murni akan lenyap di sana. */
+/* ── Pulpen bertanda tangan ──────────────────────────────────────────────
+   Mengikuti gambar rujukan pemilik: pulpen miring — tutup, badan, mata pena
+   runcing, penjepit berbulatan — di atas satu coretan tanda tangan berkait.
+
+   Dua keputusan yang beda dari rujukannya, keduanya karena tempatnya:
+   rujukan itu siluet HITAM di atas putih, di sini dibalik jadi terang sebab
+   hitam di latar zinc-950 lenyap sama sekali; dan coretannya dibuat keemasan
+   supaya pada 20 piksel ia tidak melebur jadi satu gumpalan dengan badan
+   penanya — sekaligus itu satu-satunya bagian yang memang pantas memakai
+   warna aksen merek.
+
+   Geometrinya dihitung pada satu sumbu miring: tutup, badan, dan mata pena
+   berbagi kemiringan yang sama persis, dan penjepitnya menurun sejajar sumbu
+   itu. Menggambarnya dengan kira-kira menghasilkan pena yang patah. */
 function IkonPena({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 26 26" className={className} aria-hidden>
-      <circle cx="16.5" cy="8.5" r="7" fill="#f59e0b" />
-      <g transform="translate(2 3)">
-        <path d="M18.24 10.24a6 6 0 0 0-8.49-8.49L3 8.5V17h8.5z"
-              fill="#18181b" stroke="#fafafa" strokeWidth="1.1" strokeLinejoin="round" />
-        <line x1="14" y1="6" x2="0.5" y2="19.5" stroke="#fafafa" strokeWidth="1.1" strokeLinecap="round" />
+      <g fill="#fafafa" stroke="#fafafa" strokeWidth="0.55" strokeLinejoin="round">
+        <path d="M18.81 2.13 L22.19 3.87 L19.15 9.76 L15.77 8.02 Z" />
+        <path d="M15.37 8.80 L18.75 10.54 L15.79 16.27 L12.41 14.53 Z" />
+        <path d="M12.36 15.29 L15.20 16.75 L12.50 18.50 Z" />
       </g>
-      <path d="M2.5 23.5c2.6 1 4.6-.9 7.6-.2 1.6.4 2.6.2 3.4-.4"
-            fill="none" stroke="#f59e0b" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M21.5 2.7 C22.6 2.9 23.3 3.6 23.1 4.4 L21.04 8.30"
+            fill="none" stroke="#fafafa" strokeWidth="1.05" strokeLinecap="round" />
+      <circle cx="20.81" cy="8.74" r="0.8" fill="#fafafa" />
+      <path d="M1.5 22.9 C2.9 20.9 4.4 23.8 5.8 22.9 C6.6 22.3 6.2 18.6 8.0 18.6 C10.0 18.6 9.2 22.3 10.9 23.1 C12.2 23.7 13.1 21.9 14.5 22.4 C15.5 22.8 16.1 23.2 17.2 22.5"
+            fill="none" stroke="#f59e0b" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
