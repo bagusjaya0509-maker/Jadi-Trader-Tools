@@ -25,6 +25,42 @@ import { PenggambarAlat, type GambarAlat, type JenisAlat } from '@/lib/plugin-al
 
 export interface Garis { nama: string; nilai: (number | null)[]; warna: string }
 
+/* ── Presisi sumbu harga ───────────────────────────────────────────────
+   lightweight-charts memakai bawaan `minMove: 0.01` kalau tidak diberi
+   tahu. Untuk BTC di 64.000 itu wajar; untuk GBPUSD di 1,35 sumbu kanan
+   cuma bisa menaruh label tiap 0,01 — jadi seluruh layar hanya memuat
+   1.36 / 1.35 / 1.34 / 1.33, dan harga di antaranya tidak punya angka
+   sama sekali. Untuk koin sen lebih parah: THETA di 0,1337 membuat dua
+   label berbeda sama-sama tertulis "0.14".
+
+   Presisinya diambil dari DATANYA SENDIRI, bukan dari daftar tebakan per
+   simbol. Berapa desimal yang dipakai bursa/broker adalah pernyataan
+   mereka tentang tick terkecil simbol itu — MT5 mengirim GBPUSD 5 desimal,
+   Binance mengirim ENJ 5 desimal, BTC 2. Membacanya berarti sumbu kita
+   ikut benar untuk simbol yang belum pernah kita lihat. */
+function desimalDeret(closes: number[]): number {
+  let maks = 0;
+  for (let i = Math.max(0, closes.length - 200); i < closes.length; i++) {
+    const v = closes[i];
+    if (!isFinite(v)) continue;
+    const s = String(v);
+    if (s.indexOf('e') >= 0 || s.indexOf('E') >= 0) continue;  // notasi ilmiah
+    const titik = s.indexOf('.');
+    if (titik >= 0) maks = Math.max(maks, s.length - titik - 1);
+    if (maks >= 8) return 8;
+  }
+  return maks;
+}
+
+function formatHarga(closes: number[]): { precision: number; minMove: number } {
+  const akhir = closes.length ? Math.abs(closes[closes.length - 1]) : 0;
+  /* Lantai menurut besaran: deret yang kebetulan bulat semua (harga diam di
+     angka genap) tidak boleh membuat sumbunya jadi bilangan bulat. */
+  const lantai = akhir >= 1000 ? 2 : akhir >= 1 ? 4 : akhir > 0 ? 5 : 2;
+  const d = Math.min(8, Math.max(lantai, desimalDeret(closes)));
+  return { precision: d, minMove: Number(Math.pow(10, -d).toFixed(d)) };
+}
+
 export interface GarisHarga { harga: number; warna: string; label: string }
 
 /* ── Tinggi panel SMI ──────────────────────────────────────────────────
@@ -184,6 +220,7 @@ export function ChartLilin({
       upColor: '#10b981', downColor: '#f87171',
       borderUpColor: '#10b981', borderDownColor: '#f87171',
       wickUpColor: '#10b981', wickDownColor: '#f87171',
+      priceFormat: { type: 'price', ...formatHarga(lilin.closes) },
     });
     /* Penggambar isian — zona S/R terisi warna dan pewarna tengah channel,
        digambar LANGSUNG di kanvas panel harga lewat primitive. Seri garis
@@ -884,6 +921,16 @@ export function ChartLilin({
     document.addEventListener('visibilitychange', bangun);
     return () => { cancelAnimationFrame(raf); document.removeEventListener('visibilitychange', bangun); };
   }, [pasang]);
+
+  /* Presisi sumbu MENGIKUTI simbol yang sedang tampil. Chart dibuat sekali
+     dan dipakai ulang saat berpindah koin, jadi tanpa ini GBPUSD akan
+     mewarisi presisi BTC — dan sumbunya kembali cuma punya empat angka. */
+  useEffect(() => {
+    const s = seri.current;
+    if (!s || !lilin.closes.length) return;
+    s.applyOptions({ priceFormat: { type: 'price', ...formatHarga(lilin.closes) } });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lilin.closes.length, lilin.closes[lilin.closes.length - 1]]);
 
   /* Label harga bawaan dimatikan saat kita menggambar penggantinya sendiri —
      dua label di tempat yang sama saling menimpa. */
