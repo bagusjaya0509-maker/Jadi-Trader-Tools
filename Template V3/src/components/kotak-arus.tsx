@@ -77,6 +77,9 @@ export function KotakArus({ sumber, arus, bisaTulis, ringkas = false }: {
         <div className={cn('flex gap-3 text-[11.5px]', ringkas ? 'mb-2' : 'mb-3')}>
           <span className="text-zinc-500">Masuk <span className="angka text-emerald-500">{uang(totalSetor)}</span></span>
           <span className="text-zinc-500">Keluar <span className="angka text-red-400">{uang(totalTarik)}</span></span>
+          {milikku.length > 1 && (
+            <span className="ml-auto text-zinc-600">{milikku.length} catatan</span>
+          )}
         </div>
 
         <div className={cn('grid gap-2', ringkas ? 'grid-cols-2' : 'grid-cols-1 sm:grid-cols-4')}>
@@ -104,8 +107,21 @@ export function KotakArus({ sumber, arus, bisaTulis, ringkas = false }: {
 
         {pesan && <div className="mt-2 text-[11.5px] text-zinc-400">{pesan}</div>}
 
+        {/* SATU baris terlihat, sisanya digulir.
+            ────────────────────────────────────────────────────────────────
+            Daftar ini tumbuh seumur akun — sepuluh setoran berarti kotaknya
+            sepuluh baris lebih tinggi, dan panel di sebelahnya ikut molor
+            mengikuti baris tertinggi. Tingginya dipatok satu baris: 40 px,
+            dari baris yang diukur 39 px (py-2 + tombol hapus 22 px + garis
+            bawah) plus 1 px kelonggaran — angka pas-pasan akan memotong
+            barisnya sendiri begitu font atau ikonnya berbeda sepiksel.
+
+            Scrollbar-nya SENGAJA dibiarkan terlihat, tidak disembunyikan
+            seperti di panel lain: dengan satu baris saja yang tampak, ia
+            satu-satunya tanda bahwa masih ada catatan di bawahnya. Jumlah
+            catatannya juga ditulis di baris Masuk/Keluar di atas. */}
         {milikku.length > 0 && (
-          <div className={cn('mt-3 overflow-y-auto', ringkas ? 'max-h-[86px]' : 'max-h-[160px]')}>
+          <div className="mt-3 max-h-[40px] overflow-y-auto">
             {milikku.map((a) => (
               <div key={a.id} className="flex items-center justify-between border-b border-zinc-800/50 py-2 text-[12.5px]">
                 <span className="flex min-w-0 items-center gap-2">
