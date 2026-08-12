@@ -30,6 +30,95 @@ const KELAS_ISIAN =
 
 const KUNCI_TUTUP = 'jt.pojokTutup';
 
+/* ── Isian angka: bisa dikosongkan, bisa dinaik-turunkan ────────────────
+   Model lama `value={n || ''} onChange={Number(v) || 0}` punya dua cacat
+   yang keduanya terasa saat mengetik:
+
+     · Lot 0.01 MUSTAHIL diketik. "0" dan "0." sama-sama bernilai 0, dan
+       0 dirender sebagai string kosong — kolomnya membersihkan diri
+       sendiri di tengah pengetikan, dan angka desimal tidak pernah
+       sempat terbentuk.
+     · Leverage TIDAK BISA dihapus. Kosong berarti Number('') = 0, yang
+       jatuh ke `|| 1` — jadi begitu isinya dihapus, angka 1 muncul
+       menggantikannya. Mengganti 10 jadi 20 berarti berkelahi dulu.
+
+   Perbaikannya: teks MENTAH yang sedang diketik disimpan apa adanya
+   selama kolomnya dipegang, dan angka hanya dikirim ke atas kalau
+   teksnya memang angka yang sah. Kolom yang ditinggalkan dalam keadaan
+   kosong kembali menampilkan nilai terakhirnya — bukan 0, bukan 1.
+
+   Segitiga naik-turun menambah/mengurangi satu langkah; panah keyboard
+   ↑↓ melakukan hal yang sama, karena tangan yang sudah di kolomnya tidak
+   perlu pindah ke mouse. */
+function Segitiga({ arah }: { arah: 'atas' | 'bawah' }) {
+  return (
+    <svg viewBox="0 0 8 5" className="h-[4px] w-2" aria-hidden="true">
+      <polygon points={arah === 'atas' ? '4,0 8,5 0,5' : '4,5 8,0 0,0'} fill="currentColor" />
+    </svg>
+  );
+}
+
+function IsianAngka({ nilai, atur, langkah, min = 0, maks, desimal = 2, lebar, judul, mati }: {
+  nilai: number;
+  atur: (n: number) => void;
+  langkah: number;
+  min?: number;
+  maks?: number;
+  desimal?: number;
+  lebar: string;
+  judul: string;
+  mati?: boolean;
+}) {
+  const [draf, setDraf] = useState<string | null>(null);
+  const teks = draf ?? (nilai ? String(nilai) : '');
+
+  const rapi = (n: number) => Number(n.toFixed(desimal));
+  const jepit = (n: number) => Math.min(maks ?? Infinity, Math.max(min, n));
+
+  function geser(arah: 1 | -1) {
+    if (mati) return;
+    const dasar = draf !== null && draf.trim() !== '' ? Number(draf) : nilai;
+    const mulai = isFinite(dasar) ? dasar : min;
+    setDraf(null);
+    atur(jepit(rapi(mulai + arah * langkah)));
+  }
+
+  return (
+    <label className="block">
+      <span className="mb-0.5 block text-[9.5px] uppercase tracking-wide text-zinc-500">{judul}</span>
+      <div className={cn('relative', lebar)}>
+        <input value={teks} inputMode="decimal" disabled={mati}
+               onChange={(e) => {
+                 const v = e.target.value;
+                 setDraf(v);
+                 /* Kosong TIDAK dikirim ke atas: nilai lama bertahan diam-diam
+                    sampai ada angka baru — itulah yang membuat kolomnya bisa
+                    dihapus total tanpa melompat ke 0 atau 1. */
+                 if (v.trim() === '') return;
+                 const n = Number(v);
+                 if (isFinite(n) && n >= 0) atur(jepit(n));
+               }}
+               onBlur={() => setDraf(null)}
+               onKeyDown={(e) => {
+                 if (e.key === 'ArrowUp') { e.preventDefault(); geser(1); }
+                 if (e.key === 'ArrowDown') { e.preventDefault(); geser(-1); }
+               }}
+               className={cn(KELAS_ISIAN, 'angka pr-4')} />
+        <div className="absolute inset-y-0 right-0 flex w-4 flex-col justify-center">
+          {([['atas', 1], ['bawah', -1]] as const).map(([arah, delta]) => (
+            <button key={arah} type="button" tabIndex={-1} disabled={mati}
+                    onClick={() => geser(delta)}
+                    title={`${delta > 0 ? 'Tambah' : 'Kurangi'} ${langkah}`}
+                    className="flex h-[13px] cursor-pointer items-center justify-center text-zinc-500 transition-colors hover:text-zinc-100 disabled:cursor-default disabled:opacity-40">
+              <Segitiga arah={arah} />
+            </button>
+          ))}
+        </div>
+      </div>
+    </label>
+  );
+}
+
 export function PojokOrder({
   posisi, hargaKini, draf, rencana, mode, jenis, risiko, tunda, onBatalTunda,
   onPilih, onUbah, onKirim, onBatal, onTutup, onGantiMode, mati,
@@ -222,30 +311,18 @@ export function PojokOrder({
             sekali, jadi setelannya harus ikut tiketnya. */}
         {!nyata && demoSetelan && aturDemo && (
           <div className="mt-1.5 flex items-end gap-1.5">
-            <label className="block">
-              <span className="mb-0.5 block text-[9.5px] uppercase tracking-wide text-zinc-500">Modal $</span>
-              <input value={demoSetelan.modal || ''} inputMode="decimal"
-                     onChange={(e) => aturDemo({ ...demoSetelan, modal: Number(e.target.value) || 0 })}
-                     className={cn(KELAS_ISIAN, 'angka w-[64px]')} />
-            </label>
-            <label className="block">
-              <span className="mb-0.5 block text-[9.5px] uppercase tracking-wide text-zinc-500">Risk %</span>
-              <input value={demoSetelan.risikoPersen || ''} inputMode="decimal"
-                     onChange={(e) => aturDemo({ ...demoSetelan, risikoPersen: Number(e.target.value) || 0 })}
-                     className={cn(KELAS_ISIAN, 'angka w-[52px]')} />
-            </label>
-            <label className="block">
-              <span className="mb-0.5 block text-[9.5px] uppercase tracking-wide text-zinc-500">SL ×ATR</span>
-              <input value={demoSetelan.kaliAtr || ''} inputMode="decimal"
-                     onChange={(e) => aturDemo({ ...demoSetelan, kaliAtr: Number(e.target.value) || 0 })}
-                     className={cn(KELAS_ISIAN, 'angka w-[52px]')} />
-            </label>
-            <label className="block">
-              <span className="mb-0.5 block text-[9.5px] uppercase tracking-wide text-zinc-500">R : R</span>
-              <input value={demoSetelan.rr || ''} inputMode="decimal"
-                     onChange={(e) => aturDemo({ ...demoSetelan, rr: Number(e.target.value) || 0 })}
-                     className={cn(KELAS_ISIAN, 'angka w-[48px]')} />
-            </label>
+            <IsianAngka judul="Modal $" lebar="w-[76px]" langkah={50}
+                        nilai={demoSetelan.modal}
+                        atur={(n) => aturDemo({ ...demoSetelan, modal: n })} />
+            <IsianAngka judul="Risk %" lebar="w-[64px]" langkah={0.1} maks={100}
+                        nilai={demoSetelan.risikoPersen}
+                        atur={(n) => aturDemo({ ...demoSetelan, risikoPersen: n })} />
+            <IsianAngka judul="SL ×ATR" lebar="w-[64px]" langkah={0.1}
+                        nilai={demoSetelan.kaliAtr}
+                        atur={(n) => aturDemo({ ...demoSetelan, kaliAtr: n })} />
+            <IsianAngka judul="R : R" lebar="w-[62px]" langkah={0.1}
+                        nilai={demoSetelan.rr}
+                        atur={(n) => aturDemo({ ...demoSetelan, rr: n })} />
           </div>
         )}
 
@@ -254,12 +331,11 @@ export function PojokOrder({
             dengan Area Entry. Tanpa ini tiketnya cuma setengah keputusan. */}
         {nyata && mt5 && (
           <div className="mt-1.5 flex items-end gap-1.5">
-            <label className="block">
-              <span className="mb-0.5 block text-[9.5px] uppercase tracking-wide text-zinc-500">Lot</span>
-              <input value={lotMt5 || ''} inputMode="decimal"
-                     onChange={(e) => aturLotMt5?.(Number(e.target.value) || 0)}
-                     className={cn(KELAS_ISIAN, 'angka w-[64px]')} />
-            </label>
+            {/* Langkah 0.01 = satu langkah lot terkecil di kebanyakan broker;
+                batas 10 sama dengan pagar lot di server. */}
+            <IsianAngka judul="Lot" lebar="w-[76px]" langkah={0.01} maks={10}
+                        nilai={lotMt5 ?? 0}
+                        atur={(n) => aturLotMt5?.(n)} />
             <span className="pb-1 text-[10px] leading-tight text-zinc-600">
               Market ke EA MT5 · SL/TP ikut terpasang
             </span>
@@ -268,18 +344,15 @@ export function PojokOrder({
 
         {nyata && !mt5 && nyataSetelan && aturNyata && (
           <div className="mt-1.5 flex items-end gap-1.5">
-            <label className="block">
-              <span className="mb-0.5 block text-[9.5px] uppercase tracking-wide text-zinc-500">Modal $</span>
-              <input value={nyataSetelan.modal || ''} inputMode="decimal"
-                     onChange={(e) => aturNyata({ ...nyataSetelan, modal: Number(e.target.value) || 0 })}
-                     className={cn(KELAS_ISIAN, 'angka w-[64px]')} />
-            </label>
-            <label className="block">
-              <span className="mb-0.5 block text-[9.5px] uppercase tracking-wide text-zinc-500">Lev</span>
-              <input value={nyataSetelan.leverage || ''} inputMode="numeric"
-                     onChange={(e) => aturNyata({ ...nyataSetelan, leverage: Number(e.target.value) || 1 })}
-                     className={cn(KELAS_ISIAN, 'angka w-[44px]')} />
-            </label>
+            <IsianAngka judul="Modal $" lebar="w-[76px]" langkah={50}
+                        nilai={nyataSetelan.modal}
+                        atur={(n) => aturNyata({ ...nyataSetelan, modal: n })} />
+            {/* Leverage bilangan bulat, minimal 1 — 125× adalah atap bursa
+                yang paling longgar; di atas itu ordernya ditolak sebelum
+                sempat merugikan siapa pun. */}
+            <IsianAngka judul="Lev" lebar="w-[60px]" langkah={1} min={1} maks={125} desimal={0}
+                        nilai={nyataSetelan.leverage}
+                        atur={(n) => aturNyata({ ...nyataSetelan, leverage: n })} />
             <label className="block grow">
               <span className="mb-0.5 block text-[9.5px] uppercase tracking-wide text-zinc-500">Metode TP</span>
               <select value={nyataSetelan.metode}
