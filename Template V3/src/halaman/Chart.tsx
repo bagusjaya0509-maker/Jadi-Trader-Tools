@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { Panel, PanelHead, KartuKpi, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn, uang, persen, harga, tanggalPendek } from '@/lib/utils';
-import { ChartLilin, type Garis, type GarisHarga, type GarisSeret } from '@/components/chart-lilin';
+import { ChartLilin, type Garis, type GarisHarga, type GarisSeret, type PosisiChartMt5 } from '@/components/chart-lilin';
 import { PanelReplay, type AksiOrder, type JenisEntry } from '@/components/panel-replay';
 import { PojokOrder } from '@/components/pojok-order';
 import { kirimOrderNyata, type MetodeTp } from '@/lib/order-nyata';
@@ -217,21 +217,25 @@ export default function ChartBacktest() {
   const nilaiLotMt5 = simbol.startsWith('MT5:') ? (bacaSpekMt5(simbol.slice(4)) ?? 100) : 0;
   /* ── Posisi MT5 di chart — ala garis posisi MetaTrader ──────────────
      Setiap posisi terbuka di simbol ini digambar ChartLilin sebagai price
-     line entry/SL/TP yang menembus ke sumbu harga, dengan PnL berjalan
-     polos di atas garis entrynya. Bukan pengganti garis tiket: rencana
-     entry/SL/TP tetap bebas dipakai untuk LAYERING — menyusun posisi
-     berikutnya selagi yang lama berjalan. Garisnya hilang sendiri saat
-     posisinya tutup, dari SL/TP maupun tangan, dari web maupun MT5. */
-  const posisiMt5Chart = useMemo(() => {
-    if (!simbol.startsWith('MT5:')) return [];
+     line entry/SL/TP yang menembus ke sumbu harga. Bukan pengganti garis
+     tiket: rencana entry/SL/TP tetap bebas dipakai untuk LAYERING —
+     menyusun posisi berikutnya selagi yang lama berjalan. Garisnya hilang
+     sendiri saat posisinya tutup, dari SL/TP maupun tangan.
+
+     Identitasnya distabilkan lewat KUNCI JSON, bukan useMemo biasa:
+     laporan EA tiap beberapa detik membawa array posisi BARU dengan isi
+     yang sama, dan tanpa kunci ini ChartLilin membongkar-pasang semua
+     price line-nya tiap laporan — itulah "chart terasa berat". PnL
+     sengaja TIDAK ikut (dan tidak ditampilkan): angka yang berdetak
+     terus adalah pemicu gambar-ulang yang tak pernah berhenti. */
+  const kunciPosisiMt5 = useMemo(() => {
+    if (!simbol.startsWith('MT5:')) return '[]';
     const dasarS = simbol.slice(4);
-    return akunMt5.posisi
+    return JSON.stringify(akunMt5.posisi
       .filter((p) => p.simbol.toUpperCase().indexOf(dasarS) === 0)
-      .map((p) => ({
-        tiket: p.tiket, arah: p.arah, lot: p.lot,
-        entry: p.hargaBuka, sl: p.sl, tp: p.tp, profit: p.profit,
-      }));
+      .map((p) => ({ tiket: p.tiket, arah: p.arah, lot: p.lot, entry: p.hargaBuka, sl: p.sl, tp: p.tp })));
   }, [simbol, akunMt5.posisi]);
+  const posisiMt5Chart = useMemo(() => JSON.parse(kunciPosisiMt5) as PosisiChartMt5[], [kunciPosisiMt5]);
   /* Tick bid/ask menumpang balasan klines MT5 yang memang sudah dipoll —
      dibaca ulang tiap render, dan render datang tiap data lilin segar. */
   const tickMt5 = simbol.startsWith('MT5:') ? bacaTickMt5(simbol.slice(4)) : null;

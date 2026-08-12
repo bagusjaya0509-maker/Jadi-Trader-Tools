@@ -1750,7 +1750,16 @@ app.post('/api/mt5/tick', batasLaju, (req, res) => {
   /* Ask menyusul di EA v2.02 — v2.01 tidak mengirimnya, jadi 0 berarti
      "belum ada", bukan "spread nol". Web menyembunyikan garis Ask-nya. */
   const ask = Number(b.ask);
-  MT5_TICK[simbol] = { bid, ask: isFinite(ask) && ask > 0 ? ask : 0, waktu: Date.now() };
+  /* tb = jam BROKER dalam ms (EA v2.03) — timeline yang sama dengan
+     stempel waktu bar OHLC dari CopyRates. `waktu` (jam server sendiri)
+     tetap dipakai untuk uji kesegaran; tb untuk uji BATAS LILIN. Dua jam
+     itu selisih 2-3 jam (broker EET), dan mencampurnya adalah sumber bug
+     lilin meregang-lalu-melompat di chart web. */
+  const tb = Number(b.t) * 1000;
+  MT5_TICK[simbol] = {
+    bid, ask: isFinite(ask) && ask > 0 ? ask : 0,
+    waktu: Date.now(), tb: isFinite(tb) && tb > 0 ? tb : 0,
+  };
   res.json({ ok: true });
 });
 
@@ -1845,8 +1854,14 @@ app.get('/api/mt5/klines', batasLaju, (req, res) => {
   const dur = DUR_TF[tf] || 0;
   if (tick && dur && rows.length && (Date.now() - tick.waktu) < 30000) {
     const akhir = rows[rows.length - 1].map(Number);
-    if (tick.waktu >= akhir[0] + dur) {
-      const buka = akhir[0] + Math.floor((tick.waktu - akhir[0]) / dur) * dur;
+    /* Batas lilin diuji dengan JAM BROKER (tb, EA v2.03) karena stempel
+       bar juga jam broker. Memakai jam server sendiri di sini (tick lama
+       tanpa tb) membuat tick tak pernah dianggap melewati batas — lilin
+       terakhir terus diregangkan memakan bar berikutnya, lalu melompat
+       terkoreksi saat kiriman OHLC penuh tiba. */
+    const tTick = tick.tb || tick.waktu;
+    if (tTick >= akhir[0] + dur) {
+      const buka = akhir[0] + Math.floor((tTick - akhir[0]) / dur) * dur;
       rows = rows.concat([[buka, tick.bid, tick.bid, tick.bid, tick.bid]]);
     } else {
       akhir[4] = tick.bid;

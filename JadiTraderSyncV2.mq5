@@ -32,7 +32,7 @@
 //       tombol AutoTrading (Algo Trading) di toolbar MT5 menyala.
 //+------------------------------------------------------------------+
 #property copyright "Jadi Trader Tools"
-#property version   "2.02"
+#property version   "2.03"
 #property strict
 #property description "Trade-Fi Sync v2: jurnal + eksekusi perintah web + kirim chart MT5. Baca pagar pengamannya di kepala berkas."
 
@@ -49,7 +49,7 @@ input string SimbolChart      = "";                                  // Simbol y
 input int    KirimChartMenit  = 5;                                   // Jeda kirim OHLC ke web (menit)
 input bool   KirimTick        = true;                                // Kirim harga tiap detik (harga web = MT5)
 
-#define VERSI_EA "2.02"
+#define VERSI_EA "2.03"
 #define PFX      "JTS_"
 
 CTrade   gTrade;
@@ -362,10 +362,15 @@ void KirimTickSekarang()
    // Ask ikut dikirim (v2.02): chart web menggambar garis harga permintaan,
    // karena jarak bid-ask di emas bukan pembulatan — itu biaya masuk posisi.
    double ask = SymbolInfoDouble(gSimbolChart, SYMBOL_ASK);
+   // t = jam BROKER (v2.03) — timeline yang SAMA dengan stempel waktu bar
+   // OHLC. Tanpa ini server membandingkan jam broker dengan jam aslinya
+   // sendiri (selisih 2-3 jam), salah menebak batas lilin, dan lilin
+   // terakhir di web meregang lalu melompat tiap kiriman OHLC penuh.
    string isi = "{\"kode\":\"" + JsonTeks(KodePasangan)
               + "\",\"simbol\":\"" + JsonTeks(SimbolDasar())
               + "\",\"bid\":" + DoubleToString(bid, digit)
-              + (ask > 0 ? ",\"ask\":" + DoubleToString(ask, digit) : "") + "}";
+              + (ask > 0 ? ",\"ask\":" + DoubleToString(ask, digit) : "")
+              + ",\"t\":" + IntegerToString((long)TimeCurrent()) + "}";
    string balasan;
    // Timeout pendek: tick berikutnya datang sedetik lagi — menunggu lama
    // untuk angka yang sebentar lagi basi hanya membekukan timer.
