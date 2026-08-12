@@ -124,12 +124,16 @@ export interface KendaliPine {
   nonaktif: () => void;
 }
 
-export function DockPine({ buka, tab, aturTab, onTutup, lilin, tf, hingga, aturHasil, onInfo, onKendali }: {
+export function DockPine({ buka, tab, aturTab, onTutup, lilin, simbol, tf, hingga, aturHasil, onInfo, onKendali }: {
   buka: boolean;
   tab: 'editor' | 'input';
   aturTab: (t: 'editor' | 'input') => void;
   onTutup: () => void;
   lilin: Lilin;
+  /** Ikut kunci hitung-ulang — dua simbol dengan TF sama bisa berbagi
+   *  jumlah bar & stempel terakhir, dan tanpa simbol di kuncinya skrip
+   *  tidak pernah dihitung ulang saat chart berganti koin. */
+  simbol: string;
   tf: string;
   hingga?: number;
   aturHasil: (h: HasilPine | null) => void;
@@ -225,7 +229,7 @@ export function DockPine({ buka, tab, aturTab, onTutup, lilin, tf, hingga, aturH
   const kunciJalan = useRef<{ kunci: string; setelan: unknown }>({ kunci: '', setelan: null });
   useEffect(() => {
     if (!aktif || !lilin.closes.length) return;
-    const kunci = `${lilin.times.length}|${lilin.times[lilin.times.length - 1] ?? 0}|${hingga ?? -1}|${aktif.id}`;
+    const kunci = `${simbol}|${tf}|${lilin.times.length}|${lilin.times[lilin.times.length - 1] ?? 0}|${hingga ?? -1}|${aktif.id}`;
     if (kunci === kunciJalan.current.kunci && setelan === kunciJalan.current.setelan) return;
     const jeda = setTimeout(() => {
       kunciJalan.current = { kunci, setelan };

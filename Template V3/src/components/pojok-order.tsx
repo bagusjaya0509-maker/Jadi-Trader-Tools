@@ -34,7 +34,7 @@ export function PojokOrder({
   posisi, hargaKini, draf, rencana, mode, jenis, risiko, tunda, onBatalTunda,
   onPilih, onUbah, onKirim, onBatal, onTutup, onGantiMode, mati,
   nyataSetelan, aturNyata, sibukNyata, kabar, demoSetelan, aturDemo,
-  catatan, aturCatatan, qtyDemo, mt5, lotMt5, aturLotMt5,
+  catatan, aturCatatan, qtyDemo, mt5, lotMt5, aturLotMt5, nilaiLotMt5,
 }: {
   posisi: { arah: 'BUY' | 'SELL'; masuk: number; sl: number; tp: number; pnl: number; risiko: number; unit: number } | null;
   hargaKini?: number;
@@ -49,6 +49,8 @@ export function PojokOrder({
   mt5?: boolean;
   lotMt5?: number;
   aturLotMt5?: (n: number) => void;
+  /** Dolar per 1 lot per 1.0 harga — dilaporkan EA v2.01. */
+  nilaiLotMt5?: number;
   /** Pending order demo yang sedang menunggu harganya tersentuh. */
   tunda?: { arah: 'BUY' | 'SELL'; jenis: 'MARKET' | 'LIMIT' | 'STOP'; entry: number; sl: number; tp: number } | null;
   onBatalTunda?: () => void;
@@ -300,6 +302,17 @@ export function PojokOrder({
                leverage / entry, dikali jarak harga. Angka risiko demo (persen
                dari modal latihan) di sini menyesatkan: ia bukan uang yang
                akan bergerak. */
+            if (nyata && mt5 && entry && sl && tp && lotMt5 && nilaiLotMt5) {
+              /* Dolar dari lot × nilai per lot yang dilaporkan EA — angka
+                 yang sama dengan yang akan terjadi di MT5, bukan tebakan. */
+              return (
+                <span className="text-[10.5px] text-zinc-500">
+                  <span className="angka text-red-400">-{uang(lotMt5 * nilaiLotMt5 * Math.abs(entry - sl))}</span>
+                  {' / '}
+                  <span className="angka text-emerald-400">+{uang(lotMt5 * nilaiLotMt5 * Math.abs(tp - entry))}</span>
+                </span>
+              );
+            }
             if (nyata && !mt5 && nyataSetelan && entry && sl && tp) {
               const qty = (nyataSetelan.modal * nyataSetelan.leverage) / entry;
               return (

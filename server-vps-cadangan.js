@@ -1623,6 +1623,11 @@ app.post('/api/mt5/lapor', batasLaju, express.json({ limit: '512kb' }), (req, re
    pernah disetujui siapa pun.
    ══════════════════════════════════════════════════════════════════════════ */
 const MT5_KLINES_FILE = path.join(__dirname, 'mt5-klines.json');
+/* Tick terakhir per simbol — DI MEMORI saja. Satu tulisan disk per detik
+   demi angka yang basi dalam sedetik adalah cara mengaus-auskan disk VPS;
+   restart pm2 kehilangan ticknya dan itu bukan kehilangan apa-apa. */
+const MT5_TICK = {};
+const DUR_TF = { '5m': 300000, '15m': 900000, '1h': 3600000, '4h': 14400000, '1d': 86400000 };
 function mt5KlinesBaca() {
   try { return JSON.parse(fs.readFileSync(MT5_KLINES_FILE, 'utf8')); } catch (e) { return {}; }
 }
@@ -1725,8 +1730,30 @@ app.post('/api/mt5/klines', batasLaju, express.json({ limit: '1mb' }), (req, res
   const k = mt5KlinesBaca();
   if (!k[simbol]) k[simbol] = {};
   k[simbol][tf] = { diperbarui: Date.now(), data };
+  /* Spec simbol (nilai dolar per lot per 1.0 harga) menumpang kiriman
+     klines — EA yang tahu tick value broker & mata uang akunnya, bukan
+     web. Dipakai web menghitung dolar SL/TP tiket MT5. */
+  const nilaiLot = Number(b.nilaiLot);
+  if (isFinite(nilaiLot) && nilaiLot > 0) k[simbol].spec = { nilaiLot, diperbarui: Date.now() };
   mt5KlinesTulis(k);
   res.json({ ok: true, n: data.length });
+});
+
+// --- EA: tick per detik — bikin harga web menempel harga MT5 ---
+app.post('/api/mt5/tick', batasLaju, (req, res) => {
+  const b = req.body || {};
+  const r = uidDariKode(b.kode);
+  if (!r) return res.status(403).json({ error: 'kode tidak dikenal' });
+  const simbol = String(b.simbol || '').toUpperCase().replace(/[^A-Z0-9.]/g, '');
+  const bid = Number(b.bid);
+  if (!simbol || !isFinite(bid) || bid <= 0) return res.status(400).json({ error: 'tick tidak sah' });
+  MT5_TICK[simbol] = { bid, waktu: Date.now() };
+  res.json({ ok: true });
+});
+
+// --- Web: daftar simbol MT5 yang datanya ada — mengisi pilihan chart ---
+app.get('/api/mt5/simbol', batasLaju, (req, res) => {
+  res.json({ ok: true, simbol: Object.keys(mt5KlinesBaca()) });
 });
 
 // --- Web: baca OHLC MT5 — bentuk balasannya SAMA dengan /api/klines ---
@@ -1737,7 +1764,32 @@ app.get('/api/mt5/klines', batasLaju, (req, res) => {
   const k = mt5KlinesBaca();
   const isi = k[simbol] && k[simbol][tf];
   if (!isi) return res.json({ ok: true, sumber: 'mt5', diperbarui: 0, data: [] });
-  res.json({ ok: true, sumber: 'mt5', diperbarui: isi.diperbarui, data: isi.data.slice(-limit) });
+  let rows = isi.data.slice(-limit);
+  /* Lilin terakhir DIHIDUPKAN dengan tick: kiriman penuh datang tiap ±5
+     menit, tapi tick datang tiap detik. Tanpa tambalan ini harga web
+     tertinggal beberapa menit dari MT5 — dan chart live yang telat lima
+     menit terasa mati. Tick yang jatuh SETELAH lilin terakhir berakhir
+     membuka lilin sintetis baru, jadi grafiknya terus berdetak di antara
+     dua kiriman penuh. */
+  const tick = MT5_TICK[simbol];
+  const dur = DUR_TF[tf] || 0;
+  if (tick && dur && rows.length && (Date.now() - tick.waktu) < 30000) {
+    const akhir = rows[rows.length - 1].map(Number);
+    if (tick.waktu >= akhir[0] + dur) {
+      const buka = akhir[0] + Math.floor((tick.waktu - akhir[0]) / dur) * dur;
+      rows = rows.concat([[buka, tick.bid, tick.bid, tick.bid, tick.bid]]);
+    } else {
+      akhir[4] = tick.bid;
+      if (tick.bid > akhir[2]) akhir[2] = tick.bid;
+      if (tick.bid < akhir[3]) akhir[3] = tick.bid;
+      rows = rows.slice(0, -1).concat([akhir]);
+    }
+  }
+  res.json({
+    ok: true, sumber: 'mt5', diperbarui: isi.diperbarui,
+    spec: k[simbol].spec || null,
+    data: rows,
+  });
 });
 
 /* ══════════════════════════════════════════════════════════════════════════

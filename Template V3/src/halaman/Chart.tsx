@@ -16,7 +16,8 @@ import { WatchChart } from '@/components/watch-chart';
 import type { JenisAlat, GambarAlat } from '@/lib/plugin-alat';
 import type { HasilPine } from '@/lib/pine';
 import { bacaSetelanChart, simpanSetelanChart } from '@/lib/replay';
-import { ambilKlines, type Lilin } from '@/lib/pasar';
+import { ambilKlines, bacaSpekMt5, daftarSimbolMt5, type Lilin } from '@/lib/pasar';
+import { useAkunMt5 } from '@/lib/akun';
 import {
   jalankanUji, garisIndikator, zonaSnr, deretSmi, SETELAN_BAWAAN,
   type Setelan, type HasilUji,
@@ -140,6 +141,11 @@ export default function ChartBacktest() {
     } catch { setGambarAlat([]); }
     setAlat(null);
   }, [simbol, tf]);
+  /* Hasil Pine dari simbol lama DIBUANG saat chart berganti — garis di
+     level 64.000 milik BTC yang tergambar di chart ONE 0,0009 membuat
+     skala harga meledak dan grafiknya "rusak". Skrip aktif dihitung ulang
+     sendiri oleh dock begitu data simbol baru tiba. */
+  useEffect(() => { setPine(null); }, [simbol, tf]);
   const tambahGambar = useCallback((g: Omit<GambarAlat, 'id'>) => {
     setGambarAlat((d) => {
       const b = [...d, { ...g, id: 'g' + Date.now() }];
@@ -171,6 +177,31 @@ export default function ChartBacktest() {
   /* Lot untuk order REAL simbol MT5 — bursa berjalan pakai qty dari modal ×
      leverage; MT5 berpikir dalam lot, jadi kolomnya memang beda. */
   const [lotMt5, setLotMt5] = useState(0.01);
+  /* Simbol MT5 yang tersedia — EA yang dipasang di chart pair lain otomatis
+     menambah daftar ini, tanpa menyentuh kode web. */
+  const [simbolMt5, setSimbolMt5] = useState<string[]>(['XAUUSD']);
+  useEffect(() => { void daftarSimbolMt5().then((d) => { if (d.length) setSimbolMt5(d); }); }, []);
+  /* Posisi MT5 yang sedang terbuka di simbol chart ini — sumber garis
+     entry/SL/TP mode REAL. Garisnya milik BROKER: tetap ada selama
+     posisinya hidup (dibuka dari web ataupun MT5), hilang sendiri saat
+     SL/TP kena atau ditutup dari mana pun. */
+  const akunMt5 = useAkunMt5();
+  const posisiMt5Chart = useMemo(() => {
+    if (!simbol.startsWith('MT5:')) return null;
+    const dasarS = simbol.slice(4);
+    return akunMt5.posisi.find((p) => p.simbol.toUpperCase().indexOf(dasarS) === 0) ?? null;
+  }, [simbol, akunMt5.posisi]);
+  const nilaiLotMt5 = simbol.startsWith('MT5:') ? (bacaSpekMt5(simbol.slice(4)) ?? 100) : 0;
+  /* Posisi MT5 yang BARU SAJA lenyap (SL/TP kena atau ditutup) menyapu
+     garis rencananya juga — garis order yang sudah mati harus ikut mati. */
+  const jejakPosMt5 = useRef<{ simbol: string; ada: boolean }>({ simbol: '', ada: false });
+  useEffect(() => {
+    const j = jejakPosMt5.current;
+    if (j.simbol === simbol && j.ada && !posisiMt5Chart) {
+      setRencana({}); setDraf(null); entryDigeser.current = false;
+    }
+    jejakPosMt5.current = { simbol, ada: !!posisiMt5Chart };
+  }, [posisiMt5Chart, simbol]);
 
   /* Mengubah SL ×ATR / R:R saat tiket TERBUKA langsung menggeser garisnya —
      setelan yang baru berlaku untuk tiket berikutnya terasa seperti setelan
@@ -393,12 +424,15 @@ export default function ChartBacktest() {
   const labelJenis = jenisEntry === 'MARKET' ? 'Market'
     : `${draf === 'BUY' ? 'Buy' : 'Sell'} ${jenisEntry === 'STOP' ? 'Stop' : 'Limit'}`;
   const garisSeret: GarisSeret[] = useMemo(() => {
+    const posMt5 = aksi?.mode === 'real' ? posisiMt5Chart : null;
     const sumber = aksiPosisi
       ? { entry: aksiPosisi.masuk, sl: aksiPosisi.sl, tp: aksiPosisi.tp }
+      : posMt5
+      ? { entry: posMt5.hargaBuka, sl: posMt5.sl || undefined, tp: posMt5.tp || undefined }
       : aksiTunda
       ? { entry: aksiTunda.entry, sl: aksiTunda.sl, tp: aksiTunda.tp }
       : rencana;
-    const kunci = !!aksiPosisi || !!aksiTunda;
+    const kunci = !!aksiPosisi || !!aksiTunda || !!posMt5;
     const g: GarisSeret[] = [];
 
     /* Risiko & imbalan DITULIS DI GARISNYA.
@@ -414,6 +448,15 @@ export default function ChartBacktest() {
       if (aksiPosisi) {
         ketSl = `· -${uang(aksiPosisi.risiko)}`;
         ketTp = `· +${uang(aksiPosisi.unit * Math.abs(tpN - aksiPosisi.masuk))}`;
+      } else if (posMt5) {
+        /* Posisi MT5 hidup: dolar dari lot × nilai-per-lot yang dilaporkan
+           EA (akun sen sudah dikonversi di EA-nya). */
+        ketSl = `· -${uang(posMt5.lot * nilaiLotMt5 * Math.abs(e - s))}`;
+        ketTp = `· +${uang(posMt5.lot * nilaiLotMt5 * Math.abs(tpN - e))}`;
+      } else if (aksi?.mode === 'real' && simbol.startsWith('MT5:')) {
+        /* Tiket MT5 yang sedang disusun: lot × nilai per lot. */
+        ketSl = `· -${uang(lotMt5 * nilaiLotMt5 * Math.abs(e - s))}`;
+        ketTp = `· +${uang(lotMt5 * nilaiLotMt5 * Math.abs(tpN - e))}`;
       } else if (aksi?.mode === 'real') {
         /* Mode REAL: dolar dari ukuran order yang SEBENARNYA akan dikirim —
            qty = modal × leverage / entry, bukan dari setelan risiko demo. */
@@ -434,7 +477,9 @@ export default function ChartBacktest() {
         }
       }
     }
-    const ketEntry = aksiTunda
+    const ketEntry = posMt5
+      ? `· MT5 #${posMt5.tiket} · ${posMt5.arah} ${posMt5.lot} lot`
+      : aksiTunda
       ? `· ${aksiTunda.arah === 'BUY' ? 'Buy' : 'Sell'} ${aksiTunda.jenis === 'STOP' ? 'Stop' : 'Limit'} menunggu`
       : draf ? `· ${labelJenis}` : '';
 
@@ -442,7 +487,7 @@ export default function ChartBacktest() {
     if (sumber.sl) g.push({ id: 'sl', harga: sumber.sl, warna: '#f87171', label: 'SL', ket: ketSl, bisaSeret: !kunci });
     if (sumber.tp) g.push({ id: 'tp', harga: sumber.tp, warna: '#10b981', label: 'TP', ket: ketTp, bisaSeret: !kunci });
     return g;
-  }, [aksiPosisi, aksiTunda, rencana, aksi, draf, labelJenis, nyataSetelan]);
+  }, [aksiPosisi, aksiTunda, rencana, aksi, draf, labelJenis, nyataSetelan, posisiMt5Chart, lotMt5, nilaiLotMt5, simbol]);
 
   const terakhir = lilin.closes[lilin.closes.length - 1];
   const sebelumnya = lilin.closes[lilin.closes.length - 2];
@@ -565,7 +610,9 @@ export default function ChartBacktest() {
             <datalist id="simbolChart">
               {/* Sumber Trade-Fi di urutan teratas — satu-satunya entri yang
                   bukan Binance, jadi ia yang paling butuh terlihat ada. */}
-              <option value="MT5:XAUUSD">Trade-Fi — dari MT5 (EA v2)</option>
+              {simbolMt5.map((s) => (
+                <option key={'MT5:' + s} value={'MT5:' + s}>Trade-Fi — dari MT5 (EA v2)</option>
+              ))}
               {SIMBOL_DASAR.map((s) => <option key={s} value={s} />)}
             </datalist>
           </div>
@@ -794,7 +841,12 @@ export default function ChartBacktest() {
                                           : h.status === 'gagal' ? `EA menolak: ${h.pesan}`
                                           : h.status === 'kedaluwarsa' ? 'Perintah kedaluwarsa — EA tidak menjemput dalam 5 menit.'
                                           : h.pesan);
-                                        if (h.status === 'sukses') { setDraf(null); setRencana({}); }
+                                        /* Rencana TIDAK dibuang: mode real
+                                           akan menampilkan garis posisi
+                                           broker menggantikannya (≤30 dtk),
+                                           dan mode demo bisa memakai level
+                                           yang sama lagi. */
+                                        if (h.status === 'sukses') setDraf(null);
                                       })
                                       .catch((e) => setKabarNyata(e instanceof Error ? e.message : 'Gagal mengirim perintah'))
                                       .finally(() => setSibukNyata(false));
@@ -824,6 +876,7 @@ export default function ChartBacktest() {
                               }}
                               nyataSetelan={nyataSetelan} aturNyata={setNyataSetelan}
                               mt5={simbol.startsWith('MT5:')} lotMt5={lotMt5} aturLotMt5={setLotMt5}
+                              nilaiLotMt5={nilaiLotMt5}
                               demoSetelan={demoSetelan} aturDemo={setDemoSetelan}
                               catatan={catatanTiket} aturCatatan={setCatatanTiket}
                               sibukNyata={sibukNyata} kabar={kabarNyata || undefined}
@@ -837,7 +890,7 @@ export default function ChartBacktest() {
               Nama yang terpasang tertulis DI chartnya, dengan ikon setelan
               dan kode di sebelahnya. Indikator tanpa nama di layar adalah
               garis misterius; indikator yang bernama adalah alat. */}
-          <div className="pointer-events-none absolute left-2 top-12 z-20 flex flex-col items-start gap-1">
+          <div className="pointer-events-none absolute right-16 top-2 z-20 flex flex-col items-end gap-1">
             {pineInfo && (
               <div className="pointer-events-auto flex items-center gap-1 rounded-md bg-zinc-950/75 px-2 py-1 backdrop-blur-sm">
                 <span className="max-w-[200px] truncate text-[11px] text-zinc-200" title={pineInfo.nama}>{pineInfo.nama}</span>
@@ -908,7 +961,7 @@ export default function ChartBacktest() {
               geserannya. */}
           <DockPine buka={dockBuka} tab={dockTab} aturTab={setDockTab}
                     onTutup={() => setDockBuka(false)}
-                    lilin={lilin} tf={tf} hingga={replayIdx ?? undefined}
+                    lilin={lilin} simbol={simbol} tf={tf} hingga={replayIdx ?? undefined}
                     aturHasil={setPine} onInfo={setPineInfo} onKendali={setKendaliPine} />
           <WatchChart buka={watchBuka}
                       onToggle={() => { setWatchBuka((v) => !v); setDockBuka(false); }}

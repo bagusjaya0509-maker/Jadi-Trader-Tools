@@ -62,6 +62,12 @@ export async function ambilKlines(simbol: string, tf: string, batas = 200, segar
       : `${dasar()}/api/klines?symbol=${encodeURIComponent(simbol)}&interval=${tf}&limit=${batas}${segar ? '&fresh=1' : ''}`);
     if (!r.ok) return KOSONG;
     const j = await r.json();
+    /* Spec MT5 (dolar per lot per 1.0 harga) menumpang balasan klines —
+       dihitung EA dari tick value broker + mata uang akun, disimpan di
+       sini untuk dipakai tiket order menghitung dolar SL/TP. */
+    if (mt5 && j?.spec && Number(j.spec.nilaiLot) > 0) {
+      SPEK_MT5.set(simbol.slice(4), Number(j.spec.nilaiLot));
+    }
     /* Backend membungkus balasan Binance jadi {ok, data}. Bentuk mentah
        Binance sendiri berupa array-of-array, jadi keduanya diterima —
        proxy yang lebih lama pernah meneruskan apa adanya. */
@@ -80,6 +86,24 @@ export async function ambilKlines(simbol: string, tf: string, batas = 200, segar
   } catch {
     return KOSONG;
   }
+}
+
+const SPEK_MT5 = new Map<string, number>();
+
+/** Dolar per 1 lot per 1.0 pergerakan harga untuk simbol MT5 — null kalau
+ *  EA belum pernah mengirimkannya (build lama). */
+export function bacaSpekMt5(simbolDasar: string): number | null {
+  return SPEK_MT5.get(simbolDasar) ?? null;
+}
+
+/** Simbol MT5 yang datanya sudah ada di server — EA di chart pair lain
+ *  otomatis menambah daftarnya. */
+export async function daftarSimbolMt5(): Promise<string[]> {
+  try {
+    const r = await fetch(`${dasar()}/api/mt5/simbol`);
+    const j = await r.json();
+    return Array.isArray(j?.simbol) ? j.simbol.filter((x: unknown) => typeof x === 'string') : [];
+  } catch { return []; }
 }
 
 export interface Ticker { lastPrice: number; ubah24j: number }

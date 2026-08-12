@@ -32,7 +32,7 @@
 //       tombol AutoTrading (Algo Trading) di toolbar MT5 menyala.
 //+------------------------------------------------------------------+
 #property copyright "Jadi Trader Tools"
-#property version   "2.00"
+#property version   "2.01"
 #property strict
 #property description "Trade-Fi Sync v2: jurnal + eksekusi perintah web + kirim chart MT5. Baca pagar pengamannya di kepala berkas."
 
@@ -47,8 +47,9 @@ input bool   IzinkanTrading   = true;                                // Eksekusi
 input double LotMaks          = 1.0;                                 // Lot maksimum per perintah
 input string SimbolChart      = "";                                  // Simbol yang dikirim ke chart web (kosong = simbol chart ini)
 input int    KirimChartMenit  = 5;                                   // Jeda kirim OHLC ke web (menit)
+input bool   KirimTick        = true;                                // Kirim harga tiap detik (harga web = MT5)
 
-#define VERSI_EA "2.00"
+#define VERSI_EA "2.01"
 #define PFX      "JTS_"
 
 CTrade   gTrade;
@@ -130,6 +131,9 @@ void OnTimer()
          gDetikJalan = 0;
          Kirim();
       }
+      // Tick tiap detik: payload ~90 byte — inilah yang membuat harga di
+      // web menempel ke MT5; kiriman OHLC penuh hanya tiap 5 menit.
+      if(KirimTick) KirimTickSekarang();
       int jedaChart = KirimChartMenit;
       if(jedaChart < 1) jedaChart = 1;
       if(gDetikChart >= jedaChart * 60)
@@ -300,7 +304,7 @@ string UrlDasar()
 }
 
 // POST JSON; kembalikan kode HTTP (-1 = WebRequest gagal total).
-int PostJson(string jalur, string isi, string &balasan)
+int PostJson(string jalur, string isi, string &balasan, int timeoutMs = 10000)
 {
    char data[], hasil[];
    string kepala;
@@ -308,9 +312,60 @@ int PostJson(string jalur, string isi, string &balasan)
    if(panjang > 0) ArrayResize(data, panjang - 1);
    ResetLastError();
    int kode = WebRequest("POST", UrlDasar() + jalur, "Content-Type: application/json\r\n",
-                         10000, data, hasil, kepala);
+                         timeoutMs, data, hasil, kepala);
    balasan = (kode == -1) ? "" : CharArrayToString(hasil, 0, WHOLE_ARRAY, CP_UTF8);
    return kode;
+}
+
+//+------------------------------------------------------------------+
+//| NILAI LOT & TICK                                                  |
+//+------------------------------------------------------------------+
+// Dolar per 1 lot per 1.0 pergerakan harga — bahan web menghitung dolar
+// SL/TP tiket MT5. Akun sen (USC) dibagi 100 DI SINI, supaya web selalu
+// menerima dolar sungguhan tanpa harus menebak mata uang akun.
+double NilaiLotSimbol(string simbol)
+{
+   double tv = SymbolInfoDouble(simbol, SYMBOL_TRADE_TICK_VALUE);
+   double ts = SymbolInfoDouble(simbol, SYMBOL_TRADE_TICK_SIZE);
+   if(ts <= 0 || tv <= 0) return 0;
+   double nilai = tv / ts;
+   string mu = AccountInfoString(ACCOUNT_CURRENCY);
+   StringToUpper(mu);
+   if(StringFind(mu, "USC") >= 0 || StringFind(mu, "CENT") >= 0) nilai /= 100;
+   return nilai;
+}
+
+// Nama DASAR simbol chart (XAUUSDc -> XAUUSD) — dipakai tick & klines.
+string SimbolDasar()
+{
+   string dasarSimbol = gSimbolChart;
+   int q = StringLen(dasarSimbol);
+   while(q > 0)
+   {
+      ushort c = StringGetCharacter(dasarSimbol, q - 1);
+      bool hurufBesar = (c >= 'A' && c <= 'Z');
+      bool angka = (c >= '0' && c <= '9');
+      if(hurufBesar || angka) break;
+      q--;
+   }
+   dasarSimbol = StringSubstr(dasarSimbol, 0, q);
+   StringToUpper(dasarSimbol);
+   return dasarSimbol;
+}
+
+void KirimTickSekarang()
+{
+   double bid = SymbolInfoDouble(gSimbolChart, SYMBOL_BID);
+   if(bid <= 0) return;              // pasar tutup / simbol belum siap
+   int digit = (int)SymbolInfoInteger(gSimbolChart, SYMBOL_DIGITS);
+   if(digit <= 0) digit = 5;
+   string isi = "{\"kode\":\"" + JsonTeks(KodePasangan)
+              + "\",\"simbol\":\"" + JsonTeks(SimbolDasar())
+              + "\",\"bid\":" + DoubleToString(bid, digit) + "}";
+   string balasan;
+   // Timeout pendek: tick berikutnya datang sedetik lagi — menunggu lama
+   // untuk angka yang sebentar lagi basi hanya membekukan timer.
+   PostJson("/api/mt5/tick", isi, balasan, 3000);
 }
 
 int AmbilTeks(string jalur, string &balasan)
@@ -516,25 +571,12 @@ void KirimChartSatu(ENUM_TIMEFRAMES tfMt5, string tfWeb)
    }
    data += "]";
 
-   // Nama DASAR yang dikirim (XAUUSDc -> XAUUSD): halaman web tidak perlu
-   // tahu akhiran broker, dan dua broker berbeda tetap mengisi satu simbol.
-   string dasarSimbol = gSimbolChart;
-   int p = StringLen(dasarSimbol);
-   while(p > 0)
-   {
-      ushort c = StringGetCharacter(dasarSimbol, p - 1);
-      bool hurufBesar = (c >= 'A' && c <= 'Z');
-      bool angka = (c >= '0' && c <= '9');
-      if(hurufBesar || angka) break;
-      p--;
-   }
-   dasarSimbol = StringSubstr(dasarSimbol, 0, p);
-   StringToUpper(dasarSimbol);
-
    string isi = "{";
    isi += "\"kode\":\""   + JsonTeks(KodePasangan) + "\",";
-   isi += "\"simbol\":\"" + JsonTeks(dasarSimbol) + "\",";
+   isi += "\"simbol\":\"" + JsonTeks(SimbolDasar()) + "\",";
    isi += "\"tf\":\""     + tfWeb + "\",";
+   // Nilai per lot menumpang di sini — web memakainya menghitung dolar SL/TP.
+   isi += "\"nilaiLot\":"  + DoubleToString(NilaiLotSimbol(gSimbolChart), 4) + ",";
    isi += "\"data\":"     + data;
    isi += "}";
 

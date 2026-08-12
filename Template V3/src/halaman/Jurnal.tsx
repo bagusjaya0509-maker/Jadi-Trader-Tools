@@ -607,25 +607,28 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
               </div>
             </Panel>
 
-            {/* Posisi Terbuka & Pola Emosi BERDAMPINGAN, tinggi sama.
-                ────────────────────────────────────────────────────────────
-                Dua panel pendek yang saling melengkapi: apa yang sedang
-                berjalan, dan bagaimana perasaan saat membukanya. Daftar yang
-                panjang digulir DI DALAM panelnya — rodanya jalan saat kursor
-                di atasnya — tanpa batang scrollbar yang menggores tepinya.
-                [&>div]:h-full: keduanya membungkus diri dengan Panel sendiri;
-                tanpa ini pembungkusnya meregang tapi kartunya tetap pendek. */}
-            <div className="grid grow grid-cols-1 gap-4 sm:grid-cols-2 [&>div]:h-full">
-              <PanelPosisiJurnal sumber={sumber} />
+            {/* Posisi Terbuka selebar penuh kolom kiri — sejajar dengan
+                kurva ekuitas di atasnya, meregang menemui dasar kolom kanan. */}
+            <div className="grow [&>div]:h-full"><PanelPosisiJurnal sumber={sumber} /></div>
+            </div>
+
+            {/* Kolom kanan: kalender + Pola Emosi PERSIS di bawahnya,
+                selebar kalendernya — dan karena kolom kanan memanjang,
+                Posisi Terbuka di kiri ikut meregang menyamainya. */}
+            <div className="flex min-w-0 flex-col gap-4">
               <Panel className="flex min-w-0 flex-col">
+                <PanelHead judul="Kalender P/L" sub="Klik panah atau nama bulan untuk berpindah." />
+                <div className="flex grow flex-col justify-start px-5 pb-5"><Kalender pl={pl} /></div>
+              </Panel>
+              <Panel className="min-w-0">
                 <PanelHead judul="Pola Emosi" sub="Emosi saat entry vs hasilnya." />
-                <div className="grow px-5 pb-5">
+                <div className="px-5 pb-5">
                   {emosi.length === 0 ? (
-                    <p className="py-5 text-center text-[12.5px] text-zinc-600">
+                    <p className="py-4 text-center text-[12.5px] text-zinc-600">
                       Belum ada catatan emosi di jurnal ini.
                     </p>
                   ) : (
-                    <div className="gulir-senyap max-h-[190px] overflow-y-auto">
+                    <div className="gulir-senyap max-h-[170px] overflow-y-auto">
                       {emosi.map(([nama, d]) => (
                         <div key={nama} className="flex items-center justify-between border-b border-zinc-800/50 py-2 text-[12.5px] last:border-0">
                           <span className="truncate text-zinc-300">{nama}</span>
@@ -640,12 +643,6 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
                 </div>
               </Panel>
             </div>
-            </div>
-
-            <Panel className="flex min-w-0 flex-col">
-              <PanelHead judul="Kalender P/L" sub="Klik panah atau nama bulan untuk berpindah." />
-              <div className="flex grow flex-col justify-start px-5 pb-5"><Kalender pl={pl} /></div>
-            </Panel>
 
             {/* Riwayat SELALU selebar tiga kolom — Pola Emosi sudah pindah
                 ke sebelah Posisi Terbuka, jadi tidak ada lagi yang menuntut
