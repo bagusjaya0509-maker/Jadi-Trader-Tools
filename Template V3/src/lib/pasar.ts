@@ -52,7 +52,14 @@ export async function ambilKlines(simbol: string, tf: string, batas = 200, segar
   if (ada && Date.now() - ada.waktu < (segar ? 2_500 : UMUR_MS)) return ada.isi;
 
   try {
-    const r = await fetch(`${dasar()}/api/klines?symbol=${encodeURIComponent(simbol)}&interval=${tf}&limit=${batas}${segar ? '&fresh=1' : ''}`);
+    /* Simbol "MT5:XAUUSD" = sumber TRADE-FI: OHLC yang dikirim EA v2 dari
+       terminal MT5 pengguna, bukan dari Binance. Bentuk balasan servernya
+       sudah disamakan dengan /api/klines, jadi seluruh halaman — chart,
+       indikator, replay, backtest — bekerja tanpa tahu bedanya. */
+    const mt5 = simbol.startsWith('MT5:');
+    const r = await fetch(mt5
+      ? `${dasar()}/api/mt5/klines?symbol=${encodeURIComponent(simbol.slice(4))}&interval=${tf}&limit=${batas}`
+      : `${dasar()}/api/klines?symbol=${encodeURIComponent(simbol)}&interval=${tf}&limit=${batas}${segar ? '&fresh=1' : ''}`);
     if (!r.ok) return KOSONG;
     const j = await r.json();
     /* Backend membungkus balasan Binance jadi {ok, data}. Bentuk mentah

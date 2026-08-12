@@ -1,0 +1,413 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Play, Trash2, TriangleAlert, CheckCircle2, RotateCcw, X, Plus, Square } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { jalankanPine, CONTOH_PINE, type HasilPine, type InputPine } from '@/lib/pine';
+import type { Lilin } from '@/lib/pasar';
+
+/* ════════════════════════════════════════════════════════════════════════
+   DOCK PINE — editor & setelan indikator di SISI KANAN chart
+   ════════════════════════════════════════════════════════════════════════
+   Dulu panel Pine duduk di bawah chart: menyunting skrip berarti kehilangan
+   chart dari pandangan, padahal hasil suntingannya digambar DI chart.
+   Sekarang ia laci yang meluncur dari kanan — persis Pine Editor
+   TradingView — dan chartnya tetap terlihat selagi disunting.
+
+   SKRIPNYA DAFTAR, bukan satu kotak. Setiap skrip yang dijalankan otomatis
+   terdaftar dan diingat; yang terakhir aktif dijalankan lagi sendiri saat
+   halaman dibuka — indikator bukan sesuatu yang dipasang ulang tiap pagi.
+   Satu skrip aktif pada satu waktu: dua indikator gambar di panel yang sama
+   saling menimpa tanpa ada cara membedakan garis siapa milik siapa.
+   ════════════════════════════════════════════════════════════════════════ */
+
+export interface SkripPine { id: string; nama: string; kode: string; aktif: boolean }
+
+const KUNCI_DAFTAR = 'jt.pineDaftar';
+const KUNCI_LAMA = 'jt.pineKode';
+const KUNCI_INPUT = 'jt.pineInput';
+
+type NilaiSetelan = number | boolean | string;
+
+function namaDariKode(kode: string): string {
+  const m = /(?:indicator|study|strategy)\s*\(\s*["']([^"']+)["']/.exec(kode);
+  return m ? m[1] : 'Skrip tanpa nama';
+}
+
+function bacaDaftar(): SkripPine[] {
+  try {
+    const d = JSON.parse(localStorage.getItem(KUNCI_DAFTAR) ?? '[]') as SkripPine[];
+    if (Array.isArray(d) && d.length) return d;
+  } catch { /* rusak → mulai ulang */ }
+  /* Migrasi dari era satu-kotak: skrip lama jadi entri pertama daftar. */
+  try {
+    const lama = localStorage.getItem(KUNCI_LAMA);
+    if (lama && lama.trim()) {
+      return [{ id: 's1', nama: namaDariKode(lama), kode: lama, aktif: false }];
+    }
+  } catch { /* privat */ }
+  return [{ id: 's1', nama: namaDariKode(CONTOH_PINE), kode: CONTOH_PINE, aktif: false }];
+}
+
+function simpanDaftar(d: SkripPine[]) {
+  try { localStorage.setItem(KUNCI_DAFTAR, JSON.stringify(d)); } catch { /* privat */ }
+}
+
+function KontrolInput({ inp, nilai, atur }: {
+  inp: InputPine;
+  nilai: NilaiSetelan | undefined;
+  atur: (v: NilaiSetelan) => void;
+}) {
+  const v = nilai !== undefined ? nilai : inp.bawaan;
+
+  if (inp.jenis === 'bool') {
+    return (
+      <label className="flex cursor-pointer items-center gap-2 py-0.5 text-[12px] text-zinc-300">
+        <input type="checkbox" checked={!!v} onChange={(e) => atur(e.target.checked)}
+               className="size-3.5 shrink-0 cursor-pointer accent-emerald-500" />
+        <span className="truncate" title={inp.judul}>{inp.judul}</span>
+      </label>
+    );
+  }
+  if (inp.jenis === 'color') {
+    const s = typeof v === 'string' ? v : '#a1a1aa';
+    const dasar = /^#[0-9a-fA-F]{6}/.test(s) ? s.slice(0, 7) : '#a1a1aa';
+    const alfa = s.length === 9 ? s.slice(7)
+      : typeof inp.bawaan === 'string' && inp.bawaan.length === 9 ? inp.bawaan.slice(7) : '';
+    return (
+      <label className="flex cursor-pointer items-center gap-2 py-0.5 text-[12px] text-zinc-300">
+        <input type="color" value={dasar} onChange={(e) => atur(e.target.value + alfa)}
+               className="h-5 w-8 shrink-0 cursor-pointer rounded border border-zinc-700 bg-transparent p-0" />
+        <span className="truncate" title={inp.judul}>{inp.judul}</span>
+      </label>
+    );
+  }
+  if (inp.jenis === 'string' && inp.pilihan?.length) {
+    return (
+      <label className="flex items-center justify-between gap-2 py-0.5 text-[12px] text-zinc-300">
+        <span className="truncate" title={inp.judul}>{inp.judul}</span>
+        <select value={String(v ?? '')} onChange={(e) => atur(e.target.value)}
+                className="h-6 shrink-0 cursor-pointer rounded border border-zinc-700 bg-zinc-900 px-1 text-[11px] text-zinc-200 outline-none">
+          {inp.pilihan.map((p) => <option key={p}>{p}</option>)}
+        </select>
+      </label>
+    );
+  }
+  if (inp.jenis === 'int' || inp.jenis === 'float') {
+    return (
+      <label className="flex items-center justify-between gap-2 py-0.5 text-[12px] text-zinc-300">
+        <span className="truncate" title={inp.judul}>{inp.judul}</span>
+        <input type="number" value={typeof v === 'number' ? v : Number(v) || 0}
+               step={inp.jenis === 'int' ? 1 : 'any'}
+               onChange={(e) => {
+                 const x = Number(e.target.value);
+                 if (isFinite(x)) atur(inp.jenis === 'int' ? Math.round(x) : x);
+               }}
+               className="angka h-6 w-[76px] shrink-0 rounded border border-zinc-700 bg-zinc-900 px-1.5 text-right text-[11px] text-zinc-200 outline-none focus-visible:border-zinc-500" />
+      </label>
+    );
+  }
+  if (inp.jenis === 'string') {
+    return (
+      <label className="flex items-center justify-between gap-2 py-0.5 text-[12px] text-zinc-300">
+        <span className="truncate" title={inp.judul}>{inp.judul}</span>
+        <input value={String(v ?? '')} onChange={(e) => atur(e.target.value)}
+               className="h-6 w-[110px] shrink-0 rounded border border-zinc-700 bg-zinc-900 px-1.5 text-[11px] text-zinc-200 outline-none focus-visible:border-zinc-500" />
+      </label>
+    );
+  }
+  return null;
+}
+
+export interface InfoPine { nama: string; adaInput: boolean }
+export interface KendaliPine {
+  daftar: { id: string; nama: string; aktif: boolean }[];
+  jalankan: (id: string) => void;
+  nonaktif: () => void;
+}
+
+export function DockPine({ buka, tab, aturTab, onTutup, lilin, tf, hingga, aturHasil, onInfo, onKendali }: {
+  buka: boolean;
+  tab: 'editor' | 'input';
+  aturTab: (t: 'editor' | 'input') => void;
+  onTutup: () => void;
+  lilin: Lilin;
+  tf: string;
+  hingga?: number;
+  aturHasil: (h: HasilPine | null) => void;
+  /** Nama & ketersediaan input skrip aktif — bahan legend pojok chart. */
+  onInfo: (i: InfoPine | null) => void;
+  /** Daftar skrip + aksi jalankan/nonaktif — bahan menu Indikator. */
+  onKendali: (k: KendaliPine) => void;
+}) {
+  const [daftar, setDaftar] = useState<SkripPine[]>(bacaDaftar);
+  const [idPilih, setIdPilih] = useState(() => {
+    const d = bacaDaftar();
+    return (d.find((s) => s.aktif) ?? d[0]).id;
+  });
+  const [hasil, setHasil] = useState<HasilPine | null>(null);
+  const [setelan, setSetelan] = useState<Record<string, NilaiSetelan>>(() => {
+    try { return JSON.parse(localStorage.getItem(KUNCI_INPUT) ?? '{}') as Record<string, NilaiSetelan>; }
+    catch { return {}; }
+  });
+
+  const pilih = daftar.find((s) => s.id === idPilih) ?? daftar[0];
+  const aktif = daftar.find((s) => s.aktif) ?? null;
+
+  function ubahDaftar(f: (d: SkripPine[]) => SkripPine[]) {
+    setDaftar((d) => { const b = f(d); simpanDaftar(b); return b; });
+  }
+
+  function potong(l: Lilin, batas?: number): Lilin {
+    if (batas === undefined || batas >= l.closes.length - 1) return l;
+    const n = batas + 1;
+    return {
+      opens: l.opens.slice(0, n), highs: l.highs.slice(0, n),
+      lows: l.lows.slice(0, n), closes: l.closes.slice(0, n),
+      times: l.times.slice(0, n),
+    };
+  }
+
+  function adaKeluaran(h: HasilPine) {
+    return h.plot.length || h.segmen?.length || h.penanda?.length || h.kotak?.length || h.isian?.length;
+  }
+
+  /* Nilai terkini untuk efek/panggilan tanpa menambah dependensi. */
+  const acuan = useRef({ lilin, tf, hingga, setelan, daftar });
+  acuan.current = { lilin, tf, hingga, setelan, daftar };
+
+  const eksekusi = useCallback((kode: string, nama: string) => {
+    const { lilin: l, tf: t, hingga: hg, setelan: st } = acuan.current;
+    if (!l.closes.length) return;
+    const h = jalankanPine(kode, potong(l, hg), t, st);
+    setHasil(h);
+    aturHasil(adaKeluaran(h) ? h : null);
+    onInfo({ nama, adaInput: !!h.input?.some((x) => x.jenis !== 'lain') });
+  }, [aturHasil, onInfo]);
+
+  const jalankan = useCallback((id: string) => {
+    const d = acuan.current.daftar;
+    const s = d.find((x) => x.id === id);
+    if (!s) return;
+    ubahDaftar((dd) => dd.map((x) => ({ ...x, aktif: x.id === id })));
+    setIdPilih(id);
+    eksekusi(s.kode, s.nama);
+  }, [eksekusi]);
+
+  const nonaktif = useCallback(() => {
+    ubahDaftar((d) => d.map((x) => ({ ...x, aktif: false })));
+    setHasil(null);
+    aturHasil(null);
+    onInfo(null);
+  }, [aturHasil, onInfo]);
+
+  /* Menu Indikator di luar sana butuh daftar + kendali. Dikirim ulang tiap
+     daftarnya berubah. */
+  useEffect(() => {
+    onKendali({
+      daftar: daftar.map(({ id, nama, aktif: a }) => ({ id, nama, aktif: a })),
+      jalankan, nonaktif,
+    });
+  }, [daftar, jalankan, nonaktif, onKendali]);
+
+  /* ── Skrip aktif dijalankan SENDIRI saat data pertama siap ──────────
+     Itulah arti "tersimpan default": indikator yang kemarin terpasang
+     sudah terpasang lagi hari ini, tanpa disuruh. */
+  const sudahOtomatis = useRef(false);
+  useEffect(() => {
+    if (sudahOtomatis.current || !lilin.closes.length) return;
+    sudahOtomatis.current = true;
+    const a = acuan.current.daftar.find((s) => s.aktif);
+    if (a) eksekusi(a.kode, a.nama);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lilin.closes.length]);
+
+  /* ── Ikut replay, bar baru, dan setelan — dihitung ulang hanya saat
+     kuncinya berubah, bukan tiap detak harga 3 detik. */
+  const kunciJalan = useRef<{ kunci: string; setelan: unknown }>({ kunci: '', setelan: null });
+  useEffect(() => {
+    if (!aktif || !lilin.closes.length) return;
+    const kunci = `${lilin.times.length}|${lilin.times[lilin.times.length - 1] ?? 0}|${hingga ?? -1}|${aktif.id}`;
+    if (kunci === kunciJalan.current.kunci && setelan === kunciJalan.current.setelan) return;
+    const jeda = setTimeout(() => {
+      kunciJalan.current = { kunci, setelan };
+      eksekusi(aktif.kode, aktif.nama);
+    }, 250);
+    return () => clearTimeout(jeda);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hingga, lilin, setelan, aktif?.id]);
+
+  function taruhSetelan(kunci: string, v: NilaiSetelan) {
+    setSetelan((s) => {
+      const b = { ...s, [kunci]: v };
+      try { localStorage.setItem(KUNCI_INPUT, JSON.stringify(b)); } catch { /* privat */ }
+      return b;
+    });
+  }
+
+  function kembaliBawaan(kunciDaftar: string[]) {
+    setSetelan((s) => {
+      const b = { ...s };
+      kunciDaftar.forEach((k) => delete b[k]);
+      try { localStorage.setItem(KUNCI_INPUT, JSON.stringify(b)); } catch { /* privat */ }
+      return b;
+    });
+  }
+
+  function ubahKode(v: string) {
+    ubahDaftar((d) => d.map((s) => (s.id === idPilih ? { ...s, kode: v, nama: namaDariKode(v) } : s)));
+  }
+
+  function skripBaru() {
+    const id = 's' + Date.now();
+    ubahDaftar((d) => [...d, { id, nama: 'Skrip baru', kode: '//@version=6\nindicator("Skrip baru", overlay=true)\n\nplot(ta.ema(close, 21), title="EMA 21", color=color.yellow)\n', aktif: false }]);
+    setIdPilih(id);
+  }
+
+  function hapusSkrip() {
+    if (daftar.length <= 1) return;
+    if (!confirm(`Hapus skrip "${pilih?.nama}"?`)) return;
+    const hapusAktif = pilih?.aktif;
+    ubahDaftar((d) => d.filter((s) => s.id !== idPilih));
+    const sisa = acuan.current.daftar.filter((s) => s.id !== idPilih);
+    setIdPilih(sisa[0]?.id ?? '');
+    if (hapusAktif) { setHasil(null); aturHasil(null); onInfo(null); }
+  }
+
+  const kelompok: [string, InputPine[]][] = [];
+  (hasil?.input ?? []).forEach((inp) => {
+    if (inp.jenis === 'lain') return;
+    const ada = kelompok.find(([g]) => g === inp.grup);
+    if (ada) ada[1].push(inp);
+    else kelompok.push([inp.grup, [inp]]);
+  });
+
+  return (
+    <div className={cn(
+      'absolute inset-y-0 right-0 z-30 flex w-[380px] max-w-[92%] flex-col border-l border-zinc-800 bg-zinc-950/[.97] backdrop-blur transition-transform duration-300',
+      buka ? 'translate-x-0' : 'pointer-events-none translate-x-full')}>
+      {/* ── Kepala: tab + tutup ── */}
+      <div className="flex items-center gap-1 border-b border-zinc-800 px-3 py-2">
+        <span className="mr-1 text-[12.5px] font-medium text-zinc-200">Pine Script</span>
+        {(['editor', 'input'] as const).map((t) => (
+          <button key={t} onClick={() => aturTab(t)}
+            className={cn('cursor-pointer rounded px-2 py-1 text-[11.5px] capitalize transition-colors',
+              tab === t ? 'bg-zinc-800 text-zinc-100' : 'text-zinc-500 hover:text-zinc-200')}>
+            {t === 'editor' ? 'Editor' : 'Input'}
+          </button>
+        ))}
+        <button onClick={onTutup} title="Tutup panel"
+          className="ml-auto cursor-pointer rounded p-1 text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-200">
+          <X className="size-4" />
+        </button>
+      </div>
+
+      {tab === 'editor' ? (
+        <div className="flex min-h-0 grow flex-col gap-2 p-3">
+          <div className="flex items-center gap-1.5">
+            <select value={idPilih} onChange={(e) => setIdPilih(e.target.value)}
+              className="h-7 min-w-0 grow cursor-pointer rounded border border-zinc-800 bg-zinc-900 px-1.5 text-[12px] text-zinc-200 outline-none">
+              {daftar.map((s) => (
+                <option key={s.id} value={s.id}>{s.aktif ? '● ' : ''}{s.nama}</option>
+              ))}
+            </select>
+            <button onClick={skripBaru} title="Skrip baru"
+              className="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded border border-zinc-800 text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-100">
+              <Plus className="size-3.5" />
+            </button>
+            <button onClick={hapusSkrip} disabled={daftar.length <= 1} title="Hapus skrip ini"
+              className="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded border border-zinc-800 text-zinc-500 transition-colors hover:border-red-500/40 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-40">
+              <Trash2 className="size-3.5" />
+            </button>
+          </div>
+
+          <textarea value={pilih?.kode ?? ''} onChange={(e) => ubahKode(e.target.value)} spellCheck={false}
+            className="min-h-0 grow resize-none rounded-md border border-zinc-800 bg-zinc-900/60 p-2.5 font-mono text-[11px] leading-relaxed text-zinc-200 outline-none focus-visible:border-zinc-600" />
+
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button onClick={() => jalankan(idPilih)} disabled={!lilin.closes.length}
+              className="flex cursor-pointer items-center gap-1.5 rounded-md bg-zinc-100 px-3 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:opacity-50">
+              <Play className="size-3.5" /> Jalankan di chart
+            </button>
+            {aktif && (
+              <button onClick={nonaktif}
+                className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 py-1.5 text-[12px] text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200">
+                <Square className="size-3" /> Lepas dari chart
+              </button>
+            )}
+          </div>
+
+          {hasil && (
+            <div className="gulir-senyap min-h-0 shrink-0 basis-auto space-y-1.5 overflow-y-auto" style={{ maxHeight: '30%' }}>
+              {adaKeluaran(hasil) ? (
+                <div className="flex items-start gap-1.5 rounded-md border border-emerald-500/20 bg-emerald-500/[0.04] p-2 text-[11.5px] text-zinc-300">
+                  <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-emerald-500" />
+                  <span>
+                    {[
+                      hasil.plot.length ? `${hasil.plot.length} garis` : '',
+                      hasil.segmen?.length ? `${hasil.segmen.length} trendline` : '',
+                      hasil.penanda?.length ? `${hasil.penanda.length} label` : '',
+                      hasil.kotak?.length ? `${hasil.kotak.length} zona` : '',
+                      hasil.isian?.length ? `${hasil.isian.length} isian` : '',
+                    ].filter(Boolean).join(' · ')} digambar
+                  </span>
+                </div>
+              ) : null}
+              {hasil.galat.length > 0 && (
+                <div className="rounded-md border border-amber-500/25 bg-amber-500/[0.04] p-2">
+                  <div className="mb-1 flex items-center gap-1.5 text-[11.5px] text-amber-300">
+                    <TriangleAlert className="size-3.5" /> {hasil.galat.length} baris ditolak
+                  </div>
+                  <ul className="space-y-0.5 font-mono text-[10.5px] text-amber-200/80">
+                    {hasil.galat.slice(0, 8).map((g) => <li key={g}>{g}</li>)}
+                  </ul>
+                </div>
+              )}
+              {hasil.dilewati.length > 0 && (
+                <details className="rounded-md border border-zinc-800/60 p-2">
+                  <summary className="cursor-pointer text-[11px] text-zinc-500">
+                    {hasil.dilewati.length} baris dilewati
+                  </summary>
+                  <ul className="mt-1 space-y-0.5 font-mono text-[10px] text-zinc-600">
+                    {hasil.dilewati.map((g) => <li key={g}>{g}</li>)}
+                  </ul>
+                </details>
+              )}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="gulir-senyap min-h-0 grow overflow-y-auto p-3">
+          {kelompok.length === 0 ? (
+            <p className="py-8 text-center text-[12px] text-zinc-600">
+              {aktif ? 'Skrip ini tidak punya input yang bisa diatur.' : 'Jalankan sebuah skrip dulu — inputnya muncul di sini.'}
+            </p>
+          ) : (
+            <>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <span className="text-[11px] text-zinc-500">Perubahan langsung digambar ulang.</span>
+                <button onClick={() => kembaliBawaan((hasil?.input ?? []).map((x) => x.kunci))}
+                  className="flex shrink-0 cursor-pointer items-center gap-1 rounded-md border border-zinc-800 px-2 py-1 text-[11px] text-zinc-400 transition-colors hover:border-zinc-700 hover:text-zinc-200">
+                  <RotateCcw className="size-3" /> Bawaan
+                </button>
+              </div>
+              {kelompok.map(([grup, dft]) => (
+                <div key={grup || '(umum)'} className="mb-3 last:mb-0">
+                  {grup && (
+                    <div className="mb-1 border-b border-zinc-800/60 pb-1 text-[10px] font-medium uppercase tracking-wide text-zinc-600">
+                      {grup}
+                    </div>
+                  )}
+                  <div className="space-y-0.5">
+                    {dft.map((inp) => (
+                      <KontrolInput key={inp.kunci} inp={inp} nilai={setelan[inp.kunci]}
+                                    atur={(v) => taruhSetelan(inp.kunci, v)} />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

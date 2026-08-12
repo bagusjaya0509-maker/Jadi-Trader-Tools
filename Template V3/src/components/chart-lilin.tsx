@@ -8,6 +8,7 @@ import { cn, harga as fHarga } from '@/lib/utils';
 import type { TradeUji } from '@/lib/backtest';
 import type { SegmenPine, PenandaPine, KotakPine, IsianPine } from '@/lib/pine-bar';
 import { PenggambarIsi } from '@/lib/plugin-isi';
+import { PenggambarAlat, type GambarAlat, type JenisAlat } from '@/lib/plugin-alat';
 
 /* ════════════════════════════════════════════════════════════════════════
    CHART LILIN
@@ -64,6 +65,7 @@ export interface GarisSeret {
 export function ChartLilin({
   lilin, garis, trade, tinggi = 420, hingga, garisHarga, onKlikBar, smi, mundur, pojok,
   garisSeret, onSeret, onHapusGaris, hamparanBawah, segmen, penandaPine, kotakPine, isianPine,
+  alat, onAlatSelesai, gambarAlat,
 }: {
   lilin: Lilin;
   garis?: Garis[];
@@ -100,6 +102,12 @@ export function ChartLilin({
   kotakPine?: KotakPine[];
   /** Isian antar dua garis (linefill) — pewarna tengah channel paralel. */
   isianPine?: IsianPine[];
+  /** Alat gambar yang sedang dipegang — null berarti kursor biasa. */
+  alat?: JenisAlat | null;
+  /** Dipanggil saat satu tarikan alat selesai. */
+  onAlatSelesai?: (g: Omit<GambarAlat, 'id'>) => void;
+  /** Gambar tangan yang sudah jadi — ukur, fib, kotak. */
+  gambarAlat?: GambarAlat[];
 }) {
   const kotak = useRef<HTMLDivElement>(null);
   const chart = useRef<IChartApi | null>(null);
@@ -109,6 +117,7 @@ export function ChartLilin({
   const seriSmi = useRef<ISeriesApi<'Line'>[]>([]);
   const garisPos = useRef<IPriceLine[]>([]);
   const isiPine = useRef<PenggambarIsi | null>(null);
+  const alatPrim = useRef<PenggambarAlat | null>(null);
   /* Handler klik disimpan di ref supaya langganannya dipasang SEKALI.
      Melanggan ulang tiap render menumpuk pendengar di chart yang sama. */
   const klikRef = useRef(onKlikBar);
@@ -150,11 +159,14 @@ export function ChartLilin({
     const prim = new PenggambarIsi();
     seri.current.attachPrimitive(prim);
     isiPine.current = prim;
+    const primAlat = new PenggambarAlat();
+    seri.current.attachPrimitive(primAlat);
+    alatPrim.current = primAlat;
     c.subscribeClick((p) => {
       if (klikRef.current && typeof p.logical === 'number') klikRef.current(Math.round(p.logical));
     });
 
-    return () => { c.remove(); chart.current = null; seri.current = null; seriGaris.current = []; penanda.current = null; garisPos.current = []; isiPine.current = null; };
+    return () => { c.remove(); chart.current = null; seri.current = null; seriGaris.current = []; penanda.current = null; garisPos.current = []; isiPine.current = null; alatPrim.current = null; };
   }, []);
 
   /* Data lilin */
@@ -373,6 +385,90 @@ export function ChartLilin({
     tanda.sort((a, b) => (a.time as number) - (b.time as number));
     p.setMarkers(tanda);
   }, [trade, penandaPine, lilin]);
+
+  /* ── Gambar tangan: data + interaksi tariknya ──────────────────────
+     Saat sebuah alat dipegang, seret-geser chart DIMATIKAN dan kursor jadi
+     crosshair: satu gerakan tarik = satu gambar. Koordinatnya stempel
+     waktu, jadi gambarnya tidak merayap saat lilin baru lahir. */
+  useEffect(() => {
+    const n = lilin.times.length;
+    const tfMs = n > 1 ? lilin.times[1] - lilin.times[0] : 3_600_000;
+    alatPrim.current?.setData(gambarAlat ?? [], { tAkhir: n ? lilin.times[n - 1] : 0, tfMs, n });
+  }, [gambarAlat, lilin]);
+
+  useEffect(() => {
+    const c = chart.current;
+    if (!c) return;
+    c.applyOptions({ handleScroll: !alat, handleScale: !alat });
+    if (kotak.current) kotak.current.style.cursor = alat ? 'crosshair' : '';
+  }, [alat]);
+
+  const tarikAlat = useRef<{ t1: number; h1: number } | null>(null);
+  useEffect(() => {
+    if (!alat || !onAlatSelesai) return;
+    const el = kotak.current;
+    if (!el) return;
+
+    const posisiDari = (e: MouseEvent): { t: number; h: number } | null => {
+      const c = chart.current, s = seri.current;
+      if (!c || !s) return null;
+      const rect = el.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const paneH = paneHargaRef.current || rect.height;
+      const y = Math.min(Math.max(e.clientY - rect.top, 2), paneH - 2);
+      const h = s.coordinateToPrice(y);
+      if (typeof h !== 'number' || !isFinite(h)) return null;
+      /* Waktu dari koordinat; di luar data (kanan lilin terakhir) jatuh ke
+         sumbu logika + durasi timeframe. */
+      const t = c.timeScale().coordinateToTime(x);
+      if (t != null) return { t: (t as number) * 1000, h };
+      const l = c.timeScale().coordinateToLogical(x);
+      const times = acuan.current.lilin.times;
+      if (l == null || times.length < 2) return null;
+      const tfMs = times[1] - times[0];
+      return { t: times[times.length - 1] + (l - (times.length - 1)) * tfMs, h };
+    };
+
+    const turun = (e: MouseEvent) => {
+      if (e.button !== 0) return;
+      const p = posisiDari(e);
+      if (!p) return;
+      tarikAlat.current = { t1: p.t, h1: p.h };
+      alatPrim.current?.setPratinjau({ jenis: alat, t1: p.t, h1: p.h, t2: p.t, h2: p.h });
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    const gerak = (e: MouseEvent) => {
+      const a = tarikAlat.current;
+      if (!a) return;
+      const p = posisiDari(e);
+      if (!p) return;
+      alatPrim.current?.setPratinjau({ jenis: alat, t1: a.t1, h1: a.h1, t2: p.t, h2: p.h });
+    };
+    const lepas = (e: MouseEvent) => {
+      const a = tarikAlat.current;
+      if (!a) return;
+      tarikAlat.current = null;
+      alatPrim.current?.setPratinjau(null);
+      const p = posisiDari(e);
+      /* Klik tanpa tarikan bukan gambar — titik tunggal tidak menyimpan
+         informasi apa pun. */
+      if (p && (Math.abs(p.t - a.t1) > 1 || p.h !== a.h1)) {
+        onAlatSelesai({ jenis: alat, t1: a.t1, h1: a.h1, t2: p.t, h2: p.h });
+      }
+    };
+    /* Fase capture: menang atas penangan chart & garis seret. */
+    el.addEventListener('mousedown', turun, true);
+    window.addEventListener('mousemove', gerak);
+    window.addEventListener('mouseup', lepas);
+    return () => {
+      el.removeEventListener('mousedown', turun, true);
+      window.removeEventListener('mousemove', gerak);
+      window.removeEventListener('mouseup', lepas);
+      tarikAlat.current = null;
+      alatPrim.current?.setPratinjau(null);
+    };
+  }, [alat, onAlatSelesai]);
 
   /* ── Menempelkan hamparan ke skala harga ───────────────────────────
      Posisinya ditulis LANGSUNG ke gaya elemennya di dalam

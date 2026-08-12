@@ -1,13 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Play, Loader2, RefreshCw, Radio, TriangleAlert, History } from 'lucide-react';
+import {
+  Play, Loader2, RefreshCw, Radio, TriangleAlert, History,
+  Layers, ChevronDown, Settings2, Code2, X, Ruler, Rows3, Square, Eraser,
+} from 'lucide-react';
 import { Panel, PanelHead, KartuKpi, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn, uang, persen, harga, tanggalPendek } from '@/lib/utils';
 import { ChartLilin, type Garis, type GarisHarga, type GarisSeret } from '@/components/chart-lilin';
 import { PanelReplay, type AksiOrder, type JenisEntry } from '@/components/panel-replay';
 import { PojokOrder } from '@/components/pojok-order';
 import { kirimOrderNyata, type MetodeTp } from '@/lib/order-nyata';
-import { PanelPine } from '@/components/panel-pine';
+import { kirimPerintahMt5, tungguHasilMt5 } from '@/lib/mt5-order';
+import { DockPine, type InfoPine, type KendaliPine } from '@/components/dock-pine';
+import { WatchChart } from '@/components/watch-chart';
+import type { JenisAlat, GambarAlat } from '@/lib/plugin-alat';
 import type { HasilPine } from '@/lib/pine';
 import { bacaSetelanChart, simpanSetelanChart } from '@/lib/replay';
 import { ambilKlines, type Lilin } from '@/lib/pasar';
@@ -112,6 +118,42 @@ export default function ChartBacktest() {
   const [garisHarga, setGarisHarga] = useState<GarisHarga[]>([]);
   const [aksi, setAksi] = useState<AksiOrder | null>(null);
   const [pine, setPine] = useState<HasilPine | null>(null);
+  /* ── Menu indikator, dock Pine, watchlist, alat gambar ─────────────
+     SNR, SMI, dan skrip Pine kini satu keluarga di balik satu tombol
+     Indikator; yang aktif tampil sebagai legend di pojok chart, persis
+     TradingView. Dock Pine meluncur dari kanan supaya menyunting skrip
+     tidak pernah kehilangan chartnya dari pandangan. */
+  const [menuInd, setMenuInd] = useState(false);
+  const [dockBuka, setDockBuka] = useState(false);
+  const [dockTab, setDockTab] = useState<'editor' | 'input'>('editor');
+  const [pineInfo, setPineInfo] = useState<InfoPine | null>(null);
+  const [kendaliPine, setKendaliPine] = useState<KendaliPine | null>(null);
+  const [watchBuka, setWatchBuka] = useState(false);
+  /* Alat gambar tangan — ukur %, fibonacci, kotak SNR. Gambarnya milik
+     SIMBOL+TF: kotak support BTC 1 jam tidak ada urusannya dengan ETH. */
+  const [alat, setAlat] = useState<JenisAlat | null>(null);
+  const [gambarAlat, setGambarAlat] = useState<GambarAlat[]>([]);
+  useEffect(() => {
+    try {
+      const d = JSON.parse(localStorage.getItem(`jt.alat.${simbol}|${tf}`) ?? '[]') as GambarAlat[];
+      setGambarAlat(Array.isArray(d) ? d : []);
+    } catch { setGambarAlat([]); }
+    setAlat(null);
+  }, [simbol, tf]);
+  const tambahGambar = useCallback((g: Omit<GambarAlat, 'id'>) => {
+    setGambarAlat((d) => {
+      const b = [...d, { ...g, id: 'g' + Date.now() }];
+      try { localStorage.setItem(`jt.alat.${simbol}|${tf}`, JSON.stringify(b)); } catch { /* privat */ }
+      return b;
+    });
+    /* Satu tarikan, satu gambar — kembali ke kursor biasa. Menggambar lagi
+       tinggal menekan alatnya lagi; alat yang menempel diam-diam membuat
+       seretan chart berikutnya jadi kotak yang tidak diminta. */
+    setAlat(null);
+  }, [simbol, tf]);
+  function bukaDock(t: 'editor' | 'input') {
+    setDockTab(t); setDockBuka(true); setWatchBuka(false); setMenuInd(false);
+  }
   const [kendaliReplay, setKendaliReplay] = useState<React.ReactNode>(null);
   /* Arah tiket yang sedang disusun. null = belum ada tiket, chart cuma
      menggambar rencana dari kartu screener kalau ada. */
@@ -126,6 +168,9 @@ export default function ChartBacktest() {
   /* Emosi & alasan diisi SEBELUM kirim — masuk jurnal (demo) dan record
      posisi screener (real). Jurnal tanpa alasan cuma daftar angka. */
   const [catatanTiket, setCatatanTiket] = useState({ emosi: 'Netral', alasan: '' });
+  /* Lot untuk order REAL simbol MT5 — bursa berjalan pakai qty dari modal ×
+     leverage; MT5 berpikir dalam lot, jadi kolomnya memang beda. */
+  const [lotMt5, setLotMt5] = useState(0.01);
 
   /* Mengubah SL ×ATR / R:R saat tiket TERBUKA langsung menggeser garisnya —
      setelan yang baru berlaku untuk tiket berikutnya terasa seperti setelan
@@ -224,7 +269,11 @@ export default function ChartBacktest() {
       try {
         const l = await ambilKlines(simbol, tf, 500, true);
         if (!hidup) return;
-        if (!l.closes.length) { setGalat('Data tidak diterima. Proxy VPS mungkin sedang tidak menjawab.'); }
+        if (!l.closes.length) {
+          setGalat(simbol.startsWith('MT5:')
+            ? 'Belum ada data dari terminal MT5 — buka MT5 dengan EA Trade-Fi Sync v2 terpasang; chart terisi begitu EA mengirim (± tiap 5 menit).'
+            : 'Data tidak diterima. Proxy VPS mungkin sedang tidak menjawab.');
+        }
         else { setLilin(l); setGalat(''); }
       } catch (e) {
         if (hidup) setGalat(e instanceof Error ? e.message : 'Gagal mengambil data');
@@ -416,7 +465,8 @@ export default function ChartBacktest() {
     /* Bentuk yang jelas bukan simbol tidak dikirim ke proxy sama sekali;
        kotaknya dikembalikan ke simbol yang sedang tampil supaya tidak ada
        yang mengira grafiknya sedang menampilkan apa yang tertulis. */
-    if (!/^[A-Z0-9]{5,15}$/.test(v)) { setKetik(simbol); return; }
+    /* Awalan MT5: = sumber Trade-Fi (OHLC dari terminal MT5 lewat EA v2). */
+    if (!/^(MT5:)?[A-Z0-9]{3,15}$/.test(v)) { setKetik(simbol); return; }
     if (v !== simbol) setSimbol(v);
   }
 
@@ -513,6 +563,9 @@ export default function ChartBacktest() {
                    placeholder="BTCUSDT"
                    className={cn(KELAS_ISIAN, 'angka')} />
             <datalist id="simbolChart">
+              {/* Sumber Trade-Fi di urutan teratas — satu-satunya entri yang
+                  bukan Binance, jadi ia yang paling butuh terlihat ada. */}
+              <option value="MT5:XAUUSD">Trade-Fi — dari MT5 (EA v2)</option>
               {SIMBOL_DASAR.map((s) => <option key={s} value={s} />)}
             </datalist>
           </div>
@@ -535,6 +588,12 @@ export default function ChartBacktest() {
                 {gerak >= 0 ? '+' : ''}{gerak.toFixed(2)}%
               </span>
             )}
+            {simbol.startsWith('MT5:') && (
+              <span className="mb-1 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-amber-300"
+                    title="OHLC dari terminal MT5-mu, dikirim EA Trade-Fi Sync v2 tiap beberapa menit. Order REAL di simbol ini berangkat ke MT5, bukan Binance.">
+                TRADE-FI · MT5
+              </span>
+            )}
             {/* Hitung mundurnya sekarang MENEMPEL di sisi skala harga di dalam
                 chart, sejajar label harga — sama seperti TradingView. Di
                 bilah atas ia jauh dari tempat mata sedang berada. */}
@@ -548,18 +607,68 @@ export default function ChartBacktest() {
               className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100">
               <RefreshCw className={cn('size-3.5', memuat && 'animate-spin')} /> Segarkan
             </button>
-            <label title="Zona support & resisten dari logika yang sama dengan Screener Entry"
-              className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-700">
-              <input type="checkbox" checked={tampilSnr} onChange={(e) => setTampilSnr(e.target.checked)}
-                     className="size-3.5 cursor-pointer accent-zinc-200" />
-              Zona SNR
-            </label>
-            <label title="Panel SMI di bawah chart — perhitungan yang sama dengan Screener Entry"
-              className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-700">
-              <input type="checkbox" checked={tampilSmi} onChange={(e) => setTampilSmi(e.target.checked)}
-                     className="size-3.5 cursor-pointer accent-zinc-200" />
-              SMI
-            </label>
+            {/* ── SATU menu untuk semua indikator ─────────────────────
+                Dua checkbox yang berjajar akan jadi lima begitu indikator
+                bertambah; menu tumbuh ke bawah, bilah kendali tidak. Skrip
+                Pine yang pernah dijalankan ikut terdaftar di sini dan
+                diingat — memasangnya kembali satu klik, bukan tempel-ulang. */}
+            <div className="relative">
+              <button onClick={() => setMenuInd((v) => !v)}
+                className={cn('flex cursor-pointer items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[12px] transition-colors',
+                  menuInd ? 'border-zinc-600 text-zinc-100' : 'border-zinc-800 text-zinc-300 hover:border-zinc-700 hover:text-zinc-100')}>
+                <Layers className="size-3.5" /> Indikator
+                {(Number(tampilSnr) + Number(tampilSmi) + (pineInfo ? 1 : 0)) > 0 && (
+                  <span className="rounded bg-zinc-800 px-1 text-[10px] text-zinc-300">
+                    {Number(tampilSnr) + Number(tampilSmi) + (pineInfo ? 1 : 0)}
+                  </span>
+                )}
+                <ChevronDown className="size-3" />
+              </button>
+              {menuInd && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setMenuInd(false)} />
+                  <div className="absolute right-0 top-full z-40 mt-1 w-72 rounded-lg border border-zinc-800 bg-zinc-950 p-1.5 shadow-2xl">
+                    <div className="px-2 pb-1 pt-0.5 text-[10px] font-medium uppercase tracking-wider text-zinc-600">Bawaan</div>
+                    <label className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors hover:bg-zinc-900">
+                      <input type="checkbox" checked={tampilSnr} onChange={(e) => setTampilSnr(e.target.checked)}
+                             className="size-3.5 cursor-pointer accent-emerald-500" />
+                      <span className="min-w-0">
+                        <span className="block text-[12px] text-zinc-200">Zona SNR</span>
+                        <span className="block truncate text-[10.5px] text-zinc-600">Support & resisten dari logika Screener Entry</span>
+                      </span>
+                    </label>
+                    <label className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors hover:bg-zinc-900">
+                      <input type="checkbox" checked={tampilSmi} onChange={(e) => setTampilSmi(e.target.checked)}
+                             className="size-3.5 cursor-pointer accent-emerald-500" />
+                      <span className="min-w-0">
+                        <span className="block text-[12px] text-zinc-200">SMI</span>
+                        <span className="block truncate text-[10.5px] text-zinc-600">Panel osilator di bawah chart</span>
+                      </span>
+                    </label>
+                    <div className="mt-1 flex items-center justify-between border-t border-zinc-800/70 px-2 pb-1 pt-1.5">
+                      <span className="text-[10px] font-medium uppercase tracking-wider text-zinc-600">Pine Script</span>
+                      <button onClick={() => bukaDock('editor')}
+                        className="cursor-pointer rounded px-1.5 py-0.5 text-[11px] text-zinc-400 transition-colors hover:bg-zinc-900 hover:text-zinc-100">
+                        + Buat / tempel
+                      </button>
+                    </div>
+                    {(kendaliPine?.daftar ?? []).map((s) => (
+                      <button key={s.id}
+                        onClick={() => {
+                          if (!kendaliPine) return;
+                          if (s.aktif) kendaliPine.nonaktif(); else kendaliPine.jalankan(s.id);
+                          setMenuInd(false);
+                        }}
+                        className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-zinc-900">
+                        <span className={cn('size-2 shrink-0 rounded-full', s.aktif ? 'bg-emerald-500' : 'border border-zinc-700')} />
+                        <span className="min-w-0 grow truncate text-[12px] text-zinc-200">{s.nama}</span>
+                        <span className="shrink-0 text-[10.5px] text-zinc-600">{s.aktif ? 'aktif' : 'pasang'}</span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
             <button onClick={() => {
                 if (replayIdx !== null) { setReplayIdx(null); return; }
                 mulaiReplay.current?.();
@@ -583,6 +692,11 @@ export default function ChartBacktest() {
         )}
 
         <div className="border-t border-zinc-800/80 px-2 pb-2">
+          {/* relative + overflow-hidden: rumah semua hamparan chart — legend,
+              alat gambar, dock Pine, dan watchlist yang meluncur dari kanan.
+              Tanpa overflow-hidden, panel yang sedang tersembunyi
+              (translate-x-full) melebarkan halaman. */}
+          <div className="relative overflow-hidden">
           {lilin.times.length > 0
             ? <ChartLilin key={`${simbol}|${tf}|${kunciChart}`}
                           lilin={lilin} garis={garis} trade={replayIdx === null ? hasil?.trade : undefined}
@@ -603,6 +717,9 @@ export default function ChartBacktest() {
                           isianPine={pine?.isian}
                           penandaPine={pine?.penanda}
                           kotakPine={pine?.kotak}
+                          alat={alat}
+                          onAlatSelesai={tambahGambar}
+                          gambarAlat={gambarAlat}
                           mundur={DURASI_TF[tf] ? jamMundur(detik) : undefined}
                           hamparanBawah={kendaliReplay}
                           pojok={aksi ? (
@@ -654,6 +771,35 @@ export default function ChartBacktest() {
                                 const { entry, sl, tp } = rencana;
                                 if (!draf || !entry || !sl || !tp) return;
                                 if (aksi.mode === 'real') {
+                                  if (simbol.startsWith('MT5:')) {
+                                    /* Jalur TRADE-FI: perintah masuk antrean
+                                       server, EA v2 di terminal MT5 yang
+                                       mengeksekusi, lalu nasibnya dijajaki
+                                       sampai EA melapor. Sementara MARKET
+                                       saja — pending order MT5 menyusul. */
+                                    if (jenisEntry !== 'MARKET') {
+                                      setKabarNyata('Order MT5 lewat web sementara MARKET saja — geser garis entry ke dekat harga pasar.');
+                                      return;
+                                    }
+                                    if (!(lotMt5 > 0)) { setKabarNyata('Isi lot dulu.'); return; }
+                                    if (!confirm(`Kirim ke MT5:\n${draf} ${lotMt5} lot ${simbol.slice(4)}\nSL ${sl}  ·  TP ${tp}\n\nEA & AutoTrading harus menyala.`)) return;
+                                    setSibukNyata(true);
+                                    setKabarNyata('Mengirim perintah ke EA…');
+                                    void kirimPerintahMt5({ aksi: 'BUKA', simbol: simbol.slice(4), arah: draf, lot: lotMt5, sl, tp })
+                                      .then(async ({ id }) => {
+                                        setKabarNyata('Perintah antre — EA menjemput tiap 5 detik…');
+                                        const h = await tungguHasilMt5(id);
+                                        setKabarNyata(
+                                          h.status === 'sukses' ? `Terbuka di MT5 — ${h.pesan}`
+                                          : h.status === 'gagal' ? `EA menolak: ${h.pesan}`
+                                          : h.status === 'kedaluwarsa' ? 'Perintah kedaluwarsa — EA tidak menjemput dalam 5 menit.'
+                                          : h.pesan);
+                                        if (h.status === 'sukses') { setDraf(null); setRencana({}); }
+                                      })
+                                      .catch((e) => setKabarNyata(e instanceof Error ? e.message : 'Gagal mengirim perintah'))
+                                      .finally(() => setSibukNyata(false));
+                                    return;
+                                  }
                                   /* Konfirmasi berisi angka ada DI DALAM
                                      kirimOrderNyata — jalur yang sama persis
                                      dengan Area Entry V2, termasuk pengaman
@@ -677,6 +823,7 @@ export default function ChartBacktest() {
                                 setDraf(null);
                               }}
                               nyataSetelan={nyataSetelan} aturNyata={setNyataSetelan}
+                              mt5={simbol.startsWith('MT5:')} lotMt5={lotMt5} aturLotMt5={setLotMt5}
                               demoSetelan={demoSetelan} aturDemo={setDemoSetelan}
                               catatan={catatanTiket} aturCatatan={setCatatanTiket}
                               sibukNyata={sibukNyata} kabar={kabarNyata || undefined}
@@ -685,6 +832,88 @@ export default function ChartBacktest() {
             : <div className="flex h-[440px] items-center justify-center text-[12.5px] text-zinc-600">
                 {memuat ? 'Memuat lilin…' : 'Tidak ada data untuk simbol ini.'}
               </div>}
+
+          {/* ── Legend indikator ala TradingView — pojok kiri-atas ────
+              Nama yang terpasang tertulis DI chartnya, dengan ikon setelan
+              dan kode di sebelahnya. Indikator tanpa nama di layar adalah
+              garis misterius; indikator yang bernama adalah alat. */}
+          <div className="pointer-events-none absolute left-2 top-12 z-20 flex flex-col items-start gap-1">
+            {pineInfo && (
+              <div className="pointer-events-auto flex items-center gap-1 rounded-md bg-zinc-950/75 px-2 py-1 backdrop-blur-sm">
+                <span className="max-w-[200px] truncate text-[11px] text-zinc-200" title={pineInfo.nama}>{pineInfo.nama}</span>
+                {pineInfo.adaInput && (
+                  <button onClick={() => bukaDock('input')} title="Setelan input"
+                    className="cursor-pointer rounded p-0.5 text-zinc-500 transition-colors hover:text-zinc-100">
+                    <Settings2 className="size-3" />
+                  </button>
+                )}
+                <button onClick={() => bukaDock('editor')} title="Buka kodenya"
+                  className="cursor-pointer rounded p-0.5 text-zinc-500 transition-colors hover:text-zinc-100">
+                  <Code2 className="size-3" />
+                </button>
+                <button onClick={() => kendaliPine?.nonaktif()} title="Lepas dari chart"
+                  className="cursor-pointer rounded p-0.5 text-zinc-500 transition-colors hover:text-red-400">
+                  <X className="size-3" />
+                </button>
+              </div>
+            )}
+            {tampilSnr && (
+              <div className="pointer-events-auto flex items-center gap-1 rounded-md bg-zinc-950/75 px-2 py-1 backdrop-blur-sm">
+                <span className="text-[11px] text-zinc-300">Zona SNR</span>
+                <button onClick={() => setTampilSnr(false)} title="Sembunyikan"
+                  className="cursor-pointer rounded p-0.5 text-zinc-500 transition-colors hover:text-red-400">
+                  <X className="size-3" />
+                </button>
+              </div>
+            )}
+            {tampilSmi && (
+              <div className="pointer-events-auto flex items-center gap-1 rounded-md bg-zinc-950/75 px-2 py-1 backdrop-blur-sm">
+                <span className="text-[11px] text-zinc-300">SMI</span>
+                <button onClick={() => setTampilSmi(false)} title="Sembunyikan"
+                  className="cursor-pointer rounded p-0.5 text-zinc-500 transition-colors hover:text-red-400">
+                  <X className="size-3" />
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* ── Alat gambar — bilah tegak di tepi kiri, ala TradingView ── */}
+          <div className="absolute left-2 top-1/2 z-20 flex -translate-y-1/2 flex-col gap-0.5 rounded-lg border border-zinc-800/80 bg-zinc-950/85 p-1 backdrop-blur-sm">
+            {([
+              ['ukur', Ruler, 'Ukur % kenaikan / penurunan — klik lalu tarik'],
+              ['fib', Rows3, 'Fibonacci retracement — tarik dari swing ke swing'],
+              ['kotak', Square, 'Kotak SNR manual — tarik membentuk zonanya'],
+            ] as const).map(([j, Ikon, judul]) => (
+              <button key={j} onClick={() => setAlat(alat === j ? null : j)} title={judul}
+                className={cn('flex size-7 cursor-pointer items-center justify-center rounded transition-colors',
+                  alat === j ? 'bg-zinc-100 text-zinc-950' : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100')}>
+                <Ikon className="size-3.5" />
+              </button>
+            ))}
+            <button
+              onClick={() => {
+                if (!gambarAlat.length) return;
+                if (!confirm(`Hapus ${gambarAlat.length} gambar di ${simbol} ${tf}?`)) return;
+                setGambarAlat([]);
+                try { localStorage.setItem(`jt.alat.${simbol}|${tf}`, '[]'); } catch { /* privat */ }
+              }}
+              disabled={!gambarAlat.length} title="Hapus semua gambar di simbol & timeframe ini"
+              className="flex size-7 cursor-pointer items-center justify-center rounded text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-35">
+              <Eraser className="size-3.5" />
+            </button>
+          </div>
+
+          {/* Dock Pine & watchlist SELALU terpasang (autorun skrip aktif dan
+              harga watchlist hidup di dalamnya); yang berganti hanya
+              geserannya. */}
+          <DockPine buka={dockBuka} tab={dockTab} aturTab={setDockTab}
+                    onTutup={() => setDockBuka(false)}
+                    lilin={lilin} tf={tf} hingga={replayIdx ?? undefined}
+                    aturHasil={setPine} onInfo={setPineInfo} onKendali={setKendaliPine} />
+          <WatchChart buka={watchBuka}
+                      onToggle={() => { setWatchBuka((v) => !v); setDockBuka(false); }}
+                      simbol={simbol} onPilih={setSimbol} />
+          </div>
           {/* Pegangan tinggi chart: diseret = diatur, dilepas = dikunci dan
               diingat sebagai bawaan, klik dua kali = kembali otomatis. */}
           <div onPointerDown={mulaiSeretTinggi}
@@ -713,8 +942,6 @@ export default function ChartBacktest() {
                        tanpaBingkai />
         </div>
       </Panel>
-
-      <PanelPine lilin={lilin} tf={tf} hingga={replayIdx ?? undefined} aturHasil={setPine} />
 
       {/* ── Setelan uji ── */}
       <Panel className="mt-4">

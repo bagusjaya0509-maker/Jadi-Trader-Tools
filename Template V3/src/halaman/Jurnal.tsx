@@ -259,7 +259,7 @@ function PanelPosisiJurnal({ sumber }: { sumber: Sumber }) {
             {sumber === 'kripto' ? 'Tidak ada posisi kripto terbuka.' : mt5.terhubung === true ? 'Tidak ada posisi MT5 terbuka.' : mt5.ket}
           </div>
         ) : (
-          <div className="max-h-[190px] space-y-2 overflow-y-auto">
+          <div className="gulir-senyap max-h-[190px] space-y-2 overflow-y-auto">
             {baris.map((b) => (
               <div key={b.kunci} className="flex items-center justify-between gap-2 rounded-lg border border-zinc-800/60 px-3 py-2">
                 <span className="flex min-w-0 items-center gap-2">
@@ -311,7 +311,7 @@ function CatatanKecil({ c }: { c: { nada: 'baik' | 'awas' | 'buruk'; teks: strin
  *  Dipakai dua kali dengan daftar transaksi berbeda. Menuliskannya dua kali
  *  akan membuat kedua jurnal berbeda diam-diam dalam dua putaran revisi —
  *  persis yang terjadi pada `statPer` sebelum diperbaiki. */
-function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun, labelSaldo, keIntegrasi, sumber, arus, bisaTulis, contoh = false, pemisah = false, tanpaEmosi = false }: {
+function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun, labelSaldo, keIntegrasi, sumber, arus, bisaTulis, contoh = false, pemisah = false }: {
   judul: string; ket: string; Ikon: typeof Bitcoin;
   trade: Trade[]; saldoAwal: number; warna: string; idGradien: string;
   akun: StatusAkun; labelSaldo: string; keIntegrasi: string;
@@ -320,7 +320,6 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
   pemisah?: boolean;
   /** Kripto: pola emosinya sudah terwakili di Trade-Fi; riwayatnya yang
    *  butuh lebar penuh karena berisi ratusan baris sinkron. */
-  tanpaEmosi?: boolean;
 }) {
   /* Setoran & penarikan masuk ke SALDO, bukan ke P/L — jadi ia digabung ke
      saldo awal, bukan ke daftar transaksi. Kalau ikut ke transaksi, menyetor
@@ -608,11 +607,39 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
               </div>
             </Panel>
 
-            {/* [&>div]:h-full — PanelPosisiJurnal membungkus dirinya dengan
-                Panel sendiri; tanpa ini pembungkusnya meregang tapi kartunya
-                tetap pendek, dan tepi bawah kolom kiri tidak pernah bertemu
-                tepi bawah kalender. */}
-            <div className="grow [&>div]:h-full"><PanelPosisiJurnal sumber={sumber} /></div>
+            {/* Posisi Terbuka & Pola Emosi BERDAMPINGAN, tinggi sama.
+                ────────────────────────────────────────────────────────────
+                Dua panel pendek yang saling melengkapi: apa yang sedang
+                berjalan, dan bagaimana perasaan saat membukanya. Daftar yang
+                panjang digulir DI DALAM panelnya — rodanya jalan saat kursor
+                di atasnya — tanpa batang scrollbar yang menggores tepinya.
+                [&>div]:h-full: keduanya membungkus diri dengan Panel sendiri;
+                tanpa ini pembungkusnya meregang tapi kartunya tetap pendek. */}
+            <div className="grid grow grid-cols-1 gap-4 sm:grid-cols-2 [&>div]:h-full">
+              <PanelPosisiJurnal sumber={sumber} />
+              <Panel className="flex min-w-0 flex-col">
+                <PanelHead judul="Pola Emosi" sub="Emosi saat entry vs hasilnya." />
+                <div className="grow px-5 pb-5">
+                  {emosi.length === 0 ? (
+                    <p className="py-5 text-center text-[12.5px] text-zinc-600">
+                      Belum ada catatan emosi di jurnal ini.
+                    </p>
+                  ) : (
+                    <div className="gulir-senyap max-h-[190px] overflow-y-auto">
+                      {emosi.map(([nama, d]) => (
+                        <div key={nama} className="flex items-center justify-between border-b border-zinc-800/50 py-2 text-[12.5px] last:border-0">
+                          <span className="truncate text-zinc-300">{nama}</span>
+                          <span className="flex shrink-0 items-center gap-2.5">
+                            <span className="angka text-[11px] text-zinc-600">{d.n}×</span>
+                            <span className={cn('angka text-[12px]', d.pnl >= 0 ? 'text-emerald-500' : 'text-red-400')}>{uang(d.pnl, true)}</span>
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </Panel>
+            </div>
             </div>
 
             <Panel className="flex min-w-0 flex-col">
@@ -620,7 +647,10 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
               <div className="flex grow flex-col justify-start px-5 pb-5"><Kalender pl={pl} /></div>
             </Panel>
 
-            <Panel className={cn('min-w-0', tanpaEmosi ? 'lg:col-span-3' : 'lg:col-span-2')}>
+            {/* Riwayat SELALU selebar tiga kolom — Pola Emosi sudah pindah
+                ke sebelah Posisi Terbuka, jadi tidak ada lagi yang menuntut
+                sepertiga baris ini. */}
+            <Panel className="min-w-0 lg:col-span-3">
               <PanelHead
                 judul="Riwayat Trade"
                 sub={rangkum && barisTabel.length !== trade.length
@@ -737,31 +767,6 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
               </div>
             </Panel>
 
-            {!tanpaEmosi && (
-            <Panel>
-              <PanelHead judul="Pola Emosi" sub="Emosi saat entry vs hasilnya." />
-              <div className="px-5 pb-5">
-                {emosi.length === 0 ? (
-                  <p className="py-6 text-center text-[12.5px] text-zinc-600">
-                    Belum ada catatan emosi di jurnal ini.
-                  </p>
-                ) : (
-                  <div className="max-h-[300px] overflow-y-auto pr-1">
-                    {emosi.map(([nama, d]) => (
-                      <div key={nama} className="flex items-center justify-between border-b border-zinc-800/50 py-2.5 text-[13px]">
-                        <span className="text-zinc-300">{nama}</span>
-                        <span className="flex items-center gap-3">
-                          <span className="angka text-[11.5px] text-zinc-600">{d.n}×</span>
-                          <span className={cn('angka', d.pnl >= 0 ? 'text-emerald-500' : 'text-red-400')}>{uang(d.pnl, true)}</span>
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </Panel>
-            )}
-
           </div>
         </>
       )}
@@ -819,7 +824,7 @@ export default function Jurnal() {
         sumber="forex" arus={arus} bisaTulis={bisaTulis}
       />
 
-      <BlokJurnal pemisah tanpaEmosi
+      <BlokJurnal pemisah
         judul="Jurnal Kripto" ket="Binance Futures lewat Screener"
         Ikon={Bitcoin} trade={kripto} saldoAwal={0}
         warna="text-emerald-400" idGradien="gEqKripto"

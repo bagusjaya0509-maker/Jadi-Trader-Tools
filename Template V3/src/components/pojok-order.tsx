@@ -34,7 +34,7 @@ export function PojokOrder({
   posisi, hargaKini, draf, rencana, mode, jenis, risiko, tunda, onBatalTunda,
   onPilih, onUbah, onKirim, onBatal, onTutup, onGantiMode, mati,
   nyataSetelan, aturNyata, sibukNyata, kabar, demoSetelan, aturDemo,
-  catatan, aturCatatan, qtyDemo,
+  catatan, aturCatatan, qtyDemo, mt5, lotMt5, aturLotMt5,
 }: {
   posisi: { arah: 'BUY' | 'SELL'; masuk: number; sl: number; tp: number; pnl: number; risiko: number; unit: number } | null;
   hargaKini?: number;
@@ -45,6 +45,10 @@ export function PojokOrder({
   /** Qty demo yang dibekukan saat tiket dibuka — dolar risiko/imbalan
    *  dihitung darinya, jadi menggeser garis MENGUBAH angkanya. */
   qtyDemo?: number;
+  /** Simbol Trade-Fi (MT5): REAL memakai lot, bukan modal × leverage. */
+  mt5?: boolean;
+  lotMt5?: number;
+  aturLotMt5?: (n: number) => void;
   /** Pending order demo yang sedang menunggu harganya tersentuh. */
   tunda?: { arah: 'BUY' | 'SELL'; jenis: 'MARKET' | 'LIMIT' | 'STOP'; entry: number; sl: number; tp: number } | null;
   onBatalTunda?: () => void;
@@ -246,7 +250,21 @@ export function PojokOrder({
         {/* Order sungguhan butuh UKURANNYA di tempat yang sama dengan
             levelnya — modal, leverage, dan metode TP yang persis sama
             dengan Area Entry. Tanpa ini tiketnya cuma setengah keputusan. */}
-        {nyata && nyataSetelan && aturNyata && (
+        {nyata && mt5 && (
+          <div className="mt-1.5 flex items-end gap-1.5">
+            <label className="block">
+              <span className="mb-0.5 block text-[9.5px] uppercase tracking-wide text-zinc-500">Lot</span>
+              <input value={lotMt5 || ''} inputMode="decimal"
+                     onChange={(e) => aturLotMt5?.(Number(e.target.value) || 0)}
+                     className={cn(KELAS_ISIAN, 'angka w-[64px]')} />
+            </label>
+            <span className="pb-1 text-[10px] leading-tight text-zinc-600">
+              Market ke EA MT5 · SL/TP ikut terpasang
+            </span>
+          </div>
+        )}
+
+        {nyata && !mt5 && nyataSetelan && aturNyata && (
           <div className="mt-1.5 flex items-end gap-1.5">
             <label className="block">
               <span className="mb-0.5 block text-[9.5px] uppercase tracking-wide text-zinc-500">Modal $</span>
@@ -282,7 +300,7 @@ export function PojokOrder({
                leverage / entry, dikali jarak harga. Angka risiko demo (persen
                dari modal latihan) di sini menyesatkan: ia bukan uang yang
                akan bergerak. */
-            if (nyata && nyataSetelan && entry && sl && tp) {
+            if (nyata && !mt5 && nyataSetelan && entry && sl && tp) {
               const qty = (nyataSetelan.modal * nyataSetelan.leverage) / entry;
               return (
                 <span className="text-[10.5px] text-zinc-500">

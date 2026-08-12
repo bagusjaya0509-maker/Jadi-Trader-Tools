@@ -135,3 +135,9 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 .animasi-kartu-baru { animation: kartuBaruMasuk 0.55s ease-out both; }
+
+/* Gulir tanpa batang: rodanya jalan saat kursor di atas panel, batang
+   scrollbar-nya tidak pernah digambar. Untuk daftar pendek di dalam kartu —
+   batang abu-abu di panel 190 px lebih berisik daripada isinya. */
+.gulir-senyap { scrollbar-width: none; }
+.gulir-senyap::-webkit-scrollbar { display: none; }
