@@ -134,8 +134,14 @@ export function Dashboard() {
      jurnal. Sebelumnya dashboard selalu memakai hitungan jurnal, jadi ia
      berselisih dengan jurnal begitu MT5 atau Binance tersambung — dua
      halaman menyebut hal yang sama dengan dua angka berbeda. */
-  const saldoForex = mt5.terhubung === true && mt5.saldo !== null ? mt5.saldo : forex.saldo;
-  const saldoKripto = binance.terhubung === true && binance.saldo !== null ? binance.saldo : kripto.saldo;
+  /* `saldo !== null` SAJA, bukan `terhubung === true`: EA yang offline
+     masih membawa saldo laporan terakhirnya (atau salinan lokalnya), dan
+     angka itu tetap yang paling benar sampai ada transaksi baru. Syarat
+     lama membuat saldo mundur ke hitungan jurnal lama tiap MT5 desktop
+     ditutup — lalu angka mundur itu ikut TERBIT ke ringkasan yang dibaca
+     halaman depan. */
+  const saldoForex = mt5.saldo !== null ? mt5.saldo : forex.saldo;
+  const saldoKripto = binance.saldo !== null ? binance.saldo : kripto.saldo;
   const totalSaldo = saldoForex + saldoKripto;
   const sumberSaldo = [
     mt5.terhubung === true ? 'MT5' : null,

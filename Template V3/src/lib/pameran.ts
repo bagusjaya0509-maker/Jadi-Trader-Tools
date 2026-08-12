@@ -34,9 +34,12 @@ export interface AngkaPameran {
   saldo: number;
   /** Transaksi paling lama; 0 kalau tidak diketahui. */
   sejak: number;
+  /** Judul & subjudul hero yang diterbitkan pemilik — '' kalau belum. */
+  judul: string;
+  sub: string;
 }
 
-const KOSONG: AngkaPameran = { siap: false, jumlah: 0, winrate: 0, bersih: 0, kurva: [], tumbuh: 0, saldo: 0, sejak: 0 };
+const KOSONG: AngkaPameran = { siap: false, jumlah: 0, winrate: 0, bersih: 0, kurva: [], tumbuh: 0, saldo: 0, sejak: 0, judul: '', sub: '' };
 
 /** Firestore REST membungkus tiap nilai dalam objek bertipe. */
 function nilai(f: any): any {
@@ -57,11 +60,19 @@ export function useAngkaPameran(): AngkaPameran {
      jurnal mentah adalah cara paling pasti untuk berselisih perlahan. */
   useEffect(() => {
     let hidup = true;
+    let teksTerbit = { judul: '', sub: '' };
     fetch(DOK.replace('jurnalShowcase', 'ringkasanAkun'))
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
       .then((j) => {
         if (!hidup) return;
         const f = j?.fields ?? {};
+        /* Teks hero menumpang dokumen yang SAMA — dibaca sebelum pemeriksaan
+           jumlah supaya pemilik yang baru menerbitkan teks (tapi belum pernah
+           menerbitkan ringkasan angka) tetap terlihat teksnya. */
+        teksTerbit = {
+          judul: String(nilai(f.teksJudul) ?? ''),
+          sub: String(nilai(f.teksSub) ?? ''),
+        };
         const jumlah = Number(nilai(f.jumlah)) || 0;
         if (!jumlah) throw new Error('kosong');
         const kurva = (f.kurva?.arrayValue?.values ?? []).map((v: any) => Number(nilai(v)) || 0);
@@ -74,11 +85,12 @@ export function useAngkaPameran(): AngkaPameran {
           tumbuh: Number(nilai(f.tumbuh)) || 0,
           saldo: Number(nilai(f.saldo)) || 0,
           sejak: Number(nilai(f.sejak)) || 0,
+          ...teksTerbit,
         });
       })
       /* Belum ada ringkasan (mis. pemiliknya belum pernah membuka Dashboard
          sejak fitur ini ada) — jatuh ke jurnal pameran seperti sebelumnya. */
-      .catch(() => { if (hidup) void muatDariShowcase(setAngka, () => hidup); });
+      .catch(() => { if (hidup) void muatDariShowcase(setAngka, () => hidup, teksTerbit); });
     return () => { hidup = false; };
   }, []);
 
@@ -88,6 +100,7 @@ export function useAngkaPameran(): AngkaPameran {
 function muatDariShowcase(
   setAngka: (a: AngkaPameran) => void,
   masihHidup: () => boolean,
+  teksTerbit: { judul: string; sub: string },
 ) {
   return fetch(DOK)
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
@@ -124,7 +137,7 @@ function muatDariShowcase(
           });
         } catch { /* idem */ }
 
-        if (!baris.length) { setAngka(KOSONG); return; }
+        if (!baris.length) { setAngka({ ...KOSONG, ...teksTerbit }); return; }
 
         baris.sort((a, b) => a.waktu - b.waktu);
         const menang = baris.filter((b) => b.pnl > 0).length;
@@ -150,6 +163,7 @@ function muatDariShowcase(
           tumbuh,
           saldo: jalan,
           sejak: baris[0]?.waktu ?? 0,
+          ...teksTerbit,
         });
       })
       .catch(() => { /* hero tetap tampil tanpa angka */ });

@@ -186,9 +186,19 @@ export function PanelPine({ lilin, tf = '4h', hingga, aturHasil }: {
      963 baris. */
   const hasilAktif = useRef(false);
   hasilAktif.current = hasil !== null && !!adaKeluaran(hasil);
+  const kunciJalan = useRef<{ kunci: string; setelan: unknown }>({ kunci: '', setelan: null });
   useEffect(() => {
     if (!hasilAktif.current || !lilin.closes.length) return;
+    /* Kunci = jumlah bar + stempel bar terakhir: berubah saat BAR BARU
+       lahir atau replay maju, TIDAK berubah saat close bar berjalan
+       berdetak tiap 3 detik. Menjalankan ulang skrip 963 baris (±0,6 dtk)
+       pada setiap detak menyendat halaman dan membongkar-pasang seluruh
+       gambarnya — itulah "chart maju-mundur sendiri". Nilai final indikator
+       memang dihitung saat barnya tutup, sama seperti TradingView. */
+    const kunci = `${lilin.times.length}|${lilin.times[lilin.times.length - 1] ?? 0}|${hingga ?? -1}`;
+    if (kunci === kunciJalan.current.kunci && setelan === kunciJalan.current.setelan) return;
     const jeda = setTimeout(() => {
+      kunciJalan.current = { kunci, setelan };
       const h = jalankanPine(kode, potong(lilin, hingga), tf, setelan);
       setHasil(h);
       aturHasil(adaKeluaran(h) ? h : null);

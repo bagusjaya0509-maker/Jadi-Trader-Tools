@@ -56,6 +56,30 @@ export interface StatusAkun {
 
 const BELUM: StatusAkun = { terhubung: null, saldo: null, ekuitas: null, mataUang: null, ket: 'Memeriksa…', posisi: [] };
 
+/* ── Saldo terakhir yang diketahui, per akun ──────────────────────────────
+   Server menyimpan laporan EA terakhir DI MEMORI — restart pm2 menghapusnya,
+   dan backend yang tak terjangkau tidak menjawab sama sekali. Dua-duanya
+   membuat saldo "berjalan mundur" ke hitungan jurnal lama begitu MT5
+   desktop ditutup. Salinan lokal ini membuat angka terakhir yang pernah
+   TERBUKTI benar tetap dipakai sampai ada laporan baru. */
+interface SaldoTersimpan { saldo: number; ekuitas: number; mataUang: string | null; waktu: number }
+
+function simpanSaldoTerakhir(uid: string, s: SaldoTersimpan) {
+  try { localStorage.setItem('jt.mt5Terakhir.' + uid, JSON.stringify(s)); } catch { /* privat */ }
+}
+
+function dariSimpanan(uid: string, sebab: string): StatusAkun | null {
+  try {
+    const s = JSON.parse(localStorage.getItem('jt.mt5Terakhir.' + uid) ?? 'null') as SaldoTersimpan | null;
+    if (!s || !isFinite(s.saldo)) return null;
+    const tgl = new Date(s.waktu).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
+    return {
+      terhubung: false, saldo: s.saldo, ekuitas: s.ekuitas, mataUang: s.mataUang,
+      ket: `${sebab} — saldo terakhir (${tgl})`, posisi: [],
+    };
+  } catch { return null; }
+}
+
 /** Akun sen dibagi 100. Tanpa ini akun cent terlihat 100× lebih besar —
  *  kekeliruan yang sama sudah pernah diperbaiki di jurnal V2. */
 function keUsd(nilai: number, mataUang: string | null) {
@@ -95,7 +119,7 @@ export function useAkunMt5(): StatusAkun {
         const token = await u.getIdToken();
         const r = await fetch(`${dasar()}/api/mt5/status`, { headers: { Authorization: 'Bearer ' + token } });
         if (!hidup) return;
-        if (!r.ok) { setSt({ ...BELUM, terhubung: false, ket: 'Backend tidak menjawab' }); return; }
+        if (!r.ok) { setSt(dariSimpanan(u.uid, 'Backend tidak menjawab') ?? { ...BELUM, terhubung: false, ket: 'Backend tidak menjawab' }); return; }
         const j = await r.json();
         const akun = j?.data?.akun;
         /* EA yang MATI bukan akun yang hilang. Server tetap menyimpan
@@ -103,7 +127,8 @@ export function useAkunMt5(): StatusAkun {
            kembali ke hitungan jurnal (~$300) setiap MT5 ditutup membuat
            angkanya melompat dua kali sehari tanpa satu pun transaksi. */
         if (!akun) {
-          setSt({ ...BELUM, terhubung: false, ket: j?.kode ? `Kode ${j.kode} — EA belum melapor` : 'EA belum terpasang' });
+          setSt(dariSimpanan(u.uid, 'EA offline')
+            ?? { ...BELUM, terhubung: false, ket: j?.kode ? `Kode ${j.kode} — EA belum melapor` : 'EA belum terpasang' });
           return;
         }
         const eaHidup = !!j?.terhubung;
@@ -124,6 +149,11 @@ export function useAkunMt5(): StatusAkun {
           /* EA mengirim detik, bukan milidetik. */
           waktuBuka: (Number(p.waktuBuka) || 0) * 1000,
         }));
+        simpanSaldoTerakhir(u.uid, {
+          saldo: keUsd(Number(akun.saldo) || 0, mu),
+          ekuitas: keUsd(Number(akun.ekuitas) || 0, mu),
+          mataUang: mu, waktu: Date.now(),
+        });
         setSt({
           terhubung: eaHidup,
           saldo: keUsd(Number(akun.saldo) || 0, mu),
@@ -138,7 +168,8 @@ export function useAkunMt5(): StatusAkun {
           posisi: eaHidup ? posisi : [],
         });
       } catch {
-        if (hidup) setSt({ ...BELUM, terhubung: false, ket: 'Tidak bisa menghubungi backend' });
+        if (hidup) setSt(dariSimpanan(auth.currentUser?.uid ?? '', 'Backend tak terjangkau')
+          ?? { ...BELUM, terhubung: false, ket: 'Tidak bisa menghubungi backend' });
       }
     }
 

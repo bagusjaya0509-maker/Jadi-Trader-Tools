@@ -505,6 +505,15 @@ export async function terbitkanRingkasan(r: RingkasanAkun, trade?: Trade[]) {
   }, { merge: true });
 }
 
+/** Judul & subjudul hero halaman depan. Menumpang public/ringkasanAkun —
+ *  dokumen yang memang sudah diambil halaman depan lewat REST, jadi teks
+ *  terbitan pemilik sampai ke semua pengunjung tanpa satu permintaan baru. */
+export async function terbitkanTeksBeranda(judul: string, sub: string) {
+  const { setDoc } = await import('firebase/firestore');
+  await setDoc(doc(db, 'public', 'ringkasanAkun'),
+    { teksJudul: judul, teksSub: sub, _updatedAt: Date.now() }, { merge: true });
+}
+
 /* Data contoh NYATA milik pemilik, dibaca akun baru & mode pameran.
    Dimuat sekali per sesi; kalau dokumennya belum ada (pemilik belum pernah
    membuka dashboard sejak fitur ini), jatuh ke contoh statis. */

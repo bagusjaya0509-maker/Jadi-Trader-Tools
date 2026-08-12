@@ -595,6 +595,10 @@ export default function ChartBacktest() {
                             seretTangan.current = true;
                             setRencana((r) => ({ ...r, [id]: h }));
                           }}
+                          onHapusGaris={(id) => {
+                            setRencana((r) => ({ ...r, [id]: undefined }));
+                            if (id === 'entry') entryDigeser.current = false;
+                          }}
                           segmen={pine?.segmen}
                           isianPine={pine?.isian}
                           penandaPine={pine?.penanda}
@@ -635,7 +639,17 @@ export default function ChartBacktest() {
                                 if (r.entry !== rencana.entry) entryDigeser.current = true;
                                 setRencana(r);
                               }}
-                              onBatal={() => { setDraf(null); setKabarNyata(''); }}
+                              onBatal={() => {
+                                /* Batal berarti BATAL SEUTUHNYA: tiket ditutup
+                                   DAN garisnya ikut hilang. Garis order dari
+                                   tiket yang sudah dibatalkan terbaca sebagai
+                                   order yang masih hidup — dan tampak seperti
+                                   coretan putih misterius memotong chart. */
+                                setDraf(null); setKabarNyata('');
+                                setRencana({});
+                                entryDigeser.current = false;
+                                seretTangan.current = false;
+                              }}
                               onKirim={() => {
                                 const { entry, sl, tp } = rencana;
                                 if (!draf || !entry || !sl || !tp) return;

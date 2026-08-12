@@ -1,6 +1,8 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, LineChart, Wallet, Crown, Star } from "lucide-react";
+import { ArrowRight, LineChart, Wallet, Crown, Pencil, Check, X, RotateCcw } from "lucide-react";
 import { useAngkaPameran, usePosisiPameran } from "@/lib/pameran";
+import { JUDUL_BERANDA, SUB_BERANDA, bacaTeksLokal, simpanTeksLokal } from "@/lib/teks-beranda";
 
 /* ── Grafik portofolio hero, digambar tangan ──────────────────────────────
    Dulu ini <AreaChart> Recharts, dan itu menyeret 115 kB (gzip) ke HALAMAN
@@ -113,24 +115,68 @@ const StatItem = ({ value, label }: { value: string; label: string }) => (
   </div>
 );
 
+/* ── Tiga suasana latar ───────────────────────────────────────────────────
+   Desainnya SATU — lorong berkabut dengan gerbang bercahaya — digeser rona
+   warnanya jadi tiga suasana: emas hangat, magenta-cyan, terakota-biru.
+   Klik di bagian kosong halaman menggilirnya; pilihannya diingat. */
+const LATAR = ['hero-bg.webp', 'hero-bg2.webp', 'hero-bg3.webp']
+  .map((n) => import.meta.env.BASE_URL + n);
+
 export default function HeroSection() {
-  /* Hero memakai angka PAMERAN — jurnal yang memang sengaja dipublikasikan
-     di `public/jurnalShowcase` — bukan data pengguna yang sedang masuk.
-     Halaman ini halaman pemasaran; menampilkan jurnal kosong milik
-     pengunjung baru bukan cara memperkenalkan produk.
-
-     Yang berubah: angkanya sekarang SUNGGUHAN. Sebelum ini winrate, PNL,
-     dan pertumbuhan porto diambil dari data/contoh.ts dan data/porto.ts —
-     rekam jejak karangan yang dipajang di halaman jualan produk trading.
-
-     Diambil lewat REST API Firestore dengan `fetch` biasa, bukan SDK: SDK-nya
-     menyeret ±450 kB ke halaman yang paling sering dibuka orang yang belum
-     tentu masuk, untuk angka yang bisa didapat dengan satu permintaan. */
+  /* Hero memakai angka PAMERAN — jurnal yang memang sengaja dipublikasikan,
+     bukan data pengguna yang sedang masuk. Diambil lewat REST API dengan
+     `fetch` biasa, bukan SDK: SDK-nya menyeret ±450 kB ke halaman yang
+     paling sering dibuka orang yang belum tentu masuk. */
   const pameran = useAngkaPameran();
   const posisi = usePosisiPameran();
 
+  /* ── Teks hero: lokal > terbitan pemilik > bawaan ── */
+  const [teks, setTeks] = useState(() => {
+    const l = bacaTeksLokal();
+    return { judul: l.judul || JUDUL_BERANDA, sub: l.sub || SUB_BERANDA };
+  });
+  useEffect(() => {
+    /* Teks terbitan pemilik dipakai HANYA kalau perangkat ini belum punya
+       suntingannya sendiri — bawaan pribadi mengalahkan bawaan situs. */
+    const l = bacaTeksLokal();
+    if (l.judul || l.sub) return;
+    if (pameran.judul || pameran.sub) {
+      setTeks({ judul: pameran.judul || JUDUL_BERANDA, sub: pameran.sub || SUB_BERANDA });
+    }
+  }, [pameran.judul, pameran.sub]);
+
+  const [sunting, setSunting] = useState(false);
+  const [draf, setDraf] = useState({ judul: '', sub: '' });
+
+  const [latar, setLatar] = useState(() => {
+    try {
+      const n = Number(localStorage.getItem('jt.latarBeranda'));
+      return n >= 0 && n < LATAR.length ? n : 0;
+    } catch { return 0; }
+  });
+  function gantiLatar() {
+    setLatar((l) => {
+      const b = (l + 1) % LATAR.length;
+      try { localStorage.setItem('jt.latarBeranda', String(b)); } catch { /* privat */ }
+      return b;
+    });
+  }
+
+  const barisJudul = teks.judul.split('\n').map((b) => b.trim()).filter(Boolean);
+  const barisEmas = barisJudul.length > 1 ? 1 : -1;
+  const potonganSub = teks.sub.split('Jadi Trader Profitable!');
+
   return (
-    <div className="relative w-full bg-zinc-950 text-white overflow-hidden font-sans">
+    <div
+      className="relative w-full bg-zinc-950 text-white overflow-hidden font-sans"
+      /* Klik di area kosong menggilir latarnya. Tautan, tombol, dan kotak
+         sunting dikecualikan — mereka punya pekerjaannya sendiri. */
+      onClick={(e) => {
+        if (sunting) return;
+        if ((e.target as HTMLElement).closest('a,button,input,textarea,select,[data-tanpa-latar]')) return;
+        gantiLatar();
+      }}
+    >
       <style>{`
         @keyframes fadeSlideIn {
           from { opacity: 0; transform: translateY(20px); }
@@ -149,54 +195,123 @@ export default function HeroSection() {
         .delay-500 { animation-delay: 0.5s; }
       `}</style>
 
-      {/* Latar disalin ke public/hero-bg.webp — tidak lagi menunjuk bucket
-          Supabase milik pembuat aslinya, yang di perambanmu diblokir dan yang
-          isinya bisa hilang kapan saja. */}
-      <div
-        className="absolute inset-0 z-0 bg-[url('/hero-bg.webp')] bg-cover bg-center opacity-40"
-        style={{
-          maskImage: "linear-gradient(180deg, transparent, black 0%, black 70%, transparent)",
-          WebkitMaskImage: "linear-gradient(180deg, transparent, black 0%, black 70%, transparent)",
-        }}
-      />
+      {/* Ketiga latar dirender bertumpuk dan cuma opacity-nya yang berganti —
+          pergantian gambar jadi pudar-silang halus, bukan kedipan putih
+          menunggu unduhan. */}
+      {LATAR.map((src, i) => (
+        <div key={src} aria-hidden
+          className={"pointer-events-none absolute inset-0 z-0 bg-cover bg-center transition-opacity duration-700 " +
+            (latar === i ? "opacity-40" : "opacity-0")}
+          style={{
+            backgroundImage: `url('${src}')`,
+            maskImage: "linear-gradient(180deg, transparent, black 0%, black 70%, transparent)",
+            WebkitMaskImage: "linear-gradient(180deg, transparent, black 0%, black 70%, transparent)",
+          }}
+        />
+      ))}
 
       <div className="relative z-10 mx-auto max-w-7xl px-4 pt-24 pb-12 sm:px-6 md:pt-32 md:pb-20 lg:px-8">
         <div className="grid grid-cols-1 gap-12 lg:grid-cols-12 lg:gap-8 items-start">
 
-          {/* --- LEFT COLUMN --- */}
+          {/* --- KOLOM KIRI --- */}
           <div className="lg:col-span-7 flex flex-col justify-center space-y-8 pt-8">
 
             <div className="animate-fade-in delay-100">
               <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 backdrop-blur-md transition-colors hover:bg-white/10">
                 <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-zinc-300 flex items-center gap-2">
-                  Jadi Trader Tools
-                  <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" />
+                  Jadi Trader Journey
+                  {/* Pensil, bukan bintang: judul dan subjudul halaman ini
+                      BISA DIUBAH — diklik, disunting di tempat, tersimpan
+                      sebagai bawaan perangkat ini. */}
+                  <button
+                    onClick={() => { setDraf({ judul: teks.judul, sub: teks.sub }); setSunting(true); }}
+                    title="Ubah judul & subjudul halaman ini"
+                    className="cursor-pointer text-yellow-400 transition-transform hover:scale-110">
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
                 </span>
               </div>
             </div>
 
-            {/* Judul dipecah tiga baris, dan gradien emas hanya di SATU baris.
-                Kalau seluruh judul diberi gradien, tidak ada lagi yang
-                ditonjolkan — semuanya sama-sama berteriak. */}
-            <h1
-              className="animate-fade-in delay-200 text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-medium tracking-tighter leading-[0.95]"
-              style={{
-                maskImage: "linear-gradient(180deg, black 0%, black 80%, transparent 100%)",
-                WebkitMaskImage: "linear-gradient(180deg, black 0%, black 80%, transparent 100%)"
-              }}
-            >
-              Setidaknya kalau<br />
-              <span className="bg-gradient-to-br from-white via-white to-[#ffcd75] bg-clip-text text-transparent">
-                belum profit
-              </span><br />
-              jangan sampai Lose.
-            </h1>
+            {sunting ? (
+              <div className="animate-fade-in space-y-3 max-w-xl" data-tanpa-latar>
+                <label className="block">
+                  <span className="mb-1 block text-[11px] uppercase tracking-wider text-zinc-500">
+                    Judul besar — satu baris per baris tampil; baris kedua bergradasi emas
+                  </span>
+                  <textarea value={draf.judul} rows={3} spellCheck={false} autoFocus
+                    onChange={(e) => setDraf((d) => ({ ...d, judul: e.target.value }))}
+                    className="w-full resize-y rounded-xl border border-white/15 bg-white/5 p-4 text-2xl font-medium tracking-tight text-white outline-none backdrop-blur-md focus-visible:border-white/30" />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-[11px] uppercase tracking-wider text-zinc-500">Subjudul</span>
+                  <textarea value={draf.sub} rows={3} spellCheck={false}
+                    onChange={(e) => setDraf((d) => ({ ...d, sub: e.target.value }))}
+                    className="w-full resize-y rounded-xl border border-white/15 bg-white/5 p-4 text-base text-zinc-200 outline-none backdrop-blur-md focus-visible:border-white/30" />
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => {
+                      const judul = draf.judul.trim() || JUDUL_BERANDA;
+                      const sub = draf.sub.trim() || SUB_BERANDA;
+                      simpanTeksLokal(judul, sub);
+                      setTeks({ judul, sub });
+                      setSunting(false);
+                    }}
+                    className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-white px-5 py-2 text-sm font-semibold text-zinc-950 transition-colors hover:bg-zinc-200">
+                    <Check className="w-4 h-4" /> Simpan
+                  </button>
+                  <button onClick={() => setSunting(false)}
+                    className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-5 py-2 text-sm text-white transition-colors hover:bg-white/10">
+                    <X className="w-4 h-4" /> Batal
+                  </button>
+                  <button
+                    onClick={() => { simpanTeksLokal('', ''); setTeks({ judul: JUDUL_BERANDA, sub: SUB_BERANDA }); setSunting(false); }}
+                    title="Hapus suntingan perangkat ini dan kembali ke teks bawaan"
+                    className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-5 py-2 text-sm text-zinc-400 transition-colors hover:bg-white/10 hover:text-white">
+                    <RotateCcw className="w-4 h-4" /> Bawaan
+                  </button>
+                </div>
+                <p className="text-[11.5px] leading-relaxed text-zinc-500">
+                  Tersimpan sebagai bawaan di perangkat ini. Untuk mengubahnya bagi semua pengunjung,
+                  pakai Maintenance → Teks Beranda.
+                </p>
+              </div>
+            ) : (
+              <>
+                {/* Judul dipecah per baris, dan gradien emas hanya di SATU
+                    baris. Kalau seluruh judul diberi gradien, tidak ada lagi
+                    yang ditonjolkan — semuanya sama-sama berteriak. */}
+                <h1
+                  className="animate-fade-in delay-200 text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-medium tracking-tighter leading-[0.95]"
+                  style={{
+                    maskImage: "linear-gradient(180deg, black 0%, black 80%, transparent 100%)",
+                    WebkitMaskImage: "linear-gradient(180deg, black 0%, black 80%, transparent 100%)"
+                  }}
+                >
+                  {barisJudul.map((b, i) => (
+                    <span key={i}>
+                      {i === barisEmas
+                        ? <span className="bg-gradient-to-br from-white via-white to-[#ffcd75] bg-clip-text text-transparent">{b}</span>
+                        : b}
+                      {i < barisJudul.length - 1 && <br />}
+                    </span>
+                  ))}
+                </h1>
 
-            <p className="animate-fade-in delay-300 max-w-xl text-lg text-zinc-400 leading-relaxed">
-              Satu trade yang terukur lebih baik daripada banyak trade asal-asalan.
-              Jadi buat trading plan terbaikmu dari sini untuk bisa{" "}
-              <span className="text-zinc-200">Jadi Trader Profitable!</span>
-            </p>
+                <p className="animate-fade-in delay-300 max-w-xl text-lg text-zinc-400 leading-relaxed">
+                  {potonganSub.length > 1
+                    ? (
+                      <>
+                        {potonganSub[0]}
+                        <span className="text-zinc-200">Jadi Trader Profitable!</span>
+                        {potonganSub.slice(1).join('Jadi Trader Profitable!')}
+                      </>
+                    )
+                    : teks.sub}
+                </p>
+              </>
+            )}
 
             <div className="animate-fade-in delay-400 flex flex-col sm:flex-row gap-4">
               <Link
@@ -217,10 +332,10 @@ export default function HeroSection() {
             </div>
           </div>
 
-          {/* --- RIGHT COLUMN --- */}
+          {/* --- KOLOM KANAN --- */}
           <div className="lg:col-span-5 space-y-6 lg:mt-12">
 
-            {/* Stats Card */}
+            {/* Kartu statistik */}
             <div className="animate-fade-in delay-500 relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur-xl shadow-2xl">
               <div className="absolute top-0 right-0 -mr-16 -mt-16 h-64 w-64 rounded-full bg-white/5 blur-3xl pointer-events-none" />
 

@@ -63,7 +63,7 @@ export interface GarisSeret {
 
 export function ChartLilin({
   lilin, garis, trade, tinggi = 420, hingga, garisHarga, onKlikBar, smi, mundur, pojok,
-  garisSeret, onSeret, hamparanBawah, segmen, penandaPine, kotakPine, isianPine,
+  garisSeret, onSeret, onHapusGaris, hamparanBawah, segmen, penandaPine, kotakPine, isianPine,
 }: {
   lilin: Lilin;
   garis?: Garis[];
@@ -87,6 +87,8 @@ export function ChartLilin({
   garisSeret?: GarisSeret[];
   /** Dipanggil saat sebuah garis selesai digeser. */
   onSeret?: (id: GarisSeret['id'], harga: number) => void;
+  /** Hapus satu garis lewat tombol ✕ di labelnya. */
+  onHapusGaris?: (id: GarisSeret['id']) => void;
   /** Panel yang ditumpangkan di bagian bawah area harga — dipakai kendali
    *  replay, supaya ia menyatu dengan grafik alih-alih memanjangkan halaman. */
   hamparanBawah?: React.ReactNode;
@@ -237,6 +239,12 @@ export function ChartLilin({
   useEffect(() => {
     const c = chart.current;
     if (!c) return;
+    /* Jendela pandang DISIMPAN lalu DIPULIHKAN. Membongkar-pasang seri —
+       apalagi yang datanya menjulur ke masa depan — menggeser pemetaan
+       skala waktu, dan chart tampak berjalan maju-mundur sendiri setiap
+       data disegarkan. Zoom dan posisi geser milik orangnya, bukan milik
+       penyegaran data. */
+    const rentang = c.timeScale().getVisibleLogicalRange();
     seriGaris.current.forEach((s) => c.removeSeries(s));
     seriGaris.current = [];
     (garis ?? []).forEach((g) => {
@@ -251,6 +259,7 @@ export function ChartLilin({
       );
       seriGaris.current.push(s);
     });
+    if (rentang) { try { c.timeScale().setVisibleLogicalRange(rentang); } catch { /* chart baru */ } }
   }, [garis, lilin, hingga]);
 
   /* ── Trendline & kotak dari Pine ───────────────────────────────────
@@ -262,6 +271,10 @@ export function ChartLilin({
   useEffect(() => {
     const c = chart.current;
     if (!c) return;
+    /* Alasan yang sama dengan garis indikator: gambar Pine dibongkar-pasang
+       saat dihitung ulang, dan tanpa pemulihan rentang setiap hitung ulang
+       melempar jendela pandang ke tempat lain. */
+    const rentang = c.timeScale().getVisibleLogicalRange();
     seriPine.current.forEach((s) => { try { c.removeSeries(s); } catch { /* lepas */ } });
     seriPine.current = [];
     if (!lilin.times.length) { isiPine.current?.setData([], []); return; }
@@ -318,6 +331,7 @@ export function ChartLilin({
         return { x1: f.x1, ya1: f.y1a, yb1: f.y1b, x2, ya2: y2a, yb2: y2b, warna: f.warna };
       })
     );
+    if (rentang) { try { c.timeScale().setVisibleLogicalRange(rentang); } catch { /* chart baru */ } }
   }, [segmen, kotakPine, isianPine, lilin]);
 
   /* Penanda entry & exit tiap trade hasil backtest */
@@ -433,6 +447,11 @@ export function ChartLilin({
     };
 
     (gs ?? []).forEach((g) => taruh(garisRef.current.get(g.id), g.harga));
+
+    /* Garis order berhenti DI TEPI skala harga, tidak menerobos ke bawah
+       angka-angkanya. Elemen DOM membentang selebar komponen; tanpa batas
+       ini garis entry tampak seperti coretan pucat menimpa sumbu harga. */
+    if (lebar) garisRef.current.forEach((el) => { el.style.right = (lebar + 2) + 'px'; });
 
     const n = hg === undefined ? l.closes.length : Math.min(l.closes.length, hg + 1);
     taruh(labelRef.current, l.closes[n - 1]);
@@ -577,6 +596,17 @@ export function ChartLilin({
             <div className="h-px flex-1" style={{
               background: `repeating-linear-gradient(90deg, ${g.warna} 0 6px, transparent 6px 11px)`,
             }} />
+            {/* ✕ menghapus garis INI saja — order yang batal harus bisa
+                dibersihkan dari chart tanpa menunggu apa pun. */}
+            {bisa && onHapusGaris && (
+              <button
+                onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); onHapusGaris(g.id); }}
+                title={`Hapus garis ${g.label}`}
+                className="mr-1 flex size-[14px] shrink-0 cursor-pointer items-center justify-center rounded-sm text-[10px] font-bold leading-none text-zinc-950 opacity-80 shadow transition-opacity hover:opacity-100"
+                style={{ background: g.warna }}>
+                ×
+              </button>
+            )}
             <span className="angka mr-0.5 shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-zinc-950 shadow"
                   style={{ background: g.warna }}>
               {g.label} {fHarga(g.harga)}{g.ket ? ` ${g.ket}` : ''}

@@ -21,6 +21,46 @@ import { usePermintaanLisensi } from '@/lib/admin';
    layar. Kalau nanti sumber aslinya didapat, berkas ini yang perlu ditimpa.
    ════════════════════════════════════════════════════════════════════════ */
 
+/* ── Kartu "Baru · vX.Y" ─────────────────────────────────────────────────
+   Meluncur keluar dari garis pembatas Help Center saat sidebar dibuka,
+   terpampang penuh beberapa detik, lalu MELIPAT sendiri hingga tersisa
+   baris judulnya saja — kartu promo boleh menyapa, tidak boleh menginap.
+   Diklik saat terlipat: terbuka penuh lagi (lalu melipat lagi sendiri);
+   saat terbuka, kliknya adalah tautan ke changelog seperti biasa. */
+function KartuBaru({ versi, judul, ringkas }: { versi: string; judul: string; ringkas: string }) {
+  const [buka, setBuka] = useState(true);
+  useEffect(() => {
+    if (!buka) return;
+    const jeda = setTimeout(() => setBuka(false), 7000);
+    return () => clearTimeout(jeda);
+  }, [buka]);
+  return (
+    <Link to="/changelog"
+      onClick={(e) => { if (!buka) { e.preventDefault(); setBuka(true); } }}
+      className="animasi-kartu-baru mx-3 mb-3 block overflow-hidden rounded-lg border border-zinc-800/80 p-3 transition-colors hover:border-zinc-700 hover:bg-zinc-900/40">
+      <div className="flex items-center gap-1.5">
+        <Sparkles className="size-3 text-amber-400" strokeWidth={2} />
+        <span className="text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+          Baru · {versi}
+        </span>
+        <ChevronRight className={cn('ml-auto size-3 text-zinc-600 transition-transform duration-300', buka && 'rotate-90')} />
+      </div>
+      {/* grid-rows 1fr/0fr: satu-satunya cara menganimasikan tinggi konten
+          yang tidak diketahui tanpa menebak max-height. */}
+      <div className={cn('grid transition-all duration-500 ease-in-out',
+        buka ? 'mt-1.5 grid-rows-[1fr] opacity-100' : 'mt-0 grid-rows-[0fr] opacity-0')}>
+        <div className="min-h-0 overflow-hidden">
+          <div className="text-[13px] font-medium text-zinc-100">{judul}</div>
+          <p className="mt-0.5 line-clamp-2 text-[12px] leading-relaxed text-zinc-500">{ringkas}</p>
+          <span className="mt-2 inline-flex items-center gap-1 text-[12px] text-zinc-300">
+            Learn more <ChevronRight className="size-3" />
+          </span>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
 const NAV = [
   {
     grup: 'Trading',
@@ -395,22 +435,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         {/* Changelog: berisi pembaruan web yang benar-benar menarik, dan
             "Learn more" membuka laporan lengkap fitur terbaru. */}
-        {!ciut && (
-          <Link to="/changelog"
-            className="mx-3 mb-3 block rounded-lg border border-zinc-800/80 p-3 transition-colors hover:border-zinc-700 hover:bg-zinc-900/40">
-            <div className="flex items-center gap-1.5">
-              <Sparkles className="size-3 text-amber-400" strokeWidth={2} />
-              <span className="text-[10px] font-medium uppercase tracking-wider text-zinc-500">
-                Baru · {terbaru.versi}
-              </span>
-            </div>
-            <div className="mt-1.5 text-[13px] font-medium text-zinc-100">{terbaru.judul}</div>
-            <p className="mt-0.5 line-clamp-2 text-[12px] leading-relaxed text-zinc-500">{terbaru.ringkas}</p>
-            <span className="mt-2 inline-flex items-center gap-1 text-[12px] text-zinc-300">
-              Learn more <ChevronRight className="size-3" />
-            </span>
-          </Link>
-        )}
+        {!ciut && <KartuBaru versi={terbaru.versi} judul={terbaru.judul} ringkas={terbaru.ringkas} />}
 
         <div className="border-t border-zinc-800/80 px-3 py-2">
           <Bantuan ciut={ciut} />

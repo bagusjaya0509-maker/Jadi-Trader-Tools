@@ -8,6 +8,8 @@ import { tanggalPendek } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 import { PanelLisensi } from '@/components/panel-lisensi';
 import { PanelKesehatan } from '@/components/panel-kesehatan';
+import { terbitkanTeksBeranda } from '@/lib/data';
+import { JUDUL_BERANDA, SUB_BERANDA, bacaTeksLokal, simpanTeksLokal } from '@/lib/teks-beranda';
 
 /* ════════════════════════════════════════════════════════════════════════
    MAINTENANCE — khusus pemilik
@@ -85,6 +87,58 @@ function PanelLisensiAktif() {
             </Tabel>
           </TabelBungkus>
         )}
+      </div>
+    </Panel>
+  );
+}
+
+/* ── Teks hero beranda ───────────────────────────────────────────────────
+   Kalimat besar halaman depan diubah DI SINI, bukan di kode: pemilik
+   mengetik, menekan Terbitkan, dan semua pengunjung membacanya lewat
+   dokumen publik yang sama dengan angka pameran. */
+function PanelTeksBeranda() {
+  const [judul, setJudul] = useState(() => bacaTeksLokal().judul || JUDUL_BERANDA);
+  const [sub, setSub] = useState(() => bacaTeksLokal().sub || SUB_BERANDA);
+  const [kabar, setKabar] = useState('');
+  const [sibuk, setSibuk] = useState(false);
+
+  async function simpan() {
+    simpanTeksLokal(judul.trim(), sub.trim());
+    setSibuk(true); setKabar('');
+    try {
+      await terbitkanTeksBeranda(judul.trim(), sub.trim());
+      setKabar('Diterbitkan — halaman depan memakai teks ini untuk semua pengunjung.');
+    } catch {
+      setKabar('Tersimpan di perangkat ini; penerbitan untuk semua pengunjung gagal (butuh akun pemilik).');
+    } finally { setSibuk(false); }
+  }
+
+  return (
+    <Panel className="mt-4">
+      <PanelHead judul="Teks Beranda"
+                 sub="Judul besar & subjudul hero halaman depan. Baris kedua judul otomatis bergradasi emas." />
+      <div className="grid grid-cols-1 gap-4 px-5 pb-5 lg:grid-cols-2">
+        <label className="block">
+          <span className="mb-1 block text-[11px] text-zinc-500">Judul besar — satu baris per baris tampil</span>
+          <textarea value={judul} onChange={(e) => setJudul(e.target.value)} rows={3} spellCheck={false}
+            className="w-full resize-y rounded-md border border-zinc-800 bg-zinc-900/60 p-3 text-[13px] leading-relaxed text-zinc-200 outline-none focus-visible:border-zinc-600" />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-[11px] text-zinc-500">Subjudul — frasa "Jadi Trader Profitable!" otomatis disorot</span>
+          <textarea value={sub} onChange={(e) => setSub(e.target.value)} rows={3} spellCheck={false}
+            className="w-full resize-y rounded-md border border-zinc-800 bg-zinc-900/60 p-3 text-[13px] leading-relaxed text-zinc-200 outline-none focus-visible:border-zinc-600" />
+        </label>
+      </div>
+      <div className="flex flex-wrap items-center gap-3 border-t border-zinc-800/80 px-5 py-3">
+        <button onClick={() => void simpan()} disabled={sibuk || !judul.trim() || !sub.trim()}
+          className="cursor-pointer rounded-md bg-zinc-100 px-3.5 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:opacity-50">
+          {sibuk ? 'Menerbitkan…' : 'Terbitkan'}
+        </button>
+        <button onClick={() => { setJudul(JUDUL_BERANDA); setSub(SUB_BERANDA); setKabar('Bawaan dimuat — tekan Terbitkan untuk memakainya.'); }}
+          className="cursor-pointer rounded-md border border-zinc-800 px-3 py-1.5 text-[12px] text-zinc-400 transition-colors hover:border-zinc-700 hover:text-zinc-200">
+          Kembalikan bawaan
+        </button>
+        {kabar && <span className="text-[12px] text-zinc-500">{kabar}</span>}
       </div>
     </Panel>
   );
@@ -252,6 +306,7 @@ export default function Maintenance() {
   return (
     <div className="p-4 sm:p-6">
       <PanelKesehatan />
+      <PanelTeksBeranda />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KartuKpi label="Produk tayang" nilai={String(tayang.length)} catatan="terlihat pengunjung" />
         <KartuKpi label="Di tempat sampah" nilai={String(sampah.length)} catatan="bisa dipulihkan" />
