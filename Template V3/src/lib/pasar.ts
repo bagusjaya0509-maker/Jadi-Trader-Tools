@@ -68,6 +68,16 @@ export async function ambilKlines(simbol: string, tf: string, batas = 200, segar
     if (mt5 && j?.spec && Number(j.spec.nilaiLot) > 0) {
       SPEK_MT5.set(simbol.slice(4), Number(j.spec.nilaiLot));
     }
+    /* Tick bid/ask ikut menumpang: chart MT5 memuat ulang klines tiap
+       beberapa detik, jadi menumpangkan tick di balasan yang SAMA memberi
+       harga ask segar tanpa satu permintaan jaringan tambahan pun. */
+    if (mt5 && j?.tick && Number(j.tick.bid) > 0) {
+      TICK_MT5.set(simbol.slice(4), {
+        bid: Number(j.tick.bid),
+        ask: Number(j.tick.ask) || 0,
+        waktu: Number(j.tick.waktu) || Date.now(),
+      });
+    }
     /* Backend membungkus balasan Binance jadi {ok, data}. Bentuk mentah
        Binance sendiri berupa array-of-array, jadi keduanya diterima —
        proxy yang lebih lama pernah meneruskan apa adanya. */
@@ -89,6 +99,13 @@ export async function ambilKlines(simbol: string, tf: string, batas = 200, segar
 }
 
 const SPEK_MT5 = new Map<string, number>();
+const TICK_MT5 = new Map<string, { bid: number; ask: number; waktu: number }>();
+
+/** Tick MT5 terakhir yang menumpang balasan klines — bahan garis Ask di
+ *  chart. `ask` 0 berarti EA-nya masih v2.01 (belum mengirim ask). */
+export function bacaTickMt5(simbolDasar: string): { bid: number; ask: number; waktu: number } | null {
+  return TICK_MT5.get(simbolDasar) ?? null;
+}
 
 /** Dolar per 1 lot per 1.0 pergerakan harga untuk simbol MT5 — null kalau
  *  EA belum pernah mengirimkannya (build lama). */

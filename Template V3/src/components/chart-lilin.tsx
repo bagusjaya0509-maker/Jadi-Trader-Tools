@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   createChart, CandlestickSeries, LineSeries, createSeriesMarkers,
   type IChartApi, type ISeriesApi, type ISeriesMarkersPluginApi, type IPriceLine, type Logical, type Time,
 } from 'lightweight-charts';
 import type { Lilin } from '@/lib/pasar';
-import { cn, harga as fHarga } from '@/lib/utils';
+import { cn, uang, harga as fHarga } from '@/lib/utils';
 import type { TradeUji } from '@/lib/backtest';
 import type { SegmenPine, PenandaPine, KotakPine, IsianPine } from '@/lib/pine-bar';
 import { PenggambarIsi } from '@/lib/plugin-isi';
@@ -62,10 +62,30 @@ export interface GarisSeret {
   bisaSeret?: boolean;
 }
 
+/** Posisi MT5 terbuka yang digambar di chart — datang dari laporan EA.
+ *
+ *  Digambar sebagai PRICE LINE bawaan lightweight-charts, bukan elemen DOM
+ *  seperti GarisSeret. Alasannya kebalikan dari alasan GarisSeret: garis
+ *  posisi harus MENEMBUS sampai ke sumbu harga dengan label kotak yang ikut
+ *  bergerak — persis garis harga berjalan di MetaTrader — dan itu persis
+ *  yang price line lakukan gratis. Yang tetap DOM cuma tiga hamparan tipis:
+ *  PnL polos di atas garis entry, pegangan seret SL/TP, dan tombol Kirim. */
+export interface PosisiChartMt5 {
+  tiket: string;
+  arah: 'BUY' | 'SELL';
+  lot: number;
+  entry: number;
+  sl: number;
+  tp: number;
+  /** PnL berjalan dalam USD — sudah dikonversi dari mata uang akun. */
+  profit: number;
+}
+
 export function ChartLilin({
   lilin, garis, trade, tinggi = 420, hingga, garisHarga, onKlikBar, smi, mundur, pojok,
   garisSeret, onSeret, onHapusGaris, hamparanBawah, segmen, penandaPine, kotakPine, isianPine,
-  alat, onAlatSelesai, gambarAlat, gambarPilih, onPilihGambar, garisBayang,
+  alat, onAlatSelesai, gambarAlat, gambarPilih, onPilihGambar,
+  posisiMt5, onUbahPosisi, hargaAsk,
 }: {
   lilin: Lilin;
   garis?: Garis[];
@@ -112,8 +132,13 @@ export function ChartLilin({
   gambarPilih?: string | null;
   /** Klik pada gambar memilihnya; klik ruang kosong membatalkan. */
   onPilihGambar?: (id: string | null) => void;
-  /** Garis bayang posisi broker — entry + PnL berjalan, tidak bisa digeser. */
-  garisBayang?: { id: string; harga: number; warna: string; label: string; ket?: string }[];
+  /** Posisi MT5 terbuka — price line entry/SL/TP + PnL + seret SL/TP. */
+  posisiMt5?: PosisiChartMt5[];
+  /** Kirim SL/TP baru sebuah posisi ke EA; resolve true kalau EA sukses.
+   *  Tanpa handler ini SL/TP posisinya tidak bisa diseret sama sekali. */
+  onUbahPosisi?: (tiket: string, sl: number, tp: number) => Promise<boolean>;
+  /** Harga permintaan (ask) MT5 — garis penanda spread di atas bid. */
+  hargaAsk?: number;
 }) {
   const kotak = useRef<HTMLDivElement>(null);
   const chart = useRef<IChartApi | null>(null);
@@ -545,11 +570,24 @@ export function ChartLilin({
      jepitan bisa jatuh di wilayah yang penyembunyinya anggap "di luar". */
   const paneHargaRef = useRef(0);
 
+  /* ── Ubahan SL/TP posisi MT5 ────────────────────────────────────────
+     Satu ubahan hidup pada satu waktu: nilai yang sedang diseret MENANG
+     atas nilai broker di garisnya (pratinjau), lalu menunggu tombol
+     Kirim. `terkirim` menahan pratinjaunya setelah EA sukses — laporan
+     EA berikutnya butuh beberapa detik, dan garis yang melompat balik ke
+     nilai lama selama jeda itu terlihat seperti perintah yang gagal. */
+  const [ubah, setUbah] = useState<{
+    tiket: string; sl: number; tp: number;
+    bidang: 'sl' | 'tp'; sibuk: boolean; terkirim: boolean;
+  } | null>(null);
+  const seretUbah = useRef<{ tiket: string; bidang: 'sl' | 'tp' } | null>(null);
+  const garisPosMt5 = useRef<IPriceLine[]>([]);
+
   /* Nilai terbaru dibaca dari ref di dalam rAF. Kalau dibaca dari closure,
      loopnya harus dipasang ulang tiap render — dan itu mengalahkan
      tujuannya. */
-  const acuan = useRef({ garisSeret, lilin, hingga, garisBayang });
-  acuan.current = { garisSeret, lilin, hingga, garisBayang };
+  const acuan = useRef({ garisSeret, lilin, hingga, posisiMt5, ubah });
+  acuan.current = { garisSeret, lilin, hingga, posisiMt5, ubah };
 
   const hargaDariY = useCallback((y: number) => {
     const s = seri.current;
@@ -568,7 +606,7 @@ export function ChartLilin({
   const pasang = useCallback(() => {
     const s = seri.current, c = chart.current;
     if (!s || !c) return;
-    const { garisSeret: gs, lilin: l, hingga: hg, garisBayang: gb } = acuan.current;
+    const { garisSeret: gs, lilin: l, hingga: hg, posisiMt5: pm, ubah: ub } = acuan.current;
 
     /* Lebar skala harga dibaca tiap kali, bukan sekali: ia berubah sendiri
        begitu angkanya bertambah satu digit. */
@@ -595,7 +633,33 @@ export function ChartLilin({
       }
     };
 
-    [...(gs ?? []), ...(gb ?? [])].forEach((g) => taruh(garisRef.current.get(g.id), g.harga));
+    (gs ?? []).forEach((g) => taruh(garisRef.current.get(g.id), g.harga));
+
+    /* Hamparan posisi MT5. Garis-garisnya sendiri price line (digambar
+       kanvas oleh chart-nya); yang ditempatkan di sini cuma tiga penumpang
+       DOM-nya: PnL di ATAS garis entry, pegangan seret di level SL/TP
+       (nilai seretan menang atas nilai broker), dan tombol Kirim yang
+       menempel di garis yang terakhir dipegang. */
+    (pm ?? []).forEach((p) => {
+      const u = ub && ub.tiket === p.tiket ? ub : null;
+      const elPnl = garisRef.current.get('pnl-' + p.tiket);
+      if (elPnl) {
+        const y = s.priceToCoordinate(p.entry);
+        /* Batas atas 12 px, bukan -2: elemen ini duduk DI ATAS garisnya
+           (translateY -100%), jadi garis di tepi atas berarti teksnya
+           sudah keluar jendela. */
+        if (typeof y === 'number' && isFinite(y) && y >= 12 && (!paneHarga || y <= paneHarga + 2)) {
+          elPnl.style.top = (y - 3) + 'px';
+          elPnl.style.visibility = 'visible';
+        } else elPnl.style.visibility = 'hidden';
+      }
+      const slPos = u ? u.sl : p.sl;
+      taruh(garisRef.current.get(`ubah-${p.tiket}-sl`), slPos > 0 ? slPos : undefined);
+      const tpPos = u ? u.tp : p.tp;
+      taruh(garisRef.current.get(`ubah-${p.tiket}-tp`), tpPos > 0 ? tpPos : undefined);
+    });
+    const elTombol = garisRef.current.get('ubah-tombol');
+    if (elTombol && ub) taruh(elTombol, ub.bidang === 'tp' ? ub.tp : ub.sl);
 
     /* Garis order berhenti DI TEPI skala harga, tidak menerobos ke bawah
        angka-angkanya. Elemen DOM membentang selebar komponen; tanpa batas
@@ -642,7 +706,7 @@ export function ChartLilin({
      requestAnimationFrame berhenti total saat tabnya tidak terlihat. Tanpa
      panggilan langsung ini, membuka halaman di tab latar lalu berpindah ke
      sana akan menampilkan garis dan label yang belum punya posisi. */
-  useEffect(pasang, [pasang, garisSeret, lilin, hingga, mundur, smi]);
+  useEffect(pasang, [pasang, garisSeret, lilin, hingga, mundur, smi, posisiMt5, ubah]);
 
   useEffect(() => {
     let raf = 0;
@@ -697,6 +761,109 @@ export function ChartLilin({
     seret.current = { id, mulaiY: e.clientY };
     document.body.style.cursor = 'ns-resize';
     chart.current?.applyOptions({ handleScroll: false, handleScale: false });
+  }
+
+  /* ── Garis posisi MT5: PRICE LINE, bukan overlay DOM ────────────────
+     createPriceLine menempel sampai KE DALAM sumbu harga dengan label
+     kotak yang ikut bergerak bersama kanvas — persis garis posisi
+     MetaTrader. Di garisnya sendiri TIDAK ada angka entry/SL/TP: angkanya
+     sudah ada di label sumbu, dan satu-satunya angka yang pantas menumpang
+     di area chart adalah PnL berjalan (elemen DOM terpisah di bawah).
+     Nilai yang sedang diseret (ubah) menang atas nilai broker supaya
+     pratinjaunya hidup mengikuti kursor. */
+  useEffect(() => {
+    const s = seri.current;
+    if (!s) return;
+    const buat = (price: number, color: string, title: string, lineStyle: number) => {
+      try {
+        garisPosMt5.current.push(s.createPriceLine({
+          price, color, lineWidth: 1, lineStyle, axisLabelVisible: true, title,
+        }));
+      } catch { /* seri sedang dibongkar ulang */ }
+    };
+    (posisiMt5 ?? []).forEach((p) => {
+      const u = ubah && ubah.tiket === p.tiket ? ubah : null;
+      buat(p.entry, p.arah === 'BUY' ? '#10b981' : '#f87171', `${p.arah} ${p.lot}`, 2);
+      const slPos = u ? u.sl : p.sl;
+      if (slPos > 0) buat(slPos, '#f87171', 'SL', 1);
+      const tpPos = u ? u.tp : p.tp;
+      if (tpPos > 0) buat(tpPos, '#10b981', 'TP', 1);
+    });
+    /* Harga permintaan (ask): garis titik jarang — jaraknya ke garis harga
+       bid adalah SPREAD, dan di emas spread bukan pembulatan. Baru muncul
+       kalau EA v2.02+ yang mengirim tick (v2.01 tidak membawa ask). */
+    if (hargaAsk && isFinite(hargaAsk) && hargaAsk > 0) buat(hargaAsk, '#60a5fa', 'Ask', 4);
+    return () => {
+      garisPosMt5.current.forEach((g) => { try { s.removePriceLine(g); } catch { /* dibongkar */ } });
+      garisPosMt5.current = [];
+    };
+  }, [posisiMt5, ubah, hargaAsk]);
+
+  /* Ubahan menutup hidupnya sendiri saat laporan EA berikutnya sudah
+     MEMBAWA nilai barunya, atau posisinya lenyap (tertutup dari mana pun).
+     Selama masih diseret ia tidak boleh ditutup — saat mousedown nilainya
+     masih sama persis dengan nilai broker. */
+  useEffect(() => {
+    if (!ubah || ubah.sibuk || seretUbah.current) return;
+    const p = (posisiMt5 ?? []).find((x) => x.tiket === ubah.tiket);
+    if (!p) { setUbah(null); return; }
+    /* Toleransi RELATIF, bukan persamaan persis: EA merapikan harga ke
+       digit simbol sebelum memasangnya, jadi 2412.3456 yang dikirim
+       kembali sebagai 2412.35 — dan itu tetap "sudah terpasang". */
+    const dekat = (a: number, b: number) => Math.abs(a - b) <= Math.max(Math.abs(b) * 1e-5, 1e-9);
+    if (dekat(ubah.sl, p.sl) && dekat(ubah.tp, p.tp)) setUbah(null);
+  }, [posisiMt5, ubah]);
+
+  /* Seret SL/TP posisi — pendengar di window, alasan yang sama dengan
+     seret garis tiket: kursor selalu lolos dari strip setipis 14 px. */
+  useEffect(() => {
+    if (!onUbahPosisi) return;
+    const gerak = (e: MouseEvent) => {
+      const su = seretUbah.current;
+      if (!su) return;
+      e.preventDefault();
+      const h = hargaDariY(e.clientY);
+      if (h !== null) setUbah((u) => (u && u.tiket === su.tiket ? { ...u, [su.bidang]: h } : u));
+    };
+    const lepas = () => {
+      if (!seretUbah.current) return;
+      seretUbah.current = null;
+      document.body.style.cursor = '';
+      chart.current?.applyOptions({ handleScroll: true, handleScale: true });
+      /* Pemicu efek penutup di atas: seretan tanpa perpindahan (klik
+         polos) harus langsung bubar tanpa menampilkan tombol Kirim. */
+      setUbah((u) => (u ? { ...u } : u));
+    };
+    window.addEventListener('mousemove', gerak);
+    window.addEventListener('mouseup', lepas);
+    return () => {
+      window.removeEventListener('mousemove', gerak);
+      window.removeEventListener('mouseup', lepas);
+    };
+  }, [onUbahPosisi, hargaDariY]);
+
+  function mulaiSeretUbah(p: PosisiChartMt5, bidang: 'sl' | 'tp', e: React.MouseEvent) {
+    if (!onUbahPosisi) return;
+    e.preventDefault();
+    e.stopPropagation();
+    seretUbah.current = { tiket: p.tiket, bidang };
+    setUbah((u) => (u && u.tiket === p.tiket && !u.terkirim
+      ? { ...u, bidang, sibuk: false }
+      : { tiket: p.tiket, sl: p.sl, tp: p.tp, bidang, sibuk: false, terkirim: false }));
+    document.body.style.cursor = 'ns-resize';
+    chart.current?.applyOptions({ handleScroll: false, handleScale: false });
+  }
+
+  async function kirimUbah() {
+    if (!ubah || !onUbahPosisi || ubah.sibuk) return;
+    const kirim = ubah;
+    setUbah({ ...kirim, sibuk: true });
+    const ok = await onUbahPosisi(kirim.tiket, kirim.sl, kirim.tp);
+    /* Sukses: tombolnya hilang tapi PRATINJAUNYA bertahan sampai laporan
+       EA menyusul (efek penutup di atas yang membubarkannya). Gagal:
+       tombol tetap ada — nilainya masih di tempat, tinggal coba lagi
+       atau Batal. */
+    setUbah((u) => (u && u.tiket === kirim.tiket ? { ...u, sibuk: false, terkirim: ok } : u));
   }
 
   const idxAkhir = (hingga === undefined ? lilin.closes.length : Math.min(lilin.closes.length, hingga + 1)) - 1;
@@ -764,25 +931,60 @@ export function ChartLilin({
         );
       })}
 
-      {/* Bayang posisi MT5 — garis entry tipis + PnL berjalan. Tidak bisa
-          digeser dan tidak menghalangi klik: levelnya milik broker. */}
-      {(garisBayang ?? []).map((g) => (
-        <div key={g.id}
+      {/* Posisi MT5. Garis entry/SL/TP-nya PRICE LINE (menembus ke sumbu
+          harga — digambar chart-nya sendiri); di DOM tinggal PnL polos di
+          atas garis entry: merah rugi, hijau untung, tanpa kotak, tanpa
+          angka entry/SL/TP — angkanya sudah di label sumbu. */}
+      {(posisiMt5 ?? []).map((p) => (
+        <div key={'pnl-' + p.tiket}
              ref={(el) => {
-               if (el) garisRef.current.set(g.id, el);
-               else garisRef.current.delete(g.id);
+               if (el) garisRef.current.set('pnl-' + p.tiket, el);
+               else garisRef.current.delete('pnl-' + p.tiket);
              }}
-             className="pointer-events-none absolute left-0 right-0 z-10 flex items-center"
-             style={{ transform: 'translateY(-50%)', height: 14, visibility: 'hidden' }}>
-          <div className="h-px flex-1 opacity-60" style={{
-            background: `repeating-linear-gradient(90deg, ${g.warna} 0 3px, transparent 3px 7px)`,
-          }} />
-          <span className="angka mr-0.5 shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-zinc-950 opacity-90 shadow"
-                style={{ background: g.warna }}>
-            {g.label}{g.ket ? ` ${g.ket}` : ''}
-          </span>
+             className={cn('angka pointer-events-none absolute left-3 z-10 pr-1.5 text-right text-[11.5px] font-semibold tabular-nums',
+               p.profit >= 0 ? 'text-emerald-400' : 'text-red-400')}
+             style={{ transform: 'translateY(-100%)', visibility: 'hidden',
+               textShadow: '0 1px 4px rgba(9,9,11,.95), 0 0 2px rgba(9,9,11,.9)' }}>
+          {p.profit >= 0 ? '+' : ''}{uang(p.profit)}
         </div>
       ))}
+
+      {/* Pegangan seret SL/TP posisi — strip transparan 14 px di level
+          garisnya. Menyeret menampilkan tombol Kirim; tanpa menekan Kirim
+          tidak ada apa pun yang berangkat ke MT5. */}
+      {onUbahPosisi && (posisiMt5 ?? []).map((p) => (['sl', 'tp'] as const).map((b) => (
+        <div key={`ubah-${p.tiket}-${b}`}
+             ref={(el) => {
+               if (el) garisRef.current.set(`ubah-${p.tiket}-${b}`, el);
+               else garisRef.current.delete(`ubah-${p.tiket}-${b}`);
+             }}
+             title={`Seret ${b.toUpperCase()} posisi #${p.tiket}`}
+             className="absolute left-0 z-10 cursor-ns-resize"
+             style={{ transform: 'translateY(-50%)', height: 14, visibility: 'hidden' }}
+             onMouseDown={(e) => mulaiSeretUbah(p, b, e)} />
+      )))}
+
+      {/* Tombol keputusan ubahan — menempel di garis yang terakhir
+          dipegang, tepat di kiri sumbu harga. */}
+      {ubah && !ubah.terkirim && onUbahPosisi && (
+        <div ref={(el) => {
+               if (el) garisRef.current.set('ubah-tombol', el);
+               else garisRef.current.delete('ubah-tombol');
+             }}
+             className="absolute z-20 flex items-center gap-1.5"
+             style={{ transform: 'translateY(-50%)', visibility: 'hidden' }}>
+          <button onClick={() => void kirimUbah()} disabled={ubah.sibuk}
+                  className="flex cursor-pointer items-center rounded-md bg-zinc-100 px-2 py-1 text-[10.5px] font-semibold leading-none text-zinc-950 shadow-lg transition-colors hover:bg-white disabled:cursor-default disabled:opacity-60">
+            {ubah.sibuk ? 'Mengirim…' : `Kirim SL/TP → MT5`}
+          </button>
+          {!ubah.sibuk && (
+            <button onClick={() => setUbah(null)}
+                    className="cursor-pointer rounded-md border border-zinc-700 bg-zinc-900/95 px-2 py-1 text-[10.5px] leading-none text-zinc-300 shadow transition-colors hover:text-zinc-100">
+              Batal
+            </button>
+          )}
+        </div>
+      )}
 
       {pojok && <div className="absolute left-2 top-2 z-20">{pojok}</div>}
 

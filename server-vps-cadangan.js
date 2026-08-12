@@ -1747,7 +1747,10 @@ app.post('/api/mt5/tick', batasLaju, (req, res) => {
   const simbol = String(b.simbol || '').toUpperCase().replace(/[^A-Z0-9.]/g, '');
   const bid = Number(b.bid);
   if (!simbol || !isFinite(bid) || bid <= 0) return res.status(400).json({ error: 'tick tidak sah' });
-  MT5_TICK[simbol] = { bid, waktu: Date.now() };
+  /* Ask menyusul di EA v2.02 — v2.01 tidak mengirimnya, jadi 0 berarti
+     "belum ada", bukan "spread nol". Web menyembunyikan garis Ask-nya. */
+  const ask = Number(b.ask);
+  MT5_TICK[simbol] = { bid, ask: isFinite(ask) && ask > 0 ? ask : 0, waktu: Date.now() };
   res.json({ ok: true });
 });
 
@@ -1855,6 +1858,10 @@ app.get('/api/mt5/klines', batasLaju, (req, res) => {
   res.json({
     ok: true, sumber: 'mt5', diperbarui: isi.diperbarui,
     spec: k[simbol].spec || null,
+    /* Tick bid/ask ikut dipulangkan: web sudah memanggil rute ini tiap
+       beberapa detik untuk lilinnya — harga ask menumpang gratis di sini
+       daripada membuka satu jalur polling baru. */
+    tick: MT5_TICK[simbol] || null,
     data: rows,
   });
 });

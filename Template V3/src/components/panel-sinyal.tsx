@@ -61,8 +61,11 @@ export function PanelSinyal() {
 
   if (!daftar.length) return null;
 
+  /* mb-4, bukan mt-4: panel ini PEMBUKA halaman Copy Trading — jaraknya
+     ke bawah (panel permintaan akses), bukan ke atas. Saat kosong ia
+     null, jadi margin-nya ikut hilang tanpa menyisakan celah. */
   return (
-    <Panel className="mt-4">
+    <Panel className="mb-4">
       <PanelHead
         judul="Sinyal Pantauan"
         sub="Dikurasi agen Pemburu Sinyal — hanya sinyal berlevel lengkap yang lolos; sumbernya ditulis terbuka."

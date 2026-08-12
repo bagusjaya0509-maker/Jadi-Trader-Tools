@@ -5,6 +5,7 @@ import {
   TrendingUp, TrendingDown, RefreshCw,
 } from 'lucide-react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
+import { PanelSinyal } from '@/components/panel-sinyal';
 import { cn, uang, persen, harga as fHarga, tanggalPendek } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 import { useRiwayat, useSaldoAwal } from '@/lib/data';
@@ -296,6 +297,12 @@ export default function Analisa() {
 
   return (
     <div className="p-4 sm:p-6">
+      {/* ── Sinyal kurasi agen Pemburu Sinyal ─────────────────────────
+         Duduk di halaman Copy Trading, bukan dashboard: sinyal komunitas
+         adalah bahan meniru trade orang lain — satu keluarga dengan
+         analisa berbayar di bawahnya, bukan dengan KPI jurnal pribadi. */}
+      <PanelSinyal />
+
       {/* Permintaan masuk untuk analisaku */}
       {masuk.length > 0 && (
         <Panel className="mb-4">

@@ -16,7 +16,7 @@ import { WatchChart } from '@/components/watch-chart';
 import type { JenisAlat, GambarAlat } from '@/lib/plugin-alat';
 import type { HasilPine } from '@/lib/pine';
 import { bacaSetelanChart, simpanSetelanChart } from '@/lib/replay';
-import { ambilKlines, bacaSpekMt5, daftarSimbolMt5, type Lilin } from '@/lib/pasar';
+import { ambilKlines, bacaSpekMt5, bacaTickMt5, daftarSimbolMt5, type Lilin } from '@/lib/pasar';
 import { useAkunMt5 } from '@/lib/akun';
 import {
   jalankanUji, garisIndikator, zonaSnr, deretSmi, SETELAN_BAWAAN,
@@ -215,45 +215,42 @@ export default function ChartBacktest() {
      SL/TP kena atau ditutup dari mana pun. */
   const akunMt5 = useAkunMt5();
   const nilaiLotMt5 = simbol.startsWith('MT5:') ? (bacaSpekMt5(simbol.slice(4)) ?? 100) : 0;
-  /* ── Bayang posisi MT5 — ala garis posisi MetaTrader ────────────────
-     Setiap posisi terbuka di simbol ini tampil sebagai SATU garis entry
-     tipis dengan PnL BERJALAN di labelnya. Bukan pengganti garis tiket:
-     rencana entry/SL/TP tetap bebas dipakai untuk LAYERING — menyusun
-     posisi berikutnya selagi yang lama berjalan. Garisnya hilang sendiri
-     saat posisinya tutup, dari SL/TP maupun tangan, dari web maupun MT5. */
-  const garisBayang = useMemo(() => {
+  /* ── Posisi MT5 di chart — ala garis posisi MetaTrader ──────────────
+     Setiap posisi terbuka di simbol ini digambar ChartLilin sebagai price
+     line entry/SL/TP yang menembus ke sumbu harga, dengan PnL berjalan
+     polos di atas garis entrynya. Bukan pengganti garis tiket: rencana
+     entry/SL/TP tetap bebas dipakai untuk LAYERING — menyusun posisi
+     berikutnya selagi yang lama berjalan. Garisnya hilang sendiri saat
+     posisinya tutup, dari SL/TP maupun tangan, dari web maupun MT5. */
+  const posisiMt5Chart = useMemo(() => {
     if (!simbol.startsWith('MT5:')) return [];
     const dasarS = simbol.slice(4);
-    const nilai = nilaiLotMt5 || 100;
-    const keluar: { id: string; harga: number; warna: string; label: string; ket?: string }[] = [];
-    akunMt5.posisi
+    return akunMt5.posisi
       .filter((p) => p.simbol.toUpperCase().indexOf(dasarS) === 0)
-      .forEach((p) => {
-        keluar.push({
-          id: 'mt5-' + p.tiket,
-          harga: p.hargaBuka,
-          warna: p.arah === 'BUY' ? '#10b981' : '#f87171',
-          label: `#${p.tiket} ${p.arah} ${p.lot}`,
-          ket: `· ${p.profit >= 0 ? '+' : ''}${uang(p.profit)}`,
-        });
-        /* SL & TP posisinya ikut sebagai PENANDA — garis tipis dengan
-           dolar yang dipertaruhkan/diincar, supaya level yang sedang
-           menjaga uang tetap terlihat selama posisinya hidup. */
-        if (p.sl > 0) {
-          keluar.push({
-            id: `mt5-${p.tiket}-sl`, harga: p.sl, warna: '#f87171',
-            label: 'SL', ket: `· #${p.tiket} · -${uang(p.lot * nilai * Math.abs(p.hargaBuka - p.sl))}`,
-          });
-        }
-        if (p.tp > 0) {
-          keluar.push({
-            id: `mt5-${p.tiket}-tp`, harga: p.tp, warna: '#10b981',
-            label: 'TP', ket: `· #${p.tiket} · +${uang(p.lot * nilai * Math.abs(p.tp - p.hargaBuka))}`,
-          });
-        }
-      });
-    return keluar;
-  }, [simbol, akunMt5.posisi, nilaiLotMt5]);
+      .map((p) => ({
+        tiket: p.tiket, arah: p.arah, lot: p.lot,
+        entry: p.hargaBuka, sl: p.sl, tp: p.tp, profit: p.profit,
+      }));
+  }, [simbol, akunMt5.posisi]);
+  /* Tick bid/ask menumpang balasan klines MT5 yang memang sudah dipoll —
+     dibaca ulang tiap render, dan render datang tiap data lilin segar. */
+  const tickMt5 = simbol.startsWith('MT5:') ? bacaTickMt5(simbol.slice(4)) : null;
+  /* Seretan SL/TP posisi baru BERANGKAT saat tombol Kirim di chart
+     ditekan — ChartLilin yang memegang pratinjau dan tombolnya, jalur
+     kirimnya sama dengan order BUKA: antrean perintah → EA → laporan. */
+  const ubahPosisiMt5 = useCallback(async (tiket: string, sl: number, tp: number): Promise<boolean> => {
+    try {
+      setKabarNyata(`Mengirim SL/TP baru #${tiket} ke EA…`);
+      const { id } = await kirimPerintahMt5({ aksi: 'UBAH', tiket, sl, tp });
+      const h = await tungguHasilMt5(id);
+      const sukses = h.status === 'sukses';
+      setKabarNyata(sukses ? `SL/TP #${tiket} terpasang di MT5 — ${h.pesan}` : `Ubahan #${tiket}: ${h.pesan}`);
+      return sukses;
+    } catch (e) {
+      setKabarNyata(e instanceof Error ? e.message : 'Gagal mengirim ubahan SL/TP');
+      return false;
+    }
+  }, []);
 
   /* Mengubah SL ×ATR / R:R saat tiket TERBUKA langsung menggeser garisnya —
      setelan yang baru berlaku untuk tiket berikutnya terasa seperti setelan
@@ -811,7 +808,9 @@ export default function ChartBacktest() {
                           gambarAlat={gambarAlat}
                           gambarPilih={gambarPilih}
                           onPilihGambar={setGambarPilih}
-                          garisBayang={garisBayang}
+                          posisiMt5={posisiMt5Chart}
+                          onUbahPosisi={simbol.startsWith('MT5:') ? ubahPosisiMt5 : undefined}
+                          hargaAsk={tickMt5?.ask || undefined}
                           mundur={DURASI_TF[tf] ? jamMundur(detik) : undefined}
                           hamparanBawah={kendaliReplay}
                           pojok={aksi ? (
