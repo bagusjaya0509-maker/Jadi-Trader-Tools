@@ -109,20 +109,30 @@ export class PenggambarAlat implements ISeriesPrimitive<Time> {
               if (x1 == null || x2 == null || y1 == null || y2 == null) continue;
               const kiri = Math.min(x1, x2), kanan = Math.max(x1, x2);
 
-              /* Gambar TERPILIH diberi bingkai putus-putus + empat pegangan
-                 sudut — tanda "yang ini yang akan terhapus kalau kamu
-                 menekan Delete". */
+              /* Gambar TERPILIH: PEGANGAN BULAT di titik jangkarnya sendiri,
+                 tanpa bingkai putus-putus.
+                 ────────────────────────────────────────────────────────
+                 Bingkai kotak berbohong tentang bentuknya — trendline
+                 miring dikurung persegi panjang yang sebagian besar isinya
+                 bukan garis itu, dan orang jadi mengira yang terpilih
+                 adalah kotaknya. Pegangan di ujung justru menunjukkan dua
+                 hal sekaligus: mana yang terpilih, DAN di mana ia bisa
+                 ditarik untuk diperpanjang. */
               if ('id' in g && g.id && g.id === this.pilih) {
-                const bA = Math.min(y1, y2) - 5, bB = Math.max(y1, y2) + 5;
+                const titik: [number, number][] = g.jenis === 'garis'
+                  ? [[x1, y1], [x2, y2]]
+                  /* Kotak, ukur, fib ditarik dari sudut ke sudut — jadi
+                     pegangannya di empat sudut yang benar-benar ada. */
+                  : [[x1, y1], [x2, y2], [x1, y2], [x2, y1]];
                 ctx.save();
-                ctx.setLineDash([4, 3]);
-                ctx.strokeStyle = 'rgba(250,250,250,.85)';
-                ctx.lineWidth = 1;
-                ctx.strokeRect(kiri - 5, bA, (kanan - kiri) + 10, bB - bA);
-                ctx.setLineDash([]);
-                ctx.fillStyle = '#fafafa';
-                for (const [hx, hy] of [[kiri - 5, bA], [kanan + 5, bA], [kiri - 5, bB], [kanan + 5, bB]]) {
-                  ctx.fillRect(hx - 2.5, hy - 2.5, 5, 5);
+                for (const [hx, hy] of titik) {
+                  ctx.beginPath();
+                  ctx.arc(hx, hy, 4.5, 0, Math.PI * 2);
+                  ctx.fillStyle = '#09090b';
+                  ctx.fill();
+                  ctx.lineWidth = 1.5;
+                  ctx.strokeStyle = '#fafafa';
+                  ctx.stroke();
                 }
                 ctx.restore();
               }

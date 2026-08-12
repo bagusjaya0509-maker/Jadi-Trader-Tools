@@ -157,6 +157,17 @@ export default function ChartBacktest() {
        seretan chart berikutnya jadi kotak yang tidak diminta. */
     setAlat(null);
   }, [simbol, tf]);
+  /* Menggeser gambar / menarik ujungnya. Disimpan ke localStorage pada
+     kunci simbol|tf yang SAMA dengan penambahan — gambar yang dipindah
+     lalu kembali ke tempat lama saat halaman dibuka ulang lebih
+     menjengkelkan daripada gambar yang tidak bisa dipindah sama sekali. */
+  const ubahGambar = useCallback((id: string, ubah: Partial<GambarAlat>) => {
+    setGambarAlat((d) => {
+      const b = d.map((g) => (g.id === id ? { ...g, ...ubah } : g));
+      try { localStorage.setItem(`jt.alat.${simbol}|${tf}`, JSON.stringify(b)); } catch { /* privat */ }
+      return b;
+    });
+  }, [simbol, tf]);
   /* Gambar TERPILIH: klik gambarnya di mode kursor biasa, hapus dengan
      Delete/Backspace, batal pilih dengan Escape. */
   const [gambarPilih, setGambarPilih] = useState<string | null>(null);
@@ -826,6 +837,7 @@ export default function ChartBacktest() {
                           gambarAlat={gambarAlat}
                           gambarPilih={gambarPilih}
                           onPilihGambar={setGambarPilih}
+                          onUbahGambar={ubahGambar}
                           posisiMt5={posisiMt5Chart}
                           onUbahPosisi={simbol.startsWith('MT5:') ? ubahPosisiMt5 : undefined}
                           hargaAsk={askTampil}

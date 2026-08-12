@@ -82,7 +82,7 @@ export interface PosisiChartMt5 {
 export function ChartLilin({
   lilin, garis, trade, tinggi = 420, hingga, garisHarga, onKlikBar, smi, mundur, pojok,
   garisSeret, onSeret, onHapusGaris, hamparanBawah, segmen, penandaPine, kotakPine, isianPine,
-  alat, onAlatSelesai, gambarAlat, gambarPilih, onPilihGambar,
+  alat, onAlatSelesai, gambarAlat, gambarPilih, onPilihGambar, onUbahGambar,
   posisiMt5, onUbahPosisi, hargaAsk,
 }: {
   lilin: Lilin;
@@ -130,6 +130,9 @@ export function ChartLilin({
   gambarPilih?: string | null;
   /** Klik pada gambar memilihnya; klik ruang kosong membatalkan. */
   onPilihGambar?: (id: string | null) => void;
+  /** Gambar terpilih digeser utuh, atau salah satu ujungnya ditarik.
+   *  Tanpa handler ini gambar tetap beku setelah tertempel. */
+  onUbahGambar?: (id: string, ubah: Partial<Pick<GambarAlat, 't1' | 'h1' | 't2' | 'h2'>>) => void;
   /** Posisi MT5 terbuka — price line entry/SL/TP + PnL + seret SL/TP. */
   posisiMt5?: PosisiChartMt5[];
   /** Kirim SL/TP baru sebuah posisi ke EA; resolve true kalau EA sukses.
@@ -433,6 +436,11 @@ export function ChartLilin({
   }, [alat]);
 
   useEffect(() => { alatPrim.current?.setPilih(gambarPilih ?? null); }, [gambarPilih]);
+  /* Dibaca di dalam penangan mousedown yang dipasang SEKALI — kalau dibaca
+     dari closure, penangannya harus dipasang ulang tiap kali pilihan
+     berubah, dan seretan yang sedang berjalan ikut putus. */
+  const pilihRef = useRef(gambarPilih ?? null);
+  pilihRef.current = gambarPilih ?? null;
 
   /* ── Memilih gambar dengan klik (mode kursor biasa) ─────────────────
      Klik = mousedown+mouseup yang nyaris tidak bergerak; seretan panning
@@ -488,6 +496,138 @@ export function ChartLilin({
     el.addEventListener('click', klik);
     return () => { el.removeEventListener('mousedown', turun); el.removeEventListener('click', klik); };
   }, [onPilihGambar]);
+
+  /* ── Menggeser & menarik ujung gambar yang sudah tertempel ───────────
+     Gambar yang sudah jadi dulu BEKU: satu-satunya cara memperbaiki
+     trendline yang meleset dua piksel adalah menghapusnya lalu menggambar
+     ulang dari nol. Sekarang gambar terpilih bisa digeser utuh, dan tiap
+     ujungnya bisa ditarik sendiri — jadi memperpanjang trendline tidak
+     lagi berarti kehilangan sudut yang sudah pas.
+
+     Yang dipegang selama seretan: waktu & harga, bukan piksel. Chart yang
+     ikut bergeser di tengah seretan (harga baru masuk) tidak menyeret
+     gambarnya ikut pindah. */
+  const seretGambar = useRef<
+    { id: string; mode: 'geser' | 'ujung1' | 'ujung2'; awal: GambarAlat; t: number; h: number } | null
+  >(null);
+
+  useEffect(() => {
+    if (!onUbahGambar) return;
+    const el = kotak.current;
+    if (!el) return;
+
+    const posisiDari = (e: MouseEvent) => {
+      const c = chart.current, s = seri.current;
+      if (!c || !s) return null;
+      const rect = el.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const paneH = paneHargaRef.current || rect.height;
+      const y = Math.min(Math.max(e.clientY - rect.top, 2), paneH - 2);
+      const h = s.coordinateToPrice(y);
+      if (typeof h !== 'number' || !isFinite(h)) return null;
+      const t = c.timeScale().coordinateToTime(x);
+      if (t != null) return { t: (t as number) * 1000, h, x, y };
+      const l = c.timeScale().coordinateToLogical(x);
+      const times = acuan.current.lilin.times;
+      if (l == null || times.length < 2) return null;
+      const tfMs = times[1] - times[0];
+      return { t: times[times.length - 1] + (l - (times.length - 1)) * tfMs, h, x, y };
+    };
+
+    const koordinat = (g: GambarAlat) => {
+      const c = chart.current, s = seri.current;
+      if (!c || !s) return null;
+      const X = (t: number): number | null => {
+        const x = c.timeScale().timeToCoordinate(Math.floor(t / 1000) as Time);
+        if (x != null) return x;
+        const times = acuan.current.lilin.times;
+        if (times.length < 2) return null;
+        const tfMs = times[1] - times[0];
+        return c.timeScale().logicalToCoordinate((times.length - 1 + (t - times[times.length - 1]) / tfMs) as Logical);
+      };
+      const x1 = X(g.t1), x2 = X(g.t2);
+      const y1 = s.priceToCoordinate(g.h1), y2 = s.priceToCoordinate(g.h2);
+      if (x1 == null || x2 == null || y1 == null || y2 == null) return null;
+      return { x1, y1, x2, y2 };
+    };
+
+    const turun = (e: MouseEvent) => {
+      if (e.button !== 0) return;
+      const { alat: a, gambarAlat: gs } = acuanPilih.current;
+      if (a) return;                       // sedang memegang alat: itu menggambar baru
+      const pilihId = pilihRef.current;
+      if (!pilihId) return;                // hanya gambar TERPILIH yang bisa digeser
+      const g = (gs ?? []).find((x) => x.id === pilihId);
+      if (!g) return;
+      const p = posisiDari(e);
+      const k = koordinat(g);
+      if (!p || !k) return;
+
+      /* Pegangan menang atas badan: ujung yang berada di dalam badan kotak
+         tetap harus bisa ditarik sendiri. */
+      const dekat = (hx: number, hy: number) => Math.hypot(p.x - hx, p.y - hy) <= 9;
+      let mode: 'geser' | 'ujung1' | 'ujung2' | null = null;
+      if (dekat(k.x1, k.y1)) mode = 'ujung1';
+      else if (dekat(k.x2, k.y2)) mode = 'ujung2';
+      else if (g.jenis !== 'garis' && dekat(k.x1, k.y2)) mode = 'ujung1';
+      else if (g.jenis !== 'garis' && dekat(k.x2, k.y1)) mode = 'ujung2';
+      else {
+        /* Di dalam badannya? Untuk garis: dekat ruasnya. Untuk yang lain:
+           di dalam kotaknya. */
+        if (g.jenis === 'garis') {
+          const dx = k.x2 - k.x1, dy = k.y2 - k.y1;
+          const pj = dx * dx + dy * dy;
+          const tt = pj ? Math.max(0, Math.min(1, ((p.x - k.x1) * dx + (p.y - k.y1) * dy) / pj)) : 0;
+          if (Math.hypot(p.x - (k.x1 + tt * dx), p.y - (k.y1 + tt * dy)) <= 7) mode = 'geser';
+        } else if (p.x >= Math.min(k.x1, k.x2) - 4 && p.x <= Math.max(k.x1, k.x2) + 4
+          && p.y >= Math.min(k.y1, k.y2) - 4 && p.y <= Math.max(k.y1, k.y2) + 4) {
+          mode = 'geser';
+        }
+      }
+      if (!mode) return;
+
+      seretGambar.current = { id: g.id, mode, awal: { ...g }, t: p.t, h: p.h };
+      document.body.style.cursor = mode === 'geser' ? 'move' : 'grabbing';
+      chart.current?.applyOptions({ handleScroll: false, handleScale: false });
+      e.preventDefault();
+      e.stopPropagation();
+    };
+
+    const gerak = (e: MouseEvent) => {
+      const sg = seretGambar.current;
+      if (!sg) return;
+      const p = posisiDari(e);
+      if (!p) return;
+      e.preventDefault();
+      const a = sg.awal;
+      if (sg.mode === 'geser') {
+        const dt = p.t - sg.t, dh = p.h - sg.h;
+        onUbahGambar(sg.id, { t1: a.t1 + dt, h1: a.h1 + dh, t2: a.t2 + dt, h2: a.h2 + dh });
+      } else if (sg.mode === 'ujung1') {
+        onUbahGambar(sg.id, { t1: p.t, h1: p.h });
+      } else {
+        onUbahGambar(sg.id, { t2: p.t, h2: p.h });
+      }
+    };
+
+    const lepas = () => {
+      if (!seretGambar.current) return;
+      seretGambar.current = null;
+      document.body.style.cursor = '';
+      chart.current?.applyOptions({ handleScroll: true, handleScale: true });
+    };
+
+    /* Fase capture supaya menang atas penangan geser chart bawaan. */
+    el.addEventListener('mousedown', turun, true);
+    window.addEventListener('mousemove', gerak);
+    window.addEventListener('mouseup', lepas);
+    return () => {
+      el.removeEventListener('mousedown', turun, true);
+      window.removeEventListener('mousemove', gerak);
+      window.removeEventListener('mouseup', lepas);
+      seretGambar.current = null;
+    };
+  }, [onUbahGambar]);
 
   const tarikAlat = useRef<{ t1: number; h1: number } | null>(null);
   useEffect(() => {
