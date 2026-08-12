@@ -330,10 +330,16 @@ export default function Marketplace() {
               <div className="mt-1 text-[11.5px] text-zinc-600">{p.versi}</div>
               <p className="mt-3 flex-1 text-[12.5px] leading-relaxed text-zinc-400">{p.ringkas}</p>
               <div className="mt-4 flex items-end justify-between gap-3">
-                <div className="angka text-xl font-semibold tracking-tight">
+                {/* Harga lama dicoret DI SEBELAH harga berlaku, bukan
+                    menggantikannya: yang harus terbaca lebih dulu adalah
+                    angka yang benar-benar dibayar. */}
+                <div className="angka flex items-baseline gap-2 text-xl font-semibold tracking-tight">
                   {p.harga === 0
                     ? <span className="text-emerald-500">Free</span>
                     : <span className="text-zinc-100">${p.harga}</span>}
+                  {p.hargaAsal && (
+                    <span className="text-[13px] font-normal text-zinc-600 line-through">${p.hargaAsal}</span>
+                  )}
                 </div>
                 <button
                   onClick={() => setAktif(p)}
@@ -471,8 +477,16 @@ export default function Marketplace() {
             </div>
 
             <div className="p-6">
-              <div className="angka mb-5 text-2xl font-semibold">
+              <div className="angka mb-5 flex items-baseline gap-2.5 text-2xl font-semibold">
                 {aktif.harga === 0 ? <span className="text-emerald-500">Free</span> : <span className="text-zinc-100">${aktif.harga}</span>}
+                {aktif.hargaAsal && (
+                  <>
+                    <span className="text-[15px] font-normal text-zinc-600 line-through">${aktif.hargaAsal}</span>
+                    <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-emerald-400">
+                      harga perkenalan
+                    </span>
+                  </>
+                )}
               </div>
               <p className="mb-6 text-[13.5px] leading-[1.75] text-zinc-400">{aktif.ringkas}</p>
 

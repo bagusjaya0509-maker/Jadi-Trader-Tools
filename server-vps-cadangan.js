@@ -1786,6 +1786,64 @@ app.get('/api/sinyal', batasLaju, (req, res) => {
 });
 
 /* ══════════════════════════════════════════════════════════════════════════
+   KABAR AGEN — isi lonceng notifikasi di situs
+   ══════════════════════════════════════════════════════════════════════════
+   Agen Pemburu Sinyal memantau ruang sinyal komunitas. Setiap kali ada
+   POSTINGAN BARU di sana ia menaruh satu kabar di sini, dan lonceng di
+   pojok kanan atas situs menghitungnya sebagai notifikasi belum dibaca.
+
+   Kenapa kabar terpisah dari /api/sinyal: tidak semua postingan lolos jadi
+   sinyal. Postingan tanpa SL ditolak dari panel sinyal — tapi orangnya
+   tetap berhak tahu bahwa analis di ruang itu baru saja bicara. Yang satu
+   daftar level siap pakai, yang satu pemberitahuan bahwa ada yang baru.
+
+   Menulis butuh APP_TOKEN (requireToken). Membaca terbuka: notifikasi ini
+   memang untuk semua pengunjung situs, dan isinya bukan rahasia. */
+const KABAR_FILE = path.join(__dirname, 'kabar.json');
+function kabarBaca() {
+  try {
+    const d = JSON.parse(fs.readFileSync(KABAR_FILE, 'utf8'));
+    return Array.isArray(d.kabar) ? d.kabar : [];
+  } catch (e) { return []; }
+}
+
+app.get('/api/kabar', batasLaju, (req, res) => {
+  res.json({ ok: true, kabar: kabarBaca() });
+});
+
+app.post('/api/kabar', batasLaju, requireToken, (req, res) => {
+  const b = req.body || {};
+  const judul = String(b.judul || '').slice(0, 200).trim();
+  if (!judul) return res.status(400).json({ error: 'judul wajib diisi' });
+
+  const kabar = kabarBaca();
+  /* id yang SAMA menimpa, tidak menumpuk: agen yang memeriksa ruang tiap
+     setengah jam akan melihat postingan yang sama berkali-kali, dan lonceng
+     yang berbunyi ulang untuk kabar yang sudah dibaca adalah cara tercepat
+     membuat orang mematikan notifikasinya. */
+  const id = String(b.id || 'k' + Date.now().toString(36)).slice(0, 80).replace(/[^\w.:-]/g, '');
+  const baris = {
+    id,
+    judul,
+    detail: String(b.detail || '').slice(0, 500),
+    sumber: String(b.sumber || '').slice(0, 120),
+    /* 'sinyal' = postingan yang lolos jadi level siap pakai (ada di panel
+       Sinyal Pantauan); 'pantau' = ada postingan baru, tapi belum/tidak
+       jadi sinyal. Situs memakai ini untuk warna lencananya. */
+    jenis: b.jenis === 'sinyal' ? 'sinyal' : 'pantau',
+    pair: String(b.pair || '').slice(0, 20).toUpperCase(),
+    tautan: String(b.tautan || '').slice(0, 300),
+    waktu: Number(b.waktu) > 0 ? Number(b.waktu) : Date.now(),
+  };
+  const sisa = kabar.filter(x => x.id !== id);
+  sisa.unshift(baris);
+  /* 50 kabar terakhir: lonceng bukan arsip, dan berkasnya harus tetap
+     bisa dibaca sekali tulis tanpa mikir. */
+  fs.writeFileSync(KABAR_FILE, JSON.stringify({ kabar: sisa.slice(0, 50) }, null, 2));
+  res.json({ ok: true, id, total: Math.min(sisa.length, 50) });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
    CACHE DOKUMEN PUBLIK FIRESTORE
    ══════════════════════════════════════════════════════════════════════════
    Kuota baca Firestore PERNAH HABIS (429) dan halaman depan tampil kosong —

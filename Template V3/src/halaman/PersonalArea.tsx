@@ -34,7 +34,7 @@ const KATEGORI: KategoriAset[] = ['Kripto', 'Sekuritas', 'Emas', 'Bank', 'E-Wall
 
 export default function PersonalArea() {
   const { pengguna } = useAuth();
-  const { isi, memuat, galat, kosong, simpan } = usePorto();
+  const { isi, tampil, contoh, memuat, galat, kosong, simpan } = usePorto();
   const [pesan, setPesan] = useState('');
   const [sibuk, setSibuk] = useState(false);
   /* `kategori` string, bukan KategoriAset: enam kategori bawaan tidak akan
@@ -46,8 +46,8 @@ export default function PersonalArea() {
      harga SEKARANG; yang disimpan bersama pos adalah harga saat dicatat, jadi
      rasionya yang dipakai sebagai faktor. */
   const simbolDipakai = useMemo(
-    () => [...new Set(isi.aset.map((a) => a.simbol).filter(Boolean) as string[])],
-    [isi.aset]
+    () => [...new Set(tampil.aset.map((a) => a.simbol).filter(Boolean) as string[])],
+    [tampil.aset]
   );
   const hargaPasar = useHargaPasar(simbolDipakai);
   const [berdenyut, setBerdenyut] = useState(false);
@@ -62,16 +62,16 @@ export default function PersonalArea() {
      Tanpa `hargaCatat` tidak ada pembanding, jadi nilainya dibiarkan apa
      adanya — lebih baik diam daripada mengalikan dengan angka karangan. */
   const asetHidup = useMemo(
-    () => isi.aset.map((a) => {
+    () => tampil.aset.map((a) => {
       const kini = a.simbol ? hargaPasar[a.simbol] : undefined;
       const gerak = a.simbol && a.hargaCatat && kini ? kini / a.hargaCatat : 1;
       return { ...a, nilaiKini: a.nilai * gerak, bergerak: gerak !== 1 };
     }),
-    [isi.aset, hargaPasar]
+    [tampil.aset, hargaPasar]
   );
 
   const totalAset = asetHidup.reduce((s, a) => s + a.nilaiKini, 0);
-  const totalKewajiban = isi.kewajiban.reduce((s, k) => s + k.nilai, 0);
+  const totalKewajiban = tampil.kewajiban.reduce((s, k) => s + k.nilai, 0);
   const portoBersih = totalAset - totalKewajiban;
   const likuid = asetHidup
     .filter((a) => a.kategori !== 'Emas' && a.kategori !== 'Sekuritas')
@@ -98,7 +98,11 @@ export default function PersonalArea() {
      bergerak — dan setiap pergerakan memicu satu tulisan ke Firestore. Satu
      halaman yang dibiarkan terbuka semalam akan menulis ribuan kali untuk
      mencatat satu angka bulanan. */
-  const portoTercatat = isi.aset.reduce((s, a) => s + a.nilai, 0) - totalKewajiban;
+  /* Yang DICATAT ke Firestore dihitung dari isi NYATA — kalau memakai
+     `tampil`, porto contoh akan tertulis ke akun orang sebagai riwayat
+     bulanan yang tidak pernah ia punya. */
+  const portoTercatat = isi.aset.reduce((s, a) => s + a.nilai, 0)
+    - isi.kewajiban.reduce((s, k) => s + k.nilai, 0);
   useEffect(() => {
     if (memuat || kosong || !pengguna || !isi.aset.length) return;
     if (isi.bulanan[kunciBulan] === portoTercatat) return;
@@ -109,11 +113,11 @@ export default function PersonalArea() {
   }, [memuat, kosong, pengguna, isi, portoTercatat, kunciBulan, simpan]);
 
   const riwayatBulan = useMemo(
-    () => Object.entries(isi.bulanan).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => ({
+    () => Object.entries(tampil.bulanan).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => ({
       bulan: new Date(k + '-01T00:00:00').toLocaleDateString('id-ID', { month: 'short', year: '2-digit' }),
       porto: v,
     })),
-    [isi.bulanan]
+    [tampil.bulanan]
   );
   const bulanIni = riwayatBulan[riwayatBulan.length - 1];
   const bulanLalu = riwayatBulan[riwayatBulan.length - 2];
@@ -145,18 +149,23 @@ export default function PersonalArea() {
       .then(() => setBaru({ nama: '', nilai: '', kategori: 'Bank', simbol: '' }));
   }
 
-  const hapusPos = (id: string) =>
+  /* Baris CONTOH tidak bisa dihapus — ia bukan milik siapa pun, dan
+     "menghapusnya" berarti menulis daftar kosong ke akun yang memang sudah
+     kosong. Ia lenyap sendiri begitu pos pertama yang sungguhan masuk. */
+  const hapusPos = (id: string) => {
+    if (contoh) { setPesan('Itu baris contoh — tambah pos pertamamu, contohnya hilang sendiri.'); return; }
     void jalankan(() => simpan({ ...isi, aset: isi.aset.filter((a) => a.id !== id) }), 'Pos dihapus.');
+  };
 
   return (
     <div className="p-4 sm:p-6">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <KartuKpi label="Aset Kotor"    nilai={rupiahRingkas(totalAset)}      catatan={`${isi.aset.length} pos tercatat`} Ikon={Wallet} />
+        <KartuKpi label="Aset Kotor"    nilai={rupiahRingkas(totalAset)}      catatan={`${tampil.aset.length} pos tercatat`} Ikon={Wallet} />
         <KartuKpi label="Porto Bersih"  nilai={rupiahRingkas(portoBersih)}
                   delta={tumbuh === null ? undefined : Number(tumbuh.toFixed(1))}
                   catatan={tumbuh === null ? 'belum ada bulan pembanding' : undefined} Ikon={TrendingUp} />
         <KartuKpi label="Liquid Cash"   nilai={rupiahRingkas(likuid)}         catatan="tanpa emas & sekuritas" Ikon={Banknote} />
-        <KartuKpi label="Total Bon"     nilai={rupiahRingkas(totalKewajiban)} catatan={`${isi.kewajiban.length} kewajiban`} Ikon={Scale} warna="text-red-400" />
+        <KartuKpi label="Total Bon"     nilai={rupiahRingkas(totalKewajiban)} catatan={`${tampil.kewajiban.length} kewajiban`} Ikon={Scale} warna="text-red-400" />
       </div>
 
       {pesan && (
@@ -183,7 +192,11 @@ export default function PersonalArea() {
 
       {!memuat && pengguna && isi.aset.length === 0 && (
         <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-900/60 px-4 py-3">
-          <span className="text-[12.5px] text-zinc-400">Belum ada pos tercatat.</span>
+          <span className="text-[12.5px] text-zinc-400">
+            Angka di halaman ini masih <span className="text-amber-300/90">contoh</span> — supaya kamu bisa
+            melihat bentuk jadinya. Tambah pos pertamamu di bawah dan contohnya hilang sendiri;
+            tidak ada satu pun angka contoh yang tersimpan ke akunmu.
+          </span>
           <button onClick={() => void jalankan(() => simpan(bawaan()), 'Daftar bawaan dimuat — sunting sesuai punyamu.')}
                   disabled={sibuk}
                   className="cursor-pointer rounded-md border border-zinc-800 px-3 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100 disabled:opacity-50">
@@ -406,7 +419,7 @@ export default function PersonalArea() {
                       placeholder="Jenis" disabled={!pengguna}
                       className="h-9 w-full rounded-md border border-zinc-800 bg-zinc-900/60 px-2 text-[12.5px] text-zinc-300 outline-none transition-colors placeholder:text-zinc-600 hover:border-zinc-700 focus-visible:border-zinc-600 disabled:opacity-50" />
                     <datalist id="katPorto">
-                      {[...new Set([...KATEGORI, ...isi.aset.map((a) => a.kategori)])].map((k) => (
+                      {[...new Set([...KATEGORI, ...tampil.aset.map((a) => a.kategori)])].map((k) => (
                         <option key={k} value={k} />
                       ))}
                     </datalist>
@@ -438,15 +451,17 @@ export default function PersonalArea() {
               <TabelBungkus>
                 <Tabel>
                   <tbody>
-                    {isi.kewajiban.length === 0 && (
+                    {tampil.kewajiban.length === 0 && (
                       <Tr><Td colSpan={2} className="py-4 text-center text-zinc-600">Belum ada kewajiban tercatat.</Td></Tr>
                     )}
-                    {isi.kewajiban.map((k) => (
+                    {tampil.kewajiban.map((k) => (
                       <Tr key={k.id}>
                         <Td className="text-zinc-300">{k.nama}</Td>
                         <Td className="angka text-right text-red-400">
                           <span className="mr-2">{rupiah(k.nilai)}</span>
-                          <button onClick={() => { if (confirm(`Hapus "${k.nama}"?`)) void jalankan(() => simpan({ ...isi, kewajiban: isi.kewajiban.filter((x) => x.id !== k.id) }), 'Kewajiban dihapus.'); }}
+                          <button onClick={() => {
+                            if (contoh) { setPesan('Itu baris contoh — isi punyamu dulu, contohnya hilang sendiri.'); return; }
+                            if (confirm(`Hapus "${k.nama}"?`)) void jalankan(() => simpan({ ...isi, kewajiban: isi.kewajiban.filter((x) => x.id !== k.id) }), 'Kewajiban dihapus.'); }}
                                   disabled={sibuk} aria-label={`Hapus ${k.nama}`}
                                   className="cursor-pointer rounded p-1 align-middle text-zinc-700 transition-colors hover:bg-zinc-800 hover:text-red-400 disabled:opacity-40">
                             <Trash2 className="size-3.5" />

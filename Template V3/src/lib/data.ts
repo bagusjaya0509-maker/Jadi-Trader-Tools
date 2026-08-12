@@ -386,6 +386,7 @@ export function useProduk(): HasilProduk {
               nama: String(p.nama ?? ''),
               versi: String(p.versi ?? ''),
               harga: Number(p.harga) || 0,
+              hargaAsal: Number(p.hargaAsal) > (Number(p.harga) || 0) ? Number(p.hargaAsal) : undefined,
               ringkas: String(p.ringkas ?? ''),
               fitur: Array.isArray(p.fitur) ? p.fitur.map(String) : [],
               premium: !!p.premium,

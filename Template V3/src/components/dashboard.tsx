@@ -85,7 +85,7 @@ export function Dashboard() {
 
      Arus kas dibebankan ke sumbernya sendiri, sama seperti di Jurnal:
      setoran MT5 tidak boleh menaikkan saldo kripto. */
-  const { data: arus } = useArusKas();
+  const { data: arus, contoh: arusContoh } = useArusKas();
   const arusForex = arusBersih(arus, 'forex');
   const arusKripto = arusBersih(arus, 'kripto');
   const modalTotal = saldoAwal + arusForex + arusKripto;
@@ -163,7 +163,10 @@ export function Dashboard() {
   const { pemilik } = useAuth();
   const sidikTerbit = useRef('');
   useEffect(() => {
-    if (!pemilik || !RIWAYAT.length) return;
+    /* `arusContoh` ikut jadi penjaga: halaman depan menampilkan angka ini
+       sebagai rekam jejak sungguhan, dan menerbitkan saldo yang sebagian
+       berasal dari setoran contoh akan membuatnya berbohong. */
+    if (!pemilik || !RIWAYAT.length || contoh || arusContoh) return;
     const r = {
       saldo: Number(totalSaldo.toFixed(2)),
       jumlah: stat.jumlah,

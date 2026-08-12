@@ -4,10 +4,11 @@ import {
   LayoutGrid, BarChart3, Briefcase, Users, Plug, CandlestickChart,
   Wallet, TrendingUp, Wrench, CreditCard, LifeBuoy, BookOpen,
   PanelLeft, Bell, Mail, X, Sparkles, MessageCircle, Send, AtSign,
-  AlertTriangle, Newspaper, ChevronRight, Copy,
+  AlertTriangle, Newspaper, ChevronRight, Copy, Radar,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
+import { useKabarAgen, umurKabar } from '@/lib/kabar';
 import { MenuPengguna, PitaLangganan } from '@/components/gerbang';
 import { NEWS, PESAN, CHANGELOG } from '@/data/notifikasi';
 import { LogoJT } from '@/components/logo-jt';
@@ -162,18 +163,25 @@ function Lonceng() {
     'jt.newsDibaca',
     NEWS.filter((n) => n.baru).map((n) => n.judul)
   );
+  /* Kabar agen duduk DI ATAS berita pasar di panel yang sama, bukan di ikon
+     ketiga. Alasannya sama dengan alasan lonceng/amplop/changelog dipisah:
+     yang menentukan bukan siapa pengirimnya, tapi apakah isinya soal PASAR.
+     Postingan sinyal baru di ruang komunitas adalah kejadian pasar — ia
+     sekamar dengan kalender berita, bukan dengan kabar akun. */
+  const agen = useKabarAgen();
+  const totalBelum = belum + agen.belum;
 
   return (
     <div className="relative" ref={ref}>
       <button
-        onClick={() => { setBuka((v) => !v); tandai(); }}
-        aria-label="Berita pasar"
+        onClick={() => { setBuka((v) => !v); tandai(); agen.tandai(); }}
+        aria-label="Berita pasar & kabar agen"
         className="relative cursor-pointer text-zinc-400 transition-colors hover:text-zinc-100"
       >
         <Bell className="size-[18px]" strokeWidth={1.8} />
-        {belum > 0 && (
+        {totalBelum > 0 && (
           <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-amber-500 text-[9px] font-bold text-zinc-950">
-            {belum}
+            {totalBelum}
           </span>
         )}
       </button>
@@ -183,9 +191,43 @@ function Lonceng() {
           <div className="flex items-center gap-2 border-b border-zinc-800 px-4 py-3">
             <Newspaper className="size-4 text-zinc-400" strokeWidth={1.8} />
             <span className="text-[13px] font-medium text-zinc-100">Berita Pasar</span>
-            <span className="ml-auto text-[11px] text-zinc-600">{belum} baru</span>
+            <span className="ml-auto text-[11px] text-zinc-600">{totalBelum} baru</span>
           </div>
           <div className="max-h-[380px] overflow-y-auto">
+            {/* ── Kabar agen Pemburu Sinyal ── */}
+            {agen.kabar.length > 0 && (
+              <div className="border-b border-zinc-800/70 bg-zinc-900/30">
+                <div className="flex items-center gap-1.5 px-4 pb-1 pt-2.5">
+                  <Radar className="size-3 text-red-400" strokeWidth={2} />
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+                    Agen Pemburu Sinyal
+                  </span>
+                </div>
+                {agen.kabar.slice(0, 8).map((k) => (
+                  <div key={k.id} className="border-b border-zinc-800/40 px-4 py-2.5 last:border-0">
+                    <div className="flex items-center gap-2">
+                      <span className={cn('rounded px-1.5 py-0.5 text-[9.5px] font-medium uppercase',
+                        k.jenis === 'sinyal' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-sky-500/15 text-sky-400')}>
+                        {k.jenis === 'sinyal' ? 'sinyal' : 'postingan'}
+                      </span>
+                      {k.pair && <span className="angka text-[11px] text-zinc-500">{k.pair}</span>}
+                      <span className="ml-auto text-[11px] text-zinc-600">{umurKabar(k.waktu)}</span>
+                    </div>
+                    <div className="mt-1.5 text-[12.5px] leading-snug text-zinc-200">{k.judul}</div>
+                    {k.detail && <div className="mt-0.5 text-[11.5px] leading-snug text-zinc-500">{k.detail}</div>}
+                    <div className="mt-1 flex items-center gap-2">
+                      {k.sumber && <span className="truncate text-[10.5px] text-zinc-600">{k.sumber}</span>}
+                      {k.jenis === 'sinyal' && (
+                        <Link to="/copy" onClick={() => setBuka(false)}
+                              className="ml-auto shrink-0 text-[10.5px] text-zinc-400 underline-offset-2 hover:text-zinc-100 hover:underline">
+                          Lihat levelnya
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
             {NEWS.map((n) => (
               <div key={n.id} className={cn('border-b border-zinc-800/50 px-4 py-3 last:border-0', n.baru && 'bg-zinc-900/40')}>
                 <div className="flex items-center gap-2">

@@ -69,8 +69,21 @@ export function bawaan(): IsiPorto {
   };
 }
 
+/* Contoh untuk halaman yang MASIH KOSONG — dibuat sekali supaya id-nya
+   tetap sama antar render (kunci daftar React, dan pilihan baris). */
+const CONTOH: IsiPorto = bawaan();
+
 export interface HasilPorto {
+  /** Isi NYATA milik pengguna. Semua penulisan berangkat dari sini — dan
+   *  hanya dari sini, supaya angka contoh tidak pernah punya jalan masuk
+   *  ke Firestore. */
   isi: IsiPorto;
+  /** Isi untuk DITAMPILKAN: contoh selama porto masih kosong, punya sendiri
+   *  begitu ada satu pos pun. Halaman yang seluruhnya nol tidak menjelaskan
+   *  apa pun tentang apa yang akan ia dapat. */
+  tampil: IsiPorto;
+  /** true kalau yang sedang tampil adalah contoh, bukan milik penggunanya. */
+  contoh: boolean;
   memuat: boolean;
   galat: string | null;
   /** true kalau pengguna belum punya dokumen porto sama sekali. */
@@ -121,7 +134,17 @@ export function usePorto(): HasilPorto {
       { ...bersih, _updatedAt: Date.now() }, { merge: true });
   }, [pengguna]);
 
-  return { isi, memuat: memuat || memuatAuth, galat, kosong, simpan };
+  /* Contoh dipasang saat SELESAI memuat dan hasilnya benar-benar nol pos.
+     Dipakai juga saat belum login — etalase halaman ini memang isinya. */
+  const contoh = !(memuat || memuatAuth) && isi.aset.length === 0 && isi.kewajiban.length === 0;
+
+  return {
+    isi,
+    tampil: contoh ? CONTOH : isi,
+    contoh,
+    memuat: memuat || memuatAuth,
+    galat, kosong, simpan,
+  };
 }
 
 export { idBaru };

@@ -150,6 +150,11 @@ export interface Produk {
   nama: string;
   versi: string;
   harga: number;
+  /** Harga sebelum potongan — ditampilkan tercoret di sebelah harga
+   *  berlaku. Kosong berarti tidak ada potongan; angka yang lebih kecil
+   *  atau sama dengan harga berlaku diabaikan, karena "diskon" yang tidak
+   *  menurunkan apa pun adalah kebohongan kecil yang tidak perlu. */
+  hargaAsal?: number;
   ringkas: string;
   /** Katalog nyata memakai format `nama|penjelasan` pada sebagian butir.
    *  Halaman detail memecahnya; yang tanpa pipa ditampilkan apa adanya. */

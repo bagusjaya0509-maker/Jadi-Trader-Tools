@@ -102,7 +102,17 @@ export interface Arus {
   catatan: string;
 }
 
-export function useArusKas(): { data: Arus[]; memuat: boolean } {
+/* Arus kas contoh — dipakai HANYA saat layarnya masih benar-benar kosong.
+   Setoran awal lalu dua penambahan modal: bentuk paling wajar dari orang
+   yang baru mulai, dan cukup untuk membuat kartu saldo & grafik modal
+   punya isi. Tidak pernah ditulis ke Firestore; ia hidup di layar saja. */
+const ARUS_CONTOH: Arus[] = [
+  { id: 'contoh-3', sumber: 'kripto', jenis: 'setor', nilai: 500, waktu: Date.now() - 5 * 86_400_000, catatan: 'Tambah modal (contoh)' },
+  { id: 'contoh-2', sumber: 'forex', jenis: 'setor', nilai: 300, waktu: Date.now() - 26 * 86_400_000, catatan: 'Setoran akun MT5 (contoh)' },
+  { id: 'contoh-1', sumber: 'kripto', jenis: 'setor', nilai: 1000, waktu: Date.now() - 62 * 86_400_000, catatan: 'Setoran awal (contoh)' },
+];
+
+export function useArusKas(): { data: Arus[]; memuat: boolean; contoh: boolean } {
   const { pengguna, memuat: memuatAuth } = useAuth();
   const [data, setData] = useState<Arus[]>([]);
   const [memuat, setMemuat] = useState(true);
@@ -130,7 +140,11 @@ export function useArusKas(): { data: Arus[]; memuat: boolean } {
     );
   }, [pengguna, memuatAuth]);
 
-  return { data, memuat };
+  /* Kosong SETELAH selesai memuat berarti belum ada catatan sama sekali —
+     bukan berarti orangnya tidak pernah menyetor. Yang tampil contoh,
+     yang tersimpan tetap kosong sampai ia mencatat sendiri. */
+  const contoh = !(memuat || memuatAuth) && data.length === 0;
+  return { data: contoh ? ARUS_CONTOH : data, memuat, contoh };
 }
 
 export async function simpanArus(a: Omit<Arus, 'id'> & { id?: string }) {
@@ -148,6 +162,10 @@ export async function simpanArus(a: Omit<Arus, 'id'> & { id?: string }) {
 }
 
 export async function hapusArus(id: string) {
+  /* Baris contoh tidak punya dokumen untuk dihapus — ia cuma tampil selama
+     daftarnya masih kosong, dan lenyap sendiri begitu catatan pertama yang
+     sungguhan masuk. */
+  if (id.startsWith('contoh-')) return;
   await deleteDoc(doc(db, 'users', butuhUid(), 'arusKas', id));
 }
 
