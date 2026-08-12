@@ -201,7 +201,27 @@ export function saldoBulanIni(trade: Trade[], saldoAwal: number): TitikSaldo[] {
  *  mengimpor modul Firestore. */
 export interface ArusRingkas { jenis: 'setor' | 'tarik'; nilai: number; waktu: number }
 
-export function saldoDuaBulan(trade: Trade[], saldoAwal: number, arus: ArusRingkas[] = []): TitikBanding[] {
+export function saldoDuaBulan(
+  trade: Trade[],
+  saldoAwal: number,
+  arus: ArusRingkas[] = [],
+  /** Saldo NYATA hari ini — angka yang sama dengan kartu Total Saldo dan
+   *  kartu saldo di Jurnal (broker kalau tersambung, hitungan jurnal kalau
+   *  tidak). Kalau diisi, kurvanya dijangkarkan ke sana.
+   *
+   *  KENAPA PERLU: kurva ini menumpuk P/L di atas `saldoAwal`, sebuah angka
+   *  asumsi dari profil. Saldo broker tidak pernah persis sama dengan
+   *  asumsi itu — ada swap, komisi, setoran yang tidak tercatat di jurnal —
+   *  jadi ujung kurvanya berselisih dengan angka saldo di halaman Jurnal,
+   *  dan dua halaman menyebut hal yang sama dengan dua angka berbeda.
+   *
+   *  Yang digeser cuma TITIK ACUANNYA. Selisih harian (P/L + arus kas)
+   *  tetap apa adanya, jadi bentuk kurvanya tidak berubah sedikit pun —
+   *  hanya tingginya yang dibetulkan sampai ujungnya menyentuh saldo yang
+   *  sebenarnya. Bulan lalu digeser dengan selisih yang sama supaya
+   *  keduanya tetap dalam satu skala. */
+  saldoKini?: number,
+): TitikBanding[] {
   const kini = new Date();
   const th = kini.getFullYear(), bl = kini.getMonth();
   const awalIni = new Date(th, bl, 1).getTime();
@@ -236,6 +256,15 @@ export function saldoDuaBulan(trade: Trade[], saldoAwal: number, arus: ArusRingk
   let jIni = saldoAwal + jumlahSebelum(awalIni);
   let jLalu = saldoAwal + jumlahSebelum(awalLalu);
 
+  /* Geser acuan: hitung dulu ujung kurva menurut model, lalu cari selisihnya
+     dengan saldo sungguhan hari ini. */
+  let geser = 0;
+  if (typeof saldoKini === 'number' && isFinite(saldoKini)) {
+    let ujung = jIni;
+    for (let h = 1; h <= kini.getDate(); h++) ujung += hIni.get(h) ?? 0;
+    geser = saldoKini - ujung;
+  }
+
   const out: TitikBanding[] = [];
   const maks = Math.max(kini.getDate(), hLalu.size ? hariLalu : 0);
   for (let h = 1; h <= maks; h++) {
@@ -243,11 +272,11 @@ export function saldoDuaBulan(trade: Trade[], saldoAwal: number, arus: ArusRingk
     jLalu += hLalu.get(h) ?? 0;
     out.push({
       label: String(h),
-      ini: h <= kini.getDate() ? Number(jIni.toFixed(2)) : null,
+      ini: h <= kini.getDate() ? Number((jIni + geser).toFixed(2)) : null,
       /* Bulan lalu digambar hanya kalau memang ADA transaksinya. Garis datar
          sepanjang bulan pada akun yang belum trading bukan pembanding —
          itu cuma garis yang terlihat seperti data. */
-      lalu: hLalu.size && h <= hariLalu ? Number(jLalu.toFixed(2)) : null,
+      lalu: hLalu.size && h <= hariLalu ? Number((jLalu + geser).toFixed(2)) : null,
     });
   }
   return out;

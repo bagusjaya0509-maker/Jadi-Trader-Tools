@@ -85,7 +85,7 @@ export function Dashboard() {
 
      Arus kas dibebankan ke sumbernya sendiri, sama seperti di Jurnal:
      setoran MT5 tidak boleh menaikkan saldo kripto. */
-  const { data: arus, contoh: arusContoh } = useArusKas();
+  const { data: arus } = useArusKas();
   const arusForex = arusBersih(arus, 'forex');
   const arusKripto = arusBersih(arus, 'kripto');
   const modalTotal = saldoAwal + arusForex + arusKripto;
@@ -105,9 +105,6 @@ export function Dashboard() {
      dengan angka karangan, jadi akun yang transaksinya baru mulai bulan ini
      tetap menampilkan lima bulan riwayat yang tidak pernah terjadi. */
   const perBulan = useMemo(() => plPerBulan(RIWAYAT), [RIWAYAT]);
-  /* Basisnya saldo awal SAJA — setoran/penarikan masuk sebagai peristiwa
-     bertanggal di dalam kurva, bukan digelontorkan ke titik awal. */
-  const kurvaSaldo = useMemo(() => saldoDuaBulan(RIWAYAT, saldoAwal, arus), [RIWAYAT, saldoAwal, arus]);
 
   const bulanIni = perBulan[perBulan.length - 1];
   const bulanLalu = perBulan[perBulan.length - 2];
@@ -116,12 +113,6 @@ export function Dashboard() {
   const trenBulan = bulanIni && bulanLalu && Math.abs(bulanLalu.pnl) > 0.005
     ? Number((((bulanIni.pnl - bulanLalu.pnl) / Math.abs(bulanLalu.pnl)) * 100).toFixed(1))
     : null;
-
-  const titikIni = kurvaSaldo.filter((k) => k.ini !== null);
-  const adaBulanLalu = kurvaSaldo.some((k) => k.lalu !== null);
-  const awalKurva = titikIni[0]?.ini ?? saldoAwal;
-  const akhirKurva = titikIni[titikIni.length - 1]?.ini ?? saldoAwal;
-  const selisihSaldo = awalKurva ? ((akhirKurva - awalKurva) / Math.abs(awalKurva)) * 100 : 0;
 
   /* Posisi MT5 NYATA dari EA, bukan tiga baris contoh yang ditulis di
      data/porto.ts. Profitnya sudah dikonversi dari akun sen di lib/akun.ts. */
@@ -147,6 +138,26 @@ export function Dashboard() {
     mt5.terhubung === true ? 'MT5' : null,
     binance.terhubung === true ? 'Binance' : null,
   ].filter(Boolean);
+
+  /* Kurva saldo DIJANGKARKAN ke `totalSaldo` — angka yang sama persis dengan
+     kartu Total Saldo di atasnya dan kartu saldo di halaman Jurnal.
+     ──────────────────────────────────────────────────────────────────────
+     Sebelumnya ia menumpuk P/L di atas `saldoAwal` dari profil, sebuah
+     asumsi. Begitu MT5 atau Binance tersambung, saldo sungguhannya berbeda
+     (swap, komisi, setoran yang tidak lewat jurnal), dan ujung kurva ini
+     tidak pernah bertemu dengan angka yang tertulis besar-besar di
+     sebelahnya — persis keluhan "saldo bulan ini tidak sesuai jurnal".
+     Yang digeser cuma titik acuannya; naik-turun hariannya tetap dari
+     transaksi. Karena itu ia harus dihitung SETELAH totalSaldo diketahui. */
+  const kurvaSaldo = useMemo(
+    () => saldoDuaBulan(RIWAYAT, saldoAwal, arus, totalSaldo),
+    [RIWAYAT, saldoAwal, arus, totalSaldo]
+  );
+  const titikIni = kurvaSaldo.filter((k) => k.ini !== null);
+  const adaBulanLalu = kurvaSaldo.some((k) => k.lalu !== null);
+  const awalKurva = titikIni[0]?.ini ?? saldoAwal;
+  const akhirKurva = titikIni[titikIni.length - 1]?.ini ?? saldoAwal;
+  const selisihSaldo = awalKurva ? ((akhirKurva - awalKurva) / Math.abs(awalKurva)) * 100 : 0;
   const POSISI_MT5 = mt5.posisi;
   const pnlMt5 = POSISI_MT5.reduce((s, p) => s + p.profit, 0);
   /* null = tidak ada satu pun posisi yang membawa PnL dari bursa. Menjumlahkan
@@ -163,10 +174,10 @@ export function Dashboard() {
   const { pemilik } = useAuth();
   const sidikTerbit = useRef('');
   useEffect(() => {
-    /* `arusContoh` ikut jadi penjaga: halaman depan menampilkan angka ini
-       sebagai rekam jejak sungguhan, dan menerbitkan saldo yang sebagian
-       berasal dari setoran contoh akan membuatnya berbohong. */
-    if (!pemilik || !RIWAYAT.length || contoh || arusContoh) return;
+    /* `contoh` ikut jadi penjaga: halaman depan menampilkan angka ini sebagai
+       rekam jejak sungguhan, dan menerbitkan hitungan yang berasal dari
+       transaksi contoh akan membuatnya berbohong. */
+    if (!pemilik || !RIWAYAT.length || contoh) return;
     const r = {
       saldo: Number(totalSaldo.toFixed(2)),
       jumlah: stat.jumlah,
