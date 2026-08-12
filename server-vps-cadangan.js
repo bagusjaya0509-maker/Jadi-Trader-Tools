@@ -1766,19 +1766,39 @@ app.get('/api/mt5/simbol', batasLaju, (req, res) => {
    saat kuota di hulu sedang habis. Halaman depan tidak boleh kosong hanya
    karena Google sedang menghitung ulang jatah kita.
    ══════════════════════════════════════════════════════════════════════════ */
-const PUBLIK_CACHE = {};
+/* Cache-nya DI DISK, bukan cuma memori: restart pm2 tidak boleh membuat
+   halaman depan kosong lagi, dan snapshot terakhir yang baik lebih berharga
+   daripada kesegaran — angka pameran berubah paling cepat harian. */
+const PUBLIK_FILE = path.join(__dirname, 'publik-cache.json');
+let PUBLIK_CACHE = {};
+try { PUBLIK_CACHE = JSON.parse(fs.readFileSync(PUBLIK_FILE, 'utf8')); } catch (e) { PUBLIK_CACHE = {}; }
+function publikSimpan() {
+  try { fs.writeFileSync(PUBLIK_FILE, JSON.stringify(PUBLIK_CACHE)); } catch (e) { /* disk penuh — memori tetap jalan */ }
+}
 const PUBLIK_BOLEH = ['ringkasanAkun', 'posisiTerbuka', 'jurnalShowcase'];
+
+async function publikSegarkan(dok) {
+  const r = await axios.get(
+    'https://firestore.googleapis.com/v1/projects/jadi-trader-tools/databases/(default)/documents/public/' + dok,
+    { timeout: 10000 });
+  PUBLIK_CACHE[dok] = { waktu: Date.now(), isi: r.data };
+  publikSimpan();
+  return r.data;
+}
+
+/* Menghangat SENDIRI tiap 5 menit: saat kuota Firestore pulih dari 429,
+   cache terisi tanpa menunggu pengunjung pertama — dan sejak saat itu
+   halaman depan tidak pernah lagi bergantung pada nasib kuota. */
+setInterval(() => {
+  PUBLIK_BOLEH.forEach(dok => { publikSegarkan(dok).catch(() => { /* kuota masih habis */ }); });
+}, 5 * 60 * 1000);
 app.get('/api/publik/:dok', batasLaju, async (req, res) => {
   const dok = String(req.params.dok || '').replace(/[^A-Za-z0-9]/g, '');
   if (PUBLIK_BOLEH.indexOf(dok) < 0) return res.status(404).json({ error: 'dokumen tidak dikenal' });
   const c = PUBLIK_CACHE[dok];
   if (c && Date.now() - c.waktu < 60000) return res.json(c.isi);
   try {
-    const r = await axios.get(
-      'https://firestore.googleapis.com/v1/projects/jadi-trader-tools/databases/(default)/documents/public/' + dok,
-      { timeout: 10000 });
-    PUBLIK_CACHE[dok] = { waktu: Date.now(), isi: r.data };
-    res.json(r.data);
+    res.json(await publikSegarkan(dok));
   } catch (e) {
     if (c) return res.json(c.isi);   // hulu 429 → salinan terakhir yang baik
     const status = (e.response && e.response.status) || 502;

@@ -112,9 +112,8 @@ const SUDAH = [
 ];
 
 const MENUNGGU = [
-  'VPS kedua khusus agen — menjalankan Claude Agent SDK 24 jam',
-  'Langganan yang menanggung model agen (Fable/Opus/Sonnet)',
-  'Pembaca sinyal Discord (token bot + izin ruang sumber)',
+  'VPS kedua khusus agen — upgrade ke 24 jam nonstop (mode manual sudah bisa duluan)',
+  'Pembaca sinyal Discord otomatis (mode manual: lewat Chrome yang sudah login)',
   'Setelan risiko per pengguna untuk trading mandiri',
 ];
 
@@ -188,7 +187,7 @@ export default function Markas() {
                   <span className="rounded bg-zinc-800/80 px-1.5 py-0.5 text-[10px] text-zinc-300">{a.model}</span>
                   <span className={cn('rounded px-1.5 py-0.5 text-[10px] font-medium',
                     a.status === 'aktif' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-amber-500/10 text-amber-300/90')}>
-                    {a.status === 'aktif' ? 'AKTIF — sesi ini' : 'MENUNGGU VPS AGEN'}
+                    {a.status === 'aktif' ? 'AKTIF — sesi ini' : 'SIAP MANUAL · Claude Code'}
                   </span>
                 </div>
                 <ul className={cn('space-y-1 text-[11.5px] leading-relaxed text-zinc-400',
@@ -236,9 +235,33 @@ export default function Markas() {
           </ul>
         </div>
 
+        {/* ── Mode manual — cara memanggil agen HARI INI ── */}
+        <div className="mt-4 rounded-2xl border border-amber-500/25 bg-amber-500/[0.04] p-5">
+          <div className="mb-2 text-[13px] font-medium text-amber-300">
+            Mode manual — jalan sekarang, tanpa VPS
+          </div>
+          <p className="mb-3 text-[12px] leading-relaxed text-zinc-400">
+            Kelima agen sudah TERDAFTAR sebagai subagent Claude Code di komputer pemilik
+            (<span className="font-mono text-zinc-500">~/.claude/agents/</span>). Buka Claude Code, lalu panggil
+            dengan menyebut namanya:
+          </p>
+          <ul className="space-y-1.5 font-mono text-[11.5px] leading-relaxed text-zinc-300">
+            <li>· "pakai subagent <span className="text-amber-300">penyiar</span>: buat 3 ide konten promosi minggu ini"</li>
+            <li>· "pakai subagent <span className="text-amber-300">perupa</span>: rancang banner produk SMI"</li>
+            <li>· "pakai subagent <span className="text-amber-300">bendahara</span>: rekap penjualan lisensi Agustus"</li>
+            <li>· "pakai subagent <span className="text-amber-300">pengelola-porto</span>: evaluasi jurnal bulan ini"</li>
+            <li>· "pakai subagent <span className="text-amber-300">pemburu-sinyal</span>: proses sinyal terbaru di Discord"</li>
+          </ul>
+          <p className="mt-3 text-[11.5px] leading-relaxed text-zinc-500">
+            Batasnya jujur: hidup hanya selama komputer & sesinya terbuka, memakai jatah langganan
+            yang sama (agen berat mempercepat habisnya), dan eksekusi uang selalu berhenti menunggu
+            persetujuanmu — di mode mana pun.
+          </p>
+        </div>
+
         <p className="mt-6 flex items-center gap-2 text-[11.5px] text-zinc-600">
           <Server className="size-3.5" />
-          Begitu VPS agen tersedia, halaman ini berubah dari cetak biru menjadi ruang kendali:
+          Begitu VPS agen tersedia, halaman ini berubah dari cetak biru menjadi ruang kendali 24 jam:
           status hidup tiap agen, log pekerjaannya, dan tombol jeda per meja.
         </p>
       </div>

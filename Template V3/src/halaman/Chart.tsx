@@ -224,16 +224,36 @@ export default function ChartBacktest() {
   const garisBayang = useMemo(() => {
     if (!simbol.startsWith('MT5:')) return [];
     const dasarS = simbol.slice(4);
-    return akunMt5.posisi
+    const nilai = nilaiLotMt5 || 100;
+    const keluar: { id: string; harga: number; warna: string; label: string; ket?: string }[] = [];
+    akunMt5.posisi
       .filter((p) => p.simbol.toUpperCase().indexOf(dasarS) === 0)
-      .map((p) => ({
-        id: 'mt5-' + p.tiket,
-        harga: p.hargaBuka,
-        warna: p.arah === 'BUY' ? '#10b981' : '#f87171',
-        label: `#${p.tiket} ${p.arah} ${p.lot}`,
-        ket: `· ${p.profit >= 0 ? '+' : ''}${uang(p.profit)}`,
-      }));
-  }, [simbol, akunMt5.posisi]);
+      .forEach((p) => {
+        keluar.push({
+          id: 'mt5-' + p.tiket,
+          harga: p.hargaBuka,
+          warna: p.arah === 'BUY' ? '#10b981' : '#f87171',
+          label: `#${p.tiket} ${p.arah} ${p.lot}`,
+          ket: `· ${p.profit >= 0 ? '+' : ''}${uang(p.profit)}`,
+        });
+        /* SL & TP posisinya ikut sebagai PENANDA — garis tipis dengan
+           dolar yang dipertaruhkan/diincar, supaya level yang sedang
+           menjaga uang tetap terlihat selama posisinya hidup. */
+        if (p.sl > 0) {
+          keluar.push({
+            id: `mt5-${p.tiket}-sl`, harga: p.sl, warna: '#f87171',
+            label: 'SL', ket: `· #${p.tiket} · -${uang(p.lot * nilai * Math.abs(p.hargaBuka - p.sl))}`,
+          });
+        }
+        if (p.tp > 0) {
+          keluar.push({
+            id: `mt5-${p.tiket}-tp`, harga: p.tp, warna: '#10b981',
+            label: 'TP', ket: `· #${p.tiket} · +${uang(p.lot * nilai * Math.abs(p.tp - p.hargaBuka))}`,
+          });
+        }
+      });
+    return keluar;
+  }, [simbol, akunMt5.posisi, nilaiLotMt5]);
 
   /* Mengubah SL ×ATR / R:R saat tiket TERBUKA langsung menggeser garisnya —
      setelan yang baru berlaku untuk tiket berikutnya terasa seperti setelan
