@@ -1757,6 +1757,23 @@ app.get('/api/mt5/simbol', batasLaju, (req, res) => {
 });
 
 /* ══════════════════════════════════════════════════════════════════════════
+   SINYAL PANTAUAN — hasil kurasi agen Pemburu Sinyal
+   ══════════════════════════════════════════════════════════════════════════
+   Sinyal yang lolos disiplin agen (pair, arah, entry, SL, TP LENGKAP —
+   tanpa SL ditolak) disimpan di sinyal.json dan disajikan publik di sini.
+   Penulisan lewat SSH oleh agen; endpoint tulis via web menyusul bersama
+   panel kurasinya. */
+const SINYAL_FILE = path.join(__dirname, 'sinyal.json');
+app.get('/api/sinyal', batasLaju, (req, res) => {
+  try {
+    const d = JSON.parse(fs.readFileSync(SINYAL_FILE, 'utf8'));
+    res.json({ ok: true, sinyal: Array.isArray(d.sinyal) ? d.sinyal : [] });
+  } catch (e) {
+    res.json({ ok: true, sinyal: [] });
+  }
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
    CACHE DOKUMEN PUBLIK FIRESTORE
    ══════════════════════════════════════════════════════════════════════════
    Kuota baca Firestore PERNAH HABIS (429) dan halaman depan tampil kosong —

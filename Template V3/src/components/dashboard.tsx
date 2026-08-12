@@ -12,6 +12,7 @@ import { useAuth } from '@/lib/auth';
 import { useHargaPasar } from '@/lib/harga';
 import { LabelContoh, SpandukContoh } from '@/components/gerbang';
 import { useAkunMt5, useAkunBinance } from '@/lib/akun';
+import { PanelSinyal } from '@/components/panel-sinyal';
 import { useArusKas, arusBersih } from '@/lib/tulis-jurnal';
 import { PanelEvaluasi } from '@/components/panel-evaluasi';
 
@@ -230,6 +231,10 @@ export function Dashboard() {
           Ikon={Scale}
         />
       </div>
+
+      {/* ── Sinyal kurasi agen Pemburu Sinyal — hanya yang berlevel
+          lengkap; sumbernya ditulis terbuka. ── */}
+      <PanelSinyal />
 
       {/* ── Dua grafik ── */}
       <div className="mt-4 grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
