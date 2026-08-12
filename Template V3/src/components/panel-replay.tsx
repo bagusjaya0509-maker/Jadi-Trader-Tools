@@ -313,9 +313,19 @@ export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, aturAks
     if (!trade.length) return;
     setMenyimpan(true); setPesan('');
     try {
+      /* SUMBER mengikuti simbolnya, bukan ditulis mati 'kripto'.
+         ────────────────────────────────────────────────────────────────
+         Sebelumnya latihan replay di MT5:GBPUSD tersimpan sebagai transaksi
+         KRIPTO — muncul di jurnal Kripto dengan "lot" 5232 dan ikut
+         menjumlah Net P/L-nya. Satu latihan forex bisa menggeser angka
+         yang dipakai menilai cara dagang kripto. */
+      const mt5 = simbol.startsWith('MT5:');
+      const dasar = mt5 ? simbol.slice(4) : simbol;
+      const sumberTrade: 'forex' | 'kripto' = mt5 ? 'forex' : 'kripto';
       for (const t of trade) {
         await simpanTrade({
-          sumber: 'kripto', pair: simbol, arah: t.arah,
+          sumber: sumberTrade, pair: dasar, arah: t.arah,
+          latihan: true,
           lot: Number(t.unit.toFixed(6)),
           masukHarga: t.masuk, keluarHarga: t.keluar, pnl: t.pnl,
           waktu: t.keluarWaktu,

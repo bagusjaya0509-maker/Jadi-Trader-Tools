@@ -28,6 +28,8 @@ export interface Trade {
   sumber: Sumber;
   emosi?: string;
   alasan?: string;
+  /** Hasil latihan replay — tampil di riwayat, tapi tidak ikut statistik. */
+  latihan?: boolean;
   /** Nilai order dalam USD: margin x leverage untuk kripto, dan
    *  lot x ukuran kontrak untuk forex. Undefined kalau datanya tidak
    *  menyertakan margin/leverage — lebih baik kosong daripada ditebak. */

@@ -37,6 +37,11 @@ export interface MasukanTrade {
   emosiEvaluasi: string;
   alasan: string;
   catatan: string;
+  /** Hasil LATIHAN (replay), bukan transaksi sungguhan. Tetap tersimpan
+   *  dan tetap terlihat di riwayat, tapi tidak ikut dijumlah ke Net P/L,
+   *  winrate, dan profit factor — angka yang dipakai menilai diri sendiri
+   *  tidak boleh memuat trade yang tidak pernah mempertaruhkan apa pun. */
+  latihan?: boolean;
 }
 
 /** Kunci gabungan sumber + waktu, dipakai untuk mengurutkan per sumber
@@ -82,7 +87,8 @@ export async function simpanTrade(m: MasukanTrade) {
       catatan: m.catatan,
     },
     kunciUrut: kunciUrut(m.sumber, m.waktu),
-    _asal: 'manual-v3',
+    latihan: !!m.latihan,
+    _asal: m.latihan ? 'replay-v3' : 'manual-v3',
   }, { merge: true });
   return id;
 }

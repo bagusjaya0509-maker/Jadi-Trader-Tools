@@ -439,6 +439,34 @@ app.get('/api/positions', requireToken, async (req, res) => {
   }
 });
 
+/* GET /api/open-orders  ->  SL & TP yang SEDANG terpasang di bursa
+   ──────────────────────────────────────────────────────────────────────────
+   Order entry kripto dari web memang sudah memasang STOP_MARKET dan
+   TAKE_PROFIT_MARKET di Binance - tapi /fapi/v2/positionRisk tidak
+   menyebutkannya sama sekali, jadi web menampilkan posisi tanpa SL/TP dan
+   jurnal menulis "belum dipasang" untuk posisi yang stopnya justru aman.
+
+   Yang dipulangkan sengaja RINGKAS: satu baris per simbol berisi harga
+   pemicu SL dan TP. Sumbernya bursa, bukan catatan kita sendiri - jadi
+   SL yang digeser lewat aplikasi Binance pun ikut terbaca. */
+app.get('/api/open-orders', requireToken, async (req, res) => {
+  try {
+    const data = await futuresRequest('GET', '/fapi/v1/openOrders', {});
+    const perSimbol = {};
+    (Array.isArray(data) ? data : []).forEach(o => {
+      const s = o.symbol;
+      if (!perSimbol[s]) perSimbol[s] = { simbol: s, sl: 0, tp: 0 };
+      const pemicu = parseFloat(o.stopPrice) || 0;
+      if (!pemicu) return;
+      if (o.type === 'STOP_MARKET' || o.type === 'STOP') perSimbol[s].sl = pemicu;
+      if (o.type === 'TAKE_PROFIT_MARKET' || o.type === 'TAKE_PROFIT') perSimbol[s].tp = pemicu;
+    });
+    res.json({ ok: true, order: Object.values(perSimbol) });
+  } catch (e) {
+    res.status(500).json({ error: e.response ? e.response.data : e.message });
+  }
+});
+
 // Riwayat income asli (REALIZED_PNL, komisi/exchange fee & funding fee) dari
 // Binance - dipakai buat sinkron biaya & PNL ASLI, bukan estimasi/rumus sendiri.
 // Query:
@@ -1779,9 +1807,21 @@ const SINYAL_FILE = path.join(__dirname, 'sinyal.json');
 app.get('/api/sinyal', batasLaju, (req, res) => {
   try {
     const d = JSON.parse(fs.readFileSync(SINYAL_FILE, 'utf8'));
-    res.json({ ok: true, sinyal: Array.isArray(d.sinyal) ? d.sinyal : [] });
+    /* `diperiksa` = kapan agen TERAKHIR MEMERIKSA ruangnya, bukan kapan
+       sinyal terakhir masuk. Dua hal yang berbeda, dan situs perlu yang
+       pertama: "belum ada sinyal baru" hanya menenangkan kalau orang tahu
+       agennya memang baru saja melihat. Diambil dari waktu ubah kabar
+       terakhir kalau ada; kalau belum pernah, dari berkas sinyalnya. */
+    let diperiksa = 0;
+    try { diperiksa = fs.statSync(KABAR_FILE).mtimeMs; } catch (e) {}
+    if (!diperiksa) { try { diperiksa = fs.statSync(SINYAL_FILE).mtimeMs; } catch (e) {} }
+    res.json({
+      ok: true,
+      sinyal: Array.isArray(d.sinyal) ? d.sinyal : [],
+      diperiksa: Math.round(diperiksa) || 0,
+    });
   } catch (e) {
-    res.json({ ok: true, sinyal: [] });
+    res.json({ ok: true, sinyal: [], diperiksa: 0 });
   }
 });
 

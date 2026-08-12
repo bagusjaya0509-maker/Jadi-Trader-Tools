@@ -330,6 +330,16 @@ export interface PosisiBursa {
   jumlah: number;
   entry: number;
   pnl: number;
+  /** Harga pemicu STOP_MARKET / TAKE_PROFIT_MARKET yang SEDANG terpasang
+   *  di bursa. 0 berarti memang tidak ada ordernya.
+   *
+   *  Kenapa dibaca terpisah: `positionRisk` tidak pernah menyebut stop yang
+   *  menjaga posisinya, jadi web menampilkan posisi kripto tanpa SL/TP —
+   *  dan jurnal menulis "belum dipasang" untuk posisi yang stopnya justru
+   *  aman di bursa. Dibaca dari bursa, bukan dari catatan sendiri, supaya
+   *  SL yang digeser lewat aplikasi Binance ikut terbaca. */
+  sl: number;
+  tp: number;
 }
 
 export function usePosisiBinance(): { data: PosisiBursa[]; aktif: boolean } {
@@ -343,10 +353,25 @@ export function usePosisiBinance(): { data: PosisiBursa[]; aktif: boolean } {
 
     async function ambil() {
       try {
-        const r = await fetch(`${dasar()}/api/positions`, { headers: { 'X-App-Token': token.trim() } });
+        const kepala = { 'X-App-Token': token.trim() };
+        const r = await fetch(`${dasar()}/api/positions`, { headers: kepala });
         if (!r.ok) throw new Error(String(r.status));
         const j = await r.json();
         if (!hidup) return;
+
+        /* Stop yang terpasang dibaca dari rute terpisah. Kegagalannya TIDAK
+           menggagalkan posisi: daftar posisi tanpa SL masih berguna, daftar
+           posisi yang hilang sama sekali tidak. */
+        const stop = new Map<string, { sl: number; tp: number }>();
+        try {
+          const ro = await fetch(`${dasar()}/api/open-orders`, { headers: kepala });
+          if (ro.ok) {
+            const jo = await ro.json();
+            (jo.order ?? []).forEach((o: any) => {
+              stop.set(String(o.simbol ?? ''), { sl: Number(o.sl) || 0, tp: Number(o.tp) || 0 });
+            });
+          }
+        } catch { /* bursa sedang tidak menjawab soal order */ }
         /* Binance mengirim SATU baris untuk setiap simbol yang pernah
            disentuh — 858 baris untuk tiga posisi. Yang qty-nya nol bukan
            posisi; menampilkannya berarti daftar sepanjang ratusan baris. */
@@ -358,6 +383,8 @@ export function usePosisiBinance(): { data: PosisiBursa[]; aktif: boolean } {
             jumlah: Math.abs(Number(p.positionAmt)) || 0,
             entry: Number(p.entryPrice) || 0,
             pnl: Number(p.unRealizedProfit) || 0,
+            sl: stop.get(String(p.symbol ?? ''))?.sl ?? 0,
+            tp: stop.get(String(p.symbol ?? ''))?.tp ?? 0,
           })));
         setAktif(true);
       } catch {

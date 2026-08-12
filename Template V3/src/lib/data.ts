@@ -73,6 +73,14 @@ function keTrade(id: string, d: DocumentData): Trade {
     sumber,
     emosi: d.psikologi?.emosiMasuk ?? undefined,
     alasan: d.psikologi?.alasanMasuk ?? d.sebabKeluar ?? undefined,
+    /* Transaksi latihan lama tidak punya field `latihan` — ia baru ada
+       sejak perbaikan ini. Yang lama dikenali dari jejak yang memang
+       sudah ditulis waktu itu: alasan "Latihan replay" atau catatan
+       "bukan transaksi sungguhan". Tanpa ini, latihan yang terlanjur
+       tersimpan akan terus menghitung diri sebagai trade sungguhan. */
+    latihan: d.latihan === true
+      || /latihan replay/i.test(String(d.psikologi?.alasanMasuk ?? ''))
+      || /bukan transaksi sungguhan/i.test(String(d.psikologi?.catatan ?? '')),
     /* NILAI ORDER, bukan margin. Yang ditanyakan orang saat melihat riwayat
        adalah "posisi ini sebesar apa" — dan jawabannya margin DIKALI
        leverage, bukan modal yang dipakai. Posisi $100 dengan leverage 4×
@@ -286,12 +294,21 @@ export function usePosisi(): HasilData<Posisi[]> {
     const dariPublik = new Map(data.map((p) => [p.simbol, p]));
     return bursa.map((b): Posisi => {
       const p = dariPublik.get(b.simbol);
+      /* SL/TP dari BURSA menang: itu order yang benar-benar terpasang dan
+         akan benar-benar dieksekusi. Dokumen publik cuma dipakai kalau
+         bursanya tidak menyebutkan stop untuk simbol itu — misalnya posisi
+         lama yang stopnya dipasang manual di aplikasi Binance sebelum rute
+         open-orders ada. */
       return p
-        ? { ...p, arah: b.arah, entry: b.entry || p.entry, jumlah: b.jumlah, pnlFloat: b.pnl }
+        ? {
+            ...p, arah: b.arah, entry: b.entry || p.entry,
+            sl: b.sl || p.sl, tp: b.tp || p.tp,
+            jumlah: b.jumlah, pnlFloat: b.pnl,
+          }
         : {
             id: `bursa-${b.simbol}`,
             simbol: b.simbol, arah: b.arah, tf: '—',
-            entry: b.entry, sl: 0, tp: 0, hargaKini: b.entry,
+            entry: b.entry, sl: b.sl, tp: b.tp, hargaKini: b.entry,
             venue: 'Binance Live', buka: 0,
             jumlah: b.jumlah, pnlFloat: b.pnl,
           };

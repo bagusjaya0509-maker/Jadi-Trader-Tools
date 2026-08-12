@@ -268,12 +268,19 @@ function PanelPosisiJurnal({ sumber }: { sumber: Sumber }) {
         }
       />
       <div className="px-5 pb-5">
+        {/* Daftar posisi TANPA batas tinggi tetap.
+            ────────────────────────────────────────────────────────────
+            Dulu 190 px — pas untuk tiga baris, dan baris keempat
+            terpotong di tengah tanpa tanda apa pun bahwa masih ada lagi.
+            Punya lima posisi terbuka bukan keadaan luar biasa; yang luar
+            biasa adalah panel yang menyembunyikannya. Gulir baru muncul
+            kalau daftarnya benar-benar panjang. */}
         {baris.length === 0 ? (
           <div className="py-5 text-center text-[12.5px] text-zinc-600">
             {sumber === 'kripto' ? 'Tidak ada posisi kripto terbuka.' : mt5.terhubung === true ? 'Tidak ada posisi MT5 terbuka.' : mt5.ket}
           </div>
         ) : (
-          <div className="gulir-senyap max-h-[190px] space-y-2 overflow-y-auto">
+          <div className="gulir-senyap max-h-[520px] space-y-2 overflow-y-auto">
             {baris.map((b) => (
               <div key={b.kunci} className="rounded-lg border border-zinc-800/60 px-3 py-2">
                 <div className="flex items-center justify-between gap-2">
@@ -310,15 +317,24 @@ function PanelPosisiJurnal({ sumber }: { sumber: Sumber }) {
                       {b.tp > 0 ? fHarga(b.tp) : '—'}
                     </span>
                   </span>
-                  <select
-                    value={emosiPos.peta[b.kunci] ?? ''}
-                    disabled={!emosiPos.bisaTulis}
-                    onChange={(e) => { void emosiPos.simpan(b.kunci, e.target.value, b.tiket).catch(() => {}); }}
-                    title="Emosi saat posisi ini berjalan — ikut tercatat di riwayat order saat ditutup"
-                    className="ml-auto h-6 cursor-pointer rounded border border-zinc-800 bg-zinc-900 px-1 text-[10.5px] text-zinc-300 outline-none disabled:cursor-not-allowed disabled:opacity-50">
-                    <option value="">emosi…</option>
-                    {EMOSI.map((e) => <option key={e} value={e}>{e}</option>)}
-                  </select>
+                  {/* Emosi ditulis SEJAJAR dengan entry/SL/TP sebagai data,
+                      bukan sebagai tombol. Kotak pilihan di antara angka
+                      membuat barisnya terbaca seperti formulir, padahal
+                      yang dibaca sekilas di sini adalah keadaan posisi.
+                      Menyuntingnya tetap bisa: klik teksnya. */}
+                  <span className="ml-auto flex items-center gap-1 text-zinc-600">
+                    Emosi{' '}
+                    <select
+                      value={emosiPos.peta[b.kunci] ?? ''}
+                      disabled={!emosiPos.bisaTulis}
+                      onChange={(e) => { void emosiPos.simpan(b.kunci, e.target.value, b.tiket).catch(() => {}); }}
+                      title="Emosi saat posisi ini berjalan — ikut tercatat di riwayat order saat ditutup"
+                      className={cn('cursor-pointer appearance-none border-0 bg-transparent p-0 text-[11px] outline-none disabled:cursor-not-allowed',
+                        emosiPos.peta[b.kunci] ? 'text-zinc-300' : 'text-zinc-600')}>
+                      <option value="">—</option>
+                      {EMOSI.map((e) => <option key={e} value={e}>{e}</option>)}
+                    </select>
+                  </span>
                 </div>
               </div>
             ))}

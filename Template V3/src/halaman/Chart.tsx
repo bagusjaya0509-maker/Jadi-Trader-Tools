@@ -249,6 +249,10 @@ export default function ChartBacktest() {
   /* Tick bid/ask menumpang balasan klines MT5 yang memang sudah dipoll —
      dibaca ulang tiap render, dan render datang tiap data lilin segar. */
   const tickMt5 = simbol.startsWith('MT5:') ? bacaTickMt5(simbol.slice(4)) : null;
+  /* Garis Ask HANYA di mode real. Di mode latihan tidak ada spread yang
+     dibayar siapa pun, jadi garis kedua di dekat harga cuma menambah satu
+     garis lagi yang harus diabaikan mata. */
+  const askTampil = aksi?.mode === 'real' ? (tickMt5?.ask || undefined) : undefined;
   /* Seretan SL/TP posisi baru BERANGKAT saat tombol Kirim di chart
      ditekan — ChartLilin yang memegang pratinjau dan tombolnya, jalur
      kirimnya sama dengan order BUKA: antrean perintah → EA → laporan. */
@@ -824,7 +828,7 @@ export default function ChartBacktest() {
                           onPilihGambar={setGambarPilih}
                           posisiMt5={posisiMt5Chart}
                           onUbahPosisi={simbol.startsWith('MT5:') ? ubahPosisiMt5 : undefined}
-                          hargaAsk={tickMt5?.ask || undefined}
+                          hargaAsk={askTampil}
                           mundur={DURASI_TF[tf] ? jamMundur(detik) : undefined}
                           hamparanBawah={kendaliReplay}
                           pojok={aksi ? (

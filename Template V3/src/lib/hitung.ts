@@ -27,7 +27,13 @@ export interface Stat {
 }
 
 export function statGabungan(trade: Trade[], saldoAwal = SALDO_AWAL): Stat {
-  const sah = trade.filter((t) => Number.isFinite(t.pnl));
+  /* LATIHAN TIDAK IKUT DIHITUNG.
+     ────────────────────────────────────────────────────────────────────
+     Trade replay tidak pernah mempertaruhkan uang, jadi memasukkannya ke
+     Net P/L, winrate, dan profit factor membuat angka yang dipakai
+     menilai diri sendiri berbohong ke arah yang menyenangkan. Ia tetap
+     tersimpan dan tetap terlihat di riwayat — cuma tidak ikut menghitung. */
+  const sah = trade.filter((t) => Number.isFinite(t.pnl) && !t.latihan);
   const menang = sah.filter((t) => t.pnl > 0);
   const kalah = sah.filter((t) => t.pnl < 0);
 
@@ -68,7 +74,9 @@ export interface TitikEkuitas { i: number; nilai: number; label: string }
 /** Kurva ekuitas. Diurut menaik menurut waktu — riwayat tersimpan kadang urut
  *  terbalik, dan kurva yang digambar dari urutan salah naik-turun tanpa arti. */
 export function kurvaEkuitas(trade: Trade[], saldoAwal = SALDO_AWAL): TitikEkuitas[] {
-  const urut = [...trade].sort((a, b) => a.waktu - b.waktu);
+  /* Tanpa latihan, alasan yang sama dengan statGabungan: kurva ekuitas
+     adalah cerita uang yang benar-benar berpindah. */
+  const urut = [...trade].filter((t) => !t.latihan).sort((a, b) => a.waktu - b.waktu);
   let jalan = saldoAwal;
   const titik: TitikEkuitas[] = [{ i: 0, nilai: jalan, label: 'Awal' }];
   urut.forEach((t, i) => {
@@ -105,7 +113,7 @@ const NAMA_BULAN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep
  *  tengahnya tetap muncul dengan nol supaya sumbu waktunya tidak melompat,
  *  tapi bulan sebelum transaksi pertama tidak pernah ada. */
 export function plPerBulan(trade: Trade[], maksBulan = 12): Bulan[] {
-  const sah = trade.filter((t) => Number.isFinite(t.pnl) && t.waktu > 0);
+  const sah = trade.filter((t) => Number.isFinite(t.pnl) && t.waktu > 0 && !t.latihan);
   if (!sah.length) return [];
 
   /* Dirinci per SUMBER, bukan cuma totalnya.
@@ -290,7 +298,7 @@ export function saldoDuaBulan(
 /** P/L per hari untuk kalender & grafik batang. */
 export function plPerHari(trade: Trade[]) {
   const peta = new Map<string, number>();
-  trade.forEach((t) => {
+  trade.filter((t) => !t.latihan).forEach((t) => {
     const k = new Date(t.waktu).toISOString().slice(0, 10);
     peta.set(k, (peta.get(k) ?? 0) + t.pnl);
   });
