@@ -212,3 +212,45 @@ function mulaiPantau(d: { simbol: string; arah: 'BUY' | 'SELL'; qty: string; sl:
   }, 10_000);
   pantauan.set(kunci, jam);
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   UBAH SL/TP ORDER YANG SUDAH TERPASANG
+   ══════════════════════════════════════════════════════════════════════
+   Binance tidak punya "geser trigger price". Cara mengubah conditional
+   order adalah MEMBATALKAN yang lama lalu memasang yang baru, dan itu
+   dikerjakan backend dalam satu permintaan supaya tidak ada jendela
+   waktu di mana posisinya tak terlindungi karena tab tertutup di antara
+   dua panggilan.
+
+   Id order lama dikirim supaya yang dibatalkan benar-benar order ini,
+   bukan "SL apa pun di simbol ini" — akun yang punya beberapa stop di
+   satu pair akan kehilangan yang salah.
+   ══════════════════════════════════════════════════════════════════════ */
+export interface UbahSlTp {
+  symbol: string;
+  side: 'BUY' | 'SELL';
+  sl?: number;
+  slQuantity?: number;
+  oldSlOrderId?: string;
+  tp1?: number;
+  tp1Quantity?: number;
+  oldTp1OrderId?: string;
+}
+
+export async function ubahSlTpNyata(p: UbahSlTp): Promise<void> {
+  const { url, token } = bacaKoneksi();
+  const dasar = (url.trim() || 'https://103-253-145-38.sslip.io').replace(/\/+$/, '');
+  if (!token.trim()) throw new Error('App Token belum diisi di Integrations.');
+  const r = await fetch(`${dasar}/api/trade/futures/edit-sltp`, {
+    method: 'POST',
+    headers: { 'X-App-Token': token.trim(), 'Content-Type': 'application/json' },
+    body: JSON.stringify(p),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    /* Pesan bursa dibawa apa adanya kalau ada — "would immediately
+       trigger" jauh lebih berguna daripada "gagal 500". */
+    const rinci = typeof j?.error === 'object' ? (j.error.msg ?? JSON.stringify(j.error)) : j?.error;
+    throw new Error(rinci ? String(rinci) : `Backend menjawab ${r.status}`);
+  }
+}

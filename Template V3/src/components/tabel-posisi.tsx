@@ -38,8 +38,12 @@ export interface BarisPosisi {
   tiket?: string;
 }
 
-export function TabelPosisi({ baris, kolomEmosi, kosong }: {
+export function TabelPosisi({ baris, kolomEmosi, kosong, onKlikBaris }: {
   baris: BarisPosisi[];
+  /** Klik baris = buka order ini di chart untuk disunting. Kalau tidak
+   *  diberikan, barisnya tidak bisa diklik sama sekali — bukan bisa
+   *  diklik tapi tidak melakukan apa-apa. */
+  onKlikBaris?: (b: BarisPosisi) => void;
   /** Sel emosi per baris (Jurnal). Kolomnya hanya muncul kalau diberikan. */
   kolomEmosi?: (b: BarisPosisi) => React.ReactNode;
   /** Kalimat saat tidak ada posisi. */
@@ -72,7 +76,10 @@ export function TabelPosisi({ baris, kolomEmosi, kosong }: {
               ? ((b.hargaKini! - b.entry) / b.entry) * 100 * (b.arah === 'BUY' ? 1 : -1)
               : null;
             return (
-              <Tr key={b.kunci}>
+              <Tr key={b.kunci}
+                  onClick={onKlikBaris ? () => onKlikBaris(b) : undefined}
+                  title={onKlikBaris ? 'Buka di chart untuk mengubah SL/TP' : undefined}
+                  className={onKlikBaris ? 'cursor-pointer transition-colors hover:bg-zinc-800/40' : undefined}>
                 <Td>
                   <span className="text-zinc-200">{b.simbol}</span>
                   <span className={cn('ml-1.5 text-[10.5px]',

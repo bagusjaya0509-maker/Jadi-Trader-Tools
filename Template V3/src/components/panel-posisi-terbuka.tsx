@@ -26,7 +26,33 @@ import type { Sumber } from '@/data/contoh';
  *  Kripto dari `public/posisiTerbuka` (dan dari bursa langsung kalau App
  *  Token ada); Trade-Fi dari laporan EA. Dua sumber berbeda, satu tampilan —
  *  yang ditanyakan sama: apa yang sedang berjalan sekarang. */
-export function PanelPosisiTerbuka({ sumber }: { sumber: Sumber }) {
+/** Order yang dipilih untuk disunting di chart. Bentuknya sengaja SATU
+ *  untuk kedua pasar dan kedua jenis: yang membedakan cuma isian mana
+ *  yang terisi, bukan bentuk datanya — pemanggilnya tidak perlu bercabang
+ *  empat kali. */
+export interface OrderSunting {
+  pasar: 'kripto' | 'mt5';
+  jenis: 'posisi' | 'pending';
+  /** Simbol chart: "BTCUSDT" atau "MT5:XAUUSD". */
+  simbolChart: string;
+  /** Simbol asli di bursa/broker. */
+  simbol: string;
+  arah: 'BUY' | 'SELL';
+  entry: number;
+  sl: number;
+  tp: number;
+  /** Ukuran: jumlah koin (kripto) atau lot (MT5). */
+  ukuran: number;
+  /** Tiket MT5, atau id order pending kripto. */
+  tiket?: string;
+}
+
+export function PanelPosisiTerbuka({ sumber, onSunting }: {
+  sumber: Sumber;
+  /** Klik baris = buka order itu di chart. Tanpa ini barisnya tidak bisa
+   *  diklik sama sekali. */
+  onSunting?: (o: OrderSunting) => void;
+}) {
   const { data: posisiKripto, pending: pendingKripto } = usePosisi();
   const mt5 = useAkunMt5();
   /* Order menggantung dari DUA pasar, disamakan bentuknya di sini.
@@ -111,6 +137,21 @@ export function PanelPosisiTerbuka({ sumber }: { sumber: Sumber }) {
             data, bukan formulir. */}
         <TabelPosisi
           baris={baris}
+          onKlikBaris={onSunting && ((b) => onSunting({
+            pasar: sumber === 'kripto' ? 'kripto' : 'mt5',
+            jenis: 'posisi',
+            simbolChart: sumber === 'kripto' ? b.simbol : `MT5:${b.simbol}`,
+            simbol: b.simbol,
+            arah: b.arah,
+            entry: b.entry, sl: b.sl, tp: b.tp,
+            /* Ukuran dibaca dari sumber aslinya, bukan dari teks
+               berformat di kolom Size — "1.234,5" akan jadi 1,2345 kalau
+               diurai sebagai angka Inggris. */
+            ukuran: sumber === 'kripto'
+              ? (posisiKripto.find((p) => p.id === b.kunci)?.jumlah ?? 0)
+              : (mt5.posisi.find((p) => p.tiket === b.kunci)?.lot ?? 0),
+            tiket: b.tiket,
+          }))}
           kosong={sumber === 'kripto'
             ? 'Tidak ada posisi kripto terbuka.'
             : mt5.terhubung === true ? 'Tidak ada posisi MT5 terbuka.' : mt5.ket}
@@ -158,7 +199,21 @@ export function PanelPosisiTerbuka({ sumber }: { sumber: Sumber }) {
                  menampilkan enam di sisi lain. */
               sumber === 'kripto' ? 'max-h-[142px]' : 'max-h-[213px]')}>
               {pending.map((o) => (
-                <div key={o.kunci} className="py-2">
+                <div key={o.kunci}
+                     onClick={onSunting ? () => onSunting({
+                       pasar: sumber === 'kripto' ? 'kripto' : 'mt5',
+                       jenis: 'pending',
+                       simbolChart: sumber === 'kripto' ? o.simbol : `MT5:${o.simbol}`,
+                       simbol: o.simbol,
+                       arah: o.arah,
+                       entry: o.harga, sl: o.sl, tp: o.tp,
+                       ukuran: sumber === 'kripto'
+                         ? (pendingKripto.find((x) => x.id === o.kunci)?.qty ?? 0)
+                         : (mt5.pending.find((x) => x.tiket === o.kunci)?.lot ?? 0),
+                       tiket: o.kunci,
+                     }) : undefined}
+                     title={onSunting ? 'Buka di chart untuk mengubah harga/SL/TP' : undefined}
+                     className={cn('py-2', onSunting && 'cursor-pointer rounded transition-colors hover:bg-zinc-800/40')}>
                   <div className="flex items-center justify-between gap-2">
                     <span className="flex min-w-0 items-center gap-2">
                       <span className="truncate text-[12.5px] text-zinc-200">{o.simbol}</span>

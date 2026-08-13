@@ -9,11 +9,11 @@ import { cn, uang, persen, harga, tanggalPendek } from '@/lib/utils';
 import { ChartLilin, type Garis, type GarisHarga, type GarisSeret, type PosisiChartMt5 } from '@/components/chart-lilin';
 import { PanelReplay, type AksiOrder, type JenisEntry } from '@/components/panel-replay';
 import { PojokOrder } from '@/components/pojok-order';
-import { kirimOrderNyata, type MetodeTp } from '@/lib/order-nyata';
+import { kirimOrderNyata, ubahSlTpNyata, type MetodeTp } from '@/lib/order-nyata';
 import { kirimPerintahMt5, tungguHasilMt5 } from '@/lib/mt5-order';
 import { DockPine, type InfoPine, type KendaliPine } from '@/components/dock-pine';
 import { WatchChart } from '@/components/watch-chart';
-import { PanelPosisiTerbuka } from '@/components/panel-posisi-terbuka';
+import { PanelPosisiTerbuka, type OrderSunting } from '@/components/panel-posisi-terbuka';
 import type { JenisAlat, GambarAlat } from '@/lib/plugin-alat';
 import type { HasilPine } from '@/lib/pine';
 import { bacaSetelanChart, simpanSetelanChart } from '@/lib/replay';
@@ -215,13 +215,17 @@ export default function ChartBacktest() {
      Disimpan sebagai jarak dari kiri-atas area chart dalam piksel, bukan
      persen: chart yang tingginya diseret akan menggeser bilah yang
      posisinya berbasis persen, padahal orangnya tidak memindahkannya. */
-  const [letakAlat, setLetakAlat] = useState<{ x: number; y: number }>(() => {
+  /* null = belum pernah dipindah → pakai tempat bawaannya (pojok kiri
+     bawah, lewat kelas CSS). Menyimpan bawaan sebagai ANGKA piksel akan
+     mengunci letaknya ke satu ukuran layar: yang pas di 1280 px jatuh di
+     tengah chart pada layar 3440 px. Angka baru muncul setelah orangnya
+     benar-benar memindahkannya. */
+  const [letakAlat, setLetakAlat] = useState<{ x: number; y: number } | null>(() => {
     try {
       const d = JSON.parse(localStorage.getItem('jt.letakAlat') ?? 'null');
       if (d && typeof d.x === 'number' && typeof d.y === 'number') return d;
     } catch { /* privat */ }
-    /* Bawaan: di kanan panel order, sejajar puncaknya. */
-    return { x: 300, y: 8 };
+    return null;
   });
   const areaChart = useRef<HTMLDivElement>(null);
 
@@ -230,7 +234,15 @@ export default function ChartBacktest() {
        memilih alat jadi mustahil tanpa menggeser bilahnya. */
     if ((e.target as HTMLElement).closest('button')) return;
     e.preventDefault();
-    const awal = { x: e.clientX, y: e.clientY, lx: letakAlat.x, ly: letakAlat.y };
+    const kotakBilah = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const b0 = areaChart.current?.getBoundingClientRect();
+    /* Kalau belum pernah dipindah, titik awalnya diambil dari LETAK
+       SEBENARNYA di layar — bukan dari angka bawaan yang tidak ada. */
+    const awal = {
+      x: e.clientX, y: e.clientY,
+      lx: letakAlat ? letakAlat.x : (b0 ? kotakBilah.left - b0.left : 8),
+      ly: letakAlat ? letakAlat.y : (b0 ? kotakBilah.top - b0.top : 8),
+    };
     const batas = () => areaChart.current?.getBoundingClientRect();
     const hitung = (ev: PointerEvent) => {
       const b = batas();
@@ -263,6 +275,92 @@ export default function ChartBacktest() {
        tidak menindih dock Pine yang meluncur di atas grafik. */
     setDockTab(t); setDockBuka(true); setMenuInd(false);
   }
+  /* ── Sunting SL/TP order yang SUDAH ADA ─────────────────────────
+     Diisi saat baris di panel Posisi Terbuka diklik. Selama terisi,
+     chart menggambar tiga garis order itu — entry terkunci, SL & TP
+     bisa diseret — dan sebuah bilah kecil menawarkan Kirim perubahan.
+
+     Dipisah dari `rencana` (tiket yang sedang disusun) dengan sengaja:
+     keduanya menggambar garis yang mirip, tapi akibat menekan Kirim
+     sangat berbeda. Satu membuka posisi baru, satu mengubah yang sudah
+     jalan; menyatukannya berarti satu salah klik bisa membuka order
+     yang tidak diminta. */
+  const [sunting, setSunting] = useState<OrderSunting | null>(null);
+  const [suntingSl, setSuntingSl] = useState(0);
+  const [suntingTp, setSuntingTp] = useState(0);
+  const [suntingSibuk, setSuntingSibuk] = useState(false);
+  const [suntingKabar, setSuntingKabar] = useState('');
+
+  function bukaSunting(o: OrderSunting) {
+    setSimbol(o.simbolChart.toUpperCase());
+    setSunting(o);
+    setSuntingSl(o.sl);
+    setSuntingTp(o.tp);
+    setSuntingKabar('');
+  }
+
+  async function kirimSunting() {
+    if (!sunting) return;
+    const slBaru = Number(suntingSl) || 0;
+    const tpBaru = Number(suntingTp) || 0;
+    if (!slBaru && !tpBaru) { setSuntingKabar('Isi SL atau TP dulu.'); return; }
+    /* Pagar arah: SL di sisi yang salah bukan proteksi, itu perintah
+       menutup rugi seketika. Ditolak di sini, bukan di bursa — pesan
+       bursa berbunyi "would immediately trigger" dan tidak menjelaskan
+       apa pun bagi yang belum pernah melihatnya. */
+    const acuan = sunting.entry;
+    if (acuan > 0 && slBaru > 0) {
+      const salah = sunting.arah === 'BUY' ? slBaru >= acuan : slBaru <= acuan;
+      if (salah) { setSuntingKabar(`SL ${sunting.arah === 'BUY' ? 'harus di bawah' : 'harus di atas'} harga entry.`); return; }
+    }
+    if (acuan > 0 && tpBaru > 0) {
+      const salah = sunting.arah === 'BUY' ? tpBaru <= acuan : tpBaru >= acuan;
+      if (salah) { setSuntingKabar(`TP ${sunting.arah === 'BUY' ? 'harus di atas' : 'harus di bawah'} harga entry.`); return; }
+    }
+
+    setSuntingSibuk(true);
+    setSuntingKabar('Mengirim perubahan…');
+    try {
+      if (sunting.pasar === 'mt5') {
+        const { id } = await kirimPerintahMt5({
+          aksi: 'UBAH',
+          tiket: sunting.tiket,
+          sl: slBaru || undefined,
+          tp: tpBaru || undefined,
+          /* Pending order MT5: harga pemicunya ikut dipertahankan apa
+             adanya — yang sedang diubah cuma SL/TP. */
+          entry: sunting.jenis === 'pending' ? sunting.entry : undefined,
+        });
+        const hasil = await tungguHasilMt5(id);
+        setSuntingKabar(hasil.status === 'sukses' ? `Terkirim ke MT5 — ${hasil.pesan}` : `Gagal: ${hasil.pesan}`);
+      } else {
+        /* Kripto: order lama DIBATALKAN lalu dipasang ulang di harga
+           baru — itulah cara Binance mengubah conditional order, dan
+           backend sudah mengurus pembatalannya. Id order lamanya
+           diambil dari daftar order bursa supaya yang dibatalkan
+           benar-benar milik simbol ini. */
+        const milik = orderBursa.filter((x) => x.simbol === sunting.simbol);
+        const slLama = milik.find((x) => x.jenis === 'SL');
+        const tpLama = milik.find((x) => x.jenis === 'TP');
+        const qty = sunting.ukuran || slLama?.qty || tpLama?.qty || 0;
+        if (!qty) throw new Error('Ukuran posisi tidak diketahui — muat ulang halaman lalu coba lagi.');
+        await ubahSlTpNyata({
+          symbol: sunting.simbol,
+          side: sunting.arah,
+          sl: slBaru || undefined,
+          slQuantity: slBaru ? qty : undefined,
+          oldSlOrderId: slLama?.id,
+          tp1: tpBaru || undefined,
+          tp1Quantity: tpBaru ? qty : undefined,
+          oldTp1OrderId: tpLama?.id,
+        });
+        setSuntingKabar('Terkirim ke Binance — SL/TP diperbarui.');
+      }
+    } catch (e) {
+      setSuntingKabar(e instanceof Error ? e.message : 'Gagal mengirim perubahan');
+    } finally { setSuntingSibuk(false); }
+  }
+
   const [kendaliReplay, setKendaliReplay] = useState<React.ReactNode>(null);
   /* Arah tiket yang sedang disusun. null = belum ada tiket, chart cuma
      menggambar rencana dari kartu screener kalau ada. */
@@ -623,6 +721,17 @@ export default function ChartBacktest() {
   const labelJenis = jenisEntry === 'MARKET' ? 'Market'
     : `${draf === 'BUY' ? 'Buy' : 'Sell'} ${jenisEntry === 'STOP' ? 'Stop' : 'Limit'}`;
   const garisSeret: GarisSeret[] = useMemo(() => {
+    /* Mode SUNTING menang atas semuanya: begitu sebuah order dipilih dari
+       panel, yang digambar adalah order ITU — bukan rencana tiket yang
+       kebetulan masih tersisa di layar. Dua set garis di satu chart tidak
+       bisa dibedakan, dan yang diseret orangnya harus yang ia maksud. */
+    if (sunting) {
+      const g: GarisSeret[] = [];
+      if (sunting.entry) g.push({ id: 'entry', harga: sunting.entry, warna: '#d4d4d8', label: 'Entry', ket: `· ${sunting.arah}`, bisaSeret: false });
+      if (suntingSl) g.push({ id: 'sl', harga: suntingSl, warna: '#f87171', label: 'SL', ket: '· seret lalu Kirim', bisaSeret: true });
+      if (suntingTp) g.push({ id: 'tp', harga: suntingTp, warna: '#10b981', label: 'TP', ket: '· seret lalu Kirim', bisaSeret: true });
+      return g;
+    }
     const sumber = aksiPosisi
       ? { entry: aksiPosisi.masuk, sl: aksiPosisi.sl, tp: aksiPosisi.tp }
       : aksiTunda
@@ -676,7 +785,7 @@ export default function ChartBacktest() {
     if (sumber.sl) g.push({ id: 'sl', harga: sumber.sl, warna: '#f87171', label: 'SL', ket: ketSl, bisaSeret: !kunci });
     if (sumber.tp) g.push({ id: 'tp', harga: sumber.tp, warna: '#10b981', label: 'TP', ket: ketTp, bisaSeret: !kunci });
     return g;
-  }, [aksiPosisi, aksiTunda, rencana, aksi, draf, labelJenis, nyataSetelan, lotMt5, nilaiLotMt5, simbol]);
+  }, [sunting, suntingSl, suntingTp, aksiPosisi, aksiTunda, rencana, aksi, draf, labelJenis, nyataSetelan, lotMt5, nilaiLotMt5, simbol]);
 
   /* ── Order yang BENAR-BENAR menggantung di bursa ────────────────────
      Sumbernya bursa, bukan keadaan halaman ini. Itulah yang membuatnya
@@ -987,6 +1096,11 @@ export default function ChartBacktest() {
                           onKlikBar={replayIdx === null ? undefined : setReplayIdx}
                           garisSeret={garisSeret}
                           onSeret={(id, h) => {
+                            if (sunting) {
+                              if (id === 'sl') setSuntingSl(h);
+                              if (id === 'tp') setSuntingTp(h);
+                              return;
+                            }
                             if (id === 'entry') entryDigeser.current = true;
                             seretTangan.current = true;
                             setRencana((r) => ({ ...r, [id]: h }));
@@ -1156,11 +1270,58 @@ export default function ChartBacktest() {
                 {memuat ? 'Memuat lilin…' : 'Tidak ada data untuk simbol ini.'}
               </div>}
 
+          {/* ── Bilah SUNTING order ────────────────────────────────
+              Muncul hanya saat sebuah order dipilih dari panel Posisi
+              Terbuka. Ditaruh di dasar chart, bukan melayang di tengah:
+              yang sedang dibaca orangnya adalah garis-garisnya, dan
+              bilah yang menutupi harga justru menghalangi keputusan yang
+              sedang diambil. */}
+          {sunting && (
+            <div className="absolute inset-x-2 bottom-2 z-30 flex flex-wrap items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-950/95 px-3 py-2 backdrop-blur">
+              <span className="text-[12px] text-zinc-200">
+                {sunting.simbol}
+                <span className={cn('ml-1.5 text-[10.5px]', sunting.arah === 'BUY' ? 'text-emerald-500' : 'text-red-400')}>
+                  {sunting.arah}
+                </span>
+                <span className="ml-1.5 text-[10.5px] text-zinc-500">
+                  {sunting.jenis === 'pending' ? 'pending' : 'posisi'} · {sunting.pasar === 'mt5' ? 'Trade-Fi' : 'Binance'}
+                </span>
+              </span>
+              <label className="flex items-center gap-1 text-[11px] text-zinc-500">
+                SL
+                <input type="number" step="any" value={suntingSl || ''}
+                       onChange={(e) => setSuntingSl(Number(e.target.value) || 0)}
+                       className="angka h-7 w-[110px] rounded border border-zinc-800 bg-zinc-900 px-1.5 text-right text-[11.5px] text-zinc-200 outline-none focus-visible:border-zinc-600" />
+              </label>
+              <label className="flex items-center gap-1 text-[11px] text-zinc-500">
+                TP
+                <input type="number" step="any" value={suntingTp || ''}
+                       onChange={(e) => setSuntingTp(Number(e.target.value) || 0)}
+                       className="angka h-7 w-[110px] rounded border border-zinc-800 bg-zinc-900 px-1.5 text-right text-[11.5px] text-zinc-200 outline-none focus-visible:border-zinc-600" />
+              </label>
+              <button onClick={() => void kirimSunting()} disabled={suntingSibuk}
+                className="flex cursor-pointer items-center gap-1.5 rounded-md bg-zinc-100 px-3 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-60">
+                {suntingSibuk ? <Loader2 className="size-3.5 animate-spin" /> : null}
+                Kirim perubahan
+              </button>
+              <button onClick={() => { setSunting(null); setSuntingKabar(''); }}
+                className="cursor-pointer rounded-md border border-zinc-800 px-2.5 py-1.5 text-[12px] text-zinc-400 transition-colors hover:border-zinc-600">
+                Batal
+              </button>
+              {suntingKabar && (
+                <span className="min-w-0 grow truncate text-[11.5px] text-zinc-400" title={suntingKabar}>{suntingKabar}</span>
+              )}
+            </div>
+          )}
+
           {/* ── Legend indikator ala TradingView — pojok kiri-atas ────
               Nama yang terpasang tertulis DI chartnya, dengan ikon setelan
               dan kode di sebelahnya. Indikator tanpa nama di layar adalah
               garis misterius; indikator yang bernama adalah alat. */}
-          <div className="pointer-events-none absolute right-16 top-2 z-20 flex flex-col items-end gap-1">
+          {/* right-24, bukan right-16: tombol × di ujung nama indikator
+              dulu nyaris menempel pita harga di sumbu kanan, dan dua hal
+              yang bisa diklik sedekat itu bikin salah tekan. */}
+          <div className="pointer-events-none absolute right-24 top-2 z-20 flex flex-col items-end gap-1">
             {pineInfo && (
               /* Tanpa latar: nama indikator adalah KETERANGAN chart, bukan
                      kartu tersendiri. Kotak gelap di atas lilin justru menutup
@@ -1215,14 +1376,16 @@ export default function ChartBacktest() {
               kalau tidak ada yang terpilih. */}
           {alatTutup ? (
             <button onClick={() => aturAlatTutup(false)} title="Buka bilah alat gambar"
-              style={{ left: letakAlat.x, top: letakAlat.y }}
-              className="absolute z-20 flex size-7 cursor-pointer items-center justify-center rounded-lg border border-zinc-800/80 bg-zinc-950/85 text-zinc-500 backdrop-blur-sm transition-colors hover:text-zinc-200">
+              style={letakAlat ? { left: letakAlat.x, top: letakAlat.y } : undefined}
+              className={cn('absolute z-20 flex size-7 cursor-pointer items-center justify-center rounded-lg border border-zinc-800/80 bg-zinc-950/85 text-zinc-500 backdrop-blur-sm transition-colors hover:text-zinc-200',
+                !letakAlat && 'bottom-2 left-2')}>
               <Ruler className="size-3.5" />
             </button>
           ) : (
           <div onPointerDown={mulaiSeretAlat}
-               style={{ left: letakAlat.x, top: letakAlat.y }}
-               className="absolute z-20 flex cursor-move flex-row items-center gap-0.5 rounded-lg border border-zinc-800/80 bg-zinc-950/85 p-1 backdrop-blur-sm">
+               style={letakAlat ? { left: letakAlat.x, top: letakAlat.y } : undefined}
+               className={cn('absolute z-20 flex cursor-move flex-row items-center gap-0.5 rounded-lg border border-zinc-800/80 bg-zinc-950/85 p-1 backdrop-blur-sm',
+                 !letakAlat && 'bottom-2 left-2')}>
             {/* Pegangan seret di ujung kiri — memberi tahu bilahnya bisa
                 dipindah tanpa perlu dicoba dulu. */}
             <GripVertical className="size-3.5 shrink-0 text-zinc-700" />
@@ -1331,8 +1494,8 @@ export default function ChartBacktest() {
           persis seperti di Dashboard. Judul di atas dua panel yang
           masing-masing sudah berjudul cuma mengulang. */}
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <PanelPosisiTerbuka sumber="kripto" />
-        <PanelPosisiTerbuka sumber="forex" />
+        <PanelPosisiTerbuka sumber="kripto" onSunting={bukaSunting} />
+        <PanelPosisiTerbuka sumber="forex" onSunting={bukaSunting} />
       </div>
 
       {/* ── Backtest (beta) — tampil hanya kalau dibuka dari ikon di

@@ -35,7 +35,7 @@
 //       tombol AutoTrading (Algo Trading) di toolbar MT5 menyala.
 //+------------------------------------------------------------------+
 #property copyright "Jadi Trader Tools"
-#property version   "2.04"
+#property version   "2.06"
 #property strict
 #property description "Trade-Fi Sync v2: jurnal + eksekusi perintah web + kirim chart MT5. Baca pagar pengamannya di kepala berkas."
 
@@ -52,7 +52,7 @@ input string SimbolChart      = "";                                  // Simbol y
 input int    KirimChartMenit  = 5;                                   // Jeda kirim OHLC ke web (menit)
 input bool   KirimTick        = true;                                // Kirim harga tiap detik (harga web = MT5)
 
-#define VERSI_EA "2.05"
+#define VERSI_EA "2.06"
 #define PFX      "JTS_"
 
 CTrade   gTrade;
@@ -572,23 +572,48 @@ void JalankanPerintah(string baris)
    }
    else if(aksi == "UBAH")
    {
-      if(!PositionSelectByTicket(tiket))
+      // Satu perintah untuk DUA hal: posisi yang sudah jalan, dan order
+      // yang masih menunggu harga. Web tidak perlu tahu bedanya - ia cuma
+      // mengirim nomor tiketnya, dan terminal yang tahu tiket itu milik
+      // yang mana. Memisahkannya jadi dua aksi berarti web harus menebak,
+      // dan tebakan yang meleset menghasilkan "tidak ditemukan" untuk
+      // order yang jelas-jelas ada di layar.
+      double entryUbah = (n >= 9 ? StringToDouble(b[8]) : 0.0);
+
+      if(PositionSelectByTicket(tiket))
       {
-         LaporHasil(id, false, "Posisi " + IntegerToString((long)tiket) + " tidak ditemukan", "");
+         string s = PositionGetString(POSITION_SYMBOL);
+         // 0 berarti PERTAHANKAN yang sekarang, bukan hapus - menghapus stop
+         // lewat kelalaian mengisi kolom adalah kecelakaan, bukan fitur.
+         double slp = (sl > 0 ? RapikanHarga(s, sl) : PositionGetDouble(POSITION_SL));
+         double tpp = (tp > 0 ? RapikanHarga(s, tp) : PositionGetDouble(POSITION_TP));
+         ok = gTrade.PositionModify(tiket, slp, tpp);
+         pesan = ok ? ("SL " + DoubleToString(slp, 2) + " TP " + DoubleToString(tpp, 2))
+                    : ("retcode " + IntegerToString((int)gTrade.ResultRetcode()) + " " + gTrade.ResultRetcodeDescription());
+         tiketHasil = IntegerToString((long)tiket);
+         gPerintahAkhir = "UBAH #" + IntegerToString((long)tiket) + " " + (ok ? "OK" : "GAGAL");
+      }
+      else if(OrderSelect(tiket))
+      {
+         // Pending order: harga pemicunya juga boleh digeser, lewat kolom
+         // entry yang sama dengan yang dipakai BUKA.
+         string s = OrderGetString(ORDER_SYMBOL);
+         double hrg = (entryUbah > 0 ? RapikanHarga(s, entryUbah) : OrderGetDouble(ORDER_PRICE_OPEN));
+         double slp = (sl > 0 ? RapikanHarga(s, sl) : OrderGetDouble(ORDER_SL));
+         double tpp = (tp > 0 ? RapikanHarga(s, tp) : OrderGetDouble(ORDER_TP));
+         ok = gTrade.OrderModify(tiket, hrg, slp, tpp, ORDER_TIME_GTC, 0);
+         pesan = ok ? ("Pending " + DoubleToString(hrg, 2) + " SL " + DoubleToString(slp, 2) + " TP " + DoubleToString(tpp, 2))
+                    : ("retcode " + IntegerToString((int)gTrade.ResultRetcode()) + " " + gTrade.ResultRetcodeDescription());
+         tiketHasil = IntegerToString((long)tiket);
+         gPerintahAkhir = "UBAH-P #" + IntegerToString((long)tiket) + " " + (ok ? "OK" : "GAGAL");
+      }
+      else
+      {
+         LaporHasil(id, false, "Tiket " + IntegerToString((long)tiket) + " tidak ditemukan (bukan posisi maupun pending)", "");
          gPerintahGagal++;
          gPerintahAkhir = "UBAH #" + IntegerToString((long)tiket) + " GAGAL: tak ada";
          return;
       }
-      string s = PositionGetString(POSITION_SYMBOL);
-      // 0 berarti PERTAHANKAN yang sekarang, bukan hapus — menghapus stop
-      // lewat kelalaian mengisi kolom adalah kecelakaan, bukan fitur.
-      double slp = (sl > 0 ? RapikanHarga(s, sl) : PositionGetDouble(POSITION_SL));
-      double tpp = (tp > 0 ? RapikanHarga(s, tp) : PositionGetDouble(POSITION_TP));
-      ok = gTrade.PositionModify(tiket, slp, tpp);
-      pesan = ok ? ("SL " + DoubleToString(slp, 2) + " TP " + DoubleToString(tpp, 2))
-                 : ("retcode " + IntegerToString((int)gTrade.ResultRetcode()) + " " + gTrade.ResultRetcodeDescription());
-      tiketHasil = IntegerToString((long)tiket);
-      gPerintahAkhir = "UBAH #" + IntegerToString((long)tiket) + " " + (ok ? "OK" : "GAGAL");
    }
    else if(aksi == "TUTUP")
    {
