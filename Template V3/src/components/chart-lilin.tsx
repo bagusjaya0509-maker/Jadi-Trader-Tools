@@ -119,9 +119,12 @@ export function ChartLilin({
   lilin, garis, trade, tinggi = 420, hingga, garisHarga, onKlikBar, smi, mundur, pojok,
   garisSeret, onSeret, onHapusGaris, hamparanBawah, segmen, penandaPine, kotakPine, isianPine,
   alat, onAlatSelesai, gambarAlat, gambarPilih, onPilihGambar, onUbahGambar,
-  posisiMt5, onUbahPosisi, hargaAsk,
+  posisiMt5, onUbahPosisi, hargaAsk, kunciUkuran,
 }: {
   lilin: Lilin;
+  /** Berubah = kolom chart berubah lebar; chart diukur ulang.
+   *  Nilainya tidak dipakai, cuma perubahannya. */
+  kunciUkuran?: number;
   garis?: Garis[];
   trade?: TradeUji[];
   tinggi?: number;
@@ -178,6 +181,9 @@ export function ChartLilin({
   hargaAsk?: number;
 }) {
   const kotak = useRef<HTMLDivElement>(null);
+  /* Diisi saat chart dibuat; dipanggil efek di bawah tiap kolomnya
+     berubah lebar. */
+  const ukurLagi = useRef<(() => void) | null>(null);
   const chart = useRef<IChartApi | null>(null);
   const seri = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const seriGaris = useRef<ISeriesApi<'Line'>[]>([]);
@@ -213,9 +219,44 @@ export function ChartLilin({
         vertLine: { color: 'rgba(255,255,255,.2)', labelBackgroundColor: '#27272a' },
         horzLine: { color: 'rgba(255,255,255,.2)', labelBackgroundColor: '#27272a' },
       },
-      autoSize: true,
+      /* autoSize BAWAAN PUSTAKA TIDAK DIPAKAI.
+         Diukur langsung: saat kolom chart menyempit karena watchlist
+         ditarik keluar, `.tv-lightweight-charts` ikut menyempit tapi
+         tabel di dalamnya tetap terkunci di lebar lama — lilinnya
+         terpotong, bukan mengecil. Pengamat sendiri di bawah ini
+         memanggil resize() dengan angka yang benar-benar terukur, jadi
+         perilakunya tidak bergantung pada penafsiran pustaka terhadap
+         perubahan tata letak flex. */
+      width: kotak.current.clientWidth || 600,
+      height: tinggi,
     });
     chart.current = c;
+
+    /* Ukuran mengikuti wadahnya. Dipasang di sini, bukan di efek
+       terpisah, supaya pengamatnya hidup dan mati bersama chartnya —
+       pengamat yang menyintasi chart akan memanggil resize() pada objek
+       yang sudah dibuang. */
+    const wadah = kotak.current;
+    const ukurUlang = () => {
+      const l = wadah.clientWidth, t = wadah.clientHeight;
+      if (l > 0 && t > 0) c.resize(l, t);
+    };
+    /* TIGA pemicu, sengaja bertumpuk — dan itu bukan kelebihan:
+         · ResizeObserver menangkap perubahan tata letak apa pun;
+         · window.resize menangkap jendela yang diubah ukurannya;
+         · prop `kunciUkuran` menangkap kolom yang menyempit karena
+           watchlist ditarik.
+       ResizeObserver saja SEHARUSNYA cukup, tapi ia tidak menyala di
+       semua lingkungan — terukur nol panggilan di panel pratinjau
+       walau elemennya jelas berubah lebar. Chart yang tidak ikut
+       menyempit memotong lilin di tepi kanan tanpa tanda apa pun, dan
+       itu terlalu mahal untuk digantungkan pada satu mekanisme yang
+       tidak bisa dipastikan ada. Memanggil resize() dua kali dengan
+       angka yang sama tidak berbiaya. */
+    const pengamat = new ResizeObserver(ukurUlang);
+    pengamat.observe(wadah);
+    window.addEventListener('resize', ukurUlang);
+    ukurLagi.current = ukurUlang;
     seri.current = c.addSeries(CandlestickSeries, {
       upColor: '#10b981', downColor: '#f87171',
       borderUpColor: '#10b981', borderDownColor: '#f87171',
@@ -235,8 +276,28 @@ export function ChartLilin({
       if (klikRef.current && typeof p.logical === 'number') klikRef.current(Math.round(p.logical));
     });
 
-    return () => { c.remove(); chart.current = null; seri.current = null; seriGaris.current = []; penanda.current = null; garisPos.current = []; isiPine.current = null; alatPrim.current = null; };
+    return () => { pengamat.disconnect(); window.removeEventListener('resize', ukurUlang); ukurLagi.current = null; c.remove(); chart.current = null; seri.current = null; seriGaris.current = []; penanda.current = null; garisPos.current = []; isiPine.current = null; alatPrim.current = null; };
   }, []);
+
+  /* Kolom chart berubah lebar (watchlist ditarik) → ukur ulang.
+     Dipisah dari efek pembuatan chart supaya tidak membuat ulang
+     chartnya — membuat ulang berarti zoom dan posisi geser kembali ke
+     awal, dan itu terasa seperti kehilangan pekerjaan. */
+  useEffect(() => {
+    if (!ukurLagi.current) return;
+    /* Diukur DUA KALI: sekali segera (tata letak flex sudah dihitung
+       ulang saat efek ini jalan), sekali lagi sesaat kemudian untuk
+       menangkap transisi CSS yang belum selesai.
+
+       Memakai timer, bukan requestAnimationFrame: rAF tidak berjalan di
+       halaman yang tidak sedang digambar — tab latar, atau panel
+       pratinjau yang tidak tampil — dan chart yang ukurannya menunggu
+       frame yang tidak pernah datang akan tetap salah lebar sampai
+       disentuh. Timer jalan tanpa syarat itu. */
+    ukurLagi.current();
+    const id = window.setTimeout(() => ukurLagi.current?.(), 120);
+    return () => window.clearTimeout(id);
+  }, [kunciUkuran, tinggi]);
 
   /* Data lilin */
   useEffect(() => {

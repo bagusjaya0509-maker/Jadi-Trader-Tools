@@ -13,6 +13,7 @@ import { kirimOrderNyata, type MetodeTp } from '@/lib/order-nyata';
 import { kirimPerintahMt5, tungguHasilMt5 } from '@/lib/mt5-order';
 import { DockPine, type InfoPine, type KendaliPine } from '@/components/dock-pine';
 import { WatchChart } from '@/components/watch-chart';
+import { PanelPosisiTerbuka } from '@/components/panel-posisi-terbuka';
 import type { JenisAlat, GambarAlat } from '@/lib/plugin-alat';
 import type { HasilPine } from '@/lib/pine';
 import { bacaSetelanChart, simpanSetelanChart } from '@/lib/replay';
@@ -127,6 +128,9 @@ export default function ChartBacktest() {
   /* Panel Backtest tertutup saat halaman dibuka. Ia beta, dan yang beta
      tidak boleh menempati ruang tetap di layar seolah sudah matang. */
   const [backtestBuka, setBacktestBuka] = useState(false);
+  /* Lebar watchlist naik ke sini HANYA sebagai pemicu ukur-ulang chart —
+     kolomnya sendiri tetap diurus WatchChart. */
+  const [lebarWatch, setLebarWatch] = useState(0);
   const [aksi, setAksi] = useState<AksiOrder | null>(null);
   const [pine, setPine] = useState<HasilPine | null>(null);
   /* ── Menu indikator, dock Pine, watchlist, alat gambar ─────────────
@@ -139,7 +143,6 @@ export default function ChartBacktest() {
   const [dockTab, setDockTab] = useState<'editor' | 'input'>('editor');
   const [pineInfo, setPineInfo] = useState<InfoPine | null>(null);
   const [kendaliPine, setKendaliPine] = useState<KendaliPine | null>(null);
-  const [watchBuka, setWatchBuka] = useState(false);
   /* Alat gambar tangan — ukur %, fibonacci, kotak SNR. Gambarnya milik
      SIMBOL+TF: kotak support BTC 1 jam tidak ada urusannya dengan ETH. */
   const [alat, setAlat] = useState<JenisAlat | null>(null);
@@ -207,7 +210,9 @@ export default function ChartBacktest() {
     try { localStorage.setItem('jt.alatTutup', v ? '1' : '0'); } catch { /* privat */ }
   }
   function bukaDock(t: 'editor' | 'input') {
-    setDockTab(t); setDockBuka(true); setWatchBuka(false); setMenuInd(false);
+    /* Watchlist tidak lagi perlu ditutup di sini: ia kolom sendiri,
+       tidak menindih dock Pine yang meluncur di atas grafik. */
+    setDockTab(t); setDockBuka(true); setMenuInd(false);
   }
   const [kendaliReplay, setKendaliReplay] = useState<React.ReactNode>(null);
   /* Arah tiket yang sedang disusun. null = belum ada tiket, chart cuma
@@ -920,7 +925,11 @@ export default function ChartBacktest() {
               alat gambar, dock Pine, dan watchlist yang meluncur dari kanan.
               Tanpa overflow-hidden, panel yang sedang tersembunyi
               (translate-x-full) melebarkan halaman. */}
-          <div className="relative overflow-hidden">
+          {/* Grafik dan watchlist SEJAJAR, bukan bertumpuk: kolom kiri
+              menyusut saat pembatas ditarik, jadi lilin di tepi kanan
+              tidak pernah tertutup daftar. */}
+          <div className="flex">
+          <div className="relative min-w-0 grow overflow-hidden">
           {lilin.times.length > 0
             ? <ChartLilin key={`${simbol}|${tf}|${kunciChart}`}
                           lilin={lilin} garis={garis} trade={replayIdx === null ? hasil?.trade : undefined}
@@ -950,6 +959,7 @@ export default function ChartBacktest() {
                           posisiMt5={posisiMt5Chart}
                           onUbahPosisi={simbol.startsWith('MT5:') ? ubahPosisiMt5 : undefined}
                           hargaAsk={askTampil}
+                          kunciUkuran={lebarWatch}
                           mundur={DURASI_TF[tf] ? jamMundur(detik) : undefined}
                           hamparanBawah={kendaliReplay}
                           pojok={aksi ? (
@@ -1141,17 +1151,23 @@ export default function ChartBacktest() {
             )}
           </div>
 
-          {/* ── Alat gambar — bilah tegak yang bisa DILIPAT ─────────
+          {/* ── Alat gambar — bilah MENDATAR di dasar chart ─────────
+              Dulu tegak di tengah sisi kiri, dan di situ ia berdiri tepat
+              di jalur panel order yang terbuka dari pojok kiri atas:
+              begitu ordernya panjang, keduanya bertumpuk dan tombol alat
+              jadi tidak bisa ditekan. Dasar chart kosong dan tetap
+              kosong berapa pun isi panel ordernya.
+
               Klik gambar (mode kursor) untuk memilihnya, Delete untuk
               menghapus; penghapus menghapus yang terpilih dulu, semuanya
               kalau tidak ada yang terpilih. */}
           {alatTutup ? (
             <button onClick={() => aturAlatTutup(false)} title="Buka bilah alat gambar"
-              className="absolute left-2 top-1/2 z-20 flex size-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-lg border border-zinc-800/80 bg-zinc-950/85 text-zinc-500 backdrop-blur-sm transition-colors hover:text-zinc-200">
+              className="absolute bottom-2 left-2 z-20 flex size-7 cursor-pointer items-center justify-center rounded-lg border border-zinc-800/80 bg-zinc-950/85 text-zinc-500 backdrop-blur-sm transition-colors hover:text-zinc-200">
               <Ruler className="size-3.5" />
             </button>
           ) : (
-          <div className="absolute left-2 top-1/2 z-20 flex -translate-y-1/2 flex-col gap-0.5 rounded-lg border border-zinc-800/80 bg-zinc-950/85 p-1 backdrop-blur-sm">
+          <div className="absolute bottom-2 left-2 z-20 flex flex-row items-center gap-0.5 rounded-lg border border-zinc-800/80 bg-zinc-950/85 p-1 backdrop-blur-sm">
             {([
               ['garis', TrendingUp, 'Garis tren — tarik dari titik ke titik'],
               ['ukur', Ruler, 'Ukur % kenaikan / penurunan — klik lalu tarik'],
@@ -1199,9 +1215,8 @@ export default function ChartBacktest() {
                     onTutup={() => setDockBuka(false)}
                     lilin={lilin} simbol={simbol} tf={tf} hingga={replayIdx ?? undefined}
                     aturHasil={setPine} onInfo={setPineInfo} onKendali={setKendaliPine} />
-          <WatchChart buka={watchBuka}
-                      onToggle={() => { setWatchBuka((v) => !v); setDockBuka(false); }}
-                      simbol={simbol} onPilih={setSimbol} />
+          </div>
+          <WatchChart simbol={simbol} onPilih={setSimbol} onLebar={setLebarWatch} />
           </div>
           {/* Pegangan tinggi chart: diseret = diatur, dilepas = dikunci dan
               diingat sebagai bawaan, klik dua kali = kembali otomatis. */}
@@ -1250,6 +1265,22 @@ export default function ChartBacktest() {
                        tanpaBingkai />
         </div>
       </Panel>
+
+      {/* ── Posisi Terbuka ──────────────────────────────────────────
+          Dipindah ke sini dari Jurnal. Alasannya bukan kerapian: posisi
+          terbuka adalah sesuatu yang masih bisa DIPERBUAT — SL-nya
+          digeser, ditutup, ditambah — dan semua perbuatan itu terjadi di
+          halaman ini. Jurnal tempat menilai yang sudah lewat. */}
+      <div className="mb-3 mt-6">
+        <h2 className="text-[14px] font-medium text-zinc-200">Posisi Terbuka</h2>
+        <p className="text-[12px] text-zinc-500">
+          Yang sedang berjalan sekarang di kedua pasar — beserta order yang masih menunggu harga.
+        </p>
+      </div>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <PanelPosisiTerbuka sumber="kripto" />
+        <PanelPosisiTerbuka sumber="forex" />
+      </div>
 
       {/* ── Backtest (beta) — tampil hanya kalau dibuka dari ikon di
              pojok bawah chart ── */}

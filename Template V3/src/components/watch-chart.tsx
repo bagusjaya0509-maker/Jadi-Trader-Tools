@@ -1,15 +1,24 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Plus, X, GripVertical, Pencil, FolderPlus } from 'lucide-react';
+import { Plus, X, GripVertical, Pencil, FolderPlus } from 'lucide-react';
 import { cn, harga as fHarga } from '@/lib/utils';
 import { ambilTickers, hargaTickMt5, daftarSimbolMt5, type Ticker } from '@/lib/pasar';
 import { SIMBOL_DASAR } from '@/lib/simbol';
 
 /* ════════════════════════════════════════════════════════════════════════
-   WATCHLIST CHART — panel geser di sisi kanan grafik
+   WATCHLIST CHART — kolom kanan dengan PEMBATAS yang diseret
    ════════════════════════════════════════════════════════════════════════
-   Daftar pantauan yang menyatu dengan chartnya, ala TradingView: pegangan
-   tipis di tepi kanan, LEBARNYA BISA DITARIK dari tepi kirinya dan diingat,
-   satu klik pada barisnya mengganti simbol chart.
+   Daftar pantauan yang menyatu dengan chartnya, ala TradingView. Tidak ada
+   tombol buka-tutup: yang ada satu GARIS PEMBATAS di tepi kanan grafik.
+   Ditarik ke kiri, watchlist melebar dan grafik menyempit; ditarik sampai
+   mentok kanan, watchlist tertutup dan grafik memakai seluruh lebar.
+
+   Bedanya dengan panel yang menghampar di atas grafik: di sini grafiknya
+   benar-benar MENYEMPIT, jadi lilin di tepi kanan tidak pernah tertutup
+   daftar. Itu sebabnya ia jadi kolom sejajar, bukan lapisan di atasnya.
+
+   Lebarnya bebas — satu keadaan (angka lebar) mengurus buka, tutup, dan
+   ukuran sekaligus. Nol berarti tertutup; tidak ada saklar terpisah yang
+   bisa berselisih dengan lebarnya.
 
    Isinya SEKSI-SEKSI yang dinamai orangnya sendiri — "Forex", "Kripto",
    "Emas", terserah — dan pair-nya dipindah-pindah dengan DISERET: ke
@@ -48,16 +57,25 @@ function bacaSeksi(): SeksiWatch[] {
   return [{ id: 'utama', nama: 'Watchlist', simbol: BAWAAN }];
 }
 
+/** Lebar minimum yang masih berguna. Di bawah ini daftarnya tidak
+ *  terbaca, jadi seretan yang berhenti di situ dianggap "tutup". */
+const LEBAR_MIN = 170;
+const LEBAR_MAKS = 460;
+/** Lebar yang dipakai saat dibuka lewat klik dua kali pada pembatas. */
+const LEBAR_BAWAAN = 236;
+
 function bacaLebar(): number {
   try {
     const n = Number(localStorage.getItem(KUNCI_LEBAR));
-    return n >= 180 && n <= 420 ? n : 236;
-  } catch { return 236; }
+    if (n === 0) return 0;                       /* sengaja ditutup */
+    return n >= LEBAR_MIN && n <= LEBAR_MAKS ? n : 0;
+  } catch { return 0; }
 }
 
-export function WatchChart({ buka, onToggle, simbol, onPilih }: {
-  buka: boolean;
-  onToggle: () => void;
+export function WatchChart({ simbol, onPilih, onLebar }: {
+  /** Dipanggil tiap lebar berubah — chart memakainya untuk mengukur
+   *  ulang dirinya. */
+  onLebar?: (n: number) => void;
   simbol: string;
   onPilih: (s: string) => void;
 }) {
@@ -67,6 +85,8 @@ export function WatchChart({ buka, onToggle, simbol, onPilih }: {
   const [pilihanMt5, setPilihanMt5] = useState<string[]>([]);
   const [ketik, setKetik] = useState('');
   const [lebar, setLebar] = useState(bacaLebar);
+  const terbuka = lebar > 0;
+  useEffect(() => { onLebar?.(lebar); }, [lebar, onLebar]);
   /* Seksi yang sedang DIGANTI NAMANYA / seksi baru yang sedang diketik. */
   const [ubahNama, setUbahNama] = useState<{ id: string; nilai: string } | null>(null);
   const [seksiBaru, setSeksiBaru] = useState<string | null>(null);
@@ -88,7 +108,7 @@ export function WatchChart({ buka, onToggle, simbol, onPilih }: {
      Daftar simbol MT5 ikut disegarkan: EA yang baru dipasang di chart
      lain menambah pilihan tanpa menunggu panel dibuka ulang. */
   useEffect(() => {
-    if (!buka) return;
+    if (!terbuka) return;
     let hidup = true;
     const tarikBinance = () => void ambilTickers().then((t) => { if (hidup) setTickers(t); }).catch(() => { /* diam */ });
     const tarikMt5 = () => void hargaTickMt5().then((t) => { if (hidup) setTickMt5(t); }).catch(() => { /* diam */ });
@@ -100,7 +120,7 @@ export function WatchChart({ buka, onToggle, simbol, onPilih }: {
     const jamM = setInterval(tarikMt5, 5_000);
     const jamD = setInterval(tarikDaftar, 30_000);
     return () => { hidup = false; clearInterval(jamB); clearInterval(jamM); clearInterval(jamD); };
-  }, [buka]);
+  }, [terbuka]);
 
   function tambah() {
     const v = ketik.trim().toUpperCase();
@@ -153,42 +173,69 @@ export function WatchChart({ buka, onToggle, simbol, onPilih }: {
     simpanSeksi(d);
   }
 
-  /* Tepi kiri panel BISA DITARIK — lebar pilihan orangnya diingat. */
+  /* Satu seretan mengurus TIGA hal: membuka, mengubah ukuran, menutup.
+     Tidak ada saklar terpisah — saklar dan lebar yang disimpan terpisah
+     bisa berselisih (tertutup tapi lebarnya 300, atau sebaliknya), dan
+     yang menang jadi tergantung urutan pembacaan. Di sini lebar ADALAH
+     keadaannya: nol berarti tertutup.
+
+     Yang di bawah LEBAR_MIN dijepit ke nol, bukan ke 170: berhenti di
+     lebar yang terlalu sempit menghasilkan kolom yang tidak terbaca dan
+     tidak bisa ditutup dengan gerakan yang sama. */
   function mulaiTarikLebar(e: React.PointerEvent) {
     e.preventDefault();
+    /* setPointerCapture MELEMPAR kalau pointernya tidak aktif — dan
+       lemparannya terjadi SEBELUM penyimak gerak terpasang, jadi
+       seretannya mati total tanpa jejak. Ia cuma penyempurna (menjaga
+       seretan tetap terkunci saat kursor keluar jendela), bukan syarat;
+       kegagalannya tidak boleh membatalkan yang pokok. */
+    try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* pointer sudah lepas */ }
     const awalX = e.clientX, awalL = lebar;
-    const jepit = (n: number) => Math.min(420, Math.max(180, n));
-    const gerak = (ev: PointerEvent) => setLebar(jepit(awalL + (awalX - ev.clientX)));
+    const jepit = (n: number) => {
+      if (n < LEBAR_MIN * 0.6) return 0;
+      return Math.min(LEBAR_MAKS, Math.max(LEBAR_MIN, n));
+    };
+    const hitung = (x: number) => jepit(awalL + (awalX - x));
+    const gerak = (ev: PointerEvent) => setLebar(hitung(ev.clientX));
     const lepas = (ev: PointerEvent) => {
       window.removeEventListener('pointermove', gerak);
       window.removeEventListener('pointerup', lepas);
-      try { localStorage.setItem(KUNCI_LEBAR, String(Math.round(jepit(awalL + (awalX - ev.clientX))))); } catch { /* privat */ }
+      try { localStorage.setItem(KUNCI_LEBAR, String(Math.round(hitung(ev.clientX)))); } catch { /* privat */ }
     };
     window.addEventListener('pointermove', gerak);
     window.addEventListener('pointerup', lepas);
   }
 
+  /* Klik dua kali pada pembatas = buka/tutup di lebar terakhir. Seretan
+     tetap cara utamanya; ini jalan pintas untuk yang tidak ingin
+     mengukur apa-apa. */
+  function alihkan() {
+    const baru = lebar > 0 ? 0 : LEBAR_BAWAAN;
+    setLebar(baru);
+    try { localStorage.setItem(KUNCI_LEBAR, String(baru)); } catch { /* privat */ }
+  }
+
   return (
-    <div
-      className={cn(
-        'absolute inset-y-0 right-0 z-20 border-l border-zinc-800 bg-zinc-950/[.96] backdrop-blur transition-transform duration-300',
-        buka ? 'translate-x-0' : 'translate-x-full')}
-      style={{ width: lebar }}>
-      {/* Pegangan buka-tutup — selalu terlihat di tepi kiri panel. */}
-      <button onClick={onToggle}
-        title={buka ? 'Tutup watchlist' : 'Buka watchlist'}
-        className="absolute -left-[22px] top-1/2 flex h-14 w-[22px] -translate-y-1/2 cursor-pointer items-center justify-center rounded-l-md border border-r-0 border-zinc-800 bg-zinc-900/95 text-zinc-500 transition-colors hover:text-zinc-200">
-        {buka ? <ChevronRight className="size-3.5" /> : <ChevronLeft className="size-3.5" />}
-      </button>
+    <div className="flex shrink-0" style={{ width: lebar + 6 }}>
+      {/* GARIS PEMBATAS — menyatu dengan watchlist, bukan tombol terpisah.
+          Selalu ada walau watchlist tertutup: itulah satu-satunya cara
+          membukanya kembali, dan pegangan yang menghilang saat tertutup
+          adalah pegangan yang tidak bisa dipakai. */}
+      <div onPointerDown={mulaiTarikLebar}
+           onDoubleClick={alihkan}
+           title={terbuka ? 'Tarik untuk mengatur lebar — tarik ke kanan untuk menutup' : 'Tarik ke kiri untuk membuka watchlist'}
+           className="group relative w-1.5 shrink-0 cursor-ew-resize bg-zinc-800/60 transition-colors hover:bg-zinc-600">
+        {/* Pegangan bertitik: memberi tahu ia BISA DISERET tanpa perlu
+            dicoba dulu. Sebuah garis polos terbaca sebagai hiasan. */}
+        <span className="pointer-events-none absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col gap-[3px]">
+          {[0, 1, 2].map((i) => (
+            <span key={i} className="block size-[2px] rounded-full bg-zinc-600 transition-colors group-hover:bg-zinc-300" />
+          ))}
+        </span>
+      </div>
 
-      {/* Penarik lebar — strip tipis di tepi kiri. */}
-      {buka && (
-        <div onPointerDown={mulaiTarikLebar}
-             title="Tarik untuk mengatur lebar"
-             className="absolute inset-y-0 -left-1 z-10 w-2 cursor-ew-resize" />
-      )}
-
-      <div className="flex h-full flex-col">
+      {!terbuka ? null : (
+      <div className="flex h-full min-w-0 grow flex-col border-l border-zinc-800 bg-zinc-950/[.96]">
         <div className="border-b border-zinc-800 px-3 py-2">
           <div className="mb-1.5 flex items-center justify-between">
             <span className="text-[12px] font-medium text-zinc-200">Watchlist</span>
@@ -334,6 +381,7 @@ export function WatchChart({ buka, onToggle, simbol, onPilih }: {
           )}
         </div>
       </div>
+      )}
     </div>
   );
 }
