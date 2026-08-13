@@ -90,6 +90,19 @@ function Angka({ label, nilai, atur, langkah = 1, min = 0 }: {
   );
 }
 
+/** Rapikan simbol untuk chart.
+ *
+ *  Kripto ditulis huruf besar semua — Binance memang begitu. Simbol MT5
+ *  TIDAK: nama simbol broker PEKA huruf besar-kecil, dan Exness memakai
+ *  akhiran kecil ("EURJPYc", "XAUUSDc"). Meng-uppercase-nya mengubahnya
+ *  jadi simbol yang tidak ada, dan chart menjawab "belum ada data dari
+ *  terminal MT5" — pesan yang menunjuk ke EA, padahal EA-nya baik-baik
+ *  saja dan yang salah nama yang kita cari. */
+function rapikanSimbol(s: string): string {
+  const t = s.trim();
+  return /^MT5:/i.test(t) ? 'MT5:' + t.slice(4) : t.toUpperCase();
+}
+
 export default function ChartBacktest() {
   /* Simbol & timeframe boleh datang dari alamatnya: `#/chart?simbol=ETHUSDT`.
      Itulah yang dipakai menu klik-kanan di Screener Entry untuk membuka koin
@@ -100,7 +113,7 @@ export default function ChartBacktest() {
      di screener harus membuka koin yang diklik, bukan koin kemarin. */
   const awal = bacaSetelanChart();
   const { order: orderBursa } = usePosisiBinance();
-  const [simbol, setSimbol] = useState(() => (cari.get('simbol') || awal.simbol || 'BTCUSDT').toUpperCase());
+  const [simbol, setSimbol] = useState(() => rapikanSimbol(cari.get('simbol') || awal.simbol || 'BTCUSDT'));
   const [tf, setTf] = useState(() => {
     const t = (cari.get('tf') || awal.tf || '4h').toLowerCase();
     return ['5m', '15m', '1h', '4h', '1d'].includes(t) ? t : '4h';
@@ -110,7 +123,7 @@ export default function ChartBacktest() {
      di screener dua kali berturut-turut harus berpindah dua kali. */
   useEffect(() => {
     const s = cari.get('simbol');
-    if (s) setSimbol(s.toUpperCase());
+    if (s) setSimbol(rapikanSimbol(s));
     const x = (cari.get('tf') || '').toLowerCase();
     if (x && ['5m', '15m', '1h', '4h', '1d'].includes(x)) setTf(x);
   }, [cari]);
@@ -292,7 +305,7 @@ export default function ChartBacktest() {
   const [suntingKabar, setSuntingKabar] = useState('');
 
   function bukaSunting(o: OrderSunting) {
-    setSimbol(o.simbolChart.toUpperCase());
+    setSimbol(rapikanSimbol(o.simbolChart));
     setSunting(o);
     setSuntingSl(o.sl);
     setSuntingTp(o.tp);
@@ -937,7 +950,7 @@ export default function ChartBacktest() {
                 karena setiap ketukan diperlakukan sebagai keputusan. */}
             <input list="simbolChart" value={ketik}
                    onChange={(e) => {
-                     const v = e.target.value.toUpperCase();
+                     const v = rapikanSimbol(e.target.value);
                      setKetik(v);
                      /* Memilih dari daftar langsung berlaku — itu memang
                         sebuah pilihan, bukan setengah kata. */

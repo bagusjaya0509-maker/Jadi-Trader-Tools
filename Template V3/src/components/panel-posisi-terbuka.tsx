@@ -6,6 +6,7 @@ import { useEmosiPosisi, EMOSI } from '@/lib/emosi-posisi';
 import { useHargaPasar } from '@/lib/harga';
 import { TabelPosisi, type BarisPosisi } from '@/components/tabel-posisi';
 import type { Sumber } from '@/data/contoh';
+import { simbolDasarMt5 } from '@/lib/simbol';
 
 /* ════════════════════════════════════════════════════════════════════════
    POSISI TERBUKA — dipindah dari Jurnal ke Chart & Backtest
@@ -66,7 +67,10 @@ export function PanelPosisiTerbuka({ sumber, onSunting }: {
         jenis: o.tipe.replace('_MARKET', ' Stop').replace('LIMIT', 'Limit'),
         harga: o.pemicu || o.harga, sl: 0, tp: 0,
       }))
-    : mt5.pending.map((o) => ({
+    /* Yang paling BARU dipasang di atas. Order pending dibuat berurutan
+       waktu, dan yang baru saja dikirim adalah yang sedang dipikirkan —
+       menaruhnya di ekor daftar berarti ia harus dicari dulu. */
+    : [...mt5.pending].sort((a, b) => b.waktu - a.waktu).map((o) => ({
         kunci: o.tiket, simbol: o.simbol, arah: o.arah,
         ukuran: `${o.lot} lot`,
         jenis: o.jenis.replace('_', ' '),
@@ -140,7 +144,9 @@ export function PanelPosisiTerbuka({ sumber, onSunting }: {
           onKlikBaris={onSunting && ((b) => onSunting({
             pasar: sumber === 'kripto' ? 'kripto' : 'mt5',
             jenis: 'posisi',
-            simbolChart: sumber === 'kripto' ? b.simbol : `MT5:${b.simbol}`,
+            /* Nama DASAR, bukan nama broker: chart & tick dikirim EA
+               dengan nama dasar. */
+            simbolChart: sumber === 'kripto' ? b.simbol : `MT5:${simbolDasarMt5(b.simbol)}`,
             simbol: b.simbol,
             arah: b.arah,
             entry: b.entry, sl: b.sl, tp: b.tp,
@@ -197,13 +203,18 @@ export function PanelPosisiTerbuka({ sumber, onSunting }: {
                  (SL/TP ikut), baris kripto satu; tinggi yang sama untuk
                  keduanya akan memotong baris keempat di satu sisi dan
                  menampilkan enam di sisi lain. */
-              sumber === 'kripto' ? 'max-h-[142px]' : 'max-h-[213px]')}>
+              /* ENAM baris terlihat, bukan empat: panel di bawahnya masih
+                 punya ruang, dan daftar yang berhenti di empat memaksa
+                 menggulir untuk hal yang sebenarnya muat. Angkanya
+                 kelipatan tinggi baris yang sama seperti sebelumnya
+                 (kripto 35,5 px; Trade-Fi 53,25 px). */
+              sumber === 'kripto' ? 'max-h-[213px]' : 'max-h-[320px]')}>
               {pending.map((o) => (
                 <div key={o.kunci}
                      onClick={onSunting ? () => onSunting({
                        pasar: sumber === 'kripto' ? 'kripto' : 'mt5',
                        jenis: 'pending',
-                       simbolChart: sumber === 'kripto' ? o.simbol : `MT5:${o.simbol}`,
+                       simbolChart: sumber === 'kripto' ? o.simbol : `MT5:${simbolDasarMt5(o.simbol)}`,
                        simbol: o.simbol,
                        arah: o.arah,
                        entry: o.harga, sl: o.sl, tp: o.tp,

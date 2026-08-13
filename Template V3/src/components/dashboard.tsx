@@ -367,7 +367,7 @@ export function Dashboard() {
                 </div>
                 {/* Empat baris terlihat, sisanya digulir — sama aturannya
                     dengan daftar pending Trade-Fi di sebelah. */}
-                <div className="gulir-senyap max-h-[135px] divide-y divide-zinc-800/60 overflow-y-auto">
+                <div className="gulir-senyap max-h-[213px] divide-y divide-zinc-800/60 overflow-y-auto">
                   {ORDER_PENDING.map((o) => (
                     <div key={o.id} className="flex items-baseline justify-between gap-2 py-1.5">
                       <div className="min-w-0">
@@ -454,8 +454,8 @@ export function Dashboard() {
                     EMPAT yang terlihat, sisanya digulir: tinggi panel harus
                     berhenti tumbuh di titik tertentu, kalau tidak deretan
                     order pending mendorong seluruh halaman ke bawah. */}
-                <div className="gulir-senyap max-h-[213px] divide-y divide-zinc-800/60 overflow-y-auto">
-                  {mt5.pending.map((o) => (
+                <div className="gulir-senyap max-h-[320px] divide-y divide-zinc-800/60 overflow-y-auto">
+                  {[...mt5.pending].sort((a, b) => b.waktu - a.waktu).map((o) => (
                     <div key={o.tiket} className="py-2">
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex min-w-0 items-center gap-2">

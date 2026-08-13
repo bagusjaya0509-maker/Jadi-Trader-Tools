@@ -135,3 +135,27 @@ export function useSimbol() {
 
   return { aktif, favorit, diblokir };
 }
+
+/** Nama DASAR simbol broker MT5: "EURJPYc" → "EURJPY", "XAUUSDc" → "XAUUSD".
+ *
+ *  Aturannya SAMA PERSIS dengan SimbolDasar() di EA — buang karakter di
+ *  ujung yang bukan huruf besar atau angka — dan kesamaan itu wajib:
+ *  EA mengirim chart & tick memakai nama dasar, sementara laporan posisi
+ *  dan pending memakai nama broker apa adanya. Kalau web memakai nama
+ *  broker untuk mencari chart, servernya menjawab kosong dan layar
+ *  berkata "belum ada data dari terminal MT5" — menunjuk EA, padahal
+ *  EA-nya baik-baik saja dan yang salah nama yang dicari.
+ *
+ *  Ditulis di sini, bukan di tempat pemakaian, supaya aturan yang harus
+ *  cocok dengan EA hidup di SATU tempat. */
+export function simbolDasarMt5(nama: string): string {
+  let q = nama.length;
+  while (q > 0) {
+    const c = nama.charCodeAt(q - 1);
+    const hurufBesar = c >= 65 && c <= 90;
+    const angka = c >= 48 && c <= 57;
+    if (hurufBesar || angka) break;
+    q--;
+  }
+  return nama.slice(0, q).toUpperCase();
+}
