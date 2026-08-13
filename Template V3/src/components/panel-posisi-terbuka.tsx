@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { cn, uang, harga as fHarga } from '@/lib/utils';
 import { usePosisi } from '@/lib/data';
@@ -7,6 +8,8 @@ import { useHargaPasar } from '@/lib/harga';
 import { TabelPosisi, type BarisPosisi } from '@/components/tabel-posisi';
 import type { Sumber } from '@/data/contoh';
 import { simbolDasarMt5 } from '@/lib/simbol';
+import { cariStopNyasar } from '@/lib/stop-nyasar';
+import { batalPendingNyata } from '@/lib/order-nyata';
 
 /* ════════════════════════════════════════════════════════════════════════
    POSISI TERBUKA — dipindah dari Jurnal ke Chart & Backtest
@@ -88,6 +91,43 @@ export function PanelPosisiTerbuka({ sumber, onSunting }: {
       }));
 
   const emosiPos = useEmosiPosisi();
+
+  /* ── Penjaga stop nyasar ────────────────────────────────────────────
+     SL/TP di Binance menempel pada SIMBOL, bukan pada posisi — jadi ia
+     bisa hidup terus setelah posisinya tutup, dan bisa menumpuk kalau
+     perubahan lama gagal dibatalkan. Keduanya tidak terlihat di mana pun
+     sampai ia menembak posisi yang salah.
+
+     Yang dilaporkan di sini cuma temuannya. Pembatalannya tetap harus
+     ditekan orangnya, dengan kotak konfirmasi yang MENYEBUT tiap order —
+     membatalkan order diam-diam di latar belakang adalah hal terakhir
+     yang boleh dilakukan panel yang cuma bertugas menampilkan. */
+  const nyasar = useMemo(
+    () => (sumber === 'kripto'
+      ? cariStopNyasar(stopKripto, posisiKripto.map((p) => ({ simbol: p.simbol, jumlah: p.jumlah ?? 0 })), pendingKripto)
+      : []),
+    [sumber, stopKripto, posisiKripto, pendingKripto]);
+  const [sibukBersih, setSibukBersih] = useState(false);
+  const [kabarBersih, setKabarBersih] = useState('');
+
+  async function bersihkanNyasar() {
+    const daftar = nyasar.map((n, i) => `${i + 1}. ${n.order.simbol} ${n.order.jenis} @ ${fHarga(n.order.pemicu)} — ${n.ket}`).join('\n');
+    if (!confirm(`Batalkan ${nyasar.length} order berikut di Binance?
+
+${daftar}
+
+Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
+    setSibukBersih(true); setKabarBersih('');
+    let sukses = 0; const gagal: string[] = [];
+    for (const n of nyasar) {
+      try { await batalPendingNyata({ symbol: n.order.simbol, orderId: n.order.id, isAlgo: true }); sukses++; }
+      catch { gagal.push(`${n.order.simbol} ${n.order.jenis}`); }
+    }
+    setSibukBersih(false);
+    setKabarBersih(gagal.length
+      ? `${sukses} dibatalkan, ${gagal.length} gagal (${gagal.join(', ')}). Coba lagi atau batalkan manual di Binance.`
+      : `${sukses} order dibatalkan. Daftarnya menyegar sendiri dalam beberapa detik.`);
+  }
 
   /* Ukuran, entry, SL, dan TP ikut ditampilkan — tanpa keempatnya, panel
      ini cuma memberi tahu ADA posisi, bukan posisi seperti apa. Kripto
@@ -195,6 +235,28 @@ export function PanelPosisiTerbuka({ sumber, onSunting }: {
             <span className="text-amber-200/60">
               {' '}Kompilasi ulang ke v{VERSI_EA_PENDING} (F7 di MetaEditor), lalu pasang ulang EA-nya.
             </span>
+          </div>
+        )}
+
+        {nyasar.length > 0 && (
+          <div className="mt-3 rounded-lg border border-amber-500/25 bg-amber-500/[0.04] px-3 py-2">
+            <div className="text-[11px] font-medium text-amber-200/90">
+              {nyasar.length} order SL/TP tidak menjaga apa pun
+            </div>
+            <ul className="mt-1 space-y-0.5">
+              {nyasar.map((n) => (
+                <li key={n.order.id} className="text-[10.5px] leading-relaxed text-amber-200/60">
+                  <span className="text-amber-200/85">{n.order.simbol} {n.order.jenis}</span>
+                  {' @ '}<span className="angka">{fHarga(n.order.pemicu)}</span>
+                  {' — '}{n.ket}
+                </li>
+              ))}
+            </ul>
+            <button onClick={() => void bersihkanNyasar()} disabled={sibukBersih}
+              className="mt-1.5 cursor-pointer rounded px-1.5 py-1 text-[10.5px] text-amber-300/90 transition-colors hover:bg-amber-500/10 disabled:cursor-not-allowed disabled:opacity-50">
+              {sibukBersih ? 'Membatalkan…' : `Batalkan ${nyasar.length} order ini`}
+            </button>
+            {kabarBersih && <div className="mt-0.5 text-[10px] leading-relaxed text-amber-200/70">{kabarBersih}</div>}
           </div>
         )}
 

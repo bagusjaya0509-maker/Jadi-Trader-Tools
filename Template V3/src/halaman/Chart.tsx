@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Play, Loader2, RefreshCw, Radio, TriangleAlert, History,
@@ -18,13 +18,13 @@ import type { JenisAlat, GambarAlat } from '@/lib/plugin-alat';
 import type { HasilPine } from '@/lib/pine';
 import { bacaSetelanChart, simpanSetelanChart } from '@/lib/replay';
 import { ambilKlines, bacaSpekMt5, bacaTickMt5, daftarSimbolMt5, type Lilin } from '@/lib/pasar';
-import { useAkunMt5 } from '@/lib/akun';
+import { useAkunMt5, segarkanAkunMt5 } from '@/lib/akun';
 /* Langsung dari admin, BUKAN lewat usePosisi(): yang dibutuhkan di sini
    cuma daftar order bursa, sementara usePosisi() juga memasang listener
    Firestore. Halaman chart dibuka lama dan sering — menambah satu
    listener di sini adalah cara pelan-pelan menghabiskan kuota untuk data
    yang tidak dipakainya. */
-import { usePosisiBinance } from '@/lib/admin';
+import { usePosisiBinance, bacaStopBursa } from '@/lib/admin';
 import {
   jalankanUji, garisIndikator, zonaSnr, deretSmi, SETELAN_BAWAAN,
   type Setelan, type HasilUji,
@@ -112,7 +112,7 @@ export default function ChartBacktest() {
      Alamat menang karena ia perbuatan yang baru saja dilakukan — klik kanan
      di screener harus membuka koin yang diklik, bukan koin kemarin. */
   const awal = bacaSetelanChart();
-  const { data: posisiBursa, order: orderBursa } = usePosisiBinance();
+  const { data: posisiBursa, order: orderBursa, segarkan: segarkanBursa } = usePosisiBinance();
   const akunMt5 = useAkunMt5();
   const [simbol, setSimbol] = useState(() => rapikanSimbol(cari.get('simbol') || awal.simbol || 'BTCUSDT'));
   const [tf, setTf] = useState(() => {
@@ -343,6 +343,33 @@ export default function ChartBacktest() {
     if (o.pasar === 'kripto') void tickSimbol(o.simbol).then(setTickAktif).catch(() => {});
   }
 
+  /* ── Menunggu bursa MENCATAT, bukan sekadar MENERIMA ──────────────
+     Panel ini dulu bilang "terkirim" begitu Binance menjawab 200. Tapi
+     daftar order bursa baru menampilkan level barunya beberapa detik
+     kemudian, dan tabel Posisi Terbuka baru membacanya di putaran 30
+     detik berikutnya. Di sela itu layar bilang berhasil sementara
+     angkanya masih yang lama — dan itu terbaca sebagai "belum masuk",
+     jadi perubahannya dikirim lagi. Dikirim lagi bukan hal sepele:
+     tiap kiriman memasang stop BARU. Dari situlah stop menumpuk.
+
+     Jadi sekarang panelnya menunggu sampai bursa sendiri yang bilang
+     levelnya sudah berubah, baru berkata berhasil — dan pada detik yang
+     sama tabelnya dipaksa membaca ulang, supaya keduanya berubah
+     berbarengan. */
+  async function tungguStopBursa(simbol: string, sl: number, tp: number): Promise<boolean> {
+    /* Toleransi relatif: harga yang dikirim sudah dibulatkan ke tick,
+       tapi bursa memulangkannya dengan jumlah desimal versinya sendiri
+       (63215.90 vs 63215.9). Membandingkan persis akan selalu meleset. */
+    const sama = (dibursa: number, diminta: number) =>
+      !diminta || (dibursa > 0 && Math.abs(dibursa - diminta) <= Math.max(diminta * 1e-4, 1e-9));
+    for (let i = 0; i < 12; i++) {
+      await new Promise((r) => setTimeout(r, 900));
+      const kini = await bacaStopBursa(simbol);
+      if (kini && sama(kini.sl, sl) && sama(kini.tp, tp)) return true;
+    }
+    return false;
+  }
+
   async function kirimSunting() {
     if (!sunting) return;
     /* Dibulatkan lagi tepat sebelum kirim: angka yang DIKETIK tangan
@@ -380,7 +407,11 @@ export default function ChartBacktest() {
           entry: sunting.jenis === 'pending' ? sunting.entry : undefined,
         });
         const hasil = await tungguHasilMt5(id);
-        setSuntingKabar(hasil.status === 'sukses' ? `Terkirim ke MT5 — ${hasil.pesan}` : `Gagal: ${hasil.pesan}`);
+        /* Jawaban EA sudah jawaban broker sungguhan — yang telat cuma
+           tabelnya, yang membaca status tiap 30 detik. Dipaksa membaca
+           ulang supaya panel dan tabel berubah berbarengan. */
+        if (hasil.status === 'sukses') segarkanAkunMt5();
+        setSuntingKabar(hasil.status === 'sukses' ? `Berhasil — ${hasil.pesan}` : `Gagal: ${hasil.pesan}`);
       } else {
         /* Kripto: order lama DIBATALKAN lalu dipasang ulang di harga
            baru — itulah cara Binance mengubah conditional order, dan
@@ -419,9 +450,20 @@ export default function ChartBacktest() {
         /* Sisa yang gagal dibatalkan DIKATAKAN, tidak ditelan. Stop yatim
            yang tertinggal akan menembak posisi berikutnya, dan pemiliknya
            harus tahu sekarang — bukan saat itu terjadi. */
-        setSuntingKabar(sisa.length
-          ? `SL/TP baru terpasang, tapi ${sisa.length} order lama gagal dibatalkan (${sisa.join(', ')}). Batalkan manual di Binance.`
-          : 'Terkirim ke Binance — SL/TP diperbarui, order lama dibatalkan.');
+        if (sisa.length) {
+          /* Sisa yang gagal dibatalkan DIKATAKAN, tidak ditelan — dan
+             tidak perlu menunggu konfirmasi, karena keadaannya sudah
+             jelas keliru. */
+          segarkanBursa();
+          setSuntingKabar(`SL/TP baru terpasang, tapi ${sisa.length} order lama gagal dibatalkan (${sisa.join(', ')}). Batalkan manual di Binance.`);
+        } else {
+          setSuntingKabar('Terkirim — menunggu bursa mencatatnya…');
+          const tercatat = await tungguStopBursa(sunting.simbol, slBaru, tpBaru);
+          segarkanBursa();
+          setSuntingKabar(tercatat
+            ? 'Berhasil — bursa sudah mencatat SL/TP barunya.'
+            : 'Sudah dikirim dan diterima bursa, tapi daftar ordernya belum berubah. JANGAN kirim ulang — tiap kiriman memasang stop baru. Tunggu sebentar lalu periksa Posisi Terbuka.');
+        }
       }
     } catch (e) {
       setSuntingKabar(e instanceof Error ? e.message : 'Gagal mengirim perubahan');
@@ -453,15 +495,28 @@ export default function ChartBacktest() {
     const b0 = areaChart.current?.getBoundingClientRect();
     const awal = {
       x: e.clientX, y: e.clientY,
-      lx: letakUbah ? letakUbah.x : (b0 ? kotak.left - b0.left : 290),
-      ly: letakUbah ? letakUbah.y : (b0 ? kotak.top - b0.top : 8),
+      /* Pangkalnya letak yang SEDANG DIPAKAI, bukan yang diminta: kalau
+         panelnya barusan dijepit karena chart mengecil, menyeret dari
+         koordinat lama membuatnya melompat dulu sebelum ikut kursor. */
+      lx: letakPakai ? letakPakai.x : (b0 ? kotak.left - b0.left : 290),
+      ly: letakPakai ? letakPakai.y : (b0 ? kotak.top - b0.top : 8),
     };
     const hitung = (ev: PointerEvent) => {
       const b = areaChart.current?.getBoundingClientRect();
       const x = awal.lx + (ev.clientX - awal.x);
       const y = awal.ly + (ev.clientY - awal.y);
       if (!b) return { x, y };
-      return { x: Math.max(4, Math.min(b.width - 60, x)), y: Math.max(4, Math.min(b.height - 40, y)) };
+      /* Dijepit dengan UKURAN PANELNYA, bukan angka tetap. Batas lama
+         (b.width-60, b.height-40) membolehkan panel diseret sampai cuma
+         sesobek ujungnya yang tersisa di layar. */
+      const maxY = Math.max(4, b.height - kotak.height - 4);
+      const atasTampak = Math.min(maxY, Math.max(4, 64 - b.top));
+      const bawahTampak = Math.min(maxY, window.innerHeight - b.top - kotak.height - 8);
+      const yPas = Math.max(4, Math.min(maxY, y));
+      return {
+        x: Math.max(4, Math.min(Math.max(4, b.width - kotak.width - 4), x)),
+        y: bawahTampak >= atasTampak ? Math.max(atasTampak, Math.min(bawahTampak, yPas)) : yPas,
+      };
     };
     const gerak = (ev: PointerEvent) => setLetakUbah(hitung(ev));
     const lepas = (ev: PointerEvent) => {
@@ -506,10 +561,11 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
         const { id } = await kirimPerintahMt5({ aksi: 'TUTUP', tiket: sunting.tiket });
         const hasil = await tungguHasilMt5(id);
         setSuntingKabar(hasil.status === 'sukses' ? `Selesai — ${hasil.pesan}` : `Gagal: ${hasil.pesan}`);
-        if (hasil.status === 'sukses') setSunting(null);
+        if (hasil.status === 'sukses') { segarkanAkunMt5(); setSunting(null); }
       } else if (sunting.jenis === 'pending') {
         await batalPendingNyata({ symbol: sunting.simbol, orderId: sunting.tiket ?? '' });
         setSuntingKabar('Pending order dibatalkan.');
+        segarkanBursa();
         setSunting(null);
       } else {
         const milik = orderBursa.filter((x) => x.simbol === sunting.simbol);
@@ -527,6 +583,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
         setSuntingKabar(sisaTutup.length
           ? `Posisi ditutup, tapi ${sisaTutup.length} stop lama gagal dibatalkan (${sisaTutup.join(', ')}). Batalkan manual di Binance.`
           : 'Posisi ditutup dan semua stop-nya dibersihkan.');
+        segarkanBursa();
         setSunting(null);
       }
     } catch (e) {
@@ -1074,6 +1131,79 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
     window.addEventListener('pointerup', lepas);
   }, [tinggiChart]);
 
+  /* ── Panel ubah order tidak boleh kabur dari chart ─────────────────
+     Letaknya disimpan sebagai koordinat DI DALAM area chart. Begitu
+     areanya mengecil — batas tinggi chart diturunkan, jendela dikecilkan,
+     watchlist dilebarkan — koordinat lama itu jatuh di luar area: panelnya
+     terpotong di tepi atau melayang lepas dari grafiknya, seolah tidak
+     ikut bergerak.
+
+     Jadi letak yang DIMINTA (hasil seretan, yang diingat) disimpan apa
+     adanya, sedangkan yang DIPAKAI dijepit ulang setiap ukurannya
+     berubah — dengan tinggi panel yang diukur, bukan angka tebakan.
+     Begitu areanya melebar lagi, panelnya kembali ke tempat pilihan
+     pemiliknya sendiri; menimpa letak simpanan akan menghukum orang
+     karena sempat mengecilkan chart sebentar. */
+  const kotakUbah = useRef<HTMLDivElement>(null);
+  const [letakPakai, setLetakPakai] = useState<{ x: number; y: number } | null>(letakUbah);
+
+  useLayoutEffect(() => {
+    if (!sunting) return;
+    const jepitUbah = () => {
+      if (!letakUbah) { setLetakPakai(null); return; }
+      const b = areaChart.current?.getBoundingClientRect();
+      const k = kotakUbah.current?.getBoundingClientRect();
+      if (!b || !k) return;
+      const maxX = Math.max(4, b.width - k.width - 4);
+      const maxY = Math.max(4, b.height - k.height - 4);
+      const x = Math.max(4, Math.min(maxX, letakUbah.x));
+      let y = Math.max(4, Math.min(maxY, letakUbah.y));
+
+      /* ── Batas kedua: bagian chart yang BENAR-BENAR TERLIHAT ────────
+         Muat di dalam kotak chart belum berarti terlihat. Chart ini
+         setinggi 500+ px sementara jendelanya lebih pendek, jadi begitu
+         halaman di-scroll, ujung atas chart naik ke luar layar — dan
+         panel yang duduk di dekat ujung itu ikut hilang ke atas atau
+         tertutup bilah judul yang menempel di puncak halaman (tinggi
+         56 px, dan ia menang karena digambar belakangan).
+
+         Yang terlihat itulah batas sebenarnya. Panel dijaga tetap berada
+         di antara sisi bawah bilah judul dan sisi bawah layar — jadi ia
+         bergeser mengikuti apa yang sedang kamu lihat, bukan mengikuti
+         kotak yang sebagian sudah di luar layar. */
+      const KEPALA = 56;
+      const atasTampak = Math.min(maxY, Math.max(4, KEPALA + 8 - b.top));
+      const bawahTampak = Math.min(maxY, window.innerHeight - b.top - k.height - 8);
+      if (bawahTampak >= atasTampak) y = Math.max(atasTampak, Math.min(bawahTampak, y));
+
+      setLetakPakai((l) => (l && l.x === x && l.y === y ? l : { x, y }));
+    };
+    jepitUbah();
+    /* ResizeObserver menangkap perubahan yang tidak lewat state sama
+       sekali: garis pembatas watchlist digeser, panel induknya melar. */
+    const ro = new ResizeObserver(jepitUbah);
+    if (areaChart.current) ro.observe(areaChart.current);
+    window.addEventListener('resize', jepitUbah);
+    /* capture: true — supaya scroll dari WADAH mana pun ikut tertangkap,
+       bukan cuma scroll jendela. */
+    window.addEventListener('scroll', jepitUbah, true);
+    /* Jaring pengaman. Semua pemicu di atas berbasis KEJADIAN, dan
+       kejadian bisa tidak sampai: scroll dengan inersia yang diredam,
+       wadah yang menggulir tanpa memancarkan apa-apa, tata letak yang
+       bergeser karena gambar selesai dimuat. Panel yang salah letak
+       sekali lalu diam di situ adalah persis keluhannya — jadi letaknya
+       diperiksa ulang lima kali sedetik selama panelnya terbuka.
+       Ongkosnya dua getBoundingClientRect; setLetakPakai hanya menulis
+       kalau angkanya benar-benar berubah, jadi tidak ada render sia-sia. */
+    const denyut = setInterval(jepitUbah, 200);
+    return () => {
+      ro.disconnect();
+      clearInterval(denyut);
+      window.removeEventListener('resize', jepitUbah);
+      window.removeEventListener('scroll', jepitUbah, true);
+    };
+  }, [sunting, letakUbah, tinggiChart]);
+
   /* ── Kunci remount chart ───────────────────────────────────────────
      Ganti simbol/timeframe atau tombol Segarkan MEMBANGUN ULANG komponen
      chart seutuhnya. Pernah ada keadaan chart kosong yang tidak bisa
@@ -1478,9 +1608,12 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
               pilihannya diingat. Alasannya sama dengan bilah alat: tidak
               ada satu sudut yang benar untuk semua susunan panel. */}
           {sunting && (
-            <div onPointerDown={mulaiSeretUbah}
-                 style={letakUbah ? { left: letakUbah.x, top: letakUbah.y } : undefined}
-                 className={cn('absolute z-30 cursor-move', !letakUbah && 'bottom-2 right-2')}>
+            <div ref={kotakUbah} onPointerDown={mulaiSeretUbah}
+                 style={letakPakai ? { left: letakPakai.x, top: letakPakai.y } : undefined}
+                 /* z-20, setara bilah alat gambar — bilah judul halaman
+                    ber-z-30, dan panel yang bisa menimpanya akan menutupi
+                    navigasi. */
+                 className={cn('absolute z-20 cursor-move', !letakPakai && 'bottom-2 right-2')}>
               {/* Tanpa bingkai dan latar — ia bagian dari chart, bukan
                   kartu yang menumpang di atasnya. */}
               <div className="w-[210px] shrink-0 text-[11.5px]">

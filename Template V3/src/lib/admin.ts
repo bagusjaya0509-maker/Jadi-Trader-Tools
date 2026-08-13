@@ -364,15 +364,38 @@ export interface OrderBursa {
   dibuat: number;
 }
 
+/** Stop yang SEDANG terpasang di bursa untuk satu simbol, sekali baca.
+ *  Dipakai untuk MENUNGGU bursa benar-benar mencatat perubahan sebelum
+ *  layar berani mengatakan "berhasil". Mengembalikan null kalau bursanya
+ *  tidak menjawab — itu berbeda dari "tidak ada stop", dan bedanya
+ *  penting: yang satu berarti belum tahu, yang satu berarti telanjang. */
+export async function bacaStopBursa(simbol: string): Promise<{ sl: number; tp: number } | null> {
+  const token = bacaKoneksi().token.trim();
+  if (!token) return null;
+  try {
+    const r = await fetch(`${dasar()}/api/open-orders`, { headers: { 'X-App-Token': token } });
+    if (!r.ok) return null;
+    const j = await r.json();
+    const o = (j.order ?? []).find((x: any) => String(x.simbol ?? '') === simbol);
+    return { sl: Number(o?.sl) || 0, tp: Number(o?.tp) || 0 };
+  } catch { return null; }
+}
+
 export function usePosisiBinance(): {
   data: PosisiBursa[];
   order: OrderBursa[];
   aktif: boolean;
+  /** Paksa baca ulang sekarang, tanpa menunggu putaran 30 detik.
+   *  Dipakai setelah mengubah order: menunggu satu putaran penuh membuat
+   *  layar bilang "berhasil" sementara tabelnya masih menampilkan angka
+   *  lama — dan selisih itu terbaca sebagai kegagalan. */
+  segarkan: () => void;
 } {
   const [data, setData] = useState<PosisiBursa[]>([]);
   const [order, setOrder] = useState<OrderBursa[]>([]);
   const [aktif, setAktif] = useState(false);
   const { token } = bacaKoneksi();
+  const [pemicu, setPemicu] = useState(0);
 
   useEffect(() => {
     if (!token.trim()) { setAktif(false); setData([]); return; }
@@ -438,9 +461,9 @@ export function usePosisiBinance(): {
     void ambil();
     const jam = setInterval(ambil, JEDA_MS);
     return () => { hidup = false; clearInterval(jam); };
-  }, [token]);
+  }, [token, pemicu]);
 
-  return { data, order, aktif };
+  return { data, order, aktif, segarkan: () => setPemicu((n) => n + 1) };
 }
 
 /** Unggah satu gambar ke VPS, dapat URL publiknya.

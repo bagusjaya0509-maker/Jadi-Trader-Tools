@@ -134,6 +134,16 @@ function keUsd(nilai: number, mataUang: string | null) {
   return /cent|USC/i.test(mataUang) ? nilai / 100 : nilai;
 }
 
+/* ── Pemicu baca-ulang segera ─────────────────────────────────────────
+   Sesudah SL/TP sebuah posisi diubah, menunggu putaran 30 detik membuat
+   layar mengatakan "berhasil" sementara tabel Posisi Terbuka masih
+   memperlihatkan angka lama. Selisih itu terbaca sebagai "belum masuk",
+   jadi perubahannya dikirim berkali-kali — dan tiap kiriman memasang
+   stop baru. Panggil ini setelah perubahan supaya keduanya berubah
+   berbarengan. */
+const pendengarAkun = new Set<() => void>();
+export function segarkanAkunMt5() { pendengarAkun.forEach((f) => f()); }
+
 export function useAkunMt5(): StatusAkun {
   const [st, setSt] = useState<StatusAkun>(BELUM);
   /* Auth Firebase memulihkan sesi dari IndexedDB SECARA ASINKRON. Selama
@@ -248,7 +258,10 @@ export function useAkunMt5(): StatusAkun {
 
     void periksa();
     const jam = setInterval(periksa, JEDA_MS);
-    return () => { hidup = false; clearInterval(jam); };
+    /* Ikut mendengar permintaan baca-ulang segera. */
+    const dengar = () => { void periksa(); };
+    pendengarAkun.add(dengar);
+    return () => { hidup = false; clearInterval(jam); pendengarAkun.delete(dengar); };
   }, [siapaUid]);
 
   return st;
