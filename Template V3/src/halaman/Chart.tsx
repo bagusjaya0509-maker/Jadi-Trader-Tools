@@ -339,11 +339,22 @@ export default function ChartBacktest() {
   useEffect(() => {
     const sl = Number(cari.get('sl')) || undefined;
     const tp = Number(cari.get('tp')) || undefined;
-    const kunci = `${simbol}|${sl ?? ''}|${tp ?? ''}`;
+    /* ENTRY ikut dibaca dari alamat. Sinyal komunitas punya entry sendiri —
+       memakai harga terakhir sebagai gantinya membuat R:R di chart berbeda
+       dari R:R yang tertulis di kartunya, padahal keduanya menyebut sinyal
+       yang sama. Kalau tidak dikirim, barulah harga terakhir dipakai. */
+    const entryUrl = Number(cari.get('entry')) || undefined;
+    const kunci = `${simbol}|${entryUrl ?? ''}|${sl ?? ''}|${tp ?? ''}`;
     if (dipasang.current === kunci) return;
     dipasang.current = kunci;
-    if (sl || tp) {
-      setRencana({ entry: lilin.closes[lilin.closes.length - 1] || undefined, sl, tp });
+    if (sl || tp || entryUrl) {
+      setRencana({
+        entry: entryUrl ?? lilin.closes[lilin.closes.length - 1] ?? undefined,
+        sl, tp,
+      });
+      /* Entry dari sinyal adalah KEPUTUSAN, bukan tebakan — jadi penyusul
+         harga otomatis berhenti ikut campur begitu ia dipasang. */
+      if (entryUrl) entryDigeser.current = true;
     }
   }, [cari, simbol, lilin]);
 
@@ -849,7 +860,20 @@ export default function ChartBacktest() {
                               draf={draf} rencana={rencana} mode={aksi.mode}
                               jenis={labelJenis} risiko={aksi.risiko} qtyDemo={qtyDemo.current}
                               tunda={aksiTunda} onBatalTunda={aksi.batalTunda}
-                              onGantiMode={(m) => { aksi.gantiMode(m); setKabarNyata(''); }}
+                              onGantiMode={(m) => {
+                                aksi.gantiMode(m);
+                                setKabarNyata('');
+                                /* Pindah ke LATIHAN membersihkan garisnya.
+                                   Level order sungguhan yang tertinggal di
+                                   mode demo akan terbaca sebagai rencana
+                                   latihan — dan menggesernya di sana tidak
+                                   mengubah apa pun di bursa. */
+                                if (m === 'demo') {
+                                  setRencana({});
+                                  setDraf(null);
+                                  entryDigeser.current = false;
+                                }
+                              }}
                               onPilih={(arah) => {
                                 setDraf(arah);
                                 setKabarNyata('');
@@ -939,7 +963,15 @@ export default function ChartBacktest() {
                                     emosi: catatanTiket.emosi, alasan: catatanTiket.alasan,
                                   }).then((h) => {
                                     setKabarNyata(h.pesan);
-                                    if (h.pesan !== 'Dibatalkan.') { setDraf(null); setRencana({}); }
+                                    /* Garis entry/SL/TP TETAP TERPASANG setelah
+                                       order sungguhan berangkat — sama seperti
+                                       jalur MT5 di atas. Sebelumnya `rencana`
+                                       dikosongkan, jadi begitu order kripto
+                                       terkirim chartnya polos: level yang
+                                       sedang menjaga uang justru hilang dari
+                                       layar tepat saat ia mulai berlaku.
+                                       Yang ditutup cuma tiketnya. */
+                                    if (h.pesan !== 'Dibatalkan.') setDraf(null);
                                   }).catch((e) => {
                                     setKabarNyata(e instanceof Error ? e.message : 'Gagal mengirim order');
                                   }).finally(() => setSibukNyata(false));

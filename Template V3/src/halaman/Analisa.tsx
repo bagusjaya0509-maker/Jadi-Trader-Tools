@@ -333,7 +333,7 @@ export default function Analisa() {
       {/* Posting */}
       <Panel className="mb-4">
         <PanelHead
-          judul="Copy Trading"
+          judul="Copy Signal"
           sub="Posting rencana trade-mu — orang menilai dari rekam jejak jurnalmu, bukan dari klaim."
           kanan={
             <span className="flex items-center gap-2">

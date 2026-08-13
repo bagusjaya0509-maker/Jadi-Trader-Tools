@@ -382,18 +382,29 @@ export function PanelSinyal() {
               <p className="mb-2.5 line-clamp-2 text-[11px] leading-relaxed text-zinc-600" title={s.catatan}>
                 {s.catatan}
               </p>
+              {/* SEMUA sinyal membuka Chart & Backtest kita, bukan chart
+                  orang lain — lengkap dengan entry, SL, dan TP-nya. Menaut
+                  ke chart sumber berarti menyuruh orang membaca level di
+                  satu tempat lalu memasangnya sendiri di tempat lain, dan
+                  di situlah angka salah ketik lahir.
+                  Pair non-USDT dibuka lewat sumber MT5 (butuh EA terpasang
+                  di simbol itu); tautan sumbernya tetap disediakan kecil
+                  di sebelahnya sebagai rujukan. */}
               <div className="flex items-center gap-2">
-                {kripto ? (
-                  <Link to={`/chart?simbol=${s.pair}&sl=${s.sl}&tp=${s.tp}`}
-                    className="flex cursor-pointer items-center gap-1.5 rounded-md bg-zinc-100 px-2.5 py-1 text-[11px] font-medium text-zinc-950 transition-colors hover:bg-white">
-                    <CandlestickChart className="size-3" /> Buka di Chart
-                  </Link>
-                ) : s.tautan ? (
+                <Link
+                  to={`/chart?simbol=${kripto ? s.pair : `MT5:${s.pair}`}`
+                    + `&tf=${encodeURIComponent(s.tf || '4h')}`
+                    + `&entry=${s.entry}&sl=${s.sl}&tp=${s.tp}&arah=${s.arah}`}
+                  className="flex cursor-pointer items-center gap-1.5 rounded-md bg-zinc-100 px-2.5 py-1 text-[11px] font-medium text-zinc-950 transition-colors hover:bg-white">
+                  <CandlestickChart className="size-3" /> Buka di Chart
+                </Link>
+                {s.tautan && (
                   <a href={s.tautan} target="_blank" rel="noreferrer"
-                    className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 py-1 text-[11px] text-zinc-300 transition-colors hover:border-zinc-600 hover:text-zinc-100">
-                    <ExternalLink className="size-3" /> Chart sumber
+                    title="Chart milik sumbernya"
+                    className="flex cursor-pointer items-center gap-1 rounded-md border border-zinc-800 px-2 py-1 text-[10.5px] text-zinc-500 transition-colors hover:border-zinc-600 hover:text-zinc-300">
+                    <ExternalLink className="size-3" /> sumber
                   </a>
-                ) : null}
+                )}
                 <span className="ml-auto truncate text-[10px] text-zinc-600">{s.sumber}</span>
               </div>
             </div>
