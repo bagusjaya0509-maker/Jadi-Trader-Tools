@@ -430,7 +430,7 @@ export function Dashboard() {
             }
           />
           <div className="space-y-2.5 px-5 pb-5">
-            {POSISI_MT5.length === 0 && (
+            {POSISI_MT5.length === 0 && mt5.pending.length === 0 && (
               <div className="px-1 py-6 text-center text-[12.5px] text-zinc-500">
                 {mt5.terhubung === true ? 'Tidak ada posisi MT5 terbuka.' : mt5.ket}
               </div>
@@ -460,6 +460,42 @@ export function Dashboard() {
                 </div>
               </div>
             ))}
+
+            {/* PENDING MT5 — Sell Stop / Buy Limit dsb yang menunggu harga.
+                MT5 menyimpannya terpisah dari posisi, dan EA di bawah v2.05
+                tidak melaporkannya sama sekali. Sekarang ia punya tempat
+                sendiri di sini, dengan bingkai kuning supaya tidak terbaca
+                sebagai posisi yang sudah jalan. */}
+            {mt5.pending.length > 0 && (
+              <div className="border-t border-zinc-800/60 pt-2.5">
+                <div className="mb-1.5 flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-amber-400/80">
+                  <Clock className="size-3" strokeWidth={2} />
+                  Menunggu harga · {mt5.pending.length} order
+                </div>
+                <div className="space-y-1.5">
+                  {mt5.pending.map((o) => (
+                    <div key={o.tiket} className="rounded-lg border border-amber-500/20 bg-amber-500/[0.03] p-2.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <span className="truncate text-[12.5px] text-zinc-200">{o.simbol}</span>
+                          <span className={cn('rounded px-1.5 py-0.5 text-[10px]',
+                            o.arah === 'BUY' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-400')}>
+                            {o.jenis.replace('_', ' ')}
+                          </span>
+                          <span className="angka text-[11px] text-zinc-600">{o.lot} lot</span>
+                        </div>
+                        <span className="angka shrink-0 text-[12.5px] text-amber-400/90">{harga(o.harga)}</span>
+                      </div>
+                      <div className="mt-1.5 flex gap-4 text-[11px] text-zinc-500">
+                        <span>SL <span className="angka text-red-400/80">{o.sl ? harga(o.sl) : '—'}</span></span>
+                        <span>TP <span className="angka text-emerald-500/80">{o.tp ? harga(o.tp) : '—'}</span></span>
+                        <span className="text-zinc-700">#{o.tiket}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </Panel>
 

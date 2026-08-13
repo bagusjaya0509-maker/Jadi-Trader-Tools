@@ -224,10 +224,23 @@ function KartuSaldo({ judul, saldoJurnal, akun, keIntegrasi }: {
 function PanelPosisiJurnal({ sumber }: { sumber: Sumber }) {
   const { data: posisiKripto, pending: pendingKripto } = usePosisi();
   const mt5 = useAkunMt5();
-  /* Order pending hanya ada di sisi kripto: MT5 melaporkan posisi, bukan
-     order yang masih menggantung. Menampilkannya di panel Trade-Fi akan
-     jadi janji kosong. */
-  const pending = sumber === 'kripto' ? pendingKripto : [];
+  /* Order menggantung dari DUA pasar, disamakan bentuknya di sini.
+     Keduanya menjawab pertanyaan yang sama — "order-ku sampai atau
+     tidak?" — jadi keduanya pantas tampil dengan cara yang sama, walau
+     satuannya beda: kripto memakai jumlah koin, MT5 memakai lot. */
+  const pending = sumber === 'kripto'
+    ? pendingKripto.map((o) => ({
+        kunci: o.id, simbol: o.simbol, arah: o.arah,
+        ukuran: o.qty.toLocaleString('id-ID', { maximumFractionDigits: 4 }),
+        jenis: o.tipe.replace('_MARKET', ' Stop').replace('LIMIT', 'Limit'),
+        harga: o.pemicu || o.harga, sl: 0, tp: 0,
+      }))
+    : mt5.pending.map((o) => ({
+        kunci: o.tiket, simbol: o.simbol, arah: o.arah,
+        ukuran: `${o.lot} lot`,
+        jenis: o.jenis.replace('_', ' '),
+        harga: o.harga, sl: o.sl, tp: o.tp,
+      }));
 
   const emosiPos = useEmosiPosisi();
 
@@ -357,24 +370,29 @@ function PanelPosisiJurnal({ sumber }: { sumber: Sumber }) {
             </div>
             <div className="space-y-1.5">
               {pending.map((o) => (
-                <div key={o.id}
-                     className="flex items-center justify-between gap-2 rounded-lg border border-amber-500/20 bg-amber-500/[0.03] px-3 py-2">
-                  <span className="flex min-w-0 items-center gap-2">
-                    <span className="truncate text-[12.5px] text-zinc-200">{o.simbol}</span>
-                    <span className={cn('rounded px-1.5 py-0.5 text-[10px]',
-                      o.arah === 'BUY' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-400')}>
-                      {o.arah}
+                <div key={o.kunci}
+                     className="rounded-lg border border-amber-500/20 bg-amber-500/[0.03] px-3 py-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span className="truncate text-[12.5px] text-zinc-200">{o.simbol}</span>
+                      <span className={cn('rounded px-1.5 py-0.5 text-[10px]',
+                        o.arah === 'BUY' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-400')}>
+                        {o.jenis}
+                      </span>
+                      <span className="angka shrink-0 text-[11px] text-zinc-400">{o.ukuran}</span>
                     </span>
-                    <span className="angka shrink-0 text-[11px] text-zinc-400">
-                      {o.qty.toLocaleString('id-ID', { maximumFractionDigits: 4 })}
-                    </span>
-                    <span className="truncate text-[11px] text-zinc-600">
-                      {o.tipe.replace('_MARKET', ' Stop').replace('LIMIT', 'Limit')}
-                    </span>
-                  </span>
-                  <span className="angka shrink-0 text-[12px] text-amber-400/90">
-                    {fHarga(o.pemicu || o.harga)}
-                  </span>
+                    <span className="angka shrink-0 text-[12px] text-amber-400/90">{fHarga(o.harga)}</span>
+                  </div>
+                  {/* SL/TP hanya ditulis kalau order-nya memang membawanya.
+                      Order kripto pending belum punya penjaga sampai ia
+                      ke-fill, dan menulis "SL —" untuk itu memberi kesan
+                      SL-nya hilang, padahal memang belum waktunya ada. */}
+                  {(o.sl > 0 || o.tp > 0) && (
+                    <div className="mt-1.5 flex gap-4 text-[11px] text-zinc-600">
+                      <span>SL <span className="angka text-red-400/90">{o.sl ? fHarga(o.sl) : '—'}</span></span>
+                      <span>TP <span className="angka text-emerald-500/90">{o.tp ? fHarga(o.tp) : '—'}</span></span>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

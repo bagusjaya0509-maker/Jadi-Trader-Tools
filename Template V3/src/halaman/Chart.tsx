@@ -633,7 +633,20 @@ export default function ChartBacktest() {
      pair yang sama berarti dua kewajiban berbeda, dan meringkasnya jadi
      satu garis persis menyembunyikan order kedua. */
   const garisOrder = useMemo(() => {
-    if (simbol.startsWith('MT5:')) return [];
+    /* MT5 punya daftarnya sendiri — pending order dilaporkan EA, bukan
+       diambil dari Binance. Simbol chart berawalan "MT5:" sementara EA
+       melapor nama broker apa adanya (EURJPYc), jadi awalannya dikupas
+       dulu sebelum dibandingkan. */
+    if (simbol.startsWith('MT5:')) {
+      const nama = simbol.slice(4).toUpperCase();
+      const milikMt5 = akunMt5.pending.filter((o) => o.simbol.toUpperCase() === nama);
+      const banyakMt5 = milikMt5.length > 1;
+      return milikMt5.map((o, i): GarisHarga => ({
+        harga: o.harga,
+        warna: o.arah === 'BUY' ? 'rgba(251,191,36,.85)' : 'rgba(251,146,60,.85)',
+        label: `${o.jenis.replace('_', ' ')}${banyakMt5 ? ` ${i + 1}` : ''}`,
+      }));
+    }
     const milik = orderBursa.filter((o) => o.jenis === 'ENTRY' && o.simbol === simbol)
       /* Order yang SEDANG dipegang panel tiket sudah digambar sebagai
          garis Entry beserta rencana SL/TP-nya. Menggambarnya sekali lagi
@@ -648,7 +661,7 @@ export default function ChartBacktest() {
       warna: o.arah === 'BUY' ? 'rgba(251,191,36,.85)' : 'rgba(251,146,60,.85)',
       label: `${o.arah === 'BUY' ? 'Buy' : 'Sell'} ${/STOP/.test(o.tipe) ? 'Stop' : 'Limit'}${banyak ? ` ${i + 1}` : ''}`,
     }));
-  }, [orderBursa, simbol, aksiTunda]);
+  }, [orderBursa, simbol, aksiTunda, akunMt5.pending]);
 
   const terakhir = lilin.closes[lilin.closes.length - 1];
   const sebelumnya = lilin.closes[lilin.closes.length - 2];

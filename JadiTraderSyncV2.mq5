@@ -52,7 +52,7 @@ input string SimbolChart      = "";                                  // Simbol y
 input int    KirimChartMenit  = 5;                                   // Jeda kirim OHLC ke web (menit)
 input bool   KirimTick        = true;                                // Kirim harga tiap detik (harga web = MT5)
 
-#define VERSI_EA "2.04"
+#define VERSI_EA "2.05"
 #define PFX      "JTS_"
 
 CTrade   gTrade;
@@ -67,6 +67,7 @@ int      gDetikPerintah   = 0;
 int      gDetikChart      = 0;
 int      gJeda            = 20;
 int      gPosisiTerkirim  = 0;
+int      gPendingTerkirim = 0;
 int      gRiwayatTerkirim = 0;
 int      gPerintahSukses  = 0;
 int      gPerintahGagal   = 0;
@@ -241,6 +242,10 @@ void GambarDasbor()
 
    Lbl("posisi", x, y, "Posisi   : " + IntegerToString(PositionsTotal())
        + " terbuka  |  terkirim " + IntegerToString(gPosisiTerkirim), C'150,152,160', 9); y += 16;
+   // Baris sendiri, bukan digabung ke baris posisi: "0 terbuka" yang
+   // berdiri sendirian itulah yang bikin pending order terasa hilang.
+   Lbl("pending", x, y, "Pending  : " + IntegerToString(OrdersTotal())
+       + " menunggu  |  terkirim " + IntegerToString(gPendingTerkirim), C'150,152,160', 9); y += 16;
    Lbl("riwayat", x, y, "Riwayat  : " + IntegerToString(gRiwayatTerkirim)
        + " trade sejak " + TimeToString(AwalRiwayat(), TIME_DATE), C'150,152,160', 9); y += 16;
 
@@ -741,6 +746,64 @@ string BagianPosisi()
    return s;
 }
 
+//+------------------------------------------------------------------+
+//| PENDING ORDER — order yang MENUNGGU, bukan posisi yang berjalan.  |
+//|                                                                   |
+//| MT5 menyimpan keduanya di tempat terpisah: posisi di               |
+//| PositionsTotal(), order menggantung di OrdersTotal(). Selama EA    |
+//| ini cuma membaca yang pertama, empat Sell Stop yang terpasang di   |
+//| EURJPYc tidak pernah sampai ke web sama sekali — dan pemiliknya    |
+//| melihat "0 posisi" lalu mengira order-nya tidak terkirim.          |
+//|                                                                   |
+//| Yang dikirim harga PEMICU-nya (ORDER_PRICE_OPEN), karena itulah    |
+//| harga yang menentukan kapan ia jadi posisi.                        |
+//+------------------------------------------------------------------+
+string BagianPending()
+{
+   string s = "[";
+   int total = OrdersTotal();
+   bool pertama = true;
+   for(int i = 0; i < total; i++)
+   {
+      ulong tiket = OrderGetTicket(i);
+      if(tiket == 0) continue;
+      if(!OrderSelect(tiket)) continue;
+
+      ENUM_ORDER_TYPE jenis = (ENUM_ORDER_TYPE)OrderGetInteger(ORDER_TYPE);
+      // Order MARKET yang sedang diproses bukan "menunggu" — ia akan jadi
+      // posisi dalam hitungan milidetik. Yang dilaporkan hanya yang benar
+      // benar menggantung menunggu harga.
+      string namaJenis = "";
+      if(jenis == ORDER_TYPE_BUY_LIMIT)       namaJenis = "BUY_LIMIT";
+      else if(jenis == ORDER_TYPE_SELL_LIMIT) namaJenis = "SELL_LIMIT";
+      else if(jenis == ORDER_TYPE_BUY_STOP)   namaJenis = "BUY_STOP";
+      else if(jenis == ORDER_TYPE_SELL_STOP)  namaJenis = "SELL_STOP";
+      else continue;
+
+      string simbol = OrderGetString(ORDER_SYMBOL);
+      int digit = (int)SymbolInfoInteger(simbol, SYMBOL_DIGITS);
+      if(digit <= 0) digit = 5;
+
+      if(!pertama) s += ",";
+      pertama = false;
+
+      s += "{";
+      s += "\"tiket\":\""  + IntegerToString((long)tiket) + "\",";
+      s += "\"simbol\":\"" + JsonTeks(simbol) + "\",";
+      s += "\"jenis\":\""  + namaJenis + "\",";
+      s += "\"arah\":\""   + ((jenis == ORDER_TYPE_BUY_LIMIT || jenis == ORDER_TYPE_BUY_STOP) ? "BUY" : "SELL") + "\",";
+      s += "\"lot\":"      + JsonAngka(OrderGetDouble(ORDER_VOLUME_CURRENT), 2) + ",";
+      s += "\"harga\":"    + JsonAngka(OrderGetDouble(ORDER_PRICE_OPEN), digit) + ",";
+      s += "\"sl\":"       + JsonAngka(OrderGetDouble(ORDER_SL), digit) + ",";
+      s += "\"tp\":"       + JsonAngka(OrderGetDouble(ORDER_TP), digit) + ",";
+      s += "\"waktu\":"    + IntegerToString((long)OrderGetInteger(ORDER_TIME_SETUP)) + ",";
+      s += "\"komentar\":\""+ JsonTeks(OrderGetString(ORDER_COMMENT)) + "\"";
+      s += "}";
+   }
+   s += "]";
+   return s;
+}
+
 datetime AwalRiwayat()
 {
    int hari = HariRiwayat;
@@ -918,8 +981,10 @@ void Tampilkan(string status, string pesan, color warna)
 void Kirim()
 {
    string bagianPosisi  = BagianPosisi();
+   string bagianPending = BagianPending();
    string bagianRiwayat = BagianRiwayat();
    gPosisiTerkirim  = HitungObjek(bagianPosisi);
+   gPendingTerkirim = HitungObjek(bagianPending);
    gRiwayatTerkirim = HitungObjek(bagianRiwayat);
 
    string isi = "{";
@@ -928,6 +993,7 @@ void Kirim()
    isi += "\"akun\":"      + BagianAkun() + ",";
    isi += "\"riwayatDari\":" + IntegerToString((long)AwalRiwayat()) + ",";
    isi += "\"posisi\":"    + bagianPosisi + ",";
+   isi += "\"pending\":"   + bagianPending + ",";
    isi += "\"ringkas\":"   + BagianRingkas() + ",";
    isi += "\"riwayat\":"   + bagianRiwayat;
    isi += "}";

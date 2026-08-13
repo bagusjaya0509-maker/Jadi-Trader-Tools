@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Play, Trash2, TriangleAlert, CheckCircle2, RotateCcw, X, Plus, Square,
-         Loader2, Stethoscope } from 'lucide-react';
+         Loader2, Stethoscope, Copy, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { bacaKoneksi } from '@/lib/koneksi';
 import { auth } from '@/lib/firebase';
 import { jalankanPine, CONTOH_PINE, type HasilPine, type InputPine } from '@/lib/pine';
 import type { Lilin } from '@/lib/pasar';
+import { susunPermintaanPine, terapkanTambalanPine } from '@/lib/pine-tambalan';
 
 /* ════════════════════════════════════════════════════════════════════════
    DOCK PINE — editor & setelan indikator di SISI KANAN chart
@@ -155,6 +156,13 @@ export function DockPine({ buka, tab, aturTab, onTutup, lilin, simbol, tf, hingg
   const [usul, setUsul] = useState<{ kode: string; penjelasan: string; perubahan: string[] } | null>(null);
   const [dokterSibuk, setDokterSibuk] = useState(false);
   const [dokterKabar, setDokterKabar] = useState('');
+  /* Mode MANUAL: permintaannya disalin, dibawa ke Claude desktop, lalu
+     jawabannya ditempel balik ke sini. Ada karena API Anthropic berbayar
+     terpisah dari langganan Claude — dan menunggu tagihan bukan alasan
+     yang masuk akal untuk membiarkan tombolnya mati. */
+  const [tempelBuka, setTempelBuka] = useState(false);
+  const [tempelIsi, setTempelIsi] = useState('');
+  const [tersalin, setTersalin] = useState(false);
   const [setelan, setSetelan] = useState<Record<string, NilaiSetelan>>(() => {
     try { return JSON.parse(localStorage.getItem(KUNCI_INPUT) ?? '{}') as Record<string, NilaiSetelan>; }
     catch { return {}; }
@@ -190,6 +198,35 @@ export function DockPine({ buka, tab, aturTab, onTutup, lilin, simbol, tf, hingg
     } catch (e) {
       setDokterKabar(e instanceof Error ? e.message : 'Gagal memanggil agen');
     } finally { setDokterSibuk(false); }
+  }
+
+  /* ── Jalur MANUAL ──────────────────────────────────────────────────
+     Permintaan yang disalin SAMA PERSIS dengan yang dikirim ke n8n, dan
+     jawabannya diproses fungsi yang sama pula. Itu yang penting: kedua
+     jalur tunduk pada pagar yang sama, jadi memakai Claude desktop tidak
+     berarti menempel kode mentah tanpa pemeriksaan. */
+  async function salinPermintaan() {
+    if (!hasil) return;
+    const teks = susunPermintaanPine(pilih.kode, hasil.galat, hasil.dilewati);
+    try {
+      await navigator.clipboard.writeText(teks);
+      setTersalin(true);
+      setTempelBuka(true);
+      setDokterKabar('Tertempel di papan klip. Buka Claude, tempel, lalu salin balik jawabannya ke bawah.');
+      window.setTimeout(() => setTersalin(false), 2500);
+    } catch {
+      setDokterKabar('Peramban menolak menyalin. Buka kotak di bawah, teksnya bisa disalin manual dari sana.');
+      setTempelBuka(true);
+    }
+  }
+
+  function terapkanJawaban() {
+    const h = terapkanTambalanPine(pilih.kode, tempelIsi);
+    if ('error' in h) { setDokterKabar(h.error); return; }
+    setUsul(h);
+    setTempelBuka(false);
+    setTempelIsi('');
+    setDokterKabar('Usulan siap — periksa dulu, baru Terapkan.');
   }
 
   function potong(l: Lilin, batas?: number): Lilin {
@@ -416,15 +453,32 @@ export function DockPine({ buka, tab, aturTab, onTutup, lilin, simbol, tf, hingg
                   terpisah. */}
               {(hasil.galat.length > 0 || hasil.dilewati.length > 0) && (
                 <div className="rounded-md border border-zinc-800/60 p-2">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* Dua jalur ke tujuan yang sama. Yang kiri butuh agen
+                        n8n + API berbayar; yang kanan cuma butuh Claude
+                        yang sudah terbuka di desktop. Keduanya berakhir di
+                        usulan yang sama, lewat pemeriksaan yang sama. */}
+                    <button
+                      onClick={() => void salinPermintaan()}
+                      title="Salin permintaan lengkap — tempel ke Claude desktop, lalu bawa jawabannya ke sini"
+                      className="flex cursor-pointer items-center gap-1.5 rounded bg-zinc-100 px-2 py-1 text-[11px] font-medium text-zinc-950 transition-colors hover:bg-white">
+                      {tersalin
+                        ? <><Check className="size-3" /> Tersalin</>
+                        : <><Copy className="size-3" /> Salin untuk Claude</>}
+                    </button>
+                    <button
+                      onClick={() => setTempelBuka((v) => !v)}
+                      className="cursor-pointer rounded border border-zinc-800 px-2 py-1 text-[11px] text-zinc-300 transition-colors hover:border-zinc-600">
+                      Tempel jawaban
+                    </button>
                     <button
                       onClick={() => void mintaPerbaikan()}
                       disabled={dokterSibuk}
-                      title="Kirim skrip + daftar galat ke agen Dokter Pine"
-                      className="flex cursor-pointer items-center gap-1.5 rounded bg-zinc-100 px-2 py-1 text-[11px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-60">
+                      title="Lewat agen Dokter Pine di n8n — butuh credential API"
+                      className="flex cursor-pointer items-center gap-1.5 rounded border border-zinc-800 px-2 py-1 text-[11px] text-zinc-400 transition-colors hover:border-zinc-600 disabled:cursor-not-allowed disabled:opacity-60">
                       {dokterSibuk
                         ? <><Loader2 className="size-3 animate-spin" /> Agen membaca…</>
-                        : <><Stethoscope className="size-3" /> Perbaiki dengan AI</>}
+                        : <><Stethoscope className="size-3" /> Lewat agen</>}
                     </button>
                     {usul && (
                       <button
@@ -446,6 +500,30 @@ export function DockPine({ buka, tab, aturTab, onTutup, lilin, simbol, tf, hingg
                   </div>
                   {dokterKabar && (
                     <div className="mt-1.5 text-[10.5px] leading-relaxed text-zinc-500">{dokterKabar}</div>
+                  )}
+
+                  {tempelBuka && (
+                    <div className="mt-2 space-y-1.5">
+                      <textarea
+                        value={tempelIsi}
+                        onChange={(e) => setTempelIsi(e.target.value)}
+                        placeholder={'Tempel jawaban Claude di sini — seluruhnya, termasuk kurung kurawal.\n{"perbaikan":[{"baris":82,"jadi":"..."}],"penjelasan":"..."}'}
+                        spellCheck={false}
+                        className="gulir-senyap h-24 w-full resize-y rounded border border-zinc-800 bg-zinc-950 p-2 font-mono text-[10.5px] leading-relaxed text-zinc-300 outline-none placeholder:text-zinc-700 focus:border-zinc-600" />
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={terapkanJawaban}
+                          disabled={tempelIsi.trim().length < 5}
+                          className="cursor-pointer rounded border border-emerald-500/40 px-2 py-1 text-[11px] text-emerald-400 transition-colors hover:bg-emerald-500/10 disabled:cursor-not-allowed disabled:opacity-40">
+                          Proses jawaban
+                        </button>
+                        <button
+                          onClick={() => { setTempelBuka(false); setTempelIsi(''); }}
+                          className="cursor-pointer rounded border border-zinc-800 px-2 py-1 text-[11px] text-zinc-400 transition-colors hover:border-zinc-600">
+                          Tutup
+                        </button>
+                      </div>
+                    </div>
                   )}
                   {usul && (
                     <div className="mt-2 space-y-1.5">

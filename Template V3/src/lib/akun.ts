@@ -42,6 +42,26 @@ export interface PosisiBroker {
   waktuBuka: number;
 }
 
+/** Order MT5 yang MENUNGGU harga — belum jadi posisi.
+ *
+ *  MT5 menyimpannya terpisah dari posisi (OrdersTotal vs PositionsTotal),
+ *  dan EA di bawah v2.05 tidak melaporkannya sama sekali. Akibatnya empat
+ *  Sell Stop yang terpasang rapi di terminal tidak muncul di mana pun, dan
+ *  layar berkata "0 posisi" — pernyataan yang benar tapi menyesatkan. */
+export interface PendingBroker {
+  tiket: string;
+  simbol: string;
+  /** BUY_STOP | SELL_STOP | BUY_LIMIT | SELL_LIMIT */
+  jenis: string;
+  arah: 'BUY' | 'SELL';
+  lot: number;
+  /** Harga pemicunya — inilah yang menentukan kapan ia jadi posisi. */
+  harga: number;
+  sl: number;
+  tp: number;
+  waktu: number;
+}
+
 export interface StatusAkun {
   /** null = belum diketahui (masih memeriksa). */
   terhubung: boolean | null;
@@ -52,9 +72,13 @@ export interface StatusAkun {
   ket: string;
   /** Posisi yang sedang terbuka di broker. Kosong kalau tidak tersambung. */
   posisi: PosisiBroker[];
+  /** Order menggantung. Kosong kalau tidak tersambung ATAU kalau EA-nya
+   *  masih di bawah v2.05 — versi lama tidak mengirim kolom ini, dan
+   *  daftar kosong dari EA lama bukan bukti tidak ada pending. */
+  pending: PendingBroker[];
 }
 
-const BELUM: StatusAkun = { terhubung: null, saldo: null, ekuitas: null, mataUang: null, ket: 'Memeriksa…', posisi: [] };
+const BELUM: StatusAkun = { terhubung: null, saldo: null, ekuitas: null, mataUang: null, ket: 'Memeriksa…', posisi: [], pending: [] };
 
 /* ── Saldo terakhir yang diketahui, per akun ──────────────────────────────
    Server menyimpan laporan EA terakhir DI MEMORI — restart pm2 menghapusnya,
@@ -75,7 +99,7 @@ function dariSimpanan(uid: string, sebab: string): StatusAkun | null {
     const tgl = new Date(s.waktu).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
     return {
       terhubung: false, saldo: s.saldo, ekuitas: s.ekuitas, mataUang: s.mataUang,
-      ket: `${sebab} — saldo terakhir (${tgl})`, posisi: [],
+      ket: `${sebab} — saldo terakhir (${tgl})`, posisi: [], pending: [],
     };
   } catch { return null; }
 }
@@ -162,6 +186,17 @@ export function useAkunMt5(): StatusAkun {
           /* EA mengirim detik, bukan milidetik. */
           waktuBuka: (Number(p.waktuBuka) || 0) * 1000,
         }));
+        const pending: PendingBroker[] = (j?.data?.pending ?? []).map((p: any) => ({
+          tiket: String(p.tiket ?? ''),
+          simbol: String(p.simbol ?? ''),
+          jenis: String(p.jenis ?? ''),
+          arah: p.arah === 'SELL' ? 'SELL' : 'BUY',
+          lot: Number(p.lot) || 0,
+          harga: Number(p.harga) || 0,
+          sl: Number(p.sl) || 0,
+          tp: Number(p.tp) || 0,
+          waktu: (Number(p.waktu) || 0) * 1000,
+        }));
         simpanSaldoTerakhir(u.uid, {
           saldo: keUsd(Number(akun.saldo) || 0, mu),
           ekuitas: keUsd(Number(akun.ekuitas) || 0, mu),
@@ -179,6 +214,7 @@ export function useAkunMt5(): StatusAkun {
              benar sampai ada transaksi, tapi posisi terbuka bisa sudah
              berubah tanpa kita tahu. */
           posisi: eaHidup ? posisi : [],
+          pending: eaHidup ? pending : [],
         });
       } catch {
         if (hidup) gagalLunak(() => dariSimpanan(auth.currentUser?.uid ?? '', 'Backend tak terjangkau')
@@ -313,7 +349,7 @@ export function useAkunBinance(): StatusAkun {
            hanya yang benar-benar terbuka. */
         setSt({
           terhubung: true, saldo, ekuitas: isFinite(ekuitas) ? ekuitas : saldo,
-          mataUang: 'USDT', ket: 'Binance Futures', posisi: [],
+          mataUang: 'USDT', ket: 'Binance Futures', posisi: [], pending: [],
         });
       } catch {
         if (hidup) setSt({ ...BELUM, terhubung: false, ket: 'Tidak bisa menghubungi backend' });

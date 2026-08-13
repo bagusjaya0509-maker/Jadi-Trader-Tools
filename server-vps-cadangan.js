@@ -1694,6 +1694,14 @@ app.post('/api/mt5/lapor', batasLaju, express.json({ limit: '512kb' }), (req, re
     // Posisi TERBUKA justru harus ditimpa: yang sudah tertutup wajib hilang
     // dari daftar, kalau digabung ia akan menempel selamanya.
     posisi: Array.isArray(b.posisi) ? b.posisi.slice(0, 200) : [],
+    /* Pending order ditimpa dengan alasan yang sama seperti posisi: order
+       yang sudah ke-fill atau dibatalkan WAJIB hilang dari daftar. Order
+       menggantung yang menempel selamanya adalah kebalikan dari gunanya.
+
+       EA lama (< 2.05) tidak mengirim kolom ini sama sekali. `undefined`
+       jadi [] — benar, karena EA yang tidak melaporkan pending memang
+       tidak bisa dijadikan bukti bahwa ada pending. */
+    pending: Array.isArray(b.pending) ? b.pending.slice(0, 200) : [],
     riwayat: gabungan,
     riwayatDari: Number(b.riwayatDari) || (lama.riwayatDari || 0),
     versiEa: String(b.versiEa || '')
