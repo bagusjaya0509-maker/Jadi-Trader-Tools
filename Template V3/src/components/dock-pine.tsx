@@ -505,11 +505,14 @@ export function DockPine({ buka, tab, aturTab, onTutup, lilin, simbol, tf, hingg
                     <button
                       onClick={() => void mintaPerbaikan()}
                       disabled={dokterSibuk}
-                      title="Lewat agen Dokter Pine di n8n — butuh credential API"
+                      title="Lewat agen Dokter Pine di n8n — masih beta, butuh credential API"
                       className="flex cursor-pointer items-center gap-1.5 rounded border border-zinc-800 px-2 py-1 text-[11px] text-zinc-400 transition-colors hover:border-zinc-600 disabled:cursor-not-allowed disabled:opacity-60">
                       {dokterSibuk
                         ? <><Loader2 className="size-3 animate-spin" /> Agen membaca…</>
-                        : <><Stethoscope className="size-3" /> Lewat agen</>}
+                        : <>
+                            <Stethoscope className="size-3" /> Lewat agen
+                            <span className="rounded bg-amber-500/15 px-1 text-[9.5px] text-amber-400/90">beta</span>
+                          </>}
                     </button>
                     {usul && (
                       <button
@@ -528,6 +531,15 @@ export function DockPine({ buka, tab, aturTab, onTutup, lilin, simbol, tf, hingg
                         Buang
                       </button>
                     )}
+                  </div>
+                  {/* Catatan kecil, bukan spanduk: yang perlu diketahui
+                      cuma bahwa jalur agennya masih dikerjakan — jalur
+                      salin-tempel ke Claude desktop sudah bisa dipakai
+                      penuh. Menyamakan keduanya di satu peringatan besar
+                      akan membuat orang menghindari keduanya. */}
+                  <div className="mt-1.5 text-[10px] leading-relaxed text-zinc-600">
+                    Jalur <span className="text-zinc-500">Lewat agen</span> masih beta dan sedang diperbaiki.
+                    Yang paling andal sekarang: Salin untuk Claude → tempel jawabannya.
                   </div>
                   {dokterKabar && (
                     <div className="mt-1.5 text-[10.5px] leading-relaxed text-zinc-500">{dokterKabar}</div>

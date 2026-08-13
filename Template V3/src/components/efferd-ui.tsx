@@ -25,7 +25,11 @@ export function PanelHead({
   kanan,
   className,
 }: {
-  judul: string;
+  /* Bukan `string`: judul kadang membawa lencana di sebelahnya —
+     "beta", jumlah, status. Memaksanya jadi teks polos berarti lencana
+     itu terusir ke `kanan`, tempat tombol berada, dan ia berhenti
+     terbaca sebagai keterangan judul. */
+  judul: React.ReactNode;
   sub?: string;
   kanan?: React.ReactNode;
   className?: string;

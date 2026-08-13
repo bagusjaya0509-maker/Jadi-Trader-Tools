@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import {
   Play, Loader2, RefreshCw, Radio, TriangleAlert, History,
   Layers, ChevronDown, Settings2, Code2, X, Ruler, Rows3, Square, Eraser, Minus, TrendingUp,
-} from 'lucide-react';
+  FlaskConical } from 'lucide-react';
 import { Panel, PanelHead, KartuKpi, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn, uang, persen, harga, tanggalPendek } from '@/lib/utils';
 import { ChartLilin, type Garis, type GarisHarga, type GarisSeret, type PosisiChartMt5 } from '@/components/chart-lilin';
@@ -124,6 +124,9 @@ export default function ChartBacktest() {
   /* null = replay mati. Angkanya indeks bar terakhir yang boleh tampil. */
   const [replayIdx, setReplayIdx] = useState<number | null>(null);
   const [garisHarga, setGarisHarga] = useState<GarisHarga[]>([]);
+  /* Panel Backtest tertutup saat halaman dibuka. Ia beta, dan yang beta
+     tidak boleh menempati ruang tetap di layar seolah sudah matang. */
+  const [backtestBuka, setBacktestBuka] = useState(false);
   const [aksi, setAksi] = useState<AksiOrder | null>(null);
   const [pine, setPine] = useState<HasilPine | null>(null);
   /* ── Menu indikator, dock Pine, watchlist, alat gambar ─────────────
@@ -1209,9 +1212,28 @@ export default function ChartBacktest() {
             <div className="h-[3px] w-16 rounded-full bg-zinc-800 transition-colors group-hover:bg-zinc-500" />
           </div>
         </div>
-        <div className="border-t border-zinc-800/80 px-4 py-2.5 text-[11.5px] text-zinc-600">
-          {lilin.times.length} lilin · {simbol} {TF.find((x) => x.nilai === tf)?.label} · lewat proxy VPS
-          {hasil?.trade.length ? ` · ${hasil.trade.length} penanda trade` : ''}
+        <div className="flex items-center justify-between gap-3 border-t border-zinc-800/80 px-4 py-2 text-[11.5px] text-zinc-600">
+          <span className="min-w-0 truncate">
+            {lilin.times.length} lilin · {simbol} {TF.find((x) => x.nilai === tf)?.label} · lewat proxy VPS
+            {hasil?.trade.length ? ` · ${hasil.trade.length} penanda trade` : ''}
+          </span>
+          {/* Backtest disembunyikan di balik ikon di pojok chart, bukan
+              dibentangkan di bawahnya. Alasannya bukan sekadar ruang:
+              hasilnya masih beta, dan panel yang selalu terbuka membuat
+              angkanya terbaca sebagai bagian tetap halaman — padahal ia
+              sedang diuji. Yang dibuka atas kemauan sendiri dibaca dengan
+              kewaspadaan yang berbeda. */}
+          <button
+            onClick={() => setBacktestBuka((v) => !v)}
+            title={backtestBuka ? 'Tutup panel Backtest' : 'Buka panel Backtest (beta)'}
+            className={cn('flex shrink-0 cursor-pointer items-center gap-1.5 rounded border px-2 py-1 text-[11px] transition-colors',
+              backtestBuka
+                ? 'border-zinc-600 text-zinc-200'
+                : 'border-zinc-800 text-zinc-500 hover:border-zinc-600 hover:text-zinc-300')}>
+            <FlaskConical className="size-3" strokeWidth={2} />
+            Backtest
+            <span className="rounded bg-amber-500/15 px-1 text-[9.5px] text-amber-400/90">beta</span>
+          </button>
         </div>
 
         {/* SELALU terpasang, tampil hanya saat dibuka. Efeknya tetap jalan
@@ -1229,122 +1251,124 @@ export default function ChartBacktest() {
         </div>
       </Panel>
 
-      {/* ── Setelan uji ── */}
-      <Panel className="mt-4">
-        <PanelHead
-          judul="Backtest"
-          sub="Dihitung dengan indikator yang sama persis dengan Screener Entry."
-          kanan={
-            <button onClick={jalankan} disabled={uji || lilin.closes.length < 60}
-              className="flex cursor-pointer items-center gap-2 rounded-md bg-zinc-100 px-3.5 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50">
-              {uji ? <Loader2 className="size-3.5 animate-spin" /> : <Play className="size-3.5" />}
-              Jalankan Backtest
-            </button>
-          }
-        />
-        <div className="grid grid-cols-2 gap-3 px-5 pb-5 sm:grid-cols-4 xl:grid-cols-7">
-          <div>
-            <label className="mb-1 block text-[11px] text-zinc-500">Strategi</label>
-            <select value={set.strategi} onChange={(e) => setSet({ ...set, strategi: e.target.value as Setelan['strategi'] })}
-                    className={cn(KELAS_ISIAN, 'cursor-pointer')}>
-              <option value="smi">SMI dari zona jenuh</option>
-              <option value="ema">Silang EMA</option>
-            </select>
+      {/* ── Backtest (beta) — tampil hanya kalau dibuka dari ikon di
+             pojok bawah chart ── */}
+      {backtestBuka && (
+        <>
+          <div className="mt-4 rounded-lg border border-amber-500/25 bg-amber-500/[0.04] px-4 py-2.5 text-[12px] leading-relaxed text-amber-200/80">
+            <span className="font-medium">Backtest masih beta.</span>
+            <span className="text-amber-200/60">
+              {' '}Angkanya dihitung dari data lilin yang sedang tampil dan belum memperhitungkan
+              slippage maupun spread yang berubah-ubah. Pakai sebagai pembanding kasar antar setelan,
+              bukan sebagai janji hasil.
+            </span>
           </div>
-          {set.strategi === 'ema' && (
-            <>
-              <Angka label="EMA cepat" nilai={set.emaCepat} atur={(n) => setSet({ ...set, emaCepat: n })} min={2} />
-              <Angka label="EMA lambat" nilai={set.emaLambat} atur={(n) => setSet({ ...set, emaLambat: n })} min={3} />
-            </>
-          )}
-          <Angka label="SL (× ATR)" nilai={set.slAtr} atur={(n) => setSet({ ...set, slAtr: n })} langkah={0.1} />
-          <Angka label="Risk : Reward" nilai={set.rr} atur={(n) => setSet({ ...set, rr: n })} langkah={0.5} />
-          <Angka label="Modal ($)" nilai={set.modal} atur={(n) => setSet({ ...set, modal: n })} langkah={100} />
-          <Angka label="Risiko / trade (%)" nilai={set.risikoPersen} atur={(n) => setSet({ ...set, risikoPersen: n })} langkah={0.25} />
-          <Angka label="Biaya (%)" nilai={set.biayaPersen} atur={(n) => setSet({ ...set, biayaPersen: n })} langkah={0.01} />
-        </div>
-
-        {/* Asumsi ditulis di layar, bukan disembunyikan di kode. Backtest tanpa
-            asumsi yang terbaca adalah angka tanpa arti. */}
-        <div className="border-t border-zinc-800/80 px-5 py-3 text-[11.5px] leading-relaxed text-zinc-600">
-          Entry di harga <span className="text-zinc-400">open lilin berikutnya</span> setelah sinyal, bukan di
-          close lilin sinyalnya. SL/TP diperiksa terhadap high/low tiap lilin; kalau satu lilin menyentuh
-          keduanya, yang dianggap kena adalah <span className="text-zinc-400">SL</span> — data lilin tidak tahu
-          mana yang lebih dulu, dan menebak yang menguntungkan membuat setiap hasil terlalu bagus.
-        </div>
-      </Panel>
-
-      {/* ── Hasil ── */}
-      {hasil && (
-        hasil.catatan ? (
-          <Panel className="mt-4 px-5 py-6 text-center text-[12.5px] text-zinc-500">{hasil.catatan}</Panel>
-        ) : (
-          <>
-            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
-              <KartuKpi label="Total Trade" nilai={String(hasil.jumlah)}
-                        catatan={`${hasil.menang} menang · ${hasil.kalah} kalah`} />
-              <KartuKpi label="Winrate" nilai={persen(hasil.winrate)} catatan="dari transaksi selesai" />
-              <KartuKpi label="P/L Bersih" nilai={uang(hasil.bersih, true)}
-                        warna={hasil.bersih >= 0 ? 'text-emerald-500' : 'text-red-400'}
-                        catatan={`modal ${uang(set.modal)} → ${uang(hasil.ekuitasAkhir)}`} />
-              <KartuKpi label="Profit Factor"
-                        nilai={hasil.faktorProfit === null ? '—' : hasil.faktorProfit === Infinity ? '∞' : hasil.faktorProfit.toFixed(2)}
-                        catatan="gross profit / gross loss" />
-              <KartuKpi label="Max Drawdown" nilai={`${hasil.drawdown.toFixed(1)}%`}
-                        warna={hasil.drawdown > 10 ? 'text-red-400' : undefined}
-                        catatan="penurunan terdalam dari puncak" />
+      {/* ── Setelan uji ── */}
+          <Panel className="mt-4">
+            <PanelHead
+              judul="Backtest"
+              sub="Dihitung dengan indikator yang sama persis dengan Screener Entry."
+              kanan={
+                <button onClick={jalankan} disabled={uji || lilin.closes.length < 60}
+                  className="flex cursor-pointer items-center gap-2 rounded-md bg-zinc-100 px-3.5 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50">
+                  {uji ? <Loader2 className="size-3.5 animate-spin" /> : <Play className="size-3.5" />}
+                  Jalankan Backtest
+                </button>
+              }
+            />
+            <div className="grid grid-cols-2 gap-3 px-5 pb-5 sm:grid-cols-4 xl:grid-cols-7">
+              <div>
+                <label className="mb-1 block text-[11px] text-zinc-500">Strategi</label>
+                <select value={set.strategi} onChange={(e) => setSet({ ...set, strategi: e.target.value as Setelan['strategi'] })}
+                        className={cn(KELAS_ISIAN, 'cursor-pointer')}>
+                  <option value="smi">SMI dari zona jenuh</option>
+                  <option value="ema">Silang EMA</option>
+                </select>
+              </div>
+              {set.strategi === 'ema' && (
+                <>
+                  <Angka label="EMA cepat" nilai={set.emaCepat} atur={(n) => setSet({ ...set, emaCepat: n })} min={2} />
+                  <Angka label="EMA lambat" nilai={set.emaLambat} atur={(n) => setSet({ ...set, emaLambat: n })} min={3} />
+                </>
+              )}
+              <Angka label="SL (× ATR)" nilai={set.slAtr} atur={(n) => setSet({ ...set, slAtr: n })} langkah={0.1} />
+              <Angka label="Risk : Reward" nilai={set.rr} atur={(n) => setSet({ ...set, rr: n })} langkah={0.5} />
+              <Angka label="Modal ($)" nilai={set.modal} atur={(n) => setSet({ ...set, modal: n })} langkah={100} />
+              <Angka label="Risiko / trade (%)" nilai={set.risikoPersen} atur={(n) => setSet({ ...set, risikoPersen: n })} langkah={0.25} />
+              <Angka label="Biaya (%)" nilai={set.biayaPersen} atur={(n) => setSet({ ...set, biayaPersen: n })} langkah={0.01} />
             </div>
 
-            <Panel className="mt-4">
-              <PanelHead judul="Daftar Trade" sub={`${hasil.jumlah} transaksi — penandanya ikut tergambar di chart.`} />
-              <div className="px-5 pb-5">
-                <TabelBungkus className="max-h-[380px] overflow-y-auto">
-                  <Tabel>
-                    <thead className="sticky top-0 bg-zinc-950">
-                      <tr>
-                        <Th>#</Th><Th>Masuk</Th><Th>Arah</Th>
-                        <Th className="text-right">Entry</Th><Th className="text-right">Keluar</Th>
-                        <Th>Sebab</Th><Th className="text-right">P/L</Th><Th className="text-right">Ekuitas</Th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {hasil.trade.map((t) => (
-                        <Tr key={t.no}>
-                          <Td className="angka text-zinc-600">{t.no}</Td>
-                          <Td className="whitespace-nowrap text-zinc-500">{tanggalPendek(t.masukWaktu)}</Td>
-                          <Td><span className={cn('text-[11.5px]', t.arah === 'BUY' ? 'text-emerald-500' : 'text-red-400')}>{t.arah}</span></Td>
-                          <Td className="angka text-right text-zinc-400">{harga(t.masuk)}</Td>
-                          <Td className="angka text-right text-zinc-400">{harga(t.keluar)}</Td>
-                          <Td><span className={cn('rounded px-1.5 py-0.5 text-[10px]',
-                            t.sebab === 'TP' ? 'bg-emerald-500/10 text-emerald-500'
-                              : t.sebab === 'SL' ? 'bg-red-500/10 text-red-400'
-                              : 'bg-zinc-800 text-zinc-400')}>{t.sebab}</span></Td>
-                          <Td className={cn('angka text-right', t.pnl >= 0 ? 'text-emerald-500' : 'text-red-400')}>
-                            {uang(t.pnl, true)}
-                          </Td>
-                          <Td className="angka text-right text-zinc-300">{uang(t.ekuitas)}</Td>
-                        </Tr>
-                      ))}
-                    </tbody>
-                  </Tabel>
-                </TabelBungkus>
-              </div>
-            </Panel>
-          </>
-        )
-      )}
+            {/* Asumsi ditulis di layar, bukan disembunyikan di kode. Backtest tanpa
+                asumsi yang terbaca adalah angka tanpa arti. */}
+            <div className="border-t border-zinc-800/80 px-5 py-3 text-[11.5px] leading-relaxed text-zinc-600">
+              Entry di harga <span className="text-zinc-400">open lilin berikutnya</span> setelah sinyal, bukan di
+              close lilin sinyalnya. SL/TP diperiksa terhadap high/low tiap lilin; kalau satu lilin menyentuh
+              keduanya, yang dianggap kena adalah <span className="text-zinc-400">SL</span> — data lilin tidak tahu
+              mana yang lebih dulu, dan menebak yang menguntungkan membuat setiap hasil terlalu bagus.
+            </div>
+          </Panel>
 
-      {/* Batas yang diakui terbuka — supaya tidak ada yang mengira EA MT5-nya
-          bisa diuji di sini lalu kecewa setelah mencoba. */}
-      <Panel className="mt-4 px-5 py-4">
-        <div className="text-[12.5px] text-zinc-400">Menguji EA MetaTrader 5</div>
-        <p className="mt-1 text-[12px] leading-relaxed text-zinc-600">
-          Backtest di halaman ini berjalan untuk pasar kripto lewat proxy VPS. Menguji Expert Advisor
-          MetaTrader butuh Strategy Tester MT5, yang berjalan di Windows dan tidak bisa dijalankan dari
-          halaman web — jalurnya adalah VPS Windows tersendiri yang menjalankan MT5 plus jembatan
-          perintah. Itu tahap berikutnya, bukan sesuatu yang tersembunyi di balik tombol ini.
-        </p>
-      </Panel>
+          {/* ── Hasil ── */}
+          {hasil && (
+            hasil.catatan ? (
+              <Panel className="mt-4 px-5 py-6 text-center text-[12.5px] text-zinc-500">{hasil.catatan}</Panel>
+            ) : (
+              <>
+                <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+                  <KartuKpi label="Total Trade" nilai={String(hasil.jumlah)}
+                            catatan={`${hasil.menang} menang · ${hasil.kalah} kalah`} />
+                  <KartuKpi label="Winrate" nilai={persen(hasil.winrate)} catatan="dari transaksi selesai" />
+                  <KartuKpi label="P/L Bersih" nilai={uang(hasil.bersih, true)}
+                            warna={hasil.bersih >= 0 ? 'text-emerald-500' : 'text-red-400'}
+                            catatan={`modal ${uang(set.modal)} → ${uang(hasil.ekuitasAkhir)}`} />
+                  <KartuKpi label="Profit Factor"
+                            nilai={hasil.faktorProfit === null ? '—' : hasil.faktorProfit === Infinity ? '∞' : hasil.faktorProfit.toFixed(2)}
+                            catatan="gross profit / gross loss" />
+                  <KartuKpi label="Max Drawdown" nilai={`${hasil.drawdown.toFixed(1)}%`}
+                            warna={hasil.drawdown > 10 ? 'text-red-400' : undefined}
+                            catatan="penurunan terdalam dari puncak" />
+                </div>
+
+                <Panel className="mt-4">
+                  <PanelHead judul="Daftar Trade" sub={`${hasil.jumlah} transaksi — penandanya ikut tergambar di chart.`} />
+                  <div className="px-5 pb-5">
+                    <TabelBungkus className="max-h-[380px] overflow-y-auto">
+                      <Tabel>
+                        <thead className="sticky top-0 bg-zinc-950">
+                          <tr>
+                            <Th>#</Th><Th>Masuk</Th><Th>Arah</Th>
+                            <Th className="text-right">Entry</Th><Th className="text-right">Keluar</Th>
+                            <Th>Sebab</Th><Th className="text-right">P/L</Th><Th className="text-right">Ekuitas</Th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {hasil.trade.map((t) => (
+                            <Tr key={t.no}>
+                              <Td className="angka text-zinc-600">{t.no}</Td>
+                              <Td className="whitespace-nowrap text-zinc-500">{tanggalPendek(t.masukWaktu)}</Td>
+                              <Td><span className={cn('text-[11.5px]', t.arah === 'BUY' ? 'text-emerald-500' : 'text-red-400')}>{t.arah}</span></Td>
+                              <Td className="angka text-right text-zinc-400">{harga(t.masuk)}</Td>
+                              <Td className="angka text-right text-zinc-400">{harga(t.keluar)}</Td>
+                              <Td><span className={cn('rounded px-1.5 py-0.5 text-[10px]',
+                                t.sebab === 'TP' ? 'bg-emerald-500/10 text-emerald-500'
+                                  : t.sebab === 'SL' ? 'bg-red-500/10 text-red-400'
+                                  : 'bg-zinc-800 text-zinc-400')}>{t.sebab}</span></Td>
+                              <Td className={cn('angka text-right', t.pnl >= 0 ? 'text-emerald-500' : 'text-red-400')}>
+                                {uang(t.pnl, true)}
+                              </Td>
+                              <Td className="angka text-right text-zinc-300">{uang(t.ekuitas)}</Td>
+                            </Tr>
+                          ))}
+                        </tbody>
+                      </Tabel>
+                    </TabelBungkus>
+                  </div>
+                </Panel>
+              </>
+            )
+          )}
+        </>
+      )}
     </div>
   );
 }

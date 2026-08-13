@@ -218,8 +218,19 @@ export function PanelSinyal() {
   return (
     <Panel className="mb-4">
       <PanelHead
-        judul="Sinyal Pantauan"
-        sub="Dikurasi agen Pemburu Sinyal — hanya sinyal berlevel lengkap yang lolos; sumbernya ditulis terbuka."
+        judul={
+          /* Label beta menempel di JUDULNYA, bukan di catatan kecil yang
+             bisa terlewat. Agen ini masih diperbaiki, dan orang yang
+             menaruh uang berdasarkan sinyalnya berhak tahu itu sebelum
+             membaca isinya — bukan sesudah. */
+          <span className="flex items-center gap-2">
+            Sinyal Pantauan
+            <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[9.5px] font-normal text-amber-400/90">
+              beta
+            </span>
+          </span>
+        }
+        sub="Dikurasi agen Pemburu Sinyal — hanya sinyal berlevel lengkap yang lolos; sumbernya ditulis terbuka. Agennya masih dalam perbaikan: hasilnya bisa meleset atau tertunda, jadi periksa ulang sebelum dipakai."
         kanan={
           <span className="flex items-center gap-2">
             {/* Yang ditampilkan LAMA KERJANYA, bukan jam pemeriksaan.
