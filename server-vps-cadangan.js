@@ -2095,6 +2095,84 @@ app.post('/api/hunter/hasil', batasLaju, requireToken, (req, res) => {
    Yang dikembalikan adalah USULAN. Penerapannya tetap keputusan
    orangnya — kode yang diganti diam-diam oleh mesin adalah cara tercepat
    kehilangan skrip yang sudah benar. */
+/* ══════════════════════════════════════════════════════════════════════
+   CELAH MESIN PINE — peringkat dari pemakaian nyata
+   ══════════════════════════════════════════════════════════════════════
+   Mesin Pine kita tidak akan pernah selengkap TradingView. Yang bisa
+   dilakukan: tahu PERSIS celah mana yang paling sering menghambat orang,
+   supaya tiap perbaikan mengenai yang paling banyak dipakai — bukan yang
+   kebetulan paling keras dikeluhkan.
+
+   Yang disimpan HANYA NAMA FITUR. Skripnya tidak pernah dikirim: indikator
+   itu milik penulisnya, kadang dibeli mahal, dan menyedotnya ke server
+   demi telemetri tidak sebanding dengan manfaatnya. Nama fungsi sudah
+   cukup untuk memberi peringkat.
+
+   Yang TIDAK dilakukan sistem ini: memperbaiki mesinnya sendiri. Kode
+   mesin yang ditulis model lalu dipasang tanpa ditinjau akan menghasilkan
+   indikator yang salah DIAM-DIAM — dan indikator yang salah diam-diam
+   adalah cara tercepat kehilangan uang orang. Yang otomatis di sini
+   pencatatan dan pemeringkatannya; perbaikannya tetap ditulis dan diuji
+   manusia.
+   ══════════════════════════════════════════════════════════════════════ */
+const PINE_GALAT_FILE = path.join(__dirname, 'pine-galat.json');
+function pineGalatBaca() {
+  try { return JSON.parse(fs.readFileSync(PINE_GALAT_FILE, 'utf8')); } catch (e) { return { fitur: {} }; }
+}
+function pineGalatTulis(d) { fs.writeFileSync(PINE_GALAT_FILE, JSON.stringify(d)); }
+
+/* Terbuka tanpa login: pengunjung yang mencoba chart juga menabrak celah
+   yang sama, dan justru merekalah yang paling mungkin pergi diam-diam. */
+app.post('/api/pine/galat', batasLaju, express.json({ limit: '8kb' }), (req, res) => {
+  const masuk = Array.isArray(req.body && req.body.fitur) ? req.body.fitur : [];
+  /* Saringan ketat: nama fitur Pine bentuknya terbatas. Apa pun di luar
+     itu ditolak diam-diam — daftar ini dibaca manusia untuk memutuskan
+     pekerjaan, jadi ia tidak boleh bisa diisi teks sembarangan. */
+  const sah = masuk
+    .map(x => String(x || '').trim().slice(0, 60))
+    .filter(x => /^(?:lain: )?[A-Za-z_][A-Za-z0-9_.<>]*$/.test(x))
+    .slice(0, 20);
+  if (!sah.length) return res.json({ ok: true, dicatat: 0 });
+
+  const d = pineGalatBaca();
+  const kini = Date.now();
+  for (const nama of sah) {
+    const r = d.fitur[nama] || { jumlah: 0, pertama: kini, terakhir: kini };
+    r.jumlah++;
+    r.terakhir = kini;
+    d.fitur[nama] = r;
+  }
+  /* Batas jumlah entri: daftar yang tumbuh tanpa batas berhenti berguna
+     sebagai alat memutuskan. Yang paling jarang dan paling lama tidak
+     tersentuh dibuang lebih dulu. */
+  const nama = Object.keys(d.fitur);
+  if (nama.length > 400) {
+    nama.sort((a, b) => (d.fitur[a].jumlah - d.fitur[b].jumlah) || (d.fitur[a].terakhir - d.fitur[b].terakhir));
+    nama.slice(0, nama.length - 400).forEach(k => delete d.fitur[k]);
+  }
+  pineGalatTulis(d);
+  res.json({ ok: true, dicatat: sah.length });
+});
+
+app.get('/api/pine/galat', batasLaju, requireToken, (req, res) => {
+  const d = pineGalatBaca();
+  const daftar = Object.entries(d.fitur)
+    .map(([nama, r]) => ({ nama, jumlah: r.jumlah, pertama: r.pertama, terakhir: r.terakhir }))
+    .sort((a, b) => b.jumlah - a.jumlah);
+  res.json({ ok: true, daftar, total: daftar.reduce((s, x) => s + x.jumlah, 0) });
+});
+
+app.post('/api/pine/galat/hapus', batasLaju, requireToken, (req, res) => {
+  /* Dipakai setelah celahnya BENAR-BENAR ditutup di mesin: entrinya
+     dibuang supaya peringkatnya kembali mencerminkan yang masih nyata. */
+  const nama = String((req.body || {}).nama || '');
+  const d = pineGalatBaca();
+  if (!d.fitur[nama]) return res.status(404).json({ error: 'nama tidak ada di daftar' });
+  delete d.fitur[nama];
+  pineGalatTulis(d);
+  res.json({ ok: true });
+});
+
 const N8N_PINE_URL = process.env.N8N_PINE_URL
   || 'http://127.0.0.1:5678/webhook/pine-perbaiki';
 

@@ -32,6 +32,57 @@ export interface HasilTambalan {
   perubahan: string[];
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   CELAH MESIN — apa yang DIMINTA skrip tapi belum ada di mesin kita
+   ══════════════════════════════════════════════════════════════════════
+   Mesin Pine kita tidak akan pernah selengkap TradingView, dan tiap skrip
+   baru punya peluang menyentuh sesuatu yang belum ada. Menunggu pengguna
+   melapor satu per satu berarti yang dilaporkan cuma yang paling kesal;
+   yang diam-diam menyerah tidak pernah terhitung.
+
+   Jadi yang dikirim balik CUMA NAMA FITURNYA — `timeframe.in_seconds`,
+   `table.cell`, `array.avg`. Bukan skripnya. Skrip indikator itu milik
+   penulisnya, kadang dibeli mahal, dan mengunggahnya ke server orang lain
+   demi telemetri adalah pengkhianatan yang tidak sebanding dengan
+   manfaatnya. Nama fungsi sudah cukup untuk memberi peringkat.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/** Ambil nama fitur dari daftar galat & baris yang dilewati. */
+export function fiturHilang(galat: string[], dilewati: string[]): string[] {
+  const set = new Set<string>();
+
+  for (const g of galat) {
+    const fn = /fungsi "([^"]+)"/.exec(g);
+    if (fn) { set.add(fn[1]); continue; }
+    /* "variabel X belum didefinisikan" bisa berarti dua hal: salah ketik
+       di skripnya (bukan urusan kita), atau bawaan Pine yang belum kita
+       kenal. Yang bertitik hampir pasti bawaan — `syminfo.timezone`,
+       `chart.bg_color`. Yang tanpa titik dibiarkan, supaya daftar ini
+       tidak penuh nama variabel pribadi orang. */
+    const v = /variabel "([A-Za-z_][A-Za-z0-9_]*\.[A-Za-z0-9_.]+)"/.exec(g);
+    if (v) { set.add(v[1]); continue; }
+    /* Sisanya diringkas jadi PENANDA TETAP, bukan potongan pesannya.
+       Percobaan pertama saya mengirim 40 karakter pertama galatnya — dan
+       itu membawa serta nama variabel pribadi dari skrip orang
+       ("variabel myStrategyEdge belum didefinisikan"). Nama variabel
+       adalah isi skrip, dan janji kita jelas: yang dikirim cuma nama
+       fitur Pine. Jadi yang dilaporkan sekarang cuma JENIS galatnya. */
+    if (/variabel "/.test(g)) { set.add('lain.variabel_tak_dikenal'); continue; }
+    if (/riwayat|indeks/.test(g)) { set.add('lain.riwayat'); continue; }
+    if (/tidak paham|sisa yang tidak terbaca/.test(g)) { set.add('lain.sintaks'); continue; }
+    set.add('lain.tak_terurai');
+  }
+
+  for (const d of dilewati) {
+    /* Bentuknya "baris 153: table.cell(statTable, 0, 0, ... — dilewati" */
+    const m = /^baris \d+: ([A-Za-z_][A-Za-z0-9_.]*)\s*\(/.exec(d);
+    if (m) set.add(m[1]);
+  }
+
+  /* Batas atas supaya satu skrip aneh tidak membanjiri peringkat. */
+  return [...set].slice(0, 20);
+}
+
 /** Susun teks permintaan yang siap ditempel ke Claude desktop.
  *
  *  Aturan dan bentuk jawabannya identik dengan yang dipakai node

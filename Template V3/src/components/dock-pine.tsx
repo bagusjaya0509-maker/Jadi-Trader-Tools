@@ -6,7 +6,7 @@ import { bacaKoneksi } from '@/lib/koneksi';
 import { auth } from '@/lib/firebase';
 import { jalankanPine, CONTOH_PINE, type HasilPine, type InputPine } from '@/lib/pine';
 import type { Lilin } from '@/lib/pasar';
-import { susunPermintaanPine, terapkanTambalanPine } from '@/lib/pine-tambalan';
+import { susunPermintaanPine, terapkanTambalanPine, fiturHilang } from '@/lib/pine-tambalan';
 
 /* ════════════════════════════════════════════════════════════════════════
    DOCK PINE — editor & setelan indikator di SISI KANAN chart
@@ -24,6 +24,30 @@ import { susunPermintaanPine, terapkanTambalanPine } from '@/lib/pine-tambalan';
    ════════════════════════════════════════════════════════════════════════ */
 
 export interface SkripPine { id: string; nama: string; kode: string; aktif: boolean }
+
+/* ── Lapor celah mesin ──────────────────────────────────────────────────
+   Yang dikirim CUMA NAMA FITUR yang belum didukung — bukan skripnya.
+   Tujuannya satu: pemilik tahu celah mana yang paling sering menghambat
+   orang, jadi perbaikan mesin berikutnya mengenai yang paling banyak
+   dipakai, bukan yang kebetulan paling keras dikeluhkan.
+
+   Diingat per sesi supaya menjalankan skrip yang sama sepuluh kali tidak
+   menghitung sepuluh — yang ingin diukur berapa ORANG tersandung, bukan
+   berapa kali tombol ditekan. Gagal kirim diabaikan total: telemetri
+   tidak boleh mengganggu orang yang sedang bekerja. */
+const celahTerkirim = new Set<string>();
+function laporCelah(galat: string[], dilewati: string[]) {
+  if (!galat.length && !dilewati.length) return;
+  const fitur = fiturHilang(galat, dilewati).filter((f) => !celahTerkirim.has(f));
+  if (!fitur.length) return;
+  fitur.forEach((f) => celahTerkirim.add(f));
+  const dasar = (bacaKoneksi().url.trim() || 'https://103-253-145-38.sslip.io').replace(/\/+$/, '');
+  void fetch(`${dasar}/api/pine/galat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fitur }),
+  }).catch(() => { /* sunyi: ini catatan, bukan pekerjaan penggunanya */ });
+}
 
 const KUNCI_DAFTAR = 'jt.pineDaftar';
 const KUNCI_LAMA = 'jt.pineKode';
@@ -254,6 +278,7 @@ export function DockPine({ buka, tab, aturTab, onTutup, lilin, simbol, tf, hingg
     setHasil(h);
     aturHasil(adaKeluaran(h) ? h : null);
     onInfo({ nama, adaInput: !!h.input?.some((x) => x.jenis !== 'lain') });
+    laporCelah(h.galat, h.dilewati);
   }, [aturHasil, onInfo]);
 
   const jalankan = useCallback((id: string) => {

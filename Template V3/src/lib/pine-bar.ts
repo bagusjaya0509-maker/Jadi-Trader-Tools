@@ -757,6 +757,16 @@ class Mesin {
         if (this.tf === '1w') return 'W';
         return this.tf;
       }
+      /* Panjang timeframe chart dalam detik. Indikator siklus memakainya
+         sebagai GERBANG ("hanya tampil di 4H ke atas"), jadi kalau tidak
+         didukung bukan satu baris yang hilang — seluruh deteksinya tidak
+         pernah jalan dan chartnya kosong tanpa sebab yang terlihat. */
+      case 'timeframe.in_seconds': {
+        const m = /^(\d+)([mhdw])$/.exec(this.tf);
+        if (!m) return 3600;
+        const n = Number(m[1]);
+        return n * ({ m: 60, h: 3600, d: 86400, w: 604800 }[m[2]] ?? 3600);
+      }
       case 'timeframe.isdaily': return this.tf === '1d' || this.tf === 'D';
       case 'timeframe.isweekly': return this.tf === '1w' || this.tf === 'W';
       case 'timeframe.isintraday': return !['1d', 'D', '1w', 'W'].includes(this.tf);
@@ -832,6 +842,10 @@ class Mesin {
          Inilah yang membuat indikator berbasis jadwal rilis bisa jalan:
          tanpa timestamp() dan dayofweek(), seluruh array tanggal NFP/CPI
          cuma angka yang tidak pernah cocok dengan bar mana pun. */
+      /* Dipanggil sebagai fungsi — `timeframe.in_seconds()`. Argumennya
+         opsional (TF lain); kalau disebut, kita tetap menjawab TF chart
+         dan mengakuinya di catatan, bukan mengarang jawaban. */
+      case 'timeframe.in_seconds': return this.nilaiNama('timeframe.in_seconds', baris);
       case 'timestamp': {
         /* Tiga bentuk yang benar-benar dipakai orang:
              timestamp("2026-08-07 08:30")
@@ -1011,6 +1025,18 @@ class Mesin {
          Argumennya dievaluasi apa adanya, jadi `array.from(timestamp(...),
          timestamp(...))` langsung jadi larik stempel waktu. */
       case 'array.from': return { jenis: 'array', isi: e.arg.map((_, i) => arg(i)) } as NilaiArray;
+      /* Ringkasan larik — dipakai indikator siklus untuk merata-ratakan
+         panjang cycle sebelumnya lalu memproyeksikan yang berikutnya. */
+      case 'array.avg': case 'array.sum': case 'array.min': case 'array.max': {
+        const a = arg(0) as NilaiArray;
+        if (a?.jenis !== 'array') return null;
+        const xs = a.isi.map((v) => this.angka(v)).filter((x): x is number => x != null);
+        if (!xs.length) return null;
+        if (e.nama === 'array.min') return Math.min(...xs);
+        if (e.nama === 'array.max') return Math.max(...xs);
+        const jum = xs.reduce((s, x) => s + x, 0);
+        return e.nama === 'array.sum' ? jum : jum / xs.length;
+      }
       case 'array.push': { const a = arg(0) as NilaiArray; if (a?.jenis === 'array') a.isi.push(arg(1)); return null; }
       case 'array.pop': { const a = arg(0) as NilaiArray; return a?.jenis === 'array' ? (a.isi.pop() ?? null) : null; }
       case 'array.shift': { const a = arg(0) as NilaiArray; return a?.jenis === 'array' ? (a.isi.shift() ?? null) : null; }
