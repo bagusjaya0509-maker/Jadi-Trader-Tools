@@ -1,0 +1,120 @@
+{
+  "_catatan": "Katalog jenis agen. Dipakai halaman Markas Agen dan dijadikan tag di n8n supaya workflow bisa disaring per kategori. Kategorinya dibagi menurut APA YANG BISA DILAKUKAN AGEN kalau ia salah — bukan menurut teknologinya.",
+  "kategori": [
+    {
+      "id": "pengumpul",
+      "nama": "Pengumpul",
+      "ringkas": "Membaca sumber luar dan membawanya masuk. Tidak mengubah apa pun di dalam.",
+      "risiko": "rendah",
+      "kenapaBegitu": "Salahnya berupa informasi keliru yang tampil di layar — menjengkelkan, tapi tidak memindahkan uang dan tidak merusak berkas.",
+      "butuhPersetujuan": false,
+      "warna": "#60a5fa"
+    },
+    {
+      "id": "perbaikan",
+      "nama": "Perbaikan",
+      "ringkas": "Mengusulkan perubahan pada kode atau konfigurasi. Selalu berhenti di usulan.",
+      "risiko": "sedang",
+      "kenapaBegitu": "Salahnya bisa merusak skrip yang sudah benar. Karena itu hasilnya WAJIB ditinjau manusia sebelum diterapkan, dan versi lamanya harus bisa dikembalikan.",
+      "butuhPersetujuan": true,
+      "warna": "#fbbf24"
+    },
+    {
+      "id": "analisa",
+      "nama": "Analisa",
+      "ringkas": "Menghitung dan menyimpulkan dari data yang sudah ada. Keluarannya angka dan kalimat.",
+      "risiko": "sedang",
+      "kenapaBegitu": "Salahnya menyesatkan keputusan orang tanpa terlihat salah. Wajib menyebut dari data mana angkanya berasal.",
+      "butuhPersetujuan": false,
+      "warna": "#a78bfa"
+    },
+    {
+      "id": "operasi",
+      "nama": "Operasi",
+      "ringkas": "Menyentuh dunia luar: order, transfer, publikasi, penghapusan.",
+      "risiko": "tinggi",
+      "kenapaBegitu": "Salahnya memindahkan uang atau menghapus barang. TIDAK PERNAH berjalan tanpa persetujuan manusia per-tindakan, berapa kali pun ia sudah benar sebelumnya.",
+      "butuhPersetujuan": true,
+      "warna": "#f87171"
+    }
+  ],
+  "agen": [
+    {
+      "id": "pemburu-sinyal",
+      "nama": "Pemburu Sinyal",
+      "kategori": "pengumpul",
+      "pemicu": "tombol",
+      "otak": "claude",
+      "status": "dijeda",
+      "workflow": "pemburu-sinyal.json",
+      "ringkas": "Membaca ruang sinyal komunitas, menyaring yang berlevel lengkap, menerbitkannya ke panel Copy Signal.",
+      "batas": "Butuh sesi Chrome pemilik — tidak bisa berjalan di mesin pengguna lain."
+    },
+    {
+      "id": "dokter-pine",
+      "nama": "Dokter Pine",
+      "kategori": "perbaikan",
+      "pemicu": "tombol",
+      "otak": "claude",
+      "status": "aktif",
+      "workflow": "dokter-pine.json",
+      "ringkas": "Membaca skrip Pine beserta baris yang ditolak mesin, lalu mengusulkan perbaikan seminimal mungkin.",
+      "batas": "Hanya mengusulkan. Penerapan ada di tangan pengguna, dan skrip lama tetap tersimpan."
+    },
+    {
+      "id": "pengelola-porto",
+      "nama": "Pengelola Porto",
+      "kategori": "analisa",
+      "pemicu": "manual",
+      "otak": "claude",
+      "status": "manual",
+      "workflow": null,
+      "ringkas": "Menilai portofolio dan jurnal, menyusun rencana dari sinyal yang dipilih pengguna.",
+      "batas": "Menyusun rencana, tidak mengirim order."
+    },
+    {
+      "id": "penyiar",
+      "nama": "Penyiar",
+      "kategori": "pengumpul",
+      "pemicu": "manual",
+      "otak": "sonnet",
+      "status": "manual",
+      "workflow": null,
+      "ringkas": "Konten promosi dan balasan CS.",
+      "batas": "Publikasi keluar butuh persetujuan."
+    },
+    {
+      "id": "perupa",
+      "nama": "Perupa",
+      "kategori": "perbaikan",
+      "pemicu": "manual",
+      "otak": "sonnet",
+      "status": "manual",
+      "workflow": null,
+      "ringkas": "Aset visual: poster, banner, ikon.",
+      "batas": "Menghasilkan berkas, tidak menerbitkannya sendiri."
+    },
+    {
+      "id": "bendahara",
+      "nama": "Bendahara",
+      "kategori": "analisa",
+      "pemicu": "manual",
+      "otak": "sonnet",
+      "status": "manual",
+      "workflow": null,
+      "ringkas": "Arus kas usaha dan rekap lisensi.",
+      "batas": "Melaporkan, tidak memindahkan uang."
+    },
+    {
+      "id": "eksekutor",
+      "nama": "Eksekutor Order",
+      "kategori": "operasi",
+      "pemicu": "tombol",
+      "otak": "manusia",
+      "status": "manusia-saja",
+      "workflow": null,
+      "ringkas": "Mengirim order ke MT5/Binance dari halaman Chart.",
+      "batas": "SENGAJA tidak diberikan ke agen mana pun. Yang menekan Kirim tetap manusia."
+    }
+  ]
+}
