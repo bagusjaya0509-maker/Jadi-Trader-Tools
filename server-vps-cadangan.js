@@ -2134,12 +2134,23 @@ app.post('/api/pine/galat', batasLaju, express.json({ limit: '8kb' }), (req, res
     .slice(0, 20);
   if (!sah.length) return res.json({ ok: true, dicatat: 0 });
 
+  /* Versi aplikasi saat celahnya tertabrak. Gunanya satu: membedakan
+     "masih ada di build terbaru" dari "sisa dari build lama yang sudah
+     diperbaiki". Tanpa itu daftar peringkat pelan-pelan penuh hantu —
+     celah yang sudah ditutup tapi angkanya tetap tinggi. */
+  const versi = String((req.body && req.body.versi) || '').slice(0, 24)
+    .replace(/[^A-Za-z0-9._-]/g, '');
+
   const d = pineGalatBaca();
   const kini = Date.now();
   for (const nama of sah) {
-    const r = d.fitur[nama] || { jumlah: 0, pertama: kini, terakhir: kini };
+    const r = d.fitur[nama] || { jumlah: 0, pertama: kini, terakhir: kini, versi: [] };
     r.jumlah++;
     r.terakhir = kini;
+    if (versi) {
+      r.versi = Array.isArray(r.versi) ? r.versi : [];
+      if (!r.versi.includes(versi)) r.versi = [...r.versi, versi].slice(-4);
+    }
     d.fitur[nama] = r;
   }
   /* Batas jumlah entri: daftar yang tumbuh tanpa batas berhenti berguna
@@ -2157,7 +2168,12 @@ app.post('/api/pine/galat', batasLaju, express.json({ limit: '8kb' }), (req, res
 app.get('/api/pine/galat', batasLaju, requireToken, (req, res) => {
   const d = pineGalatBaca();
   const daftar = Object.entries(d.fitur)
-    .map(([nama, r]) => ({ nama, jumlah: r.jumlah, pertama: r.pertama, terakhir: r.terakhir }))
+    .map(([nama, r]) => ({
+      nama, jumlah: r.jumlah, pertama: r.pertama, terakhir: r.terakhir,
+      /* Versi ikut dikirim — tanpa ini kolomnya di panel selalu kosong
+         dan catatan yang sudah disimpan jadi sia-sia. */
+      versi: Array.isArray(r.versi) ? r.versi : [],
+    }))
     .sort((a, b) => b.jumlah - a.jumlah);
   res.json({ ok: true, daftar, total: daftar.reduce((s, x) => s + x.jumlah, 0) });
 });

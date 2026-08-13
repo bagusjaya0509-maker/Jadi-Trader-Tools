@@ -35,6 +35,10 @@ export interface SkripPine { id: string; nama: string; kode: string; aktif: bool
    menghitung sepuluh — yang ingin diukur berapa ORANG tersandung, bukan
    berapa kali tombol ditekan. Gagal kirim diabaikan total: telemetri
    tidak boleh mengganggu orang yang sedang bekerja. */
+function bacaVersiBuild(): string {
+  try { return String(__JT_VERSI__ ?? ''); } catch { return ''; }
+}
+
 const celahTerkirim = new Set<string>();
 function laporCelah(galat: string[], dilewati: string[]) {
   if (!galat.length && !dilewati.length) return;
@@ -45,7 +49,9 @@ function laporCelah(galat: string[], dilewati: string[]) {
   void fetch(`${dasar}/api/pine/galat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fitur }),
+    /* Versi build ikut dikirim supaya celah lama bisa dibedakan dari
+       yang masih hidup di build terbaru. */
+    body: JSON.stringify({ fitur, versi: bacaVersiBuild() }),
   }).catch(() => { /* sunyi: ini catatan, bukan pekerjaan penggunanya */ });
 }
 

@@ -145,6 +145,18 @@ function PanelTeksBeranda() {
   );
 }
 
+/** Judul pemisah antar urusan. Sengaja bukan panel: ia PENANDA, dan
+ *  penanda yang punya bingkai sendiri akan bersaing perhatian dengan isi
+ *  yang ditandainya. */
+function Bagian({ judul, sub }: { judul: string; sub: string }) {
+  return (
+    <div className="mb-3 mt-6 first:mt-0">
+      <h2 className="text-[14px] font-medium text-zinc-200">{judul}</h2>
+      <p className="text-[12px] text-zinc-500">{sub}</p>
+    </div>
+  );
+}
+
 export default function Maintenance() {
   /* Katalog NYATA dari Firestore, bukan salinan data contoh.
      Sebelumnya halaman ini memulai dari `PRODUK` dan menyimpan perubahannya
@@ -306,9 +318,26 @@ export default function Maintenance() {
 
   return (
     <div className="p-4 sm:p-6">
+      {/* Halaman ini menampung lima urusan yang tidak berhubungan satu
+          sama lain — kesehatan mesin, celah Pine, teks beranda, katalog
+          produk, lisensi. Tanpa judul pemisah, semuanya terbaca sebagai
+          satu tumpukan panel dan orang harus membaca isinya dulu untuk
+          tahu sedang melihat apa. Judul section membuat halaman ini bisa
+          DIPINDAI, bukan dibaca. */}
+      <Bagian judul="Kesehatan Sistem"
+              sub="Sambungan backend, bursa, dan layanan pendukung." />
       <PanelKesehatan />
+
+      <Bagian judul="Mesin Pine Script"
+              sub="Celah yang ditemukan dari pemakaian nyata — bahan perbaikan berikutnya." />
       <PanelCelahPine />
+
+      <Bagian judul="Situs & Konten"
+              sub="Teks yang dilihat pengunjung sebelum masuk." />
       <PanelTeksBeranda />
+
+      <Bagian judul="Katalog Produk"
+              sub="Produk yang tayang di Marketplace, sumbernya, dan tempat sampahnya." />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KartuKpi label="Produk tayang" nilai={String(tayang.length)} catatan="terlihat pengunjung" />
         <KartuKpi label="Di tempat sampah" nilai={String(sampah.length)} catatan="bisa dipulihkan" />
@@ -520,8 +549,9 @@ export default function Maintenance() {
         </div>
       </div>
 
+      <Bagian judul="Lisensi Produk"
+              sub="Lisensi yang sedang aktif dan permintaan yang menunggu keputusan." />
       <PanelLisensiAktif />
-
       <PanelLisensi />
     </div>
   );

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { RefreshCw, Check, Loader2 } from 'lucide-react';
+import { RefreshCw, Check, Loader2, Copy } from 'lucide-react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { cn, tanggalPendek } from '@/lib/utils';
 import { bacaKoneksi } from '@/lib/koneksi';
@@ -23,7 +23,7 @@ import { bacaKoneksi } from '@/lib/koneksi';
    pemeringkatannya.
    ════════════════════════════════════════════════════════════════════════ */
 
-interface Celah { nama: string; jumlah: number; pertama: number; terakhir: number }
+interface Celah { nama: string; jumlah: number; pertama: number; terakhir: number; versi?: string[] }
 
 function dasar() {
   return (bacaKoneksi().url.trim() || 'https://103-253-145-38.sslip.io').replace(/\/+$/, '');
@@ -45,6 +45,7 @@ export function PanelCelahPine() {
   const [daftar, setDaftar] = useState<Celah[] | null>(null);
   const [galat, setGalat] = useState('');
   const [sibuk, setSibuk] = useState(false);
+  const [tersalin, setTersalin] = useState(false);
 
   const muat = useCallback(async () => {
     const token = bacaKoneksi().token.trim();
@@ -79,6 +80,53 @@ export function PanelCelahPine() {
     } catch { /* biarkan; muat ulang akan menunjukkan keadaan sebenarnya */ }
   }
 
+  /* ── Laporan siap diserahkan ──────────────────────────────────────
+     Tujuannya satu kali jalan: satu teks yang memuat SEMUA yang perlu
+     diketahui untuk memperbaiki — nama fiturnya, berapa sering
+     tertabrak, kapan terakhir, dan sudah dikelompokkan menurut jenis
+     pekerjaannya. Menyalin daftar mentah berarti pekerjaan memilah itu
+     dikerjakan dua kali: sekali olehmu saat menyalin, sekali lagi saat
+     dibaca. Di sini dikerjakan sekali, oleh yang punya datanya. */
+  async function salinLaporan() {
+    const d = daftar ?? [];
+    if (!d.length) return;
+    const tgl = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+    const grup = new Map<string, Celah[]>();
+    for (const c of d) {
+      const k = kelompok(c.nama).label;
+      grup.set(k, [...(grup.get(k) ?? []), c]);
+    }
+    const bagian = [...grup.entries()].map(([label, isi]) => {
+      const baris = isi
+        .sort((a, b) => b.jumlah - a.jumlah)
+        .map((c) => `- ${c.nama} — ${c.jumlah}× (terakhir ${tanggalPendek(c.terakhir)}${c.versi?.length ? `, versi ${c.versi.join('/')}` : ''})`);
+      return `## ${label} (${isi.length})\n${baris.join('\n')}`;
+    });
+
+    const teks = [
+      `# Celah Mesin Pine — ${tgl}`,
+      '',
+      `${d.length} fitur belum didukung, ${d.reduce((s, x) => s + x.jumlah, 0)} kali tertabrak pengguna.`,
+      'Diurutkan menurut seberapa sering menghambat. Yang atas lebih dulu.',
+      '',
+      ...bagian,
+      '',
+      '## Catatan',
+      '- Daftar ini berisi NAMA FITUR saja; skrip penggunanya tidak dikirim ke server.',
+      '- "bisa ditambahkan" = fungsi bawaan Pine yang tinggal dipasang di mesin.',
+      '- "butuh tabel" / "butuh pewarna latar" = perlu permukaan gambar baru di chart, bukan sekadar fungsi.',
+      '- "perlu ditelusuri" = galat yang belum bisa dipetakan ke satu nama fungsi.',
+    ].join('\n');
+
+    try {
+      await navigator.clipboard.writeText(teks);
+      setTersalin(true);
+      window.setTimeout(() => setTersalin(false), 2500);
+    } catch {
+      setGalat('Peramban menolak menyalin. Buka konsol atau salin manual dari daftar di bawah.');
+    }
+  }
+
   const total = (daftar ?? []).reduce((s, x) => s + x.jumlah, 0);
   const maks = Math.max(1, ...(daftar ?? []).map((x) => x.jumlah));
 
@@ -88,11 +136,19 @@ export function PanelCelahPine() {
         judul="Celah Mesin Pine"
         sub="Fitur yang diminta skrip pengguna tapi belum ada di mesin. Hanya namanya yang dicatat — skripnya tidak pernah dikirim."
         kanan={
-          <button onClick={() => void muat()} disabled={sibuk}
-            className="flex cursor-pointer items-center gap-1.5 rounded border border-zinc-800 px-2 py-1 text-[11px] text-zinc-400 transition-colors hover:border-zinc-600 disabled:opacity-50">
-            {sibuk ? <Loader2 className="size-3 animate-spin" /> : <RefreshCw className="size-3" />}
-            Segarkan
-          </button>
+          <span className="flex items-center gap-2">
+            <button onClick={() => void salinLaporan()} disabled={!daftar?.length}
+              title="Salin laporan lengkap — siap diserahkan untuk sekali jalan perbaikan"
+              className="flex cursor-pointer items-center gap-1.5 rounded bg-zinc-100 px-2 py-1 text-[11px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-40">
+              {tersalin ? <Check className="size-3" /> : <Copy className="size-3" />}
+              {tersalin ? 'Tersalin' : 'Salin laporan'}
+            </button>
+            <button onClick={() => void muat()} disabled={sibuk}
+              className="flex cursor-pointer items-center gap-1.5 rounded border border-zinc-800 px-2 py-1 text-[11px] text-zinc-400 transition-colors hover:border-zinc-600 disabled:opacity-50">
+              {sibuk ? <Loader2 className="size-3 animate-spin" /> : <RefreshCw className="size-3" />}
+              Segarkan
+            </button>
+          </span>
         }
       />
       <div className="px-5 pb-5">

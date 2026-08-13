@@ -14,6 +14,7 @@ import { LabelContoh, SpandukContoh } from '@/components/gerbang';
 import { useAkunMt5, useAkunBinance, versiKurangDari, VERSI_EA_PENDING } from '@/lib/akun';
 import { useArusKas, arusBersih } from '@/lib/tulis-jurnal';
 import { PanelEvaluasi } from '@/components/panel-evaluasi';
+import { TabelPosisi } from '@/components/tabel-posisi';
 
 /* ════════════════════════════════════════════════════════════════════════
    DASHBOARD
@@ -334,57 +335,23 @@ export function Dashboard() {
             }
           />
           <div className="px-5 pb-5">
-            <TabelBungkus>
-              <Tabel>
-                <thead>
-                  <tr><Th>Pair</Th><Th className="text-right">Size</Th><Th className="text-right">Entry</Th>
-                      <Th className="text-right">Gerak</Th><Th className="text-right">P/L</Th></tr>
-                </thead>
-                <tbody>
-                  {POSISI_TERBUKA.map((p) => {
-                    const gerak = ((p.hargaKini - p.entry) / p.entry) * 100 * (p.arah === 'BUY' ? 1 : -1);
-                    return (
-                      <Tr key={p.id}>
-                        <Td>
-                          <span className="text-zinc-200">{p.simbol.replace('USDT', '')}</span>
-                          <span className={cn('ml-1.5 text-[10.5px]', p.arah === 'BUY' ? 'text-emerald-500' : 'text-red-400')}>
-                            {p.arah}
-                          </span>
-                          {/* SL & TP menumpang baris keterangan, bukan jadi dua
-                            kolom baru: tabel ini sudah lima kolom di panel
-                            setengah lebar. SL yang belum dipasang ditulis
-                            terang-terangan — itu justru yang harus terlihat. */}
-                        <div className="text-[10.5px] text-zinc-600">
-                          {p.venue} · {p.tf}
-                          {' · SL '}
-                          <span className={cn('angka', p.sl > 0 ? 'text-red-400/80' : 'text-amber-400/80')}>
-                            {p.sl > 0 ? harga(p.sl) : 'belum'}
-                          </span>
-                          {p.tp > 0 && <> · TP <span className="angka text-emerald-500/80">{harga(p.tp)}</span></>}
-                        </div>
-                        </Td>
-                        {/* Size dan P/L hanya ada kalau datanya dari bursa.
-                            Dokumen publik sengaja tidak menyiarkan keduanya —
-                            ukuran posisi membocorkan besar akun. Tanda hubung
-                            berarti "tidak disiarkan", bukan "nol". */}
-                        <Td className="angka text-right text-zinc-400">
-                          {p.jumlah ? p.jumlah.toLocaleString('id-ID', { maximumFractionDigits: 4 }) : '—'}
-                        </Td>
-                        <Td className="angka text-right text-zinc-400">{harga(p.entry)}</Td>
-                        <Td className={cn('angka text-right', gerak >= 0 ? 'text-emerald-500' : 'text-red-400')}>
-                          {gerak >= 0 ? '+' : ''}{gerak.toFixed(2)}%
-                        </Td>
-                        <Td className={cn('angka text-right',
-                          p.pnlFloat === undefined ? 'text-zinc-600'
-                            : p.pnlFloat >= 0 ? 'text-emerald-500' : 'text-red-400')}>
-                          {p.pnlFloat === undefined ? '—' : uang(p.pnlFloat, true)}
-                        </Td>
-                      </Tr>
-                    );
-                  })}
-                </tbody>
-              </Tabel>
-            </TabelBungkus>
+            <TabelPosisi
+              kosong="Tidak ada posisi kripto terbuka."
+              baris={POSISI_TERBUKA.map((p) => ({
+                kunci: p.id,
+                simbol: p.simbol.replace('USDT', ''),
+                arah: p.arah,
+                /* Tanda hubung berarti "tidak disiarkan", bukan "nol":
+                   dokumen publik sengaja tidak menyiarkan ukuran posisi
+                   karena itu membocorkan besar akun. */
+                ukuran: p.jumlah ? p.jumlah.toLocaleString('id-ID', { maximumFractionDigits: 4 }) : '',
+                entry: p.entry,
+                hargaKini: p.hargaKini,
+                sl: p.sl, tp: p.tp,
+                pnl: p.pnlFloat,
+                ket: [p.venue, p.tf && p.tf !== '—' ? p.tf : ''].filter(Boolean).join(' · '),
+              }))}
+            />
 
             {/* PENDING — order yang sudah terkirim tapi belum ke-fill.
                 Sengaja di bawah tabel dan bukan di dalamnya: ini BUKAN
@@ -434,12 +401,6 @@ export function Dashboard() {
             }
           />
           <div className="space-y-2.5 px-5 pb-5">
-            {POSISI_MT5.length === 0 && mt5.pending.length === 0 && (
-              <div className="px-1 py-6 text-center text-[12.5px] text-zinc-500">
-                {mt5.terhubung === true ? 'Tidak ada posisi MT5 terbuka.' : mt5.ket}
-              </div>
-            )}
-
             {/* EA lama TIDAK BISA melaporkan pending order — dan diamnya
                 layar terbaca sebagai "tidak ada order", padahal bisa saja
                 ada empat yang terpasang di terminal. Dua keadaan yang
@@ -454,31 +415,24 @@ export function Dashboard() {
                 </span>
               </div>
             )}
-            {POSISI_MT5.map((p) => (
-              <div key={p.tiket} className="rounded-lg border border-zinc-800/60 p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[13px] text-zinc-200">{p.simbol}</span>
-                    <span className={cn('rounded px-1.5 py-0.5 text-[10px]',
-                      p.arah === 'BUY' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-400')}>
-                      {p.arah}
-                    </span>
-                    <span className="angka text-[11px] text-zinc-600">{p.lot} lot</span>
-                  </div>
-                  <span className={cn('angka text-[12.5px]', p.profit >= 0 ? 'text-emerald-500' : 'text-red-400')}>
-                    {uang(p.profit, true)}
-                  </span>
-                </div>
-                <div className="mt-1.5 flex gap-4 text-[11px] text-zinc-500">
-                  <span>Entry <span className="angka text-zinc-400">{harga(p.hargaBuka)}</span></span>
-                  <span>Kini <span className="angka text-zinc-400">{harga(p.hargaKini)}</span></span>
-                  {/* SL/TP 0 berarti TIDAK DIPASANG, bukan "di harga nol".
-                      Menampilkan "0" untuk itu keliru dan menyesatkan. */}
-                  <span>SL <span className="angka text-red-400/80">{p.sl ? harga(p.sl) : '—'}</span></span>
-                  <span>TP <span className="angka text-emerald-500/80">{p.tp ? harga(p.tp) : '—'}</span></span>
-                </div>
-              </div>
-            ))}
+            {/* Susunan kolom SAMA PERSIS dengan panel kripto di sebelah.
+                Dulu di sini kartu: Gerak tidak ada, Size bukan kolom, dan
+                dua panel berdampingan menjawab pertanyaan yang sama dengan
+                dua bentuk berbeda — orang jadi mengira datanya beda. */}
+            <TabelPosisi
+              kosong={mt5.terhubung === true ? 'Tidak ada posisi MT5 terbuka.' : mt5.ket}
+              baris={POSISI_MT5.map((p) => ({
+                kunci: p.tiket,
+                simbol: p.simbol,
+                arah: p.arah,
+                ukuran: `${p.lot} lot`,
+                entry: p.hargaBuka,
+                hargaKini: p.hargaKini,
+                sl: p.sl, tp: p.tp,
+                pnl: p.profit,
+                ket: `#${p.tiket}`,
+              }))}
+            />
 
             {/* PENDING MT5 — Sell Stop / Buy Limit dsb yang menunggu harga.
                 MT5 menyimpannya terpisah dari posisi, dan EA di bawah v2.05

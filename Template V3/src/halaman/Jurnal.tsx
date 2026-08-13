@@ -9,7 +9,9 @@ import { LabelContoh, SpandukContoh } from '@/components/gerbang';
 import { useAuth } from '@/lib/auth';
 import type { Trade, Sumber } from '@/data/contoh';
 import { useAkunMt5, useAkunBinance, type StatusAkun, versiKurangDari, VERSI_EA_PENDING } from '@/lib/akun';
+import { TabelPosisi, type BarisPosisi } from '@/components/tabel-posisi';
 import { useEmosiPosisi, EMOSI } from '@/lib/emosi-posisi';
+import { useHargaPasar } from '@/lib/harga';
 import { ModalTrade } from '@/components/modal-trade';
 import { KotakArus } from '@/components/kotak-arus';
 import { useArusKas, arusBersih, sinkronRiwayatMt5, sinkronRiwayatBinance, type Arus } from '@/lib/tulis-jurnal';
@@ -249,22 +251,28 @@ function PanelPosisiJurnal({ sumber }: { sumber: Sumber }) {
      memakai jumlah koin (size order), Trade-Fi memakai lot; keduanya
      ditulis dengan satuannya sendiri karena "0,05" tanpa satuan berarti
      dua hal yang sangat berbeda di dua pasar itu. */
-  const baris = sumber === 'kripto'
+  /* Harga berjalan diambil sendiri di sini, sama seperti Dashboard.
+     Tanpa itu `hargaKini` sama dengan entry — dan kolom Gerak akan
+     menulis "+0.00%", yang terbaca sebagai "harga tidak bergerak"
+     padahal artinya "harganya tidak kita ketahui". Salah satu dari dua
+     itu bohong; yang jujur adalah mengambil harganya. */
+  const hargaPasar = useHargaPasar(sumber === 'kripto' ? posisiKripto.map((p) => p.simbol) : []);
+
+  const baris: BarisPosisi[] = sumber === 'kripto'
     ? posisiKripto.map((p) => ({
         kunci: p.id, simbol: p.simbol, arah: p.arah,
         ket: p.tf && p.tf !== '—' ? p.tf : p.venue,
-        ukuran: p.jumlah ? `${p.jumlah} ${p.simbol.replace(/USDT$/, '')}` : '',
-        entry: p.entry, sl: p.sl, tp: p.tp,
+        ukuran: p.jumlah ? p.jumlah.toLocaleString('id-ID', { maximumFractionDigits: 4 }) : '',
+        entry: p.entry, hargaKini: hargaPasar[p.simbol], sl: p.sl, tp: p.tp,
         pnl: p.pnlFloat,
-        tiket: undefined as string | undefined,
       }))
     : mt5.posisi.map((p) => ({
         kunci: p.tiket, simbol: p.simbol, arah: p.arah,
         ket: `#${p.tiket}`,
         ukuran: `${p.lot} lot`,
-        entry: p.hargaBuka, sl: p.sl, tp: p.tp,
+        entry: p.hargaBuka, hargaKini: p.hargaKini, sl: p.sl, tp: p.tp,
         pnl: p.profit,
-        tiket: p.tiket as string | undefined,
+        tiket: p.tiket,
       }));
 
   const total = baris.some((b) => b.pnl !== undefined)
@@ -272,7 +280,10 @@ function PanelPosisiJurnal({ sumber }: { sumber: Sumber }) {
     : null;
 
   return (
-    <Panel>
+    /* self-start: panel ini setinggi ISINYA, tidak ikut meregang
+       mengikuti kolom kalender di sebelahnya. Kotak tinggi yang isinya
+       dua baris terbaca seperti ada yang gagal dimuat. */
+    <Panel className="self-start">
       <PanelHead
         judul="Posisi Terbuka"
         sub={sumber === 'kripto' ? 'Berjalan di Binance.' : 'Berjalan di MetaTrader 5.'}
@@ -285,84 +296,31 @@ function PanelPosisiJurnal({ sumber }: { sumber: Sumber }) {
         }
       />
       <div className="px-5 pb-5">
-        {/* Daftar posisi TANPA batas tinggi tetap.
-            ────────────────────────────────────────────────────────────
-            Dulu 190 px — pas untuk tiga baris, dan baris keempat
-            terpotong di tengah tanpa tanda apa pun bahwa masih ada lagi.
-            Punya lima posisi terbuka bukan keadaan luar biasa; yang luar
-            biasa adalah panel yang menyembunyikannya. Gulir baru muncul
-            kalau daftarnya benar-benar panjang. */}
-        {baris.length === 0 && pending.length === 0 ? (
-          <div className="py-5 text-center text-[12.5px] text-zinc-600">
-            {sumber === 'kripto' ? 'Tidak ada posisi kripto terbuka.' : mt5.terhubung === true ? 'Tidak ada posisi MT5 terbuka.' : mt5.ket}
-          </div>
-        ) : (
-          <div className="gulir-senyap max-h-[520px] space-y-2 overflow-y-auto">
-            {baris.map((b) => (
-              <div key={b.kunci} className="rounded-lg border border-zinc-800/60 px-3 py-2">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="flex min-w-0 items-center gap-2">
-                    <span className="truncate text-[12.5px] text-zinc-200">{b.simbol}</span>
-                    <span className={cn('rounded px-1.5 py-0.5 text-[10px]',
-                      b.arah === 'BUY' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-400')}>
-                      {b.arah}
-                    </span>
-                    {b.ukuran && <span className="angka shrink-0 text-[11px] text-zinc-400">{b.ukuran}</span>}
-                    <span className="truncate text-[11px] text-zinc-600">{b.ket}</span>
-                  </span>
-                  {/* Tanda hubung berarti PnL berjalannya tidak disiarkan —
-                      bukan berarti nol. */}
-                  <span className={cn('angka shrink-0 text-[12px]',
-                    b.pnl === undefined ? 'text-zinc-600' : b.pnl >= 0 ? 'text-emerald-500' : 'text-red-400')}>
-                    {b.pnl === undefined ? '—' : uang(b.pnl, true)}
-                  </span>
-                </div>
+        {/* Susunan kolom SAMA dengan Dashboard: Pair | Size | Entry |
+            Gerak | P/L, SL & TP di baris keterangan. Dulu di sini kartu
+            sendiri — dan panel yang menjawab pertanyaan yang sama dengan
+            bentuk berbeda memaksa orang belajar dua kali. Emosi jadi
+            kolom terakhir; tetap bisa disunting, tetap dibaca sebagai
+            data, bukan formulir. */}
+        <TabelPosisi
+          baris={baris}
+          kosong={sumber === 'kripto'
+            ? 'Tidak ada posisi kripto terbuka.'
+            : mt5.terhubung === true ? 'Tidak ada posisi MT5 terbuka.' : mt5.ket}
+          kolomEmosi={(b) => (
+            <select
+              value={emosiPos.peta[b.kunci] ?? ''}
+              disabled={!emosiPos.bisaTulis}
+              onChange={(e) => { void emosiPos.simpan(b.kunci, e.target.value, b.tiket).catch(() => {}); }}
+              title="Emosi saat posisi ini berjalan — ikut tercatat di riwayat order saat ditutup"
+              className={cn('cursor-pointer appearance-none border-0 bg-transparent p-0 text-right text-[11px] outline-none disabled:cursor-not-allowed',
+                emosiPos.peta[b.kunci] ? 'text-zinc-300' : 'text-zinc-600')}>
+              <option value="">—</option>
+              {EMOSI.map((e) => <option key={e} value={e}>{e}</option>)}
+            </select>
+          )}
+        />
 
-                {/* Baris kedua: level yang sedang menjaga uangnya, lalu emosi.
-                    SL/TP bernilai 0 berarti BELUM DIPASANG — ditulis apa
-                    adanya, karena posisi tanpa stop adalah hal yang justru
-                    harus terlihat, bukan disamarkan jadi tanda hubung. */}
-                <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
-                  <span className="text-zinc-600">masuk <span className="angka text-zinc-400">{fHarga(b.entry)}</span></span>
-                  <span className="text-zinc-600">SL{' '}
-                    <span className={cn('angka', b.sl > 0 ? 'text-red-400/90' : 'text-amber-400/80')}>
-                      {b.sl > 0 ? fHarga(b.sl) : 'belum dipasang'}
-                    </span>
-                  </span>
-                  <span className="text-zinc-600">TP{' '}
-                    <span className={cn('angka', b.tp > 0 ? 'text-emerald-500/90' : 'text-zinc-600')}>
-                      {b.tp > 0 ? fHarga(b.tp) : '—'}
-                    </span>
-                  </span>
-                  {/* Emosi ditulis SEJAJAR dengan entry/SL/TP sebagai data,
-                      bukan sebagai tombol. Kotak pilihan di antara angka
-                      membuat barisnya terbaca seperti formulir, padahal
-                      yang dibaca sekilas di sini adalah keadaan posisi.
-                      Menyuntingnya tetap bisa: klik teksnya. */}
-                  <span className="ml-auto flex items-center gap-1 text-zinc-600">
-                    Emosi{' '}
-                    <select
-                      value={emosiPos.peta[b.kunci] ?? ''}
-                      disabled={!emosiPos.bisaTulis}
-                      onChange={(e) => { void emosiPos.simpan(b.kunci, e.target.value, b.tiket).catch(() => {}); }}
-                      title="Emosi saat posisi ini berjalan — ikut tercatat di riwayat order saat ditutup"
-                      className={cn('cursor-pointer appearance-none border-0 bg-transparent p-0 text-[11px] outline-none disabled:cursor-not-allowed',
-                        emosiPos.peta[b.kunci] ? 'text-zinc-300' : 'text-zinc-600')}>
-                      <option value="">—</option>
-                      {EMOSI.map((e) => <option key={e} value={e}>{e}</option>)}
-                    </select>
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* ORDER MENUNGGU — sudah terkirim ke bursa, belum ke-fill.
-            Dipisah dari daftar posisi karena statusnya berbeda secara
-            mendasar: belum ada uang yang bergerak, belum ada P/L, dan
-            belum ada apa pun untuk dievaluasi. Yang dijawab kotak ini
-            cuma satu: "order-ku sampai atau tidak?" */}
         {/* Sama seperti di Dashboard: EA lama tidak bisa melaporkan
             pending, dan layar yang diam soal itu memberi kesan order-nya
             tidak terkirim. */}
