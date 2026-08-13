@@ -179,8 +179,17 @@ export function PanelSinyal() {
     const j = setInterval(() => setTik((v) => v + 1), 1000);
     return () => clearInterval(j);
   }, [sedangJalan]);
-  const berjalanMs = sedangJalan
-    ? Date.now() - (permintaan!.mulai || permintaan!.waktu)
+  /* DUA keadaan yang berbeda, dan sebelumnya keduanya ditulis "bekerja":
+       · menunggu dijemput — agen belum menyentuh apa pun
+       · dikerjakan        — agen benar-benar sedang membaca ruang sinyal
+     Menyebut yang pertama "bekerja 2m 50d" adalah kebohongan kecil yang
+     membuat orang mengira ada yang macet, padahal agennya memang belum
+     dibangunkan. Penjemputan berjalan tiap 2 menit. */
+  const dijemputMs = 2 * 60_000;
+  const sudahMulai = !!permintaan?.mulai;
+  const berjalanMs = sudahMulai ? Date.now() - permintaan!.mulai! : 0;
+  const sisaJemput = sedangJalan && !sudahMulai
+    ? Math.max(0, dijemputMs - ((Date.now() - permintaan!.waktu) % dijemputMs))
     : 0;
   void tik;   // pemicu render tiap detik
 
@@ -211,7 +220,7 @@ export function PanelSinyal() {
                 menit itu wajar. */}
             {sedangJalan ? (
               <span className="angka hidden text-[10.5px] text-amber-300/90 sm:inline">
-                bekerja {durasi(berjalanMs)}
+                {sudahMulai ? `bekerja ${durasi(berjalanMs)}` : `dijemput ≤ ${durasi(sisaJemput)}`}
               </span>
             ) : hasil?.durasiMs ? (
               <span className="hidden text-[10.5px] text-zinc-500 sm:inline">
@@ -241,9 +250,10 @@ export function PanelSinyal() {
           {kabarMinta && <span className="text-zinc-400">{kabarMinta}</span>}
           {sedangJalan && !kabarMinta && (
             <span className="text-amber-300/90">
-              {permintaan!.mulai
+              {sudahMulai
                 ? <>Agen sedang membaca ruang sinyal — berjalan <span className="angka">{durasi(berjalanMs)}</span>.</>
-                : <>Permintaan {kapan(permintaan!.waktu)} — menunggu agen mengambilnya (dijemput tiap 10 menit).</>}
+                : <>Permintaan {kapan(permintaan!.waktu)} — belum dijemput. Penjemputan berjalan tiap 2 menit,
+                   jadi agen mulai dalam <span className="angka">≤ {durasi(sisaJemput)}</span>. Ia hanya jalan saat aplikasi Claude terbuka.</>}
             </span>
           )}
           {!sedangJalan && !kabarMinta && hasil && (
