@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
-  ArrowLeft, CheckCircle2, Clock, Loader2, LogIn, ShieldCheck, XCircle,
+  ArrowLeft, CheckCircle2, Clock, KeyRound, Loader2, LogIn, ShieldCheck, XCircle,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import {
-  useKuota, mintaAkses, permintaanSaya, masukDiscord, LINK_BAYAR, type Permintaan,
+  useKuota, mintaAkses, permintaanSaya, masukDiscord, aktifkanKode, LINK_BAYAR,
+  type Permintaan,
 } from '@/lib/akses';
 import { cn } from '@/lib/utils';
 
@@ -59,6 +60,24 @@ export default function Akses() {
   const [sibuk, setSibuk] = useState(false);
   const [kabar, setKabar] = useState('');
   const [catatan, setCatatan] = useState('');
+  const [kode, setKode] = useState('');
+  const [sibukKode, setSibukKode] = useState(false);
+  const [kabarKode, setKabarKode] = useState('');
+
+  async function tukarKode() {
+    setSibukKode(true); setKabarKode('');
+    try {
+      const h = await aktifkanKode(kode);
+      setKabarKode(
+        h.firestoreOk === false
+          ? 'Kode diterima, tapi masa berlakunya gagal disimpan. Hubungi admin sebelum mencoba lagi.'
+          : `Akses aktif sampai ${h.berakhir ? new Date(h.berakhir).toLocaleDateString('id-ID') : '—'}. Muat ulang halaman.`,
+      );
+      if (h.ok && h.firestoreOk !== false) setTimeout(() => window.location.reload(), 1400);
+    } catch (e) {
+      setKabarKode(e instanceof Error ? e.message : 'Gagal menukar kode');
+    } finally { setSibukKode(false); }
+  }
 
   /* Permintaan sendiri dibaca ulang tiap kali orangnya berganti — bukan
      sekali saat modul dimuat. Orang yang keluar lalu masuk dengan akun lain
@@ -192,6 +211,39 @@ export default function Akses() {
             </p>
           </div>
         ) : null}
+
+        {/* ── Tukar kode lisensi ────────────────────────────────────────
+            Ditaruh SEBELUM tombol minta: orang yang sudah memegang kode tidak
+            perlu membaca cara meminta sesuatu yang sudah ada di tangannya. */}
+        {pengguna && !sudahAktif && (
+          <div className="flex flex-col gap-3 rounded-xl border border-zinc-800 bg-zinc-900/40 p-5">
+            <div>
+              <div className="text-[13.5px] font-medium text-zinc-200">Sudah punya kode akses?</div>
+              <p className="mt-1 text-[12.5px] leading-relaxed text-zinc-500">
+                Kode dikirim ke email setelah permintaan disetujui. Satu kode berlaku untuk
+                satu akun.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2.5">
+              <input
+                value={kode}
+                onChange={(e) => setKode(e.target.value.toUpperCase().slice(0, 19))}
+                placeholder="JT3-XXXX-XXXX-XXXX"
+                spellCheck={false}
+                className="angka h-10 min-w-0 flex-1 rounded-md border border-zinc-800 bg-zinc-950 px-3 text-[13px] tracking-wider text-zinc-100 outline-none placeholder:text-zinc-700 focus-visible:border-zinc-600"
+              />
+              <button
+                onClick={() => void tukarKode()}
+                disabled={sibukKode || kode.trim().length < 19}
+                className="inline-flex cursor-pointer items-center gap-2 rounded-md bg-zinc-100 px-5 text-[13px] font-semibold text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {sibukKode ? <Loader2 className="size-4 animate-spin" /> : <KeyRound className="size-4" />}
+                Aktifkan
+              </button>
+            </div>
+            {kabarKode && <div className="text-[12px] leading-relaxed text-zinc-400">{kabarKode}</div>}
+          </div>
+        )}
 
         {/* ── Tombol minta ──────────────────────────────────────────── */}
         {pengguna && !sudahAktif && terakhir?.status !== 'baru' && (

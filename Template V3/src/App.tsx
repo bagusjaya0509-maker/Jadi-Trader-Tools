@@ -187,7 +187,12 @@ function Beranda() {
 function usePenjaga() {
   const { memuat, pemilik, langganan } = useAuth();
   const lokasi = useLocation();
-  const boleh = pemilik || langganan.status === 'aktif' || langganan.warisan;
+  /* HANYA lisensi aktif. Masa coba dan penanda "akun lama" DICABUT dari
+     gerbang: keduanya terbukti bocor — siapa pun yang pernah login sekali
+     sudah punya masa coba, jadi gerbangnya membuka untuk orang yang tidak
+     pernah disetujui siapa pun. Satu-satunya kunci sekarang adalah kode
+     lisensi yang ditukar di halaman /akses. */
+  const boleh = pemilik || langganan.status === 'aktif';
   const keAkses = <Navigate to={`/akses?dari=${encodeURIComponent(lokasi.pathname)}`} replace />;
   return { memuat, boleh, keAkses };
 }
@@ -212,7 +217,7 @@ function Kerangka() {
   /* `warisan` ikut membuka: akun yang sudah ada sebelum gerbang ini dipasang
      tidak pernah diminta meminta akses, jadi melemparnya ke halaman
      permintaan sama saja mengunci orang di luar rumahnya sendiri. */
-  if (!(pemilik || langganan.status === 'aktif' || langganan.warisan)) {
+  if (!(pemilik || langganan.status === 'aktif')) {
     return <Navigate to={`/akses?dari=${encodeURIComponent(lokasi.pathname)}`} replace />;
   }
   return (

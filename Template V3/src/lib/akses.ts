@@ -106,6 +106,20 @@ export async function permintaanSaya(): Promise<Permintaan[]> {
   return (j.permintaan ?? []) as Permintaan[];
 }
 
+/** Tukar kode lisensi jadi akses. Kode diikat ke akun pertama yang
+ *  menukarnya — tanpa itu satu kode bisa disebar ke seratus orang dan kuota
+ *  20/80 tidak berarti apa-apa. */
+export async function aktifkanKode(kode: string) {
+  const r = await fetch(`${dasar()}/api/akses/aktifkan`, {
+    method: 'POST',
+    headers: await kepalaLogin(),
+    body: JSON.stringify({ kode: kode.trim().toUpperCase() }),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || `Server menjawab ${r.status}`);
+  return j as { ok: boolean; berakhir?: number; firestoreOk?: boolean };
+}
+
 /* ── Pemilik: daftar & putuskan ──────────────────────────────────────── */
 function kepalaPemilik(): Record<string, string> {
   const t = bacaKoneksi().token.trim();
