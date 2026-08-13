@@ -35,7 +35,7 @@
 //       tombol AutoTrading (Algo Trading) di toolbar MT5 menyala.
 //+------------------------------------------------------------------+
 #property copyright "Jadi Trader Tools"
-#property version   "2.06"
+#property version   "2.07"
 #property strict
 #property description "Trade-Fi Sync v2: jurnal + eksekusi perintah web + kirim chart MT5. Baca pagar pengamannya di kepala berkas."
 
@@ -52,7 +52,7 @@ input string SimbolChart      = "";                                  // Simbol y
 input int    KirimChartMenit  = 5;                                   // Jeda kirim OHLC ke web (menit)
 input bool   KirimTick        = true;                                // Kirim harga tiap detik (harga web = MT5)
 
-#define VERSI_EA "2.06"
+#define VERSI_EA "2.07"
 #define PFX      "JTS_"
 
 CTrade   gTrade;
@@ -617,18 +617,33 @@ void JalankanPerintah(string baris)
    }
    else if(aksi == "TUTUP")
    {
-      if(!PositionSelectByTicket(tiket))
+      // Sama seperti UBAH: satu perintah untuk posisi DAN pending. Menutup
+      // posisi dan membatalkan order yang belum jadi memang dua operasi
+      // berbeda di MT5, tapi bagi yang menekannya keduanya berarti hal yang
+      // sama - "batalkan ini". Terminal yang tahu tiket itu milik yang mana.
+      if(PositionSelectByTicket(tiket))
       {
-         LaporHasil(id, false, "Posisi " + IntegerToString((long)tiket) + " tidak ditemukan", "");
+         ok = gTrade.PositionClose(tiket);
+         pesan = ok ? "posisi ditutup"
+                    : ("retcode " + IntegerToString((int)gTrade.ResultRetcode()) + " " + gTrade.ResultRetcodeDescription());
+         tiketHasil = IntegerToString((long)tiket);
+         gPerintahAkhir = "TUTUP #" + IntegerToString((long)tiket) + " " + (ok ? "OK" : "GAGAL");
+      }
+      else if(OrderSelect(tiket))
+      {
+         ok = gTrade.OrderDelete(tiket);
+         pesan = ok ? "pending dibatalkan"
+                    : ("retcode " + IntegerToString((int)gTrade.ResultRetcode()) + " " + gTrade.ResultRetcodeDescription());
+         tiketHasil = IntegerToString((long)tiket);
+         gPerintahAkhir = "HAPUS #" + IntegerToString((long)tiket) + " " + (ok ? "OK" : "GAGAL");
+      }
+      else
+      {
+         LaporHasil(id, false, "Tiket " + IntegerToString((long)tiket) + " tidak ditemukan (bukan posisi maupun pending)", "");
          gPerintahGagal++;
          gPerintahAkhir = "TUTUP #" + IntegerToString((long)tiket) + " GAGAL: tak ada";
          return;
       }
-      ok = gTrade.PositionClose(tiket);
-      pesan = ok ? "posisi ditutup"
-                 : ("retcode " + IntegerToString((int)gTrade.ResultRetcode()) + " " + gTrade.ResultRetcodeDescription());
-      tiketHasil = IntegerToString((long)tiket);
-      gPerintahAkhir = "TUTUP #" + IntegerToString((long)tiket) + " " + (ok ? "OK" : "GAGAL");
    }
    else
    {

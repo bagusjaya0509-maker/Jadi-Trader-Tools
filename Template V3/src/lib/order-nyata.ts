@@ -254,3 +254,36 @@ export async function ubahSlTpNyata(p: UbahSlTp): Promise<void> {
     throw new Error(rinci ? String(rinci) : `Backend menjawab ${r.status}`);
   }
 }
+
+/** Batalkan pending order kripto yang belum ke-fill. */
+export async function batalPendingNyata(p: { symbol: string; orderId: string; isAlgo?: boolean }): Promise<void> {
+  const { url, token } = bacaKoneksi();
+  const dasar = (url.trim() || 'https://103-253-145-38.sslip.io').replace(/\/+$/, '');
+  if (!token.trim()) throw new Error('App Token belum diisi di Integrations.');
+  const r = await fetch(`${dasar}/api/trade/futures/cancel-pending`, {
+    method: 'POST',
+    headers: { 'X-App-Token': token.trim(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ symbol: p.symbol, orderId: p.orderId, isAlgo: p.isAlgo !== false }),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(typeof j?.error === 'object' ? (j.error.msg ?? JSON.stringify(j.error)) : (j?.error ?? `Backend menjawab ${r.status}`));
+}
+
+/** Tutup posisi kripto di harga pasar. SL/TP yang masih menggantung ikut
+ *  dibatalkan backend — stop yatim yang tertinggal akan menembak posisi
+ *  BERIKUTNYA di pair yang sama. */
+export async function tutupPosisiNyata(p: {
+  symbol: string; side: 'BUY' | 'SELL'; quantity: number;
+  slOrderId?: string; tp1OrderId?: string;
+}): Promise<void> {
+  const { url, token } = bacaKoneksi();
+  const dasar = (url.trim() || 'https://103-253-145-38.sslip.io').replace(/\/+$/, '');
+  if (!token.trim()) throw new Error('App Token belum diisi di Integrations.');
+  const r = await fetch(`${dasar}/api/trade/futures/close`, {
+    method: 'POST',
+    headers: { 'X-App-Token': token.trim(), 'Content-Type': 'application/json' },
+    body: JSON.stringify(p),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(typeof j?.error === 'object' ? (j.error.msg ?? JSON.stringify(j.error)) : (j?.error ?? `Backend menjawab ${r.status}`));
+}

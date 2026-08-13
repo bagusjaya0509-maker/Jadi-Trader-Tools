@@ -9,7 +9,7 @@ import { cn, uang, persen, harga, tanggalPendek } from '@/lib/utils';
 import { ChartLilin, type Garis, type GarisHarga, type GarisSeret, type PosisiChartMt5 } from '@/components/chart-lilin';
 import { PanelReplay, type AksiOrder, type JenisEntry } from '@/components/panel-replay';
 import { PojokOrder } from '@/components/pojok-order';
-import { kirimOrderNyata, ubahSlTpNyata, type MetodeTp } from '@/lib/order-nyata';
+import { kirimOrderNyata, ubahSlTpNyata, batalPendingNyata, tutupPosisiNyata, type MetodeTp } from '@/lib/order-nyata';
 import { kirimPerintahMt5, tungguHasilMt5 } from '@/lib/mt5-order';
 import { DockPine, type InfoPine, type KendaliPine } from '@/components/dock-pine';
 import { WatchChart } from '@/components/watch-chart';
@@ -112,7 +112,8 @@ export default function ChartBacktest() {
      Alamat menang karena ia perbuatan yang baru saja dilakukan — klik kanan
      di screener harus membuka koin yang diklik, bukan koin kemarin. */
   const awal = bacaSetelanChart();
-  const { order: orderBursa } = usePosisiBinance();
+  const { data: posisiBursa, order: orderBursa } = usePosisiBinance();
+  const akunMt5 = useAkunMt5();
   const [simbol, setSimbol] = useState(() => rapikanSimbol(cari.get('simbol') || awal.simbol || 'BTCUSDT'));
   const [tf, setTf] = useState(() => {
     const t = (cari.get('tf') || awal.tf || '4h').toLowerCase();
@@ -299,16 +300,24 @@ export default function ChartBacktest() {
      jalan; menyatukannya berarti satu salah klik bisa membuka order
      yang tidak diminta. */
   const [sunting, setSunting] = useState<OrderSunting | null>(null);
-  const [suntingSl, setSuntingSl] = useState(0);
-  const [suntingTp, setSuntingTp] = useState(0);
+  /* Disimpan sebagai TEKS, bukan angka. Isian angka yang menyimpan
+     number tidak bisa diketik: "0." berubah jadi 0 di tengah ketikan dan
+     titiknya hilang, jadi harga desimal mustahil dimasukkan tangan.
+     Angkanya diurai saat dipakai, bukan saat diketik. */
+  const [suntingSlTeks, setSuntingSlTeks] = useState('');
+  const [suntingTpTeks, setSuntingTpTeks] = useState('');
+  const suntingSl = Number(suntingSlTeks) || 0;
+  const suntingTp = Number(suntingTpTeks) || 0;
+  const setSuntingSl = (n: number) => setSuntingSlTeks(n ? String(n) : '');
+  const setSuntingTp = (n: number) => setSuntingTpTeks(n ? String(n) : '');
   const [suntingSibuk, setSuntingSibuk] = useState(false);
   const [suntingKabar, setSuntingKabar] = useState('');
 
   function bukaSunting(o: OrderSunting) {
     setSimbol(rapikanSimbol(o.simbolChart));
     setSunting(o);
-    setSuntingSl(o.sl);
-    setSuntingTp(o.tp);
+    setSuntingSlTeks(o.sl ? String(o.sl) : '');
+    setSuntingTpTeks(o.tp ? String(o.tp) : '');
     setSuntingKabar('');
   }
 
@@ -374,6 +383,63 @@ export default function ChartBacktest() {
     } finally { setSuntingSibuk(false); }
   }
 
+  /* Batalkan pending / tutup posisi. Dipisah dari kirimSunting karena
+     akibatnya tidak bisa dibatalkan: yang satu mengubah level, yang satu
+     mengakhiri ordernya. Keduanya minta konfirmasi yang MENYEBUT apa
+     yang akan hilang — "Yakin?" tidak memberi tahu apa-apa. */
+  /* P/L berjalan order yang sedang disunting — dibaca dari sumber yang
+     sama dengan panelnya, bukan dihitung ulang di sini. Dua tempat yang
+     menghitung P/L dengan rumus sendiri akan berselisih cepat atau
+     lambat, dan yang satu pasti salah. */
+  const pnlSunting = useMemo(() => {
+    if (!sunting || sunting.jenis !== 'posisi') return null;
+    if (sunting.pasar === 'mt5') {
+      const p = akunMt5.posisi.find((x) => x.tiket === sunting.tiket);
+      return p ? p.profit : null;
+    }
+    const p = posisiBursa.find((x) => x.simbol === sunting.simbol);
+    return p ? p.pnl : null;
+  }, [sunting, akunMt5.posisi, posisiBursa]);
+
+  async function akhiriOrder() {
+    if (!sunting) return;
+    const nama = `${sunting.simbol} ${sunting.arah}`;
+    const pesan = sunting.jenis === 'pending'
+      ? `Batalkan pending order ${nama}?
+
+Order ini belum jadi posisi — tidak ada rugi/untung yang terkunci.`
+      : `Tutup posisi ${nama} sekarang di harga pasar?
+
+${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini akan TERKUNCI begitu ditutup.` : 'P/L berjalan tidak diketahui.'}`;
+    if (!confirm(pesan)) return;
+
+    setSuntingSibuk(true);
+    setSuntingKabar(sunting.jenis === 'pending' ? 'Membatalkan order…' : 'Menutup posisi…');
+    try {
+      if (sunting.pasar === 'mt5') {
+        const { id } = await kirimPerintahMt5({ aksi: 'TUTUP', tiket: sunting.tiket });
+        const hasil = await tungguHasilMt5(id);
+        setSuntingKabar(hasil.status === 'sukses' ? `Selesai — ${hasil.pesan}` : `Gagal: ${hasil.pesan}`);
+        if (hasil.status === 'sukses') setSunting(null);
+      } else if (sunting.jenis === 'pending') {
+        await batalPendingNyata({ symbol: sunting.simbol, orderId: sunting.tiket ?? '' });
+        setSuntingKabar('Pending order dibatalkan.');
+        setSunting(null);
+      } else {
+        const milik = orderBursa.filter((x) => x.simbol === sunting.simbol);
+        await tutupPosisiNyata({
+          symbol: sunting.simbol, side: sunting.arah, quantity: sunting.ukuran,
+          slOrderId: milik.find((x) => x.jenis === 'SL')?.id,
+          tp1OrderId: milik.find((x) => x.jenis === 'TP')?.id,
+        });
+        setSuntingKabar('Posisi ditutup di harga pasar.');
+        setSunting(null);
+      }
+    } catch (e) {
+      setSuntingKabar(e instanceof Error ? e.message : 'Gagal mengakhiri order');
+    } finally { setSuntingSibuk(false); }
+  }
+
   const [kendaliReplay, setKendaliReplay] = useState<React.ReactNode>(null);
   /* Arah tiket yang sedang disusun. null = belum ada tiket, chart cuma
      menggambar rencana dari kartu screener kalau ada. */
@@ -409,7 +475,6 @@ export default function ChartBacktest() {
      entry/SL/TP mode REAL. Garisnya milik BROKER: tetap ada selama
      posisinya hidup (dibuka dari web ataupun MT5), hilang sendiri saat
      SL/TP kena atau ditutup dari mana pun. */
-  const akunMt5 = useAkunMt5();
   const nilaiLotMt5 = simbol.startsWith('MT5:') ? (bacaSpekMt5(simbol.slice(4)) ?? 100) : 0;
   /* ── Posisi MT5 di chart — ala garis posisi MetaTrader ──────────────
      Setiap posisi terbuka di simbol ini digambar ChartLilin sebagai price
@@ -1138,7 +1203,9 @@ export default function ChartBacktest() {
                           kunciUkuran={lebarWatch}
                           mundur={DURASI_TF[tf] ? jamMundur(detik) : undefined}
                           hamparanBawah={kendaliReplay}
-                          pojok={aksi ? (
+                          pojok={(aksi || sunting) ? (
+                            <div className="flex items-start gap-2">
+                            {aksi ? (
                             <PojokOrder
                               posisi={aksi.posisi} hargaKini={aksi.hargaKini}
                               draf={draf} rencana={rencana} mode={aksi.mode}
@@ -1278,6 +1345,72 @@ export default function ChartBacktest() {
                               catatan={catatanTiket} aturCatatan={setCatatanTiket}
                               sibukNyata={sibukNyata} kabar={kabarNyata || undefined}
                               onTutup={aksi.tutup} mati={aksi.mati} />
+                            ) : null}
+                            {sunting && (
+                              /* Menempel di SEBELAH panel order, bukan di dasar
+                                 chart: dock Pine meluncur dari kanan dan
+                                 menutupi apa pun yang duduk di bawah. Tanpa
+                                 bingkai dan latar — ia bagian dari chart, bukan
+                                 kartu yang menumpang di atasnya. */
+                              <div className="w-[210px] shrink-0 text-[11.5px]">
+                                <div className="flex items-baseline gap-1.5">
+                                  <span className="text-zinc-200">{sunting.simbol}</span>
+                                  <span className={cn('text-[10.5px]', sunting.arah === 'BUY' ? 'text-emerald-500' : 'text-red-400')}>
+                                    {sunting.arah}
+                                  </span>
+                                  <span className="text-[10px] text-zinc-500">
+                                    {sunting.jenis === 'pending' ? 'pending' : 'posisi'} · {sunting.pasar === 'mt5' ? 'Trade-Fi' : 'Binance'}
+                                  </span>
+                                </div>
+                                {pnlSunting !== null && (
+                                  <div className="mt-0.5 text-[10.5px] text-zinc-500">
+                                    P/L berjalan{' '}
+                                    <span className={cn('angka', pnlSunting >= 0 ? 'text-emerald-500' : 'text-red-400')}>
+                                      {uang(pnlSunting, true)}
+                                    </span>
+                                  </div>
+                                )}
+                                {/* Klik kolomnya = garisnya langsung muncul di
+                                    harga sekarang, siap diseret. Sebelumnya
+                                    order tanpa SL sama sekali tidak punya garis
+                                    untuk dipegang, jadi satu-satunya cara
+                                    memasangnya adalah mengetik angkanya dari
+                                    nol — padahal justru order tanpa SL yang
+                                    paling perlu cepat dipasangi. */}
+                                {([['SL', suntingSlTeks, setSuntingSlTeks, 'text-red-400/90'],
+                                   ['TP', suntingTpTeks, setSuntingTpTeks, 'text-emerald-500/90']] as const).map(([nama, nilai, atur, warna]) => (
+                                  <label key={nama} className="mt-1 flex items-center gap-1.5">
+                                    <span className={cn('w-5 text-[10.5px]', warna)}>{nama}</span>
+                                    <input
+                                      value={nilai}
+                                      inputMode="decimal"
+                                      placeholder="klik lalu seret garisnya"
+                                      onFocus={() => { if (!nilai && aksi?.hargaKini) atur(String(aksi.hargaKini)); }}
+                                      onChange={(e) => atur(e.target.value.replace(/[^\d.,-]/g, '').replace(',', '.'))}
+                                      className="angka h-6 min-w-0 grow rounded border border-zinc-800 bg-zinc-900/80 px-1.5 text-right text-[11px] text-zinc-200 outline-none placeholder:text-[9.5px] placeholder:text-zinc-700 focus-visible:border-zinc-600" />
+                                  </label>
+                                ))}
+                                <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                                  <button onClick={() => void kirimSunting()} disabled={suntingSibuk}
+                                    className="flex cursor-pointer items-center gap-1 rounded bg-zinc-100 px-2 py-1 text-[10.5px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-60">
+                                    {suntingSibuk ? <Loader2 className="size-3 animate-spin" /> : null}
+                                    Kirim
+                                  </button>
+                                  <button onClick={() => void akhiriOrder()} disabled={suntingSibuk}
+                                    className="cursor-pointer rounded px-2 py-1 text-[10.5px] text-red-400/90 transition-colors hover:bg-red-500/10 disabled:opacity-50">
+                                    {sunting.jenis === 'pending' ? 'Hapus order' : 'Tutup posisi'}
+                                  </button>
+                                  <button onClick={() => { setSunting(null); setSuntingKabar(''); }}
+                                    className="cursor-pointer rounded px-2 py-1 text-[10.5px] text-zinc-500 transition-colors hover:text-zinc-300">
+                                    Batal
+                                  </button>
+                                </div>
+                                {suntingKabar && (
+                                  <div className="mt-1 text-[10px] leading-relaxed text-zinc-400">{suntingKabar}</div>
+                                )}
+                              </div>
+                            )}
+                            </div>
                           ) : undefined} />
             : <div className="flex h-[440px] items-center justify-center text-[12.5px] text-zinc-600">
                 {memuat ? 'Memuat lilin…' : 'Tidak ada data untuk simbol ini.'}
@@ -1289,44 +1422,6 @@ export default function ChartBacktest() {
               yang sedang dibaca orangnya adalah garis-garisnya, dan
               bilah yang menutupi harga justru menghalangi keputusan yang
               sedang diambil. */}
-          {sunting && (
-            <div className="absolute inset-x-2 bottom-2 z-30 flex flex-wrap items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-950/95 px-3 py-2 backdrop-blur">
-              <span className="text-[12px] text-zinc-200">
-                {sunting.simbol}
-                <span className={cn('ml-1.5 text-[10.5px]', sunting.arah === 'BUY' ? 'text-emerald-500' : 'text-red-400')}>
-                  {sunting.arah}
-                </span>
-                <span className="ml-1.5 text-[10.5px] text-zinc-500">
-                  {sunting.jenis === 'pending' ? 'pending' : 'posisi'} · {sunting.pasar === 'mt5' ? 'Trade-Fi' : 'Binance'}
-                </span>
-              </span>
-              <label className="flex items-center gap-1 text-[11px] text-zinc-500">
-                SL
-                <input type="number" step="any" value={suntingSl || ''}
-                       onChange={(e) => setSuntingSl(Number(e.target.value) || 0)}
-                       className="angka h-7 w-[110px] rounded border border-zinc-800 bg-zinc-900 px-1.5 text-right text-[11.5px] text-zinc-200 outline-none focus-visible:border-zinc-600" />
-              </label>
-              <label className="flex items-center gap-1 text-[11px] text-zinc-500">
-                TP
-                <input type="number" step="any" value={suntingTp || ''}
-                       onChange={(e) => setSuntingTp(Number(e.target.value) || 0)}
-                       className="angka h-7 w-[110px] rounded border border-zinc-800 bg-zinc-900 px-1.5 text-right text-[11.5px] text-zinc-200 outline-none focus-visible:border-zinc-600" />
-              </label>
-              <button onClick={() => void kirimSunting()} disabled={suntingSibuk}
-                className="flex cursor-pointer items-center gap-1.5 rounded-md bg-zinc-100 px-3 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-60">
-                {suntingSibuk ? <Loader2 className="size-3.5 animate-spin" /> : null}
-                Kirim perubahan
-              </button>
-              <button onClick={() => { setSunting(null); setSuntingKabar(''); }}
-                className="cursor-pointer rounded-md border border-zinc-800 px-2.5 py-1.5 text-[12px] text-zinc-400 transition-colors hover:border-zinc-600">
-                Batal
-              </button>
-              {suntingKabar && (
-                <span className="min-w-0 grow truncate text-[11.5px] text-zinc-400" title={suntingKabar}>{suntingKabar}</span>
-              )}
-            </div>
-          )}
-
           {/* ── Legend indikator ala TradingView — pojok kiri-atas ────
               Nama yang terpasang tertulis DI chartnya, dengan ikon setelan
               dan kode di sebelahnya. Indikator tanpa nama di layar adalah
@@ -1496,25 +1591,17 @@ export default function ChartBacktest() {
                        tampil={replayIdx !== null}
                        tanpaBingkai />
         </div>
-      </Panel>
 
-      {/* ── Posisi Terbuka ──────────────────────────────────────────
-          Dipindah ke sini dari Jurnal. Alasannya bukan kerapian: posisi
-          terbuka adalah sesuatu yang masih bisa DIPERBUAT — SL-nya
-          digeser, ditutup, ditambah — dan semua perbuatan itu terjadi di
-          halaman ini. Jurnal tempat menilai yang sudah lewat. */}
-      {/* Tanpa judul section: tiap panel sudah menyebut pasarnya sendiri,
-          persis seperti di Dashboard. Judul di atas dua panel yang
-          masing-masing sudah berjudul cuma mengulang. */}
-      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <PanelPosisiTerbuka sumber="kripto" onSunting={bukaSunting} />
-        <PanelPosisiTerbuka sumber="forex" onSunting={bukaSunting} />
-      </div>
-
+        {/* ── Backtest (beta) — MENYATU dengan panel grafik ─────────
+            Dulu panel terpisah di bawahnya. Disatukan seperti panel
+            Replay karena isinya memang milik chart ini: setelan yang
+            diubah di sana mengubah penanda trade DI grafik yang sama.
+            Panel sendiri membuat keduanya terbaca sebagai dua alat yang
+            kebetulan bertetangga. */}
+        {backtestBuka && (
+          <div className="border-t border-zinc-800/80">
       {/* ── Backtest (beta) — tampil hanya kalau dibuka dari ikon di
              pojok bawah chart ── */}
-      {backtestBuka && (
-        <>
           <div className="mt-4 rounded-lg border border-amber-500/25 bg-amber-500/[0.04] px-4 py-2.5 text-[12px] leading-relaxed text-amber-200/80">
             <span className="font-medium">Backtest masih beta.</span>
             <span className="text-amber-200/60">
@@ -1627,8 +1714,22 @@ export default function ChartBacktest() {
               </>
             )
           )}
-        </>
-      )}
+        </div>
+        )}
+      </Panel>
+
+      {/* ── Posisi Terbuka ──────────────────────────────────────────
+          Dipindah ke sini dari Jurnal. Alasannya bukan kerapian: posisi
+          terbuka adalah sesuatu yang masih bisa DIPERBUAT — SL-nya
+          digeser, ditutup, ditambah — dan semua perbuatan itu terjadi di
+          halaman ini. Jurnal tempat menilai yang sudah lewat. */}
+      {/* Tanpa judul section: tiap panel sudah menyebut pasarnya sendiri,
+          persis seperti di Dashboard. Judul di atas dua panel yang
+          masing-masing sudah berjudul cuma mengulang. */}
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <PanelPosisiTerbuka sumber="kripto" onSunting={bukaSunting} />
+        <PanelPosisiTerbuka sumber="forex" onSunting={bukaSunting} />
+      </div>
     </div>
   );
 }
