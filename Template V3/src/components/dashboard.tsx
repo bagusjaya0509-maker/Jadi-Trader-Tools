@@ -11,7 +11,7 @@ import { useRiwayat, usePosisi, useSaldoAwal, terbitkanRingkasan } from '@/lib/d
 import { useAuth } from '@/lib/auth';
 import { useHargaPasar } from '@/lib/harga';
 import { LabelContoh, SpandukContoh } from '@/components/gerbang';
-import { useAkunMt5, useAkunBinance } from '@/lib/akun';
+import { useAkunMt5, useAkunBinance, versiKurangDari, VERSI_EA_PENDING } from '@/lib/akun';
 import { useArusKas, arusBersih } from '@/lib/tulis-jurnal';
 import { PanelEvaluasi } from '@/components/panel-evaluasi';
 
@@ -433,6 +433,21 @@ export function Dashboard() {
             {POSISI_MT5.length === 0 && mt5.pending.length === 0 && (
               <div className="px-1 py-6 text-center text-[12.5px] text-zinc-500">
                 {mt5.terhubung === true ? 'Tidak ada posisi MT5 terbuka.' : mt5.ket}
+              </div>
+            )}
+
+            {/* EA lama TIDAK BISA melaporkan pending order — dan diamnya
+                layar terbaca sebagai "tidak ada order", padahal bisa saja
+                ada empat yang terpasang di terminal. Dua keadaan yang
+                sangat berbeda tidak boleh terlihat sama, jadi versinya
+                disebut terang-terangan beserta cara memperbaikinya. */}
+            {mt5.terhubung === true && mt5.versiEa && versiKurangDari(mt5.versiEa, VERSI_EA_PENDING) && (
+              <div className="rounded-lg border border-amber-500/25 bg-amber-500/[0.04] px-3 py-2 text-[11px] leading-relaxed text-amber-200/80">
+                EA v{mt5.versiEa} belum mengirim pending order.
+                <span className="text-amber-200/60">
+                  {' '}Kompilasi ulang <span className="angka">JadiTraderSyncV2.mq5</span> ke v{VERSI_EA_PENDING} (F7 di MetaEditor),
+                  lalu pasang ulang EA-nya. Posisi terbuka tetap tercatat seperti biasa.
+                </span>
               </div>
             )}
             {POSISI_MT5.map((p) => (

@@ -76,9 +76,32 @@ export interface StatusAkun {
    *  masih di bawah v2.05 — versi lama tidak mengirim kolom ini, dan
    *  daftar kosong dari EA lama bukan bukti tidak ada pending. */
   pending: PendingBroker[];
+  /** Versi EA yang MELAPOR, apa adanya ('' kalau tidak menyebutkan).
+   *
+   *  Dipakai untuk membedakan "tidak ada pending order" dari "EA-nya
+   *  belum bisa melaporkan pending order". Dua keadaan itu terlihat sama
+   *  persis di layar — kosong — dan itulah yang bikin orang mengira
+   *  order-nya tidak terkirim padahal terpasang rapi di terminal. */
+  versiEa: string;
 }
 
-const BELUM: StatusAkun = { terhubung: null, saldo: null, ekuitas: null, mataUang: null, ket: 'Memeriksa…', posisi: [], pending: [] };
+/** Versi EA paling awal yang mengirim daftar pending order. */
+export const VERSI_EA_PENDING = '2.05';
+
+/** Bandingkan versi bergaya "2.4.1" tanpa terjebak perbandingan teks:
+ *  "2.10" > "2.9" secara angka, tapi lebih kecil kalau diadu sebagai
+ *  string. Versi EA akan menembus 2.10 cepat atau lambat. */
+export function versiKurangDari(a: string, b: string): boolean {
+  const pa = String(a).split('.').map((x) => parseInt(x, 10) || 0);
+  const pb = String(b).split('.').map((x) => parseInt(x, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const x = pa[i] ?? 0, y = pb[i] ?? 0;
+    if (x !== y) return x < y;
+  }
+  return false;
+}
+
+const BELUM: StatusAkun = { terhubung: null, saldo: null, ekuitas: null, mataUang: null, ket: 'Memeriksa…', posisi: [], pending: [], versiEa: '' };
 
 /* ── Saldo terakhir yang diketahui, per akun ──────────────────────────────
    Server menyimpan laporan EA terakhir DI MEMORI — restart pm2 menghapusnya,
@@ -99,7 +122,7 @@ function dariSimpanan(uid: string, sebab: string): StatusAkun | null {
     const tgl = new Date(s.waktu).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
     return {
       terhubung: false, saldo: s.saldo, ekuitas: s.ekuitas, mataUang: s.mataUang,
-      ket: `${sebab} — saldo terakhir (${tgl})`, posisi: [], pending: [],
+      ket: `${sebab} — saldo terakhir (${tgl})`, posisi: [], pending: [], versiEa: '',
     };
   } catch { return null; }
 }
@@ -215,6 +238,7 @@ export function useAkunMt5(): StatusAkun {
              berubah tanpa kita tahu. */
           posisi: eaHidup ? posisi : [],
           pending: eaHidup ? pending : [],
+          versiEa: String(j?.data?.versiEa || ''),
         });
       } catch {
         if (hidup) gagalLunak(() => dariSimpanan(auth.currentUser?.uid ?? '', 'Backend tak terjangkau')
@@ -349,7 +373,7 @@ export function useAkunBinance(): StatusAkun {
            hanya yang benar-benar terbuka. */
         setSt({
           terhubung: true, saldo, ekuitas: isFinite(ekuitas) ? ekuitas : saldo,
-          mataUang: 'USDT', ket: 'Binance Futures', posisi: [], pending: [],
+          mataUang: 'USDT', ket: 'Binance Futures', posisi: [], pending: [], versiEa: '',
         });
       } catch {
         if (hidup) setSt({ ...BELUM, terhubung: false, ket: 'Tidak bisa menghubungi backend' });

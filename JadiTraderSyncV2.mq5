@@ -774,10 +774,12 @@ string BagianPending()
       // posisi dalam hitungan milidetik. Yang dilaporkan hanya yang benar
       // benar menggantung menunggu harga.
       string namaJenis = "";
-      if(jenis == ORDER_TYPE_BUY_LIMIT)       namaJenis = "BUY_LIMIT";
-      else if(jenis == ORDER_TYPE_SELL_LIMIT) namaJenis = "SELL_LIMIT";
-      else if(jenis == ORDER_TYPE_BUY_STOP)   namaJenis = "BUY_STOP";
-      else if(jenis == ORDER_TYPE_SELL_STOP)  namaJenis = "SELL_STOP";
+      if(jenis == ORDER_TYPE_BUY_LIMIT)            namaJenis = "BUY_LIMIT";
+      else if(jenis == ORDER_TYPE_SELL_LIMIT)      namaJenis = "SELL_LIMIT";
+      else if(jenis == ORDER_TYPE_BUY_STOP)        namaJenis = "BUY_STOP";
+      else if(jenis == ORDER_TYPE_SELL_STOP)       namaJenis = "SELL_STOP";
+      else if(jenis == ORDER_TYPE_BUY_STOP_LIMIT)  namaJenis = "BUY_STOP_LIMIT";
+      else if(jenis == ORDER_TYPE_SELL_STOP_LIMIT) namaJenis = "SELL_STOP_LIMIT";
       else continue;
 
       string simbol = OrderGetString(ORDER_SYMBOL);

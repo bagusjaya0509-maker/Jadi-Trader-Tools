@@ -8,7 +8,7 @@ import { useRiwayat, useSaldoAwal, usePosisi } from '@/lib/data';
 import { LabelContoh, SpandukContoh } from '@/components/gerbang';
 import { useAuth } from '@/lib/auth';
 import type { Trade, Sumber } from '@/data/contoh';
-import { useAkunMt5, useAkunBinance, type StatusAkun } from '@/lib/akun';
+import { useAkunMt5, useAkunBinance, type StatusAkun, versiKurangDari, VERSI_EA_PENDING } from '@/lib/akun';
 import { useEmosiPosisi, EMOSI } from '@/lib/emosi-posisi';
 import { ModalTrade } from '@/components/modal-trade';
 import { KotakArus } from '@/components/kotak-arus';
@@ -363,6 +363,19 @@ function PanelPosisiJurnal({ sumber }: { sumber: Sumber }) {
             mendasar: belum ada uang yang bergerak, belum ada P/L, dan
             belum ada apa pun untuk dievaluasi. Yang dijawab kotak ini
             cuma satu: "order-ku sampai atau tidak?" */}
+        {/* Sama seperti di Dashboard: EA lama tidak bisa melaporkan
+            pending, dan layar yang diam soal itu memberi kesan order-nya
+            tidak terkirim. */}
+        {sumber !== 'kripto' && mt5.terhubung === true && mt5.versiEa
+          && versiKurangDari(mt5.versiEa, VERSI_EA_PENDING) && (
+          <div className="mt-3 rounded-lg border border-amber-500/25 bg-amber-500/[0.04] px-3 py-2 text-[11px] leading-relaxed text-amber-200/80">
+            EA v{mt5.versiEa} belum mengirim pending order.
+            <span className="text-amber-200/60">
+              {' '}Kompilasi ulang ke v{VERSI_EA_PENDING} (F7 di MetaEditor), lalu pasang ulang EA-nya.
+            </span>
+          </div>
+        )}
+
         {pending.length > 0 && (
           <div className="mt-3 border-t border-zinc-800/60 pt-3">
             <div className="mb-2 text-[11px] uppercase tracking-wide text-amber-400/80">
