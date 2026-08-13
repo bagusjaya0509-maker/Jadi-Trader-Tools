@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Play, Trash2, TriangleAlert, CheckCircle2, RotateCcw, X, Plus, Square } from 'lucide-react';
+import { Play, Trash2, TriangleAlert, CheckCircle2, RotateCcw, X, Plus, Square,
+         Loader2, Stethoscope } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { bacaKoneksi } from '@/lib/koneksi';
+import { auth } from '@/lib/firebase';
 import { jalankanPine, CONTOH_PINE, type HasilPine, type InputPine } from '@/lib/pine';
 import type { Lilin } from '@/lib/pasar';
 
@@ -148,6 +151,10 @@ export function DockPine({ buka, tab, aturTab, onTutup, lilin, simbol, tf, hingg
     return (d.find((s) => s.aktif) ?? d[0]).id;
   });
   const [hasil, setHasil] = useState<HasilPine | null>(null);
+  /* Usulan Dokter Pine — ditahan di sini sampai orangnya menekan Terapkan. */
+  const [usul, setUsul] = useState<{ kode: string; penjelasan: string; perubahan: string[] } | null>(null);
+  const [dokterSibuk, setDokterSibuk] = useState(false);
+  const [dokterKabar, setDokterKabar] = useState('');
   const [setelan, setSetelan] = useState<Record<string, NilaiSetelan>>(() => {
     try { return JSON.parse(localStorage.getItem(KUNCI_INPUT) ?? '{}') as Record<string, NilaiSetelan>; }
     catch { return {}; }
@@ -158,6 +165,31 @@ export function DockPine({ buka, tab, aturTab, onTutup, lilin, simbol, tf, hingg
 
   function ubahDaftar(f: (d: SkripPine[]) => SkripPine[]) {
     setDaftar((d) => { const b = f(d); simpanDaftar(b); return b; });
+  }
+
+  /* Memanggil agen Dokter Pine. Lewat backend kita, bukan langsung ke n8n:
+     alamat & credential agen tidak boleh sampai ke browser. Jawabannya
+     USULAN — tidak ada yang ditimpa sampai tombol Terapkan ditekan. */
+  async function mintaPerbaikan() {
+    if (!hasil) return;
+    const u = auth.currentUser;
+    if (!u) { setDokterKabar('Masuk dulu untuk memakai agen.'); return; }
+    setDokterSibuk(true); setDokterKabar('Agen membaca skrip dan daftar galatnya…'); setUsul(null);
+    try {
+      const dasar = (bacaKoneksi().url.trim() || 'https://103-253-145-38.sslip.io').replace(/\/+$/, '');
+      const token = await u.getIdToken();
+      const r = await fetch(`${dasar}/api/agen/pine`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kode: pilih.kode, galat: hasil.galat, dilewati: hasil.dilewati }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j?.error || `Server menjawab ${r.status}`);
+      setUsul({ kode: j.kode, penjelasan: j.penjelasan || '', perubahan: j.perubahan || [] });
+      setDokterKabar('Usulan siap — periksa dulu, baru Terapkan.');
+    } catch (e) {
+      setDokterKabar(e instanceof Error ? e.message : 'Gagal memanggil agen');
+    } finally { setDokterSibuk(false); }
   }
 
   function potong(l: Lilin, batas?: number): Lilin {
@@ -374,6 +406,64 @@ export function DockPine({ buka, tab, aturTab, onTutup, lilin, simbol, tf, hingg
                     {hasil.dilewati.map((g) => <li key={g}>{g}</li>)}
                   </ul>
                 </details>
+              )}
+
+              {/* ── Dokter Pine ────────────────────────────────────────
+                  Agen dipanggil MANUAL dan hasilnya berhenti di usulan.
+                  Kode yang ditimpa diam-diam oleh mesin adalah cara
+                  tercepat kehilangan skrip yang sudah benar — jadi
+                  perbaikannya ditampilkan dulu, dan tombol Terapkan
+                  terpisah. */}
+              {(hasil.galat.length > 0 || hasil.dilewati.length > 0) && (
+                <div className="rounded-md border border-zinc-800/60 p-2">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => void mintaPerbaikan()}
+                      disabled={dokterSibuk}
+                      title="Kirim skrip + daftar galat ke agen Dokter Pine"
+                      className="flex cursor-pointer items-center gap-1.5 rounded bg-zinc-100 px-2 py-1 text-[11px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-60">
+                      {dokterSibuk
+                        ? <><Loader2 className="size-3 animate-spin" /> Agen membaca…</>
+                        : <><Stethoscope className="size-3" /> Perbaiki dengan AI</>}
+                    </button>
+                    {usul && (
+                      <button
+                        onClick={() => {
+                          ubahDaftar((d) => d.map((s) => (s.id === pilih.id ? { ...s, kode: usul.kode } : s)));
+                          setUsul(null);
+                          setDokterKabar('Perbaikan diterapkan — tekan Jalankan untuk mengujinya.');
+                        }}
+                        className="cursor-pointer rounded border border-emerald-500/40 px-2 py-1 text-[11px] text-emerald-400 transition-colors hover:bg-emerald-500/10">
+                        Terapkan
+                      </button>
+                    )}
+                    {usul && (
+                      <button onClick={() => { setUsul(null); setDokterKabar(''); }}
+                        className="cursor-pointer rounded border border-zinc-800 px-2 py-1 text-[11px] text-zinc-400 transition-colors hover:border-zinc-600">
+                        Buang
+                      </button>
+                    )}
+                  </div>
+                  {dokterKabar && (
+                    <div className="mt-1.5 text-[10.5px] leading-relaxed text-zinc-500">{dokterKabar}</div>
+                  )}
+                  {usul && (
+                    <div className="mt-2 space-y-1.5">
+                      <div className="text-[11px] leading-relaxed text-zinc-400">{usul.penjelasan}</div>
+                      {usul.perubahan.length > 0 && (
+                        <ul className="space-y-0.5 font-mono text-[10px] text-zinc-500">
+                          {usul.perubahan.map((p, i) => <li key={i}>· {p}</li>)}
+                        </ul>
+                      )}
+                      <details className="rounded border border-zinc-800/60 p-1.5">
+                        <summary className="cursor-pointer text-[10.5px] text-zinc-500">Lihat kode usulan</summary>
+                        <pre className="gulir-senyap mt-1 max-h-[200px] overflow-auto whitespace-pre-wrap font-mono text-[10px] leading-relaxed text-zinc-400">
+{usul.kode}
+                        </pre>
+                      </details>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           )}

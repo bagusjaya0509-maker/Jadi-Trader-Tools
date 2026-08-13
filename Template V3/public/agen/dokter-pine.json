@@ -1,0 +1,80 @@
+{
+  "name": "Dokter Pine — perbaiki galat skrip",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "pine-perbaiki",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "masuk",
+      "name": "Permintaan perbaikan",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-520, 300],
+      "webhookId": "dokter-pine",
+      "notes": "Dipanggil backend situs (bukan browser langsung), supaya alamat & credential n8n tidak pernah sampai ke perangkat pengguna. Isi: { kode, galat[], dilewati[], catatan }."
+    },
+    {
+      "parameters": {
+        "jsCode": "/* SUSUN PERMINTAAN — sempit dan spesifik.\n *\n * Model diberi TIGA hal saja: kode aslinya, daftar baris yang ditolak\n * mesin Pine kita, dan aturan mainnya. Tidak diberi kebebasan menulis\n * ulang skrip dari nol — indikator yang \"diperbaiki\" jadi indikator lain\n * adalah kerusakan yang paling sulit disadari pemiliknya. */\nconst b = $input.first().json.body ?? $input.first().json;\nconst kode = String(b.kode || '');\nconst galat = Array.isArray(b.galat) ? b.galat : [];\nconst dilewati = Array.isArray(b.dilewati) ? b.dilewati : [];\n\nconst aturan = [\n  'Kamu memperbaiki skrip Pine v5/v6 agar bisa dijalankan mesin Pine sederhana milik Jadi Trader Tools.',\n  'ATURAN YANG TIDAK BOLEH DILANGGAR:',\n  '1. Perbaiki HANYA baris yang bermasalah. Jangan menulis ulang skrip, jangan merapikan gaya, jangan mengganti nama variabel yang sudah jalan.',\n  '2. JANGAN mengubah maksud indikatornya. Kalau sebuah baris tidak bisa didukung, komentari baris itu dan jelaskan — jangan menggantinya dengan perhitungan lain yang kelihatan mirip.',\n  '3. Pertahankan deklarasi indicator()/study() apa adanya, termasuk overlay=.',\n  '4. Balas HANYA JSON valid, tanpa pagar kode markdown, dengan bentuk:',\n  '   {\"kode\":\"<skrip lengkap hasil perbaikan>\",\"penjelasan\":\"<2-4 kalimat>\",\"perubahan\":[\"baris X: ...\"]}',\n].join('\\n');\n\nconst permintaan = [\n  '## Baris yang DITOLAK mesin',\n  galat.length ? galat.map((g, i) => `${i + 1}. ${g}`).join('\\n') : '(tidak ada)',\n  '',\n  '## Baris yang DILEWATI (belum didukung)',\n  dilewati.length ? dilewati.map((g, i) => `${i + 1}. ${g}`).join('\\n') : '(tidak ada)',\n  '',\n  b.catatan ? `## Catatan pengguna\\n${b.catatan}\\n` : '',\n  '## Skrip lengkap',\n  kode,\n].join('\\n');\n\nreturn [{ json: { aturan, permintaan, kodeAsli: kode, jumlahGalat: galat.length + dilewati.length } }];"
+      },
+      "id": "susun",
+      "name": "Susun permintaan",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-300, 300]
+    },
+    {
+      "parameters": {
+        "modelId": "claude-sonnet-5",
+        "messages": {
+          "values": [
+            { "role": "system", "content": "={{ $json.aturan }}" },
+            { "content": "={{ $json.permintaan }}" }
+          ]
+        },
+        "options": { "maxTokensToSample": 8000, "temperature": 0 }
+      },
+      "id": "otak",
+      "name": "Otak — Claude",
+      "type": "@n8n/n8n-nodes-langchain.anthropic",
+      "typeVersion": 1,
+      "position": [-70, 300],
+      "notes": "Butuh credential Anthropic API. Suhu 0: perbaikan kode bukan tempat untuk kreativitas. Kalau kamu lebih suka otak lain (OpenAI, atau Hermes lokal lewat node Ollama), ganti node INI saja — sisanya tidak berubah."
+    },
+    {
+      "parameters": {
+        "jsCode": "/* URAI JAWABAN — dan jangan percaya begitu saja.\n *\n * Model kadang membungkus JSON-nya dengan pagar markdown atau menambah\n * kalimat pengantar. Dua hal diperiksa sebelum jawabannya diteruskan:\n * bentuknya JSON yang sah, dan kodenya tidak menyusut drastis. Skrip 400\n * baris yang kembali jadi 30 baris bukan perbaikan, itu kehilangan. */\nconst raw = $input.first().json;\nconst asli = $('Susun permintaan').first().json.kodeAsli || '';\n\nlet teks = raw.content ?? raw.text ?? raw.message?.content ?? raw.output ?? '';\nif (Array.isArray(teks)) teks = teks.map(x => x.text ?? x).join('');\nteks = String(teks).trim();\n\n/* Buang pagar markdown kalau ada. */\nteks = teks.replace(/^```(?:json)?\\s*/i, '').replace(/```\\s*$/, '').trim();\n\nlet j;\ntry {\n  j = JSON.parse(teks);\n} catch (e) {\n  /* Coba ambil objek JSON pertama yang utuh di dalam teks. */\n  const m = teks.match(/\\{[\\s\\S]*\\}/);\n  if (!m) return [{ json: { error: 'Jawaban agen bukan JSON yang bisa dibaca.' } }];\n  try { j = JSON.parse(m[0]); }\n  catch (e2) { return [{ json: { error: 'Jawaban agen bukan JSON yang bisa dibaca.' } }]; }\n}\n\nconst kode = String(j.kode || '');\nif (kode.length < 10) return [{ json: { error: 'Agen tidak mengembalikan kode.' } }];\nif (asli && kode.length < asli.length * 0.5) {\n  return [{ json: { error: `Perbaikan ditolak: kodenya menyusut dari ${asli.length} ke ${kode.length} karakter. Itu penulisan ulang, bukan perbaikan.` } }];\n}\n\nreturn [{ json: {\n  kode,\n  penjelasan: String(j.penjelasan || ''),\n  perubahan: Array.isArray(j.perubahan) ? j.perubahan.map(String) : [],\n} }];"
+      },
+      "id": "urai",
+      "name": "Urai & periksa jawaban",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [160, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "jawab",
+      "name": "Jawab backend",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [390, 300],
+      "notes": "Yang dikembalikan USULAN. Penerapannya keputusan penggunanya — kode yang diganti diam-diam oleh mesin adalah cara tercepat kehilangan skrip yang sudah benar."
+    }
+  ],
+  "connections": {
+    "Permintaan perbaikan": { "main": [[{ "node": "Susun permintaan", "type": "main", "index": 0 }]] },
+    "Susun permintaan": { "main": [[{ "node": "Otak — Claude", "type": "main", "index": 0 }]] },
+    "Otak — Claude": { "main": [[{ "node": "Urai & periksa jawaban", "type": "main", "index": 0 }]] },
+    "Urai & periksa jawaban": { "main": [[{ "node": "Jawab backend", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "agen:perbaikan" }, { "name": "pemicu:tombol" }, { "name": "otak:claude" }],
+  "pinData": {}
+}

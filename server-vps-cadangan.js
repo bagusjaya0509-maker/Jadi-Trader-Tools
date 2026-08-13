@@ -2004,6 +2004,64 @@ app.post('/api/hunter/hasil', batasLaju, requireToken, (req, res) => {
 });
 
 /* ══════════════════════════════════════════════════════════════════════════
+   DOKTER PINE — agen yang memperbaiki galat skrip, atas permintaan
+   ══════════════════════════════════════════════════════════════════════════
+   Beda mendasar dengan Pemburu Sinyal, dan bedanya menentukan rancangannya:
+   agen ini TIDAK butuh browser, sesi login, atau ruang Discord. Ia cuma
+   perlu membaca kode + pesan galat dan mengembalikan kode yang benar.
+   Artinya ia bisa dikerjakan n8n LANGSUNG dan menjawab dalam hitungan
+   detik — tidak perlu antrean yang dijemput tiap beberapa menit.
+
+   Web tidak memanggil n8n langsung. Ia lewat sini supaya:
+     · alamat & token n8n tidak pernah sampai ke browser;
+     · tidak ada urusan CORS;
+     · kalau n8n mati, jawabannya jujur ("agen sedang tidak tersedia")
+       alih-alih galat jaringan yang tidak bisa dibaca siapa pun.
+
+   Yang dikembalikan adalah USULAN. Penerapannya tetap keputusan
+   orangnya — kode yang diganti diam-diam oleh mesin adalah cara tercepat
+   kehilangan skrip yang sudah benar. */
+const N8N_PINE_URL = process.env.N8N_PINE_URL
+  || 'http://127.0.0.1:5678/webhook/pine-perbaiki';
+
+app.post('/api/agen/pine', batasLaju, butuhLogin, async (req, res) => {
+  const b = req.body || {};
+  const kode = String(b.kode || '');
+  if (kode.length < 10) return res.status(400).json({ error: 'kode skrip kosong' });
+  if (kode.length > 40000) return res.status(400).json({ error: 'skrip terlalu panjang (maks 40.000 karakter)' });
+
+  const galat = Array.isArray(b.galat) ? b.galat.slice(0, 40).map(String) : [];
+  const dilewati = Array.isArray(b.dilewati) ? b.dilewati.slice(0, 40).map(String) : [];
+  if (!galat.length && !dilewati.length) {
+    return res.status(400).json({ error: 'tidak ada galat untuk diperbaiki' });
+  }
+
+  try {
+    const r = await axios.post(N8N_PINE_URL,
+      { kode, galat, dilewati, catatan: String(b.catatan || '').slice(0, 300) },
+      { timeout: 120000, headers: { 'Content-Type': 'application/json' } });
+    const d = r.data || {};
+    if (!d.kode) return res.status(502).json({ error: d.error || 'Agen menjawab tanpa kode perbaikan.' });
+    res.json({
+      ok: true,
+      kode: String(d.kode).slice(0, 60000),
+      penjelasan: String(d.penjelasan || '').slice(0, 2000),
+      perubahan: Array.isArray(d.perubahan) ? d.perubahan.slice(0, 20).map(String) : [],
+    });
+  } catch (e) {
+    /* n8n mati / workflow belum diaktifkan / node AI belum punya
+       credential — semuanya bermuara ke satu kalimat yang bisa
+       ditindaklanjuti, bukan tumpukan jejak galat. */
+    const status = e.response ? e.response.status : 0;
+    res.status(503).json({
+      error: status === 404
+        ? 'Workflow "Dokter Pine" belum aktif di n8n — impor dan aktifkan dulu.'
+        : 'Agen Dokter Pine sedang tidak tersedia. Pastikan n8n hidup dan workflow-nya aktif.',
+    });
+  }
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
    MEMORI AGEN — apa yang sudah dipelajari, supaya tidak dipelajari lagi
    ══════════════════════════════════════════════════════════════════════════
    Tiap kali agen berjalan ia mulai dengan ingatan kosong. Akibatnya
