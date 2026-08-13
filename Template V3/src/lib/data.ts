@@ -258,7 +258,7 @@ function kePosisiPublik(p: any, i: number): Posisi {
  *
  *  Dokumen ini juga sengaja publik: pengunjung yang belum berlangganan tetap
  *  bisa melihat posisi pemilik — itu memang bagian dari etalasenya. */
-export function usePosisi(): HasilData<Posisi[]> & { pending: OrderBursa[] } {
+export function usePosisi(): HasilData<Posisi[]> & { pending: OrderBursa[]; stop: OrderBursa[] } {
   const { pengguna, memuat: memuatAuth } = useAuth();
   const [data, setData] = useState<Posisi[]>(POSISI_TERBUKA);
   const [memuat, setMemuat] = useState(true);
@@ -299,6 +299,19 @@ export function usePosisi(): HasilData<Posisi[]> & { pending: OrderBursa[] } {
     [order],
   );
 
+  /* SL/TP yang terpasang di bursa, apa adanya.
+     ─────────────────────────────────────────────────────────────────
+     Di Binance Futures, SL/TP BUKAN bagian dari order entry — ia order
+     kondisional tersendiri yang cuma terikat pada SIMBOL. Karena itu
+     baris pending tidak bisa membawa SL/TP-nya sendiri, dan sebelum ini
+     kolomnya selalu kosong walau stopnya benar-benar terpasang. Orang
+     yang baru saja memasang SL lalu melihat kolom kosong wajar mengira
+     pemasangannya gagal — padahal yang gagal cuma tampilannya. */
+  const stop = useMemo(
+    () => order.filter((o) => o.jenis === 'SL' || o.jenis === 'TP'),
+    [order],
+  );
+
   const gabungan = useMemo(() => {
     if (!aktif) return data;
     const dariPublik = new Map(data.map((p) => [p.simbol, p]));
@@ -327,7 +340,7 @@ export function usePosisi(): HasilData<Posisi[]> & { pending: OrderBursa[] } {
 
   /* `contoh` berarti "ini bukan datamu, ini contoh". Dokumen publik itu data
      sungguhan, jadi labelnya hanya muncul kalau dokumennya memang belum ada. */
-  return { data: gabungan, pending, memuat: memuat || memuatAuth, contoh: !ada && !pengguna, galat };
+  return { data: gabungan, pending, stop, memuat: memuat || memuatAuth, contoh: !ada && !pengguna, galat };
 }
 
 /** Ringkasan pra-hitung. Satu pembacaan, bukan 400.

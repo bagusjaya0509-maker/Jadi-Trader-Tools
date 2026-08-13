@@ -54,19 +54,29 @@ export function PanelPosisiTerbuka({ sumber, onSunting }: {
    *  diklik sama sekali. */
   onSunting?: (o: OrderSunting) => void;
 }) {
-  const { data: posisiKripto, pending: pendingKripto } = usePosisi();
+  const { data: posisiKripto, pending: pendingKripto, stop: stopKripto } = usePosisi();
   const mt5 = useAkunMt5();
   /* Order menggantung dari DUA pasar, disamakan bentuknya di sini.
      Keduanya menjawab pertanyaan yang sama — "order-ku sampai atau
      tidak?" — jadi keduanya pantas tampil dengan cara yang sama, walau
      satuannya beda: kripto memakai jumlah koin, MT5 memakai lot. */
   const pending = sumber === 'kripto'
-    ? pendingKripto.map((o) => ({
-        kunci: o.id, simbol: o.simbol, arah: o.arah,
-        ukuran: o.qty.toLocaleString('id-ID', { maximumFractionDigits: 4 }),
-        jenis: o.tipe.replace('_MARKET', ' Stop').replace('LIMIT', 'Limit'),
-        harga: o.pemicu || o.harga, sl: 0, tp: 0,
-      }))
+    ? pendingKripto.map((o) => {
+        /* SL/TP dicari dari simbol yang sama — di bursa ia order
+           terpisah, bukan bagian dari order entry ini. Yang terdekat ke
+           harga entry yang ditampilkan. */
+        const sl = stopKripto.filter((x) => x.simbol === o.simbol && x.jenis === 'SL')
+          .sort((a, b) => Math.abs(a.pemicu - o.harga) - Math.abs(b.pemicu - o.harga))[0];
+        const tp = stopKripto.filter((x) => x.simbol === o.simbol && x.jenis === 'TP')
+          .sort((a, b) => Math.abs(a.pemicu - o.harga) - Math.abs(b.pemicu - o.harga))[0];
+        return {
+          kunci: o.id, simbol: o.simbol, arah: o.arah,
+          ukuran: o.qty.toLocaleString('id-ID', { maximumFractionDigits: 4 }),
+          jenis: o.tipe.replace('_MARKET', ' Stop').replace('LIMIT', 'Limit'),
+          harga: o.pemicu || o.harga,
+          sl: sl?.pemicu ?? 0, tp: tp?.pemicu ?? 0,
+        };
+      })
     /* Yang paling BARU dipasang di atas. Order pending dibuat berurutan
        waktu, dan yang baru saja dikirim adalah yang sedang dipikirkan —
        menaruhnya di ekor daftar berarti ia harus dicari dulu. */
