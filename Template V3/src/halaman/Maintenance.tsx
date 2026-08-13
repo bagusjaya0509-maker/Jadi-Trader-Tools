@@ -9,6 +9,7 @@ import { useAuth } from '@/lib/auth';
 import { PanelLisensi } from '@/components/panel-lisensi';
 import { PanelKesehatan } from '@/components/panel-kesehatan';
 import { PanelCelahPine } from '@/components/panel-celah-pine';
+import { PanelPermintaanAkses } from '@/components/panel-permintaan-akses';
 import { terbitkanTeksBeranda } from '@/lib/data';
 import { JUDUL_BERANDA, SUB_BERANDA, bacaTeksLokal, simpanTeksLokal } from '@/lib/teks-beranda';
 
@@ -324,6 +325,10 @@ export default function Maintenance() {
           satu tumpukan panel dan orang harus membaca isinya dulu untuk
           tahu sedang melihat apa. Judul section membuat halaman ini bisa
           DIPINDAI, bukan dibaca. */}
+      <Bagian judul="Permintaan Akses"
+              sub="20 akses gratis dan 80 berbayar, masing-masing 30 hari. Persetujuanmu yang membuka aplikasi." />
+      <PanelPermintaanAkses />
+
       <Bagian judul="Kesehatan Sistem"
               sub="Sambungan backend, bursa, dan layanan pendukung." />
       <PanelKesehatan />

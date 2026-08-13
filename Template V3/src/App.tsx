@@ -1,10 +1,11 @@
 import { HashRouter, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useEffect, lazy, Suspense } from 'react';
 import { Loader2 } from 'lucide-react';
-import { PenyediaAuth } from '@/lib/auth';
+import { PenyediaAuth, useAuth } from '@/lib/auth';
 import { catatKunjungan } from '@/lib/admin';
 import { AppShell } from '@/components/app-shell';
 import Pendaratan from '@/halaman/Pendaratan';
+import Akses from '@/halaman/Akses';
 
 /* HashRouter: GitHub Pages tidak bisa mengarahkan /dashboard ke index.html,
    jadi jalur seperti itu 404 begitu di-refresh. #/dashboard bekerja di mana
@@ -170,7 +171,24 @@ function Beranda() {
   );
 }
 
+/* ── Gerbang akses ───────────────────────────────────────────────────────
+   Seluruh aplikasi ada di balik kerangka ini, jadi menjaganya di satu tempat
+   menjaga semuanya sekaligus. Menempelkan pemeriksaan di tiap tombol berarti
+   tombol yang lupa dipasangi diam-diam jadi pintu belakang — dan alamat
+   halamannya tetap bisa diketik langsung.
+
+   Yang membuka pintu HANYA `bayarSampai` di masa depan, yang cuma ditulis
+   server saat kamu menyetujui permintaan. Masa coba 30 hari otomatis TIDAK
+   lagi memberi akses: kalau ia masih berlaku, siapa pun yang login langsung
+   masuk tanpa persetujuan, dan batas 20 orang itu tidak berarti apa-apa. */
 function Kerangka() {
+  const { memuat, pemilik, langganan } = useAuth();
+  const lokasi = useLocation();
+
+  if (memuat) return <Menunggu />;
+  if (!(pemilik || langganan.status === 'aktif')) {
+    return <Navigate to={`/akses?dari=${encodeURIComponent(lokasi.pathname)}`} replace />;
+  }
   return (
     <AppShell>
       <Suspense fallback={<Menunggu />}>
@@ -194,6 +212,7 @@ export default function App() {
               hidup di alamat sendiri supaya bisa dilihat tanpa mengganggu
               siapa pun. */}
           <Route path="/pendaratan" element={<Pendaratan />} />
+          <Route path="/akses" element={<Akses />} />
           {/* Markas Agen SENGAJA di luar kerangka terminal — halaman
               terpisah untuk pusat kendali agen AI, bukan bagian dasbor. */}
           <Route path="/markas" element={<Markas />} />
