@@ -31,6 +31,13 @@ export interface PerintahMt5 {
   sl?: number;
   tp?: number;
   tiket?: string;
+  /** Harga entry yang diminta. 0/kosong = eksekusi di harga pasar.
+   *  Kalau diisi dan jaraknya dari harga pasar melewati stops level
+   *  broker, EA v2.04+ memasangnya sebagai pending order — Buy/Sell Stop
+   *  kalau entry mengejar tembusan, Buy/Sell Limit kalau menunggu balik.
+   *  Jenisnya dipilih EA, bukan di sini: hanya terminal yang tahu harga
+   *  pasar pada detik eksekusi. */
+  entry?: number;
 }
 
 export async function kirimPerintahMt5(p: PerintahMt5): Promise<{ id: string }> {

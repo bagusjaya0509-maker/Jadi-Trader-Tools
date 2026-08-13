@@ -332,6 +332,52 @@ export default function ChartBacktest() {
      hiasan yang terpisah dari kotak isian. */
   const [rencana, setRencana] = useState<{ entry?: number; sl?: number; tp?: number }>({});
 
+  /* ── Tiket yang SELAMAT dari pindah halaman ──────────────────────────
+     Pindah ke Journal lalu kembali ke sini dulu menghapus segalanya:
+     panel BUY/SELL tertutup, entry/SL/TP yang sudah disusun hilang, lot
+     dan catatan emosinya ikut. Padahal rencana trade adalah pekerjaan —
+     kadang sepuluh menit menggeser garis — dan React membuang seluruhnya
+     hanya karena komponennya dilepas.
+
+     Disimpan di sessionStorage, bukan localStorage: rencana yang belum
+     dikirim TIDAK boleh bangkit lagi besok pagi seolah masih berlaku.
+     Ia hidup selama tab ini hidup, dan hilang saat orangnya menyegarkan
+     halaman sendiri — persis yang diminta. */
+  const KUNCI_TIKET = 'jt.tiketChart';
+  const tiketDipulihkan = useRef(false);
+  useEffect(() => {
+    if (tiketDipulihkan.current) return;
+    tiketDipulihkan.current = true;
+    try {
+      const t = JSON.parse(sessionStorage.getItem(KUNCI_TIKET) ?? 'null');
+      if (!t || t.simbol !== simbol) return;
+      if (t.rencana && (t.rencana.entry || t.rencana.sl || t.rencana.tp)) {
+        setRencana(t.rencana);
+        entryDigeser.current = true;   // level pulihan adalah keputusan, bukan tebakan
+      }
+      if (t.draf === 'BUY' || t.draf === 'SELL') setDraf(t.draf);
+      if (t.catatan) setCatatanTiket(t.catatan);
+      if (Number(t.lotMt5) > 0) setLotMt5(Number(t.lotMt5));
+    } catch { /* rusak → mulai bersih */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    /* Hanya menyimpan kalau memang ADA yang disusun. Menulis objek kosong
+       tiap render membuat penyegaran halaman memulihkan "tidak ada apa-apa"
+       dan menimpa tiket yang masih hidup di tab lain. */
+    const adaIsi = !!draf || !!(rencana.entry || rencana.sl || rencana.tp);
+    try {
+      if (adaIsi) {
+        sessionStorage.setItem(KUNCI_TIKET, JSON.stringify({
+          simbol, draf, rencana, catatan: catatanTiket, lotMt5,
+        }));
+      } else {
+        sessionStorage.removeItem(KUNCI_TIKET);
+      }
+    } catch { /* mode privat */ }
+  }, [simbol, draf, rencana, catatanTiket, lotMt5]);
+
   /* Level dari alamat dipasang SEKALI per kombinasi yang datang. Kalau
      dipasang tiap render, seretan orangnya akan terlempar balik ke angka
      kartu setiap kali komponennya menggambar ulang. */
@@ -922,15 +968,22 @@ export default function ChartBacktest() {
                                        mengeksekusi, lalu nasibnya dijajaki
                                        sampai EA melapor. Sementara MARKET
                                        saja — pending order MT5 menyusul. */
-                                    if (jenisEntry !== 'MARKET') {
-                                      setKabarNyata('Order MT5 lewat web sementara MARKET saja — geser garis entry ke dekat harga pasar.');
-                                      return;
-                                    }
                                     if (!(lotMt5 > 0)) { setKabarNyata('Isi lot dulu.'); return; }
-                                    if (!confirm(`Kirim ke MT5:\n${draf} ${lotMt5} lot ${simbol.slice(4)}\nSL ${sl}  ·  TP ${tp}\n\nEA & AutoTrading harus menyala.`)) return;
+                                    /* Pending order didukung sejak EA v2.04:
+                                       entry yang jauh dari harga pasar menjadi
+                                       Buy/Sell Stop atau Limit. JENISNYA
+                                       diputuskan EA, bukan di sini — terminal
+                                       yang tahu harga pasar pada detik
+                                       eksekusi; layar ini datanya sudah
+                                       beberapa detik umurnya. Yang dikirim
+                                       niatnya: harga entry. */
+                                    const entryKirim = jenisEntry === 'MARKET' ? 0 : entry;
+                                    if (!confirm(`Kirim ke MT5:\n${labelJenis} ${draf} ${lotMt5} lot ${simbol.slice(4)}`
+                                      + `${entryKirim ? `\nEntry ${entryKirim}` : ' (harga pasar)'}`
+                                      + `\nSL ${sl}  ·  TP ${tp}\n\nEA & AutoTrading harus menyala.`)) return;
                                     setSibukNyata(true);
                                     setKabarNyata('Mengirim perintah ke EA…');
-                                    void kirimPerintahMt5({ aksi: 'BUKA', simbol: simbol.slice(4), arah: draf, lot: lotMt5, sl, tp })
+                                    void kirimPerintahMt5({ aksi: 'BUKA', simbol: simbol.slice(4), arah: draf, lot: lotMt5, sl, tp, entry: entryKirim })
                                       .then(async ({ id }) => {
                                         setKabarNyata('Perintah antre — EA menjemput tiap 5 detik…');
                                         const h = await tungguHasilMt5(id);

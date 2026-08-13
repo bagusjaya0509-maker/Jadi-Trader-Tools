@@ -24,22 +24,25 @@
 //
 //  CARA PASANG
 //    1. Salin ke MQL5/Experts, Compile di MetaEditor (F7).
-//    2. Tools -> Options -> Expert Advisors -> izinkan WebRequest ke
-//       alamat server di bawah, DAN centang "Allow Algo Trading".
+//    2. Isi input AlamatServer dengan alamat backend MILIKMU SENDIRI.
+//       Bawaannya sengaja kosong: EA ini disebar, dan alamat bawaan
+//       berarti akun pembelinya mengirim data ke mesin orang lain.
+//    3. Tools -> Options -> Expert Advisors -> izinkan WebRequest ke
+//       alamat itu, DAN centang "Allow Algo Trading".
 //    3. Seret ke chart XAUUSD (chart yang dipakai menentukan simbol
 //       yang dikirim ke web kalau SimbolChart dikosongkan).
 //    4. Isi KodePasangan dari halaman Integrations situsmu, dan pastikan
 //       tombol AutoTrading (Algo Trading) di toolbar MT5 menyala.
 //+------------------------------------------------------------------+
 #property copyright "Jadi Trader Tools"
-#property version   "2.03"
+#property version   "2.04"
 #property strict
 #property description "Trade-Fi Sync v2: jurnal + eksekusi perintah web + kirim chart MT5. Baca pagar pengamannya di kepala berkas."
 
 #include <Trade\Trade.mqh>
 
 input string KodePasangan     = "";                                  // Kode Pasangan dari halaman jurnal
-input string AlamatServer     = "https://103-253-145-38.sslip.io";   // Alamat server (tanpa garis miring di akhir)
+input string AlamatServer     = "";                                  // Alamat server backend-mu, mis. https://server-anda.com (tanpa / di akhir)
 input int    IntervalDetik    = 20;                                  // Jeda antar laporan jurnal (detik)
 input int    HariRiwayat      = 60;                                  // Cadangan kalau tanggal di bawah kosong (hari)
 input string MulaiDariTanggal = "2026.08.04";                        // Riwayat diambil mulai tanggal ini (YYYY.MM.DD)
@@ -49,7 +52,7 @@ input string SimbolChart      = "";                                  // Simbol y
 input int    KirimChartMenit  = 5;                                   // Jeda kirim OHLC ke web (menit)
 input bool   KirimTick        = true;                                // Kirim harga tiap detik (harga web = MT5)
 
-#define VERSI_EA "2.03"
+#define VERSI_EA "2.04"
 #define PFX      "JTS_"
 
 CTrade   gTrade;
@@ -88,6 +91,27 @@ int OnInit()
 
    EventSetTimer(1);
    BuatDasbor();
+
+   /* Alamat server SENGAJA kosong dari pabrik.
+      ─────────────────────────────────────────────────────────────────
+      EA ini dijual dan disebar; menaruh alamat server penjualnya sebagai
+      bawaan berarti tiap pembeli diam-diam mengirim saldo, posisi, dan
+      riwayat akunnya ke mesin orang lain. Alamatnya harus diisi sendiri
+      oleh pemakainya — dan kalau kosong, EA berhenti terang-terangan
+      alih-alih menyambung ke mana pun. */
+   string alamatCek = AlamatServer;
+   StringTrimLeft(alamatCek);
+   StringTrimRight(alamatCek);
+   if(StringLen(alamatCek) < 8)
+   {
+      gStatus = "MENUNGGU ALAMAT SERVER";
+      gWarnaStatus = clrOrangeRed;
+      gPesan = "Isi input AlamatServer dengan alamat backend-mu sendiri,\n"
+             + "mis. https://server-anda.com (tanpa garis miring di akhir).\n"
+             + "Lalu izinkan alamat itu di Tools > Options > Expert Advisors.";
+      GambarDasbor();
+      return(INIT_SUCCEEDED);
+   }
 
    if(StringLen(KodePasangan) < 8)
    {
@@ -177,7 +201,11 @@ void BuatDasbor()
       ObjectSetInteger(0, n, OBJPROP_YDISTANCE, 18);
       ObjectSetInteger(0, n, OBJPROP_XSIZE, 400);
       ObjectSetInteger(0, n, OBJPROP_YSIZE, 344);
-      ObjectSetInteger(0, n, OBJPROP_BGCOLOR, C'21,23,28');
+      /* Dasbor TEMBUS PANDANG: latar penuh menutupi lilin di baliknya, dan
+         panel yang menyembunyikan harga adalah panel yang akhirnya
+         dipindahkan atau dimatikan orangnya. clrNONE membuat isinya
+         mengambang di atas chart; bingkainya saja yang menandai batas. */
+      ObjectSetInteger(0, n, OBJPROP_BGCOLOR, clrNONE);
       ObjectSetInteger(0, n, OBJPROP_BORDER_TYPE, BORDER_FLAT);
       ObjectSetInteger(0, n, OBJPROP_COLOR, C'60,64,72');
       ObjectSetInteger(0, n, OBJPROP_SELECTABLE, false);
@@ -478,14 +506,62 @@ void JalankanPerintah(string baris)
       double slp = (sl > 0 ? RapikanHarga(s, sl) : 0.0);
       double tpp = (tp > 0 ? RapikanHarga(s, tp) : 0.0);
       gTrade.SetTypeFillingBySymbol(s);
-      if(arah == "BUY") ok = gTrade.Buy(lotPakai, s, 0.0, slp, tpp, "TradeFi web");
-      else              ok = gTrade.Sell(lotPakai, s, 0.0, slp, tpp, "TradeFi web");
+
+      /* ── JENIS ORDER ────────────────────────────────────────────────
+         Kolom ke-9 membawa harga entry yang diminta web. Kalau ia 0 atau
+         terlalu dekat dengan harga pasar, ordernya MARKET seperti dulu.
+         Kalau tidak, jenisnya ditentukan dari LETAK entry terhadap harga
+         sekarang — persis aturan yang dipakai layar:
+
+             BUY  di ATAS pasar  -> Buy Stop   (mengejar tembusan)
+             BUY  di BAWAH pasar -> Buy Limit  (menunggu diskon)
+             SELL di BAWAH pasar -> Sell Stop
+             SELL di ATAS pasar  -> Sell Limit
+
+         Menentukannya DI SINI, bukan di web, disengaja: yang tahu harga
+         pasar sebenarnya pada detik eksekusi adalah terminal, bukan
+         halaman yang datanya sudah beberapa detik umurnya. Web mengirim
+         niatnya (harga entry); EA memilih jenis ordernya. */
+      double entryMinta = (n >= 9 ? StringToDouble(b[8]) : 0.0);
+      double bid = SymbolInfoDouble(s, SYMBOL_BID);
+      double ask = SymbolInfoDouble(s, SYMBOL_ASK);
+      double acuan = (arah == "BUY" ? ask : bid);
+      int    digit = (int)SymbolInfoInteger(s, SYMBOL_DIGITS);
+      double poin  = SymbolInfoDouble(s, SYMBOL_POINT);
+      /* Jarak minimum broker (stops level): di bawah itu pending order
+         PASTI ditolak, jadi diperlakukan sebagai market saja. */
+      double jarakMin = (double)SymbolInfoInteger(s, SYMBOL_TRADE_STOPS_LEVEL) * poin;
+      if(jarakMin <= 0) jarakMin = 10 * poin;
+
+      bool pending = (entryMinta > 0 && MathAbs(entryMinta - acuan) > jarakMin);
+      double entryP = (entryMinta > 0 ? RapikanHarga(s, entryMinta) : 0.0);
+
+      string jenisTeks = "Market";
+      if(pending)
+      {
+         if(arah == "BUY")
+         {
+            if(entryP > acuan) { ok = gTrade.BuyStop (lotPakai, entryP, s, slp, tpp, ORDER_TIME_GTC, 0, "TradeFi web"); jenisTeks = "Buy Stop"; }
+            else               { ok = gTrade.BuyLimit(lotPakai, entryP, s, slp, tpp, ORDER_TIME_GTC, 0, "TradeFi web"); jenisTeks = "Buy Limit"; }
+         }
+         else
+         {
+            if(entryP < acuan) { ok = gTrade.SellStop (lotPakai, entryP, s, slp, tpp, ORDER_TIME_GTC, 0, "TradeFi web"); jenisTeks = "Sell Stop"; }
+            else               { ok = gTrade.SellLimit(lotPakai, entryP, s, slp, tpp, ORDER_TIME_GTC, 0, "TradeFi web"); jenisTeks = "Sell Limit"; }
+         }
+      }
+      else
+      {
+         if(arah == "BUY") ok = gTrade.Buy(lotPakai, s, 0.0, slp, tpp, "TradeFi web");
+         else              ok = gTrade.Sell(lotPakai, s, 0.0, slp, tpp, "TradeFi web");
+      }
+
       pesan = "retcode " + IntegerToString((int)gTrade.ResultRetcode()) + " " + gTrade.ResultRetcodeDescription();
       if(ok)
       {
          tiketHasil = IntegerToString((long)gTrade.ResultOrder());
-         pesan = arah + " " + DoubleToString(lotPakai, 2) + " lot " + s + " @ "
-               + DoubleToString(gTrade.ResultPrice(), (int)SymbolInfoInteger(s, SYMBOL_DIGITS));
+         pesan = jenisTeks + " " + arah + " " + DoubleToString(lotPakai, 2) + " lot " + s + " @ "
+               + DoubleToString(pending ? entryP : gTrade.ResultPrice(), digit);
       }
       gPerintahAkhir = "BUKA " + arah + " " + s + " " + (ok ? "OK" : "GAGAL");
    }

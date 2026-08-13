@@ -1692,7 +1692,12 @@ app.post('/api/mt5/perintah/kirim', batasLaju, butuhLogin, (req, res) => {
   if (!d.perintah) d.perintah = {};
   const antre = d.perintah[req.uid] || [];
   const id = 'c' + Date.now().toString(36) + crypto.randomBytes(2).toString('hex');
-  antre.push({ id, aksi, simbol, arah, lot, sl, tp, tiket, status: 'antre', dibuat: Date.now(), pesan: '' });
+  /* `entry` boleh kosong: 0 berarti "eksekusi di harga pasar". Jenis
+     ordernya TIDAK ditentukan di sini — terminal yang tahu harga pasar
+     pada detik eksekusi, bukan halaman web yang datanya sudah beberapa
+     detik umurnya. */
+  const entry = Number(b.entry) > 0 ? Number(b.entry) : 0;
+  antre.push({ id, aksi, simbol, arah, lot, sl, tp, tiket, entry, status: 'antre', dibuat: Date.now(), pesan: '' });
   d.perintah[req.uid] = antre.slice(-50);
   mt5Tulis(d);
   res.json({ ok: true, id });
@@ -1717,7 +1722,11 @@ app.get('/api/mt5/perintah', batasLaju, (req, res) => {
     if (q.status !== 'antre') continue;
     if (kini - q.dibuat > 5 * 60 * 1000) { q.status = 'kedaluwarsa'; ubah = true; continue; }
     q.status = 'terkirim'; q.diambil = kini; ubah = true;
-    baris.push([q.id, q.aksi, q.simbol, q.arah, q.lot, q.sl, q.tp, q.tiket].join('|'));
+    /* Kolom ke-9 = harga ENTRY yang diminta. EA v2.04+ memakainya untuk
+       memilih pending order (Buy/Sell Stop & Limit); EA lama mengabaikan
+       kolom berlebih dan tetap MARKET seperti sebelumnya, jadi menambahkan
+       ini tidak merusak terminal yang belum diperbarui. */
+    baris.push([q.id, q.aksi, q.simbol, q.arah, q.lot, q.sl, q.tp, q.tiket, q.entry || 0].join('|'));
   }
   if (ubah) mt5Tulis(d);
   res.type('text/plain').send(baris.join('\n'));
