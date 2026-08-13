@@ -4,7 +4,7 @@ import { Loader2 } from 'lucide-react';
 import { PenyediaAuth } from '@/lib/auth';
 import { catatKunjungan } from '@/lib/admin';
 import { AppShell } from '@/components/app-shell';
-import HeroSection from '@/components/ui/glassmorphism-trust-hero';
+import Pendaratan from '@/halaman/Pendaratan';
 
 /* HashRouter: GitHub Pages tidak bisa mengarahkan /dashboard ke index.html,
    jadi jalur seperti itu 404 begitu di-refresh. #/dashboard bekerja di mana
@@ -62,6 +62,10 @@ function muat<T>(impor: () => Promise<T>): Promise<T> {
   });
 }
 
+/* Hero lama sekarang halaman kedua, jadi ikut dimalaskan. Yang dimuat di
+   awal cuma Pendaratan — halaman yang benar-benar dilihat orang lebih
+   dulu. */
+const HeroLama      = lazy(() => muat(() => import('@/components/ui/glassmorphism-trust-hero')));
 const Dashboard     = lazy(() => muat(() => import('@/components/dashboard').then((m) => ({ default: m.Dashboard }))));
 /* #/screener menampilkan screener V2 yang ASLI, ditanam apa adanya.
    Versi React-nya masih ada di halaman/Screener.tsx dan bisa dibuka di
@@ -152,12 +156,16 @@ function Menunggu() {
   );
 }
 
-/* Beranda = hero apa adanya, tanpa sidebar — halaman depan tugasnya
-   meyakinkan, bukan mengoperasikan. */
+/* Hero lama, tanpa sidebar. Dipindah dari "/" ke "/beranda" saat halaman
+   Pendaratan mengambil alih pintu depan: isinya masih dipakai (tombol View
+   Portfolio & Open Chart), dan menghapusnya cuma membuang sesuatu yang
+   sudah jadi tanpa alasan. */
 function Beranda() {
   return (
     <div className="w-full h-screen overflow-y-auto bg-zinc-950">
-      <HeroSection />
+      <Suspense fallback={<Menunggu />}>
+        <HeroLama />
+      </Suspense>
     </div>
   );
 }
@@ -179,6 +187,13 @@ export default function App() {
         <KeAtas />
         <Routes>
           <Route path="/" element={<Beranda />} />
+          {/* DITUNDA. Halaman pendaratan sudah jadi tapi BELUM jadi pintu
+              depan — pemiliknya ingin alurnya dulu yang benar: belum masuk
+              lihat halaman ini, sudah masuk langsung ke tools, dan klik logo
+              tidak menariknya keluar dari tools. Sampai itu dirancang, ia
+              hidup di alamat sendiri supaya bisa dilihat tanpa mengganggu
+              siapa pun. */}
+          <Route path="/pendaratan" element={<Pendaratan />} />
           {/* Markas Agen SENGAJA di luar kerangka terminal — halaman
               terpisah untuk pusat kendali agen AI, bukan bagian dasbor. */}
           <Route path="/markas" element={<Markas />} />

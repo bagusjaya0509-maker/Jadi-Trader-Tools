@@ -34,11 +34,26 @@
   --font-mono: 'IBM Plex Mono', 'SF Mono', Consolas, monospace;
 
   --animate-masuk: masuk 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+
+  /* Dipakai halaman Pendaratan. Bukan token warna — cuma nama animasi, dan
+     tanpanya elemen yang berawal `opacity-0` tidak pernah terlihat. */
+  --animate-appear: appear 0.5s ease-out forwards;
+  --animate-appear-zoom: appear-zoom 0.8s ease-out forwards;
 }
 
 @keyframes masuk {
   from { opacity: 0; transform: translateY(14px); }
   to   { opacity: 1; transform: none; }
+}
+
+@keyframes appear {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes appear-zoom {
+  from { opacity: 0; transform: scale(0.98); }
+  to   { opacity: 1; transform: scale(1); }
 }
 
 html { -webkit-text-size-adjust: 100%; }
