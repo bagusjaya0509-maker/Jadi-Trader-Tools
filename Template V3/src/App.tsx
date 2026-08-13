@@ -1,5 +1,5 @@
 import { HashRouter, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
-import { useEffect, lazy, Suspense } from 'react';
+import { useEffect, lazy, Suspense, type ReactNode } from 'react';
 import { Loader2 } from 'lucide-react';
 import { PenyediaAuth, useAuth } from '@/lib/auth';
 import { catatKunjungan } from '@/lib/admin';
@@ -181,6 +181,29 @@ function Beranda() {
    server saat kamu menyetujui permintaan. Masa coba 30 hari otomatis TIDAK
    lagi memberi akses: kalau ia masih berlaku, siapa pun yang login langsung
    masuk tanpa persetujuan, dan batas 20 orang itu tidak berarti apa-apa. */
+/** Satu-satunya tempat yang memutuskan boleh-tidaknya masuk. Dipakai
+ *  Kerangka DAN halaman di luar kerangka, supaya tidak ada dua definisi
+ *  "punya akses" yang bisa berselisih diam-diam. */
+function usePenjaga() {
+  const { memuat, pemilik, langganan } = useAuth();
+  const lokasi = useLocation();
+  const boleh = pemilik || langganan.status === 'aktif' || langganan.warisan;
+  const keAkses = <Navigate to={`/akses?dari=${encodeURIComponent(lokasi.pathname)}`} replace />;
+  return { memuat, boleh, keAkses };
+}
+
+/** Pembungkus untuk halaman yang TIDAK memakai AppShell — Markas Agen.
+ *  Sebelumnya ia berada di luar Kerangka dan karena itu terbuka untuk siapa
+ *  saja: cukup mengetik #/markas dan pusat kendali agennya terbuka tanpa
+ *  persetujuan apa pun. Rute di luar gerbang adalah pintu belakang, seberapa
+ *  pun tidak sengajanya. */
+function Penjaga({ children }: { children: ReactNode }) {
+  const { memuat, boleh, keAkses } = usePenjaga();
+  if (memuat) return <Menunggu />;
+  if (!boleh) return keAkses;
+  return <>{children}</>;
+}
+
 function Kerangka() {
   const { memuat, pemilik, langganan } = useAuth();
   const lokasi = useLocation();
@@ -218,7 +241,7 @@ export default function App() {
           <Route path="/akses" element={<Akses />} />
           {/* Markas Agen SENGAJA di luar kerangka terminal — halaman
               terpisah untuk pusat kendali agen AI, bukan bagian dasbor. */}
-          <Route path="/markas" element={<Markas />} />
+          <Route path="/markas" element={<Penjaga><Markas /></Penjaga>} />
           <Route element={<Kerangka />}>
             <Route path="/dashboard"   element={<Dashboard />} />
             <Route path="/screener"        element={<Screener />} />

@@ -80,8 +80,8 @@ export default function Akses() {
     try {
       const h = await mintaAkses({ jenis, catatan });
       setKabar(h.sudahAda
-        ? 'Permintaanmu yang sebelumnya masih menunggu — tidak perlu dikirim lagi.'
-        : 'Permintaan terkirim. Saya akan meninjaunya.');
+        ? 'Permintaan sebelumnya masih dalam antrean — tidak perlu dikirim ulang.'
+        : 'Permintaan terkirim dan masuk antrean peninjauan.');
       muatUlang();
     } catch (e) {
       setKabar(e instanceof Error ? e.message : 'Gagal mengirim permintaan');
@@ -90,19 +90,26 @@ export default function Akses() {
 
   return (
     <div className="min-h-screen w-full overflow-y-auto bg-zinc-950">
-      <div className="mx-auto flex max-w-[620px] flex-col gap-6 px-5 py-12 md:py-20">
+      <div className="mx-auto flex max-w-[600px] flex-col gap-8 px-5 py-14 md:py-24">
 
         <Link to="/" className="inline-flex w-fit items-center gap-1.5 text-[12.5px] text-zinc-500 transition-colors hover:text-zinc-300">
           <ArrowLeft className="size-3.5" /> Kembali ke beranda
         </Link>
 
-        <div>
-          <h1 className="text-2xl font-medium tracking-tighter text-zinc-100 sm:text-3xl">
-            Akses Jadi Trader Tools
+        {/* Hierarki dibawa SKALA dan BOBOT, bukan dengan menambah keluarga
+            huruf. Halaman ini memakai IBM Plex Sans yang sama dengan seluruh
+            aplikasi — yang membedakannya ukuran, jarak, dan keheningan di
+            sekitarnya. */}
+        <div className="flex flex-col gap-3">
+          <span className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">
+            Akses terbatas
+          </span>
+          <h1 className="text-[30px] font-medium leading-[1.15] tracking-tighter text-zinc-50 sm:text-[38px]">
+            Masuk ke Jadi Trader Tools
           </h1>
-          <p className="mt-2 text-[14px] leading-relaxed text-zinc-400">
-            Aksesnya masih dibuka terbatas supaya saya sempat menemani setiap orang yang masuk.
-            Masuk dengan Google atau Discord, kirim permintaan, dan saya buka manual.
+          <p className="max-w-[46ch] text-[14.5px] leading-relaxed text-zinc-400">
+            Akses dibuka bertahap agar setiap pengguna baru mendapat pendampingan.
+            Pilih cara masuk, kirim permintaan, lalu akses dibuka setelah ditinjau.
           </p>
         </div>
 
@@ -128,25 +135,25 @@ export default function Akses() {
         {sudahAktif ? (
           <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/[0.06] p-5">
             <div className="flex items-center gap-2 text-[14px] font-medium text-emerald-400">
-              <CheckCircle2 className="size-4" /> Aksesmu aktif
+              <CheckCircle2 className="size-4" /> Akses aktif
             </div>
             <p className="mt-1.5 text-[12.5px] leading-relaxed text-zinc-400">
               {pemilik
-                ? 'Kamu pemilik situs ini — semua halaman terbuka.'
+                ? 'Akun pemilik — seluruh halaman terbuka.'
                 : <>Berlaku sampai {langganan.berakhir?.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
                    {langganan.sisaHari !== null && <> · sisa {langganan.sisaHari} hari</>}.</>}
             </p>
             <Link to={tujuan}
               className="mt-4 inline-flex items-center gap-2 rounded-md bg-zinc-100 px-5 py-2.5 text-[13px] font-semibold text-zinc-950 transition-colors hover:bg-white">
-              Lanjut ke aplikasi
+              Buka aplikasi
             </Link>
           </div>
         ) : !pengguna ? (
           /* ── Belum masuk ─────────────────────────────────────────── */
           <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-5">
-            <div className="text-[13.5px] font-medium text-zinc-200">Masuk dulu</div>
+            <div className="text-[13.5px] font-medium text-zinc-200">Masuk untuk melanjutkan</div>
             <p className="mt-1 text-[12.5px] leading-relaxed text-zinc-500">
-              Dipakai untuk menandai permintaanmu dan mengirim kabar saat aksesnya dibuka.
+              Akun dipakai untuk menandai permintaan dan mengirim kabar saat akses dibuka.
             </p>
             <div className="mt-4 flex flex-wrap gap-2.5">
               <button
@@ -168,21 +175,20 @@ export default function Akses() {
           /* ── Menunggu tinjauan ───────────────────────────────────── */
           <div className="rounded-xl border border-amber-500/25 bg-amber-500/[0.05] p-5">
             <div className="flex items-center gap-2 text-[14px] font-medium text-amber-300">
-              <Clock className="size-4" /> Permintaanmu sedang ditunggu
+              <Clock className="size-4" /> Permintaan sedang ditinjau
             </div>
             <p className="mt-1.5 text-[12.5px] leading-relaxed text-zinc-400">
-              Dikirim {new Date(terakhir.waktu).toLocaleString('id-ID')}. Begitu saya setujui,
-              halaman ini langsung berubah dan tombolnya kembali berfungsi seperti biasa —
-              tidak perlu mengirim ulang.
+              Dikirim {new Date(terakhir.waktu).toLocaleString('id-ID')}. Halaman ini berubah
+              sendiri begitu akses dibuka — tidak perlu mengirim ulang.
             </p>
           </div>
         ) : terakhir?.status === 'ditolak' ? (
           <div className="rounded-xl border border-red-500/25 bg-red-500/[0.05] p-5">
             <div className="flex items-center gap-2 text-[14px] font-medium text-red-400">
-              <XCircle className="size-4" /> Permintaan sebelumnya ditolak
+              <XCircle className="size-4" /> Permintaan sebelumnya tidak disetujui
             </div>
             <p className="mt-1.5 text-[12.5px] leading-relaxed text-zinc-400">
-              Kalau menurutmu ini keliru, tulis alasannya di kolom di bawah lalu kirim lagi.
+              Tambahkan keterangan di kolom bawah, lalu kirim ulang.
             </p>
           </div>
         ) : null}
@@ -196,7 +202,7 @@ export default function Akses() {
               value={catatan}
               onChange={(e) => setCatatan(e.target.value.slice(0, 300))}
               rows={2}
-              placeholder="Ceritakan singkat kamu trading apa (opsional)"
+              placeholder="Ceritakan singkat gaya trading kamu (opsional)"
               className="w-full resize-none rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-[12.5px] text-zinc-200 outline-none placeholder:text-zinc-600 focus-visible:border-zinc-600"
             />
 
@@ -213,7 +219,7 @@ export default function Akses() {
                 )}
               >
                 {sibuk ? <Loader2 className="size-4 animate-spin" /> : null}
-                {kuota.gratisHabis ? 'Kuota gratis habis' : `Minta akses gratis ${kuota.hari} hari`}
+                {kuota.gratisHabis ? 'Kuota gratis habis' : `Minta akses gratis · ${kuota.hari} hari`}
               </button>
 
               {/* Tombol bayar SELALU ada, tapi jadi pilihan utama begitu yang
@@ -236,8 +242,8 @@ export default function Akses() {
 
             {kuota.gratisHabis && (
               <p className="text-[11.5px] leading-relaxed text-zinc-500">
-                Setelah membayar, kembali ke halaman ini dan tekan tombol di bawah supaya
-                permintaanmu masuk ke antrean saya.
+                Setelah pembayaran selesai, kirim permintaan di bawah agar masuk antrean
+                peninjauan.
               </p>
             )}
             {kuota.gratisHabis && (
@@ -246,15 +252,15 @@ export default function Akses() {
                 disabled={sibuk}
                 className="w-fit cursor-pointer rounded-md border border-zinc-800 px-4 py-2 text-[12.5px] text-zinc-300 transition-colors hover:bg-zinc-900 disabled:opacity-60"
               >
-                Saya sudah bayar — kirim permintaan
+                Sudah bayar — kirim permintaan
               </button>
             )}
 
             {kabar && <div className="text-[12px] leading-relaxed text-zinc-400">{kabar}</div>}
 
             <p className="text-[11.5px] leading-relaxed text-zinc-600">
-              Harga perintis untuk 100 orang pertama. Sesudah kuota ini habis, harganya kembali
-              ke daftar normal di toko.
+              Harga perintis untuk 100 pengguna pertama. Setelah kuota ini habis, harga kembali
+              ke daftar normal.
             </p>
           </div>
         )}
@@ -262,8 +268,8 @@ export default function Akses() {
         <div className="flex items-start gap-2 text-[11.5px] leading-relaxed text-zinc-600">
           <ShieldCheck className="mt-0.5 size-3.5 shrink-0" />
           <span>
-            Yang saya simpan cuma email, nama akun, dan catatanmu. Tidak ada kunci API atau data
-            broker yang diminta di halaman ini.
+            Yang disimpan hanya email, nama akun, dan keterangan yang ditulis. Kunci API dan data
+            broker tidak diminta di halaman ini.
           </span>
         </div>
       </div>
