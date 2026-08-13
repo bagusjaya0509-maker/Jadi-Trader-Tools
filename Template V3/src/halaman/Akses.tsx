@@ -97,7 +97,7 @@ export default function Akses() {
         </Link>
 
         <div>
-          <h1 className="font-display text-2xl font-bold tracking-tight text-zinc-100 sm:text-3xl">
+          <h1 className="text-2xl font-medium tracking-tighter text-zinc-100 sm:text-3xl">
             Akses Jadi Trader Tools
           </h1>
           <p className="mt-2 text-[14px] leading-relaxed text-zinc-400">

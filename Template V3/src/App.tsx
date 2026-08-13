@@ -186,7 +186,10 @@ function Kerangka() {
   const lokasi = useLocation();
 
   if (memuat) return <Menunggu />;
-  if (!(pemilik || langganan.status === 'aktif')) {
+  /* `warisan` ikut membuka: akun yang sudah ada sebelum gerbang ini dipasang
+     tidak pernah diminta meminta akses, jadi melemparnya ke halaman
+     permintaan sama saja mengunci orang di luar rumahnya sendiri. */
+  if (!(pemilik || langganan.status === 'aktif' || langganan.warisan)) {
     return <Navigate to={`/akses?dari=${encodeURIComponent(lokasi.pathname)}`} replace />;
   }
   return (

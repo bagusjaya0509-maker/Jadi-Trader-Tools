@@ -189,7 +189,7 @@ export default function Pendaratan() {
       {/* ── Masalah yang dijawab ──────────────────────────────────────── */}
       <section className="mx-auto max-w-[1280px] px-4 py-16 md:py-24">
         <div className="mx-auto max-w-[760px] text-center">
-          <h2 className="font-display text-2xl font-bold tracking-tight text-zinc-100 sm:text-3xl md:text-4xl">
+          <h2 className="text-2xl font-bold tracking-tight text-zinc-100 sm:text-3xl md:text-4xl">
             Trading itu satu keputusan. Alatnya yang terpisah-pisah.
           </h2>
           <p className="mt-4 text-[15px] leading-relaxed text-zinc-400">
@@ -297,7 +297,7 @@ export default function Pendaratan() {
 
       {/* ── Ajakan penutup ────────────────────────────────────────────── */}
       <section className="mx-auto max-w-[1280px] px-4 py-16 text-center md:py-24">
-        <h2 className="font-display text-2xl font-bold tracking-tight text-zinc-100 sm:text-3xl">
+        <h2 className="text-2xl font-bold tracking-tight text-zinc-100 sm:text-3xl">
           Mulai dari mencatat. Sisanya menyusul.
         </h2>
         <p className="mx-auto mt-4 max-w-[560px] text-[15px] leading-relaxed text-zinc-400">

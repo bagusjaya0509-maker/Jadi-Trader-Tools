@@ -133,7 +133,13 @@ export async function putuskanPermintaan(id: string, tindakan: 'setujui' | 'tola
 }
 
 /** Login Discord: backend menyelesaikan OAuth lalu mengarahkan balik dengan
- *  `#discord=<token>`, yang sudah ditangani di lib/auth.tsx saat modul dimuat. */
+ *  `#discord=<token>`, yang sudah ditangani di lib/auth.tsx saat modul dimuat.
+ *
+ *  `balik` WAJIB dikirim. Backend mencocokkannya dengan daftar alamat yang
+ *  sah sebelum mengarahkan siapa pun — tanpa itu ia menjawab "Alamat balik
+ *  tidak dikenal", dan tombolnya cuma menampilkan JSON galat. Daftar itu ada
+ *  supaya token login tidak bisa dialihkan ke situs orang lain. */
 export function masukDiscord() {
-  window.location.href = `${dasar()}/api/auth/discord`;
+  const balik = window.location.origin + window.location.pathname;
+  window.location.href = `${dasar()}/api/auth/discord?balik=${encodeURIComponent(balik)}`;
 }

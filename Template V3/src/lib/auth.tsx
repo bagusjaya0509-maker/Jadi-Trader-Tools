@@ -45,6 +45,10 @@ export type StatusLangganan = 'coba' | 'aktif' | 'habis' | 'tidakDiketahui';
 
 export interface Langganan {
   status: StatusLangganan;
+  /** Akun LAMA — sudah ada sebelum gerbang persetujuan dipasang.
+   *  Tidak pernah diminta meminta akses, jadi tidak boleh tiba-tiba terkunci
+   *  di luar oleh aturan yang belum ada waktu ia mendaftar. */
+  warisan: boolean;
   /** Sisa hari masa coba / langganan. null kalau tidak diketahui. */
   sisaHari: number | null;
   berakhir: Date | null;
@@ -60,7 +64,14 @@ interface Isi {
   galat: string | null;
 }
 
-const KosongLangganan: Langganan = { status: 'tidakDiketahui', sisaHari: null, berakhir: null };
+/* Gerbang persetujuan mulai berlaku 13 Agustus 2026. Akun yang `mulai`-nya
+   lebih awal dari ini mendaftar di masa ketika masuk saja sudah cukup —
+   mengunci mereka sekarang berarti menghukum orang karena datang duluan.
+   Kalau ada yang perlu dicabut, cabut satu per satu lewat panel, bukan
+   dengan aturan yang menyapu semuanya sekaligus. */
+const WARISAN_SEBELUM = Date.parse('2026-08-13T00:00:00Z');
+
+const KosongLangganan: Langganan = { status: 'tidakDiketahui', sisaHari: null, berakhir: null, warisan: false };
 const Konteks = createContext<Isi | null>(null);
 
 /** Timestamp dioper sebagai argumen karena kelasnya baru ada setelah impor
@@ -99,19 +110,22 @@ async function bacaAtauBuatLangganan(uid: string): Promise<Langganan> {
   const bayarSampai = keTanggal(data.bayarSampai, Timestamp);
   const skrg = Date.now();
 
+  const mulai = keTanggal(data.mulai, Timestamp);
+  const warisan = !!mulai && +mulai < WARISAN_SEBELUM;
+
   if (bayarSampai && +bayarSampai > skrg) {
     return {
       status: 'aktif',
       sisaHari: Math.ceil((+bayarSampai - skrg) / MS_HARI),
       berakhir: bayarSampai,
+      warisan,
     };
   }
 
-  const mulai = keTanggal(data.mulai, Timestamp);
   if (mulai) {
     const akhir = new Date(+mulai + HARI_COBA * MS_HARI);
     const sisa = Math.ceil((+akhir - skrg) / MS_HARI);
-    return { status: sisa > 0 ? 'coba' : 'habis', sisaHari: Math.max(0, sisa), berakhir: akhir };
+    return { status: sisa > 0 ? 'coba' : 'habis', sisaHari: Math.max(0, sisa), berakhir: akhir, warisan };
   }
 
   return KosongLangganan;

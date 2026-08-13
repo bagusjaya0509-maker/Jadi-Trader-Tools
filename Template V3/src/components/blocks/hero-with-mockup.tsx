@@ -50,7 +50,7 @@ export function HeroWithMockup({
               'inline-block animate-appear',
               'bg-gradient-to-b from-zinc-50 via-zinc-200 to-zinc-500',
               'bg-clip-text text-transparent',
-              'font-display text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl',
+              'text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl',
               'leading-[1.1] sm:leading-[1.1]',
               'max-w-[16ch]',
             )}
