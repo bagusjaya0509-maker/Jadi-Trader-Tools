@@ -1454,12 +1454,9 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
             <div onPointerDown={mulaiSeretUbah}
                  style={letakUbah ? { left: letakUbah.x, top: letakUbah.y } : undefined}
                  className={cn('absolute z-30 cursor-move', !letakUbah && 'left-[290px] top-2')}>
-                            /* Menempel di SEBELAH panel order, bukan di dasar
-                               chart: dock Pine meluncur dari kanan dan
-                               menutupi apa pun yang duduk di bawah. Tanpa
-                               bingkai dan latar — ia bagian dari chart, bukan
-                               kartu yang menumpang di atasnya. */
-                            <div className="w-[210px] shrink-0 text-[11.5px]">
+              {/* Tanpa bingkai dan latar — ia bagian dari chart, bukan
+                  kartu yang menumpang di atasnya. */}
+              <div className="w-[210px] shrink-0 text-[11.5px]">
                               <div className="flex items-baseline gap-1.5">
                                 <span className="text-zinc-200">{sunting.simbol}</span>
                                 <span className={cn('text-[10.5px]', sunting.arah === 'BUY' ? 'text-emerald-500' : 'text-red-400')}>
