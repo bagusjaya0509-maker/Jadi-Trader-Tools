@@ -45,8 +45,24 @@ interface Sinyal {
   statusHarga?: 'belum' | 'dekat' | 'jalan' | '';
 }
 
-interface Permintaan { id: string; waktu: number; status: string }
-interface HasilHunter { waktu: number; status: string; diperiksa: number; sinyalBaru: number; ringkas: string }
+interface Permintaan { id: string; waktu: number; status: string; mulai?: number }
+interface HasilHunter {
+  waktu: number; status: string; diperiksa: number; sinyalBaru: number; ringkas: string;
+  mulai?: number; durasiMs?: number;
+}
+
+/** "2m 14d" — sengaja pendek dan berjalan. Yang ditanyakan orang yang
+ *  menekan tombol bukan jam dinding, melainkan berapa lama ia harus
+ *  menunggu; angka yang bergerak menjawabnya tanpa perlu dijelaskan. */
+function durasi(ms: number): string {
+  if (!isFinite(ms) || ms < 0) return '—';
+  const d = Math.floor(ms / 1000);
+  if (d < 60) return `${d} dtk`;
+  const m = Math.floor(d / 60);
+  const sisa = d % 60;
+  if (m < 60) return `${m}m ${String(sisa).padStart(2, '0')}d`;
+  return `${Math.floor(m / 60)}j ${String(m % 60).padStart(2, '0')}m`;
+}
 
 function umurTeks(ts: number): string {
   const h = Math.floor((Date.now() - ts) / 3_600_000);
@@ -154,6 +170,20 @@ export function PanelSinyal() {
   const sedangJalan = !!permintaan && permintaan.status !== 'selesai'
     && Date.now() - permintaan.waktu < 30 * 60_000;
 
+  /* Jam berjalan saat agen bekerja. Tanpa detik yang bergerak, tombol yang
+     diam tiga menit tidak bisa dibedakan dari tombol yang macet — dan itu
+     persis keluhannya. */
+  const [tik, setTik] = useState(0);
+  useEffect(() => {
+    if (!sedangJalan) return;
+    const j = setInterval(() => setTik((v) => v + 1), 1000);
+    return () => clearInterval(j);
+  }, [sedangJalan]);
+  const berjalanMs = sedangJalan
+    ? Date.now() - (permintaan!.mulai || permintaan!.waktu)
+    : 0;
+  void tik;   // pemicu render tiap detik
+
   /* "Baru" berarti pencarian terakhir masih dalam 6 jam. Sejak agen bekerja
      ATAS PERMINTAAN, ukurannya bukan lagi "apakah jadwalnya jalan" —
      jadwalnya memang tidak ada. Yang berguna diketahui: apakah yang tampil
@@ -175,11 +205,19 @@ export function PanelSinyal() {
         sub="Dikurasi agen Pemburu Sinyal — hanya sinyal berlevel lengkap yang lolos; sumbernya ditulis terbuka."
         kanan={
           <span className="flex items-center gap-2">
-            {diperiksa > 0 && (
-              <span className="hidden text-[10.5px] text-zinc-500 sm:inline">
-                diperiksa {kapan(diperiksa)}
+            {/* Yang ditampilkan LAMA KERJANYA, bukan jam pemeriksaan.
+                "diperiksa hari ini 00.01" tidak menjawab pertanyaan siapa
+                pun; "bekerja 2m 14d" memberi tahu apakah menunggu tiga
+                menit itu wajar. */}
+            {sedangJalan ? (
+              <span className="angka hidden text-[10.5px] text-amber-300/90 sm:inline">
+                bekerja {durasi(berjalanMs)}
               </span>
-            )}
+            ) : hasil?.durasiMs ? (
+              <span className="hidden text-[10.5px] text-zinc-500 sm:inline">
+                terakhir bekerja <span className="angka">{durasi(hasil.durasiMs)}</span>
+              </span>
+            ) : null}
             {/* Tombol panggil. Agen tidak lagi memeriksa tiap 30 menit —
                 ruang sinyal tidak berbicara sesering itu, dan 34 kali
                 "tidak ada yang baru" sehari cuma membakar kuota. */}
@@ -203,12 +241,16 @@ export function PanelSinyal() {
           {kabarMinta && <span className="text-zinc-400">{kabarMinta}</span>}
           {sedangJalan && !kabarMinta && (
             <span className="text-amber-300/90">
-              Permintaan {kapan(permintaan!.waktu)} — menunggu agen membaca ruang sinyal.
+              {permintaan!.mulai
+                ? <>Agen sedang membaca ruang sinyal — berjalan <span className="angka">{durasi(berjalanMs)}</span>.</>
+                : <>Permintaan {kapan(permintaan!.waktu)} — menunggu agen mengambilnya (dijemput tiap 10 menit).</>}
             </span>
           )}
           {!sedangJalan && !kabarMinta && hasil && (
             <span>
-              Pencarian terakhir {kapan(hasil.waktu)}: {hasil.diperiksa} postingan diperiksa,{' '}
+              Pencarian terakhir {kapan(hasil.waktu)}
+              {hasil.durasiMs ? <> · lama kerja <span className="angka text-zinc-400">{durasi(hasil.durasiMs)}</span></> : null}
+              {' '}· {hasil.diperiksa} postingan diperiksa,{' '}
               <span className={hasil.sinyalBaru > 0 ? 'text-emerald-400' : 'text-zinc-400'}>
                 {hasil.sinyalBaru} sinyal baru
               </span>

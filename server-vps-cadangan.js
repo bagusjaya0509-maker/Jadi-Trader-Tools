@@ -1934,18 +1934,33 @@ app.get('/api/hunter/status', batasLaju, (req, res) => {
   res.json({ ok: true, permintaan: d.permintaan || null, terakhir: d.terakhir || null });
 });
 
-/* Agen melapor: sedang dikerjakan, atau selesai dengan ringkasannya. */
+/* Agen melapor: sedang dikerjakan, atau selesai dengan ringkasannya.
+   DURASI dicatat di sini, bukan ditebak layar: `dikerjakan` menandai
+   menit mulai, `selesai` menutupnya. Yang ingin diketahui orang yang
+   menekan tombol bukan "kapan terakhir diperiksa" — itu jam dinding
+   yang tidak menjawab apa pun — melainkan BERAPA LAMA agen bekerja,
+   supaya ia tahu menunggu 3 menit itu wajar atau ada yang macet. */
 app.post('/api/hunter/hasil', batasLaju, requireToken, (req, res) => {
   const b = req.body || {};
   const d = hunterBaca();
   const status = ['dikerjakan', 'selesai', 'gagal'].indexOf(String(b.status)) >= 0
     ? String(b.status) : 'selesai';
+  const skrg = Date.now();
 
-  if (d.permintaan) d.permintaan.status = status;
+  if (d.permintaan) {
+    d.permintaan.status = status;
+    if (status === 'dikerjakan' && !d.permintaan.mulai) d.permintaan.mulai = skrg;
+  }
+
   if (status !== 'dikerjakan') {
+    const mulai = Number(d.permintaan && d.permintaan.mulai) || 0;
     d.terakhir = {
-      waktu: Date.now(),
+      waktu: skrg,
       status,
+      mulai,
+      /* 0 berarti agen tidak pernah melapor "dikerjakan" — jujur lebih
+         baik daripada durasi karangan dari selisih jam permintaan. */
+      durasiMs: mulai ? skrg - mulai : 0,
       diperiksa: Number(b.diperiksa) || 0,
       sinyalBaru: Number(b.sinyalBaru) || 0,
       ringkas: String(b.ringkas || '').slice(0, 300),
@@ -1953,6 +1968,48 @@ app.post('/api/hunter/hasil', batasLaju, requireToken, (req, res) => {
   }
   hunterTulis(d);
   res.json({ ok: true, permintaan: d.permintaan, terakhir: d.terakhir });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   MEMORI AGEN — apa yang sudah dipelajari, supaya tidak dipelajari lagi
+   ══════════════════════════════════════════════════════════════════════════
+   Tiap kali agen berjalan ia mulai dengan ingatan kosong. Akibatnya
+   pelajaran yang mahal — "izin browser harus disetujui sekali di awal",
+   "postingan Setra taruh levelnya di gambar, bukan teks" — hilang begitu
+   sesinya tutup, dan orangnya menjelaskan hal yang sama berulang kali.
+
+   Berkas ini ingatan bersama itu: dibaca agen SEBELUM bekerja, ditulis
+   SESUDAHNYA. Dibaca juga oleh n8n, jadi aturan yang sama berlaku di
+   kedua jalur, dan bisa dilihat manusia kapan saja. */
+const CATATAN_FILE = path.join(__dirname, 'agen-catatan.json');
+function catatanBaca() {
+  try {
+    const d = JSON.parse(fs.readFileSync(CATATAN_FILE, 'utf8'));
+    return Array.isArray(d.catatan) ? d.catatan : [];
+  } catch (e) { return []; }
+}
+
+app.get('/api/agen/catatan', batasLaju, (req, res) => {
+  res.json({ ok: true, catatan: catatanBaca() });
+});
+
+app.post('/api/agen/catatan', batasLaju, requireToken, (req, res) => {
+  const b = req.body || {};
+  const isi = String(b.isi || '').trim().slice(0, 600);
+  if (!isi) return res.status(400).json({ error: 'isi wajib' });
+
+  const daftar = catatanBaca();
+  const kunci = String(b.kunci || isi.slice(0, 40)).slice(0, 60);
+  /* Kunci sama = pelajaran yang sama diperbarui, bukan ditumpuk. Catatan
+     yang menumpuk jadi arsip yang tidak dibaca siapa pun, termasuk agen. */
+  const sisa = daftar.filter(x => x && x.kunci !== kunci);
+  sisa.unshift({
+    kunci, isi,
+    bidang: String(b.bidang || 'umum').slice(0, 30),
+    waktu: Date.now(),
+  });
+  fs.writeFileSync(CATATAN_FILE, JSON.stringify({ catatan: sisa.slice(0, 60) }, null, 2));
+  res.json({ ok: true, kunci, total: Math.min(sisa.length, 60) });
 });
 
 /* ══════════════════════════════════════════════════════════════════════════
