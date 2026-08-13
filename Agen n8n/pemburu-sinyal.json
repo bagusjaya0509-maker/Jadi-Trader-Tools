@@ -1,0 +1,133 @@
+{
+  "name": "Pemburu Sinyal — kurasi & terbit",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "sinyal-masuk",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-masuk",
+      "name": "Postingan masuk",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-460, 300],
+      "webhookId": "pemburu-sinyal-masuk",
+      "notes": "Pintu masuk satu-satunya. Pengirimnya boleh siapa saja: Claude yang membaca Discord lewat browser, bot Discord kalau nanti diizinkan admin server, atau kamu sendiri lewat curl untuk menguji."
+    },
+    {
+      "parameters": {
+        "jsCode": "/* NORMALISASI — satu bentuk untuk semua pengirim.\n *\n * Pengirimnya bisa mengirim level yang sudah jadi (pair/arah/entry/sl/tp),\n * atau cuma teks postingan mentah. Yang kedua diurai di sini supaya\n * aturannya hidup di SATU tempat yang bisa dilihat, bukan tersebar di\n * kepala tiap pemanggil. */\nconst b = $input.first().json.body ?? $input.first().json;\n\nconst angka = (v) => {\n  const n = Number(String(v ?? '').replace(/[^\\d.\\-]/g, ''));\n  return isFinite(n) && n > 0 ? n : 0;\n};\n\nconst teks = String(b.teks ?? b.text ?? '');\n\n/* Urai dari teks HANYA kalau tidak dikirim eksplisit. Angka yang dikirim\n   pengirim lebih dipercaya daripada tebakan regex kita sendiri. */\nconst cari = (label) => {\n  const m = new RegExp(label + '\\\\s*[:=]?\\\\s*([0-9]+(?:[.,][0-9]+)?)', 'i').exec(teks);\n  return m ? angka(m[1].replace(',', '.')) : 0;\n};\n\nconst pair = String(b.pair ?? '').toUpperCase().replace(/[^A-Z0-9:.]/g, '')\n  || (/(\\b[A-Z]{6}\\b|\\b[A-Z]{2,10}USDT?\\b)/.exec(teks.toUpperCase())?.[1] ?? '');\n\nlet arah = String(b.arah ?? '').toUpperCase();\nif (arah !== 'BUY' && arah !== 'SELL') {\n  if (/\\bsell\\b|\\bshort\\b/i.test(teks)) arah = 'SELL';\n  else if (/\\bbuy\\b|\\blong\\b/i.test(teks)) arah = 'BUY';\n  else arah = '';\n}\n\nconst entry = angka(b.entry) || cari('entry|masuk|open');\nconst sl = angka(b.sl) || cari('sl|stop\\\\s*loss');\nconst tp = angka(b.tp) || cari('tp|take\\\\s*profit|target');\n\n/* id STABIL: pemeriksaan berulang atas postingan yang sama menghasilkan id\n   yang sama, jadi ia menimpa alih-alih menumpuk. */\nconst tanggal = new Date(Number(b.waktu) || Date.now()).toISOString().slice(0, 10).replace(/-/g, '');\nconst id = String(b.id ?? `st-${tanggal}-${pair}-${arah}`.toLowerCase());\n\nreturn [{ json: {\n  id,\n  pair, arah, entry, sl, tp,\n  tf: String(b.tf ?? ''),\n  sumber: String(b.sumber ?? 'Sekolah Trading · #free-prediksi-market'),\n  analis: String(b.analis ?? ''),\n  tautan: String(b.tautan ?? ''),\n  catatan: String(b.catatan ?? teks).slice(0, 500),\n  waktu: Number(b.waktu) || Date.now(),\n  taksiran: b.taksiran === true,\n  /* Hasil pemeriksaan harga oleh pengirim. Tidak ditebak di sini: n8n\n     tidak punya harga forex, dan menebak umur sinyal dari jam saja akan\n     menyebut 'masih berlaku' untuk entry yang sudah lewat jauh. */\n  hargaSaatKurasi: Number(b.hargaSaatKurasi) || 0,\n  statusHarga: ['belum','dekat','jalan'].includes(String(b.statusHarga)) ? String(b.statusHarga) : '',\n  kadaluarsa: Number(b.kadaluarsa) || 0,\n} }];"
+      },
+      "id": "normalisasi",
+      "name": "Normalisasi",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "/* DISIPLIN — pagar yang sama dengan yang dipegang agen sejak awal.\n *\n * Sinyal tanpa SL ABSOLUT ditolak jadi sinyal. \"SL 60 pips\" bukan level;\n * ia baru jadi level setelah seseorang menghitungnya, dan yang menghitung\n * itu harus manusia yang menanggung risikonya.\n *\n * Yang ditolak TIDAK dibuang — ia tetap berangkat sebagai kabar, karena\n * orangnya tetap berhak tahu ada yang baru diposting di ruang itu. */\nconst d = $input.first().json;\nconst alasan = [];\n\nif (!d.pair) alasan.push('pair tidak terbaca');\nif (d.arah !== 'BUY' && d.arah !== 'SELL') alasan.push('arah tidak terbaca');\nif (!d.entry) alasan.push('entry tidak absolut');\nif (!d.sl) alasan.push('SL tidak absolut');\nif (!d.tp) alasan.push('TP tidak absolut');\n\nif (!alasan.length) {\n  const sisiBenar = d.arah === 'BUY'\n    ? (d.sl < d.entry && d.tp > d.entry)\n    : (d.sl > d.entry && d.tp < d.entry);\n  if (!sisiBenar) alasan.push('SL/TP di sisi yang salah terhadap entry');\n}\n\nconst lolos = alasan.length === 0;\n/* R:R dihitung dari levelnya sendiri, bukan dari klaim siapa pun. */\nconst rr = lolos ? Math.abs(d.tp - d.entry) / Math.abs(d.entry - d.sl) : 0;\n\nreturn [{ json: {\n  ...d,\n  lolos,\n  alasanTolak: alasan.join(', '),\n  rr: Number(rr.toFixed(2)),\n  judulKabar: lolos\n    ? `Sinyal ${d.pair} ${d.arah} — R:R 1:${rr.toFixed(2)}`\n    : `Postingan baru${d.pair ? ' ' + d.pair : ''} di ruang sinyal`,\n  detailKabar: lolos\n    ? `Entry ${d.entry} · SL ${d.sl} · TP ${d.tp}${d.taksiran ? ' (level taksiran dari gambar)' : ''}`\n    : `Belum jadi sinyal: ${alasan.join(', ')}.`,\n} }];"
+      },
+      "id": "disiplin",
+      "name": "Uji disiplin",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-20, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
+          "conditions": [
+            {
+              "id": "lolos",
+              "leftValue": "={{ $json.lolos }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "cabang",
+      "name": "Lolos disiplin?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://103-253-145-38.sslip.io/api/sinyal",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-App-Token", "value": "={{ $credentials }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ id: $json.id, pair: $json.pair, arah: $json.arah, tf: $json.tf, entry: $json.entry, sl: $json.sl, tp: $json.tp, sumber: $json.sumber, analis: $json.analis, waktu: $json.waktu, catatan: $json.catatan, tautan: $json.tautan, kadaluarsa: $json.kadaluarsa, hargaSaatKurasi: $json.hargaSaatKurasi, statusHarga: $json.statusHarga }) }}",
+        "options": {}
+      },
+      "id": "terbit-sinyal",
+      "name": "Terbitkan sinyal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [430, 190],
+      "notes": "Pakai credential Header Auth bernama 'Jadi Trader APP_TOKEN' (nama header X-App-Token). Server MENGUJI ULANG disiplinnya, jadi salah kirim tetap ditolak di sana."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://103-253-145-38.sslip.io/api/kabar",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-App-Token", "value": "={{ $credentials }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ id: 'k-' + $json.id, judul: $json.judulKabar, detail: $json.detailKabar, sumber: $json.sumber, jenis: $json.lolos ? 'sinyal' : 'pantau', pair: $json.pair, tautan: $json.tautan, waktu: $json.waktu }) }}",
+        "options": {}
+      },
+      "id": "kirim-kabar",
+      "name": "Kirim kabar ke lonceng",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, id: $json.id, lolos: $json.lolos, alasanTolak: $json.alasanTolak, rr: $json.rr }) }}",
+        "options": {}
+      },
+      "id": "jawab",
+      "name": "Jawab pengirim",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [890, 300],
+      "notes": "Pengirim mendapat vonisnya kembali — lolos atau tidak, dan kenapa. Tanpa ini agen di sisi sana cuma menebak."
+    }
+  ],
+  "connections": {
+    "Postingan masuk": { "main": [[{ "node": "Normalisasi", "type": "main", "index": 0 }]] },
+    "Normalisasi": { "main": [[{ "node": "Uji disiplin", "type": "main", "index": 0 }]] },
+    "Uji disiplin": { "main": [[{ "node": "Lolos disiplin?", "type": "main", "index": 0 }]] },
+    "Lolos disiplin?": {
+      "main": [
+        [{ "node": "Terbitkan sinyal", "type": "main", "index": 0 }],
+        [{ "node": "Kirim kabar ke lonceng", "type": "main", "index": 0 }]
+      ]
+    },
+    "Terbitkan sinyal": { "main": [[{ "node": "Kirim kabar ke lonceng", "type": "main", "index": 0 }]] },
+    "Kirim kabar ke lonceng": { "main": [[{ "node": "Jawab pengirim", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "pinData": {}
+}

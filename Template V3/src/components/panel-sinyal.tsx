@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Radar, ExternalLink, CandlestickChart } from 'lucide-react';
+import { Radar, ExternalLink, CandlestickChart, Loader2, Sparkles } from 'lucide-react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { cn, harga as fHarga } from '@/lib/utils';
 import { bacaKoneksi } from '@/lib/koneksi';
+import { useAuth } from '@/lib/auth';
+import { auth } from '@/lib/firebase';
 
 /* ════════════════════════════════════════════════════════════════════════
    SINYAL PANTAUAN — hasil kurasi agen Pemburu Sinyal
@@ -33,9 +35,20 @@ interface Sinyal {
   waktu: number;
   catatan: string;
   tautan?: string;
+  /** Sampai kapan levelnya masih layak dipakai — diisi agen SETELAH
+   *  memeriksa harga terkini. 0 berarti tidak dinyatakan. */
+  kadaluarsa?: number;
+  /** Harga saat agen mengkurasi, dan penilaiannya: 'belum' (entry belum
+   *  tersentuh), 'dekat', atau 'jalan' (harga sudah lewat — sinyalnya
+   *  tinggal kenangan). */
+  hargaSaatKurasi?: number;
+  statusHarga?: 'belum' | 'dekat' | 'jalan' | '';
 }
 
-function umur(ts: number): string {
+interface Permintaan { id: string; waktu: number; status: string }
+interface HasilHunter { waktu: number; status: string; diperiksa: number; sinyalBaru: number; ringkas: string }
+
+function umurTeks(ts: number): string {
   const h = Math.floor((Date.now() - ts) / 3_600_000);
   if (h < 1) return 'baru saja';
   if (h < 24) return `${h} jam lalu`;
@@ -58,9 +71,24 @@ function kapan(ts: number): string {
   return `${d.toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short' })} ${jam}`;
 }
 
+/** Sisa umur sinyal dalam kalimat pendek. */
+function sisaUmur(kadaluarsa: number): { teks: string; habis: boolean } {
+  const sisa = kadaluarsa - Date.now();
+  if (sisa <= 0) return { teks: 'kadaluarsa', habis: true };
+  const jam = Math.floor(sisa / 3_600_000);
+  if (jam < 1) return { teks: `sisa ${Math.max(1, Math.floor(sisa / 60_000))} menit`, habis: false };
+  if (jam < 24) return { teks: `sisa ${jam} jam`, habis: false };
+  return { teks: `sisa ${Math.floor(jam / 24)} hari`, habis: false };
+}
+
 export function PanelSinyal() {
   const [daftar, setDaftar] = useState<Sinyal[]>([]);
   const [diperiksa, setDiperiksa] = useState(0);
+  const [permintaan, setPermintaan] = useState<Permintaan | null>(null);
+  const [hasil, setHasil] = useState<HasilHunter | null>(null);
+  const [meminta, setMeminta] = useState(false);
+  const [kabarMinta, setKabarMinta] = useState('');
+  const { pengguna } = useAuth();
 
   useEffect(() => {
     let hidup = true;
@@ -77,16 +105,60 @@ export function PanelSinyal() {
         })
         .catch(() => { /* panel kosong lebih baik daripada panel karangan */ });
     };
+    const tarikStatus = () => {
+      fetch(`${dasar}/api/hunter/status`)
+        .then((r) => r.json())
+        .then((j) => {
+          if (!hidup) return;
+          setPermintaan(j?.permintaan ?? null);
+          setHasil(j?.terakhir ?? null);
+        })
+        .catch(() => { /* status diam lebih baik daripada status karangan */ });
+    };
     tarik();
+    tarikStatus();
     const jam = setInterval(tarik, 120_000);
-    return () => { hidup = false; clearInterval(jam); };
+    /* Status agen ditarik lebih sering DARIPADA daftar sinyalnya: setelah
+       menekan tombol, yang ditunggu orangnya adalah kabar bahwa
+       permintaannya sedang dikerjakan — bukan sinyalnya, yang memang belum
+       ada sampai agennya selesai. */
+    const jamStatus = setInterval(tarikStatus, 15_000);
+    return () => { hidup = false; clearInterval(jam); clearInterval(jamStatus); };
   }, []);
 
-  /* Agen dianggap AKTIF kalau pemeriksaan terakhirnya belum lewat 90 menit —
-     jadwalnya tiap 30 menit, jadi dua jadwal terlewat berarti ada yang tidak
-     beres (aplikasi tertutup, Chrome tidak tersambung). Lampu hijau yang
-     menyala terus tanpa memandang kenyataan tidak memberi tahu apa pun. */
-  const aktif = diperiksa > 0 && Date.now() - diperiksa < 90 * 60_000;
+  /* Meminta agen bekerja. Butuh login: tombolnya ada di browser, dan
+     APP_TOKEN pemilik tidak boleh ikut ke sana. */
+  async function mintaHunter() {
+    const u = auth.currentUser;
+    if (!u) { setKabarMinta('Masuk dulu untuk meminta agen bekerja.'); return; }
+    setMeminta(true); setKabarMinta('');
+    try {
+      const dasar = (bacaKoneksi().url.trim() || PROXY_BAWAAN).replace(/\/+$/, '');
+      const token = await u.getIdToken();
+      const r = await fetch(`${dasar}/api/hunter/minta`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ catatan: 'Diminta dari halaman Copy Trading' }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j?.error || `Server menjawab ${r.status}`);
+      setPermintaan(j.permintaan ?? null);
+      setKabarMinta(j.sudahAntre
+        ? 'Sudah ada permintaan yang menunggu — agen mengerjakan yang itu dulu.'
+        : 'Permintaan terkirim. Agen mengerjakannya saat aplikasi Claude terbuka.');
+    } catch (e) {
+      setKabarMinta(e instanceof Error ? e.message : 'Gagal mengirim permintaan');
+    } finally { setMeminta(false); }
+  }
+
+  const sedangJalan = !!permintaan && permintaan.status !== 'selesai'
+    && Date.now() - permintaan.waktu < 30 * 60_000;
+
+  /* "Baru" berarti pencarian terakhir masih dalam 6 jam. Sejak agen bekerja
+     ATAS PERMINTAAN, ukurannya bukan lagi "apakah jadwalnya jalan" —
+     jadwalnya memang tidak ada. Yang berguna diketahui: apakah yang tampil
+     ini hasil pencarian yang masih segar, atau sisa kemarin. */
+  const aktif = diperiksa > 0 && Date.now() - diperiksa < 6 * 3_600_000;
 
   /* Panel tetap tampil walau belum ada sinyal — supaya "belum ada sinyal
      baru" bisa dibedakan dari "agennya mati". Yang membedakan cuma baris
@@ -108,15 +180,43 @@ export function PanelSinyal() {
                 diperiksa {kapan(diperiksa)}
               </span>
             )}
-            <span className={cn('flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
-              aktif ? 'bg-emerald-500/15 text-emerald-400' : 'bg-zinc-800 text-zinc-500')}>
-              <span className={cn('size-1.5 rounded-full', aktif ? 'bg-emerald-400' : 'bg-zinc-600')} />
-              {aktif ? 'AI aktif' : 'AI diam'}
-            </span>
+            {/* Tombol panggil. Agen tidak lagi memeriksa tiap 30 menit —
+                ruang sinyal tidak berbicara sesering itu, dan 34 kali
+                "tidak ada yang baru" sehari cuma membakar kuota. */}
+            <button onClick={() => void mintaHunter()} disabled={meminta || sedangJalan || !pengguna}
+              title={!pengguna ? 'Masuk dulu untuk meminta agen bekerja'
+                : sedangJalan ? 'Permintaanmu sedang dikerjakan' : 'Panggil agen untuk mencari sinyal terbaru sekarang'}
+              className={cn('flex cursor-pointer items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors',
+                sedangJalan ? 'bg-amber-500/15 text-amber-300'
+                  : 'bg-zinc-100 text-zinc-950 hover:bg-white',
+                'disabled:cursor-not-allowed disabled:opacity-60')}>
+              {sedangJalan
+                ? <><Loader2 className="size-3 animate-spin" /> Agen bekerja…</>
+                : <><Sparkles className="size-3" /> Minta AI Hunter</>}
+            </button>
             <Radar className={cn('size-4', aktif ? 'text-red-400' : 'text-zinc-600')} />
           </span>
         }
       />
+      {(kabarMinta || sedangJalan || hasil) && (
+        <div className="px-5 pb-2 text-[11px] leading-relaxed text-zinc-500">
+          {kabarMinta && <span className="text-zinc-400">{kabarMinta}</span>}
+          {sedangJalan && !kabarMinta && (
+            <span className="text-amber-300/90">
+              Permintaan {kapan(permintaan!.waktu)} — menunggu agen membaca ruang sinyal.
+            </span>
+          )}
+          {!sedangJalan && !kabarMinta && hasil && (
+            <span>
+              Pencarian terakhir {kapan(hasil.waktu)}: {hasil.diperiksa} postingan diperiksa,{' '}
+              <span className={hasil.sinyalBaru > 0 ? 'text-emerald-400' : 'text-zinc-400'}>
+                {hasil.sinyalBaru} sinyal baru
+              </span>
+              {hasil.ringkas ? ` · ${hasil.ringkas}` : ''}
+            </span>
+          )}
+        </div>
+      )}
       {/* Baris waktu untuk layar sempit — di sana lencana di kepala panel
           sudah penuh, dan kapan terakhir diperiksa terlalu penting untuk
           dibuang begitu saja. */}
@@ -142,8 +242,16 @@ export function PanelSinyal() {
           /* Pair forex tidak berdolar — 181.643 yen bukan $181. */
           const f = (v: number) => (kripto ? fHarga(v) : v.toFixed(3));
           const tua = Date.now() - s.waktu > 3 * 86_400_000;
+          /* Sinyal mati karena HARGANYA sudah jalan, bukan karena umurnya.
+             Dua penanda dipisah supaya keduanya bisa dibaca: umur kurasi
+             (kapan agen melihatnya) dan sisa masa berlaku (sampai kapan
+             levelnya masih layak). */
+          const umur = s.kadaluarsa ? sisaUmur(s.kadaluarsa) : null;
+          const mati = (umur?.habis ?? false) || s.statusHarga === 'jalan';
           return (
-            <div key={s.id} className="rounded-xl border border-zinc-800/70 p-3.5">
+            <div key={s.id}
+                 className={cn('rounded-xl border p-3.5 transition-opacity',
+                   mati ? 'border-zinc-800/50 opacity-55' : 'border-zinc-800/70')}>
               <div className="mb-2 flex items-center gap-2">
                 <span className="text-[13.5px] font-semibold tracking-tight text-zinc-100">{s.pair}</span>
                 <span className={cn('rounded px-1.5 py-0.5 text-[10px] font-semibold',
@@ -152,9 +260,37 @@ export function PanelSinyal() {
                 </span>
                 <span className="text-[10.5px] uppercase text-zinc-600">{s.tf}</span>
                 <span className={cn('ml-auto text-[10.5px]', tua ? 'text-amber-400/80' : 'text-zinc-500')}>
-                  {umur(s.waktu)}{tua ? ' · periksa ulang' : ''}
+                  {umurTeks(s.waktu)}{tua ? ' · periksa ulang' : ''}
                 </span>
               </div>
+
+              {/* Masa berlaku & keadaan harga — hasil pemeriksaan agen, bukan
+                  hitungan jam belaka. */}
+              {(umur || s.statusHarga) && (
+                <div className="mb-2 flex flex-wrap items-center gap-1.5 text-[10px]">
+                  {s.statusHarga === 'jalan' ? (
+                    <span className="rounded bg-red-500/15 px-1.5 py-0.5 font-semibold uppercase tracking-wide text-red-400">
+                      harga sudah jalan
+                    </span>
+                  ) : s.statusHarga === 'dekat' ? (
+                    <span className="rounded bg-amber-500/15 px-1.5 py-0.5 font-semibold uppercase tracking-wide text-amber-300">
+                      dekat entry
+                    </span>
+                  ) : s.statusHarga === 'belum' ? (
+                    <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 font-semibold uppercase tracking-wide text-emerald-400">
+                      belum tersentuh
+                    </span>
+                  ) : null}
+                  {umur && (
+                    <span className={cn(umur.habis ? 'text-red-400/80' : 'text-zinc-500')}>
+                      {umur.habis ? 'kadaluarsa' : `berlaku · ${umur.teks}`}
+                    </span>
+                  )}
+                  {s.hargaSaatKurasi ? (
+                    <span className="text-zinc-600">harga saat dikurasi {f(s.hargaSaatKurasi)}</span>
+                  ) : null}
+                </div>
+              )}
               <div className="mb-2 grid grid-cols-3 gap-2 text-center">
                 <div className="rounded-lg bg-zinc-900/70 py-1.5">
                   <div className="text-[9.5px] uppercase tracking-wide text-zinc-600">Entry</div>

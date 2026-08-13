@@ -1825,6 +1825,136 @@ app.get('/api/sinyal', batasLaju, (req, res) => {
   }
 });
 
+/* POST /api/sinyal  ->  terbitkan satu sinyal berlevel lengkap
+   ──────────────────────────────────────────────────────────────────────────
+   Sebelum ini sinyal cuma bisa masuk lewat SSH: agen menulis sinyal.json
+   dengan tangan. Akibatnya langkah paling penting dari alur kerja agen —
+   keputusan "ini lolos disiplin, terbitkan" — tidak terlihat di mana pun
+   dan tidak bisa dijalankan alat lain.
+
+   Rute ini membuatnya bisa dipanggil n8n, jadi seluruh alurnya berdiri di
+   satu tempat yang bisa dipantau. Disiplinnya TETAP DIJAGA DI SINI, bukan
+   cuma di pemanggil: pair, arah, entry, SL, dan TP wajib ada dan masuk
+   akal. Server yang percaya begitu saja pada kliennya bukan pagar. */
+app.post('/api/sinyal', batasLaju, requireToken, (req, res) => {
+  const b = req.body || {};
+  const pair = String(b.pair || '').toUpperCase().replace(/[^A-Z0-9:.]/g, '');
+  const arah = String(b.arah || '').toUpperCase();
+  const entry = Number(b.entry), sl = Number(b.sl), tp = Number(b.tp);
+
+  if (!pair) return res.status(400).json({ error: 'pair wajib' });
+  if (arah !== 'BUY' && arah !== 'SELL') return res.status(400).json({ error: 'arah harus BUY/SELL' });
+  for (const [nama, v] of [['entry', entry], ['sl', sl], ['tp', tp]]) {
+    if (!isFinite(v) || v <= 0) return res.status(400).json({ error: `${nama} harus angka mutlak > 0` });
+  }
+  /* SL di sisi yang salah bukan salah ketik yang bisa dimaafkan — itu
+     sinyal yang akan menutup posisi persis saat ia mulai benar. */
+  const sisiBenar = arah === 'BUY' ? (sl < entry && tp > entry) : (sl > entry && tp < entry);
+  if (!sisiBenar) return res.status(400).json({ error: 'SL/TP berada di sisi yang salah terhadap entry' });
+
+  let d = { sinyal: [] };
+  try { d = JSON.parse(fs.readFileSync(SINYAL_FILE, 'utf8')); } catch (e) {}
+  if (!Array.isArray(d.sinyal)) d.sinyal = [];
+
+  const id = String(b.id || 's' + Date.now().toString(36)).slice(0, 80).replace(/[^\w.:-]/g, '');
+  const baris = {
+    id, pair, arah,
+    tf: String(b.tf || '').slice(0, 10),
+    entry, sl, tp,
+    sumber: String(b.sumber || '').slice(0, 120),
+    analis: String(b.analis || '').slice(0, 80),
+    waktu: Number(b.waktu) > 0 ? Number(b.waktu) : Date.now(),
+    catatan: String(b.catatan || '').slice(0, 500),
+    tautan: String(b.tautan || '').slice(0, 300),
+    /* KADALUARSA — sampai kapan level ini masih layak dipakai.
+       Sinyal tidak mati karena umurnya, ia mati karena harganya sudah
+       jalan: entry yang sudah dilewati jauh bukan lagi entry, ia cuma
+       kenangan. Agen mengisinya setelah MEMERIKSA HARGA TERKINI, dan
+       menuliskan alasannya di `hargaSaatKurasi`. */
+    kadaluarsa: Number(b.kadaluarsa) > 0 ? Number(b.kadaluarsa) : 0,
+    hargaSaatKurasi: Number(b.hargaSaatKurasi) > 0 ? Number(b.hargaSaatKurasi) : 0,
+    statusHarga: ['belum', 'dekat', 'jalan'].indexOf(String(b.statusHarga)) >= 0
+      ? String(b.statusHarga) : '',
+  };
+  /* id sama menimpa: agen yang memeriksa ruang berulang kali akan melihat
+     postingan yang sama lagi, dan panel berisi tiga salinan sinyal yang
+     sama lebih buruk daripada panel kosong. */
+  const sisa = d.sinyal.filter(x => x && x.id !== id);
+  sisa.unshift(baris);
+  d.sinyal = sisa.slice(0, 30);
+  fs.writeFileSync(SINYAL_FILE, JSON.stringify(d, null, 2));
+  res.json({ ok: true, id, total: d.sinyal.length });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   PERMINTAAN AI HUNTER — agen bekerja saat DIMINTA, bukan tiap 30 menit
+   ══════════════════════════════════════════════════════════════════════════
+   Pemeriksaan berjadwal dicabut karena hasilnya jarang berubah: ruang
+   sinyal tidak berbicara tiap setengah jam, jadi 34 pemeriksaan sehari
+   menghasilkan 34 kali "tidak ada yang baru" dan membakar kuota untuk itu.
+
+   Sekarang orangnyalah yang memutuskan kapan. Tombol di halaman Copy
+   Trading menaruh SATU permintaan di sini; agen mengambilnya saat berjalan,
+   lalu melapor balik. Panel menampilkan keadaannya apa adanya — diminta,
+   sedang dikerjakan, atau selesai dengan hasilnya — supaya tidak ada yang
+   perlu menebak apakah permintaannya sampai. */
+const HUNTER_FILE = path.join(__dirname, 'hunter.json');
+function hunterBaca() {
+  try { return JSON.parse(fs.readFileSync(HUNTER_FILE, 'utf8')); }
+  catch (e) { return { permintaan: null, terakhir: null }; }
+}
+function hunterTulis(d) { fs.writeFileSync(HUNTER_FILE, JSON.stringify(d, null, 2)); }
+
+/* Meminta butuh LOGIN, bukan APP_TOKEN: tombolnya ada di browser pengguna,
+   dan menaruh token pemilik di sana sama saja menyerahkannya. */
+app.post('/api/hunter/minta', batasLaju, butuhLogin, (req, res) => {
+  const d = hunterBaca();
+  const skrg = Date.now();
+
+  /* Satu permintaan hidup pada satu waktu. Menekan tombol tiga kali karena
+     tidak sabar tidak boleh berubah jadi tiga kali kerja. */
+  if (d.permintaan && d.permintaan.status !== 'selesai' && (skrg - d.permintaan.waktu) < 30 * 60_000) {
+    return res.json({ ok: true, sudahAntre: true, permintaan: d.permintaan });
+  }
+
+  d.permintaan = {
+    id: 'p' + skrg.toString(36),
+    waktu: skrg,
+    oleh: String(req.uid || '').slice(0, 40),
+    catatan: String((req.body || {}).catatan || '').slice(0, 200),
+    status: 'menunggu',
+  };
+  hunterTulis(d);
+  res.json({ ok: true, sudahAntre: false, permintaan: d.permintaan });
+});
+
+/* Status dibaca panel tiap beberapa detik — publik, isinya bukan rahasia. */
+app.get('/api/hunter/status', batasLaju, (req, res) => {
+  const d = hunterBaca();
+  res.json({ ok: true, permintaan: d.permintaan || null, terakhir: d.terakhir || null });
+});
+
+/* Agen melapor: sedang dikerjakan, atau selesai dengan ringkasannya. */
+app.post('/api/hunter/hasil', batasLaju, requireToken, (req, res) => {
+  const b = req.body || {};
+  const d = hunterBaca();
+  const status = ['dikerjakan', 'selesai', 'gagal'].indexOf(String(b.status)) >= 0
+    ? String(b.status) : 'selesai';
+
+  if (d.permintaan) d.permintaan.status = status;
+  if (status !== 'dikerjakan') {
+    d.terakhir = {
+      waktu: Date.now(),
+      status,
+      diperiksa: Number(b.diperiksa) || 0,
+      sinyalBaru: Number(b.sinyalBaru) || 0,
+      ringkas: String(b.ringkas || '').slice(0, 300),
+    };
+  }
+  hunterTulis(d);
+  res.json({ ok: true, permintaan: d.permintaan, terakhir: d.terakhir });
+});
+
 /* ══════════════════════════════════════════════════════════════════════════
    KABAR AGEN — isi lonceng notifikasi di situs
    ══════════════════════════════════════════════════════════════════════════
