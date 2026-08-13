@@ -609,13 +609,23 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
                     {pesanBin}
                   </div>
                 )}
-                <TabelBungkus className="max-h-[380px] overflow-y-auto">
+                {/* Tinggi = kepala tabel + SEMBILAN baris, diukur dari layar
+                    (28 + 9x45 = 433), bukan ditebak. Angka bulat yang enak
+                    dilihat di kode hampir selalu memotong baris terakhir di
+                    tengah — dan baris yang terpotong terbaca sebagai bug,
+                    bukan sebagai batas. */}
+                <TabelBungkus className="max-h-[433px] overflow-y-auto">
                   <Tabel>
                     <thead className="sticky top-0 bg-zinc-950">
                       <tr>
                         <Th>Tanggal</Th><Th>Pair</Th><Th>Arah</Th>
-                        <Th className="text-right">Lot/Qty</Th>
-                        <Th className="text-right">Nilai Order</Th>
+                        {/* Kripto memakai SIZE ORDER dalam dolar; Trade-Fi
+                            memakai lot. Dulu keduanya dipaksa ke satu kolom
+                            "Lot/Qty" plus kolom "Nilai Order" terpisah —
+                            padahal di kripto ukuran order MEMANG dinyatakan
+                            dalam dolar, jadi dua kolom itu menyatakan hal yang
+                            sama dua kali. */}
+                        <Th className="text-right">{sumber === 'kripto' ? 'Size Order' : 'Lot'}</Th>
                         <Th className="text-right">P/L</Th>
                         <Th>Emosi</Th><Th>Setup</Th><Th />
                       </tr>
@@ -634,13 +644,15 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
                             )}
                           </Td>
                           <Td><span className={cn('text-[11.5px]', t.arah === 'BUY' ? 'text-emerald-500' : 'text-red-400')}>{t.arah}</span></Td>
-                          <Td className="angka text-right text-zinc-400">{t.lot}</Td>
-                          {/* Nilai order = margin x leverage, dalam dolar.
-                              Tanda hubung berarti dokumennya tidak menyimpan
-                              margin/leverage — bukan berarti nol. */}
+                          {/* Tanda hubung berarti dokumennya tidak menyimpan
+                              angkanya — bukan berarti nol. */}
                           <Td className="angka whitespace-nowrap text-right text-zinc-400">
-                            {t.nilaiOrder ? uang(t.nilaiOrder) : '—'}
-                            {t.leverage ? <span className="ml-1 text-[10.5px] text-zinc-600">{t.leverage}×</span> : null}
+                            {sumber === 'kripto'
+                              ? (t.nilaiOrder ? uang(t.nilaiOrder) : '—')
+                              : (t.lot || '—')}
+                            {sumber === 'kripto' && t.leverage
+                              ? <span className="ml-1 text-[10.5px] text-zinc-600">{t.leverage}×</span>
+                              : null}
                           </Td>
                           <Td className={cn('angka text-right', t.pnl >= 0 ? 'text-emerald-500' : 'text-red-400')}>{uang(t.pnl, true)}</Td>
                           <Td className="whitespace-nowrap text-[12px] text-zinc-400">{t.emosi}</Td>

@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import {
   Play, Loader2, RefreshCw, Radio, TriangleAlert, History,
   Layers, ChevronDown, Settings2, Code2, X, Ruler, Rows3, Square, Eraser, Minus, TrendingUp,
-  FlaskConical } from 'lucide-react';
+  FlaskConical, GripVertical } from 'lucide-react';
 import { Panel, PanelHead, KartuKpi, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn, uang, persen, harga, tanggalPendek } from '@/lib/utils';
 import { ChartLilin, type Garis, type GarisHarga, type GarisSeret, type PosisiChartMt5 } from '@/components/chart-lilin';
@@ -205,6 +205,55 @@ export default function ChartBacktest() {
   const [alatTutup, setAlatTutup] = useState(() => {
     try { return localStorage.getItem('jt.alatTutup') === '1'; } catch { return false; }
   });
+  /* ── Letak bilah alat: BISA DIPINDAH ────────────────────────────
+     Posisi tetap selalu salah untuk sebagian orang: panel order membuka
+     dari kiri atas, dock Pine dari kanan, dan tinggi chart bisa diseret.
+     Apa pun sudut yang dipilih, ada susunan yang membuatnya menghalangi.
+     Jadi tempatnya ditentukan pemakainya sendiri — diseret, lalu diingat
+     per perangkat.
+
+     Disimpan sebagai jarak dari kiri-atas area chart dalam piksel, bukan
+     persen: chart yang tingginya diseret akan menggeser bilah yang
+     posisinya berbasis persen, padahal orangnya tidak memindahkannya. */
+  const [letakAlat, setLetakAlat] = useState<{ x: number; y: number }>(() => {
+    try {
+      const d = JSON.parse(localStorage.getItem('jt.letakAlat') ?? 'null');
+      if (d && typeof d.x === 'number' && typeof d.y === 'number') return d;
+    } catch { /* privat */ }
+    /* Bawaan: di kanan panel order, sejajar puncaknya. */
+    return { x: 300, y: 8 };
+  });
+  const areaChart = useRef<HTMLDivElement>(null);
+
+  function mulaiSeretAlat(e: React.PointerEvent) {
+    /* Tombol alatnya sendiri tidak boleh ikut memicu seretan — kalau ikut,
+       memilih alat jadi mustahil tanpa menggeser bilahnya. */
+    if ((e.target as HTMLElement).closest('button')) return;
+    e.preventDefault();
+    const awal = { x: e.clientX, y: e.clientY, lx: letakAlat.x, ly: letakAlat.y };
+    const batas = () => areaChart.current?.getBoundingClientRect();
+    const hitung = (ev: PointerEvent) => {
+      const b = batas();
+      const x = awal.lx + (ev.clientX - awal.x);
+      const y = awal.ly + (ev.clientY - awal.y);
+      if (!b) return { x, y };
+      /* Dijepit di dalam area chart, disisakan 36 px supaya bilahnya
+         tidak bisa diseret keluar layar dan hilang selamanya. */
+      return {
+        x: Math.max(4, Math.min(b.width - 36, x)),
+        y: Math.max(4, Math.min(b.height - 36, y)),
+      };
+    };
+    const gerak = (ev: PointerEvent) => setLetakAlat(hitung(ev));
+    const lepas = (ev: PointerEvent) => {
+      window.removeEventListener('pointermove', gerak);
+      window.removeEventListener('pointerup', lepas);
+      try { localStorage.setItem('jt.letakAlat', JSON.stringify(hitung(ev))); } catch { /* privat */ }
+    };
+    window.addEventListener('pointermove', gerak);
+    window.addEventListener('pointerup', lepas);
+  }
+
   function aturAlatTutup(v: boolean) {
     setAlatTutup(v);
     try { localStorage.setItem('jt.alatTutup', v ? '1' : '0'); } catch { /* privat */ }
@@ -929,7 +978,7 @@ export default function ChartBacktest() {
               menyusut saat pembatas ditarik, jadi lilin di tepi kanan
               tidak pernah tertutup daftar. */}
           <div className="flex">
-          <div className="relative min-w-0 grow overflow-hidden">
+          <div ref={areaChart} className="relative min-w-0 grow overflow-hidden">
           {lilin.times.length > 0
             ? <ChartLilin key={`${simbol}|${tf}|${kunciChart}`}
                           lilin={lilin} garis={garis} trade={replayIdx === null ? hasil?.trade : undefined}
@@ -1113,7 +1162,10 @@ export default function ChartBacktest() {
               garis misterius; indikator yang bernama adalah alat. */}
           <div className="pointer-events-none absolute right-16 top-2 z-20 flex flex-col items-end gap-1">
             {pineInfo && (
-              <div className="pointer-events-auto flex items-center gap-1 rounded-md bg-zinc-950/75 px-2 py-1 backdrop-blur-sm">
+              /* Tanpa latar: nama indikator adalah KETERANGAN chart, bukan
+                     kartu tersendiri. Kotak gelap di atas lilin justru menutup
+                     data yang sedang dibaca. */
+              <div className="pointer-events-auto flex items-center gap-1 px-1 py-0.5">
                 <span className="max-w-[200px] truncate text-[11px] text-zinc-200" title={pineInfo.nama}>{pineInfo.nama}</span>
                 {pineInfo.adaInput && (
                   <button onClick={() => bukaDock('input')} title="Setelan input"
@@ -1132,7 +1184,7 @@ export default function ChartBacktest() {
               </div>
             )}
             {tampilSnr && (
-              <div className="pointer-events-auto flex items-center gap-1 rounded-md bg-zinc-950/75 px-2 py-1 backdrop-blur-sm">
+              <div className="pointer-events-auto flex items-center gap-1 px-1 py-0.5">
                 <span className="text-[11px] text-zinc-300">Zona SNR</span>
                 <button onClick={() => setTampilSnr(false)} title="Sembunyikan"
                   className="cursor-pointer rounded p-0.5 text-zinc-500 transition-colors hover:text-red-400">
@@ -1141,7 +1193,7 @@ export default function ChartBacktest() {
               </div>
             )}
             {tampilSmi && (
-              <div className="pointer-events-auto flex items-center gap-1 rounded-md bg-zinc-950/75 px-2 py-1 backdrop-blur-sm">
+              <div className="pointer-events-auto flex items-center gap-1 px-1 py-0.5">
                 <span className="text-[11px] text-zinc-300">SMI</span>
                 <button onClick={() => setTampilSmi(false)} title="Sembunyikan"
                   className="cursor-pointer rounded p-0.5 text-zinc-500 transition-colors hover:text-red-400">
@@ -1163,11 +1215,17 @@ export default function ChartBacktest() {
               kalau tidak ada yang terpilih. */}
           {alatTutup ? (
             <button onClick={() => aturAlatTutup(false)} title="Buka bilah alat gambar"
-              className="absolute bottom-2 left-2 z-20 flex size-7 cursor-pointer items-center justify-center rounded-lg border border-zinc-800/80 bg-zinc-950/85 text-zinc-500 backdrop-blur-sm transition-colors hover:text-zinc-200">
+              style={{ left: letakAlat.x, top: letakAlat.y }}
+              className="absolute z-20 flex size-7 cursor-pointer items-center justify-center rounded-lg border border-zinc-800/80 bg-zinc-950/85 text-zinc-500 backdrop-blur-sm transition-colors hover:text-zinc-200">
               <Ruler className="size-3.5" />
             </button>
           ) : (
-          <div className="absolute bottom-2 left-2 z-20 flex flex-row items-center gap-0.5 rounded-lg border border-zinc-800/80 bg-zinc-950/85 p-1 backdrop-blur-sm">
+          <div onPointerDown={mulaiSeretAlat}
+               style={{ left: letakAlat.x, top: letakAlat.y }}
+               className="absolute z-20 flex cursor-move flex-row items-center gap-0.5 rounded-lg border border-zinc-800/80 bg-zinc-950/85 p-1 backdrop-blur-sm">
+            {/* Pegangan seret di ujung kiri — memberi tahu bilahnya bisa
+                dipindah tanpa perlu dicoba dulu. */}
+            <GripVertical className="size-3.5 shrink-0 text-zinc-700" />
             {([
               ['garis', TrendingUp, 'Garis tren — tarik dari titik ke titik'],
               ['ukur', Ruler, 'Ukur % kenaikan / penurunan — klik lalu tarik'],
@@ -1241,10 +1299,8 @@ export default function ChartBacktest() {
           <button
             onClick={() => setBacktestBuka((v) => !v)}
             title={backtestBuka ? 'Tutup panel Backtest' : 'Buka panel Backtest (beta)'}
-            className={cn('flex shrink-0 cursor-pointer items-center gap-1.5 rounded border px-2 py-1 text-[11px] transition-colors',
-              backtestBuka
-                ? 'border-zinc-600 text-zinc-200'
-                : 'border-zinc-800 text-zinc-500 hover:border-zinc-600 hover:text-zinc-300')}>
+            className={cn('flex shrink-0 cursor-pointer items-center gap-1.5 rounded px-2 py-1 text-[11px] transition-colors',
+              backtestBuka ? 'text-zinc-200' : 'text-zinc-500 hover:text-zinc-300')}>
             <FlaskConical className="size-3" strokeWidth={2} />
             Backtest
             <span className="rounded bg-amber-500/15 px-1 text-[9.5px] text-amber-400/90">beta</span>
@@ -1271,13 +1327,10 @@ export default function ChartBacktest() {
           terbuka adalah sesuatu yang masih bisa DIPERBUAT — SL-nya
           digeser, ditutup, ditambah — dan semua perbuatan itu terjadi di
           halaman ini. Jurnal tempat menilai yang sudah lewat. */}
-      <div className="mb-3 mt-6">
-        <h2 className="text-[14px] font-medium text-zinc-200">Posisi Terbuka</h2>
-        <p className="text-[12px] text-zinc-500">
-          Yang sedang berjalan sekarang di kedua pasar — beserta order yang masih menunggu harga.
-        </p>
-      </div>
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      {/* Tanpa judul section: tiap panel sudah menyebut pasarnya sendiri,
+          persis seperti di Dashboard. Judul di atas dua panel yang
+          masing-masing sudah berjudul cuma mengulang. */}
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <PanelPosisiTerbuka sumber="kripto" />
         <PanelPosisiTerbuka sumber="forex" />
       </div>

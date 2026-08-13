@@ -67,7 +67,7 @@ const NAV = [
     grup: 'Trading',
     butir: [
       { ke: '/dashboard', label: 'Dashboard',     Ikon: LayoutGrid },
-      { ke: '/screener',  label: 'Screener Entry', Ikon: BarChart3 },
+      { ke: '/screener',  label: 'Screener Area', Ikon: BarChart3 },
       { ke: '/jurnal',    label: 'Journal',        Ikon: Briefcase },
     ],
   },
@@ -75,7 +75,7 @@ const NAV = [
     grup: 'Workspace',
     butir: [
       { ke: '/personal',    label: 'Personal Area',    Ikon: Wallet },
-      { ke: '/chart',       label: 'Chart & Backtest', Ikon: CandlestickChart },
+      { ke: '/chart',       label: 'Chart dan Entry', Ikon: CandlestickChart },
       { ke: '/marketplace', label: 'Marketplace',      Ikon: Users },
       { ke: '/copy',        label: 'Copy Signal',      Ikon: Copy },
       { ke: '/integrasi',   label: 'Integrations',     Ikon: Plug },
@@ -93,9 +93,9 @@ const NAV = [
 
 const JUDUL: Record<string, string> = {
   '/dashboard': 'Dashboard',
-  '/screener': 'Screener Entry',
-  '/screener-react': 'Screener Entry (React)',
-  '/chart': 'Chart & Backtest',
+  '/screener': 'Screener Area',
+  '/screener-react': 'Screener Area (React)',
+  '/chart': 'Chart dan Entry',
   '/jurnal': 'Journal',
   '/personal': 'Personal Area',
   '/copy': 'Copy Signal',

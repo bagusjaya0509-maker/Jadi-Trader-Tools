@@ -88,8 +88,12 @@ export function PanelPosisiTerbuka({ sumber }: { sumber: Sumber }) {
        dua baris terbaca seperti ada yang gagal dimuat. */
     <Panel className="self-start">
       <PanelHead
-        judul="Posisi Terbuka"
-        sub={sumber === 'kripto' ? 'Berjalan di Binance.' : 'Berjalan di MetaTrader 5.'}
+        /* Judul menyebut PASARNYA, sama persis dengan Dashboard —
+           dua panel berdampingan yang sama-sama berjudul "Posisi
+           Terbuka" memaksa membaca sub-judulnya dulu untuk tahu yang
+           mana. */
+        judul={sumber === 'kripto' ? 'Posisi Terbuka — Kripto' : 'Order Terbuka — Trade-Fi'}
+        sub={sumber === 'kripto' ? 'Order yang sedang berjalan di Binance.' : 'Dari MetaTrader 5, lewat EA JadiTraderSync.'}
         kanan={
           total === null
             ? <span className="text-[11.5px] text-zinc-500">{baris.length} posisi</span>
