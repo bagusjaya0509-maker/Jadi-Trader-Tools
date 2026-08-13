@@ -308,6 +308,18 @@ export default function ChartBacktest() {
   const [suntingTpTeks, setSuntingTpTeks] = useState('');
   const suntingSl = Number(suntingSlTeks) || 0;
   const suntingTp = Number(suntingTpTeks) || 0;
+  /* Harga hasil SERETAN dibulatkan ke jumlah desimal yang sama dengan
+     harga entry-nya. Tanpa ini seretan menghasilkan angka penuh presisi
+     mesin — 0.1288668232530828 — dan bursa menolaknya dengan "precision
+     is over the maximum defined for this asset". Ditolak bursa berarti
+     stop yang dikira sudah terpasang ternyata tidak ada; itu kegagalan
+     yang mahal untuk sesuatu yang cuma soal pembulatan. */
+  function bulatkanHarga(n: number, acuan: number): number {
+    const teks = String(acuan);
+    const titik = teks.indexOf('.');
+    const desimal = titik < 0 ? 0 : Math.min(8, teks.length - titik - 1);
+    return Number(n.toFixed(desimal));
+  }
   const setSuntingSl = (n: number) => setSuntingSlTeks(n ? String(n) : '');
   const setSuntingTp = (n: number) => setSuntingTpTeks(n ? String(n) : '');
   const [suntingSibuk, setSuntingSibuk] = useState(false);
@@ -387,6 +399,47 @@ export default function ChartBacktest() {
      akibatnya tidak bisa dibatalkan: yang satu mengubah level, yang satu
      mengakhiri ordernya. Keduanya minta konfirmasi yang MENYEBUT apa
      yang akan hilang — "Yakin?" tidak memberi tahu apa-apa. */
+  /* Letak panel ubah order. null = belum dipernah dipindah → duduk di
+     kanan panel order lewat kelas CSS. Angka baru muncul setelah
+     orangnya menyeretnya, dengan alasan yang sama seperti bilah alat:
+     bawaan berangka mengunci letaknya ke satu ukuran layar. */
+  const [letakUbah, setLetakUbah] = useState<{ x: number; y: number } | null>(() => {
+    try {
+      const d = JSON.parse(localStorage.getItem('jt.letakUbah') ?? 'null');
+      if (d && typeof d.x === 'number' && typeof d.y === 'number') return d;
+    } catch { /* privat */ }
+    return null;
+  });
+
+  function mulaiSeretUbah(e: React.PointerEvent) {
+    /* Isian dan tombol tidak boleh memicu seretan — kalau ikut, mengetik
+       harga jadi mustahil tanpa menggeser panelnya. */
+    if ((e.target as HTMLElement).closest('input, button, select, label')) return;
+    e.preventDefault();
+    const kotak = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const b0 = areaChart.current?.getBoundingClientRect();
+    const awal = {
+      x: e.clientX, y: e.clientY,
+      lx: letakUbah ? letakUbah.x : (b0 ? kotak.left - b0.left : 290),
+      ly: letakUbah ? letakUbah.y : (b0 ? kotak.top - b0.top : 8),
+    };
+    const hitung = (ev: PointerEvent) => {
+      const b = areaChart.current?.getBoundingClientRect();
+      const x = awal.lx + (ev.clientX - awal.x);
+      const y = awal.ly + (ev.clientY - awal.y);
+      if (!b) return { x, y };
+      return { x: Math.max(4, Math.min(b.width - 60, x)), y: Math.max(4, Math.min(b.height - 40, y)) };
+    };
+    const gerak = (ev: PointerEvent) => setLetakUbah(hitung(ev));
+    const lepas = (ev: PointerEvent) => {
+      window.removeEventListener('pointermove', gerak);
+      window.removeEventListener('pointerup', lepas);
+      try { localStorage.setItem('jt.letakUbah', JSON.stringify(hitung(ev))); } catch { /* privat */ }
+    };
+    window.addEventListener('pointermove', gerak);
+    window.addEventListener('pointerup', lepas);
+  }
+
   /* P/L berjalan order yang sedang disunting — dibaca dari sumber yang
      sama dengan panelnya, bukan dihitung ulang di sini. Dua tempat yang
      menghitung P/L dengan rumus sendiri akan berselisih cepat atau
@@ -805,7 +858,17 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
        bisa dibedakan, dan yang diseret orangnya harus yang ia maksud. */
     if (sunting) {
       const g: GarisSeret[] = [];
-      if (sunting.entry) g.push({ id: 'entry', harga: sunting.entry, warna: '#d4d4d8', label: 'Entry', ket: `· ${sunting.arah}`, bisaSeret: false });
+      /* Entry BISA DISERET, tapi ia tidak pindah — yang berubah SL atau
+         TP, tergantung ke mana ia ditarik. Gerakan itu meniru cara orang
+         memikirkannya: "dari harga masuk, turun sekian jadi stop; naik
+         sekian jadi target". Menyeret dari garis yang sudah ada jauh
+         lebih cepat daripada mencari garis SL yang memang belum pernah
+         dipasang. */
+      if (sunting.entry) g.push({
+        id: 'entry', harga: sunting.entry, warna: '#d4d4d8', label: 'Entry',
+        ket: `· ${sunting.arah} — tarik ke ${sunting.arah === 'BUY' ? 'bawah = SL, atas = TP' : 'atas = SL, bawah = TP'}`,
+        bisaSeret: true,
+      });
       if (suntingSl) g.push({ id: 'sl', harga: suntingSl, warna: '#f87171', label: 'SL', ket: '· seret lalu Kirim', bisaSeret: true });
       if (suntingTp) g.push({ id: 'tp', harga: suntingTp, warna: '#10b981', label: 'TP', ket: '· seret lalu Kirim', bisaSeret: true });
       return g;
@@ -1175,8 +1238,23 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                           garisSeret={garisSeret}
                           onSeret={(id, h) => {
                             if (sunting) {
-                              if (id === 'sl') setSuntingSl(h);
-                              if (id === 'tp') setSuntingTp(h);
+                              /* Acuan presisi diambil dari SL/TP yang sudah
+                                 ada lebih dulu, bukan dari entry: harga entry
+                                 di bursa adalah RATA-RATA fill, jadi desimalnya
+                                 panjang dan bukan kelipatan tick. Harga pemicu
+                                 SL/TP selalu kelipatan tick yang sah — itulah
+                                 contoh yang benar untuk ditiru. */
+                              const acuan = sunting.sl || sunting.tp || aksi?.hargaKini || sunting.entry || h;
+                              const hb = bulatkanHarga(h, acuan);
+                              if (id === 'sl') setSuntingSl(hb);
+                              else if (id === 'tp') setSuntingTp(hb);
+                              else if (id === 'entry') {
+                                /* Sisi mana yang dimaksud ditentukan ARAH
+                                   posisinya, bukan atas-bawah layar: untuk
+                                   SELL, "di atas entry" justru stop. */
+                                const rugi = sunting.arah === 'BUY' ? h < sunting.entry : h > sunting.entry;
+                                if (rugi) setSuntingSl(hb); else setSuntingTp(hb);
+                              }
                               return;
                             }
                             if (id === 'entry') entryDigeser.current = true;
@@ -1203,9 +1281,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                           kunciUkuran={lebarWatch}
                           mundur={DURASI_TF[tf] ? jamMundur(detik) : undefined}
                           hamparanBawah={kendaliReplay}
-                          pojok={(aksi || sunting) ? (
-                            <div className="flex items-start gap-2">
-                            {aksi ? (
+                          pojok={aksi ? (
                             <PojokOrder
                               posisi={aksi.posisi} hargaKini={aksi.hargaKini}
                               draf={draf} rencana={rencana} mode={aksi.mode}
@@ -1345,72 +1421,6 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                               catatan={catatanTiket} aturCatatan={setCatatanTiket}
                               sibukNyata={sibukNyata} kabar={kabarNyata || undefined}
                               onTutup={aksi.tutup} mati={aksi.mati} />
-                            ) : null}
-                            {sunting && (
-                              /* Menempel di SEBELAH panel order, bukan di dasar
-                                 chart: dock Pine meluncur dari kanan dan
-                                 menutupi apa pun yang duduk di bawah. Tanpa
-                                 bingkai dan latar — ia bagian dari chart, bukan
-                                 kartu yang menumpang di atasnya. */
-                              <div className="w-[210px] shrink-0 text-[11.5px]">
-                                <div className="flex items-baseline gap-1.5">
-                                  <span className="text-zinc-200">{sunting.simbol}</span>
-                                  <span className={cn('text-[10.5px]', sunting.arah === 'BUY' ? 'text-emerald-500' : 'text-red-400')}>
-                                    {sunting.arah}
-                                  </span>
-                                  <span className="text-[10px] text-zinc-500">
-                                    {sunting.jenis === 'pending' ? 'pending' : 'posisi'} · {sunting.pasar === 'mt5' ? 'Trade-Fi' : 'Binance'}
-                                  </span>
-                                </div>
-                                {pnlSunting !== null && (
-                                  <div className="mt-0.5 text-[10.5px] text-zinc-500">
-                                    P/L berjalan{' '}
-                                    <span className={cn('angka', pnlSunting >= 0 ? 'text-emerald-500' : 'text-red-400')}>
-                                      {uang(pnlSunting, true)}
-                                    </span>
-                                  </div>
-                                )}
-                                {/* Klik kolomnya = garisnya langsung muncul di
-                                    harga sekarang, siap diseret. Sebelumnya
-                                    order tanpa SL sama sekali tidak punya garis
-                                    untuk dipegang, jadi satu-satunya cara
-                                    memasangnya adalah mengetik angkanya dari
-                                    nol — padahal justru order tanpa SL yang
-                                    paling perlu cepat dipasangi. */}
-                                {([['SL', suntingSlTeks, setSuntingSlTeks, 'text-red-400/90'],
-                                   ['TP', suntingTpTeks, setSuntingTpTeks, 'text-emerald-500/90']] as const).map(([nama, nilai, atur, warna]) => (
-                                  <label key={nama} className="mt-1 flex items-center gap-1.5">
-                                    <span className={cn('w-5 text-[10.5px]', warna)}>{nama}</span>
-                                    <input
-                                      value={nilai}
-                                      inputMode="decimal"
-                                      placeholder="klik lalu seret garisnya"
-                                      onFocus={() => { if (!nilai && aksi?.hargaKini) atur(String(aksi.hargaKini)); }}
-                                      onChange={(e) => atur(e.target.value.replace(/[^\d.,-]/g, '').replace(',', '.'))}
-                                      className="angka h-6 min-w-0 grow rounded border border-zinc-800 bg-zinc-900/80 px-1.5 text-right text-[11px] text-zinc-200 outline-none placeholder:text-[9.5px] placeholder:text-zinc-700 focus-visible:border-zinc-600" />
-                                  </label>
-                                ))}
-                                <div className="mt-1.5 flex flex-wrap items-center gap-1">
-                                  <button onClick={() => void kirimSunting()} disabled={suntingSibuk}
-                                    className="flex cursor-pointer items-center gap-1 rounded bg-zinc-100 px-2 py-1 text-[10.5px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-60">
-                                    {suntingSibuk ? <Loader2 className="size-3 animate-spin" /> : null}
-                                    Kirim
-                                  </button>
-                                  <button onClick={() => void akhiriOrder()} disabled={suntingSibuk}
-                                    className="cursor-pointer rounded px-2 py-1 text-[10.5px] text-red-400/90 transition-colors hover:bg-red-500/10 disabled:opacity-50">
-                                    {sunting.jenis === 'pending' ? 'Hapus order' : 'Tutup posisi'}
-                                  </button>
-                                  <button onClick={() => { setSunting(null); setSuntingKabar(''); }}
-                                    className="cursor-pointer rounded px-2 py-1 text-[10.5px] text-zinc-500 transition-colors hover:text-zinc-300">
-                                    Batal
-                                  </button>
-                                </div>
-                                {suntingKabar && (
-                                  <div className="mt-1 text-[10px] leading-relaxed text-zinc-400">{suntingKabar}</div>
-                                )}
-                              </div>
-                            )}
-                            </div>
                           ) : undefined} />
             : <div className="flex h-[440px] items-center justify-center text-[12.5px] text-zinc-600">
                 {memuat ? 'Memuat lilin…' : 'Tidak ada data untuk simbol ini.'}
@@ -1422,6 +1432,79 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
               yang sedang dibaca orangnya adalah garis-garisnya, dan
               bilah yang menutupi harga justru menghalangi keputusan yang
               sedang diambil. */}
+          {/* ── Panel ubah order — hamparan yang BISA DIPINDAH ────────
+              Bawaannya duduk di kanan panel order; begitu diseret, letak
+              pilihannya diingat. Alasannya sama dengan bilah alat: tidak
+              ada satu sudut yang benar untuk semua susunan panel. */}
+          {sunting && (
+            <div onPointerDown={mulaiSeretUbah}
+                 style={letakUbah ? { left: letakUbah.x, top: letakUbah.y } : undefined}
+                 className={cn('absolute z-30 cursor-move', !letakUbah && 'left-[290px] top-2')}>
+                            /* Menempel di SEBELAH panel order, bukan di dasar
+                               chart: dock Pine meluncur dari kanan dan
+                               menutupi apa pun yang duduk di bawah. Tanpa
+                               bingkai dan latar — ia bagian dari chart, bukan
+                               kartu yang menumpang di atasnya. */
+                            <div className="w-[210px] shrink-0 text-[11.5px]">
+                              <div className="flex items-baseline gap-1.5">
+                                <span className="text-zinc-200">{sunting.simbol}</span>
+                                <span className={cn('text-[10.5px]', sunting.arah === 'BUY' ? 'text-emerald-500' : 'text-red-400')}>
+                                  {sunting.arah}
+                                </span>
+                                <span className="text-[10px] text-zinc-500">
+                                  {sunting.jenis === 'pending' ? 'pending' : 'posisi'} · {sunting.pasar === 'mt5' ? 'Trade-Fi' : 'Binance'}
+                                </span>
+                              </div>
+                              {pnlSunting !== null && (
+                                <div className="mt-0.5 text-[10.5px] text-zinc-500">
+                                  P/L berjalan{' '}
+                                  <span className={cn('angka', pnlSunting >= 0 ? 'text-emerald-500' : 'text-red-400')}>
+                                    {uang(pnlSunting, true)}
+                                  </span>
+                                </div>
+                              )}
+                              {/* Klik kolomnya = garisnya langsung muncul di
+                                  harga sekarang, siap diseret. Sebelumnya
+                                  order tanpa SL sama sekali tidak punya garis
+                                  untuk dipegang, jadi satu-satunya cara
+                                  memasangnya adalah mengetik angkanya dari
+                                  nol — padahal justru order tanpa SL yang
+                                  paling perlu cepat dipasangi. */}
+                              {([['SL', suntingSlTeks, setSuntingSlTeks, 'text-red-400/90'],
+                                 ['TP', suntingTpTeks, setSuntingTpTeks, 'text-emerald-500/90']] as const).map(([nama, nilai, atur, warna]) => (
+                                <label key={nama} className="mt-1 flex items-center gap-1.5">
+                                  <span className={cn('w-5 text-[10.5px]', warna)}>{nama}</span>
+                                  <input
+                                    value={nilai}
+                                    inputMode="decimal"
+                                    placeholder="klik lalu seret garisnya"
+                                    onFocus={() => { if (!nilai && aksi?.hargaKini) atur(String(aksi.hargaKini)); }}
+                                    onChange={(e) => atur(e.target.value.replace(/[^\d.,-]/g, '').replace(',', '.'))}
+                                    className="angka h-6 min-w-0 grow rounded border border-zinc-800 bg-zinc-900/80 px-1.5 text-right text-[11px] text-zinc-200 outline-none placeholder:text-[9.5px] placeholder:text-zinc-700 focus-visible:border-zinc-600" />
+                                </label>
+                              ))}
+                              <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                                <button onClick={() => void kirimSunting()} disabled={suntingSibuk}
+                                  className="flex cursor-pointer items-center gap-1 rounded bg-zinc-100 px-2 py-1 text-[10.5px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-60">
+                                  {suntingSibuk ? <Loader2 className="size-3 animate-spin" /> : null}
+                                  Kirim
+                                </button>
+                                <button onClick={() => void akhiriOrder()} disabled={suntingSibuk}
+                                  className="cursor-pointer rounded px-2 py-1 text-[10.5px] text-red-400/90 transition-colors hover:bg-red-500/10 disabled:opacity-50">
+                                  {sunting.jenis === 'pending' ? 'Hapus order' : 'Tutup posisi'}
+                                </button>
+                                <button onClick={() => { setSunting(null); setSuntingKabar(''); }}
+                                  className="cursor-pointer rounded px-2 py-1 text-[10.5px] text-zinc-500 transition-colors hover:text-zinc-300">
+                                  Batal
+                                </button>
+                              </div>
+                              {suntingKabar && (
+                                <div className="mt-1 text-[10px] leading-relaxed text-zinc-400">{suntingKabar}</div>
+                              )}
+                            </div>
+            </div>
+          )}
+
           {/* ── Legend indikator ala TradingView — pojok kiri-atas ────
               Nama yang terpasang tertulis DI chartnya, dengan ikon setelan
               dan kode di sebelahnya. Indikator tanpa nama di layar adalah
