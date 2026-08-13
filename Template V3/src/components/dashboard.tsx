@@ -394,26 +394,30 @@ export function Dashboard() {
                 terlihat di mana pun akan dipesan ulang. */}
             {ORDER_PENDING.length > 0 && (
               <div className="mt-3 border-t border-zinc-800/60 pt-3">
-                <div className="mb-1.5 flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-amber-400/80">
+                <div className="mb-1 flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-amber-400/80">
                   <Clock className="size-3" strokeWidth={2} />
                   Menunggu harga · {ORDER_PENDING.length} order
                 </div>
-                {ORDER_PENDING.map((o) => (
-                  <div key={o.id} className="flex items-baseline justify-between gap-2 py-1">
-                    <div className="min-w-0">
-                      <span className="text-[12.5px] text-zinc-300">{o.simbol.replace('USDT', '')}</span>
-                      <span className={cn('ml-1.5 text-[10.5px]',
-                        o.arah === 'BUY' ? 'text-emerald-500' : 'text-red-400')}>{o.arah}</span>
-                      <span className="ml-1.5 text-[10.5px] text-zinc-600">
-                        {o.tipe.replace('_MARKET', ' Stop').replace('LIMIT', 'Limit')}
-                      </span>
+                {/* Empat baris terlihat, sisanya digulir — sama aturannya
+                    dengan daftar pending Trade-Fi di sebelah. */}
+                <div className="gulir-senyap max-h-[135px] divide-y divide-zinc-800/60 overflow-y-auto">
+                  {ORDER_PENDING.map((o) => (
+                    <div key={o.id} className="flex items-baseline justify-between gap-2 py-1.5">
+                      <div className="min-w-0">
+                        <span className="text-[12.5px] text-zinc-300">{o.simbol.replace('USDT', '')}</span>
+                        <span className={cn('ml-1.5 text-[10.5px]',
+                          o.arah === 'BUY' ? 'text-emerald-500' : 'text-red-400')}>{o.arah}</span>
+                        <span className="ml-1.5 text-[10.5px] text-zinc-600">
+                          {o.tipe.replace('_MARKET', ' Stop').replace('LIMIT', 'Limit')}
+                        </span>
+                      </div>
+                      <div className="angka shrink-0 text-[11.5px] text-zinc-500">
+                        {o.qty.toLocaleString('id-ID', { maximumFractionDigits: 4 })} @{' '}
+                        <span className="text-amber-400/90">{harga(o.pemicu || o.harga)}</span>
+                      </div>
                     </div>
-                    <div className="angka shrink-0 text-[11.5px] text-zinc-500">
-                      {o.qty.toLocaleString('id-ID', { maximumFractionDigits: 4 })} @{' '}
-                      <span className="text-amber-400/90">{harga(o.pemicu || o.harga)}</span>
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -483,28 +487,36 @@ export function Dashboard() {
                 sebagai posisi yang sudah jalan. */}
             {mt5.pending.length > 0 && (
               <div className="border-t border-zinc-800/60 pt-2.5">
-                <div className="mb-1.5 flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-amber-400/80">
+                <div className="mb-1 flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-amber-400/80">
                   <Clock className="size-3" strokeWidth={2} />
                   Menunggu harga · {mt5.pending.length} order
                 </div>
-                <div className="space-y-1.5">
+                {/* GARIS pemisah, bukan kotak per order — sama seperti daftar
+                    posisi kripto di sebelah. Lima kartu berbingkai membuat
+                    panel ini terlihat lebih "berat" daripada posisi yang
+                    benar-benar berjalan, padahal order menunggu justru yang
+                    paling ringan bobotnya.
+
+                    EMPAT yang terlihat, sisanya digulir: tinggi panel harus
+                    berhenti tumbuh di titik tertentu, kalau tidak deretan
+                    order pending mendorong seluruh halaman ke bawah. */}
+                <div className="gulir-senyap max-h-[213px] divide-y divide-zinc-800/60 overflow-y-auto">
                   {mt5.pending.map((o) => (
-                    <div key={o.tiket} className="rounded-lg border border-amber-500/20 bg-amber-500/[0.03] p-2.5">
+                    <div key={o.tiket} className="py-2">
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex min-w-0 items-center gap-2">
                           <span className="truncate text-[12.5px] text-zinc-200">{o.simbol}</span>
-                          <span className={cn('rounded px-1.5 py-0.5 text-[10px]',
-                            o.arah === 'BUY' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-400')}>
+                          <span className={cn('text-[10.5px]',
+                            o.arah === 'BUY' ? 'text-emerald-500' : 'text-red-400')}>
                             {o.jenis.replace('_', ' ')}
                           </span>
                           <span className="angka text-[11px] text-zinc-600">{o.lot} lot</span>
                         </div>
                         <span className="angka shrink-0 text-[12.5px] text-amber-400/90">{harga(o.harga)}</span>
                       </div>
-                      <div className="mt-1.5 flex gap-4 text-[11px] text-zinc-500">
+                      <div className="mt-0.5 flex gap-4 text-[10.5px] text-zinc-600">
                         <span>SL <span className="angka text-red-400/80">{o.sl ? harga(o.sl) : '—'}</span></span>
                         <span>TP <span className="angka text-emerald-500/80">{o.tp ? harga(o.tp) : '—'}</span></span>
-                        <span className="text-zinc-700">#{o.tiket}</span>
                       </div>
                     </div>
                   ))}

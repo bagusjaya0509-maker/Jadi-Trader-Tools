@@ -381,15 +381,24 @@ function PanelPosisiJurnal({ sumber }: { sumber: Sumber }) {
             <div className="mb-2 text-[11px] uppercase tracking-wide text-amber-400/80">
               Menunggu harga · {pending.length} order
             </div>
-            <div className="space-y-1.5">
+            {/* Garis pemisah, bukan kotak berbingkai — order menunggu tidak
+                boleh terlihat lebih berbobot daripada posisi yang benar-
+                benar berjalan di atasnya. Empat terlihat, sisanya digulir
+                supaya panelnya berhenti tumbuh. */}
+            <div className={cn('gulir-senyap divide-y divide-zinc-800/60 overflow-y-auto',
+              /* Tinggi tepat EMPAT baris, diukur langsung dari CSS
+                 terkompilasi — bukan ditebak. Baris MT5 dua baris teks
+                 (SL/TP ikut), baris kripto satu; tinggi yang sama untuk
+                 keduanya akan memotong baris keempat di satu sisi dan
+                 menampilkan enam di sisi lain. */
+              sumber === 'kripto' ? 'max-h-[142px]' : 'max-h-[213px]')}>
               {pending.map((o) => (
-                <div key={o.kunci}
-                     className="rounded-lg border border-amber-500/20 bg-amber-500/[0.03] px-3 py-2">
+                <div key={o.kunci} className="py-2">
                   <div className="flex items-center justify-between gap-2">
                     <span className="flex min-w-0 items-center gap-2">
                       <span className="truncate text-[12.5px] text-zinc-200">{o.simbol}</span>
-                      <span className={cn('rounded px-1.5 py-0.5 text-[10px]',
-                        o.arah === 'BUY' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-400')}>
+                      <span className={cn('text-[10.5px]',
+                        o.arah === 'BUY' ? 'text-emerald-500' : 'text-red-400')}>
                         {o.jenis}
                       </span>
                       <span className="angka shrink-0 text-[11px] text-zinc-400">{o.ukuran}</span>
@@ -401,7 +410,7 @@ function PanelPosisiJurnal({ sumber }: { sumber: Sumber }) {
                       ke-fill, dan menulis "SL —" untuk itu memberi kesan
                       SL-nya hilang, padahal memang belum waktunya ada. */}
                   {(o.sl > 0 || o.tp > 0) && (
-                    <div className="mt-1.5 flex gap-4 text-[11px] text-zinc-600">
+                    <div className="mt-0.5 flex gap-4 text-[10.5px] text-zinc-600">
                       <span>SL <span className="angka text-red-400/90">{o.sl ? fHarga(o.sl) : '—'}</span></span>
                       <span>TP <span className="angka text-emerald-500/90">{o.tp ? fHarga(o.tp) : '—'}</span></span>
                     </div>
