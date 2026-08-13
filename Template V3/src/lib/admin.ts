@@ -342,8 +342,35 @@ export interface PosisiBursa {
   tp: number;
 }
 
-export function usePosisiBinance(): { data: PosisiBursa[]; aktif: boolean } {
+/** Satu order yang SEDANG menggantung di bursa.
+ *
+ *  Dipisahkan dari PosisiBursa karena keduanya menjawab pertanyaan yang
+ *  berbeda: posisi adalah "aku sedang memegang apa", order adalah "apa
+ *  yang akan terjadi kalau harga bergerak". Order ENTRY yang belum
+ *  ke-fill sama sekali tidak punya posisi — dan justru itu yang paling
+ *  sering lupa ditampilkan, lalu pemiliknya merasa order-nya tidak
+ *  terkirim padahal menggantung rapi di bursa. */
+export interface OrderBursa {
+  id: string;
+  simbol: string;
+  /** ENTRY = order yang akan MEMBUKA posisi (pending). SL/TP = penjaga
+   *  posisi yang sudah ada. */
+  jenis: 'ENTRY' | 'SL' | 'TP' | 'LAIN';
+  tipe: string;
+  arah: 'BUY' | 'SELL';
+  pemicu: number;
+  harga: number;
+  qty: number;
+  dibuat: number;
+}
+
+export function usePosisiBinance(): {
+  data: PosisiBursa[];
+  order: OrderBursa[];
+  aktif: boolean;
+} {
   const [data, setData] = useState<PosisiBursa[]>([]);
+  const [order, setOrder] = useState<OrderBursa[]>([]);
   const [aktif, setAktif] = useState(false);
   const { token } = bacaKoneksi();
 
@@ -370,6 +397,22 @@ export function usePosisiBinance(): { data: PosisiBursa[]; aktif: boolean } {
             (jo.order ?? []).forEach((o: any) => {
               stop.set(String(o.simbol ?? ''), { sl: Number(o.sl) || 0, tp: Number(o.tp) || 0 });
             });
+            /* Daftar mentahnya ikut disimpan. Ringkasan sl/tp per simbol
+               menjawab "posisi ini dijaga di harga berapa", tapi TIDAK
+               bisa menjawab "ada berapa order" — dua order di simbol yang
+               sama menyusut jadi satu angka. Chart butuh yang kedua untuk
+               menggambar satu garis per order. */
+            if (hidup) setOrder((jo.daftar ?? []).map((o: any): OrderBursa => ({
+              id: String(o.id ?? ''),
+              simbol: String(o.simbol ?? ''),
+              jenis: (o.jenis ?? 'LAIN') as OrderBursa['jenis'],
+              tipe: String(o.tipe ?? ''),
+              arah: o.arah === 'SELL' ? 'SELL' : 'BUY',
+              pemicu: Number(o.pemicu) || 0,
+              harga: Number(o.harga) || 0,
+              qty: Number(o.qty) || 0,
+              dibuat: Number(o.dibuat) || 0,
+            })));
           }
         } catch { /* bursa sedang tidak menjawab soal order */ }
         /* Binance mengirim SATU baris untuk setiap simbol yang pernah
@@ -397,7 +440,7 @@ export function usePosisiBinance(): { data: PosisiBursa[]; aktif: boolean } {
     return () => { hidup = false; clearInterval(jam); };
   }, [token]);
 
-  return { data, aktif };
+  return { data, order, aktif };
 }
 
 /** Unggah satu gambar ke VPS, dapat URL publiknya.

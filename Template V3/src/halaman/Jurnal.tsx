@@ -222,8 +222,12 @@ function KartuSaldo({ judul, saldoJurnal, akun, keIntegrasi }: {
  *  Token ada); Trade-Fi dari laporan EA. Dua sumber berbeda, satu tampilan —
  *  yang ditanyakan sama: apa yang sedang berjalan sekarang. */
 function PanelPosisiJurnal({ sumber }: { sumber: Sumber }) {
-  const { data: posisiKripto } = usePosisi();
+  const { data: posisiKripto, pending: pendingKripto } = usePosisi();
   const mt5 = useAkunMt5();
+  /* Order pending hanya ada di sisi kripto: MT5 melaporkan posisi, bukan
+     order yang masih menggantung. Menampilkannya di panel Trade-Fi akan
+     jadi janji kosong. */
+  const pending = sumber === 'kripto' ? pendingKripto : [];
 
   const emosiPos = useEmosiPosisi();
 
@@ -275,7 +279,7 @@ function PanelPosisiJurnal({ sumber }: { sumber: Sumber }) {
             Punya lima posisi terbuka bukan keadaan luar biasa; yang luar
             biasa adalah panel yang menyembunyikannya. Gulir baru muncul
             kalau daftarnya benar-benar panjang. */}
-        {baris.length === 0 ? (
+        {baris.length === 0 && pending.length === 0 ? (
           <div className="py-5 text-center text-[12.5px] text-zinc-600">
             {sumber === 'kripto' ? 'Tidak ada posisi kripto terbuka.' : mt5.terhubung === true ? 'Tidak ada posisi MT5 terbuka.' : mt5.ket}
           </div>
@@ -338,6 +342,42 @@ function PanelPosisiJurnal({ sumber }: { sumber: Sumber }) {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* ORDER MENUNGGU — sudah terkirim ke bursa, belum ke-fill.
+            Dipisah dari daftar posisi karena statusnya berbeda secara
+            mendasar: belum ada uang yang bergerak, belum ada P/L, dan
+            belum ada apa pun untuk dievaluasi. Yang dijawab kotak ini
+            cuma satu: "order-ku sampai atau tidak?" */}
+        {pending.length > 0 && (
+          <div className="mt-3 border-t border-zinc-800/60 pt-3">
+            <div className="mb-2 text-[11px] uppercase tracking-wide text-amber-400/80">
+              Menunggu harga · {pending.length} order
+            </div>
+            <div className="space-y-1.5">
+              {pending.map((o) => (
+                <div key={o.id}
+                     className="flex items-center justify-between gap-2 rounded-lg border border-amber-500/20 bg-amber-500/[0.03] px-3 py-2">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="truncate text-[12.5px] text-zinc-200">{o.simbol}</span>
+                    <span className={cn('rounded px-1.5 py-0.5 text-[10px]',
+                      o.arah === 'BUY' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-400')}>
+                      {o.arah}
+                    </span>
+                    <span className="angka shrink-0 text-[11px] text-zinc-400">
+                      {o.qty.toLocaleString('id-ID', { maximumFractionDigits: 4 })}
+                    </span>
+                    <span className="truncate text-[11px] text-zinc-600">
+                      {o.tipe.replace('_MARKET', ' Stop').replace('LIMIT', 'Limit')}
+                    </span>
+                  </span>
+                  <span className="angka shrink-0 text-[12px] text-amber-400/90">
+                    {fHarga(o.pemicu || o.harga)}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>

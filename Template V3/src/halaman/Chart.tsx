@@ -18,6 +18,12 @@ import type { HasilPine } from '@/lib/pine';
 import { bacaSetelanChart, simpanSetelanChart } from '@/lib/replay';
 import { ambilKlines, bacaSpekMt5, bacaTickMt5, daftarSimbolMt5, type Lilin } from '@/lib/pasar';
 import { useAkunMt5 } from '@/lib/akun';
+/* Langsung dari admin, BUKAN lewat usePosisi(): yang dibutuhkan di sini
+   cuma daftar order bursa, sementara usePosisi() juga memasang listener
+   Firestore. Halaman chart dibuka lama dan sering — menambah satu
+   listener di sini adalah cara pelan-pelan menghabiskan kuota untuk data
+   yang tidak dipakainya. */
+import { usePosisiBinance } from '@/lib/admin';
 import {
   jalankanUji, garisIndikator, zonaSnr, deretSmi, SETELAN_BAWAAN,
   type Setelan, type HasilUji,
@@ -92,6 +98,7 @@ export default function ChartBacktest() {
      Alamat menang karena ia perbuatan yang baru saja dilakukan — klik kanan
      di screener harus membuka koin yang diklik, bukan koin kemarin. */
   const awal = bacaSetelanChart();
+  const { order: orderBursa } = usePosisiBinance();
   const [simbol, setSimbol] = useState(() => (cari.get('simbol') || awal.simbol || 'BTCUSDT').toUpperCase());
   const [tf, setTf] = useState(() => {
     const t = (cari.get('tf') || awal.tf || '4h').toLowerCase();
@@ -614,6 +621,35 @@ export default function ChartBacktest() {
     return g;
   }, [aksiPosisi, aksiTunda, rencana, aksi, draf, labelJenis, nyataSetelan, lotMt5, nilaiLotMt5, simbol]);
 
+  /* ── Order yang BENAR-BENAR menggantung di bursa ────────────────────
+     Sumbernya bursa, bukan keadaan halaman ini. Itulah yang membuatnya
+     bertahan melewati kirim dan melewati refresh: yang digambar bukan
+     ingatan chart tentang apa yang pernah dikirim, melainkan jawaban
+     Binance atas pertanyaan "apa yang MASIH menggantung sekarang".
+     Ingatan bisa basi — order yang dibatalkan lewat aplikasi HP akan
+     tetap tergambar sampai halaman dimuat ulang. Jawaban bursa tidak.
+
+     Satu garis per order, bukan satu garis per simbol: dua kali order di
+     pair yang sama berarti dua kewajiban berbeda, dan meringkasnya jadi
+     satu garis persis menyembunyikan order kedua. */
+  const garisOrder = useMemo(() => {
+    if (simbol.startsWith('MT5:')) return [];
+    const milik = orderBursa.filter((o) => o.jenis === 'ENTRY' && o.simbol === simbol)
+      /* Order yang SEDANG dipegang panel tiket sudah digambar sebagai
+         garis Entry beserta rencana SL/TP-nya. Menggambarnya sekali lagi
+         dari bursa menaruh dua garis di harga yang sama persis — terbaca
+         seperti dua order padahal cuma satu. */
+      .filter((o) => !(aksiTunda && Math.abs((o.pemicu || o.harga) - aksiTunda.entry) < 1e-9));
+    /* Dinomori hanya kalau memang lebih dari satu: "Buy Stop 1" saat cuma
+       ada satu order justru menimbulkan pertanyaan di mana yang kedua. */
+    const banyak = milik.length > 1;
+    return milik.map((o, i): GarisHarga => ({
+      harga: o.pemicu || o.harga,
+      warna: o.arah === 'BUY' ? 'rgba(251,191,36,.85)' : 'rgba(251,146,60,.85)',
+      label: `${o.arah === 'BUY' ? 'Buy' : 'Sell'} ${/STOP/.test(o.tipe) ? 'Stop' : 'Limit'}${banyak ? ` ${i + 1}` : ''}`,
+    }));
+  }, [orderBursa, simbol, aksiTunda]);
+
   const terakhir = lilin.closes[lilin.closes.length - 1];
   const sebelumnya = lilin.closes[lilin.closes.length - 2];
   const gerak = terakhir && sebelumnya ? ((terakhir - sebelumnya) / sebelumnya) * 100 : 0;
@@ -873,7 +909,7 @@ export default function ChartBacktest() {
             ? <ChartLilin key={`${simbol}|${tf}|${kunciChart}`}
                           lilin={lilin} garis={garis} trade={replayIdx === null ? hasil?.trade : undefined}
                           tinggi={tinggiChart} hingga={replayIdx ?? undefined} smi={smi}
-                          garisHarga={[...garisHarga, ...garisZona]}
+                          garisHarga={[...garisHarga, ...garisZona, ...garisOrder]}
                           onKlikBar={replayIdx === null ? undefined : setReplayIdx}
                           garisSeret={garisSeret}
                           onSeret={(id, h) => {

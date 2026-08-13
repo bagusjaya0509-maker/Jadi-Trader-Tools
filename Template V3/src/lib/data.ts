@@ -5,7 +5,7 @@ import {
 } from 'firebase/firestore';
 import { app } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth';
-import { usePosisiBinance } from '@/lib/admin';
+import { usePosisiBinance, type OrderBursa } from '@/lib/admin';
 import {
   RIWAYAT, POSISI_TERBUKA, SALDO_AWAL, PRODUK,
   type Trade, type Posisi, type Sumber, type Produk,
@@ -258,7 +258,7 @@ function kePosisiPublik(p: any, i: number): Posisi {
  *
  *  Dokumen ini juga sengaja publik: pengunjung yang belum berlangganan tetap
  *  bisa melihat posisi pemilik — itu memang bagian dari etalasenya. */
-export function usePosisi(): HasilData<Posisi[]> {
+export function usePosisi(): HasilData<Posisi[]> & { pending: OrderBursa[] } {
   const { pengguna, memuat: memuatAuth } = useAuth();
   const [data, setData] = useState<Posisi[]>(POSISI_TERBUKA);
   const [memuat, setMemuat] = useState(true);
@@ -287,7 +287,17 @@ export function usePosisi(): HasilData<Posisi[]> {
      buka. Binance tidak mengirimkan keempatnya di rute posisi, jadi
      mengganti begitu saja akan menukar data yang lebih lengkap dengan yang
      lebih benar — padahal keduanya bisa dipakai bersama. */
-  const { data: bursa, aktif } = usePosisiBinance();
+  const { data: bursa, order, aktif } = usePosisiBinance();
+
+  /* Order ENTRY yang belum ke-fill: BELUM jadi posisi, jadi ia tidak
+     boleh masuk daftar posisi — tapi juga tidak boleh hilang. Order yang
+     terkirim lalu tak terlihat di mana pun membuat pemiliknya mengira
+     pengirimannya gagal, lalu memesan lagi. Dua order untuk niat yang
+     sama adalah kerugian yang lahir dari layar, bukan dari pasar. */
+  const pending = useMemo(
+    () => order.filter((o) => o.jenis === 'ENTRY').sort((a, b) => b.dibuat - a.dibuat),
+    [order],
+  );
 
   const gabungan = useMemo(() => {
     if (!aktif) return data;
@@ -317,7 +327,7 @@ export function usePosisi(): HasilData<Posisi[]> {
 
   /* `contoh` berarti "ini bukan datamu, ini contoh". Dokumen publik itu data
      sungguhan, jadi labelnya hanya muncul kalau dokumennya memang belum ada. */
-  return { data: gabungan, memuat: memuat || memuatAuth, contoh: !ada && !pengguna, galat };
+  return { data: gabungan, pending, memuat: memuat || memuatAuth, contoh: !ada && !pengguna, galat };
 }
 
 /** Ringkasan pra-hitung. Satu pembacaan, bukan 400.

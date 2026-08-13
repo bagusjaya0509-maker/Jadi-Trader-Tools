@@ -449,19 +449,85 @@ app.get('/api/positions', requireToken, async (req, res) => {
    Yang dipulangkan sengaja RINGKAS: satu baris per simbol berisi harga
    pemicu SL dan TP. Sumbernya bursa, bukan catatan kita sendiri - jadi
    SL yang digeser lewat aplikasi Binance pun ikut terbaca. */
+/* DUA daftar, bukan satu. Ini sumber bug yang bikin SL "hilang" dari
+   dashboard padahal terpasang rapi di Binance:
+
+   SL dan TP kita dipasang lewat POST /fapi/v1/algoOrder (conditional
+   order). Order jenis itu TIDAK muncul di /fapi/v1/openOrders — ia punya
+   daftarnya sendiri, /fapi/v1/openAlgoOrders. Selama rute ini cuma
+   membaca yang pertama, jawabannya selalu kosong, dan layar melaporkan
+   "tanpa SL" untuk posisi yang sebenarnya terlindungi. Kesalahan seperti
+   ini lebih berbahaya daripada layar yang mati: ia terbaca sebagai fakta.
+
+   Yang dikembalikan dua bentuk sekaligus:
+   - `order`  : ringkasan sl/tp per simbol (dipakai tampilan lama)
+   - `daftar` : SETIAP order satu per satu, supaya chart bisa menggambar
+                satu garis per order — dua kali order berarti dua garis,
+                bukan satu yang menimpa yang lain. */
 app.get('/api/open-orders', requireToken, async (req, res) => {
   try {
-    const data = await futuresRequest('GET', '/fapi/v1/openOrders', {});
+    const [biasa, algo] = await Promise.all([
+      futuresRequest('GET', '/fapi/v1/openOrders', {}),
+      /* Kalau daftar algo gagal diambil, JANGAN diam-diam dianggap
+         kosong — kosong berarti "tidak ada SL", dan itu kebohongan yang
+         menenangkan. Tandai gagal, biar layar bisa bilang tidak tahu. */
+      futuresRequest('GET', '/fapi/v1/openAlgoOrders', {}).catch(() => null),
+    ]);
+
+    const daftar = [];
+    const tambah = (o, dariAlgo) => {
+      const pemicu = parseFloat(o.triggerPrice || o.stopPrice) || 0;
+      const tipe = String(o.orderType || o.type || '');
+      const reduce = o.reduceOnly === true || o.reduceOnly === 'true' ||
+                     o.closePosition === true || o.closePosition === 'true';
+      /* Bukan reduceOnly = order yang MEMBUKA posisi, alias pending
+         entry. Itu yang wajib ikut terlihat di dashboard & jurnal. */
+      const jenis = !reduce ? 'ENTRY'
+        : /STOP/.test(tipe) ? 'SL'
+        : /TAKE_PROFIT/.test(tipe) ? 'TP' : 'LAIN';
+      daftar.push({
+        id: String(o.algoId || o.orderId || ''),
+        simbol: o.symbol,
+        jenis, tipe,
+        arah: o.side,
+        pemicu,
+        harga: parseFloat(o.price) || 0,
+        qty: parseFloat(o.quantity || o.origQty) || 0,
+        algo: !!dariAlgo,
+        status: o.algoStatus || o.status || 'NEW',
+        dibuat: Number(o.createTime || o.time || 0),
+      });
+    };
+    (Array.isArray(biasa) ? biasa : []).forEach(o => tambah(o, false));
+    const daftarAlgo = Array.isArray(algo) ? algo : (algo && algo.orders) || [];
+    daftarAlgo.forEach(o => tambah(o, true));
+
+    /* Ringkasan per simbol: ambil SL/TP yang PALING DEKAT ke harga entry,
+       bukan yang terakhir dibaca. Dengan TP1 & TP2 terpasang, "yang
+       terakhir menang" menampilkan TP2 dan menyembunyikan TP1. */
     const perSimbol = {};
-    (Array.isArray(data) ? data : []).forEach(o => {
-      const s = o.symbol;
-      if (!perSimbol[s]) perSimbol[s] = { simbol: s, sl: 0, tp: 0 };
-      const pemicu = parseFloat(o.stopPrice) || 0;
-      if (!pemicu) return;
-      if (o.type === 'STOP_MARKET' || o.type === 'STOP') perSimbol[s].sl = pemicu;
-      if (o.type === 'TAKE_PROFIT_MARKET' || o.type === 'TAKE_PROFIT') perSimbol[s].tp = pemicu;
+    for (const o of daftar) {
+      if (!o.pemicu || o.jenis === 'ENTRY') continue;
+      const s = perSimbol[o.simbol] || (perSimbol[o.simbol] = { simbol: o.simbol, sl: 0, tp: 0, jumlahTp: 0 });
+      if (o.jenis === 'SL') s.sl = o.pemicu;
+      if (o.jenis === 'TP') {
+        s.jumlahTp++;
+        /* Arah order penutup memberi tahu posisinya long atau short, dan
+           itu menentukan TP mana yang "pertama kena". Posisi long ditutup
+           dengan SELL di ATAS entry — TP terdekat yang paling rendah.
+           Posisi short kebalikannya. Mengambil min untuk keduanya akan
+           menampilkan TP terjauh pada setiap posisi short. */
+        const lebihDekat = o.arah === 'SELL' ? o.pemicu < s.tp : o.pemicu > s.tp;
+        if (!s.tp || lebihDekat) s.tp = o.pemicu;
+      }
+    }
+
+    res.json({
+      ok: true,
+      order: Object.values(perSimbol),
+      daftar,
+      algoGagal: algo === null,
     });
-    res.json({ ok: true, order: Object.values(perSimbol) });
   } catch (e) {
     res.status(500).json({ error: e.response ? e.response.data : e.message });
   }
@@ -2028,7 +2094,15 @@ app.post('/api/agen/pine', batasLaju, butuhLogin, async (req, res) => {
   const b = req.body || {};
   const kode = String(b.kode || '');
   if (kode.length < 10) return res.status(400).json({ error: 'kode skrip kosong' });
-  if (kode.length > 40000) return res.status(400).json({ error: 'skrip terlalu panjang (maks 40.000 karakter)' });
+  /* 200 rb karakter ~ 50 rb token: masih jauh di dalam jendela konteks
+     model. Batas 40 rb yang lama asal dipilih dan menolak skrip nyata
+     seperti News & GAP Hunter.
+     Yang DULU jadi batas sesungguhnya bukan masukannya, melainkan
+     KELUARANNYA: mengembalikan skrip utuh berarti ribuan token jawaban
+     dan skrip panjang terpotong di tengah. Sekarang model mengembalikan
+     TAMBALAN per baris dan n8n yang menempelkannya, jadi panjang skrip
+     tidak lagi menentukan panjang jawaban. */
+  if (kode.length > 200000) return res.status(400).json({ error: 'skrip terlalu panjang (maks 200.000 karakter)' });
 
   const galat = Array.isArray(b.galat) ? b.galat.slice(0, 40).map(String) : [];
   const dilewati = Array.isArray(b.dilewati) ? b.dilewati.slice(0, 40).map(String) : [];
@@ -2042,11 +2116,19 @@ app.post('/api/agen/pine', batasLaju, butuhLogin, async (req, res) => {
       { timeout: 120000, headers: { 'Content-Type': 'application/json' } });
     const d = r.data || {};
     if (!d.kode) return res.status(502).json({ error: d.error || 'Agen menjawab tanpa kode perbaikan.' });
+    /* JANGAN memotong kodenya di sini. Skrip Pine yang dipenggal tetap
+       terlihat seperti skrip yang sah — pengguna baru sadar setelah
+       menekan Terapkan dan setengah indikatornya raib. Lebih baik
+       menolak terang-terangan daripada mengembalikan potongan. */
+    const kodeBalik = String(d.kode);
+    if (kodeBalik.length > 200000) {
+      return res.status(502).json({ error: 'Jawaban agen melebihi batas wajar — perbaikan dibatalkan.' });
+    }
     res.json({
       ok: true,
-      kode: String(d.kode).slice(0, 60000),
+      kode: kodeBalik,
       penjelasan: String(d.penjelasan || '').slice(0, 2000),
-      perubahan: Array.isArray(d.perubahan) ? d.perubahan.slice(0, 20).map(String) : [],
+      perubahan: Array.isArray(d.perubahan) ? d.perubahan.slice(0, 60).map(String) : [],
     });
   } catch (e) {
     /* n8n mati / workflow belum diaktifkan / node AI belum punya

@@ -71,7 +71,7 @@ function TipBulan({ active, payload }: { active?: boolean; payload?: { payload: 
 
 export function Dashboard() {
   const { data: RIWAYAT, contoh } = useRiwayat();
-  const { data: posisiMentah } = usePosisi();
+  const { data: posisiMentah, pending: ORDER_PENDING } = usePosisi();
   const hargaPasar = useHargaPasar(posisiMentah.map((p) => p.simbol));
   const POSISI_TERBUKA = posisiMentah.map((p) => ({ ...p, hargaKini: hargaPasar[p.simbol] ?? p.hargaKini }));
   const saldoAwal = useSaldoAwal();
@@ -311,9 +311,14 @@ export function Dashboard() {
         </Panel>
       </div>
 
-      {/* ── Tiga panel bawah ── */}
-      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <Panel>
+      {/* ── Tiga panel bawah ──
+          Bukan tiga kolom sama lebar. Dua panel kiri memuat TABEL — pair,
+          size, entry, SL/TP, P/L — dan sepertiga layar memaksa angkanya
+          terbungkus. Activity cuma satu baris teks per kejadian, jadi
+          kolom paling sempit justru bentuk alaminya. Lima kolom dibagi
+          2 : 2 : 1. */}
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-5">
+        <Panel className="lg:col-span-2">
           <PanelHead
             judul="Posisi Terbuka — Kripto"
             sub="Order yang sedang berjalan di Binance."
@@ -380,10 +385,41 @@ export function Dashboard() {
                 </tbody>
               </Tabel>
             </TabelBungkus>
+
+            {/* PENDING — order yang sudah terkirim tapi belum ke-fill.
+                Sengaja di bawah tabel dan bukan di dalamnya: ini BUKAN
+                posisi, tidak punya P/L, dan menaruhnya sebaris dengan
+                posisi nyata akan membuat orang mengira ia sudah jalan.
+                Tapi ia juga tidak boleh disembunyikan — order yang tak
+                terlihat di mana pun akan dipesan ulang. */}
+            {ORDER_PENDING.length > 0 && (
+              <div className="mt-3 border-t border-zinc-800/60 pt-3">
+                <div className="mb-1.5 flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-amber-400/80">
+                  <Clock className="size-3" strokeWidth={2} />
+                  Menunggu harga · {ORDER_PENDING.length} order
+                </div>
+                {ORDER_PENDING.map((o) => (
+                  <div key={o.id} className="flex items-baseline justify-between gap-2 py-1">
+                    <div className="min-w-0">
+                      <span className="text-[12.5px] text-zinc-300">{o.simbol.replace('USDT', '')}</span>
+                      <span className={cn('ml-1.5 text-[10.5px]',
+                        o.arah === 'BUY' ? 'text-emerald-500' : 'text-red-400')}>{o.arah}</span>
+                      <span className="ml-1.5 text-[10.5px] text-zinc-600">
+                        {o.tipe.replace('_MARKET', ' Stop').replace('LIMIT', 'Limit')}
+                      </span>
+                    </div>
+                    <div className="angka shrink-0 text-[11.5px] text-zinc-500">
+                      {o.qty.toLocaleString('id-ID', { maximumFractionDigits: 4 })} @{' '}
+                      <span className="text-amber-400/90">{harga(o.pemicu || o.harga)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </Panel>
 
-        <Panel>
+        <Panel className="lg:col-span-2">
           <PanelHead
             judul="Order Terbuka — Trade-Fi"
             sub="Dari MetaTrader 5, lewat EA JadiTraderSync."
