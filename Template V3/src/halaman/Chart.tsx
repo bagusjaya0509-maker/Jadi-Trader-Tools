@@ -9,7 +9,7 @@ import { cn, uang, persen, harga, tanggalPendek } from '@/lib/utils';
 import { ChartLilin, type Garis, type GarisHarga, type GarisSeret, type PosisiChartMt5 } from '@/components/chart-lilin';
 import { PanelReplay, type AksiOrder, type JenisEntry } from '@/components/panel-replay';
 import { PojokOrder } from '@/components/pojok-order';
-import { kirimOrderNyata, ubahSlTpNyata, batalPendingNyata, tutupPosisiNyata, type MetodeTp } from '@/lib/order-nyata';
+import { kirimOrderNyata, ubahSlTpNyata, batalPendingNyata, tutupPosisiNyata, tickSimbol, keTick, type MetodeTp } from '@/lib/order-nyata';
 import { kirimPerintahMt5, tungguHasilMt5 } from '@/lib/mt5-order';
 import { DockPine, type InfoPine, type KendaliPine } from '@/components/dock-pine';
 import { WatchChart } from '@/components/watch-chart';
@@ -314,7 +314,13 @@ export default function ChartBacktest() {
      is over the maximum defined for this asset". Ditolak bursa berarti
      stop yang dikira sudah terpasang ternyata tidak ada; itu kegagalan
      yang mahal untuk sesuatu yang cuma soal pembulatan. */
+  /* Tick simbol dari bursa — diambil sekali saat order dipilih. Nol
+     berarti belum/ tidak diketahui; pembulatannya jatuh ke tebakan
+     desimal, dan itu ditulis apa adanya alih-alih berpura-pura tahu. */
+  const [tickAktif, setTickAktif] = useState(0);
+
   function bulatkanHarga(n: number, acuan: number): number {
+    if (tickAktif > 0) return keTick(n, tickAktif);
     const teks = String(acuan);
     const titik = teks.indexOf('.');
     const desimal = titik < 0 ? 0 : Math.min(8, teks.length - titik - 1);
@@ -331,12 +337,20 @@ export default function ChartBacktest() {
     setSuntingSlTeks(o.sl ? String(o.sl) : '');
     setSuntingTpTeks(o.tp ? String(o.tp) : '');
     setSuntingKabar('');
+    /* Kripto punya tickSize resmi; MT5 dibulatkan EA sendiri lewat
+       RapikanHarga(), jadi tidak perlu diambil di sini. */
+    setTickAktif(0);
+    if (o.pasar === 'kripto') void tickSimbol(o.simbol).then(setTickAktif).catch(() => {});
   }
 
   async function kirimSunting() {
     if (!sunting) return;
-    const slBaru = Number(suntingSl) || 0;
-    const tpBaru = Number(suntingTp) || 0;
+    /* Dibulatkan lagi tepat sebelum kirim: angka yang DIKETIK tangan
+       tidak lewat jalur seretan, dan 63160.98886568123 yang ditempel
+       dari mana pun akan ditolak bursa sama saja. */
+    const acuanKirim = sunting.sl || sunting.tp || aksi?.hargaKini || sunting.entry || 0;
+    const slBaru = suntingSl ? bulatkanHarga(suntingSl, acuanKirim) : 0;
+    const tpBaru = suntingTp ? bulatkanHarga(suntingTp, acuanKirim) : 0;
     if (!slBaru && !tpBaru) { setSuntingKabar('Isi SL atau TP dulu.'); return; }
     /* Pagar arah: SL di sisi yang salah bukan proteksi, itu perintah
        menutup rugi seketika. Ditolak di sini, bukan di bursa — pesan

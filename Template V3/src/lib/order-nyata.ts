@@ -260,7 +260,13 @@ export async function batalPendingNyata(p: { symbol: string; orderId: string; is
   const { url, token } = bacaKoneksi();
   const dasar = (url.trim() || 'https://103-253-145-38.sslip.io').replace(/\/+$/, '');
   if (!token.trim()) throw new Error('App Token belum diisi di Integrations.');
-  const r = await fetch(`${dasar}/api/trade/futures/cancel-pending`, {
+  /* cancel-order, BUKAN cancel-pending. Yang kedua namanya menjanjikan
+     hal ini tapi isinya cuma mengurus SL/TP: ia menerima slOrderId /
+     tp1OrderId / tp2OrderId dan MENGABAIKAN orderId. Permintaan hapus
+     dijawab 200 dengan objek kosong — order tetap hidup di bursa
+     sementara layar berkata sudah dibatalkan. Kegagalan diam yang paling
+     berbahaya bentuknya: ia terlihat berhasil. */
+  const r = await fetch(`${dasar}/api/trade/futures/cancel-order`, {
     method: 'POST',
     headers: { 'X-App-Token': token.trim(), 'Content-Type': 'application/json' },
     body: JSON.stringify({ symbol: p.symbol, orderId: p.orderId, isAlgo: p.isAlgo !== false }),
@@ -286,4 +292,40 @@ export async function tutupPosisiNyata(p: {
   });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(typeof j?.error === 'object' ? (j.error.msg ?? JSON.stringify(j.error)) : (j?.error ?? `Backend menjawab ${r.status}`));
+}
+
+
+/** Tick size simbol dari bursa, di-cache per simbol.
+ *
+ *  Membulatkan harga memakai "jumlah desimal harga lain" cuma tebakan
+ *  yang kebetulan sering benar. Yang menentukan sah atau tidaknya sebuah
+ *  harga adalah tickSize simbol itu — BTCUSDT 0.1, THETAUSDT 0.0001 —
+ *  dan bursa menolak apa pun di luar kelipatannya dengan "Precision is
+ *  over the maximum defined for this asset". Ditolak berarti stop yang
+ *  dikira terpasang sebenarnya tidak ada. */
+const tickCache = new Map<string, number>();
+
+export async function tickSimbol(simbol: string): Promise<number> {
+  const ada = tickCache.get(simbol);
+  if (ada) return ada;
+  const { url, token } = bacaKoneksi();
+  const dasar = (url.trim() || 'https://103-253-145-38.sslip.io').replace(/\/+$/, '');
+  if (!token.trim()) return 0;
+  try {
+    const r = await fetch(`${dasar}/api/symbol-filters?symbol=${encodeURIComponent(simbol)}`, {
+      headers: { 'X-App-Token': token.trim() },
+    });
+    if (!r.ok) return 0;
+    const j = await r.json();
+    const t = Number(j.tickSize) || 0;
+    if (t > 0) tickCache.set(simbol, t);
+    return t;
+  } catch { return 0; }
+}
+
+/** Bulatkan ke kelipatan tick terdekat, dengan desimal yang benar. */
+export function keTick(nilai: number, tick: number): number {
+  if (!tick || tick <= 0) return nilai;
+  const desimal = Math.max(0, Math.min(10, String(tick).includes('.') ? String(tick).split('.')[1].replace(/0+$/, '').length : 0));
+  return Number((Math.round(nilai / tick) * tick).toFixed(desimal));
 }
