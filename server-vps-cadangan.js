@@ -1928,10 +1928,34 @@ app.post('/api/hunter/minta', batasLaju, butuhLogin, (req, res) => {
   res.json({ ok: true, sudahAntre: false, permintaan: d.permintaan });
 });
 
-/* Status dibaca panel tiap beberapa detik — publik, isinya bukan rahasia. */
+/* Status dibaca panel tiap beberapa detik — publik, isinya bukan rahasia.
+   `jeda` ikut dipulangkan supaya panel bisa JUJUR: kalau penjemputnya
+   dimatikan, tombol yang menjanjikan "dijemput ≤ 3 menit" adalah janji
+   yang tidak akan ditepati siapa pun. */
 app.get('/api/hunter/status', batasLaju, (req, res) => {
   const d = hunterBaca();
-  res.json({ ok: true, permintaan: d.permintaan || null, terakhir: d.terakhir || null });
+  res.json({
+    ok: true,
+    permintaan: d.permintaan || null,
+    terakhir: d.terakhir || null,
+    jeda: d.jeda === true,
+    alasanJeda: String(d.alasanJeda || ''),
+  });
+});
+
+/* Menjeda / melanjutkan agen. Dipakai saat logikanya sedang diperbaiki —
+   lebih baik tombolnya mati terang-terangan daripada menerima permintaan
+   yang tidak akan pernah dikerjakan. */
+app.post('/api/hunter/jeda', batasLaju, requireToken, (req, res) => {
+  const b = req.body || {};
+  const d = hunterBaca();
+  d.jeda = b.jeda !== false;
+  d.alasanJeda = String(b.alasan || '').slice(0, 200);
+  /* Permintaan yang menggantung ikut dibersihkan: membiarkannya berarti
+     panel terus menghitung mundur untuk penjemput yang sudah mati. */
+  if (d.jeda && d.permintaan && d.permintaan.status !== 'selesai') d.permintaan = null;
+  hunterTulis(d);
+  res.json({ ok: true, jeda: d.jeda, alasanJeda: d.alasanJeda });
 });
 
 /* Agen melapor: sedang dikerjakan, atau selesai dengan ringkasannya.

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Radar, ExternalLink, CandlestickChart, Loader2, Sparkles } from 'lucide-react';
+import { Radar, ExternalLink, CandlestickChart, Loader2, Sparkles, PauseCircle } from 'lucide-react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { cn, harga as fHarga } from '@/lib/utils';
 import { bacaKoneksi } from '@/lib/koneksi';
@@ -102,6 +102,12 @@ export function PanelSinyal() {
   const [diperiksa, setDiperiksa] = useState(0);
   const [permintaan, setPermintaan] = useState<Permintaan | null>(null);
   const [hasil, setHasil] = useState<HasilHunter | null>(null);
+  /* Agen bisa DIJEDA saat logikanya sedang diperbaiki. Tombol yang tetap
+     hidup dalam keadaan itu menerima permintaan yang tidak akan pernah
+     dikerjakan — dan menunggu selamanya lebih buruk daripada ditolak
+     terus terang di muka. */
+  const [jeda, setJeda] = useState(false);
+  const [alasanJeda, setAlasanJeda] = useState('');
   const [meminta, setMeminta] = useState(false);
   const [kabarMinta, setKabarMinta] = useState('');
   const { pengguna } = useAuth();
@@ -128,6 +134,8 @@ export function PanelSinyal() {
           if (!hidup) return;
           setPermintaan(j?.permintaan ?? null);
           setHasil(j?.terakhir ?? null);
+          setJeda(j?.jeda === true);
+          setAlasanJeda(String(j?.alasanJeda ?? ''));
         })
         .catch(() => { /* status diam lebih baik daripada status karangan */ });
     };
@@ -230,14 +238,18 @@ export function PanelSinyal() {
             {/* Tombol panggil. Agen tidak lagi memeriksa tiap 30 menit —
                 ruang sinyal tidak berbicara sesering itu, dan 34 kali
                 "tidak ada yang baru" sehari cuma membakar kuota. */}
-            <button onClick={() => void mintaHunter()} disabled={meminta || sedangJalan || !pengguna}
-              title={!pengguna ? 'Masuk dulu untuk meminta agen bekerja'
+            <button onClick={() => void mintaHunter()} disabled={jeda || meminta || sedangJalan || !pengguna}
+              title={jeda ? (alasanJeda || 'Agen sedang dijeda untuk perbaikan')
+                : !pengguna ? 'Masuk dulu untuk meminta agen bekerja'
                 : sedangJalan ? 'Permintaanmu sedang dikerjakan' : 'Panggil agen untuk mencari sinyal terbaru sekarang'}
               className={cn('flex cursor-pointer items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors',
-                sedangJalan ? 'bg-amber-500/15 text-amber-300'
+                jeda ? 'bg-zinc-800 text-zinc-500'
+                  : sedangJalan ? 'bg-amber-500/15 text-amber-300'
                   : 'bg-zinc-100 text-zinc-950 hover:bg-white',
                 'disabled:cursor-not-allowed disabled:opacity-60')}>
-              {sedangJalan
+              {jeda
+                ? <><PauseCircle className="size-3" /> Agen dijeda</>
+                : sedangJalan
                 ? <><Loader2 className="size-3 animate-spin" /> Agen bekerja…</>
                 : <><Sparkles className="size-3" /> Minta AI Hunter</>}
             </button>
@@ -245,9 +257,15 @@ export function PanelSinyal() {
           </span>
         }
       />
-      {(kabarMinta || sedangJalan || hasil) && (
+      {(jeda || kabarMinta || sedangJalan || hasil) && (
         <div className="px-5 pb-2 text-[11px] leading-relaxed text-zinc-500">
-          {kabarMinta && <span className="text-zinc-400">{kabarMinta}</span>}
+          {jeda && (
+            <span className="text-amber-300/90">
+              Agen sedang dijeda{alasanJeda ? ` — ${alasanJeda}` : ' untuk perbaikan'}. Sinyal yang
+              sudah terbit di bawah tetap berlaku sesuai masa berlakunya masing-masing.
+            </span>
+          )}
+          {!jeda && kabarMinta && <span className="text-zinc-400">{kabarMinta}</span>}
           {sedangJalan && !kabarMinta && (
             <span className="text-amber-300/90">
               {sudahMulai
