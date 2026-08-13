@@ -2,6 +2,7 @@ import { smiSeries, atr, findPivots, SMI_K, SMI_D, SMI_EMA } from '@/lib/jt-scan
 import type { Lilin } from '@/lib/pasar';
 import {
   butuhPerBar, jalankanPineBar,
+  buangKomentar, belumSelesaiPine,
   type SegmenPine, type PenandaPine, type KotakPine, type IsianPine, type InputPine,
 } from '@/lib/pine-bar';
 
@@ -231,7 +232,7 @@ class Pengurai {
   urai(teks: string): Deret {
     this.teks = teks;
     this.pos = 0;
-    const d = this.banding();
+    const d = this.ternary();
     this.lewatiSpasi();
     if (this.pos < this.teks.length) throw new Error(`sisa yang tidak terbaca: "${this.teks.slice(this.pos)}"`);
     return d;
@@ -240,6 +241,66 @@ class Pengurai {
   private lewatiSpasi() { while (this.pos < this.teks.length && /\s/.test(this.teks[this.pos])) this.pos++; }
   private lihat(s: string) { this.lewatiSpasi(); return this.teks.startsWith(s, this.pos); }
   private ambil(s: string) { if (this.lihat(s)) { this.pos += s.length; return true; } return false; }
+
+  /* ── Ternary & logika ───────────────────────────────────────────────
+     Ditambahkan belakangan setelah ketahuan HILANG: `cond ? a : b` dan
+     `and`/`or`/`not` termasuk yang paling sering dipakai di Pine —
+     `plot(x, color = close > open ? color.green : color.red)` ada di
+     hampir setiap indikator — tapi mesin vektor ini tidak pernah
+     mengenalnya, dan menolaknya dengan "sisa yang tidak terbaca".
+
+     Urutan prioritas mengikuti Pine: ternary paling longgar, lalu or,
+     and, not, baru perbandingan. Salah urutan di sini membuat
+     `a > 1 and b < 2` diurai sebagai `a > (1 and b) < 2` — hasilnya angka
+     yang masuk akal tapi salah, dan itu jenis kekeliruan yang paling
+     sulit ketahuan. */
+  private ternary(): Deret {
+    const kondisi = this.atau();
+    this.lewatiSpasi();
+    if (!this.ambil('?')) return kondisi;
+    const benar = this.ternary();
+    this.lewatiSpasi();
+    if (!this.ambil(':')) throw new Error('ternary tanpa ":"');
+    const salah = this.ternary();
+    const n = Math.max(kondisi.length, benar.length, salah.length);
+    const out: Deret = new Array(n).fill(null);
+    for (let i = 0; i < n; i++) {
+      const k = kondisi[i];
+      if (k == null || !isFinite(k)) continue;
+      const v = k !== 0 ? benar[i] : salah[i];
+      out[i] = v == null || !isFinite(v) ? null : v;
+    }
+    return out;
+  }
+
+  private atau(): Deret {
+    let kiri = this.dan();
+    for (;;) {
+      this.lewatiSpasi();
+      if (!/^or/.test(this.teks.slice(this.pos))) return kiri;
+      this.pos += 2;
+      kiri = petakan2(kiri, this.dan(), (a, b) => (a !== 0 || b !== 0 ? 1 : 0));
+    }
+  }
+
+  private dan(): Deret {
+    let kiri = this.bukan();
+    for (;;) {
+      this.lewatiSpasi();
+      if (!/^and/.test(this.teks.slice(this.pos))) return kiri;
+      this.pos += 3;
+      kiri = petakan2(kiri, this.bukan(), (a, b) => (a !== 0 && b !== 0 ? 1 : 0));
+    }
+  }
+
+  private bukan(): Deret {
+    this.lewatiSpasi();
+    if (/^not/.test(this.teks.slice(this.pos))) {
+      this.pos += 3;
+      return petakan2(this.bukan(), konstanta(0, this.n), (a) => (a === 0 ? 1 : 0));
+    }
+    return this.banding();
+  }
 
   private banding(): Deret {
     let kiri = this.jumlah();
@@ -286,7 +347,7 @@ class Pengurai {
     this.lewatiSpasi();
     if (this.ambil('-')) return petakan2(konstanta(0, this.n), this.satuan(), (a, b) => a - b);
     if (this.ambil('(')) {
-      const d = this.banding();
+      const d = this.ternary();
       if (!this.ambil(')')) throw new Error('kurung tutup hilang');
       return this.riwayat(d);
     }
@@ -384,7 +445,7 @@ class Pengurai {
         this.pos = j + 1;
         arg.push(konstanta(NaN, this.n));
       } else {
-        arg.push(this.banding());
+        arg.push(this.ternary());
       }
       if (this.ambil(',')) continue;
       if (this.ambil(')')) return arg;
@@ -577,11 +638,14 @@ export function jalankanPine(kode: string, l: Lilin, tf = '4h',
   const mentahSemua = kode.split(/\r?\n/);
   const baris: { teks: string; no: number }[] = [];
   for (let i = 0; i < mentahSemua.length; i++) {
-    let t = mentahSemua[i];
+    /* Komentar dibuang PER BARIS sebelum digabung. Kalau digabung dulu,
+       baris hasil gabungan tidak punya baris baru lagi — dan satu `//` di
+       tengahnya menelan seluruh sisa ekspresi. */
+    let t = buangKomentar(mentahSemua[i]);
     const no = i + 1;
     const hitung = (s: string) => {
       let d = 0, dalamStr: string | null = null;
-      for (const c of s.replace(/\/\/.*$/, '')) {
+      for (const c of s) {
         if (dalamStr) { if (c === dalamStr) dalamStr = null; continue; }
         if (c === '"' || c === "'") dalamStr = c;
         else if (c === '(' || c === '[') d++;
@@ -590,10 +654,12 @@ export function jalankanPine(kode: string, l: Lilin, tf = '4h',
       return d;
     };
     let saldo = hitung(t);
-    while (saldo > 0 && i + 1 < mentahSemua.length) {
+    while (i + 1 < mentahSemua.length) {
+      const berikut = buangKomentar(mentahSemua[i + 1]);
+      if (!(saldo > 0 || (belumSelesaiPine(t) && berikut.trim() !== ''))) break;
       i++;
-      t += ' ' + mentahSemua[i].trim();
-      saldo += hitung(mentahSemua[i]);
+      t += ' ' + berikut.trim();
+      saldo += hitung(berikut);
     }
     baris.push({ teks: t, no });
   }
@@ -607,7 +673,7 @@ export function jalankanPine(kode: string, l: Lilin, tf = '4h',
   baris.forEach(({ teks: mentah, no: nomorBaris }) => {
     const i = nomorBaris - 1;
     void i;
-    let b = mentah.replace(/\/\/.*$/, '').trim();
+    let b = mentah.trim();   /* komentar sudah dibuang di penyambung di atas */
     if (!b || DILEWATI.test(mentah)) return;
 
     /* `var float x = ...`, `float x = ...` — kata kunci deklarasi dilepas;

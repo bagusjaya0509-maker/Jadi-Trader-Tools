@@ -377,6 +377,142 @@ function uraiBlok(baris: { teks: string; no: number; indent: number }[], mulai: 
   return { stmt, lanjut: i };
 }
 
+/** Buang komentar `//` dari SATU baris, dengan menghormati tanda petik.
+ *
+ *  Urutannya penting dan pernah salah: baris yang kurungnya belum tertutup
+ *  digabung dulu dengan baris berikutnya, BARU komentarnya dibuang. Hasil
+ *  gabungan tidak punya baris baru, jadi satu `/​/` di tengahnya menghapus
+ *  seluruh sisa ekspresi — `array.from(` yang argumennya masing-masing
+ *  berkomentar akan berakhir sebagai kurung buka tanpa isi.
+ *
+ *  Gejalanya menyesatkan: mesin melapor "tidak paham" di baris pembuka,
+ *  padahal barisnya benar dan yang rusak adalah cara kita menyusunnya.
+ *  Karena itu komentar dibuang PER BARIS, sebelum digabung.
+ *
+ *  Tanda petik dihormati supaya `str.tostring(x, "#.##")` dan alamat
+ *  "https://..." di dalam teks tidak ikut terpotong. */
+/** Baris yang jelas BELUM selesai walau kurungnya seimbang.
+ *
+ *  Pine membolehkan satu pernyataan melipat ke baris berikutnya selama
+ *  lanjutannya menjorok — dan skrip kalender ekonomi memakainya terus:
+ *
+ *      isNFP = enableNFP and (f_inNewsWindow(time, nfpDates, winMs) or
+ *           (nfpEx1_on and time >= nfpEx1_t and time < nfpEx1_t + winMs))
+ *
+ *  Baris pertama kurungnya seimbang, jadi hitungan kurung saja menyatakan
+ *  "sudah selesai" — padahal ia berakhir dengan `or` dan jelas menunggu
+ *  operan berikutnya. Yang diperiksa di sini operator yang menggantung di
+ *  ujung baris, bukan indentasi lanjutannya: indentasi di Pine punya arti
+ *  lain (blok if/for), dan memakainya untuk dua hal sekaligus membuat
+ *  keduanya salah di kasus pinggir. */
+export function belumSelesaiPine(s: string): boolean {
+  const t = s.trimEnd();
+  /* `nama(a, b) =>` di ujung baris adalah KEPALA fungsi multi-baris, dan
+     itu pernyataan yang sudah utuh — badannya tinggal di baris-baris
+     menjorok di bawahnya. Tanpa pengecualian ini, kepalanya tersambung ke
+     baris pertama badannya, fungsinya berubah jadi satu-baris, dan sisa
+     badannya jatuh ke tingkat atas — di mana parameternya tidak ada.
+     Galat yang muncul menyebut "arr belum didefinisikan", jauh dari
+     penyebabnya. */
+  if (/=>$/.test(t)) return false;
+  return /(?:\b(?:and|or|not)|[+\-*/%,?:]|[=<>!]=?)$/.test(t);
+}
+
+export function buangKomentar(s: string): string {
+  let dalam: string | null = null;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (dalam) {
+      if (c === '\\') { i++; continue; }
+      if (c === dalam) dalam = null;
+      continue;
+    }
+    if (c === '"' || c === "'") { dalam = c; continue; }
+    if (c === '/' && s[i + 1] === '/') return s.slice(0, i);
+  }
+  return s;
+}
+
+/* ── Waktu & zona waktu ──────────────────────────────────────────────
+   Indikator berbasis kalender ekonomi (NFP, CPI, FOMC) berdiri di atas
+   satu hal: "jam berapa bar ini menurut New York". Tanpa zona waktu yang
+   benar, seluruh penandanya meleset beberapa jam — dan melesetnya TIDAK
+   terlihat sebagai galat, cuma sebagai label di lilin yang salah. Itu
+   sebabnya bagian ini memakai Intl, bukan offset tetap yang ditulis
+   tangan: America/New_York bergeser sendiri saat DST, dan rilis 08:30 ET
+   di bulan Januari bukan jam UTC yang sama dengan 08:30 ET di bulan Juli.
+
+   Bentuk "GMT+3" tetap ditangani terpisah karena itu yang dipakai untuk
+   jam broker, dan broker memang tidak mengenal DST. */
+function offsetZonaMenit(ms: number, tz: string): number {
+  const z = String(tz || '').trim();
+  const tetap = /^(?:GMT|UTC)\s*([+-])\s*(\d{1,2})(?::?(\d{2}))?$/i.exec(z);
+  if (tetap) {
+    const tanda = tetap[1] === '-' ? -1 : 1;
+    return tanda * (parseInt(tetap[2], 10) * 60 + (tetap[3] ? parseInt(tetap[3], 10) : 0));
+  }
+  if (!z || /^(?:GMT|UTC|Z|Etc\/UTC|Etc\/GMT)$/i.test(z)) return 0;
+  try {
+    const f = new Intl.DateTimeFormat('en-US', {
+      timeZone: z, hour12: false,
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+    });
+    const p: Record<string, string> = {};
+    for (const x of f.formatToParts(new Date(ms))) p[x.type] = x.value;
+    const dinding = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour % 24, +p.minute, +p.second);
+    return Math.round((dinding - (ms - (ms % 1000))) / 60000);
+  } catch {
+    /* Zona tidak dikenal Intl → diperlakukan UTC. Lebih baik meleset
+       seragam daripada melempar galat di tengah indikator. */
+    return 0;
+  }
+}
+
+/** Pecahan waktu dinding di zona tertentu. `hari` mengikuti Pine:
+ *  Minggu = 1 … Sabtu = 7. */
+function bagianWaktu(ms: number, tz: string) {
+  const d = new Date(ms + offsetZonaMenit(ms, tz) * 60000);
+  return {
+    tahun: d.getUTCFullYear(), bulan: d.getUTCMonth() + 1, tanggal: d.getUTCDate(),
+    jam: d.getUTCHours(), menit: d.getUTCMinutes(), detik: d.getUTCSeconds(),
+    hari: d.getUTCDay() + 1,
+  };
+}
+
+/** Waktu dinding → stempel UTC. Dihitung dua kali karena offsetnya sendiri
+ *  bergantung pada instant yang sedang dicari: tebakan pertama memakai
+ *  offset di sekitar tanggal itu, tebakan kedua mengoreksinya kalau
+ *  tebakan pertama mendarat di sisi lain pergantian DST. */
+function keStempel(tz: string, y: number, bln: number, tgl: number, jam: number, menit: number): number {
+  const dinding = Date.UTC(y, bln - 1, tgl, jam, menit);
+  let hasil = dinding;
+  for (let i = 0; i < 2; i++) hasil = dinding - offsetZonaMenit(hasil, tz) * 60000;
+  return hasil;
+}
+
+/** Angka → teks mengikuti format Pine ("#.##", "0.0000", format.mintick). */
+function formatAngka(x: number, fmt: string | null, mintick: number): string {
+  if (!fmt || fmt === 'format.inherit') return String(+x.toFixed(6));
+  if (fmt === 'format.mintick') {
+    const desimal = Math.max(0, Math.round(-Math.log10(mintick)));
+    return x.toFixed(Math.min(10, desimal));
+  }
+  if (fmt === 'format.percent') return x.toFixed(2) + '%';
+  if (fmt === 'format.volume') return String(Math.round(x));
+  /* Pola gaya "#.##" / "0.000": jumlah tanda di belakang titik = jumlah
+     desimal. '#' berarti boleh dibuang kalau nol, '0' berarti dipaksa
+     tampil — bedanya terlihat pada "1.5" vs "1.50". */
+  const p = /^([#0]*)(?:\.([#0]+))?$/.exec(String(fmt).trim());
+  if (!p) return String(+x.toFixed(6));
+  const desimal = p[2] ? p[2].length : 0;
+  const teks = x.toFixed(desimal);
+  if (p[2] && p[2].includes('#') && !p[2].includes('0')) {
+    return teks.replace(/\.?0+$/, '');
+  }
+  return teks;
+}
+
 /* ── Deret bantu (dipakai ta.*) ──────────────────────────────────────── */
 function atrDeret(h: number[], l: number[], c: number[], p: number): (number | null)[] {
   const n = c.length, tr: number[] = new Array(n);
@@ -504,6 +640,12 @@ class Mesin {
     switch (nama) {
       case 'open': return l.opens; case 'high': return l.highs;
       case 'low': return l.lows; case 'close': return l.closes;
+      /* `time` sebagai DERET, bukan angka tunggal: skrip menulis
+         `time[1]` untuk membandingkan bar ini dengan bar sebelumnya —
+         itulah cara mendeteksi "bar pertama hari Senin". Dijadikan deret
+         di sini membuat riwayatnya jalan sendiri, tanpa penanganan
+         khusus di mana pun. */
+      case 'time': case 'time_close': return l.times;
       default: return null;
     }
   }
@@ -526,6 +668,23 @@ class Mesin {
         const a = this.eval(e.a, baris), b = this.eval(e.b, baris);
         if (e.op === '==') return a === b || (this.angka(a) !== null && this.angka(a) === this.angka(b));
         if (e.op === '!=') return !(a === b || (this.angka(a) !== null && this.angka(a) === this.angka(b)));
+        /* `+` di Pine juga MENYAMBUNG TEKS. Tanpa ini, label yang disusun
+           dari potongan ("Gap: " + teks + "\n" + angka) berubah jadi null
+           dan tergambar sebagai label kosong — muncul di tempat yang benar,
+           tapi tanpa satu huruf pun. Kegagalan yang paling membingungkan
+           karena tidak ada galat sama sekali.
+
+           Hanya berlaku kalau salah satu sisinya memang teks; angka +
+           angka tetap penjumlahan. */
+        if (e.op === '+' && (typeof a === 'string' || typeof b === 'string')) {
+          const keTeks = (v: Nilai): string => {
+            if (v == null) return 'na';
+            if (typeof v === 'number') return String(+v.toFixed(6));
+            if (typeof v === 'boolean') return v ? 'true' : 'false';
+            return typeof v === 'string' ? v : '';
+          };
+          return keTeks(a) + keTeks(b);
+        }
         const x = this.angka(a), y = this.angka(b);
         if (x == null || y == null) {
           if (['>', '<', '>=', '<='].includes(e.op)) return false;
@@ -549,6 +708,13 @@ class Mesin {
           if (deret) { const k = this.bar - ofs; return k >= 0 ? deret[k] : null; }
           const riw = this.riwayat.get(e.a.v);
           if (riw) { const k = riw.length - ofs; return ofs === 0 ? this.lingkup.get(e.a.v) ?? null : (k >= 1 ? riw[k - 1] : null); }
+          /* `bar_index[n]` punya jawaban pasti tanpa perlu menyimpan
+             riwayat: nomor bar sekarang dikurangi n. Sebelum ini ia jatuh
+             ke cabang "tanpa riwayat" dan mengembalikan null — dan
+             line.new(bar_index[1], ...) yang koordinat kirinya null
+             dibuang diam-diam. Garis gap Jumat→Senin tidak pernah muncul,
+             tanpa satu pun galat yang menjelaskan kenapa. */
+          if (e.a.v === 'bar_index') { const k = this.bar - ofs; return k >= 0 ? k : null; }
           /* variabel tanpa riwayat: [0] = nilai kini */
           if (ofs === 0) return this.nilaiNama(e.a.v, baris);
           return null;
@@ -596,6 +762,24 @@ class Mesin {
       case 'timeframe.isintraday': return !['1d', 'D', '1w', 'W'].includes(this.tf);
       case 'syminfo.tickerid': case 'syminfo.ticker': return 'CHART';
       case 'syminfo.mintick': return 0.01;
+      /* Minggu = 1 … Sabtu = 7, persis penomoran Pine. Kalau dinomori
+         dari nol seperti JavaScript, `dayofweek(time) == dayofweek.monday`
+         akan cocok di hari Minggu — dan tidak ada yang terlihat salah
+         sampai seseorang membandingkan penandanya dengan kalender. */
+      case 'dayofweek.sunday': return 1;
+      case 'dayofweek.monday': return 2;
+      case 'dayofweek.tuesday': return 3;
+      case 'dayofweek.wednesday': return 4;
+      case 'dayofweek.thursday': return 5;
+      case 'dayofweek.friday': return 6;
+      case 'dayofweek.saturday': return 7;
+      /* Tanpa argumen, fungsi waktu Pine memakai waktu bar berjalan. */
+      case 'dayofweek': return bagianWaktu(this.l.times[this.bar] ?? 0, '').hari;
+      case 'hour': return bagianWaktu(this.l.times[this.bar] ?? 0, '').jam;
+      case 'minute': return bagianWaktu(this.l.times[this.bar] ?? 0, '').menit;
+      case 'year': return bagianWaktu(this.l.times[this.bar] ?? 0, '').tahun;
+      case 'month': return bagianWaktu(this.l.times[this.bar] ?? 0, '').bulan;
+      case 'dayofmonth': return bagianWaktu(this.l.times[this.bar] ?? 0, '').tanggal;
     }
     if (/^color\./.test(nama)) return WARNA[nama.slice(6)] ?? '#a1a1aa';
     /* Konstanta gaya/tempat: nilainya namanya sendiri. */
@@ -636,7 +820,60 @@ class Mesin {
       case 'nz': { const v = arg(0); return v == null ? (arg(1) ?? 0) : v; }
       case 'int': case 'float': return nArg(0);
       case 'bool': return this.benar(arg(0));
-      case 'str.tostring': { const v = arg(0); return v == null ? 'na' : String(typeof v === 'number' ? +v.toFixed(6) : v); }
+      case 'str.tostring': {
+        const v = arg(0);
+        if (v == null) return 'na';
+        if (typeof v !== 'number') return String(v);
+        const fmt = e.arg.length > 1 || 'format' in e.namaArg ? dapat('format', 1) : null;
+        return formatAngka(v, typeof fmt === 'string' ? fmt : null, 0.01);
+      }
+
+      /* ── Waktu & kalender ────────────────────────────────────────────
+         Inilah yang membuat indikator berbasis jadwal rilis bisa jalan:
+         tanpa timestamp() dan dayofweek(), seluruh array tanggal NFP/CPI
+         cuma angka yang tidak pernah cocok dengan bar mana pun. */
+      case 'timestamp': {
+        /* Tiga bentuk yang benar-benar dipakai orang:
+             timestamp("2026-08-07 08:30")
+             timestamp(tz, y, m, d, jam, menit)
+             timestamp(y, m, d, jam, menit)                */
+        const a0 = arg(0);
+        if (e.arg.length === 1 && typeof a0 === 'string') {
+          const m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?/.exec(a0.trim());
+          if (!m) return null;
+          return keStempel('', +m[1], +m[2], +m[3], m[4] ? +m[4] : 0, m[5] ? +m[5] : 0);
+        }
+        const adaTz = typeof a0 === 'string';
+        const tz = adaTz ? a0 : '';
+        const g = adaTz ? 1 : 0;
+        const y = nArg(g), bln = nArg(g + 1), tgl = nArg(g + 2);
+        if (y == null || bln == null || tgl == null) return null;
+        return keStempel(tz, y, bln, tgl, nArg(g + 3) ?? 0, nArg(g + 4) ?? 0);
+      }
+      case 'dayofweek': case 'hour': case 'minute': case 'second':
+      case 'year': case 'month': case 'dayofmonth': case 'weekofyear': {
+        /* Argumen pertama waktu, kedua zona — keduanya opsional. Kalau
+           zonanya tidak disebut, Pine memakai zona bursa; kita memakai
+           UTC dan mengatakannya di catatan, bukan menebak. */
+        const t = e.arg.length ? nArg(0) : (this.l.times[this.bar] ?? null);
+        if (t == null) return null;
+        const z = e.arg.length > 1 ? arg(1) : '';
+        const w = bagianWaktu(t, typeof z === 'string' ? z : '');
+        switch (e.nama) {
+          case 'dayofweek': return w.hari;
+          case 'hour': return w.jam;
+          case 'minute': return w.menit;
+          case 'second': return w.detik;
+          case 'year': return w.tahun;
+          case 'month': return w.bulan;
+          case 'dayofmonth': return w.tanggal;
+          default: {
+            const awal = Date.UTC(w.tahun, 0, 1);
+            const kini = Date.UTC(w.tahun, w.bulan - 1, w.tanggal);
+            return Math.floor((kini - awal) / 604800000) + 1;
+          }
+        }
+      }
       case 'math.min': { const xs = e.arg.map((_, i) => nArg(i)).filter((x): x is number => x != null); return xs.length ? Math.min(...xs) : null; }
       case 'math.max': { const xs = e.arg.map((_, i) => nArg(i)).filter((x): x is number => x != null); return xs.length ? Math.max(...xs) : null; }
       case 'math.abs': { const x = nArg(0); return x == null ? null : Math.abs(x); }
@@ -653,7 +890,12 @@ class Mesin {
          centang tampilkan sinyal, ganti warna, ubah periode — tanpa
          menyunting skripnya. Nilai yang dipilih orangnya menang. */
       case 'input': case 'input.int': case 'input.float': case 'input.bool':
-      case 'input.string': case 'input.timeframe': case 'input.source': case 'input.color': {
+      case 'input.string': case 'input.timeframe': case 'input.source': case 'input.color':
+      /* input.time menyimpan STEMPEL WAKTU, dan itu sudah dihasilkan
+         timestamp() di argumen bawaannya — jadi ia cukup ikut jalur yang
+         sama. Tanpa case ini, `input.time(timestamp(...))` jatuh ke
+         "fungsi tidak dikenal" dan seluruh blok tanggal tambahan mati. */
+      case 'input.time': {
         const mentah = dapat('defval', 0);
         const bawaan = e.nama === 'input.color'
           ? (typeof mentah === 'string' ? mentah : '#a1a1aa')
@@ -765,6 +1007,10 @@ class Mesin {
       case 'array.new': case 'array.new_float': case 'array.new_int': case 'array.new_bool':
       case 'array.new_string': case 'array.new_line': case 'array.new_label': case 'array.new_box':
         return { jenis: 'array', isi: [] };
+      /* array.from(...) — dipakai untuk daftar tanggal yang ditulis tangan.
+         Argumennya dievaluasi apa adanya, jadi `array.from(timestamp(...),
+         timestamp(...))` langsung jadi larik stempel waktu. */
+      case 'array.from': return { jenis: 'array', isi: e.arg.map((_, i) => arg(i)) } as NilaiArray;
       case 'array.push': { const a = arg(0) as NilaiArray; if (a?.jenis === 'array') a.isi.push(arg(1)); return null; }
       case 'array.pop': { const a = arg(0) as NilaiArray; return a?.jenis === 'array' ? (a.isi.pop() ?? null) : null; }
       case 'array.shift': { const a = arg(0) as NilaiArray; return a?.jenis === 'array' ? (a.isi.shift() ?? null) : null; }
@@ -999,11 +1245,13 @@ export function jalankanPineBar(kode: string, l: Lilin, tf = '4h',
   const mentah = kode.split(/\r?\n/);
   const baris: { teks: string; no: number; indent: number }[] = [];
   for (let i = 0; i < mentah.length; i++) {
-    let teks = mentah[i];
+    /* Komentar dibuang PER BARIS, sebelum penggabungan — lihat alasannya
+       di buangKomentar(). */
+    let teks = buangKomentar(mentah[i]);
     const no = i + 1;
     const hitung = (s: string) => {
       let d = 0, dalam: string | null = null;
-      for (const c of s.replace(/\/\/.*$/, '')) {
+      for (const c of s) {
         if (dalam) { if (c === dalam) dalam = null; continue; }
         if (c === '"' || c === "'") dalam = c;
         else if (c === '(' || c === '[') d++;
@@ -1012,11 +1260,20 @@ export function jalankanPineBar(kode: string, l: Lilin, tf = '4h',
       return d;
     };
     let saldo = hitung(teks);
-    while (saldo > 0 && i + 1 < mentah.length) { i++; teks += ' ' + mentah[i].trim(); saldo += hitung(mentah[i]); }
-    const tanpaKomentar = teks.replace(/\/\/.*$/, '');
-    if (!tanpaKomentar.trim()) continue;
-    const indent = /^\s*/.exec(tanpaKomentar)![0].replace(/\t/g, '    ').length;
-    baris.push({ teks: tanpaKomentar.trim(), no, indent });
+    while (i + 1 < mentah.length) {
+      const berikut = buangKomentar(mentah[i + 1]);
+      /* Kurung belum tutup -> pasti sambung. Kurung sudah seimbang ->
+         sambung hanya kalau barisnya berakhir dengan operator menggantung
+         DAN masih ada isi di baris berikutnya (baris kosong mengakhiri
+         pernyataan, bukan menunggunya). */
+      if (!(saldo > 0 || (belumSelesaiPine(teks) && berikut.trim() !== ''))) break;
+      i++;
+      teks += ' ' + berikut.trim();
+      saldo += hitung(berikut);
+    }
+    if (!teks.trim()) continue;
+    const indent = /^\s*/.exec(teks)![0].replace(/\t/g, '    ').length;
+    baris.push({ teks: teks.trim(), no, indent });
   }
 
   /* Urai seluruh program sekali. Galat urai menghentikan (dengan nomor
