@@ -387,22 +387,41 @@ export default function ChartBacktest() {
            backend sudah mengurus pembatalannya. Id order lamanya
            diambil dari daftar order bursa supaya yang dibatalkan
            benar-benar milik simbol ini. */
+        /* SEMUA stop lama, bukan yang pertama ditemukan. Posisi yang
+           dibuka bertahap punya beberapa SL/TP (TP1, TP2, sisa layering),
+           dan membatalkan satu saja meninggalkan sisanya hidup: stop
+           menumpuk melebihi ukuran posisi, lalu yang tersisa menembak
+           posisi BERIKUTNYA di pair yang sama. */
         const milik = orderBursa.filter((x) => x.simbol === sunting.simbol);
-        const slLama = milik.find((x) => x.jenis === 'SL');
-        const tpLama = milik.find((x) => x.jenis === 'TP');
-        const qty = sunting.ukuran || slLama?.qty || tpLama?.qty || 0;
+        const stopLama = milik.filter((x) => x.jenis === 'SL' || x.jenis === 'TP');
+        const qty = sunting.ukuran || stopLama[0]?.qty || 0;
         if (!qty) throw new Error('Ukuran posisi tidak diketahui — muat ulang halaman lalu coba lagi.');
+
+        /* URUTANNYA DISENGAJA: pasang yang baru DULU, baru batalkan yang
+           lama. Sebentar kelebihan stop tidak berbahaya — yang pertama
+           kena menutup posisinya. Sebaliknya, membatalkan dulu lalu gagal
+           memasang meninggalkan posisi TANPA stop sama sekali, dan itu
+           kegagalan yang membakar uang. */
         await ubahSlTpNyata({
           symbol: sunting.simbol,
           side: sunting.arah,
           sl: slBaru || undefined,
           slQuantity: slBaru ? qty : undefined,
-          oldSlOrderId: slLama?.id,
           tp1: tpBaru || undefined,
           tp1Quantity: tpBaru ? qty : undefined,
-          oldTp1OrderId: tpLama?.id,
         });
-        setSuntingKabar('Terkirim ke Binance — SL/TP diperbarui.');
+
+        const sisa: string[] = [];
+        for (const o of stopLama) {
+          try { await batalPendingNyata({ symbol: sunting.simbol, orderId: o.id, isAlgo: true }); }
+          catch { sisa.push(`${o.jenis} ${o.pemicu}`); }
+        }
+        /* Sisa yang gagal dibatalkan DIKATAKAN, tidak ditelan. Stop yatim
+           yang tertinggal akan menembak posisi berikutnya, dan pemiliknya
+           harus tahu sekarang — bukan saat itu terjadi. */
+        setSuntingKabar(sisa.length
+          ? `SL/TP baru terpasang, tapi ${sisa.length} order lama gagal dibatalkan (${sisa.join(', ')}). Batalkan manual di Binance.`
+          : 'Terkirim ke Binance — SL/TP diperbarui, order lama dibatalkan.');
       }
     } catch (e) {
       setSuntingKabar(e instanceof Error ? e.message : 'Gagal mengirim perubahan');
@@ -496,10 +515,18 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
         const milik = orderBursa.filter((x) => x.simbol === sunting.simbol);
         await tutupPosisiNyata({
           symbol: sunting.simbol, side: sunting.arah, quantity: sunting.ukuran,
-          slOrderId: milik.find((x) => x.jenis === 'SL')?.id,
-          tp1OrderId: milik.find((x) => x.jenis === 'TP')?.id,
         });
-        setSuntingKabar('Posisi ditutup di harga pasar.');
+        /* SEMUA stop dibersihkan setelah posisinya tertutup. Stop yatim
+           yang tertinggal tidak melakukan apa-apa hari ini — lalu menembak
+           posisi berikutnya di pair yang sama, entah kapan. */
+        const sisaTutup: string[] = [];
+        for (const o of milik.filter((x) => x.jenis === 'SL' || x.jenis === 'TP')) {
+          try { await batalPendingNyata({ symbol: sunting.simbol, orderId: o.id, isAlgo: true }); }
+          catch { sisaTutup.push(`${o.jenis} ${o.pemicu}`); }
+        }
+        setSuntingKabar(sisaTutup.length
+          ? `Posisi ditutup, tapi ${sisaTutup.length} stop lama gagal dibatalkan (${sisaTutup.join(', ')}). Batalkan manual di Binance.`
+          : 'Posisi ditutup dan semua stop-nya dibersihkan.');
         setSunting(null);
       }
     } catch (e) {
@@ -1453,7 +1480,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
           {sunting && (
             <div onPointerDown={mulaiSeretUbah}
                  style={letakUbah ? { left: letakUbah.x, top: letakUbah.y } : undefined}
-                 className={cn('absolute z-30 cursor-move', !letakUbah && 'left-[290px] top-2')}>
+                 className={cn('absolute z-30 cursor-move', !letakUbah && 'bottom-2 right-2')}>
               {/* Tanpa bingkai dan latar — ia bagian dari chart, bukan
                   kartu yang menumpang di atasnya. */}
               <div className="w-[210px] shrink-0 text-[11.5px]">
