@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
-  ArrowLeft, CheckCircle2, Clock, KeyRound, Loader2, LogIn, ShieldCheck, XCircle,
+  ArrowLeft, CheckCircle2, Clock, KeyRound, Loader2, LogIn, LogOut, ShieldCheck, XCircle,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import {
@@ -51,7 +51,7 @@ function KartuKuota({ judul, pakai, total, sisa, warna, catatan }: {
 }
 
 export default function Akses() {
-  const { pengguna, memuat: memuatAuth, masuk, langganan, pemilik } = useAuth();
+  const { pengguna, memuat: memuatAuth, masuk, keluar, langganan, pemilik } = useAuth();
   const { kuota, memuat: memuatKuota, muatUlang } = useKuota();
   const [params] = useSearchParams();
   const tujuan = params.get('dari') || '/dashboard';
@@ -111,9 +111,30 @@ export default function Akses() {
     <div className="min-h-screen w-full overflow-y-auto bg-zinc-950">
       <div className="mx-auto flex max-w-[600px] flex-col gap-8 px-5 py-14 md:py-24">
 
-        <Link to="/" className="inline-flex w-fit items-center gap-1.5 text-[12.5px] text-zinc-500 transition-colors hover:text-zinc-300">
-          <ArrowLeft className="size-3.5" /> Kembali ke beranda
-        </Link>
+        {/* Pintu keluar WAJIB ada di halaman gerbang.
+            ────────────────────────────────────────────────────────────────
+            Tanpa ini, orang yang masuk dengan akun keliru terkunci: halaman
+            ini tidak menampilkan aplikasi, dan tidak ada satu pun tombol
+            untuk berganti akun. Sudah terjadi — pemiliknya sendiri terkunci
+            di luar setelah menguji alur permintaan dengan email lain. */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Link to="/" className="inline-flex items-center gap-1.5 text-[12.5px] text-zinc-500 transition-colors hover:text-zinc-300">
+            <ArrowLeft className="size-3.5" /> Kembali ke beranda
+          </Link>
+          {pengguna && (
+            <div className="flex items-center gap-2.5 text-[12px]">
+              <span className="max-w-[22ch] truncate text-zinc-500">
+                {pengguna.email || pengguna.displayName || 'akun tanpa nama'}
+              </span>
+              <button
+                onClick={() => void keluar()}
+                className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 py-1.5 text-zinc-400 transition-colors hover:border-zinc-700 hover:text-zinc-200"
+              >
+                <LogOut className="size-3.5" /> Ganti akun
+              </button>
+            </div>
+          )}
+        </div>
 
         {/* Hierarki dibawa SKALA dan BOBOT, bukan dengan menambah keluarga
             huruf. Halaman ini memakai IBM Plex Sans yang sama dengan seluruh
