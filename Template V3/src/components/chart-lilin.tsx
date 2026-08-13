@@ -117,7 +117,7 @@ export interface PosisiChartMt5 {
 
 export function ChartLilin({
   lilin, garis, trade, tinggi = 420, hingga, garisHarga, onKlikBar, smi, mundur, pojok,
-  garisSeret, onSeret, onHapusGaris, hamparanBawah, segmen, penandaPine, kotakPine, isianPine,
+  garisSeret, onSeret, onKlikGaris, onHapusGaris, hamparanBawah, segmen, penandaPine, kotakPine, isianPine,
   alat, onAlatSelesai, gambarAlat, gambarPilih, onPilihGambar, onUbahGambar,
   posisiMt5, onUbahPosisi, hargaAsk, kunciUkuran,
 }: {
@@ -146,6 +146,12 @@ export function ChartLilin({
   garisSeret?: GarisSeret[];
   /** Dipanggil saat sebuah garis selesai digeser. */
   onSeret?: (id: GarisSeret['id'], harga: number) => void;
+  /** Garisnya DISENTUH — diklik saja, atau diklik lalu diseret. Dipisah
+   *  dari onSeret karena menyentuh dan menggeser adalah dua maksud yang
+   *  berbeda: yang satu "saya mau mengurus garis ini", yang satu "nilainya
+   *  jadi sekian". Halaman chart memakainya untuk memunculkan panel ubah
+   *  order hanya ketika garisnya benar-benar dituju. */
+  onKlikGaris?: (id: GarisSeret['id']) => void;
   /** Hapus satu garis lewat tombol ✕ di labelnya. */
   onHapusGaris?: (id: GarisSeret['id']) => void;
   /** Panel yang ditumpangkan di bagian bawah area harga — dipakai kendali
@@ -1028,9 +1034,12 @@ export function ChartLilin({
   }, [onSeret, hargaDariY]);
 
   function mulaiSeret(id: string, e: React.MouseEvent) {
-    if (!onSeret) return;
     e.preventDefault();
     e.stopPropagation();
+    /* Diberitahukan lebih dulu, sebelum urusan seret: klik yang tidak
+       jadi digeser pun tetap sebuah maksud. */
+    onKlikGaris?.(id as GarisSeret['id']);
+    if (!onSeret) return;
     seret.current = { id, mulaiY: e.clientY };
     document.body.style.cursor = 'ns-resize';
     chart.current?.applyOptions({ handleScroll: false, handleScale: false });

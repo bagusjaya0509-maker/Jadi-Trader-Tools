@@ -328,12 +328,25 @@ export default function ChartBacktest() {
   }
   const setSuntingSl = (n: number) => setSuntingSlTeks(n ? String(n) : '');
   const setSuntingTp = (n: number) => setSuntingTpTeks(n ? String(n) : '');
+  /* ── Dua langkah: pilih dulu, baru ubah ────────────────────────────
+     Mengklik nama pair MENAMPILKAN ordernya di chart — entry, SL, TP —
+     dan berhenti di situ. Panel ubahnya baru muncul setelah salah satu
+     garis itu diklik.
+
+     Alasannya: kebanyakan klik pada nama pair cuma ingin MELIHAT, "stop
+     saya sekarang di mana". Memunculkan panel berisi tombol Kirim dan
+     Tutup posisi untuk maksud sebesar itu berarti alat pengubah uang
+     terbuka sepanjang waktu, menutupi chart yang sedang dibaca. Panelnya
+     sekarang menunggu sampai ada yang benar-benar menuju garisnya. */
+  const [panelUbah, setPanelUbah] = useState(false);
   const [suntingSibuk, setSuntingSibuk] = useState(false);
   const [suntingKabar, setSuntingKabar] = useState('');
 
   function bukaSunting(o: OrderSunting) {
     setSimbol(rapikanSimbol(o.simbolChart));
     setSunting(o);
+    /* Garisnya dulu, panelnya belakangan. */
+    setPanelUbah(false);
     setSuntingSlTeks(o.sl ? String(o.sl) : '');
     setSuntingTpTeks(o.tp ? String(o.tp) : '');
     setSuntingKabar('');
@@ -962,13 +975,20 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
          sekian jadi target". Menyeret dari garis yang sudah ada jauh
          lebih cepat daripada mencari garis SL yang memang belum pernah
          dipasang. */
+      /* Sebelum panelnya dibuka, garisnya menjelaskan cara membukanya —
+         garis yang bisa diklik tapi tidak mengatakannya sama saja dengan
+         tidak ada. */
+      const ketEntry = panelUbah
+        ? `· ${sunting.arah} — tarik ke ${sunting.arah === 'BUY' ? 'bawah = SL, atas = TP' : 'atas = SL, bawah = TP'}`
+        : `· ${sunting.arah} — klik untuk ubah`;
+      const ketStop = panelUbah ? '· seret lalu Kirim' : '· klik untuk ubah';
       if (sunting.entry) g.push({
         id: 'entry', harga: sunting.entry, warna: '#d4d4d8', label: 'Entry',
-        ket: `· ${sunting.arah} — tarik ke ${sunting.arah === 'BUY' ? 'bawah = SL, atas = TP' : 'atas = SL, bawah = TP'}`,
+        ket: ketEntry,
         bisaSeret: true,
       });
-      if (suntingSl) g.push({ id: 'sl', harga: suntingSl, warna: '#f87171', label: 'SL', ket: '· seret lalu Kirim', bisaSeret: true });
-      if (suntingTp) g.push({ id: 'tp', harga: suntingTp, warna: '#10b981', label: 'TP', ket: '· seret lalu Kirim', bisaSeret: true });
+      if (suntingSl) g.push({ id: 'sl', harga: suntingSl, warna: '#f87171', label: 'SL', ket: ketStop, bisaSeret: true });
+      if (suntingTp) g.push({ id: 'tp', harga: suntingTp, warna: '#10b981', label: 'TP', ket: ketStop, bisaSeret: true });
       return g;
     }
     const sumber = aksiPosisi
@@ -1024,7 +1044,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
     if (sumber.sl) g.push({ id: 'sl', harga: sumber.sl, warna: '#f87171', label: 'SL', ket: ketSl, bisaSeret: !kunci });
     if (sumber.tp) g.push({ id: 'tp', harga: sumber.tp, warna: '#10b981', label: 'TP', ket: ketTp, bisaSeret: !kunci });
     return g;
-  }, [sunting, suntingSl, suntingTp, aksiPosisi, aksiTunda, rencana, aksi, draf, labelJenis, nyataSetelan, lotMt5, nilaiLotMt5, simbol]);
+  }, [sunting, panelUbah, suntingSl, suntingTp, aksiPosisi, aksiTunda, rencana, aksi, draf, labelJenis, nyataSetelan, lotMt5, nilaiLotMt5, simbol]);
 
   /* ── Order yang BENAR-BENAR menggantung di bursa ────────────────────
      Sumbernya bursa, bukan keadaan halaman ini. Itulah yang membuatnya
@@ -1148,7 +1168,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
   const [letakPakai, setLetakPakai] = useState<{ x: number; y: number } | null>(letakUbah);
 
   useLayoutEffect(() => {
-    if (!sunting) return;
+    if (!sunting || !panelUbah) return;
     const jepitUbah = () => {
       if (!letakUbah) { setLetakPakai(null); return; }
       const b = areaChart.current?.getBoundingClientRect();
@@ -1202,7 +1222,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
       window.removeEventListener('resize', jepitUbah);
       window.removeEventListener('scroll', jepitUbah, true);
     };
-  }, [sunting, letakUbah, tinggiChart]);
+  }, [sunting, panelUbah, letakUbah, tinggiChart]);
 
   /* ── Kunci remount chart ───────────────────────────────────────────
      Ganti simbol/timeframe atau tombol Segarkan MEMBANGUN ULANG komponen
@@ -1432,7 +1452,13 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                             seretTangan.current = true;
                             setRencana((r) => ({ ...r, [id]: h }));
                           }}
+                          onKlikGaris={() => setPanelUbah(true)}
                           onHapusGaris={(id) => {
+                            /* Dalam mode sunting, × pada salah satu garis
+                               berarti "sudahi urusan order ini" — bukan
+                               menghapus satu level dari rencana tiket, yang
+                               memang tidak sedang digambar. */
+                            if (sunting) { setSunting(null); setPanelUbah(false); setSuntingKabar(''); return; }
                             setRencana((r) => ({ ...r, [id]: undefined }));
                             if (id === 'entry') entryDigeser.current = false;
                           }}
@@ -1607,7 +1633,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
               Bawaannya duduk di kanan panel order; begitu diseret, letak
               pilihannya diingat. Alasannya sama dengan bilah alat: tidak
               ada satu sudut yang benar untuk semua susunan panel. */}
-          {sunting && (
+          {sunting && panelUbah && (
             <div ref={kotakUbah} onPointerDown={mulaiSeretUbah}
                  style={letakPakai ? { left: letakPakai.x, top: letakPakai.y } : undefined}
                  /* z-20, setara bilah alat gambar — bilah judul halaman
@@ -1664,9 +1690,13 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                                   className="cursor-pointer rounded px-2 py-1 text-[10.5px] text-red-400/90 transition-colors hover:bg-red-500/10 disabled:opacity-50">
                                   {sunting.jenis === 'pending' ? 'Hapus order' : 'Tutup posisi'}
                                 </button>
-                                <button onClick={() => { setSunting(null); setSuntingKabar(''); }}
+                                {/* Menutup PANELNYA saja — garis ordernya
+                                    tetap di chart, jadi tinggal diklik lagi
+                                    kalau berubah pikiran. Untuk melepas
+                                    garisnya, pakai tanda × di ujung garis. */}
+                                <button onClick={() => { setPanelUbah(false); setSuntingKabar(''); }}
                                   className="cursor-pointer rounded px-2 py-1 text-[10.5px] text-zinc-500 transition-colors hover:text-zinc-300">
-                                  Batal
+                                  Tutup panel
                                 </button>
                               </div>
                               {suntingKabar && (
