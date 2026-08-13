@@ -1,6 +1,18 @@
 import { useState } from 'react';
 import { Check, X, RefreshCw, Copy, KeyRound, ShieldAlert } from 'lucide-react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
+import { useKuota } from '@/lib/akses';
+
+/* Nama produk yang terbaca manusia. Backend menyimpan slug (`jadi-trader-v3`)
+   karena itu kunci yang stabil; layar tidak boleh ikut menampilkannya mentah —
+   yang membaca panel ini perlu tahu ORANGNYA minta apa, bukan kunci apa yang
+   dipakai basis data. */
+const NAMA_PRODUK: Record<string, string> = {
+  'jadi-trader-v3': 'Akses Jadi Trader Tools',
+  'ea-jaditradersync': 'EA JadiTraderSync',
+  'indikator-v3': 'Indikator Jadi Trader V3',
+};
+function namaProduk(slug: string) { return NAMA_PRODUK[slug] ?? slug; }
 import { cn, tanggalPendek } from '@/lib/utils';
 import { usePermintaanLisensi, putuskanLisensi } from '@/lib/admin';
 
@@ -19,6 +31,7 @@ import { usePermintaanLisensi, putuskanLisensi } from '@/lib/admin';
 
 export function PanelLisensi() {
   const { data, memuat, galat, muatUlang } = usePermintaanLisensi();
+  const { kuota } = useKuota();
   const [sibuk, setSibuk] = useState('');
   const [pesan, setPesan] = useState('');
   const [tersalin, setTersalin] = useState('');
@@ -42,10 +55,16 @@ export function PanelLisensi() {
   return (
     <Panel className="mt-4">
       <PanelHead
-        judul="Permintaan Lisensi"
-        sub="Pembeli yang menunggu kode aktivasi."
+        judul="Permintaan Akses & Lisensi"
+        sub="Satu-satunya tempat permintaan disetujui — akses situs maupun kode produk."
         kanan={
           <span className="flex items-center gap-2">
+            {/* Sisa kuota ikut di sini supaya keputusan menyetujui diambil
+                sambil melihat berapa tempat yang tersisa, bukan setelah
+                membukanya di layar lain. */}
+            <span className="angka hidden text-[11px] text-zinc-500 sm:inline">
+              gratis {kuota.gratisTerpakai}/{kuota.gratisTotal} · bayar {kuota.bayarTerpakai}/{kuota.bayarTotal}
+            </span>
             {baru.length > 0 && (
               <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-[11px] font-medium text-red-400">
                 {baru.length} baru
@@ -95,9 +114,21 @@ export function PanelLisensi() {
                       {x.status}
                     </span>
                   </div>
-                  <div className="mt-0.5 text-[11.5px] text-zinc-500">
-                    {x.produk} · {tanggalPendek(x.waktu)}
-                    {x.nama && x.email ? ` · ${x.nama}` : ''}
+                  <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11.5px] text-zinc-500">
+                    <span className="text-zinc-400">{namaProduk(x.produk)}</span>
+                    {x.jenis && (
+                      <span className={cn('rounded px-1.5 py-0.5 text-[10px]',
+                        x.jenis === 'bayar'
+                          ? 'bg-[#ffcd75]/10 text-[#ffcd75]'
+                          : 'bg-emerald-500/10 text-emerald-500')}>
+                        {x.jenis === 'bayar' ? 'berbayar' : 'gratis'}
+                      </span>
+                    )}
+                    <span>· {tanggalPendek(x.waktu)}</span>
+                    {x.nama && x.email ? <span>· {x.nama}</span> : null}
+                    {x.berakhir ? (
+                      <span className="angka">· berlaku s/d {tanggalPendek(x.berakhir)}</span>
+                    ) : null}
                   </div>
                   {x.catatan && <div className="mt-1 text-[12px] text-zinc-400">{x.catatan}</div>}
                   {x.bukti && (

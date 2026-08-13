@@ -507,6 +507,12 @@ export interface PermintaanLisensi {
   bukti: string;
   status: 'baru' | 'disetujui' | 'ditolak';
   waktu: number;
+  /** Ditentukan SERVER, bukan diterima dari browser — kalau kuota gratis
+   *  habis, permintaan yang mengaku gratis otomatis jadi berbayar. */
+  jenis?: 'gratis' | 'bayar';
+  /** Akhir masa 30 hari, dihitung dari saat disetujui. Kosong selama
+   *  permintaannya belum diputus. */
+  berakhir?: number;
   kode?: string;
   /** Sidik kode setelah disetujui — inilah yang menautkan permintaan ini
    *  dengan barisnya di daftar lisensi aktif. */
@@ -525,6 +531,11 @@ export function usePermintaanLisensi(): Hasil<PermintaanLisensi[]> {
       bukti: String(x.bukti ?? ''),
       status: x.status === 'disetujui' ? 'disetujui' : x.status === 'ditolak' ? 'ditolak' : 'baru',
       waktu: Number(x.waktu) || 0,
+      /* Keduanya OPSIONAL di tipe, jadi tsc tidak akan mengeluh kalau baris
+         ini hilang — dan panelnya cuma tampil tanpa jenis dan tanpa masa
+         berlaku, tanpa satu pun tanda kenapa. Sudah pernah terjadi. */
+      jenis: x.jenis === 'bayar' ? 'bayar' : x.jenis === 'gratis' ? 'gratis' : undefined,
+      berakhir: Number(x.berakhir) || undefined,
       kode: x.kode ? String(x.kode) : undefined,
       sidik: x.sidik ? String(x.sidik) : undefined,
     })), []);

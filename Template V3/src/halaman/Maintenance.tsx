@@ -9,7 +9,6 @@ import { useAuth } from '@/lib/auth';
 import { PanelLisensi } from '@/components/panel-lisensi';
 import { PanelKesehatan } from '@/components/panel-kesehatan';
 import { PanelCelahPine } from '@/components/panel-celah-pine';
-import { PanelPermintaanAkses } from '@/components/panel-permintaan-akses';
 import { terbitkanTeksBeranda } from '@/lib/data';
 import { JUDUL_BERANDA, SUB_BERANDA, bacaTeksLokal, simpanTeksLokal } from '@/lib/teks-beranda';
 
@@ -325,9 +324,13 @@ export default function Maintenance() {
           satu tumpukan panel dan orang harus membaca isinya dulu untuk
           tahu sedang melihat apa. Judul section membuat halaman ini bisa
           DIPINDAI, bukan dibaca. */}
-      <Bagian judul="Permintaan Akses"
-              sub="20 akses gratis dan 80 berbayar, masing-masing 30 hari. Persetujuanmu yang membuka aplikasi." />
-      <PanelPermintaanAkses />
+      {/* PALING ATAS, dan sengaja. Permintaan yang menunggu adalah satu-satunya
+          hal di halaman ini yang membuat ORANG LAIN menunggu — sisanya bisa
+          dikerjakan kapan saja. */}
+      <Bagian judul="Permintaan Akses & Lisensi"
+              sub="20 akses gratis dan 80 berbayar, masing-masing 30 hari. Persetujuan di sini yang membuka aplikasi." />
+      <PanelLisensi />
+      <PanelLisensiAktif />
 
       <Bagian judul="Kesehatan Sistem"
               sub="Sambungan backend, bursa, dan layanan pendukung." />
@@ -554,10 +557,6 @@ export default function Maintenance() {
         </div>
       </div>
 
-      <Bagian judul="Lisensi Produk"
-              sub="Lisensi yang sedang aktif dan permintaan yang menunggu keputusan." />
-      <PanelLisensiAktif />
-      <PanelLisensi />
     </div>
   );
 }
