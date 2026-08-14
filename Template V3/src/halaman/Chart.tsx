@@ -349,6 +349,28 @@ export default function ChartBacktest() {
   const [suntingSibuk, setSuntingSibuk] = useState(false);
   const [suntingKabar, setSuntingKabar] = useState('');
 
+  /* Menutup panel ubah MENGEMBALIKAN seretan ke level aslinya.
+     ────────────────────────────────────────────────────────────────────
+     Dulu tombol tutup cuma menyembunyikan panelnya. Nilai hasil seretan
+     tetap tersimpan, jadi garis SL/TP tetap tergambar di tempat baru —
+     padahal Kirim tidak pernah ditekan dan broker masih memegang level
+     yang lama.
+
+     Itu jenis kebohongan yang paling mahal di layar trading: orangnya
+     melihat stop di tempat yang ia inginkan, menutup panelnya karena
+     merasa selesai, dan pergi dengan keyakinan bahwa posisinya terlindungi
+     di situ. Yang melindunginya masih level lama, dan tidak ada satu pun
+     tanda di layar yang mengatakannya.
+
+     Sekarang menutup panel = membatalkan. Satu-satunya cara mengubah level
+     adalah menekan Kirim. */
+  function tutupPanelUbah() {
+    setPanelUbah(false);
+    setSuntingKabar('');
+    setSuntingSlTeks(sunting?.sl ? String(sunting.sl) : '');
+    setSuntingTpTeks(sunting?.tp ? String(sunting.tp) : '');
+  }
+
   function bukaSunting(o: OrderSunting) {
     setSimbol(rapikanSimbol(o.simbolChart));
     /* PINDAH KE MODE REAL, otomatis.
@@ -1046,10 +1068,11 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
       /* Sebelum panelnya dibuka, garisnya menjelaskan cara membukanya —
          garis yang bisa diklik tapi tidak mengatakannya sama saja dengan
          tidak ada. */
-      const ketEntry = panelUbah
-        ? `· ${sunting.arah} — tarik ke ${sunting.arah === 'BUY' ? 'bawah = SL, atas = TP' : 'atas = SL, bawah = TP'}`
-        : `· ${sunting.arah} — klik untuk ubah`;
-      const ketStop = panelUbah ? '· seret lalu Kirim' : '· klik untuk ubah';
+      /* Arahnya saja. Sisanya — "klik untuk ubah", "seret lalu Kirim" —
+         sudah dijelaskan kursor dan tombolnya sendiri, dan di garis ia
+         cuma teks panjang yang menutupi lilin. */
+      const ketEntry = `· ${sunting.arah}`;
+      const ketStop = '';
       if (sunting.entry) g.push({
         id: 'entry', harga: sunting.entry, warna: '#d4d4d8', label: 'Entry',
         ket: ketEntry,
@@ -1833,7 +1856,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                                     tetap di chart, jadi tinggal diklik lagi
                                     kalau berubah pikiran. Untuk melepas
                                     garisnya, pakai tanda × di ujung garis. */}
-                                <button onClick={() => { setPanelUbah(false); setSuntingKabar(''); }}
+                                <button onClick={tutupPanelUbah}
                                   className="cursor-pointer rounded px-2 py-1 text-[10.5px] text-zinc-500 transition-colors hover:text-zinc-300">
                                   Tutup panel
                                 </button>

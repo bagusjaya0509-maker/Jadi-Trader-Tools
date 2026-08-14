@@ -1237,7 +1237,17 @@ export function ChartLilin({
             )}
             <span className="angka mr-0.5 shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-zinc-950 shadow"
                   style={{ background: g.warna }}>
-              {g.label} {fHarga(g.harga)}{g.ket ? ` ${g.ket}` : ''}
+              {/* HANYA NAMANYA. Angkanya sudah tergambar di sumbu harga
+                  sebelah kanan — price line milik chart menaruhnya di sana
+                  dengan gaya yang sama persis dengan harga terkini. Menulis
+                  ulang di sini berarti satu angka yang sama muncul dua kali
+                  di satu layar, dan yang panjang justru menutupi lilin.
+
+                  `ket` juga tidak lagi ditempel. Kalimat "klik untuk ubah"
+                  menjelaskan sesuatu yang sudah dijelaskan kursornya
+                  (ns-resize) dan hanya perlu dibaca sekali seumur hidup —
+                  sesudah itu ia cuma teks yang menghalangi harga. */}
+              {g.label}
             </span>
           </div>
         );
