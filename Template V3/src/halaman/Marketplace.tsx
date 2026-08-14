@@ -4,6 +4,7 @@ import {
   GripHorizontal,
 } from 'lucide-react';
 import { PeragaProduk } from '@/components/peraga-produk';
+import { PanelDiscord } from '@/components/panel-discord';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { cn, tanggalPendek } from '@/lib/utils';
 import { type Produk } from '@/data/contoh';
@@ -349,11 +350,16 @@ export default function Marketplace() {
         <PanelHead
           judul="Products"
           sub="Indikator TradingView dan Expert Advisor MetaTrader yang dipakai di terminal ini."
-          kanan={bisaUrut ? (
-            <span className="flex items-center gap-1.5 text-[11px] text-zinc-500">
-              <GripHorizontal className="size-3.5" /> seret kartu untuk mengatur urutan
+          kanan={
+            <span className="flex items-center gap-3">
+              {bisaUrut && (
+                <span className="hidden items-center gap-1.5 text-[11px] text-zinc-500 lg:flex">
+                  <GripHorizontal className="size-3.5" /> seret kartu untuk mengatur urutan
+                </span>
+              )}
+              <PanelDiscord />
             </span>
-          ) : undefined}
+          }
         />
         {kabarUrut && <div className="px-5 pb-2 text-[11.5px] text-zinc-500">{kabarUrut}</div>}
         {/* Kolom MENGIKUTI jumlah produk (maks 4). Empat kolom dengan tiga
