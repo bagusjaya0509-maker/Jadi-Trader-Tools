@@ -188,17 +188,37 @@ export default function Akses() {
         {/* Hierarki dibawa SKALA dan BOBOT, bukan dengan menambah keluarga
             huruf. Halaman ini memakai IBM Plex Sans yang sama dengan seluruh
             aplikasi — yang membedakannya ukuran, jarak, dan keheningan di
-            sekitarnya. */}
-        <div className="animate-fade-in delay-100 flex flex-col gap-3">
-          <span className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">
-            Akses terbatas
-          </span>
-          <h1 className="text-[30px] font-medium leading-[1.15] tracking-tighter text-zinc-50 sm:text-[38px]">
-            Masuk ke Jadi Trader Tools
+            sekitarnya.
+
+            KENAPA UKURANNYA DINAIKKAN. Sebelumnya judul di sini 38px di atas
+            teks 14,5px — rasio 2,6:1. Judul display baru terbaca sebagai
+            JUDUL kalau jaraknya dari teks tubuh mendekati 4:1; di bawah itu
+            ia terbaca sebagai label formulir yang kebesaran. Hero halaman
+            depan memakai 72px di atas 18px (4:1), dan halaman ini terasa
+            janggal justru karena setengah-setengah menirunya.
+
+            Leading ikut turun ke 0.95 seperti hero. Pada ukuran sebesar ini
+            leading 1.15 membuat dua baris judul tampak seperti dua kalimat
+            yang tidak berhubungan. */}
+        <div className="animate-fade-in delay-100 flex flex-col gap-4">
+          {/* Lencana pil, bukan teks polos — bentuk yang sama dengan hero. */}
+          <div className="inline-flex w-fit items-center rounded-full border border-white/10 bg-white/5 px-3 py-1.5 backdrop-blur-md">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-300 sm:text-xs">
+              Akses terbatas
+            </span>
+          </div>
+          <h1 className="text-4xl font-medium leading-[0.95] tracking-tighter text-zinc-50 sm:text-5xl lg:text-[56px]">
+            Masuk ke<br />
+            {/* Gradien emas hanya di SATU baris, persis aturan hero: kalau
+                seluruh judul diberi gradien, tidak ada lagi yang ditonjolkan. */}
+            <span className="bg-gradient-to-br from-white via-white to-[#ffcd75] bg-clip-text text-transparent">
+              Jadi Trader Tools
+            </span>
           </h1>
-          <p className="max-w-[46ch] text-[14.5px] leading-relaxed text-zinc-400">
+          <p className="max-w-[46ch] text-[15.5px] leading-relaxed text-zinc-400">
             Akses dibuka bertahap agar setiap pengguna baru mendapat pendampingan.
-            Pilih cara masuk, kirim permintaan, lalu akses dibuka setelah ditinjau.
+            Pilih cara masuk, kirim permintaan, lalu{' '}
+            <span className="text-zinc-200">akses dibuka setelah ditinjau</span>.
           </p>
         </div>
 
