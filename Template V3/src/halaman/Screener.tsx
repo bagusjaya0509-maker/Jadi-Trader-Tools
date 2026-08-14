@@ -1,16 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Search, Check, X, ExternalLink, Star, Activity, Wallet, CheckCheck,
-  TrendingUp, ShieldAlert, ChevronRight, Loader2, RotateCcw, WifiOff, Plus,
+  Search, Check, X, ExternalLink, Star, Loader2, RotateCcw, WifiOff, Plus,
 } from 'lucide-react';
-import { Panel, PanelHead, KartuKpi, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
+import { Panel, PanelHead } from '@/components/efferd-ui';
 import { MiniChart } from '@/components/mini-chart';
-import { cn, harga as fharga, persen, uang } from '@/lib/utils';
-import { useRiwayat, usePosisi } from '@/lib/data';
-import { statGabungan } from '@/lib/hitung';
-import { useKoneksi } from '@/lib/koneksi';
-import { useHargaPasar } from '@/lib/harga';
+import { cn, harga as fharga, persen } from '@/lib/utils';
 import { proxyHidup } from '@/lib/pasar';
 import {
   useSimbol, togglFavorit, blokirSimbol, pulihkanSimbol, tambahSimbol,
@@ -31,13 +26,16 @@ import {
 
    Dua bentuk kartu, dan bedanya disengaja:
 
-     · Area Pantau    — mini chart + ceklist, TANPA angka order. Grafiknya
+     · Screener Tools — mini chart + ceklist, TANPA angka order. Grafiknya
                         yang paling berguna di sini: zona SNR cuma bisa
                         dilihat sebagai bentuk. Daftar ini isinya koin yang
                         layak DILIHAT; angka order di sampingnya membuatnya
                         terbaca sudah layak dieksekusi.
-     · Parallel Signal — ceklist + area entry, TANPA grafik. Levelnya sudah
+     · Zona Pantau    — ceklist + level entry, TANPA grafik. Levelnya sudah
                         pasti, jadi yang dibutuhkan angkanya.
+
+   (Sampai 14 Agu 2026 keduanya bernama "Area Pantau" dan "Parallel
+   Signal" — nama lama itu masih hidup di lib/pindai.ts dan notifikasi.)
    ════════════════════════════════════════════════════════════════════════ */
 
 const TF = [
@@ -276,15 +274,8 @@ export default function Screener() {
   const [mode, setMode] = useState<ModeParallel>('snrh4');
   const [tf, setTf] = useState('4h');
   const [cari, setCari] = useState('');
-  const [tolak, setTolak] = useState(false);
 
-  const { siap } = useKoneksi();
   const { aktif, favorit, diblokir } = useSimbol();
-  const { data: RIWAYAT } = useRiwayat();
-  const { data: posisiMentah } = usePosisi();
-  const hargaPasar = useHargaPasar(posisiMentah.map((p) => p.simbol));
-  const posisi = posisiMentah.map((p) => ({ ...p, hargaKini: hargaPasar[p.simbol] ?? p.hargaKini }));
-  const stat = statGabungan(RIWAYAT);
 
   const [pantau, setPantau] = useState<SinyalPantau[]>([]);
   const [parallel, setParallel] = useState<SinyalParallel[]>([]);
@@ -330,21 +321,11 @@ export default function Screener() {
      menghabiskan kuota proxy untuk halaman yang mungkin sedang ditinggal. */
   useEffect(() => { void jalankan(); }, [jalankan]);
 
-  const floating = posisi.reduce((s, p) => {
-    const g = (p.hargaKini - p.entry) / p.entry * (p.arah === 'BUY' ? 1 : -1);
-    return s + g * 80;
-  }, 0);
-
   const saring = <T extends SinyalPantau>(d: T[]) =>
     cari ? d.filter((s) => s.simbol.toLowerCase().includes(cari.toLowerCase())) : d;
 
   const pantauTampil = saring(pantau);
   const parallelTampil = saring(parallel);
-
-  function bukaOrderSungguhan() {
-    if (!siap) { setTolak(true); return; }
-    setTolak(false);
-  }
 
   const kendali = (
     <div className="flex flex-wrap items-center gap-2">
@@ -398,10 +379,10 @@ export default function Screener() {
 
   return (
     <div className="p-4 sm:p-6">
-      {/* ── Area Pantau ── */}
+      {/* ── Screener Tools (dulu: Area Pantau) ── */}
       <Panel>
         <PanelHead
-          judul="Area Pantau"
+          judul="Screener Tools"
           sub={`Koin dengan SMI ${tf} ekstrem. Zona SNR selalu diambil dari 4 jam. ${ketPindai}.`}
           kanan={kendali}
         />
@@ -412,10 +393,9 @@ export default function Screener() {
               : `Tidak ada koin dengan SMI ${tf} di wilayah ekstrem saat ini.`}
           />
         ) : (
-          /* Gulir mendatar, bukan grid yang terus turun. Area Pantau bisa
+          /* Gulir mendatar, bukan grid yang terus turun. Screener Tools bisa
              menghasilkan puluhan kartu sekaligus; dibiarkan menumpuk ke bawah,
-             ia mendorong Parallel Signal dan Area Entry keluar layar — bagian
-             yang justru dipakai untuk entry jadi tidak terlihat sama sekali. */
+             ia mendorong Zona Pantau keluar layar sama sekali. */
           <div className="flex gap-4 overflow-x-auto px-5 pb-5">
             {pantauTampil.map((s, i) => (
               <KartuPantau
@@ -429,10 +409,10 @@ export default function Screener() {
         )}
       </Panel>
 
-      {/* ── Parallel Signal ── */}
+      {/* ── Zona Pantau (dulu: Parallel Signal) ── */}
       <Panel className="mt-4">
         <PanelHead
-          judul="Parallel Signal"
+          judul="Zona Pantau"
           sub={mode === 'snrh4'
             ? 'Mode SNR H4 — timeframe terkunci 4 jam (zona) + M5 (sentuhan).'
             : mode === 'snr'
@@ -463,153 +443,12 @@ export default function Screener() {
         )}
       </Panel>
 
-      {/* Empat KPI di bawah Parallel Signal: angka-angka ini merangkum APA
-          YANG SUDAH DILAKUKAN, bukan apa yang sedang dicari. */}
-      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <KartuKpi label="Posisi Terbuka"    nilai={String(posisi.length)}
-                  catatan={`${posisi.filter((p) => p.venue === 'Binance Live').length} live · ${posisi.filter((p) => p.venue !== 'Binance Live').length} simulasi`}
-                  Ikon={Activity} />
-        <KartuKpi label="Total PNL Floating" nilai={uang(floating, true)} catatan="belum direalisasi"
-                  warna={floating >= 0 ? 'text-emerald-500' : 'text-red-400'} Ikon={TrendingUp} />
-        <KartuKpi label="Transaksi Selesai"  nilai={String(stat.jumlah)}
-                  catatan={`${stat.menang} menang · ${stat.kalah} kalah`} Ikon={CheckCheck} />
-        <KartuKpi label="Total PNL Realized" nilai={uang(stat.bersih, true)}
-                  catatan={`winrate ${persen(stat.winrate)}`}
-                  warna={stat.bersih >= 0 ? 'text-emerald-500' : 'text-red-400'} Ikon={Wallet} />
-      </div>
+      {/* KPI, Posisi Terbuka, Area Entry, dan Riwayat dulu ada di sini.
+          Keputusan pemilik 14 Agu 2026: halaman screener cukup memindai —
+          Screener Tools dan Zona Pantau. Eksekusi & pemantauan posisi
+          tempatnya di Chart dan Dashboard, yang memang membacanya dari
+          sumber yang sama. */}
 
-      {/* ── Area Entry ── */}
-      <Panel className="mt-4">
-        <PanelHead judul="Area Entry" sub="Susun order sebelum dikirim. Ukuran, arah, dan level dihitung di sini." />
-        <div className="px-5 pb-5">
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {[['Modal per posisi ($)', '30'], ['Leverage (x)', '1']].map(([label, isi]) => (
-              <div key={label}>
-                <label className="mb-1 block text-[11px] text-zinc-500">{label}</label>
-                <input defaultValue={isi} inputMode="numeric"
-                  className="h-9 w-full rounded-md border border-zinc-800 bg-zinc-900/60 px-3 font-mono text-[12.5px] text-zinc-100 outline-none hover:border-zinc-700 focus-visible:border-zinc-600" />
-              </div>
-            ))}
-            <div>
-              <label className="mb-1 block text-[11px] text-zinc-500">Sinyal terpilih</label>
-              <Pilih
-                nilai={parallelTampil[0]?.simbol ?? 'manual'}
-                onChange={() => {}}
-                opsi={parallelTampil.length
-                  ? parallelTampil.map((s) => ({ v: s.simbol, t: `${s.simbol.replace('USDT', '')} — ${s.arah}` }))
-                  : [{ v: 'manual', t: 'Belum ada sinyal — koin manual…' }]}
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-[11px] text-zinc-500">Arah order</label>
-              <Pilih nilai="ikut" onChange={() => {}} opsi={[
-                { v: 'ikut', t: 'Ikut sinyal' }, { v: 'buy', t: 'Paksa BUY' }, { v: 'sell', t: 'Paksa SELL' },
-              ]} />
-            </div>
-            <div>
-              <label className="mb-1 block text-[11px] text-zinc-500">Jenis order</label>
-              <Pilih nilai="market" onChange={() => {}} opsi={[
-                { v: 'market', t: 'Market' }, { v: 'limit', t: 'Limit' }, { v: 'stop', t: 'Stop market' },
-              ]} />
-            </div>
-            <div>
-              <label className="mb-1 block text-[11px] text-zinc-500">SL manual</label>
-              <input placeholder={parallelTampil[0] ? fharga(parallelTampil[0].sl) : 'otomatis dari zona'}
-                className="h-9 w-full rounded-md border border-zinc-800 bg-zinc-900/60 px-3 font-mono text-[12.5px] text-zinc-100 outline-none placeholder:text-zinc-600 hover:border-zinc-700 focus-visible:border-zinc-600" />
-            </div>
-            <div>
-              <label className="mb-1 block text-[11px] text-zinc-500">TP manual</label>
-              <input placeholder={parallelTampil[0] ? fharga(parallelTampil[0].tp1) : 'otomatis 1:1 / 1:2'}
-                className="h-9 w-full rounded-md border border-zinc-800 bg-zinc-900/60 px-3 font-mono text-[12.5px] text-zinc-100 outline-none placeholder:text-zinc-600 hover:border-zinc-700 focus-visible:border-zinc-600" />
-            </div>
-            <div className="flex items-end">
-              <button className="h-9 w-full cursor-pointer rounded-md bg-zinc-100 text-[12.5px] font-semibold text-zinc-950 transition-colors hover:bg-white">
-                Open Demo Order
-              </button>
-            </div>
-          </div>
-
-          <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-amber-500/25 bg-amber-500/[0.05] p-3">
-            <span className="flex-1 text-[12px] leading-relaxed text-zinc-400">
-              Order sungguhan memakai saldo Binance-mu. Periksa ukuran dan SL sebelum menekan.
-            </span>
-            <span className={cn('rounded px-2 py-1 text-[11px]',
-              siap ? 'bg-emerald-500/10 text-emerald-500' : 'bg-zinc-700/30 text-zinc-400')}>
-              {siap ? 'VPS tersambung' : 'VPS belum diatur'}
-            </span>
-            <button onClick={bukaOrderSungguhan}
-              className="cursor-pointer rounded-md border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-[12.5px] font-semibold text-amber-300 transition-colors hover:bg-amber-500/20">
-              Open Real Order
-            </button>
-          </div>
-
-          {tolak && (
-            <div role="alert" className="mt-3 flex flex-wrap items-start gap-3 rounded-lg border border-red-500/30 bg-red-500/[0.07] p-3.5">
-              <ShieldAlert className="mt-0.5 size-4 shrink-0 text-red-400" strokeWidth={2} />
-              <div className="min-w-0 flex-1">
-                <div className="text-[13px] font-medium text-red-300">Order dibatalkan — sambungan belum lengkap</div>
-                <p className="mt-1 text-[12px] leading-relaxed text-zinc-400">
-                  Order sungguhan berangkat lewat VPS-mu sendiri, bukan lewat server kami. Isi dulu
-                  <span className="text-zinc-200"> Backend URL</span> dan
-                  <span className="text-zinc-200"> App Token</span> di halaman Integrations —
-                  di sana ada tutorial lengkapnya, dari membuat API key Binance sampai VPS-nya jalan.
-                </p>
-                <Link to="/integrasi"
-                  className="mt-2.5 inline-flex items-center gap-1.5 rounded-md bg-zinc-100 px-3 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white">
-                  Buka Integrations <ChevronRight className="size-3.5" />
-                </Link>
-              </div>
-              <button onClick={() => setTolak(false)} aria-label="Tutup"
-                className="cursor-pointer text-zinc-600 transition-colors hover:text-zinc-300">
-                <X className="size-4" />
-              </button>
-            </div>
-          )}
-
-          <div className="mt-4">
-            <div className="mb-2 text-[11.5px] font-medium uppercase tracking-wider text-zinc-500">Posisi Terbuka</div>
-            <TabelBungkus>
-              <Tabel>
-                <thead>
-                  <tr>
-                    <Th>Pair</Th><Th>TF</Th><Th>Venue</Th>
-                    <Th className="text-right">Entry</Th><Th className="text-right">SL</Th>
-                    <Th className="text-right">TP</Th><Th className="text-right">Harga</Th>
-                    <Th className="text-right">Gerak</Th><Th />
-                  </tr>
-                </thead>
-                <tbody>
-                  {posisi.map((p) => {
-                    const gerak = ((p.hargaKini - p.entry) / p.entry) * 100 * (p.arah === 'BUY' ? 1 : -1);
-                    return (
-                      <Tr key={p.id}>
-                        <Td>
-                          <span className="font-medium text-zinc-100">{p.simbol.replace('USDT', '')}</span>
-                          <span className={cn('ml-2 text-[11px]', p.arah === 'BUY' ? 'text-emerald-500' : 'text-red-400')}>{p.arah}</span>
-                        </Td>
-                        <Td className="text-zinc-500">{p.tf}</Td>
-                        <Td className="text-[12px] text-zinc-500">{p.venue}</Td>
-                        <Td className="angka text-right text-zinc-300">{fharga(p.entry)}</Td>
-                        <Td className="angka text-right text-red-400">{fharga(p.sl)}</Td>
-                        <Td className="angka text-right text-emerald-500">{fharga(p.tp)}</Td>
-                        <Td className="angka text-right text-zinc-100">{fharga(p.hargaKini)}</Td>
-                        <Td className={cn('angka text-right', gerak >= 0 ? 'text-emerald-500' : 'text-red-400')}>
-                          {gerak >= 0 ? '+' : ''}{gerak.toFixed(2)}%
-                        </Td>
-                        <Td className="text-right">
-                          <button className="cursor-pointer rounded border border-zinc-800 px-2 py-0.5 text-[11px] text-zinc-400 transition-colors hover:border-red-500/40 hover:text-red-400">
-                            Close
-                          </button>
-                        </Td>
-                      </Tr>
-                    );
-                  })}
-                </tbody>
-              </Tabel>
-            </TabelBungkus>
-          </div>
-        </div>
-      </Panel>
     </div>
   );
 }

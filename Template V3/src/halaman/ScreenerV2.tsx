@@ -87,11 +87,18 @@ const CSS_TANPA_CANGKANG = `
   .es-toprow, .es-user-bar { display: none !important; }
   .es-header .es-title { display: none !important; }
 
-  /* Backend URL & App Token di Area Entry — tempatnya di Integrations.
-     Disembunyikan lewat induk labelnya supaya label ikut hilang, bukan
-     menyisakan tulisan yang menggantung tanpa kolom isian. */
-  .es-live-trade-config label:has(#esLiveBackendUrl),
-  .es-live-trade-config label:has(#esLiveAppToken) { display: none !important; }
+  /* ── Panel simulasi & live trading disembunyikan SELURUHNYA ──
+     Keputusan pemilik 14 Agu 2026: halaman screener cukup Area Pantau dan
+     Parallel Signal. Ringkasan KPI, tabel Posisi Terbuka, Entry Area
+     (termasuk kotak Live Trading), dan Riwayat Transaksi — semuanya satu
+     blok .es-sim-section — tidak lagi ditampilkan DI SINI.
+
+     Disembunyikan, BUKAN dihapus dari berkas V2-nya: 194 titik di JS V2
+     menulis ke elemen-elemen blok ini tanpa penjaga null, jadi menghapus
+     DOM-nya membuat seluruh halaman mati oleh TypeError. Dengan CSS,
+     mesin simulasinya tetap berjalan diam-diam dan V2 yang dibuka berdiri
+     sendiri (tempat live trading tetap dipakai) tidak berubah sama sekali. */
+  .es-sim-section { display: none !important; }
 
   /* ── Huruf & warna mengikuti V3 ── */
   :root {
@@ -193,10 +200,8 @@ const CSS_TANPA_CANGKANG = `
     box-shadow: none !important;
   }
 
-  /* Kotak Live Trading DIBIARKAN seperti aslinya di V2.
-     Sempat saya beri cahaya berdenyut; hasilnya lebih ramai, bukan lebih
-     jelas — dan gaya aslinya sudah membedakan diri dengan cukup. Tidak ada
-     aturan untuk '.es-live-trade-config' di sini, dan itu disengaja. */
+  /* Kotak Live Trading kini ikut tersembunyi bersama .es-sim-section di
+     atas — aturan gaya untuknya tidak lagi diperlukan di sini. */
 
   /* Scrollbar tipis seperti sisa aplikasi */
   * { scrollbar-width: thin; scrollbar-color: #3f3f46 transparent; }
@@ -336,6 +341,18 @@ export default function ScreenerV2() {
                   s.textContent = CSS_TANPA_CANGKANG;
                   (d.head || d.documentElement).appendChild(s);
                 }
+                /* Nama section diganti DI TAMPILAN, bukan di berkas V2.
+                   Nama lama ("Area Pantau", "Parallel Signal") tertanam di
+                   localStorage V2 (chip section tersembunyi), di notifikasi,
+                   dan di dokumentasi — menyuntingnya di sumber berarti
+                   memburu semua itu sekaligus. Di sini cukup dua judul yang
+                   terlihat orang. Selektor Parallel Signal lewat induknya
+                   [data-section] karena kelas .es-priority-title dipakai
+                   tiga section berbeda. */
+                const j1 = d.querySelector('.es-pantau-title');
+                if (j1) j1.textContent = 'Screener Tools';
+                const j2 = d.querySelector('[data-section="crosshunter"] .es-priority-title');
+                if (j2) j2.textContent = 'Zona Pantau';
                 /* Padding kiri body diatur langsung di elemennya, bukan lewat
                    stylesheet. Aturan `body{padding-left:0!important}` di CSS
                    di atas terbukti TIDAK menang — isi halaman tetap mulai di
