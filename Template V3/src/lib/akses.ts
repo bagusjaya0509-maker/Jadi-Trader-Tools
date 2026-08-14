@@ -120,6 +120,27 @@ export async function aktifkanKode(kode: string) {
   return j as { ok: boolean; berakhir?: number; firestoreOk?: boolean };
 }
 
+export interface SetelanAkses extends Kuota { bukaPermintaan: boolean; }
+
+/* ── Pemilik: setelan akses ─────────────────────────────────────────── */
+export async function bacaSetelanAkses(): Promise<SetelanAkses> {
+  const r = await fetch(`${dasar()}/api/akses/setelan`, { headers: kepalaPemilik() });
+  if (r.status === 401) throw new Error('App Token ditolak.');
+  if (!r.ok) throw new Error(`Server menjawab ${r.status}`);
+  return (await r.json()) as SetelanAkses;
+}
+
+export async function simpanSetelanAkses(nilai: {
+  bukaPermintaan?: boolean; gratisTotal?: number; bayarTotal?: number; hari?: number;
+}): Promise<SetelanAkses> {
+  const r = await fetch(`${dasar()}/api/akses/setelan`, {
+    method: 'POST', headers: kepalaPemilik(), body: JSON.stringify(nilai),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || `Server menjawab ${r.status}`);
+  return j as SetelanAkses;
+}
+
 /* ── Pemilik: daftar & putuskan ──────────────────────────────────────── */
 function kepalaPemilik(): Record<string, string> {
   const t = bacaKoneksi().token.trim();

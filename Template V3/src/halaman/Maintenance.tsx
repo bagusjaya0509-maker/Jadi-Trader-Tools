@@ -7,6 +7,7 @@ import { unggahGambar, keDataUrl, useLisensi, cabutLisensi } from '@/lib/admin';
 import { tanggalPendek } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 import { PanelLisensi } from '@/components/panel-lisensi';
+import { PanelSetelanAkses } from '@/components/panel-setelan-akses';
 import { PanelKesehatan } from '@/components/panel-kesehatan';
 import { PanelCelahPine } from '@/components/panel-celah-pine';
 import { terbitkanTeksBeranda } from '@/lib/data';
@@ -329,6 +330,7 @@ export default function Maintenance() {
           dikerjakan kapan saja. */}
       <Bagian judul="Permintaan Akses & Lisensi"
               sub="20 akses gratis dan 80 berbayar, masing-masing 30 hari. Persetujuan di sini yang membuka aplikasi." />
+      <PanelSetelanAkses />
       <PanelLisensi />
       <PanelLisensiAktif />
 
