@@ -996,7 +996,17 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
            LEBIH DARI ITU butuh penomoran halaman (permintaan berulang dengan
            startTime mundur), bukan sekadar angka yang dinaikkan. Binance
            membatasi 1000 PER PERMINTAAN, bukan seluruhnya. */
-        const l = await ambilKlines(simbol, tf, 1000, true);
+        /* MT5 meminta SEMUA yang tersimpan, kripto cukup 1000.
+           ────────────────────────────────────────────────────────────
+           Bedanya bukan selera: kripto punya penomoran halaman (tombol
+           "Muat lebih lama" menarik potongan berikutnya lewat endTime),
+           jadi 1000 per permintaan sudah cukup dan sisanya diambil saat
+           diminta. Trade-Fi TIDAK punya rute itu — tidak ada cara meminta
+           lilin lebih tua dari MT5 — jadi satu permintaan ini adalah
+           satu-satunya kesempatan. Menjepitnya di 1000 berarti riwayat
+           yang sudah dikirim EA dan sudah tersimpan di disk VPS tetap
+           tidak pernah sampai ke layar. */
+        const l = await ambilKlines(simbol, tf, simbol.startsWith('MT5:') ? 15000 : 1000, true);
         if (!hidup) return;
         if (!l.closes.length) {
           setGalat(simbol.startsWith('MT5:')
