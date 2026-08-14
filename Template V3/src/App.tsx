@@ -74,6 +74,7 @@ const Dashboard     = lazy(() => muat(() => import('@/components/dashboard').the
    (lib/pindai.ts) tetap dipakai kalau nanti ada section yang diport. */
 const Screener      = lazy(() => muat(() => import('@/halaman/ScreenerV2')));
 const ScreenerReact = lazy(() => muat(() => import('@/halaman/Screener')));
+const Aktivasi      = lazy(() => muat(() => import('@/halaman/Aktivasi')));
 const ChartBacktest = lazy(() => muat(() => import('@/halaman/Chart')));
 const Jurnal        = lazy(() => muat(() => import('@/halaman/Jurnal')));
 const PersonalArea  = lazy(() => muat(() => import('@/halaman/PersonalArea')));
@@ -244,6 +245,11 @@ export default function App() {
               siapa pun. */}
           <Route path="/pendaratan" element={<Pendaratan />} />
           <Route path="/akses" element={<Akses />} />
+          {/* Tujuan link kiriman otomatis Lynk sesudah pembayaran. DI LUAR
+              gerbang: orang yang baru membayar belum punya akses apa pun,
+              jadi gerbang yang menahannya di sini akan memantulkannya ke
+              halaman minta-akses — persis langkah yang sudah ia lewati. */}
+          <Route path="/aktivasi" element={<Aktivasi />} />
           {/* Markas Agen SENGAJA di luar kerangka terminal — halaman
               terpisah untuk pusat kendali agen AI, bukan bagian dasbor. */}
           <Route path="/markas" element={<Penjaga><Markas /></Penjaga>} />

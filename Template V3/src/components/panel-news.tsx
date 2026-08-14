@@ -116,7 +116,15 @@ export function useKalender() {
    `ref` yang diteruskan seperti prop lain DIABAIKAN DIAM-DIAM — tidak ada
    peringatan, refnya cuma selamanya null dan gulir otomatisnya tidak
    pernah jalan. (Baru React 19 yang memperbolehkannya.) */
-const Baris = forwardRef<HTMLDivElement, { e: EventEkonomi; kini: number }>(function Baris({ e, kini }, ref) {
+/* Tipe props DIBERI NAMA, tidak ditulis inline di dalam <...> milik
+   forwardRef. Bukan soal rapi: di berkas .tsx, parser Babel milik Vite
+   membaca `<` sesudah nama sebagai awal JSX, lalu tersandung pada `;` di
+   dalam tipe objek inline dan menggagalkan SELURUH modul dengan galat 500.
+   tsc menerimanya tanpa keluhan, jadi ini tidak akan tertangkap oleh
+   pemeriksaan tipe — hanya oleh membuka halamannya. */
+interface PropsBaris { e: EventEkonomi; kini: number }
+
+const Baris = forwardRef<HTMLDivElement, PropsBaris>(function Baris({ e, kini }, ref) {
   const lewat = e.waktu < kini;
   const d = new Date(e.waktu);
   const angka = [

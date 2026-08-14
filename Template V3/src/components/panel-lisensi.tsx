@@ -131,7 +131,17 @@ export function PanelLisensi() {
                     ) : null}
                   </div>
                   {x.catatan && <div className="mt-1 text-[12px] text-zinc-400">{x.catatan}</div>}
-                  {x.bukti && (
+                  {/* Permintaan dari halaman /aktivasi ditandai "lynk".
+                      Ditampilkan sebagai LENCANA, bukan teks bukti biasa:
+                      inilah baris yang harus dicocokkan dengan daftar Orders
+                      di lynk.id, dan mencarinya di antara catatan bebas
+                      berarti membacanya satu per satu. */}
+                  {x.bukti === 'lynk' && (
+                    <span className="inline-flex items-center gap-1 rounded bg-[#ffcd75]/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#ffcd75]">
+                      Lynk · sudah bayar
+                    </span>
+                  )}
+                  {x.bukti && x.bukti !== 'lynk' && (
                     <div className="mt-1 text-[11.5px] text-zinc-600">
                       Bukti: <span className="text-zinc-400">{x.bukti}</span>
                     </div>

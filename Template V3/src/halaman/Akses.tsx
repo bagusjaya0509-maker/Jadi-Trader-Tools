@@ -397,8 +397,9 @@ export default function Akses() {
 
             {kuota.gratisHabis && (
               <p className="text-[11.5px] leading-relaxed text-zinc-500">
-                Setelah pembayaran selesai, kirim permintaan di bawah agar masuk antrean
-                peninjauan.
+                Setelah pembayaran lunas, Lynk mengirim link aktivasi otomatis — buka link itu
+                dan permintaanmu tercatat sendiri. Tombol di bawah hanya untuk berjaga kalau
+                link-nya tidak sampai.
               </p>
             )}
             {kuota.gratisHabis && (
