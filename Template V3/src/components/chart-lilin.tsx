@@ -322,7 +322,7 @@ export function ChartLilin({
        Dua efek lain di bawah (garis & alat) sudah memakai pola yang sama
        persis. Efek inilah satu-satunya yang terlewat — dan karena ia yang
        memegang lilinnya, justru dialah yang paling terlihat melompat. */
-    const rentang = c?.timeScale().getVisibleLogicalRange() ?? null;
+    const tampak = c?.timeScale().getVisibleRange() ?? null;
     const batas = hingga === undefined ? lilin.times.length : Math.max(1, Math.min(lilin.times.length, hingga + 1));
     seri.current.setData(lilin.times.slice(0, batas).map((t, i) => ({
       /* lightweight-charts memakai DETIK, bukan milidetik. Mengirim ms
@@ -330,10 +330,41 @@ export function ChartLilin({
       time: Math.floor(t / 1000) as Time,
       open: lilin.opens[i], high: lilin.highs[i], low: lilin.lows[i], close: lilin.closes[i],
     })));
-    /* Hanya dikembalikan kalau memang ADA rentang sebelumnya — pada
-       gambar pertama chart belum punya, dan memaksakan rentang kosong
-       menghasilkan sumbu waktu yang tidak masuk akal. */
-    if (rentang && c) { try { c.timeScale().setVisibleLogicalRange(rentang); } catch { /* chart baru */ } }
+
+    /* Dikembalikan berdasarkan WAKTU, bukan nomor bar.
+       ────────────────────────────────────────────────────────────────
+       Versi sebelumnya menyimpan getVisibleLogicalRange() — nomor bar.
+       Itu gagal persis pada kasus yang paling penting: memotong 3000 bar
+       jadi 2154 membuat nomor yang disimpan (mis. 2500–3010) menunjuk ke
+       LUAR data, pustaka membetulkannya sendiri, dan chart melompat.
+       Lebih buruk lagi, efek garis di bawah lalu menyimpan posisi yang
+       sudah terlanjur melompat itu dan menguncinya.
+
+       Waktu tidak bergeser saat data dipotong: 3 Februari tetap 3
+       Februari. Jadi jendela yang sama tetap menunjuk lilin yang sama.
+
+       Kalau jendelanya menjulur melewati lilin terakhir (persis yang
+       terjadi saat titik replay dipilih), jendelanya DIGESER KIRI dengan
+       lebar yang sama — bukan dipendekkan. Lebar tetap berarti tingkat
+       zoom tidak berubah; yang berubah cuma bar terakhir kini duduk di
+       tepi kanan, tempat orangnya memang akan melanjutkan. */
+    if (tampak && c && batas > 1) {
+      const akhirData = Math.floor(lilin.times[batas - 1] / 1000);
+      const dari = Number(tampak.from), ke = Number(tampak.to);
+      const lebar = ke - dari;
+      const keBaru = Math.min(ke, akhirData);
+      const dariBaru = keBaru - lebar;
+      /* Tidak dipaksakan kalau jendelanya jadi mulai sebelum lilin
+         pertama — rentang yang lebih lebar daripada datanya membuat
+         pustaka menggambar sumbu waktu yang tidak masuk akal. */
+      const awalData = Math.floor(lilin.times[0] / 1000);
+      try {
+        c.timeScale().setVisibleRange({
+          from: (dariBaru < awalData ? awalData : dariBaru) as Time,
+          to: keBaru as Time,
+        });
+      } catch { /* chart baru / rentang tidak sah */ }
+    }
   }, [lilin, hingga]);
 
   /* Garis harga posisi (entry / SL / TP) */
