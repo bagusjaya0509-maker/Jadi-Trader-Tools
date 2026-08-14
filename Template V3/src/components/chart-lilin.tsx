@@ -307,7 +307,22 @@ export function ChartLilin({
 
   /* Data lilin */
   useEffect(() => {
-    if (!seri.current || !lilin.times.length) return;
+    if (!seri.current) return;
+    const c = chart.current;
+    if (!lilin.times.length) return;
+    /* Rentang yang SEDANG DILIHAT disimpan dulu, dipasang lagi sesudah
+       setData.
+       ────────────────────────────────────────────────────────────────
+       setData membuat lightweight-charts menggulir sendiri ke ujung
+       kanan data. Untuk penyegaran harga biasa itu benar — lilin baru
+       memang ada di ujung. Tapi saat REPLAY, `hingga` memotong datanya:
+       ujung kanan berpindah jauh ke masa lalu, chart melompat ke sana,
+       dan orangnya kehilangan tempat yang baru saja ia bidik.
+
+       Dua efek lain di bawah (garis & alat) sudah memakai pola yang sama
+       persis. Efek inilah satu-satunya yang terlewat — dan karena ia yang
+       memegang lilinnya, justru dialah yang paling terlihat melompat. */
+    const rentang = c?.timeScale().getVisibleLogicalRange() ?? null;
     const batas = hingga === undefined ? lilin.times.length : Math.max(1, Math.min(lilin.times.length, hingga + 1));
     seri.current.setData(lilin.times.slice(0, batas).map((t, i) => ({
       /* lightweight-charts memakai DETIK, bukan milidetik. Mengirim ms
@@ -315,6 +330,10 @@ export function ChartLilin({
       time: Math.floor(t / 1000) as Time,
       open: lilin.opens[i], high: lilin.highs[i], low: lilin.lows[i], close: lilin.closes[i],
     })));
+    /* Hanya dikembalikan kalau memang ADA rentang sebelumnya — pada
+       gambar pertama chart belum punya, dan memaksakan rentang kosong
+       menghasilkan sumbu waktu yang tidak masuk akal. */
+    if (rentang && c) { try { c.timeScale().setVisibleLogicalRange(rentang); } catch { /* chart baru */ } }
   }, [lilin, hingga]);
 
   /* Garis harga posisi (entry / SL / TP) */
