@@ -842,6 +842,17 @@ export function ChartLilin({
   const ubahRef = useRef<UbahMt5 | null>(null);
   const aturUbah = useCallback((v: UbahMt5 | null) => { ubahRef.current = v; setUbah(v); }, []);
   const seretUbah = useRef<{ tiket: string; bidang: 'sl' | 'tp' } | null>(null);
+  /* Garis mana yang sedang DIPILIH. Bawaannya tidak ada: garis order polos
+     saja — angkanya sudah tercetak di sumbu harga, dan nama serta tombol
+     hapus di badan chart cuma menutupi lilin yang sedang dibaca.
+
+     Nama dan tanda × baru muncul di garis yang diklik. Alasannya bukan
+     kerapian semata: × adalah tombol yang MENGHAPUS, dan tombol hapus yang
+     selalu tergeletak di dekat harga adalah tombol yang cepat atau lambat
+     tersenggol. Menyembunyikannya sampai garisnya dipilih membuat menghapus
+     jadi dua langkah yang disengaja, bukan satu klik refleks. */
+  const [garisAktif, setGarisAktif] = useState<string | null>(null);
+
   const garisPosMt5 = useRef<IPriceLine[]>([]);
   /* Price line untuk garis SERET (Entry/SL/TP tiket & order yang disunting).
      Terpisah dari garisPosMt5 supaya keduanya bisa dibongkar sendiri-sendiri:
@@ -1223,7 +1234,12 @@ export function ChartLilin({
   const naik = idxAkhir >= 0 && lilin.closes[idxAkhir] >= lilin.opens[idxAkhir];
 
   return (
-    <div className="relative overflow-hidden">
+    /* onMouseDownCapture, BUKAN onMouseDown: fase capture berjalan dari luar
+       ke dalam, jadi pilihan lama dibersihkan LEBIH DULU, lalu garis yang
+       kebetulan ditekan menyalakan pilihannya sendiri. Dengan onMouseDown
+       biasa urutannya terbalik (bubbling: dalam dulu, luar belakangan) dan
+       pilihan yang baru saja dibuat langsung terhapus lagi. */
+    <div className="relative overflow-hidden" onMouseDownCapture={() => setGarisAktif(null)}>
       <div ref={kotak} style={{ height: tinggi }} className="w-full" />
 
       {/* Hitung mundur DI DALAM label harga, bukan di sebelahnya.
@@ -1256,13 +1272,13 @@ export function ChartLilin({
                className={cn('absolute left-0 right-0 z-10 flex items-center',
                  bisa ? 'cursor-ns-resize' : 'pointer-events-none')}
                style={{ transform: 'translateY(-50%)', height: 14, visibility: 'hidden' }}
-               onMouseDown={bisa ? (e) => mulaiSeret(g.id, e) : undefined}>
+               onMouseDown={bisa ? (e) => { setGarisAktif(g.id); mulaiSeret(g.id, e); } : undefined}>
             <div className="h-px flex-1" style={{
               background: `repeating-linear-gradient(90deg, ${g.warna} 0 6px, transparent 6px 11px)`,
             }} />
             {/* ✕ menghapus garis INI saja — order yang batal harus bisa
                 dibersihkan dari chart tanpa menunggu apa pun. */}
-            {bisa && onHapusGaris && (
+            {bisa && onHapusGaris && garisAktif === g.id && (
               <button
                 onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); onHapusGaris(g.id); }}
                 title={`Hapus garis ${g.label}`}
@@ -1271,6 +1287,7 @@ export function ChartLilin({
                 ×
               </button>
             )}
+            {garisAktif === g.id && (
             <span className="angka mr-0.5 shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-zinc-950 shadow"
                   style={{ background: g.warna }}>
               {/* HANYA NAMANYA. Angkanya sudah tergambar di sumbu harga
@@ -1285,6 +1302,7 @@ export function ChartLilin({
                   sesudah itu ia cuma teks yang menghalangi harga. */}
               {g.label}
             </span>
+            )}
           </div>
         );
       })}
