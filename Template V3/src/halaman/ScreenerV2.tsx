@@ -100,6 +100,14 @@ const CSS_TANPA_CANGKANG = `
      sendiri (tempat live trading tetap dipakai) tidak berubah sama sekali. */
   .es-sim-section { display: none !important; }
 
+  /* Tombol & panel News PINDAH ke bilah kendali Chart & Entry (komponen
+     components/panel-news.tsx, sumber data sama: /api/news). Disembunyikan
+     di sini supaya tidak ada dua kalender yang bisa menampilkan isi berbeda
+     saat salah satunya gagal memuat. Sama seperti blok di atas: hanya
+     disembunyikan, JS kalendernya di V2 tetap utuh dan tetap jalan saat V2
+     dibuka berdiri sendiri. */
+  .es-econ-calendar-panel { display: none !important; }
+
   /* ── Huruf & warna mengikuti V3 ── */
   :root {
     --v2-radius: 12px;
@@ -350,7 +358,7 @@ export default function ScreenerV2() {
                    [data-section] karena kelas .es-priority-title dipakai
                    tiga section berbeda. */
                 const j1 = d.querySelector('.es-pantau-title');
-                if (j1) j1.textContent = 'Screener Tools';
+                if (j1) j1.textContent = 'Koin Hunter';
                 const j2 = d.querySelector('[data-section="crosshunter"] .es-priority-title');
                 if (j2) j2.textContent = 'Zona Pantau';
                 /* Padding kiri body diatur langsung di elemennya, bukan lewat

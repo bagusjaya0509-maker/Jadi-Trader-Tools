@@ -4,6 +4,7 @@ import {
   Play, Loader2, RefreshCw, Radio, TriangleAlert, History,
   Layers, ChevronDown, Settings2, Code2, X, Ruler, Rows3, Square, Eraser, Minus, TrendingUp,
   FlaskConical, GripVertical } from 'lucide-react';
+import { PanelNews } from '@/components/panel-news';
 import { Panel, PanelHead, KartuKpi, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn, uang, persen, harga, tanggalPendek } from '@/lib/utils';
 import { ChartLilin, type Garis, type GarisHarga, type GarisSeret, type PosisiChartMt5 } from '@/components/chart-lilin';
@@ -1326,6 +1327,11 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
               className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100">
               <RefreshCw className={cn('size-3.5', memuat && 'animate-spin')} /> Segarkan
             </button>
+            {/* News pindah ke sini dari screener. Kalender ekonomi menjawab
+                "aman tidak entry sekarang", dan pertanyaan itu muncul saat
+                orang sedang menatap chart sambil menaruh SL — bukan saat
+                sedang memilih koin. */}
+            <PanelNews />
             {/* ── SATU menu untuk semua indikator ─────────────────────
                 Dua checkbox yang berjajar akan jadi lima begitu indikator
                 bertambah; menu tumbuh ke bawah, bilah kendali tidak. Skrip

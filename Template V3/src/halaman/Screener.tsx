@@ -26,7 +26,7 @@ import {
 
    Dua bentuk kartu, dan bedanya disengaja:
 
-     · Screener Tools — mini chart + ceklist, TANPA angka order. Grafiknya
+     · Koin Hunter    — mini chart + ceklist, TANPA angka order. Grafiknya
                         yang paling berguna di sini: zona SNR cuma bisa
                         dilihat sebagai bentuk. Daftar ini isinya koin yang
                         layak DILIHAT; angka order di sampingnya membuatnya
@@ -379,10 +379,10 @@ export default function Screener() {
 
   return (
     <div className="p-4 sm:p-6">
-      {/* ── Screener Tools (dulu: Area Pantau) ── */}
+      {/* ── Koin Hunter (dulu: Area Pantau) ── */}
       <Panel>
         <PanelHead
-          judul="Screener Tools"
+          judul="Koin Hunter"
           sub={`Koin dengan SMI ${tf} ekstrem. Zona SNR selalu diambil dari 4 jam. ${ketPindai}.`}
           kanan={kendali}
         />
@@ -393,7 +393,7 @@ export default function Screener() {
               : `Tidak ada koin dengan SMI ${tf} di wilayah ekstrem saat ini.`}
           />
         ) : (
-          /* Gulir mendatar, bukan grid yang terus turun. Screener Tools bisa
+          /* Gulir mendatar, bukan grid yang terus turun. Koin Hunter bisa
              menghasilkan puluhan kartu sekaligus; dibiarkan menumpuk ke bawah,
              ia mendorong Zona Pantau keluar layar sama sekali. */
           <div className="flex gap-4 overflow-x-auto px-5 pb-5">

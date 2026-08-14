@@ -97,7 +97,13 @@ function sisaUmur(kadaluarsa: number): { teks: string; habis: boolean } {
   return { teks: `sisa ${Math.floor(jam / 24)} hari`, habis: false };
 }
 
-export function PanelSinyal() {
+/* `ringkas` = panel ini sedang berdiri di dalam rak 4 slot di halaman Copy
+   Signal, bukan membentang selebar halaman. Yang berubah HANYA tata letak
+   dalamnya: kisi sinyal jadi satu kolom, dan jarak bawahnya dilepas karena
+   grid induknya yang mengatur jarak. Tidak ada isi yang disembunyikan —
+   panel yang menyembunyikan data saat disempitkan membuat orang mengira
+   agennya berhenti bekerja. */
+export function PanelSinyal({ ringkas = false }: { ringkas?: boolean } = {}) {
   const [daftar, setDaftar] = useState<Sinyal[]>([]);
   const [diperiksa, setDiperiksa] = useState(0);
   const [permintaan, setPermintaan] = useState<Permintaan | null>(null);
@@ -216,7 +222,7 @@ export function PanelSinyal() {
      ke bawah (panel permintaan akses), bukan ke atas. Saat kosong ia
      null, jadi margin-nya ikut hilang tanpa menyisakan celah. */
   return (
-    <Panel className="mb-4">
+    <Panel className={cn(!ringkas && 'mb-4')}>
       <PanelHead
         judul={
           /* Label beta menempel di JUDULNYA, bukan di catatan kecil yang
@@ -314,7 +320,8 @@ export function PanelSinyal() {
             : 'Agennya sedang tidak memeriksa — ia berjalan saat aplikasi Claude terbuka.'}
         </p>
       )}
-      <div className="grid grid-cols-1 gap-3 px-5 pb-5 md:grid-cols-2 xl:grid-cols-3">
+      <div className={cn('grid grid-cols-1 gap-3 px-5 pb-5',
+                          !ringkas && 'md:grid-cols-2 xl:grid-cols-3')}>
         {daftar.map((s) => {
           const jarakSl = Math.abs(s.entry - s.sl);
           const jarakTp = Math.abs(s.tp - s.entry);

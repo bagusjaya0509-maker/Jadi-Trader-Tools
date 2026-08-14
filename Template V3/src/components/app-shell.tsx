@@ -75,7 +75,7 @@ const NAV = [
     grup: 'Workspace',
     butir: [
       { ke: '/personal',    label: 'Personal Area',    Ikon: Wallet },
-      { ke: '/chart',       label: 'Chart dan Entry', Ikon: CandlestickChart },
+      { ke: '/chart',       label: 'Chart & Entry', Ikon: CandlestickChart },
       { ke: '/marketplace', label: 'Marketplace',      Ikon: Users },
       { ke: '/copy',        label: 'Copy Signal',      Ikon: Copy },
       { ke: '/integrasi',   label: 'Integrations',     Ikon: Plug },
@@ -95,7 +95,7 @@ const JUDUL: Record<string, string> = {
   '/dashboard': 'Dashboard',
   '/screener': 'Screener Area',
   '/screener-react': 'Screener Area (React)',
-  '/chart': 'Chart dan Entry',
+  '/chart': 'Chart & Entry',
   '/jurnal': 'Journal',
   '/personal': 'Personal Area',
   '/copy': 'Copy Signal',

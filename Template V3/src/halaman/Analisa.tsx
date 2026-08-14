@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Loader2, Lock, Unlock, Trash2, Send, LineChart, X, CheckCircle2,
-  TrendingUp, TrendingDown, RefreshCw,
+  TrendingUp, TrendingDown, RefreshCw, Radar,
 } from 'lucide-react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { PanelSinyal } from '@/components/panel-sinyal';
@@ -234,6 +234,35 @@ function KartuAnalisa({ a, status, milikku, onSegarkan }: {
   );
 }
 
+/** Lencana Beta. Dipakai di dua tempat, jadi ditulis sekali.
+ *  Ini proyek besar yang dibangun sambil jalan — menandainya lebih jujur
+ *  daripada membiarkan orang mengira fitur setengah jadi ini sudah final. */
+function LencanaBeta() {
+  return (
+    <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-400">
+      Beta
+    </span>
+  );
+}
+
+/** Slot agen yang belum terisi. Menjelaskan APA yang akan menempatinya dan
+ *  ATAS DASAR APA urutannya kelak disusun — placeholder yang cuma bertulis
+ *  "segera hadir" tidak memberi tahu apa pun yang tidak sudah jelas. */
+function SlotAgen({ urutan }: { urutan: number }) {
+  return (
+    <Panel className="flex flex-col items-start justify-center gap-2 border-dashed p-5">
+      <span className="flex items-center gap-2">
+        <Radar className="size-4 text-zinc-700" />
+        <span className="text-[12.5px] font-medium text-zinc-400">Slot agen {urutan}</span>
+      </span>
+      <p className="text-[11.5px] leading-relaxed text-zinc-600">
+        Belum terisi. Agen berikutnya masuk ke sini, dan keempat slot nanti
+        diurutkan dari ketepatan analisanya — bukan dari urutan pendaftaran.
+      </p>
+    </Panel>
+  );
+}
+
 export default function Analisa() {
   const { pengguna } = useAuth();
   const { data: riwayat } = useRiwayat();
@@ -297,11 +326,30 @@ export default function Analisa() {
 
   return (
     <div className="p-4 sm:p-6">
-      {/* ── Sinyal kurasi agen Pemburu Sinyal ─────────────────────────
-         Duduk di halaman Copy Trading, bukan dashboard: sinyal komunitas
+      {/* ── Rak sinyal pantauan: empat slot ───────────────────────────
+         Duduk di halaman Copy Signal, bukan dashboard: sinyal komunitas
          adalah bahan meniru trade orang lain — satu keluarga dengan
-         analisa berbayar di bawahnya, bukan dengan KPI jurnal pribadi. */}
-      <PanelSinyal />
+         analisa berbayar di bawahnya, bukan dengan KPI jurnal pribadi.
+
+         EMPAT SLOT SEKARANG, WALAUPUN BARU SATU TERISI. Raknya dibangun
+         duluan supaya agen kedua tinggal masuk ke slot yang sudah ada —
+         bukan memicu tata ulang halaman saat itu juga. Slot kosongnya
+         sengaja MENJELASKAN dirinya: kotak abu tanpa keterangan terbaca
+         sebagai panel yang gagal memuat, bukan sebagai tempat yang memang
+         belum diisi.
+
+         Urutannya kelak mengikuti ketepatan analisa, bukan waktu daftar.
+         Sampai angka itu terkumpul, urutan sekarang belum berarti apa-apa
+         dan itu dikatakan apa adanya di layar. */}
+      <div className="mb-4 flex items-center gap-2">
+        <h2 className="text-[15px] font-semibold tracking-tight text-zinc-100">Sinyal Pantauan</h2>
+        <LencanaBeta />
+        <span className="text-[11.5px] text-zinc-500">1 dari 4 slot terisi</span>
+      </div>
+      <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <PanelSinyal ringkas />
+        {[2, 3, 4].map((n) => <SlotAgen key={n} urutan={n} />)}
+      </div>
 
       {/* Permintaan masuk untuk analisaku */}
       {masuk.length > 0 && (
@@ -333,7 +381,7 @@ export default function Analisa() {
       {/* Posting */}
       <Panel className="mb-4">
         <PanelHead
-          judul="Copy Signal"
+          judul={<span className="flex items-center gap-2">Copy Signal <LencanaBeta /></span>}
           sub="Posting rencana trade-mu — orang menilai dari rekam jejak jurnalmu, bukan dari klaim."
           kanan={
             <span className="flex items-center gap-2">
@@ -414,7 +462,11 @@ export default function Analisa() {
           Belum ada analisa. Jadilah yang pertama memposting.
         </Panel>
       ) : (
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        /* Empat berjejer, sesuai permintaan pemilik. Kartunya jadi lebih
+           sempit, jadi breakpoint-nya bertahap: 1 kolom di HP, 2 di tablet,
+           4 baru di layar lebar — memaksa 4 kolom di layar kecil membuat
+           tiap kartu selebar 80 px dan tidak ada yang terbaca. */
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
           {daftar.map((a) => (
             <KartuAnalisa key={a.id} a={a} status={statusku[a.id]}
               milikku={a.uid === pengguna?.uid} onSegarkan={segarkan} />
