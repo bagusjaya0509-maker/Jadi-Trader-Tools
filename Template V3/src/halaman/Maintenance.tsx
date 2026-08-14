@@ -8,6 +8,7 @@ import { tanggalPendek } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 import { PanelLisensi } from '@/components/panel-lisensi';
 import { PanelSetelanAkses } from '@/components/panel-setelan-akses';
+import { PanelTrafikSistem } from '@/components/panel-trafik-sistem';
 import { PanelKesehatan } from '@/components/panel-kesehatan';
 import { PanelCelahPine } from '@/components/panel-celah-pine';
 import { terbitkanTeksBeranda } from '@/lib/data';
@@ -176,6 +177,7 @@ const TAB = [
   { id: 'akses',   label: 'Akses & Lisensi', judul: 'Permintaan Akses & Lisensi', sub: '20 akses gratis dan 80 berbayar, masing-masing 30 hari. Persetujuan di sini yang membuka aplikasi.' },
   { id: 'produk',  label: 'Katalog Produk',  judul: 'Katalog Produk',             sub: 'Produk yang tayang di Marketplace, sumbernya, dan tempat sampahnya.' },
   { id: 'sistem',  label: 'Kesehatan Sistem', judul: 'Kesehatan Sistem',          sub: 'Sambungan backend, bursa, dan layanan pendukung.' },
+  { id: 'trafik',  label: 'Trafik & Server',  judul: 'Trafik & Server',           sub: 'Kunjungan situs dan beban VPS. Pindah dari halaman Sales — ini pertanyaan "mesinnya sehat", bukan "usahanya untung".' },
   { id: 'pine',    label: 'Mesin Pine',      judul: 'Mesin Pine Script',          sub: 'Celah yang ditemukan dari pemakaian nyata — bahan perbaikan berikutnya.' },
   { id: 'konten',  label: 'Situs & Konten',  judul: 'Situs & Konten',             sub: 'Teks yang dilihat pengunjung sebelum masuk.' },
 ] as const;
@@ -391,6 +393,8 @@ export default function Maintenance() {
       </>)}
 
       {tab === 'sistem' && <PanelKesehatan />}
+
+      {tab === 'trafik' && <PanelTrafikSistem />}
 
       {tab === 'pine' && <PanelCelahPine />}
 

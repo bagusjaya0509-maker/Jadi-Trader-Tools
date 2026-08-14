@@ -84,7 +84,7 @@ const NAV = [
   {
     grup: 'Administration',
     butir: [
-      { ke: '/pemilik',     label: 'Traffic & Sales', Ikon: TrendingUp },
+      { ke: '/pemilik',     label: 'Sales Report', Ikon: TrendingUp },
       { ke: '/maintenance', label: 'Maintenance',     Ikon: Wrench },
       { ke: '/tagihan',     label: 'Billing',         Ikon: CreditCard },
     ],
@@ -101,7 +101,7 @@ const JUDUL: Record<string, string> = {
   '/copy': 'Copy Signal',
   '/marketplace': 'Marketplace',
   '/integrasi': 'Integrations',
-  '/pemilik': 'Traffic & Sales',
+  '/pemilik': 'Sales Report',
   '/maintenance': 'Maintenance',
   '/tagihan': 'Billing',
   '/dokumentasi': 'Documentation',

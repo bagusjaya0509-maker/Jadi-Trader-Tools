@@ -125,6 +125,27 @@ export function usePenjualan(): Hasil<Penjualan[]> {
     })), []);
 }
 
+/* ── Pengeluaran ─────────────────────────────────────────────────────────
+   Pasangan dari Penjualan, disimpan di berkas yang SAMA di backend: laba
+   bersih = penjualan − pengeluaran, dan dua angka yang selalu dibaca
+   bersama sebaiknya tidak bisa berbeda umurnya. */
+export interface Pengeluaran {
+  id: string; keperluan: string; kategori: string;
+  nilai: number; catatan: string; waktu: number;
+}
+
+export function usePengeluaran(): Hasil<Pengeluaran[]> {
+  return useRute('/api/pengeluaran/daftar', (j) =>
+    (j?.pengeluaran ?? []).map((p: any): Pengeluaran => ({
+      id: String(p.id ?? ''),
+      keperluan: String(p.keperluan ?? ''),
+      kategori: String(p.kategori ?? ''),
+      nilai: Number(p.nilai) || 0,
+      catatan: String(p.catatan ?? ''),
+      waktu: Number(p.waktu) || 0,
+    })), []);
+}
+
 /* ── Laporan bug & error ─────────────────────────────────────────────── */
 export interface Laporan {
   id: string; jenis: string; pesan: string; halaman: string;
@@ -219,6 +240,9 @@ async function kirim(jalur: string, muatan: unknown) {
 export const catatPenjualan = (p: { produk: string; pembeli: string; nilai: number; catatan?: string }) =>
   kirim('/api/penjualan', p);
 export const hapusPenjualan = (id: string) => kirim('/api/penjualan/hapus', { id });
+export const catatPengeluaran = (p: { keperluan: string; kategori: string; nilai: number; catatan?: string }) =>
+  kirim('/api/pengeluaran', p);
+export const hapusPengeluaran = (id: string) => kirim('/api/pengeluaran/hapus', { id });
 export const tandaiLaporan = (id: string, status: string) => kirim('/api/lapor/status', { id, status });
 export const cabutLisensi = (sidik: string) => kirim('/api/lisensi/cabut', { sidik });
 

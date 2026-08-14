@@ -1,15 +1,16 @@
 import { useMemo, useState } from 'react';
-import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import {
-  CheckCircle2, AlertCircle, Clock, Plus, RefreshCw, Trash2, KeyRound, ShieldAlert,
+  Clock, Plus, RefreshCw, Trash2, KeyRound, ShieldAlert, TrendingDown,
 } from 'lucide-react';
-import { Panel, PanelHead, KartuKpi, BadgeTren, TipGrafik, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
+import { Panel, PanelHead, KartuKpi, TipGrafik, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn, uang, tanggalPendek } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 import {
-  useTrafik, useKlien, usePenjualan, useLaporan, useLisensi, useStatusVps,
+  useKlien, usePenjualan, usePengeluaran, useLaporan, useLisensi,
   usePermintaanLisensi,
-  catatPenjualan, hapusPenjualan, tandaiLaporan, cabutLisensi,
+  catatPenjualan, hapusPenjualan, catatPengeluaran, hapusPengeluaran,
+  tandaiLaporan, cabutLisensi,
 } from '@/lib/admin';
 
 /* Traffic & Sales memakai kerangka Efferd yang sama persis dengan Dashboard:
@@ -20,6 +21,15 @@ import {
    memakai data contoh: tiga klien karangan, empat penjualan karangan, dan
    grafik trafik dua puluh hari yang tidak pernah terjadi. Halaman untuk
    mengambil keputusan adalah tempat paling buruk untuk angka karangan. */
+
+/* Kategori pengeluaran yang tetap. Daftar pilihan, bukan teks bebas:
+   "VPS", "vps", dan "Sewa VPS" akan jadi tiga pos berbeda saat dijumlahkan,
+   dan laporan yang posnya bercabang sendiri berhenti bisa dibandingkan
+   antar bulan. */
+const KATEGORI_KELUAR = [
+  'Server & Domain', 'Iklan & Promosi', 'Alat & Langganan',
+  'Jasa & Tenaga', 'Legal & Perizinan', 'Lainnya',
+];
 
 function jamLalu(ms: number) {
   if (!ms) return '—';
@@ -51,12 +61,11 @@ function Kabar({ memuat, galat, kosong, teksKosong }: {
 
 export default function Pemilik() {
   const { pemilik } = useAuth();
-  const trafik = useTrafik();
   const klien = useKlien();
   const penjualan = usePenjualan();
+  const pengeluaran = usePengeluaran();
   const laporan = useLaporan();
   const lisensi = useLisensi();
-  const vps = useStatusVps();
   /* Permintaan lisensi dipakai untuk menautkan tiap kode aktif ke pembelinya.
      Kode yang tidak punya pasangan permintaan berarti diaktifkan tangan lewat
      panel V2 — biasanya uji coba, dan itu perlu terlihat sebagai apa adanya
@@ -65,19 +74,16 @@ export default function Pemilik() {
 
   const [pesan, setPesan] = useState('');
   const [form, setForm] = useState({ produk: '', pembeli: '', nilai: '', catatan: '' });
+  const [formKeluar, setFormKeluar] = useState({ keperluan: '', kategori: '', nilai: '', catatan: '' });
   const [sibuk, setSibuk] = useState(false);
 
   const totalPenjualan = penjualan.data.reduce((s, p) => s + p.nilai, 0);
-  const laporanBaru = laporan.data.filter((l) => l.status === 'baru').length;
-  const hariIni = trafik.data[trafik.data.length - 1];
-  const kemarin = trafik.data[trafik.data.length - 2];
-  const ramPakai = vps.data.ramTotalMb - vps.data.ramBebasMb;
+  const totalPengeluaran = pengeluaran.data.reduce((s, p) => s + p.nilai, 0);
+  /* Laba BERSIH, bukan omzet. Halaman yang cuma menampilkan pemasukan
+     membuat usaha terlihat lebih sehat daripada kenyataannya — dan itu
+     justru angka yang dipakai memutuskan boleh belanja apa berikutnya. */
+  const labaBersih = totalPenjualan - totalPengeluaran;
 
-  /* Tren dihitung dari dua hari yang benar-benar ada. Delta tetap (+12,4%)
-     yang ditulis di kode adalah janji yang tidak pernah ditepati datanya. */
-  const trenKunjungan = hariIni && kemarin && kemarin.total > 0
-    ? Number((((hariIni.total - kemarin.total) / kemarin.total) * 100).toFixed(1))
-    : null;
 
   /* Penjualan per bulan, dari catatan penjualan yang sungguhan. Panel ini
      dulu menggambar `PORTO_BULANAN` — pemasukan & pengeluaran pribadi dalam
@@ -96,14 +102,6 @@ export default function Pemilik() {
     return [...peta.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([, v]) => v);
   }, [penjualan.data]);
 
-  /* Halaman mana yang paling ramai — dari rincian per halaman yang memang
-     sudah dikirim backend, tapi selama ini tidak pernah ditampilkan. */
-  const perHalaman = useMemo(() => {
-    const peta = new Map<string, number>();
-    trafik.data.forEach((h) => Object.entries(h.halaman).forEach(([n, v]) =>
-      peta.set(n, (peta.get(n) ?? 0) + Number(v))));
-    return [...peta.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
-  }, [trafik.data]);
 
   async function tambahPenjualan() {
     const nilai = Number(form.nilai);
@@ -115,6 +113,24 @@ export default function Pemilik() {
       setForm({ produk: '', pembeli: '', nilai: '', catatan: '' });
       setPesan('Penjualan tercatat.');
       penjualan.muatUlang();
+    } catch (e) {
+      setPesan('Gagal mencatat: ' + (e instanceof Error ? e.message : 'tidak diketahui'));
+    } finally { setSibuk(false); }
+  }
+
+  async function tambahPengeluaran() {
+    const nilai = Number(formKeluar.nilai);
+    if (!formKeluar.keperluan.trim()) { setPesan('Keperluan wajib diisi.'); return; }
+    if (!isFinite(nilai) || nilai <= 0) { setPesan('Nilai pengeluaran harus angka lebih dari nol.'); return; }
+    setSibuk(true);
+    try {
+      await catatPengeluaran({
+        keperluan: formKeluar.keperluan.trim(), kategori: formKeluar.kategori.trim(),
+        nilai, catatan: formKeluar.catatan.trim(),
+      });
+      setFormKeluar({ keperluan: '', kategori: '', nilai: '', catatan: '' });
+      setPesan('Pengeluaran tercatat.');
+      pengeluaran.muatUlang();
     } catch (e) {
       setPesan('Gagal mencatat: ' + (e instanceof Error ? e.message : 'tidak diketahui'));
     } finally { setSibuk(false); }
@@ -134,11 +150,10 @@ export default function Pemilik() {
                   catatan={`${penjualan.data.length} penjualan tercatat`} />
         <KartuKpi label="Active clients" nilai={String(klien.data.length)}
                   catatan="akun yang pernah masuk" />
-        <KartuKpi label="Visits today" nilai={String(hariIni?.total ?? 0)}
-                  delta={trenKunjungan ?? undefined} deltaSufiks="vs kemarin"
-                  catatan={hariIni ? `${hariIni.unik} pengunjung unik` : 'belum ada kunjungan hari ini'} />
-        <KartuKpi label="Open reports" nilai={String(laporanBaru)}
-                  catatan={`${laporan.data.length} laporan total`} />
+        <KartuKpi label="Pengeluaran" nilai={uang(totalPengeluaran)}
+                  catatan={`${pengeluaran.data.length} pengeluaran tercatat`} />
+        <KartuKpi label="Laba bersih" nilai={uang(labaBersih)}
+                  catatan={labaBersih >= 0 ? 'pemasukan dikurangi pengeluaran' : 'pengeluaran melebihi pemasukan'} />
       </div>
 
       {pesan && (
@@ -146,116 +161,6 @@ export default function Pemilik() {
           {pesan}
         </div>
       )}
-
-      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Panel>
-          <PanelHead
-            judul="Website traffic"
-            sub="Kunjungan harian & pengunjung unik, 90 hari terakhir."
-            kanan={trenKunjungan !== null ? <BadgeTren nilai={trenKunjungan} /> : undefined}
-          />
-          <div className="h-[260px] px-2 pb-4">
-            {trafik.memuat || trafik.galat || !trafik.data.length ? (
-              <div className="px-3 pt-3">
-                <Kabar memuat={trafik.memuat} galat={trafik.galat} kosong={!trafik.data.length}
-                       teksKosong="Belum ada kunjungan tercatat." />
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={trafik.data} margin={{ top: 8, right: 12, left: 4, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="gTraf" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#fafafa" stopOpacity={0.2} />
-                      <stop offset="100%" stopColor="#fafafa" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid vertical={false} stroke="rgba(255,255,255,.05)" />
-                  <XAxis dataKey="label" tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} minTickGap={36} />
-                  <YAxis tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} width={34} allowDecimals={false} />
-                  <Tooltip content={<TipGrafik />} cursor={{ stroke: 'rgba(255,255,255,.12)' }} />
-                  <Area type="monotone" dataKey="total" name="Kunjungan" stroke="#fafafa" strokeWidth={1.8} fill="url(#gTraf)" dot={false} />
-                  <Area type="monotone" dataKey="unik" name="Unik" stroke="#71717a" strokeWidth={1.4} strokeDasharray="4 3" fill="none" dot={false} />
-                </AreaChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-          {perHalaman.length > 0 && (
-            <div className="border-t border-zinc-800/80 px-5 py-3">
-              <div className="mb-2 text-[11px] text-zinc-500">Halaman paling ramai</div>
-              <div className="flex flex-wrap gap-1.5">
-                {perHalaman.map(([nama, n]) => (
-                  <span key={nama} className="rounded-md border border-zinc-800 bg-zinc-900/60 px-2 py-1 text-[11.5px] text-zinc-400">
-                    {nama} <span className="angka text-zinc-200">{n}</span>
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-        </Panel>
-
-        <Panel>
-          <PanelHead
-            judul="Infrastructure health"
-            sub="Status VPS yang melayani proxy, lisensi, dan jembatan MT5."
-            kanan={
-              <button onClick={vps.muatUlang} title="Segarkan"
-                      className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 py-1.5 text-[11.5px] text-zinc-400 transition-colors hover:border-zinc-700 hover:text-zinc-200">
-                <RefreshCw className={cn('size-3.5', vps.memuat && 'animate-spin')} /> Segarkan
-              </button>
-            }
-          />
-          <div className="space-y-3 px-5 pb-5">
-            {(vps.memuat || vps.galat) && (
-              <Kabar memuat={vps.memuat} galat={vps.galat} kosong={false} teksKosong="" />
-            )}
-            {!vps.memuat && !vps.galat && (
-              <>
-                <div className="rounded-lg border border-zinc-800/60 p-3">
-                  <div className="mb-2 flex justify-between text-[12.5px]">
-                    <span className="text-zinc-400">RAM terpakai</span>
-                    <span className="angka text-zinc-100">{ramPakai} / {vps.data.ramTotalMb} MB</span>
-                  </div>
-                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
-                    <div className="h-full rounded-full bg-gradient-to-r from-zinc-100 to-zinc-400"
-                         style={{ width: `${vps.data.ramTotalMb ? (ramPakai / vps.data.ramTotalMb) * 100 : 0}%` }} />
-                  </div>
-                </div>
-                {[
-                  {
-                    Ikon: CheckCircle2, warna: 'text-emerald-500', judul: 'Backend online',
-                    ket: `${vps.data.ramProsesMb} MB · uptime ${Math.floor(vps.data.waktuHidupDetik / 3600)} jam · Node ${vps.data.node}`,
-                  },
-                  {
-                    /* Ambang 1,0 per core adalah definisi "beban penuh" di
-                       Linux: satu proses siap jalan per core. Di atas itu ada
-                       antrean, dan itulah yang perlu terlihat. */
-                    Ikon: (vps.data.beban[0] ?? 0) > vps.data.cpu ? AlertCircle : CheckCircle2,
-                    warna: (vps.data.beban[0] ?? 0) > vps.data.cpu ? 'text-amber-500' : 'text-emerald-500',
-                    judul: (vps.data.beban[0] ?? 0) > vps.data.cpu ? 'Beban CPU tinggi' : 'Beban CPU normal',
-                    ket: `${vps.data.beban.join(' / ')} pada ${vps.data.cpu} core`,
-                  },
-                  {
-                    Ikon: vps.data.gerbangLangganan ? CheckCircle2 : AlertCircle,
-                    warna: vps.data.gerbangLangganan ? 'text-emerald-500' : 'text-amber-500',
-                    judul: vps.data.gerbangLangganan ? 'Gerbang langganan aktif' : 'Gerbang langganan mati',
-                    ket: vps.data.gerbangLangganan
-                      ? 'Data pasar hanya untuk pelanggan aktif'
-                      : 'GERBANG_LANGGANAN belum dinyalakan — proxy terbuka untuk semua yang login',
-                  },
-                ].map(({ Ikon, warna, judul, ket }) => (
-                  <div key={judul} className="flex items-start gap-3 rounded-lg border border-zinc-800/60 p-3">
-                    <Ikon className={`mt-0.5 size-4 shrink-0 ${warna}`} strokeWidth={2} />
-                    <div className="min-w-0">
-                      <div className="text-[13px] text-zinc-200">{judul}</div>
-                      <div className="text-[12px] text-zinc-500">{ket}</div>
-                    </div>
-                  </div>
-                ))}
-              </>
-            )}
-          </div>
-        </Panel>
-      </div>
 
       {/* ── Penjualan per bulan ── */}
       <Panel className="mt-4">
@@ -298,6 +203,86 @@ export default function Pemilik() {
             <button onClick={() => void tambahPenjualan()} disabled={sibuk || !pemilik}
                     title={pemilik ? undefined : 'Hanya pemilik yang boleh mencatat penjualan'}
                     className="flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-md bg-zinc-100 px-3 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50">
+              <Plus className="size-3.5" /> Catat
+            </button>
+          </div>
+        </div>
+      </Panel>
+
+      {/* ── Pengeluaran ────────────────────────────────────────────────
+          Sejajar dengan penjualan, bukan disembunyikan di halaman lain:
+          laba bersih cuma berarti kalau kedua sisinya terlihat berdampingan.
+          Kalau pengeluaran harus dicari di tempat terpisah, yang dilihat
+          orang tiap hari cuma pemasukan — dan usaha akan selalu tampak
+          lebih sehat daripada kenyataannya. */}
+      <Panel className="mt-4">
+        <PanelHead judul="Pengeluaran" sub="Biaya yang keluar — VPS, domain, iklan, alat, apa pun."
+                   kanan={
+                     <span className="angka text-[12.5px] text-red-400/90">
+                       −{uang(totalPengeluaran)}
+                     </span>
+                   } />
+        <div className="px-5 pb-5">
+          <Kabar memuat={pengeluaran.memuat} galat={pengeluaran.galat} kosong={!pengeluaran.data.length}
+                 teksKosong="Belum ada pengeluaran tercatat." />
+          {pengeluaran.data.length > 0 && (
+            <TabelBungkus>
+              <Tabel>
+                <thead><tr><Th>Tanggal</Th><Th>Keperluan</Th><Th>Kategori</Th><Th className="text-right">Nilai</Th><Th /></tr></thead>
+                <tbody>
+                  {pengeluaran.data.slice(0, 20).map((p) => (
+                    <Tr key={p.id}>
+                      <Td className="whitespace-nowrap text-zinc-500">{tanggalPendek(p.waktu)}</Td>
+                      <Td className="text-zinc-200">
+                        {p.keperluan}
+                        {p.catatan && <div className="text-[11px] text-zinc-600">{p.catatan}</div>}
+                      </Td>
+                      <Td className="text-zinc-500">{p.kategori || '—'}</Td>
+                      <Td className="angka text-right text-red-400/90">−{uang(p.nilai)}</Td>
+                      <Td className="text-right">
+                        <button
+                          onClick={() => {
+                            /* Konfirmasi MENYEBUT apa yang dihapus. Catatan
+                               keuangan yang hilang tidak bisa disusun ulang
+                               dari ingatan. */
+                            if (!confirm(`Hapus pengeluaran "${p.keperluan}" senilai ${uang(p.nilai)}?`)) return;
+                            void jalankan(() => hapusPengeluaran(p.id), 'Pengeluaran dihapus.', pengeluaran.muatUlang);
+                          }}
+                          disabled={sibuk || !pemilik}
+                          className="cursor-pointer rounded p-1 text-zinc-600 transition-colors hover:bg-zinc-800 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-40">
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      </Td>
+                    </Tr>
+                  ))}
+                </tbody>
+              </Tabel>
+            </TabelBungkus>
+          )}
+        </div>
+        <div className="border-t border-zinc-800/80 px-5 py-4">
+          <div className="mb-2 flex items-center gap-1.5 text-[11px] text-zinc-500">
+            <TrendingDown className="size-3.5 text-red-400/80" /> Catat pengeluaran baru
+          </div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-5">
+            <input value={formKeluar.keperluan} onChange={(e) => setFormKeluar({ ...formKeluar, keperluan: e.target.value })}
+                   placeholder="Keperluan — mis. Sewa VPS Agustus" disabled={!pemilik}
+                   className="h-9 rounded-md border border-zinc-800 bg-zinc-900/60 px-3 text-[12.5px] text-zinc-100 outline-none hover:border-zinc-700 focus-visible:border-zinc-600 disabled:opacity-50 sm:col-span-2" />
+            {/* Kategori sebagai daftar pilihan, bukan teks bebas: "VPS",
+                "vps", dan "Sewa VPS" akan jadi tiga kategori berbeda saat
+                nanti dijumlahkan per pos. */}
+            <select value={formKeluar.kategori} onChange={(e) => setFormKeluar({ ...formKeluar, kategori: e.target.value })}
+                    disabled={!pemilik}
+                    className="h-9 cursor-pointer rounded-md border border-zinc-800 bg-zinc-900/60 px-3 text-[12.5px] text-zinc-100 outline-none hover:border-zinc-700 focus-visible:border-zinc-600 disabled:opacity-50">
+              <option value="">Kategori…</option>
+              {KATEGORI_KELUAR.map((k) => <option key={k} value={k}>{k}</option>)}
+            </select>
+            <input value={formKeluar.nilai} onChange={(e) => setFormKeluar({ ...formKeluar, nilai: e.target.value })}
+                   placeholder="Nilai ($)" inputMode="decimal" disabled={!pemilik}
+                   className="angka h-9 rounded-md border border-zinc-800 bg-zinc-900/60 px-3 text-[12.5px] text-zinc-100 outline-none hover:border-zinc-700 focus-visible:border-zinc-600 disabled:opacity-50" />
+            <button onClick={() => void tambahPengeluaran()} disabled={sibuk || !pemilik}
+                    title={pemilik ? undefined : 'Hanya pemilik yang boleh mencatat pengeluaran'}
+                    className="flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-red-500/30 bg-red-500/10 px-3 text-[12px] font-medium text-red-300 transition-colors hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50">
               <Plus className="size-3.5" /> Catat
             </button>
           </div>
