@@ -108,8 +108,41 @@ export default function Akses() {
   }
 
   return (
-    <div className="min-h-screen w-full overflow-y-auto bg-zinc-950">
-      <div className="mx-auto flex max-w-[600px] flex-col gap-8 px-5 py-14 md:py-24">
+    /* ── Tata letak dua panel ────────────────────────────────────────────
+       Gambar penuh di kiri, isi di kanan — pola halaman masuk yang dipilih
+       pemiliknya. Yang TIDAK diambil dari contohnya: kolom email + kata
+       sandi. Situs ini tidak punya login kata sandi sama sekali, hanya
+       Google, Discord, dan kode lisensi. Memasang kolom sandi yang tidak
+       menuju ke mana-mana berarti mengundang orang mengetik sandinya ke
+       formulir palsu — kebiasaan yang merugikan mereka di tempat lain.
+
+       Paletnya tetap gelap, bukan panel putih seperti contohnya: halaman ini
+       pintu masuk ke terminal yang seluruhnya gelap, dan panel putih di
+       tengah alur itu terbaca seperti situs yang berbeda. */
+    <div className="flex min-h-screen w-full bg-zinc-950">
+
+      {/* Kiri: gambar merek. Disembunyikan di layar sempit — di HP, gambar
+          setinggi separuh layar cuma mendorong isinya turun. */}
+      <div className="relative hidden flex-1 overflow-hidden lg:block">
+        <img
+          src={`${import.meta.env.BASE_URL}hero-bg2.webp`}
+          alt=""
+          className="absolute inset-0 size-full object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-zinc-950/40 via-zinc-950/20 to-zinc-950" />
+        <div className="absolute bottom-10 left-10 right-10">
+          <div className="text-[15px] font-medium tracking-tight text-zinc-100">
+            Jadi Trader <span className="text-zinc-400">Tools</span>
+          </div>
+          <p className="mt-1.5 max-w-[34ch] text-[12.5px] leading-relaxed text-zinc-400">
+            Chart, screener, jurnal, dan eksekusi ke Binance serta MetaTrader 5 di satu layar.
+          </p>
+        </div>
+      </div>
+
+      {/* Kanan: isi */}
+      <div className="flex w-full flex-col overflow-y-auto lg:w-[560px] lg:shrink-0 lg:border-l lg:border-zinc-900">
+      <div className="mx-auto flex w-full max-w-[460px] flex-col gap-7 px-6 py-12 md:py-16">
 
         {/* Pintu keluar WAJIB ada di halaman gerbang.
             ────────────────────────────────────────────────────────────────
@@ -345,6 +378,7 @@ export default function Akses() {
             broker tidak diminta di halaman ini.
           </span>
         </div>
+      </div>
       </div>
     </div>
   );
