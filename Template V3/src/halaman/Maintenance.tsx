@@ -158,7 +158,31 @@ function Bagian({ judul, sub }: { judul: string; sub: string }) {
   );
 }
 
+/* ════════════════════════════════════════════════════════════════════════
+   SUB-HALAMAN — lima urusan yang tidak berhubungan satu sama lain
+   ════════════════════════════════════════════════════════════════════════
+   Dulu kelimanya ditumpuk di satu halaman panjang, dipisah judul section.
+   Judul memang membuatnya bisa dipindai, tapi tidak menyelesaikan hal yang
+   sebenarnya mengganggu: untuk mengurus katalog produk, orang harus
+   menggulir melewati permintaan akses, kesehatan sistem, celah Pine, dan
+   teks beranda — empat hal yang sama sekali tidak sedang ia pikirkan.
+
+   Sebagai tab, tiap urusan berdiri sendiri dan halamannya sependek isinya.
+   Yang TIDAK diubah: urutannya. Permintaan akses tetap pertama dan tetap
+   jadi tab bawaan, karena ia satu-satunya yang membuat ORANG LAIN
+   menunggu — sisanya bisa dikerjakan kapan saja.
+   ════════════════════════════════════════════════════════════════════════ */
+const TAB = [
+  { id: 'akses',   label: 'Akses & Lisensi', judul: 'Permintaan Akses & Lisensi', sub: '20 akses gratis dan 80 berbayar, masing-masing 30 hari. Persetujuan di sini yang membuka aplikasi.' },
+  { id: 'produk',  label: 'Katalog Produk',  judul: 'Katalog Produk',             sub: 'Produk yang tayang di Marketplace, sumbernya, dan tempat sampahnya.' },
+  { id: 'sistem',  label: 'Kesehatan Sistem', judul: 'Kesehatan Sistem',          sub: 'Sambungan backend, bursa, dan layanan pendukung.' },
+  { id: 'pine',    label: 'Mesin Pine',      judul: 'Mesin Pine Script',          sub: 'Celah yang ditemukan dari pemakaian nyata — bahan perbaikan berikutnya.' },
+  { id: 'konten',  label: 'Situs & Konten',  judul: 'Situs & Konten',             sub: 'Teks yang dilihat pengunjung sebelum masuk.' },
+] as const;
+type IdTab = typeof TAB[number]['id'];
+
 export default function Maintenance() {
+  const [tab, setTab] = useState<IdTab>('akses');
   /* Katalog NYATA dari Firestore, bukan salinan data contoh.
      Sebelumnya halaman ini memulai dari `PRODUK` dan menyimpan perubahannya
      di useState saja — jadi menghapus produk terlihat berhasil, tapi tidak
@@ -332,35 +356,47 @@ export default function Maintenance() {
 
   return (
     <div className="p-4 sm:p-6">
-      {/* Halaman ini menampung lima urusan yang tidak berhubungan satu
-          sama lain — kesehatan mesin, celah Pine, teks beranda, katalog
-          produk, lisensi. Tanpa judul pemisah, semuanya terbaca sebagai
-          satu tumpukan panel dan orang harus membaca isinya dulu untuk
-          tahu sedang melihat apa. Judul section membuat halaman ini bisa
-          DIPINDAI, bukan dibaca. */}
-      {/* PALING ATAS, dan sengaja. Permintaan yang menunggu adalah satu-satunya
-          hal di halaman ini yang membuat ORANG LAIN menunggu — sisanya bisa
-          dikerjakan kapan saja. */}
-      <Bagian judul="Permintaan Akses & Lisensi"
-              sub="20 akses gratis dan 80 berbayar, masing-masing 30 hari. Persetujuan di sini yang membuka aplikasi." />
-      <PanelSetelanAkses />
-      <PanelLisensi />
-      <PanelLisensiAktif />
+      {/* Bilah tab menggulir mendatar di layar sempit, bukan membungkus
+          jadi dua baris: bilah yang tingginya berubah menggeser seluruh
+          isi halaman tiap kali jendela diubah. */}
+      <div className="mb-5 flex gap-1 overflow-x-auto border-b border-zinc-800/80">
+        {TAB.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={cn(
+              'shrink-0 cursor-pointer border-b-2 px-3.5 py-2.5 text-[12.5px] transition-colors',
+              tab === t.id
+                ? 'border-zinc-100 text-zinc-100'
+                : 'border-transparent text-zinc-500 hover:text-zinc-300',
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
 
-      <Bagian judul="Kesehatan Sistem"
-              sub="Sambungan backend, bursa, dan layanan pendukung." />
-      <PanelKesehatan />
+      {/* Judul & keterangan tetap ada di dalam tabnya. Tab yang cuma
+          berisi panel tanpa kalimat pembuka memaksa orang menyimpulkan
+          sendiri sedang melihat apa. */}
+      {(() => {
+        const aktif = TAB.find((t) => t.id === tab)!;
+        return <Bagian judul={aktif.judul} sub={aktif.sub} />;
+      })()}
 
-      <Bagian judul="Mesin Pine Script"
-              sub="Celah yang ditemukan dari pemakaian nyata — bahan perbaikan berikutnya." />
-      <PanelCelahPine />
+      {tab === 'akses' && (<>
+        <PanelSetelanAkses />
+        <PanelLisensi />
+        <PanelLisensiAktif />
+      </>)}
 
-      <Bagian judul="Situs & Konten"
-              sub="Teks yang dilihat pengunjung sebelum masuk." />
-      <PanelTeksBeranda />
+      {tab === 'sistem' && <PanelKesehatan />}
 
-      <Bagian judul="Katalog Produk"
-              sub="Produk yang tayang di Marketplace, sumbernya, dan tempat sampahnya." />
+      {tab === 'pine' && <PanelCelahPine />}
+
+      {tab === 'konten' && <PanelTeksBeranda />}
+
+      {tab === 'produk' && (<>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KartuKpi label="Produk tayang" nilai={String(tayang.length)} catatan="terlihat pengunjung" />
         <KartuKpi label="Di tempat sampah" nilai={String(sampah.length)} catatan="bisa dipulihkan" />
@@ -591,6 +627,7 @@ export default function Maintenance() {
           </Panel>
         </div>
       </div>
+      </>)}
 
     </div>
   );
