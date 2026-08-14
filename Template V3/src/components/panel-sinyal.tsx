@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Radar, ExternalLink, CandlestickChart, Loader2, Sparkles, PauseCircle } from 'lucide-react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { cn, harga as fHarga } from '@/lib/utils';
-import { bacaKoneksi } from '@/lib/koneksi';
+import { bacaKoneksi, PROXY_BAWAAN } from '@/lib/koneksi';
 import { useAuth } from '@/lib/auth';
 import { auth } from '@/lib/firebase';
 
@@ -20,7 +20,6 @@ import { auth } from '@/lib/firebase';
    pair forex menaut ke chart sumbernya.
    ════════════════════════════════════════════════════════════════════════ */
 
-const PROXY_BAWAAN = 'https://103-253-145-38.sslip.io';
 
 interface Sinyal {
   id: string;

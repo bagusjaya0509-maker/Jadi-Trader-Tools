@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { bacaKoneksi } from '@/lib/koneksi';
+import { bacaKoneksi, PROXY_BAWAAN } from '@/lib/koneksi';
 
 /* ════════════════════════════════════════════════════════════════════════
    KABAR AGEN — pemberitahuan dari Pemburu Sinyal
@@ -17,7 +17,6 @@ import { bacaKoneksi } from '@/lib/koneksi';
    berhenti adalah kabar barunya — kabar lama tetap tersaji.
    ════════════════════════════════════════════════════════════════════════ */
 
-const PROXY_BAWAAN = 'https://103-253-145-38.sslip.io';
 const KUNCI_DIBACA = 'jt.kabarDibaca';
 
 export interface KabarAgen {

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Play, Trash2, TriangleAlert, CheckCircle2, RotateCcw, X, Plus, Square,
          Loader2, Stethoscope, Copy, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { bacaKoneksi } from '@/lib/koneksi';
+import { bacaKoneksi, PROXY_BAWAAN } from '@/lib/koneksi';
 import { auth } from '@/lib/firebase';
 import { jalankanPine, CONTOH_PINE, type HasilPine, type InputPine } from '@/lib/pine';
 import type { Lilin } from '@/lib/pasar';
@@ -45,7 +45,7 @@ function laporCelah(galat: string[], dilewati: string[]) {
   const fitur = fiturHilang(galat, dilewati).filter((f) => !celahTerkirim.has(f));
   if (!fitur.length) return;
   fitur.forEach((f) => celahTerkirim.add(f));
-  const dasar = (bacaKoneksi().url.trim() || 'https://103-253-145-38.sslip.io').replace(/\/+$/, '');
+  const dasar = (bacaKoneksi().url.trim() || PROXY_BAWAAN).replace(/\/+$/, '');
   void fetch(`${dasar}/api/pine/galat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -214,7 +214,7 @@ export function DockPine({ buka, tab, aturTab, onTutup, lilin, simbol, tf, hingg
     if (!u) { setDokterKabar('Masuk dulu untuk memakai agen.'); return; }
     setDokterSibuk(true); setDokterKabar('Agen membaca skrip dan daftar galatnya…'); setUsul(null);
     try {
-      const dasar = (bacaKoneksi().url.trim() || 'https://103-253-145-38.sslip.io').replace(/\/+$/, '');
+      const dasar = (bacaKoneksi().url.trim() || PROXY_BAWAAN).replace(/\/+$/, '');
       const token = await u.getIdToken();
       const r = await fetch(`${dasar}/api/agen/pine`, {
         method: 'POST',

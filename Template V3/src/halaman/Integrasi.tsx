@@ -7,7 +7,7 @@ import {
 import { Panel, PanelHead, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { TutorialVps } from '@/components/tutorial-vps';
 import { cn } from '@/lib/utils';
-import { bacaKoneksi, simpanKoneksi, hapusKoneksi, koneksiLengkap } from '@/lib/koneksi';
+import { bacaKoneksi, simpanKoneksi, hapusKoneksi, koneksiLengkap, PROXY_BAWAAN } from '@/lib/koneksi';
 import { useKodeMt5, useAkunMt5 } from '@/lib/akun';
 import { tautanBerkas } from '@/lib/admin';
 
@@ -190,7 +190,7 @@ export default function Integrasi() {
      setelan pengguna kalau ada — orang yang memakai VPS sendiri harus
      memasukkan alamat VPS-nya, bukan alamat kami. Tanpa garis miring di
      ujung: MT5 mencocokkan alamatnya persis. */
-  const alamatBackend = (url.trim() || 'https://103-253-145-38.sslip.io').replace(/\/+$/, '');
+  const alamatBackend = (url.trim() || PROXY_BAWAAN).replace(/\/+$/, '');
   const [tersalin, setTersalin] = useState<string | null>(null);
 
   return (

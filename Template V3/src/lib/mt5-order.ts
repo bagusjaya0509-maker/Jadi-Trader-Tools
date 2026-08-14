@@ -1,5 +1,5 @@
 import { auth } from '@/lib/firebase';
-import { bacaKoneksi } from '@/lib/koneksi';
+import { bacaKoneksi, PROXY_BAWAAN } from '@/lib/koneksi';
 
 /* ════════════════════════════════════════════════════════════════════════
    ORDER MT5 LEWAT WEB — jalur perintah EA Trade-Fi Sync v2
@@ -16,7 +16,6 @@ import { bacaKoneksi } from '@/lib/koneksi';
        bukan menatap tombol yang diam.
    ════════════════════════════════════════════════════════════════════════ */
 
-const PROXY_BAWAAN = 'https://103-253-145-38.sslip.io';
 
 function dasar() {
   const url = bacaKoneksi().url.trim();

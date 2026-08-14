@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import { bacaKoneksi } from '@/lib/koneksi';
+import { bacaKoneksi, PROXY_BAWAAN } from '@/lib/koneksi';
 
 /* ════════════════════════════════════════════════════════════════════════
    DATA PEMILIK — trafik, klien, penjualan, laporan, lisensi, status VPS
@@ -18,7 +18,6 @@ import { bacaKoneksi } from '@/lib/koneksi';
    mengatakannya daripada diam-diam jatuh ke data contoh.
    ════════════════════════════════════════════════════════════════════════ */
 
-const PROXY_BAWAAN = 'https://103-253-145-38.sslip.io';
 /** Sama dengan jeda di lib/akun.ts — dua panel yang menanyakan hal yang
  *  sama tidak boleh menyegarkan diri pada irama berbeda. */
 const JEDA_MS = 30_000;

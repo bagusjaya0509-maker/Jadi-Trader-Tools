@@ -1,7 +1,7 @@
 import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Newspaper, X, Loader2, TriangleAlert } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { bacaKoneksi } from '@/lib/koneksi';
+import { bacaKoneksi, PROXY_BAWAAN } from '@/lib/koneksi';
 
 /* ════════════════════════════════════════════════════════════════════════
    NEWS — kalender ekonomi, pindahan dari screener
@@ -18,7 +18,6 @@ import { bacaKoneksi } from '@/lib/koneksi';
    belum mengatur Backend URL tetap melihat isinya lewat proxy bawaan.
    ════════════════════════════════════════════════════════════════════════ */
 
-const PROXY_BAWAAN = 'https://103-253-145-38.sslip.io';
 
 /** Ambil ulang tiap 10 menit. Backend sudah men-cache 15 menit, jadi lebih
  *  sering dari ini cuma menambah permintaan tanpa menambah data baru. */

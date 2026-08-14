@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { auth } from '@/lib/firebase';
-import { bacaKoneksi } from '@/lib/koneksi';
+import { bacaKoneksi, PROXY_BAWAAN } from '@/lib/koneksi';
 
 /* ════════════════════════════════════════════════════════════════════════
    AKSES PERINTIS — 20 gratis, 80 berbayar, 30 hari
@@ -14,7 +14,6 @@ import { bacaKoneksi } from '@/lib/koneksi';
    "tinggal 19 dari 20" kepada orang yang belum punya akun sama sekali.
    ════════════════════════════════════════════════════════════════════════ */
 
-const PROXY_BAWAAN = 'https://103-253-145-38.sslip.io';
 
 /** bacaKoneksi() sengaja mengembalikan kosong sebelum login — jadi untuk
  *  rute publik alamatnya diambil apa adanya, dengan bawaan VPS. */

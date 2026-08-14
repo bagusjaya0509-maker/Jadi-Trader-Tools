@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { db } from '@/lib/data';
 import { auth } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth';
-import { bacaKoneksi } from '@/lib/koneksi';
+import { bacaKoneksi, PROXY_BAWAAN } from '@/lib/koneksi';
 import type { Sumber } from '@/data/contoh';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -269,7 +269,6 @@ export async function sinkronRiwayatBinance(sudahAda: Set<string>, sejakMs: numb
    Fungsi ini menutup jalur itu. Tidak ada berkas EA baru yang perlu dipasang.
    ════════════════════════════════════════════════════════════════════════ */
 
-const PROXY_BAWAAN = 'https://103-253-145-38.sslip.io';
 
 export interface HasilSinkron {
   ditemukan: number;

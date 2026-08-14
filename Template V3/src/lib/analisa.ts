@@ -1,4 +1,5 @@
 import { auth } from '@/lib/firebase';
+import { PROXY_BAWAAN } from '@/lib/koneksi';
 
 /* ════════════════════════════════════════════════════════════════════════
    COPY TRADING — klien untuk rute /api/analisa di VPS
@@ -10,7 +11,7 @@ import { auth } from '@/lib/firebase';
    atau tidak, bukan tombol di layar.
    ════════════════════════════════════════════════════════════════════════ */
 
-const DASAR = 'https://103-253-145-38.sslip.io';
+const DASAR = PROXY_BAWAAN;
 
 export interface RingkasAnalisa {
   id: string; uid: string; nama: string; judul: string; pasangan: string;

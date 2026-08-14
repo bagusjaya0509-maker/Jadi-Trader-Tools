@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { RefreshCw, Check, Loader2, Copy } from 'lucide-react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { cn, tanggalPendek } from '@/lib/utils';
-import { bacaKoneksi } from '@/lib/koneksi';
+import { bacaKoneksi, PROXY_BAWAAN } from '@/lib/koneksi';
 
 /* ════════════════════════════════════════════════════════════════════════
    CELAH MESIN PINE — daftar yang menentukan pekerjaan berikutnya
@@ -26,7 +26,7 @@ import { bacaKoneksi } from '@/lib/koneksi';
 interface Celah { nama: string; jumlah: number; pertama: number; terakhir: number; versi?: string[] }
 
 function dasar() {
-  return (bacaKoneksi().url.trim() || 'https://103-253-145-38.sslip.io').replace(/\/+$/, '');
+  return (bacaKoneksi().url.trim() || PROXY_BAWAAN).replace(/\/+$/, '');
 }
 
 /** Kelompok kasar supaya daftarnya bisa dibaca sebagai keputusan, bukan

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import { bacaKoneksi } from '@/lib/koneksi';
+import { bacaKoneksi, PROXY_BAWAAN } from '@/lib/koneksi';
 
 /* ════════════════════════════════════════════════════════════════════════
    SALDO AKUN — MT5 & Binance
@@ -20,7 +20,6 @@ import { bacaKoneksi } from '@/lib/koneksi';
    saldo hasil hitungan sendiri; yang hilang cuma badge "Connected".
    ════════════════════════════════════════════════════════════════════════ */
 
-const PROXY_BAWAAN = 'https://103-253-145-38.sslip.io';
 const JEDA_MS = 30_000;
 
 function dasar() {

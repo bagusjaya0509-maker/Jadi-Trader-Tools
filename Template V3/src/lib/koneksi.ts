@@ -108,3 +108,29 @@ export function useKoneksi() {
 
   return { koneksi: k, siap: koneksiLengkap(k) };
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   ALAMAT BACKEND BAWAAN — SATU-SATUNYA tempat host ditulis
+   ════════════════════════════════════════════════════════════════════════
+   Sebelum ini alamat VPS ditulis ulang di 17 berkas. Selama alamatnya tidak
+   pernah berubah, itu tidak terasa; begitu pindah ke domain sendiri, satu
+   berkas yang terlewat berarti satu fitur yang diam-diam masih memanggil
+   alamat lama — dan tidak ada satu pun galat yang menunjuk ke sana, karena
+   alamat lamanya memang masih hidup.
+
+   Dibaca dari `VITE_BACKEND` kalau ada, jadi alamat bisa diganti saat build
+   tanpa menyentuh kode sama sekali:
+     VITE_BACKEND=https://namadomain.com npm run build
+
+   Nilai cadangannya tetap sslip.io supaya build tanpa env tetap bekerja
+   persis seperti sekarang.
+   ════════════════════════════════════════════════════════════════════════ */
+export const PROXY_BAWAAN =
+  (import.meta.env.VITE_BACKEND as string | undefined)?.replace(/\/+$/, '') ||
+  'https://103-253-145-38.sslip.io';
+
+/** Alamat backend yang BERLAKU: punya pengguna kalau ia mengisinya sendiri
+ *  di Integrations, kalau tidak ya bawaan. */
+export function dasarBackend(): string {
+  return (bacaKoneksi().url.trim() || PROXY_BAWAAN).replace(/\/+$/, '');
+}

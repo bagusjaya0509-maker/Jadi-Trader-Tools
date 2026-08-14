@@ -1,4 +1,4 @@
-import { bacaKoneksi } from '@/lib/koneksi';
+import { bacaKoneksi, PROXY_BAWAAN } from '@/lib/koneksi';
 
 /* ════════════════════════════════════════════════════════════════════════
    DATA PASAR — klines & ticker lewat proxy VPS
@@ -14,7 +14,6 @@ import { bacaKoneksi } from '@/lib/koneksi';
    pengunjung yang belum mengatur apa pun tetap melihat data.
    ════════════════════════════════════════════════════════════════════════ */
 
-const PROXY_BAWAAN = 'https://103-253-145-38.sslip.io';
 
 function dasar() {
   const url = bacaKoneksi().url.trim();

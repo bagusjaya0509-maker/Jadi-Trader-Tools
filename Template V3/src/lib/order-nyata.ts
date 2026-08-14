@@ -1,4 +1,4 @@
-import { bacaKoneksi, koneksiLengkap } from '@/lib/koneksi';
+import { bacaKoneksi, koneksiLengkap, PROXY_BAWAAN } from '@/lib/koneksi';
 import { uang, harga as fHarga } from '@/lib/utils';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -239,7 +239,7 @@ export interface UbahSlTp {
 
 export async function ubahSlTpNyata(p: UbahSlTp): Promise<void> {
   const { url, token } = bacaKoneksi();
-  const dasar = (url.trim() || 'https://103-253-145-38.sslip.io').replace(/\/+$/, '');
+  const dasar = (url.trim() || PROXY_BAWAAN).replace(/\/+$/, '');
   if (!token.trim()) throw new Error('App Token belum diisi di Integrations.');
   const r = await fetch(`${dasar}/api/trade/futures/edit-sltp`, {
     method: 'POST',
@@ -258,7 +258,7 @@ export async function ubahSlTpNyata(p: UbahSlTp): Promise<void> {
 /** Batalkan pending order kripto yang belum ke-fill. */
 export async function batalPendingNyata(p: { symbol: string; orderId: string; isAlgo?: boolean }): Promise<void> {
   const { url, token } = bacaKoneksi();
-  const dasar = (url.trim() || 'https://103-253-145-38.sslip.io').replace(/\/+$/, '');
+  const dasar = (url.trim() || PROXY_BAWAAN).replace(/\/+$/, '');
   if (!token.trim()) throw new Error('App Token belum diisi di Integrations.');
   /* cancel-order, BUKAN cancel-pending. Yang kedua namanya menjanjikan
      hal ini tapi isinya cuma mengurus SL/TP: ia menerima slOrderId /
@@ -283,7 +283,7 @@ export async function tutupPosisiNyata(p: {
   slOrderId?: string; tp1OrderId?: string;
 }): Promise<void> {
   const { url, token } = bacaKoneksi();
-  const dasar = (url.trim() || 'https://103-253-145-38.sslip.io').replace(/\/+$/, '');
+  const dasar = (url.trim() || PROXY_BAWAAN).replace(/\/+$/, '');
   if (!token.trim()) throw new Error('App Token belum diisi di Integrations.');
   const r = await fetch(`${dasar}/api/trade/futures/close`, {
     method: 'POST',
@@ -309,7 +309,7 @@ export async function tickSimbol(simbol: string): Promise<number> {
   const ada = tickCache.get(simbol);
   if (ada) return ada;
   const { url, token } = bacaKoneksi();
-  const dasar = (url.trim() || 'https://103-253-145-38.sslip.io').replace(/\/+$/, '');
+  const dasar = (url.trim() || PROXY_BAWAAN).replace(/\/+$/, '');
   if (!token.trim()) return 0;
   try {
     const r = await fetch(`${dasar}/api/symbol-filters?symbol=${encodeURIComponent(simbol)}`, {

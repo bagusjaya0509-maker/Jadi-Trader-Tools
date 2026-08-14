@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { bacaKoneksi } from '@/lib/koneksi';
+import { bacaKoneksi, PROXY_BAWAAN } from '@/lib/koneksi';
 
 /* ════════════════════════════════════════════════════════════════════════
    HARGA PASAR TERKINI
@@ -21,7 +21,6 @@ import { bacaKoneksi } from '@/lib/koneksi';
 
 /** Dipakai kalau pengguna belum mengisi Backend URL sendiri. Sama dengan
  *  `MARKET_PROXY_DEFAULT` di screener V2 — satu alamat, dua aplikasi. */
-const PROXY_BAWAAN = 'https://103-253-145-38.sslip.io';
 
 const JEDA_MS = 20_000;
 

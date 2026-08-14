@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { PROXY_BAWAAN } from '@/lib/koneksi';
 
 /* ════════════════════════════════════════════════════════════════════════
    ANGKA PAMERAN HALAMAN DEPAN
@@ -24,7 +25,7 @@ import { useEffect, useState } from 'react';
    Firestore sendiri-sendiri, dan kuotanya milik bersama. VPS menyegarkan
    sekali per menit untuk SEMUA pengunjung, dan menyajikan salinan terakhir
    yang baik bahkan saat kuota hulu sedang habis. */
-const DOK = 'https://103-253-145-38.sslip.io/api/publik/jurnalShowcase';
+const DOK = `${PROXY_BAWAAN}/api/publik/jurnalShowcase`;
 
 export interface AngkaPameran {
   siap: boolean;
