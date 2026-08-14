@@ -202,6 +202,22 @@ export default function ChartBacktest() {
   const [uji, setUji] = useState(false);
   /* null = replay mati. Angkanya indeks bar terakhir yang boleh tampil. */
   const [replayIdx, setReplayIdx] = useState<number | null>(null);
+  /* MODE BIDIK — sekali pakai, bukan keadaan yang menetap.
+     ────────────────────────────────────────────────────────────────────
+     Menekan Replay tidak langsung memulai; ia menyalakan mode ini, dan
+     klik BERIKUTNYA di chart menentukan titik mulainya. Sesudah satu klik
+     modenya padam sendiri.
+
+     Kenapa sekali pakai, bukan "klik kapan saja saat replay jalan": area
+     chart dipakai untuk banyak hal — memilih garis, menaruh alat, sekadar
+     memfokuskan. Kalau tiap klik di sana memindahkan waktu, tidak ada
+     lagi klik yang aman, dan orangnya harus terus mengingat chart sedang
+     dalam mode berbahaya. Sekali pakai membalik bebannya: modenya jelas
+     menyala, dipakai sekali, lalu hilang. */
+  const [bidikReplay, setBidikReplay] = useState(false);
+  /* Mode bidik dibatalkan tiap ganti simbol/timeframe — bidikan untuk
+     chart lain tidak berarti apa-apa di sini. */
+  useEffect(() => { setBidikReplay(false); }, [simbol, tf]);
   const [garisHarga, setGarisHarga] = useState<GarisHarga[]>([]);
   /* Panel Backtest tertutup saat halaman dibuka. Ia beta, dan yang beta
      tidak boleh menempati ruang tetap di layar seolah sudah matang. */
@@ -1616,15 +1632,23 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
               )}
             </div>
             <button onClick={() => {
-                if (replayIdx !== null) { setReplayIdx(null); return; }
-                mulaiReplay.current?.();
+                /* Sedang replay -> keluar. Sedang membidik -> batal.
+                   Selain itu -> mulai membidik. Satu tombol, tiga keadaan
+                   yang saling berurutan, jadi tidak perlu tombol kedua. */
+                if (replayIdx !== null) { setReplayIdx(null); setBidikReplay(false); return; }
+                setBidikReplay((v) => !v);
               }}
-              title={replayIdx !== null ? 'Keluar dari replay' : 'Mulai replay dari 60% data'}
+              title={replayIdx !== null ? 'Keluar dari replay'
+                : bidikReplay ? 'Batal memilih titik mulai'
+                : 'Pilih titik mulai replay — klik di chart'}
               className={cn('flex cursor-pointer items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[12px] transition-colors',
                 replayIdx !== null
                   ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400'
+                  : bidikReplay
+                  ? 'border-amber-500/50 bg-amber-500/10 text-amber-300'
                   : 'border-zinc-800 text-zinc-300 hover:border-zinc-700 hover:text-zinc-100')}>
-              <History className="size-3.5" /> Replay
+              <History className="size-3.5" />
+              {bidikReplay ? 'Klik di chart…' : 'Replay'}
               {replayIdx !== null && <span className="angka text-[10.5px]">bar {replayIdx + 1}</span>}
             </button>
           </div>
@@ -1652,22 +1676,21 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                           lilin={lilinGabung} garis={garis} trade={replayIdx === null ? hasil?.trade : undefined}
                           tinggi={tinggiChart} hingga={replayIdx ?? undefined} smi={smi}
                           garisHarga={[...garisHarga, ...garisZona, ...garisOrder]}
-                          /* KLIK CHART TIDAK MENGGESER REPLAY — dihapus atas
-                              permintaan pemilik.
-
-                              Dulu tiap klik di area chart saat replay berjalan
-                              memindahkan posisi replay ke bar itu. Sempat
-                              dijaga supaya tidak menyala saat alat gambar
-                              dipakai, tapi masalahnya lebih mendasar: area
-                              chart adalah tempat orang mengklik untuk banyak
-                              hal — memilih garis, menaruh alat, sekadar
-                              memfokuskan — dan menjadikan SETIAP klik di sana
-                              sebagai perintah pindah waktu berarti tidak ada
-                              lagi klik yang aman.
-
-                              Posisi replay sekarang HANYA diubah lewat
-                              penggeser dan tombolnya sendiri: satu tempat,
-                              disengaja, tidak bisa tersenggol. */
+                          /* Klik chart HANYA berlaku saat mode bidik menyala —
+                              sekali, untuk menentukan titik mulai replay.
+                              Sesudah itu modenya padam dan klik kembali tidak
+                              berakibat apa-apa, jadi memilih garis atau
+                              menaruh alat tetap aman seperti biasa. */
+                          onKlikBar={bidikReplay ? ((i) => {
+                            /* Dijepit ke dalam rentang data: klik di ruang
+                               kosong sebelah kanan chart mengembalikan indeks
+                               di luar array, dan replay yang mulai di luar
+                               datanya menggambar chart kosong. Disisakan 2 bar
+                               supaya selalu ada yang bisa dimajukan. */
+                            const maks = lilinGabung.times.length - 2;
+                            setReplayIdx(Math.max(0, Math.min(i, maks)));
+                            setBidikReplay(false);
+                          }) : undefined}
                           garisSeret={garisSeret}
                           onSeret={(id, h) => {
                             if (sunting) {
