@@ -1642,7 +1642,24 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                           lilin={lilinGabung} garis={garis} trade={replayIdx === null ? hasil?.trade : undefined}
                           tinggi={tinggiChart} hingga={replayIdx ?? undefined} smi={smi}
                           garisHarga={[...garisHarga, ...garisZona, ...garisOrder]}
-                          onKlikBar={replayIdx === null ? undefined : setReplayIdx}
+                          /* KLIK CHART = PINDAHKAN POSISI REPLAY — tapi HANYA
+                              kalau tidak ada alat gambar yang sedang dipakai.
+
+                              Sebelumnya syaratnya cuma "replay sedang jalan",
+                              dan akibatnya alat gambar tidak bisa dipakai sama
+                              sekali selama replay: tiap klik untuk menaruh atau
+                              memindahkan garis JUGA menggeser posisi replay,
+                              jadi chartnya melompat tepat saat orangnya sedang
+                              membidik. Terbaca sebagai "grafiknya maju sendiri",
+                              padahal yang terjadi satu klik dikerjakan dua kali
+                              oleh dua fitur yang tidak saling tahu.
+
+                              Dua keadaan yang menahan: `alat` (sedang memegang
+                              alat, hendak menggambar baru) dan `gambarPilih`
+                              (sebuah gambar sedang dipilih, hendak digeser).
+                              Di luar keduanya, klik tetap memindahkan replay
+                              seperti biasa. */
+                          onKlikBar={replayIdx === null || alat || gambarPilih ? undefined : setReplayIdx}
                           garisSeret={garisSeret}
                           onSeret={(id, h) => {
                             if (sunting) {
