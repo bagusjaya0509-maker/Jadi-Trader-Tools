@@ -15,6 +15,22 @@ import { useAkunMt5, useAkunBinance, versiKurangDari, VERSI_EA_PENDING } from '@
 import { useArusKas, arusBersih } from '@/lib/tulis-jurnal';
 import { PanelEvaluasi } from '@/components/panel-evaluasi';
 import { TabelPosisi } from '@/components/tabel-posisi';
+import { bacaSpekMt5 } from '@/lib/pasar';
+import { simbolDasarMt5 } from '@/lib/simbol';
+
+/* Risiko & target dalam DOLAR — rumus yang SAMA dengan panel Posisi Terbuka
+   di Chart & Entry. Ditulis dua kali di dua berkas dan itu disengaja: satu
+   angka uang yang dihitung berbeda di dua layar jauh lebih buruk daripada
+   satu fungsi yang ditulis dua kali, jadi kalau salah satunya diubah, yang
+   lain HARUS ikut.
+     · kripto   — jumlah koin x jarak harga
+     · Trade-Fi — lot x dolar per lot per 1.0 harga (dilaporkan EA)
+   undefined kalau SL/TP belum dipasang atau ukurannya tidak diketahui —
+   nol di sana akan terbaca "tidak ada risiko". */
+function uangDariJarak(jarak: number, unitPerHarga: number): number | undefined {
+  if (!(jarak > 0) || !(unitPerHarga > 0)) return undefined;
+  return jarak * unitPerHarga;
+}
 
 /* ════════════════════════════════════════════════════════════════════════
    DASHBOARD
@@ -348,6 +364,8 @@ export function Dashboard() {
                 entry: p.entry,
                 hargaKini: p.hargaKini,
                 sl: p.sl, tp: p.tp,
+                risikoUsd: uangDariJarak(p.sl > 0 ? Math.abs(p.entry - p.sl) : 0, p.jumlah ?? 0),
+                imbalUsd: uangDariJarak(p.tp > 0 ? Math.abs(p.tp - p.entry) : 0, p.jumlah ?? 0),
                 pnl: p.pnlFloat,
                 ket: [p.venue, p.tf && p.tf !== '—' ? p.tf : ''].filter(Boolean).join(' · '),
               }))}
@@ -430,6 +448,10 @@ export function Dashboard() {
                 hargaKini: p.hargaKini,
                 sl: p.sl, tp: p.tp,
                 pnl: p.profit,
+                risikoUsd: uangDariJarak(p.sl > 0 ? Math.abs(p.hargaBuka - p.sl) : 0,
+                  (bacaSpekMt5(simbolDasarMt5(p.simbol)) ?? 0) * p.lot),
+                imbalUsd: uangDariJarak(p.tp > 0 ? Math.abs(p.tp - p.hargaBuka) : 0,
+                  (bacaSpekMt5(simbolDasarMt5(p.simbol)) ?? 0) * p.lot),
                 ket: `#${p.tiket}`,
               }))}
             />

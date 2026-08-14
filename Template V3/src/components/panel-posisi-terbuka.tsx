@@ -3,8 +3,8 @@ import { Panel, PanelHead } from '@/components/efferd-ui';
 import { cn, uang, harga as fHarga } from '@/lib/utils';
 import { usePosisi } from '@/lib/data';
 import { useAkunMt5, versiKurangDari, VERSI_EA_PENDING } from '@/lib/akun';
-import { useEmosiPosisi, EMOSI } from '@/lib/emosi-posisi';
 import { useHargaPasar } from '@/lib/harga';
+import { bacaSpekMt5 } from '@/lib/pasar';
 import { TabelPosisi, type BarisPosisi } from '@/components/tabel-posisi';
 import type { Sumber } from '@/data/contoh';
 import { simbolDasarMt5 } from '@/lib/simbol';
@@ -90,7 +90,6 @@ export function PanelPosisiTerbuka({ sumber, onSunting }: {
         harga: o.harga, sl: o.sl, tp: o.tp,
       }));
 
-  const emosiPos = useEmosiPosisi();
 
   /* ── Penjaga stop nyasar ────────────────────────────────────────────
      SL/TP di Binance menempel pada SIMBOL, bukan pada posisi — jadi ia
@@ -141,22 +140,55 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
      itu bohong; yang jujur adalah mengambil harganya. */
   const hargaPasar = useHargaPasar(sumber === 'kripto' ? posisiKripto.map((p) => p.simbol) : []);
 
+  /* ── Risiko & target dalam DOLAR ───────────────────────────────────
+     SL dan TP sebagai harga cuma bisa dinilai orang yang hafal ukuran
+     posisinya. Yang sebenarnya ditanyakan: berapa uang yang hilang kalau
+     stop kena, dan berapa yang didapat kalau target kena.
+
+     Rumusnya berbeda per pasar dan itu tidak bisa disatukan:
+       · kripto   — jumlah koin x jarak harga
+       · Trade-Fi — lot x dolar per lot per 1.0 harga (dilaporkan EA)
+     Menyamakan keduanya berarti salah satunya salah 100x lipat.
+
+     undefined kalau SL/TP belum dipasang atau ukurannya tidak diketahui.
+     Angka nol di sana akan terbaca "tidak ada risiko", yang justru
+     kebalikan dari kenyataannya. */
+  function uangDari(jarak: number, unitPerHarga: number): number | undefined {
+    if (!(jarak > 0) || !(unitPerHarga > 0)) return undefined;
+    return jarak * unitPerHarga;
+  }
+
   const baris: BarisPosisi[] = sumber === 'kripto'
-    ? posisiKripto.map((p) => ({
-        kunci: p.id, simbol: p.simbol, arah: p.arah,
-        ket: p.tf && p.tf !== '—' ? p.tf : p.venue,
-        ukuran: p.jumlah ? p.jumlah.toLocaleString('id-ID', { maximumFractionDigits: 4 }) : '',
-        entry: p.entry, hargaKini: hargaPasar[p.simbol], sl: p.sl, tp: p.tp,
-        pnl: p.pnlFloat,
-      }))
-    : mt5.posisi.map((p) => ({
-        kunci: p.tiket, simbol: p.simbol, arah: p.arah,
-        ket: `#${p.tiket}`,
-        ukuran: `${p.lot} lot`,
-        entry: p.hargaBuka, hargaKini: p.hargaKini, sl: p.sl, tp: p.tp,
-        pnl: p.profit,
-        tiket: p.tiket,
-      }));
+    ? posisiKripto.map((p) => {
+        const unit = p.jumlah ?? 0;
+        return {
+          kunci: p.id, simbol: p.simbol, arah: p.arah,
+          ket: p.tf && p.tf !== '—' ? p.tf : p.venue,
+          ukuran: p.jumlah ? p.jumlah.toLocaleString('id-ID', { maximumFractionDigits: 4 }) : '',
+          entry: p.entry, hargaKini: hargaPasar[p.simbol], sl: p.sl, tp: p.tp,
+          pnl: p.pnlFloat,
+          risikoUsd: uangDari(p.sl > 0 ? Math.abs(p.entry - p.sl) : 0, unit),
+          imbalUsd: uangDari(p.tp > 0 ? Math.abs(p.tp - p.entry) : 0, unit),
+        };
+      })
+    : mt5.posisi.map((p) => {
+        /* Nilai per lot dari EA. bacaSpekMt5 memakai nama DASAR, sementara
+           EA melapor nama broker apa adanya (XAUUSDc) — dikupas dulu, sama
+           seperti di chart. Null berarti EA lama yang belum melaporkannya;
+           kolomnya dibiarkan kosong daripada memakai angka karangan. */
+        const nilaiLot = bacaSpekMt5(simbolDasarMt5(p.simbol));
+        const unit = nilaiLot ? p.lot * nilaiLot : 0;
+        return {
+          kunci: p.tiket, simbol: p.simbol, arah: p.arah,
+          ket: `#${p.tiket}`,
+          ukuran: `${p.lot} lot`,
+          entry: p.hargaBuka, hargaKini: p.hargaKini, sl: p.sl, tp: p.tp,
+          pnl: p.profit,
+          tiket: p.tiket,
+          risikoUsd: uangDari(p.sl > 0 ? Math.abs(p.hargaBuka - p.sl) : 0, unit),
+          imbalUsd: uangDari(p.tp > 0 ? Math.abs(p.tp - p.hargaBuka) : 0, unit),
+        };
+      });
 
   const total = baris.some((b) => b.pnl !== undefined)
     ? baris.reduce((s, b) => s + (b.pnl ?? 0), 0)
@@ -186,9 +218,13 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
         {/* Susunan kolom SAMA dengan Dashboard: Pair | Size | Entry |
             Gerak | P/L, SL & TP di baris keterangan. Dulu di sini kartu
             sendiri — dan panel yang menjawab pertanyaan yang sama dengan
-            bentuk berbeda memaksa orang belajar dua kali. Emosi jadi
-            kolom terakhir; tetap bisa disunting, tetap dibaca sebagai
-            data, bukan formulir. */}
+            bentuk berbeda memaksa orang belajar dua kali.
+
+            Kolom Emosi DIHAPUS (keputusan pemilik 14 Agu 2026) dan
+            digantikan Risk SL & Target TP dalam dolar. Emosi tetap
+            tercatat lewat panel tiket saat order dibuat — yang hilang
+            cuma penyuntingannya di tabel ini, dan tempatnya dipakai
+            untuk angka yang dibutuhkan saat posisi sedang berjalan. */}
         <TabelPosisi
           baris={baris}
           onKlikBaris={onSunting && ((b) => onSunting({
@@ -211,18 +247,6 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
           kosong={sumber === 'kripto'
             ? 'Tidak ada posisi kripto terbuka.'
             : mt5.terhubung === true ? 'Tidak ada posisi MT5 terbuka.' : mt5.ket}
-          kolomEmosi={(b) => (
-            <select
-              value={emosiPos.peta[b.kunci] ?? ''}
-              disabled={!emosiPos.bisaTulis}
-              onChange={(e) => { void emosiPos.simpan(b.kunci, e.target.value, b.tiket).catch(() => {}); }}
-              title="Emosi saat posisi ini berjalan — ikut tercatat di riwayat order saat ditutup"
-              className={cn('cursor-pointer appearance-none border-0 bg-transparent p-0 text-right text-[11px] outline-none disabled:cursor-not-allowed',
-                emosiPos.peta[b.kunci] ? 'text-zinc-300' : 'text-zinc-600')}>
-              <option value="">—</option>
-              {EMOSI.map((e) => <option key={e} value={e}>{e}</option>)}
-            </select>
-          )}
         />
 
         {/* Sama seperti di Dashboard: EA lama tidak bisa melaporkan

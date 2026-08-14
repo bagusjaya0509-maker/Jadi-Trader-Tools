@@ -30,7 +30,7 @@ import {
   jalankanUji, garisIndikator, zonaSnr, deretSmi, SETELAN_BAWAAN,
   type Setelan, type HasilUji,
 } from '@/lib/backtest';
-import { SIMBOL_DASAR } from '@/lib/simbol';
+import { SIMBOL_DASAR, simbolDasarMt5 } from '@/lib/simbol';
 
 /* ════════════════════════════════════════════════════════════════════════
    CHART & BACKTEST
@@ -665,6 +665,34 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
   /* Tick bid/ask menumpang balasan klines MT5 yang memang sudah dipoll —
      dibaca ulang tiap render, dan render datang tiap data lilin segar. */
   const tickMt5 = simbol.startsWith('MT5:') ? bacaTickMt5(simbol.slice(4)) : null;
+
+  /* ── Berapa desimal yang dipakai simbol ini ────────────────────────
+     Panel tiket dulu menulis SL/TP dengan toFixed(6) untuk SEMUA simbol,
+     dan hasilnya "4345.504523" di XAUUSD — angka yang tidak mungkin
+     dikirim ke broker mana pun. Bukan sekadar jelek dibaca: SL/TP yang
+     lebih presisi daripada simbolnya ditolak broker, dan stop yang
+     ditolak adalah stop yang dikira terpasang padahal tidak ada.
+
+     EA TIDAK melaporkan `digits`, jadi angkanya disimpulkan dari tick
+     bid/ask yang memang datang dengan presisi asli broker (4334.488 =
+     3 desimal). Diambil yang TERBANYAK dari bid dan ask: harga yang
+     kebetulan bulat (4334.5) akan menyesatkan kalau dipakai sendirian.
+
+     Untuk kripto, tick bursa sudah ditangani `bulatkanHarga`; di sini
+     cukup jatuh ke presisi harga terakhir. */
+  function desimalDari(...angka: (number | undefined)[]): number {
+    let maks = 0;
+    for (const n of angka) {
+      if (!n || !isFinite(n)) continue;
+      const t = String(n);
+      const titik = t.indexOf('.');
+      if (titik >= 0) maks = Math.max(maks, Math.min(8, t.length - titik - 1));
+    }
+    return maks;
+  }
+  const desimalHarga = simbol.startsWith('MT5:')
+    ? desimalDari(tickMt5?.bid, tickMt5?.ask) || 2
+    : desimalDari(lilin.closes[lilin.closes.length - 1]) || 2;
   /* Garis Ask HANYA di mode real. Di mode latihan tidak ada spread yang
      dibayar siapa pun, jadi garis kedua di dekat harga cuma menambah satu
      garis lagi yang harus diabaikan mata. */
@@ -1065,13 +1093,49 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
        dulu sebelum dibandingkan. */
     if (simbol.startsWith('MT5:')) {
       const nama = simbol.slice(4).toUpperCase();
-      const milikMt5 = akunMt5.pending.filter((o) => o.simbol.toUpperCase() === nama);
+      /* NAMA DASAR di kedua sisi.
+         ──────────────────────────────────────────────────────────────
+         Dulu di sini `o.simbol.toUpperCase() === nama`, dan itu TIDAK
+         PERNAH cocok di broker yang memakai akhiran: EA melapor
+         "XAUUSDc", chart bertanya "XAUUSD", dan toUpperCase justru
+         menghapus satu-satunya petunjuk bahwa huruf terakhir itu
+         akhiran ("XAUUSDC"). Akibatnya tidak ada galat sama sekali —
+         cuma chart yang selamanya bersih padahal ada order hidup.
+         simbolDasarMt5 mengupas akhiran huruf kecil di NAMA MENTAH,
+         jadi harus dipanggil sebelum huruf besar dipaksakan. */
+      const cocok = (s: string) => simbolDasarMt5(s) === nama;
+
+      const g: GarisHarga[] = [];
+
+      /* POSISI TERBUKA — entry, SL, dan TP.
+         ──────────────────────────────────────────────────────────────
+         Sebelumnya cuma pending order yang digambar, jadi begitu order
+         terisi garisnya JUSTRU HILANG — persis di saat ia paling
+         dibutuhkan. Posisi yang sedang berjalan tanpa garis di chart
+         berarti stop dan target cuma angka di tabel; mata tidak bisa
+         menilai jaraknya terhadap harga sekarang. */
+      for (const p of akunMt5.posisi.filter((p) => cocok(p.simbol))) {
+        const nomor = akunMt5.posisi.length > 1 ? ` #${p.tiket}` : '';
+        if (p.hargaBuka) g.push({
+          harga: p.hargaBuka, warna: 'rgba(212,212,216,.85)',
+          label: `${p.arah} ${p.lot} lot${nomor}`,
+        });
+        /* SL/TP hanya digambar kalau memang terpasang. Nol berarti tidak
+           ada — menggambarnya di harga 0 akan meremukkan skala chart. */
+        if (p.sl > 0) g.push({ harga: p.sl, warna: 'rgba(248,113,113,.85)', label: `SL${nomor}` });
+        if (p.tp > 0) g.push({ harga: p.tp, warna: 'rgba(16,185,129,.85)', label: `TP${nomor}` });
+      }
+
+      const milikMt5 = akunMt5.pending.filter((o) => cocok(o.simbol));
       const banyakMt5 = milikMt5.length > 1;
-      return milikMt5.map((o, i): GarisHarga => ({
-        harga: o.harga,
-        warna: o.arah === 'BUY' ? 'rgba(251,191,36,.85)' : 'rgba(251,146,60,.85)',
-        label: `${o.jenis.replace('_', ' ')}${banyakMt5 ? ` ${i + 1}` : ''}`,
-      }));
+      for (const [i, o] of milikMt5.entries()) {
+        g.push({
+          harga: o.harga,
+          warna: o.arah === 'BUY' ? 'rgba(251,191,36,.85)' : 'rgba(251,146,60,.85)',
+          label: `${o.jenis.replace('_', ' ')}${banyakMt5 ? ` ${i + 1}` : ''}`,
+        });
+      }
+      return g;
     }
     const milik = orderBursa.filter((o) => o.jenis === 'ENTRY' && o.simbol === simbol)
       /* Order yang SEDANG dipegang panel tiket sudah digambar sebagai
@@ -1087,7 +1151,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
       warna: o.arah === 'BUY' ? 'rgba(251,191,36,.85)' : 'rgba(251,146,60,.85)',
       label: `${o.arah === 'BUY' ? 'Buy' : 'Sell'} ${/STOP/.test(o.tipe) ? 'Stop' : 'Limit'}${banyak ? ` ${i + 1}` : ''}`,
     }));
-  }, [orderBursa, simbol, aksiTunda, akunMt5.pending]);
+  }, [orderBursa, simbol, aksiTunda, akunMt5.pending, akunMt5.posisi]);
 
   const terakhir = lilin.closes[lilin.closes.length - 1];
   const sebelumnya = lilin.closes[lilin.closes.length - 2];
@@ -1619,7 +1683,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                               }}
                               nyataSetelan={nyataSetelan} aturNyata={setNyataSetelan}
                               mt5={simbol.startsWith('MT5:')} lotMt5={lotMt5} aturLotMt5={setLotMt5}
-                              nilaiLotMt5={nilaiLotMt5}
+                              nilaiLotMt5={nilaiLotMt5} desimalHarga={desimalHarga}
                               demoSetelan={demoSetelan} aturDemo={setDemoSetelan}
                               catatan={catatanTiket} aturCatatan={setCatatanTiket}
                               sibukNyata={sibukNyata} kabar={kabarNyata || undefined}

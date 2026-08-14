@@ -123,7 +123,7 @@ export function PojokOrder({
   posisi, hargaKini, draf, rencana, mode, jenis, risiko, tunda, onBatalTunda,
   onPilih, onUbah, onKirim, onBatal, onTutup, onGantiMode, mati,
   nyataSetelan, aturNyata, sibukNyata, kabar, demoSetelan, aturDemo,
-  catatan, aturCatatan, qtyDemo, mt5, lotMt5, aturLotMt5, nilaiLotMt5,
+  catatan, aturCatatan, qtyDemo, mt5, lotMt5, aturLotMt5, nilaiLotMt5, desimalHarga = 6,
 }: {
   posisi: { arah: 'BUY' | 'SELL'; masuk: number; sl: number; tp: number; pnl: number; risiko: number; unit: number } | null;
   hargaKini?: number;
@@ -140,6 +140,11 @@ export function PojokOrder({
   aturLotMt5?: (n: number) => void;
   /** Dolar per 1 lot per 1.0 harga — dilaporkan EA v2.01. */
   nilaiLotMt5?: number;
+  /** Berapa desimal yang dipakai simbol ini. Dulu di sini toFixed(6) untuk
+   *  SEMUA simbol, dan hasilnya "4345.504523" di XAUUSD — angka yang tidak
+   *  mungkin dikirim ke broker mana pun, dan SL yang ditolak broker adalah
+   *  SL yang dikira terpasang padahal tidak ada. */
+  desimalHarga?: number;
   /** Pending order demo yang sedang menunggu harganya tersentuh. */
   tunda?: { arah: 'BUY' | 'SELL'; jenis: 'MARKET' | 'LIMIT' | 'STOP'; entry: number; sl: number; tp: number } | null;
   onBatalTunda?: () => void;
@@ -250,7 +255,7 @@ export function PojokOrder({
     const Isian = ({ k, label, warna }: { k: 'entry' | 'sl' | 'tp'; label: string; warna: string }) => (
       <label className="block">
         <span className="mb-0.5 block text-[9.5px] uppercase tracking-wide" style={{ color: warna }}>{label}</span>
-        <input value={rencana[k] === undefined ? '' : String(Number(rencana[k]!.toFixed(6)))}
+        <input value={rencana[k] === undefined ? '' : String(Number(rencana[k]!.toFixed(desimalHarga)))}
                inputMode="decimal"
                onChange={(e) => onUbah({ ...rencana, [k]: Number(e.target.value) || undefined })}
                className={cn(KELAS_ISIAN, 'angka w-[86px]')} />

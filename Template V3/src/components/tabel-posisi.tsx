@@ -12,7 +12,8 @@ import { cn, uang, harga } from '@/lib/utils';
    punya Size sebagai kolom. Orang yang membandingkan dua panel jadi
    mengira datanya berbeda, padahal cuma penulisannya.
 
-   Satu komponen, satu susunan kolom: Pair | Size | Entry | Gerak | P/L,
+   Satu komponen, satu susunan kolom: Pair | Size | Entry | Gerak |
+   Risk SL | Target TP | P/L,
    dengan SL & TP menumpang baris keterangan di bawah nama pair. SL/TP
    tidak dijadikan kolom sendiri karena lima kolom sudah penuh di panel
    setengah lebar — tapi ia WAJIB terlihat, karena "posisi tanpa stop"
@@ -34,18 +35,23 @@ export interface BarisPosisi {
   pnl?: number;
   /** Venue, timeframe, atau nomor tiket. */
   ket?: string;
-  /** Tiket MT5 — dipakai penyimpan emosi. */
+  /** Tiket MT5. */
   tiket?: string;
+  /** Uang yang HILANG kalau SL tersentuh, dan uang yang DIDAPAT kalau TP
+   *  tersentuh. Dihitung di pemanggilnya karena rumusnya berbeda per pasar:
+   *  kripto memakai jumlah koin, Trade-Fi memakai lot x nilai per lot.
+   *  undefined = tidak bisa dihitung (SL/TP belum dipasang, atau ukuran
+   *  posisinya tidak diketahui) — dan itu ditulis apa adanya, bukan nol. */
+  risikoUsd?: number;
+  imbalUsd?: number;
 }
 
-export function TabelPosisi({ baris, kolomEmosi, kosong, onKlikBaris }: {
+export function TabelPosisi({ baris, kosong, onKlikBaris }: {
   baris: BarisPosisi[];
   /** Klik baris = buka order ini di chart untuk disunting. Kalau tidak
    *  diberikan, barisnya tidak bisa diklik sama sekali — bukan bisa
    *  diklik tapi tidak melakukan apa-apa. */
   onKlikBaris?: (b: BarisPosisi) => void;
-  /** Sel emosi per baris (Jurnal). Kolomnya hanya muncul kalau diberikan. */
-  kolomEmosi?: (b: BarisPosisi) => React.ReactNode;
   /** Kalimat saat tidak ada posisi. */
   kosong: string;
 }) {
@@ -62,8 +68,14 @@ export function TabelPosisi({ baris, kolomEmosi, kosong, onKlikBaris }: {
             <Th className="text-right">Size</Th>
             <Th className="text-right">Entry</Th>
             <Th className="text-right">Gerak</Th>
+            {/* Risk & Target duduk TEPAT SEBELUM P/L, bukan di ujung.
+                Ketiganya satu kalimat yang dibaca sekali jalan: berapa yang
+                dipertaruhkan, berapa yang diincar, dan di mana posisinya
+                sekarang di antara keduanya. Dipisah oleh kolom lain,
+                hubungannya hilang. */}
+            <Th className="text-right">Risk SL</Th>
+            <Th className="text-right">Target TP</Th>
             <Th className="text-right">P/L</Th>
-            {kolomEmosi && <Th className="text-right">Emosi</Th>}
           </tr>
         </thead>
         <tbody>
@@ -108,11 +120,22 @@ export function TabelPosisi({ baris, kolomEmosi, kosong, onKlikBaris }: {
                   gerak === null ? 'text-zinc-600' : gerak >= 0 ? 'text-emerald-500' : 'text-red-400')}>
                   {gerak === null ? '—' : `${gerak >= 0 ? '+' : ''}${gerak.toFixed(2)}%`}
                 </Td>
+                {/* Risiko ditulis BERTANDA MINUS, target bertanda plus.
+                    Dua angka telanjang bersebelahan terbaca sebagai dua
+                    jumlah yang sama sifatnya; tandanya yang memberi tahu
+                    mana yang keluar dari saku dan mana yang masuk. */}
+                <Td className={cn('angka text-right',
+                  b.risikoUsd === undefined ? 'text-zinc-600' : 'text-red-400/90')}>
+                  {b.risikoUsd === undefined ? '—' : `-${uang(b.risikoUsd)}`}
+                </Td>
+                <Td className={cn('angka text-right',
+                  b.imbalUsd === undefined ? 'text-zinc-600' : 'text-emerald-500/90')}>
+                  {b.imbalUsd === undefined ? '—' : `+${uang(b.imbalUsd)}`}
+                </Td>
                 <Td className={cn('angka text-right',
                   b.pnl === undefined ? 'text-zinc-600' : b.pnl >= 0 ? 'text-emerald-500' : 'text-red-400')}>
                   {b.pnl === undefined ? '—' : uang(b.pnl, true)}
                 </Td>
-                {kolomEmosi && <Td className="text-right">{kolomEmosi(b)}</Td>}
               </Tr>
             );
           })}
