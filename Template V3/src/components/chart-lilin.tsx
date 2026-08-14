@@ -843,6 +843,10 @@ export function ChartLilin({
   const aturUbah = useCallback((v: UbahMt5 | null) => { ubahRef.current = v; setUbah(v); }, []);
   const seretUbah = useRef<{ tiket: string; bidang: 'sl' | 'tp' } | null>(null);
   const garisPosMt5 = useRef<IPriceLine[]>([]);
+  /* Price line untuk garis SERET (Entry/SL/TP tiket & order yang disunting).
+     Terpisah dari garisPosMt5 supaya keduanya bisa dibongkar sendiri-sendiri:
+     yang satu berubah tiap laporan EA, yang ini tiap seretan. */
+  const garisSeretHarga = useRef<IPriceLine[]>([]);
   /* SL/TP per tiket dipegang lewat peta supaya seretan bisa MENGGESER
      garis yang sudah ada (applyOptions) alih-alih membongkar-pasang
      semua price line tiap gerakan. */
@@ -1079,6 +1083,38 @@ export function ChartLilin({
       petaGarisMt5.current.clear();
     };
   }, [posisiMt5, ubah]);
+
+  /* ── Garis seret ikut menembus ke SUMBU HARGA ───────────────────────
+     Overlay DOM di atas kanvas menggambar garis dan gagangnya, tapi
+     angkanya berhenti di tepi chart — sumbu harga di kanan tidak tahu
+     apa-apa tentangnya. Akibatnya SL/TP/Entry jadi satu-satunya level
+     penting yang harganya TIDAK tercetak di tempat mata sudah terbiasa
+     mencarinya: kolom yang sama dengan harga terkini.
+
+     Price line di sini murni untuk LABEL SUMBU-nya. Garis visual dan
+     seretannya tetap milik overlay DOM — lineWidth 1 dengan warna yang
+     sama membuat keduanya bertindih rapi, bukan jadi dua garis.
+
+     title dikosongkan: kotak sumbu hanya memuat angka, persis seperti
+     kotak harga terkini. Namanya (Entry/SL/TP) sudah ada di gagang
+     seretnya di dalam chart. */
+  useEffect(() => {
+    const s = seri.current;
+    if (!s) return;
+    (garisSeret ?? []).forEach((g) => {
+      if (!g.harga) return;
+      try {
+        garisSeretHarga.current.push(s.createPriceLine({
+          price: g.harga, color: g.warna, lineWidth: 1, lineStyle: 2,
+          axisLabelVisible: true, title: '',
+        }));
+      } catch { /* seri sedang dibongkar ulang */ }
+    });
+    return () => {
+      garisSeretHarga.current.forEach((g) => { try { s.removePriceLine(g); } catch { /* dibongkar */ } });
+      garisSeretHarga.current = [];
+    };
+  }, [garisSeret]);
 
   /* Harga permintaan (ask): garis titik jarang — jaraknya ke garis harga
      bid adalah SPREAD, dan di emas spread bukan pembulatan. Garisnya
