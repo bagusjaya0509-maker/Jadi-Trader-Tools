@@ -285,16 +285,33 @@ export function PanelSinyal({ ringkas = false }: { ringkas?: boolean } = {}) {
           </span>
         }
       />
-      {(jeda || kabarMinta || sedangJalan || hasil) && (
+      {/* DISEMBUNYIKAN DI RAK (permintaan pemilik 14 Agu 2026).
+          ──────────────────────────────────────────────────────────────
+          Blok ini menjelaskan keadaan AGEN — dijeda, sedang berjalan,
+          hasil pencarian terakhir. Di kolom 320 px kalimatnya membungkus
+          jadi belasan baris dan mendorong sinyalnya, satu-satunya isi
+          yang benar-benar dicari, jauh ke bawah.
+
+          Yang TIDAK ikut hilang: lencana "Agen dijeda" dan waktu bekerja
+          di kepala panel. Keduanya menyampaikan hal yang sama dalam dua
+          kata, dan itu bagian yang memang harus tetap terlihat — orang
+          yang menaruh uang berdasarkan sinyal berhak tahu agennya sedang
+          tidak bekerja.
+
+          Yang hilang cuma kalimat panjangnya. Kabar hasil permintaan
+          (kabarMinta) tetap tampil walau di rak: itu jawaban langsung
+          atas tombol yang baru saja ditekan, dan menelannya membuat
+          tombolnya terasa tidak melakukan apa-apa. */}
+      {(ringkas ? !!kabarMinta : (jeda || kabarMinta || sedangJalan || hasil)) && (
         <div className="px-5 pb-2 text-[11px] leading-relaxed text-zinc-500">
-          {jeda && (
+          {!ringkas && jeda && (
             <span className="text-amber-300/90">
               Agen sedang dijeda{alasanJeda ? ` — ${alasanJeda}` : ' untuk perbaikan'}. Sinyal yang
               sudah terbit di bawah tetap berlaku sesuai masa berlakunya masing-masing.
             </span>
           )}
           {!jeda && kabarMinta && <span className="text-zinc-400">{kabarMinta}</span>}
-          {sedangJalan && !kabarMinta && (
+          {!ringkas && sedangJalan && !kabarMinta && (
             <span className="text-amber-300/90">
               {sudahMulai
                 ? <>Agen sedang membaca ruang sinyal — berjalan <span className="angka">{durasi(berjalanMs)}</span>.</>
@@ -302,7 +319,7 @@ export function PanelSinyal({ ringkas = false }: { ringkas?: boolean } = {}) {
                    jadi agen mulai dalam <span className="angka">≤ {durasi(sisaJemput)}</span>. Ia hanya jalan saat aplikasi Claude terbuka.</>}
             </span>
           )}
-          {!sedangJalan && !kabarMinta && hasil && (
+          {!ringkas && !sedangJalan && !kabarMinta && hasil && (
             <span>
               Pencarian terakhir {kapan(hasil.waktu)}
               {hasil.durasiMs ? <> · lama kerja <span className="angka text-zinc-400">{durasi(hasil.durasiMs)}</span></> : null}
