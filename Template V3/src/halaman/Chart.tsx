@@ -2190,7 +2190,13 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                        aturAksi={setAksi} aturKendali={setKendaliReplay}
                        aturMulai={simpanMulai}
                        usulSl={usulSl} usulTp={usulTp}
+                       /* `tampil` mengatur panel BAWAH (pesan & hasil latihan);
+                          `bidik` mengatur bar kendali melayang di atas chart.
+                          Dipisah karena keduanya muncul di saat yang berbeda:
+                          barnya harus ada SEJAK tombol Replay ditekan, panel
+                          bawahnya baru berarti setelah ada trade. */
                        tampil={replayIdx !== null}
+                       bidik={bidikReplay}
                        tanpaBingkai />
         </div>
 

@@ -46,7 +46,7 @@ export interface AksiOrder {
    dan panel ini tidak perlu tahu apa pun tentang cara menggambar.
    ════════════════════════════════════════════════════════════════════════ */
 
-export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, aturAksi, aturKendali, aturMulai, demoSetelan, usulSl, usulTp, tanpaBingkai = false, tampil = true }: {
+export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, aturAksi, aturKendali, aturMulai, demoSetelan, usulSl, usulTp, tanpaBingkai = false, tampil = true, bidik = false }: {
   lilin: Lilin;
   simbol: string;
   tf: string;
@@ -78,6 +78,12 @@ export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, aturAks
      halaman dibuka — menyembunyikannya sampai tombol Replay ditekan berarti
      dua perbuatan untuk satu maksud. */
   tampil?: boolean;
+  /** Chart sedang MENUNGGU titik mulai diklik. Bar kendali digambar dalam
+   *  bentuk yang sama persis tapi mati, supaya saat kliknya mendarat tidak
+   *  ada yang berubah UKURAN — cuma tombolnya yang jadi hidup. Bar yang baru
+   *  muncul di detik yang sama dengan klik membuat mata mengira chartnya
+   *  yang bergeser. */
+  bidik?: boolean;
 }) {
   const [main, setMain] = useState(false);
   const [cepat, setCepat] = useState(4);
@@ -362,7 +368,37 @@ export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, aturAks
      Latarnya tembus supaya menyatu — panel terpisah di bawah chart memaksa
      mata bolak-balik antara grafik dan tombol untuk satu perbuatan yang
      sama. */
-  const kendali = idx === null ? null : (
+  /* Kembaran MATI dari bar di bawah — bentuk, jarak, dan tinggi identik.
+     Yang berbeda cuma: tombolnya tidak bisa ditekan, dan tempat "bar 335/1000"
+     diisi petunjuk apa yang sedang ditunggu. */
+  const kendaliBidik = (
+    <div>
+      <div className="flex flex-wrap items-center gap-1.5 opacity-60">
+        <span className="flex size-8 items-center justify-center rounded-md bg-zinc-700 text-zinc-400">
+          <Play className="size-4" />
+        </span>
+        <span className="flex size-8 items-center justify-center rounded-md border border-zinc-700/70 bg-zinc-900/70 text-zinc-600">
+          <SkipForward className="size-4" />
+        </span>
+        <span className="flex size-8 items-center justify-center rounded-md border border-zinc-700/70 bg-zinc-900/70 text-zinc-600">
+          <RotateCcw className="size-4" />
+        </span>
+        <div className="flex overflow-hidden rounded-md border border-zinc-700/70 bg-zinc-900/70">
+          {KECEPATAN.map((k) => (
+            <span key={k.x} className="px-2 py-1.5 text-[11.5px] text-zinc-600">{k.x}×</span>
+          ))}
+        </div>
+        <span className="rounded bg-amber-500/15 px-2 py-1 text-[11px] text-amber-300">
+          Klik di chart untuk memilih titik mulai
+        </span>
+      </div>
+      {/* Penggeser mati — menahan tingginya supaya identik dengan bar hidup. */}
+      <input type="range" min={0} max={100} value={0} readOnly disabled
+             className="mt-2 h-1 w-full cursor-not-allowed opacity-30" />
+    </div>
+  );
+
+  const kendali = idx === null ? (bidik ? kendaliBidik : null) : (
     <div>
       <div className="flex flex-wrap items-center gap-1.5">
         <button onClick={() => setMain(!main)}
@@ -414,7 +450,7 @@ export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, aturAks
      Tandanya berisi SEMUA nilai yang dibaca `kendali`. Kalau ada yang
      tertinggal, tombolnya akan memakai nilai basi — jadi daftar ini harus
      ikut diperbarui setiap kali isinya bertambah. */
-  const tandaKendali = `${idx}|${main}|${cepat}|${lilin.closes.length}|${lilin.times[idx ?? 0] ?? 0}`;
+  const tandaKendali = `${idx}|${main}|${cepat}|${lilin.closes.length}|${lilin.times[idx ?? 0] ?? 0}|${bidik}`;
   useEffect(() => {
     aturKendali?.(kendali);
     return () => aturKendali?.(null);
@@ -436,6 +472,9 @@ export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, aturAks
      dan panel yang muncul hanya untuk menanyakan hal yang sama sekali lagi
      mendorong grafiknya ke atas layar tanpa menambah apa pun. */
   if (!tampil || !hidup) return null;
+  /* Saat MEMBIDIK, panel ini tidak menggambar apa pun sendiri — bar
+     kendalinya sudah dikirim ke hamparan chart lewat aturKendali. Yang
+     dikembalikan null cuma bagian bawahnya. */
   /* Setelannya sudah pindah ke tiket pojok. Panel bawah tinggal punya satu
      alasan hidup: pesan terakhir dan catatan latihan — kalau dua-duanya
      kosong, tidak ada yang perlu digambar. */
