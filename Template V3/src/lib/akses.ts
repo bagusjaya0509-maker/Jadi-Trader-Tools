@@ -27,11 +27,17 @@ export interface Kuota {
   gratisTerpakai: number; gratisTotal: number; gratisSisa: number; gratisHabis: boolean;
   bayarTerpakai: number; bayarTotal: number; bayarSisa: number; bayarHabis: boolean;
   hari: number;
+  /** Sakelar pemilik di Maintenance. Saat mati, kartu kuota dan tombol minta
+   *  DISEMBUNYIKAN — bukan sekadar dimatikan. Kuota yang tetap terpampang
+   *  saat pendaftaran tutup cuma mengundang pertanyaan yang jawabannya
+   *  "tidak bisa". */
+  bukaPermintaan: boolean;
 }
 
 export const KUOTA_KOSONG: Kuota = {
   gratisTerpakai: 0, gratisTotal: 20, gratisSisa: 20, gratisHabis: false,
   bayarTerpakai: 0, bayarTotal: 80, bayarSisa: 80, bayarHabis: false, hari: 30,
+  bukaPermintaan: true,
 };
 
 /** Link checkout Rp 17.900. Produknya bernama "Request Access". */
