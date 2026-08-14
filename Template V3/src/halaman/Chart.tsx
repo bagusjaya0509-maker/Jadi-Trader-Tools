@@ -351,6 +351,17 @@ export default function ChartBacktest() {
 
   function bukaSunting(o: OrderSunting) {
     setSimbol(rapikanSimbol(o.simbolChart));
+    /* PINDAH KE MODE REAL, otomatis.
+       ──────────────────────────────────────────────────────────────────
+       Yang diklik adalah posisi SUNGGUHAN di broker. Membukanya sementara
+       chart masih di mode latihan berarti dua hal yang berlawanan tampil
+       bersamaan: garis order nyata di atas chart yang sedang berpura-pura.
+       Orangnya lalu menyeret SL — dan tidak ada satu pun tanda di layar
+       apakah seretan itu akan mengubah posisi nyata atau cuma simulasi.
+
+       Jadi modenya ikut berpindah. Tidak ada yang perlu ditebak: kalau
+       yang tampil order nyata, chartnya dalam mode nyata. */
+    aksi?.gantiMode('real');
     setSunting(o);
     /* Garisnya dulu, panelnya belakangan. */
     setPanelUbah(false);
@@ -1019,7 +1030,12 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
        panel, yang digambar adalah order ITU — bukan rencana tiket yang
        kebetulan masih tersisa di layar. Dua set garis di satu chart tidak
        bisa dibedakan, dan yang diseret orangnya harus yang ia maksud. */
-    if (sunting) {
+    /* Order yang sedang disunting SELALU order nyata. Alasan yang sama
+       dengan garisOrder di bawah: di mode latihan ia tidak boleh tergambar.
+       bukaSunting memang sudah memindahkan mode ke real, tapi orangnya bisa
+       menekan Demo sesudahnya — dan saat itu garisnya harus ikut hilang,
+       bukan tertinggal sebagai order yang tampak masih bisa diseret. */
+    if (sunting && aksi?.mode === 'real') {
       const g: GarisSeret[] = [];
       /* Entry BISA DISERET, tapi ia tidak pindah — yang berubah SL atau
          TP, tergantung ke mana ia ditarik. Gerakan itu meniru cara orang
@@ -1110,6 +1126,17 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
      pair yang sama berarti dua kewajiban berbeda, dan meringkasnya jadi
      satu garis persis menyembunyikan order kedua. */
   const garisOrder = useMemo(() => {
+    /* MODE LATIHAN TIDAK MENAMPILKAN ORDER NYATA.
+       ──────────────────────────────────────────────────────────────────
+       Garis ini menggambarkan uang sungguhan yang sedang dipertaruhkan.
+       Di mode demo ia bukan sekadar tidak relevan — ia menyesatkan: orang
+       yang sedang berlatih melihat SL di layar dan mengira itu bagian dari
+       latihannya, atau sebaliknya mengira posisi nyatanya sudah terlindungi
+       padahal yang dilihat cuma sisa gambar dari mode sebelumnya.
+
+       Kembali ke mode real, garisnya muncul lagi apa adanya — tidak ada
+       yang dihapus, cuma tidak digambar. */
+    if (aksi?.mode !== 'real') return [];
     /* MT5 punya daftarnya sendiri — pending order dilaporkan EA, bukan
        diambil dari Binance. Simbol chart berawalan "MT5:" sementara EA
        melapor nama broker apa adanya (EURJPYc), jadi awalannya dikupas
@@ -1174,7 +1201,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
       warna: o.arah === 'BUY' ? 'rgba(251,191,36,.85)' : 'rgba(251,146,60,.85)',
       label: `${o.arah === 'BUY' ? 'Buy' : 'Sell'} ${/STOP/.test(o.tipe) ? 'Stop' : 'Limit'}${banyak ? ` ${i + 1}` : ''}`,
     }));
-  }, [orderBursa, simbol, aksiTunda, akunMt5.pending, akunMt5.posisi]);
+  }, [orderBursa, simbol, aksiTunda, akunMt5.pending, akunMt5.posisi, aksi?.mode]);
 
   const terakhir = lilin.closes[lilin.closes.length - 1];
   const sebelumnya = lilin.closes[lilin.closes.length - 2];
@@ -1741,7 +1768,11 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
               Bawaannya duduk di kanan panel order; begitu diseret, letak
               pilihannya diingat. Alasannya sama dengan bilah alat: tidak
               ada satu sudut yang benar untuk semua susunan panel. */}
-          {sunting && panelUbah && (
+          {/* Ikut syarat mode yang sama dengan garisnya. Panel ubah SL/TP
+              yang tertinggal setelah garisnya hilang menawarkan tombol
+              Kirim untuk order yang tidak terlihat di mana pun — dan itu
+              cara paling mudah mengirim perubahan ke order yang salah. */}
+          {sunting && panelUbah && aksi?.mode === 'real' && (
             <div ref={kotakUbah} onPointerDown={mulaiSeretUbah}
                  style={letakPakai ? { left: letakPakai.x, top: letakPakai.y } : undefined}
                  /* z-20, setara bilah alat gambar — bilah judul halaman
