@@ -142,7 +142,30 @@ function Langkah({ no, judul, anak }: { no: number; judul: string; anak: React.R
   );
 }
 
+/* ════════════════════════════════════════════════════════════════════════
+   TIGA SUB-HALAMAN — kesehatan, MT5, Binance
+   ════════════════════════════════════════════════════════════════════════
+   Halaman ini menampung tiga hal yang dipakai pada saat yang berbeda:
+
+     · Kesehatan sambungan — dilihat TIAP HARI, sekilas, untuk memastikan
+       datanya masih mengalir.
+     · Pemasangan EA MT5   — dibaca SEKALI saat memasang, lalu tidak pernah
+       lagi sampai ganti komputer.
+     · Backend & Binance   — sama, sekali saat mengatur.
+
+   Ditumpuk jadi satu, yang dilihat tiap hari terkubur di bawah dua panduan
+   panjang yang sudah selesai dibaca berbulan-bulan lalu. Sebagai tab,
+   halaman pertama tinggal denyut sambungan — pendek, langsung terbaca.
+   ════════════════════════════════════════════════════════════════════════ */
+const TAB_INT = [
+  { id: 'sehat',   label: 'Connection Health', judul: 'Kesehatan Sambungan', sub: 'Apakah data masih mengalir dari MT5 dan Binance.' },
+  { id: 'mt5',     label: 'Pasang EA MT5',     judul: 'Pasang EA di MetaTrader 5', sub: 'Kode pasangan, unduhan EA, dan lima langkah pemasangannya.' },
+  { id: 'binance', label: 'Backend & Binance', judul: 'Backend URL & Binance',     sub: 'Alamat VPS, App Token, kunci API, dan pemasangan dari nol.' },
+] as const;
+type IdTabInt = typeof TAB_INT[number]['id'];
+
 export default function Integrasi() {
+  const [tab, setTab] = useState<IdTabInt>('sehat');
   const [bukaLangkah, setBukaLangkah] = useState(false);
   /* Kode pasangan ASLI dari backend, bukan contoh.
      Sebelumnya baris ini berisi `useState('JT-4F2A-91C7')` — kode yang
@@ -195,6 +218,33 @@ export default function Integrasi() {
 
   return (
     <div className="p-4 sm:p-6">
+      {/* Bilah tab menggulir mendatar di layar sempit, bukan membungkus jadi
+          dua baris: bilah yang tingginya berubah menggeser seluruh isi
+          halaman tiap kali jendela diubah. */}
+      <div className="mb-5 flex gap-1 overflow-x-auto border-b border-zinc-800/80">
+        {TAB_INT.map((t) => (
+          <button key={t.id} onClick={() => setTab(t.id)}
+            className={cn(
+              'shrink-0 cursor-pointer border-b-2 px-3.5 py-2.5 text-[12.5px] transition-colors',
+              tab === t.id ? 'border-zinc-100 text-zinc-100'
+                           : 'border-transparent text-zinc-500 hover:text-zinc-300',
+            )}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {(() => {
+        const aktif = TAB_INT.find((t) => t.id === tab)!;
+        return (
+          <div className="mb-3">
+            <h2 className="text-[14px] font-medium text-zinc-200">{aktif.judul}</h2>
+            <p className="text-[12px] text-zinc-500">{aktif.sub}</p>
+          </div>
+        );
+      })()}
+
+      {tab === 'sehat' && (<>
       {/* ── Status sambungan: denyut + latensi, bukan empat kotak angka ── */}
       <Panel>
         <PanelHead
@@ -222,8 +272,9 @@ export default function Integrasi() {
         </div>
       </Panel>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
-        {/* ── MT5 ── */}
+      </>)}
+
+      {tab === 'mt5' && (
         <Panel>
           <PanelHead
             judul="MetaTrader 5"
@@ -403,7 +454,9 @@ export default function Integrasi() {
           </div>
         </Panel>
 
-        {/* ── Binance ── */}
+      )}
+
+      {tab === 'binance' && (<>
         <Panel className="border-amber-500/25">
           <PanelHead
             judul="Binance Futures"
@@ -522,7 +575,6 @@ export default function Integrasi() {
             </div>
           </div>
         </Panel>
-      </div>
 
       {/* ── Tutorial pemasangan ── */}
       <Panel className="mt-4">
@@ -540,6 +592,10 @@ export default function Integrasi() {
         </div>
       </Panel>
 
+      </>)}
+
+      {/* Log tampil di SEMUA tab: ia jawaban dari "kenapa tidak nyambung",
+          dan pertanyaan itu muncul di tab mana pun orangnya sedang berada. */}
       <Panel className="mt-4">
         <PanelHead judul="Connection log" sub="Kejadian terakhir dari kedua sambungan." />
         <div className="px-5 pb-5">
