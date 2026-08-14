@@ -179,6 +179,11 @@ export default function ChartBacktest() {
          sesuatu yang tidak ada lagi, bukan diam-diam tidak melakukan apa-apa
          setiap kali ditekan. */
       if (!potongan.times.length) { setHabisRiwayat(true); return; }
+      /* Kalau replay sedang berjalan, indeksnya DIGESER sebanyak lilin yang
+         baru disisipkan di depan — supaya bar yang sedang ditonton tetap bar
+         yang sama. Tanpa ini, menekan "Muat lebih lama" di tengah replay
+         melompat mundur bertahun-tahun tanpa ada yang menyentuh penggeser. */
+      setReplayIdx((i) => (i === null ? i : i + potongan.times.length));
       setRiwayatLama((lama) => lama ? {
         times:  [...potongan.times,  ...lama.times],
         opens:  [...potongan.opens,  ...lama.opens],
@@ -2057,7 +2062,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
               geserannya. */}
           <DockPine buka={dockBuka} tab={dockTab} aturTab={setDockTab}
                     onTutup={() => setDockBuka(false)}
-                    lilin={lilin} simbol={simbol} tf={tf} hingga={replayIdx ?? undefined}
+                    lilin={lilinGabung} simbol={simbol} tf={tf} hingga={replayIdx ?? undefined}
                     aturHasil={setPine} onInfo={setPineInfo} onKendali={setKendaliPine} />
           </div>
           <WatchChart simbol={simbol} onPilih={setSimbol} onLebar={setLebarWatch} />
@@ -2121,7 +2126,17 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
             meski tidak menggambar apa pun — itulah yang membuat tombol
             BUY/SELL di pojok chart tersedia sejak halaman dibuka. */}
         <div className={cn(replayIdx !== null ? 'border-t border-zinc-800/80' : 'hidden')}>
-          <PanelReplay lilin={lilin} simbol={simbol} tf={tf} idx={replayIdx}
+          {/* lilinGabung, BUKAN lilin — replayIdx adalah INDEKS ke dalam
+              array, dan chart menggambar lilinGabung. Begitu "Muat lebih
+              lama" menyisipkan 2000 lilin di DEPAN, indeks yang sama
+              menunjuk bar yang sama sekali berbeda: replay memberi harga
+              dari 2021 sementara chart menggambar 2026, dan tiket entry
+              lahir dengan SL/TP yang jaraknya tidak masuk akal.
+
+              Tidak ada galat sama sekali — cuma angka yang salah, dan itu
+              angka yang dipakai memasang stop. Dua tempat yang memakai
+              indeks yang sama WAJIB memakai array yang sama. */}
+          <PanelReplay lilin={lilinGabung} simbol={simbol} tf={tf} idx={replayIdx}
                        demoSetelan={demoSetelan}
                        setIdx={setReplayIdx} aturGaris={setGarisHarga}
                        aturAksi={setAksi} aturKendali={setKendaliReplay}
