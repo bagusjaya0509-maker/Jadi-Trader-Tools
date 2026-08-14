@@ -18,7 +18,7 @@ import { PanelPosisiTerbuka, type OrderSunting } from '@/components/panel-posisi
 import type { JenisAlat, GambarAlat } from '@/lib/plugin-alat';
 import type { HasilPine } from '@/lib/pine';
 import { bacaSetelanChart, simpanSetelanChart } from '@/lib/replay';
-import { ambilKlines, bacaSpekMt5, bacaTickMt5, daftarSimbolMt5, type Lilin } from '@/lib/pasar';
+import { ambilKlines, ambilKlinesSebelum, bacaSpekMt5, bacaTickMt5, daftarSimbolMt5, type Lilin } from '@/lib/pasar';
 import { useAkunMt5, segarkanAkunMt5 } from '@/lib/akun';
 /* Langsung dari admin, BUKAN lewat usePosisi(): yang dibutuhkan di sini
    cuma daftar order bursa, sementara usePosisi() juga memasang listener
@@ -130,6 +130,64 @@ export default function ChartBacktest() {
     if (x && ['5m', '15m', '1h', '4h', '1d'].includes(x)) setTf(x);
   }, [cari]);
   const [lilin, setLilin] = useState<Lilin>({ opens: [], highs: [], lows: [], closes: [], times: [] });
+  /* Riwayat tambahan hasil "Muat lebih lama", DISIMPAN TERPISAH dari `lilin`.
+     ────────────────────────────────────────────────────────────────────
+     `lilin` disegarkan tiap 3 detik oleh polling harga. Kalau potongan lama
+     ikut ditulis ke sana, penyegaran berikutnya akan menimpanya dan riwayat
+     yang baru saja ditarik lenyap begitu saja — orangnya menekan tombol,
+     melihat chart memanjang, lalu tiga detik kemudian kembali seperti semula
+     tanpa penjelasan.
+
+     Disimpan terpisah lalu disambung saat menggambar: polling boleh menimpa
+     `lilin` sesukanya, riwayat lamanya tidak tersentuh. */
+  const [riwayatLama, setRiwayatLama] = useState<Lilin | null>(null);
+  const [muatLama, setMuatLama] = useState(false);
+  const [habisRiwayat, setHabisRiwayat] = useState(false);
+
+  /* Potongan lama dibuang tiap ganti simbol atau timeframe — riwayat BTC
+     harian tidak berarti apa-apa di chart ETH 15 menit, dan menyambungnya
+     akan menggambar harga yang tidak pernah terjadi. */
+  useEffect(() => { setRiwayatLama(null); setHabisRiwayat(false); }, [simbol, tf]);
+
+  /* Lilin yang BENAR-BENAR digambar: riwayat lama di depan, data hidup di
+     belakang. */
+  const lilinGabung: Lilin = useMemo(() => {
+    if (!riwayatLama || !riwayatLama.times.length) return lilin;
+    /* Titik potong dicari dari WAKTU, bukan dari panjang array: polling bisa
+       menggeser jendela `lilin` beberapa lilin ke depan di antara dua
+       penyegaran, dan menyambung dengan asumsi panjang tetap akan
+       menghasilkan lilin kembar atau lubang. */
+    const mulaiHidup = lilin.times[0] ?? Infinity;
+    let potong = riwayatLama.times.length;
+    while (potong > 0 && riwayatLama.times[potong - 1] >= mulaiHidup) potong--;
+    return {
+      times:  [...riwayatLama.times.slice(0, potong),  ...lilin.times],
+      opens:  [...riwayatLama.opens.slice(0, potong),  ...lilin.opens],
+      highs:  [...riwayatLama.highs.slice(0, potong),  ...lilin.highs],
+      lows:   [...riwayatLama.lows.slice(0, potong),   ...lilin.lows],
+      closes: [...riwayatLama.closes.slice(0, potong), ...lilin.closes],
+    };
+  }, [riwayatLama, lilin]);
+
+  async function muatLebihLama() {
+    const tertua = (riwayatLama?.times[0] ?? lilin.times[0]) || 0;
+    if (!tertua || muatLama) return;
+    setMuatLama(true);
+    try {
+      const potongan = await ambilKlinesSebelum(simbol, tf, tertua - 1);
+      /* Kosong = sudah mentok. Ditandai supaya tombolnya berhenti menawarkan
+         sesuatu yang tidak ada lagi, bukan diam-diam tidak melakukan apa-apa
+         setiap kali ditekan. */
+      if (!potongan.times.length) { setHabisRiwayat(true); return; }
+      setRiwayatLama((lama) => lama ? {
+        times:  [...potongan.times,  ...lama.times],
+        opens:  [...potongan.opens,  ...lama.opens],
+        highs:  [...potongan.highs,  ...lama.highs],
+        lows:   [...potongan.lows,   ...lama.lows],
+        closes: [...potongan.closes, ...lama.closes],
+      } : potongan);
+    } finally { setMuatLama(false); }
+  }
   const [memuat, setMemuat] = useState(true);
   const [galat, setGalat] = useState('');
   const [segar, setSegar] = useState(0);
@@ -1576,7 +1634,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
           <div ref={areaChart} className="relative min-w-0 grow overflow-hidden">
           {lilin.times.length > 0
             ? <ChartLilin key={`${simbol}|${tf}|${kunciChart}`}
-                          lilin={lilin} garis={garis} trade={replayIdx === null ? hasil?.trade : undefined}
+                          lilin={lilinGabung} garis={garis} trade={replayIdx === null ? hasil?.trade : undefined}
                           tinggi={tinggiChart} hingga={replayIdx ?? undefined} smi={smi}
                           garisHarga={[...garisHarga, ...garisZona, ...garisOrder]}
                           onKlikBar={replayIdx === null ? undefined : setReplayIdx}
@@ -2014,9 +2072,33 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
           </div>
         </div>
         <div className="flex items-center justify-between gap-3 border-t border-zinc-800/80 px-4 py-2 text-[11.5px] text-zinc-600">
-          <span className="min-w-0 truncate">
-            {lilin.times.length} lilin · {simbol} {TF.find((x) => x.nilai === tf)?.label} · lewat proxy VPS
-            {hasil?.trade.length ? ` · ${hasil.trade.length} penanda trade` : ''}
+          <span className="flex min-w-0 items-center gap-2 truncate">
+            <span className="truncate">
+              {lilinGabung.times.length} lilin · {simbol} {TF.find((x) => x.nilai === tf)?.label} · lewat proxy VPS
+              {hasil?.trade.length ? ` · ${hasil.trade.length} penanda trade` : ''}
+            </span>
+            {/* Binance memberi maksimum 1000 lilin PER PERMINTAAN, bukan
+                seluruhnya. Tombol ini menarik potongan berikutnya ke belakang
+                dan menyambungnya — ditekan tiga kali di TF harian, chartnya
+                mundur sampai 2018.
+
+                Ditaruh di kaki chart, bukan di bilah kendali atas: ia baru
+                dicari SESUDAH orangnya menggulir mentok ke kiri, dan di situlah
+                matanya sudah berada. MT5 tidak punya rute untuk meminta lilin
+                lebih tua, jadi tombolnya tidak ditawarkan sama sekali di sana —
+                lebih jujur daripada tombol yang selalu menjawab "tidak ada". */}
+            {!simbol.startsWith('MT5:') && !habisRiwayat && (
+              <button
+                onClick={() => void muatLebihLama()}
+                disabled={muatLama}
+                title="Tarik 1000 lilin sebelum yang paling tua"
+                className="shrink-0 cursor-pointer rounded border border-zinc-800 px-2 py-0.5 text-[11px] text-zinc-400 transition-colors hover:border-zinc-700 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-50">
+                {muatLama ? 'Memuat…' : '← Muat lebih lama'}
+              </button>
+            )}
+            {habisRiwayat && (
+              <span className="shrink-0 text-zinc-700">riwayat terjauh</span>
+            )}
           </span>
           {/* Backtest disembunyikan di balik ikon di pojok chart, bukan
               dibentangkan di bawahnya. Alasannya bukan sekadar ruang:
