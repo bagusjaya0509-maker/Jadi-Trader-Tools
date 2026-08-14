@@ -218,6 +218,10 @@ export default function ChartBacktest() {
   /* Mode bidik dibatalkan tiap ganti simbol/timeframe — bidikan untuk
      chart lain tidak berarti apa-apa di sini. */
   useEffect(() => { setBidikReplay(false); }, [simbol, tf]);
+  /* Padam juga begitu replay MULAI lewat jalan mana pun (play, penggeser).
+     Tanpa ini klik di chart sesudahnya masih dianggap membidik dan
+     melempar posisi replay yang sudah berjalan. */
+  useEffect(() => { if (replayIdx !== null) setBidikReplay(false); }, [replayIdx]);
   const [garisHarga, setGarisHarga] = useState<GarisHarga[]>([]);
   /* Panel Backtest tertutup saat halaman dibuka. Ia beta, dan yang beta
      tidak boleh menempati ruang tetap di layar seolah sudah matang. */
@@ -2196,7 +2200,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                           barnya harus ada SEJAK tombol Replay ditekan, panel
                           bawahnya baru berarti setelah ada trade. */
                        tampil={replayIdx !== null}
-                       bidik={bidikReplay}
+                       bidik={bidikReplay} onBatalBidik={() => setBidikReplay(false)}
                        tanpaBingkai />
         </div>
 

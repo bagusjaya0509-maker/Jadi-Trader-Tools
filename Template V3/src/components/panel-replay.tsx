@@ -46,7 +46,7 @@ export interface AksiOrder {
    dan panel ini tidak perlu tahu apa pun tentang cara menggambar.
    ════════════════════════════════════════════════════════════════════════ */
 
-export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, aturAksi, aturKendali, aturMulai, demoSetelan, usulSl, usulTp, tanpaBingkai = false, tampil = true, bidik = false }: {
+export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, aturAksi, aturKendali, aturMulai, demoSetelan, usulSl, usulTp, tanpaBingkai = false, tampil = true, bidik = false, onBatalBidik }: {
   lilin: Lilin;
   simbol: string;
   tf: string;
@@ -84,6 +84,8 @@ export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, aturAks
    *  muncul di detik yang sama dengan klik membuat mata mengira chartnya
    *  yang bergeser. */
   bidik?: boolean;
+  /** Tombol Keluar pada bar bidik — membatalkan mode bidik di halaman. */
+  onBatalBidik?: () => void;
 }) {
   const [main, setMain] = useState(false);
   const [cepat, setCepat] = useState(4);
@@ -368,33 +370,61 @@ export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, aturAks
      Latarnya tembus supaya menyatu — panel terpisah di bawah chart memaksa
      mata bolak-balik antara grafik dan tombol untuk satu perbuatan yang
      sama. */
-  /* Kembaran MATI dari bar di bawah — bentuk, jarak, dan tinggi identik.
-     Yang berbeda cuma: tombolnya tidak bisa ditekan, dan tempat "bar 335/1000"
-     diisi petunjuk apa yang sedang ditunggu. */
+  /* Bar untuk MODE BIDIK — gaya yang SAMA PERSIS dengan bar hidup di
+     bawah, bukan versi kelabu.
+     ────────────────────────────────────────────────────────────────────
+     Sempat dibuat kembaran redup (abu-abu, tombol mati), dan pemilik
+     menolaknya: bar yang tampil harus bar putih yang biasa. Maka tombolnya
+     dibuat SUNGGUH BEKERJA, bukan sekadar dicat hidup — tombol yang
+     tampak bisa ditekan tapi diam adalah kebohongan kecil yang membuat
+     orang mengira halamannya rusak.
+
+       · Play / maju / ulang  -> mulai replay dari 60% data (bawaan lama)
+       · Kecepatan            -> tersimpan betulan, kepakai begitu jalan
+       · Penggeser            -> memilih titik mulai secara langsung
+       · Klik di chart        -> tetap cara utama membidik titik mulai
+       · Keluar               -> membatalkan mode bidik
+
+     Satu-satunya yang berbeda dari bar hidup: chip "bar 335/1000" diganti
+     ajakan memilih titik — karena barnya memang belum di mana-mana. */
   const kendaliBidik = (
     <div>
-      <div className="flex flex-wrap items-center gap-1.5 opacity-60">
-        <span className="flex size-8 items-center justify-center rounded-md bg-zinc-700 text-zinc-400">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <button onClick={mulai} title="Mulai dari 60% data"
+          className="flex size-8 cursor-pointer items-center justify-center rounded-md bg-zinc-100 text-zinc-950 transition-colors hover:bg-white">
           <Play className="size-4" />
-        </span>
-        <span className="flex size-8 items-center justify-center rounded-md border border-zinc-700/70 bg-zinc-900/70 text-zinc-600">
+        </button>
+        <button onClick={mulai} title="Mulai dari 60% data"
+          className="flex size-8 cursor-pointer items-center justify-center rounded-md border border-zinc-700/70 bg-zinc-900/70 text-zinc-300 transition-colors hover:border-zinc-600">
           <SkipForward className="size-4" />
-        </span>
-        <span className="flex size-8 items-center justify-center rounded-md border border-zinc-700/70 bg-zinc-900/70 text-zinc-600">
+        </button>
+        <button onClick={mulai} title="Mulai dari 60% data"
+          className="flex size-8 cursor-pointer items-center justify-center rounded-md border border-zinc-700/70 bg-zinc-900/70 text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200">
           <RotateCcw className="size-4" />
-        </span>
+        </button>
         <div className="flex overflow-hidden rounded-md border border-zinc-700/70 bg-zinc-900/70">
           {KECEPATAN.map((k) => (
-            <span key={k.x} className="px-2 py-1.5 text-[11.5px] text-zinc-600">{k.x}×</span>
+            <button key={k.x} onClick={() => setCepat(k.x)}
+              className={cn('cursor-pointer px-2 py-1.5 text-[11.5px] transition-colors',
+                cepat === k.x ? 'bg-zinc-100 text-zinc-950' : 'text-zinc-400 hover:text-zinc-200')}>
+              {k.x}×
+            </button>
           ))}
         </div>
         <span className="rounded bg-amber-500/15 px-2 py-1 text-[11px] text-amber-300">
           Klik di chart untuk memilih titik mulai
         </span>
+        <button onClick={onBatalBidik} title="Batal"
+          className="ml-auto flex cursor-pointer items-center gap-1 rounded-md border border-zinc-700/70 bg-zinc-900/70 px-2 py-1.5 text-[11.5px] text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200">
+          <X className="size-3.5" /> Keluar
+        </button>
       </div>
-      {/* Penggeser mati — menahan tingginya supaya identik dengan bar hidup. */}
-      <input type="range" min={0} max={100} value={0} readOnly disabled
-             className="mt-2 h-1 w-full cursor-not-allowed opacity-30" />
+
+      {/* Penggeser HIDUP: menariknya langsung memilih titik mulai — cara
+          ketiga di samping klik chart dan tombol play. */}
+      <input type="range" min={20} max={Math.max(21, lilin.closes.length - 1)} value={20}
+             onChange={(e) => setIdx(Number(e.target.value))}
+             className="mt-2 h-1 w-full cursor-pointer accent-emerald-500" />
     </div>
   );
 
