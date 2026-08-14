@@ -12,6 +12,7 @@ import { useProduk, simpanKatalogProduk } from '@/lib/data';
 import { useAuth } from '@/lib/auth';
 import { suratLisensi, sisipkanPenanda, unduhTeks } from '@/lib/surat-lisensi';
 import { useUlasan, kirimUlasan, hapusUlasan } from '@/lib/ulasan';
+import { useTutupLuar } from '@/lib/tutup-luar';
 import {
   ambilSumberGratis, ambilSumberBerlisensi, tautanBerkas,
   mintaLisensi, usePermintaanSaya,
@@ -537,7 +538,7 @@ export default function Marketplace() {
       {aktif && (
         <div
           className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm sm:p-8"
-          onClick={() => setAktif(null)}
+          {...useTutupLuar(() => setAktif(null))}
         >
           <Panel className="my-4 w-full max-w-3xl bg-zinc-950" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between gap-4 border-b border-zinc-800/80 p-6">

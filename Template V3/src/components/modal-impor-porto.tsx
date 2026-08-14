@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { rupiah, warnaKategori } from '@/data/porto';
 import { bacaLembar, keAsetDanKewajiban, type BarisImpor } from '@/lib/impor-porto';
 import type { IsiPorto } from '@/lib/porto';
+import { useTutupLuar } from '@/lib/tutup-luar';
 
 /* ════════════════════════════════════════════════════════════════════════
    IMPOR LEMBAR -> PRATINJAU -> SIMPAN
@@ -72,7 +73,7 @@ export function ModalImporPorto({ isi, simpan, tutup }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm sm:p-8"
-         onClick={tutup}>
+         {...useTutupLuar(tutup)}>
       <Panel className="my-4 w-full max-w-3xl bg-zinc-950" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between gap-4 border-b border-zinc-800/80 px-6 py-5">
           <div>

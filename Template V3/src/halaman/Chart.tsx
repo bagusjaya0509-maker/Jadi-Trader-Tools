@@ -301,6 +301,12 @@ export default function ChartBacktest() {
      jalan; menyatukannya berarti satu salah klik bisa membuka order
      yang tidak diminta. */
   const [sunting, setSunting] = useState<OrderSunting | null>(null);
+  /* Cermin `sunting` yang selalu mutakhir. akhiriOrder bisa dipanggil satu
+     tick setelah setSunting (dari tombol Tutup di tabel), dan pada saat itu
+     closure-nya masih memegang nilai render SEBELUMNYA — menutup order yang
+     salah, atau tidak menutup apa pun. Ref tidak menunggu render. */
+  const suntingAktif = useRef<OrderSunting | null>(null);
+  suntingAktif.current = sunting;
   /* Disimpan sebagai TEKS, bukan angka. Isian angka yang menyimpan
      number tidak bisa diketik: "0." berubah jadi 0 di tengah ketikan dan
      titiknya hilang, jadi harga desimal mustahil dimasukkan tangan.
@@ -556,7 +562,24 @@ export default function ChartBacktest() {
     return p ? p.pnl : null;
   }, [sunting, akunMt5.posisi, posisiBursa]);
 
-  async function akhiriOrder() {
+  /* Menutup order yang DIPILIH DARI TABEL, tanpa harus masuk mode sunting
+     dulu. Fitur tutupnya sebenarnya sudah ada sejak lama, tapi tersembunyi
+     di balik dua langkah — klik baris, lalu klik garis di chart — dan
+     pemilik sendiri menyimpulkan Trade-Fi "belum punya fitur tutup".
+     Fitur yang ada tapi tidak ditemukan sama saja dengan tidak ada.
+
+     Order-nya dibuka di chart lebih dulu supaya orangnya MELIHAT apa yang
+     akan ditutup — konfirmasi berisi nama dan P/L tetap muncul sesudahnya. */
+  function tutupDariTabel(o: OrderSunting) {
+    bukaSunting(o);
+    /* Satu putaran render supaya `sunting` sudah terisi saat akhiriOrder
+       membacanya. Tanpa jeda ini ia membaca state lama dan menutup order
+       yang salah — atau tidak menutup apa pun. */
+    setTimeout(() => { void akhiriOrder(o); }, 0);
+  }
+
+  async function akhiriOrder(dipilih?: OrderSunting) {
+    const sunting = dipilih ?? suntingAktif.current;
     if (!sunting) return;
     const nama = `${sunting.simbol} ${sunting.arah}`;
     const pesan = sunting.jenis === 'pending'
@@ -1642,10 +1665,25 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                                           : h.pesan);
                                         /* Rencana TIDAK dibuang: mode real
                                            akan menampilkan garis posisi
-                                           broker menggantikannya (≤30 dtk),
-                                           dan mode demo bisa memakai level
-                                           yang sama lagi. */
-                                        if (h.status === 'sukses') setDraf(null);
+                                           broker menggantikannya, dan mode
+                                           demo bisa memakai level yang sama
+                                           lagi. */
+                                        if (h.status === 'sukses') {
+                                          /* BACA-ULANG SEGERA. Ini yang dulu
+                                             hilang: dua jalur lain (ubah SL/TP
+                                             dan tutup posisi) memanggilnya,
+                                             jalur BUKA tidak — jadi panel
+                                             Order Terbuka Trade-Fi baru
+                                             memperlihatkan posisinya saat
+                                             putaran 30 detik berikutnya
+                                             kebetulan lewat. Layar bilang
+                                             "Terbuka di MT5" sementara
+                                             tabelnya masih kosong, dan jeda
+                                             itu terbaca sebagai ordernya
+                                             tidak masuk. */
+                                          segarkanAkunMt5();
+                                          setDraf(null);
+                                        }
                                       })
                                       .catch((e) => setKabarNyata(e instanceof Error ? e.message : 'Gagal mengirim perintah'))
                                       .finally(() => setSibukNyata(false));
@@ -2081,8 +2119,8 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
           persis seperti di Dashboard. Judul di atas dua panel yang
           masing-masing sudah berjudul cuma mengulang. */}
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <PanelPosisiTerbuka sumber="kripto" onSunting={bukaSunting} />
-        <PanelPosisiTerbuka sumber="forex" onSunting={bukaSunting} />
+        <PanelPosisiTerbuka sumber="kripto" onSunting={bukaSunting} onTutup={tutupDariTabel} />
+        <PanelPosisiTerbuka sumber="forex" onSunting={bukaSunting} onTutup={tutupDariTabel} />
       </div>
     </div>
   );

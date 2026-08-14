@@ -4,6 +4,7 @@ import { Panel } from '@/components/efferd-ui';
 import { cn } from '@/lib/utils';
 import { simpanTrade, hapusTrade, type MasukanTrade } from '@/lib/tulis-jurnal';
 import type { Trade, Sumber } from '@/data/contoh';
+import { useTutupLuar } from '@/lib/tutup-luar';
 
 /* ════════════════════════════════════════════════════════════════════════
    MODAL TAMBAH / SUNTING TRADE
@@ -122,7 +123,7 @@ export function ModalTrade({ sumber, trade, tutup }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm sm:p-8"
-         onClick={tutup}>
+         {...useTutupLuar(tutup)}>
       <Panel className="my-4 w-full max-w-2xl bg-zinc-950" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between gap-4 border-b border-zinc-800/80 px-6 py-5">
           <div>

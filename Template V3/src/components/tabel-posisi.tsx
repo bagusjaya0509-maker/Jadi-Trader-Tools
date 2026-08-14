@@ -59,8 +59,10 @@ export interface BarisPosisi {
   imbalUsd?: number;
 }
 
-export function TabelPosisi({ baris, kosong, onKlikBaris }: {
+export function TabelPosisi({ baris, kosong, onKlikBaris, onTutup }: {
   baris: BarisPosisi[];
+  /** Tombol Tutup per baris. Kolomnya hanya muncul kalau diberikan. */
+  onTutup?: (b: BarisPosisi) => void;
   /** Klik baris = buka order ini di chart untuk disunting. Kalau tidak
    *  diberikan, barisnya tidak bisa diklik sama sekali — bukan bisa
    *  diklik tapi tidak melakukan apa-apa. */
@@ -89,6 +91,7 @@ export function TabelPosisi({ baris, kosong, onKlikBaris }: {
             <Th className="text-right">Risk SL</Th>
             <Th className="text-right">Target TP</Th>
             <Th className="text-right">P/L</Th>
+            {onTutup && <Th />}
           </tr>
         </thead>
         <tbody>
@@ -158,6 +161,21 @@ export function TabelPosisi({ baris, kosong, onKlikBaris }: {
                   b.pnl === undefined ? 'text-zinc-600' : b.pnl >= 0 ? 'text-emerald-500' : 'text-red-400')}>
                   {b.pnl === undefined ? '—' : uang(b.pnl, true)}
                 </Td>
+                {onTutup && (
+                  <Td className="text-right">
+                    {/* stopPropagation: barisnya juga bisa diklik (buka di
+                        chart), dan tanpa ini menekan Tutup menjalankan
+                        keduanya. Warna merah baru muncul saat disentuh —
+                        tombol yang menyala merah terus mengundang klik
+                        refleks pada tindakan yang tidak bisa dibatalkan. */}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onTutup(b); }}
+                      title="Tutup posisi ini di harga pasar"
+                      className="cursor-pointer rounded border border-zinc-800 px-2 py-0.5 text-[11px] text-zinc-400 transition-colors hover:border-red-500/40 hover:text-red-400">
+                      Tutup
+                    </button>
+                  </Td>
+                )}
               </Tr>
             );
           })}

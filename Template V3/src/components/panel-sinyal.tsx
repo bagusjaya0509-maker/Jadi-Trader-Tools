@@ -221,7 +221,12 @@ export function PanelSinyal({ ringkas = false }: { ringkas?: boolean } = {}) {
      ke bawah (panel permintaan akses), bukan ke atas. Saat kosong ia
      null, jadi margin-nya ikut hilang tanpa menyisakan celah. */
   return (
-    <Panel className={cn(!ringkas && 'mb-4')}>
+    /* Di rak 4 slot, tingginya DIKUNCI dan isinya yang menggulir.
+       Tanpa ini panel pertama menjulur jauh ke bawah sementara tiga slot
+       kosong di sebelahnya pendek — dan baris yang tingginya timpang
+       terbaca sebagai tata letak yang rusak, bukan sebagai satu panel
+       yang kebetulan berisi banyak. */
+    <Panel className={cn(!ringkas && 'mb-4', ringkas && 'flex h-[460px] flex-col overflow-hidden')}>
       <PanelHead
         judul={
           /* Label beta menempel di JUDULNYA, bukan di catatan kecil yang
@@ -235,7 +240,14 @@ export function PanelSinyal({ ringkas = false }: { ringkas?: boolean } = {}) {
             </span>
           </span>
         }
-        sub="Dikurasi agen Pemburu Sinyal — hanya sinyal berlevel lengkap yang lolos; sumbernya ditulis terbuka. Agennya masih dalam perbaikan: hasilnya bisa meleset atau tertunda, jadi periksa ulang sebelum dipakai."
+        /* Kalimat panjangnya dipendekkan di rak. Di kolom 320 px ia
+           membungkus jadi belasan baris dan mendorong sinyalnya —
+           satu-satunya isi yang benar-benar dicari — turun ke luar layar.
+           Peringatan betanya TIDAK hilang: ia sudah menempel di judul,
+           dan kalimat lengkapnya tetap terbaca sebagai tooltip. */
+        sub={ringkas
+          ? 'Dikurasi agen Pemburu Sinyal. Masih beta — periksa ulang sebelum dipakai.'
+          : 'Dikurasi agen Pemburu Sinyal — hanya sinyal berlevel lengkap yang lolos; sumbernya ditulis terbuka. Agennya masih dalam perbaikan: hasilnya bisa meleset atau tertunda, jadi periksa ulang sebelum dipakai.'}
         kanan={
           <span className="flex items-center gap-2">
             {/* Yang ditampilkan LAMA KERJANYA, bukan jam pemeriksaan.
@@ -320,7 +332,8 @@ export function PanelSinyal({ ringkas = false }: { ringkas?: boolean } = {}) {
         </p>
       )}
       <div className={cn('grid grid-cols-1 gap-3 px-5 pb-5',
-                          !ringkas && 'md:grid-cols-2 xl:grid-cols-3')}>
+                          !ringkas && 'md:grid-cols-2 xl:grid-cols-3',
+                          ringkas && 'min-h-0 flex-1 overflow-y-auto')}>
         {daftar.map((s) => {
           const jarakSl = Math.abs(s.entry - s.sl);
           const jarakTp = Math.abs(s.tp - s.entry);

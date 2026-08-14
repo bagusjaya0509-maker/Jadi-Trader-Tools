@@ -51,11 +51,15 @@ export interface OrderSunting {
   tiket?: string;
 }
 
-export function PanelPosisiTerbuka({ sumber, onSunting }: {
+export function PanelPosisiTerbuka({ sumber, onSunting, onTutup }: {
   sumber: Sumber;
   /** Klik baris = buka order itu di chart. Tanpa ini barisnya tidak bisa
    *  diklik sama sekali. */
   onSunting?: (o: OrderSunting) => void;
+  /** Tombol Tutup per baris. Terpisah dari onSunting karena menutup posisi
+   *  adalah tindakan yang tidak bisa dibatalkan — ia harus punya tombolnya
+   *  sendiri, bukan menumpang klik baris yang sama dengan "lihat di chart". */
+  onTutup?: (o: OrderSunting) => void;
 }) {
   const { data: posisiKripto, pending: pendingKripto, stop: stopKripto } = usePosisi();
   const mt5 = useAkunMt5();
@@ -191,6 +195,31 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
         };
       });
 
+  /* Satu bentuk OrderSunting untuk DUA pemakai: klik baris (lihat di chart)
+     dan tombol Tutup. Dulu bentuknya ditulis inline di satu tempat saja;
+     begitu tombol Tutup ditambahkan, menyalinnya berarti dua salinan yang
+     bisa menyimpang — dan yang menyimpang di sini adalah order MANA yang
+     ditutup. */
+  function keOrder(b: BarisPosisi): OrderSunting {
+    return {
+      pasar: sumber === 'kripto' ? 'kripto' : 'mt5',
+      jenis: 'posisi',
+      /* Nama DASAR, bukan nama broker: chart & tick dikirim EA dengan
+         nama dasar. */
+      simbolChart: sumber === 'kripto' ? b.simbol : `MT5:${simbolDasarMt5(b.simbol)}`,
+      simbol: b.simbol,
+      arah: b.arah,
+      entry: b.entry, sl: b.sl, tp: b.tp,
+      /* Ukuran dibaca dari sumber aslinya, bukan dari teks berformat di
+         kolom Size — "1.234,5" akan jadi 1,2345 kalau diurai sebagai
+         angka Inggris. */
+      ukuran: sumber === 'kripto'
+        ? (posisiKripto.find((p) => p.id === b.kunci)?.jumlah ?? 0)
+        : (mt5.posisi.find((p) => p.tiket === b.kunci)?.lot ?? 0),
+      tiket: b.tiket,
+    };
+  }
+
   const total = baris.some((b) => b.pnl !== undefined)
     ? baris.reduce((s, b) => s + (b.pnl ?? 0), 0)
     : null;
@@ -228,23 +257,8 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
             untuk angka yang dibutuhkan saat posisi sedang berjalan. */}
         <TabelPosisi
           baris={baris}
-          onKlikBaris={onSunting && ((b) => onSunting({
-            pasar: sumber === 'kripto' ? 'kripto' : 'mt5',
-            jenis: 'posisi',
-            /* Nama DASAR, bukan nama broker: chart & tick dikirim EA
-               dengan nama dasar. */
-            simbolChart: sumber === 'kripto' ? b.simbol : `MT5:${simbolDasarMt5(b.simbol)}`,
-            simbol: b.simbol,
-            arah: b.arah,
-            entry: b.entry, sl: b.sl, tp: b.tp,
-            /* Ukuran dibaca dari sumber aslinya, bukan dari teks
-               berformat di kolom Size — "1.234,5" akan jadi 1,2345 kalau
-               diurai sebagai angka Inggris. */
-            ukuran: sumber === 'kripto'
-              ? (posisiKripto.find((p) => p.id === b.kunci)?.jumlah ?? 0)
-              : (mt5.posisi.find((p) => p.tiket === b.kunci)?.lot ?? 0),
-            tiket: b.tiket,
-          }))}
+          onTutup={onTutup && ((b) => onTutup(keOrder(b)))}
+          onKlikBaris={onSunting && ((b) => onSunting(keOrder(b)))}
           kosong={sumber === 'kripto'
             ? 'Tidak ada posisi kripto terbuka.'
             : mt5.terhubung === true ? 'Tidak ada posisi MT5 terbuka.' : mt5.ket}

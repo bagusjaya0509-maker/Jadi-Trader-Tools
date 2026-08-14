@@ -10,6 +10,7 @@ import { cn, uang, persen, harga as fHarga, tanggalPendek } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 import { useRiwayat, useSaldoAwal } from '@/lib/data';
 import { statGabungan, kurvaEkuitas } from '@/lib/hitung';
+import { useTutupLuar } from '@/lib/tutup-luar';
 import {
   daftarAnalisa, kirimAnalisa, hapusAnalisa, bukaIsi, mintaAkses,
   statusSaya, putuskanAkses,
@@ -55,7 +56,7 @@ function Sparkline({ kurva }: { kurva: number[] }) {
 function ModalPortofolio({ a, tutup }: { a: RingkasAnalisa; tutup: () => void }) {
   const s = a.snapshot;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={tutup}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" {...useTutupLuar(tutup)}>
       <div className="w-full max-w-md rounded-xl border border-zinc-800 bg-zinc-950 p-5" onClick={(e) => e.stopPropagation()}>
         <div className="mb-3 flex items-center justify-between">
           <div>
@@ -250,7 +251,7 @@ function LencanaBeta() {
  *  "segera hadir" tidak memberi tahu apa pun yang tidak sudah jelas. */
 function SlotAgen({ urutan }: { urutan: number }) {
   return (
-    <Panel className="flex flex-col items-start justify-center gap-2 border-dashed p-5">
+    <Panel className="flex h-[460px] flex-col items-start justify-center gap-2 border-dashed p-5">
       <span className="flex items-center gap-2">
         <Radar className="size-4 text-zinc-700" />
         <span className="text-[12.5px] font-medium text-zinc-400">Slot agen {urutan}</span>
