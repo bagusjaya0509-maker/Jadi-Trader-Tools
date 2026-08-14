@@ -8,7 +8,7 @@ import { Panel, PanelHead, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/
 import { TutorialVps } from '@/components/tutorial-vps';
 import { cn } from '@/lib/utils';
 import { bacaKoneksi, simpanKoneksi, hapusKoneksi, koneksiLengkap, PROXY_BAWAAN } from '@/lib/koneksi';
-import { useKodeMt5, useAkunMt5 } from '@/lib/akun';
+import { useKodeMt5, useAkunMt5, versiKurangDari, VERSI_EA_PENDING } from '@/lib/akun';
 import { tautanBerkas } from '@/lib/admin';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -176,6 +176,21 @@ export default function Integrasi() {
   const statusMt5 = useAkunMt5();
   const kodeMt5 = kodeM.kode;
   const mt5Tersambung = statusMt5.terhubung === true;
+  /* EA di bawah v2.05 tidak mengirim pending order maupun tick. Daftar
+     kemampuan mengikuti versi yang BENAR-BENAR terpasang, bukan versi
+     terbaru yang ada — menjanjikan fitur yang tidak akan datang membuat
+     orangnya menunggu data yang tidak pernah ada. */
+  const eaLama = !!statusMt5.versiEa && versiKurangDari(statusMt5.versiEa, VERSI_EA_PENDING);
+  const kemampuanMt5: [string, string, boolean][] = [
+    ['Baca saldo & ekuitas', 'Aktif', true],
+    ['Posisi terbuka & riwayat', 'Aktif', true],
+    ['Data lilin ke chart (OHLC)', 'Aktif', true],
+    ['Pending order', eaLama ? `Butuh EA v${VERSI_EA_PENDING}` : 'Aktif', !eaLama],
+    ['Harga tick (bid/ask)', eaLama ? `Butuh EA v${VERSI_EA_PENDING}` : 'Aktif', !eaLama],
+    ['Kirim order & ubah SL/TP', 'Aktif', true],
+    ['Tutup posisi', 'Aktif', true],
+    ['Tarik dana', 'Tidak pernah', false],
+  ];
   const [lihatToken, setLihatToken] = useState(false);
   const [disalin, setDisalin] = useState(false);
 
@@ -347,6 +362,59 @@ export default function Integrasi() {
                   EA melapor — {statusMt5.ket}, saldo {statusMt5.saldo?.toFixed(2)} {statusMt5.mataUang}
                 </p>
               )}
+            </div>
+
+            {/* ── Yang aktif lewat sambungan ini ──────────────────────────
+                Bentuk yang SAMA PERSIS dengan panel Binance di sebelahnya —
+                dua sambungan yang menjawab pertanyaan yang sama ("apa yang
+                bisa dilakukan lewat sini") pantas dibaca dengan cara yang
+                sama.
+
+                Bedanya: daftar Binance tetap, daftar ini MENGIKUTI VERSI EA
+                yang benar-benar terpasang. EA lama tidak bisa mengirim
+                pending order atau tick — menampilkannya sebagai "Aktif"
+                berarti menjanjikan sesuatu yang tidak akan datang, dan
+                orangnya akan menunggu data yang tidak pernah ada. */}
+            <div className="mt-4 rounded-lg border border-zinc-800/60 p-4">
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <span className="text-[11.5px] font-medium uppercase tracking-wider text-zinc-500">
+                  Yang aktif lewat sambungan ini
+                </span>
+                {statusMt5.versiEa && (
+                  <span className="rounded bg-zinc-800/70 px-1.5 py-0.5 text-[10.5px] text-zinc-400">
+                    EA v{statusMt5.versiEa}
+                  </span>
+                )}
+              </div>
+              <TabelBungkus>
+                <Tabel>
+                  <thead>
+                    <tr><Th>Kemampuan</Th><Th>Status</Th></tr>
+                  </thead>
+                  <tbody>
+                    {kemampuanMt5.map(([nama, status, on]) => (
+                      <Tr key={nama}>
+                        <Td className="text-zinc-300">{nama}</Td>
+                        <Td>
+                          <span className={cn(
+                            'rounded px-1.5 py-0.5 text-[11px]',
+                            on ? 'bg-emerald-500/10 text-emerald-500' : 'bg-zinc-700/30 text-zinc-500'
+                          )}>
+                            {status}
+                          </span>
+                        </Td>
+                      </Tr>
+                    ))}
+                  </tbody>
+                </Tabel>
+              </TabelBungkus>
+              <p className="mt-3 text-[11.5px] leading-relaxed text-zinc-600">
+                {statusMt5.terhubung !== true
+                  ? 'EA belum melapor, jadi daftar ini menunjukkan apa yang AKAN aktif begitu tersambung.'
+                  : eaLama
+                  ? <>EA v{statusMt5.versiEa} belum mengirim pending order dan tick. Kompilasi ulang <span className="text-zinc-400">JadiTraderSyncV2.mq5</span> ke v{VERSI_EA_PENDING} atau lebih baru, lalu pasang ulang.</>
+                  : <>Order berangkat ke MT5 hanya kalau <span className="text-zinc-400">Algo Trading</span> menyala dan input <span className="text-zinc-400">IzinkanTrading</span> bernilai true. Keduanya kunci di sisimu, bukan di sisi kami.</>}
+              </p>
             </div>
 
 
@@ -610,8 +678,14 @@ export default function Integrasi() {
       </Panel>
       )}
 
-      {/* Log tampil di SEMUA tab: ia jawaban dari "kenapa tidak nyambung",
-          dan pertanyaan itu muncul di tab mana pun orangnya sedang berada. */}
+      {/* Log HANYA di tab Connection (keputusan pemilik).
+          Sempat ditampilkan di semua tab dengan alasan "pertanyaan kenapa
+          tidak nyambung muncul di mana saja" — tapi tab tutorial dibaca
+          justru SEBELUM ada yang bisa gagal, dan log kosong di bawah
+          panduan cuma menambah panjang halaman tanpa menjawab apa pun.
+          Yang sedang membaca panduan dan menemui galat akan kembali ke
+          tab Connection, tempat semua tombolnya juga berada. */}
+      {tab === 'sehat' && (
       <Panel className="mt-4">
         <PanelHead judul="Connection log" sub="Kejadian terakhir dari kedua sambungan." />
         <div className="px-5 pb-5">
@@ -652,6 +726,7 @@ export default function Integrasi() {
           </p>
         </div>
       </Panel>
+      )}
     </div>
   );
 }

@@ -4,8 +4,9 @@ import {
   Clock, Plus, RefreshCw, Trash2, KeyRound, ShieldAlert, TrendingDown,
 } from 'lucide-react';
 import { Panel, PanelHead, KartuKpi, TipGrafik, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
-import { cn, uang, tanggalPendek } from '@/lib/utils';
+import { cn, tanggalPendek } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
+import { useKurs } from '@/lib/kurs';
 import {
   useKlien, usePenjualan, usePengeluaran, useLaporan, useLisensi,
   usePermintaanLisensi,
@@ -64,6 +65,7 @@ export default function Pemilik() {
   const klien = useKlien();
   const penjualan = usePenjualan();
   const pengeluaran = usePengeluaran();
+  const { kurs, setKurs, tampil, setTampil, fmt } = useKurs();
   const laporan = useLaporan();
   const lisensi = useLisensi();
   /* Permintaan lisensi dipakai untuk menautkan tiap kode aktif ke pembelinya.
@@ -145,14 +147,46 @@ export default function Pemilik() {
 
   return (
     <div className="p-4 sm:p-6">
+      {/* ── Sakelar mata uang ──────────────────────────────────────────
+          Semua nilai TERSIMPAN dalam dolar; ini cuma cara membacanya.
+          Kursnya diketik sendiri, bukan diambil dari layanan kurs hidup:
+          laporan yang angkanya berubah sendiri tiap hari tidak bisa
+          dibandingkan antar bulan — "Agustus Rp 2,4 juta" hari ini bisa
+          jadi "Rp 2,45 juta" minggu depan tanpa satu transaksi pun
+          berubah. Kurs yang diketik sendiri selalu bisa
+          dipertanggungjawabkan. */}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <div className="flex overflow-hidden rounded-md border border-zinc-800">
+          {(['USD', 'IDR'] as const).map((m) => (
+            <button key={m} onClick={() => setTampil(m)}
+              className={cn('cursor-pointer px-3 py-1.5 text-[12px] transition-colors',
+                tampil === m ? 'bg-zinc-100 text-zinc-950' : 'text-zinc-400 hover:text-zinc-200')}>
+              {m === 'USD' ? '$ USD' : 'Rp IDR'}
+            </button>
+          ))}
+        </div>
+        {tampil === 'IDR' && (
+          <label className="flex items-center gap-2 text-[11.5px] text-zinc-500">
+            1 USD =
+            <input value={kurs} onChange={(e) => setKurs(Number(e.target.value))}
+                   inputMode="numeric"
+                   className="angka h-8 w-24 rounded-md border border-zinc-800 bg-zinc-900/60 px-2 text-[12px] text-zinc-100 outline-none hover:border-zinc-700 focus-visible:border-zinc-600" />
+            IDR
+          </label>
+        )}
+        <span className="text-[11px] text-zinc-600">
+          Semua nilai dicatat dalam dolar — ini cuma cara menampilkannya.
+        </span>
+      </div>
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <KartuKpi label="Revenue" nilai={uang(totalPenjualan)}
+        <KartuKpi label="Revenue" nilai={fmt(totalPenjualan)}
                   catatan={`${penjualan.data.length} penjualan tercatat`} />
         <KartuKpi label="Active clients" nilai={String(klien.data.length)}
                   catatan="akun yang pernah masuk" />
-        <KartuKpi label="Pengeluaran" nilai={uang(totalPengeluaran)}
+        <KartuKpi label="Pengeluaran" nilai={fmt(totalPengeluaran)}
                   catatan={`${pengeluaran.data.length} pengeluaran tercatat`} />
-        <KartuKpi label="Laba bersih" nilai={uang(labaBersih)}
+        <KartuKpi label="Laba bersih" nilai={fmt(labaBersih)}
                   catatan={labaBersih >= 0 ? 'pemasukan dikurangi pengeluaran' : 'pengeluaran melebihi pemasukan'} />
       </div>
 
@@ -219,7 +253,7 @@ export default function Pemilik() {
         <PanelHead judul="Pengeluaran" sub="Biaya yang keluar — VPS, domain, iklan, alat, apa pun."
                    kanan={
                      <span className="angka text-[12.5px] text-red-400/90">
-                       −{uang(totalPengeluaran)}
+                       −{fmt(totalPengeluaran)}
                      </span>
                    } />
         <div className="px-5 pb-5">
@@ -238,14 +272,14 @@ export default function Pemilik() {
                         {p.catatan && <div className="text-[11px] text-zinc-600">{p.catatan}</div>}
                       </Td>
                       <Td className="text-zinc-500">{p.kategori || '—'}</Td>
-                      <Td className="angka text-right text-red-400/90">−{uang(p.nilai)}</Td>
+                      <Td className="angka text-right text-red-400/90">−{fmt(p.nilai)}</Td>
                       <Td className="text-right">
                         <button
                           onClick={() => {
                             /* Konfirmasi MENYEBUT apa yang dihapus. Catatan
                                keuangan yang hilang tidak bisa disusun ulang
                                dari ingatan. */
-                            if (!confirm(`Hapus pengeluaran "${p.keperluan}" senilai ${uang(p.nilai)}?`)) return;
+                            if (!confirm(`Hapus pengeluaran "${p.keperluan}" senilai ${fmt(p.nilai)}?`)) return;
                             void jalankan(() => hapusPengeluaran(p.id), 'Pengeluaran dihapus.', pengeluaran.muatUlang);
                           }}
                           disabled={sibuk || !pemilik}
@@ -307,7 +341,7 @@ export default function Pemilik() {
                           {p.produk}
                           {p.pembeli && <div className="text-[11px] text-zinc-600">{p.pembeli}</div>}
                         </Td>
-                        <Td className="angka text-right text-emerald-500">{uang(p.nilai)}</Td>
+                        <Td className="angka text-right text-emerald-500">{fmt(p.nilai)}</Td>
                         <Td className="text-right">
                           <button
                             onClick={() => void jalankan(() => hapusPenjualan(p.id), 'Catatan penjualan dihapus.', penjualan.muatUlang)}
