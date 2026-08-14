@@ -35,7 +35,7 @@
 //       tombol AutoTrading (Algo Trading) di toolbar MT5 menyala.
 //+------------------------------------------------------------------+
 #property copyright "Jadi Trader Tools"
-#property version   "2.07"
+#property version   "2.08"
 #property strict
 #property description "Trade-Fi Sync v2: jurnal + eksekusi perintah web + kirim chart MT5. Baca pagar pengamannya di kepala berkas."
 
@@ -49,10 +49,11 @@ input string MulaiDariTanggal = "2026.08.04";                        // Riwayat 
 input bool   IzinkanTrading   = true;                                // Eksekusi perintah dari web (false = baca-saja)
 input double LotMaks          = 1.0;                                 // Lot maksimum per perintah
 input string SimbolChart      = "";                                  // Simbol yang dikirim ke chart web (kosong = simbol chart ini)
+input int    LilinPerTF       = 3000;                                // Jumlah lilin per timeframe yang dikirim ke chart web (400-15000)
 input int    KirimChartMenit  = 5;                                   // Jeda kirim OHLC ke web (menit)
 input bool   KirimTick        = true;                                // Kirim harga tiap detik (harga web = MT5)
 
-#define VERSI_EA "2.07"
+#define VERSI_EA "2.08"
 #define PFX      "JTS_"
 
 CTrade   gTrade;
@@ -677,13 +678,31 @@ void AmbilPerintah()
 //+------------------------------------------------------------------+
 //| CHART MT5 -> WEB                                                  |
 //+------------------------------------------------------------------+
-//  Lima timeframe yang sama dengan halaman Chart web. 400 bar per TF —
-//  cukup untuk indikator matang plus replay, dan tetap ringan (~25 KB).
+//  Lima timeframe yang sama dengan halaman Chart web.
+//
+//  JUMLAHNYA SEKARANG BISA DIATUR (input LilinPerTF), bawaan 3000.
+//  Dulu dipaku 400 — cukup untuk indikator matang, tapi di TF 1 jam itu
+//  cuma 23 hari, dan chart web tidak punya cara meminta yang lebih tua:
+//  backend hanya MENAMPUNG apa yang EA kirim, ia tidak bisa memintanya.
+//  Jadi apa pun yang tidak dikirim di sini hilang selamanya bagi web.
+//
+//  Ukuran kiriman ~64 bita per lilin: 3000 lilin ≈ 190 KB, masih jauh di
+//  bawah batas 1 MB per unggahan milik backend. 15000 (≈960 KB) adalah
+//  batas atas yang aman; di atas itu unggahannya ditolak dan chart-nya
+//  justru KOSONG, bukan sekadar pendek — karena itu dijepit di sini,
+//  bukan dipercayakan pada orang yang mengisi kotaknya.
+//
+//  Batas sesungguhnya sering bukan angka ini melainkan berapa bar yang
+//  disimpan terminalmu sendiri (Tools > Options > Charts > Max bars).
+//  CopyRates mengembalikan apa adanya kalau kurang, dan itu tidak apa-apa.
 void KirimChartSatu(ENUM_TIMEFRAMES tfMt5, string tfWeb)
 {
    MqlRates rates[];
    ArraySetAsSeries(rates, false);
-   int n = CopyRates(gSimbolChart, tfMt5, 0, 400, rates);
+   int minta = LilinPerTF;
+   if(minta < 400)   minta = 400;
+   if(minta > 15000) minta = 15000;
+   int n = CopyRates(gSimbolChart, tfMt5, 0, minta, rates);
    if(n < 10) return;                       // pasar tutup / simbol salah — jangan kirim remah
 
    int digit = (int)SymbolInfoInteger(gSimbolChart, SYMBOL_DIGITS);
