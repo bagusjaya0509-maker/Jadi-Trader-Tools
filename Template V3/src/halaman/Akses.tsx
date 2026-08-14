@@ -166,7 +166,7 @@ export default function Akses() {
             ini tidak menampilkan aplikasi, dan tidak ada satu pun tombol
             untuk berganti akun. Sudah terjadi — pemiliknya sendiri terkunci
             di luar setelah menguji alur permintaan dengan email lain. */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="animate-fade-in flex flex-wrap items-center justify-between gap-3">
           <Link to="/" className="inline-flex items-center gap-1.5 text-[12.5px] text-zinc-500 transition-colors hover:text-zinc-300">
             <ArrowLeft className="size-3.5" /> Kembali ke beranda
           </Link>
@@ -224,7 +224,7 @@ export default function Akses() {
 
         {/* ── Sudah punya akses ─────────────────────────────────────── */}
         {sudahAktif ? (
-          <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/[0.06] p-5">
+          <div className="animate-fade-in delay-300 rounded-xl border border-emerald-500/25 bg-emerald-500/[0.06] p-5">
             <div className="flex items-center gap-2 text-[14px] font-medium text-emerald-400">
               <CheckCircle2 className="size-4" /> Akses aktif
             </div>
@@ -241,7 +241,7 @@ export default function Akses() {
           </div>
         ) : !pengguna ? (
           /* ── Belum masuk ─────────────────────────────────────────── */
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-5">
+          <div className="animate-fade-in delay-300 rounded-xl border border-zinc-800 bg-zinc-900/40 p-5">
             <div className="text-[13.5px] font-medium text-zinc-200">Masuk untuk melanjutkan</div>
             <p className="mt-1 text-[12.5px] leading-relaxed text-zinc-500">
               Akun dipakai untuk menandai permintaan dan mengirim kabar saat akses dibuka.
@@ -275,7 +275,7 @@ export default function Akses() {
           </div>
         ) : terakhir?.status === 'baru' ? (
           /* ── Menunggu tinjauan ───────────────────────────────────── */
-          <div className="rounded-xl border border-amber-500/25 bg-amber-500/[0.05] p-5">
+          <div className="animate-fade-in delay-300 rounded-xl border border-amber-500/25 bg-amber-500/[0.05] p-5">
             <div className="flex items-center gap-2 text-[14px] font-medium text-amber-300">
               <Clock className="size-4" /> Permintaan sedang ditinjau
             </div>
@@ -285,7 +285,7 @@ export default function Akses() {
             </p>
           </div>
         ) : terakhir?.status === 'ditolak' ? (
-          <div className="rounded-xl border border-red-500/25 bg-red-500/[0.05] p-5">
+          <div className="animate-fade-in delay-300 rounded-xl border border-red-500/25 bg-red-500/[0.05] p-5">
             <div className="flex items-center gap-2 text-[14px] font-medium text-red-400">
               <XCircle className="size-4" /> Permintaan sebelumnya tidak disetujui
             </div>
@@ -330,7 +330,7 @@ export default function Akses() {
 
         {/* ── Tombol minta ──────────────────────────────────────────── */}
         {pengguna && !sudahAktif && kuota.bukaPermintaan && terakhir?.status !== 'baru' && (
-          <div className="flex flex-col gap-3 rounded-xl border border-zinc-800 bg-zinc-900/40 p-5">
+          <div className="animate-fade-in delay-500 flex flex-col gap-3 rounded-xl border border-zinc-800 bg-zinc-900/40 p-5">
             <div className="text-[13.5px] font-medium text-zinc-200">Minta akses</div>
 
             <textarea
@@ -400,7 +400,7 @@ export default function Akses() {
           </div>
         )}
 
-        <div className="flex items-start gap-2 text-[11.5px] leading-relaxed text-zinc-600">
+        <div className="animate-fade-in delay-500 flex items-start gap-2 text-[11.5px] leading-relaxed text-zinc-600">
           <ShieldCheck className="mt-0.5 size-3.5 shrink-0" />
           <span>
             Yang disimpan hanya email, nama akun, dan keterangan yang ditulis. Kunci API dan data

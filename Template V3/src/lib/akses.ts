@@ -37,7 +37,11 @@ export interface Kuota {
 export const KUOTA_KOSONG: Kuota = {
   gratisTerpakai: 0, gratisTotal: 20, gratisSisa: 20, gratisHabis: false,
   bayarTerpakai: 0, bayarTotal: 80, bayarSisa: 80, bayarHabis: false, hari: 30,
-  bukaPermintaan: true,
+  /* Bawaan MATI, bukan hidup. Nilai ini dipakai selama jawaban server belum
+     datang; kalau hidup, kartu kuota berkedip muncul lalu hilang begitu
+     server bilang pendaftaran ditutup. Lebih baik terlambat sedetik daripada
+     menampilkan sesuatu yang langsung ditarik kembali. */
+  bukaPermintaan: false,
 };
 
 /** Link checkout Rp 17.900. Produknya bernama "Request Access". */
