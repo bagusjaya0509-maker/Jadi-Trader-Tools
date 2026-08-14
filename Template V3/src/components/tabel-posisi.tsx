@@ -26,6 +26,19 @@ export interface BarisPosisi {
   arah: 'BUY' | 'SELL';
   /** Sudah lengkap dengan satuannya: "223,8 THETA" atau "0,01 lot". */
   ukuran: string;
+  /** Nilai posisi dalam DOLAR (jumlah x entry).
+   *
+   *  Kenapa bukan sekadar menempelkan "$" di depan `ukuran`: 298 itu
+   *  jumlah KOIN THETA, dan "$298" adalah angka yang salah — nilainya
+   *  sebenarnya sekitar $40. Lambang mata uang di depan angka yang bukan
+   *  uang bukan sekadar keliru dibaca; ia membuat orang menilai besar
+   *  posisinya tujuh kali lipat dari kenyataan.
+   *
+   *  Jadi dolarnya dihitung, dan jumlah koinnya TETAP ditampilkan di
+   *  bawahnya — tidak ada data yang hilang. undefined untuk Trade-Fi:
+   *  di sana ukurannya lot, dan nilai notionalnya bergantung ukuran
+   *  kontrak broker. */
+  ukuranUsd?: number;
   entry: number;
   /** Harga berjalan — dipakai menghitung Gerak. */
   hargaKini?: number;
@@ -114,7 +127,16 @@ export function TabelPosisi({ baris, kosong, onKlikBaris }: {
                     </span>
                   </div>
                 </Td>
-                <Td className="angka text-right text-zinc-400">{b.ukuran || '—'}</Td>
+                <Td className="angka text-right">
+                  {b.ukuranUsd !== undefined ? (
+                    <>
+                      <div className="text-zinc-200">{uang(b.ukuranUsd)}</div>
+                      <div className="text-[10.5px] text-zinc-600">{b.ukuran || '—'}</div>
+                    </>
+                  ) : (
+                    <span className="text-zinc-400">{b.ukuran || '—'}</span>
+                  )}
+                </Td>
                 <Td className="angka text-right text-zinc-400">{harga(b.entry)}</Td>
                 <Td className={cn('angka text-right',
                   gerak === null ? 'text-zinc-600' : gerak >= 0 ? 'text-emerald-500' : 'text-red-400')}>

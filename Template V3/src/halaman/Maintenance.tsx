@@ -181,17 +181,21 @@ export default function Maintenance() {
      memakai input tak terkendali tanpa satu pun handler — mengetik apa pun
      di sana lalu menekan "Simpan produk" tidak pernah terjadi apa-apa. */
   const [pilih, setPilih] = useState('');
-  const [form, setForm] = useState({ id: '', nama: '', harga: '', versi: '', ringkas: '', fitur: '', sampul: '' });
+  const [form, setForm] = useState({ id: '', nama: '', harga: '', hargaAsal: '', versi: '', ringkas: '', fitur: '', sampul: '' });
   const [unggahSibuk, setUnggahSibuk] = useState(false);
 
   function muatKeForm(id: string) {
     setPilih(id);
     const p = tayang.find((x) => x.id === id);
-    if (!p) { setForm({ id: '', nama: '', harga: '', versi: '', ringkas: '', fitur: '', sampul: '' }); return; }
+    if (!p) { setForm({ id: '', nama: '', harga: '', hargaAsal: '', versi: '', ringkas: '', fitur: '', sampul: '' }); return; }
     setForm({
       id: String(p.id ?? ''),
       nama: String(p.nama ?? ''),
       harga: String(p.harga ?? 0),
+      /* Kosong, BUKAN "0", kalau tidak ada promo — "0" di kotak ini akan
+         tersimpan sebagai harga coret nol dan Marketplace menampilkan
+         "$50  $0" yang terbaca sebagai barang gratis. */
+      hargaAsal: p.hargaAsal ? String(p.hargaAsal) : '',
       versi: String(p.versi ?? ''),
       ringkas: String(p.ringkas ?? ''),
       fitur: Array.isArray(p.fitur) ? p.fitur.join('\n') : '',
@@ -228,6 +232,15 @@ export default function Maintenance() {
       ...(lama ?? {}),
       id, nama: form.nama.trim(),
       harga: Number(form.harga) || 0,
+      /* Harga coret hanya disimpan kalau memang LEBIH BESAR dari harga
+         berlaku. "Diskon" yang tidak menurunkan apa pun bukan sekadar
+         tidak berguna — ia klaim yang salah di halaman jualan, dan itu
+         jenis kesalahan yang merusak kepercayaan orang pada seluruh
+         katalognya. Kalau tidak lolos, field-nya DIHAPUS, bukan disimpan
+         nol: nol akan tergambar sebagai coretan "$0". */
+      ...(Number(form.hargaAsal) > (Number(form.harga) || 0)
+        ? { hargaAsal: Number(form.hargaAsal) }
+        : { hargaAsal: undefined }),
       versi: form.versi.trim(),
       ringkas: form.ringkas.trim(),
       fitur: form.fitur.split('\n').map((s) => s.trim()).filter(Boolean),
@@ -480,6 +493,26 @@ export default function Maintenance() {
                   <input value={form.harga} onChange={(e) => setForm({ ...form, harga: e.target.value })}
                     placeholder="50" inputMode="numeric" disabled={!pemilik}
                     className="h-9 w-full rounded-md border border-zinc-800 bg-zinc-900/60 px-3 font-mono text-[12.5px] text-zinc-100 outline-none placeholder:text-zinc-600 hover:border-zinc-700 focus-visible:border-zinc-600 disabled:opacity-50" />
+                </div>
+                <div>
+                  {/* Harga coret duduk TEPAT DI SEBELAH harga berlaku, bukan
+                      di baris lain: keduanya cuma berarti kalau dibaca
+                      berpasangan, dan dipisah jarak orang gampang mengisi
+                      salah satunya saja. */}
+                  <label className="mb-1 block text-[11px] text-zinc-500">
+                    Harga coret <span className="text-zinc-600">(promo, kosongkan kalau tidak ada)</span>
+                  </label>
+                  <input value={form.hargaAsal} onChange={(e) => setForm({ ...form, hargaAsal: e.target.value })}
+                    placeholder="100" inputMode="numeric" disabled={!pemilik}
+                    className="h-9 w-full rounded-md border border-zinc-800 bg-zinc-900/60 px-3 font-mono text-[12.5px] text-zinc-100 outline-none placeholder:text-zinc-600 hover:border-zinc-700 focus-visible:border-zinc-600 disabled:opacity-50" />
+                  {/* Diperingatkan SEBELUM disimpan, bukan setelah. Angka yang
+                      diam-diam dibuang membuat orang mengira promonya sudah
+                      terpasang padahal tidak muncul di mana pun. */}
+                  {form.hargaAsal.trim() !== '' && Number(form.hargaAsal) <= (Number(form.harga) || 0) && (
+                    <p className="mt-1 text-[10.5px] leading-relaxed text-amber-400/90">
+                      Harus lebih besar dari harga berlaku (${Number(form.harga) || 0}) — kalau tidak, coretannya tidak akan disimpan.
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="mb-1 block text-[11px] text-zinc-500">Versi / label</label>

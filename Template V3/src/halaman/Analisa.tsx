@@ -346,9 +346,23 @@ export default function Analisa() {
         <LencanaBeta />
         <span className="text-[11.5px] text-zinc-500">1 dari 4 slot terisi</span>
       </div>
-      <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <PanelSinyal ringkas />
-        {[2, 3, 4].map((n) => <SlotAgen key={n} urutan={n} />)}
+      {/* LEBAR TETAP + gulir mendatar, bukan grid responsif.
+          ────────────────────────────────────────────────────────────────
+          Dengan grid, keempat slot memanjang-memendek mengikuti lebar
+          jendela: satu kartu jadi selebar layar di monitor besar, lalu
+          remuk jadi kolom sempit saat jendela dikecilkan. Isi kartunya —
+          harga, level, ceklist — punya lebar yang memang dibutuhkan, dan
+          lebar yang berubah-ubah membuat mata harus mencari ulang letak
+          tiap angka setiap kali jendelanya digeser.
+
+          Dengan lebar tetap, kartunya selalu terlihat sama; yang berubah
+          cuma berapa banyak yang muat sekaligus. Pola yang sama dipakai
+          Koin Hunter di Screener. */}
+      <div className="mb-4 flex gap-4 overflow-x-auto pb-1">
+        <div className="w-[320px] shrink-0"><PanelSinyal ringkas /></div>
+        {[2, 3, 4].map((n) => (
+          <div key={n} className="w-[320px] shrink-0"><SlotAgen urutan={n} /></div>
+        ))}
       </div>
 
       {/* Permintaan masuk untuk analisaku */}
@@ -462,14 +476,16 @@ export default function Analisa() {
           Belum ada analisa. Jadilah yang pertama memposting.
         </Panel>
       ) : (
-        /* Empat berjejer, sesuai permintaan pemilik. Kartunya jadi lebih
-           sempit, jadi breakpoint-nya bertahap: 1 kolom di HP, 2 di tablet,
-           4 baru di layar lebar — memaksa 4 kolom di layar kecil membuat
-           tiap kartu selebar 80 px dan tidak ada yang terbaca. */
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        /* Empat berjejer dengan LEBAR TETAP, alasan yang sama dengan rak
+           di atas: kartu yang lebarnya ikut jendela membuat tata letaknya
+           berubah tiap kali jendela digeser. Yang menggulir cuma barisnya,
+           halamannya tidak ikut melebar. */
+        <div className="flex gap-4 overflow-x-auto pb-1">
           {daftar.map((a) => (
-            <KartuAnalisa key={a.id} a={a} status={statusku[a.id]}
-              milikku={a.uid === pengguna?.uid} onSegarkan={segarkan} />
+            <div key={a.id} className="w-[320px] shrink-0">
+              <KartuAnalisa a={a} status={statusku[a.id]}
+                milikku={a.uid === pengguna?.uid} onSegarkan={segarkan} />
+            </div>
           ))}
         </div>
       )}

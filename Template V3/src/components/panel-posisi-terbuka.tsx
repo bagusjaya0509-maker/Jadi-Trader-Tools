@@ -167,6 +167,7 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
           ukuran: p.jumlah ? p.jumlah.toLocaleString('id-ID', { maximumFractionDigits: 4 }) : '',
           entry: p.entry, hargaKini: hargaPasar[p.simbol], sl: p.sl, tp: p.tp,
           pnl: p.pnlFloat,
+          ukuranUsd: unit > 0 && p.entry > 0 ? unit * p.entry : undefined,
           risikoUsd: uangDari(p.sl > 0 ? Math.abs(p.entry - p.sl) : 0, unit),
           imbalUsd: uangDari(p.tp > 0 ? Math.abs(p.tp - p.entry) : 0, unit),
         };

@@ -364,6 +364,7 @@ export function Dashboard() {
                 entry: p.entry,
                 hargaKini: p.hargaKini,
                 sl: p.sl, tp: p.tp,
+                ukuranUsd: (p.jumlah ?? 0) > 0 && p.entry > 0 ? (p.jumlah ?? 0) * p.entry : undefined,
                 risikoUsd: uangDariJarak(p.sl > 0 ? Math.abs(p.entry - p.sl) : 0, p.jumlah ?? 0),
                 imbalUsd: uangDariJarak(p.tp > 0 ? Math.abs(p.tp - p.entry) : 0, p.jumlah ?? 0),
                 pnl: p.pnlFloat,
