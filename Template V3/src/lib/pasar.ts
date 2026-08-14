@@ -45,6 +45,49 @@ const UMUR_MS = 15_000;
    cache server-nya (fresh=1). Beban: satu chart @3 dtk = 20 permintaan per
    menit — Binance mengizinkan 1200 bobot per menit, klines berbobot 2,
    jadi ini 3% dari jatah. */
+/** Menarik potongan lilin SEBELUM `sebelumMs`. Dipakai tombol "Muat lebih
+ *  lama" di chart.
+ *
+ *  Binance membatasi 1000 lilin PER PERMINTAAN, bukan seluruhnya — jadi
+ *  riwayat panjang disusun dari beberapa potongan yang disambung. Titik
+ *  sambungnya `waktu lilin tertua − 1 ms`: dengan begitu potongan berikutnya
+ *  berhenti tepat sebelum yang sudah dipegang, dan tidak ada lilin kembar
+ *  yang harus disaring di sisi chart.
+ *
+ *  TIDAK memakai cache memori: tiap potongan diminta sekali seumur sesi, dan
+ *  menyimpannya berarti menahan megabyte data yang tidak akan diminta lagi. */
+export async function ambilKlinesSebelum(simbol: string, tf: string, sebelumMs: number, batas = 1000): Promise<Lilin> {
+  try {
+    const mt5 = simbol.startsWith('MT5:');
+    /* MT5 tidak punya penomoran halaman: EA mengirim apa yang ada di
+       terminalnya, dan tidak ada rute untuk meminta yang lebih tua.
+       Dikembalikan kosong supaya tombolnya bisa mengatakan itu apa adanya,
+       bukan berputar selamanya. */
+    if (mt5) return KOSONG;
+    const r = await fetch(
+      `${dasar()}/api/klines?symbol=${encodeURIComponent(simbol)}&interval=${tf}&limit=${batas}&endTime=${sebelumMs}`);
+    if (!r.ok) return KOSONG;
+    const j = await r.json();
+    const baris = Array.isArray(j) ? j : (j?.data ?? []);
+    if (!Array.isArray(baris) || !baris.length) return KOSONG;
+    /* Bentuknya PERSIS sama dengan ambilKlines — termasuk `times` dalam
+       MILIDETIK mentah, bukan detik. Sempat di sini dibagi 1000, dan
+       akibatnya bukan galat melainkan lilin lama yang mendarat di tahun
+       1970: chart tetap menggambar, cuma sumbu waktunya jadi tidak masuk
+       akal. Dua fungsi yang mengisi struktur yang sama wajib mengisinya
+       dengan satuan yang sama. */
+    return {
+      times: baris.map((k: unknown[]) => Number(k[0])),
+      opens: baris.map((k: unknown[]) => Number(k[1])),
+      highs: baris.map((k: unknown[]) => Number(k[2])),
+      lows: baris.map((k: unknown[]) => Number(k[3])),
+      closes: baris.map((k: unknown[]) => Number(k[4])),
+    };
+  } catch {
+    return KOSONG;
+  }
+}
+
 export async function ambilKlines(simbol: string, tf: string, batas = 200, segar = false): Promise<Lilin> {
   const kunci = `${simbol}|${tf}|${batas}`;
   const ada = simpanan.get(kunci);
