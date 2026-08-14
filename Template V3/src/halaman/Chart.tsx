@@ -922,7 +922,18 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
     let hidup = true;
     async function tarik() {
       try {
-        const l = await ambilKlines(simbol, tf, 500, true);
+        /* 1000, batas yang memang sudah diizinkan backend (dan batas satu
+           permintaan Binance). Dulu 500 tanpa alasan yang tercatat — dan
+           setengah dari yang boleh berarti setengah riwayat yang hilang
+           tanpa ada yang menyadarinya.
+
+           Dalam satuan waktu: 1000 lilin = ±5,5 bulan di TF 4 jam, ±2 tahun
+           9 bulan di TF harian.
+
+           LEBIH DARI ITU butuh penomoran halaman (permintaan berulang dengan
+           startTime mundur), bukan sekadar angka yang dinaikkan. Binance
+           membatasi 1000 PER PERMINTAAN, bukan seluruhnya. */
+        const l = await ambilKlines(simbol, tf, 1000, true);
         if (!hidup) return;
         if (!l.closes.length) {
           setGalat(simbol.startsWith('MT5:')
