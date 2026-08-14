@@ -158,9 +158,9 @@ function Langkah({ no, judul, anak }: { no: number; judul: string; anak: React.R
    halaman pertama tinggal denyut sambungan — pendek, langsung terbaca.
    ════════════════════════════════════════════════════════════════════════ */
 const TAB_INT = [
-  { id: 'sehat',   label: 'Connection Health', judul: 'Kesehatan Sambungan', sub: 'Apakah data masih mengalir dari MT5 dan Binance.' },
-  { id: 'mt5',     label: 'Pasang EA MT5',     judul: 'Pasang EA di MetaTrader 5', sub: 'Kode pasangan, unduhan EA, dan lima langkah pemasangannya.' },
-  { id: 'binance', label: 'Backend & Binance', judul: 'Backend URL & Binance',     sub: 'Alamat VPS, App Token, kunci API, dan pemasangan dari nol.' },
+  { id: 'sehat',   label: 'Connection',        judul: 'Sambungan',                sub: 'Semua tombol menyambung ada di sini: MT5 dan Binance. Panduannya di dua tab sebelah.' },
+  { id: 'mt5',     label: 'Tutorial Pasang MT5',      judul: 'Tutorial Pasang EA di MetaTrader 5', sub: 'Enam langkah pemasangan dan daftar gejala kalau tidak jalan.' },
+  { id: 'binance', label: 'Tutorial Connect Binance', judul: 'Tutorial Connect Binance',          sub: 'Dari membuat kunci API sampai order pertama berangkat.' },
 ] as const;
 type IdTabInt = typeof TAB_INT[number]['id'];
 
@@ -272,9 +272,18 @@ export default function Integrasi() {
         </div>
       </Panel>
 
-      </>)}
 
-      {tab === 'mt5' && (
+      {/* AKSI MENYAMBUNG BERKUMPUL DI SATU TEMPAT.
+          ──────────────────────────────────────────────────────────────
+          Kode pasangan MT5 dan Backend URL Binance adalah dua tombol untuk
+          satu pekerjaan yang sama: menyambungkan sumber data. Memisahkannya
+          ke dua tab memaksa orang berpindah tab di tengah satu pekerjaan,
+          dan yang lebih buruk — tidak ada satu layar pun yang bisa menjawab
+          "sudah tersambung semua belum?".
+
+          Yang dipisah cuma PANDUANNYA: dibaca sekali saat memasang, lalu
+          tidak pernah lagi. */}
+      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
         <Panel>
           <PanelHead
             judul="MetaTrader 5"
@@ -340,91 +349,6 @@ export default function Integrasi() {
               )}
             </div>
 
-            <div className="rounded-lg border border-zinc-800/60 p-4">
-              {/* Dilipat secara bawaan supaya kartu MT5 setinggi kartu
-                  Binance di sebelahnya — enam langkah pemasangan hanya
-                  dibutuhkan SEKALI, sementara kartunya dilihat tiap hari. */}
-              <button onClick={() => setBukaLangkah((v) => !v)}
-                className="flex w-full cursor-pointer items-center justify-between text-left">
-                <span className="text-[11.5px] font-medium uppercase tracking-wider text-zinc-500">
-                  Cara memasang — 6 langkah
-                </span>
-                <span className="text-[11.5px] text-zinc-500">{bukaLangkah ? 'Sembunyikan' : 'Lihat langkah'}</span>
-              </button>
-              {bukaLangkah && <div className="mt-3">
-              <Langkah no={1} judul="Unduh berkasnya" anak={
-                <>Klik <span className="text-zinc-300">Unduh JadiTraderSync.ex5</span> di bawah. Berkasnya ±36 KB.</>
-              } />
-              <Langkah no={2} judul="Buka folder data MT5" anak={
-                <>Di MetaTrader 5: <span className="text-zinc-300">File → Open Data Folder</span>, lalu masuk ke
-                  <span className="angka text-zinc-300"> MQL5\Experts</span>. Salin berkas .ex5 ke situ.
-                  <span className="mt-1 block text-zinc-600">Jangan cari lewat Windows Explorer — tiap terminal MT5 punya
-                  folder datanya sendiri di lokasi yang panjang dan acak.</span></>
-              } />
-              <Langkah no={3} judul="Segarkan daftar EA" anak={
-                <>Di panel <span className="text-zinc-300">Navigator</span> (Ctrl+N), klik kanan
-                  <span className="text-zinc-300"> Expert Advisors → Refresh</span>. JadiTraderSync muncul di daftar.
-                  Kalau belum, tutup dan buka lagi MT5-nya.</>
-              } />
-              <Langkah no={4} judul="Izinkan alamat server" anak={
-                <><span className="text-zinc-300">Tools → Options → Expert Advisors</span> → centang
-                  <span className="text-zinc-300"> Allow WebRequest for listed URL</span>, lalu tambahkan alamat ini:
-                  <span className="mt-1.5 flex items-center gap-2">
-                    <code className="angka rounded border border-zinc-800 bg-zinc-900 px-2 py-1 text-[11.5px] text-zinc-300">{alamatBackend}</code>
-                    <button onClick={() => void navigator.clipboard.writeText(alamatBackend).then(() => setTersalin('url'))}
-                            className="cursor-pointer rounded p-1 text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
-                            aria-label="Salin alamat server">
-                      {tersalin === 'url' ? <CheckCircle2 className="size-3.5 text-emerald-500" /> : <Copy className="size-3.5" />}
-                    </button>
-                  </span>
-                  <span className="mt-1 block text-zinc-600">Salin persis — tanpa garis miring di ujung. MT5 mencocokkan
-                  alamatnya huruf per huruf, dan satu karakter beda membuat EA gagal tanpa pesan yang menjelaskan.</span></>
-              } />
-              <Langkah no={5} judul="Seret ke chart mana pun" anak={
-                <>Chart apa saja, timeframe apa saja — EA ini tidak membaca harga, jadi tidak berpengaruh.
-                  Di tab <span className="text-zinc-300">Common</span> centang
-                  <span className="text-zinc-300"> Allow Algo Trading</span>.</>
-              } />
-              <Langkah no={6} judul="Isi Kode Pasangan" anak={
-                <>Di tab <span className="text-zinc-300">Inputs</span>, isi
-                  <span className="angka text-zinc-300"> KodePasangan</span> dengan kode
-                  <span className="angka text-zinc-300"> {kodeMt5 ?? 'JTM5-XXXX-XXXX'}</span> di atas, lalu OK.
-                  <span className="mt-1 block text-zinc-600">Pastikan tombol <b className="text-zinc-500">Algo Trading</b> di
-                  toolbar berwarna hijau. Kalau merah, EA terpasang tapi tidak berjalan.</span></>
-              } />
-              <div className="flex gap-3">
-                <div className="flex size-6 shrink-0 items-center justify-center rounded-full border border-emerald-500/40 bg-emerald-500/10">
-                  <CheckCircle2 className="size-3.5 text-emerald-500" strokeWidth={2.2} />
-                </div>
-                <div className="text-[13px] font-medium text-zinc-200">Selesai — jurnal terisi sendiri</div>
-              </div>
-              </div>}
-
-              {/* Tiga kegagalan yang paling sering terjadi, dengan cirinya
-                  masing-masing. Daftar "kalau tidak jalan, cek koneksi" tidak
-                  menolong siapa pun; yang menolong adalah pasangan
-                  gejala→sebab. */}
-              <div className="mt-4 border-t border-zinc-800/60 pt-3">
-                <div className="mb-2 text-[11.5px] font-medium uppercase tracking-wider text-zinc-500">
-                  Kalau tidak jalan
-                </div>
-                <dl className="space-y-2 text-[12px] leading-relaxed">
-                  {[
-                    ['Tab Experts: "WebRequest ... 4060"',
-                     'Alamat server belum masuk daftar izin, atau ada bedanya satu karakter. Ulangi langkah 4.'],
-                    ['Server membalas 400 "Kode Pasangan tidak valid"',
-                     'Kode salah ketik atau sudah diputar. Tekan tombol segarkan di atas, lalu salin ulang ke input EA.'],
-                    ['EA terpasang tapi status tetap "belum melapor"',
-                     'Tombol Algo Trading di toolbar masih merah, atau ikon EA di pojok chart bersilang. Keduanya berarti EA tidak dijalankan.'],
-                  ].map(([gejala, sebab]) => (
-                    <div key={gejala}>
-                      <dt className="text-zinc-300">{gejala}</dt>
-                      <dd className="text-zinc-500">{sebab}</dd>
-                    </div>
-                  ))}
-                </dl>
-              </div>
-            </div>
 
             <div className="mt-4 flex flex-wrap gap-2">
               {/* <a>, bukan <button>. Backend menjawab dengan
@@ -454,9 +378,6 @@ export default function Integrasi() {
           </div>
         </Panel>
 
-      )}
-
-      {tab === 'binance' && (<>
         <Panel className="border-amber-500/25">
           <PanelHead
             judul="Binance Futures"
@@ -575,9 +496,105 @@ export default function Integrasi() {
             </div>
           </div>
         </Panel>
+      </div>
+      </>)}
 
-      {/* ── Tutorial pemasangan ── */}
-      <Panel className="mt-4">
+      {/* ── Tutorial pasang EA MT5 ── */}
+      {tab === 'mt5' && (
+        <Panel>
+          <div className="px-5 py-5">
+            <div className="rounded-lg border border-zinc-800/60 p-4">
+              {/* Dilipat secara bawaan supaya kartu MT5 setinggi kartu
+                  Binance di sebelahnya — enam langkah pemasangan hanya
+                  dibutuhkan SEKALI, sementara kartunya dilihat tiap hari. */}
+              <button onClick={() => setBukaLangkah((v) => !v)}
+                className="flex w-full cursor-pointer items-center justify-between text-left">
+                <span className="text-[11.5px] font-medium uppercase tracking-wider text-zinc-500">
+                  Cara memasang — 6 langkah
+                </span>
+                <span className="text-[11.5px] text-zinc-500">{bukaLangkah ? 'Sembunyikan' : 'Lihat langkah'}</span>
+              </button>
+              {bukaLangkah && <div className="mt-3">
+              <Langkah no={1} judul="Unduh berkasnya" anak={
+                <>Klik <span className="text-zinc-300">Unduh JadiTraderSync.ex5</span> di bawah. Berkasnya ±36 KB.</>
+              } />
+              <Langkah no={2} judul="Buka folder data MT5" anak={
+                <>Di MetaTrader 5: <span className="text-zinc-300">File → Open Data Folder</span>, lalu masuk ke
+                  <span className="angka text-zinc-300"> MQL5\Experts</span>. Salin berkas .ex5 ke situ.
+                  <span className="mt-1 block text-zinc-600">Jangan cari lewat Windows Explorer — tiap terminal MT5 punya
+                  folder datanya sendiri di lokasi yang panjang dan acak.</span></>
+              } />
+              <Langkah no={3} judul="Segarkan daftar EA" anak={
+                <>Di panel <span className="text-zinc-300">Navigator</span> (Ctrl+N), klik kanan
+                  <span className="text-zinc-300"> Expert Advisors → Refresh</span>. JadiTraderSync muncul di daftar.
+                  Kalau belum, tutup dan buka lagi MT5-nya.</>
+              } />
+              <Langkah no={4} judul="Izinkan alamat server" anak={
+                <><span className="text-zinc-300">Tools → Options → Expert Advisors</span> → centang
+                  <span className="text-zinc-300"> Allow WebRequest for listed URL</span>, lalu tambahkan alamat ini:
+                  <span className="mt-1.5 flex items-center gap-2">
+                    <code className="angka rounded border border-zinc-800 bg-zinc-900 px-2 py-1 text-[11.5px] text-zinc-300">{alamatBackend}</code>
+                    <button onClick={() => void navigator.clipboard.writeText(alamatBackend).then(() => setTersalin('url'))}
+                            className="cursor-pointer rounded p-1 text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
+                            aria-label="Salin alamat server">
+                      {tersalin === 'url' ? <CheckCircle2 className="size-3.5 text-emerald-500" /> : <Copy className="size-3.5" />}
+                    </button>
+                  </span>
+                  <span className="mt-1 block text-zinc-600">Salin persis — tanpa garis miring di ujung. MT5 mencocokkan
+                  alamatnya huruf per huruf, dan satu karakter beda membuat EA gagal tanpa pesan yang menjelaskan.</span></>
+              } />
+              <Langkah no={5} judul="Seret ke chart mana pun" anak={
+                <>Chart apa saja, timeframe apa saja — EA ini tidak membaca harga, jadi tidak berpengaruh.
+                  Di tab <span className="text-zinc-300">Common</span> centang
+                  <span className="text-zinc-300"> Allow Algo Trading</span>.</>
+              } />
+              <Langkah no={6} judul="Isi Kode Pasangan" anak={
+                <>Di tab <span className="text-zinc-300">Inputs</span>, isi
+                  <span className="angka text-zinc-300"> KodePasangan</span> dengan kode
+                  <span className="angka text-zinc-300"> {kodeMt5 ?? 'JTM5-XXXX-XXXX'}</span> di atas, lalu OK.
+                  <span className="mt-1 block text-zinc-600">Pastikan tombol <b className="text-zinc-500">Algo Trading</b> di
+                  toolbar berwarna hijau. Kalau merah, EA terpasang tapi tidak berjalan.</span></>
+              } />
+              <div className="flex gap-3">
+                <div className="flex size-6 shrink-0 items-center justify-center rounded-full border border-emerald-500/40 bg-emerald-500/10">
+                  <CheckCircle2 className="size-3.5 text-emerald-500" strokeWidth={2.2} />
+                </div>
+                <div className="text-[13px] font-medium text-zinc-200">Selesai — jurnal terisi sendiri</div>
+              </div>
+              </div>}
+
+              {/* Tiga kegagalan yang paling sering terjadi, dengan cirinya
+                  masing-masing. Daftar "kalau tidak jalan, cek koneksi" tidak
+                  menolong siapa pun; yang menolong adalah pasangan
+                  gejala→sebab. */}
+              <div className="mt-4 border-t border-zinc-800/60 pt-3">
+                <div className="mb-2 text-[11.5px] font-medium uppercase tracking-wider text-zinc-500">
+                  Kalau tidak jalan
+                </div>
+                <dl className="space-y-2 text-[12px] leading-relaxed">
+                  {[
+                    ['Tab Experts: "WebRequest ... 4060"',
+                     'Alamat server belum masuk daftar izin, atau ada bedanya satu karakter. Ulangi langkah 4.'],
+                    ['Server membalas 400 "Kode Pasangan tidak valid"',
+                     'Kode salah ketik atau sudah diputar. Tekan tombol segarkan di atas, lalu salin ulang ke input EA.'],
+                    ['EA terpasang tapi status tetap "belum melapor"',
+                     'Tombol Algo Trading di toolbar masih merah, atau ikon EA di pojok chart bersilang. Keduanya berarti EA tidak dijalankan.'],
+                  ].map(([gejala, sebab]) => (
+                    <div key={gejala}>
+                      <dt className="text-zinc-300">{gejala}</dt>
+                      <dd className="text-zinc-500">{sebab}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            </div>
+          </div>
+        </Panel>
+      )}
+
+      {/* ── Tutorial connect Binance ── */}
+      {tab === 'binance' && (
+      <Panel>
         <PanelHead
           judul="Pemasangan dari nol"
           sub="Sepuluh langkah dari membuat API key Binance sampai order pertama berangkat. Perintahnya siap disalin."
@@ -591,8 +608,7 @@ export default function Integrasi() {
           <TutorialVps />
         </div>
       </Panel>
-
-      </>)}
+      )}
 
       {/* Log tampil di SEMUA tab: ia jawaban dari "kenapa tidak nyambung",
           dan pertanyaan itu muncul di tab mana pun orangnya sedang berada. */}
