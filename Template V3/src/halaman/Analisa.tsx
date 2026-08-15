@@ -63,7 +63,7 @@ function Sparkline({ kurva }: { kurva: number[] }) {
     `${(i / (kurva.length - 1)) * 300},${60 - ((v - min) / rentang) * 56 + 2}`).join(' ');
   const naik = kurva[kurva.length - 1] >= kurva[0];
   return (
-    <svg viewBox="0 0 300 64" className="h-24 w-full">
+    <svg viewBox="0 0 300 64" preserveAspectRatio="none" className="h-36 w-full">
       <polyline points={titik} fill="none" stroke={naik ? '#10b981' : '#f87171'} strokeWidth="1.6" />
     </svg>
   );
@@ -73,12 +73,13 @@ function ModalPortofolio({ a, tutup }: { a: RingkasAnalisa; tutup: () => void })
   const s = a.snapshot;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" {...useTutupLuar(tutup)}>
-      <div className="w-full max-w-md rounded-xl border border-zinc-800 bg-zinc-950 p-5" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-2xl rounded-xl border border-zinc-800 bg-zinc-950 p-5" onClick={(e) => e.stopPropagation()}>
         <div className="mb-3 flex items-center justify-between">
           <div>
-            <div className="text-[14px] font-medium text-zinc-100">Portofolio {a.nama}</div>
-            <div className="text-[11.5px] text-zinc-500">
-              Diambil otomatis dari jurnalnya saat analisa diposting — bukan diketik tangan.
+            <div className="text-[14px] font-medium text-zinc-100">Jurnal {a.nama}</div>
+            <div className="text-[11.5px] leading-relaxed text-zinc-500">
+              Diambil otomatis dari jurnalnya {tanggalPendek(a.dibuat)}, saat analisa ini diposting —
+              bukan diketik tangan, dan bukan angka hari ini.
             </div>
           </div>
           <button onClick={tutup} className="cursor-pointer rounded p-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200">
@@ -87,22 +88,98 @@ function ModalPortofolio({ a, tutup }: { a: RingkasAnalisa; tutup: () => void })
         </div>
         {s ? (
           <>
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                ['Saldo', uang(s.saldo)],
-                ['Winrate', persen(s.winrate)],
-                ['Profit factor', s.pf ? s.pf.toFixed(2) : '—'],
-                ['Transaksi', String(s.jumlah)],
-              ].map(([l, v]) => (
-                <div key={l} className="rounded-lg border border-zinc-800/60 p-3">
-                  <div className="text-[11px] text-zinc-500">{l}</div>
-                  <div className="angka mt-0.5 text-[16px] font-semibold text-zinc-100">{v}</div>
+            {/* SUSUNANNYA MENIRU HALAMAN JURNAL — saldo besar, win rate dengan
+                jumlah transaksinya, profit factor, Net P/L berwarna, lalu kurva
+                ekuitas dengan kalimat "dari X ke Y". Angka yang sama sebaiknya
+                dibaca dengan cara yang sama di kedua layar; kalau tidak, orang
+                mengira ia sedang melihat dua hal berbeda. */}
+            <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+              <div className="rounded-lg border border-zinc-800/60 p-3.5">
+                <div className="text-[11.5px] text-zinc-500">Saldo jurnal</div>
+                <div className="angka mt-1.5 text-[22px] font-semibold leading-none tracking-tight text-zinc-100">
+                  {uang(s.saldo)}
                 </div>
-              ))}
+              </div>
+
+              <div className="rounded-lg border border-zinc-800/60 p-3.5">
+                <div className="text-[11.5px] text-zinc-500">Win rate</div>
+                <div className="angka mt-1.5 text-[22px] font-semibold leading-none tracking-tight text-zinc-100">
+                  {persen(s.winrate)}
+                </div>
+                <div className="mt-2 text-[11px] text-zinc-500">
+                  {s.menang !== undefined && s.kalah !== undefined
+                    ? <>{s.menang} menang · {s.kalah} kalah</>
+                    : <>{s.jumlah} transaksi</>}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-zinc-800/60 p-3.5">
+                <div className="text-[11.5px] text-zinc-500">Profit factor</div>
+                <div className={cn('angka mt-1.5 text-[22px] font-semibold leading-none tracking-tight',
+                  !s.pf ? 'text-zinc-100' : s.pf >= 1 ? 'text-emerald-500' : 'text-red-400')}>
+                  {s.pf ? s.pf.toFixed(2) : '—'}
+                </div>
+                {/* Profit factor DIJELASKAN, bukan dibiarkan telanjang. Di
+                    bawah 1 artinya total ruginya lebih besar daripada total
+                    untungnya — dan itu yang paling sering tidak dipahami
+                    orang yang cuma melihat win rate tinggi di sebelahnya. */}
+                <div className="mt-2 text-[11px] text-zinc-500">
+                  {!s.pf ? 'belum bisa dihitung' : s.pf >= 1 ? 'untung > rugi' : 'rugi > untung'}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-zinc-800/60 p-3.5">
+                <div className="text-[11.5px] text-zinc-500">Net P/L</div>
+                {s.bersih === undefined ? (
+                  <div className="angka mt-1.5 text-[22px] font-semibold leading-none text-zinc-600">—</div>
+                ) : (
+                  <div className={cn('angka mt-1.5 text-[22px] font-semibold leading-none tracking-tight',
+                    s.bersih >= 0 ? 'text-emerald-500' : 'text-red-400')}>
+                    {uang(s.bersih, true)}
+                  </div>
+                )}
+                <div className="mt-2 text-[11px] text-zinc-500">
+                  {s.bersih === undefined ? 'analisa lama' : 'sejak awal jurnal'}
+                </div>
+              </div>
             </div>
-            <div className="mt-3 rounded-lg border border-zinc-800/60 p-3">
-              <div className="mb-1 text-[11px] text-zinc-500">Kurva ekuitas (60 titik terakhir)</div>
+
+            {s.pf > 0 && s.pf < 1 && s.winrate >= 50 && (
+              <p className="mt-2.5 rounded-lg border border-amber-500/25 bg-amber-500/[0.05] px-3 py-2 text-[11.5px] leading-relaxed text-amber-200/80">
+                Sering menang ({persen(s.winrate)}) tapi profit factor {s.pf.toFixed(2)} — rata-rata
+                kalahnya lebih besar daripada rata-rata menangnya. Winrate tinggi saja tidak berarti akunnya tumbuh.
+              </p>
+            )}
+
+            {/* CAKUPANNYA DISEBUT. Halaman Jurnal memisahkan Trade-Fi dan
+                Kripto jadi dua blok dengan saldo masing-masing; snapshot ini
+                menggabung keduanya. Tanpa kalimat ini, orang membandingkan
+                $301 di sini dengan $526 di halaman Jurnal lalu menyimpulkan
+                salah satunya bohong — padahal keduanya benar untuk cakupan
+                yang berbeda. */}
+            <p className="mt-2.5 text-[11px] text-zinc-600">
+              Cakupan: seluruh jurnal — Trade-Fi dan Kripto digabung, bukan salah satu saja.
+            </p>
+
+            <div className="mt-2 rounded-lg border border-zinc-800/60 p-3.5">
+              <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+                <span className="text-[12.5px] text-zinc-300">Kurva Ekuitas</span>
+                <span className="text-[11px] text-zinc-500">
+                  {s.saldoAwal !== undefined && s.saldoAwal > 0
+                    ? <>Dari <span className="angka">{uang(s.saldoAwal)}</span> ke <span className="angka">{uang(s.saldo)}</span> · <span className="angka">{s.jumlah}</span> transaksi</>
+                    : <><span className="angka">{s.kurva.length}</span> titik terakhir · <span className="angka">{s.jumlah}</span> transaksi</>}
+                </span>
+              </div>
               <Sparkline kurva={s.kurva} />
+              {/* Kurvanya sengaja disebut sebagai POTONGAN. Ia 60 titik
+                  terakhir, bukan seluruh riwayat — membiarkannya terlihat
+                  seperti kurva penuh membuat orang menghitung pertumbuhan
+                  dari titik awal yang sebenarnya bukan awal apa pun. */}
+              {s.jumlah > s.kurva.length && (
+                <p className="mt-1.5 text-[11px] text-zinc-600">
+                  Menampilkan {s.kurva.length} transaksi terakhir dari {s.jumlah}.
+                </p>
+              )}
             </div>
           </>
         ) : (
@@ -318,9 +395,14 @@ function KartuAnalisa({ a, status, milikku, pemilik, onSegarkan }: {
           dijual; menayangkannya gratis membuat tombol belinya tak berarti. */}
       {a.sampul ? (
         <img src={a.sampul} alt="" loading="lazy"
-             className="-mx-4 -mt-4 mb-3 h-28 w-[calc(100%+2rem)] border-b border-zinc-800 object-cover" />
+             /* max-w-none WAJIB: preflight Tailwind memberi setiap <img>
+               `max-width: 100%`, dan itu memotong `calc(100% + 2rem)` kembali
+               ke lebar kotak isi — sampulnya jadi menyisakan celah di kanan
+               persis selebar padding kartu. Kelasnya benar sejak awal; yang
+               membatalkannya aturan bawaan, bukan calc-nya. */
+            className="-mx-4 -mt-4 mb-3 h-28 w-[calc(100%_+_2rem)] max-w-none border-b border-zinc-800 object-cover" />
       ) : a.adaSampul ? (
-        <div className="-mx-4 -mt-4 mb-3 flex h-28 w-[calc(100%+2rem)] items-center justify-center gap-2 border-b border-zinc-800 bg-zinc-900/60 text-[11.5px] text-zinc-600">
+        <div className="-mx-4 -mt-4 mb-3 flex h-28 w-[calc(100%_+_2rem)] items-center justify-center gap-2 border-b border-zinc-800 bg-zinc-900/60 text-[11.5px] text-zinc-600">
           <Lock className="size-3.5" /> Sampul chart terbuka setelah dibeli
         </div>
       ) : null}
@@ -336,6 +418,15 @@ function KartuAnalisa({ a, status, milikku, pemilik, onSegarkan }: {
               {a.arah}
             </span>
             <span className="angka text-[12.5px] text-zinc-300">{a.pasangan}</span>
+            {/* Pasar ditandai di baris simbol, bukan di catatan kecil:
+                inilah yang menentukan apakah sinyal ini BISA dipakai
+                pembacanya sama sekali. */}
+            {a.pasar && (
+              <span className={cn('rounded px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-wide',
+                a.pasar === 'tradefi' ? 'bg-violet-500/15 text-violet-300' : 'bg-amber-500/15 text-amber-300')}>
+                {a.pasar === 'tradefi' ? 'Trade-Fi' : 'Kripto'}
+              </span>
+            )}
             {a.tf && <span className="angka text-[11px] text-zinc-500">{a.tf}</span>}
             <span className="text-[11px] text-zinc-600">· {tanggalPendek(a.dibuat)}</span>
           </div>
@@ -551,6 +642,7 @@ export default function Analisa() {
 
   const [pasangan, setPasangan] = useState('BTCUSDT');
   const [arah, setArah] = useState<'BUY' | 'SELL'>('BUY');
+  const [pasar, setPasar] = useState<'kripto' | 'tradefi'>('kripto');
   const [hargaJual, setHargaJual] = useState(5);
   const [ringkas, setRingkas] = useState('');
   const [entry, setEntry] = useState('');
@@ -574,6 +666,10 @@ export default function Analisa() {
   useEffect(() => {
     const d = ambilDraf();
     if (!d) return;
+    /* Awalan MT5: pada simbolnya adalah penanda pasar yang paling bisa
+       dipercaya — ia datang dari daftar simbol MT5 itu sendiri, bukan dari
+       tebakan atas nama pasangannya. */
+    setPasar(/^MT5:/i.test(d.pasangan) ? 'tradefi' : 'kripto');
     setPasangan(d.pasangan.replace(/^MT5:/i, ''));
     setArah(d.arah);
     /* Dirapikan DI SINI, saat masuk — bukan saat dikirim. Angka yang
@@ -606,6 +702,13 @@ export default function Analisa() {
       pf: stat.faktorProfit === null || stat.faktorProfit === Infinity ? 0 : Number(stat.faktorProfit.toFixed(2)),
       jumlah: stat.jumlah,
       kurva: kurvaEkuitas(riwayat, saldoAwal).map((t) => t.nilai).slice(-60),
+      /* Angka-angka ini yang membuat modalnya bisa berbahasa sama dengan
+         halaman Jurnal. Saldo akhir sendirian tidak memberi tahu apa pun:
+         $300 bisa berarti naik dari $100 atau jatuh dari $1.000. */
+      bersih: Number(stat.bersih.toFixed(2)),
+      menang: stat.menang,
+      kalah: stat.kalah,
+      saldoAwal: Number(saldoAwal.toFixed(2)),
     };
   }, [riwayat, saldoAwal]);
 
@@ -617,7 +720,7 @@ export default function Analisa() {
            dari formulir. Server tetap mewajibkannya, dan kartu-kartu lama
            yang judulnya berbeda dari ringkasannya tetap tampil apa adanya. */
         judul: (ringkas.trim() || `${pasangan.trim().toUpperCase()} · ${arah}`).slice(0, 80),
-        pasangan: pasangan.trim().toUpperCase(), arah,
+        pasangan: pasangan.trim().toUpperCase(), arah, pasar,
         harga: hargaJual, ringkas: ringkas.trim(),
         isi: { entry: Number(entry) || 0, sl: Number(sl) || 0, tp: Number(tp) || 0, alasan: alasan.trim() },
         nama: pengguna?.displayName || pengguna?.email?.split('@')[0] || 'Analis',
@@ -797,6 +900,20 @@ export default function Analisa() {
                 <label className="mb-1 block text-[11px] text-zinc-500">Arah</label>
                 <select value={arah} onChange={(e) => setArah(e.target.value as 'BUY' | 'SELL')} className={cn(KELAS_ISIAN, 'cursor-pointer')}>
                   <option>BUY</option><option>SELL</option>
+                </select>
+              </div>
+              {/* Jenis pasar. Nama pasangan saja tidak cukup memberi tahu:
+                  XAUUSD di MT5 dan XAUT di Binance dibaca sama oleh mata,
+                  tapi dieksekusi di tempat yang berbeda, dengan lot dan jam
+                  pasar yang berbeda pula. Pembeli yang cuma punya akun
+                  kripto tidak bisa memakai sinyal Trade-Fi — itu harus
+                  terlihat SEBELUM ia membayar, bukan sesudah. */}
+              <div>
+                <label className="mb-1 block text-[11px] text-zinc-500">Pasar</label>
+                <select value={pasar} onChange={(e) => setPasar(e.target.value as 'kripto' | 'tradefi')}
+                        className={cn(KELAS_ISIAN, 'cursor-pointer')}>
+                  <option value="kripto">Kripto (Binance)</option>
+                  <option value="tradefi">Trade-Fi (MT5)</option>
                 </select>
               </div>
               <div>

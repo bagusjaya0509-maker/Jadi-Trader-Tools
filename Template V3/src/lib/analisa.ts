@@ -45,7 +45,19 @@ export interface RingkasAnalisa {
   /** Analisa ini punya gambar — dipakai kartu berbayar untuk mengatakan
    *  "berilustrasi" tanpa menunjukkan ilustrasinya. */
   adaSampul?: boolean;
-  snapshot: { saldo: number; winrate: number; pf: number; jumlah: number; kurva: number[] } | null;
+  /** 'kripto' (Binance) atau 'tradefi' (MT5). Nama pasangan saja tidak
+   *  cukup: XAUUSD di MT5 dan XAUT di Binance dibaca sama oleh mata tapi
+   *  dieksekusi di tempat berbeda, dengan lot dan jam pasar berbeda pula. */
+  pasar?: 'kripto' | 'tradefi';
+  /** Potret jurnal analis PADA SAAT posting. Bukan jurnalnya hari ini:
+   *  jurnal itu ada di Firestore miliknya sendiri dan tidak dibagikan.
+   *  `bersih`/`menang`/`kalah`/`saldoAwal` baru ada sejak 16 Agu 2026 —
+   *  analisa lama tidak punya, dan layarnya menyembunyikan baris itu
+   *  daripada menampilkan nol yang terbaca seperti "tidak pernah untung". */
+  snapshot: {
+    saldo: number; winrate: number; pf: number; jumlah: number; kurva: number[];
+    bersih?: number; menang?: number; kalah?: number; saldoAwal?: number;
+  } | null;
 }
 export interface IsiAnalisa { entry: number; sl: number; tp: number; alasan: string }
 
@@ -79,7 +91,7 @@ export async function daftarAnalisa(): Promise<RingkasAnalisa[]> {
 
 export async function kirimAnalisa(d: {
   judul: string; pasangan: string; arah: 'BUY' | 'SELL'; harga: number;
-  ringkas: string; isi: IsiAnalisa; nama: string;
+  ringkas: string; isi: IsiAnalisa; nama: string; pasar: 'kripto' | 'tradefi';
   snapshot: RingkasAnalisa['snapshot'];
   /** Persetujuan membuka akses pantau jurnal. WAJIB true — server menolak
    *  tanpa ini. Analis dinilai dari rekam jejak yang bisa diperiksa, dan
