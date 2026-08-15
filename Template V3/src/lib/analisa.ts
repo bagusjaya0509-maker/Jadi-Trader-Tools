@@ -37,6 +37,14 @@ export interface RingkasAnalisa {
   /** "Buy Limit" / "Sell Stop" / "Market" — keterangan, bukan angka, jadi
    *  aman tampil publik pada analisa yang levelnya masih terkunci. */
   jenisEntry?: string;
+  /** URL sampul — HANYA terisi untuk analisa gratis. Sampulnya tangkapan
+   *  layar chart yang memuat garis entry/SL/TP; pada analisa berbayar
+   *  gambar itu bukan pelengkap melainkan produknya, dan menayangkannya
+   *  di kartu publik membuat gerbang pembeliannya jadi hiasan. */
+  sampul?: string;
+  /** Analisa ini punya gambar — dipakai kartu berbayar untuk mengatakan
+   *  "berilustrasi" tanpa menunjukkan ilustrasinya. */
+  adaSampul?: boolean;
   snapshot: { saldo: number; winrate: number; pf: number; jumlah: number; kurva: number[] } | null;
 }
 export interface IsiAnalisa { entry: number; sl: number; tp: number; alasan: string }

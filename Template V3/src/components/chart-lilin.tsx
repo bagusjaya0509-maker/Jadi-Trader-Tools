@@ -119,8 +119,12 @@ export function ChartLilin({
   lilin, garis, trade, tinggi = 420, hingga, garisHarga, onKlikBar, smi, mundur, pojok,
   garisSeret, onSeret, onKlikGaris, onHapusGaris, hamparanBawah, segmen, penandaPine, kotakPine, isianPine,
   alat, onAlatSelesai, gambarAlat, gambarPilih, onPilihGambar, onUbahGambar,
-  posisiMt5, onUbahPosisi, hargaAsk, kunciUkuran,
+  posisiMt5, onUbahPosisi, hargaAsk, kunciUkuran, bagikanFoto,
 }: {
+  /** Diberi SATU fungsi pemotret begitu chartnya siap. Dipakai halaman yang
+   *  perlu sampul analisa; yang diserahkan cuma kemampuan memotret, bukan
+   *  objek chartnya — lihat catatan di tempat pemasangannya. */
+  bagikanFoto?: (ambil: () => string | null) => void;
   lilin: Lilin;
   /** Berubah = kolom chart berubah lebar; chart diukur ulang.
    *  Nilainya tidak dipakai, cuma perubahannya. */
@@ -201,6 +205,14 @@ export function ChartLilin({
   /* Handler klik disimpan di ref supaya langganannya dipasang SEKALI.
      Melanggan ulang tiap render menumpuk pendengar di chart yang sama. */
   const klikRef = useRef(onKlikBar);
+  /* Pemotret disimpan di ref, dan `bagikanFoto` juga — supaya efek pembuatan
+     chart (yang sengaja berdependensi kosong agar chartnya tidak dibuat
+     ulang tiap render) tetap memakai callback terbaru tanpa menjadikannya
+     dependensi. */
+  const fotoRef = useRef<(() => string | null) | null>(null);
+  const bagikanFotoRef = useRef(bagikanFoto);
+  bagikanFotoRef.current = bagikanFoto;
+  useEffect(() => { if (fotoRef.current) bagikanFoto?.(fotoRef.current); }, [bagikanFoto]);
   klikRef.current = onKlikBar;
 
   /* Chart dibuat SEKALI. Membuatnya ulang tiap data berubah akan mengembalikan
@@ -281,6 +293,19 @@ export function ChartLilin({
     c.subscribeClick((p) => {
       if (klikRef.current && typeof p.logical === 'number') klikRef.current(Math.round(p.logical));
     });
+
+    /* Pemotret diserahkan ke pemanggil SEBAGAI FUNGSI, bukan dengan
+       membocorkan objek chart-nya. Halaman yang butuh sampul cuma perlu
+       satu kemampuan — memotret — dan memberi seluruh API chart untuk itu
+       berarti halaman lain bisa diam-diam ikut menyetel skala, seri, atau
+       menghapusnya. `takeScreenshot` bawaan lightweight-charts menggambar
+       ulang ke kanvas sendiri, jadi hasilnya memuat lilin, indikator, DAN
+       alat gambar — persis yang terlihat di layar. */
+    fotoRef.current = () => {
+      try { return c.takeScreenshot().toDataURL('image/jpeg', 0.85); }
+      catch (e) { return null; }
+    };
+    bagikanFotoRef.current?.(fotoRef.current);
 
     return () => { pengamat.disconnect(); window.removeEventListener('resize', ukurUlang); ukurLagi.current = null; c.remove(); chart.current = null; seri.current = null; seriGaris.current = []; penanda.current = null; garisPos.current = []; isiPine.current = null; alatPrim.current = null; };
   }, []);

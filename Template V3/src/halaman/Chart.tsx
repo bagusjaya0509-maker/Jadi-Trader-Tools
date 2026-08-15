@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Play, Loader2, RefreshCw, Radio, TriangleAlert, History,
   Layers, ChevronDown, Settings2, Code2, X, Ruler, Rows3, Square, Eraser, Minus, TrendingUp,
   FlaskConical, GripHorizontal } from 'lucide-react';
 import { PanelNews } from '@/components/panel-news';
+import { simpanDraf } from '@/lib/draf-sinyal';
 import { Panel, PanelHead, KartuKpi, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn, uang, persen, harga, tanggalPendek } from '@/lib/utils';
 import { ChartLilin, type Garis, type GarisHarga, type GarisSeret, type PosisiChartMt5 } from '@/components/chart-lilin';
@@ -123,6 +124,7 @@ export default function ChartBacktest() {
      Itulah yang dipakai menu klik-kanan di Screener Entry untuk membuka koin
      tertentu di sini, dan juga yang membuat halaman ini bisa ditandai. */
   const [cari] = useSearchParams();
+  const navigasi = useNavigate();
   /* Urutan sumber: ALAMAT dulu, lalu setelan tersimpan, baru bawaan.
      Alamat menang karena ia perbuatan yang baru saja dilakukan — klik kanan
      di screener harus membuka koin yang diklik, bukan koin kemarin. */
@@ -767,6 +769,34 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
   /* Arah tiket yang sedang disusun. null = belum ada tiket, chart cuma
      menggambar rencana dari kartu screener kalau ada. */
   const [draf, setDraf] = useState<'BUY' | 'SELL' | null>(null);
+
+  /* ── Kirim rencana ke Copy Signal ─────────────────────────────────────
+     Halaman ini yang punya alat gambar, watchlist, indikator, dan data
+     MT5 — jadi di sinilah analisa disusun, bukan di chart mini yang
+     ditempel ke formulir. Yang dikirim: pasangan, timeframe, arah, ketiga
+     level, DAN tangkapan layar chartnya sebagai sampul.
+
+     Sampulnya berharga justru karena memuat gambar analisanya — fibonacci,
+     kotak SNR, garis tren. Chart polos berisi tiga garis tidak memberi
+     tahu apa pun kepada calon pembeli. */
+  const ambilFoto = useRef<null | (() => string | null)>(null);
+  const [kabarKirimSinyal, setKabarKirimSinyal] = useState('');
+
+  function kirimKeCopySignal() {
+    if (!draf) { setKabarKirimSinyal('Pilih arah BUY atau SELL dulu di panel order.'); return; }
+    const { entry, sl, tp } = rencana;
+    if (!entry || !sl || !tp) { setKabarKirimSinyal('Entry, SL, dan TP harus terisi ketiganya.'); return; }
+
+    const sampul = ambilFoto.current?.() ?? '';
+    const ok = simpanDraf({
+      pasangan: simbol, tf, arah: draf,
+      entry, sl, tp, sampul,
+    });
+    if (!ok) { setKabarKirimSinyal('Gagal menyiapkan draf — coba lagi.'); return; }
+    /* Alamat TANPA level: level sudah ikut di draf, dan menaruhnya juga di
+       query akan membuat dua sumber kebenaran yang bisa berselisih. */
+    navigasi('/copy');
+  }
   /* Setelan order sungguhan — hidup di halaman supaya label risiko di
      garis chart dihitung dari angka yang SAMA dengan yang akan dikirim. */
   const [nyataSetelan, setNyataSetelan] = useState<{ modal: number; leverage: number; metode: MetodeTp }>(
@@ -1821,6 +1851,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                           kunciUkuran={lebarWatch}
                           mundur={DURASI_TF[tf] ? jamMundur(detik) : undefined}
                           hamparanBawah={kendaliReplay}
+                          bagikanFoto={(ambil) => { ambilFoto.current = ambil; }}
                           pojok={aksi ? (
                             <PojokOrder
                               posisi={aksi.posisi} hargaKini={aksi.hargaKini}
@@ -1975,7 +2006,9 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                               demoSetelan={demoSetelan} aturDemo={setDemoSetelan}
                               catatan={catatanTiket} aturCatatan={setCatatanTiket}
                               sibukNyata={sibukNyata} kabar={kabarNyata || undefined}
-                              onTutup={aksi.tutup} mati={aksi.mati} />
+                              onTutup={aksi.tutup} mati={aksi.mati}
+                              onKirimSinyal={kirimKeCopySignal}
+                              kabarSinyal={kabarKirimSinyal || undefined} />
                           ) : undefined} />
             : <div className="flex h-[440px] flex-col items-center justify-center gap-1.5 px-6 text-center text-[12.5px] text-zinc-600">
                 {memuat ? 'Memuat lilin…'

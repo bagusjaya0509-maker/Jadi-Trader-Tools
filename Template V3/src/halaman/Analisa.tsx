@@ -7,6 +7,7 @@ import {
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { PanelSinyal } from '@/components/panel-sinyal';
 import { PerformaSignal } from '@/components/performa-signal';
+import { ambilDraf } from '@/lib/draf-sinyal';
 import { cn, uang, persen, harga as fHarga, tanggalPendek } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 import { useRiwayat, useSaldoAwal } from '@/lib/data';
@@ -294,8 +295,22 @@ function KartuAnalisa({ a, status, milikku, pemilik, onSegarkan }: {
 
   return (
     /* `relative` wajib: lencana AI Agent duduk absolut di pojok panel. */
-    <Panel className={cn('relative p-4', selesai && 'opacity-75')}>
+    <Panel className={cn('relative overflow-hidden p-4', selesai && 'opacity-75')}>
       {a.agen && <LencanaAgen />}
+
+      {/* Sampul analisa. Untuk yang BERBAYAR gambarnya tidak dikirim server
+          sama sekali — yang tampil cuma keterangan bahwa analisanya
+          berilustrasi. Sampul berisi garis entry/SL/TP adalah produk yang
+          dijual; menayangkannya gratis membuat tombol belinya tak berarti. */}
+      {a.sampul ? (
+        <img src={a.sampul} alt="" loading="lazy"
+             className="-mx-4 -mt-4 mb-3 h-28 w-[calc(100%+2rem)] border-b border-zinc-800 object-cover" />
+      ) : a.adaSampul ? (
+        <div className="-mx-4 -mt-4 mb-3 flex h-28 w-[calc(100%+2rem)] items-center justify-center gap-2 border-b border-zinc-800 bg-zinc-900/60 text-[11.5px] text-zinc-600">
+          <Lock className="size-3.5" /> Sampul chart terbuka setelah dibeli
+        </div>
+      ) : null}
+
       <div className="flex flex-wrap items-start gap-2">
         <div className="min-w-0 grow">
           {/* pr-20 menyisakan ruang untuk lencana di pojok, supaya baris ini
@@ -534,6 +549,24 @@ export default function Analisa() {
      karena tiap posting adalah komitmen baru yang tidak bisa ditarik. */
   const [izinJurnal, setIzinJurnal] = useState(false);
   const [pahamPermanen, setPahamPermanen] = useState(false);
+  /* Sampul dari Chart & Entry. Data URL JPEG, diunggah SESUDAH analisanya
+     terposting — endpoint galeri butuh id analisanya, dan id itu baru ada
+     setelah POST berhasil. */
+  const [sampul, setSampul] = useState('');
+
+  /* Draf dari Chart & Entry dibaca SEKALI saat halaman dibuka, lalu
+     dihapus oleh ambilDraf() — kalau tidak, menyegarkan halaman akan
+     mengisi ulang formulir yang barusan sengaja dikosongkan orangnya. */
+  useEffect(() => {
+    const d = ambilDraf();
+    if (!d) return;
+    setPasangan(d.pasangan.replace(/^MT5:/i, ''));
+    setArah(d.arah);
+    setEntry(String(d.entry)); setSl(String(d.sl)); setTp(String(d.tp));
+    if (d.sampul) setSampul(d.sampul);
+    setFormBuka(true);
+    setKabar(`Rencana dari Chart & Entry masuk — ${d.pasangan} ${d.tf} ${d.arah}. Lengkapi judul dan alasannya.`);
+  }, []);
 
   const segarkan = () => {
     void daftarAnalisa().then(setDaftar).finally(() => setMemuat(false));
@@ -559,7 +592,7 @@ export default function Analisa() {
   async function posting() {
     setSibuk(true); setKabar('');
     try {
-      await kirimAnalisa({
+      const hasil = await kirimAnalisa({
         judul: judul.trim(), pasangan: pasangan.trim().toUpperCase(), arah,
         harga: hargaJual, ringkas: ringkas.trim(),
         isi: { entry: Number(entry) || 0, sl: Number(sl) || 0, tp: Number(tp) || 0, alasan: alasan.trim() },
@@ -567,10 +600,24 @@ export default function Analisa() {
         snapshot,
         izinJurnal,
       });
-      setKabar('Analisa terposting — dan kini permanen. Semoga levelnya bekerja.');
+      /* Sampul diunggah SESUDAH analisanya ada — galeri butuh id-nya.
+         Kegagalan unggah TIDAK membatalkan postingan: analisanya sudah
+         permanen di server, dan menampilkan "gagal memposting" untuk
+         sampul yang tidak jadi terpasang akan membuat orang memposting
+         ulang analisa yang sebenarnya sudah masuk. */
+      let kabarSampul = '';
+      if (sampul && hasil?.id) {
+        try {
+          await tambahGambar(hasil.id, sampul, 'Sampul analisa',
+            pengguna?.displayName || pengguna?.email?.split('@')[0] || '');
+        } catch (e) {
+          kabarSampul = ' (sampul gagal diunggah — bisa ditambahkan lagi lewat galeri)';
+        }
+      }
+      setKabar(`Analisa terposting — dan kini permanen. Semoga levelnya bekerja.${kabarSampul}`);
       setFormBuka(false);
       setJudul(''); setRingkas(''); setEntry(''); setSl(''); setTp(''); setAlasan('');
-      setIzinJurnal(false); setPahamPermanen(false);
+      setIzinJurnal(false); setPahamPermanen(false); setSampul('');
       segarkan();
     } catch (e) {
       setKabar(e instanceof Error ? e.message : 'Gagal memposting');
@@ -747,6 +794,53 @@ export default function Analisa() {
                   className="w-full resize-y rounded-md border border-zinc-800 bg-zinc-900/60 p-2.5 text-[12.5px] text-zinc-200 outline-none focus-visible:border-zinc-600" />
               </div>
             </div>
+            {/* ── Sampul dari Chart & Entry ───────────────────────────────
+                Level bisa diketik tangan di kolom di atas, tapi menyusunnya
+                di chart jauh lebih tepat — dan sampulnya cuma bisa lahir di
+                sana, karena yang membuat sampul layak dilihat adalah gambar
+                analisanya: fibonacci, kotak SNR, garis tren. Chart mini di
+                dalam formulir ini hanya akan menghasilkan lilin polos plus
+                tiga garis, sampul yang tidak memberi tahu apa pun. */}
+            <div className="mt-3 rounded-lg border border-zinc-800 bg-zinc-950/60 p-3">
+              {sampul ? (
+                <div className="flex flex-wrap items-start gap-3">
+                  <img src={sampul} alt="Sampul analisa"
+                       className="h-24 w-40 shrink-0 rounded border border-zinc-800 object-cover" />
+                  <div className="min-w-0 grow">
+                    <div className="text-[12px] font-medium text-zinc-200">Sampul terpasang</div>
+                    <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-500">
+                      Tangkapan layar chart-mu ikut terbit sebagai sampul analisa ini.
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Link to={`/chart?simbol=${encodeURIComponent(pasangan)}&arah=${arah}`
+                              + (entry ? `&entry=${entry}` : '') + (sl ? `&sl=${sl}` : '') + (tp ? `&tp=${tp}` : '')}
+                        className="rounded-md border border-zinc-700 px-2.5 py-1 text-[11.5px] text-zinc-300 transition-colors hover:border-zinc-500">
+                        Susun ulang di Chart
+                      </Link>
+                      <button onClick={() => setSampul('')}
+                        className="cursor-pointer rounded-md border border-zinc-800 px-2.5 py-1 text-[11.5px] text-zinc-500 transition-colors hover:border-red-500/40 hover:text-red-400">
+                        Hapus sampul
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-wrap items-center gap-3">
+                  <ImagePlus className="size-4 shrink-0 text-zinc-600" />
+                  <p className="min-w-0 grow text-[11.5px] leading-relaxed text-zinc-500">
+                    Belum ada sampul. Susun rencanamu di Chart & Entry — geser garis entry, SL,
+                    dan TP, tambahkan gambar analisamu — lalu tekan{' '}
+                    <span className="text-zinc-300">"Ke Copy Signal"</span> di tiket order.
+                    Level dan tangkapan layarnya masuk ke formulir ini otomatis.
+                  </p>
+                  <Link to={`/chart?simbol=${encodeURIComponent(pasangan)}`}
+                    className="shrink-0 rounded-md bg-zinc-100 px-3 py-1.5 text-[11.5px] font-medium text-zinc-950 transition-colors hover:bg-white">
+                    Susun di Chart & Entry
+                  </Link>
+                </div>
+              )}
+            </div>
+
             {/* ── Dua persetujuan yang menjadikan seseorang analis ─────────
                 Keduanya disetujui SADAR pada tiap posting, bukan diingat:
                 tiap sinyal adalah komitmen baru yang tidak bisa ditarik.

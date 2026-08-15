@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { TrendingUp, TrendingDown, X, Check, Ban, CandlestickChart, Minus, Hourglass } from 'lucide-react';
+import { TrendingUp, TrendingDown, X, Check, Ban, CandlestickChart, Minus, Hourglass , Share2 } from 'lucide-react';
 import { cn, uang, harga as fHarga } from '@/lib/utils';
 import { METODE_TP, type MetodeTp } from '@/lib/order-nyata';
 
@@ -120,7 +120,7 @@ function IsianAngka({ nilai, atur, langkah, min = 0, maks, desimal = 2, lebar, j
 }
 
 export function PojokOrder({
-  posisi, hargaKini, draf, rencana, mode, jenis, risiko, tunda, onBatalTunda,
+  posisi, hargaKini, draf, rencana, mode, jenis, risiko, tunda, onBatalTunda, onKirimSinyal, kabarSinyal,
   onPilih, onUbah, onKirim, onBatal, onTutup, onGantiMode, mati,
   nyataSetelan, aturNyata, sibukNyata, kabar, demoSetelan, aturDemo,
   catatan, aturCatatan, qtyDemo, mt5, lotMt5, aturLotMt5, nilaiLotMt5, desimalHarga = 6,
@@ -157,6 +157,11 @@ export function PojokOrder({
   onKirim: () => void;
   onBatal: () => void;
   onTutup: () => void;
+  /** Kirim rencana tiket ini ke formulir Copy Signal + tangkapan layar
+   *  chart sebagai sampul. Tidak diberikan = tombolnya tidak muncul. */
+  onKirimSinyal?: () => void;
+  /** Pesan hasil pengiriman (mis. level belum lengkap). */
+  kabarSinyal?: string;
   onGantiMode: (m: 'demo' | 'real') => void;
   mati?: boolean;
   /** Setelan order sungguhan — modal, leverage, metode TP. Diangkat ke
@@ -433,6 +438,24 @@ export function PojokOrder({
                     : 'bg-zinc-100 text-zinc-950 hover:bg-white')}>
             <Check className="size-3" /> {sibukNyata ? 'Mengirim…' : nyata ? 'Kirim order' : 'Kirim'}
           </button>
+          {/* Kirim rencana ini ke formulir Copy Signal beserta tangkapan
+              layar chartnya. Ditaruh SEBARIS dengan Kirim/Batal karena ia
+              nasib ketiga dari tiket yang sama: dieksekusi, dibatalkan,
+              atau dibagikan sebagai analisa. */}
+          {onKirimSinyal && (
+            <button onClick={onKirimSinyal} disabled={!arahBenar}
+              title={arahBenar ? 'Kirim entry/SL/TP + tangkapan layar chart ke formulir Copy Signal'
+                               : 'SL dan TP harus berada di sisi yang benar terhadap entry'}
+              className="flex cursor-pointer items-center gap-1 rounded border border-sky-500/40 bg-sky-500/10 px-2 py-1 text-[11px] text-sky-300 transition-colors hover:bg-sky-500/20 disabled:cursor-not-allowed disabled:opacity-40">
+              <Share2 className="size-3" /> Ke Copy Signal
+            </button>
+          )}
+          {/* Alasan gagalnya DITAMPILKAN. Tombol yang diam saat ditekan
+              membuat orang menekannya berulang kali sambil menebak apa
+              yang salah — pola yang sudah dua kali muncul di aplikasi ini. */}
+          {kabarSinyal && (
+            <span className="w-full px-1 text-[10.5px] leading-tight text-amber-300/90">{kabarSinyal}</span>
+          )}
           <button onClick={onBatal} title="Batalkan tiket"
             className="flex cursor-pointer items-center gap-1 rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-400 transition-colors hover:border-zinc-500 hover:text-zinc-200">
             <Ban className="size-3" /> Batal
