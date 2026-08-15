@@ -1122,13 +1122,44 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
     }
   }, [cari, simbol, lilin]);
 
-  /* Entry menyusul harga terakhir selama belum ada posisi dan belum digeser
-     sendiri — supaya garisnya tidak menggantung jauh dari lilin terbaru. */
+  /* ── Entry menyusul harga: SELURUH RENCANA IKUT, bukan entry sendirian ──
+     Ini sebab R:R diam-diam meleset.
+
+     Dulu tiap lilin baru cuma memindahkan ENTRY ke harga penutupan terakhir
+     sementara SL dan TP tinggal di tempatnya. Jaraknya berubah sendiri: entry
+     yang merangkak naik menjauh dari SL dan mendekat ke TP, jadi risiko
+     membesar dan imbalan mengecil pada setiap lilin. Rencana yang disusun
+     tepat 1 : 2 sampai di formulir Copy Signal sebagai 1 : 1,65 — tanpa ada
+     yang menyentuh apa pun.
+
+     Terukur pada kasus yang dilaporkan: entry 63.130,01 dengan SL 62.239,669
+     dan TP 64.596,177. R:R = 2 tepat pada entry 63.025 — selisih seratus
+     dolar merangkak, dan rasionya turun 18%.
+
+     Sekarang ketiganya digeser dengan selisih yang SAMA. Bentuk rencananya
+     tetap; yang berubah cuma letaknya. R:R tidak bisa lagi berubah tanpa ada
+     yang mengubahnya.
+
+     LEVEL HASIL SERETAN TANGAN TIDAK DIGESER SAMA SEKALI — dan entry-nya pun
+     ikut diam. SL yang sengaja ditaruh di bawah swing low tertentu berhenti
+     benar begitu digeser otomatis; sementara memindahkan entry sendirian
+     mengulang persis cacat yang baru diperbaiki. Kalau orangnya sudah
+     memutuskan, tiketnya berhenti bergerak sendiri. */
   const entryDigeser = useRef(false);
   useEffect(() => {
-    if (entryDigeser.current || aksiPosisi) return;
+    if (entryDigeser.current || aksiPosisi || seretTangan.current) return;
     const h = lilin.closes[lilin.closes.length - 1];
-    if (h && (rencana.sl || rencana.tp)) setRencana((r) => ({ ...r, entry: h }));
+    if (!h) return;
+    setRencana((r) => {
+      if (!r.sl && !r.tp) return r;
+      const geser = r.entry ? h - r.entry : 0;
+      if (!geser) return { ...r, entry: h };
+      return {
+        entry: h,
+        sl: r.sl ? r.sl + geser : r.sl,
+        tp: r.tp ? r.tp + geser : r.tp,
+      };
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lilin.closes.length]);
 
