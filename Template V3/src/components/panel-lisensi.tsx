@@ -39,6 +39,19 @@ export function PanelLisensi() {
 
   const baru = data.filter((x) => x.status === 'baru');
 
+  /* URUTAN TERLAMA → TERBARU, sama arah dengan panel Lisensi Aktif di
+     sebelahnya. Backend mengirim permintaan terbaru dulu sementara daftar
+     lisensi aktif urut maju, jadi dua panel bersebelahan itu berjalan
+     berlawanan arah dan nomor barisnya tidak pernah bisa dipadankan.
+     Diurutkan di sini, bukan di server: dua rute itu dipakai layar lain
+     juga, dan urutan adalah keputusan tampilan. */
+  const urut = [...data].sort((a, b) => a.waktu - b.waktu);
+
+  /* Permintaan BARU ada di bawah setelah diurutkan maju — jadi lipatan 10
+     baris akan menyembunyikan justru yang perlu ditindak. Selama masih ada
+     yang baru, daftarnya dibuka penuh. */
+  const batasAwal = baru.length ? urut.length : 10;
+
   async function putuskan(id: string, tindakan: 'setujui' | 'tolak') {
     if (tindakan === 'tolak' && !confirm('Tolak permintaan ini?')) return;
     setSibuk(id); setPesan('');
@@ -101,13 +114,20 @@ export function PanelLisensi() {
         )}
 
         <DaftarLipat
-          data={data}
+          data={urut}
+          batasAwal={batasAwal}
           kosong={null}
           render={(x, no) => (
             <div key={x.id} className={cn('rounded-lg border p-3',
               x.status === 'baru' ? 'border-amber-500/25 bg-amber-500/[0.03]' : 'border-zinc-800/60')}>
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div className="min-w-0">
+              {/* TANPA flex-wrap, dan sisi kiri `flex-1 min-w-0`.
+                  Sebelumnya alasan panjang milik pemohon melebarkan kolom
+                  kiri sampai tombol kodenya terdorong ke baris bawah — kode
+                  JT3 itu yang paling sering dicari mata di panel ini, dan
+                  posisinya jadi berpindah-pindah tergantung panjang alasan
+                  orang. Sekarang kiri yang mengalah, kanan tetap di tempat. */}
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <NomorBaris no={no} />
                     <span className="text-[13px] text-zinc-200">{x.email || x.nama || x.uid}</span>
@@ -134,7 +154,15 @@ export function PanelLisensi() {
                       <span className="angka">· berlaku s/d {tanggalPendek(x.berakhir)}</span>
                     ) : null}
                   </div>
-                  {x.catatan && <div className="mt-1 text-[12px] text-zinc-400">{x.catatan}</div>}
+                  {/* Alasan dipotong dua baris. Ia keterangan, bukan isi
+                      utama barisnya; alasan sepanjang paragraf membuat satu
+                      kartu setinggi tiga kartu lain dan daftarnya berhenti
+                      bisa dipindai. Teks penuhnya tetap ada di tooltip. */}
+                  {x.catatan && (
+                    <div title={x.catatan} className="mt-1 line-clamp-2 text-[12px] text-zinc-400">
+                      {x.catatan}
+                    </div>
+                  )}
                   {/* Permintaan dari halaman /aktivasi ditandai "lynk".
                       Ditampilkan sebagai LENCANA, bukan teks bukti biasa:
                       inilah baris yang harus dicocokkan dengan daftar Orders

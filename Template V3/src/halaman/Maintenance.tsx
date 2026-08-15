@@ -39,6 +39,14 @@ function PanelLisensiAktif() {
   const [sibuk, setSibuk] = useState('');
   const [pesan, setPesan] = useState('');
 
+  /* Urut TERLAMA → TERBARU, arah yang sama dengan panel Permintaan di
+     sebelahnya. Backend memang sudah mengirimnya begitu (baris didorong ke
+     belakang tiap kali disetujui), tapi itu kebetulan cara ia menyimpan,
+     bukan janji — dan panel ini berdampingan dengan panel lain yang nomor
+     barisnya dipadankan dengan mata. Urutan yang dipakai untuk memadankan
+     harus ditulis, bukan diwarisi. */
+  const urut = [...data].sort((a, b) => a.tgl - b.tgl);
+
   async function cabut(sidik: string) {
     if (!confirm(`Cabut lisensi ${sidik}?\n\nPembelinya tidak bisa lagi membuka sumber produk dengan kode ini.`)) return;
     setSibuk(sidik); setPesan('');
@@ -76,12 +84,16 @@ function PanelLisensiAktif() {
              setengah layar akan dipotong oleh overflow-x-auto milik
              TabelBungkus — persis keluhan "panelnya terpotong". */
           <DaftarLipat
-            data={data}
+            data={urut}
             kosong={null}
             render={(l, no) => (
               <div key={l.sidik} className="rounded-lg border border-zinc-800/60 p-3">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="flex min-w-0 items-start gap-2">
+                {/* Sama seperti panel permintaan: tanpa flex-wrap, kiri yang
+                    mengalah. Tombol Cabut harus selalu di tempat yang sama —
+                    tombol yang berpindah baris tergantung panjang email
+                    adalah tombol yang salah pencet. */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 flex-1 items-start gap-2">
                     <NomorBaris no={no} className="mt-0.5" />
                     <div className="min-w-0">
                       <div className="angka truncate text-[12.5px] text-zinc-300">{l.sidik}</div>
@@ -89,7 +101,11 @@ function PanelLisensiAktif() {
                         <span className="text-zinc-400">{l.produk || '—'}</span>
                         <span>· {l.tgl ? tanggalPendek(l.tgl) : '—'}</span>
                       </div>
-                      {l.catatan && <div className="mt-1 text-[11.5px] text-zinc-500">{l.catatan}</div>}
+                      {l.catatan && (
+                        <div title={l.catatan} className="mt-1 line-clamp-2 text-[11.5px] text-zinc-500">
+                          {l.catatan}
+                        </div>
+                      )}
                     </div>
                   </div>
                   <button onClick={() => void cabut(l.sidik)} disabled={sibuk === l.sidik}

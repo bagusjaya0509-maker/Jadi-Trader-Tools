@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Loader2, Save, CalendarClock, KeyRound, TriangleAlert, CheckCircle2 } from 'lucide-react';
-import { Panel, PanelHead, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
+import { Panel, PanelHead } from '@/components/efferd-ui';
 import { cn } from '@/lib/utils';
 import { bacaKoneksi, PROXY_BAWAAN } from '@/lib/koneksi';
 import { useLisensi } from '@/lib/admin';
@@ -227,23 +227,26 @@ export function PanelLangganan() {
             {memuatLisensi ? 'Memuat…' : 'Belum ada lisensi aktif.'}
           </p>
         ) : (
-          <TabelBungkus>
-            <Tabel>
-              <thead><Tr><Th>Jenis lisensi</Th><Th>Jumlah aktif</Th></Tr></thead>
-              <tbody>
-                {perProduk.map(([produk, jml]) => (
-                  <Tr key={produk}>
-                    <Td>
-                      <span className="flex items-center gap-2 text-[12.5px] text-zinc-200">
-                        <KeyRound className="size-3.5 text-zinc-600" /> {produk}
-                      </span>
-                    </Td>
-                    <Td><span className="angka text-[13px] text-zinc-100">{jml}</span></Td>
-                  </Tr>
-                ))}
-              </tbody>
-            </Tabel>
-          </TabelBungkus>
+          /* KARTU, BUKAN TABEL — dan inilah yang bikin panelnya terlihat
+             terpotong sebelumnya. Tabelnya tanpa padding kiri-kanan dan
+             tanpa jarak bawah, jadi baris terakhir berhimpit persis di garis
+             tepi panel: bukan benar-benar terpotong, tapi terbaca begitu,
+             dan itu sama saja. Dua kolom untuk dua angka juga tidak butuh
+             tabel — apalagi tabel yang membawa overflow-x-auto sendiri. */
+          <div className="space-y-2 px-5 pb-5">
+            {perProduk.map(([produk, jml]) => (
+              <div key={produk}
+                   className="flex items-center justify-between gap-3 rounded-lg border border-zinc-800/60 px-3 py-2.5">
+                <span className="flex min-w-0 items-center gap-2 text-[12.5px] text-zinc-200">
+                  <KeyRound className="size-3.5 shrink-0 text-zinc-600" />
+                  <span className="truncate">{produk}</span>
+                </span>
+                <span className="shrink-0 text-[11px] text-zinc-500">
+                  <span className="angka text-[14px] font-semibold text-zinc-100">{jml}</span> aktif
+                </span>
+              </div>
+            ))}
+          </div>
         )}
       </Panel>
     </>
