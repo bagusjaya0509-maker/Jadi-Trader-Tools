@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Play, Loader2, RefreshCw, Radio, TriangleAlert, History,
   Layers, ChevronDown, Settings2, Code2, X, Ruler, Rows3, Square, Eraser, Minus, TrendingUp,
-  FlaskConical, GripHorizontal } from 'lucide-react';
+  FlaskConical, GripHorizontal, Maximize2, Minimize2 } from 'lucide-react';
 import { PanelNews } from '@/components/panel-news';
 import { simpanDraf } from '@/lib/draf-sinyal';
 import { Panel, PanelHead, KartuKpi, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
@@ -1519,7 +1519,44 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
       return v >= 360 && v <= 1600 ? v : null;
     } catch { return null; }
   });
-  const tinggiChart = tinggiManual ?? Math.max(460, tinggiLayar - (tampilSmi ? 343 : 303));
+  /* ── Layar penuh ──────────────────────────────────────────────────────
+     Fullscreen API dipasang pada AREA CHART, bukan pada seluruh halaman:
+     yang ingin dilihat lebar orangnya adalah lilinnya, dan sidebar plus
+     bilah simbol yang ikut membesar cuma memindahkan sempitnya.
+
+     Tingginya WAJIB ikut berubah. Kanvas lightweight-charts berukuran
+     tetap dari prop `tinggi`; membiarkannya akan membuat layar penuh
+     menampilkan chart setinggi semula di tengah bidang hitam — terlihat
+     seperti fitur yang rusak, bukan seperti tidak ada fitur.
+
+     `layarPenuh` diikuti dari EVENT, bukan dari tombol. Orang keluar dari
+     layar penuh dengan Esc jauh lebih sering daripada dengan menekan
+     tombolnya lagi, dan state yang cuma di-toggle tombol akan tertinggal
+     menyala sesudah Esc. */
+  const [layarPenuh, setLayarPenuh] = useState(false);
+  useEffect(() => {
+    const ubah = () => setLayarPenuh(document.fullscreenElement === areaChart.current);
+    document.addEventListener('fullscreenchange', ubah);
+    return () => document.removeEventListener('fullscreenchange', ubah);
+  }, []);
+  const [tinggiLayarPenuh, setTinggiLayarPenuh] = useState(0);
+  useEffect(() => {
+    if (!layarPenuh) return;
+    const ukur = () => setTinggiLayarPenuh(window.innerHeight - (tampilSmi ? 8 : 8));
+    ukur();
+    window.addEventListener('resize', ukur);
+    return () => window.removeEventListener('resize', ukur);
+  }, [layarPenuh, tampilSmi]);
+  const gantiLayarPenuh = useCallback(() => {
+    const el = areaChart.current;
+    if (!el) return;
+    if (document.fullscreenElement) void document.exitFullscreen();
+    else void el.requestFullscreen?.().catch(() => { /* ditolak browser — biarkan */ });
+  }, []);
+
+  const tinggiChart = layarPenuh && tinggiLayarPenuh
+    ? tinggiLayarPenuh
+    : tinggiManual ?? Math.max(460, tinggiLayar - (tampilSmi ? 343 : 303));
   const mulaiSeretTinggi = useCallback((e: React.PointerEvent) => {
     e.preventDefault();
     const awalY = e.clientY, awalT = tinggiChart;
@@ -1816,6 +1853,13 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
               </span>
               {replayIdx !== null && <span className="angka text-[10.5px]">bar {replayIdx + 1}</span>}
             </button>
+
+            <button onClick={gantiLayarPenuh}
+              title={layarPenuh ? 'Keluar dari layar penuh (Esc)' : 'Layar penuh — chart saja'}
+              aria-label={layarPenuh ? 'Keluar dari layar penuh' : 'Layar penuh'}
+              className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100 sm:px-2.5">
+              {layarPenuh ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
+            </button>
           </div>
         </div>
 
@@ -1835,7 +1879,11 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
               menyusut saat pembatas ditarik, jadi lilin di tepi kanan
               tidak pernah tertutup daftar. */}
           <div className="flex">
-          <div ref={areaChart} className="relative min-w-0 grow overflow-hidden">
+          {/* bg WAJIB saat layar penuh: elemen yang dinaikkan browser ke
+              fullscreen tidak mewarisi latar halamannya, dan tanpa ini
+              chartnya berdiri di atas putih bawaan. */}
+          <div ref={areaChart}
+               className={cn('relative min-w-0 grow overflow-hidden', layarPenuh && 'bg-zinc-950 p-1')}>
           {lilin.times.length > 0
             ? <ChartLilin key={`${simbol}|${tf}|${kunciChart}`}
                           lilin={lilinGabung} garis={garis} trade={replayIdx === null ? hasil?.trade : undefined}

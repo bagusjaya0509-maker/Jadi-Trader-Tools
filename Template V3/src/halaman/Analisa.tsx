@@ -680,6 +680,10 @@ export default function Analisa() {
      memposting banyak sinyal, dan menderetkan semuanya rata membuat rekam
      jejak per orangnya tidak pernah terlihat utuh. */
   const [kanalBuka, setKanalBuka] = useState<string | null>(null);
+  /** Halaman depan Market Signal: daftar kanal, belum masuk ke kanal siapa
+   *  pun. Dipakai memutuskan apa yang boleh menumpuk di kepala halaman —
+   *  begitu seseorang masuk ke sebuah kanal, kepala halaman itu miliknya. */
+  const diDepan = sub === 'market' && kanalBuka === null;
   const [performa, setPerforma] = useState<Performa | null>(null);
   const { data: riwayat } = useRiwayat();
   const saldoAwal = useSaldoAwal();
@@ -687,7 +691,6 @@ export default function Analisa() {
   const [masuk, setMasuk] = useState<PermintaanMasuk[]>([]);
   const [statusku, setStatusku] = useState<Record<string, string>>({});
   const [memuat, setMemuat] = useState(true);
-  const [formBuka, setFormBuka] = useState(false);
   const [kabar, setKabar] = useState('');
   const [sibuk, setSibuk] = useState(false);
 
@@ -731,8 +734,13 @@ export default function Analisa() {
     setSl(String(rapikanHarga(d.sl)));
     setTp(String(rapikanHarga(d.tp)));
     if (d.sampul) setSampul(d.sampul);
-    setFormBuka(true);
-    setKabar(`Rencana dari Chart & Entry masuk — ${d.pasangan} ${d.tf} ${d.arah}. Lengkapi judul dan alasannya.`);
+    /* PINDAH TAB, bukan sekadar membuka panel. Formulirnya sekarang hidup di
+       tab Posting Signal; draf yang mendarat di tab yang tidak sedang
+       dilihat sama saja dengan draf yang hilang — orangnya menekan "Ke Copy
+       Signal" di chart lalu tiba di daftar kanal, tanpa tanda apa pun bahwa
+       rencananya sudah sampai. */
+    setCariSub({ sub: 'posting' }, { replace: true });
+    setKabar(`Rencana dari Chart & Entry masuk — ${d.pasangan} ${d.tf} ${d.arah}. Lengkapi ringkasan dan alasannya.`);
   }, []);
 
   const segarkan = () => {
@@ -793,7 +801,6 @@ export default function Analisa() {
         }
       }
       setKabar(`Analisa terposting — dan kini permanen. Semoga levelnya bekerja.${kabarSampul}`);
-      setFormBuka(false);
       setRingkas(''); setEntry(''); setSl(''); setTp(''); setAlasan('');
       setIzinJurnal(false); setPahamPermanen(false); setSampul('');
       segarkan();
@@ -831,6 +838,18 @@ export default function Analisa() {
           Di ATAS, bukan di kaki halaman. Disclaimer yang menunggu digulir
           tidak pernah sampai ke orang yang sedang bersiap menekan "Buka di
           Chart & Entry". */}
+      {/* HANYA di halaman depan Market Signal — bukan di dalam kanal, bukan
+          di tab Posting. Di dalam kanal, kotak amber setinggi tiga baris
+          duduk di antara nama analis dan sinyalnya, dan layar itu berhenti
+          terasa seperti kanal orang tersebut.
+
+          TIDAK DIHAPUS, DIPERKECIL. Kanal justru layar yang menampilkan
+          entry, SL, dan TP — bentuk yang paling gampang dibaca sebagai
+          "beli sekarang di harga ini". Menghilangkan penyeimbangnya sama
+          sekali di situ bukan lagi keputusan tampilan, dan ini wilayah OJK
+          / Bappebti. Jadi versi ringkasnya tetap ada: satu baris kecil di
+          bawah judul kanal. */}
+      {diDepan && (
       <div className="mb-4 rounded-lg border border-amber-500/20 bg-amber-500/[0.04] px-4 py-3">
         <p className="text-[11.5px] leading-relaxed text-zinc-400">
           <span className="font-medium text-amber-300/90">Bukan rekomendasi beli atau jual.</span>{' '}
@@ -843,6 +862,7 @@ export default function Analisa() {
           </Link>
         </p>
       </div>
+      )}
 
       {/* ── Papan peringkat, DI KEPALA Market Signal ─────────────────────
           Bukan sub-halaman sendiri lagi. Orang datang ke sini untuk mencari
@@ -853,7 +873,7 @@ export default function Analisa() {
 
           Bisa dilipat: begitu seseorang tahu siapa yang ia ikuti, papan itu
           berubah jadi penghalang antara dia dan sinyalnya. */}
-      {sub === 'market' && <PapanPeringkatSignal data={performa} />}
+      {diDepan && <PapanPeringkatSignal data={performa} />}
 
       <div className={cn(sub !== 'market' && 'hidden')}>
       {/* ── Rak sinyal pantauan: empat slot ───────────────────────────
@@ -939,21 +959,20 @@ export default function Analisa() {
           judul={<span className="flex items-center gap-2">Copy Signal <LencanaBeta /></span>}
           sub="Posting rencana trade-mu — yang dinilai orang adalah hasil sinyalmu, bukan klaimmu."
           kanan={
-            <span className="flex items-center gap-2">
-              <button onClick={segarkan} aria-label="Segarkan"
-                className="cursor-pointer rounded p-1 text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-200">
-                <RefreshCw className={cn('size-3.5', memuat && 'animate-spin')} />
-              </button>
-              {pengguna && (
-                <button onClick={() => setFormBuka((v) => !v)}
-                  className="cursor-pointer rounded-md bg-zinc-100 px-3 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white">
-                  {formBuka ? 'Tutup form' : 'Posting analisa'}
-                </button>
-              )}
-            </span>
+            <button onClick={segarkan} aria-label="Segarkan"
+              className="cursor-pointer rounded p-1 text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-200">
+              <RefreshCw className={cn('size-3.5', memuat && 'animate-spin')} />
+            </button>
           }
         />
-        {formBuka && (
+        {/* FORMULIRNYA LANGSUNG TERBUKA — tombol "Posting analisa" dibuang.
+            Tabnya sendiri sudah bernama Posting Signal: siapa pun yang
+            sampai ke sini sudah menyatakan niatnya, dan meminta satu klik
+            lagi untuk membuka panel di dalam tab yang isinya cuma panel itu
+            adalah pintu di depan pintu. Dulu tombolnya masuk akal karena
+            formulir ini duduk di atas daftar sinyal yang dicari orang lain;
+            sesudah pindah tab, alasan itu ikut hilang. */}
+        {pengguna && (
           <div className="border-t border-zinc-800/80 px-5 py-4">
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {/* Kolom "Judul" DIHAPUS. Ia meminta orang menulis dua ringkasan
@@ -1299,10 +1318,19 @@ export default function Analisa() {
               className="mb-3 flex cursor-pointer items-center gap-1.5 text-[12.5px] text-zinc-500 transition-colors hover:text-zinc-200">
               ← Semua kanal
             </button>
-            <div className="mb-3 flex items-center gap-2 text-[13.5px] text-zinc-200">
+            <div className="mb-1.5 flex items-center gap-2 text-[13.5px] text-zinc-200">
               <span className="font-medium">{infoTerpilih?.nama}</span>
               <span className="text-zinc-600">· {terpilih.length} sinyal</span>
             </div>
+            {/* Satu baris, bukan kotak amber. Cukup untuk tetap ada di layar
+                yang menampilkan entry/SL/TP, cukup kecil untuk tidak berdiri
+                di antara nama analis dan sinyalnya. */}
+            <p className="mb-3 text-[11px] text-zinc-600">
+              Bukan rekomendasi beli atau jual · rekam jejak bukan jaminan hasil ·{' '}
+              <Link to="/legal" className="underline decoration-zinc-700 underline-offset-2 hover:text-zinc-400">
+                Disclaimer
+              </Link>
+            </p>
             <div className="flex gap-4 overflow-x-auto pb-1">
               {terpilih.map((a) => (
                 <div key={a.id} className="w-[320px] shrink-0">
