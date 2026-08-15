@@ -491,7 +491,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <BookOpen className="size-4 shrink-0" strokeWidth={1.8} />
             {!ciut && <span>Documentation</span>}
           </NavLink>
-          {!ciut && <div className="px-2 pb-1 pt-3 text-[11px] text-zinc-600">© 2026 Jadi Trader Tools</div>}
+          {/* Baris hak cipta sekaligus jalan masuk ke halaman Legal. Ditaruh
+              di sini, bukan sebagai butir nav tersendiri: disclaimer dan
+              ketentuan bukan alat yang dipakai sehari-hari, jadi menaruhnya
+              sejajar Dashboard dan Journal hanya menambah kebisingan pada
+              menu yang justru harus cepat dipindai. Tapi ia tetap harus ADA
+              dan konsisten di setiap halaman — dan pojok bawah adalah tempat
+              pertama orang mencarinya. */}
+          {!ciut && (
+            <div className="px-2 pb-1 pt-3 text-[11px] text-zinc-600">
+              © 2026 Jadi Trader Tools ·{' '}
+              <Link to="/legal" className="transition-colors hover:text-zinc-400">Legal</Link>
+            </div>
+          )}
         </div>
       </aside>
 

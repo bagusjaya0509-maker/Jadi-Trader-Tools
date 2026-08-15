@@ -60,6 +60,10 @@ export default function Akses() {
   const [sibuk, setSibuk] = useState(false);
   const [kabar, setKabar] = useState('');
   const [catatan, setCatatan] = useState('');
+  /* Sengaja TIDAK disimpan di localStorage. Persetujuan risiko harus
+     diberikan sadar setiap kali orang meminta akses — centang yang sudah
+     terisi sendiri saat halaman dibuka bukan persetujuan, cuma hiasan. */
+  const [pahamRisiko, setPahamRisiko] = useState(false);
   const [kode, setKode] = useState('');
   const [sibukKode, setSibukKode] = useState(false);
   const [kabarKode, setKabarKode] = useState('');
@@ -361,14 +365,43 @@ export default function Akses() {
               className="w-full resize-none rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-[12.5px] text-zinc-200 outline-none placeholder:text-zinc-600 focus-visible:border-zinc-600"
             />
 
+            {/* Persetujuan risiko DI SINI, bukan cuma tautan di footer.
+                Disclaimer melindungi sejauh penggunanya benar-benar melihatnya
+                saat mengambil keputusan — dan titik keputusannya adalah detik
+                sebelum ia meminta atau membayar akses, bukan halaman yang
+                mungkin tidak pernah ia buka.
+
+                Mengunci KEDUA tombol, bukan hanya yang berbayar: yang gratis
+                pun membuka alat yang sama dan risiko yang sama. */}
+            <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-zinc-800 bg-zinc-950/60 px-3.5 py-3">
+              <input
+                type="checkbox"
+                checked={pahamRisiko}
+                onChange={(e) => setPahamRisiko(e.target.checked)}
+                className="mt-0.5 size-3.5 shrink-0 cursor-pointer accent-emerald-500"
+              />
+              <span className="text-[12px] leading-relaxed text-zinc-400">
+                Saya paham trading berisiko kehilangan seluruh modal, dan Jadi Trader Tools adalah{' '}
+                <span className="text-zinc-200">alat bantu analisa — bukan nasihat investasi</span>.
+                Saya sudah membaca{' '}
+                <Link to="/legal" className="text-zinc-300 underline decoration-zinc-700 underline-offset-2 hover:decoration-zinc-400">
+                  Disclaimer &amp; Ketentuan
+                </Link>.
+              </span>
+            </label>
+
             <div className="flex flex-wrap gap-2.5">
               <button
                 onClick={() => void kirim('gratis')}
-                disabled={sibuk || kuota.gratisHabis}
-                title={kuota.gratisHabis ? 'Kuota gratis sudah habis' : undefined}
+                disabled={sibuk || kuota.gratisHabis || !pahamRisiko}
+                title={
+                  kuota.gratisHabis ? 'Kuota gratis sudah habis'
+                    : !pahamRisiko ? 'Centang persetujuan risiko dulu'
+                    : undefined
+                }
                 className={cn(
                   'inline-flex items-center gap-2 rounded-md px-5 py-2.5 text-[13px] font-semibold transition-colors',
-                  kuota.gratisHabis
+                  kuota.gratisHabis || !pahamRisiko
                     ? 'cursor-not-allowed bg-zinc-800 text-zinc-600'
                     : 'cursor-pointer bg-emerald-500 text-zinc-950 hover:bg-emerald-400 disabled:opacity-60',
                 )}
@@ -380,15 +413,25 @@ export default function Akses() {
               {/* Tombol bayar SELALU ada, tapi jadi pilihan utama begitu yang
                   gratis habis — orang yang datang terlambat tetap punya jalan
                   masuk, bukan jalan buntu. */}
+              {/* Tautan tidak bisa di-`disabled` seperti tombol, jadi
+                  klik-nya ditahan di onClick DAN pointer-events dimatikan.
+                  Dua-duanya perlu: pointer-events saja masih bisa ditembus
+                  lewat keyboard, dan onClick saja masih memberi kesan tombol
+                  hidup padahal tidak. */}
               <a
                 href={LINK_BAYAR}
                 target="_blank"
                 rel="noopener noreferrer"
+                aria-disabled={!pahamRisiko}
+                title={!pahamRisiko ? 'Centang persetujuan risiko dulu' : undefined}
+                onClick={(e) => { if (!pahamRisiko) e.preventDefault(); }}
                 className={cn(
                   'inline-flex items-center gap-2 rounded-md px-5 py-2.5 text-[13px] font-semibold transition-colors',
-                  kuota.gratisHabis
-                    ? 'bg-[#ffcd75] text-zinc-950 hover:bg-[#ffd98f]'
-                    : 'border border-zinc-800 text-zinc-300 hover:bg-zinc-900',
+                  !pahamRisiko
+                    ? 'pointer-events-none cursor-not-allowed bg-zinc-800 text-zinc-600'
+                    : kuota.gratisHabis
+                      ? 'bg-[#ffcd75] text-zinc-950 hover:bg-[#ffd98f]'
+                      : 'border border-zinc-800 text-zinc-300 hover:bg-zinc-900',
                 )}
               >
                 Bayar Rp 17.900 · {kuota.hari} hari

@@ -85,6 +85,7 @@ const Maintenance   = lazy(() => muat(() => import('@/halaman/Maintenance')));
 const Billing       = lazy(() => muat(() => import('@/halaman/Billing')));
 const Dokumentasi   = lazy(() => muat(() => import('@/halaman/Dokumentasi')));
 const Changelog     = lazy(() => muat(() => import('@/halaman/Changelog')));
+const Legal         = lazy(() => muat(() => import('@/halaman/Legal')));
 const CopyTrading   = lazy(() => muat(() => import('@/halaman/Analisa')));
 const Markas        = lazy(() => muat(() => import('@/halaman/Markas')));
 
@@ -235,6 +236,19 @@ export default function App() {
     <PenyediaAuth>
       <HashRouter>
         <KeAtas />
+        {/* SATU Suspense membungkus SELURUH Routes.
+            Sebelumnya Suspense hanya ada di dalam Kerangka, jadi setiap rute
+            malas DI LUAR gerbang melempar "A component suspended while
+            responding to synchronous input" dan halamannya kosong. Ditemukan
+            saat menambah /legal, lalu terbukti bukan bug baru: /aktivasi
+            mengalaminya juga — dan itu halaman tempat pembeli MENDARAT
+            sesudah membayar lewat Lynk. Orang yang baru saja mengirim uang
+            melihat layar kosong, dan tidak ada satu pun galat yang muncul
+            di sisi kita.
+
+            Ditaruh di sini, bukan ditambal satu per satu di tiap rute: rute
+            yang ditambahkan besok ikut terlindungi tanpa perlu diingat. */}
+        <Suspense fallback={<Menunggu />}>
         <Routes>
           <Route path="/" element={<Beranda />} />
           {/* DITUNDA. Halaman pendaratan sudah jadi tapi BELUM jadi pintu
@@ -253,6 +267,13 @@ export default function App() {
           {/* Markas Agen SENGAJA di luar kerangka terminal — halaman
               terpisah untuk pusat kendali agen AI, bukan bagian dasbor. */}
           <Route path="/markas" element={<Penjaga><Markas /></Penjaga>} />
+          {/* Legal WAJIB di luar gerbang. Orang membaca disclaimer dan
+              ketentuan refund JUSTRU sebelum membayar — kalau halaman ini
+              berada di dalam Kerangka, calon pembeli yang mengkliknya
+              dilempar ke halaman minta-akses dan tidak pernah sampai ke
+              dokumen yang sedang ia cari. Disclaimer yang hanya bisa dibaca
+              orang yang sudah terlanjur membeli tidak melindungi siapa pun. */}
+          <Route path="/legal" element={<Legal />} />
           <Route element={<Kerangka />}>
             <Route path="/dashboard"   element={<Dashboard />} />
             <Route path="/screener"        element={<Screener />} />
@@ -271,6 +292,7 @@ export default function App() {
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </Suspense>
       </HashRouter>
     </PenyediaAuth>
   );

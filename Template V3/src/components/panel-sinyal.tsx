@@ -458,6 +458,23 @@ export function PanelSinyal({ ringkas = false }: { ringkas?: boolean } = {}) {
           );
         })}
       </div>
+
+      {/* Peringatan ditempel PADA panelnya, bukan diserahkan ke halaman Legal.
+          Inilah satu-satunya tempat di aplikasi yang menampilkan pair, arah,
+          entry, SL, dan TP sekaligus — bentuk yang paling mudah dibaca orang
+          sebagai "beli sekarang di harga ini". Kalimat penyeimbangnya harus
+          berada di layar yang sama, saat itu juga; disclaimer yang menunggu
+          diklik di pojok bawah tidak pernah sampai ke orang yang sedang
+          bersiap menekan Buka di Chart. */}
+      <div className="border-t border-zinc-800/80 px-5 py-3">
+        <p className="text-[11px] leading-relaxed text-zinc-600">
+          Keluaran algoritma dari data harga publik — <span className="text-zinc-500">bukan rekomendasi
+          beli atau jual</span>. Periksa ulang sebelum eksekusi; seluruh risiko dan keputusan ada padamu.{' '}
+          <Link to="/legal" className="underline decoration-zinc-700 underline-offset-2 hover:text-zinc-400">
+            Disclaimer
+          </Link>
+        </p>
+      </div>
     </Panel>
   );
 }
