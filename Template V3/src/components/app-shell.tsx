@@ -501,7 +501,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {!ciut && (
             <div className="px-2 pb-1 pt-3 text-[11px] text-zinc-600">
               © 2026 Jadi Trader Tools ·{' '}
-              <Link to="/legal" className="transition-colors hover:text-zinc-400">Legal</Link>
+              <Link to="/legal" className="transition-colors hover:text-zinc-400">Legal - Privasi</Link>
             </div>
           )}
         </div>
