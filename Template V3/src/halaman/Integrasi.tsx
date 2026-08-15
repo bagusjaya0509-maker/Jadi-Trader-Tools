@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   CheckCircle2, Circle, Copy, Eye, EyeOff, RefreshCw, Download,
   ShieldCheck, TriangleAlert, Plug, Link2Off, Activity, Server,
@@ -165,7 +166,14 @@ const TAB_INT = [
 type IdTabInt = typeof TAB_INT[number]['id'];
 
 export default function Integrasi() {
-  const [tab, setTab] = useState<IdTabInt>('sehat');
+  /* Tab dibaca dari alamat (?tab=mt5) supaya sub-menu sidebar bisa
+     menunjuk langsung ke tutorial yang dimaksud. Tab yang tidak punya
+     alamat tidak bisa ditaut — dan tutorial pemasangan justru yang paling
+     sering dikirim orang ke orang lain lewat tautan. */
+  const [cariTab, setCariTab] = useSearchParams();
+  const tab: IdTabInt = TAB_INT.some((t) => t.id === cariTab.get('tab'))
+    ? (cariTab.get('tab') as IdTabInt) : 'sehat';
+  const setTab = (id: IdTabInt) => setCariTab(id === 'sehat' ? {} : { tab: id }, { replace: true });
   /* Kode pasangan ASLI dari backend, bukan contoh.
      Sebelumnya baris ini berisi `useState('JT-4F2A-91C7')` — kode yang
      ditulis mati di sini. Awalannya salah (backend membuat `JTM5-…`) DAN

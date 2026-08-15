@@ -88,7 +88,12 @@ const NAV = [
           { ke: '/copy',              label: 'Sinyal' },
           { ke: '/copy?sub=performa', label: 'Performa Signal' },
         ] },
-      { ke: '/integrasi',   label: 'Integrations',     Ikon: Plug },
+      { ke: '/integrasi',   label: 'Integrations',     Ikon: Plug,
+        sub: [
+          { ke: '/integrasi',             label: 'Connection' },
+          { ke: '/integrasi?tab=mt5',     label: 'Tutorial Pasang MT5' },
+          { ke: '/integrasi?tab=binance', label: 'Tutorial Connect Binance' },
+        ] },
     ],
   },
   {
