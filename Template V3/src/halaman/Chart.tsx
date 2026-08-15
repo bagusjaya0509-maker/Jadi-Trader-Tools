@@ -348,6 +348,12 @@ export default function ChartBacktest() {
     return null;
   });
   const areaChart = useRef<HTMLDivElement>(null);
+  /** Kartu chart utuh — bilah kendali DAN grafiknya. Inilah yang dinaikkan
+   *  ke layar penuh; `areaChart` tetap dipakai untuk mengukur lebar kanvas. */
+  const kartuChart = useRef<HTMLDivElement>(null);
+  /** Bilah kendali di kepala kartu. Tingginya diukur saat layar penuh
+   *  supaya kanvasnya mengisi sisa jendela dengan tepat. */
+  const bilahChart = useRef<HTMLDivElement>(null);
 
   function mulaiSeretAlat(e: React.PointerEvent) {
     /* Tombol alatnya sendiri tidak boleh ikut memicu seretan — kalau ikut,
@@ -1571,20 +1577,37 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
      menyala sesudah Esc. */
   const [layarPenuh, setLayarPenuh] = useState(false);
   useEffect(() => {
-    const ubah = () => setLayarPenuh(document.fullscreenElement === areaChart.current);
+    const ubah = () => setLayarPenuh(document.fullscreenElement === kartuChart.current);
     document.addEventListener('fullscreenchange', ubah);
     return () => document.removeEventListener('fullscreenchange', ubah);
   }, []);
+  /* Tinggi kanvas saat layar penuh = tinggi jendela dikurangi bilah kendali
+     yang IKUT tampil di atasnya. Bilahnya diukur, bukan ditaksir: isinya
+     membungkus jadi dua baris di jendela sempit, dan angka tetap akan
+     memotong chart persis sebanyak baris yang bertambah. */
   const [tinggiLayarPenuh, setTinggiLayarPenuh] = useState(0);
   useEffect(() => {
     if (!layarPenuh) return;
-    const ukur = () => setTinggiLayarPenuh(window.innerHeight - (tampilSmi ? 8 : 8));
+    const ukur = () => {
+      const bilah = bilahChart.current?.offsetHeight ?? 0;
+      /* 34 px: garis pemisah + padding kartu + ruang untuk pegangan seret
+         tinggi di bawah chart. Tanpa sisa ini, sumbu waktunya terpotong. */
+      setTinggiLayarPenuh(Math.max(240, window.innerHeight - bilah - 34));
+    };
+    /* Dua kali: sekali sekarang, sekali setelah browser selesai menata
+       ulang jendela fullscreen — pengukuran pertama masih memakai tinggi
+       jendela yang lama. */
     ukur();
+    const t = setTimeout(ukur, 120);
     window.addEventListener('resize', ukur);
-    return () => window.removeEventListener('resize', ukur);
+    return () => { clearTimeout(t); window.removeEventListener('resize', ukur); };
   }, [layarPenuh, tampilSmi]);
   const gantiLayarPenuh = useCallback(() => {
-    const el = areaChart.current;
+    /* Yang dinaikkan KARTUNYA, bukan area chart saja: bilah simbol,
+       timeframe, harga terakhir, News, Indikator, dan Replay adalah alat
+       yang justru dipakai sambil melihat chart lebar. Layar penuh yang
+       membuang semuanya memaksa keluar-masuk tiap kali ganti timeframe. */
+    const el = kartuChart.current;
     if (!el) return;
     if (document.fullscreenElement) void document.exitFullscreen();
     else void el.requestFullscreen?.().catch(() => { /* ditolak browser — biarkan */ });
@@ -1711,8 +1734,12 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
   return (
     <div className="p-4 sm:p-6">
       {/* ── Bilah kendali ── */}
+      {/* Pembungkus ber-ref: Panel komponen fungsi tanpa forwardRef, jadi
+          ref tidak bisa dipasang langsung padanya. Div ini yang dinaikkan
+          ke layar penuh, dan ia memuat bilah kendali beserta grafiknya. */}
+      <div ref={kartuChart} className={cn(layarPenuh && 'bg-zinc-950 p-1.5')}>
       <Panel>
-        <div className="flex flex-wrap items-end gap-3 p-4">
+        <div ref={bilahChart} className="flex flex-wrap items-end gap-3 p-4">
           <div className="min-w-[168px]">
             <label className="mb-1 block text-[11px] text-zinc-500">Simbol</label>
             {/* Diketik dulu, DIKOMIT belakangan.
@@ -1915,11 +1942,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
               menyusut saat pembatas ditarik, jadi lilin di tepi kanan
               tidak pernah tertutup daftar. */}
           <div className="flex">
-          {/* bg WAJIB saat layar penuh: elemen yang dinaikkan browser ke
-              fullscreen tidak mewarisi latar halamannya, dan tanpa ini
-              chartnya berdiri di atas putih bawaan. */}
-          <div ref={areaChart}
-               className={cn('relative min-w-0 grow overflow-hidden', layarPenuh && 'bg-zinc-950 p-1')}>
+          <div ref={areaChart} className="relative min-w-0 grow overflow-hidden">
           {lilin.times.length > 0
             ? <ChartLilin key={`${simbol}|${tf}|${kunciChart}`}
                           lilin={lilinGabung} garis={garis} trade={replayIdx === null ? hasil?.trade : undefined}
@@ -2635,6 +2658,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
         </div>
         )}
       </Panel>
+      </div>
 
       {/* ── Posisi Terbuka ──────────────────────────────────────────
           Dipindah ke sini dari Jurnal. Alasannya bukan kerapian: posisi

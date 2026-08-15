@@ -473,12 +473,6 @@ export function PojokOrder({
                 </span>
               );
             }
-            /* MODE COPY: hanya R:R, tanpa dolar. Angka dolarnya diturunkan
-               dari Modal & Risk% yang barusan disembunyikan — menampilkan
-               hasil dari setelan yang tidak terlihat membuat orang mengira
-               -$10 / +$20 itu bagian dari sinyalnya, padahal ia ukuran
-               posisi si penyusun. Yang menyeberang ke pembaca cuma rasio. */
-            if (modeSekarang === 'copy') return null;
             if (!nyata && risk > 0 && reward > 0) {
               /* Qty beku dari jangkar tiket: dolarnya MENGIKUTI garis. SL
                  yang ditarik menjauh menampilkan risiko lebih besar — bukan
@@ -509,7 +503,13 @@ export function PojokOrder({
               layar chartnya. Ditaruh SEBARIS dengan Kirim/Batal karena ia
               nasib ketiga dari tiket yang sama: dieksekusi, dibatalkan,
               atau dibagikan sebagai analisa. */}
-          {onKirimSinyal && (
+          {/* HANYA di mode COPY. Di DEMO ia tombol biru yang duduk di sebelah
+              Kirim tanpa ada hubungannya dengan apa yang sedang dikerjakan —
+              orang yang sedang latihan tidak sedang menyusun sinyal, dan
+              tombol yang tidak relevan di sebelah tombol eksekusi adalah
+              tombol yang cepat atau lambat salah ditekan. Lencananya sendiri
+              yang jadi jalan masuk: putar ke COPY, tombolnya muncul. */}
+          {onKirimSinyal && modeSekarang === 'copy' && (
             <button onClick={onKirimSinyal} disabled={!arahBenar}
               title={arahBenar ? 'Kirim entry/SL/TP + tangkapan layar chart ke formulir Copy Signal'
                                : 'SL dan TP harus berada di sisi yang benar terhadap entry'}
