@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Loader2, Lock, Unlock, Trash2, Send, LineChart, X, CheckCircle2,
-  TrendingUp, TrendingDown, RefreshCw, Radar, Sparkles, ImagePlus, Images,
+  TrendingUp, TrendingDown, RefreshCw, Radar, Sparkles, ImagePlus, Images, Flag,
 } from 'lucide-react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { PanelSinyal } from '@/components/panel-sinyal';
@@ -104,9 +104,31 @@ function ModalPortofolio({ a, tutup }: { a: RingkasAnalisa; tutup: () => void })
  *  perlu tahu jenis mana yang sedang ia pertimbangkan. */
 function LencanaAgen() {
   return (
-    <span className="flex items-center gap-1 rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-sky-300"
+    /* Ditempel di POJOK KANAN ATAS panel, bukan ikut mengalir di dalam isi.
+       Sebagai baris tersendiri ia mendorong judul turun dan memakan satu
+       baris penuh untuk dua kata — dan lencana yang memanjang terbaca
+       sebagai isi kartu, padahal ia keterangan TENTANG kartunya. */
+    <span className="absolute right-3 top-3 z-10 flex items-center gap-1 rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-sky-300"
           title="Ditulis agen AI dari data lilin, bukan oleh analis manusia">
       <Sparkles className="size-3" /> AI Agent
+    </span>
+  );
+}
+
+/** Label hasil sinyal. Muncul HANYA kalau backend sudah bisa memastikannya
+ *  dari lilin sejak analisa diposting — kalau simbolnya tidak bisa dinilai,
+ *  tidak ada label sama sekali. Diam lebih jujur daripada menebak. */
+function LencanaHasil({ hasil }: { hasil: 'sl' | 'tp' }) {
+  const kenaTp = hasil === 'tp';
+  return (
+    <span className={cn(
+      'flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold',
+      kenaTp ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400',
+    )}
+      title={kenaTp
+        ? 'Harga sudah menyentuh TP sejak analisa ini diposting — rencananya selesai.'
+        : 'Harga sudah menyentuh SL sejak analisa ini diposting — rencananya selesai.'}>
+      <Flag className="size-3" /> Expired · {kenaTp ? 'TP' : 'SL'}
     </span>
   );
 }
@@ -261,11 +283,17 @@ function KartuAnalisa({ a, status, milikku, onSegarkan }: {
     } finally { setSibuk(false); }
   }
 
+  const selesai = a.hasil === 'sl' || a.hasil === 'tp';
+
   return (
-    <Panel className="p-4">
+    /* `relative` wajib: lencana AI Agent duduk absolut di pojok panel. */
+    <Panel className={cn('relative p-4', selesai && 'opacity-75')}>
+      {a.agen && <LencanaAgen />}
       <div className="flex flex-wrap items-start gap-2">
         <div className="min-w-0 grow">
-          <div className="flex items-center gap-2">
+          {/* pr-20 menyisakan ruang untuk lencana di pojok, supaya baris ini
+              tidak menabraknya di kartu selebar 320px. */}
+          <div className={cn('flex flex-wrap items-center gap-x-2 gap-y-1', a.agen && 'pr-20')}>
             <span className={cn('flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold',
               a.arah === 'BUY' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400')}>
               {a.arah === 'BUY' ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
@@ -275,7 +303,21 @@ function KartuAnalisa({ a, status, milikku, onSegarkan }: {
             {a.tf && <span className="angka text-[11px] text-zinc-500">{a.tf}</span>}
             <span className="text-[11px] text-zinc-600">· {tanggalPendek(a.dibuat)}</span>
           </div>
-          {a.agen && <div className="mt-1.5"><LencanaAgen /></div>}
+          {/* Tipe entry DI TAMPILAN UTAMA, sebelum analisanya dibuka.
+              Ia keterangan, bukan angka — jadi tidak membocorkan level yang
+              masih terkunci, tapi menjawab pertanyaan yang menentukan: ini
+              rencana yang menunggu harga datang, atau eksekusi sekarang?
+              Orang yang menimbang membeli berhak tahu itu lebih dulu. */}
+          {(a.jenisEntry || selesai) && (
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+              {a.jenisEntry && (
+                <span className="rounded border border-zinc-800 px-1.5 py-0.5 text-[10px] font-medium text-zinc-400">
+                  {a.jenisEntry}
+                </span>
+              )}
+              {selesai && <LencanaHasil hasil={a.hasil as 'sl' | 'tp'} />}
+            </div>
+          )}
           <div className="mt-1 text-[13.5px] font-medium text-zinc-100">{a.judul}</div>
           <div className="mt-0.5 text-[12px] leading-relaxed text-zinc-500">{a.ringkas}</div>
           <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-zinc-500">

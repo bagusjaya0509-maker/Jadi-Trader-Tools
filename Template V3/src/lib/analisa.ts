@@ -25,6 +25,18 @@ export interface RingkasAnalisa {
    *  timeframe yang DIANALISA, bukan timeframe terakhir yang dilihat orang. */
   tf?: string;
   jumlahGambar?: number;
+  /** Hasil sinyal menurut lilin SEJAK diposting — bukan menurut harga
+   *  sekarang. Sinyal yang sempat menyentuh TP lalu harganya balik tetap
+   *  sudah selesai; membandingkan harga saat ini akan menyatakannya masih
+   *  aktif dan orang mengira masih ada peluang yang sudah lewat.
+   *  null = masih berjalan. Kosong/undefined = tidak bisa dinilai (simbol
+   *  di luar Binance Futures) — dan itu ditampilkan sebagai tidak ada
+   *  label, bukan sebagai tebakan. */
+  hasil?: 'sl' | 'tp' | null;
+  waktuHasil?: number | null;
+  /** "Buy Limit" / "Sell Stop" / "Market" — keterangan, bukan angka, jadi
+   *  aman tampil publik pada analisa yang levelnya masih terkunci. */
+  jenisEntry?: string;
   snapshot: { saldo: number; winrate: number; pf: number; jumlah: number; kurva: number[] } | null;
 }
 export interface IsiAnalisa { entry: number; sl: number; tp: number; alasan: string }
