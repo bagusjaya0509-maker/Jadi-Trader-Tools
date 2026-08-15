@@ -4,7 +4,7 @@ import {
   LayoutGrid, BarChart3, Briefcase, Users, Plug, CandlestickChart,
   Wallet, TrendingUp, Wrench, CreditCard, LifeBuoy, BookOpen,
   PanelLeft, Bell, Mail, X, Sparkles, MessageCircle, Send, AtSign,
-  AlertTriangle, Newspaper, ChevronRight, Copy, Radar, UserCircle2, Crown,
+  AlertTriangle, Newspaper, ChevronRight, ChevronDown, Copy, Radar, UserCircle2, Crown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BADAN, WA_LINK } from '@/lib/badan';
@@ -79,7 +79,15 @@ const NAV = [
       { ke: '/personal',    label: 'Personal Area',    Ikon: Wallet },
       { ke: '/chart',       label: 'Chart & Entry', Ikon: CandlestickChart },
       { ke: '/marketplace', label: 'Marketplace',      Ikon: Users },
-      { ke: '/copy',        label: 'Copy Signal',      Ikon: Copy },
+      /* `sub` membuat menu ini bisa dibuka dengan panah: sub-halamannya
+         terlihat dari sidebar tanpa harus mendarat dulu di halamannya.
+         Alamat sub memakai query (?sub=…) yang dibaca halamannya sendiri —
+         tab yang tidak bisa dituju lewat alamat tidak bisa ditaut siapa pun. */
+      { ke: '/copy',        label: 'Copy Signal',      Ikon: Copy,
+        sub: [
+          { ke: '/copy',              label: 'Sinyal' },
+          { ke: '/copy?sub=performa', label: 'Performa Signal' },
+        ] },
       { ke: '/integrasi',   label: 'Integrations',     Ikon: Plug },
     ],
   },
@@ -118,7 +126,15 @@ const NAV = [
     IkonGrup: Crown,
     butir: [
       { ke: '/pemilik',     label: 'Sales Report', Ikon: TrendingUp },
-      { ke: '/maintenance', label: 'Maintenance',     Ikon: Wrench },
+      { ke: '/maintenance', label: 'Maintenance',     Ikon: Wrench,
+        sub: [
+          { ke: '/maintenance',             label: 'Akses & Lisensi' },
+          { ke: '/maintenance?tab=produk',  label: 'Katalog Produk' },
+          { ke: '/maintenance?tab=sistem',  label: 'Kesehatan Sistem' },
+          { ke: '/maintenance?tab=trafik',  label: 'Trafik & Server' },
+          { ke: '/maintenance?tab=pine',    label: 'Mesin Pine' },
+          { ke: '/maintenance?tab=konten',  label: 'Situs & Konten' },
+        ] },
     ],
   },
 ];
@@ -485,9 +501,27 @@ function Bantuan({ ciut }: { ciut: boolean }) {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [laci, setLaci] = useState(false);
   const [ciut, setCiut] = useState(false);
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const { pemilik } = useAuth();
   const judul = JUDUL[pathname] ?? 'Dashboard';
+
+  /* ── Sub-menu yang terbuka di sidebar ─────────────────────────────────
+     Menu ber-`sub` punya panah untuk membuka daftar sub-halamannya.
+     Menu yang halamannya SEDANG dibuka otomatis terbuka — orang yang
+     berada di Performa Signal berhak melihat di mana dirinya tanpa
+     mengklik panah dulu. Pilihan manual disimpan per menu supaya membuka
+     satu tidak menutup yang lain. */
+  const [subBuka, setSubBuka] = useState<Record<string, boolean>>({});
+  const subTerbuka = (ke: string) => subBuka[ke] ?? pathname === ke;
+  /* Aktif-tidaknya SUB dibandingkan dengan alamat penuh (path + query):
+     NavLink bawaan hanya melihat pathname, jadi kedua sub /copy akan
+     sama-sama menyala. */
+  const subAktif = (ke: string) => {
+    const [p, q] = ke.split('?');
+    if (p !== pathname) return false;
+    if (!q) return search === '' || !search.includes('sub=') && !search.includes('tab=');
+    return search.includes(q);
+  };
   /* Ikon halaman diambil dari tabel NAV yang sama dengan sidebar, jadi
      keduanya tidak bisa berbeda. Menyimpan daftar ikon kedua di sini akan
      berselisih dengan sidebar pada penambahan menu berikutnya. */
@@ -578,28 +612,62 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <g.IkonGrup className="size-3.5 text-amber-400/70" strokeWidth={2} />
                 </div>
               )}
-              {g.butir.map(({ ke, label, Ikon }: any) => (
-                <NavLink key={ke} to={ke} onClick={() => setLaci(false)} title={ciut ? label : undefined}
-                  className={({ isActive }) => cn(
-                    'mb-0.5 flex items-center gap-2.5 rounded-md px-2 py-2 text-[13px] transition-colors',
-                    ciut && 'justify-center px-0',
-                    isActive ? 'bg-zinc-800/70 text-zinc-100' : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100'
-                  )}
-                >
-                  {/* Lencana merah di pojok kiri-atas ikon, bukan di ujung
-                      kanan baris: saat sidebar diciutkan yang tersisa hanya
-                      ikonnya, dan lencana yang menempel pada baris akan ikut
-                      hilang justru ketika ia paling dibutuhkan. */}
-                  <span className="relative shrink-0">
-                    <Ikon className="size-4" strokeWidth={1.8} />
-                    {ke === '/maintenance' && lisensiBaru > 0 && (
-                      <span className="absolute -left-1.5 -top-1 flex min-w-[15px] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-semibold leading-[15px] text-white">
-                        {lisensiBaru > 9 ? '9+' : lisensiBaru}
+              {g.butir.map(({ ke, label, Ikon, sub }: any) => (
+                <div key={ke}>
+                  <div className="relative">
+                    <NavLink to={ke} onClick={() => setLaci(false)} title={ciut ? label : undefined}
+                      className={({ isActive }) => cn(
+                        'mb-0.5 flex items-center gap-2.5 rounded-md px-2 py-2 text-[13px] transition-colors',
+                        ciut && 'justify-center px-0',
+                        isActive ? 'bg-zinc-800/70 text-zinc-100' : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100'
+                      )}
+                    >
+                      {/* Lencana merah di pojok kiri-atas ikon, bukan di ujung
+                          kanan baris: saat sidebar diciutkan yang tersisa hanya
+                          ikonnya, dan lencana yang menempel pada baris akan ikut
+                          hilang justru ketika ia paling dibutuhkan. */}
+                      <span className="relative shrink-0">
+                        <Ikon className="size-4" strokeWidth={1.8} />
+                        {ke === '/maintenance' && lisensiBaru > 0 && (
+                          <span className="absolute -left-1.5 -top-1 flex min-w-[15px] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-semibold leading-[15px] text-white">
+                            {lisensiBaru > 9 ? '9+' : lisensiBaru}
+                          </span>
+                        )}
                       </span>
+                      {!ciut && <span>{label}</span>}
+                    </NavLink>
+                    {/* Panah pembuka sub-menu. Tombol TERPISAH dari tautannya:
+                        mengklik nama tetap berpindah halaman, mengklik panah
+                        hanya membuka daftar — dua niat yang berbeda tidak
+                        boleh berebut satu klik. Hilang saat sidebar ciut,
+                        karena sub-teks tidak punya tempat di lebar ikon. */}
+                    {sub && !ciut && (
+                      <button
+                        onClick={() => setSubBuka((s) => ({ ...s, [ke]: !subTerbuka(ke) }))}
+                        aria-label={subTerbuka(ke) ? `Tutup sub-menu ${label}` : `Buka sub-menu ${label}`}
+                        className="absolute right-1.5 top-1/2 -translate-y-1/2 cursor-pointer rounded p-1 text-zinc-600 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
+                      >
+                        <ChevronDown className={cn('size-3.5 transition-transform', subTerbuka(ke) && 'rotate-180')} />
+                      </button>
                     )}
-                  </span>
-                  {!ciut && <span>{label}</span>}
-                </NavLink>
+                  </div>
+                  {sub && !ciut && subTerbuka(ke) && (
+                    <div className="mb-1 ml-[17px] border-l border-zinc-800 pl-3">
+                      {sub.map((s: any) => (
+                        <Link key={s.ke} to={s.ke} onClick={() => setLaci(false)}
+                          className={cn(
+                            'block rounded-md px-2 py-1.5 text-[12px] transition-colors',
+                            subAktif(s.ke)
+                              ? 'bg-zinc-800/50 text-zinc-100'
+                              : 'text-zinc-500 hover:bg-zinc-900 hover:text-zinc-200',
+                          )}
+                        >
+                          {s.label}
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
               ))}
             </div>
           ))}

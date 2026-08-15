@@ -73,6 +73,10 @@ export async function kirimAnalisa(d: {
   judul: string; pasangan: string; arah: 'BUY' | 'SELL'; harga: number;
   ringkas: string; isi: IsiAnalisa; nama: string;
   snapshot: RingkasAnalisa['snapshot'];
+  /** Persetujuan membuka akses pantau jurnal. WAJIB true — server menolak
+   *  tanpa ini. Analis dinilai dari rekam jejak yang bisa diperiksa, dan
+   *  posting sinyal berarti bersedia diperiksa. */
+  izinJurnal: boolean;
 }) {
   return panggil('/api/analisa', { method: 'POST', body: JSON.stringify(d) });
 }

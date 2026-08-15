@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Upload, Trash2, RotateCcw, Plus, FileCode2, Image as ImageIcon, ShieldAlert } from 'lucide-react';
 import { Panel, PanelHead, KartuKpi, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn } from '@/lib/utils';
@@ -184,7 +185,14 @@ const TAB = [
 type IdTab = typeof TAB[number]['id'];
 
 export default function Maintenance() {
-  const [tab, setTab] = useState<IdTab>('akses');
+  /* Tab dibaca dari alamat (?tab=produk) supaya sub-menu sidebar bisa
+     menunjuk langsung ke sini. State lokal tetap jadi sumber saat orang
+     mengklik tab di dalam halaman — alamatnya ikut ditulis agar tautan
+     yang disalin membawa tab yang sedang dilihat. */
+  const [cariTab, setCariTab] = useSearchParams();
+  const tabDariAlamat = TAB.some((t) => t.id === cariTab.get('tab')) ? (cariTab.get('tab') as IdTab) : 'akses';
+  const tab = tabDariAlamat;
+  const setTab = (id: IdTab) => setCariTab(id === 'akses' ? {} : { tab: id }, { replace: true });
   /* Katalog NYATA dari Firestore, bukan salinan data contoh.
      Sebelumnya halaman ini memulai dari `PRODUK` dan menyimpan perubahannya
      di useState saja — jadi menghapus produk terlihat berhasil, tapi tidak

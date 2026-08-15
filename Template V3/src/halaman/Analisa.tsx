@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   Loader2, Lock, Unlock, Trash2, Send, LineChart, X, CheckCircle2,
   TrendingUp, TrendingDown, RefreshCw, Radar, Sparkles, ImagePlus, Images, Flag,
@@ -14,8 +14,8 @@ import { statGabungan, kurvaEkuitas } from '@/lib/hitung';
 import { useTutupLuar } from '@/lib/tutup-luar';
 import {
   daftarAnalisa, kirimAnalisa, hapusAnalisa, bukaIsi, mintaAkses,
-  statusSaya, putuskanAkses, tambahGambar, hapusGambar, kecilkanGambar,
-  type RingkasAnalisa, type IsiAnalisa, type PermintaanMasuk, type GambarAnalisa,
+  statusSaya, putuskanAkses, tambahGambar, hapusGambar, kecilkanGambar, ambilPerforma,
+  type RingkasAnalisa, type IsiAnalisa, type PermintaanMasuk, type GambarAnalisa, type Performa,
 } from '@/lib/analisa';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -242,10 +242,16 @@ function Galeri({ analisaId, galeri, bisaTambah, uidku, penulisku, onBerubah }: 
   );
 }
 
-function KartuAnalisa({ a, status, milikku, onSegarkan }: {
+function KartuAnalisa({ a, status, milikku, pemilik, onSegarkan }: {
   a: RingkasAnalisa;
   status: string | undefined;
   milikku: boolean;
+  /** Pemilik APLIKASI, bukan penulis analisa. Satu-satunya yang boleh
+   *  menghapus — itu moderasi (kewajiban pengawasan PSE), bukan fitur.
+   *  Penulis TIDAK bisa menghapus sinyalnya sendiri: rekam jejak yang bisa
+   *  dihapus bukan rekam jejak. Server menolaknya juga; tombol yang
+   *  disembunyikan di sini cuma sopan santun, penjaganya di backend. */
+  pemilik?: boolean;
   onSegarkan: () => void;
 }) {
   const { pengguna } = useAuth();
@@ -418,10 +424,10 @@ function KartuAnalisa({ a, status, milikku, onSegarkan }: {
                 <Lock className="size-3.5" /> Beli akses · {uang(a.harga)}
               </button>
             )}
-            {milikku && (
-              <button onClick={() => { if (confirm('Hapus analisa ini?')) void hapusAnalisa(a.id).then(onSegarkan); }}
+            {pemilik && (
+              <button onClick={() => { if (confirm('Hapus sinyal ini? (moderasi pemilik — penulisnya tidak bisa)')) void hapusAnalisa(a.id).then(onSegarkan); }}
                 className="ml-auto flex cursor-pointer items-center gap-1 rounded-md border border-zinc-800 px-2 py-1.5 text-[11.5px] text-zinc-500 transition-colors hover:border-red-500/40 hover:text-red-400">
-                <Trash2 className="size-3.5" /> Hapus
+                <Trash2 className="size-3.5" /> Moderasi
               </button>
             )}
           </div>
@@ -490,8 +496,20 @@ type IdSub = typeof SUB[number]['id'];
 const TAMPIL_RAK_SINYAL = false;
 
 export default function Analisa() {
-  const [sub, setSub] = useState<IdSub>('sinyal');
-  const { pengguna } = useAuth();
+  /* Sub-halaman DIBACA DARI ALAMAT (`#/copy?sub=performa`), bukan cuma dari
+     state: sidebar sekarang punya sub-menu yang menunjuk langsung ke sini,
+     dan tab yang tidak bisa dituju lewat alamat tidak bisa ditaut siapa pun. */
+  const [cariSub, setCariSub] = useSearchParams();
+  const sub: IdSub = SUB.some((s) => s.id === cariSub.get('sub')) ? (cariSub.get('sub') as IdSub) : 'sinyal';
+  const setSub = (id: IdSub) => setCariSub(id === 'sinyal' ? {} : { sub: id }, { replace: true });
+  const { pengguna, pemilik } = useAuth();
+
+  /* Kanal yang sedang dibuka — null berarti daftar kanal. Sinyal kini
+     dikelompokkan PER ANALIS seperti papan kanal: satu orang sering
+     memposting banyak sinyal, dan menderetkan semuanya rata membuat rekam
+     jejak per orangnya tidak pernah terlihat utuh. */
+  const [kanalBuka, setKanalBuka] = useState<string | null>(null);
+  const [performa, setPerforma] = useState<Performa | null>(null);
   const { data: riwayat } = useRiwayat();
   const saldoAwal = useSaldoAwal();
   const [daftar, setDaftar] = useState<RingkasAnalisa[]>([]);
@@ -511,9 +529,15 @@ export default function Analisa() {
   const [sl, setSl] = useState('');
   const [tp, setTp] = useState('');
   const [alasan, setAlasan] = useState('');
+  /* Persetujuan pantau jurnal + kesadaran permanen. SENGAJA tidak diingat
+     di localStorage: keduanya harus disetujui sadar pada TIAP posting,
+     karena tiap posting adalah komitmen baru yang tidak bisa ditarik. */
+  const [izinJurnal, setIzinJurnal] = useState(false);
+  const [pahamPermanen, setPahamPermanen] = useState(false);
 
   const segarkan = () => {
     void daftarAnalisa().then(setDaftar).finally(() => setMemuat(false));
+    void ambilPerforma().then(setPerforma).catch(() => { /* panel kanal jalan tanpa performa */ });
     if (pengguna) void statusSaya().then((s) => { setMasuk(s.masuk); setStatusku(s.statusku); }).catch(() => { /* belum login */ });
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -541,10 +565,12 @@ export default function Analisa() {
         isi: { entry: Number(entry) || 0, sl: Number(sl) || 0, tp: Number(tp) || 0, alasan: alasan.trim() },
         nama: pengguna?.displayName || pengguna?.email?.split('@')[0] || 'Analis',
         snapshot,
+        izinJurnal,
       });
-      setKabar('Analisa terposting.');
+      setKabar('Analisa terposting — dan kini permanen. Semoga levelnya bekerja.');
       setFormBuka(false);
       setJudul(''); setRingkas(''); setEntry(''); setSl(''); setTp(''); setAlasan('');
+      setIzinJurnal(false); setPahamPermanen(false);
       segarkan();
     } catch (e) {
       setKabar(e instanceof Error ? e.message : 'Gagal memposting');
@@ -721,14 +747,48 @@ export default function Analisa() {
                   className="w-full resize-y rounded-md border border-zinc-800 bg-zinc-900/60 p-2.5 text-[12.5px] text-zinc-200 outline-none focus-visible:border-zinc-600" />
               </div>
             </div>
+            {/* ── Dua persetujuan yang menjadikan seseorang analis ─────────
+                Keduanya disetujui SADAR pada tiap posting, bukan diingat:
+                tiap sinyal adalah komitmen baru yang tidak bisa ditarik.
+                Server menolak tanpa izin jurnal — centangnya bukan hiasan. */}
+            <div className="mt-3 space-y-2">
+              <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-zinc-800 bg-zinc-950/60 px-3.5 py-3">
+                <input type="checkbox" checked={izinJurnal} onChange={(e) => setIzinJurnal(e.target.checked)}
+                  className="mt-0.5 size-3.5 shrink-0 cursor-pointer accent-emerald-500" />
+                <span className="text-[12px] leading-relaxed text-zinc-400">
+                  Saya <span className="text-zinc-200">membuka akses pantau jurnal saya</span> untuk
+                  pengguna lain. Rekam jejak jurnalku saat ini ({snapshot.jumlah} transaksi,
+                  winrate {persen(snapshot.winrate)}, PF {snapshot.pf || '—'}) terlampir dan bisa
+                  diperiksa siapa pun lewat tombol "Lihat portofolio" — pembeli berhak menilai
+                  dari data, bukan dari klaim.
+                </span>
+              </label>
+              <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-zinc-800 bg-zinc-950/60 px-3.5 py-3">
+                <input type="checkbox" checked={pahamPermanen} onChange={(e) => setPahamPermanen(e.target.checked)}
+                  className="mt-0.5 size-3.5 shrink-0 cursor-pointer accent-amber-500" />
+                <span className="text-[12px] leading-relaxed text-zinc-400">
+                  Saya paham sinyal ini <span className="text-amber-300/90">tidak bisa dihapus</span> setelah
+                  diposting, dan hasilnya — kena TP maupun SL — akan tercatat permanen di performa saya.
+                  Pastikan analisamu matang sebelum menekan Posting.
+                </span>
+              </label>
+            </div>
+
+            {snapshot.jumlah === 0 && (
+              <p className="mt-2 text-[12px] leading-relaxed text-amber-300/90">
+                Jurnalmu masih kosong — server akan menolak posting. Analis wajib punya riwayat
+                trading yang bisa diperiksa; isi jurnalmu dulu.
+              </p>
+            )}
+
             <div className="mt-3 flex items-center gap-3">
-              <button onClick={() => void posting()} disabled={sibuk || !judul.trim() || !entry}
-                className="flex cursor-pointer items-center gap-2 rounded-md bg-zinc-100 px-3.5 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:opacity-50">
-                {sibuk ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />} Posting
+              <button onClick={() => void posting()}
+                disabled={sibuk || !judul.trim() || !entry || !izinJurnal || !pahamPermanen || snapshot.jumlah === 0}
+                title={!izinJurnal || !pahamPermanen ? 'Centang kedua persetujuan dulu'
+                  : snapshot.jumlah === 0 ? 'Jurnalmu masih kosong' : undefined}
+                className="flex cursor-pointer items-center gap-2 rounded-md bg-zinc-100 px-3.5 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50">
+                {sibuk ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />} Posting — permanen
               </button>
-              <span className="text-[11.5px] text-zinc-600">
-                Rekam jejak jurnalmu ({snapshot.jumlah} transaksi, winrate {persen(snapshot.winrate)}) ikut terlampir otomatis.
-              </span>
             </div>
           </div>
         )}
@@ -738,7 +798,12 @@ export default function Analisa() {
         )}
       </Panel>
 
-      {/* Daftar */}
+      {/* ── Kanal per analis ────────────────────────────────────────────
+         Satu analis sering memposting banyak sinyal. Dideretkan rata,
+         rekam jejak per ORANG tidak pernah terlihat utuh — dan justru
+         orangnya yang sedang dinilai pembeli, bukan sinyal satuannya.
+         Maka daftar utamanya kartu kanal: satu kartu per analis dengan
+         performanya, dan sinyal-sinyalnya terbuka SETELAH kanalnya dipilih. */}
       {memuat ? (
         <div className="flex items-center justify-center gap-2 py-10 text-[13px] text-zinc-500">
           <Loader2 className="size-4 animate-spin" /> Memuat analisa…
@@ -747,20 +812,89 @@ export default function Analisa() {
         <Panel className="px-5 py-10 text-center text-[13px] text-zinc-500">
           Belum ada analisa. Jadilah yang pertama memposting.
         </Panel>
-      ) : (
-        /* Empat berjejer dengan LEBAR TETAP, alasan yang sama dengan rak
-           di atas: kartu yang lebarnya ikut jendela membuat tata letaknya
-           berubah tiap kali jendela digeser. Yang menggulir cuma barisnya,
-           halamannya tidak ikut melebar. */
-        <div className="flex gap-4 overflow-x-auto pb-1">
-          {daftar.map((a) => (
-            <div key={a.id} className="w-[320px] shrink-0">
-              <KartuAnalisa a={a} status={statusku[a.id]}
-                milikku={a.uid === pengguna?.uid} onSegarkan={segarkan} />
+      ) : (() => {
+        /* Kelompokkan per analis, urut dari sinyal terbaru. Performa
+           (winrate, estimasi) dijahit dari endpoint performa bila ada —
+           analis yang belum punya sinyal selesai tampil tanpa angka,
+           bukan dengan nol yang terbaca seperti rekam jejak buruk. */
+        const kanal = new Map<string, RingkasAnalisa[]>();
+        for (const a of daftar) {
+          const k = kanal.get(a.uid) ?? [];
+          k.push(a); kanal.set(a.uid, k);
+        }
+        const kanalUrut = [...kanal.entries()].sort((x, y) => y[1][0].dibuat - x[1][0].dibuat);
+        const perfDari = (uid: string) => performa?.analis.find((p) => p.uid === uid) ?? null;
+        const terpilih = kanalBuka ? kanal.get(kanalBuka) ?? [] : [];
+        const infoTerpilih = kanalBuka ? kanal.get(kanalBuka)?.[0] : undefined;
+
+        return kanalBuka === null ? (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {kanalUrut.map(([uid, sinyal]) => {
+              const a0 = sinyal[0];
+              const p = perfDari(uid);
+              const selesai = sinyal.filter((s) => s.hasil === 'tp' || s.hasil === 'sl').length;
+              return (
+                <button key={uid} onClick={() => setKanalBuka(uid)}
+                  className="relative cursor-pointer rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 text-left transition-colors hover:border-zinc-600">
+                  {a0.agen && <LencanaAgen />}
+                  <div className="flex items-center gap-2.5">
+                    <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-zinc-700 to-zinc-900 text-[14px] font-semibold text-zinc-100">
+                      {(a0.nama || '?').trim()[0]?.toUpperCase() ?? '?'}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-[13.5px] font-medium text-zinc-100">{a0.nama}</span>
+                      <span className="block text-[11px] text-zinc-600">
+                        {sinyal.length} sinyal · {selesai} selesai
+                        {uid === pengguna?.uid && ' · kanalmu'}
+                      </span>
+                    </span>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <div className="rounded-lg border border-zinc-800/60 p-2.5">
+                      <div className="text-[10.5px] text-zinc-600">Winrate</div>
+                      <div className={cn('angka text-[15px] font-semibold',
+                        p ? (p.winrate >= 50 ? 'text-emerald-400' : 'text-zinc-100') : 'text-zinc-600')}>
+                        {p ? persen(p.winrate) : '—'}
+                      </div>
+                    </div>
+                    <div className="rounded-lg border border-zinc-800/60 p-2.5">
+                      <div className="text-[10.5px] text-zinc-600">Estimasi $1.000</div>
+                      <div className={cn('angka text-[15px] font-semibold',
+                        p ? (p.hasilDolar >= 0 ? 'text-emerald-400' : 'text-red-400') : 'text-zinc-600')}>
+                        {p ? uang(p.hasilDolar, true) : '—'}
+                      </div>
+                    </div>
+                  </div>
+                  {!p && (
+                    <p className="mt-2 text-[10.5px] leading-relaxed text-zinc-600">
+                      Belum ada sinyal yang selesai — angka muncul setelah harga menyentuh SL/TP.
+                    </p>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <>
+            <button onClick={() => setKanalBuka(null)}
+              className="mb-3 flex cursor-pointer items-center gap-1.5 text-[12.5px] text-zinc-500 transition-colors hover:text-zinc-200">
+              ← Semua kanal
+            </button>
+            <div className="mb-3 flex items-center gap-2 text-[13.5px] text-zinc-200">
+              <span className="font-medium">{infoTerpilih?.nama}</span>
+              <span className="text-zinc-600">· {terpilih.length} sinyal</span>
             </div>
-          ))}
-        </div>
-      )}
+            <div className="flex gap-4 overflow-x-auto pb-1">
+              {terpilih.map((a) => (
+                <div key={a.id} className="w-[320px] shrink-0">
+                  <KartuAnalisa a={a} status={statusku[a.id]}
+                    milikku={a.uid === pengguna?.uid} pemilik={pemilik} onSegarkan={segarkan} />
+                </div>
+              ))}
+            </div>
+          </>
+        );
+      })()}
       </div>
     </div>
   );
