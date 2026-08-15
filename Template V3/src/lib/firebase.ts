@@ -19,7 +19,25 @@ import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 
 const konfigurasi = {
   apiKey: 'AIzaSyB4cWVI-k3q16TmRCbM_lbJwgtjxIs_Weo',
-  authDomain: 'jadi-trader-tools.firebaseapp.com',
+  /* DOMAIN SENDIRI, bukan jadi-trader-tools.firebaseapp.com — dan ini
+     perbaikan login Safari, bukan soal merek.
+     ────────────────────────────────────────────────────────────────────
+     Alur login Google bolak-balik lewat halaman pembantu di `authDomain`.
+     Selama authDomain-nya firebaseapp.com, halaman itu pihak KETIGA bagi
+     jaditrader.co.id — dan Safari (ITP) memblokir storage pihak ketiga.
+     Akibat nyatanya sudah terjadi: pengguna MacBook memilih akun Google,
+     berhasil, lalu terlempar balik ke halaman login karena hasil loginnya
+     tersangkut di storage yang diblokir. Tanpa satu pun pesan galat.
+
+     Dengan authDomain = domain sendiri, seluruh alur jadi SATU origin dan
+     tidak ada storage pihak ketiga yang perlu diblokir. Syaratnya dua, dan
+     keduanya sudah dipasang:
+     1. Caddy meneruskan `/__/auth/*` ke jadi-trader-tools.firebaseapp.com
+        (halaman pembantunya tetap milik Firebase, cuma disajikan dari sini);
+     2. `https://jaditrader.co.id/__/auth/handler` terdaftar sebagai
+        redirect URI di OAuth client Google Cloud.
+     Jangan kembalikan ke firebaseapp.com tanpa mencabut keduanya. */
+  authDomain: 'jaditrader.co.id',
   projectId: 'jadi-trader-tools',
   storageBucket: 'jadi-trader-tools.firebasestorage.app',
   messagingSenderId: '171244479105',

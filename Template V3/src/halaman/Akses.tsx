@@ -51,7 +51,7 @@ function KartuKuota({ judul, pakai, total, sisa, warna, catatan }: {
 }
 
 export default function Akses() {
-  const { pengguna, memuat: memuatAuth, masuk, keluar, langganan, pemilik } = useAuth();
+  const { pengguna, memuat: memuatAuth, masuk, keluar, langganan, pemilik, galat } = useAuth();
   const { kuota, memuat: memuatKuota, muatUlang } = useKuota();
   const [params] = useSearchParams();
   const tujuan = params.get('dari') || '/dashboard';
@@ -296,6 +296,14 @@ export default function Akses() {
                 Discord
               </button>
             </div>
+            {/* Galat login WAJIB tampak di sini. Halaman ini sempat menelan
+                semua kegagalan masuk: `masuk()` menyimpan pesannya ke context,
+                tapi tidak ada satu baris pun yang menampilkannya — orang yang
+                loginnya gagal cuma melihat tombol yang seolah tidak bereaksi,
+                lalu menyimpulkan dirinya ditolak. */}
+            {galat && (
+              <p className="mt-3 text-[11.5px] leading-relaxed text-red-400">{galat}</p>
+            )}
           </div>
         ) : terakhir?.status === 'baru' ? (
           /* ── Menunggu tinjauan ───────────────────────────────────── */
