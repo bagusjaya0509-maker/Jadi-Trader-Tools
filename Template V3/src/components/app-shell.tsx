@@ -4,12 +4,13 @@ import {
   LayoutGrid, BarChart3, Briefcase, Users, Plug, CandlestickChart,
   Wallet, TrendingUp, Wrench, CreditCard, LifeBuoy, BookOpen,
   PanelLeft, Bell, Mail, X, Sparkles, MessageCircle, Send, AtSign,
-  AlertTriangle, Newspaper, ChevronRight, Copy, Radar,
+  AlertTriangle, Newspaper, ChevronRight, Copy, Radar, UserCircle2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BADAN, WA_LINK } from '@/lib/badan';
 import { useAuth } from '@/lib/auth';
 import { useKabarAgen, umurKabar } from '@/lib/kabar';
+import { useKabarPribadi } from '@/lib/kabar-pribadi';
 import { MenuPengguna, PitaLangganan } from '@/components/gerbang';
 import { NEWS, PESAN, CHANGELOG } from '@/data/notifikasi';
 import { LogoJT } from '@/components/logo-jt';
@@ -170,13 +171,36 @@ function Lonceng() {
      Postingan sinyal baru di ruang komunitas adalah kejadian pasar — ia
      sekamar dengan kalender berita, bukan dengan kabar akun. */
   const agen = useKabarAgen();
-  const totalBelum = belum + agen.belum;
+
+  /* Kabar PRIBADI — kejadian yang menimpa akun ini, bukan pasar. Ditaruh
+     paling atas dan sebagai kelompok tersendiri karena bobotnya berbeda:
+     "aksesmu sudah aktif" adalah sesuatu yang harus dilakukan orangnya
+     sekarang, sementara kalender berita cuma perlu diketahui.
+
+     Yang belum dibaca dihitung dari waktu buka lonceng terakhir, disimpan
+     terpisah dari penanda NEWS supaya membuka lonceng untuk melihat berita
+     tidak diam-diam menghapus tanda pada kabar akun yang belum ditindak. */
+  const { pengguna } = useAuth();
+  const pribadi = useKabarPribadi(pengguna?.uid);
+  const [pribadiDibaca, setPribadiDibaca] = useState<number>(() => {
+    try { return Number(localStorage.getItem('jt.kabarPribadiDibaca')) || 0; } catch { return 0; }
+  });
+  const pribadiBelum = pribadi.filter((k) => k.waktu > pribadiDibaca).length;
+  const tandaiPribadi = () => {
+    const paling = pribadi.reduce((m, k) => Math.max(m, k.waktu), 0);
+    if (paling > pribadiDibaca) {
+      setPribadiDibaca(paling);
+      try { localStorage.setItem('jt.kabarPribadiDibaca', String(paling)); } catch { /* privat */ }
+    }
+  };
+
+  const totalBelum = belum + agen.belum + pribadiBelum;
 
   return (
     <div className="relative" ref={ref}>
       <button
-        onClick={() => { setBuka((v) => !v); tandai(); agen.tandai(); }}
-        aria-label="Berita pasar & kabar agen"
+        onClick={() => { setBuka((v) => !v); tandai(); agen.tandai(); tandaiPribadi(); }}
+        aria-label="Kabar akun, berita pasar & kabar agen"
         className="relative cursor-pointer text-zinc-400 transition-colors hover:text-zinc-100"
       >
         <Bell className="size-[18px]" strokeWidth={1.8} />
@@ -195,6 +219,36 @@ function Lonceng() {
             <span className="ml-auto text-[11px] text-zinc-600">{totalBelum} baru</span>
           </div>
           <div className="max-h-[380px] overflow-y-auto">
+            {/* ── Kabar akun: kejadian NYATA milik orang ini ──
+                Paling atas karena paling perlu ditindak. Kosong = tidak ada
+                yang terjadi; sengaja TIDAK diisi contoh supaya loncengnya
+                tetap bisa dipercaya saat benar-benar berbunyi. */}
+            {pribadi.length > 0 && (
+              <div className="border-b border-zinc-800/70 bg-zinc-900/30">
+                <div className="flex items-center gap-1.5 px-4 pb-1 pt-2.5">
+                  <UserCircle2 className="size-3 text-amber-400" strokeWidth={2} />
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+                    Akun kamu
+                  </span>
+                </div>
+                {pribadi.slice(0, 6).map((k) => (
+                  <div key={k.id} className="border-b border-zinc-800/40 px-4 py-2.5 last:border-0">
+                    <div className="flex items-center gap-2">
+                      <span className={cn('rounded px-1.5 py-0.5 text-[9.5px] font-medium uppercase',
+                        k.jenis === 'akses' ? 'bg-emerald-500/15 text-emerald-400'
+                          : k.jenis === 'peringatan' ? 'bg-amber-500/15 text-amber-400'
+                          : 'bg-zinc-700/30 text-zinc-400')}>
+                        {k.jenis === 'akses' ? 'akses' : k.jenis === 'peringatan' ? 'perhatian' : 'sesi'}
+                      </span>
+                      <span className="ml-auto text-[11px] text-zinc-600">{umurKabar(k.waktu)}</span>
+                    </div>
+                    <div className="mt-1.5 text-[12.5px] leading-snug text-zinc-200">{k.judul}</div>
+                    {k.detail && <div className="mt-0.5 text-[11.5px] leading-snug text-zinc-500">{k.detail}</div>}
+                  </div>
+                ))}
+              </div>
+            )}
+
             {/* ── Kabar agen Pemburu Sinyal ── */}
             {agen.kabar.length > 0 && (
               <div className="border-b border-zinc-800/70 bg-zinc-900/30">

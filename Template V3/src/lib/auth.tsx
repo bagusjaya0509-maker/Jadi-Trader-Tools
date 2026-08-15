@@ -4,6 +4,7 @@ import {
   type User,
 } from 'firebase/auth';
 import { app, auth, penyediaGoogle, UID_PEMILIK } from '@/lib/firebase';
+import { catatKabarPribadi } from '@/lib/kabar-pribadi';
 
 /* ════════════════════════════════════════════════════════════════════════
    AUTENTIKASI + STATUS LANGGANAN
@@ -134,21 +135,53 @@ function keTanggal(v: any, Timestamp: any): Date | null {
    ikut terunduh oleh setiap pengunjung halaman depan — termasuk yang cuma
    melihat sekilas lalu pergi. Jedanya jatuh saat login, ketika orangnya
    memang sedang menunggu sesuatu. */
-async function bacaAtauBuatLangganan(uid: string): Promise<Langganan> {
-  const { getFirestore, doc, getDoc, setDoc, serverTimestamp, Timestamp } =
+/** Pasang PEMANTAU hidup pada `langganan/{uid}`.
+ *
+ *  Dulu ini `getDoc` sekali saat login, dan itu punya akibat yang baru
+ *  terasa di pemakaian nyata: pemilik menekan "Setujui", backend menulis
+ *  `bayarSampai` ke Firestore — tapi tab pengguna yang sedang terbuka tidak
+ *  pernah diberi tahu. Orangnya tetap melihat layar terkunci sampai ia
+ *  menekan muat ulang, dan tidak ada yang memberitahunya bahwa ia harus.
+ *  Yang paling merugikan: sebagian menyerah sebelum sempat me-refresh.
+ *
+ *  `onSnapshot` menutup celah itu — begitu dokumennya berubah di server,
+ *  layarnya ikut berubah tanpa disentuh.
+ *
+ *  Memulangkan fungsi pembatal; pemanggil WAJIB memanggilnya saat pengguna
+ *  berganti atau keluar. Pemantau yang tidak dicabut akan terus menulis ke
+ *  state komponen yang sudah tidak dipakai, dan pada pergantian akun ia
+ *  menimpa data akun baru dengan data akun lama. */
+async function pantauLangganan(
+  uid: string,
+  saatBerubah: (l: Langganan) => void,
+): Promise<() => void> {
+  const { getFirestore, doc, getDoc, setDoc, serverTimestamp, Timestamp, onSnapshot } =
     await import('firebase/firestore');
   const db = getFirestore(app);
   const ref = doc(db, 'langganan', uid);
-  let cuplikan = await getDoc(ref);
 
+  const cuplikan = await getDoc(ref);
   if (!cuplikan.exists()) {
     /* hasOnly(['mulai']) di aturan — jangan tambahkan field lain di sini,
        create-nya akan ditolak seluruhnya. */
     await setDoc(ref, { mulai: serverTimestamp() });
-    cuplikan = await getDoc(ref);
   }
 
-  const data = cuplikan.data() ?? {};
+  return onSnapshot(
+    ref,
+    (snap) => saatBerubah(hitungLangganan(snap.data() ?? {}, Timestamp)),
+    /* Pemantau gagal (jaringan putus, aturan berubah) TIDAK mengunci siapa
+       pun: status terakhir yang diketahui dibiarkan apa adanya. Menjatuhkan
+       orang ke 'habis' karena sinyal hilang sedetik adalah cara tercepat
+       membuat aplikasi terasa tidak bisa dipercaya. */
+    (e) => console.warn('Pemantau langganan berhenti:', e?.message ?? e),
+  );
+}
+
+/** Terjemahkan isi dokumen jadi status langganan. Murni — tidak menyentuh
+ *  jaringan — supaya pembacaan pertama dan tiap pembaruan onSnapshot
+ *  memakai aturan yang sama persis dan tidak mungkin berselisih. */
+function hitungLangganan(data: any, Timestamp: any): Langganan {
   const bayarSampai = keTanggal(data.bayarSampai, Timestamp);
   const skrg = Date.now();
 
@@ -180,7 +213,21 @@ export function PenyediaAuth({ children }: { children: React.ReactNode }) {
   const [galat, setGalat] = useState<string | null>(null);
 
   useEffect(() => {
-    return onAuthStateChanged(auth, async (u) => {
+    /* Pembatal pemantau Firestore yang sedang aktif. Disimpan di luar
+       callback karena onAuthStateChanged bisa berbunyi lagi (ganti akun,
+       token kedaluwarsa) sebelum pemantau lama sempat dicabut. */
+    let cabutPantau: (() => void) | null = null;
+    /* Penanda giliran. Pemasangan pemantau itu async; kalau pengguna
+       berganti di tengah jalan, pemantau yang terlambat datang harus
+       membatalkan dirinya sendiri alih-alih memasang diri untuk akun yang
+       sudah bukan pemilik layar. */
+    let giliran = 0;
+
+    const berhenti = onAuthStateChanged(auth, async (u) => {
+      const punyaGiliran = ++giliran;
+      cabutPantau?.();
+      cabutPantau = null;
+
       setPengguna(u);
       if (u) {
         /* Catat kehadiran ke backend supaya halaman Traffic & Sales punya
@@ -189,17 +236,61 @@ export function PenyediaAuth({ children }: { children: React.ReactNode }) {
            lain. Sengaja tidak di-await: daftar klien tidak boleh menahan
            tampilnya aplikasi. */
         void import('@/lib/admin').then((m) => m.catatKlienHadir());
+
+        /* Kabar "berhasil masuk" — dikunci pada `lastSignInTime`, BUKAN pada
+           saat callback ini berbunyi. onAuthStateChanged juga berbunyi di
+           tiap muat ulang halaman untuk sesi yang sudah ada; memakai
+           Date.now() akan mencatat "berhasil masuk" setiap kali orangnya
+           menekan F5, dan lonceng yang berisi dua puluh kabar palsu lebih
+           buruk daripada lonceng kosong. */
+        const kapanMasuk = Date.parse(u.metadata?.lastSignInTime ?? '') || 0;
+        if (kapanMasuk) {
+          catatKabarPribadi(u.uid, {
+            id: `masuk:${kapanMasuk}`,
+            jenis: 'masuk',
+            judul: 'Berhasil masuk',
+            detail: u.email ? `Sebagai ${u.email}` : 'Sesi kamu aktif di perangkat ini.',
+            waktu: kapanMasuk,
+          });
+        }
+
+        /* Status sebelumnya, untuk mengenali PERPINDAHAN ke aktif. Tanpa
+           pembanding ini, kabar "akses disetujui" akan terbit tiap kali
+           onSnapshot berbunyi pada akun yang memang sudah aktif. */
+        let statusSebelum: StatusLangganan | null = null;
+
         try {
-          setLangganan(await bacaAtauBuatLangganan(u.uid));
+          const cabut = await pantauLangganan(u.uid, (l) => {
+            if (punyaGiliran !== giliran) return;
+            /* Inilah pasangan dari pemantau hidup di atas: begitu pemilik
+               menekan Setujui, statusnya berubah tanpa muat ulang DAN
+               loncengnya berbunyi menjelaskan kenapa layarnya berubah. */
+            if (statusSebelum && statusSebelum !== 'aktif' && l.status === 'aktif') {
+              catatKabarPribadi(u.uid, {
+                id: `akses:${l.berakhir ? +l.berakhir : Date.now()}`,
+                jenis: 'akses',
+                judul: 'Akses kamu sudah aktif',
+                detail: l.sisaHari != null
+                  ? `Permintaanmu disetujui. Berlaku ${l.sisaHari} hari lagi.`
+                  : 'Permintaanmu disetujui.',
+              });
+            }
+            statusSebelum = l.status;
+            setLangganan(l);
+          });
+          if (punyaGiliran === giliran) cabutPantau = cabut;
+          else cabut();
         } catch (e) {
           console.warn('Status langganan tidak terbaca:', e);
-          setLangganan(KosongLangganan);
+          if (punyaGiliran === giliran) setLangganan(KosongLangganan);
         }
       } else {
         setLangganan(KosongLangganan);
       }
-      setMemuat(false);
+      if (punyaGiliran === giliran) setMemuat(false);
     });
+
+    return () => { cabutPantau?.(); berhenti(); };
   }, []);
 
   const nilai = useMemo<Isi>(() => ({
