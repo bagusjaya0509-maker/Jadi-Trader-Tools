@@ -96,7 +96,7 @@ const NAV = [
     ],
   },
   {
-    /* Owner Page = alat PEMILIK, disembunyikan dari yang lain.
+    /* Business = alat PEMILIK, disembunyikan dari yang lain.
        ──────────────────────────────────────────────────────────────────
        Dulu grup ini bernama "Administration" dan menampung Billing juga —
        dua hal yang sama sekali berbeda: Sales Report melihat penjualan
@@ -104,9 +104,16 @@ const NAV = [
        untuk keduanya membuat batas itu kabur persis di tempat yang paling
        tidak boleh kabur.
 
+       Sempat bernama "Owner Page", lalu diganti: "Page" itu tunggal
+       padahal grupnya memuat dua halaman, dan tidak ada nama grup lain
+       yang memakai kata itu — Trading, Workspace, Administration semuanya
+       kategori. "Business" sejajar dengan mereka dan jujur soal isinya
+       (penjualan + pemeliharaan produk = urusan usaha), sekaligus tetap
+       terbaca wajar kalau suatu saat ada admin selain pemiliknya.
+
        Mahkotanya sama dengan penanda premium di Marketplace — satu
        lambang, satu arti, di seluruh aplikasi. */
-    grup: 'Owner Page',
+    grup: 'Business',
     hanyaPemilik: true,
     IkonGrup: Crown,
     butir: [
@@ -559,8 +566,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <div key={g.grup} className="mb-5">
               {!ciut && (
                 <div className="flex items-center gap-1.5 px-2 pb-2">
-                  {g.IkonGrup && <g.IkonGrup className="size-3.5 shrink-0 text-amber-400" strokeWidth={2} />}
                   <span className="text-[11px] font-medium text-zinc-500">{g.grup}</span>
+                  {g.IkonGrup && <g.IkonGrup className="size-3.5 shrink-0 text-amber-400" strokeWidth={2} />}
                 </div>
               )}
               {/* Sidebar CIUT tinggal ikon, jadi judul grupnya hilang — dan
