@@ -122,12 +122,17 @@ export function useKoneksi() {
    tanpa menyentuh kode sama sekali:
      VITE_BACKEND=https://namadomain.com npm run build
 
-   Nilai cadangannya tetap sslip.io supaya build tanpa env tetap bekerja
-   persis seperti sekarang.
+   Nilai cadangannya jadi jaditrader.co.id sejak 15 Agu 2026, hari domainnya
+   tayang. Sempat dipertimbangkan tetap sslip.io karena alamat itu diturunkan
+   dari IP dan tidak pernah kedaluwarsa, sementara domain harus diperpanjang
+   tiap tahun — tapi ketahanan itu semu: kalau domainnya mati, situsnya sendiri
+   ikut mati, jadi cadangan yang masih hidup tidak menyelamatkan siapa pun.
+   Yang nyata adalah biayanya kalau dibiarkan: satu build tanpa env diam-diam
+   memanggil alamat lama, dan tidak ada galat yang menunjuk ke sana.
    ════════════════════════════════════════════════════════════════════════ */
 export const PROXY_BAWAAN =
   (import.meta.env.VITE_BACKEND as string | undefined)?.replace(/\/+$/, '') ||
-  'https://103-253-145-38.sslip.io';
+  'https://jaditrader.co.id';
 
 /** Alamat backend yang BERLAKU: punya pengguna kalau ia mengisinya sendiri
  *  di Integrations, kalau tidak ya bawaan. */
