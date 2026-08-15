@@ -39,13 +39,13 @@ function PanelLisensiAktif() {
   const [sibuk, setSibuk] = useState('');
   const [pesan, setPesan] = useState('');
 
-  /* Urut TERLAMA → TERBARU, arah yang sama dengan panel Permintaan di
-     sebelahnya. Backend memang sudah mengirimnya begitu (baris didorong ke
-     belakang tiap kali disetujui), tapi itu kebetulan cara ia menyimpan,
-     bukan janji — dan panel ini berdampingan dengan panel lain yang nomor
-     barisnya dipadankan dengan mata. Urutan yang dipakai untuk memadankan
-     harus ditulis, bukan diwarisi. */
-  const urut = [...data].sort((a, b) => a.tgl - b.tgl);
+  /* Urut TERBARU → TERLAMA, arah yang sama dengan panel Permintaan di
+     sebelahnya. Backend mengirimnya justru terbalik — baris didorong ke
+     belakang tiap kali disetujui, jadi yang paling lama ada di depan — dan
+     panel ini berdampingan dengan panel lain yang nomor barisnya dipadankan
+     dengan mata. Urutan yang dipakai untuk memadankan harus ditulis, bukan
+     diwarisi dari cara backend kebetulan menyimpan. */
+  const urut = [...data].sort((a, b) => b.tgl - a.tgl);
 
   async function cabut(sidik: string) {
     if (!confirm(`Cabut lisensi ${sidik}?\n\nPembelinya tidak bisa lagi membuka sumber produk dengan kode ini.`)) return;

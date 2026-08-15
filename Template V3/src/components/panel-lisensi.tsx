@@ -39,18 +39,16 @@ export function PanelLisensi() {
 
   const baru = data.filter((x) => x.status === 'baru');
 
-  /* URUTAN TERLAMA → TERBARU, sama arah dengan panel Lisensi Aktif di
-     sebelahnya. Backend mengirim permintaan terbaru dulu sementara daftar
-     lisensi aktif urut maju, jadi dua panel bersebelahan itu berjalan
-     berlawanan arah dan nomor barisnya tidak pernah bisa dipadankan.
-     Diurutkan di sini, bukan di server: dua rute itu dipakai layar lain
-     juga, dan urutan adalah keputusan tampilan. */
-  const urut = [...data].sort((a, b) => a.waktu - b.waktu);
+  /* URUTAN TERBARU → TERLAMA, sama arah dengan panel Lisensi Aktif di
+     sebelahnya. Backend mengirim keduanya dengan arah berbeda — permintaan
+     mundur, lisensi aktif maju — jadi dua panel bersebelahan itu berjalan
+     berlawanan dan nomor barisnya tidak pernah bisa dipadankan. Diurutkan
+     di sini, bukan di server: dua rute itu dipakai layar lain juga, dan
+     urutan adalah keputusan tampilan.
 
-  /* Permintaan BARU ada di bawah setelah diurutkan maju — jadi lipatan 10
-     baris akan menyembunyikan justru yang perlu ditindak. Selama masih ada
-     yang baru, daftarnya dibuka penuh. */
-  const batasAwal = baru.length ? urut.length : 10;
+     Terbaru di atas: ini panel kerja. Yang baru masuk hari ini yang perlu
+     ditindak, dan ia harus terlihat tanpa menggulir maupun membuka lipatan. */
+  const urut = [...data].sort((a, b) => b.waktu - a.waktu);
 
   async function putuskan(id: string, tindakan: 'setujui' | 'tolak') {
     if (tindakan === 'tolak' && !confirm('Tolak permintaan ini?')) return;
@@ -115,7 +113,6 @@ export function PanelLisensi() {
 
         <DaftarLipat
           data={urut}
-          batasAwal={batasAwal}
           kosong={null}
           render={(x, no) => (
             <div key={x.id} className={cn('rounded-lg border p-3',
