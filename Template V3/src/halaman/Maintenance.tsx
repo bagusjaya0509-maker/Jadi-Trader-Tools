@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Upload, Trash2, RotateCcw, Plus, FileCode2, Image as ImageIcon, ShieldAlert } from 'lucide-react';
-import { Panel, PanelHead, KartuKpi, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
+import { Panel, PanelHead, KartuKpi } from '@/components/efferd-ui';
 import { cn } from '@/lib/utils';
 import { useProduk, simpanKatalogProduk } from '@/lib/data';
 import { unggahGambar, keDataUrl, useLisensi, cabutLisensi } from '@/lib/admin';
@@ -12,6 +12,7 @@ import { PanelSetelanAkses } from '@/components/panel-setelan-akses';
 import { PanelTrafikSistem } from '@/components/panel-trafik-sistem';
 import { PanelKesehatan } from '@/components/panel-kesehatan';
 import { PanelLangganan } from '@/components/panel-langganan';
+import { DaftarLipat, NomorBaris } from '@/components/daftar-lipat';
 import { PanelCelahPine } from '@/components/panel-celah-pine';
 import { terbitkanTeksBeranda } from '@/lib/data';
 import { JUDUL_BERANDA, SUB_BERANDA, bacaTeksLokal, simpanTeksLokal } from '@/lib/teks-beranda';
@@ -51,7 +52,7 @@ function PanelLisensiAktif() {
   }
 
   return (
-    <Panel className="mt-4">
+    <Panel>
       <PanelHead
         judul="Lisensi Aktif"
         sub={`Kode yang sudah diaktifkan untuk pembeli · ${data.length} aktif.`}
@@ -70,27 +71,35 @@ function PanelLisensiAktif() {
             Belum ada lisensi aktif. Menyetujui permintaan di panel atas akan menambahkannya ke sini.
           </p>
         ) : (
-          <TabelBungkus>
-            <Tabel>
-              <thead><tr><Th>Sidik kode</Th><Th>Produk</Th><Th>Catatan</Th><Th>Aktif sejak</Th><Th /></tr></thead>
-              <tbody>
-                {data.map((l) => (
-                  <Tr key={l.sidik}>
-                    <Td className="angka text-zinc-300">{l.sidik}</Td>
-                    <Td className="text-zinc-400">{l.produk || '—'}</Td>
-                    <Td className="text-zinc-400">{l.catatan || '—'}</Td>
-                    <Td className="whitespace-nowrap text-zinc-500">{l.tgl ? tanggalPendek(l.tgl) : '—'}</Td>
-                    <Td className="text-right">
-                      <button onClick={() => void cabut(l.sidik)} disabled={sibuk === l.sidik}
-                        className="cursor-pointer rounded border border-zinc-800 px-2 py-0.5 text-[11px] text-zinc-400 transition-colors hover:border-red-500/40 hover:text-red-400 disabled:opacity-50">
-                        {sibuk === l.sidik ? 'Mencabut…' : 'Cabut'}
-                      </button>
-                    </Td>
-                  </Tr>
-                ))}
-              </tbody>
-            </Tabel>
-          </TabelBungkus>
+          /* Kartu, bukan tabel. Panel ini kini seleher dengan panel
+             permintaan di sebelahnya, dan tabel lima kolom di lebar
+             setengah layar akan dipotong oleh overflow-x-auto milik
+             TabelBungkus — persis keluhan "panelnya terpotong". */
+          <DaftarLipat
+            data={data}
+            kosong={null}
+            render={(l, no) => (
+              <div key={l.sidik} className="rounded-lg border border-zinc-800/60 p-3">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="flex min-w-0 items-start gap-2">
+                    <NomorBaris no={no} className="mt-0.5" />
+                    <div className="min-w-0">
+                      <div className="angka truncate text-[12.5px] text-zinc-300">{l.sidik}</div>
+                      <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11px] text-zinc-500">
+                        <span className="text-zinc-400">{l.produk || '—'}</span>
+                        <span>· {l.tgl ? tanggalPendek(l.tgl) : '—'}</span>
+                      </div>
+                      {l.catatan && <div className="mt-1 text-[11.5px] text-zinc-500">{l.catatan}</div>}
+                    </div>
+                  </div>
+                  <button onClick={() => void cabut(l.sidik)} disabled={sibuk === l.sidik}
+                    className="shrink-0 cursor-pointer rounded border border-zinc-800 px-2 py-0.5 text-[11px] text-zinc-400 transition-colors hover:border-red-500/40 hover:text-red-400 disabled:opacity-50">
+                    {sibuk === l.sidik ? 'Mencabut…' : 'Cabut'}
+                  </button>
+                </div>
+              </div>
+            )}
+          />
         )}
       </div>
     </Panel>
@@ -396,10 +405,20 @@ export default function Maintenance() {
         return <Bagian judul={aktif.judul} sub={aktif.sub} />;
       })()}
 
+      {/* Permintaan dan lisensi aktif BERDAMPINGAN: keduanya sisi dari satu
+          keputusan — menyetujui permintaan di kiri menambah baris di kanan.
+          Ditumpuk atas-bawah, menyetujui berarti menggulir untuk memastikan
+          hasilnya masuk, lalu menggulir balik untuk permintaan berikutnya.
+
+          Baru dua kolom di layar lebar (xl). Di bawah itu keduanya butuh
+          lebar penuh: masing-masing memuat email, produk, tanggal, dan
+          tombol dalam satu baris. */}
       {tab === 'akses' && (<>
         <PanelSetelanAkses />
-        <PanelLisensi />
-        <PanelLisensiAktif />
+        <div className="grid gap-4 xl:grid-cols-2">
+          <PanelLisensi />
+          <PanelLisensiAktif />
+        </div>
       </>)}
 
       {tab === 'sistem' && <PanelKesehatan />}

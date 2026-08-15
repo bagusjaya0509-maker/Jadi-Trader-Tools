@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Check, X, RefreshCw, Copy, KeyRound, ShieldAlert } from 'lucide-react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
+import { DaftarLipat, NomorBaris } from '@/components/daftar-lipat';
 import { useKuota } from '@/lib/akses';
 
 /* Nama produk yang terbaca manusia. Backend menyimpan slug (`jadi-trader-v3`)
@@ -53,7 +54,7 @@ export function PanelLisensi() {
   }
 
   return (
-    <Panel className="mt-4">
+    <Panel>
       <PanelHead
         judul="Permintaan Akses & Lisensi"
         sub="Satu-satunya tempat permintaan disetujui — akses situs maupun kode produk."
@@ -99,13 +100,16 @@ export function PanelLisensi() {
           </div>
         )}
 
-        <div className="space-y-2.5">
-          {data.map((x) => (
+        <DaftarLipat
+          data={data}
+          kosong={null}
+          render={(x, no) => (
             <div key={x.id} className={cn('rounded-lg border p-3',
               x.status === 'baru' ? 'border-amber-500/25 bg-amber-500/[0.03]' : 'border-zinc-800/60')}>
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
+                    <NomorBaris no={no} />
                     <span className="text-[13px] text-zinc-200">{x.email || x.nama || x.uid}</span>
                     <span className={cn('rounded px-1.5 py-0.5 text-[10px] uppercase',
                       x.status === 'baru' ? 'bg-amber-500/10 text-amber-400'
@@ -176,8 +180,8 @@ export function PanelLisensi() {
                 </div>
               </div>
             </div>
-          ))}
-        </div>
+          )}
+        />
       </div>
     </Panel>
   );

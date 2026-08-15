@@ -131,33 +131,42 @@ export function PanelLangganan() {
           <p className="px-5 pb-5 text-[12.5px] text-amber-300/90">{galat}</p>
         ) : (
           <>
-            <TabelBungkus>
-              <Tabel>
-                <thead>
-                  <Tr><Th>Layanan</Th><Th>Penyedia</Th><Th>Habis</Th><Th>Sisa</Th><Th>Biaya perpanjang</Th></Tr>
-                </thead>
-                <tbody>
-                  {daftar.map((l, i) => (
-                    <Tr key={l.id}>
-                      <Td>
-                        <div className="text-[12.5px] text-zinc-200">{l.nama}</div>
-                        {l.catatan && <div className="mt-0.5 max-w-[42ch] text-[10.5px] leading-relaxed text-zinc-600">{l.catatan}</div>}
-                      </Td>
-                      <Td><span className="text-[12px] text-zinc-400">{l.penyedia}</span></Td>
-                      <Td>
-                        <input type="date" value={l.habis} onChange={(e) => ubah(i, 'habis', e.target.value)}
-                               className={cn(KELAS_ISIAN, 'angka w-[140px] cursor-pointer')} />
-                      </Td>
-                      <Td><LencanaSisa sisa={sisaHari(l.habis)} /></Td>
-                      <Td>
-                        <input value={l.biaya} onChange={(e) => ubah(i, 'biaya', e.target.value)}
-                               placeholder="mis. Rp 180.000/th" className={cn(KELAS_ISIAN, 'w-[150px]')} />
-                      </Td>
-                    </Tr>
-                  ))}
-                </tbody>
-              </Tabel>
-            </TabelBungkus>
+            {/* KARTU, BUKAN TABEL. Tabel lima kolom berisi input lebar-tetap
+                selalu melebihi panelnya begitu jendelanya menyempit —
+                `overflow-x-auto` lalu memotongnya, dan yang terlihat adalah
+                panel yang isinya terpenggal di tepi. Kartu mengalir: kolom
+                yang tidak muat turun ke baris berikutnya, tidak ada yang
+                hilang di lebar mana pun. */}
+            <div className="space-y-2.5 px-5 pb-4">
+              {daftar.map((l, i) => (
+                <div key={l.id} className="rounded-lg border border-zinc-800/60 p-3">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="text-[12.5px] text-zinc-200">{l.nama}</div>
+                      <div className="text-[11px] text-zinc-600">{l.penyedia}</div>
+                    </div>
+                    <LencanaSisa sisa={sisaHari(l.habis)} />
+                  </div>
+
+                  <div className="mt-2.5 flex flex-wrap gap-2.5">
+                    <label className="min-w-[150px] grow">
+                      <span className="mb-1 block text-[10.5px] text-zinc-600">Tanggal habis</span>
+                      <input type="date" value={l.habis} onChange={(e) => ubah(i, 'habis', e.target.value)}
+                             className={cn(KELAS_ISIAN, 'angka cursor-pointer')} />
+                    </label>
+                    <label className="min-w-[150px] grow">
+                      <span className="mb-1 block text-[10.5px] text-zinc-600">Biaya perpanjang</span>
+                      <input value={l.biaya} onChange={(e) => ubah(i, 'biaya', e.target.value)}
+                             placeholder="mis. Rp 180.000/th" className={KELAS_ISIAN} />
+                    </label>
+                  </div>
+
+                  {l.catatan && (
+                    <p className="mt-2 text-[10.5px] leading-relaxed text-zinc-600">{l.catatan}</p>
+                  )}
+                </div>
+              ))}
+            </div>
             <div className="flex flex-wrap items-center gap-3 px-5 py-3.5">
               <button onClick={() => void simpan()} disabled={sibuk}
                 className="flex cursor-pointer items-center gap-2 rounded-md bg-zinc-100 px-3.5 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:opacity-50">
