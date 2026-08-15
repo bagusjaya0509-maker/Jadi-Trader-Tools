@@ -19,6 +19,16 @@
 export const BADAN = {
   nama: 'PT Solusi Bursa Nusantara',
   nib: '1508260003215',
+
+  /* Nomor permohonan Pendaftaran PSE Lingkup Privat, terbit 15 Agu 2026 di
+     pse.komdigi.go.id — status TERDAFTAR untuk sistem elektronik "Jadi
+     Trader Tools" (jaditrader.co.id).
+
+     Dicantumkan di Kebijakan Privasi karena UU PDP menuntut identitas
+     pengendali data yang bisa DIPERIKSA, bukan sekadar disebut: nomor ini
+     bisa dicocokkan orang di portal PSE. */
+  tdpse: '20260815-J6BNT',
+
   kota: 'Kota Mataram, Nusa Tenggara Barat, Indonesia',
   email: 'business@jaditrader.co.id',
 

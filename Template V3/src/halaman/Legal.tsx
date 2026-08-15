@@ -160,7 +160,11 @@ const BAGIAN: Bagian[] = [
       <>
         <P>
           Kebijakan ini disusun mengikuti <Tegas>UU No. 27 Tahun 2022 tentang Pelindungan Data
-          Pribadi</Tegas>. Pengendali data adalah {BADAN.nama}.
+          Pribadi</Tegas>. Pengendali data adalah {BADAN.nama}, terdaftar sebagai{' '}
+          <Tegas>Penyelenggara Sistem Elektronik Lingkup Privat</Tegas> pada Kementerian
+          Komunikasi dan Digital dengan nomor permohonan{' '}
+          <Tegas>{BADAN.tdpse}</Tegas>. Pertanyaan mengenai data pribadi dapat ditujukan kepada
+          penanggung jawab pelindungan data pribadi di <Tegas>{BADAN.email}</Tegas>.
         </P>
 
         <SubJudul>Yang kami simpan</SubJudul>
@@ -196,11 +200,28 @@ const BAGIAN: Bagian[] = [
         </P>
 
         <SubJudul>Di mana data disimpan, dan siapa lagi yang terlibat</SubJudul>
+        <Sorot>
+          <Tegas>Datamu disimpan dan diproses di Singapura, bukan di Indonesia.</Tegas>{' '}
+          Server kami berada di pusat data Singapura, dan basis data Firebase kami memakai
+          wilayah <Tegas>asia-southeast1</Tegas> yang juga berlokasi di Singapura.
+        </Sorot>
+        <P>
+          Kami menyampaikannya terang-terangan karena UU PDP mewajibkan kamu diberi tahu bila
+          data pribadimu dikirim ke luar wilayah Indonesia. Singapura dipilih karena jarak
+          jaringannya paling dekat dengan Indonesia — halaman terbuka lebih cepat, dan harga
+          pasar sampai dengan jeda yang lebih kecil. Fakta ini juga sudah kami daftarkan apa
+          adanya kepada Kementerian Komunikasi dan Digital.
+        </P>
+        <P>
+          Pihak yang memproses data atas nama kami — semuanya terikat perjanjian pemrosesan
+          data dan tidak boleh memakai datamu untuk keperluan mereka sendiri:
+        </P>
         <Daftar butir={[
-          <><Tegas>Google Firebase</Tegas> — autentikasi dan basis data jurnal.</>,
-          <><Tegas>Server kami</Tegas> di Indonesia — lisensi, data pasar yang diteruskan, dan jembatan ke platform tradingmu.</>,
+          <><Tegas>Google Cloud / Firebase</Tegas> (Singapura) — autentikasi akun dan basis data jurnal.</>,
+          <><Tegas>DigitalOcean, LLC</Tegas> (Singapura) — server aplikasi: lisensi, data pasar yang diteruskan, dan jembatan ke platform tradingmu.</>,
+          <><Tegas>Resend</Tegas> — mengirim surel layanan, misalnya pemberitahuan akses disetujui. Hanya menerima alamat surel dan isi suratnya.</>,
           <><Tegas>Discord</Tegas> — hanya bila kamu memilih masuk lewat Discord.</>,
-          <><Tegas>Lynk.id</Tegas> — memproses pembayaran. Data kartu dan rekeningmu ditangani mereka, tidak pernah melewati kami.</>,
+          <><Tegas>Penyedia jasa pembayaran berizin</Tegas> — memproses pembayaran. Nomor kartu dan rekeningmu ditangani mereka dan <Tegas>tidak pernah melewati sistem kami</Tegas>.</>,
         ]} />
 
         <SubJudul>Hak kamu atas datamu</SubJudul>
@@ -211,9 +232,34 @@ const BAGIAN: Bagian[] = [
           <Tegas>{BADAN.email}</Tegas> dari alamat email yang terdaftar di akunmu. Kami menjawab
           paling lambat 14 hari kerja.
         </P>
+        <SubJudul>Berapa lama data disimpan</SubJudul>
         <P>
-          Jurnal dan data akun disimpan selama akunmu aktif. Bila kamu meminta penghapusan, data
-          dihapus kecuali bagian yang wajib kami simpan untuk catatan pembayaran dan perpajakan.
+          Data tidak kami simpan selamanya. Batas waktunya kami sebutkan supaya kamu bisa
+          menagihnya:
+        </P>
+        <Daftar butir={[
+          <><Tegas>Identitas akun dan jurnal trading</Tegas> — selama akunmu aktif. Bila kamu meminta penghapusan, dihapus paling lambat <Tegas>30 hari</Tegas> sesudahnya.</>,
+          <><Tegas>Akun yang tidak dipakai</Tegas> — bila tidak ada aktivitas selama <Tegas>24 bulan</Tegas>, kami hubungi lebih dulu lewat surel, lalu menghapusnya bila tidak ada tanggapan dalam 30 hari.</>,
+          <><Tegas>Catatan pembayaran dan pajak</Tegas> — <Tegas>10 tahun</Tegas>, mengikuti kewajiban pembukuan perpajakan. Bagian ini tidak bisa dihapus lebih awal atas permintaan, dan itu bukan pilihan kami.</>,
+          <><Tegas>Catatan teknis dan log server</Tegas> — <Tegas>90 hari</Tegas>, lalu terhapus otomatis.</>,
+        ]} />
+
+        <SubJudul>Kalau terjadi kebocoran data</SubJudul>
+        <P>
+          Kami tidak akan menyembunyikannya. Bila terjadi kegagalan pelindungan data pribadi,
+          kami memberi tahu <Tegas>kamu</Tegas> dan <Tegas>Kementerian Komunikasi dan
+          Digital</Tegas> paling lambat <Tegas>3x24 jam</Tegas> sejak diketahui — sesuai
+          kewajiban UU PDP. Pemberitahuannya akan menyebut data apa yang terdampak, apa
+          akibatnya bagimu, dan langkah apa yang sedang kami ambil.
+        </P>
+
+        <SubJudul>Menyampaikan keluhan</SubJudul>
+        <P>
+          Bila kamu merasa data pribadimu tidak kami perlakukan sebagaimana mestinya, sampaikan
+          ke <Tegas>{BADAN.email}</Tegas> atau WhatsApp <Tegas>{BADAN.waTampil}</Tegas>. Kami
+          menjawab paling lambat 14 hari kerja. Bila jawabannya tidak memuaskan, kamu berhak
+          mengadu ke lembaga pelindungan data pribadi yang berwenang — hak itu tidak hilang
+          hanya karena kamu sudah mengadu ke kami lebih dulu.
         </P>
 
         <SubJudul>Penyimpanan lokal di perambanmu</SubJudul>
