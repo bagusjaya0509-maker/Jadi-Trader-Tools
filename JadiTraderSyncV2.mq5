@@ -35,7 +35,7 @@
 //       tombol AutoTrading (Algo Trading) di toolbar MT5 menyala.
 //+------------------------------------------------------------------+
 #property copyright "Jadi Trader Tools"
-#property version   "2.08"
+#property version   "2.09"
 #property strict
 #property description "Trade-Fi Sync v2: jurnal + eksekusi perintah web + kirim chart MT5. Baca pagar pengamannya di kepala berkas."
 
@@ -53,7 +53,7 @@ input int    LilinPerTF       = 3000;                                // Jumlah l
 input int    KirimChartMenit  = 5;                                   // Jeda kirim OHLC ke web (menit)
 input bool   KirimTick        = true;                                // Kirim harga tiap detik (harga web = MT5)
 
-#define VERSI_EA "2.08"
+#define VERSI_EA "2.09"
 #define PFX      "JTS_"
 
 CTrade   gTrade;
@@ -736,8 +736,17 @@ void KirimChartSatu(ENUM_TIMEFRAMES tfMt5, string tfWeb)
 void KirimChartSemua()
 {
    if(StringLen(KodePasangan) < 8) return;
+   // M1 dan M30 ditambahkan di v2.09 — sampai versi itu, memilih 1 Menit
+   // atau 30 Menit di web pada simbol Trade-Fi menghasilkan chart kosong
+   // karena tidak ada yang pernah mengirimkannya.
+   //
+   // Urutan SENGAJA dari yang paling cepat basi: M1 berumur satu menit,
+   // jadi ia yang paling rugi kalau permintaan terakhir kehabisan waktu
+   // di tengah antrean.
+   KirimChartSatu(PERIOD_M1,  "1m");
    KirimChartSatu(PERIOD_M5,  "5m");
    KirimChartSatu(PERIOD_M15, "15m");
+   KirimChartSatu(PERIOD_M30, "30m");
    KirimChartSatu(PERIOD_H1,  "1h");
    KirimChartSatu(PERIOD_H4,  "4h");
    KirimChartSatu(PERIOD_D1,  "1d");

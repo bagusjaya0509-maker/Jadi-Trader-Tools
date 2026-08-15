@@ -52,17 +52,31 @@ import { SIMBOL_DASAR, simbolDasarMt5 } from '@/lib/simbol';
    ════════════════════════════════════════════════════════════════════════ */
 
 const TF = [
+  { nilai: '1m', label: '1 Menit' },
   { nilai: '5m', label: '5 Menit' },
   { nilai: '15m', label: '15 Menit' },
+  { nilai: '30m', label: '30 Menit' },
   { nilai: '1h', label: '1 Jam' },
   { nilai: '4h', label: '4 Jam' },
   { nilai: '1d', label: 'Harian' },
 ];
 
+/** Timeframe yang BENAR-BENAR dikirim EA Trade-Fi.
+ *  ──────────────────────────────────────────────────────────────────────
+ *  Binance melayani semua interval di atas, tapi MT5 tidak: yang ada di
+ *  server cuma apa yang dikirim EA dari terminal orangnya. EA v2.03 ke
+ *  bawah mengirim lima ini saja, jadi memilih 1m/30m pada simbol MT5
+ *  menghasilkan chart kosong — dan chart kosong tanpa sebab yang terlihat
+ *  adalah bug di mata pemakainya, bukan fitur yang belum ada.
+ *
+ *  Dipakai untuk menjelaskan, bukan untuk melarang: begitu EA diperbarui,
+ *  timeframe-nya terisi sendiri tanpa halaman ini perlu diubah lagi. */
+const TF_MT5 = ['5m', '15m', '1h', '4h', '1d'];
+
 /** Durasi tiap timeframe dalam milidetik. */
 const DURASI_TF: Record<string, number> = {
-  '5m': 5 * 60_000, '15m': 15 * 60_000, '1h': 3_600_000,
-  '4h': 4 * 3_600_000, '1d': 24 * 3_600_000,
+  '1m': 60_000, '5m': 5 * 60_000, '15m': 15 * 60_000, '30m': 30 * 60_000,
+  '1h': 3_600_000, '4h': 4 * 3_600_000, '1d': 24 * 3_600_000,
 };
 
 /** 3725 -> "1:02:05". Jam disembunyikan kalau nol — "0:02:05" membuat mata
@@ -1923,8 +1937,25 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                               sibukNyata={sibukNyata} kabar={kabarNyata || undefined}
                               onTutup={aksi.tutup} mati={aksi.mati} />
                           ) : undefined} />
-            : <div className="flex h-[440px] items-center justify-center text-[12.5px] text-zinc-600">
-                {memuat ? 'Memuat lilin…' : 'Tidak ada data untuk simbol ini.'}
+            : <div className="flex h-[440px] flex-col items-center justify-center gap-1.5 px-6 text-center text-[12.5px] text-zinc-600">
+                {memuat ? 'Memuat lilin…'
+                  /* Kosong pada simbol Trade-Fi di timeframe yang belum
+                     dikirim EA punya SEBAB yang diketahui — dan sebab yang
+                     diketahui tidak boleh disampaikan sebagai "tidak ada
+                     data", kalimat yang membuat orang mengira simbolnya
+                     rusak lalu mencari-cari di tempat yang salah. */
+                  : simbol.startsWith('MT5:') && !TF_MT5.includes(tf) ? (
+                    <>
+                      <span className="text-zinc-400">
+                        Timeframe {TF.find((x) => x.nilai === tf)?.label ?? tf} belum dikirim EA Trade-Fi.
+                      </span>
+                      <span className="max-w-sm leading-relaxed">
+                        EA yang terpasang mengirim {TF_MT5.join(', ')}. Untuk kripto Binance,
+                        timeframe ini sudah bisa dipakai sekarang — pilih simbol non-MT5,
+                        atau perbarui EA-nya dari Marketplace.
+                      </span>
+                    </>
+                  ) : 'Tidak ada data untuk simbol ini.'}
               </div>}
 
           {/* ── Bilah SUNTING order ────────────────────────────────
