@@ -19,6 +19,7 @@ import { PanelPosisiTerbuka, type OrderSunting } from '@/components/panel-posisi
 import type { JenisAlat, GambarAlat } from '@/lib/plugin-alat';
 import type { HasilPine } from '@/lib/pine';
 import { bacaSetelanChart, simpanSetelanChart } from '@/lib/replay';
+import { atr } from '@/lib/jt-scan-core';
 import { ambilKlines, ambilKlinesSebelum, bacaSpekMt5, bacaTickMt5, daftarSimbolMt5, type Lilin } from '@/lib/pasar';
 import { useAkunMt5, segarkanAkunMt5 } from '@/lib/akun';
 /* Langsung dari admin, BUKAN lewat usePosisi(): yang dibutuhkan di sini
@@ -936,13 +937,56 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
     jangkarQty(rencana.entry ?? aksi.hargaKini, rencana.sl, aksi.risiko);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draf, demoSetelan.modal, demoSetelan.risikoPersen]);
+  /* ── SL ×ATR dan R : R MENGGESER GARISNYA SUNGGUHAN ──────────────────
+     Dua kolom itu sebelumnya tidak melakukan apa-apa. Tiga sebab, dan
+     ketiganya harus diperbaiki bersama:
+
+     1. Efeknya berhenti kalau `seretTangan.current` — sekali seseorang
+        menggeser garis, kedua kolom itu mati untuk selamanya di tiket itu.
+        Tapi MENGUBAH ANGKANYA ADALAH PERMINTAAN EKSPLISIT; ia bukan usulan
+        otomatis yang perlu tahu diri. Yang tetap tahu diri cuma usulan saat
+        tiket baru dibuka.
+
+     2. `aksi.usul()` memulangkan level yang SUDAH ada kalau sisinya masih
+        benar (lihat `sahUsul` di panel-replay). Jadi efeknya memang jalan,
+        lalu menyetel rencana ke angka yang sama persis. Tidak ada yang
+        bergerak, tidak ada galat.
+
+     3. `usulSlTp()` berjangkar pada HARGA PENUTUPAN TERAKHIR, bukan pada
+        entry tiketnya. Untuk Buy Limit di 62.883 sementara harga 63.156,
+        SL dan TP-nya dihitung dari 63.156 — R:R yang tampil lalu tidak
+        cocok dengan jarak garis yang benar-benar terlihat di chart.
+
+     Sekarang keduanya dihitung dari ENTRY TIKET, dan masing-masing hanya
+     menyentuh yang jadi urusannya:
+       · SL ×ATR  -> SL dipasang ulang dari ATR, TP menyusul memakai R:R.
+       · R : R    -> SL DIBIARKAN (termasuk hasil seretan tangan), hanya TP
+                     yang bergerak. Orang yang menaruh SL-nya di bawah swing
+                     low tertentu tidak sedang meminta SL-nya dipindah. */
+  const setelanTerpakai = useRef({ kaliAtr: demoSetelan.kaliAtr, rr: demoSetelan.rr });
   useEffect(() => {
-    if (!draf || !aksi || aksi.mode !== 'demo' || seretTangan.current) return;
-    const u = aksi.usul(draf);
-    if (u && u.sl && u.tp) {
-      setRencana((r) => ({ ...r, sl: u.sl, tp: u.tp }));
-      jangkarQty(u.entry, u.sl, aksi.risiko);
+    const lama = setelanTerpakai.current;
+    const atrBerubah = lama.kaliAtr !== demoSetelan.kaliAtr;
+    setelanTerpakai.current = { kaliAtr: demoSetelan.kaliAtr, rr: demoSetelan.rr };
+    if (!draf || !aksi || aksi.mode !== 'demo') return;
+
+    const entry = rencana.entry ?? aksi.hargaKini;
+    if (!entry) return;
+    const arahBuy = draf === 'BUY';
+
+    let sl = rencana.sl;
+    if (atrBerubah || !sl) {
+      const idx = replayIdx ?? lilinGabung.closes.length - 1;
+      const a = atr(lilinGabung.highs, lilinGabung.lows, lilinGabung.closes, 14)[idx];
+      if (!Number.isFinite(a) || a <= 0) return;
+      sl = arahBuy ? entry - a * demoSetelan.kaliAtr : entry + a * demoSetelan.kaliAtr;
     }
+    const jarak = Math.abs(entry - sl);
+    if (!jarak) return;
+    const tp = arahBuy ? entry + jarak * demoSetelan.rr : entry - jarak * demoSetelan.rr;
+
+    setRencana((r) => ({ ...r, sl, tp }));
+    jangkarQty(entry, sl, aksi.risiko);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [demoSetelan.kaliAtr, demoSetelan.rr]);
   const [sibukNyata, setSibukNyata] = useState(false);
@@ -2026,7 +2070,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                               onTutup={aksi.tutup} mati={aksi.mati}
                               onKirimSinyal={kirimKeCopySignal}
                               kabarSinyal={kabarKirimSinyal || undefined}
-                              dariSinyal={dariSinyal} />
+                              dariSinyal={dariSinyal} onGantiCopy={setDariSinyal} />
                           ) : undefined} />
             : <div className="flex h-[440px] flex-col items-center justify-center gap-1.5 px-6 text-center text-[12.5px] text-zinc-600">
                 {memuat ? 'Memuat lilin…'

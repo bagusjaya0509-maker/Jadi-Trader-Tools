@@ -298,12 +298,58 @@ export function ChartLilin({
        membocorkan objek chart-nya. Halaman yang butuh sampul cuma perlu
        satu kemampuan — memotret — dan memberi seluruh API chart untuk itu
        berarti halaman lain bisa diam-diam ikut menyetel skala, seri, atau
-       menghapusnya. `takeScreenshot` bawaan lightweight-charts menggambar
-       ulang ke kanvas sendiri, jadi hasilnya memuat lilin, indikator, DAN
-       alat gambar — persis yang terlihat di layar. */
+       menghapusnya.
+
+       SELURUH KANVAS DI DALAM WADAH DITUMPUK, bukan cuma hasil
+       `takeScreenshot()`.
+       ────────────────────────────────────────────────────────────────────
+       Catatan lama di sini menyatakan takeScreenshot() "memuat lilin,
+       indikator, DAN alat gambar". Ternyata tidak: kotak SNR yang digambar
+       orang hilang dari sampulnya. Sebabnya `PenggambarAlat` menggambar di
+       lapisan `zOrder: 'top'`, dan lapisan itu kanvas terpisah yang tidak
+       ikut terpotret.
+
+       Menurunkan zOrder-nya akan menaruh alat gambar DI BAWAH lilin — bukan
+       perbaikan, cuma memindah cacatnya. Jadi yang dilakukan: hasil potret
+       dipakai sebagai alas, lalu tiap kanvas yang benar-benar ada di dalam
+       wadah ditempelkan di atasnya pada posisinya sendiri. Apa pun yang
+       digambar ke kanvas — alat gambar sekarang, apa pun yang ditambahkan
+       nanti — ikut, tanpa perlu tahu lapisan mana milik siapa.
+
+       Yang tetap TIDAK ikut: panel HTML melayang (tiket order, label garis
+       yang sedang diseret, bilah alat). Mereka bukan kanvas, dan itu
+       disebutkan di layar pratinjau sampul. */
     fotoRef.current = () => {
-      try { return c.takeScreenshot().toDataURL('image/jpeg', 0.85); }
-      catch (e) { return null; }
+      try {
+        const alas = c.takeScreenshot();
+        const wadah = kotak.current;
+        if (!wadah) return alas.toDataURL('image/jpeg', 0.85);
+
+        const gabung = document.createElement('canvas');
+        gabung.width = alas.width;
+        gabung.height = alas.height;
+        const ctx = gabung.getContext('2d');
+        if (!ctx) return alas.toDataURL('image/jpeg', 0.85);
+        ctx.drawImage(alas, 0, 0);
+
+        /* Kanvas dalam berukuran piksel perangkat tapi DILETAKKAN dalam
+           piksel CSS. Skalanya diturunkan dari lebar potret dibagi lebar
+           wadah — bukan dari devicePixelRatio, yang bisa berbeda dari yang
+           dipakai pustaka saat menggambar. */
+        const rw = wadah.getBoundingClientRect();
+        if (!rw.width) return gabung.toDataURL('image/jpeg', 0.85);
+        const skala = alas.width / rw.width;
+
+        for (const el of Array.from(wadah.querySelectorAll('canvas'))) {
+          if (!el.width || !el.height) continue;
+          const r = el.getBoundingClientRect();
+          if (!r.width || !r.height) continue;
+          ctx.drawImage(el,
+            (r.left - rw.left) * skala, (r.top - rw.top) * skala,
+            r.width * skala, r.height * skala);
+        }
+        return gabung.toDataURL('image/jpeg', 0.85);
+      } catch (e) { return null; }
     };
     bagikanFotoRef.current?.(fotoRef.current);
 

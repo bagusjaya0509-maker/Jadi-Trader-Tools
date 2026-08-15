@@ -120,7 +120,7 @@ function IsianAngka({ nilai, atur, langkah, min = 0, maks, desimal = 2, lebar, j
 }
 
 export function PojokOrder({
-  posisi, hargaKini, draf, rencana, mode, jenis, risiko, tunda, onBatalTunda, onKirimSinyal, kabarSinyal, dariSinyal,
+  posisi, hargaKini, draf, rencana, mode, jenis, risiko, tunda, onBatalTunda, onKirimSinyal, kabarSinyal, dariSinyal, onGantiCopy,
   onPilih, onUbah, onKirim, onBatal, onTutup, onGantiMode, mati,
   nyataSetelan, aturNyata, sibukNyata, kabar, demoSetelan, aturDemo,
   catatan, aturCatatan, qtyDemo, mt5, lotMt5, aturLotMt5, nilaiLotMt5, desimalHarga = 6,
@@ -152,6 +152,10 @@ export function PojokOrder({
   draf: 'BUY' | 'SELL' | null;
   rencana: RencanaOrder;
   mode: 'demo' | 'real';
+  /** Nyalakan/matikan mode COPY dari lencana. Tanpa ini lencananya cuma
+   *  bisa memutar dua mode, dan COPY hanya bisa dicapai lewat tautan dari
+   *  halaman Copy Signal. */
+  onGantiCopy?: (v: boolean) => void;
   onPilih: (arah: 'BUY' | 'SELL') => void;
   onUbah: (r: RencanaOrder) => void;
   onKirim: () => void;
@@ -207,17 +211,37 @@ export function PojokOrder({
      merah dan berbunyi "Kirim order" kalau modenya real, dan lencananya
      tetap bisa diklik untuk berganti. Judul tooltipnya menyebut mode yang
      sedang berlaku, jadi tidak ada yang disembunyikan. */
+  /* TIGA MODE DALAM SATU PUTARAN: DEMO → REAL → COPY → DEMO.
+     Dulu lencananya cuma memutar DEMO↔REAL, dan COPY muncul semata-mata
+     karena chart-nya dibuka dari Copy Signal — tidak bisa dituju sendiri.
+     Akibatnya orang yang ingin menyusun sinyal harus kembali ke halaman
+     Copy Signal dulu supaya tiketnya berlabel benar. */
+  const modeSekarang: 'demo' | 'real' | 'copy' = dariSinyal ? 'copy' : nyata ? 'real' : 'demo';
+  function putarMode() {
+    if (modeSekarang === 'demo') { onGantiMode('real'); return; }
+    if (modeSekarang === 'real') {
+      /* COPY bukan mode order — ia niat: rencana ini disusun untuk
+         dibagikan. Order sungguhan dimatikan supaya tombol Kirim tidak
+         berwarna merah sementara yang dituju cuma memposting sinyal. */
+      onGantiMode('demo');
+      onGantiCopy?.(true);
+      return;
+    }
+    onGantiCopy?.(false);
+  }
+
   const Lencana = (
-    <button onClick={() => onGantiMode(nyata ? 'demo' : 'real')}
-      title={dariSinyal
-        ? `Chart dibuka untuk Copy Signal · mode order sekarang: ${nyata ? 'REAL' : 'DEMO'} (klik untuk ganti)`
-        : nyata ? 'Ganti ke latihan (demo)' : 'Ganti ke order sungguhan (real)'}
+    <button onClick={putarMode}
+      title={modeSekarang === 'copy'
+        ? 'Menyusun rencana untuk Copy Signal — klik untuk kembali ke latihan (demo)'
+        : modeSekarang === 'real' ? 'Order sungguhan — klik untuk menyusun sinyal Copy'
+        : 'Latihan (demo) — klik untuk order sungguhan'}
       className={cn('flex cursor-pointer items-center gap-1 rounded px-1.5 py-0.5 text-[9.5px] font-semibold tracking-wide transition-colors',
-        dariSinyal ? 'bg-sky-500/20 text-sky-300 hover:bg-sky-500/30'
-          : nyata ? 'bg-red-500/25 text-red-300 hover:bg-red-500/35'
+        modeSekarang === 'copy' ? 'bg-sky-500/20 text-sky-300 hover:bg-sky-500/30'
+          : modeSekarang === 'real' ? 'bg-red-500/25 text-red-300 hover:bg-red-500/35'
                   : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200')}>
-      {dariSinyal && <Copy className="size-2.5" />}
-      {dariSinyal ? 'COPY' : nyata ? 'REAL' : 'DEMO'}
+      {modeSekarang === 'copy' && <Copy className="size-2.5" />}
+      {modeSekarang === 'copy' ? 'COPY' : modeSekarang === 'real' ? 'REAL' : 'DEMO'}
     </button>
   );
 
