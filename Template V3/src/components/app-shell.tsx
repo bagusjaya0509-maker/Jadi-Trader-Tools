@@ -172,35 +172,13 @@ function Lonceng() {
      sekamar dengan kalender berita, bukan dengan kabar akun. */
   const agen = useKabarAgen();
 
-  /* Kabar PRIBADI — kejadian yang menimpa akun ini, bukan pasar. Ditaruh
-     paling atas dan sebagai kelompok tersendiri karena bobotnya berbeda:
-     "aksesmu sudah aktif" adalah sesuatu yang harus dilakukan orangnya
-     sekarang, sementara kalender berita cuma perlu diketahui.
-
-     Yang belum dibaca dihitung dari waktu buka lonceng terakhir, disimpan
-     terpisah dari penanda NEWS supaya membuka lonceng untuk melihat berita
-     tidak diam-diam menghapus tanda pada kabar akun yang belum ditindak. */
-  const { pengguna } = useAuth();
-  const pribadi = useKabarPribadi(pengguna?.uid);
-  const [pribadiDibaca, setPribadiDibaca] = useState<number>(() => {
-    try { return Number(localStorage.getItem('jt.kabarPribadiDibaca')) || 0; } catch { return 0; }
-  });
-  const pribadiBelum = pribadi.filter((k) => k.waktu > pribadiDibaca).length;
-  const tandaiPribadi = () => {
-    const paling = pribadi.reduce((m, k) => Math.max(m, k.waktu), 0);
-    if (paling > pribadiDibaca) {
-      setPribadiDibaca(paling);
-      try { localStorage.setItem('jt.kabarPribadiDibaca', String(paling)); } catch { /* privat */ }
-    }
-  };
-
-  const totalBelum = belum + agen.belum + pribadiBelum;
+  const totalBelum = belum + agen.belum;
 
   return (
     <div className="relative" ref={ref}>
       <button
-        onClick={() => { setBuka((v) => !v); tandai(); agen.tandai(); tandaiPribadi(); }}
-        aria-label="Kabar akun, berita pasar & kabar agen"
+        onClick={() => { setBuka((v) => !v); tandai(); agen.tandai(); }}
+        aria-label="Berita pasar & kabar agen"
         className="relative cursor-pointer text-zinc-400 transition-colors hover:text-zinc-100"
       >
         <Bell className="size-[18px]" strokeWidth={1.8} />
@@ -219,36 +197,6 @@ function Lonceng() {
             <span className="ml-auto text-[11px] text-zinc-600">{totalBelum} baru</span>
           </div>
           <div className="max-h-[380px] overflow-y-auto">
-            {/* ── Kabar akun: kejadian NYATA milik orang ini ──
-                Paling atas karena paling perlu ditindak. Kosong = tidak ada
-                yang terjadi; sengaja TIDAK diisi contoh supaya loncengnya
-                tetap bisa dipercaya saat benar-benar berbunyi. */}
-            {pribadi.length > 0 && (
-              <div className="border-b border-zinc-800/70 bg-zinc-900/30">
-                <div className="flex items-center gap-1.5 px-4 pb-1 pt-2.5">
-                  <UserCircle2 className="size-3 text-amber-400" strokeWidth={2} />
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-                    Akun kamu
-                  </span>
-                </div>
-                {pribadi.slice(0, 6).map((k) => (
-                  <div key={k.id} className="border-b border-zinc-800/40 px-4 py-2.5 last:border-0">
-                    <div className="flex items-center gap-2">
-                      <span className={cn('rounded px-1.5 py-0.5 text-[9.5px] font-medium uppercase',
-                        k.jenis === 'akses' ? 'bg-emerald-500/15 text-emerald-400'
-                          : k.jenis === 'peringatan' ? 'bg-amber-500/15 text-amber-400'
-                          : 'bg-zinc-700/30 text-zinc-400')}>
-                        {k.jenis === 'akses' ? 'akses' : k.jenis === 'peringatan' ? 'perhatian' : 'sesi'}
-                      </span>
-                      <span className="ml-auto text-[11px] text-zinc-600">{umurKabar(k.waktu)}</span>
-                    </div>
-                    <div className="mt-1.5 text-[12.5px] leading-snug text-zinc-200">{k.judul}</div>
-                    {k.detail && <div className="mt-0.5 text-[11.5px] leading-snug text-zinc-500">{k.detail}</div>}
-                  </div>
-                ))}
-              </div>
-            )}
-
             {/* ── Kabar agen Pemburu Sinyal ── */}
             {agen.kabar.length > 0 && (
               <div className="border-b border-zinc-800/70 bg-zinc-900/30">
@@ -316,17 +264,42 @@ function Pesan() {
     PESAN.filter((p) => p.baru).map((p) => p.judul)
   );
 
+  /* Kabar PRIBADI — kejadian yang menimpa akun ini: berhasil masuk, akses
+     disetujui. Awalnya ditaruh di lonceng, tapi lonceng sudah bermakna
+     "PASAR" (berita + agen); kabar akun di sana terbaca sebagai berita pasar
+     yang salah kamar. Amplop memang panel pemberitahuan akun, jadi ke sini.
+
+     Penanda bacanya tetap 'jt.kabarPribadiDibaca' — terpisah dari penanda
+     PESAN supaya membuka amplop untuk membaca pengumuman tidak diam-diam
+     menghapus tanda pada kabar akun yang belum ditindak, dan supaya penanda
+     lama pengguna tidak hangus saat kabarnya pindah panel. */
+  const { pengguna } = useAuth();
+  const pribadi = useKabarPribadi(pengguna?.uid);
+  const [pribadiDibaca, setPribadiDibaca] = useState<number>(() => {
+    try { return Number(localStorage.getItem('jt.kabarPribadiDibaca')) || 0; } catch { return 0; }
+  });
+  const pribadiBelum = pribadi.filter((k) => k.waktu > pribadiDibaca).length;
+  const tandaiPribadi = () => {
+    const paling = pribadi.reduce((m, k) => Math.max(m, k.waktu), 0);
+    if (paling > pribadiDibaca) {
+      setPribadiDibaca(paling);
+      try { localStorage.setItem('jt.kabarPribadiDibaca', String(paling)); } catch { /* privat */ }
+    }
+  };
+
+  const totalBelum = belum + pribadiBelum;
+
   return (
     <div className="relative" ref={ref}>
       <button
-        onClick={() => { setBuka((v) => !v); tandai(); }}
+        onClick={() => { setBuka((v) => !v); tandai(); tandaiPribadi(); }}
         aria-label="Pemberitahuan"
         className="relative cursor-pointer text-zinc-400 transition-colors hover:text-zinc-100"
       >
         <Mail className="size-[18px]" strokeWidth={1.8} />
-        {belum > 0 && (
+        {totalBelum > 0 && (
           <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white">
-            {belum}
+            {totalBelum}
           </span>
         )}
       </button>
@@ -336,9 +309,39 @@ function Pesan() {
           <div className="flex items-center gap-2 border-b border-zinc-800 px-4 py-3">
             <Mail className="size-4 text-zinc-400" strokeWidth={1.8} />
             <span className="text-[13px] font-medium text-zinc-100">Pemberitahuan</span>
-            <span className="ml-auto text-[11px] text-zinc-600">{belum} belum dibaca</span>
+            <span className="ml-auto text-[11px] text-zinc-600">{totalBelum} belum dibaca</span>
           </div>
           <div className="max-h-[380px] overflow-y-auto">
+            {/* ── Kabar akun: kejadian NYATA milik orang ini ──
+                Paling atas karena paling perlu ditindak. Kosong = tidak ada
+                yang terjadi; sengaja TIDAK diisi contoh supaya panelnya
+                tetap bisa dipercaya saat benar-benar berbunyi. */}
+            {pribadi.length > 0 && (
+              <div className="border-b border-zinc-800/70 bg-zinc-900/30">
+                <div className="flex items-center gap-1.5 px-4 pb-1 pt-2.5">
+                  <UserCircle2 className="size-3 text-amber-400" strokeWidth={2} />
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+                    Akun kamu
+                  </span>
+                </div>
+                {pribadi.slice(0, 6).map((k) => (
+                  <div key={k.id} className="border-b border-zinc-800/40 px-4 py-2.5 last:border-0">
+                    <div className="flex items-center gap-2">
+                      <span className={cn('rounded px-1.5 py-0.5 text-[9.5px] font-medium uppercase',
+                        k.jenis === 'akses' ? 'bg-emerald-500/15 text-emerald-400'
+                          : k.jenis === 'peringatan' ? 'bg-amber-500/15 text-amber-400'
+                          : 'bg-zinc-700/30 text-zinc-400')}>
+                        {k.jenis === 'akses' ? 'akses' : k.jenis === 'peringatan' ? 'perhatian' : 'sesi'}
+                      </span>
+                      <span className="ml-auto text-[11px] text-zinc-600">{umurKabar(k.waktu)}</span>
+                    </div>
+                    <div className="mt-1.5 text-[12.5px] leading-snug text-zinc-200">{k.judul}</div>
+                    {k.detail && <div className="mt-0.5 text-[11.5px] leading-snug text-zinc-500">{k.detail}</div>}
+                  </div>
+                ))}
+              </div>
+            )}
+
             {PESAN.map((p) => (
               <div key={p.id} className={cn('flex gap-3 border-b border-zinc-800/50 px-4 py-3 last:border-0', p.baru && 'bg-zinc-900/40')}>
                 <div className={cn(

@@ -771,14 +771,21 @@ export function ChartLilin({
       chart.current?.applyOptions({ handleScroll: true, handleScale: true });
     };
 
-    /* Fase capture supaya menang atas penangan geser chart bawaan. */
-    el.addEventListener('mousedown', turun, true);
-    window.addEventListener('mousemove', gerak);
-    window.addEventListener('mouseup', lepas);
+    /* Fase capture supaya menang atas penangan geser chart bawaan.
+       POINTER events, bukan mouse: di layar sentuh, seretan jari tidak
+       pernah membangkitkan mousemove — semua seretan di chart ini mati
+       total di HP sebelum diganti. pointercancel disamakan dengan lepas:
+       peramban yang merebut gerakan (mis. memutuskan ini scroll) tidak
+       boleh meninggalkan seretan menggantung. */
+    el.addEventListener('pointerdown', turun, true);
+    window.addEventListener('pointermove', gerak);
+    window.addEventListener('pointerup', lepas);
+    window.addEventListener('pointercancel', lepas);
     return () => {
-      el.removeEventListener('mousedown', turun, true);
-      window.removeEventListener('mousemove', gerak);
-      window.removeEventListener('mouseup', lepas);
+      el.removeEventListener('pointerdown', turun, true);
+      window.removeEventListener('pointermove', gerak);
+      window.removeEventListener('pointerup', lepas);
+      window.removeEventListener('pointercancel', lepas);
       seretGambar.current = null;
     };
   }, [onUbahGambar]);
@@ -837,14 +844,27 @@ export function ChartLilin({
         onAlatSelesai({ jenis: alat, t1: a.t1, h1: a.h1, t2: p.t, h2: p.h });
       }
     };
-    /* Fase capture: menang atas penangan chart & garis seret. */
-    el.addEventListener('mousedown', turun, true);
-    window.addEventListener('mousemove', gerak);
-    window.addEventListener('mouseup', lepas);
+    /* pointercancel ≠ pointerup: koordinat pada cancel tidak bisa
+       dipercaya, jadi tarikannya DIBUANG, bukan dikomit jadi gambar. */
+    const batal = () => { tarikAlat.current = null; alatPrim.current?.setPratinjau(null); };
+    /* Fase capture: menang atas penangan chart & garis seret. Pointer,
+       bukan mouse — supaya menggambar dengan jari juga jalan.
+
+       Selama alat terpasang, geser/zoom chart DIMATIKAN: stopPropagation
+       menahan mousedown dari lightweight-charts, tapi pustaka itu memasang
+       pendengar touchstart-nya sendiri yang tidak ikut tertahan — di HP,
+       menarik kotak SNR jadi sekaligus menggeser chartnya. */
+    chart.current?.applyOptions({ handleScroll: false, handleScale: false });
+    el.addEventListener('pointerdown', turun, true);
+    window.addEventListener('pointermove', gerak);
+    window.addEventListener('pointerup', lepas);
+    window.addEventListener('pointercancel', batal);
     return () => {
-      el.removeEventListener('mousedown', turun, true);
-      window.removeEventListener('mousemove', gerak);
-      window.removeEventListener('mouseup', lepas);
+      chart.current?.applyOptions({ handleScroll: true, handleScale: true });
+      el.removeEventListener('pointerdown', turun, true);
+      window.removeEventListener('pointermove', gerak);
+      window.removeEventListener('pointerup', lepas);
+      window.removeEventListener('pointercancel', batal);
       tarikAlat.current = null;
       alatPrim.current?.setPratinjau(null);
     };
@@ -1090,15 +1110,17 @@ export function ChartLilin({
          supaya menggeser garis tidak ikut menggeser grafiknya. */
       chart.current?.applyOptions({ handleScroll: true, handleScale: true });
     };
-    window.addEventListener('mousemove', gerak);
-    window.addEventListener('mouseup', lepas);
+    window.addEventListener('pointermove', gerak);
+    window.addEventListener('pointerup', lepas);
+    window.addEventListener('pointercancel', lepas);
     return () => {
-      window.removeEventListener('mousemove', gerak);
-      window.removeEventListener('mouseup', lepas);
+      window.removeEventListener('pointermove', gerak);
+      window.removeEventListener('pointerup', lepas);
+      window.removeEventListener('pointercancel', lepas);
     };
   }, [onSeret, hargaDariY]);
 
-  function mulaiSeret(id: string, e: React.MouseEvent) {
+  function mulaiSeret(id: string, e: React.PointerEvent) {
     e.preventDefault();
     e.stopPropagation();
     /* Diberitahukan lebih dulu, sebelum urusan seret: klik yang tidak
@@ -1241,15 +1263,17 @@ export function ChartLilin({
          perpindahan dibubarkan efek penutup di atas. */
       if (ubahRef.current) aturUbah({ ...ubahRef.current });
     };
-    window.addEventListener('mousemove', gerak);
-    window.addEventListener('mouseup', lepas);
+    window.addEventListener('pointermove', gerak);
+    window.addEventListener('pointerup', lepas);
+    window.addEventListener('pointercancel', lepas);
     return () => {
-      window.removeEventListener('mousemove', gerak);
-      window.removeEventListener('mouseup', lepas);
+      window.removeEventListener('pointermove', gerak);
+      window.removeEventListener('pointerup', lepas);
+      window.removeEventListener('pointercancel', lepas);
     };
   }, [onUbahPosisi, hargaDariY, aturUbah]);
 
-  function mulaiSeretUbah(p: PosisiChartMt5, bidang: 'sl' | 'tp', e: React.MouseEvent) {
+  function mulaiSeretUbah(p: PosisiChartMt5, bidang: 'sl' | 'tp', e: React.PointerEvent) {
     if (!onUbahPosisi) return;
     e.preventDefault();
     e.stopPropagation();
@@ -1284,12 +1308,14 @@ export function ChartLilin({
   const naik = idxAkhir >= 0 && lilin.closes[idxAkhir] >= lilin.opens[idxAkhir];
 
   return (
-    /* onMouseDownCapture, BUKAN onMouseDown: fase capture berjalan dari luar
-       ke dalam, jadi pilihan lama dibersihkan LEBIH DULU, lalu garis yang
-       kebetulan ditekan menyalakan pilihannya sendiri. Dengan onMouseDown
-       biasa urutannya terbalik (bubbling: dalam dulu, luar belakangan) dan
-       pilihan yang baru saja dibuat langsung terhapus lagi. */
-    <div className="relative overflow-hidden" onMouseDownCapture={() => setGarisAktif(null)}>
+    /* onPointerDownCapture, BUKAN onPointerDown: fase capture berjalan dari
+       luar ke dalam, jadi pilihan lama dibersihkan LEBIH DULU, lalu garis
+       yang kebetulan ditekan menyalakan pilihannya sendiri. Dengan bubbling
+       biasa urutannya terbalik (dalam dulu, luar belakangan) dan pilihan
+       yang baru saja dibuat langsung terhapus lagi. Pointer, bukan mouse:
+       gagang garis di bawah memakai pointerdown, dan sentuhan yang jadi
+       seretan tidak pernah membangkitkan mousedown sama sekali. */
+    <div className="relative overflow-hidden" onPointerDownCapture={() => setGarisAktif(null)}>
       <div ref={kotak} style={{ height: tinggi }} className="w-full" />
 
       {/* Hitung mundur DI DALAM label harga, bukan di sebelahnya.
@@ -1320,9 +1346,12 @@ export function ChartLilin({
                  else garisRef.current.delete(g.id);
                }}
                className={cn('absolute left-0 right-0 z-10 flex items-center',
-                 bisa ? 'cursor-ns-resize' : 'pointer-events-none')}
+                 /* touch-none WAJIB di gagang: tanpa itu peramban HP membaca
+                    seretan jari sebagai scroll halaman, membatalkan pointer
+                    (pointercancel), dan garisnya tidak pernah pindah. */
+                 bisa ? 'cursor-ns-resize touch-none' : 'pointer-events-none')}
                style={{ transform: 'translateY(-50%)', height: 14, visibility: 'hidden' }}
-               onMouseDown={bisa ? (e) => { setGarisAktif(g.id); mulaiSeret(g.id, e); } : undefined}>
+               onPointerDown={bisa ? (e) => { setGarisAktif(g.id); mulaiSeret(g.id, e); } : undefined}>
             <div className="h-px flex-1" style={{
               background: `repeating-linear-gradient(90deg, ${g.warna} 0 6px, transparent 6px 11px)`,
             }} />
@@ -1330,7 +1359,7 @@ export function ChartLilin({
                 dibersihkan dari chart tanpa menunggu apa pun. */}
             {bisa && onHapusGaris && garisAktif === g.id && (
               <button
-                onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); onHapusGaris(g.id); }}
+                onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); onHapusGaris(g.id); }}
                 title={`Hapus garis ${g.label}`}
                 className="mr-1 flex size-[14px] shrink-0 cursor-pointer items-center justify-center rounded-sm text-[10px] font-bold leading-none text-zinc-950 opacity-80 shadow transition-opacity hover:opacity-100"
                 style={{ background: g.warna }}>
@@ -1386,9 +1415,9 @@ export function ChartLilin({
                else garisRef.current.delete(`ubah-${p.tiket}-${b}`);
              }}
              title={`Seret ${b.toUpperCase()} posisi #${p.tiket}`}
-             className="absolute left-0 z-10 cursor-ns-resize"
+             className="absolute left-0 z-10 cursor-ns-resize touch-none"
              style={{ transform: 'translateY(-50%)', height: 14, visibility: 'hidden' }}
-             onMouseDown={(e) => mulaiSeretUbah(p, b, e)} />
+             onPointerDown={(e) => mulaiSeretUbah(p, b, e)} />
       )))}
 
       {/* Tombol keputusan ubahan — menempel di garis yang terakhir

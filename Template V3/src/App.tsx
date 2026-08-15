@@ -219,7 +219,10 @@ function Kerangka() {
   /* `warisan` ikut membuka: akun yang sudah ada sebelum gerbang ini dipasang
      tidak pernah diminta meminta akses, jadi melemparnya ke halaman
      permintaan sama saja mengunci orang di luar rumahnya sendiri. */
-  if (!(pemilik || langganan.status === 'aktif')) {
+  /* Server dev LOKAL membuka gerbang tanpa login — halaman di dalamnya harus
+     bisa diperiksa dan diperbaiki tanpa kredensial. `import.meta.env.DEV`
+     bernilai false saat build, jadi cabang ini tidak ada di bundel produksi. */
+  if (!import.meta.env.DEV && !(pemilik || langganan.status === 'aktif')) {
     return <Navigate to={`/akses?dari=${encodeURIComponent(lokasi.pathname)}`} replace />;
   }
   return (

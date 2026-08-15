@@ -1927,7 +1927,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                  /* z-20, setara bilah alat gambar — bilah judul halaman
                     ber-z-30, dan panel yang bisa menimpanya akan menutupi
                     navigasi. */
-                 className={cn('absolute z-20 cursor-move', !letakPakai && 'bottom-2 right-2')}>
+                 className={cn('absolute z-20 cursor-move touch-none', !letakPakai && 'bottom-2 right-2')}>
               {/* Tanpa bingkai dan latar — ia bagian dari chart, bukan
                   kartu yang menumpang di atasnya. */}
               <div className="w-[210px] shrink-0 text-[11.5px]">
@@ -2064,7 +2064,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
           ) : (
           <div onPointerDown={mulaiSeretAlat}
                style={letakAlat ? { left: letakAlat.x, top: letakAlat.y } : undefined}
-               className={cn('absolute z-20 flex cursor-move flex-row items-center gap-0.5 rounded-lg border border-zinc-800/80 bg-zinc-950/85 p-1 backdrop-blur-sm',
+               className={cn('absolute z-20 flex cursor-move touch-none flex-row items-center gap-0.5 rounded-lg border border-zinc-800/80 bg-zinc-950/85 p-1 backdrop-blur-sm',
                  !letakAlat && 'bottom-2 left-2')}>
             {/* Pegangan seret di ujung kiri — memberi tahu bilahnya bisa
                 dipindah tanpa perlu dicoba dulu. */}
@@ -2124,7 +2124,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
           <div onPointerDown={mulaiSeretTinggi}
                onDoubleClick={() => { setTinggiManual(null); try { localStorage.removeItem('jt.tinggiChart'); } catch { /* privat */ } }}
                title="Seret untuk mengatur tinggi chart — dilepas, ukurannya diingat. Klik dua kali: kembali otomatis."
-               className="group flex h-3 w-full cursor-ns-resize items-center justify-center">
+               className="group flex h-3 w-full cursor-ns-resize touch-none items-center justify-center">
             <div className="h-[3px] w-16 rounded-full bg-zinc-800 transition-colors group-hover:bg-zinc-500" />
           </div>
         </div>

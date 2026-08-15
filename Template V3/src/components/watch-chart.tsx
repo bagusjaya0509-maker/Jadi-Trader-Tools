@@ -191,9 +191,13 @@ export function WatchChart({ simbol, onPilih, onLebar }: {
        kegagalannya tidak boleh membatalkan yang pokok. */
     try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* pointer sudah lepas */ }
     const awalX = e.clientX, awalL = lebar;
+    /* Batas atasnya DINAMIS: di HP, 460 px berarti seluruh layar — chart
+       yang tersisa 0 px tidak bisa dipakai menutup kembali daftarnya.
+       Chart disisakan minimal ~120 px supaya selalu ada jalan pulang. */
+    const maks = Math.min(LEBAR_MAKS, Math.max(LEBAR_MIN, window.innerWidth - 120));
     const jepit = (n: number) => {
       if (n < LEBAR_MIN * 0.6) return 0;
-      return Math.min(LEBAR_MAKS, Math.max(LEBAR_MIN, n));
+      return Math.min(maks, Math.max(LEBAR_MIN, n));
     };
     const hitung = (x: number) => jepit(awalL + (awalX - x));
     const gerak = (ev: PointerEvent) => setLebar(hitung(ev.clientX));
@@ -210,7 +214,8 @@ export function WatchChart({ simbol, onPilih, onLebar }: {
      tetap cara utamanya; ini jalan pintas untuk yang tidak ingin
      mengukur apa-apa. */
   function alihkan() {
-    const baru = lebar > 0 ? 0 : LEBAR_BAWAAN;
+    const baru = lebar > 0 ? 0
+      : Math.min(LEBAR_BAWAAN, Math.max(LEBAR_MIN, window.innerWidth - 120));
     setLebar(baru);
     try { localStorage.setItem(KUNCI_LEBAR, String(baru)); } catch { /* privat */ }
   }
@@ -224,7 +229,11 @@ export function WatchChart({ simbol, onPilih, onLebar }: {
       <div onPointerDown={mulaiTarikLebar}
            onDoubleClick={alihkan}
            title={terbuka ? 'Tarik untuk mengatur lebar — tarik ke kanan untuk menutup' : 'Tarik ke kiri untuk membuka watchlist'}
-           className="group relative w-1.5 shrink-0 cursor-ew-resize bg-zinc-800/60 transition-colors hover:bg-zinc-600">
+           className="group relative w-1.5 shrink-0 cursor-ew-resize touch-none bg-zinc-800/60 transition-colors hover:bg-zinc-600">
+        {/* Bidang sentuh diam-diam diperluas ±10 px: garis 6 px mustahil
+            dipegang jari. Kejadiannya menggelembung ke pegangan induk,
+            jadi tidak butuh penangan sendiri. */}
+        <span className="absolute inset-y-0 -left-2.5 -right-2.5" />
         {/* Pegangan bertitik: memberi tahu ia BISA DISERET tanpa perlu
             dicoba dulu. Sebuah garis polos terbaca sebagai hiasan. */}
         <span className="pointer-events-none absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col gap-[3px]">
