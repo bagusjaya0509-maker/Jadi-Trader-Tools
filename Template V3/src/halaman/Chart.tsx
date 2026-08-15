@@ -130,9 +130,14 @@ export default function ChartBacktest() {
   const { data: posisiBursa, order: orderBursa, segarkan: segarkanBursa } = usePosisiBinance();
   const akunMt5 = useAkunMt5();
   const [simbol, setSimbol] = useState(() => rapikanSimbol(cari.get('simbol') || awal.simbol || 'BTCUSDT'));
+  /* Daftar timeframe yang boleh datang dari alamat — DIAMBIL dari TF, bukan
+     ditulis ulang. Dulu ini array terpisah berisi lima nilai, dan saat 1m
+     dan 30m ditambahkan ke TF, `?tf=1m` diam-diam jatuh ke 4h: tautan yang
+     menunjuk timeframe baru membuka timeframe yang salah tanpa memberi tahu
+     siapa pun. Satu sumber, tidak bisa berselisih lagi. */
   const [tf, setTf] = useState(() => {
     const t = (cari.get('tf') || awal.tf || '4h').toLowerCase();
-    return ['5m', '15m', '1h', '4h', '1d'].includes(t) ? t : '4h';
+    return TF.some((x) => x.nilai === t) ? t : '4h';
   });
 
   /* Alamat yang berubah saat halaman sudah terbuka ikut diikuti — klik kanan
@@ -141,7 +146,7 @@ export default function ChartBacktest() {
     const s = cari.get('simbol');
     if (s) setSimbol(rapikanSimbol(s));
     const x = (cari.get('tf') || '').toLowerCase();
-    if (x && ['5m', '15m', '1h', '4h', '1d'].includes(x)) setTf(x);
+    if (x && TF.some((y) => y.nilai === x)) setTf(x);
   }, [cari]);
   const [lilin, setLilin] = useState<Lilin>({ opens: [], highs: [], lows: [], closes: [], times: [] });
   /* Riwayat tambahan hasil "Muat lebih lama", DISIMPAN TERPISAH dari `lilin`.
@@ -917,6 +922,41 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
      jadi menggeser garis di chart adalah cara mengubah level, bukan sekadar
      hiasan yang terpisah dari kotak isian. */
   const [rencana, setRencana] = useState<{ entry?: number; sl?: number; tp?: number }>({});
+
+  /* ── Level yang datang dari halaman Copy Signal ───────────────────────
+     `#/chart?simbol=BTCUSDT&tf=4h&arah=SELL&entry=63707&sl=64080&tp=62484`
+     membuka tiket yang SUDAH terisi, dengan ketiga garisnya tergambar.
+
+     Sebelum ini tautan "Buka di Chart" mengirim sl/tp/arah — dan halaman ini
+     membuang semuanya, cuma membaca `simbol`. Jadi orang yang baru membayar
+     sebuah analisa mendarat di chart kosong dan harus MENGETIK ULANG level
+     yang barusan ia beli, dari ingatan. Setiap salah ketik di situ adalah
+     stop loss yang meleset pada uang sungguhan.
+
+     Dipasang SEKALI per kombinasi level, bukan tiap render: sesudah tiba di
+     sini garisnya milik orangnya: ia boleh menggeser SL-nya, dan efek yang
+     berjalan ulang akan menyeretnya balik ke angka analisa sambil ia
+     memegang mouse. `kunci` berubah hanya kalau alamatnya benar-benar
+     menunjuk analisa lain. */
+  const kunciAnalisa = `${cari.get('arah') || ''}|${cari.get('entry') || ''}|${cari.get('sl') || ''}|${cari.get('tp') || ''}`;
+  const analisaTerpasang = useRef('');
+  useEffect(() => {
+    const arah = (cari.get('arah') || '').toUpperCase();
+    if (arah !== 'BUY' && arah !== 'SELL') return;
+    if (analisaTerpasang.current === kunciAnalisa) return;
+    analisaTerpasang.current = kunciAnalisa;
+
+    const angka = (k: string) => {
+      const n = Number(cari.get(k));
+      return Number.isFinite(n) && n > 0 ? n : undefined;
+    };
+    setDraf(arah);
+    setRencana({ entry: angka('entry'), sl: angka('sl'), tp: angka('tp') });
+    /* Mode TIDAK diubah otomatis. Membuka analisa orang lain tidak boleh
+       diam-diam memindahkan seseorang ke mode order sungguhan — yang
+       memutuskan uang sungguhan dipertaruhkan adalah orangnya, bukan
+       sebuah tautan. */
+  }, [cari, kunciAnalisa]);
 
   /* ── Tiket yang SELAMAT dari pindah halaman ──────────────────────────
      Pindah ke Journal lalu kembali ke sini dulu menghapus segalanya:

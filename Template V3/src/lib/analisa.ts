@@ -17,9 +17,24 @@ export interface RingkasAnalisa {
   id: string; uid: string; nama: string; judul: string; pasangan: string;
   arah: 'BUY' | 'SELL'; harga: number; ringkas: string; dibuat: number;
   jumlahPembeli: number;
+  /** Ditulis agen AI, bukan pengguna. Dipasang HANYA oleh rute
+   *  /api/analisa/agen yang dijaga App Token — kalau nilainya bisa dikirim
+   *  lewat POST biasa, siapa pun yang login bisa menyamar jadi agen resmi. */
+  agen?: boolean;
+  /** Timeframe analisanya. Dipakai tautan ke Chart supaya yang terbuka
+   *  timeframe yang DIANALISA, bukan timeframe terakhir yang dilihat orang. */
+  tf?: string;
+  jumlahGambar?: number;
   snapshot: { saldo: number; winrate: number; pf: number; jumlah: number; kurva: number[] } | null;
 }
 export interface IsiAnalisa { entry: number; sl: number; tp: number; alasan: string }
+
+/** Satu foto di galeri sebuah analisa. Foto menempel pada ANALISANYA, bukan
+ *  pada pengunggahnya — siapa pun yang boleh membuka analisa itu melihat
+ *  semua foto di dalamnya, termasuk yang ditambahkan orang lain. */
+export interface GambarAnalisa {
+  id: string; url: string; ket: string; uid: string; nama: string; waktu: number;
+}
 export interface PermintaanMasuk { id: string; judul: string; uid: string; nama: string; bukti: string; waktu: number }
 
 async function idToken(): Promise<string> {
@@ -54,9 +69,53 @@ export async function hapusAnalisa(id: string) {
   return panggil(`/api/analisa?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
 }
 
-export async function bukaIsi(id: string): Promise<IsiAnalisa> {
+export async function bukaIsi(id: string): Promise<{ isi: IsiAnalisa; galeri: GambarAnalisa[] }> {
   const j = await panggil(`/api/analisa/isi?id=${encodeURIComponent(id)}`);
-  return j.isi;
+  return { isi: j.isi, galeri: j.galeri ?? [] };
+}
+
+/* ── Galeri foto ────────────────────────────────────────────────────────
+   Dikirim sebagai data URL, bukan multipart. Alasannya bukan kemalasan:
+   rute /api/gambar yang sudah ada memakai pola yang sama, dan menambah
+   parser multipart di backend berarti dependensi baru untuk satu rute.
+   Batas 5 MB dijaga di server; di sini gambarnya diperkecil dulu supaya
+   foto 12 MP dari HP tidak berangkat utuh lalu ditolak setelah menunggu. */
+
+/** Perkecil ke maksimal 1600px sisi terpanjang dan kompres ke JPEG 82%.
+ *  Tangkapan layar chart tidak butuh lebih; yang dibaca orang adalah garis
+ *  dan angkanya, bukan jumlah pikselnya. */
+export function kecilkanGambar(berkas: File, maks = 1600): Promise<string> {
+  return new Promise((selesai, gagal) => {
+    const pembaca = new FileReader();
+    pembaca.onerror = () => gagal(new Error('Gagal membaca berkas'));
+    pembaca.onload = () => {
+      const img = new Image();
+      img.onerror = () => gagal(new Error('Berkas ini bukan gambar yang bisa dibaca'));
+      img.onload = () => {
+        const skala = Math.min(1, maks / Math.max(img.width, img.height));
+        const kanvas = document.createElement('canvas');
+        kanvas.width = Math.round(img.width * skala);
+        kanvas.height = Math.round(img.height * skala);
+        const ktx = kanvas.getContext('2d');
+        if (!ktx) return gagal(new Error('Canvas tidak tersedia'));
+        ktx.drawImage(img, 0, 0, kanvas.width, kanvas.height);
+        selesai(kanvas.toDataURL('image/jpeg', 0.82));
+      };
+      img.src = String(pembaca.result);
+    };
+    pembaca.readAsDataURL(berkas);
+  });
+}
+
+export async function tambahGambar(id: string, dataUrl: string, ket: string, nama: string): Promise<GambarAnalisa> {
+  const j = await panggil('/api/analisa/gambar', {
+    method: 'POST', body: JSON.stringify({ id, dataUrl, ket, nama }),
+  });
+  return j.gambar;
+}
+
+export async function hapusGambar(id: string, gambarId: string) {
+  return panggil('/api/analisa/gambar/hapus', { method: 'POST', body: JSON.stringify({ id, gambarId }) });
 }
 
 export async function mintaAkses(id: string, bukti: string, nama: string) {

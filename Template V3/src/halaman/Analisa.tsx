@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Loader2, Lock, Unlock, Trash2, Send, LineChart, X, CheckCircle2,
-  TrendingUp, TrendingDown, RefreshCw, Radar,
+  TrendingUp, TrendingDown, RefreshCw, Radar, Sparkles, ImagePlus, Images,
 } from 'lucide-react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { PanelSinyal } from '@/components/panel-sinyal';
@@ -13,8 +13,8 @@ import { statGabungan, kurvaEkuitas } from '@/lib/hitung';
 import { useTutupLuar } from '@/lib/tutup-luar';
 import {
   daftarAnalisa, kirimAnalisa, hapusAnalisa, bukaIsi, mintaAkses,
-  statusSaya, putuskanAkses,
-  type RingkasAnalisa, type IsiAnalisa, type PermintaanMasuk,
+  statusSaya, putuskanAkses, tambahGambar, hapusGambar, kecilkanGambar,
+  type RingkasAnalisa, type IsiAnalisa, type PermintaanMasuk, type GambarAnalisa,
 } from '@/lib/analisa';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -97,6 +97,128 @@ function ModalPortofolio({ a, tutup }: { a: RingkasAnalisa; tutup: () => void })
   );
 }
 
+/** Penanda analisa yang ditulis agen AI, bukan orang.
+ *  Wajib ada dan wajib jelas: pembaca berhak tahu apakah yang ia baca
+ *  disusun manusia dengan rekam jejak jurnal, atau mesin yang membaca
+ *  lilin. Keduanya boleh salah — tapi salahnya berbeda jenis, dan orang
+ *  perlu tahu jenis mana yang sedang ia pertimbangkan. */
+function LencanaAgen() {
+  return (
+    <span className="flex items-center gap-1 rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-sky-300"
+          title="Ditulis agen AI dari data lilin, bukan oleh analis manusia">
+      <Sparkles className="size-3" /> AI Agent
+    </span>
+  );
+}
+
+/* ── Galeri foto analisa ─────────────────────────────────────────────────
+   Terbuka untuk SEMUA yang boleh membuka analisanya, bukan hanya penulisnya.
+   Itu keputusan yang disengaja: analisa yang bisa ditimpali tangkapan layar
+   orang lain — "punyaku ke-fill di sini", "di TF 1 jam bentuknya begini" —
+   jadi bahan diskusi. Kalau cuma penulis yang boleh menempel gambar, yang
+   didapat adalah pengumuman satu arah.
+
+   Yang menjaga dari penyalahgunaan bukan larangan mengunggah, melainkan
+   batas jumlah (server) dan tombol hapus untuk pengunggah DAN penulisnya. */
+function Galeri({ analisaId, galeri, bisaTambah, uidku, penulisku, onBerubah }: {
+  analisaId: string;
+  galeri: GambarAnalisa[];
+  bisaTambah: boolean;
+  uidku?: string;
+  penulisku: boolean;
+  onBerubah: (g: GambarAnalisa[]) => void;
+}) {
+  const [sibuk, setSibuk] = useState(false);
+  const [kabar, setKabar] = useState('');
+  const [besar, setBesar] = useState<GambarAnalisa | null>(null);
+  const berkasRef = useRef<HTMLInputElement>(null);
+  const { pengguna } = useAuth();
+
+  async function pilihBerkas(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    /* Input dikosongkan SEGERA. Tanpa ini, memilih berkas yang sama dua kali
+       berturut-turut tidak memicu onChange sama sekali — orangnya menekan,
+       tidak terjadi apa-apa, dan tidak ada galat untuk dibaca. */
+    e.target.value = '';
+    if (!f) return;
+    setSibuk(true); setKabar('');
+    try {
+      const kecil = await kecilkanGambar(f);
+      const g = await tambahGambar(
+        analisaId, kecil, '',
+        pengguna?.displayName || pengguna?.email?.split('@')[0] || '',
+      );
+      onBerubah([...galeri, g]);
+    } catch (err) {
+      setKabar(err instanceof Error ? err.message : 'Gagal mengunggah');
+    } finally { setSibuk(false); }
+  }
+
+  async function buang(g: GambarAnalisa) {
+    if (!confirm('Hapus foto ini?')) return;
+    try {
+      await hapusGambar(analisaId, g.id);
+      onBerubah(galeri.filter((x) => x.id !== g.id));
+    } catch (err) {
+      setKabar(err instanceof Error ? err.message : 'Gagal menghapus');
+    }
+  }
+
+  return (
+    <div className="mt-3 w-full border-t border-zinc-800/60 pt-3">
+      <div className="mb-2 flex items-center gap-2">
+        <Images className="size-3.5 text-zinc-500" />
+        <span className="text-[11.5px] text-zinc-400">
+          Foto analisa {galeri.length > 0 && <span className="angka text-zinc-500">· {galeri.length}</span>}
+        </span>
+        {bisaTambah && (
+          <button onClick={() => berkasRef.current?.click()} disabled={sibuk}
+            className="ml-auto flex cursor-pointer items-center gap-1 rounded-md border border-zinc-800 px-2 py-1 text-[11px] text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200 disabled:opacity-50">
+            {sibuk ? <Loader2 className="size-3 animate-spin" /> : <ImagePlus className="size-3" />}
+            Tambah foto
+          </button>
+        )}
+        <input ref={berkasRef} type="file" accept="image/png,image/jpeg,image/webp"
+               onChange={(e) => void pilihBerkas(e)} className="hidden" />
+      </div>
+
+      {galeri.length === 0 ? (
+        <p className="text-[11.5px] leading-relaxed text-zinc-600">
+          {bisaTambah
+            ? 'Belum ada foto. Tangkapan layar chart-mu akan terlihat oleh semua yang membuka analisa ini.'
+            : 'Belum ada foto.'}
+        </p>
+      ) : (
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {galeri.map((g) => (
+            <div key={g.id} className="group relative shrink-0">
+              <img src={g.url} alt={g.ket || 'Foto analisa'} loading="lazy"
+                   onClick={() => setBesar(g)}
+                   className="h-20 w-28 cursor-zoom-in rounded-md border border-zinc-800 object-cover" />
+              <span className="mt-0.5 block max-w-28 truncate text-[10px] text-zinc-600">{g.nama}</span>
+              {(g.uid === uidku || penulisku) && (
+                <button onClick={() => void buang(g)} aria-label="Hapus foto"
+                  className="absolute right-1 top-1 hidden cursor-pointer rounded bg-zinc-950/80 p-0.5 text-zinc-400 hover:text-red-400 group-hover:block">
+                  <X className="size-3" />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      {kabar && <p className="mt-1.5 text-[11.5px] text-amber-300/90">{kabar}</p>}
+
+      {besar && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4"
+             onClick={() => setBesar(null)}>
+          <img src={besar.url} alt={besar.ket || 'Foto analisa'}
+               className="max-h-full max-w-full rounded-lg object-contain" />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function KartuAnalisa({ a, status, milikku, onSegarkan }: {
   a: RingkasAnalisa;
   status: string | undefined;
@@ -106,6 +228,7 @@ function KartuAnalisa({ a, status, milikku, onSegarkan }: {
   const { pengguna } = useAuth();
   const [buka, setBuka] = useState(false);
   const [isi, setIsi] = useState<IsiAnalisa | null>(null);
+  const [galeri, setGaleri] = useState<GambarAnalisa[]>([]);
   const [formBeli, setFormBeli] = useState(false);
   const [bukti, setBukti] = useState('');
   const [sibuk, setSibuk] = useState(false);
@@ -117,7 +240,9 @@ function KartuAnalisa({ a, status, milikku, onSegarkan }: {
   async function muatIsi() {
     setSibuk(true); setKabar('');
     try {
-      setIsi(await bukaIsi(a.id));
+      const h = await bukaIsi(a.id);
+      setIsi(h.isi);
+      setGaleri(h.galeri);
       setBuka(true);
     } catch (e) {
       setKabar(e instanceof Error ? e.message : 'Gagal membuka');
@@ -147,8 +272,10 @@ function KartuAnalisa({ a, status, milikku, onSegarkan }: {
               {a.arah}
             </span>
             <span className="angka text-[12.5px] text-zinc-300">{a.pasangan}</span>
+            {a.tf && <span className="angka text-[11px] text-zinc-500">{a.tf}</span>}
             <span className="text-[11px] text-zinc-600">· {tanggalPendek(a.dibuat)}</span>
           </div>
+          {a.agen && <div className="mt-1.5"><LencanaAgen /></div>}
           <div className="mt-1 text-[13.5px] font-medium text-zinc-100">{a.judul}</div>
           <div className="mt-0.5 text-[12px] leading-relaxed text-zinc-500">{a.ringkas}</div>
           <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-zinc-500">
@@ -160,16 +287,26 @@ function KartuAnalisa({ a, status, milikku, onSegarkan }: {
               </>
             )}
             <span>{a.jumlahPembeli} pengcopy</span>
+            {!!a.jumlahGambar && (
+              <span className="flex items-center gap-1"><Images className="size-3" /> {a.jumlahGambar} foto</span>
+            )}
           </div>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1.5">
           <span className={cn('angka text-[14px] font-semibold', a.harga === 0 ? 'text-emerald-500' : 'text-zinc-100')}>
             {a.harga === 0 ? 'Gratis' : uang(a.harga)}
           </span>
-          <button onClick={() => setLihatPorto(true)}
-            className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 py-1.5 text-[11.5px] text-zinc-300 transition-colors hover:border-zinc-700">
-            <LineChart className="size-3.5" /> Lihat portofolio
-          </button>
+          {/* Tombol portofolio TIDAK ditampilkan untuk agen: agen tidak punya
+              jurnal, jadi tombolnya cuma membuka modal yang selalu berbunyi
+              "belum ada snapshot" — jalan buntu yang terlihat seperti fitur
+              rusak. Yang menggantikan rekam jejaknya adalah alasan analisa
+              yang terbuka penuh, gratis, untuk siapa pun. */}
+          {!a.agen && (
+            <button onClick={() => setLihatPorto(true)}
+              className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 py-1.5 text-[11.5px] text-zinc-300 transition-colors hover:border-zinc-700">
+              <LineChart className="size-3.5" /> Lihat portofolio
+            </button>
+          )}
         </div>
       </div>
 
@@ -179,11 +316,30 @@ function KartuAnalisa({ a, status, milikku, onSegarkan }: {
             <span className="text-zinc-500">Entry <span className="angka text-zinc-200">{fHarga(isi.entry)}</span></span>
             <span className="text-zinc-500">SL <span className="angka text-red-400">{fHarga(isi.sl)}</span></span>
             <span className="text-zinc-500">TP <span className="angka text-emerald-500">{fHarga(isi.tp)}</span></span>
-            <Link to={`/chart?simbol=${a.pasangan}&sl=${isi.sl}&tp=${isi.tp}&arah=${a.arah}`}
+            {/* Tautan membawa SELURUH rencana, bukan cuma simbolnya.
+                Dulu di sini sl/tp/arah ikut dikirim tapi halaman Chart
+                membuangnya — orang yang baru membayar analisa mendarat di
+                chart kosong dan harus mengetik ulang level yang barusan ia
+                beli, dari ingatan. Sekarang tiketnya terbuka sudah terisi.
+                `tf` ikut supaya yang tampil timeframe yang DIANALISA. */}
+            <Link
+              to={`/chart?simbol=${encodeURIComponent(a.pasangan)}`
+                + (a.tf ? `&tf=${a.tf}` : '')
+                + `&arah=${a.arah}&entry=${isi.entry}&sl=${isi.sl}&tp=${isi.tp}`}
               className="ml-auto flex items-center gap-1.5 rounded-md bg-zinc-100 px-2.5 py-1.5 text-[11.5px] font-medium text-zinc-950 transition-colors hover:bg-white">
-              Buka di Chart
+              <LineChart className="size-3.5" /> Buka di Chart &amp; Entry
             </Link>
-            {isi.alasan && <p className="w-full text-[12px] leading-relaxed text-zinc-400">{isi.alasan}</p>}
+            {isi.alasan && (
+              /* whitespace-pre-line: analisa agen ditulis berparagraf dengan
+                 judul bagian. Diperas jadi satu blok, ia berubah dari bacaan
+                 jadi dinding teks. */
+              <p className="w-full whitespace-pre-line text-[12px] leading-relaxed text-zinc-400">{isi.alasan}</p>
+            )}
+            <Galeri
+              analisaId={a.id} galeri={galeri} bisaTambah={!!pengguna}
+              uidku={pengguna?.uid} penulisku={milikku}
+              onBerubah={setGaleri}
+            />
           </div>
         ) : formBeli ? (
           <div className="space-y-2">
