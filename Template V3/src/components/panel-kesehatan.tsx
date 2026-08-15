@@ -54,6 +54,30 @@ export function PanelKesehatan() {
   const bebanPersen = v.cpu ? Math.round(((v.beban[0] ?? 0) / v.cpu) * 100) : 0;
   const disk = v.disk;
   const q = v.permintaan;
+  const swap = v.swap;
+
+  /* ── VONIS UPGRADE ────────────────────────────────────────────────────
+     "Perlu upgrade atau belum" adalah pertanyaan yang terus berulang, dan
+     jawabannya selalu butuh menimbang tiga angka sekaligus. Ditaruh di sini
+     supaya bisa dibaca sendiri kapan saja, bukan ditanyakan tiap kali.
+
+     Ambangnya MUTLAK (MB), bukan persen. Pada mesin 1 GB, "RAM 80%" berarti
+     masih ada ~190 MB — cukup; pada mesin 8 GB, 80% berarti 1,6 GB — sangat
+     cukup. Persen yang sama berarti dua hal yang berbeda, dan justru MB
+     sisanya yang menentukan apakah proses akan dibunuh OS.
+
+     SWAP ikut dinilai karena ia sinyal tekanan memori yang paling awal:
+     RAM tersedia masih terlihat sehat justru ketika kernel sudah diam-diam
+     memindahkan halaman ke disk, dan yang terasa pengguna adalah halaman
+     yang melambat — bukan angka RAM-nya. */
+  const alasanUpgrade: string[] = [];
+  if (v.ramBebasMb < 200) alasanUpgrade.push(`RAM tersedia tinggal ${v.ramBebasMb} MB`);
+  if (swap && swap.pakaiMb > 500) alasanUpgrade.push(`swap terpakai ${swap.pakaiMb} MB — memori nyata sudah tidak cukup`);
+  if (bebanPersen >= 80) alasanUpgrade.push(`CPU rata-rata ${bebanPersen}% dari ${v.cpu} inti`);
+  if (disk && disk.persen >= 85) alasanUpgrade.push(`disk ${disk.persen}% penuh`);
+
+  const dekatAmbang =
+    (v.ramBebasMb < 300 || (swap && swap.pakaiMb > 250) || bebanPersen >= 60) && alasanUpgrade.length === 0;
 
   /* ── Saran dihitung dari ambang yang TERTULIS ─────────────────────── */
   const saran: { nada: 'buruk' | 'awas'; teks: string }[] = [];
@@ -83,15 +107,63 @@ export function PanelKesehatan() {
       <div className="grid grid-cols-2 gap-3 px-5 pb-4 lg:grid-cols-4">
         <Ukur label="CPU" Ikon={Cpu} buruk={bebanPersen >= 90}
               nilai={`${bebanPersen}%`} sub={`beban ${v.beban.join(' / ') || '—'} · ${v.cpu} inti`} />
-        <Ukur label="RAM" Ikon={MemoryStick} buruk={ramPakaiPersen >= 90}
-              nilai={`${ramPakaiPersen}%`}
-              sub={`${v.ramTotalMb - v.ramBebasMb} / ${v.ramTotalMb} MB · proses ${v.ramProsesMb} MB`} />
+        {/* Angka utamanya MB TERSEDIA, bukan persen terpakai. Yang menentukan
+            apakah proses dibunuh OS adalah sisa megabytenya, dan "58%" tidak
+            memberi tahu apakah sisanya 400 MB atau 40 MB. */}
+        <Ukur label="RAM tersedia" Ikon={MemoryStick} buruk={v.ramBebasMb < 200}
+              nilai={`${v.ramBebasMb} MB`}
+              sub={`${ramPakaiPersen}% terpakai dari ${v.ramTotalMb} MB · backend ${v.ramProsesMb} MB`} />
+        {swap && (
+          <Ukur label="Swap" Ikon={MemoryStick} buruk={swap.pakaiMb > 500}
+                nilai={`${swap.pakaiMb} MB`}
+                sub={`${swap.persen}% dari ${swap.totalMb} MB · naik = RAM mulai sesak`} />
+        )}
         <Ukur label="Disk" Ikon={HardDrive} buruk={!!disk && disk.persen >= 90}
               nilai={disk ? `${disk.persen}%` : '—'}
               sub={disk ? `${(disk.terpakaiMb / 1024).toFixed(1)} / ${(disk.totalMb / 1024).toFixed(1)} GB` : 'tidak terbaca'} />
         <Ukur label="Trafik" Ikon={Activity}
               nilai={q ? `${q.perMenit}/mnt` : '—'}
               sub={q ? `${q.total.toLocaleString('id-ID')} permintaan sejak restart` : 'menunggu data'} />
+      </div>
+
+      {/* ── Vonis upgrade ─────────────────────────────────────────────── */}
+      <div className={cn('border-t px-5 py-3.5',
+        alasanUpgrade.length ? 'border-red-500/25 bg-red-500/[0.04]'
+          : dekatAmbang ? 'border-amber-500/25 bg-amber-500/[0.04]'
+          : 'border-zinc-800/60')}>
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+          <span className="text-[11px] uppercase tracking-wider text-zinc-600">Perlu upgrade VPS?</span>
+          <span className={cn('text-[13px] font-semibold',
+            alasanUpgrade.length ? 'text-red-400' : dekatAmbang ? 'text-amber-400' : 'text-emerald-500')}>
+            {alasanUpgrade.length ? 'Ya — sudah waktunya'
+              : dekatAmbang ? 'Belum, tapi mulai dekat'
+              : 'Belum perlu'}
+          </span>
+        </div>
+        <p className="mt-1 text-[11.5px] leading-relaxed text-zinc-500">
+          {alasanUpgrade.length
+            ? <>Alasannya: {alasanUpgrade.join('; ')}.</>
+            : <>
+                Ambang yang dipakai: RAM tersedia di bawah <span className="angka">200 MB</span>,
+                swap lewat <span className="angka">500 MB</span>, CPU rata-rata di atas{' '}
+                <span className="angka">80%</span>, atau disk lewat <span className="angka">85%</span>.
+                Sekarang: <span className="angka text-zinc-400">{v.ramBebasMb} MB</span> tersedia
+                {swap && <>, swap <span className="angka text-zinc-400">{swap.pakaiMb} MB</span></>},
+                CPU <span className="angka text-zinc-400">{bebanPersen}%</span>
+                {disk && <>, disk <span className="angka text-zinc-400">{disk.persen}%</span></>}.
+              </>}
+        </p>
+        {/* Agen belum jalan, dan itu yang paling mungkin mengubah jawabannya.
+            Disebutkan supaya keputusannya tidak diambil dari keadaan hari ini
+            saja — mesin yang lapang sekarang bisa sesak begitu enam agen
+            dinyalakan bersamaan. */}
+        <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-600">
+          Catatan: angka ini keadaan <span className="text-zinc-500">sekarang</span>, saat agen
+          belum berjalan. n8n sudah jadi pemakai RAM terbesar dalam keadaan diam — kalau agen
+          dinyalakan, pertimbangkan VPS <span className="text-zinc-500">kedua</span> yang terpisah,
+          bukan memperbesar mesin ini: agen yang macet di mesin yang sama bisa ikut menjatuhkan
+          situs pelanggan.
+        </p>
       </div>
 
       {q && (q.tolakanAuth > 0 || q.kena429 > 0 || q.galat5xx > 0) && (

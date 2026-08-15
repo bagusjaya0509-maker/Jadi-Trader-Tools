@@ -184,6 +184,10 @@ export interface StatusVps {
   ramTotalMb: number; ramBebasMb: number; ramProsesMb: number;
   beban: number[]; cpu: number; node: string; gerbangLangganan: boolean;
   disk: { totalMb: number; terpakaiMb: number; persen: number } | null;
+  /** Swap. null bila mesinnya tidak punya atau tidak terbaca — dan panel
+   *  menyembunyikan barisnya, bukan menampilkan nol. "Swap 0%" terbaca
+   *  sebagai "swap sehat" padahal artinya "tidak tahu". */
+  swap: { totalMb: number; pakaiMb: number; persen: number } | null;
   permintaan: {
     sejak: number; total: number; perMenit: number;
     tolakanAuth: number; kena429: number; galat5xx: number;
@@ -193,7 +197,7 @@ export interface StatusVps {
 const VPS_KOSONG: StatusVps = {
   waktuHidupDetik: 0, waktuHidupMesinDetik: 0, ramTotalMb: 0, ramBebasMb: 0,
   ramProsesMb: 0, beban: [], cpu: 0, node: '', gerbangLangganan: false,
-  disk: null, permintaan: null,
+  disk: null, swap: null, permintaan: null,
 };
 
 export function useStatusVps(): Hasil<StatusVps> {
@@ -211,6 +215,11 @@ export function useStatusVps(): Hasil<StatusVps> {
       totalMb: Number(j.disk.totalMb) || 0,
       terpakaiMb: Number(j.disk.terpakaiMb) || 0,
       persen: Number(j.disk.persen) || 0,
+    } : null,
+    swap: j?.swap ? {
+      totalMb: Number(j.swap.totalMb) || 0,
+      pakaiMb: Number(j.swap.pakaiMb) || 0,
+      persen: Number(j.swap.persen) || 0,
     } : null,
     permintaan: j?.permintaan ? {
       sejak: Number(j.permintaan.sejak) || 0,
