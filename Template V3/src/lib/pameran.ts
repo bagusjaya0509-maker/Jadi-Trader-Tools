@@ -42,9 +42,43 @@ export interface AngkaPameran {
   /** Judul & subjudul hero yang diterbitkan pemilik — '' kalau belum. */
   judul: string;
   sub: string;
+  /** true = angka ILUSTRASI berlabel, bukan jurnal siapa pun. */
+  contoh: boolean;
 }
 
-const KOSONG: AngkaPameran = { siap: false, jumlah: 0, winrate: 0, bersih: 0, kurva: [], tumbuh: 0, saldo: 0, sejak: 0, judul: '', sub: '' };
+const KOSONG: AngkaPameran = { siap: false, jumlah: 0, winrate: 0, bersih: 0, kurva: [], tumbuh: 0, saldo: 0, sejak: 0, judul: '', sub: '', contoh: false };
+
+/* ── Angka ilustrasi untuk pengunjung yang BELUM masuk ────────────────────
+   Jurnal showcase adalah data trading pemilik yang sesungguhnya — termasuk
+   saat sedang minus. Menampilkannya ke anggota adalah fitur kejujuran;
+   menampilkannya ke setiap orang asing di halaman jualan berarti memajang
+   rapor pribadi pemilik di etalase, dan pemiliknya tidak pernah memilih itu.
+
+   Maka pengunjung tanpa akun melihat kartu ILUSTRASI: angkanya sengaja
+   sedang-sedang saja (winrate 57%, bukan 90%), kurvanya punya penurunan,
+   dan kartunya MEMBAWA LABEL "contoh" yang terlihat. Batasnya di situ:
+   peraga berlabel adalah tangkapan layar produk; angka karangan yang
+   mengaku rekam jejak adalah tipuan — dan yang kedua persis yang dilarang
+   halaman Disclaimer kita sendiri.
+
+   Kurvanya ditulis tangan, bukan digenerate: deret yang naik-turun wajar
+   lebih meyakinkan (dan lebih jujur soal sifat trading) daripada tangga
+   mulus ke kanan atas. bersih = selisih ujung kurva; tumbuh = bersih/awal —
+   ketiganya HARUS konsisten satu sama lain karena pembaca yang teliti akan
+   menghitungnya. */
+export const PAMERAN_CONTOH: AngkaPameran = {
+  siap: true,
+  jumlah: 213,
+  winrate: 57.6,
+  bersih: 140.5,
+  kurva: [1000, 1012, 1004, 1031, 1058, 1044, 1079, 1102, 1088, 1121, 1153, 1140.5],
+  tumbuh: 14.1,
+  saldo: 1140.5,
+  /* ~9 bulan lalu — cukup lama untuk terlihat teruji, tidak sok veteran. */
+  sejak: Date.now() - 270 * 86_400_000,
+  judul: '', sub: '',
+  contoh: true,
+};
 
 /** Firestore REST membungkus tiap nilai dalam objek bertipe. */
 function nilai(f: any): any {
@@ -83,6 +117,7 @@ export function useAngkaPameran(): AngkaPameran {
         const kurva = (f.kurva?.arrayValue?.values ?? []).map((v: any) => Number(nilai(v)) || 0);
         setAngka({
           siap: true,
+          contoh: false,
           jumlah,
           winrate: Number(nilai(f.winrate)) || 0,
           bersih: Number(nilai(f.bersih)) || 0,
@@ -161,6 +196,7 @@ function muatDariShowcase(
 
         setAngka({
           siap: true,
+          contoh: false,
           jumlah: baris.length,
           winrate: (menang / baris.length) * 100,
           bersih,

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, LineChart, Wallet, Crown, Check, X, RotateCcw } from "lucide-react";
-import { useAngkaPameran, usePosisiPameran } from "@/lib/pameran";
+import { useAngkaPameran, usePosisiPameran, PAMERAN_CONTOH } from "@/lib/pameran";
+import { useAuth } from "@/lib/auth";
 import { JUDUL_BERANDA, SUB_BERANDA, bacaTeksLokal, simpanTeksLokal } from "@/lib/teks-beranda";
 
 /* ── Grafik portofolio hero, digambar tangan ──────────────────────────────
@@ -158,8 +159,17 @@ export default function HeroSection() {
      bukan data pengguna yang sedang masuk. Diambil lewat REST API dengan
      `fetch` biasa, bukan SDK: SDK-nya menyeret ±450 kB ke halaman yang
      paling sering dibuka orang yang belum tentu masuk. */
-  const pameran = useAngkaPameran();
+  const nyata = useAngkaPameran();
   const posisi = usePosisiPameran();
+
+  /* Kartu statistik: jurnal showcase ASLI hanya untuk yang sudah masuk.
+     Pengunjung tanpa akun mendapat angka ilustrasi berlabel "contoh" —
+     jurnal pemilik (termasuk saat minus) bukan konsumsi orang asing di
+     halaman jualan. Selama status auth belum diketahui, pengunjunglah
+     asumsinya: salah tebak sebentar cuma berarti anggota melihat kartu
+     contoh sekejap, bukan orang asing melihat rapor pribadi sekejap. */
+  const { pengguna } = useAuth();
+  const pameran = pengguna ? nyata : PAMERAN_CONTOH;
 
   /* ── Teks hero: lokal > terbitan pemilik > bawaan ── */
   const [teks, setTeks] = useState(() => {
@@ -400,7 +410,9 @@ export default function HeroSection() {
                     pembaca yang paham berhenti percaya. */}
                 <div className="mb-6">
                   <div className="flex justify-between text-sm mb-2">
-                    <span className="text-zinc-400">Perkembangan akun</span>
+                    <span className="text-zinc-400">
+                      {pameran.contoh ? 'Perkembangan akun · contoh' : 'Perkembangan akun'}
+                    </span>
                     {pameran.siap && (
                       <span className={pameran.tumbuh >= 0 ? "text-emerald-400 font-medium" : "text-red-400 font-medium"}>
                         {pameran.tumbuh >= 0 ? "+" : ""}{pameran.tumbuh.toFixed(1)}%{' '}
@@ -426,6 +438,17 @@ export default function HeroSection() {
                 </div>
 
                 <div className="mt-8 flex flex-wrap gap-2">
+                  {/* Label contoh TAMPIL PERTAMA dan berwarna beda — bukan
+                      disembunyikan di sudut. Peraga berlabel jelas adalah
+                      tangkapan layar produk; angka tanpa label di halaman
+                      jualan terbaca sebagai rekam jejak, dan rekam jejak
+                      karangan persis yang dilarang halaman Disclaimer kita
+                      sendiri. */}
+                  {pameran.contoh && (
+                    <div className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1 text-[10px] font-medium tracking-wide text-amber-200">
+                      CONTOH TAMPILAN
+                    </div>
+                  )}
                   <div className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-medium tracking-wide text-zinc-300">
                     <span className="relative flex h-2 w-2">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
