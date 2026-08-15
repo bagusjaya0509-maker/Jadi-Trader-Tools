@@ -794,12 +794,34 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
      identik (tiga garis, panel yang sama), dan rencana orang lain tidak
      boleh dikirim ke bursa karena dikira rencana sendiri.
 
-     DIMATIKAN begitu orangnya menekan BUY/SELL sendiri: sejak itu levelnya
-     miliknya, dan penanda yang bertahan akan berbohong. */
+     DIMATIKAN begitu orangnya menekan BUY/SELL sendiri — TAPI HANYA untuk
+     COPY yang datang dari level orang lain. Lihat `copyManual` di bawah. */
   const [dariSinyal, setDariSinyal] = useState(() => cari.get('untuk') === 'sinyal');
+  /** COPY yang datang dari NIAT orangnya, bukan dari level orang lain.
+   *
+   *  Dua jalan masuk yang tampak sama tapi berbeda maknanya:
+   *
+   *    · `?arah=&entry=&sl=&tp=` — level dari analisa orang lain. Begitu
+   *      orangnya memilih arah sendiri, penandanya harus mati; kalau tidak
+   *      ia berbohong soal asal rencananya.
+   *    · `?untuk=sinyal` — datang dari tombol "Susun di Chart & Entry" di
+   *      formulir Copy Signal. Ia MEMANG sedang menyusun sinyal, dan itu
+   *      niat, bukan warisan. Menekan BUY adalah langkah PERTAMA dari niat
+   *      itu, bukan pembatalannya.
+   *
+   *  Sempat disamakan, dan akibatnya mode COPY jatuh ke DEMO pada klik BUY
+   *  pertama — persis di alur yang paling membutuhkannya. Tombol "Ke Copy
+   *  Signal" pun ikut hilang bersamanya, karena ia hanya tampil di mode
+   *  COPY: orangnya datang untuk menyusun sinyal lalu kehilangan satu-
+   *  satunya tombol yang mengirimkannya. */
+  const copyManual = useRef(cari.get('untuk') === 'sinyal');
   /* Alamat bisa berubah tanpa halaman dimuat ulang (klik dari kartu lain),
      jadi penandanya ikut dibaca lagi. */
-  useEffect(() => { if (cari.get('untuk') === 'sinyal') setDariSinyal(true); }, [cari]);
+  useEffect(() => {
+    if (cari.get('untuk') !== 'sinyal') return;
+    setDariSinyal(true);
+    copyManual.current = true;
+  }, [cari]);
 
   function kirimKeCopySignal() {
     if (!draf) { setKabarKirimSinyal('Pilih arah BUY atau SELL dulu di panel order.'); return; }
@@ -926,11 +948,6 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
      yang rusak. Level hasil seretan tangan tidak disentuh: begitu orangnya
      menggeser sendiri, usulannya berhenti ikut campur. */
   const seretTangan = useRef(false);
-  /** COPY dinyalakan dari lencana, bukan diwarisi dari tautan analisa.
-   *  Bedanya menentukan: yang datang dari tautan berhenti berlaku begitu
-   *  orangnya memilih arah sendiri; yang ia pilih sendiri adalah MODE, dan
-   *  mode tidak boleh berubah karena sebuah klik yang bukan tentang mode. */
-  const copyManual = useRef(false);
   /* ── Qty demo DIJANGKARKAN, bukan dihitung ulang tiap seretan ────────
      Model lama: risiko dolar = modal × %risiko, titik — angkanya membeku
      di -$10 walau garis SL ditarik dua kali lebih jauh, karena ukuran
