@@ -39,6 +39,20 @@ const KELAS_ISIAN =
   'h-9 w-full rounded-md border border-zinc-800 bg-zinc-900/60 px-2.5 text-[12.5px] text-zinc-200 ' +
   'outline-none transition-colors hover:border-zinc-700 focus-visible:border-zinc-600';
 
+/** Rapikan harga yang datang dari garis chart.
+ *
+ *  Menggeser garis menghasilkan angka sepanjang `62577.76218771864` —
+ *  presisi yang tidak berarti apa-apa (tidak ada bursa menerima pecahan
+ *  sekecil itu) dan membuat kolomnya tidak terbaca.
+ *
+ *  Tiga desimal untuk harga >= 1. Di bawah itu TIDAK dipotong tiga desimal:
+ *  koin seharga 0,00001234 akan menjadi 0 — bukan dirapikan, melainkan
+ *  dihapus. Untuk mereka yang dipakai angka penting, bukan angka desimal. */
+function rapikanHarga(n: number): number {
+  if (!Number.isFinite(n) || n === 0) return n;
+  return Math.abs(n) >= 1 ? Number(n.toFixed(3)) : Number(n.toPrecision(6));
+}
+
 /* Sparkline kurva ekuitas — SVG polos, tanpa pustaka: 60 titik tidak butuh
    Recharts, dan modal ini harus ringan karena dibuka dari daftar. */
 function Sparkline({ kurva }: { kurva: number[] }) {
@@ -535,7 +549,6 @@ export default function Analisa() {
   const [kabar, setKabar] = useState('');
   const [sibuk, setSibuk] = useState(false);
 
-  const [judul, setJudul] = useState('');
   const [pasangan, setPasangan] = useState('BTCUSDT');
   const [arah, setArah] = useState<'BUY' | 'SELL'>('BUY');
   const [hargaJual, setHargaJual] = useState(5);
@@ -563,7 +576,13 @@ export default function Analisa() {
     if (!d) return;
     setPasangan(d.pasangan.replace(/^MT5:/i, ''));
     setArah(d.arah);
-    setEntry(String(d.entry)); setSl(String(d.sl)); setTp(String(d.tp));
+    /* Dirapikan DI SINI, saat masuk — bukan saat dikirim. Angka yang
+       ditampilkan ke orangnya harus sama persis dengan angka yang akan
+       terbit; merapikan diam-diam saat submit berarti ia memposting level
+       yang berbeda dari yang ia lihat dan setujui. */
+    setEntry(String(rapikanHarga(d.entry)));
+    setSl(String(rapikanHarga(d.sl)));
+    setTp(String(rapikanHarga(d.tp)));
     if (d.sampul) setSampul(d.sampul);
     setFormBuka(true);
     setKabar(`Rencana dari Chart & Entry masuk — ${d.pasangan} ${d.tf} ${d.arah}. Lengkapi judul dan alasannya.`);
@@ -621,7 +640,7 @@ export default function Analisa() {
       }
       setKabar(`Analisa terposting — dan kini permanen. Semoga levelnya bekerja.${kabarSampul}`);
       setFormBuka(false);
-      setJudul(''); setRingkas(''); setEntry(''); setSl(''); setTp(''); setAlasan('');
+      setRingkas(''); setEntry(''); setSl(''); setTp(''); setAlasan('');
       setIzinJurnal(false); setPahamPermanen(false); setSampul('');
       segarkan();
     } catch (e) {
@@ -822,41 +841,33 @@ export default function Analisa() {
                         TP {arah === 'BUY' ? 'di atas' : 'di bawah'}-nya.
                       </p>
                     ) : (
-                      <>
-                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                          <div>
-                            <div className="text-[10.5px] text-zinc-600">Jarak SL</div>
-                            <div className="angka text-[13px] text-red-400">
-                              {fHarga(jarakSl)} <span className="text-zinc-600">({((jarakSl / e) * 100).toFixed(2)}%)</span>
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-[10.5px] text-zinc-600">Jarak TP</div>
-                            <div className="angka text-[13px] text-emerald-400">
-                              {fHarga(jarakTp)} <span className="text-zinc-600">({((jarakTp / e) * 100).toFixed(2)}%)</span>
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-[10.5px] text-zinc-600">Risiko : imbalan</div>
-                            <div className={cn('angka text-[13px] font-semibold',
-                              rr >= 1.5 ? 'text-emerald-400' : rr >= 1 ? 'text-zinc-200' : 'text-amber-400')}>
-                              1 : {rr.toFixed(2)}
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-[10.5px] text-zinc-600">Jika kena TP</div>
-                            <div className="angka text-[13px] font-semibold text-emerald-400">
-                              +{uang(rr * RISIKO)}
-                            </div>
-                          </div>
-                        </div>
-                        <p className="mt-2 text-[10.5px] leading-relaxed text-zinc-600">
-                          Hitungan dolar memakai contoh modal <span className="text-zinc-500">{uang(1000)}</span> dengan
-                          risiko 1% — kena SL berarti <span className="text-red-400/90">−{uang(RISIKO)}</span>, kena TP{' '}
-                          <span className="text-emerald-400/90">+{uang(rr * RISIKO)}</span>. Ini model yang sama dengan
-                          halaman Performa Signal, bukan hasil trading yang dijanjikan.
-                        </p>
-                      </>
+                      /* SATU BARIS, tiga angka. Versi sebelumnya memakai empat
+                         kotak — jarak SL, jarak TP, rasio, dan hasil TP —
+                         dan dua di antaranya (jarak dalam harga dan persen)
+                         adalah bahan MENTAH dari rasio yang sudah ditampilkan
+                         di sebelahnya. Angka yang sudah terangkum tidak perlu
+                         ditampilkan lagi bersama bahannya; yang terjadi cuma
+                         empat angka yang harus dibaca untuk memahami satu. */
+                      <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+                        <span className="flex items-baseline gap-2">
+                          <span className="text-[11px] text-zinc-500">R : R</span>
+                          <span className={cn('angka text-[16px] font-semibold',
+                            rr >= 1.5 ? 'text-emerald-400' : rr >= 1 ? 'text-zinc-100' : 'text-amber-400')}>
+                            1 : {rr.toFixed(2)}
+                          </span>
+                        </span>
+                        <span className="flex items-baseline gap-2">
+                          <span className="text-[11px] text-zinc-500">Risk SL</span>
+                          <span className="angka text-[16px] font-semibold text-red-400">−{uang(RISIKO)}</span>
+                        </span>
+                        <span className="flex items-baseline gap-2">
+                          <span className="text-[11px] text-zinc-500">TP</span>
+                          <span className="angka text-[16px] font-semibold text-emerald-400">+{uang(rr * RISIKO)}</span>
+                        </span>
+                        <span className="text-[10.5px] leading-relaxed text-zinc-600">
+                          contoh modal {uang(1000)}, risiko 1%
+                        </span>
+                      </div>
                     )}
                   </div>
                 );
@@ -962,8 +973,16 @@ export default function Analisa() {
 
             <div className="mt-3 flex items-center gap-3">
               <button onClick={() => void posting()}
-                disabled={sibuk || !judul.trim() || !entry || !izinJurnal || !pahamPermanen || snapshot.jumlah === 0}
-                title={!izinJurnal || !pahamPermanen ? 'Centang kedua persetujuan dulu'
+                /* Syarat `!judul.trim()` DIHAPUS bersama kolomnya. Ia sempat
+                   tertinggal saat kolom Judul dibuang, dan karena judulnya
+                   tidak pernah lagi diisi siapa pun, tombolnya terkunci
+                   permanen — formulir yang sudah lengkap menolak dikirim
+                   tanpa memberi tahu apa yang kurang. */
+                disabled={sibuk || !ringkas.trim() || !entry || !sl || !tp
+                          || !izinJurnal || !pahamPermanen || snapshot.jumlah === 0}
+                title={!ringkas.trim() ? 'Isi ringkasan publik dulu — itu yang jadi judul kartunya'
+                  : !entry || !sl || !tp ? 'Entry, SL, dan TP harus terisi'
+                  : !izinJurnal || !pahamPermanen ? 'Centang kedua persetujuan dulu'
                   : snapshot.jumlah === 0 ? 'Jurnalmu masih kosong' : undefined}
                 className="flex cursor-pointer items-center gap-2 rounded-md bg-zinc-100 px-3.5 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50">
                 {sibuk ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />} Posting — permanen
