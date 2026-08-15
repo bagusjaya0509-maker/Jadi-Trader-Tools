@@ -85,8 +85,8 @@ const NAV = [
          tab yang tidak bisa dituju lewat alamat tidak bisa ditaut siapa pun. */
       { ke: '/copy',        label: 'Copy Signal',      Ikon: Copy,
         sub: [
-          { ke: '/copy',              label: 'Sinyal' },
-          { ke: '/copy?sub=performa', label: 'Performa Signal' },
+          { ke: '/copy',             label: 'Market Signal' },
+          { ke: '/copy?sub=posting', label: 'Posting Signal' },
         ] },
       { ke: '/integrasi',   label: 'Integrations',     Ikon: Plug,
         sub: [

@@ -2,11 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   Loader2, Lock, Unlock, Trash2, Send, LineChart, X, CheckCircle2,
-  TrendingUp, TrendingDown, RefreshCw, Radar, Sparkles, ImagePlus, Images, Flag,
+  TrendingUp, TrendingDown, RefreshCw, Radar, Sparkles, ImagePlus, Images, Flag, Ban,
 } from 'lucide-react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { PanelSinyal } from '@/components/panel-sinyal';
-import { PerformaSignal } from '@/components/performa-signal';
+import { PapanPeringkatSignal, PerformaAnalisSatu } from '@/components/performa-signal';
 import { ambilDraf } from '@/lib/draf-sinyal';
 import { cn, uang, persen, harga as fHarga, tanggalPendek } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
@@ -16,6 +16,7 @@ import { useTutupLuar } from '@/lib/tutup-luar';
 import {
   daftarAnalisa, kirimAnalisa, hapusAnalisa, bukaIsi, mintaAkses,
   statusSaya, putuskanAkses, tambahGambar, hapusGambar, kecilkanGambar, ambilPerforma,
+  batalkanAnalisa, bisaDibatalkan,
   type RingkasAnalisa, type IsiAnalisa, type PermintaanMasuk, type GambarAnalisa, type Performa,
 } from '@/lib/analisa';
 
@@ -53,138 +54,51 @@ function rapikanHarga(n: number): number {
   return Math.abs(n) >= 1 ? Number(n.toFixed(3)) : Number(n.toPrecision(6));
 }
 
-/* Sparkline kurva ekuitas — SVG polos, tanpa pustaka: 60 titik tidak butuh
-   Recharts, dan modal ini harus ringan karena dibuka dari daftar. */
-function Sparkline({ kurva }: { kurva: number[] }) {
-  if (kurva.length < 2) return <div className="py-6 text-center text-[12px] text-zinc-600">Kurva belum tersedia.</div>;
-  const min = Math.min(...kurva), maks = Math.max(...kurva);
-  const rentang = maks - min || 1;
-  const titik = kurva.map((v, i) =>
-    `${(i / (kurva.length - 1)) * 300},${60 - ((v - min) / rentang) * 56 + 2}`).join(' ');
-  const naik = kurva[kurva.length - 1] >= kurva[0];
-  return (
-    <svg viewBox="0 0 300 64" preserveAspectRatio="none" className="h-36 w-full">
-      <polyline points={titik} fill="none" stroke={naik ? '#10b981' : '#f87171'} strokeWidth="1.6" />
-    </svg>
-  );
-}
 
-function ModalPortofolio({ a, tutup }: { a: RingkasAnalisa; tutup: () => void }) {
-  const s = a.snapshot;
+/* ── Panel performa sinyal satu analis ───────────────────────────────────
+   Menggantikan modal portofolio jurnal. Alasannya bukan kerapian:
+   PORTOFOLIO PRIBADI MENJAWAB PERTANYAAN YANG TIDAK SEDANG DITANYA.
+   Orang bisa pandai membaca pasar untuk orang lain tapi berantakan
+   mengurus akunnya sendiri — ukuran posisi terlalu besar, memindah SL,
+   membalas dendam sesudah rugi. Jurnalnya akan berdarah sementara
+   sinyal-sinyalnya bagus, dan pembaca menyimpulkan hal yang salah dari
+   angka yang benar.
+
+   Yang diikuti pembeli adalah SINYALNYA. Maka yang ditampilkan di sini
+   rekam jejak sinyalnya: berapa yang kena TP, berapa kena SL, berapa yang
+   ia tarik sebelum harganya datang, dan kenapa. */
+function ModalPerformaAnalis({ a, performa, dibatalkan, berjalan, tutup }: {
+  a: RingkasAnalisa;
+  performa: Performa | null;
+  dibatalkan: RingkasAnalisa[];
+  berjalan: number;
+  tutup: () => void;
+}) {
+  const analis = performa?.analis.find((x) => x.uid === a.uid) ?? null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" {...useTutupLuar(tutup)}>
-      <div className="w-full max-w-2xl rounded-xl border border-zinc-800 bg-zinc-950 p-5" onClick={(e) => e.stopPropagation()}>
-        <div className="mb-3 flex items-center justify-between">
-          <div>
-            <div className="text-[14px] font-medium text-zinc-100">Jurnal {a.nama}</div>
+      <div className="max-h-full w-full max-w-2xl overflow-y-auto rounded-xl border border-zinc-800 bg-zinc-950 p-5"
+           onClick={(e) => e.stopPropagation()}>
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-[14px] font-medium text-zinc-100">Performa signal {a.nama}</div>
             <div className="text-[11.5px] leading-relaxed text-zinc-500">
-              Diambil otomatis dari jurnalnya {tanggalPendek(a.dibuat)}, saat analisa ini diposting —
-              bukan diketik tangan, dan bukan angka hari ini.
+              Dihitung server dari lilin sungguhan sejak tiap sinyal diposting — tidak ada satu
+              angka pun di sini yang bisa diisi tangan, termasuk oleh pemilik situs.
             </div>
           </div>
-          <button onClick={tutup} className="cursor-pointer rounded p-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200">
+          <button onClick={tutup} className="shrink-0 cursor-pointer rounded p-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200">
             <X className="size-4" />
           </button>
         </div>
-        {s ? (
-          <>
-            {/* SUSUNANNYA MENIRU HALAMAN JURNAL — saldo besar, win rate dengan
-                jumlah transaksinya, profit factor, Net P/L berwarna, lalu kurva
-                ekuitas dengan kalimat "dari X ke Y". Angka yang sama sebaiknya
-                dibaca dengan cara yang sama di kedua layar; kalau tidak, orang
-                mengira ia sedang melihat dua hal berbeda. */}
-            <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-              <div className="rounded-lg border border-zinc-800/60 p-3.5">
-                <div className="text-[11.5px] text-zinc-500">Saldo jurnal</div>
-                <div className="angka mt-1.5 text-[22px] font-semibold leading-none tracking-tight text-zinc-100">
-                  {uang(s.saldo)}
-                </div>
-              </div>
 
-              <div className="rounded-lg border border-zinc-800/60 p-3.5">
-                <div className="text-[11.5px] text-zinc-500">Win rate</div>
-                <div className="angka mt-1.5 text-[22px] font-semibold leading-none tracking-tight text-zinc-100">
-                  {persen(s.winrate)}
-                </div>
-                <div className="mt-2 text-[11px] text-zinc-500">
-                  {s.menang !== undefined && s.kalah !== undefined
-                    ? <>{s.menang} menang · {s.kalah} kalah</>
-                    : <>{s.jumlah} transaksi</>}
-                </div>
-              </div>
-
-              <div className="rounded-lg border border-zinc-800/60 p-3.5">
-                <div className="text-[11.5px] text-zinc-500">Profit factor</div>
-                <div className={cn('angka mt-1.5 text-[22px] font-semibold leading-none tracking-tight',
-                  !s.pf ? 'text-zinc-100' : s.pf >= 1 ? 'text-emerald-500' : 'text-red-400')}>
-                  {s.pf ? s.pf.toFixed(2) : '—'}
-                </div>
-                {/* Profit factor DIJELASKAN, bukan dibiarkan telanjang. Di
-                    bawah 1 artinya total ruginya lebih besar daripada total
-                    untungnya — dan itu yang paling sering tidak dipahami
-                    orang yang cuma melihat win rate tinggi di sebelahnya. */}
-                <div className="mt-2 text-[11px] text-zinc-500">
-                  {!s.pf ? 'belum bisa dihitung' : s.pf >= 1 ? 'untung > rugi' : 'rugi > untung'}
-                </div>
-              </div>
-
-              <div className="rounded-lg border border-zinc-800/60 p-3.5">
-                <div className="text-[11.5px] text-zinc-500">Net P/L</div>
-                {s.bersih === undefined ? (
-                  <div className="angka mt-1.5 text-[22px] font-semibold leading-none text-zinc-600">—</div>
-                ) : (
-                  <div className={cn('angka mt-1.5 text-[22px] font-semibold leading-none tracking-tight',
-                    s.bersih >= 0 ? 'text-emerald-500' : 'text-red-400')}>
-                    {uang(s.bersih, true)}
-                  </div>
-                )}
-                <div className="mt-2 text-[11px] text-zinc-500">
-                  {s.bersih === undefined ? 'analisa lama' : 'sejak awal jurnal'}
-                </div>
-              </div>
-            </div>
-
-            {s.pf > 0 && s.pf < 1 && s.winrate >= 50 && (
-              <p className="mt-2.5 rounded-lg border border-amber-500/25 bg-amber-500/[0.05] px-3 py-2 text-[11.5px] leading-relaxed text-amber-200/80">
-                Sering menang ({persen(s.winrate)}) tapi profit factor {s.pf.toFixed(2)} — rata-rata
-                kalahnya lebih besar daripada rata-rata menangnya. Winrate tinggi saja tidak berarti akunnya tumbuh.
-              </p>
-            )}
-
-            {/* CAKUPANNYA DISEBUT. Halaman Jurnal memisahkan Trade-Fi dan
-                Kripto jadi dua blok dengan saldo masing-masing; snapshot ini
-                menggabung keduanya. Tanpa kalimat ini, orang membandingkan
-                $301 di sini dengan $526 di halaman Jurnal lalu menyimpulkan
-                salah satunya bohong — padahal keduanya benar untuk cakupan
-                yang berbeda. */}
-            <p className="mt-2.5 text-[11px] text-zinc-600">
-              Cakupan: seluruh jurnal — Trade-Fi dan Kripto digabung, bukan salah satu saja.
-            </p>
-
-            <div className="mt-2 rounded-lg border border-zinc-800/60 p-3.5">
-              <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
-                <span className="text-[12.5px] text-zinc-300">Kurva Ekuitas</span>
-                <span className="text-[11px] text-zinc-500">
-                  {s.saldoAwal !== undefined && s.saldoAwal > 0
-                    ? <>Dari <span className="angka">{uang(s.saldoAwal)}</span> ke <span className="angka">{uang(s.saldo)}</span> · <span className="angka">{s.jumlah}</span> transaksi</>
-                    : <><span className="angka">{s.kurva.length}</span> titik terakhir · <span className="angka">{s.jumlah}</span> transaksi</>}
-                </span>
-              </div>
-              <Sparkline kurva={s.kurva} />
-              {/* Kurvanya sengaja disebut sebagai POTONGAN. Ia 60 titik
-                  terakhir, bukan seluruh riwayat — membiarkannya terlihat
-                  seperti kurva penuh membuat orang menghitung pertumbuhan
-                  dari titik awal yang sebenarnya bukan awal apa pun. */}
-              {s.jumlah > s.kurva.length && (
-                <p className="mt-1.5 text-[11px] text-zinc-600">
-                  Menampilkan {s.kurva.length} transaksi terakhir dari {s.jumlah}.
-                </p>
-              )}
-            </div>
-          </>
-        ) : (
-          <p className="py-6 text-center text-[12.5px] text-zinc-600">Analis ini belum menyertakan snapshot.</p>
-        )}
+        <PerformaAnalisSatu
+          analis={analis}
+          modal={performa?.modal ?? 1000}
+          risikoPersen={performa?.risikoPersen ?? 1}
+          berjalan={berjalan}
+          dibatalkan={dibatalkan}
+        />
       </div>
     </div>
   );
@@ -211,7 +125,20 @@ function LencanaAgen() {
 /** Label hasil sinyal. Muncul HANYA kalau backend sudah bisa memastikannya
  *  dari lilin sejak analisa diposting — kalau simbolnya tidak bisa dinilai,
  *  tidak ada label sama sekali. Diam lebih jujur daripada menebak. */
-function LencanaHasil({ hasil }: { hasil: 'sl' | 'tp' }) {
+function LencanaHasil({ hasil }: { hasil: 'sl' | 'tp' | 'batal' }) {
+  /* DIBATALKAN PUNYA WARNANYA SENDIRI — abu, bukan merah.
+     Memberinya warna kalah akan membuat analis yang disiplin menarik
+     rencana yang sudah tidak sah terlihat sama dengan yang kena SL,
+     padahal tidak ada posisi yang pernah jalan dan tidak ada uang yang
+     hilang. Warna adalah penilaian; ini bukan kekalahan. */
+  if (hasil === 'batal') {
+    return (
+      <span className="flex items-center gap-1 rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-400"
+        title="Ditarik penulisnya sebelum harga menyentuh entry — alasannya tercatat.">
+        <Ban className="size-3" /> Dibatalkan
+      </span>
+    );
+  }
   const kenaTp = hasil === 'tp';
   return (
     <span className={cn(
@@ -223,6 +150,78 @@ function LencanaHasil({ hasil }: { hasil: 'sl' | 'tp' }) {
         : 'Harga sudah menyentuh SL sejak analisa ini diposting — rencananya selesai.'}>
       <Flag className="size-3" /> Expired · {kenaTp ? 'TP' : 'SL'}
     </span>
+  );
+}
+
+/* ── Batalkan sinyal: alasannya WAJIB, dan itu bukan formalitas ──────────
+   Analis boleh menarik rencana yang harganya tidak pernah datang — level
+   yang disusun kemarin bisa jadi tidak sah lagi hari ini. Yang tidak boleh
+   adalah menariknya diam-diam: pembatalan tanpa alasan hanya memindahkan
+   sinyal dari daftar ke tempat sampah, dan orang yang sudah menaruh order
+   mengikutinya tidak pernah tahu kenapa.
+
+   Server juga menolak alasan di bawah 10 huruf, jadi batas yang sama
+   ditulis di sini — supaya orang tahu SEBELUM menekan, bukan sesudah. */
+function ModalBatal({ a, tutup, selesai }: {
+  a: RingkasAnalisa; tutup: () => void; selesai: () => void;
+}) {
+  const [alasan, setAlasan] = useState('');
+  const [sibuk, setSibuk] = useState(false);
+  const [galat, setGalat] = useState('');
+  const cukup = alasan.trim().length >= 10;
+
+  async function kirim() {
+    setSibuk(true); setGalat('');
+    try {
+      await batalkanAnalisa(a.id, alasan.trim());
+      selesai();
+      tutup();
+    } catch (e) {
+      setGalat(e instanceof Error ? e.message : 'Gagal membatalkan');
+    } finally { setSibuk(false); }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4" {...useTutupLuar(tutup)}>
+      <div className="w-full max-w-lg rounded-xl border border-zinc-800 bg-zinc-950 p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-1 flex items-center gap-2">
+          <Ban className="size-4 text-zinc-400" />
+          <span className="text-[14px] font-medium text-zinc-100">Batalkan sinyal</span>
+          <span className="angka text-[12px] text-zinc-500">{a.arah} {a.pasangan}</span>
+        </div>
+        <p className="mb-3 text-[11.5px] leading-relaxed text-zinc-500">
+          Harganya belum menyentuh entry, jadi rencana ini masih bisa ditarik. Pembatalannya{' '}
+          <span className="text-zinc-300">tidak menghapus apa pun</span> — sinyalnya tetap ada di
+          rekam jejakmu bersama alasan ini, dan terbaca siapa pun yang membuka performamu.
+        </p>
+
+        <label className="mb-1 block text-[11px] text-zinc-500">
+          Kenapa dibatalkan? <span className="text-zinc-600">(minimal 10 huruf)</span>
+        </label>
+        <textarea value={alasan} onChange={(e) => setAlasan(e.target.value)} rows={3} maxLength={300}
+          placeholder="mis. Struktur H4 berubah — level supply-nya sudah tembus, setup ini tidak sah lagi."
+          className="w-full resize-y rounded-md border border-zinc-800 bg-zinc-900/60 p-3 text-[12.5px] leading-relaxed text-zinc-200 outline-none transition-colors hover:border-zinc-700 focus-visible:border-zinc-600" />
+        <div className="mt-1 flex justify-between text-[10.5px] text-zinc-600">
+          <span>{cukup ? 'Cukup' : `Kurang ${10 - alasan.trim().length} huruf lagi`}</span>
+          <span className="angka">{alasan.length}/300</span>
+        </div>
+
+        {galat && <p className="mt-2 text-[12px] text-amber-300/90">{galat}</p>}
+
+        <div className="mt-3 flex items-center gap-2">
+          <button onClick={() => void kirim()} disabled={sibuk || !cukup}
+            title={!cukup ? 'Tulis alasannya dulu — minimal 10 huruf' : undefined}
+            className="flex cursor-pointer items-center gap-2 rounded-md bg-zinc-100 px-3.5 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50">
+            {sibuk ? <Loader2 className="size-3.5 animate-spin" /> : <Ban className="size-3.5" />}
+            Batalkan sinyal
+          </button>
+          <button onClick={tutup}
+            className="cursor-pointer rounded-md border border-zinc-800 px-3 py-1.5 text-[12px] text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200">
+            Urungkan
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -334,10 +333,18 @@ function Galeri({ analisaId, galeri, bisaTambah, uidku, penulisku, onBerubah }: 
   );
 }
 
-function KartuAnalisa({ a, status, milikku, pemilik, onSegarkan }: {
+function KartuAnalisa({ a, status, milikku, pemilik, onSegarkan, performa, dibatalkanAnalis, berjalanAnalis }: {
   a: RingkasAnalisa;
   status: string | undefined;
   milikku: boolean;
+  /** Performa seluruh papan — kartu ini cuma mengambil barisnya sendiri.
+   *  Dioper dari halaman, bukan diambil ulang tiap kartu: satu daftar bisa
+   *  memuat belasan kartu, dan belasan permintaan untuk data yang sama
+   *  adalah cara paling cepat menghabiskan kuota rute publik. */
+  performa: Performa | null;
+  /** Sinyal analis ini yang dibatalkan, untuk panel performanya. */
+  dibatalkanAnalis: RingkasAnalisa[];
+  berjalanAnalis: number;
   /** Pemilik APLIKASI, bukan penulis analisa. Satu-satunya yang boleh
    *  menghapus — itu moderasi (kewajiban pengawasan PSE), bukan fitur.
    *  Penulis TIDAK bisa menghapus sinyalnya sendiri: rekam jejak yang bisa
@@ -355,8 +362,11 @@ function KartuAnalisa({ a, status, milikku, pemilik, onSegarkan }: {
   const [sibuk, setSibuk] = useState(false);
   const [kabar, setKabar] = useState('');
   const [lihatPorto, setLihatPorto] = useState(false);
+  const [formBatal, setFormBatal] = useState(false);
 
   const bisaBuka = milikku || a.harga === 0 || status === 'pembeli';
+  const bolehBatal = bisaDibatalkan(a, pengguna?.uid);
+  const perfPenulis = performa?.analis.find((x) => x.uid === a.uid) ?? null;
 
   async function muatIsi() {
     setSibuk(true); setKabar('');
@@ -382,7 +392,7 @@ function KartuAnalisa({ a, status, milikku, pemilik, onSegarkan }: {
     } finally { setSibuk(false); }
   }
 
-  const selesai = a.hasil === 'sl' || a.hasil === 'tp';
+  const selesai = a.hasil === 'sl' || a.hasil === 'tp' || a.hasil === 'batal';
 
   return (
     /* `relative` wajib: lencana AI Agent duduk absolut di pojok panel. */
@@ -442,18 +452,43 @@ function KartuAnalisa({ a, status, milikku, pemilik, onSegarkan }: {
                   {a.jenisEntry}
                 </span>
               )}
-              {selesai && <LencanaHasil hasil={a.hasil as 'sl' | 'tp'} />}
+              {selesai && <LencanaHasil hasil={a.hasil as 'sl' | 'tp' | 'batal'} />}
             </div>
+          )}
+          {/* Alasan pembatalan tampil DI KARTU, bukan disembunyikan di balik
+              "buka analisa". Orang yang sudah menaruh order mengikuti sinyal
+              ini perlu tahu kenapa ditarik pada pandangan pertama, bukan
+              sesudah menekan sesuatu. */}
+          {a.hasil === 'batal' && a.alasanBatal && (
+            <p className="mt-1.5 rounded-md border border-zinc-800 bg-zinc-900/50 px-2.5 py-1.5 text-[11.5px] leading-relaxed text-zinc-400">
+              <span className="text-zinc-500">Alasan dibatalkan:</span> {a.alasanBatal}
+            </p>
           )}
           <div className="mt-1 text-[13.5px] font-medium text-zinc-100">{a.judul}</div>
           <div className="mt-0.5 text-[12px] leading-relaxed text-zinc-500">{a.ringkas}</div>
           <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-zinc-500">
             <span>oleh <span className="text-zinc-300">{a.nama}</span></span>
-            {a.snapshot && (
+            {/* WINRATE SINYAL, bukan winrate jurnal.
+                Baris ini dulu menampilkan winrate & PF dari jurnal pribadi
+                penulisnya — angka yang benar untuk pertanyaan yang tidak
+                sedang ditanya. Orang bisa menyusun sinyal bagus lalu
+                menghancurkan akunnya sendiri dengan ukuran posisi dan SL
+                yang dipindah; jurnal yang berdarah membuat pembaca menolak
+                sinyal yang sebenarnya bekerja, dan sebaliknya.
+                Yang diikuti pembeli adalah sinyalnya. Maka itu yang
+                ditampilkan — dan kalau belum ada yang selesai, dikatakan
+                apa adanya, bukan ditambal angka jurnal. */}
+            {perfPenulis && perfPenulis.total > 0 ? (
               <>
-                <span>winrate <span className="angka text-zinc-300">{persen(a.snapshot.winrate)}</span></span>
-                <span>PF <span className="angka text-zinc-300">{a.snapshot.pf ? a.snapshot.pf.toFixed(2) : '—'}</span></span>
+                <span>winrate sinyal{' '}
+                  <span className={cn('angka', perfPenulis.winrate >= 50 ? 'text-emerald-400' : 'text-zinc-300')}>
+                    {persen(perfPenulis.winrate)}
+                  </span>
+                </span>
+                <span><span className="angka text-zinc-300">{perfPenulis.total}</span> selesai</span>
               </>
+            ) : (
+              <span className="text-zinc-600">belum ada sinyal selesai</span>
             )}
             <span>{a.jumlahPembeli} pengcopy</span>
             {!!a.jumlahGambar && (
@@ -474,6 +509,16 @@ function KartuAnalisa({ a, status, milikku, pemilik, onSegarkan }: {
             <button onClick={() => setLihatPorto(true)}
               className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 py-1.5 text-[11.5px] text-zinc-300 transition-colors hover:border-zinc-700">
               <LineChart className="size-3.5" /> Lihat portofolio
+            </button>
+          )}
+          {/* Batalkan HANYA muncul untuk sinyal sendiri yang masih menunggu
+              harga. Begitu entry tersentuh tombolnya hilang — dan itu bukan
+              sekadar disembunyikan, server menolaknya juga. */}
+          {bolehBatal && (
+            <button onClick={() => setFormBatal(true)}
+              title="Tarik rencana ini sebelum harganya datang — alasannya wajib dan tercatat permanen"
+              className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 py-1.5 text-[11.5px] text-zinc-400 transition-colors hover:border-amber-500/40 hover:text-amber-300">
+              <Ban className="size-3.5" /> Batalkan
             </button>
           )}
         </div>
@@ -555,7 +600,13 @@ function KartuAnalisa({ a, status, milikku, pemilik, onSegarkan }: {
         {kabar && <p className="mt-2 text-[12px] text-amber-300/90">{kabar}</p>}
       </div>
 
-      {lihatPorto && <ModalPortofolio a={a} tutup={() => setLihatPorto(false)} />}
+      {lihatPorto && (
+        <ModalPerformaAnalis a={a} performa={performa} dibatalkan={dibatalkanAnalis}
+                             berjalan={berjalanAnalis} tutup={() => setLihatPorto(false)} />
+      )}
+      {formBatal && (
+        <ModalBatal a={a} tutup={() => setFormBatal(false)} selesai={onSegarkan} />
+      )}
     </Panel>
   );
 }
@@ -599,8 +650,8 @@ function SlotAgen({ urutan }: { urutan: number }) {
    Pola tabnya sama dengan halaman Maintenance — satu pola untuk hal yang
    sama, bukan dua cara berbeda menyelesaikan masalah yang identik. */
 const SUB = [
-  { id: 'sinyal',   label: 'Sinyal' },
-  { id: 'performa', label: 'Performa Signal' },
+  { id: 'market',  label: 'Market Signal' },
+  { id: 'posting', label: 'Posting Signal' },
 ] as const;
 type IdSub = typeof SUB[number]['id'];
 
@@ -620,8 +671,8 @@ export default function Analisa() {
      state: sidebar sekarang punya sub-menu yang menunjuk langsung ke sini,
      dan tab yang tidak bisa dituju lewat alamat tidak bisa ditaut siapa pun. */
   const [cariSub, setCariSub] = useSearchParams();
-  const sub: IdSub = SUB.some((s) => s.id === cariSub.get('sub')) ? (cariSub.get('sub') as IdSub) : 'sinyal';
-  const setSub = (id: IdSub) => setCariSub(id === 'sinyal' ? {} : { sub: id }, { replace: true });
+  const sub: IdSub = SUB.some((s) => s.id === cariSub.get('sub')) ? (cariSub.get('sub') as IdSub) : 'market';
+  const setSub = (id: IdSub) => setCariSub(id === 'market' ? {} : { sub: id }, { replace: true });
   const { pengguna, pemilik } = useAuth();
 
   /* Kanal yang sedang dibuka — null berarti daftar kanal. Sinyal kini
@@ -793,9 +844,18 @@ export default function Analisa() {
         </p>
       </div>
 
-      {sub === 'performa' && <PerformaSignal />}
+      {/* ── Papan peringkat, DI KEPALA Market Signal ─────────────────────
+          Bukan sub-halaman sendiri lagi. Orang datang ke sini untuk mencari
+          sinyal; sekalian di layar yang sama ia melihat rekam jejak siapa
+          yang paling baik. Papan peringkat yang harus dicari di tab lain
+          adalah papan yang tidak pernah dibaca orang yang paling perlu
+          membacanya — yang sedang menimbang mengikuti seseorang.
 
-      <div className={cn(sub !== 'sinyal' && 'hidden')}>
+          Bisa dilipat: begitu seseorang tahu siapa yang ia ikuti, papan itu
+          berubah jadi penghalang antara dia dan sinyalnya. */}
+      {sub === 'market' && <PapanPeringkatSignal data={performa} />}
+
+      <div className={cn(sub !== 'market' && 'hidden')}>
       {/* ── Rak sinyal pantauan: empat slot ───────────────────────────
          Duduk di halaman Copy Signal, bukan dashboard: sinyal komunitas
          adalah bahan meniru trade orang lain — satu keluarga dengan
@@ -836,6 +896,15 @@ export default function Analisa() {
         ))}
       </div>
       </>}
+      </div>
+
+      {/* ── Posting Signal ───────────────────────────────────────────────
+          Memposting dan mencari sinyal adalah dua pekerjaan berbeda yang
+          dilakukan orang berbeda, di saat berbeda. Formulir setinggi layar
+          yang duduk di atas daftar sinyal memaksa setiap pengunjung —
+          termasuk yang tidak akan pernah memposting apa pun — menggulir
+          melewatinya untuk sampai ke yang ia cari. */}
+      <div className={cn(sub !== 'posting' && 'hidden')}>
 
       {/* Permintaan masuk untuk analisaku */}
       {masuk.length > 0 && (
@@ -868,7 +937,7 @@ export default function Analisa() {
       <Panel className="mb-4">
         <PanelHead
           judul={<span className="flex items-center gap-2">Copy Signal <LencanaBeta /></span>}
-          sub="Posting rencana trade-mu — orang menilai dari rekam jejak jurnalmu, bukan dari klaim."
+          sub="Posting rencana trade-mu — yang dinilai orang adalah hasil sinyalmu, bukan klaimmu."
           kanan={
             <span className="flex items-center gap-2">
               <button onClick={segarkan} aria-label="Segarkan"
@@ -1062,12 +1131,18 @@ export default function Analisa() {
               <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-zinc-800 bg-zinc-950/60 px-3.5 py-3">
                 <input type="checkbox" checked={izinJurnal} onChange={(e) => setIzinJurnal(e.target.checked)}
                   className="mt-0.5 size-3.5 shrink-0 cursor-pointer accent-emerald-500" />
+                {/* KALIMAT INI HARUS TETAP BENAR. Ia sempat menjanjikan
+                    jurnalnya "bisa diperiksa siapa pun lewat Lihat
+                    portofolio" — dan sesudah panel itu diganti performa
+                    sinyal, janji tersebut jadi keliru ke arah yang paling
+                    buruk: orang menyetujui sesuatu yang tidak terjadi, dan
+                    tidak menyetujui yang benar-benar terjadi. */}
                 <span className="text-[12px] leading-relaxed text-zinc-400">
-                  Saya <span className="text-zinc-200">membuka akses pantau jurnal saya</span> untuk
-                  pengguna lain. Rekam jejak jurnalku saat ini ({snapshot.jumlah} transaksi,
-                  winrate {persen(snapshot.winrate)}, PF {snapshot.pf || '—'}) terlampir dan bisa
-                  diperiksa siapa pun lewat tombol "Lihat portofolio" — pembeli berhak menilai
-                  dari data, bukan dari klaim.
+                  Saya lampirkan <span className="text-zinc-200">rekam jejak jurnal saya</span>{' '}
+                  ({snapshot.jumlah} transaksi, winrate {persen(snapshot.winrate)}, PF {snapshot.pf || '—'})
+                  sebagai syarat memposting — analis harus benar-benar trading, bukan cuma
+                  memberi arahan. Yang tampil publik adalah <span className="text-zinc-200">hasil
+                  sinyal-sinyalku</span>; isi jurnalku sendiri tidak dibuka.
                 </span>
               </label>
               <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-zinc-800 bg-zinc-950/60 px-3.5 py-3">
@@ -1139,7 +1214,9 @@ export default function Analisa() {
           <p className="px-5 pb-4 text-[12.5px] text-zinc-500">Masuk dulu untuk memposting atau membeli analisa.</p>
         )}
       </Panel>
+      </div>
 
+      <div className={cn(sub !== 'market' && 'hidden')}>
       {/* ── Kanal per analis ────────────────────────────────────────────
          Satu analis sering memposting banyak sinyal. Dideretkan rata,
          rekam jejak per ORANG tidak pernah terlihat utuh — dan justru
@@ -1230,7 +1307,10 @@ export default function Analisa() {
               {terpilih.map((a) => (
                 <div key={a.id} className="w-[320px] shrink-0">
                   <KartuAnalisa a={a} status={statusku[a.id]}
-                    milikku={a.uid === pengguna?.uid} pemilik={pemilik} onSegarkan={segarkan} />
+                    milikku={a.uid === pengguna?.uid} pemilik={pemilik} onSegarkan={segarkan}
+                    performa={performa}
+                    dibatalkanAnalis={terpilih.filter((s) => s.hasil === 'batal')}
+                    berjalanAnalis={terpilih.filter((s) => !s.hasil).length} />
                 </div>
               ))}
             </div>

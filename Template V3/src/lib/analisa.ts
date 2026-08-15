@@ -31,9 +31,19 @@ export interface RingkasAnalisa {
    *  aktif dan orang mengira masih ada peluang yang sudah lewat.
    *  null = masih berjalan. Kosong/undefined = tidak bisa dinilai (simbol
    *  di luar Binance Futures) — dan itu ditampilkan sebagai tidak ada
-   *  label, bukan sebagai tebakan. */
-  hasil?: 'sl' | 'tp' | null;
+   *  label, bukan sebagai tebakan.
+   *  'batal' = ditarik penulisnya sebelum harganya datang — lihat
+   *  `alasanBatal`. Bukan kalah dan bukan menang; ia keadaan tersendiri. */
+  hasil?: 'sl' | 'tp' | 'batal' | null;
   waktuHasil?: number | null;
+  /** Harga pernah menyentuh entry. Ditulis penilai dari lilin sungguhan,
+   *  dan tidak pernah dicabut lagi. Inilah yang mengunci pembatalan:
+   *  order yang sudah terisi adalah posisi yang sudah jalan, dan
+   *  menariknya sama dengan menghapus trade yang sedang rugi. */
+  terisi?: boolean;
+  /** Alasan pembatalan, wajib diisi penulisnya. Ditayangkan apa adanya —
+   *  yang dinilai orang justru kenapa sebuah rencana ditarik. */
+  alasanBatal?: string;
   /** "Buy Limit" / "Sell Stop" / "Market" — keterangan, bukan angka, jadi
    *  aman tampil publik pada analisa yang levelnya masih terkunci. */
   jenisEntry?: string;
@@ -101,6 +111,23 @@ export async function kirimAnalisa(d: {
   return panggil('/api/analisa', { method: 'POST', body: JSON.stringify(d) });
 }
 
+/** Batalkan sinyal sendiri. Server menolak kalau bukan penulisnya, kalau
+ *  harganya sudah menyentuh entry, kalau jenisnya Market, atau kalau
+ *  alasannya kurang dari 10 huruf — jadi galatnya ditampilkan apa adanya,
+ *  bukan diterjemahkan jadi "gagal". */
+export async function batalkanAnalisa(id: string, alasan: string) {
+  return panggil('/api/analisa/batal', { method: 'POST', body: JSON.stringify({ id, alasan }) });
+}
+
+/** Sinyal ini masih bisa dibatalkan penulisnya? Syaratnya sama persis
+ *  dengan yang dijaga server — ditulis ulang di sini HANYA supaya tombolnya
+ *  tidak muncul saat pasti ditolak, bukan sebagai pengaman. Pengamannya di
+ *  server; ini cuma sopan santun tampilan. */
+export function bisaDibatalkan(a: RingkasAnalisa, uidku?: string): boolean {
+  return !!uidku && a.uid === uidku && !a.hasil && !a.terisi
+    && !!a.jenisEntry && !/^market$/i.test(a.jenisEntry);
+}
+
 export async function hapusAnalisa(id: string) {
   return panggil(`/api/analisa?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
 }
@@ -157,6 +184,10 @@ export async function tambahGambar(id: string, dataUrl: string, ket: string, nam
 export interface PerformaAnalis {
   uid: string; nama: string; agen: boolean;
   menang: number; kalah: number; total: number;
+  /** Sinyal yang ditarik sebelum harganya datang. TIDAK masuk `total` dan
+   *  tidak masuk penyebut winrate: menghukum analis yang disiplin menarik
+   *  rencana yang sudah tidak sah akan mendorong kebiasaan sebaliknya. */
+  batal: number;
   winrate: number;
   /** Estimasi hasil dolar menurut model yang disebut di `modal`/`risikoPersen`. */
   hasilDolar: number;
