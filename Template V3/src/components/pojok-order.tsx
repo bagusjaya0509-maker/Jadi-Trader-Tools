@@ -378,8 +378,15 @@ export function PojokOrder({
 
         {/* Ukuran latihan diatur DI SINI, bukan di panel bawah replay —
             order demo bisa dibuka tanpa menyentuh tombol replay sama
-            sekali, jadi setelannya harus ikut tiketnya. */}
-        {!nyata && demoSetelan && aturDemo && (
+            sekali, jadi setelannya harus ikut tiketnya.
+
+            DISEMBUNYIKAN DI MODE COPY. Modal dan Risk% adalah uang MILIK
+            PENYUSUNNYA; sinyal yang dibagikan tidak membawa ukuran posisi,
+            karena yang membacanya punya modal dan toleransi risikonya
+            sendiri. Menampilkannya di tiket yang sedang menyusun sinyal
+            membuat angka pribadi terlihat seperti bagian dari sinyalnya —
+            dan sekaligus jadi pembeda yang jelas antara tiga mode itu. */}
+        {modeSekarang === 'demo' && demoSetelan && aturDemo && (
           <div className="mt-1.5 flex items-end gap-1.5">
             <IsianAngka judul="Modal $" lebar="w-[76px]" langkah={50}
                         nilai={demoSetelan.modal}
@@ -466,6 +473,12 @@ export function PojokOrder({
                 </span>
               );
             }
+            /* MODE COPY: hanya R:R, tanpa dolar. Angka dolarnya diturunkan
+               dari Modal & Risk% yang barusan disembunyikan — menampilkan
+               hasil dari setelan yang tidak terlihat membuat orang mengira
+               -$10 / +$20 itu bagian dari sinyalnya, padahal ia ukuran
+               posisi si penyusun. Yang menyeberang ke pembaca cuma rasio. */
+            if (modeSekarang === 'copy') return null;
             if (!nyata && risk > 0 && reward > 0) {
               /* Qty beku dari jangkar tiket: dolarnya MENGIKUTI garis. SL
                  yang ditarik menjauh menampilkan risiko lebih besar — bukan

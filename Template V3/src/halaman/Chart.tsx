@@ -920,6 +920,11 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
      yang rusak. Level hasil seretan tangan tidak disentuh: begitu orangnya
      menggeser sendiri, usulannya berhenti ikut campur. */
   const seretTangan = useRef(false);
+  /** COPY dinyalakan dari lencana, bukan diwarisi dari tautan analisa.
+   *  Bedanya menentukan: yang datang dari tautan berhenti berlaku begitu
+   *  orangnya memilih arah sendiri; yang ia pilih sendiri adalah MODE, dan
+   *  mode tidak boleh berubah karena sebuah klik yang bukan tentang mode. */
+  const copyManual = useRef(false);
   /* ── Qty demo DIJANGKARKAN, bukan dihitung ulang tiap seretan ────────
      Model lama: risiko dolar = modal × %risiko, titik — angkanya membeku
      di -$10 walau garis SL ditarik dua kali lebih jauh, karena ukuran
@@ -1980,10 +1985,21 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                               onPilih={(arah) => {
                                 setDraf(arah);
                                 setKabarNyata('');
-                                /* Sejak orangnya memilih arah sendiri, levelnya
-                                   miliknya — penanda COPY yang bertahan akan
-                                   berbohong tentang asal rencananya. */
-                                setDariSinyal(false);
+                                /* COPY DARI TAUTAN dimatikan di sini, COPY YANG
+                                   DIPILIH SENDIRI TIDAK.
+                                   ────────────────────────────────────────────
+                                   Dulu `dariSinyal` cuma berarti satu hal:
+                                   level ini datang dari analisa orang lain.
+                                   Memilih arah sendiri membuat penanda itu
+                                   berbohong, jadi ia dimatikan — benar.
+
+                                   Sejak lencananya jadi pemutar tiga mode,
+                                   COPY juga berarti "aku sedang menyusun
+                                   sinyal". Mematikannya saat orangnya menekan
+                                   BUY/SELL berarti mode yang baru saja ia
+                                   pilih lompat balik ke DEMO pada klik
+                                   pertama — mode yang tidak bisa dipakai. */
+                                if (!copyManual.current) setDariSinyal(false);
                                 seretTangan.current = false;
                                 /* Level yang SUDAH dipasang orangnya dipertahankan
                                    selama masih benar sisinya untuk arah ini.
@@ -2118,7 +2134,8 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                               onTutup={aksi.tutup} mati={aksi.mati}
                               onKirimSinyal={kirimKeCopySignal}
                               kabarSinyal={kabarKirimSinyal || undefined}
-                              dariSinyal={dariSinyal} onGantiCopy={setDariSinyal} />
+                              dariSinyal={dariSinyal}
+                              onGantiCopy={(v) => { copyManual.current = v; setDariSinyal(v); }} />
                           ) : undefined} />
             : <div className="flex h-[440px] flex-col items-center justify-center gap-1.5 px-6 text-center text-[12.5px] text-zinc-600">
                 {memuat ? 'Memuat lilin…'
