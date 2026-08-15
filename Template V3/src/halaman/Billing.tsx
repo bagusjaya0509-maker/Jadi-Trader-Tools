@@ -29,6 +29,18 @@ const NANTI = [
   { Ikon: CreditCard, nama: 'Kartu',         ket: 'Perpanjangan otomatis tiap bulan' },
 ];
 
+/* Judul section — bentuk yang sama persis dengan Maintenance, dan itu
+   disengaja: dua halaman administrasi yang tersusun beda membuat orang
+   mengira ia berada di bagian aplikasi yang lain. */
+function Bagian({ judul, sub }: { judul: string; sub: string }) {
+  return (
+    <div className="mb-3 mt-6 first:mt-0">
+      <h2 className="text-[14px] font-medium text-zinc-200">{judul}</h2>
+      <p className="text-[12px] text-zinc-500">{sub}</p>
+    </div>
+  );
+}
+
 export default function Billing() {
   return (
     <div className="p-4 sm:p-6">
@@ -60,6 +72,7 @@ export default function Billing() {
         </a>
       </div>
 
+      <Bagian judul="Ringkasan Langganan" sub="Status paket dan tagihanmu saat ini." />
       {/* KPI dengan tanda "—", bukan angka.
           Kerangkanya sengaja dipertahankan supaya bentuk halamannya sudah
           benar saat nanti diisi data sungguhan — dan supaya jelas ini
@@ -71,7 +84,8 @@ export default function Billing() {
         <KartuKpi label="Total dibayar"    nilai="—" catatan="Riwayat mulai tercatat nanti" />
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <Bagian judul="Cara Pembayaran" sub="Metode tersimpan dan yang sedang disiapkan." />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Panel className="lg:col-span-2">
           <PanelHead
             judul="Metode Pembayaran"
@@ -107,7 +121,8 @@ export default function Billing() {
         </Panel>
       </div>
 
-      <Panel className="mt-4">
+      <Bagian judul="Riwayat" sub="Catatan pembayaran yang pernah terjadi." />
+      <Panel>
         <PanelHead judul="Riwayat Tagihan" sub="Semua pembayaran yang pernah tercatat." />
         <div className="px-5 pb-5">
           <div className="rounded-lg border border-dashed border-zinc-800 px-4 py-8 text-center text-[12.5px] text-zinc-500">

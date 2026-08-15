@@ -160,12 +160,31 @@ async function pantauLangganan(
   const db = getFirestore(app);
   const ref = doc(db, 'langganan', uid);
 
-  const cuplikan = await getDoc(ref);
+  let cuplikan = await getDoc(ref);
   if (!cuplikan.exists()) {
     /* hasOnly(['mulai']) di aturan — jangan tambahkan field lain di sini,
        create-nya akan ditolak seluruhnya. */
     await setDoc(ref, { mulai: serverTimestamp() });
+    /* Dibaca ULANG: `serverTimestamp()` cuma penanda saat dikirim, nilainya
+       baru ada setelah server mengisinya. Tanpa pembacaan kedua, masa coba
+       dihitung dari `null` dan orangnya langsung terlihat 'habis'. */
+    cuplikan = await getDoc(ref);
   }
+
+  /* HASIL PERTAMA DIKIRIM SEBELUM PEMANTAU DIPASANG — dan ini bukan
+     optimasi, ini perbaikan bug yang menendang orang keluar.
+     ────────────────────────────────────────────────────────────────────
+     `onSnapshot` memulangkan fungsi pembatalnya SEKETIKA; callback datanya
+     baru berbunyi beberapa milidetik kemudian. Jadi `await pantauLangganan()`
+     selesai ketika status langganan MASIH 'tidakDiketahui' — pemanggil lalu
+     menurunkan `memuat` ke false, gerbang dievaluasi pada status kosong itu,
+     dan orang yang aksesnya sah dilempar ke halaman minta-akses. Datanya
+     tiba sesaat sesudahnya, tapi navigasinya sudah terjadi.
+
+     Gejalanya persis: login berhasil, tapi begitu halaman di-refresh
+     orangnya kembali ke halaman login. Cuplikan yang SUDAH kita ambil di
+     atas menutup celah itu tanpa satu pun pembacaan tambahan. */
+  saatBerubah(hitungLangganan(cuplikan.data() ?? {}, Timestamp));
 
   return onSnapshot(
     ref,

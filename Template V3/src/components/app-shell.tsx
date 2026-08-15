@@ -262,6 +262,18 @@ function Lonceng() {
                 {n.detail && <div className="mt-0.5 text-[11.5px] text-zinc-500">{n.detail}</div>}
               </div>
             ))}
+            {/* Benar-benar kosong = belum ada kejadian pasar yang tercatat.
+                Dikatakan apa adanya; kotak kosong tanpa kalimat terbaca
+                seperti panel yang gagal memuat. */}
+            {agen.kabar.length === 0 && NEWS.length === 0 && (
+              <div className="px-4 py-8 text-center">
+                <Newspaper className="mx-auto size-5 text-zinc-700" strokeWidth={1.6} />
+                <div className="mt-2 text-[12.5px] text-zinc-400">Belum ada kabar pasar</div>
+                <div className="mx-auto mt-1 max-w-[240px] text-[11.5px] leading-snug text-zinc-600">
+                  Sinyal dari agen Pemburu Sinyal muncul di sini begitu ada yang masuk.
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -378,6 +390,18 @@ function Pesan() {
                 </div>
               </div>
             ))}
+            {/* Kosong = belum ada apa pun yang terjadi pada akun ini. Itu
+                keadaan yang WAJAR untuk orang yang baru masuk, jadi
+                kalimatnya menenangkan, bukan meminta maaf. */}
+            {pribadi.length === 0 && PESAN.length === 0 && (
+              <div className="px-4 py-8 text-center">
+                <Mail className="mx-auto size-5 text-zinc-700" strokeWidth={1.6} />
+                <div className="mt-2 text-[12.5px] text-zinc-400">Belum ada pemberitahuan</div>
+                <div className="mx-auto mt-1 max-w-[240px] text-[11.5px] leading-snug text-zinc-600">
+                  Kabar tentang akunmu — akses disetujui, sesi baru — muncul di sini.
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

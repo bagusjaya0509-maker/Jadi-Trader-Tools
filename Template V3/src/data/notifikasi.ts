@@ -26,40 +26,23 @@ export interface Berita {
 /* Berita dampak tinggi ditaruh di atas hanya kalau waktunya juga paling
    dekat. Menaikkan berita lama karena "dampaknya tinggi" membuat orang
    membaca kabar kemarin sebagai kabar sekarang. */
-export const NEWS: Berita[] = [
-  {
-    id: 'n1', dampak: 'tinggi', mata: 'USD', waktu: '32 mnt lagi',
-    judul: 'CPI Amerika Serikat (YoY)',
-    detail: 'Perkiraan 2,9% · sebelumnya 3,1%. XAU dan kripto biasanya bergerak keras di menit pertama.',
-    baru: true,
-  },
-  {
-    id: 'n2', dampak: 'tinggi', mata: 'BTC', waktu: '1 jam lalu',
-    judul: 'Arus keluar ETF spot $214 juta',
-    detail: 'Hari ketiga berturut-turut. Rezim BTC di Area Pantau turun ke NETRAL.',
-    baru: true,
-  },
-  {
-    id: 'n3', dampak: 'sedang', mata: 'USD', waktu: '3 jam lalu',
-    judul: 'Klaim pengangguran mingguan',
-    detail: 'Rilis 221 ribu, sedikit di bawah perkiraan 224 ribu.',
-    baru: true,
-  },
-  {
-    id: 'n4', dampak: 'sedang', mata: 'XAU', waktu: '5 jam lalu',
-    judul: 'Emas menembus 4.340 lalu ditolak',
-    detail: 'Zona resisten H4 di 4.340 bertahan — sinyal SELL XAUT masih valid.',
-  },
-  {
-    id: 'n5', dampak: 'rendah', mata: 'SOL', waktu: '8 jam lalu',
-    judul: 'Upgrade jaringan Solana selesai',
-    detail: 'Tidak ada gangguan perdagangan. Volume kembali normal.',
-  },
-  {
-    id: 'n6', dampak: 'rendah', mata: 'EUR', waktu: 'Kemarin',
-    judul: 'ECB menahan suku bunga di 3,25%',
-  },
-];
+/* SENGAJA KOSONG — dan ini yang paling penting dari ketiganya.
+   ──────────────────────────────────────────────────────────────────────
+   Dulu berisi enam berita contoh dengan waktu RELATIF yang ditulis mati:
+   "CPI Amerika Serikat · 32 mnt lagi" tetap berbunyi "32 mnt lagi"
+   selamanya, hari ini maupun tahun depan.
+
+   Di aplikasi lain itu cuma tampilan yang basi. Di aplikasi TRADING itu
+   informasi pasar yang salah: ada orang yang menahan entry karena mengira
+   rilis CPI tinggal setengah jam lagi, atau justru masuk karena mengira
+   "arus keluar ETF $214 juta" baru terjadi satu jam lalu. Angka-angka itu
+   tidak pernah nyata sekali pun.
+
+   Loncengnya tidak jadi kosong: kabar agen Pemburu Sinyal yang NYATA
+   tetap tampil di sana (lihat `useKabarAgen` di app-shell). Kalender
+   berita sungguhan bisa dipasang nanti dari sumber yang benar-benar
+   hidup — sampai saat itu, tidak ada lebih jujur daripada palsu. */
+export const NEWS: Berita[] = [];
 
 export interface PesanAkun {
   id: string;
@@ -72,43 +55,27 @@ export interface PesanAkun {
   baru?: boolean;
 }
 
-export const PESAN: PesanAkun[] = [
-  {
-    id: 'p1', jenis: 'peringatan',
-    judul: 'Paket Screener habis dalam 4 hari',
-    isi: 'Langganan berakhir 14 Agustus 2026. Setelah itu Area Pantau dan Parallel Signal berhenti memuat data.',
-    aksi: 'Perpanjang sekarang', aksiKe: '/tagihan',
-    waktu: '2 jam lalu', baru: true,
-  },
-  {
-    id: 'p2', jenis: 'peringatan',
-    judul: 'App Token Binance belum diisi',
-    isi: 'Tombol Open Real Order akan ditolak sampai Backend URL dan App Token tersimpan.',
-    aksi: 'Atur di Integrations', aksiKe: '/integrasi',
-    waktu: '6 jam lalu', baru: true,
-  },
-  {
-    id: 'p3', jenis: 'kabar',
-    judul: 'Jadi Trader V3 versi 3.4 tersedia',
-    isi: 'Perbaikan pada duplikat channel kedua dan zona SNR di timeframe kecil. Unduh ulang dari Marketplace.',
-    aksi: 'Buka Marketplace', aksiKe: '/marketplace',
-    waktu: 'Kemarin', baru: true,
-  },
-  {
-    id: 'p4', jenis: 'kabar',
-    judul: 'Laporan bulan Juli sudah siap',
-    isi: '123 transaksi tercatat, winrate 51,2%. Ringkasan lengkap ada di Journal.',
-    aksi: 'Lihat Journal', aksiKe: '/jurnal',
-    waktu: '3 hari lalu',
-  },
-  {
-    id: 'p5', jenis: 'kabar',
-    judul: 'VPS dipindah ke sslip.io ber-HTTPS',
-    isi: 'Alamat lama dengan IP telanjang berhenti melayani 1 September 2026. Perbarui Backend URL kalau masih memakai yang lama.',
-    aksi: 'Periksa sambungan', aksiKe: '/integrasi',
-    waktu: '1 minggu lalu',
-  },
-];
+/* SENGAJA KOSONG.
+   ──────────────────────────────────────────────────────────────────────
+   Dulu berisi lima pesan contoh, dan tiap satunya salah untuk orang yang
+   baru mendaftar hari ini:
+
+     · "Paket Screener habis dalam 4 hari" — menakuti tanpa sebab; ia
+       belum punya paket apa pun.
+     · "Laporan Juli: 123 transaksi, winrate 51,2%" — itu angka ORANG
+       LAIN, terbaca sebagai riwayatnya sendiri.
+     · "VPS dipindah ke sslip.io" — bukan cuma basi, sekarang menyesatkan:
+       alamatnya sudah jaditrader.co.id.
+
+   Amplop ini tidak dibiarkan kosong: `app-shell` mengisinya dengan kabar
+   PRIBADI yang nyata (berhasil masuk, akses disetujui) dari
+   `lib/kabar-pribadi`. Kosong berarti memang belum ada yang terjadi — dan
+   itu jawaban yang jujur, jauh lebih baik daripada panel ramai yang
+   isinya tidak satu pun tentang orang yang sedang membacanya.
+
+   Pengumuman produk sungguhan boleh masuk ke sini nanti, satu per satu,
+   saat memang ada yang perlu diumumkan. */
+export const PESAN: PesanAkun[] = [];
 
 export interface ButirRilis {
   jenis: 'baru' | 'perbaikan' | 'peningkatan';
