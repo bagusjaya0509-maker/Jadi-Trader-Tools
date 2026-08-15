@@ -263,7 +263,13 @@ export function PojokOrder({
     );
 
     return (
-      <div className={cn('rounded-lg border bg-zinc-900/92 px-2.5 py-2 backdrop-blur-sm',
+      /* max-w di HP: tiket ini duduk sebagai hamparan di pojok kiri-atas
+         chart, dan tanpa batas ia melebar mengikuti isinya sampai ~306 px —
+         di layar 375 px itu berarti menutupi hampir seluruh lebar lilin,
+         dan ujung kanannya menabrak legend indikator. Dibatasi menyisakan
+         5 rem supaya sumbu harga dan legend tetap terbaca; isinya sudah
+         `flex-wrap`, jadi yang terjadi cuma turun baris. */
+      <div className={cn('max-w-[calc(100vw-5rem)] rounded-lg border bg-zinc-900/92 px-2.5 py-2 backdrop-blur-sm sm:max-w-none',
         nyata ? 'border-red-500/40' : 'border-zinc-700')}>
         <div className="mb-1.5 flex items-center gap-2">
           {Lencana}

@@ -1560,13 +1560,24 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                 bilah atas ia jauh dari tempat mata sedang berada. */}
           </div>
 
-          <div className="ml-auto flex items-center gap-3">
-            <span className={cn('flex items-center gap-1.5 text-[11px]', memuat ? 'text-zinc-600' : 'text-emerald-500')}>
+          <div className="ml-auto flex items-center gap-2 sm:gap-3">
+            {/* Status live PINDAH KE DALAM CHART di layar kecil.
+                ──────────────────────────────────────────────────────────
+                Di HP, bilah ini berebut ~180 px dengan empat tombol dan
+                yang terlempar keluar layar adalah Replay — tombol paling
+                kanan. "live · 3 dtk" adalah keterangan chart, bukan
+                perintah: ia tidak perlu ruang di baris yang isinya tombol.
+                Versi chart-nya ada di pojok kanan-atas grafik. */}
+            <span className={cn('hidden items-center gap-1.5 text-[11px] sm:flex', memuat ? 'text-zinc-600' : 'text-emerald-500')}>
               <Radio className="size-3" /> {memuat ? 'memuat' : 'live · 3 dtk'}
             </span>
+            {/* Label tombol disembunyikan di HP — ikonnya sudah dikenali,
+                dan `title` tetap menjelaskan untuk yang ragu. */}
             <button onClick={() => { setSegar((n) => n + 1); setKunciChart((n) => n + 1); }}
-              className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100">
-              <RefreshCw className={cn('size-3.5', memuat && 'animate-spin')} /> Segarkan
+              title="Segarkan data"
+              className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100 sm:px-2.5">
+              <RefreshCw className={cn('size-3.5', memuat && 'animate-spin')} />
+              <span className="hidden sm:inline">Segarkan</span>
             </button>
             {/* News pindah ke sini dari screener. Kalender ekonomi menjawab
                 "aman tidak entry sekarang", dan pertanyaan itu muncul saat
@@ -1580,15 +1591,17 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                 diingat — memasangnya kembali satu klik, bukan tempel-ulang. */}
             <div className="relative">
               <button onClick={() => setMenuInd((v) => !v)}
-                className={cn('flex cursor-pointer items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[12px] transition-colors',
+                title="Indikator"
+                className={cn('flex cursor-pointer items-center gap-1.5 rounded-md border px-2 py-1.5 text-[12px] transition-colors sm:px-2.5',
                   menuInd ? 'border-zinc-600 text-zinc-100' : 'border-zinc-800 text-zinc-300 hover:border-zinc-700 hover:text-zinc-100')}>
-                <Layers className="size-3.5" /> Indikator
+                <Layers className="size-3.5" />
+                <span className="hidden sm:inline">Indikator</span>
                 {(Number(tampilSnr) + Number(tampilSmi) + (pineInfo ? 1 : 0)) > 0 && (
                   <span className="rounded bg-zinc-800 px-1 text-[10px] text-zinc-300">
                     {Number(tampilSnr) + Number(tampilSmi) + (pineInfo ? 1 : 0)}
                   </span>
                 )}
-                <ChevronDown className="size-3" />
+                <ChevronDown className="hidden size-3 sm:block" />
               </button>
               {menuInd && (
                 <>
@@ -1645,14 +1658,21 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
               title={replayIdx !== null ? 'Keluar dari replay'
                 : bidikReplay ? 'Batal memilih titik mulai'
                 : 'Pilih titik mulai replay — klik di chart'}
-              className={cn('flex cursor-pointer items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[12px] transition-colors',
+              className={cn('flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border px-2 py-1.5 text-[12px] transition-colors sm:px-2.5',
                 replayIdx !== null
                   ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400'
                   : bidikReplay
                   ? 'border-amber-500/50 bg-amber-500/10 text-amber-300'
                   : 'border-zinc-800 text-zinc-300 hover:border-zinc-700 hover:text-zinc-100')}>
               <History className="size-3.5" />
-              {bidikReplay ? 'Klik di chart…' : 'Replay'}
+              {/* Label disembunyikan di HP KECUALI saat modenya menyala.
+                  Ikon jam-mundur sendirian sudah cukup untuk tombol diam,
+                  tapi "sedang membidik" dan "sedang replay" adalah keadaan
+                  BERBAHAYA — klik berikutnya di chart punya arti lain — dan
+                  keadaan berbahaya harus tertulis, sesempit apa pun layarnya. */}
+              <span className={cn(bidikReplay || replayIdx !== null ? 'inline' : 'hidden sm:inline')}>
+                {bidikReplay ? 'Klik di chart…' : 'Replay'}
+              </span>
               {replayIdx !== null && <span className="angka text-[10.5px]">bar {replayIdx + 1}</span>}
             </button>
           </div>
@@ -2000,8 +2020,26 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
               garis misterius; indikator yang bernama adalah alat. */}
           {/* right-24, bukan right-16: tombol × di ujung nama indikator
               dulu nyaris menempel pita harga di sumbu kanan, dan dua hal
-              yang bisa diklik sedekat itu bikin salah tekan. */}
-          <div className="pointer-events-none absolute right-24 top-2 z-20 flex flex-col items-end gap-1">
+              yang bisa diklik sedekat itu bikin salah tekan.
+
+              DI HP seluruh kolom ini turun ke KANAN-BAWAH, dan status live
+              ikut masuk ke dalamnya. Alasannya diukur, bukan dikira: di
+              layar 375 px tiket order melebar sampai ~328 px dari kiri dan
+              tingginya 220 px, jadi seluruh paruh ATAS chart adalah
+              miliknya — apa pun yang ditaruh di sana tertimpa, termasuk
+              nama indikator (keluhan aslinya) dan badge live di percobaan
+              pertama perbaikan ini.
+
+              Kanan-bawah satu-satunya sudut yang benar-benar bebas: tiket
+              di kiri-atas, bilah alat di kiri-tengah, sumbu harga di tepi
+              kanan. right-16 menjaga jarak dari sumbu itu. */}
+          <div className="pointer-events-none absolute bottom-2 right-16 z-20 flex flex-col items-end gap-1 sm:bottom-auto sm:right-24 sm:top-2">
+            {/* Status live — HP saja; di layar lebar ia tetap di bilah
+                kendali, yang di sana memang muat. */}
+            <div className={cn('flex items-center gap-1 rounded bg-zinc-950/70 px-1.5 py-0.5 text-[10px] backdrop-blur-sm sm:hidden',
+              memuat ? 'text-zinc-500' : 'text-emerald-500')}>
+              <Radio className="size-2.5" /> {memuat ? 'memuat' : 'live · 3 dtk'}
+            </div>
             {pineInfo && (
               /* Tanpa latar: nama indikator adalah KETERANGAN chart, bukan
                      kartu tersendiri. Kotak gelap di atas lilin justru menutup

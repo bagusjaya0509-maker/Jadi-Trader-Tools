@@ -4,7 +4,7 @@ import {
   LayoutGrid, BarChart3, Briefcase, Users, Plug, CandlestickChart,
   Wallet, TrendingUp, Wrench, CreditCard, LifeBuoy, BookOpen,
   PanelLeft, Bell, Mail, X, Sparkles, MessageCircle, Send, AtSign,
-  AlertTriangle, Newspaper, ChevronRight, Copy, Radar, UserCircle2,
+  AlertTriangle, Newspaper, ChevronRight, Copy, Radar, UserCircle2, Crown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BADAN, WA_LINK } from '@/lib/badan';
@@ -81,24 +81,34 @@ const NAV = [
       { ke: '/marketplace', label: 'Marketplace',      Ikon: Users },
       { ke: '/copy',        label: 'Copy Signal',      Ikon: Copy },
       { ke: '/integrasi',   label: 'Integrations',     Ikon: Plug },
-      /* Billing ada DI SINI, bukan di Administration.
-         ────────────────────────────────────────────────────────────────
-         Administration disembunyikan dari yang bukan pemilik, jadi selama
-         Billing duduk di sana ia cuma terlihat oleh satu orang — padahal
-         tagihan adalah urusan PELANGGAN: dialah yang perlu tahu paketnya
-         apa, habis kapan, dan bagaimana memperpanjang. Sales Report dan
-         Maintenance memang alat pemilik; Billing tidak pernah begitu.
-
-         DIPARKIR, bukan dihapus: rutenya tetap hidup supaya tautan lama
-         tidak mati dan halamannya siap dinyalakan begitu pembayaran
-         tersambung. Lencana "beta" adalah peringatan yang terbaca SEBELUM
-         diklik — orang yang mengira ada tagihan tertunggak tidak perlu
-         membuka halaman untuk tahu belum ada apa-apa. */
+    ],
+  },
+  {
+    /* Administration = urusan AKUN SENDIRI, terlihat semua orang.
+       Billing DIPARKIR, bukan dihapus: rutenya tetap hidup supaya tautan
+       lama tidak mati dan halamannya siap dinyalakan begitu pembayaran
+       tersambung. Lencana "beta" adalah peringatan yang terbaca SEBELUM
+       diklik — orang yang mengira ada tagihan tertunggak tidak perlu
+       membuka halaman untuk tahu belum ada apa-apa. */
+    grup: 'Administration',
+    butir: [
       { ke: '/tagihan',     label: 'Billing',          Ikon: CreditCard, lencana: 'beta' },
     ],
   },
   {
-    grup: 'Administration',
+    /* Owner Page = alat PEMILIK, disembunyikan dari yang lain.
+       ──────────────────────────────────────────────────────────────────
+       Dulu grup ini bernama "Administration" dan menampung Billing juga —
+       dua hal yang sama sekali berbeda: Sales Report melihat penjualan
+       SEMUA orang, Billing melihat tagihan SATU orang. Nama yang sama
+       untuk keduanya membuat batas itu kabur persis di tempat yang paling
+       tidak boleh kabur.
+
+       Mahkotanya sama dengan penanda premium di Marketplace — satu
+       lambang, satu arti, di seluruh aplikasi. */
+    grup: 'Owner Page',
+    hanyaPemilik: true,
+    IkonGrup: Crown,
     butir: [
       { ke: '/pemilik',     label: 'Sales Report', Ikon: TrendingUp },
       { ke: '/maintenance', label: 'Maintenance',     Ikon: Wrench },
@@ -541,13 +551,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
 
         <nav className="flex-1 overflow-y-auto px-3 py-2">
-          {/* Administration disembunyikan dari yang bukan pemilik. Ini murni
-              kerapian tampilan — halamannya sendiri dijaga Security Rules,
-              yang memakai uid yang sama. Menu tersembunyi tidak pernah jadi
-              pengamanan; siapa pun bisa mengetik #/pemilik. */}
-          {NAV.filter((g) => g.grup !== 'Administration' || pemilik).map((g) => (
+          {/* Grup bertanda `hanyaPemilik` disembunyikan dari yang lain. Ini
+              murni kerapian tampilan — halamannya sendiri dijaga Security
+              Rules, yang memakai uid yang sama. Menu tersembunyi tidak
+              pernah jadi pengamanan; siapa pun bisa mengetik #/pemilik. */}
+          {NAV.filter((g: any) => !g.hanyaPemilik || pemilik).map((g: any) => (
             <div key={g.grup} className="mb-5">
-              {!ciut && <div className="px-2 pb-2 text-[11px] font-medium text-zinc-500">{g.grup}</div>}
+              {!ciut && (
+                <div className="flex items-center gap-1.5 px-2 pb-2">
+                  {g.IkonGrup && <g.IkonGrup className="size-3.5 shrink-0 text-amber-400" strokeWidth={2} />}
+                  <span className="text-[11px] font-medium text-zinc-500">{g.grup}</span>
+                </div>
+              )}
+              {/* Sidebar CIUT tinggal ikon, jadi judul grupnya hilang — dan
+                  bersamanya hilang pula satu-satunya tanda bahwa dua menu di
+                  bawah ini khusus pemilik. Mahkota kecil ini menggantikannya. */}
+              {ciut && g.IkonGrup && (
+                <div className="flex justify-center pb-1.5">
+                  <g.IkonGrup className="size-3.5 text-amber-400/70" strokeWidth={2} />
+                </div>
+              )}
               {g.butir.map(({ ke, label, Ikon, lencana }: any) => (
                 <NavLink key={ke} to={ke} onClick={() => setLaci(false)} title={ciut ? label : undefined}
                   className={({ isActive }) => cn(
