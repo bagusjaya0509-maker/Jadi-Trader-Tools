@@ -7,7 +7,7 @@ import {
   AlertTriangle, Newspaper, ChevronRight, Copy, Radar,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { BADAN } from '@/lib/badan';
+import { BADAN, WA_LINK } from '@/lib/badan';
 import { useAuth } from '@/lib/auth';
 import { useKabarAgen, umurKabar } from '@/lib/kabar';
 import { MenuPengguna, PitaLangganan } from '@/components/gerbang';
@@ -324,7 +324,7 @@ function Bantuan({ ciut }: { ciut: boolean }) {
      Documentation — mencampur keduanya membuat orang yang butuh jawaban
      cepat malah tersesat di daftar artikel. */
   const SALURAN = [
-    { Ikon: MessageCircle, label: 'WhatsApp', ket: 'Balasan tercepat', href: 'https://wa.me/6281234567890', warna: 'text-emerald-400' },
+    { Ikon: MessageCircle, label: 'WhatsApp', ket: BADAN.waTampil, href: WA_LINK, warna: 'text-emerald-400' },
     { Ikon: Send, label: 'Discord', ket: 'Diskusi & komunitas', href: '#', warna: 'text-indigo-400' },
     /* Email USAHA, bukan email pribadi pemilik. Alamat pribadi di halaman
        bantuan berarti alamat itu ikut tersebar ke setiap pengguna, tidak

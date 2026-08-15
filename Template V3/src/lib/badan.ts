@@ -21,4 +21,18 @@ export const BADAN = {
   nib: '1508260003215',
   kota: 'Kota Mataram, Nusa Tenggara Barat, Indonesia',
   email: 'business@jaditrader.co.id',
+
+  /* Nomor telepon usaha, sama dengan yang terdaftar di NIB (085947720369).
+     Disimpan dalam format internasional TANPA tanda plus dan tanpa nol
+     depan, karena itu yang diminta wa.me: 0859… menjadi 62859…
+
+     Sebelumnya tautan Help Center menunjuk 6281234567890 — nomor contoh
+     yang ikut tersalin dari template. Siapa pun yang mengkliknya mendarat
+     di percakapan dengan orang asing, dan pengirimnya tidak pernah tahu
+     pesannya tidak sampai. */
+  waNomor: '6285947720369',
+  waTampil: '0859-4772-0369',
 } as const;
+
+/** Tautan WhatsApp siap pakai. Dipakai Help Center dan Documentation. */
+export const WA_LINK = `https://wa.me/${BADAN.waNomor}`;

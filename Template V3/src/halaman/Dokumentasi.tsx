@@ -5,7 +5,7 @@ import {
   CreditCard, ShieldCheck, LifeBuoy, Library, ChevronRight, type LucideIcon,
 } from 'lucide-react';
 import { Panel } from '@/components/efferd-ui';
-import { BADAN } from '@/lib/badan';
+import { BADAN, WA_LINK } from '@/lib/badan';
 import { cn } from '@/lib/utils';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -418,7 +418,7 @@ export default function Dokumentasi() {
 
             <div className="mt-8 flex flex-wrap items-center gap-3 border-t border-zinc-800/80 pt-5">
               <span className="text-[12.5px] text-zinc-500">Belum terjawab?</span>
-              <a href="https://wa.me/6281234567890" target="_blank" rel="noreferrer"
+              <a href={WA_LINK} target="_blank" rel="noreferrer"
                 className="rounded-md border border-zinc-800 px-3 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100">
                 Tanya lewat WhatsApp
               </a>
