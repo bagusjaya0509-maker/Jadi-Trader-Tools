@@ -553,6 +553,7 @@ export default function Analisa() {
      terposting — endpoint galeri butuh id analisanya, dan id itu baru ada
      setelah POST berhasil. */
   const [sampul, setSampul] = useState('');
+  const [lihatSampul, setLihatSampul] = useState(false);
 
   /* Draf dari Chart & Entry dibaca SEKALI saat halaman dibuka, lalu
      dihapus oleh ambilDraf() — kalau tidak, menyegarkan halaman akan
@@ -593,7 +594,11 @@ export default function Analisa() {
     setSibuk(true); setKabar('');
     try {
       const hasil = await kirimAnalisa({
-        judul: judul.trim(), pasangan: pasangan.trim().toUpperCase(), arah,
+        /* Judul rekaman diturunkan dari ringkasan — kolomnya sudah dihapus
+           dari formulir. Server tetap mewajibkannya, dan kartu-kartu lama
+           yang judulnya berbeda dari ringkasannya tetap tampil apa adanya. */
+        judul: (ringkas.trim() || `${pasangan.trim().toUpperCase()} · ${arah}`).slice(0, 80),
+        pasangan: pasangan.trim().toUpperCase(), arah,
         harga: hargaJual, ringkas: ringkas.trim(),
         isi: { entry: Number(entry) || 0, sl: Number(sl) || 0, tp: Number(tp) || 0, alasan: alasan.trim() },
         nama: pengguna?.displayName || pengguna?.email?.split('@')[0] || 'Analis',
@@ -760,10 +765,11 @@ export default function Analisa() {
         {formBuka && (
           <div className="border-t border-zinc-800/80 px-5 py-4">
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <div className="col-span-2">
-                <label className="mb-1 block text-[11px] text-zinc-500">Judul</label>
-                <input value={judul} onChange={(e) => setJudul(e.target.value)} className={KELAS_ISIAN} />
-              </div>
+              {/* Kolom "Judul" DIHAPUS. Ia meminta orang menulis dua ringkasan
+                  untuk satu analisa — judul dan ringkasan publik — dan yang
+                  kedua selalu memuat yang pertama. Judul rekamannya kini
+                  diambil dari ringkasan (lihat `posting`), jadi kartu lama
+                  yang judulnya berbeda tetap tampil apa adanya. */}
               <div>
                 <label className="mb-1 block text-[11px] text-zinc-500">Pasangan</label>
                 <input value={pasangan} onChange={(e) => setPasangan(e.target.value.toUpperCase())} className={cn(KELAS_ISIAN, 'angka')} />
@@ -785,9 +791,76 @@ export default function Analisa() {
               <div><label className="mb-1 block text-[11px] text-zinc-500">TP</label>
                 <input value={tp} onChange={(e) => setTp(e.target.value)} inputMode="decimal" className={cn(KELAS_ISIAN, 'angka')} /></div>
               <div className="col-span-2 sm:col-span-4">
-                <label className="mb-1 block text-[11px] text-zinc-500">Ringkasan publik (terlihat sebelum dibayar — sertakan kontak pembayaranmu)</label>
-                <input value={ringkas} onChange={(e) => setRingkas(e.target.value)} className={KELAS_ISIAN} />
+                <label className="mb-1 block text-[11px] text-zinc-500">
+                  Ringkasan publik — ini yang jadi judul kartu, terlihat sebelum dibayar
+                </label>
+                <input value={ringkas} onChange={(e) => setRingkas(e.target.value)}
+                       placeholder="mis. EMA tersusun turun, jual di pantulan EMA50" className={KELAS_ISIAN} />
               </div>
+
+              {/* ── Risiko & imbalan dalam DOLAR ────────────────────────────
+                  Level dalam angka harga tidak memberi tahu apa pun tentang
+                  besar taruhannya. Yang dihitung di sini memakai model yang
+                  SAMA dengan halaman Performa Signal — modal $1.000, risiko
+                  1% — supaya angka yang dilihat analis saat memposting dan
+                  angka yang dilihat pembeli di rekam jejak berasal dari
+                  aturan yang satu, bukan dua yang kebetulan mirip. */}
+              {(() => {
+                const e = Number(entry), s = Number(sl), t = Number(tp);
+                if (!e || !s || !t) return null;
+                const jarakSl = Math.abs(e - s), jarakTp = Math.abs(t - e);
+                if (!jarakSl) return null;
+                const rr = jarakTp / jarakSl;
+                const sisiBenar = arah === 'BUY' ? (s < e && t > e) : (s > e && t < e);
+                const RISIKO = 10;             // 1% dari $1.000
+                return (
+                  <div className="col-span-2 sm:col-span-4 rounded-lg border border-zinc-800 bg-zinc-950/60 p-3">
+                    {!sisiBenar ? (
+                      <p className="text-[12px] leading-relaxed text-amber-300/90">
+                        SL dan TP berada di sisi yang salah untuk arah {arah}. Untuk {arah},
+                        SL harus {arah === 'BUY' ? 'di bawah' : 'di atas'} entry dan
+                        TP {arah === 'BUY' ? 'di atas' : 'di bawah'}-nya.
+                      </p>
+                    ) : (
+                      <>
+                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                          <div>
+                            <div className="text-[10.5px] text-zinc-600">Jarak SL</div>
+                            <div className="angka text-[13px] text-red-400">
+                              {fHarga(jarakSl)} <span className="text-zinc-600">({((jarakSl / e) * 100).toFixed(2)}%)</span>
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-[10.5px] text-zinc-600">Jarak TP</div>
+                            <div className="angka text-[13px] text-emerald-400">
+                              {fHarga(jarakTp)} <span className="text-zinc-600">({((jarakTp / e) * 100).toFixed(2)}%)</span>
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-[10.5px] text-zinc-600">Risiko : imbalan</div>
+                            <div className={cn('angka text-[13px] font-semibold',
+                              rr >= 1.5 ? 'text-emerald-400' : rr >= 1 ? 'text-zinc-200' : 'text-amber-400')}>
+                              1 : {rr.toFixed(2)}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-[10.5px] text-zinc-600">Jika kena TP</div>
+                            <div className="angka text-[13px] font-semibold text-emerald-400">
+                              +{uang(rr * RISIKO)}
+                            </div>
+                          </div>
+                        </div>
+                        <p className="mt-2 text-[10.5px] leading-relaxed text-zinc-600">
+                          Hitungan dolar memakai contoh modal <span className="text-zinc-500">{uang(1000)}</span> dengan
+                          risiko 1% — kena SL berarti <span className="text-red-400/90">−{uang(RISIKO)}</span>, kena TP{' '}
+                          <span className="text-emerald-400/90">+{uang(rr * RISIKO)}</span>. Ini model yang sama dengan
+                          halaman Performa Signal, bukan hasil trading yang dijanjikan.
+                        </p>
+                      </>
+                    )}
+                  </div>
+                );
+              })()}
               <div className="col-span-2 sm:col-span-4">
                 <label className="mb-1 block text-[11px] text-zinc-500">Alasan / analisa lengkap (terkunci)</label>
                 <textarea value={alasan} onChange={(e) => setAlasan(e.target.value)} rows={3}
@@ -804,14 +877,26 @@ export default function Analisa() {
             <div className="mt-3 rounded-lg border border-zinc-800 bg-zinc-950/60 p-3">
               {sampul ? (
                 <div className="flex flex-wrap items-start gap-3">
-                  <img src={sampul} alt="Sampul analisa"
-                       className="h-24 w-40 shrink-0 rounded border border-zinc-800 object-cover" />
+                  {/* Gambar kecilnya SENDIRI bisa diklik untuk membesar —
+                      selain tombolnya. Ukuran 160×96 tidak cukup untuk
+                      menilai apakah levelnya kelihatan, dan sampul yang tidak
+                      pernah diperiksa terbit apa adanya ke calon pembeli. */}
+                  <button onClick={() => setLihatSampul(true)} title="Lihat ukuran penuh"
+                          className="shrink-0 cursor-zoom-in">
+                    <img src={sampul} alt="Sampul analisa"
+                         className="h-24 w-40 rounded border border-zinc-800 object-cover transition-opacity hover:opacity-80" />
+                  </button>
                   <div className="min-w-0 grow">
                     <div className="text-[12px] font-medium text-zinc-200">Sampul terpasang</div>
                     <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-500">
                       Tangkapan layar chart-mu ikut terbit sebagai sampul analisa ini.
+                      Periksa dulu sebelum memposting — sinyalnya permanen.
                     </p>
                     <div className="mt-2 flex flex-wrap gap-2">
+                      <button onClick={() => setLihatSampul(true)}
+                        className="cursor-pointer rounded-md border border-zinc-700 px-2.5 py-1 text-[11.5px] text-zinc-200 transition-colors hover:border-zinc-500">
+                        Lihat sampul
+                      </button>
                       <Link to={`/chart?simbol=${encodeURIComponent(pasangan)}&arah=${arah}`
                               + (entry ? `&entry=${entry}` : '') + (sl ? `&sl=${sl}` : '') + (tp ? `&tp=${tp}` : '')}
                         className="rounded-md border border-zinc-700 px-2.5 py-1 text-[11.5px] text-zinc-300 transition-colors hover:border-zinc-500">
@@ -886,6 +971,33 @@ export default function Analisa() {
             </div>
           </div>
         )}
+        {/* Pratinjau sampul ukuran penuh. Yang terpotret HANYA kanvas
+            chartnya — lilin, indikator, garis harga, dan alat gambar.
+            Panel melayang yang digambar HTML (tiket order, label garis yang
+            sedang diseret, bilah alat) TIDAK ikut, karena mereka bukan
+            bagian dari kanvas. Itu disebutkan di sini supaya bedanya dengan
+            layar tidak terbaca sebagai sampul yang rusak. */}
+        {lihatSampul && sampul && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/85 p-4"
+               onClick={() => setLihatSampul(false)}>
+            <div className="max-h-full w-full max-w-4xl overflow-auto" onClick={(e) => e.stopPropagation()}>
+              <img src={sampul} alt="Sampul analisa ukuran penuh"
+                   className="w-full rounded-lg border border-zinc-800" />
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <p className="min-w-0 grow text-[11.5px] leading-relaxed text-zinc-500">
+                  Yang terpotret adalah kanvas chart: lilin, indikator, garis harga, dan alat
+                  gambar. Tiket order dan label garis yang sedang diseret tidak ikut — keduanya
+                  panel melayang, bukan bagian dari chartnya.
+                </p>
+                <button onClick={() => setLihatSampul(false)}
+                  className="shrink-0 cursor-pointer rounded-md bg-zinc-100 px-3 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white">
+                  Tutup
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {kabar && <p className="px-5 pb-4 text-[12px] text-zinc-400">{kabar}</p>}
         {!pengguna && (
           <p className="px-5 pb-4 text-[12.5px] text-zinc-500">Masuk dulu untuk memposting atau membeli analisa.</p>

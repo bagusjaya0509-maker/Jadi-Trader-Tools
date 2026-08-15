@@ -782,6 +782,15 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
   const ambilFoto = useRef<null | (() => string | null)>(null);
   const [kabarKirimSinyal, setKabarKirimSinyal] = useState('');
 
+  /* Level di layar ini datang dari analisa Copy Signal, bukan disusun
+     sendiri. Dipakai menyalakan penanda COPY di tiket order — tampilannya
+     identik (tiga garis, panel yang sama), dan rencana orang lain tidak
+     boleh dikirim ke bursa karena dikira rencana sendiri.
+
+     DIMATIKAN begitu orangnya menekan BUY/SELL sendiri: sejak itu levelnya
+     miliknya, dan penanda yang bertahan akan berbohong. */
+  const [dariSinyal, setDariSinyal] = useState(false);
+
   function kirimKeCopySignal() {
     if (!draf) { setKabarKirimSinyal('Pilih arah BUY atau SELL dulu di panel order.'); return; }
     const { entry, sl, tp } = rencana;
@@ -982,6 +991,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
     };
     setDraf(arah);
     setRencana({ entry: angka('entry'), sl: angka('sl'), tp: angka('tp') });
+    setDariSinyal(true);
     /* Mode TIDAK diubah otomatis. Membuka analisa orang lain tidak boleh
        diam-diam memindahkan seseorang ke mode order sungguhan — yang
        memutuskan uang sungguhan dipertaruhkan adalah orangnya, bukan
@@ -1875,6 +1885,10 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                               onPilih={(arah) => {
                                 setDraf(arah);
                                 setKabarNyata('');
+                                /* Sejak orangnya memilih arah sendiri, levelnya
+                                   miliknya — penanda COPY yang bertahan akan
+                                   berbohong tentang asal rencananya. */
+                                setDariSinyal(false);
                                 seretTangan.current = false;
                                 /* Level yang SUDAH dipasang orangnya dipertahankan
                                    selama masih benar sisinya untuk arah ini.
@@ -2008,7 +2022,8 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                               sibukNyata={sibukNyata} kabar={kabarNyata || undefined}
                               onTutup={aksi.tutup} mati={aksi.mati}
                               onKirimSinyal={kirimKeCopySignal}
-                              kabarSinyal={kabarKirimSinyal || undefined} />
+                              kabarSinyal={kabarKirimSinyal || undefined}
+                              dariSinyal={dariSinyal} />
                           ) : undefined} />
             : <div className="flex h-[440px] flex-col items-center justify-center gap-1.5 px-6 text-center text-[12.5px] text-zinc-600">
                 {memuat ? 'Memuat lilin…'

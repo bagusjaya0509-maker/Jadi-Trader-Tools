@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { TrendingUp, TrendingDown, X, Check, Ban, CandlestickChart, Minus, Hourglass , Share2 } from 'lucide-react';
+import { TrendingUp, TrendingDown, X, Check, Ban, CandlestickChart, Minus, Hourglass , Share2 , Copy } from 'lucide-react';
 import { cn, uang, harga as fHarga } from '@/lib/utils';
 import { METODE_TP, type MetodeTp } from '@/lib/order-nyata';
 
@@ -120,7 +120,7 @@ function IsianAngka({ nilai, atur, langkah, min = 0, maks, desimal = 2, lebar, j
 }
 
 export function PojokOrder({
-  posisi, hargaKini, draf, rencana, mode, jenis, risiko, tunda, onBatalTunda, onKirimSinyal, kabarSinyal,
+  posisi, hargaKini, draf, rencana, mode, jenis, risiko, tunda, onBatalTunda, onKirimSinyal, kabarSinyal, dariSinyal,
   onPilih, onUbah, onKirim, onBatal, onTutup, onGantiMode, mati,
   nyataSetelan, aturNyata, sibukNyata, kabar, demoSetelan, aturDemo,
   catatan, aturCatatan, qtyDemo, mt5, lotMt5, aturLotMt5, nilaiLotMt5, desimalHarga = 6,
@@ -162,6 +162,9 @@ export function PojokOrder({
   onKirimSinyal?: () => void;
   /** Pesan hasil pengiriman (mis. level belum lengkap). */
   kabarSinyal?: string;
+  /** Level di chart ini datang dari analisa Copy Signal. Menyalakan
+   *  penanda COPY biru — lihat catatan di tempat pembuatannya. */
+  dariSinyal?: boolean;
   onGantiMode: (m: 'demo' | 'real') => void;
   mati?: boolean;
   /** Setelan order sungguhan — modal, leverage, metode TP. Diangkat ke
@@ -203,11 +206,29 @@ export function PojokOrder({
     </button>
   );
 
+  /* ── Penanda COPY ─────────────────────────────────────────────────────
+     Muncul saat level di chart ini datang dari sebuah analisa Copy Signal,
+     bukan disusun sendiri. Biru, terpisah dari lencana DEMO/REAL, karena
+     yang dibedakannya hal lain: DEMO/REAL menjawab "uangnya sungguhan atau
+     tidak", COPY menjawab "levelnya siapa".
+
+     Perlu dibedakan justru karena tampilannya identik: tiga garis yang sama,
+     panel yang sama. Tanpa penanda ini, rencana orang lain yang baru dibuka
+     dari kartu analisa tidak bisa dibedakan dari rencana yang barusan
+     disusun sendiri — dan yang pertama tidak boleh dikirim ke bursa karena
+     mengira yang kedua. */
+  const LencanaCopy = dariSinyal ? (
+    <span title="Level ini berasal dari analisa Copy Signal, bukan disusun di sini"
+      className="flex items-center gap-1 rounded bg-sky-500/20 px-1.5 py-0.5 text-[9.5px] font-semibold tracking-wide text-sky-300">
+      <Copy className="size-2.5" /> COPY
+    </span>
+  ) : null;
+
   /* ── Pending order menunggu ────────────────────────────────────────── */
   if (tunda) {
     return (
       <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-zinc-900/90 px-2 py-1.5 backdrop-blur-sm">
-        {Lencana}
+        {Lencana}{LencanaCopy}
         <Hourglass className="size-3.5 text-amber-400" />
         <span className="text-[11px] text-amber-200/90">
           {tunda.arah === 'BUY' ? 'Buy' : 'Sell'} {tunda.jenis === 'STOP' ? 'Stop' : 'Limit'}{' '}
@@ -225,7 +246,7 @@ export function PojokOrder({
   if (posisi) {
     return (
       <div className="flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900/90 px-2 py-1.5 backdrop-blur-sm">
-        {Lencana}
+        {Lencana}{LencanaCopy}
         <span className={cn('rounded px-1.5 py-0.5 text-[10px] font-semibold',
           posisi.arah === 'BUY' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400')}>
           {posisi.arah}
@@ -277,7 +298,7 @@ export function PojokOrder({
       <div className={cn('max-w-[calc(100vw-5rem)] rounded-lg border bg-zinc-900/92 px-2.5 py-2 backdrop-blur-sm sm:max-w-none',
         nyata ? 'border-red-500/40' : 'border-zinc-700')}>
         <div className="mb-1.5 flex items-center gap-2">
-          {Lencana}
+          {Lencana}{LencanaCopy}
           <span className={cn('rounded px-1.5 py-0.5 text-[10px] font-semibold',
             draf === 'BUY' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400')}>
             {draf}
@@ -479,7 +500,7 @@ export function PojokOrder({
   /* ── Diam terbuka: pilih arah ──────────────────────────────────────── */
   return (
     <div className="flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900/85 px-1.5 py-1.5 backdrop-blur-sm">
-      {Lencana}
+      {Lencana}{LencanaCopy}
       <button onClick={() => onPilih('BUY')} disabled={mati}
         className="flex cursor-pointer items-center gap-1 rounded bg-emerald-500/20 px-2.5 py-1 text-[11.5px] font-semibold text-emerald-300 transition-colors hover:bg-emerald-500/30 disabled:cursor-not-allowed disabled:opacity-40">
         <TrendingUp className="size-3.5" /> BUY
