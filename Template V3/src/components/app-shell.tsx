@@ -81,6 +81,20 @@ const NAV = [
       { ke: '/marketplace', label: 'Marketplace',      Ikon: Users },
       { ke: '/copy',        label: 'Copy Signal',      Ikon: Copy },
       { ke: '/integrasi',   label: 'Integrations',     Ikon: Plug },
+      /* Billing ada DI SINI, bukan di Administration.
+         ────────────────────────────────────────────────────────────────
+         Administration disembunyikan dari yang bukan pemilik, jadi selama
+         Billing duduk di sana ia cuma terlihat oleh satu orang — padahal
+         tagihan adalah urusan PELANGGAN: dialah yang perlu tahu paketnya
+         apa, habis kapan, dan bagaimana memperpanjang. Sales Report dan
+         Maintenance memang alat pemilik; Billing tidak pernah begitu.
+
+         DIPARKIR, bukan dihapus: rutenya tetap hidup supaya tautan lama
+         tidak mati dan halamannya siap dinyalakan begitu pembayaran
+         tersambung. Lencana "beta" adalah peringatan yang terbaca SEBELUM
+         diklik — orang yang mengira ada tagihan tertunggak tidak perlu
+         membuka halaman untuk tahu belum ada apa-apa. */
+      { ke: '/tagihan',     label: 'Billing',          Ikon: CreditCard, lencana: 'beta' },
     ],
   },
   {
@@ -88,12 +102,6 @@ const NAV = [
     butir: [
       { ke: '/pemilik',     label: 'Sales Report', Ikon: TrendingUp },
       { ke: '/maintenance', label: 'Maintenance',     Ikon: Wrench },
-      /* Billing DIPARKIR, bukan dihapus: rutenya tetap hidup supaya tautan
-         lama tidak mati dan halamannya siap dinyalakan begitu Xendit
-         tersambung. Lencana "beta" di sini adalah peringatan yang terbaca
-         SEBELUM diklik — orang yang mengira ada tagihan tertunggak tidak
-         perlu membuka halaman untuk tahu belum ada apa-apa. */
-      { ke: '/tagihan',     label: 'Billing',         Ikon: CreditCard, lencana: 'beta' },
     ],
   },
 ];
