@@ -126,6 +126,38 @@ export async function tambahGambar(id: string, dataUrl: string, ket: string, nam
   return j.gambar;
 }
 
+/* ── Performa signal ────────────────────────────────────────────────────
+   Angkanya dihitung backend dari sinyal yang SUDAH SELESAI menurut lilin
+   sungguhan — tidak ada satu pun yang bisa diisi tangan, termasuk oleh
+   pemilik. Papan peringkat yang bisa disetel sendiri tidak berarti apa-apa. */
+export interface PerformaAnalis {
+  uid: string; nama: string; agen: boolean;
+  menang: number; kalah: number; total: number;
+  winrate: number;
+  /** Estimasi hasil dolar menurut model yang disebut di `modal`/`risikoPersen`. */
+  hasilDolar: number;
+  terakhir: number;
+  /** Tanggal lokal `YYYY-MM-DD` -> hasil dolar hari itu. Untuk kalender. */
+  harian: Record<string, number>;
+}
+
+export interface Performa {
+  modal: number;
+  risikoPersen: number;
+  analis: PerformaAnalis[];
+  /** Sinyal yang masih berjalan. Dipakai layar untuk mengatakan terus
+   *  terang bahwa peringkatnya belum berarti apa-apa saat datanya sedikit. */
+  berjalan: number;
+}
+
+export async function ambilPerforma(): Promise<Performa> {
+  const j = await panggil('/api/analisa/performa', {}, false);
+  return {
+    modal: j.modal ?? 1000, risikoPersen: j.risikoPersen ?? 1,
+    analis: j.analis ?? [], berjalan: j.berjalan ?? 0,
+  };
+}
+
 export async function hapusGambar(id: string, gambarId: string) {
   return panggil('/api/analisa/gambar/hapus', { method: 'POST', body: JSON.stringify({ id, gambarId }) });
 }

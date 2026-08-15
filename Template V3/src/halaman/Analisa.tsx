@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { PanelSinyal } from '@/components/panel-sinyal';
+import { PerformaSignal } from '@/components/performa-signal';
 import { cn, uang, persen, harga as fHarga, tanggalPendek } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 import { useRiwayat, useSaldoAwal } from '@/lib/data';
@@ -462,7 +463,23 @@ function SlotAgen({ urutan }: { urutan: number }) {
   );
 }
 
+/* ── SUB-HALAMAN ─────────────────────────────────────────────────────────
+   Dua urusan yang berbeda pertanyaannya. "Sinyal" menjawab apa yang sedang
+   ditawarkan sekarang; "Performa" menjawab apakah yang ditawarkan itu
+   pernah terbukti. Menumpuk keduanya dalam satu halaman panjang membuat
+   orang yang datang untuk memeriksa rekam jejak harus menggulir melewati
+   sinyal yang belum ia percayai.
+
+   Pola tabnya sama dengan halaman Maintenance — satu pola untuk hal yang
+   sama, bukan dua cara berbeda menyelesaikan masalah yang identik. */
+const SUB = [
+  { id: 'sinyal',   label: 'Sinyal' },
+  { id: 'performa', label: 'Performa Signal' },
+] as const;
+type IdSub = typeof SUB[number]['id'];
+
 export default function Analisa() {
+  const [sub, setSub] = useState<IdSub>('sinyal');
   const { pengguna } = useAuth();
   const { data: riwayat } = useRiwayat();
   const saldoAwal = useSaldoAwal();
@@ -525,6 +542,22 @@ export default function Analisa() {
 
   return (
     <div className="p-4 sm:p-6">
+      {/* Bilah sub-halaman. Sengaja di paling atas dan bukan di dalam salah
+          satu panel: ia memilih SELURUH isi halaman, dan kontrol yang
+          mengubah semuanya tidak boleh terlihat seperti milik satu panel. */}
+      <div className="mb-4 flex flex-wrap gap-1.5 border-b border-zinc-800/80 pb-3">
+        {SUB.map((s) => (
+          <button key={s.id} onClick={() => setSub(s.id)}
+            className={cn('cursor-pointer rounded-md px-3 py-1.5 text-[12.5px] transition-colors',
+              sub === s.id ? 'bg-zinc-100 font-medium text-zinc-950' : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200')}>
+            {s.label}
+          </button>
+        ))}
+      </div>
+
+      {sub === 'performa' && <PerformaSignal />}
+
+      <div className={cn(sub !== 'sinyal' && 'hidden')}>
       {/* ── Rak sinyal pantauan: empat slot ───────────────────────────
          Duduk di halaman Copy Signal, bukan dashboard: sinyal komunitas
          adalah bahan meniru trade orang lain — satu keluarga dengan
@@ -688,6 +721,7 @@ export default function Analisa() {
           ))}
         </div>
       )}
+      </div>
     </div>
   );
 }
