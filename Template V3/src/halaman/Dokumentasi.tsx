@@ -5,6 +5,7 @@ import {
   CreditCard, ShieldCheck, LifeBuoy, Library, ChevronRight, type LucideIcon,
 } from 'lucide-react';
 import { Panel } from '@/components/efferd-ui';
+import { BADAN } from '@/lib/badan';
 import { cn } from '@/lib/utils';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -421,7 +422,9 @@ export default function Dokumentasi() {
                 className="rounded-md border border-zinc-800 px-3 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100">
                 Tanya lewat WhatsApp
               </a>
-              <a href="mailto:bagusjaya0509@gmail.com"
+              {/* Email usaha, sejalan dengan Help Center dan halaman Legal —
+                  dibaca dari lib/badan.ts supaya ketiganya tidak menyimpang. */}
+              <a href={`mailto:${BADAN.email}`}
                 className="rounded-md border border-zinc-800 px-3 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100">
                 Kirim email
               </a>

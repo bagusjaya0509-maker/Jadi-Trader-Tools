@@ -7,6 +7,7 @@ import {
   AlertTriangle, Newspaper, ChevronRight, Copy, Radar,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { BADAN } from '@/lib/badan';
 import { useAuth } from '@/lib/auth';
 import { useKabarAgen, umurKabar } from '@/lib/kabar';
 import { MenuPengguna, PitaLangganan } from '@/components/gerbang';
@@ -325,7 +326,12 @@ function Bantuan({ ciut }: { ciut: boolean }) {
   const SALURAN = [
     { Ikon: MessageCircle, label: 'WhatsApp', ket: 'Balasan tercepat', href: 'https://wa.me/6281234567890', warna: 'text-emerald-400' },
     { Ikon: Send, label: 'Discord', ket: 'Diskusi & komunitas', href: '#', warna: 'text-indigo-400' },
-    { Ikon: AtSign, label: 'Email', ket: 'bagusjaya0509@gmail.com', href: 'mailto:bagusjaya0509@gmail.com', warna: 'text-zinc-400' },
+    /* Email USAHA, bukan email pribadi pemilik. Alamat pribadi di halaman
+       bantuan berarti alamat itu ikut tersebar ke setiap pengguna, tidak
+       bisa didelegasikan ke siapa pun, dan terbaca sebagai hobi ketimbang
+       usaha berbadan hukum. Dibaca dari lib/badan.ts supaya sama persis
+       dengan yang tertulis di halaman Legal dan footer. */
+    { Ikon: AtSign, label: 'Email', ket: BADAN.email, href: `mailto:${BADAN.email}`, warna: 'text-zinc-400' },
   ];
 
   return (
