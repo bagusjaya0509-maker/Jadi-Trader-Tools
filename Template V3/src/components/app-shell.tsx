@@ -87,12 +87,12 @@ const NAV = [
     /* Administration = urusan AKUN SENDIRI, terlihat semua orang.
        Billing DIPARKIR, bukan dihapus: rutenya tetap hidup supaya tautan
        lama tidak mati dan halamannya siap dinyalakan begitu pembayaran
-       tersambung. Lencana "beta" adalah peringatan yang terbaca SEBELUM
-       diklik — orang yang mengira ada tagihan tertunggak tidak perlu
-       membuka halaman untuk tahu belum ada apa-apa. */
+       tersambung. Penanda "beta"-nya ada DI DALAM halaman (pita
+       maintenance di puncaknya), bukan di sidebar — satu peringatan di
+       satu tempat; lencana di menu cuma mengulanginya. */
     grup: 'Administration',
     butir: [
-      { ke: '/tagihan',     label: 'Billing',          Ikon: CreditCard, lencana: 'beta' },
+      { ke: '/tagihan',     label: 'Billing',          Ikon: CreditCard },
     ],
   },
   {
@@ -559,8 +559,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <div key={g.grup} className="mb-5">
               {!ciut && (
                 <div className="flex items-center gap-1.5 px-2 pb-2">
-                  {g.IkonGrup && <g.IkonGrup className="size-3.5 shrink-0 text-amber-400" strokeWidth={2} />}
                   <span className="text-[11px] font-medium text-zinc-500">{g.grup}</span>
+                  {g.IkonGrup && <g.IkonGrup className="size-3.5 shrink-0 text-amber-400" strokeWidth={2} />}
                 </div>
               )}
               {/* Sidebar CIUT tinggal ikon, jadi judul grupnya hilang — dan
@@ -571,7 +571,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <g.IkonGrup className="size-3.5 text-amber-400/70" strokeWidth={2} />
                 </div>
               )}
-              {g.butir.map(({ ke, label, Ikon, lencana }: any) => (
+              {g.butir.map(({ ke, label, Ikon }: any) => (
                 <NavLink key={ke} to={ke} onClick={() => setLaci(false)} title={ciut ? label : undefined}
                   className={({ isActive }) => cn(
                     'mb-0.5 flex items-center gap-2.5 rounded-md px-2 py-2 text-[13px] transition-colors',
@@ -592,11 +592,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     )}
                   </span>
                   {!ciut && <span>{label}</span>}
-                  {!ciut && lencana && (
-                    <span className="ml-auto rounded bg-amber-500/15 px-1.5 py-0.5 text-[9.5px] font-medium uppercase tracking-wide text-amber-400/90">
-                      {lencana}
-                    </span>
-                  )}
                 </NavLink>
               ))}
             </div>
