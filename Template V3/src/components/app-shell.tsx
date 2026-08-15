@@ -559,8 +559,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <div key={g.grup} className="mb-5">
               {!ciut && (
                 <div className="flex items-center gap-1.5 px-2 pb-2">
-                  <span className="text-[11px] font-medium text-zinc-500">{g.grup}</span>
                   {g.IkonGrup && <g.IkonGrup className="size-3.5 shrink-0 text-amber-400" strokeWidth={2} />}
+                  <span className="text-[11px] font-medium text-zinc-500">{g.grup}</span>
                 </div>
               )}
               {/* Sidebar CIUT tinggal ikon, jadi judul grupnya hilang — dan
