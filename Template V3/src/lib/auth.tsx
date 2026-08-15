@@ -25,17 +25,59 @@ import { app, auth, penyediaGoogle, UID_PEMILIK } from '@/lib/firebase';
    menolak tulisan kalau memang tidak berhak.
    ════════════════════════════════════════════════════════════════════════ */
 
-/* ── Login Discord: token kustom datang lewat hash ──────────────────────
+/* ── Login Discord: KODE TUKAR datang lewat hash, bukan tokennya ────────
    Backend VPS menyelesaikan OAuth Discord lalu mengarahkan balik ke sini
-   dengan `#discord=<token>`. Diproses SEKALI di muat modul, sebelum router
-   sempat menganggapnya alamat halaman — token sekali pakai tidak boleh
-   nyangkut di riwayat peramban. */
+   dengan `#discord=<kode acak>`. Kode itu ditukar lewat POST menjadi token
+   Firebase yang sesungguhnya.
+
+   Sebelum 15 Agu 2026 yang dikirim adalah tokennya langsung. Chrome lalu
+   memasang layar merah "Situs berbahaya" pada URL itu — dan tuduhannya
+   bisa dimengerti: domain yang baru berumur beberapa hari, dialihkan dari
+   discord.com, membawa JWT yang isinya menyebut identitytoolkit.googleapis.com.
+   Bagi pemindai otomatis itu persis bentuk kit phishing yang memanen login
+   Google.
+
+   Perbaikannya sekaligus menutup lubang yang sebenarnya: token asli tidak
+   lagi tersangkut di riwayat peramban, log server, maupun header Referer.
+
+   Diproses SEKALI saat modul dimuat, sebelum router sempat menganggap hash
+   itu alamat halaman. */
 if (typeof window !== 'undefined' && window.location.hash.startsWith('#discord=')) {
-  const token = decodeURIComponent(window.location.hash.slice(9));
+  const kode = decodeURIComponent(window.location.hash.slice(9));
+  /* Hash dibersihkan LEBIH DULU, sebelum permintaan jaringan berangkat.
+     Kalau ditunda sampai jawabannya datang, kode itu sempat terekam di
+     riwayat — dan kalau permintaannya gagal, ia tertinggal di sana. */
   window.history.replaceState(null, '', window.location.pathname + '#/dashboard');
-  signInWithCustomToken(auth, token).catch((e) => {
-    console.error('Login Discord gagal:', e);
-  });
+
+  void (async () => {
+    try {
+      /* Menerima DUA bentuk, dan itu disengaja selama masa peralihan.
+         Frontend dan backend tidak bisa berganti pada detik yang sama:
+         yang satu tayang lewat GitHub Actions, yang satu lewat restart pm2.
+         Kalau sisi ini hanya mengerti bentuk baru, setiap orang yang login
+         di sela kedua deploy itu gagal masuk tanpa tahu kenapa.
+
+         Token Firebase adalah JWT — selalu punya titik pemisah. Kode tukar
+         adalah base64url acak tanpa titik. Membedakannya cukup dengan itu.
+
+         Cabang lama boleh dibuang setelah backend baru terbukti jalan. */
+      let token = kode;
+      if (!kode.includes('.')) {
+        const { dasarBackend } = await import('@/lib/koneksi');
+        const r = await fetch(`${dasarBackend()}/api/auth/discord/tukar`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ kode }),
+        });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok || !j.token) throw new Error(j.error || `Server menjawab ${r.status}`);
+        token = j.token;
+      }
+      await signInWithCustomToken(auth, token);
+    } catch (e) {
+      console.error('Login Discord gagal:', e);
+    }
+  })();
 }
 
 const HARI_COBA = 30;
