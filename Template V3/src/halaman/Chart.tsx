@@ -789,7 +789,10 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
 
      DIMATIKAN begitu orangnya menekan BUY/SELL sendiri: sejak itu levelnya
      miliknya, dan penanda yang bertahan akan berbohong. */
-  const [dariSinyal, setDariSinyal] = useState(false);
+  const [dariSinyal, setDariSinyal] = useState(() => cari.get('untuk') === 'sinyal');
+  /* Alamat bisa berubah tanpa halaman dimuat ulang (klik dari kartu lain),
+     jadi penandanya ikut dibaca lagi. */
+  useEffect(() => { if (cari.get('untuk') === 'sinyal') setDariSinyal(true); }, [cari]);
 
   function kirimKeCopySignal() {
     if (!draf) { setKabarKirimSinyal('Pilih arah BUY atau SELL dulu di panel order.'); return; }

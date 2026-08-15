@@ -897,7 +897,7 @@ export default function Analisa() {
                         className="cursor-pointer rounded-md border border-zinc-700 px-2.5 py-1 text-[11.5px] text-zinc-200 transition-colors hover:border-zinc-500">
                         Lihat sampul
                       </button>
-                      <Link to={`/chart?simbol=${encodeURIComponent(pasangan)}&arah=${arah}`
+                      <Link to={`/chart?simbol=${encodeURIComponent(pasangan)}&untuk=sinyal&arah=${arah}`
                               + (entry ? `&entry=${entry}` : '') + (sl ? `&sl=${sl}` : '') + (tp ? `&tp=${tp}` : '')}
                         className="rounded-md border border-zinc-700 px-2.5 py-1 text-[11.5px] text-zinc-300 transition-colors hover:border-zinc-500">
                         Susun ulang di Chart
@@ -918,7 +918,7 @@ export default function Analisa() {
                     <span className="text-zinc-300">"Ke Copy Signal"</span> di tiket order.
                     Level dan tangkapan layarnya masuk ke formulir ini otomatis.
                   </p>
-                  <Link to={`/chart?simbol=${encodeURIComponent(pasangan)}`}
+                  <Link to={`/chart?simbol=${encodeURIComponent(pasangan)}&untuk=sinyal`}
                     className="shrink-0 rounded-md bg-zinc-100 px-3 py-1.5 text-[11.5px] font-medium text-zinc-950 transition-colors hover:bg-white">
                     Susun di Chart & Entry
                   </Link>

@@ -136,6 +136,7 @@ const NAV = [
           { ke: '/maintenance',             label: 'Akses & Lisensi' },
           { ke: '/maintenance?tab=produk',  label: 'Katalog Produk' },
           { ke: '/maintenance?tab=sistem',  label: 'Kesehatan Sistem' },
+          { ke: '/maintenance?tab=langganan', label: 'Langganan & Lisensi' },
           { ke: '/maintenance?tab=trafik',  label: 'Trafik & Server' },
           { ke: '/maintenance?tab=pine',    label: 'Mesin Pine' },
           { ke: '/maintenance?tab=konten',  label: 'Situs & Konten' },
