@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { TrendingUp, TrendingDown, X, Check, Ban, CandlestickChart, Minus, Hourglass , Share2 , Copy } from 'lucide-react';
+import { TrendingUp, TrendingDown, X, Check, Ban, CandlestickChart, Minus, Hourglass, Share2 } from 'lucide-react';
 import { cn, uang, harga as fHarga } from '@/lib/utils';
 import { METODE_TP, type MetodeTp } from '@/lib/order-nyata';
 
@@ -240,7 +240,11 @@ export function PojokOrder({
         modeSekarang === 'copy' ? 'bg-sky-500/20 text-sky-300 hover:bg-sky-500/30'
           : modeSekarang === 'real' ? 'bg-red-500/25 text-red-300 hover:bg-red-500/35'
                   : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200')}>
-      {modeSekarang === 'copy' && <Copy className="size-2.5" />}
+      {/* Tulisan saja, tanpa ikon. COPY dulu satu-satunya mode berikon, dan
+          itu membuatnya terbaca sebagai jenis lencana yang berbeda dari dua
+          saudaranya — padahal ketiganya satu putaran yang sama. Lebarnya pun
+          jadi tidak sama, sehingga tombolnya bergeser tiap kali modenya
+          berubah. */}
       {modeSekarang === 'copy' ? 'COPY' : modeSekarang === 'real' ? 'REAL' : 'DEMO'}
     </button>
   );
