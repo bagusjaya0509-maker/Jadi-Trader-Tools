@@ -478,6 +478,17 @@ const SUB = [
 ] as const;
 type IdSub = typeof SUB[number]['id'];
 
+/* Rak "Sinyal Pantauan" DISEMBUNYIKAN sementara — agennya masih jauh dari
+   siap dan tiga dari empat slotnya kosong. Rak yang isinya satu panel beta
+   plus tiga kotak "belum terisi" tidak menjanjikan apa pun kepada pengunjung
+   selain bahwa produknya belum jadi.
+
+   Kodenya SENGAJA TIDAK DIHAPUS, cuma dimatikan dari satu tempat. Rak itu
+   hasil beberapa putaran perbaikan (lebar tetap, gulir mendatar, slot yang
+   menjelaskan dirinya); membuangnya berarti mengerjakan ulang semuanya saat
+   agennya siap. Ubah ke `true` untuk menampilkannya lagi. */
+const TAMPIL_RAK_SINYAL = false;
+
 export default function Analisa() {
   const [sub, setSub] = useState<IdSub>('sinyal');
   const { pengguna } = useAuth();
@@ -555,6 +566,33 @@ export default function Analisa() {
         ))}
       </div>
 
+      {/* ── Peringatan risiko, di tingkat HALAMAN ──────────────────────────
+          Kalimat ini dulu menempel di panel Sinyal Pantauan. Panel itu kini
+          disembunyikan — dan yang ikut hilang bersamanya justru satu-satunya
+          penyeimbang yang terlihat, padahal halaman ini menampilkan pair,
+          arah, entry, SL, dan TP dari analisa berbayar: bentuk yang paling
+          mudah dibaca orang sebagai "beli sekarang di harga ini".
+
+          DI LUAR TAB, jadi terlihat di keduanya. Tab Performa justru yang
+          paling membutuhkannya: winrate dan estimasi hasil adalah angka yang
+          paling gampang dibaca sebagai janji.
+
+          Di ATAS, bukan di kaki halaman. Disclaimer yang menunggu digulir
+          tidak pernah sampai ke orang yang sedang bersiap menekan "Buka di
+          Chart & Entry". */}
+      <div className="mb-4 rounded-lg border border-amber-500/20 bg-amber-500/[0.04] px-4 py-3">
+        <p className="text-[11.5px] leading-relaxed text-zinc-400">
+          <span className="font-medium text-amber-300/90">Bukan rekomendasi beli atau jual.</span>{' '}
+          Analisa di halaman ini disusun pengguna lain dan agen AI dari data harga publik —
+          termasuk yang berbayar. Rekam jejak dan estimasi yang ditampilkan adalah catatan masa
+          lalu, <span className="text-zinc-300">bukan jaminan hasil</span>. Periksa ulang sebelum
+          eksekusi; seluruh risiko dan keputusan ada padamu.{' '}
+          <Link to="/legal" className="underline decoration-zinc-700 underline-offset-2 hover:text-zinc-200">
+            Disclaimer &amp; Ketentuan
+          </Link>
+        </p>
+      </div>
+
       {sub === 'performa' && <PerformaSignal />}
 
       <div className={cn(sub !== 'sinyal' && 'hidden')}>
@@ -573,6 +611,7 @@ export default function Analisa() {
          Urutannya kelak mengikuti ketepatan analisa, bukan waktu daftar.
          Sampai angka itu terkumpul, urutan sekarang belum berarti apa-apa
          dan itu dikatakan apa adanya di layar. */}
+      {TAMPIL_RAK_SINYAL && <>
       <div className="mb-4 flex items-center gap-2">
         <h2 className="text-[15px] font-semibold tracking-tight text-zinc-100">Sinyal Pantauan</h2>
         <LencanaBeta />
@@ -596,6 +635,7 @@ export default function Analisa() {
           <div key={n} className="w-[320px] shrink-0"><SlotAgen urutan={n} /></div>
         ))}
       </div>
+      </>}
 
       {/* Permintaan masuk untuk analisaku */}
       {masuk.length > 0 && (

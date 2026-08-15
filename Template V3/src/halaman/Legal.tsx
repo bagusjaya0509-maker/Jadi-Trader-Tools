@@ -203,7 +203,8 @@ const BAGIAN: Bagian[] = [
         <Sorot>
           <Tegas>Datamu disimpan dan diproses di Singapura, bukan di Indonesia.</Tegas>{' '}
           Server kami berada di pusat data Singapura, dan basis data Firebase kami memakai
-          wilayah <Tegas>asia-southeast1</Tegas> yang juga berlokasi di Singapura.
+          wilayah <Tegas>asia-southeast1</Tegas> yang juga berlokasi di Singapura.{' '}
+          <Tegas>Satu pengecualian: pengiriman surel diproses di Jepang.</Tegas>
         </Sorot>
         <P>
           Kami menyampaikannya terang-terangan karena UU PDP mewajibkan kamu diberi tahu bila
@@ -219,7 +220,12 @@ const BAGIAN: Bagian[] = [
         <Daftar butir={[
           <><Tegas>Google Cloud / Firebase</Tegas> (Singapura) — autentikasi akun dan basis data jurnal.</>,
           <><Tegas>DigitalOcean, LLC</Tegas> (Singapura) — server aplikasi: lisensi, data pasar yang diteruskan, dan jembatan ke platform tradingmu.</>,
-          <><Tegas>Resend</Tegas> — mengirim surel layanan, misalnya pemberitahuan akses disetujui. Hanya menerima alamat surel dan isi suratnya.</>,
+          /* Wilayahnya disebut TERPISAH dari Singapura karena memang berbeda
+             negara. Menuliskan "Singapura" untuk seluruh pemroses akan lebih
+             rapi dibaca, tapi tidak benar — dan justru soal lokasi inilah UU
+             PDP menuntut pemberitahuan. Layanan surel yang kami pakai tidak
+             menyediakan wilayah Singapura; Tokyo yang terdekat ke Indonesia. */
+          <><Tegas>Resend</Tegas> (Tokyo, Jepang) — mengirim surel layanan, misalnya pemberitahuan akses disetujui. Hanya menerima alamat surel dan isi suratnya. Wilayah Singapura tidak tersedia di layanan ini, dan Tokyo yang jaringannya paling dekat.</>,
           <><Tegas>Discord</Tegas> — hanya bila kamu memilih masuk lewat Discord.</>,
           <><Tegas>Penyedia jasa pembayaran berizin</Tegas> — memproses pembayaran. Nomor kartu dan rekeningmu ditangani mereka dan <Tegas>tidak pernah melewati sistem kami</Tegas>.</>,
         ]} />
