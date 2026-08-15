@@ -166,7 +166,6 @@ type IdTabInt = typeof TAB_INT[number]['id'];
 
 export default function Integrasi() {
   const [tab, setTab] = useState<IdTabInt>('sehat');
-  const [bukaLangkah, setBukaLangkah] = useState(false);
   /* Kode pasangan ASLI dari backend, bukan contoh.
      Sebelumnya baris ini berisi `useState('JT-4F2A-91C7')` — kode yang
      ditulis mati di sini. Awalannya salah (backend membuat `JTM5-…`) DAN
@@ -572,17 +571,15 @@ export default function Integrasi() {
         <Panel>
           <div className="px-5 py-5">
             <div className="rounded-lg border border-zinc-800/60 p-4">
-              {/* Dilipat secara bawaan supaya kartu MT5 setinggi kartu
-                  Binance di sebelahnya — enam langkah pemasangan hanya
-                  dibutuhkan SEKALI, sementara kartunya dilihat tiap hari. */}
-              <button onClick={() => setBukaLangkah((v) => !v)}
-                className="flex w-full cursor-pointer items-center justify-between text-left">
-                <span className="text-[11.5px] font-medium uppercase tracking-wider text-zinc-500">
-                  Cara memasang — 6 langkah
-                </span>
-                <span className="text-[11.5px] text-zinc-500">{bukaLangkah ? 'Sembunyikan' : 'Lihat langkah'}</span>
-              </button>
-              {bukaLangkah && <div className="mt-3">
+              {/* TERBUKA, tidak dilipat. Dulu disembunyikan demi kartu yang
+                  rapi, tapi halaman ini berjudul "Tutorial Pasang MT5" —
+                  tutorial yang isinya harus diklik dulu adalah tutorial yang
+                  menyembunyikan satu-satunya alasan orang membukanya, dan
+                  yang membacanya justru orang yang sedang bingung. */}
+              <div className="text-[11.5px] font-medium uppercase tracking-wider text-zinc-500">
+                Cara memasang — 6 langkah
+              </div>
+              <div className="mt-3">
               <Langkah no={1} judul="Unduh berkasnya" anak={
                 <>Klik <span className="text-zinc-300">Unduh JadiTraderSync.ex5</span> di bawah. Berkasnya ±36 KB.</>
               } />
@@ -629,7 +626,7 @@ export default function Integrasi() {
                 </div>
                 <div className="text-[13px] font-medium text-zinc-200">Selesai — jurnal terisi sendiri</div>
               </div>
-              </div>}
+              </div>
 
               {/* Tiga kegagalan yang paling sering terjadi, dengan cirinya
                   masing-masing. Daftar "kalau tidak jalan, cek koneksi" tidak

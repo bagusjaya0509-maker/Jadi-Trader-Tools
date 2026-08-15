@@ -88,7 +88,12 @@ const NAV = [
     butir: [
       { ke: '/pemilik',     label: 'Sales Report', Ikon: TrendingUp },
       { ke: '/maintenance', label: 'Maintenance',     Ikon: Wrench },
-      { ke: '/tagihan',     label: 'Billing',         Ikon: CreditCard },
+      /* Billing DIPARKIR, bukan dihapus: rutenya tetap hidup supaya tautan
+         lama tidak mati dan halamannya siap dinyalakan begitu Xendit
+         tersambung. Lencana "beta" di sini adalah peringatan yang terbaca
+         SEBELUM diklik — orang yang mengira ada tagihan tertunggak tidak
+         perlu membuka halaman untuk tahu belum ada apa-apa. */
+      { ke: '/tagihan',     label: 'Billing',         Ikon: CreditCard, lencana: 'beta' },
     ],
   },
 ];
@@ -511,7 +516,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {NAV.filter((g) => g.grup !== 'Administration' || pemilik).map((g) => (
             <div key={g.grup} className="mb-5">
               {!ciut && <div className="px-2 pb-2 text-[11px] font-medium text-zinc-500">{g.grup}</div>}
-              {g.butir.map(({ ke, label, Ikon }) => (
+              {g.butir.map(({ ke, label, Ikon, lencana }: any) => (
                 <NavLink key={ke} to={ke} onClick={() => setLaci(false)} title={ciut ? label : undefined}
                   className={({ isActive }) => cn(
                     'mb-0.5 flex items-center gap-2.5 rounded-md px-2 py-2 text-[13px] transition-colors',
@@ -532,6 +537,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     )}
                   </span>
                   {!ciut && <span>{label}</span>}
+                  {!ciut && lencana && (
+                    <span className="ml-auto rounded bg-amber-500/15 px-1.5 py-0.5 text-[9.5px] font-medium uppercase tracking-wide text-amber-400/90">
+                      {lencana}
+                    </span>
+                  )}
                 </NavLink>
               ))}
             </div>

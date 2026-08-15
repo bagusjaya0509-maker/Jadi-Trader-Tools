@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import {
   Play, Loader2, RefreshCw, Radio, TriangleAlert, History,
   Layers, ChevronDown, Settings2, Code2, X, Ruler, Rows3, Square, Eraser, Minus, TrendingUp,
-  FlaskConical, GripVertical } from 'lucide-react';
+  FlaskConical, GripHorizontal } from 'lucide-react';
 import { PanelNews } from '@/components/panel-news';
 import { Panel, PanelHead, KartuKpi, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn, uang, persen, harga, tanggalPendek } from '@/lib/utils';
@@ -2044,12 +2044,15 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
             )}
           </div>
 
-          {/* ── Alat gambar — bilah MENDATAR di dasar chart ─────────
-              Dulu tegak di tengah sisi kiri, dan di situ ia berdiri tepat
-              di jalur panel order yang terbuka dari pojok kiri atas:
-              begitu ordernya panjang, keduanya bertumpuk dan tombol alat
-              jadi tidak bisa ditekan. Dasar chart kosong dan tetap
-              kosong berapa pun isi panel ordernya.
+          {/* ── Alat gambar — bilah TEGAK di sisi kiri chart ─────────
+              Tegak seperti TradingView: itu bentuk yang sudah dikenali
+              tangan, dan tinggi chart selalu lebih longgar daripada
+              lebarnya — bilah mendatar memakan lebar yang justru dipakai
+              membaca lilin.
+
+              Bentrokan lama dengan panel order (keduanya dulu di pojok
+              kiri atas) sudah tidak berlaku: bilahnya duduk di kiri-TENGAH
+              dan tetap bisa diseret ke mana saja.
 
               Klik gambar (mode kursor) untuk memilihnya, Delete untuk
               menghapus; penghapus menghapus yang terpilih dulu, semuanya
@@ -2058,17 +2061,20 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
             <button onClick={() => aturAlatTutup(false)} title="Buka bilah alat gambar"
               style={letakAlat ? { left: letakAlat.x, top: letakAlat.y } : undefined}
               className={cn('absolute z-20 flex size-7 cursor-pointer items-center justify-center rounded-lg border border-zinc-800/80 bg-zinc-950/85 text-zinc-500 backdrop-blur-sm transition-colors hover:text-zinc-200',
-                !letakAlat && 'bottom-2 left-2')}>
+                !letakAlat && 'left-2 top-1/2 -translate-y-1/2')}>
               <Ruler className="size-3.5" />
             </button>
           ) : (
           <div onPointerDown={mulaiSeretAlat}
                style={letakAlat ? { left: letakAlat.x, top: letakAlat.y } : undefined}
-               className={cn('absolute z-20 flex cursor-move touch-none flex-row items-center gap-0.5 rounded-lg border border-zinc-800/80 bg-zinc-950/85 p-1 backdrop-blur-sm',
-                 !letakAlat && 'bottom-2 left-2')}>
-            {/* Pegangan seret di ujung kiri — memberi tahu bilahnya bisa
-                dipindah tanpa perlu dicoba dulu. */}
-            <GripVertical className="size-3.5 shrink-0 text-zinc-700" />
+               className={cn('absolute z-20 flex cursor-move touch-none flex-col items-center gap-0.5 rounded-lg border border-zinc-800/80 bg-zinc-950/85 p-1 backdrop-blur-sm',
+                 !letakAlat && 'left-2 top-1/2 -translate-y-1/2')}>
+            {/* Pegangan seret di ujung ATAS — memberi tahu bilahnya bisa
+                dipindah tanpa perlu dicoba dulu. GripHorizontal, bukan
+                Vertical: titik-titiknya harus melintang terhadap arah
+                bilahnya supaya terbaca sebagai pegangan, bukan sebagai
+                tombol keempat yang kebetulan bergaris. */}
+            <GripHorizontal className="size-3.5 shrink-0 text-zinc-700" />
             {([
               ['garis', TrendingUp, 'Garis tren — tarik dari titik ke titik'],
               ['ukur', Ruler, 'Ukur % kenaikan / penurunan — klik lalu tarik'],

@@ -489,11 +489,22 @@ export function useSaldoAwal(): number {
 
   useEffect(() => {
     if (!pengguna) { setSaldo(SALDO_AWAL); return; }
+    /* SUDAH LOGIN TAPI PROFILNYA BELUM ADA = NOL, bukan SALDO_AWAL.
+       ──────────────────────────────────────────────────────────────────
+       SALDO_AWAL (359) itu angka CONTOH untuk mode pameran. Dulu ia juga
+       jadi nilai awal state untuk orang yang sudah login, jadi akun yang
+       baru dibuat — nol transaksi, profil belum ada — membuka Dashboard
+       dan melihat "Total Saldo $359.00 · Trade-Fi $359.00" tanpa satu pun
+       label contoh. Angka itu terbaca sebagai UANG MILIKNYA, di halaman
+       yang setiap angka lainnya sudah jujur menulis nol.
+
+       Ditulis nol lebih dulu, lalu ditimpa profil kalau memang ada. */
+    setSaldo(0);
     return onSnapshot(doc(db, 'users', pengguna.uid), (s) => {
       try {
         const p = JSON.parse(s.data()?.jtAccountProfile_v1 ?? '{}');
-        if (typeof p.startBalance === 'number') setSaldo(p.startBalance);
-      } catch { /* profil belum ada — pakai bawaan */ }
+        setSaldo(typeof p.startBalance === 'number' ? p.startBalance : 0);
+      } catch { setSaldo(0); }
     }, () => {});
   }, [pengguna]);
 

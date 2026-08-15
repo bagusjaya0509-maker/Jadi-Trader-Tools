@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
-import { db } from '@/lib/data';
+import { db, bacaPilihanContoh } from '@/lib/data';
 import { useAuth } from '@/lib/auth';
 import { ASET, KEWAJIBAN } from '@/data/porto';
 
@@ -97,6 +97,14 @@ export function usePorto(): HasilPorto {
   const [memuat, setMemuat] = useState(true);
   const [galat, setGalat] = useState<string | null>(null);
   const [kosong, setKosong] = useState(false);
+  /* Pilihan "mulai kosong" ditekan di Dashboard, dibaca di sini — tanpa
+     penyimak ini halaman baru ikut kosong setelah pindah halaman. */
+  const [, setVersiPilihan] = useState(0);
+  useEffect(() => {
+    const naik = () => setVersiPilihan((v) => v + 1);
+    window.addEventListener('jt:pilihan-contoh', naik);
+    return () => window.removeEventListener('jt:pilihan-contoh', naik);
+  }, []);
 
   useEffect(() => {
     if (memuatAuth) return;
@@ -135,8 +143,16 @@ export function usePorto(): HasilPorto {
   }, [pengguna]);
 
   /* Contoh dipasang saat SELESAI memuat dan hasilnya benar-benar nol pos.
-     Dipakai juga saat belum login — etalase halaman ini memang isinya. */
-  const contoh = !(memuat || memuatAuth) && isi.aset.length === 0 && isi.kewajiban.length === 0;
+     Dipakai juga saat belum login — etalase halaman ini memang isinya.
+
+     KECUALI kalau orangnya sudah menekan "mulai kosong" di Dashboard.
+     Pilihan itu dulu hanya menyapu riwayat trade, jadi Personal Area tetap
+     memamerkan porto contoh Rp 180 juta sesudahnya — "hapus semua data"
+     yang menyisakan halaman paling penuh angka justru terbaca sebagai
+     tombol yang tidak bekerja. Satu pilihan, satu arti, di semua halaman. */
+  const pilihKosong = !!pengguna && bacaPilihanContoh(pengguna.uid) === 'kosong';
+  const contoh = !(memuat || memuatAuth) && !pilihKosong
+    && isi.aset.length === 0 && isi.kewajiban.length === 0;
 
   return {
     isi,

@@ -5,7 +5,6 @@ import {
   GripHorizontal,
 } from 'lucide-react';
 import { PeragaProduk } from '@/components/peraga-produk';
-import { PanelDiscord } from '@/components/panel-discord';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { cn, tanggalPendek } from '@/lib/utils';
 import { type Produk } from '@/data/contoh';
@@ -352,15 +351,17 @@ export default function Marketplace() {
         <PanelHead
           judul="Products"
           sub="Indikator TradingView dan Expert Advisor MetaTrader yang dipakai di terminal ini."
+          /* PanelDiscord DICABUT dari sini. Judul panel "Products" adalah
+             tempat orang mencari produk; kotak komunitas di sebelahnya
+             menarik perhatian keluar dari barang yang sedang dijual. Tautan
+             Discord tetap ada di kaki halaman ini — di situ ia jadi ajakan
+             sesudah melihat-lihat, bukan gangguan sebelum melihat. */
           kanan={
-            <span className="flex items-center gap-3">
-              {bisaUrut && (
-                <span className="hidden items-center gap-1.5 text-[11px] text-zinc-500 lg:flex">
-                  <GripHorizontal className="size-3.5" /> seret kartu untuk mengatur urutan
-                </span>
-              )}
-              <PanelDiscord />
-            </span>
+            bisaUrut ? (
+              <span className="hidden items-center gap-1.5 text-[11px] text-zinc-500 lg:flex">
+                <GripHorizontal className="size-3.5" /> seret kartu untuk mengatur urutan
+              </span>
+            ) : undefined
           }
         />
         {kabarUrut && <div className="px-5 pb-2 text-[11.5px] text-zinc-500">{kabarUrut}</div>}
