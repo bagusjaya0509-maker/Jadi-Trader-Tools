@@ -36,7 +36,7 @@ on:
     branches: [main]
     paths:
       - 'Template V3/**'
-      - 'Template V2 Premium/ema-cross-screener_3.html'
+      - 'ema-cross-screener_3.html'
       - '.github/workflows/bangun-v3.yml'
   workflow_dispatch:        # bisa dijalankan manual dari tab Actions
 
@@ -160,11 +160,16 @@ jobs:
       # simulasi yang sudah disembunyikan akan muncul lagi dan nama
       # "Koin Hunter"/"Zona Pantau" kembali ke nama lama, tanpa satu pun
       # pesan galat. Berkasnya berdiri sendiri, 500 kB, tanpa JS/CSS lokal.
+      #
+      # Jalurnya AKAR repo, bukan "Template V2 Premium/..." — folder itu cuma
+      # ada di vault lokal pemilik. Salah jalur di sini baru ketahuan saat
+      # VPS_SSH_KEY terpasang (15 Agu 2026): sebelum itu seluruh langkah VPS
+      # terlewati diam-diam, jadi workflow tampak hijau.
       - name: Kirim screener V2 ke VPS
         if: env.PUNYA_KUNCI == 'true'
         run: |
           scp -i ~/.ssh/deploy -o BatchMode=yes \
-            "Template V2 Premium/ema-cross-screener_3.html" \
+            "ema-cross-screener_3.html" \
             root@103.253.145.38:/root/v2/ema-cross-screener_3.html
           echo "Screener V2 tersinkron."
 
