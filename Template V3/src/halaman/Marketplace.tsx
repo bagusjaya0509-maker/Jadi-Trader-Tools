@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Check, Crown, Download, Copy, X, Star, MessageCircle, ExternalLink, KeyRound, Loader2, Trash2,
   GripHorizontal,
@@ -626,6 +627,29 @@ export default function Marketplace() {
 
               {/* Pengambilan sumber — gratis maupun berlisensi. */}
               <AmbilSumber produk={aktif} />
+
+              {/* Peringatan HANYA untuk produk berbayar, dan ditaruh TEPAT
+                  sebelum jalur pembeliannya. Yang gratis tidak menimbulkan
+                  sengketa uang, dan menempelkan peringatan di semua tempat
+                  membuatnya jadi latar yang tidak lagi dibaca siapa pun.
+
+                  Kalimat refund ikut di sini, bukan cuma di halaman Legal:
+                  "produk digital tidak bisa dikembalikan" yang baru diketahui
+                  SESUDAH membayar adalah keluhan, bukan ketentuan. */}
+              {aktif.harga > 0 && (
+                <div className="rounded-lg border border-zinc-800 bg-zinc-950/60 px-4 py-3">
+                  <p className="text-[11.5px] leading-relaxed text-zinc-500">
+                    Yang kamu beli adalah <span className="text-zinc-400">lisensi perangkat
+                    lunak alat bantu analisa</span> — bukan nasihat investasi dan bukan janji
+                    keuntungan. Trading berisiko kehilangan seluruh modal. Lisensi berlaku untuk
+                    satu akun, dan <span className="text-zinc-400">tidak dapat dikembalikan setelah
+                    diaktifkan</span>.{' '}
+                    <Link to="/legal" className="underline decoration-zinc-700 underline-offset-2 hover:text-zinc-300">
+                      Ketentuan lengkap
+                    </Link>
+                  </p>
+                </div>
+              )}
 
               {aktif.harga > 0 && <MintaKode produk={aktif.id} lynk={aktif.lynk} />}
             </div>

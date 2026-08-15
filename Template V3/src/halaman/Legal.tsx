@@ -4,6 +4,7 @@ import {
   TriangleAlert, ShieldCheck, ScrollText, Receipt, Building2, type LucideIcon,
 } from 'lucide-react';
 import { Panel } from '@/components/efferd-ui';
+import { BADAN } from '@/lib/badan';
 import { cn } from '@/lib/utils';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -40,17 +41,6 @@ import { cn } from '@/lib/utils';
    ════════════════════════════════════════════════════════════════════════ */
 
 const DIPERBARUI = '15 Agustus 2026';
-
-/* Identitas badan usaha. Alamat SENGAJA hanya sampai tingkat kota — alamat
-   lengkap di NIB adalah rumah pemilik, dan tidak ada gunanya diindeks mesin
-   pencari. Yang membangun kepercayaan adalah nomor NIB yang bisa diperiksa
-   siapa pun di OSS, bukan nama jalannya. */
-const BADAN = {
-  nama: 'PT Solusi Bursa Nusantara',
-  nib: '1508260003215',
-  kota: 'Kota Mataram, Nusa Tenggara Barat, Indonesia',
-  email: 'business@jaditrader.co.id',
-};
 
 function P({ children }: { children: React.ReactNode }) {
   return <p className="text-[13px] leading-relaxed text-zinc-400">{children}</p>;

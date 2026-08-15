@@ -4,6 +4,7 @@ import {
   ShieldCheck, MoveVertical, Wallet,
 } from 'lucide-react';
 import { HeroWithMockup } from '@/components/blocks/hero-with-mockup';
+import { BADAN } from '@/lib/badan';
 import { cn } from '@/lib/utils';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -320,6 +321,49 @@ export default function Pendaratan() {
           </Link>
         </div>
       </section>
+
+      {/* ── Footer ──────────────────────────────────────────────────────
+          Halaman ini satu-satunya yang dilihat orang SEBELUM membeli, jadi
+          di sinilah identitas penyelenggara paling wajib berada — bukan
+          cuma di dalam aplikasi yang baru terbuka setelah bayar.
+
+          Nomor NIB ditulis lengkap dan sengaja: siapa pun bisa memeriksanya
+          di OSS. Itu satu-satunya hal di footer ini yang benar-benar bisa
+          diverifikasi orang asing, dan pembeda paling murah dari penjual
+          alat trading yang cuma punya akun Telegram.
+
+          Alamat berhenti di tingkat kota — lihat alasannya di lib/badan.ts. */}
+      <footer className="border-t border-zinc-800/80">
+        <div className="mx-auto max-w-[1280px] px-4 py-10">
+          <p className="max-w-[720px] text-[12px] leading-relaxed text-zinc-500">
+            Jadi Trader Tools menjual lisensi perangkat lunak alat bantu analisa pasar.{' '}
+            <span className="text-zinc-400">
+              Bukan nasihat investasi, dan kami tidak pernah mengelola dana siapa pun.
+            </span>{' '}
+            Trading berisiko kehilangan seluruh modal — hasil masa lalu bukan jaminan hasil
+            di masa depan.
+          </p>
+
+          <div className="mt-6 flex flex-col gap-4 border-t border-zinc-800/60 pt-6 text-[12px] text-zinc-500 sm:flex-row sm:items-end sm:justify-between">
+            <div className="space-y-1">
+              <div className="text-zinc-400">{BADAN.nama}</div>
+              <div>NIB {BADAN.nib}</div>
+              <div>{BADAN.kota}</div>
+              <div>
+                <a href={`mailto:${BADAN.email}`} className="transition-colors hover:text-zinc-300">
+                  {BADAN.email}
+                </a>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-4">
+              <Link to="/legal" className="transition-colors hover:text-zinc-300">Disclaimer &amp; Privasi</Link>
+              <Link to="/dokumentasi" className="transition-colors hover:text-zinc-300">Dokumentasi</Link>
+              <span className="text-zinc-600">© 2026 Jadi Trader Tools</span>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
