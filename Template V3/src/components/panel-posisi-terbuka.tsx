@@ -83,6 +83,28 @@ export function PanelPosisiTerbuka({ sumber, onSunting, onTutup }: {
     if (sumber !== 'kripto') return;
     sapuYangSudahAda(posisiKripto, pendingKripto);
   }, [sumber, posisiKripto, pendingKripto]);
+  /* ── Rencana SL/TP order yang masih menggantung ───────────────────────
+     Ditulis ke localStorage oleh kirimOrderNyata saat ordernya berangkat,
+     berikut liveOrderId dari jawaban Binance. Inilah satu-satunya tempat
+     rencana itu hidup selama entry-nya belum terisi — di bursa BELUM ada
+     apa-apa, karena Binance menolak order reduceOnly tanpa posisi. */
+  const rencanaLokal = useMemo(() => {
+    const peta = new Map<string, { sl: number; tp: number }>();
+    if (sumber !== 'kripto') return peta;
+    try {
+      const s = JSON.parse(localStorage.getItem('emaScreenerPrioritySim_v1') ?? '{}');
+      for (const rec of Object.values<Record<string, unknown>>(s.positions ?? {})) {
+        if (!rec || typeof rec !== 'object') continue;
+        const id = rec.liveOrderId;
+        if (id == null) continue;
+        peta.set(String(id), { sl: Number(rec.sl) || 0, tp: Number(rec.tp1) || 0 });
+      }
+    } catch { /* localStorage privat/rusak — tampil tanpa rencana */ }
+    return peta;
+    /* pendingKripto sebagai kunci: daftar berubah = mungkin ada order
+       baru yang rencananya baru saja ditulis. */
+  }, [sumber, pendingKripto]);
+
   /* Order menggantung dari DUA pasar, disamakan bentuknya di sini.
      Keduanya menjawab pertanyaan yang sama — "order-ku sampai atau
      tidak?" — jadi keduanya pantas tampil dengan cara yang sama, walau
@@ -96,12 +118,21 @@ export function PanelPosisiTerbuka({ sumber, onSunting, onTutup }: {
           .sort((a, b) => Math.abs(a.pemicu - o.harga) - Math.abs(b.pemicu - o.harga))[0];
         const tp = stopKripto.filter((x) => x.simbol === o.simbol && x.jenis === 'TP')
           .sort((a, b) => Math.abs(a.pemicu - o.harga) - Math.abs(b.pemicu - o.harga))[0];
+        /* Bursa tidak punya SL/TP untuk entry yang masih menggantung —
+           Binance menolak order reduceOnly selama posisinya belum ada.
+           RENCANANYA ada di catatan lokal yang ditulis saat order
+           dikirim. Ditampilkan sebagai rencana, dengan label yang
+           mengatakannya: menuliskannya tanpa keterangan membuat orang
+           mengira stopnya sudah hidup di bursa, padahal baru dipasang
+           saat entry-nya terisi. */
+        const rencana = !sl && !tp ? rencanaLokal.get(String(o.id)) : undefined;
         return {
           kunci: o.id, simbol: o.simbol, arah: o.arah,
           ukuran: o.qty.toLocaleString('id-ID', { maximumFractionDigits: 4 }),
           jenis: o.tipe.replace('_MARKET', ' Stop').replace('LIMIT', 'Limit'),
           harga: o.pemicu || o.harga,
-          sl: sl?.pemicu ?? 0, tp: tp?.pemicu ?? 0,
+          sl: sl?.pemicu ?? rencana?.sl ?? 0, tp: tp?.pemicu ?? rencana?.tp ?? 0,
+          rencana: !!rencana,
         };
       })
     /* Yang paling BARU dipasang di atas. Order pending dibuat berurutan
@@ -111,7 +142,9 @@ export function PanelPosisiTerbuka({ sumber, onSunting, onTutup }: {
         kunci: o.tiket, simbol: o.simbol, arah: o.arah,
         ukuran: `${o.lot} lot`,
         jenis: o.jenis.replace('_', ' '),
-        harga: o.harga, sl: o.sl, tp: o.tp,
+        /* MT5 lain cerita: SL/TP menempel di order pending-nya sendiri,
+           jadi angka dari EA memang sudah terpasang — bukan rencana. */
+        harga: o.harga, sl: o.sl, tp: o.tp, rencana: false,
       }));
 
 
@@ -403,7 +436,12 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
                        simbolChart: sumber === 'kripto' ? o.simbol : `MT5:${simbolDasarMt5(o.simbol)}`,
                        simbol: o.simbol,
                        arah: o.arah,
-                       entry: o.harga, sl: o.sl, tp: o.tp,
+                       /* Rencana TIDAK ikut ke chart: garis SL/TP di sana
+                          bisa diseret lalu dikirim, dan mengirim perubahan
+                          untuk stop yang belum ada di bursa hanya
+                          menghasilkan galat. Yang dibawa cuma yang
+                          benar-benar terpasang. */
+                       entry: o.harga, sl: o.rencana ? 0 : o.sl, tp: o.rencana ? 0 : o.tp,
                        ukuran: sumber === 'kripto'
                          ? (pendingKripto.find((x) => x.id === o.kunci)?.qty ?? 0)
                          : (mt5.pending.find((x) => x.tiket === o.kunci)?.lot ?? 0),
@@ -423,13 +461,21 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
                     <span className="angka shrink-0 text-[12px] text-amber-400/90">{fHarga(o.harga)}</span>
                   </div>
                   {/* SL/TP hanya ditulis kalau order-nya memang membawanya.
-                      Order kripto pending belum punya penjaga sampai ia
-                      ke-fill, dan menulis "SL —" untuk itu memberi kesan
-                      SL-nya hilang, padahal memang belum waktunya ada. */}
+                      Untuk entry kripto yang menggantung, angkanya RENCANA —
+                      stop sungguhan baru dipasang saat entry terisi, karena
+                      Binance menolak order penutup tanpa posisi. Labelnya
+                      wajib mengatakan itu: angka tanpa keterangan terbaca
+                      sebagai stop yang sudah hidup di bursa. */}
                   {(o.sl > 0 || o.tp > 0) && (
-                    <div className="mt-0.5 flex gap-4 text-[10.5px] text-zinc-600">
+                    <div className="mt-0.5 flex items-center gap-4 text-[10.5px] text-zinc-600">
                       <span>SL <span className="angka text-red-400/90">{o.sl ? fHarga(o.sl) : '—'}</span></span>
                       <span>TP <span className="angka text-emerald-500/90">{o.tp ? fHarga(o.tp) : '—'}</span></span>
+                      {o.rencana && (
+                        <span className="rounded bg-zinc-800/80 px-1.5 py-px text-[9.5px] text-zinc-500"
+                              title="Stop sungguhan baru dipasang di Binance begitu entry-nya terisi.">
+                          rencana — dipasang saat terisi
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>
