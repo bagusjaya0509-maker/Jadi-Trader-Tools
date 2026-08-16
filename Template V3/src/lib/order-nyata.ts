@@ -47,6 +47,22 @@ export interface PermintaanNyata {
   alasan?: string;
 }
 
+/* Cache filter simbol seumur 10 menit. Bukan localStorage: aturan bursa
+   boleh basi beberapa menit, tapi tidak boleh selamat dari hari ke hari —
+   dan kegagalan mengambilnya harus tetap terasa, bukan tertutup data lama. */
+const cacheFilter = new Map<string, { waktu: number; isi: any }>();
+const UMUR_FILTER_MS = 10 * 60 * 1000;
+
+async function ambilFilter(dasar: string, simbol: string, kepala: Record<string, string>) {
+  const kena = cacheFilter.get(simbol);
+  if (kena && Date.now() - kena.waktu < UMUR_FILTER_MS) return kena.isi;
+  const rf = await fetch(`${dasar}/api/symbol-filters?symbol=${simbol}`, { headers: kepala });
+  const f = await rf.json();
+  if (!rf.ok) throw new Error(f.error || `symbol-filters menjawab ${rf.status}`);
+  cacheFilter.set(simbol, { waktu: Date.now(), isi: f });
+  return f;
+}
+
 function keStep(n: number, step: number, presisi: number | null) {
   const v = Math.floor(n / step) * step;
   return v.toFixed(presisi ?? 6);
@@ -67,10 +83,14 @@ export async function kirimOrderNyata(p: PermintaanNyata): Promise<{ pesan: stri
   const kepala = { 'Content-Type': 'application/json', 'X-App-Token': koneksi.token.trim() };
 
   /* Aturan presisi simbol — WAJIB. Menebak jumlah desimal berarti ditolak
-     Binance dengan -1111 tepat saat ordernya paling ingin masuk. */
-  const rf = await fetch(`${dasar}/api/symbol-filters?symbol=${p.simbol}`, { headers: kepala });
-  const f = await rf.json();
-  if (!rf.ok) throw new Error(f.error || `symbol-filters menjawab ${rf.status}`);
+     Binance dengan -1111 tepat saat ordernya paling ingin masuk.
+
+     Di-CACHE per sesi: permintaan ini berangkat SEBELUM dialog konfirmasi,
+     jadi dialah jeda antara menekan Kirim dan munculnya angka yang harus
+     disetujui. Aturan presisi berubah nyaris tidak pernah (VPS pun
+     menyimpannya 6 jam); menunggu jaringan untuk data yang sudah kita
+     pegang membuat tombolnya terasa berat tanpa alasan. */
+  const f = await ambilFilter(dasar, p.simbol, kepala);
   const stepSize: number = f.stepSize || 0.001;
   const tickSize: number = f.tickSize || 0.01;
   const qP: number | null = f.quantityPrecision ?? null;
