@@ -3,6 +3,7 @@ import {
   ArrowRight, LineChart, Radar, NotebookPen, Code2, Bot, Plug,
   ShieldCheck, MoveVertical, Wallet,
 } from 'lucide-react';
+import { KisiFitur } from '@/components/kisi-fitur';
 import { HeroWithMockup } from '@/components/blocks/hero-with-mockup';
 import { BADAN } from '@/lib/badan';
 import { cn } from '@/lib/utils';
@@ -187,8 +188,14 @@ export default function Pendaratan() {
         <PeragaTerminal />
       </HeroWithMockup>
 
+      {/* ── Kisi peraga ────────────────────────────────────────────────
+          DI ATAS kartu fitur, bukan di bawahnya. Orang yang belum percaya
+          tidak dibujuk daftar poin; ia dibujuk melihat layarnya. Kartu di
+          bawah baru berguna sesudah ia ingin tahu rinciannya. */}
+      <KisiFitur />
+
       {/* ── Masalah yang dijawab ──────────────────────────────────────── */}
-      <section className="mx-auto max-w-[1280px] px-4 py-16 md:py-24">
+      <section className="mx-auto max-w-[1280px] px-4 pb-16 md:pb-24">
         <div className="mx-auto max-w-[760px] text-center">
           <h2 className="text-2xl font-bold tracking-tight text-zinc-100 sm:text-3xl md:text-4xl">
             Trading itu satu keputusan. Alatnya yang terpisah-pisah.
