@@ -359,6 +359,32 @@ export default function Template() {
       <Header />
       <main className="grow">
         <HeroSection />
+        {/* ── Sambungan hero → featuresgrid ─────────────────────────────
+            Terukur sebelum diperbaiki: latar halaman rgb(9,9,11) bertemu
+            latar featuresgrid rgb(0,0,0) pada satu garis, tanpa jarak sama
+            sekali — dan bingkai layar hero MENJULUR 29px melewati batas
+            seksinya, jadi bagian bawah gambar yang sedang melarut justru
+            terpotong hitam pekat. Yang terlihat: pita gelap mendadak tepat
+            di tempat mata sedang mengikuti gambar memudar.
+
+            Jembatan ini menyelesaikan ketiganya sekaligus. Ia dimulai
+            PERSIS pada warna halaman, jadi 29px julur bingkai itu jatuh di
+            atas warna yang sama — tidak ada lagi potongan. Lalu ia meluruh
+            ke hitam pekat sepanjang 10rem, sehingga perpindahan warnanya
+            terjadi di ruang, bukan di garis.
+
+            `-mt-8` menariknya naik supaya peluruhan gambar dan peluruhan
+            warna saling menimpa, bukan berbaris satu demi satu.
+
+            Ditaruh DI SINI, bukan di dalam featuresgrid.tsx: berkas itu
+            salinan mentah yang sengaja tidak disentuh, supaya pembaruan
+            berikutnya dari sumbernya tinggal ditimpa. */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none -mt-8 h-40 w-full"
+          style={{ background: 'linear-gradient(to bottom, var(--color-background) 0%, var(--color-background) 18%, #000 100%)' }}
+        />
+
         {/* featuresgrid — ditempel apa adanya dari sumbernya, di bawah hero.
             Diimpor dengan alias karena namanya `Component`; berkasnya sendiri
             tidak disentuh sama sekali. */}
