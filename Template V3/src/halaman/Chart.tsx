@@ -2086,9 +2086,24 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                                   && (arah === 'BUY'
                                     ? rencana.sl < e && rencana.tp > e
                                     : rencana.sl > e && rencana.tp < e);
-                                if (sisiBenar) { setRencana((r) => ({ ...r, entry: e })); return; }
+                                /* jangkarQty DIPANGGIL LANGSUNG di kedua
+                                   cabang, bukan diserahkan ke efek. Efeknya
+                                   memang ikut jalan, tapi ia menulis ref —
+                                   tanpa render ulang — jadi tiket yang baru
+                                   terbuka sempat menampilkan dolar dari
+                                   cadangan −$10 mati sampai ada state lain
+                                   yang berubah. Jangkar yang dipasang di
+                                   sini ikut ter-render bersama rencananya. */
+                                if (sisiBenar) {
+                                  setRencana((r) => ({ ...r, entry: e }));
+                                  jangkarQty(e, rencana.sl, aksi.risiko);
+                                  return;
+                                }
                                 const u = aksi.usul(arah);
-                                if (u) setRencana({ entry: u.entry, sl: u.sl || undefined, tp: u.tp || undefined });
+                                if (u) {
+                                  setRencana({ entry: u.entry, sl: u.sl || undefined, tp: u.tp || undefined });
+                                  jangkarQty(u.entry, u.sl, aksi.risiko);
+                                }
                               }}
                               onUbah={(r) => {
                                 /* Entry yang DIKETIK sama sengajanya dengan

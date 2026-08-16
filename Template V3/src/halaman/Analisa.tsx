@@ -738,7 +738,25 @@ export default function Analisa() {
     setSl(String(rapikanHarga(d.sl)));
     setTp(String(rapikanHarga(d.tp)));
     if (d.sampul) setSampul(d.sampul);
-    if (d.qty && d.qty > 0) setQtyDraf(d.qty);
+    /* QTY SELALU TERPASANG untuk draf yang datang dari chart — kalau perlu,
+       diturunkan ulang dari levelnya sendiri.
+
+       Tanpa cadangan ini ada jendela di mana formulirnya kembali mematok
+       −$10: draf yang ditulis bundel Chart LAMA (belum mengirim qty) dibaca
+       formulir BARU — persis yang terjadi saat deploy baru saja naik dan
+       chunk halaman ter-cache tidak serempak. Formulir lalu jatuh ke model
+       contoh, dan angka yang barusan diperbaiki terlihat rusak lagi.
+
+       Turunannya memakai anggapan yang sama dengan tiket chart mode Copy:
+       risiko dasar $10 (Modal $1.000 × 1% — setelannya memang tersembunyi
+       di mode itu) dibagi jarak SL saat draf dibuat. Untuk draf yang membawa
+       qty asli, angka itulah yang menang. */
+    if (d.qty && d.qty > 0) {
+      setQtyDraf(d.qty);
+    } else {
+      const jarak0 = Math.abs(d.entry - d.sl);
+      setQtyDraf(jarak0 > 0 ? 10 / jarak0 : 0);
+    }
     /* PINDAH TAB, bukan sekadar membuka panel. Formulirnya sekarang hidup di
        tab Posting Signal; draf yang mendarat di tab yang tidak sedang
        dilihat sama saja dengan draf yang hilang — orangnya menekan "Ke Copy
