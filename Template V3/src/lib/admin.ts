@@ -393,6 +393,12 @@ export interface OrderBursa {
   pemicu: number;
   harga: number;
   qty: number;
+  /** Order ini tinggal di daftar CONDITIONAL Binance (/fapi/v1/openAlgoOrders),
+   *  bukan daftar biasa. Menentukan endpoint mana yang bisa menghapusnya:
+   *  algo -> /fapi/v1/algoOrder (algoId), biasa -> /fapi/v1/order (orderId).
+   *  Backend sudah lama mengirim bendera ini; tipe di sini yang belum
+   *  menyebutnya, jadi ia terbuang diam-diam sebelum sampai ke pemakainya. */
+  algo: boolean;
   dibuat: number;
 }
 
@@ -466,6 +472,7 @@ export function usePosisiBinance(): {
               pemicu: Number(o.pemicu) || 0,
               harga: Number(o.harga) || 0,
               qty: Number(o.qty) || 0,
+              algo: !!o.algo,
               dibuat: Number(o.dibuat) || 0,
             })));
           }

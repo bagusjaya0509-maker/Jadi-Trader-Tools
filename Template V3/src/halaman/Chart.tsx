@@ -744,7 +744,24 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
         setSuntingKabar(hasil.status === 'sukses' ? `Selesai — ${hasil.pesan}` : `Gagal: ${hasil.pesan}`);
         if (hasil.status === 'sukses') { segarkanAkunMt5(); setSunting(null); }
       } else if (sunting.jenis === 'pending') {
-        await batalPendingNyata({ symbol: sunting.simbol, orderId: sunting.tiket ?? '' });
+        /* PENANDA DAFTAR IKUT DIKIRIM, tidak lagi ditebak.
+           ────────────────────────────────────────────────────────────────
+           Binance menyimpan order di dua daftar terpisah dengan endpoint
+           hapus masing-masing: LIMIT di /fapi/v1/order, STOP/TP/SL di
+           /fapi/v1/algoOrder. Sebelumnya baris ini tidak mengirim `isAlgo`
+           sama sekali, dan nilai bawaannya TRUE — jadi setiap pending
+           LIMIT dikirim ke endpoint algo dan dijawab -2011 "Unknown order
+           sent.", ordernya tetap hidup di bursa.
+
+           Bendera aslinya sudah dilaporkan /api/open-orders sebagai
+           `algo`; tinggal dipakai. Bawaannya kini FALSE, bukan true:
+           pending entry yang lazim adalah LIMIT. */
+        const asli = orderBursa.find((x) => x.id === (sunting.tiket ?? ''));
+        await batalPendingNyata({
+          symbol: sunting.simbol,
+          orderId: sunting.tiket ?? '',
+          isAlgo: asli?.algo ?? false,
+        });
         setSuntingKabar('Pending order dibatalkan.');
         segarkanBursa();
         setSunting(null);
