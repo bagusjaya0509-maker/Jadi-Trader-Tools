@@ -17,6 +17,7 @@ import {
   NavigationMenuTrigger,
 } from '@/components/ui/navigation-menu';
 import { cn } from '@/lib/utils';
+import { Component as FeaturesGrid } from '@/components/ui/featuresgrid';
 
 /* ════════════════════════════════════════════════════════════════════════
    TEMPLATE — header-3 + hero-3 APA ADANYA
@@ -358,6 +359,10 @@ export default function Template() {
       <Header />
       <main className="grow">
         <HeroSection />
+        {/* featuresgrid — ditempel apa adanya dari sumbernya, di bawah hero.
+            Diimpor dengan alias karena namanya `Component`; berkasnya sendiri
+            tidak disentuh sama sekali. */}
+        <FeaturesGrid />
       </main>
     </div>
   );
