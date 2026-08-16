@@ -1,5 +1,6 @@
 import { bacaKoneksi, koneksiLengkap, PROXY_BAWAAN } from '@/lib/koneksi';
 import { uang, harga as fHarga } from '@/lib/utils';
+import { mulaiKirim, tandaiTerkirim, tandaiGagal } from '@/lib/order-sementara';
 
 /* ════════════════════════════════════════════════════════════════════════
    ORDER SUNGGUHAN KE BINANCE FUTURES — satu jalur untuk seluruh V3
@@ -140,21 +141,55 @@ export async function kirimOrderNyata(p: PermintaanNyata): Promise<{ pesan: stri
     return { pesan: 'Dibatalkan.', pending: false };
   }
 
-  const r = await fetch(`${dasar}/api/trade/futures`, {
-    method: 'POST', headers: kepala,
-    body: JSON.stringify({
-      symbol: p.simbol, side: p.arah, quantity: qtyStr, leverage: p.leverage,
-      entryType: p.jenis === 'MARKET' ? 'MARKET' : p.jenis === 'LIMIT' ? 'LIMIT' : 'STOP_MARKET',
-      entryPrice: p.jenis === 'MARKET' ? undefined : keStep(p.entry, tickSize, pP),
-      sl: slStr, tp1: tp1Kirim, qty1,
-      ...(tp2Kirim ? { tp2: tp2Kirim, qty2: qty2Kirim } : {}),
-    }),
+  /* BARIS SEMENTARA DIPASANG DI SINI — sesudah orangnya menyetujui, sebelum
+     permintaannya berangkat. Order butuh beberapa detik sampai ke Binance
+     dan tabel Posisi Terbuka baru menampilkannya pada putaran baca
+     berikutnya; selama jeda itu layar kosong, dan yang dirasakan bukan
+     "sedang menunggu" melainkan "ordernya gagal". Orang yang mengira
+     ordernya gagal MEMESAN LAGI — dua order untuk satu niat.
+
+     Ditaruh di lib, bukan di halaman Chart, supaya setiap pemanggil
+     kirimOrderNyata ikut mendapatkannya tanpa mengulang kode yang sama. */
+  const idSementara = mulaiKirim({
+    simbol: p.simbol, arah: p.arah,
+    jenis: p.jenis === 'MARKET' ? 'Market' : p.jenis === 'LIMIT' ? 'Limit' : 'Stop',
+    harga: p.jenis === 'MARKET' ? (p.entry || 0) : Number(keStep(p.entry, tickSize, pP)),
+    qty: Number(qtyStr) || 0,
+    sl: Number(slStr) || 0,
+    tp: Number(tp1Kirim) || 0,
+    /* MARKET langsung jadi POSISI; LIMIT/STOP menggantung sebagai PENDING.
+       Bedanya menentukan daftar mana yang dipakai memeriksa apakah bursa
+       sudah benar-benar mencatatnya. */
+    menjadi: p.jenis === 'MARKET' ? 'posisi' : 'pending',
   });
-  const j = await r.json().catch(() => ({}));
+
+  let r: Response;
+  let j: any;
+  try {
+    r = await fetch(`${dasar}/api/trade/futures`, {
+      method: 'POST', headers: kepala,
+      body: JSON.stringify({
+        symbol: p.simbol, side: p.arah, quantity: qtyStr, leverage: p.leverage,
+        entryType: p.jenis === 'MARKET' ? 'MARKET' : p.jenis === 'LIMIT' ? 'LIMIT' : 'STOP_MARKET',
+        entryPrice: p.jenis === 'MARKET' ? undefined : keStep(p.entry, tickSize, pP),
+        sl: slStr, tp1: tp1Kirim, qty1,
+        ...(tp2Kirim ? { tp2: tp2Kirim, qty2: qty2Kirim } : {}),
+      }),
+    });
+    j = await r.json().catch(() => ({}));
+  } catch (e) {
+    /* Jaringan putus sebelum jawaban datang. Ini keadaan yang PALING perlu
+       dikatakan apa adanya: ordernya bisa saja sudah sampai ke bursa. */
+    tandaiGagal(idSementara, 'Jaringan terputus — periksa Binance sebelum mengirim ulang.');
+    throw e;
+  }
   if (!r.ok) {
     const tahap = j.stage ? `[gagal di: ${j.stage}] ` : '';
-    throw new Error(tahap + (j.error ? JSON.stringify(j.error).slice(0, 200) : `Backend menjawab ${r.status}`));
+    const pesan = tahap + (j.error ? JSON.stringify(j.error).slice(0, 200) : `Backend menjawab ${r.status}`);
+    tandaiGagal(idSementara, pesan);
+    throw new Error(pesan);
   }
+  tandaiTerkirim(idSementara);
 
   /* ── Catat ke registry posisi Screener Entry ──────────────────────
      V2 menampilkan tabel Posisi Terbuka dari `emaScreenerPrioritySim_v1`

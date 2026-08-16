@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { cn, uang, harga as fHarga } from '@/lib/utils';
 import { usePosisi } from '@/lib/data';
@@ -10,6 +10,7 @@ import type { Sumber } from '@/data/contoh';
 import { simbolDasarMt5 } from '@/lib/simbol';
 import { cariStopNyasar } from '@/lib/stop-nyasar';
 import { batalPendingNyata } from '@/lib/order-nyata';
+import { useOrderSementara, sapuYangSudahAda } from '@/lib/order-sementara';
 
 /* ════════════════════════════════════════════════════════════════════════
    POSISI TERBUKA — dipindah dari Jurnal ke Chart & Backtest
@@ -63,6 +64,25 @@ export function PanelPosisiTerbuka({ sumber, onSunting, onTutup }: {
 }) {
   const { data: posisiKripto, pending: pendingKripto, stop: stopKripto } = usePosisi();
   const mt5 = useAkunMt5();
+
+  /* ── Order yang baru saja dikirim, belum terlihat di bursa ────────────
+     Jembatan beberapa detik antara menekan Kirim dan putaran baca
+     berikutnya. Tanpa ini layar kosong, dan yang dirasakan orangnya bukan
+     "sedang menunggu" melainkan "ordernya gagal" — lalu ia memesan lagi.
+
+     Cuma untuk kripto: perintah MT5 punya jalur dan umpan baliknya
+     sendiri lewat EA, dan menampilkannya di sini akan menjanjikan sesuatu
+     yang panel ini tidak tahu kebenarannya. */
+  const semuaSementara = useOrderSementara();
+  const sementara = sumber === 'kripto' ? semuaSementara : [];
+  /* Disapu SETIAP kali data bursa berubah, bukan lewat timer: begitu
+     ordernya muncul dari sumber yang sesungguhnya, baris sementaranya
+     tidak punya alasan hidup lagi — dan membiarkan keduanya tampil
+     berarti satu order terlihat dua kali. */
+  useEffect(() => {
+    if (sumber !== 'kripto') return;
+    sapuYangSudahAda(posisiKripto, pendingKripto);
+  }, [sumber, posisiKripto, pendingKripto]);
   /* Order menggantung dari DUA pasar, disamakan bentuknya di sini.
      Keduanya menjawab pertanyaan yang sama — "order-ku sampai atau
      tidak?" — jadi keduanya pantas tampil dengan cara yang sama, walau
@@ -296,6 +316,61 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
               {sibukBersih ? 'Membatalkan…' : `Batalkan ${nyasar.length} order ini`}
             </button>
             {kabarBersih && <div className="mt-0.5 text-[10px] leading-relaxed text-amber-200/70">{kabarBersih}</div>}
+          </div>
+        )}
+
+        {/* ── Baru dikirim ────────────────────────────────────────────
+            DI ATAS segalanya dan TERPISAH dari daftar bursa. Terpisah
+            karena isinya belum tentu ada: mencampurnya dengan order yang
+            sudah tercatat di Binance membuat dua hal berbeda derajat
+            kepastiannya terbaca sederajat. Statusnya ditulis apa adanya —
+            "Mengirim…", "Terkirim", atau alasan gagalnya. */}
+        {sementara.length > 0 && (
+          <div className="mt-3 border-t border-zinc-800/60 pt-3">
+            <div className="mb-2 text-[11px] uppercase tracking-wide text-sky-400/80">
+              Baru dikirim · {sementara.length}
+            </div>
+            <div className="divide-y divide-zinc-800/60">
+              {sementara.map((o) => (
+                <div key={o.id} className="py-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span className="angka truncate text-[12px] text-zinc-200">{o.simbol}</span>
+                      <span className={cn('text-[10px] font-semibold',
+                        o.arah === 'BUY' ? 'text-emerald-500' : 'text-red-400')}>{o.arah}</span>
+                      <span className="rounded border border-zinc-800 px-1.5 py-0.5 text-[9.5px] text-zinc-500">
+                        {o.jenis}
+                      </span>
+                      <span className="angka hidden text-[10.5px] text-zinc-600 sm:inline">{o.qty}</span>
+                    </span>
+                    <span className={cn(
+                      'flex shrink-0 items-center gap-1.5 rounded px-1.5 py-0.5 text-[10px] font-medium',
+                      o.status === 'mengirim' ? 'bg-sky-500/10 text-sky-300'
+                        : o.status === 'terkirim' ? 'bg-emerald-500/10 text-emerald-400'
+                        : 'bg-red-500/10 text-red-400')}>
+                      {o.status === 'mengirim' && (
+                        <span className="size-1.5 animate-pulse rounded-full bg-sky-400" />
+                      )}
+                      {o.status === 'mengirim' ? 'Mengirim…'
+                        : o.status === 'terkirim' ? 'Terkirim' : 'Gagal'}
+                    </span>
+                  </div>
+                  <div className="mt-0.5 flex flex-wrap items-center gap-x-3 text-[10.5px] text-zinc-600">
+                    <span>Entry <span className="angka text-zinc-500">{fHarga(o.harga)}</span></span>
+                    {!!o.sl && <span>SL <span className="angka text-red-400/80">{fHarga(o.sl)}</span></span>}
+                    {!!o.tp && <span>TP <span className="angka text-emerald-500/80">{fHarga(o.tp)}</span></span>}
+                  </div>
+                  {o.status === 'terkirim' && (
+                    <div className="mt-0.5 text-[10px] text-zinc-600">
+                      Diterima bursa — barisnya pindah ke daftar di bawah begitu Binance mencatatnya.
+                    </div>
+                  )}
+                  {o.status === 'gagal' && o.pesan && (
+                    <div className="mt-0.5 text-[10.5px] leading-relaxed text-red-400/90">{o.pesan}</div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
