@@ -722,6 +722,47 @@ export default function ChartBacktest() {
     setTimeout(() => { void akhiriOrder(o); }, 0);
   }
 
+  /* ── Menunggu bursa BENAR-BENAR melepas order ────────────────────────
+     Dulu garis Entry/SL/TP hilang begitu permintaan hapus dijawab 200.
+     Itu terlalu dini: 200 berarti "Binance menerima perintahnya", bukan
+     "ordernya sudah lepas". Selama beberapa detik sesudahnya order masih
+     terdaftar di bursa sementara layar sudah bersih — dan layar yang
+     lebih maju daripada kenyataan adalah bentuk kebohongan yang paling
+     sulit disadari, karena ia terlihat seperti keberhasilan.
+
+     Sekarang garisnya BERTAHAN sampai order itu benar-benar tidak ada
+     lagi di daftar bursa, dengan label "menghapus…" supaya jelas ia
+     sedang dalam perjalanan, bukan masih hidup normal. */
+  const [hapusMenunggu, setHapusMenunggu] = useState<
+    { id: string; sejak: number } | null>(null);
+  const menungguHapus = useRef(false);
+
+  useEffect(() => {
+    if (!hapusMenunggu) return;
+    /* Hilang dari daftar bursa = tuntas. Inilah satu-satunya bukti yang
+       benar-benar berarti; sisanya cuma janji. */
+    if (!orderBursa.some((o) => o.id === hapusMenunggu.id)) {
+      setSuntingKabar('Order sudah lepas dari bursa.');
+      setSunting(null);
+      setHapusMenunggu(null);
+      menungguHapus.current = false;
+      setSuntingSibuk(false);
+      return;
+    }
+    /* Batas 12 detik. Lewat itu kita TIDAK tahu, dan mengaku tidak tahu
+       lebih berguna daripada menghapus garisnya sambil berharap. */
+    if (Date.now() - hapusMenunggu.sejak > 12_000) {
+      setSuntingKabar('Perintah hapus diterima, tapi bursa masih menampilkan ordernya. Periksa langsung di Binance sebelum mengirim ulang.');
+      setHapusMenunggu(null);
+      menungguHapus.current = false;
+      setSuntingSibuk(false);
+      return;
+    }
+    const t = setTimeout(() => segarkanBursa(), 1500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hapusMenunggu, orderBursa]);
+
   async function akhiriOrder(dipilih?: OrderSunting) {
     const sunting = dipilih ?? suntingAktif.current;
     if (!sunting) return;
@@ -762,9 +803,13 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
           orderId: sunting.tiket ?? '',
           isAlgo: asli?.algo ?? false,
         });
-        setSuntingKabar('Pending order dibatalkan.');
+        /* Garis SENGAJA tidak dihapus di sini. Yang baru terjadi cuma
+           "Binance menerima perintahnya"; pembuktiannya menunggu order itu
+           hilang dari daftar bursa, dan efek di atas yang mengurusnya. */
+        setSuntingKabar('Perintah hapus diterima — menunggu bursa melepas ordernya…');
+        menungguHapus.current = true;
+        setHapusMenunggu({ id: sunting.tiket ?? '', sejak: Date.now() });
         segarkanBursa();
-        setSunting(null);
       } else {
         const milik = orderBursa.filter((x) => x.simbol === sunting.simbol);
         await tutupPosisiNyata({
@@ -785,8 +830,15 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
         setSunting(null);
       }
     } catch (e) {
+      menungguHapus.current = false;
+      setHapusMenunggu(null);
       setSuntingKabar(e instanceof Error ? e.message : 'Gagal mengakhiri order');
-    } finally { setSuntingSibuk(false); }
+    } finally {
+      /* Tetap SIBUK selama masih menunggu bursa: tombolnya belum boleh
+         bisa ditekan lagi, dan orangnya belum boleh mengira semuanya
+         selesai. Yang mematikannya efek penunggu di atas. */
+      if (!menungguHapus.current) setSuntingSibuk(false);
+    }
   }
 
   const [kendaliReplay, setKendaliReplay] = useState<React.ReactNode>(null);
@@ -1435,15 +1487,21 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
       /* Arahnya saja. Sisanya — "klik untuk ubah", "seret lalu Kirim" —
          sudah dijelaskan kursor dan tombolnya sendiri, dan di garis ia
          cuma teks panjang yang menutupi lilin. */
-      const ketEntry = `· ${sunting.arah}`;
-      const ketStop = '';
+      /* SEDANG DIHAPUS: garisnya tetap ada tapi berhenti berpura-pura
+         normal. Keterangannya berubah, dan seretnya dimatikan — menggeser
+         SL milik order yang sedang dibatalkan adalah perintah yang tidak
+         punya sasaran, dan membiarkannya bisa diseret mengundang orang
+         mengirim perubahan ke order yang sebentar lagi tidak ada. */
+      const sedangHapus = !!hapusMenunggu;
+      const ketEntry = sedangHapus ? '· menghapus…' : `· ${sunting.arah}`;
+      const ketStop = sedangHapus ? '· menghapus…' : '';
       if (sunting.entry) g.push({
-        id: 'entry', harga: sunting.entry, warna: '#d4d4d8', label: 'Entry',
+        id: 'entry', harga: sunting.entry, warna: sedangHapus ? '#71717a' : '#d4d4d8', label: 'Entry',
         ket: ketEntry,
-        bisaSeret: true,
+        bisaSeret: !sedangHapus,
       });
-      if (suntingSl) g.push({ id: 'sl', harga: suntingSl, warna: '#f87171', label: 'SL', ket: ketStop, bisaSeret: true });
-      if (suntingTp) g.push({ id: 'tp', harga: suntingTp, warna: '#10b981', label: 'TP', ket: ketStop, bisaSeret: true });
+      if (suntingSl) g.push({ id: 'sl', harga: suntingSl, warna: sedangHapus ? '#7f5f5f' : '#f87171', label: 'SL', ket: ketStop, bisaSeret: !sedangHapus });
+      if (suntingTp) g.push({ id: 'tp', harga: suntingTp, warna: sedangHapus ? '#4a6b5e' : '#10b981', label: 'TP', ket: ketStop, bisaSeret: !sedangHapus });
       return g;
     }
     const sumber = aksiPosisi
@@ -1499,7 +1557,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
     if (sumber.sl) g.push({ id: 'sl', harga: sumber.sl, warna: '#f87171', label: 'SL', ket: ketSl, bisaSeret: !kunci });
     if (sumber.tp) g.push({ id: 'tp', harga: sumber.tp, warna: '#10b981', label: 'TP', ket: ketTp, bisaSeret: !kunci });
     return g;
-  }, [sunting, panelUbah, suntingSl, suntingTp, aksiPosisi, aksiTunda, rencana, aksi, draf, labelJenis, nyataSetelan, lotMt5, nilaiLotMt5, simbol]);
+  }, [sunting, panelUbah, suntingSl, suntingTp, aksiPosisi, aksiTunda, rencana, aksi, draf, labelJenis, nyataSetelan, lotMt5, nilaiLotMt5, simbol, hapusMenunggu]);
 
   /* ── Order yang BENAR-BENAR menggantung di bursa ────────────────────
      Sumbernya bursa, bukan keadaan halaman ini. Itulah yang membuatnya
