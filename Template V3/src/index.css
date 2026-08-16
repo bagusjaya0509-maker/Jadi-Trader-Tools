@@ -1,4 +1,7 @@
 @import "tailwindcss";
+/* Utilitas animate-in/fade-in/slide-in — dipakai hero & header baru.
+   Tailwind v4 tidak membawanya sendiri. */
+@import "tw-animate-css";
 
 /* ════════════════════════════════════════════════════════════════════════
    DESAIN #3 — mengikuti Efferd Dashboard 2
@@ -14,6 +17,31 @@
    ════════════════════════════════════════════════════════════════════════ */
 
 @theme {
+  /* ── Token semantik shadcn — DIPETAKAN KE ZINC, satu tema saja ────────
+     Catatan lama di atas benar untuk masanya: komponen acuan menulis warna
+     zinc mentah, token semantik cuma peluang bentrok. Header & hero baru
+     halaman Pendaratan ditulis di atas token (bg-background, bg-card,
+     text-muted-foreground), jadi sekarang tokennya HARUS ada — tapi tetap
+     satu tema gelap, dipatok ke palet zinc yang sama dengan seluruh situs.
+     Tidak ada mode terang, tidak ada dua sumber kebenaran warna. */
+  --color-background: #09090b;            /* zinc-950 */
+  --color-foreground: #fafafa;            /* zinc-50  */
+  --color-card: #121214;
+  --color-card-foreground: #fafafa;
+  --color-popover: #09090b;
+  --color-popover-foreground: #fafafa;
+  --color-muted: #18181b;                 /* zinc-900 */
+  --color-muted-foreground: #a1a1aa;      /* zinc-400 */
+  --color-accent: #27272a;                /* zinc-800 */
+  --color-accent-foreground: #fafafa;
+  --color-border: #27272a;
+  --color-input: #27272a;
+  --color-ring: #71717a;
+  --color-primary: #f4f4f5;               /* tombol utama zinc terang */
+  --color-primary-foreground: #09090b;
+  --color-secondary: #27272a;
+  --color-secondary-foreground: #fafafa;
+
   /* Efferd memakai grotesk netral. Space Grotesk dipertahankan untuk angka
      besar & judul karena karakternya paling dekat, sementara badan teks
      memakai Inter — di sini Inter memang pilihan yang tepat, bukan bawaan

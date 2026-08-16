@@ -1,27 +1,25 @@
-import { Link } from 'react-router-dom';
-import {
-  ArrowRight, LineChart, Radar, NotebookPen, Code2, Bot, Plug,
-  ShieldCheck, MoveVertical, Wallet,
-} from 'lucide-react';
-import { KisiFitur } from '@/components/kisi-fitur';
-import { HeroWithMockup } from '@/components/blocks/hero-with-mockup';
-import { BADAN } from '@/lib/badan';
 import { cn } from '@/lib/utils';
+import { Link } from 'react-router-dom';
+import { BADAN } from '@/lib/badan';
+import { Header } from '@/components/ui/header-3';
+import { HeroSection } from '@/components/ui/hero-3';
 
 /* ════════════════════════════════════════════════════════════════════════
    PENDARATAN — halaman pertama untuk orang yang belum masuk
    ════════════════════════════════════════════════════════════════════════
-   Halaman depan sebelumnya (hero glassmorphism) langsung menawarkan "View
-   Portfolio" dan "Open Chart" — dua tombol yang cuma masuk akal bagi orang
-   yang SUDAH tahu situs ini apa. Orang yang baru mendarat belum tahu, dan
-   tidak ada satu kalimat pun di layar pertama yang memberitahunya.
+   Dirombak total mengikuti pasangan header-3 + hero-3 (efferd/sshahaider):
+   header sticky dengan dua menu jatuh, hero dengan animasi masuk bertingkat
+   dan layar berbingkai yang melarut ke bawah.
 
-   Halaman ini tugasnya satu: menjelaskan alatnya cukup jelas sampai orang
-   tahu apakah ini untuk dia. Bukan daftar fitur — daftar fitur menjawab
-   "ada apa saja", sementara yang ditanyakan pengunjung adalah "apa yang
-   berubah kalau saya pakai".
-   ════════════════════════════════════════════════════════════════════════ */
+   ISI BAGIAN TENGAH SENGAJA BELUM ADA. Keputusan pemilik: pasang kerangka
+   tampilannya dulu 100%, isian menyusul, footer lama dipertahankan — ia
+   satu-satunya bagian halaman yang memuat identitas hukum (NIB) dan
+   disclaimer, dan itu tidak boleh ikut hilang selama masa transisi.
 
+   Yang mengisi bingkai layar hero tetap PeragaTerminal — antarmuka tiruan
+   kami sendiri, bukan tangkapan layar produk lain dari CDN template. */
+
+/* ── Peraga terminal ── (dipertahankan dari versi sebelumnya) */
 /* ── Peraga terminal ─────────────────────────────────────────────────────
    Antarmuka sungguhan, bukan tangkapan layar.
 
@@ -134,200 +132,15 @@ function PeragaTerminal() {
   );
 }
 
-/* ── Kartu alat ──────────────────────────────────────────────────────── */
-function Alat({ ikon: Ikon, judul, kalimat, poin, gratis }: {
-  ikon: typeof LineChart;
-  judul: string;
-  kalimat: string;
-  poin: string[];
-  gratis?: boolean;
-}) {
-  return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-zinc-900 bg-zinc-900/30 p-6 transition-colors hover:border-zinc-800">
-      <div className="flex items-center gap-3">
-        <span className="flex size-9 items-center justify-center rounded-xl bg-[#ffcd75]/10 text-[#ffcd75]">
-          <Ikon className="size-4" />
-        </span>
-        <h3 className="text-[15px] font-semibold text-zinc-100">{judul}</h3>
-        {gratis && (
-          <span className="ml-auto rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10.5px] font-medium text-emerald-400">
-            Gratis
-          </span>
-        )}
-      </div>
-      <p className="text-[13.5px] leading-relaxed text-zinc-400">{kalimat}</p>
-      <ul className="flex flex-col gap-1.5">
-        {poin.map((p) => (
-          <li key={p} className="flex gap-2 text-[12.5px] leading-relaxed text-zinc-500">
-            <span className="mt-[7px] size-1 shrink-0 rounded-full bg-[#ffcd75]/60" />
-            {p}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
 export default function Pendaratan() {
   return (
-    <div className="min-h-screen w-full overflow-y-auto bg-zinc-950">
-      <HeroWithMockup
-        title="Analisa, kirim order, dan catat alasannya di satu layar"
-        description="Jadi Trader Tools menyatukan chart, screener, jurnal, dan eksekusi ke Binance Futures serta MetaTrader 5. Tidak perlu pindah aplikasi untuk mengubah stop loss — klik garisnya di chart, geser, kirim."
-        primaryCta={{
-          text: 'Mulai dari jurnal — gratis',
-          href: '#/jurnal',
-          icon: <NotebookPen className="mr-2 size-4" />,
-        }}
-        secondaryCta={{
-          text: 'Lihat paket & harga',
-          href: 'https://lynk.id/jaditrader_payment',
-          icon: <Wallet className="mr-2 size-4" />,
-        }}
-      >
-        <PeragaTerminal />
-      </HeroWithMockup>
-
-      {/* ── Kisi peraga ────────────────────────────────────────────────
-          DI ATAS kartu fitur, bukan di bawahnya. Orang yang belum percaya
-          tidak dibujuk daftar poin; ia dibujuk melihat layarnya. Kartu di
-          bawah baru berguna sesudah ia ingin tahu rinciannya. */}
-      <KisiFitur />
-
-      {/* ── Masalah yang dijawab ──────────────────────────────────────── */}
-      <section className="mx-auto max-w-[1280px] px-4 pb-16 md:pb-24">
-        <div className="mx-auto max-w-[760px] text-center">
-          <h2 className="text-2xl font-bold tracking-tight text-zinc-100 sm:text-3xl md:text-4xl">
-            Trading itu satu keputusan. Alatnya yang terpisah-pisah.
-          </h2>
-          <p className="mt-4 text-[15px] leading-relaxed text-zinc-400">
-            Chart di satu aplikasi, order di aplikasi broker, catatan di spreadsheet, sinyal di
-            grup chat. Tiap pindah tempat adalah kesempatan untuk lupa — lupa memasang stop,
-            lupa alasan masuk, lupa bahwa setup ini sudah tiga kali gagal.
-          </p>
-        </div>
-
-        <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Alat
-            ikon={NotebookPen}
-            judul="Jurnal"
-            gratis
-            kalimat="Tempat kamu mengetahui kebiasaanmu sendiri. Gratis selamanya, karena baru terasa gunanya setelah 30 hari diisi."
-            poin={[
-              'Emosi per posisi, lalu Pola Emosi memperlihatkan mana yang paling sering muncul di trade rugi',
-              'Kalender: hari apa kamu paling sering salah',
-              'Terisi sendiri dari Binance dan MT5 — tidak mengetik ulang',
-            ]}
-          />
-          <Alat
-            ikon={LineChart}
-            judul="Chart dan Entry"
-            kalimat="Chart yang bisa mengeksekusi. Order sungguhan berangkat dari sini, bukan dari tab lain."
-            poin={[
-              'Klik nama pair → entry, SL, TP-nya tergambar di chart',
-              'Seret garisnya, kirim — SL/TP di brokermu ikut berubah',
-              'Tutup posisi atau hapus pending order langsung dari garisnya',
-            ]}
-          />
-          <Alat
-            ikon={Radar}
-            judul="Screener Area"
-            kalimat="Berhenti membuka chart satu per satu untuk mencari setup yang itu-itu juga."
-            poin={[
-              'Area Pantau memindai SMI + SNR di seluruh watchlist sekaligus',
-              'Parallel Signal: pair mana searah, mana berlawanan',
-              'Watchlist tanpa batas, termasuk emas dan indeks',
-            ]}
-          />
-          <Alat
-            ikon={Code2}
-            judul="Pine editor & backtest"
-            kalimat="Tulis indikatormu sendiri dan jalankan di chart yang sama, tanpa pindah platform."
-            poin={[
-              'Mesin Pine sendiri — skrip TradingView-mu jalan di sini',
-              'Dokter Pine memperbaiki skrip yang error',
-              'Backtest dan replay bar-per-bar untuk latihan',
-            ]}
-          />
-          <Alat
-            ikon={Plug}
-            judul="Sambungan broker"
-            kalimat="Binance Futures lewat VPS sendiri, MetaTrader 5 lewat EA JadiTraderSync."
-            poin={[
-              'Kunci API tidak pernah lewat browser — hanya VPS-mu sendiri',
-              'EA mengirim saldo, posisi, dan pending order ke situs',
-              'Pair broker berakhiran (EURJPYc, XAUUSDm) dikenali otomatis',
-            ]}
-          />
-          <Alat
-            ikon={Bot}
-            judul="Agen AI"
-            kalimat="Membaca sinyal, mengevaluasi porto, memperbaiki skrip. Dibayar per pakai, bukan per bulan."
-            poin={[
-              'Sinyal mentah jadi order siap kirim — kamu yang menyetujui',
-              'Evaluasi portofolio dan rencana eksekusi',
-              'Token tidak hangus, tidak ada masa kedaluwarsa',
-            ]}
-          />
-        </div>
-      </section>
-
-      {/* ── Pengaman ──────────────────────────────────────────────────── */}
-      <section className="border-y border-zinc-900 bg-zinc-900/20">
-        <div className="mx-auto max-w-[1280px] px-4 py-14 md:py-20">
-          <div className="grid gap-8 md:grid-cols-3">
-            {[
-              {
-                ikon: ShieldCheck,
-                judul: 'Kunci API tinggal di VPS-mu',
-                teks: 'Order dikirim lewat backend milikmu sendiri, bukan server bersama. Browser tidak pernah memegang kunci Binance-mu.',
-              },
-              {
-                ikon: MoveVertical,
-                judul: 'Batas lot yang kamu tentukan',
-                teks: 'Perintah di atas batas ditolak, bukan dikecilkan diam-diam. Perintah yang lebih tua dari 5 menit kedaluwarsa sendiri.',
-              },
-              {
-                ikon: NotebookPen,
-                judul: 'Setiap order minta persetujuan',
-                teks: 'Tidak ada yang berangkat tanpa kamu menekan kirim, termasuk yang disiapkan agen AI.',
-              },
-            ].map(({ ikon: Ikon, judul, teks }) => (
-              <div key={judul} className="flex flex-col gap-2">
-                <Ikon className="size-5 text-[#ffcd75]" />
-                <h3 className="text-[14px] font-semibold text-zinc-100">{judul}</h3>
-                <p className="text-[13px] leading-relaxed text-zinc-400">{teks}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Ajakan penutup ────────────────────────────────────────────── */}
-      <section className="mx-auto max-w-[1280px] px-4 py-16 text-center md:py-24">
-        <h2 className="text-2xl font-bold tracking-tight text-zinc-100 sm:text-3xl">
-          Mulai dari mencatat. Sisanya menyusul.
-        </h2>
-        <p className="mx-auto mt-4 max-w-[560px] text-[15px] leading-relaxed text-zinc-400">
-          Jurnalnya gratis selamanya dan tidak minta kartu kredit. Kalau setelah sebulan kamu
-          merasa butuh melihat pasar lebih dulu sebelum entry, paketnya menunggu di situ.
-        </p>
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-          <Link
-            to="/jurnal"
-            className="group inline-flex items-center gap-2 rounded-md bg-gradient-to-b from-[#ffcd75] to-[#c9a24b] px-7 py-3 text-sm font-semibold text-zinc-950 shadow-lg transition-all hover:from-[#ffcd75] hover:to-[#ffcd75]"
-          >
-            Buka jurnal gratis
-            <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" />
-          </Link>
-          <Link
-            to="/dokumentasi"
-            className="inline-flex items-center gap-2 rounded-md border border-zinc-800 px-7 py-3 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-900"
-          >
-            Baca dokumentasi
-          </Link>
-        </div>
-      </section>
+    <div className="min-h-screen w-full overflow-y-auto bg-background text-foreground">
+      <Header />
+      <main className="grow">
+        <HeroSection>
+          <PeragaTerminal />
+        </HeroSection>
+      </main>
 
       {/* ── Footer ──────────────────────────────────────────────────────
           Halaman ini satu-satunya yang dilihat orang SEBELUM membeli, jadi
