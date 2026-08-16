@@ -960,14 +960,54 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
      berarti risiko membesar. Mengubah modal/%risiko/SL×ATR menjangkarkan
      ulang; menyeret garis tidak. */
   const qtyDemo = useRef(0);
+  /* KEMBARAN STATE, bukan cuma ref.
+     ──────────────────────────────────────────────────────────────────────
+     Ref dibaca saat render tapi menulisnya TIDAK memicu render. Jadi
+     jangkar yang dipasang di dalam efek baru terlihat pada render
+     BERIKUTNYA — dan sampai saat itu tiketnya menampilkan angka dari jalur
+     cadangan, yaitu −$10 mati. Yang dipakai menggambar sekarang state ini;
+     ref-nya tetap ada untuk dibaca di dalam callback (kirim order, draf
+     sinyal) tanpa ikut jadi dependency. */
+  const [qtyTampil, setQtyTampil] = useState(0);
   const jangkarQty = useCallback((e?: number, s?: number, risikoD?: number) => {
-    if (e && s && e !== s && risikoD) qtyDemo.current = risikoD / Math.abs(e - s);
+    if (!e || !s || e === s || !risikoD) return;
+    const q = risikoD / Math.abs(e - s);
+    qtyDemo.current = q;
+    setQtyTampil((lama) => (Math.abs(lama - q) > 1e-9 ? q : lama));
   }, []);
+  /* Jangkar ULANG: tiket baru dibuka, atau modal/%risiko diubah. */
   useEffect(() => {
     if (!draf || !aksi || aksi.mode !== 'demo') return;
     jangkarQty(rencana.entry ?? aksi.hargaKini, rencana.sl, aksi.risiko);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draf, demoSetelan.modal, demoSetelan.risikoPersen]);
+  /* ── Jangkar SUSULAN — ini yang selama ini hilang ────────────────────
+     Efek di atas berhenti kalau `aksi` belum ada, dan `aksi` datang dari
+     PanelReplay SESUDAH lilinnya termuat. Untuk tiket yang DIPULIHKAN dari
+     sessionStorage, `draf` sudah terisi jauh sebelum itu — efeknya jalan
+     sekali, menemui `aksi` null, lalu tidak pernah dipanggil lagi karena
+     `draf` tidak berubah lagi.
+
+     Akibatnya qty tinggal nol, tampilan jatuh ke jalur cadangan
+     `risiko / jarak`, dan hasil kalinya SELALU tepat −$10 berapa pun garis
+     SL digeser. Persis keluhan "angkanya tidak berubah": bukan jangkarnya
+     yang salah hitung, melainkan tidak pernah ada jangkar sama sekali.
+
+     Efek ini memasangnya begitu bahannya lengkap, dan berhenti ikut campur
+     setelah terpasang — supaya menyeret garis tetap mengubah dolarnya,
+     bukan menjangkarkan ulang.
+
+     Dependency-nya `aksi`, BUKAN `rencana` — `rencana` dideklarasikan lebih
+     bawah di berkas ini, dan menyebutnya di daftar dependency (yang
+     dievaluasi saat render, bukan saat efek jalan) adalah galat TDZ. Untuk
+     tiket pulihan itu tidak jadi soal: `rencana` sudah terisi bersamaan
+     dengan `draf`, jauh sebelum `aksi` muncul. */
+  useEffect(() => {
+    if (qtyDemo.current > 0) return;
+    if (!draf || !aksi || aksi.mode !== 'demo') return;
+    jangkarQty(rencana.entry ?? aksi.hargaKini, rencana.sl, aksi.risiko);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draf, aksi]);
   /* ── SL ×ATR dan R : R MENGGESER GARISNYA SUNGGUHAN ──────────────────
      Dua kolom itu sebelumnya tidak melakukan apa-apa. Tiga sebab, dan
      ketiganya harus diperbaiki bersama:
@@ -2040,7 +2080,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                             <PojokOrder
                               posisi={aksi.posisi} hargaKini={aksi.hargaKini}
                               draf={draf} rencana={rencana} mode={aksi.mode}
-                              jenis={labelJenis} risiko={aksi.risiko} qtyDemo={qtyDemo.current}
+                              jenis={labelJenis} risiko={aksi.risiko} qtyDemo={qtyTampil}
                               tunda={aksiTunda} onBatalTunda={aksi.batalTunda}
                               onGantiMode={(m) => {
                                 aksi.gantiMode(m);
@@ -2123,6 +2163,10 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                                 setRencana({});
                                 entryDigeser.current = false;
                                 seretTangan.current = false;
+                                /* Jangkar ikut dilepas: tiket berikutnya
+                                   harus menghitung ukurannya sendiri, bukan
+                                   mewarisi ukuran rencana yang dibatalkan. */
+                                qtyDemo.current = 0; setQtyTampil(0);
                               }}
                               onKirim={() => {
                                 const { entry, sl, tp } = rencana;
