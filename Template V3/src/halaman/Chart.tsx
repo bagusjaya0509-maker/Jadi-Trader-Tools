@@ -832,6 +832,9 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
     const ok = simpanDraf({
       pasangan: simbol, tf, arah: draf,
       entry, sl, tp, sampul,
+      /* Qty beku ikut dikirim — inilah yang membuat "Risk SL" di formulir
+         menampilkan angka yang sama dengan tiket ini, bukan −$10 mati. */
+      qty: qtyDemo.current > 0 ? qtyDemo.current : undefined,
     });
     if (!ok) { setKabarKirimSinyal('Gagal menyiapkan draf — coba lagi.'); return; }
     /* Alamat TANPA level: level sudah ikut di draf, dan menaruhnya juga di

@@ -712,6 +712,10 @@ export default function Analisa() {
      terposting — endpoint galeri butuh id analisanya, dan id itu baru ada
      setelah POST berhasil. */
   const [sampul, setSampul] = useState('');
+  /** Ukuran posisi beku yang dibawa draf dari Chart & Entry. Dipakai supaya
+   *  "Risk SL" di sini menampilkan angka yang SAMA dengan tiket chart —
+   *  bukan −$10 mati dari model contoh. 0 = disusun langsung di sini. */
+  const [qtyDraf, setQtyDraf] = useState(0);
   const [lihatSampul, setLihatSampul] = useState(false);
 
   /* Draf dari Chart & Entry dibaca SEKALI saat halaman dibuka, lalu
@@ -734,6 +738,7 @@ export default function Analisa() {
     setSl(String(rapikanHarga(d.sl)));
     setTp(String(rapikanHarga(d.tp)));
     if (d.sampul) setSampul(d.sampul);
+    if (d.qty && d.qty > 0) setQtyDraf(d.qty);
     /* PINDAH TAB, bukan sekadar membuka panel. Formulirnya sekarang hidup di
        tab Posting Signal; draf yang mendarat di tab yang tidak sedang
        dilihat sama saja dengan draf yang hilang — orangnya menekan "Ke Copy
@@ -802,7 +807,7 @@ export default function Analisa() {
       }
       setKabar(`Analisa terposting — dan kini permanen. Semoga levelnya bekerja.${kabarSampul}`);
       setRingkas(''); setEntry(''); setSl(''); setTp(''); setAlasan('');
-      setIzinJurnal(false); setPahamPermanen(false); setSampul('');
+      setIzinJurnal(false); setPahamPermanen(false); setSampul(''); setQtyDraf(0);
       segarkan();
     } catch (e) {
       setKabar(e instanceof Error ? e.message : 'Gagal memposting');
@@ -1036,7 +1041,21 @@ export default function Analisa() {
                 if (!jarakSl) return null;
                 const rr = jarakTp / jarakSl;
                 const sisiBenar = arah === 'BUY' ? (s < e && t > e) : (s > e && t < e);
-                const RISIKO = 10;             // 1% dari $1.000
+                /* DUA SUMBER ANGKA, dan yang dipakai disebut di layar.
+                   ──────────────────────────────────────────────────────
+                   Kalau rencananya datang dari Chart & Entry, ukuran
+                   posisinya sudah dibekukan di sana dan dolarnya MENGIKUTI
+                   jarak SL — geser SL lebih jauh, risikonya membesar.
+                   Itu yang barusan dilihat orangnya di tiket chart, dan
+                   formulir ini harus menampilkan angka yang sama.
+
+                   Kalau diketik langsung di sini tanpa melewati chart,
+                   tidak ada ukuran posisi untuk dipakai; yang tersisa model
+                   contoh 1% dari $1.000. Bedanya disebutkan, bukan
+                   disembunyikan — dua angka yang lahir dari model berbeda
+                   tidak boleh terlihat seperti satu jenis angka. */
+                const dariChart = qtyDraf > 0;
+                const RISIKO = dariChart ? qtyDraf * jarakSl : 10;
                 return (
                   <div className="col-span-2 sm:col-span-4 rounded-lg border border-zinc-800 bg-zinc-950/60 p-3">
                     {!sisiBenar ? (
@@ -1070,7 +1089,9 @@ export default function Analisa() {
                           <span className="angka text-[16px] font-semibold text-emerald-400">+{uang(rr * RISIKO)}</span>
                         </span>
                         <span className="text-[10.5px] leading-relaxed text-zinc-600">
-                          contoh modal {uang(1000)}, risiko 1%
+                          {dariChart
+                            ? 'ukuran posisi dari tiket Chart & Entry — sama dengan yang kamu lihat di sana'
+                            : `contoh modal ${uang(1000)}, risiko 1%`}
                         </span>
                       </div>
                     )}

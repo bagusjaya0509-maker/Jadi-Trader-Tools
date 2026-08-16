@@ -34,6 +34,17 @@ export interface DrafSinyal {
   /** Tangkapan layar chart sebagai data URL JPEG. Kosong bila pemotretnya
    *  gagal — formulirnya tetap terisi level, cuma tanpa sampul. */
   sampul: string;
+  /** Ukuran posisi yang DIBEKUKAN tiket chart saat dibuka (risiko dolar
+   *  dibagi jarak SL saat itu). Dibawa serta supaya angka dolar di formulir
+   *  Copy Signal sama persis dengan yang barusan terlihat di chart.
+   *
+   *  Tanpa ini keduanya memakai model berbeda: chart membekukan qty
+   *  sehingga menggeser SL MENGUBAH dolarnya, sementara formulir memakai
+   *  "1% dari $1.000" mati yang selalu −$10 berapa pun jarak SL-nya. Dua
+   *  angka benar menurut modelnya masing-masing, dan tetap saja tidak
+   *  cocok di layar yang sama. Kosong = disusun langsung di formulir,
+   *  tanpa melewati chart. */
+  qty?: number;
   waktu: number;
 }
 
