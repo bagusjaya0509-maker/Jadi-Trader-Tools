@@ -75,6 +75,10 @@ const Dashboard     = lazy(() => muat(() => import('@/components/dashboard').the
 const Screener      = lazy(() => muat(() => import('@/halaman/ScreenerV2')));
 const ScreenerReact = lazy(() => muat(() => import('@/halaman/Screener')));
 const Aktivasi      = lazy(() => muat(() => import('@/halaman/Aktivasi')));
+/* Halaman contoh template, berdiri sendiri — tidak ditautkan dari mana pun
+   dan tidak memuat sepotong pun isi situs ini. Dimuat lazy supaya berkas
+   dan gambar CDN-nya tidak ikut membebani jalur muat awal. */
+const Template      = lazy(() => muat(() => import('@/halaman/Template')));
 const ChartBacktest = lazy(() => muat(() => import('@/halaman/Chart')));
 const Jurnal        = lazy(() => muat(() => import('@/halaman/Jurnal')));
 const PersonalArea  = lazy(() => muat(() => import('@/halaman/PersonalArea')));
@@ -261,6 +265,7 @@ export default function App() {
               hidup di alamat sendiri supaya bisa dilihat tanpa mengganggu
               siapa pun. */}
           <Route path="/pendaratan" element={<Pendaratan />} />
+          <Route path="/template" element={<Template />} />
           <Route path="/akses" element={<Akses />} />
           {/* Tujuan link kiriman otomatis Lynk sesudah pembayaran. DI LUAR
               gerbang: orang yang baru membayar belum punya akses apa pun,
