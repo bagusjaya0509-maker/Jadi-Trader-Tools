@@ -56,25 +56,32 @@ export function langgananPreview(f: () => void): () => void {
   return () => { pendengar.delete(f); };
 }
 
-/* ── Jatah replay: SEKALI per sesi preview ───────────────────────────────
-   Replay adalah alat latihan yang bisa dipakai berjam-jam tanpa pernah
-   menyentuh alasan untuk mendaftar. Membiarkannya bebas berarti preview
-   berhenti jadi etalase dan berubah jadi versi gratis yang utuh.
+/* ── Jatah "sekali lihat" ────────────────────────────────────────────────
+   Dua alat di dalam aplikasi ini bisa dipakai berjam-jam tanpa pernah
+   menyentuh alasan untuk mendaftar: REPLAY (latihan eksekusi di atas data
+   pasar sungguhan) dan SCREENER AREA (pemindai yang memanggil proxy VPS
+   tiap kali dijalankan). Membiarkan keduanya bebas berarti preview berhenti
+   jadi etalase dan berubah jadi versi gratis yang utuh.
 
-   Sekali, bukan nol: satu putaran cukup untuk merasakan bentuknya —
-   memilih titik mulai, memajukan bar, membuka posisi latihan — dan itu
+   Sekali, bukan nol: satu kali cukup untuk merasakan bentuknya, dan itu
    memang yang perlu dilihat sebelum memutuskan. Yang dibatasi cuma
    PENGULANGANNYA.
 
-   Di sessionStorage bersama penanda previewnya sendiri, jadi keduanya
-   lahir dan mati bersamaan. Yang sudah masuk tidak pernah melewati
-   pemeriksaan ini — pemanggilnya wajib memastikan tidak ada sesi. */
-const KUNCI_REPLAY = 'jt.preview.replay';
+   SATU pasang fungsi untuk keduanya, bukan dua pasang yang mirip. Dua
+   salinan aturan yang sama akan menyimpang begitu salah satunya diperbaiki
+   — dan yang menyimpang di sini adalah siapa yang kena batas.
 
-export function jatahReplayTerpakai(): boolean {
-  try { return sessionStorage.getItem(KUNCI_REPLAY) === '1'; } catch { return false; }
+   Di sessionStorage bersama penanda previewnya sendiri, jadi semuanya lahir
+   dan mati bersamaan. Yang sudah masuk tidak pernah melewati pemeriksaan
+   ini — pemanggilnya wajib memastikan tidak ada sesi. */
+export type Jatah = 'replay' | 'screener';
+
+const kunciJatah = (nama: Jatah) => `jt.preview.${nama}`;
+
+export function jatahTerpakai(nama: Jatah): boolean {
+  try { return sessionStorage.getItem(kunciJatah(nama)) === '1'; } catch { return false; }
 }
 
-export function pakaiJatahReplay() {
-  try { sessionStorage.setItem(KUNCI_REPLAY, '1'); } catch { /* privat */ }
+export function pakaiJatah(nama: Jatah) {
+  try { sessionStorage.setItem(kunciJatah(nama), '1'); } catch { /* privat */ }
 }

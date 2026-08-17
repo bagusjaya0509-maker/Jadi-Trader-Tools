@@ -34,7 +34,7 @@ import {
 } from '@/lib/backtest';
 import { SIMBOL_DASAR, simbolDasarMt5 } from '@/lib/simbol';
 import { useAuth } from '@/lib/auth';
-import { modePreview, jatahReplayTerpakai, pakaiJatahReplay } from '@/lib/preview';
+import { modePreview, jatahTerpakai, pakaiJatah } from '@/lib/preview';
 
 /* ════════════════════════════════════════════════════════════════════════
    CHART & BACKTEST
@@ -260,7 +260,7 @@ export default function ChartBacktest() {
      orang yang membatalkannya sebelum memilih titik belum melihat apa pun —
      menghabiskan jatahnya di situ adalah hukuman untuk keragu-raguan. */
   useEffect(() => {
-    if (tamuPreview && replayIdx !== null) pakaiJatahReplay();
+    if (tamuPreview && replayIdx !== null) pakaiJatah('replay');
   }, [tamuPreview, replayIdx]);
   const [garisHarga, setGarisHarga] = useState<GarisHarga[]>([]);
   /* Panel Backtest tertutup saat halaman dibuka. Ia beta, dan yang beta
@@ -2052,7 +2052,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                    terbaca sebagai halaman rusak, bukan sebagai batas yang
                    disengaja — dan yang perlu tahu justru orang yang baru saja
                    menyukai fiturnya. */
-                if (tamuPreview && jatahReplayTerpakai()) {
+                if (tamuPreview && jatahTerpakai('replay')) {
                   setKabarReplay('Replay di mode preview berlaku sekali. Masuk untuk memakainya sepuasnya — sesi latihanmu ikut tersimpan ke jurnal.');
                   return;
                 }
@@ -2060,7 +2060,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                 setBidikReplay((v) => !v);
               }}
               title={replayIdx !== null ? 'Keluar dari replay'
-                : tamuPreview && jatahReplayTerpakai() ? 'Replay preview sudah terpakai — masuk untuk memakainya lagi'
+                : tamuPreview && jatahTerpakai('replay') ? 'Replay preview sudah terpakai — masuk untuk memakainya lagi'
                 : bidikReplay ? 'Batal memilih titik mulai'
                 : 'Pilih titik mulai replay — klik di chart'}
               className={cn('flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border px-2 py-1.5 text-[12px] transition-colors sm:px-2.5',

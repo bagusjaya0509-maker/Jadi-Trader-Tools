@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Loader2, ExternalLink, TriangleAlert, RotateCcw } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { Loader2, ExternalLink, TriangleAlert, RotateCcw, Radar, ArrowRight, Lock } from 'lucide-react';
+import { useAuth } from '@/lib/auth';
+import { modePreview, jatahTerpakai, pakaiJatah } from '@/lib/preview';
 
 /* ════════════════════════════════════════════════════════════════════════
    SCREENER ENTRY — screener V2 yang ASLI, ditanam apa adanya
@@ -218,6 +220,19 @@ const CSS_TANPA_CANGKANG = `
   *::-webkit-scrollbar-track { background: transparent; }
 `;
 
+/** Lencana sampul: kuning saat masih bisa dibuka, kelabu saat sudah lewat.
+ *  Ditulis sebagai fungsi supaya kedua keadaan memakai bentuk yang sama
+ *  persis dan cuma warnanya yang berbeda — lencana yang berubah bentuk
+ *  membuat mata mengira ia dua hal berlainan. */
+function cnSampul(terkunci: boolean) {
+  return [
+    'inline-flex w-fit items-center gap-2 rounded-full border px-3 py-1.5',
+    terkunci
+      ? 'border-zinc-700 bg-zinc-800/40 text-zinc-400'
+      : 'border-amber-500/30 bg-amber-500/[0.07] text-amber-300',
+  ].join(' ');
+}
+
 export default function ScreenerV2() {
   const arahkan = useNavigate();
 
@@ -253,7 +268,30 @@ export default function ScreenerV2() {
   const [siap, setSiap] = useState(false);
   const [ronde, setRonde] = useState(0);
 
+  /* ── SEKALI LIHAT untuk pengunjung preview ────────────────────────────
+     Aturan yang sama dengan Replay di Chart & Entry, dan alasannya sama:
+     screener ini bukan tampilan, ia ALAT — tiap pemindaian memanggil proxy
+     VPS untuk ratusan simbol. Dibiarkan bebas, preview berhenti jadi
+     etalase dan jadi versi gratis yang utuh.
+
+     `!pengguna` bukan pelengkap: penanda preview hidup di sessionStorage
+     dan bisa TERTINGGAL di tab yang sama sesudah orangnya masuk. Membaca
+     modePreview() saja akan mengunci screener milik pelanggan yang sudah
+     membayar — kegagalan paling mahal dari dua kemungkinan salah. */
+  const { pengguna } = useAuth();
+  const tamuPreview = modePreview() && !pengguna;
+  /* Tamu preview SELALU mulai tertutup, jatahnya masih utuh atau tidak.
+     Yang membedakan keduanya cuma isi sampulnya: tawaran, atau penjelasan
+     bahwa jatahnya sudah lewat. Menyamakan "boleh membuka" dengan "sudah
+     terbuka" membuat layarnya langsung terpampang tanpa ada yang pernah
+     menekan apa pun — dan batas yang tidak pernah ditawarkan bukan batas. */
+  const [buka, setBuka] = useState(!tamuPreview);
+  const terkunci = tamuPreview && !buka && jatahTerpakai('screener');
+
   useEffect(() => {
+    /* Belum dibuka -> jangan menyentuh jaringan sama sekali. Menyiapkan
+       bingkai untuk layar yang sedang tertutup adalah kerja yang dibuang. */
+    if (!buka) return;
     let hidup = true;
     (async () => {
       setGagal(false); setSiap(false); setAlamat(null);
@@ -277,7 +315,7 @@ export default function ScreenerV2() {
       if (hidup) setAlamat(CADANGAN);
     })();
     return () => { hidup = false; };
-  }, [ronde]);
+  }, [ronde, buka]);
 
   /* Iframe lintas-domain tidak memberi tahu kalau isinya gagal dimuat —
      `onError` hampir tidak pernah terpanggil, dan `onLoad` tetap menyala
@@ -289,6 +327,88 @@ export default function ScreenerV2() {
     const t = setTimeout(() => setGagal(true), 15_000);
     return () => clearTimeout(t);
   }, [alamat, siap]);
+
+  /* ── Sampul sekali-lihat ──────────────────────────────────────────────
+     BATASNYA DITULIS SEBELUM TOMBOLNYA, sama seperti di halaman /pratinjau.
+     Kalimat "berlaku sekali" kehilangan seluruh gunanya kalau baru muncul
+     sesudah jatahnya terpakai — dan orang yang merasa dijebak tidak
+     mendaftar, ia menutup tab.
+
+     Dua keadaan, satu bentuk: sebelum dipakai ia tawaran, sesudah dipakai
+     ia penjelasan berikut jalan keluarnya. Tidak ada layar mati tanpa
+     kalimat — itu terbaca sebagai halaman rusak, bukan batas yang
+     disengaja. */
+  if (tamuPreview && !buka) {
+    return (
+      <div className="flex min-h-[70vh] items-center justify-center p-6">
+        <div className="w-full max-w-lg rounded-xl border border-zinc-800 bg-zinc-900/40 p-6">
+          <div className={cnSampul(terkunci)}>
+            {terkunci ? <Lock className="size-4" strokeWidth={2} /> : <Radar className="size-4" strokeWidth={2} />}
+            <span className="text-[10.5px] font-semibold uppercase tracking-wider">
+              {terkunci ? 'Sudah terpakai' : 'Sekali lihat'}
+            </span>
+          </div>
+
+          <h1 className="mt-4 text-2xl font-medium tracking-tight text-zinc-50">
+            {terkunci ? 'Screener Area sudah kamu buka' : 'Screener Area'}
+          </h1>
+
+          <p className="mt-2 text-[13.5px] leading-relaxed text-zinc-400">
+            {terkunci ? (
+              <>
+                Di mode preview, screener berlaku sekali — dan sekali itu sudah lewat.
+                Masuk untuk memakainya tanpa batas, berikut jurnal dan Chart &amp; Entry
+                yang menyimpan hasilnya.
+              </>
+            ) : (
+              <>
+                Pemindai yang membaca ratusan simbol Binance langsung dari pasar:
+                Koin Hunter, Zona Pantau, dan sinyal paralel. Angkanya <b>bukan contoh</b> —
+                ini alat yang sesungguhnya, berjalan atas data sekarang.
+              </>
+            )}
+          </p>
+
+          {!terkunci && (
+            <ul className="mt-5 flex flex-col gap-2.5 border-t border-zinc-800 pt-5">
+              {[
+                ['Berlaku sekali per kunjungan', 'Begitu kamu pindah halaman lalu kembali, layarnya tertutup lagi.'],
+                ['Bukan data contoh', 'Berbeda dari halaman preview lain — yang ini memindai pasar sungguhan.'],
+                ['Tidak perlu daftar', 'Tidak ada yang diminta, dan tidak ada yang disimpan.'],
+              ].map(([judul, ket]) => (
+                <li key={judul} className="flex gap-2.5">
+                  <span className="mt-1.5 size-1 shrink-0 rounded-full bg-zinc-600" />
+                  <div>
+                    <div className="text-[12.5px] font-medium text-zinc-200">{judul}</div>
+                    <div className="text-[11.5px] leading-relaxed text-zinc-500">{ket}</div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <div className="mt-5 flex flex-wrap items-center gap-2.5">
+            {terkunci ? (
+              <Link to="/pratinjau"
+                className="flex items-center gap-2 rounded-md bg-zinc-100 px-4 py-2.5 text-[13px] font-medium text-zinc-950 transition-colors hover:bg-white">
+                Masuk untuk membukanya lagi <ArrowRight className="size-4" />
+              </Link>
+            ) : (
+              <button
+                onClick={() => { pakaiJatah('screener'); setBuka(true); }}
+                className="flex cursor-pointer items-center gap-2 rounded-md bg-zinc-100 px-4 py-2.5 text-[13px] font-medium text-zinc-950 transition-colors hover:bg-white">
+                Buka Screener Area <ArrowRight className="size-4" />
+              </button>
+            )}
+            <Link to="/dashboard"
+              className="rounded-md border border-zinc-800 px-4 py-2.5 text-[13px] text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100">
+              Kembali ke Dashboard
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (gagal) {
     return (
