@@ -34,11 +34,19 @@ type Layar = {
   aksen: string;
 };
 
+/* Urutannya BUKAN urutan menu, melainkan urutan cerita: yang paling dulu
+   ditunjukkan adalah layar yang paling menjelaskan produk ini. Chart &
+   Entry dinaikkan ke nomor satu karena di situlah replay dan penyusunan
+   order terjadi — inti yang dijual. Screener turun ke nomor tiga.
+
+   Kalau daftar ini diubah lagi, `no` harus ikut dinomori ulang: angkanya
+   ditulis tangan, tidak diturunkan dari indeks, jadi menukar dua entri
+   tanpa memperbaiki `no` akan menampilkan "03" di posisi pertama. */
 const LAYAR: Layar[] = [
   {
-    no: '01', berkas: 'screener', aksen: '#ffcd75',
-    judul: 'Screener Area',
-    ket: 'Pindai ratusan pair sekaligus. Yang lolos saring muncul dengan alasannya, bukan cuma tanda panah.',
+    no: '01', berkas: 'chart', aksen: '#60a5fa',
+    judul: 'Chart & Entry',
+    ket: 'Susun entry, SL, dan TP dengan menggeser garis. Order berangkat ke Binance lewat VPS-mu sendiri.',
   },
   {
     no: '02', berkas: 'dashboard', aksen: '#34d399',
@@ -46,9 +54,9 @@ const LAYAR: Layar[] = [
     ket: 'Saldo, winrate, dan profit factor dihitung dari transaksimu sendiri — bukan dari angka yang kami karang.',
   },
   {
-    no: '03', berkas: 'chart', aksen: '#60a5fa',
-    judul: 'Chart & Entry',
-    ket: 'Susun entry, SL, dan TP dengan menggeser garis. Order berangkat ke Binance lewat VPS-mu sendiri.',
+    no: '03', berkas: 'screener', aksen: '#ffcd75',
+    judul: 'Screener Area',
+    ket: 'Pindai ratusan pair sekaligus. Yang lolos saring muncul dengan alasannya, bukan cuma tanda panah.',
   },
   {
     no: '04', berkas: 'jurnal', aksen: '#f472b6',
