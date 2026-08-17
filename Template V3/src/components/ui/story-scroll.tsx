@@ -44,7 +44,21 @@ export const FlowSection: React.FC<FlowSectionProps> = ({
   <section
     data-flow-section
     aria-label={ariaLabel}
-    className={cx('relative min-h-full w-full overflow-hidden', className)}
+    /* h-full WAJIB berdampingan dengan min-h-full, dan alasannya hanya
+       kelihatan pada seksi TERAKHIR.
+
+       `min-h-full` saja membuat tinggi seksi tetap `auto`. Empat seksi
+       pertama tidak terpengaruh: ScrollTrigger menyematkannya, dan
+       penyematan memasang tinggi eksplisit. Seksi terakhir tidak
+       disematkan — tingginya tetap auto, jadi `min-h-full` di kotak
+       dalamnya (persentase terhadap induk ber-tinggi auto) tidak
+       menghasilkan apa-apa, dan kotak itu menyusut ke tinggi isinya.
+       Terukur: gambar seksi terakhir setinggi 187 px, bukan 555 — sisanya
+       tembus ke seksi di bawahnya, jadi dua layar terlihat bertumpuk.
+
+       height:100% menjadikan tingginya pasti, dan persentase di dalamnya
+       punya sesuatu untuk dihitung. */
+    className={cx('relative h-full min-h-full w-full overflow-hidden', className)}
   >
     <div
       data-flow-inner

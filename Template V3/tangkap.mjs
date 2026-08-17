@@ -18,7 +18,11 @@ const HALAMAN = [
   ['dashboard',   '/dashboard'],
   ['chart',       '/chart?simbol=BTCUSDT&tf=4h'],
   ['jurnal',      '/jurnal'],
-  ['marketplace', '/marketplace'],
+  /* Copy Signal dipotret APA ADANYA — papan peringkat terbuka. Dua varian
+     lain sudah dicoba dan lebih buruk: melipat peringkat menyisakan 60%
+     layar kosong, dan tab Posting Signal butuh login jadi isinya cuma satu
+     kalimat ajakan masuk. */
+  ['copy',        '/copy'],
 ];
 
 mkdirSync(KELUAR, { recursive: true });

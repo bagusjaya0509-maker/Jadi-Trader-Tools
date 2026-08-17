@@ -56,9 +56,9 @@ const LAYAR: Layar[] = [
     ket: 'Kurva ekuitas dan kalender P/L terisi sendiri dari MetaTrader 5 dan Binance. Tidak ada yang diketik ulang.',
   },
   {
-    no: '05', berkas: 'marketplace', aksen: '#c084fc',
-    judul: 'Marketplace',
-    ket: 'Indikator Pine dan Expert Advisor yang dipakai terminal ini — termasuk yang gratis.',
+    no: '05', berkas: 'copy', aksen: '#c084fc',
+    judul: 'Copy Signal',
+    ket: 'Sinyal dari analis lain, diurutkan dari hasil sinyalnya sendiri — bukan dari jumlah pengikut.',
   },
 ];
 
