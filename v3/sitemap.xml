@@ -26,12 +26,17 @@
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
-  <url>
-    <!-- Etalase penuh tanpa login: bentuk barangnya bisa dilihat siapa saja. -->
-    <loc>https://jaditrader.co.id/preview</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.9</priority>
-  </url>
+  <!-- /preview SENGAJA TIDAK DIDAFTARKAN, meski ia halaman publik terbaik
+       yang kita punya.
+
+       Halaman itu bukan halaman: ia menyalakan mode preview lalu langsung
+       melempar pengunjung ke /dashboard. Bagi perayap artinya alamat sitemap
+       yang berakhir di jalur yang justru dilarang robots.txt — dan Search
+       Console melaporkannya sebagai galat, bukan sebagai halaman.
+
+       Diketahui dari kejadian nyata: permintaan indeks untuk /preview DITOLAK
+       dengan "indexing issues were detected with the URL". Jalan masuknya
+       tetap ada lewat tombol di halaman depan, yang memang tempatnya. -->
   <url>
     <!-- Halaman masuk / permintaan akses. Publik, dan memang tujuan pencarian
          bermerek ("jadi trader tools login"). -->
