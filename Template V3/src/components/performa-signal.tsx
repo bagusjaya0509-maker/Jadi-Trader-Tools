@@ -213,6 +213,8 @@ export function PerformaAnalisSatu({ analis, modal, risikoPersen, berjalan, diba
                  ket={`jadi ${uang(modal + analis!.hasilDolar)}`} />
           </div>
 
+          <KurvaSaldo harian={harian} modal={modal} />
+
           <div className="rounded-lg border border-zinc-800/60 p-3.5">
             <div className="mb-2 flex items-baseline justify-between">
               <span className="text-[12.5px] text-zinc-300">Kalender hasil</span>
@@ -272,6 +274,85 @@ export function PerformaAnalisSatu({ analis, modal, risikoPersen, berjalan, diba
           Sinyal ini disusun agen AI dari data harga publik, bukan orang dengan jurnal trading.
         </p>
       )}
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   KURVA SALDO — bentuk perjalanannya, bukan cuma angka akhirnya
+   ════════════════════════════════════════════════════════════════════════
+   KPI "Estimasi dari $1.000" sudah menyebut hasil akhirnya, tapi satu angka
+   tidak bisa membedakan dua rekam jejak yang sangat berbeda: naik pelan
+   dan rata, atau naik tinggi lalu jatuh lalu pulih. Keduanya bisa berakhir
+   di angka yang sama, dan yang kedua jauh lebih berat dijalani.
+
+   Kurva ini menjawab itu. Titik mulanya modal utuh, lalu tiap hari yang
+   ada hasilnya menggesernya.
+
+   ── DIGAMBAR SVG SENDIRI, BUKAN PUSTAKA GRAFIK ──────────────────────────
+   Recharts sudah ada di proyek ini, tapi menariknya ke sini berarti
+   menambah ratusan kilobita untuk satu garis polos. Yang dibutuhkan cuma
+   satu <polyline> — dan itu tidak butuh pustaka apa pun.
+   ════════════════════════════════════════════════════════════════════════ */
+function KurvaSaldo({ harian, modal }: { harian: Map<string, number>; modal: number }) {
+  const titik = useMemo(() => {
+    /* Diurutkan menurut TANGGAL, bukan urutan penyisipan Map. Kunci Map
+       mempertahankan urutan masuk, dan hasil yang dinilai server belakangan
+       bisa saja milik hari yang lebih awal — kurva yang mengikuti urutan
+       masuk akan menggambar perjalanan yang tidak pernah terjadi. */
+    const hari = [...harian.keys()].sort();
+    let saldo = modal;
+    const keluar = [{ hari: '', saldo }];
+    for (const h of hari) {
+      saldo += harian.get(h) ?? 0;
+      keluar.push({ hari: h, saldo });
+    }
+    return keluar;
+  }, [harian, modal]);
+
+  if (titik.length < 2) return null;
+
+  const nilai = titik.map((t) => t.saldo);
+  const atas = Math.max(...nilai, modal);
+  const bawah = Math.min(...nilai, modal);
+  /* Bantalan supaya garisnya tidak menempel ke tepi kotak. Kalau seluruh
+     nilainya sama (belum ada hasil), rentangnya nol dan pembagian di bawah
+     menghasilkan NaN — karena itu ada batas bawah 1. */
+  const rentang = Math.max(atas - bawah, 1);
+  const L = 300, T = 90, pad = 6;
+
+  const x = (i: number) => (i / (titik.length - 1)) * L;
+  const y = (v: number) => pad + (1 - (v - bawah) / rentang) * (T - pad * 2);
+
+  const garis = titik.map((t, i) => `${x(i).toFixed(1)},${y(t.saldo).toFixed(1)}`).join(' ');
+  const akhir = nilai[nilai.length - 1];
+  const untung = akhir >= modal;
+  const warna = untung ? '#34d399' : '#f87171';
+  /* Garis modal awal: tanpa patokan ini, kurva yang turun dari $1.000 ke
+     $990 terlihat sama saja dengan yang naik dari $980 — mata membaca
+     bentuk, bukan sumbu. */
+  const yModal = y(modal);
+
+  return (
+    <div className="rounded-lg border border-zinc-800/60 p-3.5">
+      <div className="mb-2 flex items-baseline justify-between">
+        <span className="text-[12.5px] text-zinc-300">Perkembangan saldo</span>
+        <span className="text-[10.5px] text-zinc-600">estimasi dari {uang(modal)}</span>
+      </div>
+      <svg viewBox={`0 0 ${L} ${T}`} className="h-[90px] w-full" role="img"
+           aria-label={`Kurva saldo estimasi, dari ${uang(modal)} menjadi ${uang(akhir)}`}>
+        <line x1="0" x2={L} y1={yModal} y2={yModal} strokeDasharray="3 3"
+              stroke="rgba(255,255,255,0.18)" strokeWidth="1" />
+        <polyline points={garis} fill="none" stroke={warna} strokeWidth="1.75"
+                  strokeLinejoin="round" strokeLinecap="round" />
+        <circle cx={x(titik.length - 1)} cy={y(akhir)} r="2.5" fill={warna} />
+      </svg>
+      <div className="mt-1.5 flex items-baseline justify-between font-mono text-[10.5px]">
+        <span className="text-zinc-600">{uang(modal)}</span>
+        <span className={untung ? 'text-emerald-400' : 'text-red-400'}>
+          {uang(akhir)} ({akhir >= modal ? '+' : ''}{uang(akhir - modal, true)})
+        </span>
+      </div>
     </div>
   );
 }

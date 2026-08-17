@@ -478,7 +478,10 @@ function KartuAnalisa({ a, status, milikku, pemilik, onSegarkan, performa, dibat
 
   return (
     /* `relative` wajib: lencana AI Agent duduk absolut di pojok panel. */
-    <Panel className={cn('relative overflow-hidden p-4', selesai && 'opacity-75')}>
+    /* flex-col + h-full: kartu mengisi tinggi raknya, bukan tinggi isinya.
+       Dipasangkan dengan mt-auto di baris tombol supaya seluruh kartu di
+       satu rak berakhir di garis yang sama. */
+    <Panel className={cn('relative flex h-full flex-col overflow-hidden p-4', selesai && 'opacity-75')}>
       {a.agen && <LencanaAgen />}
 
       {/* Sampul analisa. Untuk yang BERBAYAR gambarnya tidak dikirim server
@@ -680,8 +683,21 @@ function KartuAnalisa({ a, status, milikku, pemilik, onSegarkan, performa, dibat
                 chart kosong dan harus mengetik ulang level yang barusan ia
                 beli, dari ingatan. Sekarang tiketnya terbuka sudah terisi.
                 `tf` ikut supaya yang tampil timeframe yang DIANALISA. */}
+            {/* AWALAN MT5: WAJIB untuk Trade-Fi, dan ini pernah rusak.
+                Halaman Chart memilih SUMBER DATA dari bentuk simbolnya:
+                tanpa awalan ia menarik lilin dari proxy VPS ke Binance,
+                dengan "MT5:" ia menarik dari lilin yang dikirim EA.
+
+                Dulu baris ini mengirim pasangan apa adanya, jadi sinyal
+                XAUUSD mendarat di chart yang mencari XAUUSD DI BINANCE —
+                bursa yang memang tidak punya simbol itu. Yang muncul
+                "Tidak ada data untuk simbol ini" dan "Proxy VPS mungkin
+                sedang tidak menjawab": dua pesan yang menuduh jaringan
+                padahal permintaannya sendiri yang salah alamat, dan itu
+                membuat orang mengira layanannya sedang mati. */}
             <Link
-              to={`/chart?simbol=${encodeURIComponent(a.pasangan)}`
+              to={`/chart?simbol=${encodeURIComponent(
+                    (a.pasar === 'tradefi' ? 'MT5:' : '') + a.pasangan)}`
                 + (a.tf ? `&tf=${a.tf}` : '')
                 + `&arah=${a.arah}&entry=${isi.entry}&sl=${isi.sl}&tp=${isi.tp}`}
               className="ml-auto flex items-center gap-1.5 rounded-md bg-zinc-100 px-2.5 py-1.5 text-[11.5px] font-medium text-zinc-950 transition-colors hover:bg-white">
@@ -716,7 +732,12 @@ function KartuAnalisa({ a, status, milikku, pemilik, onSegarkan, performa, dibat
             </div>
           </div>
         ) : (
-          <div className="flex items-center gap-2">
+          /* mt-auto: baris tombol dipaku ke DASAR kartu.
+             Tanpa ini tiap kartu setinggi isinya masing-masing, dan di rak
+             mendatar hasilnya deretan tombol yang tingginya bertingkat-
+             tingkat — mata membaca itu sebagai tata letak yang rusak,
+             padahal cuma isinya yang tidak sama panjang. */
+          <div className="mt-auto flex items-center gap-2 pt-1">
             {bisaBuka ? (
               <button onClick={() => void muatIsi()} disabled={sibuk}
                 className="flex cursor-pointer items-center gap-1.5 rounded-md bg-zinc-100 px-3 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:opacity-50">
@@ -1864,9 +1885,9 @@ export default function Analisa() {
                       Tidak ada sinyal di ruangan ini.
                     </p>
                   ) : (
-                    <div className="flex gap-4 overflow-x-auto pb-1">
+                    <div className="flex items-stretch gap-4 overflow-x-auto pb-1">
                       {tampil.map((a) => (
-                        <div key={a.id} className="w-[320px] shrink-0">
+                        <div key={a.id} className="flex w-[320px] shrink-0">
                           <KartuAnalisa a={a} status={statusku[a.id]}
                             milikku={a.uid === pengguna?.uid} pemilik={pemilik} onSegarkan={segarkan}
                             performa={performa} hargaKini={hargaUntuk(a.pasangan)}
