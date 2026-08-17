@@ -696,10 +696,13 @@ export default function Analisa() {
      begini, hitungannya mulai saat kalimatnya benar-benar terlihat, dan
      mulai lagi tiap kali orangnya kembali ke halaman depan Market Signal.
 
-     YANG PERLU DICATAT DENGAN JUJUR: kalimat ini ±45 kata, dan 3 detik
-     cukup untuk kira-kira 10 kata. Ia lewat sebelum sempat dibaca habis.
-     Yang menahan risikonya karena itu BUKAN kalimat ini, melainkan tiga
-     hal yang tidak ikut menghilang:
+     LIMA DETIK, dinaikkan dari tiga (permintaan pemilik, 17 Agu 2026).
+
+     YANG PERLU DICATAT DENGAN JUJUR: kalimat ini ±45 kata, dan 5 detik
+     cukup untuk kira-kira 16 kata pada kecepatan baca wajar. Ia masih
+     lewat sebelum sempat dibaca habis — naik dari tiga detik memperbaiki
+     keadaan, tidak menyelesaikannya. Yang menahan risikonya karena itu
+     BUKAN kalimat ini, melainkan tiga hal yang tidak ikut menghilang:
        · satu baris ringkas DI ATAS tiap kanal yang dibuka — dan kanal
          itulah layar yang benar-benar menampilkan entry, SL, dan TP
        · tautan "Legal" permanen di kaki sidebar
@@ -710,7 +713,7 @@ export default function Analisa() {
   useEffect(() => {
     if (!diDepan) return;
     setDiskTampil(true);
-    const t = setTimeout(() => setDiskTampil(false), 3000);
+    const t = setTimeout(() => setDiskTampil(false), 5000);
     return () => clearTimeout(t);
   }, [diDepan]);
 
@@ -1229,18 +1232,17 @@ export default function Analisa() {
               <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-zinc-800 bg-zinc-950/60 px-3.5 py-3">
                 <input type="checkbox" checked={izinJurnal} onChange={(e) => setIzinJurnal(e.target.checked)}
                   className="mt-0.5 size-3.5 shrink-0 cursor-pointer accent-emerald-500" />
-                {/* KALIMAT INI HARUS TETAP BENAR. Ia sempat menjanjikan
-                    jurnalnya "bisa diperiksa siapa pun lewat Lihat
-                    portofolio" — dan sesudah panel itu diganti performa
-                    sinyal, janji tersebut jadi keliru ke arah yang paling
-                    buruk: orang menyetujui sesuatu yang tidak terjadi, dan
-                    tidak menyetujui yang benar-benar terjadi. */}
+                {/* KALIMAT INI HARUS TETAP BENAR — dan versi lamanya sudah
+                    tidak. Ia menjanjikan jurnal sebagai SYARAT memposting;
+                    syarat itu dicabut 17 Agu 2026, dan yang dinilai publik
+                    sekarang performa sinyalnya. Persetujuan yang menyebut
+                    sesuatu yang tidak lagi terjadi lebih buruk daripada
+                    tidak ada persetujuan sama sekali. */}
                 <span className="text-[12px] leading-relaxed text-zinc-400">
-                  Saya lampirkan <span className="text-zinc-200">rekam jejak jurnal saya</span>{' '}
-                  ({snapshot.jumlah} transaksi, winrate {persen(snapshot.winrate)}, PF {snapshot.pf || '—'})
-                  sebagai syarat memposting — analis harus benar-benar trading, bukan cuma
-                  memberi arahan. Yang tampil publik adalah <span className="text-zinc-200">hasil
-                  sinyal-sinyalku</span>; isi jurnalku sendiri tidak dibuka.
+                  Saya paham yang dinilai orang adalah{' '}
+                  <span className="text-zinc-200">hasil sinyal-sinyalku</span> — kena TP atau SL,
+                  dihitung otomatis di papan peringkat. Jurnal pribadiku tidak jadi syarat dan
+                  tidak dibuka.
                 </span>
               </label>
               <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-zinc-800 bg-zinc-950/60 px-3.5 py-3">
@@ -1254,12 +1256,10 @@ export default function Analisa() {
               </label>
             </div>
 
-            {snapshot.jumlah === 0 && (
-              <p className="mt-2 text-[12px] leading-relaxed text-amber-300/90">
-                Jurnalmu masih kosong — server akan menolak posting. Analis wajib punya riwayat
-                trading yang bisa diperiksa; isi jurnalmu dulu.
-              </p>
-            )}
+            {/* PERINGATAN "jurnalmu masih kosong" DIHAPUS. Ia menyuruh orang
+                mengisi jurnal untuk sesuatu yang tidak lagi diperiksa siapa
+                pun — pekerjaan yang tidak menghasilkan apa-apa, disodorkan
+                sebagai keharusan. */}
 
             <div className="mt-3 flex items-center gap-3">
               <button onClick={() => void posting()}
@@ -1268,12 +1268,16 @@ export default function Analisa() {
                    tidak pernah lagi diisi siapa pun, tombolnya terkunci
                    permanen — formulir yang sudah lengkap menolak dikirim
                    tanpa memberi tahu apa yang kurang. */
+                /* `snapshot.jumlah === 0` DICABUT dari syarat: jurnal kosong
+                   tidak lagi menghalangi siapa pun memposting. Yang tersisa
+                   cuma kelengkapan formulir dan dua persetujuan — keduanya
+                   soal sinyal yang sedang dikirim, bukan soal masa lalu
+                   orangnya. */
                 disabled={sibuk || !ringkas.trim() || !entry || !sl || !tp
-                          || !izinJurnal || !pahamPermanen || snapshot.jumlah === 0}
+                          || !izinJurnal || !pahamPermanen}
                 title={!ringkas.trim() ? 'Isi ringkasan publik dulu — itu yang jadi judul kartunya'
                   : !entry || !sl || !tp ? 'Entry, SL, dan TP harus terisi'
-                  : !izinJurnal || !pahamPermanen ? 'Centang kedua persetujuan dulu'
-                  : snapshot.jumlah === 0 ? 'Jurnalmu masih kosong' : undefined}
+                  : !izinJurnal || !pahamPermanen ? 'Centang kedua persetujuan dulu' : undefined}
                 className="flex cursor-pointer items-center gap-2 rounded-md bg-zinc-100 px-3.5 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50">
                 {sibuk ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />} Posting — permanen
               </button>
