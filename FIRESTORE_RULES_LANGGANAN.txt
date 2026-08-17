@@ -1,14 +1,27 @@
-ATURAN FIRESTORE — MASA COBA 30 HARI + LANGGANAN $5/BULAN
+ATURAN FIRESTORE — PRATINJAU 24 JAM + AKSES LEWAT KODE
 ===========================================================================
 
-INI BAGIAN YANG PALING PENTING DARI SELURUH FITUR LANGGANAN.
+INI BAGIAN YANG PALING PENTING DARI SELURUH FITUR AKSES.
 
 Penguncian di halaman web cuma tampilan — siapa pun bisa membukanya lewat
 view-source. Aturan di bawah ini jalan di server Google dan TIDAK BISA
-disentuh dari peramban. Selama blok ini belum di-publish, jurnal masih bisa
-ditulis oleh siapa saja yang masa cobanya sudah habis.
+disentuh dari peramban.
 
 Buka: Firebase Console → Firestore Database → tab "Rules" → Publish.
+
+---------------------------------------------------------------------------
+APA YANG BERUBAH (17 Agu 2026) DAN KENAPA ITU WAJIB
+---------------------------------------------------------------------------
+
+Jendela otomatis dipendekkan dari 30 HARI jadi 24 JAM, mengikuti mode
+pratinjau di web.
+
+Ini BUKAN sekadar penyelarasan angka. Selama aturan di bawah masih menulis
+30 hari sementara layar mengunci sesudah sehari, server tetap MENGIZINKAN
+tulis selama 29 hari sesudahnya — siapa pun yang mau cukup memanggil
+Firestore langsung dari console peramban dan gerbangnya tidak ada artinya.
+Layar yang mengunci tanpa aturan yang ikut mengunci adalah gembok yang
+digantung di pintu tanpa dikaitkan.
 
 ---------------------------------------------------------------------------
 SALIN SELURUHNYA (ini aturan LENGKAP, sudah termasuk blok public/ yang lama)
@@ -18,19 +31,19 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ---- Status langganan ------------------------------------------------
+    // ---- Status akses ----------------------------------------------------
     // Dokumen ini yang menentukan siapa boleh memakai fitur berbayar.
     //
     // create : boleh SEKALI oleh pemiliknya sendiri, dan field "mulai" WAJIB
     //          sama dengan waktu server (request.time). Halaman mengirim
     //          serverTimestamp(), jadi jam di HP tidak bisa dipakai memundurkan
     //          tanggal mulai. Field lain tidak boleh ikut ditulis.
-    // update : DITOLAK untuk pengguna biasa -> masa coba tidak bisa di-reset
+    // update : DITOLAK untuk pengguna biasa -> pratinjau tidak bisa di-reset
     //          dan bayarSampai tidak bisa dipalsukan sendiri.
     // delete : DITOLAK -> hapus dokumen lalu buat baru juga tidak bisa.
     //
-    // Kamu sebagai pemilik tetap bisa menulis apa pun di sini (lihat baris
-    // terakhir) — itulah cara memperpanjang langganan sesudah orang membayar.
+    // Ketiganya bersama-sama yang membuat "pratinjau sekali per akun" benar:
+    // tanpa penolakan update DAN delete, 24 jam itu bisa diulang tanpa batas.
     match /langganan/{uid} {
       allow read: if request.auth != null
                   && (request.auth.uid == uid || request.auth.uid == 'EOrakx0QnSVgsi6BECSOXvUM9kG3');
@@ -46,14 +59,14 @@ service cloud.firestore {
 
     // ---- Data pribadi tiap pengguna --------------------------------------
     // BACA selalu boleh untuk pemiliknya — orang tidak boleh kehilangan akses
-    // ke riwayat tradingnya sendiri hanya karena berhenti berlangganan.
-    // TULIS butuh langganan aktif: itulah yang membuat jurnal jadi baca-saja
-    // sesudah masa coba habis.
+    // ke riwayat tradingnya sendiri hanya karena pratinjaunya habis.
+    // TULIS butuh akses aktif: itulah yang membuat jurnal jadi baca-saja
+    // sesudah 24 jam.
     match /users/{uid} {
       allow read: if request.auth != null && request.auth.uid == uid;
       allow write: if request.auth != null
                    && request.auth.uid == uid
-                   && langgananAktif(uid);
+                   && aksesAktif(uid);
     }
 
     // ---- Jurnal contoh untuk pengunjung (blok lama, jangan dihapus) -------
@@ -79,62 +92,58 @@ service cloud.firestore {
     }
 
     // ---- Penolong --------------------------------------------------------
-    function docLangganan(uid) {
-      return get(/databases/$(database)/documents/langganan/$(uid)).data;
+    // Dokumen langganan selalu berupa map: kalau belum ada, hasilnya map
+    // KOSONG, bukan null. Bentuk ini dipilih supaya tidak ada satu pun jalur
+    // yang bisa membaca field dari dokumen yang tidak ada.
+    function langgananData(uid) {
+      return exists(/databases/$(database)/documents/langganan/$(uid))
+        ? get(/databases/$(database)/documents/langganan/$(uid)).data
+        : {};
     }
 
-    function langgananAktif(uid) {
+    function aksesAktif(uid) {
       return uid == 'EOrakx0QnSVgsi6BECSOXvUM9kG3'
+        // masih di dalam PRATINJAU 24 jam sejak login pertama
         || (
-          exists(/databases/$(database)/documents/langganan/$(uid))
-          && (
-            // masih di dalam masa coba 30 hari
-            (
-              'mulai' in docLangganan(uid)
-              && docLangganan(uid).mulai + duration.value(30, 'd') > request.time
-            )
-            // atau langganannya masih berlaku
-            || (
-              'bayarSampai' in docLangganan(uid)
-              && docLangganan(uid).bayarSampai > request.time
-            )
-          )
+          'mulai' in langgananData(uid)
+          && langgananData(uid).mulai + duration.value(24, 'h') > request.time
+        )
+        // atau aksesnya sudah dibuka lewat kode / persetujuan
+        || (
+          'bayarSampai' in langgananData(uid)
+          && langgananData(uid).bayarSampai > request.time
         );
     }
   }
 }
 
 ---------------------------------------------------------------------------
-CARA MEMPERPANJANG LANGGANAN SESUDAH ORANG MEMBAYAR
+CARA MEMBUKA AKSES SESUDAH ORANG MEMBAYAR / DISETUJUI
 ---------------------------------------------------------------------------
 
-Sementara ini manual lewat Firebase Console:
+Jalur normalnya lewat halaman Maintenance → Permintaan Akses (backend yang
+menulis bayarSampai). Manual lewat Firebase Console kalau perlu:
 
   1. Firestore Database → koleksi "langganan" → cari dokumen dengan uid orang
      itu. (Kalau tidak tahu uid-nya: minta emailnya, lalu cocokkan lewat
      Authentication → Users.)
-  2. Tambah/ubah field  bayarSampai  bertipe timestamp, isi tanggal 1 bulan
-     dari sekarang.
-  3. Selesai. Halaman orang itu akan melihat status barunya dalam ≤5 menit
-     (backend menyimpan status di cache selama itu), atau langsung kalau
-     halamannya dimuat ulang.
-
-Untuk perpanjangan bulan berikutnya, ubah lagi tanggal yang sama.
+  2. Tambah/ubah field  bayarSampai  bertipe timestamp.
+  3. Selesai. Halaman orang itu berubah TANPA muat ulang — web memasang
+     pemantau hidup di dokumen ini.
 
 ---------------------------------------------------------------------------
 CATATAN YANG PERLU KAMU SADARI
 ---------------------------------------------------------------------------
 
+• Akun yang dokumen langganannya SUDAH ADA sebelum perubahan ini otomatis
+  dianggap habis pratinjaunya — `mulai`-nya sudah lewat 24 jam. Itu memang
+  yang diinginkan: mereka sudah pernah melihat isinya. Yang punya
+  bayarSampai aktif tidak terpengaruh sama sekali.
+
 • Tiap kali pengguna MENULIS ke users/{uid}, aturan ini membaca dokumen
-  langganan/{uid}. Satu pembacaan itu ikut terhitung kuota Firestore. Jurnal
-  menyimpan tiap 15 detik saat halaman terbuka, jadi kira-kira 240 pembacaan
-  ekstra per jam per pengguna aktif. Masih jauh di bawah kuota gratis, tapi
-  bukan nol — kalau pengguna sudah ratusan, ini yang pertama perlu ditinjau.
+  langganan/{uid}. Satu pembacaan itu ikut terhitung kuota Firestore.
 
-• Pengguna yang sudah pakai tool ini sejak lama TIDAK punya dokumen
-  langganan. Saat halaman dibuka pertama kali sesudah pembaruan ini, dokumen
-  itu dibuat dan masa cobanya mulai dari HARI ITU — jadi mereka dapat 30 hari
-  penuh, bukan langsung terkunci.
-
-• Orang bisa membuat akun Google baru untuk mendapat 30 hari lagi. Ini tidak
-  bisa ditutup sepenuhnya di sistem mana pun yang memakai login gratis.
+• Orang bisa membuat akun Google baru untuk mendapat 24 jam lagi. Ini tidak
+  bisa ditutup sepenuhnya di sistem mana pun yang memakai login gratis —
+  tapi imbalannya sekarang sehari, bukan sebulan, dan itu jauh lebih kecil
+  daripada ongkos membuat akun baru berulang kali.

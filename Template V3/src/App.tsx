@@ -193,12 +193,18 @@ function Beranda() {
 function usePenjaga() {
   const { memuat, pemilik, langganan } = useAuth();
   const lokasi = useLocation();
-  /* HANYA lisensi aktif. Masa coba dan penanda "akun lama" DICABUT dari
-     gerbang: keduanya terbukti bocor — siapa pun yang pernah login sekali
-     sudah punya masa coba, jadi gerbangnya membuka untuk orang yang tidak
-     pernah disetujui siapa pun. Satu-satunya kunci sekarang adalah kode
-     lisensi yang ditukar di halaman /akses. */
-  const boleh = pemilik || langganan.status === 'aktif';
+  /* Lisensi aktif, ATAU pratinjau 24 jam yang belum habis.
+     ────────────────────────────────────────────────────────────────────
+     Masa coba 30 hari dicabut 13 Agu 2026 karena bocor: siapa pun yang
+     login sekali punya akses sebulan, jadi gerbang persetujuan tidak
+     berarti apa-apa. Pratinjau ini SENGAJA jauh lebih pendek — cukup
+     untuk melihat seluruh isinya sekali duduk, terlalu pendek untuk
+     dipakai bekerja, jadi orang yang serius tetap harus meminta akses.
+
+     `warisan` TETAP tidak membuka gerbang. Penanda itu cuma menyatakan
+     "akun lama", dan membiarkannya membuka pintu berarti setiap akun yang
+     dibuat sebelum 13 Agu punya akses permanen tanpa pernah disetujui. */
+  const boleh = pemilik || langganan.status === 'aktif' || langganan.status === 'pratinjau';
   const keAkses = <Navigate to={`/akses?dari=${encodeURIComponent(lokasi.pathname)}`} replace />;
   return { memuat, boleh, keAkses };
 }
@@ -226,7 +232,7 @@ function Kerangka() {
   /* Server dev LOKAL membuka gerbang tanpa login — halaman di dalamnya harus
      bisa diperiksa dan diperbaiki tanpa kredensial. `import.meta.env.DEV`
      bernilai false saat build, jadi cabang ini tidak ada di bundel produksi. */
-  if (!import.meta.env.DEV && !(pemilik || langganan.status === 'aktif')) {
+  if (!import.meta.env.DEV && !(pemilik || langganan.status === 'aktif' || langganan.status === 'pratinjau')) {
     return <Navigate to={`/akses?dari=${encodeURIComponent(lokasi.pathname)}`} replace />;
   }
   return (

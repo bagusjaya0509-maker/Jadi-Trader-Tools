@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
-  ArrowLeft, CheckCircle2, Clock, KeyRound, Loader2, LogOut, ShieldCheck, XCircle,
+  ArrowLeft, CheckCircle2, Clock, Eye, KeyRound, Loader2, LogOut, ShieldCheck, XCircle,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import {
@@ -224,6 +224,21 @@ export default function Akses() {
             Pilih cara masuk, kirim permintaan, lalu{' '}
             <span className="text-zinc-200">akses dibuka setelah ditinjau</span>.
           </p>
+
+          {/* Orang yang sampai di sini SESUDAH pratinjaunya habis pantas
+              diberi tahu apa yang barusan terjadi. Tanpa kalimat ini
+              layarnya cuma "tiba-tiba terkunci", dan yang paling sering
+              menyusul bukan pembelian melainkan kesimpulan bahwa
+              aplikasinya rusak. */}
+          {pengguna && !sudahAktif && langganan.status === 'habis' && (
+            <div className="flex w-fit items-start gap-2.5 rounded-lg border border-sky-500/25 bg-sky-500/[0.06] px-3.5 py-2.5">
+              <Eye className="mt-0.5 size-4 shrink-0 text-sky-300" strokeWidth={2} />
+              <p className="max-w-[44ch] text-[12.5px] leading-relaxed text-zinc-300">
+                Pratinjau 24 jam kamu sudah selesai. Yang sudah kamu simpan tidak
+                hilang — ia menunggu di akun yang sama begitu akses dibuka.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* ── Kuota ─────────────────────────────────────────────────── */}

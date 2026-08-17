@@ -131,23 +131,30 @@ export function MenuPengguna() {
             </div>
 
             <div className="border-b border-zinc-800 px-4 py-3">
-              <div className="text-[11px] uppercase tracking-wider text-zinc-600">Langganan</div>
+              <div className="text-[11px] uppercase tracking-wider text-zinc-600">Akses</div>
               <div className="mt-1 flex items-baseline gap-2">
                 <span className={cn('text-[13px]',
                   langganan.status === 'aktif' ? 'text-emerald-400'
-                    : langganan.status === 'coba' ? 'text-zinc-100'
+                    : langganan.status === 'pratinjau' ? 'text-sky-300'
                     : langganan.status === 'habis' ? 'text-red-400' : 'text-zinc-400')}>
                   {langganan.status === 'aktif' ? 'Aktif'
-                    : langganan.status === 'coba' ? 'Masa coba'
+                    : langganan.status === 'pratinjau' ? 'Pratinjau'
                     : langganan.status === 'habis' ? 'Habis' : 'Belum diketahui'}
                 </span>
-                {langganan.sisaHari !== null && langganan.status !== 'habis' && (
+                {/* Pratinjau diukur JAM, langganan diukur hari — memakai satu
+                    satuan untuk keduanya menulis "sisa 1 hari" untuk sisa dua
+                    menit, dan itu kebohongan yang baru ketahuan saat layarnya
+                    mendadak terkunci. */}
+                {langganan.status === 'pratinjau' && langganan.sisaMs !== null && (
+                  <span className="angka text-[11.5px] text-zinc-500">sisa {sisaTerbaca(langganan.sisaMs)}</span>
+                )}
+                {langganan.status === 'aktif' && langganan.sisaHari !== null && (
                   <span className="angka text-[11.5px] text-zinc-500">sisa {langganan.sisaHari} hari</span>
                 )}
               </div>
-              <Link to="/tagihan" onClick={() => setBuka(false)}
+              <Link to={langganan.status === 'aktif' ? '/tagihan' : '/akses'} onClick={() => setBuka(false)}
                 className="mt-2 inline-flex items-center gap-1 text-[12px] text-zinc-300 hover:text-zinc-100">
-                Kelola tagihan <ChevronRight className="size-3" />
+                {langganan.status === 'aktif' ? 'Kelola tagihan' : 'Minta akses penuh'} <ChevronRight className="size-3" />
               </Link>
             </div>
 
@@ -164,33 +171,80 @@ export function MenuPengguna() {
   );
 }
 
-/** Pita peringatan saat masa coba mau habis atau sudah habis. */
+/** "3 jam 12 menit", "48 menit", "kurang dari semenit". Dipakai di dua
+ *  tempat, jadi ditulis sekali di sini supaya keduanya tidak pernah
+ *  membulatkan dengan cara yang berbeda. */
+export function sisaTerbaca(ms: number): string {
+  if (ms <= 0) return 'habis';
+  const menit = Math.floor(ms / 60_000);
+  if (menit < 1) return 'kurang dari semenit';
+  const jam = Math.floor(menit / 60);
+  const sisaMenit = menit % 60;
+  if (jam < 1) return `${menit} menit`;
+  return sisaMenit ? `${jam} jam ${sisaMenit} menit` : `${jam} jam`;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   PITA AKSES — pratinjau berjalan, atau pratinjau habis
+   ════════════════════════════════════════════════════════════════════════
+   Selama pratinjau, pita ini TIDAK BISA DITUTUP. Alasannya bukan estetika:
+   satu-satunya hal yang membedakan pratinjau dari akses penuh adalah
+   jamnya, dan menyembunyikan jam berarti orangnya menyusun jurnal seharian
+   tanpa tahu bahwa besok layarnya terkunci. Tombol tutup pada keterangan
+   sepenting itu adalah tombol untuk melupakan kabar buruk.
+
+   Sesudah habis, pita boleh ditutup — pesannya sudah tersampaikan, dan
+   gerbangnya sendiri yang menahan.
+   ════════════════════════════════════════════════════════════════════════ */
 export function PitaLangganan() {
   const { pengguna, langganan } = useAuth();
   const [tutup, setTutup] = useState(false);
-  if (!pengguna || tutup) return null;
+  /* Detak per menit supaya hitungannya turun sendiri. Bukan per detik:
+     layarnya tidak perlu setepat itu, dan render tiap detik di seluruh
+     aplikasi adalah ongkos yang tidak dibayar apa pun. */
+  const [, detak] = useState(0);
+  useEffect(() => {
+    if (langganan.status !== 'pratinjau') return;
+    const t = setInterval(() => detak((n) => n + 1), 60_000);
+    return () => clearInterval(t);
+  }, [langganan.status]);
 
+  if (!pengguna) return null;
+
+  const pratinjau = langganan.status === 'pratinjau';
   const habis = langganan.status === 'habis';
-  const segera = langganan.status === 'coba' && (langganan.sisaHari ?? 99) <= 7;
-  if (!habis && !segera) return null;
+  if (!pratinjau && !habis) return null;
+  if (habis && tutup) return null;
+
+  const sisa = pratinjau && langganan.berakhir ? +langganan.berakhir - Date.now() : 0;
 
   return (
     <div className={cn(
       'flex flex-wrap items-center gap-3 border-b px-4 py-2.5 text-[12.5px]',
-      habis ? 'border-red-500/25 bg-red-500/[0.07]' : 'border-amber-500/25 bg-amber-500/[0.06]'
+      habis ? 'border-red-500/25 bg-red-500/[0.07]' : 'border-sky-500/25 bg-sky-500/[0.06]',
     )}>
-      <TriangleAlert className={cn('size-4 shrink-0', habis ? 'text-red-400' : 'text-amber-400')} strokeWidth={2} />
+      {habis
+        ? <TriangleAlert className="size-4 shrink-0 text-red-400" strokeWidth={2} />
+        : <Eye className="size-4 shrink-0 text-sky-300" strokeWidth={2} />}
       <span className="flex-1 text-zinc-300">
-        {habis
-          ? 'Masa coba habis. Jurnal masih bisa dibaca, tapi tidak bisa menyimpan perubahan baru.'
-          : `Masa coba tersisa ${langganan.sisaHari} hari.`}
+        {habis ? (
+          <>Pratinjau sudah habis. Minta kode akses, atau tanyakan sisa kuota gratis ke pemilik.</>
+        ) : (
+          <>
+            <span className="font-medium text-sky-200">Mode pratinjau</span> — sisa{' '}
+            <span className="angka text-sky-200">{sisaTerbaca(sisa)}</span>. Isi yang tampil adalah data
+            contoh, dan sesudah ini perlu kode akses.
+          </>
+        )}
       </span>
-      <Link to="/tagihan"
+      <Link to="/akses"
         className="rounded-md bg-zinc-100 px-3 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white">
-        Perpanjang
+        Minta akses
       </Link>
-      <button onClick={() => setTutup(true)} aria-label="Tutup"
-        className="cursor-pointer text-zinc-600 hover:text-zinc-300">✕</button>
+      {habis && (
+        <button onClick={() => setTutup(true)} aria-label="Tutup"
+          className="cursor-pointer text-zinc-600 hover:text-zinc-300">✕</button>
+      )}
     </div>
   );
 }

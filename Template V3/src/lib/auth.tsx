@@ -81,10 +81,28 @@ if (typeof window !== 'undefined' && window.location.hash.startsWith('#discord='
   })();
 }
 
-const HARI_COBA = 30;
+/* ── PRATINJAU 24 JAM ────────────────────────────────────────────────────
+   Menggantikan masa coba 30 hari yang DICABUT 13 Agu 2026. Pencabutan itu
+   punya sebab yang masih berlaku: siapa pun yang login sekali otomatis
+   punya akses, jadi gerbang persetujuan tidak berarti apa-apa selama
+   sebulan penuh per akun.
+
+   Yang berubah sekarang hanya PANJANG jendelanya, dari 30 hari jadi 24
+   jam — cukup untuk melihat seluruh isi alat sekali duduk, terlalu pendek
+   untuk dipakai bekerja. Yang TIDAK berubah: jendelanya tetap dihitung
+   dari `mulai` yang ditulis SEKALI dengan waktu server, dan aturan
+   Firestore menolak update/delete dari pengguna biasa. Artinya tidak ada
+   cara memundurkan jam perangkat, me-reset dokumennya, atau memperpanjang
+   sendiri.
+
+   Yang tetap terbuka, sadar dan diterima: orang bisa membuat akun Google
+   baru untuk mendapat 24 jam lagi. Tidak ada sistem berlogin gratis yang
+   bisa menutup itu — tapi imbalannya kini sehari, bukan sebulan.        */
+const JAM_PRATINJAU = 24;
+const MS_JAM = 3_600_000;
 const MS_HARI = 86_400_000;
 
-export type StatusLangganan = 'coba' | 'aktif' | 'habis' | 'tidakDiketahui';
+export type StatusLangganan = 'pratinjau' | 'aktif' | 'habis' | 'tidakDiketahui';
 
 export interface Langganan {
   status: StatusLangganan;
@@ -92,8 +110,12 @@ export interface Langganan {
    *  Tidak pernah diminta meminta akses, jadi tidak boleh tiba-tiba terkunci
    *  di luar oleh aturan yang belum ada waktu ia mendaftar. */
   warisan: boolean;
-  /** Sisa hari masa coba / langganan. null kalau tidak diketahui. */
+  /** Sisa hari langganan. null kalau tidak diketahui. */
   sisaHari: number | null;
+  /** Sisa waktu dalam milidetik — dipakai pratinjau, yang umurnya diukur
+   *  jam bukan hari. `sisaHari` membulatkan ke atas, jadi ia menulis "1
+   *  hari lagi" untuk sisa dua menit. */
+  sisaMs: number | null;
   berakhir: Date | null;
 }
 
@@ -114,7 +136,7 @@ interface Isi {
    dengan aturan yang menyapu semuanya sekaligus. */
 const WARISAN_SEBELUM = Date.parse('2026-08-13T00:00:00Z');
 
-const KosongLangganan: Langganan = { status: 'tidakDiketahui', sisaHari: null, berakhir: null, warisan: false };
+const KosongLangganan: Langganan = { status: 'tidakDiketahui', sisaHari: null, sisaMs: null, berakhir: null, warisan: false };
 const Konteks = createContext<Isi | null>(null);
 
 /** Timestamp dioper sebagai argumen karena kelasnya baru ada setelah impor
@@ -211,15 +233,25 @@ function hitungLangganan(data: any, Timestamp: any): Langganan {
     return {
       status: 'aktif',
       sisaHari: Math.ceil((+bayarSampai - skrg) / MS_HARI),
+      sisaMs: +bayarSampai - skrg,
       berakhir: bayarSampai,
       warisan,
     };
   }
 
   if (mulai) {
-    const akhir = new Date(+mulai + HARI_COBA * MS_HARI);
-    const sisa = Math.ceil((+akhir - skrg) / MS_HARI);
-    return { status: sisa > 0 ? 'coba' : 'habis', sisaHari: Math.max(0, sisa), berakhir: akhir, warisan };
+    /* Jendela pratinjau dihitung dari `mulai` — login PERTAMA akun ini,
+       bukan login hari ini. Akun yang dokumennya sudah lama ada berarti
+       pratinjaunya memang sudah lewat; itu benar, bukan efek samping. */
+    const akhir = new Date(+mulai + JAM_PRATINJAU * MS_JAM);
+    const sisaMs = +akhir - skrg;
+    return {
+      status: sisaMs > 0 ? 'pratinjau' : 'habis',
+      sisaHari: Math.max(0, Math.ceil(sisaMs / MS_HARI)),
+      sisaMs: Math.max(0, sisaMs),
+      berakhir: akhir,
+      warisan,
+    };
   }
 
   return KosongLangganan;
@@ -230,6 +262,30 @@ export function PenyediaAuth({ children }: { children: React.ReactNode }) {
   const [memuat, setMemuat] = useState(true);
   const [langganan, setLangganan] = useState<Langganan>(KosongLangganan);
   const [galat, setGalat] = useState<string | null>(null);
+
+  /* ── Penutup jendela pratinjau ────────────────────────────────────────
+     Status dihitung dari dokumen Firestore, dan dokumen itu TIDAK berubah
+     saat waktu berjalan — onSnapshot tidak akan pernah berbunyi hanya
+     karena 24 jam lewat. Tanpa pewaktu ini, tab yang dibiarkan terbuka
+     memegang akses selamanya: pratinjau sehari yang jadi seumur hidup
+     asal jangan menutup peramban.
+
+     Yang dipakai satu setTimeout tepat ke detik berakhirnya, bukan
+     interval yang menghitung tiap detik — layar tidak perlu tahu sisa
+     waktunya sampai ke detik, ia cuma perlu tahu KAPAN berhenti. */
+  useEffect(() => {
+    if (langganan.status !== 'pratinjau' || !langganan.berakhir) return;
+    const sisa = +langganan.berakhir - Date.now();
+    if (sisa <= 0) return;
+    const t = setTimeout(
+      () => setLangganan((l) => (l.status === 'pratinjau' ? { ...l, status: 'habis', sisaMs: 0, sisaHari: 0 } : l)),
+      /* +1 detik: pembulatan jam klien vs server bisa meleset beberapa
+         milidetik, dan menutup terlalu cepat lebih menjengkelkan daripada
+         menutup sedetik terlambat. */
+      sisa + 1000,
+    );
+    return () => clearTimeout(t);
+  }, [langganan.status, langganan.berakhir]);
 
   useEffect(() => {
     /* Pembatal pemantau Firestore yang sedang aktif. Disimpan di luar
