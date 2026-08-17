@@ -95,6 +95,7 @@ const Changelog     = lazy(() => muat(() => import('@/halaman/Changelog')));
 const Legal         = lazy(() => muat(() => import('@/halaman/Legal')));
 const CopyTrading   = lazy(() => muat(() => import('@/halaman/Analisa')));
 const Markas        = lazy(() => muat(() => import('@/halaman/Markas')));
+const Sosmed        = lazy(() => muat(() => import('@/halaman/Sosmed')));
 
 /* ── Pramuat halaman lain SAAT SENGGANG ─────────────────────────────────
    Tiap halaman adalah potongan JS terpisah yang baru diunduh saat pertama
@@ -321,6 +322,7 @@ export default function App() {
             <Route path="/copy"        element={<CopyTrading />} />
             <Route path="/integrasi"   element={<Integrasi />} />
             <Route path="/pemilik"     element={<Pemilik />} />
+            <Route path="/sosmed"      element={<Sosmed />} />
             <Route path="/maintenance" element={<Maintenance />} />
             <Route path="/tagihan"     element={<Billing />} />
             <Route path="/dokumentasi" element={<Dokumentasi />} />
