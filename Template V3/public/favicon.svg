@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Jadi Trader Tools">
+  <!-- Tile gelap dengan garis tepi tipis. Tepinya perlu: di bilah tab gelap
+       Chrome (#35363a) tile #09090b tanpa tepi kehilangan bentuk kotaknya. -->
+  <rect width="32" height="32" rx="7.5" fill="#09090b"/>
+  <rect x=".5" y=".5" width="31" height="31" rx="7" fill="none" stroke="#27272a"/>
+
+  <!-- Tiga batang naik dari dalam pusaran. -->
+  <g fill="#fafafa">
+    <rect x="11.2" y="5.4" width="2.9" height="9.4" rx="1.25"/>
+    <rect x="15.5" y="2.6" width="2.9" height="12.2" rx="1.25"/>
+    <rect x="19.8" y="7.8" width="2.9" height="7" rx="1.25"/>
+  </g>
+
+  <!-- Tiga cincin dalam perspektif, mengerucut ke bawah.
+       CINCIN UTUH, bukan busur setengah — dan itu bukan pilihan gaya:
+       busur yang melengkung ke bawah dengan batang di atasnya terbaca
+       sebagai wajah tersenyum. Versi pertama gambar ini memang begitu.
+       Opasitas menurun ke bawah yang memberi kesan berputar, bukan
+       sekadar bertumpuk. -->
+  <g fill="none" stroke="#fafafa">
+    <ellipse cx="16" cy="18.6" rx="11" ry="3.7" stroke-width="2.2"/>
+    <ellipse cx="16" cy="23.3" rx="7.4" ry="2.6" stroke-width="2.1" stroke-opacity=".6"/>
+    <ellipse cx="16" cy="26.9" rx="4" ry="1.7" stroke-width="2" stroke-opacity=".32"/>
+  </g>
+</svg>

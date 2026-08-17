@@ -4,6 +4,32 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Jadi Trader — Terminal Trading</title>
+
+    <!-- ── Favicon ──────────────────────────────────────────────────────
+         SVG didahulukan: satu berkas 700 bita yang tajam di semua ukuran,
+         dari 16 px di bilah tab sampai 128 px di halaman "tab baru".
+         Chrome, Firefox, dan Edge memakainya.
+
+         PNG 32/48 untuk Safari, yang sampai sekarang belum mendukung
+         favicon SVG sama sekali — tanpa ini tab Safari kosong. Urutannya
+         penting: peramban memakai yang PERTAMA yang ia mengerti.
+
+         apple-touch-icon dipakai saat halaman ini disimpan ke layar depan
+         iPhone. Ia versi TANPA sudut membulat; iOS memasang maskernya
+         sendiri, dan tile yang sudah bulat lalu dimasker lagi menghasilkan
+         tepi bergerigi.
+
+         Ketiga PNG dibuat dari favicon.svg yang sama lewat
+         `node buat-favicon.mjs` — bukan digambar ulang satu per satu. -->
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="48x48" href="./favicon-48.png" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+    <!-- Warna bilah alamat di Chrome Android — disamakan dengan latar
+         aplikasi supaya bilahnya menyatu, bukan jadi pita putih di atas
+         halaman gelap. -->
+    <meta name="theme-color" content="#09090b" />
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
