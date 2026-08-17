@@ -7,13 +7,18 @@ import { PeragaReplay } from "@/components/ui/peraga-replay";
 import { PeragaJurnal, PeragaIntegrasi, PeragaLeaderboard } from "@/components/ui/peraga-kartu";
 
 export const Component = () => {
-  /* Jarak ATAS dipangkas dua kali (py-24/sm:py-32 -> pt-12/sm:pt-16 ->
-     pt-6/sm:pt-8), bawahnya dibiarkan. Bagian ini menyusul tepat di bawah
-     tur layar, dan dua ruang kosong besar yang bertumpuk membuat halamannya
-     terbaca seperti terputus — orang mengira isinya sudah habis lalu
-     berhenti menggulir. */
+  /* Jarak ATAS dipangkas tiga kali, tiap kali separuh dari sebelumnya:
+     py-24/sm:py-32 -> pt-12/sm:pt-16 -> pt-6/sm:pt-8 -> pt-3/sm:pt-4.
+     Bawahnya dibiarkan. Bagian ini menyusul tepat di bawah tur layar, dan
+     dua ruang kosong besar yang bertumpuk membuat halamannya terbaca
+     seperti terputus — orang mengira isinya sudah habis lalu berhenti
+     menggulir.
+
+     Di bawah ini jangan dipangkas lagi tanpa mengurangi `mb-16` pada
+     kepala seksi: yang tersisa sebagai pemisah tinggal jarak itu, dan
+     kalau keduanya habis, judul seksi menempel ke tepi bawah tur layar. */
   return (
-    <section className="relative w-full bg-black pt-6 pb-24 font-sans text-white sm:pt-8 sm:pb-32 selection:bg-white selection:text-black">
+    <section className="relative w-full bg-black pt-3 pb-24 font-sans text-white sm:pt-4 sm:pb-32 selection:bg-white selection:text-black">
       <div className="mx-auto max-w-6xl px-6 md:px-8">
 
         {/* Section Header */}
