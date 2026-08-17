@@ -255,7 +255,10 @@ export function Dashboard() {
 
   return (
     <div className="p-4 sm:p-6">
-      <SpandukContoh contoh={contoh} />
+      {/* `riwayat` dioper supaya spanduknya bisa mengenali transaksi contoh
+          yang SUDAH terimpor — tanpa itu ia tidak punya cara menawarkan
+          penghapusannya, dan impor jadi keputusan sekali jalan. */}
+      <SpandukContoh contoh={contoh} riwayat={RIWAYAT} />
       {contoh && <div className="mb-4"><LabelContoh tampil /></div>}
       {/* ── KPI: gabungan kripto + trade-fi ── */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">

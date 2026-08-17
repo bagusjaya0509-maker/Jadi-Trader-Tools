@@ -334,35 +334,112 @@ export function LabelContoh({ tampil }: { tampil: boolean }) {
 
 
 /* ── Spanduk data contoh untuk akun baru ─────────────────────────────────
-   Muncul HANYA saat pengguna sudah login tapi jurnalnya masih kosong dan
-   layarnya sedang menampilkan data contoh. Dua pilihan, dua akibat yang
-   jelas — dan keduanya bisa diubah lagi nanti dengan menambah/menghapus
-   transaksi, jadi tidak ada yang permanen di sini. */
+   TIGA keadaan, bukan dua, dan yang ketiga yang paling penting.
+
+   Sebelum ini pilihannya cuma "mulai dari nol" atau "biarkan contohnya",
+   dan yang kedua tidak menyalin apa pun — ia hanya menahan tampilan supaya
+   tetap memperlihatkan konstanta di dalam kode. Akibatnya orang yang baru
+   saja menjelajahi preview lalu masuk melihat seluruh bentuk yang membuatnya
+   tertarik menguap: jurnalnya sendiri kosong, dan tidak ada satu tombol pun
+   yang bisa mengembalikannya.
+
+   Sekarang "Impor" benar-benar MENULIS ke jurnalnya, sekali, atas
+   permintaannya. Dan karena menulis, ia wajib bisa dibatalkan — keadaan
+   ketiga: jurnal yang berisi transaksi contoh selalu membawa tombol
+   hapusnya sendiri. Pilihan yang tidak bisa dibatalkan bukan pilihan.
+   ──────────────────────────────────────────────────────────────────────── */
 import { useAuth as useAuthGerbang } from '@/lib/auth';
 import { bacaPilihanContoh, simpanPilihanContoh } from '@/lib/data';
 import { useState as useStateGerbang } from 'react';
+import type { Trade } from '@/data/contoh';
 
-export function SpandukContoh({ contoh }: { contoh: boolean }) {
+export function SpandukContoh({ contoh, riwayat = [] }: { contoh: boolean; riwayat?: Trade[] }) {
   const { pengguna } = useAuthGerbang();
   const [, setV] = useStateGerbang(0);
-  if (!contoh || !pengguna) return null;
+  const [sibuk, setSibuk] = useStateGerbang<'' | 'impor' | 'hapus'>('');
+  const [kabar, setKabar] = useStateGerbang('');
+
+  if (!pengguna) return null;
+
+  /* Import DINAMIS, dimuat saat tombolnya ditekan. Bukan karena Firestore —
+     berkas ini sudah menarik lib/data.ts secara statis, jadi mesin tulisnya
+     memang sudah ada di jalur ini (dan build memperingatkan tepat soal itu).
+     Yang dihindari lebih sederhana: impor-contoh.ts membawa SELURUH 123
+     transaksi contoh sebagai konstanta, dan itu tidak perlu ikut ke setiap
+     pemuatan halaman untuk tombol yang kebanyakan orang tekan sekali seumur
+     akun — atau tidak sama sekali. */
+  async function jalankan(apa: 'impor' | 'hapus') {
+    if (!pengguna) return;
+    setSibuk(apa); setKabar('');
+    try {
+      const m = await import('@/lib/impor-contoh');
+      if (apa === 'impor') {
+        const n = await m.imporContoh(pengguna.uid);
+        setKabar(`${n} transaksi contoh masuk ke jurnalmu. Angka di seluruh halaman ikut terisi.`);
+      } else {
+        await m.hapusImporContoh(pengguna.uid);
+        simpanPilihanContoh(pengguna.uid, 'kosong');
+        setKabar('Data contoh dihapus. Jurnalmu kembali kosong.');
+      }
+    } catch (e) {
+      setKabar('Gagal: ' + (e instanceof Error ? e.message : 'tidak diketahui'));
+    } finally { setSibuk(''); }
+  }
+
+  /* KEADAAN 3 didahulukan. Jurnal yang berisi transaksi contoh harus selalu
+     mengatakannya — termasuk berbulan-bulan sesudah imporya, saat orangnya
+     sudah lupa dan mulai membaca winrate itu sebagai rekam jejaknya sendiri. */
+  if (adaContohDiRiwayat(riwayat)) {
+    return (
+      <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-amber-500/25 bg-amber-500/[0.05] px-4 py-3">
+        <Eye className="size-4 shrink-0 text-amber-400" strokeWidth={2} />
+        <span className="text-[12.5px] text-amber-100/90">
+          Jurnal ini berisi <b>transaksi contoh</b> hasil impor — bukan hasil tradingmu.
+          Hapus kapan saja, transaksimu sendiri tidak ikut terhapus.
+        </span>
+        <span className="ml-auto flex items-center gap-3">
+          {kabar && <span className="text-[11.5px] text-amber-200/70">{kabar}</span>}
+          <button onClick={() => void jalankan('hapus')} disabled={!!sibuk}
+            className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-700 px-3 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-red-500/40 hover:text-red-300 disabled:opacity-50">
+            {sibuk === 'hapus' && <Loader2 className="size-3.5 animate-spin" />}
+            {sibuk === 'hapus' ? 'Menghapus…' : 'Hapus data contoh'}
+          </button>
+        </span>
+      </div>
+    );
+  }
+
+  if (!contoh) return null;
   if (bacaPilihanContoh(pengguna.uid) !== null) return null;
-  const pilih = (p: 'kosong' | 'biarkan') => { simpanPilihanContoh(pengguna.uid, p); setV((x) => x + 1); };
+
   return (
     <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-sky-500/25 bg-sky-500/[0.05] px-4 py-3">
       <span className="text-[12.5px] text-sky-200/90">
         Akunmu masih kosong, jadi halaman ini menampilkan <b>data contoh</b> dulu.
+        Mau disalin jadi milikmu supaya bisa diutak-atik?
       </span>
-      <span className="ml-auto flex gap-2">
-        <button onClick={() => pilih('kosong')}
-          className="cursor-pointer rounded-md border border-zinc-700 px-3 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-500">
-          Mulai dengan data kosong
+      <span className="ml-auto flex items-center gap-3">
+        {kabar && <span className="text-[11.5px] text-sky-200/70">{kabar}</span>}
+        <button onClick={() => { simpanPilihanContoh(pengguna.uid, 'kosong'); setV((x) => x + 1); }}
+          disabled={!!sibuk}
+          className="cursor-pointer rounded-md border border-zinc-700 px-3 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-500 disabled:opacity-50">
+          Mulai dari nol
         </button>
-        <button onClick={() => pilih('biarkan')}
-          className="cursor-pointer rounded-md bg-zinc-100 px-3 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white">
-          Biarkan contohnya
+        <button onClick={() => void jalankan('impor')} disabled={!!sibuk}
+          className="flex cursor-pointer items-center gap-1.5 rounded-md bg-zinc-100 px-3 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:opacity-60">
+          {sibuk === 'impor' && <Loader2 className="size-3.5 animate-spin" />}
+          {sibuk === 'impor' ? 'Menyalin…' : 'Impor data contoh'}
         </button>
       </span>
     </div>
   );
+}
+
+/* Ditulis di sini, bukan diimpor dari lib/impor-contoh.ts, supaya berkas
+   itu tetap bisa dimuat malas: satu impor statis untuk pemeriksaan sepele
+   akan menarik seluruh mesin tulis Firestore ke jalur awal. Awalannya
+   sengaja ditulis ulang apa adanya — kalau ia berubah di sana, uji
+   `uji-impor-contoh.mjs` yang membaca KEDUA berkas akan gagal. */
+function adaContohDiRiwayat(riwayat: Trade[]): boolean {
+  return riwayat.some((t) => t.id.startsWith('contoh-'));
 }

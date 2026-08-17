@@ -6,7 +6,7 @@ import { cn, uang, persen, tanggalPendek } from '@/lib/utils';
 import { KalenderPl } from '@/components/kalender-pl';
 import { statGabungan, kurvaEkuitas, plPerHari, rangkumLayering } from '@/lib/hitung';
 import { useRiwayat, useSaldoAwal } from '@/lib/data';
-import { LabelContoh, SpandukContoh } from '@/components/gerbang';
+import { LabelContoh } from '@/components/gerbang';
 import { useAuth } from '@/lib/auth';
 import type { Trade, Sumber } from '@/data/contoh';
 import { useAkunMt5, useAkunBinance, type StatusAkun } from '@/lib/akun';
@@ -127,11 +127,19 @@ function CatatanKecil({ c }: { c: { nada: 'baik' | 'awas' | 'buruk'; teks: strin
  *  Dipakai dua kali dengan daftar transaksi berbeda. Menuliskannya dua kali
  *  akan membuat kedua jurnal berbeda diam-diam dalam dua putaran revisi —
  *  persis yang terjadi pada `statPer` sebelum diperbaiki. */
-function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun, labelSaldo, keIntegrasi, sumber, arus, bisaTulis, contoh = false, pemisah = false }: {
+/* `contoh` DICABUT dari daftar prop ini, bukan sekadar dibiarkan.
+   ────────────────────────────────────────────────────────────────────────
+   Nilainya tidak pernah dioper dari pemanggilnya, jadi spanduknya tidak
+   pernah tampil di halaman ini — dan sejak spanduk itu bisa MENULIS 123
+   transaksi ke jurnal orang, prop mati yang tinggal diisi satu kata adalah
+   ranjau. Mengisinya juga akan memunculkan dua spanduk impor sekaligus di
+   satu halaman, karena blok ini digambar dua kali (Trade-Fi dan Kripto).
+   Pilihannya tinggal punya satu rumah: Dashboard. */
+function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun, labelSaldo, keIntegrasi, sumber, arus, bisaTulis, pemisah = false }: {
   judul: string; ket: string; Ikon: typeof Bitcoin;
   trade: Trade[]; saldoAwal: number; warna: string; idGradien: string;
   akun: StatusAkun; labelSaldo: string; keIntegrasi: string;
-  sumber: Sumber; arus: Arus[]; bisaTulis: boolean; contoh?: boolean;
+  sumber: Sumber; arus: Arus[]; bisaTulis: boolean;
   /** Garis pemisah tebal di atas judul — menandai pergantian jurnal. */
   pemisah?: boolean;
   /** Kripto: pola emosinya sudah terwakili di Trade-Fi; riwayatnya yang
@@ -286,7 +294,6 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
         <span className="angka ml-auto text-[12px] text-zinc-600">{trade.length} transaksi</span>
       </div>
 
-      <SpandukContoh contoh={contoh} />
       {kosong ? (
         <Panel className="px-5 py-10 text-center text-[13px] text-zinc-500">
           Belum ada transaksi {judul.toLowerCase()}.
