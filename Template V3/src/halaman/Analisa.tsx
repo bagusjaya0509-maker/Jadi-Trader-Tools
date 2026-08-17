@@ -684,6 +684,36 @@ export default function Analisa() {
    *  pun. Dipakai memutuskan apa yang boleh menumpuk di kepala halaman —
    *  begitu seseorang masuk ke sebuah kanal, kepala halaman itu miliknya. */
   const diDepan = sub === 'market' && kanalBuka === null;
+
+  /* ── Peringatan risiko: tampil 3 detik, lalu menyusut sendiri ──────────
+     Keputusan pemilik 17 Agu 2026, sesudah sempat dicoba jadi kaki halaman
+     dan dikembalikan ke atas.
+
+     Timernya digantung pada `diDepan`, BUKAN pada pemasangan komponen.
+     Kalau digantung pada mount, orang yang mendarat di tab Posting lalu
+     pindah ke Market sepuluh detik kemudian tidak akan pernah melihatnya —
+     timernya sudah habis di layar yang tidak menampilkannya. Digantung
+     begini, hitungannya mulai saat kalimatnya benar-benar terlihat, dan
+     mulai lagi tiap kali orangnya kembali ke halaman depan Market Signal.
+
+     YANG PERLU DICATAT DENGAN JUJUR: kalimat ini ±45 kata, dan 3 detik
+     cukup untuk kira-kira 10 kata. Ia lewat sebelum sempat dibaca habis.
+     Yang menahan risikonya karena itu BUKAN kalimat ini, melainkan tiga
+     hal yang tidak ikut menghilang:
+       · satu baris ringkas DI ATAS tiap kanal yang dibuka — dan kanal
+         itulah layar yang benar-benar menampilkan entry, SL, dan TP
+       · tautan "Legal" permanen di kaki sidebar
+       · halaman /legal itu sendiri
+     Ini wilayah OJK/Bappebti; kalau salah satu dari tiga itu dicabut,
+     durasi 3 detik ini harus ikut ditinjau ulang. */
+  const [diskTampil, setDiskTampil] = useState(true);
+  useEffect(() => {
+    if (!diDepan) return;
+    setDiskTampil(true);
+    const t = setTimeout(() => setDiskTampil(false), 3000);
+    return () => clearTimeout(t);
+  }, [diDepan]);
+
   const [performa, setPerforma] = useState<Performa | null>(null);
   const { data: riwayat } = useRiwayat();
   const saldoAwal = useSaldoAwal();
@@ -851,8 +881,51 @@ export default function Analisa() {
         ))}
       </div>
 
-      {/* Peringatan risiko sekarang jadi KAKI halaman Market Signal —
-          lihat komentar lengkapnya di dekat penutup wadah <div> di bawah. */}
+      {/* ── Peringatan risiko, 3 detik lalu menyusut ──────────────────────
+          Alasan lengkapnya di dekat `diskTampil` di atas berkas ini.
+
+          MENYUSUT, BUKAN LANGSUNG LENYAP. `display:none` mendadak membuat
+          seluruh halaman melompat naik 3 detik setelah dibuka — persis saat
+          mata sedang menyusuri kartu kanal, dan yang terasa bukan "kalimat
+          itu selesai" melainkan "halamannya bergeser sendiri".
+
+          grid-rows 1fr → 0fr menganimasikan tinggi yang SEBENARNYA, tanpa
+          menebak max-height. Kalau kalimatnya diperpanjang nanti, tidak ada
+          angka ajaib yang ikut harus diperbaiki.
+
+          DITULIS SEBAGAI GAYA INLINE, bukan kelas `grid-rows-[0fr]`.
+          Versi pertama memakai kelas itu dan GAGAL DIAM-DIAM: Tailwind tidak
+          menghasilkan aturannya sama sekali (diperiksa — nol aturan
+          `grid-rows` di seluruh stylesheet), jadi nama kelasnya cuma teks
+          mati. Yang bekerja tinggal `opacity-0`, dan hasilnya gabungan
+          terburuk: kalimatnya tak terlihat tapi tetap memakan 37 px, jadi
+          halaman tetap terdorong ke bawah oleh sesuatu yang tidak ada.
+          Gaya inline tidak bisa terlewat pemindai kelas.
+
+          motion-reduce: yang menyalakan "kurangi gerak" di sistemnya
+          mendapat pergantian tanpa animasi — mereka menyalakannya justru
+          karena gerak begini memicu sesuatu. */}
+      {diDepan && (
+        <div
+          style={{ gridTemplateRows: diskTampil ? '1fr' : '0fr' }}
+          className={cn(
+            'grid overflow-hidden transition-all duration-500 ease-out motion-reduce:transition-none',
+            diskTampil ? 'mb-4 opacity-100' : 'mb-0 opacity-0',
+          )}>
+          <div className="overflow-hidden">
+            <p className="text-[11.5px] leading-relaxed text-zinc-400">
+              <span className="font-medium text-amber-300/90">Bukan rekomendasi beli atau jual.</span>{' '}
+              Analisa di halaman ini disusun pengguna lain dan agen AI dari data harga publik —
+              termasuk yang berbayar. Rekam jejak dan estimasi yang ditampilkan adalah catatan masa
+              lalu, <span className="text-zinc-300">bukan jaminan hasil</span>. Periksa ulang sebelum
+              eksekusi; seluruh risiko dan keputusan ada padamu.{' '}
+              <Link to="/legal" className="underline decoration-zinc-700 underline-offset-2 hover:text-zinc-200">
+                Disclaimer &amp; Ketentuan
+              </Link>
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* ── Papan peringkat, DI KEPALA Market Signal ─────────────────────
           Bukan sub-halaman sendiri lagi. Orang datang ke sini untuk mencari
@@ -1351,44 +1424,6 @@ export default function Analisa() {
           </>
         );
       })()}
-
-      {/* ── Peringatan risiko — KAKI halaman Market Signal ────────────────
-          Dipindah dari kepala ke kaki, permintaan pemilik 17 Agu 2026.
-
-          SEBAB ASLINYA, supaya tidak diundang balik tanpa sadar: ia ditaruh
-          di atas justru karena disclaimer yang menunggu digulir tidak
-          pernah sampai ke orang yang sedang bersiap menekan "Buka di
-          Chart & Entry". Itu tetap benar, dan risikonya nyata — ini wilayah
-          OJK/Bappebti.
-
-          YANG MENAHAN RISIKO ITU sekarang bukan posisinya, melainkan tiga
-          hal yang sengaja TIDAK ikut dipindah:
-            · satu baris ringkas tetap ada DI ATAS begitu sebuah kanal
-              dibuka — dan kanal itulah layar yang benar-benar menampilkan
-              entry, SL, dan TP
-            · kalimatnya utuh di sini, bukan versi pendek
-            · tautan Disclaimer & Ketentuan ikut
-
-          Jadi yang berubah cuma halaman DAFTAR kanal — layar yang belum
-          menunjukkan satu pun harga yang bisa dieksekusi.
-
-          Di dalam wadah Market Signal, bukan di luarnya: sebagai kaki
-          halaman ia harus ikut tersembunyi saat tab Posting dibuka, bukan
-          menggantung di bawah layar yang bukan miliknya. */}
-      {diDepan && (
-        <div className="mt-6 border-t border-zinc-800/60 pt-4">
-          <p className="text-[11.5px] leading-relaxed text-zinc-500">
-            <span className="font-medium text-amber-300/90">Bukan rekomendasi beli atau jual.</span>{' '}
-            Analisa di halaman ini disusun pengguna lain dan agen AI dari data harga publik —
-            termasuk yang berbayar. Rekam jejak dan estimasi yang ditampilkan adalah catatan masa
-            lalu, <span className="text-zinc-400">bukan jaminan hasil</span>. Periksa ulang sebelum
-            eksekusi; seluruh risiko dan keputusan ada padamu.{' '}
-            <Link to="/legal" className="underline decoration-zinc-700 underline-offset-2 hover:text-zinc-300">
-              Disclaimer &amp; Ketentuan
-            </Link>
-          </p>
-        </div>
-      )}
       </div>
     </div>
   );
