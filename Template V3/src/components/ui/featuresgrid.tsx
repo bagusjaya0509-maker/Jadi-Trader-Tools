@@ -5,8 +5,12 @@
 import { Terminal, Database, Network, ShieldCheck } from "lucide-react";
 
 export const Component = () => {
+  /* Jarak ATAS dipangkas (py-24/sm:py-32 -> pt-12/sm:pt-16), bawahnya
+     dibiarkan. Bagian ini menyusul tepat di bawah tur layar, dan dua ruang
+     kosong besar yang bertumpuk membuat halamannya terbaca seperti
+     terputus — orang mengira isinya sudah habis lalu berhenti menggulir. */
   return (
-    <section className="relative w-full bg-black py-24 font-sans text-white sm:py-32 selection:bg-white selection:text-black">
+    <section className="relative w-full bg-black pt-12 pb-24 font-sans text-white sm:pt-16 sm:pb-32 selection:bg-white selection:text-black">
       <div className="mx-auto max-w-6xl px-6 md:px-8">
 
         {/* Section Header */}
@@ -14,12 +18,20 @@ export const Component = () => {
           <div className="mb-6 inline-flex items-center rounded-full border border-white/[0.12] bg-white/[0.03] px-3 py-1 text-xs font-medium uppercase tracking-widest text-neutral-400">
             Platform Capabilities
           </div>
-          <h2 className="mb-4 max-w-3xl text-balance text-4xl font-medium tracking-tighter text-white sm:text-5xl md:text-6xl">
-            Everything you need. <br className="hidden sm:block" />
-            <span className="text-neutral-600">Nothing you don't.</span>
+          {/* Skalanya diturunkan satu tingkat (4xl/5xl/6xl -> 3xl/4xl/5xl) dan
+              kotaknya dilebarkan. Ukuran lama dipilih untuk "Everything you
+              need." — tiga kata. Kalimat Indonesianya lima kali lebih panjang,
+              dan pada 6xl ia memakan seluruh layar sampai kartu-kartu di
+              bawahnya tidak pernah terlihat tanpa menggulir dua kali. */}
+          <h2 className="mb-4 max-w-4xl text-balance text-3xl font-medium tracking-tighter text-white sm:text-4xl md:text-5xl">
+            Semua tools yang dibuat diarahkan menjadi sistem paksa untuk bisa
+            mendisiplinkan diri <br className="hidden sm:block" />
+            <span className="text-neutral-600">untuk membentuk jiwa trader, bukan gambler.</span>
           </h2>
           <p className="max-w-2xl text-balance text-base text-neutral-400 sm:text-lg">
-            Purpose-built primitives designed for maximum leverage. No bloat, no gimmicks—just raw, unadulterated performance.
+            Tujuan tools ini dibuat karena dari sekian pengalaman yang ada, satu-satunya
+            penyebab gagal menjadi trader profitable bukanlah teknik analisanya — tapi
+            psikologi dan konsistensi terhadap risk dan reward saat trading.
           </p>
         </div>
 
