@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { bacaKoneksi, PROXY_BAWAAN } from '@/lib/koneksi';
+import { AKUN_MT5_CONTOH, pakaiContoh } from '@/lib/contoh-pratinjau';
 
 /* ════════════════════════════════════════════════════════════════════════
    SALDO AKUN — MT5 & Binance
@@ -165,7 +166,17 @@ export function useAkunMt5(): StatusAkun {
     let hidup = true;
     if (siapaUid === undefined) return;          // auth belum menjawab
     if (siapaUid === null) {
-      setSt({ ...BELUM, terhubung: false, ket: 'Masuk dulu untuk menyambungkan' });
+      /* Belum masuk → tampilkan akun CONTOH, bukan kotak kosong $0.00.
+         Panel Trade-Fi butuh MetaTrader hidup DAN EA terpasang; pengunjung
+         yang belum punya keduanya cuma melihat kotak kosong, dan itu
+         satu-satunya kesan yang ia bawa tentang fitur ini.
+
+         `terhubung: false` DIPERTAHANKAN di data contohnya, dan itu
+         penting: panel membaca bendera itu untuk memutuskan menampilkan
+         lencana tersambung. Lencana tersambung yang tidak benar adalah
+         cara tercepat membuat orang menutup MetaTrader sambil merasa
+         posisinya tetap terpantau. */
+      setSt(pakaiContoh(false) ? AKUN_MT5_CONTOH : { ...BELUM, terhubung: false, ket: 'Masuk dulu untuk menyambungkan' });
       return;
     }
 

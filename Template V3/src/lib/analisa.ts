@@ -207,10 +207,28 @@ export interface Performa {
 
 export async function ambilPerforma(): Promise<Performa> {
   const j = await panggil('/api/analisa/performa', {}, false);
-  return {
+  const nyata: Performa = {
     modal: j.modal ?? 1000, risikoPersen: j.risikoPersen ?? 1,
     analis: j.analis ?? [], berjalan: j.berjalan ?? 0,
   };
+
+  /* Papan peringkat kosong adalah masalah "hari pertama": ia baru berisi
+     setelah harga benar-benar menyentuh SL/TP sebuah sinyal, dan sampai
+     itu terjadi halamannya terlihat seperti fitur yang belum jadi.
+
+     Contohnya dipakai HANYA kalau belum ada satu pun sinyal selesai —
+     bukan kalau daftarnya pendek. Satu sinyal sungguhan sudah cukup
+     untuk mengambil alih; data karangan tidak boleh menutupi hasil
+     seseorang walau cuma satu baris. */
+  const selesai = nyata.analis.reduce((s, a) => s + a.total, 0);
+  if (selesai > 0) return nyata;
+
+  const { PERFORMA_CONTOH, pakaiContoh } = await import('@/lib/contoh-pratinjau');
+  if (!pakaiContoh(false)) return nyata;
+  /* `berjalan` diambil dari yang SUNGGUHAN kalau ada — jumlah sinyal yang
+     sedang berjalan itu fakta yang terbaca, dan tidak ada alasan
+     menggantinya dengan angka contoh. */
+  return { ...PERFORMA_CONTOH, berjalan: nyata.berjalan || PERFORMA_CONTOH.berjalan };
 }
 
 export async function hapusGambar(id: string, gambarId: string) {
