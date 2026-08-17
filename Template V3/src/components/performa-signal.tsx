@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Ban, ChevronDown, ChevronRight, Eye, Sparkles, Target } from 'lucide-react';
 import { KalenderPl } from '@/components/kalender-pl';
 import { LeaderboardCard } from '@/components/ui/leaderboard-card';
@@ -293,8 +293,42 @@ export function PerformaAnalisSatu({ analis, modal, risikoPersen, berjalan, diba
    Recharts sudah ada di proyek ini, tapi menariknya ke sini berarti
    menambah ratusan kilobita untuk satu garis polos. Yang dibutuhkan cuma
    satu <polyline> — dan itu tidak butuh pustaka apa pun.
+
+   ── KENAPA LEBARNYA DIUKUR, BUKAN DITULIS TETAP ─────────────────────────
+   Versi pertama memakai `viewBox="0 0 300 90"` pada elemen `w-full`, dan
+   itu SALAH dengan cara yang tidak kelihatan dari kodenya.
+
+   `preserveAspectRatio` bawaan SVG adalah `xMidYMid meet`: kalau rasio
+   viewBox tidak sama dengan rasio elemennya, gambarnya diperkecil sampai
+   muat di sisi TERPENDEK lalu ditaruh di TENGAH. Di panel selebar 602 px,
+   viewBox 300x90 digambar apa adanya 300 px dan disisakan 151 px kosong di
+   kiri DAN kanan — diukur, bukan diperkirakan. Kurvanya cuma memakai 50%
+   panel, dan garis putus-putus modal awal berhenti jauh sebelum tepi,
+   sehingga ia tidak lagi terbaca sebagai garis patokan.
+
+   Menambahkan `preserveAspectRatio="none"` memang memenuhi lebarnya, tapi
+   menariknya mendatar 2x: garis tegak jadi dua kali lebih tebal daripada
+   garis mendatar, dan titik bulat di ujung berubah jadi lonjong.
+
+   Jadi lebarnya diukur dan dipakai sebagai satuan gambar. Skalanya 1:1,
+   tidak ada yang perlu diregangkan, dan tidak ada yang berubah bentuk.
    ════════════════════════════════════════════════════════════════════════ */
 function KurvaSaldo({ harian, modal }: { harian: Map<string, number>; modal: number }) {
+  /* ResizeObserver, bukan sekali ukur saat pasang: panel ini hidup di dalam
+     modal yang lebarnya ikut lebar jendela, dan pengguna mengubah ukuran
+     jendela. Sekali ukur menghasilkan kurva yang benar saat dibuka lalu
+     salah selamanya sesudah jendelanya digeser. */
+  const kotak = useRef<HTMLDivElement>(null);
+  const [lebar, setLebar] = useState(0);
+  useEffect(() => {
+    const el = kotak.current;
+    if (!el) return;
+    setLebar(el.clientWidth);
+    const ro = new ResizeObserver(([e]) => setLebar(e.contentRect.width));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   const titik = useMemo(() => {
     /* Diurutkan menurut TANGGAL, bukan urutan penyisipan Map. Kunci Map
        mempertahankan urutan masuk, dan hasil yang dinilai server belakangan
@@ -319,10 +353,18 @@ function KurvaSaldo({ harian, modal }: { harian: Map<string, number>; modal: num
      nilainya sama (belum ada hasil), rentangnya nol dan pembagian di bawah
      menghasilkan NaN — karena itu ada batas bawah 1. */
   const rentang = Math.max(atas - bawah, 1);
-  const L = 300, T = 90, pad = 6;
+  /* L = lebar sesungguhnya panel ini, diukur di atas. T tetap 90 karena
+     tingginya memang dipatok `h-[90px]`.
 
-  const x = (i: number) => (i / (titik.length - 1)) * L;
-  const y = (v: number) => pad + (1 - (v - bawah) / rentang) * (T - pad * 2);
+     padX ADA karena titik terakhir adalah lingkaran ber-jari-jari 2,5:
+     digambar tepat di x = L ia terpotong separuh oleh tepi SVG. Ini bukan
+     soal kerapian — titik ujung itulah yang menandai saldo sekarang, dan
+     setengah titik terbaca seperti garisnya berhenti mendadak. */
+  const T = 90, padY = 6, padX = 4;
+  const L = lebar;
+
+  const x = (i: number) => padX + (i / (titik.length - 1)) * (L - padX * 2);
+  const y = (v: number) => padY + (1 - (v - bawah) / rentang) * (T - padY * 2);
 
   const garis = titik.map((t, i) => `${x(i).toFixed(1)},${y(t.saldo).toFixed(1)}`).join(' ');
   const akhir = nilai[nilai.length - 1];
@@ -339,14 +381,23 @@ function KurvaSaldo({ harian, modal }: { harian: Map<string, number>; modal: num
         <span className="text-[12.5px] text-zinc-300">Perkembangan saldo</span>
         <span className="text-[10.5px] text-zinc-600">estimasi dari {uang(modal)}</span>
       </div>
-      <svg viewBox={`0 0 ${L} ${T}`} className="h-[90px] w-full" role="img"
-           aria-label={`Kurva saldo estimasi, dari ${uang(modal)} menjadi ${uang(akhir)}`}>
-        <line x1="0" x2={L} y1={yModal} y2={yModal} strokeDasharray="3 3"
-              stroke="rgba(255,255,255,0.18)" strokeWidth="1" />
-        <polyline points={garis} fill="none" stroke={warna} strokeWidth="1.75"
-                  strokeLinejoin="round" strokeLinecap="round" />
-        <circle cx={x(titik.length - 1)} cy={y(akhir)} r="2.5" fill={warna} />
-      </svg>
+      {/* Kotak pengukur. Tingginya dipatok supaya tata letaknya tidak
+          melompat pada gambar pertama, saat lebarnya belum terukur. */}
+      <div ref={kotak} className="h-[90px] w-full">
+        {L > 0 && (
+          <svg viewBox={`0 0 ${L} ${T}`} width={L} height={T} className="block" role="img"
+               aria-label={`Kurva saldo estimasi, dari ${uang(modal)} menjadi ${uang(akhir)}`}>
+            {/* Garis patokan menyeberang PENUH, dari tepi ke tepi. Ia
+                mewakili "modal awal" — patokan yang berhenti di tengah
+                panel berhenti pula jadi patokan. */}
+            <line x1="0" x2={L} y1={yModal} y2={yModal} strokeDasharray="3 3"
+                  stroke="rgba(255,255,255,0.18)" strokeWidth="1" />
+            <polyline points={garis} fill="none" stroke={warna} strokeWidth="1.75"
+                      strokeLinejoin="round" strokeLinecap="round" />
+            <circle cx={x(titik.length - 1)} cy={y(akhir)} r="2.5" fill={warna} />
+          </svg>
+        )}
+      </div>
       <div className="mt-1.5 flex items-baseline justify-between font-mono text-[10.5px]">
         <span className="text-zinc-600">{uang(modal)}</span>
         <span className={untung ? 'text-emerald-400' : 'text-red-400'}>

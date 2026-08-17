@@ -82,9 +82,22 @@ function ModalPerformaAnalis({ a, performa, dibatalkan, berjalan, tutup }: {
   tutup: () => void;
 }) {
   const analis = performa?.analis.find((x) => x.uid === a.uid) ?? null;
+
+  /* TIRAI 80% + blur, bukan 60% polos.
+     Panel ini dulu tirainya paling tipis di seluruh aplikasi padahal isinya
+     paling padat, dan latarnya bukan halaman tenang melainkan rak kartu
+     sinyal — bergambar, berwarna, penuh tombol. Pada 60% tanpa blur kartu
+     itu masih terbaca utuh di kiri dan kanan dialog, jadi mata tidak bisa
+     memutuskan mana yang sedang dibaca. Modal lain di berkas ini sudah
+     memakai /70 sampai /85; yang ini tertinggal.
+
+     LEBARNYA NAIK ke 3xl. Waktu ditulis, isinya cuma beberapa KPI. Sekarang
+     ia memuat empat KPI, kurva saldo, kalender sebulan penuh, dan daftar
+     pembatalan — dan kalender 7 kolom di dalam 2xl membuat tiap selnya
+     terlalu sempit untuk memuat tanggal beserta angkanya. */
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" {...useTutupLuar(tutup)}>
-      <div className="max-h-full w-full max-w-2xl overflow-y-auto rounded-xl border border-zinc-800 bg-zinc-950 p-5"
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm" {...useTutupLuar(tutup)}>
+      <div className="max-h-full w-full max-w-3xl overflow-y-auto rounded-xl border border-zinc-800 bg-zinc-950 p-5"
            onClick={(e) => e.stopPropagation()}>
         <div className="mb-3 flex items-start justify-between gap-3">
           <div className="min-w-0">
