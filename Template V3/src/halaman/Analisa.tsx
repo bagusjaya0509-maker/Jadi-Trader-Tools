@@ -876,8 +876,16 @@ export default function Analisa() {
           sekali di situ bukan lagi keputusan tampilan, dan ini wilayah OJK
           / Bappebti. Jadi versi ringkasnya tetap ada: satu baris kecil di
           bawah judul kanal. */}
+      {/* TANPA KOTAK — keputusan pemilik 17 Agu 2026. Bingkai amber di kepala
+          halaman menarik mata lebih kuat daripada sinyal yang justru dicari
+          orang, dan halaman ini sudah punya banyak kotak berbingkai di
+          bawahnya. Yang HILANG cuma bingkainya: seluruh kalimatnya utuh,
+          tetap di ATAS, dan kata "Bukan rekomendasi beli atau jual" tetap
+          amber supaya bobotnya tidak ikut hilang bersama kotaknya. Ini
+          wilayah OJK/Bappebti — yang boleh diringkas tampilannya, bukan
+          isinya. */}
       {diDepan && (
-      <div className="mb-4 rounded-lg border border-amber-500/20 bg-amber-500/[0.04] px-4 py-3">
+      <div className="mb-4">
         <p className="text-[11.5px] leading-relaxed text-zinc-400">
           <span className="font-medium text-amber-300/90">Bukan rekomendasi beli atau jual.</span>{' '}
           Analisa di halaman ini disusun pengguna lain dan agen AI dari data harga publik —

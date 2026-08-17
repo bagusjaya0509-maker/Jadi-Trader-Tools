@@ -66,9 +66,11 @@ export function PapanPeringkatSignal({ data }: { data: Performa | null }) {
 
   if (!data) return null;
 
+  /* Cuma totalSinyal yang tersisa — dipakai penjaga "belum ada yang
+     selesai", label di tombol lipat, dan catatan kaki papan peringkat.
+     Jumlah menang dan estimasi hasil GABUNGAN ikut terbuang bersama empat
+     KPI-nya: keduanya tidak dibaca siapa pun lagi. */
   const totalSinyal = data.analis.reduce((s, a) => s + a.total, 0);
-  const totalMenang = data.analis.reduce((s, a) => s + a.menang, 0);
-  const total = data.analis.reduce((s, a) => s + a.hasilDolar, 0);
   const semuaHari = data.analis.flatMap((a) => Object.keys(a.harian ?? {})).sort();
 
   /* BELUM ADA YANG SELESAI = satu baris, bukan panel kosong setinggi layar.
@@ -113,20 +115,31 @@ export function PapanPeringkatSignal({ data }: { data: Performa | null }) {
         </p>
       )}
 
+      {/* EMPAT KPI GABUNGAN DIHAPUS — keputusan pemilik 17 Agu 2026.
+          ────────────────────────────────────────────────────────────────
+          Angkanya adalah penjumlahan SELURUH analis, dan penjumlahan itu
+          tidak menjawab pertanyaan yang membawa orang ke halaman ini:
+          "sinyal siapa yang layak saya ikuti". Winrate gabungan 0% dari
+          satu sinyal milik satu orang terbaca seperti vonis atas seluruh
+          fiturnya. Papan peringkat di bawah menjawabnya per analis —
+          itulah angka yang bisa ditindaklanjuti.
+
+          Jumlah sinyal selesai TIDAK ikut hilang: ia sudah tertulis di
+          ujung kanan tombol lipat di atas ("N sinyal selesai").
+
+          `Kpi` tetap dipakai di kanal per-analis di bawah, jadi
+          komponennya tidak ikut dibuang. */}
       {buka && (
         <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Kpi label="Sinyal selesai" nilai={String(totalSinyal)}
-                 ket={`${data.berjalan} masih berjalan`} />
-            <Kpi label="Menang / kalah" nilai={`${totalMenang} / ${totalSinyal - totalMenang}`} />
-            <Kpi label="Winrate gabungan"
-                 nilai={totalSinyal ? persen((totalMenang / totalSinyal) * 100) : '—'}
-                 warna={totalSinyal && totalMenang / totalSinyal >= 0.5 ? 'text-emerald-400' : undefined} />
-            <Kpi label={`Estimasi dari ${uang(data.modal)}`} nilai={uang(total, true)}
-                 warna={total >= 0 ? 'text-emerald-400' : 'text-red-400'} />
-          </div>
-
           <LeaderboardCard
+            /* Bingkai dan latar panelnya dimatikan lewat className, BUKAN
+               dengan menyunting components/ui/leaderboard-card.tsx.
+               Berkas itu primitif yang dipakai apa adanya; menghapus
+               bingkainya di sumber berarti pemakai berikutnya mewarisi
+               keputusan tampilan yang cuma berlaku untuk halaman ini.
+               `cn` memakai tailwind-merge, jadi border-0 dan bg-transparent
+               di sini benar-benar mengalahkan kelas bawaannya. */
+            className="border-0 bg-transparent p-0"
             title="Papan Peringkat Analis"
             fromDate={semuaHari[0]}
             toDate={semuaHari[semuaHari.length - 1]}
