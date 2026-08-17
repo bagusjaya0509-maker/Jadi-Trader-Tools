@@ -19,8 +19,25 @@ Disallow: /maintenance
 Disallow: /tagihan
 Disallow: /sosmed
 
-# Aset build: nama berkasnya berubah tiap rilis, jadi merayapinya cuma
-# menghasilkan riwayat alamat mati.
-Disallow: /assets/
+# JANGAN PERNAH menutup /assets/ di sini.
+#
+# Versi pertama berkas ini menulis `Disallow: /assets/` dengan alasan yang
+# terdengar masuk akal: nama berkasnya berubah tiap rilis, jadi merayapinya
+# cuma menghasilkan riwayat alamat mati.
+#
+# Alasan itu benar untuk situs yang halamannya sudah jadi di HTML. Di sini ia
+# salah total. Halaman ini nyaris kosong sampai JavaScript-nya jalan, dan
+# SELURUH aplikasinya ada di /assets/ — index-*.js, react-*.js, firebase-*.js,
+# index-*.css. Menutup /assets/ bukan menghemat jatah rayapan; ia mencabut
+# satu-satunya isi yang dipunyai halaman ini.
+#
+# Akibatnya terukur: Live Test di Search Console memotret halaman ini 412x732
+# piksel, satu warna, PUTIH 100% — nol piksel dari situs yang latarnya hitam.
+# Google melihat halaman kosong, dan halaman kosong tidak diberi peringkat.
+#
+# Google sendiri menyatakannya sebagai kesalahan paling sering pada aplikasi
+# JavaScript: perayapnya harus boleh mengambil JS dan CSS, persis seperti
+# peramban biasa. Kalau suatu hari tergoda menutupnya lagi demi "jatah
+# rayapan", jalankan Live Test dulu dan lihat sendiri layar putihnya.
 
 Sitemap: https://jaditrader.co.id/sitemap.xml
