@@ -1,68 +1,63 @@
-ATURAN FIRESTORE — PRATINJAU 24 JAM + AKSES LEWAT KODE
+ATURAN FIRESTORE — DUA SUNTINGAN KECIL UNTUK PRATINJAU 24 JAM
 ===========================================================================
 
-INI BAGIAN YANG PALING PENTING DARI SELURUH FITUR AKSES.
-
-Penguncian di halaman web cuma tampilan — siapa pun bisa membukanya lewat
-view-source. Aturan di bawah ini jalan di server Google dan TIDAK BISA
-disentuh dari peramban.
-
-Buka: Firebase Console → Firestore Database → tab "Rules" → Publish.
-
----------------------------------------------------------------------------
-APA YANG BERUBAH (17 Agu 2026) DAN KENAPA ITU WAJIB
+JANGAN SALIN SELURUH BERKAS INI KE CONSOLE.
 ---------------------------------------------------------------------------
 
-Jendela otomatis dipendekkan dari 30 HARI jadi 24 JAM, mengikuti mode
-pratinjau di web.
+Versi berkas ini sebelumnya berbunyi "SALIN SELURUHNYA", dan itu SALAH —
+hampir menyebabkan pemadaman. Diperiksa langsung di Firebase Console 17
+Agu 2026: aturan yang benar-benar tayang panjangnya 119 baris dan berisi
+dua blok yang TIDAK PERNAH ADA di berkas ini:
 
-Ini BUKAN sekadar penyelarasan angka. Selama aturan di bawah masih menulis
-30 hari sementara layar mengunci sesudah sehari, server tetap MENGIZINKAN
-tulis selama 29 hari sesudahnya — siapa pun yang mau cukup memanggil
-Firestore langsung dari console peramban dan gerbangnya tidak ada artinya.
-Layar yang mengunci tanpa aturan yang ikut mengunci adalah gembok yang
-digantung di pintu tanpa dikaitkan.
+  · match /users/{uid}/{sub=**}   -> subkoleksi V3: jurnal, transaksi,
+                                     posisi. Tanpa blok ini SELURUH jurnal
+                                     semua pengguna berhenti terbaca, dan
+                                     layarnya kosong tanpa satu pun pesan
+                                     error yang menjelaskan.
+  · match /ulasan/{id}            -> ulasan Marketplace, lengkap dengan
+                                     validasi bintang, panjang isi, dan
+                                     keharusan email sudah tersamar.
+
+Menempel berkas lama bulat-bulat akan MENGHAPUS keduanya.
+
+PELAJARAN YANG DICATAT: berkas panduan yang mengaku "aturan LENGKAP" akan
+selalu tertinggal dari yang tayang, karena aturannya diubah lewat Console
+sementara berkasnya diubah lewat editor kode. Dua tempat, satu kebenaran,
+tidak pernah ada yang menyamakan. Sejak sekarang berkas ini hanya memuat
+SUNTINGAN, bukan salinan penuh — dan yang tayang tetap satu-satunya
+sumber kebenaran.
 
 ---------------------------------------------------------------------------
-SALIN SELURUHNYA (ini aturan LENGKAP, sudah termasuk blok public/ yang lama)
+CARA MEMASANG
 ---------------------------------------------------------------------------
 
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
+Buka: Firebase Console -> Firestore Database -> tab "Rules".
+Lakukan DUA suntingan di bawah, lalu Publish. Jangan sentuh yang lain.
 
-    // ---- Status akses ----------------------------------------------------
-    // Dokumen ini yang menentukan siapa boleh memakai fitur berbayar.
-    //
-    // create : boleh SEKALI oleh pemiliknya sendiri, dan field "mulai" WAJIB
-    //          sama dengan waktu server (request.time). Halaman mengirim
-    //          serverTimestamp(), jadi jam di HP tidak bisa dipakai memundurkan
-    //          tanggal mulai. Field lain tidak boleh ikut ditulis.
-    // update : DITOLAK untuk pengguna biasa -> pratinjau tidak bisa di-reset
-    //          dan bayarSampai tidak bisa dipalsukan sendiri.
-    // delete : DITOLAK -> hapus dokumen lalu buat baru juga tidak bisa.
-    //
-    // Ketiganya bersama-sama yang membuat "pratinjau sekali per akun" benar:
-    // tanpa penolakan update DAN delete, 24 jam itu bisa diulang tanpa batas.
-    match /langganan/{uid} {
-      allow read: if request.auth != null
-                  && (request.auth.uid == uid || request.auth.uid == 'EOrakx0QnSVgsi6BECSOXvUM9kG3');
+Kalau ragu: Console menyimpan riwayat versi di sisi kiri, jadi salah
+publish bisa dikembalikan dengan memilih versi sebelumnya.
 
-      allow create: if request.auth != null
-                    && request.auth.uid == uid
-                    && request.resource.data.keys().hasOnly(['mulai'])
-                    && request.resource.data.mulai == request.time;
+===========================================================================
+SUNTINGAN 1 — izinkan pengguna memasang penanda pratinjau (SEKALI)
+===========================================================================
 
-      // SATU-SATUNYA update yang boleh dilakukan pengguna biasa: memasang
+Cari blok:            match /langganan/{uid} {
+
+Di dalamnya sudah ada `allow read`, `allow create`, dan baris terakhir:
+
+      allow update, delete: if request.auth != null
+                            && request.auth.uid == 'EOrakx0QnSVgsi6BECSOXvUM9kG3';
+
+SISIPKAN blok berikut TEPAT SEBELUM baris `allow update, delete` itu:
+
+      // Satu-satunya update yang boleh dilakukan pengguna biasa: memasang
       // field "pratinjau" SEKALI, dengan waktu server.
       //
-      // Empat syarat, dan keempatnya perlu:
-      //  - fieldnya BELUM ada  -> pratinjau tidak bisa diulang
-      //  - nilainya request.time -> jam perangkat tidak bisa dipakai
-      //  - hanya "pratinjau" yang berubah -> bayarSampai tidak bisa
-      //    ikut disisipkan dalam permintaan yang sama
-      //  - "mulai" tidak berubah -> catatan kapan akun ini datang aman
-      //
+      // Empat syarat, keempatnya perlu:
+      //  - fieldnya BELUM ada        -> pratinjau tidak bisa diulang
+      //  - nilainya request.time     -> jam perangkat tidak bisa dipakai
+      //  - hanya "pratinjau" berubah -> bayarSampai tidak bisa disisipkan
+      //                                 dalam permintaan yang sama
       // Hilangkan salah satunya dan 24 jam itu berhenti berarti apa-apa.
       allow update: if request.auth != null
                     && request.auth.uid == uid
@@ -70,60 +65,26 @@ service cloud.firestore {
                     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pratinjau'])
                     && request.resource.data.pratinjau == request.time;
 
-      allow update, delete: if request.auth != null
-                            && request.auth.uid == 'EOrakx0QnSVgsi6BECSOXvUM9kG3';
-    }
+`allow` yang berkali-kali di-OR-kan, jadi baris pemilik di bawahnya tetap
+berlaku penuh dan tidak perlu diubah.
 
-    // ---- Data pribadi tiap pengguna --------------------------------------
-    // BACA selalu boleh untuk pemiliknya — orang tidak boleh kehilangan akses
-    // ke riwayat tradingnya sendiri hanya karena pratinjaunya habis.
-    // TULIS butuh akses aktif: itulah yang membuat jurnal jadi baca-saja
-    // sesudah 24 jam.
-    match /users/{uid} {
-      allow read: if request.auth != null && request.auth.uid == uid;
-      allow write: if request.auth != null
-                   && request.auth.uid == uid
-                   && aksesAktif(uid);
-    }
+===========================================================================
+SUNTINGAN 2 — jendela otomatis: dari 30 hari "mulai" jadi 24 jam "pratinjau"
+===========================================================================
 
-    // ---- Jurnal contoh untuk pengunjung (blok lama, jangan dihapus) -------
-    match /public/{docId} {
-      allow read: if true;
-      allow write: if request.auth != null
-                   && request.auth.uid == 'EOrakx0QnSVgsi6BECSOXvUM9kG3';
-    }
+Cari fungsi di bagian bawah berkas:   function langgananAktif(uid) {
 
-    // ---- Catatan keanggotaan lama (blok lama, jangan dihapus) -------------
-    match /members/{uid} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
-    }
+Di dalamnya ada klausa seperti ini (angka harinya mungkin 30):
 
-    // ---- Layout default yang diwarisi pengguna baru -----------------------
-    // DIBIARKAN PERSIS seperti aturanmu yang sudah jalan: syarat tulisnya pakai
-    // EMAIL, bukan uid. Jangan diganti ke uid tanpa alasan - yang sekarang
-    // sudah terbukti bekerja, dan mengubahnya cuma menambah risiko.
-    match /config/{doc} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null
-                   && request.auth.token.email == 'bagusjaya0509@gmail.com';
-    }
+        || (
+          'mulai' in langgananData(uid)
+          && langgananData(uid).mulai + duration.value(30, 'd') > request.time
+        )
 
-    // ---- Penolong --------------------------------------------------------
-    // Dokumen langganan selalu berupa map: kalau belum ada, hasilnya map
-    // KOSONG, bukan null. Bentuk ini dipilih supaya tidak ada satu pun jalur
-    // yang bisa membaca field dari dokumen yang tidak ada.
-    function langgananData(uid) {
-      return exists(/databases/$(database)/documents/langganan/$(uid))
-        ? get(/databases/$(database)/documents/langganan/$(uid)).data
-        : {};
-    }
+GANTI seluruh klausa itu dengan:
 
-    function aksesAktif(uid) {
-      return uid == 'EOrakx0QnSVgsi6BECSOXvUM9kG3'
-        // masih di dalam PRATINJAU 24 jam.
-        //
         // Dihitung dari "pratinjau", BUKAN dari "mulai". Bedanya menentukan
-        // segalanya: "mulai" ditulis pada login pertama siapa pun, jadi
+        // segalanya: "mulai" ditulis pada login pertama SIAPA PUN, jadi
         // memakainya berarti setiap orang yang login otomatis dapat 24 jam
         // dan kuota event 30 hari di /akses jadi tidak ada gunanya.
         // "pratinjau" hanya ada kalau orangnya menekan tombol Preview.
@@ -131,42 +92,37 @@ service cloud.firestore {
           'pratinjau' in langgananData(uid)
           && langgananData(uid).pratinjau + duration.value(24, 'h') > request.time
         )
-        // atau aksesnya sudah dibuka lewat kode / persetujuan
-        || (
-          'bayarSampai' in langgananData(uid)
-          && langgananData(uid).bayarSampai > request.time
-        );
-    }
-  }
-}
 
----------------------------------------------------------------------------
-CARA MEMBUKA AKSES SESUDAH ORANG MEMBAYAR / DISETUJUI
----------------------------------------------------------------------------
+Klausa `bayarSampai` di bawahnya JANGAN disentuh — itu yang menjaga akses
+orang yang sudah membayar atau disetujui.
 
-Jalur normalnya lewat halaman Maintenance → Permintaan Akses (backend yang
-menulis bayarSampai). Manual lewat Firebase Console kalau perlu:
+===========================================================================
+SESUDAH PUBLISH — CARA MEMASTIKAN BERHASIL
+===========================================================================
 
-  1. Firestore Database → koleksi "langganan" → cari dokumen dengan uid orang
-     itu. (Kalau tidak tahu uid-nya: minta emailnya, lalu cocokkan lewat
-     Authentication → Users.)
-  2. Tambah/ubah field  bayarSampai  bertipe timestamp.
-  3. Selesai. Halaman orang itu berubah TANPA muat ulang — web memasang
-     pemantau hidup di dokumen ini.
+1. Buka https://jaditrader.co.id/#/template dengan akun Google KEDUA
+   (bukan akun pemilik — pemilik selalu dilewatkan tanpa perlu pratinjau).
+2. Klik "Preview tools · 1 hari" -> Mulai pratinjau 24 jam.
+3. Yang harus muncul: masuk ke Dashboard, dengan pita BIRU di atas
+   berbunyi "Mode pratinjau — sisa 23 jam …".
+4. Kalau muncul pesan merah "permission-denied", berarti suntingannya
+   belum tersimpan — periksa lagi Suntingan 1.
 
----------------------------------------------------------------------------
-CATATAN YANG PERLU KAMU SADARI
----------------------------------------------------------------------------
+Uji kedua, yang membuktikan gerbangnya tidak bocor: keluar, lalu login
+dengan akun ketiga TANPA menekan tombol Preview. Ia harus dilempar ke
+/akses, bukan masuk. Kalau ia masuk, berarti Suntingan 2 belum terpasang
+dan jendela masih dihitung dari "mulai".
 
-• Akun yang dokumen langganannya SUDAH ADA sebelum perubahan ini otomatis
-  dianggap habis pratinjaunya — `mulai`-nya sudah lewat 24 jam. Itu memang
-  yang diinginkan: mereka sudah pernah melihat isinya. Yang punya
-  bayarSampai aktif tidak terpengaruh sama sekali.
+===========================================================================
+CATATAN
+===========================================================================
 
-• Tiap kali pengguna MENULIS ke users/{uid}, aturan ini membaca dokumen
-  langganan/{uid}. Satu pembacaan itu ikut terhitung kuota Firestore.
+• Akun yang sudah punya bayarSampai aktif tidak terpengaruh sama sekali
+  oleh kedua suntingan ini.
 
-• Orang bisa membuat akun Google baru untuk mendapat 24 jam lagi. Ini tidak
-  bisa ditutup sepenuhnya di sistem mana pun yang memakai login gratis —
-  tapi imbalannya sekarang sehari, bukan sebulan, dan itu jauh lebih kecil
-  daripada ongkos membuat akun baru berulang kali.
+• Akun yang sudah pernah login tapi belum pernah menekan Preview akan
+  terhitung 'habis' dan diarahkan ke /akses. Itu memang yang diinginkan.
+
+• Orang bisa membuat akun Google baru untuk mendapat 24 jam lagi. Tidak
+  bisa ditutup di sistem mana pun yang memakai login gratis — tapi
+  imbalannya sehari, bukan sebulan.
