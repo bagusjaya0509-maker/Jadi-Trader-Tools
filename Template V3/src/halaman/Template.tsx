@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/navigation-menu';
 import { cn } from '@/lib/utils';
 import { Component as FeaturesGrid } from '@/components/ui/featuresgrid';
+import StoryScrollDemo from '@/components/ui/story-scroll-demo';
 
 /* ════════════════════════════════════════════════════════════════════════
    TEMPLATE — header-3 + hero-3 APA ADANYA
@@ -128,20 +129,15 @@ function HeroSection() {
           }}
         >
           <div className="relative mx-auto max-w-5xl overflow-hidden rounded-lg border bg-background p-2 shadow-xl ring-1 ring-card">
-            <img
-              alt="app screen"
-              className="z-2 aspect-video rounded-lg border dark:hidden"
-              height="1080"
-              src="https://storage.efferd.com/screen/dashboard-light.webp"
-              width="1920"
-            />
-            <img
-              alt="app screen"
-              className="hidden aspect-video rounded-lg bg-background dark:block"
-              height="1080"
-              src="https://storage.efferd.com/screen/dashboard-dark.webp"
-              width="1920"
-            />
+            {/* Kotak gambar hero: dulu tangkapan layar dashboard dari CDN
+                efferd, sekarang template story-scroll yang HIDUP — digulir
+                di dalam kotaknya sendiri, seksi-seksinya berputar masuk dan
+                menumpuk persis seperti demo aslinya. Rasio 16:9 dipertahankan
+                supaya bingkai, mask peluruhan, dan sambungan ke featuresgrid
+                di bawahnya tidak bergeser sedikit pun. */}
+            <div className="aspect-video overflow-hidden rounded-lg border">
+              <StoryScrollDemo />
+            </div>
           </div>
         </div>
       </div>
