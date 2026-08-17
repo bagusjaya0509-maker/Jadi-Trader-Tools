@@ -10,8 +10,40 @@ export const Component = () => {
      kosong besar yang bertumpuk membuat halamannya terbaca seperti
      terputus — orang mengira isinya sudah habis lalu berhenti menggulir. */
   return (
-    <section className="relative w-full bg-black pt-12 pb-24 font-sans text-white sm:pt-16 sm:pb-32 selection:bg-white selection:text-black">
-      <div className="mx-auto max-w-6xl px-6 md:px-8">
+    /* ── GARIS TEMPELAN DI ATAS SEKSI INI ────────────────────────────────
+       Latarnya dulu `bg-black` — hitam MURNI rgb(0,0,0) — sementara halaman
+       di atasnya zinc-950 rgb(9,9,11). Selisih sembilan tingkat itu tidak
+       terlihat sebagai "dua warna", tapi tepi tempat keduanya bertemu jadi
+       garis lurus setajam penggaris melintasi seluruh lebar layar.
+
+       Itulah garis yang berkali-kali dikira berasal dari bias cahaya di
+       hero. Bukan: menghaluskan gradien tidak akan pernah menyentuhnya,
+       karena penyebabnya loncatan warna latar, bukan peluruhan cahaya.
+       Disamakan ke zinc-950 dan garisnya hilang di sumbernya.
+
+       JANGAN dikembalikan ke bg-black demi "hitam yang lebih pekat" —
+       yang didapat cuma garis itu lagi. */
+    <section className="relative w-full bg-zinc-950 pt-12 pb-24 font-sans text-white sm:pt-16 sm:pb-32 selection:bg-white selection:text-black">
+      {/* Sambungan cahaya dari hero, diturunkan melewati batas seksi sampai
+          kira-kira sejajar lencana "JADI TRADER TOOLS". Gunanya bukan
+          hiasan: ia membuat mata membaca kedua seksi sebagai satu bidang
+          yang menerus, sehingga tidak ada tempat lagi untuk mencari tepi.
+
+          Pembungkus isi di bawah diberi `relative` BUKAN sebagai hiasan:
+          elemen berposisi menimpa elemen tak-berposisi di lapisan yang
+          sama, jadi tanpa itu lapisan cahaya ini menutupi judul seksinya. */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-64"
+           style={{
+             backgroundImage:
+               'radial-gradient(60% 100% at 50% 0%,'
+               + 'rgba(255,255,255,0.035) 0%,'
+               + 'rgba(255,255,255,0.028) 20%,'
+               + 'rgba(255,255,255,0.017) 42%,'
+               + 'rgba(255,255,255,0.008) 62%,'
+               + 'rgba(255,255,255,0.003) 80%,'
+               + 'rgba(255,255,255,0) 100%)',
+           }} />
+      <div className="relative mx-auto max-w-6xl px-6 md:px-8">
 
         {/* Section Header */}
         <div className="mb-16 flex flex-col items-center text-center">
