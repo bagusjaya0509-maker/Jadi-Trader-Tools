@@ -68,11 +68,13 @@ function HeroSection() {
         <div
           className={cn(
             'absolute inset-0 isolate -z-10',
-            /* Cahaya putihnya diredupkan 0,1 -> 0,04 dan dipersempit
-               (20%x80% -> 16%x55%): pada latar zinc-950 bias selebar itu
-               membuat sudut kiri atas terlihat seperti layar yang bocor
-               cahayanya, bukan seperti sorotan yang disengaja. */
-            'bg-[radial-gradient(16%_55%_at_18%_0%,rgba(255,255,255,0.04),transparent)]',
+            /* Cahaya putihnya diredupkan 0,1 -> 0,04, lalu DIPINDAH ke tengah
+               atas (18% -> 50%). Ditaruh di 18% ia jatuh di bahu kiri judul
+               saja, dan sorotan yang tidak simetris pada latar zinc-950
+               terbaca sebagai layar yang bocor cahayanya, bukan sebagai
+               sorotan yang disengaja. Melebar 16% -> 42% karena berkas
+               setipis itu di tengah berubah jadi garis, bukan cahaya. */
+            'bg-[radial-gradient(42%_50%_at_50%_0%,rgba(255,255,255,0.04),transparent)]',
           )}
         />
       </div>
@@ -88,7 +90,7 @@ function HeroSection() {
             'fade-in slide-in-from-bottom-10 animate-in fill-mode-backwards delay-100 duration-500 ease-out',
           )}
         >
-          Latih Psikologi &amp; Skill Trading Dalam 1 Halaman Tools Untuk Jadi Trader Profitable
+          Latih Psikologi &amp; Skill Trading Dalam 1 Halaman Tools
         </h1>
 
         <p
@@ -97,8 +99,8 @@ function HeroSection() {
             'fade-in slide-in-from-bottom-10 animate-in fill-mode-backwards delay-200 duration-500 ease-out',
           )}
         >
-          Jadi Trader Tools membantu trader untuk disiplin dengan sistem jurnaling,{' '}
-          <br className="hidden sm:block" />Chart Replay, dan Screener yang sesuai dengan gaya trading perorangan.
+          Jadi Trader Tools Membantu Traders disiplin jurnaling,{' '}
+          <br className="hidden sm:block" />Latih Skill Lewat Chart Replay dan Screening
         </p>
 
         {/* Dua tombol template diganti dua pintu SUNGGUHAN — inilah satu-
@@ -129,8 +131,14 @@ function HeroSection() {
       <div className="relative">
         <div
           className={cn(
-            'absolute -inset-x-20 inset-y-0 -translate-y-1/3 scale-120 rounded-full',
-            'bg-[radial-gradient(ellipse_at_center,rgba(255,255,255,0.1),transparent,transparent)]',
+            /* Dulu satu bulatan besar: -inset-x-20 menjulur 80px melewati
+               kedua sisi dan scale-120 melebarkannya lagi, sehingga
+               cahayanya keluar di kiri, kanan, dan bawah gambar — tiga
+               tepi yang seharusnya gelap. Sekarang dipaku ke tepi ATAS
+               saja (at 50% 0%) dan tingginya dibatasi setengah kotak, jadi
+               yang tersisa satu sorotan dari atas-tengah. */
+            'absolute inset-x-0 top-0 h-1/2',
+            'bg-[radial-gradient(50%_100%_at_50%_0%,rgba(255,255,255,0.1),transparent)]',
             'blur-[50px]',
           )}
         />

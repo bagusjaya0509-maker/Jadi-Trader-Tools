@@ -3,13 +3,15 @@ import { Link, useSearchParams } from 'react-router-dom';
 import {
   Loader2, Lock, Unlock, Trash2, Send, LineChart, X, CheckCircle2,
   TrendingUp, TrendingDown, RefreshCw, Radar, Sparkles, ImagePlus, Images, Flag, Ban,
-  Settings2, UserRound,
+  Settings2, UserRound, Pin,
 } from 'lucide-react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { PanelSinyal } from '@/components/panel-sinyal';
 import { PapanPeringkatSignal, PerformaAnalisSatu } from '@/components/performa-signal';
 import { ambilDraf } from '@/lib/draf-sinyal';
 import { AvatarAnalis } from '@/components/avatar-analis';
+import { ringkasKanal, type RingkasKanal } from '@/lib/ringkas-kanal';
+import { usePinAnalis } from '@/lib/pin-analis';
 import { cn, uang, persen, harga as fHarga, tanggalPendek } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 import { useRiwayat, useSaldoAwal } from '@/lib/data';
@@ -107,18 +109,84 @@ function ModalPerformaAnalis({ a, performa, dibatalkan, berjalan, tutup }: {
   );
 }
 
+/* ── Lencana gaya trading & tingkat risiko ──────────────────────────────
+   Keduanya diturunkan di `ringkasKanal`, tidak pernah diketik analisnya.
+   Warnanya sengaja TIDAK memuji: risiko rendah bukan prestasi dan risiko
+   tinggi bukan aib — scalper agresif yang jujur soal risikonya lebih
+   berguna daripada yang menyamar tenang. Emerald/amber/rose di sini
+   membaca "sejauh mana ia pernah turun", bukan "sebagus apa ia". */
+const WARNA_RISIKO: Record<string, string> = {
+  Rendah: 'border-emerald-500/30 text-emerald-400/90',
+  Sedang: 'border-amber-500/30 text-amber-400/90',
+  Tinggi: 'border-rose-500/30 text-rose-400/90',
+};
+
+function LencanaKanal({ r, className }: { r: RingkasKanal; className?: string }) {
+  return (
+    <div className={cn('flex flex-wrap items-center gap-1.5', className)}>
+      {r.gaya && (
+        <span title="Diturunkan dari timeframe yang paling sering ia analisa"
+              className="rounded border border-zinc-700/70 px-1.5 py-0.5 text-[10px] text-zinc-400">
+          {r.gaya}
+        </span>
+      )}
+      {/* Saat datanya belum cukup, lencananya TETAP ada — hanya isinya yang
+          berganti jadi "belum dinilai". Menghilangkannya sama sekali membuat
+          analis tanpa rekam jejak terlihat seperti tidak punya kolom risiko,
+          bukan seperti belum cukup diuji; dan pembaca yang tidak melihat
+          peringatan apa pun akan menganggapnya sudah aman. */}
+      <span title={r.alasanRisiko}
+            className={cn('rounded border px-1.5 py-0.5 text-[10px]',
+              r.risiko ? WARNA_RISIKO[r.risiko] : 'border-zinc-800 text-zinc-600')}>
+        {r.risiko ? `Risiko ${r.risiko.toLowerCase()}` : 'Risiko belum dinilai'}
+      </span>
+    </div>
+  );
+}
+
+/** Satu baris hitungan: menang / kalah / berjalan / menggantung.
+ *  Angka nol tetap ditulis, tidak disembunyikan — "0 kalah" dari 12 sinyal
+ *  adalah keterangan, dan menghilangkannya membuat kartunya terbaca seperti
+ *  belum pernah diuji. */
+function BarisHitung({ r }: { r: RingkasKanal }) {
+  const bagian: Array<[string, number, string]> = [
+    ['menang', r.profit, 'text-emerald-400'],
+    ['kalah', r.rugi, 'text-red-400'],
+    ['jalan', r.berjalan, 'text-sky-400'],
+    ['pending', r.pending, 'text-amber-400'],
+  ];
+  return (
+    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[10.5px] text-zinc-600">
+      {bagian.map(([nama, nilai, warna]) => (
+        <span key={nama} className="whitespace-nowrap">
+          <span className={cn('angka font-semibold', nilai > 0 ? warna : 'text-zinc-600')}>{nilai}</span>
+          {' '}{nama}
+        </span>
+      ))}
+      {r.batal > 0 && (
+        <span className="whitespace-nowrap" title="Ditarik penulisnya sebelum harganya datang">
+          <span className="angka font-semibold text-zinc-500">{r.batal}</span> batal
+        </span>
+      )}
+    </div>
+  );
+}
+
 /** Penanda analisa yang ditulis agen AI, bukan orang.
  *  Wajib ada dan wajib jelas: pembaca berhak tahu apakah yang ia baca
  *  disusun manusia dengan rekam jejak jurnal, atau mesin yang membaca
  *  lilin. Keduanya boleh salah — tapi salahnya berbeda jenis, dan orang
  *  perlu tahu jenis mana yang sedang ia pertimbangkan. */
-function LencanaAgen() {
+function LencanaAgen({ geser }: { geser?: boolean }) {
   return (
     /* Ditempel di POJOK KANAN ATAS panel, bukan ikut mengalir di dalam isi.
        Sebagai baris tersendiri ia mendorong judul turun dan memakan satu
        baris penuh untuk dua kata — dan lencana yang memanjang terbaca
        sebagai isi kartu, padahal ia keterangan TENTANG kartunya. */
-    <span className="absolute right-3 top-3 z-10 flex items-center gap-1 rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-sky-300"
+    /* `geser` memberi tempat untuk tombol pin di kartu kanal — dua elemen
+       yang sama-sama dipaku ke pojok kanan atas akan saling menimpa. */
+    <span className={cn('absolute top-3 z-10 flex items-center gap-1 rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-sky-300',
+                        geser ? 'right-10' : 'right-3')}
           title="Ditulis agen AI dari data lilin, bukan oleh analis manusia">
       <Sparkles className="size-3" /> AI Agent
     </span>
@@ -503,17 +571,16 @@ function KartuAnalisa({ a, status, milikku, pemilik, onSegarkan, performa, dibat
           <span className={cn('angka text-[14px] font-semibold', a.harga === 0 ? 'text-emerald-500' : 'text-zinc-100')}>
             {a.harga === 0 ? 'Gratis' : uang(a.harga)}
           </span>
-          {/* Tombol portofolio TIDAK ditampilkan untuk agen: agen tidak punya
-              jurnal, jadi tombolnya cuma membuka modal yang selalu berbunyi
-              "belum ada snapshot" — jalan buntu yang terlihat seperti fitur
-              rusak. Yang menggantikan rekam jejaknya adalah alasan analisa
-              yang terbuka penuh, gratis, untuk siapa pun. */}
-          {!a.agen && (
-            <button onClick={() => setLihatPorto(true)}
-              className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 py-1.5 text-[11.5px] text-zinc-300 transition-colors hover:border-zinc-700">
-              <LineChart className="size-3.5" /> Lihat portofolio
-            </button>
-          )}
+          {/* Dulu tombol ini disembunyikan untuk agen, dan alasannya sudah
+              tidak berlaku: yang dibukanya bukan lagi snapshot jurnal
+              melainkan performa SINYAL — dihitung server dari lilin sejak
+              tiap sinyal diposting. Agen punya itu persis seperti manusia.
+              Menyembunyikannya justru membuat satu-satunya peserta papan
+              yang tidak bisa dinilai adalah yang menulis paling banyak. */}
+          <button onClick={() => setLihatPorto(true)}
+            className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 py-1.5 text-[11.5px] text-zinc-300 transition-colors hover:border-zinc-700">
+            <LineChart className="size-3.5" /> Lihat Performa Signal
+          </button>
           {/* Batalkan HANYA muncul untuk sinyal sendiri yang masih menunggu
               harga. Begitu entry tersentuh tombolnya hilang — dan itu bukan
               sekadar disembunyikan, server menolaknya juga. */}
@@ -683,6 +750,7 @@ export default function Analisa() {
      memposting banyak sinyal, dan menderetkan semuanya rata membuat rekam
      jejak per orangnya tidak pernah terlihat utuh. */
   const [kanalBuka, setKanalBuka] = useState<string | null>(null);
+  const { disematkan, ubahPin } = usePinAnalis();
   /** Halaman depan Market Signal: daftar kanal, belum masuk ke kanal siapa
    *  pun. Dipakai memutuskan apa yang boleh menumpuk di kepala halaman —
    *  begitu seseorang masuk ke sebuah kanal, kepala halaman itu miliknya. */
@@ -1520,8 +1588,17 @@ export default function Analisa() {
           const k = kanal.get(a.uid) ?? [];
           k.push(a); kanal.set(a.uid, k);
         }
-        const kanalUrut = [...kanal.entries()].sort((x, y) => y[1][0].dibuat - x[1][0].dibuat);
+        /* Yang disematkan naik ke atas, sisanya tetap urut sinyal terbaru.
+           Sematan hanya mengubah tampilan orang yang menyematkan — lihat
+           lib/pin-analis.ts soal kenapa ia tidak dibuat bersama. */
+        const kanalUrut = [...kanal.entries()].sort((x, y) => {
+          const px = disematkan(x[0]) ? 1 : 0, py = disematkan(y[0]) ? 1 : 0;
+          return py - px || y[1][0].dibuat - x[1][0].dibuat;
+        });
         const perfDari = (uid: string) => performa?.analis.find((p) => p.uid === uid) ?? null;
+        /* Uang yang dipertaruhkan per sinyal menurut model papan peringkat.
+           Dipakai menyatakan drawdown dalam satuan risiko, bukan dolar. */
+        const risikoPerSinyal = (performa?.modal ?? 1000) * (performa?.risikoPersen ?? 1) / 100;
         const terpilih = kanalBuka ? kanal.get(kanalBuka) ?? [] : [];
         const infoTerpilih = kanalBuka ? kanal.get(kanalBuka)?.[0] : undefined;
 
@@ -1530,44 +1607,72 @@ export default function Analisa() {
             {kanalUrut.map(([uid, sinyal]) => {
               const a0 = sinyal[0];
               const p = perfDari(uid);
-              const selesai = sinyal.filter((s) => s.hasil === 'tp' || s.hasil === 'sl').length;
+              const r = ringkasKanal(sinyal, p, risikoPerSinyal);
+              const disemat = disematkan(uid);
               return (
-                <button key={uid} onClick={() => setKanalBuka(uid)}
-                  className="relative cursor-pointer rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 text-left transition-colors hover:border-zinc-600">
-                  {a0.agen && <LencanaAgen />}
-                  <div className="flex items-center gap-2.5">
-                    <AvatarAnalis nama={a0.nama} foto={a0.foto} uid={uid}
-                                  className="size-10" kelasHuruf="text-[14px]" />
-                    <span className="min-w-0">
-                      <span className="block truncate text-[13.5px] font-medium text-zinc-100">{a0.nama}</span>
-                      <span className="block text-[11px] text-zinc-600">
-                        {sinyal.length} sinyal · {selesai} selesai
-                        {uid === pengguna?.uid && ' · kanalmu'}
+                /* Bukan satu <button> besar lagi: tombol pin ada DI DALAM
+                   kartu, dan tombol bersarang di dalam tombol tidak sah —
+                   peramban memutus sarangnya sendiri dan salah satunya
+                   berhenti bisa diklik. */
+                <div key={uid}
+                  className={cn('relative rounded-xl border bg-zinc-900/40 transition-colors',
+                    disemat ? 'border-amber-500/40' : 'border-zinc-800 hover:border-zinc-600')}>
+                  {a0.agen && <LencanaAgen geser />}
+                  <button onClick={() => setKanalBuka(uid)}
+                    className="w-full cursor-pointer p-4 text-left">
+                    <div className="flex items-center gap-2.5 pr-8">
+                      <AvatarAnalis nama={a0.nama} foto={a0.foto} uid={uid}
+                                    className="size-10" kelasHuruf="text-[14px]" />
+                      <span className="min-w-0">
+                        <span className="block truncate text-[13.5px] font-medium text-zinc-100">{a0.nama}</span>
+                        <span className="block text-[11px] text-zinc-600">
+                          {r.total} sinyal diunggah
+                          {uid === pengguna?.uid && ' · kanalmu'}
+                        </span>
                       </span>
-                    </span>
-                  </div>
-                  <div className="mt-3 grid grid-cols-2 gap-2">
-                    <div className="rounded-lg border border-zinc-800/60 p-2.5">
-                      <div className="text-[10.5px] text-zinc-600">Winrate</div>
-                      <div className={cn('angka text-[15px] font-semibold',
-                        p ? (p.winrate >= 50 ? 'text-emerald-400' : 'text-zinc-100') : 'text-zinc-600')}>
-                        {p ? persen(p.winrate) : '—'}
+                    </div>
+                    <LencanaKanal r={r} className="mt-2.5" />
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <div className="rounded-lg border border-zinc-800/60 p-2.5">
+                        <div className="text-[10.5px] text-zinc-600">Winrate</div>
+                        <div className={cn('angka text-[15px] font-semibold',
+                          r.winrate !== null ? (r.winrate >= 50 ? 'text-emerald-400' : 'text-zinc-100') : 'text-zinc-600')}>
+                          {r.winrate !== null ? persen(r.winrate) : '—'}
+                        </div>
+                      </div>
+                      <div className="rounded-lg border border-zinc-800/60 p-2.5">
+                        <div className="text-[10.5px] text-zinc-600">Estimasi $1.000</div>
+                        <div className={cn('angka text-[15px] font-semibold',
+                          p ? (p.hasilDolar >= 0 ? 'text-emerald-400' : 'text-red-400') : 'text-zinc-600')}>
+                          {p ? uang(p.hasilDolar, true) : '—'}
+                        </div>
                       </div>
                     </div>
-                    <div className="rounded-lg border border-zinc-800/60 p-2.5">
-                      <div className="text-[10.5px] text-zinc-600">Estimasi $1.000</div>
-                      <div className={cn('angka text-[15px] font-semibold',
-                        p ? (p.hasilDolar >= 0 ? 'text-emerald-400' : 'text-red-400') : 'text-zinc-600')}>
-                        {p ? uang(p.hasilDolar, true) : '—'}
-                      </div>
-                    </div>
-                  </div>
-                  {!p && (
-                    <p className="mt-2 text-[10.5px] leading-relaxed text-zinc-600">
-                      Belum ada sinyal yang selesai — angka muncul setelah harga menyentuh SL/TP.
-                    </p>
-                  )}
-                </button>
+                    <BarisHitung r={r} />
+                    {r.pending > 0 && (
+                      <p className="mt-1.5 text-[10.5px] text-zinc-600">
+                        Order menggantung terakhir diposting {tanggalPendek(r.pendingTerbaru)}
+                      </p>
+                    )}
+                    {r.winrate === null && (
+                      <p className="mt-2 text-[10.5px] leading-relaxed text-zinc-600">
+                        Belum ada sinyal yang selesai — angka muncul setelah harga menyentuh SL/TP.
+                      </p>
+                    )}
+                  </button>
+                  {/* Pin milik penontonnya sendiri, tidak mengubah urutan
+                      papan untuk orang lain. Lihat lib/pin-analis.ts. */}
+                  <button
+                    onClick={() => ubahPin(uid)}
+                    aria-pressed={disemat}
+                    title={disemat ? 'Lepas sematan — kanal ini kembali urut menurut sinyal terbaru'
+                                   : 'Sematkan kanal ini ke atas, hanya untuk tampilanmu'}
+                    className={cn('absolute right-2 top-2 z-10 cursor-pointer rounded-md p-1.5 transition-colors',
+                      disemat ? 'text-amber-400 hover:bg-amber-500/10'
+                              : 'text-zinc-600 hover:bg-zinc-800 hover:text-zinc-300')}>
+                    <Pin className={cn('size-3.5', disemat && 'fill-current')} />
+                  </button>
+                </div>
               );
             })}
           </div>
@@ -1577,9 +1682,16 @@ export default function Analisa() {
               className="mb-3 flex cursor-pointer items-center gap-1.5 text-[12.5px] text-zinc-500 transition-colors hover:text-zinc-200">
               ← Semua kanal
             </button>
-            <div className="mb-1.5 flex items-center gap-2 text-[13.5px] text-zinc-200">
+            <div className="mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[13.5px] text-zinc-200">
               <span className="font-medium">{infoTerpilih?.nama}</span>
               <span className="text-zinc-600">· {terpilih.length} sinyal</span>
+              <LencanaKanal r={ringkasKanal(terpilih, perfDari(kanalBuka), risikoPerSinyal)} />
+            </div>
+            {/* Hitungan yang sama seperti di kartunya. Diulang dengan
+                sengaja: begitu kanalnya terbuka, kartu tempat angka itu
+                tadi berdiri sudah tidak ada di layar. */}
+            <div className="mb-2.5">
+              <BarisHitung r={ringkasKanal(terpilih, perfDari(kanalBuka), risikoPerSinyal)} />
             </div>
             {/* Satu baris, bukan kotak amber. Cukup untuk tetap ada di layar
                 yang menampilkan entry/SL/TP, cukup kecil untuk tidak berdiri

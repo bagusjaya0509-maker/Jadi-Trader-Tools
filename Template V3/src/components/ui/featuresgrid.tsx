@@ -24,9 +24,9 @@ export const Component = () => {
               dan pada 6xl ia memakan seluruh layar sampai kartu-kartu di
               bawahnya tidak pernah terlihat tanpa menggulir dua kali. */}
           <h2 className="mb-4 max-w-4xl text-balance text-3xl font-medium tracking-tighter text-white sm:text-4xl md:text-5xl">
-            Semua tools yang dibuat diarahkan menjadi sistem paksa untuk bisa
-            mendisiplinkan diri <br className="hidden sm:block" />
-            <span className="text-neutral-600">untuk membentuk jiwa trader, bukan gambler.</span>
+            Semua Tools Yang Dibuat Diarahkan Menjadi Sistem Paksa Untuk Bisa
+            Mendisiplinkan Diri <br className="hidden sm:block" />
+            <span className="text-neutral-600">Untuk Membentuk Jiwa Trader, Bukan Gambler.</span>
           </h2>
           <p className="max-w-2xl text-balance text-base text-neutral-400 sm:text-lg">
             Tujuan tools ini dibuat karena dari sekian pengalaman yang ada, satu-satunya

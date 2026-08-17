@@ -13,7 +13,7 @@ import type { Performa, PerformaAnalis, RingkasAnalisa } from '@/lib/analisa';
       sana untuk mencari sinyal; sekalian di situ ia melihat siapa yang
       rekam jejaknya paling baik, tanpa harus pindah halaman.
 
-   2. `PerformaAnalisSatu` mengisi panel "Lihat portofolio" — performa
+   2. `PerformaAnalisSatu` mengisi panel "Lihat Performa Signal" — performa
       sinyal ORANG ITU saja. Yang dinilai pembeli adalah sinyalnya, bukan
       cara ia menjalankan akunnya sendiri: orang bisa saja pandai membaca
       pasar untuk orang lain tapi berantakan mengurus tradingnya sendiri,
@@ -169,7 +169,7 @@ export function PapanPeringkatSignal({ data }: { data: Performa | null }) {
   );
 }
 
-/* ── 2. Performa sinyal SATU analis, untuk panel "Lihat portofolio" ───── */
+/* ── 2. Performa sinyal SATU analis, untuk panel "Lihat Performa Signal" ───── */
 
 export function PerformaAnalisSatu({ analis, modal, risikoPersen, berjalan, dibatalkan }: {
   analis: PerformaAnalis | null;
