@@ -149,6 +149,71 @@ export const AKTIVITAS_CONTOH: AktivitasContoh[] = [
   { id: 'a8', jenis: 'tutup',  teks: 'XAUUSDc SELL ditutup manual +$4,60',                  waktu: SEKARANG_CONTOH - 4 * HARI },
 ];
 
+/* ════════════════════════════════════════════════════════════════════════
+   DATA UNTUK HALAMAN /preview
+   ════════════════════════════════════════════════════════════════════════
+   Bentuknya SUDAH SIAP PAKAI oleh komponen murni (`BarisPosisi`, data
+   Recharts), jadi halaman preview tidak perlu menghitung apa pun — dan
+   karena tidak menghitung, ia tidak bisa berselisih dengan perhitungan
+   yang dipakai panel sungguhan.
+
+   Angkanya saling cocok dan itu disengaja: total P/L posisi kripto +
+   Trade-Fi, saldo, dan titik terakhir kurva saldo semuanya berangkat dari
+   bilangan yang sama. Layar yang angkanya tidak berjumlah adalah layar
+   yang ketahuan karangan dalam sepuluh detik.                          */
+
+/** Baris posisi siap render — bentuk `BarisPosisi` di tabel-posisi.tsx. */
+export const POSISI_KRIPTO_PREVIEW = [
+  { kunci: 'k1', simbol: 'BTCUSDT', arah: 'BUY'  as const, ukuran: '0,0182 BTC', ukuranUsd: 1166.2, entry: 64065.10, hargaKini: 64784.50, sl: 63277.00, tp: 65182.00, pnl: 13.09, ket: 'Binance Live · 4h', risikoUsd: -14.35, imbalUsd: 20.33 },
+  { kunci: 'k2', simbol: 'SOLUSDT', arah: 'BUY'  as const, ukuran: '4,62 SOL',   ukuranUsd: 346.7,  entry: 75.0500,  hargaKini: 77.8200,  sl: 72.4000,  tp: 81.6000,  pnl: 12.80, ket: 'Binance Live · 4h', risikoUsd: -12.24, imbalUsd: 30.20 },
+  { kunci: 'k3', simbol: 'ETHUSDT', arah: 'SELL' as const, ukuran: '0,196 ETH',  ukuranUsd: 365.9,  entry: 1867.00,  hargaKini: 1849.40,  sl: 1902.00,  tp: 1798.00,  pnl: 3.45,  ket: 'Binance Live · 1h', risikoUsd: -6.86,  imbalUsd: 13.52 },
+  { kunci: 'k4', simbol: 'ADAUSDT', arah: 'BUY'  as const, ukuran: '1.240 ADA',  ukuranUsd: 201.1,  entry: 0.16220,  hargaKini: 0.15940,  sl: 0.15600,  tp: 0.17400,  pnl: -3.47, ket: 'Binance Live · 4h', risikoUsd: -7.69,  imbalUsd: 14.63 },
+];
+
+export const POSISI_TRADEFI_PREVIEW = [
+  { kunci: 't1', simbol: 'XAUUSDc', arah: 'BUY'  as const, ukuran: '0,04 lot', entry: 1921.35, hargaKini: 1928.02, sl: 1913.80, tp: 1939.50, pnl: 26.68, ket: 'MT5 · #51884213', tiket: '51884213', risikoUsd: -30.20, imbalUsd: 72.60 },
+  { kunci: 't2', simbol: 'EURUSD',  arah: 'SELL' as const, ukuran: '0,10 lot', entry: 1.08420, hargaKini: 1.08267, sl: 1.08760, tp: 1.07850, pnl: 15.30, ket: 'MT5 · #51884190', tiket: '51884190', risikoUsd: -34.00, imbalUsd: 57.00 },
+  { kunci: 't3', simbol: 'USDJPY',  arah: 'BUY'  as const, ukuran: '0,06 lot', entry: 147.220, hargaKini: 146.985, sl: 146.700, tp: 148.400, pnl: -9.58, ket: 'MT5 · #51883977', tiket: '51883977', risikoUsd: -21.20, imbalUsd: 48.10 },
+];
+
+/** Empat angka kepala Dashboard. Dihitung tangan SEKALI di sini supaya
+ *  halaman preview tidak menjalankan mesin statistik yang sesungguhnya —
+ *  memanggilnya berarti membuka jalur baru ke logika nyata. */
+export const KPI_PREVIEW = {
+  saldo: 1_046.92,
+  saldoTradeFi: 528.39,
+  saldoKripto: 518.53,
+  winrate: 58.4,
+  menang: 73,
+  kalah: 52,
+  pnl: 187.92,
+  pnlPersen: 21.9,
+  untung: 512.40,
+  rugi: 324.48,
+  profitFactor: 1.58,
+};
+
+/** Enam bulan, DUA di antaranya merah. Deret yang hijau semua bukan
+ *  rekam jejak — itu iklan, dan pembaca yang paham langsung tahu. */
+export const BULANAN_PREVIEW = [
+  { bulan: 'Mar', hasil: 24.60 },
+  { bulan: 'Apr', hasil: -18.30 },
+  { bulan: 'Mei', hasil: 41.85 },
+  { bulan: 'Jun', hasil: 33.20 },
+  { bulan: 'Jul', hasil: -12.45 },
+  { bulan: 'Agu', hasil: 119.02 },
+];
+
+/** Saldo harian bulan berjalan — 28 titik, deterministik. Ada satu
+ *  penurunan tajam di tengah: kurva yang naik mulus tidak pernah terjadi,
+ *  dan drawdown justru bagian yang paling perlu dilihat calon pemakai. */
+export const SALDO_HARIAN_PREVIEW = (() => {
+  const langkah = [0, 8, 14, 9, 22, 31, 27, 44, 52, 47, 61, 74, 68, 83,
+                   96, 71, 58, 66, 79, 92, 88, 104, 117, 111, 126, 139, 148, 160];
+  const dasar = 886.92;
+  return langkah.map((d, i) => ({ hari: i + 1, saldo: Number((dasar + d).toFixed(2)) }));
+})();
+
 /* ── Boleh menampilkan contoh? ───────────────────────────────────────────
    Pilihan "pakai contoh / mulai dari nol" SUDAH punya rumahnya sendiri:
    `bacaPilihanContoh(uid)` di lib/data.ts, yang diisi spanduk biru di
