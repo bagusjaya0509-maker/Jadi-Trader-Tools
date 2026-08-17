@@ -118,9 +118,13 @@ function HeroSection() {
             baru akses 30 hari. Menaruh yang berbayar lebih dulu memaksa
             orang memutuskan sebelum ia melihat apa pun. */}
         <div className="fade-in slide-in-from-bottom-10 flex w-fit animate-in flex-wrap items-center gap-3 fill-mode-backwards pt-2 delay-300 duration-500 ease-out">
+          {/* Corongnya berurut dari yang paling murah: lihat dulu tanpa
+              mendaftar, baru coba dengan akun sendiri, baru ambil akses.
+              Menaruh pendaftaran di langkah pertama memaksa orang
+              memutuskan sebelum ia tahu barangnya apa. */}
           <Button asChild>
-            <Link to="/pratinjau">
-              <EyeIcon className="size-4 mr-2" data-icon="inline-start" /> Preview tools · 1 hari
+            <Link to="/preview">
+              <EyeIcon className="size-4 mr-2" data-icon="inline-start" /> Lihat preview · tanpa daftar
             </Link>
           </Button>
           <Button variant="outline" asChild>

@@ -2,6 +2,7 @@ import { HashRouter, Routes, Route, Navigate, Outlet, useLocation } from 'react-
 import { useEffect, lazy, Suspense, type ReactNode } from 'react';
 import { Loader2 } from 'lucide-react';
 import { PenyediaAuth, useAuth } from '@/lib/auth';
+import { modePreview } from '@/lib/preview';
 import { catatKunjungan } from '@/lib/admin';
 import { AppShell } from '@/components/app-shell';
 import Pendaratan from '@/halaman/Pendaratan';
@@ -224,7 +225,7 @@ function Penjaga({ children }: { children: ReactNode }) {
 }
 
 function Kerangka() {
-  const { memuat, pemilik, langganan } = useAuth();
+  const { memuat, pemilik, langganan, pengguna } = useAuth();
   const lokasi = useLocation();
 
   if (memuat) return <Menunggu />;
@@ -234,7 +235,19 @@ function Kerangka() {
   /* Server dev LOKAL membuka gerbang tanpa login — halaman di dalamnya harus
      bisa diperiksa dan diperbaiki tanpa kredensial. `import.meta.env.DEV`
      bernilai false saat build, jadi cabang ini tidak ada di bundel produksi. */
-  if (!import.meta.env.DEV && !(pemilik || langganan.status === 'aktif' || langganan.status === 'pratinjau')) {
+  /* MODE PREVIEW membuka kerangkanya untuk pengunjung yang BELUM MASUK.
+     ────────────────────────────────────────────────────────────────────
+     Syarat `!pengguna` itu bagian terpenting dari baris ini, bukan
+     pelengkap: preview hanya berlaku untuk orang tanpa sesi. Yang sudah
+     masuk tetap diurus gerbang seperti biasa, jadi tidak ada cara
+     memakai mode ini untuk melewati akses berbayar dengan akun sendiri.
+
+     Yang dibuka cuma TAMPILAN. Tanpa sesi, Firestore Security Rules
+     menolak setiap pembacaan dan penulisan — jadi yang terlihat hanya
+     data contoh yang memang sudah disiapkan untuk pengunjung. */
+  const preview = modePreview() && !pengguna;
+  if (!import.meta.env.DEV && !preview
+      && !(pemilik || langganan.status === 'aktif' || langganan.status === 'pratinjau')) {
     return <Navigate to={`/akses?dari=${encodeURIComponent(lokasi.pathname)}`} replace />;
   }
   return (

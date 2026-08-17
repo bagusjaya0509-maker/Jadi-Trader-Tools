@@ -190,7 +190,17 @@ export default function Pratinjau() {
             kegagalan: sebagian orang datang ke sini justru sudah siap
             mengambil kuota 30 hari, dan memaksa mereka lewat pratinjau
             dulu cuma menambah satu langkah yang tidak mereka butuhkan. */}
-        <div className="border-t border-zinc-800 pt-5">
+        <div className="flex flex-col gap-2 border-t border-zinc-800 pt-5">
+          {/* Jalan keluar untuk yang belum siap memakai jatah 24 jamnya.
+              Tanpa ini, satu-satunya cara melihat isinya adalah
+              membelanjakan pratinjau yang cuma bisa dipakai sekali. */}
+          <p className="text-[12.5px] leading-relaxed text-zinc-500">
+            Belum mau memakai jatahnya?{' '}
+            <Link to="/preview" className="text-zinc-200 underline underline-offset-2 hover:text-white">
+              Lihat preview tanpa daftar
+            </Link>{' '}
+            — isinya data contoh, tapi seluruh halamannya bisa dijelajahi.
+          </p>
           <p className="text-[12.5px] leading-relaxed text-zinc-500">
             Sudah yakin, atau pratinjaunya sudah terpakai?{' '}
             <Link to="/akses" className="text-zinc-200 underline underline-offset-2 hover:text-white">

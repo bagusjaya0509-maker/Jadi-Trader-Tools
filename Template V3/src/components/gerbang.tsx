@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { LogOut, ChevronRight, TriangleAlert, Eye, Loader2 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { discordSiap, mulaiLoginDiscord } from '@/lib/analisa';
+import { modePreview, akhiriPreview } from '@/lib/preview';
 import { cn } from '@/lib/utils';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -219,6 +220,35 @@ export function PitaLangganan() {
     const t = setInterval(() => detak((n) => n + 1), 60_000);
     return () => clearInterval(t);
   }, [langganan.status]);
+
+  /* ── Pengunjung mode preview ──────────────────────────────────────────
+     Ia belum masuk, jadi cabang di bawah tidak berlaku untuknya — tapi
+     justru dialah yang paling perlu diberi tahu. Seluruh angka yang ia
+     lihat karangan, dan satu-satunya yang membuat itu jujur adalah
+     kalimat yang mengatakannya.
+
+     TIDAK bisa ditutup. Tombol tutup pada keterangan sepenting ini adalah
+     tombol untuk melupakan bahwa yang dilihat bukan kenyataan. */
+  if (!pengguna && modePreview()) {
+    return (
+      <div className="flex flex-wrap items-center gap-3 border-b border-sky-500/25 bg-sky-500/[0.07] px-4 py-2.5 text-[12.5px]">
+        <Eye className="size-4 shrink-0 text-sky-300" strokeWidth={2} />
+        <span className="flex-1 text-zinc-300">
+          <span className="font-medium text-sky-200">Mode preview</span> — kamu sedang menjelajah
+          website yang sesungguhnya, tapi seluruh angkanya <b>data contoh</b>. Berpindah halaman
+          bebas; menyimpan perubahan baru bisa setelah masuk.
+        </span>
+        <Link to="/pratinjau"
+          className="rounded-md bg-zinc-100 px-3 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white">
+          Coba dengan akunku
+        </Link>
+        <button onClick={() => { akhiriPreview(); window.location.hash = '#/'; }}
+          className="cursor-pointer text-[12px] text-zinc-500 underline underline-offset-2 hover:text-zinc-300">
+          Keluar preview
+        </button>
+      </div>
+    );
+  }
 
   if (!pengguna) return null;
 
