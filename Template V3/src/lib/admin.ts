@@ -583,6 +583,17 @@ export function usePermintaanLisensi(): Hasil<PermintaanLisensi[]> {
 export const putuskanLisensi = (id: string, tindakan: 'setujui' | 'tolak', kode?: string) =>
   kirim('/api/lisensi/permintaan/putuskan', { id, tindakan, ...(kode ? { kode } : {}) });
 
+/** Buang catatan permintaan dari daftar — dipakai membersihkan email uji
+ *  yang sudah terpakai, karena satu email hanya boleh punya satu
+ *  permintaan aktif.
+ *
+ *  TIDAK mencabut lisensi. Keduanya hidup di daftar berbeda di backend, dan
+ *  jawaban rutenya membawa `lisensiMasihAktif` supaya layar bisa
+ *  mengatakannya — orang yang menghapus catatan sering mengira aksesnya
+ *  ikut hilang, dan ia berhak tahu bahwa tidak. */
+export const hapusPermintaanLisensi = (id: string): Promise<{ email?: string; lisensiMasihAktif?: boolean }> =>
+  kirim('/api/lisensi/permintaan/hapus', { id }) as Promise<{ email?: string; lisensiMasihAktif?: boolean }>;
+
 /** Kirim permintaan aktivasi. Butuh login — emailnya diambil backend dari
  *  ID token yang sudah diverifikasi, bukan dari kiriman halaman ini. */
 export async function mintaLisensi(p: { produk: string; nama?: string; catatan?: string; bukti?: string }) {

@@ -7,7 +7,7 @@ import { useProduk, simpanKatalogProduk } from '@/lib/data';
 import { unggahGambar, keDataUrl, useLisensi, cabutLisensi } from '@/lib/admin';
 import { tanggalPendek } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
-import { PanelLisensi } from '@/components/panel-lisensi';
+import { PanelLisensi, LencanaJenis, namaProduk } from '@/components/panel-lisensi';
 import { PanelSetelanAkses } from '@/components/panel-setelan-akses';
 import { PanelTrafikSistem } from '@/components/panel-trafik-sistem';
 import { PanelKesehatan } from '@/components/panel-kesehatan';
@@ -87,29 +87,32 @@ function PanelLisensiAktif() {
             data={urut}
             kosong={null}
             render={(l, no) => (
+              /* Bentuk kartunya DISAMAKAN dengan panel Permintaan di
+                 sebelahnya: susunan baris yang sama, padding yang sama,
+                 dan penanda jenis di tempat yang sama. Sebelumnya kartu
+                 di sini jauh lebih pendek dan isinya berbeda urutan, jadi
+                 dua panel bersebelahan terbaca seperti dua daftar yang
+                 tidak berhubungan.
+
+                 Yang paling menentukan: EMAIL naik jadi baris utama,
+                 menggantikan sidik. Sidik itu kunci basis data — yang
+                 dicari mata di panel ini adalah SIAPA, bukan hash-nya. */
               <div key={l.sidik} className="rounded-lg border border-zinc-800/60 p-3">
-                {/* Sama seperti panel permintaan: tanpa flex-wrap, kiri yang
-                    mengalah. Tombol Cabut harus selalu di tempat yang sama —
-                    tombol yang berpindah baris tergantung panjang email
-                    adalah tombol yang salah pencet. */}
                 <div className="flex items-start justify-between gap-3">
-                  <div className="flex min-w-0 flex-1 items-start gap-2">
-                    <NomorBaris no={no} className="mt-0.5" />
-                    <div className="min-w-0">
-                      <div className="angka truncate text-[12.5px] text-zinc-300">{l.sidik}</div>
-                      <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11px] text-zinc-500">
-                        <span className="text-zinc-400">{l.produk || '—'}</span>
-                        <span>· {l.tgl ? tanggalPendek(l.tgl) : '—'}</span>
-                      </div>
-                      {l.catatan && (
-                        <div title={l.catatan} className="mt-1 line-clamp-2 text-[11.5px] text-zinc-500">
-                          {l.catatan}
-                        </div>
-                      )}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <NomorBaris no={no} />
+                      <span className="truncate text-[13px] text-zinc-200">{l.catatan || l.sidik}</span>
                     </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11.5px] text-zinc-500">
+                      <LencanaJenis slug={l.produk || ''} />
+                      <span className="text-zinc-400">{namaProduk(l.produk || '')}</span>
+                      <span>· {l.tgl ? tanggalPendek(l.tgl) : '—'}</span>
+                    </div>
+                    <div className="angka mt-1 truncate text-[11px] text-zinc-600">sidik {l.sidik}</div>
                   </div>
                   <button onClick={() => void cabut(l.sidik)} disabled={sibuk === l.sidik}
-                    className="shrink-0 cursor-pointer rounded border border-zinc-800 px-2 py-0.5 text-[11px] text-zinc-400 transition-colors hover:border-red-500/40 hover:text-red-400 disabled:opacity-50">
+                    className="shrink-0 cursor-pointer rounded-md border border-zinc-800 px-2.5 py-1.5 text-[12px] text-zinc-400 transition-colors hover:border-red-500/40 hover:text-red-400 disabled:opacity-50">
                     {sibuk === l.sidik ? 'Mencabut…' : 'Cabut'}
                   </button>
                 </div>
@@ -429,9 +432,21 @@ export default function Maintenance() {
           Baru dua kolom di layar lebar (xl). Di bawah itu keduanya butuh
           lebar penuh: masing-masing memuat email, produk, tanggal, dan
           tombol dalam satu baris. */}
+      {/* Jarak vertikal DIUKUR, bukan dikira-kira. Sebelumnya panel setelan
+          menempel langsung ke grid di bawahnya — terukur 0 px, dan itulah
+          "panel dempet" yang dilaporkan: induknya tidak memasang jarak
+          apa pun antar-anak.
+
+          mb-5 (20 px) dipilih supaya SAMA dengan gap-5 antar kolom, jadi
+          jarak mendatar dan menurun sepadan. Ini penting justru karena
+          panel setelan adalah FORMULIR yang diakhiri tombol Simpan:
+          tombol yang berdempetan dengan kotak di bawahnya terbaca seolah
+          milik kotak itu. */}
       {tab === 'akses' && (<>
-        <PanelSetelanAkses />
-        <div className="grid gap-4 xl:grid-cols-2">
+        <div className="mb-5">
+          <PanelSetelanAkses />
+        </div>
+        <div className="grid gap-5 xl:grid-cols-2">
           <PanelLisensi />
           <PanelLisensiAktif />
         </div>

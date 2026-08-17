@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, X, RefreshCw, Copy, KeyRound, ShieldAlert } from 'lucide-react';
+import { Check, X, RefreshCw, Copy, KeyRound, ShieldAlert, Trash2, Globe, Package } from 'lucide-react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { DaftarLipat, NomorBaris } from '@/components/daftar-lipat';
 import { useKuota } from '@/lib/akses';
@@ -13,9 +13,34 @@ const NAMA_PRODUK: Record<string, string> = {
   'ea-jaditradersync': 'EA JadiTraderSync',
   'indikator-v3': 'Indikator Jadi Trader V3',
 };
-function namaProduk(slug: string) { return NAMA_PRODUK[slug] ?? slug; }
+export function namaProduk(slug: string) { return NAMA_PRODUK[slug] || 'Tanpa produk'; }
+
+/* ── DUA JENIS LISENSI YANG SELAMA INI TERCAMPUR ─────────────────────────
+   `jadi-trader-v3` membuka SITUS — ia yang menentukan seseorang bisa masuk
+   atau tidak. Slug lain adalah barang di Marketplace: EA dan indikator,
+   yang diunduh dan dipasang di MetaTrader atau TradingView, dan sama sekali
+   tidak menyentuh gerbang situs.
+
+   Keduanya tampil dalam satu daftar dengan bentuk yang sama, dan itu
+   membuat panel ini sulit dibaca: mencabut satu baris bisa berarti
+   "orang ini tidak bisa login lagi" atau "orang ini kehilangan EA-nya",
+   dan sebelum ini tidak ada apa pun di layar yang membedakannya. */
+export function jenisLisensi(slug: string): 'situs' | 'produk' {
+  return slug === 'jadi-trader-v3' ? 'situs' : 'produk';
+}
+
+export function LencanaJenis({ slug }: { slug: string }) {
+  const situs = jenisLisensi(slug) === 'situs';
+  return (
+    <span className={cn('inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium',
+      situs ? 'bg-sky-500/12 text-sky-300' : 'bg-violet-500/12 text-violet-300')}>
+      {situs ? <Globe className="size-2.5" /> : <Package className="size-2.5" />}
+      {situs ? 'Akses situs' : 'Produk'}
+    </span>
+  );
+}
 import { cn, tanggalPendek } from '@/lib/utils';
-import { usePermintaanLisensi, putuskanLisensi } from '@/lib/admin';
+import { usePermintaanLisensi, putuskanLisensi, hapusPermintaanLisensi } from '@/lib/admin';
 
 /* ════════════════════════════════════════════════════════════════════════
    PERMINTAAN LISENSI — panel pemilik
@@ -58,6 +83,28 @@ export function PanelLisensi() {
       setPesan(tindakan === 'setujui'
         ? `Disetujui. Kode ${j.kode} sudah aktif — salin dan kirim ke pembeli.`
         : 'Permintaan ditolak.');
+      muatUlang();
+    } catch (e) {
+      setPesan('Gagal: ' + (e instanceof Error ? e.message : 'tidak diketahui'));
+    } finally { setSibuk(''); }
+  }
+
+  /* Menghapus CATATANNYA, bukan mencabut aksesnya. Konfirmasinya menyebut
+     perbedaan itu di muka — dua tindakan yang bunyinya mirip tapi
+     akibatnya jauh berbeda, dan yang satu tidak bisa dibatalkan. */
+  async function hapus(id: string, email: string) {
+    if (!confirm(
+      `Hapus catatan permintaan dari ${email || 'akun ini'}?\n\n` +
+      'Yang dihapus HANYA catatannya, supaya email itu bisa dipakai meminta akses lagi. ' +
+      'Lisensi yang sudah aktif TIDAK ikut dicabut — untuk itu pakai tombol Cabut di panel Lisensi Aktif.\n\n' +
+      'Tidak bisa dibatalkan.',
+    )) return;
+    setSibuk(id); setPesan('');
+    try {
+      const j = await hapusPermintaanLisensi(id);
+      setPesan(j.lisensiMasihAktif
+        ? `Catatan ${j.email || ''} dihapus. Lisensinya MASIH aktif — cabut dari panel Lisensi Aktif kalau memang mau ditutup.`
+        : `Catatan ${j.email || ''} dihapus. Email itu bisa dipakai meminta akses lagi.`);
       muatUlang();
     } catch (e) {
       setPesan('Gagal: ' + (e instanceof Error ? e.message : 'tidak diketahui'));
@@ -135,7 +182,8 @@ export function PanelLisensi() {
                       {x.status}
                     </span>
                   </div>
-                  <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11.5px] text-zinc-500">
+                  <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11.5px] text-zinc-500">
+                    <LencanaJenis slug={x.produk} />
                     <span className="text-zinc-400">{namaProduk(x.produk)}</span>
                     {x.jenis && (
                       <span className={cn('rounded px-1.5 py-0.5 text-[10px]',
@@ -202,6 +250,27 @@ export function PanelLisensi() {
                       <KeyRound className="size-3.5" /> tanpa kode
                     </span>
                   )}
+
+                  {/* Hapus catatan — tersedia untuk SEMUA status, termasuk
+                      yang masih 'baru'. Sengaja: permintaan uji sering tidak
+                      pernah diputus sama sekali, dan kalau tombolnya cuma
+                      muncul sesudah disetujui/ditolak, satu-satunya cara
+                      membersihkannya adalah memutuskan sesuatu yang tidak
+                      ingin diputuskan.
+
+                      Ikon polos tanpa teks, dan warnanya baru menyala saat
+                      disentuh: tindakan yang tidak bisa dibatalkan tidak
+                      boleh sama menonjolnya dengan Setujui, yang ada di
+                      baris yang sama. */}
+                  <button
+                    onClick={() => void hapus(x.id, x.email || '')}
+                    disabled={!!sibuk}
+                    title="Hapus catatan permintaan (tidak mencabut lisensi)"
+                    aria-label="Hapus catatan permintaan"
+                    className="cursor-pointer rounded-md p-1.5 text-zinc-600 transition-colors hover:bg-red-500/10 hover:text-red-400 disabled:opacity-40"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </button>
                 </div>
               </div>
             </div>
