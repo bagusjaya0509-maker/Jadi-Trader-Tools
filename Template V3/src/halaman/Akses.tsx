@@ -155,7 +155,7 @@ export default function Akses() {
             Jadi Trader <span className="text-zinc-400">Tools</span>
           </div>
           <p className="mt-1.5 max-w-[34ch] text-[12.5px] leading-relaxed text-zinc-400">
-            Chart, screener, jurnal, dan eksekusi ke Binance serta MetaTrader 5 di satu layar.
+            Chart, screener, jurnal, dan eksekusi Pasar Kripto &amp; Forex di satu layar.
           </p>
         </div>
       </div>

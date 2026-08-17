@@ -120,16 +120,35 @@ const FlowArt: React.FC<FlowArtProps> = ({
         if (!inner) return;
 
         if (i > 0) {
-          gsap.set(inner, { rotation: 30, transformOrigin: 'bottom left' });
+          /* force3D + backface: memaksa panel ini jadi lapisan GPU sendiri.
+             Tanpa itu peramban me-raster ulang seluruh kotak tiap kali
+             sudutnya berubah — di ponsel itu yang paling mahal, dan
+             bingkai yang jatuh terlihat sebagai getar. */
+          gsap.set(inner, {
+            rotation: 30, transformOrigin: 'bottom left',
+            force3D: true, backfaceVisibility: 'hidden',
+          });
           const tween = gsap.to(inner, {
             rotation: 0,
             ease: 'none',
+            force3D: true,
             scrollTrigger: {
               scroller,
               trigger: section,
               start: 'top bottom',
               end: 'top 25%',
-              scrub: true,
+              /* ── KENAPA 0,4 DAN BUKAN `true` ────────────────────────────
+                 `scrub: true` memetakan sudut LANGSUNG ke posisi gulir.
+                 Di desktop mulus karena guliran datang halus, tapi di
+                 ponsel guliran sampai sebagai lompatan besar yang jarang —
+                 dan tiap lompatan jadi patahan rotasi yang terlihat
+                 sebagai getar pada gambar yang sedang naik.
+
+                 Angka (detik) menyuruh GSAP MENGEJAR posisi itu, bukan
+                 menempel padanya: lompatan gulir diserap jadi gerak
+                 pendek yang halus. 0,4 cukup untuk meredam tanpa membuat
+                 panelnya terasa terlambat mengikuti jari. */
+              scrub: 0.4,
             },
           });
           if (tween.scrollTrigger) triggers.push(tween.scrollTrigger);
