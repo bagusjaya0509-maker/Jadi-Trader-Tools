@@ -242,13 +242,28 @@ export function PitaLangganan() {
      TIDAK bisa ditutup. Tombol tutup pada keterangan sepenting ini adalah
      tombol untuk melupakan bahwa yang dilihat bukan kenyataan. */
   if (!pengguna && modePreview()) {
+    /* ── Kenapa `basis-full` di ponsel, bukan sekadar `flex-wrap` ────────
+       Dulu barisnya `flex-wrap` dengan teks ber-`flex-1`, dan itu tidak
+       pernah membungkus: `flex-1` membuat teksnya boleh MENYUSUT tanpa
+       batas, jadi tombol-tombolnya selalu "muat" di baris yang sama dan
+       teksnya terperas jadi kolom selebar dua-tiga kata — satu kalimat
+       jadi belasan baris di layar ponsel.
+
+       `basis-full` memberi teks lebar dasar 100%, jadi tombolnya TERPAKSA
+       turun ke baris berikutnya. Di sm ke atas dikembalikan ke satu baris
+       (`sm:basis-0` + flex-1), karena di sana ruangnya memang cukup. */
     return (
-      <div className="flex flex-wrap items-center gap-3 border-b border-sky-500/25 bg-sky-500/[0.07] px-4 py-2.5 text-[12.5px]">
-        <Eye className="size-4 shrink-0 text-sky-300" strokeWidth={2} />
-        <span className="flex-1 text-zinc-300">
-          <span className="font-medium text-sky-200">Mode preview</span> — kamu sedang menjelajah
-          website yang sesungguhnya, tapi seluruh angkanya <b>data contoh</b>. Berpindah halaman
-          bebas; menyimpan perubahan baru bisa setelah masuk.
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-sky-500/25 bg-sky-500/[0.07] px-4 py-2.5 text-[12.5px]">
+        <span className="flex min-w-0 flex-1 basis-full items-start gap-2.5 sm:basis-0 sm:items-center">
+          {/* mt-0.5 hanya di ponsel: di sana teksnya banyak baris, dan ikon
+              yang dipusatkan terhadap blok tinggi terbaca melayang di
+              tengah alinea alih-alih menandai awalnya. */}
+          <Eye className="mt-0.5 size-4 shrink-0 text-sky-300 sm:mt-0" strokeWidth={2} />
+          <span className="text-zinc-300">
+            <span className="font-medium text-sky-200">Mode preview</span> — kamu sedang menjelajah
+            website yang sesungguhnya, tapi seluruh angkanya <b>data contoh</b>. Berpindah halaman
+            bebas; menyimpan perubahan baru bisa setelah masuk.
+          </span>
         </span>
         <Link to="/pratinjau"
           className="rounded-md bg-zinc-100 px-3 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white">
