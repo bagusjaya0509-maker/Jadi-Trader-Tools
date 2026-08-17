@@ -94,6 +94,18 @@ export function MenuPengguna() {
     return <span className="size-7 shrink-0 animate-pulse rounded-full bg-zinc-800" aria-hidden />;
   }
 
+  /* MODE PREVIEW: tidak ada tombol masuk di pojok ini.
+     ──────────────────────────────────────────────────────────────────────
+     Bukan sekadar kerapian. `TombolMasuk` menggambar DUA tombol bertumpuk
+     (Google lalu Discord), sementara bilah atas ini setinggi satu baris —
+     jadi yang kedua meluber ke bawah dan menindih panel di halaman. Yang
+     terlihat orangnya: dua kotak putih melayang di atas isinya.
+
+     Ajakan masuk tidak hilang, cuma pindah ke tempat yang benar: pita
+     preview tepat di bawah bilah ini sudah membawa "Coba dengan akunku",
+     lengkap dengan kalimat yang menjelaskan kenapa. Satu ajakan yang
+     dijelaskan mengalahkan dua tombol telanjang di pojok. */
+  if (!pengguna && modePreview()) return null;
   if (!pengguna) return <TombolMasuk />;
 
   const huruf = (pengguna.displayName || pengguna.email || '?').trim()[0].toUpperCase();

@@ -8,6 +8,7 @@ import { useAuth } from '@/lib/auth';
 import { usePosisiBinance, type OrderBursa } from '@/lib/admin';
 import {
   RIWAYAT, POSISI_TERBUKA, SALDO_AWAL, PRODUK,
+  POSISI_KRIPTO_CONTOH, PENDING_KRIPTO_CONTOH, STOP_KRIPTO_CONTOH,
   type Trade, type Posisi, type Sumber, type Produk,
 } from '@/data/contoh';
 
@@ -337,6 +338,27 @@ export function usePosisi(): HasilData<Posisi[]> & { pending: OrderBursa[]; stop
           };
     });
   }, [aktif, bursa, data]);
+
+  /* ── PENGUNJUNG TANPA SESI melihat contoh, bukan sisa milik pemilik ────
+     `public/posisiTerbuka` memang sengaja publik, dan dulu itu yang
+     ditampilkan ke pengunjung. Masalahnya isinya satu-dua baris posisi
+     pemilik yang kebetulan sedang jalan — sementara panel Trade-Fi di
+     sebelahnya sudah punya tiga posisi dan dua pending dari contoh MT5.
+     Panel kembar yang timpang isinya terbaca sebagai fitur setengah jadi,
+     dan itu kesan pertama satu-satunya yang dibawa orang.
+
+     Cabangnya menunggu `memuatAuth` selesai. Tanpa itu, pemilik yang
+     menyegarkan halaman melihat kedipan data contoh selama ~300 ms
+     pertama, sebelum Firebase memulihkan sesinya dari IndexedDB.
+
+     Yang SUDAH masuk sama sekali tidak lewat sini — dokumen publik dan
+     bursanya tetap jalan seperti biasa. */
+  if (!memuatAuth && !pengguna) {
+    return {
+      data: POSISI_KRIPTO_CONTOH, pending: PENDING_KRIPTO_CONTOH, stop: STOP_KRIPTO_CONTOH,
+      memuat: false, contoh: true, galat: null,
+    };
+  }
 
   /* `contoh` berarti "ini bukan datamu, ini contoh". Dokumen publik itu data
      sungguhan, jadi labelnya hanya muncul kalau dokumennya memang belum ada. */

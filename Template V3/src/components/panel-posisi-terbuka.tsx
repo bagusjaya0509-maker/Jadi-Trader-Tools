@@ -11,6 +11,7 @@ import { simbolDasarMt5 } from '@/lib/simbol';
 import { cariStopNyasar } from '@/lib/stop-nyasar';
 import { batalPendingNyata } from '@/lib/order-nyata';
 import { useOrderSementara, sapuYangSudahAda } from '@/lib/order-sementara';
+import { barisPendingKripto, rencanaLokal } from '@/lib/pending-kripto';
 
 /* ════════════════════════════════════════════════════════════════════════
    POSISI TERBUKA — dipindah dari Jurnal ke Chart & Backtest
@@ -62,7 +63,7 @@ export function PanelPosisiTerbuka({ sumber, onSunting, onTutup }: {
    *  sendiri, bukan menumpang klik baris yang sama dengan "lihat di chart". */
   onTutup?: (o: OrderSunting) => void;
 }) {
-  const { data: posisiKripto, pending: pendingKripto, stop: stopKripto } = usePosisi();
+  const { data: posisiKripto, pending: pendingKripto, stop: stopKripto, contoh: kriptoContoh } = usePosisi();
   const mt5 = useAkunMt5();
 
   /* ── Order yang baru saja dikirim, belum terlihat di bursa ────────────
@@ -88,53 +89,23 @@ export function PanelPosisiTerbuka({ sumber, onSunting, onTutup }: {
      berikut liveOrderId dari jawaban Binance. Inilah satu-satunya tempat
      rencana itu hidup selama entry-nya belum terisi — di bursa BELUM ada
      apa-apa, karena Binance menolak order reduceOnly tanpa posisi. */
-  const rencanaLokal = useMemo(() => {
-    const peta = new Map<string, { sl: number; tp: number }>();
-    if (sumber !== 'kripto') return peta;
-    try {
-      const s = JSON.parse(localStorage.getItem('emaScreenerPrioritySim_v1') ?? '{}');
-      for (const rec of Object.values<Record<string, unknown>>(s.positions ?? {})) {
-        if (!rec || typeof rec !== 'object') continue;
-        const id = rec.liveOrderId;
-        if (id == null) continue;
-        peta.set(String(id), { sl: Number(rec.sl) || 0, tp: Number(rec.tp1) || 0 });
-      }
-    } catch { /* localStorage privat/rusak — tampil tanpa rencana */ }
-    return peta;
+  const rencana = useMemo(
+    () => (sumber === 'kripto' ? rencanaLokal() : new Map()),
     /* pendingKripto sebagai kunci: daftar berubah = mungkin ada order
        baru yang rencananya baru saja ditulis. */
-  }, [sumber, pendingKripto]);
+    [sumber, pendingKripto],
+  );
 
   /* Order menggantung dari DUA pasar, disamakan bentuknya di sini.
      Keduanya menjawab pertanyaan yang sama — "order-ku sampai atau
      tidak?" — jadi keduanya pantas tampil dengan cara yang sama, walau
-     satuannya beda: kripto memakai jumlah koin, MT5 memakai lot. */
+     satuannya beda: kripto memakai jumlah koin, MT5 memakai lot.
+
+     Sisi kripto dipetakan lib/pending-kripto.ts, bukan di sini: Dashboard
+     memakai baris yang sama persis, dan dua salinan pemetaan sudah pernah
+     menyimpang — yang satu menampilkan SL/TP, yang lain tidak. */
   const pending = sumber === 'kripto'
-    ? pendingKripto.map((o) => {
-        /* SL/TP dicari dari simbol yang sama — di bursa ia order
-           terpisah, bukan bagian dari order entry ini. Yang terdekat ke
-           harga entry yang ditampilkan. */
-        const sl = stopKripto.filter((x) => x.simbol === o.simbol && x.jenis === 'SL')
-          .sort((a, b) => Math.abs(a.pemicu - o.harga) - Math.abs(b.pemicu - o.harga))[0];
-        const tp = stopKripto.filter((x) => x.simbol === o.simbol && x.jenis === 'TP')
-          .sort((a, b) => Math.abs(a.pemicu - o.harga) - Math.abs(b.pemicu - o.harga))[0];
-        /* Bursa tidak punya SL/TP untuk entry yang masih menggantung —
-           Binance menolak order reduceOnly selama posisinya belum ada.
-           RENCANANYA ada di catatan lokal yang ditulis saat order
-           dikirim. Ditampilkan sebagai rencana, dengan label yang
-           mengatakannya: menuliskannya tanpa keterangan membuat orang
-           mengira stopnya sudah hidup di bursa, padahal baru dipasang
-           saat entry-nya terisi. */
-        const rencana = !sl && !tp ? rencanaLokal.get(String(o.id)) : undefined;
-        return {
-          kunci: o.id, simbol: o.simbol, arah: o.arah,
-          ukuran: o.qty.toLocaleString('id-ID', { maximumFractionDigits: 4 }),
-          jenis: o.tipe.replace('_MARKET', ' Stop').replace('LIMIT', 'Limit'),
-          harga: o.pemicu || o.harga,
-          sl: sl?.pemicu ?? rencana?.sl ?? 0, tp: tp?.pemicu ?? rencana?.tp ?? 0,
-          rencana: !!rencana,
-        };
-      })
+    ? barisPendingKripto(pendingKripto, stopKripto, rencana)
     /* Yang paling BARU dipasang di atas. Order pending dibuat berurutan
        waktu, dan yang baru saja dikirim adalah yang sedang dipikirkan —
        menaruhnya di ekor daftar berarti ia harus dicari dulu. */
@@ -195,7 +166,13 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
      menulis "+0.00%", yang terbaca sebagai "harga tidak bergerak"
      padahal artinya "harganya tidak kita ketahui". Salah satu dari dua
      itu bohong; yang jujur adalah mengambil harganya. */
-  const hargaPasar = useHargaPasar(sumber === 'kripto' ? posisiKripto.map((p) => p.simbol) : []);
+  /* KECUALI untuk data contoh. Baris contoh sudah membawa hargaKini dan
+     pnlFloat yang saling cocok; menimpanya dengan harga bursa yang
+     sesungguhnya membuat kolom Gerak menghitung selisih antara harga hari
+     ini dan entry karangan — persentase yang tidak berarti apa-apa, dan
+     satu permintaan jaringan untuk menghasilkannya. */
+  const hargaPasar = useHargaPasar(
+    sumber === 'kripto' && !kriptoContoh ? posisiKripto.map((p) => p.simbol) : []);
 
   /* ── Risiko & target dalam DOLAR ───────────────────────────────────
      SL dan TP sebagai harga cuma bisa dinilai orang yang hafal ukuran
@@ -222,7 +199,13 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
           kunci: p.id, simbol: p.simbol, arah: p.arah,
           ket: p.tf && p.tf !== '—' ? p.tf : p.venue,
           ukuran: p.jumlah ? p.jumlah.toLocaleString('id-ID', { maximumFractionDigits: 4 }) : '',
-          entry: p.entry, hargaKini: hargaPasar[p.simbol], sl: p.sl, tp: p.tp,
+          /* Data nyata: HANYA harga pasar. `p.hargaKini` dari dokumen publik
+             selalu sama dengan entry, jadi memakainya sebagai cadangan akan
+             menulis "+0,00%" — yang terbaca "harga tidak bergerak" padahal
+             artinya "harganya tidak kita ketahui". Contoh punya harganya
+             sendiri dan memang boleh dipakai. */
+          entry: p.entry, hargaKini: kriptoContoh ? p.hargaKini : hargaPasar[p.simbol],
+          sl: p.sl, tp: p.tp,
           pnl: p.pnlFloat,
           ukuranUsd: unit > 0 && p.entry > 0 ? unit * p.entry : undefined,
           risikoUsd: uangDari(p.sl > 0 ? Math.abs(p.entry - p.sl) : 0, unit),

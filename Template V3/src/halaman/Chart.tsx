@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import {
   Play, Loader2, RefreshCw, Radio, TriangleAlert, History,
   Layers, ChevronDown, Settings2, Code2, X, Ruler, Rows3, Square, Eraser, Minus, TrendingUp,
@@ -33,6 +33,8 @@ import {
   type Setelan, type HasilUji,
 } from '@/lib/backtest';
 import { SIMBOL_DASAR, simbolDasarMt5 } from '@/lib/simbol';
+import { useAuth } from '@/lib/auth';
+import { modePreview, jatahReplayTerpakai, pakaiJatahReplay } from '@/lib/preview';
 
 /* ════════════════════════════════════════════════════════════════════════
    CHART & BACKTEST
@@ -244,6 +246,22 @@ export default function ChartBacktest() {
      Tanpa ini klik di chart sesudahnya masih dianggap membidik dan
      melempar posisi replay yang sudah berjalan. */
   useEffect(() => { if (replayIdx !== null) setBidikReplay(false); }, [replayIdx]);
+
+  /* ── Jatah replay untuk pengunjung preview ────────────────────────────
+     `!pengguna` bukan pelengkap: penanda preview hidup di sessionStorage
+     dan bisa TERTINGGAL di tab yang sama setelah orangnya masuk. Membaca
+     modePreview() saja akan membatasi replay milik pelanggan yang sudah
+     membayar — kegagalan yang paling mahal dari dua kemungkinan salah. */
+  const { pengguna } = useAuth();
+  const tamuPreview = modePreview() && !pengguna;
+  const [kabarReplay, setKabarReplay] = useState('');
+  /* Jatahnya ditandai terpakai saat replay BENAR-BENAR mulai, bukan saat
+     tombolnya ditekan. Menekan Replay cuma menyalakan mode bidik, dan
+     orang yang membatalkannya sebelum memilih titik belum melihat apa pun —
+     menghabiskan jatahnya di situ adalah hukuman untuk keragu-raguan. */
+  useEffect(() => {
+    if (tamuPreview && replayIdx !== null) pakaiJatahReplay();
+  }, [tamuPreview, replayIdx]);
   const [garisHarga, setGarisHarga] = useState<GarisHarga[]>([]);
   /* Panel Backtest tertutup saat halaman dibuka. Ia beta, dan yang beta
      tidak boleh menempati ruang tetap di layar seolah sudah matang. */
@@ -2029,9 +2047,20 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                    Selain itu -> mulai membidik. Satu tombol, tiga keadaan
                    yang saling berurutan, jadi tidak perlu tombol kedua. */
                 if (replayIdx !== null) { setReplayIdx(null); setBidikReplay(false); return; }
+                /* Pengunjung preview: satu putaran, lalu tombolnya menjelaskan
+                   diri sendiri alih-alih diam. Tombol mati tanpa kalimat
+                   terbaca sebagai halaman rusak, bukan sebagai batas yang
+                   disengaja — dan yang perlu tahu justru orang yang baru saja
+                   menyukai fiturnya. */
+                if (tamuPreview && jatahReplayTerpakai()) {
+                  setKabarReplay('Replay di mode preview berlaku sekali. Masuk untuk memakainya sepuasnya — sesi latihanmu ikut tersimpan ke jurnal.');
+                  return;
+                }
+                setKabarReplay('');
                 setBidikReplay((v) => !v);
               }}
               title={replayIdx !== null ? 'Keluar dari replay'
+                : tamuPreview && jatahReplayTerpakai() ? 'Replay preview sudah terpakai — masuk untuk memakainya lagi'
                 : bidikReplay ? 'Batal memilih titik mulai'
                 : 'Pilih titik mulai replay — klik di chart'}
               className={cn('flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border px-2 py-1.5 text-[12px] transition-colors sm:px-2.5',
@@ -2065,6 +2094,22 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
           <div className="flex items-start gap-2 border-t border-zinc-800/80 px-4 py-3">
             <TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-500" />
             <span className="text-[12.5px] text-amber-200/90">{galat}</span>
+          </div>
+        )}
+
+        {/* Batas jatah replay — diletakkan tepat di bawah tombolnya, bukan
+            sebagai popup. Yang baru saja ditekan ada di baris atas, dan
+            jawabannya pantas muncul di tempat mata sudah berada. */}
+        {kabarReplay && (
+          <div className="flex flex-wrap items-center gap-2.5 border-t border-sky-500/20 bg-sky-500/[0.05] px-4 py-3">
+            <History className="size-4 shrink-0 text-sky-300" strokeWidth={2} />
+            <span className="flex-1 text-[12.5px] leading-relaxed text-sky-100/90">{kabarReplay}</span>
+            <Link to="/pratinjau"
+              className="rounded-md bg-zinc-100 px-3 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white">
+              Masuk
+            </Link>
+            <button onClick={() => setKabarReplay('')} aria-label="Tutup"
+              className="cursor-pointer px-1 text-zinc-500 transition-colors hover:text-zinc-300">✕</button>
           </div>
         )}
 

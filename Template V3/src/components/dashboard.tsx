@@ -15,6 +15,7 @@ import { useAkunMt5, useAkunBinance, versiKurangDari, VERSI_EA_PENDING } from '@
 import { useArusKas, arusBersih } from '@/lib/tulis-jurnal';
 import { PanelEvaluasi } from '@/components/panel-evaluasi';
 import { TabelPosisi } from '@/components/tabel-posisi';
+import { barisPendingKripto, rencanaLokal } from '@/lib/pending-kripto';
 import { bacaSpekMt5 } from '@/lib/pasar';
 import { simbolDasarMt5 } from '@/lib/simbol';
 
@@ -88,9 +89,18 @@ function TipBulan({ active, payload }: { active?: boolean; payload?: { payload: 
 
 export function Dashboard() {
   const { data: RIWAYAT, contoh } = useRiwayat();
-  const { data: posisiMentah, pending: ORDER_PENDING } = usePosisi();
-  const hargaPasar = useHargaPasar(posisiMentah.map((p) => p.simbol));
+  const { data: posisiMentah, pending: pendingMentah, stop: stopKripto, contoh: kriptoContoh } = usePosisi();
+  /* Harga bursa TIDAK diambil untuk data contoh: barisnya sudah membawa
+     hargaKini dan pnlFloat yang saling cocok, dan menimpanya dengan harga
+     hari ini membuat kolom Gerak menghitung selisih terhadap entry karangan. */
+  const hargaPasar = useHargaPasar(kriptoContoh ? [] : posisiMentah.map((p) => p.simbol));
   const POSISI_TERBUKA = posisiMentah.map((p) => ({ ...p, hargaKini: hargaPasar[p.simbol] ?? p.hargaKini }));
+  /* Baris pending dipetakan lib/pending-kripto.ts — pemetaan yang SAMA
+     dengan panel Posisi Terbuka di Chart & Entry. Sebelumnya panel ini
+     memetakan sendiri dan hasilnya berbeda: SL/TP tidak pernah tampil di
+     sini, padahal panel Trade-Fi tepat di sebelahnya menampilkannya. */
+  const rencana = useMemo(() => rencanaLokal(), [pendingMentah]);
+  const ORDER_PENDING = barisPendingKripto(pendingMentah, stopKripto, rencana);
   const saldoAwal = useSaldoAwal();
 
   /* SETORAN & PENARIKAN ikut dihitung, persis seperti di halaman Jurnal.
@@ -384,23 +394,45 @@ export function Dashboard() {
                   <Clock className="size-3" strokeWidth={2} />
                   Menunggu harga · {ORDER_PENDING.length} order
                 </div>
-                {/* Empat baris terlihat, sisanya digulir — sama aturannya
-                    dengan daftar pending Trade-Fi di sebelah. */}
-                <div className="gulir-senyap max-h-[213px] divide-y divide-zinc-800/60 overflow-y-auto">
+                {/* Susunannya SAMA PERSIS dengan pending Trade-Fi di panel
+                    sebelah: simbol + jenis + ukuran di kiri, harga di kanan,
+                    SL/TP di baris keterangan. Dulu di sini cuma qty dan harga,
+                    dan dua panel berdampingan yang menjawab pertanyaan sama
+                    dengan isi berbeda memaksa orang menebak mana yang benar.
+
+                    Enam baris terlihat, sisanya digulir — tingginya kelipatan
+                    tinggi baris dua-baris teks, sama seperti daftar Trade-Fi. */}
+                <div className="gulir-senyap max-h-[320px] divide-y divide-zinc-800/60 overflow-y-auto">
                   {ORDER_PENDING.map((o) => (
-                    <div key={o.id} className="flex items-baseline justify-between gap-2 py-1.5">
-                      <div className="min-w-0">
-                        <span className="text-[12.5px] text-zinc-300">{o.simbol.replace('USDT', '')}</span>
-                        <span className={cn('ml-1.5 text-[10.5px]',
-                          o.arah === 'BUY' ? 'text-emerald-500' : 'text-red-400')}>{o.arah}</span>
-                        <span className="ml-1.5 text-[10.5px] text-zinc-600">
-                          {o.tipe.replace('_MARKET', ' Stop').replace('LIMIT', 'Limit')}
-                        </span>
+                    <div key={o.kunci} className="py-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <span className="truncate text-[12.5px] text-zinc-200">{o.simbol.replace('USDT', '')}</span>
+                          <span className={cn('text-[10.5px]',
+                            o.arah === 'BUY' ? 'text-emerald-500' : 'text-red-400')}>
+                            {o.arah} {o.jenis}
+                          </span>
+                          <span className="angka shrink-0 text-[11px] text-zinc-600">{o.ukuran}</span>
+                        </div>
+                        <span className="angka shrink-0 text-[12.5px] text-amber-400/90">{harga(o.harga)}</span>
                       </div>
-                      <div className="angka shrink-0 text-[11.5px] text-zinc-500">
-                        {o.qty.toLocaleString('id-ID', { maximumFractionDigits: 4 })} @{' '}
-                        <span className="text-amber-400/90">{harga(o.pemicu || o.harga)}</span>
-                      </div>
+                      {/* Ditulis hanya kalau ordernya memang membawanya, dan
+                          label "rencana" wajib ikut kalau stopnya baru catatan
+                          lokal: angka tanpa keterangan terbaca sebagai stop
+                          yang sudah hidup di bursa, padahal ia baru dipasang
+                          saat entry-nya terisi. */}
+                      {(o.sl > 0 || o.tp > 0) && (
+                        <div className="mt-0.5 flex flex-wrap items-center gap-x-4 text-[10.5px] text-zinc-600">
+                          <span>SL <span className="angka text-red-400/80">{o.sl ? harga(o.sl) : '—'}</span></span>
+                          <span>TP <span className="angka text-emerald-500/80">{o.tp ? harga(o.tp) : '—'}</span></span>
+                          {o.rencana && (
+                            <span className="rounded bg-zinc-800/80 px-1.5 py-px text-[9.5px] text-zinc-500"
+                                  title="Stop sungguhan baru dipasang di Binance begitu entry-nya terisi.">
+                              rencana
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

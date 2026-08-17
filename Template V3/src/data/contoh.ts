@@ -14,6 +14,11 @@
    ada VPS — sesuai permintaan, ini murni tampilan.
    ════════════════════════════════════════════════════════════════════════ */
 
+/* Impor TIPE saja — dihapus seluruhnya saat kompilasi, jadi berkas ini
+   tetap daun tanpa satu pun ketergantungan runtime. Itu yang membuatnya
+   aman diimpor lib/data.ts tanpa membuat lingkaran impor. */
+import type { OrderBursa } from '@/lib/admin';
+
 export const SALDO_AWAL = 359.0;
 
 export type Sumber = 'forex' | 'kripto';
@@ -112,6 +117,45 @@ export const POSISI_TERBUKA: Posisi[] = [
   { id: 'p2', simbol: 'ADAUSDT',  arah: 'BUY',  tf: '4H', entry: 0.1622,   sl: 0.1606,   tp: 0.1653,   hargaKini: 0.1985,    venue: 'Binance Live', buka: skrg - 26 * 3600_000 },
   { id: 'p3', simbol: 'XAUTUSDT', arah: 'SELL', tf: '4H', entry: 4400.00,  sl: 4460.00,  tp: 4280.00,  hargaKini: 4329.51,   venue: 'Simulasi',     buka: skrg - 9 * 3600_000 },
   { id: 'p4', simbol: 'XAUUSDc',  arah: 'BUY',  tf: '1H', entry: 1925.40,  sl: 1918.00,  tp: 1941.00,  hargaKini: 1928.02,   venue: 'MT5',          buka: skrg - 3 * 3600_000 },
+];
+
+/* ── Posisi & order kripto untuk PENGUNJUNG ──────────────────────────────
+   Dipakai `usePosisi()` saat tidak ada sesi sama sekali. Bukan hiasan:
+   sebelum ini pengunjung melihat SATU posisi milik pemilik dari
+   `public/posisiTerbuka` sementara panel Trade-Fi di sebelahnya sudah punya
+   tiga posisi dan dua pending. Dua panel berdampingan yang isinya sepadan
+   di kenyataan, tapi timpang di layar, terbaca sebagai fitur yang belum jadi.
+
+   ANGKANYA SALING COCOK dan itu syarat, bukan kerapian: pnlFloat tiap baris
+   = (hargaKini − entry) x jumlah, jadi kolom Gerak, P/L, Risk SL, dan
+   Target TP semuanya berangkat dari bilangan yang sama. Layar yang angkanya
+   tidak berjumlah ketahuan karangan dalam sepuluh detik.
+
+   Satu posisi MERAH disengaja. Tiga baris hijau bukan etalase, itu iklan —
+   dan orang yang paham pasar langsung tahu angkanya disetel. */
+export const POSISI_KRIPTO_CONTOH: Posisi[] = [
+  { id: 'c-btc', simbol: 'BTCUSDT', arah: 'BUY',  tf: '4H', entry: 64065.10, sl: 63277.00, tp: 65182.00, hargaKini: 64784.50, venue: 'Binance Live', buka: skrg - 5 * 3600_000,  jumlah: 0.0182, pnlFloat: 13.09 },
+  { id: 'c-sol', simbol: 'SOLUSDT', arah: 'BUY',  tf: '4H', entry: 75.0500,  sl: 72.4000,  tp: 81.6000,  hargaKini: 77.8200,  venue: 'Binance Live', buka: skrg - 19 * 3600_000, jumlah: 4.62,   pnlFloat: 12.80 },
+  { id: 'c-ada', simbol: 'ADAUSDT', arah: 'BUY',  tf: '1H', entry: 0.16220,  sl: 0.15600,  tp: 0.17400,  hargaKini: 0.15940,  venue: 'Binance Live', buka: skrg - 2 * 86_400_000, jumlah: 1240,  pnlFloat: -3.47 },
+];
+
+/* Bentuknya `OrderBursa` — SAMA PERSIS dengan jawaban /api/open-orders,
+   supaya panel tidak perlu tahu ini contoh dan tidak ada cabang tampilan
+   kedua yang bisa berselisih dengan yang asli. */
+export const PENDING_KRIPTO_CONTOH: OrderBursa[] = [
+  { id: 'c-o1', simbol: 'LINKUSDT', jenis: 'ENTRY', tipe: 'LIMIT', arah: 'BUY',  pemicu: 0, harga: 13.8500, qty: 24.5, algo: false, dibuat: skrg - 4 * 3600_000 },
+  { id: 'c-o2', simbol: 'AVAXUSDT', jenis: 'ENTRY', tipe: 'STOP',  arah: 'SELL', pemicu: 26.4000, harga: 26.4000, qty: 12.8, algo: true, dibuat: skrg - 13 * 3600_000 },
+];
+
+/* SL/TP pending SENGAJA order tersendiri, bukan field pada order entry-nya.
+   Begitulah Binance Futures bekerja — stop menempel pada SIMBOL — dan
+   contoh yang menyederhanakannya akan membuat panel menampilkan bentuk yang
+   tidak pernah ada di akun sungguhan. */
+export const STOP_KRIPTO_CONTOH: OrderBursa[] = [
+  { id: 'c-s1', simbol: 'LINKUSDT', jenis: 'SL', tipe: 'STOP_MARKET',         arah: 'SELL', pemicu: 13.3200, harga: 0, qty: 24.5, algo: true, dibuat: skrg - 4 * 3600_000 },
+  { id: 'c-s2', simbol: 'LINKUSDT', jenis: 'TP', tipe: 'TAKE_PROFIT_MARKET',  arah: 'SELL', pemicu: 15.1000, harga: 0, qty: 24.5, algo: true, dibuat: skrg - 4 * 3600_000 },
+  { id: 'c-s3', simbol: 'AVAXUSDT', jenis: 'SL', tipe: 'STOP_MARKET',         arah: 'BUY',  pemicu: 27.2500, harga: 0, qty: 12.8, algo: true, dibuat: skrg - 13 * 3600_000 },
+  { id: 'c-s4', simbol: 'AVAXUSDT', jenis: 'TP', tipe: 'TAKE_PROFIT_MARKET',  arah: 'BUY',  pemicu: 24.7000, harga: 0, qty: 12.8, algo: true, dibuat: skrg - 13 * 3600_000 },
 ];
 
 /* ── Sinyal untuk layar Screener ──────────────────────────────────────── */
