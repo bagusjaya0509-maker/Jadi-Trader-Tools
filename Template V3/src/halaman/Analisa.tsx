@@ -523,7 +523,37 @@ function KartuAnalisa({ a, status, milikku, pemilik, onSegarkan, performa, dibat
                   {a.jenisEntry}
                 </span>
               )}
+              {/* Keadaan sinyalnya, dibawa DI KARTU dan bukan cuma di judul
+                  raknya: kartu ini juga tampil di rak "Semua kanal" dan di
+                  hasil pencarian, jauh dari pengelompokannya. Tanpa lencana
+                  ini, di sana order yang harganya belum datang terlihat
+                  persis sama dengan posisi yang sudah berjalan.
+
+                  `terisi` yang membedakan, bukan jenis ordernya — Buy Limit
+                  yang harganya sudah tersentuh SUDAH jadi posisi. */}
+              {!selesai && (
+                a.terisi || !a.jenisEntry || /^market$/i.test(a.jenisEntry) ? (
+                  <span title="Harga sudah menyentuh entry — titik masuknya sudah lewat"
+                        className="flex items-center gap-1 rounded border border-sky-500/30 px-1.5 py-0.5 text-[10px] font-medium text-sky-400">
+                    <span className="size-1.5 rounded-full bg-sky-400" /> Berjalan
+                  </span>
+                ) : (
+                  <span title="Order menggantung — entry-nya belum tersentuh"
+                        className="flex items-center gap-1 rounded border border-amber-500/30 px-1.5 py-0.5 text-[10px] font-medium text-amber-400">
+                    <span className="size-1.5 rounded-full bg-amber-400" /> Menunggu harga
+                  </span>
+                )
+              )}
               {selesai && <LencanaHasil hasil={a.hasil as 'sl' | 'tp' | 'batal'} />}
+              {/* Sinyal selesai kini terbuka untuk siapa pun — dikatakan di
+                  kartunya supaya orang tahu tidak perlu membeli apa pun
+                  untuk memeriksanya. */}
+              {selesai && a.harga > 0 && (
+                <span className="rounded border border-emerald-500/30 px-1.5 py-0.5 text-[10px] font-medium text-emerald-400/90"
+                      title="Peluangnya sudah habis, jadi levelnya dibuka gratis untuk diperiksa">
+                  Terbuka gratis
+                </span>
+              )}
             </div>
           )}
           {/* Alasan pembatalan tampil DI KARTU, bukan disembunyikan di balik
@@ -1702,17 +1732,59 @@ export default function Analisa() {
                 Disclaimer
               </Link>
             </p>
-            <div className="flex gap-4 overflow-x-auto pb-1">
-              {terpilih.map((a) => (
-                <div key={a.id} className="w-[320px] shrink-0">
-                  <KartuAnalisa a={a} status={statusku[a.id]}
-                    milikku={a.uid === pengguna?.uid} pemilik={pemilik} onSegarkan={segarkan}
-                    performa={performa}
-                    dibatalkanAnalis={terpilih.filter((s) => s.hasil === 'batal')}
-                    berjalanAnalis={terpilih.filter((s) => !s.hasil).length} />
+            {/* ── DIPISAH TIGA RAK MENURUT KEADAANNYA ────────────────────
+                Sebelumnya seluruh sinyal satu kanal berjejer di satu rak
+                mendatar tanpa penanda apa pun, jadi order yang HARGANYA
+                BELUM DATANG terlihat persis sama dengan posisi yang sudah
+                berjalan — dan sama dengan yang sudah selesai berbulan lalu.
+                Ketiganya menuntut tindakan yang berbeda: yang menggantung
+                masih bisa diikuti, yang berjalan sudah lewat titik masuknya,
+                dan yang selesai cuma bahan penilaian.
+
+                Pembedanya `terisi`, BUKAN jenis ordernya: Buy Limit yang
+                harganya sudah tersentuh SUDAH jadi posisi berjalan.
+                Menghitungnya sebagai "menunggu harga" akan menjanjikan
+                peluang yang sebenarnya sudah lewat. */}
+            {(() => {
+              const selesai = terpilih.filter((s) => !!s.hasil);
+              const belum = terpilih.filter((s) => !s.hasil);
+              const menunggu = belum.filter(
+                (s) => !s.terisi && !!s.jenisEntry && !/^market$/i.test(s.jenisEntry));
+              const berjalan = belum.filter((s) => !menunggu.includes(s));
+
+              const rak = [
+                { kunci: 'jalan', judul: 'Sedang berjalan', isi: berjalan,
+                  warna: 'text-sky-400',
+                  ket: 'Harga sudah menyentuh entry — titik masuknya sudah lewat.' },
+                { kunci: 'nunggu', judul: 'Menunggu harga', isi: menunggu,
+                  warna: 'text-amber-400',
+                  ket: 'Order menggantung, entry-nya belum tersentuh.' },
+                { kunci: 'selesai', judul: 'Sudah selesai', isi: selesai,
+                  warna: 'text-zinc-400',
+                  ket: 'Kena TP/SL atau ditarik penulisnya. Levelnya terbuka gratis — peluangnya sudah habis, yang tersisa bahan penilaian.' },
+              ].filter((r) => r.isi.length > 0);
+
+              return rak.map((r) => (
+                <div key={r.kunci} className="mb-5">
+                  <div className="mb-2 flex items-baseline gap-2">
+                    <span className={cn('text-[12.5px] font-medium', r.warna)}>{r.judul}</span>
+                    <span className="angka text-[11px] text-zinc-600">{r.isi.length}</span>
+                    <span className="hidden text-[11px] text-zinc-600 sm:inline">· {r.ket}</span>
+                  </div>
+                  <div className="flex gap-4 overflow-x-auto pb-1">
+                    {r.isi.map((a) => (
+                      <div key={a.id} className="w-[320px] shrink-0">
+                        <KartuAnalisa a={a} status={statusku[a.id]}
+                          milikku={a.uid === pengguna?.uid} pemilik={pemilik} onSegarkan={segarkan}
+                          performa={performa}
+                          dibatalkanAnalis={terpilih.filter((s) => s.hasil === 'batal')}
+                          berjalanAnalis={berjalan.length} />
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              ))}
-            </div>
+              ));
+            })()}
           </>
         );
       })()}
