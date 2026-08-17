@@ -172,10 +172,33 @@ function Menunggu() {
   );
 }
 
-/* Hero lama, tanpa sidebar. Dipindah dari "/" ke "/beranda" saat halaman
-   Pendaratan mengambil alih pintu depan: isinya masih dipakai (tombol View
-   Portfolio & Open Chart), dan menghapusnya cuma membuang sesuatu yang
-   sudah jadi tanpa alasan. */
+/* ── PINTU DEPAN: dua wajah di satu alamat ──────────────────────────────
+   Belum login  -> halaman jualan (Template).
+   Sudah login  -> hero lama, halaman utama sebelum diubah.
+
+   Alasannya: halaman jualan itu untuk orang yang belum kenal produknya.
+   Menyodorkannya lagi ke orang yang sudah masuk sama saja menjual barang
+   yang sudah dibelinya, dan bikin ia harus mencari jalan sendiri kembali
+   ke tools.
+
+   ── `memuat` WAJIB dihormati, dan ini bukan kehati-hatian berlebihan ────
+   Status login Firebase tidak tersedia seketika. Kalau baris ini langsung
+   memutuskan berdasarkan `pengguna` yang masih null, SETIAP pengguna yang
+   sudah login akan melihat kedipan halaman jualan lebih dulu sebelum
+   halamannya ditukar — persis kesan yang sedang dihindari, dan justru
+   paling kelihatan di sambungan lambat karena kedipannya makin lama.
+
+   Karena itu selama `memuat` tidak ada yang dirender kecuali penanda
+   tunggu. Menebak lebih dulu lalu memperbaiki belakangan bukan pilihan di
+   halaman pertama yang dilihat orang. */
+function PintuDepan() {
+  const { pengguna, memuat } = useAuth();
+  if (memuat) return <Menunggu />;
+  return pengguna ? <Beranda /> : <Template />;
+}
+
+/* Hero lama, tanpa sidebar. Sekarang dipakai DUA tempat: rute /beranda,
+   dan pintu depan untuk pengguna yang sudah login (lihat PintuDepan). */
 function Beranda() {
   return (
     <div className="w-full h-screen overflow-y-auto bg-zinc-950">
@@ -284,13 +307,12 @@ export default function App() {
             yang ditambahkan besok ikut terlindungi tanpa perlu diingat. */}
         <Suspense fallback={<Menunggu />}>
         <Routes>
-          {/* PINTU DEPAN. Halaman ini yang dilihat orang saat membuka
-              jaditrader.co.id, dan ia ada DI LUAR gerbang — memang harus:
-              yang mendarat di sini justru orang yang belum punya akses.
+          {/* PINTU DEPAN, dua wajah — lihat PintuDepan di atas. Belum login
+              dapat halaman jualan, sudah login dapat hero lama.
 
-              Sebelumnya `/` menampilkan hero lama; ia sekarang pindah ke
-              /beranda dan tetap bisa dibuka. */}
-          <Route path="/" element={<Template />} />
+              DI LUAR gerbang, dan memang harus: yang mendarat di sini
+              justru orang yang belum punya akses. */}
+          <Route path="/" element={<PintuDepan />} />
           {/* Alamat lamanya DIPERTAHANKAN, bukan dihapus: alamat ini sudah
               dibagikan dan dipakai memeriksa hasil selama halamannya
               digarap. Menghapusnya membuat tautan yang beredar jatuh ke
