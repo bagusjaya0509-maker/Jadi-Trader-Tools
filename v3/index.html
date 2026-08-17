@@ -70,11 +70,41 @@
          halaman gelap. -->
     <meta name="theme-color" content="#09090b" />
 
+    <!-- ── Tautan lama /#/apa-pun → /apa-pun ────────────────────────────
+         Sampai 17 Agu 2026 aplikasi ini memakai HashRouter, jadi seluruh
+         alamat yang pernah dibagikan berbentuk jaditrader.co.id/#/journal.
+         Sesudah pindah ke BrowserRouter, alamat begitu memuat halaman depan
+         dan tanda pagarnya diabaikan — tautannya tidak menghasilkan galat,
+         ia cuma diam-diam mendarat di tempat yang salah. Itu jenis kerusakan
+         yang paling lama tidak ketahuan.
+
+         Yang paling menentukan bukan bookmark orang, melainkan LYNK: alamat
+         tujuan sesudah pembayaran tersimpan di setelan Lynk, di luar
+         jangkauan kode ini. Kalau /#/aktivasi berhenti bekerja, yang melihat
+         akibatnya adalah orang yang baru saja mengirim uang.
+
+         Dijalankan di <head> dan bukan di dalam React: ia harus selesai
+         SEBELUM router membaca alamatnya, kalau tidak halaman depan sempat
+         tergambar dulu lalu melompat. Tanpa `defer`, tanpa `type=module` —
+         keduanya menunda eksekusi sampai sesudah dokumen terurai. -->
+    <script>
+      (function () {
+        var h = window.location.hash;
+        if (h.slice(0, 2) !== '#/') return;
+        var tujuan = h.slice(1);          /* "/chart?simbol=BTCUSDT" */
+        var luar = window.location.search; /* "?r=..." mode preview */
+        if (luar.length > 1) {
+          tujuan += (tujuan.indexOf('?') === -1 ? '?' : '&') + luar.slice(1);
+        }
+        window.history.replaceState(null, '', tujuan);
+      })();
+    </script>
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
-    <script type="module" crossorigin src="./assets/index-DAgcmaj0.js"></script>
-    <link rel="modulepreload" crossorigin href="./assets/react-DRIkVFoA.js">
+    <script type="module" crossorigin src="./assets/index-DtKFKrPH.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/react-B0Mm-yK2.js">
     <link rel="modulepreload" crossorigin href="./assets/firebase-D_y3CBvp.js">
     <link rel="stylesheet" crossorigin href="./assets/index-DC4VMhBb.css">
   </head>

@@ -1,0 +1,1 @@
+import{r as u}from"./react-B0Mm-yK2.js";function n(e){const t=u.useRef(!1);return{onMouseDown:r=>{t.current=r.target===r.currentTarget},onClick:r=>{r.target===r.currentTarget&&t.current&&(t.current=!1,e())}}}export{n as u};
