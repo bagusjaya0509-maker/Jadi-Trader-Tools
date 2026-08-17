@@ -496,13 +496,26 @@ export function PojokOrder({
             }
             return null;
           })()}
-          <button onClick={onKirim} disabled={!arahBenar || mati || sibukNyata}
-            title={arahBenar ? undefined : 'SL dan TP harus berada di sisi yang benar terhadap entry'}
-            className={cn('ml-auto flex cursor-pointer items-center gap-1 rounded px-2.5 py-1 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40',
-              nyata ? 'bg-red-500/25 text-red-200 hover:bg-red-500/35'
-                    : 'bg-zinc-100 text-zinc-950 hover:bg-white')}>
-            <Check className="size-3" /> {sibukNyata ? 'Mengirim…' : nyata ? 'Kirim order' : 'Kirim'}
-          </button>
+          {/* TOMBOL KIRIM TIDAK ADA DI MODE COPY — keputusan pemilik 17 Agu
+              2026, dan alasannya berdiri sendiri: di mode COPY tiket ini
+              bukan order yang mau dieksekusi, melainkan rencana yang mau
+              DIBAGIKAN. "Kirim" di situ mengeksekusi posisi demo yang tidak
+              diminta siapa pun, tepat di sebelah tombol yang benar-benar
+              dimaksud — dan dua tombol bersebelahan yang salah satunya
+              melakukan hal yang tidak diinginkan cepat atau lambat salah
+              ditekan.
+
+              DEMO dan REAL tidak tersentuh: di sana Kirim justru satu-
+              satunya alasan tiket itu ada. */}
+          {modeSekarang !== 'copy' && (
+            <button onClick={onKirim} disabled={!arahBenar || mati || sibukNyata}
+              title={arahBenar ? undefined : 'SL dan TP harus berada di sisi yang benar terhadap entry'}
+              className={cn('ml-auto flex cursor-pointer items-center gap-1 rounded px-2.5 py-1 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40',
+                nyata ? 'bg-red-500/25 text-red-200 hover:bg-red-500/35'
+                      : 'bg-zinc-100 text-zinc-950 hover:bg-white')}>
+              <Check className="size-3" /> {sibukNyata ? 'Mengirim…' : nyata ? 'Kirim order' : 'Kirim'}
+            </button>
+          )}
           {/* Kirim rencana ini ke formulir Copy Signal beserta tangkapan
               layar chartnya. Ditaruh SEBARIS dengan Kirim/Batal karena ia
               nasib ketiga dari tiket yang sama: dieksekusi, dibatalkan,
@@ -513,11 +526,15 @@ export function PojokOrder({
               tombol yang tidak relevan di sebelah tombol eksekusi adalah
               tombol yang cepat atau lambat salah ditekan. Lencananya sendiri
               yang jadi jalan masuk: putar ke COPY, tombolnya muncul. */}
+          {/* `ml-auto` PINDAH KE SINI di mode COPY. Ia dulu menempel pada
+              tombol Kirim; begitu Kirim tidak digambar, tanpa ini seluruh
+              barisnya menggumpal ke kiri dan Batal melompat ke tempat yang
+              tadi dipakai tombol utama. */}
           {onKirimSinyal && modeSekarang === 'copy' && (
             <button onClick={onKirimSinyal} disabled={!arahBenar}
               title={arahBenar ? 'Kirim entry/SL/TP + tangkapan layar chart ke formulir Copy Signal'
                                : 'SL dan TP harus berada di sisi yang benar terhadap entry'}
-              className="flex cursor-pointer items-center gap-1 rounded border border-sky-500/40 bg-sky-500/10 px-2 py-1 text-[11px] text-sky-300 transition-colors hover:bg-sky-500/20 disabled:cursor-not-allowed disabled:opacity-40">
+              className="ml-auto flex cursor-pointer items-center gap-1 rounded border border-sky-500/40 bg-sky-500/10 px-2 py-1 text-[11px] text-sky-300 transition-colors hover:bg-sky-500/20 disabled:cursor-not-allowed disabled:opacity-40">
               <Share2 className="size-3" /> Ke Copy Signal
             </button>
           )}

@@ -730,6 +730,26 @@ export default function Analisa() {
   const [pasangan, setPasangan] = useState('BTCUSDT');
   const [arah, setArah] = useState<'BUY' | 'SELL'>('BUY');
   const [pasar, setPasar] = useState<'kripto' | 'tradefi'>('kripto');
+
+  /* Simbol untuk halaman Chart — AWALAN `MT5:` DIPASANG KEMBALI di sini.
+     ──────────────────────────────────────────────────────────────────────
+     Ini perbaikan bug yang dilaporkan: tombol "Susun ulang di Chart"
+     membuka `#/chart?simbol=XAUUSD`, dan chartnya menjawab "Data tidak
+     diterima. Proxy VPS mungkin sedang tidak menjawab" — pesan yang
+     menuduh VPS padahal VPS-nya sehat. Yang salah simbolnya: XAUUSD itu
+     simbol MT5, dan proxy Binance memang tidak punya lilinnya.
+
+     Perjalanannya bocor di satu titik. Draf dari chart datang sebagai
+     `MT5:XAUUSD`; formulir MENCOPOT awalannya supaya kolom Pasangan enak
+     dibaca, lalu menyimpan pasarnya terpisah di `pasar`. Tautan ini cuma
+     memakai `pasangan` dan melupakan `pasar`, jadi penanda pasarnya hilang
+     dalam perjalanan pulang.
+
+     Disatukan di sini, bukan di dalam JSX-nya: kalau nanti ada tombol
+     kedua yang membuka chart dari formulir ini, ia memakai nilai yang sama
+     dan tidak bisa lupa dengan cara yang sama. */
+  const simbolUntukChart = (pasar === 'tradefi' ? 'MT5:' : '') + pasangan.trim().toUpperCase();
+
   const [hargaJual, setHargaJual] = useState(5);
   const [ringkas, setRingkas] = useState('');
   const [entry, setEntry] = useState('');
@@ -1195,7 +1215,7 @@ export default function Analisa() {
                         className="cursor-pointer rounded-md border border-zinc-700 px-2.5 py-1 text-[11.5px] text-zinc-200 transition-colors hover:border-zinc-500">
                         Lihat sampul
                       </button>
-                      <Link to={`/chart?simbol=${encodeURIComponent(pasangan)}&untuk=sinyal&arah=${arah}`
+                      <Link to={`/chart?simbol=${encodeURIComponent(simbolUntukChart)}&untuk=sinyal&arah=${arah}`
                               + (entry ? `&entry=${entry}` : '') + (sl ? `&sl=${sl}` : '') + (tp ? `&tp=${tp}` : '')}
                         className="rounded-md border border-zinc-700 px-2.5 py-1 text-[11.5px] text-zinc-300 transition-colors hover:border-zinc-500">
                         Susun ulang di Chart
