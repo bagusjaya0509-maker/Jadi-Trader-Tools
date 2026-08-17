@@ -260,7 +260,7 @@ function kePosisiPublik(p: any, i: number): Posisi {
  *  Dokumen ini juga sengaja publik: pengunjung yang belum berlangganan tetap
  *  bisa melihat posisi pemilik — itu memang bagian dari etalasenya. */
 export function usePosisi(): HasilData<Posisi[]> & { pending: OrderBursa[]; stop: OrderBursa[] } {
-  const { pengguna, memuat: memuatAuth } = useAuth();
+  const { pengguna, memuat: memuatAuth, pemilik } = useAuth();
   const [data, setData] = useState<Posisi[]>(POSISI_TERBUKA);
   const [memuat, setMemuat] = useState(true);
   const [galat, setGalat] = useState<string | null>(null);
@@ -360,9 +360,45 @@ export function usePosisi(): HasilData<Posisi[]> & { pending: OrderBursa[]; stop
     };
   }
 
-  /* `contoh` berarti "ini bukan datamu, ini contoh". Dokumen publik itu data
-     sungguhan, jadi labelnya hanya muncul kalau dokumennya memang belum ada. */
-  return { data: gabungan, pending, stop, memuat: memuat || memuatAuth, contoh: !ada && !pengguna, galat };
+  /* ── DOKUMEN PUBLIK ITU MILIK PEMILIK, bukan milik yang membacanya ─────
+     Ini perbaikan bug yang dilaporkan: pengguna baru menekan "Mulai dari
+     nol", seluruh angka lain jujur jadi nol — lalu panel "Posisi Terbuka —
+     Kripto" tetap menampilkan MANAUSDT, dan Activity menulis "Posisi
+     MANAUSDT BUY terbuka di Binance Live". Itu posisi PEMILIK, di bawah
+     judul "Order yang sedang berjalan di Binance", di dasbor orang lain.
+     Bukan sekadar sisa data contoh — itu menyatakan sesuatu yang tidak
+     benar tentang akun yang sedang dibuka.
+
+     `public/posisiTerbuka` ditulis screener V2 dari peramban pemilik, jadi
+     isinya memang posisi pemilik. Aturannya sekarang mengikuti kepemilikan
+     itu:
+       · belum masuk        -> data contoh (cabang di atas)
+       · pemilik            -> dokumennya sendiri, seperti sebelumnya
+       · sudah masuk, bursa aktif -> posisi miliknya sendiri dari bursa
+       · sudah masuk, tanpa bursa -> KOSONG
+
+     Yang dicabut: pengunjung yang sudah masuk tidak lagi melihat posisi
+     pemilik sebagai etalase. Sebab aslinya (tugas 8, "posisi terbuka
+     pemilik terlihat oleh semua pengguna") tetap dihormati untuk yang
+     BELUM masuk — merekalah etalasenya — dan mereka sekarang malah dapat
+     tampilan yang lebih penuh lewat data contoh.
+
+     Yang DIPERTAHANKAN: saat bursanya aktif, dokumen publik tetap dipakai
+     memasok SL/TP, timeframe, dan waktu buka yang tidak dikirim Binance —
+     itu tetap jalan lewat `gabungan` di atas.
+
+     `pending` dan `stop` TIDAK ikut dijaga di sini, dan itu bukan
+     kelalaian: keduanya datang dari `usePosisiBinance()` — order di bursa
+     milik yang sedang masuk, lewat App Token-nya sendiri. Tanpa bursa aktif
+     keduanya memang sudah kosong. */
+  return {
+    data: pemilik || aktif ? gabungan : [],
+    pending, stop,
+    /* `contoh` berarti "ini bukan datamu, ini contoh". Dokumen publik itu
+       data sungguhan, jadi labelnya hanya muncul kalau dokumennya memang
+       belum ada. */
+    memuat: memuat || memuatAuth, contoh: !ada && !pengguna, galat,
+  };
 }
 
 /** Ringkasan pra-hitung. Satu pembacaan, bukan 400.

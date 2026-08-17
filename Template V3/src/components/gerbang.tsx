@@ -351,6 +351,7 @@ export function LabelContoh({ tampil }: { tampil: boolean }) {
 import { useAuth as useAuthGerbang } from '@/lib/auth';
 import { bacaPilihanContoh, simpanPilihanContoh } from '@/lib/data';
 import { useState as useStateGerbang } from 'react';
+import { imporContoh, hapusImporContoh, AWALAN_CONTOH } from '@/lib/impor-contoh';
 import type { Trade } from '@/data/contoh';
 
 export function SpandukContoh({ contoh, riwayat = [] }: { contoh: boolean; riwayat?: Trade[] }) {
@@ -361,23 +362,33 @@ export function SpandukContoh({ contoh, riwayat = [] }: { contoh: boolean; riway
 
   if (!pengguna) return null;
 
-  /* Import DINAMIS, dimuat saat tombolnya ditekan. Bukan karena Firestore —
-     berkas ini sudah menarik lib/data.ts secara statis, jadi mesin tulisnya
-     memang sudah ada di jalur ini (dan build memperingatkan tepat soal itu).
-     Yang dihindari lebih sederhana: impor-contoh.ts membawa SELURUH 123
-     transaksi contoh sebagai konstanta, dan itu tidak perlu ikut ke setiap
-     pemuatan halaman untuk tombol yang kebanyakan orang tekan sekali seumur
-     akun — atau tidak sama sekali. */
+  /* IMPOR STATIS, dan sebelumnya dinamis — itu bug yang dilaporkan.
+     ──────────────────────────────────────────────────────────────────────
+     `await import('@/lib/impor-contoh')` memecah kodenya jadi potongan
+     terpisah bernama hash, misalnya `impor-contoh-D1OOC03W.js`. Nama itu
+     berubah TIAP BUILD. Halaman yang sudah terbuka — atau yang dimuat dari
+     index.html versi cache — memegang daftar nama LAMA, jadi begitu
+     tombolnya ditekan permintaannya 404 dan yang terbaca orangnya:
+     "Failed to fetch dynamically imported module".
+
+     App.tsx punya penawarnya (`muat()`, memuat ulang sekali dengan
+     parameter pembeda), tapi itu cuma membungkus rute malas — bukan impor
+     dinamis di dalam komponen seperti ini.
+
+     Alih-alih menyalin penawar itu ke sini, impornya dijadikan statis.
+     Alasannya: penghematannya memang tidak ada. Berkas ini sudah menarik
+     lib/data.ts, yang menarik data/contoh.ts — tempat 123 transaksi contoh
+     itu SEBENARNYA tinggal. Yang dipecah tadi cuma ~1 kB fungsi tulis.
+     Satu kilobita bukan harga yang pantas untuk satu kelas kegagalan. */
   async function jalankan(apa: 'impor' | 'hapus') {
     if (!pengguna) return;
     setSibuk(apa); setKabar('');
     try {
-      const m = await import('@/lib/impor-contoh');
       if (apa === 'impor') {
-        const n = await m.imporContoh(pengguna.uid);
+        const n = await imporContoh(pengguna.uid);
         setKabar(`${n} transaksi contoh masuk ke jurnalmu. Angka di seluruh halaman ikut terisi.`);
       } else {
-        await m.hapusImporContoh(pengguna.uid);
+        await hapusImporContoh(pengguna.uid);
         simpanPilihanContoh(pengguna.uid, 'kosong');
         setKabar('Data contoh dihapus. Jurnalmu kembali kosong.');
       }
@@ -435,11 +446,11 @@ export function SpandukContoh({ contoh, riwayat = [] }: { contoh: boolean; riway
   );
 }
 
-/* Ditulis di sini, bukan diimpor dari lib/impor-contoh.ts, supaya berkas
-   itu tetap bisa dimuat malas: satu impor statis untuk pemeriksaan sepele
-   akan menarik seluruh mesin tulis Firestore ke jalur awal. Awalannya
-   sengaja ditulis ulang apa adanya — kalau ia berubah di sana, uji
-   `uji-impor-contoh.mjs` yang membaca KEDUA berkas akan gagal. */
+/* Memakai AWALAN_CONTOH yang SUNGGUHAN, bukan salinan tulisan tangan.
+   Sempat ditulis ulang di sini waktu impornya masih dinamis — dua tempat
+   memegang satu string, dijaga sebaris uji. Begitu impornya jadi statis,
+   alasan itu hilang dan salinannya ikut dibuang: yang menulis id dan yang
+   mengenalinya sekarang membaca konstanta yang sama persis. */
 function adaContohDiRiwayat(riwayat: Trade[]): boolean {
-  return riwayat.some((t) => t.id.startsWith('contoh-'));
+  return riwayat.some((t) => t.id.startsWith(AWALAN_CONTOH));
 }

@@ -40,12 +40,27 @@ const srcImpor = readFileSync('src/lib/impor-contoh.ts', 'utf8');
 const awalan = srcImpor.match(/AWALAN_CONTOH\s*=\s*'([^']+)'/)?.[1];
 cek('AWALAN_CONTOH terbaca dari sumbernya', awalan, 'contoh-');
 
-/* gerbang.tsx menuliskan awalan yang sama SECARA TERPISAH — sengaja, supaya
-   berkas impor tetap bisa dimuat malas. Harganya: keduanya bisa menyimpang
-   diam-diam, dan baris inilah yang mencegahnya. */
+/* gerbang.tsx harus MENGIMPOR awalannya, bukan menyalinnya. Salinan tulisan
+   tangan pernah ada di sana — perlu waktu impornya masih dinamis — dan
+   baris ini yang memastikan ia tidak kembali. */
 const srcGerbang = readFileSync('src/components/gerbang.tsx', 'utf8');
-const diGerbang = srcGerbang.match(/t\.id\.startsWith\('([^']+)'\)/)?.[1];
-cek('gerbang.tsx memakai awalan yang sama', diGerbang, awalan);
+/* KOMENTAR DIBUANG DULU. Versi pertama uji ini gagal bukan karena kodenya
+   salah, melainkan karena komentar yang MENJELASKAN kenapa impor dinamis
+   dibuang justru memuat frasa yang dicarinya. Uji yang membaca komentar
+   sebagai kode akan menghukum setiap penjelasan yang baik. */
+const kodeGerbang = srcGerbang.replace(/\/\*[\s\S]*?\*\//g, '');
+
+cek('gerbang.tsx mengimpor AWALAN_CONTOH',
+  /import\s*\{[^}]*AWALAN_CONTOH[^}]*\}\s*from\s*'@\/lib\/impor-contoh'/.test(kodeGerbang), true);
+cek('gerbang.tsx tidak menyalin awalannya sendiri',
+  /startsWith\('contoh-'\)/.test(kodeGerbang), false);
+
+/* IMPOR STATIS, bukan dinamis. `await import(...)` memecahnya jadi potongan
+   bernama hash yang berubah tiap build — halaman dari cache memegang nama
+   lama, permintaannya 404, dan tombolnya gagal dengan "Failed to fetch
+   dynamically imported module". Persis bug yang dilaporkan pemilik. */
+cek('impor-contoh ditarik statis, bukan lewat await import()',
+  /await import\(['"]@\/lib\/impor-contoh/.test(kodeGerbang), false);
 
 /* ── 3. Yang paling penting: TIDAK menabrak id migrasi ────────────────── */
 const idImpor = RIWAYAT.map((t) => awalan + t.id);
