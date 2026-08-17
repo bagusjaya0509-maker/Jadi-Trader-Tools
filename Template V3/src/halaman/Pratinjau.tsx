@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Clock, Eye, Loader2, TriangleAlert } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Clock, Eye, Loader2, LogOut, TriangleAlert } from 'lucide-react';
 import { useAuth, mulaiPratinjau } from '@/lib/auth';
 import { TombolMasuk } from '@/components/gerbang';
 import { cn } from '@/lib/utils';
@@ -25,8 +25,28 @@ import { cn } from '@/lib/utils';
 
 type Fase = 'diam' | 'jalan' | 'gagal';
 
+/** Galat Firestore diterjemahkan jadi kalimat yang menyebut PENYEBABNYA.
+ *
+ *  "Missing or insufficient permissions." benar secara teknis dan tidak
+ *  berguna sama sekali bagi yang membacanya: ia tidak menyebut siapa yang
+ *  menolak, kenapa, atau apa yang harus dilakukan. Untuk halaman ini
+ *  penyebabnya hampir selalu satu — aturan Firestore yang mengizinkan
+ *  penulisan field `pratinjau` belum di-publish — jadi kalimat itu yang
+ *  ditulis, lengkap dengan pesan aslinya untuk yang perlu menelusuri. */
+function terjemahkanGalat(e: unknown): string {
+  const kode = (e as { code?: string })?.code ?? '';
+  const pesan = e instanceof Error ? e.message : String(e);
+  if (kode === 'permission-denied' || /insufficient permissions/i.test(pesan)) {
+    return 'Server menolak permintaannya. Aturan Firestore yang mengizinkan pratinjau belum terpasang — hubungi pemilik dan sebutkan pesan ini. (permission-denied)';
+  }
+  if (kode === 'unavailable' || /offline|network/i.test(pesan)) {
+    return 'Tidak bisa menghubungi server. Periksa koneksi, lalu coba lagi.';
+  }
+  return pesan || 'Pratinjau gagal dimulai.';
+}
+
 export default function Pratinjau() {
-  const { pengguna, memuat, langganan, pemilik } = useAuth();
+  const { pengguna, memuat, langganan, pemilik, keluar } = useAuth();
   const arahkan = useNavigate();
   const [fase, setFase] = useState<Fase>('diam');
   const [kabar, setKabar] = useState('');
@@ -58,10 +78,7 @@ export default function Pratinjau() {
       setKabar('Pratinjau dimulai. Membuka…');
     } catch (e) {
       setFase('gagal');
-      /* Galat aturan Firestore dilaporkan APA ADANYA, tidak ditelan.
-         Menelannya berarti orangnya menunggu layar yang tidak akan
-         pernah terbuka, tanpa tahu kenapa. */
-      setKabar(e instanceof Error ? e.message : 'Pratinjau gagal dimulai.');
+      setKabar(terjemahkanGalat(e));
     }
   }
 
@@ -137,7 +154,23 @@ export default function Pratinjau() {
                 ? <><Loader2 className="size-4 animate-spin" /> Membuka…</>
                 : <>Mulai pratinjau 24 jam <ArrowRight className="size-4" /></>}
             </button>
-            <p className="text-center text-[11.5px] text-zinc-600">Masuk sebagai {pengguna.email}</p>
+            {/* GANTI AKUN wajib ada di sini, dan ketiadaannya kemarin
+                membuat halaman ini jadi jalan buntu: pratinjau melekat
+                pada akun, jadi begitu satu akun terpakai atau ditolak,
+                satu-satunya jalan maju adalah memakai akun lain — dan
+                tidak ada satu pun tombol di layar yang memungkinkannya.
+                Menyuruh orang membuka menu di halaman LAIN untuk keluar
+                bukan jawaban; ia sedang berdiri di halaman ini. */}
+            <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[11.5px] text-zinc-600">
+              <span>Masuk sebagai {pengguna.email}</span>
+              <span className="text-zinc-700">·</span>
+              <button
+                onClick={() => { void keluar(); }}
+                className="inline-flex cursor-pointer items-center gap-1 text-zinc-400 underline underline-offset-2 transition-colors hover:text-zinc-100"
+              >
+                <LogOut className="size-3" /> Ganti akun
+              </button>
+            </div>
           </div>
         )}
 
