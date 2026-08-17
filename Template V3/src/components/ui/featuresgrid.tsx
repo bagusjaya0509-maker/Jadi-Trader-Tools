@@ -11,36 +11,14 @@ export const Component = () => {
      kosong besar yang bertumpuk membuat halamannya terbaca seperti
      terputus — orang mengira isinya sudah habis lalu berhenti menggulir. */
   return (
-    /* ── GARIS TEMPELAN DI BATAS ATAS SEKSI INI ──────────────────────────
-       Riwayatnya perlu diingat supaya tidak diputar ulang dari nol.
-
-       Latar seksi ini hitam murni rgb(0,0,0), sementara halaman di atasnya
-       dulu zinc-950 rgb(9,9,11). Selisih sebelas tingkat itu tidak terlihat
-       sebagai "dua warna", tapi tepi tempat keduanya bertemu jadi garis
-       lurus setajam penggaris melintasi seluruh lebar layar.
-
-       Itulah garis yang dua kali dikira berasal dari bias cahaya di hero.
-       Bukan — dan karena itu dua putaran penghalusan gradien tidak pernah
-       menyentuhnya sama sekali. Penyebabnya loncatan warna latar.
-
-       Sekarang SELURUH halaman ini hitam murni dan seluruh cahayanya
-       dimatikan, atas permintaan pemilik. Aturan yang tersisa satu:
-       seksi mana pun yang ditambahkan ke halaman ini harus memakai warna
-       latar yang sama persis. Satu seksi ber-zinc-950 sudah cukup untuk
-       memunculkan garis itu lagi. */
     <section className="relative w-full bg-black pt-12 pb-24 font-sans text-white sm:pt-16 sm:pb-32 selection:bg-white selection:text-black">
-      <div className="relative mx-auto max-w-6xl px-6 md:px-8">
+      <div className="mx-auto max-w-6xl px-6 md:px-8">
 
         {/* Section Header */}
         <div className="mb-16 flex flex-col items-center text-center">
           <div className="mb-6 inline-flex items-center rounded-full border border-white/[0.12] bg-white/[0.03] px-3 py-1 text-xs font-medium uppercase tracking-widest text-neutral-400">
             Jadi Trader Tools
           </div>
-          {/* Skalanya diturunkan satu tingkat (4xl/5xl/6xl -> 3xl/4xl/5xl) dan
-              kotaknya dilebarkan. Ukuran lama dipilih untuk "Everything you
-              need." — tiga kata. Kalimat Indonesianya lima kali lebih panjang,
-              dan pada 6xl ia memakan seluruh layar sampai kartu-kartu di
-              bawahnya tidak pernah terlihat tanpa menggulir dua kali. */}
           {/* Skalanya diturunkan satu tingkat (4xl/5xl/6xl -> 3xl/4xl/5xl) dan
               kotaknya dilebarkan 4xl -> 5xl. Ukuran lama dipilih untuk
               "Everything you need." — tiga kata.
@@ -83,7 +61,7 @@ export const Component = () => {
               Yang ini SATU-SATUNYA yang interaktif, dan itu disengaja:
               replay tidak bisa dijelaskan gambar diam — yang membuatnya
               masuk akal justru bahwa lanjutannya belum kelihatan. */}
-          <div className="group flex min-h-[320px] flex-col overflow-hidden rounded-xl border border-white/[0.08] bg-black transition-colors hover:border-white/[0.15] md:col-span-2">
+          <div className="group flex min-h-[320px] flex-col overflow-hidden rounded-xl border border-white/[0.08] bg-[#050505] transition-colors hover:border-white/[0.15] md:col-span-2">
             <div className="relative flex flex-1 items-center justify-center p-8">
               <div className="w-full max-w-md">
                 <PeragaReplay />
@@ -102,7 +80,7 @@ export const Component = () => {
           </div>
 
           {/* ── Kartu 2: Jurnal ────────────────────────────────────────── */}
-          <div className="group flex min-h-[320px] flex-col overflow-hidden rounded-xl border border-white/[0.08] bg-black transition-colors hover:border-white/[0.15]">
+          <div className="group flex min-h-[320px] flex-col overflow-hidden rounded-xl border border-white/[0.08] bg-[#050505] transition-colors hover:border-white/[0.15]">
             <div className="flex flex-1 items-center justify-center p-8">
               <div className="flex w-full flex-col gap-2">
                 <div className="mb-1 flex items-center justify-between font-mono text-[10px] text-neutral-600">
@@ -137,7 +115,7 @@ export const Component = () => {
           </div>
 
           {/* ── Kartu 3: Integrasi ─────────────────────────────────────── */}
-          <div className="group flex min-h-[320px] flex-col overflow-hidden rounded-xl border border-white/[0.08] bg-black transition-colors hover:border-white/[0.15]">
+          <div className="group flex min-h-[320px] flex-col overflow-hidden rounded-xl border border-white/[0.08] bg-[#050505] transition-colors hover:border-white/[0.15]">
             <div className="flex flex-1 items-center justify-center p-8">
               <div className="flex w-full flex-col gap-2.5">
                 {[
@@ -171,7 +149,7 @@ export const Component = () => {
           </div>
 
           {/* ── Kartu 4: Copy Signal ───────────────────────────────────── */}
-          <div className="group flex min-h-[320px] flex-col overflow-hidden rounded-xl border border-white/[0.08] bg-black transition-colors hover:border-white/[0.15] md:col-span-2">
+          <div className="group flex min-h-[320px] flex-col overflow-hidden rounded-xl border border-white/[0.08] bg-[#050505] transition-colors hover:border-white/[0.15] md:col-span-2">
             <div className="relative flex flex-1 items-center justify-center p-8">
               <div className="flex w-full max-w-sm flex-col gap-2.5">
                 <div className="flex items-center justify-between font-mono text-[10px] text-neutral-600">
