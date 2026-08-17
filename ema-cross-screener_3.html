@@ -1095,14 +1095,18 @@
   /* Sinyal Prioritas (.es-snr-pick) memakai gaya yang SAMA dengan Parallel.
      Sebelumnya hanya .es-ch-pick yang punya aturan ini, jadi tombol BUY/SELL di
      section SNR tampil polos tanpa efek hover/tekan - beda sendiri. */
-  .es-ch-pick, .es-snr-pick{
+  /* .es-priority-signal dan .es-pantau-pick ikut: sejak badge ini membuka
+     Chart & Entry, ia harus TERLIHAT bisa diklik. Kursor panah pada
+     sesuatu yang ternyata bereaksi adalah cara tercepat membuat orang
+     tidak pernah mencobanya. */
+  .es-ch-pick, .es-snr-pick, .es-priority-signal, .es-pantau-pick{
     border:none;
     cursor:pointer;
     line-height:1;
     transition:filter .15s, transform .1s;
   }
-  .es-ch-pick:hover, .es-snr-pick:hover{ filter:brightness(1.25); }
-  .es-ch-pick:active, .es-snr-pick:active{ transform:scale(0.96); }
+  .es-ch-pick:hover, .es-snr-pick:hover, .es-priority-signal:hover, .es-pantau-pick:hover{ filter:brightness(1.25); }
+  .es-ch-pick:active, .es-snr-pick:active, .es-priority-signal:active, .es-pantau-pick:active{ transform:scale(0.96); }
 
   /* Menu klik-kanan pada kartu sinyal - pengganti tombol "Ganti Chart / Kelola
      Koin" yang dulu nongkrong di bilah kendali tiap section. Ditaruh di kartunya
@@ -5379,7 +5383,7 @@
         <div class="es-priority-card-top">
           <span class="es-priority-rank">#${i+1}</span>
           <span class="es-priority-symbol">${c.symbol.replace('USDT','')}</span>
-          <span class="es-priority-signal ${statusCls}">${statusLabel}</span>
+          <span class="es-priority-signal ${statusCls}" title="Buka di Chart &amp; Entry">${statusLabel}</span>
           ${c.highProbability ? '<span class="es-priority-hp-badge">HIGH PROBABILITY</span>' : ''}
         </div>
         <div class="es-priority-tf">Risk: <strong>${riskLabel}</strong> • TF ${c.tfLabel} • Harga $${fmtPrice(c.price)}</div>
@@ -5697,7 +5701,7 @@
       <div class="es-priority-card-top">
         <span class="es-priority-rank">#${i+1}</span>
         <span class="es-priority-symbol">${c.symbol.replace('USDT','')}</span>
-        <span class="es-priority-signal ${statusCls}">${statusLabel}</span>
+        <span class="es-priority-signal ${statusCls}" title="Buka di Chart &amp; Entry">${statusLabel}</span>
       </div>
       <div class="es-priority-tf">ICT Scalping • HTF 1H / LTF 5m • Harga $${fmtPrice(c.price)} • Checklist ${checks}/4</div>
       <div class="es-checklist">
@@ -10151,6 +10155,54 @@
       if(arah) q += '&arah=' + encodeURIComponent(arah);
       return window.location.origin + '/v3/#/chart' + q;
     }
+
+    /* ── BUY NOW / SELL NOW MEMBUKA CHART & ENTRY ───────────────────────
+       Ketiga jenis kartu (Koin Hunter, Sinyal Prioritas SNR, Zona Pantau)
+       SUDAH membawa data-sl / data-tp / data-arah / data-tf sejak lama —
+       yang belum ada cuma jalan dari badge-nya ke halaman Chart. Jadi yang
+       ditambahkan di sini hanya pemicunya, bukan datanya.
+
+       Dipasang sebagai SATU pendengar di document, bukan satu per kartu:
+       kartu-kartu ini digambar ulang tiap kali pemindaian selesai, dan
+       pendengar yang ditempel per kartu ikut hilang bersama kartunya.
+
+       ── KENAPA FASE CAPTURE, BUKAN BUBBLE ───────────────────────────────
+       Dua dari tiga badge (.es-snr-pick dan .es-pantau-pick) SUDAH punya
+       tugas sendiri — selectTradableSignalByUid() — dan pendengarnya
+       memanggil e.stopPropagation(). Dipasang di fase bubble seperti
+       biasa, pendengar ini tidak akan pernah kebagian: kliknya sudah
+       dihentikan di tombolnya sendiri.
+
+       Fase capture berjalan LEBIH DULU, jadi keduanya sama-sama jalan —
+       sinyalnya tetap terpilih seperti sebelumnya, dan chart-nya ikut
+       terbuka. Tidak ada tugas lama yang dicabut. */
+    function jtBukaChartDariKartu(kartu){
+      if(!kartu) return;
+      var simbol = kartu.getAttribute('data-symbol');
+      if(!simbol) return;
+      var tf = kartu.getAttribute('data-tf')
+            || ((typeof intervalSel !== 'undefined' && intervalSel) ? intervalSel.value : '4h');
+      var sl = kartu.getAttribute('data-sl') || '';
+      var tp = kartu.getAttribute('data-tp') || '';
+      var arah = kartu.getAttribute('data-arah') || '';
+      if(window.parent !== window){
+        try{
+          window.parent.postMessage({ jt: 'buka-chart', simbol: simbol, tf: tf, sl: sl, tp: tp, arah: arah }, window.location.origin);
+          return;
+        }catch(e){ /* induk beda asal — jatuh ke tab baru di bawah */ }
+      }
+      window.open(alamatChartV3(simbol, tf, sl, tp, arah), '_blank');
+    }
+
+    document.addEventListener('click', function(e){
+      if(!e.target || !e.target.closest) return;
+      var badge = e.target.closest('.es-priority-signal, .es-snr-pick, .es-pantau-pick');
+      if(!badge) return;
+      /* Kartu PANTAU belum punya arah — tetap boleh dibuka, chart-nya cuma
+         terbuka tanpa garis rencana. Yang ditolak cuma kartu tanpa simbol,
+         dan itu sudah dijaga di dalam fungsinya. */
+      jtBukaChartDariKartu(badge.closest('[data-symbol]'));
+    }, true);
 
     let simbolAktif = null, bagianAktif = null, kartuAktifEl = null;
     const tutup = () => { menu.classList.remove('open'); simbolAktif = null; };
