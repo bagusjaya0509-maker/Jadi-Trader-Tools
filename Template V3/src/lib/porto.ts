@@ -69,9 +69,39 @@ export function bawaan(): IsiPorto {
   };
 }
 
+/* ── Riwayat bulanan CONTOH ──────────────────────────────────────────────
+   Panel "Perkembangan Porto" butuh minimal dua bulan; dengan `bulanan: {}`
+   ia selalu menampilkan "riwayat bulanan mulai terisi begitu ada dua bulan
+   tercatat" — satu-satunya kotak kosong yang tersisa di Personal Area.
+
+   Ini SENGAJA tidak masuk ke `bawaan()`. Fungsi itu dipakai tombol "Isi
+   dari daftar bawaan", yang MENULIS ke Firestore akun orang; menuliskan
+   delapan bulan riwayat yang tidak pernah ia jalani berarti menaruh
+   kebohongan di data miliknya sendiri, dan besok ia akan membacanya
+   sebagai fakta. Contoh hanya boleh hidup di lapisan tampilan.
+
+   Angkanya naik dengan DUA bulan turun. Kurva yang naik mulus setiap bulan
+   tidak pernah terjadi pada portofolio siapa pun, dan orang yang mengerti
+   akan langsung tahu grafiknya disetel. */
+function bulananContoh(): Record<string, number> {
+  /* Nilai bulan terakhir SAMA PERSIS dengan porto bersih yang dihitung
+     dari aset & kewajiban contoh (180.218.200 − 75.309.420). Kalau beda,
+     titik terakhir grafik akan bertentangan dengan kartu KPI di atasnya —
+     dan selisih yang tidak bisa dijelaskan lebih merusak kepercayaan
+     daripada panel yang kosong. */
+  const nilai = [71_400_000, 76_850_000, 82_300_000, 79_100_000, 88_600_000, 93_250_000, 91_800_000, 104_908_780];
+  const out: Record<string, number> = {};
+  const skrg = new Date();
+  nilai.forEach((v, i) => {
+    const d = new Date(skrg.getFullYear(), skrg.getMonth() - (nilai.length - 1 - i), 1);
+    out[`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`] = v;
+  });
+  return out;
+}
+
 /* Contoh untuk halaman yang MASIH KOSONG — dibuat sekali supaya id-nya
    tetap sama antar render (kunci daftar React, dan pilihan baris). */
-const CONTOH: IsiPorto = bawaan();
+const CONTOH: IsiPorto = { ...bawaan(), bulanan: bulananContoh() };
 
 export interface HasilPorto {
   /** Isi NYATA milik pengguna. Semua penulisan berangkat dari sini — dan
