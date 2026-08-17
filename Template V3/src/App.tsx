@@ -64,9 +64,8 @@ function muat<T>(impor: () => Promise<T>): Promise<T> {
   });
 }
 
-/* Hero lama sekarang halaman kedua, jadi ikut dimalaskan. Yang dimuat di
-   awal cuma Pendaratan — halaman yang benar-benar dilihat orang lebih
-   dulu. */
+/* Hero lama sekarang halaman kedua (/beranda), jadi ikut dimalaskan.
+   Pintu depannya Template — lihat catatan di rute "/". */
 const HeroLama      = lazy(() => muat(() => import('@/components/ui/glassmorphism-trust-hero')));
 const Dashboard     = lazy(() => muat(() => import('@/components/dashboard').then((m) => ({ default: m.Dashboard }))));
 /* #/screener menampilkan screener V2 yang ASLI, ditanam apa adanya.
@@ -76,9 +75,15 @@ const Dashboard     = lazy(() => muat(() => import('@/components/dashboard').the
 const Screener      = lazy(() => muat(() => import('@/halaman/ScreenerV2')));
 const ScreenerReact = lazy(() => muat(() => import('@/halaman/Screener')));
 const Aktivasi      = lazy(() => muat(() => import('@/halaman/Aktivasi')));
-/* Halaman contoh template, berdiri sendiri — tidak ditautkan dari mana pun
-   dan tidak memuat sepotong pun isi situs ini. Dimuat lazy supaya berkas
-   dan gambar CDN-nya tidak ikut membebani jalur muat awal. */
+/* PINTU DEPAN situs (rute "/"), bukan lagi halaman contoh yang berdiri
+   sendiri seperti dulu.
+
+   TETAP dimuat lazy, dan itu pilihan sadar: kalau diimpor eager, seluruh
+   isinya (tur lima layar + empat peraga beranimasi) ikut masuk bundel utama
+   dan ditanggung juga oleh pengguna yang sudah login — orang yang justru
+   tidak pernah melihat halaman ini. Ongkosnya sekejap <Menunggu /> saat
+   kunjungan pertama. Kalau kelak waktu muat pertama jadi masalah, di sinilah
+   tempat menukarnya. */
 const Template      = lazy(() => muat(() => import('@/halaman/Template')));
 const Pratinjau     = lazy(() => muat(() => import('@/halaman/Pratinjau')));
 const Preview       = lazy(() => muat(() => import('@/halaman/Preview')));
@@ -279,15 +284,24 @@ export default function App() {
             yang ditambahkan besok ikut terlindungi tanpa perlu diingat. */}
         <Suspense fallback={<Menunggu />}>
         <Routes>
-          <Route path="/" element={<Beranda />} />
-          {/* DITUNDA. Halaman pendaratan sudah jadi tapi BELUM jadi pintu
-              depan — pemiliknya ingin alurnya dulu yang benar: belum masuk
-              lihat halaman ini, sudah masuk langsung ke tools, dan klik logo
-              tidak menariknya keluar dari tools. Sampai itu dirancang, ia
-              hidup di alamat sendiri supaya bisa dilihat tanpa mengganggu
-              siapa pun. */}
-          <Route path="/pendaratan" element={<Pendaratan />} />
+          {/* PINTU DEPAN. Halaman ini yang dilihat orang saat membuka
+              jaditrader.co.id, dan ia ada DI LUAR gerbang — memang harus:
+              yang mendarat di sini justru orang yang belum punya akses.
+
+              Sebelumnya `/` menampilkan hero lama; ia sekarang pindah ke
+              /beranda dan tetap bisa dibuka. */}
+          <Route path="/" element={<Template />} />
+          {/* Alamat lamanya DIPERTAHANKAN, bukan dihapus: alamat ini sudah
+              dibagikan dan dipakai memeriksa hasil selama halamannya
+              digarap. Menghapusnya membuat tautan yang beredar jatuh ke
+              rute "*" dan terlihat seperti halamannya hilang. */}
           <Route path="/template" element={<Template />} />
+          {/* Hero lama. Bukan dibuang — isinya masih utuh dan bisa dipakai
+              lagi kalau dibutuhkan. */}
+          <Route path="/beranda" element={<Beranda />} />
+          {/* Halaman pendaratan versi lain, tidak ditautkan dari mana pun.
+              Disimpan sebagai pembanding tampilan. */}
+          <Route path="/pendaratan" element={<Pendaratan />} />
           {/* DI LUAR gerbang, dan memang harus: halaman ini justru tempat
               orang yang belum punya akses memulai pratinjaunya. */}
           <Route path="/pratinjau" element={<Pratinjau />} />
