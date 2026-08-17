@@ -2,7 +2,8 @@
    — template aslinya mengimpornya tanpa pernah memakainya, dan tsconfig
    proyek ini menyalakan noUnusedLocals sehingga build GAGAL karenanya.
    Tidak ada satu pun kelas, teks, atau struktur yang disentuh. */
-import { Terminal, Database, Network, ShieldCheck } from "lucide-react";
+import { CandlestickChart, NotebookPen, PlugZap, Users } from "lucide-react";
+import { PeragaReplay } from "@/components/ui/peraga-replay";
 
 export const Component = () => {
   /* Jarak ATAS dipangkas (py-24/sm:py-32 -> pt-12/sm:pt-16), bawahnya
@@ -10,39 +11,24 @@ export const Component = () => {
      kosong besar yang bertumpuk membuat halamannya terbaca seperti
      terputus — orang mengira isinya sudah habis lalu berhenti menggulir. */
   return (
-    /* ── GARIS TEMPELAN DI ATAS SEKSI INI ────────────────────────────────
-       Latarnya dulu `bg-black` — hitam MURNI rgb(0,0,0) — sementara halaman
-       di atasnya zinc-950 rgb(9,9,11). Selisih sembilan tingkat itu tidak
-       terlihat sebagai "dua warna", tapi tepi tempat keduanya bertemu jadi
-       garis lurus setajam penggaris melintasi seluruh lebar layar.
+    /* ── GARIS TEMPELAN DI BATAS ATAS SEKSI INI ──────────────────────────
+       Riwayatnya perlu diingat supaya tidak diputar ulang dari nol.
 
-       Itulah garis yang berkali-kali dikira berasal dari bias cahaya di
-       hero. Bukan: menghaluskan gradien tidak akan pernah menyentuhnya,
-       karena penyebabnya loncatan warna latar, bukan peluruhan cahaya.
-       Disamakan ke zinc-950 dan garisnya hilang di sumbernya.
+       Latar seksi ini hitam murni rgb(0,0,0), sementara halaman di atasnya
+       dulu zinc-950 rgb(9,9,11). Selisih sebelas tingkat itu tidak terlihat
+       sebagai "dua warna", tapi tepi tempat keduanya bertemu jadi garis
+       lurus setajam penggaris melintasi seluruh lebar layar.
 
-       JANGAN dikembalikan ke bg-black demi "hitam yang lebih pekat" —
-       yang didapat cuma garis itu lagi. */
-    <section className="relative w-full bg-zinc-950 pt-12 pb-24 font-sans text-white sm:pt-16 sm:pb-32 selection:bg-white selection:text-black">
-      {/* Sambungan cahaya dari hero, diturunkan melewati batas seksi sampai
-          kira-kira sejajar lencana "JADI TRADER TOOLS". Gunanya bukan
-          hiasan: ia membuat mata membaca kedua seksi sebagai satu bidang
-          yang menerus, sehingga tidak ada tempat lagi untuk mencari tepi.
+       Itulah garis yang dua kali dikira berasal dari bias cahaya di hero.
+       Bukan — dan karena itu dua putaran penghalusan gradien tidak pernah
+       menyentuhnya sama sekali. Penyebabnya loncatan warna latar.
 
-          Pembungkus isi di bawah diberi `relative` BUKAN sebagai hiasan:
-          elemen berposisi menimpa elemen tak-berposisi di lapisan yang
-          sama, jadi tanpa itu lapisan cahaya ini menutupi judul seksinya. */}
-      <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-64"
-           style={{
-             backgroundImage:
-               'radial-gradient(60% 100% at 50% 0%,'
-               + 'rgba(255,255,255,0.035) 0%,'
-               + 'rgba(255,255,255,0.028) 20%,'
-               + 'rgba(255,255,255,0.017) 42%,'
-               + 'rgba(255,255,255,0.008) 62%,'
-               + 'rgba(255,255,255,0.003) 80%,'
-               + 'rgba(255,255,255,0) 100%)',
-           }} />
+       Sekarang SELURUH halaman ini hitam murni dan seluruh cahayanya
+       dimatikan, atas permintaan pemilik. Aturan yang tersisa satu:
+       seksi mana pun yang ditambahkan ke halaman ini harus memakai warna
+       latar yang sama persis. Satu seksi ber-zinc-950 sudah cukup untuk
+       memunculkan garis itu lagi. */
+    <section className="relative w-full bg-black pt-12 pb-24 font-sans text-white sm:pt-16 sm:pb-32 selection:bg-white selection:text-black">
       <div className="relative mx-auto max-w-6xl px-6 md:px-8">
 
         {/* Section Header */}
@@ -85,131 +71,142 @@ export const Component = () => {
         {/* Bento Grid Layout */}
         <div className="grid w-full grid-cols-1 gap-4 md:grid-cols-3 md:grid-rows-2">
 
-          {/* Feature 1: Large Card (Performance) */}
-          <div className="group flex min-h-[320px] flex-col overflow-hidden rounded-xl border border-white/[0.08] bg-[#050505] transition-colors hover:border-white/[0.15] md:col-span-2">
+          {/* ── Kartu 1: Chart & Entry (replay yang bisa dimainkan) ──────
+              Keempat kartu di bawah ini dulu berisi peraga infrastruktur
+              milik template asalnya — latensi edge node, kunci API, webhook.
+              Tidak satu pun dari itu ada di produk ini, dan halaman jualan
+              yang memperagakan fitur yang tidak dimiliki adalah janji yang
+              harus ditagih orang setelah membayar. Diganti dengan empat
+              layar yang benar-benar ada: Chart & Entry, Jurnal, Integrasi,
+              Copy Signal.
+
+              Yang ini SATU-SATUNYA yang interaktif, dan itu disengaja:
+              replay tidak bisa dijelaskan gambar diam — yang membuatnya
+              masuk akal justru bahwa lanjutannya belum kelihatan. */}
+          <div className="group flex min-h-[320px] flex-col overflow-hidden rounded-xl border border-white/[0.08] bg-black transition-colors hover:border-white/[0.15] md:col-span-2">
             <div className="relative flex flex-1 items-center justify-center p-8">
-              {/* Minimalist Terminal UI Mock */}
-              <div className="w-full max-w-md overflow-hidden rounded-lg border border-white/[0.08] bg-black font-mono text-[11px] leading-relaxed text-neutral-500 sm:text-xs">
-                <div className="flex border-b border-white/[0.08] px-4 py-2">
-                  <div className="flex gap-1.5">
-                    <div className="h-2 w-2 rounded-full bg-white/[0.15]" />
-                    <div className="h-2 w-2 rounded-full bg-white/[0.15]" />
-                    <div className="h-2 w-2 rounded-full bg-white/[0.15]" />
-                  </div>
-                </div>
-                <div className="p-4">
-                  <div className="flex justify-between">
-                    <span className="text-white">latency_check --region global</span>
-                    <span>[OK]</span>
-                  </div>
-                  <div className="mt-2 flex justify-between text-neutral-400">
-                    <span>resolving edge nodes...</span>
-                    <span>12ms</span>
-                  </div>
-                  <div className="flex justify-between text-neutral-400">
-                    <span>authenticating request...</span>
-                    <span>8ms</span>
-                  </div>
-                  <div className="flex justify-between text-neutral-400">
-                    <span>establishing connection...</span>
-                    <span>14ms</span>
-                  </div>
-                  <div className="mt-4 flex items-center gap-2 border-t border-white/[0.08] pt-4 text-white">
-                    <span className="flex h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
-                    Global deployment active (34ms total)
-                  </div>
-                </div>
+              <div className="w-full max-w-md">
+                <PeragaReplay />
               </div>
             </div>
             <div className="border-t border-white/[0.04] bg-white/[0.01] p-6">
               <div className="mb-2 flex items-center gap-2 text-white">
-                <Terminal className="h-4 w-4" />
-                <h3 className="text-sm font-medium">Sub-50ms Execution</h3>
+                <CandlestickChart className="h-4 w-4" />
+                <h3 className="text-sm font-medium">Chart &amp; Entry — Replay</h3>
               </div>
               <p className="text-sm text-neutral-400">
-                Deployed across 150+ edge nodes globally. Your logic executes precisely where your users are, instantly.
+                Putar ulang pergerakan harga bar demi bar dan ambil keputusan tanpa tahu
+                lanjutannya. Coba tombol Putar di atas — begitulah cara alatnya bekerja.
               </p>
             </div>
           </div>
 
-          {/* Feature 2: Small Card (Database) */}
-          <div className="group flex min-h-[320px] flex-col overflow-hidden rounded-xl border border-white/[0.08] bg-[#050505] transition-colors hover:border-white/[0.15]">
+          {/* ── Kartu 2: Jurnal ────────────────────────────────────────── */}
+          <div className="group flex min-h-[320px] flex-col overflow-hidden rounded-xl border border-white/[0.08] bg-black transition-colors hover:border-white/[0.15]">
             <div className="flex flex-1 items-center justify-center p-8">
-              {/* Minimalist Data Structure Mock */}
-              <div className="flex flex-col gap-2 w-full">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="flex h-8 w-full items-center justify-between rounded border border-white/[0.04] bg-white/[0.02] px-3">
-                    <div className="h-1 w-12 rounded bg-white/[0.2]" />
-                    <div className="h-1 w-4 rounded bg-white/[0.1]" />
+              <div className="flex w-full flex-col gap-2">
+                <div className="mb-1 flex items-center justify-between font-mono text-[10px] text-neutral-600">
+                  <span>RIWAYAT TRADE</span>
+                  <span className="rounded border border-white/[0.08] px-1.5 py-0.5">contoh</span>
+                </div>
+                {[
+                  { p: 'BTCUSDT', a: 'BUY', r: '+2,1R', u: true, e: 'Sabar' },
+                  { p: 'SOLUSDT', a: 'SELL', r: '-1,0R', u: false, e: 'FOMO' },
+                  { p: 'XAUUSD', a: 'BUY', r: '+1,4R', u: true, e: 'Disiplin' },
+                ].map((t) => (
+                  <div key={t.p}
+                       className="flex items-center gap-2 rounded border border-white/[0.04] bg-white/[0.02] px-2.5 py-2 font-mono text-[10px]">
+                    <span className="text-neutral-300">{t.p}</span>
+                    <span className={t.a === 'BUY' ? 'text-emerald-400/80' : 'text-red-400/80'}>{t.a}</span>
+                    <span className="ml-auto rounded bg-white/[0.04] px-1.5 py-0.5 text-neutral-500">{t.e}</span>
+                    <span className={t.u ? 'text-emerald-400' : 'text-red-400'}>{t.r}</span>
                   </div>
                 ))}
               </div>
             </div>
             <div className="border-t border-white/[0.04] bg-white/[0.01] p-6">
               <div className="mb-2 flex items-center gap-2 text-white">
-                <Database className="h-4 w-4" />
-                <h3 className="text-sm font-medium">Atomic State</h3>
+                <NotebookPen className="h-4 w-4" />
+                <h3 className="text-sm font-medium">Jurnal</h3>
               </div>
               <p className="text-sm text-neutral-400">
-                Strictly consistent, strongly typed data primitives available at the edge.
+                Tiap trade tercatat lengkap dengan emosi yang menyertainya — di situ pola
+                yang menggerogoti akun mulai kelihatan.
               </p>
             </div>
           </div>
 
-          {/* Feature 3: Small Card (Security) */}
-          <div className="group flex min-h-[320px] flex-col overflow-hidden rounded-xl border border-white/[0.08] bg-[#050505] transition-colors hover:border-white/[0.15]">
+          {/* ── Kartu 3: Integrasi ─────────────────────────────────────── */}
+          <div className="group flex min-h-[320px] flex-col overflow-hidden rounded-xl border border-white/[0.08] bg-black transition-colors hover:border-white/[0.15]">
             <div className="flex flex-1 items-center justify-center p-8">
-              {/* Minimalist Auth Key Mock */}
-              <div className="w-full max-w-[200px] break-all font-mono text-[10px] leading-tight text-neutral-600">
-                <span className="text-white">sk_live_</span>
-                51MkxXXXXXXXXXXXXXXXXXXXXX
-                <br />
-                <br />
-                <div className="h-px w-full bg-white/[0.08] my-2" />
-                AES-256-GCM / SHA-384
+              <div className="flex w-full flex-col gap-2.5">
+                {[
+                  { n: 'MetaTrader 5', k: 'Forex & Emas', s: 'Terhubung' },
+                  { n: 'Binance', k: 'Kripto Futures', s: 'Terhubung' },
+                ].map((i) => (
+                  <div key={i.n} className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3">
+                    <div className="flex items-center gap-2">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                      <span className="text-[12px] text-neutral-200">{i.n}</span>
+                      <span className="ml-auto font-mono text-[9.5px] text-emerald-400/80">{i.s}</span>
+                    </div>
+                    <div className="mt-1.5 pl-3.5 font-mono text-[9.5px] text-neutral-600">{i.k}</div>
+                  </div>
+                ))}
+                <div className="mt-0.5 font-mono text-[9.5px] leading-relaxed text-neutral-600">
+                  Kunci API disimpan di perangkatmu sendiri.
+                </div>
               </div>
             </div>
             <div className="border-t border-white/[0.04] bg-white/[0.01] p-6">
               <div className="mb-2 flex items-center gap-2 text-white">
-                <ShieldCheck className="h-4 w-4" />
-                <h3 className="text-sm font-medium">Zero-Trust Auth</h3>
+                <PlugZap className="h-4 w-4" />
+                <h3 className="text-sm font-medium">Integrasi</h3>
               </div>
               <p className="text-sm text-neutral-400">
-                Enterprise-grade encryption by default. No keys ever touch our database unhashed.
+                Sambungkan MT5 dan Binance, lalu posisi serta riwayatmu masuk sendiri —
+                tidak perlu dicatat ulang satu per satu.
               </p>
             </div>
           </div>
 
-          {/* Feature 4: Large Card (API / Webhooks) */}
-          <div className="group flex min-h-[320px] flex-col overflow-hidden rounded-xl border border-white/[0.08] bg-[#050505] transition-colors hover:border-white/[0.15] md:col-span-2">
+          {/* ── Kartu 4: Copy Signal ───────────────────────────────────── */}
+          <div className="group flex min-h-[320px] flex-col overflow-hidden rounded-xl border border-white/[0.08] bg-black transition-colors hover:border-white/[0.15] md:col-span-2">
             <div className="relative flex flex-1 items-center justify-center p-8">
-              {/* Minimalist Webhook/API Mock */}
-              <div className="flex w-full max-w-sm flex-col gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="flex h-8 items-center rounded border border-white/[0.08] bg-black px-3 font-mono text-xs text-white">
-                    POST
+              <div className="flex w-full max-w-sm flex-col gap-2.5">
+                <div className="flex items-center justify-between font-mono text-[10px] text-neutral-600">
+                  <span>PAPAN SINYAL</span>
+                  <span className="rounded border border-white/[0.08] px-1.5 py-0.5">contoh</span>
+                </div>
+                {[
+                  { i: 'R', n: 'Analis', w: '68%', g: 'Scalping', s: 'Berjalan', warna: 'text-sky-400' },
+                  { i: 'A', n: 'AI Agent', w: '54%', g: 'Intraday', s: 'Menunggu harga', warna: 'text-amber-400' },
+                ].map((a) => (
+                  <div key={a.i} className="flex items-center gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] p-3">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-[11px] font-semibold text-neutral-300">
+                      {a.i}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-[12px] text-neutral-200">{a.n}</span>
+                      <span className="block font-mono text-[9.5px] text-neutral-600">{a.g}</span>
+                    </span>
+                    <span className="ml-auto text-right">
+                      <span className="block font-mono text-[12px] text-emerald-400">{a.w}</span>
+                      <span className={`block font-mono text-[9.5px] ${a.warna}`}>{a.s}</span>
+                    </span>
                   </div>
-                  <div className="flex-1 rounded border border-white/[0.08] bg-black px-3 py-2 font-mono text-xs text-neutral-500">
-                    api.leadmeta.dev/v1/sync
-                  </div>
-                </div>
-                <div className="pl-[60px]">
-                  <div className="h-6 border-l border-white/[0.12]" />
-                </div>
-                <div className="flex items-center justify-between rounded border border-white/[0.08] bg-white/[0.02] p-3 font-mono text-xs text-neutral-400">
-                  <span>{`{ "status": "success", "records": 240 }`}</span>
-                  <span className="text-white">200 OK</span>
-                </div>
+                ))}
               </div>
             </div>
             <div className="border-t border-white/[0.04] bg-white/[0.01] p-6">
               <div className="mb-2 flex items-center gap-2 text-white">
-                <Network className="h-4 w-4" />
-                <h3 className="text-sm font-medium">Programmatic Control</h3>
+                <Users className="h-4 w-4" />
+                <h3 className="text-sm font-medium">Copy Signal</h3>
               </div>
               <p className="text-sm text-neutral-400">
-                Manage every aspect of your infrastructure through our strictly typed REST API.
-                Built for developers who demand complete automation.
+                Sinyal dari analis lain dan agen AI, dinilai dari rekam jejak sinyalnya
+                sendiri — winrate, gaya trading, dan tingkat risikonya dihitung dari harga
+                yang sudah terjadi, bukan dari klaim yang ditulis pemiliknya.
               </p>
             </div>
           </div>

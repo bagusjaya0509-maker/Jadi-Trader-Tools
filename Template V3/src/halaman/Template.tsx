@@ -63,47 +63,18 @@ type LinkItem = {
 function HeroSection() {
   return (
     <section className="mx-auto w-full max-w-5xl overflow-hidden pt-16">
-      {/* Shades */}
-      <div aria-hidden="true" className="absolute inset-0 size-full overflow-hidden">
-        {/* Cahaya DIPINDAH ke tengah atas (18% -> 50%): ditaruh di 18% ia
-            jatuh di bahu kiri judul saja, dan sorotan yang tidak simetris
-            pada latar zinc-950 terbaca sebagai layar yang bocor cahayanya,
-            bukan sebagai sorotan yang disengaja.
+      {/* Cahaya latar DIHAPUS atas permintaan pemilik: seluruh halaman ini
+         sekarang hitam murni polos, tanpa sorotan sama sekali.
 
-            ── KENAPA BUKAN DUA WARNA LAGI ──────────────────────────────
-            Dua stop memberi kenaikan alpha yang LURUS, dan mata menajamkan
-            patahan di ujung ramp lurus (pita Mach). Stop berlapis di bawah
-            ini melengkungkan peluruhannya sehingga tidak ada satu titik pun
-            tempat lajunya berubah mendadak.
+         Riwayat singkatnya, supaya tidak diulang dari nol: garis melintang
+         yang berkali-kali terlihat di sini TIDAK pernah berasal dari cahaya.
+         Penyebabnya loncatan warna latar antar-seksi — hitam murni bertemu
+         zinc-950, selisih sebelas tingkat, cukup untuk membentuk garis
+         setajam penggaris selebar layar. Karena itu menghaluskan gradien
+         dua kali tidak pernah menyelesaikannya.
 
-            CATATAN, supaya tidak "diperbaiki" balik nanti: ujung
-            rgba(255,255,255,0) dipakai karena lebih jelas dibaca, BUKAN
-            karena `transparent` menggeser warna ke abu-abu. Dugaan itu
-            sudah diukur di peramban ini dan tidak terbukti — gradien CSS
-            diinterpolasi dalam ruang premultiplied, dan kedua jalur
-            berakhir di warna yang sama persis di atas zinc-950. Yang
-            benar-benar menghaluskan sambungannya adalah stop berlapis,
-            radius yang lebih lebar, dan hilangnya potongan kotak.
-
-            Ditulis sebagai style, bukan kelas Tailwind: enam stop menjadi
-            satu kelas arbitrer sepanjang baris yang tidak bisa dibaca lagi,
-            dan satu spasi yang terlewat di sana membuatnya diam-diam tidak
-            tergenerasi sama sekali. */}
-        <div
-          className="absolute inset-0 isolate -z-10"
-          style={{
-            backgroundImage:
-              'radial-gradient(46% 55% at 50% 0%,'
-              + 'rgba(255,255,255,0.10) 0%,'
-              + 'rgba(255,255,255,0.088) 18%,'
-              + 'rgba(255,255,255,0.060) 38%,'
-              + 'rgba(255,255,255,0.032) 57%,'
-              + 'rgba(255,255,255,0.013) 75%,'
-              + 'rgba(255,255,255,0.004) 88%,'
-              + 'rgba(255,255,255,0) 100%)',
-          }}
-        />
-      </div>
+         Kalau nanti cahayanya dihidupkan lagi, syaratnya satu: SEMUA seksi
+         di halaman ini harus berlatar warna yang sama persis lebih dulu. */}
       <div className="relative z-10 flex max-w-2xl flex-col gap-5 px-4">
         {/* Lencana "NOW · accepting new client projects" DIBUANG. Ia milik
             template agensi yang menjual jasa; kami menjual alat, tidak
@@ -155,34 +126,6 @@ function HeroSection() {
         </div>
       </div>
       <div className="relative">
-        {/* Dulu satu bulatan besar: -inset-x-20 menjulur 80px melewati kedua
-            sisi dan scale-120 melebarkannya lagi, sehingga cahayanya keluar
-            di kiri, kanan, dan bawah gambar — tiga tepi yang seharusnya
-            gelap. Sekarang dipaku ke tepi ATAS saja.
-
-            Tingginya TIDAK lagi dipotong h-1/2. Kotak yang dipotong memberi
-            batas keras di tempat peluruhannya belum selesai, dan `blur`
-            tidak menyembunyikannya — ia justru menegaskan garisnya. Yang
-            membatasi sekarang gradiennya sendiri: ia sudah mencapai alpha
-            nol jauh sebelum dasar kotak.
-
-            Stop berlapis dengan alasan yang sama seperti cahaya hero di
-            atas, dan blur dinaikkan 50 -> 60px karena radiusnya kini lebih
-            lebar. */}
-        <div
-          className="absolute inset-0 blur-[60px]"
-          style={{
-            backgroundImage:
-              'radial-gradient(58% 62% at 50% 0%,'
-              + 'rgba(255,255,255,0.16) 0%,'
-              + 'rgba(255,255,255,0.140) 18%,'
-              + 'rgba(255,255,255,0.095) 38%,'
-              + 'rgba(255,255,255,0.050) 57%,'
-              + 'rgba(255,255,255,0.020) 75%,'
-              + 'rgba(255,255,255,0.006) 88%,'
-              + 'rgba(255,255,255,0) 100%)',
-          }}
-        />
         <div
           className={cn(
             'relative mt-8 -mr-56 overflow-hidden px-2 sm:mt-12 sm:mr-0 md:mt-20',
@@ -193,7 +136,7 @@ function HeroSection() {
             WebkitMaskImage: 'linear-gradient(to bottom, black 60%, transparent)',
           }}
         >
-          <div className="relative mx-auto max-w-5xl overflow-hidden rounded-lg border bg-background p-2 shadow-xl ring-1 ring-card">
+          <div className="relative mx-auto max-w-5xl overflow-hidden rounded-lg border bg-black p-2 shadow-xl ring-1 ring-card">
             {/* Kotak gambar hero: dulu tangkapan layar dashboard dari CDN
                 efferd, sekarang template story-scroll yang HIDUP — digulir
                 di dalam kotaknya sendiri, seksi-seksinya berputar masuk dan
@@ -425,7 +368,7 @@ const WordmarkIcon = ({ className }: { className?: string }) => (
 
 export default function Template() {
   return (
-    <div className="flex min-h-screen w-full flex-col overflow-y-auto bg-background text-foreground">
+    <div className="flex min-h-screen w-full flex-col overflow-y-auto bg-black text-foreground">
       <Header />
       <main className="grow">
         <HeroSection />
