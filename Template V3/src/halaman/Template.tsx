@@ -65,17 +65,43 @@ function HeroSection() {
     <section className="mx-auto w-full max-w-5xl overflow-hidden pt-16">
       {/* Shades */}
       <div aria-hidden="true" className="absolute inset-0 size-full overflow-hidden">
+        {/* Cahaya DIPINDAH ke tengah atas (18% -> 50%): ditaruh di 18% ia
+            jatuh di bahu kiri judul saja, dan sorotan yang tidak simetris
+            pada latar zinc-950 terbaca sebagai layar yang bocor cahayanya,
+            bukan sebagai sorotan yang disengaja.
+
+            ── KENAPA BUKAN DUA WARNA LAGI ──────────────────────────────
+            Dua stop memberi kenaikan alpha yang LURUS, dan mata menajamkan
+            patahan di ujung ramp lurus (pita Mach). Stop berlapis di bawah
+            ini melengkungkan peluruhannya sehingga tidak ada satu titik pun
+            tempat lajunya berubah mendadak.
+
+            CATATAN, supaya tidak "diperbaiki" balik nanti: ujung
+            rgba(255,255,255,0) dipakai karena lebih jelas dibaca, BUKAN
+            karena `transparent` menggeser warna ke abu-abu. Dugaan itu
+            sudah diukur di peramban ini dan tidak terbukti — gradien CSS
+            diinterpolasi dalam ruang premultiplied, dan kedua jalur
+            berakhir di warna yang sama persis di atas zinc-950. Yang
+            benar-benar menghaluskan sambungannya adalah stop berlapis,
+            radius yang lebih lebar, dan hilangnya potongan kotak.
+
+            Ditulis sebagai style, bukan kelas Tailwind: enam stop menjadi
+            satu kelas arbitrer sepanjang baris yang tidak bisa dibaca lagi,
+            dan satu spasi yang terlewat di sana membuatnya diam-diam tidak
+            tergenerasi sama sekali. */}
         <div
-          className={cn(
-            'absolute inset-0 isolate -z-10',
-            /* Cahaya putihnya diredupkan 0,1 -> 0,04, lalu DIPINDAH ke tengah
-               atas (18% -> 50%). Ditaruh di 18% ia jatuh di bahu kiri judul
-               saja, dan sorotan yang tidak simetris pada latar zinc-950
-               terbaca sebagai layar yang bocor cahayanya, bukan sebagai
-               sorotan yang disengaja. Melebar 16% -> 42% karena berkas
-               setipis itu di tengah berubah jadi garis, bukan cahaya. */
-            'bg-[radial-gradient(42%_50%_at_50%_0%,rgba(255,255,255,0.04),transparent)]',
-          )}
+          className="absolute inset-0 isolate -z-10"
+          style={{
+            backgroundImage:
+              'radial-gradient(46% 55% at 50% 0%,'
+              + 'rgba(255,255,255,0.10) 0%,'
+              + 'rgba(255,255,255,0.088) 18%,'
+              + 'rgba(255,255,255,0.060) 38%,'
+              + 'rgba(255,255,255,0.032) 57%,'
+              + 'rgba(255,255,255,0.013) 75%,'
+              + 'rgba(255,255,255,0.004) 88%,'
+              + 'rgba(255,255,255,0) 100%)',
+          }}
         />
       </div>
       <div className="relative z-10 flex max-w-2xl flex-col gap-5 px-4">
@@ -129,18 +155,33 @@ function HeroSection() {
         </div>
       </div>
       <div className="relative">
+        {/* Dulu satu bulatan besar: -inset-x-20 menjulur 80px melewati kedua
+            sisi dan scale-120 melebarkannya lagi, sehingga cahayanya keluar
+            di kiri, kanan, dan bawah gambar — tiga tepi yang seharusnya
+            gelap. Sekarang dipaku ke tepi ATAS saja.
+
+            Tingginya TIDAK lagi dipotong h-1/2. Kotak yang dipotong memberi
+            batas keras di tempat peluruhannya belum selesai, dan `blur`
+            tidak menyembunyikannya — ia justru menegaskan garisnya. Yang
+            membatasi sekarang gradiennya sendiri: ia sudah mencapai alpha
+            nol jauh sebelum dasar kotak.
+
+            Stop berlapis dengan alasan yang sama seperti cahaya hero di
+            atas, dan blur dinaikkan 50 -> 60px karena radiusnya kini lebih
+            lebar. */}
         <div
-          className={cn(
-            /* Dulu satu bulatan besar: -inset-x-20 menjulur 80px melewati
-               kedua sisi dan scale-120 melebarkannya lagi, sehingga
-               cahayanya keluar di kiri, kanan, dan bawah gambar — tiga
-               tepi yang seharusnya gelap. Sekarang dipaku ke tepi ATAS
-               saja (at 50% 0%) dan tingginya dibatasi setengah kotak, jadi
-               yang tersisa satu sorotan dari atas-tengah. */
-            'absolute inset-x-0 top-0 h-1/2',
-            'bg-[radial-gradient(50%_100%_at_50%_0%,rgba(255,255,255,0.1),transparent)]',
-            'blur-[50px]',
-          )}
+          className="absolute inset-0 blur-[60px]"
+          style={{
+            backgroundImage:
+              'radial-gradient(58% 62% at 50% 0%,'
+              + 'rgba(255,255,255,0.16) 0%,'
+              + 'rgba(255,255,255,0.140) 18%,'
+              + 'rgba(255,255,255,0.095) 38%,'
+              + 'rgba(255,255,255,0.050) 57%,'
+              + 'rgba(255,255,255,0.020) 75%,'
+              + 'rgba(255,255,255,0.006) 88%,'
+              + 'rgba(255,255,255,0) 100%)',
+          }}
         />
         <div
           className={cn(

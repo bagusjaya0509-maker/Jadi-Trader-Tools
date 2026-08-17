@@ -16,17 +16,32 @@ export const Component = () => {
         {/* Section Header */}
         <div className="mb-16 flex flex-col items-center text-center">
           <div className="mb-6 inline-flex items-center rounded-full border border-white/[0.12] bg-white/[0.03] px-3 py-1 text-xs font-medium uppercase tracking-widest text-neutral-400">
-            Platform Capabilities
+            Jadi Trader Tools
           </div>
           {/* Skalanya diturunkan satu tingkat (4xl/5xl/6xl -> 3xl/4xl/5xl) dan
               kotaknya dilebarkan. Ukuran lama dipilih untuk "Everything you
               need." — tiga kata. Kalimat Indonesianya lima kali lebih panjang,
               dan pada 6xl ia memakan seluruh layar sampai kartu-kartu di
               bawahnya tidak pernah terlihat tanpa menggulir dua kali. */}
-          <h2 className="mb-4 max-w-4xl text-balance text-3xl font-medium tracking-tighter text-white sm:text-4xl md:text-5xl">
+          {/* Skalanya diturunkan satu tingkat (4xl/5xl/6xl -> 3xl/4xl/5xl) dan
+              kotaknya dilebarkan 4xl -> 5xl. Ukuran lama dipilih untuk
+              "Everything you need." — tiga kata.
+
+              Lebarnya diukur, bukan ditebak: pada 48px baris penutupnya
+              butuh 944px sementara max-w-4xl cuma 896px, jadi "Gambler."
+              selalu jatuh sendirian ke baris berikutnya. max-w-5xl (1024px)
+              memberi kelonggaran yang cukup. */}
+          <h2 className="mb-4 max-w-5xl text-balance text-3xl font-medium tracking-tighter text-white sm:text-4xl md:text-5xl">
             Semua Tools Yang Dibuat Diarahkan Menjadi Sistem Paksa Untuk Bisa
             Mendisiplinkan Diri <br className="hidden sm:block" />
-            <span className="text-neutral-600">Untuk Membentuk Jiwa Trader, Bukan Gambler.</span>
+            {/* Satu baris HANYA dari lg ke atas. Di bawah itu ruangnya
+                memang tidak cukup (768px cuma menyediakan ~704px untuk
+                kalimat yang butuh 944px), dan memaksakan nowrap di sana
+                bukan membuatnya satu baris — ia membuat seluruh halaman
+                bisa digeser ke samping. */}
+            <span className="text-neutral-600 lg:whitespace-nowrap">
+              Untuk Membentuk Jiwa Trader, Bukan Gambler.
+            </span>
           </h2>
           <p className="max-w-2xl text-balance text-base text-neutral-400 sm:text-lg">
             Tujuan tools ini dibuat karena dari sekian pengalaman yang ada, satu-satunya
