@@ -15,7 +15,8 @@ import { usePinAnalis } from '@/lib/pin-analis';
 import { cn, uang, persen, harga as fHarga, tanggalPendek } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 import { useRiwayat, useSaldoAwal } from '@/lib/data';
-import { useHargaPasar } from '@/lib/harga';
+import { useHargaPasar, useHargaTradeFi } from '@/lib/harga';
+import { simbolDasarMt5 } from '@/lib/simbol';
 import { statGabungan, kurvaEkuitas } from '@/lib/hitung';
 import { useTutupLuar } from '@/lib/tutup-luar';
 import {
@@ -409,9 +410,14 @@ function KartuAnalisa({ a, status, milikku, pemilik, onSegarkan, performa, dibat
   a: RingkasAnalisa;
   status: string | undefined;
   milikku: boolean;
-  /** Harga pasar terkini pasangan ini. undefined = tidak diketahui —
-   *  pasangan Trade-Fi memang tidak punya sumber harga publik di sini, dan
-   *  kartunya lebih baik diam daripada menampilkan harga pasar lain. */
+  /** Harga pasar terkini pasangan ini. undefined = tidak diketahui, dan
+   *  kartunya memang diam saat itu terjadi.
+   *
+   *  Untuk Trade-Fi, undefined juga berarti tick MT5-nya sudah kedaluwarsa
+   *  — terminal pemilik mati, chart-nya dilepas, atau pasar sedang tutup.
+   *  Diam di situ disengaja: harga akhir pekan yang tampil seolah hidup
+   *  akan menjawab "rencana ini masih terpakai?" dengan percaya diri dan
+   *  salah. Lihat useHargaTradeFi. */
   hargaKini?: number;
   /** Performa seluruh papan — kartu ini cuma mengambil barisnya sendiri.
    *  Dioper dari halaman, bukan diambil ulang tiap kartu: satu daftar bisa
@@ -521,7 +527,21 @@ function KartuAnalisa({ a, status, milikku, pemilik, onSegarkan, performa, dibat
               masih terkunci, tapi menjawab pertanyaan yang menentukan: ini
               rencana yang menunggu harga datang, atau eksekusi sekarang?
               Orang yang menimbang membeli berhak tahu itu lebih dulu. */}
-          {(a.jenisEntry || selesai) && (
+          {/* Baris ini dulu digerbangi `(a.jenisEntry || selesai)`, dan itu
+              masuk akal ketika isinya HANYA tipe entry: tidak ada tipe, tidak
+              ada yang digambar.
+
+              Begitu lencana keadaan (Berjalan / Menunggu harga) dan harga
+              terkini masuk ke sini, gerbang itu berubah jadi bug: sinyal
+              dengan jenisEntry kosong — entry pasar, dan itu wajar — kehilangan
+              SELURUH barisnya, termasuk dua keterangan yang tidak ada
+              hubungannya dengan tipe entry. Nyata di XAUUSD: kartunya tidak
+              pernah menampilkan status maupun harga sementara kartu kripto di
+              sebelahnya menampilkan keduanya.
+
+              Gerbangnya dibuang. Barisnya selalu punya isi: kalau selesai ada
+              lencana hasil, kalau belum ada lencana keadaan. */}
+          {(
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
               {a.jenisEntry && (
                 <span className="rounded border border-zinc-800 px-1.5 py-0.5 text-[10px] font-medium text-zinc-400">
@@ -849,12 +869,22 @@ export default function Analisa() {
   /* Harga terkini tiap pasangan, dipakai kartu sinyal untuk menjawab satu
      pertanyaan: rencana ini masih terpakai atau harganya sudah lewat?
 
-     HANYA kripto. useHargaPasar menyaring sendiri ke simbol Binance, jadi
-     pasangan Trade-Fi memulangkan undefined dan kartunya tidak menampilkan
-     angka apa pun. Itu disengaja: harga MT5 datang dari EA di terminal
-     pemiliknya, dan menampilkan harga Binance untuk XAUUSD Exness adalah
-     angka yang terlihat benar sambil menunjuk pasar yang berbeda. */
+     DUA sumber, karena memang dua pasar yang berbeda:
+       kripto   -> proxy VPS ke Binance, selalu hidup
+       Trade-Fi -> tick MT5 dari EA di terminal pemilik, dan HANYA yang
+                   masih segar (lihat useHargaTradeFi soal harga basi)
+
+     Keduanya tidak pernah tercampur: useHargaPasar menyaring sendiri ke
+     simbol berakhiran USDT/USDC/BUSD/FDUSD, sisanya dicari di peta MT5.
+     Menampilkan harga Binance untuk XAUUSD Exness adalah angka yang
+     terlihat benar sambil menunjuk pasar yang berbeda. */
   const hargaPasar = useHargaPasar(daftar.map((a) => a.pasangan));
+  const hargaMt5 = useHargaTradeFi();
+  /* Pasangan sinyal ditulis apa adanya oleh penulisnya ("XAUUSD"), sementara
+     peta MT5 berkunci simbol dasar. simbolDasarMt5 memotong akhiran broker
+     supaya "XAUUSDc" dan "XAUUSD" bertemu di kunci yang sama. */
+  const hargaUntuk = (pasangan: string): number | undefined =>
+    hargaPasar[pasangan] ?? hargaMt5[simbolDasarMt5(pasangan)];
   /* Sub-halaman kanal: berjalan / menunggu harga / selesai. */
   const [rakAktif, setRakAktif] = useState<'jalan' | 'nunggu' | 'selesai'>('jalan');
   const [masuk, setMasuk] = useState<PermintaanMasuk[]>([]);
@@ -1839,7 +1869,7 @@ export default function Analisa() {
                         <div key={a.id} className="w-[320px] shrink-0">
                           <KartuAnalisa a={a} status={statusku[a.id]}
                             milikku={a.uid === pengguna?.uid} pemilik={pemilik} onSegarkan={segarkan}
-                            performa={performa} hargaKini={hargaPasar[a.pasangan]}
+                            performa={performa} hargaKini={hargaUntuk(a.pasangan)}
                             dibatalkanAnalis={terpilih.filter((s) => s.hasil === 'batal')}
                             berjalanAnalis={berjalan.length} />
                         </div>

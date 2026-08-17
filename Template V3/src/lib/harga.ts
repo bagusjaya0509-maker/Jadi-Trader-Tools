@@ -85,3 +85,65 @@ export function useHargaPasar(simbol: string[]): Record<string, number> {
 
   return harga;
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   HARGA TRADE-FI (MT5) — dan kenapa yang BASI harus disembunyikan
+   ════════════════════════════════════════════════════════════════════════
+   Kripto punya bursa yang selalu hidup; Trade-Fi tidak. Harga MT5 sampai ke
+   sini hanya lewat EA yang menempel di chart di terminal pemiliknya. Kalau
+   terminalnya ditutup, chart-nya dilepas, atau pasarnya tutup akhir pekan,
+   angka terakhir tetap tersimpan di server — dan diam di situ.
+
+   Terukur saat fitur ini dibuat (17 Agu 2026): XAUUSD berumur 1 detik,
+   sementara EURJPY, USDJPY, dan GBPUSD berumur ~1.720 detik karena
+   chart-nya baru saja ditutup. Ketiganya tetap dipulangkan server dengan
+   bentuk yang persis sama dengan yang segar.
+
+   Menampilkan angka 28 menit lalu sebagai "harga terkini" di kartu sinyal
+   bukan ketidaksempurnaan kecil — kartu itu dipakai memutuskan apakah
+   sebuah rencana masih layak diikuti. Harga basi menjawab pertanyaan itu
+   dengan percaya diri, dan salah.
+
+   Jadi yang lewat batas umur TIDAK ditampilkan sama sekali. Kartu tanpa
+   harga jujur mengatakan "tidak tahu"; kartu dengan harga basi berbohong.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/** Di atas ini tick dianggap sudah tidak mewakili pasar. EA mengirim tiap
+ *  detik saat aktif, jadi 90 detik sudah sangat longgar — ia menoleransi
+ *  jaringan tersendat tanpa pernah menoleransi terminal yang mati. */
+const UMUR_TICK_MAKS_MS = 90_000;
+const JEDA_MT5_MS = 10_000;
+
+/** Peta simbol dasar (XAUUSD, BTCUSD, …) → harga tick MT5 yang MASIH SEGAR.
+ *  Simbol yang tick terakhirnya kedaluwarsa sengaja tidak muncul. */
+export function useHargaTradeFi(): Record<string, number> {
+  const [harga, setHarga] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    let hidup = true;
+
+    async function segarkan() {
+      const { hargaTickMt5 } = await import('@/lib/pasar');
+      const mentah = await hargaTickMt5();
+      if (!hidup) return;
+      const kini = Date.now();
+      const segar: Record<string, number> = {};
+      for (const [simbol, t] of Object.entries(mentah)) {
+        if (!t || !(t.bid > 0)) continue;
+        if (kini - (t.waktu || 0) > UMUR_TICK_MAKS_MS) continue;
+        segar[simbol] = t.bid;
+      }
+      /* DITIMPA seluruhnya, bukan digabung seperti pada kripto. Simbol yang
+         tadinya segar lalu berhenti mengirim HARUS hilang dari layar —
+         menggabung akan mengabadikan harga terakhirnya selamanya, yang
+         persis kesalahan yang sedang dicegah. */
+      setHarga(segar);
+    }
+
+    void segarkan();
+    const jam = setInterval(() => void segarkan(), JEDA_MT5_MS);
+    return () => { hidup = false; clearInterval(jam); };
+  }, []);
+
+  return harga;
+}
