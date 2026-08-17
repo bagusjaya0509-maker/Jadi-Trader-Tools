@@ -46,6 +46,27 @@ export interface AksiOrder {
    dan panel ini tidak perlu tahu apa pun tentang cara menggambar.
    ════════════════════════════════════════════════════════════════════════ */
 
+/* ── Baris kendali: SATU BARIS yang digeser di ponsel ────────────────────
+   Sebelumnya `flex-wrap`, dan itu tampak aman sampai dilihat di layar 375px.
+
+   Bilah ini ditumpangkan di DASAR chart (`bottom` di chart-lilin), sementara
+   tiket order ditumpangkan di ATASNYA (`top-2`). Di layar lebar keduanya
+   tidak pernah bertemu. Di ponsel isinya tidak muat satu baris, `flex-wrap`
+   memecahnya jadi tiga baris, dan karena dijangkarkan ke bawah ia tumbuh KE
+   ATAS — persis ke dalam tiket order yang sedang tumbuh ke bawah. Yang
+   terlihat pengguna: tombol putar menindih baris R:R.
+
+   Digeser mendatar, bukan dibungkus, karena chart di ponsel cuma setinggi
+   sekitar 340 px. Tinggi adalah barang paling langka di layar itu; lebar
+   bisa digeser, tinggi tidak bisa dikembalikan.
+
+   `sm:` mengembalikan perilaku lama di layar lebar, supaya tampilan desktop
+   yang sudah benar tidak ikut berubah. */
+const BARIS_KENDALI =
+  'flex items-center gap-1.5 overflow-x-auto ' +
+  '[-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ' +
+  'sm:flex-wrap sm:overflow-visible';
+
 export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, aturAksi, aturKendali, aturMulai, demoSetelan, usulSl, usulTp, tanpaBingkai = false, tampil = true, bidik = false, onBatalBidik }: {
   lilin: Lilin;
   simbol: string;
@@ -389,20 +410,20 @@ export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, aturAks
      ajakan memilih titik — karena barnya memang belum di mana-mana. */
   const kendaliBidik = (
     <div>
-      <div className="flex flex-wrap items-center gap-1.5">
+      <div className={BARIS_KENDALI}>
         <button onClick={mulai} title="Mulai dari 60% data"
-          className="flex size-8 cursor-pointer items-center justify-center rounded-md bg-zinc-100 text-zinc-950 transition-colors hover:bg-white">
+          className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md bg-zinc-100 text-zinc-950 transition-colors hover:bg-white">
           <Play className="size-4" />
         </button>
         <button onClick={mulai} title="Mulai dari 60% data"
-          className="flex size-8 cursor-pointer items-center justify-center rounded-md border border-zinc-700/70 bg-zinc-900/70 text-zinc-300 transition-colors hover:border-zinc-600">
+          className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md border border-zinc-700/70 bg-zinc-900/70 text-zinc-300 transition-colors hover:border-zinc-600">
           <SkipForward className="size-4" />
         </button>
         <button onClick={mulai} title="Mulai dari 60% data"
-          className="flex size-8 cursor-pointer items-center justify-center rounded-md border border-zinc-700/70 bg-zinc-900/70 text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200">
+          className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md border border-zinc-700/70 bg-zinc-900/70 text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200">
           <RotateCcw className="size-4" />
         </button>
-        <div className="flex overflow-hidden rounded-md border border-zinc-700/70 bg-zinc-900/70">
+        <div className="flex shrink-0 overflow-hidden rounded-md border border-zinc-700/70 bg-zinc-900/70">
           {KECEPATAN.map((k) => (
             <button key={k.x} onClick={() => setCepat(k.x)}
               className={cn('cursor-pointer px-2 py-1.5 text-[11.5px] transition-colors',
@@ -411,11 +432,11 @@ export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, aturAks
             </button>
           ))}
         </div>
-        <span className="rounded bg-amber-500/15 px-2 py-1 text-[11px] text-amber-300">
+        <span className="shrink-0 whitespace-nowrap rounded bg-amber-500/15 px-2 py-1 text-[11px] text-amber-300">
           Klik di chart untuk memilih titik mulai
         </span>
         <button onClick={onBatalBidik} title="Batal"
-          className="ml-auto flex cursor-pointer items-center gap-1 rounded-md border border-zinc-700/70 bg-zinc-900/70 px-2 py-1.5 text-[11.5px] text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200">
+          className="flex shrink-0 cursor-pointer items-center gap-1 rounded-md border border-zinc-700/70 bg-zinc-900/70 px-2 py-1.5 text-[11.5px] text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200 sm:ml-auto">
           <X className="size-3.5" /> Keluar
         </button>
       </div>
@@ -430,20 +451,20 @@ export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, aturAks
 
   const kendali = idx === null ? (bidik ? kendaliBidik : null) : (
     <div>
-      <div className="flex flex-wrap items-center gap-1.5">
+      <div className={BARIS_KENDALI}>
         <button onClick={() => setMain(!main)}
-          className="flex size-8 cursor-pointer items-center justify-center rounded-md bg-zinc-100 text-zinc-950 transition-colors hover:bg-white">
+          className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md bg-zinc-100 text-zinc-950 transition-colors hover:bg-white">
           {main ? <Pause className="size-4" /> : <Play className="size-4" />}
         </button>
         <button onClick={majuSatu} title="Maju satu bar (→)"
-          className="flex size-8 cursor-pointer items-center justify-center rounded-md border border-zinc-700/70 bg-zinc-900/70 text-zinc-300 transition-colors hover:border-zinc-600">
+          className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md border border-zinc-700/70 bg-zinc-900/70 text-zinc-300 transition-colors hover:border-zinc-600">
           <SkipForward className="size-4" />
         </button>
         <button onClick={mulai} title="Ulang dari awal"
-          className="flex size-8 cursor-pointer items-center justify-center rounded-md border border-zinc-700/70 bg-zinc-900/70 text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200">
+          className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md border border-zinc-700/70 bg-zinc-900/70 text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200">
           <RotateCcw className="size-4" />
         </button>
-        <div className="flex overflow-hidden rounded-md border border-zinc-700/70 bg-zinc-900/70">
+        <div className="flex shrink-0 overflow-hidden rounded-md border border-zinc-700/70 bg-zinc-900/70">
           {KECEPATAN.map((k) => (
             <button key={k.x} onClick={() => setCepat(k.x)}
               className={cn('cursor-pointer px-2 py-1.5 text-[11.5px] transition-colors',
@@ -452,11 +473,11 @@ export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, aturAks
             </button>
           ))}
         </div>
-        <span className="angka rounded bg-zinc-900/70 px-2 py-1 text-[11px] text-zinc-400">
+        <span className="angka shrink-0 whitespace-nowrap rounded bg-zinc-900/70 px-2 py-1 text-[11px] text-zinc-400">
           bar {idx + 1}/{lilin.closes.length} · {tanggalPendek(lilin.times[idx])}
         </span>
         <button onClick={keluar} title="Keluar dari replay"
-          className="ml-auto flex cursor-pointer items-center gap-1 rounded-md border border-zinc-700/70 bg-zinc-900/70 px-2 py-1.5 text-[11.5px] text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200">
+          className="flex shrink-0 cursor-pointer items-center gap-1 rounded-md border border-zinc-700/70 bg-zinc-900/70 px-2 py-1.5 text-[11.5px] text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200 sm:ml-auto">
           <X className="size-3.5" /> Keluar
         </button>
       </div>

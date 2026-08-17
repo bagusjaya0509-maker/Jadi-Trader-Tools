@@ -1521,8 +1521,14 @@ export function ChartLilin({
       {/* left-14: logo atribusi TradingView duduk di pojok kiri bawah panel
           harga, dan lisensi lightweight-charts mensyaratkan ia terlihat —
           kendalinya yang minggir, bukan logonya. */}
+      {/* right-2 HANYA di ponsel (sm:right-auto mengembalikannya di layar
+          lebar). Bilah kendalinya digeser mendatar di sana, dan sebuah
+          wadah yang lebarnya "auto" tidak pernah bisa menggeser apa pun —
+          ia cuma tumbuh sampai isinya muat lalu meluber keluar chart. Batas
+          kanan inilah yang memberinya lebar untuk digeser. */}
       {hamparanBawah && (
-        <div ref={hamparanRef} className="absolute left-14 z-20" style={{ bottom: smi ? 120 : 34 }}>
+        <div ref={hamparanRef} className="absolute left-14 right-2 z-20 sm:right-auto"
+             style={{ bottom: smi ? 120 : 34 }}>
           {hamparanBawah}
         </div>
       )}
