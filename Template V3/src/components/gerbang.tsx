@@ -133,11 +133,17 @@ export function MenuPengguna() {
             <div className="border-b border-zinc-800 px-4 py-3">
               <div className="text-[11px] uppercase tracking-wider text-zinc-600">Akses</div>
               <div className="mt-1 flex items-baseline gap-2">
+                {/* Pemilik didahulukan atas status langganan — sama alasannya
+                    dengan PitaLangganan: gerbang memakai dua sumber, dan
+                    membaca satu saja menulis "Habis" untuk orang yang
+                    aksesnya justru tidak bisa dicabut. */}
                 <span className={cn('text-[13px]',
-                  langganan.status === 'aktif' ? 'text-emerald-400'
+                  pemilik ? 'text-amber-400'
+                    : langganan.status === 'aktif' ? 'text-emerald-400'
                     : langganan.status === 'pratinjau' ? 'text-sky-300'
                     : langganan.status === 'habis' ? 'text-red-400' : 'text-zinc-400')}>
-                  {langganan.status === 'aktif' ? 'Aktif'
+                  {pemilik ? 'Penuh'
+                    : langganan.status === 'aktif' ? 'Aktif'
                     : langganan.status === 'pratinjau' ? 'Pratinjau'
                     : langganan.status === 'habis' ? 'Habis' : 'Belum diketahui'}
                 </span>
@@ -145,17 +151,22 @@ export function MenuPengguna() {
                     satuan untuk keduanya menulis "sisa 1 hari" untuk sisa dua
                     menit, dan itu kebohongan yang baru ketahuan saat layarnya
                     mendadak terkunci. */}
-                {langganan.status === 'pratinjau' && langganan.sisaMs !== null && (
+                {!pemilik && langganan.status === 'pratinjau' && langganan.sisaMs !== null && (
                   <span className="angka text-[11.5px] text-zinc-500">sisa {sisaTerbaca(langganan.sisaMs)}</span>
                 )}
-                {langganan.status === 'aktif' && langganan.sisaHari !== null && (
+                {!pemilik && langganan.status === 'aktif' && langganan.sisaHari !== null && (
                   <span className="angka text-[11.5px] text-zinc-500">sisa {langganan.sisaHari} hari</span>
                 )}
               </div>
-              <Link to={langganan.status === 'aktif' ? '/tagihan' : '/akses'} onClick={() => setBuka(false)}
-                className="mt-2 inline-flex items-center gap-1 text-[12px] text-zinc-300 hover:text-zinc-100">
-                {langganan.status === 'aktif' ? 'Kelola tagihan' : 'Minta akses penuh'} <ChevronRight className="size-3" />
-              </Link>
+              {/* Pemilik tidak punya tagihan dan tidak perlu meminta akses —
+                  keduanya tautan yang menuju halaman yang tidak menjawab
+                  apa pun untuknya. */}
+              {!pemilik && (
+                <Link to={langganan.status === 'aktif' ? '/tagihan' : '/akses'} onClick={() => setBuka(false)}
+                  className="mt-2 inline-flex items-center gap-1 text-[12px] text-zinc-300 hover:text-zinc-100">
+                  {langganan.status === 'aktif' ? 'Kelola tagihan' : 'Minta akses penuh'} <ChevronRight className="size-3" />
+                </Link>
+              )}
             </div>
 
             <button
@@ -197,7 +208,7 @@ export function sisaTerbaca(ms: number): string {
    gerbangnya sendiri yang menahan.
    ════════════════════════════════════════════════════════════════════════ */
 export function PitaLangganan() {
-  const { pengguna, langganan } = useAuth();
+  const { pengguna, langganan, pemilik } = useAuth();
   const [tutup, setTutup] = useState(false);
   /* Detak per menit supaya hitungannya turun sendiri. Bukan per detik:
      layarnya tidak perlu setepat itu, dan render tiap detik di seluruh
@@ -211,7 +222,25 @@ export function PitaLangganan() {
 
   if (!pengguna) return null;
 
+  /* PEMILIK tidak pernah melihat pita ini.
+     ────────────────────────────────────────────────────────────────────
+     Pemilik lolos gerbang lewat jalur `pemilik`, BUKAN lewat status
+     langganan — dan status langganannya sendiri terhitung 'habis', karena
+     ia memang tidak punya `bayarSampai` dan tidak pernah mengambil
+     pratinjau. Tanpa penjaga ini, satu-satunya orang yang aksesnya paling
+     tidak mungkin dicabut justru disuruh "minta kode akses" tiap kali
+     membuka Dashboard.
+
+     Pelajarannya lebih luas dari satu pita: layar yang menyimpulkan hak
+     akses dari `langganan.status` saja akan selalu salah untuk pemilik,
+     karena gerbangnya memakai DUA sumber. Yang membaca hak akses harus
+     membaca keduanya. */
+  if (pemilik) return null;
+
   const pratinjau = langganan.status === 'pratinjau';
+  /* 'habis' hanya bisa terlihat sekejap: begitu statusnya berubah,
+     gerbang melempar orangnya ke /akses. Pitanya tetap ada supaya
+     detik-detik itu tidak berupa layar yang berubah tanpa penjelasan. */
   const habis = langganan.status === 'habis';
   if (!pratinjau && !habis) return null;
   if (habis && tutup) return null;
