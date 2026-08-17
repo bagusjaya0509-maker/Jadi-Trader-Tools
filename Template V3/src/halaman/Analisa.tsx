@@ -524,6 +524,17 @@ function KartuAnalisa({ a, status, milikku, pemilik, onSegarkan, performa, dibat
             )}
             {a.tf && <span className="angka text-[11px] text-zinc-500">{a.tf}</span>}
             <span className="text-[11px] text-zinc-600">· {tanggalPendek(a.dibuat)}</span>
+            {/* HARGA DI UJUNG BARIS INI, bukan di tengah kartu.
+                Sebelumnya ia berdiri sendiri di antara isi analisa dan
+                tombol, dan di rak mendatar posisinya ikut bergeser
+                mengikuti panjang judul tiap kartu — mata harus
+                mencarinya ulang di tiap kartu. Di ujung baris kepala ia
+                selalu di tempat yang sama, sebaris dengan tanggal:
+                dua keterangan yang sama-sama dibaca sekilas. */}
+            <span className={cn('angka ml-auto shrink-0 text-[13px] font-semibold',
+              a.harga === 0 ? 'text-emerald-500' : 'text-zinc-100')}>
+              {a.harga === 0 ? 'Gratis' : uang(a.harga)}
+            </span>
           </div>
           {/* Tipe entry DI TAMPILAN UTAMA, sebelum analisanya dibuka.
               Ia keterangan, bukan angka — jadi tidak membocorkan level yang
@@ -645,9 +656,6 @@ function KartuAnalisa({ a, status, milikku, pemilik, onSegarkan, performa, dibat
           </div>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1.5">
-          <span className={cn('angka text-[14px] font-semibold', a.harga === 0 ? 'text-emerald-500' : 'text-zinc-100')}>
-            {a.harga === 0 ? 'Gratis' : uang(a.harga)}
-          </span>
           {/* Dulu tombol ini disembunyikan untuk agen, dan alasannya sudah
               tidak berlaku: yang dibukanya bukan lagi snapshot jurnal
               melainkan performa SINYAL — dihitung server dari lilin sejak
