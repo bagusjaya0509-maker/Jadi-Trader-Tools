@@ -23,10 +23,17 @@ import StoryScrollDemo from '@/components/ui/story-scroll-demo';
 /* ════════════════════════════════════════════════════════════════════════
    TEMPLATE — header-3 + hero-3 APA ADANYA
    ════════════════════════════════════════════════════════════════════════
-   Halaman ini SENGAJA tidak tahu apa-apa tentang Jadi Trader Tools. Tidak
-   ada tautan ke halaman kami, tidak ada nama produk kami, tidak ada angka
-   kami. Isinya salinan utuh template aslinya — copy bahasa Inggris, menu
-   Website Builder / Cloud Platform, tangkapan layar dari CDN efferd.
+   Kerangkanya salinan utuh template aslinya — copy bahasa Inggris, menu
+   Website Builder / Cloud Platform, tata letak header + hero apa adanya.
+
+   SATU bagian sekarang berisi milik kita: kotak gambar di hero, yang
+   tadinya tangkapan layar dashboard dari CDN efferd, diganti tur lima
+   layar aplikasi sendiri (lihat story-scroll-demo.tsx). Itu memang yang
+   diminta pemilik — kotak itu bagian yang paling masuk akal diganti,
+   karena di sanalah template menaruh "produknya".
+
+   Sisanya tetap tidak tahu apa-apa tentang kita: tidak ada tautan ke
+   halaman kami, dan tidak satu pun angka kami di dalam copy-nya.
 
    Kenapa berdiri sendiri: mencampur template dengan isi sungguhan membuat
    dua hal yang berbeda sifat sulit dibedakan. Kalau template ini kelak
