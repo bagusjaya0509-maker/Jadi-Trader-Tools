@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Ban, ChevronDown, ChevronRight, Sparkles, Target } from 'lucide-react';
+import { Ban, ChevronDown, ChevronRight, Eye, Sparkles, Target } from 'lucide-react';
 import { KalenderPl } from '@/components/kalender-pl';
 import { LeaderboardCard } from '@/components/ui/leaderboard-card';
 import { cn, uang, persen, tanggalPendek } from '@/lib/utils';
@@ -93,8 +93,25 @@ export function PapanPeringkatSignal({ data }: { data: Performa | null }) {
         className="mb-2 flex w-full cursor-pointer items-center gap-1.5 rounded-md px-1 py-1 text-[11.5px] text-zinc-500 transition-colors hover:bg-zinc-900 hover:text-zinc-300">
         {buka ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
         {buka ? 'Sembunyikan papan peringkat' : 'Tampilkan papan peringkat analis'}
+        {/* Label contoh WAJIB, dan ditaruh di baris yang sama dengan
+            judulnya supaya ikut terbaca walau papannya dilipat. Papan
+            peringkat adalah dasar orang memutuskan sinyal siapa yang
+            ditiru; angka karangan tanpa label di sini bukan hiasan yang
+            keliru, melainkan saran investasi palsu. */}
+        {data.contoh && (
+          <span className="inline-flex items-center gap-1 rounded bg-sky-500/12 px-1.5 py-0.5 text-[10px] font-medium text-sky-300">
+            <Eye className="size-2.5" /> data contoh
+          </span>
+        )}
         <span className="angka ml-auto text-[11px] text-zinc-600">{totalSinyal} sinyal selesai</span>
       </button>
+
+      {data.contoh && buka && (
+        <p className="mb-2 px-1 text-[11.5px] leading-relaxed text-sky-200/70">
+          Nama dan angka di papan ini <b>bukan analis sungguhan</b> — ia memperlihatkan
+          bentuk peringkatnya saja. Rekam jejak yang benar muncul begitu kamu punya akses penuh.
+        </p>
+      )}
 
       {buka && (
         <div className="space-y-3">

@@ -203,32 +203,44 @@ export interface Performa {
   /** Sinyal yang masih berjalan. Dipakai layar untuk mengatakan terus
    *  terang bahwa peringkatnya belum berarti apa-apa saat datanya sedikit. */
   berjalan: number;
+  /** true = isinya CONTOH, bukan rekam jejak siapa pun. Layar WAJIB
+   *  menuliskannya. Papan peringkat adalah dasar orang memutuskan sinyal
+   *  siapa yang ditiru; angka karangan tanpa label di sana bukan hiasan
+   *  yang keliru, melainkan saran investasi palsu. */
+  contoh?: boolean;
 }
 
-export async function ambilPerforma(): Promise<Performa> {
+/** @param bolehContoh Hanya boleh true untuk penonton yang TIDAK punya
+ *  akses — pratinjau atau belum masuk. Pemilik dan pelanggan aktif SELALU
+ *  melihat rekam jejak sungguhan, seberapa pun tipis.
+ *
+ *  Pemisahan ini yang menjaga fitur aslinya utuh: siapa pun yang bisa
+ *  menekan "tiru sinyal" mengambil keputusannya dari angka yang benar,
+ *  dan tidak ada satu jalur pun yang membuat data contoh sampai ke sana. */
+export async function ambilPerforma(bolehContoh = false): Promise<Performa> {
   const j = await panggil('/api/analisa/performa', {}, false);
   const nyata: Performa = {
     modal: j.modal ?? 1000, risikoPersen: j.risikoPersen ?? 1,
     analis: j.analis ?? [], berjalan: j.berjalan ?? 0,
   };
+  if (!bolehContoh) return nyata;
 
-  /* Papan peringkat kosong adalah masalah "hari pertama": ia baru berisi
-     setelah harga benar-benar menyentuh SL/TP sebuah sinyal, dan sampai
-     itu terjadi halamannya terlihat seperti fitur yang belum jadi.
+  /* Papan peringkat baru berarti sesudah ada beberapa sinyal selesai. Di
+     bawah itu ia bukan cuma tipis — ia MENYESATKAN: satu sinyal kalah
+     membuat satu-satunya analis tampil 0% winrate, dan itu penilaian yang
+     tidak layak dibaca siapa pun. Halamannya sendiri sudah mengatakannya
+     ("baru 1 sinyal selesai — terlalu sedikit untuk menyimpulkan").
 
-     Contohnya dipakai HANYA kalau belum ada satu pun sinyal selesai —
-     bukan kalau daftarnya pendek. Satu sinyal sungguhan sudah cukup
-     untuk mengambil alih; data karangan tidak boleh menutupi hasil
-     seseorang walau cuma satu baris. */
+     Untuk penonton yang memang sedang melihat-lihat, contoh berlabel
+     lebih jujur daripada peringkat sungguhan yang belum layak dipercaya. */
   const selesai = nyata.analis.reduce((s, a) => s + a.total, 0);
-  if (selesai > 0) return nyata;
+  if (selesai >= 3) return nyata;
 
-  const { PERFORMA_CONTOH, pakaiContoh } = await import('@/lib/contoh-pratinjau');
-  if (!pakaiContoh(false)) return nyata;
-  /* `berjalan` diambil dari yang SUNGGUHAN kalau ada — jumlah sinyal yang
+  const { PERFORMA_CONTOH } = await import('@/lib/contoh-pratinjau');
+  /* `berjalan` tetap dari yang SUNGGUHAN kalau ada — jumlah sinyal yang
      sedang berjalan itu fakta yang terbaca, dan tidak ada alasan
      menggantinya dengan angka contoh. */
-  return { ...PERFORMA_CONTOH, berjalan: nyata.berjalan || PERFORMA_CONTOH.berjalan };
+  return { ...PERFORMA_CONTOH, contoh: true, berjalan: nyata.berjalan || PERFORMA_CONTOH.berjalan };
 }
 
 export async function hapusGambar(id: string, gambarId: string) {

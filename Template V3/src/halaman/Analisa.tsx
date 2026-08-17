@@ -673,7 +673,7 @@ export default function Analisa() {
   const [cariSub, setCariSub] = useSearchParams();
   const sub: IdSub = SUB.some((s) => s.id === cariSub.get('sub')) ? (cariSub.get('sub') as IdSub) : 'market';
   const setSub = (id: IdSub) => setCariSub(id === 'market' ? {} : { sub: id }, { replace: true });
-  const { pengguna, pemilik } = useAuth();
+  const { pengguna, pemilik, langganan } = useAuth();
 
   /* Kanal yang sedang dibuka — null berarti daftar kanal. Sinyal kini
      dikelompokkan PER ANALIS seperti papan kanal: satu orang sering
@@ -768,7 +768,11 @@ export default function Analisa() {
 
   const segarkan = () => {
     void daftarAnalisa().then(setDaftar).finally(() => setMemuat(false));
-    void ambilPerforma().then(setPerforma).catch(() => { /* panel kanal jalan tanpa performa */ });
+    /* Contoh HANYA untuk yang belum punya akses. Pemilik dan pelanggan
+       aktif — satu-satunya orang yang bisa benar-benar menirukan sinyal —
+       selalu melihat rekam jejak sungguhan. */
+    const bolehContoh = !pengguna || (!pemilik && langganan.status === 'pratinjau');
+    void ambilPerforma(bolehContoh).then(setPerforma).catch(() => { /* panel kanal jalan tanpa performa */ });
     if (pengguna) void statusSaya().then((s) => { setMasuk(s.masuk); setStatusku(s.statusku); }).catch(() => { /* belum login */ });
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps
