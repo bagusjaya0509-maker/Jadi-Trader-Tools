@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { Crown, Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { AvatarAnalis } from '@/components/avatar-analis';
 
 /* ════════════════════════════════════════════════════════════════════════
    TABEL PERINGKAT
@@ -18,6 +19,8 @@ export interface LeaderboardRankingItem {
   byline?: string;
   value: number;
   agen?: boolean;
+  /** Foto profil, kosong kalau analisnya memilih anonim. */
+  foto?: string;
 }
 
 function nilaiUang(n: number) {
@@ -38,9 +41,8 @@ function Baris({ r, aku }: { r: LeaderboardRankingItem; aku: boolean }) {
         ? <Crown className={cn('size-3.5 shrink-0',
             r.rank === 1 ? 'text-amber-400' : r.rank === 2 ? 'text-zinc-300' : 'text-orange-400')} />
         : <span className="size-3.5 shrink-0" />}
-      <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-zinc-700 to-zinc-900 text-[11px] font-semibold text-zinc-200">
-        {(r.userName || '?').trim()[0]?.toUpperCase() ?? '?'}
-      </span>
+      <AvatarAnalis nama={r.userName} foto={r.foto} uid={r.userId}
+                    className="size-7" kelasHuruf="text-[11px]" />
       <span className="min-w-0 grow">
         <span className="flex items-center gap-1.5">
           <span className="truncate text-[12.5px] text-zinc-200">{r.userName}</span>

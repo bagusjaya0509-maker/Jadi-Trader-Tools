@@ -15,6 +15,8 @@ const DASAR = PROXY_BAWAAN;
 
 export interface RingkasAnalisa {
   id: string; uid: string; nama: string; judul: string; pasangan: string;
+  /** Foto profil analisnya, kosong kalau anonim. Lihat PerformaAnalis.foto. */
+  foto?: string;
   arah: 'BUY' | 'SELL'; harga: number; ringkas: string; dibuat: number;
   jumlahPembeli: number;
   /** Ditulis agen AI, bukan pengguna. Dipasang HANYA oleh rute
@@ -111,6 +113,44 @@ export async function kirimAnalisa(d: {
   return panggil('/api/analisa', { method: 'POST', body: JSON.stringify(d) });
 }
 
+/* ════════════════════════════════════════════════════════════════════════
+   PROFIL ANALIS — nama tampilan & avatar
+   ════════════════════════════════════════════════════════════════════════
+   Disimpan di SERVER, bukan Firestore, dan itu bukan pilihan kenyamanan:
+   yang membaca nama & avatar adalah ORANG LAIN — papan peringkat dan kartu
+   kanal menampilkan analis selain dirinya. Aturan Firestore mengunci
+   `users/{uid}` untuk pemiliknya sendiri, jadi profil di sana tidak akan
+   pernah terbaca siapa pun kecuali yang punya.
+
+   Server menggabungkannya SAAT MEMBACA, bukan menulis balik ke tiap
+   rekaman: ganti nama sekali langsung berlaku untuk seluruh sinyal lama.
+   ════════════════════════════════════════════════════════════════════════ */
+export interface ProfilAnalis {
+  nama: string;
+  /** 'anonim' = jangan tampilkan foto walau ada. Fotonya tidak dihapus,
+   *  jadi berpindah kembali ke 'foto' tidak perlu mengunggah ulang. */
+  avatar: 'anonim' | 'foto';
+  foto: string;
+}
+
+/** Profil SEMUA analis, dipakai layar untuk menggambar avatar orang lain.
+ *  Terbuka tanpa login — sama seperti papan peringkatnya sendiri. */
+export async function ambilProfilAnalis(): Promise<Record<string, { nama: string; foto: string }>> {
+  try {
+    const j = await panggil('/api/analis/profil', {}, false);
+    return j?.profil ?? {};
+  } catch { return {}; }
+}
+
+/** Simpan profil SENDIRI. `dataUrl` opsional — kalau ada, ia diunggah dan
+ *  modenya otomatis jadi 'foto'. */
+export async function simpanProfilAnalis(d: {
+  nama?: string; avatar?: 'anonim' | 'foto'; dataUrl?: string;
+}): Promise<ProfilAnalis> {
+  const j = await panggil('/api/analis/profil', { method: 'POST', body: JSON.stringify(d) });
+  return j?.profil ?? { nama: '', avatar: 'anonim', foto: '' };
+}
+
 /** Batalkan sinyal sendiri. Server menolak kalau bukan penulisnya, kalau
  *  harganya sudah menyentuh entry, kalau jenisnya Market, atau kalau
  *  alasannya kurang dari 10 huruf — jadi galatnya ditampilkan apa adanya,
@@ -183,6 +223,10 @@ export async function tambahGambar(id: string, dataUrl: string, ket: string, nam
    pemilik. Papan peringkat yang bisa disetel sendiri tidak berarti apa-apa. */
 export interface PerformaAnalis {
   uid: string; nama: string; agen: boolean;
+  /** Foto profil analis, kosong kalau ia memilih anonim. Datang dari
+   *  server dan sudah menghormati pilihannya — layar tidak perlu tahu
+   *  mode avatarnya, cukup: ada foto atau tidak. */
+  foto?: string;
   menang: number; kalah: number; total: number;
   /** Sinyal yang ditarik sebelum harganya datang. TIDAK masuk `total` dan
    *  tidak masuk penyebut winrate: menghukum analis yang disiplin menarik

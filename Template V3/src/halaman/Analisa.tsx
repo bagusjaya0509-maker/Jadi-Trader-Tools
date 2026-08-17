@@ -3,11 +3,13 @@ import { Link, useSearchParams } from 'react-router-dom';
 import {
   Loader2, Lock, Unlock, Trash2, Send, LineChart, X, CheckCircle2,
   TrendingUp, TrendingDown, RefreshCw, Radar, Sparkles, ImagePlus, Images, Flag, Ban,
+  Settings2, UserRound,
 } from 'lucide-react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { PanelSinyal } from '@/components/panel-sinyal';
 import { PapanPeringkatSignal, PerformaAnalisSatu } from '@/components/performa-signal';
 import { ambilDraf } from '@/lib/draf-sinyal';
+import { AvatarAnalis } from '@/components/avatar-analis';
 import { cn, uang, persen, harga as fHarga, tanggalPendek } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 import { useRiwayat, useSaldoAwal } from '@/lib/data';
@@ -15,6 +17,7 @@ import { statGabungan, kurvaEkuitas } from '@/lib/hitung';
 import { useTutupLuar } from '@/lib/tutup-luar';
 import {
   daftarAnalisa, kirimAnalisa, hapusAnalisa, bukaIsi, mintaAkses,
+  ambilProfilAnalis, simpanProfilAnalis,
   statusSaya, putuskanAkses, tambahGambar, hapusGambar, kecilkanGambar, ambilPerforma,
   batalkanAnalisa, bisaDibatalkan,
   type RingkasAnalisa, type IsiAnalisa, type PermintaanMasuk, type GambarAnalisa, type Performa,
@@ -750,6 +753,69 @@ export default function Analisa() {
      dan tidak bisa lupa dengan cara yang sama. */
   const simbolUntukChart = (pasar === 'tradefi' ? 'MT5:' : '') + pasangan.trim().toUpperCase();
 
+  /* ── Profil analis: nama tampilan & avatar ────────────────────────────
+     Dibuka dari ikon gerigi di kepala panel Posting Signal — bukan halaman
+     sendiri. Yang diatur di sini cuma dipakai di satu tempat (papan Copy
+     Signal), dan pengaturan yang tinggal di halaman lain adalah pengaturan
+     yang tidak pernah ditemukan orang yang membutuhkannya.
+
+     Nilai awalnya dari server, BUKAN dari akun Google. Kalau dari akun,
+     orang yang sudah mengganti namanya akan melihat nama lamanya kembali
+     tiap kali panel ini dibuka, dan menekan Simpan tanpa curiga akan
+     mengembalikannya betulan. */
+  const [bukaSetelan, setBukaSetelan] = useState(false);
+  const [profNama, setProfNama] = useState('');
+  const [profAvatar, setProfAvatar] = useState<'anonim' | 'foto'>('anonim');
+  const [profFoto, setProfFoto] = useState('');
+  const [profBaru, setProfBaru] = useState('');        // data URL yang belum tersimpan
+  const [profSibuk, setProfSibuk] = useState(false);
+  const [profKabar, setProfKabar] = useState('');
+  const berkasFoto = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (!pengguna) return;
+    void ambilProfilAnalis().then((semua) => {
+      const p = semua[pengguna.uid];
+      setProfNama(p?.nama || pengguna.displayName || pengguna.email?.split('@')[0] || '');
+      setProfFoto(p?.foto || '');
+      setProfAvatar(p?.foto ? 'foto' : 'anonim');
+    });
+  }, [pengguna]);
+
+  function pilihFoto(f: File | null) {
+    if (!f) return;
+    /* Dibatasi DI SINI juga, bukan cuma di server: mengunggah 8 MB lewat
+       jaringan seluler lalu ditolak adalah menit yang terbuang tanpa hasil,
+       dan pesannya baru datang setelah semuanya terkirim. */
+    if (f.size > 2 * 1024 * 1024) {
+      setProfKabar(`Foto ${(f.size / 1048576).toFixed(1)} MB — batasnya 2 MB.`);
+      return;
+    }
+    const r = new FileReader();
+    r.onload = () => { setProfBaru(String(r.result || '')); setProfAvatar('foto'); setProfKabar(''); };
+    r.readAsDataURL(f);
+  }
+
+  async function simpanProfil() {
+    setProfSibuk(true); setProfKabar('');
+    try {
+      const hasil = await simpanProfilAnalis({
+        nama: profNama.trim(),
+        avatar: profAvatar,
+        ...(profBaru ? { dataUrl: profBaru } : {}),
+      });
+      setProfNama(hasil.nama);
+      setProfFoto(hasil.foto);
+      setProfAvatar(hasil.avatar);
+      setProfBaru('');
+      setProfKabar('Tersimpan. Nama dan avatarmu berlaku untuk seluruh sinyal, termasuk yang lama.');
+      segarkan();
+    } catch (e) {
+      setProfKabar('Gagal: ' + (e instanceof Error ? e.message : 'tidak diketahui'));
+    } finally { setProfSibuk(false); }
+  }
+
+
   const [hargaJual, setHargaJual] = useState(5);
   const [ringkas, setRingkas] = useState('');
   const [entry, setEntry] = useState('');
@@ -862,7 +928,11 @@ export default function Analisa() {
         pasangan: pasangan.trim().toUpperCase(), arah, pasar,
         harga: hargaJual, ringkas: ringkas.trim(),
         isi: { entry: Number(entry) || 0, sl: Number(sl) || 0, tp: Number(tp) || 0, alasan: alasan.trim() },
-        nama: pengguna?.displayName || pengguna?.email?.split('@')[0] || 'Analis',
+        /* Nama PROFIL didahulukan. Server menimpanya lagi saat membaca,
+           jadi ini cuma cadangan — tapi cadangan yang benar: tanpa ini,
+           rekaman baru menyimpan nama akun Google milik orang yang justru
+           sudah sengaja memakai nama samaran. */
+        nama: profNama.trim() || pengguna?.displayName || pengguna?.email?.split('@')[0] || 'Analis',
         snapshot,
         izinJurnal,
       });
@@ -1045,10 +1115,23 @@ export default function Analisa() {
           judul={<span className="flex items-center gap-2">Copy Signal <LencanaBeta /></span>}
           sub="Posting rencana trade-mu — yang dinilai orang adalah hasil sinyalmu, bukan klaimmu."
           kanan={
-            <button onClick={segarkan} aria-label="Segarkan"
-              className="cursor-pointer rounded p-1 text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-200">
-              <RefreshCw className={cn('size-3.5', memuat && 'animate-spin')} />
-            </button>
+            <span className="flex items-center gap-1">
+              {/* Gerigi HANYA untuk yang sudah masuk: profil analis tidak
+                  ada artinya sebelum ada akun yang memilikinya, dan tombol
+                  yang membuka panel kosong terbaca sebagai fitur rusak. */}
+              {pengguna && (
+                <button onClick={() => setBukaSetelan((v) => !v)} aria-label="Pengaturan profil analis"
+                  title="Nama tampilan & avatar"
+                  className={cn('cursor-pointer rounded p-1 transition-colors hover:bg-zinc-800',
+                    bukaSetelan ? 'text-zinc-200' : 'text-zinc-500 hover:text-zinc-200')}>
+                  <Settings2 className="size-3.5" />
+                </button>
+              )}
+              <button onClick={segarkan} aria-label="Segarkan"
+                className="cursor-pointer rounded p-1 text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-200">
+                <RefreshCw className={cn('size-3.5', memuat && 'animate-spin')} />
+              </button>
+            </span>
           }
         />
         {/* FORMULIRNYA LANGSUNG TERBUKA — tombol "Posting analisa" dibuang.
@@ -1058,6 +1141,80 @@ export default function Analisa() {
             adalah pintu di depan pintu. Dulu tombolnya masuk akal karena
             formulir ini duduk di atas daftar sinyal yang dicari orang lain;
             sesudah pindah tab, alasan itu ikut hilang. */}
+        {pengguna && bukaSetelan && (
+          <div className="border-t border-zinc-800/80 bg-zinc-950/40 px-5 py-4">
+            <div className="mb-3 flex items-center gap-2">
+              <UserRound className="size-3.5 text-zinc-500" />
+              <h3 className="text-[12.5px] font-medium text-zinc-200">Tampilanmu sebagai analis</h3>
+            </div>
+
+            <div className="flex flex-wrap items-start gap-5">
+              {/* Pratinjau HIDUP, bukan contoh. Inilah yang akan dilihat
+                  orang lain di papan peringkat — dan avatar yang cuma bisa
+                  dibayangkan sampai tersimpan adalah avatar yang dipasang
+                  lalu langsung diganti. */}
+              <div className="flex flex-col items-center gap-2">
+                <AvatarAnalis
+                  nama={profNama || 'Analis'}
+                  foto={profAvatar === 'foto' ? (profBaru || profFoto) : ''}
+                  uid={pengguna.uid}
+                  className="size-16" kelasHuruf="text-[22px]"
+                />
+                <span className="text-[10.5px] text-zinc-600">pratinjau</span>
+              </div>
+
+              <div className="min-w-[220px] grow">
+                <label className="mb-1 block text-[11px] text-zinc-500">Nama tampilan</label>
+                <input value={profNama} maxLength={40}
+                  onChange={(e) => setProfNama(e.target.value)}
+                  placeholder="Nama yang dilihat orang di papan peringkat"
+                  className={KELAS_ISIAN} />
+                <p className="mt-1 text-[10.5px] leading-relaxed text-zinc-600">
+                  Berlaku untuk <b className="font-normal text-zinc-500">seluruh sinyalmu</b>, termasuk yang
+                  sudah diposting. Boleh nama samaran — yang dinilai orang hasil sinyalnya.
+                </p>
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button onClick={() => { setProfAvatar('anonim'); setProfKabar(''); }}
+                    className={cn('cursor-pointer rounded-md border px-3 py-1.5 text-[12px] transition-colors',
+                      profAvatar === 'anonim'
+                        ? 'border-zinc-500 bg-zinc-800/60 text-zinc-100'
+                        : 'border-zinc-800 text-zinc-400 hover:border-zinc-700')}>
+                    Anonim — huruf awal
+                  </button>
+                  <button onClick={() => berkasFoto.current?.click()}
+                    className={cn('flex cursor-pointer items-center gap-1.5 rounded-md border px-3 py-1.5 text-[12px] transition-colors',
+                      profAvatar === 'foto'
+                        ? 'border-zinc-500 bg-zinc-800/60 text-zinc-100'
+                        : 'border-zinc-800 text-zinc-400 hover:border-zinc-700')}>
+                    <ImagePlus className="size-3.5" />
+                    {profFoto || profBaru ? 'Ganti foto' : 'Unggah foto'}
+                  </button>
+                  <input ref={berkasFoto} type="file" accept="image/png,image/jpeg,image/webp" hidden
+                    onChange={(e) => { pilihFoto(e.target.files?.[0] ?? null); e.target.value = ''; }} />
+                </div>
+                <p className="mt-1 text-[10.5px] leading-relaxed text-zinc-600">
+                  PNG, JPG, atau WebP — maksimal 2 MB. Memilih Anonim tidak menghapus fotomu;
+                  ia cuma berhenti ditampilkan, jadi bisa dinyalakan lagi kapan saja.
+                </p>
+
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                  <button onClick={() => void simpanProfil()} disabled={profSibuk || !profNama.trim()}
+                    className="flex cursor-pointer items-center gap-1.5 rounded-md bg-zinc-100 px-3.5 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50">
+                    {profSibuk && <Loader2 className="size-3.5 animate-spin" />} Simpan
+                  </button>
+                  {profKabar && (
+                    <span className={cn('text-[11.5px] leading-relaxed',
+                      /^Gagal/.test(profKabar) ? 'text-red-400' : 'text-emerald-400/90')}>
+                      {profKabar}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {pengguna && (
           <div className="border-t border-zinc-800/80 px-5 py-4">
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -1379,9 +1536,8 @@ export default function Analisa() {
                   className="relative cursor-pointer rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 text-left transition-colors hover:border-zinc-600">
                   {a0.agen && <LencanaAgen />}
                   <div className="flex items-center gap-2.5">
-                    <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-zinc-700 to-zinc-900 text-[14px] font-semibold text-zinc-100">
-                      {(a0.nama || '?').trim()[0]?.toUpperCase() ?? '?'}
-                    </span>
+                    <AvatarAnalis nama={a0.nama} foto={a0.foto} uid={uid}
+                                  className="size-10" kelasHuruf="text-[14px]" />
                     <span className="min-w-0">
                       <span className="block truncate text-[13.5px] font-medium text-zinc-100">{a0.nama}</span>
                       <span className="block text-[11px] text-zinc-600">

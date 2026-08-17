@@ -1,5 +1,6 @@
 import { Crown } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { AvatarAnalis } from '@/components/avatar-analis';
 
 /* ════════════════════════════════════════════════════════════════════════
    PODIUM TIGA BESAR
@@ -10,10 +11,11 @@ import { cn } from '@/lib/utils';
    yang tidak ada di proyek ini, dan menambahkannya berarti menyeret satu
    sistem warna kedua ke dalam antarmuka yang seluruhnya sudah zinc gelap.
 
-   Avatar memakai huruf awal, bukan foto. Analis di sini dikenali dari nama
-   akunnya; menarik foto profil dari penyedia login berarti mengirim
-   permintaan ke domain lain untuk setiap baris papan peringkat, dan CSP di
-   halaman ini memblokirnya.
+   Avatar memakai FOTO kalau analisnya mengunggah satu, huruf awal kalau
+   tidak. Catatan lama di sini menyebut foto mustahil karena CSP memblokir
+   permintaan ke domain penyedia login — itu benar untuk foto Google, dan
+   tidak lagi berlaku: foto profil analis disimpan di VPS sendiri dan
+   disajikan dari domain yang sama dengan halamannya.
    ════════════════════════════════════════════════════════════════════════ */
 
 export interface LeaderboardRanking {
@@ -25,6 +27,8 @@ export interface LeaderboardRanking {
   byline?: string;
   /** Ditulis agen AI, bukan orang. Dipakai menandai barisnya. */
   agen?: boolean;
+  /** Foto profil, kosong kalau analisnya memilih anonim. */
+  foto?: string;
 }
 
 /** Tinggi balok per peringkat. Bukan sekadar hiasan: beda tingginya yang
@@ -37,16 +41,20 @@ const WARNA: Record<number, string> = {
 };
 const MAHKOTA: Record<number, string> = { 1: 'text-amber-400', 2: 'text-zinc-300', 3: 'text-orange-400' };
 
-function Avatar({ nama, peringkat }: { nama: string; peringkat: number }) {
-  const huruf = (nama || '?').trim()[0]?.toUpperCase() ?? '?';
+function Avatar({ nama, peringkat, foto, uid }: {
+  nama: string; peringkat: number; foto?: string; uid?: string;
+}) {
+  /* Cincinnya tetap di sini, BUKAN dipindah ke AvatarAnalis: emas untuk
+     juara satu adalah bahasa podium ini sendiri, dan daftar peringkat di
+     bawahnya tidak memakainya. */
   return (
     <div className="relative">
-      <div className={cn(
-        'flex items-center justify-center rounded-full bg-gradient-to-br from-zinc-700 to-zinc-900 font-semibold text-zinc-100 ring-1',
-        peringkat === 1 ? 'size-14 text-[18px] ring-amber-500/50' : 'size-11 text-[15px] ring-zinc-700',
-      )}>
-        {huruf}
-      </div>
+      <AvatarAnalis
+        nama={nama} foto={foto} uid={uid}
+        className={cn('ring-1',
+          peringkat === 1 ? 'size-14 ring-amber-500/50' : 'size-11 ring-zinc-700')}
+        kelasHuruf={peringkat === 1 ? 'text-[18px]' : 'text-[15px]'}
+      />
       <Crown className={cn('absolute -bottom-1 left-1/2 size-4 -translate-x-1/2', MAHKOTA[peringkat])}
              strokeWidth={2.5} />
     </div>
@@ -76,7 +84,7 @@ export function LeaderboardPodium({ rankings, className }: {
       {susunan.map((r, i) =>
         r ? (
           <div key={r.userId} className="flex w-[30%] max-w-[130px] flex-col items-center">
-            <Avatar nama={r.userName} peringkat={r.rank} />
+            <Avatar nama={r.userName} peringkat={r.rank} foto={r.foto} uid={r.userId} />
             <div className="mt-2.5 w-full truncate text-center text-[11.5px] text-zinc-300" title={r.userName}>
               {r.userName}
             </div>

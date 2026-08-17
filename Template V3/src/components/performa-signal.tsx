@@ -61,6 +61,9 @@ export function PapanPeringkatSignal({ data }: { data: Performa | null }) {
 
   const peringkat = useMemo(() => (data?.analis ?? []).map((a, i) => ({
     userId: a.uid, rank: i + 1, userName: a.nama, value: a.hasilDolar, agen: a.agen,
+    /* Foto ikut dari server dan SUDAH menghormati pilihan anonim analisnya —
+       layar ini tidak perlu tahu modenya, cukup: ada foto atau tidak. */
+    foto: a.foto,
     byline: `${persen(a.winrate)} winrate · ${a.total} sinyal`,
   })), [data]);
 
