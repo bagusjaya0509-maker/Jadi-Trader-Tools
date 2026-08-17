@@ -257,7 +257,7 @@ export default function ScreenerV2() {
         if (isFinite(n) && n > 0) q.set(k, String(n));
       }
       if (d.arah === 'BUY' || d.arah === 'SELL') q.set('arah', d.arah);
-      arahkan(`/chart?${q}`);
+      arahkan(`/chart-entry?${q}`);
     };
     window.addEventListener('message', dengar);
     return () => window.removeEventListener('message', dengar);
@@ -389,7 +389,7 @@ export default function ScreenerV2() {
 
           <div className="mt-5 flex flex-wrap items-center gap-2.5">
             {terkunci ? (
-              <Link to="/pratinjau"
+              <Link to="/tour"
                 className="flex items-center gap-2 rounded-md bg-zinc-100 px-4 py-2.5 text-[13px] font-medium text-zinc-950 transition-colors hover:bg-white">
                 Masuk untuk membukanya lagi <ArrowRight className="size-4" />
               </Link>

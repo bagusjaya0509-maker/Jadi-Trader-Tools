@@ -1,27 +1,56 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  SITEMAP — dan kenapa isinya cuma SATU alamat
+  Sampai 17 Agu 2026 berkas ini berisi SATU alamat, dan penjelasannya panjang:
+  aplikasinya memakai HashRouter, seluruh halaman hidup di belakang tanda
+  pagar, dan Google membuang segala sesuatu sesudah "#" — jadi menuliskan
+  /#/marketplace di sini tidak membuatnya terindeks, ia cuma membuat Search
+  Console melaporkan duplikat.
 
-  Aplikasi ini memakai HashRouter, jadi seluruh halamannya hidup di belakang
-  tanda pagar: /#/akses, /#/marketplace, /#/copy, dan seterusnya.
+  Alasan itu sudah dicabut. Rutenya kini alamat sungguhan yang benar-benar
+  dikirim ke server, dan server sudah tahu cara menjawabnya (FALLBACK_SPA di
+  server.js). Maka daftar di bawah barulah berarti.
 
-  Google MEMBUANG segala sesuatu sesudah "#" saat menyusun daftar alamat.
-  Bagi perayap, /#/akses dan /#/marketplace adalah alamat yang sama persis
-  dengan "/". Menuliskannya di sitemap tidak membuatnya terindeks — ia cuma
-  membuat Search Console melaporkan alamat duplikat.
+  YANG MASUK HANYA HALAMAN YANG BISA DIBACA TANPA LOGIN. Mendaftarkan
+  /dashboard atau /journal di sini bukan cuma sia-sia — perayap yang
+  membukanya menerima layar minta-akses, dan Search Console mencatatnya
+  sebagai halaman tipis berisi konten yang sama berulang-ulang. Itu menurunkan
+  penilaian seluruh situs, bukan menaikkan halaman yang didaftarkan.
 
-  Jadi hari ini situs ini punya SATU halaman yang bisa diindeks, dan sitemap
-  ini menyatakan itu apa adanya. Menambah baris palsu di sini tidak akan
-  menambah satu pun halaman di hasil pencarian.
-
-  Untuk benar-benar punya banyak halaman yang terindeks, alamatnya harus
-  berpindah dari /#/akses menjadi /akses — itu perubahan pada cara aplikasi
-  membaca alamat, bukan pada berkas ini.
+  Karena itu daftar ini pendek, dan memang seharusnya pendek: sebuah aplikasi
+  di balik login tidak punya banyak halaman publik, dan berpura-pura punya
+  tidak menolong siapa pun.
 -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://jaditrader.co.id/</loc>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
+  </url>
+  <url>
+    <!-- Etalase penuh tanpa login: bentuk barangnya bisa dilihat siapa saja. -->
+    <loc>https://jaditrader.co.id/preview</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <!-- Halaman masuk / permintaan akses. Publik, dan memang tujuan pencarian
+         bermerek ("jadi trader tools login"). -->
+    <loc>https://jaditrader.co.id/akses</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <!-- Disclaimer, ketentuan, dan kebijakan privasi. WAJIB terbaca sebelum
+         orang membayar, jadi ia harus bisa ditemukan lewat pencarian juga. -->
+    <loc>https://jaditrader.co.id/legal</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <!-- Catatan rilis. Halaman publik yang isinya benar-benar berubah, dan
+         itu yang membuat perayap kembali. -->
+    <loc>https://jaditrader.co.id/changelog</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.4</priority>
   </url>
 </urlset>

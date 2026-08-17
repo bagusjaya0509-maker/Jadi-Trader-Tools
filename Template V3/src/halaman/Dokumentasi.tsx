@@ -223,7 +223,7 @@ const ARTIKEL: Artikel[] = [
           Tutorial lengkapnya — dari membuat API key sampai <K>pm2 startup</K>, dengan kode siap
           salin — ada di halaman Integrations.
         </P>
-        <Link to="/integrasi"
+        <Link to="/integrations"
           className="inline-flex items-center gap-1.5 rounded-md bg-zinc-100 px-3 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white">
           Buka tutorial pemasangan <ChevronRight className="size-3.5" />
         </Link>

@@ -13,11 +13,34 @@ User-agent: *
 Allow: /
 
 # Halaman di balik gerbang — tidak ada isi publik untuk dirayapi.
+#
+# Sampai 17 Agu 2026 baris-baris ini sebenarnya TIDAK BERPENGARUH apa pun:
+# aplikasinya memakai HashRouter, jadi alamatnya /#/markas dan perayap tidak
+# pernah mengirim bagian sesudah "#" — yang ia minta selalu "/". Aturan yang
+# ditulis dengan niat benar tapi tidak pernah terpakai sekali pun.
+#
+# Sesudah pindah ke BrowserRouter alamatnya sungguhan, dan barulah aturan ini
+# bekerja. Nama barunya ikut diperbarui; nama lama dibiarkan karena alamat itu
+# masih hidup sebagai pengalih.
+Disallow: /hq
+Disallow: /owner
+Disallow: /maintenance
+Disallow: /billing
+Disallow: /social
+Disallow: /dashboard
+Disallow: /journal
+Disallow: /personal-area
+Disallow: /chart-entry
+Disallow: /integrations
+# Nama lama, masih hidup sebagai pengalih.
 Disallow: /markas
 Disallow: /pemilik
-Disallow: /maintenance
 Disallow: /tagihan
 Disallow: /sosmed
+Disallow: /jurnal
+Disallow: /personal
+Disallow: /chart
+Disallow: /integrasi
 
 # JANGAN PERNAH menutup /assets/ di sini.
 #

@@ -70,29 +70,29 @@ const NAV = [
     butir: [
       { ke: '/dashboard', label: 'Dashboard',     Ikon: LayoutGrid },
       { ke: '/screener',  label: 'Screener Area', Ikon: BarChart3 },
-      { ke: '/jurnal',    label: 'Journal',        Ikon: Briefcase },
+      { ke: '/journal',    label: 'Journal',        Ikon: Briefcase },
     ],
   },
   {
     grup: 'Workspace',
     butir: [
-      { ke: '/personal',    label: 'Personal Area',    Ikon: Wallet },
-      { ke: '/chart',       label: 'Chart & Entry', Ikon: CandlestickChart },
+      { ke: '/personal-area',    label: 'Personal Area',    Ikon: Wallet },
+      { ke: '/chart-entry',       label: 'Chart & Entry', Ikon: CandlestickChart },
       { ke: '/marketplace', label: 'Marketplace',      Ikon: Users },
       /* `sub` membuat menu ini bisa dibuka dengan panah: sub-halamannya
          terlihat dari sidebar tanpa harus mendarat dulu di halamannya.
          Alamat sub memakai query (?sub=…) yang dibaca halamannya sendiri —
          tab yang tidak bisa dituju lewat alamat tidak bisa ditaut siapa pun. */
-      { ke: '/copy',        label: 'Copy Signal',      Ikon: Copy,
+      { ke: '/copy-signal',        label: 'Copy Signal',      Ikon: Copy,
         sub: [
-          { ke: '/copy',             label: 'Market Signal' },
-          { ke: '/copy?sub=posting', label: 'Posting Signal' },
+          { ke: '/copy-signal',             label: 'Market Signal' },
+          { ke: '/copy-signal?sub=posting', label: 'Posting Signal' },
         ] },
-      { ke: '/integrasi',   label: 'Integrations',     Ikon: Plug,
+      { ke: '/integrations',   label: 'Integrations',     Ikon: Plug,
         sub: [
-          { ke: '/integrasi',             label: 'Connection' },
-          { ke: '/integrasi?tab=mt5',     label: 'Tutorial Pasang MT5' },
-          { ke: '/integrasi?tab=binance', label: 'Tutorial Connect Binance' },
+          { ke: '/integrations',             label: 'Connection' },
+          { ke: '/integrations?tab=mt5',     label: 'Tutorial Pasang MT5' },
+          { ke: '/integrations?tab=binance', label: 'Tutorial Connect Binance' },
         ] },
     ],
   },
@@ -105,7 +105,7 @@ const NAV = [
        satu tempat; lencana di menu cuma mengulanginya. */
     grup: 'Administration',
     butir: [
-      { ke: '/tagihan',     label: 'Billing',          Ikon: CreditCard },
+      { ke: '/billing',     label: 'Billing',          Ikon: CreditCard },
     ],
   },
   {
@@ -130,7 +130,7 @@ const NAV = [
     hanyaPemilik: true,
     IkonGrup: Crown,
     butir: [
-      { ke: '/pemilik',     label: 'Sales Report', Ikon: TrendingUp },
+      { ke: '/owner',     label: 'Sales Report', Ikon: TrendingUp },
       { ke: '/maintenance', label: 'Maintenance',     Ikon: Wrench,
         sub: [
           { ke: '/maintenance',             label: 'Akses & Lisensi' },
@@ -149,16 +149,16 @@ const JUDUL: Record<string, string> = {
   '/dashboard': 'Dashboard',
   '/screener': 'Screener Area',
   '/screener-react': 'Screener Area (React)',
-  '/chart': 'Chart & Entry',
-  '/jurnal': 'Journal',
-  '/personal': 'Personal Area',
-  '/copy': 'Copy Signal',
+  '/chart-entry': 'Chart & Entry',
+  '/journal': 'Journal',
+  '/personal-area': 'Personal Area',
+  '/copy-signal': 'Copy Signal',
   '/marketplace': 'Marketplace',
-  '/integrasi': 'Integrations',
-  '/pemilik': 'Sales Report',
+  '/integrations': 'Integrations',
+  '/owner': 'Sales Report',
   '/maintenance': 'Maintenance',
-  '/tagihan': 'Billing',
-  '/dokumentasi': 'Documentation',
+  '/billing': 'Billing',
+  '/docs': 'Documentation',
   '/changelog': 'Changelog',
 };
 
@@ -273,7 +273,7 @@ function Lonceng() {
                     <div className="mt-1 flex items-center gap-2">
                       {k.sumber && <span className="truncate text-[10.5px] text-zinc-600">{k.sumber}</span>}
                       {k.jenis === 'sinyal' && (
-                        <Link to="/copy" onClick={() => setBuka(false)}
+                        <Link to="/copy-signal" onClick={() => setBuka(false)}
                               className="ml-auto shrink-0 text-[10.5px] text-zinc-400 underline-offset-2 hover:text-zinc-100 hover:underline">
                           Lihat levelnya
                         </Link>
@@ -685,7 +685,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         <div className="border-t border-zinc-800/80 px-3 py-2">
           <Bantuan ciut={ciut} />
-          <NavLink to="/dokumentasi" title={ciut ? 'Documentation' : undefined}
+          <NavLink to="/docs" title={ciut ? 'Documentation' : undefined}
             className={({ isActive }) => cn(
               'flex items-center gap-2.5 rounded-md px-2 py-2 text-[13px] transition-colors hover:bg-zinc-900 hover:text-zinc-100',
               ciut && 'justify-center px-0',

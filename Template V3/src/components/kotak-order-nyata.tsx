@@ -122,7 +122,7 @@ export function KotakOrderNyata({ simbol, hargaKini, arahTerkunci, slAwal, tpAwa
         <TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-500" />
         <div className="min-w-0 text-[12.5px] leading-relaxed text-amber-200/90">
           Order sungguhan butuh Backend URL dan App Token milik VPS-mu sendiri.
-          <Link to="/integrasi" className="ml-1 inline-flex items-center gap-1 text-amber-300 underline underline-offset-2">
+          <Link to="/integrations" className="ml-1 inline-flex items-center gap-1 text-amber-300 underline underline-offset-2">
             Pasang di Integrations <ExternalLink className="size-3" />
           </Link>
         </div>

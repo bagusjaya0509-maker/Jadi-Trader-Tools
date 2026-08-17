@@ -262,7 +262,7 @@ function Kosong({ memuat, offline, jumlahDipindai, pesan }: {
         <div className="text-[13px] text-zinc-300">Proxy pasar tidak terjangkau</div>
         <p className="mx-auto mt-1 max-w-md text-[12px] leading-relaxed text-zinc-500">
           Data harga diambil lewat VPS karena Binance diblokir sebagian ISP Indonesia.
-          Periksa Backend URL di <Link to="/integrasi" className="text-zinc-300 underline decoration-zinc-700 underline-offset-2">Integrations</Link>.
+          Periksa Backend URL di <Link to="/integrations" className="text-zinc-300 underline decoration-zinc-700 underline-offset-2">Integrations</Link>.
         </p>
       </div>
     );

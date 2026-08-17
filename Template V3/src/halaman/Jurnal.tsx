@@ -652,7 +652,7 @@ export default function Jurnal() {
         judul="Jurnal Trade-Fi" ket="Forex & XAU lewat MetaTrader 5"
         Ikon={CandlestickChart} trade={forex} saldoAwal={saldoAwal}
         warna="text-amber-400" idGradien="gEqForex"
-        akun={mt5} labelSaldo="Saldo MetaTrader 5" keIntegrasi="/integrasi"
+        akun={mt5} labelSaldo="Saldo MetaTrader 5" keIntegrasi="/integrations"
         sumber="forex" arus={arus} bisaTulis={bisaTulis}
       />
 
@@ -660,7 +660,7 @@ export default function Jurnal() {
         judul="Jurnal Kripto" ket="Binance Futures lewat Screener"
         Ikon={Bitcoin} trade={kripto} saldoAwal={0}
         warna="text-emerald-400" idGradien="gEqKripto"
-        akun={binance} labelSaldo="Saldo Binance Futures" keIntegrasi="/integrasi"
+        akun={binance} labelSaldo="Saldo Binance Futures" keIntegrasi="/integrations"
         sumber="kripto" arus={arus} bisaTulis={bisaTulis}
       />
     </div>

@@ -1,4 +1,4 @@
-import { HashRouter, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useEffect, lazy, Suspense, type ReactNode } from 'react';
 import { Loader2 } from 'lucide-react';
 import { PenyediaAuth, useAuth } from '@/lib/auth';
@@ -8,9 +8,27 @@ import { AppShell } from '@/components/app-shell';
 import Pendaratan from '@/halaman/Pendaratan';
 import Akses from '@/halaman/Akses';
 
-/* HashRouter: GitHub Pages tidak bisa mengarahkan /dashboard ke index.html,
-   jadi jalur seperti itu 404 begitu di-refresh. #/dashboard bekerja di mana
-   saja tanpa konfigurasi server. */
+/* ── BrowserRouter, sejak 17 Agu 2026 ────────────────────────────────────
+   Dulu HashRouter, dengan alasan yang benar pada zamannya: situsnya
+   disajikan GitHub Pages, yang tidak bisa mengarahkan /dashboard ke
+   index.html, jadi alamat seperti itu 404 begitu di-refresh.
+
+   Alasan itu sudah gugur. Situsnya sekarang dilayani Express di VPS, dan
+   fallback SPA-nya sudah terpasang di sana (cari FALLBACK_SPA di server.js).
+
+   Yang dibeli dengan pindah ini bukan kerapian. HashRouter menaruh seluruh
+   rute sesudah tanda pagar, dan peramban TIDAK PERNAH mengirim bagian itu
+   ke server — jadi bagi Google seluruh situs ini cuma SATU alamat. Ke-15
+   halaman runtuh jadi satu, dan sitemap yang berisi lebih dari satu baris
+   hanya menghasilkan laporan duplikat. Sekarang tiap halaman punya alamat
+   sendiri yang bisa diindeks, dibagikan, dan muncul sendiri di hasil
+   pencarian.
+
+   TAUTAN LAMA TIDAK DIBIARKAN MATI. Dua lapis menanganinya:
+     1. Cuplikan di <head> index.html menulis ulang /#/apa-pun jadi /apa-pun
+        sebelum React menyala — ini yang menyelamatkan tautan Lynk sesudah
+        pembayaran, yang alamatnya tersimpan di luar kendali kita.
+     2. Rute `Alias` di bawah memetakan slug lama ke slug baru. */
 
 /* ── Pemuatan malas ───────────────────────────────────────────────────────
    Hanya Beranda yang dimuat di awal. Sisanya menyusul saat rutenya dibuka.
@@ -288,10 +306,20 @@ function Kerangka() {
   );
 }
 
+/** Alamat lama → alamat baru. Tautan yang sudah tersebar tidak boleh mati
+ *  hanya karena kita memperbaiki penamaan; `replace` dipakai supaya tombol
+ *  Back tidak memantul balik ke alamat lama lalu dialihkan lagi. `search`
+ *  dan `hash` ikut dibawa — tanpa itu /chart?simbol=BTCUSDT mendarat di
+ *  chart kosong. */
+function Alias({ ke }: { ke: string }) {
+  const { search, hash } = useLocation();
+  return <Navigate to={ke + search + hash} replace />;
+}
+
 export default function App() {
   return (
     <PenyediaAuth>
-      <HashRouter>
+      <BrowserRouter>
         <KeAtas />
         {/* SATU Suspense membungkus SELURUH Routes.
             Sebelumnya Suspense hanya ada di dalam Kerangka, jadi setiap rute
@@ -320,13 +348,13 @@ export default function App() {
           <Route path="/template" element={<Template />} />
           {/* Hero lama. Bukan dibuang — isinya masih utuh dan bisa dipakai
               lagi kalau dibutuhkan. */}
-          <Route path="/beranda" element={<Beranda />} />
+          <Route path="/homeuser" element={<Beranda />} />
           {/* Halaman pendaratan versi lain, tidak ditautkan dari mana pun.
               Disimpan sebagai pembanding tampilan. */}
-          <Route path="/pendaratan" element={<Pendaratan />} />
+          <Route path="/landing" element={<Pendaratan />} />
           {/* DI LUAR gerbang, dan memang harus: halaman ini justru tempat
               orang yang belum punya akses memulai pratinjaunya. */}
-          <Route path="/pratinjau" element={<Pratinjau />} />
+          <Route path="/tour" element={<Pratinjau />} />
           {/* Etalase penuh TANPA login. Di luar gerbang, dan memang harus:
               orang yang sedang menimbang produk tidak boleh disuruh
               mendaftar untuk melihat bentuk barangnya. */}
@@ -339,7 +367,7 @@ export default function App() {
           <Route path="/aktivasi" element={<Aktivasi />} />
           {/* Markas Agen SENGAJA di luar kerangka terminal — halaman
               terpisah untuk pusat kendali agen AI, bukan bagian dasbor. */}
-          <Route path="/markas" element={<Penjaga><Markas /></Penjaga>} />
+          <Route path="/hq" element={<Penjaga><Markas /></Penjaga>} />
           {/* Legal WAJIB di luar gerbang. Orang membaca disclaimer dan
               ketentuan refund JUSTRU sebelum membayar — kalau halaman ini
               berada di dalam Kerangka, calon pembeli yang mengkliknya
@@ -348,26 +376,51 @@ export default function App() {
               orang yang sudah terlanjur membeli tidak melindungi siapa pun. */}
           <Route path="/legal" element={<Legal />} />
           <Route element={<Kerangka />}>
-            <Route path="/dashboard"   element={<Dashboard />} />
-            <Route path="/screener"        element={<Screener />} />
-            <Route path="/screener-react"  element={<ScreenerReact />} />
-            <Route path="/chart"       element={<ChartBacktest />} />
-            <Route path="/jurnal"      element={<Jurnal />} />
-            <Route path="/personal"    element={<PersonalArea />} />
-            <Route path="/marketplace" element={<Marketplace />} />
-            <Route path="/copy"        element={<CopyTrading />} />
-            <Route path="/integrasi"   element={<Integrasi />} />
-            <Route path="/pemilik"     element={<Pemilik />} />
-            <Route path="/sosmed"      element={<Sosmed />} />
-            <Route path="/maintenance" element={<Maintenance />} />
-            <Route path="/tagihan"     element={<Billing />} />
-            <Route path="/dokumentasi" element={<Dokumentasi />} />
-            <Route path="/changelog"   element={<Changelog />} />
+            <Route path="/dashboard"      element={<Dashboard />} />
+            <Route path="/screener"       element={<Screener />} />
+            <Route path="/screener-react" element={<ScreenerReact />} />
+            <Route path="/chart-entry"    element={<ChartBacktest />} />
+            <Route path="/journal"        element={<Jurnal />} />
+            <Route path="/personal-area"  element={<PersonalArea />} />
+            <Route path="/marketplace"    element={<Marketplace />} />
+            <Route path="/copy-signal"    element={<CopyTrading />} />
+            <Route path="/integrations"   element={<Integrasi />} />
+            <Route path="/owner"          element={<Pemilik />} />
+            <Route path="/social"         element={<Sosmed />} />
+            <Route path="/maintenance"    element={<Maintenance />} />
+            <Route path="/billing"        element={<Billing />} />
+            <Route path="/docs"           element={<Dokumentasi />} />
+            <Route path="/changelog"      element={<Changelog />} />
           </Route>
+
+          {/* ── ALAMAT LAMA ─────────────────────────────────────────────────
+              Dipertahankan sebagai pengalih, bukan dihapus. Alamat-alamat ini
+              sudah tersebar di bookmark, riwayat peramban, tangkapan layar
+              tutorial, dan pesan WhatsApp — dan yang membukanya besok tidak
+              akan mengira "namanya berubah", ia akan mengira situsnya rusak.
+
+              /akses dan /aktivasi TIDAK boleh sekadar dihapus dalam keadaan
+              apa pun: /aktivasi adalah tempat Lynk melempar orang SESUDAH
+              mereka membayar, dan alamat itu tersimpan di setelan Lynk — di
+              luar jangkauan kode ini. */}
+          <Route path="/beranda"     element={<Alias ke="/homeuser" />} />
+          <Route path="/pendaratan"  element={<Alias ke="/landing" />} />
+          <Route path="/pratinjau"   element={<Alias ke="/tour" />} />
+          <Route path="/markas"      element={<Alias ke="/hq" />} />
+          <Route path="/chart"       element={<Alias ke="/chart-entry" />} />
+          <Route path="/jurnal"      element={<Alias ke="/journal" />} />
+          <Route path="/personal"    element={<Alias ke="/personal-area" />} />
+          <Route path="/copy"        element={<Alias ke="/copy-signal" />} />
+          <Route path="/integrasi"   element={<Alias ke="/integrations" />} />
+          <Route path="/pemilik"     element={<Alias ke="/owner" />} />
+          <Route path="/sosmed"      element={<Alias ke="/social" />} />
+          <Route path="/tagihan"     element={<Alias ke="/billing" />} />
+          <Route path="/dokumentasi" element={<Alias ke="/docs" />} />
+
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         </Suspense>
-      </HashRouter>
+      </BrowserRouter>
     </PenyediaAuth>
   );
 }

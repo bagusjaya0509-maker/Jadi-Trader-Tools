@@ -926,7 +926,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
     if (!ok) { setKabarKirimSinyal('Gagal menyiapkan draf — coba lagi.'); return; }
     /* Alamat TANPA level: level sudah ikut di draf, dan menaruhnya juga di
        query akan membuat dua sumber kebenaran yang bisa berselisih. */
-    navigasi('/copy');
+    navigasi('/copy-signal');
   }
   /* Setelan order sungguhan — hidup di halaman supaya label risiko di
      garis chart dihitung dari angka yang SAMA dengan yang akan dikirim. */
@@ -2104,7 +2104,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
           <div className="flex flex-wrap items-center gap-2.5 border-t border-sky-500/20 bg-sky-500/[0.05] px-4 py-3">
             <History className="size-4 shrink-0 text-sky-300" strokeWidth={2} />
             <span className="flex-1 text-[12.5px] leading-relaxed text-sky-100/90">{kabarReplay}</span>
-            <Link to="/pratinjau"
+            <Link to="/tour"
               className="rounded-md bg-zinc-100 px-3 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white">
               Masuk
             </Link>

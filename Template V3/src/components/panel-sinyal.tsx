@@ -439,7 +439,7 @@ export function PanelSinyal({ ringkas = false }: { ringkas?: boolean } = {}) {
                   di sebelahnya sebagai rujukan. */}
               <div className="flex items-center gap-2">
                 <Link
-                  to={`/chart?simbol=${kripto ? s.pair : `MT5:${s.pair}`}`
+                  to={`/chart-entry?simbol=${kripto ? s.pair : `MT5:${s.pair}`}`
                     + `&tf=${encodeURIComponent(s.tf || '4h')}`
                     + `&entry=${s.entry}&sl=${s.sl}&tp=${s.tp}&arah=${s.arah}`}
                   className="flex cursor-pointer items-center gap-1.5 rounded-md bg-zinc-100 px-2.5 py-1 text-[11px] font-medium text-zinc-950 transition-colors hover:bg-white">

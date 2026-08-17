@@ -119,7 +119,7 @@ const BAGIAN: Bagian[] = [
         <P>
           Kartu sinyal, Area Pantau, Copy Signal, dan panel sejenisnya adalah hasil perhitungan
           otomatis atas data harga publik menurut aturan yang tertulis di{' '}
-          <Link to="/dokumentasi" className="text-zinc-200 underline decoration-zinc-700 underline-offset-2 hover:decoration-zinc-400">
+          <Link to="/docs" className="text-zinc-200 underline decoration-zinc-700 underline-offset-2 hover:decoration-zinc-400">
             Documentation
           </Link>. Sistem tidak mengetahui kondisi keuanganmu, toleransi risikomu, atau tujuanmu —
           jadi keluarannya tidak mungkin menjadi saran yang cocok untukmu secara pribadi.

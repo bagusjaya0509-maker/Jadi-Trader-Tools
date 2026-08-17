@@ -178,7 +178,7 @@ export default function Pendaratan() {
 
             <div className="flex flex-wrap items-center gap-4">
               <Link to="/legal" className="transition-colors hover:text-zinc-300">Disclaimer &amp; Privasi</Link>
-              <Link to="/dokumentasi" className="transition-colors hover:text-zinc-300">Dokumentasi</Link>
+              <Link to="/docs" className="transition-colors hover:text-zinc-300">Dokumentasi</Link>
               <span className="text-zinc-600">© 2026 Jadi Trader Tools</span>
             </div>
           </div>

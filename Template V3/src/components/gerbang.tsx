@@ -175,7 +175,7 @@ export function MenuPengguna() {
                   keduanya tautan yang menuju halaman yang tidak menjawab
                   apa pun untuknya. */}
               {!pemilik && (
-                <Link to={langganan.status === 'aktif' ? '/tagihan' : '/akses'} onClick={() => setBuka(false)}
+                <Link to={langganan.status === 'aktif' ? '/billing' : '/akses'} onClick={() => setBuka(false)}
                   className="mt-2 inline-flex items-center gap-1 text-[12px] text-zinc-300 hover:text-zinc-100">
                   {langganan.status === 'aktif' ? 'Kelola tagihan' : 'Minta akses penuh'} <ChevronRight className="size-3" />
                 </Link>
@@ -265,11 +265,22 @@ export function PitaLangganan() {
             bebas; menyimpan perubahan baru bisa setelah masuk.
           </span>
         </span>
-        <Link to="/pratinjau"
+        <Link to="/tour"
           className="rounded-md bg-zinc-100 px-3 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white">
           Coba dengan akunku
         </Link>
-        <button onClick={() => { akhiriPreview(); window.location.hash = '#/'; }}
+        {/* location.assign('/'), BUKAN location.hash = '#/'.
+            Yang lama bekerja hanya selama aplikasi ini memakai HashRouter:
+            mengubah tanda pagar memang memindahkan halaman waktu itu.
+            Sesudah pindah ke BrowserRouter (17 Agu 2026) ia tidak lagi
+            menavigasi apa pun — tombolnya akan terlihat rusak tanpa
+            memunculkan satu pun galat.
+
+            Muat ulang penuh memang disengaja di sini, tidak seperti tautan
+            lain: keluar dari mode preview membuang seluruh data contoh, dan
+            memulai dari halaman yang benar-benar bersih lebih dapat
+            diandalkan daripada membujuk setiap panel melepas datanya. */}
+        <button onClick={() => { akhiriPreview(); window.location.assign('/'); }}
           className="cursor-pointer text-[12px] text-zinc-500 underline underline-offset-2 hover:text-zinc-300">
           Keluar preview
         </button>
