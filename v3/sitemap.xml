@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SITEMAP — dan kenapa isinya cuma SATU alamat
+
+  Aplikasi ini memakai HashRouter, jadi seluruh halamannya hidup di belakang
+  tanda pagar: /#/akses, /#/marketplace, /#/copy, dan seterusnya.
+
+  Google MEMBUANG segala sesuatu sesudah "#" saat menyusun daftar alamat.
+  Bagi perayap, /#/akses dan /#/marketplace adalah alamat yang sama persis
+  dengan "/". Menuliskannya di sitemap tidak membuatnya terindeks — ia cuma
+  membuat Search Console melaporkan alamat duplikat.
+
+  Jadi hari ini situs ini punya SATU halaman yang bisa diindeks, dan sitemap
+  ini menyatakan itu apa adanya. Menambah baris palsu di sini tidak akan
+  menambah satu pun halaman di hasil pencarian.
+
+  Untuk benar-benar punya banyak halaman yang terindeks, alamatnya harus
+  berpindah dari /#/akses menjadi /akses — itu perubahan pada cara aplikasi
+  membaca alamat, bukan pada berkas ini.
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://jaditrader.co.id/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+</urlset>

@@ -1,0 +1,26 @@
+# Jadi Trader Tools — https://jaditrader.co.id
+#
+# Sebelum berkas ini ada, /robots.txt menjawab 404. Itu bukan penghalang
+# perayapan (tanpa robots.txt semuanya dianggap boleh), tapi ia satu sinyal
+# kecil bahwa situsnya belum diurus — dan Search Console mencatatnya.
+#
+# Yang DITUTUP di bawah bukan rahasia: seluruh halaman itu tetap butuh login,
+# dan menutupnya di sini cuma mencegah perayap membuang jatah rayapannya pada
+# alamat yang selalu memulangkan layar login yang sama. Jatah itu terbatas,
+# dan untuk situs baru ia sangat berharga.
+
+User-agent: *
+Allow: /
+
+# Halaman di balik gerbang — tidak ada isi publik untuk dirayapi.
+Disallow: /markas
+Disallow: /pemilik
+Disallow: /maintenance
+Disallow: /tagihan
+Disallow: /sosmed
+
+# Aset build: nama berkasnya berubah tiap rilis, jadi merayapinya cuma
+# menghasilkan riwayat alamat mati.
+Disallow: /assets/
+
+Sitemap: https://jaditrader.co.id/sitemap.xml
