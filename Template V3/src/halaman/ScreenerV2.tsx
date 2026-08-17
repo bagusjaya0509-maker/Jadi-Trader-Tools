@@ -461,8 +461,25 @@ export default function ScreenerV2() {
                  dan itu tidak apa-apa: screener-nya tetap jalan, cuma
                  cangkang V2-nya ikut kelihatan. */
               try {
-                const d = (e.currentTarget as HTMLIFrameElement).contentDocument;
+                const bingkai = e.currentTarget as HTMLIFrameElement;
+                const d = bingkai.contentDocument;
                 if (!d) return;
+
+                /* ── Nyalakan mode tamu di dalam bingkai ────────────────
+                   Screener V2 punya dinding loginnya SENDIRI, dan gerbang
+                   preview di sisi V3 tidak menyentuhnya sama sekali — itu
+                   sebabnya tamu yang sudah menekan "Buka Screener Area"
+                   tetap disodori "Masuk dengan Google" di dalam bingkai.
+
+                   Dipanggil sebagai fungsi, bukan lewat query param atau
+                   penanda di localStorage: memanggilnya hanya mungkin dari
+                   halaman SAMA-DOMAIN yang membingkainya, dan V2 sendiri
+                   memeriksa ulang syarat itu sebelum membuka apa pun. Alamat
+                   V2 yang dibuka langsung tetap terkunci. */
+                if (tamuPreview) {
+                  const w = bingkai.contentWindow as (Window & { jtModeTamu?: () => boolean }) | null;
+                  w?.jtModeTamu?.();
+                }
                 if (!d.getElementById('jt-v3-tanpa-cangkang')) {
                   const s = d.createElement('style');
                   s.id = 'jt-v3-tanpa-cangkang';

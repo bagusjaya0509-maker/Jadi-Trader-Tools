@@ -2820,6 +2820,58 @@
   ];
   let esIsOwner = false;
 
+  /* ═══════════════════════════════════════════════════════════════════════
+     MODE TAMU — screener bisa dilihat sekali tanpa login, LEWAT V3 SAJA
+     ═══════════════════════════════════════════════════════════════════════
+     Halaman preview V3 (#/screener) menanam halaman ini dalam bingkai dan
+     memanggil window.jtModeTamu(). Tanpa itu, tidak ada satu pun jalan lain
+     yang menyalakannya: bukan query param, bukan localStorage, bukan
+     nama pengguna tertentu. Alamat halaman ini yang dibuka langsung tetap
+     terkunci persis seperti sebelumnya.
+
+     TIGA SYARAT, semuanya harus benar:
+       1. sakelarnya menyala (TAMU_DIIZINKAN)
+       2. halaman ini sedang DIBINGKAI, bukan dibuka sendiri
+       3. induk bingkainya SAMA-DOMAIN — dibaca langsung dari
+          window.parent.location.origin, yang MELEMPAR kalau lintas-domain
+
+     Syarat ketiga yang menutup lubangnya: siapa pun boleh membingkai halaman
+     ini dari situsnya sendiri, tapi tidak ada yang bisa menaruh halaman di
+     jaditrader.co.id selain pemiliknya. Jadi satu-satunya pintu ke mode ini
+     adalah preview V3, yang sudah punya batas sekali-lihatnya sendiri.
+
+     YANG TIDAK DILAKUKAN MODE TAMU, dan ini bagian terpentingnya: ia TIDAK
+     memanggil masukAplikasi(). Tidak ada uid, jadi tidak ada sinkron cloud,
+     tidak ada penanaman layout, tidak ada konfigurasi live trading, tidak
+     ada timer yang menulis ke Firestore tiap 15 detik. Tamu cuma MELIHAT dan
+     MEMINDAI; tidak ada satu bita pun yang ia tulis ke akun siapa pun.
+
+     MEMATIKANNYA: ubah TAMU_DIIZINKAN jadi false. Satu kata, dan screener
+     kembali terkunci penuh untuk siapa pun yang belum masuk.
+     ═══════════════════════════════════════════════════════════════════════ */
+  const TAMU_DIIZINKAN = true;
+  let esModeTamu = false;
+
+  window.jtModeTamu = function(){
+    if(!TAMU_DIIZINKAN) return false;
+    if(window.top === window.self) return false;          // dibuka sendiri
+    try{
+      if(window.parent.location.origin !== window.location.origin) return false;
+    }catch(e){ return false; }                            // induk lintas-domain
+    if(esModeTamu) return true;
+    esModeTamu = true;
+    /* Elemennya dicari SAAT DIPANGGIL, bukan ditangkap di atas: fungsi ini
+       bisa dipanggil sebelum atau sesudah gerbangnya sempat tampil, dan
+       keduanya harus sama-sama bekerja. */
+    var g = document.getElementById('esAuthGate');
+    if(g) g.style.display = 'none';
+    var a = document.getElementById('esActivateGate');
+    if(a) a.style.display = 'none';
+    var u = document.getElementById('esUserBar');
+    if(u) u.style.display = 'none';
+    return true;
+  };
+
   const esAuthGateEl = document.getElementById('esAuthGate');
   const esAuthStatusEl = document.getElementById('esAuthStatus');
   const esGoogleLoginBtn = document.getElementById('esGoogleLoginBtn');
@@ -2830,6 +2882,10 @@
   // tidak ada sesi aktif - kalau dipanggil lebih awal, user yang sudah login
   // sempat melihat tombol "Masuk dengan Google" berkedip tiap pindah halaman.
   function tampilkanKotakLogin(){
+    /* Tamu tidak pernah disodori kotak login. Penjaga ditaruh DI SINI, di
+       satu-satunya fungsi yang memunculkannya, bukan di tiap pemanggilnya —
+       pemanggil yang ditambahkan besok ikut terjaga tanpa perlu diingat. */
+    if(esModeTamu) return;
     if(esAuthLoadingEl) esAuthLoadingEl.style.display = 'none';
     if(esAuthBoxEl) esAuthBoxEl.style.display = 'block';
   }
@@ -2876,6 +2932,12 @@
      mengunci gara-gara satu berkas gagal diunduh hanya menyusahkan orang
      yang sudah bayar. */
   function izinSinyal(){
+    /* Tamu preview boleh memindai. Itu memang seluruh gunanya: screener yang
+       terlihat tapi tidak bisa dijalankan cuma tangkapan layar mahal, dan
+       tidak ada yang bisa menilai alat dari bentuk tombolnya.
+       Batas jumlahnya dijaga di sisi V3 (sekali per kunjungan halaman), bukan
+       di sini — dan tamu tidak menulis apa pun ke akun siapa pun. */
+    if(esModeTamu) return true;
     if(typeof JTLangganan === 'undefined') return true;
     return JTLangganan.boleh('Sinyal &amp; Pemindaian');
   }
@@ -3240,6 +3302,12 @@
       });
     } else {
       esCurrentUid = null;
+      /* MODE TAMU menang di sini, dan urutannya penting: Firebase menjawab
+         ~1 detik sesudah halaman muat, jauh SESUDAH V3 sempat memanggil
+         jtModeTamu(). Tanpa penjaga ini, gerbang login yang sudah
+         disembunyikan akan muncul lagi sendiri sedetik kemudian — persis
+         yang dilaporkan pemilik. */
+      if(esModeTamu) return;
       esAuthGateEl.style.display = 'flex';
       // Baru SEKARANG status login benar-benar diketahui: spinner diganti kotak
       // login. Sebelum titik ini kotaknya sengaja disembunyikan (lihat markup).
