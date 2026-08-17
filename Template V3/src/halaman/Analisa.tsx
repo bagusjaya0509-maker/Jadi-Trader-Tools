@@ -851,53 +851,8 @@ export default function Analisa() {
         ))}
       </div>
 
-      {/* ── Peringatan risiko, di tingkat HALAMAN ──────────────────────────
-          Kalimat ini dulu menempel di panel Sinyal Pantauan. Panel itu kini
-          disembunyikan — dan yang ikut hilang bersamanya justru satu-satunya
-          penyeimbang yang terlihat, padahal halaman ini menampilkan pair,
-          arah, entry, SL, dan TP dari analisa berbayar: bentuk yang paling
-          mudah dibaca orang sebagai "beli sekarang di harga ini".
-
-          DI LUAR TAB, jadi terlihat di keduanya. Tab Performa justru yang
-          paling membutuhkannya: winrate dan estimasi hasil adalah angka yang
-          paling gampang dibaca sebagai janji.
-
-          Di ATAS, bukan di kaki halaman. Disclaimer yang menunggu digulir
-          tidak pernah sampai ke orang yang sedang bersiap menekan "Buka di
-          Chart & Entry". */}
-      {/* HANYA di halaman depan Market Signal — bukan di dalam kanal, bukan
-          di tab Posting. Di dalam kanal, kotak amber setinggi tiga baris
-          duduk di antara nama analis dan sinyalnya, dan layar itu berhenti
-          terasa seperti kanal orang tersebut.
-
-          TIDAK DIHAPUS, DIPERKECIL. Kanal justru layar yang menampilkan
-          entry, SL, dan TP — bentuk yang paling gampang dibaca sebagai
-          "beli sekarang di harga ini". Menghilangkan penyeimbangnya sama
-          sekali di situ bukan lagi keputusan tampilan, dan ini wilayah OJK
-          / Bappebti. Jadi versi ringkasnya tetap ada: satu baris kecil di
-          bawah judul kanal. */}
-      {/* TANPA KOTAK — keputusan pemilik 17 Agu 2026. Bingkai amber di kepala
-          halaman menarik mata lebih kuat daripada sinyal yang justru dicari
-          orang, dan halaman ini sudah punya banyak kotak berbingkai di
-          bawahnya. Yang HILANG cuma bingkainya: seluruh kalimatnya utuh,
-          tetap di ATAS, dan kata "Bukan rekomendasi beli atau jual" tetap
-          amber supaya bobotnya tidak ikut hilang bersama kotaknya. Ini
-          wilayah OJK/Bappebti — yang boleh diringkas tampilannya, bukan
-          isinya. */}
-      {diDepan && (
-      <div className="mb-4">
-        <p className="text-[11.5px] leading-relaxed text-zinc-400">
-          <span className="font-medium text-amber-300/90">Bukan rekomendasi beli atau jual.</span>{' '}
-          Analisa di halaman ini disusun pengguna lain dan agen AI dari data harga publik —
-          termasuk yang berbayar. Rekam jejak dan estimasi yang ditampilkan adalah catatan masa
-          lalu, <span className="text-zinc-300">bukan jaminan hasil</span>. Periksa ulang sebelum
-          eksekusi; seluruh risiko dan keputusan ada padamu.{' '}
-          <Link to="/legal" className="underline decoration-zinc-700 underline-offset-2 hover:text-zinc-200">
-            Disclaimer &amp; Ketentuan
-          </Link>
-        </p>
-      </div>
-      )}
+      {/* Peringatan risiko sekarang jadi KAKI halaman Market Signal —
+          lihat komentar lengkapnya di dekat penutup wadah <div> di bawah. */}
 
       {/* ── Papan peringkat, DI KEPALA Market Signal ─────────────────────
           Bukan sub-halaman sendiri lagi. Orang datang ke sini untuk mencari
@@ -1396,6 +1351,44 @@ export default function Analisa() {
           </>
         );
       })()}
+
+      {/* ── Peringatan risiko — KAKI halaman Market Signal ────────────────
+          Dipindah dari kepala ke kaki, permintaan pemilik 17 Agu 2026.
+
+          SEBAB ASLINYA, supaya tidak diundang balik tanpa sadar: ia ditaruh
+          di atas justru karena disclaimer yang menunggu digulir tidak
+          pernah sampai ke orang yang sedang bersiap menekan "Buka di
+          Chart & Entry". Itu tetap benar, dan risikonya nyata — ini wilayah
+          OJK/Bappebti.
+
+          YANG MENAHAN RISIKO ITU sekarang bukan posisinya, melainkan tiga
+          hal yang sengaja TIDAK ikut dipindah:
+            · satu baris ringkas tetap ada DI ATAS begitu sebuah kanal
+              dibuka — dan kanal itulah layar yang benar-benar menampilkan
+              entry, SL, dan TP
+            · kalimatnya utuh di sini, bukan versi pendek
+            · tautan Disclaimer & Ketentuan ikut
+
+          Jadi yang berubah cuma halaman DAFTAR kanal — layar yang belum
+          menunjukkan satu pun harga yang bisa dieksekusi.
+
+          Di dalam wadah Market Signal, bukan di luarnya: sebagai kaki
+          halaman ia harus ikut tersembunyi saat tab Posting dibuka, bukan
+          menggantung di bawah layar yang bukan miliknya. */}
+      {diDepan && (
+        <div className="mt-6 border-t border-zinc-800/60 pt-4">
+          <p className="text-[11.5px] leading-relaxed text-zinc-500">
+            <span className="font-medium text-amber-300/90">Bukan rekomendasi beli atau jual.</span>{' '}
+            Analisa di halaman ini disusun pengguna lain dan agen AI dari data harga publik —
+            termasuk yang berbayar. Rekam jejak dan estimasi yang ditampilkan adalah catatan masa
+            lalu, <span className="text-zinc-400">bukan jaminan hasil</span>. Periksa ulang sebelum
+            eksekusi; seluruh risiko dan keputusan ada padamu.{' '}
+            <Link to="/legal" className="underline decoration-zinc-700 underline-offset-2 hover:text-zinc-300">
+              Disclaimer &amp; Ketentuan
+            </Link>
+          </p>
+        </div>
+      )}
       </div>
     </div>
   );
