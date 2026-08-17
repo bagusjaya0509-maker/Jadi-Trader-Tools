@@ -29,7 +29,11 @@ const bagian = [
   potong('function hitungLangganan', '\nexport function PenyediaAuth'),
 ].join('\n');
 
-const js = transformSync(bagian, { loader: 'ts', format: 'cjs' }).code;
+/* `export` dibuang dulu: potongannya ikut membawa mulaiPratinjau yang
+   ber-export, dan esbuild akan memancarkan module.exports yang tidak ada
+   artinya di dalam new Function. Fungsi itu sendiri tidak dipanggil di
+   sini — ia cuma perlu bisa di-parse. */
+const js = transformSync(bagian.replace(/^export /gm, ''), { loader: 'ts', format: 'cjs' }).code;
 const hitungLangganan = new Function(`${js}; return hitungLangganan;`)();
 
 const JAM = 3_600_000;
@@ -46,32 +50,39 @@ const cek = (nama, dapat, harap) => {
 };
 
 const skrg = Date.now();
-const st = (ms) => hitungLangganan({ mulai: new Date(ms) }, T).status;
+const st = (d) => hitungLangganan(d, T).status;
 
-cek('baru login detik ini', st(skrg), 'pratinjau');
-cek('sudah 1 jam', st(skrg - 1 * JAM), 'pratinjau');
-cek('sudah 23 jam 59 menit', st(skrg - 23.98 * JAM), 'pratinjau');
-cek('tepat 24 jam + 1 detik', st(skrg - 24 * JAM - 1000), 'habis');
-cek('sudah 3 hari', st(skrg - 72 * JAM), 'habis');
-cek('dokumen lama (30 hari lalu)', st(skrg - 720 * JAM), 'habis');
+/* ── YANG PALING PENTING ──────────────────────────────────────────────
+   Login biasa TIDAK memberi pratinjau. Ini pemisah antara corong /akses
+   (kuota event 30 hari) dan tombol Preview di /template. Kalau kasus ini
+   pernah memulangkan 'pratinjau', event kuotanya kehilangan gunanya —
+   dan itu persis kebocoran yang membuat masa coba dicabut 13 Agu.      */
+cek('LOGIN BIASA (mulai saja, baru detik ini)', st({ mulai: new Date(skrg) }), 'habis');
+cek('login biasa sejak kemarin', st({ mulai: new Date(skrg - 20 * JAM) }), 'habis');
 
-/* Jam perangkat dimundurkan tidak bisa memperpanjang: `mulai` datang dari
-   server, jadi memundurkan Date.now() justru MEMPERPENDEK, tidak pernah
-   memperpanjang. Yang diuji di sini kebalikannya — `mulai` di MASA DEPAN
-   (jam perangkat dimajukan/dimundurkan) tidak boleh memberi akses abadi. */
-cek('mulai di masa depan (jam dicurangi)', st(skrg + 240 * JAM), 'pratinjau');
+/* Pratinjau dihitung dari field `pratinjau`, bukan `mulai`. */
+const p = (ms, mulaiMs = skrg - 500 * JAM) =>
+  st({ mulai: new Date(mulaiMs), pratinjau: new Date(ms) });
 
-/* bayarSampai selalu menang atas pratinjau, dan pratinjau habis tidak
-   boleh menutup orang yang sudah membayar. */
-const bayar = (mulaiMs, sampaiMs) =>
-  hitungLangganan({ mulai: new Date(mulaiMs), bayarSampai: new Date(sampaiMs) }, T).status;
-cek('pratinjau habis TAPI sudah bayar', bayar(skrg - 720 * JAM, skrg + 720 * JAM), 'aktif');
-cek('pratinjau habis dan bayar juga habis', bayar(skrg - 720 * JAM, skrg - 1 * JAM), 'habis');
+cek('pratinjau baru ditekan', p(skrg), 'pratinjau');
+cek('pratinjau 1 jam lalu', p(skrg - 1 * JAM), 'pratinjau');
+cek('pratinjau 23 jam 59 menit lalu', p(skrg - 23.98 * JAM), 'pratinjau');
+cek('pratinjau 24 jam + 1 detik lalu', p(skrg - 24 * JAM - 1000), 'habis');
+cek('pratinjau 3 hari lalu', p(skrg - 72 * JAM), 'habis');
+cek('akun lama yang menekan preview hari ini', p(skrg - 2 * JAM, skrg - 720 * JAM), 'pratinjau');
 
-cek('dokumen kosong', hitungLangganan({}, T).status, 'tidakDiketahui');
+/* bayarSampai selalu menang: orang yang sudah membayar tidak boleh
+   terkunci hanya karena pratinjaunya sudah lewat. */
+const bayar = (sampaiMs, pratinjauMs) =>
+  st({ mulai: new Date(skrg - 720 * JAM), pratinjau: new Date(pratinjauMs), bayarSampai: new Date(sampaiMs) });
+cek('pratinjau habis TAPI sudah bayar', bayar(skrg + 720 * JAM, skrg - 720 * JAM), 'aktif');
+cek('pratinjau masih jalan DAN sudah bayar', bayar(skrg + 720 * JAM, skrg - 1 * JAM), 'aktif');
+cek('pratinjau habis dan bayar juga habis', bayar(skrg - 1 * JAM, skrg - 720 * JAM), 'habis');
+
+cek('dokumen kosong', st({}), 'tidakDiketahui');
 
 /* Sisa waktu harus jam, bukan hari yang dibulatkan ke atas. */
-const l = hitungLangganan({ mulai: new Date(skrg - 23.9 * JAM) }, T);
+const l = hitungLangganan({ mulai: new Date(skrg - 500 * JAM), pratinjau: new Date(skrg - 23.9 * JAM) }, T);
 cek('sisaMs < 1 jam saat tersisa 6 menit', l.sisaMs < JAM, true);
 
 console.log(`\n${lulus} lulus, ${gagal} gagal`);

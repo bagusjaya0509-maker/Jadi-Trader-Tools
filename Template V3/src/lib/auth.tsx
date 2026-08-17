@@ -81,23 +81,23 @@ if (typeof window !== 'undefined' && window.location.hash.startsWith('#discord='
   })();
 }
 
-/* ── PRATINJAU 24 JAM ────────────────────────────────────────────────────
-   Menggantikan masa coba 30 hari yang DICABUT 13 Agu 2026. Pencabutan itu
-   punya sebab yang masih berlaku: siapa pun yang login sekali otomatis
-   punya akses, jadi gerbang persetujuan tidak berarti apa-apa selama
-   sebulan penuh per akun.
+/* ── PRATINJAU 24 JAM — JALUR TERPISAH, BUKAN BAWAAN LOGIN ───────────────
+   Pratinjau TIDAK diberikan hanya karena orang login. Ia dimulai dengan
+   sengaja lewat tombol Preview di halaman /template, dan penandanya
+   dokumen tersendiri: field `pratinjau`.
 
-   Yang berubah sekarang hanya PANJANG jendelanya, dari 30 hari jadi 24
-   jam — cukup untuk melihat seluruh isi alat sekali duduk, terlalu pendek
-   untuk dipakai bekerja. Yang TIDAK berubah: jendelanya tetap dihitung
-   dari `mulai` yang ditulis SEKALI dengan waktu server, dan aturan
-   Firestore menolak update/delete dari pengguna biasa. Artinya tidak ada
-   cara memundurkan jam perangkat, me-reset dokumennya, atau memperpanjang
-   sendiri.
+   Pemisahan ini bukan kerapian, ia menentukan corongnya. Kalau setiap
+   login otomatis dapat 24 jam, orang yang mendarat di /akses — tempat
+   kuota event 30 hari ditawarkan — tidak punya alasan mengambilnya:
+   ia sudah masuk. Event kuotanya jadi tidak ada gunanya.
+
+   `mulai` SENGAJA tidak dipakai untuk ini. Field itu ditulis pada login
+   pertama siapa pun, jadi memakainya berarti kembali ke masa coba
+   otomatis yang dicabut 13 Agu 2026 karena persis membocorkan gerbang.
 
    Yang tetap terbuka, sadar dan diterima: orang bisa membuat akun Google
    baru untuk mendapat 24 jam lagi. Tidak ada sistem berlogin gratis yang
-   bisa menutup itu — tapi imbalannya kini sehari, bukan sebulan.        */
+   bisa menutup itu — tapi imbalannya sehari, bukan sebulan.            */
 const JAM_PRATINJAU = 24;
 const MS_JAM = 3_600_000;
 const MS_HARI = 86_400_000;
@@ -219,6 +219,32 @@ async function pantauLangganan(
   );
 }
 
+/** Mulai pratinjau 24 jam untuk akun yang sedang masuk.
+ *
+ *  Ditulis dengan `serverTimestamp()` dan HANYA kalau fieldnya belum ada —
+ *  dua-duanya juga ditegakkan aturan Firestore, jadi pemeriksaan di sini
+ *  bukan pengamannya, cuma penghemat satu penulisan yang pasti ditolak.
+ *
+ *  Memulangkan hasil yang JUJUR: `sudahPernah` untuk akun yang pratinjaunya
+ *  sudah dipakai (termasuk yang sudah habis), dan melempar kalau server
+ *  menolak. Yang paling berbahaya di sini adalah menelan galat lalu
+ *  memasukkan orangnya seolah berhasil — layar terbuka sebentar, lalu
+ *  terkunci lagi begitu status sungguhannya tiba. */
+export async function mulaiPratinjau(uid: string): Promise<'mulai' | 'sudahPernah'> {
+  const { getFirestore, doc, getDoc, setDoc, serverTimestamp } = await import('firebase/firestore');
+  const db = getFirestore(app);
+  const ref = doc(db, 'langganan', uid);
+
+  const ada = await getDoc(ref);
+  if (ada.exists() && ada.data()?.pratinjau) return 'sudahPernah';
+
+  /* merge: dokumennya mungkin sudah ada dengan `mulai` di dalamnya.
+     Menulis tanpa merge akan MENGHAPUS `mulai`, dan itu menghilangkan
+     satu-satunya catatan kapan akun ini pertama datang. */
+  await setDoc(ref, { pratinjau: serverTimestamp() }, { merge: true });
+  return 'mulai';
+}
+
 /** Terjemahkan isi dokumen jadi status langganan. Murni — tidak menyentuh
  *  jaringan — supaya pembacaan pertama dan tiap pembaruan onSnapshot
  *  memakai aturan yang sama persis dan tidak mungkin berselisih. */
@@ -239,11 +265,13 @@ function hitungLangganan(data: any, Timestamp: any): Langganan {
     };
   }
 
-  if (mulai) {
-    /* Jendela pratinjau dihitung dari `mulai` — login PERTAMA akun ini,
-       bukan login hari ini. Akun yang dokumennya sudah lama ada berarti
-       pratinjaunya memang sudah lewat; itu benar, bukan efek samping. */
-    const akhir = new Date(+mulai + JAM_PRATINJAU * MS_JAM);
+  /* Pratinjau dihitung dari field `pratinjau` — DITULIS SAAT ORANGNYA
+     MENEKAN tombol Preview, bukan saat ia login. Akun yang login biasa
+     tidak punya field ini sama sekali, jadi ia jatuh ke 'habis' dan
+     diarahkan ke /akses tempat kuota event ditawarkan. */
+  const mulaiPratinjau = keTanggal(data.pratinjau, Timestamp);
+  if (mulaiPratinjau) {
+    const akhir = new Date(+mulaiPratinjau + JAM_PRATINJAU * MS_JAM);
     const sisaMs = +akhir - skrg;
     return {
       status: sisaMs > 0 ? 'pratinjau' : 'habis',
@@ -252,6 +280,14 @@ function hitungLangganan(data: any, Timestamp: any): Langganan {
       berakhir: akhir,
       warisan,
     };
+  }
+
+  /* Sudah pernah login tapi belum pernah mengambil pratinjau dan belum
+     punya akses: 'habis' — bukan 'tidakDiketahui'. Bedanya penting,
+     karena layar memakai 'tidakDiketahui' untuk "belum terbaca" dan
+     menahan diri menampilkan apa pun. */
+  if (mulai) {
+    return { status: 'habis', sisaHari: 0, sisaMs: 0, berakhir: null, warisan };
   }
 
   return KosongLangganan;

@@ -79,6 +79,7 @@ const Aktivasi      = lazy(() => muat(() => import('@/halaman/Aktivasi')));
    dan tidak memuat sepotong pun isi situs ini. Dimuat lazy supaya berkas
    dan gambar CDN-nya tidak ikut membebani jalur muat awal. */
 const Template      = lazy(() => muat(() => import('@/halaman/Template')));
+const Pratinjau     = lazy(() => muat(() => import('@/halaman/Pratinjau')));
 const ChartBacktest = lazy(() => muat(() => import('@/halaman/Chart')));
 const Jurnal        = lazy(() => muat(() => import('@/halaman/Jurnal')));
 const PersonalArea  = lazy(() => muat(() => import('@/halaman/PersonalArea')));
@@ -272,6 +273,9 @@ export default function App() {
               siapa pun. */}
           <Route path="/pendaratan" element={<Pendaratan />} />
           <Route path="/template" element={<Template />} />
+          {/* DI LUAR gerbang, dan memang harus: halaman ini justru tempat
+              orang yang belum punya akses memulai pratinjaunya. */}
+          <Route path="/pratinjau" element={<Pratinjau />} />
           <Route path="/akses" element={<Akses />} />
           {/* Tujuan link kiriman otomatis Lynk sesudah pembayaran. DI LUAR
               gerbang: orang yang baru membayar belum punya akses apa pun,

@@ -53,6 +53,23 @@ service cloud.firestore {
                     && request.resource.data.keys().hasOnly(['mulai'])
                     && request.resource.data.mulai == request.time;
 
+      // SATU-SATUNYA update yang boleh dilakukan pengguna biasa: memasang
+      // field "pratinjau" SEKALI, dengan waktu server.
+      //
+      // Empat syarat, dan keempatnya perlu:
+      //  - fieldnya BELUM ada  -> pratinjau tidak bisa diulang
+      //  - nilainya request.time -> jam perangkat tidak bisa dipakai
+      //  - hanya "pratinjau" yang berubah -> bayarSampai tidak bisa
+      //    ikut disisipkan dalam permintaan yang sama
+      //  - "mulai" tidak berubah -> catatan kapan akun ini datang aman
+      //
+      // Hilangkan salah satunya dan 24 jam itu berhenti berarti apa-apa.
+      allow update: if request.auth != null
+                    && request.auth.uid == uid
+                    && !('pratinjau' in resource.data)
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pratinjau'])
+                    && request.resource.data.pratinjau == request.time;
+
       allow update, delete: if request.auth != null
                             && request.auth.uid == 'EOrakx0QnSVgsi6BECSOXvUM9kG3';
     }
@@ -103,10 +120,16 @@ service cloud.firestore {
 
     function aksesAktif(uid) {
       return uid == 'EOrakx0QnSVgsi6BECSOXvUM9kG3'
-        // masih di dalam PRATINJAU 24 jam sejak login pertama
+        // masih di dalam PRATINJAU 24 jam.
+        //
+        // Dihitung dari "pratinjau", BUKAN dari "mulai". Bedanya menentukan
+        // segalanya: "mulai" ditulis pada login pertama siapa pun, jadi
+        // memakainya berarti setiap orang yang login otomatis dapat 24 jam
+        // dan kuota event 30 hari di /akses jadi tidak ada gunanya.
+        // "pratinjau" hanya ada kalau orangnya menekan tombol Preview.
         || (
-          'mulai' in langgananData(uid)
-          && langgananData(uid).mulai + duration.value(24, 'h') > request.time
+          'pratinjau' in langgananData(uid)
+          && langgananData(uid).pratinjau + duration.value(24, 'h') > request.time
         )
         // atau aksesnya sudah dibuka lewat kode / persetujuan
         || (

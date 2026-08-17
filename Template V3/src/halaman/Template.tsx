@@ -1,8 +1,9 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
+import { Link } from 'react-router-dom';
 import type { LucideIcon } from 'lucide-react';
 import {
-  ArrowRightIcon, PhoneCallIcon,
+  ArrowRightIcon, EyeIcon,
   CodeIcon, GlobeIcon, LayersIcon, UserPlusIcon, Users, Star,
   FileText, Shield, RotateCcw, Handshake, Leaf, HelpCircle, BarChart, PlugIcon,
 } from 'lucide-react';
@@ -108,12 +109,24 @@ function HeroSection() {
           We help brands scale faster through design, development <br /> and strategic execution.
         </p>
 
-        <div className="fade-in slide-in-from-bottom-10 flex w-fit animate-in items-center justify-center gap-3 fill-mode-backwards pt-2 delay-300 duration-500 ease-out">
-          <Button variant="outline">
-            <PhoneCallIcon className="size-4 mr-2" data-icon="inline-start" /> Book a Call
+        {/* Dua tombol template diganti dua pintu SUNGGUHAN — inilah satu-
+            satunya bagian copy template yang menunjuk ke isi kami, dan ia
+            ditaruh di sini karena di sinilah orang berhenti setelah
+            melihat tur layarnya di kotak bawah.
+
+            Urutannya disengaja: pratinjau dulu (murah, tanpa komitmen),
+            baru akses 30 hari. Menaruh yang berbayar lebih dulu memaksa
+            orang memutuskan sebelum ia melihat apa pun. */}
+        <div className="fade-in slide-in-from-bottom-10 flex w-fit animate-in flex-wrap items-center gap-3 fill-mode-backwards pt-2 delay-300 duration-500 ease-out">
+          <Button asChild>
+            <Link to="/pratinjau">
+              <EyeIcon className="size-4 mr-2" data-icon="inline-start" /> Preview tools · 1 hari
+            </Link>
           </Button>
-          <Button>
-            Get started <ArrowRightIcon className="size-4 ml-2" data-icon="inline-end" />
+          <Button variant="outline" asChild>
+            <Link to="/akses">
+              Ambil akses 30 hari <ArrowRightIcon className="size-4 ml-2" data-icon="inline-end" />
+            </Link>
           </Button>
         </div>
       </div>
