@@ -15,6 +15,7 @@ import { usePinAnalis } from '@/lib/pin-analis';
 import { cn, uang, persen, harga as fHarga, tanggalPendek } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 import { useRiwayat, useSaldoAwal } from '@/lib/data';
+import { useHargaPasar } from '@/lib/harga';
 import { statGabungan, kurvaEkuitas } from '@/lib/hitung';
 import { useTutupLuar } from '@/lib/tutup-luar';
 import {
@@ -404,10 +405,14 @@ function Galeri({ analisaId, galeri, bisaTambah, uidku, penulisku, onBerubah }: 
   );
 }
 
-function KartuAnalisa({ a, status, milikku, pemilik, onSegarkan, performa, dibatalkanAnalis, berjalanAnalis }: {
+function KartuAnalisa({ a, status, milikku, pemilik, onSegarkan, performa, dibatalkanAnalis, berjalanAnalis, hargaKini }: {
   a: RingkasAnalisa;
   status: string | undefined;
   milikku: boolean;
+  /** Harga pasar terkini pasangan ini. undefined = tidak diketahui —
+   *  pasangan Trade-Fi memang tidak punya sumber harga publik di sini, dan
+   *  kartunya lebih baik diam daripada menampilkan harga pasar lain. */
+  hargaKini?: number;
   /** Performa seluruh papan — kartu ini cuma mengambil barisnya sendiri.
    *  Dioper dari halaman, bukan diambil ulang tiap kartu: satu daftar bisa
    *  memuat belasan kartu, dan belasan permintaan untuk data yang sama
@@ -543,6 +548,25 @@ function KartuAnalisa({ a, status, milikku, pemilik, onSegarkan, performa, dibat
                     <span className="size-1.5 rounded-full bg-amber-400" /> Menunggu harga
                   </span>
                 )
+              )}
+              {/* HARGA TERKINI — menjawab "rencana ini masih terpakai?"
+                  ────────────────────────────────────────────────────────
+                  Ditaruh di sini, bukan di dalam panel terkunci, karena
+                  harga pasar bukan milik siapa pun: ia tidak membocorkan
+                  entry/SL/TP yang justru dijual. Yang bisa dibaca orang
+                  cuma "pasarnya sekarang di sini" — dan itu persis yang
+                  ia butuhkan untuk memutuskan membeli sinyalnya atau
+                  tidak.
+
+                  Sinyal SELESAI tidak menampilkannya: harganya sudah tidak
+                  relevan, dan angka berjalan di sebelah hasil yang sudah
+                  final justru mengesankan ia masih bisa diikuti. */}
+              {!selesai && hargaKini !== undefined && hargaKini > 0 && (
+                <span title="Harga pasar terkini — dari proxy VPS, bukan dari penulis sinyal"
+                      className="flex items-center gap-1 rounded border border-zinc-800 px-1.5 py-0.5 font-mono text-[10px] text-zinc-300">
+                  <span className="size-1 animate-pulse rounded-full bg-emerald-400" />
+                  {fHarga(hargaKini)}
+                </span>
               )}
               {selesai && <LencanaHasil hasil={a.hasil as 'sl' | 'tp' | 'batal'} />}
               {/* Sinyal selesai kini terbuka untuk siapa pun — dikatakan di
@@ -822,6 +846,17 @@ export default function Analisa() {
   const { data: riwayat } = useRiwayat();
   const saldoAwal = useSaldoAwal();
   const [daftar, setDaftar] = useState<RingkasAnalisa[]>([]);
+  /* Harga terkini tiap pasangan, dipakai kartu sinyal untuk menjawab satu
+     pertanyaan: rencana ini masih terpakai atau harganya sudah lewat?
+
+     HANYA kripto. useHargaPasar menyaring sendiri ke simbol Binance, jadi
+     pasangan Trade-Fi memulangkan undefined dan kartunya tidak menampilkan
+     angka apa pun. Itu disengaja: harga MT5 datang dari EA di terminal
+     pemiliknya, dan menampilkan harga Binance untuk XAUUSD Exness adalah
+     angka yang terlihat benar sambil menunjuk pasar yang berbeda. */
+  const hargaPasar = useHargaPasar(daftar.map((a) => a.pasangan));
+  /* Sub-halaman kanal: berjalan / menunggu harga / selesai. */
+  const [rakAktif, setRakAktif] = useState<'jalan' | 'nunggu' | 'selesai'>('jalan');
   const [masuk, setMasuk] = useState<PermintaanMasuk[]>([]);
   const [statusku, setStatusku] = useState<Record<string, string>>({});
   const [memuat, setMemuat] = useState(true);
@@ -1753,37 +1788,66 @@ export default function Analisa() {
               const berjalan = belum.filter((s) => !menunggu.includes(s));
 
               const rak = [
-                { kunci: 'jalan', judul: 'Sedang berjalan', isi: berjalan,
-                  warna: 'text-sky-400',
+                { kunci: 'jalan' as const, judul: 'Sedang berjalan', isi: berjalan,
+                  aktif: 'border-sky-500/60 bg-sky-500/10 text-sky-300',
                   ket: 'Harga sudah menyentuh entry — titik masuknya sudah lewat.' },
-                { kunci: 'nunggu', judul: 'Menunggu harga', isi: menunggu,
-                  warna: 'text-amber-400',
-                  ket: 'Order menggantung, entry-nya belum tersentuh.' },
-                { kunci: 'selesai', judul: 'Sudah selesai', isi: selesai,
-                  warna: 'text-zinc-400',
+                { kunci: 'nunggu' as const, judul: 'Menunggu harga', isi: menunggu,
+                  aktif: 'border-amber-500/60 bg-amber-500/10 text-amber-300',
+                  ket: 'Order masih menggantung — entry-nya belum tersentuh, jadi rencananya masih bisa diikuti.' },
+                { kunci: 'selesai' as const, judul: 'Sudah selesai', isi: selesai,
+                  aktif: 'border-zinc-600 bg-zinc-800/60 text-zinc-200',
                   ket: 'Kena TP/SL atau ditarik penulisnya. Levelnya terbuka gratis — peluangnya sudah habis, yang tersisa bahan penilaian.' },
-              ].filter((r) => r.isi.length > 0);
+              ];
+              /* Tab yang isinya kosong tetap DITAMPILKAN, cuma diredupkan dan
+                 tidak bisa ditekan. Menyembunyikannya membuat jumlah tab
+                 berubah-ubah antar-kanal, dan orang kehilangan patokan di
+                 mana ia sedang berdiri. Nol yang terbaca juga informasi:
+                 "analis ini tidak punya satu pun yang menggantung". */
+              const pilih = rak.find((r) => r.kunci === rakAktif) ?? rak[0];
+              const tampil = pilih.isi;
 
-              return rak.map((r) => (
-                <div key={r.kunci} className="mb-5">
-                  <div className="mb-2 flex items-baseline gap-2">
-                    <span className={cn('text-[12.5px] font-medium', r.warna)}>{r.judul}</span>
-                    <span className="angka text-[11px] text-zinc-600">{r.isi.length}</span>
-                    <span className="hidden text-[11px] text-zinc-600 sm:inline">· {r.ket}</span>
+              return (
+                <>
+                  <div className="mb-2.5 flex flex-wrap gap-1.5">
+                    {rak.map((r) => {
+                      const kosong = r.isi.length === 0;
+                      const ini = r.kunci === pilih.kunci;
+                      return (
+                        <button key={r.kunci} disabled={kosong}
+                          onClick={() => setRakAktif(r.kunci)}
+                          title={r.ket}
+                          className={cn(
+                            'flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[12px] transition-colors',
+                            kosong ? 'cursor-not-allowed border-zinc-800/60 text-zinc-700'
+                              : ini ? cn('cursor-pointer', r.aktif)
+                              : 'cursor-pointer border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200')}>
+                          {r.judul}
+                          <span className="angka text-[11px] opacity-70">{r.isi.length}</span>
+                        </button>
+                      );
+                    })}
                   </div>
-                  <div className="flex gap-4 overflow-x-auto pb-1">
-                    {r.isi.map((a) => (
-                      <div key={a.id} className="w-[320px] shrink-0">
-                        <KartuAnalisa a={a} status={statusku[a.id]}
-                          milikku={a.uid === pengguna?.uid} pemilik={pemilik} onSegarkan={segarkan}
-                          performa={performa}
-                          dibatalkanAnalis={terpilih.filter((s) => s.hasil === 'batal')}
-                          berjalanAnalis={berjalan.length} />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ));
+                  <p className="mb-3 text-[11.5px] leading-relaxed text-zinc-600">{pilih.ket}</p>
+
+                  {tampil.length === 0 ? (
+                    <p className="rounded-lg border border-zinc-800/60 px-4 py-6 text-center text-[12px] text-zinc-600">
+                      Tidak ada sinyal di ruangan ini.
+                    </p>
+                  ) : (
+                    <div className="flex gap-4 overflow-x-auto pb-1">
+                      {tampil.map((a) => (
+                        <div key={a.id} className="w-[320px] shrink-0">
+                          <KartuAnalisa a={a} status={statusku[a.id]}
+                            milikku={a.uid === pengguna?.uid} pemilik={pemilik} onSegarkan={segarkan}
+                            performa={performa} hargaKini={hargaPasar[a.pasangan]}
+                            dibatalkanAnalis={terpilih.filter((s) => s.hasil === 'batal')}
+                            berjalanAnalis={berjalan.length} />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              );
             })()}
           </>
         );
