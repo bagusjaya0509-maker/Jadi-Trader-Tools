@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   createChart, CandlestickSeries, LineSeries, createSeriesMarkers,
   type IChartApi, type ISeriesApi, type ISeriesMarkersPluginApi, type IPriceLine, type Logical, type Time,
@@ -207,6 +207,37 @@ export function ChartLilin({
   const garisPos = useRef<IPriceLine[]>([]);
   const isiPine = useRef<PenggambarIsi | null>(null);
   const alatPrim = useRef<PenggambarAlat | null>(null);
+
+  /* ── JARAK ANTAR-BAR ────────────────────────────────────────────────
+     Diambil dari MEDIAN selisih seluruh lilin, bukan dari dua lilin
+     pertama seperti sebelumnya.
+
+     Sebabnya bukan kehati-hatian teoretis. Pasar forex dan emas TUTUP
+     akhir pekan, dan lilin tertua di deret 3000 bar kebetulan bisa jatuh
+     tepat sebelum jeda itu. Diukur pada MT5:XAUUSD 1 jam yang sedang
+     tayang: `times[1] - times[0]` = 50 JAM, sementara median selisihnya
+     1 jam. 131 dari 2999 lilin punya jeda tidak normal, terbesar 74 jam.
+
+     Angka itu dipakai SEMUA yang mengekstrapolasi ke luar data — garis
+     Pine yang menjulur ke kanan, alat gambar yang ujungnya di masa depan,
+     dan penempatan alat posisi. Semuanya meleset lima puluh kali lipat di
+     simbol MT5, diam-diam, sejak sebelum alat posisi ada.
+
+     Median, bukan rata-rata: rata-rata ikut tertarik oleh 131 jeda akhir
+     pekan itu. Median tidak. Dihitung ulang hanya saat datanya berganti. */
+  const tfMs = useMemo(() => {
+    const t = lilin.times;
+    if (t.length < 2) return 3_600_000;
+    const d: number[] = [];
+    for (let i = 1; i < t.length; i++) { const v = t[i] - t[i - 1]; if (v > 0) d.push(v); }
+    if (!d.length) return 3_600_000;
+    d.sort((a, b) => a - b);
+    return d[d.length >> 1];
+  }, [lilin]);
+  /* Penangan tetikus dipasang SEKALI; kalau membaca `tfMs` dari closure,
+     mereka akan memegang nilai dari render saat dipasang. */
+  const tfRef = useRef(tfMs);
+  tfRef.current = tfMs;
   /* Handler klik disimpan di ref supaya langganannya dipasang SEKALI.
      Melanggan ulang tiap render menumpuk pendengar di chart yang sama. */
   const klikRef = useRef(onKlikBar);
@@ -639,7 +670,6 @@ export function ChartLilin({
     seriPine.current = [];
     if (!lilin.times.length) { isiPine.current?.setData([], []); return; }
     const n = lilin.times.length;
-    const tfMs = n > 1 ? lilin.times[1] - lilin.times[0] : 3_600_000;
     const waktuBar = (x: number) => {
       const b = Math.round(x);
       const ms = b < n ? lilin.times[Math.max(0, b)] : lilin.times[n - 1] + (b - (n - 1)) * tfMs;
@@ -740,7 +770,6 @@ export function ChartLilin({
      waktu, jadi gambarnya tidak merayap saat lilin baru lahir. */
   useEffect(() => {
     const n = lilin.times.length;
-    const tfMs = n > 1 ? lilin.times[1] - lilin.times[0] : 3_600_000;
     alatPrim.current?.setData(gambarAlat ?? [], { tAkhir: n ? lilin.times[n - 1] : 0, tfMs, n });
   }, [gambarAlat, lilin]);
 
@@ -783,7 +812,7 @@ export function ChartLilin({
         if (x != null) return x;
         const times = acuan.current.lilin.times;
         if (times.length < 2) return null;
-        const tfMs = times[1] - times[0];
+        const tfMs = tfRef.current;
         return c.timeScale().logicalToCoordinate((times.length - 1 + (t - times[times.length - 1]) / tfMs) as Logical);
       };
       let kena: string | null = null;
@@ -855,7 +884,7 @@ export function ChartLilin({
       const l = c.timeScale().coordinateToLogical(x);
       const times = acuan.current.lilin.times;
       if (l == null || times.length < 2) return null;
-      const tfMs = times[1] - times[0];
+      const tfMs = tfRef.current;
       return { t: times[times.length - 1] + (l - (times.length - 1)) * tfMs, h, x, y };
     };
 
@@ -867,7 +896,7 @@ export function ChartLilin({
         if (x != null) return x;
         const times = acuan.current.lilin.times;
         if (times.length < 2) return null;
-        const tfMs = times[1] - times[0];
+        const tfMs = tfRef.current;
         return c.timeScale().logicalToCoordinate((times.length - 1 + (t - times[times.length - 1]) / tfMs) as Logical);
       };
       const x1 = X(g.t1), x2 = X(g.t2);
@@ -1022,7 +1051,7 @@ export function ChartLilin({
       const l = c.timeScale().coordinateToLogical(x);
       const times = acuan.current.lilin.times;
       if (l == null || times.length < 2) return null;
-      const tfMs = times[1] - times[0];
+      const tfMs = tfRef.current;
       return { t: times[times.length - 1] + (l - (times.length - 1)) * tfMs, h };
     };
 
@@ -1046,6 +1075,18 @@ export function ChartLilin({
        proporsional, di harga berapa pun dan zoom berapa pun. */
     if (alat === 'posisiBeli' || alat === 'posisiJual') {
       const beli = alat === 'posisiBeli';
+      /* Koordinat x → stempel waktu. Sama seperti posisiDari, tapi tanpa
+         sumbu harga: yang dicari cuma di mana ujung kanan kotaknya jatuh. */
+      const waktuDariX = (x: number): number | null => {
+        const c = chart.current;
+        if (!c) return null;
+        const t = c.timeScale().coordinateToTime(x);
+        if (t != null) return (t as number) * 1000;
+        const l = c.timeScale().coordinateToLogical(x);
+        const times = acuan.current.lilin.times;
+        if (l == null || times.length < 2) return null;
+        return times[times.length - 1] + (l - (times.length - 1)) * tfRef.current;
+      };
       const tempel = (e: PointerEvent) => {
         if (e.button !== 0) return;
         const c = chart.current, s = seri.current;
@@ -1059,15 +1100,26 @@ export function ChartLilin({
         const jarak = Math.abs(hAtas - hBawah) * 0.14;
         if (!isFinite(jarak) || jarak <= 0) return;
 
-        const rentang = c.timeScale().getVisibleLogicalRange();
-        const barTampak = rentang ? Math.abs(Number(rentang.to) - Number(rentang.from)) : 60;
-        const times = acuan.current.lilin.times;
-        const tfMs = times.length >= 2 ? times[1] - times[0] : 3_600_000;
-        const bar = Math.max(6, Math.round(barTampak * 0.22));
+        /* Lebarnya diukur dalam PIKSEL lalu dibalik jadi waktu, bukan
+           dihitung "sekian bar dikali durasi timeframe".
+
+           Versi pertama memakai perkalian itu dan hasilnya memanjang
+           menutupi hampir seluruh chart. Bukan karena angkanya kebesaran:
+           durasi satu bar yang dipakai mengalikan itu sendiri salah 50x
+           di simbol MT5 (lihat catatan tfMs di atas). Perkalian apa pun
+           terhadap besaran yang tidak tetap akan meleset, dan melesetnya
+           menumpuk makin jauh ke kanan.
+
+           Piksel tidak punya akhir pekan. 18% lebar panel selalu 18%
+           lebar panel — di simbol apa pun, di zoom berapa pun. */
+        const kotakEl = el.getBoundingClientRect();
+        const xKlik = e.clientX - kotakEl.left;
+        const t2 = waktuDariX(Math.min(xKlik + kotakEl.width * 0.18, kotakEl.width - 4));
+        if (t2 == null || t2 <= p.t) return;
 
         onAlatSelesai({
           jenis: 'posisi', arah: beli ? 'beli' : 'jual',
-          t1: p.t, h1: p.h, t2: p.t + bar * tfMs,
+          t1: p.t, h1: p.h, t2,
           h2: p.h + (beli ? jarak : -jarak),
           h3: p.h - (beli ? jarak : -jarak),
         });

@@ -214,21 +214,24 @@ export class PenggambarAlat implements ISeriesPrimitive<Time> {
                 pita(y1, y2, '16,185,129');    // entry → target
                 pita(y1, y3, '248,113,113');   // entry → stop
 
-                const garis = (y: number, warna: string, putus = false) => {
-                  ctx.save();
-                  if (putus) ctx.setLineDash([4, 3]);
-                  ctx.strokeStyle = warna;
-                  ctx.lineWidth = 1;
-                  ctx.beginPath();
-                  ctx.moveTo(kiri, y); ctx.lineTo(kanan, y);
-                  ctx.stroke();
-                  ctx.restore();
-                };
-                garis(y2, 'rgba(16,185,129,.8)');
-                garis(y3, 'rgba(248,113,113,.8)');
-                /* Entry putus-putus: ia batas antara dua bidang, bukan level
-                   ketiga yang berdiri sendiri. */
-                garis(y1, 'rgba(228,228,231,.85)', true);
+                /* Cuma garis ENTRY yang digambar. Batas atas dan bawah sudah
+                   ditandai oleh tepi bidang warnanya sendiri — menggarisi
+                   tepi yang memang sudah kelihatan tidak menambah keterangan
+                   apa pun, cuma menambah satu garis lagi yang melintasi
+                   lilin.
+
+                   Entry beda kedudukannya: ia bukan tepi, ia PERBATASAN
+                   antara dua bidang. Tanpa garis, ia cuma tempat dua warna
+                   bersentuhan — dan justru harga itu yang paling perlu
+                   terbaca persis. */
+                ctx.save();
+                ctx.setLineDash([4, 3]);
+                ctx.strokeStyle = 'rgba(228,228,231,.85)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(kiri, y1); ctx.lineTo(kanan, y1);
+                ctx.stroke();
+                ctx.restore();
 
                 /* ANGKA HANYA SAAT TERPILIH. Chart yang berisi beberapa
                    setup, masing-masing dengan empat label menempel, berubah
