@@ -54,7 +54,11 @@
 .parallax__layers {
   position: relative;
   width: 100%;
-  height: 100svh;
+  /* Dikurangi tinggi header (h-14 = 3.5rem). Bagian ini duduk DI BAWAH
+     header, jadi 100svh utuh membuat kakinya — beserta tombol suasana di
+     pojoknya — jatuh persis di bawah lipatan dan tidak pernah terlihat
+     sebelum orang menggulir. */
+  height: calc(100svh - 3.5rem);
 }
 
 .parallax__layer-img {
@@ -143,5 +147,93 @@
   .parallax__layer-img,
   .parallax__layer-title {
     will-change: auto;
+  }
+}
+
+/* ── LILIN DI PUNGGUNG GUNUNG ───────────────────────────────────────────
+   Duduk di pita mendatar sekitar garis punggungan, bukan menelusuri
+   siluet fotonya. Menelusuri siluet mustahil dijaga: object-fit cover
+   memotong gambarnya berbeda-beda di tiap rasio layar, jadi lilin yang
+   pas di monitor akan meleset di ponsel. Pita mendatar yang bentuknya
+   sendiri meniru punggungan terbaca menyatu di semua ukuran, dan tidak
+   pernah "hampir pas" — keadaan yang justru paling terlihat salah. */
+.parallax__candles {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 24%;
+  height: 17%;
+  will-change: transform;
+  pointer-events: none;
+}
+
+.parallax__candles-svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* Sengaja tidak pekat. Ini bagian dari pemandangan, bukan grafik yang
+   harus dibaca — lilin bersolek penuh di atas foto akan terlihat seperti
+   tangkapan layar yang tertempel, bukan seperti punggungan yang kebetulan
+   berbentuk pasar. */
+.parallax__candles line { stroke-width: 1.25; opacity: 0.75; }
+.parallax__candles rect { opacity: 0.62; }
+
+.parallax__candles .naik line { stroke: #34d399; }
+.parallax__candles .naik rect { fill: #34d399; }
+.parallax__candles .turun line { stroke: #f87171; }
+.parallax__candles .turun rect { fill: #f87171; }
+
+/* ── SUASANA MALAM ─────────────────────────────────────────────────────
+   Dibuat dari foto yang SAMA lewat filter, bukan dari set gambar kedua.
+   Arahnya sengaja hanya satu jurusan: senja → malam. Membuat "siang" dari
+   foto senja tidak pernah berhasil — yang keluar bukan siang, melainkan
+   foto malam yang dipucatkan. Menggelapkan foto senja jauh lebih jujur:
+   matahari memang sedang turun, tinggal diteruskan.
+
+   Lilinnya justru DINAIKKAN kontrasnya di sini: latar yang lebih gelap
+   membuat opasitas yang pas di senja jadi nyaris hilang. */
+.parallax[data-suasana='malam'] .parallax__layer-img {
+  filter: brightness(0.42) saturate(0.72) contrast(1.08) hue-rotate(-12deg);
+}
+
+.parallax[data-suasana='malam'] .parallax__candles line { opacity: 0.95; }
+.parallax[data-suasana='malam'] .parallax__candles rect { opacity: 0.85; }
+
+.parallax__layer-img,
+.parallax__candles line,
+.parallax__candles rect {
+  transition: filter 700ms ease, opacity 700ms ease;
+}
+
+/* Tombol pemindah suasana — kecil, di pojok, tidak menantang isi utama. */
+.parallax__suasana {
+  position: absolute;
+  right: 1rem;
+  bottom: 1.25rem;
+  z-index: 3;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(9, 9, 11, 0.5);
+  backdrop-filter: blur(6px);
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: color 200ms ease, border-color 200ms ease, background 200ms ease;
+}
+
+.parallax__suasana:hover {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(9, 9, 11, 0.68);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .parallax__layer-img,
+  .parallax__candles line,
+  .parallax__candles rect {
+    transition: none;
   }
 }
