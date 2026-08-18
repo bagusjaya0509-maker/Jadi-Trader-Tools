@@ -870,7 +870,26 @@ export default function Analisa() {
   /** Halaman depan Market Signal: daftar kanal, belum masuk ke kanal siapa
    *  pun. Dipakai memutuskan apa yang boleh menumpuk di kepala halaman —
    *  begitu seseorang masuk ke sebuah kanal, kepala halaman itu miliknya. */
-  const diDepan = sub === 'market' && kanalBuka === null;
+  /* KEPALA HALAMAN — peringatan risiko + papan peringkat.
+     ────────────────────────────────────────────────────────────────────
+     Dulu `sub === 'market' && kanalBuka === null`, dan syarat pertama itu
+     yang membuat bilah sub-halaman melompat: di Market Signal bilahnya
+     duduk di bawah papan peringkat, di Posting Signal tidak ada apa pun di
+     atasnya sehingga ia naik sendiri ke puncak. Menekan tab yang seharusnya
+     bersaudara terasa seperti berpindah ke halaman lain.
+
+     Syarat `sub` dilepas. Keduanya kini tampil di kedua sub-halaman, dan
+     itu bukan sekadar demi posisi bilah:
+
+       · Peringatan risiko JUSTRU lebih perlu dibaca yang sedang MEMPOSTING
+         sinyal untuk diikuti orang lain, bukan cuma yang membacanya.
+       · Papan peringkat memperlihatkan kepada yang mau memposting di mana
+         posisinya sekarang — konteks yang hilang kalau ia harus pindah tab
+         untuk melihatnya.
+
+     Yang tersisa cuma `kanalBuka === null`: membuka satu kanal adalah masuk
+     ke dalam sesuatu, dan di sana seluruh halaman memang berganti. */
+  const diDepan = kanalBuka === null;
 
   /* ── Peringatan risiko: tampil 3 detik, lalu menyusut sendiri ──────────
      Keputusan pemilik 17 Agu 2026, sesudah sempat dicoba jadi kaki halaman
@@ -1231,13 +1250,15 @@ export default function Analisa() {
           yang baru masuk, dan bilah ini berubah fungsi jadi pembatas antara
           ringkasan di atas dan daftar sinyal di bawah.
 
-          KONSEKUENSINYA DISENGAJA DAN PERLU DIKETAHUI: papan peringkat cuma
-          tampil di Market Signal saat tidak ada kanal yang dibuka
-          (`diDepan`). Di Posting Signal, dan saat sebuah kanal dibuka,
-          tidak ada apa pun di atasnya — jadi bilah ini naik sendiri ke
-          puncak halaman. Kalau posisinya yang berpindah-pindah terasa
-          mengganggu, tempatnya harus dikembalikan ke atas; tidak ada jalan
-          tengah selama papan peringkatnya bersyarat.
+          POSISINYA SEKARANG TETAP di Market Signal maupun Posting Signal:
+          kepala halaman (peringatan risiko + papan peringkat) sengaja
+          ditampilkan di keduanya — lihat catatan di `diDepan`. Versi
+          pertama tidak begitu, dan bilah ini melompat ke puncak tiap kali
+          tab Posting dibuka.
+
+          Ia masih naik saat sebuah KANAL dibuka, dan itu dibiarkan:
+          membuka kanal adalah masuk ke dalam sesuatu, dan di sana seluruh
+          halaman memang berganti — bukan tab bersaudara yang ditukar.
 
           border-t, bukan border-b: garisnya kini memisahkan dari yang di
           ATAS, bukan menggarisbawahi dirinya sendiri. */}
