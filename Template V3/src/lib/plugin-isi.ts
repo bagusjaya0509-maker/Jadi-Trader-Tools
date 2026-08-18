@@ -64,10 +64,34 @@ export class PenggambarIsi implements ISeriesPrimitive<Time> {
           const c = this.chart, s = this.seri;
           if (!c || !s || (!this.kotak.length && !this.poli.length)) return;
           const skala = c.timeScale();
+
+          /* ── HANYA YANG TERLIHAT YANG DIGAMBAR ──────────────────────────
+             Versi sebelumnya melingkupi SELURUH isi kotak dan poligon tiap
+             kali kanvas digambar ulang, tanpa peduli mana yang ada di layar.
+
+             Itu murah selama gambarnya sedikit. Ia berhenti murah begitu
+             sebuah skrip Pine memakai fill() antara dua plot: satu panggilan
+             itu menghasilkan SATU POLIGON PER LILIN. Pada 3000 lilin berarti
+             3000 poligon, masing-masing enam konversi koordinat plus satu
+             lintasan kanvas — dikerjakan ulang tiap chart menggambar, yaitu
+             tiap bar replay maju, tiap digeser, tiap kursor bergerak.
+
+             Yang benar-benar terlihat biasanya delapan puluhan lilin. Sisanya
+             digambar di luar layar lalu dibuang peramban.
+
+             Penyaringan ini TIDAK MENGUBAH satu piksel pun: yang dilewati
+             hanya yang seluruhnya berada di luar rentang yang tampak. Batas
+             dilonggarkan satu bar di tiap sisi supaya benda yang cuma
+             separuh masuk tetap tergambar utuh. */
+          const tampak = skala.getVisibleLogicalRange();
+          const dari = tampak ? Number(tampak.from) - 1 : -Infinity;
+          const sampai = tampak ? Number(tampak.to) + 1 : Infinity;
+
           target.useMediaCoordinateSpace(({ context: ctx }) => {
             const X = (b: number) => skala.logicalToCoordinate(b as Logical);
             const Y = (v: number) => s.priceToCoordinate(v);
             for (const k of this.kotak) {
+              if (Math.max(k.b1, k.b2) < dari || Math.min(k.b1, k.b2) > sampai) continue;
               const x1 = X(k.b1), x2 = X(k.b2), y1 = Y(k.atas), y2 = Y(k.bawah);
               if (x1 == null || x2 == null || y1 == null || y2 == null) continue;
               const kiri = Math.min(x1, x2), puncak = Math.min(y1, y2);
@@ -76,6 +100,10 @@ export class PenggambarIsi implements ISeriesPrimitive<Time> {
               if (k.tepi) { ctx.strokeStyle = k.tepi; ctx.lineWidth = 1; ctx.strokeRect(kiri, puncak, lebar, tinggi); }
             }
             for (const f of this.poli) {
+              /* Inilah yang paling menentukan: fill() antara dua plot Pine
+                 menghasilkan satu poligon per lilin, jadi daftar ini yang
+                 paling panjang. */
+              if (Math.max(f.x1, f.x2) < dari || Math.min(f.x1, f.x2) > sampai) continue;
               const x1 = X(f.x1), x2 = X(f.x2);
               const ya1 = Y(f.ya1), yb1 = Y(f.yb1), ya2 = Y(f.ya2), yb2 = Y(f.yb2);
               if (x1 == null || x2 == null || ya1 == null || yb1 == null || ya2 == null || yb2 == null) continue;

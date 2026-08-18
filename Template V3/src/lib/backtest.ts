@@ -244,29 +244,94 @@ export interface ZonaSnrPenuh { resisten: Zona | null; support: Zona | null; atr
  *  Pivot kiri/kanan 10, bukan 5. Angka itu bukan selera: dengan 5, riak kecil
  *  ikut terhitung pivot dan zonanya berpindah tiap beberapa bar.
  */
-export function zonaSnr(l: Lilin, batasIdx?: number): ZonaSnrPenuh {
-  const n = batasIdx === undefined ? l.closes.length : Math.min(l.closes.length, batasIdx + 1);
+/* ── SNR: DIHITUNG SEKALI, DIBACA BERKALI-KALI ──────────────────────────
+   Versi lama memanggil zonaSnr(lilin, replayIdx) dari sebuah useMemo yang
+   bergantung pada replayIdx — jadi seluruh isinya diulang tiap bar replay,
+   empat kali sedetik, DI JALUR RENDER REACT. Isinya: tiga penyalinan larik
+   sepanjang n, dua pemindaian pivot dengan jendela 20, dan satu perhitungan
+   deret ATR penuh. Pada 3000 lilin itu sekitar 135.000 operasi per tick —
+   semuanya untuk menghasilkan TIGA ANGKA.
+
+   Yang dilaporkan pemiliknya sebagai "balok SNR yang bergerak tiap tick"
+   memang ini.
+
+   ── KENAPA BOLEH DIHITUNG DI MUKA, DAN INI BUKAN HAMPIRAN ─────────────
+   Keduanya kausal, jadi hasilnya IDENTIK, bukan sekadar mirip:
+
+   findPivots(nilai, 10, 10) memakai loop `for (i = 10; i < len - 10; i++)`.
+   Pada larik yang dipotong sepanjang n, ia menemukan pivot dengan indeks
+   i <= n - 11 — dan tiap pivot itu punya jendela tetangga i-10..i+10 yang
+   seluruhnya berada di dalam potongan. Jadi menyaring daftar pivot larik
+   PENUH dengan syarat yang sama menghasilkan himpunan yang sama persis.
+   Penting: syarat i <= n-11 itu jugalah yang menjaga TIDAK ADA INTIP MASA
+   DEPAN — pivot baru diakui setelah 10 lilin sesudahnya terbentuk, sama
+   seperti dulu.
+
+   atr: out[i] cuma bergantung pada tr[i] dan out[i-1], dan tr[i] cuma pada
+   lilin i dan i-1. Tidak ada satu pun yang melihat ke depan, jadi
+   atr(penuh)[n-1] sama dengan atr(dipotong)[n-1].
+
+   Yang tersisa per tick: satu pencarian biner dan satu pembacaan larik. */
+export type SiapSnr = {
+  puncak: { index: number; value: number }[];
+  lembah: { index: number; value: number }[];
+  atrDeret: number[];
+  panjang: number;
+};
+
+/** Dihitung SEKALI untuk satu set lilin. Simpan hasilnya di useMemo. */
+export function siapkanSnr(l: Lilin): SiapSnr {
+  return {
+    puncak: findPivots(l.highs, 10, 10, true) as { index: number; value: number }[],
+    lembah: findPivots(l.lows, 10, 10, false) as { index: number; value: number }[],
+    atrDeret: atr(l.highs, l.lows, l.closes, 14) as number[],
+    panjang: l.closes.length,
+  };
+}
+
+/** Pivot terakhir yang indeksnya di bawah `batas`. Daftarnya sudah urut
+ *  menaik dari findPivots, jadi pencarian biner cukup — tidak perlu
+ *  menyaring seluruh larik tiap kali. */
+function pivotTerakhir(
+  daftar: { index: number; value: number }[],
+  batas: number,
+): { index: number; value: number } | undefined {
+  let lo = 0, hi = daftar.length - 1, hasil = -1;
+  while (lo <= hi) {
+    const tengah = (lo + hi) >> 1;
+    if (daftar[tengah].index < batas) { hasil = tengah; lo = tengah + 1; }
+    else hi = tengah - 1;
+  }
+  return hasil >= 0 ? daftar[hasil] : undefined;
+}
+
+export function zonaSnrDari(siap: SiapSnr, batasIdx?: number): ZonaSnrPenuh {
+  const n = batasIdx === undefined ? siap.panjang : Math.min(siap.panjang, batasIdx + 1);
   const kosong: ZonaSnrPenuh = { resisten: null, support: null, atr: 0 };
   if (n < 30) return kosong;
 
-  const highs = l.highs.slice(0, n);
-  const lows = l.lows.slice(0, n);
-  const closes = l.closes.slice(0, n);
-
-  const puncak = findPivots(highs, 10, 10, true) as { index: number; value: number }[];
-  const lembah = findPivots(lows, 10, 10, false) as { index: number; value: number }[];
-  const a = atr(highs, lows, closes, 14)[n - 1];
+  const a = siap.atrDeret[n - 1];
   if (!isFinite(a) || a <= 0) return kosong;
 
+  /* n - 10: batas ATAS yang eksklusif, meniru `i < len - right` di
+     findPivots pada larik sepanjang n. */
+  const batasPivot = n - 10;
   const tol = a * 0.5;
   const buat = (p?: { value: number }): Zona | null =>
     p ? { nilai: p.value, atas: p.value + tol, bawah: p.value - tol } : null;
 
   return {
-    resisten: buat(puncak[puncak.length - 1]),
-    support: buat(lembah[lembah.length - 1]),
+    resisten: buat(pivotTerakhir(siap.puncak, batasPivot)),
+    support: buat(pivotTerakhir(siap.lembah, batasPivot)),
     atr: a,
   };
+}
+
+/** Bentuk lama, dipertahankan untuk pemanggilan sekali jalan (backtest).
+ *  Untuk apa pun yang dipanggil berulang dengan lilin yang sama, pakai
+ *  siapkanSnr + zonaSnrDari. */
+export function zonaSnr(l: Lilin, batasIdx?: number): ZonaSnrPenuh {
+  return zonaSnrDari(siapkanSnr(l), batasIdx);
 }
 
 /** Garis SMI untuk panel bawah — dikembalikan sebagai deret biasa supaya

@@ -29,7 +29,7 @@ import { useAkunMt5, segarkanAkunMt5 } from '@/lib/akun';
    yang tidak dipakainya. */
 import { usePosisiBinance, bacaStopBursa } from '@/lib/admin';
 import {
-  jalankanUji, garisIndikator, zonaSnr, deretSmi, SETELAN_BAWAAN,
+  jalankanUji, garisIndikator, siapkanSnr, zonaSnrDari, deretSmi, SETELAN_BAWAAN,
   type Setelan, type HasilUji,
 } from '@/lib/backtest';
 import { SIMBOL_DASAR, simbolDasarMt5 } from '@/lib/simbol';
@@ -1480,9 +1480,21 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
   /* Zona dihitung sampai bar yang SEDANG tampil, bukan sampai bar terakhir.
      Selama replay, menggambar zona dari data masa depan adalah cara paling
      halus untuk membuat latihannya berbohong. */
+  /* Pivot & ATR dihitung SEKALI per set lilin — bukan tiap bar replay.
+     Alasan lengkapnya di siapkanSnr (lib/backtest.ts): dulu useMemo ini
+     bergantung pada replayIdx, jadi tiga penyalinan larik, dua pemindaian
+     pivot, dan satu deret ATR penuh diulang empat kali sedetik di jalur
+     render — sekitar 135.000 operasi per tick pada 3000 lilin, untuk
+     menghasilkan tiga angka. */
+  const siapSnr = useMemo(
+    () => (tampilSnr && lilin.closes.length ? siapkanSnr(lilin) : null),
+    [tampilSnr, lilin]
+  );
+
+  /* Yang tersisa per bar: satu pencarian biner dan satu pembacaan larik. */
   const zona = useMemo(
-    () => (tampilSnr && lilin.closes.length ? zonaSnr(lilin, replayIdx ?? undefined) : null),
-    [tampilSnr, lilin, replayIdx]
+    () => (siapSnr ? zonaSnrDari(siapSnr, replayIdx ?? undefined) : null),
+    [siapSnr, replayIdx]
   );
 
   /* Zona digambar sebagai TIGA garis per sisi: batas atas, nilai pivotnya,
