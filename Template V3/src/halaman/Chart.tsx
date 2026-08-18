@@ -1620,24 +1620,22 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
 
       const g: GarisHarga[] = [];
 
-      /* POSISI TERBUKA — entry, SL, dan TP.
+      /* POSISI TERBUKA SENGAJA TIDAK DIGAMBAR DI SINI.
          ──────────────────────────────────────────────────────────────
-         Sebelumnya cuma pending order yang digambar, jadi begitu order
-         terisi garisnya JUSTRU HILANG — persis di saat ia paling
-         dibutuhkan. Posisi yang sedang berjalan tanpa garis di chart
-         berarti stop dan target cuma angka di tabel; mata tidak bisa
-         menilai jaraknya terhadap harga sekarang. */
-      for (const p of akunMt5.posisi.filter((p) => cocok(p.simbol))) {
-        const nomor = akunMt5.posisi.length > 1 ? ` #${p.tiket}` : '';
-        if (p.hargaBuka) g.push({
-          harga: p.hargaBuka, warna: 'rgba(212,212,216,.85)',
-          label: `${p.arah} ${p.lot} lot${nomor}`,
-        });
-        /* SL/TP hanya digambar kalau memang terpasang. Nol berarti tidak
-           ada — menggambarnya di harga 0 akan meremukkan skala chart. */
-        if (p.sl > 0) g.push({ harga: p.sl, warna: 'rgba(248,113,113,.85)', label: `SL${nomor}` });
-        if (p.tp > 0) g.push({ harga: p.tp, warna: 'rgba(16,185,129,.85)', label: `TP${nomor}` });
-      }
+         Dulu blok ini menggambar entry, SL, dan TP tiap posisi MT5 —
+         dan ChartLilin SUDAH menggambarnya sendiri lewat prop
+         `posisiMt5`. Jadi tiap level punya DUA garis di harga yang sama
+         persis, masing-masing dengan labelnya sendiri di sumbu harga.
+
+         Dengan satu posisi itu terlihat seperti garis yang agak tebal.
+         Dengan dua posisi hasilnya enam level digambar dua belas kali,
+         dan sumbu harga jadi tumpukan angka yang saling menimpa — persis
+         yang terjadi saat pemiliknya mencoba layering dua lot.
+
+         Yang dipertahankan versi ChartLilin, bukan versi ini: di sana
+         garisnya punya gagang seret SL/TP beserta alur "Kirim SL/TP →
+         MT5". Yang di sini cuma gambar. Nomor tiket yang dulu ditulis di
+         label ikut pindah ke sana supaya tidak ada yang hilang. */
 
       const milikMt5 = akunMt5.pending.filter((o) => cocok(o.simbol));
       const banyakMt5 = milikMt5.length > 1;
@@ -1664,7 +1662,15 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
       warna: o.arah === 'BUY' ? 'rgba(251,191,36,.85)' : 'rgba(251,146,60,.85)',
       label: `${o.arah === 'BUY' ? 'Buy' : 'Sell'} ${/STOP/.test(o.tipe) ? 'Stop' : 'Limit'}${banyak ? ` ${i + 1}` : ''}`,
     }));
-  }, [orderBursa, simbol, aksiTunda, akunMt5.pending, akunMt5.posisi, aksi?.mode]);
+  /* akunMt5.posisi DIKELUARKAN dari dependensi bersama blok yang memakainya.
+     Bukan sekadar rapi-rapi: EA melapor tiap beberapa detik dengan array
+     posisi BARU yang isinya sama, jadi dependensi ini menghitung ulang
+     seluruh garis order — lalu ChartLilin membongkar-pasang price line-nya
+     — beberapa detik sekali, selamanya, untuk hasil yang identik. Itulah
+     salah satu sumber "chart terasa berat" yang sudah dicatat di berkas
+     ini. Posisi kini digambar ChartLilin lewat prop `posisiMt5`, yang
+     identitasnya memang sudah distabilkan lewat kunci JSON. */
+  }, [orderBursa, simbol, aksiTunda, akunMt5.pending, aksi?.mode]);
 
   const terakhir = lilin.closes[lilin.closes.length - 1];
   const sebelumnya = lilin.closes[lilin.closes.length - 2];

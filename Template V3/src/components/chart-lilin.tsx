@@ -1223,13 +1223,23 @@ export function ChartLilin({
         if (kunci) petaGarisMt5.current.set(kunci, g);
       } catch { /* seri sedang dibongkar ulang */ }
     };
-    (posisiMt5 ?? []).forEach((p) => {
+    /* EKOR TIKET, bukan tiket penuh. Nomor MT5 sepanjang sepuluh angka
+       ("#4165473634") memakan lebih banyak ruang daripada level yang
+       ditandainya, dan yang dibutuhkan mata cuma pembeda antar posisi —
+       bukan nomor yang bisa dibacakan lewat telepon. Empat angka terakhir
+       cukup untuk itu, dan nomor lengkapnya tetap ada di tabel posisi.
+       Hanya muncul kalau posisinya memang lebih dari satu. */
+    const daftar = posisiMt5 ?? [];
+    const ekor = daftar.length > 1
+      ? (t: string | number) => ' #' + String(t).slice(-4)
+      : () => '';
+    daftar.forEach((p) => {
       const u = ubahRef.current && ubahRef.current.tiket === p.tiket ? ubahRef.current : null;
       buat(p.entry, p.arah === 'BUY' ? '#10b981' : '#f87171', '', 2);
       const slPos = u ? u.sl : p.sl;
-      if (slPos > 0) buat(slPos, '#f87171', 'SL', 1, p.tiket + '-sl');
+      if (slPos > 0) buat(slPos, '#f87171', 'SL' + ekor(p.tiket), 1, p.tiket + '-sl');
       const tpPos = u ? u.tp : p.tp;
-      if (tpPos > 0) buat(tpPos, '#10b981', 'TP', 1, p.tiket + '-tp');
+      if (tpPos > 0) buat(tpPos, '#10b981', 'TP' + ekor(p.tiket), 1, p.tiket + '-tp');
     });
     return () => {
       garisPosMt5.current.forEach((g) => { try { s.removePriceLine(g); } catch { /* dibongkar */ } });
@@ -1473,6 +1483,7 @@ export function ChartLilin({
              style={{ transform: 'translateY(-100%)', visibility: 'hidden',
                textShadow: '0 1px 4px rgba(9,9,11,.95), 0 0 2px rgba(9,9,11,.9)' }}>
           {p.arah} {p.lot}
+          {(posisiMt5 ?? []).length > 1 && ' #' + String(p.tiket).slice(-4)}
         </div>
       ))}
 
