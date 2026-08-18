@@ -194,28 +194,53 @@
   transition: filter 700ms ease, opacity 700ms ease;
 }
 
-/* Tombol pemindah suasana — kecil, di pojok, tidak menantang isi utama. */
+/* Tombol pemindah suasana — kecil, di pojok, tidak menantang isi utama.
+   Naik ke atas: di kaki gambar ia jatuh persis di daerah peluruhan ke hitam
+   dan berdesakan dengan sambungan ke bagian berikutnya. Di atas ia duduk di
+   langit, bagian gambar yang memang paling kosong di kedua suasana. */
 .parallax__suasana {
   position: absolute;
   right: 1rem;
-  bottom: 1.25rem;
+  top: 1rem;
   z-index: 3;
-  padding: 0.35rem 0.75rem;
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.18);
   background: rgba(9, 9, 11, 0.5);
   backdrop-filter: blur(6px);
   color: rgba(255, 255, 255, 0.75);
-  font-size: 0.72rem;
-  letter-spacing: 0.02em;
   cursor: pointer;
   transition: color 200ms ease, border-color 200ms ease, background 200ms ease;
+}
+
+/* Lingkarannya 36 px karena itu ukuran yang pas di sudut gambar, tapi jari
+   butuh 44 px. Daerah sentuhnya dilebarkan lewat lapisan tak terlihat, bukan
+   dengan membesarkan tombolnya — jadi yang tumbuh cuma sasarannya.
+
+   Angkanya -6px, dan itu BUKAN 36+12. `inset` pada elemen semu dihitung
+   dari PADDING BOX, jadi border 1 px di tiap sisi tidak ikut: 36 - 2 = 34,
+   lalu 34 + 12 = 46 px. Hitungan yang kelihatan benar (-4px untuk mencapai
+   44) sebenarnya cuma menghasilkan 42 px. Diukur di browser, bukan
+   dikira-kira. */
+.parallax__suasana::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: inherit;
 }
 
 .parallax__suasana:hover {
   color: #fff;
   border-color: rgba(255, 255, 255, 0.35);
   background: rgba(9, 9, 11, 0.68);
+}
+
+.parallax__suasana:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.8);
+  outline-offset: 2px;
 }
 
 @media (prefers-reduced-motion: reduce) {

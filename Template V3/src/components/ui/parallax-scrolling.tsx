@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import Lenis from '@studio-freight/lenis';
+import { Moon, Sun } from 'lucide-react';
 import './parallax-scrolling.css';
 import { LogoJT } from '@/components/logo-jt';
 
@@ -124,11 +125,23 @@ export function ParallaxComponent() {
           <div className="parallax__fade"></div>
           {/* Pemindah suasana. Kecil dan di pojok: ia mainan, bukan kendali
               utama halaman — dan halaman depan tidak boleh menyuruh orang
-              memilih apa pun sebelum ia tahu produknya apa. */}
+              memilih apa pun sebelum ia tahu produknya apa.
+
+              Ikonnya menunjukkan TUJUAN, bukan keadaan sekarang: sedang senja
+              maka yang tampil bulan, karena itulah yang akan terjadi kalau
+              ditekan. Tombol yang menampilkan keadaan sekarang selalu ambigu —
+              orang tidak tahu apakah ia lampu penanda atau sakelar.
+
+              Tanpa teks ia jadi ikon telanjang, jadi aria-label-nya wajib dan
+              title-nya dipasang supaya yang memakai tetikus juga dapat
+              keterangan yang sama. */}
           <button type="button" className="parallax__suasana"
                   onClick={() => setSuasana((v) => (v === 'senja' ? 'malam' : 'senja'))}
+                  title={suasana === 'senja' ? 'Ubah ke suasana malam' : 'Ubah ke suasana senja'}
                   aria-label={suasana === 'senja' ? 'Ubah ke suasana malam' : 'Ubah ke suasana senja'}>
-            {suasana === 'senja' ? 'Malam' : 'Senja'}
+            {suasana === 'senja'
+              ? <Moon size={17} strokeWidth={1.75} aria-hidden="true" />
+              : <Sun size={17} strokeWidth={1.75} aria-hidden="true" />}
           </button>
         </div>
       </section>
