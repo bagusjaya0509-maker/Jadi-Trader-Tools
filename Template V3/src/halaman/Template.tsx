@@ -8,6 +8,7 @@ import {
   FileText, Shield, RotateCcw, Handshake, HelpCircle, BarChart, PlugIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ParallaxComponent } from '@/components/ui/parallax-scrolling';
 import { MenuToggleIcon } from '@/components/ui/menu-toggle-icon';
 import {
   NavigationMenu,
@@ -428,6 +429,7 @@ export default function Template() {
     <div className="flex min-h-screen w-full flex-col overflow-y-auto bg-background text-foreground">
       <Header />
       <main className="grow">
+        <ParallaxComponent />
         <HeroSection />
         {/* ── Sambungan hero → featuresgrid ─────────────────────────────
             Terukur sebelum diperbaiki: latar halaman rgb(9,9,11) bertemu
