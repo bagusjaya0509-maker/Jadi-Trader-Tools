@@ -1265,12 +1265,43 @@ export function ChartLilin({
   useEffect(() => {
     const s = seri.current;
     if (!s) return;
+
+    /* ── SATU LEVEL, SATU ANGKA DI SUMBU ────────────────────────────
+       Garis posisi MT5 sudah menulis angkanya sendiri ke sumbu (berlabel
+       "SL"/"TP"). Sesudah sebuah rencana dikirim jadi order, garis
+       rencananya TETAP ADA di level yang sama — memang disengaja, supaya
+       bisa dipakai menyusun layer berikutnya — dan ia menulis angka
+       KEDUA di level yang sama persis, kali ini tanpa nama.
+
+       Hasilnya tiap SL dan TP punya dua kotak angka bertumpuk di sumbu:
+       satu bertuliskan "TP 4444.756", satu lagi "4444.756" polos. Dengan
+       dua posisi jadi empat, dan sumbu harga berhenti bisa dibaca.
+
+       Yang dimatikan LABELNYA saja, bukan garisnya. Garis rencananya
+       tetap hidup dan tetap bisa diseret; begitu digeser menjauh dari
+       level posisi, angkanya muncul kembali dengan sendirinya. */
+    const berlabel: number[] = [];
+    for (const p of posisiMt5 ?? []) {
+      const u = ubahRef.current && ubahRef.current.tiket === p.tiket ? ubahRef.current : null;
+      if (p.entry) berlabel.push(p.entry);
+      const sl = u ? u.sl : p.sl;
+      if (sl > 0) berlabel.push(sl);
+      const tp = u ? u.tp : p.tp;
+      if (tp > 0) berlabel.push(tp);
+    }
+    /* Toleransi RELATIF, bukan angka tetap: 0,001 adalah satu tick di
+       emas tapi seratus tick di EURUSD. 1e-7 dari harga selalu lebih
+       kecil daripada satu tick di kedua-duanya, jadi yang disatukan
+       hanyalah level yang memang sama. */
+    const kembar = (a: number) =>
+      berlabel.some((b) => Math.abs(a - b) <= Math.max(1e-9, Math.abs(b) * 1e-7));
+
     (garisSeret ?? []).forEach((g) => {
       if (!g.harga) return;
       try {
         garisSeretHarga.current.push(s.createPriceLine({
           price: g.harga, color: g.warna, lineWidth: 1, lineStyle: 2,
-          axisLabelVisible: true, title: '',
+          axisLabelVisible: !kembar(g.harga), title: '',
         }));
       } catch { /* seri sedang dibongkar ulang */ }
     });
@@ -1278,7 +1309,7 @@ export function ChartLilin({
       garisSeretHarga.current.forEach((g) => { try { s.removePriceLine(g); } catch { /* dibongkar */ } });
       garisSeretHarga.current = [];
     };
-  }, [garisSeret]);
+  }, [garisSeret, posisiMt5, ubah]);
 
   /* Harga permintaan (ask): garis titik jarang — jaraknya ke garis harga
      bid adalah SPREAD, dan di emas spread bukan pembulatan. Garisnya
