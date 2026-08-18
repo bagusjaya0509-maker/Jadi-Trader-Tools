@@ -1224,9 +1224,68 @@ export function ChartLilin({
      sana akan menampilkan garis dan label yang belum punya posisi. */
   useEffect(pasang, [pasang, garisSeret, lilin, hingga, mundur, smi, posisiMt5, ubah]);
 
+  /* ── LOOP rAF: TETAP JALAN, TAPI BERHENTI BEKERJA SAAT TIDAK ADA YANG
+        BERUBAH ───────────────────────────────────────────────────────────
+     Versi sebelumnya memanggil pasang() enam puluh kali per detik tanpa
+     syarat, selamanya. Dihitung dari isinya: tiap panggilan melakukan 16
+     pembacaan tata letak dan penulisan gaya — priceScale().width(),
+     panes().getHeight(), getBoundingClientRect(), lalu menulis style.left
+     dan style.bottom. Jadi kira-kira 960 operasi tata letak per detik
+     dikerjakan terus-menerus, bahkan saat chartnya diam dan tidak ada satu
+     piksel pun yang perlu berpindah.
+
+     Itu pajak tetap yang dibayar sepanjang halaman terbuka. Ia baru terasa
+     saat ada pekerjaan lain yang berebut frame yang sama — misalnya replay
+     yang memajukan bar empat kali sedetik sambil indikator Pine menambah
+     satu panel dan dua seri lagi untuk diukur.
+
+     Loopnya TIDAK dihapus, dan itu disengaja. Label melayang di sini HTML
+     yang ditumpuk di atas kanvas: ia harus mengikuti saat chart digeser
+     atau di-zoom, dan pustaka tidak memberi satu kejadian pun yang
+     menangkap semua caranya. Yang diubah cuma syaratnya — kalau tidak ada
+     yang berubah sejak frame lalu, framenya dilewati.
+
+     Sidik jarinya sengaja dari nilai yang MURAH dibaca: rentang logis
+     disimpan pustaka di memori (bukan pembacaan DOM), clientWidth/Height
+     hampir selalu terlayani dari cache, dan sisanya cuma angka yang sudah
+     ada di tangan. Kalau salah satu berubah, frame itu tetap dikerjakan
+     penuh seperti dulu — jadi tidak ada keadaan yang kehilangan
+     pembaruannya, cuma keadaan diam yang berhenti membayar. */
+  const sidikRef = useRef('');
+
   useEffect(() => {
     let raf = 0;
-    const tik = () => { raf = requestAnimationFrame(tik); pasang(); };
+    const tik = () => {
+      raf = requestAnimationFrame(tik);
+      const c = chart.current, k = kotak.current;
+      if (c && k) {
+        let r: { from: number; to: number } | null = null;
+        try { r = c.timeScale().getVisibleLogicalRange() as { from: number; to: number } | null; } catch { r = null; }
+        const { hingga: hg, lilin: l, garisSeret: gs, posisiMt5: pm } = acuan.current;
+        /* Tinggi panel IKUT sidik jari. Pembatas antara panel harga dan
+           panel osilator bisa diseret orangnya, dan itu memindahkan dasar
+           hamparan tanpa mengubah rentang, ukuran kotak, atau satu pun
+           nilai lain di sini. Tanpa baris ini, label akan tertinggal di
+           tempat lama sampai ada hal lain yang kebetulan berubah.
+
+           getHeight() membaca keadaan yang sudah disimpan pustaka, bukan
+           memaksa peramban menghitung tata letak — jadi ia murah, dan
+           harganya sepadan untuk menutup celah ini. */
+        let tinggiPane = '';
+        try { tinggiPane = c.panes().map((p) => Math.round(p.getHeight())).join(','); } catch { /* versi lama */ }
+        const sidik = [
+          r ? Math.round(r.from * 100) : 'x', r ? Math.round(r.to * 100) : 'x',
+          k.clientWidth, k.clientHeight, tinggiPane,
+          hg ?? -1, l.times.length, gs?.length ?? 0, pm?.length ?? 0,
+          ubahRef.current ? 'seret' : '-',
+        ].join('|');
+        /* Saat sesuatu SEDANG diseret, jangan pernah dilewati: nilai
+           seretannya hidup di ref dan tidak masuk sidik jari mana pun. */
+        if (sidik === sidikRef.current && !ubahRef.current) return;
+        sidikRef.current = sidik;
+      }
+      pasang();
+    };
     raf = requestAnimationFrame(tik);
     /* Tab yang kembali terlihat memasang ulang segera — rAF baru bangun satu
        frame kemudian, dan satu frame dengan label di tempat lama sudah cukup
