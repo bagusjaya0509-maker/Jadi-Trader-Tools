@@ -1,4 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+
+/* Berapa lama panel order menganggur sebelum melipat sendiri. Cukup
+   lama untuk berpikir, cukup singkat supaya tidak menginap di atas
+   lilin yang sedang dibaca. */
+const JEDA_LIPAT_SENDIRI_MS = 12_000;
 import { TrendingUp, TrendingDown, X, Check, Ban, CandlestickChart, Minus, Hourglass, Share2 } from 'lucide-react';
 import { cn, uang, harga as fHarga } from '@/lib/utils';
 import { METODE_TP, type MetodeTp } from '@/lib/order-nyata';
@@ -123,13 +128,8 @@ export function PojokOrder({
   posisi, hargaKini, draf, rencana, mode, jenis, risiko, tunda, onBatalTunda, onKirimSinyal, kabarSinyal, dariSinyal, onGantiCopy,
   onPilih, onUbah, onKirim, onBatal, onTutup, onGantiMode, mati,
   nyataSetelan, aturNyata, sibukNyata, kabar, demoSetelan, aturDemo,
-  catatan, aturCatatan, qtyDemo, mt5, lotMt5, aturLotMt5, nilaiLotMt5, desimalHarga = 6, onBuka,
+  catatan, aturCatatan, qtyDemo, mt5, lotMt5, aturLotMt5, nilaiLotMt5, desimalHarga = 6,
 }: {
-  /** Dipanggil saat panelnya DIBUKA (bukan ditutup). Halaman memakainya
-   *  untuk melebarkan chart di layar kecil — tiket ini menutupi hampir
-   *  seluruh grafik di HP, dan menyusun order sambil tidak bisa melihat
-   *  lilinnya adalah cara paling cepat salah menaruh SL. */
-  onBuka?: () => void;
   posisi: { arah: 'BUY' | 'SELL'; masuk: number; sl: number; tp: number; pnl: number; risiko: number; unit: number } | null;
   hargaKini?: number;
   /** Label jenis order hasil letak garis entry: "Market", "Buy Limit", dst. */
@@ -200,13 +200,27 @@ export function PojokOrder({
   const [tutupPanel, setTutupPanel] = useState(() => {
     try { return localStorage.getItem(KUNCI_TUTUP) === '1'; } catch { return false; }
   });
+  /* ── MELIPAT SENDIRI SAAT MEMANG SEDANG TIDAK DIPAKAI ───────────────
+     Hanya kalau tidak ada apa pun yang hidup: tidak ada posisi terbuka,
+     tidak ada pending, dan tidak ada tiket yang sedang disusun. Dalam
+     keadaan itu panelnya cuma dua tombol BUY/SELL yang menutupi lilin,
+     dan menutupinya tidak menghilangkan apa pun yang belum selesai.
+
+     Penghitungnya disetel ulang tiap kali pointer menyentuh atau sekadar
+     masuk ke areanya. Panel yang melipat tepat saat jari sedang menuju
+     tombol BUY jauh lebih buruk daripada panel yang menetap. */
+  const [sentuh, setSentuh] = useState(0);
+  const bangunkan = () => setSentuh((n) => n + 1);
+  const menganggur = !posisi && !tunda && !draf;
+  useEffect(() => {
+    if (tutupPanel || !menganggur) return;
+    const t = setTimeout(() => aturTutup(true), JEDA_LIPAT_SENDIRI_MS);
+    return () => clearTimeout(t);
+  }, [tutupPanel, menganggur, sentuh]);
+
   function aturTutup(v: boolean) {
     setTutupPanel(v);
     try { localStorage.setItem(KUNCI_TUTUP, v ? '1' : '0'); } catch { /* privat */ }
-    /* Hanya saat DIBUKA. Menutup panel tidak boleh ikut mengubah ukuran
-       chart — orang menutupnya justru supaya bisa melihat grafik apa
-       adanya, dan memaksa layar penuh di saat itu melawan maksudnya. */
-    if (!v) onBuka?.();
   }
 
   /* ── Lencana mode ─────────────────────────────────────────────────────
@@ -575,7 +589,8 @@ export function PojokOrder({
 
   /* ── Diam terbuka: pilih arah ──────────────────────────────────────── */
   return (
-    <div className="flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900/85 px-1.5 py-1.5 backdrop-blur-sm">
+    <div onPointerEnter={bangunkan} onPointerDown={bangunkan}
+         className="flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900/85 px-1.5 py-1.5 backdrop-blur-sm">
       {Lencana}
       <button onClick={() => onPilih('BUY')} disabled={mati}
         className="flex cursor-pointer items-center gap-1 rounded bg-emerald-500/20 px-2.5 py-1 text-[11.5px] font-semibold text-emerald-300 transition-colors hover:bg-emerald-500/30 disabled:cursor-not-allowed disabled:opacity-40">

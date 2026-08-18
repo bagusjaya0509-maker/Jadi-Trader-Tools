@@ -117,6 +117,12 @@ function Angka({ label, nilai, atur, langkah = 1, min = 0 }: {
  *  jadi simbol yang tidak ada, dan chart menjawab "belum ada data dari
  *  terminal MT5" — pesan yang menunjuk ke EA, padahal EA-nya baik-baik
  *  saja dan yang salah nama yang kita cari. */
+/* Berapa lama bilah alat gambar menganggur sebelum melipat sendiri.
+   Sengaja lebih panjang daripada panel order: memilih alat lalu berpikir
+   di mana menaruh garisnya memakan waktu, dan bilah yang lenyap di tengah
+   pertimbangan itu memaksa mulai dari awal. */
+const JEDA_LIPAT_ALAT_MS = 20_000;
+
 function rapikanSimbol(s: string): string {
   const t = s.trim();
   return /^MT5:/i.test(t) ? 'MT5:' + t.slice(4) : t.toUpperCase();
@@ -409,6 +415,69 @@ export default function ChartBacktest() {
     window.addEventListener('pointermove', gerak);
     window.addEventListener('pointerup', lepas);
   }
+
+  /* ── BILAH ALAT MENGHINDAR DARI TIKET ORDER ────────────────────────
+     Tiket order dijangkarkan di pojok kiri-ATAS chart dan tumbuh ke
+     bawah; bilah alat duduk di tepi kiri, di TENGAH. Di chart yang
+     pendek — HP, atau jendela yang tingginya dikecilkan — keduanya
+     bertemu, dan yang tertimbun bilah alatnya.
+
+     Digeser sementara lewat transform, BUKAN dengan mengubah `letakAlat`.
+     letakAlat adalah tempat yang dipilih orangnya sendiri dan disimpan;
+     menimpanya berarti posisi pilihannya hilang diam-diam, dan ia tidak
+     akan kembali saat tiketnya ditutup. */
+  const alatRef = useRef<HTMLElement | null>(null);
+  const pojokRef = useRef<HTMLDivElement>(null);
+  const geserRef = useRef(0);
+  const [geserAlat, setGeserAlat] = useState(0);
+  useEffect(() => { geserRef.current = geserAlat; }, [geserAlat]);
+
+  useEffect(() => {
+    const hitung = () => {
+      const a = alatRef.current, p = pojokRef.current;
+      if (!a || !p) { setGeserAlat(0); return; }
+      const ra = a.getBoundingClientRect();
+      const rp = p.getBoundingClientRect();
+      if (!rp.width || !rp.height) { setGeserAlat(0); return; }
+      /* Kotak alat pada posisi ASLINYA: geseran yang sedang berlaku
+         dikurangkan dulu. Tanpa ini tiap pengukuran menumpuk di atas
+         pengukuran sebelumnya dan bilahnya merayap turun tanpa henti. */
+      const atas = ra.top - geserRef.current;
+      const bawah = ra.bottom - geserRef.current;
+      const tindih = rp.left < ra.right && rp.right > ra.left
+                  && rp.top < bawah && rp.bottom > atas;
+      setGeserAlat(tindih ? Math.round(rp.bottom + 8 - atas) : 0);
+    };
+    hitung();
+    /* ResizeObserver, bukan daftar state: tiket order melipat, membuka,
+       dan berganti bentuk dari dalam dirinya sendiri — halaman ini tidak
+       tahu kapan. Yang bisa diamati cuma akibatnya, yaitu ukurannya. */
+    const ro = new ResizeObserver(hitung);
+    if (alatRef.current) ro.observe(alatRef.current);
+    if (pojokRef.current) ro.observe(pojokRef.current);
+    window.addEventListener('resize', hitung);
+    return () => { ro.disconnect(); window.removeEventListener('resize', hitung); };
+  }, [aksi, alatTutup, letakAlat]);
+
+  /* ── BILAH ALAT MELIPAT SENDIRI ────────────────────────────────────
+     Hanya saat tidak ada alat yang sedang aktif — bilah yang melipat di
+     tengah orang menarik garis fibonacci adalah kerusakan, bukan fitur.
+     Penghitungnya disetel ulang tiap pointer menyentuh atau masuk ke
+     areanya. */
+  const [sentuhAlat, setSentuhAlat] = useState(0);
+  const bangunkanAlat = () => setSentuhAlat((n) => n + 1);
+  useEffect(() => {
+    if (alatTutup || alat) return;
+    const t = setTimeout(() => aturAlatTutup(true), JEDA_LIPAT_ALAT_MS);
+    return () => clearTimeout(t);
+  }, [alatTutup, alat, sentuhAlat]);
+
+  /* Satu tempat menghitung posisi bilah alat, dipakai kedua wujudnya
+     (terlipat dan terbuka) supaya keduanya tidak pernah menyimpang. */
+  const gayaAlat: React.CSSProperties = letakAlat
+    ? { left: letakAlat.x, top: letakAlat.y,
+        transform: geserAlat ? `translateY(${geserAlat}px)` : undefined }
+    : { transform: `translateY(calc(-50% + ${geserAlat}px))` };
 
   function aturAlatTutup(v: boolean) {
     setAlatTutup(v);
@@ -2322,21 +2391,8 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                           hamparanBawah={kendaliReplay}
                           bagikanFoto={(ambil) => { ambilFoto.current = ambil; }}
                           pojok={aksi ? (
+                            <div ref={pojokRef}>
                             <PojokOrder
-                              /* Membuka tiket order melebarkan chart — DI HP SAJA.
-                                 Tiket ini menutupi hampir seluruh grafik di layar
-                                 375 px, dan menyusun SL sambil tidak bisa melihat
-                                 lilinnya adalah cara tercepat menaruhnya di tempat
-                                 yang salah. Di layar lebar keduanya sudah muat
-                                 berdampingan, jadi memaksa layar penuh di sana cuma
-                                 merebut kendali yang tidak perlu direbut.
-
-                                 Kliknya sendiri yang jadi izin: permintaan layar
-                                 penuh hanya diterima peramban kalau datang dari
-                                 gerakan pengguna, dan ini memang gerakan itu. */
-                              onBuka={() => {
-                                if (window.innerWidth < 640 && !layarPenuh) gantiLayarPenuh();
-                              }}
                               posisi={aksi.posisi} hargaKini={aksi.hargaKini}
                               draf={draf} rencana={rencana} mode={aksi.mode}
                               jenis={labelJenis} risiko={aksi.risiko} qtyDemo={qtyTampil}
@@ -2528,6 +2584,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                               kabarSinyal={kabarKirimSinyal || undefined}
                               dariSinyal={dariSinyal}
                               onGantiCopy={(v) => { copyManual.current = v; setDariSinyal(v); }} />
+                            </div>
                           ) : undefined} />
             : <div className="flex h-[440px] flex-col items-center justify-center gap-1.5 px-6 text-center text-[12.5px] text-zinc-600">
                 {memuat ? 'Memuat lilin…'
@@ -2718,18 +2775,27 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
               Klik gambar (mode kursor) untuk memilihnya, Delete untuk
               menghapus; penghapus menghapus yang terpilih dulu, semuanya
               kalau tidak ada yang terpilih. */}
+          {/* `gayaAlat`: posisi + geseran menghindar tiket order, digabung.
+              -translate-y-1/2 pindah dari kelas ke gaya inline karena
+              transform inline mengalahkan kelas Tailwind — dua-duanya
+              tidak bisa hidup berdampingan, dan yang kalah jadi hilang
+              tanpa suara. */}
           {alatTutup ? (
             <button onClick={() => aturAlatTutup(false)} title="Buka bilah alat gambar"
-              style={letakAlat ? { left: letakAlat.x, top: letakAlat.y } : undefined}
-              className={cn('absolute z-20 flex size-7 cursor-pointer items-center justify-center rounded-lg border border-zinc-800/80 bg-zinc-950/85 text-zinc-500 backdrop-blur-sm transition-colors hover:text-zinc-200',
-                !letakAlat && 'left-2 top-1/2 -translate-y-1/2')}>
+              ref={(el) => { alatRef.current = el; }}
+              onPointerEnter={bangunkanAlat}
+              style={gayaAlat}
+              className={cn('absolute z-20 flex size-7 cursor-pointer items-center justify-center rounded-lg border border-zinc-800/80 bg-zinc-950/85 text-zinc-500 backdrop-blur-sm transition-[color,transform] duration-300 hover:text-zinc-200',
+                !letakAlat && 'left-2 top-1/2')}>
               <Ruler className="size-3.5" />
             </button>
           ) : (
-          <div onPointerDown={mulaiSeretAlat}
-               style={letakAlat ? { left: letakAlat.x, top: letakAlat.y } : undefined}
-               className={cn('absolute z-20 flex cursor-move touch-none flex-col items-center gap-0.5 rounded-lg border border-zinc-800/80 bg-zinc-950/85 p-1 backdrop-blur-sm',
-                 !letakAlat && 'left-2 top-1/2 -translate-y-1/2')}>
+          <div onPointerDown={(e) => { bangunkanAlat(); mulaiSeretAlat(e); }}
+               onPointerEnter={bangunkanAlat}
+               ref={(el) => { alatRef.current = el; }}
+               style={gayaAlat}
+               className={cn('absolute z-20 flex cursor-move touch-none flex-col items-center gap-0.5 rounded-lg border border-zinc-800/80 bg-zinc-950/85 p-1 backdrop-blur-sm transition-transform duration-300',
+                 !letakAlat && 'left-2 top-1/2')}>
             {/* Pegangan seret di ujung ATAS — memberi tahu bilahnya bisa
                 dipindah tanpa perlu dicoba dulu. GripHorizontal, bukan
                 Vertical: titik-titiknya harus melintang terhadap arah
