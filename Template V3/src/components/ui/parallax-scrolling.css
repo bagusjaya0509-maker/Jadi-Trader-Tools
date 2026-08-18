@@ -163,18 +163,29 @@
 /* ── GRAFIKNYA TIDAK IKUT GELAP ────────────────────────────────────────
    Lilinnya menyatu di dalam foto gunung, jadi filter malam di atas
    menggelapkannya berbarengan dengan batu dan saljunya — dan grafik yang
-   ikut padam kehilangan seluruh maksudnya. Lapisan ini memasang kembali
-   lilin yang sama di atasnya, tanpa filter apa pun.
+   ikut padam kehilangan seluruh maksudnya.
+
+   Untuk lapisan gunung, filter itu diganti sepenuhnya oleh satu gambar
+   malam yang sudah dibakukan (gunung-malam.webp): gunungnya digelapkan
+   dengan rumus yang sama persis dengan filter di atas, tapi cahaya
+   lilinnya ditambahkan kembali utuh sesudahnya.
+
+   KENAPA GAMBAR UTUH, BUKAN TEMPELAN LILIN BERTOPENG. Versi bertopeng
+   sempat dicoba dan terlihat ngeblur dibanding senja. Sebabnya bukan
+   tepi topengnya, tapi caranya: piksel setengah-tembus membawa warna
+   gunung TERANG lalu menggantikan gunung gelap di bawahnya, jadi tiap
+   lilin dapat cincin kabut. Menambahkan cahaya tidak punya masalah itu —
+   di luar lilin yang ditambahkan nol, dan nol tidak meninggalkan tepi.
 
    Dua kelas dipakai pada pemilih di bawah (bukan sekadar urutan tulis)
    supaya ia menang kekhususan atas aturan malam di atas. Kalau
-   diandalkan urutan saja, satu pemindahan baris diam-diam memadamkannya
-   lagi tanpa galat apa pun yang menjelaskan sebabnya. */
-.parallax__layer-lilin {
+   diandalkan urutan saja, satu pemindahan baris diam-diam menggelapkan
+   gambar yang sudah gelap tanpa galat apa pun yang menjelaskan sebabnya. */
+.parallax__layer-malam {
   opacity: 0;
 }
 
-.parallax[data-suasana='malam'] .parallax__layer-img.parallax__layer-lilin {
+.parallax[data-suasana='malam'] .parallax__layer-img.parallax__layer-malam {
   opacity: 1;
   filter: none;
 }
