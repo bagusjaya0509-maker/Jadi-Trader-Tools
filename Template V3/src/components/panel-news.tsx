@@ -73,7 +73,9 @@ export function useKalender() {
   /* Detak per menit supaya hitung mundurnya benar-benar berjalan. Tanpa ini
      angkanya membeku di nilai saat panel dibuka — dan hitung mundur yang
      tidak turun lebih menyesatkan daripada tidak ada hitung mundur. */
-  const [, setDetak] = useState(0);
+  /* Detak menit. Dipakai sebagai DEPENDENSI perhitungan di bawah, bukan
+     sekadar pemicu render — lihat catatan di `berikut`. */
+  const [detak, setDetak] = useState(0);
 
   const muat = useCallback(async () => {
     try {
@@ -100,15 +102,44 @@ export function useKalender() {
   /* Rilis dampak tinggi terdekat yang BELUM lewat, mata uang apa pun:
      penanda siaga di tombol tidak boleh ikut filter panel — orang yang
      menyaring ke JPY tetap perlu tahu NFP sebentar lagi rilis. */
+  /* `detak` WAJIB ada di dependensi. Tanpa itu hasilnya dibekukan pada saat
+     data terakhir diambil: rilis yang sudah lewat tetap dilaporkan sebagai
+     "berikutnya" sampai pengambilan data berikutnya — dan `siaga` yang
+     dihitung dari situ ikut salah. Datanya sendiri jarang berubah; yang
+     berubah tiap menit adalah SEKARANG. */
   const berikut = useMemo(() => {
     if (!events) return null;
     const kini = Date.now();
     return events.find((e) => e.dampak === 'high' && MAYOR.includes(e.mataUang) && e.waktu > kini) ?? null;
-  }, [events]);
+  }, [events, detak]);
 
   const siaga = !!berikut && berikut.waktu - Date.now() <= SIAGA_MENIT * 60_000;
 
-  return { events, galat, memuat, berikut, siaga, muatUlang: muat };
+  /* ── Berapa rilis penting HARI INI ────────────────────────────────────
+     Yang dihitung: dampak tinggi, mata uang mayor, dan tanggal hari ini
+     menurut jam pengguna sendiri.
+
+     Dipisah jadi `total` dan `sisa` karena keduanya menjawab pertanyaan
+     berbeda. "Hari ini ada 4" berguna untuk memutuskan seberapa longgar
+     boleh menaruh SL sejak pagi; "3 belum lewat" yang menentukan apakah
+     aman entry SEKARANG. Lencana memakai `sisa` — angka yang tidak pernah
+     berubah sepanjang hari berhenti dibaca sebelum siang.
+
+     Semua dampak TIDAK ikut dihitung. Kalender penuh berisi belasan rilis
+     sehari yang tidak menggerakkan apa pun, dan lencana bertuliskan "17"
+     tiap hari sama saja dengan tidak ada lencana. */
+  const hariIni = useMemo(() => {
+    if (!events) return { total: 0, sisa: 0 };
+    const awal = new Date(); awal.setHours(0, 0, 0, 0);
+    const mulai = awal.getTime();
+    const akhir = mulai + 86_400_000;
+    const kini = Date.now();
+    const punya = events.filter((e) =>
+      e.dampak === 'high' && MAYOR.includes(e.mataUang) && e.waktu >= mulai && e.waktu < akhir);
+    return { total: punya.length, sisa: punya.filter((e) => e.waktu > kini).length };
+  }, [events, detak]);
+
+  return { events, galat, memuat, berikut, siaga, hariIni, muatUlang: muat };
 }
 
 /* forwardRef, BUKAN `ref` sebagai prop biasa. Proyek ini React 18: di sana
@@ -164,9 +195,10 @@ export function PanelNews() {
   const [buka, setBuka] = useState(false);
   const [cur, setCur] = useState('USD');
   const [dampak, setDampak] = useState('high');
-  const { events, galat, memuat, berikut, siaga } = useKalender();
+  const { events, galat, memuat, berikut, siaga, hariIni } = useKalender();
   const kotak = useRef<HTMLDivElement>(null);
   const barisDepan = useRef<HTMLDivElement>(null);
+  const wadahDaftar = useRef<HTMLDivElement>(null);
 
   /* Esc menutup. Panel melayang yang cuma bisa ditutup dengan menemukan
      tombol X-nya memaksa orang mencari, padahal tangannya sudah di papan
@@ -217,9 +249,24 @@ export function PanelNews() {
      'auto', bukan 'smooth': animasi gulir saat panel baru muncul terbaca
      sebagai isinya melompat sendiri. */
   useEffect(() => {
-    if (!buka || !barisDepan.current) return;
+    if (!buka) return;
     const t = setTimeout(() => {
-      barisDepan.current?.scrollIntoView({ block: 'start', behavior: 'auto' });
+      const baris = barisDepan.current;
+      const wadah = wadahDaftar.current;
+      if (!baris || !wadah) return;
+      /* scrollTop DIHITUNG SENDIRI, bukan scrollIntoView.
+         ────────────────────────────────────────────────────────────────
+         scrollIntoView menggulir SEMUA leluhur yang bisa digulir sampai
+         elemennya terlihat — termasuk halamannya. Akibatnya membuka
+         kalender ini menyeret seluruh halaman Chart & Entry ke atas: chart
+         yang sedang ditatap orang berpindah sendiri, dan yang terasa bukan
+         "kalender terbuka" melainkan "halamannya melompat".
+
+         Selisih getBoundingClientRect, bukan offsetTop: offsetTop diukur
+         terhadap offsetParent, yang belum tentu wadah ini — satu `relative`
+         yang ditambahkan orang lain di antaranya sudah cukup membuat
+         angkanya salah tanpa ada yang sadar. */
+      wadah.scrollTop += baris.getBoundingClientRect().top - wadah.getBoundingClientRect().top;
     }, 0);
     return () => clearTimeout(t);
   }, [buka, perHari]);
@@ -228,9 +275,12 @@ export function PanelNews() {
     <div className="static sm:relative" ref={kotak}>
       <button
         onClick={() => setBuka((v) => !v)}
-        title={berikut
-          ? `Berikutnya: ${berikut.judul} (${berikut.mataUang})`
-          : 'Kalender ekonomi — rilis berdampak tinggi'}
+        title={[
+          hariIni.total > 0
+            ? `${hariIni.total} rilis dampak tinggi hari ini · ${hariIni.sisa} belum lewat`
+            : 'Tidak ada rilis dampak tinggi hari ini',
+          berikut ? `Berikutnya: ${berikut.judul} (${berikut.mataUang})` : '',
+        ].filter(Boolean).join(' — ')}
         className={cn(
           'flex cursor-pointer items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[12px] transition-colors',
           siaga
@@ -241,6 +291,15 @@ export function PanelNews() {
         )}
       >
         <Newspaper className="size-3.5" /> News
+        {/* Hitungan rilis penting yang BELUM lewat hari ini. Disembunyikan
+            saat nol — angka "0" memakan tempat untuk mengatakan tidak ada
+            apa-apa, dan tombol tanpa lencana sudah mengatakannya. */}
+        {hariIni.sisa > 0 && (
+          <span className={cn('angka rounded px-1 text-[10px] leading-[1.4]',
+            siaga ? 'bg-amber-500/25 text-amber-200' : 'bg-zinc-800 text-zinc-300')}>
+            {hariIni.sisa}
+          </span>
+        )}
         {/* Titik hanya muncul kalau memang ada yang perlu diwaspadai.
             Lencana yang selalu menyala berhenti dibaca dalam sehari. */}
         {siaga && <span className="size-1.5 animate-pulse rounded-full bg-amber-400" />}
@@ -260,7 +319,7 @@ export function PanelNews() {
              bukan terhadap tombol. inset-x-0 lalu membuatnya selebar
              bilah itu — tidak bisa keluar layar, berapa pun posisi
              tombolnya. Di layar lebar semuanya kembali seperti semula. */}
-          <div className="absolute inset-x-0 top-full z-40 mt-1 flex max-h-[70vh] w-auto flex-col overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950 shadow-2xl sm:inset-x-auto sm:right-0 sm:w-[min(92vw,380px)]">
+          <div className="absolute inset-x-0 top-full z-40 mt-1 flex max-h-[min(70vh,420px)] w-auto flex-col overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950 shadow-2xl sm:inset-x-auto sm:right-0 sm:w-[min(92vw,380px)]">
             <div className="flex items-center gap-2 border-b border-zinc-800 px-3.5 py-2.5">
               <Newspaper className="size-3.5 text-zinc-400" />
               <span className="text-[12.5px] font-medium text-zinc-200">Kalender Ekonomi</span>
@@ -310,7 +369,7 @@ export function PanelNews() {
               )
             )}
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-3.5 py-2">
+            <div ref={wadahDaftar} className="min-h-0 flex-1 overflow-y-auto px-3.5 py-2">
               {memuat ? (
                 <div className="flex items-center gap-2 py-6 text-[12px] text-zinc-500">
                   <Loader2 className="size-3.5 animate-spin" /> Memuat kalender…
