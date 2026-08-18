@@ -1166,19 +1166,6 @@ export default function Analisa() {
 
   return (
     <div className="p-4 sm:p-6">
-      {/* Bilah sub-halaman. Sengaja di paling atas dan bukan di dalam salah
-          satu panel: ia memilih SELURUH isi halaman, dan kontrol yang
-          mengubah semuanya tidak boleh terlihat seperti milik satu panel. */}
-      <div className="mb-4 flex flex-wrap gap-1.5 border-b border-zinc-800/80 pb-3">
-        {SUB.map((s) => (
-          <button key={s.id} onClick={() => setSub(s.id)}
-            className={cn('cursor-pointer rounded-md px-3 py-1.5 text-[12.5px] transition-colors',
-              sub === s.id ? 'bg-zinc-100 font-medium text-zinc-950' : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200')}>
-            {s.label}
-          </button>
-        ))}
-      </div>
-
       {/* ── Peringatan risiko, 3 detik lalu menyusut ──────────────────────
           Alasan lengkapnya di dekat `diskTampil` di atas berkas ini.
 
@@ -1235,6 +1222,35 @@ export default function Analisa() {
           Bisa dilipat: begitu seseorang tahu siapa yang ia ikuti, papan itu
           berubah jadi penghalang antara dia dan sinyalnya. */}
       {diDepan && <PapanPeringkatSignal data={performa} />}
+
+      {/* ── Bilah sub-halaman ───────────────────────────────────────────
+          Dipindah ke SINI (18 Agu 2026) — di bawah papan peringkat beserta
+          catatan cara estimasi dihitung, bukan lagi di paling atas halaman.
+
+          Yang dibeli: papan peringkat jadi hal pertama yang dilihat orang
+          yang baru masuk, dan bilah ini berubah fungsi jadi pembatas antara
+          ringkasan di atas dan daftar sinyal di bawah.
+
+          KONSEKUENSINYA DISENGAJA DAN PERLU DIKETAHUI: papan peringkat cuma
+          tampil di Market Signal saat tidak ada kanal yang dibuka
+          (`diDepan`). Di Posting Signal, dan saat sebuah kanal dibuka,
+          tidak ada apa pun di atasnya — jadi bilah ini naik sendiri ke
+          puncak halaman. Kalau posisinya yang berpindah-pindah terasa
+          mengganggu, tempatnya harus dikembalikan ke atas; tidak ada jalan
+          tengah selama papan peringkatnya bersyarat.
+
+          border-t, bukan border-b: garisnya kini memisahkan dari yang di
+          ATAS, bukan menggarisbawahi dirinya sendiri. */}
+      <div className="mb-4 flex flex-wrap gap-1.5 border-t border-zinc-800/80 pt-3">
+        {SUB.map((s) => (
+          <button key={s.id} onClick={() => setSub(s.id)}
+            className={cn('cursor-pointer rounded-md px-3 py-1.5 text-[12.5px] transition-colors',
+              sub === s.id ? 'bg-zinc-100 font-medium text-zinc-950' : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200')}>
+            {s.label}
+          </button>
+        ))}
+      </div>
+
 
       <div className={cn(sub !== 'market' && 'hidden')}>
       {/* ── Rak sinyal pantauan: empat slot ───────────────────────────
