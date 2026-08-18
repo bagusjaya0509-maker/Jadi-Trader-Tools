@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import {
   Play, Loader2, RefreshCw, Radio, TriangleAlert, History,
   Layers, ChevronDown, Settings2, Code2, X, Ruler, Rows3, Square, Eraser, Minus, TrendingUp,
-  FlaskConical, GripHorizontal, Maximize2, Minimize2 } from 'lucide-react';
+  FlaskConical, GripHorizontal, Maximize2, Minimize2, SquareSplitVertical } from 'lucide-react';
 import { PanelNews } from '@/components/panel-news';
 import { simpanDraf } from '@/lib/draf-sinyal';
 import { Panel, PanelHead, KartuKpi, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
@@ -2834,6 +2834,10 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
               ['ukur', Ruler, 'Ukur % kenaikan / penurunan — klik lalu tarik'],
               ['fib', Rows3, 'Fibonacci retracement — tarik dari swing ke swing'],
               ['kotak', Square, 'Kotak SNR manual — tarik membentuk zonanya'],
+              /* Ikonnya kotak yang terbelah mendatar — persis bentuk yang
+                 digambar alat ini: satu bidang hijau di atas garis entry,
+                 satu bidang merah di bawahnya. */
+              ['posisi', SquareSplitVertical, 'Posisi SL/TP manual — tarik dari entry ke target, stop lahir 1:1 lalu tinggal digeser'],
             ] as const).map(([j, Ikon, judul]) => (
               <button key={j} onClick={() => setAlat(alat === j ? null : j)} title={judul}
                 className={cn('flex size-7 cursor-pointer items-center justify-center rounded transition-colors',

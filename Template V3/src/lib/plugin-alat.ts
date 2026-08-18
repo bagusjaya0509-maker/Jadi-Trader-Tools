@@ -18,7 +18,7 @@ import type {
    bar terakhir + durasi timeframe.
    ════════════════════════════════════════════════════════════════════════ */
 
-export type JenisAlat = 'ukur' | 'fib' | 'kotak' | 'garis';
+export type JenisAlat = 'ukur' | 'fib' | 'kotak' | 'garis' | 'posisi';
 
 export interface GambarAlat {
   id: string;
@@ -26,6 +26,14 @@ export interface GambarAlat {
   /** Stempel waktu (ms) dan harga kedua ujungnya. */
   t1: number; h1: number;
   t2: number; h2: number;
+  /** Harga KETIGA — hanya alat 'posisi' yang memakainya: h1 entry,
+      h2 take profit, h3 stop loss.
+
+      Opsional, bukan wajib. Empat alat lama memang cuma punya dua sudut,
+      dan gambar yang sudah tersimpan di localStorage orang tidak akan
+      pernah membawa medan ini — kalau dijadikan wajib, semua kotak SNR
+      dan fibonacci yang sudah ada langsung tidak sah bentuknya. */
+  h3?: number;
 }
 
 interface MetaAlat { tAkhir: number; tfMs: number; n: number }
@@ -100,6 +108,21 @@ export class PenggambarAlat implements ISeriesPrimitive<Time> {
             ctx.font = "10px 'IBM Plex Sans', sans-serif";
             ctx.textBaseline = 'middle';
             const Y = (v: number) => s.priceToCoordinate(v);
+
+            /* Label bersalut. Teks polos di atas pita tembus pandang hilang
+               begitu sebatang lilin lewat di belakangnya — dan angka SL
+               yang kadang terbaca kadang tidak lebih buruk daripada tidak
+               ada angka sama sekali. */
+            const chip = (x: number, y: number, teks: string, rgb: string, rataKanan = false) => {
+              const w = ctx.measureText(teks).width;
+              const px = rataKanan ? x - w - 14 : x;
+              ctx.fillStyle = `rgba(${rgb},.92)`;
+              ctx.beginPath();
+              ctx.roundRect(px, y - 8.5, w + 14, 17, 4);
+              ctx.fill();
+              ctx.fillStyle = '#09090b';
+              ctx.fillText(teks, px + 7, y);
+            };
             const semua: (GambarAlat | (Omit<GambarAlat, 'id'> & { id?: string }))[] =
               this.pratinjau ? [...this.gambar, this.pratinjau] : this.gambar;
 
@@ -121,9 +144,18 @@ export class PenggambarAlat implements ISeriesPrimitive<Time> {
               if ('id' in g && g.id && g.id === this.pilih) {
                 const titik: [number, number][] = g.jenis === 'garis'
                   ? [[x1, y1], [x2, y2]]
-                  /* Kotak, ukur, fib ditarik dari sudut ke sudut — jadi
-                     pegangannya di empat sudut yang benar-benar ada. */
-                  : [[x1, y1], [x2, y2], [x1, y2], [x2, y1]];
+                  : g.jenis === 'posisi'
+                    /* Posisi punya TIGA harga dan satu rentang waktu, bukan
+                       dua sudut. Pegangan harga duduk di TENGAH garisnya
+                       masing-masing, pegangan waktu di kedua ujung garis
+                       entry — supaya tidak ada satu titik pun yang berarti
+                       dua hal sekaligus. */
+                    ? [[kiri, y1], [kanan, y1],
+                       [(kiri + kanan) / 2, y2],
+                       [(kiri + kanan) / 2, Y(g.h3 ?? g.h1) ?? y1]]
+                    /* Kotak, ukur, fib ditarik dari sudut ke sudut — jadi
+                       pegangannya di empat sudut yang benar-benar ada. */
+                    : [[x1, y1], [x2, y2], [x1, y2], [x2, y1]];
                 ctx.save();
                 for (const [hx, hy] of titik) {
                   ctx.beginPath();
@@ -135,6 +167,78 @@ export class PenggambarAlat implements ISeriesPrimitive<Time> {
                   ctx.stroke();
                 }
                 ctx.restore();
+              }
+
+              /* ── ALAT POSISI: entry, stop loss, take profit ───────────
+                 Tiga harga dalam satu gambar. h1 entry, h2 target, h3 stop.
+
+                 Hijau ke arah target, merah ke arah stop — dua warna yang
+                 sudah berarti untung dan rugi di seluruh aplikasi ini, jadi
+                 arah risikonya terbaca sebelum angkanya sempat dibaca.
+
+                 Yang membuatnya ALAT, bukan sekadar dua kotak berwarna:
+                 rasio imbal-risiko dihitung dari jarak ketiga garisnya
+                 sendiri dan ikut berubah tiap kali salah satunya ditarik.
+                 Itu pertanyaan yang benar-benar ditanyakan orang sebelum
+                 masuk posisi, dan menghitungnya di kepala sambil melihat
+                 chart adalah cara paling umum salah hitung. */
+              if (g.jenis === 'posisi') {
+                const hSl = g.h3 ?? g.h1;
+                const y3 = Y(hSl);
+                if (y3 == null) continue;
+                const lebar = Math.max(kanan - kiri, 1);
+
+                const pita = (yA: number, yB: number, rgb: string) => {
+                  ctx.fillStyle = `rgba(${rgb},.13)`;
+                  ctx.fillRect(kiri, Math.min(yA, yB), lebar, Math.abs(yB - yA));
+                  ctx.strokeStyle = `rgba(${rgb},.55)`;
+                  ctx.lineWidth = 1;
+                  ctx.strokeRect(kiri, Math.min(yA, yB), lebar, Math.abs(yB - yA));
+                };
+                pita(y1, y2, '16,185,129');    // entry → target
+                pita(y1, y3, '248,113,113');   // entry → stop
+
+                /* Garis entry putus-putus: ia batas antara dua pita, bukan
+                   level ketiga yang berdiri sendiri. */
+                ctx.save();
+                ctx.setLineDash([4, 3]);
+                ctx.strokeStyle = 'rgba(228,228,231,.85)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(kiri, y1); ctx.lineTo(kanan, y1);
+                ctx.stroke();
+                ctx.restore();
+
+                /* Persen yang ditulis adalah UNTUNG-RUGI di level itu, bukan
+                   jarak harga. Pada posisi short harga naik berarti rugi —
+                   menuliskan "+10%" di pita merah cuma karena stopnya
+                   kebetulan di atas entry adalah kebohongan yang paling
+                   mudah dipercaya orang yang sedang buru-buru.
+
+                   Arahnya dibaca dari letak TARGET, bukan dari letak stop:
+                   target selalu ada di sisi untung, sedangkan stop boleh
+                   pindah ke sisi untung juga (stop yang sudah dinaikkan
+                   melewati entry). Rumus ini menuliskannya sebagai persen
+                   POSITIF, apa adanya, dan rasio imbal-risikonya jadi tak
+                   terdefinisi — memang begitu keadaannya: sudah tidak ada
+                   yang dipertaruhkan. */
+                const arah = g.h2 >= g.h1 ? 1 : -1;
+                const laba = (v: number) => (g.h1 !== 0 ? ((arah * (v - g.h1)) / g.h1) * 100 : 0);
+                const untung = Math.abs(g.h2 - g.h1);
+                const rugi = arah * (g.h1 - hSl);
+                const pT = laba(g.h2), pS = laba(hSl);
+                const tanda = (v: number) => `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`;
+
+                /* Label duduk DI DALAM pitanya masing-masing — di sisi garis
+                   yang menghadap entry. Ditaruh di luar, TP dan SL saling
+                   bertukar tempat begitu arah posisinya dibalik. */
+                chip(kiri + 4, y2 + (y2 < y1 ? 10 : -10),
+                  `TP ${hargaTeks(g.h2)}  ${tanda(pT)}`, '16,185,129');
+                chip(kiri + 4, y3 + (y3 < y1 ? 10 : -10),
+                  `SL ${hargaTeks(hSl)}  ${tanda(pS)}`, '248,113,113');
+                chip(kiri + 4, y1, rugi > 0 ? `RR 1:${(untung / rugi).toFixed(2)}` : 'RR —', '228,228,231');
+                chip(kanan - 4, y1, `Entry ${hargaTeks(g.h1)}`, '228,228,231', true);
+                continue;
               }
 
               if (g.jenis === 'garis') {

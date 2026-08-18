@@ -182,7 +182,7 @@ export function ChartLilin({
   onPilihGambar?: (id: string | null) => void;
   /** Gambar terpilih digeser utuh, atau salah satu ujungnya ditarik.
    *  Tanpa handler ini gambar tetap beku setelah tertempel. */
-  onUbahGambar?: (id: string, ubah: Partial<Pick<GambarAlat, 't1' | 'h1' | 't2' | 'h2'>>) => void;
+  onUbahGambar?: (id: string, ubah: Partial<Pick<GambarAlat, 't1' | 'h1' | 't2' | 'h2' | 'h3'>>) => void;
   /** Posisi MT5 terbuka — price line entry/SL/TP + PnL + seret SL/TP. */
   posisiMt5?: PosisiChartMt5[];
   /** Kirim SL/TP baru sebuah posisi ke EA; resolve true kalau EA sukses.
@@ -803,8 +803,17 @@ export function ChartLilin({
           if (Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy)) <= 7) { kena = g.id; break; }
           continue;
         }
+        /* Alat posisi menyimpan stop loss di harga KETIGA, yang letaknya
+           justru di luar rentang h1..h2. Kotak uji yang cuma memakai dua
+           harga membuat separuh alatnya — seluruh pita merah — tidak bisa
+           diklik sama sekali. */
+        let ya = Math.min(y1, y2), yb = Math.max(y1, y2);
+        if (g.jenis === 'posisi') {
+          const y3 = s.priceToCoordinate(g.h3 ?? g.h1);
+          if (y3 != null) { ya = Math.min(ya, y3); yb = Math.max(yb, y3); }
+        }
         if (px >= Math.min(x1, x2) - 8 && px <= Math.max(x1, x2) + 8
-          && py >= Math.min(y1, y2) - 8 && py <= Math.max(y1, y2) + 8) { kena = g.id; break; }
+          && py >= ya - 8 && py <= yb + 8) { kena = g.id; break; }
       }
       onPilihGambar(kena);
     };
@@ -824,7 +833,7 @@ export function ChartLilin({
      ikut bergeser di tengah seretan (harga baru masuk) tidak menyeret
      gambarnya ikut pindah. */
   const seretGambar = useRef<
-    { id: string; mode: 'geser' | 'ujung1' | 'ujung2'; awal: GambarAlat; t: number; h: number } | null
+    { id: string; mode: 'geser' | 'ujung1' | 'ujung2' | 'tp' | 'sl'; awal: GambarAlat; t: number; h: number } | null
   >(null);
 
   useEffect(() => {
@@ -864,7 +873,8 @@ export function ChartLilin({
       const x1 = X(g.t1), x2 = X(g.t2);
       const y1 = s.priceToCoordinate(g.h1), y2 = s.priceToCoordinate(g.h2);
       if (x1 == null || x2 == null || y1 == null || y2 == null) return null;
-      return { x1, y1, x2, y2 };
+      const y3 = g.jenis === 'posisi' ? s.priceToCoordinate(g.h3 ?? g.h1) : null;
+      return { x1, y1, x2, y2, y3 };
     };
 
     const turun = (e: MouseEvent) => {
@@ -882,8 +892,26 @@ export function ChartLilin({
       /* Pegangan menang atas badan: ujung yang berada di dalam badan kotak
          tetap harus bisa ditarik sendiri. */
       const dekat = (hx: number, hy: number) => Math.hypot(p.x - hx, p.y - hy) <= 9;
-      let mode: 'geser' | 'ujung1' | 'ujung2' | null = null;
-      if (dekat(k.x1, k.y1)) mode = 'ujung1';
+      let mode: 'geser' | 'ujung1' | 'ujung2' | 'tp' | 'sl' | null = null;
+      if (g.jenis === 'posisi') {
+        /* Pegangan alat posisi TIDAK di sudut kotak. Menarik sudut akan
+           menggeser waktu dan harga sekaligus, dan menggeser TP tanpa
+           sengaja adalah cara termudah membuat rasio imbal-risiko yang
+           tertulis di layar berbohong. Jadi: waktu di dua ujung garis
+           entry, harga di tengah garisnya masing-masing. */
+        const kr = Math.min(k.x1, k.x2), kn = Math.max(k.x1, k.x2);
+        const tg = (kr + kn) / 2;
+        if (dekat(kr, k.y1)) mode = 'ujung1';
+        else if (dekat(kn, k.y1)) mode = 'ujung2';
+        else if (dekat(tg, k.y2)) mode = 'tp';
+        else if (k.y3 != null && dekat(tg, k.y3)) mode = 'sl';
+        else {
+          const atas = Math.min(k.y1, k.y2, k.y3 ?? k.y1);
+          const bawah = Math.max(k.y1, k.y2, k.y3 ?? k.y1);
+          if (p.x >= kr - 4 && p.x <= kn + 4 && p.y >= atas - 4 && p.y <= bawah + 4) mode = 'geser';
+        }
+      }
+      else if (dekat(k.x1, k.y1)) mode = 'ujung1';
       else if (dekat(k.x2, k.y2)) mode = 'ujung2';
       else if (g.jenis !== 'garis' && dekat(k.x1, k.y2)) mode = 'ujung1';
       else if (g.jenis !== 'garis' && dekat(k.x2, k.y1)) mode = 'ujung2';
@@ -903,7 +931,9 @@ export function ChartLilin({
       if (!mode) return;
 
       seretGambar.current = { id: g.id, mode, awal: { ...g }, t: p.t, h: p.h };
-      document.body.style.cursor = mode === 'geser' ? 'move' : 'grabbing';
+      document.body.style.cursor = mode === 'geser' ? 'move'
+        : mode === 'tp' || mode === 'sl' ? 'ns-resize'
+        : g.jenis === 'posisi' ? 'ew-resize' : 'grabbing';
       chart.current?.applyOptions({ handleScroll: false, handleScale: false });
       e.preventDefault();
       e.stopPropagation();
@@ -916,6 +946,24 @@ export function ChartLilin({
       if (!p) return;
       e.preventDefault();
       const a = sg.awal;
+      if (a.jenis === 'posisi') {
+        /* Waktu dan harga dipisah tegas: ujung kiri/kanan hanya melebarkan
+           rentangnya, garis TP/SL hanya naik-turun. Menggeser badannya
+           membawa ketiga harga sekaligus — setup yang sudah disusun tidak
+           boleh berubah rasionya hanya karena dipindah ke swing lain. */
+        const dh = p.h - sg.h;
+        if (sg.mode === 'geser') {
+          const dt = p.t - sg.t;
+          onUbahGambar(sg.id, {
+            t1: a.t1 + dt, t2: a.t2 + dt,
+            h1: a.h1 + dh, h2: a.h2 + dh, h3: (a.h3 ?? a.h1) + dh,
+          });
+        } else if (sg.mode === 'ujung1') onUbahGambar(sg.id, { t1: p.t });
+        else if (sg.mode === 'ujung2') onUbahGambar(sg.id, { t2: p.t });
+        else if (sg.mode === 'tp') onUbahGambar(sg.id, { h2: p.h });
+        else onUbahGambar(sg.id, { h3: p.h });
+        return;
+      }
       if (sg.mode === 'geser') {
         const dt = p.t - sg.t, dh = p.h - sg.h;
         onUbahGambar(sg.id, { t1: a.t1 + dt, h1: a.h1 + dh, t2: a.t2 + dt, h2: a.h2 + dh });
@@ -978,12 +1026,23 @@ export function ChartLilin({
       return { t: times[times.length - 1] + (l - (times.length - 1)) * tfMs, h };
     };
 
+    /* Alat posisi lahir dengan TIGA harga sekaligus: entry di tempat
+       tombol ditekan, target di tempat dilepas, dan stop dicerminkan ke
+       seberang entry pada jarak yang sama. Rasio 1:1 sebagai titik awal —
+       angka yang jelas-jelas sementara dan langsung terlihat perlu diubah,
+       jadi orang menariknya. Stop di angka karangan yang kebetulan masuk
+       akal justru yang tidak akan pernah diperiksa. */
+    const bentuk = (t1: number, h1: number, t2: number, h2: number): Omit<GambarAlat, 'id'> =>
+      alat === 'posisi'
+        ? { jenis: alat, t1, h1, t2, h2, h3: h1 - (h2 - h1) }
+        : { jenis: alat, t1, h1, t2, h2 };
+
     const turun = (e: MouseEvent) => {
       if (e.button !== 0) return;
       const p = posisiDari(e);
       if (!p) return;
       tarikAlat.current = { t1: p.t, h1: p.h };
-      alatPrim.current?.setPratinjau({ jenis: alat, t1: p.t, h1: p.h, t2: p.t, h2: p.h });
+      alatPrim.current?.setPratinjau(bentuk(p.t, p.h, p.t, p.h));
       e.preventDefault();
       e.stopPropagation();
     };
@@ -992,7 +1051,7 @@ export function ChartLilin({
       if (!a) return;
       const p = posisiDari(e);
       if (!p) return;
-      alatPrim.current?.setPratinjau({ jenis: alat, t1: a.t1, h1: a.h1, t2: p.t, h2: p.h });
+      alatPrim.current?.setPratinjau(bentuk(a.t1, a.h1, p.t, p.h));
     };
     const lepas = (e: MouseEvent) => {
       const a = tarikAlat.current;
@@ -1002,8 +1061,16 @@ export function ChartLilin({
       const p = posisiDari(e);
       /* Klik tanpa tarikan bukan gambar — titik tunggal tidak menyimpan
          informasi apa pun. */
-      if (p && (Math.abs(p.t - a.t1) > 1 || p.h !== a.h1)) {
-        onAlatSelesai({ jenis: alat, t1: a.t1, h1: a.h1, t2: p.t, h2: p.h });
+      /* Posisi tanpa jarak HARGA bukan setup: entry, TP, dan SL menumpuk
+         di satu garis dan rasionya tak terdefinisi. Alat lain masih berarti
+         dengan satu sumbu saja — kotak setipis garis tetap menandai level. */
+      if (p) {
+        const cukupWaktu = Math.abs(p.t - a.t1) > 1;
+        const cukupHarga = p.h !== a.h1;
+        const cukup = alat === 'posisi'
+          ? cukupWaktu && cukupHarga
+          : cukupWaktu || cukupHarga;
+        if (cukup) onAlatSelesai(bentuk(a.t1, a.h1, p.t, p.h));
       }
     };
     /* pointercancel ≠ pointerup: koordinat pada cancel tidak bisa
