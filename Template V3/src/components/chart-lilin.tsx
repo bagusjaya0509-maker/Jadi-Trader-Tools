@@ -1289,12 +1289,34 @@ export function ChartLilin({
       const tp = u ? u.tp : p.tp;
       if (tp > 0) berlabel.push(tp);
     }
-    /* Toleransi RELATIF, bukan angka tetap: 0,001 adalah satu tick di
-       emas tapi seratus tick di EURUSD. 1e-7 dari harga selalu lebih
-       kecil daripada satu tick di kedua-duanya, jadi yang disatukan
-       hanyalah level yang memang sama. */
-    const kembar = (a: number) =>
-      berlabel.some((b) => Math.abs(a - b) <= Math.max(1e-9, Math.abs(b) * 1e-7));
+    /* AMBANGNYA SATU TICK TAMPILAN, bukan angka relatif yang dikarang.
+       ──────────────────────────────────────────────────────────────
+       Versi pertama memakai 1e-7 dari harga. Itu jauh LEBIH KETAT
+       daripada presisi yang dipakai chart menulis angkanya: di emas
+       1e-7 berarti 0,0004 sementara sumbunya menulis tiga desimal
+       (0,001). Akibatnya dua level yang berbeda 0,0005 — tampil sebagai
+       angka yang SAMA PERSIS di layar — tetap dianggap berbeda dan
+       keduanya diberi label. Itulah kenapa TP menyatu tapi SL tidak:
+       TP-nya kebetulan sama sampai ke bit terakhir, SL-nya tidak.
+
+       minMove dibaca dari seri, bukan dihitung ulang dari `lilin`:
+       memasukkan `lilin` ke dependensi berarti seluruh price line
+       dibongkar-pasang tiap lilin baru datang. Nilainya sudah dijaga
+       tetap mutakhir oleh efek priceFormat di atas, dan telat sedikit
+       pun tidak berbahaya — ia cuma ambang pembanding. */
+    const fmt = (s.options() as { priceFormat?: { minMove?: number } }).priceFormat;
+    const tick = fmt?.minMove && fmt.minMove > 0 ? fmt.minMove : 1e-6;
+    /* DIBULATKAN KE PETAK TICK, bukan dibandingkan selisihnya.
+       Selisih < tick gagal justru di kasus paling jelas: 4398,507 dikurangi
+       4398,506 menghasilkan 0,0009999999995 di float — lebih kecil dari
+       0,001, jadi dua level yang jelas-jelas berbeda ikut disatukan.
+
+       Membulatkan keduanya ke petak yang sama persis dengan yang dipakai
+       sumbu menulis angkanya membuat kriterianya jadi apa adanya: satu
+       angka kalau memang tercetak sama, dua kalau tercetak beda. */
+    const kePetak = (x: number) => Math.round(x / tick);
+    const petak = berlabel.map(kePetak);
+    const kembar = (a: number) => petak.includes(kePetak(a));
 
     (garisSeret ?? []).forEach((g) => {
       if (!g.harga) return;
