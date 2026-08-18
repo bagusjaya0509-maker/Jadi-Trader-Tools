@@ -11,19 +11,22 @@ import { LogoJT } from '@/components/logo-jt';
 
 export function ParallaxComponent() {
   const parallaxRef = useRef<HTMLDivElement>(null);
-  /* MALAM = keadaan bawaan, dan itu keputusan pemiliknya.
-     ──────────────────────────────────────────────────────────────────────
-     Alasannya bukan selera semata: seluruh halaman di bawah hero ini
-     zinc-950 hampir hitam. Gambar senja terang dan kebiruan, jadi
-     sambungannya ke bagian berikutnya terasa patah — mata melompat dari
-     langit terang ke hitam pekat dalam satu garis. Yang malam mendarat
-     mulus, dan lilin di punggung gunungnya justru yang paling menyala.
+  /* SENJA = keadaan bawaan. Keputusan pemiliknya, dan ini wajah pertama
+     situsnya — bukan urusan yang perlu dimenangkan lewat argumen teknis.
+
+     Satu hal yang tetap dicatat supaya tidak hilang: halaman di bawah hero
+     ini zinc-950 hampir hitam, sedangkan gambar senja terang dan kebiruan,
+     jadi sambungan ke bagian berikutnya lebih terasa patah dibanding kalau
+     malam yang dipakai. Yang menutupinya sekarang jembatan gradien di
+     Template.tsx (lihat komentar "Sambungan hero → featuresgrid" di sana).
+     Kalau suatu hari pita gelap itu terlihat lagi, di situlah tempatnya
+     diurus — bukan dengan menukar suasana bawaannya.
 
      Pilihan ini TIDAK diingat antar-kunjungan. Disengaja: menyimpannya
      berarti menaruh sesuatu di perangkat orang untuk hal yang bukan
      kebutuhan mereka melainkan hiasan kami, dan halaman depan tidak boleh
      menagih izin apa pun sebelum ia menjelaskan produknya apa. */
-  const [suasana, setSuasana] = useState<'senja' | 'malam'>('malam');
+  const [suasana, setSuasana] = useState<'senja' | 'malam'>('senja');
 
   useEffect(() => {
     gsap.registerPlugin(ScrollTrigger);
@@ -116,11 +119,10 @@ export function ParallaxComponent() {
           <div className="parallax__black-line-overflow"></div>
           <div data-parallax-layers className="parallax__layers">
             <img src="/parallax/langit.webp" loading="eager" width="800" data-parallax-layer="1" alt="" className="parallax__layer-img" />
-            {/* Gunung senja. Ia lapisan DASAR dan selalu ada, tapi sejak
-                malam jadi bawaan ia tidak terlihat sampai tombolnya ditekan
-                — gambar malam di atasnya legap dan menutupinya penuh.
-                Karena itu prioritasnya yang diturunkan, bukan yang malam. */}
-            <img src="/parallax/gunung-lilin.webp" loading="eager" fetchPriority="low" width="800" data-parallax-layer="2" alt="" className="parallax__layer-img" />
+            {/* Gunung senja — lapisan dasar DAN yang dilihat orang pada frame
+                pertama, karena senja suasana bawaannya. Prioritasnya dibiarkan
+                normal; ia tidak boleh mengantre di belakang apa pun. */}
+            <img src="/parallax/gunung-lilin.webp" loading="eager" width="800" data-parallax-layer="2" alt="" className="parallax__layer-img" />
             {/* Malam adalah gambar tersendiri yang dilukis pemiliknya, bukan
                 foto senja yang digelapkan. Bulan purnama, langit berbintang,
                 salju kena cahaya bulan — hal-hal yang tidak akan pernah keluar
@@ -130,13 +132,18 @@ export function ParallaxComponent() {
                 yang sama seperti gunung di bawahnya; keduanya tidak pernah
                 bergeser satu sama lain saat digulir.
 
-                Prioritas unduhnya SENGAJA tidak diturunkan. Dulu ia rendah,
-                waktu senja masih bawaan dan gambar ini cuma dipakai kalau
-                tombolnya ditekan. Sejak malam jadi bawaan, dialah yang
-                dilihat orang pada frame pertama — menahannya di antrean
-                bawah berarti pengunjung sempat melihat gunung senja yang
-                diredupkan filter, lalu gambarnya berkedip berganti. */}
-            <img src="/parallax/gunung-malam.webp" loading="eager" width="800" data-parallax-layer="2" alt="" className="parallax__layer-img parallax__layer-malam" />
+                fetchPriority rendah, tapi tetap eager: dengan senja sebagai
+                bawaan, 64 kB ini belum tentu dipakai sama sekali, jadi ia
+                tidak boleh berebut jalur dengan tiga gambar yang memang
+                langsung tampil. Menunda muatnya sampai tombolnya ditekan
+                lebih hemat lagi — tapi itu menukar penghematan sekali dengan
+                kedipan setiap kali beralih, dan pertukaran itu tidak sepadan.
+
+                CATATAN KALAU SUASANA BAWAANNYA DIUBAH LAGI: baris ini ikut.
+                Atribut low di sini hanya benar selama bukan gambar ini yang
+                tampil pertama; kalau malam jadi bawaan, low harus pindah ke
+                gunung-lilin.webp di atas. Sudah pernah tertukar sekali. */}
+            <img src="/parallax/gunung-malam.webp" loading="eager" fetchPriority="low" width="800" data-parallax-layer="2" alt="" className="parallax__layer-img parallax__layer-malam" />
             <div data-parallax-layer="3" className="parallax__layer-title">
               <h2 className="parallax__title">Jadi Trader</h2>
             </div>
