@@ -93,6 +93,23 @@ export function ParallaxComponent() {
           <div data-parallax-layers className="parallax__layers">
             <img src="/parallax/langit.webp" loading="eager" width="800" data-parallax-layer="1" alt="" className="parallax__layer-img" />
             <img src="/parallax/gunung-lilin.webp" loading="eager" width="800" data-parallax-layer="2" alt="" className="parallax__layer-img" />
+            {/* Lilinnya saja, latar tembus pandang — dipotong dari gambar gunung
+                yang SAMA persis, jadi tidak ada urusan penjajaran: piksel ke-n
+                di sini adalah piksel ke-n di sana. Lapisannya juga "2", supaya
+                GSAP menggerakkannya dengan yPercent yang sama dan keduanya
+                tidak pernah bergeser satu sama lain saat digulir.
+
+                Di suasana senja ia tidak terlihat (opacity 0) — lilinnya sudah
+                menyatu di gambar gunung. Di malam ia menyala tanpa filter, dan
+                itulah gunanya: yang gelap cuma gunungnya.
+
+                fetchPriority rendah, tapi tetap eager: pada bukaan pertama ia
+                47 kB yang belum tentu dipakai, jadi ia tidak boleh berebut jalur
+                dengan tiga gambar yang memang langsung tampil. Menunda muatnya
+                sampai tombolnya ditekan lebih hemat lagi — tapi itu menukar
+                penghematan sekali dengan kedipan setiap kali beralih, dan
+                pertukaran itu tidak sepadan. */}
+            <img src="/parallax/lilin-nyala.webp" loading="eager" fetchPriority="low" width="800" data-parallax-layer="2" alt="" className="parallax__layer-img parallax__layer-lilin" />
             <div data-parallax-layer="3" className="parallax__layer-title">
               <h2 className="parallax__title">Jadi Trader</h2>
             </div>

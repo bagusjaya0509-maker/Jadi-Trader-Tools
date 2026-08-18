@@ -160,9 +160,27 @@
   filter: brightness(0.42) saturate(0.72) contrast(1.08) hue-rotate(-12deg);
 }
 
+/* ── GRAFIKNYA TIDAK IKUT GELAP ────────────────────────────────────────
+   Lilinnya menyatu di dalam foto gunung, jadi filter malam di atas
+   menggelapkannya berbarengan dengan batu dan saljunya — dan grafik yang
+   ikut padam kehilangan seluruh maksudnya. Lapisan ini memasang kembali
+   lilin yang sama di atasnya, tanpa filter apa pun.
+
+   Dua kelas dipakai pada pemilih di bawah (bukan sekadar urutan tulis)
+   supaya ia menang kekhususan atas aturan malam di atas. Kalau
+   diandalkan urutan saja, satu pemindahan baris diam-diam memadamkannya
+   lagi tanpa galat apa pun yang menjelaskan sebabnya. */
+.parallax__layer-lilin {
+  opacity: 0;
+}
+
+.parallax[data-suasana='malam'] .parallax__layer-img.parallax__layer-lilin {
+  opacity: 1;
+  filter: none;
+}
 
 .parallax__layer-img {
-  transition: filter 700ms ease;
+  transition: filter 700ms ease, opacity 700ms ease;
 }
 
 /* Tombol pemindah suasana — kecil, di pojok, tidak menantang isi utama. */
