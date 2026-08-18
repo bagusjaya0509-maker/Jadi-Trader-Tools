@@ -59,7 +59,15 @@ export function ParallaxComponent() {
 
     const lenis = new Lenis();
     lenis.on('scroll', ScrollTrigger.update);
-    gsap.ticker.add((time) => { lenis.raf(time * 1000); });
+
+    /* Fungsinya dipegang di variabel supaya bisa DILEPAS lagi di bawah.
+       Versi aslinya menuliskannya sebagai fungsi anonim langsung di dalam
+       gsap.ticker.add, dan fungsi anonim tidak punya pegangan — ia tidak
+       akan pernah bisa dicabut. Tiap kali komponen ini dipasang ulang,
+       satu callback baru menumpuk, dan yang lama tetap memanggil raf()
+       pada Lenis yang sudah dihancurkan. */
+    const detak = (time: number) => { lenis.raf(time * 1000); };
+    gsap.ticker.add(detak);
     gsap.ticker.lagSmoothing(0);
 
     return () => {
@@ -77,6 +85,12 @@ export function ParallaxComponent() {
       tl?.scrollTrigger?.kill();
       tl?.kill();
       if (triggerElement) gsap.killTweensOf(triggerElement);
+
+      /* Urutannya penting: cabut detaknya DULU, baru hancurkan Lenis.
+         Terbalik, masih ada peluang satu frame memanggil raf() pada
+         instance yang sudah mati. */
+      gsap.ticker.remove(detak);
+      gsap.ticker.lagSmoothing(500, 33);   // kembalikan bawaan GSAP
       lenis.destroy();
     };
   }, []);

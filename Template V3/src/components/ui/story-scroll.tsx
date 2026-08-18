@@ -181,6 +181,19 @@ const FlowArt: React.FC<FlowArtProps> = ({
     <main
       ref={containerRef}
       aria-label={ariaLabel}
+      /* ── data-lenis-prevent WAJIB ADA ────────────────────────────────
+         Halaman depan menjalankan Lenis (dibawa komponen parallax), dan
+         Lenis menangkap `wheel` di seluruh dokumen lalu menerjemahkannya
+         jadi gulir HALAMAN. Kotak ini menggulir dirinya sendiri, jadi
+         tanpa atribut ini rodanya dirampas: terukur di situs tayang —
+         roda di atas kotak membuat scrollTop kotak tetap 0 sementara
+         scrollY halaman lompat 300 px. Panelnya terkunci di seksi 01 dan
+         empat seksi sisanya tidak pernah bisa dicapai.
+
+         Atribut ini memberitahu Lenis untuk melepas kejadian yang berasal
+         dari dalam sini dan membiarkan gulir asli bekerja. Namanya dicek
+         langsung di paket terpasang (lenis 1.0.42), bukan dihafal. */
+      data-lenis-prevent
       className={cx('gulir-senyap h-full w-full overflow-y-auto overflow-x-hidden', className)}
     >
       {children}
