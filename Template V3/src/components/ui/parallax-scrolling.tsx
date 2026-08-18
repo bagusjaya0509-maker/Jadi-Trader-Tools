@@ -5,6 +5,7 @@ import { useEffect, useRef } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import Lenis from '@studio-freight/lenis';
+import './parallax-scrolling.css';
 
 export function ParallaxComponent() {
   const parallaxRef = useRef<HTMLDivElement>(null);
@@ -14,8 +15,13 @@ export function ParallaxComponent() {
 
     const triggerElement = parallaxRef.current?.querySelector('[data-parallax-layers]');
 
+    let tl: gsap.core.Timeline | null = null;
+
     if (triggerElement) {
-      const tl = gsap.timeline({
+      /* Dipegang di variabel lokal supaya TypeScript tahu ia pasti ada di
+         dalam blok ini; `tl` di luar sana boleh null karena pembersihan
+         di bawah harus tetap aman kalau pemicunya tidak pernah ketemu. */
+      const garis = gsap.timeline({
         scrollTrigger: {
           trigger: triggerElement,
           start: "0% 0%",
@@ -23,6 +29,8 @@ export function ParallaxComponent() {
           scrub: 0
         }
       });
+
+      tl = garis;
 
       const layers = [
         { layer: "1", yPercent: 70 },
@@ -32,7 +40,7 @@ export function ParallaxComponent() {
       ];
 
       layers.forEach((layerObj, idx) => {
-        tl.to(
+        garis.to(
           triggerElement.querySelectorAll(`[data-parallax-layer="${layerObj.layer}"]`),
           {
             yPercent: layerObj.yPercent,
@@ -49,8 +57,19 @@ export function ParallaxComponent() {
     gsap.ticker.lagSmoothing(0);
 
     return () => {
-      // Clean up GSAP and ScrollTrigger instances
-      ScrollTrigger.getAll().forEach(st => st.kill());
+      /* HANYA milik komponen ini yang dibersihkan.
+         ──────────────────────────────────────────────────────────────
+         Versi aslinya memanggil ScrollTrigger.getAll().forEach(kill) —
+         itu membunuh SEMUA ScrollTrigger di halaman, termasuk milik
+         komponen lain yang tidak ada urusannya. Halaman ini punya
+         animasi gulir sendiri (gambar tur yang di-scrub); begitu
+         komponen ini dilepas, animasi itu ikut mati dan tidak ada
+         galat apa pun yang menjelaskan kenapa.
+
+         Timeline-nya membawa scrollTrigger-nya sendiri, jadi
+         mematikan timeline sudah cukup. */
+      tl?.scrollTrigger?.kill();
+      tl?.kill();
       if (triggerElement) gsap.killTweensOf(triggerElement);
       lenis.destroy();
     };

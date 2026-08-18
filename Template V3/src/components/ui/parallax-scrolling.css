@@ -1,0 +1,132 @@
+/* ════════════════════════════════════════════════════════════════════════
+   PARALLAX — bagian yang tidak ikut terkirim
+   ════════════════════════════════════════════════════════════════════════
+   Komponennya datang lengkap dengan markup dan animasi GSAP-nya, tapi
+   TANPA CSS. Sepuluh kelas di bawah dirujuk markup itu dan tidak ada satu
+   pun di proyek ini, jadi yang tampil cuma empat gambar berbaris menurun
+   pada ukuran aslinya — animasinya jalan, tapi yang digerakkan bukan
+   bentuk yang dimaksud.
+
+   Berkas ini menyusunnya kembali dari markup: empat lapisan bertumpuk,
+   judul di antara lapisan ketiga dan keempat, peluruhan ke hitam di kaki.
+   Ini REKONSTRUKSI, bukan salinan aslinya — kalau CSS dari sumbernya
+   didapat, timpa berkas ini dan hasilnya jadi persis seperti demonya.
+
+   ── SATU ATURAN YANG TIDAK BOLEH DILANGGAR ─────────────────────────────
+   Elemen berlabel data-parallax-layer TIDAK BOLEH diberi `transform` di
+   sini. GSAP menganimasikan yPercent lewat properti yang sama, dan ia
+   menimpa seluruh nilainya — bukan menggabung. Satu translate(-50%) untuk
+   memusatkan gambar akan lenyap pada frame pertama animasi, dan lapisannya
+   melompat. Pemusatan diurus inset/objek-fit, bukan transform.
+   ════════════════════════════════════════════════════════════════════════ */
+
+.parallax {
+  position: relative;
+  width: 100%;
+  background: #000;
+}
+
+.parallax__header {
+  position: relative;
+  width: 100%;
+}
+
+.parallax__visuals {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+}
+
+/* Tinggi kotak inilah JARAK GULIR animasinya: pemicunya start "0% 0%"
+   sampai end "100% 0%", yaitu dari tepi atasnya menyentuh puncak layar
+   sampai tepi bawahnya menyentuh puncak layar. Satu layar penuh memberi
+   perjalanan yang cukup terasa tanpa menahan orang terlalu lama sebelum
+   sampai ke isi halaman. */
+.parallax__layers {
+  position: relative;
+  width: 100%;
+  height: 100svh;
+}
+
+.parallax__layer-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* Tanpa transform — lihat catatan di kepala berkas. */
+  will-change: transform;
+}
+
+/* Urutan tumpukan mengikuti urutan di markup, jadi tidak ada z-index sama
+   sekali: lapisan 1 paling belakang, 4 paling depan, judul di antara 3 dan
+   4. Menambahkan z-index di sini justru akan mengunci urutan itu dan
+   membuat penyusunan ulang markup diam-diam tidak berpengaruh. */
+.parallax__layer-title {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 1rem;
+  will-change: transform;
+}
+
+.parallax__title {
+  margin: 0;
+  font-size: clamp(3rem, 13vw, 11rem);
+  line-height: 0.95;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  text-align: center;
+  color: #fff;
+}
+
+/* Peluruhan ke hitam di kaki gambar — supaya lapisan terbawah menyatu
+   dengan bagian halaman sesudahnya, bukan berhenti pada satu garis. */
+.parallax__fade {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 32%;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0) 0%, #000 92%);
+  pointer-events: none;
+}
+
+/* Penutup satu piksel di batas bawah. Pembulatan sub-piksel kadang
+   menyisakan celah terang di sana saat halaman digulir; garis ini
+   menutupnya tanpa mengubah tata letak apa pun. */
+.parallax__black-line-overflow {
+  position: absolute;
+  inset-inline: 0;
+  bottom: -1px;
+  height: 2px;
+  background: #000;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.parallax__content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5rem 1rem 6rem;
+  background: #000;
+  color: #fff;
+}
+
+/* SVG-nya membawa atribut width="100%"; tanpa batas ini ia memenuhi
+   seluruh lebar halaman. */
+.osmo-icon-svg {
+  width: 100%;
+  max-width: 3.5rem;
+  height: auto;
+  opacity: 0.6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .parallax__layer-img,
+  .parallax__layer-title {
+    will-change: auto;
+  }
+}
