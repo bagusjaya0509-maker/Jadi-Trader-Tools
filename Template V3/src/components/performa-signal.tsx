@@ -39,6 +39,68 @@ function Kpi({ label, nilai, warna, ket }: {
   );
 }
 
+/* ── Catatan yang menyusut sendiri sesudah 5 detik ──────────────────────
+   Tampil utuh dulu, lalu mengecil jadi satu baris "Catatan · buka
+   selengkapnya". Polanya sengaja sama dengan peringatan risiko di kepala
+   halaman Copy Signal, dan alasannya sama pula: kalimat ini WAJIB terbaca
+   sekali — ia yang mencegah angka estimasi dibaca sebagai janji — tapi
+   sesudah dibaca ia berdiri di antara orang dan angka yang sedang ia
+   periksa.
+
+   MENYUSUT, BUKAN LENYAP. `display:none` yang mendadak membuat isi di
+   bawahnya melompat naik 5 detik sesudah halaman dibuka, persis saat mata
+   sedang menyusuri papan peringkat; yang terasa bukan "catatannya selesai"
+   melainkan "halamannya bergeser sendiri". grid-rows 1fr → 0fr
+   menganimasikan tinggi yang SEBENARNYA, tanpa menebak max-height — kalau
+   kalimatnya diperpanjang nanti, tidak ada angka ajaib yang ikut berubah.
+
+   DITULIS SEBAGAI GAYA INLINE, bukan kelas `grid-rows-[0fr]`. Tailwind
+   tidak menghasilkan aturan itu sama sekali (sudah diperiksa saat menggarap
+   peringatan risiko: nol aturan `grid-rows` di seluruh stylesheet), jadi
+   nama kelasnya cuma teks mati dan yang tersisa `opacity-0` — tak terlihat
+   tapi tetap memakan tinggi.
+
+   SEKALI DISENTUH, PENGHITUNGNYA BERHENTI. Panel yang menutup sendiri
+   beberapa detik sesudah dibuka tangan terbaca sebagai kerusakan, bukan
+   sebagai fitur.
+
+   motion-reduce: yang menyalakan "kurangi gerak" mendapat pergantian tanpa
+   animasi — mereka menyalakannya justru karena gerak begini memicu sesuatu. */
+const JEDA_LIPAT_MS = 5000;
+
+function CatatanLipat({ children }: { children: React.ReactNode }) {
+  const [buka, setBuka] = useState(true);
+  const [disentuh, setDisentuh] = useState(false);
+
+  useEffect(() => {
+    if (disentuh) return;
+    const t = setTimeout(() => setBuka(false), JEDA_LIPAT_MS);
+    return () => clearTimeout(t);
+  }, [disentuh]);
+
+  return (
+    <div>
+      <button
+        onClick={() => { setDisentuh(true); setBuka((v) => !v); }}
+        aria-expanded={buka}
+        className="flex cursor-pointer items-center gap-1 rounded px-1 py-0.5 text-[11px] text-zinc-600 transition-colors hover:text-zinc-400">
+        {buka ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
+        Catatan · {buka ? 'sembunyikan' : 'buka selengkapnya'}
+      </button>
+      <div
+        style={{ gridTemplateRows: buka ? '1fr' : '0fr' }}
+        className={cn(
+          'grid overflow-hidden transition-all duration-500 ease-out motion-reduce:transition-none',
+          buka ? 'opacity-100' : 'opacity-0',
+        )}>
+        <div className="overflow-hidden">
+          <div className="space-y-2 px-1 pt-1">{children}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** Kalimat asumsi estimasi. Ditulis sekali, dipakai di kedua tempat —
  *  angka estimasi tidak boleh pernah muncul tanpa kalimat ini. */
 function CatatanAsumsi({ modal, risikoPersen }: { modal: number; risikoPersen: number }) {
@@ -149,20 +211,26 @@ export function PapanPeringkatSignal({ data }: { data: Performa | null }) {
             currentUserId={pengguna?.uid}
             podiumRankings={peringkat.slice(0, 3)}
             rankings={peringkat}
-            catatan={
-              <>
-                Diurutkan dari estimasi hasil, bukan dari jumlah pengikut atau
-                banyaknya posting. {totalSinyal < 20 && (
-                  <span className="text-amber-500/80">
-                    Baru {totalSinyal} sinyal yang selesai — terlalu sedikit untuk menyimpulkan
-                    siapa yang lebih baik. Urutannya belum berarti apa-apa.
-                  </span>
-                )}
-              </>
-            }
           />
 
-          <CatatanAsumsi modal={data.modal} risikoPersen={data.risikoPersen} />
+          {/* Kedua catatan dilipat BERSAMA, satu tombol untuk keduanya.
+              Dulu yang atas dititipkan lewat prop `catatan` LeaderboardCard
+              sehingga tercetak di dalam kartunya. Dipindah keluar supaya
+              keduanya bisa menyusut sebagai satu blok — dua tombol "buka
+              selengkapnya" bertumpuk untuk dua alinea yang saling menyambung
+              lebih berisik daripada alineanya sendiri. */}
+          <CatatanLipat>
+            <p className="text-[11px] leading-relaxed text-zinc-600">
+              Diurutkan dari estimasi hasil, bukan dari jumlah pengikut atau
+              banyaknya posting. {totalSinyal < 20 && (
+                <span className="text-amber-500/80">
+                  Baru {totalSinyal} sinyal yang selesai — terlalu sedikit untuk menyimpulkan
+                  siapa yang lebih baik. Urutannya belum berarti apa-apa.
+                </span>
+              )}
+            </p>
+            <CatatanAsumsi modal={data.modal} risikoPersen={data.risikoPersen} />
+          </CatatanLipat>
         </div>
       )}
     </div>
@@ -266,7 +334,11 @@ export function PerformaAnalisSatu({ analis, modal, risikoPersen, berjalan, diba
         </div>
       )}
 
-      {selesai > 0 && <CatatanAsumsi modal={modal} risikoPersen={risikoPersen} />}
+      {selesai > 0 && (
+        <CatatanLipat>
+          <CatatanAsumsi modal={modal} risikoPersen={risikoPersen} />
+        </CatatanLipat>
+      )}
 
       {analis?.agen && (
         <p className="flex items-start gap-1.5 text-[11px] leading-relaxed text-sky-300/70">
