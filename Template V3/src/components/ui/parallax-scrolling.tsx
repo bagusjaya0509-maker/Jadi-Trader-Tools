@@ -83,15 +83,20 @@ export function ParallaxComponent() {
   return (
     <div className="parallax" data-suasana={suasana} ref={parallaxRef}>
       <section className="parallax__header">
+        {/* GAMBARNYA MILIK KITA SENDIRI, bukan lagi pinjaman CDN Osmo.
+            Dua alasan, dan yang kedua yang memaksa: server orang lain bisa
+            memindahkan berkasnya kapan saja dan hero ini ikut kosong — dan
+            begitu gambarnya disunting sendiri, versi suntingan itu memang
+            tidak ada di sana. */}
         <div className="parallax__visuals">
           <div className="parallax__black-line-overflow"></div>
           <div data-parallax-layers className="parallax__layers">
-            <img src="https://cdn.prod.website-files.com/671752cd4027f01b1b8f1c7f/6717795be09b462b2e8ebf71_osmo-parallax-layer-3.webp" loading="eager" width="800" data-parallax-layer="1" alt="" className="parallax__layer-img" />
-            <img src="https://cdn.prod.website-files.com/671752cd4027f01b1b8f1c7f/6717795b4d5ac529e7d3a562_osmo-parallax-layer-2.webp" loading="eager" width="800" data-parallax-layer="2" alt="" className="parallax__layer-img" />
+            <img src="/parallax/langit.webp" loading="eager" width="800" data-parallax-layer="1" alt="" className="parallax__layer-img" />
+            <img src="/parallax/gunung-lilin.webp" loading="eager" width="800" data-parallax-layer="2" alt="" className="parallax__layer-img" />
             <div data-parallax-layer="3" className="parallax__layer-title">
               <h2 className="parallax__title">Jadi Trader</h2>
             </div>
-            <img src="https://cdn.prod.website-files.com/671752cd4027f01b1b8f1c7f/6717795bb5aceca85011ad83_osmo-parallax-layer-1.webp" loading="eager" width="800" data-parallax-layer="4" alt="" className="parallax__layer-img" />
+            <img src="/parallax/depan.webp" loading="eager" width="800" data-parallax-layer="4" alt="" className="parallax__layer-img" />
           </div>
           <div className="parallax__fade"></div>
           {/* Pemindah suasana. Kecil dan di pojok: ia mainan, bukan kendali
