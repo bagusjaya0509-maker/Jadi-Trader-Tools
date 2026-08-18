@@ -165,17 +165,24 @@
    menggelapkannya berbarengan dengan batu dan saljunya — dan grafik yang
    ikut padam kehilangan seluruh maksudnya.
 
-   Untuk lapisan gunung, filter itu diganti sepenuhnya oleh satu gambar
-   malam yang sudah dibakukan (gunung-malam.webp): gunungnya digelapkan
-   dengan rumus yang sama persis dengan filter di atas, tapi cahaya
-   lilinnya ditambahkan kembali utuh sesudahnya.
+   Untuk lapisan gunung, filter itu tidak dipakai sama sekali. Malamnya
+   adalah GAMBAR TERSENDIRI yang dilukis pemiliknya — langit berbintang,
+   bulan purnama, salju kena cahaya bulan — bukan foto senja yang
+   digelapkan. Dua percobaan sebelumnya (menggelapkan lewat filter, lalu
+   menempelkan lilin bertopeng di atasnya) sudah dibuang; keduanya
+   menghasilkan malam palsu yang cuma redup.
 
-   KENAPA GAMBAR UTUH, BUKAN TEMPELAN LILIN BERTOPENG. Versi bertopeng
-   sempat dicoba dan terlihat ngeblur dibanding senja. Sebabnya bukan
-   tepi topengnya, tapi caranya: piksel setengah-tembus membawa warna
-   gunung TERANG lalu menggantikan gunung gelap di bawahnya, jadi tiap
-   lilin dapat cincin kabut. Menambahkan cahaya tidak punya masalah itu —
-   di luar lilin yang ditambahkan nol, dan nol tidak meninggalkan tepi.
+   SATU HAL YANG WAJIB DIJAGA KALAU GAMBARNYA DIGANTI LAGI: ukurannya
+   harus 1284x1225, sama persis dengan gunung-lilin.webp. object-fit:
+   cover memotong menurut perbandingan sisi, jadi rasio yang berbeda
+   membuat kedua suasana terpotong berbeda pula — dan gunungnya meloncat
+   saat tombolnya ditekan. Sumber aslinya utuh di vault,
+   Aset/parallax/editan-malam.png (1287x1222, dipotong 3 px mendatar).
+
+   Penjajarannya diperiksa, bukan diandaikan: korelasi tepi mencari
+   geseran terbaik dan menemukannya di 0 x -2 px. Punggung gunungnya
+   memang jatuh di tempat yang sama, jadi peralihannya terbaca sebagai
+   matahari terbenam, bukan sebagai gambar yang berganti.
 
    Dua kelas dipakai pada pemilih di bawah (bukan sekadar urutan tulis)
    supaya ia menang kekhususan atas aturan malam di atas. Kalau

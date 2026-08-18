@@ -94,28 +94,21 @@ export function ParallaxComponent() {
           <div data-parallax-layers className="parallax__layers">
             <img src="/parallax/langit.webp" loading="eager" width="800" data-parallax-layer="1" alt="" className="parallax__layer-img" />
             <img src="/parallax/gunung-lilin.webp" loading="eager" width="800" data-parallax-layer="2" alt="" className="parallax__layer-img" />
-            {/* Gunung versi malam, gambar utuh — bukan tempelan lilin bertopeng.
-                Percobaan pertama memang begitu, dan hasilnya terlihat ngeblur
-                dibanding senja: piksel setengah-tembus di tepi lilin membawa
-                warna gunung TERANG, lalu MENGGANTIKAN gunung gelap di bawahnya,
-                jadi tiap lilin dapat cincin kabut.
-
-                Gambar ini dibakukan dengan cara yang berbeda: cahaya lilin
-                dipisahkan dulu dari gunungnya, gunungnya digelapkan, lalu
-                cahaya itu DITAMBAHKAN kembali utuh. Menambah, bukan mengganti —
-                dan karena di luar lilin yang ditambahkan nol, tidak ada tepi
-                topeng yang bisa terlihat sama sekali.
+            {/* Malam adalah gambar tersendiri yang dilukis pemiliknya, bukan
+                foto senja yang digelapkan. Bulan purnama, langit berbintang,
+                salju kena cahaya bulan — hal-hal yang tidak akan pernah keluar
+                dari sebuah filter, sekeras apa pun fotonya digelapkan.
 
                 Lapisannya tetap "2" supaya GSAP menggerakkannya dengan yPercent
                 yang sama seperti gunung di bawahnya; keduanya tidak pernah
                 bergeser satu sama lain saat digulir.
 
                 fetchPriority rendah, tapi tetap eager: pada bukaan pertama ia
-                50 kB yang belum tentu dipakai, jadi ia tidak boleh berebut jalur
-                dengan tiga gambar yang memang langsung tampil. Menunda muatnya
-                sampai tombolnya ditekan lebih hemat lagi — tapi itu menukar
-                penghematan sekali dengan kedipan setiap kali beralih, dan
-                pertukaran itu tidak sepadan. */}
+                64 kB yang belum tentu dipakai, jadi ia tidak boleh berebut
+                jalur dengan tiga gambar yang memang langsung tampil. Menunda
+                muatnya sampai tombolnya ditekan lebih hemat lagi — tapi itu
+                menukar penghematan sekali dengan kedipan setiap kali beralih,
+                dan pertukaran itu tidak sepadan. */}
             <img src="/parallax/gunung-malam.webp" loading="eager" fetchPriority="low" width="800" data-parallax-layer="2" alt="" className="parallax__layer-img parallax__layer-malam" />
             <div data-parallax-layer="3" className="parallax__layer-title">
               <h2 className="parallax__title">Jadi Trader</h2>
