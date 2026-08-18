@@ -8,48 +8,6 @@ import Lenis from '@studio-freight/lenis';
 import './parallax-scrolling.css';
 import { LogoJT } from '@/components/logo-jt';
 
-/* ── LILIN DI PUNGGUNG GUNUNG ────────────────────────────────────────────
-   Deret TETAP, bukan acak. Dekorasi yang berubah tiap kali halaman dimuat
-   terbaca seperti data sungguhan yang sedang salah — dan bentuknya tidak
-   bisa ditinjau desainnya kalau tiap kali dilihat ia berbeda.
-
-   Bentuk deretnya sengaja meniru punggungan di belakangnya: naik panjang
-   ke puncak sekitar tengah, lalu surut. Ia BUKAN data harga dan tidak
-   berpura-pura begitu; ini bagian dari gambar, bukan grafik.
-   ──────────────────────────────────────────────────────────────────────── */
-/* Deret naik panjang lalu surut, meniru punggungan di belakangnya.
-   Lima puluh enam langkah, bukan dua puluh delapan: pada lebar layar penuh
-   jumlah yang sedikit membuat jarak antar lilin menganga dan ia terbaca
-   sebagai titik-titik, bukan sebagai pasar. */
-const LANGKAH = [
-  2, 3, -1, 2, 4, -2, 3, 2, -1, 4, 2, -2, 5, 3,
-  -1, 2, 4, -3, 3, 5, -2, 2, 4, -1, 3, 2, -3, 4,
-  -2, 3, -4, 1, -3, -5, 2, -4, -2, -5, 1, -3, -4, -2,
-  -5, 1, -4, -3, -5, 2, -4, -6, 1, -3, -5, -2, -4, -3,
-];
-
-const LILIN = (() => {
-  /* Batas 6..54 dalam satuan viewBox setinggi 62 — menyisakan ruang untuk
-     sumbu di kedua ujung tanpa terpotong. */
-  let tinggi = 18;
-  return LANGKAH.map((d, i) => {
-    const buka = tinggi;
-    tinggi = Math.max(6, Math.min(54, tinggi + d));
-    const tutup = tinggi;
-    /* Sumbu sebanding besar batangnya — lilin bersumbu sama panjang untuk
-       badan besar dan kecil terbaca sebagai pola cetakan, bukan pasar. */
-    const sumbu = Math.abs(d) * 0.6 + 1.2;
-    return {
-      i,
-      atasBadan: Math.max(buka, tutup),
-      tinggiBadan: Math.max(1.1, Math.abs(tutup - buka)),
-      sumbuAtas: Math.max(buka, tutup) + sumbu,
-      sumbuBawah: Math.min(buka, tutup) - sumbu,
-      naik: tutup >= buka,
-    };
-  });
-})();
-
 export function ParallaxComponent() {
   const parallaxRef = useRef<HTMLDivElement>(null);
   /* Senja = keadaan bawaan, dan itu keputusan pemiliknya: fotonya memang
@@ -132,30 +90,6 @@ export function ParallaxComponent() {
             <img src="https://cdn.prod.website-files.com/671752cd4027f01b1b8f1c7f/6717795b4d5ac529e7d3a562_osmo-parallax-layer-2.webp" loading="eager" width="800" data-parallax-layer="2" alt="" className="parallax__layer-img" />
             <div data-parallax-layer="3" className="parallax__layer-title">
               <h2 className="parallax__title">Jadi Trader</h2>
-            </div>
-            {/* Lilin duduk DI ANTARA gunung dan latar depan, dan ikut
-                lapisan 2 supaya ia bergerak bersama punggungan — bukan
-                mengambang sendiri di depan seluruh gambar. */}
-            <div data-parallax-layer="2" className="parallax__candles" aria-hidden="true">
-              {/* preserveAspectRatio="none" meregangkan gambar mendatar jauh
-                  lebih besar daripada tegak (sekitar 5x lawan 1,4x di layar
-                  lebar). Karena itu lebar badan ditulis KECIL dalam satuan
-                  viewBox — 2,4 satuan menjadi sekitar 12 px di layar. Ditulis
-                  dengan angka yang terlihat wajar di viewBox, hasilnya batang
-                  gepeng selebar tiga kali tingginya. */}
-              <svg viewBox="0 0 280 62" preserveAspectRatio="none" className="parallax__candles-svg">
-                {LILIN.map((c) => {
-                  const x = c.i * 5 + 2.5;
-                  const y = (v: number) => 62 - v;
-                  return (
-                    <g key={c.i} className={c.naik ? 'naik' : 'turun'}>
-                      <line x1={x} x2={x} y1={y(c.sumbuAtas)} y2={y(c.sumbuBawah)}
-                            vectorEffect="non-scaling-stroke" />
-                      <rect x={x - 1.2} width="2.4" y={y(c.atasBadan)} height={c.tinggiBadan} />
-                    </g>
-                  );
-                })}
-              </svg>
             </div>
             <img src="https://cdn.prod.website-files.com/671752cd4027f01b1b8f1c7f/6717795bb5aceca85011ad83_osmo-parallax-layer-1.webp" loading="eager" width="800" data-parallax-layer="4" alt="" className="parallax__layer-img" />
           </div>
