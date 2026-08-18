@@ -1728,12 +1728,46 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
      layar penuh dengan Esc jauh lebih sering daripada dengan menekan
      tombolnya lagi, dan state yang cuma di-toggle tombol akan tertinggal
      menyala sesudah Esc. */
-  const [layarPenuh, setLayarPenuh] = useState(false);
+  const [penuhAsli, setPenuhAsli] = useState(false);
+
+  /* ── LAYAR PENUH SEMU, untuk peramban yang tidak punya yang asli ──────
+     iOS Safari TIDAK mendukung Element.requestFullscreen sama sekali —
+     satu-satunya yang bisa layar penuh di sana adalah elemen <video>.
+     Pemanggilannya tidak melempar galat dan tidak mencetak apa pun; ia
+     cuma tidak terjadi. Dari sisi pengguna: tombolnya ditekan, tidak ada
+     yang bergerak, dan tidak ada yang bisa dilaporkan.
+
+     Karena itu ada mode semu: kartunya dipasang `fixed inset-0` sehingga
+     menutupi viewport. Bukan layar penuh sungguhan — bilah alamat Safari
+     tetap ada — tapi ia memberi yang sebenarnya dicari orang di HP, yaitu
+     chart selebar dan setinggi mungkin.
+
+     Dipakai juga sebagai jaring pengaman di peramban yang PUNYA API-nya
+     tapi menolak permintaannya (izin, kebijakan iframe). */
+  const [penuhSemu, setPenuhSemu] = useState(false);
+  const layarPenuh = penuhAsli || penuhSemu;
+
   useEffect(() => {
-    const ubah = () => setLayarPenuh(document.fullscreenElement === kartuChart.current);
+    const ubah = () => setPenuhAsli(document.fullscreenElement === kartuChart.current);
     document.addEventListener('fullscreenchange', ubah);
     return () => document.removeEventListener('fullscreenchange', ubah);
   }, []);
+
+  /* Esc tetap harus bekerja di mode semu — orang sudah terbiasa, dan mode
+     yang cuma bisa ditutup lewat satu tombol kecil terasa seperti jebakan.
+     Gulir halaman dikunci selama menyala: tanpa itu halaman di BELAKANG
+     ikut bergulir saat orang menggeser chart. */
+  useEffect(() => {
+    if (!penuhSemu) return;
+    const tekan = (e: KeyboardEvent) => { if (e.key === 'Escape') setPenuhSemu(false); };
+    document.addEventListener('keydown', tekan);
+    const asal = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', tekan);
+      document.body.style.overflow = asal;
+    };
+  }, [penuhSemu]);
   /* Tinggi kanvas saat layar penuh = tinggi jendela dikurangi bilah kendali
      yang IKUT tampil di atasnya. Bilahnya diukur, bukan ditaksir: isinya
      membungkus jadi dua baris di jendela sempit, dan angka tetap akan
@@ -1762,9 +1796,20 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
        membuang semuanya memaksa keluar-masuk tiap kali ganti timeframe. */
     const el = kartuChart.current;
     if (!el) return;
-    if (document.fullscreenElement) void document.exitFullscreen();
-    else void el.requestFullscreen?.().catch(() => { /* ditolak browser — biarkan */ });
-  }, []);
+
+    if (penuhSemu) { setPenuhSemu(false); return; }
+    if (document.fullscreenElement) { void document.exitFullscreen(); return; }
+
+    /* Dicek DULU, bukan dicoba lalu ditangkap: di iOS Safari
+       requestFullscreen tidak ada sama sekali, jadi `?.()` menghasilkan
+       undefined tanpa melempar apa pun — tidak ada yang bisa ditangkap,
+       dan tombolnya diam. */
+    if (document.fullscreenEnabled && typeof el.requestFullscreen === 'function') {
+      void el.requestFullscreen().catch(() => setPenuhSemu(true));
+      return;
+    }
+    setPenuhSemu(true);
+  }, [penuhSemu]);
 
   const tinggiChart = layarPenuh && tinggiLayarPenuh
     ? tinggiLayarPenuh
@@ -1890,9 +1935,15 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
       {/* Pembungkus ber-ref: Panel komponen fungsi tanpa forwardRef, jadi
           ref tidak bisa dipasang langsung padanya. Div ini yang dinaikkan
           ke layar penuh, dan ia memuat bilah kendali beserta grafiknya. */}
-      <div ref={kartuChart} className={cn(layarPenuh && 'bg-zinc-950 p-1.5')}>
+      <div ref={kartuChart}
+           className={cn(layarPenuh && 'bg-zinc-950 p-1.5',
+                         penuhSemu && 'fixed inset-0 z-50 overflow-y-auto')}>
       <Panel>
-        <div ref={bilahChart} className="flex flex-wrap items-end gap-3 p-4">
+        {/* `relative`: jangkar bagi panel News dan menu Indikator di HP.
+            Keduanya dilepas dari tombolnya di layar kecil dan digantung
+            ke bilah ini, supaya lebarnya mengikuti bilah dan tidak bisa
+            keluar layar berapa pun posisi tombol pemicunya. */}
+        <div ref={bilahChart} className="relative flex flex-wrap items-end gap-3 p-4">
           <div className="min-w-[168px]">
             <label className="mb-1 block text-[11px] text-zinc-500">Simbol</label>
             {/* Diketik dulu, DIKOMIT belakangan.
@@ -1983,7 +2034,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                 bertambah; menu tumbuh ke bawah, bilah kendali tidak. Skrip
                 Pine yang pernah dijalankan ikut terdaftar di sini dan
                 diingat — memasangnya kembali satu klik, bukan tempel-ulang. */}
-            <div className="relative">
+            <div className="static sm:relative">
               <button onClick={() => setMenuInd((v) => !v)}
                 title="Indikator"
                 className={cn('flex cursor-pointer items-center gap-1.5 rounded-md border px-2 py-1.5 text-[12px] transition-colors sm:px-2.5',
@@ -2000,7 +2051,9 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
               {menuInd && (
                 <>
                   <div className="fixed inset-0 z-30" onClick={() => setMenuInd(false)} />
-                  <div className="absolute right-0 top-full z-40 mt-1 w-72 rounded-lg border border-zinc-800 bg-zinc-950 p-1.5 shadow-2xl">
+                  {/* Sama seperti panel News: inset-x-0 di HP supaya
+                      lebarnya mengikuti bilah, right-0 w-72 di layar lebar. */}
+                  <div className="absolute inset-x-0 top-full z-40 mt-1 w-auto rounded-lg border border-zinc-800 bg-zinc-950 p-1.5 shadow-2xl sm:inset-x-auto sm:right-0 sm:w-72">
                     <div className="px-2 pb-1 pt-0.5 text-[10px] font-medium uppercase tracking-wider text-zinc-600">Bawaan</div>
                     <label className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors hover:bg-zinc-900">
                       <input type="checkbox" checked={tampilSnr} onChange={(e) => setTampilSnr(e.target.checked)}
@@ -2198,6 +2251,20 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                           bagikanFoto={(ambil) => { ambilFoto.current = ambil; }}
                           pojok={aksi ? (
                             <PojokOrder
+                              /* Membuka tiket order melebarkan chart — DI HP SAJA.
+                                 Tiket ini menutupi hampir seluruh grafik di layar
+                                 375 px, dan menyusun SL sambil tidak bisa melihat
+                                 lilinnya adalah cara tercepat menaruhnya di tempat
+                                 yang salah. Di layar lebar keduanya sudah muat
+                                 berdampingan, jadi memaksa layar penuh di sana cuma
+                                 merebut kendali yang tidak perlu direbut.
+
+                                 Kliknya sendiri yang jadi izin: permintaan layar
+                                 penuh hanya diterima peramban kalau datang dari
+                                 gerakan pengguna, dan ini memang gerakan itu. */
+                              onBuka={() => {
+                                if (window.innerWidth < 640 && !layarPenuh) gantiLayarPenuh();
+                              }}
                               posisi={aksi.posisi} hargaKini={aksi.hargaKini}
                               draf={draf} rencana={rencana} mode={aksi.mode}
                               jenis={labelJenis} risiko={aksi.risiko} qtyDemo={qtyTampil}

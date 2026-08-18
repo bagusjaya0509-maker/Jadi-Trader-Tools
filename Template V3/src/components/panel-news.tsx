@@ -225,7 +225,7 @@ export function PanelNews() {
   }, [buka, perHari]);
 
   return (
-    <div className="relative" ref={kotak}>
+    <div className="static sm:relative" ref={kotak}>
       <button
         onClick={() => setBuka((v) => !v)}
         title={berikut
@@ -249,7 +249,18 @@ export function PanelNews() {
       {buka && (
         <>
           <div className="fixed inset-0 z-30" onClick={() => setBuka(false)} />
-          <div className="absolute right-0 top-full z-40 mt-1 flex max-h-[70vh] w-[min(92vw,380px)] flex-col overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950 shadow-2xl">
+          {/* MOBILE: dilepas dari tombolnya, digantung ke BILAH.
+             Dulu `absolute right-0` — digantung ke tepi kanan tombol
+             pemicunya. Tombol ini duduk di tengah bilah, jadi panel
+             selebar ~300 px memanjang KE KIRI dan separuhnya keluar
+             layar di HP: yang terbaca cuma potongan kalimat.
+
+             `static sm:relative` pada pembungkus membuat panelnya
+             berhitung terhadap bilah kendali (yang kini `relative`),
+             bukan terhadap tombol. inset-x-0 lalu membuatnya selebar
+             bilah itu — tidak bisa keluar layar, berapa pun posisi
+             tombolnya. Di layar lebar semuanya kembali seperti semula. */}
+          <div className="absolute inset-x-0 top-full z-40 mt-1 flex max-h-[70vh] w-auto flex-col overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950 shadow-2xl sm:inset-x-auto sm:right-0 sm:w-[min(92vw,380px)]">
             <div className="flex items-center gap-2 border-b border-zinc-800 px-3.5 py-2.5">
               <Newspaper className="size-3.5 text-zinc-400" />
               <span className="text-[12.5px] font-medium text-zinc-200">Kalender Ekonomi</span>

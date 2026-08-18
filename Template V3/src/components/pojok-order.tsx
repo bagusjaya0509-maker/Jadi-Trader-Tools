@@ -123,8 +123,13 @@ export function PojokOrder({
   posisi, hargaKini, draf, rencana, mode, jenis, risiko, tunda, onBatalTunda, onKirimSinyal, kabarSinyal, dariSinyal, onGantiCopy,
   onPilih, onUbah, onKirim, onBatal, onTutup, onGantiMode, mati,
   nyataSetelan, aturNyata, sibukNyata, kabar, demoSetelan, aturDemo,
-  catatan, aturCatatan, qtyDemo, mt5, lotMt5, aturLotMt5, nilaiLotMt5, desimalHarga = 6,
+  catatan, aturCatatan, qtyDemo, mt5, lotMt5, aturLotMt5, nilaiLotMt5, desimalHarga = 6, onBuka,
 }: {
+  /** Dipanggil saat panelnya DIBUKA (bukan ditutup). Halaman memakainya
+   *  untuk melebarkan chart di layar kecil — tiket ini menutupi hampir
+   *  seluruh grafik di HP, dan menyusun order sambil tidak bisa melihat
+   *  lilinnya adalah cara paling cepat salah menaruh SL. */
+  onBuka?: () => void;
   posisi: { arah: 'BUY' | 'SELL'; masuk: number; sl: number; tp: number; pnl: number; risiko: number; unit: number } | null;
   hargaKini?: number;
   /** Label jenis order hasil letak garis entry: "Market", "Buy Limit", dst. */
@@ -198,6 +203,10 @@ export function PojokOrder({
   function aturTutup(v: boolean) {
     setTutupPanel(v);
     try { localStorage.setItem(KUNCI_TUTUP, v ? '1' : '0'); } catch { /* privat */ }
+    /* Hanya saat DIBUKA. Menutup panel tidak boleh ikut mengubah ukuran
+       chart — orang menutupnya justru supaya bisa melihat grafik apa
+       adanya, dan memaksa layar penuh di saat itu melawan maksudnya. */
+    if (!v) onBuka?.();
   }
 
   /* ── Lencana mode ─────────────────────────────────────────────────────
