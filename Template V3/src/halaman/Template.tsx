@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import type { LucideIcon } from 'lucide-react';
@@ -426,6 +426,24 @@ const WordmarkIcon = ({ className }: { className?: string }) => (
 );
 
 export default function Template() {
+  /* ── HALAMAN DEPAN SELALU GELAP ──────────────────────────────────────
+     Tema terang milik aplikasi setelah login, bukan halaman jualan ini:
+     hero-nya foto gunung malam, featuresgrid-nya hitam pekat, dan
+     keduanya memang dirancang gelap. Pengguna yang sudah memilih tema
+     terang lalu membuka halaman ini akan melihat teks putih di atas
+     putih — bukan karena temanya salah, tapi karena halaman ini tidak
+     pernah ikut temanya.
+
+     Pilihannya TIDAK dihapus, cuma dilepas selama halaman ini terpasang
+     dan dipasang lagi saat ditinggalkan. Menghapusnya berarti orang
+     kehilangan preferensinya cuma karena mampir ke halaman depan. */
+  useEffect(() => {
+    const akar = document.documentElement;
+    const sebelumnya = akar.getAttribute('data-tema');
+    if (sebelumnya) akar.removeAttribute('data-tema');
+    return () => { if (sebelumnya) akar.setAttribute('data-tema', sebelumnya); };
+  }, []);
+
   return (
     <div className="flex min-h-screen w-full flex-col overflow-y-auto bg-background text-foreground">
       <Header />

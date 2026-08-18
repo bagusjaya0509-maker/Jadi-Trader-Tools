@@ -208,11 +208,11 @@ export default function Pemilik() {
           ) : (
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={perBulan} margin={{ top: 8, right: 12, left: 8, bottom: 0 }}>
-                <CartesianGrid vertical={false} stroke="rgba(255,255,255,.05)" />
+                <CartesianGrid vertical={false} stroke="currentColor" strokeOpacity={0.09} />
                 <XAxis dataKey="bulan" tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} width={44}
                        tickFormatter={(v) => `$${v}`} />
-                <Tooltip content={<TipGrafik />} cursor={{ fill: 'rgba(255,255,255,.04)' }} />
+                <Tooltip content={<TipGrafik />} cursor={{ fill: 'currentColor', fillOpacity: 0.06 }} />
                 <Bar dataKey="nilai" name="Penjualan" fill="#10b981" fillOpacity={0.8} radius={[3, 3, 0, 0]} maxBarSize={26} />
               </BarChart>
             </ResponsiveContainer>

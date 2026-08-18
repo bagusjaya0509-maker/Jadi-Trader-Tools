@@ -5,6 +5,7 @@ import {
   Wallet, TrendingUp, Wrench, CreditCard, LifeBuoy, BookOpen,
   PanelLeft, Bell, Mail, X, Sparkles, MessageCircle, Send, AtSign,
   AlertTriangle, Newspaper, ChevronRight, ChevronDown, Copy, Radar, UserCircle2, Crown,
+  Sun, Moon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BADAN, WA_LINK } from '@/lib/badan';
@@ -233,6 +234,55 @@ function useSudahDibaca(kunci: string, id: string[]) {
   return { belum, tandai };
 }
 
+/* ── Pemindah tema gelap ↔ terang ────────────────────────────────────────
+   Atributnya dipasang di <html>, BUKAN di kerangka ini. Alasannya bukan
+   selera: modal-modal aplikasi diportal ke <body> (lihat catatan portal di
+   Analisa.tsx), jadi kalau atributnya menempel di kerangka, tiap dialog
+   yang terbuka akan lompat balik ke tema gelap sementara halaman di
+   belakangnya terang.
+
+   DISIMPAN di localStorage, dan di sini itu memang pantas — beda dengan
+   pemindah suasana di hero halaman depan yang sengaja tidak diingat. Ini
+   preferensi alat kerja: orang yang memilih terang karena ruangannya
+   silau tidak mau memilih ulang tiap kali membuka aplikasinya.
+
+   Pembacaan awal dilakukan di useState, bukan useEffect, supaya temanya
+   sudah benar pada gambar pertama — useEffect berjalan SESUDAH render, dan
+   itu berarti satu kedipan gelap sebelum berubah terang. */
+type Tema = 'gelap' | 'terang';
+
+function bacaTema(): Tema {
+  try { return localStorage.getItem('jt.tema') === 'terang' ? 'terang' : 'gelap'; }
+  catch { return 'gelap'; }
+}
+
+function TombolTema() {
+  const [tema, setTema] = useState<Tema>(bacaTema);
+
+  useEffect(() => {
+    const akar = document.documentElement;
+    if (tema === 'terang') akar.setAttribute('data-tema', 'terang');
+    else akar.removeAttribute('data-tema');
+    try { localStorage.setItem('jt.tema', tema); } catch { /* mode privat */ }
+  }, [tema]);
+
+  const keTerang = tema === 'gelap';
+  return (
+    <button
+      onClick={() => setTema(keTerang ? 'terang' : 'gelap')}
+      title={keTerang ? 'Ganti ke tema terang' : 'Ganti ke tema gelap'}
+      aria-label={keTerang ? 'Ganti ke tema terang' : 'Ganti ke tema gelap'}
+      className="cursor-pointer text-zinc-400 transition-colors hover:text-zinc-100"
+    >
+      {/* Lambangnya menunjukkan TUJUAN, bukan keadaan sekarang — sama
+          seperti pemindah suasana di halaman depan, supaya dua tombol di
+          satu produk tidak berbicara dengan dua bahasa berbeda. */}
+      {keTerang ? <Sun className="size-[18px]" strokeWidth={1.8} />
+                : <Moon className="size-[18px]" strokeWidth={1.8} />}
+    </button>
+  );
+}
+
 function Lonceng() {
   const [buka, setBuka] = useState(false);
   const ref = usePenutupLuar<HTMLDivElement>(() => setBuka(false));
@@ -385,7 +435,7 @@ function Pesan() {
       >
         <Mail className="size-[18px]" strokeWidth={1.8} />
         {totalBelum > 0 && (
-          <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white">
+          <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-[#fff]">
             {totalBelum}
           </span>
         )}
@@ -658,7 +708,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       <span className="relative shrink-0">
                         <Ikon className="size-4" strokeWidth={1.8} />
                         {ke === '/maintenance' && lisensiBaru > 0 && (
-                          <span className="absolute -left-1.5 -top-1 flex min-w-[15px] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-semibold leading-[15px] text-white">
+                          <span className="absolute -left-1.5 -top-1 flex min-w-[15px] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-semibold leading-[15px] text-[#fff]">
                             {lisensiBaru > 9 ? '9+' : lisensiBaru}
                           </span>
                         )}
@@ -755,6 +805,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="ml-auto flex items-center gap-3">
+            <TombolTema />
             <Pesan />
             <Lonceng />
             <MenuPengguna />

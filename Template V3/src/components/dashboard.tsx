@@ -289,7 +289,7 @@ export function Dashboard() {
           <div className="h-[220px] px-2 pb-4 sm:h-[260px]">
             <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <BarChart data={perBulan} margin={{ top: 8, right: 12, left: 4, bottom: 0 }}>
-                <CartesianGrid vertical={false} stroke="rgba(255,255,255,.05)" />
+                <CartesianGrid vertical={false} stroke="currentColor" strokeOpacity={0.09} />
                 <XAxis dataKey="bulan" tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} width={44}
                        tickFormatter={(v) => `$${v}`} />
@@ -297,7 +297,7 @@ export function Dashboard() {
                     Trade-Fi + Kripto; kalender di halaman Jurnal menampilkan
                     satu jurnal saja. Keduanya benar — dan tanpa rincian yang
                     bisa dibaca, selisihnya terbaca sebagai angka yang salah. */}
-                <Tooltip cursor={{ fill: 'rgba(255,255,255,.04)' }} content={<TipBulan />} />
+                <Tooltip cursor={{ fill: 'currentColor', fillOpacity: 0.06 }} content={<TipBulan />} />
                 {/* Warna batang mengikuti tanda P/L — bulan rugi tidak boleh
                     terlihat sama dengan bulan untung hanya karena tingginya
                     kebetulan mirip. */}
@@ -322,18 +322,18 @@ export function Dashboard() {
           <div className="h-[220px] px-2 pb-4 sm:h-[260px]">
             <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <LineChart data={kurvaSaldo} margin={{ top: 8, right: 12, left: 4, bottom: 0 }}>
-                <CartesianGrid vertical={false} stroke="rgba(255,255,255,.05)" />
+                <CartesianGrid vertical={false} stroke="currentColor" strokeOpacity={0.09} />
                 <XAxis dataKey="label" tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} minTickGap={20} />
                 <YAxis tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} width={44}
                        tickFormatter={(v) => `$${v}`} domain={['dataMin - 10', 'dataMax + 10']} />
-                <Tooltip content={<TipGrafik />} cursor={{ stroke: 'rgba(255,255,255,.12)' }} />
+                <Tooltip content={<TipGrafik />} cursor={{ stroke: 'currentColor', strokeOpacity: 0.22 }} />
                 {/* Bulan lalu digambar DULU supaya garis bulan ini ada di
                     atasnya — yang sedang berjalan adalah yang dibaca. */}
                 {adaBulanLalu && (
                   <Line type="monotone" dataKey="lalu" name="Bulan lalu" stroke="#71717a" strokeWidth={1.4}
                         strokeDasharray="4 4" dot={false} connectNulls />
                 )}
-                <Line type="monotone" dataKey="ini" name="Bulan ini" stroke="#fafafa" strokeWidth={1.8}
+                <Line type="monotone" dataKey="ini" name="Bulan ini" stroke="currentColor" strokeWidth={1.8}
                       dot={false} connectNulls />
               </LineChart>
             </ResponsiveContainer>

@@ -195,3 +195,138 @@ body {
    batang abu-abu di panel 190 px lebih berisik daripada isinya. */
 .gulir-senyap { scrollbar-width: none; }
 .gulir-senyap::-webkit-scrollbar { display: none; }
+
+/* ════════════════════════════════════════════════════════════════════════
+   TEMA TERANG
+   ════════════════════════════════════════════════════════════════════════
+   Catatan lama di kepala berkas ini berkata "tidak ada mode terang". Itu
+   benar untuk masanya. Sekarang ada, dan cara memasangnya sengaja dipilih
+   supaya kalimat berikutnya bisa dijamin, bukan sekadar dijanjikan:
+
+     TEMA GELAP TIDAK BISA RUSAK OLEH BERKAS INI.
+
+   Seluruh nilai terang hidup di dalam satu pemilih, [data-tema='terang'].
+   Selama atribut itu tidak dipasang di <html>, tidak ada satu pun deklarasi
+   di bawah yang aktif — bukan "tertimpa nilai gelap", melainkan tidak
+   pernah ikut dihitung. Menghapus blok ini mengembalikan keadaan lama
+   persis seperti semula.
+
+   ── KENAPA VARIABEL, BUKAN MENGGANTI 2.670 KELAS ──────────────────────
+   Diukur sebelum dikerjakan: ada 2.670 kelas warna zinc di 63 berkas.
+   Menggantinya satu per satu bukan pekerjaan yang masuk akal, dan tiap
+   gantian adalah peluang merusak tema gelap.
+
+   Tailwind v4 menyusun utilitasnya sebagai variabel, bukan hex mati:
+
+       .bg-zinc-950 { background-color: var(--color-zinc-950) }
+
+   Jadi mendefinisikan ulang variabelnya membalik seluruh aplikasi
+   sekaligus, tanpa satu pun berkas komponen disentuh.
+
+   ── KENAPA SLATE, BUKAN ABU-ABU NETRAL ────────────────────────────────
+   Permintaannya "putih hitam biru". Slate adalah abu-abu yang condong
+   biru, jadi warna dasarnya membawa biru itu tanpa satu komponen pun
+   diberi kelas biru. Birunya ada di seluruh permukaan, bukan ditempel.
+
+   ── KENAPA PUTIH IKUT DIBALIK ─────────────────────────────────────────
+   Dihitung: 58 hover:bg-white dan 33 bg-white, hampir semuanya berpasangan
+   dengan `bg-zinc-100 text-zinc-950` — itu TOMBOL UTAMA, bukan putih
+   harfiah. "Putih" di aplikasi gelap berarti "permukaan paling terang",
+   dan lawannya di tema terang adalah yang paling gelap. Sisanya, 22
+   text-white yang duduk di atas warna pekat, diperbaiki satu per satu —
+   itu memang putih sungguhan.
+   ════════════════════════════════════════════════════════════════════════ */
+
+[data-tema='terang'] {
+  /* Memberi tahu peramban: batang gulir, kolom isian bawaan, dan menu
+     jatuh milik sistem ikut terang. Tanpa ini semuanya tetap gelap dan
+     terlihat seperti sisa yang lupa diganti. */
+  color-scheme: light;
+
+  /* ── Tangga zinc, dibalik ujung ke ujung ─────────────────────────────
+     zinc-950 dulu latar halaman, sekarang putih. zinc-100 dulu teks
+     paling terang, sekarang teks paling gelap. Yang di tengah mengikuti.
+
+     zinc-100 (#1e293b) dan white (#0f172a) sengaja TIDAK sama: pasangan
+     `bg-zinc-100 hover:bg-white` harus tetap punya beda saat disentuh —
+     di tema gelap ia menuju lebih terang, di sini menuju lebih gelap. */
+  --color-zinc-950: #ffffff;
+  --color-zinc-900: #f8fafc;
+  --color-zinc-800: #e2e8f0;
+  --color-zinc-700: #cbd5e1;
+  --color-zinc-600: #94a3b8;
+  --color-zinc-500: #64748b;
+  --color-zinc-400: #475569;
+  --color-zinc-300: #334155;
+  --color-zinc-200: #273449;
+  --color-zinc-100: #1e293b;
+  --color-zinc-50:  #0f172a;
+
+  --color-white: #0f172a;
+  --color-black: #ffffff;
+
+  /* ── Aksen: warnanya tetap, terangnya turun ──────────────────────────
+     Hijau dan merah TIDAK boleh bertukar arti — hijau tetap untung, merah
+     tetap rugi. Yang berubah cuma kepekatannya: emerald-400 (#34d399)
+     dipilih agar terbaca di atas hitam, dan di atas putih ia nyaris
+     hilang. Nilai di bawah adalah saudara yang lebih tua di tangga yang
+     sama, bukan warna lain. */
+     Daftar di bawah TIDAK ditebak: tiap corak yang benar-benar dipakai di
+     src dihitung dulu, lalu ditimpa semuanya. Percobaan pertama cuma
+     menimpa 300/400/500 dan `text-sky-200` lolos — rasionya jatuh ke 1,33,
+     nyaris tak terbaca. Corak yang terlewat satu saja langsung terlihat.
+
+     Yang berakhiran alfa (bg-emerald-500/10, border-red-400/30) TIDAK perlu
+     diurus terpisah: sepersepuluh warna di atas putih tetap jadi rona muda,
+     sama seperti di atas hitam. Yang bermasalah cuma warna pekat. */
+  --color-emerald-100: #065f46;
+  --color-emerald-200: #047857;
+  --color-emerald-300: #059669;
+  --color-emerald-400: #059669;
+  --color-emerald-500: #047857;
+  --color-emerald-600: #065f46;
+  --color-green-400: #16a34a;
+  --color-green-500: #15803d;
+  --color-red-200: #b91c1c;
+  --color-red-300: #dc2626;
+  --color-red-400: #dc2626;
+  --color-red-500: #b91c1c;
+  --color-rose-300: #e11d48;
+  --color-rose-400: #e11d48;
+  --color-rose-500: #be123c;
+  --color-amber-100: #78350f;
+  --color-amber-200: #92400e;
+  --color-amber-300: #b45309;
+  --color-amber-400: #a16207;
+  --color-amber-500: #854d0e;
+  --color-sky-100: #075985;
+  --color-sky-200: #0369a1;
+  --color-sky-300: #0284c7;
+  --color-sky-400: #0284c7;
+  --color-sky-500: #0369a1;
+  --color-indigo-400: #4f46e5;
+  --color-indigo-500: #4338ca;
+
+  /* ── Token semantik ──────────────────────────────────────────────────
+     Dipakai header & hero halaman Pendaratan (114 sebutan). Ditulis
+     terpisah, bukan diturunkan dari tangga di atas, karena perannya
+     memang beda: `card` boleh sedikit abu supaya panel terangkat dari
+     halaman putih, sedangkan `background` harus putih bersih. */
+  --color-background: #ffffff;
+  --color-foreground: #0f172a;
+  --color-card: #f8fafc;
+  --color-card-foreground: #0f172a;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #0f172a;
+  --color-muted: #f1f5f9;
+  --color-muted-foreground: #64748b;
+  --color-accent: #e2e8f0;
+  --color-accent-foreground: #0f172a;
+  --color-border: #e2e8f0;
+  --color-input: #cbd5e1;
+  --color-ring: #0284c7;
+  --color-primary: #1e293b;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #e2e8f0;
+  --color-secondary-foreground: #0f172a;
+}

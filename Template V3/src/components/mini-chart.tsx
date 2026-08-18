@@ -81,7 +81,7 @@ export function MiniChart({ seed, arah, zonaPada, smi }: Props) {
       })}
 
       {/* Panel SMI */}
-      <line x1={0} x2={W} y1={Hc + gap + Hs / 2} y2={Hc + gap + Hs / 2} stroke="rgba(255,255,255,.07)" strokeWidth={1} />
+      <line x1={0} x2={W} y1={Hc + gap + Hs / 2} y2={Hc + gap + Hs / 2} stroke="currentColor" strokeOpacity={0.13} strokeWidth={1} />
       <polyline points={titikSmi} fill="none" stroke="#a1a1aa" strokeWidth={1} />
       <text x={4} y={Hc + gap + 8} fill="#52525b" fontSize={7} fontFamily="IBM Plex Mono">SMI</text>
     </svg>

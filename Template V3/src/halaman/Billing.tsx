@@ -65,7 +65,7 @@ export default function Billing() {
           href={WA_LINK}
           target="_blank"
           rel="noreferrer"
-          className="flex shrink-0 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-3.5 py-2 text-[12.5px] font-medium text-white transition-colors hover:bg-emerald-500"
+          className="flex shrink-0 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-3.5 py-2 text-[12.5px] font-medium text-[#fff] transition-colors hover:bg-emerald-500"
         >
           <MessageCircle className="size-3.5" strokeWidth={2} />
           Hubungi admin

@@ -9,6 +9,7 @@ import type { TradeUji } from '@/lib/backtest';
 import type { SegmenPine, PenandaPine, KotakPine, IsianPine } from '@/lib/pine-bar';
 import { PenggambarIsi } from '@/lib/plugin-isi';
 import { PenggambarAlat, type GambarAlat, type JenisAlat } from '@/lib/plugin-alat';
+import { useTema, temaSekarang, WARNA_CHART } from '@/lib/tema';
 
 /* ════════════════════════════════════════════════════════════════════════
    CHART LILIN
@@ -195,6 +196,10 @@ export function ChartLilin({
      berubah lebar. */
   const ukurLagi = useRef<(() => void) | null>(null);
   const chart = useRef<IChartApi | null>(null);
+  /* Grafik ini KANVAS, bukan SVG — warnanya tidak ikut variabel CSS
+     seperti sisa aplikasi, jadi temanya harus dibaca dan dipasang
+     tangan. Lihat catatan lengkapnya di lib/tema.ts. */
+  const tema = useTema();
   const seri = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const seriGaris = useRef<ISeriesApi<'Line'>[]>([]);
   const penanda = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
@@ -223,19 +228,19 @@ export function ChartLilin({
     const c = createChart(kotak.current, {
       layout: {
         background: { color: 'transparent' },
-        textColor: '#a1a1aa',
+        textColor: WARNA_CHART[temaSekarang()].teks,
         fontFamily: "'IBM Plex Sans', -apple-system, sans-serif",
         fontSize: 11,
       },
       grid: {
-        vertLines: { color: 'rgba(255,255,255,.04)' },
-        horzLines: { color: 'rgba(255,255,255,.04)' },
+        vertLines: { color: WARNA_CHART[temaSekarang()].kisi },
+        horzLines: { color: WARNA_CHART[temaSekarang()].kisi },
       },
-      rightPriceScale: { borderColor: 'rgba(255,255,255,.08)' },
-      timeScale: { borderColor: 'rgba(255,255,255,.08)', timeVisible: true, secondsVisible: false },
+      rightPriceScale: { borderColor: WARNA_CHART[temaSekarang()].batasSkala },
+      timeScale: { borderColor: WARNA_CHART[temaSekarang()].batasSkala, timeVisible: true, secondsVisible: false },
       crosshair: {
-        vertLine: { color: 'rgba(255,255,255,.2)', labelBackgroundColor: '#27272a' },
-        horzLine: { color: 'rgba(255,255,255,.2)', labelBackgroundColor: '#27272a' },
+        vertLine: { color: WARNA_CHART[temaSekarang()].bidik, labelBackgroundColor: WARNA_CHART[temaSekarang()].labelBidik },
+        horzLine: { color: WARNA_CHART[temaSekarang()].bidik, labelBackgroundColor: WARNA_CHART[temaSekarang()].labelBidik },
       },
       /* autoSize BAWAAN PUSTAKA TIDAK DIPAKAI.
          Diukur langsung: saat kolom chart menyempit karena watchlist
@@ -376,6 +381,39 @@ export function ChartLilin({
     return () => window.clearTimeout(id);
   }, [kunciUkuran, tinggi]);
 
+  /* ── Warna ikut tema ──────────────────────────────────────────────
+     Dipasang lewat applyOptions, BUKAN dengan membuat ulang chartnya.
+     Membuat ulang berarti kehilangan rentang yang sedang dilihat, alat
+     gambar yang sedang terpasang, dan posisi gulir — mahal sekali untuk
+     sesuatu yang cuma pergantian warna.
+
+     Yang TIDAK ikut berubah: warna lilin naik/turun. Hijau dan merah itu
+     arti, bukan hiasan, dan keduanya sudah cukup pekat untuk terbaca di
+     atas putih maupun hitam. */
+  useEffect(() => {
+    const c = chart.current;
+    if (!c) return;
+    const w = WARNA_CHART[tema];
+    c.applyOptions({
+      layout: { textColor: w.teks },
+      grid: { vertLines: { color: w.kisi }, horzLines: { color: w.kisi } },
+      rightPriceScale: { borderColor: w.batasSkala },
+      timeScale: { borderColor: w.batasSkala },
+      crosshair: {
+        vertLine: { color: w.bidik, labelBackgroundColor: w.labelBidik },
+        horzLine: { color: w.bidik, labelBackgroundColor: w.labelBidik },
+      },
+    });
+  }, [tema]);
+
+  /* Penanda apa yang TERAKHIR digambar, dipakai memutuskan jalur cepat.
+     Disimpan di ref, bukan state: ia tidak boleh memicu render sendiri. */
+  const terakhirBatas = useRef(0);
+  const terakhirLilin = useRef<unknown>(null);
+  const terakhirBatasSmi = useRef(0);
+  const terakhirSmi = useRef<unknown>(null);
+  const terakhirLilinSmi = useRef<unknown>(null);
+
   /* Data lilin */
   useEffect(() => {
     if (!seri.current) return;
@@ -393,8 +431,36 @@ export function ChartLilin({
        Dua efek lain di bawah (garis & alat) sudah memakai pola yang sama
        persis. Efek inilah satu-satunya yang terlewat — dan karena ia yang
        memegang lilinnya, justru dialah yang paling terlihat melompat. */
-    const tampak = c?.timeScale().getVisibleRange() ?? null;
     const batas = hingga === undefined ? lilin.times.length : Math.max(1, Math.min(lilin.times.length, hingga + 1));
+
+    /* ── JALUR CEPAT: replay maju satu bar ────────────────────────────────
+       Kasus yang paling sering saat replay berjalan, dan satu-satunya yang
+       benar-benar butuh cepat. `update()` menyentuh SATU lilin; `setData`
+       menyusun ulang semuanya. Di 3000 bar bedanya bukan halus — itu selisih
+       antara replay yang mengalir dan replay yang tersendat.
+
+       Sengaja TIDAK menyimpan-memulihkan visible range di sini: yang membuat
+       chart melompat adalah setData, bukan update. Melewatinya menghilangkan
+       dua operasi tata letak lagi per tick. */
+    const jalurCepatReplay =
+      terakhirLilin.current === lilin &&
+      batas === terakhirBatas.current + 1 &&
+      batas <= lilin.times.length;
+
+    if (jalurCepatReplay) {
+      const i = batas - 1;
+      seri.current.update({
+        time: Math.floor(lilin.times[i] / 1000) as Time,
+        open: lilin.opens[i], high: lilin.highs[i], low: lilin.lows[i], close: lilin.closes[i],
+      });
+      terakhirBatas.current = batas;
+      return;
+    }
+
+    terakhirLilin.current = lilin;
+    terakhirBatas.current = batas;
+
+    const tampak = c?.timeScale().getVisibleRange() ?? null;
     seri.current.setData(lilin.times.slice(0, batas).map((t, i) => ({
       /* lightweight-charts memakai DETIK, bukan milidetik. Mengirim ms
          menaruh setiap lilin di tahun 58.000 dan sumbunya jadi kosong. */
@@ -483,7 +549,7 @@ export function ChartLilin({
     const acuan = seriSmi.current[0];
     if (acuan) {
       [50, -50].forEach((v) => acuan.createPriceLine({
-        price: v, color: 'rgba(255,255,255,.14)', lineWidth: 1, lineStyle: 2,
+        price: v, color: WARNA_CHART[temaSekarang()].garisNol, lineWidth: 1, lineStyle: 2,
         axisLabelVisible: false, title: '',
       }));
     }
@@ -496,6 +562,31 @@ export function ChartLilin({
   useEffect(() => {
     if (!smi || seriSmi.current.length < 2 || !lilin.times.length) return;
     const batas = hingga === undefined ? lilin.times.length : Math.max(1, Math.min(lilin.times.length, hingga + 1));
+
+    /* Jalur cepat yang sama dengan seri lilin: maju satu bar cuma perlu
+       menyentuh satu titik di tiap seri, bukan menyusun ulang keduanya.
+       Bobotnya sepadan dengan lilin — dua seri sepanjang data yang sama. */
+    const jalurCepatSmi =
+      terakhirSmi.current === smi &&
+      terakhirLilinSmi.current === lilin &&
+      batas === terakhirBatasSmi.current + 1;
+
+    if (jalurCepatSmi) {
+      const i = batas - 1;
+      const t = Math.floor(lilin.times[i] / 1000) as Time;
+      /* Nilai null dilewati, tidak dipaksakan: isi() memang membuangnya, dan
+         mengirim null ke update() membuat pustaka melempar. */
+      const v0 = smi.smi[i], v1 = smi.signal[i];
+      if (v0 != null && isFinite(v0)) seriSmi.current[0].update({ time: t, value: v0 });
+      if (v1 != null && isFinite(v1)) seriSmi.current[1].update({ time: t, value: v1 });
+      terakhirBatasSmi.current = batas;
+      return;
+    }
+
+    terakhirSmi.current = smi;
+    terakhirLilinSmi.current = lilin;
+    terakhirBatasSmi.current = batas;
+
     const isi = (nilai: (number | null)[]) =>
       lilin.times.slice(0, batas)
         .map((t, i) => ({ time: Math.floor(t / 1000) as Time, value: nilai[i] }))

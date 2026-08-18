@@ -109,7 +109,7 @@ export function PanelDiscord() {
           <div className="flex flex-col gap-2 border-t border-zinc-800 p-3">
             <button
               onClick={bukaJendelaObrolan}
-              className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#5865F2] px-4 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[#4752c4]"
+              className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#5865F2] px-4 py-2.5 text-[13px] font-semibold text-[#fff] transition-colors hover:bg-[#4752c4]"
             >
               <ExternalLink className="size-4" /> Buka ruang obrolan
             </button>

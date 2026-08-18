@@ -73,15 +73,15 @@ export function PanelTrafikSistem() {
               <AreaChart data={trafik.data} margin={{ top: 8, right: 12, left: 4, bottom: 0 }}>
                 <defs>
                   <linearGradient id="gTraf" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#fafafa" stopOpacity={0.2} />
-                    <stop offset="100%" stopColor="#fafafa" stopOpacity={0} />
+                    <stop offset="0%" stopColor="currentColor" stopOpacity={0.2} />
+                    <stop offset="100%" stopColor="currentColor" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid vertical={false} stroke="rgba(255,255,255,.05)" />
+                <CartesianGrid vertical={false} stroke="currentColor" strokeOpacity={0.09} />
                 <XAxis dataKey="label" tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} minTickGap={36} />
                 <YAxis tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} width={34} allowDecimals={false} />
-                <Tooltip content={<TipGrafik />} cursor={{ stroke: 'rgba(255,255,255,.12)' }} />
-                <Area type="monotone" dataKey="total" name="Kunjungan" stroke="#fafafa" strokeWidth={1.8} fill="url(#gTraf)" dot={false} />
+                <Tooltip content={<TipGrafik />} cursor={{ stroke: 'currentColor', strokeOpacity: 0.22 }} />
+                <Area type="monotone" dataKey="total" name="Kunjungan" stroke="currentColor" strokeWidth={1.8} fill="url(#gTraf)" dot={false} />
                 <Area type="monotone" dataKey="unik" name="Unik" stroke="#71717a" strokeWidth={1.4} strokeDasharray="4 3" fill="none" dot={false} />
               </AreaChart>
             </ResponsiveContainer>

@@ -67,7 +67,7 @@ export function PanelEvaluasi({ trade, saldoAwal }: { trade: Trade[]; saldoAwal:
      dibaca, dan warnanya mengulang informasi yang sudah disampaikan angka
      besar dan keenam bar di sebelahnya. Bentuknya cuma perlu menunjukkan
      BENTUK; keparahannya sudah punya tempatnya sendiri. */
-  const konfigRadar = { skor: { label: 'Skor', color: '#fafafa' } } satisfies ChartConfig;
+  const konfigRadar = { skor: { label: 'Skor', color: 'currentColor' } } satisfies ChartConfig;
 
   return (
     <Panel className="mt-4">
@@ -166,7 +166,7 @@ export function PanelEvaluasi({ trade, saldoAwal }: { trade: Trade[]; saldoAwal:
                       <text
                         x={x} y={y} dy={4} textAnchor={textAnchor}
                         fontSize={10.5}
-                        fill={d?.lulus ? '#fafafa' : '#71717a'}
+                        fill={d?.lulus ? 'currentColor' : '#71717a'}
                       >
                         {payload.value}
                       </text>

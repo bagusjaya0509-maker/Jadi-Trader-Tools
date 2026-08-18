@@ -254,7 +254,7 @@ export default function Sosmed() {
               </button>
             ) : (
               <button onClick={() => void hubungkan()} disabled={sibuk || !token || status?.disetel === false}
-                      className="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50">
+                      className="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-[#fff] hover:bg-emerald-500 disabled:opacity-50">
                 {sibuk ? <Loader2 className="size-4 animate-spin" /> : <Plug className="size-4" />}
                 Hubungkan TikTok
               </button>
@@ -315,7 +315,7 @@ export default function Sosmed() {
         <PanelHead judul="3. Terbitkan" />
         <div className="p-4">
           <button onClick={() => void terbitkan()} disabled={!siapTerbit || jalan}
-                  className="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50">
+                  className="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-emerald-500 disabled:opacity-50">
             {jalan ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
             Terbitkan ke TikTok
           </button>

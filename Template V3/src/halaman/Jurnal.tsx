@@ -404,11 +404,11 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
                   <AreaChart data={kurva} margin={{ top: 8, right: 12, left: 4, bottom: 4 }}>
                     <defs>
                       <linearGradient id={idGradien} x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#fafafa" stopOpacity={0.22} />
-                        <stop offset="100%" stopColor="#fafafa" stopOpacity={0} />
+                        <stop offset="0%" stopColor="currentColor" stopOpacity={0.22} />
+                        <stop offset="100%" stopColor="currentColor" stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid vertical={false} stroke="rgba(255,255,255,.05)" />
+                    <CartesianGrid vertical={false} stroke="currentColor" strokeOpacity={0.09} />
                     {/* `interval="preserveStartEnd"` menahan label pertama dan
                         terakhir tetap tampil; tanpa itu Recharts membuang
                         keduanya saat padat, dan rentang tanggalnya jadi tidak
@@ -417,13 +417,13 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
                            minTickGap={48} height={30} dy={10} interval="preserveStartEnd" />
                     <YAxis tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} width={48}
                            tickFormatter={(v) => `$${v}`} domain={['dataMin - 8', 'dataMax + 8']} />
-                    <Tooltip content={<TipGrafik />} cursor={{ stroke: 'rgba(255,255,255,.12)' }} />
+                    <Tooltip content={<TipGrafik />} cursor={{ stroke: 'currentColor', strokeOpacity: 0.22 }} />
                     {/* `baseValue="dataMin"` — isian turun sampai DASAR kotak.
                         Bawaannya 0, dan karena sumbunya dimulai di sekitar
                         $267 titik nol itu jauh di bawah layar: isiannya
                         digambar ke luar area gambar, jadi yang terlihat cuma
                         garis tanpa gradasi dan kurvanya terkesan menggantung. */}
-                    <Area type="monotone" dataKey="nilai" name="Ekuitas" stroke="#fafafa" strokeWidth={1.8}
+                    <Area type="monotone" dataKey="nilai" name="Ekuitas" stroke="currentColor" strokeWidth={1.8}
                           fill={`url(#${idGradien})`} dot={false} baseValue="dataMin" />
                   </AreaChart>
                 </ResponsiveContainer>

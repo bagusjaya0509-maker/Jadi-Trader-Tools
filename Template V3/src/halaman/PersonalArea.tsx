@@ -283,7 +283,7 @@ export default function PersonalArea() {
                     <stop offset="100%" stopColor="#ffcd75" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid vertical={false} stroke="rgba(255,255,255,.05)" />
+                <CartesianGrid vertical={false} stroke="currentColor" strokeOpacity={0.09} />
                 <XAxis dataKey="bulan" tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} minTickGap={16} />
                 <YAxis tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} width={56}
                        tickFormatter={(v) => `${Math.round(v / 1_000_000)}jt`} />
@@ -296,7 +296,7 @@ export default function PersonalArea() {
                       </div>
                     ) : null
                   }
-                  cursor={{ stroke: 'rgba(255,255,255,.12)' }}
+                  cursor={{ stroke: 'currentColor', strokeOpacity: 0.22 }}
                 />
                 <Area type="monotone" dataKey="porto" stroke="#ffcd75" strokeWidth={1.8} fill="url(#gPorto)" dot={false} />
               </AreaChart>
