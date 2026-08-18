@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   Loader2, Lock, Unlock, Trash2, Send, LineChart, X, CheckCircle2,
   TrendingUp, TrendingDown, RefreshCw, Radar, Sparkles, ImagePlus, Images, Flag, Ban,
-  Settings2, UserRound, Pin,
+  Settings2, UserRound, Pin, TriangleAlert,
 } from 'lucide-react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { PanelSinyal } from '@/components/panel-sinyal';
@@ -95,7 +96,25 @@ function ModalPerformaAnalis({ a, performa, dibatalkan, berjalan, tutup }: {
      ia memuat empat KPI, kurva saldo, kalender sebulan penuh, dan daftar
      pembatalan — dan kalender 7 kolom di dalam 2xl membuat tiap selnya
      terlalu sempit untuk memuat tanggal beserta angkanya. */
-  return (
+  /* ── DIPORTAL KE <body>, DAN ITU WAJIB ────────────────────────────────
+     Modal ini dirender DARI DALAM kartu sinyal, dan kartu yang sinyalnya
+     sudah selesai memakai `opacity-75` (lihat Panel di KartuAnalisa).
+     Elemen ber-opacity < 1 membuat STACKING CONTEXT sendiri, jadi dua hal
+     terjadi sekaligus dan keduanya terlihat di layar:
+
+       1. z-50 milik modal cuma berlaku DI DALAM kartu itu. Kartu-kartu
+          tetangga di rak yang sama tergambar DI ATAS modalnya — panelnya
+          tertutup dan tidak bisa dibaca.
+       2. Seluruh modal ikut pudar 75%, karena opacity induk berlaku pada
+          seluruh grupnya.
+
+     Terukur di situs tayang: rantai induknya .fixed.inset-0.z-50 →
+     div opacity 0.75 → .w-[320px] → .overflow-x-auto.
+
+     Menaikkan z-index TIDAK menolong — angka berapa pun tetap dibandingkan
+     di dalam stacking context yang sama. Yang menolong cuma keluar dari
+     sana, dan portal adalah cara React melakukannya. */
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm" {...useTutupLuar(tutup)}>
       <div className="max-h-full w-full max-w-3xl overflow-y-auto rounded-xl border border-zinc-800 bg-zinc-950 p-5"
            onClick={(e) => e.stopPropagation()}>
@@ -120,7 +139,8 @@ function ModalPerformaAnalis({ a, performa, dibatalkan, berjalan, tutup }: {
           dibatalkan={dibatalkan}
         />
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -267,7 +287,9 @@ function ModalBatal({ a, tutup, selesai }: {
     } finally { setSibuk(false); }
   }
 
-  return (
+  /* Diportal karena alasan yang sama dengan ModalPerformaAnalis —
+     catatan lengkapnya ada di sana. */
+  return createPortal(
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4" {...useTutupLuar(tutup)}>
       <div className="w-full max-w-lg rounded-xl border border-zinc-800 bg-zinc-950 p-5" onClick={(e) => e.stopPropagation()}>
         <div className="mb-1 flex items-center gap-2">
@@ -307,7 +329,8 @@ function ModalBatal({ a, tutup, selesai }: {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -408,12 +431,15 @@ function Galeri({ analisaId, galeri, bisaTambah, uidku, penulisku, onBerubah }: 
       )}
       {kabar && <p className="mt-1.5 text-[11.5px] text-amber-300/90">{kabar}</p>}
 
-      {besar && (
+      {/* Diportal — sama seperti dua modal di atas berkas ini. Galeri
+          hidup di dalam kartu sinyal juga. */}
+      {besar && createPortal(
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4"
              onClick={() => setBesar(null)}>
           <img src={besar.url} alt={besar.ket || 'Foto analisa'}
                className="max-h-full max-w-full rounded-lg object-contain" />
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
@@ -952,6 +978,12 @@ export default function Analisa() {
   const [statusku, setStatusku] = useState<Record<string, string>>({});
   const [memuat, setMemuat] = useState(true);
   const [kabar, setKabar] = useState('');
+  /* Nada kabar. Sebelumnya sukses dan gagal memakai satu string yang sama
+     dan dirender identik — abu-abu 12px di kaki panel. Yang memposting
+     karena itu harus MEMBACA kalimatnya untuk tahu sinyalnya masuk atau
+     tidak, dan kalau terlewat ia bolak-balik memeriksa sendiri. Warna dan
+     lambang menjawabnya sebelum kalimatnya dibaca. */
+  const [nada, setNada] = useState<'info' | 'ok' | 'galat'>('info');
   const [sibuk, setSibuk] = useState(false);
 
   const [pasangan, setPasangan] = useState('BTCUSDT');
@@ -1106,6 +1138,7 @@ export default function Analisa() {
        Signal" di chart lalu tiba di daftar kanal, tanpa tanda apa pun bahwa
        rencananya sudah sampai. */
     setCariSub({ sub: 'posting' }, { replace: true });
+    setNada('info');
     setKabar(`Rencana dari Chart & Entry masuk — ${d.pasangan} ${d.tf} ${d.arah}. Lengkapi ringkasan dan alasannya.`);
   }, []);
 
@@ -1142,7 +1175,7 @@ export default function Analisa() {
   }, [riwayat, saldoAwal]);
 
   async function posting() {
-    setSibuk(true); setKabar('');
+    setSibuk(true); setKabar(''); setNada('info');
     try {
       const hasil = await kirimAnalisa({
         /* Judul rekaman diturunkan dari ringkasan — kolomnya sudah dihapus
@@ -1174,11 +1207,13 @@ export default function Analisa() {
           kabarSampul = ' (sampul gagal diunggah — bisa ditambahkan lagi lewat galeri)';
         }
       }
+      setNada('ok');
       setKabar(`Analisa terposting — dan kini permanen. Semoga levelnya bekerja.${kabarSampul}`);
       setRingkas(''); setEntry(''); setSl(''); setTp(''); setAlasan('');
       setIzinJurnal(false); setPahamPermanen(false); setSampul(''); setQtyDraf(0);
       segarkan();
     } catch (e) {
+      setNada('galat');
       setKabar(e instanceof Error ? e.message : 'Gagal memposting');
     } finally { setSibuk(false); }
   }
@@ -1701,6 +1736,49 @@ export default function Analisa() {
                 {sibuk ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />} Posting — permanen
               </button>
             </div>
+
+            {/* ── KABAR HASIL, TEPAT DI BAWAH TOMBOLNYA ────────────────────
+                Dulu ia satu baris abu-abu 12px di KAKI panel — di bawah
+                modal pratinjau sampul, jauh dari tombol yang barusan
+                ditekan, dan berbentuk sama persis apakah sinyalnya masuk
+                atau gagal. Yang memposting jadi harus mencari kalimatnya
+                lalu membacanya untuk tahu hasilnya; kalau terlewat, ia
+                bolak-balik memeriksa sendiri ke daftar Market.
+
+                Tiga hal yang membuatnya terjawab tanpa dicari:
+
+                1. TEMPAT. Mata sudah ada di tombol, jadi kabarnya muncul
+                   di situ juga — bukan di ujung halaman.
+                2. WARNA DAN LAMBANG. Hijau berpusat centang untuk berhasil,
+                   merah bersegitiga untuk gagal. Terbaca sebelum
+                   kalimatnya dibaca.
+                3. JALAN KELUAR. Berhasil membawa tombol yang memindahkan
+                   ke tab Market — tempat sinyalnya sekarang berada. Itu
+                   yang selama ini dikerjakan tangan.
+
+                role="status" + aria-live: pembaca layar mengumumkannya
+                sendiri. Tanpa itu, perubahan ini cuma memperbaiki keadaan
+                bagi yang melihat layar. */}
+            {kabar && (
+              <div role="status" aria-live="polite"
+                className={cn('mt-3 flex items-start gap-2.5 rounded-lg border px-3 py-2.5 text-[12.5px] leading-relaxed',
+                  nada === 'ok' ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200'
+                    : nada === 'galat' ? 'border-red-500/40 bg-red-500/10 text-red-200'
+                      : 'border-zinc-700 bg-zinc-900/60 text-zinc-300')}>
+                {nada === 'ok' ? <CheckCircle2 className="mt-px size-4 shrink-0" />
+                  : nada === 'galat' ? <TriangleAlert className="mt-px size-4 shrink-0" />
+                    : <Sparkles className="mt-px size-4 shrink-0" />}
+                <div className="min-w-0 grow">
+                  <p>{kabar}</p>
+                  {nada === 'ok' && (
+                    <button onClick={() => setSub('market')}
+                      className="mt-2 cursor-pointer rounded-md border border-emerald-500/40 px-2.5 py-1 text-[11.5px] font-medium text-emerald-100 transition-colors hover:bg-emerald-500/15">
+                      Lihat sinyalnya di Market
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
         {/* Pratinjau sampul ukuran penuh. Yang terpotret HANYA kanvas
@@ -1730,7 +1808,9 @@ export default function Analisa() {
           </div>
         )}
 
-        {kabar && <p className="px-5 pb-4 text-[12px] text-zinc-400">{kabar}</p>}
+        {/* Baris kabar yang dulu di sini SUDAH PINDAH ke bawah tombol Posting
+            (lihat catatan di sana). Tidak digandakan: dua salinan pesan yang
+            sama di satu panel membuat orang mengira ada dua kejadian. */}
         {!pengguna && (
           <p className="px-5 pb-4 text-[12.5px] text-zinc-500">Masuk dulu untuk memposting atau membeli analisa.</p>
         )}
