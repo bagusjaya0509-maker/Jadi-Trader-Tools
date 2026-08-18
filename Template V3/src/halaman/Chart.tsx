@@ -1043,12 +1043,27 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
      sengaja TIDAK ikut (dan tidak ditampilkan): angka yang berdetak
      terus adalah pemicu gambar-ulang yang tak pernah berhenti. */
   const kunciPosisiMt5 = useMemo(() => {
+    /* ── MODE LATIHAN TIDAK MENAMPILKAN POSISI NYATA ───────────────────
+       Aturan yang sama sudah lama berlaku untuk garis ORDER menggantung
+       (lihat garisOrder di bawah), tapi tidak pernah ikut dipasang di
+       sini — jadi garis entry/SL/TP dari posisi MT5 yang benar-benar
+       hidup tetap tergambar saat orangnya berpindah ke demo atau copy.
+
+       Ini bukan sekadar tidak relevan, ia menyesatkan ke dua arah: yang
+       sedang berlatih mengira SL itu bagian dari latihannya, atau yang
+       punya posisi nyata mengira posisinya terlindungi padahal yang
+       dilihat cuma sisa gambar dari mode sebelumnya. Uang sungguhan
+       tidak boleh digambar di layar latihan.
+
+       Kembali ke real, garisnya muncul lagi apa adanya — tidak ada yang
+       dihapus, cuma tidak digambar. */
+    if (aksi?.mode !== 'real') return '[]';
     if (!simbol.startsWith('MT5:')) return '[]';
     const dasarS = simbol.slice(4);
     return JSON.stringify(akunMt5.posisi
       .filter((p) => p.simbol.toUpperCase().indexOf(dasarS) === 0)
       .map((p) => ({ tiket: p.tiket, arah: p.arah, lot: p.lot, entry: p.hargaBuka, sl: p.sl, tp: p.tp })));
-  }, [simbol, akunMt5.posisi]);
+  }, [simbol, akunMt5.posisi, aksi?.mode]);
   const posisiMt5Chart = useMemo(() => JSON.parse(kunciPosisiMt5) as PosisiChartMt5[], [kunciPosisiMt5]);
   /* Tick bid/ask menumpang balasan klines MT5 yang memang sudah dipoll —
      dibaca ulang tiap render, dan render datang tiap data lilin segar. */

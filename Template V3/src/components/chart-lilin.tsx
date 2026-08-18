@@ -1273,9 +1273,31 @@ export function ChartLilin({
            harganya sepadan untuk menutup celah ini. */
         let tinggiPane = '';
         try { tinggiPane = c.panes().map((p) => Math.round(p.getHeight())).join(','); } catch { /* versi lama */ }
+
+        /* ── SUMBU HARGA WAJIB IKUT. Ini celah yang saya buat sendiri ────
+           Versi pertama sidik jari ini cuma memuat rentang WAKTU, ukuran
+           kotak, dan tinggi panel. Menarik-ulur skala HARGA mengubah
+           pemetaan tegak saja — rentang waktu tetap, kotak tetap, panel
+           tetap — jadi framenya dilewati dan garis entry/SL/TP tertinggal
+           di tempat lama sampai ada hal lain yang kebetulan berubah.
+           Dilaporkan pemiliknya, dan memang benar.
+
+           Dua harga acuan, bukan satu: satu titik cuma menangkap
+           GESERAN; dua titik yang berbeda menangkap geseran DAN
+           perubahan skala, karena keduanya menentukan pemetaan
+           harga-ke-piksel secara utuh. */
+        const s0 = seri.current;
+        let sumbuHarga = '';
+        if (s0 && l.closes.length) {
+          const pa = l.closes[l.closes.length - 1];
+          const ya = s0.priceToCoordinate(pa);
+          const yb = s0.priceToCoordinate(pa * 1.01);
+          sumbuHarga = `${ya == null ? 'x' : Math.round(ya)},${yb == null ? 'x' : Math.round(yb)}`;
+        }
+
         const sidik = [
           r ? Math.round(r.from * 100) : 'x', r ? Math.round(r.to * 100) : 'x',
-          k.clientWidth, k.clientHeight, tinggiPane,
+          k.clientWidth, k.clientHeight, tinggiPane, sumbuHarga,
           hg ?? -1, l.times.length, gs?.length ?? 0, pm?.length ?? 0,
           ubahRef.current ? 'seret' : '-',
         ].join('|');

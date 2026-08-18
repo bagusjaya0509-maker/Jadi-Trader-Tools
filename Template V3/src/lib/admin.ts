@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { bacaKoneksi, PROXY_BAWAAN } from '@/lib/koneksi';
@@ -423,6 +423,18 @@ export function usePosisiBinance(): {
   data: PosisiBursa[];
   order: OrderBursa[];
   aktif: boolean;
+  /** Benar selama pemeriksaan PERTAMA ke bursa belum selesai.
+   *
+   *  Tanpa penanda ini, `aktif` yang masih false di detik pertama tidak
+   *  bisa dibedakan dari "bursa memang tidak tersambung" — dan pemanggil
+   *  terlanjur menampilkan cadangannya. Itulah sebab kedipan MANAUSDT:
+   *  dokumen publik sempat tampil sebelum posisi bursa yang sebenarnya
+   *  datang menggantikannya.
+   *
+   *  Hanya untuk pemeriksaan pertama. Putaran 30 detik berikutnya TIDAK
+   *  menyalakannya lagi — kalau tidak, tabelnya akan berkedip kosong tiap
+   *  setengah menit. */
+  memeriksa: boolean;
   /** Paksa baca ulang sekarang, tanpa menunggu putaran 30 detik.
    *  Dipakai setelah mengubah order: menunggu satu putaran penuh membuat
    *  layar bilang "berhasil" sementara tabelnya masih menampilkan angka
@@ -432,11 +444,15 @@ export function usePosisiBinance(): {
   const [data, setData] = useState<PosisiBursa[]>([]);
   const [order, setOrder] = useState<OrderBursa[]>([]);
   const [aktif, setAktif] = useState(false);
+  const [memeriksa, setMemeriksa] = useState(true);
+  const sudahPertama = useRef(false);
   const { token } = bacaKoneksi();
   const [pemicu, setPemicu] = useState(0);
 
   useEffect(() => {
-    if (!token.trim()) { setAktif(false); setData([]); return; }
+    /* Tanpa token tidak ada yang perlu diperiksa — jawabannya sudah pasti
+       sekarang juga, jadi jangan menahan pemanggil menunggu. */
+    if (!token.trim()) { setAktif(false); setData([]); setMemeriksa(false); return; }
     let hidup = true;
 
     async function ambil() {
@@ -494,6 +510,10 @@ export function usePosisiBinance(): {
         setAktif(true);
       } catch {
         if (hidup) { setAktif(false); }
+      } finally {
+        /* Berhasil maupun gagal, pemeriksaannya SELESAI — dan jawaban
+           "tidak tersambung" sama sahihnya dengan "tersambung". */
+        if (hidup && !sudahPertama.current) { sudahPertama.current = true; setMemeriksa(false); }
       }
     }
 
@@ -502,7 +522,7 @@ export function usePosisiBinance(): {
     return () => { hidup = false; clearInterval(jam); };
   }, [token, pemicu]);
 
-  return { data, order, aktif, segarkan: () => setPemicu((n) => n + 1) };
+  return { data, order, aktif, memeriksa, segarkan: () => setPemicu((n) => n + 1) };
 }
 
 /** Unggah satu gambar ke VPS, dapat URL publiknya.

@@ -288,7 +288,7 @@ export function usePosisi(): HasilData<Posisi[]> & { pending: OrderBursa[]; stop
      buka. Binance tidak mengirimkan keempatnya di rute posisi, jadi
      mengganti begitu saja akan menukar data yang lebih lengkap dengan yang
      lebih benar — padahal keduanya bisa dipakai bersama. */
-  const { data: bursa, order, aktif } = usePosisiBinance();
+  const { data: bursa, order, aktif, memeriksa: memeriksaBursa } = usePosisiBinance();
 
   /* Order ENTRY yang belum ke-fill: BELUM jadi posisi, jadi ia tidak
      boleh masuk daftar posisi — tapi juga tidak boleh hilang. Order yang
@@ -314,6 +314,26 @@ export function usePosisi(): HasilData<Posisi[]> & { pending: OrderBursa[]; stop
   );
 
   const gabungan = useMemo(() => {
+    /* ── JANGAN MENEBAK SELAMA JAWABANNYA BELUM ADA ────────────────────
+       Dulu baris ini cuma `if (!aktif) return data`. Masalahnya `aktif`
+       bernilai false karena DUA sebab yang berbeda artinya: bursanya
+       memang tidak tersambung, atau pemeriksaannya baru saja dimulai.
+
+       Pada penyegaran halaman, sebab kedua yang berlaku — jadi dokumen
+       publik ditampilkan lebih dulu, lalu diganti posisi bursa yang
+       sebenarnya begitu jawabannya datang. Yang terlihat: satu posisi
+       lama berkedip muncul lalu hilang sendiri. Dilaporkan pemiliknya
+       sebagai MANAUSDT yang selalu nongol tiap refresh.
+
+       Data contoh TIDAK bersalah di sini — isinya BTC, SOL, dan ADA;
+       tidak ada MANAUSDT sama sekali. Yang berkedip itu dokumen publik
+       `posisiTerbuka`, berisi posisi sungguhan.
+
+       Sekarang: selama masih memeriksa, kembalikan KOSONG. Panel yang
+       sekejap kosong jujur soal ketidaktahuannya; panel yang menampilkan
+       posisi lama menyatakan sesuatu yang tidak benar tentang akun yang
+       sedang dibuka. */
+    if (memeriksaBursa) return [];
     if (!aktif) return data;
     const dariPublik = new Map(data.map((p) => [p.simbol, p]));
     return bursa.map((b): Posisi => {
@@ -337,7 +357,7 @@ export function usePosisi(): HasilData<Posisi[]> & { pending: OrderBursa[]; stop
             jumlah: b.jumlah, pnlFloat: b.pnl,
           };
     });
-  }, [aktif, bursa, data]);
+  }, [aktif, bursa, data, memeriksaBursa]);
 
   /* ── PENGUNJUNG TANPA SESI melihat contoh, bukan sisa milik pemilik ────
      `public/posisiTerbuka` memang sengaja publik, dan dulu itu yang
