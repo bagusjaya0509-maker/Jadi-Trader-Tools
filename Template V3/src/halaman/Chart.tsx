@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import {
   Play, Loader2, RefreshCw, Radio, TriangleAlert, History,
   Layers, ChevronDown, Settings2, Code2, X, Ruler, Rows3, Square, Eraser, Minus, TrendingUp,
-  FlaskConical, GripHorizontal, Maximize2, Minimize2, SquareSplitVertical } from 'lucide-react';
+  FlaskConical, GripHorizontal, Maximize2, Minimize2, SquareArrowUp, SquareArrowDown } from 'lucide-react';
 import { PanelNews } from '@/components/panel-news';
 import { simpanDraf } from '@/lib/draf-sinyal';
 import { Panel, PanelHead, KartuKpi, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
@@ -16,7 +16,7 @@ import { kirimPerintahMt5, tungguHasilMt5 } from '@/lib/mt5-order';
 import { DockPine, type InfoPine, type KendaliPine } from '@/components/dock-pine';
 import { WatchChart } from '@/components/watch-chart';
 import { PanelPosisiTerbuka, type OrderSunting } from '@/components/panel-posisi-terbuka';
-import type { JenisAlat, GambarAlat } from '@/lib/plugin-alat';
+import type { AlatPegang, GambarAlat } from '@/lib/plugin-alat';
 import type { HasilPine } from '@/lib/pine';
 import { bacaSetelanChart, simpanSetelanChart } from '@/lib/replay';
 import { atr } from '@/lib/jt-scan-core';
@@ -289,7 +289,7 @@ export default function ChartBacktest() {
   const [kendaliPine, setKendaliPine] = useState<KendaliPine | null>(null);
   /* Alat gambar tangan — ukur %, fibonacci, kotak SNR. Gambarnya milik
      SIMBOL+TF: kotak support BTC 1 jam tidak ada urusannya dengan ETH. */
-  const [alat, setAlat] = useState<JenisAlat | null>(null);
+  const [alat, setAlat] = useState<AlatPegang | null>(null);
   const [gambarAlat, setGambarAlat] = useState<GambarAlat[]>([]);
   useEffect(() => {
     try {
@@ -304,11 +304,18 @@ export default function ChartBacktest() {
      sendiri oleh dock begitu data simbol baru tiba. */
   useEffect(() => { setPine(null); }, [simbol, tf]);
   const tambahGambar = useCallback((g: Omit<GambarAlat, 'id'>) => {
+    const id = 'g' + Date.now();
     setGambarAlat((d) => {
-      const b = [...d, { ...g, id: 'g' + Date.now() }];
+      const b = [...d, { ...g, id }];
       try { localStorage.setItem(`jt.alat.${simbol}|${tf}`, JSON.stringify(b)); } catch { /* privat */ }
       return b;
     });
+    /* Alat posisi langsung TERPILIH begitu ditempel. Angkanya cuma tampil
+       saat terpilih, jadi tanpa ini yang baru saja ditaruh orang muncul
+       sebagai dua bidang warna tanpa satu angka pun — dan pegangannya juga
+       belum ada, padahal menggeser garis persis itu yang dikerjakan
+       berikutnya. */
+    if (g.jenis === 'posisi') setGambarPilih(id);
     /* Satu tarikan, satu gambar — kembali ke kursor biasa. Menggambar lagi
        tinggal menekan alatnya lagi; alat yang menempel diam-diam membuat
        seretan chart berikutnya jadi kotak yang tidak diminta. */
@@ -328,7 +335,14 @@ export default function ChartBacktest() {
   /* Gambar TERPILIH: klik gambarnya di mode kursor biasa, hapus dengan
      Delete/Backspace, batal pilih dengan Escape. */
   const [gambarPilih, setGambarPilih] = useState<string | null>(null);
-  useEffect(() => { setGambarPilih(null); }, [simbol, tf, alat]);
+  /* Ganti simbol/TF: yang terpilih sudah tidak ada di layar. */
+  useEffect(() => { setGambarPilih(null); }, [simbol, tf]);
+  /* MEMEGANG alat baru membatalkan pilihan, tapi MELEPASNYA tidak. Dulu
+     keduanya satu efek dengan `alat` di daftar kebergantungan, dan itu
+     baik-baik saja selama tidak ada alat yang memilih hasilnya sendiri:
+     alat posisi menempel, memilih gambarnya, lalu melepaskan dirinya —
+     dan pelepasan itu langsung mencabut pilihan yang baru saja dibuat. */
+  useEffect(() => { if (alat) setGambarPilih(null); }, [alat]);
   useEffect(() => {
     const tekan = (e: KeyboardEvent) => {
       const t = document.activeElement?.tagName;
@@ -2830,18 +2844,26 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                 tombol keempat yang kebetulan bergaris. */}
             <GripHorizontal className="size-3.5 shrink-0 text-zinc-700" />
             {([
-              ['garis', TrendingUp, 'Garis tren — tarik dari titik ke titik'],
-              ['ukur', Ruler, 'Ukur % kenaikan / penurunan — klik lalu tarik'],
-              ['fib', Rows3, 'Fibonacci retracement — tarik dari swing ke swing'],
-              ['kotak', Square, 'Kotak SNR manual — tarik membentuk zonanya'],
-              /* Ikonnya kotak yang terbelah mendatar — persis bentuk yang
-                 digambar alat ini: satu bidang hijau di atas garis entry,
-                 satu bidang merah di bawahnya. */
-              ['posisi', SquareSplitVertical, 'Posisi SL/TP manual — tarik dari entry ke target, stop lahir 1:1 lalu tinggal digeser'],
-            ] as const).map(([j, Ikon, judul]) => (
+              ['garis', TrendingUp, 'Garis tren — tarik dari titik ke titik', ''],
+              ['ukur', Ruler, 'Ukur % kenaikan / penurunan — klik lalu tarik', ''],
+              ['fib', Rows3, 'Fibonacci retracement — tarik dari swing ke swing', ''],
+              ['kotak', Square, 'Kotak SNR manual — tarik membentuk zonanya', ''],
+              /* Dua tombol, satu alat. Arahnya harus ditentukan SEBELUM
+                 ditempel — kalau tidak, sekali klik tidak cukup untuk tahu
+                 mana target dan mana stop.
+
+                 Ikonnya kotak berpanah: bentuk alatnya sendiri, plus arah
+                 yang dituju. Diberi warna karena dua tombol bersebelahan
+                 yang bentuknya nyaris sama dibedakan mata lewat warna dulu,
+                 baru arah panahnya — dan hijau/merah di sini bukan hiasan,
+                 itu warna yang persis akan muncul di chart. */
+              ['posisiBeli', SquareArrowUp, 'Posisi BELI — klik sekali di chart, kotak SL/TP langsung tertempel', 'text-emerald-500'],
+              ['posisiJual', SquareArrowDown, 'Posisi JUAL — klik sekali di chart, kotak SL/TP langsung tertempel', 'text-red-400'],
+            ] as const).map(([j, Ikon, judul, warna]) => (
               <button key={j} onClick={() => setAlat(alat === j ? null : j)} title={judul}
                 className={cn('flex size-7 cursor-pointer items-center justify-center rounded transition-colors',
-                  alat === j ? 'bg-zinc-100 text-zinc-950' : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100')}>
+                  alat === j ? 'bg-zinc-100 text-zinc-950'
+                    : cn(warna || 'text-zinc-400', 'hover:bg-zinc-800 hover:text-zinc-100'))}>
                 <Ikon className="size-3.5" />
               </button>
             ))}

@@ -8,7 +8,7 @@ import { cn, harga as fHarga } from '@/lib/utils';
 import type { TradeUji } from '@/lib/backtest';
 import type { SegmenPine, PenandaPine, KotakPine, IsianPine } from '@/lib/pine-bar';
 import { PenggambarIsi } from '@/lib/plugin-isi';
-import { PenggambarAlat, type GambarAlat, type JenisAlat } from '@/lib/plugin-alat';
+import { PenggambarAlat, type GambarAlat, type AlatPegang } from '@/lib/plugin-alat';
 import { useTema, temaSekarang, WARNA_CHART } from '@/lib/tema';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -171,7 +171,7 @@ export function ChartLilin({
   /** Isian antar dua garis (linefill) — pewarna tengah channel paralel. */
   isianPine?: IsianPine[];
   /** Alat gambar yang sedang dipegang — null berarti kursor biasa. */
-  alat?: JenisAlat | null;
+  alat?: AlatPegang | null;
   /** Dipanggil saat satu tarikan alat selesai. */
   onAlatSelesai?: (g: Omit<GambarAlat, 'id'>) => void;
   /** Gambar tangan yang sudah jadi — ukur, fib, kotak. */
@@ -1026,16 +1026,64 @@ export function ChartLilin({
       return { t: times[times.length - 1] + (l - (times.length - 1)) * tfMs, h };
     };
 
-    /* Alat posisi lahir dengan TIGA harga sekaligus: entry di tempat
-       tombol ditekan, target di tempat dilepas, dan stop dicerminkan ke
-       seberang entry pada jarak yang sama. Rasio 1:1 sebagai titik awal —
-       angka yang jelas-jelas sementara dan langsung terlihat perlu diubah,
-       jadi orang menariknya. Stop di angka karangan yang kebetulan masuk
-       akal justru yang tidak akan pernah diperiksa. */
+    /* ── ALAT POSISI: SEKALI KLIK, LANGSUNG TERTEMPEL ─────────────────
+       Empat alat lain butuh dua titik karena dua titiknya memang informasi:
+       dari mana ke mana. Setup SL/TP tidak begitu — yang benar-benar
+       ditentukan orang cuma satu harga masuk, dan dua garis di sekitarnya
+       yang memang akan digeser sesudahnya. Memaksa menarik dulu berarti
+       meminta orang memutuskan target SEBELUM melihat kotaknya, padahal
+       justru kotaknya yang dipakai memutuskan.
+
+       Arahnya sudah ditentukan di bilah (tombol beli atau jual), jadi satu
+       klik cukup: entry di tempat yang diklik, target ke arah untung, stop
+       ke arah sebaliknya pada jarak yang sama — rasio 1:1 sebagai titik
+       awal yang jelas-jelas sementara.
+
+       Jaraknya diambil dari yang SEDANG TERLIHAT, bukan persentase harga.
+       Angka tetap seperti 1% menghasilkan kotak setipis rambut di chart
+       yang di-zoom lebar, dan kotak yang menelan seluruh layar di chart
+       yang sedang rapat. 14% tinggi layar dan 22% lebarnya selalu jatuh
+       proporsional, di harga berapa pun dan zoom berapa pun. */
+    if (alat === 'posisiBeli' || alat === 'posisiJual') {
+      const beli = alat === 'posisiBeli';
+      const tempel = (e: PointerEvent) => {
+        if (e.button !== 0) return;
+        const c = chart.current, s = seri.current;
+        if (!c || !s) return;
+        const p = posisiDari(e);
+        if (!p) return;
+        const paneH = paneHargaRef.current || el.getBoundingClientRect().height;
+        const hAtas = s.coordinateToPrice(2);
+        const hBawah = s.coordinateToPrice(Math.max(paneH - 2, 4));
+        if (typeof hAtas !== 'number' || typeof hBawah !== 'number') return;
+        const jarak = Math.abs(hAtas - hBawah) * 0.14;
+        if (!isFinite(jarak) || jarak <= 0) return;
+
+        const rentang = c.timeScale().getVisibleLogicalRange();
+        const barTampak = rentang ? Math.abs(Number(rentang.to) - Number(rentang.from)) : 60;
+        const times = acuan.current.lilin.times;
+        const tfMs = times.length >= 2 ? times[1] - times[0] : 3_600_000;
+        const bar = Math.max(6, Math.round(barTampak * 0.22));
+
+        onAlatSelesai({
+          jenis: 'posisi', arah: beli ? 'beli' : 'jual',
+          t1: p.t, h1: p.h, t2: p.t + bar * tfMs,
+          h2: p.h + (beli ? jarak : -jarak),
+          h3: p.h - (beli ? jarak : -jarak),
+        });
+        e.preventDefault();
+        e.stopPropagation();
+      };
+      chart.current?.applyOptions({ handleScroll: false, handleScale: false });
+      el.addEventListener('pointerdown', tempel, true);
+      return () => {
+        chart.current?.applyOptions({ handleScroll: true, handleScale: true });
+        el.removeEventListener('pointerdown', tempel, true);
+      };
+    }
+
     const bentuk = (t1: number, h1: number, t2: number, h2: number): Omit<GambarAlat, 'id'> =>
-      alat === 'posisi'
-        ? { jenis: alat, t1, h1, t2, h2, h3: h1 - (h2 - h1) }
-        : { jenis: alat, t1, h1, t2, h2 };
+      ({ jenis: alat, t1, h1, t2, h2 });
 
     const turun = (e: MouseEvent) => {
       if (e.button !== 0) return;
@@ -1061,16 +1109,11 @@ export function ChartLilin({
       const p = posisiDari(e);
       /* Klik tanpa tarikan bukan gambar — titik tunggal tidak menyimpan
          informasi apa pun. */
-      /* Posisi tanpa jarak HARGA bukan setup: entry, TP, dan SL menumpuk
-         di satu garis dan rasionya tak terdefinisi. Alat lain masih berarti
-         dengan satu sumbu saja — kotak setipis garis tetap menandai level. */
-      if (p) {
-        const cukupWaktu = Math.abs(p.t - a.t1) > 1;
-        const cukupHarga = p.h !== a.h1;
-        const cukup = alat === 'posisi'
-          ? cukupWaktu && cukupHarga
-          : cukupWaktu || cukupHarga;
-        if (cukup) onAlatSelesai(bentuk(a.t1, a.h1, p.t, p.h));
+      /* Klik tanpa tarikan bukan gambar — titik tunggal tidak menyimpan
+         informasi apa pun. (Alat posisi justru sebaliknya: ia ditempel
+         dengan sekali klik, dan tidak pernah sampai ke baris ini.) */
+      if (p && (Math.abs(p.t - a.t1) > 1 || p.h !== a.h1)) {
+        onAlatSelesai(bentuk(a.t1, a.h1, p.t, p.h));
       }
     };
     /* pointercancel ≠ pointerup: koordinat pada cancel tidak bisa

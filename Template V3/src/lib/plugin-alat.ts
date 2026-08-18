@@ -20,6 +20,14 @@ import type {
 
 export type JenisAlat = 'ukur' | 'fib' | 'kotak' | 'garis' | 'posisi';
 
+/** Alat yang bisa DIPEGANG di bilah.
+
+    Alat posisi punya dua tombol — beli dan jual — tapi keduanya
+    menghasilkan gambar berjenis 'posisi' yang sama. Yang membedakan cuma
+    `arah`-nya, jadi mereka bukan jenis gambar tersendiri: satu jalur
+    penggambaran, satu jalur uji-kena, satu jalur seretan. */
+export type AlatPegang = Exclude<JenisAlat, 'posisi'> | 'posisiBeli' | 'posisiJual';
+
 export interface GambarAlat {
   id: string;
   jenis: JenisAlat;
@@ -34,6 +42,9 @@ export interface GambarAlat {
       pernah membawa medan ini — kalau dijadikan wajib, semua kotak SNR
       dan fibonacci yang sudah ada langsung tidak sah bentuknya. */
   h3?: number;
+  /** Arah posisi, hanya untuk jenis 'posisi'. Disimpan, bukan disimpulkan
+      dari letak target — lihat alasannya di penggambarnya. */
+  arah?: 'beli' | 'jual';
 }
 
 interface MetaAlat { tAkhir: number; tfMs: number; n: number }
@@ -141,7 +152,8 @@ export class PenggambarAlat implements ISeriesPrimitive<Time> {
                  adalah kotaknya. Pegangan di ujung justru menunjukkan dua
                  hal sekaligus: mana yang terpilih, DAN di mana ia bisa
                  ditarik untuk diperpanjang. */
-              if ('id' in g && g.id && g.id === this.pilih) {
+              const terpilih = 'id' in g && !!g.id && g.id === this.pilih;
+              if (terpilih) {
                 const titik: [number, number][] = g.jenis === 'garis'
                   ? [[x1, y1], [x2, y2]]
                   : g.jenis === 'posisi'
@@ -188,56 +200,81 @@ export class PenggambarAlat implements ISeriesPrimitive<Time> {
                 if (y3 == null) continue;
                 const lebar = Math.max(kanan - kiri, 1);
 
+                /* TANPA BINGKAI LUAR. Kotak berbingkai penuh punya dua sisi
+                   TEGAK yang tidak mewakili apa pun: tidak ada harga di
+                   sana, tidak ada yang bisa ditarik di sana. Justru sisi
+                   tegak itu yang paling merebut mata, karena dialah satu-
+                   satunya garis di alat ini yang memotong lilin. Yang
+                   bermakna cuma tiga garis MENDATAR — target, entry, stop —
+                   dan dua bidang warna di antaranya. */
                 const pita = (yA: number, yB: number, rgb: string) => {
                   ctx.fillStyle = `rgba(${rgb},.13)`;
                   ctx.fillRect(kiri, Math.min(yA, yB), lebar, Math.abs(yB - yA));
-                  ctx.strokeStyle = `rgba(${rgb},.55)`;
-                  ctx.lineWidth = 1;
-                  ctx.strokeRect(kiri, Math.min(yA, yB), lebar, Math.abs(yB - yA));
                 };
                 pita(y1, y2, '16,185,129');    // entry → target
                 pita(y1, y3, '248,113,113');   // entry → stop
 
-                /* Garis entry putus-putus: ia batas antara dua pita, bukan
-                   level ketiga yang berdiri sendiri. */
-                ctx.save();
-                ctx.setLineDash([4, 3]);
-                ctx.strokeStyle = 'rgba(228,228,231,.85)';
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                ctx.moveTo(kiri, y1); ctx.lineTo(kanan, y1);
-                ctx.stroke();
-                ctx.restore();
+                const garis = (y: number, warna: string, putus = false) => {
+                  ctx.save();
+                  if (putus) ctx.setLineDash([4, 3]);
+                  ctx.strokeStyle = warna;
+                  ctx.lineWidth = 1;
+                  ctx.beginPath();
+                  ctx.moveTo(kiri, y); ctx.lineTo(kanan, y);
+                  ctx.stroke();
+                  ctx.restore();
+                };
+                garis(y2, 'rgba(16,185,129,.8)');
+                garis(y3, 'rgba(248,113,113,.8)');
+                /* Entry putus-putus: ia batas antara dua bidang, bukan level
+                   ketiga yang berdiri sendiri. */
+                garis(y1, 'rgba(228,228,231,.85)', true);
 
-                /* Persen yang ditulis adalah UNTUNG-RUGI di level itu, bukan
-                   jarak harga. Pada posisi short harga naik berarti rugi —
-                   menuliskan "+10%" di pita merah cuma karena stopnya
-                   kebetulan di atas entry adalah kebohongan yang paling
-                   mudah dipercaya orang yang sedang buru-buru.
+                /* ANGKA HANYA SAAT TERPILIH. Chart yang berisi beberapa
+                   setup, masing-masing dengan empat label menempel, berubah
+                   jadi dinding angka yang menutupi lilin yang justru mau
+                   dibaca. Bidang warnanya sudah cukup untuk tahu ada setup
+                   di situ; angkanya baru perlu saat setup itu sedang
+                   dikerjakan — dan saat itu ia pasti sedang terpilih.
 
-                   Arahnya dibaca dari letak TARGET, bukan dari letak stop:
-                   target selalu ada di sisi untung, sedangkan stop boleh
-                   pindah ke sisi untung juga (stop yang sudah dinaikkan
-                   melewati entry). Rumus ini menuliskannya sebagai persen
-                   POSITIF, apa adanya, dan rasio imbal-risikonya jadi tak
-                   terdefinisi — memang begitu keadaannya: sudah tidak ada
-                   yang dipertaruhkan. */
-                const arah = g.h2 >= g.h1 ? 1 : -1;
-                const laba = (v: number) => (g.h1 !== 0 ? ((arah * (v - g.h1)) / g.h1) * 100 : 0);
-                const untung = Math.abs(g.h2 - g.h1);
-                const rugi = arah * (g.h1 - hSl);
-                const pT = laba(g.h2), pS = laba(hSl);
-                const tanda = (v: number) => `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`;
+                   Semua hitungannya ikut masuk ke dalam sini: tidak ada
+                   gunanya menghitung rasio imbal-risiko yang tidak akan
+                   digambar. */
+                if (terpilih) {
+                  /* Persen yang ditulis adalah UNTUNG-RUGI di level itu,
+                     bukan jarak harga. Pada posisi jual harga naik berarti
+                     rugi — menuliskan "+10%" di bidang merah cuma karena
+                     stopnya kebetulan di atas entry adalah kalimat yang
+                     salah arah, dan justru paling mudah dipercaya orang
+                     yang sedang buru-buru menaruh order.
 
-                /* Label duduk DI DALAM pitanya masing-masing — di sisi garis
-                   yang menghadap entry. Ditaruh di luar, TP dan SL saling
-                   bertukar tempat begitu arah posisinya dibalik. */
-                chip(kiri + 4, y2 + (y2 < y1 ? 10 : -10),
-                  `TP ${hargaTeks(g.h2)}  ${tanda(pT)}`, '16,185,129');
-                chip(kiri + 4, y3 + (y3 < y1 ? 10 : -10),
-                  `SL ${hargaTeks(hSl)}  ${tanda(pS)}`, '248,113,113');
-                chip(kiri + 4, y1, rugi > 0 ? `RR 1:${(untung / rugi).toFixed(2)}` : 'RR —', '228,228,231');
-                chip(kanan - 4, y1, `Entry ${hargaTeks(g.h1)}`, '228,228,231', true);
+                     Arahnya dari MEDANNYA sendiri, bukan disimpulkan dari
+                     letak target. Kalau disimpulkan, menarik target
+                     melewati entry akan mengubah posisi beli jadi posisi
+                     jual diam-diam — padahal yang sebenarnya terjadi adalah
+                     setup beli yang targetnya di bawah entry, yaitu setup
+                     rugi. Justru itu yang paling perlu terlihat, bukan
+                     disembunyikan dengan membalik artinya.
+
+                     Gambar dari sebelum medan arah ada tidak punya nilai
+                     itu; untuk mereka geometri dipakai sebagai tebakan. */
+                  const arah = g.arah === 'jual' ? -1 : g.arah === 'beli' ? 1 : g.h2 >= g.h1 ? 1 : -1;
+                  const laba = (v: number) => (g.h1 !== 0 ? ((arah * (v - g.h1)) / g.h1) * 100 : 0);
+                  const untung = Math.abs(g.h2 - g.h1);
+                  const rugi = arah * (g.h1 - hSl);
+                  const pT = laba(g.h2), pS = laba(hSl);
+                  const tanda = (v: number) => `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`;
+
+                  /* Label duduk DI DALAM bidangnya masing-masing, di sisi
+                     garis yang menghadap entry. Ditaruh di luar, TP dan SL
+                     saling bertukar tempat begitu arahnya dibalik. */
+                  chip(kiri + 4, y2 + (y2 < y1 ? 10 : -10),
+                    `TP ${hargaTeks(g.h2)}  ${tanda(pT)}`, '16,185,129');
+                  chip(kiri + 4, y3 + (y3 < y1 ? 10 : -10),
+                    `SL ${hargaTeks(hSl)}  ${tanda(pS)}`, '248,113,113');
+                  chip(kiri + 4, y1, rugi > 0 ? `RR 1:${(untung / rugi).toFixed(2)}` : 'RR —', '228,228,231');
+                  chip(kanan - 4, y1, `Entry ${hargaTeks(g.h1)}`, '228,228,231', true);
+                }
                 continue;
               }
 
