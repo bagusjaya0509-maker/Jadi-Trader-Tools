@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ParallaxComponent } from '@/components/ui/parallax-scrolling';
+import { Footerdemo } from '@/components/ui/footer-section';
 import { MenuToggleIcon } from '@/components/ui/menu-toggle-icon';
 import {
   NavigationMenu,
@@ -462,6 +463,15 @@ export default function Template() {
             tidak disentuh sama sekali. */}
         <FeaturesGrid />
       </main>
+
+      {/* Footer. Ditempel dari komponen sumbernya, isinya diganti data
+          sungguhan — catatan lengkap soal apa yang tidak ikut ditempel ada
+          di kepala footer-section.tsx.
+
+          DI LUAR <main>, dan itu bukan selera: <main> menandai isi utama
+          halaman untuk pembaca layar dan lompat-ke-isi. Identitas hukum dan
+          disclaimer adalah pelengkap dokumen, bukan isi utamanya. */}
+      <Footerdemo />
     </div>
   );
 }
