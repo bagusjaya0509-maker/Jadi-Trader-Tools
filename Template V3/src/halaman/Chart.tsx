@@ -1683,12 +1683,64 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
   const [ketik, setKetik] = useState(simbol);
   useEffect(() => { setKetik(simbol); }, [simbol]);
   function komitSimbol() {
-    const v = ketik.trim().toUpperCase();
+    const mentah = ketik.trim();
+    if (!mentah) { setKetik(simbol); return; }
+
+    /* ── DICOCOKKAN KE DAFTAR MT5 DULU ────────────────────────────────
+       Orang mengetik "XAUUSD" karena itu nama yang ia kenal. Yang tahu
+       emas harus ditulis "MT5:XAUUSDc" hanyalah kodenya — dan sebelum ini
+       ketikan itu dikirim apa adanya ke Binance, bursa yang memang tidak
+       punya simbol emas. Yang muncul: "Data tidak diterima. Proxy VPS
+       mungkin sedang tidak menjawab" — pesan yang menuduh jaringan padahal
+       permintaannya sendiri yang salah alamat.
+
+       Tanpa peduli huruf besar-kecil, dan tanpa peduli apakah awalan
+       "MT5:" ikut diketik. */
+    const tanpaAwalan = mentah.replace(/^MT5:/i, '');
+    const cocokMt5 = simbolMt5.find((s) => s.toLowerCase() === tanpaAwalan.toLowerCase());
+    if (cocokMt5) {
+      const penuh = 'MT5:' + cocokMt5;
+      setKetik(penuh);
+      if (penuh !== simbol) setSimbol(penuh);
+      return;
+    }
+
+    /* rapikanSimbol, BUKAN toUpperCase(). Versi lama meng-uppercase apa pun
+       — termasuk "MT5:XAUUSDc" jadi "MT5:XAUUSDC", simbol yang tidak ada di
+       broker mana pun. Alasan lengkapnya ada di atas rapikanSimbol. */
+    const v = rapikanSimbol(mentah);
     /* Bentuk yang jelas bukan simbol tidak dikirim ke proxy sama sekali;
        kotaknya dikembalikan ke simbol yang sedang tampil supaya tidak ada
-       yang mengira grafiknya sedang menampilkan apa yang tertulis. */
-    /* Awalan MT5: = sumber Trade-Fi (OHLC dari terminal MT5 lewat EA v2). */
-    if (!/^(MT5:)?[A-Z0-9]{3,15}$/.test(v)) { setKetik(simbol); return; }
+       yang mengira grafiknya sedang menampilkan apa yang tertulis.
+       Titik, garis bawah, dan pagar ikut diizinkan: nama simbol broker
+       memakainya ("EURUSD.m", "#AAPL"). */
+    if (!/^(MT5:)?[A-Za-z0-9._#-]{2,20}$/.test(v)) { setKetik(simbol); return; }
+    if (v !== simbol) setSimbol(v);
+  }
+
+  /* ── Saran simbol ─────────────────────────────────────────────────────
+     Dulu ini <datalist>. Di iOS Safari dukungannya tidak bisa diandalkan:
+     kotaknya bisa diketik tapi TIDAK ADA satu pun pilihan yang muncul, dan
+     tidak ada galat apa pun — dari sisi pengguna pencariannya sekadar mati.
+     Satu-satunya jalan masuk yang tersisa di HP adalah lewat watchlist.
+
+     Diganti daftar buatan sendiri: markup biasa, jadi ia berperilaku sama
+     di semua peramban. Sumbernya ikut ditulis di tiap baris — "Trade-Fi ·
+     MT5" atau "Kripto · Binance" — karena dari namanya saja XAUUSD dan
+     BTCUSDT terlihat sejenis padahal datangnya dari dua tempat berbeda. */
+  const [saranBuka, setSaranBuka] = useState(false);
+  const saranSimbol = useMemo(() => {
+    const q = ketik.trim().replace(/^MT5:/i, '').toLowerCase();
+    const semua = [
+      ...simbolMt5.map((s) => ({ nilai: 'MT5:' + s, label: s, sumber: 'Trade-Fi · MT5' })),
+      ...SIMBOL_DASAR.map((s) => ({ nilai: s, label: s, sumber: 'Kripto · Binance' })),
+    ];
+    return (q ? semua.filter((o) => o.label.toLowerCase().includes(q)) : semua).slice(0, 40);
+  }, [ketik, simbolMt5]);
+
+  function pilihSimbol(v: string) {
+    setKetik(v);
+    setSaranBuka(false);
     if (v !== simbol) setSimbol(v);
   }
 
@@ -1944,7 +1996,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
             ke bilah ini, supaya lebarnya mengikuti bilah dan tidak bisa
             keluar layar berapa pun posisi tombol pemicunya. */}
         <div ref={bilahChart} className="relative flex flex-wrap items-end gap-3 p-4">
-          <div className="min-w-[168px]">
+          <div className="static min-w-[168px] sm:relative">
             <label className="mb-1 block text-[11px] text-zinc-500">Simbol</label>
             {/* Diketik dulu, DIKOMIT belakangan.
                 ──────────────────────────────────────────────────────────
@@ -1954,26 +2006,40 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                 Yang terlihat adalah halaman tersendat lalu grafiknya hilang
                 diganti pesan galat — bukan karena pencariannya rusak, tapi
                 karena setiap ketukan diperlakukan sebagai keputusan. */}
-            <input list="simbolChart" value={ketik}
-                   onChange={(e) => {
-                     const v = rapikanSimbol(e.target.value);
-                     setKetik(v);
-                     /* Memilih dari daftar langsung berlaku — itu memang
-                        sebuah pilihan, bukan setengah kata. */
-                     if (SIMBOL_DASAR.includes(v) || simbolMt5.some((s) => 'MT5:' + s === v)) setSimbol(v);
+            <input value={ketik}
+                   onChange={(e) => { setKetik(e.target.value); setSaranBuka(true); }}
+                   onFocus={() => setSaranBuka(true)}
+                   onKeyDown={(e) => {
+                     if (e.key === 'Enter') { komitSimbol(); setSaranBuka(false); e.currentTarget.blur(); }
+                     if (e.key === 'Escape') setSaranBuka(false);
                    }}
-                   onKeyDown={(e) => { if (e.key === 'Enter') komitSimbol(); }}
                    onBlur={komitSimbol}
-                   placeholder="BTCUSDT"
+                   placeholder="BTCUSDT / XAUUSD"
+                   autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false}
                    className={cn(KELAS_ISIAN, 'angka')} />
-            <datalist id="simbolChart">
-              {/* Sumber Trade-Fi di urutan teratas — satu-satunya entri yang
-                  bukan Binance, jadi ia yang paling butuh terlihat ada. */}
-              {simbolMt5.map((s) => (
-                <option key={'MT5:' + s} value={'MT5:' + s}>Trade-Fi — dari MT5 (EA v2)</option>
-              ))}
-              {SIMBOL_DASAR.map((s) => <option key={s} value={s} />)}
-            </datalist>
+
+            {saranBuka && saranSimbol.length > 0 && (
+              <>
+                <div className="fixed inset-0 z-30" onPointerDown={() => setSaranBuka(false)} />
+                {/* inset-x-0 di HP, lebar tetap di layar lebar — sama seperti
+                    panel News dan menu Indikator; jangkarnya bilah kendali. */}
+                <div className="absolute inset-x-0 top-full z-40 mt-1 max-h-[min(60vh,320px)] w-auto overflow-y-auto rounded-lg border border-zinc-800 bg-zinc-950 p-1 shadow-2xl sm:inset-x-auto sm:left-0 sm:w-72">
+                  {saranSimbol.map((o) => (
+                    <button key={o.nilai} type="button"
+                      /* onPointerDown + preventDefault, BUKAN onClick.
+                         Menyentuh daftar ini membuat kotak isian kehilangan
+                         fokus lebih dulu, dan onBlur menjalankan komitSimbol
+                         yang menutup daftarnya — kliknya tidak pernah sampai.
+                         preventDefault menahan perpindahan fokus itu. */
+                      onPointerDown={(e) => { e.preventDefault(); pilihSimbol(o.nilai); }}
+                      className="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-left transition-colors hover:bg-zinc-900">
+                      <span className="angka text-[12.5px] text-zinc-200">{o.label}</span>
+                      <span className="ml-auto shrink-0 text-[10.5px] text-zinc-600">{o.sumber}</span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
           <div className="min-w-[120px]">
             <label className="mb-1 block text-[11px] text-zinc-500">Timeframe</label>

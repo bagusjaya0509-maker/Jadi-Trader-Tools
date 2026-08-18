@@ -32,11 +32,34 @@ import { usePermintaanLisensi } from '@/lib/admin';
    saat terbuka, kliknya adalah tautan ke changelog seperti biasa. */
 function KartuBaru({ versi, judul, ringkas }: { versi: string; judul: string; ringkas: string }) {
   const [buka, setBuka] = useState(true);
+  const [sembunyi, setSembunyi] = useState(false);
   useEffect(() => {
     if (!buka) return;
     const jeda = setTimeout(() => setBuka(false), 7000);
     return () => clearTimeout(jeda);
   }, [buka]);
+
+  /* DI HP IA BENAR-BENAR HILANG, bukan cuma menyusut jadi baris judul.
+     Di layar lebar sidebar-nya menetap dan baris "Baru - versi" itu murah:
+     ia menempati ruang yang memang kosong. Di HP sidebar adalah laci yang
+     digulir, dan baris itu duduk persis di antara menu terakhir dan Help
+     Center — jadi tiap kali orang menggulir mencari menu, ia menabrak kartu
+     promo yang urusannya sudah selesai.
+
+     Ditunda 500 ms supaya melipatnya sempat terlihat: menghilang seketika
+     terbaca seperti ada yang error, sedangkan menyusut lalu hilang terbaca
+     sebagai sesuatu yang memang sudah selesai.
+
+     Tidak bisa dibuka lagi di HP, dan itu memang yang diminta — isinya
+     tetap ada di halaman Changelog, satu ketukan dari mana saja. */
+  useEffect(() => {
+    if (buka || sembunyi || window.innerWidth >= 768) return;
+    const jeda = setTimeout(() => setSembunyi(true), 500);
+    return () => clearTimeout(jeda);
+  }, [buka, sembunyi]);
+
+  if (sembunyi) return null;
+
   return (
     <Link to="/changelog"
       onClick={(e) => { if (!buka) { e.preventDefault(); setBuka(true); } }}
