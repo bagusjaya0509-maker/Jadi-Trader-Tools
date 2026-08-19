@@ -16,6 +16,7 @@ import { PapanPeringkatSignal, PerformaAnalisSatu } from '@/components/performa-
    adalah papan peringkat SEMUA analis, sedangkan yang ditempel ini
    performa satu orang. Yang di kepala sudah dikembalikan. */
 import PerformaKalender from '@/components/performa-kalender';
+import { SparklineSaldo } from '@/components/kurva-saldo';
 import { ambilDraf } from '@/lib/draf-sinyal';
 import { AvatarAnalis } from '@/components/avatar-analis';
 import { ringkasKanal, type RingkasKanal } from '@/lib/ringkas-kanal';
@@ -2200,7 +2201,18 @@ export default function Analisa() {
                       </span>
                     </div>
                     <LencanaKanal r={r} className="mt-2.5" />
-                    <div className="mt-3 grid grid-cols-2 gap-2">
+                    {/* Winrate & Estimasi dipersempit, kurvanya mengisi
+                        kolom ketiga. Dua angka menjawab "berapa"; kurva
+                        menjawab "ke mana arahnya" — dan yang terakhir itu
+                        yang tidak bisa dibaca dari angka mana pun. Tujuh
+                        menang kecil yang kalah oleh dua rugi besar
+                        menghasilkan winrate 78% dan kurva yang menurun.
+
+                        Kolom kurvanya PALING LEBAR (1,4fr) walau isinya
+                        paling sedikit: garis butuh lebar untuk punya bentuk,
+                        sementara angka tidak bertambah jelas karena kotaknya
+                        dilebarkan. */}
+                    <div className="mt-3 grid grid-cols-[1fr_1fr_1.4fr] gap-2">
                       <div className="rounded-lg border border-zinc-800/60 p-2.5">
                         <div className="text-[10.5px] text-zinc-600">Winrate</div>
                         <div className={cn('angka text-[15px] font-semibold',
@@ -2214,6 +2226,28 @@ export default function Analisa() {
                           p ? (p.hasilDolar >= 0 ? 'text-emerald-400' : 'text-red-400') : 'text-zinc-600')}>
                           {p ? uang(p.hasilDolar, true) : '—'}
                         </div>
+                      </div>
+                      {/* Kurva saldo, sekecil kotak di sebelahnya.
+
+                          Tanpa judul dan tanpa angka: keduanya sudah berdiri
+                          di dua kotak kiri, dan mengulangnya di kotak ketiga
+                          cuma menyempitkan garisnya. Yang ditambahkan kurva
+                          justru yang TIDAK ADA di angka mana pun — bentuk
+                          perjalanannya. Winrate 78% bisa datang dari tujuh
+                          menang kecil yang kalah oleh dua rugi besar, dan
+                          cuma garisnya yang memperlihatkan itu.
+
+                          Garis putus-putus di dalamnya modal awal. Kurva di
+                          atasnya untung, di bawahnya rugi — patokan yang
+                          membuat bentuknya bisa dibaca tanpa satu angka pun.
+
+                          Disembunyikan kalau sinyal selesainya belum ada:
+                          garis lurus sepanjang kotak bukan informasi, dan
+                          ia terbaca seperti akun yang datar padahal artinya
+                          belum ada yang bisa digambar. */}
+                      <div className="flex items-center justify-center rounded-lg border border-zinc-800/60 px-1.5 py-2">
+                        <SparklineSaldo sinyal={sinyal} kelas="h-[44px] w-full"
+                          modal={performa?.modal ?? 1000} />
                       </div>
                     </div>
                     <BarisHitung r={r} />
@@ -2288,13 +2322,7 @@ export default function Analisa() {
 
                  Isinya masih data contoh bawaan komponennya dan belum
                  tersambung ke sinyal siapa pun. Menunggu instruksi. */
-              /* `modal` dari server, bukan angka 1000 yang ditulis di sini:
-                 papan peringkat memakai nilai yang sama, dan dua layar yang
-                 memegang konstanta sendiri-sendiri adalah dua layar yang
-                 suatu hari memakai modal berbeda. */
-              if (sub === 'performa') {
-                return <PerformaKalender sinyal={terpilih} modal={performa?.modal ?? 1000} />;
-              }
+              if (sub === 'performa') return <PerformaKalender sinyal={terpilih} />;
               const selesai = terpilih.filter((s) => !!s.hasil);
               const belum = terpilih.filter((s) => !s.hasil);
               const menunggu = belum.filter(
@@ -2317,7 +2345,20 @@ export default function Analisa() {
                  berubah-ubah antar-kanal, dan orang kehilangan patokan di
                  mana ia sedang berdiri. Nol yang terbaca juga informasi:
                  "analis ini tidak punya satu pun yang menggantung". */
-              const pilih = rak.find((r) => r.kunci === rakAktif) ?? rak[0];
+              /* Yang dipilih orangnya menang; kalau ia belum memilih, atau
+                 yang dipilihnya kebetulan kosong, jatuh ke rak pertama yang
+                 BERISI — bukan ke rak[0].
+
+                 Ini bug yang dilaporkan: analis yang semua sinyalnya sudah
+                 selesai membuka kanalnya dan mendapat "Tidak ada sinyal di
+                 ruangan ini", padahal ada tujuh di rak sebelah. Bawaannya
+                 'jalan', dan 'jalan' kebetulan kosong. Layar yang menjawab
+                 "tidak ada" untuk pertanyaan yang tidak diajukan siapa pun
+                 terbaca sebagai data yang hilang, bukan sebagai rak yang
+                 kebetulan kosong. */
+              const dipilih = rak.find((r) => r.kunci === rakAktif);
+              const pilih = (dipilih && dipilih.isi.length) ? dipilih
+                          : (rak.find((r) => r.isi.length > 0) ?? rak[0]);
               const tampil = pilih.isi;
 
               return (
