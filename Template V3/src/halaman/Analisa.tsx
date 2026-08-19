@@ -1312,6 +1312,47 @@ export default function Analisa() {
     void ambilPerforma(bolehContoh).then(setPerforma).catch(() => { /* panel kanal jalan tanpa performa */ });
     if (pengguna) void statusSaya().then((s) => { setMasuk(s.masuk); setStatusku(s.statusku); }).catch(() => { /* belum login */ });
   };
+
+  /* ── HALAMAN INI BERUBAH SENDIRI, JADI IA HARUS MEMERIKSA SENDIRI ──────
+     Laporan pemiliknya: sinyal XAUUSD-nya sudah kena TP tapi layar tetap
+     menulis "Berjalan". Ditelusuri, dan yang salah bukan MT5 dan bukan
+     penilainya — keduanya bekerja. Servernya sudah mencatat "kena TP"
+     lengkap dengan jam dan RR-nya.
+
+     Yang tidak terjadi: halaman ini TIDAK PERNAH mengambil ulang datanya.
+     `segarkan()` cuma dipanggil sesudah orangnya memposting sinyal atau
+     menyimpan profil — dua hal yang ia lakukan sendiri. Sementara sinyal
+     berubah karena HARGA, bukan karena tombol: penilai server menandainya
+     tiap lima menit tanpa ada yang menyentuh layar ini.
+
+     Jadi apa pun yang termuat saat halaman dibuka akan bertahan di sana
+     sampai dimuat ulang. Yang membuatnya sulit disadari: datanya tidak
+     salah, cuma tua — dan layar yang menampilkan angka tua terlihat persis
+     sama dengan layar yang menampilkan angka terbaru.
+
+     ── DUA PEMICU, DAN KEDUANYA HEMAT ────────────────────────────────────
+     Menyegarkan saat TABNYA KEMBALI TERLIHAT menutup kejadian yang paling
+     sering: orangnya membuka tab lain, kembali beberapa jam kemudian, dan
+     langsung mendapat yang terbaru tanpa satu permintaan pun terbuang
+     selama ia pergi.
+
+     Selang satu menit menangani yang menunggui layarnya. Dijaga
+     `visibilityState`: tab latar tidak meminta apa-apa. Ini bukan
+     kerapian — koneksi yang dipakai proyek ini dibatasi kuota, dan halaman
+     yang memanggil server tiap menit selamanya di tab yang terlupakan itu
+     tagihan yang tidak seorang pun memintanya. */
+  const segarkanRef = useRef(segarkan);
+  segarkanRef.current = segarkan;
+  useEffect(() => {
+    const terlihat = () => document.visibilityState === 'visible';
+    const j = setInterval(() => { if (terlihat()) segarkanRef.current(); }, 60_000);
+    const saatKembali = () => { if (terlihat()) segarkanRef.current(); };
+    document.addEventListener('visibilitychange', saatKembali);
+    return () => {
+      clearInterval(j);
+      document.removeEventListener('visibilitychange', saatKembali);
+    };
+  }, []);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(segarkan, [pengguna?.uid]);
 
