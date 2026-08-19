@@ -117,6 +117,7 @@ const Dokumentasi   = lazy(() => muat(() => import('@/halaman/Dokumentasi')));
 const Changelog     = lazy(() => muat(() => import('@/halaman/Changelog')));
 const Legal         = lazy(() => muat(() => import('@/halaman/Legal')));
 const CopyTrading   = lazy(() => muat(() => import('@/halaman/Analisa')));
+const HalamanHarga  = lazy(() => muat(() => import('@/halaman/Harga')));
 const Markas        = lazy(() => muat(() => import('@/halaman/Markas')));
 const Sosmed        = lazy(() => muat(() => import('@/halaman/Sosmed')));
 
@@ -389,6 +390,16 @@ export default function App() {
             <Route path="/social"         element={<Sosmed />} />
             <Route path="/maintenance"    element={<Maintenance />} />
             <Route path="/billing"        element={<Billing />} />
+            {/* Daftar paket DI DALAM aplikasi. Ada karena halaman depan
+                tidak bisa dipakai untuk ini: "/" merender Beranda begitu
+                orangnya login, jadi tautan "/#harga" mendarat di halaman
+                yang tidak punya jangkar itu — tombolnya ditekan, tidak
+                terjadi apa-apa.
+
+                Komponennya SAMA dengan yang di halaman depan, bukan salinan.
+                Dua daftar harga yang harus diperbarui bersamaan adalah dua
+                daftar harga yang suatu hari berbeda. */}
+            <Route path="/harga"          element={<HalamanHarga />} />
             <Route path="/docs"           element={<Dokumentasi />} />
             <Route path="/changelog"      element={<Changelog />} />
           </Route>

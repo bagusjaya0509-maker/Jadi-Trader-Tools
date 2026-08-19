@@ -394,10 +394,10 @@ export default function ScreenerV2() {
             semuanya sudah terpakai. Jatahnya kembali penuh saat masa aktifmu diperpanjang.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
-            <a href="/#harga"
-               className="rounded-md bg-zinc-100 px-4 py-2 text-[12.5px] font-medium text-zinc-950 transition-colors hover:bg-white">
+            <Link to="/harga"
+                  className="rounded-md bg-zinc-100 px-4 py-2 text-[12.5px] font-medium text-zinc-950 transition-colors hover:bg-white">
               Lihat paket tanpa batas
-            </a>
+            </Link>
             <Link to="/dashboard"
                   className="rounded-md border border-zinc-800 px-4 py-2 text-[12.5px] text-zinc-300 transition-colors hover:border-zinc-700">
               Kembali ke Dashboard
