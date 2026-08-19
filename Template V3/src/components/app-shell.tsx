@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { NavLink, useLocation, Link } from 'react-router-dom';
+import { NavLink, useLocation, Link, useSearchParams } from 'react-router-dom';
 import {
   LayoutGrid, BarChart3, Briefcase, Users, Plug, CandlestickChart,
   Wallet, TrendingUp, Wrench, CreditCard, LifeBuoy, BookOpen,
@@ -595,6 +595,40 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   /* Aktif-tidaknya SUB dibandingkan dengan alamat penuh (path + query):
      NavLink bawaan hanya melihat pathname, jadi kedua sub /copy akan
      sama-sama menyala. */
+  /* ── SUB-MENU YANG TUMBUH SAAT SEBUAH KANAL DIBUKA ────────────────────
+     Kanal yang sedang dibaca hidup di alamat (?kanal=<uid>), jadi sidebar
+     bisa mengetahuinya tanpa satu pun state dibagi antar komponen.
+
+     Selama tidak ada kanal terbuka, menunya persis seperti semula. Begitu
+     satu dibuka, "Market Signal" bertunas: Area Analis, dan di dalamnya dua
+     tab yang memang ada di layarnya.
+
+     Sidebar yang berhenti di "Market Signal" padahal orangnya sudah dua
+     lapis di dalamnya membuat satu-satunya penunjuk posisi di aplikasi ini
+     berbohong soal di mana orangnya berada. */
+  const [cariUrl] = useSearchParams();
+  const kanalUrl = cariUrl.get('kanal') || '';
+  const alamatKanal = (tab?: string) =>
+    `/copy-signal?kanal=${encodeURIComponent(kanalUrl)}${tab ? '&sub=' + tab : ''}`;
+
+  function subDinamis(ke: string, sub: any[]) {
+    if (ke !== '/copy-signal' || !kanalUrl) return sub;
+    return sub.map((s: any) =>
+      s.ke === '/copy-signal'
+        ? {
+            ...s,
+            anak: [{
+              ke: alamatKanal(),
+              label: 'Area Analis',
+              anak: [
+                { ke: alamatKanal(),         label: 'Performa Signal' },
+                { ke: alamatKanal('market'), label: 'Market Signal' },
+              ],
+            }],
+          }
+        : s);
+  }
+
   const subAktif = (ke: string) => {
     const [p, q] = ke.split('?');
     if (p !== pathname) return false;
@@ -732,17 +766,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   </div>
                   {sub && !ciut && subTerbuka(ke) && (
                     <div className="mb-1 ml-[17px] border-l border-zinc-800 pl-3">
-                      {sub.map((s: any) => (
-                        <Link key={s.ke} to={s.ke} onClick={() => setLaci(false)}
-                          className={cn(
-                            'block rounded-md px-2 py-1.5 text-[12px] transition-colors',
-                            subAktif(s.ke)
-                              ? 'bg-zinc-800/50 text-zinc-100'
-                              : 'text-zinc-500 hover:bg-zinc-900 hover:text-zinc-200',
-                          )}
-                        >
-                          {s.label}
-                        </Link>
+                      {subDinamis(ke, sub).map((s: any) => (
+                        <BarisSub key={s.ke} butir={s} aktif={subAktif}
+                                  tutupLaci={() => setLaci(false)} />
                       ))}
                     </div>
                   )}
@@ -818,5 +844,39 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </div>
 
     </div>
+  );
+}
+
+/* Menggambar satu butir sub-menu BESERTA keturunannya, berapa pun dalamnya.
+   Ditulis rekursif, bukan dua lapis yang disalin: sidebar ini sudah punya
+   tiga tingkat, dan tingkat keempat yang datang nanti tidak boleh menuntut
+   penulisan ulang. */
+function BarisSub({ butir, aktif, tutupLaci }: {
+  butir: any;
+  aktif: (ke: string) => boolean;
+  tutupLaci: () => void;
+}) {
+  return (
+    <>
+      <Link to={butir.ke} onClick={tutupLaci}
+        className={cn(
+          'block rounded-md px-2 py-1.5 text-[12px] transition-colors',
+          aktif(butir.ke)
+            ? 'bg-zinc-800/50 text-zinc-100'
+            : 'text-zinc-500 hover:bg-zinc-900 hover:text-zinc-200',
+        )}
+      >
+        {butir.label}
+      </Link>
+      {Array.isArray(butir.anak) && butir.anak.length > 0 && (
+        /* Garis tepinya menipis tiap turun satu tingkat — kedalaman terbaca
+           dari beratnya, bukan cuma dari jaraknya. */
+        <div className="ml-2 border-l border-zinc-800/60 pl-2.5">
+          {butir.anak.map((a: any) => (
+            <BarisSub key={a.ke} butir={a} aktif={aktif} tutupLaci={tutupLaci} />
+          ))}
+        </div>
+      )}
+    </>
   );
 }

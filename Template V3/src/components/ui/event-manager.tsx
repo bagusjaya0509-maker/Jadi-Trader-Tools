@@ -287,11 +287,11 @@ export function EventManager({
   }
 
   return (
-    <div className={cn("flex flex-col gap-4", className)}>
+    <div className={cn("flex flex-col gap-4 [&_button]:text-[12px]", className)}>
       {/* Header */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
-          <h2 className="text-xl font-semibold sm:text-2xl">
+          <h2 className="text-[15px] font-semibold sm:text-[17px]">
             {view === "month" &&
               currentDate.toLocaleDateString("id-ID", {
                 month: "long",
@@ -380,7 +380,7 @@ export function EventManager({
             placeholder={petunjukCari}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
+            className="h-9 pl-9 text-[12.5px]"
           />
           {searchQuery && (
             <Button
@@ -978,7 +978,7 @@ function EventCard({
       >
         <div
           className={cn(
-            "rounded px-1.5 py-0.5 text-xs font-medium transition-all duration-300",
+            "rounded px-1.5 py-0.5 text-[10.5px] font-medium transition-all duration-300",
             colorClasses.bg,
             "text-white truncate animate-in fade-in slide-in-from-top-1",
             isHovered && "scale-105 shadow-lg z-10",
@@ -991,10 +991,14 @@ function EventCard({
             <Card className="border-2 p-3 shadow-xl">
               <div className="space-y-2">
                 <div className="flex items-start justify-between gap-2">
-                  <h4 className="font-semibold text-sm leading-tight">{event.title}</h4>
+                  <h4 className="text-[12.5px] font-semibold leading-tight">{event.title}</h4>
                   <div className={cn("h-3 w-3 rounded-full flex-shrink-0", colorClasses.bg)} />
                 </div>
-                {event.description && <p className="text-xs text-muted-foreground line-clamp-2">{event.description}</p>}
+                {event.description && (
+                  <p className="whitespace-pre-line text-[11px] leading-relaxed text-muted-foreground">
+                    {event.description}
+                  </p>
+                )}
                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
                   <Clock className="h-3 w-3" />
                   <span>
@@ -1090,7 +1094,11 @@ function EventCard({
                 <h4 className="font-semibold leading-tight">{event.title}</h4>
                 <div className={cn("h-4 w-4 rounded-full flex-shrink-0", colorClasses.bg)} />
               </div>
-              {event.description && <p className="text-sm text-muted-foreground">{event.description}</p>}
+              {event.description && (
+                <p className="whitespace-pre-line text-[11.5px] leading-relaxed text-muted-foreground">
+                  {event.description}
+                </p>
+              )}
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Clock className="h-3.5 w-3.5" />
@@ -1186,7 +1194,7 @@ function MonthView({
     <Card className="overflow-hidden">
       <div className="grid grid-cols-7 border-b">
         {["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"].map((day) => (
-          <div key={day} className="border-r p-2 text-center text-xs font-medium last:border-r-0 sm:text-sm">
+          <div key={day} className="border-r p-1.5 text-center text-[11px] font-medium last:border-r-0">
             <span className="hidden sm:inline">{day}</span>
             <span className="sm:hidden">{day.charAt(0)}</span>
           </div>
@@ -1216,7 +1224,7 @@ function MonthView({
             >
               <div
                 className={cn(
-                  "mb-1 flex h-5 w-5 items-center justify-center rounded-full text-xs sm:h-6 sm:w-6 sm:text-sm",
+                  "mb-1 flex h-5 w-5 items-center justify-center rounded-full text-[11px] sm:h-[22px] sm:w-[22px]",
                   isToday && "bg-primary text-primary-foreground font-semibold",
                 )}
               >
@@ -1291,7 +1299,7 @@ function ListView({
       <div className="space-y-6">
         {Object.entries(groupedEvents).map(([date, dateEvents]) => (
           <div key={date} className="space-y-3">
-            <h3 className="text-xs font-semibold text-muted-foreground sm:text-sm">{date}</h3>
+            <h3 className="text-[11px] font-semibold text-muted-foreground">{date}</h3>
             <div className="space-y-2">
               {dateEvents.map((event) => {
                 const colorClasses = getColorClasses(event.color)
@@ -1306,11 +1314,11 @@ function ListView({
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                           <div className="min-w-0">
-                            <h4 className="font-semibold text-sm group-hover:text-primary transition-colors sm:text-base truncate">
+                            <h4 className="truncate text-[12.5px] font-semibold transition-colors group-hover:text-primary">
                               {event.title}
                             </h4>
                             {event.description && (
-                              <p className="mt-1 text-xs text-muted-foreground sm:text-sm line-clamp-2">
+                              <p className="mt-1 line-clamp-2 whitespace-pre-line text-[11.5px] text-muted-foreground">
                                 {event.description}
                               </p>
                             )}
@@ -1359,7 +1367,7 @@ function ListView({
           </div>
         ))}
         {sortedEvents.length === 0 && (
-          <div className="py-12 text-center text-sm text-muted-foreground sm:text-base">Tidak ada yang cocok</div>
+          <div className="py-10 text-center text-[12.5px] text-muted-foreground">Tidak ada yang cocok</div>
         )}
       </div>
     </Card>

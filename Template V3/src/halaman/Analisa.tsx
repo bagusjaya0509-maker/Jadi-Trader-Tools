@@ -986,7 +986,29 @@ export default function Analisa() {
      dikelompokkan PER ANALIS seperti papan kanal: satu orang sering
      memposting banyak sinyal, dan menderetkan semuanya rata membuat rekam
      jejak per orangnya tidak pernah terlihat utuh. */
-  const [kanalBuka, setKanalBuka] = useState<string | null>(null);
+  /* ── KANAL YANG TERBUKA HIDUP DI ALAMAT, BUKAN DI STATE ───────────────
+     Dulu `useState`, dan itu menutup tiga hal sekaligus:
+
+     1. Sidebar tidak mungkin tahu kanal siapa yang sedang dibuka, jadi
+        sub-menu "Area Analis" tidak bisa digambar sama sekali.
+     2. Kanal seseorang tidak bisa ditautkan. Menyalin alamatnya lalu
+        membukanya di tempat lain mendarat di daftar, bukan di kanalnya.
+     3. Muat ulang halaman membuang kanal yang sedang dibaca.
+
+     Ketiganya satu sebab, jadi satu perbaikan. */
+  const kanalBuka = cariSub.get('kanal') || null;
+
+  /* Pindah kanal MENGOSONGKAN `sub`, bukan mempertahankannya. Tab yang
+     sedang dibuka milik kanal yang barusan ditinggalkan; membawanya ke kanal
+     lain berarti menebak bahwa orangnya ingin melihat hal yang sama tentang
+     orang yang berbeda. Yang bawaan lebih baik daripada yang ditebak. */
+  const setKanalBuka = (uid: string | null) =>
+    setCariSub((p) => {
+      const b = new URLSearchParams(p);
+      if (uid) b.set('kanal', uid); else b.delete('kanal');
+      b.delete('sub');
+      return b;
+    }, { replace: true });
   const { disematkan, ubahPin } = usePinAnalis();
   /** Halaman depan Market Signal: daftar kanal, belum masuk ke kanal siapa
    *  pun. Dipakai memutuskan apa yang boleh menumpuk di kepala halaman —
@@ -1037,7 +1059,15 @@ export default function Analisa() {
      MENGOSONGKAN parameternya — dan alamat tanpa parameter di dalam kanal
      berarti Performa, jadi tombolnya memantul balik ke tab yang barusan
      ditinggalkan. */
-  const setSub = (id: IdSub) => setCariSub(id === bawaanSub ? {} : { sub: id }, { replace: true });
+  /* Disunting dari parameter yang SEDANG BERLAKU, bukan ditulis dari nol.
+     Bentuk lamanya menyerahkan objek utuh, dan itu menghapus `kanal`:
+     menekan tab di dalam kanal akan melemparkan orangnya keluar ke daftar. */
+  const setSub = (id: IdSub) =>
+    setCariSub((p) => {
+      const b = new URLSearchParams(p);
+      if (id === bawaanSub) b.delete('sub'); else b.set('sub', id);
+      return b;
+    }, { replace: true });
 
   /* ── Peringatan risiko: tampil 3 detik, lalu menyusut sendiri ──────────
      Keputusan pemilik 17 Agu 2026, sesudah sempat dicoba jadi kaki halaman
