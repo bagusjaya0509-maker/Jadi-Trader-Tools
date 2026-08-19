@@ -933,6 +933,18 @@ type IdSub = typeof SUB[number]['id'];
    agennya siap. Ubah ke `true` untuk menampilkannya lagi. */
 const TAMPIL_RAK_SINYAL = false;
 
+/** Sinyal ini pasar kripto (Binance) atau Trade-Fi (MT5)?
+ *
+ *  `pasar` sudah dikirim server, tapi analisa LAMA — yang diposting sebelum
+ *  medan itu ada — tidak punya. Bentuk pasangannya jadi jaring pengaman:
+ *  yang berakhiran USDT pasti kripto, sisanya Trade-Fi. Tanpa cadangan itu
+ *  sinyal lama semuanya jatuh ke satu kelompok yang salah, dan yang paling
+ *  lama justru yang paling banyak dipakai menilai rekam jejak. */
+function pasarKripto(s: RingkasAnalisa): boolean {
+  if (s.pasar) return s.pasar === 'kripto';
+  return /USDT$/i.test(s.pasangan || '');
+}
+
 export default function Analisa() {
   /* Sub-halaman DIBACA DARI ALAMAT (`#/copy?sub=performa`), bukan cuma dari
      state: sidebar sekarang punya sub-menu yang menunjuk langsung ke sini,
@@ -2330,14 +2342,52 @@ export default function Analisa() {
                       Tidak ada sinyal di ruangan ini.
                     </p>
                   ) : (
-                    <div className="flex items-stretch gap-4 overflow-x-auto pb-1">
-                      {tampil.map((a) => (
-                        <div key={a.id} className="flex w-[320px] shrink-0">
-                          <KartuAnalisa a={a} status={statusku[a.id]}
-                            milikku={a.uid === pengguna?.uid} pemilik={pemilik} onSegarkan={segarkan}
-                            performa={performa} hargaKini={hargaUntuk(a.pasangan)}
-                            dibatalkanAnalis={terpilih.filter((s) => s.hasil === 'batal')}
-                            berjalanAnalis={berjalan.length} />
+                    /* ── DIPISAH MENURUT PASAR, DI KETIGA RAK ─────────────
+                       Kripto dan Trade-Fi berjejer rata dulu, dan itu
+                       menyamarkan perbedaan yang justru menentukan bisa
+                       tidaknya sebuah sinyal diikuti: BTCUSDT jalan terus
+                       tujuh hari seminggu, XAUUSD berhenti akhir pekan dan
+                       buka lagi Senin. Order yang "menunggu harga" di dua
+                       pasar itu bukan keadaan yang sama — yang satu bisa
+                       kena malam ini, yang satu menunggu pasar buka.
+
+                       Lotnya juga tidak sebanding, dan eksekusinya di tempat
+                       berbeda: Binance untuk yang satu, MT5 untuk yang lain.
+                       Orang yang cuma memasang salah satunya perlu tahu
+                       mana yang bisa ia tiru tanpa membaca satu per satu.
+
+                       Kelompok KOSONG tidak digambar. Judul "Trade-Fi" di
+                       atas rak kosong tidak menerangkan apa pun, dan di rak
+                       yang isinya satu pasar saja ia cuma menambah baris. */
+                    <div className="space-y-4">
+                      {[
+                        { kunci: 'kripto' as const, judul: 'Kripto', sumber: 'Binance Futures',
+                          isi: tampil.filter(pasarKripto) },
+                        { kunci: 'tradefi' as const, judul: 'Trade-Fi', sumber: 'MetaTrader 5',
+                          isi: tampil.filter((s) => !pasarKripto(s)) },
+                      ].filter((g) => g.isi.length > 0).map((g) => (
+                        <div key={g.kunci}>
+                          <div className="mb-2 flex items-center gap-2">
+                            <span className="text-[12px] font-medium text-zinc-300">{g.judul}</span>
+                            <span className="angka text-[11px] text-zinc-600">{g.isi.length}</span>
+                            <span className="text-[11px] text-zinc-700">· {g.sumber}</span>
+                            {/* Garis mengisi sisa lebar: ia memisahkan kelompok
+                                ini dari yang di bawahnya tanpa menambah kotak
+                                bertepi yang berat di layar yang sudah penuh
+                                kartu bertepi. */}
+                            <span className="h-px flex-1 bg-zinc-800/70" />
+                          </div>
+                          <div className="flex items-stretch gap-4 overflow-x-auto pb-1">
+                            {g.isi.map((a) => (
+                              <div key={a.id} className="flex w-[320px] shrink-0">
+                                <KartuAnalisa a={a} status={statusku[a.id]}
+                                  milikku={a.uid === pengguna?.uid} pemilik={pemilik} onSegarkan={segarkan}
+                                  performa={performa} hargaKini={hargaUntuk(a.pasangan)}
+                                  dibatalkanAnalis={terpilih.filter((s) => s.hasil === 'batal')}
+                                  berjalanAnalis={berjalan.length} />
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       ))}
                     </div>
