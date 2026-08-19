@@ -47,38 +47,23 @@ export interface AngkaPameran {
 }
 
 const KOSONG: AngkaPameran = { siap: false, jumlah: 0, winrate: 0, bersih: 0, kurva: [], tumbuh: 0, saldo: 0, sejak: 0, judul: '', sub: '', contoh: false };
+/* ── Kenapa angkanya tidak lagi di sini ───────────────────────────────
+   Dulu berkas ini juga memuat PAMERAN_CONTOH: winrate 57,6%, 213
+   transaksi, saldo 1.140,50 — angka ilustrasi yang digambar kartu hero.
 
-/* ── Angka ilustrasi untuk pengunjung yang BELUM masuk ────────────────────
-   Jurnal showcase adalah data trading pemilik yang sesungguhnya — termasuk
-   saat sedang minus. Menampilkannya ke anggota adalah fitur kejujuran;
-   menampilkannya ke setiap orang asing di halaman jualan berarti memajang
-   rapor pribadi pemilik di etalase, dan pemiliknya tidak pernah memilih itu.
+   Itu jadi bug yang dilaporkan pemiliknya: kartu di halaman depan tidak
+   pernah cocok dengan Dashboard, dan tidak bisa cocok. Ia mengimpor data
+   contoh, Dashboard berubah, kartunya tidak. Ia menghapus datanya,
+   Dashboard kosong, kartunya tetap. Konstanta tidak menghitung apa pun.
 
-   Maka pengunjung tanpa akun melihat kartu ILUSTRASI: angkanya sengaja
-   sedang-sedang saja (winrate 57%, bukan 90%), kurvanya punya penurunan,
-   dan kartunya MEMBAWA LABEL "contoh" yang terlihat. Batasnya di situ:
-   peraga berlabel adalah tangkapan layar produk; angka karangan yang
-   mengaku rekam jejak adalah tipuan — dan yang kedua persis yang dilarang
-   halaman Disclaimer kita sendiri.
+   Angka kartu hero sekarang datang dari useRingkasanAkun() di
+   lib/ringkasan.ts — hook yang SAMA dengan yang dipakai Dashboard.
+   usePosisiPameran() ikut dibuang: strip posisi terbuka sekarang memakai
+   usePosisi(), yang sudah menegakkan kepemilikan.
 
-   Kurvanya ditulis tangan, bukan digenerate: deret yang naik-turun wajar
-   lebih meyakinkan (dan lebih jujur soal sifat trading) daripada tangga
-   mulus ke kanan atas. bersih = selisih ujung kurva; tumbuh = bersih/awal —
-   ketiganya HARUS konsisten satu sama lain karena pembaca yang teliti akan
-   menghitungnya. */
-export const PAMERAN_CONTOH: AngkaPameran = {
-  siap: true,
-  jumlah: 213,
-  winrate: 57.6,
-  bersih: 140.5,
-  kurva: [1000, 1012, 1004, 1031, 1058, 1044, 1079, 1102, 1088, 1121, 1153, 1140.5],
-  tumbuh: 14.1,
-  saldo: 1140.5,
-  /* ~9 bulan lalu — cukup lama untuk terlihat teruji, tidak sok veteran. */
-  sejak: Date.now() - 270 * 86_400_000,
-  judul: '', sub: '',
-  contoh: true,
-};
+   Yang TERSISA di berkas ini cuma TEKS hero (judul & subjudul) terbitan
+   pemilik — itu memang setelan situs, bukan data akun. Medan angka di
+   AngkaPameran dibiarkan supaya bentuk dokumennya tetap terbaca utuh. */
 
 /** Firestore REST membungkus tiap nilai dalam objek bertipe. */
 function nilai(f: any): any {
@@ -216,36 +201,3 @@ function muatDariShowcase(
 
    Diambil lewat REST karena alasan yang sama dengan angka pameran di atas:
    halaman depan tidak boleh membayar 450 kB untuk satu daftar pendek. */
-export interface PosisiPameran {
-  simbol: string;
-  arah: 'BUY' | 'SELL';
-  entry: number;
-  tf: string;
-}
-
-export function usePosisiPameran(): PosisiPameran[] {
-  const [daftar, setDaftar] = useState<PosisiPameran[]>([]);
-
-  useEffect(() => {
-    let hidup = true;
-    fetch(DOK.replace('jurnalShowcase', 'posisiTerbuka'))
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-      .then((j) => {
-        if (!hidup) return;
-        const arr = j?.fields?.posisi?.arrayValue?.values ?? [];
-        setDaftar(arr.map((v: any) => {
-          const f = v?.mapValue?.fields ?? {};
-          return {
-            simbol: String(nilai(f.simbol) ?? ''),
-            arah: nilai(f.arah) === 'SELL' ? 'SELL' : 'BUY',
-            entry: Number(nilai(f.entry)) || 0,
-            tf: String(nilai(f.tf) ?? ''),
-          };
-        }).filter((p: PosisiPameran) => p.simbol));
-      })
-      .catch(() => { /* marquee kosong lebih baik daripada marquee karangan */ });
-    return () => { hidup = false; };
-  }, []);
-
-  return daftar;
-}

@@ -1,8 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, LineChart, Wallet, Crown, Check, X, RotateCcw } from "lucide-react";
-import { useAngkaPameran, usePosisiPameran, PAMERAN_CONTOH } from "@/lib/pameran";
-import { useAuth } from "@/lib/auth";
+/* Dari pameran.ts tinggal TEKS-nya. Angkanya dulu juga dari sana — dan itu
+   biang laporan "data homepage tidak sama dengan dashboard": yang dipakai
+   PAMERAN_CONTOH, konstanta tulis tangan yang tidak pernah menghitung apa
+   pun, jadi impor maupun hapus data tidak menggerakkannya sedikit pun. */
+import { useAngkaPameran } from "@/lib/pameran";
+import { useRingkasanAkun } from "@/lib/ringkasan";
+import { usePosisi } from "@/lib/data";
 import { JUDUL_BERANDA, SUB_BERANDA, bacaTeksLokal, simpanTeksLokal } from "@/lib/teks-beranda";
 
 /* ── Grafik portofolio hero, digambar tangan ──────────────────────────────
@@ -155,38 +160,39 @@ const LATAR = ['hero-bg.webp', 'hero-bg2.webp', 'hero-bg3.webp']
   .map((n) => import.meta.env.BASE_URL + n);
 
 export default function HeroSection() {
-  /* Hero memakai angka PAMERAN — jurnal yang memang sengaja dipublikasikan,
-     bukan data pengguna yang sedang masuk. Diambil lewat REST API dengan
-     `fetch` biasa, bukan SDK: SDK-nya menyeret ±450 kB ke halaman yang
-     paling sering dibuka orang yang belum tentu masuk. */
-  const nyata = useAngkaPameran();
-  const posisi = usePosisiPameran();
+  /* ── ANGKANYA MILIK YANG SEDANG MELIHAT ───────────────────────────────
+     Hero ini cuma tampil SESUDAH LOGIN — halaman logout punya heronya
+     sendiri di Template.tsx. Jadi kartu ini seharusnya sejak awal
+     menggambarkan akun yang sedang dibuka, dan sekarang begitu.
 
-  /* Kartu statistik: angka rekening SUNGGUHAN hanya untuk PEMILIKNYA.
-     Semua orang lain — termasuk yang sudah punya akun — mendapat kartu
-     ilustrasi berlabel "contoh".
+     Dua salah arah yang diperbaiki sekaligus:
 
-     Sebelum ini gerbangnya `pengguna`, yaitu "sudah login". Itu terbaca
-     masuk akal tapi bukan pagar: mendaftar gratis dan makan dua puluh
-     detik, jadi siapa pun yang penasaran bisa melewatinya. Ketahuan saat
-     pemiliknya membuka situsnya sendiri dengan akun uji coba dan melihat
-     saldo, kurva, serta posisi MANA miliknya sendiri terpampang di sana.
+     1. Angkanya dulu konstanta di lib/pameran.ts. Pemiliknya mengimpor data
+        contoh — Dashboard berubah, kartu ini tidak. Ia menghapus data
+        contohnya — Dashboard kosong, kartu ini tetap di $1.140,50. Bukan
+        selisih hitungan: kartunya memang tidak pernah menghitung.
 
-     Yang bocor bukan cuma angka. Saldo berjalan, persen naik-turun, dan
-     daftar posisi yang sedang terbuka adalah rekening pribadi seseorang —
-     dan halaman itu halaman jualan, bukan laporan kinerja.
+     2. Sebelum itu lagi ia menampilkan ringkasan PEMILIK ke tiap akun yang
+        login, lengkap dengan posisi terbukanya.
 
-     Ada alasan kedua yang berdiri sendiri: angkanya TERBIT OTOMATIS dari
-     Dashboard tiap kali berubah, tanpa ada yang menekan apa pun. Jadi
-     rekening yang kebetulan sedang merah hari itu langsung jadi bahan
-     etalase. Etalase yang berubah sendiri mengikuti hari buruk seseorang
-     bukan etalase.
+     useRingkasanAkun() adalah hook yang SAMA dengan yang dipakai Dashboard.
+     Bukan rumus yang disalin — objek yang sama. Dua layar yang menghitung
+     sendiri-sendiri adalah dua layar yang suatu hari berselisih, dan yang
+     berselisih di sini saldo orang. */
+  const { angka, siap, contoh } = useRingkasanAkun();
 
-     Selama status auth belum diketahui, ORANG LAIN yang diasumsikan.
-     Salah tebak sebentar berarti pemiliknya melihat kartu contoh sekejap —
-     bukan orang lain melihat rekening pemiliknya sekejap. */
-  const { pemilik } = useAuth();
-  const pameran = pemilik ? nyata : PAMERAN_CONTOH;
+  /* Posisi miliknya sendiri. usePosisi() sudah menegakkan kepemilikan:
+     pemilik melihat dokumennya sendiri, yang lain melihat posisi bursanya
+     sendiri atau kosong — tidak pernah posisi orang lain. */
+  const { data: posisi } = usePosisi();
+
+  /* Judul & subjudul hero masih terbitan pemilik, dan itu memang benar:
+     teks itu setelan situs, bukan data akun. */
+  const teksTerbit = useAngkaPameran();
+
+  /* Dirakit jadi satu objek supaya bagian gambar di bawah tidak berubah:
+     yang berganti sumbernya, bukan tampilannya. */
+  const pameran = { ...angka, siap, contoh, judul: teksTerbit.judul, sub: teksTerbit.sub };
 
   /* ── Teks hero: lokal > terbitan pemilik > bawaan ── */
   const [teks, setTeks] = useState(() => {

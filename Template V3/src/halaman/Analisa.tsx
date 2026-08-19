@@ -954,9 +954,15 @@ export default function Analisa() {
      permintaan itu bisa dikirim tanpa membuka halaman ini sama sekali. */
   const bolehPosting = pemilik || (!memuatPaket && paketku.postingSinyal);
 
-  /* Alamat langsung ke ?sub=posting dipulangkan ke daftar, bukan dibiarkan
-     membuka tab yang tombolnya sengaja tidak ada. */
-  const sub: IdSub = subMinta === 'posting' && !bolehPosting ? 'market' : subMinta;
+  /* Tabnya TETAP TERBUKA dan formulirnya tetap bisa diisi — keputusan
+     pemilik. Yang dimatikan cuma tombol kirimnya.
+
+     Menyembunyikan tabnya lebih mudah, tapi salah sasaran: orang yang
+     sedang mencoba produk justru perlu MELIHAT apa yang akan ia dapat.
+     Formulir yang bisa diisi sampai ujung lalu berhenti di satu tombol
+     berlabel jelas menerangkan nilainya jauh lebih baik daripada menu
+     yang tidak pernah ia tahu ada. */
+  const sub: IdSub = subMinta;
 
   /* Kanal yang sedang dibuka — null berarti daftar kanal. Sinyal kini
      dikelompokkan PER ANALIS seperti papan kanal: satu orang sering
@@ -1397,7 +1403,7 @@ export default function Analisa() {
           border-t, bukan border-b: garisnya kini memisahkan dari yang di
           ATAS, bukan menggarisbawahi dirinya sendiri. */}
       <div className="mb-4 flex flex-wrap gap-1.5 border-t border-zinc-800/80 pt-3">
-        {SUB.filter((s) => s.id !== 'posting' || bolehPosting).map((s) => (
+        {SUB.map((s) => (
           <button key={s.id} onClick={() => setSub(s.id)}
             className={cn('cursor-pointer rounded-md px-3 py-1.5 text-[12.5px] transition-colors',
               sub === s.id ? 'bg-zinc-100 font-medium text-zinc-950' : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200')}>
@@ -1814,6 +1820,24 @@ export default function Analisa() {
                 pun — pekerjaan yang tidak menghasilkan apa-apa, disodorkan
                 sebagai keharusan. */}
 
+            {/* Tooltip saja tidak cukup: di layar sentuh ia tidak pernah
+                muncul, dan tombol mati tanpa keterangan terbaca sebagai
+                halaman rusak — bukan sebagai batas yang disengaja. */}
+            {!bolehPosting && (
+              <div className="mt-3 rounded-lg border border-sky-500/25 bg-sky-500/[0.04] px-3.5 py-3">
+                <p className="text-[12px] leading-relaxed text-zinc-400">
+                  <span className="text-sky-300">Mode pratinjau</span> — semua alat terbuka, tapi
+                  memposting sinyal belum. Sinyal tidak bisa dihapus setelah terbit dan ikut
+                  dihitung papan peringkat, jadi ia menunggu akses dulu. Formulir ini boleh kamu
+                  isi sampai ujung untuk melihat isinya.
+                </p>
+                <Link to="/harga"
+                      className="mt-2.5 inline-block rounded-md bg-zinc-100 px-3.5 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white">
+                  Lihat paket
+                </Link>
+              </div>
+            )}
+
             <div className="mt-3 flex items-center gap-3">
               <button onClick={() => void posting()}
                 /* Syarat `!judul.trim()` DIHAPUS bersama kolomnya. Ia sempat
@@ -1826,9 +1850,16 @@ export default function Analisa() {
                    cuma kelengkapan formulir dan dua persetujuan — keduanya
                    soal sinyal yang sedang dikirim, bukan soal masa lalu
                    orangnya. */
-                disabled={sibuk || !ringkas.trim() || !entry || !sl || !tp
+                /* `!bolehPosting` DIDAHULUKAN di title supaya alasan yang
+                   sebenarnya yang terbaca. Tanpa itu, orang bermode pratinjau
+                   dengan formulir separuh terisi membaca "Entry, SL, dan TP
+                   harus terisi", melengkapinya, lalu tombolnya tetap mati —
+                   petunjuk yang menyuruh mengerjakan sesuatu yang tidak
+                   membuka apa pun. */
+                disabled={sibuk || !bolehPosting || !ringkas.trim() || !entry || !sl || !tp
                           || !izinJurnal || !pahamPermanen}
-                title={!ringkas.trim() ? 'Isi ringkasan publik dulu — itu yang jadi judul kartunya'
+                title={!bolehPosting ? 'Mode pratinjau: semua alat terbuka, tapi memposting sinyal perlu akses'
+                  : !ringkas.trim() ? 'Isi ringkasan publik dulu — itu yang jadi judul kartunya'
                   : !entry || !sl || !tp ? 'Entry, SL, dan TP harus terisi'
                   : !izinJurnal || !pahamPermanen ? 'Centang kedua persetujuan dulu' : undefined}
                 className="flex cursor-pointer items-center gap-2 rounded-md bg-zinc-100 px-3.5 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50">

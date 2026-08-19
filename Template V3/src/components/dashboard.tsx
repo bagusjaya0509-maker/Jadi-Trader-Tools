@@ -5,14 +5,17 @@ import {
 import { Wallet, Percent, TrendingUp, Scale, Clock } from 'lucide-react';
 import { Panel, PanelHead, KartuKpi, BadgeTren, TipGrafik, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn, uang, persen, harga, tanggalPendek } from '@/lib/utils';
-import { statGabungan, statPer, plPerBulan, saldoDuaBulan, type Bulan } from '@/lib/hitung';
+import { plPerBulan, type Bulan } from '@/lib/hitung';
 
-import { useRiwayat, usePosisi, useSaldoAwal, terbitkanRingkasan } from '@/lib/data';
+import { usePosisi, terbitkanRingkasan } from '@/lib/data';
+/* Modal, statistik, saldo broker, dan kurva TIDAK lagi dihitung di sini —
+   semuanya datang dari useRingkasanAkun(), hook yang sama yang menggambar
+   kartu hero halaman depan. Itu sebabnya daftar impor ini menyusut. */
+import { useRingkasanAkun } from '@/lib/ringkasan';
 import { useAuth } from '@/lib/auth';
 import { useHargaPasar } from '@/lib/harga';
 import { LabelContoh, SpandukContoh } from '@/components/gerbang';
-import { useAkunMt5, useAkunBinance, versiKurangDari, VERSI_EA_PENDING } from '@/lib/akun';
-import { useArusKas, arusBersih } from '@/lib/tulis-jurnal';
+import { versiKurangDari, VERSI_EA_PENDING } from '@/lib/akun';
 import { PanelEvaluasi } from '@/components/panel-evaluasi';
 import { TabelPosisi } from '@/components/tabel-posisi';
 import { barisPendingKripto, rencanaLokal } from '@/lib/pending-kripto';
@@ -88,7 +91,17 @@ function TipBulan({ active, payload }: { active?: boolean; payload?: { payload: 
 }
 
 export function Dashboard() {
-  const { data: RIWAYAT, contoh } = useRiwayat();
+  /* SATU sumber hitungan, dipakai layar ini DAN kartu hero halaman depan.
+
+     Dulu rumusnya ditulis di sini, dan hero memakai konstanta yang ditulis
+     tangan — jadi kedua layar tidak pernah bisa cocok, apa pun yang
+     dikerjakan orangnya. Sekarang keduanya menggambar objek yang sama.
+     Lihat lib/ringkasan.ts untuk riwayat selisih yang mendahuluinya. */
+  const {
+    RIWAYAT, contoh, saldoAwal, stat, forex, kripto,
+    mt5, binance, saldoForex, saldoKripto, totalSaldo, sumberSaldo,
+    kurvaSaldo, titikIni, adaBulanLalu, selisihSaldo, angka,
+  } = useRingkasanAkun();
   const { data: posisiMentah, pending: pendingMentah, stop: stopKripto, contoh: kriptoContoh } = usePosisi();
   /* Harga bursa TIDAK diambil untuk data contoh: barisnya sudah membawa
      hargaKini dan pnlFloat yang saling cocok, dan menimpanya dengan harga
@@ -101,32 +114,6 @@ export function Dashboard() {
      sini, padahal panel Trade-Fi tepat di sebelahnya menampilkannya. */
   const rencana = useMemo(() => rencanaLokal(), [pendingMentah]);
   const ORDER_PENDING = barisPendingKripto(pendingMentah, stopKripto, rencana);
-  const saldoAwal = useSaldoAwal();
-
-  /* SETORAN & PENARIKAN ikut dihitung, persis seperti di halaman Jurnal.
-     ──────────────────────────────────────────────────────────────────────
-     Jurnal memakai `saldoAwal + arusBersih(...)` sebagai modal; dashboard
-     dulu hanya `saldoAwal`. Begitu ada satu setoran saja, kedua halaman
-     langsung berselisih — dan selisihnya terbaca sebagai "dashboardnya
-     tidak sinkron", padahal keduanya benar menurut rumusnya masing-masing.
-
-     Arus kas dibebankan ke sumbernya sendiri, sama seperti di Jurnal:
-     setoran MT5 tidak boleh menaikkan saldo kripto. */
-  const { data: arus } = useArusKas();
-  const arusForex = arusBersih(arus, 'forex');
-  const arusKripto = arusBersih(arus, 'kripto');
-  const modalTotal = saldoAwal + arusForex + arusKripto;
-
-  const stat = statGabungan(RIWAYAT, modalTotal);
-  /* Rincian dari daftar yang SAMA dengan totalnya. Dashboard adalah
-     penjumlahan jurnal Trade-Fi dan Kripto — kalau ketiganya tidak berasal
-     dari satu array, angkanya pasti berselisih cepat atau lambat. */
-  /* Saldo awal dibebankan ke Trade-Fi saja, PERSIS seperti di halaman Jurnal.
-     Kalau dibebankan ke keduanya ia terhitung dua kali, dan penjumlahan dua
-     jurnal tidak akan pernah sama dengan total di dashboard. */
-  const forex = statPer(RIWAYAT, 'forex', saldoAwal + arusForex);
-  const kripto = statPer(RIWAYAT, 'kripto', arusKripto);
-
   /* Bulan dan kurva saldo DIHITUNG dari transaksi, tidak lagi dari daftar
      yang ditulis tangan di data/porto.ts. Daftar itu berisi Maret–Agustus
      dengan angka karangan, jadi akun yang transaksinya baru mulai bulan ini
@@ -141,51 +128,6 @@ export function Dashboard() {
     ? Number((((bulanIni.pnl - bulanLalu.pnl) / Math.abs(bulanLalu.pnl)) * 100).toFixed(1))
     : null;
 
-  /* Posisi MT5 NYATA dari EA, bukan tiga baris contoh yang ditulis di
-     data/porto.ts. Profitnya sudah dikonversi dari akun sen di lib/akun.ts. */
-  const mt5 = useAkunMt5();
-  const binance = useAkunBinance();
-
-  /* TOTAL SALDO = saldo jurnal Trade-Fi + saldo jurnal Kripto, dengan aturan
-     yang SAMA dengan kartu saldo di halaman Jurnal: kalau brokernya
-     tersambung, angka broker yang dipakai; kalau tidak, hasil hitungan
-     jurnal. Sebelumnya dashboard selalu memakai hitungan jurnal, jadi ia
-     berselisih dengan jurnal begitu MT5 atau Binance tersambung — dua
-     halaman menyebut hal yang sama dengan dua angka berbeda. */
-  /* `saldo !== null` SAJA, bukan `terhubung === true`: EA yang offline
-     masih membawa saldo laporan terakhirnya (atau salinan lokalnya), dan
-     angka itu tetap yang paling benar sampai ada transaksi baru. Syarat
-     lama membuat saldo mundur ke hitungan jurnal lama tiap MT5 desktop
-     ditutup — lalu angka mundur itu ikut TERBIT ke ringkasan yang dibaca
-     halaman depan. */
-  const saldoForex = mt5.saldo !== null ? mt5.saldo : forex.saldo;
-  const saldoKripto = binance.saldo !== null ? binance.saldo : kripto.saldo;
-  const totalSaldo = saldoForex + saldoKripto;
-  const sumberSaldo = [
-    mt5.terhubung === true ? 'MT5' : null,
-    binance.terhubung === true ? 'Binance' : null,
-  ].filter(Boolean);
-
-  /* Kurva saldo BERANGKAT DARI `totalSaldo`, angka yang sama persis dengan
-     kartu Total Saldo di atasnya dan kartu saldo di halaman Jurnal — saldo
-     broker kalau MT5/Binance tersambung, hitungan jurnal kalau tidak.
-     ──────────────────────────────────────────────────────────────────────
-     Setoran & penarikan SENGAJA TIDAK IKUT. Saldo broker sudah memuat uang
-     yang masuk dan keluar; menambahkannya lagi sebagai peristiwa di kurva
-     berarti menghitungnya dua kali, dan hari-hari sebelumnya jadi meleset
-     sebesar setoran itu. Yang menggerakkan kurva cuma P/L transaksi —
-     satu-satunya hal yang belum terkandung di titik acuannya.
-
-     Harus dihitung SETELAH totalSaldo diketahui, karena ia titik jangkarnya. */
-  const kurvaSaldo = useMemo(
-    () => saldoDuaBulan(RIWAYAT, saldoAwal, [], totalSaldo),
-    [RIWAYAT, saldoAwal, totalSaldo]
-  );
-  const titikIni = kurvaSaldo.filter((k) => k.ini !== null);
-  const adaBulanLalu = kurvaSaldo.some((k) => k.lalu !== null);
-  const awalKurva = titikIni[0]?.ini ?? saldoAwal;
-  const akhirKurva = titikIni[titikIni.length - 1]?.ini ?? saldoAwal;
-  const selisihSaldo = awalKurva ? ((akhirKurva - awalKurva) / Math.abs(awalKurva)) * 100 : 0;
   const POSISI_MT5 = mt5.posisi;
   const pnlMt5 = POSISI_MT5.reduce((s, p) => s + p.profit, 0);
   /* null = tidak ada satu pun posisi yang membawa PnL dari bursa. Menjumlahkan
@@ -206,15 +148,10 @@ export function Dashboard() {
        rekam jejak sungguhan, dan menerbitkan hitungan yang berasal dari
        transaksi contoh akan membuatnya berbohong. */
     if (!pemilik || !RIWAYAT.length || contoh) return;
-    const r = {
-      saldo: Number(totalSaldo.toFixed(2)),
-      jumlah: stat.jumlah,
-      winrate: Number((stat.winrate ?? 0).toFixed(1)),
-      bersih: Number(stat.bersih.toFixed(2)),
-      kurva: titikIni.map((x) => x.ini as number),
-      tumbuh: Number(selisihSaldo.toFixed(1)),
-      sejak: Math.min(...RIWAYAT.map((t) => t.waktu).filter((x) => x > 0)),
-    };
+    /* Objek yang SAMA dengan yang digambar kartu hero — bukan disusun ulang
+       di sini. Menyusunnya ulang berarti dua daftar field yang harus
+       diperbarui bersamaan, dan yang satu pasti terlupa. */
+    const r = angka;
     const sidik = JSON.stringify(r);
     if (sidik === sidikTerbit.current) return;
     const j = setTimeout(() => {
@@ -222,7 +159,7 @@ export function Dashboard() {
       void terbitkanRingkasan(r, RIWAYAT).catch((e) => console.warn('ringkasan tidak terbit:', e));
     }, 2000);
     return () => clearTimeout(j);
-  }, [pemilik, RIWAYAT.length, totalSaldo, stat, kurvaSaldo, selisihSaldo]);
+  }, [pemilik, RIWAYAT.length, contoh, angka]);
 
   /* Aktivitas dirakit dari KEJADIAN NYATA: transaksi terakhir yang ditutup,
      posisi yang sedang terbuka, dan status sambungan. Daftar sebelumnya
