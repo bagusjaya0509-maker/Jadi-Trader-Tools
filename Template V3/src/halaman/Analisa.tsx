@@ -2288,7 +2288,13 @@ export default function Analisa() {
 
                  Isinya masih data contoh bawaan komponennya dan belum
                  tersambung ke sinyal siapa pun. Menunggu instruksi. */
-              if (sub === 'performa') return <PerformaKalender sinyal={terpilih} />;
+              /* `modal` dari server, bukan angka 1000 yang ditulis di sini:
+                 papan peringkat memakai nilai yang sama, dan dua layar yang
+                 memegang konstanta sendiri-sendiri adalah dua layar yang
+                 suatu hari memakai modal berbeda. */
+              if (sub === 'performa') {
+                return <PerformaKalender sinyal={terpilih} modal={performa?.modal ?? 1000} />;
+              }
               const selesai = terpilih.filter((s) => !!s.hasil);
               const belum = terpilih.filter((s) => !s.hasil);
               const menunggu = belum.filter(

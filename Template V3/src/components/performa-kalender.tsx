@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
 import { EventManager, type Event } from '@/components/ui/event-manager';
 import type { RingkasAnalisa } from '@/lib/analisa';
+import { cn } from '@/lib/utils';
+import { usd } from '@/lib/harga-akses';
 
 /* ════════════════════════════════════════════════════════════════════════
    PERFORMA SIGNAL — kalender & riwayat satu analis
@@ -64,6 +66,114 @@ function lamanya(mulai: number, selesai: number): string {
 function dolar(n: number): string {
   const tanda = n > 0 ? '+' : n < 0 ? '−' : '';
   return `${tanda}$${Math.abs(n).toFixed(2)}`;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   KURVA SALDO SATU ANALIS
+   ════════════════════════════════════════════════════════════════════════
+   Kalender menjawab "kapan dan berapa". Ini menjawab yang tidak bisa
+   dijawab kalender: KE MANA ARAHNYA. Deretan kotak hijau-merah tidak
+   memperlihatkan bahwa tujuh menang kecil bisa kalah oleh dua rugi besar —
+   kurva memperlihatkannya dalam sekali lihat.
+
+   ── ANGKANYA ESTIMASI, DAN ITU HARUS TERTULIS ──────────────────────────
+   Ini BUKAN uang sungguhan siapa pun. Ia hasil satu model: modal awal
+   tetap, risiko tetap per sinyal, dan tiap sinyal dianggap diikuti penuh.
+   Analisnya mungkin tidak pernah memegang modal sebesar itu, dan yang
+   meniru sinyalnya hampir pasti memakai angka lain.
+
+   Model yang sama sudah dipakai papan peringkat, dan angkanya datang dari
+   server lewat medan hasilDolar — layar ini tidak menghitung ulang apa pun.
+
+   ── DIGAMBAR TANGAN, BUKAN PAKAI RECHARTS ──────────────────────────────
+   Recharts memang sudah ada di proyek ini, tapi ia potongan ±380 kB yang
+   sekarang cuma dimuat halaman yang benar-benar memerlukannya. Menariknya
+   ke sini akan membebani halaman Copy Signal demi satu garis tanpa sumbu,
+   tanpa tooltip, dan tanpa legenda. Yang diperlukan cuma sebuah path.
+   ════════════════════════════════════════════════════════════════════════ */
+function KurvaSaldo({ sinyal, modal }: { sinyal: RingkasAnalisa[]; modal: number }) {
+  const titik = useMemo(() => {
+    const selesai = sinyal
+      .filter((s) => typeof s.hasilDolar === 'number' && (s.waktuHasil || s.dibuat))
+      .sort((a, b) => (a.waktuHasil || a.dibuat) - (b.waktuHasil || b.dibuat));
+    let saldo = modal;
+    /* Titik pertama modal awal, sebelum sinyal mana pun. Tanpa itu kurvanya
+       mulai dari hasil sinyal PERTAMA, dan hasil pertama yang kebetulan
+       menang membuat grafiknya seolah tidak pernah di bawah modal. */
+    const out = [{ t: selesai.length ? selesai[0].dibuat : Date.now(), v: modal }];
+    for (const s of selesai) {
+      saldo += s.hasilDolar as number;
+      out.push({ t: s.waktuHasil || s.dibuat, v: saldo });
+    }
+    return out;
+  }, [sinyal, modal]);
+
+  if (titik.length < 2) return null;
+
+  const akhir = titik[titik.length - 1].v;
+  const naik = akhir >= modal;
+  const nilai = titik.map((p) => p.v);
+
+  /* Rentangnya SELALU memuat garis modal. Kalau tidak, akun yang tidak
+     pernah menyentuh modal awal menggambar garis modalnya di luar bidang —
+     dan pembaca kehilangan satu-satunya patokan yang membuat kurvanya
+     berarti. */
+  const min = Math.min(...nilai, modal);
+  const max = Math.max(...nilai, modal);
+  const rentang = max - min || 1;
+
+  const W = 600, H = 120, padA = 8;
+  const X = (i: number) => (i / (titik.length - 1)) * W;
+  const Y = (v: number) => padA + (1 - (v - min) / rentang) * (H - padA * 2);
+
+  const d = titik.map((p, i) => (i ? 'L' : 'M') + X(i).toFixed(1) + ',' + Y(p.v).toFixed(1)).join(' ');
+  const warna = naik ? '#34d399' : '#f87171';
+  const selisih = akhir - modal;
+  const persen = modal ? (selisih / modal) * 100 : 0;
+
+  return (
+    <div className="mb-4 rounded-xl border border-zinc-800/70 bg-zinc-900/30 p-3.5">
+      <div className="mb-2.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <span className="text-[12.5px] font-medium text-zinc-200">Perkembangan saldo</span>
+        <span className={cn('angka text-[15px] font-semibold', naik ? 'text-emerald-400' : 'text-red-400')}>
+          {usd(akhir)}
+        </span>
+        <span className={cn('angka text-[11.5px]', naik ? 'text-emerald-400/80' : 'text-red-400/80')}>
+          {selisih >= 0 ? '+' : '−'}{usd(Math.abs(selisih))} · {selisih >= 0 ? '+' : '−'}{Math.abs(persen).toFixed(1)}%
+        </span>
+        <span className="ml-auto text-[11px] text-zinc-600">
+          Estimasi · modal {usd(modal)}, risiko 1% per sinyal
+        </span>
+      </div>
+
+      <div className="h-[120px] w-full">
+        <svg viewBox={'0 0 ' + W + ' ' + H} preserveAspectRatio="none" className="h-full w-full" aria-hidden>
+          <defs>
+            <linearGradient id="gradSaldoAnalis" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={warna} stopOpacity={0.28} />
+              <stop offset="100%" stopColor={warna} stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          {/* Garis modal awal: patokan yang memisahkan untung dari rugi.
+              Putus-putus supaya ia terbaca sebagai acuan, bukan sebagai data. */}
+          <line x1="0" y1={Y(modal)} x2={W} y2={Y(modal)}
+                stroke="#52525b" strokeWidth={1} strokeDasharray="4 4"
+                vectorEffect="non-scaling-stroke" />
+          <path d={d + ' L' + W + ',' + H + ' L0,' + H + ' Z'} fill="url(#gradSaldoAnalis)" />
+          {/* vectorEffect: tanpa ini tebal garisnya ikut melar saat
+              preserveAspectRatio="none" meregangkan viewBox ke lebar panel. */}
+          <path d={d} fill="none" stroke={warna} strokeWidth={1.8}
+                vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </div>
+
+      <p className="mt-2 text-[11px] leading-relaxed text-zinc-600">
+        Dihitung dari {titik.length - 1} sinyal yang sudah selesai, berurutan menurut waktu
+        penutupannya. Bukan hasil trading sungguhan — angka ini memakai model yang sama
+        dengan papan peringkat, bukan modal atau ukuran posisi analisnya.
+      </p>
+    </div>
+  );
 }
 
 export function keAcara(sinyal: RingkasAnalisa[]): Event[] {
@@ -133,7 +243,9 @@ export function keAcara(sinyal: RingkasAnalisa[]): Event[] {
   });
 }
 
-export default function PerformaKalender({ sinyal }: { sinyal: RingkasAnalisa[] }) {
+export default function PerformaKalender(
+  { sinyal, modal = 1000 }: { sinyal: RingkasAnalisa[]; modal?: number },
+) {
   const acara = useMemo(() => keAcara(sinyal), [sinyal]);
 
   /* Kategori & tag DITURUNKAN dari sinyalnya, bukan didaftar tangan —
@@ -148,6 +260,11 @@ export default function PerformaKalender({ sinyal }: { sinyal: RingkasAnalisa[] 
     () => [...new Set(acara.flatMap((a) => a.tags ?? []))].sort(), [acara]);
 
   return (
+    <>
+    {/* Kurva DI ATAS kalender: ia menjawab "layak diikuti atau tidak", dan
+        itu pertanyaan yang dibawa orang ke halaman ini. Kalendernya
+        menjawab pertanyaan berikutnya — kapan dan berapa. */}
+    <KurvaSaldo sinyal={sinyal} modal={modal} />
     <EventManager
       events={acara}
       categories={kategori}
@@ -169,5 +286,6 @@ export default function PerformaKalender({ sinyal }: { sinyal: RingkasAnalisa[] 
       tombolBaruMati
       judulTombolBaru="Copy Signal belum aktif — sistemnya masih dibangun"
     />
+    </>
   );
 }
