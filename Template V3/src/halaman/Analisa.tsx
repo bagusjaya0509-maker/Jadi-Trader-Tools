@@ -9,11 +9,12 @@ import {
 } from 'lucide-react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { PanelSinyal } from '@/components/panel-sinyal';
-import { PerformaAnalisSatu } from '@/components/performa-signal';
-/* TEMPELAN — sedang dinilai. PapanPeringkatSignal dicabut dari kepala
-   halaman dan diganti blok ini apa adanya, atas permintaan pemilik.
-   Komponennya masih ada di components/performa-signal.tsx dan masih dipakai
-   PerformaAnalisSatu, jadi mengembalikannya cukup satu baris. */
+import { PapanPeringkatSignal, PerformaAnalisSatu } from '@/components/performa-signal';
+/* TEMPELAN — sedang dinilai, ditaruh DI DALAM KANAL ANALIS.
+
+   Sempat dipasang di kepala Market Signal dan itu keliru: kepala halaman
+   adalah papan peringkat SEMUA analis, sedangkan yang ditempel ini
+   performa satu orang. Yang di kepala sudah dikembalikan. */
 import EventManagerDemo from '@/components/ui/event-manager-demo';
 import { ambilDraf } from '@/lib/draf-sinyal';
 import { AvatarAnalis } from '@/components/avatar-analis';
@@ -1385,7 +1386,7 @@ export default function Analisa() {
 
           Bisa dilipat: begitu seseorang tahu siapa yang ia ikuti, papan itu
           berubah jadi penghalang antara dia dan sinyalnya. */}
-      {diDepan && <EventManagerDemo />}
+      {diDepan && <PapanPeringkatSignal data={performa} />}
 
       {/* ── Bilah sub-halaman ───────────────────────────────────────────
           Dipindah ke SINI (18 Agu 2026) — di bawah papan peringkat beserta
@@ -2091,6 +2092,18 @@ export default function Analisa() {
                 Disclaimer
               </Link>
             </p>
+
+            {/* ── TEMPELAN, MASIH APA ADANYA ────────────────────────────
+                Duduk di sini karena ini RUANG SATU ANALIS: di atasnya nama
+                dan hitungannya, di bawahnya sinyal-sinyalnya. Performa satu
+                orang memang miliknya kanal ini, bukan milik kepala halaman —
+                di sana yang berdiri papan peringkat semua analis.
+
+                Isinya masih data contoh bawaan komponennya dan belum
+                tersambung ke sinyal siapa pun. Menunggu instruksi. */}
+            <div className="mb-4">
+              <EventManagerDemo />
+            </div>
             {/* ── DIPISAH TIGA RAK MENURUT KEADAANNYA ────────────────────
                 Sebelumnya seluruh sinyal satu kanal berjejer di satu rak
                 mendatar tanpa penanda apa pun, jadi order yang HARGANYA
