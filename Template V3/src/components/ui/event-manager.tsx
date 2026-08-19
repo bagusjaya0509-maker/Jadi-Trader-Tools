@@ -350,7 +350,15 @@ export function EventManager({
           </Button>
         </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+        {/* Dirapatkan ke KANAN, sejajar dengan panel Bulan/Daftar/Copy
+            Signal tepat di atasnya. Dua baris kendali yang tepi kanannya
+            segaris terbaca sebagai satu blok; yang satu kiri satu kanan
+            terbaca sebagai dua urusan yang tidak berhubungan.
+
+            gap-2 antara judul dan panahnya, bukan gap-4: panah itu MILIK
+            judulnya — ia menggeser bulan yang tertulis di sebelahnya — dan
+            jarak yang terlalu longgar membuatnya terlihat berdiri sendiri. */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end sm:gap-2">
           <h2 className="text-[15px] font-semibold sm:text-[17px]">
             {view === "month" &&
               currentDate.toLocaleDateString("id-ID", {
