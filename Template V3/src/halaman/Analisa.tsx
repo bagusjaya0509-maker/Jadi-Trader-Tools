@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { usePaket, LABEL_PAKET } from '@/lib/paket';
 import {
   Loader2, Lock, Unlock, Send, X, CheckCircle2,
@@ -418,6 +418,10 @@ function KartuAnalisa({ a, status, milikku, onSegarkan, performa, hargaKini }: {
   const [isi, setIsi] = useState<IsiAnalisa | null>(null);
   const [galeri, setGaleri] = useState<GambarAnalisa[]>([]);
   const [formBeli, setFormBeli] = useState(false);
+  /* Berpindah lewat router, bukan href: memuat ulang seluruh aplikasi cuma
+     untuk berpindah halaman di dalamnya membuang seluruh data yang sudah
+     diambil — termasuk level yang barusan dijemput. */
+  const navigate = useNavigate();
   const [bukti, setBukti] = useState('');
   const [sibuk, setSibuk] = useState(false);
   const [kabar, setKabar] = useState('');
@@ -465,12 +469,49 @@ function KartuAnalisa({ a, status, milikku, onSegarkan, performa, hargaKini }: {
      Tanpa ini, sinyal XAUUSD mendarat di chart yang mencari XAUUSD di
      Binance, bursa yang memang tidak punya simbol itu — dan pesan yang
      muncul menuduh jaringan padahal permintaannya yang salah alamat. */
-  const tautanChart = `/chart-entry?simbol=${encodeURIComponent(
-        (a.pasar === 'tradefi' ? 'MT5:' : '') + a.pasangan)}`
+  /* Dijadikan fungsi supaya level yang BARU DIJEMPUT bisa dipakai langsung,
+     tanpa menunggu render berikutnya. `setIsi` tidak mengubah `isi` di
+     dalam pemanggilan yang sedang berjalan — memakai variabelnya di situ
+     akan menghasilkan tautan tanpa garis, persis bug yang sedang dibetulkan. */
+  const alamatChart = (lv: IsiAnalisa | null) =>
+    `/chart-entry?simbol=${encodeURIComponent((a.pasar === 'tradefi' ? 'MT5:' : '') + a.pasangan)}`
     + (a.tf ? `&tf=${a.tf}` : '')
-    + (isi ? `&arah=${a.arah}&entry=${isi.entry}&sl=${isi.sl}&tp=${isi.tp}` : '');
+    + (lv ? `&arah=${a.arah}&entry=${lv.entry}&sl=${lv.sl}&tp=${lv.tp}` : '');
+  const tautanChart = alamatChart(isi);
   const bolehBatal = bisaDibatalkan(a, pengguna?.uid);
   const perfPenulis = performa?.analis.find((x) => x.uid === a.uid) ?? null;
+
+  /* Tautan chart yang MENJEMPUT levelnya dulu.
+     ──────────────────────────────────────────────────────────────────────
+     Laporan pemiliknya: sinyal yang sudah selesai dibuka di chart, garis
+     entry/SL/TP-nya tidak ikut. Perbaikan sebelumnya membuat tombol "Buka
+     analisa" muncul untuk sinyal selesai, tapi itu menyisakan satu langkah
+     yang tidak masuk akal: levelnya sudah GRATIS, orangnya sudah menekan
+     "Buka di Chart", dan ia masih harus menekan tombol lain dulu supaya
+     yang diminta ikut terbawa.
+
+     Sekarang tombolnya yang menjemput. Kalau levelnya belum ada di tangan
+     tapi memang boleh dibuka, ia diambil dulu, baru chart-nya dibuka —
+     dengan garisnya lengkap.
+
+     SATU permintaan, dan hanya saat diklik. Memuatnya otomatis untuk tiap
+     kartu akan berarti belasan permintaan tiap kali kanal dibuka, untuk
+     level yang mungkin tidak satu pun dilihat orang. */
+  async function keChart(e: React.MouseEvent) {
+    if (isi || !bisaBuka) return;             // sudah lengkap, atau memang terkunci
+    e.preventDefault();
+    setSibuk(true);
+    try {
+      const h = await bukaIsi(a.id);
+      setIsi(h.isi);
+      setGaleri(h.galeri);
+      navigate(alamatChart(h.isi));
+    } catch {
+      /* Gagal mengambil level bukan alasan menahan orang di halaman ini —
+         chart tetap dibuka, cuma tanpa garisnya. */
+      navigate(alamatChart(null));
+    } finally { setSibuk(false); }
+  }
 
   async function muatIsi() {
     setSibuk(true); setKabar('');
@@ -719,7 +760,16 @@ function KartuAnalisa({ a, status, milikku, onSegarkan, performa, hargaKini }: {
               <p className="w-full whitespace-pre-line text-[12px] leading-relaxed text-zinc-400">{isi.alasan}</p>
             )}
             <Galeri
-              analisaId={a.id} galeri={galeri} bisaTambah={!!pengguna}
+              /* bisaTambah SELALU false: menambah foto ke sinyal ditutup
+                  seluruhnya, bukan cuma di formulir postingnya. Foto galeri
+                  menempel pada ANALISANYA — siapa pun yang boleh membukanya
+                  bisa menambahkan gambar ke sana — jadi meninggalkan pintu
+                  ini terbuka membuat pencabutan di formulir tidak berarti
+                  apa-apa.
+
+                  Komponennya dibiarkan utuh: ia masih menampilkan foto yang
+                  sudah ada, dan menyalakannya lagi cukup satu nilai. */
+              analisaId={a.id} galeri={galeri} bisaTambah={false}
               uidku={pengguna?.uid} penulisku={milikku}
               onBerubah={setGaleri}
             />
@@ -782,7 +832,7 @@ function KartuAnalisa({ a, status, milikku, onSegarkan, performa, hargaKini }: {
                 Yang tersisa dari keadaan itu warnanya: putih pekat kalau
                 levelnya memang ikut terbawa, bergaris tipis kalau chart-nya
                 terbuka tanpa level. */}
-            <Link to={tautanChart}
+            <Link to={tautanChart} onClick={(e) => void keChart(e)}
               title={isi
                 ? 'Buka chart dengan entry, SL, dan TP sudah terisi'
                 : bisaBuka
@@ -866,8 +916,15 @@ function SlotAgen({ urutan }: { urutan: number }) {
    ia juga salah tempat: memposting sinyal bukan sesuatu yang dilakukan
    "di dalam" kanal orang lain. */
 const SUB = [
-  { id: 'performa', label: 'Performa Signal' },
+  /* URUTANNYA: 'market' duluan, dan di dalam kanal ia yang terbuka
+     pertama — keputusan pemilik, mengubah yang sebelumnya.
+
+     Alasannya masuk akal begitu dilihat dari sisi orang yang mengklik: ia
+     baru saja memilih sebuah kanal dari daftar yang SUDAH memperlihatkan
+     winrate, estimasi, dan kurva saldonya. Rekam jejaknya sudah ia baca —
+     yang belum ia lihat justru sinyalnya. */
   { id: 'market',   label: 'Market Signal' },
+  { id: 'performa', label: 'Performa Signal' },
   { id: 'posting',  label: 'Posting Signal' },
 ] as const;
 type IdSub = typeof SUB[number]['id'];
@@ -1022,7 +1079,7 @@ export default function Analisa() {
   /* Masuk kanal, yang pertama terlihat Performa Signal — keputusan pemilik.
      Orang membuka kanal seseorang untuk menimbang apakah ia layak diikuti,
      dan itu pertanyaan tentang rekam jejak, bukan tentang sinyal terbarunya. */
-  const bawaanSub: IdSub = diDepan ? 'market' : 'performa';
+  const bawaanSub: IdSub = 'market';
   const sub: IdSub = subMinta && tabTampil.some((s) => s.id === subMinta) ? subMinta : bawaanSub;
 
   /* Bawaan tidak ditulis ke alamat, tab lain ditulis. Kalau 'market' selalu
@@ -1130,7 +1187,6 @@ export default function Analisa() {
      Disatukan di sini, bukan di dalam JSX-nya: kalau nanti ada tombol
      kedua yang membuka chart dari formulir ini, ia memakai nilai yang sama
      dan tidak bisa lupa dengan cara yang sama. */
-  const simbolUntukChart = (pasar === 'tradefi' ? 'MT5:' : '') + pasangan.trim().toUpperCase();
 
   /* ── Profil analis: nama tampilan & avatar ────────────────────────────
      Dibuka dari ikon gerigi di kepala panel Posting Signal — bukan halaman
@@ -1341,7 +1397,7 @@ export default function Analisa() {
   async function posting() {
     setSibuk(true); setKabar(''); setNada('info');
     try {
-      const hasil = await kirimAnalisa({
+      await kirimAnalisa({
         /* Judul rekaman diturunkan dari ringkasan — kolomnya sudah dihapus
            dari formulir. Server tetap mewajibkannya, dan kartu-kartu lama
            yang judulnya berbeda dari ringkasannya tetap tampil apa adanya. */
@@ -1357,22 +1413,8 @@ export default function Analisa() {
         snapshot,
         izinJurnal,
       });
-      /* Sampul diunggah SESUDAH analisanya ada — galeri butuh id-nya.
-         Kegagalan unggah TIDAK membatalkan postingan: analisanya sudah
-         permanen di server, dan menampilkan "gagal memposting" untuk
-         sampul yang tidak jadi terpasang akan membuat orang memposting
-         ulang analisa yang sebenarnya sudah masuk. */
-      let kabarSampul = '';
-      if (sampul && hasil?.id) {
-        try {
-          await tambahGambar(hasil.id, sampul, 'Sampul analisa',
-            pengguna?.displayName || pengguna?.email?.split('@')[0] || '');
-        } catch (e) {
-          kabarSampul = ' (sampul gagal diunggah — bisa ditambahkan lagi lewat galeri)';
-        }
-      }
       setNada('ok');
-      setKabar(`Analisa terposting — dan kini permanen. Semoga levelnya bekerja.${kabarSampul}`);
+      setKabar('Analisa terposting — dan kini permanen. Semoga levelnya bekerja.');
       setRingkas(''); setEntry(''); setSl(''); setTp(''); setAlasan('');
       setIzinJurnal(false); setPahamPermanen(false); setSampul(''); setQtyDraf(0);
       segarkan();
@@ -1854,64 +1896,20 @@ export default function Analisa() {
                   className="w-full resize-y rounded-md border border-zinc-800 bg-zinc-900/60 p-2.5 text-[12.5px] text-zinc-200 outline-none focus-visible:border-zinc-600" />
               </div>
             </div>
-            {/* ── Sampul dari Chart & Entry ───────────────────────────────
-                Level bisa diketik tangan di kolom di atas, tapi menyusunnya
-                di chart jauh lebih tepat — dan sampulnya cuma bisa lahir di
-                sana, karena yang membuat sampul layak dilihat adalah gambar
-                analisanya: fibonacci, kotak SNR, garis tren. Chart mini di
-                dalam formulir ini hanya akan menghasilkan lilin polos plus
-                tiga garis, sampul yang tidak memberi tahu apa pun. */}
-            <div className="mt-3 rounded-lg border border-zinc-800 bg-zinc-950/60 p-3">
-              {sampul ? (
-                <div className="flex flex-wrap items-start gap-3">
-                  {/* Gambar kecilnya SENDIRI bisa diklik untuk membesar —
-                      selain tombolnya. Ukuran 160×96 tidak cukup untuk
-                      menilai apakah levelnya kelihatan, dan sampul yang tidak
-                      pernah diperiksa terbit apa adanya ke calon pembeli. */}
-                  <button onClick={() => setLihatSampul(true)} title="Lihat ukuran penuh"
-                          className="shrink-0 cursor-zoom-in">
-                    <img src={sampul} alt="Sampul analisa"
-                         className="h-24 w-40 rounded border border-zinc-800 object-cover transition-opacity hover:opacity-80" />
-                  </button>
-                  <div className="min-w-0 grow">
-                    <div className="text-[12px] font-medium text-zinc-200">Sampul terpasang</div>
-                    <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-500">
-                      Tangkapan layar chart-mu ikut terbit sebagai sampul analisa ini.
-                      Periksa dulu sebelum memposting — sinyalnya permanen.
-                    </p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <button onClick={() => setLihatSampul(true)}
-                        className="cursor-pointer rounded-md border border-zinc-700 px-2.5 py-1 text-[11.5px] text-zinc-200 transition-colors hover:border-zinc-500">
-                        Lihat sampul
-                      </button>
-                      <Link to={`/chart-entry?simbol=${encodeURIComponent(simbolUntukChart)}&untuk=sinyal&arah=${arah}`
-                              + (entry ? `&entry=${entry}` : '') + (sl ? `&sl=${sl}` : '') + (tp ? `&tp=${tp}` : '')}
-                        className="rounded-md border border-zinc-700 px-2.5 py-1 text-[11.5px] text-zinc-300 transition-colors hover:border-zinc-500">
-                        Susun ulang di Chart
-                      </Link>
-                      <button onClick={() => setSampul('')}
-                        className="cursor-pointer rounded-md border border-zinc-800 px-2.5 py-1 text-[11.5px] text-zinc-500 transition-colors hover:border-red-500/40 hover:text-red-400">
-                        Hapus sampul
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-wrap items-center gap-3">
-                  <ImagePlus className="size-4 shrink-0 text-zinc-600" />
-                  <p className="min-w-0 grow text-[11.5px] leading-relaxed text-zinc-500">
-                    Belum ada sampul. Susun rencanamu di Chart & Entry — geser garis entry, SL,
-                    dan TP, tambahkan gambar analisamu — lalu tekan{' '}
-                    <span className="text-zinc-300">"Ke Copy Signal"</span> di tiket order.
-                    Level dan tangkapan layarnya masuk ke formulir ini otomatis.
-                  </p>
-                  <Link to={`/chart-entry?simbol=${encodeURIComponent(pasangan)}&untuk=sinyal`}
-                    className="shrink-0 rounded-md bg-zinc-100 px-3 py-1.5 text-[11.5px] font-medium text-zinc-950 transition-colors hover:bg-white">
-                    Susun di Chart & Entry
-                  </Link>
-                </div>
-              )}
-            </div>
+            {/* KOTAK SAMPUL DICABUT — permintaan pemilik: pengguna tidak
+                boleh melampirkan foto saat memposting sinyal, karena
+                gambar yang diunggah orang tidak bisa diperiksa
+                keasliannya. Tangkapan layar chart bisa disunting, dan
+                sampul yang menunjukkan level rapi tapi tidak pernah
+                terjadi adalah bukti palsu yang terlihat meyakinkan
+                justru di tempat orang memutuskan mau menirunya.
+
+                Yang dinilai sekarang murni angkanya: entry/SL/TP yang
+                tercatat, dan hasil yang dihitung server dari lilin
+                sungguhan. Keduanya tidak bisa dikarang.
+
+                Sampul yang SUDAH terlanjur ada tetap tampil di kartunya —
+                yang ditutup jalan menambahnya, bukan yang sudah ada. */}
 
             {/* ── Dua persetujuan yang menjadikan seseorang analis ─────────
                 Keduanya disetujui SADAR pada tiap posting, bukan diingat:
