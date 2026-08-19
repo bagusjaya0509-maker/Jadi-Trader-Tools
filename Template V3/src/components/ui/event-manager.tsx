@@ -59,6 +59,17 @@ export interface EventManagerProps {
    *  ada tapi mati menerangkan rencana; tombol yang hilang tidak. */
   tombolBaruMati?: boolean
   judulTombolBaru?: string
+  /** Sembunyikan penyaring Warna.
+   *
+   *  Dipakai saat warnanya DITURUNKAN dari sesuatu yang sudah punya
+   *  penyaringnya sendiri. Di kalender performa, warna = hasil sinyal, dan
+   *  "Categories" sudah menyaring hasil sinyal — dua tombol untuk pekerjaan
+   *  yang sama persis, dan yang satu memakai kosakata yang lebih buruk
+   *  ("Green" vs "Kena TP"). */
+  sembunyikanFilterWarna?: boolean
+  /** Tulisan bayangan di kotak cari. Bawaannya "Search events..." — kalimat
+   *  yang menerangkan apa kotaknya, bukan apa yang bisa diketik ke dalamnya. */
+  petunjukCari?: string
   /** Isinya bukan milik yang melihat: kotak rinciannya jadi bacaan saja,
    *  tanpa Simpan dan tanpa Hapus. */
   hanyaBaca?: boolean
@@ -87,6 +98,8 @@ export function EventManager({
   tombolBaruMati = false,
   judulTombolBaru,
   hanyaBaca = false,
+  sembunyikanFilterWarna = false,
+  petunjukCari = "Search events...",
 }: EventManagerProps) {
   /* `initialEvents` dipakai sebagai NILAI AWAL saja oleh useState, jadi
      daftar yang datang belakangan (mis. sesudah fetch selesai) tidak akan
@@ -364,7 +377,7 @@ export function EventManager({
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search events..."
+            placeholder={petunjukCari}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9"
@@ -385,9 +398,11 @@ export function EventManager({
         <div className="sm:hidden -mx-4 px-4">
           <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
             {/* Color Filter */}
-            <DropdownMenu>
+            <DropdownMenu open={sembunyikanFilterWarna ? false : undefined}>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-2 whitespace-nowrap flex-shrink-0 bg-transparent">
+                <Button variant="outline" size="sm"
+                  className={cn("gap-2 whitespace-nowrap flex-shrink-0 bg-transparent",
+                    sembunyikanFilterWarna && "hidden")}>
                   <Filter className="h-4 w-4" />
                   Colors
                   {selectedColors.length > 0 && (
@@ -500,7 +515,8 @@ export function EventManager({
           {/* Color Filter */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2 bg-transparent">
+              <Button variant="outline" size="sm"
+                className={cn("gap-2 bg-transparent", sembunyikanFilterWarna && "hidden")}>
                 <Filter className="h-4 w-4" />
                 Colors
                 {selectedColors.length > 0 && (
