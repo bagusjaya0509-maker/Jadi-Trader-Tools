@@ -1,1 +1,0 @@
-import{a as r}from"./index-DQtsPWWD.js";import{P as s}from"./ruixen-pricing05-BsCBdYNT.js";import"./react-B0Mm-yK2.js";import"./firebase-D_y3CBvp.js";function o(){return r.jsx("div",{className:"p-4 sm:p-6",children:r.jsx("div",{className:"-my-16 sm:-my-20",children:r.jsx(s,{})})})}export{o as default};
