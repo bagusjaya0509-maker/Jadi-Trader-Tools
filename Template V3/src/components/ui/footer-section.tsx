@@ -142,16 +142,17 @@ function Footerdemo() {
 
           <div>
             <h3 className="mb-4 text-lg font-semibold">Badan usaha</h3>
-            {/* Yang tersisa: nama badan dan NOMOR NIB. Nomor itu yang bisa
-                diperiksa siapa pun di OSS, dan itulah gunanya dipajang.
+            {/* Nama badan, NOMOR NIB, dan WILAYAH — tanpa nama kota.
+                Nomor NIB itu yang bisa diperiksa siapa pun di OSS, dan
+                itulah gunanya dipajang.
 
-                TDPSE dan baris kota DICABUT atas permintaan pemiliknya.
-                Keduanya masih tersimpan di lib/badan.ts — dipakai halaman
-                Legal — jadi mencabutnya di sini tidak menghapus datanya,
-                cuma berhenti menampilkannya di footer. */}
+                TDPSE dicabut atas permintaan pemiliknya; nilainya masih ada
+                di lib/badan.ts dan tetap dipakai halaman Legal, karena di
+                sana ia memang diperlukan untuk UU PDP. */}
             <address className="space-y-2 text-sm not-italic text-muted-foreground">
               <p className="text-foreground">{BADAN.nama}</p>
               <p>NIB {BADAN.nib}</p>
+              <p>{BADAN.wilayah}</p>
               <p>
                 <a
                   href={`mailto:${BADAN.email}`}

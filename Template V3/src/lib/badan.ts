@@ -30,6 +30,16 @@ export const BADAN = {
   tdpse: '20260815-J6BNT',
 
   kota: 'Kota Mataram, Nusa Tenggara Barat, Indonesia',
+
+  /* Sama dengan `kota` tapi TANPA nama kotanya — dipakai footer halaman
+     depan. Bukan pengganti `kota`: halaman Legal dan Pendaratan tetap
+     memakai yang lengkap karena di sana identitas badan usaha memang harus
+     bisa dicocokkan, sementara footer cuma perlu menyatakan asalnya.
+
+     Dua medan, bukan satu yang dipotong saat digambar: memotong untai di
+     tempat pemakaian berarti aturan pemotongannya hidup di komponen, dan
+     komponen berikutnya akan memotongnya dengan cara lain. */
+  wilayah: 'Nusa Tenggara Barat - Indonesia',
   email: 'business@jaditrader.co.id',
 
   /* Nomor telepon usaha, sama dengan yang terdaftar di NIB (085947720369).
