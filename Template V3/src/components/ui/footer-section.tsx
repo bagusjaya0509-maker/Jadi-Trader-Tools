@@ -218,12 +218,13 @@ function Footerdemo() {
 
           <div className="mt-6 flex flex-col items-center justify-between gap-4 text-center text-sm md:flex-row md:text-left">
             <p className="text-muted-foreground">© 2026 {BADAN.nama}. Semua hak dilindungi.</p>
+            {/* "Harga & akses" dicabut di sini juga. Footer memuatnya DUA
+                kali — sekali di tautan cepat, sekali di baris bawah — dan
+                mencabut yang pertama saja meninggalkan yang kedua tetap
+                tayang. */}
             <nav className="flex gap-4">
               <Link to="/legal" className="text-muted-foreground transition-colors hover:text-foreground">
                 Disclaimer &amp; privasi
-              </Link>
-              <Link to="/akses" className="text-muted-foreground transition-colors hover:text-foreground">
-                Harga &amp; akses
               </Link>
             </nav>
           </div>
