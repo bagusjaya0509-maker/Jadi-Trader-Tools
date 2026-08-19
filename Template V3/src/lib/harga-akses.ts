@@ -33,6 +33,10 @@ export interface HargaPaket {
   hargaTestingCoret: number;
   hargaPremium3: number;
   hargaTahunan: number;
+  /** Nilai daftar produk marketplace yang ikut di paket tahunan. Dipakai
+      menghitung klaim hematnya, jadi ia setelan — bukan angka yang ditulis
+      tangan di kartu harga. */
+  nilaiMarketplace: number;
   /** Sakelar kartu event gratis dari Maintenance. */
   eventGratis: boolean;
   /** Tautan checkout per paket. KOSONG berarti paketnya belum bisa dibeli,
@@ -54,7 +58,8 @@ export const HARGA_BAWAAN: HargaPaket = {
   hargaTesting: 1,
   hargaTestingCoret: 5,
   hargaPremium3: 10,
-  hargaTahunan: 100,
+  hargaTahunan: 79,
+  nilaiMarketplace: 54,
   eventGratis: true,
   linkTesting: '',
   linkPremium3: '',

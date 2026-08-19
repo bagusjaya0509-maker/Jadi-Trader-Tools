@@ -139,6 +139,7 @@ export interface SetelanAkses extends Kuota {
   hargaTestingCoret: number;
   hargaPremium3: number;
   hargaTahunan: number;
+  nilaiMarketplace: number;
   eventGratis: boolean;
   linkTesting: string;
   linkPremium3: string;
@@ -156,7 +157,7 @@ export async function bacaSetelanAkses(): Promise<SetelanAkses> {
 export async function simpanSetelanAkses(nilai: {
   bukaPermintaan?: boolean; gratisTotal?: number; bayarTotal?: number; hari?: number;
   hargaTesting?: number; hargaTestingCoret?: number;
-  hargaPremium3?: number; hargaTahunan?: number; eventGratis?: boolean;
+  hargaPremium3?: number; hargaTahunan?: number; nilaiMarketplace?: number; eventGratis?: boolean;
   linkTesting?: string; linkPremium3?: string; linkTahunan?: string;
 }): Promise<SetelanAkses> {
   const r = await fetch(`${dasar()}/api/akses/setelan`, {

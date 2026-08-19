@@ -138,6 +138,7 @@ export function PanelSetelanAkses() {
         hargaTestingCoret: ubah.hargaTestingCoret ?? st.hargaTestingCoret,
         hargaPremium3: ubah.hargaPremium3 ?? st.hargaPremium3,
         hargaTahunan: ubah.hargaTahunan ?? st.hargaTahunan,
+        nilaiMarketplace: ubah.nilaiMarketplace ?? st.nilaiMarketplace,
         eventGratis: ubah.eventGratis ?? st.eventGratis,
         linkTesting: ubah.linkTesting ?? st.linkTesting,
         linkPremium3: ubah.linkPremium3 ?? st.linkPremium3,
@@ -261,6 +262,9 @@ export function PanelSetelanAkses() {
                 <Uang label="Tahunan" nilai={st.hargaTahunan}
                       catatan="sekali bayar untuk 12 bulan"
                       atur={(n) => setSt({ ...st, hargaTahunan: n })} />
+                <Uang label="Nilai produk Marketplace" nilai={st.nilaiMarketplace}
+                      catatan={`jumlah harga daftar indikator + EA yang ikut di paket tahunan — dipakai menghitung klaim hematnya`}
+                      atur={(n) => setSt({ ...st, nilaiMarketplace: n })} />
               </div>
             </div>
 

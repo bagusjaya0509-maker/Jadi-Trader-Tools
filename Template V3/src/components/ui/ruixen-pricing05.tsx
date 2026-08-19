@@ -41,6 +41,23 @@ export default function Pricing_05() {
     ? Math.round((1 - h.hargaPremium3 / setara3Bulan) * 100)
     : 0;
 
+  /* HEMAT PAKET TAHUNAN, dibandingkan dengan MERAKIT SENDIRI — bukan dengan
+     harga bulanan.
+
+     Sebabnya begitulah orang benar-benar berhitung. Yang mau setahun penuh
+     plus isi marketplace punya jalan lain yang nyata: beli paket 3 bulan
+     empat kali, lalu beli indikator dan EA-nya satuan. Kalau paket tahunan
+     tidak mengalahkan jalan itu, ia tidak punya alasan untuk dipilih — dan
+     pembaca yang teliti akan menemukannya sendiri.
+
+     Angka 4x sengaja: itu jalan termurah menutup 12 bulan lewat paket lain
+     yang ada di halaman yang sama. Membandingkan dengan yang lebih mahal
+     akan menghasilkan persen yang lebih besar dan lebih rapuh. */
+  const rakitSetahun = h.hargaPremium3 * 4 + h.nilaiMarketplace;
+  const hematTahunan = rakitSetahun > h.hargaTahunan && h.hargaTahunan > 0
+    ? Math.round((1 - h.hargaTahunan / rakitSetahun) * 100)
+    : 0;
+
   const pricingTiers = [
     ...(adaEvent
       ? [{
@@ -123,7 +140,11 @@ export default function Pricing_05() {
         { t: "Semua yang ada di Premium 3 Bulan" },
         { t: "Akses penuh SELURUH indikator & EA di Marketplace" },
         { t: "Termasuk rilis baru selama masa aktif" },
-        { t: "Harga terkunci satu tahun penuh" },
+        {
+          t: hematTahunan > 0
+            ? `${hematTahunan}% lebih murah dari beli satuan setahun (${usd(rakitSetahun)})`
+            : 'Harga terkunci satu tahun penuh',
+        },
       ],
     },
   ];
