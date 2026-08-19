@@ -70,7 +70,6 @@ const TAUTAN = [
   { ke: '/', teks: 'Beranda' },
   { ke: '/preview', teks: 'Lihat produk' },
   { ke: '/tour', teks: 'Coba tur' },
-  { ke: '/akses', teks: 'Harga & akses' },
   { ke: '/legal', teks: 'Disclaimer & privasi' },
 ] as const;
 
@@ -143,15 +142,16 @@ function Footerdemo() {
 
           <div>
             <h3 className="mb-4 text-lg font-semibold">Badan usaha</h3>
-            {/* Alamat berhenti di tingkat kota, dan itu keputusan yang sudah
-                dicatat di lib/badan.ts: alamat penuh di NIB adalah rumah
-                pemiliknya. Yang bisa diperiksa orang adalah NOMOR NIB di
-                OSS, bukan nama jalannya. */}
+            {/* Yang tersisa: nama badan dan NOMOR NIB. Nomor itu yang bisa
+                diperiksa siapa pun di OSS, dan itulah gunanya dipajang.
+
+                TDPSE dan baris kota DICABUT atas permintaan pemiliknya.
+                Keduanya masih tersimpan di lib/badan.ts — dipakai halaman
+                Legal — jadi mencabutnya di sini tidak menghapus datanya,
+                cuma berhenti menampilkannya di footer. */}
             <address className="space-y-2 text-sm not-italic text-muted-foreground">
               <p className="text-foreground">{BADAN.nama}</p>
               <p>NIB {BADAN.nib}</p>
-              <p>TDPSE {BADAN.tdpse}</p>
-              <p>{BADAN.kota}</p>
               <p>
                 <a
                   href={`mailto:${BADAN.email}`}
