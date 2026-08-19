@@ -486,6 +486,32 @@ function KartuAnalisa({ a, status, milikku, pemilik, onSegarkan, performa, dibat
   const [formBatal, setFormBatal] = useState(false);
 
   const bisaBuka = milikku || a.harga === 0 || status === 'pembeli';
+
+  /* ── TAUTAN "BUKA DI CHART" ──────────────────────────────────────────
+     Dulu tautan ini cuma ada SETELAH analisanya dibuka, terkubur di baris
+     Entry/SL/TP. Sekarang ia naik ke baris tombol dan ada di kedua
+     keadaan — terkunci maupun terbuka.
+
+     Yang dikirim berbeda, dan pembedanya bukan selera: PASANGAN dan ARAH
+     sudah tertulis terang di kepala kartu untuk semua orang, jadi
+     membukanya di chart tidak membocorkan apa pun. Yang dibayar adalah
+     LEVEL-nya — entry, SL, TP — dan itu cuma ikut kalau isinya memang
+     sudah ada di tangan.
+
+     Jadi yang belum membeli tetap bisa melihat chart pasangannya di
+     timeframe yang dianalisa; yang ia tidak dapat cuma garis-garisnya.
+     Gemboknya menyatakan persis itu.
+
+     AWALAN MT5: WAJIB untuk Trade-Fi. Halaman Chart memilih SUMBER DATA
+     dari bentuk simbolnya — tanpa awalan ia menarik lilin dari proxy VPS
+     ke Binance, dengan "MT5:" ia menarik dari lilin yang dikirim EA.
+     Tanpa ini, sinyal XAUUSD mendarat di chart yang mencari XAUUSD di
+     Binance, bursa yang memang tidak punya simbol itu — dan pesan yang
+     muncul menuduh jaringan padahal permintaannya yang salah alamat. */
+  const tautanChart = `/chart-entry?simbol=${encodeURIComponent(
+        (a.pasar === 'tradefi' ? 'MT5:' : '') + a.pasangan)}`
+    + (a.tf ? `&tf=${a.tf}` : '')
+    + (isi ? `&arah=${a.arah}&entry=${isi.entry}&sl=${isi.sl}&tp=${isi.tp}` : '');
   const bolehBatal = bisaDibatalkan(a, pengguna?.uid);
   const perfPenulis = performa?.analis.find((x) => x.uid === a.uid) ?? null;
 
@@ -701,10 +727,44 @@ function KartuAnalisa({ a, status, milikku, pemilik, onSegarkan, performa, dibat
               tiap sinyal diposting. Agen punya itu persis seperti manusia.
               Menyembunyikannya justru membuat satu-satunya peserta papan
               yang tidak bisa dinilai adalah yang menulis paling banyak. */}
-          <button onClick={() => setLihatPorto(true)}
-            className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 py-1.5 text-[11.5px] text-zinc-300 transition-colors hover:border-zinc-700">
-            <LineChart className="size-3.5" /> Lihat Performa Signal
-          </button>
+          {/* Sebaris, bukan bertumpuk. Keduanya sama-sama "buka sesuatu
+              tentang sinyal ini" — ditumpuk tegak mereka terbaca sebagai
+              dua tingkat kepentingan yang berbeda, padahal sejajar. */}
+          <div className="flex items-center gap-1.5">
+            <button onClick={() => setLihatPorto(true)}
+              className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 py-1.5 text-[11.5px] text-zinc-300 transition-colors hover:border-zinc-700">
+              <LineChart className="size-3.5" /> Performa Signal
+            </button>
+            {/* Gembok TERTUTUP selama levelnya belum jadi milik pembacanya,
+                TERBUKA begitu jadi. Ikon chart yang dulu di sini tidak
+                menerangkan apa-apa — tombolnya sudah bertuliskan "Chart".
+                Yang benar-benar perlu diketahui sebelum ditekan justru
+                apakah yang dibuka nanti berisi garis atau kosong.
+
+                Tampilannya ikut berubah, bukan cuma ikonnya: yang terbuka
+                jadi tombol padat karena memang tindakan utamanya; yang
+                terkunci tetap bergaris tipis, supaya tidak menjanjikan
+                lebih dari yang diberikannya.
+
+                Keterangannya punya TIGA keadaan, bukan dua. Gemboknya soal
+                HAK — boleh atau tidak. Tapi keterangan harus soal yang
+                benar-benar akan terjadi: sinyal gratis yang analisanya
+                belum dibuka memang boleh, tapi levelnya belum ada di
+                tangan, jadi tautannya juga belum membawanya. Menjanjikan
+                "sudah terisi" di situ akan meleset. */}
+            <Link to={tautanChart}
+              title={isi
+                ? 'Buka chart dengan entry, SL, dan TP sudah terisi'
+                : bisaBuka
+                  ? 'Buka analisanya dulu supaya entry, SL, dan TP ikut terbawa ke chart'
+                  : 'Chart terbuka di pasangan dan timeframe ini — level entry/SL/TP belum termasuk'}
+              className={cn('flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[11.5px] font-medium transition-colors',
+                bisaBuka
+                  ? 'bg-zinc-100 text-zinc-950 hover:bg-white'
+                  : 'border border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200')}>
+              {bisaBuka ? <Unlock className="size-3.5" /> : <Lock className="size-3.5" />} Buka di Chart
+            </Link>
+          </div>
           {/* Batalkan HANYA muncul untuk sinyal sendiri yang masih menunggu
               harga. Begitu entry tersentuh tombolnya hilang — dan itu bukan
               sekadar disembunyikan, server menolaknya juga. */}
@@ -724,32 +784,11 @@ function KartuAnalisa({ a, status, milikku, pemilik, onSegarkan, performa, dibat
             <span className="text-zinc-500">Entry <span className="angka text-zinc-200">{fHarga(isi.entry)}</span></span>
             <span className="text-zinc-500">SL <span className="angka text-red-400">{fHarga(isi.sl)}</span></span>
             <span className="text-zinc-500">TP <span className="angka text-emerald-500">{fHarga(isi.tp)}</span></span>
-            {/* Tautan membawa SELURUH rencana, bukan cuma simbolnya.
-                Dulu di sini sl/tp/arah ikut dikirim tapi halaman Chart
-                membuangnya — orang yang baru membayar analisa mendarat di
-                chart kosong dan harus mengetik ulang level yang barusan ia
-                beli, dari ingatan. Sekarang tiketnya terbuka sudah terisi.
-                `tf` ikut supaya yang tampil timeframe yang DIANALISA. */}
-            {/* AWALAN MT5: WAJIB untuk Trade-Fi, dan ini pernah rusak.
-                Halaman Chart memilih SUMBER DATA dari bentuk simbolnya:
-                tanpa awalan ia menarik lilin dari proxy VPS ke Binance,
-                dengan "MT5:" ia menarik dari lilin yang dikirim EA.
-
-                Dulu baris ini mengirim pasangan apa adanya, jadi sinyal
-                XAUUSD mendarat di chart yang mencari XAUUSD DI BINANCE —
-                bursa yang memang tidak punya simbol itu. Yang muncul
-                "Tidak ada data untuk simbol ini" dan "Proxy VPS mungkin
-                sedang tidak menjawab": dua pesan yang menuduh jaringan
-                padahal permintaannya sendiri yang salah alamat, dan itu
-                membuat orang mengira layanannya sedang mati. */}
-            <Link
-              to={`/chart-entry?simbol=${encodeURIComponent(
-                    (a.pasar === 'tradefi' ? 'MT5:' : '') + a.pasangan)}`
-                + (a.tf ? `&tf=${a.tf}` : '')
-                + `&arah=${a.arah}&entry=${isi.entry}&sl=${isi.sl}&tp=${isi.tp}`}
-              className="ml-auto flex items-center gap-1.5 rounded-md bg-zinc-100 px-2.5 py-1.5 text-[11.5px] font-medium text-zinc-950 transition-colors hover:bg-white">
-              <LineChart className="size-3.5" /> Buka di Chart &amp; Entry
-            </Link>
+            {/* Tautan "Buka di Chart" DULU di sini, sebaris dengan
+                Entry/SL/TP. Ia pindah naik ke baris tombol: di sini ia
+                cuma ada setelah analisanya dibuka, padahal pertanyaan
+                "chart-nya seperti apa" justru datang SEBELUM orang
+                memutuskan membuka. */}
             {isi.alasan && (
               /* whitespace-pre-line: analisa agen ditulis berparagraf dengan
                  judul bagian. Diperas jadi satu blok, ia berubah dari bacaan
