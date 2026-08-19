@@ -111,8 +111,15 @@ export function SparklineSaldo(
       {/* Latar setengah pekat: garisnya bisa lewat persis di belakang
           labelnya, dan angka tanpa alas di atas garis berwarna jadi sulit
           dibaca justru di kartu yang kurvanya paling ramai. */}
-      <span className={cn('absolute right-0 -translate-y-1/2 rounded bg-zinc-950/75 px-1 text-[9.5px] font-medium tabular-nums',
-                          naik ? 'text-emerald-300' : 'text-red-300')}
+      {/* PUTIH, bukan mengikuti warna kurvanya. Garis dan bidangnya sudah
+          hijau atau merah; angka yang ikut berwarna cuma mengulang hal yang
+          sama dengan cara yang lebih lemah. Putih membuatnya terbaca sebagai
+          keterangan — nilai, bukan penilaian.
+
+          8px: ia label penyerta, bukan angka utama. Yang utama sudah berdiri
+          di kotak Estimasi di sebelah kirinya dengan ukuran 15px, dan dua
+          angka sebesar itu di satu kotak berebut mata. */}
+      <span className="absolute right-0 -translate-y-1/2 rounded bg-zinc-950/75 px-1 text-[8px] tabular-nums text-zinc-100"
             style={{ top: yAkhir + '%' }}>
         {uang(akhir)}
       </span>
