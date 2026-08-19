@@ -110,11 +110,11 @@ export default function Pricing_05() {
       <div className="mx-auto max-w-6xl px-6 md:px-8">
         <div className="text-center max-w-2xl mx-auto">
           <h2 className="text-4xl font-semibold tracking-tight sm:text-5xl">
-            Satu produk, beberapa lama pakai
+            Pilih akses yang sesuai kebutuhanmu
           </h2>
           <p className="text-muted-foreground mt-4 text-lg">
-            Isinya sama di semua paket. Yang berbeda cuma berapa lama berlakunya —
-            dan berapa banyak yang bisa masuk.
+            Mulai gratis, coba lebih banyak fitur, atau gunakan akses penuh untuk
+            kebutuhan trading yang lebih serius.
           </p>
         </div>
 
@@ -216,10 +216,6 @@ export default function Pricing_05() {
           ))}
         </div>
 
-        <p className="mt-10 text-center text-xs leading-relaxed text-muted-foreground">
-          Jadi Trader Tools adalah perangkat bantu analisa dan pencatatan. Bukan penasihat
-          investasi, bukan pengelola dana, dan tidak menjanjikan hasil apa pun.
-        </p>
       </div>
     </section>
   );
