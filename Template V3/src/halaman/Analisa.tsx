@@ -4,7 +4,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { usePaket, LABEL_PAKET } from '@/lib/paket';
 import {
   Loader2, Lock, Unlock, Send, X, CheckCircle2,
-  TrendingUp, TrendingDown, RefreshCw, Radar, Sparkles, ImagePlus, Images, Flag, Ban,
+  TrendingUp, TrendingDown, RefreshCw, Radar, Sparkles, ImagePlus, Images, Flag, Ban, Trash2,
   Settings2, UserRound, Pin, TriangleAlert, ArrowLeft, CandlestickChart,
 } from 'lucide-react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
@@ -17,6 +17,7 @@ import { PapanPeringkatSignal } from '@/components/performa-signal';
    performa satu orang. Yang di kepala sudah dikembalikan. */
 import PerformaKalender from '@/components/performa-kalender';
 import { SparklineSaldo } from '@/components/kurva-saldo';
+import { DataLilinSinyal } from '@/components/data-lilin-sinyal';
 import { ambilDraf } from '@/lib/draf-sinyal';
 import { AvatarAnalis } from '@/components/avatar-analis';
 import { ringkasKanal, type RingkasKanal } from '@/lib/ringkas-kanal';
@@ -32,7 +33,7 @@ import {
   daftarAnalisa, kirimAnalisa, bukaIsi, mintaAkses,
   ambilProfilAnalis, simpanProfilAnalis,
   statusSaya, putuskanAkses, tambahGambar, hapusGambar, kecilkanGambar, ambilPerforma,
-  batalkanAnalisa, bisaDibatalkan,
+  batalkanAnalisa, bisaDibatalkan, keadaanSinyal,
   type RingkasAnalisa, type IsiAnalisa, type PermintaanMasuk, type GambarAnalisa, type Performa,
 } from '@/lib/analisa';
 
@@ -633,19 +634,41 @@ function KartuAnalisa({ a, status, milikku, onSegarkan, performa, hargaKini }: {
 
                   `terisi` yang membedakan, bukan jenis ordernya — Buy Limit
                   yang harganya sudah tersentuh SUDAH jadi posisi. */}
-              {!selesai && (
-                a.terisi || !a.jenisEntry || /^market$/i.test(a.jenisEntry) ? (
+{/* TIGA keadaan, dan yang ketiga yang menjadi pokok: "belum dinilai".
+
+                  Dulu di sini cuma ada dua cabang, dan cabang "Berjalan"
+                  ikut menampung sinyal yang jenisEntry-nya masih KOSONG —
+                  yaitu setiap sinyal yang baru diposting, sebelum penilai
+                  sempat menyentuhnya. Akibatnya order menggantung muncul
+                  sebagai posisi yang sudah jalan, lalu berpindah sendiri ke
+                  "Menunggu harga" beberapa menit kemudian tanpa ada apa pun
+                  yang terjadi di pasar. Itu laporan pemiliknya.
+
+                  Sekarang pembedanya keadaanSinyal(), dan keadaan yang belum
+                  diperiksa mengaku belum diperiksa. Warnanya sengaja zinc,
+                  bukan biru atau amber: ia bukan kabar tentang pasar, ia
+                  kabar tentang kami. */}
+              {!selesai && (() => {
+                const keadaan = keadaanSinyal(a);
+                if (keadaan === 'jalan') return (
                   <span title="Harga sudah menyentuh entry — titik masuknya sudah lewat"
                         className="flex items-center gap-1 rounded border border-sky-500/30 px-1.5 py-0.5 text-[10px] font-medium text-sky-400">
                     <span className="size-1.5 rounded-full bg-sky-400" /> Berjalan
                   </span>
-                ) : (
+                );
+                if (keadaan === 'nunggu') return (
                   <span title="Order menggantung — entry-nya belum tersentuh"
                         className="flex items-center gap-1 rounded border border-amber-500/30 px-1.5 py-0.5 text-[10px] font-medium text-amber-400">
                     <span className="size-1.5 rounded-full bg-amber-400" /> Menunggu harga
                   </span>
-                )
-              )}
+                );
+                return (
+                  <span title="Penilai belum sampai ke sinyal ini — keadaannya muncul setelah lilinnya dibaca, paling lama beberapa menit"
+                        className="flex items-center gap-1 rounded border border-zinc-700 px-1.5 py-0.5 text-[10px] font-medium text-zinc-500">
+                    <span className="size-1.5 rounded-full bg-zinc-600" /> Menunggu penilaian
+                  </span>
+                );
+              })()}
               {/* HARGA TERKINI — menjawab "rencana ini masih terpakai?"
                   ────────────────────────────────────────────────────────
                   Ditaruh di sini, bukan di dalam panel terkunci, karena
@@ -736,7 +759,17 @@ function KartuAnalisa({ a, status, milikku, onSegarkan, performa, hargaKini }: {
             <button onClick={() => setFormBatal(true)}
               title="Tarik rencana ini sebelum harganya datang — alasannya wajib dan tercatat permanen"
               className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 py-1.5 text-[11.5px] text-zinc-400 transition-colors hover:border-amber-500/40 hover:text-amber-300">
-              <Ban className="size-3.5" /> Batalkan
+              {/* Ikon bak sampah — permintaan pemilik, supaya tombolnya
+                  terbaca sekilas sebagai "tarik order ini" di antara tombol
+                  lain yang semuanya justru MEMBUKA sesuatu.
+
+                  SATU CATATAN untuk yang mengubahnya nanti: ini BUKAN
+                  penghapusan. Barisnya tetap ada, tetap terhitung di papan
+                  peringkat pada kolomnya sendiri ("Dibatalkan"), dan
+                  alasannya tayang permanen di kartunya. Bak sampah biasanya
+                  berarti hilang — di sini tidak, dan yang menegakkan itu
+                  gerbang di server, bukan ikon di layar. */}
+              <Trash2 className="size-3.5" /> Batalkan
             </button>
           )}
         </div>
@@ -832,18 +865,46 @@ function KartuAnalisa({ a, status, milikku, onSegarkan, performa, hargaKini }: {
                 Yang tersisa dari keadaan itu warnanya: putih pekat kalau
                 levelnya memang ikut terbawa, bergaris tipis kalau chart-nya
                 terbuka tanpa level. */}
-            <Link to={tautanChart} onClick={(e) => void keChart(e)}
-              title={isi
-                ? 'Buka chart dengan entry, SL, dan TP sudah terisi'
-                : bisaBuka
-                  ? 'Buka analisanya dulu supaya entry, SL, dan TP ikut terbawa ke chart'
-                  : 'Chart terbuka di pasangan dan timeframe ini — level entry/SL/TP belum termasuk'}
-              className={cn('flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors',
-                isi
-                  ? 'bg-zinc-100 text-zinc-950 hover:bg-white'
-                  : 'border border-zinc-800 text-zinc-300 hover:border-zinc-600 hover:text-zinc-100')}>
-              <CandlestickChart className="size-3.5" /> Buka di Chart
-            </Link>
+{/* IKUT TERKUNCI kalau levelnya belum boleh dibuka.
+
+                Dulu tombol ini selalu bisa ditekan, dengan alasan yang
+                sebenarnya masuk akal: pasangan dan timeframe sudah tertulis
+                terang di kepala kartu untuk semua orang, jadi membuka
+                chart-nya tidak membocorkan apa pun.
+
+                Yang tidak diperhitungkan alasan itu adalah apa yang
+                DIDAPAT orangnya. Ia menekan tombol di kartu sinyal, pindah
+                halaman, dan sampai di chart kosong — chart yang persis sama
+                dengan yang bisa ia buka sendiri dari menu, tanpa satu pun
+                garis dari sinyal yang barusan ia klik. Itu tidak terbaca
+                sebagai "bagian ini berbayar"; itu terbaca sebagai fitur yang
+                rusak, dan yang tampak rusak justru produk yang dijual.
+
+                Sekarang keadaannya dinyatakan sebelum orangnya berpindah
+                halaman. Gembok di sini memang mengulang gembok di tombol
+                sebelahnya, dan itu disengaja: keduanya menuju hal yang sama
+                (levelnya), jadi keduanya harus terkunci bersama.
+
+                Yang sudah boleh membuka tetap dapat garisnya OTOMATIS —
+                keChart() menjemput levelnya dulu, lihat catatannya di atas. */}
+            {bisaBuka ? (
+              <Link to={tautanChart} onClick={(e) => void keChart(e)}
+                title={isi
+                  ? 'Buka chart dengan entry, SL, dan TP sudah terisi'
+                  : 'Buka chart — entry, SL, dan TP dijemput dulu lalu ikut terbawa'}
+                className={cn('flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors',
+                  isi
+                    ? 'bg-zinc-100 text-zinc-950 hover:bg-white'
+                    : 'border border-zinc-800 text-zinc-300 hover:border-zinc-600 hover:text-zinc-100')}>
+                {sibuk && !isi ? <Loader2 className="size-3.5 animate-spin" /> : <CandlestickChart className="size-3.5" />}
+                Buka di Chart
+              </Link>
+            ) : (
+              <span title="Chart-nya ikut terbuka begitu akses sinyal ini dibuka — lengkap dengan garis entry, SL, dan TP"
+                className="flex shrink-0 cursor-not-allowed items-center gap-1.5 rounded-md border border-zinc-800/60 px-3 py-1.5 text-[12px] font-medium text-zinc-600">
+                <Lock className="size-3.5" /> Buka di Chart
+              </span>
+            )}
             {/* TOMBOL MODERASI DICABUT — permintaan pemilik.
 
                 YANG DICABUT TOMBOLNYA, BUKAN KEMAMPUANNYA. Rute
@@ -1153,7 +1214,7 @@ export default function Analisa() {
   const hargaUntuk = (pasangan: string): number | undefined =>
     hargaPasar[pasangan] ?? hargaMt5[simbolDasarMt5(pasangan)];
   /* Sub-halaman kanal: berjalan / menunggu harga / selesai. */
-  const [rakAktif, setRakAktif] = useState<'jalan' | 'nunggu' | 'selesai'>('jalan');
+  const [rakAktif, setRakAktif] = useState<'jalan' | 'nunggu' | 'selesai' | 'lilin'>('jalan');
   const [masuk, setMasuk] = useState<PermintaanMasuk[]>([]);
   const [statusku, setStatusku] = useState<Record<string, string>>({});
   const [memuat, setMemuat] = useState(true);
@@ -2290,9 +2351,24 @@ export default function Analisa() {
               if (sub === 'performa') return <PerformaKalender sinyal={terpilih} />;
               const selesai = terpilih.filter((s) => !!s.hasil);
               const belum = terpilih.filter((s) => !s.hasil);
-              const menunggu = belum.filter(
-                (s) => !s.terisi && !!s.jenisEntry && !/^market$/i.test(s.jenisEntry));
-              const berjalan = belum.filter((s) => !menunggu.includes(s));
+              /* PEMBEDANYA `terisi`, DAN HANYA ITU.
+                 ────────────────────────────────────────────────────────────
+                 Sebelumnya rak ini menyaring lewat jenisEntry: yang kosong
+                 atau "Market" dianggap berjalan. Dua-duanya menebak.
+
+                 jenisEntry baru terisi pada penilaian pertama, jadi sinyal
+                 yang baru diposting selalu jatuh ke "Sedang berjalan" dulu,
+                 lalu pindah sendiri ke "Menunggu harga" begitu penilai
+                 sampai. Itu bug yang dilaporkan pemiliknya, dan bentuknya
+                 paling merepotkan di rak: sinyal berpindah kotak tanpa ada
+                 apa pun yang terjadi di pasar.
+
+                 `terisi` tidak punya masalah itu. Ia ditulis dari lilin
+                 sungguhan, sekali, dan tidak pernah dicabut lagi — jadi
+                 perpindahan yang mungkin cuma satu, searah, dan memang
+                 karena harganya benar-benar sampai. */
+              const berjalan = belum.filter((s) => keadaanSinyal(s) === 'jalan');
+              const menunggu = belum.filter((s) => keadaanSinyal(s) !== 'jalan');
 
               const rak = [
                 { kunci: 'jalan' as const, judul: 'Sedang berjalan', isi: berjalan,
@@ -2304,6 +2380,24 @@ export default function Analisa() {
                 { kunci: 'selesai' as const, judul: 'Sudah selesai', isi: selesai,
                   aktif: 'border-zinc-600 bg-zinc-800/60 text-zinc-200',
                   ket: 'Kena TP/SL atau ditarik penulisnya. Levelnya terbuka gratis — peluangnya sudah habis, yang tersisa bahan penilaian.' },
+                /* RAK KEEMPAT — bukan kelompok keadaan, melainkan sudut
+                   pandang lain atas seluruh isi kanal ini.
+
+                   Tiga rak di kirinya menjawab "sinyal mana yang bisa saya
+                   ikuti sekarang". Yang ini menjawab pertanyaan yang lebih
+                   mendasar dan sampai sekarang tidak punya tempat: "dari
+                   mana angkanya datang". Papan peringkat menjanjikan hasil
+                   yang dibaca dari lilin sungguhan; janji itu tidak bisa
+                   diperiksa siapa pun kalau sumbernya tidak pernah
+                   ditampilkan.
+
+                   `isi` sengaja SELURUH sinyal kanalnya, bukan potongan:
+                   yang sedang ditelusuri orang di sini justru perjalanan
+                   dari diposting sampai hasilnya jatuh, dan memotongnya
+                   menurut keadaan akan memutus perjalanan itu di tengah. */
+                { kunci: 'lilin' as const, judul: 'Data Lilin', isi: terpilih,
+                  aktif: 'border-zinc-600 bg-zinc-800/60 text-zinc-200',
+                  ket: 'Jejak penilaian tiap sinyal terhadap lilin bursa — sumber datanya, kapan entry tersentuh, dan kapan hasilnya jatuh.' },
               ];
               /* Tab yang isinya kosong tetap DITAMPILKAN, cuma diredupkan dan
                  tidak bisa ditekan. Menyembunyikannya membuat jumlah tab
@@ -2349,7 +2443,13 @@ export default function Analisa() {
                   </div>
                   <p className="mb-3 text-[11.5px] leading-relaxed text-zinc-600">{pilih.ket}</p>
 
-                  {tampil.length === 0 ? (
+                  {/* Data Lilin tidak digambar sebagai kartu: yang dibaca di
+                      sana perbandingan antar-baris (jam, sumber, hasil), dan
+                      kartu mendatar memaksa mata melompat bolak-balik untuk
+                      membandingkan dua angka yang seharusnya bersebelahan. */}
+                  {pilih.kunci === 'lilin' ? (
+                    <DataLilinSinyal sinyal={tampil} />
+                  ) : tampil.length === 0 ? (
                     <p className="rounded-lg border border-zinc-800/60 px-4 py-6 text-center text-[12px] text-zinc-600">
                       Tidak ada sinyal di ruangan ini.
                     </p>

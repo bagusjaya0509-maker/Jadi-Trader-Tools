@@ -54,6 +54,19 @@ export interface RingkasAnalisa {
    *  order yang sudah terisi adalah posisi yang sudah jalan, dan
    *  menariknya sama dengan menghapus trade yang sedang rugi. */
   terisi?: boolean;
+  /** Dari bursa & timeframe mana lilin penilainya diambil, mis. "Binance
+   *  Futures · 15m". Ditulis server tiap kali sinyal dinilai. Kosong untuk
+   *  sinyal yang sudah selesai sebelum 20 Agu 2026 — penilai berhenti
+   *  menyentuh sinyal yang hasilnya sudah jatuh, jadi catatannya tidak bisa
+   *  dibuat surut. Aman publik: ia keterangan tentang SUMBER DATA, bukan
+   *  tentang level yang dijual. */
+  sumberLilin?: string;
+  /** Kapan entry-nya tersentuh. Server hanya mengirimkannya untuk sinyal
+   *  yang SUDAH SELESAI, dan gerbangnya sama dengan sampul & level.
+   *  Alasannya: jam sentuhan menunjuk satu lilin, dan rentang high–low
+   *  lilin itu mempersempit tebakan entry sampai beberapa dolar. Bahwa ia
+   *  sudah tersentuh tetap publik lewat `terisi`; yang ditahan jamnya. */
+  waktuIsi?: number | null;
   /** Alasan pembatalan, wajib diisi penulisnya. Ditayangkan apa adanya —
    *  yang dinilai orang justru kenapa sebuah rencana ditarik. */
   alasanBatal?: string;
@@ -174,6 +187,34 @@ export async function batalkanAnalisa(id: string, alasan: string) {
  *  dengan yang dijaga server — ditulis ulang di sini HANYA supaya tombolnya
  *  tidak muncul saat pasti ditolak, bukan sebagai pengaman. Pengamannya di
  *  server; ini cuma sopan santun tampilan. */
+/** Keadaan sebuah sinyal yang belum selesai.
+ *
+ *  `jalan`  — entry sudah tersentuh. FAKTA, dibaca server dari lilin
+ *             sungguhan dan tidak pernah dicabut kembali.
+ *  `nunggu` — penilai sudah memeriksanya dan entry-nya belum tersentuh.
+ *  `belum`  — penilai belum pernah sampai ke sinyal ini.
+ *
+ *  ── KENAPA INI ADA ────────────────────────────────────────────────────
+ *  Dulu layar menyimpulkan keadaan dari `jenisEntry`: kosong atau "Market"
+ *  dianggap berjalan, sisanya menunggu. Dua-duanya keliru.
+ *
+ *  `jenisEntry` baru terisi pada penilaian pertama — sampai saat itu ia
+ *  KOSONG, dan kosong dibaca sebagai "berjalan". Jadi tiap order menggantung
+ *  yang baru diposting memperkenalkan dirinya sebagai posisi yang sudah
+ *  jalan, lalu berubah sendiri beberapa menit kemudian. Itu laporan
+ *  pemiliknya, dan ia benar: tidak ada yang terjadi di pasar di antara dua
+ *  tampilan itu.
+ *
+ *  Yang salah bukan cuma waktunya, tapi juga logikanya: tidak tahu bukan
+ *  jawaban. Sekarang `terisi` yang menentukan — satu-satunya medan di sini
+ *  yang benar-benar dibaca dari lilin — dan yang belum diperiksa mengaku
+ *  belum diperiksa. */
+export type KeadaanSinyal = 'jalan' | 'nunggu' | 'belum';
+export function keadaanSinyal(a: RingkasAnalisa): KeadaanSinyal {
+  if (a.terisi) return 'jalan';
+  return a.jenisEntry ? 'nunggu' : 'belum';
+}
+
 export function bisaDibatalkan(a: RingkasAnalisa, uidku?: string): boolean {
   return !!uidku && a.uid === uidku && !a.hasil && !a.terisi
     && !!a.jenisEntry && !/^market$/i.test(a.jenisEntry);
