@@ -129,7 +129,18 @@ export async function aktifkanKode(kode: string) {
   return j as { ok: boolean; berakhir?: number; firestoreOk?: boolean };
 }
 
-export interface SetelanAkses extends Kuota { bukaPermintaan: boolean; }
+export interface SetelanAkses extends Kuota {
+  bukaPermintaan: boolean;
+  /* Harga paket, dalam DOLAR. Menumpang di setelan akses dan bukan di
+     tempat sendiri karena ini satu urusan yang sama: apa yang dijual,
+     berapa harganya, dan berapa sisa tempatnya. Halaman depan membacanya
+     lewat cermin publiknya, /api/akses/kuota. */
+  hargaTesting: number;
+  hargaTestingCoret: number;
+  hargaPremium3: number;
+  hargaTahunan: number;
+  eventGratis: boolean;
+}
 
 /* ── Pemilik: setelan akses ─────────────────────────────────────────── */
 export async function bacaSetelanAkses(): Promise<SetelanAkses> {
@@ -141,6 +152,8 @@ export async function bacaSetelanAkses(): Promise<SetelanAkses> {
 
 export async function simpanSetelanAkses(nilai: {
   bukaPermintaan?: boolean; gratisTotal?: number; bayarTotal?: number; hari?: number;
+  hargaTesting?: number; hargaTestingCoret?: number;
+  hargaPremium3?: number; hargaTahunan?: number; eventGratis?: boolean;
 }): Promise<SetelanAkses> {
   const r = await fetch(`${dasar()}/api/akses/setelan`, {
     method: 'POST', headers: kepalaPemilik(), body: JSON.stringify(nilai),

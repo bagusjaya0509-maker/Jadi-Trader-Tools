@@ -47,6 +47,36 @@ function Angka({ label, nilai, pakai, catatan, atur }: {
   );
 }
 
+/* Kembaran `Angka` untuk uang. Bukan menambah prop ke Angka, karena
+   bedanya bukan tampilan saja: uang boleh berdesimal (step 0.5), punya
+   lambang $ di dalam kotaknya, dan tidak punya gagasan "sudah terpakai".
+   Menyatukan keduanya berarti satu komponen dengan dua mode yang saling
+   mematikan separuh propnya. */
+function Uang({ label, nilai, catatan, atur }: {
+  label: string;
+  nilai: number;
+  catatan?: string;
+  atur: (n: number) => void;
+}) {
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="text-[11.5px] text-zinc-400">{label}</span>
+      <div className="relative">
+        <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[13px] text-zinc-500">$</span>
+        <input
+          type="number"
+          min={0}
+          step={0.5}
+          value={nilai}
+          onChange={(e) => atur(Math.max(0, Number(e.target.value) || 0))}
+          className="angka h-9 w-full rounded-md border border-zinc-800 bg-zinc-950 pl-6 pr-2.5 text-[13px] text-zinc-100 outline-none focus-visible:border-zinc-600"
+        />
+      </div>
+      <span className="text-[10.5px] leading-relaxed text-zinc-600">{catatan}</span>
+    </label>
+  );
+}
+
 export function PanelSetelanAkses() {
   const [st, setSt] = useState<SetelanAkses | null>(null);
   const [galat, setGalat] = useState<string | null>(null);
@@ -70,9 +100,14 @@ export function PanelSetelanAkses() {
         gratisTotal: ubah.gratisTotal ?? st.gratisTotal,
         bayarTotal: ubah.bayarTotal ?? st.bayarTotal,
         hari: ubah.hari ?? st.hari,
+        hargaTesting: ubah.hargaTesting ?? st.hargaTesting,
+        hargaTestingCoret: ubah.hargaTestingCoret ?? st.hargaTestingCoret,
+        hargaPremium3: ubah.hargaPremium3 ?? st.hargaPremium3,
+        hargaTahunan: ubah.hargaTahunan ?? st.hargaTahunan,
+        eventGratis: ubah.eventGratis ?? st.eventGratis,
       });
       setSt(baru);
-      setKabar('Tersimpan. Halaman akses langsung memakai angka ini.');
+      setKabar('Tersimpan. Halaman akses dan bagian harga di halaman depan langsung memakai angka ini.');
     } catch (e) {
       setKabar(e instanceof Error ? e.message : 'Gagal menyimpan');
     } finally {
@@ -83,8 +118,8 @@ export function PanelSetelanAkses() {
   return (
     <Panel className="mt-4">
       <PanelHead
-        judul="Setelan Akses"
-        sub="Buka atau tutup pendaftaran, dan tentukan sendiri kuotanya."
+        judul="Setelan Akses & Harga"
+        sub="Buka atau tutup pendaftaran, atur kuotanya, dan tentukan harga tiap paket."
       />
       <div className="px-5 pb-5">
         {galat ? (
@@ -141,6 +176,55 @@ export function PanelSetelanAkses() {
                 catatan="berlaku untuk persetujuan berikutnya"
                 atur={(n) => setSt({ ...st, hari: Math.max(1, n) })}
               />
+            </div>
+
+            {/* ── HARGA PAKET ───────────────────────────────────────────
+                Satu formulir dengan kuota, bukan panel tersendiri, karena
+                dua-duanya menjawab pertanyaan yang sama dari sisi berbeda:
+                berapa harganya, dan berapa banyak yang bisa masuk. Dipisah
+                jadi dua panel, keduanya harus disimpan terpisah dan
+                gampang tertinggal satu. */}
+            <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-3">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-[12.5px] text-zinc-200">
+                    Kartu event gratis {st.eventGratis ? 'tampil' : 'disembunyikan'}
+                  </div>
+                  <div className="text-[11px] leading-relaxed text-zinc-500">
+                    Kartunya juga hilang SENDIRI saat kuota gratis habis atau pendaftaran ditutup —
+                    sakelar ini untuk mematikannya lebih awal.
+                  </div>
+                </div>
+                <button
+                  onClick={() => void simpan({ eventGratis: !st.eventGratis })}
+                  disabled={sibuk}
+                  aria-label={st.eventGratis ? 'Sembunyikan kartu event' : 'Tampilkan kartu event'}
+                  className={cn(
+                    'relative h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors disabled:opacity-50',
+                    st.eventGratis ? 'bg-emerald-500' : 'bg-zinc-700',
+                  )}
+                >
+                  <span className={cn('absolute top-0.5 size-5 rounded-full bg-white transition-all',
+                    st.eventGratis ? 'left-[22px]' : 'left-0.5')} />
+                </button>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <Uang label="Testing — New Launch" nilai={st.hargaTesting}
+                      catatan="harga jual paket peluncuran"
+                      atur={(n) => setSt({ ...st, hargaTesting: n })} />
+                <Uang label="Harga coret" nilai={st.hargaTestingCoret}
+                      catatan={st.hargaTestingCoret > st.hargaTesting
+                        ? 'dicoret di atas harga jual'
+                        : 'isi 0 kalau tidak mau ada coretan'}
+                      atur={(n) => setSt({ ...st, hargaTestingCoret: n })} />
+                <Uang label="Premium 3 bulan" nilai={st.hargaPremium3}
+                      catatan="sekali bayar untuk 90 hari"
+                      atur={(n) => setSt({ ...st, hargaPremium3: n })} />
+                <Uang label="Tahunan" nilai={st.hargaTahunan}
+                      catatan="sekali bayar untuk 12 bulan"
+                      atur={(n) => setSt({ ...st, hargaTahunan: n })} />
+              </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
