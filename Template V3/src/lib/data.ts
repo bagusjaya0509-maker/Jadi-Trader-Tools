@@ -623,12 +623,30 @@ export async function terbitkanRingkasan(r: RingkasanAkun, trade?: Trade[]) {
     kurva: r.kurva.slice(-60).map((x) => Number(x.toFixed(2))),
     /* Transaksi pemilik (dipadatkan) ikut terbit sebagai DATA CONTOH untuk
        akun baru — halaman kosong tidak menjelaskan apa pun tentang apa yang
-       akan didapat. Hanya field yang dipakai layar; tanpa catatan pribadi. */
+       akan didapat.
+
+       `alasan` DICABUT dari sini. Komentar ini dulu berbunyi "tanpa catatan
+       pribadi" padahal barisnya menyalin `u: t.alasan` — dan dokumen ini
+       terbaca siapa saja tanpa login, cukup dengan alamatnya. Isinya
+       kebetulan masih aman waktu diperiksa (150 baris berbunyi "Sinkron
+       Binance", hasil sinkron otomatis, bukan tulisan tangan), jadi tidak
+       ada yang terlanjur tersiar. Yang salah salurannya: begitu pemiliknya
+       menulis satu catatan sungguhan — kenapa ia masuk, apa yang ia
+       sesali — kalimat itu terbit ke alamat publik dalam dua detik, tanpa
+       ada yang bertanya.
+
+       `emosi` tetap ikut: isinya kosakata tertutup dari menu pilihan
+       (Netral / Serakah / Takut / …), bukan tulisan bebas, dan panel Pola
+       Emosi butuh itu supaya akun baru melihat panelnya hidup. Batasnya di
+       situ: label yang bisa ditebak boleh, kalimat yang ditulis sendiri
+       tidak. Kalau batas itu mau digeser, geser DI SINI — bukan dengan
+       menyaring di sisi pembaca, karena yang menentukan apa yang tersiar
+       adalah apa yang ditulis, bukan apa yang dibaca. */
     ...(trade ? {
       contohTrade: trade.slice(0, 150).map((t) => ({
         p: t.pair, a: t.arah, s: t.sumber, w: t.waktu,
         n: Number(t.pnl.toFixed(2)), l: t.lot ?? 0,
-        e: t.emosi ?? '', u: t.alasan ?? '',
+        e: t.emosi ?? '',
       })),
     } : {}),
     _updatedAt: Date.now(),

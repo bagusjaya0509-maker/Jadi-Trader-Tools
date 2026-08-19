@@ -162,14 +162,31 @@ export default function HeroSection() {
   const nyata = useAngkaPameran();
   const posisi = usePosisiPameran();
 
-  /* Kartu statistik: jurnal showcase ASLI hanya untuk yang sudah masuk.
-     Pengunjung tanpa akun mendapat angka ilustrasi berlabel "contoh" —
-     jurnal pemilik (termasuk saat minus) bukan konsumsi orang asing di
-     halaman jualan. Selama status auth belum diketahui, pengunjunglah
-     asumsinya: salah tebak sebentar cuma berarti anggota melihat kartu
-     contoh sekejap, bukan orang asing melihat rapor pribadi sekejap. */
-  const { pengguna } = useAuth();
-  const pameran = pengguna ? nyata : PAMERAN_CONTOH;
+  /* Kartu statistik: angka rekening SUNGGUHAN hanya untuk PEMILIKNYA.
+     Semua orang lain — termasuk yang sudah punya akun — mendapat kartu
+     ilustrasi berlabel "contoh".
+
+     Sebelum ini gerbangnya `pengguna`, yaitu "sudah login". Itu terbaca
+     masuk akal tapi bukan pagar: mendaftar gratis dan makan dua puluh
+     detik, jadi siapa pun yang penasaran bisa melewatinya. Ketahuan saat
+     pemiliknya membuka situsnya sendiri dengan akun uji coba dan melihat
+     saldo, kurva, serta posisi MANA miliknya sendiri terpampang di sana.
+
+     Yang bocor bukan cuma angka. Saldo berjalan, persen naik-turun, dan
+     daftar posisi yang sedang terbuka adalah rekening pribadi seseorang —
+     dan halaman itu halaman jualan, bukan laporan kinerja.
+
+     Ada alasan kedua yang berdiri sendiri: angkanya TERBIT OTOMATIS dari
+     Dashboard tiap kali berubah, tanpa ada yang menekan apa pun. Jadi
+     rekening yang kebetulan sedang merah hari itu langsung jadi bahan
+     etalase. Etalase yang berubah sendiri mengikuti hari buruk seseorang
+     bukan etalase.
+
+     Selama status auth belum diketahui, ORANG LAIN yang diasumsikan.
+     Salah tebak sebentar berarti pemiliknya melihat kartu contoh sekejap —
+     bukan orang lain melihat rekening pemiliknya sekejap. */
+  const { pemilik } = useAuth();
+  const pameran = pemilik ? nyata : PAMERAN_CONTOH;
 
   /* ── Teks hero: lokal > terbitan pemilik > bawaan ── */
   const [teks, setTeks] = useState(() => {

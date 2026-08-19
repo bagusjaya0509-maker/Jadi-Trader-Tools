@@ -22,14 +22,22 @@ import Pricing_05 from '@/components/ui/ruixen-pricing05';
    ════════════════════════════════════════════════════════════════════════ */
 
 export default function Harga() {
-  /* -my-24 mengimbangi py-24 bawaan bloknya. Di halaman depan jarak selega
-     itu benar karena ia satu seksi di antara seksi lain; di dalam kerangka
-     aplikasi ia meninggalkan ruang kosong sebesar layar di atas kartunya. */
+  /* Jarak bawaan bloknya py-24 — benar di halaman depan, di mana ia satu
+     seksi di antara seksi lain. Di dalam kerangka aplikasi ia meninggalkan
+     ruang kosong sebesar layar di atas kartunya.
+
+     Dikecilkan lewat pemilih anak, BUKAN margin negatif. Margin negatif
+     memang memangkas jaraknya, tapi ia memangkasnya dengan cara MENARIK
+     kartunya naik ke atas — dan yang ada di atas halaman ini adalah panel
+     pemberitahuan mode pratinjau. Panelnya tertimpa dan tersisa ujung
+     kiri-kanannya saja: terlihat seperti sisa gambar yang gagal dihapus.
+
+     `[&>section]` menghasilkan pemilih turunan, yang kekhususannya lebih
+     tinggi daripada kelas py-24 di seksinya — jadi ia menang tanpa perlu
+     !important dan tanpa mengubah komponen tempelannya. */
   return (
-    <div className="p-4 sm:p-6">
-      <div className="-my-16 sm:-my-20">
-        <Pricing_05 />
-      </div>
+    <div className="p-4 sm:p-6 [&>section]:py-4 sm:[&>section]:py-6">
+      <Pricing_05 />
     </div>
   );
 }
