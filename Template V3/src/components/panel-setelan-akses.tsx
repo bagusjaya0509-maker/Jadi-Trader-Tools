@@ -77,6 +77,40 @@ function Uang({ label, nilai, catatan, atur }: {
   );
 }
 
+/* Kolom tautan checkout. Peringatannya ditulis di bawah kolomnya sendiri,
+   bukan di dokumentasi: server MENOLAK DIAM-DIAM tautan yang bukan https,
+   dan aturan yang cuma hidup di server adalah aturan yang orangnya temukan
+   dengan cara gagal. */
+function Tautan({ label, nilai, catatan, atur }: {
+  label: string;
+  nilai: string;
+  catatan?: string;
+  atur: (v: string) => void;
+}) {
+  const salah = nilai.trim() !== '' && !/^https:\/\//.test(nilai.trim());
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="text-[11.5px] text-zinc-400">{label}</span>
+      <input
+        type="url"
+        inputMode="url"
+        placeholder="https://checkout.xendit.co/…  (kosong = Available soon)"
+        value={nilai}
+        onChange={(e) => atur(e.target.value)}
+        className={cn(
+          'h-9 w-full rounded-md border bg-zinc-950 px-2.5 text-[13px] text-zinc-100 outline-none focus-visible:border-zinc-600',
+          salah ? 'border-amber-500/50' : 'border-zinc-800',
+        )}
+      />
+      <span className={cn('text-[10.5px] leading-relaxed', salah ? 'text-amber-400/90' : 'text-zinc-600')}>
+        {salah
+          ? 'harus diawali https:// — selain itu ditolak server dan nilai lamanya dipertahankan'
+          : catatan ?? (nilai.trim() ? 'paket ini bisa dibeli' : 'kosong — kartunya tampil "Available soon"')}
+      </span>
+    </label>
+  );
+}
+
 export function PanelSetelanAkses() {
   const [st, setSt] = useState<SetelanAkses | null>(null);
   const [galat, setGalat] = useState<string | null>(null);
@@ -105,6 +139,9 @@ export function PanelSetelanAkses() {
         hargaPremium3: ubah.hargaPremium3 ?? st.hargaPremium3,
         hargaTahunan: ubah.hargaTahunan ?? st.hargaTahunan,
         eventGratis: ubah.eventGratis ?? st.eventGratis,
+        linkTesting: ubah.linkTesting ?? st.linkTesting,
+        linkPremium3: ubah.linkPremium3 ?? st.linkPremium3,
+        linkTahunan: ubah.linkTahunan ?? st.linkTahunan,
       });
       setSt(baru);
       setKabar('Tersimpan. Halaman akses dan bagian harga di halaman depan langsung memakai angka ini.');
@@ -224,6 +261,28 @@ export function PanelSetelanAkses() {
                 <Uang label="Tahunan" nilai={st.hargaTahunan}
                       catatan="sekali bayar untuk 12 bulan"
                       atur={(n) => setSt({ ...st, hargaTahunan: n })} />
+              </div>
+            </div>
+
+            {/* ── TAUTAN CHECKOUT ───────────────────────────────────────
+                Kosong = paketnya tampil "Available soon" dengan tombol mati
+                di halaman depan. Diisi = kartunya hidup sendiri, tanpa ganti
+                kode dan tanpa deploy.
+
+                Itu sebabnya kolom ini ada: paket yang harganya sudah
+                dipajang tapi belum bisa dibeli adalah tombol yang mengantar
+                orang ke tempat yang tidak menjualnya. Lebih baik ia
+                menyatakan belum siap. */}
+            <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-3">
+              <div className="mb-3 text-[12.5px] text-zinc-200">Tautan checkout tiap paket</div>
+              <div className="grid gap-3">
+                <Tautan label="Testing — New Launch" nilai={st.linkTesting}
+                        catatan="kosongkan untuk memakai halaman Akses yang sekarang"
+                        atur={(v) => setSt({ ...st, linkTesting: v })} />
+                <Tautan label="Premium 3 Bulan" nilai={st.linkPremium3}
+                        atur={(v) => setSt({ ...st, linkPremium3: v })} />
+                <Tautan label="Tahunan" nilai={st.linkTahunan}
+                        atur={(v) => setSt({ ...st, linkTahunan: v })} />
               </div>
             </div>
 

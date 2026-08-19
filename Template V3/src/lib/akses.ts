@@ -140,6 +140,9 @@ export interface SetelanAkses extends Kuota {
   hargaPremium3: number;
   hargaTahunan: number;
   eventGratis: boolean;
+  linkTesting: string;
+  linkPremium3: string;
+  linkTahunan: string;
 }
 
 /* ── Pemilik: setelan akses ─────────────────────────────────────────── */
@@ -154,6 +157,7 @@ export async function simpanSetelanAkses(nilai: {
   bukaPermintaan?: boolean; gratisTotal?: number; bayarTotal?: number; hari?: number;
   hargaTesting?: number; hargaTestingCoret?: number;
   hargaPremium3?: number; hargaTahunan?: number; eventGratis?: boolean;
+  linkTesting?: string; linkPremium3?: string; linkTahunan?: string;
 }): Promise<SetelanAkses> {
   const r = await fetch(`${dasar()}/api/akses/setelan`, {
     method: 'POST', headers: kepalaPemilik(), body: JSON.stringify(nilai),

@@ -31,6 +31,9 @@ export default function Pricing_05() {
           unit: `/ ${h.hari} hari`,
           note: `Kuota ${h.gratisTotal} orang — sisa ${h.gratisSisa}. Hilang sendiri saat penuh.`,
           buttonText: "Ambil tempat gratis",
+          /* Event gratis tidak butuh checkout — pendaftarannya lewat
+             halaman Akses, jadi ia selalu tersedia selama kartunya tampil. */
+          link: "/akses",
           popular: false,
           inverse: false,
           features: [
@@ -48,6 +51,10 @@ export default function Pricing_05() {
       unit: `/ ${h.hari} hari`,
       note: "Harga perkenalan selama masa uji coba peluncuran.",
       buttonText: "Ambil sekarang",
+      /* Paket bulanan SUDAH bisa dibeli lewat halaman Akses hari ini, jadi
+         halaman Akses yang jadi cadangannya kalau tautan khusus belum
+         diisi. Dua paket di bawah tidak punya cadangan seperti itu. */
+      link: h.linkTesting || "/akses",
       popular: true,
       inverse: true,
       features: [
@@ -64,6 +71,7 @@ export default function Pricing_05() {
       unit: "/ 3 bulan",
       note: "Untuk yang sudah cocok dan tidak mau memperpanjang tiap bulan.",
       buttonText: "Ambil paket 3 bulan",
+      link: h.linkPremium3,
       popular: false,
       inverse: false,
       features: [
@@ -80,6 +88,7 @@ export default function Pricing_05() {
       unit: "/ 12 bulan",
       note: "Paling murah per bulannya.",
       buttonText: "Ambil paket tahunan",
+      link: h.linkTahunan,
       popular: false,
       inverse: false,
       features: [
@@ -105,7 +114,7 @@ export default function Pricing_05() {
         </div>
 
         <div className="flex flex-col gap-6 items-center mt-12 lg:flex-row lg:items-end lg:justify-center">
-          {pricingTiers.map(({ title, price, strike, unit, note, buttonText, popular, features, inverse }) => (
+          {pricingTiers.map(({ title, price, strike, unit, note, buttonText, link, popular, features, inverse }) => (
             <Card
               key={title}
               className={`max-w-xs w-full border ${inverse ? "bg-black text-white" : ""}`}
@@ -114,7 +123,16 @@ export default function Pricing_05() {
                 <CardTitle className={`text-lg font-bold ${inverse ? "text-white/70" : "text-muted-foreground"}`}>
                   {title}
                 </CardTitle>
-                {popular && (
+                {/* Label "Available soon" menggantikan lencana Popular saat
+                    paketnya belum bisa dibeli. Tidak ditumpuk berdua: satu
+                    kartu yang sekaligus "paling banyak dipilih" dan "belum
+                    tersedia" tidak menyatakan apa pun. */}
+                {!link && (
+                  <span className="text-sm px-3 py-1 rounded-xl border border-white/15 text-muted-foreground font-medium">
+                    Available soon
+                  </span>
+                )}
+                {link && popular && (
                   <motion.div
                     animate={{ backgroundPositionX: "-100%" }}
                     transition={{
@@ -147,16 +165,31 @@ export default function Pricing_05() {
                 <p className={`mt-2 text-xs leading-relaxed ${inverse ? "text-white/50" : "text-muted-foreground"}`}>
                   {note}
                 </p>
-                <Button
-                  variant={inverse ? "secondary" : "default"}
-                  className="w-full mt-6"
-                  asChild
-                >
-                  {/* Semua menuju /akses, bukan langsung ke checkout: centang
-                      persetujuan risiko ada di halaman itu, dan jalan pintas
-                      ke pembayaran akan melewatinya. */}
-                  <a href="/akses">{buttonText}</a>
-                </Button>
+                {/* Tombol MATI, bukan tombol hidup yang mengantar ke tempat
+                    yang tidak menjual paket ini. Tombol yang bisa ditekan
+                    tapi tidak mengantar ke mana-mana adalah cara tercepat
+                    membuat orang mengira situsnya rusak.
+
+                    Begitu tautannya diisi dari Maintenance, tombolnya hidup
+                    sendiri — tidak perlu ganti kode, tidak perlu deploy. */}
+                {link ? (
+                  <Button
+                    variant={inverse ? "secondary" : "default"}
+                    className="w-full mt-6"
+                    asChild
+                  >
+                    <a href={link}>{buttonText}</a>
+                  </Button>
+                ) : (
+                  <Button
+                    variant="secondary"
+                    className="w-full mt-6"
+                    disabled
+                    title="Paket ini belum bisa dibeli — sedang disiapkan"
+                  >
+                    Available soon
+                  </Button>
+                )}
                 <ul className="flex flex-col gap-4 mt-6 text-sm">
                   {features.map((feature) => (
                     <li key={feature} className="flex items-center gap-2">

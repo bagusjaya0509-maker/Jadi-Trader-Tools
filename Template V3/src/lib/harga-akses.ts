@@ -35,6 +35,14 @@ export interface HargaPaket {
   hargaTahunan: number;
   /** Sakelar kartu event gratis dari Maintenance. */
   eventGratis: boolean;
+  /** Tautan checkout per paket. KOSONG berarti paketnya belum bisa dibeli,
+      dan kartunya tampil "Available soon" dengan tombol mati. Server hanya
+      menerima https:// — nilai ini jadi href di halaman depan, dan untai
+      bebas berarti menerima "javascript:..." yang jalan di peramban
+      pengunjung. */
+  linkTesting: string;
+  linkPremium3: string;
+  linkTahunan: string;
   gratisTotal: number;
   gratisSisa: number;
   gratisHabis: boolean;
@@ -48,6 +56,9 @@ export const HARGA_BAWAAN: HargaPaket = {
   hargaPremium3: 10,
   hargaTahunan: 100,
   eventGratis: true,
+  linkTesting: '',
+  linkPremium3: '',
+  linkTahunan: '',
   gratisTotal: 20,
   gratisSisa: 20,
   gratisHabis: false,
