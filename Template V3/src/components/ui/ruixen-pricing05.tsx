@@ -110,7 +110,7 @@ export default function Pricing_05() {
       <div className="mx-auto max-w-6xl px-6 md:px-8">
         <div className="text-center max-w-2xl mx-auto">
           <h2 className="text-4xl font-semibold tracking-tight sm:text-5xl">
-            Pilih akses yang sesuai kebutuhanmu
+            Pilih Akses Sesuai Kebutuhanmu
           </h2>
           <p className="text-muted-foreground mt-4 text-lg">
             Mulai gratis, coba lebih banyak fitur, atau gunakan akses penuh untuk
