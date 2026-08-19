@@ -67,7 +67,7 @@ export default function Pricing_05() {
           unit: `/ ${h.hari} hari`,
           note: `Kuota ${h.gratisTotal} orang — sisa ${h.gratisSisa}. Hilang sendiri saat penuh.`,
           buttonText: "Ambil tempat gratis",
-          rp: '',
+          rp: rupiah(0, h.kursUsd),
           /* Event gratis tidak butuh checkout — pendaftarannya lewat
              halaman Akses, jadi ia selalu tersedia selama kartunya tampil. */
           link: "/akses",

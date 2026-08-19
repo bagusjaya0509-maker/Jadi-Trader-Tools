@@ -111,7 +111,11 @@ export function usd(n: number): string {
     Selalu didahului "≈" — ini keterangan, bukan angka yang mengikat. Yang
     mengikat muncul di halaman checkout. */
 export function rupiah(usd: number, kurs: number): string {
-  if (!usd || !kurs) return '';
+  if (!kurs) return '';
+  /* Nol TIDAK dibubuhi tanda kira-kira. Nol dikali kurs berapa pun tetap
+     nol — tidak ada yang diperkirakan, dan "≈ Rp 0" justru menimbulkan
+     pertanyaan apakah nanti ada biaya kecil yang belum disebut. */
+  if (usd === 0) return 'Rp 0';
   const n = Math.round((usd * kurs) / 1000) * 1000;
   return '≈ Rp ' + n.toLocaleString('id-ID');
 }
