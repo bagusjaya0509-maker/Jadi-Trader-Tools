@@ -3,13 +3,13 @@ import { createPortal } from 'react-dom';
 import { Link, useSearchParams } from 'react-router-dom';
 import { usePaket, LABEL_PAKET } from '@/lib/paket';
 import {
-  Loader2, Lock, Unlock, Trash2, Send, LineChart, X, CheckCircle2,
+  Loader2, Lock, Unlock, Trash2, Send, X, CheckCircle2,
   TrendingUp, TrendingDown, RefreshCw, Radar, Sparkles, ImagePlus, Images, Flag, Ban,
-  Settings2, UserRound, Pin, TriangleAlert, ArrowLeft,
+  Settings2, UserRound, Pin, TriangleAlert, ArrowLeft, CandlestickChart,
 } from 'lucide-react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { PanelSinyal } from '@/components/panel-sinyal';
-import { PapanPeringkatSignal, PerformaAnalisSatu } from '@/components/performa-signal';
+import { PapanPeringkatSignal } from '@/components/performa-signal';
 /* TEMPELAN — sedang dinilai, ditaruh DI DALAM KANAL ANALIS.
 
    Sempat dipasang di kepala Market Signal dan itu keliru: kepala halaman
@@ -71,86 +71,17 @@ function rapikanHarga(n: number): number {
 }
 
 
-/* ── Panel performa sinyal satu analis ───────────────────────────────────
-   Menggantikan modal portofolio jurnal. Alasannya bukan kerapian:
-   PORTOFOLIO PRIBADI MENJAWAB PERTANYAAN YANG TIDAK SEDANG DITANYA.
-   Orang bisa pandai membaca pasar untuk orang lain tapi berantakan
-   mengurus akunnya sendiri — ukuran posisi terlalu besar, memindah SL,
-   membalas dendam sesudah rugi. Jurnalnya akan berdarah sementara
-   sinyal-sinyalnya bagus, dan pembaca menyimpulkan hal yang salah dari
-   angka yang benar.
+/* ModalPerformaAnalis DIBUANG bersama tombol yang membukanya.
 
-   Yang diikuti pembeli adalah SINYALNYA. Maka yang ditampilkan di sini
-   rekam jejak sinyalnya: berapa yang kena TP, berapa kena SL, berapa yang
-   ia tarik sebelum harganya datang, dan kenapa. */
-function ModalPerformaAnalis({ a, performa, dibatalkan, berjalan, tutup }: {
-  a: RingkasAnalisa;
-  performa: Performa | null;
-  dibatalkan: RingkasAnalisa[];
-  berjalan: number;
-  tutup: () => void;
-}) {
-  const analis = performa?.analis.find((x) => x.uid === a.uid) ?? null;
+   Satu-satunya pemicunya tombol "Performa Signal" di kartu, dan begitu
+   tombolnya dicabut modal itu jadi layar yang tidak punya pintu: kode
+   yang lengkap, teruji, dan tidak akan pernah tampil. Yang membacanya
+   nanti akan menghabiskan waktu mencari kenapa ia tidak muncul.
 
-  /* TIRAI 80% + blur, bukan 60% polos.
-     Panel ini dulu tirainya paling tipis di seluruh aplikasi padahal isinya
-     paling padat, dan latarnya bukan halaman tenang melainkan rak kartu
-     sinyal — bergambar, berwarna, penuh tombol. Pada 60% tanpa blur kartu
-     itu masih terbaca utuh di kiri dan kanan dialog, jadi mata tidak bisa
-     memutuskan mana yang sedang dibaca. Modal lain di berkas ini sudah
-     memakai /70 sampai /85; yang ini tertinggal.
+   Isinya tidak hilang dari produk: PerformaAnalisSatu tetap hidup di
+   components/performa-signal.tsx, dan performa per-analis sekarang
+   punya sub-halamannya sendiri di kanal. */
 
-     LEBARNYA NAIK ke 3xl. Waktu ditulis, isinya cuma beberapa KPI. Sekarang
-     ia memuat empat KPI, kurva saldo, kalender sebulan penuh, dan daftar
-     pembatalan — dan kalender 7 kolom di dalam 2xl membuat tiap selnya
-     terlalu sempit untuk memuat tanggal beserta angkanya. */
-  /* ── DIPORTAL KE <body>, DAN ITU WAJIB ────────────────────────────────
-     Modal ini dirender DARI DALAM kartu sinyal, dan kartu yang sinyalnya
-     sudah selesai memakai `opacity-75` (lihat Panel di KartuAnalisa).
-     Elemen ber-opacity < 1 membuat STACKING CONTEXT sendiri, jadi dua hal
-     terjadi sekaligus dan keduanya terlihat di layar:
-
-       1. z-50 milik modal cuma berlaku DI DALAM kartu itu. Kartu-kartu
-          tetangga di rak yang sama tergambar DI ATAS modalnya — panelnya
-          tertutup dan tidak bisa dibaca.
-       2. Seluruh modal ikut pudar 75%, karena opacity induk berlaku pada
-          seluruh grupnya.
-
-     Terukur di situs tayang: rantai induknya .fixed.inset-0.z-50 →
-     div opacity 0.75 → .w-[320px] → .overflow-x-auto.
-
-     Menaikkan z-index TIDAK menolong — angka berapa pun tetap dibandingkan
-     di dalam stacking context yang sama. Yang menolong cuma keluar dari
-     sana, dan portal adalah cara React melakukannya. */
-  return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm" {...useTutupLuar(tutup)}>
-      <div className="max-h-full w-full max-w-3xl overflow-y-auto rounded-xl border border-zinc-800 bg-zinc-950 p-5"
-           onClick={(e) => e.stopPropagation()}>
-        <div className="mb-3 flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="text-[14px] font-medium text-zinc-100">Performa signal {a.nama}</div>
-            <div className="text-[11.5px] leading-relaxed text-zinc-500">
-              Dihitung server dari lilin sungguhan sejak tiap sinyal diposting — tidak ada satu
-              angka pun di sini yang bisa diisi tangan, termasuk oleh pemilik situs.
-            </div>
-          </div>
-          <button onClick={tutup} className="shrink-0 cursor-pointer rounded p-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200">
-            <X className="size-4" />
-          </button>
-        </div>
-
-        <PerformaAnalisSatu
-          analis={analis}
-          modal={performa?.modal ?? 1000}
-          risikoPersen={performa?.risikoPersen ?? 1}
-          berjalan={berjalan}
-          dibatalkan={dibatalkan}
-        />
-      </div>
-    </div>,
-    document.body,
-  );
-}
 
 /* ── Lencana gaya trading & tingkat risiko ──────────────────────────────
    Keduanya diturunkan di `ringkasKanal`, tidak pernah diketik analisnya.
@@ -456,7 +387,7 @@ function Galeri({ analisaId, galeri, bisaTambah, uidku, penulisku, onBerubah }: 
   );
 }
 
-function KartuAnalisa({ a, status, milikku, pemilik, onSegarkan, performa, dibatalkanAnalis, berjalanAnalis, hargaKini }: {
+function KartuAnalisa({ a, status, milikku, pemilik, onSegarkan, performa, hargaKini }: {
   a: RingkasAnalisa;
   status: string | undefined;
   milikku: boolean;
@@ -474,9 +405,6 @@ function KartuAnalisa({ a, status, milikku, pemilik, onSegarkan, performa, dibat
    *  memuat belasan kartu, dan belasan permintaan untuk data yang sama
    *  adalah cara paling cepat menghabiskan kuota rute publik. */
   performa: Performa | null;
-  /** Sinyal analis ini yang dibatalkan, untuk panel performanya. */
-  dibatalkanAnalis: RingkasAnalisa[];
-  berjalanAnalis: number;
   /** Pemilik APLIKASI, bukan penulis analisa. Satu-satunya yang boleh
    *  menghapus — itu moderasi (kewajiban pengawasan PSE), bukan fitur.
    *  Penulis TIDAK bisa menghapus sinyalnya sendiri: rekam jejak yang bisa
@@ -493,7 +421,6 @@ function KartuAnalisa({ a, status, milikku, pemilik, onSegarkan, performa, dibat
   const [bukti, setBukti] = useState('');
   const [sibuk, setSibuk] = useState(false);
   const [kabar, setKabar] = useState('');
-  const [lihatPorto, setLihatPorto] = useState(false);
   const [formBatal, setFormBatal] = useState(false);
 
   const bisaBuka = milikku || a.harga === 0 || status === 'pembeli';
@@ -732,50 +659,16 @@ function KartuAnalisa({ a, status, milikku, pemilik, onSegarkan, performa, dibat
           </div>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1.5">
-          {/* Dulu tombol ini disembunyikan untuk agen, dan alasannya sudah
-              tidak berlaku: yang dibukanya bukan lagi snapshot jurnal
-              melainkan performa SINYAL — dihitung server dari lilin sejak
-              tiap sinyal diposting. Agen punya itu persis seperti manusia.
-              Menyembunyikannya justru membuat satu-satunya peserta papan
-              yang tidak bisa dinilai adalah yang menulis paling banyak. */}
-          {/* Sebaris, bukan bertumpuk. Keduanya sama-sama "buka sesuatu
-              tentang sinyal ini" — ditumpuk tegak mereka terbaca sebagai
-              dua tingkat kepentingan yang berbeda, padahal sejajar. */}
-          <div className="flex items-center gap-1.5">
-            <button onClick={() => setLihatPorto(true)}
-              className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 py-1.5 text-[11.5px] text-zinc-300 transition-colors hover:border-zinc-700">
-              <LineChart className="size-3.5" /> Performa Signal
-            </button>
-            {/* Gembok TERTUTUP selama levelnya belum jadi milik pembacanya,
-                TERBUKA begitu jadi. Ikon chart yang dulu di sini tidak
-                menerangkan apa-apa — tombolnya sudah bertuliskan "Chart".
-                Yang benar-benar perlu diketahui sebelum ditekan justru
-                apakah yang dibuka nanti berisi garis atau kosong.
+          {/* [Performa Signal] DICABUT — permintaan pemilik. Panel performa
+              analisnya sudah terbuka lebar sebagai sub-halaman sendiri di
+              kanal; tombol per-kartu yang membuka hal yang sama cuma jalan
+              kedua ke tempat yang sudah punya pintu.
 
-                Tampilannya ikut berubah, bukan cuma ikonnya: yang terbuka
-                jadi tombol padat karena memang tindakan utamanya; yang
-                terkunci tetap bergaris tipis, supaya tidak menjanjikan
-                lebih dari yang diberikannya.
-
-                Keterangannya punya TIGA keadaan, bukan dua. Gemboknya soal
-                HAK — boleh atau tidak. Tapi keterangan harus soal yang
-                benar-benar akan terjadi: sinyal gratis yang analisanya
-                belum dibuka memang boleh, tapi levelnya belum ada di
-                tangan, jadi tautannya juga belum membawanya. Menjanjikan
-                "sudah terisi" di situ akan meleset. */}
-            <Link to={tautanChart}
-              title={isi
-                ? 'Buka chart dengan entry, SL, dan TP sudah terisi'
-                : bisaBuka
-                  ? 'Buka analisanya dulu supaya entry, SL, dan TP ikut terbawa ke chart'
-                  : 'Chart terbuka di pasangan dan timeframe ini — level entry/SL/TP belum termasuk'}
-              className={cn('flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[11.5px] font-medium transition-colors',
-                bisaBuka
-                  ? 'bg-zinc-100 text-zinc-950 hover:bg-white'
-                  : 'border border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200')}>
-              {bisaBuka ? <Unlock className="size-3.5" /> : <Lock className="size-3.5" />} Buka di Chart
-            </Link>
-          </div>
+              [Buka di Chart] TURUN ke baris tombol di dasar kartu, sejajar
+              "Buka analisa". Keduanya tindakan atas sinyal ini, dan
+              memisahkannya — satu di kepala, satu di kaki — membuat mata
+              harus menyapu kartu dua kali untuk menemukan apa yang bisa
+              dilakukan. */}
           {/* Batalkan HANYA muncul untuk sinyal sendiri yang masih menunggu
               harga. Begitu entry tersentuh tombolnya hilang — dan itu bukan
               sekadar disembunyikan, server menolaknya juga. */}
@@ -838,7 +731,14 @@ function KartuAnalisa({ a, status, milikku, pemilik, onSegarkan, performa, dibat
             {bisaBuka ? (
               <button onClick={() => void muatIsi()} disabled={sibuk}
                 className="flex cursor-pointer items-center gap-1.5 rounded-md bg-zinc-100 px-3 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:opacity-50">
-                {sibuk ? <Loader2 className="size-3.5 animate-spin" /> : <Unlock className="size-3.5" />}
+                {sibuk ? <Loader2 className="size-3.5 animate-spin" />
+                  /* DICERMIN mendatar. Gembok terbuka lucide menaruh besinya
+                     di kanan, dan di sana ia terbaca seperti sedang MENUTUP:
+                     ujung besinya menjauh dari badan gemboknya, jadi
+                     garisnya tampak tidak menyatu. Dicermin, besinya
+                     menghadap kiri dan bertumpu pada badannya — bentuk yang
+                     dibaca orang sebagai "sudah terbuka". */
+                  : <Unlock className="size-3.5 -scale-x-100" />}
                 Buka analisa
               </button>
             ) : status === 'menunggu' ? (
@@ -851,6 +751,30 @@ function KartuAnalisa({ a, status, milikku, pemilik, onSegarkan, performa, dibat
                 <Lock className="size-3.5" /> Beli akses · {uang(a.harga)}
               </button>
             )}
+            {/* Ikon CANDLESTICK, bukan gembok.
+
+                Gembok di sini menjawab pertanyaan yang salah: ia bercerita
+                tentang kunci, padahal yang dituju tombolnya adalah CHART.
+                Keadaan terkunci sudah dinyatakan tombol di sebelah kirinya
+                ("Buka analisa" / "Beli akses"), jadi dua gembok bersebelahan
+                cuma mengulang hal yang sama dua kali dengan satu-satunya
+                pembeda arah besinya.
+
+                Yang tersisa dari keadaan itu warnanya: putih pekat kalau
+                levelnya memang ikut terbawa, bergaris tipis kalau chart-nya
+                terbuka tanpa level. */}
+            <Link to={tautanChart}
+              title={isi
+                ? 'Buka chart dengan entry, SL, dan TP sudah terisi'
+                : bisaBuka
+                  ? 'Buka analisanya dulu supaya entry, SL, dan TP ikut terbawa ke chart'
+                  : 'Chart terbuka di pasangan dan timeframe ini — level entry/SL/TP belum termasuk'}
+              className={cn('flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors',
+                isi
+                  ? 'bg-zinc-100 text-zinc-950 hover:bg-white'
+                  : 'border border-zinc-800 text-zinc-300 hover:border-zinc-600 hover:text-zinc-100')}>
+              <CandlestickChart className="size-3.5" /> Buka di Chart
+            </Link>
             {pemilik && (
               <button onClick={() => { if (confirm('Hapus sinyal ini? (moderasi pemilik — penulisnya tidak bisa)')) void hapusAnalisa(a.id).then(onSegarkan); }}
                 className="ml-auto flex cursor-pointer items-center gap-1 rounded-md border border-zinc-800 px-2 py-1.5 text-[11.5px] text-zinc-500 transition-colors hover:border-red-500/40 hover:text-red-400">
@@ -862,10 +786,6 @@ function KartuAnalisa({ a, status, milikku, pemilik, onSegarkan, performa, dibat
         {kabar && <p className="mt-2 text-[12px] text-amber-300/90">{kabar}</p>}
       </div>
 
-      {lihatPorto && (
-        <ModalPerformaAnalis a={a} performa={performa} dibatalkan={dibatalkanAnalis}
-                             berjalan={berjalanAnalis} tutup={() => setLihatPorto(false)} />
-      )}
       {formBatal && (
         <ModalBatal a={a} tutup={() => setFormBatal(false)} selesai={onSegarkan} />
       )}
@@ -2450,9 +2370,7 @@ export default function Analisa() {
                               <div key={a.id} className="flex w-[320px] shrink-0">
                                 <KartuAnalisa a={a} status={statusku[a.id]}
                                   milikku={a.uid === pengguna?.uid} pemilik={pemilik} onSegarkan={segarkan}
-                                  performa={performa} hargaKini={hargaUntuk(a.pasangan)}
-                                  dibatalkanAnalis={terpilih.filter((s) => s.hasil === 'batal')}
-                                  berjalanAnalis={berjalan.length} />
+                                  performa={performa} hargaKini={hargaUntuk(a.pasangan)} />
                               </div>
                             ))}
                           </div>
