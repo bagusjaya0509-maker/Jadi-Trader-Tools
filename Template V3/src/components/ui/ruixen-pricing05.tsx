@@ -66,7 +66,12 @@ export default function Pricing_05() {
           </p>
         </div>
 
-        <div className="flex flex-col gap-6 items-center mt-12 lg:flex-row lg:items-end lg:justify-center">
+        {/* items-stretch, bukan items-end. Bawaan bloknya meratakan kartu di
+            SISI BAWAH, jadi puncaknya bergerigi mengikuti panjang daftar
+            masing-masing — yang isinya paling banyak menjulang paling tinggi
+            tanpa maksud apa-apa. Diratakan tingginya, ketiganya berangkat
+            dari garis yang sama. */}
+        <div className="flex flex-col gap-6 items-center mt-12 lg:flex-row lg:items-stretch lg:justify-center">
           {pricingTiers.map(({ title, monthlyPrice, buttonText, popular, features, inverse }) => (
             <Card
               key={title}

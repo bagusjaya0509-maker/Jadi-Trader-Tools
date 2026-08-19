@@ -25,9 +25,15 @@ import { cn } from '@/lib/utils';
    jadi ×, menu HP lewat portal. Yang diganti HANYA isinya — tautan menuju
    halaman kami sendiri, wordmark memakai logo kami.
 
-   Tautan pakai <a href="#/..."> polos, bukan <Link>: router situs ini
-   HashRouter, jadi href hash adalah bentuk aslinya — dan komponen
-   NavigationMenuLink milik Radix memang mengoper props ke <a>.
+   Tautan pakai <a href="/..."> polos, bukan <Link>; NavigationMenuLink
+   milik Radix memang mengoper props ke <a>.
+
+   Bentuknya dulu "#/..." karena situs ini memakai HashRouter. Sejak
+   17 Agustus 2026 routernya BrowserRouter, dan di router itu "#/akses"
+   BUKAN rute — cuma jangkar halaman. Alamat di bilah URL berubah tapi
+   halamannya diam, jadi tombolnya tampak "tidak berfungsi" padahal
+   tautannya ada. Tanda pagarnya sudah diturunkan di seluruh berkas
+   halaman depan.
    ════════════════════════════════════════════════════════════════════════ */
 
 type LinkItem = {
@@ -38,23 +44,23 @@ type LinkItem = {
 };
 
 const produkLinks: LinkItem[] = [
-  { title: 'Dashboard',     href: '#/dashboard',   icon: LayoutDashboard, description: 'Ringkasan akun & posisi terbuka' },
-  { title: 'Chart & Entry', href: '#/chart',       icon: LineChart,       description: 'Chart yang bisa mengeksekusi order' },
-  { title: 'Screener Area', href: '#/screener',    icon: Radar,           description: 'Pindai SMI + SNR seluruh watchlist' },
-  { title: 'Journal',       href: '#/jurnal',      icon: NotebookPen,     description: 'Jurnal yang terisi sendiri dari broker' },
-  { title: 'Copy Signal',   href: '#/copy',        icon: Copy,            description: 'Sinyal komunitas dengan rekam jejak' },
-  { title: 'Integrations',  href: '#/integrasi',   icon: Plug,            description: 'Binance Futures & MetaTrader 5' },
+  { title: 'Dashboard',     href: '/dashboard',   icon: LayoutDashboard, description: 'Ringkasan akun & posisi terbuka' },
+  { title: 'Chart & Entry', href: '/chart',       icon: LineChart,       description: 'Chart yang bisa mengeksekusi order' },
+  { title: 'Screener Area', href: '/screener',    icon: Radar,           description: 'Pindai SMI + SNR seluruh watchlist' },
+  { title: 'Journal',       href: '/jurnal',      icon: NotebookPen,     description: 'Jurnal yang terisi sendiri dari broker' },
+  { title: 'Copy Signal',   href: '/copy',        icon: Copy,            description: 'Sinyal komunitas dengan rekam jejak' },
+  { title: 'Integrations',  href: '/integrasi',   icon: Plug,            description: 'Binance Futures & MetaTrader 5' },
 ];
 
 const perusahaanLinks: LinkItem[] = [
-  { title: 'Marketplace',  href: '#/marketplace',  icon: Store,      description: 'EA, indikator, dan lisensi' },
-  { title: 'Dokumentasi',  href: '#/dokumentasi',  icon: FileText,   description: 'Panduan pemasangan & pemakaian' },
-  { title: 'Changelog',    href: '#/changelog',    icon: ScrollText, description: 'Apa yang baru di tiap rilis' },
+  { title: 'Marketplace',  href: '/marketplace',  icon: Store,      description: 'EA, indikator, dan lisensi' },
+  { title: 'Dokumentasi',  href: '/dokumentasi',  icon: FileText,   description: 'Panduan pemasangan & pemakaian' },
+  { title: 'Changelog',    href: '/changelog',    icon: ScrollText, description: 'Apa yang baru di tiap rilis' },
 ];
 
 const perusahaanLinks2: LinkItem[] = [
-  { title: 'Disclaimer & Privasi', href: '#/legal',       icon: Shield },
-  { title: 'Help Center',          href: '#/dokumentasi', icon: HelpCircle },
+  { title: 'Disclaimer & Privasi', href: '/legal',       icon: Shield },
+  { title: 'Help Center',          href: '/dokumentasi', icon: HelpCircle },
 ];
 
 export function Header() {
@@ -75,7 +81,7 @@ export function Header() {
     >
       <nav className="mx-auto flex h-14 w-full max-w-5xl items-center justify-between px-4">
         <div className="flex items-center gap-5">
-          <a href="#/pendaratan" className="hover:bg-accent flex items-center gap-2 rounded-md p-2">
+          <a href="/pendaratan" className="hover:bg-accent flex items-center gap-2 rounded-md p-2">
             <img src="brand/logo-ikon-256.png" alt="" className="size-5 rounded" />
             <span className="text-sm font-semibold tracking-tight text-foreground">
               Jadi Trader <span className="text-muted-foreground font-normal">Tools</span>
@@ -94,7 +100,7 @@ export function Header() {
                   <div className="p-2">
                     <p className="text-muted-foreground text-sm">
                       Belum punya akses?{' '}
-                      <a href="#/akses" className="text-foreground font-medium hover:underline">
+                      <a href="/akses" className="text-foreground font-medium hover:underline">
                         Minta akses
                       </a>
                     </p>
@@ -136,10 +142,10 @@ export function Header() {
         </div>
         <div className="hidden items-center gap-2 md:flex">
           <Button variant="outline" asChild>
-            <a href="#/akses">Masuk</a>
+            <a href="/akses">Masuk</a>
           </Button>
           <Button asChild>
-            <a href="#/jurnal">Mulai gratis</a>
+            <a href="/jurnal">Mulai gratis</a>
           </Button>
         </div>
         <Button
@@ -172,10 +178,10 @@ export function Header() {
         </NavigationMenu>
         <div className="flex flex-col gap-2">
           <Button variant="outline" className="w-full bg-transparent" asChild>
-            <a href="#/akses" onClick={() => setOpen(false)}>Masuk</a>
+            <a href="/akses" onClick={() => setOpen(false)}>Masuk</a>
           </Button>
           <Button className="w-full" asChild>
-            <a href="#/jurnal" onClick={() => setOpen(false)}>Mulai gratis</a>
+            <a href="/jurnal" onClick={() => setOpen(false)}>Mulai gratis</a>
           </Button>
         </div>
       </MobileMenu>

@@ -248,7 +248,7 @@ function Header() {
                   <div className="p-2">
                     <p className="text-muted-foreground text-sm">
                       Belum yakin?{' '}
-                      <a href="#/preview" className="text-foreground font-medium hover:underline">
+                      <a href="/preview" className="text-foreground font-medium hover:underline">
                         Lihat preview dulu
                       </a>
                     </p>
@@ -281,7 +281,7 @@ function Header() {
                 </NavigationMenuContent>
               </NavigationMenuItem>
               <NavigationMenuLink className="px-4" asChild>
-                <a href="#/akses" className="hover:bg-accent rounded-md p-2">Harga &amp; Akses</a>
+                <a href="/akses" className="hover:bg-accent rounded-md p-2">Harga &amp; Akses</a>
               </NavigationMenuLink>
             </NavigationMenuList>
           </NavigationMenu>
@@ -290,8 +290,8 @@ function Header() {
           {/* Dua tombol template ini dulu tidak menuju ke mana pun. Tombol
               mati di pojok kanan atas halaman depan adalah tempat pertama
               orang menekan saat sudah tertarik. */}
-          <Button variant="outline" asChild><a href="#/preview">Lihat preview</a></Button>
-          <Button asChild><a href="#/akses">Ambil akses</a></Button>
+          <Button variant="outline" asChild><a href="/preview">Lihat preview</a></Button>
+          <Button asChild><a href="/akses">Ambil akses</a></Button>
         </div>
         <Button
           size="icon"
@@ -375,25 +375,25 @@ function ListItem({
 }
 
 const productLinks: LinkItem[] = [
-  { title: 'Screener Area',  href: '#/screener',  description: 'Koin Hunter & Zona Pantau — pindai ratusan simbol Binance', icon: BarChart },
-  { title: 'Chart & Entry',  href: '#/chart',     description: 'Chart, alat gambar, dan Replay untuk latihan eksekusi',    icon: LayersIcon },
-  { title: 'Journal',        href: '#/jurnal',    description: 'Catat trade, emosi, dan alasan — dari MT5 & Binance',      icon: FileText },
-  { title: 'Copy Signal',    href: '#/copy',      description: 'Sinyal analis lain, dinilai dari performa sinyalnya',      icon: UserPlusIcon },
-  { title: 'Marketplace',    href: '#/marketplace', description: 'EA, indikator, dan alat bantu trading',                  icon: GlobeIcon },
-  { title: 'Integrations',   href: '#/integrasi', description: 'Sambungkan MetaTrader 5 dan Binance Futures',              icon: PlugIcon },
+  { title: 'Screener Area',  href: '/screener',  description: 'Koin Hunter & Zona Pantau — pindai ratusan simbol Binance', icon: BarChart },
+  { title: 'Chart & Entry',  href: '/chart',     description: 'Chart, alat gambar, dan Replay untuk latihan eksekusi',    icon: LayersIcon },
+  { title: 'Journal',        href: '/jurnal',    description: 'Catat trade, emosi, dan alasan — dari MT5 & Binance',      icon: FileText },
+  { title: 'Copy Signal',    href: '/copy',      description: 'Sinyal analis lain, dinilai dari performa sinyalnya',      icon: UserPlusIcon },
+  { title: 'Marketplace',    href: '/marketplace', description: 'EA, indikator, dan alat bantu trading',                  icon: GlobeIcon },
+  { title: 'Integrations',   href: '/integrasi', description: 'Sambungkan MetaTrader 5 dan Binance Futures',              icon: PlugIcon },
 ];
 
 const companyLinks: LinkItem[] = [
-  { title: 'Personal Area',  href: '#/personal', description: 'Rekap performa dan evaluasi caramu berdagang', icon: Users },
-  { title: 'Papan peringkat', href: '#/copy',    description: 'Rekam jejak analis, dihitung dari sinyal yang selesai', icon: Star },
-  { title: 'Jadi analis',    href: '#/copy?sub=posting', description: 'Posting sinyalmu sendiri — semua orang boleh', icon: Handshake },
+  { title: 'Personal Area',  href: '/personal', description: 'Rekap performa dan evaluasi caramu berdagang', icon: Users },
+  { title: 'Papan peringkat', href: '/copy',    description: 'Rekam jejak analis, dihitung dari sinyal yang selesai', icon: Star },
+  { title: 'Jadi analis',    href: '/copy?sub=posting', description: 'Posting sinyalmu sendiri — semua orang boleh', icon: Handshake },
 ];
 
 const companyLinks2: LinkItem[] = [
-  { title: 'Disclaimer & Ketentuan', href: '#/legal',       icon: FileText },
-  { title: 'Kebijakan Privasi',      href: '#/legal',       icon: Shield },
-  { title: 'Changelog',              href: '#/changelog',   icon: RotateCcw },
-  { title: 'Dokumentasi',            href: '#/dokumentasi', icon: HelpCircle },
+  { title: 'Disclaimer & Ketentuan', href: '/legal',       icon: FileText },
+  { title: 'Kebijakan Privasi',      href: '/legal',       icon: Shield },
+  { title: 'Changelog',              href: '/changelog',   icon: RotateCcw },
+  { title: 'Dokumentasi',            href: '/dokumentasi', icon: HelpCircle },
 ];
 
 function useScroll(threshold: number) {
@@ -445,8 +445,19 @@ export default function Template() {
     return () => { if (sebelumnya) akar.setAttribute('data-tema', sebelumnya); };
   }, []);
 
+  /* Pembungkus di bawah ini TANPA overflow-y-auto, dan justru itu yang
+     membuat headernya menempel.
+
+     position:sticky selalu terikat pada kotak-gulir TERDEKAT, bukan pada
+     jendela. Selama pembungkus ini punya overflow-y-auto ia dihitung
+     sebagai kotak-gulir — padahal tingginya cuma min-h-screen, jadi ia
+     tumbuh mengikuti isinya dan tidak pernah benar-benar menggulir. Yang
+     menggulir tetap jendela.
+
+     Akibatnya headernya menempel pada sesuatu yang diam: ikut terbawa naik
+     dan hilang dari layar begitu halaman digulir. */
   return (
-    <div className="flex min-h-screen w-full flex-col overflow-y-auto bg-background text-foreground">
+    <div className="flex min-h-screen w-full flex-col bg-background text-foreground">
       <Header />
       <main className="grow">
         <ParallaxComponent />

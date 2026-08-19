@@ -42,7 +42,7 @@ export function HeroSection({ children }: { children?: React.ReactNode }) {
             'group flex w-fit items-center gap-3 rounded-sm border bg-card p-1 shadow-xs',
             'fade-in slide-in-from-bottom-10 animate-in fill-mode-backwards transition-all delay-500 duration-500 ease-out',
           )}
-          href="#/akses"
+          href="/akses"
         >
           <div className="rounded-xs border bg-card px-1.5 py-0.5 shadow-sm">
             <p className="font-mono text-xs">BARU</p>
@@ -78,7 +78,7 @@ export function HeroSection({ children }: { children?: React.ReactNode }) {
 
         <div className="fade-in slide-in-from-bottom-10 flex w-fit animate-in items-center justify-center gap-3 fill-mode-backwards pt-2 delay-300 duration-500 ease-out">
           <Button variant="outline" asChild>
-            <a href="#/jurnal">
+            <a href="/jurnal">
               <NotebookPenIcon className="size-4 mr-2" data-icon="inline-start" /> Mulai dari jurnal — gratis
             </a>
           </Button>
