@@ -84,6 +84,38 @@
   to   { opacity: 1; transform: scale(1); }
 }
 
+/* ── WARNA BORDER BAWAAN — butiran migrasi Tailwind v3 → v4 ─────────────
+   Di Tailwind v3, kelas `border` polos (tanpa `border-<warna>`) memakai
+   warna border bawaan dari konfigurasi — abu-abu tipis. Di v4 bawaannya
+   diganti jadi `currentColor`, yaitu warna TEKS elemen itu.
+
+   Di halaman gelap ini akibatnya keras: kartu dengan teks #fafafa dapat
+   garis tepi #fafafa juga. Bukan garis tipis abu-abu, tapi garis PUTIH
+   penuh mengelilingi kotak. Itu yang bikin blok tempelan terlihat
+   "outline-nya kelewat tebal" padahal lebarnya tetap 1px — yang berubah
+   kontrasnya, bukan ketebalannya.
+
+   Diukur di halaman tayang sebelum aturan ini dipasang: 5 elemen kena —
+   bingkai mockup di hero (2) dan ketiga kartu harga. Semuanya memakai
+   `border` polos, dan tidak satu pun memang menginginkan garis putih.
+
+   Aturan ini menyentuh HANYA yang tidak menyebut warnanya sendiri.
+   `border-white/[0.08]`, `border-zinc-800`, dan sejenisnya tetap menang
+   karena kelas utilitasnya lebih khusus daripada pemilih semesta ini.
+
+   Nilainya lewat token, jadi ia ikut berganti di tema terang (#e2e8f0)
+   tanpa aturan kedua. Cadangan `currentColor` dipertahankan supaya
+   perilakunya tetap terdefinisi kalau tokennya suatu saat hilang. */
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-border, currentColor);
+  }
+}
+
 html { -webkit-text-size-adjust: 100%; }
 
 body {
