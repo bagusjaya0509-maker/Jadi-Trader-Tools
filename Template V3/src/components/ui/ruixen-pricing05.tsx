@@ -81,12 +81,20 @@ export default function Pricing_05() {
           </p>
         </div>
 
-        {/* items-stretch, bukan items-end. Bawaan bloknya meratakan kartu di
-            SISI BAWAH, jadi puncaknya bergerigi mengikuti panjang daftar
-            masing-masing — yang isinya paling banyak menjulang paling tinggi
-            tanpa maksud apa-apa. Diratakan tingginya, ketiganya berangkat
-            dari garis yang sama. */}
-        <div className="flex flex-col gap-6 items-center mt-12 lg:flex-row lg:items-stretch lg:justify-center">
+        {/* lg:items-end — bawaan bloknya, dikembalikan.
+
+            Sempat saya ganti items-stretch karena puncak kartunya bergerigi
+            dan terbaca seperti salah pasang. Itu keliru: ketidaksejajaran itu
+            memang rancangannya, dan yang membuat halaman terlihat miring
+            waktu itu adalah `container` yang tidak memusat (sudah diperbaiki
+            di baris pembungkus di atas), bukan kartunya.
+
+            items-stretch juga membawa akibatnya sendiri: semua kartu dipaksa
+            setinggi yang terpanjang, jadi Starter yang isinya lima baris
+            berakhir dengan ruang kosong menganga di bawah daftarnya. Rata
+            bawah membuat tiap kartu setinggi isinya sendiri, dan garis dasar
+            yang sama itulah yang mengikat ketiganya. */}
+        <div className="flex flex-col gap-6 items-center mt-12 lg:flex-row lg:items-end lg:justify-center">
           {pricingTiers.map(({ title, monthlyPrice, buttonText, popular, features, inverse }) => (
             <Card
               key={title}
