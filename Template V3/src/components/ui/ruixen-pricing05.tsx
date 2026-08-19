@@ -22,6 +22,25 @@ export default function Pricing_05() {
      bahwa tempatnya habis. */
   const adaEvent = h.eventGratis && h.bukaPermintaan && !h.gratisHabis;
 
+  /* HEMAT PAKET 3 BULAN, dihitung saat digambar — bukan angka yang ditulis
+     tangan di dalam teks.
+
+     Sebabnya harganya bisa diubah dari Maintenance kapan saja. Angka persen
+     yang ditanam di kalimat akan tetap berbunyi "33%" setelah harganya
+     diganti, dan klaim hemat yang tidak lagi benar lebih buruk daripada
+     tidak ada klaim sama sekali.
+
+     Pembandingnya HARGA NORMAL bulanan (harga coret), bukan harga promo —
+     dan harga coret itu tertulis di kartu sebelahnya, jadi pembaca bisa
+     memeriksa sendiri hitungannya. Membandingkan dengan harga promo $1
+     akan menghasilkan angka yang benar secara aritmetika tapi menyesatkan:
+     promo itu sementara, langganan tiga bulan tidak. */
+  const bulananNormal = h.hargaTestingCoret > 0 ? h.hargaTestingCoret : h.hargaTesting;
+  const setara3Bulan = bulananNormal * 3;
+  const hemat3Bulan = setara3Bulan > h.hargaPremium3 && h.hargaPremium3 > 0
+    ? Math.round((1 - h.hargaPremium3 / setara3Bulan) * 100)
+    : 0;
+
   const pricingTiers = [
     ...(adaEvent
       ? [{
@@ -40,7 +59,7 @@ export default function Pricing_05() {
             { t: "Chart & jurnal penuh selama masa aktif" },
             { t: `Screener ${BATAS.gratis.screener} kali pakai` },
             { t: `Replay chart ${BATAS.gratis.replay} kali pakai` },
-            { t: "Sambungan Binance Futures & MetaTrader 5" },
+            { t: "Sambungan Binance Futures & MetaTrader 5", no: true },
             { t: "Copy Signal", no: true },
             { t: "Indikator & EA marketplace", no: true },
           ],
@@ -64,7 +83,7 @@ export default function Pricing_05() {
         { t: `Screener ${BATAS.testing.screener} kali — 5x paket gratis` },
         { t: `Replay chart ${BATAS.testing.replay} kali — 5x paket gratis` },
         { t: "Copy Signal + rekam jejak analis" },
-        { t: "Tidak perlu menunggu kuota gratis" },
+        { t: "Sambungan Binance Futures & MetaTrader 5" },
         { t: "Indikator & EA marketplace", no: true },
       ],
     },
@@ -82,7 +101,11 @@ export default function Pricing_05() {
         { t: "Screener tanpa batas hitungan" },
         { t: "Replay chart tanpa batas hitungan" },
         { t: "Copy Signal + rekam jejak analis" },
-        { t: "Tanpa perpanjangan tiap 30 hari" },
+        {
+          t: hemat3Bulan > 0
+            ? `${hemat3Bulan}% lebih murah dari 3x harga bulanan normal`
+            : 'Sekali bayar untuk 90 hari penuh',
+        },
         { t: "Indikator & EA marketplace", no: true },
       ],
     },
