@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Upload, Trash2, RotateCcw, Plus, FileCode2, Image as ImageIcon, ShieldAlert } from 'lucide-react';
+import { PanelModerasiSinyal } from '@/components/panel-moderasi-sinyal';
 import { Panel, PanelHead, KartuKpi } from '@/components/efferd-ui';
 import { cn } from '@/lib/utils';
 import { useProduk, simpanKatalogProduk } from '@/lib/data';
@@ -211,6 +212,11 @@ const TAB = [
   { id: 'trafik',  label: 'Trafik & Server',  judul: 'Trafik & Server',           sub: 'Kunjungan situs dan beban VPS. Pindah dari halaman Sales — ini pertanyaan "mesinnya sehat", bukan "usahanya untung".' },
   { id: 'pine',    label: 'Mesin Pine',      judul: 'Mesin Pine Script',          sub: 'Celah yang ditemukan dari pemakaian nyata — bahan perbaikan berikutnya.' },
   { id: 'konten',  label: 'Situs & Konten',  judul: 'Situs & Konten',             sub: 'Teks yang dilihat pengunjung sebelum masuk.' },
+  /* Moderasi duduk di SINI, bukan di kartu sinyal. Alat pengawasan yang
+     menempel di layar tempat orang memilih sinyal membuat keduanya terlihat
+     sebagai satu jenis tindakan — dan tombol hapus di antara tombol beli
+     adalah tombol hapus yang cepat atau lambat tertekan. */
+  { id: 'moderasi', label: 'Moderasi Sinyal', judul: 'Moderasi Sinyal',            sub: 'Menurunkan sinyal yang melanggar. Kewajiban pengawasan PSE, bukan alat penyuntingan — penulisnya sendiri tidak bisa menghapus rekam jejaknya.' },
 ] as const;
 type IdTab = typeof TAB[number]['id'];
 
@@ -460,6 +466,8 @@ export default function Maintenance() {
       {tab === 'pine' && <PanelCelahPine />}
 
       {tab === 'konten' && <PanelTeksBeranda />}
+
+      {tab === 'moderasi' && <PanelModerasiSinyal />}
 
       {tab === 'produk' && (<>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">

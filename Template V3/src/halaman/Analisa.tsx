@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Link, useSearchParams } from 'react-router-dom';
 import { usePaket, LABEL_PAKET } from '@/lib/paket';
 import {
-  Loader2, Lock, Unlock, Trash2, Send, X, CheckCircle2,
+  Loader2, Lock, Unlock, Send, X, CheckCircle2,
   TrendingUp, TrendingDown, RefreshCw, Radar, Sparkles, ImagePlus, Images, Flag, Ban,
   Settings2, UserRound, Pin, TriangleAlert, ArrowLeft, CandlestickChart,
 } from 'lucide-react';
@@ -29,7 +29,7 @@ import { simbolDasarMt5 } from '@/lib/simbol';
 import { statGabungan, kurvaEkuitas } from '@/lib/hitung';
 import { useTutupLuar } from '@/lib/tutup-luar';
 import {
-  daftarAnalisa, kirimAnalisa, hapusAnalisa, bukaIsi, mintaAkses,
+  daftarAnalisa, kirimAnalisa, bukaIsi, mintaAkses,
   ambilProfilAnalis, simpanProfilAnalis,
   statusSaya, putuskanAkses, tambahGambar, hapusGambar, kecilkanGambar, ambilPerforma,
   batalkanAnalisa, bisaDibatalkan,
@@ -387,7 +387,7 @@ function Galeri({ analisaId, galeri, bisaTambah, uidku, penulisku, onBerubah }: 
   );
 }
 
-function KartuAnalisa({ a, status, milikku, pemilik, onSegarkan, performa, hargaKini }: {
+function KartuAnalisa({ a, status, milikku, onSegarkan, performa, hargaKini }: {
   a: RingkasAnalisa;
   status: string | undefined;
   milikku: boolean;
@@ -410,7 +410,7 @@ function KartuAnalisa({ a, status, milikku, pemilik, onSegarkan, performa, harga
    *  Penulis TIDAK bisa menghapus sinyalnya sendiri: rekam jejak yang bisa
    *  dihapus bukan rekam jejak. Server menolaknya juga; tombol yang
    *  disembunyikan di sini cuma sopan santun, penjaganya di backend. */
-  pemilik?: boolean;
+
   onSegarkan: () => void;
 }) {
   const { pengguna } = useAuth();
@@ -423,7 +423,26 @@ function KartuAnalisa({ a, status, milikku, pemilik, onSegarkan, performa, harga
   const [kabar, setKabar] = useState('');
   const [formBatal, setFormBatal] = useState(false);
 
-  const bisaBuka = milikku || a.harga === 0 || status === 'pembeli';
+  /* ── SINYAL SELESAI IKUT TERBUKA — menyamakan diri dengan servernya ───
+     Bug yang dilaporkan pemiliknya: sinyal yang sudah selesai dibuka di
+     chart, tapi entry/SL/TP-nya tidak ikut terbawa.
+
+     Sebabnya baris ini. Server sudah membuka level untuk sinyal yang sudah
+     kena TP/SL/batal sejak 17 Agu 2026 — lihat gerbang di /api/analisa/isi
+     — tapi syarat di layar tidak ikut diperbarui. Akibatnya kartu sinyal
+     berbayar yang sudah selesai menulis "Terbuka gratis" di lencananya,
+     TIDAK menampilkan tombol "Buka analisa", dan karena `isi` tidak pernah
+     dimuat, tautan chart-nya berangkat tanpa level.
+
+     Tiga bagian yang saling bertentangan di satu kartu, dan tidak satu pun
+     berbunyi seperti galat — itu sebabnya ia bertahan sekian lama.
+
+     Rumusnya SENGAJA disalin apa adanya dari server, termasuk 'batal':
+     rencana yang ditarik sebelum harganya datang juga tidak bisa
+     ditradingkan lagi, dan alasan pembatalannya justru bagian yang paling
+     layak dinilai orang. */
+  const sudahSelesai = a.hasil === 'tp' || a.hasil === 'sl' || a.hasil === 'batal';
+  const bisaBuka = milikku || a.harga === 0 || sudahSelesai || status === 'pembeli';
 
   /* ── TAUTAN "BUKA DI CHART" ──────────────────────────────────────────
      Dulu tautan ini cuma ada SETELAH analisanya dibuka, terkubur di baris
@@ -775,12 +794,19 @@ function KartuAnalisa({ a, status, milikku, pemilik, onSegarkan, performa, harga
                   : 'border border-zinc-800 text-zinc-300 hover:border-zinc-600 hover:text-zinc-100')}>
               <CandlestickChart className="size-3.5" /> Buka di Chart
             </Link>
-            {pemilik && (
-              <button onClick={() => { if (confirm('Hapus sinyal ini? (moderasi pemilik — penulisnya tidak bisa)')) void hapusAnalisa(a.id).then(onSegarkan); }}
-                className="ml-auto flex cursor-pointer items-center gap-1 rounded-md border border-zinc-800 px-2 py-1.5 text-[11.5px] text-zinc-500 transition-colors hover:border-red-500/40 hover:text-red-400">
-                <Trash2 className="size-3.5" /> Moderasi
-              </button>
-            )}
+            {/* TOMBOL MODERASI DICABUT — permintaan pemilik.
+
+                YANG DICABUT TOMBOLNYA, BUKAN KEMAMPUANNYA. Rute
+                DELETE /api/analisa di VPS masih hidup dan masih memeriksa
+                bahwa yang meminta adalah pemilik aplikasi; sinyal tetap bisa
+                ditarik dari sana kalau suatu saat perlu.
+
+                Itu perlu dicatat, karena penghapusan sinyal bukan cuma
+                kenyamanan: sebagai PSE, penyelenggara wajib bisa menurunkan
+                isi yang melanggar dari platformnya sendiri. Kalau rutenya
+                ikut dicabut suatu hari, kewajiban itu ikut hilang bersamanya
+                — dan tidak akan ada yang menyadarinya sampai ada yang
+                memposting sesuatu yang harus diturunkan. */}
           </div>
         )}
         {kabar && <p className="mt-2 text-[12px] text-amber-300/90">{kabar}</p>}
@@ -2369,7 +2395,7 @@ export default function Analisa() {
                             {g.isi.map((a) => (
                               <div key={a.id} className="flex w-[320px] shrink-0">
                                 <KartuAnalisa a={a} status={statusku[a.id]}
-                                  milikku={a.uid === pengguna?.uid} pemilik={pemilik} onSegarkan={segarkan}
+                                  milikku={a.uid === pengguna?.uid} onSegarkan={segarkan}
                                   performa={performa} hargaKini={hargaUntuk(a.pasangan)} />
                               </div>
                             ))}
