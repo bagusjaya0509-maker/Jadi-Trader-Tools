@@ -9,7 +9,12 @@ import {
 } from 'lucide-react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { PanelSinyal } from '@/components/panel-sinyal';
-import { PapanPeringkatSignal, PerformaAnalisSatu } from '@/components/performa-signal';
+import { PerformaAnalisSatu } from '@/components/performa-signal';
+/* TEMPELAN — sedang dinilai. PapanPeringkatSignal dicabut dari kepala
+   halaman dan diganti blok ini apa adanya, atas permintaan pemilik.
+   Komponennya masih ada di components/performa-signal.tsx dan masih dipakai
+   PerformaAnalisSatu, jadi mengembalikannya cukup satu baris. */
+import EventManagerDemo from '@/components/ui/event-manager-demo';
 import { ambilDraf } from '@/lib/draf-sinyal';
 import { AvatarAnalis } from '@/components/avatar-analis';
 import { ringkasKanal, type RingkasKanal } from '@/lib/ringkas-kanal';
@@ -1380,7 +1385,7 @@ export default function Analisa() {
 
           Bisa dilipat: begitu seseorang tahu siapa yang ia ikuti, papan itu
           berubah jadi penghalang antara dia dan sinyalnya. */}
-      {diDepan && <PapanPeringkatSignal data={performa} />}
+      {diDepan && <EventManagerDemo />}
 
       {/* ── Bilah sub-halaman ───────────────────────────────────────────
           Dipindah ke SINI (18 Agu 2026) — di bawah papan peringkat beserta
