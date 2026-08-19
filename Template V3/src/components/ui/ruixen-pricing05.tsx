@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useHargaPaket, usd } from "@/lib/harga-akses";
+import { useHargaPaket, usd, BATAS } from "@/lib/harga-akses";
 
 /* Isi kartu diisi dari setelan yang hidup di server (lihat lib/harga-akses).
    Rangka, kelas, dan gerakan lencananya tetap seperti blok aslinya. */
@@ -37,10 +37,12 @@ export default function Pricing_05() {
           popular: false,
           inverse: false,
           features: [
-            "Akses penuh, tanpa potongan fitur",
-            "Chart replay + eksekusi order",
-            "Screener SMI & SNR",
-            "Jurnal otomatis dari broker",
+            { t: "Chart & jurnal penuh selama masa aktif" },
+            { t: `Screener ${BATAS.gratis.screener} kali pakai` },
+            { t: `Replay chart ${BATAS.gratis.replay} kali pakai` },
+            { t: "Sambungan Binance Futures & MetaTrader 5" },
+            { t: "Copy Signal", no: true },
+            { t: "Indikator & EA marketplace", no: true },
           ],
         }]
       : []),
@@ -58,10 +60,12 @@ export default function Pricing_05() {
       popular: true,
       inverse: true,
       features: [
-        "Semua yang ada di paket gratis",
-        "Tidak perlu menunggu kuota gratis",
-        "Copy Signal + rekam jejak analis",
-        "Sambungan Binance Futures & MetaTrader 5",
+        { t: "Semua yang ada di paket gratis" },
+        { t: `Screener ${BATAS.testing.screener} kali — 5x paket gratis` },
+        { t: `Replay chart ${BATAS.testing.replay} kali — 5x paket gratis` },
+        { t: "Copy Signal + rekam jejak analis" },
+        { t: "Tidak perlu menunggu kuota gratis" },
+        { t: "Indikator & EA marketplace", no: true },
       ],
     },
     {
@@ -69,16 +73,17 @@ export default function Pricing_05() {
       price: usd(h.hargaPremium3),
       strike: 0,
       unit: "/ 3 bulan",
-      note: "Untuk yang sudah cocok dan tidak mau memperpanjang tiap bulan.",
+      note: "Batas hitungan dibuka. Pakai sepuasnya sampai masa aktif habis.",
       buttonText: "Ambil paket 3 bulan",
       link: h.linkPremium3,
       popular: false,
       inverse: false,
       features: [
-        "Isi sama dengan paket bulanan",
-        "Tanpa perpanjangan tiap 30 hari",
-        "Prioritas jawaban dukungan",
-        "Ikut menentukan urutan pengerjaan fitur",
+        { t: "Screener tanpa batas hitungan" },
+        { t: "Replay chart tanpa batas hitungan" },
+        { t: "Copy Signal + rekam jejak analis" },
+        { t: "Tanpa perpanjangan tiap 30 hari" },
+        { t: "Indikator & EA marketplace", no: true },
       ],
     },
     {
@@ -86,16 +91,16 @@ export default function Pricing_05() {
       price: usd(h.hargaTahunan),
       strike: 0,
       unit: "/ 12 bulan",
-      note: "Paling murah per bulannya.",
+      note: "Satu-satunya paket yang membuka isi Marketplace tanpa membeli satuan.",
       buttonText: "Ambil paket tahunan",
       link: h.linkTahunan,
       popular: false,
       inverse: false,
       features: [
-        "Isi sama dengan paket lain",
-        "Harga terkunci satu tahun penuh",
-        "Prioritas jawaban dukungan",
-        "Akses lebih dulu ke fitur yang belum rilis",
+        { t: "Semua yang ada di Premium 3 Bulan" },
+        { t: "Akses penuh SELURUH indikator & EA di Marketplace" },
+        { t: "Termasuk rilis baru selama masa aktif" },
+        { t: "Harga terkunci satu tahun penuh" },
       ],
     },
   ];
@@ -190,10 +195,19 @@ export default function Pricing_05() {
                     Available soon
                   </Button>
                 )}
-                <ul className="flex flex-col gap-4 mt-6 text-sm">
-                  {features.map((feature) => (
-                    <li key={feature} className="flex items-center gap-2">
-                      <span>{feature}</span>
+                {/* Yang TIDAK didapat ikut ditulis, dan itu bukan kelalaian.
+                     Daftar yang cuma memuat yang didapat membuat pembaca
+                     menebak sisanya — dan tebakan orang selalu ke arah yang
+                     menguntungkan dirinya, sampai ia membayar dan kecewa.
+                     Dicoret dan diredupkan supaya bedanya terbaca sekilas,
+                     tanpa perlu membandingkan empat kartu baris per baris. */}
+                <ul className="flex flex-col gap-3 mt-6 text-sm">
+                  {features.map((f) => (
+                    <li key={f.t} className="flex items-start gap-2">
+                      <span className={`mt-px shrink-0 text-xs ${f.no ? "opacity-40" : "opacity-70"}`}>
+                        {f.no ? "\u2715" : "\u2713"}
+                      </span>
+                      <span className={f.no ? "line-through opacity-40" : undefined}>{f.t}</span>
                     </li>
                   ))}
                 </ul>

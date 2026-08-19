@@ -70,6 +70,25 @@ export const HARGA_BAWAAN: HargaPaket = {
   hari: 30,
 };
 
+/* ── BATAS PEMAKAIAN PER PAKET ──────────────────────────────────────────
+   Angka yang membedakan paket satu dengan lainnya. Ditaruh di sini, bukan
+   ditulis langsung di kartu harga, karena tempat ini akan dibaca DUA pihak:
+   kartu harga yang menjanjikannya, dan penegakan batas yang menghitungnya.
+
+   Kalau angkanya ditulis di kartu saja, halaman harga dan perilaku aplikasi
+   akan berpisah pelan-pelan — dan yang paling mungkin terjadi bukan orang
+   protes karena dibatasi, tapi orang membayar lebih untuk batas yang
+   ternyata tidak pernah ditegakkan.
+
+   PENTING: sampai penegakannya dibangun, angka-angka ini baru JANJI. Tidak
+   ada penghitung pemakaian di Screener maupun Replay. */
+export const BATAS = {
+  /** Paket event gratis. */
+  gratis: { screener: 10, replay: 20 },
+  /** Paket testing — lima kali lipat paket gratis. */
+  testing: { screener: 50, replay: 100 },
+} as const;
+
 /** Uang dolar tanpa desimal kalau bulat: $1, $10, $100, $1.5. */
 export function usd(n: number): string {
   return '$' + (Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0$/, ''));
