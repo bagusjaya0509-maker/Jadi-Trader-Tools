@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Loader2, ExternalLink, TriangleAlert, RotateCcw, Radar, ArrowRight, Lock } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { modePreview, jatahTerpakai, pakaiJatah } from '@/lib/preview';
+import { usePaket, pakaiKuota, LABEL_PAKET } from '@/lib/paket';
 
 /* ════════════════════════════════════════════════════════════════════════
    SCREENER ENTRY — screener V2 yang ASLI, ditanam apa adanya
@@ -280,6 +281,46 @@ export default function ScreenerV2() {
      membayar — kegagalan paling mahal dari dua kemungkinan salah. */
   const { pengguna } = useAuth();
   const tamuPreview = modePreview() && !pengguna;
+  const { paket: paketku, muatUlang: muatPaket } = usePaket();
+  /* null = belum diputuskan. Dibedakan dari false supaya layarnya tidak
+     berkedip "terkunci" selama jawaban server masih di jalan. */
+  const [bolehPaket, setBolehPaket] = useState<boolean | null>(null);
+  const [kabarKuota, setKabarKuota] = useState('');
+
+  /* ── JATAH SCREENER PELANGGAN ─────────────────────────────────────────
+     Dihitung per KUNJUNGAN, bukan per render dan bukan per pemindaian.
+
+     Per render salah: React memasang ulang komponen karena banyak sebab
+     yang tidak ada hubungannya dengan orangnya — dan jatah sepuluh akan
+     ludes tanpa ia menyentuh apa pun.
+
+     Per pemindaian juga tidak bisa: pemindainya hidup di dalam bingkai V2,
+     dan menghitung dari luar berarti menebak. "Akses screener 10 kali"
+     memang berarti membukanya sepuluh kali, dan itu yang dihitung.
+
+     Penanda sesi menjaga supaya bolak-balik antar halaman dalam satu sesi
+     tidak dihitung berkali-kali. Sesi baru = kunjungan baru. */
+  useEffect(() => {
+    if (tamuPreview || !pengguna) { setBolehPaket(true); return; }
+    const kunci = 'jt.paket.screener.sesi';
+    let batal = false;
+    (async () => {
+      try {
+        if (sessionStorage.getItem(kunci) === '1') { if (!batal) setBolehPaket(true); return; }
+      } catch { /* privat */ }
+      const h = await pakaiKuota('screener');
+      if (batal) return;
+      if (h.boleh) {
+        try { sessionStorage.setItem(kunci, '1'); } catch { /* privat */ }
+        setBolehPaket(true);
+      } else {
+        setKabarKuota(h.alasan ?? 'Jatah screener paket ini sudah habis.');
+        setBolehPaket(false);
+      }
+      muatPaket();
+    })();
+    return () => { batal = true; };
+  }, [tamuPreview, pengguna, muatPaket]);
   /* Tamu preview SELALU mulai tertutup, jatahnya masih utuh atau tidak.
      Yang membedakan keduanya cuma isi sampulnya: tawaran, atau penjelasan
      bahwa jatahnya sudah lewat. Menyamakan "boleh membuka" dengan "sudah
@@ -338,6 +379,35 @@ export default function ScreenerV2() {
      ia penjelasan berikut jalan keluarnya. Tidak ada layar mati tanpa
      kalimat — itu terbaca sebagai halaman rusak, bukan batas yang
      disengaja. */
+  /* Jatah paket habis. Bentuknya sengaja sama dengan sampul tamu preview:
+     kalimat, lalu jalan keluarnya. Layar mati tanpa keterangan terbaca
+     sebagai halaman rusak, bukan sebagai batas yang disengaja — dan yang
+     membacanya justru orang yang sudah membayar. */
+  if (bolehPaket === false) {
+    return (
+      <div className="flex min-h-[70vh] items-center justify-center p-6">
+        <div className="w-full max-w-lg rounded-xl border border-amber-500/25 bg-amber-500/[0.04] p-6">
+          <div className="text-[14px] font-medium text-amber-300">Jatah Screener sudah habis</div>
+          <p className="mt-2 text-[12.5px] leading-relaxed text-zinc-400">
+            {kabarKuota} Paket <span className="text-zinc-200">{LABEL_PAKET[paketku.paket]}</span> memberi{' '}
+            <span className="angka text-zinc-200">{paketku.batas.screener}</span> kali akses per masa aktif, dan
+            semuanya sudah terpakai. Jatahnya kembali penuh saat masa aktifmu diperpanjang.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <a href="/#harga"
+               className="rounded-md bg-zinc-100 px-4 py-2 text-[12.5px] font-medium text-zinc-950 transition-colors hover:bg-white">
+              Lihat paket tanpa batas
+            </a>
+            <Link to="/dashboard"
+                  className="rounded-md border border-zinc-800 px-4 py-2 text-[12.5px] text-zinc-300 transition-colors hover:border-zinc-700">
+              Kembali ke Dashboard
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (tamuPreview && !buka) {
     return (
       <div className="flex min-h-[70vh] items-center justify-center p-6">

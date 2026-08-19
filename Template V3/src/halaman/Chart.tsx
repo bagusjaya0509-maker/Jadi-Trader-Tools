@@ -35,6 +35,7 @@ import {
 import { SIMBOL_DASAR, simbolDasarMt5 } from '@/lib/simbol';
 import { useAuth } from '@/lib/auth';
 import { modePreview, jatahTerpakai, pakaiJatah } from '@/lib/preview';
+import { usePaket, pakaiKuota, teksSisa } from '@/lib/paket';
 
 /* ════════════════════════════════════════════════════════════════════════
    CHART & BACKTEST
@@ -260,6 +261,11 @@ export default function ChartBacktest() {
      membayar — kegagalan yang paling mahal dari dua kemungkinan salah. */
   const { pengguna } = useAuth();
   const tamuPreview = modePreview() && !pengguna;
+  /* Dua pagar berbeda untuk dua orang berbeda: `tamuPreview` menjaga
+     pengunjung yang belum punya akun, `paketku` menjaga batas paket orang
+     yang sudah masuk. Keduanya menjaga tombol yang sama dan itu bukan
+     duplikasi — alasan membatasinya berbeda, jadi kalimatnya juga berbeda. */
+  const { paket: paketku, muatUlang: muatPaket } = usePaket();
   const [kabarReplay, setKabarReplay] = useState('');
   /* Jatahnya ditandai terpakai saat replay BENAR-BENAR mulai, bukan saat
      tombolnya ditekan. Menekan Replay cuma menyalakan mode bidik, dan
@@ -2277,7 +2283,12 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                 </>
               )}
             </div>
-            <button onClick={() => {
+            {/* async: memakai jatah paket harus menunggu jawaban SERVER
+                sebelum replaynya dibuka. Menjalankannya tanpa menunggu
+                berarti replaynya mulai duluan lalu ditolak sesudahnya —
+                dan yang terlihat orang adalah fitur yang menyala sebentar
+                lalu mati sendiri. */}
+            <button onClick={async () => {
                 /* Sedang replay -> keluar. Sedang membidik -> batal.
                    Selain itu -> mulai membidik. Satu tombol, tiga keadaan
                    yang saling berurutan, jadi tidak perlu tombol kedua. */
@@ -2291,13 +2302,24 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                   setKabarReplay('Replay di mode preview berlaku sekali. Masuk untuk memakainya sepuasnya — sesi latihanmu ikut tersimpan ke jurnal.');
                   return;
                 }
+                /* Jatah paket DIPAKAI SAAT MEMILIH TITIK MULAI, bukan saat
+                   replaynya berjalan. Kalau dihitung tiap bar maju, satu
+                   sesi latihan menghabiskan seluruh jatah bulan itu dalam
+                   semenit. Satu kali tekan = satu sesi. */
+                if (!tamuPreview && pengguna) {
+                  const h = await pakaiKuota('replay');
+                  muatPaket();
+                  if (!h.boleh) { setKabarReplay(h.alasan ?? 'Jatah replay sudah habis.'); return; }
+                }
                 setKabarReplay('');
                 setBidikReplay((v) => !v);
               }}
               title={replayIdx !== null ? 'Keluar dari replay'
                 : tamuPreview && jatahTerpakai('replay') ? 'Replay preview sudah terpakai — masuk untuk memakainya lagi'
                 : bidikReplay ? 'Batal memilih titik mulai'
-                : 'Pilih titik mulai replay — klik di chart'}
+                : teksSisa(paketku, 'replay')
+                  ? `Pilih titik mulai replay — ${teksSisa(paketku, 'replay')}`
+                  : 'Pilih titik mulai replay — klik di chart'}
               className={cn('flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border px-2 py-1.5 text-[12px] transition-colors sm:px-2.5',
                 replayIdx !== null
                   ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400'

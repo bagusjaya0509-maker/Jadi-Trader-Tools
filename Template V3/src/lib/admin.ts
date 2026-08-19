@@ -322,9 +322,28 @@ export async function ambilSumberGratis(id: string, jenis: 'txt' | 'mq5' = 'txt'
   return String(j.kode ?? '');
 }
 
-/** Sumber produk premium, dengan kode lisensi pembeli. */
+/** Sumber produk premium. DUA jalan masuk, dan server yang memutuskan mana
+ *  yang berlaku:
+ *
+ *  1. Kode lisensi per produk — jalur lama, tetap berlaku. Orang yang
+ *     membeli satu indikator tidak perlu berlangganan apa pun.
+ *  2. Identitas orang yang sedang login — kalau paketnya TAHUNAN, seluruh
+ *     produk terbuka tanpa kode.
+ *
+ *  Identitasnya SELALU dikirim kalau ada sesi, bahkan saat kode juga ada.
+ *  Menebak sendiri di sisi browser ("kirim token cuma kalau paketnya
+ *  tahunan") berarti menyalin aturan paket ke tempat kedua — dan salinan
+ *  aturan yang kedua akan menyimpang dari yang pertama begitu salah satunya
+ *  diperbaiki. Biar server saja yang tahu siapa dapat apa. */
 export async function ambilSumberBerlisensi(id: string, kode: string) {
-  const r = await fetch(`${dasar()}/api/produk?id=${encodeURIComponent(id)}&kode=${encodeURIComponent(kode)}`);
+  const q = new URLSearchParams({ id });
+  if (kode) q.set('kode', kode);
+  const kepala: Record<string, string> = {};
+  try {
+    const u = auth.currentUser;
+    if (u) kepala.Authorization = 'Bearer ' + (await u.getIdToken());
+  } catch { /* tanpa sesi -> jalur kode lisensi */ }
+  const r = await fetch(`${dasar()}/api/produk?${q}`, { headers: kepala });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error ?? `Backend menjawab ${r.status}`);
   return String(j.kode ?? '');

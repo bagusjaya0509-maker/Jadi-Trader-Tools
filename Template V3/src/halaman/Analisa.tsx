@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useSearchParams } from 'react-router-dom';
+import { usePaket, LABEL_PAKET } from '@/lib/paket';
 import {
   Loader2, Lock, Unlock, Trash2, Send, LineChart, X, CheckCircle2,
   TrendingUp, TrendingDown, RefreshCw, Radar, Sparkles, ImagePlus, Images, Flag, Ban,
@@ -925,6 +926,18 @@ export default function Analisa() {
   const sub: IdSub = SUB.some((s) => s.id === cariSub.get('sub')) ? (cariSub.get('sub') as IdSub) : 'market';
   const setSub = (id: IdSub) => setCariSub(id === 'market' ? {} : { sub: id }, { replace: true });
   const { pengguna, pemilik, langganan } = useAuth();
+  /* Copy Signal tidak termasuk paket gratis — itu yang tertulis di kartu
+     harga, jadi itu yang harus berlaku di sini. Kartu harga yang menjanjikan
+     pembeda lalu tidak menegakkannya bukan cuma bohong kepada pembeli; ia
+     juga menghapus alasan orang naik paket.
+
+     PEMILIK selalu lewat: ia harus bisa memeriksa sinyal orang lain, dan
+     mengunci dirinya sendiri dari alat pemeriksaannya tidak masuk akal.
+
+     `memuatPaket` ikut dijaga supaya halamannya tidak berkedip terkunci
+     selama jawaban server masih di jalan. */
+  const { paket: paketku, memuat: memuatPaket } = usePaket();
+  const kunciCopy = !!pengguna && !pemilik && !memuatPaket && !paketku.copySignal;
 
   /* Kanal yang sedang dibuka — null berarti daftar kanal. Sinyal kini
      dikelompokkan PER ANALIS seperti papan kanal: satu orang sering
@@ -1255,6 +1268,34 @@ export default function Analisa() {
       setNada('galat');
       setKabar(e instanceof Error ? e.message : 'Gagal memposting');
     } finally { setSibuk(false); }
+  }
+
+  /* Terkunci karena paket. Bentuknya kalimat + jalan keluar, bukan layar
+     kosong: yang membacanya orang yang sudah punya akun dan sedang mencari
+     alasan untuk naik paket, bukan orang tersesat. */
+  if (kunciCopy) {
+    return (
+      <div className="flex min-h-[70vh] items-center justify-center p-6">
+        <div className="w-full max-w-lg rounded-xl border border-amber-500/25 bg-amber-500/[0.04] p-6">
+          <div className="text-[14px] font-medium text-amber-300">Copy Signal belum termasuk paketmu</div>
+          <p className="mt-2 text-[12.5px] leading-relaxed text-zinc-400">
+            Paket <span className="text-zinc-200">{LABEL_PAKET[paketku.paket]}</span> memberi akses penuh ke
+            chart, screener, dan jurnal — tapi belum ke papan sinyal analis. Copy Signal terbuka mulai paket
+            berbayar, tanpa tambahan biaya lain.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <a href="/#harga"
+               className="rounded-md bg-zinc-100 px-4 py-2 text-[12.5px] font-medium text-zinc-950 transition-colors hover:bg-white">
+              Lihat paket
+            </a>
+            <Link to="/dashboard"
+                  className="rounded-md border border-zinc-800 px-4 py-2 text-[12.5px] text-zinc-300 transition-colors hover:border-zinc-700">
+              Kembali ke Dashboard
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
