@@ -56,7 +56,22 @@ const pricingTiers = [
 export default function Pricing_05() {
   return (
     <section className="py-24 bg-white dark:bg-background">
-      <div className="container">
+      {/* `container` diganti pembungkus yang sama dengan bagian-bagian lain
+          halaman ini. Dua sebab, keduanya terukur:
+
+          1. Di Tailwind v4 `container` HANYA memasang max-width bertingkat —
+             tidak ada margin-inline:auto, tidak ada padding. (Di v3 dulu bisa
+             dinyalakan lewat `center: true` di konfigurasi; v4 tidak punya
+             berkas konfigurasi itu.) Jadi di layar lebih lebar dari 1280px
+             kotaknya menempel KIRI dengan ruang kosong menganga di kanan.
+          2. Tanpa padding, di layar 1280px ke bawah isinya menyentuh tepi
+             jendela — sementara FeaturesGrid tepat di atasnya berjarak 59px.
+             Dua bagian bersebelahan dengan garis tepi berbeda terbaca sebagai
+             salah pasang, bukan sebagai variasi.
+
+          max-w-6xl px-6 md:px-8 persis sama dengan FeaturesGrid dan footer,
+          jadi ketiganya berbagi satu garis tepi. */}
+      <div className="mx-auto max-w-6xl px-6 md:px-8">
         <div className="text-center max-w-2xl mx-auto">
           <h2 className="text-4xl font-semibold tracking-tight sm:text-5xl">
             Simple pricing for every team
