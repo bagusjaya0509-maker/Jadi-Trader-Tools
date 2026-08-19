@@ -97,20 +97,30 @@ function Footerdemo() {
       <div className="mx-auto max-w-6xl px-4 py-12 md:px-6 lg:px-8">
         <div className="grid gap-12 md:grid-cols-2 lg:grid-cols-4">
           <div className="relative">
+            {/* Kalimat lama terdengar dibuat-buat karena tiga hal: judulnya
+                pasif ("mau ditanyakan"), kalimat keduanya menyebut orangnya
+                lewat nominalisasi ("yang membangun alatnya") alih-alih
+                menyebut diri, dan penutupnya berupa penyangkalan berpasangan
+                — bentuk yang lebih sering dipakai iklan daripada orang.
+
+                Gantinya menyebut apa yang BENAR-BENAR terjadi saat tombolnya
+                ditekan: pesannya masuk WhatsApp, dan yang membalas orangnya
+                sendiri. Tidak perlu diklaim bukan bot kalau sudah dikatakan
+                siapa yang membalas. */}
             <h2 className="mb-4 text-3xl font-bold tracking-tight">Ada yang mau ditanyakan?</h2>
             <p className="mb-6 text-muted-foreground">
-              Dibalas langsung oleh yang membangun alatnya. Bukan bot, bukan tiket antrean.
+              Tulis di sini, pesannya langsung masuk WhatsApp saya — dan saya sendiri yang membalas.
             </p>
             <form className="relative" onSubmit={kirim}>
               <label htmlFor="tanya" className="sr-only">
-                Tulis pertanyaan Anda
+                Tulis pertanyaanmu
               </label>
               <Input
                 id="tanya"
                 type="text"
                 value={pesan}
                 onChange={(e) => setPesan(e.target.value)}
-                placeholder="Tulis pertanyaan Anda"
+                placeholder="Tulis pertanyaanmu di sini"
                 className="pr-12 backdrop-blur-sm"
               />
               <Button
