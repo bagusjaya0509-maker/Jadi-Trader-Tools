@@ -119,7 +119,6 @@ function CatatanAsumsi({ modal, risikoPersen }: { modal: number; risikoPersen: n
 
 export function PapanPeringkatSignal({ data }: { data: Performa | null }) {
   const { pengguna } = useAuth();
-  const [buka, setBuka] = useState(true);
 
   const peringkat = useMemo(() => (data?.analis ?? []).map((a, i) => ({
     userId: a.uid, rank: i + 1, userName: a.nama, value: a.hasilDolar, agen: a.agen,
@@ -156,10 +155,16 @@ export function PapanPeringkatSignal({ data }: { data: Performa | null }) {
 
   return (
     <div className="mb-4">
-      <button onClick={() => setBuka((v) => !v)}
-        className="mb-2 flex w-full cursor-pointer items-center gap-1.5 rounded-md px-1 py-1 text-[11.5px] text-zinc-500 transition-colors hover:bg-zinc-900 hover:text-zinc-300">
-        {buka ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
-        {buka ? 'Sembunyikan papan peringkat' : 'Tampilkan papan peringkat analis'}
+      {/* Dulu tombol lipat "Sembunyikan papan peringkat". Dicabut atas
+          permintaan pemilik, dan memang tidak punya pekerjaan: papan ini
+          SATU-SATUNYA isi kepala halaman, jadi melipatnya cuma menyisakan
+          baris kosong — bukan membuka ruang untuk apa pun. Sakelar yang
+          hasilnya cuma "tidak ada apa-apa" adalah pilihan yang tidak perlu
+          ditawarkan.
+
+          Bagian yang tetap: lencana data-contoh dan hitungan sinyal selesai.
+          Keduanya keterangan tentang papannya, bukan kendali. */}
+      <div className="mb-2 flex w-full items-center gap-1.5 px-1 py-1 text-[11.5px] text-zinc-500">
         {/* Label contoh WAJIB, dan ditaruh di baris yang sama dengan
             judulnya supaya ikut terbaca walau papannya dilipat. Papan
             peringkat adalah dasar orang memutuskan sinyal siapa yang
@@ -171,9 +176,9 @@ export function PapanPeringkatSignal({ data }: { data: Performa | null }) {
           </span>
         )}
         <span className="angka ml-auto text-[11px] text-zinc-600">{totalSinyal} sinyal selesai</span>
-      </button>
+      </div>
 
-      {data.contoh && buka && (
+      {data.contoh && (
         <p className="mb-2 px-1 text-[11.5px] leading-relaxed text-sky-200/70">
           Nama dan angka di papan ini <b>bukan analis sungguhan</b> — ia memperlihatkan
           bentuk peringkatnya saja. Rekam jejak yang benar muncul begitu kamu punya akses penuh.
@@ -194,8 +199,7 @@ export function PapanPeringkatSignal({ data }: { data: Performa | null }) {
 
           `Kpi` tetap dipakai di kanal per-analis di bawah, jadi
           komponennya tidak ikut dibuang. */}
-      {buka && (
-        <div className="space-y-3">
+      <div className="space-y-3">
           <LeaderboardCard
             /* Bingkai dan latar panelnya dimatikan lewat className, BUKAN
                dengan menyunting components/ui/leaderboard-card.tsx.
@@ -220,7 +224,13 @@ export function PapanPeringkatSignal({ data }: { data: Performa | null }) {
               selengkapnya" bertumpuk untuk dua alinea yang saling menyambung
               lebih berisik daripada alineanya sendiri. */}
           <CatatanLipat>
+            {/* Aturan resetnya ditulis DI SINI, bersama cara mengurutkannya:
+                keduanya menjawab pertanyaan yang sama — "angka ini
+                sebenarnya mengukur apa". Analis yang tidak tahu papannya
+                dimulai ulang akan mengira rekam jejaknya hilang. */}
             <p className="text-[11px] leading-relaxed text-zinc-600">
+              Papan ini <span className="text-zinc-400">dimulai ulang setiap awal bulan</span> —
+              yang diperingkatkan hasil bulan berjalan, bukan sepanjang masa.{' '}
               Diurutkan dari estimasi hasil, bukan dari jumlah pengikut atau
               banyaknya posting. {totalSinyal < 20 && (
                 <span className="text-amber-500/80">
@@ -231,8 +241,7 @@ export function PapanPeringkatSignal({ data }: { data: Performa | null }) {
             </p>
             <CatatanAsumsi modal={data.modal} risikoPersen={data.risikoPersen} />
           </CatatanLipat>
-        </div>
-      )}
+      </div>
     </div>
   );
 }

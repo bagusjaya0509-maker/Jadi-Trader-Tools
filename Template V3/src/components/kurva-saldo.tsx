@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import type { RingkasAnalisa } from '@/lib/analisa';
+import { cn, uang } from '@/lib/utils';
 
 /* ════════════════════════════════════════════════════════════════════════
    KURVA SALDO SATU ANALIS
@@ -71,6 +72,17 @@ export function SparklineSaldo(
   const W = 120, H = 44, pad = 4;
   const { d, Y } = jalur(nilai, W, H, pad, modal);
 
+  /* Label saldo akhir ditulis sebagai HTML DI ATAS svg-nya, bukan sebagai
+     <text> di dalamnya. Sebabnya preserveAspectRatio="none": viewBox-nya
+     diregangkan ke lebar kotak, dan apa pun di dalam svg ikut teregang —
+     huruf jadi gepeng melebar dengan derajat yang berbeda di tiap kartu,
+     tergantung selebar apa kartunya kebetulan digambar.
+
+     Tingginya mengikuti titik terakhir supaya labelnya menempel pada ujung
+     garisnya, bukan mengambang di sudut. Dijepit 14–86% supaya ia tidak
+     terpotong tepi atas atau bawah saat kurvanya berakhir di ekstrem. */
+  const yAkhir = Math.min(86, Math.max(14, (Y(akhir) / H) * 100));
+
   /* id gradien DIBEDAKAN per warna, bukan per pemakaian. Beberapa kartu
      tampil bersamaan di satu layar; id yang sama di semua kartu membuat
      yang belakangan menimpa definisi yang pertama, dan seluruh kartu ikut
@@ -78,8 +90,9 @@ export function SparklineSaldo(
   const idGrad = naik ? 'gradSaldoNaik' : 'gradSaldoTurun';
 
   return (
-    <svg viewBox={'0 0 ' + W + ' ' + H} preserveAspectRatio="none"
-         className={kelas} aria-hidden>
+    <span className={cn('relative block', kelas)}>
+      <svg viewBox={'0 0 ' + W + ' ' + H} preserveAspectRatio="none"
+           className="h-full w-full" aria-hidden>
       <defs>
         <linearGradient id={idGrad} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={warna} stopOpacity={0.3} />
@@ -94,6 +107,15 @@ export function SparklineSaldo(
           preserveAspectRatio="none" meregangkan viewBox ke lebar kotaknya. */}
       <path d={d} fill="none" stroke={warna} strokeWidth={1.6}
             vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
+      </svg>
+      {/* Latar setengah pekat: garisnya bisa lewat persis di belakang
+          labelnya, dan angka tanpa alas di atas garis berwarna jadi sulit
+          dibaca justru di kartu yang kurvanya paling ramai. */}
+      <span className={cn('absolute right-0 -translate-y-1/2 rounded bg-zinc-950/75 px-1 text-[9.5px] font-medium tabular-nums',
+                          naik ? 'text-emerald-300' : 'text-red-300')}
+            style={{ top: yAkhir + '%' }}>
+        {uang(akhir)}
+      </span>
+    </span>
   );
 }
