@@ -2185,7 +2185,17 @@ export default function Analisa() {
                    berhenti bisa diklik. */
                 <div key={uid}
                   className={cn('relative rounded-xl border bg-zinc-900/40 transition-colors',
-                    disemat ? 'border-amber-500/40' : 'border-zinc-800 hover:border-zinc-600')}>
+                    /* Tepi kartu TIDAK lagi ikut menguning saat disematkan.
+                        Sematan itu urusan tampilan SATU orang — ia tidak
+                        mengubah apa pun tentang analisnya — sementara tepi
+                        berwarna adalah penanda paling keras yang dimiliki
+                        kartu ini, dan di sebelah kartu lain ia terbaca
+                        seperti peringkat atau status istimewa.
+
+                        Cukup pinnya yang menyala. Yang menyematkan tahu ia
+                        menyematkan; yang lain tidak perlu diberi tahu
+                        dengan bingkai. */
+                    'border-zinc-800 hover:border-zinc-600')}>
                   {a0.agen && <LencanaAgen geser />}
                   <button onClick={() => setKanalBuka(uid)}
                     className="w-full cursor-pointer p-4 text-left">
@@ -2276,9 +2286,15 @@ export default function Analisa() {
                     aria-pressed={disemat}
                     title={disemat ? 'Lepas sematan — kanal ini kembali urut menurut sinyal terbaru'
                                    : 'Sematkan kanal ini ke atas, hanya untuk tampilanmu'}
+                    /* Disamarkan saat belum disematkan: ia alat yang jarang
+                        dipakai, duduk di sudut kartu yang isinya angka rekam
+                        jejak, dan pin seterang teks membuat mata singgah di
+                        situ tiap kali membaca kartu. Muncul jelas saat
+                        disorot — cukup untuk ditemukan, tidak cukup untuk
+                        mengganggu. */
                     className={cn('absolute right-2 top-2 z-10 cursor-pointer rounded-md p-1.5 transition-colors',
-                      disemat ? 'text-amber-400 hover:bg-amber-500/10'
-                              : 'text-zinc-600 hover:bg-zinc-800 hover:text-zinc-300')}>
+                      disemat ? 'text-amber-400 hover:text-amber-300'
+                              : 'text-zinc-700 hover:text-zinc-400')}>
                     <Pin className={cn('size-3.5', disemat && 'fill-current')} />
                   </button>
                 </div>
