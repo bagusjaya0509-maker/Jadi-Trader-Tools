@@ -199,7 +199,10 @@ function BarisHitung({ r }: { r: RingkasKanal }) {
     ['pending', r.pending, 'text-amber-400'],
   ];
   return (
-    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[10.5px] text-zinc-600">
+    /* mt-2.5: barisnya duduk tepat di bawah kotak Estimasi yang bertepi, dan
+       tanpa jarak ia menempel ke garis itu — terbaca seperti kaki kotaknya,
+       bukan sebagai keterangan kartu yang berdiri sendiri. */
+    <div className="mt-2.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[10.5px] text-zinc-600">
       {bagian.map(([nama, nilai, warna]) => (
         <span key={nama} className="whitespace-nowrap">
           <span className={cn('angka font-semibold', nilai > 0 ? warna : 'text-zinc-600')}>{nilai}</span>
@@ -2268,11 +2271,6 @@ export default function Analisa() {
                       </div>
                     </div>
                     <BarisHitung r={r} />
-                    {r.pending > 0 && (
-                      <p className="mt-1.5 text-[10.5px] text-zinc-600">
-                        Order menggantung terakhir diposting {tanggalPendek(r.pendingTerbaru)}
-                      </p>
-                    )}
                     {r.winrate === null && (
                       <p className="mt-2 text-[10.5px] leading-relaxed text-zinc-600">
                         Belum ada sinyal yang selesai — angka muncul setelah harga menyentuh SL/TP.
