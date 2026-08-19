@@ -24,7 +24,11 @@ import { bacaKoneksi, PROXY_BAWAAN } from '@/lib/koneksi';
    ════════════════════════════════════════════════════════════════════════ */
 
 export type Fitur = 'screener' | 'replay';
-export type NamaPaket = 'gratis' | 'testing' | 'premium3' | 'tahunan';
+/* 'pratinjau' TIDAK dijual dan tidak bisa dipasang ke lisensi — ia keadaan
+    sementara yang dihitung server dari jam mulai pratinjau. Ada di daftar
+    ini karena server memang bisa memulangkannya, dan tipe yang tidak
+    menyebutnya membuat layar menampilkan nama paket kosong. */
+export type NamaPaket = 'gratis' | 'pratinjau' | 'testing' | 'premium3' | 'tahunan';
 
 export interface Paket {
   paket: NamaPaket;
@@ -36,6 +40,11 @@ export interface Paket {
   sisa: Record<Fitur, number>;
   copySignal: boolean;
   marketplace: boolean;
+  /** Boleh MEMPOSTING sinyal, bukan sekadar membacanya. Terpisah dari
+   *  `copySignal` karena pratinjau membuka yang satu tanpa yang lain:
+   *  sinyal tidak bisa dihapus setelah terbit dan ikut dihitung papan
+   *  peringkat, jadi akun 24 jam tidak boleh meninggalkan jejak di sana. */
+  postingSinyal: boolean;
 }
 
 /** Dipakai selama jawaban server belum datang. Paling sempit, bukan paling
@@ -46,7 +55,7 @@ export const PAKET_KOSONG: Paket = {
   batas: { screener: 0, replay: 0 },
   pakai: { screener: 0, replay: 0 },
   sisa: { screener: 0, replay: 0 },
-  copySignal: false, marketplace: false,
+  copySignal: false, marketplace: false, postingSinyal: false,
 };
 
 function dasar(): string {
@@ -128,6 +137,7 @@ export function teksSisa(p: Paket, fitur: Fitur): string {
 
 export const LABEL_PAKET: Record<NamaPaket, string> = {
   gratis: 'Event Terbatas',
+  pratinjau: 'Pratinjau 24 Jam',
   testing: 'Testing — New Launch',
   premium3: 'Premium 3 Bulan',
   tahunan: 'Tahunan',

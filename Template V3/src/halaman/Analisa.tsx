@@ -923,7 +923,7 @@ export default function Analisa() {
      state: sidebar sekarang punya sub-menu yang menunjuk langsung ke sini,
      dan tab yang tidak bisa dituju lewat alamat tidak bisa ditaut siapa pun. */
   const [cariSub, setCariSub] = useSearchParams();
-  const sub: IdSub = SUB.some((s) => s.id === cariSub.get('sub')) ? (cariSub.get('sub') as IdSub) : 'market';
+  const subMinta: IdSub = SUB.some((s) => s.id === cariSub.get('sub')) ? (cariSub.get('sub') as IdSub) : 'market';
   const setSub = (id: IdSub) => setCariSub(id === 'market' ? {} : { sub: id }, { replace: true });
   const { pengguna, pemilik, langganan } = useAuth();
   /* Copy Signal tidak termasuk paket gratis — itu yang tertulis di kartu
@@ -938,6 +938,25 @@ export default function Analisa() {
      selama jawaban server masih di jalan. */
   const { paket: paketku, memuat: memuatPaket } = usePaket();
   const kunciCopy = !!pengguna && !pemilik && !memuatPaket && !paketku.copySignal;
+
+  /* ── Siapa yang boleh MEMPOSTING ──────────────────────────────────────
+     Pratinjau 24 jam membuka semua alat, TAPI tidak membuka ini. Sinyal
+     tidak bisa dihapus setelah diposting dan ikut dihitung papan peringkat,
+     jadi akun sekali-pakai yang memposting lalu menghilang meninggalkan
+     jejak permanen di papan yang dipakai analis sungguhan.
+
+     Selama jawaban server belum datang (`memuatPaket`), tabnya DITAHAN.
+     Menampilkannya dulu lalu mencabutnya begitu jawaban tiba membuat orang
+     mengetik separuh formulir ke dalam tab yang lenyap.
+
+     Ini cuma menyembunyikan pintunya. Yang mengunci ada di server —
+     POST /api/analisa menolak dengan 403 POSTING_TERKUNCI, karena
+     permintaan itu bisa dikirim tanpa membuka halaman ini sama sekali. */
+  const bolehPosting = pemilik || (!memuatPaket && paketku.postingSinyal);
+
+  /* Alamat langsung ke ?sub=posting dipulangkan ke daftar, bukan dibiarkan
+     membuka tab yang tombolnya sengaja tidak ada. */
+  const sub: IdSub = subMinta === 'posting' && !bolehPosting ? 'market' : subMinta;
 
   /* Kanal yang sedang dibuka — null berarti daftar kanal. Sinyal kini
      dikelompokkan PER ANALIS seperti papan kanal: satu orang sering
@@ -1378,7 +1397,7 @@ export default function Analisa() {
           border-t, bukan border-b: garisnya kini memisahkan dari yang di
           ATAS, bukan menggarisbawahi dirinya sendiri. */}
       <div className="mb-4 flex flex-wrap gap-1.5 border-t border-zinc-800/80 pt-3">
-        {SUB.map((s) => (
+        {SUB.filter((s) => s.id !== 'posting' || bolehPosting).map((s) => (
           <button key={s.id} onClick={() => setSub(s.id)}
             className={cn('cursor-pointer rounded-md px-3 py-1.5 text-[12.5px] transition-colors',
               sub === s.id ? 'bg-zinc-100 font-medium text-zinc-950' : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200')}>
