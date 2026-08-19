@@ -907,9 +907,18 @@ function SlotAgen({ urutan }: { urutan: number }) {
 
    Pola tabnya sama dengan halaman Maintenance — satu pola untuk hal yang
    sama, bukan dua cara berbeda menyelesaikan masalah yang identik. */
+/* Urutannya SENGAJA begini: 'performa' duluan. Ia cuma muncul di dalam
+   kanal, dan di sana ia yang pertama — keputusan pemilik.
+
+   'posting' TIDAK ikut tampil di dalam kanal. Ia sudah ada sebagai sub-menu
+   sidebar, dan menu yang sama muncul dua kali di satu layar membuat orang
+   menebak-nebak apakah keduanya benda yang sama. Di dalam ruang satu analis
+   ia juga salah tempat: memposting sinyal bukan sesuatu yang dilakukan
+   "di dalam" kanal orang lain. */
 const SUB = [
-  { id: 'market',  label: 'Market Signal' },
-  { id: 'posting', label: 'Posting Signal' },
+  { id: 'performa', label: 'Performa Signal' },
+  { id: 'market',   label: 'Market Signal' },
+  { id: 'posting',  label: 'Posting Signal' },
 ] as const;
 type IdSub = typeof SUB[number]['id'];
 
@@ -968,7 +977,6 @@ export default function Analisa() {
      Formulir yang bisa diisi sampai ujung lalu berhenti di satu tombol
      berlabel jelas menerangkan nilainya jauh lebih baik daripada menu
      yang tidak pernah ia tahu ada. */
-  const sub: IdSub = subMinta;
 
   /* Kanal yang sedang dibuka — null berarti daftar kanal. Sinyal kini
      dikelompokkan PER ANALIS seperti papan kanal: satu orang sering
@@ -999,6 +1007,21 @@ export default function Analisa() {
      Yang tersisa cuma `kanalBuka === null`: membuka satu kanal adalah masuk
      ke dalam sesuatu, dan di sana seluruh halaman memang berganti. */
   const diDepan = kanalBuka === null;
+
+  /* ── Tab mana yang tampil, dan mana yang sedang dibuka ────────────────
+     Daftar kanal : Market + Posting  (seperti semula)
+     Dalam kanal  : Performa + Market (Performa duluan)
+
+     `sub` HARUS dihitung SESUDAH `diDepan`, bukan sebelumnya — daftar
+     tabnya sendiri bergantung pada apakah sebuah kanal sedang terbuka.
+
+     Alamat yang menunjuk tab yang tidak ada di keadaan ini dipulangkan ke
+     'market', bukan dibiarkan. Tanpa itu, orang yang membuka ?sub=performa
+     lalu menekan "← Semua kanal" mendarat di daftar kanal dengan tab yang
+     tombolnya tidak ada di mana pun — layar kosong tanpa penjelasan dan
+     tanpa jalan keluar selain menebak. */
+  const tabTampil = SUB.filter((s) => (diDepan ? s.id !== 'performa' : s.id !== 'posting'));
+  const sub: IdSub = tabTampil.some((s) => s.id === subMinta) ? subMinta : 'market';
 
   /* ── Peringatan risiko: tampil 3 detik, lalu menyusut sendiri ──────────
      Keputusan pemilik 17 Agu 2026, sesudah sempat dicoba jadi kaki halaman
@@ -1408,26 +1431,8 @@ export default function Analisa() {
 
           border-t, bukan border-b: garisnya kini memisahkan dari yang di
           ATAS, bukan menggarisbawahi dirinya sendiri. */}
-      {/* ── TEMPELAN, MASIH APA ADANYA ──────────────────────────────────
-          Naik ke PALING ATAS halaman atas permintaan pemilik — di atas bilah
-          tab, jadi seluruh sisanya (Market/Posting, "← Semua kanal", nama
-          analis, hitungan, disclaimer) turun di bawahnya.
-
-          Syaratnya `sub === 'market' && !diDepan`, BUKAN sekadar !diDepan.
-          `kanalBuka` tidak ikut kosong saat orang pindah ke tab Posting,
-          jadi tanpa syarat sub-nya blok ini ikut nongol di atas formulir
-          posting — layar yang sama sekali tidak ada hubungannya.
-
-          Tetap TERIKAT SATU KANAL walau posisinya di puncak: ia cuma ada
-          begitu sebuah kanal dibuka, dan hilang begitu kembali ke daftar.
-          Yang berubah tempatnya, bukan kepemilikannya.
-
-          Isinya masih data contoh bawaan komponennya dan belum tersambung ke
-          sinyal siapa pun. Menunggu instruksi. */}
-      {sub === 'market' && !diDepan && <EventManagerDemo />}
-
       <div className="mb-4 flex flex-wrap gap-1.5 border-t border-zinc-800/80 pt-3">
-        {SUB.map((s) => (
+        {tabTampil.map((s) => (
           <button key={s.id} onClick={() => setSub(s.id)}
             className={cn('cursor-pointer rounded-md px-3 py-1.5 text-[12.5px] transition-colors',
               sub === s.id ? 'bg-zinc-100 font-medium text-zinc-950' : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200')}>
@@ -1971,7 +1976,12 @@ export default function Analisa() {
       </Panel>
       </div>
 
-      <div className={cn(sub !== 'market' && 'hidden')}>
+      {/* Ikut tampil saat tab Performa dibuka, supaya KEPALA KANAL —
+          "← Semua kanal", nama analis, lencana, hitungan, disclaimer —
+          tetap ada di KEDUA tab. Kalau blok ini ikut disembunyikan, tab
+          Performa menampilkan angka tanpa menyebut angka SIAPA, dan tombol
+          kembali ke daftar kanal ikut lenyap: orangnya terjebak. */}
+      <div className={cn(sub === 'posting' && 'hidden')}>
       {/* ── Kanal per analis ────────────────────────────────────────────
          Satu analis sering memposting banyak sinyal. Dideretkan rata,
          rekam jejak per ORANG tidak pernah terlihat utuh — dan justru
@@ -2125,6 +2135,12 @@ export default function Analisa() {
                 Menghitungnya sebagai "menunggu harga" akan menjanjikan
                 peluang yang sebenarnya sudah lewat. */}
             {(() => {
+              /* Tab Performa mengganti BADAN kanal saja — kepalanya di atas
+                 sengaja dibiarkan berdiri, lihat catatan di pembungkusnya.
+
+                 Isinya masih data contoh bawaan komponennya dan belum
+                 tersambung ke sinyal siapa pun. Menunggu instruksi. */
+              if (sub === 'performa') return <EventManagerDemo />;
               const selesai = terpilih.filter((s) => !!s.hasil);
               const belum = terpilih.filter((s) => !s.hasil);
               const menunggu = belum.filter(
