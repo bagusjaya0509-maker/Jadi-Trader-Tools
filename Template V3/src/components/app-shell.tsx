@@ -856,19 +856,47 @@ function BarisSub({ butir, aktif, tutupLaci }: {
   aktif: (ke: string) => boolean;
   tutupLaci: () => void;
 }) {
+  const punyaAnak = Array.isArray(butir.anak) && butir.anak.length > 0;
+
+  /* TERBUKA sebagai bawaan, tidak seperti menu tingkat atas yang bawaannya
+     tertutup. Bedanya bukan kelalaian: cabang ini cuma ADA saat orangnya
+     sudah masuk ke dalam kanal, jadi menutupnya di awal berarti
+     menyembunyikan persis apa yang barusan ia buka. Yang tingkat atas
+     berbeda — semuanya selalu ada, dan membuka semuanya sekaligus membuat
+     sidebarnya panjang tanpa ada yang meminta. */
+  const [buka, setBuka] = useState(true);
+
   return (
     <>
-      <Link to={butir.ke} onClick={tutupLaci}
-        className={cn(
-          'my-px block rounded-md px-2.5 py-[7px] text-[12px] leading-tight transition-colors',
-          aktif(butir.ke)
-            ? 'bg-zinc-800/50 text-zinc-100'
-            : 'text-zinc-500 hover:bg-zinc-900 hover:text-zinc-200',
+      {/* relative + tombol menumpang: bidang tautannya tetap selebar penuh
+          supaya mudah ditekan, dan panahnya duduk di atasnya. Menaruh
+          keduanya berdampingan akan menyusutkan sasaran tautan tiap kali
+          sebuah butir punya keturunan — dua butir bersebelahan jadi punya
+          lebar klik berbeda tanpa alasan yang terlihat. */}
+      <div className="relative">
+        <Link to={butir.ke} onClick={tutupLaci}
+          className={cn(
+            'my-px block rounded-md px-2.5 py-[7px] text-[12px] leading-tight transition-colors',
+            punyaAnak && 'pr-7',
+            aktif(butir.ke)
+              ? 'bg-zinc-800/50 text-zinc-100'
+              : 'text-zinc-500 hover:bg-zinc-900 hover:text-zinc-200',
+          )}
+        >
+          {butir.label}
+        </Link>
+        {punyaAnak && (
+          <button
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setBuka((b) => !b); }}
+            aria-expanded={buka}
+            aria-label={buka ? `Tutup sub-menu ${butir.label}` : `Buka sub-menu ${butir.label}`}
+            className="absolute right-1 top-1/2 -translate-y-1/2 cursor-pointer rounded p-0.5 text-zinc-600 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
+          >
+            <ChevronDown className={cn('size-3 transition-transform', buka && 'rotate-180')} />
+          </button>
         )}
-      >
-        {butir.label}
-      </Link>
-      {Array.isArray(butir.anak) && butir.anak.length > 0 && (
+      </div>
+      {punyaAnak && buka && (
         /* Garis tepinya menipis tiap turun satu tingkat — kedalaman terbaca
            dari beratnya, bukan cuma dari jaraknya. */
         <div className="ml-2 mt-0.5 space-y-0.5 border-l border-zinc-800/60 py-0.5 pl-2.5">
