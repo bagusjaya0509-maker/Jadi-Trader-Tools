@@ -2034,7 +2034,6 @@ export default function Analisa() {
            Dipakai menyatakan drawdown dalam satuan risiko, bukan dolar. */
         const risikoPerSinyal = (performa?.modal ?? 1000) * (performa?.risikoPersen ?? 1) / 100;
         const terpilih = kanalBuka ? kanal.get(kanalBuka) ?? [] : [];
-        const infoTerpilih = kanalBuka ? kanal.get(kanalBuka)?.[0] : undefined;
 
         return kanalBuka === null ? (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -2116,26 +2115,28 @@ export default function Analisa() {
               className="mb-3 flex cursor-pointer items-center gap-1.5 text-[12.5px] text-zinc-500 transition-colors hover:text-zinc-200">
               ← Semua kanal
             </button>
-            <div className="mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[13.5px] text-zinc-200">
-              <span className="font-medium">{infoTerpilih?.nama}</span>
-              <span className="text-zinc-600">· {terpilih.length} sinyal</span>
-              <LencanaKanal r={ringkasKanal(terpilih, perfDari(kanalBuka), risikoPerSinyal)} />
-            </div>
-            {/* Hitungan yang sama seperti di kartunya. Diulang dengan
-                sengaja: begitu kanalnya terbuka, kartu tempat angka itu
-                tadi berdiri sudah tidak ada di layar. */}
-            <div className="mb-2.5">
-              <BarisHitung r={ringkasKanal(terpilih, perfDari(kanalBuka), risikoPerSinyal)} />
-            </div>
-            {/* Satu baris, bukan kotak amber. Cukup untuk tetap ada di layar
-                yang menampilkan entry/SL/TP, cukup kecil untuk tidak berdiri
-                di antara nama analis dan sinyalnya. */}
-            <p className="mb-3 text-[11px] text-zinc-600">
-              Bukan rekomendasi beli atau jual · rekam jejak bukan jaminan hasil ·{' '}
-              <Link to="/legal" className="underline decoration-zinc-700 underline-offset-2 hover:text-zinc-400">
-                Disclaimer
-              </Link>
-            </p>
+            {/* ── KEPALA KANAL DICABUT — permintaan pemilik ──────────────
+                Yang berdiri di sini dulu: nama analis, "· 7 sinyal", lencana
+                risiko, baris menang/kalah/jalan/pending, dan satu baris
+                disclaimer.
+
+                Semuanya sudah ada di KARTU KANAL di halaman depan — layar
+                yang baru saja ditinggalkan orangnya untuk sampai ke sini.
+                Mengulangnya membuat dua layar berurutan mengatakan hal yang
+                sama, dan yang kedua memakan tinggi layar yang seharusnya
+                dipakai sinyalnya sendiri.
+
+                "← Semua kanal" SENGAJA tidak ikut dicabut: ia satu-satunya
+                jalan kembali ke daftar, dan mencabutnya akan mengurung
+                orangnya di dalam kanal.
+
+                CATATAN UNTUK YANG MENGUBAH INI NANTI: baris disclaimer ikut
+                hilang dari sini. Layar ini menampilkan entry/SL/TP dan rekam
+                jejak, dan peringatan risiko tingkat halaman (kotak amber di
+                atas) cuma tampil di DAFTAR kanal, tidak di dalamnya. Jadi
+                sekarang tidak ada satu pun peringatan di layar ini selain
+                tautan "Legal" di kaki sidebar. Itu keputusan pemiliknya dan
+                dicatat di sini supaya tidak hilang tanpa jejak. */}
 
             {/* ── DIPISAH TIGA RAK MENURUT KEADAANNYA ────────────────────
                 Sebelumnya seluruh sinyal satu kanal berjejer di satu rak
