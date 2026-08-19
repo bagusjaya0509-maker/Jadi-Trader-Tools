@@ -2212,41 +2212,48 @@ export default function Analisa() {
                         paling sedikit: garis butuh lebar untuk punya bentuk,
                         sementara angka tidak bertambah jelas karena kotaknya
                         dilebarkan. */}
-                    <div className="mt-3 grid grid-cols-[1fr_1fr_1.4fr] gap-2">
-                      <div className="rounded-lg border border-zinc-800/60 p-2.5">
+                    {/* Winrate TANPA kotak; Estimasi dan kurvanya DISATUKAN.
+
+                        Tiga kotak bertepi berjejer membuat kartu ini terbaca
+                        sebagai tiga hal setara, padahal dua di antaranya
+                        satu hal: "berapa hasilnya" dan "bagaimana bentuk
+                        perjalanan hasil itu" adalah angka dan grafik dari
+                        deret yang SAMA. Menyatukannya jadi satu kotak
+                        menjadikannya satu pernyataan, dan winrate yang
+                        berdiri sendiri di kirinya jadi pembanding — bukan
+                        anggota ketiga dari daftar yang tidak ada.
+
+                        Winrate kehilangan tepinya karena ia satu angka,
+                        bukan satu panel. Kotak yang isinya satu baris teks
+                        cuma menambah garis di layar yang sudah penuh kartu
+                        bertepi. */}
+                    <div className="mt-3 flex items-center gap-3">
+                      <div className="shrink-0">
                         <div className="text-[10.5px] text-zinc-600">Winrate</div>
                         <div className={cn('angka text-[15px] font-semibold',
                           r.winrate !== null ? (r.winrate >= 50 ? 'text-emerald-400' : 'text-zinc-100') : 'text-zinc-600')}>
                           {r.winrate !== null ? persen(r.winrate) : '—'}
                         </div>
                       </div>
-                      <div className="rounded-lg border border-zinc-800/60 p-2.5">
-                        <div className="text-[10.5px] text-zinc-600">Estimasi $1.000</div>
-                        <div className={cn('angka text-[15px] font-semibold',
-                          p ? (p.hasilDolar >= 0 ? 'text-emerald-400' : 'text-red-400') : 'text-zinc-600')}>
-                          {p ? uang(p.hasilDolar, true) : '—'}
+
+                      <div className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg border border-zinc-800/60 p-2.5">
+                        <div className="shrink-0">
+                          <div className="text-[10.5px] text-zinc-600">Estimasi $1.000</div>
+                          <div className={cn('angka text-[15px] font-semibold',
+                            p ? (p.hasilDolar >= 0 ? 'text-emerald-400' : 'text-red-400') : 'text-zinc-600')}>
+                            {p ? uang(p.hasilDolar, true) : '—'}
+                          </div>
                         </div>
-                      </div>
-                      {/* Kurva saldo, sekecil kotak di sebelahnya.
+                        {/* Kurvanya mengisi sisa lebar, di kanan angkanya.
+                            Garis putus-putus di dalamnya modal awal: di
+                            atasnya untung, di bawahnya rugi — patokan yang
+                            membuat bentuknya bisa dibaca tanpa satu angka.
 
-                          Tanpa judul dan tanpa angka: keduanya sudah berdiri
-                          di dua kotak kiri, dan mengulangnya di kotak ketiga
-                          cuma menyempitkan garisnya. Yang ditambahkan kurva
-                          justru yang TIDAK ADA di angka mana pun — bentuk
-                          perjalanannya. Winrate 78% bisa datang dari tujuh
-                          menang kecil yang kalah oleh dua rugi besar, dan
-                          cuma garisnya yang memperlihatkan itu.
-
-                          Garis putus-putus di dalamnya modal awal. Kurva di
-                          atasnya untung, di bawahnya rugi — patokan yang
-                          membuat bentuknya bisa dibaca tanpa satu angka pun.
-
-                          Disembunyikan kalau sinyal selesainya belum ada:
-                          garis lurus sepanjang kotak bukan informasi, dan
-                          ia terbaca seperti akun yang datar padahal artinya
-                          belum ada yang bisa digambar. */}
-                      <div className="flex items-center justify-center rounded-lg border border-zinc-800/60 px-1.5 py-2">
-                        <SparklineSaldo sinyal={sinyal} kelas="h-[44px] w-full"
+                            Disembunyikan kalau belum ada sinyal selesai:
+                            garis lurus sepanjang kotak bukan informasi, dan
+                            ia terbaca seperti akun yang datar padahal
+                            artinya belum ada yang bisa digambar. */}
+                        <SparklineSaldo sinyal={sinyal} kelas="ml-auto h-[40px] w-full min-w-0"
                           modal={performa?.modal ?? 1000} />
                       </div>
                     </div>
