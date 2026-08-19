@@ -1512,12 +1512,29 @@ export default function Analisa() {
         </div>
       )}
 
-      <div className="mb-4 flex flex-wrap gap-1.5 border-t border-zinc-800/80 pt-3">
+      <div className="mb-4 flex flex-wrap gap-1 border-t border-zinc-800/80 pt-3">
         {tabTampil.map((s) => (
+          /* GARIS BAWAH, bukan bidang terisi.
+
+             Tab terisi penuh punya berat yang sama dengan tombol tindakan —
+             di layar yang juga memuat "Copy Signal" dan "Kembali", ia ikut
+             berebut perhatian padahal tugasnya cuma menandai posisi.
+
+             Garisnya di <span>, BUKAN di tombolnya: tombolnya punya px-3
+             supaya sasaran kliknya lega, dan garis yang ikut selebar itu
+             akan lebih panjang daripada tulisannya.
+
+             `font-medium` dipasang di KEDUA keadaan. Menebalkan hanya yang
+             aktif membuat lebarnya berubah tiap kali tab ditukar, dan
+             tetangganya bergeser sedikit — gerakan yang tidak diminta siapa
+             pun dan terlihat seperti layar yang belum tenang. */
           <button key={s.id} onClick={() => setSub(s.id)}
-            className={cn('cursor-pointer rounded-md px-3 py-1.5 text-[12.5px] transition-colors',
-              sub === s.id ? 'bg-zinc-100 font-medium text-zinc-950' : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200')}>
-            {s.label}
+            className={cn('cursor-pointer px-3 pt-1 pb-0.5 text-[12.5px] font-medium transition-colors',
+              sub === s.id ? 'text-zinc-100' : 'text-zinc-500 hover:text-zinc-300')}>
+            <span className={cn('inline-block border-b-2 pb-1.5 transition-colors',
+              sub === s.id ? 'border-zinc-100' : 'border-transparent')}>
+              {s.label}
+            </span>
           </button>
         ))}
       </div>
