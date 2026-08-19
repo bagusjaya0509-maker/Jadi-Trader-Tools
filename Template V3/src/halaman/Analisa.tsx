@@ -1408,6 +1408,24 @@ export default function Analisa() {
 
           border-t, bukan border-b: garisnya kini memisahkan dari yang di
           ATAS, bukan menggarisbawahi dirinya sendiri. */}
+      {/* ── TEMPELAN, MASIH APA ADANYA ──────────────────────────────────
+          Naik ke PALING ATAS halaman atas permintaan pemilik — di atas bilah
+          tab, jadi seluruh sisanya (Market/Posting, "← Semua kanal", nama
+          analis, hitungan, disclaimer) turun di bawahnya.
+
+          Syaratnya `sub === 'market' && !diDepan`, BUKAN sekadar !diDepan.
+          `kanalBuka` tidak ikut kosong saat orang pindah ke tab Posting,
+          jadi tanpa syarat sub-nya blok ini ikut nongol di atas formulir
+          posting — layar yang sama sekali tidak ada hubungannya.
+
+          Tetap TERIKAT SATU KANAL walau posisinya di puncak: ia cuma ada
+          begitu sebuah kanal dibuka, dan hilang begitu kembali ke daftar.
+          Yang berubah tempatnya, bukan kepemilikannya.
+
+          Isinya masih data contoh bawaan komponennya dan belum tersambung ke
+          sinyal siapa pun. Menunggu instruksi. */}
+      {sub === 'market' && !diDepan && <EventManagerDemo />}
+
       <div className="mb-4 flex flex-wrap gap-1.5 border-t border-zinc-800/80 pt-3">
         {SUB.map((s) => (
           <button key={s.id} onClick={() => setSub(s.id)}
@@ -2093,17 +2111,6 @@ export default function Analisa() {
               </Link>
             </p>
 
-            {/* ── TEMPELAN, MASIH APA ADANYA ────────────────────────────
-                Duduk di sini karena ini RUANG SATU ANALIS: di atasnya nama
-                dan hitungannya, di bawahnya sinyal-sinyalnya. Performa satu
-                orang memang miliknya kanal ini, bukan milik kepala halaman —
-                di sana yang berdiri papan peringkat semua analis.
-
-                Isinya masih data contoh bawaan komponennya dan belum
-                tersambung ke sinyal siapa pun. Menunggu instruksi. */}
-            <div className="mb-4">
-              <EventManagerDemo />
-            </div>
             {/* ── DIPISAH TIGA RAK MENURUT KEADAANNYA ────────────────────
                 Sebelumnya seluruh sinyal satu kanal berjejer di satu rak
                 mendatar tanpa penanda apa pun, jadi order yang HARGANYA
