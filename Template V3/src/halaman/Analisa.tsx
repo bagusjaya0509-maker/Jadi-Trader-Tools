@@ -1046,7 +1046,16 @@ export default function Analisa() {
      lalu menekan "← Semua kanal" mendarat di daftar kanal dengan tab yang
      tombolnya tidak ada di mana pun — layar kosong tanpa penjelasan dan
      tanpa jalan keluar selain menebak. */
-  const tabTampil = SUB.filter((s) => (diDepan ? s.id !== 'performa' : s.id !== 'posting'));
+  /* Label 'market' BERGANTUNG KEADAAN, dan itu bukan kemanjaan.
+
+     Di daftar kanal ia memang Market Signal: pasar sinyal SEMUA analis.
+     Di dalam sebuah kanal ia bukan itu — isinya daftar sinyal SATU orang.
+     Memakai satu nama untuk keduanya membuat pohon menunya memuat "Market
+     Signal" dua kali bersarang di dalam dirinya sendiri, dan orang harus
+     menebak apakah keduanya benda yang sama. */
+  const tabTampil = SUB
+    .filter((s) => (diDepan ? s.id !== 'performa' : s.id !== 'posting'))
+    .map((s) => (!diDepan && s.id === 'market' ? { ...s, label: 'Daftar Signal' } : s));
 
   /* Masuk kanal, yang pertama terlihat Performa Signal — keputusan pemilik.
      Orang membuka kanal seseorang untuk menimbang apakah ia layak diikuti,
@@ -1477,6 +1486,23 @@ export default function Analisa() {
 
           border-t, bukan border-b: garisnya kini memisahkan dari yang di
           ATAS, bukan menggarisbawahi dirinya sendiri. */}
+      {/* ── PANEL KELUAR, DI ATAS BILAH TAB ──────────────────────────────
+          Dulu tombol ini duduk DI BAWAH bilah tab, di dalam badan kanal —
+          jadi ia ikut berpindah tiap kali tab diganti, dan letaknya berubah
+          tergantung isi tabnya. Jalan keluar yang pindah-pindah tempat harus
+          dicari dulu tiap kali diperlukan.
+
+          Sekarang ia di atas segalanya, dalam panelnya sendiri: ia memang
+          bukan bagian dari tab mana pun, ia jalan keluar dari keduanya. */}
+      {!diDepan && (
+        <div className="mb-3 rounded-lg border border-zinc-800/70 bg-zinc-900/40 px-3 py-2">
+          <button onClick={() => setKanalBuka(null)}
+            className="flex cursor-pointer items-center gap-1.5 text-[12.5px] text-zinc-400 transition-colors hover:text-zinc-100">
+            ← Semua kanal
+          </button>
+        </div>
+      )}
+
       <div className="mb-4 flex flex-wrap gap-1.5 border-t border-zinc-800/80 pt-3">
         {tabTampil.map((s) => (
           <button key={s.id} onClick={() => setSub(s.id)}
@@ -2141,10 +2167,6 @@ export default function Analisa() {
           </div>
         ) : (
           <>
-            <button onClick={() => setKanalBuka(null)}
-              className="mb-3 flex cursor-pointer items-center gap-1.5 text-[12.5px] text-zinc-500 transition-colors hover:text-zinc-200">
-              ← Semua kanal
-            </button>
             {/* ── KEPALA KANAL DICABUT — permintaan pemilik ──────────────
                 Yang berdiri di sini dulu: nama analis, "· 7 sinyal", lencana
                 risiko, baris menang/kalah/jalan/pending, dan satu baris

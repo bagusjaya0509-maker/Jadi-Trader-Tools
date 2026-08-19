@@ -622,7 +622,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               label: 'Area Analis',
               anak: [
                 { ke: alamatKanal(),         label: 'Performa Signal' },
-                { ke: alamatKanal('market'), label: 'Market Signal' },
+                { ke: alamatKanal('market'), label: 'Daftar Signal' },
               ],
             }],
           }
@@ -765,7 +765,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     )}
                   </div>
                   {sub && !ciut && subTerbuka(ke) && (
-                    <div className="mb-1 ml-[17px] border-l border-zinc-800 pl-3">
+                    <div className="mb-1 ml-[17px] space-y-0.5 border-l border-zinc-800 py-1 pl-3">
                       {subDinamis(ke, sub).map((s: any) => (
                         <BarisSub key={s.ke} butir={s} aktif={subAktif}
                                   tutupLaci={() => setLaci(false)} />
@@ -860,7 +860,7 @@ function BarisSub({ butir, aktif, tutupLaci }: {
     <>
       <Link to={butir.ke} onClick={tutupLaci}
         className={cn(
-          'block rounded-md px-2 py-1.5 text-[12px] transition-colors',
+          'my-px block rounded-md px-2.5 py-[7px] text-[12px] leading-tight transition-colors',
           aktif(butir.ke)
             ? 'bg-zinc-800/50 text-zinc-100'
             : 'text-zinc-500 hover:bg-zinc-900 hover:text-zinc-200',
@@ -871,7 +871,7 @@ function BarisSub({ butir, aktif, tutupLaci }: {
       {Array.isArray(butir.anak) && butir.anak.length > 0 && (
         /* Garis tepinya menipis tiap turun satu tingkat — kedalaman terbaca
            dari beratnya, bukan cuma dari jaraknya. */
-        <div className="ml-2 border-l border-zinc-800/60 pl-2.5">
+        <div className="ml-2 mt-0.5 space-y-0.5 border-l border-zinc-800/60 py-0.5 pl-2.5">
           {butir.anak.map((a: any) => (
             <BarisSub key={a.ke} butir={a} aktif={aktif} tutupLaci={tutupLaci} />
           ))}
