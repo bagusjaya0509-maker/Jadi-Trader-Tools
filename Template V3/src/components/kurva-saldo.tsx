@@ -76,12 +76,7 @@ export function SparklineSaldo(
      <text> di dalamnya. Sebabnya preserveAspectRatio="none": viewBox-nya
      diregangkan ke lebar kotak, dan apa pun di dalam svg ikut teregang —
      huruf jadi gepeng melebar dengan derajat yang berbeda di tiap kartu,
-     tergantung selebar apa kartunya kebetulan digambar.
-
-     Tingginya mengikuti titik terakhir supaya labelnya menempel pada ujung
-     garisnya, bukan mengambang di sudut. Dijepit 14–86% supaya ia tidak
-     terpotong tepi atas atau bawah saat kurvanya berakhir di ekstrem. */
-  const yAkhir = Math.min(86, Math.max(14, (Y(akhir) / H) * 100));
+     tergantung selebar apa kartunya kebetulan digambar. */
 
   /* id gradien DIBEDAKAN per warna, bukan per pemakaian. Beberapa kartu
      tampil bersamaan di satu layar; id yang sama di semua kartu membuat
@@ -111,16 +106,22 @@ export function SparklineSaldo(
       {/* Latar setengah pekat: garisnya bisa lewat persis di belakang
           labelnya, dan angka tanpa alas di atas garis berwarna jadi sulit
           dibaca justru di kartu yang kurvanya paling ramai. */}
-      {/* PUTIH, bukan mengikuti warna kurvanya. Garis dan bidangnya sudah
-          hijau atau merah; angka yang ikut berwarna cuma mengulang hal yang
-          sama dengan cara yang lebih lemah. Putih membuatnya terbaca sebagai
-          keterangan — nilai, bukan penilaian.
+      {/* SUDUT, MENGIKUTI ARAHNYA — bukan mengikuti titik akhir garisnya.
 
-          8px: ia label penyerta, bukan angka utama. Yang utama sudah berdiri
-          di kotak Estimasi di sebelah kirinya dengan ukuran 15px, dan dua
-          angka sebesar itu di satu kotak berebut mata. */}
-      <span className="absolute right-0 -translate-y-1/2 rounded bg-zinc-950/75 px-1 text-[8px] tabular-nums text-zinc-100"
-            style={{ top: yAkhir + '%' }}>
+          Untung di kanan ATAS, rugi di kanan BAWAH. Kurva yang naik berakhir
+          tinggi dan yang turun berakhir rendah, jadi sudutnya selalu jatuh
+          di sisi yang sama dengan ujung garisnya — labelnya menempel pada
+          kesimpulan kurvanya tanpa perlu dihitung tiap kali.
+
+          Tanpa latar dan tanpa tepi: alas gelap di dalam kotak yang sudah
+          bertepi menambah bidang ketiga di ruang setinggi 40 piksel. Putih
+          di atas latar kartu sudah cukup terbaca, dan yang dikorbankan cuma
+          keterbacaan di titik tempat garisnya kebetulan lewat.
+
+          7px, leading-none: ia label penyerta. Angka utamanya sudah berdiri
+          15px di kotak Estimasi sebelah kiri. */}
+      <span className={cn('absolute right-0 text-[7px] leading-none tabular-nums text-zinc-100',
+                          naik ? 'top-0' : 'bottom-0')}>
         {uang(akhir)}
       </span>
     </span>
