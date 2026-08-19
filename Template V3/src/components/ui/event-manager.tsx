@@ -1121,6 +1121,27 @@ function MonthView({
   onDrop: (date: Date) => void
   getColorClasses: (color: string) => { bg: string; text: string }
 }) {
+  /* Hari mana yang sedang dibuka penuh.
+     ──────────────────────────────────────────────────────────────────────
+     Sebelum ini "+N more" cuma TULISAN: tidak ada penangan klik, tidak ada
+     tampilan lain yang memuat sisanya, dan tidak ada cara apa pun melihat
+     acara ke-4 dan seterusnya. Ia menjanjikan sesuatu yang tidak ada di
+     balik mana pun — jalan buntu yang berbentuk seperti tombol.
+
+     Kunci per hari, bukan satu hari saja: dua hari padat di bulan yang sama
+     bisa dibuka bersamaan, dan menutup yang satu saat yang lain dibuka akan
+     terasa seperti layar merebut kembali apa yang barusan diminta. */
+  const [hariMekar, setHariMekar] = useState<Set<string>>(new Set())
+  const kunciHari = (d: Date) =>
+    `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
+  const gilirHari = (d: Date) =>
+    setHariMekar((s) => {
+      const b = new Set(s)
+      const k = kunciHari(d)
+      if (b.has(k)) b.delete(k); else b.add(k)
+      return b
+    })
+
   const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
   const startDate = new Date(firstDayOfMonth)
   startDate.setDate(startDate.getDate() - startDate.getDay())
@@ -1159,12 +1180,17 @@ function MonthView({
           const dayEvents = getEventsForDay(day)
           const isCurrentMonth = day.getMonth() === currentDate.getMonth()
           const isToday = day.toDateString() === new Date().toDateString()
+          const mekar = hariMekar.has(kunciHari(day))
 
           return (
             <div
               key={index}
               className={cn(
                 "min-h-20 border-b border-r p-1 transition-colors last:border-r-0 sm:min-h-24 sm:p-2",
+                /* Tanpa ini kotaknya tetap setinggi semula dan isi yang
+                   baru dibuka terpotong — tombolnya bekerja tapi tidak
+                   terlihat bekerja. */
+                mekar && "min-h-max",
                 !isCurrentMonth && "bg-muted/30",
                 "hover:bg-accent/50",
               )}
@@ -1180,7 +1206,7 @@ function MonthView({
                 {day.getDate()}
               </div>
               <div className="space-y-1">
-                {dayEvents.slice(0, 3).map((event) => (
+                {(mekar ? dayEvents : dayEvents.slice(0, 3)).map((event) => (
                   <EventCard
                     key={event.id}
                     event={event}
@@ -1192,7 +1218,18 @@ function MonthView({
                   />
                 ))}
                 {dayEvents.length > 3 && (
-                  <div className="text-[10px] text-muted-foreground sm:text-xs">+{dayEvents.length - 3} more</div>
+                  /* <button>, bukan <div>: ia memang bisa ditekan, jadi ia
+                     harus bisa dituju Tab dan dibacakan pembaca layar
+                     sebagai tombol. Klik ditahan supaya tidak ikut memicu
+                     apa pun milik kotak tanggalnya. */
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); gilirHari(day) }}
+                    aria-expanded={mekar}
+                    className="w-full cursor-pointer rounded px-1 text-left text-[10px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground sm:text-xs"
+                  >
+                    {mekar ? "Show less" : `+${dayEvents.length - 3} more`}
+                  </button>
                 )}
               </div>
             </div>
