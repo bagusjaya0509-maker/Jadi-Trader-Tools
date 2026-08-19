@@ -1,3 +1,4 @@
+import { HARGA_PERINTIS_TEKS } from '@/lib/harga-akses';
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
@@ -255,7 +256,7 @@ export default function Akses() {
                           catatan={`${kuota.hari} hari`} />
               <KartuKuota judul="Akses perintis" pakai={kuota.bayarTerpakai} total={kuota.bayarTotal}
                           sisa={kuota.bayarSisa} warna="bg-[#ffcd75]"
-                          catatan={`Rp 17.900 · ${kuota.hari} hari`} />
+                          catatan={`${HARGA_PERINTIS_TEKS} · ${kuota.hari} hari`} />
             </>
           )}
         </div>
@@ -457,7 +458,7 @@ export default function Akses() {
                       : 'border border-zinc-800 text-zinc-300 hover:bg-zinc-900',
                 )}
               >
-                Bayar Rp 17.900 · {kuota.hari} hari
+                Bayar {HARGA_PERINTIS_TEKS} · {kuota.hari} hari
               </a>
             </div>
 

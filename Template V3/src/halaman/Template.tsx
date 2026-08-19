@@ -22,6 +22,7 @@ import {
 import { cn } from '@/lib/utils';
 import { LogoJT } from '@/components/logo-jt';
 import { Component as FeaturesGrid } from '@/components/ui/featuresgrid';
+import HargaAkses from '@/components/ui/pricing-akses';
 import StoryScrollDemo from '@/components/ui/story-scroll-demo';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -480,6 +481,12 @@ export default function Template() {
             Diimpor dengan alias karena namanya `Component`; berkasnya sendiri
             tidak disentuh sama sekali. */}
         <FeaturesGrid />
+        {/* Harga SESUDAH fitur, bukan sebelum. Angka yang dibaca sebelum
+            orang tahu apa yang dibeli cuma jadi angka; sesudahnya ia jadi
+            perbandingan. Tombolnya semua menuju #/akses — bukan langsung ke
+            Lynk — karena persetujuan risiko dicentang di sana, dan jalan
+            pintas ke pembayaran akan melewatinya. */}
+        <HargaAkses />
       </main>
 
       {/* Footer. Ditempel dari komponen sumbernya, isinya diganti data

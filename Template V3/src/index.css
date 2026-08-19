@@ -66,6 +66,11 @@
   /* Dipakai halaman Pendaratan. Bukan token warna — cuma nama animasi, dan
      tanpanya elemen yang berawal `opacity-0` tidak pernah terlihat. */
   --animate-appear: appear 0.5s ease-out forwards;
+  /* Kilau lencana "paling banyak dipilih" di bagian harga. Blok pricing
+     aslinya memanggil framer-motion cuma untuk menggeser background-position
+     ini — ~50 kB gzip di jalur muat pertama halaman depan demi satu baris
+     yang CSS sudah bisa sejak lama. */
+  --animate-kilau: kilau 3s linear infinite;
   --animate-appear-zoom: appear-zoom 0.8s ease-out forwards;
 }
 
@@ -73,6 +78,8 @@
   from { opacity: 0; transform: translateY(14px); }
   to   { opacity: 1; transform: none; }
 }
+
+@keyframes kilau { to { background-position-x: -200%; } }
 
 @keyframes appear {
   from { opacity: 0; transform: translateY(10px); }
