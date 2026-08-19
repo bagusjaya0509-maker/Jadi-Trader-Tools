@@ -45,13 +45,6 @@ const WARNA = {
   jalan: 'blue',
 } as const;
 
-/** "17 Agu" — dipakai jadi label penyaring tanggal posting. Tanpa tahun:
- *  kalendernya sudah menyebut bulan dan tahunnya di kepala, dan label
- *  penyaring yang panjang membuat barisnya melipat. */
-function tanggalPendek(t: number): string {
-  return new Date(t).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
-}
-
 function tanggalJam(t: number): string {
   return new Date(t).toLocaleString('id-ID', {
     day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
@@ -80,9 +73,21 @@ export function keAcara(sinyal: RingkasAnalisa[]): Event[] {
     const kapan = s.waktuHasil || s.dibuat;
     const d = typeof s.hasilDolar === 'number' ? s.hasilDolar : null;
 
-    const keadaan = selesai ? (s.hasil === 'tp' ? 'Kena TP' : 'Kena SL')
-                  : batal   ? 'Dibatalkan'
-                            : 'Masih berjalan';
+    /* DUA bentuk, sengaja.
+
+       Yang pendek jadi lencana — ia duduk di sudut kartu dengan lebar
+       beberapa puluh piksel, dan "Kena TP" di sana melipat jadi dua baris
+       tanpa menambah satu pun keterangan: warnanya sudah mengatakan "kena",
+       hurufnya cukup mengatakan "apa".
+
+       Yang panjang tetap dipakai di kalimat keterangan, karena di sana ia
+       memang sedang bercerita, bukan melabeli. */
+    const keadaan = selesai ? (s.hasil === 'tp' ? 'TP' : 'SL')
+                  : batal   ? 'Batal'
+                            : 'Jalan';
+    const keadaanPanjang = selesai ? (s.hasil === 'tp' ? 'kena TP' : 'kena SL')
+                         : batal   ? 'dibatalkan'
+                                   : 'masih berjalan';
 
     /* Judulnya yang terbaca di kotak tanggal, jadi ia harus menjawab dua
        hal dalam satu baris sempit: pasangan apa, dan berapa hasilnya. */
@@ -91,7 +96,7 @@ export function keAcara(sinyal: RingkasAnalisa[]): Event[] {
       : `${s.pasangan} · ${batal ? 'batal' : 'jalan'}`;
 
     const baris = [
-      `${s.arah} ${s.pasangan}${s.tf ? ` · ${s.tf}` : ''} — ${keadaan}`,
+      `${s.arah} ${s.pasangan}${s.tf ? ` · ${s.tf}` : ''} — ${keadaanPanjang}`,
       `Diposting ${tanggalJam(s.dibuat)}`,
       s.waktuHasil ? `Ditutup ${tanggalJam(s.waktuHasil)} · berjalan ${lamanya(s.dibuat, s.waktuHasil)}` : '',
       batal && s.alasanBatal ? `Alasan dibatalkan: ${s.alasanBatal}` : '',
@@ -108,17 +113,22 @@ export function keAcara(sinyal: RingkasAnalisa[]): Event[] {
       endTime: new Date(kapan),
       color: selesai ? (s.hasil === 'tp' ? WARNA.tp : WARNA.sl) : batal ? WARNA.batal : WARNA.jalan,
       category: keadaan,
-      /* TANGGAL POSTING ikut jadi tag, dan itu bukan hiasan: kalender ini
-         menaruh sinyal di hari ia SELESAI, jadi hari ia DIPOSTING tidak
-         terlihat di mana pun kecuali di dalam kotak rinciannya. Sebagai tag
-         ia bisa dipakai menyaring — "tunjukkan semua yang ia posting tanggal
-         17" — pertanyaan yang tidak bisa dijawab kalendernya sendiri. */
-      tags: [
-        s.arah,
-        s.pasar === 'tradefi' ? 'Trade-Fi' : 'Kripto',
-        ...(s.tf ? [s.tf] : []),
-        `Diposting ${tanggalPendek(s.dibuat)}`,
-      ],
+      /* SATU tag saja: pasarnya.
+
+         Tanggal posting sempat ikut, dan itu keliru — daftarnya TUMBUH TANPA
+         BATAS. Satu tag baru tiap hari analisnya memposting, jadi menu yang
+         hari ini enam baris jadi ratusan dalam setahun, dan penyaring yang
+         harus digulir untuk menemukan pilihannya berhenti dipakai.
+
+         Arah (BUY/SELL) dan timeframe dicabut juga: keduanya sudah tertulis
+         di kalimat keterangan tiap kartu, dan yang bisa dibaca langsung
+         tidak perlu jadi penyaring. Pasar tersisa karena ia satu-satunya
+         yang membagi daftarnya jadi dua kelompok yang benar-benar berbeda —
+         Binance dan MT5 punya jam pasar dan lot yang tidak sama.
+
+         Keduanya tetap bisa DICARI lewat kotak cari; yang dicabut menunya,
+         bukan datanya. */
+      tags: [s.pasar === 'tradefi' ? 'Trade-Fi' : 'Kripto'],
     };
   });
 }
@@ -131,16 +141,11 @@ export default function PerformaKalender({ sinyal }: { sinyal: RingkasAnalisa[] 
      menghasilkan layar kosong dan orang mengira ada yang rusak. */
   const kategori = useMemo(
     () => [...new Set(acara.map((a) => a.category).filter(Boolean) as string[])], [acara]);
-  /* Diurutkan supaya daftar tagnya tidak berubah-ubah urutannya tiap kali
-     ada sinyal baru: menu yang isinya sama tapi urutannya berganti membuat
-     orang harus membaca ulang tiap kali membukanya. Tanggal posting
-     dikumpulkan di bawah, terurut, terpisah dari tag sifat. */
-  const tag = useMemo(() => {
-    const semua = [...new Set(acara.flatMap((a) => a.tags ?? []))];
-    const tanggal = semua.filter((t) => t.startsWith('Diposting'));
-    const sifat = semua.filter((t) => !t.startsWith('Diposting'));
-    return [...sifat.sort(), ...tanggal];
-  }, [acara]);
+  /* Diurutkan supaya urutannya tidak berganti tiap kali ada sinyal baru:
+     menu yang isinya sama tapi urutannya berbeda memaksa orang membacanya
+     ulang tiap kali membuka. */
+  const tag = useMemo(
+    () => [...new Set(acara.flatMap((a) => a.tags ?? []))].sort(), [acara]);
 
   return (
     <EventManager
@@ -159,7 +164,7 @@ export default function PerformaKalender({ sinyal }: { sinyal: RingkasAnalisa[] 
          "Search events..." menerangkan apa kotaknya — hal yang sudah jelas
          dari ikon kacanya — dan diam soal satu-satunya hal yang tidak
          jelas: apa yang sebenarnya bisa diketik ke dalamnya. */
-      petunjukCari="Cari sinyal — XAUUSD, BUY, M15, Kena SL…"
+      petunjukCari="Cari sinyal — XAUUSD, BUY, M15, SL…"
       labelTombolBaru="Copy Signal"
       tombolBaruMati
       judulTombolBaru="Copy Signal belum aktif — sistemnya masih dibangun"

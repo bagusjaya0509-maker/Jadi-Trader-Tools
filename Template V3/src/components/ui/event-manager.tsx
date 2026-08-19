@@ -1008,7 +1008,7 @@ function EventCard({
                 </div>
                 <div className="flex flex-wrap gap-1">
                   {event.category && (
-                    <Badge variant="secondary" className="text-[10px] h-5">
+                    <Badge className={cn("h-5 border-transparent text-[10px] text-white", colorClasses.bg)}>
                       {event.category}
                     </Badge>
                   )}
@@ -1051,7 +1051,7 @@ function EventCard({
         {isHovered && (
           <div className="mt-2 flex flex-wrap gap-1 animate-in fade-in slide-in-from-bottom-1 duration-200">
             {event.category && (
-              <Badge variant="secondary" className="text-xs">
+              <Badge className={cn("border-transparent text-xs text-white", colorClasses.bg)}>
                 {event.category}
               </Badge>
             )}
@@ -1109,7 +1109,7 @@ function EventCard({
                 </div>
                 <div className="flex flex-wrap gap-1">
                   {event.category && (
-                    <Badge variant="secondary" className="text-xs">
+                    <Badge className={cn("border-transparent text-xs text-white", colorClasses.bg)}>
                       {event.category}
                     </Badge>
                   )}
@@ -1325,7 +1325,7 @@ function ListView({
                           </div>
                           <div className="flex flex-wrap gap-1">
                             {event.category && (
-                              <Badge variant="secondary" className="text-xs">
+                              <Badge className={cn("border-transparent text-[11px] text-white", colorClasses.bg)}>
                                 {event.category}
                               </Badge>
                             )}
