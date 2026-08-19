@@ -54,19 +54,6 @@ export interface RingkasAnalisa {
    *  order yang sudah terisi adalah posisi yang sudah jalan, dan
    *  menariknya sama dengan menghapus trade yang sedang rugi. */
   terisi?: boolean;
-  /** Dari bursa & timeframe mana lilin penilainya diambil, mis. "Binance
-   *  Futures · 15m". Ditulis server tiap kali sinyal dinilai. Kosong untuk
-   *  sinyal yang sudah selesai sebelum 20 Agu 2026 — penilai berhenti
-   *  menyentuh sinyal yang hasilnya sudah jatuh, jadi catatannya tidak bisa
-   *  dibuat surut. Aman publik: ia keterangan tentang SUMBER DATA, bukan
-   *  tentang level yang dijual. */
-  sumberLilin?: string;
-  /** Kapan entry-nya tersentuh. Server hanya mengirimkannya untuk sinyal
-   *  yang SUDAH SELESAI, dan gerbangnya sama dengan sampul & level.
-   *  Alasannya: jam sentuhan menunjuk satu lilin, dan rentang high–low
-   *  lilin itu mempersempit tebakan entry sampai beberapa dolar. Bahwa ia
-   *  sudah tersentuh tetap publik lewat `terisi`; yang ditahan jamnya. */
-  waktuIsi?: number | null;
   /** Alasan pembatalan, wajib diisi penulisnya. Ditayangkan apa adanya —
    *  yang dinilai orang justru kenapa sebuah rencana ditarik. */
   alasanBatal?: string;

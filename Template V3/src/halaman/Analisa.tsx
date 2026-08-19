@@ -17,7 +17,6 @@ import { PapanPeringkatSignal } from '@/components/performa-signal';
    performa satu orang. Yang di kepala sudah dikembalikan. */
 import PerformaKalender from '@/components/performa-kalender';
 import { SparklineSaldo } from '@/components/kurva-saldo';
-import { DataLilinSinyal } from '@/components/data-lilin-sinyal';
 import { ambilDraf } from '@/lib/draf-sinyal';
 import { AvatarAnalis } from '@/components/avatar-analis';
 import { ringkasKanal, type RingkasKanal } from '@/lib/ringkas-kanal';
@@ -1214,7 +1213,7 @@ export default function Analisa() {
   const hargaUntuk = (pasangan: string): number | undefined =>
     hargaPasar[pasangan] ?? hargaMt5[simbolDasarMt5(pasangan)];
   /* Sub-halaman kanal: berjalan / menunggu harga / selesai. */
-  const [rakAktif, setRakAktif] = useState<'jalan' | 'nunggu' | 'selesai' | 'lilin'>('jalan');
+  const [rakAktif, setRakAktif] = useState<'jalan' | 'nunggu' | 'selesai' | 'batal'>('jalan');
   const [masuk, setMasuk] = useState<PermintaanMasuk[]>([]);
   const [statusku, setStatusku] = useState<Record<string, string>>({});
   const [memuat, setMemuat] = useState(true);
@@ -2349,7 +2348,16 @@ export default function Analisa() {
                  Isinya masih data contoh bawaan komponennya dan belum
                  tersambung ke sinyal siapa pun. Menunggu instruksi. */
               if (sub === 'performa') return <PerformaKalender sinyal={terpilih} />;
-              const selesai = terpilih.filter((s) => !!s.hasil);
+              /* BATAL DIPISAH DARI SELESAI.
+                 ────────────────────────────────────────────────────────────
+                 Dulu keduanya satu rak, dan itu menyamakan dua hal yang
+                 tidak sama: yang kena TP/SL punya hasil yang bisa dinilai,
+                 sedangkan yang dibatalkan tidak pernah jadi posisi sama
+                 sekali. Menaruhnya berdampingan membuat rak "Sudah selesai"
+                 menjanjikan rekam jejak lalu menyisipkan baris yang tidak
+                 punya hasil apa-apa di tengahnya. */
+              const selesai = terpilih.filter((s) => s.hasil === 'tp' || s.hasil === 'sl');
+              const dibatalkan = terpilih.filter((s) => s.hasil === 'batal');
               const belum = terpilih.filter((s) => !s.hasil);
               /* PEMBEDANYA `terisi`, DAN HANYA ITU.
                  ────────────────────────────────────────────────────────────
@@ -2379,25 +2387,23 @@ export default function Analisa() {
                   ket: 'Order masih menggantung — entry-nya belum tersentuh, jadi rencananya masih bisa diikuti.' },
                 { kunci: 'selesai' as const, judul: 'Sudah selesai', isi: selesai,
                   aktif: 'border-zinc-600 bg-zinc-800/60 text-zinc-200',
-                  ket: 'Kena TP/SL atau ditarik penulisnya. Levelnya terbuka gratis — peluangnya sudah habis, yang tersisa bahan penilaian.' },
-                /* RAK KEEMPAT — bukan kelompok keadaan, melainkan sudut
-                   pandang lain atas seluruh isi kanal ini.
+                  ket: 'Kena TP atau SL. Levelnya terbuka gratis — peluangnya sudah habis, yang tersisa bahan penilaian.' },
+                /* RAK KEEMPAT: rencana yang DITARIK sebelum harganya datang.
+                   ──────────────────────────────────────────────────────────
+                   Ia berdiri sendiri, bukan disatukan dengan "Sudah selesai",
+                   karena pertanyaan yang dijawabnya berbeda. Yang kena TP/SL
+                   menjawab "seberapa tepat analisnya"; yang dibatalkan
+                   menjawab "seberapa jujur ia menarik rencana yang sudah
+                   tidak sah".
 
-                   Tiga rak di kirinya menjawab "sinyal mana yang bisa saya
-                   ikuti sekarang". Yang ini menjawab pertanyaan yang lebih
-                   mendasar dan sampai sekarang tidak punya tempat: "dari
-                   mana angkanya datang". Papan peringkat menjanjikan hasil
-                   yang dibaca dari lilin sungguhan; janji itu tidak bisa
-                   diperiksa siapa pun kalau sumbernya tidak pernah
-                   ditampilkan.
-
-                   `isi` sengaja SELURUH sinyal kanalnya, bukan potongan:
-                   yang sedang ditelusuri orang di sini justru perjalanan
-                   dari diposting sampai hasilnya jatuh, dan memotongnya
-                   menurut keadaan akan memutus perjalanan itu di tengah. */
-                { kunci: 'lilin' as const, judul: 'Data Lilin', isi: terpilih,
-                  aktif: 'border-zinc-600 bg-zinc-800/60 text-zinc-200',
-                  ket: 'Jejak penilaian tiap sinyal terhadap lilin bursa — sumber datanya, kapan entry tersentuh, dan kapan hasilnya jatuh.' },
+                   Dua-duanya layak dibaca, dan yang kedua justru bagian yang
+                   paling mudah disembunyikan orang kalau kami tidak
+                   menyediakan tempatnya. Sinyal tidak bisa dihapus di sini —
+                   jadi menarik rencana meninggalkan barisnya, lengkap dengan
+                   alasannya, dan rak ini yang menampungnya. */
+                { kunci: 'batal' as const, judul: 'Dibatalkan', isi: dibatalkan,
+                  aktif: 'border-zinc-700 bg-zinc-800 text-zinc-300',
+                  ket: 'Ditarik penulisnya sebelum harga menyentuh entry — jadi tidak ada posisi yang pernah jalan, dan tidak ada uang yang hilang. Alasannya tercatat di tiap kartu.' },
               ];
               /* Tab yang isinya kosong tetap DITAMPILKAN, cuma diredupkan dan
                  tidak bisa ditekan. Menyembunyikannya membuat jumlah tab
@@ -2443,13 +2449,7 @@ export default function Analisa() {
                   </div>
                   <p className="mb-3 text-[11.5px] leading-relaxed text-zinc-600">{pilih.ket}</p>
 
-                  {/* Data Lilin tidak digambar sebagai kartu: yang dibaca di
-                      sana perbandingan antar-baris (jam, sumber, hasil), dan
-                      kartu mendatar memaksa mata melompat bolak-balik untuk
-                      membandingkan dua angka yang seharusnya bersebelahan. */}
-                  {pilih.kunci === 'lilin' ? (
-                    <DataLilinSinyal sinyal={tampil} />
-                  ) : tampil.length === 0 ? (
+                  {tampil.length === 0 ? (
                     <p className="rounded-lg border border-zinc-800/60 px-4 py-6 text-center text-[12px] text-zinc-600">
                       Tidak ada sinyal di ruangan ini.
                     </p>
