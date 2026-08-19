@@ -289,39 +289,8 @@ export function EventManager({
   return (
     <div className={cn("flex flex-col gap-4 [&_button]:text-[12px]", className)}>
       {/* Header */}
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
-          <h2 className="text-[15px] font-semibold sm:text-[17px]">
-            {view === "month" &&
-              currentDate.toLocaleDateString("id-ID", {
-                month: "long",
-                year: "numeric",
-              })}
-            {view === "list" && "Semua sinyal"}
-          </h2>
-          <div className="flex items-center gap-2">
-            {/* "Hari ini" dicabut — permintaan pemilik, dan memang tidak
-                mengerjakan apa-apa di sini: kalender ini terbuka di bulan
-                berjalan, dan sinyal bulan lalu dicapai dengan satu tekan
-                panah. Tombol yang jalan pintasnya sependek jalan biasanya
-                cuma menambah barang di layar.
-
-                Panahnya kehilangan garis tepi: ia menempel di sebelah nama
-                bulan, dan dua kotak bergaris di sebelah judul membuat
-                keduanya terbaca sebagai kendali yang berdiri sendiri —
-                padahal mereka milik judul itu. */}
-            <Button variant="ghost" size="icon" onClick={() => navigateDate("prev")}
-              aria-label="Bulan sebelumnya" className="h-8 w-8">
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" onClick={() => navigateDate("next")}
-              aria-label="Bulan berikutnya" className="h-8 w-8">
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
           {/* Mobile: Select dropdown */}
           <div className="sm:hidden">
             <Select value={view} onValueChange={(value: any) => setView(value)}>
@@ -379,6 +348,37 @@ export function EventManager({
             <Plus className="mr-2 h-4 w-4" />
             {labelTombolBaru}
           </Button>
+        </div>
+
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+          <h2 className="text-[15px] font-semibold sm:text-[17px]">
+            {view === "month" &&
+              currentDate.toLocaleDateString("id-ID", {
+                month: "long",
+                year: "numeric",
+              })}
+            {view === "list" && "Semua sinyal"}
+          </h2>
+          <div className="flex items-center gap-2">
+            {/* "Hari ini" dicabut — permintaan pemilik, dan memang tidak
+                mengerjakan apa-apa di sini: kalender ini terbuka di bulan
+                berjalan, dan sinyal bulan lalu dicapai dengan satu tekan
+                panah. Tombol yang jalan pintasnya sependek jalan biasanya
+                cuma menambah barang di layar.
+
+                Panahnya kehilangan garis tepi: ia menempel di sebelah nama
+                bulan, dan dua kotak bergaris di sebelah judul membuat
+                keduanya terbaca sebagai kendali yang berdiri sendiri —
+                padahal mereka milik judul itu. */}
+            <Button variant="ghost" size="icon" onClick={() => navigateDate("prev")}
+              aria-label="Bulan sebelumnya" className="h-8 w-8">
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={() => navigateDate("next")}
+              aria-label="Bulan berikutnya" className="h-8 w-8">
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
 
