@@ -139,6 +139,7 @@ export function PanelSetelanAkses() {
         hargaPremium3: ubah.hargaPremium3 ?? st.hargaPremium3,
         hargaTahunan: ubah.hargaTahunan ?? st.hargaTahunan,
         nilaiMarketplace: ubah.nilaiMarketplace ?? st.nilaiMarketplace,
+        kursUsd: ubah.kursUsd ?? st.kursUsd,
         eventGratis: ubah.eventGratis ?? st.eventGratis,
         linkTesting: ubah.linkTesting ?? st.linkTesting,
         linkPremium3: ubah.linkPremium3 ?? st.linkPremium3,
@@ -262,6 +263,9 @@ export function PanelSetelanAkses() {
                 <Uang label="Tahunan" nilai={st.hargaTahunan}
                       catatan="sekali bayar untuk 12 bulan"
                       atur={(n) => setSt({ ...st, hargaTahunan: n })} />
+                <Angka label="Kurs 1 USD (rupiah)" nilai={st.kursUsd}
+                       catatan="dipakai keterangan kecil di bawah harga — samakan dengan harga produk Xendit-mu, bukan dengan kurs pasar"
+                       atur={(n) => setSt({ ...st, kursUsd: Math.max(1, n) })} />
                 <Uang label="Nilai produk Marketplace" nilai={st.nilaiMarketplace}
                       catatan={`jumlah harga daftar indikator + EA yang ikut di paket tahunan — dipakai menghitung klaim hematnya`}
                       atur={(n) => setSt({ ...st, nilaiMarketplace: n })} />

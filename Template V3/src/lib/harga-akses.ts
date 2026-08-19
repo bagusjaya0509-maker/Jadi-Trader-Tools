@@ -37,6 +37,8 @@ export interface HargaPaket {
       menghitung klaim hematnya, jadi ia setelan — bukan angka yang ditulis
       tangan di kartu harga. */
   nilaiMarketplace: number;
+  /** Kurs dolar ke rupiah untuk keterangan kecil di bawah harga. */
+  kursUsd: number;
   /** Sakelar kartu event gratis dari Maintenance. */
   eventGratis: boolean;
   /** Tautan checkout per paket. KOSONG berarti paketnya belum bisa dibeli,
@@ -60,6 +62,7 @@ export const HARGA_BAWAAN: HargaPaket = {
   hargaPremium3: 10,
   hargaTahunan: 79,
   nilaiMarketplace: 54,
+  kursUsd: 16_200,
   eventGratis: true,
   linkTesting: '',
   linkPremium3: '',
@@ -97,6 +100,20 @@ export const BATAS = {
 /** Uang dolar tanpa desimal kalau bulat: $1, $10, $100, $1.5. */
 export function usd(n: number): string {
   return '$' + (Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0$/, ''));
+}
+
+/** Padanan rupiah, DIBULATKAN ke ribuan terdekat.
+
+    Pembulatannya disengaja: "Rp 1.279.800" terbaca sebagai hasil hitungan
+    mesin, dan angka seperti itu membuat orang bertanya-tanya apakah nanti
+    ditagih persis segitu. "Rp 1.280.000" terbaca sebagai harga.
+
+    Selalu didahului "≈" — ini keterangan, bukan angka yang mengikat. Yang
+    mengikat muncul di halaman checkout. */
+export function rupiah(usd: number, kurs: number): string {
+  if (!usd || !kurs) return '';
+  const n = Math.round((usd * kurs) / 1000) * 1000;
+  return '≈ Rp ' + n.toLocaleString('id-ID');
 }
 
 export function useHargaPaket(): HargaPaket {

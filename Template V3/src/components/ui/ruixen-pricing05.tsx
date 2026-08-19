@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useHargaPaket, usd, BATAS } from "@/lib/harga-akses";
+import { useHargaPaket, usd, rupiah, BATAS } from "@/lib/harga-akses";
 
 /* Isi kartu diisi dari setelan yang hidup di server (lihat lib/harga-akses).
    Rangka, kelas, dan gerakan lencananya tetap seperti blok aslinya. */
@@ -67,6 +67,7 @@ export default function Pricing_05() {
           unit: `/ ${h.hari} hari`,
           note: `Kuota ${h.gratisTotal} orang — sisa ${h.gratisSisa}. Hilang sendiri saat penuh.`,
           buttonText: "Ambil tempat gratis",
+          rp: '',
           /* Event gratis tidak butuh checkout — pendaftarannya lewat
              halaman Akses, jadi ia selalu tersedia selama kartunya tampil. */
           link: "/akses",
@@ -89,6 +90,7 @@ export default function Pricing_05() {
       unit: `/ ${h.hari} hari`,
       note: "Harga perkenalan selama masa uji coba peluncuran.",
       buttonText: "Ambil sekarang",
+      rp: rupiah(h.hargaTesting, h.kursUsd),
       /* Paket bulanan SUDAH bisa dibeli lewat halaman Akses hari ini, jadi
          halaman Akses yang jadi cadangannya kalau tautan khusus belum
          diisi. Dua paket di bawah tidak punya cadangan seperti itu. */
@@ -111,6 +113,7 @@ export default function Pricing_05() {
       unit: "/ 3 bulan",
       note: "Batas hitungan dibuka. Pakai sepuasnya sampai masa aktif habis.",
       buttonText: "Ambil paket 3 bulan",
+      rp: rupiah(h.hargaPremium3, h.kursUsd),
       link: h.linkPremium3,
       popular: false,
       inverse: false,
@@ -133,6 +136,7 @@ export default function Pricing_05() {
       unit: "/ 12 bulan",
       note: "Satu-satunya paket yang membuka isi Marketplace tanpa membeli satuan.",
       buttonText: "Ambil paket tahunan",
+      rp: rupiah(h.hargaTahunan, h.kursUsd),
       link: h.linkTahunan,
       popular: false,
       inverse: false,
@@ -163,7 +167,7 @@ export default function Pricing_05() {
         </div>
 
         <div className="flex flex-col gap-6 items-center mt-12 lg:flex-row lg:items-end lg:justify-center">
-          {pricingTiers.map(({ title, price, strike, unit, note, buttonText, link, popular, features, inverse }) => (
+          {pricingTiers.map(({ title, price, strike, unit, note, rp, buttonText, link, popular, features, inverse }) => (
             <Card
               key={title}
               className={`max-w-xs w-full border ${inverse ? "bg-black text-white" : ""}`}
@@ -210,6 +214,19 @@ export default function Pricing_05() {
                   <span className={`tracking-tight font-semibold ${inverse ? "text-white/60" : "text-muted-foreground"}`}>
                     {unit}
                   </span>
+                  {/* Rupiah sebagai PANGKAT, bukan baris sendiri. Ditaruh
+                      sebaris di atas, ia terbaca sebagai keterangan atas
+                      angka dolarnya — bukan sebagai harga kedua yang
+                      bersaing dengannya.
+
+                      align-super, bukan sekadar teks kecil: tanpa itu ia
+                      duduk di garis dasar yang sama dan tampak seperti
+                      satuan tambahan. */}
+                  {rp && (
+                    <sup className={`ml-0.5 align-super text-[10px] font-normal tracking-normal ${inverse ? "text-white/45" : "text-muted-foreground/70"}`}>
+                      {rp}
+                    </sup>
+                  )}
                 </div>
                 <p className={`mt-2 text-xs leading-relaxed ${inverse ? "text-white/50" : "text-muted-foreground"}`}>
                   {note}
