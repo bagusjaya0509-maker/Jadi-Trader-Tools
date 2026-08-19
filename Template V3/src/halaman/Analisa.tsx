@@ -5,7 +5,7 @@ import { usePaket, LABEL_PAKET } from '@/lib/paket';
 import {
   Loader2, Lock, Unlock, Trash2, Send, LineChart, X, CheckCircle2,
   TrendingUp, TrendingDown, RefreshCw, Radar, Sparkles, ImagePlus, Images, Flag, Ban,
-  Settings2, UserRound, Pin, TriangleAlert,
+  Settings2, UserRound, Pin, TriangleAlert, ArrowLeft,
 } from 'lucide-react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { PanelSinyal } from '@/components/panel-sinyal';
@@ -1496,9 +1496,18 @@ export default function Analisa() {
           bukan bagian dari tab mana pun, ia jalan keluar dari keduanya. */}
       {!diDepan && (
         <div className="mb-3 rounded-lg border border-zinc-800/70 bg-zinc-900/40 px-3 py-2">
+          {/* Panah IKON, bukan karakter "←".
+              Panah teks mewarisi berat huruf paragraf — tipis, dan di 12,5px
+              ia nyaris tak terbaca sebagai panah. Ikon punya strokeWidth
+              sendiri, jadi ia bisa ditebalkan tanpa menebalkan tulisannya.
+
+              "Kembali", bukan "Semua kanal": yang perlu diketahui orangnya
+              adalah APA YANG TERJADI kalau ditekan, bukan nama tempat yang
+              akan ia datangi. */}
           <button onClick={() => setKanalBuka(null)}
-            className="flex cursor-pointer items-center gap-1.5 text-[12.5px] text-zinc-400 transition-colors hover:text-zinc-100">
-            ← Semua kanal
+            className="flex cursor-pointer items-center gap-2 text-[12.5px] font-medium text-zinc-300 transition-colors hover:text-zinc-100">
+            <ArrowLeft className="size-[18px]" strokeWidth={2.75} />
+            Kembali
           </button>
         </div>
       )}

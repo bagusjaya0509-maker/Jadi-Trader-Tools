@@ -300,13 +300,22 @@ export function EventManager({
             {view === "list" && "Semua sinyal"}
           </h2>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" onClick={() => navigateDate("prev")} className="h-8 w-8">
+            {/* "Hari ini" dicabut — permintaan pemilik, dan memang tidak
+                mengerjakan apa-apa di sini: kalender ini terbuka di bulan
+                berjalan, dan sinyal bulan lalu dicapai dengan satu tekan
+                panah. Tombol yang jalan pintasnya sependek jalan biasanya
+                cuma menambah barang di layar.
+
+                Panahnya kehilangan garis tepi: ia menempel di sebelah nama
+                bulan, dan dua kotak bergaris di sebelah judul membuat
+                keduanya terbaca sebagai kendali yang berdiri sendiri —
+                padahal mereka milik judul itu. */}
+            <Button variant="ghost" size="icon" onClick={() => navigateDate("prev")}
+              aria-label="Bulan sebelumnya" className="h-8 w-8">
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())}>
-              Hari ini
-            </Button>
-            <Button variant="outline" size="icon" onClick={() => navigateDate("next")} className="h-8 w-8">
+            <Button variant="ghost" size="icon" onClick={() => navigateDate("next")}
+              aria-label="Bulan berikutnya" className="h-8 w-8">
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
@@ -373,7 +382,17 @@ export function EventManager({
         </div>
       </div>
 
-      <div className="flex flex-col gap-2">
+      {/* SATU BARIS di layar lebar: penyaring di kiri, kotak cari mengisi
+          sisanya di kanan. Sebelumnya kotak cari punya barisnya sendiri, dan
+          dua baris kendali di atas kalender memakan tinggi yang seharusnya
+          jadi kotak tanggal.
+
+          `flex-row-reverse`, bukan urutan DOM yang ditukar: di ponsel kotak
+          cari harus tetap DI ATAS penyaringnya — ia yang paling sering
+          dipakai, dan menaruhnya di bawah tiga tombol berarti ia harus
+          dicari. Membalik urutan DOM akan memperbaiki layar lebar dengan
+          merusak yang sempit. */}
+      <div className="flex flex-col gap-2 sm:flex-row-reverse sm:items-center">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -511,7 +530,7 @@ export function EventManager({
         </div>
 
         {/* Desktop: Original layout */}
-        <div className="hidden sm:flex items-center gap-2">
+        <div className="hidden shrink-0 sm:flex sm:items-center sm:gap-2">
           {/* Color Filter */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
