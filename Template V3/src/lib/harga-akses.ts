@@ -62,7 +62,7 @@ export const HARGA_BAWAAN: HargaPaket = {
   hargaPremium3: 10,
   hargaTahunan: 79,
   nilaiMarketplace: 54,
-  kursUsd: 16_200,
+  kursUsd: 17_000,
   eventGratis: true,
   linkTesting: '',
   linkPremium3: '',
