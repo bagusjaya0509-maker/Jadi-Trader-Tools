@@ -1,0 +1,1 @@
+import{u as t,n as a,a as s}from"./index-DsexzmOA.js";import{r as u,N as o}from"./react-B0Mm-yK2.js";import"./firebase-D_y3CBvp.js";function f(){const{pengguna:r,memuat:e}=t();return u.useEffect(()=>{!e&&!r&&a()},[e,r]),e?null:s.jsx(o,{to:"/dashboard",replace:!0})}export{f as default};
