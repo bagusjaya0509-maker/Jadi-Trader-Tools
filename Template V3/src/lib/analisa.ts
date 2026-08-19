@@ -38,6 +38,17 @@ export interface RingkasAnalisa {
    *  `alasanBatal`. Bukan kalah dan bukan menang; ia keadaan tersendiri. */
   hasil?: 'sl' | 'tp' | 'batal' | null;
   waktuHasil?: number | null;
+  /** Hasil dalam dolar menurut model papan peringkat (modal & risiko% ada
+   *  di `Performa`). Dihitung SERVER, dan hanya terisi untuk sinyal yang
+   *  sudah kena TP/SL.
+   *
+   *  null untuk yang masih berjalan, dan itu disengaja: angka ini
+   *  memberitahukan rr sinyalnya — jarak TP terhadap SL — dan itu produk
+   *  yang dijual analisnya. Sinyal yang sudah selesai tidak bisa ditiru
+   *  lagi, jadi rekam jejaknya boleh terbuka; yang masih jalan tidak.
+   *  Batal juga null: tidak ada uang yang berpindah, dan menuliskannya nol
+   *  akan terbaca sebagai impas alih-alih sebagai tidak terjadi. */
+  hasilDolar?: number | null;
   /** Harga pernah menyentuh entry. Ditulis penilai dari lilin sungguhan,
    *  dan tidak pernah dicabut lagi. Inilah yang mengunci pembatalan:
    *  order yang sudah terisi adalah posisi yang sudah jalan, dan

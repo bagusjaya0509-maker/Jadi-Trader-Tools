@@ -15,7 +15,7 @@ import { PapanPeringkatSignal, PerformaAnalisSatu } from '@/components/performa-
    Sempat dipasang di kepala Market Signal dan itu keliru: kepala halaman
    adalah papan peringkat SEMUA analis, sedangkan yang ditempel ini
    performa satu orang. Yang di kepala sudah dikembalikan. */
-import EventManagerDemo from '@/components/ui/event-manager-demo';
+import PerformaKalender from '@/components/performa-kalender';
 import { ambilDraf } from '@/lib/draf-sinyal';
 import { AvatarAnalis } from '@/components/avatar-analis';
 import { ringkasKanal, type RingkasKanal } from '@/lib/ringkas-kanal';
@@ -938,8 +938,12 @@ export default function Analisa() {
      state: sidebar sekarang punya sub-menu yang menunjuk langsung ke sini,
      dan tab yang tidak bisa dituju lewat alamat tidak bisa ditaut siapa pun. */
   const [cariSub, setCariSub] = useSearchParams();
-  const subMinta: IdSub = SUB.some((s) => s.id === cariSub.get('sub')) ? (cariSub.get('sub') as IdSub) : 'market';
-  const setSub = (id: IdSub) => setCariSub(id === 'market' ? {} : { sub: id }, { replace: true });
+  /* null = alamatnya tidak menyebut tab sama sekali. Dibedakan dari
+     'market' karena tab bawaannya sekarang BERGANTUNG KEADAAN: di daftar
+     kanal 'market', di dalam kanal 'performa'. Kalau yang kosong langsung
+     dijadikan 'market', bawaan di dalam kanal tidak akan pernah kepakai. */
+  const subUrl = cariSub.get('sub');
+  const subMinta: IdSub | null = SUB.some((s) => s.id === subUrl) ? (subUrl as IdSub) : null;
   const { pengguna, pemilik, langganan } = useAuth();
   /* Copy Signal tidak termasuk paket gratis — itu yang tertulis di kartu
      harga, jadi itu yang harus berlaku di sini. Kartu harga yang menjanjikan
@@ -1021,7 +1025,19 @@ export default function Analisa() {
      tombolnya tidak ada di mana pun — layar kosong tanpa penjelasan dan
      tanpa jalan keluar selain menebak. */
   const tabTampil = SUB.filter((s) => (diDepan ? s.id !== 'performa' : s.id !== 'posting'));
-  const sub: IdSub = tabTampil.some((s) => s.id === subMinta) ? subMinta : 'market';
+
+  /* Masuk kanal, yang pertama terlihat Performa Signal — keputusan pemilik.
+     Orang membuka kanal seseorang untuk menimbang apakah ia layak diikuti,
+     dan itu pertanyaan tentang rekam jejak, bukan tentang sinyal terbarunya. */
+  const bawaanSub: IdSub = diDepan ? 'market' : 'performa';
+  const sub: IdSub = subMinta && tabTampil.some((s) => s.id === subMinta) ? subMinta : bawaanSub;
+
+  /* Bawaan tidak ditulis ke alamat, tab lain ditulis. Kalau 'market' selalu
+     dianggap bawaan seperti dulu, menekan tab Market di dalam kanal akan
+     MENGOSONGKAN parameternya — dan alamat tanpa parameter di dalam kanal
+     berarti Performa, jadi tombolnya memantul balik ke tab yang barusan
+     ditinggalkan. */
+  const setSub = (id: IdSub) => setCariSub(id === bawaanSub ? {} : { sub: id }, { replace: true });
 
   /* ── Peringatan risiko: tampil 3 detik, lalu menyusut sendiri ──────────
      Keputusan pemilik 17 Agu 2026, sesudah sempat dicoba jadi kaki halaman
@@ -2140,7 +2156,7 @@ export default function Analisa() {
 
                  Isinya masih data contoh bawaan komponennya dan belum
                  tersambung ke sinyal siapa pun. Menunggu instruksi. */
-              if (sub === 'performa') return <EventManagerDemo />;
+              if (sub === 'performa') return <PerformaKalender sinyal={terpilih} />;
               const selesai = terpilih.filter((s) => !!s.hasil);
               const belum = terpilih.filter((s) => !s.hasil);
               const menunggu = belum.filter(

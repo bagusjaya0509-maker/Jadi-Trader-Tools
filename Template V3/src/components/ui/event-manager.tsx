@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useMemo } from "react"
+import { useState, useCallback, useMemo, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -16,7 +16,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
-import { ChevronLeft, ChevronRight, Plus, Calendar, Clock, Grid3x3, List, Search, Filter, X } from "lucide-react"
+import { ChevronLeft, ChevronRight, Plus, Calendar, Clock, List, Search, Filter, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
   DropdownMenu,
@@ -46,9 +46,22 @@ export interface EventManagerProps {
   onEventDelete?: (id: string) => void
   categories?: string[]
   colors?: { name: string; value: string; bg: string; text: string }[]
-  defaultView?: "month" | "week" | "day" | "list"
+  /* Week & Day DICABUT — keputusan pemilik: keduanya pemborosan untuk
+     rekam jejak sinyal. Sebulan penuh sinyal muat di satu layar Month, dan
+     riwayatnya sudah terbaca di List; grid 24 jam × 7 hari untuk beberapa
+     sinyal per minggu menghasilkan layar yang isinya kotak kosong. */
+  defaultView?: "month" | "list"
   className?: string
   availableTags?: string[]
+  /** Tulisan di tombol kanan atas. Bawaannya "New Event". */
+  labelTombolBaru?: string
+  /** Tombol itu mati. Dipakai saat fiturnya belum dibangun — tombol yang
+   *  ada tapi mati menerangkan rencana; tombol yang hilang tidak. */
+  tombolBaruMati?: boolean
+  judulTombolBaru?: string
+  /** Isinya bukan milik yang melihat: kotak rinciannya jadi bacaan saja,
+   *  tanpa Simpan dan tanpa Hapus. */
+  hanyaBaca?: boolean
 }
 
 const defaultColors = [
@@ -70,10 +83,18 @@ export function EventManager({
   defaultView = "month",
   className,
   availableTags = ["Important", "Urgent", "Work", "Personal", "Team", "Client"],
+  labelTombolBaru = "New Event",
+  tombolBaruMati = false,
+  judulTombolBaru,
+  hanyaBaca = false,
 }: EventManagerProps) {
+  /* `initialEvents` dipakai sebagai NILAI AWAL saja oleh useState, jadi
+     daftar yang datang belakangan (mis. sesudah fetch selesai) tidak akan
+     masuk sendiri. Efek di bawah yang menyelaraskannya. */
   const [events, setEvents] = useState<Event[]>(initialEvents)
+  useEffect(() => { setEvents(initialEvents) }, [initialEvents])
   const [currentDate, setCurrentDate] = useState(new Date())
-  const [view, setView] = useState<"month" | "week" | "day" | "list">(defaultView)
+  const [view, setView] = useState<"month" | "list">(defaultView)
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
@@ -219,10 +240,6 @@ export function EventManager({
         const newDate = new Date(prev)
         if (view === "month") {
           newDate.setMonth(prev.getMonth() + (direction === "next" ? 1 : -1))
-        } else if (view === "week") {
-          newDate.setDate(prev.getDate() + (direction === "next" ? 7 : -7))
-        } else if (view === "day") {
-          newDate.setDate(prev.getDate() + (direction === "next" ? 1 : -1))
         }
         return newDate
       })
@@ -267,18 +284,6 @@ export function EventManager({
                 month: "long",
                 year: "numeric",
               })}
-            {view === "week" &&
-              `Week of ${currentDate.toLocaleDateString("en-US", {
-                month: "short",
-                day: "numeric",
-              })}`}
-            {view === "day" &&
-              currentDate.toLocaleDateString("en-US", {
-                weekday: "long",
-                month: "long",
-                day: "numeric",
-                year: "numeric",
-              })}
             {view === "list" && "All Events"}
           </h2>
           <div className="flex items-center gap-2">
@@ -308,18 +313,6 @@ export function EventManager({
                     Month View
                   </div>
                 </SelectItem>
-                <SelectItem value="week">
-                  <div className="flex items-center gap-2">
-                    <Grid3x3 className="h-4 w-4" />
-                    Week View
-                  </div>
-                </SelectItem>
-                <SelectItem value="day">
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4" />
-                    Day View
-                  </div>
-                </SelectItem>
                 <SelectItem value="list">
                   <div className="flex items-center gap-2">
                     <List className="h-4 w-4" />
@@ -342,24 +335,6 @@ export function EventManager({
               <span className="ml-1">Month</span>
             </Button>
             <Button
-              variant={view === "week" ? "secondary" : "ghost"}
-              size="sm"
-              onClick={() => setView("week")}
-              className="h-8"
-            >
-              <Grid3x3 className="h-4 w-4" />
-              <span className="ml-1">Week</span>
-            </Button>
-            <Button
-              variant={view === "day" ? "secondary" : "ghost"}
-              size="sm"
-              onClick={() => setView("day")}
-              className="h-8"
-            >
-              <Clock className="h-4 w-4" />
-              <span className="ml-1">Day</span>
-            </Button>
-            <Button
               variant={view === "list" ? "secondary" : "ghost"}
               size="sm"
               onClick={() => setView("list")}
@@ -375,10 +350,12 @@ export function EventManager({
               setIsCreating(true)
               setIsDialogOpen(true)
             }}
+            disabled={tombolBaruMati}
+            title={judulTombolBaru}
             className="w-full sm:w-auto"
           >
             <Plus className="mr-2 h-4 w-4" />
-            New Event
+            {labelTombolBaru}
           </Button>
         </div>
       </div>
@@ -685,36 +662,6 @@ export function EventManager({
         />
       )}
 
-      {view === "week" && (
-        <WeekView
-          currentDate={currentDate}
-          events={filteredEvents}
-          onEventClick={(event) => {
-            setSelectedEvent(event)
-            setIsDialogOpen(true)
-          }}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-          onDrop={handleDrop}
-          getColorClasses={getColorClasses}
-        />
-      )}
-
-      {view === "day" && (
-        <DayView
-          currentDate={currentDate}
-          events={filteredEvents}
-          onEventClick={(event) => {
-            setSelectedEvent(event)
-            setIsDialogOpen(true)
-          }}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-          onDrop={handleDrop}
-          getColorClasses={getColorClasses}
-        />
-      )}
-
       {view === "list" && (
         <ListView
           events={filteredEvents}
@@ -736,6 +683,36 @@ export function EventManager({
             </DialogDescription>
           </DialogHeader>
 
+          {/* Mode bacaan. Formulir aslinya dibiarkan utuh di cabang satunya,
+              bukan dibuang: begitu "Copy Signal" jadi, kotak ini akan perlu
+              isian lagi. Yang dicabut cuma jalannya, bukan barangnya.
+
+              Wajib ada begitu isi kalendernya bukan milik yang melihat:
+              tombol Hapus di atas sinyal orang lain cuma mengubah daftar di
+              browsernya sendiri, jadi sinyalnya "hilang" sampai halaman
+              dimuat ulang lalu muncul lagi. Yang paling buruk dari itu bukan
+              bugnya, melainkan orangnya sempat percaya sesuatu sudah
+              terhapus. */}
+          {hanyaBaca ? (
+            <div className="space-y-3">
+              <div>
+                <div className="text-sm font-semibold">{selectedEvent?.title}</div>
+                {selectedEvent?.description && (
+                  <p className="mt-1 whitespace-pre-line text-sm text-muted-foreground">
+                    {selectedEvent.description}
+                  </p>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {selectedEvent?.category && (
+                  <Badge variant="secondary" className="text-xs">{selectedEvent.category}</Badge>
+                )}
+                {selectedEvent?.tags?.map((tag) => (
+                  <Badge key={tag} variant="outline" className="text-xs">{tag}</Badge>
+                ))}
+              </div>
+            </div>
+          ) : (
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="title">Title</Label>
@@ -897,9 +874,10 @@ export function EventManager({
               </div>
             </div>
           </div>
+          )}
 
           <DialogFooter>
-            {!isCreating && (
+            {!isCreating && !hanyaBaca && (
               <Button variant="destructive" onClick={() => selectedEvent && handleDeleteEvent(selectedEvent.id)}>
                 Delete
               </Button>
@@ -912,11 +890,13 @@ export function EventManager({
                 setSelectedEvent(null)
               }}
             >
-              Cancel
+              {hanyaBaca ? "Tutup" : "Cancel"}
             </Button>
-            <Button onClick={isCreating ? handleCreateEvent : handleUpdateEvent}>
-              {isCreating ? "Create" : "Save"}
-            </Button>
+            {!hanyaBaca && (
+              <Button onClick={isCreating ? handleCreateEvent : handleUpdateEvent}>
+                {isCreating ? "Create" : "Save"}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -949,6 +929,14 @@ function EventCard({
       minute: "2-digit",
     })
   }
+
+  /** true = mulai dan selesai pada saat yang sama (dalam toleransi semenit).
+   *  Peristiwa sesaat cukup ditulis satu kali jamnya. */
+  const sesaat = Math.abs(event.endTime.getTime() - event.startTime.getTime()) < 60_000
+
+  const rentang = sesaat
+    ? formatTime(event.startTime)
+    : `${formatTime(event.startTime)} - ${formatTime(event.endTime)}`
 
   const getDuration = () => {
     const diff = event.endTime.getTime() - event.startTime.getTime()
@@ -993,9 +981,9 @@ function EventCard({
                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
                   <Clock className="h-3 w-3" />
                   <span>
-                    {formatTime(event.startTime)} - {formatTime(event.endTime)}
+                    {rentang}
                   </span>
-                  <span className="text-[10px]">({getDuration()})</span>
+                  {!sesaat && <span className="text-[10px]">({getDuration()})</span>}
                 </div>
                 <div className="flex flex-wrap gap-1">
                   {event.category && (
@@ -1037,7 +1025,7 @@ function EventCard({
         {event.description && <div className="mt-1 text-sm opacity-90 line-clamp-2">{event.description}</div>}
         <div className="mt-2 flex items-center gap-2 text-xs opacity-80">
           <Clock className="h-3 w-3" />
-          {formatTime(event.startTime)} - {formatTime(event.endTime)}
+          {rentang}
         </div>
         {isHovered && (
           <div className="mt-2 flex flex-wrap gap-1 animate-in fade-in slide-in-from-bottom-1 duration-200">
@@ -1090,9 +1078,9 @@ function EventCard({
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Clock className="h-3.5 w-3.5" />
                   <span>
-                    {formatTime(event.startTime)} - {formatTime(event.endTime)}
+                    {rentang}
                   </span>
-                  <span className="text-[10px]">({getDuration()})</span>
+                  {!sesaat && <span className="text-[10px]">({getDuration()})</span>}
                 </div>
                 <div className="flex flex-wrap gap-1">
                   {event.category && (
@@ -1215,177 +1203,6 @@ function MonthView({
   )
 }
 
-// Week View Component
-function WeekView({
-  currentDate,
-  events,
-  onEventClick,
-  onDragStart,
-  onDragEnd,
-  onDrop,
-  getColorClasses,
-}: {
-  currentDate: Date
-  events: Event[]
-  onEventClick: (event: Event) => void
-  onDragStart: (event: Event) => void
-  onDragEnd: () => void
-  onDrop: (date: Date, hour: number) => void
-  getColorClasses: (color: string) => { bg: string; text: string }
-}) {
-  const startOfWeek = new Date(currentDate)
-  startOfWeek.setDate(currentDate.getDay())
-
-  const weekDays = Array.from({ length: 7 }, (_, i) => {
-    const day = new Date(startOfWeek)
-    day.setDate(startOfWeek.getDate() + i)
-    return day
-  })
-
-  const hours = Array.from({ length: 24 }, (_, i) => i)
-
-  const getEventsForDayAndHour = (date: Date, hour: number) => {
-    return events.filter((event) => {
-      const eventDate = new Date(event.startTime)
-      const eventHour = eventDate.getHours()
-      return (
-        eventDate.getDate() === date.getDate() &&
-        eventDate.getMonth() === date.getMonth() &&
-        eventDate.getFullYear() === date.getFullYear() &&
-        eventHour === hour
-      )
-    })
-  }
-
-  return (
-    <Card className="overflow-auto">
-      <div className="grid grid-cols-8 border-b">
-        <div className="border-r p-2 text-center text-xs font-medium sm:text-sm">Time</div>
-        {weekDays.map((day) => (
-          <div
-            key={day.toISOString()}
-            className="border-r p-2 text-center text-xs font-medium last:border-r-0 sm:text-sm"
-          >
-            <div className="hidden sm:block">{day.toLocaleDateString("en-US", { weekday: "short" })}</div>
-            <div className="sm:hidden">{day.toLocaleDateString("en-US", { weekday: "narrow" })}</div>
-            <div className="text-[10px] text-muted-foreground sm:text-xs">
-              {day.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-            </div>
-          </div>
-        ))}
-      </div>
-      <div className="grid grid-cols-8">
-        {hours.map((hour) => (
-          <>
-            <div
-              key={`time-${hour}`}
-              className="border-b border-r p-1 text-[10px] text-muted-foreground sm:p-2 sm:text-xs"
-            >
-              {hour.toString().padStart(2, "0")}:00
-            </div>
-            {weekDays.map((day) => {
-              const dayEvents = getEventsForDayAndHour(day, hour)
-              return (
-                <div
-                  key={`${day.toISOString()}-${hour}`}
-                  className="min-h-12 border-b border-r p-0.5 transition-colors hover:bg-accent/50 last:border-r-0 sm:min-h-16 sm:p-1"
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={() => onDrop(day, hour)}
-                >
-                  <div className="space-y-1">
-                    {dayEvents.map((event) => (
-                      <EventCard
-                        key={event.id}
-                        event={event}
-                        onEventClick={onEventClick}
-                        onDragStart={onDragStart}
-                        onDragEnd={onDragEnd}
-                        getColorClasses={getColorClasses}
-                        variant="default"
-                      />
-                    ))}
-                  </div>
-                </div>
-              )
-            })}
-          </>
-        ))}
-      </div>
-    </Card>
-  )
-}
-
-// Day View Component
-function DayView({
-  currentDate,
-  events,
-  onEventClick,
-  onDragStart,
-  onDragEnd,
-  onDrop,
-  getColorClasses,
-}: {
-  currentDate: Date
-  events: Event[]
-  onEventClick: (event: Event) => void
-  onDragStart: (event: Event) => void
-  onDragEnd: () => void
-  onDrop: (date: Date, hour: number) => void
-  getColorClasses: (color: string) => { bg: string; text: string }
-}) {
-  const hours = Array.from({ length: 24 }, (_, i) => i)
-
-  const getEventsForHour = (hour: number) => {
-    return events.filter((event) => {
-      const eventDate = new Date(event.startTime)
-      const eventHour = eventDate.getHours()
-      return (
-        eventDate.getDate() === currentDate.getDate() &&
-        eventDate.getMonth() === currentDate.getMonth() &&
-        eventDate.getFullYear() === currentDate.getFullYear() &&
-        eventHour === hour
-      )
-    })
-  }
-
-  return (
-    <Card className="overflow-auto">
-      <div className="space-y-0">
-        {hours.map((hour) => {
-          const hourEvents = getEventsForHour(hour)
-          return (
-            <div
-              key={hour}
-              className="flex border-b last:border-b-0"
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={() => onDrop(currentDate, hour)}
-            >
-              <div className="w-14 flex-shrink-0 border-r p-2 text-xs text-muted-foreground sm:w-20 sm:p-3 sm:text-sm">
-                {hour.toString().padStart(2, "0")}:00
-              </div>
-              <div className="min-h-16 flex-1 p-1 transition-colors hover:bg-accent/50 sm:min-h-20 sm:p-2">
-                <div className="space-y-2">
-                  {hourEvents.map((event) => (
-                    <EventCard
-                      key={event.id}
-                      event={event}
-                      onEventClick={onEventClick}
-                      onDragStart={onDragStart}
-                      onDragEnd={onDragEnd}
-                      getColorClasses={getColorClasses}
-                      variant="detailed"
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    </Card>
-  )
-}
-
 // List View Component
 function ListView({
   events,
@@ -1458,12 +1275,16 @@ function ListView({
                             {event.startTime.toLocaleTimeString("en-US", {
                               hour: "2-digit",
                               minute: "2-digit",
-                            })}{" "}
-                            -{" "}
-                            {event.endTime.toLocaleTimeString("en-US", {
-                              hour: "2-digit",
-                              minute: "2-digit",
                             })}
+                            {Math.abs(event.endTime.getTime() - event.startTime.getTime()) >= 60_000 && (
+                              <>
+                                {" - "}
+                                {event.endTime.toLocaleTimeString("en-US", {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
+                              </>
+                            )}
                           </div>
                           {event.tags && event.tags.length > 0 && (
                             <div className="flex flex-wrap gap-1">
