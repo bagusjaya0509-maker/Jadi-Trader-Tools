@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useGSAP } from '@gsap/react';
@@ -87,7 +87,18 @@ const FlowArt: React.FC<FlowArtProps> = ({
   'aria-label': ariaLabel = 'Story scroll',
 }) => {
   const containerRef = useRef<HTMLElement>(null);
-  const [reducedMotion, setReducedMotion] = useState(false);
+  /* DIBACA SAAT INISIALISASI, bukan disetel belakangan lewat useEffect.
+     Dulu nilainya selalu mulai dari `false` lalu dikoreksi sesudah render
+     pertama. Untuk orang yang mematikan animasi di sistemnya, itu berarti
+     satu frame animasi tetap tergambar sebelum permintaannya dipatuhi —
+     dan justru frame pertama itu yang paling terlihat.
+
+     Fungsi pengawal dipakai (bukan nilai langsung) supaya matchMedia cuma
+     dipanggil sekali, bukan tiap render. */
+  const [reducedMotion, setReducedMotion] = useState(
+    () => typeof window !== 'undefined'
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+  );
 
   useEffect(() => {
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -96,6 +107,46 @@ const FlowArt: React.FC<FlowArtProps> = ({
     mq.addEventListener('change', update);
     return () => mq.removeEventListener('change', update);
   }, []);
+
+  /* ── KEADAAN AWAL DIPASANG SEBELUM FRAME PERTAMA DIGAMBAR ────────────
+     Ini yang memperbaiki kelebatan di halaman depan.
+
+     Lima layar tur ini bertumpuk di kotak yang sama. Yang memisahkannya
+     rotasi 30° pada layar ke-2 sampai ke-5 — dan rotasi itu dipasang di
+     dalam useGSAP, yang seperti useEffect baru berjalan SESUDAH peramban
+     menggambar. Jadi frame pertama menampilkan kelimanya bertumpuk tanpa
+     rotasi sama sekali, dan yang terlihat adalah yang paling belakang di
+     urutan DOM: layar 05 "Copy Signal". Sepersekian detik kemudian useGSAP
+     jalan, keempat layar belakang terlipat, dan yang muncul jadi 01
+     "Chart & Entry".
+
+     Itulah "gambar berubah sepersekian detik" yang dilaporkan: bukan
+     gambar yang gagal dimuat, melainkan gambar yang BENAR datang
+     terlambat satu frame.
+
+     useLayoutEffect berjalan sesudah React menempelkan DOM tapi SEBELUM
+     peramban menggambar, jadi keadaan awalnya sudah benar di frame
+     pertama. Isinya sengaja cuma penataan awal — pembuatan ScrollTrigger
+     tetap di useGSAP, karena itu pekerjaan yang mengukur tata letak dan
+     tidak boleh menahan gambar pertama.
+
+     Rangkap dengan gsap.set di useGSAP? Ya, dan itu disengaja: menyetel
+     nilai yang sama dua kali tidak berbiaya, sedangkan mencabutnya dari
+     sana membuat perbaikan ini jadi satu-satunya yang menahan tata
+     letaknya — dan kalau suatu hari baris ini terhapus, kerusakannya
+     kembali tanpa ada yang menghubungkannya ke sini. */
+  useLayoutEffect(() => {
+    if (!containerRef.current || reducedMotion) return;
+    const seksi = Array.from(
+      containerRef.current.querySelectorAll<HTMLElement>('[data-flow-section]'),
+    );
+    seksi.forEach((s, i) => {
+      s.style.zIndex = String(i + 1);
+      if (i === 0) return;
+      const dalam = s.querySelector<HTMLElement>('.flow-art-container');
+      if (dalam) dalam.style.transform = 'rotate(30deg)';
+    });
+  }, [reducedMotion]);
 
   useGSAP(
     () => {

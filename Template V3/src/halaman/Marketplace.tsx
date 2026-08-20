@@ -279,6 +279,33 @@ function MintaKode({ produk, lynk }: { produk: string; lynk?: string }) {
 
 export default function Marketplace() {
   const [aktif, setAktif] = useState<Produk | null>(null);
+  /* DINAIKKAN KE SINI DARI DALAM JSX MODALNYA.
+     ────────────────────────────────────────────────────────────────────
+     Sebelumnya useTutupLuar dipanggil di dalam `{aktif && ( … )}`, dan itu
+     memanggil hook secara BERSYARAT — pelanggaran aturan hook React yang
+     akibatnya persis seperti yang dilaporkan: tombol Detail ditekan,
+     detailnya tidak pernah muncul.
+
+     Jalannya begini. Saat halaman pertama digambar `aktif` masih null,
+     jadi cabangnya tidak dijalankan dan useTutupLuar — yang di dalamnya
+     ada useRef — tidak ikut terhitung. Begitu Detail ditekan, `aktif`
+     terisi, cabangnya hidup, dan render kedua memakai SATU hook lebih
+     banyak daripada render pertama. React membandingkan jumlahnya dan
+     melempar "Rendered more hooks than during the previous render", lalu
+     komponennya berhenti di tengah render.
+
+     Tidak ada hubungannya dengan mode pratinjau atau paket mana pun:
+     tidak ada satu pun gerbang paket di halaman ini, dan tombolnya selalu
+     digambar. Yang rusak sama untuk semua orang — pratinjau kebetulan
+     keadaan saat ia ketahuan.
+
+     Tiga pemakaian useTutupLuar lainnya (ModalBatal, ModalTrade,
+     ModalImporPorto) TIDAK bermasalah walau kelihatan mirip: ketiganya
+     ada di dalam komponennya sendiri yang dipasang dan dilepas utuh, jadi
+     hook-nya selalu dipanggil setiap kali komponen itu hidup. Yang
+     dilarang React bukan modal yang muncul-hilang, melainkan jumlah hook
+     yang berubah di dalam SATU komponen yang sama. */
+  const tutupModal = useTutupLuar(() => setAktif(null));
   const { data: PRODUK, mentah } = useProduk();
   const { pengguna, pemilik } = useAuth();
 
@@ -540,7 +567,7 @@ export default function Marketplace() {
       {aktif && (
         <div
           className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm sm:p-8"
-          {...useTutupLuar(() => setAktif(null))}
+          {...tutupModal}
         >
           <Panel className="my-4 w-full max-w-3xl bg-zinc-950" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between gap-4 border-b border-zinc-800/80 p-6">
