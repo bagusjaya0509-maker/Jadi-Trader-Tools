@@ -106,11 +106,16 @@ function CatatanLipat({ children }: { children: React.ReactNode }) {
 function CatatanAsumsi({ modal, risikoPersen }: { modal: number; risikoPersen: number }) {
   return (
     <p className="text-[11px] leading-relaxed text-zinc-600">
-      <span className="text-zinc-500">Cara estimasi dihitung:</span> modal {uang(modal)} dengan
-      risiko {risikoPersen}% ({uang(modal * risikoPersen / 100)}) per sinyal. Kena TP menambah
-      sebesar imbalan : risiko sinyal itu, kena SL mengurangi satu satuan risiko. Biaya,
-      slippage, dan ukuran posisi yang sebenarnya <span className="text-zinc-500">tidak</span> ikut
-      dihitung — ini gambaran rekam jejak, bukan hasil trading yang bisa dijanjikan.
+      <span className="text-zinc-500">Cara estimasi dihitung:</span> semua analis diukur dengan
+      penggaris yang sama — modal {uang(modal)}, risiko {risikoPersen}% ({uang(modal * risikoPersen / 100)}) per
+      sinyal. Ini <span className="text-zinc-500">bukan</span> risiko yang dipakai analisnya;
+      ukuran posisi tidak pernah ikut diposting, jadi tidak ada yang tahu berapa persen modal
+      yang sebenarnya ia pertaruhkan. Angka yang sama dipakai untuk semua supaya yang
+      dibandingkan ketepatannya, bukan seberapa besar lotnya — dengan risiko masing-masing,
+      yang menaruh lot paling besar otomatis menang tanpa perlu lebih tepat.
+      {' '}Kena TP menambah sebesar imbalan : risiko sinyal itu, kena SL mengurangi satu satuan
+      risiko. Biaya dan slippage <span className="text-zinc-500">tidak</span> ikut dihitung — ini
+      gambaran rekam jejak, bukan hasil trading yang bisa dijanjikan.
     </p>
   );
 }

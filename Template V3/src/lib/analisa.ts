@@ -277,6 +277,18 @@ export interface PerformaAnalis {
   terakhir: number;
   /** Tanggal lokal `YYYY-MM-DD` -> hasil dolar hari itu. Untuk kalender. */
   harian: Record<string, number>;
+  /** Jarak SL rata-rata sebagai PERSEN HARGA, dari sinyal yang sudah
+   *  selesai. Dihitung server.
+   *
+   *  Ini parameter risiko yang sungguhan milik analisnya — seberapa jauh
+   *  ia membiarkan harga melawan sebelum menyerah. Sengaja BUKAN "persen
+   *  dari modal": sinyal berisi entry/SL/TP, tidak pernah berisi ukuran
+   *  posisi, jadi persentase modal ditentukan lot yang dipakai PENIRUNYA
+   *  dan tidak bisa diketahui dari sini oleh siapa pun.
+   *
+   *  null = belum ada satu pun yang bisa diukur. Bukan 0 — nol di kolom
+   *  jarak SL terbaca sebagai "tanpa SL", kebalikan dari "belum tahu". */
+  slPersen?: number | null;
 }
 
 export interface Performa {

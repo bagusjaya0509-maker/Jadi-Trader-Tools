@@ -50,6 +50,9 @@ export interface RingkasKanal {
   winrate: number | null;
   gaya: GayaTrading;
   risiko: TingkatRisiko;
+  /** Jarak SL rata-rata (% harga) dari server, diteruskan apa adanya ke
+   *  lencananya. null = belum terukur. */
+  slPersen: number | null;
   /** Kalimat yang menjelaskan dari mana risikonya diturunkan, atau kenapa
    *  ia belum bisa disimpulkan. Dipakai sebagai title tooltip — label tanpa
    *  cara membacanya cuma stempel. */
@@ -140,5 +143,6 @@ export function ringkasKanal(
     pending: pendingDaftar.length,
     pendingTerbaru: pendingDaftar.reduce((t, s) => Math.max(t, s.dibuat || 0), 0),
     winrate, gaya, risiko, alasanRisiko,
+    slPersen: perf && typeof perf.slPersen === 'number' ? perf.slPersen : null,
   };
 }

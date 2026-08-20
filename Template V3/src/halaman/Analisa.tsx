@@ -109,10 +109,31 @@ function LencanaKanal({ r, className }: { r: RingkasKanal; className?: string })
           analis tanpa rekam jejak terlihat seperti tidak punya kolom risiko,
           bukan seperti belum cukup diuji; dan pembaca yang tidak melihat
           peringatan apa pun akan menganggapnya sudah aman. */}
-      <span title={r.alasanRisiko}
+      {/* ANGKANYA IKUT, bukan cuma kata sifatnya.
+          ────────────────────────────────────────────────────────────────
+          "Risiko rendah" sendirian adalah penilaian tanpa parameter —
+          pembaca tidak punya cara memeriksanya, dan dua analis yang sama
+          sama "rendah" bisa sangat berbeda.
+
+          Yang ditempelkan jarak SL rata-rata sebagai persen harga, BUKAN
+          persen modal. Persen modal memang yang lebih ingin diketahui
+          orang, tapi tidak ada yang bisa mengetahuinya: sinyal berisi
+          entry/SL/TP dan tidak pernah berisi ukuran posisi, jadi porsi
+          modal yang berisiko ditentukan lot yang dipakai penirunya
+          sendiri. Menaruh angka karangan di kolom bernama "risiko" adalah
+          kebohongan yang paling mahal di halaman ini.
+
+          Jarak SL milik analisnya sungguhan, dan ia yang menentukan:
+          dengan lot yang sama, SL 3% menguras tiga kali lipat SL 1%. */}
+      <span title={r.slPersen !== null
+              ? `${r.alasanRisiko} Jarak SL rata-rata ${r.slPersen}% dari harga, dihitung dari sinyalnya yang sudah selesai. Berapa persen MODALmu yang berisiko tergantung ukuran lot yang kamu pakai sendiri.`
+              : r.alasanRisiko}
             className={cn('rounded border px-1.5 py-0.5 text-[10px]',
               r.risiko ? WARNA_RISIKO[r.risiko] : 'border-zinc-800 text-zinc-600')}>
         {r.risiko ? `Risiko ${r.risiko.toLowerCase()}` : 'Risiko belum dinilai'}
+        {r.slPersen !== null && (
+          <span className="angka opacity-80"> · SL {r.slPersen}%</span>
+        )}
       </span>
     </div>
   );
