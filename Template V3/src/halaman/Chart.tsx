@@ -18,7 +18,7 @@ import { WatchChart } from '@/components/watch-chart';
 import { PanelPosisiTerbuka, type OrderSunting } from '@/components/panel-posisi-terbuka';
 import type { AlatPegang, GambarAlat } from '@/lib/plugin-alat';
 import type { HasilPine } from '@/lib/pine';
-import { bacaSetelanChart, simpanSetelanChart } from '@/lib/replay';
+import { bacaSetelanChart, simpanSetelanChart, usulSlTp } from '@/lib/replay';
 import { atr } from '@/lib/jt-scan-core';
 import { ambilKlines, ambilKlinesSebelum, bacaSpekMt5, bacaTickMt5, daftarSimbolMt5, type Lilin } from '@/lib/pasar';
 import { useAkunMt5, segarkanAkunMt5 } from '@/lib/akun';
@@ -1367,8 +1367,25 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
     const entryUrl = Number(cari.get('entry')) || undefined;
     const kunci = `${simbol}|${entryUrl ?? ''}|${sl ?? ''}|${tp ?? ''}`;
     if (dipasang.current === kunci) return;
-    dipasang.current = kunci;
+
+    /* ── PENJAGA DITANDAI SESUDAH BEKERJA, BUKAN SEBELUM ────────────────
+       Dulu `dipasang.current = kunci` dieksekusi tepat di sini, sebelum
+       apa pun dipasang. Efek ini berjalan lebih dulu saat lilinnya BELUM
+       datang — itu jalan yang normal, bukan kasus langka — jadi
+       penjaganya sudah tertutup pada putaran kosong, dan putaran berikutnya
+       (yang membawa lilin) keluar lebih awal tanpa memasang apa-apa.
+
+       Terlihat sebagai: chart terbuka dari "Susun di Chart & Entry" dengan
+       tiket yang kolomnya kosong dan chart tanpa garis. Tidak ada galat,
+       karena memang tidak ada yang gagal — ada yang tidak pernah dijalankan.
+
+       Sekarang penjaganya ditandai di dalam tiap cabang, sesudah kerjanya
+       benar-benar terjadi. Cabang URL pun ikut: ia memakai harga penutupan
+       terakhir sebagai entry cadangan, dan itu juga butuh lilin. */
+    if (!lilin.closes.length) return;
+
     if (sl || tp || entryUrl) {
+      dipasang.current = kunci;
       setRencana({
         entry: entryUrl ?? lilin.closes[lilin.closes.length - 1] ?? undefined,
         sl, tp,
@@ -1376,6 +1393,38 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
       /* Entry dari sinyal adalah KEPUTUSAN, bukan tebakan — jadi penyusul
          harga otomatis berhenti ikut campur begitu ia dipasang. */
       if (entryUrl) entryDigeser.current = true;
+      return;
+    }
+
+    /* ── DATANG DARI "SUSUN DI CHART & ENTRY" TANPA MEMBAWA LEVEL ──────
+       Tombol itu ditekan dari formulir Copy Signal yang kolom-kolomnya
+       masih kosong, jadi alamatnya cuma membawa simbol dan arah. Akibatnya
+       chart terbuka dengan tiket kosong dan chart polos: orangnya sampai
+       di halaman yang benar lalu tidak punya apa pun untuk digeser —
+       padahal MENGGESER GARIS itu satu-satunya alasan ia ke sini.
+
+       Sekarang tiga garisnya langsung terpasang sebagai usulan: entry di
+       harga terakhir, SL 1,5 x ATR, TP menyusul dengan R:R 2. Sama persis
+       dengan yang muncul saat orang menekan BUY sendiri — jadi tidak ada
+       perilaku kedua yang harus dipelajari, dan angkanya lahir dari ATR
+       simbol itu, bukan dari persentase datar yang berarti $900 di BTC dan
+       $0,0004 di SHIB.
+
+       USULAN, BUKAN KEPUTUSAN: entryDigeser sengaja dibiarkan false supaya
+       entry-nya tetap menyusul harga sampai orangnya menyeret sendiri —
+       persis seperti tiket yang dibuka lewat tombol BUY. */
+    const arahSinyal = (cari.get('arah') || '').toUpperCase();
+    if (cari.get('untuk') === 'sinyal'
+        && (arahSinyal === 'BUY' || arahSinyal === 'SELL')
+        ) {
+      dipasang.current = kunci;
+      const idx = lilin.closes.length - 1;
+      const u = usulSlTp(lilin, idx, arahSinyal);
+      setRencana({
+        entry: lilin.closes[idx],
+        sl: u.sl || undefined,
+        tp: u.tp || undefined,
+      });
     }
   }, [cari, simbol, lilin]);
 
@@ -2522,6 +2571,42 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                                   setRencana({ entry: u.entry, sl: u.sl || undefined, tp: u.tp || undefined });
                                   jangkarQty(u.entry, u.sl, aksi.risiko);
                                 }
+                              }}
+                              onTukarArah={() => {
+                                /* MEMBALIK, BUKAN MENYUSUN ULANG.
+                                   ──────────────────────────────────────────
+                                   SL dan TP bertukar tempat apa adanya. Itu
+                                   yang diminta, dan visualnya memang persis
+                                   itu: garis SL pindah ke tempat garis TP,
+                                   dan sebaliknya — sehingga sisinya langsung
+                                   benar untuk arah yang baru.
+
+                                   Levelnya dipertahankan, bukan dihitung
+                                   ulang dari ATR, karena dua garis itu
+                                   biasanya duduk di support/resisten
+                                   sungguhan yang barusan dipilih orangnya.
+                                   Menimpanya dengan usulan otomatis membuang
+                                   pekerjaan yang justru membuat orang datang
+                                   ke chart.
+
+                                   YANG BERUBAH DAN PERLU DILIHAT: R:R ikut
+                                   terbalik. Rencana 1:2 jadi 2:1, karena
+                                   jarak yang tadinya risiko sekarang jadi
+                                   imbalan. Angkanya tertulis di tiket, jadi
+                                   perubahannya terlihat saat itu juga. */
+                                const baru = draf === 'BUY' ? 'SELL' : 'BUY';
+                                setDraf(baru);
+                                setKabarNyata('');
+                                setRencana((r) => {
+                                  if (!r.sl || !r.tp) return r;
+                                  const tukar = { ...r, sl: r.tp, tp: r.sl };
+                                  /* Jangkar ukuran ikut dihitung ulang: jarak
+                                     risikonya berubah, dan qty yang tidak ikut
+                                     berubah berarti dolar risiko di tiket
+                                     berbohong. */
+                                  if (tukar.entry) jangkarQty(tukar.entry, tukar.sl, aksi.risiko);
+                                  return tukar;
+                                });
                               }}
                               onUbah={(r) => {
                                 /* Entry yang DIKETIK sama sengajanya dengan

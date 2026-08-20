@@ -2180,8 +2180,13 @@ export default function Analisa() {
                 Keduanya disetujui SADAR pada tiap posting, bukan diingat:
                 tiap sinyal adalah komitmen baru yang tidak bisa ditarik.
                 Server menolak tanpa izin jurnal — centangnya bukan hiasan. */}
-            <div className="mt-3 space-y-2">
-              <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-zinc-800 bg-zinc-950/60 px-3.5 py-3">
+            {/* TANPA KOTAK. Dua persetujuan ini duduk di antara panel-panel
+                lain yang semuanya bergaris, dan ikut bergaris membuat
+                keduanya terbaca sebagai dua panel tambahan — padahal ia
+                kalimat yang harus DIBACA, bukan bagian yang harus diisi.
+                Tulisan telanjang mengembalikannya jadi kalimat. */}
+            <div className="mt-3 space-y-2.5 px-0.5">
+              <label className="flex cursor-pointer items-start gap-2.5">
                 <input type="checkbox" checked={izinJurnal} onChange={(e) => setIzinJurnal(e.target.checked)}
                   className="mt-0.5 size-3.5 shrink-0 cursor-pointer accent-emerald-500" />
                 {/* KALIMAT INI HARUS TETAP BENAR — dan versi lamanya sudah
@@ -2197,7 +2202,7 @@ export default function Analisa() {
                   tidak dibuka.
                 </span>
               </label>
-              <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-zinc-800 bg-zinc-950/60 px-3.5 py-3">
+              <label className="flex cursor-pointer items-start gap-2.5">
                 <input type="checkbox" checked={pahamPermanen} onChange={(e) => setPahamPermanen(e.target.checked)}
                   className="mt-0.5 size-3.5 shrink-0 cursor-pointer accent-amber-500" />
                 <span className="text-[12px] leading-relaxed text-zinc-400">

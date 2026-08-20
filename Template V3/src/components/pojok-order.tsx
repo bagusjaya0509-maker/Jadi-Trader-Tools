@@ -126,7 +126,7 @@ function IsianAngka({ nilai, atur, langkah, min = 0, maks, desimal = 2, lebar, j
 
 export function PojokOrder({
   posisi, hargaKini, draf, rencana, mode, jenis, risiko, tunda, onBatalTunda, onKirimSinyal, kabarSinyal, dariSinyal, onGantiCopy,
-  onPilih, onUbah, onKirim, onBatal, onTutup, onGantiMode, mati,
+  onPilih, onUbah, onKirim, onBatal, onTutup, onGantiMode, onTukarArah, mati,
   nyataSetelan, aturNyata, sibukNyata, kabar, demoSetelan, aturDemo,
   catatan, aturCatatan, qtyDemo, mt5, lotMt5, aturLotMt5, nilaiLotMt5, desimalHarga = 6,
 }: {
@@ -162,6 +162,10 @@ export function PojokOrder({
    *  halaman Copy Signal. */
   onGantiCopy?: (v: boolean) => void;
   onPilih: (arah: 'BUY' | 'SELL') => void;
+  /** Membalik arah tiket yang SUDAH terbuka, sekaligus menukar SL dan TP.
+   *  Terpisah dari onPilih: memilih arah dari nol berarti menyusun rencana
+   *  baru, membalik berarti mempertahankan level yang sudah ditaruh. */
+  onTukarArah?: () => void;
   onUbah: (r: RencanaOrder) => void;
   onKirim: () => void;
   onBatal: () => void;
@@ -359,10 +363,25 @@ export function PojokOrder({
         nyata ? 'border-red-500/40' : 'border-zinc-700')}>
         <div className="mb-1.5 flex items-center gap-2">
           {Lencana}
-          <span className={cn('rounded px-1.5 py-0.5 text-[10px] font-semibold',
-            draf === 'BUY' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400')}>
-            {draf}
-          </span>
+          {/* BISA DIKLIK UNTUK MEMBALIK ARAH. Dulu ia label mati, dan
+              orang yang salah menekan BUY harus membatalkan tiketnya lalu
+              menyusun ulang seluruh rencananya dari nol — termasuk garis
+              yang sudah ia letakkan dengan susah payah di level yang
+              benar. */}
+          {onTukarArah ? (
+            <button onClick={onTukarArah} disabled={mati}
+              title={`Klik untuk membalik jadi ${draf === 'BUY' ? 'SELL' : 'BUY'} — SL dan TP ikut bertukar tempat`}
+              className={cn('cursor-pointer rounded px-1.5 py-0.5 text-[10px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+                draf === 'BUY' ? 'bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25'
+                               : 'bg-red-500/15 text-red-400 hover:bg-red-500/25')}>
+              {draf}
+            </button>
+          ) : (
+            <span className={cn('rounded px-1.5 py-0.5 text-[10px] font-semibold',
+              draf === 'BUY' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400')}>
+              {draf}
+            </span>
+          )}
           {/* Jenis order MENGIKUTI letak garis entry — geser ke atas harga
               dan tulisannya berubah sendiri. Keterangan inilah cara orangnya
               tahu seretan barusan mengubah jenis ordernya. */}
