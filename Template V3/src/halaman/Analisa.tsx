@@ -1444,12 +1444,28 @@ export default function Analisa() {
   /* Sampul dari Chart & Entry. Data URL JPEG, diunggah SESUDAH analisanya
      terposting — endpoint galeri butuh id analisanya, dan id itu baru ada
      setelah POST berhasil. */
-  const [sampul, setSampul] = useState('');
+
   /** Ukuran posisi beku yang dibawa draf dari Chart & Entry. Dipakai supaya
    *  "Risk SL" di sini menampilkan angka yang SAMA dengan tiket chart —
    *  bukan −$10 mati dari model contoh. 0 = disusun langsung di sini. */
   const [qtyDraf, setQtyDraf] = useState(0);
-  const [lihatSampul, setLihatSampul] = useState(false);
+
+  /* Simbol yang dikirim ke Chart & Entry, LENGKAP dengan penanda pasarnya.
+     ────────────────────────────────────────────────────────────────────
+     Dikembalikan bersama tautannya. Bug yang pernah diperbaikinya masih
+     mengintai kalau ini ditulis ulang sambil lalu: draf dari chart datang
+     sebagai `MT5:XAUUSD`, formulir MENCOPOT awalannya supaya kolom
+     Pasangan enak dibaca, lalu menyimpan pasarnya terpisah di `pasar`.
+     Tautan yang cuma memakai `pasangan` kehilangan penanda itu dalam
+     perjalanan pulang, dan chart mencari XAUUSD di Binance — bursa yang
+     memang tidak punya simbolnya. Pesan yang muncul menuduh VPS padahal
+     VPS-nya sehat.
+
+     Disatukan di sini, bukan di dalam JSX: kalau nanti ada tombol kedua
+     yang membuka chart dari formulir ini, ia memakai nilai yang sama dan
+     tidak bisa lupa dengan cara yang sama. */
+  const simbolUntukChart = (pasar === 'tradefi' ? 'MT5:' : '') + pasangan.trim().toUpperCase();
+
 
   /* Draf dari Chart & Entry dibaca SEKALI saat halaman dibuka, lalu
      dihapus oleh ambilDraf() — kalau tidak, menyegarkan halaman akan
@@ -1470,7 +1486,6 @@ export default function Analisa() {
     setEntry(String(rapikanHarga(d.entry)));
     setSl(String(rapikanHarga(d.sl)));
     setTp(String(rapikanHarga(d.tp)));
-    if (d.sampul) setSampul(d.sampul);
     /* QTY SELALU TERPASANG untuk draf yang datang dari chart — kalau perlu,
        diturunkan ulang dari levelnya sendiri.
 
@@ -1595,7 +1610,7 @@ export default function Analisa() {
       setNada('ok');
       setKabar('Analisa terposting — dan kini permanen. Semoga levelnya bekerja.');
       setRingkas(''); setEntry(''); setSl(''); setTp(''); setAlasan('');
-      setIzinJurnal(false); setPahamPermanen(false); setSampul(''); setQtyDraf(0);
+      setIzinJurnal(false); setPahamPermanen(false); setQtyDraf(0);
       segarkan();
     } catch (e) {
       setNada('galat');
@@ -2127,6 +2142,40 @@ export default function Analisa() {
                 Sampul yang SUDAH terlanjur ada tetap tampil di kartunya —
                 yang ditutup jalan menambahnya, bukan yang sudah ada. */}
 
+            {/* ── SUSUN DI CHART & ENTRY ───────────────────────────────────
+                DIKEMBALIKAN 20 Agu 2026 — laporan pemiliknya, "atur posting
+                di chart kok hilang".
+
+                Ia memang hilang karena saya: tautannya dulu tinggal DI DALAM
+                kotak sampul, dan kotak itu dicabut utuh waktu jalan menambah
+                foto ditutup. Dua urusan yang berbeda kebetulan tinggal di
+                satu kotak, dan yang kedua ikut terbuang tanpa disebut.
+
+                Yang kembali cuma tautannya. Tidak ada lagi sampul, unggahan,
+                atau pratinjau gambar — penutupan itu tetap berlaku.
+
+                Kenapa ini penting dan bukan kenyamanan: level BISA diketik
+                tangan di kolom di atas, tapi menyusunnya di chart jauh lebih
+                tepat. Di sana ada alat gambar, watchlist, indikator, dan
+                harga yang bergerak; di sini cuma tiga kotak angka. Analis
+                yang mengetik entry dari ingatan memposting rencana yang
+                tidak pernah ia lihat di grafiknya. */}
+            <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-950/60 p-3">
+              <CandlestickChart className="size-4 shrink-0 text-zinc-600" />
+              <p className="min-w-0 grow text-[11.5px] leading-relaxed text-zinc-500">
+                {entry || sl || tp
+                  ? 'Levelnya sudah terisi. Mau menggesernya sambil melihat grafik? Angka yang sekarang ikut terbawa, jadi tidak ada yang hilang.'
+                  : <>Susun rencanamu di Chart &amp; Entry — geser garis entry, SL, dan TP di grafiknya
+                     — lalu tekan <span className="text-zinc-300">"Ke Copy Signal"</span> di tiket
+                     order. Levelnya masuk ke formulir ini otomatis.</>}
+              </p>
+              <Link to={`/chart-entry?simbol=${encodeURIComponent(simbolUntukChart)}&untuk=sinyal&arah=${arah}`
+                      + (entry ? `&entry=${entry}` : '') + (sl ? `&sl=${sl}` : '') + (tp ? `&tp=${tp}` : '')}
+                className="shrink-0 rounded-md bg-zinc-100 px-3 py-1.5 text-[11.5px] font-medium text-zinc-950 transition-colors hover:bg-white">
+                {entry || sl || tp ? 'Susun ulang di Chart' : 'Susun di Chart & Entry'}
+              </Link>
+            </div>
+
             {/* ── Dua persetujuan yang menjadikan seseorang analis ─────────
                 Keduanya disetujui SADAR pada tiap posting, bukan diingat:
                 tiap sinyal adalah komitmen baru yang tidak bisa ditarik.
@@ -2255,32 +2304,14 @@ export default function Analisa() {
             )}
           </div>
         )}
-        {/* Pratinjau sampul ukuran penuh. Yang terpotret HANYA kanvas
-            chartnya — lilin, indikator, garis harga, dan alat gambar.
-            Panel melayang yang digambar HTML (tiket order, label garis yang
-            sedang diseret, bilah alat) TIDAK ikut, karena mereka bukan
-            bagian dari kanvas. Itu disebutkan di sini supaya bedanya dengan
-            layar tidak terbaca sebagai sampul yang rusak. */}
-        {lihatSampul && sampul && (
-          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/85 p-4"
-               onClick={() => setLihatSampul(false)}>
-            <div className="max-h-full w-full max-w-4xl overflow-auto" onClick={(e) => e.stopPropagation()}>
-              <img src={sampul} alt="Sampul analisa ukuran penuh"
-                   className="w-full rounded-lg border border-zinc-800" />
-              <div className="mt-3 flex flex-wrap items-center gap-3">
-                <p className="min-w-0 grow text-[11.5px] leading-relaxed text-zinc-500">
-                  Yang terpotret adalah kanvas chart: lilin, indikator, garis harga, dan alat
-                  gambar. Tiket order dan label garis yang sedang diseret tidak ikut — keduanya
-                  panel melayang, bukan bagian dari chartnya.
-                </p>
-                <button onClick={() => setLihatSampul(false)}
-                  className="shrink-0 cursor-pointer rounded-md bg-zinc-100 px-3 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white">
-                  Tutup
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* MODAL PRATINJAU SAMPUL DIBUANG — ia tidak bisa dicapai.
+        
+            Satu-satunya yang memanggil setLihatSampul(true) ada di dalam
+            kotak sampul di formulir, dan kotak itu dicabut waktu jalan
+            menambah foto ditutup. Yang tersisa modal lengkap yang tidak
+            punya pintu: kode yang benar, teruji, dan tidak akan pernah
+            tampil. Yang membacanya nanti akan menghabiskan waktu mencari
+            kenapa ia tidak muncul. */}
 
         {/* Baris kabar yang dulu di sini SUDAH PINDAH ke bawah tombol Posting
             (lihat catatan di sana). Tidak digandakan: dua salinan pesan yang
