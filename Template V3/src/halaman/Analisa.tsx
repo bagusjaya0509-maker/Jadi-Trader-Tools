@@ -99,13 +99,7 @@ const WARNA_RISIKO: Record<string, string> = {
 
 function LencanaKanal({ r, className }: { r: RingkasKanal; className?: string }) {
   return (
-    <div className={cn('flex flex-wrap items-center gap-1.5', className)}>
-      {r.gaya && (
-        <span title="Diturunkan dari timeframe yang paling sering ia analisa"
-              className="rounded border border-zinc-700/70 px-1.5 py-0.5 text-[10px] text-zinc-400">
-          {r.gaya}
-        </span>
-      )}
+    <span className={cn('inline-flex flex-wrap items-center gap-1.5', className)}>
       {/* Saat datanya belum cukup, lencananya TETAP ada — hanya isinya yang
           berganti jadi "belum dinilai". Menghilangkannya sama sekali membuat
           analis tanpa rekam jejak terlihat seperti tidak punya kolom risiko,
@@ -137,7 +131,7 @@ function LencanaKanal({ r, className }: { r: RingkasKanal; className?: string })
           <span className="angka opacity-80"> · SL {r.slPersen}%</span>
         )}
       </span>
-    </div>
+    </span>
   );
 }
 
@@ -2679,7 +2673,7 @@ export default function Analisa() {
                         Cukup pinnya yang menyala. Yang menyematkan tahu ia
                         menyematkan; yang lain tidak perlu diberi tahu
                         dengan bingkai. */
-                    'border-zinc-800 hover:border-zinc-600')}>
+                    'overflow-hidden border-zinc-800 hover:border-zinc-600')}>
                   {/* ── KARTU ANALIS, TATA LETAK METRIK ────────────────
                       Bentuknya mengikuti contoh yang dikirim pemilik: kurva
                       jadi LATAR di paruh kanan, angka besar berdiri di
@@ -2725,7 +2719,7 @@ export default function Analisa() {
                                       modal={performa?.modal ?? 1000} />
                     </span>
 
-                    <span className="relative z-10 block px-4 pt-4">
+                    <span className="pointer-events-none relative z-10 block px-4 pt-4">
                       <span className="flex items-start gap-2.5 pr-8">
                         {/* TITIK HADIR MENEMPEL DI AVATAR, bukan di sebelah
                             nama. Permintaan pemilik, dan letaknya memang
@@ -2789,8 +2783,6 @@ export default function Analisa() {
                         </span>
                       </span>
 
-                      <LencanaKanal r={r} className="mt-2.5" />
-
                       {/* ANGKA BESAR: estimasi hasil. Satu-satunya angka
                           sebesar ini di kartu, dan itu memang yang dicari
                           orang yang sedang memilih siapa ditiru. */}
@@ -2798,7 +2790,17 @@ export default function Analisa() {
                         p ? (p.hasilDolar >= 0 ? 'text-emerald-400' : 'text-red-400') : 'text-zinc-600')}>
                         {p ? uang(p.hasilDolar, true) : '—'}
                       </span>
-                      <span className="mt-1 block text-[10.5px] text-zinc-600">estimasi dari modal $1.000</span>
+                      {/* Lencana risiko DUDUK DI UJUNG KANAN baris keterangan
+                          ini, bukan berdiri sendiri di bawah nama. Di kiri ia
+                          menumpuk bersama nama, tanggal, dan lencana AI —
+                          empat benda di satu sisi sementara sisi kanan kosong.
+                          Di sini ia mengisi ruang yang memang menganggur, dan
+                          bersebelahan dengan angka yang justru diterangkannya:
+                          hasil sebesar itu diperoleh dengan risiko seperti apa. */}
+                      <span className="mt-1 flex items-center gap-2">
+                        <span className="text-[10.5px] text-zinc-600">estimasi dari modal $1.000</span>
+                        <LencanaKanal r={r} className="ml-auto shrink-0" />
+                      </span>
                     </span>
 
                     {/* KAKI KARTU — buram, di atas kurvanya.
