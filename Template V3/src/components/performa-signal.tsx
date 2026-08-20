@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Ban, ChevronDown, ChevronRight, Eye, Sparkles, Target } from 'lucide-react';
 import { KalenderPl } from '@/components/kalender-pl';
 import { LeaderboardCard } from '@/components/ui/leaderboard-card';
+import { PapanBelumLayak } from '@/components/papan-belum-layak';
 import { cn, uang, persen, tanggalPendek } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 import type { AturanPapan, Performa, PerformaAnalis, RingkasAnalisa } from '@/lib/analisa';
@@ -264,21 +265,19 @@ export function PapanPeringkatSignal({ data }: { data: Performa | null }) {
               sewenang-wenang: analis bisa melihat persis apa yang kurang,
               dan pembaca bisa melihat bahwa yang tidak muncul memang tidak
               memenuhi syarat — bukan tidak ada. */}
-          {belumLayak.length > 0 && (
-            <div className="rounded-lg border border-zinc-800/60 px-4 py-3">
-              <div className="mb-2 text-[11.5px] font-medium text-zinc-400">
-                Belum memenuhi syarat papan ({belumLayak.length})
-              </div>
-              <ul className="space-y-1.5">
-                {belumLayak.map((a) => (
-                  <li key={a.uid} className="text-[11.5px] leading-relaxed text-zinc-600">
-                    <span className="text-zinc-400">{a.nama}</span>
-                    {' — '}{(a.sebabTidakLayak ?? []).join('; ')}.
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+          {/* Dulu daftar baris abu-abu satu kalimat. Sekarang tiap syarat
+              punya kolomnya sendiri: angka terukur di sebelah ambang yang
+              berlaku, yang gagal diwarnai, yang lolos tetap ditulis.
+
+              Bedanya bukan hiasan. "Butuh 5 sinyal, baru 2" menjawab satu
+              hal; rapor empat kolom memperlihatkan bahwa tiga syarat lain
+              SUDAH terpenuhi — dan itulah yang membuat penolakannya terbaca
+              sebagai aturan, bukan sebagai kuasa.
+
+              Alasannya tetap dicetak apa adanya di bawah tiap baris; kalau
+              warna dan kalimat itu suatu saat berbeda, kalimatnya yang
+              berlaku. Lihat catatan di kepala PapanBelumLayak. */}
+          <PapanBelumLayak analis={belumLayak} aturan={data.aturan} />
       </div>
     </div>
   );
