@@ -49,10 +49,10 @@ import { cn, uang } from '@/lib/utils';
    dan toleransi risikonya juga miliknya sendiri.
    ════════════════════════════════════════════════════════════════════════ */
 
-const KUNCI = 'jt.hitung.posisi';
+const KUNCI = 'jt.hitung.posisi.v2';
 
 type Simpanan = { modal: number; risiko: number; leverage: number };
-const BAWAAN: Simpanan = { modal: 1000, risiko: 1, leverage: 10 };
+const BAWAAN: Simpanan = { modal: 1000, risiko: 1, leverage: 1 };
 
 function baca(): Simpanan {
   try {

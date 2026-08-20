@@ -33,9 +33,9 @@ import { useTutupLuar } from '@/lib/tutup-luar';
 import {
   daftarAnalisa, kirimAnalisa, bukaIsi, mintaAkses,
   ambilProfilAnalis, simpanProfilAnalis,
-  statusSaya, putuskanAkses, tambahGambar, hapusGambar, kecilkanGambar, ambilPerforma,
+  statusSaya, putuskanAkses, tambahGambar, ambilPerforma,
   batalkanAnalisa, bisaDibatalkan, keadaanSinyal,
-  type RingkasAnalisa, type IsiAnalisa, type PermintaanMasuk, type GambarAnalisa, type Performa,
+  type RingkasAnalisa, type IsiAnalisa, type PermintaanMasuk, type Performa,
 } from '@/lib/analisa';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -299,116 +299,19 @@ function ModalBatal({ a, tutup, selesai }: {
   );
 }
 
-/* ── Galeri foto analisa ─────────────────────────────────────────────────
-   Terbuka untuk SEMUA yang boleh membuka analisanya, bukan hanya penulisnya.
-   Itu keputusan yang disengaja: analisa yang bisa ditimpali tangkapan layar
-   orang lain — "punyaku ke-fill di sini", "di TF 1 jam bentuknya begini" —
-   jadi bahan diskusi. Kalau cuma penulis yang boleh menempel gambar, yang
-   didapat adalah pengumuman satu arah.
+/* ── GALERI FOTO ANALISA DICABUT ─────────────────────────────────────────
+   Permintaan pemilik. Sejak sampul chart ikut terbit bersama sinyalnya,
+   panel "Foto analisa" di badan analisa menampilkan GAMBAR YANG SAMA dengan
+   sampul di kepala kartu — dua salinan satu gambar, dan yang kedua memakan
+   ruang tepat di atas kalkulator.
 
-   Yang menjaga dari penyalahgunaan bukan larangan mengunggah, melainkan
-   batas jumlah (server) dan tombol hapus untuk pengunggah DAN penulisnya. */
-function Galeri({ analisaId, galeri, bisaTambah, uidku, penulisku, onBerubah }: {
-  analisaId: string;
-  galeri: GambarAnalisa[];
-  bisaTambah: boolean;
-  uidku?: string;
-  penulisku: boolean;
-  onBerubah: (g: GambarAnalisa[]) => void;
-}) {
-  const [sibuk, setSibuk] = useState(false);
-  const [kabar, setKabar] = useState('');
-  const [besar, setBesar] = useState<GambarAnalisa | null>(null);
-  const berkasRef = useRef<HTMLInputElement>(null);
-  const { pengguna } = useAuth();
+   Gantinya sampulnya sendiri yang bisa ditekan untuk diperbesar, jadi tidak
+   ada yang hilang selain salinannya.
 
-  async function pilihBerkas(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0];
-    /* Input dikosongkan SEGERA. Tanpa ini, memilih berkas yang sama dua kali
-       berturut-turut tidak memicu onChange sama sekali — orangnya menekan,
-       tidak terjadi apa-apa, dan tidak ada galat untuk dibaca. */
-    e.target.value = '';
-    if (!f) return;
-    setSibuk(true); setKabar('');
-    try {
-      const kecil = await kecilkanGambar(f);
-      const g = await tambahGambar(
-        analisaId, kecil, '',
-        pengguna?.displayName || pengguna?.email?.split('@')[0] || '',
-      );
-      onBerubah([...galeri, g]);
-    } catch (err) {
-      setKabar(err instanceof Error ? err.message : 'Gagal mengunggah');
-    } finally { setSibuk(false); }
-  }
-
-  async function buang(g: GambarAnalisa) {
-    if (!confirm('Hapus foto ini?')) return;
-    try {
-      await hapusGambar(analisaId, g.id);
-      onBerubah(galeri.filter((x) => x.id !== g.id));
-    } catch (err) {
-      setKabar(err instanceof Error ? err.message : 'Gagal menghapus');
-    }
-  }
-
-  return (
-    <div className="mt-3 w-full border-t border-zinc-800/60 pt-3">
-      <div className="mb-2 flex items-center gap-2">
-        <Images className="size-3.5 text-zinc-500" />
-        <span className="text-[11.5px] text-zinc-400">
-          Foto analisa {galeri.length > 0 && <span className="angka text-zinc-500">· {galeri.length}</span>}
-        </span>
-        {bisaTambah && (
-          <button onClick={() => berkasRef.current?.click()} disabled={sibuk}
-            className="ml-auto flex cursor-pointer items-center gap-1 rounded-md border border-zinc-800 px-2 py-1 text-[11px] text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200 disabled:opacity-50">
-            {sibuk ? <Loader2 className="size-3 animate-spin" /> : <ImagePlus className="size-3" />}
-            Tambah foto
-          </button>
-        )}
-        <input ref={berkasRef} type="file" accept="image/png,image/jpeg,image/webp"
-               onChange={(e) => void pilihBerkas(e)} className="hidden" />
-      </div>
-
-      {galeri.length === 0 ? (
-        <p className="text-[11.5px] leading-relaxed text-zinc-600">
-          {bisaTambah
-            ? 'Belum ada foto. Tangkapan layar chart-mu akan terlihat oleh semua yang membuka analisa ini.'
-            : 'Belum ada foto.'}
-        </p>
-      ) : (
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          {galeri.map((g) => (
-            <div key={g.id} className="group relative shrink-0">
-              <img src={g.url} alt={g.ket || 'Foto analisa'} loading="lazy"
-                   onClick={() => setBesar(g)}
-                   className="h-20 w-28 cursor-zoom-in rounded-md border border-zinc-800 object-cover" />
-              <span className="mt-0.5 block max-w-28 truncate text-[10px] text-zinc-600">{g.nama}</span>
-              {(g.uid === uidku || penulisku) && (
-                <button onClick={() => void buang(g)} aria-label="Hapus foto"
-                  className="absolute right-1 top-1 hidden cursor-pointer rounded bg-zinc-950/80 p-0.5 text-zinc-400 hover:text-red-400 group-hover:block">
-                  <X className="size-3" />
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-      {kabar && <p className="mt-1.5 text-[11.5px] text-amber-300/90">{kabar}</p>}
-
-      {/* Diportal — sama seperti dua modal di atas berkas ini. Galeri
-          hidup di dalam kartu sinyal juga. */}
-      {besar && createPortal(
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4"
-             onClick={() => setBesar(null)}>
-          <img src={besar.url} alt={besar.ket || 'Foto analisa'}
-               className="max-h-full max-w-full rounded-lg object-contain" />
-        </div>,
-        document.body,
-      )}
-    </div>
-  );
-}
+   Rute /api/analisa/gambar di server TIDAK dicabut, dan posting() tetap
+   mengunggah sampulnya ke sana — itu yang membuat `a.sampul` ada. Yang hilang
+   cuma komponen penampil galeri banyak-gambar; kalau kelak diperlukan lagi,
+   ia utuh di riwayat commit ini. */
 
 function KartuAnalisa({ a, status, milikku, onSegarkan, performa, hargaKini }: {
   a: RingkasAnalisa;
@@ -438,8 +341,12 @@ function KartuAnalisa({ a, status, milikku, onSegarkan, performa, hargaKini }: {
 }) {
   const { pengguna } = useAuth();
   const [buka, setBuka] = useState(false);
+  /* Sampul yang sedang dilihat besar. Dulu sampulnya cuma hiasan kepala
+     kartu: garis entry/SL/TP di dalamnya terlalu kecil untuk dibaca pada
+     tinggi 112 px, jadi satu-satunya cara memeriksanya membuka analisanya
+     lalu mencari foto yang isinya sama. Sekarang ia bisa ditekan sendiri. */
+  const [sampulBesar, setSampulBesar] = useState(false);
   const [isi, setIsi] = useState<IsiAnalisa | null>(null);
-  const [galeri, setGaleri] = useState<GambarAnalisa[]>([]);
   const [formBeli, setFormBeli] = useState(false);
   /* Berpindah lewat router, bukan href: memuat ulang seluruh aplikasi cuma
      untuk berpindah halaman di dalamnya membuang seluruh data yang sudah
@@ -527,7 +434,6 @@ function KartuAnalisa({ a, status, milikku, onSegarkan, performa, hargaKini }: {
     try {
       const h = await bukaIsi(a.id);
       setIsi(h.isi);
-      setGaleri(h.galeri);
       navigate(alamatChart(h.isi));
     } catch {
       /* Gagal mengambil level bukan alasan menahan orang di halaman ini —
@@ -541,7 +447,6 @@ function KartuAnalisa({ a, status, milikku, onSegarkan, performa, hargaKini }: {
     try {
       const h = await bukaIsi(a.id);
       setIsi(h.isi);
-      setGaleri(h.galeri);
       setBuka(true);
     } catch (e) {
       setKabar(e instanceof Error ? e.message : 'Gagal membuka');
@@ -575,18 +480,38 @@ function KartuAnalisa({ a, status, milikku, onSegarkan, performa, hargaKini }: {
           berilustrasi. Sampul berisi garis entry/SL/TP adalah produk yang
           dijual; menayangkannya gratis membuat tombol belinya tak berarti. */}
       {a.sampul ? (
-        <img src={a.sampul} alt="" loading="lazy"
+        /* BISA DITEKAN — permintaan pemilik, dan memang di sinilah orang
+           menekan lebih dulu. Dibungkus <button>, bukan onClick di <img>:
+           gambar yang bisa ditekan tapi tidak bisa dicapai papan ketik
+           adalah tombol yang cuma ada untuk yang memakai tetikus. */
+        <button onClick={() => setSampulBesar(true)}
+          title="Klik untuk memperbesar chart-nya"
+          className="-mx-4 -mt-4 mb-3 block w-[calc(100%_+_2rem)] cursor-zoom-in border-b border-zinc-800">
+        <img src={a.sampul} alt="Sampul chart analisa" loading="lazy"
              /* max-w-none WAJIB: preflight Tailwind memberi setiap <img>
                `max-width: 100%`, dan itu memotong `calc(100% + 2rem)` kembali
                ke lebar kotak isi — sampulnya jadi menyisakan celah di kanan
                persis selebar padding kartu. Kelasnya benar sejak awal; yang
                membatalkannya aturan bawaan, bukan calc-nya. */
-            className="-mx-4 -mt-4 mb-3 h-28 w-[calc(100%_+_2rem)] max-w-none border-b border-zinc-800 object-cover" />
+            className="h-28 w-full max-w-none object-cover" />
+        </button>
       ) : a.adaSampul ? (
         <div className="-mx-4 -mt-4 mb-3 flex h-28 w-[calc(100%_+_2rem)] items-center justify-center gap-2 border-b border-zinc-800 bg-zinc-900/60 text-[11.5px] text-zinc-600">
           <Lock className="size-3.5" /> Sampul chart terbuka setelah dibeli
         </div>
       ) : null}
+
+      {/* Diportal ke body — sama seperti perbesaran foto di galeri. Kartu
+          ini punya overflow-hidden, jadi apa pun yang digambar di dalamnya
+          akan terpotong di tepi kartunya sendiri. */}
+      {sampulBesar && a.sampul && createPortal(
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4"
+             onClick={() => setSampulBesar(false)}>
+          <img src={a.sampul} alt="Sampul chart analisa"
+               className="max-h-full max-w-full rounded-lg object-contain" />
+        </div>,
+        document.body,
+      )}
 
       <div className="flex flex-wrap items-start gap-2">
         <div className="min-w-0 grow">
@@ -817,59 +742,30 @@ function KartuAnalisa({ a, status, milikku, onSegarkan, performa, hargaKini }: {
                 Tempatnya juga tepat secara urutan: orang yang baru saja
                 membuka level adalah orang yang detik itu juga sedang
                 memutuskan mau masuk sebesar apa. */}
-            {/* GALERI DI ATAS KALKULATOR, bukan di kaki analisa.
-                Chart-nya BUKTI, kalkulator ALAT: yang membaca menilai
-                rencananya dulu dari gambarnya, dan baru menghitung
-                ukuran posisinya sesudah memutuskan ikut. Di kaki panel,
-                gambarnya terlewat oleh yang sudah berhenti membaca di
-                baris angka. */}
             {/* ── TOMBOL TIDAK HILANG SAAT ANALISA DIBUKA ─────────────────
                 Dilaporkan pemilik: menekan "Buka analisa" membuat kedua
                 tombolnya lenyap, dan satu-satunya jalan mengembalikannya
                 memuat ulang halaman. Sebabnya seluruh baris tombol hidup di
-                cabang ELSE dari `{buka && isi ? … : …}`, jadi begitu
-                analisanya terbuka baris itu memang tidak digambar sama
-                sekali.
+                cabang ELSE dari kondisi buka — begitu analisanya terbuka,
+                baris itu memang tidak digambar sama sekali.
 
-                Sekarang keduanya ikut ke dalam cabang terbuka, di SEBELAH
-                KANAN foto analisa — ruang yang selama ini menganggur, dan
-                tempat mata berada sesudah selesai melihat chart-nya.
+                SEJAJAR KIRI-KANAN, bukan bertumpuk. Keduanya tindakan
+                sederajat atas sinyal yang sama; ditumpuk, yang di atas
+                terbaca sebagai yang utama padahal bukan.
 
-                "Buka analisa" berubah jadi "Tutup analisa": slot yang sama,
-                tindakan kebalikannya. Membiarkannya tetap berbunyi "Buka"
-                sementara isinya sudah terbuka berarti tombol yang tidak
-                mengerjakan apa-apa — dan tombol yang tidak berbuat apa-apa
-                mengajari orang bahwa tombol di sini boleh diabaikan. */}
-            <div className="flex w-full flex-wrap items-start gap-3">
-              <div className="min-w-0 flex-1">
-            <Galeri
-              /* bisaTambah SELALU false: menambah foto ke sinyal ditutup
-                  seluruhnya, bukan cuma di formulir postingnya. Foto galeri
-                  menempel pada ANALISANYA — siapa pun yang boleh membukanya
-                  bisa menambahkan gambar ke sana — jadi meninggalkan pintu
-                  ini terbuka membuat pencabutan di formulir tidak berarti
-                  apa-apa.
-
-                  Komponennya dibiarkan utuh: ia masih menampilkan foto yang
-                  sudah ada, dan menyalakannya lagi cukup satu nilai. */
-              analisaId={a.id} galeri={galeri} bisaTambah={false}
-              uidku={pengguna?.uid} penulisku={milikku}
-              onBerubah={setGaleri}
-            />
-              </div>
-
-              <div className="flex shrink-0 flex-col gap-2 pt-6">
-                <button onClick={() => setBuka(false)}
-                  title="Tutup levelnya — tombol Buka analisa kembali seperti semula"
-                  className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-700 px-3 py-1.5 text-[12px] font-medium text-zinc-200 transition-colors hover:border-zinc-500 hover:text-zinc-100">
-                  <Lock className="size-3.5" /> Tutup analisa
-                </button>
-                <Link to={tautanChart} onClick={(e) => void keChart(e)}
-                  title="Buka chart dengan entry, SL, dan TP sudah terisi"
-                  className="flex shrink-0 items-center gap-1.5 rounded-md bg-zinc-100 px-3 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white">
-                  <CandlestickChart className="size-3.5" /> Buka di Chart
-                </Link>
-              </div>
+                "Buka analisa" berubah jadi "Tutup analisa": slot yang
+                sama, tindakan kebalikannya. */}
+            <div className="flex w-full flex-wrap items-center gap-2">
+              <button onClick={() => setBuka(false)}
+                title="Tutup levelnya — tombol Buka analisa kembali seperti semula"
+                className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-700 px-3 py-1.5 text-[12px] font-medium text-zinc-200 transition-colors hover:border-zinc-500 hover:text-zinc-100">
+                <Lock className="size-3.5" /> Tutup analisa
+              </button>
+              <Link to={tautanChart} onClick={(e) => void keChart(e)}
+                title="Buka chart dengan entry, SL, dan TP sudah terisi"
+                className="flex shrink-0 items-center gap-1.5 rounded-md bg-zinc-100 px-3 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white">
+                <CandlestickChart className="size-3.5" /> Buka di Chart
+              </Link>
             </div>
             <HitungPosisi entry={isi.entry} sl={isi.sl} kripto={pasarKripto(a)} pasangan={a.pasangan} />
             {isi.alasan && (
