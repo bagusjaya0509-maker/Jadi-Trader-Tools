@@ -300,6 +300,34 @@ export async function catatKlienHadir() {
   } catch { /* pencatatan gagal tidak boleh mengganggu apa pun */ }
 }
 
+/** Denyut kehadiran — dipanggil berulang selama tabnya terbuka.
+ *
+ *  Bedanya dengan catatKlienHadir(): yang itu dijaga sessionStorage supaya
+ *  hitungan kunjungan tidak membengkak, jadi ia menulis SEKALI per sesi.
+ *  Untuk lampu "sedang membuka" sekali per sesi tidak cukup — orang yang
+ *  membuka situs pagi hari akan tetap tercatat "terakhir: pagi" sampai
+ *  malam, dan lampunya menyala untuk orang yang sudah lama pergi.
+ *
+ *  Jadi ini menulis waktu kunjungan tanpa penjaga, dan yang membatasinya
+ *  intervalnya sendiri di pemanggil. Hitungan kunjungan memang ikut naik;
+ *  itu ongkos yang disadari, dan angka itu dipakai sebagai penanda keaktifan
+ *  kasar, bukan sebagai jumlah sesi yang akurat.
+ *
+ *  Gagal? Diam. Kehadiran adalah keterangan tambahan, bukan sesuatu yang
+ *  boleh memunculkan galat di layar orang yang sedang bekerja. */
+export async function denyutKlien() {
+  const u = auth.currentUser;
+  if (!u) return;
+  try {
+    const token = await u.getIdToken();
+    await fetch(`${dasar()}/api/klien/hadir`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ nama: u.displayName ?? '' }),
+    });
+  } catch { /* lihat catatan di atas */ }
+}
+
 /* ════════════════════════════════════════════════════════════════════════
    PRODUK — ambil sumber & berkas
    ════════════════════════════════════════════════════════════════════════

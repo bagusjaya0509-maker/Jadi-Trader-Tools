@@ -15,6 +15,14 @@ const DASAR = PROXY_BAWAAN;
 
 export interface RingkasAnalisa {
   id: string; uid: string; nama: string; judul: string; pasangan: string;
+  /** Analisnya sedang membuka situs — kunjungan terakhirnya lebih baru
+   *  dari lima menit. Dihitung server dari denyut kehadiran; layar tidak
+   *  pernah menebaknya sendiri.
+   *
+   *  Sengaja boolean, bukan cap waktu: "sedang membuka" cukup untuk
+   *  menimbang apakah sinyal barunya mungkin segera datang, sementara jam
+   *  berapa persisnya seseorang membuka situs bukan urusan orang lain. */
+  aktif?: boolean;
   /** Foto profil analisnya, kosong kalau anonim. Lihat PerformaAnalis.foto. */
   foto?: string;
   arah: 'BUY' | 'SELL'; harga: number; ringkas: string; dibuat: number;

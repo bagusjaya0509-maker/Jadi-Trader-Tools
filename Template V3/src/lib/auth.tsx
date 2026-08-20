@@ -328,6 +328,12 @@ export function PenyediaAuth({ children }: { children: React.ReactNode }) {
        callback karena onAuthStateChanged bisa berbunyi lagi (ganti akun,
        token kedaluwarsa) sebelum pemantau lama sempat dicabut. */
     let cabutPantau: (() => void) | null = null;
+    /* Pencabut denyut kehadiran. Hidup di scope efek ini, bukan di dalam
+       callback: onAuthStateChanged berbunyi lagi tiap kali sesi berganti,
+       dan denyut lama harus mati sebelum yang baru dipasang — kalau tidak,
+       tiap pergantian akun meninggalkan satu interval yang tidak pernah
+       berhenti sampai tabnya ditutup. */
+    let cabutDenyut: (() => void) | null = null;
     /* Penanda giliran. Pemasangan pemantau itu async; kalau pengguna
        berganti di tengah jalan, pemantau yang terlambat datang harus
        membatalkan dirinya sendiri alih-alih memasang diri untuk akun yang
@@ -338,6 +344,8 @@ export function PenyediaAuth({ children }: { children: React.ReactNode }) {
       const punyaGiliran = ++giliran;
       cabutPantau?.();
       cabutPantau = null;
+      cabutDenyut?.();
+      cabutDenyut = null;
 
       setPengguna(u);
       if (u) {
@@ -347,6 +355,29 @@ export function PenyediaAuth({ children }: { children: React.ReactNode }) {
            lain. Sengaja tidak di-await: daftar klien tidak boleh menahan
            tampilnya aplikasi. */
         void import('@/lib/admin').then((m) => m.catatKlienHadir());
+
+        /* ── DENYUT KEHADIRAN, tiap 2 menit ──────────────────────────
+           Yang menyalakan titik hijau "sedang membuka" di kartu analis.
+           Server menganggap kunjungan lebih baru dari 5 menit sebagai
+           sedang aktif — dua kali jeda ini, jadi satu denyut yang meleset
+           karena jaringan tidak langsung memadamkan lampunya.
+
+           HANYA SAAT TABNYA TERLIHAT. Tab yang ditinggal terbuka semalaman
+           bukan orang yang sedang membuka situs, dan lampu yang menyala
+           untuk kursi kosong lebih buruk daripada tidak ada lampu.
+
+           Denyut pertama dikirim visibilitychange/interval berikutnya —
+           kunjungan barusan sudah ditulis catatKlienHadir() di atas. */
+        const denyut = () => {
+          if (document.visibilityState !== 'visible') return;
+          void import('@/lib/admin').then((m) => m.denyutKlien());
+        };
+        const jamDenyut = window.setInterval(denyut, 120_000);
+        document.addEventListener('visibilitychange', denyut);
+        cabutDenyut = () => {
+          window.clearInterval(jamDenyut);
+          document.removeEventListener('visibilitychange', denyut);
+        };
 
         /* Kabar "berhasil masuk" — dikunci pada `lastSignInTime`, BUKAN pada
            saat callback ini berbunyi. onAuthStateChanged juga berbunyi di
@@ -401,7 +432,7 @@ export function PenyediaAuth({ children }: { children: React.ReactNode }) {
       if (punyaGiliran === giliran) setMemuat(false);
     });
 
-    return () => { cabutPantau?.(); berhenti(); };
+    return () => { cabutPantau?.(); cabutDenyut?.(); berhenti(); };
   }, []);
 
   const nilai = useMemo<Isi>(() => ({

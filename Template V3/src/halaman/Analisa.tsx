@@ -2645,6 +2645,13 @@ export default function Analisa() {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {kanalUrut.map(([uid, sinyal]) => {
               const a0 = sinyal[0];
+              /* Batas waktu rekam jejak kartu ini. Dihitung dari seluruh
+                 sinyalnya, bukan dari urutan daftarnya — daftarnya sudah
+                 diurutkan untuk keperluan lain dan urutannya bisa berubah
+                 tanpa ada yang ingat memperbaiki dua baris ini. */
+              const waktuPosting = sinyal.map((x) => x.dibuat);
+              const mulaiPosting = Math.min(...waktuPosting);
+              const terakhirPosting = Math.max(...waktuPosting);
               const p = perfDari(uid);
               const r = ringkasKanal(sinyal, p, risikoPerSinyal);
               const disemat = disematkan(uid);
@@ -2677,9 +2684,32 @@ export default function Analisa() {
                       <AvatarAnalis nama={a0.nama} foto={a0.foto} uid={uid}
                                     className="size-10" kelasHuruf="text-[14px]" />
                       <span className="min-w-0">
-                        <span className="block truncate text-[13.5px] font-medium text-zinc-100">{a0.nama}</span>
+                        <span className="flex items-center gap-1.5">
+                          <span className="truncate text-[13.5px] font-medium text-zinc-100">{a0.nama}</span>
+                          {/* TITIK HIJAU = SEDANG MEMBUKA SITUS.
+                              Datang dari server (kunjungan terakhir < 5
+                              menit), tidak pernah ditebak layar. Gunanya
+                              satu: menimbang apakah sinyal barunya mungkin
+                              segera datang, atau kanal ini sedang sepi.
+
+                              title-nya wajib. Titik berwarna tanpa
+                              keterangan adalah teka-teki, dan yang paling
+                              sering ditebak salah justru warna hijau —
+                              dikira "terverifikasi". */}
+                          {sinyal.some((x) => x.aktif) && (
+                            <span title="Sedang membuka situs"
+                                  className="size-1.5 shrink-0 rounded-full bg-emerald-500" />
+                          )}
+                        </span>
+                        {/* "Terakhir posting", bukan jumlah unggahan.
+                            Jumlahnya sudah terbaca di baris hitungan di
+                            bawah (menang/kalah/jalan/pending/batal), dan
+                            yang tidak terjawab di mana pun adalah apakah
+                            kanal ini masih hidup. Analis dengan 40 sinyal
+                            yang berhenti dua bulan lalu dan yang memposting
+                            kemarin tidak boleh terbaca sama. */}
                         <span className="block text-[11px] text-zinc-600">
-                          {r.total} sinyal diunggah
+                          Terakhir posting {tanggalPendek(terakhirPosting)}
                           {uid === pengguna?.uid && ' · kanalmu'}
                         </span>
                       </span>
@@ -2742,6 +2772,20 @@ export default function Analisa() {
                       </div>
                     </div>
                     <BarisHitung r={r} />
+                    {/* RENTANG WAKTU DI POJOK KANAN BAWAH — permintaan
+                        pemilik, dan ia menutup lubang yang sungguhan:
+                        winrate 62,5% dan estimasi +$56 tidak berarti apa-apa
+                        tanpa tahu itu hasil sepekan atau setahun. Angka
+                        tanpa rentang waktunya adalah klaim, bukan rekam
+                        jejak.
+
+                        Diambil dari sinyal PERTAMA dan TERAKHIR yang
+                        diposting analisnya, bukan dari periode papan
+                        peringkat: yang dihitung kartu ini memang seluruh
+                        sinyalnya, bukan bulan berjalan. */}
+                    <div className="mt-1.5 text-right text-[10px] text-zinc-600">
+                      {tanggalPendek(mulaiPosting)} – {tanggalPendek(terakhirPosting)}
+                    </div>
                     {r.winrate === null && (
                       <p className="mt-2 text-[10.5px] leading-relaxed text-zinc-600">
                         Belum ada sinyal yang selesai — angka muncul setelah harga menyentuh SL/TP.
