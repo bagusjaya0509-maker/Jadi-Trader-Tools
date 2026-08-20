@@ -198,11 +198,27 @@ export function PojokOrder({
   aturCatatan?: (c: { emosi: string; alasan: string }) => void;
 }) {
   const nyata = mode === 'real';
-  /* Terlipat atau terbuka — pilihan yang diingat. Saat ada tiket, posisi,
-     atau pending, panelnya SELALU tampil: keadaan yang sedang membawa uang
-     tidak boleh tersembunyi di balik ikon. */
+  /* Terlipat atau terbuka — pilihan yang diingat.
+     ────────────────────────────────────────────────────────────────────
+     BAWAANNYA TERLIPAT. Dulu terbuka, dan di ponsel bilah BUY/SELL itu
+     menutupi lilin tepat di pojok yang paling sering dilihat — dilaporkan
+     pemilik setelah temannya membukanya pertama kali di HP. Yang pertama
+     kali datang ke chart datang untuk MELIHAT HARGA; alat entry baru ia
+     cari sesudah ada yang ingin dikerjakan.
+
+     Bedanya "belum pernah memilih" dan "memilih terbuka" karena itu harus
+     dijaga: null berarti belum pernah, dan cuma itu yang dilipat. Yang
+     pernah membukanya sendiri tetap menemukannya terbuka, karena
+     pilihannya tersimpan sebagai '0' — bukan sebagai ketiadaan.
+
+     Saat ada tiket, posisi, atau pending, panelnya SELALU tampil: keadaan
+     yang sedang membawa uang tidak boleh tersembunyi di balik ikon, dan
+     ketiga cabang itu memang berada di atas penjaga ini. */
   const [tutupPanel, setTutupPanel] = useState(() => {
-    try { return localStorage.getItem(KUNCI_TUTUP) === '1'; } catch { return false; }
+    try {
+      const v = localStorage.getItem(KUNCI_TUTUP);
+      return v === null ? true : v === '1';
+    } catch { return true; }
   });
   /* ── MELIPAT SENDIRI SAAT MEMANG SEDANG TIDAK DIPAKAI ───────────────
      Hanya kalau tidak ada apa pun yang hidup: tidak ada posisi terbuka,

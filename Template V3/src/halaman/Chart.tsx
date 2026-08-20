@@ -366,8 +366,16 @@ export default function ChartBacktest() {
     window.addEventListener('keydown', tekan);
     return () => window.removeEventListener('keydown', tekan);
   }, [gambarPilih, simbol, tf]);
+  /* BAWAANNYA TERLIPAT — alasan yang sama dengan panel order: di layar
+     ponsel bilah alat gambar memakan tepi chart sebelum ada satu pun
+     gambar yang ingin dibuat. Yang pernah membukanya sendiri tetap
+     menemukannya terbuka; cuma yang BELUM PERNAH memilih (null) yang
+     dilipat. */
   const [alatTutup, setAlatTutup] = useState(() => {
-    try { return localStorage.getItem('jt.alatTutup') === '1'; } catch { return false; }
+    try {
+      const v = localStorage.getItem('jt.alatTutup');
+      return v === null ? true : v === '1';
+    } catch { return true; }
   });
   /* ── Letak bilah alat: BISA DIPINDAH ────────────────────────────
      Posisi tetap selalu salah untuk sebagian orang: panel order membuka
