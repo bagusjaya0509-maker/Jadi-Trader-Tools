@@ -25,13 +25,20 @@ import { BADAN, WA_LINK } from '@/lib/badan';
    membandingkan dengan sumbernya tahu ini disengaja:
 
    1. SAKELAR MODE GELAP. Sumbernya menambah/mencabut kelas `dark` di
-      <html>. Situs ini dikunci gelap: index.html menulis class="dark"
-      langsung, dan @theme di index.css cuma punya satu tema ("Tidak ada
-      mode terang, tidak ada dua sumber kebenaran warna"). Sakelarnya
-      karena itu tidak mengerjakan apa pun — dihitung, cuma ada SATU
-      pemakaian varian `dark:` di seluruh src. Sakelar yang tidak mengubah
-      apa-apa lebih buruk daripada tidak ada sakelar, dan halaman ini sudah
-      punya pemindah suasana sungguhan di hero-nya.
+      <html>. Yang dipakai situs ini atribut `data-tema`, dipegang sakelar
+      di kepala aplikasi — jadi sakelar kedua di kaki halaman cuma akan
+      jadi tombol kedua untuk hal yang sama, di tempat yang paling jarang
+      dilihat orang.
+
+      KOREKSI 20 Agu 2026 untuk catatan lama di sini: dulu tertulis "situs
+      ini dikunci gelap" dan "sakelarnya tidak mengerjakan apa pun". Dua
+      duanya sudah tidak benar. Tema terang sungguhan ada sejak blok
+      [data-tema='terang'] di index.css, dan class="dark" di index.html
+      TIDAK PERNAH mengendalikan varian `dark:` — varian itu bawaannya
+      mengikuti setelan sistem operasi, bukan kelas. Keyakinan bahwa
+      keduanya sama itulah yang membuat judul halaman harga hilang di HP
+      bertema terang. Sekarang `dark:` sudah diikatkan ke `data-tema`
+      lewat @custom-variant; lihat catatannya di index.css.
 
    2. Textarea. Diimpor di sumbernya tapi tidak pernah dipakai. tsconfig
       menyalakan noUnusedLocals, jadi menempelnya apa adanya menggagalkan

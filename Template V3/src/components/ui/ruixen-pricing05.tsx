@@ -153,11 +153,41 @@ export default function Pricing_05() {
     },
   ];
 
+  /* LATARNYA IKUT TEMA SITUS, TIDAK LAGI DIPUTIHKAN PAKSA.
+      ────────────────────────────────────────────────────────────────
+      Dulu baris ini memasangkan latar putih dengan varian gelap, warisan apa
+      adanya dari sumber tempelannya. Di sini pasangan itu bukan cuma
+      mubazir — ia rusak, dan rusaknya cuma kelihatan di sebagian HP.
+
+      Varian `dark:` bawaan Tailwind v4 mengikuti setelan SISTEM
+      OPERASI, bukan tema situs ini. Terbukti di CSS terbangunnya:
+
+          @media(prefers-color-scheme:dark){.dark\:bg-background{…}}
+
+      Sementara warna situs ini ditentukan atribut `data-tema` di <html>,
+      yang bawaannya GELAP dan tidak ada hubungannya dengan setelan HP.
+
+      Jadi di HP bertema terang: media query-nya tidak kena, seksi ini
+      memakai `bg-white` — sementara judulnya mewarisi --color-foreground
+      yang masih putih karena situsnya sendiri masih gelap. Putih di atas
+      putih. Judul halaman harga hilang, dan hanya untuk orang yang HP-nya
+      disetel terang. Di HP bertema gelap tampilannya sempurna, jadi ia
+      bisa bertahan lama tanpa ada yang melihatnya.
+
+      `bg-background` mengikuti `data-tema`, jadi satu kelas ini benar di
+      kedua tema tanpa syarat apa pun. Nilainya di tema gelap sama persis
+      dengan yang dihasilkan varian `dark:` tadi — tampilan yang sudah
+        benar tidak berubah sedikit pun. */
   return (
-    <section className="py-24 bg-white dark:bg-background">
+    <section className="py-24 bg-background">
       <div className="mx-auto max-w-6xl px-6 md:px-8">
         <div className="text-center max-w-2xl mx-auto">
-          <h2 className="text-4xl font-semibold tracking-tight sm:text-5xl">
+          {/* text-foreground DITULIS TEGAS, tidak diwariskan.
+              Judul inilah yang hilang, dan sebabnya justru karena warnanya
+              menumpang pada leluhurnya. Elemen yang pernah tidak terbaca
+              tidak pantas bergantung pada susunan yang bisa berubah kalau
+              seksi ini suatu saat dipindah ke halaman lain. */}
+          <h2 className="text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
             Pilih Akses Sesuai Kebutuhanmu
           </h2>
           <p className="text-muted-foreground mt-4 text-lg">

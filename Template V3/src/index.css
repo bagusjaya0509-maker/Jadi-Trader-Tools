@@ -3,6 +3,25 @@
    Tailwind v4 tidak membawanya sendiri. */
 @import "tw-animate-css";
 
+/* ── VARIAN `dark:` DIIKATKAN KE TEMA SITUS ────────────────────────────
+   Bawaan Tailwind v4, varian `dark:` berarti "sistem operasinya sedang
+   bertema gelap" — @media (prefers-color-scheme: dark). Situs ini tidak
+   memakai setelan itu sama sekali: warnanya ditentukan atribut
+   `data-tema` di <html>, yang dipegang sakelar di kepala aplikasi dan
+   bawaannya gelap.
+
+   Dua sumber kebenaran yang tidak saling tahu, dan hasilnya bug yang
+   sudah kejadian: satu kelas bervarian gelap di seksi harga membuat
+   judul halaman hilang di HP bertema terang, sementara di HP bertema
+   gelap tampilannya sempurna. Kelasnya sudah dicabut; baris ini yang
+   mencegah tempelan berikutnya mengulanginya — komponen pihak ketiga
+   hampir selalu datang membawa `dark:`.
+
+   CATATAN: class="dark" di index.html BUKAN yang mengendalikan ini, dan
+   jangan dicabut. Ia dipakai komponen chart shadcn, yang menulis
+   pemilihnya sendiri (`.dark`) untuk variabel warna grafik. */
+@custom-variant dark (&:where(:root:not([data-tema='terang']), :root:not([data-tema='terang']) *));
+
 /* ════════════════════════════════════════════════════════════════════════
    DESAIN #3 — mengikuti Efferd Dashboard 2
    ════════════════════════════════════════════════════════════════════════
