@@ -99,7 +99,7 @@ const WARNA_RISIKO: Record<string, string> = {
 
 function LencanaKanal({ r, className }: { r: RingkasKanal; className?: string }) {
   return (
-    <span className={cn('inline-flex flex-wrap items-center gap-1.5', className)}>
+    <span className={cn('pointer-events-auto inline-flex flex-wrap items-center gap-1.5', className)}>
       {/* Saat datanya belum cukup, lencananya TETAP ada — hanya isinya yang
           berganti jadi "belum dinilai". Menghilangkannya sama sekali membuat
           analis tanpa rekam jejak terlihat seperti tidak punya kolom risiko,
@@ -2735,7 +2735,7 @@ export default function Analisa() {
                                         className="size-9" kelasHuruf="text-[13px]" />
                           {sinyal.some((x) => x.aktif) && (
                             <span title="Sedang membuka situs"
-                                  className="absolute -bottom-px -right-px block size-3 rounded-full border-[3px] border-zinc-950 bg-emerald-500" />
+                                  className="pointer-events-auto absolute -bottom-px -right-px block size-3 rounded-full border-[3px] border-zinc-950 bg-emerald-500" />
                           )}
                         </span>
                         <span className="min-w-0 flex-1">
@@ -2759,7 +2759,7 @@ export default function Analisa() {
                                 justru paling perlu lencananya. */}
                             {a0.agen && !/(^|[^a-z])ai([^a-z]|$)/i.test(a0.nama) && (
                               <span title="Ditulis agen AI, bukan orang"
-                                    className="inline-flex shrink-0 items-center gap-1 rounded bg-violet-500/15 px-1.5 py-0.5 text-[9.5px] font-medium text-violet-300">
+                                    className="pointer-events-auto inline-flex shrink-0 items-center gap-1 rounded bg-violet-500/15 px-1.5 py-0.5 text-[9.5px] font-medium text-violet-300">
                                 <Sparkles className="size-2.5" /> AI
                               </span>
                             )}
