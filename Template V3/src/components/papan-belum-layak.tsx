@@ -232,22 +232,13 @@ export function PapanBelumLayak({ analis, aturan }: { analis: PerformaAnalis[]; 
 
   return (
     <div className="overflow-hidden rounded-lg border border-zinc-800/60">
-      <div className="border-b border-zinc-800/60 bg-zinc-900/30 px-3 py-2.5 sm:px-4">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <span className="text-[12px] font-medium text-zinc-300">Belum memenuhi syarat papan</span>
-          <span className="angka rounded bg-zinc-800/80 px-1.5 py-0.5 text-[10.5px] text-zinc-400">
-            {analis.length}
-          </span>
-        </div>
-        {/* Kalimat ini yang membuat daftarnya terbaca sebagai aturan, bukan
-            sebagai kuasa. Tanpa "sama untuk semua" dan "dihitung otomatis",
-            analis yang tidak muncul akan menyimpulkan papannya diatur. */}
-        <p className="mt-1 text-[11px] leading-relaxed text-zinc-600">
-          Syaratnya sama untuk semua analis dan dihitung otomatis dari sinyal yang sudah selesai —
-          tidak ada satu pun angka di bawah ini yang bisa diisi tangan.
-        </p>
-      </div>
+      {/* KEPALA PANEL DICABUT — permintaan pemilik. Judul, hitungan, dan
+          kalimat pengantarnya hilang; yang tersisa tabelnya sendiri.
 
+          Nama kolom sudah menerangkan apa yang diukur, dan sebab per baris
+          tetap tercetak di bawah tiap nama — jadi pertanyaan "kenapa dia
+          tidak masuk papan" tetap terjawab di layar tanpa kalimat
+          pembukanya. */}
       {/* ── TABEL, layar sedang ke atas ──────────────────────────────── */}
       <div className="hidden sm:block">
         <table className="w-full border-collapse text-left">
