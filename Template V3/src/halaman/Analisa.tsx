@@ -1500,22 +1500,26 @@ export default function Analisa() {
 
   const [pahamPermanen, setPahamPermanen] = useState(false);
 
-  /** Apa yang membuat tombol Posting masih terkunci.
+  /** Kolom yang belum diisi, dengan NAMA PENDEK.
    *
-   *  Ada karena tooltip saja TIDAK CUKUP: di layar sentuh ia tidak pernah
-   *  muncul sama sekali, dan tombol mati tanpa keterangan terbaca sebagai
-   *  halaman yang rusak — bukan sebagai formulir yang belum lengkap.
-   *  Dilaporkan pemilik setelah mengosongkan SL dan TP lalu tidak
-   *  menemukan satu pun petunjuk tentang apa yang kurang.
+   *  Dipakai satu tempat saja: kabar yang muncul SAAT tombol Posting
+   *  ditekan. Versi pertamanya sebuah daftar yang terpampang terus di atas
+   *  tombol; dicabut atas permintaan pemilik, dan memang keliru — peringatan
+   *  yang berdiri sejak formulir masih kosong menegur orang atas pekerjaan
+   *  yang baru saja ia mulai, lalu berhenti dibaca justru pada saat ia
+   *  akhirnya berarti.
    *
-   *  Urutannya mengikuti urutan kolomnya di layar, supaya matanya turun
-   *  sekali saja dari daftar ini ke kolom yang harus diisi. */
+   *  Namanya jadi pendek karena sekarang ia disambung jadi satu kalimat,
+   *  bukan dibaca sebagai daftar berbutir.
+   *
+   *  Urutannya tetap mengikuti urutan kolomnya di layar, supaya matanya
+   *  turun sekali saja dari kabar ini ke kolom yang harus diisi. */
   const kurangIsi = [
-    !ringkas.trim() && 'Ringkasan publik — ini yang jadi judul kartunya',
-    !entry && 'Harga Entry',
-    !sl && 'Stop Loss (SL)',
-    !tp && 'Take Profit (TP)',
-    !pahamPermanen && 'Centang persetujuan di atas tombol',
+    !ringkas.trim() && 'ringkasan publik',
+    !entry && 'Entry',
+    !sl && 'SL',
+    !tp && 'TP',
+    !pahamPermanen && 'centang persetujuan',
   ].filter(Boolean) as string[];
   /* Sampul dari Chart & Entry. Data URL JPEG, diunggah SESUDAH analisanya
      terposting — endpoint galeri butuh id analisanya, dan id itu baru ada
@@ -1677,6 +1681,15 @@ export default function Analisa() {
   }, [riwayat, saldoAwal]);
 
   async function posting() {
+    /* Penjaga kelengkapan, DI SINI — bukan di atribut disabled tombolnya.
+       Ditaruh di jalur yang dijalankan saat orangnya menekan, kabarnya jadi
+       jawaban atas perbuatannya sendiri; sebagai tombol mati, ia cuma
+       keadaan yang harus ditebak sebabnya. */
+    if (kurangIsi.length > 0) {
+      setNada('galat');
+      setKabar(`Belum bisa diposting — isi dulu ${kurangIsi.join(', ')}.`);
+      return;
+    }
     setSibuk(true); setKabar(''); setNada('info');
     try {
       await kirimAnalisa({
@@ -2439,26 +2452,6 @@ export default function Analisa() {
               </div>
             )}
 
-            {/* DAFTAR YANG KURANG, DI LAYAR — bukan cuma di tooltip.
-                Muncul hanya kalau aksesnya memang sudah ada: yang bermode
-                pratinjau sudah dapat kotak birunya sendiri di atas, dan dua
-                keterangan bertumpuk tentang dua sebab berbeda cuma membuat
-                keduanya tidak dibaca. */}
-            {bolehPosting && kurangIsi.length > 0 && (
-              <div className="mt-3 rounded-lg border border-amber-500/20 bg-amber-500/[0.04] px-3.5 py-2.5">
-                <p className="text-[11.5px] font-medium text-amber-300/90">
-                  Belum bisa diposting — lengkapi dulu:
-                </p>
-                <ul className="mt-1 space-y-0.5">
-                  {kurangIsi.map((k) => (
-                    <li key={k} className="flex gap-1.5 text-[11.5px] leading-relaxed text-zinc-400">
-                      <span className="text-zinc-600">·</span>{k}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
             <div className="mt-3 flex items-center gap-3">
               <button onClick={() => void posting()}
                 /* Syarat `!judul.trim()` DIHAPUS bersama kolomnya. Ia sempat
@@ -2477,12 +2470,24 @@ export default function Analisa() {
                    harus terisi", melengkapinya, lalu tombolnya tetap mati —
                    petunjuk yang menyuruh mengerjakan sesuatu yang tidak
                    membuka apa pun. */
-                disabled={sibuk || !bolehPosting || !ringkas.trim() || !entry || !sl || !tp
-                          || !pahamPermanen}
-                title={!bolehPosting ? 'Mode pratinjau: semua alat terbuka, tapi memposting sinyal perlu akses'
-                  : !ringkas.trim() ? 'Isi ringkasan publik dulu — itu yang jadi judul kartunya'
-                  : !entry || !sl || !tp ? 'Entry, SL, dan TP harus terisi'
-                  : !pahamPermanen ? 'Centang persetujuannya dulu' : undefined}
+                /* TOMBOL TETAP HIDUP WALAU FORMULIRNYA BELUM LENGKAP.
+                   ──────────────────────────────────────────────────────
+                   Tombol mati tidak bisa ditekan, dan yang tidak bisa
+                   ditekan tidak bisa menjelaskan dirinya: di layar sentuh
+                   tooltip-nya tidak pernah muncul, jadi yang tersisa cuma
+                   tombol kelabu tanpa sebab. Sekarang ia menerima tekanan
+                   lalu MENJAWAB — kabar di bawahnya menyebut persis kolom
+                   mana yang masih kosong.
+
+                   Yang tetap MATI cuma dua: sedang mengirim, dan belum
+                   punya akses. Keduanya bukan sesuatu yang bisa diperbaiki
+                   dengan mengisi kolom, jadi menekannya memang tidak
+                   menghasilkan apa-apa — dan untuk yang kedua sudah ada
+                   kotak biru penjelasnya di atas. */
+                disabled={sibuk || !bolehPosting}
+                title={!bolehPosting
+                  ? 'Mode pratinjau: semua alat terbuka, tapi memposting sinyal perlu akses'
+                  : undefined}
                 className="flex cursor-pointer items-center gap-2 rounded-md bg-zinc-100 px-3.5 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50">
                 {sibuk ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />} Posting — permanen
               </button>
