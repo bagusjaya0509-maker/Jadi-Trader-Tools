@@ -757,6 +757,34 @@ function KartuAnalisa({ a, status, milikku, onSegarkan, performa, hargaKini }: {
             <span className="text-zinc-500">Entry <span className="angka text-zinc-200">{fHarga(isi.entry)}</span></span>
             <span className="text-zinc-500">SL <span className="angka text-red-400">{fHarga(isi.sl)}</span></span>
             <span className="text-zinc-500">TP <span className="angka text-emerald-500">{fHarga(isi.tp)}</span></span>
+            {/* ALASANNYA MENEMPEL DI BAWAH ENTRY/SL/TP, bukan di bawah
+                tombol. Ia keterangan tentang ANGKA-ANGKA di atasnya —
+                kenapa level itu yang dipilih — jadi tempatnya menempel pada
+                yang diterangkan. Ditaruh sesudah tombol, ia terbaca sebagai
+                catatan kaki kartu, dan yang membaca sudah berhenti di baris
+                tombol.
+
+                Dipangkas satu baris supaya kalkulator tidak terdorong jauh.
+                whitespace-pre-line: analisa agen ditulis berparagraf dengan
+                whitespace-pre-line: analisa agen ditulis berparagraf dengan
+                judul bagian. Diperas jadi satu blok, ia berubah dari bacaan
+                jadi dinding teks — bentuk aslinya dipertahankan, cuma
+                tingginya yang dibatasi sampai orangnya meminta lebih. */}
+            {isi.alasan && (
+              <div className="w-full">
+                <p ref={alasanRef}
+                   className={cn('whitespace-pre-line text-[12px] leading-relaxed text-zinc-400',
+                     !alasanBuka && 'line-clamp-1')}>
+                  {isi.alasan}
+                </p>
+                {(alasanPanjang || alasanBuka) && (
+                  <button onClick={() => setAlasanBuka((v) => !v)}
+                    className="mt-0.5 cursor-pointer text-[11.5px] text-zinc-500 underline decoration-zinc-700 underline-offset-2 transition-colors hover:text-zinc-300">
+                    {alasanBuka ? 'Ringkas lagi' : 'Lihat selengkapnya'}
+                  </button>
+                )}
+              </div>
+            )}
             {/* Tautan "Buka di Chart" DULU di sini, sebaris dengan
                 Entry/SL/TP. Ia pindah naik ke baris tombol: di sini ia
                 cuma ada setelah analisanya dibuka, padahal pertanyaan
@@ -796,26 +824,6 @@ function KartuAnalisa({ a, status, milikku, onSegarkan, performa, hargaKini }: {
                 <CandlestickChart className="size-3.5" /> Buka di Chart
               </Link>
             </div>
-            {/* ALASANNYA DI ATAS KALKULATOR, dan dipangkas satu baris.
-                whitespace-pre-line: analisa agen ditulis berparagraf dengan
-                judul bagian. Diperas jadi satu blok, ia berubah dari bacaan
-                jadi dinding teks — jadi bentuk aslinya dipertahankan, cuma
-                tingginya yang dibatasi sampai orangnya meminta lebih. */}
-            {isi.alasan && (
-              <div className="w-full">
-                <p ref={alasanRef}
-                   className={cn('whitespace-pre-line text-[12px] leading-relaxed text-zinc-400',
-                     !alasanBuka && 'line-clamp-1')}>
-                  {isi.alasan}
-                </p>
-                {(alasanPanjang || alasanBuka) && (
-                  <button onClick={() => setAlasanBuka((v) => !v)}
-                    className="mt-0.5 cursor-pointer text-[11.5px] text-zinc-500 underline decoration-zinc-700 underline-offset-2 transition-colors hover:text-zinc-300">
-                    {alasanBuka ? 'Ringkas lagi' : 'Lihat selengkapnya'}
-                  </button>
-                )}
-              </div>
-            )}
             <HitungPosisi entry={isi.entry} sl={isi.sl} kripto={pasarKripto(a)} pasangan={a.pasangan} />
           </div>
         ) : formBeli ? (
