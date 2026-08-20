@@ -1014,8 +1014,22 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
     });
     if (!ok) { setKabarKirimSinyal('Gagal menyiapkan draf — coba lagi.'); return; }
     /* Alamat TANPA level: level sudah ikut di draf, dan menaruhnya juga di
-       query akan membuat dua sumber kebenaran yang bisa berselisih. */
-    navigasi('/copy-signal');
+       query akan membuat dua sumber kebenaran yang bisa berselisih.
+
+       TAPI TABNYA WAJIB DISEBUT. Dulu tujuannya '/copy-signal' polos, dan
+       halaman itu membuka tab bawaannya — Daftar Signal. Formulir posting
+       memang ikut terpasang (ia cuma disembunyikan), jadi drafnya tetap
+       terbaca dan kolomnya tetap terisi — tapi orangnya mendarat di layar
+       yang salah dan melihat daftar sinyal orang lain.
+
+       Terbaca persis seperti gagal: tombol ditekan, chart berpindah
+       halaman, tiket beserta garisnya hilang, dan yang muncul bukan
+       formulir yang barusan ia tuju. Padahal tidak ada yang hilang — cuma
+       tidak ada yang menunjukkannya.
+
+       Ini juga sebabnya bug ini bertahan lama: tidak ada galat, tidak ada
+       data yang rusak, dan yang salah cuma satu kata yang tidak ditulis. */
+    navigasi('/copy-signal?sub=posting');
   }
   /* Setelan order sungguhan — hidup di halaman supaya label risiko di
      garis chart dihitung dari angka yang SAMA dengan yang akan dikirim. */
@@ -1420,6 +1434,25 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
       dipasang.current = kunci;
       const idx = lilin.closes.length - 1;
       const u = usulSlTp(lilin, idx, arahSinyal);
+      /* ARAHNYA IKUT DISETEL, bukan cuma levelnya.
+         ────────────────────────────────────────────────────────────────
+         Tanpa baris ini keduanya bisa berselisih, dan itu bukan
+         kemungkinan teoretis — ia langsung terjadi saat diuji. Tiket yang
+         dipulihkan dari sessionStorage membawa arah SELL dari pekerjaan
+         sebelumnya, lalu blok ini menimpa levelnya dengan bentuk BUY dari
+         alamat. Hasilnya SELL dengan SL di bawah entry dan TP di atas:
+         sisinya salah, arahBenar di tiket jadi false, dan tombol
+         "Ke Copy Signal" MATI.
+
+         Yang terlihat orangnya cuma tombol yang tidak bisa ditekan tanpa
+         sebab yang jelas — tidak ada galat, karena tidak ada yang gagal;
+         dua sumber kebenaran yang tidak sepakat.
+
+         Alamat yang menang di sini, dan itu disengaja: untuk=sinyal
+         berarti orangnya BARU SAJA menekan "Susun di Chart & Entry" dengan
+         arah yang ia pilih sendiri di formulir. Niat yang baru mengalahkan
+         tiket yang tertinggal. */
+      setDraf(arahSinyal);
       setRencana({
         entry: lilin.closes[idx],
         sl: u.sl || undefined,
