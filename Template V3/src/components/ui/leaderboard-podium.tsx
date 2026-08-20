@@ -68,9 +68,13 @@ function nilaiRingkas(n: number) {
   return `${tanda}$${a.toFixed(0)}`;
 }
 
-export function LeaderboardPodium({ rankings, className }: {
+export function LeaderboardPodium({ rankings, className, onPilih }: {
   rankings: LeaderboardRanking[];
   className?: string;
+  /** Sama seperti di tabel peringkat: tiga orang yang sama, jadi tiga
+   *  panel yang sama-sama bisa ditekan. Podium yang mati sementara
+   *  barisnya hidup mengajari orang bahwa tekanannya kadang bekerja. */
+  onPilih?: (userId: string) => void;
 }) {
   /* Urutan TAMPILAN 2-1-3, bukan urutan data. Dicari per peringkat, bukan
      diambil per indeks: papan dengan kurang dari tiga analis tidak boleh
@@ -83,14 +87,25 @@ export function LeaderboardPodium({ rankings, className }: {
     <div className={cn('flex items-end justify-center gap-3', className)}>
       {susunan.map((r, i) =>
         r ? (
-          <div key={r.userId} className="flex w-[30%] max-w-[130px] flex-col items-center">
+          <div key={r.userId} className={cn('flex w-[30%] max-w-[130px] flex-col items-center',
+            onPilih && 'cursor-pointer')}
+            {...(onPilih
+              ? { role: 'button' as const, tabIndex: 0, title: `Buka performa ${r.userName}`,
+                  onClick: () => onPilih(r.userId),
+                  onKeyDown: (e: React.KeyboardEvent) => {
+                    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPilih(r.userId); }
+                  } }
+              : {})}>
             <Avatar nama={r.userName} peringkat={r.rank} foto={r.foto} uid={r.userId} />
             <div className="mt-2.5 w-full truncate text-center text-[11.5px] text-zinc-300" title={r.userName}>
               {r.userName}
             </div>
-            <div className={cn('angka text-center text-[12.5px] font-semibold',
-              r.value >= 0 ? 'text-emerald-400' : 'text-red-400')}>
-              {nilaiRingkas(r.value)}
+            <div className="flex items-baseline justify-center gap-1">
+              <span className="text-[9px] uppercase tracking-wide text-zinc-600">PNL</span>
+              <span className={cn('angka text-[12.5px] font-semibold',
+                r.value >= 0 ? 'text-emerald-400' : 'text-red-400')}>
+                {nilaiRingkas(r.value)}
+              </span>
             </div>
             {r.byline && (
               <div className="truncate text-center text-[10px] text-zinc-600" title={r.byline}>{r.byline}</div>

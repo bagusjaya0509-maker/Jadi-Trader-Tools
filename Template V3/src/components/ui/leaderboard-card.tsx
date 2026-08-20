@@ -36,6 +36,9 @@ export interface LeaderboardCardProps extends React.HTMLAttributes<HTMLDivElemen
    *  sendiri di atas kartu — satu baris penuh yang 90% kosong, tepat di
    *  tempat yang paling terlihat di halaman. */
   kanan?: React.ReactNode;
+  /** Diteruskan ke podium dan tabel peringkat. Tidak diberikan = papannya
+   *  sekadar tampilan. */
+  onPilih?: (userId: string) => void;
 }
 
 function formatTanggal(d?: string | Date) {
@@ -47,7 +50,7 @@ function formatTanggal(d?: string | Date) {
 
 export const LeaderboardCard = React.forwardRef<HTMLDivElement, LeaderboardCardProps>(
   ({ className, title = 'Papan Peringkat', fromDate, toDate, podiumRankings, rankings,
-     currentUserId, catatan, kanan, ...props }, ref) => {
+     currentUserId, catatan, kanan, onPilih, ...props }, ref) => {
     const dari = formatTanggal(fromDate);
     const sampai = formatTanggal(toDate);
 
@@ -69,13 +72,14 @@ export const LeaderboardCard = React.forwardRef<HTMLDivElement, LeaderboardCardP
           {kanan && <div className="ml-auto flex shrink-0 items-center gap-1.5 pt-0.5">{kanan}</div>}
         </div>
 
-        <LeaderboardPodium rankings={podiumRankings} className="mb-6" />
+        <LeaderboardPodium rankings={podiumRankings} className="mb-6" onPilih={onPilih} />
 
         <LeaderboardRankings
           rankings={rankings}
           currentUserId={currentUserId}
           showPagination
           defaultPageSize={10}
+          onPilih={onPilih}
         />
 
         {catatan && (

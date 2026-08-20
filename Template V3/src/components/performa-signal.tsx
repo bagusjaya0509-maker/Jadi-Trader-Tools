@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Ban, ChevronDown, ChevronRight, Eye, Sparkles, Target } from 'lucide-react';
 import { KalenderPl } from '@/components/kalender-pl';
 import { LeaderboardCard } from '@/components/ui/leaderboard-card';
@@ -125,6 +126,22 @@ function CatatanAsumsi({ modal, risikoPersen }: { modal: number; risikoPersen: n
 
 export function PapanPeringkatSignal({ data }: { data: Performa | null }) {
   const { pengguna } = useAuth();
+  const navigasi = useNavigate();
+
+  /* Menekan seorang analis di papan MEMBUKA KANALNYA, langsung di sub
+     Performa Signal — bukan di daftar sinyalnya.
+     ────────────────────────────────────────────────────────────────────
+     Yang dijawab papan peringkat adalah "siapa yang rekam jejaknya
+     paling baik", dan pertanyaan berikutnya selalu "seberapa baik, dari
+     berapa sinyal, sejak kapan". Itu isi Performa Signal. Melemparkannya
+     ke daftar sinyal berarti menjawab pertanyaan lain — apa yang sedang
+     ia posting — yang baru relevan SESUDAH orangnya diputuskan.
+
+     Alamatnya, bukan state: kanal dan sub memang tinggal di query string
+     halaman ini sebagai query string, jadi tombol Kembali peramban bekerja
+     dan tautannya bisa dibagikan. */
+  const bukaAnalis = (uid: string) =>
+    navigasi(`/copy-signal?kanal=${encodeURIComponent(uid)}&sub=performa`);
 
   /* HANYA yang layak yang diperingkatkan. Yang belum memenuhi syarat
      tidak dihilangkan — ia turun ke daftar di bawah beserta sebabnya.
@@ -206,6 +223,7 @@ export function PapanPeringkatSignal({ data }: { data: Performa | null }) {
                `cn` memakai tailwind-merge, jadi border-0 dan bg-transparent
                di sini benar-benar mengalahkan kelas bawaannya. */
             className="border-0 bg-transparent p-0"
+            onPilih={bukaAnalis}
             title="Papan Peringkat Analis"
             /* MASUK KE BARIS JUDUL, bukan berdiri di barisnya sendiri.
                ────────────────────────────────────────────────────────────

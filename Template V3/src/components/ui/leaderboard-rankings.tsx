@@ -30,10 +30,25 @@ function nilaiUang(n: number) {
   return `${tanda}$${a.toFixed(a < 100 ? 1 : 0)}`;
 }
 
-function Baris({ r, aku }: { r: LeaderboardRankingItem; aku: boolean }) {
+function Baris({ r, aku, onPilih }: {
+  r: LeaderboardRankingItem; aku: boolean; onPilih?: (userId: string) => void;
+}) {
+  /* onPilih, BUKAN prop `to`. Berkas ini primitif tampilan dan sengaja
+     tidak tahu apa-apa soal react-router — memberinya alamat berarti
+     setiap pemakai berikutnya mewarisi keputusan rute halaman ini.
+     Ongkosnya disadari: sebagai tombol ia tidak bisa dibuka di tab baru
+     dengan klik tengah. Yang dituju sub-halaman di rute yang sama, bukan
+     dokumen berdiri sendiri, jadi tab baru memang bukan yang dicari. */
+  const Bungkus = onPilih ? 'button' : 'div';
   return (
-    <div className={cn(
-      'flex items-center gap-3 rounded-lg border px-3 py-2',
+    <Bungkus
+      {...(onPilih
+        ? { type: 'button' as const, onClick: () => onPilih(r.userId),
+            title: `Buka performa ${r.userName}` }
+        : {})}
+      className={cn(
+      'flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left',
+      onPilih && 'cursor-pointer transition-colors',
       aku ? 'border-zinc-600 bg-zinc-800/60' : 'border-transparent hover:bg-zinc-900/60',
     )}>
       <span className="angka w-5 shrink-0 text-center text-[12px] text-zinc-500">{r.rank}</span>
@@ -51,19 +66,26 @@ function Baris({ r, aku }: { r: LeaderboardRankingItem; aku: boolean }) {
         </span>
         {r.byline && <span className="block truncate text-[10.5px] text-zinc-600">{r.byline}</span>}
       </span>
+      {/* ANGKANYA DIBERI NAMA. Tanpa label, "+$66.8" di ujung kanan baris
+          bisa terbaca sebagai harga, saldo, atau biaya berlangganan —
+          tiga hal yang sama masuk akalnya di halaman ini. */}
+      <span className="shrink-0 text-[9.5px] uppercase tracking-wide text-zinc-600">PNL</span>
       <span className={cn('angka shrink-0 text-[12.5px] font-semibold',
         r.value >= 0 ? 'text-emerald-400' : 'text-red-400')}>
         {nilaiUang(r.value)}
       </span>
-    </div>
+    </Bungkus>
   );
 }
 
-export function LeaderboardRankings({ rankings, currentUserId, showPagination, defaultPageSize = 10 }: {
+export function LeaderboardRankings({ rankings, currentUserId, showPagination, defaultPageSize = 10, onPilih }: {
   rankings: LeaderboardRankingItem[];
   currentUserId?: string;
   showPagination?: boolean;
   defaultPageSize?: number;
+  /** Dipanggil saat sebuah baris ditekan. Tidak diberikan = barisnya
+   *  sekadar tampilan, persis seperti sebelumnya. */
+  onPilih?: (userId: string) => void;
 }) {
   const [ukuran, setUkuran] = React.useState(defaultPageSize);
   const [hal, setHal] = React.useState(0);
@@ -89,13 +111,13 @@ export function LeaderboardRankings({ rankings, currentUserId, showPagination, d
   return (
     <div>
       <div className="space-y-0.5">
-        {potong.map((r) => <Baris key={r.userId} r={r} aku={r.userId === currentUserId} />)}
+        {potong.map((r) => <Baris key={r.userId} r={r} aku={r.userId === currentUserId} onPilih={onPilih} />)}
       </div>
 
       {/* Baris sendiri ditempel di bawah kalau tidak ikut di halaman ini. */}
       {aku && !akuDiPotongan && (
         <div className="mt-2 border-t border-zinc-800/60 pt-2">
-          <Baris r={aku} aku />
+          <Baris r={aku} aku onPilih={onPilih} />
         </div>
       )}
 
