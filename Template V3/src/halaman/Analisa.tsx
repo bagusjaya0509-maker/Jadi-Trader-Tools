@@ -817,7 +817,7 @@ function KartuAnalisa({ a, status, milikku, onSegarkan, performa, hargaKini }: {
                 Tempatnya juga tepat secara urutan: orang yang baru saja
                 membuka level adalah orang yang detik itu juga sedang
                 memutuskan mau masuk sebesar apa. */}
-            <HitungPosisi entry={isi.entry} sl={isi.sl} kripto={pasarKripto(a)} />
+            <HitungPosisi entry={isi.entry} sl={isi.sl} kripto={pasarKripto(a)} pasangan={a.pasangan} />
             {isi.alasan && (
               /* whitespace-pre-line: analisa agen ditulis berparagraf dengan
                  judul bagian. Diperas jadi satu blok, ia berubah dari bacaan
@@ -1692,7 +1692,7 @@ export default function Analisa() {
     }
     setSibuk(true); setKabar(''); setNada('info');
     try {
-      await kirimAnalisa({
+      const hasil = await kirimAnalisa({
         /* Judul rekaman diturunkan dari ringkasan — kolomnya sudah dihapus
            dari formulir. Server tetap mewajibkannya, dan kartu-kartu lama
            yang judulnya berbeda dari ringkasannya tetap tampil apa adanya. */
@@ -1707,8 +1707,47 @@ export default function Analisa() {
         nama: profNama.trim() || pengguna?.displayName || pengguna?.email?.split('@')[0] || 'Analis',
         snapshot,
       });
+
+      /* ── TANGKAPAN LAYAR CHART IKUT TERBIT ──────────────────────────
+         Dilaporkan pemilik: "Foto analisa" selalu kosong di tiap sinyal.
+         Memang begitu — gambar dari "Susun di Chart & Entry" cuma
+         dipratinjau di formulir lalu dibuang, jadi tidak pernah ada foto
+         yang bisa ditampilkan siapa pun.
+
+         PEMBEDAANNYA DENGAN PENUTUPAN 19 AGU 2026 DIJAGA. Yang ditutup
+         waktu itu UNGGAHAN BEBAS: berkas apa pun dari cakram orang, yang
+         tidak bisa diperiksa keasliannya dan bisa berisi apa saja. Gambar
+         ini lain jenis — ia dihasilkan chart KAMI SENDIRI dari level
+         sinyal yang sedang diposting, pada saat ia diposting. Tombol
+         "Tambah foto" tetap mati; yang dibuka cuma satu jalur yang
+         isinya kami sendiri yang menggambar.
+
+         BUKAN SYARAT BERHASIL. Sinyalnya sudah tersimpan satu baris di
+         atas; menggagalkan seluruh posting karena gambarnya tidak
+         terkirim akan membuang rencana yang sudah benar. Kalau gagal,
+         dikatakan apa adanya di kabarnya — bukan didiamkan.
+
+         Batas 5 MB milik server. Diperiksa di sini juga supaya
+         penolakannya berupa kalimat yang bisa dibaca, bukan galat HTTP. */
+      let catatanFoto = '';
+      const idBaru = (hasil as { id?: string } | undefined)?.id;
+      if (sampulDraf && idBaru) {
+        if (sampulDraf.length > 5_000_000) {
+          catatanFoto = ' Tangkapan layar chart-nya terlalu besar untuk ikut, jadi tidak terpasang.';
+        } else {
+          try {
+            await tambahGambar(
+              idBaru, sampulDraf, 'Chart saat sinyal ini disusun',
+              profNama.trim() || pengguna?.displayName || 'Analis',
+            );
+          } catch {
+            catatanFoto = ' Tangkapan layar chart-nya gagal diunggah — sinyalnya sendiri sudah masuk.';
+          }
+        }
+      }
+
       setNada('ok');
-      setKabar('Analisa terposting — dan kini permanen. Semoga levelnya bekerja.');
+      setKabar('Analisa terposting — dan kini permanen. Semoga levelnya bekerja.' + catatanFoto);
       setRingkas(''); setEntry(''); setSl(''); setTp(''); setAlasan('');
       setPahamPermanen(false); setQtyDraf(0); setSampulDraf('');
       segarkan();
@@ -2383,7 +2422,7 @@ export default function Analisa() {
               <div className="mt-3 rounded-lg border border-zinc-800 bg-zinc-950/60 p-3">
                 <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1">
                   <span className="text-[11.5px] font-medium text-zinc-300">Chart yang kamu susun</span>
-                  <span className="text-[11px] text-zinc-600">— untuk diperiksa, tidak ikut terbit</span>
+                  <span className="text-[11px] text-zinc-600">— ikut terbit bersama sinyalnya</span>
                   <button onClick={() => setSampulDraf('')}
                     className="ml-auto cursor-pointer rounded border border-zinc-800 px-2 py-0.5 text-[11px] text-zinc-500 transition-colors hover:border-zinc-700 hover:text-zinc-300">
                     Sembunyikan
@@ -2393,7 +2432,8 @@ export default function Analisa() {
                      className="block w-full rounded border border-zinc-800" />
                 <p className="mt-2 text-[11px] leading-relaxed text-zinc-600">
                   Cocokkan garisnya dengan Entry, SL, dan TP di atas sebelum menekan Posting —
-                  sesudah terbit, angkanya tidak bisa diubah lagi.
+                  gambar ini ikut terbit di analisamu, dan sesudah terbit angkanya tidak bisa
+                  diubah lagi. Tekan Sembunyikan kalau tidak ingin ikut.
                 </p>
               </div>
             )}
