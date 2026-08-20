@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { RingkasAnalisa } from '@/lib/analisa';
 import { cn, uang, tanggalPendek } from '@/lib/utils';
 
@@ -118,41 +118,67 @@ export function SparklineSaldo(
   const kotak = useRef<HTMLSpanElement | null>(null);
   const [ukuran, setUkuran] = useState({ w: 0, h: 0 });
 
-  useEffect(() => {
+  /* ── MENGUKUR KOTAK GAMBARNYA ──────────────────────────────────────
+     useLayoutEffect TANPA DAFTAR KEBERGANTUNGAN: ia berjalan sesudah
+     SETIAP render, sesudah tata letak dihitung, sebelum layar dilukis.
+     Tiga sumber perubahan ukuran terjawab sekaligus, dan ketiganya nyata
+     di halaman ini:
+
+     • Render pertama — kotaknya baru ada sesudah efeknya jalan.
+     • Batang gulir muncul waktu datanya datang. Halaman jadi lebih
+       sempit, kartunya ikut menyempit ~2 px. Tidak ada peristiwa apa pun
+       yang mengabarkan ini: jendelanya tidak berubah, dan observer tidak
+       melapor untuk susunan ini. Yang mengabarkannya cuma render yang
+       memuat datanya sendiri.
+     • Jendela digeser — ditangani pendengar resize di bawah.
+
+     Aman dari putaran tanpa henti karena penyimpannya menolak menyimpan
+     ukuran yang sama; setelah satu render tambahan, keadaannya diam.
+
+     TIDAK MEMAKAI requestAnimationFrame. Sempat dicoba dan terlihat
+     bekerja, padahal tidak: rAF berhenti dijalankan begitu halamannya
+     tidak sedang dilukis — tab di belakang, jendela ditutupi, peramban
+     yang tidak menggambar bingkai. Pengukuran yang cuma dijadwalkan lewat
+     rAF berarti kartu di tab belakang tidak pernah dikoreksi, dan
+     ketahuannya baru waktu orang berpindah ke tab itu. */
+  useLayoutEffect(() => {
     const el = kotak.current;
     if (!el) return;
-    /* contentRect, bukan offsetWidth: yang dipakai menggambar adalah ruang
-       DI DALAM kotaknya, dan pembacaan lewat offsetWidth memaksa layout
-       dihitung ulang tiap kali — di halaman berisi belasan kartu, itu
-       belasan perhitungan tiap kali jendela digeser satu piksel. */
-    const pakai = (w: number, h: number) =>
-      setUkuran((s) => ((s.w === w && s.h === h) ? s : { w, h }));
-
-    /* DIUKUR SEKALI DI SINI, tidak menunggu ResizeObserver.
-       ──────────────────────────────────────────────────────────────────
-       Terbukti perlu: di kartu analis yang baru, kurvanya duduk sebagai
-       lapisan berposisi absolut dengan tinggi persen, dan di susunan itu
-       observer-nya tidak pernah melaporkan apa pun — ukurannya tetap 0x0
-       selamanya, jadi grafiknya tidak digambar sama sekali sementara
-       kotaknya nyata 190x172 di layar.
-
-       Pengukuran langsung menjawab pertanyaan yang sama tanpa menunggu
-       peristiwa: berapa ukuran kotak ini SEKARANG. Observer tetap dipasang
-       untuk perubahan sesudahnya — jendela digeser, panel dilipat. */
-    const r0 = el.getBoundingClientRect();
-    pakai(Math.round(r0.width), Math.round(r0.height));
-
-    const ro = new ResizeObserver((entri) => {
-      const r = entri[0]?.contentRect;
-      if (!r) return;
-      /* contentRect bisa 0 saat induknya sedang disembunyikan; kalau
-         dipakai, grafik yang sudah tergambar ikut hilang dan tidak pernah
-         kembali karena ukuran berikutnya tidak berubah lagi. */
-      if (r.width < 1 && r.height < 1) return;
-      pakai(Math.round(r.width), Math.round(r.height));
+    const r = el.getBoundingClientRect();
+    /* Nol berarti induknya sedang disembunyikan. Kalau dipakai, grafik
+       yang sudah tergambar ikut hilang dan tidak pernah kembali — ukuran
+       berikutnya sama dengan yang tersimpan, jadi tidak ada yang memicu
+       gambar ulang. */
+    if (r.width < 1 && r.height < 1) return;
+    setUkuran((u) => {
+      const w = Math.round(r.width), h = Math.round(r.height);
+      return (u.w === w && u.h === h) ? u : { w, h };
     });
-    ro.observe(el);
-    return () => ro.disconnect();
+  });
+
+  /* Jendela digeser. Dipasang sekali, dan mengukur LANGSUNG — bukan
+     dijadwalkan. Satu getBoundingClientRect per kartu per peristiwa
+     resize memang membaca tata letak, tapi peramban sudah menggabungkan
+     peristiwa resize jadi satu per bingkai; belasan pembacaan di bingkai
+     yang tata letaknya toh baru dihitung ulang bukan beban yang terasa. */
+  useEffect(() => {
+    const ukur = () => {
+      const el = kotak.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      if (r.width < 1 && r.height < 1) return;
+      setUkuran((u) => {
+        const w = Math.round(r.width), h = Math.round(r.height);
+        return (u.w === w && u.h === h) ? u : { w, h };
+      });
+    };
+    window.addEventListener('resize', ukur);
+    /* Observer tetap dipasang: di susunan kartu analis ia memang tidak
+       pernah melapor, tapi komponen ini juga dipakai di tempat lain yang
+       kotaknya biasa, dan di sana ia yang paling tepat. */
+    const ro = new ResizeObserver(ukur);
+    if (kotak.current) ro.observe(kotak.current);
+    return () => { window.removeEventListener('resize', ukur); ro.disconnect(); };
   }, []);
 
   const { w, h } = ukuran;

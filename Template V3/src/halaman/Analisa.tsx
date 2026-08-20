@@ -1136,7 +1136,7 @@ export default function Analisa() {
      dijadikan 'market', bawaan di dalam kanal tidak akan pernah kepakai. */
   const subUrl = cariSub.get('sub');
   const subMinta: IdSub | null = SUB.some((s) => s.id === subUrl) ? (subUrl as IdSub) : null;
-  const { pengguna, pemilik, langganan } = useAuth();
+  const { pengguna, pemilik, langganan, memuat: memuatAuth } = useAuth();
   /* Copy Signal tidak termasuk paket gratis — itu yang tertulis di kartu
      harga, jadi itu yang harus berlaku di sini. Kartu harga yang menjanjikan
      pembeda lalu tidak menegakkannya bukan cuma bohong kepada pembeli; ia
@@ -1756,6 +1756,10 @@ export default function Analisa() {
   /* Terkunci karena paket. Bentuknya kalimat + jalan keluar, bukan layar
      kosong: yang membacanya orang yang sudah punya akun dan sedang mencari
      alasan untuk naik paket, bukan orang tersesat. */
+  if (memuatAuth || (!!pengguna && !pemilik && memuatPaket)) {
+    return <div className="min-h-[70vh]" />;
+  }
+
   if (kunciCopy) {
     return (
       <div className="flex min-h-[70vh] items-center justify-center p-6">
@@ -2717,8 +2721,9 @@ export default function Analisa() {
                       {/* Titik-titik raster, memudar ke kiri. Ia memberi
                           kedalaman tanpa menambah garis — dan garis lagi di
                           kartu yang sudah bertepi cuma menambah kebisingan. */}
-                      <span aria-hidden className="absolute inset-0 block text-zinc-100/[0.07]"
-                            style={{ WebkitMaskImage: 'linear-gradient(to right, transparent, black 55%)',
+                      <span aria-hidden className="absolute inset-0 block"
+                            style={{ color: warnaAksen, opacity: 0.1,
+                                     WebkitMaskImage: 'linear-gradient(to right, transparent, black 55%)',
                                      maskImage: 'linear-gradient(to right, transparent, black 55%)' }}>
                         <svg className="h-full w-full">
                           <defs>
