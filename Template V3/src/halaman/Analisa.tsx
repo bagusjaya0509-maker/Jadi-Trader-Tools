@@ -5,7 +5,7 @@ import { usePaket, LABEL_PAKET } from '@/lib/paket';
 import { useHargaPaket } from '@/lib/harga-akses';
 import {
   Loader2, Lock, Unlock, Send, X, CheckCircle2,
-  TrendingUp, TrendingDown, RefreshCw, Radar, Sparkles, ImagePlus, Images, Flag, Ban, Trash2, Plus,
+  TrendingUp, TrendingDown, ArrowUp, ArrowDown, RefreshCw, Radar, Sparkles, ImagePlus, Images, Flag, Ban, Trash2, Plus,
   Settings2, UserRound, Pin, TriangleAlert, ArrowLeft, CandlestickChart, ChevronDown, ChevronRight,
 } from 'lucide-react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
@@ -2654,6 +2654,9 @@ export default function Analisa() {
               const terakhirPosting = Math.max(...waktuPosting);
               const p = perfDari(uid);
               const r = ringkasKanal(sinyal, p, risikoPerSinyal);
+              /* Warna aksen kartu mengikuti arah hasilnya — sama dengan
+                 warna kurvanya, supaya latar dan garis tidak berselisih. */
+              const warnaAksen = p && p.hasilDolar < 0 ? '#f87171' : '#34d399';
               const disemat = disematkan(uid);
               return (
                 /* Bukan satu <button> besar lagi: tombol pin ada DI DALAM
@@ -2678,119 +2681,102 @@ export default function Analisa() {
                         dengan bingkai. */
                     'border-zinc-800 hover:border-zinc-600')}>
                   {a0.agen && <LencanaAgen geser />}
-                  <button onClick={() => setKanalBuka(uid)}
-                    className="w-full cursor-pointer p-4 text-left">
-                    <div className="flex items-center gap-2.5 pr-8">
-                      <AvatarAnalis nama={a0.nama} foto={a0.foto} uid={uid}
-                                    className="size-10" kelasHuruf="text-[14px]" />
-                      <span className="min-w-0">
-                        <span className="flex items-center gap-1.5">
-                          <span className="truncate text-[13.5px] font-medium text-zinc-100">{a0.nama}</span>
-                          {/* TITIK HIJAU = SEDANG MEMBUKA SITUS.
-                              Datang dari server (kunjungan terakhir < 5
-                              menit), tidak pernah ditebak layar. Gunanya
-                              satu: menimbang apakah sinyal barunya mungkin
-                              segera datang, atau kanal ini sedang sepi.
+                  {/* ── KARTU ANALIS, TATA LETAK METRIK ────────────────
+                      Bentuknya mengikuti contoh yang dikirim pemilik: kurva
+                      jadi LATAR di paruh kanan, angka besar berdiri di
+                      depannya, dan kaki kartu memuat rinciannya.
 
-                              title-nya wajib. Titik berwarna tanpa
-                              keterangan adalah teka-teki, dan yang paling
-                              sering ditebak salah justru warna hijau —
-                              dikira "terverifikasi". */}
-                          {sinyal.some((x) => x.aktif) && (
-                            <span title="Sedang membuka situs"
-                                  className="size-1.5 shrink-0 rounded-full bg-emerald-500" />
-                          )}
+                      Kenapa bentuk ini cocok di sini, bukan sekadar bagus:
+                      yang dijawab kartu ini satu pertanyaan — "orang ini
+                      hasilnya bagaimana" — dan bentuk lama menjawabnya
+                      dengan tiga kotak setara, sehingga mata harus memilih
+                      dulu mana yang dibaca. Sekarang ada satu angka yang
+                      jelas paling besar, dan sisanya keterangan atasnya.
+
+                      Kurvanya jadi latar, bukan kotak sendiri: bentuk
+                      perjalanan hasil adalah KONTEKS angka itu, bukan
+                      barang kedua yang setara dengannya. */}
+                  <button onClick={() => setKanalBuka(uid)}
+                    className="relative block w-full cursor-pointer overflow-hidden text-left">
+                    {/* Wilayah kurva: 62% kanan, di belakang isi kartu. */}
+                    <span className="pointer-events-none absolute inset-y-0 right-0 z-0 block w-[62%]">
+                      <span aria-hidden className="absolute inset-0 block"
+                            style={{ background: `linear-gradient(to left, ${warnaAksen}1f, transparent 78%)` }} />
+                      {/* Titik-titik raster, memudar ke kiri. Ia memberi
+                          kedalaman tanpa menambah garis — dan garis lagi di
+                          kartu yang sudah bertepi cuma menambah kebisingan. */}
+                      <span aria-hidden className="absolute inset-0 block text-zinc-100/[0.07]"
+                            style={{ WebkitMaskImage: 'linear-gradient(to right, transparent, black 55%)',
+                                     maskImage: 'linear-gradient(to right, transparent, black 55%)' }}>
+                        <svg className="h-full w-full">
+                          <defs>
+                            <pattern id={'kisi-' + uid} width="14" height="14" patternUnits="userSpaceOnUse">
+                              <circle cx="1" cy="1" r="1" fill="currentColor" />
+                            </pattern>
+                          </defs>
+                          <rect width="100%" height="100%" fill={'url(#kisi-' + uid + ')'} />
+                        </svg>
+                      </span>
+                      <SparklineSaldo sinyal={sinyal} kelas="absolute inset-x-0 bottom-0 h-[76%] w-full"
+                                      modal={performa?.modal ?? 1000} />
+                    </span>
+
+                    <span className="relative z-10 block px-4 pt-4">
+                      <span className="flex items-start gap-2.5 pr-8">
+                        <AvatarAnalis nama={a0.nama} foto={a0.foto} uid={uid}
+                                      className="size-9 shrink-0" kelasHuruf="text-[13px]" />
+                        <span className="min-w-0 flex-1">
+                          <span className="flex items-center gap-1.5">
+                            <span className="truncate text-[13.5px] font-semibold tracking-tight text-zinc-100">{a0.nama}</span>
+                            {/* Titik hijau = sedang membuka situs. Datang
+                                dari server, tidak pernah ditebak layar. */}
+                            {sinyal.some((x) => x.aktif) && (
+                              <span title="Sedang membuka situs"
+                                    className="size-1.5 shrink-0 rounded-full bg-emerald-500" />
+                            )}
+                          </span>
+                          <span className="block truncate text-[10.5px] text-zinc-500">
+                            Terakhir posting {tanggalPendek(terakhirPosting)}
+                            {uid === pengguna?.uid && ' · kanalmu'}
+                          </span>
                         </span>
-                        {/* "Terakhir posting", bukan jumlah unggahan.
-                            Jumlahnya sudah terbaca di baris hitungan di
-                            bawah (menang/kalah/jalan/pending/batal), dan
-                            yang tidak terjawab di mana pun adalah apakah
-                            kanal ini masih hidup. Analis dengan 40 sinyal
-                            yang berhenti dua bulan lalu dan yang memposting
-                            kemarin tidak boleh terbaca sama. */}
-                        <span className="block text-[11px] text-zinc-600">
-                          Terakhir posting {tanggalPendek(terakhirPosting)}
-                          {uid === pengguna?.uid && ' · kanalmu'}
+                        {/* Winrate naik ke kepala sebagai penunjuk arah —
+                            satu angka dengan panahnya, sejajar nama. Di
+                            bawah ia dulu bersaing dengan angka hasil; di
+                            sini ia jelas jadi keterangan, bukan saingan. */}
+                        <span className={cn('flex shrink-0 items-center gap-1 text-[12.5px] font-medium',
+                          r.winrate === null ? 'text-zinc-600' : r.winrate >= 50 ? 'text-emerald-400' : 'text-red-400')}>
+                          {r.winrate !== null && (
+                            r.winrate >= 50 ? <ArrowUp className="size-3.5" strokeWidth={2.5} />
+                                            : <ArrowDown className="size-3.5" strokeWidth={2.5} />
+                          )}
+                          {r.winrate !== null ? persen(r.winrate) : '—'}
                         </span>
                       </span>
-                    </div>
-                    <LencanaKanal r={r} className="mt-2.5" />
-                    {/* Winrate & Estimasi dipersempit, kurvanya mengisi
-                        kolom ketiga. Dua angka menjawab "berapa"; kurva
-                        menjawab "ke mana arahnya" — dan yang terakhir itu
-                        yang tidak bisa dibaca dari angka mana pun. Tujuh
-                        menang kecil yang kalah oleh dua rugi besar
-                        menghasilkan winrate 78% dan kurva yang menurun.
 
-                        Kolom kurvanya PALING LEBAR (1,4fr) walau isinya
-                        paling sedikit: garis butuh lebar untuk punya bentuk,
-                        sementara angka tidak bertambah jelas karena kotaknya
-                        dilebarkan. */}
-                    {/* Winrate TANPA kotak; Estimasi dan kurvanya DISATUKAN.
+                      <LencanaKanal r={r} className="mt-2.5" />
 
-                        Tiga kotak bertepi berjejer membuat kartu ini terbaca
-                        sebagai tiga hal setara, padahal dua di antaranya
-                        satu hal: "berapa hasilnya" dan "bagaimana bentuk
-                        perjalanan hasil itu" adalah angka dan grafik dari
-                        deret yang SAMA. Menyatukannya jadi satu kotak
-                        menjadikannya satu pernyataan, dan winrate yang
-                        berdiri sendiri di kirinya jadi pembanding — bukan
-                        anggota ketiga dari daftar yang tidak ada.
+                      {/* ANGKA BESAR: estimasi hasil. Satu-satunya angka
+                          sebesar ini di kartu, dan itu memang yang dicari
+                          orang yang sedang memilih siapa ditiru. */}
+                      <span className={cn('mt-3 block text-[34px] font-medium leading-none tracking-tight',
+                        p ? (p.hasilDolar >= 0 ? 'text-emerald-400' : 'text-red-400') : 'text-zinc-600')}>
+                        {p ? uang(p.hasilDolar, true) : '—'}
+                      </span>
+                      <span className="mt-1 block text-[10.5px] text-zinc-600">estimasi dari modal $1.000</span>
+                    </span>
 
-                        Winrate kehilangan tepinya karena ia satu angka,
-                        bukan satu panel. Kotak yang isinya satu baris teks
-                        cuma menambah garis di layar yang sudah penuh kartu
-                        bertepi. */}
-                    <div className="mt-3 flex items-center gap-3">
-                      <div className="shrink-0">
-                        <div className="text-[10.5px] text-zinc-600">Winrate</div>
-                        <div className={cn('angka text-[15px] font-semibold',
-                          r.winrate !== null ? (r.winrate >= 50 ? 'text-emerald-400' : 'text-zinc-100') : 'text-zinc-600')}>
-                          {r.winrate !== null ? persen(r.winrate) : '—'}
-                        </div>
-                      </div>
-
-                      <div className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg border border-zinc-800/60 p-2.5">
-                        <div className="shrink-0">
-                          <div className="text-[10.5px] text-zinc-600">Estimasi $1.000</div>
-                          <div className={cn('angka text-[15px] font-semibold',
-                            p ? (p.hasilDolar >= 0 ? 'text-emerald-400' : 'text-red-400') : 'text-zinc-600')}>
-                            {p ? uang(p.hasilDolar, true) : '—'}
-                          </div>
-                        </div>
-                        {/* Kurvanya mengisi sisa lebar, di kanan angkanya.
-                            Garis putus-putus di dalamnya modal awal: di
-                            atasnya untung, di bawahnya rugi — patokan yang
-                            membuat bentuknya bisa dibaca tanpa satu angka.
-
-                            Disembunyikan kalau belum ada sinyal selesai:
-                            garis lurus sepanjang kotak bukan informasi, dan
-                            ia terbaca seperti akun yang datar padahal
-                            artinya belum ada yang bisa digambar. */}
-                        <SparklineSaldo sinyal={sinyal} kelas="ml-auto h-[40px] w-full min-w-0"
-                          modal={performa?.modal ?? 1000} />
-                      </div>
-                    </div>
-                    <BarisHitung r={r} />
-                    {/* RENTANG WAKTU DI POJOK KANAN BAWAH — permintaan
-                        pemilik, dan ia menutup lubang yang sungguhan:
-                        winrate 62,5% dan estimasi +$56 tidak berarti apa-apa
-                        tanpa tahu itu hasil sepekan atau setahun. Angka
-                        tanpa rentang waktunya adalah klaim, bukan rekam
-                        jejak.
-
-                        Diambil dari sinyal PERTAMA dan TERAKHIR yang
-                        diposting analisnya, bukan dari periode papan
-                        peringkat: yang dihitung kartu ini memang seluruh
-                        sinyalnya, bukan bulan berjalan. */}
-                    <div className="mt-1.5 text-right text-[10px] text-zinc-600">
-                      {tanggalPendek(mulaiPosting)} – {tanggalPendek(terakhirPosting)}
-                    </div>
-                    {r.winrate === null && (
-                      <p className="mt-2 text-[10.5px] leading-relaxed text-zinc-600">
-                        Belum ada sinyal yang selesai — angka muncul setelah harga menyentuh SL/TP.
-                      </p>
-                    )}
+                    {/* KAKI KARTU — buram, di atas kurvanya.
+                        Hitungan di kiri, rentang waktunya di kanan pada
+                        BARIS YANG SAMA (permintaan pemilik). Keduanya
+                        keterangan tentang deretan sinyal yang sama: berapa
+                        banyak, dan sepanjang apa. */}
+                    <span className="relative z-10 mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-zinc-800/70 bg-zinc-900/70 px-4 py-2.5">
+                      <BarisHitung r={r} />
+                      <span className="angka ml-auto shrink-0 text-[10px] text-zinc-600">
+                        {tanggalPendek(mulaiPosting)} – {tanggalPendek(terakhirPosting)}
+                      </span>
+                    </span>
                   </button>
                   {/* PENANDA, BUKAN TOMBOL — dan hanya ada kalau memang
                       disematkan. Permintaan pemiliknya, dan ia benar: kartu
