@@ -1308,6 +1308,57 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
      berjalan ulang akan menyeretnya balik ke angka analisa sambil ia
      memegang mouse. `kunci` berubah hanya kalau alamatnya benar-benar
      menunjuk analisa lain. */
+  /* ── GARIS ORDER MILIK SATU SIMBOL SAJA ──────────────────────────────
+     Dilaporkan pemilik: di chart BTCUSD muncul tiga label harga merah,
+     putih, dan hijau di sekitar 4.400-4.500 — sisa Entry/SL/TP sinyal
+     XAUUSD yang terbawa dari alamat, menempel di kaki sumbu karena
+     angkanya tidak ada hubungannya dengan skala BTC di 72.000.
+
+     Bukan sekadar jelek: garis order yang tertinggal di simbol lain adalah
+     rencana yang tampak masih berlaku padahal tidak, dan panel tiketnya
+     ikut hidup — satu tekan Kirim di situ mengirim ukuran yang dihitung
+     dari level pasar yang berbeda sama sekali.
+
+     Level itu milik SIMBOLNYA. Begitu simbolnya berganti, tiketnya dibuang
+     seutuhnya — sama persis dengan yang dikerjakan tombol Batal.
+
+     DIBANDINGKAN DENGAN REF, bukan dijalankan tiap render: pada render
+     pertama simbolnya belum berganti dari apa pun, jadi rencana yang
+     memang datang dari alamat ("Buka di Chart") tidak ikut terhapus.
+
+     DITARUH DI ATAS efek pemasang level dari alamat. Waktu seseorang
+     berpindah dari satu analisa ke analisa lain, kedua efek menyala pada
+     render yang sama — dan React menjalankannya berurutan, jadi yang di
+     atas membersihkan lebih dulu dan yang di bawah mengisinya kembali.
+     Dibalik, yang tayang justru chart kosong. */
+  const simbolTiket = useRef(simbol);
+  useEffect(() => {
+    if (simbolTiket.current === simbol) return;
+    simbolTiket.current = simbol;
+
+    /* SATU PENGECUALIAN, dan tanpanya perbaikan ini merusak "Buka di Chart".
+       ──────────────────────────────────────────────────────────────────
+       Urutan efek tidak cukup menyelamatkannya. Saat alamat berubah ke
+       analisa bersimbol lain, efek penyelaras alamat memanggil setSimbol —
+       dan simbol barunya baru tiba di RENDER BERIKUTNYA. Pada render yang
+       sama, level dari alamat sudah dipasang; di render berikutnya efek ini
+       melihat simbolnya berganti lalu menghapus level yang baru saja
+       terpasang. Yang tayang: chart benar, garis hilang.
+
+       Jadi kalau alamat yang sedang berlaku memang menunjuk simbol ini DAN
+       membawa levelnya, tiketnya dibiarkan — level itu memang miliknya. */
+    const simbolAlamat = rapikanSimbol(cari.get('simbol') || '');
+    const bawaLevel = !!(cari.get('entry') || cari.get('sl') || cari.get('tp'));
+    if (simbolAlamat === simbol && bawaLevel) return;
+
+    setDraf(null); setRencana({}); setDariSinyal(false);
+    setKabarNyata('');
+    setCatatanTiket({ emosi: 'Netral', alasan: '' });
+    entryDigeser.current = false;
+    seretTangan.current = false;
+    qtyDemo.current = 0; setQtyTampil(0);
+  }, [simbol, cari]);
+
   const kunciAnalisa = `${cari.get('arah') || ''}|${cari.get('entry') || ''}|${cari.get('sl') || ''}|${cari.get('tp') || ''}`;
   const analisaTerpasang = useRef('');
   useEffect(() => {
