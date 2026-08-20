@@ -2790,6 +2790,7 @@ export default function Analisa() {
                             sini ia jelas jadi keterangan, bukan saingan. */}
                         <span className={cn('flex shrink-0 items-center gap-1 text-[12.5px] font-medium',
                           r.winrate === null ? 'text-zinc-600' : r.winrate >= 50 ? 'text-emerald-400' : 'text-red-400')}>
+                          <span className="text-[9.5px] font-normal text-zinc-500">WR</span>
                           {r.winrate !== null && (
                             r.winrate >= 50 ? <ArrowUp className="size-3.5" strokeWidth={2.5} />
                                             : <ArrowDown className="size-3.5" strokeWidth={2.5} />
