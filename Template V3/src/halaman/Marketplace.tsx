@@ -13,6 +13,7 @@ import { useAuth } from '@/lib/auth';
 import { suratLisensi, sisipkanPenanda, unduhTeks } from '@/lib/surat-lisensi';
 import { useUlasan, kirimUlasan, hapusUlasan } from '@/lib/ulasan';
 import { useTutupLuar } from '@/lib/tutup-luar';
+import { useHargaPaket, rupiah } from '@/lib/harga-akses';
 import {
   ambilSumberGratis, ambilSumberBerlisensi, tautanBerkas,
   mintaLisensi, usePermintaanSaya,
@@ -278,6 +279,9 @@ function MintaKode({ produk, lynk }: { produk: string; lynk?: string }) {
 }
 
 export default function Marketplace() {
+  /* Kurs untuk keterangan rupiah di bawah harga dolar. Diambil sekali di
+     sini, bukan di dalam tiap kartu — angkanya sama untuk semua produk. */
+  const { kursUsd } = useHargaPaket();
   const [aktif, setAktif] = useState<Produk | null>(null);
   /* DINAIKKAN KE SINI DARI DALAM JSX MODALNYA.
      ────────────────────────────────────────────────────────────────────
@@ -438,12 +442,22 @@ export default function Marketplace() {
                 {/* Harga lama dicoret DI SEBELAH harga berlaku, bukan
                     menggantikannya: yang harus terbaca lebih dulu adalah
                     angka yang benar-benar dibayar. */}
-                <div className="angka flex items-baseline gap-2 text-xl font-semibold tracking-tight">
-                  {p.harga === 0
-                    ? <span className="text-emerald-500">Free</span>
-                    : <span className="text-zinc-100">${p.harga}</span>}
-                  {p.hargaAsal && (
-                    <span className="text-[13px] font-normal text-zinc-600 line-through">${p.hargaAsal}</span>
+                {/* RUPIAH DI BAWAH DOLARNYA, bukan menggantikannya.
+                    Harganya memang ditetapkan dalam dolar dan itu yang
+                    ditagih; rupiah di sini keterangan, sama seperti di
+                    halaman harga. Menukar posisinya berarti menjanjikan
+                    angka rupiah yang tidak dijamin kursnya. */}
+                <div>
+                  <div className="angka flex items-baseline gap-2 text-xl font-semibold tracking-tight">
+                    {p.harga === 0
+                      ? <span className="text-emerald-500">Free</span>
+                      : <span className="text-zinc-100">${p.harga}</span>}
+                    {p.hargaAsal && (
+                      <span className="text-[13px] font-normal text-zinc-600 line-through">${p.hargaAsal}</span>
+                    )}
+                  </div>
+                  {p.harga > 0 && (
+                    <div className="angka mt-0.5 text-[11px] text-zinc-600">{rupiah(p.harga, kursUsd)}</div>
                   )}
                 </div>
                 <button
@@ -582,15 +596,20 @@ export default function Marketplace() {
             </div>
 
             <div className="p-6">
-              <div className="angka mb-5 flex items-baseline gap-2.5 text-2xl font-semibold">
-                {aktif.harga === 0 ? <span className="text-emerald-500">Free</span> : <span className="text-zinc-100">${aktif.harga}</span>}
-                {aktif.hargaAsal && (
-                  <>
-                    <span className="text-[15px] font-normal text-zinc-600 line-through">${aktif.hargaAsal}</span>
-                    <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-emerald-400">
-                      harga perkenalan
-                    </span>
-                  </>
+              <div className="mb-5">
+                <div className="angka flex items-baseline gap-2.5 text-2xl font-semibold">
+                  {aktif.harga === 0 ? <span className="text-emerald-500">Free</span> : <span className="text-zinc-100">${aktif.harga}</span>}
+                  {aktif.hargaAsal && (
+                    <>
+                      <span className="text-[15px] font-normal text-zinc-600 line-through">${aktif.hargaAsal}</span>
+                      <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-emerald-400">
+                        harga perkenalan
+                      </span>
+                    </>
+                  )}
+                </div>
+                {aktif.harga > 0 && (
+                  <div className="angka mt-1 text-[12px] text-zinc-600">{rupiah(aktif.harga, kursUsd)}</div>
                 )}
               </div>
               <p className="mb-6 text-[13.5px] leading-[1.75] text-zinc-400">{aktif.ringkas}</p>

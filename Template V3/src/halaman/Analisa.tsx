@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { usePaket, LABEL_PAKET } from '@/lib/paket';
+import { useHargaPaket } from '@/lib/harga-akses';
 import {
   Loader2, Lock, Unlock, Send, X, CheckCircle2,
   TrendingUp, TrendingDown, RefreshCw, Radar, Sparkles, ImagePlus, Images, Flag, Ban, Trash2, Plus,
@@ -1460,7 +1461,34 @@ export default function Analisa() {
   }
 
 
-  const [hargaJual, setHargaJual] = useState(5);
+  /** Harga akses yang DIKETIK analis, dalam RUPIAH, sebagai teks.
+   *
+   *  TEKS, bukan angka: kosong harus bisa dibedakan dari nol. Sebagai
+   *  number, "belum diisi" dan "sengaja digratiskan" jadi nilai yang sama
+   *  (0), dan kolomnya tidak pernah bisa benar-benar kosong — angka 0
+   *  yang menempel di kolom membuat orang mengira ia sudah memilih.
+   *
+   *  RUPIAH, bukan dolar. Yang memakai ini analis Indonesia; menyuruhnya
+   *  menaksir "$5 itu berapa" tiap kali memposting adalah pekerjaan yang
+   *  tidak perlu ada. Dolarnya tetap yang disimpan — lihat hargaUsd. */
+  const [hargaJual, setHargaJual] = useState('');
+  const { kursUsd } = useHargaPaket();
+
+  /** Rupiah yang diketik -> dolar yang DISIMPAN.
+   *
+   *  Dolar tetap satuan simpanan karena seluruh jalur sesudah ini —
+   *  kartu sinyal, gerbang beli, katalog — sudah berbicara dolar, dan
+   *  mengubah satuannya berarti menyentuh data yang sudah terbit.
+   *
+   *  Kursnya BEKU pada saat memposting: yang tersimpan hasil bagi, bukan
+   *  rupiahnya. Kalau kurs di setelan berubah kelak, rupiah yang
+   *  ditampilkan ulang bisa bergeser sedikit dari yang diketik. Dibiarkan
+   *  begitu — menyimpan dua satuan sekaligus berarti suatu hari keduanya
+   *  berbeda, dan yang mana yang benar tidak akan bisa dijawab. */
+  const hargaRp = Math.max(0, Number(hargaJual.replace(/[^0-9]/g, '')) || 0);
+  const hargaUsd = hargaRp > 0 && kursUsd > 0
+    ? Math.round((hargaRp / kursUsd) * 100) / 100
+    : 0;
   const [ringkas, setRingkas] = useState('');
   const [entry, setEntry] = useState('');
   const [sl, setSl] = useState('');
@@ -1471,6 +1499,24 @@ export default function Analisa() {
      karena tiap posting adalah komitmen baru yang tidak bisa ditarik. */
 
   const [pahamPermanen, setPahamPermanen] = useState(false);
+
+  /** Apa yang membuat tombol Posting masih terkunci.
+   *
+   *  Ada karena tooltip saja TIDAK CUKUP: di layar sentuh ia tidak pernah
+   *  muncul sama sekali, dan tombol mati tanpa keterangan terbaca sebagai
+   *  halaman yang rusak — bukan sebagai formulir yang belum lengkap.
+   *  Dilaporkan pemilik setelah mengosongkan SL dan TP lalu tidak
+   *  menemukan satu pun petunjuk tentang apa yang kurang.
+   *
+   *  Urutannya mengikuti urutan kolomnya di layar, supaya matanya turun
+   *  sekali saja dari daftar ini ke kolom yang harus diisi. */
+  const kurangIsi = [
+    !ringkas.trim() && 'Ringkasan publik — ini yang jadi judul kartunya',
+    !entry && 'Harga Entry',
+    !sl && 'Stop Loss (SL)',
+    !tp && 'Take Profit (TP)',
+    !pahamPermanen && 'Centang persetujuan di atas tombol',
+  ].filter(Boolean) as string[];
   /* Sampul dari Chart & Entry. Data URL JPEG, diunggah SESUDAH analisanya
      terposting — endpoint galeri butuh id analisanya, dan id itu baru ada
      setelah POST berhasil. */
@@ -1639,7 +1685,7 @@ export default function Analisa() {
            yang judulnya berbeda dari ringkasannya tetap tampil apa adanya. */
         judul: (ringkas.trim() || `${pasangan.trim().toUpperCase()} · ${arah}`).slice(0, 80),
         pasangan: pasangan.trim().toUpperCase(), arah, pasar,
-        harga: hargaJual, ringkas: ringkas.trim(),
+        harga: hargaUsd, ringkas: ringkas.trim(),
         isi: { entry: Number(entry) || 0, sl: Number(sl) || 0, tp: Number(tp) || 0, alasan: alasan.trim() },
         /* Nama PROFIL didahulukan. Server menimpanya lagi saat membaca,
            jadi ini cuma cadangan — tapi cadangan yang benar: tanpa ini,
@@ -2112,8 +2158,21 @@ export default function Analisa() {
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-[11px] text-zinc-500">Harga akses ($, 0 = gratis)</label>
-                <input type="number" value={hargaJual} onChange={(e) => setHargaJual(Number(e.target.value) || 0)} className={cn(KELAS_ISIAN, 'angka')} />
+                <label className="mb-1 block text-[11px] text-zinc-500">Harga akses (Rp)</label>
+                {/* Placeholder "—", bukan 0. Kolom yang menganggur harus
+                    terbaca sebagai BELUM DIPILIH; angka 0 yang menempel di
+                    situ terbaca sebagai pilihan yang sudah diambil. */}
+                <input value={hargaJual} inputMode="numeric" placeholder="—"
+                       onChange={(e) => setHargaJual(e.target.value.replace(/[^0-9]/g, ''))}
+                       className={cn(KELAS_ISIAN, 'angka')} />
+                {/* Terjemahannya ditulis di layar, bukan disimpan diam-diam.
+                    Yang disimpan memang dolar; analis berhak tahu angka
+                    berapa yang akan dilihat pembelinya. */}
+                <p className="mt-1 text-[10.5px] text-zinc-600">
+                  {hargaRp === 0
+                    ? <span className="text-emerald-500/90">Kosong = gratis</span>
+                    : <>Rp {hargaRp.toLocaleString('id-ID')} · tersimpan <span className="angka text-zinc-400">{uang(hargaUsd)}</span></>}
+                </p>
               </div>
               <div><label className="mb-1 block text-[11px] text-zinc-500">Entry</label>
                 <input value={entry} onChange={(e) => setEntry(e.target.value)} inputMode="decimal" className={cn(KELAS_ISIAN, 'angka')} /></div>
@@ -2377,6 +2436,26 @@ export default function Analisa() {
                       className="mt-2.5 inline-block rounded-md bg-zinc-100 px-3.5 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white">
                   Lihat paket
                 </Link>
+              </div>
+            )}
+
+            {/* DAFTAR YANG KURANG, DI LAYAR — bukan cuma di tooltip.
+                Muncul hanya kalau aksesnya memang sudah ada: yang bermode
+                pratinjau sudah dapat kotak birunya sendiri di atas, dan dua
+                keterangan bertumpuk tentang dua sebab berbeda cuma membuat
+                keduanya tidak dibaca. */}
+            {bolehPosting && kurangIsi.length > 0 && (
+              <div className="mt-3 rounded-lg border border-amber-500/20 bg-amber-500/[0.04] px-3.5 py-2.5">
+                <p className="text-[11.5px] font-medium text-amber-300/90">
+                  Belum bisa diposting — lengkapi dulu:
+                </p>
+                <ul className="mt-1 space-y-0.5">
+                  {kurangIsi.map((k) => (
+                    <li key={k} className="flex gap-1.5 text-[11.5px] leading-relaxed text-zinc-400">
+                      <span className="text-zinc-600">·</span>{k}
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
 
