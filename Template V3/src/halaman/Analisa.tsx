@@ -1782,7 +1782,18 @@ export default function Analisa() {
       )}
 
       <div className="mb-4 flex flex-wrap items-center gap-1 border-t border-zinc-800/80 pt-3">
-        {tabTampil.map((s) => (
+        {/* TAB TIDAK DIGAMBAR KALAU CUMA SATU.
+            ────────────────────────────────────────────────────────────
+            Sejak posting jadi tombol +, daftar kanal tinggal punya satu
+            tab: "Market Signal". Tab tunggal tidak menawarkan pilihan apa
+            pun — ia cuma label bergaris bawah yang menamai halaman yang
+            namanya sudah tertulis di kepala aplikasi.
+
+            Syaratnya jumlah, bukan diDepan, supaya ia mengurus dirinya
+            sendiri: kalau suatu hari ada tab kedua di daftar kanal,
+            labelnya kembali tanpa ada yang perlu ingat menyalakannya. Di
+            dalam kanal jumlahnya dua, jadi Daftar/Performa tetap tampil. */}
+        {tabTampil.length > 1 && tabTampil.map((s) => (
           /* GARIS BAWAH, bukan bidang terisi.
 
              Tab terisi penuh punya berat yang sama dengan tombol tindakan —
