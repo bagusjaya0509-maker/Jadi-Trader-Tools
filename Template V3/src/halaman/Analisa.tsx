@@ -1979,6 +1979,43 @@ export default function Analisa() {
                 <input value={sl} onChange={(e) => setSl(e.target.value)} inputMode="decimal" className={cn(KELAS_ISIAN, 'angka')} /></div>
               <div><label className="mb-1 block text-[11px] text-zinc-500">TP</label>
                 <input value={tp} onChange={(e) => setTp(e.target.value)} inputMode="decimal" className={cn(KELAS_ISIAN, 'angka')} /></div>
+              {/* ── PERINGATAN JARAK SL, SEBELUM DIPOSTING ─────────────────
+                  Dihitung langsung dari isian, jadi ia muncul saat orangnya
+                  masih bisa mengubah angkanya — bukan sesudah sinyalnya
+                  permanen dan sudah menghukum papan bulan ini.
+
+                  MEMPERINGATKAN, TIDAK MENGHALANGI. Tombolnya tetap hidup.
+                  Analis boleh memposting sinyal ber-SL lebar kalau memang
+                  itu rencananya; yang tidak boleh adalah ia tidak tahu
+                  akibatnya. Melarang akan mendorong orang memperkecil SL
+                  supaya lolos papan — persis kebiasaan yang paling
+                  berbahaya, karena SL yang dipersempit demi lolos aturan
+                  adalah SL yang akan kena. */}
+              {(() => {
+                const e0 = Number(entry), s0 = Number(sl);
+                if (!(e0 > 0) || !(s0 > 0)) return null;
+                const jarak = (Math.abs(e0 - s0) / e0) * 100;
+                const batas = performa?.aturan?.slMaksPersen ?? 1;
+                return (
+                  <div className="col-span-2 sm:col-span-4">
+                    <p className={cn('rounded-md border px-2.5 py-2 text-[11.5px] leading-relaxed',
+                      jarak > batas
+                        ? 'border-amber-500/30 bg-amber-500/[0.05] text-amber-200/90'
+                        : 'border-zinc-800 text-zinc-500')}>
+                      Jarak SL <span className="angka">{jarak.toFixed(2)}%</span> dari entry.{' '}
+                      {jarak > batas ? (
+                        <>Di atas batas <span className="angka">{batas}%</span> — sinyal ini akan
+                        dihitung sebagai pelanggaran, membuatmu tidak masuk papan peringkat bulan
+                        ini, dan menambah syarat minimal sinyal bulan depan. Boleh diposting;
+                        akibatnya saja yang perlu kamu tahu.</>
+                      ) : (
+                        <>Masih di dalam batas <span className="angka">{batas}%</span> papan
+                        peringkat.</>
+                      )}
+                    </p>
+                  </div>
+                );
+              })()}
               <div className="col-span-2 sm:col-span-4">
                 <label className="mb-1 block text-[11px] text-zinc-500">
                   Ringkasan publik — ini yang jadi judul kartu, terlihat sebelum dibayar

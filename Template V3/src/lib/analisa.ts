@@ -289,11 +289,45 @@ export interface PerformaAnalis {
    *  null = belum ada satu pun yang bisa diukur. Bukan 0 — nol di kolom
    *  jarak SL terbaca sebagai "tanpa SL", kebalikan dari "belum tahu". */
   slPersen?: number | null;
+  /* ── SYARAT PAPAN PERINGKAT, semuanya dihitung server ──────────────
+     Layar tidak menghitung ulang satu pun dari ini. Aturan yang ditulis
+     di dua tempat suatu hari berbeda, dan yang berbeda di sini adalah
+     syarat yang menentukan siapa muncul di papan yang dipakai orang
+     menaruh uang. */
+  /** Drawdown terdalam bulan ini, dalam persen modal model. */
+  ddPersen?: number;
+  /** Jarak SL TERJAUH bulan ini (%). null = tidak ada yang terukur. */
+  slMaks?: number | null;
+  /** Sinyal bulan ini yang jarak SL-nya melewati batas. */
+  pelanggaran?: number;
+  /** Pelanggaran bulan LALU — inilah yang menaikkan `minSinyal`. */
+  pelanggaranLalu?: number;
+  /** Sinyal selesai yang diminta bulan ini, sudah termasuk dendanya. */
+  minSinyal?: number;
+  /** Masuk papan atau tidak. */
+  layak?: boolean;
+  /** SEMUA sebab yang berlaku, bukan yang pertama saja: analis yang
+   *  memperbaiki satu hal lalu tetap tidak masuk — tanpa diberi tahu masih
+   *  ada yang kedua — akan menyimpulkan papannya yang rusak. */
+  sebabTidakLayak?: string[];
+}
+
+export interface AturanPapan {
+  ddMaksPersen: number;
+  slMaksPersen: number;
+  minSinyal: number;
+  dendaPerPelanggaran: number;
+  dendaMaks: number;
 }
 
 export interface Performa {
   modal: number;
   risikoPersen: number;
+  /** Bulan yang sedang diperingkatkan, `YYYY-MM`. */
+  periode?: string;
+  periodeLalu?: string;
+  /** Ambang yang dipakai server. Dikirim, tidak disalin ulang di layar. */
+  aturan?: AturanPapan;
   analis: PerformaAnalis[];
   /** Sinyal yang masih berjalan. Dipakai layar untuk mengatakan terus
    *  terang bahwa peringkatnya belum berarti apa-apa saat datanya sedikit. */
@@ -314,9 +348,21 @@ export interface Performa {
  *  dan tidak ada satu jalur pun yang membuat data contoh sampai ke sana. */
 export async function ambilPerforma(bolehContoh = false): Promise<Performa> {
   const j = await panggil('/api/analisa/performa', {}, false);
+  /* Medan BARU wajib ditambahkan di sini juga.
+     ────────────────────────────────────────────────────────────────────
+     Objeknya disusun ulang dari daftar tertentu, bukan disebar dari j.
+     Akibatnya sudah kejadian sekali: server mengirim `aturan`, layar tidak
+     pernah menerimanya, dan panel syarat papan tidak muncul sama sekali —
+     tanpa satu galat pun, karena `data.aturan && <SyaratPapan/>` hanya
+     diam kalau nilainya kosong.
+
+     Tetap disusun ulang, tidak diganti spread: daftar ini juga yang
+     menjamin bentuknya sesuai tipe kalau server suatu saat memulangkan
+     sesuatu yang lain. Yang perlu diingat cuma menambahkan barisnya. */
   const nyata: Performa = {
     modal: j.modal ?? 1000, risikoPersen: j.risikoPersen ?? 1,
     analis: j.analis ?? [], berjalan: j.berjalan ?? 0,
+    periode: j.periode, periodeLalu: j.periodeLalu, aturan: j.aturan,
   };
   if (!bolehContoh) return nyata;
 

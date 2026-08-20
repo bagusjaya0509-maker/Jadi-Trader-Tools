@@ -142,8 +142,22 @@ export function ParallaxComponent() {
                 CATATAN KALAU SUASANA BAWAANNYA DIUBAH LAGI: baris ini ikut.
                 Atribut low di sini hanya benar selama bukan gambar ini yang
                 tampil pertama; kalau malam jadi bawaan, low harus pindah ke
-                gunung-lilin.webp di atas. Sudah pernah tertukar sekali. */}
-            <img src="/parallax/gunung-malam.webp" loading="eager" fetchPriority="low" width="800" data-parallax-layer="2" alt="" className="parallax__layer-img parallax__layer-malam" />
+                gunung-lilin.webp di atas. Sudah pernah tertukar sekali.
+
+                DITULIS HURUF KECIL SEMUA lewat spread, bukan fetchPriority.
+                React 18 belum mengenali properti berhuruf besar itu: ia
+                meneruskannya sebagai atribut asing DAN menyalak di konsol,
+                empat kali tiap kunjungan halaman depan. Atribut HTML-nya
+                memang bernama "fetchpriority" huruf kecil; React 19 yang
+                menerima ejaan camelCase, dan proyek ini masih 18.3.
+
+                Lewat spread karena tipe JSX React 18 tidak punya medan itu
+                sama sekali — ditulis langsung, tsc yang menolak. Spread
+                melewatkan pemeriksaan tipe untuk satu atribut ini saja,
+                bukan untuk seluruh elemennya. */}
+            <img src="/parallax/gunung-malam.webp" loading="eager"
+                 {...({ fetchpriority: 'low' } as Record<string, string>)}
+                 width="800" data-parallax-layer="2" alt="" className="parallax__layer-img parallax__layer-malam" />
             <div data-parallax-layer="3" className="parallax__layer-title">
               <h2 className="parallax__title">Jadi Trader</h2>
             </div>

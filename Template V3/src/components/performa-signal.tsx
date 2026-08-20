@@ -4,7 +4,7 @@ import { KalenderPl } from '@/components/kalender-pl';
 import { LeaderboardCard } from '@/components/ui/leaderboard-card';
 import { cn, uang, persen, tanggalPendek } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
-import type { Performa, PerformaAnalis, RingkasAnalisa } from '@/lib/analisa';
+import type { AturanPapan, Performa, PerformaAnalis, RingkasAnalisa } from '@/lib/analisa';
 
 /* ════════════════════════════════════════════════════════════════════════
    PERFORMA SIGNAL — dua bentuk, satu sumber angka
@@ -125,7 +125,11 @@ function CatatanAsumsi({ modal, risikoPersen }: { modal: number; risikoPersen: n
 export function PapanPeringkatSignal({ data }: { data: Performa | null }) {
   const { pengguna } = useAuth();
 
-  const peringkat = useMemo(() => (data?.analis ?? []).map((a, i) => ({
+  /* HANYA yang layak yang diperingkatkan. Yang belum memenuhi syarat
+     tidak dihilangkan — ia turun ke daftar di bawah beserta sebabnya.
+     Menghapusnya sama sekali membuat analis yang tidak muncul mengira
+     datanya hilang, dan pembaca mengira papan ini sepi. */
+  const peringkat = useMemo(() => (data?.analis ?? []).filter((a) => a.layak !== false).map((a, i) => ({
     userId: a.uid, rank: i + 1, userName: a.nama, value: a.hasilDolar, agen: a.agen,
     /* Foto ikut dari server dan SUDAH menghormati pilihan anonim analisnya —
        layar ini tidak perlu tahu modenya, cukup: ada foto atau tidak. */
@@ -140,6 +144,7 @@ export function PapanPeringkatSignal({ data }: { data: Performa | null }) {
      Jumlah menang dan estimasi hasil GABUNGAN ikut terbuang bersama empat
      KPI-nya: keduanya tidak dibaca siapa pun lagi. */
   const totalSinyal = data.analis.reduce((s, a) => s + a.total, 0);
+  const belumLayak = data.analis.filter((a) => a.layak === false);
   const semuaHari = data.analis.flatMap((a) => Object.keys(a.harian ?? {})).sort();
 
   /* BELUM ADA YANG SELESAI = satu baris, bukan panel kosong setinggi layar.
@@ -244,10 +249,58 @@ export function PapanPeringkatSignal({ data }: { data: Performa | null }) {
                 </span>
               )}
             </p>
+            {data.aturan && <SyaratPapan a={data.aturan} />}
             <CatatanAsumsi modal={data.modal} risikoPersen={data.risikoPersen} />
           </CatatanLipat>
+
+          {/* DAFTAR YANG BELUM MASUK, dengan sebabnya masing-masing.
+              Ini bagian yang membuat aturannya terasa adil alih-alih
+              sewenang-wenang: analis bisa melihat persis apa yang kurang,
+              dan pembaca bisa melihat bahwa yang tidak muncul memang tidak
+              memenuhi syarat — bukan tidak ada. */}
+          {belumLayak.length > 0 && (
+            <div className="rounded-lg border border-zinc-800/60 px-4 py-3">
+              <div className="mb-2 text-[11.5px] font-medium text-zinc-400">
+                Belum memenuhi syarat papan ({belumLayak.length})
+              </div>
+              <ul className="space-y-1.5">
+                {belumLayak.map((a) => (
+                  <li key={a.uid} className="text-[11.5px] leading-relaxed text-zinc-600">
+                    <span className="text-zinc-400">{a.nama}</span>
+                    {' — '}{(a.sebabTidakLayak ?? []).join('; ')}.
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
       </div>
     </div>
+  );
+}
+
+/** Syarat masuk papan, dibaca dari angka yang DIKIRIM server.
+ *
+ *  Ditulis terbuka karena aturan yang tidak diumumkan bukan aturan
+ *  melainkan penyaringan diam-diam — dan analis yang tidak muncul tanpa
+ *  tahu sebabnya akan menyimpulkan papannya diatur.
+ *
+ *  Perhatikan kalimat tentang 1%: ia menjelaskan bahwa yang diukur JARAK
+ *  SL, bukan risiko sesungguhnya. Risiko sesungguhnya = ukuran posisi x
+ *  jarak SL, dan ukuran posisi tidak pernah ikut diposting — ia milik
+ *  penirunya. Mengaku mengukur sesuatu yang tidak kita punya akan
+ *  membuat seluruh papan ini tidak layak dipercaya. */
+function SyaratPapan({ a }: { a: AturanPapan }) {
+  return (
+    <p className="text-[11px] leading-relaxed text-zinc-600">
+      <span className="text-zinc-500">Syarat masuk papan:</span> minimal {a.minSinyal} sinyal
+      selesai bulan ini, drawdown tidak lebih dari {a.ddMaksPersen}% modal, dan jarak SL tiap
+      sinyal tidak lebih dari {a.slMaksPersen}% dari harga. Jarak SL {a.slMaksPersen}% berarti
+      risiko {a.slMaksPersen}% kalau posisinya sebesar modal tanpa leverage — ukuran posisi
+      tidak pernah ikut diposting, jadi itulah yang bisa diukur.{' '}
+      Melanggar tidak menghapus apa pun, tapi <span className="text-zinc-400">memperlambat</span>{' '}
+      bulan berikutnya: tiap sinyal yang melanggar menambah {a.dendaPerPelanggaran} sinyal pada
+      syarat minimal bulan depan, sampai maksimum +{a.dendaMaks}.
+    </p>
   );
 }
 
