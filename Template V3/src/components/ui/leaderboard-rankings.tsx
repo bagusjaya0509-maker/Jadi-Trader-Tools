@@ -21,6 +21,13 @@ export interface LeaderboardRankingItem {
   agen?: boolean;
   /** Foto profil, kosong kalau analisnya memilih anonim. */
   foto?: string;
+  /** Keterangan kedua, disambung di belakang byline. Dipisah dari byline
+   *  karena podium memakai byline yang sama di kolom selebar 130 px —
+   *  disambung di sana, ia cuma jadi tulisan terpotong. Baris peringkat
+   *  punya ruang, jadi hanya baris yang menggambarnya. */
+  ekstra?: string;
+  /** Penjelasan untuk `ekstra`, muncul saat disentuh tetikus. */
+  ekstraJudul?: string;
 }
 
 function nilaiUang(n: number) {
@@ -64,7 +71,14 @@ function Baris({ r, aku, onPilih }: {
           {r.agen && <Sparkles className="size-3 shrink-0 text-sky-300" aria-label="AI Agent" />}
           {aku && <span className="shrink-0 rounded bg-zinc-700 px-1 text-[9.5px] text-zinc-200">kamu</span>}
         </span>
-        {r.byline && <span className="block truncate text-[10.5px] text-zinc-600">{r.byline}</span>}
+        {(r.byline || r.ekstra) && (
+          <span className="block text-[10.5px] leading-snug text-zinc-600 line-clamp-2">
+            {r.byline}
+            {r.ekstra && (
+              <span className="angka text-zinc-500" title={r.ekstraJudul}> · {r.ekstra}</span>
+            )}
+          </span>
+        )}
       </span>
       {/* ANGKANYA DIBERI NAMA. Tanpa label, "+$66.8" di ujung kanan baris
           bisa terbaca sebagai harga, saldo, atau biaya berlangganan —

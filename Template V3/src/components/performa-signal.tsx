@@ -153,6 +153,25 @@ export function PapanPeringkatSignal({ data }: { data: Performa | null }) {
        layar ini tidak perlu tahu modenya, cukup: ada foto atau tidak. */
     foto: a.foto,
     byline: `${persen(a.winrate)} winrate · ${a.total} sinyal`,
+    /* Jarak SL rata-rata dan drawdown, disambung di belakang byline.
+       ──────────────────────────────────────────────────────────────────
+       Winrate sendirian bisa dibeli dengan TP kecil dan SL jauh: 90%
+       menang tidak berarti apa-apa kalau yang 10% menghapus semuanya.
+       Dua angka ini yang membuat winrate bisa dibaca.
+
+       "SL", bukan "risk". Yang terukur JARAK stop loss dari harga —
+       berapa persen MODAL yang berisiko ditentukan ukuran lot penirunya,
+       dan itu tidak pernah ada di dalam sinyal. Penamaannya disamakan
+       dengan lencana di kartu analis ("Risiko rendah · SL 0.6%") supaya
+       angka yang sama tidak punya dua nama di satu halaman. */
+    ekstra: [
+      a.slPersen == null ? null : `SL ${persen(a.slPersen)}`,
+      a.ddPersen === undefined ? null : `DD ${persen(a.ddPersen)}`,
+    ].filter(Boolean).join(' · '),
+    ekstraJudul:
+      `SL = jarak stop loss rata-rata dari harga, dari sinyalnya yang sudah selesai. `
+      + `Bukan persen modal — itu tergantung ukuran lot yang kamu pakai sendiri. `
+      + `DD = penurunan terdalam bulan ini terhadap modal contoh $${(data?.modal ?? 1000).toLocaleString('id-ID')}.`,
   })), [data]);
 
   if (!data) return null;
