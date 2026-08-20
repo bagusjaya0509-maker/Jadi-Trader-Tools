@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { RingkasAnalisa } from '@/lib/analisa';
-import { cn, uang } from '@/lib/utils';
+import { cn, uang, tanggalPendek } from '@/lib/utils';
 
 /* ════════════════════════════════════════════════════════════════════════
    KURVA SALDO SATU ANALIS
@@ -44,6 +44,28 @@ export function titikSaldo(sinyal: RingkasAnalisa[], modal: number): number[] {
   return out;
 }
 
+/** Sama seperti titikSaldo, tapi membawa WAKTU tiap titik.
+ *
+ *  Dipisah, bukan menggantikan: titikSaldo dipakai di tempat lain yang cuma
+ *  butuh deret angkanya, dan menambah medan ke sana berarti setiap
+ *  pemakainya ikut menanggung bentuk yang tidak ia perlukan.
+ *
+ *  Titik pertama waktunya 0 — ia keadaan SEBELUM sinyal mana pun, bukan
+ *  sebuah peristiwa. Yang membaca tooltip di titik itu diberi tulisan
+ *  "modal awal", bukan tanggal yang tidak pernah terjadi. */
+export function titikSaldoRinci(sinyal: RingkasAnalisa[], modal: number): { saldo: number; waktu: number }[] {
+  const selesai = sinyal
+    .filter((s) => typeof s.hasilDolar === 'number')
+    .sort((a, b) => (a.waktuHasil || a.dibuat) - (b.waktuHasil || b.dibuat));
+  const out = [{ saldo: modal, waktu: 0 }];
+  let saldo = modal;
+  for (const s of selesai) {
+    saldo += s.hasilDolar as number;
+    out.push({ saldo, waktu: s.waktuHasil || s.dibuat });
+  }
+  return out;
+}
+
 function jalur(nilai: number[], W: number, H: number, pad: number, modal: number) {
   /* Rentangnya SELALU memuat garis modal. Kalau tidak, akun yang tidak
      pernah menyentuh modal awal menggambar garis modalnya di luar bidang —
@@ -55,7 +77,7 @@ function jalur(nilai: number[], W: number, H: number, pad: number, modal: number
   const X = (i: number) => (i / (nilai.length - 1)) * W;
   const Y = (v: number) => pad + (1 - (v - min) / rentang) * (H - pad * 2);
   const d = nilai.map((v, i) => (i ? 'L' : 'M') + X(i).toFixed(1) + ',' + Y(v).toFixed(1)).join(' ');
-  return { d, Y };
+  return { d, X, Y };
 }
 
 /** Versi mungil untuk kartu analis: garis saja, tanpa angka dan tanpa
@@ -80,9 +102,19 @@ function jalur(nilai: number[], W: number, H: number, pad: number, modal: number
  *  akan pernah tahu ukurannya sendiri.
  */
 export function SparklineSaldo(
-  { sinyal, modal, kelas }: { sinyal: RingkasAnalisa[]; modal: number; kelas?: string },
+  { sinyal, modal, kelas, interaktif }: {
+    sinyal: RingkasAnalisa[]; modal: number; kelas?: string;
+    /** Menyalakan penunjuk: garis tegak, titik, dan kotak berisi P/L pada
+     *  posisi tetikus. Mati secara bawaan — kurva sekecil 40 px di kartu
+     *  lama tidak punya ruang untuk ditunjuk, dan penunjuk yang muncul di
+     *  grafik setinggi jempol lebih menghalangi daripada menerangkan. */
+    interaktif?: boolean;
+  },
 ) {
   const nilai = useMemo(() => titikSaldo(sinyal, modal), [sinyal, modal]);
+  const rinci = useMemo(() => titikSaldoRinci(sinyal, modal), [sinyal, modal]);
+  /** Titik yang sedang ditunjuk. null = tetikusnya sedang tidak di atas. */
+  const [tunjuk, setTunjuk] = useState<number | null>(null);
   const kotak = useRef<HTMLSpanElement | null>(null);
   const [ukuran, setUkuran] = useState({ w: 0, h: 0 });
 
@@ -93,12 +125,31 @@ export function SparklineSaldo(
        DI DALAM kotaknya, dan pembacaan lewat offsetWidth memaksa layout
        dihitung ulang tiap kali — di halaman berisi belasan kartu, itu
        belasan perhitungan tiap kali jendela digeser satu piksel. */
+    const pakai = (w: number, h: number) =>
+      setUkuran((s) => ((s.w === w && s.h === h) ? s : { w, h }));
+
+    /* DIUKUR SEKALI DI SINI, tidak menunggu ResizeObserver.
+       ──────────────────────────────────────────────────────────────────
+       Terbukti perlu: di kartu analis yang baru, kurvanya duduk sebagai
+       lapisan berposisi absolut dengan tinggi persen, dan di susunan itu
+       observer-nya tidak pernah melaporkan apa pun — ukurannya tetap 0x0
+       selamanya, jadi grafiknya tidak digambar sama sekali sementara
+       kotaknya nyata 190x172 di layar.
+
+       Pengukuran langsung menjawab pertanyaan yang sama tanpa menunggu
+       peristiwa: berapa ukuran kotak ini SEKARANG. Observer tetap dipasang
+       untuk perubahan sesudahnya — jendela digeser, panel dilipat. */
+    const r0 = el.getBoundingClientRect();
+    pakai(Math.round(r0.width), Math.round(r0.height));
+
     const ro = new ResizeObserver((entri) => {
-      const r = entri[0].contentRect;
-      setUkuran((s) => {
-        const w = Math.round(r.width), h = Math.round(r.height);
-        return (s.w === w && s.h === h) ? s : { w, h };
-      });
+      const r = entri[0]?.contentRect;
+      if (!r) return;
+      /* contentRect bisa 0 saat induknya sedang disembunyikan; kalau
+         dipakai, grafik yang sudah tergambar ikut hilang dan tidak pernah
+         kembali karena ukuran berikutnya tidak berubah lagi. */
+      if (r.width < 1 && r.height < 1) return;
+      pakai(Math.round(r.width), Math.round(r.height));
     });
     ro.observe(el);
     return () => ro.disconnect();
@@ -114,7 +165,7 @@ export function SparklineSaldo(
   const naik = akhir >= modal;
   const warna = naik ? '#34d399' : '#f87171';
   const pad = 4;
-  const { d, Y } = siap ? jalur(nilai, w, h, pad, modal) : { d: '', Y: () => 0 };
+  const { d, X, Y } = siap ? jalur(nilai, w, h, pad, modal) : { d: '', X: () => 0, Y: () => 0 };
 
   /* id gradien DIBEDAKAN per warna, bukan per pemakaian. Beberapa kartu
      tampil bersamaan di satu layar; id yang sama di semua kartu membuat
@@ -122,8 +173,25 @@ export function SparklineSaldo(
      berwarna sama dengan kartu terakhir. */
   const idGrad = naik ? 'gradSaldoNaik' : 'gradSaldoTurun';
 
+  /* Titik terdekat dari posisi tetikus. Dihitung dari LEBAR PER LANGKAH,
+     bukan dengan mencari jarak ke tiap titik: deretnya sudah berjarak
+     seragam di sumbu X, jadi satu pembagian sudah tepat dan tidak ikut
+     melambat saat sinyalnya ratusan. */
+  const cariTitik = (e: React.PointerEvent<HTMLSpanElement>) => {
+    if (!siap || !interaktif) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    const langkah = w / Math.max(1, nilai.length - 1);
+    const i = Math.round((e.clientX - r.left) / langkah);
+    setTunjuk(Math.min(nilai.length - 1, Math.max(0, i)));
+  };
+
+  const t = tunjuk !== null ? rinci[tunjuk] : null;
+  const pl = t ? t.saldo - modal : 0;
+
   return (
-    <span ref={kotak} className={cn('relative block', kelas)}>
+    <span ref={kotak} className={cn('relative block', kelas)}
+          onPointerMove={cariTitik}
+          onPointerLeave={() => setTunjuk(null)}>
       {siap && (
         <>
           <svg width={w} height={h} viewBox={'0 0 ' + w + ' ' + h} className="block" aria-hidden>
@@ -138,8 +206,41 @@ export function SparklineSaldo(
             <path d={d + ' L' + w + ',' + h + ' L0,' + h + ' Z'} fill={'url(#' + idGrad + ')'} />
             <path d={d} fill="none" stroke={warna} strokeWidth={1.6}
                   strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
 
+            {/* PENUNJUK. Garis tegak dulu, titik belakangan — kalau
+                dibalik, garisnya menimpa titik dan ujungnya tampak
+                terpotong pada layar ber-DPI rendah. */}
+            {t && (
+              <>
+                <line x1={X(tunjuk!)} y1={0} x2={X(tunjuk!)} y2={h}
+                      stroke={warna} strokeOpacity={0.35} strokeWidth={1} />
+                <circle cx={X(tunjuk!)} cy={Y(t.saldo)} r={3.5}
+                        fill={warna} stroke="#09090b" strokeWidth={1.5} />
+              </>
+            )}
+          </svg>
+        </>
+      )}
+      {/* KOTAK ANGKA, di luar svg supaya hurufnya ikut aturan huruf halaman
+          — teks di dalam svg tidak mewarisi kelas Tailwind dan harus
+          diukur sendiri di setiap layar.
+
+          Dijepit ke dalam kotaknya: di titik paling kanan, kotak yang
+          berpusat pada garisnya akan setengah keluar kartu. */}
+      {siap && t && (
+        <span className="pointer-events-none absolute top-1 z-10 -translate-x-1/2 whitespace-nowrap rounded-md border border-zinc-700 bg-zinc-950/95 px-1.5 py-1 text-center leading-tight"
+              style={{ left: Math.min(Math.max(X(tunjuk!), 34), Math.max(34, w - 34)) }}>
+          <span className={cn('angka block text-[11px] font-semibold',
+            pl > 0 ? 'text-emerald-400' : pl < 0 ? 'text-red-400' : 'text-zinc-300')}>
+            {pl === 0 ? uang(modal) : uang(pl, true)}
+          </span>
+          <span className="block text-[9px] text-zinc-500">
+            {t.waktu ? tanggalPendek(t.waktu) : 'modal awal'}
+          </span>
+        </span>
+      )}
+      {siap && (
+        <>
           {/* SUDUT, MENGIKUTI ARAHNYA — bukan mengikuti titik akhir garisnya.
 
               Untung di kanan ATAS, rugi di kanan BAWAH. Kurva yang naik

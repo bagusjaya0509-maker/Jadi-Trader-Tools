@@ -2680,7 +2680,6 @@ export default function Analisa() {
                         menyematkan; yang lain tidak perlu diberi tahu
                         dengan bingkai. */
                     'border-zinc-800 hover:border-zinc-600')}>
-                  {a0.agen && <LencanaAgen geser />}
                   {/* ── KARTU ANALIS, TATA LETAK METRIK ────────────────
                       Bentuknya mengikuti contoh yang dikirim pemilik: kurva
                       jadi LATAR di paruh kanan, angka besar berdiri di
@@ -2699,7 +2698,11 @@ export default function Analisa() {
                   <button onClick={() => setKanalBuka(uid)}
                     className="relative block w-full cursor-pointer overflow-hidden text-left">
                     {/* Wilayah kurva: 62% kanan, di belakang isi kartu. */}
-                    <span className="pointer-events-none absolute inset-y-0 right-0 z-0 block w-[62%]">
+                    {/* pointer-events dinyalakan: kurvanya sekarang bisa
+                        ditunjuk untuk membaca P/L per titik. Klik tetap
+                        menembus ke tombolnya — ia induk elemen ini, jadi
+                        peristiwanya naik ke sana seperti biasa. */}
+                    <span className="absolute inset-y-0 right-0 z-0 block w-[62%]">
                       <span aria-hidden className="absolute inset-0 block"
                             style={{ background: `linear-gradient(to left, ${warnaAksen}1f, transparent 78%)` }} />
                       {/* Titik-titik raster, memudar ke kiri. Ia memberi
@@ -2717,22 +2720,54 @@ export default function Analisa() {
                           <rect width="100%" height="100%" fill={'url(#kisi-' + uid + ')'} />
                         </svg>
                       </span>
-                      <SparklineSaldo sinyal={sinyal} kelas="absolute inset-x-0 bottom-0 h-[76%] w-full"
+                      <SparklineSaldo sinyal={sinyal} interaktif
+                                      kelas="absolute inset-x-0 bottom-0 h-[76%] w-full"
                                       modal={performa?.modal ?? 1000} />
                     </span>
 
                     <span className="relative z-10 block px-4 pt-4">
                       <span className="flex items-start gap-2.5 pr-8">
-                        <AvatarAnalis nama={a0.nama} foto={a0.foto} uid={uid}
-                                      className="size-9 shrink-0" kelasHuruf="text-[13px]" />
+                        {/* TITIK HADIR MENEMPEL DI AVATAR, bukan di sebelah
+                            nama. Permintaan pemilik, dan letaknya memang
+                            lebih benar: yang hadir ORANGNYA, dan avatar
+                            adalah orangnya. Di sebelah nama ia berebut baris
+                            dengan lencana AI.
+
+                            Cincin gelap di sekelilingnya bukan hiasan — tanpa
+                            itu titik hijau menyatu dengan foto profil yang
+                            kebetulan berwarna terang di sudut itu. */}
+                        <span className="relative shrink-0">
+                          <AvatarAnalis nama={a0.nama} foto={a0.foto} uid={uid}
+                                        className="size-9" kelasHuruf="text-[13px]" />
+                          {sinyal.some((x) => x.aktif) && (
+                            <span title="Sedang membuka situs"
+                                  className="absolute -bottom-px -right-px block size-3 rounded-full border-[3px] border-zinc-950 bg-emerald-500" />
+                          )}
+                        </span>
                         <span className="min-w-0 flex-1">
                           <span className="flex items-center gap-1.5">
                             <span className="truncate text-[13.5px] font-semibold tracking-tight text-zinc-100">{a0.nama}</span>
-                            {/* Titik hijau = sedang membuka situs. Datang
-                                dari server, tidak pernah ditebak layar. */}
-                            {sinyal.some((x) => x.aktif) && (
-                              <span title="Sedang membuka situs"
-                                    className="size-1.5 shrink-0 rounded-full bg-emerald-500" />
+                            {/* Lencana AI DI SINI, bukan melayang di pojok:
+                                ia menerangkan siapa yang menulis sinyalnya,
+                                jadi tempatnya menempel pada namanya. Di
+                                pojok ia menimpa angka winrate. */}
+                            {/* Batas kata WAJIB. Tanpa itu polanya juga cocok pada "Zainal" dan
+                                "Aisyah" — nama orang yang justru paling perlu
+                                lencananya, karena namanya sama sekali tidak
+                                menyebut agen. */}
+                            {/* Lencananya DILEWATI kalau namanya sendiri sudah menyebut AI.
+                                Agen bawaan bernama "AI Agent", dan lencana "AI"
+                                di sebelahnya membuat barisnya berbunyi "AI Agent
+                                AI" — pengulangan yang terbaca seperti kesalahan.
+
+                                Dicocokkan sebagai KATA UTUH: pola longgar juga
+                                kena pada "Zainal" dan "Aisyah", nama orang yang
+                                justru paling perlu lencananya. */}
+                            {a0.agen && !/(^|[^a-z])ai([^a-z]|$)/i.test(a0.nama) && (
+                              <span title="Ditulis agen AI, bukan orang"
+                                    className="inline-flex shrink-0 items-center gap-1 rounded bg-violet-500/15 px-1.5 py-0.5 text-[9.5px] font-medium text-violet-300">
+                                <Sparkles className="size-2.5" /> AI
+                              </span>
                             )}
                           </span>
                           <span className="block truncate text-[10.5px] text-zinc-500">
@@ -2771,7 +2806,7 @@ export default function Analisa() {
                         BARIS YANG SAMA (permintaan pemilik). Keduanya
                         keterangan tentang deretan sinyal yang sama: berapa
                         banyak, dan sepanjang apa. */}
-                    <span className="relative z-10 mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-zinc-800/70 bg-zinc-900/70 px-4 py-2.5">
+                    <span className="relative z-10 mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-zinc-800/70 bg-zinc-950 px-4 py-2.5">
                       <BarisHitung r={r} />
                       <span className="angka ml-auto shrink-0 text-[10px] text-zinc-600">
                         {tanggalPendek(mulaiPosting)} – {tanggalPendek(terakhirPosting)}
