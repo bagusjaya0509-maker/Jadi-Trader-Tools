@@ -174,20 +174,6 @@ export function PapanPeringkatSignal({ data }: { data: Performa | null }) {
 
           Bagian yang tetap: lencana data-contoh dan hitungan sinyal selesai.
           Keduanya keterangan tentang papannya, bukan kendali. */}
-      <div className="mb-2 flex w-full items-center gap-1.5 px-1 py-1 text-[11.5px] text-zinc-500">
-        {/* Label contoh WAJIB, dan ditaruh di baris yang sama dengan
-            judulnya supaya ikut terbaca walau papannya dilipat. Papan
-            peringkat adalah dasar orang memutuskan sinyal siapa yang
-            ditiru; angka karangan tanpa label di sini bukan hiasan yang
-            keliru, melainkan saran investasi palsu. */}
-        {data.contoh && (
-          <span className="inline-flex items-center gap-1 rounded bg-sky-500/12 px-1.5 py-0.5 text-[10px] font-medium text-sky-300">
-            <Eye className="size-2.5" /> data contoh
-          </span>
-        )}
-        <span className="angka ml-auto text-[11px] text-zinc-600">{totalSinyal} sinyal selesai</span>
-      </div>
-
       {data.contoh && (
         <p className="mb-2 px-1 text-[11.5px] leading-relaxed text-sky-200/70">
           Nama dan angka di papan ini <b>bukan analis sungguhan</b> — ia memperlihatkan
@@ -220,6 +206,26 @@ export function PapanPeringkatSignal({ data }: { data: Performa | null }) {
                di sini benar-benar mengalahkan kelas bawaannya. */
             className="border-0 bg-transparent p-0"
             title="Papan Peringkat Analis"
+            /* MASUK KE BARIS JUDUL, bukan berdiri di barisnya sendiri.
+               ────────────────────────────────────────────────────────────
+               Sejak tombol lipat papan dicabut, baris ini tinggal memuat
+               satu keterangan kecil di ujung kanan — 33 px tinggi yang
+               kirinya kosong sepenuhnya, tepat di bagian paling atas
+               halaman. Kekosongan di situ bukan kelegaan, ia terbaca
+               sebagai sesuatu yang gagal dimuat.
+
+               Keduanya memang keterangan TENTANG papan ini, jadi baris
+               judulnya rumah yang benar. Lencana contoh tetap ikut: ia
+               wajib terbaca bersama angkanya, dan sekarang ia justru
+               bersebelahan langsung dengan judul yang ia beri catatan. */
+            kanan={<>
+              {data.contoh && (
+                <span className="inline-flex items-center gap-1 rounded bg-sky-500/12 px-1.5 py-0.5 text-[10px] font-medium text-sky-300">
+                  <Eye className="size-2.5" /> data contoh
+                </span>
+              )}
+              <span className="angka text-[11px] text-zinc-600">{totalSinyal} sinyal selesai</span>
+            </>}
             fromDate={semuaHari[0]}
             toDate={semuaHari[semuaHari.length - 1]}
             currentUserId={pengguna?.uid}

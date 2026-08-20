@@ -27,6 +27,15 @@ export interface LeaderboardCardProps extends React.HTMLAttributes<HTMLDivElemen
   rankings: LeaderboardRankingItem[];
   currentUserId?: string;
   catatan?: React.ReactNode;
+  /** Keterangan kecil di ujung kanan baris judul — hitungan, lencana,
+   *  penanda sumber data. BUKAN kendali: baris judul tidak boleh jadi
+   *  tempat tombol, karena yang ditaruh sebaris dengan judul terbaca
+   *  sebagai bagian dari nama papannya.
+   *
+   *  Ada karena tanpanya keterangan begitu terpaksa berdiri di barisnya
+   *  sendiri di atas kartu — satu baris penuh yang 90% kosong, tepat di
+   *  tempat yang paling terlihat di halaman. */
+  kanan?: React.ReactNode;
 }
 
 function formatTanggal(d?: string | Date) {
@@ -38,7 +47,7 @@ function formatTanggal(d?: string | Date) {
 
 export const LeaderboardCard = React.forwardRef<HTMLDivElement, LeaderboardCardProps>(
   ({ className, title = 'Papan Peringkat', fromDate, toDate, podiumRankings, rankings,
-     currentUserId, catatan, ...props }, ref) => {
+     currentUserId, catatan, kanan, ...props }, ref) => {
     const dari = formatTanggal(fromDate);
     const sampai = formatTanggal(toDate);
 
@@ -46,11 +55,18 @@ export const LeaderboardCard = React.forwardRef<HTMLDivElement, LeaderboardCardP
       <div ref={ref}
         className={cn('rounded-xl border border-zinc-800 bg-zinc-900/40 p-5', className)}
         {...props}>
-        <div className="mb-5">
-          <h3 className="text-[14px] font-semibold text-zinc-100">{title}</h3>
-          {(dari || sampai) && (
-            <p className="mt-0.5 text-[11.5px] text-zinc-500">{dari} – {sampai}</p>
-          )}
+        {/* items-start, bukan items-center: judulnya dua baris (nama +
+            rentang tanggal) sedangkan keterangan kanannya satu baris.
+            Ditengahkan, keterangan itu menggantung di antara dua baris dan
+            tidak sejajar dengan apa pun. */}
+        <div className="mb-5 flex items-start gap-2">
+          <div className="min-w-0">
+            <h3 className="text-[14px] font-semibold text-zinc-100">{title}</h3>
+            {(dari || sampai) && (
+              <p className="mt-0.5 text-[11.5px] text-zinc-500">{dari} – {sampai}</p>
+            )}
+          </div>
+          {kanan && <div className="ml-auto flex shrink-0 items-center gap-1.5 pt-0.5">{kanan}</div>}
         </div>
 
         <LeaderboardPodium rankings={podiumRankings} className="mb-6" />

@@ -214,6 +214,33 @@ export function PojokOrder({
      masuk ke areanya. Panel yang melipat tepat saat jari sedang menuju
      tombol BUY jauh lebih buruk daripada panel yang menetap. */
   const [sentuh, setSentuh] = useState(0);
+
+  /* ── TIKET RINGKAS ────────────────────────────────────────
+     Permintaan pemiliknya: tiketnya menutupi terlalu banyak lilin di
+     ponsel. Yang disembunyikan baris-baris SETELAN — emosi, alasan, modal,
+     risk%, SL x ATR, R:R — dan yang tinggal justru inti keputusannya:
+     entry, SL, TP, R:R beserta angka dolarnya, Kirim, Batal.
+
+     Pembedanya jelas begitu dilihat dari cara orang memakainya: setelan
+     diisi SEKALI di awal sesi lalu tidak disentuh lagi, sedangkan tiga
+     level dan tombolnya dipakai di setiap rencana. Yang jarang dipakai
+     tapi selalu menutupi lilin adalah yang paling pantas dilipat.
+
+     Tidak disimpan antar-sesi. Ia keputusan tentang RUANG LAYAR saat itu —
+     sempit di ponsel, lega di desktop — bukan preferensi yang perlu
+     diingat, dan mengingatnya berarti orang membuka tiket di desktop lalu
+     menemukannya setengah tanpa pernah memintanya.
+
+     DIPASANG DI SINI, BUKAN DI DALAM CABANG TIKET. Versi pertamanya
+     ditulis persis di sebelah tempat pemakaiannya — di dalam if (draf) —
+     dan itu membuat halaman JADI KOSONG saat Batal ditekan: draf jadi
+     null, cabangnya tidak dijalani, hook ini tidak ikut terpanggil, dan
+     React berhenti dengan "Rendered fewer hooks than expected".
+
+     Komponen ini punya DUA return bersyarat di bawah (pending order dan
+     posisi berjalan), jadi tidak ada hook yang boleh lahir sesudah
+     titik ini. */
+  const [ringkas, setRingkas] = useState(false);
   const bangunkan = () => setSentuh((n) => n + 1);
   const menganggur = !posisi && !tunda && !draf;
   useEffect(() => {
@@ -338,24 +365,6 @@ export function PojokOrder({
     const rr = risk > 0 && reward > 0 ? reward / risk : null;
     /* SL di sisi yang salah bukan sekadar RR jelek — ia order yang langsung
        kena begitu terkirim. Ditahan di sini, bukan ditolak backend. */
-    /* ── TIKET RINGKAS ────────────────────────────────────────────────
-       Permintaan pemiliknya: tiketnya menutupi terlalu banyak lilin di
-       ponsel. Yang disembunyikan baris-baris SETELAN — emosi, alasan,
-       modal, risk%, SL x ATR, R:R — dan yang tinggal justru inti
-       keputusannya: entry, SL, TP, R:R beserta angka dolarnya, Kirim,
-       Batal.
-
-       Pembedanya jelas begitu dilihat dari cara orang memakainya: setelan
-       diisi SEKALI di awal sesi lalu tidak disentuh lagi, sedangkan tiga
-       level dan tombolnya dipakai di setiap rencana. Yang jarang dipakai
-       tapi selalu menutupi lilin adalah yang paling pantas dilipat.
-
-       Tidak disimpan antar-sesi. Ia keputusan tentang RUANG LAYAR saat
-       itu — sempit di ponsel, lega di desktop — bukan preferensi yang
-       perlu diingat, dan mengingatnya berarti orang membuka tiket di
-       desktop lalu menemukannya setengah tanpa pernah memintanya. */
-    const [ringkas, setRingkas] = useState(false);
-
     const arahBenar = !entry || !sl || !tp
       ? false
       : draf === 'BUY' ? sl < entry && tp > entry : sl > entry && tp < entry;
