@@ -346,6 +346,24 @@ function KartuAnalisa({ a, status, milikku, onSegarkan, performa, hargaKini }: {
      tinggi 112 px, jadi satu-satunya cara memeriksanya membuka analisanya
      lalu mencari foto yang isinya sama. Sekarang ia bisa ditekan sendiri. */
   const [sampulBesar, setSampulBesar] = useState(false);
+
+  /* ── ALASAN ANALISA: SATU BARIS, DENGAN JALAN MELEBAR ────────────────
+     Ia pindah ke ATAS kalkulator (permintaan pemilik) — di bawahnya,
+     alasan analis agen yang berparagraf-paragraf mendorong kalkulator
+     jauh ke bawah, dan yang baru membuka level justru sedang ingin tahu
+     harus masuk sebesar apa.
+
+     Dipangkas satu baris, bukan disembunyikan: satu baris pertama sudah
+     memberi tahu apakah alasannya perlu dibaca sekarang atau tidak.
+
+     "Lihat selengkapnya" digambar HANYA kalau tulisannya memang terpotong.
+     Diukur, bukan ditebak dari jumlah hurufnya: satu kalimat pendek bisa
+     terpotong di kartu sempit dan kalimat panjang bisa muat di kartu lebar,
+     jadi menebak dari panjang teks akan salah di kedua arah — tombol yang
+     tidak melebarkan apa pun, atau tulisan terpotong tanpa jalan keluar. */
+  const alasanRef = useRef<HTMLParagraphElement>(null);
+  const [alasanPanjang, setAlasanPanjang] = useState(false);
+  const [alasanBuka, setAlasanBuka] = useState(false);
   const [isi, setIsi] = useState<IsiAnalisa | null>(null);
   const [formBeli, setFormBeli] = useState(false);
   /* Berpindah lewat router, bukan href: memuat ulang seluruh aplikasi cuma
@@ -409,6 +427,17 @@ function KartuAnalisa({ a, status, milikku, onSegarkan, performa, hargaKini }: {
     + (lv ? `&arah=${a.arah}&entry=${lv.entry}&sl=${lv.sl}&tp=${lv.tp}` : '');
   const tautanChart = alamatChart(isi);
   const bolehBatal = bisaDibatalkan(a, pengguna?.uid);
+
+  /* Diukur saat terpangkas saja. Waktu sudah dilebarkan, scrollHeight sama
+     dengan clientHeight — mengukurnya di situ akan menyimpulkan "tidak
+     panjang" lalu menghilangkan tombol yang sedang dipakai untuk melipatnya
+     kembali. */
+  useEffect(() => {
+    if (alasanBuka) return;
+    const el = alasanRef.current;
+    if (!el) { setAlasanPanjang(false); return; }
+    setAlasanPanjang(el.scrollHeight > el.clientHeight + 1);
+  }, [isi, buka, alasanBuka]);
   const perfPenulis = performa?.analis.find((x) => x.uid === a.uid) ?? null;
 
   /* Tautan chart yang MENJEMPUT levelnya dulu.
@@ -767,13 +796,27 @@ function KartuAnalisa({ a, status, milikku, onSegarkan, performa, hargaKini }: {
                 <CandlestickChart className="size-3.5" /> Buka di Chart
               </Link>
             </div>
-            <HitungPosisi entry={isi.entry} sl={isi.sl} kripto={pasarKripto(a)} pasangan={a.pasangan} />
+            {/* ALASANNYA DI ATAS KALKULATOR, dan dipangkas satu baris.
+                whitespace-pre-line: analisa agen ditulis berparagraf dengan
+                judul bagian. Diperas jadi satu blok, ia berubah dari bacaan
+                jadi dinding teks — jadi bentuk aslinya dipertahankan, cuma
+                tingginya yang dibatasi sampai orangnya meminta lebih. */}
             {isi.alasan && (
-              /* whitespace-pre-line: analisa agen ditulis berparagraf dengan
-                 judul bagian. Diperas jadi satu blok, ia berubah dari bacaan
-                 jadi dinding teks. */
-              <p className="w-full whitespace-pre-line text-[12px] leading-relaxed text-zinc-400">{isi.alasan}</p>
+              <div className="w-full">
+                <p ref={alasanRef}
+                   className={cn('whitespace-pre-line text-[12px] leading-relaxed text-zinc-400',
+                     !alasanBuka && 'line-clamp-1')}>
+                  {isi.alasan}
+                </p>
+                {(alasanPanjang || alasanBuka) && (
+                  <button onClick={() => setAlasanBuka((v) => !v)}
+                    className="mt-0.5 cursor-pointer text-[11.5px] text-zinc-500 underline decoration-zinc-700 underline-offset-2 transition-colors hover:text-zinc-300">
+                    {alasanBuka ? 'Ringkas lagi' : 'Lihat selengkapnya'}
+                  </button>
+                )}
+              </div>
             )}
+            <HitungPosisi entry={isi.entry} sl={isi.sl} kripto={pasarKripto(a)} pasangan={a.pasangan} />
           </div>
         ) : formBeli ? (
           <div className="space-y-2">
