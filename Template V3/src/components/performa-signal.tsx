@@ -294,12 +294,17 @@ function SyaratPapan({ a }: { a: AturanPapan }) {
     <p className="text-[11px] leading-relaxed text-zinc-600">
       <span className="text-zinc-500">Syarat masuk papan:</span> minimal {a.minSinyal} sinyal
       selesai bulan ini, drawdown tidak lebih dari {a.ddMaksPersen}% modal, dan jarak SL tiap
-      sinyal tidak lebih dari <span className="angka">{a.slMaksPersen.kripto}%</span> untuk kripto
-      atau <span className="angka">{a.slMaksPersen.tradefi}%</span> untuk Trade-Fi. Batasnya
-      berbeda karena volatilitasnya berbeda — satu angka untuk keduanya akan menjegal sinyal
-      kripto yang wajar sekaligus tidak pernah menyentuh Trade-Fi sama sekali. Jarak SL sekian
-      persen berarti risiko sekian persen kalau posisinya sebesar modal tanpa leverage; ukuran
-      posisi tidak pernah ikut diposting, jadi itulah yang bisa diukur.{' '}
+      sinyal tidak lebih dari <span className="angka">{a.slMaksPersen}%</span> — sama untuk
+      kripto maupun Trade-Fi.{' '}
+      <span className="text-zinc-500">Kenapa satu angka untuk dua pasar yang volatilitasnya
+      berbeda:</span> jarak SL bukan ukuran risiko, ia pembagi. Risiko = ukuran posisi × jarak
+      SL, dan ukuran posisi ada di tanganmu — lewat margin & leverage di futures, lewat lot &
+      akun cent di MT5. Justru SL yang lebar butuh leverage lebih kecil: dengan risiko 1% dari
+      $1.000, SL 2% cukup posisi $500 tanpa leverage sama sekali, sedangkan SL 0,5% menuntut
+      $2.000. Batas {a.slMaksPersen}% karena itu bukan pagar risiko — risikomu kamu yang atur,
+      dan panel hitungan di tiap sinyal menunjukkan caranya. Ia pagar seberapa jauh sebuah
+      rencana boleh melenceng sebelum dinyatakan salah: stop yang terlalu lebar berhenti jadi
+      stop dan berubah jadi harapan.{' '}
       Melanggar tidak menghapus apa pun, tapi <span className="text-zinc-400">memperlambat</span>{' '}
       bulan berikutnya: tiap sinyal yang melanggar menambah {a.dendaPerPelanggaran} sinyal pada
       syarat minimal bulan depan, sampai maksimum +{a.dendaMaks}.

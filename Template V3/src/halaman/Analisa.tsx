@@ -17,6 +17,7 @@ import { PapanPeringkatSignal } from '@/components/performa-signal';
    performa satu orang. Yang di kepala sudah dikembalikan. */
 import PerformaKalender from '@/components/performa-kalender';
 import { SparklineSaldo } from '@/components/kurva-saldo';
+import { HitungPosisi } from '@/components/hitung-posisi';
 import { ambilDraf } from '@/lib/draf-sinyal';
 import { AvatarAnalis } from '@/components/avatar-analis';
 import { ringkasKanal, type RingkasKanal } from '@/lib/ringkas-kanal';
@@ -806,6 +807,16 @@ function KartuAnalisa({ a, status, milikku, onSegarkan, performa, hargaKini }: {
                 cuma ada setelah analisanya dibuka, padahal pertanyaan
                 "chart-nya seperti apa" justru datang SEBELUM orang
                 memutuskan membuka. */}
+            {/* PENGHITUNG POSISI — di sini, bukan di kartu tertutup.
+                Ia butuh entry dan SL, dan keduanya baru ada setelah
+                analisanya dibuka. Menaruhnya di kartu berbayar yang masih
+                terkunci berarti panel kosong yang menjanjikan sesuatu yang
+                belum bisa dihitung.
+
+                Tempatnya juga tepat secara urutan: orang yang baru saja
+                membuka level adalah orang yang detik itu juga sedang
+                memutuskan mau masuk sebesar apa. */}
+            <HitungPosisi entry={isi.entry} sl={isi.sl} kripto={pasarKripto(a)} />
             {isi.alasan && (
               /* whitespace-pre-line: analisa agen ditulis berparagraf dengan
                  judul bagian. Diperas jadi satu blok, ia berubah dari bacaan
@@ -1995,12 +2006,7 @@ export default function Analisa() {
                 const e0 = Number(entry), s0 = Number(sl);
                 if (!(e0 > 0) || !(s0 > 0)) return null;
                 const jarak = (Math.abs(e0 - s0) / e0) * 100;
-                /* Batas MENGIKUTI pasar yang sedang dipilih di formulir,
-                    bukan satu angka: peringatan yang memakai batas kripto
-                    untuk sinyal XAUUSD akan meloloskan stop empat kali
-                    lebih lebar dari kebiasaan pasar itu tanpa sepatah kata
-                    pun — persis kebalikan dari gunanya peringatan ini. */
-                const batas = performa?.aturan?.slMaksPersen?.[pasar] ?? (pasar === 'tradefi' ? 0.8 : 2);
+                const batas = performa?.aturan?.slMaksPersen ?? 2;
                 return (
                   <div className="col-span-2 sm:col-span-4">
                     <p className={cn('rounded-md border px-2.5 py-2 text-[11.5px] leading-relaxed',

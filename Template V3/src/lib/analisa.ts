@@ -314,12 +314,14 @@ export interface PerformaAnalis {
 
 export interface AturanPapan {
   ddMaksPersen: number;
-  /** Batas jarak SL PER PASAR, bukan satu angka datar — SL kripto hampir
-   *  lima kali lebih lebar daripada XAUUSD, dan itu volatilitas
-   *  instrumennya, bukan perilaku analisnya. Satu angka gagal dua arah
-   *  sekaligus: menjegal sinyal kripto yang wajar, sekaligus tidak pernah
-   *  tersentuh di Trade-Fi. Angkanya ditentukan server. */
-  slMaksPersen: { kripto: number; tradefi: number };
+  /** Batas jarak SL, SATU angka untuk semua pasar.
+   *
+   *  Sempat dipisah per pasar dengan alasan volatilitas; itu keliru. Kalau
+   *  ukuran posisi bebas diatur, jarak SL bukan ukuran risiko melainkan
+   *  PEMBAGI — risiko = ukuran posisi x jarak SL. Kripto punya margin &
+   *  leverage, MT5 punya akun cent & lot; keduanya bisa menyamakan risiko
+   *  berapa pun jarak SL-nya. Lihat HitungPosisi. */
+  slMaksPersen: number;
   minSinyal: number;
   dendaPerPelanggaran: number;
   dendaMaks: number;
