@@ -1689,71 +1689,6 @@ export default function Analisa() {
 
   return (
     <div className="p-4 sm:p-6">
-      {/* ── Peringatan risiko, 3 detik lalu menyusut ──────────────────────
-          Alasan lengkapnya di dekat `diskTampil` di atas berkas ini.
-
-          MENYUSUT, BUKAN LANGSUNG LENYAP. `display:none` mendadak membuat
-          seluruh halaman melompat naik 3 detik setelah dibuka — persis saat
-          mata sedang menyusuri kartu kanal, dan yang terasa bukan "kalimat
-          itu selesai" melainkan "halamannya bergeser sendiri".
-
-          grid-rows 1fr → 0fr menganimasikan tinggi yang SEBENARNYA, tanpa
-          menebak max-height. Kalau kalimatnya diperpanjang nanti, tidak ada
-          angka ajaib yang ikut harus diperbaiki.
-
-          DITULIS SEBAGAI GAYA INLINE, bukan kelas `grid-rows-[0fr]`.
-          Versi pertama memakai kelas itu dan GAGAL DIAM-DIAM: Tailwind tidak
-          menghasilkan aturannya sama sekali (diperiksa — nol aturan
-          `grid-rows` di seluruh stylesheet), jadi nama kelasnya cuma teks
-          mati. Yang bekerja tinggal `opacity-0`, dan hasilnya gabungan
-          terburuk: kalimatnya tak terlihat tapi tetap memakan 37 px, jadi
-          halaman tetap terdorong ke bawah oleh sesuatu yang tidak ada.
-          Gaya inline tidak bisa terlewat pemindai kelas.
-
-          motion-reduce: yang menyalakan "kurangi gerak" di sistemnya
-          mendapat pergantian tanpa animasi — mereka menyalakannya justru
-          karena gerak begini memicu sesuatu. */}
-      {diDepan && (
-        /* ── SATU PANEL, DENGAN JALAN KEMBALI ──────────────────────────
-            Dulu ia cuma menyusut sendiri sesudah 5 detik dan hilang tanpa
-            sisa. Yang membaca sekilas lalu ingin membacanya lagi tidak
-            punya cara apa pun selain memuat ulang halaman — dan ini
-            peringatan risiko di wilayah OJK/Bappebti, jenis tulisan yang
-            paling tidak boleh cuma bisa dibaca sekali.
-
-            Penyusutan otomatisnya DIPERTAHANKAN: ia tetap menyapa pada
-            kunjungan pertama lalu mengecil supaya tidak memakan layar
-            selamanya. Yang ditambahkan cuma kepalanya yang bisa ditekan,
-            jadi tidak ada yang hilang, cuma ada yang bertambah. */
-        <div className="mb-4 rounded-lg border border-zinc-800/60 px-3 py-2">
-          <button onClick={() => setDiskTampil((v) => !v)} aria-expanded={diskTampil}
-            className="flex w-full cursor-pointer items-center gap-1 text-[11px] text-zinc-500 transition-colors hover:text-zinc-300">
-            {diskTampil ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
-            <span className="font-medium text-amber-300/80">Disclaimer</span>
-            <span>· {diskTampil ? 'sembunyikan' : 'buka selengkapnya'}</span>
-          </button>
-        <div
-          style={{ gridTemplateRows: diskTampil ? '1fr' : '0fr' }}
-          className={cn(
-            'grid overflow-hidden transition-all duration-500 ease-out motion-reduce:transition-none',
-            diskTampil ? 'mt-1.5 opacity-100' : 'mt-0 opacity-0',
-          )}>
-          <div className="overflow-hidden">
-            <p className="text-[11.5px] leading-relaxed text-zinc-400">
-              <span className="font-medium text-amber-300/90">Bukan rekomendasi beli atau jual.</span>{' '}
-              Analisa di halaman ini disusun pengguna lain dan agen AI dari data harga publik —
-              termasuk yang berbayar. Rekam jejak dan estimasi yang ditampilkan adalah catatan masa
-              lalu, <span className="text-zinc-300">bukan jaminan hasil</span>. Periksa ulang sebelum
-              eksekusi; seluruh risiko dan keputusan ada padamu.{' '}
-              <Link to="/legal" className="underline decoration-zinc-700 underline-offset-2 hover:text-zinc-200">
-                Disclaimer &amp; Ketentuan
-              </Link>
-            </p>
-          </div>
-        </div>
-        </div>
-      )}
-
       {/* ── Papan peringkat, DI KEPALA Market Signal ─────────────────────
           Bukan sub-halaman sendiri lagi. Orang datang ke sini untuk mencari
           sinyal; sekalian di layar yang sama ia melihat rekam jejak siapa
@@ -2520,6 +2455,81 @@ export default function Analisa() {
 
         return kanalBuka === null ? (
           <>
+          {/* ── DISCLAIMER, TEPAT DI ATAS KARTU ANALIS ───────────────────
+              Dulu ia duduk di atas papan peringkat. Dipindah ke sini atas
+              permintaan pemilik, dan tempat barunya memang lebih tepat:
+              yang diperingatkan tulisan ini adalah keputusan MENGIKUTI
+              SESEORANG, dan keputusan itu diambil di kartu-kartu tepat di
+              bawahnya — bukan di papan peringkat, yang cuma mengurutkan
+              angka.
+
+              Bingkainya dicabut. Berkotak, ia terbaca sebagai panel yang
+              setara dengan kartu analis di bawahnya; padahal ia bukan
+              barang sejenis, ia catatan TENTANG barang-barang itu.
+
+              SATU PANEL, DENGAN JALAN KEMBALI.
+              Dulu ia cuma menyusut sendiri sesudah 5 detik dan hilang tanpa
+              sisa. Yang membaca sekilas lalu ingin membacanya lagi tidak
+              punya cara apa pun selain memuat ulang halaman — dan ini
+              peringatan risiko di wilayah OJK/Bappebti, jenis tulisan yang
+              paling tidak boleh cuma bisa dibaca sekali.
+
+              Penyusutan otomatisnya DIPERTAHANKAN: ia tetap menyapa pada
+              kunjungan pertama lalu mengecil supaya tidak memakan layar
+              selamanya. Yang ditambahkan cuma kepalanya yang bisa ditekan,
+              jadi tidak ada yang hilang, cuma ada yang bertambah.
+
+              MENYUSUT, BUKAN LENYAP — catatan animasinya.
+              Alasan lengkapnya di dekat `diskTampil` di atas berkas ini.
+
+              MENYUSUT, BUKAN LANGSUNG LENYAP. `display:none` mendadak membuat
+              seluruh halaman melompat naik 3 detik setelah dibuka — persis saat
+              mata sedang menyusuri kartu kanal, dan yang terasa bukan "kalimat
+              itu selesai" melainkan "halamannya bergeser sendiri".
+
+              grid-rows 1fr → 0fr menganimasikan tinggi yang SEBENARNYA, tanpa
+              menebak max-height. Kalau kalimatnya diperpanjang nanti, tidak ada
+              angka ajaib yang ikut harus diperbaiki.
+
+              DITULIS SEBAGAI GAYA INLINE, bukan kelas `grid-rows-[0fr]`.
+              Versi pertama memakai kelas itu dan GAGAL DIAM-DIAM: Tailwind tidak
+              menghasilkan aturannya sama sekali (diperiksa — nol aturan
+              `grid-rows` di seluruh stylesheet), jadi nama kelasnya cuma teks
+              mati. Yang bekerja tinggal `opacity-0`, dan hasilnya gabungan
+              terburuk: kalimatnya tak terlihat tapi tetap memakan 37 px, jadi
+              halaman tetap terdorong ke bawah oleh sesuatu yang tidak ada.
+              Gaya inline tidak bisa terlewat pemindai kelas.
+
+              motion-reduce: yang menyalakan "kurangi gerak" di sistemnya
+              mendapat pergantian tanpa animasi — mereka menyalakannya justru
+              karena gerak begini memicu sesuatu. */}
+          <div className="mb-3">
+            <button onClick={() => setDiskTampil((v) => !v)} aria-expanded={diskTampil}
+              className="flex w-full cursor-pointer items-center gap-1 text-[11px] text-zinc-500 transition-colors hover:text-zinc-300">
+              {diskTampil ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
+              <span className="font-medium text-amber-300/80">Disclaimer</span>
+              <span>· {diskTampil ? 'sembunyikan' : 'buka selengkapnya'}</span>
+            </button>
+          <div
+            style={{ gridTemplateRows: diskTampil ? '1fr' : '0fr' }}
+            className={cn(
+              'grid overflow-hidden transition-all duration-500 ease-out motion-reduce:transition-none',
+              diskTampil ? 'mt-1.5 opacity-100' : 'mt-0 opacity-0',
+            )}>
+            <div className="overflow-hidden">
+              <p className="text-[11.5px] leading-relaxed text-zinc-400">
+                <span className="font-medium text-amber-300/90">Bukan rekomendasi beli atau jual.</span>{' '}
+                Analisa di halaman ini disusun pengguna lain dan agen AI dari data harga publik —
+                termasuk yang berbayar. Rekam jejak dan estimasi yang ditampilkan adalah catatan masa
+                lalu, <span className="text-zinc-300">bukan jaminan hasil</span>. Periksa ulang sebelum
+                eksekusi; seluruh risiko dan keputusan ada padamu.{' '}
+                <Link to="/legal" className="underline decoration-zinc-700 underline-offset-2 hover:text-zinc-200">
+                  Disclaimer &amp; Ketentuan
+                </Link>
+              </p>
+            </div>
+          </div>
+          </div>
           {/* Petunjuk, bukan hiasan. Klik kanan tidak punya penanda apa pun
               di layar — tidak ada yang menemukannya sendiri, dan fitur yang
               tidak ditemukan sama saja dengan fitur yang tidak ada.
