@@ -231,7 +231,7 @@ export function PapanBelumLayak({ analis, aturan }: { analis: PerformaAnalis[]; 
   };
 
   return (
-    <div className="overflow-hidden rounded-lg border border-zinc-800/60">
+    <div className="border-y border-zinc-800/60">
       {/* KEPALA PANEL DICABUT — permintaan pemilik. Judul, hitungan, dan
           kalimat pengantarnya hilang; yang tersisa tabelnya sendiri.
 
@@ -241,7 +241,7 @@ export function PapanBelumLayak({ analis, aturan }: { analis: PerformaAnalis[]; 
           pembukanya. */}
       {/* ── TABEL, layar sedang ke atas ──────────────────────────────── */}
       <div className="hidden sm:block">
-        <table className="w-full border-collapse text-left">
+        <table className="w-full border-collapse text-left [&_td:first-child]:pl-0 [&_td:last-child]:pr-0 [&_th:first-child]:pl-0 [&_th:last-child]:pr-0">
           <thead>
             <tr className="border-b border-zinc-800/60">
               <KepalaKolom kunci="nama" judul="Analis" urut={urut} onUrut={gantiUrut} />
@@ -272,7 +272,7 @@ export function PapanBelumLayak({ analis, aturan }: { analis: PerformaAnalis[]; 
       {/* ── KARTU, ponsel ────────────────────────────────────────────── */}
       <ul className="divide-y divide-zinc-800/60 sm:hidden">
         {tampil.map((b) => (
-          <li key={b.uid} className="px-3 py-3">
+          <li key={b.uid} className="py-3">
             <div className="mb-2 flex items-start gap-2">
               <div className="min-w-0 flex-1"><Nama b={b} /></div>
               <LencanaStatus />
@@ -300,7 +300,7 @@ export function PapanBelumLayak({ analis, aturan }: { analis: PerformaAnalis[]; 
           mengendalikan apa pun — dan kendali mati mengajari orang bahwa
           tombol di layar ini boleh diabaikan. */}
       {terurut.length > PER_HALAMAN && (
-        <div className="flex flex-wrap items-center gap-2 border-t border-zinc-800/60 px-3 py-2 sm:px-4">
+        <div className="flex flex-wrap items-center gap-2 border-t border-zinc-800/60 py-2">
           <span className="angka text-[11px] text-zinc-600">
             {awal + 1}–{Math.min(awal + PER_HALAMAN, terurut.length)} dari {terurut.length}
           </span>
