@@ -817,13 +817,12 @@ function KartuAnalisa({ a, status, milikku, onSegarkan, performa, hargaKini }: {
                 Tempatnya juga tepat secara urutan: orang yang baru saja
                 membuka level adalah orang yang detik itu juga sedang
                 memutuskan mau masuk sebesar apa. */}
-            <HitungPosisi entry={isi.entry} sl={isi.sl} kripto={pasarKripto(a)} pasangan={a.pasangan} />
-            {isi.alasan && (
-              /* whitespace-pre-line: analisa agen ditulis berparagraf dengan
-                 judul bagian. Diperas jadi satu blok, ia berubah dari bacaan
-                 jadi dinding teks. */
-              <p className="w-full whitespace-pre-line text-[12px] leading-relaxed text-zinc-400">{isi.alasan}</p>
-            )}
+            {/* GALERI DI ATAS KALKULATOR, bukan di kaki analisa.
+                Chart-nya BUKTI, kalkulator ALAT: yang membaca menilai
+                rencananya dulu dari gambarnya, dan baru menghitung
+                ukuran posisinya sesudah memutuskan ikut. Di kaki panel,
+                gambarnya terlewat oleh yang sudah berhenti membaca di
+                baris angka. */}
             <Galeri
               /* bisaTambah SELALU false: menambah foto ke sinyal ditutup
                   seluruhnya, bukan cuma di formulir postingnya. Foto galeri
@@ -838,6 +837,13 @@ function KartuAnalisa({ a, status, milikku, onSegarkan, performa, hargaKini }: {
               uidku={pengguna?.uid} penulisku={milikku}
               onBerubah={setGaleri}
             />
+            <HitungPosisi entry={isi.entry} sl={isi.sl} kripto={pasarKripto(a)} pasangan={a.pasangan} />
+            {isi.alasan && (
+              /* whitespace-pre-line: analisa agen ditulis berparagraf dengan
+                 judul bagian. Diperas jadi satu blok, ia berubah dari bacaan
+                 jadi dinding teks. */
+              <p className="w-full whitespace-pre-line text-[12px] leading-relaxed text-zinc-400">{isi.alasan}</p>
+            )}
           </div>
         ) : formBeli ? (
           <div className="space-y-2">

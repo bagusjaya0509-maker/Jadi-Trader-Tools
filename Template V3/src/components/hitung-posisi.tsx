@@ -80,6 +80,26 @@ function kontrakBawaan(pasangan: string): number {
   return 100_000;
 }
 
+/** Besar 1 pip menurut simbolnya.
+ *
+ *  DIPAKAI UNTUK MEMBACA SAJA, tidak pernah untuk menghitung lot. Itu
+ *  disengaja: "pip" bukan satuan yang disepakati semua broker — sebagian
+ *  menulis emas 1 pip = 0,1 dan sebagian 0,01 — jadi lot yang dihitung
+ *  lewat pip akan ikut salah di broker yang memakai kesepakatan lain.
+ *
+ *  Lot dihitung dari JARAK HARGA, yang tidak punya kesepakatan dan karena
+ *  itu tidak bisa salah. Pip cuma menerjemahkan jarak itu ke satuan yang
+ *  biasa dibaca orang MT5, dan besarannya ditulis di layar supaya bisa
+ *  diperiksa. */
+function besarPip(pasangan: string): number {
+  const t = (pasangan || '').replace(/^MT5:/i, '').toUpperCase();
+  if (t.startsWith('XAU')) return 0.1;
+  if (t.startsWith('XAG')) return 0.01;
+  if (/JPY$/.test(t)) return 0.01;
+  if (/^[A-Z]{6}$/.test(t)) return 0.0001;
+  return 0.01;
+}
+
 const ISIAN = 'w-full rounded-md border border-zinc-800 bg-zinc-950 px-2 py-1 text-[12px] text-zinc-200 outline-none transition-colors focus:border-zinc-600';
 
 export function HitungPosisi({ entry, sl, kripto, pasangan = '' }: {
@@ -115,7 +135,7 @@ export function HitungPosisi({ entry, sl, kripto, pasangan = '' }: {
     <div className="mt-3 w-full rounded-lg border border-zinc-800 bg-zinc-950/60 p-3">
       <div className="mb-2.5 flex items-center gap-1.5 text-[11.5px] font-medium text-zinc-300">
         <Calculator className="size-3.5 text-zinc-500" />
-        Ukuran posisi supaya risikomu pas
+        Kalkulator Hitung
       </div>
 
       <div className="grid grid-cols-3 gap-2">
@@ -133,19 +153,26 @@ export function HitungPosisi({ entry, sl, kripto, pasangan = '' }: {
             <input value={n.leverage} onChange={ubah('leverage')} inputMode="decimal" className={cn(ISIAN, 'angka')} />
           </label>
         ) : (
-          <label className="block">
-            <span className="mb-1 block text-[10.5px] text-zinc-500">Kontrak / lot</span>
-            <input value={kontrak} inputMode="decimal"
-                   onChange={(e) => setKontrak(Math.max(0, Number(e.target.value) || 0))}
-                   className={cn(ISIAN, 'angka')} />
-          </label>
+          /* LOT DUDUK DI BARIS ISIAN, tapi bukan isian: ia jawaban dari dua
+             kolom di sebelahnya. Ditaruh sejajar keduanya supaya hubungannya
+             terbaca dalam sekali lihat — modal dan risiko masuk, lot keluar
+             — tanpa mata turun ke daftar angka di bawah. */
+          <div className="block">
+            <span className="mb-1 block text-[10.5px] text-zinc-500">Lot</span>
+            <div className={cn(ISIAN, 'angka border-zinc-700 bg-zinc-900 font-semibold text-zinc-100')}>
+              {kontrak > 0 && jarakHarga > 0
+                ? (risikoDolar / (kontrak * jarakHarga)).toFixed(4)
+                : '—'}
+            </div>
+          </div>
         )}
       </div>
 
       {kripto
         ? <Kripto entry={entry} jarakPersen={jarakPersen} risikoDolar={risikoDolar} n={n} />
-        : <Mt5 jarakHarga={jarakHarga} jarakPersen={jarakPersen} risikoDolar={risikoDolar}
-               kontrak={kontrak} risikoPersen={n.risiko} entry={entry} modal={n.modal} />}
+        : <Mt5 jarakHarga={jarakHarga} risikoDolar={risikoDolar} kontrak={kontrak}
+               setKontrak={setKontrak} risikoPersen={n.risiko} modal={n.modal}
+               pip={besarPip(pasangan)} />}
     </div>
   );
 }
@@ -201,70 +228,75 @@ function Kripto({ entry, jarakPersen, risikoDolar, n }: {
   );
 }
 
-/* ── TRADE-FI (MT5): lot, dan cuma lot ──────────────────────────────── */
-function Mt5({ jarakHarga, jarakPersen, risikoDolar, kontrak, risikoPersen, entry, modal }: {
-  jarakHarga: number; jarakPersen: number; risikoDolar: number;
-  kontrak: number; risikoPersen: number; entry: number; modal: number;
+/* ── TRADE-FI (MT5): modal, risiko, lot — tidak lebih ────────────────
+   Dirombak atas permintaan pemilik. Yang dibuang: "Rugi per 1 lot penuh"
+   dan "Dibulatkan ke step 0,01". Keduanya benar, dan keduanya membingungkan
+   di tempat ini — yang pertama angka antara yang cuma dipakai rumusnya, yang
+   kedua menjawab pertanyaan broker sebelum orangnya sempat bertanya.
+
+   Jarak SL dibaca dalam PIPS, bukan persen. Persen jarak harga tidak berarti
+   apa-apa buat yang memasang lot; pips itu satuan yang sama dengan yang
+   tertulis di terminalnya sendiri.
+
+   Tapi lotnya TIDAK dihitung lewat pips — lihat catatan di besarPip().
+   Pip cuma cara membacanya. */
+function Mt5({ jarakHarga, risikoDolar, kontrak, setKontrak, risikoPersen, modal, pip }: {
+  jarakHarga: number; risikoDolar: number; kontrak: number;
+  setKontrak: (n: number) => void; risikoPersen: number; modal: number; pip: number;
 }) {
-  /* Kerugian kalau SL kena, untuk SATU lot penuh. Inilah angka yang
-     membuat lot bisa dihitung — dan yang tidak pernah muncul kalau
-     panelnya berbicara leverage. */
   const rugiPerLot = kontrak * jarakHarga;
-  const lotIdeal = rugiPerLot > 0 ? risikoDolar / rugiPerLot : 0;
+  const lot = rugiPerLot > 0 ? risikoDolar / rugiPerLot : 0;
+  const jarakPip = pip > 0 ? jarakHarga / pip : 0;
 
-  /* DIBULATKAN KE BAWAH, bukan ke terdekat. Membulatkan 0,014 jadi 0,01
-     membuat risikonya lebih kecil dari yang diminta; membulatkannya ke
-     0,02 membuatnya lebih BESAR — dan angka yang diam-diam melewati batas
-     risiko orang adalah kesalahan yang tidak boleh dibuat kalkulator
-     risiko. */
-  const lotBulat = Math.floor(lotIdeal * 100) / 100;
-  const bisaStandar = lotBulat >= 0.01;
-  const risikoNyata = lotBulat * rugiPerLot;
-
-  /* Akun cent: ukuran kontraknya 1/100, jadi lot yang sama menanggung
-     risiko 1/100 — atau, dibalik, risiko yang sama butuh lot 100x. Itu
-     satu-satunya cara memasang risiko kecil tanpa lot pecahan yang
-     ditolak broker. */
-  const lotSen = Math.floor(lotIdeal * 100 * 100) / 100;
+  /* Lot minimum broker 0,01. Di bawah itu rencananya TIDAK BISA DIPASANG di
+     akun standar, dan panel yang menyebut angka yang tidak bisa dipakai
+     lebih buruk daripada panel yang diam. Barisnya memang dicabut; yang
+     tinggal satu peringatan, dan cuma saat ia benar-benar berlaku. */
+  const dibawahMinimum = lot > 0 && lot < 0.01;
+  const lotSen = Math.floor(lot * 100 * 100) / 100;
 
   return (
     <>
       <div className="mt-3 space-y-1 text-[11.5px]">
-        <Baris k="Jarak SL sinyal ini" v={`${jarakHarga.toPrecision(4)} (${jarakPersen.toFixed(2)}%)`} />
+        <Baris k="Jarak SL sinyal ini" v={jarakPip.toFixed(1) + ' pips'} />
         <Baris k={`Rugi kalau kena SL (${risikoPersen}% modal)`} v={uang(risikoDolar)} />
-        <Baris k="Rugi per 1 lot penuh" v={uang(rugiPerLot)} />
-        <Baris k="Lot yang pas" v={lotIdeal.toFixed(4)} tebal />
-        <Baris k="Dibulatkan ke step 0,01"
-               v={bisaStandar ? `${lotBulat.toFixed(2)} lot · rugi ${uang(risikoNyata)}` : 'di bawah lot minimum'}
-               warna={bisaStandar ? undefined : 'text-amber-300'} />
-        <Baris k="Kalau pakai akun cent" v={`${lotSen.toFixed(2)} lot cent`} />
-        <Baris k="Nilai posisi (1 lot)" v={uang(kontrak * entry)} />
+        <Baris k="Lot yang dipakai" v={lot.toFixed(4)} tebal />
       </div>
 
-      {!bisaStandar && (
+      {dibawahMinimum && (
         <Peringatan nada="amber">
-          Risiko {risikoPersen}% di sinyal ini butuh{' '}
-          <span className="angka">{lotIdeal.toFixed(4)}</span> lot — lebih kecil dari lot minimum
-          broker (0,01). Pakai <span className="text-amber-100">akun cent</span> dengan{' '}
-          <span className="angka">{lotSen.toFixed(2)}</span> lot, atau naikkan modalmu. Memaksakan
-          0,01 lot di akun standar berarti menanggung{' '}
+          Lot sekecil ini di bawah minimum broker (0,01). Pakai{' '}
+          <span className="text-amber-100">akun cent</span> dengan{' '}
+          <span className="angka">{lotSen.toFixed(2)}</span> lot, atau naikkan modalmu.
+          Memaksakan 0,01 lot di akun standar berarti menanggung{' '}
           <span className="angka">{uang(0.01 * rugiPerLot)}</span>
           {modal > 0 && <> — {((0.01 * rugiPerLot / modal) * 100).toFixed(1)}% modal, bukan {risikoPersen}%</>}.
         </Peringatan>
       )}
 
+      {/* Ukuran kontrak dan besar pip DIKATAKAN, dan yang pertama bisa
+          dikoreksi. Keduanya ditentukan BROKER, bukan standar dunia: emas
+          100 oz per lot di satu broker bisa 10 di broker lain, dan angka
+          yang tidak bisa dibetulkan akan diam-diam salah di tempat yang
+          tidak kita duga — salahnya berupa lot yang terlalu besar. */}
+      <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10.5px] text-zinc-600">
+        <span>Ukuran kontrak</span>
+        <input value={kontrak} inputMode="decimal" aria-label="Ukuran kontrak per lot"
+               onChange={(e) => setKontrak(Math.max(0, Number(e.target.value) || 0))}
+               className="angka w-20 rounded border border-zinc-800 bg-zinc-950 px-1.5 py-0.5 text-[10.5px] text-zinc-300 outline-none transition-colors focus:border-zinc-600" />
+        <span>per lot · 1 pip = <span className="angka">{pip}</span> — sesuaikan kalau brokermu berbeda</span>
+      </div>
+
       <Kaki>
-        MT5 diukur dengan <span className="text-zinc-500">lot</span>, bukan leverage: yang
-        menentukan kerugianmu adalah ukuran kontrak simbol dikali jarak SL. Leverage di MT5 milik
-        akunmu — ia cuma mengatur berapa margin yang tertahan broker, dan mengubahnya tidak
-        mengubah satu sen pun kerugian saat SL kena.{' '}
-        <span className="text-zinc-500">Ukuran kontrak ditentukan brokermu</span> — kolom di atas
-        bisa disunting kalau punyamu berbeda. Angka di sini mengandaikan simbolnya berharga dalam
-        dolar.
+        MT5 diukur dengan <span className="text-zinc-500">lot</span>: yang menentukan kerugianmu
+        adalah ukuran kontrak simbol dikali jarak SL. Leverage di MT5 milik akunmu — ia cuma
+        mengatur berapa margin yang tertahan broker, dan mengubahnya tidak mengubah satu sen pun
+        kerugian saat SL kena. Angka di sini mengandaikan simbolnya berharga dalam dolar.
       </Kaki>
     </>
   );
 }
+
 
 function Peringatan({ nada, children }: { nada: 'merah' | 'amber'; children: React.ReactNode }) {
   return (
