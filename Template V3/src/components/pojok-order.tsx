@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
    lama untuk berpikir, cukup singkat supaya tidak menginap di atas
    lilin yang sedang dibaca. */
 const JEDA_LIPAT_SENDIRI_MS = 12_000;
-import { TrendingUp, TrendingDown, X, Check, Ban, CandlestickChart, Minus, Hourglass, Share2 } from 'lucide-react';
+import { TrendingUp, TrendingDown, X, Check, Ban, CandlestickChart, Minus, Hourglass, Share2, ChevronsDownUp, ChevronsUpDown } from 'lucide-react';
 import { cn, uang, harga as fHarga } from '@/lib/utils';
 import { METODE_TP, type MetodeTp } from '@/lib/order-nyata';
 
@@ -338,6 +338,24 @@ export function PojokOrder({
     const rr = risk > 0 && reward > 0 ? reward / risk : null;
     /* SL di sisi yang salah bukan sekadar RR jelek — ia order yang langsung
        kena begitu terkirim. Ditahan di sini, bukan ditolak backend. */
+    /* ── TIKET RINGKAS ────────────────────────────────────────────────
+       Permintaan pemiliknya: tiketnya menutupi terlalu banyak lilin di
+       ponsel. Yang disembunyikan baris-baris SETELAN — emosi, alasan,
+       modal, risk%, SL x ATR, R:R — dan yang tinggal justru inti
+       keputusannya: entry, SL, TP, R:R beserta angka dolarnya, Kirim,
+       Batal.
+
+       Pembedanya jelas begitu dilihat dari cara orang memakainya: setelan
+       diisi SEKALI di awal sesi lalu tidak disentuh lagi, sedangkan tiga
+       level dan tombolnya dipakai di setiap rencana. Yang jarang dipakai
+       tapi selalu menutupi lilin adalah yang paling pantas dilipat.
+
+       Tidak disimpan antar-sesi. Ia keputusan tentang RUANG LAYAR saat
+       itu — sempit di ponsel, lega di desktop — bukan preferensi yang
+       perlu diingat, dan mengingatnya berarti orang membuka tiket di
+       desktop lalu menemukannya setengah tanpa pernah memintanya. */
+    const [ringkas, setRingkas] = useState(false);
+
     const arahBenar = !entry || !sl || !tp
       ? false
       : draf === 'BUY' ? sl < entry && tp > entry : sl > entry && tp < entry;
@@ -391,7 +409,16 @@ export function PojokOrder({
               {jenis}
             </span>
           )}
-          <span className="text-[10.5px] text-zinc-500">geser garisnya di chart</span>
+          {/* Petunjuk geser ikut disembunyikan saat ringkas: ia kalimat
+              untuk yang baru pertama memakai, dan yang sedang meringkas
+              tiketnya jelas bukan orang itu. */}
+          {!ringkas && <span className="text-[10.5px] text-zinc-500">geser garisnya di chart</span>}
+          <button onClick={() => setRingkas((v) => !v)}
+            title={ringkas ? 'Tampilkan setelan lengkap' : 'Perkecil — sembunyikan setelan, sisakan level dan tombolnya'}
+            aria-label={ringkas ? 'Perbesar tiket' : 'Perkecil tiket'}
+            className="ml-auto flex shrink-0 cursor-pointer items-center rounded p-1 text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-200">
+            {ringkas ? <ChevronsUpDown className="size-3.5" /> : <ChevronsDownUp className="size-3.5" />}
+          </button>
         </div>
 
         <div className="flex items-end gap-1.5">
@@ -400,7 +427,7 @@ export function PojokOrder({
           <Isian k="tp" label="TP" warna="#10b981" />
         </div>
 
-        {catatan && aturCatatan && (
+        {catatan && aturCatatan && !ringkas && (
           <div className="mt-1.5 flex items-end gap-1.5">
             <label className="block">
               <span className="mb-0.5 block text-[9.5px] uppercase tracking-wide text-zinc-500">Emosi</span>
@@ -432,7 +459,7 @@ export function PojokOrder({
             sendiri. Menampilkannya di tiket yang sedang menyusun sinyal
             membuat angka pribadi terlihat seperti bagian dari sinyalnya —
             dan sekaligus jadi pembeda yang jelas antara tiga mode itu. */}
-        {modeSekarang === 'demo' && demoSetelan && aturDemo && (
+        {modeSekarang === 'demo' && demoSetelan && aturDemo && !ringkas && (
           <div className="mt-1.5 flex items-end gap-1.5">
             <IsianAngka judul="Modal $" lebar="w-[76px]" langkah={50}
                         nilai={demoSetelan.modal}
@@ -452,7 +479,7 @@ export function PojokOrder({
         {/* Order sungguhan butuh UKURANNYA di tempat yang sama dengan
             levelnya — modal, leverage, dan metode TP yang persis sama
             dengan Area Entry. Tanpa ini tiketnya cuma setengah keputusan. */}
-        {nyata && mt5 && (
+        {nyata && mt5 && !ringkas && (
           <div className="mt-1.5 flex items-end gap-1.5">
             {/* Langkah 0.01 = satu langkah lot terkecil di kebanyakan broker;
                 batas 10 sama dengan pagar lot di server. */}

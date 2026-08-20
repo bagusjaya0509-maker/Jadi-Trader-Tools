@@ -315,7 +315,23 @@ function Lonceng() {
       </button>
 
       {buka && (
-        <div className="absolute right-0 top-9 z-50 w-[340px] overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 shadow-2xl">
+        /* ── DI PONSEL MELEBAR KE LAYAR, BUKAN MENGGANTUNG DI TOMBOLNYA ──
+           Dulu selalu `absolute right-0 w-[340px]`: lebarnya tetap, dan
+           tepi kanannya menempel pada tombol lonceng — yang duduk jauh dari
+           tepi layar karena masih ada avatar di sebelahnya. Terukur di
+           lebar 375: panelnya mulai di x = -120, jadi seperlima isinya
+           terpotong di luar layar kiri. Judul "Berita Pasar" pun terbaca
+           separuh.
+
+           Di ponsel ia sekarang `fixed` selebar layar dikurangi margin,
+           digantung di bawah header (56 px, terukur). Fixed, bukan
+           absolute: ia harus mengukur diri terhadap JENDELA, bukan
+           terhadap tombol yang posisinya bisa bergeser mengikuti isi
+           header.
+
+           Dari sm ke atas kembali ke perilaku lama — di sana 340 px muat
+           dan menggantung di tombolnya justru lebih tepat. */
+        <div className="fixed inset-x-3 top-14 z-50 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 shadow-2xl sm:absolute sm:inset-x-auto sm:right-0 sm:top-9 sm:w-[340px]">
           <div className="flex items-center gap-2 border-b border-zinc-800 px-4 py-3">
             <Newspaper className="size-4 text-zinc-400" strokeWidth={1.8} />
             <span className="text-[13px] font-medium text-zinc-100">Berita Pasar</span>
@@ -442,7 +458,10 @@ function Pesan() {
       </button>
 
       {buka && (
-        <div className="absolute right-0 top-9 z-50 w-[340px] overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 shadow-2xl">
+        /* Sama persis dengan dropdown berita di atas — lihat catatannya di
+           sana. Ditulis dua kali karena keduanya komponen terpisah; kalau
+           salah satu diubah, yang lain WAJIB ikut. */
+        <div className="fixed inset-x-3 top-14 z-50 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 shadow-2xl sm:absolute sm:inset-x-auto sm:right-0 sm:top-9 sm:w-[340px]">
           <div className="flex items-center gap-2 border-b border-zinc-800 px-4 py-3">
             <Mail className="size-4 text-zinc-400" strokeWidth={1.8} />
             <span className="text-[13px] font-medium text-zinc-100">Pemberitahuan</span>

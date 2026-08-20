@@ -5,7 +5,7 @@ import { usePaket, LABEL_PAKET } from '@/lib/paket';
 import {
   Loader2, Lock, Unlock, Send, X, CheckCircle2,
   TrendingUp, TrendingDown, RefreshCw, Radar, Sparkles, ImagePlus, Images, Flag, Ban, Trash2, Plus,
-  Settings2, UserRound, Pin, TriangleAlert, ArrowLeft, CandlestickChart,
+  Settings2, UserRound, Pin, TriangleAlert, ArrowLeft, CandlestickChart, ChevronDown, ChevronRight,
 } from 'lucide-react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { PanelSinyal } from '@/components/panel-sinyal';
@@ -1703,11 +1703,29 @@ export default function Analisa() {
           mendapat pergantian tanpa animasi — mereka menyalakannya justru
           karena gerak begini memicu sesuatu. */}
       {diDepan && (
+        /* ── SATU PANEL, DENGAN JALAN KEMBALI ──────────────────────────
+            Dulu ia cuma menyusut sendiri sesudah 5 detik dan hilang tanpa
+            sisa. Yang membaca sekilas lalu ingin membacanya lagi tidak
+            punya cara apa pun selain memuat ulang halaman — dan ini
+            peringatan risiko di wilayah OJK/Bappebti, jenis tulisan yang
+            paling tidak boleh cuma bisa dibaca sekali.
+
+            Penyusutan otomatisnya DIPERTAHANKAN: ia tetap menyapa pada
+            kunjungan pertama lalu mengecil supaya tidak memakan layar
+            selamanya. Yang ditambahkan cuma kepalanya yang bisa ditekan,
+            jadi tidak ada yang hilang, cuma ada yang bertambah. */
+        <div className="mb-4 rounded-lg border border-zinc-800/60 px-3 py-2">
+          <button onClick={() => setDiskTampil((v) => !v)} aria-expanded={diskTampil}
+            className="flex w-full cursor-pointer items-center gap-1 text-[11px] text-zinc-500 transition-colors hover:text-zinc-300">
+            {diskTampil ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
+            <span className="font-medium text-amber-300/80">Disclaimer</span>
+            <span>· {diskTampil ? 'sembunyikan' : 'buka selengkapnya'}</span>
+          </button>
         <div
           style={{ gridTemplateRows: diskTampil ? '1fr' : '0fr' }}
           className={cn(
             'grid overflow-hidden transition-all duration-500 ease-out motion-reduce:transition-none',
-            diskTampil ? 'mb-4 opacity-100' : 'mb-0 opacity-0',
+            diskTampil ? 'mt-1.5 opacity-100' : 'mt-0 opacity-0',
           )}>
           <div className="overflow-hidden">
             <p className="text-[11.5px] leading-relaxed text-zinc-400">
@@ -1721,6 +1739,7 @@ export default function Analisa() {
               </Link>
             </p>
           </div>
+        </div>
         </div>
       )}
 
