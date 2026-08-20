@@ -116,10 +116,18 @@ export async function kirimAnalisa(d: {
   judul: string; pasangan: string; arah: 'BUY' | 'SELL'; harga: number;
   ringkas: string; isi: IsiAnalisa; nama: string; pasar: 'kripto' | 'tradefi';
   snapshot: RingkasAnalisa['snapshot'];
-  /** Persetujuan membuka akses pantau jurnal. WAJIB true — server menolak
-   *  tanpa ini. Analis dinilai dari rekam jejak yang bisa diperiksa, dan
-   *  posting sinyal berarti bersedia diperiksa. */
-  izinJurnal: boolean;
+  /** Persetujuan membuka akses pantau jurnal.
+   *
+   *  TIDAK LAGI DIKUMPULKAN, dan karena itu opsional. Syaratnya sudah
+   *  dicabut di server 17 Agu 2026 — yang dinilai publik sekarang performa
+   *  sinyalnya, bukan isi jurnal pribadinya — dan centangnya dicabut dari
+   *  formulir 20 Agu 2026 karena persetujuan yang tidak menjaga apa pun
+   *  cuma satu ketukan lagi antara orang dan tombol.
+   *
+   *  Medannya dibiarkan ada supaya rekaman lama tetap terbaca; yang baru
+   *  tidak mengirimkannya, dan server menyimpannya false. Itu jujur:
+   *  persetujuan itu memang tidak pernah diminta. */
+  izinJurnal?: boolean;
 }) {
   return panggil('/api/analisa', { method: 'POST', body: JSON.stringify(d) });
 }

@@ -1469,7 +1469,7 @@ export default function Analisa() {
   /* Persetujuan pantau jurnal + kesadaran permanen. SENGAJA tidak diingat
      di localStorage: keduanya harus disetujui sadar pada TIAP posting,
      karena tiap posting adalah komitmen baru yang tidak bisa ditarik. */
-  const [izinJurnal, setIzinJurnal] = useState(false);
+
   const [pahamPermanen, setPahamPermanen] = useState(false);
   /* Sampul dari Chart & Entry. Data URL JPEG, diunggah SESUDAH analisanya
      terposting — endpoint galeri butuh id analisanya, dan id itu baru ada
@@ -1479,6 +1479,17 @@ export default function Analisa() {
    *  "Risk SL" di sini menampilkan angka yang SAMA dengan tiket chart —
    *  bukan −$10 mati dari model contoh. 0 = disusun langsung di sini. */
   const [qtyDraf, setQtyDraf] = useState(0);
+  /** Tangkapan layar chart yang ikut di draf dari "Susun di Chart & Entry".
+   *
+   *  UNTUK DIPERIKSA, BUKAN UNTUK TERBIT. Jalan menambah foto ke sinyal
+   *  ditutup 19 Agu 2026 karena gambar yang diunggah orang tidak bisa
+   *  diperiksa keasliannya, dan keputusan itu tidak berubah — gambar ini
+   *  tidak ikut terkirim ke mana pun.
+   *
+   *  Gunanya satu: analis bisa melihat chart yang barusan ia susun
+   *  bersebelahan dengan angka di formulir, dan menangkap entry yang
+   *  ketukar dengan SL sebelum sinyalnya jadi permanen. */
+  const [sampulDraf, setSampulDraf] = useState('');
 
   /* Simbol yang dikirim ke Chart & Entry, LENGKAP dengan penanda pasarnya.
      ────────────────────────────────────────────────────────────────────
@@ -1506,6 +1517,7 @@ export default function Analisa() {
     /* Awalan MT5: pada simbolnya adalah penanda pasar yang paling bisa
        dipercaya — ia datang dari daftar simbol MT5 itu sendiri, bukan dari
        tebakan atas nama pasangannya. */
+    if (d.sampul) setSampulDraf(d.sampul);
     setPasar(/^MT5:/i.test(d.pasangan) ? 'tradefi' : 'kripto');
     setPasangan(d.pasangan.replace(/^MT5:/i, ''));
     setArah(d.arah);
@@ -1635,12 +1647,11 @@ export default function Analisa() {
            sudah sengaja memakai nama samaran. */
         nama: profNama.trim() || pengguna?.displayName || pengguna?.email?.split('@')[0] || 'Analis',
         snapshot,
-        izinJurnal,
       });
       setNada('ok');
       setKabar('Analisa terposting — dan kini permanen. Semoga levelnya bekerja.');
       setRingkas(''); setEntry(''); setSl(''); setTp(''); setAlasan('');
-      setIzinJurnal(false); setPahamPermanen(false); setQtyDraf(0);
+      setPahamPermanen(false); setQtyDraf(0); setSampulDraf('');
       segarkan();
     } catch (e) {
       setNada('galat');
@@ -2280,7 +2291,41 @@ export default function Analisa() {
               </Link>
             </div>
 
-            {/* ── Dua persetujuan yang menjadikan seseorang analis ─────────
+            {/* ── TANGKAPAN LAYAR CHART — pemeriksaan terakhir ─────────────
+                Muncul hanya kalau formulirnya memang datang dari Chart &
+                Entry; diketik tangan, tidak ada yang bisa ditampilkan.
+
+                Ditaruh TEPAT SEBELUM persetujuan dan tombol posting, bukan
+                di atas kolom angka: di sinilah orang berhenti sejenak
+                sebelum menekan sesuatu yang permanen, dan di sinilah
+                gambar chart paling berguna — untuk mencocokkan garis yang
+                ia gambar dengan angka yang akan terbit.
+
+                DIKATAKAN TERANG bahwa ia tidak ikut terbit. Menampilkan
+                gambar di formulir tanpa menyebutkan itu akan membuat
+                analis mengira pembelinya melihat chart ini juga, lalu
+                menulis ringkasan yang mengandaikan gambar yang tidak ada
+                di sana. */}
+            {sampulDraf && (
+              <div className="mt-3 rounded-lg border border-zinc-800 bg-zinc-950/60 p-3">
+                <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span className="text-[11.5px] font-medium text-zinc-300">Chart yang kamu susun</span>
+                  <span className="text-[11px] text-zinc-600">— untuk diperiksa, tidak ikut terbit</span>
+                  <button onClick={() => setSampulDraf('')}
+                    className="ml-auto cursor-pointer rounded border border-zinc-800 px-2 py-0.5 text-[11px] text-zinc-500 transition-colors hover:border-zinc-700 hover:text-zinc-300">
+                    Sembunyikan
+                  </button>
+                </div>
+                <img src={sampulDraf} alt="Tangkapan layar chart yang barusan disusun"
+                     className="block w-full rounded border border-zinc-800" />
+                <p className="mt-2 text-[11px] leading-relaxed text-zinc-600">
+                  Cocokkan garisnya dengan Entry, SL, dan TP di atas sebelum menekan Posting —
+                  sesudah terbit, angkanya tidak bisa diubah lagi.
+                </p>
+              </div>
+            )}
+
+            {/* ── Persetujuan yang menjadikan seseorang analis ─────────────
                 Keduanya disetujui SADAR pada tiap posting, bukan diingat:
                 tiap sinyal adalah komitmen baru yang tidak bisa ditarik.
                 Server menolak tanpa izin jurnal — centangnya bukan hiasan. */}
@@ -2289,23 +2334,17 @@ export default function Analisa() {
                 keduanya terbaca sebagai dua panel tambahan — padahal ia
                 kalimat yang harus DIBACA, bukan bagian yang harus diisi.
                 Tulisan telanjang mengembalikannya jadi kalimat. */}
-            <div className="mt-3 space-y-2.5 px-0.5">
-              <label className="flex cursor-pointer items-start gap-2.5">
-                <input type="checkbox" checked={izinJurnal} onChange={(e) => setIzinJurnal(e.target.checked)}
-                  className="mt-0.5 size-3.5 shrink-0 cursor-pointer accent-emerald-500" />
-                {/* KALIMAT INI HARUS TETAP BENAR — dan versi lamanya sudah
-                    tidak. Ia menjanjikan jurnal sebagai SYARAT memposting;
-                    syarat itu dicabut 17 Agu 2026, dan yang dinilai publik
-                    sekarang performa sinyalnya. Persetujuan yang menyebut
-                    sesuatu yang tidak lagi terjadi lebih buruk daripada
-                    tidak ada persetujuan sama sekali. */}
-                <span className="text-[12px] leading-relaxed text-zinc-400">
-                  Saya paham yang dinilai orang adalah{' '}
-                  <span className="text-zinc-200">hasil sinyal-sinyalku</span> — kena TP atau SL,
-                  dihitung otomatis di papan peringkat. Jurnal pribadiku tidak jadi syarat dan
-                  tidak dibuka.
-                </span>
-              </label>
+            {/* CENTANG IZIN JURNAL DICABUT — permintaan pemilik.
+
+                Ia menyetujui sesuatu yang sudah tidak terjadi: syarat jurnal
+                dicabut di server 17 Agu 2026, dan yang dinilai publik sejak
+                itu performa sinyalnya. Persetujuan yang tidak menjaga apa pun
+                bukan cuma mubazir — ia mengajari orang mencentang tanpa
+                membaca, dan centang di sebelahnya ("sinyal ini tidak bisa
+                dihapus") justru harus dibaca.
+
+                Yang tersisa satu, dan itu yang memang punya akibat. */}
+            <div className="mt-3 px-0.5">
               <label className="flex cursor-pointer items-start gap-2.5">
                 <input type="checkbox" checked={pahamPermanen} onChange={(e) => setPahamPermanen(e.target.checked)}
                   className="mt-0.5 size-3.5 shrink-0 cursor-pointer accent-amber-500" />
@@ -2359,11 +2398,11 @@ export default function Analisa() {
                    petunjuk yang menyuruh mengerjakan sesuatu yang tidak
                    membuka apa pun. */
                 disabled={sibuk || !bolehPosting || !ringkas.trim() || !entry || !sl || !tp
-                          || !izinJurnal || !pahamPermanen}
+                          || !pahamPermanen}
                 title={!bolehPosting ? 'Mode pratinjau: semua alat terbuka, tapi memposting sinyal perlu akses'
                   : !ringkas.trim() ? 'Isi ringkasan publik dulu — itu yang jadi judul kartunya'
                   : !entry || !sl || !tp ? 'Entry, SL, dan TP harus terisi'
-                  : !izinJurnal || !pahamPermanen ? 'Centang kedua persetujuan dulu' : undefined}
+                  : !pahamPermanen ? 'Centang persetujuannya dulu' : undefined}
                 className="flex cursor-pointer items-center gap-2 rounded-md bg-zinc-100 px-3.5 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50">
                 {sibuk ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />} Posting — permanen
               </button>
