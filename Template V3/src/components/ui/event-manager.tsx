@@ -350,15 +350,24 @@ export function EventManager({
           </Button>
         </div>
 
-        {/* Dirapatkan ke KANAN, sejajar dengan panel Bulan/Daftar/Copy
-            Signal tepat di atasnya. Dua baris kendali yang tepi kanannya
-            segaris terbaca sebagai satu blok; yang satu kiri satu kanan
-            terbaca sebagai dua urusan yang tidak berhubungan.
+        {/* KE KIRI — keputusan pemilik, membalik penataan sebelumnya.
+
+            Alasan lama (dirapatkan ke kanan supaya segaris dengan panel
+            Bulan/Daftar/Copy Signal di atasnya) memang benar sebagai
+            penataan, tapi ia mengorbankan hal yang lebih penting: nama
+            bulan adalah JUDUL dari kalender di bawahnya, dan judul yang
+            duduk di ujung kanan tidak dibaca sebagai judul. Mata membaca
+            dari kiri; yang berada di kanan terbaca sebagai kendali, sama
+            seperti tombol-tombol di sebelahnya.
+
+            Sekarang tiap baris punya perannya sendiri: judul di kiri,
+            kendali di kanan — pembagian yang sudah dikenal orang dari
+            hampir semua kalender yang pernah mereka pakai.
 
             gap-2 antara judul dan panahnya, bukan gap-4: panah itu MILIK
             judulnya — ia menggeser bulan yang tertulis di sebelahnya — dan
             jarak yang terlalu longgar membuatnya terlihat berdiri sendiri. */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end sm:gap-2">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-start sm:gap-2">
           <h2 className="text-[15px] font-semibold sm:text-[17px]">
             {view === "month" &&
               currentDate.toLocaleDateString("id-ID", {

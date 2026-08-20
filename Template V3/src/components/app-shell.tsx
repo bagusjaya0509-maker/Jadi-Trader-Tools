@@ -620,9 +620,32 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             anak: [{
               ke: alamatKanal(),
               label: 'Area Analis',
+              /* URUTANNYA MENGIKUTI TAB DI HALAMANNYA: Daftar Signal
+                 dulu, Performa Signal sesudahnya. Sidebar dan tab yang
+                 mengurutkan hal yang sama dengan urutan berbeda memaksa
+                 orang membaca ulang tiap kali ia berpindah di antara
+                 keduanya.
+
+                 KEDUANYA MENYEBUT ?sub= SECARA TEGAS, dan itu memperbaiki
+                 bug yang menempel di sini: 'Performa Signal' dulu memakai
+                 alamatKanal() tanpa argumen, yaitu alamat kanal TANPA
+                 ?sub= sama sekali. Selama tab bawaannya 'performa' itu
+                 kebetulan benar. Begitu bawaannya diubah ke 'market',
+                 menekan "Performa Signal" justru membuka Daftar Signal —
+                 dan tidak ada yang berbunyi seperti galat, cuma tautan
+                 yang mendarat di tempat yang salah.
+
+                 Ikutannya juga hilang: subAktif() menandai tautan
+                 tanpa-query sebagai aktif ketika alamat juga tanpa query,
+                 jadi dulu "Area Analis" dan "Performa Signal" bisa
+                 tersorot bersamaan. Sekarang cuma satu yang cocok.
+
+                 Pelajarannya dicatat di sini karena akan terulang: tautan
+                 yang menumpang pada NILAI BAWAAN akan diam-diam berubah
+                 arah setiap kali bawaannya diganti. Sebutkan tujuannya. */
               anak: [
-                { ke: alamatKanal(),         label: 'Performa Signal' },
-                { ke: alamatKanal('market'), label: 'Daftar Signal' },
+                { ke: alamatKanal('market'),   label: 'Daftar Signal' },
+                { ke: alamatKanal('performa'), label: 'Performa Signal' },
               ],
             }],
           }
