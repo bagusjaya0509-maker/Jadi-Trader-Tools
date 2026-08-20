@@ -294,9 +294,12 @@ function SyaratPapan({ a }: { a: AturanPapan }) {
     <p className="text-[11px] leading-relaxed text-zinc-600">
       <span className="text-zinc-500">Syarat masuk papan:</span> minimal {a.minSinyal} sinyal
       selesai bulan ini, drawdown tidak lebih dari {a.ddMaksPersen}% modal, dan jarak SL tiap
-      sinyal tidak lebih dari {a.slMaksPersen}% dari harga. Jarak SL {a.slMaksPersen}% berarti
-      risiko {a.slMaksPersen}% kalau posisinya sebesar modal tanpa leverage — ukuran posisi
-      tidak pernah ikut diposting, jadi itulah yang bisa diukur.{' '}
+      sinyal tidak lebih dari <span className="angka">{a.slMaksPersen.kripto}%</span> untuk kripto
+      atau <span className="angka">{a.slMaksPersen.tradefi}%</span> untuk Trade-Fi. Batasnya
+      berbeda karena volatilitasnya berbeda — satu angka untuk keduanya akan menjegal sinyal
+      kripto yang wajar sekaligus tidak pernah menyentuh Trade-Fi sama sekali. Jarak SL sekian
+      persen berarti risiko sekian persen kalau posisinya sebesar modal tanpa leverage; ukuran
+      posisi tidak pernah ikut diposting, jadi itulah yang bisa diukur.{' '}
       Melanggar tidak menghapus apa pun, tapi <span className="text-zinc-400">memperlambat</span>{' '}
       bulan berikutnya: tiap sinyal yang melanggar menambah {a.dendaPerPelanggaran} sinyal pada
       syarat minimal bulan depan, sampai maksimum +{a.dendaMaks}.

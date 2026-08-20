@@ -1995,7 +1995,12 @@ export default function Analisa() {
                 const e0 = Number(entry), s0 = Number(sl);
                 if (!(e0 > 0) || !(s0 > 0)) return null;
                 const jarak = (Math.abs(e0 - s0) / e0) * 100;
-                const batas = performa?.aturan?.slMaksPersen ?? 1;
+                /* Batas MENGIKUTI pasar yang sedang dipilih di formulir,
+                    bukan satu angka: peringatan yang memakai batas kripto
+                    untuk sinyal XAUUSD akan meloloskan stop empat kali
+                    lebih lebar dari kebiasaan pasar itu tanpa sepatah kata
+                    pun — persis kebalikan dari gunanya peringatan ini. */
+                const batas = performa?.aturan?.slMaksPersen?.[pasar] ?? (pasar === 'tradefi' ? 0.8 : 2);
                 return (
                   <div className="col-span-2 sm:col-span-4">
                     <p className={cn('rounded-md border px-2.5 py-2 text-[11.5px] leading-relaxed',

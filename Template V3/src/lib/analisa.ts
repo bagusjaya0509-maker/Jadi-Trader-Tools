@@ -314,7 +314,12 @@ export interface PerformaAnalis {
 
 export interface AturanPapan {
   ddMaksPersen: number;
-  slMaksPersen: number;
+  /** Batas jarak SL PER PASAR, bukan satu angka datar — SL kripto hampir
+   *  lima kali lebih lebar daripada XAUUSD, dan itu volatilitas
+   *  instrumennya, bukan perilaku analisnya. Satu angka gagal dua arah
+   *  sekaligus: menjegal sinyal kripto yang wajar, sekaligus tidak pernah
+   *  tersentuh di Trade-Fi. Angkanya ditentukan server. */
+  slMaksPersen: { kripto: number; tradefi: number };
   minSinyal: number;
   dendaPerPelanggaran: number;
   dendaMaks: number;
