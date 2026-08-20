@@ -140,29 +140,44 @@ function LencanaKanal({ r, className }: { r: RingkasKanal; className?: string })
  *  adalah keterangan, dan menghilangkannya membuat kartunya terbaca seperti
  *  belum pernah diuji. */
 function BarisHitung({ r }: { r: RingkasKanal }) {
-  const bagian: Array<[string, number, string]> = [
-    ['menang', r.profit, 'text-emerald-400'],
-    ['kalah', r.rugi, 'text-red-400'],
-    ['jalan', r.berjalan, 'text-sky-400'],
-    ['pending', r.pending, 'text-amber-400'],
+  /* Batal ikut ke dalam deret yang sama, bukan ditempel belakangan dengan
+     bentuknya sendiri. Ia hitungan sinyal seperti empat lainnya; satu-
+     satunya bedanya ia disembunyikan waktu nol, karena kanal yang tidak
+     pernah membatalkan apa pun tidak perlu memakai ruang untuk mengatakan
+     "nol batal". */
+  const bagian: Array<[string, number]> = [
+    ['menang', r.profit],
+    ['kalah', r.rugi],
+    ['jalan', r.berjalan],
+    ['pending', r.pending],
   ];
+  if (r.batal > 0) bagian.push(['batal', r.batal]);
+
+  /* ── ANGKANYA BESAR, LABELNYA KECIL, SEMUANYA ABU ──────────────────
+     Bentuk ini diminta pemilik dari contoh kartu yang ia kirim (205 peak
+     / 100 low / 166 avg), dan alasannya kuat: yang dibaca ANGKANYA, dan
+     labelnya cuma memberi tahu angka itu tentang apa. Ukuran yang sama
+     untuk keduanya membuat mata mengeja seluruh barisnya kata demi kata.
+
+     Warnanya dicabut — dulu hijau/merah/biru/kuning. Warna di kartu ini
+     sudah dipakai untuk hal yang keputusannya bergantung padanya: arah
+     hasil, arah winrate, tingkat risiko. Empat warna lagi di kaki kartu
+     memakai isyarat yang sama untuk hitungan yang tidak menyimpulkan
+     apa-apa sendirian — 5 menang tidak berarti baik sebelum tahu dari
+     berapa sinyal.
+
+     inline-flex, bukan div: ia hidup di dalam rantai span di dalam
+     <button>, dan div di sana bukan susunan yang sah. */
   return (
-    /* mt-2.5: barisnya duduk tepat di bawah kotak Estimasi yang bertepi, dan
-       tanpa jarak ia menempel ke garis itu — terbaca seperti kaki kotaknya,
-       bukan sebagai keterangan kartu yang berdiri sendiri. */
-    <div className="mt-2.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[10.5px] text-zinc-600">
-      {bagian.map(([nama, nilai, warna]) => (
-        <span key={nama} className="whitespace-nowrap">
-          <span className={cn('angka font-semibold', nilai > 0 ? warna : 'text-zinc-600')}>{nilai}</span>
-          {' '}{nama}
+    <span className="inline-flex flex-wrap items-baseline gap-x-3 gap-y-1">
+      {bagian.map(([nama, nilai]) => (
+        <span key={nama} className="whitespace-nowrap"
+              title={nama === 'batal' ? 'Ditarik penulisnya sebelum harganya datang' : undefined}>
+          <span className="angka text-[13px] font-semibold tabular-nums text-zinc-300">{nilai}</span>
+          <span className="ml-1 text-[9.5px] text-zinc-600">{nama}</span>
         </span>
       ))}
-      {r.batal > 0 && (
-        <span className="whitespace-nowrap" title="Ditarik penulisnya sebelum harganya datang">
-          <span className="angka font-semibold text-zinc-500">{r.batal}</span> batal
-        </span>
-      )}
-    </div>
+    </span>
   );
 }
 
@@ -2790,17 +2805,13 @@ export default function Analisa() {
                         p ? (p.hasilDolar >= 0 ? 'text-emerald-400' : 'text-red-400') : 'text-zinc-600')}>
                         {p ? uang(p.hasilDolar, true) : '—'}
                       </span>
-                      {/* Lencana risiko DUDUK DI UJUNG KANAN baris keterangan
-                          ini, bukan berdiri sendiri di bawah nama. Di kiri ia
-                          menumpuk bersama nama, tanggal, dan lencana AI —
-                          empat benda di satu sisi sementara sisi kanan kosong.
-                          Di sini ia mengisi ruang yang memang menganggur, dan
-                          bersebelahan dengan angka yang justru diterangkannya:
-                          hasil sebesar itu diperoleh dengan risiko seperti apa. */}
-                      <span className="mt-1 flex items-center gap-2">
-                        <span className="text-[10.5px] text-zinc-600">estimasi dari modal $1.000</span>
-                        <LencanaKanal r={r} className="ml-auto shrink-0" />
-                      </span>
+                      <span className="mt-1 block text-[10.5px] text-zinc-600">estimasi dari modal $1.000</span>
+                      {/* Lencana risiko DI KIRI, tepat di bawah baris estimasi.
+                          Permintaan pemilik, dan urutannya jadi menurun rapi:
+                          angka hasilnya, keterangan dari modal berapa, lalu
+                          syarat yang menyertainya. Di ujung kanan ia sejajar
+                          angka besarnya dan terbaca seperti saingannya. */}
+                      <LencanaKanal r={r} className="mt-2" />
                     </span>
 
                     {/* KAKI KARTU — buram, di atas kurvanya.

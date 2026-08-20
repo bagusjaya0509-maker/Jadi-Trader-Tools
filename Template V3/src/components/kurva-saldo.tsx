@@ -232,29 +232,12 @@ export function SparklineSaldo(
               style={{ left: Math.min(Math.max(X(tunjuk!), 34), Math.max(34, w - 34)) }}>
           <span className={cn('angka block text-[11px] font-semibold',
             pl > 0 ? 'text-emerald-400' : pl < 0 ? 'text-red-400' : 'text-zinc-300')}>
-            {pl === 0 ? uang(modal) : uang(pl, true)}
+            {uang(t.saldo)}
           </span>
           <span className="block text-[9px] text-zinc-500">
             {t.waktu ? tanggalPendek(t.waktu) : 'modal awal'}
           </span>
         </span>
-      )}
-      {siap && (
-        <>
-          {/* SUDUT, MENGIKUTI ARAHNYA — bukan mengikuti titik akhir garisnya.
-
-              Untung di kanan ATAS, rugi di kanan BAWAH. Kurva yang naik
-              berakhir tinggi dan yang turun berakhir rendah, jadi sudutnya
-              selalu jatuh di sisi yang sama dengan ujung garisnya.
-
-              Tanpa latar dan tanpa tepi: alas gelap di dalam kotak yang
-              sudah bertepi menambah bidang ketiga di ruang setinggi 40
-              piksel. */}
-          <span className={cn('absolute right-0 text-[7px] leading-none tabular-nums text-zinc-100',
-                              naik ? 'top-0' : 'bottom-0')}>
-            {uang(akhir)}
-          </span>
-        </>
       )}
     </span>
   );
