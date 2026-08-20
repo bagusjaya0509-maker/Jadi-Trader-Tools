@@ -60,6 +60,22 @@ function Kabar({ memuat, galat, kosong, teksKosong }: {
   return null;
 }
 
+/** Kelas gulir untuk daftar yang sudah kepanjangan.
+ *
+ *  AMBANGNYA JUMLAH BARIS, bukan tinggi piksel. Panel berisi lima baris
+ *  tidak boleh kelihatan terpotong: batas tinggi yang dipasang terus-menerus
+ *  membuat daftar pendek pun tampak seperti ada sisa yang tersembunyi, dan
+ *  orang menggulir mencari sesuatu yang tidak ada.
+ *
+ *  Scrollbar-nya disembunyikan lewat .gulir-senyap — batang abu-abu di dalam
+ *  kartu lebih berisik daripada isinya. Rodanya tetap jalan, dan di layar
+ *  sentuh seretannya memang tidak pernah butuh batang.
+ *
+ *  Tingginya ditaksir dari tinggi baris yang sesungguhnya: baris tabel
+ *  py-3 + border ≈ 45 px, kartu klien p-3 dua baris + gap ≈ 72 px. */
+const gulirJika = (jumlah: number, ambang: number, tinggi: string) =>
+  jumlah > ambang ? `${tinggi} overflow-y-auto gulir-senyap` : '';
+
 export default function Pemilik() {
   const { pemilik } = useAuth();
   const klien = useKlien();
@@ -199,13 +215,15 @@ export default function Pemilik() {
       {/* ── Penjualan per bulan ── */}
       <Panel className="mt-4">
         <PanelHead judul="Penjualan per Bulan" sub="Dari catatan penjualan yang kamu masukkan." />
-        <div className="h-[240px] px-2 pb-4">
+        <div className={cn('h-[240px] px-2 pb-4', perBulan.length > 6 && 'overflow-x-auto gulir-senyap')}>
           {perBulan.length === 0 ? (
             <div className="px-3 pt-3">
               <Kabar memuat={penjualan.memuat} galat={penjualan.galat} kosong
                      teksKosong="Belum ada penjualan tercatat. Tambahkan lewat kotak di bawah." />
             </div>
           ) : (
+            <div className="h-full"
+                 style={perBulan.length > 6 ? { minWidth: perBulan.length * 64 } : undefined}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={perBulan} margin={{ top: 8, right: 12, left: 8, bottom: 0 }}>
                 <CartesianGrid vertical={false} stroke="currentColor" strokeOpacity={0.09} />
@@ -216,6 +234,7 @@ export default function Pemilik() {
                 <Bar dataKey="nilai" name="Penjualan" fill="#10b981" fillOpacity={0.8} radius={[3, 3, 0, 0]} maxBarSize={26} />
               </BarChart>
             </ResponsiveContainer>
+            </div>
           )}
         </div>
 
@@ -260,7 +279,11 @@ export default function Pemilik() {
           <Kabar memuat={pengeluaran.memuat} galat={pengeluaran.galat} kosong={!pengeluaran.data.length}
                  teksKosong="Belum ada pengeluaran tercatat." />
           {pengeluaran.data.length > 0 && (
-            <TabelBungkus>
+            /* Enam baris, permintaan pemilik. Kepala tabelnya ikut tergulir
+               — memakukannya butuh position:sticky pada <th>, dan itu
+               keputusan untuk seluruh tabel di aplikasi ini, bukan untuk
+               satu panel. */
+            <TabelBungkus className={gulirJika(pengeluaran.data.length, 6, 'max-h-[300px]')}>
               <Tabel>
                 <thead><tr><Th>Tanggal</Th><Th>Keperluan</Th><Th>Kategori</Th><Th className="text-right">Nilai</Th><Th /></tr></thead>
                 <tbody>
@@ -330,7 +353,7 @@ export default function Pemilik() {
             <Kabar memuat={penjualan.memuat} galat={penjualan.galat} kosong={!penjualan.data.length}
                    teksKosong="Belum ada penjualan." />
             {penjualan.data.length > 0 && (
-              <TabelBungkus>
+              <TabelBungkus className={gulirJika(penjualan.data.length, 10, 'max-h-[480px]')}>
                 <Tabel>
                   <thead><tr><Th>Tanggal</Th><Th>Produk</Th><Th className="text-right">Nilai</Th><Th /></tr></thead>
                   <tbody>
@@ -362,7 +385,7 @@ export default function Pemilik() {
         <Panel>
           <PanelHead judul="Client health" sub="Akun yang pernah masuk dan seberapa aktif."
                      kanan={<span className="angka text-[12px] text-zinc-500">{klien.data.length}</span>} />
-          <div className="space-y-2.5 px-5 pb-5">
+          <div className={cn('space-y-2.5 px-5 pb-5', gulirJika(klien.data.length, 10, 'max-h-[560px]'))}>
             <Kabar memuat={klien.memuat} galat={klien.galat} kosong={!klien.data.length}
                    teksKosong="Belum ada klien yang masuk." />
             {klien.data.map((k) => (
@@ -387,7 +410,10 @@ export default function Pemilik() {
                          <RefreshCw className={cn('size-3.5', laporan.memuat && 'animate-spin')} />
                        </button>
                      } />
-          <div className="max-h-[460px] overflow-y-auto px-5 pb-5">
+          {/* Batas tingginya sudah ada sejak awal; yang ditambahkan
+              penyembunyian batang dan ambang jumlah — di bawah sebelas
+              laporan panelnya tidak perlu dipotong sama sekali. */}
+          <div className={cn('px-5 pb-5', gulirJika(laporan.data.length, 10, 'max-h-[460px]'))}>
             <Kabar memuat={laporan.memuat} galat={laporan.galat} kosong={!laporan.data.length}
                    teksKosong="Belum ada laporan." />
             {laporan.data.slice(0, 40).map((l) => (
