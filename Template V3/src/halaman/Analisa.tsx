@@ -4,7 +4,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { usePaket, LABEL_PAKET } from '@/lib/paket';
 import {
   Loader2, Lock, Unlock, Send, X, CheckCircle2,
-  TrendingUp, TrendingDown, RefreshCw, Radar, Sparkles, ImagePlus, Images, Flag, Ban, Trash2,
+  TrendingUp, TrendingDown, RefreshCw, Radar, Sparkles, ImagePlus, Images, Flag, Ban, Trash2, Plus,
   Settings2, UserRound, Pin, TriangleAlert, ArrowLeft, CandlestickChart,
 } from 'lucide-react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
@@ -1252,14 +1252,37 @@ export default function Analisa() {
      Signal" dua kali bersarang di dalam dirinya sendiri, dan orang harus
      menebak apakah keduanya benda yang sama. */
   const tabTampil = SUB
-    .filter((s) => (diDepan ? s.id !== 'performa' : s.id !== 'posting'))
+    /* POSTING KELUAR DARI DERETAN TAB — ia sekarang tombol + yang membuka
+       jendela. Alasannya bukan kerapian: tab menyatakan "ini salah satu
+       cara MELIHAT halaman yang sama", padahal memposting bukan sudut
+       pandang lain atas daftar sinyal — ia pekerjaan lain, dilakukan orang
+       lain, di saat yang lain. Menaruhnya sebagai tab berarti tiap
+       pengunjung yang cuma mencari sinyal harus melewati satu pilihan yang
+       tidak pernah ia butuhkan. */
+    .filter((s) => (diDepan ? s.id === 'market' : s.id !== 'posting'))
     .map((s) => (!diDepan && s.id === 'market' ? { ...s, label: 'Daftar Signal' } : s));
 
   /* Masuk kanal, yang pertama terlihat Performa Signal — keputusan pemilik.
      Orang membuka kanal seseorang untuk menimbang apakah ia layak diikuti,
      dan itu pertanyaan tentang rekam jejak, bukan tentang sinyal terbarunya. */
   const bawaanSub: IdSub = 'market';
-  const sub: IdSub = subMinta && tabTampil.some((s) => s.id === subMinta) ? subMinta : bawaanSub;
+  /* KESAHIHAN 'posting' TIDAK LAGI DIUKUR DARI DAFTAR TAB.
+     ────────────────────────────────────────────────────────────────────
+     Baris ini dulu cuma menanyakan "apakah subMinta ada di tabTampil".
+     Begitu posting keluar dari deretan tab dan jadi tombol +, pertanyaan
+     itu selalu dijawab tidak — jadi ?sub=posting ditolak diam-diam dan
+     jatuh ke bawaannya.
+
+     Terlihat sebagai: tombol + ditekan, alamat berubah jadi ?sub=posting,
+     dan tidak terjadi apa-apa. Juga memutus jalur "Ke Copy Signal" dari
+     chart, yang mengandalkan alamat yang sama.
+
+     Sekarang 'posting' punya syaratnya sendiri: ia sah selama orangnya
+     berada di DAFTAR KANAL — tempat tombol + itu berdiri. Di dalam kanal
+     ia tetap ditolak, karena di sana memang tidak ada pintunya. */
+  const subSah = (id: IdSub) =>
+    id === 'posting' ? diDepan : tabTampil.some((s) => s.id === id);
+  const sub: IdSub = subMinta && subSah(subMinta) ? subMinta : bawaanSub;
 
   /* Bawaan tidak ditulis ke alamat, tab lain ditulis. Kalau 'market' selalu
      dianggap bawaan seperti dulu, menekan tab Market di dalam kanal akan
@@ -1275,6 +1298,13 @@ export default function Analisa() {
       if (id === bawaanSub) b.delete('sub'); else b.set('sub', id);
       return b;
     }, { replace: true });
+
+  /* Hook DI SINI, bukan di dalam JSX jendelanya. Memanggilnya di dalam
+     `{sub === 'posting' && ( … )}` berarti jumlah hook berubah saat
+     jendelanya dibuka — dan React melempar "Rendered more hooks than during
+     the previous render", persis bug yang barusan diperbaiki di
+     Marketplace. */
+  const tutupPosting = useTutupLuar(() => setSub('market'));
 
   /* ── Peringatan risiko: tampil 3 detik, lalu menyusut sendiri ──────────
      Keputusan pemilik 17 Agu 2026, sesudah sempat dicoba jadi kaki halaman
@@ -1751,7 +1781,7 @@ export default function Analisa() {
         </div>
       )}
 
-      <div className="mb-4 flex flex-wrap gap-1 border-t border-zinc-800/80 pt-3">
+      <div className="mb-4 flex flex-wrap items-center gap-1 border-t border-zinc-800/80 pt-3">
         {tabTampil.map((s) => (
           /* GARIS BAWAH, bukan bidang terisi.
 
@@ -1776,6 +1806,24 @@ export default function Analisa() {
             </span>
           </button>
         ))}
+        {/* TOMBOL POSTING — ikon, di ujung kanan, dan HANYA di daftar kanal.
+            Di dalam kanal orang sedang membaca rekam jejak satu analis;
+            tombol memposting di situ menawarkan pekerjaan yang tidak ada
+            hubungannya dengan yang sedang ia kerjakan.
+
+            Diberi tulisan di layar lebar, ikon saja di ponsel: ikon + tanpa
+            keterangan bisa berarti apa saja — tambah kanal, tambah koin,
+            tambah catatan — dan menebak di halaman yang bisa menerbitkan
+            sesuatu yang permanen bukan tebakan yang murah. Di ponsel
+            ruangnya memang tidak ada, dan title-nya yang menanggung. */}
+        {diDepan && (
+          <button onClick={() => setSub('posting')}
+            title="Posting sinyal baru — rencananya permanen setelah terbit"
+            className="ml-auto flex cursor-pointer items-center gap-1.5 rounded-md bg-zinc-100 px-2.5 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white">
+            <Plus className="size-3.5" />
+            <span className="hidden sm:inline">Posting Signal</span>
+          </button>
+        )}
       </div>
 
 
@@ -1828,7 +1876,33 @@ export default function Analisa() {
           yang duduk di atas daftar sinyal memaksa setiap pengunjung —
           termasuk yang tidak akan pernah memposting apa pun — menggulir
           melewatinya untuk sampai ke yang ia cari. */}
-      <div className={cn(sub !== 'posting' && 'hidden')}>
+      {/* ── JENDELA POSTING ────────────────────────────────────────────
+          Dulu ia blok yang menggantikan seluruh halaman lewat kelas
+          `hidden`. Sebagai jendela, daftar sinyalnya tetap terlihat di
+          belakang — dan itu bukan hiasan: orang yang menyusun sinyal
+          sering ingin melihat apa yang sudah ada sebelum menerbitkan
+          miliknya.
+
+          DIPORTAL ke <body> supaya latar gelapnya menutupi seluruh layar,
+          bukan cuma kotak induknya. Tanpa itu sidebar dan kepala aplikasi
+          tetap terang di belakangnya, dan jendelanya terbaca sebagai panel
+          yang kebetulan gelap, bukan sebagai lapisan di atas segalanya.
+
+          Isinya TIDAK diubah sebaris pun — yang berubah cuma
+          pembungkusnya. Keadaan formulir tetap tinggal di komponen
+          halaman, jadi menutup jendela di tengah pengisian tidak membuang
+          apa yang sudah diketik: ia masih ada saat dibuka lagi. */}
+      {sub === 'posting' && createPortal(
+        <div className="fixed inset-0 z-[65] overflow-y-auto bg-black/70 p-3 backdrop-blur-sm sm:p-6"
+             {...tutupPosting}>
+          <div className="mx-auto w-full max-w-3xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-2 flex items-center justify-end">
+              <button onClick={() => setSub('market')}
+                title="Tutup — isian yang sudah diketik tidak hilang"
+                className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-700 bg-zinc-900 px-2.5 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-500 hover:text-zinc-100">
+                <X className="size-3.5" /> Tutup
+              </button>
+            </div>
 
       {/* Permintaan masuk untuk analisaku */}
       {masuk.length > 0 && (
@@ -2325,14 +2399,19 @@ export default function Analisa() {
           <p className="px-5 pb-4 text-[12.5px] text-zinc-500">Masuk dulu untuk memposting atau membeli analisa.</p>
         )}
       </Panel>
-      </div>
+          </div>
+        </div>,
+        document.body,
+      )}
 
       {/* Ikut tampil saat tab Performa dibuka, supaya KEPALA KANAL —
           "← Semua kanal", nama analis, lencana, hitungan, disclaimer —
           tetap ada di KEDUA tab. Kalau blok ini ikut disembunyikan, tab
           Performa menampilkan angka tanpa menyebut angka SIAPA, dan tombol
           kembali ke daftar kanal ikut lenyap: orangnya terjebak. */}
-      <div className={cn(sub === 'posting' && 'hidden')}>
+      {/* Tidak lagi disembunyikan saat memposting: jendelanya menutupi
+          layar sendiri, dan daftar di belakangnya justru berguna dilihat. */}
+      <div>
       {/* ── Kanal per analis ────────────────────────────────────────────
          Satu analis sering memposting banyak sinyal. Dideretkan rata,
          rekam jejak per ORANG tidak pernah terlihat utuh — dan justru
