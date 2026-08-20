@@ -158,7 +158,7 @@ export function HitungPosisi({ entry, sl, kripto, pasangan = '' }: {
              terbaca dalam sekali lihat — modal dan risiko masuk, lot keluar
              — tanpa mata turun ke daftar angka di bawah. */
           <div className="block">
-            <span className="mb-1 block text-[10.5px] text-zinc-500">Lot</span>
+            <span className="mb-1 block text-[10.5px] text-zinc-500">Lot disarankan</span>
             <div className={cn(ISIAN, 'angka border-zinc-700 bg-zinc-900 font-semibold text-zinc-100')}>
               {kontrak > 0 && jarakHarga > 0
                 ? (risikoDolar / (kontrak * jarakHarga)).toFixed(4)
@@ -260,7 +260,6 @@ function Mt5({ jarakHarga, risikoDolar, kontrak, setKontrak, risikoPersen, modal
       <div className="mt-3 space-y-1 text-[11.5px]">
         <Baris k="Jarak SL sinyal ini" v={jarakPip.toFixed(1) + ' pips'} />
         <Baris k={`Rugi kalau kena SL (${risikoPersen}% modal)`} v={uang(risikoDolar)} />
-        <Baris k="Lot yang dipakai" v={lot.toFixed(4)} tebal />
       </div>
 
       {dibawahMinimum && (
@@ -287,12 +286,6 @@ function Mt5({ jarakHarga, risikoDolar, kontrak, setKontrak, risikoPersen, modal
         <span>per lot · 1 pip = <span className="angka">{pip}</span> — sesuaikan kalau brokermu berbeda</span>
       </div>
 
-      <Kaki>
-        MT5 diukur dengan <span className="text-zinc-500">lot</span>: yang menentukan kerugianmu
-        adalah ukuran kontrak simbol dikali jarak SL. Leverage di MT5 milik akunmu — ia cuma
-        mengatur berapa margin yang tertahan broker, dan mengubahnya tidak mengubah satu sen pun
-        kerugian saat SL kena. Angka di sini mengandaikan simbolnya berharga dalam dolar.
-      </Kaki>
     </>
   );
 }

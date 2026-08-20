@@ -823,6 +823,25 @@ function KartuAnalisa({ a, status, milikku, onSegarkan, performa, hargaKini }: {
                 ukuran posisinya sesudah memutuskan ikut. Di kaki panel,
                 gambarnya terlewat oleh yang sudah berhenti membaca di
                 baris angka. */}
+            {/* ── TOMBOL TIDAK HILANG SAAT ANALISA DIBUKA ─────────────────
+                Dilaporkan pemilik: menekan "Buka analisa" membuat kedua
+                tombolnya lenyap, dan satu-satunya jalan mengembalikannya
+                memuat ulang halaman. Sebabnya seluruh baris tombol hidup di
+                cabang ELSE dari `{buka && isi ? … : …}`, jadi begitu
+                analisanya terbuka baris itu memang tidak digambar sama
+                sekali.
+
+                Sekarang keduanya ikut ke dalam cabang terbuka, di SEBELAH
+                KANAN foto analisa — ruang yang selama ini menganggur, dan
+                tempat mata berada sesudah selesai melihat chart-nya.
+
+                "Buka analisa" berubah jadi "Tutup analisa": slot yang sama,
+                tindakan kebalikannya. Membiarkannya tetap berbunyi "Buka"
+                sementara isinya sudah terbuka berarti tombol yang tidak
+                mengerjakan apa-apa — dan tombol yang tidak berbuat apa-apa
+                mengajari orang bahwa tombol di sini boleh diabaikan. */}
+            <div className="flex w-full flex-wrap items-start gap-3">
+              <div className="min-w-0 flex-1">
             <Galeri
               /* bisaTambah SELALU false: menambah foto ke sinyal ditutup
                   seluruhnya, bukan cuma di formulir postingnya. Foto galeri
@@ -837,6 +856,21 @@ function KartuAnalisa({ a, status, milikku, onSegarkan, performa, hargaKini }: {
               uidku={pengguna?.uid} penulisku={milikku}
               onBerubah={setGaleri}
             />
+              </div>
+
+              <div className="flex shrink-0 flex-col gap-2 pt-6">
+                <button onClick={() => setBuka(false)}
+                  title="Tutup levelnya — tombol Buka analisa kembali seperti semula"
+                  className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-700 px-3 py-1.5 text-[12px] font-medium text-zinc-200 transition-colors hover:border-zinc-500 hover:text-zinc-100">
+                  <Lock className="size-3.5" /> Tutup analisa
+                </button>
+                <Link to={tautanChart} onClick={(e) => void keChart(e)}
+                  title="Buka chart dengan entry, SL, dan TP sudah terisi"
+                  className="flex shrink-0 items-center gap-1.5 rounded-md bg-zinc-100 px-3 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white">
+                  <CandlestickChart className="size-3.5" /> Buka di Chart
+                </Link>
+              </div>
+            </div>
             <HitungPosisi entry={isi.entry} sl={isi.sl} kripto={pasarKripto(a)} pasangan={a.pasangan} />
             {isi.alasan && (
               /* whitespace-pre-line: analisa agen ditulis berparagraf dengan
