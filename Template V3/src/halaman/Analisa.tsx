@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { usePaket, LABEL_PAKET } from '@/lib/paket';
@@ -1000,6 +1000,90 @@ type IdSub = typeof SUB[number]['id'];
    agennya siap. Ubah ke `true` untuk menampilkannya lagi. */
 const TAMPIL_RAK_SINYAL = false;
 
+/* ════════════════════════════════════════════════════════════════════
+   MENU KLIK-KANAN — satu-satunya jalan menyematkan kanal
+   ════════════════════════════════════════════════════════════════════
+   Menggantikan tombol pin yang dulu duduk permanen di pojok tiap kartu.
+   Permintaan pemiliknya, dan alasannya kuat: pin adalah alat yang dipakai
+   sekali lalu tidak disentuh berbulan-bulan, sementara kartunya dibaca
+   tiap hari. Tombol yang jarang dipakai tapi selalu terlihat membayar
+   ongkosnya tiap kali orang membaca kartu, bukan tiap kali ia dipakai.
+
+   ── YANG HILANG DAN DISADARI ────────────────────────────────────────
+   1. e.preventDefault() mematikan menu bawaan peramban di atas kartu —
+      "buka di tab baru", "salin", dan periksa elemen ikut hilang DI SANA.
+      Di luar kartu semuanya normal.
+   2. Klik kanan tidak bisa ditemukan sendiri oleh siapa pun. Karena itu
+      ada satu baris petunjuk di atas daftarnya; tanpa itu fiturnya ada
+      tapi tidak pernah dipakai, yang sama saja dengan tidak ada.
+   3. Di layar sentuh, yang membangkitkan contextmenu adalah TEKAN-TAHAN.
+      Android Chrome dan Safari iOS keduanya mengirimkannya, jadi jalannya
+      tetap ada — tapi ia jalan yang berbeda dari yang tertulis di
+      petunjuk, dan itu sebabnya petunjuknya menyebut keduanya.
+
+   Menunya sengaja cuma berisi SATU tindakan. Menu sekali-pakai yang
+   isinya satu baris lebih jujur daripada menu yang diisi tindakan lain
+   supaya terlihat pantas jadi menu. */
+function MenuPin({ x, y, disemat, pilih, tutup }: {
+  x: number; y: number; disemat: boolean; pilih: () => void; tutup: () => void;
+}) {
+  const kotak = useRef<HTMLDivElement | null>(null);
+  const [pos, setPos] = useState({ x, y });
+
+  /* Digeser masuk kalau menabrak tepi layar. Diukur SESUDAH tergambar —
+     tinggi dan lebarnya baru pasti setelah isinya ada, dan menebaknya di
+     muka akan meleset begitu labelnya berganti panjang ("Sematkan ke
+     atas" vs "Lepas sematan"). useLayoutEffect, bukan useEffect:
+     pergeserannya harus terjadi sebelum frame pertama, kalau tidak
+     menunya terlihat melompat. */
+  useLayoutEffect(() => {
+    const el = kotak.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    setPos({
+      x: Math.max(8, Math.min(x, window.innerWidth - r.width - 8)),
+      y: Math.max(8, Math.min(y, window.innerHeight - r.height - 8)),
+    });
+  }, [x, y]);
+
+  useEffect(() => {
+    const pergi = (e: Event) => {
+      /* Klik DI DALAM menunya tidak menutup: kalau tidak, tekanan yang
+         sama menutup menu sebelum tombolnya sempat menyala. */
+      if (kotak.current && e.target instanceof Node && kotak.current.contains(e.target)) return;
+      tutup();
+    };
+    const tombol = (e: KeyboardEvent) => { if (e.key === 'Escape') tutup(); };
+    /* Fase CAPTURE: menu harus tertutup sebelum klik sampai ke kartu di
+       bawahnya — tanpa itu satu klik menutup menu SEKALIGUS membuka
+       kanalnya, dan orangnya tidak pernah bermaksud membuka apa pun.
+       'scroll' juga capture: guliran terjadi di panel dalam, bukan di
+       jendela, dan pendengar tanpa capture tidak akan mendengarnya. */
+    window.addEventListener('pointerdown', pergi, true);
+    window.addEventListener('scroll', pergi, true);
+    window.addEventListener('resize', tutup);
+    window.addEventListener('keydown', tombol);
+    return () => {
+      window.removeEventListener('pointerdown', pergi, true);
+      window.removeEventListener('scroll', pergi, true);
+      window.removeEventListener('resize', tutup);
+      window.removeEventListener('keydown', tombol);
+    };
+  }, [tutup]);
+
+  return createPortal(
+    <div ref={kotak} role="menu" style={{ left: pos.x, top: pos.y }}
+      className="fixed z-[70] min-w-[188px] overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950 py-1 shadow-xl shadow-black/60">
+      <button role="menuitem" onClick={() => { pilih(); tutup(); }}
+        className="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left text-[12.5px] text-zinc-300 transition-colors hover:bg-zinc-900 hover:text-zinc-100">
+        <Pin className={cn('size-3.5', disemat ? 'fill-current text-amber-400' : 'text-zinc-500')} />
+        {disemat ? 'Lepas sematan' : 'Sematkan ke atas'}
+      </button>
+    </div>,
+    document.body,
+  );
+}
+
 /** Sinyal ini pasar kripto (Binance) atau Trade-Fi (MT5)?
  *
  *  `pasar` sudah dikirim server, tapi analisa LAMA — yang diposting sebelum
@@ -1089,6 +1173,9 @@ export default function Analisa() {
       return b;
     }, { replace: true });
   const { disematkan, ubahPin } = usePinAnalis();
+  /** Kanal yang sedang diklik-kanan, beserta titik munculnya menu. null =
+   *  tidak ada menu terbuka. */
+  const [menuPin, setMenuPin] = useState<{ uid: string; x: number; y: number } | null>(null);
   /** Halaman depan Market Signal: daftar kanal, belum masuk ke kanal siapa
    *  pun. Dipakai memutuskan apa yang boleh menumpuk di kepala halaman —
    *  begitu seseorang masuk ke sebuah kanal, kepala halaman itu miliknya. */
@@ -2179,6 +2266,17 @@ export default function Analisa() {
         const terpilih = kanalBuka ? kanal.get(kanalBuka) ?? [] : [];
 
         return kanalBuka === null ? (
+          <>
+          {/* Petunjuk, bukan hiasan. Klik kanan tidak punya penanda apa pun
+              di layar — tidak ada yang menemukannya sendiri, dan fitur yang
+              tidak ditemukan sama saja dengan fitur yang tidak ada.
+
+              Satu baris kecil dan redup: ia cuma perlu dibaca sekali seumur
+              pemakaian, jadi ia tidak boleh menuntut perhatian tiap kali
+              halaman dibuka. */}
+          <p className="mb-2.5 text-[11.5px] text-zinc-600">
+            Klik kanan kartu analis (atau tekan-tahan di layar sentuh) untuk menyematkannya ke atas.
+          </p>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {kanalUrut.map(([uid, sinyal]) => {
               const a0 = sinyal[0];
@@ -2191,6 +2289,10 @@ export default function Analisa() {
                    peramban memutus sarangnya sendiri dan salah satunya
                    berhenti bisa diklik. */
                 <div key={uid}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setMenuPin({ uid, x: e.clientX, y: e.clientY });
+                  }}
                   className={cn('relative rounded-xl border bg-zinc-900/40 transition-colors',
                     /* Tepi kartu TIDAK lagi ikut menguning saat disematkan.
                         Sematan itu urusan tampilan SATU orang — ia tidak
@@ -2281,28 +2383,36 @@ export default function Analisa() {
                       </p>
                     )}
                   </button>
-                  {/* Pin milik penontonnya sendiri, tidak mengubah urutan
-                      papan untuk orang lain. Lihat lib/pin-analis.ts. */}
-                  <button
-                    onClick={() => ubahPin(uid)}
-                    aria-pressed={disemat}
-                    title={disemat ? 'Lepas sematan — kanal ini kembali urut menurut sinyal terbaru'
-                                   : 'Sematkan kanal ini ke atas, hanya untuk tampilanmu'}
-                    /* Disamarkan saat belum disematkan: ia alat yang jarang
-                        dipakai, duduk di sudut kartu yang isinya angka rekam
-                        jejak, dan pin seterang teks membuat mata singgah di
-                        situ tiap kali membaca kartu. Muncul jelas saat
-                        disorot — cukup untuk ditemukan, tidak cukup untuk
-                        mengganggu. */
-                    className={cn('absolute right-2 top-2 z-10 cursor-pointer rounded-md p-1.5 transition-colors',
-                      disemat ? 'text-amber-400 hover:text-amber-300'
-                              : 'text-zinc-700 hover:text-zinc-400')}>
-                    <Pin className={cn('size-3.5', disemat && 'fill-current')} />
-                  </button>
+                  {/* PENANDA, BUKAN TOMBOL — dan hanya ada kalau memang
+                      disematkan. Permintaan pemiliknya, dan ia benar: kartu
+                      yang belum disematkan tidak punya urusan apa pun dengan
+                      pin, jadi menggambar pin redup di sana cuma menaruh
+                      barang di sudut yang isinya angka rekam jejak.
+
+                      pointer-events-none supaya ia tidak mencuri klik yang
+                      ditujukan ke kartunya. Yang mencabut sematan menu klik
+                      kanan yang sama, bukan ikon ini — satu jalan masuk,
+                      satu jalan keluar.
+
+                      Sematan milik penontonnya sendiri dan tidak mengubah
+                      urutan papan untuk orang lain. Lihat lib/pin-analis.ts. */}
+                  {disemat && (
+                    <span title="Disematkan — kanal ini naik ke atas, hanya untuk tampilanmu"
+                          className="pointer-events-none absolute right-2 top-2 z-10 p-1.5 text-amber-400">
+                      <Pin className="size-3.5 fill-current" />
+                    </span>
+                  )}
                 </div>
               );
             })}
           </div>
+          {menuPin && (
+            <MenuPin x={menuPin.x} y={menuPin.y}
+              disemat={disematkan(menuPin.uid)}
+              pilih={() => ubahPin(menuPin.uid)}
+              tutup={() => setMenuPin(null)} />
+          )}
+          </>
         ) : (
           <>
             {/* ── KEPALA KANAL DICABUT — permintaan pemilik ──────────────
