@@ -179,7 +179,7 @@ export default function Pricing_05() {
       dengan yang dihasilkan varian `dark:` tadi — tampilan yang sudah
         benar tidak berubah sedikit pun. */
   return (
-    <section className="py-24 bg-background">
+    <section id="harga" className="scroll-mt-20 py-24 bg-background">
       <div className="mx-auto max-w-6xl px-6 md:px-8">
         <div className="text-center max-w-2xl mx-auto">
           {/* text-foreground DITULIS TEGAS, tidak diwariskan.

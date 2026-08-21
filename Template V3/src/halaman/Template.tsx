@@ -281,7 +281,14 @@ function Header() {
                 </NavigationMenuContent>
               </NavigationMenuItem>
               <NavigationMenuLink className="px-4" asChild>
-                <a href="/akses" className="hover:bg-accent rounded-md p-2">Harga &amp; Akses</a>
+                <a href="/akses"
+                   onClick={(e) => {
+                     const seksi = document.getElementById('harga');
+                     if (!seksi) return;
+                     e.preventDefault();
+                     seksi.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                   }}
+                   className="hover:bg-accent rounded-md p-2">Harga &amp; Akses</a>
               </NavigationMenuLink>
             </NavigationMenuList>
           </NavigationMenu>
