@@ -18,6 +18,7 @@ import { PapanPeringkatSignal } from '@/components/performa-signal';
    performa satu orang. Yang di kepala sudah dikembalikan. */
 import PerformaKalender from '@/components/performa-kalender';
 import { SparklineSaldo } from '@/components/kurva-saldo';
+import { PotongGambar } from '@/components/potong-gambar';
 import { HitungPosisi } from '@/components/hitung-posisi';
 import { ambilDraf } from '@/lib/draf-sinyal';
 import { AvatarAnalis } from '@/components/avatar-analis';
@@ -1536,6 +1537,53 @@ export default function Analisa() {
    *  bersebelahan dengan angka di formulir, dan menangkap entry yang
    *  ketukar dengan SL sebelum sinyalnya jadi permanen. */
   const [sampulDraf, setSampulDraf] = useState('');
+  const [sampulDariBerkas, setSampulDariBerkas] = useState(false);
+  const [sampulAsli, setSampulAsli] = useState('');
+  const [memotong, setMemotong] = useState(false);
+  const berkasSampul = useRef<HTMLInputElement | null>(null);
+
+  /* ── MEMILIH GAMBAR ANALISA DARI CAKRAM ─────────────────────────
+     Permintaan pemilik. Perlu dicatat bahwa jalur ini pernah SENGAJA
+     ditutup 19 Agu 2026 — berkas dari cakram orang tidak bisa diperiksa
+     keasliannya, dan sinyal yang sudah terbit tidak bisa dihapus. Yang
+     dibuka sekarang jalur itu lagi, atas keputusan pemilik.
+
+     Dua pagar yang masih bisa dipasang di sini, dipasang:
+
+     • JENIS diperiksa dari MIME berkasnya, bukan cuma dari accept di
+       dialognya. accept itu saringan TAMPILAN — orang masih bisa memilih
+       "Semua berkas" di kotak dialog sistem dan menyodorkan apa pun.
+
+     • UKURAN dibatasi 3,5 MB, bukan 5 MB seperti batas servernya. Yang
+       dikirim data URL base64, dan base64 memuai sepertiga: berkas 4 MB
+       jadi untai 5,4 MB dan ditolak server SESUDAH seluruhnya terkirim.
+       3,5 MB menjaga hasil muainya tetap di bawah batas itu. */
+  function pilihSampul(f: File | null) {
+    if (!f) return;
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(f.type)) {
+      setNada('galat');
+      setKabar('Gambarnya harus PNG, JPG, atau WebP.');
+      return;
+    }
+    if (f.size > 3.5 * 1024 * 1024) {
+      setNada('galat');
+      setKabar('Gambarnya ' + (f.size / 1048576).toFixed(1) + ' MB — batasnya 3,5 MB.');
+      return;
+    }
+    const r = new FileReader();
+    r.onload = () => {
+      const isi = String(r.result || '');
+      setSampulDraf(isi);
+      setSampulAsli(isi);
+      setSampulDariBerkas(true);
+      setKabar('');
+      /* Pemotongnya dibuka LANGSUNG, tidak menunggu ditekan. Tangkapan
+         layar yang dikirim orang hampir tidak pernah pas, dan pemotong
+         yang harus dicari dulu adalah pemotong yang tidak dipakai. */
+      setMemotong(true);
+    };
+    r.readAsDataURL(f);
+  }
 
   /* Simbol yang dikirim ke Chart & Entry, LENGKAP dengan penanda pasarnya.
      ────────────────────────────────────────────────────────────────────
@@ -1733,7 +1781,8 @@ export default function Analisa() {
         } else {
           try {
             await tambahGambar(
-              idBaru, sampulDraf, 'Chart saat sinyal ini disusun',
+              idBaru, sampulDraf,
+              sampulDariBerkas ? 'Gambar analisa dari analisnya' : 'Chart saat sinyal ini disusun',
               profNama.trim() || pengguna?.displayName || 'Analis',
             );
           } catch {
@@ -1745,7 +1794,8 @@ export default function Analisa() {
       setNada('ok');
       setKabar('Analisa terposting — dan kini permanen. Semoga levelnya bekerja.' + catatanFoto);
       setRingkas(''); setEntry(''); setSl(''); setTp(''); setAlasan('');
-      setPahamPermanen(false); setQtyDraf(0); setSampulDraf('');
+      setPahamPermanen(false); setQtyDraf(0); setSampulDraf(''); setSampulDariBerkas(false);
+      setSampulAsli(''); setMemotong(false);
       segarkan();
     } catch (e) {
       setNada('galat');
@@ -2232,6 +2282,22 @@ export default function Analisa() {
                 <input value={sl} onChange={(e) => setSl(e.target.value)} inputMode="decimal" className={cn(KELAS_ISIAN, 'angka')} /></div>
               <div><label className="mb-1 block text-[11px] text-zinc-500">TP</label>
                 <input value={tp} onChange={(e) => setTp(e.target.value)} inputMode="decimal" className={cn(KELAS_ISIAN, 'angka')} /></div>
+              {/* Sel keempat baris ini memang menganggur (grid-nya
+                  sm:grid-cols-4), jadi tombolnya duduk sebaris dengan
+                  Entry/SL/TP tanpa menggeser apa pun. Letaknya juga
+                  masuk akal: gambar analisa menerangkan level-level itu,
+                  bukan pasangan atau harganya. */}
+              <div>
+                <label className="mb-1 block text-[11px] text-zinc-500">Gambar analisa</label>
+                <button onClick={() => berkasSampul.current?.click()}
+                  className={cn(KELAS_ISIAN, 'flex cursor-pointer items-center justify-center gap-1.5 text-[12px] transition-colors',
+                    sampulDraf ? 'text-zinc-100' : 'text-zinc-400 hover:text-zinc-100')}>
+                  <ImagePlus className="size-3.5" />
+                  {sampulDraf ? 'Ganti gambar' : 'Pilih gambar'}
+                </button>
+                <input ref={berkasSampul} type="file" accept="image/png,image/jpeg,image/webp" hidden
+                  onChange={(e) => { pilihSampul(e.target.files?.[0] ?? null); e.target.value = ''; }} />
+              </div>
               {/* ── PERINGATAN JARAK SL, SEBELUM DIPOSTING ─────────────────
                   Dihitung langsung dari isian, jadi ia muncul saat orangnya
                   masih bisa mengubah angkanya — bukan sesudah sinyalnya
@@ -2418,17 +2484,32 @@ export default function Analisa() {
                 analis mengira pembelinya melihat chart ini juga, lalu
                 menulis ringkasan yang mengandaikan gambar yang tidak ada
                 di sana. */}
-            {sampulDraf && (
+            {memotong && sampulAsli && (
+              <div className="mt-3">
+                <PotongGambar
+                  sumber={sampulAsli}
+                  onSelesai={(hasil) => { setSampulDraf(hasil); setMemotong(false); }}
+                  onBatal={() => { setSampulDraf(sampulAsli); setMemotong(false); }}
+                />
+              </div>
+            )}
+            {sampulDraf && !memotong && (
               <div className="mt-3 rounded-lg border border-zinc-800 bg-zinc-950/60 p-3">
                 <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <span className="text-[11.5px] font-medium text-zinc-300">Chart yang kamu susun</span>
+                  <span className="text-[11.5px] font-medium text-zinc-300">{sampulDariBerkas ? 'Gambar analisamu' : 'Chart yang kamu susun'}</span>
                   <span className="text-[11px] text-zinc-600">— ikut terbit bersama sinyalnya</span>
-                  <button onClick={() => setSampulDraf('')}
-                    className="ml-auto cursor-pointer rounded border border-zinc-800 px-2 py-0.5 text-[11px] text-zinc-500 transition-colors hover:border-zinc-700 hover:text-zinc-300">
+                  {sampulAsli && (
+                    <button onClick={() => setMemotong(true)}
+                      className="ml-auto cursor-pointer rounded border border-zinc-800 px-2 py-0.5 text-[11px] text-zinc-500 transition-colors hover:border-zinc-700 hover:text-zinc-300">
+                      Potong lagi
+                    </button>
+                  )}
+                  <button onClick={() => { setSampulDraf(''); setSampulAsli(''); setMemotong(false); setSampulDariBerkas(false); }}
+                    className="cursor-pointer rounded border border-zinc-800 px-2 py-0.5 text-[11px] text-zinc-500 transition-colors hover:border-zinc-700 hover:text-zinc-300">
                     Sembunyikan
                   </button>
                 </div>
-                <img src={sampulDraf} alt="Tangkapan layar chart yang barusan disusun"
+                <img src={sampulDraf} alt={sampulDariBerkas ? 'Gambar analisa yang dipilih' : 'Tangkapan layar chart yang barusan disusun'}
                      className="block w-full rounded border border-zinc-800" />
                 <p className="mt-2 text-[11px] leading-relaxed text-zinc-600">
                   Cocokkan garisnya dengan Entry, SL, dan TP di atas sebelum menekan Posting —

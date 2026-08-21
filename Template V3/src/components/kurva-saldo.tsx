@@ -173,9 +173,20 @@ export function SparklineSaldo(
       });
     };
     window.addEventListener('resize', ukur);
-    /* Observer tetap dipasang: di susunan kartu analis ia memang tidak
-       pernah melapor, tapi komponen ini juga dipakai di tempat lain yang
-       kotaknya biasa, dan di sana ia yang paling tepat. */
+    /* Observer tetap dipasang.
+
+       KOREKSI atas catatan sebelumnya di berkas ini: dulu ditulis bahwa
+       observer-nya "tidak pernah melapor untuk susunan berposisi absolut".
+       Itu keliru. Diuji terpisah 21 Agu 2026 — ResizeObserver tidak
+       berbunyi sama sekali di peramban yang tidak sedang MELUKIS bingkai,
+       apa pun susunannya, karena penyampaian laporannya bagian dari
+       langkah render. Yang bisu waktu itu bukan susunannya, melainkan
+       peramban pemeriksanya.
+
+       Jadi observer ini memang bekerja di peramban sungguhan. Ia
+       dipertahankan sebagai jalur utama; useLayoutEffect dan pendengar
+       resize di sekitarnya yang menjaga keadaan-keadaan yang tidak
+       dilaporkannya. */
     const ro = new ResizeObserver(ukur);
     if (kotak.current) ro.observe(kotak.current);
     return () => { window.removeEventListener('resize', ukur); ro.disconnect(); };
