@@ -326,31 +326,65 @@ export function PapanPeringkatSignal({ data }: { data: Performa | null }) {
  *  melainkan penyaringan diam-diam — dan analis yang tidak muncul tanpa
  *  tahu sebabnya akan menyimpulkan papannya diatur.
  *
- *  Perhatikan kalimat tentang 1%: ia menjelaskan bahwa yang diukur JARAK
- *  SL, bukan risiko sesungguhnya. Risiko sesungguhnya = ukuran posisi x
- *  jarak SL, dan ukuran posisi tidak pernah ikut diposting — ia milik
- *  penirunya. Mengaku mengukur sesuatu yang tidak kita punya akan
+ *  Perhatikan kalimat tentang jarak SL: ia menjelaskan bahwa yang diukur
+ *  JARAK SL, bukan risiko sesungguhnya. Risiko sesungguhnya = ukuran
+ *  posisi x jarak SL, dan ukuran posisi tidak pernah ikut diposting — ia
+ *  milik penirunya. Mengaku mengukur sesuatu yang tidak kita punya akan
  *  membuat seluruh papan ini tidak layak dipercaya. */
 function SyaratPapan({ a }: { a: AturanPapan }) {
+  /* Urutan timeframe DITENTUKAN di sini, bukan diserahkan pada urutan
+     kunci objek dari server: tabel batas yang tampil acak-acakan terbaca
+     seperti daftar angka, bukan seperti tangga. */
+  const URUT = ['5m', '15m', '30m', '1h', '4h', '1d', '1w'];
+  const tabel = a.slMaksTf
+    ? URUT.filter((t) => a.slMaksTf?.[t] != null).map((t) => [t, a.slMaksTf![t]] as const)
+    : [];
+
   return (
-    <p className="text-[11px] leading-relaxed text-zinc-600">
-      <span className="text-zinc-500">Syarat masuk papan:</span> minimal {a.minSinyal} sinyal
-      selesai bulan ini, drawdown tidak lebih dari {a.ddMaksPersen}% modal, dan jarak SL tiap
-      sinyal tidak lebih dari <span className="angka">{a.slMaksPersen}%</span> — sama untuk
-      kripto maupun Trade-Fi.{' '}
-      <span className="text-zinc-500">Kenapa satu angka untuk dua pasar yang volatilitasnya
-      berbeda:</span> jarak SL bukan ukuran risiko, ia pembagi. Risiko = ukuran posisi × jarak
-      SL, dan ukuran posisi ada di tanganmu — lewat margin & leverage di futures, lewat lot &
-      akun cent di MT5. Justru SL yang lebar butuh leverage lebih kecil: dengan risiko 1% dari
-      $1.000, SL 2% cukup posisi $500 tanpa leverage sama sekali, sedangkan SL 0,5% menuntut
-      $2.000. Batas {a.slMaksPersen}% karena itu bukan pagar risiko — risikomu kamu yang atur,
-      dan panel hitungan di tiap sinyal menunjukkan caranya. Ia pagar seberapa jauh sebuah
-      rencana boleh melenceng sebelum dinyatakan salah: stop yang terlalu lebar berhenti jadi
-      stop dan berubah jadi harapan.{' '}
-      Melanggar tidak menghapus apa pun, tapi <span className="text-zinc-400">memperlambat</span>{' '}
-      bulan berikutnya: tiap sinyal yang melanggar menambah {a.dendaPerPelanggaran} sinyal pada
-      syarat minimal bulan depan, sampai maksimum +{a.dendaMaks}.
-    </p>
+    <div className="space-y-2 text-[11px] leading-relaxed text-zinc-600">
+      <p>
+        <span className="text-zinc-500">Syarat masuk papan:</span> minimal {a.minSinyal} sinyal
+        selesai bulan ini, drawdown tidak lebih dari {a.ddMaksPersen}% modal
+        {a.sepiMaksHari ? <>, tidak berhenti memposting lebih dari {a.sepiMaksHari} hari</> : null}
+        , dan jarak SL tiap sinyal tidak lebih dari batas timeframe-nya.
+      </p>
+
+      {/* ── TABELNYA DIPAJANG, BUKAN DIRINGKAS JADI SATU KALIMAT ────────
+          Sejak 21 Agu 2026 batasnya berbeda per timeframe, dan analis
+          harus bisa membaca angkanya sendiri sebelum memposting — bukan
+          menemukannya lewat peringatan setelah SL-nya terlanjur ditulis. */}
+      {tabel.length > 0 && (
+        <p className="angka flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-zinc-500">
+          {tabel.map(([tf, v]) => (
+            <span key={tf}>{tf} <span className="text-zinc-300">{v}%</span></span>
+          ))}
+        </p>
+      )}
+
+      <p>
+        <span className="text-zinc-500">Kenapa berbeda per timeframe:</span> batas ini bukan
+        pagar risiko — risikomu kamu yang atur lewat margin &amp; leverage di futures atau lot
+        &amp; akun cent di MT5, dan panel hitungan di tiap sinyal menunjukkan caranya. Jarak SL
+        bukan ukuran risiko, ia PEMBAGI: risiko = ukuran posisi × jarak SL. Yang dijaga batas
+        ini seberapa jauh sebuah rencana boleh melenceng sebelum dinyatakan salah — dan
+        &quot;jauh&quot; itu artinya berbeda di tiap timeframe. Rentang harian ETH sendiri
+        sekitar 5%; stop 2% di sana bukan disiplin, ia berada di dalam derau. Angka di atas
+        kira-kira dua kali ATR timeframe-nya, diukur dari data pasar dan diperbarui berkala.
+      </p>
+
+      <p>
+        <span className="text-zinc-500">Berlaku sejak 21 Agustus 2026.</span> Sinyal yang
+        diposting sebelum itu tetap dinilai dengan batas lama {a.slMaksPersen}% — aturan tidak
+        berlaku surut, karena memindahkan garis finis sesudah orang berlari bukan penilaian
+        melainkan hukuman.
+      </p>
+
+      <p>
+        Melanggar tidak menghapus apa pun, tapi <span className="text-zinc-400">memperlambat</span>{' '}
+        bulan berikutnya: tiap sinyal yang melanggar menambah {a.dendaPerPelanggaran} sinyal pada
+        syarat minimal bulan depan, sampai maksimum +{a.dendaMaks}.
+      </p>
+    </div>
   );
 }
 

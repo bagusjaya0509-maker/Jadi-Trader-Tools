@@ -124,6 +124,12 @@ export async function kirimAnalisa(d: {
   judul: string; pasangan: string; arah: 'BUY' | 'SELL'; harga: number;
   ringkas: string; isi: IsiAnalisa; nama: string; pasar: 'kripto' | 'tradefi';
   snapshot: RingkasAnalisa['snapshot'];
+  /** Timeframe yang dianalisa. WAJIB diisi sejak batas jarak SL dipisah
+   *  per timeframe (21 Agu 2026): tanpa ini server tidak bisa menilai
+   *  sinyalnya sama sekali, dan sinyal yang tidak bisa dinilai tidak
+   *  pernah dihitung pelanggaran — bukan kelonggaran yang kita inginkan,
+   *  cuma akibat dari medan yang kosong. */
+  tf?: string;
   /** Persetujuan membuka akses pantau jurnal.
    *
    *  TIDAK LAGI DIKUMPULKAN, dan karena itu opsional. Syaratnya sudah
@@ -338,6 +344,16 @@ export interface AturanPapan {
    *  leverage, MT5 punya akun cent & lot; keduanya bisa menyamakan risiko
    *  berapa pun jarak SL-nya. Lihat HitungPosisi. */
   slMaksPersen: number;
+  /** Batas per timeframe, berlaku untuk sinyal yang diposting sejak
+   *  `slAturanMulai`. Angka `slMaksPersen` di atas tetap dipakai untuk
+   *  sinyal yang lebih tua — aturan tidak berlaku surut.
+   *
+   *  Dikirim server, TIDAK ditulis ulang di layar: dua salinan tabel
+   *  suatu hari akan berbeda, dan yang berbeda adalah syarat yang
+   *  menentukan siapa muncul di papan. */
+  slMaksTf?: Record<string, number>;
+  slAturanMulai?: number;
+  sepiMaksHari?: number;
   minSinyal: number;
   dendaPerPelanggaran: number;
   dendaMaks: number;

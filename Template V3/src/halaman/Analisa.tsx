@@ -92,6 +92,25 @@ function rapikanHarga(n: number): number {
    tinggi bukan aib — scalper agresif yang jujur soal risikonya lebih
    berguna daripada yang menyamar tenang. Emerald/amber/rose di sini
    membaca "sejauh mana ia pernah turun", bukan "sebagus apa ia". */
+/* Timeframe yang boleh dipilih saat memposting. Disalin dari daftar di
+   halaman Chart, TIDAK diimpor: mengimpornya menyeret seluruh potongan
+   chart ke potongan Copy Signal demi tujuh baris tabel. */
+const TF_SINYAL = [
+  { nilai: '5m', label: '5m' }, { nilai: '15m', label: '15m' },
+  { nilai: '30m', label: '30m' }, { nilai: '1h', label: '1h' },
+  { nilai: '4h', label: '4h' }, { nilai: '1d', label: '1D' },
+  { nilai: '1w', label: '1W' },
+];
+
+/* Cadangan kalau server belum mengirim tabelnya — mis. versi backend lama.
+   Angkanya sama dengan yang di server; kalau keduanya berselisih, YANG
+   MENENTUKAN tetap server, dan yang salah cuma kalimat peringatannya. */
+const BATAS_SL_TF: Record<string, number> = {
+  '1m': 0.25, '3m': 0.3, '5m': 0.35, '15m': 0.5, '30m': 0.8,
+  '1h': 1.2, '2h': 1.8, '4h': 3.5, '6h': 4.5, '8h': 5.5, '12h': 7,
+  '1d': 13, '3d': 22, '1w': 40, '1M': 70,
+};
+
 const WARNA_RISIKO: Record<string, string> = {
   Rendah: 'border-emerald-500/30 text-emerald-400/90',
   Sedang: 'border-amber-500/30 text-amber-400/90',
@@ -1491,6 +1510,11 @@ export default function Analisa() {
   const [sl, setSl] = useState('');
   const [tp, setTp] = useState('');
   const [alasan, setAlasan] = useState('');
+  /* Timeframe yang dianalisa. Bawaannya 1h — bukan kosong: sejak batas
+     jarak SL dipisah per timeframe, sinyal tanpa tf tidak bisa dinilai
+     sama sekali, dan medan kosong yang diam-diam membebaskan orang dari
+     penilaian adalah celah, bukan kelonggaran yang disengaja. */
+  const [tfSinyal, setTfSinyal] = useState('1h');
   /* Persetujuan pantau jurnal + kesadaran permanen. SENGAJA tidak diingat
      di localStorage: keduanya harus disetujui sadar pada TIAP posting,
      karena tiap posting adalah komitmen baru yang tidak bisa ditarik. */
@@ -1646,6 +1670,7 @@ export default function Analisa() {
        dilihat sama saja dengan draf yang hilang — orangnya menekan "Ke Copy
        Signal" di chart lalu tiba di daftar kanal, tanpa tanda apa pun bahwa
        rencananya sudah sampai. */
+    if (d.tf) setTfSinyal(d.tf);
     setCariSub({ sub: 'posting' }, { replace: true });
     setNada('info');
     setKabar(`Rencana dari Chart & Entry masuk — ${d.pasangan} ${d.tf} ${d.arah}. Lengkapi ringkasan dan alasannya.`);
@@ -1741,7 +1766,7 @@ export default function Analisa() {
            dari formulir. Server tetap mewajibkannya, dan kartu-kartu lama
            yang judulnya berbeda dari ringkasannya tetap tampil apa adanya. */
         judul: (ringkas.trim() || `${pasangan.trim().toUpperCase()} · ${arah}`).slice(0, 80),
-        pasangan: pasangan.trim().toUpperCase(), arah, pasar,
+        pasangan: pasangan.trim().toUpperCase(), arah, pasar, tf: tfSinyal,
         harga: hargaUsd, ringkas: ringkas.trim(),
         isi: { entry: Number(entry) || 0, sl: Number(sl) || 0, tp: Number(tp) || 0, alasan: alasan.trim() },
         /* Nama PROFIL didahulukan. Server menimpanya lagi saat membaca,
@@ -2252,12 +2277,23 @@ export default function Analisa() {
                   kripto tidak bisa memakai sinyal Trade-Fi — itu harus
                   terlihat SEBELUM ia membayar, bukan sesudah. */}
               <div>
-                <label className="mb-1 block text-[11px] text-zinc-500">Pasar</label>
-                <select value={pasar} onChange={(e) => setPasar(e.target.value as 'kripto' | 'tradefi')}
-                        className={cn(KELAS_ISIAN, 'cursor-pointer')}>
-                  <option value="kripto">Kripto (Binance)</option>
-                  <option value="tradefi">Trade-Fi (MT5)</option>
-                </select>
+                <label className="mb-1 block text-[11px] text-zinc-500">Pasar &amp; timeframe</label>
+                <div className="flex gap-1.5">
+                  <select value={pasar} onChange={(e) => setPasar(e.target.value as 'kripto' | 'tradefi')}
+                          className={cn(KELAS_ISIAN, 'min-w-0 flex-1 cursor-pointer')}>
+                    <option value="kripto">Kripto (Binance)</option>
+                    <option value="tradefi">Trade-Fi (MT5)</option>
+                  </select>
+                  {/* Timeframe MENENTUKAN batas jarak SL-nya, jadi ia bukan
+                      keterangan tambahan melainkan bagian dari penilaian.
+                      Diletakkan di sini supaya terlihat sebelum orang
+                      mengisi SL, bukan sesudah. */}
+                  <select value={tfSinyal} onChange={(e) => setTfSinyal(e.target.value)}
+                          aria-label="Timeframe yang dianalisa"
+                          className={cn(KELAS_ISIAN, 'w-[86px] shrink-0 cursor-pointer')}>
+                    {TF_SINYAL.map((t) => <option key={t.nilai} value={t.nilai}>{t.label}</option>)}
+                  </select>
+                </div>
               </div>
               <div>
                 <label className="mb-1 block text-[11px] text-zinc-500">Harga akses (Rp)</label>
@@ -2314,7 +2350,12 @@ export default function Analisa() {
                 const e0 = Number(entry), s0 = Number(sl);
                 if (!(e0 > 0) || !(s0 > 0)) return null;
                 const jarak = (Math.abs(e0 - s0) / e0) * 100;
-                const batas = performa?.aturan?.slMaksPersen ?? 2;
+                /* Batas menurut TIMEFRAME, bukan satu angka untuk semua.
+                   Tabel dari server didahulukan supaya layar dan penilai
+                   tidak pernah memakai angka berbeda; salinan lokal cuma
+                   dipakai kalau backend-nya belum mengirim tabelnya. */
+                const tabel = performa?.aturan?.slMaksTf ?? BATAS_SL_TF;
+                const batas = tabel[tfSinyal] ?? performa?.aturan?.slMaksPersen ?? 2;
                 return (
                   <div className="col-span-2 sm:col-span-4">
                     <p className={cn('rounded-md border px-2.5 py-2 text-[11.5px] leading-relaxed',
@@ -2323,13 +2364,14 @@ export default function Analisa() {
                         : 'border-zinc-800 text-zinc-500')}>
                       Jarak SL <span className="angka">{jarak.toFixed(2)}%</span> dari entry.{' '}
                       {jarak > batas ? (
-                        <>Di atas batas <span className="angka">{batas}%</span> — sinyal ini akan
-                        dihitung sebagai pelanggaran, membuatmu tidak masuk papan peringkat bulan
-                        ini, dan menambah syarat minimal sinyal bulan depan. Boleh diposting;
+                        <>Di atas batas <span className="angka">{batas}%</span> untuk timeframe{' '}
+                        <span className="angka">{tfSinyal}</span> — sinyal ini akan dihitung
+                        sebagai pelanggaran, membuatmu tidak masuk papan peringkat bulan ini,
+                        dan menambah syarat minimal sinyal bulan depan. Boleh diposting;
                         akibatnya saja yang perlu kamu tahu.</>
                       ) : (
-                        <>Masih di dalam batas <span className="angka">{batas}%</span> papan
-                        peringkat.</>
+                        <>Masih di dalam batas <span className="angka">{batas}%</span> untuk
+                        timeframe <span className="angka">{tfSinyal}</span>.</>
                       )}
                     </p>
                   </div>
