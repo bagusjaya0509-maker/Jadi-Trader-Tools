@@ -320,11 +320,24 @@ function Header() {
             <span className="text-sm">Company</span>
             {companyLinks.map((link) => (<ListItem key={link.title} {...link} />))}
             {companyLinks2.map((link) => (<ListItem key={link.title} {...link} />))}
+            <a href="/akses"
+               onClick={(e) => {
+                 const seksi = document.getElementById('harga');
+                 if (!seksi) return;
+                 e.preventDefault();
+                 setOpen(false);
+                 setTimeout(() => seksi.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
+               }}
+               className="hover:bg-accent hover:text-accent-foreground rounded-sm p-2 text-sm font-medium">
+              Harga &amp; Akses
+            </a>
           </div>
         </NavigationMenu>
         <div className="flex flex-col gap-2">
-          <Button variant="outline" className="w-full bg-transparent">Sign In</Button>
-          <Button className="w-full">Get Started</Button>
+          <Button variant="outline" className="w-full bg-transparent" asChild>
+            <a href="/preview">Lihat preview</a>
+          </Button>
+          <Button className="w-full" asChild><a href="/akses">Ambil akses</a></Button>
         </div>
       </MobileMenu>
     </header>
