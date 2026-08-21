@@ -10,6 +10,7 @@ import { cn, tanggalPendek } from '@/lib/utils';
 import { type Produk } from '@/data/contoh';
 import { useProduk, simpanKatalogProduk } from '@/lib/data';
 import { useAuth } from '@/lib/auth';
+import { usePaket } from '@/lib/paket';
 import { suratLisensi, sisipkanPenanda, unduhTeks } from '@/lib/surat-lisensi';
 import { useUlasan, kirimUlasan, hapusUlasan } from '@/lib/ulasan';
 import { useTutupLuar } from '@/lib/tutup-luar';
@@ -60,8 +61,22 @@ function AmbilSumber({ produk }: { produk: Produk }) {
      Sekarang tombolnya baru muncul setelah server benar-benar meloloskan
      kode itu sekali — bukti aktif, bukan janji. */
   const [terbuka, setTerbuka] = useState(false);
-  const { pengguna } = useAuth();
+  const { pengguna, pemilik } = useAuth();
   const gratis = produk.harga === 0;
+
+  /* ── PRODUK GRATIS PUN TIDAK TERMASUK PAKET EVENT TERBATAS ────────────
+     Kartu harga sudah menyatakannya: "Free Indikator & EA di Marketplace"
+     dicoret di paket gratis. Yang gratis di sini berarti tidak perlu KODE
+     LISENSI — bukan berarti terbuka untuk paket mana pun.
+
+     Terkunci berlaku untuk yang gratis saja. Produk berbayar sudah punya
+     gerbangnya sendiri berupa kode lisensi, dan menumpuk dua gerbang di
+     satu tombol membuat penolakannya tidak jelas datang dari mana. */
+  const { paket, memuat: memuatPaket } = usePaket();
+  const kunciEvent = gratis && !pemilik && (memuatPaket || paket.paket === 'gratis');
+  const alasanKunci = kunciEvent
+    ? 'Isi Marketplace belum termasuk paket Event Terbatas'
+    : undefined;
 
   async function ambil() {
     setSibuk(true); setKabar(''); setGagal(false);
@@ -133,7 +148,8 @@ function AmbilSumber({ produk }: { produk: Produk }) {
         </div>
       )}
       <div className="flex flex-wrap gap-3">
-        <button onClick={() => void ambil()} disabled={sibuk || (!gratis && (kode.trim().length < 8 || !setuju))}
+        <button onClick={() => void ambil()} title={alasanKunci}
+          disabled={sibuk || kunciEvent || (!gratis && (kode.trim().length < 8 || !setuju))}
           className="flex cursor-pointer items-center gap-2 rounded-full bg-zinc-100 px-6 py-3 text-[13px] font-semibold
                      text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50">
           {sibuk ? <Loader2 className="size-4 animate-spin" /> : gratis ? <Copy className="size-4" /> : <KeyRound className="size-4" />}
@@ -143,7 +159,14 @@ function AmbilSumber({ produk }: { produk: Produk }) {
             jalurnya unduhan langsung. Muncul kalau katalog menyatakan
             produknya punya berkas — DAN, untuk produk berbayar, hanya
             setelah lisensinya terbukti aktif lewat tombol di sebelah. */}
-        {produk.unduhan && (gratis || terbuka) && (
+        {produk.unduhan && (gratis || terbuka) && kunciEvent && (
+          <button type="button" disabled title={alasanKunci}
+             className="flex items-center gap-2 rounded-full border border-zinc-800 bg-zinc-900/60 px-6 py-3
+                        text-[13px] font-semibold text-zinc-100 opacity-50 disabled:cursor-not-allowed">
+            <Download className="size-4" /> Unduh .{produk.unduhan}
+          </button>
+        )}
+        {produk.unduhan && (gratis || terbuka) && !kunciEvent && (
           <a href={tautanBerkas(produk.id, gratis ? '' : kode.trim().toUpperCase(), produk.unduhan)}
              className="flex cursor-pointer items-center gap-2 rounded-full border border-zinc-800 bg-zinc-900/60 px-6 py-3
                         text-[13px] font-semibold text-zinc-100 transition-colors hover:border-zinc-700">

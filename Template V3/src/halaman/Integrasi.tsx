@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   CheckCircle2, Circle, Copy, Eye, EyeOff, RefreshCw, Download,
@@ -11,6 +11,8 @@ import { cn } from '@/lib/utils';
 import { bacaKoneksi, simpanKoneksi, hapusKoneksi, koneksiLengkap, PROXY_BAWAAN } from '@/lib/koneksi';
 import { useKodeMt5, useAkunMt5, versiKurangDari, VERSI_EA_PENDING } from '@/lib/akun';
 import { tautanBerkas } from '@/lib/admin';
+import { useAuth } from '@/lib/auth';
+import { usePaket } from '@/lib/paket';
 
 /* ════════════════════════════════════════════════════════════════════════
    INTEGRATIONS — sambungan ke MetaTrader 5 dan Binance
@@ -238,6 +240,52 @@ export default function Integrasi() {
   const alamatBackend = (url.trim() || PROXY_BAWAAN).replace(/\/+$/, '');
   const [tersalin, setTersalin] = useState<string | null>(null);
 
+  /* ── SAMBUNGAN TIDAK TERMASUK PAKET EVENT TERBATAS ────────────────────
+     Kartu harga sudah menyatakannya sejak awal — "Connect Binance Futures
+     & MetaTrader 5" dicoret di paket gratis. Halaman ini belum ikut, jadi
+     orang yang paketnya tidak memuatnya tetap bisa menekan tombolnya.
+
+     Tombolnya TETAP TAMPIL, cuma mati. Menyembunyikannya membuat halaman
+     ini terlihat seperti tidak punya fitur itu sama sekali, dan orang yang
+     sedang menimbang naik paket justru perlu melihat apa yang ia dapat.
+
+     Mati SELAMA MASIH MEMUAT juga, bukan cuma sesudah paketnya diketahui.
+     Menebak ke arah longgar berarti tombolnya sempat hidup sekejap untuk
+     orang yang tidak berhak — dan sekejap itu cukup untuk satu klik. */
+  const { pemilik } = useAuth();
+  const { paket, memuat: memuatPaket } = usePaket();
+  const kunciEvent = !pemilik && (memuatPaket || paket.paket === 'gratis');
+  const alasanKunci = kunciEvent
+    ? 'Sambungan MT5 & Binance belum termasuk paket Event Terbatas'
+    : undefined;
+
+  /* ── MODE BINANCE DIBACA DARI SERVERNYA, BUKAN DITULIS TANGAN ─────────
+     Sebelumnya kotak ini selalu berbunyi "Testnet" begitu tersambung —
+     untai mati, tidak pernah menanyakan apa pun kepada siapa pun.
+     Ternyata keliru: .env di VPS menimpa bawaan servernya ke
+     https://fapi.binance.com, jadi yang dipakai Binance Futures LIVE.
+
+     Ini jenis kesalahan yang paling mahal di halaman ini. Kotak bertuliskan
+     "Testnet" memberi tahu orang bahwa ordernya latihan padahal uangnya
+     sungguhan — dan ia berbohong justru di layar tempat orang memutuskan
+     seberani apa mencoba.
+
+     /api/health memulangkan baseUrl-nya dan tidak minta token, jadi
+     jawabannya bisa diambil apa adanya. Kalau tidak terbaca, yang ditulis
+     "Belum terbaca" — BUKAN ditebak salah satunya. Menebak "Testnet" waktu
+     tidak tahu persis mengulang kesalahan yang sedang diperbaiki. */
+  const [baseUrlServer, setBaseUrlServer] = useState<string | null>(null);
+  useEffect(() => {
+    let hidup = true;
+    fetch(alamatBackend + '/api/health')
+      .then((r) => r.json())
+      .then((j) => { if (hidup) setBaseUrlServer(typeof j?.baseUrl === 'string' ? j.baseUrl : null); })
+      .catch(() => { if (hidup) setBaseUrlServer(null); });
+    return () => { hidup = false; };
+  }, [alamatBackend]);
+  const modeTestnet = baseUrlServer !== null && /testnet/i.test(baseUrlServer);
+  const labelMode = baseUrlServer === null ? 'Belum terbaca' : modeTestnet ? 'Testnet' : 'Live';
+
   return (
     <div className="p-4 sm:p-6">
       {/* Bilah tab menggulir mendatar di layar sempit, bukan membungkus jadi
@@ -288,7 +336,7 @@ export default function Integrasi() {
           <Ubin
             Ikon={Server} nama="Binance Futures" hidup={binanceTersambung}
             ket={binanceTersambung ? 'Lewat proxy VPS sendiri' : 'Backend URL / token belum diisi'}
-            stat={[['Mode', binanceTersambung ? 'Testnet' : '—'], ['Trade masuk', '94 kripto']]}
+            stat={[['Mode', binanceTersambung ? labelMode : '—'], ['Trade masuk', '94 kripto']]}
           />
           <GarisLatensi />
         </div>
@@ -342,7 +390,7 @@ export default function Integrasi() {
                 </button>
                 <button
                   onClick={() => void kodeM.buatBaru()}
-                  disabled={kodeM.memuat}
+                  disabled={kodeM.memuat || kunciEvent}
                   className="flex cursor-pointer items-center rounded-md border border-zinc-800 px-3 text-zinc-400 transition-colors hover:border-zinc-700 hover:text-zinc-100 disabled:opacity-40"
                   title={kodeMt5 ? "Buat kode baru — EA yang sekarang akan terputus" : "Buat kode pasangan"}
                   aria-label="Buat kode baru"
@@ -444,12 +492,19 @@ export default function Integrasi() {
               </a>
               <button
                 onClick={() => void (kodeMt5 ? kodeM.putus() : kodeM.buatBaru())}
-                disabled={kodeM.memuat}
+                disabled={kodeM.memuat || kunciEvent}
+                title={alasanKunci}
                 className="flex cursor-pointer items-center gap-2 rounded-md border border-zinc-800 px-3.5 py-2 text-[12.5px] text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100 disabled:opacity-40"
               >
                 {kodeMt5 ? <><Link2Off className="size-3.5" /> Putuskan</> : <><Plug className="size-3.5" /> Sambungkan</>}
               </button>
             </div>
+            {kunciEvent && (
+              <p className="mt-3 rounded-md border border-amber-500/25 bg-amber-500/[0.05] px-3 py-2 text-[11.5px] leading-relaxed text-amber-200/90">
+                Sambungan MetaTrader 5 belum termasuk paket Event Terbatas. Berkas EA-nya tetap
+                bisa diunduh — yang terkunci cuma kode pasangannya.
+              </p>
+            )}
           </div>
         </Panel>
 
@@ -554,15 +609,27 @@ export default function Integrasi() {
               </p>
             </div>
 
+            {kunciEvent && (
+              <p className="mt-4 rounded-md border border-amber-500/25 bg-amber-500/[0.05] px-3 py-2 text-[11.5px] leading-relaxed text-amber-200/90">
+                Sambungan Binance belum termasuk paket Event Terbatas. Tombolnya sengaja
+                dibiarkan tampil supaya kelihatan apa yang terbuka setelah naik paket.
+              </p>
+            )}
+            {binanceTersambung && baseUrlServer !== null && !modeTestnet && (
+              <p className="mt-4 rounded-md border border-red-500/30 bg-red-500/[0.06] px-3 py-2 text-[11.5px] leading-relaxed text-red-200/90">
+                Backend ini menunjuk <span className="angka">{baseUrlServer}</span> — Binance Futures{' '}
+                <b>live</b>, bukan Testnet. Order yang dikirim dari sini memakai uang sungguhan.
+              </p>
+            )}
             <div className="mt-4 flex flex-wrap items-center gap-2">
               <button
-                onClick={simpanUji} disabled={!bisaSimpan}
+                onClick={simpanUji} disabled={!bisaSimpan || kunciEvent} title={alasanKunci}
                 className="cursor-pointer rounded-md bg-zinc-100 px-3.5 py-2 text-[12.5px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Simpan &amp; Uji
               </button>
               <button
-                onClick={putuskan} disabled={!tersimpan}
+                onClick={putuskan} disabled={!tersimpan || kunciEvent} title={alasanKunci}
                 className="flex cursor-pointer items-center gap-2 rounded-md border border-zinc-800 px-3.5 py-2 text-[12.5px] text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <Link2Off className="size-3.5" /> Putuskan

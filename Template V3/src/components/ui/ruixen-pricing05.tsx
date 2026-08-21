@@ -77,9 +77,9 @@ export default function Pricing_05() {
             { t: "Chart & jurnal penuh selama masa aktif" },
             { t: `Screener ${BATAS.gratis.screener} kali pakai` },
             { t: `Replay chart ${BATAS.gratis.replay} kali pakai` },
-            { t: "Sambungan Binance Futures & MetaTrader 5", no: true },
+            { t: "Connect Binance Futures & MetaTrader 5", no: true },
             { t: "Copy Signal", no: true },
-            { t: "Indikator & EA marketplace", no: true },
+            { t: "Free Indikator & EA di Marketplace", no: true },
           ],
         }]
       : []),
@@ -102,8 +102,8 @@ export default function Pricing_05() {
         { t: `Screener ${BATAS.testing.screener} kali — 5x paket gratis` },
         { t: `Replay chart ${BATAS.testing.replay} kali — 5x paket gratis` },
         { t: "Copy Signal + rekam jejak analis" },
-        { t: "Sambungan Binance Futures & MetaTrader 5" },
-        { t: "Indikator & EA marketplace", no: true },
+        { t: "Connect Binance Futures & MetaTrader 5" },
+        { t: "Free Indikator & EA di Marketplace", no: true },
       ],
     },
     {
@@ -126,7 +126,7 @@ export default function Pricing_05() {
             ? `${hemat3Bulan}% lebih murah dari 3x harga bulanan normal`
             : 'Sekali bayar untuk 90 hari penuh',
         },
-        { t: "Indikator & EA marketplace", no: true },
+        { t: "Free Indikator & EA di Marketplace", no: true },
       ],
     },
     {

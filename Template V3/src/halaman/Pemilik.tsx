@@ -92,7 +92,7 @@ export default function Pemilik() {
 
   const [pesan, setPesan] = useState('');
   const [form, setForm] = useState({ produk: '', pembeli: '', nilai: '', catatan: '' });
-  const [formKeluar, setFormKeluar] = useState({ keperluan: '', kategori: '', nilai: '', catatan: '' });
+  const [formKeluar, setFormKeluar] = useState({ keperluan: '', kategori: '', nilai: '', catatan: '', mata: 'usd' });
   const [sibuk, setSibuk] = useState(false);
 
   const totalPenjualan = penjualan.data.reduce((s, p) => s + p.nilai, 0);
@@ -137,16 +137,26 @@ export default function Pemilik() {
   }
 
   async function tambahPengeluaran() {
-    const nilai = Number(formKeluar.nilai);
+    const diketik = Number(formKeluar.nilai);
     if (!formKeluar.keperluan.trim()) { setPesan('Keperluan wajib diisi.'); return; }
-    if (!isFinite(nilai) || nilai <= 0) { setPesan('Nilai pengeluaran harus angka lebih dari nol.'); return; }
+    if (!isFinite(diketik) || diketik <= 0) { setPesan('Nilai pengeluaran harus angka lebih dari nol.'); return; }
+    /* Kurs nol berarti belum terbaca. Membagi dengannya menghasilkan
+       Infinity yang lolos ke catatan keuangan dan merusak setiap total
+       sesudahnya — lebih baik menolak dengan kalimat. */
+    if (formKeluar.mata === 'idr' && !(kurs > 0)) {
+      setPesan('Kurs dolar belum terbaca, jadi rupiahnya belum bisa dikonversi. Pilih $ dulu.');
+      return;
+    }
+    const nilai = formKeluar.mata === 'idr'
+      ? Math.round((diketik / kurs) * 100) / 100
+      : diketik;
     setSibuk(true);
     try {
       await catatPengeluaran({
         keperluan: formKeluar.keperluan.trim(), kategori: formKeluar.kategori.trim(),
         nilai, catatan: formKeluar.catatan.trim(),
       });
-      setFormKeluar({ keperluan: '', kategori: '', nilai: '', catatan: '' });
+      setFormKeluar({ keperluan: '', kategori: '', nilai: '', catatan: '', mata: formKeluar.mata });
       setPesan('Pengeluaran tercatat.');
       pengeluaran.muatUlang();
     } catch (e) {
@@ -334,15 +344,33 @@ export default function Pemilik() {
               <option value="">Kategori…</option>
               {KATEGORI_KELUAR.map((k) => <option key={k} value={k}>{k}</option>)}
             </select>
-            <input value={formKeluar.nilai} onChange={(e) => setFormKeluar({ ...formKeluar, nilai: e.target.value })}
-                   placeholder="Nilai ($)" inputMode="decimal" disabled={!pemilik}
-                   className="angka h-9 rounded-md border border-zinc-800 bg-zinc-900/60 px-3 text-[12.5px] text-zinc-100 outline-none hover:border-zinc-700 focus-visible:border-zinc-600 disabled:opacity-50" />
+            {/* Satuan duduk MENEMPEL pada kolom nilainya, bukan berdiri
+                sebagai kolom keenam. Ia bukan data tersendiri — ia
+                keterangan tentang angka di sebelahnya, dan memisahkannya
+                membuat orang bisa mengubah satu tanpa melihat yang lain. */}
+            <div className="flex gap-1.5">
+              <input value={formKeluar.nilai} onChange={(e) => setFormKeluar({ ...formKeluar, nilai: e.target.value })}
+                     placeholder={formKeluar.mata === 'idr' ? 'Nilai (Rp)' : 'Nilai ($)'}
+                     inputMode="decimal" disabled={!pemilik}
+                     className="angka h-9 min-w-0 flex-1 rounded-md border border-zinc-800 bg-zinc-900/60 px-3 text-[12.5px] text-zinc-100 outline-none hover:border-zinc-700 focus-visible:border-zinc-600 disabled:opacity-50" />
+              <select value={formKeluar.mata} onChange={(e) => setFormKeluar({ ...formKeluar, mata: e.target.value })}
+                      disabled={!pemilik} aria-label="Satuan nilai pengeluaran"
+                      className="h-9 w-[58px] shrink-0 cursor-pointer rounded-md border border-zinc-800 bg-zinc-900/60 px-2 text-[12.5px] text-zinc-100 outline-none hover:border-zinc-700 focus-visible:border-zinc-600 disabled:opacity-50">
+                <option value="usd">$</option>
+                <option value="idr">Rp</option>
+              </select>
+            </div>
             <button onClick={() => void tambahPengeluaran()} disabled={sibuk || !pemilik}
                     title={pemilik ? undefined : 'Hanya pemilik yang boleh mencatat pengeluaran'}
                     className="flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-red-500/30 bg-red-500/10 px-3 text-[12px] font-medium text-red-300 transition-colors hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50">
               <Plus className="size-3.5" /> Catat
             </button>
           </div>
+          {formKeluar.mata === 'idr' && Number(formKeluar.nilai) > 0 && kurs > 0 && (
+            <div className="angka mt-2 text-[11px] text-zinc-500">
+              Tersimpan sebagai {fmt(Number(formKeluar.nilai) / kurs)} — kurs {kurs.toLocaleString('id-ID')}/USD.
+            </div>
+          )}
         </div>
       </Panel>
 
@@ -413,7 +441,7 @@ export default function Pemilik() {
           {/* Batas tingginya sudah ada sejak awal; yang ditambahkan
               penyembunyian batang dan ambang jumlah — di bawah sebelas
               laporan panelnya tidak perlu dipotong sama sekali. */}
-          <div className={cn('px-5 pb-5', gulirJika(laporan.data.length, 10, 'max-h-[460px]'))}>
+          <div className={cn('px-5 pb-5', gulirJika(laporan.data.length, 6, 'max-h-[416px]'))}>
             <Kabar memuat={laporan.memuat} galat={laporan.galat} kosong={!laporan.data.length}
                    teksKosong="Belum ada laporan." />
             {laporan.data.slice(0, 40).map((l) => (
