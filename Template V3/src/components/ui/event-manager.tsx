@@ -1311,7 +1311,20 @@ function ListView({
   onEventClick: (event: Event) => void
   getColorClasses: (color: string) => { bg: string; text: string }
 }) {
-  const sortedEvents = [...events].sort((a, b) => a.startTime.getTime() - b.startTime.getTime())
+  /* TERBARU DI ATAS. Permintaan pemilik, dan arah yang benar untuk daftar
+     ini: yang dicari orang di Performa Signal adalah sinyal yang BARU
+     selesai — hasil kemarin, bukan hasil bulan lalu. Urutan naik memaksa
+     menggulir ke dasar setiap kali, dan makin panjang rekam jejaknya makin
+     jauh jaraknya.
+
+     Kelompok tanggalnya ikut terbalik tanpa disentuh: kuncinya untai
+     tanggal Indonesia ("Senin, 17 Agustus 2026") yang bukan bilangan, jadi
+     objeknya menjaga urutan penyisipan — dan yang disisipkan pertama
+     sekarang yang terbaru.
+
+     Jangan disamakan dengan panel Permintaan & Lisensi Aktif, yang justru
+     WAJIB terlama->terbaru karena dua daftarnya dipadankan berurutan. */
+  const sortedEvents = [...events].sort((a, b) => b.startTime.getTime() - a.startTime.getTime())
 
   const groupedEvents = sortedEvents.reduce(
     (acc, event) => {
