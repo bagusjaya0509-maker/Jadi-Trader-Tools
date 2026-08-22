@@ -777,7 +777,22 @@ class Mesin {
           const deret = this.deretBawaan(e.a.v);
           if (deret) { const k = this.bar - ofs; return k >= 0 ? deret[k] : null; }
           const riw = this.riwayat.get(e.a.v);
-          if (riw) { const k = riw.length - ofs; return ofs === 0 ? this.lingkup.get(e.a.v) ?? null : (k >= 1 ? riw[k - 1] : null); }
+          if (riw) {
+            /* SALAH SATU INDEKS sebelum ini: rumusnya riw[riw.length - ofs - 1],
+               jadi x[1] memulangkan nilai DUA bar lalu, x[2] tiga bar lalu, dan
+               seterusnya.
+
+               Saat bar ke-i berjalan, riw berisi bar 0..i-1 -- panjangnya i.
+               Bar sebelumnya ada di riw[i - 1], yaitu riw[riw.length - 1].
+
+               Akibatnya tidak pernah berupa galat, cuma angka yang meleset satu
+               bar. Pada skrip yang menumpuk nilainya sendiri (up := max(up,
+               up[1])) selisih itu membuat tumpukannya tidak pernah terbentuk:
+               Supertrend jadi gigi gergaji dengan 373 pergantian tren padahal
+               seharusnya 66. */
+            const k = riw.length - ofs;
+            return ofs === 0 ? this.lingkup.get(e.a.v) ?? null : (k >= 0 ? riw[k] : null);
+          }
           /* `bar_index[n]` punya jawaban pasti tanpa perlu menyimpan
              riwayat: nomor bar sekarang dikurangi n. Sebelum ini ia jatuh
              ke cabang "tanpa riwayat" dan mengembalikan null — dan
