@@ -763,7 +763,12 @@ export function jalankanPine(kode: string, l: Lilin, tf = '4h',
 /** Contoh yang bisa langsung dijalankan — sekaligus dokumentasi hidup. */
 /** Supertrend — skrip v4 yang beredar luas di TradingView.
  *
- *  SATU nilai diubah dari aslinya atas permintaan pemilik 22 Agu 2026:
+ *  DUA penyimpangan dari aslinya, keduanya atas permintaan pemilik
+ *  22 Agu 2026. Penanda pembalikan diubah dari shape.circle jadi
+ *  shape.triangleup / shape.triangledown: bulatan tidak menyebut arah apa
+ *  pun, jadi penggambar harus menebak — dan tebakannya membuat penanda awal
+ *  UPTREND tergambar sebagai panah ke BAWAH. Segitiga menyebut arahnya
+ *  sendiri, jadi tidak ada yang perlu ditebak. Lalu:
  *  `showsignals` bawaannya false, jadi label Buy/Sell tidak dicetak di atas
  *  lilin. Bulatan penanda pembalikan tetap ada — itu yang menandai kapan
  *  trennya berganti, dan TradingView pun menampilkannya. Yang dimatikan
@@ -797,11 +802,11 @@ trend := nz(trend[1], trend)
 trend := trend == -1 and close > dn1 ? 1 : trend == 1 and close < up1 ? -1 : trend
 upPlot = plot(trend == 1 ? up : na, title="Up Trend", style=plot.style_linebr, linewidth=2, color=color.green)
 buySignal = trend == 1 and trend[1] == -1
-plotshape(buySignal ? up : na, title="UpTrend Begins", location=location.absolute, style=shape.circle, size=size.tiny, color=color.green, transp=0)
+plotshape(buySignal ? up : na, title="UpTrend Begins", location=location.absolute, style=shape.triangleup, size=size.tiny, color=color.green, transp=0)
 plotshape(buySignal and showsignals ? up : na, title="Buy", text="Buy", location=location.absolute, style=shape.labelup, size=size.tiny, color=color.green, textcolor=color.white, transp=0)
 dnPlot = plot(trend == 1 ? na : dn, title="Down Trend", style=plot.style_linebr, linewidth=2, color=color.red)
 sellSignal = trend == -1 and trend[1] == 1
-plotshape(sellSignal ? dn : na, title="DownTrend Begins", location=location.absolute, style=shape.circle, size=size.tiny, color=color.red, transp=0)
+plotshape(sellSignal ? dn : na, title="DownTrend Begins", location=location.absolute, style=shape.triangledown, size=size.tiny, color=color.red, transp=0)
 plotshape(sellSignal and showsignals ? dn : na, title="Sell", text="Sell", location=location.absolute, style=shape.labeldown, size=size.tiny, color=color.red, textcolor=color.white, transp=0)
 mPlot = plot(ohlc4, title="", style=plot.style_circles, linewidth=0)
 longFillColor = highlighting ? (trend == 1 ? color.green : color.white) : color.white

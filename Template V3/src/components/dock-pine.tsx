@@ -94,8 +94,9 @@ const SKRIP_BAWAAN: { id: string; nama: string; kode: string; sidikLama: string[
        daftar ini berarti belum pernah disunting, jadi aman diperbarui.
        Yang tidak cocok DIBIARKAN: skrip yang sudah diutak-atik orangnya
        adalah miliknya, dan menimpanya diam-diam menghapus pekerjaannya.
-         tuybxh — versi pertama, Buy/Sell menyala */
-    sidikLama: ['tuybxh'],
+         tuybxh — versi pertama, Buy/Sell menyala
+         gjb2ys — Buy/Sell dimatikan, penanda bulat masih ada */
+    sidikLama: ['tuybxh', 'gjb2ys'],
   },
 ];
 

@@ -43,6 +43,10 @@ export interface SegmenPine {
 export interface PenandaPine {
   bar: number; harga: number; teks: string; warna: string;
   posisi: 'atas' | 'bawah';
+  /** Bentuk yang DIMINTA skrip (shape.circle, shape.square, ...). Penggambar
+   *  memetakannya ke bentuk yang tersedia; sebelumnya nilai ini dibuang dan
+   *  semua penanda jadi panah, termasuk yang jelas-jelas minta bulatan. */
+  bentuk: 'bulat' | 'kotak' | 'panahAtas' | 'panahBawah';
 }
 export interface KotakPine {
   kiri: number; atas: number; kanan: number; bawah: number;
@@ -1301,6 +1305,9 @@ class Mesin {
              TradingView yang tampil cuma bulatan kecil. */
           const teksV = dapat('text', -1);
           const ofs = this.angka(dapat('offset', -1)) ?? 0;
+          /* `up` di sini berarti bentuk yang MENUNJUK KE ATAS (triangleup,
+             arrowup, labelup), dan bentuk semacam itu selalu dipasang di
+             BAWAH barnya — menunjuk naik dari bawah. */
           const bawah = lokasi.includes('below') || gaya.includes('up');
           const barPos = Math.max(0, Math.min(this.n - 1, this.bar + Math.round(ofs)));
           /* location.absolute berarti "taruh di NILAI yang diberikan", bukan
@@ -1311,9 +1318,21 @@ class Mesin {
           const hargaAbs = lokasi.includes('absolute') && nilaiAbs != null && isFinite(nilaiAbs)
             ? nilaiAbs
             : (bawah ? l.lows[barPos] : l.highs[barPos]);
+          /* shape.* Pine jauh lebih banyak daripada yang bisa digambar
+             pustaka chart (bulat, kotak, panah atas, panah bawah). Yang
+             tidak punya padanan dipetakan ke yang paling dekat bentuknya,
+             bukan dipaksa jadi panah: segitiga dan bendera lebih mirip
+             panah, berlian dan silang lebih mirip kotak. */
+          const bentuk: PenandaPine['bentuk'] =
+            gaya.includes('circle') ? 'bulat'
+            : gaya.includes('square') || gaya.includes('diamond') || gaya.includes('cross') ? 'kotak'
+            : gaya.includes('down') ? 'panahBawah'
+            : gaya.includes('up') ? 'panahAtas'
+            : (bawah ? 'panahAtas' : 'panahBawah');
           this.penanda.push({
             bar: barPos,
             harga: hargaAbs,
+            bentuk,
             teks: typeof teksV === 'string' ? teksV : '',
             warna: typeof warnaV === 'string' ? warnaV : '#a1a1aa',
             posisi: bawah ? 'bawah' : 'atas',
@@ -1561,6 +1580,9 @@ export function jalankanPineBar(kode: string, l: Lilin, tf = '4h',
         teks: String(d.text ?? ''),
         warna: typeof d.color === 'string' ? d.color : '#a1a1aa',
         posisi: gaya.includes('_up') ? 'bawah' : 'atas',
+        /* label.new memang label, bukan bentuk — panah searah posisinya
+           adalah padanan terdekat yang tersedia. */
+        bentuk: gaya.includes('_up') ? 'panahAtas' : 'panahBawah',
       });
     } else if (g.jenis === 'box') {
       const kiri = num(d.left), atas = num(d.top), kanan = num(d.right), bawah = num(d.bottom);

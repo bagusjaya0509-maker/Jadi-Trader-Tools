@@ -1070,7 +1070,15 @@ export function ChartLilin({
     /* Plugin penanda dibuat sekali lalu dipakai ulang. Memanggil
        createSeriesMarkers tiap render menumpuk plugin di seri yang sama. */
     const p = penanda.current ?? (penanda.current = createSeriesMarkers(seri.current, []));
-    const tanda = (trade ?? []).flatMap((t) => [
+    /* Tipe ditulis TEGAS, bukan disimpulkan dari dorongan pertama.
+       Disimpulkan, bentuknya terkunci pada apa yang kebetulan dipakai
+       penanda backtest ('arrowUp' | 'arrowDown') — dan penanda Pine yang
+       meminta bulatan lalu ditolak typecheck, padahal pustakanya menerima. */
+    type TandaChart = {
+      time: Time; position: 'aboveBar' | 'belowBar';
+      color: string; shape: 'circle' | 'arrowUp' | 'arrowDown'; text: string;
+    };
+    const tanda: TandaChart[] = (trade ?? []).flatMap<TandaChart>((t) => [
       {
         time: Math.floor(t.masukWaktu / 1000) as Time,
         position: (t.arah === 'BUY' ? 'belowBar' : 'aboveBar') as 'belowBar' | 'aboveBar',
@@ -1096,7 +1104,16 @@ export function ChartLilin({
         time: Math.floor(lilin.times[m.bar] / 1000) as Time,
         position: (m.posisi === 'bawah' ? 'belowBar' : 'aboveBar') as 'belowBar' | 'aboveBar',
         color: m.warna,
-        shape: (m.posisi === 'bawah' ? 'arrowUp' : 'arrowDown') as 'arrowUp' | 'arrowDown',
+        /* Bentuk dari skripnya. Sebelumnya SELALU panah — plotshape yang
+           meminta shape.circle tetap tergambar sebagai panah, dan chart
+           penuh panah untuk sesuatu yang di TradingView cuma titik kecil. */
+        shape: (m.bentuk === 'panahAtas' ? 'arrowUp'
+              : m.bentuk === 'panahBawah' ? 'arrowDown'
+              /* 'kotak' ikut ke bulatan: pustaka ini cuma punya circle,
+                 arrowUp, dan arrowDown. Bulatan bentuk paling netral —
+                 memaksa kotak jadi panah menambahkan ARAH yang tidak
+                 pernah diminta skripnya. */
+              : 'circle') as 'circle' | 'arrowUp' | 'arrowDown',
         text: m.teks.split('\n')[0].slice(0, 18),
       });
     });
