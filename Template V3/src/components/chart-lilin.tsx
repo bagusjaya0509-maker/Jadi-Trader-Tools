@@ -936,30 +936,59 @@ export function ChartLilin({
     const rentang = c.timeScale().getVisibleLogicalRange();
     seriGaris.current.forEach((s) => c.removeSeries(s));
     seriGaris.current = [];
-    (garis ?? []).forEach((g) => {
-      const s = c.addSeries(LineSeries, {
-        color: g.warna, lineWidth: 1, priceLineVisible: false, lastValueVisible: false,
-      });
-      const batas = hingga === undefined ? lilin.times.length : Math.max(1, Math.min(lilin.times.length, hingga + 1));
-      /* Nilai kosong dikirim sebagai TITIK TANPA NILAI, bukan dibuang.
-         Membuangnya membuat pustaka menyambung titik terakhir sebelum
-         lubang ke titik pertama sesudahnya — satu garis diagonal panjang
-         melintasi daerah yang seharusnya kosong.
+    /* ── SATU SERI PER POTONGAN TERSAMBUNG ───────────────────────────
+       lightweight-charts TIDAK memutus garis di titik kosong. Diuji
+       langsung: satu seri dengan nilai di bar 0–9 dan 30–39, kosong di
+       antaranya, tetap menggambar garis lurus menyeberangi lubangnya
+       (189 piksel bertinta di daerah yang seharusnya bersih). Membuang
+       nilai kosong maupun mengirimnya sebagai titik tanpa nilai sama saja
+       hasilnya — keduanya pernah dicoba di sini.
 
-         Untuk indikator biasa itu cuma jelek. Untuk Supertrend itu salah
-         total: skripnya menggambar dua seri yang saling bergantian
-         (plot.style_linebr), masing-masing kosong justru saat yang lain
-         hidup. Dibuang, keduanya jadi zigzag yang saling menyilang di
-         seluruh chart — persis "kacau" yang dilaporkan pemilik, padahal
-         angkanya sudah benar sejak awal. */
-      s.setData(
-        lilin.times.slice(0, batas).map((t, i) => {
-          const v = g.nilai[i];
-          const time = Math.floor(t / 1000) as Time;
-          return v != null && isFinite(v) ? { time, value: v } : { time };
-        })
-      );
-      seriGaris.current.push(s);
+       Jadi lubangnya dibuat dengan MEMISAHKAN SERINYA. Dua titik yang
+       berada di seri berbeda tidak punya cara apa pun untuk tersambung.
+
+       Ini yang membuat Supertrend benar: skripnya menggambar dua plot yang
+       saling bergantian (plot.style_linebr), masing-masing kosong justru
+       saat yang lain hidup. Dalam satu seri, keduanya jadi diagonal panjang
+       yang menyilang seluruh chart.
+
+       Indikator tanpa lubang (EMA dan kawan-kawan) tetap satu seri seperti
+       sebelumnya — pemisahan hanya terjadi kalau memang ada lubang. */
+    const batasGaris = hingga === undefined
+      ? lilin.times.length
+      : Math.max(1, Math.min(lilin.times.length, hingga + 1));
+    (garis ?? []).forEach((g) => {
+      /* Potongan dikumpulkan dulu, baru diputuskan berapa seri yang perlu
+         dibuat. Membuat seri sambil berjalan berarti seri kosong terlanjur
+         lahir untuk plot yang ternyata tidak pernah berisi. */
+      const potongan: { time: Time; value: number }[][] = [];
+      let jalan: { time: Time; value: number }[] = [];
+      for (let i = 0; i < batasGaris; i++) {
+        const v = g.nilai[i];
+        if (v != null && isFinite(v)) {
+          jalan.push({ time: Math.floor(lilin.times[i] / 1000) as Time, value: v });
+        } else if (jalan.length) {
+          potongan.push(jalan);
+          jalan = [];
+        }
+      }
+      if (jalan.length) potongan.push(jalan);
+      if (!potongan.length) return;
+
+      /* Pagar untuk deret yang berselang-seling tiap bar: ribuan seri akan
+         membekukan chart, dan garis yang tersambung salah masih jauh lebih
+         baik daripada halaman yang berhenti merespons. */
+      const pecah = potongan.length <= 400 ? potongan : [potongan.flat()];
+      pecah.forEach((titik) => {
+        const s = c.addSeries(LineSeries, {
+          color: g.warna, lineWidth: 1, priceLineVisible: false, lastValueVisible: false,
+          /* Potongan sepanjang SATU bar tidak punya ruas untuk digambar —
+             tanpa penanda titik ia lenyap tanpa jejak. */
+          pointMarkersVisible: titik.length === 1,
+        });
+        s.setData(titik);
+        seriGaris.current.push(s);
+      });
     });
     if (rentang) { try { c.timeScale().setVisibleLogicalRange(rentang); } catch { /* chart baru */ } }
   }, [garis, lilin, hingga]);
