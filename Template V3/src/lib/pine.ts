@@ -761,8 +761,14 @@ export function jalankanPine(kode: string, l: Lilin, tf = '4h',
 }
 
 /** Contoh yang bisa langsung dijalankan — sekaligus dokumentasi hidup. */
-/** Supertrend — skrip v4 yang beredar luas di TradingView, disimpan APA
- *  ADANYA tanpa satu huruf pun diubah.
+/** Supertrend — skrip v4 yang beredar luas di TradingView.
+ *
+ *  SATU nilai diubah dari aslinya atas permintaan pemilik 22 Agu 2026:
+ *  `showsignals` bawaannya false, jadi label Buy/Sell tidak dicetak di atas
+ *  lilin. Bulatan penanda pembalikan tetap ada — itu yang menandai kapan
+ *  trennya berganti, dan TradingView pun menampilkannya. Yang dimatikan
+ *  hanya tulisannya, dan orangnya bisa menyalakan lagi lewat sakelar
+ *  "Show Buy/Sell Signals ?" di panel Pine; nilainya tersimpan.
  *
  *  Justru itu gunanya: ia bukti hidup bahwa mesin ini menjalankan Pine v4
  *  seperti yang orang temukan di internet — nama tanpa namespace (sma, atr,
@@ -776,7 +782,7 @@ Periods = input(title="ATR Period", type=input.integer, defval=10)
 src = input(hl2, title="Source")
 Multiplier = input(title="ATR Multiplier", type=input.float, step=0.1, defval=3.0)
 changeATR= input(title="Change ATR Calculation Method ?", type=input.bool, defval=true)
-showsignals = input(title="Show Buy/Sell Signals ?", type=input.bool, defval=true)
+showsignals = input(title="Show Buy/Sell Signals ?", type=input.bool, defval=false)
 highlighting = input(title="Highlighter On/Off ?", type=input.bool, defval=true)
 atr2 = sma(tr, Periods)
 atr= changeATR ? atr(Periods) : atr2

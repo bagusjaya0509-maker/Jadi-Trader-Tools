@@ -78,9 +78,44 @@ function namaDariKode(kode: string): string {
    dicatat, dan yang sudah tercatat tidak ditawarkan lagi apa pun nasibnya. */
 const KUNCI_BAWAAN_DITAWARKAN = 'jt.pineBawaanDitawarkan';
 
-const SKRIP_BAWAAN: { id: string; nama: string; kode: string }[] = [
-  { id: 'bawaan-supertrend', nama: 'Supertrend', kode: SUPERTREND_PINE },
+/* Sidik isi skrip — FNV-1a, cukup untuk membedakan versi. Dipakai
+   memutuskan apakah salinan yang sudah tersimpan di browser seseorang masih
+   ASLI atau sudah ia sunting sendiri. */
+function sidikSkrip(s: string): string {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return (h >>> 0).toString(36);
+}
+
+const SKRIP_BAWAAN: { id: string; nama: string; kode: string; sidikLama: string[] }[] = [
+  {
+    id: 'bawaan-supertrend', nama: 'Supertrend', kode: SUPERTREND_PINE,
+    /* Sidik versi-versi TERDAHULU. Salinan tersimpan yang sidiknya ada di
+       daftar ini berarti belum pernah disunting, jadi aman diperbarui.
+       Yang tidak cocok DIBIARKAN: skrip yang sudah diutak-atik orangnya
+       adalah miliknya, dan menimpanya diam-diam menghapus pekerjaannya.
+         tuybxh — versi pertama, Buy/Sell menyala */
+    sidikLama: ['tuybxh'],
+  },
 ];
+
+/** Memperbarui skrip bawaan yang tersimpan tapi belum disunting.
+ *
+ *  Tanpa ini, perbaikan apa pun pada skrip bawaan tidak akan pernah sampai
+ *  ke orang yang sudah memasangnya — dan merekalah yang paling mungkin
+ *  memakainya. */
+function segarkanBawaan(d: SkripPine[]): SkripPine[] {
+  let berubah = false;
+  const hasil = d.map((s) => {
+    const b = SKRIP_BAWAAN.find((x) => x.id === s.id);
+    if (!b || s.kode === b.kode) return s;
+    if (!b.sidikLama.includes(sidikSkrip(s.kode))) return s;   // sudah disunting
+    berubah = true;
+    return { ...s, kode: b.kode };
+  });
+  if (berubah) simpanDaftar(hasil);
+  return hasil;
+}
 
 /* MURNI — tidak menulis apa pun.
    Sempat menandai "sudah ditawarkan" di sini juga, dan itu salah: fungsi ini
@@ -112,7 +147,7 @@ function tandaiBawaanDitawarkan() {
 function bacaDaftar(): SkripPine[] {
   try {
     const d = JSON.parse(localStorage.getItem(KUNCI_DAFTAR) ?? '[]') as SkripPine[];
-    if (Array.isArray(d) && d.length) return tawarkanBawaan(d);
+    if (Array.isArray(d) && d.length) return tawarkanBawaan(segarkanBawaan(d));
   } catch { /* rusak → mulai ulang */ }
   /* Migrasi dari era satu-kotak: skrip lama jadi entri pertama daftar. */
   try {
