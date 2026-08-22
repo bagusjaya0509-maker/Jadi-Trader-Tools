@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   createChart, CandlestickSeries, LineSeries, createSeriesMarkers, createTextWatermark,
   type IChartApi, type ISeriesApi, type ISeriesMarkersPluginApi, type IPriceLine, type Logical, type Time,
@@ -197,7 +197,7 @@ export function ChartLilin({
   garisSeret, onSeret, onKlikGaris, onHapusGaris, hamparanBawah, segmen, penandaPine, kotakPine, isianPine,
   alat, onAlatSelesai, gambarAlat, gambarPilih, onPilihGambar, onUbahGambar,
   posisiMt5, onUbahPosisi, hargaAsk, kunciUkuran, bagikanFoto, tandaAir, tampilan, pitaSmi,
-  hamparanTengah, onUjungKiri,
+  hamparanBarTertua, onUjungKiri,
 }: {
   /** Nama pasangan yang dicetak samar di tengah area harga, seperti
    *  TradingView. `utama` nama simbolnya, `sub` baris kecil di bawahnya --
@@ -251,13 +251,17 @@ export function ChartLilin({
   /** Panel yang ditumpangkan di bagian bawah area harga — dipakai kendali
    *  replay, supaya ia menyatu dengan grafik alih-alih memanjangkan halaman. */
   hamparanBawah?: React.ReactNode;
-  /** Ditumpangkan MENGAMBANG DI TENGAH area harga. Dipakai kartu "Muat lebih
-   *  lama": ia cuma muncul saat orangnya sudah menggeser mentok ke kiri, dan
-   *  di tengah ia terbaca sebagai satu ajakan, bukan tempelan di pinggir yang
-   *  mudah terlewat. */
-  hamparanTengah?: React.ReactNode;
-  /** Dipanggil saat jendela pandang menyentuh / meninggalkan bar pertama.
-   *  Hanya saat BERUBAH, bukan tiap piksel geseran. */
+  /** Ditempelkan pada LILIN TERTUA dan ikut bergeser bersamanya. Dipakai
+   *  kartu "Muat lebih lama": yang ditawarkan kartu itu adalah data sebelum
+   *  bar tersebut, jadi di sanalah tempatnya — bukan mengambang di tengah,
+   *  yang tidak menunjuk apa pun.
+   *
+   *  Posisinya ditulis LANGSUNG ke style, bukan lewat state: satu geseran
+   *  membangkitkan puluhan pembaruan koordinat, dan melewatkan semuanya ke
+   *  React berarti puluhan render per detik demi menggeser satu kotak. */
+  hamparanBarTertua?: React.ReactNode;
+  /** Dipanggil saat lilin tertua masuk / keluar layar. Hanya saat BERUBAH,
+   *  bukan tiap piksel geseran. */
   onUjungKiri?: (di: boolean) => void;
   /** Trendline miring dari Pine (line.new) — bar → waktu di sini. */
   segmen?: SegmenPine[];
@@ -598,6 +602,7 @@ export function ChartLilin({
   const onUjungRef = useRef(onUjungKiri);
   onUjungRef.current = onUjungKiri;
   const cekUjung = useRef<(() => void) | null>(null);
+  const tempelRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const c = chart.current;
     if (!c) return;
@@ -605,11 +610,23 @@ export function ChartLilin({
     const cek = () => {
       let di = false;
       try {
-        const r = c.timeScale().getVisibleLogicalRange();
-        /* <= 1, bukan <= 0: bar pertama sudah terhitung "mentok" begitu ia
-           masuk layar. Menunggu sampai persis 0 berarti tombolnya baru
-           muncul sesudah orangnya menabrak dinding. */
-        di = !!r && Number(r.from) <= 1;
+        /* Koordinat lilin TERTUA, bukan sekadar "apakah sudah mentok".
+           Dari satu angka ini dua hal diputuskan sekaligus: apakah kartunya
+           layak tampil, dan di mana persisnya ia menempel. */
+        const x0 = c.timeScale().logicalToCoordinate(0 as Logical);
+        const lebar = kotak.current?.clientWidth ?? 0;
+        di = x0 != null && x0 >= 0 && x0 <= lebar;
+
+        const el = tempelRef.current;
+        if (el && x0 != null) {
+          /* Di RUANG KOSONG sebelah kiri lilin tertua kalau ruangnya cukup;
+             kalau tidak, menempel di kanannya. Kartu yang selalu di kanan
+             akan menutupi lilin yang justru sedang dibaca; kartu yang selalu
+             di kiri akan keluar layar begitu bar tertuanya menyentuh tepi. */
+          const lebarKartu = el.offsetWidth || 176;
+          const kiri = x0 > lebarKartu + 20 ? x0 - lebarKartu - 12 : x0 + 12;
+          el.style.transform = `translate(${Math.round(kiri)}px, -50%)`;
+        }
       } catch { /* chartnya sudah dibuang */ }
       if (di !== lalu) { lalu = di; onUjungRef.current?.(di); }
     };
@@ -641,6 +658,12 @@ export function ChartLilin({
     const t1 = window.setTimeout(() => cekUjung.current?.(), 250);
     return () => { window.clearTimeout(t0); window.clearTimeout(t1); };
   }, [lilin]);
+
+  /* Kartunya baru saja dipasang ke DOM: cek() sebelumnya berjalan saat
+     elemennya belum ada, jadi posisinya masih -9999px. Layout effect, bukan
+     effect biasa — ia berjalan sebelum peramban menggambar, jadi kartunya
+     tidak pernah terlihat melompat dari luar layar ke tempatnya. */
+  useLayoutEffect(() => { cekUjung.current?.(); }, [hamparanBarTertua]);
 
   /* -- Tanda air nama pasangan ------------------------------------------
      Plugin pane bawaan lightweight-charts v5 (createTextWatermark),
@@ -2188,14 +2211,19 @@ export function ChartLilin({
 
       {pojok && <div className="absolute left-2 top-2 z-20">{pojok}</div>}
 
-      {/* Mengambang di TENGAH area harga.
+      {/* Menempel pada lilin tertua; posisinya ditulis cek() di atas.
+          Mulai di -9999px supaya tidak sempat berkedip di tepi kiri sebelum
+          koordinat pertamanya terhitung.
+
           pointer-events-none di pembungkusnya, auto di isinya: pembungkus
-          selebar chart yang menangkap tetikus akan mematikan geser, zoom, dan
-          seluruh alat gambar di bawahnya -- kartu kecil yang membekukan
-          chart adalah harga yang jauh terlalu mahal untuk sebuah ajakan. */}
-      {hamparanTengah && (
-        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
-          <div className="pointer-events-auto">{hamparanTengah}</div>
+          yang menangkap tetikus akan mematikan geser, zoom, dan seluruh alat
+          gambar di bawahnya -- kartu kecil yang membekukan chart adalah harga
+          yang jauh terlalu mahal untuk sebuah ajakan. */}
+      {hamparanBarTertua && (
+        <div ref={tempelRef}
+             className="pointer-events-none absolute left-0 top-1/2 z-20 will-change-transform"
+             style={{ transform: 'translate(-9999px, -50%)' }}>
+          <div className="pointer-events-auto">{hamparanBarTertua}</div>
         </div>
       )}
 

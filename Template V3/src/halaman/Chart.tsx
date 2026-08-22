@@ -2832,7 +2832,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                              tua, jadi tidak ditawarkan sama sekali di sana —
                              lebih jujur daripada tombol yang selalu menjawab
                              "tidak ada". */
-                          hamparanTengah={!diUjungKiri ? undefined : simbol.startsWith('MT5:') ? (
+                          hamparanBarTertua={!diUjungKiri ? undefined : simbol.startsWith('MT5:') ? (
                             /* Trade-Fi TIDAK punya penomoran halaman: tidak
                                ada rute untuk meminta lilin lebih tua dari
                                MT5, jadi EA mengirim seluruh isi terminalnya
