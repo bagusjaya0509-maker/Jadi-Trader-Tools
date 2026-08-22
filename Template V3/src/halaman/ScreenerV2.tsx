@@ -687,7 +687,10 @@ export default function ScreenerV2() {
       {/* Tinggi dihitung dari tinggi layar dikurangi bilah atas (56 px).
           Memakai h-full tidak bekerja: induknya tidak punya tinggi pasti,
           dan iframe tanpa tinggi runtuh jadi nol piksel. */}
-      <div style={{ height: 'calc(100vh - 56px)' }}>
+      {/* bg-zinc-950 di WADAHNYA, bukan cuma di dalam bingkai. Inilah
+          warna yang terlihat selama bingkainya belum siap — dan karena ia
+          token, ia putih di tema terang tanpa satu baris tambahan. */}
+      <div className="bg-zinc-950" style={{ height: 'calc(100vh - 56px)' }}>
         {!siap && (
           <div className="absolute inset-0 flex items-center justify-center gap-2.5 text-[13px] text-zinc-500">
             <Loader2 className="size-4 animate-spin" /> Memuat screener…
@@ -769,7 +772,34 @@ export default function ScreenerV2() {
                 /* lintas-domain — biarkan apa adanya */
               }
             }}
-            className="block h-full w-full border-0"
+            /* ── KILATAN HITAM SEPERSEKIAN DETIK ───────────────────
+               Dilaporkan pemilik, terlihat saat masuk halaman ini di tema
+               terang. Sebabnya urutan, bukan warna: V2 melukis latar
+               gelapnya SENDIRI begitu dokumennya siap, sementara gaya
+               penyelaras dan penyalin tema baru berjalan di onLoad —
+               yaitu SESUDAH lukisan pertama itu. Di tema gelap kilatannya
+               tidak terlihat karena sewarna dengan sekitarnya; di terang
+               ia mencolok.
+
+               Tidak dikejar dengan menyuntik lebih awal — itu perlombaan
+               yang tidak pernah pasti menang, dan kalah sekali berarti
+               kilatannya kembali. Bingkainya cukup TIDAK DITAMPILKAN
+               sampai ia berpakaian. Yang terlihat selama itu latar wadah
+               di atas, dengan warna tema yang benar.
+
+               `siap` dinyalakan di baris pertama onLoad, tapi React baru
+               menggambar ulang SESUDAH seluruh penangan itu selesai —
+               jadi saat bingkainya muncul, gaya dan temanya sudah
+               terpasang. Sifat itu yang dipakai, bukan penundaan
+               berbasis waktu yang harus ditebak angkanya.
+
+               Kalau alamatnya lintas-domain dan penyuntikan gagal,
+               bingkainya TETAP muncul: setSiap dipanggil sebelum blok
+               try, jadi kegagalan di dalamnya tidak pernah membuat
+               screener-nya tak terlihat selamanya. */
+            className={`block h-full w-full border-0 transition-opacity duration-200 ${
+              siap ? 'opacity-100' : 'opacity-0'
+            }`}
             /* allow-same-origin WAJIB: tanpa itu Firebase di dalam bingkai
                tidak bisa membaca IndexedDB, dan orang yang sudah masuk di V3
                diminta masuk lagi di sini. */
