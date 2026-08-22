@@ -3,12 +3,13 @@ import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import {
   Play, Loader2, RefreshCw, Radio, TriangleAlert, History,
   Layers, ChevronDown, Settings2, Code2, X, Ruler, Rows3, Square, Eraser, Minus, TrendingUp,
-  FlaskConical, GripHorizontal, Maximize2, Minimize2, SquareArrowUp, SquareArrowDown } from 'lucide-react';
+  FlaskConical, GripHorizontal, Maximize2, Minimize2, SquareArrowUp, SquareArrowDown,
+  Palette } from 'lucide-react';
 import { PanelNews } from '@/components/panel-news';
 import { simpanDraf } from '@/lib/draf-sinyal';
 import { Panel, PanelHead, KartuKpi, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn, uang, persen, harga, tanggalPendek } from '@/lib/utils';
-import { ChartLilin, WARNA_LILIN_BAWAAN, type Garis, type GarisHarga, type GarisSeret, type PosisiChartMt5 } from '@/components/chart-lilin';
+import { ChartLilin, TAMPILAN_BAWAAN, type Garis, type GarisHarga, type GarisSeret, type PosisiChartMt5, type TampilanChart } from '@/components/chart-lilin';
 import { PanelReplay, type AksiOrder, type JenisEntry } from '@/components/panel-replay';
 import { PojokOrder } from '@/components/pojok-order';
 import { kirimOrderNyata, ubahSlTpNyata, batalPendingNyata, tutupPosisiNyata, tickSimbol, keTick, type MetodeTp } from '@/lib/order-nyata';
@@ -124,24 +125,67 @@ function Angka({ label, nilai, atur, langkah = 1, min = 0 }: {
    pertimbangan itu memaksa mulai dari awal. */
 const JEDA_LIPAT_ALAT_MS = 20_000;
 
-/* -- Warna lilin pilihan orangnya ----------------------------------------
+/* -- Tampilan chart pilihan orangnya --------------------------------------
    Disimpan sendiri di localStorage, BUKAN lewat simpanSetelanChart: setelan
-   di sana dikunci per simbol+timeframe, sementara warna lilin adalah selera
-   yang berlaku di semua chart. Orang yang memilih biru-oranye tidak sedang
-   memilihnya "untuk BTCUSDT H4 saja". */
-const KUNCI_WARNA_LILIN = 'jt.warnaLilin';
+   di sana dikunci per simbol+timeframe, sementara warna adalah selera yang
+   berlaku di semua chart. Orang yang memilih biru-oranye tidak sedang
+   memilihnya "untuk BTCUSDT H4 saja".
 
-function bacaWarnaLilin(): { naik: string; turun: string } {
-  /* Divalidasi, bukan dipercaya. Isi localStorage bisa disunting tangan atau
-     tertinggal dari versi lama, dan warna yang tidak sah membuat
-     lightweight-charts menggambar lilin transparan -- chart yang tampak
-     kosong tanpa satu pun galat di konsol. */
-  const sah = (v: unknown) => typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v);
+   `jt.warnaLilin` adalah kunci versi pertama yang cuma menyimpan dua warna
+   badan. Ia masih dibaca sebagai bahan pindahan supaya pilihan yang sudah
+   dibuat tidak hilang begitu saja saat setelannya bertambah. */
+const KUNCI_TAMPILAN = 'jt.tampilanChart';
+const KUNCI_LAMA_WARNA = 'jt.warnaLilin';
+
+/* Divalidasi, bukan dipercaya. Isi localStorage bisa disunting tangan atau
+   tertinggal dari versi lama, dan warna yang tidak sah membuat
+   lightweight-charts menggambar lilin transparan -- chart yang tampak kosong
+   tanpa satu pun galat di konsol. */
+const warnaSah = (v: unknown): v is string =>
+  typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v);
+
+/** Lebih lebar daripada TampilanChart: dua medan terakhir tidak dikirim ke
+ *  ChartLilin sebagai setelan, melainkan MENENTUKAN apakah prop `tandaAir`
+ *  dikirim sama sekali dan apa isinya. Dipisah begitu supaya ChartLilin tidak
+ *  perlu tahu ada pilihan on/off -- ia cuma menggambar apa yang diberikan. */
+export type SetelanTampilan = TampilanChart & { tandaAir: boolean; tandaAirTeks: string };
+
+const TAMPILAN_AWAL: SetelanTampilan = { ...TAMPILAN_BAWAAN, tandaAir: true, tandaAirTeks: '' };
+
+/** Empat petak warna di panel setelan, urut baca: badan dulu baru ekor. */
+const MEDAN_WARNA = [
+  ['naik', 'Badan naik'], ['turun', 'Badan turun'],
+  ['ekorNaik', 'Ekor naik'], ['ekorTurun', 'Ekor turun'],
+] as const;
+
+function bacaTampilan(): SetelanTampilan {
+  const hasil: SetelanTampilan = { ...TAMPILAN_AWAL };
+  const serap = (d: unknown) => {
+    if (!d || typeof d !== 'object') return;
+    const o = d as Record<string, unknown>;
+    /* Per medan, bukan seluruh objek sekaligus: berkas dari versi lama tidak
+       punya medan ekor, dan menolak seluruh isinya karena satu medan hilang
+       akan membuang pilihan yang sah. */
+    (['naik', 'turun', 'ekorNaik', 'ekorTurun'] as const).forEach((k) => {
+      if (warnaSah(o[k])) hasil[k] = o[k];
+    });
+    if (warnaSah(o.latar)) hasil.latar = o.latar;
+    if (typeof o.tandaAir === 'boolean') hasil.tandaAir = o.tandaAir;
+    if (typeof o.tandaAirTeks === 'string') hasil.tandaAirTeks = o.tandaAirTeks.slice(0, 40);
+  };
+  try { serap(JSON.parse(localStorage.getItem(KUNCI_LAMA_WARNA) ?? 'null')); } catch { /* privat */ }
+  try { serap(JSON.parse(localStorage.getItem(KUNCI_TAMPILAN) ?? 'null')); } catch { /* privat */ }
+  /* Versi lama tidak punya warna ekor sama sekali. Yang benar adalah
+     mengikuti badannya, bukan kembali ke hijau/merah bawaan: orang yang
+     sudah memilih biru-ungu tidak sedang meminta ekor hijau. */
   try {
-    const d = JSON.parse(localStorage.getItem(KUNCI_WARNA_LILIN) ?? 'null');
-    if (d && sah(d.naik) && sah(d.turun)) return { naik: d.naik, turun: d.turun };
-  } catch { /* privat atau JSON rusak */ }
-  return { ...WARNA_LILIN_BAWAAN };
+    const lama = JSON.parse(localStorage.getItem(KUNCI_LAMA_WARNA) ?? 'null');
+    if (lama && !localStorage.getItem(KUNCI_TAMPILAN)) {
+      if (warnaSah(lama.naik)) hasil.ekorNaik = lama.naik;
+      if (warnaSah(lama.turun)) hasil.ekorTurun = lama.turun;
+    }
+  } catch { /* privat */ }
+  return hasil;
 }
 
 function rapikanSimbol(s: string): string {
@@ -1593,11 +1637,13 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
     simpanSetelanChart({ simbol, tf, snr: tampilSnr, smi: tampilSmi });
   }, [simbol, tf, tampilSnr, tampilSmi]);
 
-  const [warnaLilin, setWarnaLilin] = useState(bacaWarnaLilin);
+  const [tampilan, setTampilan] = useState(bacaTampilan);
+  const [menuTampilan, setMenuTampilan] = useState(false);
   useEffect(() => {
-    try { localStorage.setItem(KUNCI_WARNA_LILIN, JSON.stringify(warnaLilin)); } catch { /* privat */ }
-  }, [warnaLilin]);
-  const warnaBawaan = warnaLilin.naik === WARNA_LILIN_BAWAAN.naik && warnaLilin.turun === WARNA_LILIN_BAWAAN.turun;
+    try { localStorage.setItem(KUNCI_TAMPILAN, JSON.stringify(tampilan)); } catch { /* privat */ }
+  }, [tampilan]);
+  const tampilanBawaan = (Object.keys(TAMPILAN_AWAL) as (keyof SetelanTampilan)[])
+    .every((k) => tampilan[k] === TAMPILAN_AWAL[k]);
 
   /* Tanda air, susunan TradingView: "SIMBOL, TF" besar di atas, "SIMBOL
      JENIS-PASAR" kecil di bawah. Awalan "MT5:" dibuang -- itu penanda rute
@@ -1610,13 +1656,25 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
      mungkin keliru. Bergantung pada `lilin` supaya ia dihitung ulang begitu
      lilin pertamanya tiba dan pasarnya sudah tercatat. */
   const mt5 = simbol.startsWith('MT5:');
+  /* Dihitung terpisah karena dipakai DUA kali: sebagai isi tanda airnya, dan
+     sebagai placeholder kolom teks di panel setelan. Placeholder yang
+     menampilkan nilai otomatis yang sesungguhnya membuat aturan "kosongkan
+     untuk otomatis" terlihat, bukan cuma tertulis. */
+  const airOtomatis = (mt5 ? simbol.slice(4) : simbol) + ', ' + tf.toUpperCase();
   const tandaAir = useMemo(() => {
+    if (!tampilan.tandaAir) return undefined;
     const nama = mt5 ? simbol.slice(4) : simbol;
     const jenis = bacaPasar(simbol);
     const pasar = mt5 ? 'TRADE-FI' : jenis === 'futures' ? 'PERP' : jenis === 'spot' ? 'SPOT' : '';
-    return { utama: nama + ', ' + tf.toUpperCase(), sub: pasar ? nama + ' ' + pasar : undefined };
+    /* Teks sendiri hanya mengganti baris ATAS. Baris bawah tetap jenis
+       pasarnya: itu keterangan yang tidak bisa diarang orangnya, dan justru
+       paling berguna ketika baris atasnya sudah diganti jadi nama sendiri. */
+    return {
+      utama: tampilan.tandaAirTeks.trim() || airOtomatis,
+      sub: pasar ? nama + ' ' + pasar : undefined,
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [simbol, tf, mt5, lilin]);
+  }, [simbol, tf, mt5, lilin, airOtomatis, tampilan.tandaAir, tampilan.tandaAirTeks]);
 
   /* ── Data realtime ──────────────────────────────────────────────────
      Ditarik ulang tiap 15 detik, sama dengan umur cache di lib/pasar.ts —
@@ -1748,6 +1806,15 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
     }
     return tampilSmi && lilin.closes.length >= 30 ? deretSmi(lilin) : null;
   }, [tampilSmi, lilin, pine]);
+
+  /* Pita jenuh cuma sah kalau panel bawah memang SMI. Skrip Pine yang
+     menumpang panel yang sama boleh berskala apa saja -- rupiah, volume,
+     0..100 -- dan pita +-50 di atasnya akan menyatakan jenuh di tempat yang
+     bukan jenuh. */
+  const smiAsli = useMemo(
+    () => smi !== null && !(pine?.plot ?? []).some((p) => p.osilator),
+    [smi, pine]
+  );
 
   /* Posisi yang sedang terbuka MENANG atas rencana: kalau sudah masuk, yang
      digambar adalah level posisinya, bukan rancangan sebelumnya. */
@@ -2445,34 +2512,6 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                         <span className="block truncate text-[10.5px] text-zinc-600">Panel osilator di bawah chart</span>
                       </span>
                     </label>
-                    {/* Warna lilin duduk di menu indikator, bukan di menu
-                        sendiri: yang dicari orang saat membukanya adalah "apa
-                        yang tampil di chart dan bagaimana rupanya" -- itu satu
-                        pertanyaan, bukan dua. */}
-                    <div className="mt-1 flex items-center justify-between border-t border-zinc-800/70 px-2 pb-1 pt-1.5">
-                      <span className="text-[10px] font-medium uppercase tracking-wider text-zinc-600">Warna lilin</span>
-                      <button onClick={() => setWarnaLilin({ ...WARNA_LILIN_BAWAAN })} disabled={warnaBawaan}
-                        className="cursor-pointer rounded px-1.5 py-0.5 text-[11px] text-zinc-400 transition-colors hover:bg-zinc-900 hover:text-zinc-100 disabled:cursor-default disabled:text-zinc-700 disabled:hover:bg-transparent">
-                        Bawaan
-                      </button>
-                    </div>
-                    <div className="flex gap-1.5 px-2 pb-1.5">
-                      {([['naik', 'Naik'], ['turun', 'Turun']] as const).map(([kunci, label]) => (
-                        <label key={kunci} className="flex flex-1 cursor-pointer items-center gap-2 rounded-md border border-zinc-800 px-2 py-1.5 transition-colors hover:bg-zinc-900">
-                          {/* Petak warnanya distel tangan: bawaan peramban
-                              memberi kotak berbingkai tebal dengan padding
-                              dalam yang tidak bisa diikuti ukuran mana pun. */}
-                          <input type="color" value={warnaLilin[kunci]}
-                                 onChange={(e) => setWarnaLilin((w) => ({ ...w, [kunci]: e.target.value }))}
-                                 aria-label={'Warna lilin ' + label.toLowerCase()}
-                                 className="size-5 shrink-0 cursor-pointer rounded border border-zinc-700 bg-transparent p-0 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:rounded-sm [&::-webkit-color-swatch]:border-0" />
-                          <span className="min-w-0">
-                            <span className="block text-[12px] text-zinc-200">{label}</span>
-                            <span className="block font-mono text-[10px] uppercase text-zinc-600">{warnaLilin[kunci]}</span>
-                          </span>
-                        </label>
-                      ))}
-                    </div>
                     <div className="mt-1 flex items-center justify-between border-t border-zinc-800/70 px-2 pb-1 pt-1.5">
                       <span className="text-[10px] font-medium uppercase tracking-wider text-zinc-600">Pine Script</span>
                       <button onClick={() => bukaDock('editor')}
@@ -2668,7 +2707,8 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                           hamparanBawah={kendaliReplay}
                           bagikanFoto={(ambil) => { ambilFoto.current = ambil; }}
                           tandaAir={tandaAir}
-                          warnaLilin={warnaLilin}
+                          tampilan={tampilan}
+                          pitaSmi={smiAsli}
                           pojok={aksi ? (
                             <div ref={pojokRef}>
                             <PojokOrder
@@ -3230,6 +3270,88 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
               angkanya terbaca sebagai bagian tetap halaman — padahal ia
               sedang diuji. Yang dibuka atas kemauan sendiri dibaca dengan
               kewaspadaan yang berbeda. */}
+          {/* Setelan tampilan berdiri SENDIRI, tidak menumpang menu
+              indikator. Menu indikator menjawab "apa yang digambar"; ini
+              menjawab "bagaimana rupanya". Menggabungkan keduanya membuat
+              daftar indikator harus digulir melewati petak warna setiap kali
+              orang cuma mau menyalakan SNR. */}
+          <div className="relative shrink-0">
+            <button
+              onClick={() => setMenuTampilan((v) => !v)}
+              title="Setelan tampilan chart"
+              className={cn('flex cursor-pointer items-center gap-1.5 rounded px-2 py-1 text-[11px] transition-colors',
+                menuTampilan ? 'text-zinc-200' : 'text-zinc-500 hover:text-zinc-300')}>
+              <Palette className="size-3" strokeWidth={2} />
+              Tampilan
+            </button>
+            {menuTampilan && (
+              <>
+                <div className="fixed inset-0 z-30" onClick={() => setMenuTampilan(false)} />
+                {/* Terbuka ke ATAS: tombolnya duduk di dasar halaman, dan
+                    panel yang terbuka ke bawah dari sana keluar layar. */}
+                <div className="absolute bottom-full right-0 z-40 mb-1 w-72 rounded-lg border border-zinc-800 bg-zinc-950 p-1.5 text-left shadow-2xl">
+                  <div className="flex items-center justify-between px-2 pb-1 pt-0.5">
+                    <span className="text-[10px] font-medium uppercase tracking-wider text-zinc-600">Lilin</span>
+                    <button onClick={() => setTampilan({ ...TAMPILAN_AWAL })} disabled={tampilanBawaan}
+                      className="cursor-pointer rounded px-1.5 py-0.5 text-[11px] text-zinc-400 transition-colors hover:bg-zinc-900 hover:text-zinc-100 disabled:cursor-default disabled:text-zinc-700 disabled:hover:bg-transparent">
+                      Bawaan
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5 px-2 pb-1.5">
+                    {MEDAN_WARNA.map(([kunci, label]) => (
+                      <label key={kunci} className="flex cursor-pointer items-center gap-2 rounded-md border border-zinc-800 px-2 py-1.5 transition-colors hover:bg-zinc-900">
+                        {/* Petak warnanya distel tangan: bawaan peramban
+                            memberi kotak berbingkai tebal dengan padding
+                            dalam yang tidak bisa diikuti ukuran mana pun. */}
+                        <input type="color" value={tampilan[kunci]} aria-label={label}
+                               onChange={(e) => setTampilan((t) => ({ ...t, [kunci]: e.target.value }))}
+                               className="size-5 shrink-0 cursor-pointer rounded border border-zinc-700 bg-transparent p-0 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:rounded-sm [&::-webkit-color-swatch]:border-0" />
+                        <span className="min-w-0">
+                          <span className="block truncate text-[11.5px] text-zinc-200">{label}</span>
+                          <span className="block font-mono text-[10px] uppercase text-zinc-600">{tampilan[kunci]}</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+
+                  <div className="mt-1 border-t border-zinc-800/70 px-2 pb-1.5 pt-1.5">
+                    <div className="flex items-center gap-2">
+                      {/* Nilainya #09090b saat "ikut tema" supaya petaknya
+                          menunjukkan warna yang benar-benar tampak sekarang,
+                          bukan hitam pekat yang tidak dipakai di mana pun. */}
+                      <input type="color" value={tampilan.latar ?? '#09090b'} aria-label="Warna latar chart"
+                             onChange={(e) => setTampilan((t) => ({ ...t, latar: e.target.value }))}
+                             className="size-5 shrink-0 cursor-pointer rounded border border-zinc-700 bg-transparent p-0 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:rounded-sm [&::-webkit-color-swatch]:border-0" />
+                      <span className="min-w-0 grow">
+                        <span className="block text-[11.5px] text-zinc-200">Latar chart</span>
+                        <span className="block font-mono text-[10px] uppercase text-zinc-600">{tampilan.latar ?? 'ikut tema'}</span>
+                      </span>
+                      <button onClick={() => setTampilan((t) => ({ ...t, latar: null }))} disabled={tampilan.latar === null}
+                        className="shrink-0 cursor-pointer rounded px-1.5 py-0.5 text-[11px] text-zinc-400 transition-colors hover:bg-zinc-900 hover:text-zinc-100 disabled:cursor-default disabled:text-zinc-700 disabled:hover:bg-transparent">
+                        Ikut tema
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="mt-1 border-t border-zinc-800/70 px-2 pb-1.5 pt-1.5">
+                    <label className="flex cursor-pointer items-center gap-2.5">
+                      <input type="checkbox" checked={tampilan.tandaAir}
+                             onChange={(e) => setTampilan((t) => ({ ...t, tandaAir: e.target.checked }))}
+                             className="size-3.5 cursor-pointer accent-emerald-500" />
+                      <span className="text-[12px] text-zinc-200">Tanda air</span>
+                    </label>
+                    <input type="text" value={tampilan.tandaAirTeks} disabled={!tampilan.tandaAir}
+                           onChange={(e) => setTampilan((t) => ({ ...t, tandaAirTeks: e.target.value.slice(0, 40) }))}
+                           placeholder={airOtomatis} aria-label="Teks tanda air"
+                           className="mt-1.5 w-full rounded border border-zinc-800 bg-zinc-900/60 px-2 py-1 text-[11.5px] text-zinc-200 placeholder:text-zinc-600 focus:border-zinc-700 focus:outline-none disabled:cursor-not-allowed disabled:opacity-40" />
+                    <p className="mt-1 text-[10px] leading-snug text-zinc-600">
+                      Kosongkan untuk memakai nama pasangan dan timeframe. Baris kecil di bawahnya tetap jenis pasarnya.
+                    </p>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
           <button
             onClick={() => setBacktestBuka((v) => !v)}
             title={backtestBuka ? 'Tutup panel Backtest' : 'Buka panel Backtest (beta)'}

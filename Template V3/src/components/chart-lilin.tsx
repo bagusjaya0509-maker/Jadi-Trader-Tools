@@ -10,6 +10,7 @@ import type { TradeUji } from '@/lib/backtest';
 import type { SegmenPine, PenandaPine, KotakPine, IsianPine } from '@/lib/pine-bar';
 import { PenggambarIsi } from '@/lib/plugin-isi';
 import { PenggambarAlat, type GambarAlat, type AlatPegang } from '@/lib/plugin-alat';
+import { PenggambarPita } from '@/lib/plugin-pita';
 import { useTema, temaSekarang, WARNA_CHART } from '@/lib/tema';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -84,10 +85,33 @@ function bacaTinggiSmi(): number {
   } catch { return TINGGI_SMI_BAWAAN; }
 }
 
-/** Warna lilin bawaan. Diekspor karena halaman Chart perlu angka yang SAMA
- *  untuk tombol "Bawaan" di setelan warnanya — dua sumber angka yang
- *  seharusnya sama adalah dua angka yang cepat atau lambat berbeda. */
-export const WARNA_LILIN_BAWAAN = { naik: '#10b981', turun: '#f87171' } as const;
+/** Tampilan chart yang bisa disetel orangnya. Badan dan ekor dipisah karena
+ *  itu dua keputusan yang berbeda: badan menyatakan arah, ekor menyatakan
+ *  seberapa jauh harga sempat pergi -- dan sebagian orang sengaja meredupkan
+ *  ekornya supaya badannya lebih terbaca.
+ *
+ *  `latar` null berarti IKUT TEMA, bukan hitam. Menyimpan warna tema sebagai
+ *  nilai tetap akan membekukannya: orang yang memilih latar saat mode gelap
+ *  lalu pindah ke mode terang akan mendapat chart hitam di halaman putih,
+ *  tanpa tahu kenapa. */
+export interface TampilanChart {
+  naik: string;
+  turun: string;
+  ekorNaik: string;
+  ekorTurun: string;
+  latar: string | null;
+}
+
+/** Diekspor karena halaman Chart perlu angka yang SAMA untuk tombol
+ *  "Bawaan" -- dua sumber angka yang seharusnya sama adalah dua angka yang
+ *  cepat atau lambat berbeda. */
+export const TAMPILAN_BAWAAN: TampilanChart = {
+  naik: '#10b981',
+  turun: '#f87171',
+  ekorNaik: '#10b981',
+  ekorTurun: '#f87171',
+  latar: null,
+};
 
 /* -- Warna panel SMI -----------------------------------------------------
    Biru untuk SMI, oranye untuk EMA-nya -- urutan yang SAMA dengan skrip SMI
@@ -97,6 +121,43 @@ export const WARNA_LILIN_BAWAAN = { naik: '#10b981', turun: '#f87171' } as const
    warna antar aplikasi terbaca sebagai silang yang berlawanan arah. */
 const WARNA_SMI = '#60a5fa';
 const WARNA_SMI_EMA = '#fbbf24';
+
+/* Ambang jenuh, SATU tempat. Dipakai garis putus-putus DAN tepi pita, jadi
+   keduanya tidak bisa lagi bergeser sendiri-sendiri. Angkanya harus sama
+   dengan SMI_OB/SMI_OS di jt-scan-core -- kalau tidak, chart dan kartu
+   screener akan berbeda pendapat tentang koin yang sama. */
+const AMBANG_SMI = 50;
+
+/* Pita jenuh beli / jenuh jual, padanan tiga `fill()` di tab Style
+   TradingView: satu pita redup di antara ambang, satu gradien hijau di
+   atasnya, satu gradien merah di bawahnya. Alfanya kecil dengan sengaja --
+   ini latar untuk membaca posisi garis, bukan data yang dibaca sendiri. */
+const WARNA_PITA_SMI = {
+  gelap: {
+    tengah: 'rgba(96,165,250,.05)',
+    obAtas: 'rgba(34,197,94,.20)', obBawah: 'rgba(34,197,94,0)',
+    osAtas: 'rgba(239,68,68,0)', osBawah: 'rgba(239,68,68,.20)',
+  },
+  terang: {
+    tengah: 'rgba(37,99,235,.055)',
+    obAtas: 'rgba(22,163,74,.16)', obBawah: 'rgba(22,163,74,0)',
+    osAtas: 'rgba(220,38,38,0)', osBawah: 'rgba(220,38,38,.16)',
+  },
+} as const;
+
+/* Batas luar gradien. 120, bukan 100: SMI bisa melewati 100 sesaat, dan
+   gradien yang berhenti tepat di 100 meninggalkan potongan kosong di puncak
+   lonjakan -- persis di tempat yang paling ingin dilihat. */
+const LUAR_PITA_SMI = 120;
+
+function pitaSmiUntuk(tema: 'gelap' | 'terang') {
+  const w = WARNA_PITA_SMI[tema];
+  return [
+    { atas: AMBANG_SMI, bawah: -AMBANG_SMI, warnaAtas: w.tengah, warnaBawah: w.tengah },
+    { atas: LUAR_PITA_SMI, bawah: AMBANG_SMI, warnaAtas: w.obAtas, warnaBawah: w.obBawah },
+    { atas: -AMBANG_SMI, bawah: -LUAR_PITA_SMI, warnaAtas: w.osAtas, warnaBawah: w.osBawah },
+  ];
+}
 
 /* -- Warna tanda air -----------------------------------------------------
    Sangat samar dengan sengaja. Tanda air itu penanda "chart ini simbol apa"
@@ -145,15 +206,20 @@ export function ChartLilin({
   lilin, garis, trade, tinggi = 420, hingga, garisHarga, onKlikBar, smi, mundur, pojok,
   garisSeret, onSeret, onKlikGaris, onHapusGaris, hamparanBawah, segmen, penandaPine, kotakPine, isianPine,
   alat, onAlatSelesai, gambarAlat, gambarPilih, onPilihGambar, onUbahGambar,
-  posisiMt5, onUbahPosisi, hargaAsk, kunciUkuran, bagikanFoto, tandaAir, warnaLilin,
+  posisiMt5, onUbahPosisi, hargaAsk, kunciUkuran, bagikanFoto, tandaAir, tampilan, pitaSmi,
 }: {
   /** Nama pasangan yang dicetak samar di tengah area harga, seperti
    *  TradingView. `utama` nama simbolnya, `sub` baris kecil di bawahnya --
    *  timeframe dan sumber datanya. Tanpa prop ini tidak ada tanda air. */
   tandaAir?: { utama: string; sub?: string };
-  /** Warna lilin naik/turun pilihan orangnya. Tanpa ini dipakai
-   *  WARNA_LILIN_BAWAAN. */
-  warnaLilin?: { naik: string; turun: string };
+  /** Warna badan, ekor, dan latar pilihan orangnya. Tanpa ini dipakai
+   *  TAMPILAN_BAWAAN. */
+  tampilan?: TampilanChart;
+  /** Gambar pita jenuh beli/jual di panel osilator. Dimatikan saat panel itu
+   *  sedang dipakai osilator Pine: ambang +-50 adalah milik SMI, dan skrip
+   *  Pine mana pun boleh berskala apa saja -- pita di skala yang salah
+   *  menyatakan jenuh di tempat yang bukan jenuh. */
+  pitaSmi?: boolean;
   /** Diberi SATU fungsi pemotret begitu chartnya siap. Dipakai halaman yang
    *  perlu sampul analisa; yang diserahkan cuma kemampuan memotret, bukan
    *  objek chartnya — lihat catatan di tempat pemasangannya. */
@@ -240,6 +306,7 @@ export function ChartLilin({
      dari opsi chart, jadi applyOptions saat tema berganti tidak akan
      menyentuhnya kalau pegangannya dibuang begitu saja. */
   const garisAmbang = useRef<IPriceLine[]>([]);
+  const pitaPrim = useRef<PenggambarPita | null>(null);
   const garisPos = useRef<IPriceLine[]>([]);
   const isiPine = useRef<PenggambarIsi | null>(null);
   const alatPrim = useRef<PenggambarAlat | null>(null);
@@ -291,10 +358,15 @@ export function ChartLilin({
      `bagikanFoto` di atas: efek pembuatan chart sengaja tidak berdependensi
      pada warna, karena mengganti warna tidak boleh membangun ulang chart
      dan membuang zoom serta posisi geser orangnya. */
-  const naikLilin = warnaLilin?.naik || WARNA_LILIN_BAWAAN.naik;
-  const turunLilin = warnaLilin?.turun || WARNA_LILIN_BAWAAN.turun;
-  const warnaLilinRef = useRef({ naik: naikLilin, turun: turunLilin });
-  warnaLilinRef.current = { naik: naikLilin, turun: turunLilin };
+  const rupa: TampilanChart = {
+    naik: tampilan?.naik || TAMPILAN_BAWAAN.naik,
+    turun: tampilan?.turun || TAMPILAN_BAWAAN.turun,
+    ekorNaik: tampilan?.ekorNaik || TAMPILAN_BAWAAN.ekorNaik,
+    ekorTurun: tampilan?.ekorTurun || TAMPILAN_BAWAAN.ekorTurun,
+    latar: tampilan?.latar ?? null,
+  };
+  const rupaRef = useRef(rupa);
+  rupaRef.current = rupa;
 
   /* Chart dibuat SEKALI. Membuatnya ulang tiap data berubah akan mengembalikan
      zoom dan posisi geser ke awal setiap 15 detik — dan chart yang melompat
@@ -357,9 +429,9 @@ export function ChartLilin({
     window.addEventListener('resize', ukurUlang);
     ukurLagi.current = ukurUlang;
     seri.current = c.addSeries(CandlestickSeries, {
-      upColor: warnaLilinRef.current.naik, downColor: warnaLilinRef.current.turun,
-      borderUpColor: warnaLilinRef.current.naik, borderDownColor: warnaLilinRef.current.turun,
-      wickUpColor: warnaLilinRef.current.naik, wickDownColor: warnaLilinRef.current.turun,
+      upColor: rupaRef.current.naik, downColor: rupaRef.current.turun,
+      borderUpColor: rupaRef.current.naik, borderDownColor: rupaRef.current.turun,
+      wickUpColor: rupaRef.current.ekorNaik, wickDownColor: rupaRef.current.ekorTurun,
       priceFormat: { type: 'price', ...formatHarga(lilin.closes) },
     });
     /* Penggambar isian — zona S/R terisi warna dan pewarna tengah channel,
@@ -489,7 +561,7 @@ export function ChartLilin({
     });
   }, [tema]);
 
-  /* -- Warna lilin ------------------------------------------------------
+  /* -- Warna lilin & latar ----------------------------------------------
      Lewat applyOptions, bukan dengan membuat ulang serinya. Membuat ulang
      seri lilin berarti mengirim seluruh datanya lagi dan kehilangan jendela
      pandang -- mahal sekali untuk satu pergantian warna. */
@@ -498,12 +570,23 @@ export function ChartLilin({
     if (!s) return;
     try {
       s.applyOptions({
-        upColor: naikLilin, downColor: turunLilin,
-        borderUpColor: naikLilin, borderDownColor: turunLilin,
-        wickUpColor: naikLilin, wickDownColor: turunLilin,
+        upColor: rupa.naik, downColor: rupa.turun,
+        borderUpColor: rupa.naik, borderDownColor: rupa.turun,
+        wickUpColor: rupa.ekorNaik, wickDownColor: rupa.ekorTurun,
       });
     } catch { /* serinya sudah dibongkar */ }
-  }, [naikLilin, turunLilin]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rupa.naik, rupa.turun, rupa.ekorNaik, rupa.ekorTurun]);
+
+  /* Latar dipisah dari efek tema di atas, dan sengaja BERJALAN SESUDAHNYA:
+     'transparent' berarti menyerahkan latarnya ke halaman, yang sudah ikut
+     tema sendiri. Jadi mematikan latar pilihan sendiri tidak perlu tahu
+     warna tema apa pun -- ia cuma berhenti menutupi. */
+  useEffect(() => {
+    try {
+      chart.current?.applyOptions({ layout: { background: { color: rupa.latar ?? 'transparent' } } });
+    } catch { /* chartnya sudah dibuang */ }
+  }, [rupa.latar, tema]);
 
   /* -- Tanda air nama pasangan ------------------------------------------
      Plugin pane bawaan lightweight-charts v5 (createTextWatermark),
@@ -669,6 +752,7 @@ export function ChartLilin({
     seriSmi.current.forEach((s) => { try { c.removeSeries(s); } catch { /* sudah lepas */ } });
     seriSmi.current = [];
     garisAmbang.current = [];
+    pitaPrim.current = null;
     if (!smi || !lilin.times.length) return;
 
     const buat = (warna: string, tebal: 1 | 2) => {
@@ -680,6 +764,15 @@ export function ChartLilin({
     buat(WARNA_SMI, 2);
     buat(WARNA_SMI_EMA, 1);
 
+    /* Pita ditempel di seri PERTAMA -- seri SMI-nya sendiri, bukan EMA-nya.
+       Primitive membaca sumbu harga lewat serinya, dan kedua seri berbagi
+       sumbu yang sama, jadi mana pun benar; yang pertama dipilih supaya
+       pitanya ikut hidup-mati bersama garis yang ambangnya ia tandai. */
+    const pitaPrimBaru = new PenggambarPita();
+    seriSmi.current[0].attachPrimitive(pitaPrimBaru);
+    pitaPrim.current = pitaPrimBaru;
+    pitaPrimBaru.setData(pitaSmiRef.current ? pitaSmiUntuk(temaSekarang()) : []);
+
     /* Ambang jenuh +50 / -50 — angka yang SAMA dengan SMI_OB dan SMI_OS di
        jt-scan-core, yaitu ambang yang dipakai kartu sinyal untuk menyebut
        sebuah koin overbought atau oversold. Garis di sini harus sama persis
@@ -687,7 +780,7 @@ export function ChartLilin({
        pendapat tentang koin yang sama. */
     const acuan = seriSmi.current[0];
     if (acuan) {
-      garisAmbang.current = [50, -50].map((v) => acuan.createPriceLine({
+      garisAmbang.current = [AMBANG_SMI, -AMBANG_SMI].map((v) => acuan.createPriceLine({
         price: v, color: WARNA_CHART[temaSekarang()].garisNol, lineWidth: 1, lineStyle: 2,
         axisLabelVisible: false, title: '',
       }));
@@ -695,6 +788,16 @@ export function ChartLilin({
     try { c.panes()[1]?.setHeight(tinggiSmi.current); } catch { /* versi tanpa panes API */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [smi === null, lilin.times.length === 0]);
+
+  /* Pita menyala/padam dan berganti tema TANPA membongkar serinya. Efek di
+     atas sengaja berdependensi sesempit mungkin supaya panel SMI tidak
+     lenyap-sekejap tiap data disegarkan; menaruh `pitaSmi` di sana akan
+     mengembalikan persis masalah itu setiap skrip Pine dijalankan. */
+  const pitaSmiRef = useRef(pitaSmi);
+  pitaSmiRef.current = pitaSmi;
+  useEffect(() => {
+    pitaPrim.current?.setData(pitaSmi ? pitaSmiUntuk(tema) : []);
+  }, [pitaSmi, tema, smi, lilin]);
 
   /* Data SMI dipotong lewat setData pada seri yang SAMA — pembatas panel
      tidak tersentuh, jadi ia diam selama replay berjalan bar demi bar. */
