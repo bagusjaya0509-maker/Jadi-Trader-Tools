@@ -23,7 +23,11 @@ import { bacaKoneksi, PROXY_BAWAAN } from '@/lib/koneksi';
    batas yang bisa direset sendiri bukan batas, cuma saran.
    ════════════════════════════════════════════════════════════════════════ */
 
-export type Fitur = 'screener' | 'replay';
+/* 'riwayat' = menarik 1000 lilin sebelum yang paling tua lewat tombol
+   "Muat lebih lama" di chart. Dihitung server seperti dua yang lain --
+   sempat dijaga penghitung localStorage, dan itu bukan penjagaan: batas
+   yang bisa dihapus lewat DevTools dalam tiga detik cuma saran. */
+export type Fitur = 'screener' | 'replay' | 'riwayat';
 /* 'pratinjau' TIDAK dijual dan tidak bisa dipasang ke lisensi — ia keadaan
     sementara yang dihitung server dari jam mulai pratinjau. Ada di daftar
     ini karena server memang bisa memulangkannya, dan tipe yang tidak
@@ -52,9 +56,9 @@ export interface Paket {
     untuk orang yang tidak membelinya, dan yang sekejap itu cukup. */
 export const PAKET_KOSONG: Paket = {
   paket: 'gratis', aktif: false, berakhir: 0,
-  batas: { screener: 0, replay: 0 },
-  pakai: { screener: 0, replay: 0 },
-  sisa: { screener: 0, replay: 0 },
+  batas: { screener: 0, replay: 0, riwayat: 0 },
+  pakai: { screener: 0, replay: 0, riwayat: 0 },
+  sisa: { screener: 0, replay: 0, riwayat: 0 },
   copySignal: false, marketplace: false, postingSinyal: false,
 };
 

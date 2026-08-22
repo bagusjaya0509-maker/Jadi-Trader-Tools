@@ -158,36 +158,6 @@ const MEDAN_WARNA = [
   ['ekorNaik', 'Ekor naik'], ['ekorTurun', 'Ekor turun'],
 ] as const;
 
-/* -- Jatah "Muat lebih lama" untuk akun gratis ---------------------------
-   Riwayat panjang adalah fitur berbayar; akun gratis dapat beberapa
-   percobaan per hari supaya tahu rasanya, bukan nol. Dihitung per HARI dan
-   disimpan di localStorage -- ini pagar rasa, bukan pagar keamanan: yang
-   dijaga backend tetap kuota screener/replay, dan orang yang membersihkan
-   localStorage cuma mencurangi dirinya sendiri soal tombol riwayat. */
-const KUNCI_JATAH_LAMA = 'jt.jatahMuatLama';
-const JATAH_LAMA_GRATIS = 3;
-
-function bacaJatahLama(): number {
-  const hari = new Date().toISOString().slice(0, 10);
-  try {
-    const d = JSON.parse(localStorage.getItem(KUNCI_JATAH_LAMA) ?? 'null');
-    if (d && d.hari === hari && Number.isFinite(d.pakai)) {
-      return Math.max(0, JATAH_LAMA_GRATIS - d.pakai);
-    }
-  } catch { /* privat atau rusak */ }
-  return JATAH_LAMA_GRATIS;
-}
-
-function pakaiJatahLama() {
-  const hari = new Date().toISOString().slice(0, 10);
-  let pakai = 0;
-  try {
-    const d = JSON.parse(localStorage.getItem(KUNCI_JATAH_LAMA) ?? 'null');
-    if (d && d.hari === hari && Number.isFinite(d.pakai)) pakai = d.pakai;
-  } catch { /* privat */ }
-  try { localStorage.setItem(KUNCI_JATAH_LAMA, JSON.stringify({ hari, pakai: pakai + 1 })); } catch { /* privat */ }
-}
-
 function bacaTampilan(): SetelanTampilan {
   const hasil: SetelanTampilan = { ...TAMPILAN_AWAL };
   const serap = (d: unknown) => {
@@ -277,7 +247,9 @@ export default function ChartBacktest() {
   /* Jendela pandang sedang menyentuh bar paling tua. Dilaporkan ChartLilin,
      dan hanya saat BERUBAH -- lihat catatan di sana. */
   const [diUjungKiri, setDiUjungKiri] = useState(false);
-  const [jatahLama, setJatahLama] = useState(bacaJatahLama);
+  /* Alasan penolakan dari SERVER, bukan hitungan sendiri. Kosong berarti
+     belum pernah ditolak. */
+  const [tolakRiwayat, setTolakRiwayat] = useState('');
 
   /* Potongan lama dibuang tiap ganti simbol atau timeframe — riwayat BTC
      harian tidak berarti apa-apa di chart ETH 15 menit, dan menyambungnya
@@ -309,11 +281,21 @@ export default function ChartBacktest() {
     if (!tertua || muatLama) return;
     setMuatLama(true);
     try {
+      /* SERVER yang memutuskan, sebelum satu lilin pun diminta. Dulu di sini
+         ada penghitung localStorage; itu bukan pagar, cuma saran yang bisa
+         dihapus lewat DevTools dalam tiga detik.
+
+         pakaiKuota melepaskan pemakaian saat servernya sendiri bermasalah
+         (lihat catatannya di lib/paket) -- lebih baik satu pemakaian tidak
+         terhitung daripada pelanggan terkunci karena jaringan buruk. */
+      const izin = await pakaiKuota('riwayat');
+      if (!izin.boleh) {
+        setTolakRiwayat(izin.alasan || 'Jatah riwayat paket ini sudah habis.');
+        return;
+      }
+      setTolakRiwayat('');
+      if (izin.paket) muatPaket();
       const potongan = await ambilKlinesSebelum(simbol, tf, tertua - 1);
-      /* Jatah dicatat SETELAH permintaan berhasil dibuat, untuk akun yang
-         tidak berbayar saja. Permintaan yang gagal jaringan tidak menghabiskan
-         percobaan orang. */
-      if (!paketku.aktif) { pakaiJatahLama(); setJatahLama(bacaJatahLama()); }
       /* Kosong = sudah mentok. Ditandai supaya tombolnya berhenti menawarkan
          sesuatu yang tidak ada lagi, bukan diam-diam tidak melakukan apa-apa
          setiap kali ditekan. */
@@ -2854,9 +2836,10 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                               <span className="rounded border border-zinc-800 bg-zinc-950/90 px-2 py-1 text-[10.5px] leading-none text-zinc-600 shadow">
                                 riwayat terjauh
                               </span>
-                            ) : !paketku.aktif && jatahLama <= 0 ? (
-                              /* Jatah gratis habis: kartunya berubah jadi
-                                 ajakan, bukan tombol mati. Tombol mati tanpa
+                            ) : tolakRiwayat ? (
+                              /* Jatah habis MENURUT SERVER, bukan menurut
+                                 hitungan browser. Kartunya berubah jadi
+                                 ajakan, bukan tombol mati: tombol mati tanpa
                                  penjelasan terbaca sebagai kerusakan; kartu
                                  yang menyebut alasannya terbaca sebagai
                                  batas yang disengaja. */
@@ -2866,7 +2849,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                                   Butuh riwayat lebih panjang?
                                 </p>
                                 <p className="mt-1 text-[10px] leading-snug text-zinc-500">
-                                  Jatah coba gratis hari ini sudah terpakai. Akses berbayar membuka riwayat tanpa batas.
+                                  {tolakRiwayat} Akses berbayar membuka riwayat tanpa batas.
                                 </p>
                                 <Link to="/harga"
                                   className="mt-2 block cursor-pointer rounded-md bg-emerald-600 px-2 py-1.5 text-[11px] font-medium text-white transition-colors hover:bg-emerald-500">
@@ -2892,9 +2875,15 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                                   className="mt-2 w-full cursor-pointer rounded-md bg-emerald-600 px-2 py-1.5 text-[11px] font-medium text-white transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60">
                                   {muatLama ? 'Memuat\u2026' : 'Muat lebih lama'}
                                 </button>
-                                {!paketku.aktif && (
+                                {/* Angka dari server, dan hanya kalau paketnya
+                                    memang punya batas. Pratinjau dan paket
+                                    berbayar memulangkan -1 = tanpa batas, dan
+                                    menempelkan "sisa" pada sesuatu yang tak
+                                    terbatas cuma membuat orang mengira ada
+                                    hitungan yang sedang berjalan. */}
+                                {paketku.batas.riwayat >= 0 && (
                                   <p className="mt-1.5 text-[9.5px] text-zinc-600">
-                                    sisa coba gratis: {jatahLama}× hari ini
+                                    {teksSisa(paketku, 'riwayat') || `sisa ${paketku.sisa.riwayat} dari ${paketku.batas.riwayat}`}
                                   </p>
                                 )}
                               </div>
