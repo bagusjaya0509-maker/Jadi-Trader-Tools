@@ -616,6 +616,10 @@ export interface PermintaanLisensi {
   /** Ditentukan SERVER, bukan diterima dari browser — kalau kuota gratis
    *  habis, permintaan yang mengaku gratis otomatis jadi berbayar. */
   jenis?: 'gratis' | 'bayar';
+  /** Paket berbayar yang dipasang tangan lewat panel Akses & Lisensi.
+   *  Kosong berarti gratis, atau berbayar dari sebelum fitur ini ada —
+   *  keduanya diperlakukan sebagai paket termurah saat ditampilkan. */
+  paket?: '' | 'testing' | 'premium3' | 'tahunan';
   /** Akhir masa 30 hari, dihitung dari saat disetujui. Kosong selama
    *  permintaannya belum diputus. */
   berakhir?: number;
@@ -649,6 +653,19 @@ export function usePermintaanLisensi(): Hasil<PermintaanLisensi[]> {
 
 export const putuskanLisensi = (id: string, tindakan: 'setujui' | 'tolak', kode?: string) =>
   kirim('/api/lisensi/permintaan/putuskan', { id, tindakan, ...(kode ? { kode } : {}) });
+
+/** Paket yang bisa dipasang tangan dari panel Akses & Lisensi. */
+export type PaketManual = 'gratis' | 'testing' | 'premium3' | 'tahunan';
+
+/** Naik/turun paket untuk permintaan yang SUDAH disetujui.
+ *
+ *  Kuotanya tidak dikirim dari sini dan tidak dihitung di sini: server
+ *  membaca `jenis` tiap permintaan untuk menghitung pemakaian gratis dan
+ *  bayar, jadi memindahkan satu orang otomatis memindahkan satu slot.
+ *  Menghitungnya juga di browser berarti dua angka yang harus selalu sama —
+ *  dan dua angka yang harus sama adalah dua angka yang suatu hari berbeda. */
+export const ubahPaketPermintaan = (id: string, paket: PaketManual) =>
+  kirim('/api/lisensi/permintaan/paket', { id, paket });
 
 /** Buang catatan permintaan dari daftar — dipakai membersihkan email uji
  *  yang sudah terpakai, karena satu email hanya boleh punya satu

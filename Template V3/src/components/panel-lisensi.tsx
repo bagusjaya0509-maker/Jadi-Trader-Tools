@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, X, RefreshCw, Copy, KeyRound, ShieldAlert, Trash2, Globe, Package } from 'lucide-react';
+import { Check, X, RefreshCw, Copy, KeyRound, ShieldAlert, Trash2, Globe, Package, ArrowUpCircle } from 'lucide-react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { DaftarLipat, NomorBaris } from '@/components/daftar-lipat';
 import { useKuota } from '@/lib/akses';
@@ -40,7 +40,8 @@ export function LencanaJenis({ slug }: { slug: string }) {
   );
 }
 import { cn, tanggalPendek } from '@/lib/utils';
-import { usePermintaanLisensi, putuskanLisensi, hapusPermintaanLisensi } from '@/lib/admin';
+import { usePermintaanLisensi, putuskanLisensi, hapusPermintaanLisensi,
+         ubahPaketPermintaan, type PaketManual } from '@/lib/admin';
 
 /* ════════════════════════════════════════════════════════════════════════
    PERMINTAAN LISENSI — panel pemilik
@@ -55,12 +56,25 @@ import { usePermintaanLisensi, putuskanLisensi, hapusPermintaanLisensi } from '@
    masih bisa dibaca.
    ════════════════════════════════════════════════════════════════════════ */
 
+/** Paket yang bisa dipasang tangan, urut dari yang paling murah.
+    Angka harinya HARUS sama dengan PAKET_UPGRADE di server.js — yang
+    ditampilkan di sini cuma keterangan, yang mengikat yang di sana. */
+const PAKET_MANUAL: { nilai: PaketManual; label: string; sub: string }[] = [
+  { nilai: 'gratis',   label: 'Gratis',            sub: 'Event Terbatas — 30 hari' },
+  { nilai: 'testing',  label: 'Berbayar 1 bulan',  sub: 'Testing / New Launch — 30 hari' },
+  { nilai: 'premium3', label: 'Berbayar 3 bulan',  sub: 'Premium 3 Bulan — 90 hari' },
+  { nilai: 'tahunan',  label: 'Tahunan',           sub: 'Tahunan — 365 hari' },
+];
+
 export function PanelLisensi() {
   const { data, memuat, galat, muatUlang } = usePermintaanLisensi();
   const { kuota } = useKuota();
   const [sibuk, setSibuk] = useState('');
   const [pesan, setPesan] = useState('');
   const [tersalin, setTersalin] = useState('');
+  /* id baris yang menunya sedang terbuka. Satu saja: dua menu terbuka
+     sekaligus membuat orang mengira pilihan di keduanya saling berkaitan. */
+  const [menuPaket, setMenuPaket] = useState('');
 
   const baru = data.filter((x) => x.status === 'baru');
 
@@ -83,6 +97,30 @@ export function PanelLisensi() {
       setPesan(tindakan === 'setujui'
         ? `Disetujui. Kode ${j.kode} sudah aktif — salin dan kirim ke pembeli.`
         : 'Permintaan ditolak.');
+      muatUlang();
+    } catch (e) {
+      setPesan('Gagal: ' + (e instanceof Error ? e.message : 'tidak diketahui'));
+    } finally { setSibuk(''); }
+  }
+
+  /* Naik/turun paket. Hanya untuk yang SUDAH disetujui — server menolak
+     yang lain, dan tombolnya pun tidak ditawarkan di sana. */
+  async function ubahPaket(id: string, paket: PaketManual, email: string) {
+    const nama = PAKET_MANUAL.find((p) => p.nilai === paket)?.label ?? paket;
+    if (!confirm(
+      `Ubah paket ${email || 'akun ini'} menjadi ${nama}?\n\n` +
+      'Masa berlakunya dihitung ulang MULAI SEKARANG, bukan disambung ke sisa yang lama. ' +
+      'Kuota gratis dan berbayar ikut bergeser sendiri.'
+    )) return;
+    setSibuk(id); setPesan(''); setMenuPaket('');
+    try {
+      const j: any = await ubahPaketPermintaan(id, paket);
+      const k = j?.kuota;
+      setPesan(
+        `Paket ${email || id} sekarang ${nama}.`
+        + (k ? ` Kuota kini gratis ${k.gratisTerpakai}/${k.gratisTotal} · bayar ${k.bayarTerpakai}/${k.bayarTotal}.` : '')
+        + (j?.firestoreOk === false ? ' Catatan: status di Firestore belum tertulis — aksesnya belum ikut berubah.' : '')
+      );
       muatUlang();
     } catch (e) {
       setPesan('Gagal: ' + (e instanceof Error ? e.message : 'tidak diketahui'));
@@ -237,7 +275,61 @@ export function PanelLisensi() {
                         <X className="size-3.5" /> Tolak
                       </button>
                     </>
-                  ) : x.kode ? (
+                  ) : null}
+
+                  {/* Paket dipasang tangan. Hanya muncul di baris yang sudah
+                      disetujui: menaikkan paket orang yang aksesnya belum
+                      diputus akan membuat dua keadaan yang bertentangan di
+                      satu baris. */}
+                  {x.status === 'disetujui' && (
+                    <div className="relative">
+                      <button
+                        onClick={() => setMenuPaket((v) => (v === x.id ? '' : x.id))}
+                        disabled={!!sibuk}
+                        title="Ubah paket — gratis, 1 bulan, 3 bulan, atau tahunan"
+                        aria-label="Ubah paket"
+                        className={cn('flex cursor-pointer items-center rounded-md border px-2 py-1.5 transition-colors disabled:opacity-50',
+                          menuPaket === x.id
+                            ? 'border-zinc-600 text-zinc-100'
+                            : 'border-zinc-800 text-zinc-500 hover:border-zinc-700 hover:text-zinc-300')}>
+                        <ArrowUpCircle className="size-3.5" />
+                      </button>
+                      {menuPaket === x.id && (
+                        <>
+                          <div className="fixed inset-0 z-30" onClick={() => setMenuPaket('')} />
+                          <div className="absolute right-0 top-full z-40 mt-1 w-56 rounded-lg border border-zinc-800 bg-zinc-950 p-1 shadow-2xl">
+                            <div className="px-2 pb-1 pt-1 text-[10px] font-medium uppercase tracking-wider text-zinc-600">
+                              Ubah paket
+                            </div>
+                            {PAKET_MANUAL.map((p) => {
+                              const kini = (x.jenis === 'bayar' ? (x.paket || 'testing') : 'gratis') === p.nilai;
+                              return (
+                                <button key={p.nilai} disabled={kini}
+                                  onClick={() => void ubahPaket(x.id, p.nilai, x.email || '')}
+                                  className={cn('flex w-full cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-left transition-colors',
+                                    kini ? 'cursor-default bg-zinc-900/60' : 'hover:bg-zinc-900')}>
+                                  <span className="min-w-0 grow">
+                                    <span className="block text-[12px] text-zinc-200">{p.label}</span>
+                                    <span className="block text-[10.5px] text-zinc-600">{p.sub}</span>
+                                  </span>
+                                  {kini && <Check className="mt-0.5 size-3.5 shrink-0 text-emerald-500" />}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Kode / "tanpa kode" HANYA untuk baris yang sudah diputus.
+                      Dulu ini cabang terakhir satu rantai ternary bersama
+                      Setujui/Tolak, jadi baris 'baru' tidak pernah
+                      mencapainya. Begitu rantainya dipecah untuk menyisipkan
+                      tombol paket, cabang ini jadi berdiri sendiri — dan
+                      baris 'baru' menampilkan Setujui, Tolak, DAN "tanpa
+                      kode" sekaligus. Pemisahnya dikembalikan tegas. */}
+                  {x.status !== 'baru' && (x.kode ? (
                     <button onClick={() => { void navigator.clipboard.writeText(x.kode!); setTersalin(x.id); }}
                       title="Salin kode untuk dikirim ke pembeli"
                       className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 py-1.5 text-[11.5px] transition-colors hover:border-zinc-700">
@@ -249,7 +341,7 @@ export function PanelLisensi() {
                     <span className="flex items-center gap-1.5 text-[11.5px] text-zinc-600">
                       <KeyRound className="size-3.5" /> tanpa kode
                     </span>
-                  )}
+                  ))}
 
                   {/* Hapus catatan — tersedia untuk SEMUA status, termasuk
                       yang masih 'baru'. Sengaja: permintaan uji sering tidak
