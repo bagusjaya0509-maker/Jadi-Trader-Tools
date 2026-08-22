@@ -178,7 +178,9 @@ export function PojokOrder({
   /** Level di chart ini datang dari analisa Copy Signal. Menyalakan
    *  penanda COPY biru — lihat catatan di tempat pembuatannya. */
   dariSinyal?: boolean;
-  onGantiMode: (m: 'demo' | 'real') => void;
+  /** `sebab` menerangkan KENAPA modenya berpindah, dan itu menentukan
+   *  apakah draf yang sedang disusun ikut dibuang. Lihat putarMode. */
+  onGantiMode: (m: 'demo' | 'real', sebab?: 'menuju-copy') => void;
   mati?: boolean;
   /** Setelan order sungguhan — modal, leverage, metode TP. Diangkat ke
    *  halaman supaya label risiko di garis chart memakai angka yang sama. */
@@ -256,7 +258,7 @@ export function PojokOrder({
      Komponen ini punya DUA return bersyarat di bawah (pending order dan
      posisi berjalan), jadi tidak ada hook yang boleh lahir sesudah
      titik ini. */
-  const [ringkas, setRingkas] = useState(false);
+  const [ringkas, setRingkas] = useState(true);
   const bangunkan = () => setSentuh((n) => n + 1);
   const menganggur = !posisi && !tunda && !draf;
   useEffect(() => {
@@ -293,7 +295,7 @@ export function PojokOrder({
       /* COPY bukan mode order — ia niat: rencana ini disusun untuk
          dibagikan. Order sungguhan dimatikan supaya tombol Kirim tidak
          berwarna merah sementara yang dituju cuma memposting sinyal. */
-      onGantiMode('demo');
+      onGantiMode('demo', 'menuju-copy');
       onGantiCopy?.(true);
       return;
     }

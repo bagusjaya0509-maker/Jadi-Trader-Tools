@@ -2601,15 +2601,22 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                               draf={draf} rencana={rencana} mode={aksi.mode}
                               jenis={labelJenis} risiko={aksi.risiko} qtyDemo={qtyTampil}
                               tunda={aksiTunda} onBatalTunda={aksi.batalTunda}
-                              onGantiMode={(m) => {
+                              onGantiMode={(m, sebab) => {
                                 aksi.gantiMode(m);
                                 setKabarNyata('');
                                 /* Pindah ke LATIHAN membersihkan garisnya.
                                    Level order sungguhan yang tertinggal di
                                    mode demo akan terbaca sebagai rencana
                                    latihan — dan menggesernya di sana tidak
-                                   mengubah apa pun di bursa. */
-                                if (m === 'demo') {
+                                   mengubah apa pun di bursa.
+
+                                   KECUALI kalau 'demo' ini cuma persinggahan
+                                   menuju COPY. Di situ orangnya sedang
+                                   mengubah rencananya jadi sinyal untuk
+                                   diposting, dan levelnya justru yang ia
+                                   bawa — membuangnya memaksa ia menggambar
+                                   ulang angka yang sama. */
+                                if (m === 'demo' && sebab !== 'menuju-copy') {
                                   setRencana({});
                                   setDraf(null);
                                   entryDigeser.current = false;

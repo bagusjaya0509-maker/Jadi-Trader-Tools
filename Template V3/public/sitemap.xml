@@ -58,4 +58,22 @@
     <changefreq>weekly</changefreq>
     <priority>0.4</priority>
   </url>
+  <url>
+    <!-- DOKUMENTASI. Dibuka untuk publik 21 Agu 2026 — sebelum itu ia di
+         balik gerbang langganan dan perayap cuma menerima layar
+         minta-akses.
+
+         Prioritasnya 0.8, di bawah halaman depan saja: sepuluh bagiannya
+         menjawab pertanyaan yang benar-benar diketik orang di Google
+         ("cara hitung lot", "sambungkan MT5 ke jurnal", "kenapa SL kena
+         terus"), dan itu membuatnya halaman dengan peluang masuk pencarian
+         paling besar yang situs ini punya.
+
+         Alamatnya /docs, BUKAN /dokumentasi — yang kedua cuma pengalih,
+         dan mendaftarkan pengalih di sitemap dilaporkan Search Console
+         sebagai "Page with redirect", bukan sebagai halaman. -->
+    <loc>https://jaditrader.co.id/docs</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
 </urlset>

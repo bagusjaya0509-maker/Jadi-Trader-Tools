@@ -294,7 +294,23 @@ function Kerangka() {
      menolak setiap pembacaan dan penulisan — jadi yang terlihat hanya
      data contoh yang memang sudah disiapkan untuk pengunjung. */
   const preview = modePreview() && !pengguna;
-  if (!import.meta.env.DEV && !preview
+  /* ── /docs DIBUKA UNTUK PUBLIK, 21 Agu 2026 ─────────────────────────
+     Dokumentasi di balik gerbang langganan itu keliru dua kali.
+
+     Pertama: dokumentasi MENJUAL produk, ia bukan produknya. Orang yang
+     mencari "cara sambungkan MT5 ke jurnal" lalu menemukan halaman ini
+     adalah calon pembeli, bukan orang yang mencuri sesuatu.
+
+     Kedua, dan ini yang terukur: sepuluh bagiannya persis pertanyaan yang
+     diketik orang di Google. Diperiksa 21 Agu 2026 — situs ini cuma punya
+     empat halaman yang bisa dibaca tanpa login, dan yang isinya paling
+     layak dicari justru terkunci. Perayap yang membuka /docs menerima
+     layar minta-akses, sama seperti pengunjung.
+
+     Dikecualikan DI SINI, bukan dengan memindahkan rutenya keluar
+     Kerangka: halamannya tetap butuh AppShell di sekelilingnya, dan rute
+     yang dipindah keluar kehilangan seluruh bingkainya. */
+  if (!import.meta.env.DEV && !preview && lokasi.pathname !== '/docs'
       && !(pemilik || langganan.status === 'aktif' || langganan.status === 'pratinjau')) {
     return <Navigate to={`/akses?dari=${encodeURIComponent(lokasi.pathname)}`} replace />;
   }
