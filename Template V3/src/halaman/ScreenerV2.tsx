@@ -111,6 +111,26 @@ const CSS_TANPA_CANGKANG = `
      dibuka berdiri sendiri. */
   .es-econ-calendar-panel { display: none !important; }
 
+  /* ── WARNA MENGIKUTI TEMA, BUKAN DITULIS MATI ──────────────────────
+     Dilaporkan pemilik: Screener tetap hitam waktu tema terang dinyalakan.
+     Sebabnya blok ini sendiri. Ia ditulis waktu V3 CUMA punya tema gelap,
+     jadi menyamakan V2 dengan V3 berarti menulis #09090b dan #fafafa apa
+     adanya — dan dengan !important, supaya menang melawan gaya bawaan V2.
+
+     Sejak tema terang ada, dua sifat itu berbalik jadi penghalang: hex mati
+     tidak ikut berubah, dan !important membuat tidak ada yang bisa
+     menimpanya. Halaman lain berbalik karena memakai kelas zinc; halaman
+     ini tidak, karena warnanya tidak pernah lewat token.
+
+     Sekarang lewat token. Nilai di tema GELAP sengaja dijaga sama persis:
+     --color-zinc-950 memang #09090b, zinc-50 memang #fafafa, zinc-300
+     memang #d4d4d8. Jadi tampilan gelapnya tidak bergeser satu piksel pun
+     — yang ditambahkan cuma kemampuan berubah.
+
+     color-mix dipakai untuk yang bertransparansi: 40% dari zinc-900 di tema
+     gelap menghasilkan rgba(24,24,27,.4), persis angka lamanya. Menuliskan
+     var() begitu saja akan membuang transparansinya dan panelnya jadi
+     kotak pekat. */
   /* ── Huruf & warna mengikuti V3 ── */
   :root {
     --v2-radius: 12px;
@@ -123,7 +143,7 @@ const CSS_TANPA_CANGKANG = `
   .es-price, .es-num, .angka, .es-sim-table td, .es-priority-levels,
   .es-card-price, .es-val { font-variant-numeric: tabular-nums !important; }
 
-  .ema-screener { background: #09090b !important; color: #fafafa !important; }
+  .ema-screener { background: var(--color-zinc-950) !important; color: var(--color-zinc-50) !important; }
 
   /* Panel & kartu: HANYA radius yang diseragamkan.
      ────────────────────────────────────────────────────────────────────
@@ -143,9 +163,9 @@ const CSS_TANPA_CANGKANG = `
   .ema-screener select, .ema-screener input[type="text"], .ema-screener input[type="number"] {
     height: 36px !important;
     border-radius: 6px !important;
-    border: 1px solid #27272a !important;
-    background: rgba(24,24,27,.6) !important;
-    color: #d4d4d8 !important;
+    border: 1px solid var(--color-zinc-800) !important;
+    background: color-mix(in srgb, var(--color-zinc-900) 60%, transparent) !important;
+    color: var(--color-zinc-300) !important;
     font-size: 12.5px !important;
   }
   .ema-screener button {
@@ -154,8 +174,8 @@ const CSS_TANPA_CANGKANG = `
   }
   /* Tombol utama V3 = putih dengan teks gelap */
   .es-scan-btn, .es-priority-scan-btn, .es-pantau-scan-btn {
-    background: #fafafa !important;
-    color: #09090b !important;
+    background: var(--color-zinc-50) !important;
+    color: var(--color-zinc-950) !important;
     border: none !important;
     font-weight: 500 !important;
   }
@@ -165,7 +185,7 @@ const CSS_TANPA_CANGKANG = `
     font-size: 15px !important;
     font-weight: 600 !important;
     letter-spacing: -.01em !important;
-    color: #fafafa !important;
+    color: var(--color-zinc-50) !important;
   }
 
   /* Hijau/merah disamakan dengan emerald-500 / red-400 milik V3 supaya
@@ -186,14 +206,14 @@ const CSS_TANPA_CANGKANG = `
      zinc-950 milik V3. Diselaraskan DI SUMBERNYA supaya setiap elemen yang
      memakainya ikut benar, tanpa perlu memburu selektor satu per satu. */
   :root, .ema-screener {
-    --bg: #09090b !important;
-    --bg-2: #09090b !important;
-    --panel: rgba(24,24,27,.4) !important;
-    --panel-2: rgba(24,24,27,.6) !important;
-    --border: rgba(39,39,42,.8) !important;
+    --bg: var(--color-zinc-950) !important;
+    --bg-2: var(--color-zinc-950) !important;
+    --panel: color-mix(in srgb, var(--color-zinc-900) 40%, transparent) !important;
+    --panel-2: color-mix(in srgb, var(--color-zinc-900) 60%, transparent) !important;
+    --border: color-mix(in srgb, var(--color-zinc-800) 80%, transparent) !important;
   }
   html, body, .ema-screener, .es-main, .es-wrap, .es-content {
-    background: #09090b !important;
+    background: var(--color-zinc-950) !important;
     background-image: none !important;
   }
 
@@ -215,9 +235,9 @@ const CSS_TANPA_CANGKANG = `
      atas — aturan gaya untuknya tidak lagi diperlukan di sini. */
 
   /* Scrollbar tipis seperti sisa aplikasi */
-  * { scrollbar-width: thin; scrollbar-color: #3f3f46 transparent; }
+  * { scrollbar-width: thin; scrollbar-color: var(--color-zinc-700) transparent; }
   *::-webkit-scrollbar { width: 9px; height: 9px; }
-  *::-webkit-scrollbar-thumb { background: #27272a; border-radius: 9px; }
+  *::-webkit-scrollbar-thumb { background: var(--color-zinc-800); border-radius: 9px; }
   *::-webkit-scrollbar-track { background: transparent; }
 `;
 
