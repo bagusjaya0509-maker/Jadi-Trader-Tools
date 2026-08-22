@@ -1278,13 +1278,27 @@ class Mesin {
           const gaya = String(dapat('style', -1) ?? '');
           const lokasi = String(dapat('location', -1) ?? '');
           const warnaV = dapat('color', -1);
-          const teksV = dapat('text', -1) ?? dapat('title', 1);
+          /* HANYA `text`. `title` adalah nama di legenda, BUKAN tulisan di
+             chart — TradingView tidak pernah mencetaknya di atas lilin.
+             Memakainya sebagai cadangan membuat setiap plotshape berjudul
+             ikut menuliskan judulnya: Supertrend jadi bertabur "UpTrend
+             Begins" dan "DownTrend Begins" di sepanjang chart, padahal di
+             TradingView yang tampil cuma bulatan kecil. */
+          const teksV = dapat('text', -1);
           const ofs = this.angka(dapat('offset', -1)) ?? 0;
           const bawah = lokasi.includes('below') || gaya.includes('up');
           const barPos = Math.max(0, Math.min(this.n - 1, this.bar + Math.round(ofs)));
+          /* location.absolute berarti "taruh di NILAI yang diberikan", bukan
+             di ujung lilin. Supertrend menaruh penandanya tepat di garis
+             trennya; dipaksa ke high/low, penandanya melayang jauh dari
+             garis yang seharusnya ia tunjuk. */
+          const nilaiAbs = this.angka(v);
+          const hargaAbs = lokasi.includes('absolute') && nilaiAbs != null && isFinite(nilaiAbs)
+            ? nilaiAbs
+            : (bawah ? l.lows[barPos] : l.highs[barPos]);
           this.penanda.push({
             bar: barPos,
-            harga: bawah ? l.lows[barPos] : l.highs[barPos],
+            harga: hargaAbs,
             teks: typeof teksV === 'string' ? teksV : '',
             warna: typeof warnaV === 'string' ? warnaV : '#a1a1aa',
             posisi: bawah ? 'bawah' : 'atas',

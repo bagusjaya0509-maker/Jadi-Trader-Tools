@@ -941,10 +941,23 @@ export function ChartLilin({
         color: g.warna, lineWidth: 1, priceLineVisible: false, lastValueVisible: false,
       });
       const batas = hingga === undefined ? lilin.times.length : Math.max(1, Math.min(lilin.times.length, hingga + 1));
+      /* Nilai kosong dikirim sebagai TITIK TANPA NILAI, bukan dibuang.
+         Membuangnya membuat pustaka menyambung titik terakhir sebelum
+         lubang ke titik pertama sesudahnya — satu garis diagonal panjang
+         melintasi daerah yang seharusnya kosong.
+
+         Untuk indikator biasa itu cuma jelek. Untuk Supertrend itu salah
+         total: skripnya menggambar dua seri yang saling bergantian
+         (plot.style_linebr), masing-masing kosong justru saat yang lain
+         hidup. Dibuang, keduanya jadi zigzag yang saling menyilang di
+         seluruh chart — persis "kacau" yang dilaporkan pemilik, padahal
+         angkanya sudah benar sejak awal. */
       s.setData(
-        lilin.times.slice(0, batas)
-          .map((t, i) => ({ time: Math.floor(t / 1000) as Time, value: g.nilai[i] }))
-          .filter((x): x is { time: Time; value: number } => x.value != null && isFinite(x.value))
+        lilin.times.slice(0, batas).map((t, i) => {
+          const v = g.nilai[i];
+          const time = Math.floor(t / 1000) as Time;
+          return v != null && isFinite(v) ? { time, value: v } : { time };
+        })
       );
       seriGaris.current.push(s);
     });
