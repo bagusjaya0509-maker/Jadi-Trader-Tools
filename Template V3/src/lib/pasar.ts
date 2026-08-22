@@ -123,6 +123,14 @@ export async function ambilKlines(simbol: string, tf: string, batas = 200, segar
     /* Backend membungkus balasan Binance jadi {ok, data}. Bentuk mentah
        Binance sendiri berupa array-of-array, jadi keduanya diterima —
        proxy yang lebih lama pernah meneruskan apa adanya. */
+    /* Pasar yang BENAR-BENAR melayani simbol ini. Proxy memilih sendiri:
+       BTCUSDT dilayani spot, BTCDOMUSDT futures karena ia tidak ada di spot.
+       Jadi tidak boleh ditebak dari nama simbol maupun dari BINANCE_BASE_URL
+       backend -- keduanya akan salah untuk sebagian koin, dan menulis jenis
+       pasar yang keliru di chart adalah kebohongan di tempat orang menakar
+       seberani apa masuk. */
+    if (j?.market === 'spot' || j?.market === 'futures') PASAR.set(simbol, j.market);
+
     const baris: any[] = Array.isArray(j) ? j : (j?.data ?? []);
     if (!Array.isArray(baris) || !baris.length) return KOSONG;
 
@@ -138,6 +146,14 @@ export async function ambilKlines(simbol: string, tf: string, batas = 200, segar
   } catch {
     return KOSONG;
   }
+}
+
+const PASAR = new Map<string, 'spot' | 'futures'>();
+
+/** Pasar yang melayani simbol ini menurut balasan proxy terakhir, atau null
+ *  kalau belum pernah diminta. Dipakai tanda air chart. */
+export function bacaPasar(simbol: string): 'spot' | 'futures' | null {
+  return PASAR.get(simbol) ?? null;
 }
 
 const SPEK_MT5 = new Map<string, number>();

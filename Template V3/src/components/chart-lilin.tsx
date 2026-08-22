@@ -523,10 +523,14 @@ export function ChartLilin({
     if (!c || !utamaAir) return;
     const w = WARNA_TANDA_AIR[tema];
     const font = "'IBM Plex Sans', -apple-system, sans-serif";
-    const baris: { text: string; color: string; fontSize: number; fontStyle?: string; fontFamily: string }[] = [
-      { text: utamaAir, color: w.utama, fontSize: 42, fontStyle: 'bold', fontFamily: font },
+    /* 46 dan 24, keduanya tanpa tebal -- proporsi dan bobot yang sama dengan
+       tanda air TradingView. Sempat dibuat tebal; dibandingkan berdampingan,
+       versi tebal terbaca sebagai judul yang menuntut dibaca, bukan sebagai
+       penanda latar yang boleh diabaikan. */
+    const baris: { text: string; color: string; fontSize: number; fontFamily: string }[] = [
+      { text: utamaAir, color: w.utama, fontSize: 46, fontFamily: font },
     ];
-    if (subAir) baris.push({ text: subAir, color: w.sub, fontSize: 17, fontFamily: font });
+    if (subAir) baris.push({ text: subAir, color: w.sub, fontSize: 24, fontFamily: font });
     try {
       const pane = c.panes()[0];
       if (!pane) return;

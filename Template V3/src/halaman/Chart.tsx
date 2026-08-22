@@ -20,7 +20,7 @@ import type { AlatPegang, GambarAlat } from '@/lib/plugin-alat';
 import type { HasilPine } from '@/lib/pine';
 import { bacaSetelanChart, simpanSetelanChart, usulSlTp } from '@/lib/replay';
 import { atr } from '@/lib/jt-scan-core';
-import { ambilKlines, ambilKlinesSebelum, bacaSpekMt5, bacaTickMt5, daftarSimbolMt5, type Lilin } from '@/lib/pasar';
+import { ambilKlines, ambilKlinesSebelum, bacaPasar, bacaSpekMt5, bacaTickMt5, daftarSimbolMt5, type Lilin } from '@/lib/pasar';
 import { useAkunMt5, segarkanAkunMt5 } from '@/lib/akun';
 /* Langsung dari admin, BUKAN lewat usePosisi(): yang dibutuhkan di sini
    cuma daftar order bursa, sementara usePosisi() juga memasang listener
@@ -1599,14 +1599,24 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
   }, [warnaLilin]);
   const warnaBawaan = warnaLilin.naik === WARNA_LILIN_BAWAAN.naik && warnaLilin.turun === WARNA_LILIN_BAWAAN.turun;
 
-  /* Tanda air: nama simbol besar, timeframe dan sumbernya kecil di bawah --
-     susunan yang sama dengan TradingView. Awalan "MT5:" dibuang: itu penanda
-     rute data untuk kita, bukan nama instrumen untuk orang yang membacanya. */
+  /* Tanda air, susunan TradingView: "SIMBOL, TF" besar di atas, "SIMBOL
+     JENIS-PASAR" kecil di bawah. Awalan "MT5:" dibuang -- itu penanda rute
+     data untuk kita, bukan nama instrumen untuk orang yang membacanya.
+
+     Jenis pasarnya DIBACA dari balasan proxy, tidak ditebak: BTCUSDT dilayani
+     spot sementara BTCDOMUSDT futures, jadi satu kata tetap akan salah untuk
+     sebagian koin. Selama belum terbaca, baris keduanya tidak ditulis sama
+     sekali -- tanda air tanpa keterangan lebih baik daripada keterangan yang
+     mungkin keliru. Bergantung pada `lilin` supaya ia dihitung ulang begitu
+     lilin pertamanya tiba dan pasarnya sudah tercatat. */
   const mt5 = simbol.startsWith('MT5:');
-  const tandaAir = useMemo(
-    () => ({ utama: mt5 ? simbol.slice(4) : simbol, sub: tf + ' \u00b7 ' + (mt5 ? 'Trade-Fi' : 'Binance') }),
-    [simbol, tf, mt5]
-  );
+  const tandaAir = useMemo(() => {
+    const nama = mt5 ? simbol.slice(4) : simbol;
+    const jenis = bacaPasar(simbol);
+    const pasar = mt5 ? 'TRADE-FI' : jenis === 'futures' ? 'PERP' : jenis === 'spot' ? 'SPOT' : '';
+    return { utama: nama + ', ' + tf.toUpperCase(), sub: pasar ? nama + ' ' + pasar : undefined };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [simbol, tf, mt5, lilin]);
 
   /* ── Data realtime ──────────────────────────────────────────────────
      Ditarik ulang tiap 15 detik, sama dengan umur cache di lib/pasar.ts —
