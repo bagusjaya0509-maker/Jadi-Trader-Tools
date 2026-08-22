@@ -2832,7 +2832,24 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                              tua, jadi tidak ditawarkan sama sekali di sana —
                              lebih jujur daripada tombol yang selalu menjawab
                              "tidak ada". */
-                          hamparanTengah={diUjungKiri && !simbol.startsWith('MT5:') ? (
+                          hamparanTengah={!diUjungKiri ? undefined : simbol.startsWith('MT5:') ? (
+                            /* Trade-Fi TIDAK punya penomoran halaman: tidak
+                               ada rute untuk meminta lilin lebih tua dari
+                               MT5, jadi EA mengirim seluruh isi terminalnya
+                               sekaligus dan tidak ada apa pun yang tersisa
+                               untuk ditarik.
+
+                               Dulu di sini tidak ada apa-apa. Diam itu yang
+                               salah: orang yang menggeser mentok ke kiri di
+                               Trade-Fi dan melihat kartunya lenyap membaca
+                               itu sebagai fitur yang rusak, bukan sebagai
+                               batas yang memang tidak ada. Alasannya sama
+                               dengan kartu berbayar yang berbunyi alih-alih
+                               jadi tombol mati. */
+                            <p className="max-w-[13rem] rounded-lg border border-zinc-800 bg-zinc-950/95 px-3 py-2 text-center text-[10.5px] leading-snug text-zinc-500 shadow-xl">
+                              Trade-Fi mengirim seluruh riwayat yang ada di terminalmu sekaligus — tidak ada lilin lebih tua yang bisa ditarik.
+                            </p>
+                          ) : (
                             habisRiwayat ? (
                               <span className="rounded border border-zinc-800 bg-zinc-950/90 px-2 py-1 text-[10.5px] leading-none text-zinc-600 shadow">
                                 riwayat terjauh
@@ -2882,7 +2899,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                                 )}
                               </div>
                             )
-                          ) : undefined}
+                          )}
                           pojok={aksi ? (
                             <div ref={pojokRef}>
                             <PojokOrder
