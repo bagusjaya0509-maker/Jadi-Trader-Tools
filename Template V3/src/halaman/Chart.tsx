@@ -21,7 +21,7 @@ import type { AlatPegang, GambarAlat } from '@/lib/plugin-alat';
 import type { HasilPine } from '@/lib/pine';
 import { bacaSetelanChart, simpanSetelanChart, usulSlTp } from '@/lib/replay';
 import { atr } from '@/lib/jt-scan-core';
-import { ambilKlines, ambilKlinesSebelum, bacaPasar, bacaSpekMt5, bacaTickMt5, daftarSimbolMt5, type Lilin } from '@/lib/pasar';
+import { ambilKlines, ambilKlinesSebelum, aturPasarKripto, bacaPasar, bacaSpekMt5, bacaTickMt5, daftarSimbolMt5, pasarKripto, type Lilin } from '@/lib/pasar';
 import { useAkunMt5, segarkanAkunMt5 } from '@/lib/akun';
 /* Langsung dari admin, BUKAN lewat usePosisi(): yang dibutuhkan di sini
    cuma daftar order bursa, sementara usePosisi() juga memasang listener
@@ -1641,6 +1641,10 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
   }, [simbol, tf, tampilSnr, tampilSmi]);
 
   const [tampilan, setTampilan] = useState(bacaTampilan);
+  /* Cermin React dari preferensi pasar di lib/pasar. Sumber kebenarannya di
+     sana (screener memakainya tanpa React); state ini cuma supaya tombolnya
+     ikut menggambar ulang. */
+  const [pasarUi, setPasarUi] = useState(pasarKripto);
   const [menuTampilan, setMenuTampilan] = useState(false);
   useEffect(() => {
     try { localStorage.setItem(KUNCI_TAMPILAN, JSON.stringify(tampilan)); } catch { /* privat */ }
@@ -3327,6 +3331,39 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                         Ikut tema
                       </button>
                     </div>
+                  </div>
+
+                  {/* Pasar kripto: futures bawaan, spot atas permintaan.
+                      Berlaku untuk SEMUA data kripto -- chart, screener,
+                      backtest -- bukan chart ini saja; dua bagian layar yang
+                      membaca pasar berbeda akan berbeda pendapat tentang
+                      koin yang sama. Trade-Fi tidak tersentuh tombol ini. */}
+                  <div className="mt-1 border-t border-zinc-800/70 px-2 pb-1.5 pt-1.5">
+                    <span className="block text-[11.5px] text-zinc-200">Pasar kripto</span>
+                    <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+                      {([['futures', 'Futures'], ['spot', 'Spot']] as const).map(([nilai, label]) => (
+                        <button key={nilai}
+                          onClick={() => {
+                            if (pasarUi === nilai) return;
+                            aturPasarKripto(nilai);
+                            setPasarUi(nilai);
+                            /* Muat ulang paksa: cache pasar sudah dibuang di
+                               aturPasarKripto, tinggal memicu penarikan. */
+                            setRiwayatLama(null);
+                            setHabisRiwayat(false);
+                            setSegar((v) => v + 1);
+                          }}
+                          className={cn('cursor-pointer rounded-md border px-2 py-1.5 text-[11.5px] transition-colors',
+                            pasarUi === nilai
+                              ? 'border-emerald-600/60 bg-emerald-500/10 text-emerald-300'
+                              : 'border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200')}>
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="mt-1 text-[10px] leading-snug text-zinc-600">
+                      Berlaku untuk chart, screener, dan backtest. Simbol yang tidak punya pasar terpilih otomatis memakai pasar satunya.
+                    </p>
                   </div>
 
                   <div className="mt-1 border-t border-zinc-800/70 px-2 pb-1.5 pt-1.5">

@@ -36,6 +36,43 @@ const KOSONG: Lilin = { opens: [], highs: [], lows: [], closes: [], times: [] };
 const simpanan = new Map<string, { waktu: number; isi: Lilin }>();
 const UMUR_MS = 15_000;
 
+/* -- Preferensi pasar kripto: futures dulu, atau spot dulu ---------------
+   FUTURES adalah bawaannya, dan itu keputusan produk, bukan teknis: order
+   dari aplikasi ini dieksekusi di Binance Futures, jadi lilin yang dianalisa
+   -- chart, screener, backtest -- harus datang dari instrumen yang sama.
+   Perp menyapu lebih dalam daripada spot karena likuidasi, dan zona SNR dari
+   lilin spot bisa melewatkan sweep yang sungguh terjadi persis di level SL.
+
+   GLOBAL, bukan per halaman: screener yang membaca pasar berbeda dari chart
+   akan berbeda pendapat tentang koin yang sama, dan keduanya tampil
+   berdampingan di layar yang sama.
+
+   Backend tetap jatuh balik per simbol (XAUT-nya futures, WBTC-nya spot
+   saja), jadi preferensi ini aman untuk semua simbol -- lihat medan `market`
+   di balasannya untuk tahu yang benar-benar melayani. */
+const KUNCI_PASAR = 'jt.pasarKripto';
+type PasarKripto = 'futures' | 'spot';
+
+function bacaPasarPilihan(): PasarKripto {
+  try {
+    return localStorage.getItem(KUNCI_PASAR) === 'spot' ? 'spot' : 'futures';
+  } catch { return 'futures'; }
+}
+
+let pasarPilihan: PasarKripto = bacaPasarPilihan();
+
+export function pasarKripto(): PasarKripto { return pasarPilihan; }
+
+export function aturPasarKripto(p: PasarKripto) {
+  pasarPilihan = p;
+  try { localStorage.setItem(KUNCI_PASAR, p); } catch { /* privat */ }
+  /* Cache lama berisi lilin pasar sebelumnya. Dibuang seluruhnya, bukan
+     ditunggu kedaluwarsa: 15 detik menatap lilin pasar yang salah setelah
+     menekan tombol adalah 15 detik yang meyakinkan orangnya tombol itu
+     rusak. */
+  simpanan.clear();
+}
+
 /* `segar` = jalur cepat untuk SATU chart yang sedang ditatap.
    ──────────────────────────────────────────────────────────────────────
    Pemindaian screener meminta puluhan simbol sekaligus — cache 15 detik di
@@ -65,7 +102,7 @@ export async function ambilKlinesSebelum(simbol: string, tf: string, sebelumMs: 
        bukan berputar selamanya. */
     if (mt5) return KOSONG;
     const r = await fetch(
-      `${dasar()}/api/klines?symbol=${encodeURIComponent(simbol)}&interval=${tf}&limit=${batas}&endTime=${sebelumMs}`);
+      `${dasar()}/api/klines?symbol=${encodeURIComponent(simbol)}&interval=${tf}&limit=${batas}&endTime=${sebelumMs}&market=${pasarPilihan}`);
     if (!r.ok) return KOSONG;
     const j = await r.json();
     const baris = Array.isArray(j) ? j : (j?.data ?? []);
@@ -89,7 +126,10 @@ export async function ambilKlinesSebelum(simbol: string, tf: string, sebelumMs: 
 }
 
 export async function ambilKlines(simbol: string, tf: string, batas = 200, segar = false): Promise<Lilin> {
-  const kunci = `${simbol}|${tf}|${batas}`;
+  /* Pasarnya IKUT ke dalam kunci. Tanpa itu, menekan tombol spot/futures
+     memulangkan lilin pasar lama dari cache selama umurnya -- bug yang
+     tampak persis seperti "tombolnya tidak bekerja". */
+  const kunci = `${pasarPilihan}|${simbol}|${tf}|${batas}`;
   const ada = simpanan.get(kunci);
   if (ada && Date.now() - ada.waktu < (segar ? 2_500 : UMUR_MS)) return ada.isi;
 
@@ -101,7 +141,7 @@ export async function ambilKlines(simbol: string, tf: string, batas = 200, segar
     const mt5 = simbol.startsWith('MT5:');
     const r = await fetch(mt5
       ? `${dasar()}/api/mt5/klines?symbol=${encodeURIComponent(simbol.slice(4))}&interval=${tf}&limit=${batas}`
-      : `${dasar()}/api/klines?symbol=${encodeURIComponent(simbol)}&interval=${tf}&limit=${batas}${segar ? '&fresh=1' : ''}`);
+      : `${dasar()}/api/klines?symbol=${encodeURIComponent(simbol)}&interval=${tf}&limit=${batas}&market=${pasarPilihan}${segar ? '&fresh=1' : ''}`);
     if (!r.ok) return KOSONG;
     const j = await r.json();
     /* Spec MT5 (dolar per lot per 1.0 harga) menumpang balasan klines —
