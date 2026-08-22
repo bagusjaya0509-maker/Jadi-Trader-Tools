@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import {
-  onAuthStateChanged, signInWithPopup, signInWithRedirect, signInWithCustomToken, signOut,
+  onAuthStateChanged, signInWithPopup, signInWithRedirect, getRedirectResult, signInWithCustomToken, signOut,
   type User,
 } from 'firebase/auth';
 import { app, auth, penyediaGoogle, UID_PEMILIK } from '@/lib/firebase';
@@ -435,6 +435,19 @@ export function PenyediaAuth({ children }: { children: React.ReactNode }) {
     return () => { cabutPantau?.(); cabutDenyut?.(); berhenti(); };
   }, []);
 
+  /* ── Hasil alur redirect ──────────────────────────────────────────────
+     `masuk` jatuh ke signInWithRedirect saat popupnya diblokir — dan itu
+     kejadian biasa di tablet. Kalau redirect-nya BERHASIL, onAuthStateChanged
+     di atas menangkapnya sendiri; kalau GAGAL, galatnya cuma bisa diambil di
+     sini. Tanpa panggilan ini orangnya dilempar balik ke halaman login tanpa
+     satu kata pun penjelasan — persis keluhan "tadi tidak bisa login, tapi
+     sekarang bisa" yang tidak menyisakan jejak untuk ditelusuri. */
+  useEffect(() => {
+    let hidup = true;
+    getRedirectResult(auth).catch((e) => { if (hidup) setGalat(pesanAuth(e)); });
+    return () => { hidup = false; };
+  }, []);
+
   const nilai = useMemo<Isi>(() => ({
     pengguna,
     memuat,
@@ -453,17 +466,53 @@ export function PenyediaAuth({ children }: { children: React.ReactNode }) {
           return;
         }
         if (e?.code === 'auth/popup-closed-by-user' || e?.code === 'auth/cancelled-popup-request') return;
-        if (e?.code === 'auth/unauthorized-domain') {
-          setGalat('Domain ini belum diizinkan di Firebase Console → Authentication → Settings → Authorized domains.');
-          return;
-        }
-        setGalat(e?.message ?? 'Gagal masuk.');
+        setGalat(pesanAuth(e));
       }
     },
     keluar: () => signOut(auth),
   }), [pengguna, memuat, langganan, galat]);
 
   return <Konteks.Provider value={nilai}>{children}</Konteks.Provider>;
+}
+
+/** Kalimat Indonesia untuk galat login, plus KODENYA.
+ *
+ *  Sebelumnya yang tampil `e.message` mentah dari SDK — kalimat Inggris
+ *  seperti "Firebase: Error (auth/network-request-failed)." di tengah
+ *  halaman berbahasa Indonesia. Orang yang membacanya tidak tahu apakah ia
+ *  salah menekan sesuatu, akunnya bermasalah, atau situsnya yang rusak, dan
+ *  22 Agu 2026 pemilik sendiri mengalaminya di tablet lalu cuma ingat
+ *  samar-samar bunyinya.
+ *
+ *  Kodenya SENGAJA tetap ditampilkan di ujung kalimat. Ia satu-satunya
+ *  bagian yang bisa ditelusuri kalau kejadiannya berulang, dan tangkapan
+ *  layar tanpa kode tidak bisa dipakai memperbaiki apa pun. */
+export function pesanAuth(e: unknown): string {
+  const kode = String((e as { code?: unknown })?.code ?? '');
+  const peta: Record<string, string> = {
+    'auth/network-request-failed':
+      'Jaringan terputus saat menghubungi Google. Coba lagi setelah sinyalnya stabil.',
+    'auth/internal-error':
+      'Google menolak permintaan login ini tanpa alasan yang jelas. Biasanya sementara — coba lagi sebentar.',
+    'auth/web-storage-unsupported':
+      'Peramban ini memblokir penyimpanan situs. Izinkan cookie untuk jaditrader.co.id, atau buka lewat Chrome.',
+    'auth/operation-not-supported-in-this-environment':
+      'Login Google tidak bisa berjalan di peramban dalam aplikasi. Buka lewat Chrome.',
+    'auth/too-many-requests':
+      'Terlalu banyak percobaan. Tunggu beberapa menit lalu coba lagi.',
+    'auth/user-disabled': 'Akun ini dinonaktifkan.',
+    'auth/account-exists-with-different-credential':
+      'Email ini sudah terdaftar lewat cara masuk yang berbeda.',
+    'auth/popup-closed-by-user': 'Jendela login ditutup sebelum selesai.',
+  };
+  if (kode === 'auth/unauthorized-domain') {
+    return 'Domain ini belum diizinkan di Firebase Console → Authentication → Settings → Authorized domains.';
+  }
+  const dasar = peta[kode];
+  if (dasar) return `${dasar} (${kode})`;
+  /* Kode yang belum dikenal: tampilkan KODENYA, bukan kalimat Inggris SDK.
+     Kode pendek bisa dibacakan lewat telepon; kalimat SDK tidak. */
+  return kode ? `Gagal masuk — ${kode}. Kirim kode ini kalau berulang.` : 'Gagal masuk. Coba lagi.';
 }
 
 export function useAuth() {

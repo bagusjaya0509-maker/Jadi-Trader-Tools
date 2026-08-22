@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
   CheckCircle2, Loader2, ShieldCheck, Clock, ArrowRight, TriangleAlert, KeyRound,
 } from 'lucide-react';
-import { useAuth } from '@/lib/auth';
+import { useAuth, pesanAuth } from '@/lib/auth';
 import { auth } from '@/lib/firebase';
 import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { mintaAkses, permintaanSaya, masukDiscord, type Permintaan } from '@/lib/akses';
@@ -85,7 +85,9 @@ export default function Aktivasi() {
     try {
       await signInWithPopup(auth, new GoogleAuthProvider());
     } catch (e) {
-      setGalat(e instanceof Error ? e.message : 'Gagal masuk');
+      /* Halaman yang PALING tidak boleh menampilkan kalimat Inggris mentah:
+         di sinilah orang yang baru saja membayar mendarat. */
+      setGalat(pesanAuth(e));
     }
   }
 
