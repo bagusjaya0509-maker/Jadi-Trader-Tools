@@ -622,8 +622,25 @@ export function ChartLilin({
     };
   }, []);
   /* Data berubah = jumlah bar berubah = "mentok" bisa berubah tanpa satu pun
-     geseran. Menyisipkan 1000 lilin lama harus MEMATIKAN tombolnya sendiri. */
-  useEffect(() => { cekUjung.current?.(); }, [lilin]);
+     geseran. Menyisipkan 1000 lilin lama harus MEMATIKAN tombolnya sendiri.
+
+     DIJADWALKAN, bukan dipanggil langsung. Efek yang memasang lilin baru ke
+     serinya duduk JAUH DI BAWAH efek ini, dan efek dijalankan React menurut
+     urutan penulisannya. Memanggil cek() di sini berarti membaca jendela
+     pandang SEBELUM lilin barunya masuk dan sebelum rentangnya dipulihkan —
+     jawabannya masih jawaban lama, jadi kartunya tetap menyala walau
+     riwayatnya sudah bertambah dan orangnya tidak lagi di ujung.
+
+     setTimeout 0 menaruhnya di tugas berikutnya, sesudah SELURUH efek commit
+     ini selesai; yang 250 ms menjaring pemulihan rentang yang baru mendarat
+     di frame berikutnya. Menggantungkan urutan pada posisi baris di berkas
+     ini terlalu rapuh — memindahkan satu efek saja akan mematahkannya lagi
+     tanpa satu pun galat. */
+  useEffect(() => {
+    const t0 = window.setTimeout(() => cekUjung.current?.(), 0);
+    const t1 = window.setTimeout(() => cekUjung.current?.(), 250);
+    return () => { window.clearTimeout(t0); window.clearTimeout(t1); };
+  }, [lilin]);
 
   /* -- Tanda air nama pasangan ------------------------------------------
      Plugin pane bawaan lightweight-charts v5 (createTextWatermark),
