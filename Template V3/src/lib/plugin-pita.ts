@@ -70,15 +70,31 @@ export class PenggambarPita implements ISeriesPrimitive<Time> {
           if (!s || !this.pita.length) return;
           target.useMediaCoordinateSpace(({ context: ctx, mediaSize }) => {
             for (const p of this.pita) {
-              const y1 = s.priceToCoordinate(p.atas);
-              const y2 = s.priceToCoordinate(p.bawah);
-              /* Nilai di luar rentang yang sedang tampak memulangkan null.
-                 Itu wajar — panel SMI menskalakan diri pada data yang
-                 terlihat, dan +120 sering berada di luar layar. Pitanya
-                 dilewati, bukan dijepit ke tepi: pita yang dijepit akan
-                 tampil sebagai garis tebal menempel di sisi panel, dan itu
-                 terbaca sebagai level yang tidak pernah kita maksudkan. */
-              if (y1 == null || y2 == null) continue;
+              const ya = s.priceToCoordinate(p.atas);
+              const yb = s.priceToCoordinate(p.bawah);
+
+              /* ── BATAS LUAR YANG TIDAK TERPETAKAN JATUH KE TEPI KANVAS ──
+                 Panel SMI menskalakan diri pada data yang terlihat, jadi
+                 +120 hampir selalu berada di luar rentang tampak. Pustaka
+                 ini MEMANG memulangkan koordinat hasil ekstrapolasi untuk
+                 nilai di luar rentang — tapi itu perilaku yang tidak
+                 dijanjikan tipenya: tanda tangannya `Coordinate | null`.
+
+                 Kalau suatu saat ia memulangkan null, pita jenuhnya tidak
+                 akan tergambar sama sekali dan tidak ada satu pun galat yang
+                 muncul — fitur yang diam-diam tidak melakukan apa-apa, jenis
+                 kerusakan yang paling lama tidak ketahuan. Jadi batas yang
+                 gagal dipetakan dijatuhkan ke tepi kanvas di sisinya: itu
+                 justru gambar yang benar, karena pita memang menjulur ke
+                 luar layar di sisi itu.
+
+                 Kalau KEDUANYA gagal, skalanya memang belum siap — dan pita
+                 setinggi seluruh panel jauh lebih buruk daripada tidak ada
+                 pita, jadi yang ini dilewati. */
+              if (ya == null && yb == null) continue;
+              const y1: number = ya ?? (p.atas > p.bawah ? 0 : mediaSize.height);
+              const y2: number = yb ?? (p.bawah > p.atas ? 0 : mediaSize.height);
+
               const puncak = Math.min(y1, y2), dasar = Math.max(y1, y2);
               const tinggi = dasar - puncak;
               if (tinggi < 0.5) continue;
