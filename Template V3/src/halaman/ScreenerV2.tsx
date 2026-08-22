@@ -276,11 +276,33 @@ const CSS_TANPA_CANGKANG = `
   /* Tombol utama ikut berbalik: di tema gelap ia putih dengan teks gelap,
      jadi di tema terang ia gelap dengan teks putih. "Putih" di sana
      berarti "permukaan paling menonjol", bukan putih harfiah. */
-  [data-tema='terang'] .es-scan-btn,
-  [data-tema='terang'] .es-priority-scan-btn,
-  [data-tema='terang'] .es-pantau-scan-btn {
-    background: #0f172a !important;
-    color: #ffffff !important;
+  /* ── TOMBOL PINDAI ────────────────────────────────────────────────
+     Kelasnya .es-priority-btn — dipakai BERTIGA: "Cari Sinyal Pantau",
+     "Cari Sinyal Parallel", dan "Cari Sinyal Prioritas ICT". Yang kedua
+     berganti tulisan jadi "Cari Sinyal SNR H4" lewat JS, jadi ia tidak
+     bisa dicari dari teksnya di berkas — id-nya esChBtn.
+
+     Tiga nama yang saya tulis sebelumnya (.es-scan-btn,
+     .es-priority-scan-btn, .es-pantau-scan-btn) TIDAK ADA di V2. Saya
+     mengarangnya dari tebakan penamaan, dan aturan yang tidak pernah
+     cocok tidak memberi tanda apa pun bahwa ia salah — ia cuma diam.
+     Yang ini diambil dari sumber V2-nya.
+
+     Aslinya: teks & tepi var(--gold) #c9a24b di atas var(--panel). Emas
+     itu dibuat untuk latar gelap; di atas putih ia tinggal 2,5:1 dan
+     nyaris hilang. Jadi emasnya digelapkan, bukan diganti warna lain —
+     tombol ini penanda "aksi utama section" di seluruh V2, dan menukar
+     warnanya di satu tema memutus hubungan itu.
+
+     Ditulis dengan .ema-screener di depannya supaya menang tanpa harus
+     bergantung pada urutan berkas. */
+  [data-tema='terang'] .ema-screener .es-priority-btn {
+    background: #ffffff !important;
+    border-color: #a97b1f !important;
+    color: #8a6420 !important;
+  }
+  [data-tema='terang'] .ema-screener .es-priority-btn:hover {
+    background: #fdf6e7 !important;
   }
   [data-tema='terang'] .es-section-head,
   [data-tema='terang'] .es-priority-header {
