@@ -158,6 +158,36 @@ const MEDAN_WARNA = [
   ['ekorNaik', 'Ekor naik'], ['ekorTurun', 'Ekor turun'],
 ] as const;
 
+/* -- Jatah "Muat lebih lama" untuk akun gratis ---------------------------
+   Riwayat panjang adalah fitur berbayar; akun gratis dapat beberapa
+   percobaan per hari supaya tahu rasanya, bukan nol. Dihitung per HARI dan
+   disimpan di localStorage -- ini pagar rasa, bukan pagar keamanan: yang
+   dijaga backend tetap kuota screener/replay, dan orang yang membersihkan
+   localStorage cuma mencurangi dirinya sendiri soal tombol riwayat. */
+const KUNCI_JATAH_LAMA = 'jt.jatahMuatLama';
+const JATAH_LAMA_GRATIS = 3;
+
+function bacaJatahLama(): number {
+  const hari = new Date().toISOString().slice(0, 10);
+  try {
+    const d = JSON.parse(localStorage.getItem(KUNCI_JATAH_LAMA) ?? 'null');
+    if (d && d.hari === hari && Number.isFinite(d.pakai)) {
+      return Math.max(0, JATAH_LAMA_GRATIS - d.pakai);
+    }
+  } catch { /* privat atau rusak */ }
+  return JATAH_LAMA_GRATIS;
+}
+
+function pakaiJatahLama() {
+  const hari = new Date().toISOString().slice(0, 10);
+  let pakai = 0;
+  try {
+    const d = JSON.parse(localStorage.getItem(KUNCI_JATAH_LAMA) ?? 'null');
+    if (d && d.hari === hari && Number.isFinite(d.pakai)) pakai = d.pakai;
+  } catch { /* privat */ }
+  try { localStorage.setItem(KUNCI_JATAH_LAMA, JSON.stringify({ hari, pakai: pakai + 1 })); } catch { /* privat */ }
+}
+
 function bacaTampilan(): SetelanTampilan {
   const hasil: SetelanTampilan = { ...TAMPILAN_AWAL };
   const serap = (d: unknown) => {
@@ -241,6 +271,7 @@ export default function ChartBacktest() {
   /* Jendela pandang sedang menyentuh bar paling tua. Dilaporkan ChartLilin,
      dan hanya saat BERUBAH -- lihat catatan di sana. */
   const [diUjungKiri, setDiUjungKiri] = useState(false);
+  const [jatahLama, setJatahLama] = useState(bacaJatahLama);
 
   /* Potongan lama dibuang tiap ganti simbol atau timeframe — riwayat BTC
      harian tidak berarti apa-apa di chart ETH 15 menit, dan menyambungnya
@@ -273,6 +304,10 @@ export default function ChartBacktest() {
     setMuatLama(true);
     try {
       const potongan = await ambilKlinesSebelum(simbol, tf, tertua - 1);
+      /* Jatah dicatat SETELAH permintaan berhasil dibuat, untuk akun yang
+         tidak berbayar saja. Permintaan yang gagal jaringan tidak menghabiskan
+         percobaan orang. */
+      if (!paketku.aktif) { pakaiJatahLama(); setJatahLama(bacaJatahLama()); }
       /* Kosong = sudah mentok. Ditandai supaya tombolnya berhenti menawarkan
          sesuatu yang tidak ada lagi, bukan diam-diam tidak melakukan apa-apa
          setiap kali ditekan. */
@@ -1646,9 +1681,41 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
      ikut menggambar ulang. */
   const [pasarUi, setPasarUi] = useState(pasarKripto);
   const [menuTampilan, setMenuTampilan] = useState(false);
-  useEffect(() => {
+
+  /* -- Panel tampilan bekerja dengan DRAF --------------------------------
+     Perubahan langsung terlihat di chart (pratinjau hidup: memilih warna
+     tanpa melihat hasilnya cuma menebak), tapi TIDAK ada yang ditulis
+     sebelum Simpan ditekan. Menutup panel lewat mana pun selain Simpan
+     mengembalikan keadaan saat panel dibuka -- itulah yang dijanjikan
+     sebuah tombol Simpan: yang belum disimpan belum terjadi. */
+  const drafAwal = useRef<{ t: SetelanTampilan; p: ReturnType<typeof pasarKripto> } | null>(null);
+
+  const bukaTutupTampilan = () => {
+    if (menuTampilan) { batalTampilan(); return; }
+    drafAwal.current = { t: tampilan, p: pasarUi };
+    setMenuTampilan(true);
+  };
+
+  const batalTampilan = () => {
+    const d = drafAwal.current;
+    if (d) { setTampilan(d.t); setPasarUi(d.p); }
+    setMenuTampilan(false);
+  };
+
+  const simpanTampilan = () => {
     try { localStorage.setItem(KUNCI_TAMPILAN, JSON.stringify(tampilan)); } catch { /* privat */ }
-  }, [tampilan]);
+    /* Pasar diterapkan DI SINI, bukan saat tombolnya diklik: berpindah pasar
+       berarti membuang cache dan menarik ulang seluruh lilin -- terlalu
+       mahal untuk sekadar pratinjau, dan orang yang cuma menimbang-nimbang
+       lalu menekan Batal tidak kehilangan apa pun. */
+    if (pasarUi !== pasarKripto()) {
+      aturPasarKripto(pasarUi);
+      setRiwayatLama(null);
+      setHabisRiwayat(false);
+      setSegar((v) => v + 1);
+    }
+    setMenuTampilan(false);
+  };
   const tampilanBawaan = (Object.keys(TAMPILAN_AWAL) as (keyof SetelanTampilan)[])
     .every((k) => tampilan[k] === TAMPILAN_AWAL[k]);
 
@@ -1747,10 +1814,17 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
      lain, dan posisi yang sedang terbuka jadi tidak punya arti. */
   useEffect(() => { setReplayIdx(null); setGarisHarga([]); }, [simbol, tf]);
 
+  /* SEMUA deret yang digambar per indeks WAJIB dihitung dari lilinGabung,
+     bukan lilin. ChartLilin menggambar lilinGabung dan memetakan nilai[i] ke
+     lilin ke-i; deret yang dihitung dari jendela live 1000 lilin akan
+     mendarat di 1000 lilin TERTUA begitu "Muat lebih lama" menyisipkan
+     riwayat di depan. Persis itulah yang terlihat: SMI menumpuk di ujung
+     kiri chart sesudah riwayat ditarik. Pine sudah benar sejak lama --
+     DockPine memang menerima lilinGabung. */
   const garis: Garis[] = useMemo(() => {
     const keluar: Garis[] = [];
-    if (set.strategi === 'ema' && lilin.closes.length) {
-      const g = garisIndikator(lilin, set);
+    if (set.strategi === 'ema' && lilinGabung.closes.length) {
+      const g = garisIndikator(lilinGabung, set);
       keluar.push({ nama: `EMA ${set.emaCepat}`, nilai: g.cepat ?? [], warna: '#fbbf24' });
       keluar.push({ nama: `EMA ${set.emaLambat}`, nilai: g.lambat ?? [], warna: '#60a5fa' });
     }
@@ -1761,7 +1835,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
     (pine?.plot ?? []).filter((p) => !p.osilator)
       .forEach((p) => keluar.push({ nama: p.judul, nilai: p.nilai, warna: p.warna }));
     return keluar;
-  }, [lilin, set, pine]);
+  }, [lilinGabung, set, pine]);
 
   /* Zona dihitung sampai bar yang SEDANG tampil, bukan sampai bar terakhir.
      Selama replay, menggambar zona dari data masa depan adalah cara paling
@@ -1772,9 +1846,13 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
      pivot, dan satu deret ATR penuh diulang empat kali sedetik di jalur
      render — sekitar 135.000 operasi per tick pada 3000 lilin, untuk
      menghasilkan tiga angka. */
+  /* lilinGabung juga di sini, dan bukan cuma soal gambar: zonaSnrDari
+     menerima replayIdx, yang merupakan indeks ke dalam lilinGabung. Memberi
+     siapkanSnr deret yang berbeda berarti replay membaca pivot dari bar yang
+     salah sesudah riwayat dimuat. */
   const siapSnr = useMemo(
-    () => (tampilSnr && lilin.closes.length ? siapkanSnr(lilin) : null),
-    [tampilSnr, lilin]
+    () => (tampilSnr && lilinGabung.closes.length ? siapkanSnr(lilinGabung) : null),
+    [tampilSnr, lilinGabung]
   );
 
   /* Yang tersisa per bar: satu pencarian biner dan satu pembacaan larik. */
@@ -1811,8 +1889,8 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
     if (dariPine.length) {
       return { smi: dariPine[0].nilai, signal: dariPine[1]?.nilai ?? [] };
     }
-    return tampilSmi && lilin.closes.length >= 30 ? deretSmi(lilin) : null;
-  }, [tampilSmi, lilin, pine]);
+    return tampilSmi && lilinGabung.closes.length >= 30 ? deretSmi(lilinGabung) : null;
+  }, [tampilSmi, lilinGabung, pine]);
 
   /* Pita jenuh cuma sah kalau panel bawah memang SMI. Skrip Pine yang
      menumpang panel yang sama boleh berskala apa saja -- rupiah, volume,
@@ -2737,14 +2815,50 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                               <span className="rounded border border-zinc-800 bg-zinc-950/90 px-2 py-1 text-[10.5px] leading-none text-zinc-600 shadow">
                                 riwayat terjauh
                               </span>
+                            ) : !paketku.aktif && jatahLama <= 0 ? (
+                              /* Jatah gratis habis: kartunya berubah jadi
+                                 ajakan, bukan tombol mati. Tombol mati tanpa
+                                 penjelasan terbaca sebagai kerusakan; kartu
+                                 yang menyebut alasannya terbaca sebagai
+                                 batas yang disengaja. */
+                              <div className="w-44 rounded-lg border border-zinc-800 bg-zinc-950/95 p-3 text-center shadow-xl">
+                                <History className="mx-auto size-5 text-amber-400/90" strokeWidth={1.75} />
+                                <p className="mt-1.5 text-[11.5px] font-medium leading-snug text-zinc-200">
+                                  Butuh riwayat lebih panjang?
+                                </p>
+                                <p className="mt-1 text-[10px] leading-snug text-zinc-500">
+                                  Jatah coba gratis hari ini sudah terpakai. Akses berbayar membuka riwayat tanpa batas.
+                                </p>
+                                <Link to="/harga"
+                                  className="mt-2 block cursor-pointer rounded-md bg-emerald-600 px-2 py-1.5 text-[11px] font-medium text-white transition-colors hover:bg-emerald-500">
+                                  Lihat paket
+                                </Link>
+                              </div>
                             ) : (
-                              <button
-                                onClick={() => void muatLebihLama()}
-                                disabled={muatLama}
-                                title="Tarik 1000 lilin sebelum yang paling tua"
-                                className="cursor-pointer rounded border border-zinc-700 bg-zinc-950/90 px-2 py-1 text-[10.5px] leading-none text-zinc-300 shadow transition-colors hover:border-zinc-600 hover:text-zinc-100 disabled:cursor-not-allowed disabled:opacity-50">
-                                {muatLama ? 'Memuat…' : '← Muat lebih lama'}
-                              </button>
+                              /* Kartu, bukan tombol telanjang -- meniru pola
+                                 kartu riwayat TradingView: ikon, tombol
+                                 utama, dan keterangan sisa jatah untuk yang
+                                 gratis. */
+                              <div className="w-44 rounded-lg border border-zinc-800 bg-zinc-950/95 p-3 text-center shadow-xl">
+                                <History className="mx-auto size-5 text-zinc-400" strokeWidth={1.75} />
+                                <p className="mt-1.5 text-[11.5px] font-medium leading-snug text-zinc-200">
+                                  Riwayat lebih lama
+                                </p>
+                                <p className="mt-1 text-[10px] leading-snug text-zinc-500">
+                                  Tarik 1000 lilin sebelum yang paling tua.
+                                </p>
+                                <button
+                                  onClick={() => void muatLebihLama()}
+                                  disabled={muatLama}
+                                  className="mt-2 w-full cursor-pointer rounded-md bg-emerald-600 px-2 py-1.5 text-[11px] font-medium text-white transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60">
+                                  {muatLama ? 'Memuat\u2026' : 'Muat lebih lama'}
+                                </button>
+                                {!paketku.aktif && (
+                                  <p className="mt-1.5 text-[9.5px] text-zinc-600">
+                                    sisa coba gratis: {jatahLama}× hari ini
+                                  </p>
+                                )}
+                              </div>
                             )
                           ) : undefined}
                           pojok={aksi ? (
@@ -3280,7 +3394,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
               yang dibaca di baris ini adalah jumlah lilin dan sumbernya. */}
           <div className="relative shrink-0">
             <button
-              onClick={() => setMenuTampilan((v) => !v)}
+              onClick={bukaTutupTampilan}
               title="Setelan tampilan chart"
               aria-label="Setelan tampilan chart"
               className={cn('flex cursor-pointer items-center rounded p-1 transition-colors',
@@ -3289,7 +3403,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
             </button>
             {menuTampilan && (
               <>
-                <div className="fixed inset-0 z-30" onClick={() => setMenuTampilan(false)} />
+                <div className="fixed inset-0 z-30" onClick={batalTampilan} />
                 {/* Terbuka ke ATAS dan ke KANAN. Tombolnya di pojok kiri
                     bawah: panel yang terbuka ke bawah atau ke kiri dari sana
                     keluar layar. */}
@@ -3343,16 +3457,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                     <div className="mt-1.5 grid grid-cols-2 gap-1.5">
                       {([['futures', 'Futures'], ['spot', 'Spot']] as const).map(([nilai, label]) => (
                         <button key={nilai}
-                          onClick={() => {
-                            if (pasarUi === nilai) return;
-                            aturPasarKripto(nilai);
-                            setPasarUi(nilai);
-                            /* Muat ulang paksa: cache pasar sudah dibuang di
-                               aturPasarKripto, tinggal memicu penarikan. */
-                            setRiwayatLama(null);
-                            setHabisRiwayat(false);
-                            setSegar((v) => v + 1);
-                          }}
+                          onClick={() => setPasarUi(nilai)}
                           className={cn('cursor-pointer rounded-md border px-2 py-1.5 text-[11.5px] transition-colors',
                             pasarUi === nilai
                               ? 'border-emerald-600/60 bg-emerald-500/10 text-emerald-300'
@@ -3396,20 +3501,38 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                   <div className="mt-1 border-t border-zinc-800/70 px-2 pb-0.5 pt-1.5">
                     <button onClick={() => setTampilan({ ...TAMPILAN_AWAL })} disabled={tampilanBawaan}
                       title={tampilanBawaan ? 'Semua setelan sudah bawaan' : 'Kembalikan warna lilin, latar, dan tanda air ke bawaan'}
-                      className="flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-md border border-zinc-800 px-2 py-1.5 text-[11.5px] text-zinc-300 transition-colors hover:border-zinc-700 hover:bg-zinc-900 hover:text-zinc-100 disabled:cursor-default disabled:border-zinc-900 disabled:text-zinc-700 disabled:hover:border-zinc-900 disabled:hover:bg-transparent disabled:hover:text-zinc-700">
+                      className="flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-md border border-zinc-800 px-2 py-1.5 text-[11.5px] text-zinc-400 transition-colors hover:border-zinc-700 hover:bg-zinc-900 hover:text-zinc-200 disabled:cursor-default disabled:border-zinc-900 disabled:text-zinc-700 disabled:hover:border-zinc-900 disabled:hover:bg-transparent disabled:hover:text-zinc-700">
                       <RotateCcw className="size-3" strokeWidth={2} />
                       {tampilanBawaan ? 'Sudah bawaan' : 'Kembalikan ke bawaan'}
                     </button>
+                    {/* Simpan yang menonjol, Batal yang polos: sesudah
+                        mengutak-atik warna, tindakan yang hampir selalu
+                        dimaksudkan adalah menyimpan. */}
+                    <div className="mt-1.5 flex gap-1.5">
+                      <button onClick={batalTampilan}
+                        className="flex-1 cursor-pointer rounded-md border border-zinc-800 px-2 py-1.5 text-[11.5px] text-zinc-400 transition-colors hover:border-zinc-700 hover:bg-zinc-900 hover:text-zinc-200">
+                        Batal
+                      </button>
+                      <button onClick={simpanTampilan}
+                        className="flex-1 cursor-pointer rounded-md bg-emerald-600 px-2 py-1.5 text-[11.5px] font-medium text-white transition-colors hover:bg-emerald-500">
+                        Simpan
+                      </button>
+                    </div>
                   </div>
                 </div>
               </>
             )}
           </div>
+          {/* Keterangan "N lilin · simbol · lewat proxy VPS" DIHAPUS atas
+              permintaan pemilik: informasi teknis yang tidak dibaca siapa pun
+              dalam pemakaian normal, tapi tampil permanen di layar setiap
+              pengguna. Jumlah penanda trade dipertahankan -- ia hanya muncul
+              sehabis backtest, dan orang yang baru menjalankan backtest
+              sedang mencarinya. */}
           <span className="flex min-w-0 items-center gap-2 truncate">
-            <span className="truncate">
-              {lilinGabung.times.length} lilin · {simbol} {TF.find((x) => x.nilai === tf)?.label} · lewat proxy VPS
-              {hasil?.trade.length ? ` · ${hasil.trade.length} penanda trade` : ''}
-            </span>
+            {hasil?.trade.length ? (
+              <span className="truncate">{hasil.trade.length} penanda trade</span>
+            ) : null}
           </span>
           {/* Backtest disembunyikan di balik ikon di pojok chart, bukan
               dibentangkan di bawahnya. Alasannya bukan sekadar ruang:
