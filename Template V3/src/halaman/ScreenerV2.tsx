@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Loader2, ExternalLink, TriangleAlert, RotateCcw, Radar, ArrowRight, Lock } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
@@ -308,6 +308,45 @@ function cnSampul(terkunci: boolean) {
 }
 
 export default function ScreenerV2() {
+  /* ── TEMA INDUK DISALIN KE DALAM BINGKAI ──────────────────────────────
+     Ini yang terlewat dua kali, dan sekali sempat merusak tema gelap.
+
+     Gaya penyelaras di bawah disuntikkan ke DOKUMEN DI DALAM IFRAME,
+     sementara `data-tema` menempel di <html> milik halaman INDUK. Dua
+     dokumen berbeda: di dalam bingkai, [data-tema='terang'] tidak pernah
+     cocok dengan apa pun, dan var(--color-zinc-*) tidak ada sama sekali
+     karena token Tailwind hidup di dokumen induk.
+
+     Satu fakta itu menjelaskan dua gejala yang tampak tidak berhubungan:
+     tema terang tidak pernah sampai ke screener, dan percobaan memakai
+     token justru membuat warnanya kosong — yang terbaca sebagai "tema
+     gelap ikut rusak".
+
+     Jadi atributnya disalin, bukan gayanya ditulis ulang. MutationObserver
+     dipakai supaya ia ikut berpindah saat sakelarnya ditekan — menyalin
+     sekali saat bingkai dimuat cuma benar sampai orangnya berganti tema. */
+  const bingkaiRef = useRef<HTMLIFrameElement | null>(null);
+
+  const salinTema = useCallback(() => {
+    /* Lintas-domain melempar saat contentDocument disentuh. Itu bukan
+       kegagalan yang perlu dilaporkan: screener-nya tetap jalan, cuma
+       temanya tidak ikut. */
+    try {
+      const d = bingkaiRef.current?.contentDocument;
+      if (!d?.documentElement) return;
+      const t = document.documentElement.getAttribute('data-tema');
+      if (t) d.documentElement.setAttribute('data-tema', t);
+      else d.documentElement.removeAttribute('data-tema');
+    } catch { /* lintas-domain — diabaikan */ }
+  }, []);
+
+  useEffect(() => {
+    salinTema();
+    const mo = new MutationObserver(salinTema);
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-tema'] });
+    return () => mo.disconnect();
+  }, [salinTema]);
+
   const arahkan = useNavigate();
 
   /* Pesan dari dalam bingkai: "buka simbol ini di Chart & Backtest".
@@ -595,6 +634,7 @@ export default function ScreenerV2() {
         )}
         {alamat && (
           <iframe
+            ref={bingkaiRef}
             src={alamat}
             title="Crypto Screener"
             onLoad={(e) => {
@@ -629,6 +669,10 @@ export default function ScreenerV2() {
                   s.textContent = CSS_TANPA_CANGKANG;
                   (d.head || d.documentElement).appendChild(s);
                 }
+                /* Disalin di sini juga, bukan cuma lewat pengamat di atas:
+                   bingkainya baru punya dokumen SEKARANG, dan pengamat
+                   hanya berbunyi kalau temanya BERUBAH sesudah ini. */
+                salinTema();
                 /* Nama section diganti DI TAMPILAN, bukan di berkas V2.
                    Nama lama ("Area Pantau", "Parallel Signal") tertanam di
                    localStorage V2 (chip section tersembunyi), di notifikasi,
