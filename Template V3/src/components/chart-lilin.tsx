@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  createChart, CandlestickSeries, LineSeries, createSeriesMarkers,
+  createChart, CandlestickSeries, LineSeries, createSeriesMarkers, createTextWatermark,
   type IChartApi, type ISeriesApi, type ISeriesMarkersPluginApi, type IPriceLine, type Logical, type Time,
+  type ITextWatermarkPluginApi,
 } from 'lightweight-charts';
 import type { Lilin } from '@/lib/pasar';
 import { cn, harga as fHarga } from '@/lib/utils';
@@ -83,6 +84,30 @@ function bacaTinggiSmi(): number {
   } catch { return TINGGI_SMI_BAWAAN; }
 }
 
+/** Warna lilin bawaan. Diekspor karena halaman Chart perlu angka yang SAMA
+ *  untuk tombol "Bawaan" di setelan warnanya — dua sumber angka yang
+ *  seharusnya sama adalah dua angka yang cepat atau lambat berbeda. */
+export const WARNA_LILIN_BAWAAN = { naik: '#10b981', turun: '#f87171' } as const;
+
+/* -- Warna panel SMI -----------------------------------------------------
+   Biru untuk SMI, oranye untuk EMA-nya -- urutan yang SAMA dengan skrip SMI
+   Ergodic di TradingView. Sebelumnya terbalik, dan itu bukan soal selera:
+   orang yang membaca chart yang sama di dua tempat mengenali garis lewat
+   warnanya, bukan dengan membaca legenda tiap kali. Dua garis yang bertukar
+   warna antar aplikasi terbaca sebagai silang yang berlawanan arah. */
+const WARNA_SMI = '#60a5fa';
+const WARNA_SMI_EMA = '#fbbf24';
+
+/* -- Warna tanda air -----------------------------------------------------
+   Sangat samar dengan sengaja. Tanda air itu penanda "chart ini simbol apa"
+   untuk mata yang baru mendarat di layar, bukan lapisan data -- ia harus
+   kalah oleh lilin paling tipis sekalipun. Angkanya beda per tema karena
+   mata jauh lebih peka pada tinta gelap di bidang terang. */
+const WARNA_TANDA_AIR = {
+  gelap: { utama: 'rgba(255,255,255,.085)', sub: 'rgba(255,255,255,.06)' },
+  terang: { utama: 'rgba(0,0,0,.075)', sub: 'rgba(0,0,0,.055)' },
+} as const;
+
 /** Garis yang bisa DIGESER: entry, SL, TP.
  *
  *  Digambar sebagai elemen DOM di atas kanvas, bukan sebagai price line
@@ -120,8 +145,15 @@ export function ChartLilin({
   lilin, garis, trade, tinggi = 420, hingga, garisHarga, onKlikBar, smi, mundur, pojok,
   garisSeret, onSeret, onKlikGaris, onHapusGaris, hamparanBawah, segmen, penandaPine, kotakPine, isianPine,
   alat, onAlatSelesai, gambarAlat, gambarPilih, onPilihGambar, onUbahGambar,
-  posisiMt5, onUbahPosisi, hargaAsk, kunciUkuran, bagikanFoto,
+  posisiMt5, onUbahPosisi, hargaAsk, kunciUkuran, bagikanFoto, tandaAir, warnaLilin,
 }: {
+  /** Nama pasangan yang dicetak samar di tengah area harga, seperti
+   *  TradingView. `utama` nama simbolnya, `sub` baris kecil di bawahnya --
+   *  timeframe dan sumber datanya. Tanpa prop ini tidak ada tanda air. */
+  tandaAir?: { utama: string; sub?: string };
+  /** Warna lilin naik/turun pilihan orangnya. Tanpa ini dipakai
+   *  WARNA_LILIN_BAWAAN. */
+  warnaLilin?: { naik: string; turun: string };
   /** Diberi SATU fungsi pemotret begitu chartnya siap. Dipakai halaman yang
    *  perlu sampul analisa; yang diserahkan cuma kemampuan memotret, bukan
    *  objek chartnya — lihat catatan di tempat pemasangannya. */
@@ -204,6 +236,10 @@ export function ChartLilin({
   const seriGaris = useRef<ISeriesApi<'Line'>[]>([]);
   const penanda = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
   const seriSmi = useRef<ISeriesApi<'Line'>[]>([]);
+  /* Pegangan garis ambang +50/-50 disimpan. Ia price line, bukan bagian
+     dari opsi chart, jadi applyOptions saat tema berganti tidak akan
+     menyentuhnya kalau pegangannya dibuang begitu saja. */
+  const garisAmbang = useRef<IPriceLine[]>([]);
   const garisPos = useRef<IPriceLine[]>([]);
   const isiPine = useRef<PenggambarIsi | null>(null);
   const alatPrim = useRef<PenggambarAlat | null>(null);
@@ -250,6 +286,15 @@ export function ChartLilin({
   bagikanFotoRef.current = bagikanFoto;
   useEffect(() => { if (fotoRef.current) bagikanFoto?.(fotoRef.current); }, [bagikanFoto]);
   klikRef.current = onKlikBar;
+
+  /* Warna lilin dipegang di ref juga, dengan alasan yang sama seperti
+     `bagikanFoto` di atas: efek pembuatan chart sengaja tidak berdependensi
+     pada warna, karena mengganti warna tidak boleh membangun ulang chart
+     dan membuang zoom serta posisi geser orangnya. */
+  const naikLilin = warnaLilin?.naik || WARNA_LILIN_BAWAAN.naik;
+  const turunLilin = warnaLilin?.turun || WARNA_LILIN_BAWAAN.turun;
+  const warnaLilinRef = useRef({ naik: naikLilin, turun: turunLilin });
+  warnaLilinRef.current = { naik: naikLilin, turun: turunLilin };
 
   /* Chart dibuat SEKALI. Membuatnya ulang tiap data berubah akan mengembalikan
      zoom dan posisi geser ke awal setiap 15 detik — dan chart yang melompat
@@ -312,9 +357,9 @@ export function ChartLilin({
     window.addEventListener('resize', ukurUlang);
     ukurLagi.current = ukurUlang;
     seri.current = c.addSeries(CandlestickSeries, {
-      upColor: '#10b981', downColor: '#f87171',
-      borderUpColor: '#10b981', borderDownColor: '#f87171',
-      wickUpColor: '#10b981', wickDownColor: '#f87171',
+      upColor: warnaLilinRef.current.naik, downColor: warnaLilinRef.current.turun,
+      borderUpColor: warnaLilinRef.current.naik, borderDownColor: warnaLilinRef.current.turun,
+      wickUpColor: warnaLilinRef.current.naik, wickDownColor: warnaLilinRef.current.turun,
       priceFormat: { type: 'price', ...formatHarga(lilin.closes) },
     });
     /* Penggambar isian — zona S/R terisi warna dan pewarna tengah channel,
@@ -420,7 +465,8 @@ export function ChartLilin({
 
      Yang TIDAK ikut berubah: warna lilin naik/turun. Hijau dan merah itu
      arti, bukan hiasan, dan keduanya sudah cukup pekat untuk terbaca di
-     atas putih maupun hitam. */
+     atas putih maupun hitam. Sejak warnanya bisa disetel sendiri, ia punya
+     efeknya sendiri di bawah -- tema tetap tidak menyentuhnya. */
   useEffect(() => {
     const c = chart.current;
     if (!c) return;
@@ -435,7 +481,64 @@ export function ChartLilin({
         horzLine: { color: w.bidik, labelBackgroundColor: w.labelBidik },
       },
     });
+    /* Garis ambang SMI diganti tangan. applyOptions di atas hanya menyentuh
+       opsi chart; price line berdiri sendiri -- di mode terang ia tetap
+       putih 14% di atas latar putih, yaitu tidak terlihat sama sekali. */
+    garisAmbang.current.forEach((g) => {
+      try { g.applyOptions({ color: w.garisNol }); } catch { /* serinya sudah dibongkar */ }
+    });
   }, [tema]);
+
+  /* -- Warna lilin ------------------------------------------------------
+     Lewat applyOptions, bukan dengan membuat ulang serinya. Membuat ulang
+     seri lilin berarti mengirim seluruh datanya lagi dan kehilangan jendela
+     pandang -- mahal sekali untuk satu pergantian warna. */
+  useEffect(() => {
+    const s = seri.current;
+    if (!s) return;
+    try {
+      s.applyOptions({
+        upColor: naikLilin, downColor: turunLilin,
+        borderUpColor: naikLilin, borderDownColor: turunLilin,
+        wickUpColor: naikLilin, wickDownColor: turunLilin,
+      });
+    } catch { /* serinya sudah dibongkar */ }
+  }, [naikLilin, turunLilin]);
+
+  /* -- Tanda air nama pasangan ------------------------------------------
+     Plugin pane bawaan lightweight-charts v5 (createTextWatermark),
+     dipasang di pane 0 -- pane harga. Bukan elemen DOM yang dihamparkan:
+     tanda air yang hidup di DOM tidak ikut terbawa saat chartnya dipotret
+     untuk sampul analisa, sementara yang digambar di kanvas ikut.
+
+     Dependensinya HANYA tema dan teksnya. Chartnya sendiri dibuat sekali
+     seumur komponen (efek di atas berdependensi kosong), jadi menambahkan
+     kunciUkuran atau tinggi ke sini cuma akan membongkar-pasang tanda air
+     tiap piksel pembatas watchlist digeser -- tanpa satu pun alasan. */
+  const tandaAirRef = useRef<ITextWatermarkPluginApi<Time> | null>(null);
+  const utamaAir = tandaAir?.utama;
+  const subAir = tandaAir?.sub;
+  useEffect(() => {
+    const c = chart.current;
+    if (!c || !utamaAir) return;
+    const w = WARNA_TANDA_AIR[tema];
+    const font = "'IBM Plex Sans', -apple-system, sans-serif";
+    const baris: { text: string; color: string; fontSize: number; fontStyle?: string; fontFamily: string }[] = [
+      { text: utamaAir, color: w.utama, fontSize: 42, fontStyle: 'bold', fontFamily: font },
+    ];
+    if (subAir) baris.push({ text: subAir, color: w.sub, fontSize: 17, fontFamily: font });
+    try {
+      const pane = c.panes()[0];
+      if (!pane) return;
+      tandaAirRef.current = createTextWatermark(pane, {
+        horzAlign: 'center', vertAlign: 'center', lines: baris,
+      });
+    } catch { /* versi pustaka tanpa plugin tanda air */ }
+    return () => {
+      try { tandaAirRef.current?.detach(); } catch { /* chartnya sudah dibuang lebih dulu */ }
+      tandaAirRef.current = null;
+    };
+  }, [tema, utamaAir, subAir]);
 
   /* Penanda apa yang TERAKHIR digambar, dipakai memutuskan jalur cepat.
      Disimpan di ref, bukan state: ia tidak boleh memicu render sendiri. */
@@ -561,6 +664,7 @@ export function ChartLilin({
     if (!c) return;
     seriSmi.current.forEach((s) => { try { c.removeSeries(s); } catch { /* sudah lepas */ } });
     seriSmi.current = [];
+    garisAmbang.current = [];
     if (!smi || !lilin.times.length) return;
 
     const buat = (warna: string, tebal: 1 | 2) => {
@@ -569,8 +673,8 @@ export function ChartLilin({
       }, 1);
       seriSmi.current.push(s);
     };
-    buat('#fbbf24', 2);
-    buat('#60a5fa', 1);
+    buat(WARNA_SMI, 2);
+    buat(WARNA_SMI_EMA, 1);
 
     /* Ambang jenuh +50 / -50 — angka yang SAMA dengan SMI_OB dan SMI_OS di
        jt-scan-core, yaitu ambang yang dipakai kartu sinyal untuk menyebut
@@ -579,7 +683,7 @@ export function ChartLilin({
        pendapat tentang koin yang sama. */
     const acuan = seriSmi.current[0];
     if (acuan) {
-      [50, -50].forEach((v) => acuan.createPriceLine({
+      garisAmbang.current = [50, -50].map((v) => acuan.createPriceLine({
         price: v, color: WARNA_CHART[temaSekarang()].garisNol, lineWidth: 1, lineStyle: 2,
         axisLabelVisible: false, title: '',
       }));

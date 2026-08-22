@@ -777,7 +777,7 @@ plot(res, title="Resisten", color=color.red)
 plot(sup, title="Support", color=color.green)
 
 // SMI di panel bawah
-plot(jt.smi(), title="SMI", color=color.orange)
-plot(jt.smiSignal(), title="SMI signal", color=color.aqua)
+plot(jt.smi(), title="SMI", color=color.aqua)
+plot(jt.smiSignal(), title="SMI signal", color=color.orange)
 hline(50, color=color.gray)
 hline(-50, color=color.gray)`;

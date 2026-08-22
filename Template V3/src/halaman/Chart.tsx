@@ -8,7 +8,7 @@ import { PanelNews } from '@/components/panel-news';
 import { simpanDraf } from '@/lib/draf-sinyal';
 import { Panel, PanelHead, KartuKpi, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn, uang, persen, harga, tanggalPendek } from '@/lib/utils';
-import { ChartLilin, type Garis, type GarisHarga, type GarisSeret, type PosisiChartMt5 } from '@/components/chart-lilin';
+import { ChartLilin, WARNA_LILIN_BAWAAN, type Garis, type GarisHarga, type GarisSeret, type PosisiChartMt5 } from '@/components/chart-lilin';
 import { PanelReplay, type AksiOrder, type JenisEntry } from '@/components/panel-replay';
 import { PojokOrder } from '@/components/pojok-order';
 import { kirimOrderNyata, ubahSlTpNyata, batalPendingNyata, tutupPosisiNyata, tickSimbol, keTick, type MetodeTp } from '@/lib/order-nyata';
@@ -123,6 +123,26 @@ function Angka({ label, nilai, atur, langkah = 1, min = 0 }: {
    di mana menaruh garisnya memakan waktu, dan bilah yang lenyap di tengah
    pertimbangan itu memaksa mulai dari awal. */
 const JEDA_LIPAT_ALAT_MS = 20_000;
+
+/* -- Warna lilin pilihan orangnya ----------------------------------------
+   Disimpan sendiri di localStorage, BUKAN lewat simpanSetelanChart: setelan
+   di sana dikunci per simbol+timeframe, sementara warna lilin adalah selera
+   yang berlaku di semua chart. Orang yang memilih biru-oranye tidak sedang
+   memilihnya "untuk BTCUSDT H4 saja". */
+const KUNCI_WARNA_LILIN = 'jt.warnaLilin';
+
+function bacaWarnaLilin(): { naik: string; turun: string } {
+  /* Divalidasi, bukan dipercaya. Isi localStorage bisa disunting tangan atau
+     tertinggal dari versi lama, dan warna yang tidak sah membuat
+     lightweight-charts menggambar lilin transparan -- chart yang tampak
+     kosong tanpa satu pun galat di konsol. */
+  const sah = (v: unknown) => typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v);
+  try {
+    const d = JSON.parse(localStorage.getItem(KUNCI_WARNA_LILIN) ?? 'null');
+    if (d && sah(d.naik) && sah(d.turun)) return { naik: d.naik, turun: d.turun };
+  } catch { /* privat atau JSON rusak */ }
+  return { ...WARNA_LILIN_BAWAAN };
+}
 
 function rapikanSimbol(s: string): string {
   const t = s.trim();
@@ -1573,6 +1593,21 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
     simpanSetelanChart({ simbol, tf, snr: tampilSnr, smi: tampilSmi });
   }, [simbol, tf, tampilSnr, tampilSmi]);
 
+  const [warnaLilin, setWarnaLilin] = useState(bacaWarnaLilin);
+  useEffect(() => {
+    try { localStorage.setItem(KUNCI_WARNA_LILIN, JSON.stringify(warnaLilin)); } catch { /* privat */ }
+  }, [warnaLilin]);
+  const warnaBawaan = warnaLilin.naik === WARNA_LILIN_BAWAAN.naik && warnaLilin.turun === WARNA_LILIN_BAWAAN.turun;
+
+  /* Tanda air: nama simbol besar, timeframe dan sumbernya kecil di bawah --
+     susunan yang sama dengan TradingView. Awalan "MT5:" dibuang: itu penanda
+     rute data untuk kita, bukan nama instrumen untuk orang yang membacanya. */
+  const mt5 = simbol.startsWith('MT5:');
+  const tandaAir = useMemo(
+    () => ({ utama: mt5 ? simbol.slice(4) : simbol, sub: tf + ' \u00b7 ' + (mt5 ? 'Trade-Fi' : 'Binance') }),
+    [simbol, tf, mt5]
+  );
+
   /* ── Data realtime ──────────────────────────────────────────────────
      Ditarik ulang tiap 15 detik, sama dengan umur cache di lib/pasar.ts —
      memintanya lebih sering hanya akan menerima salinan cache yang sama. */
@@ -2400,6 +2435,34 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                         <span className="block truncate text-[10.5px] text-zinc-600">Panel osilator di bawah chart</span>
                       </span>
                     </label>
+                    {/* Warna lilin duduk di menu indikator, bukan di menu
+                        sendiri: yang dicari orang saat membukanya adalah "apa
+                        yang tampil di chart dan bagaimana rupanya" -- itu satu
+                        pertanyaan, bukan dua. */}
+                    <div className="mt-1 flex items-center justify-between border-t border-zinc-800/70 px-2 pb-1 pt-1.5">
+                      <span className="text-[10px] font-medium uppercase tracking-wider text-zinc-600">Warna lilin</span>
+                      <button onClick={() => setWarnaLilin({ ...WARNA_LILIN_BAWAAN })} disabled={warnaBawaan}
+                        className="cursor-pointer rounded px-1.5 py-0.5 text-[11px] text-zinc-400 transition-colors hover:bg-zinc-900 hover:text-zinc-100 disabled:cursor-default disabled:text-zinc-700 disabled:hover:bg-transparent">
+                        Bawaan
+                      </button>
+                    </div>
+                    <div className="flex gap-1.5 px-2 pb-1.5">
+                      {([['naik', 'Naik'], ['turun', 'Turun']] as const).map(([kunci, label]) => (
+                        <label key={kunci} className="flex flex-1 cursor-pointer items-center gap-2 rounded-md border border-zinc-800 px-2 py-1.5 transition-colors hover:bg-zinc-900">
+                          {/* Petak warnanya distel tangan: bawaan peramban
+                              memberi kotak berbingkai tebal dengan padding
+                              dalam yang tidak bisa diikuti ukuran mana pun. */}
+                          <input type="color" value={warnaLilin[kunci]}
+                                 onChange={(e) => setWarnaLilin((w) => ({ ...w, [kunci]: e.target.value }))}
+                                 aria-label={'Warna lilin ' + label.toLowerCase()}
+                                 className="size-5 shrink-0 cursor-pointer rounded border border-zinc-700 bg-transparent p-0 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:rounded-sm [&::-webkit-color-swatch]:border-0" />
+                          <span className="min-w-0">
+                            <span className="block text-[12px] text-zinc-200">{label}</span>
+                            <span className="block font-mono text-[10px] uppercase text-zinc-600">{warnaLilin[kunci]}</span>
+                          </span>
+                        </label>
+                      ))}
+                    </div>
                     <div className="mt-1 flex items-center justify-between border-t border-zinc-800/70 px-2 pb-1 pt-1.5">
                       <span className="text-[10px] font-medium uppercase tracking-wider text-zinc-600">Pine Script</span>
                       <button onClick={() => bukaDock('editor')}
@@ -2594,6 +2657,8 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                           mundur={DURASI_TF[tf] ? jamMundur(detik) : undefined}
                           hamparanBawah={kendaliReplay}
                           bagikanFoto={(ambil) => { ambilFoto.current = ambil; }}
+                          tandaAir={tandaAir}
+                          warnaLilin={warnaLilin}
                           pojok={aksi ? (
                             <div ref={pojokRef}>
                             <PojokOrder

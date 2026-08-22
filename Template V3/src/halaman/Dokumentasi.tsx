@@ -103,7 +103,7 @@ const ARTIKEL: Artikel[] = [
           kalau ketiga syarat ini terpenuhi bersamaan:
         </P>
         <Daftar butir={[
-          <>SMI timeframe 4 jam berada di wilayah jenuh — di atas +40 (overbought) atau di bawah −40 (oversold).</>,
+          <>SMI timeframe 4 jam berada di wilayah jenuh — di atas +50 (overbought) atau di bawah −50 (oversold).</>,
           <>Candle 5 menit yang sedang berjalan menyentuh zona SNR yang digambar dari timeframe 4 jam, bukan dari 5 menit.</>,
           <>Lebar zona masih wajar. Zona yang terlalu lebar berarti pivot-nya tidak jelas, dan SL yang dihasilkan jadi tidak masuk akal.</>,
         ]} />
@@ -337,7 +337,7 @@ const ARTIKEL: Artikel[] = [
       <div className="space-y-3">
         {[
           ['SNR', 'Support & Resistance. Di aplikasi ini selalu berbentuk zona (punya lebar), bukan garis tunggal — pivot jarang berhenti di harga yang sama persis dua kali.'],
-          ['SMI', 'Stochastic Momentum Index. Skala −100 sampai +100; nol berarti harga persis di tengah rentangnya. Di atas +40 disebut jenuh beli, di bawah −40 jenuh jual.'],
+          ['SMI', 'Stochastic Momentum Index. Skala −100 sampai +100; nol berarti harga persis di tengah rentangnya. Di atas +50 disebut jenuh beli, di bawah −50 jenuh jual.'],
           ['Parallel channel', 'Dua garis sejajar yang digambar dari pivot high dan pivot low. Rail atas dan bawah dipaksa punya kemiringan sama.'],
           ['Sweep', 'Wick menembus level lalu close kembali ke dalam. Berbeda dengan breakout, yang close-nya tetap di luar.'],
           ['Rezim BTC', 'SMI 4 jam BTC, dipakai sebagai konteks membaca sinyal altcoin. Bukan filter — tidak ada sinyal yang disembunyikan karenanya.'],

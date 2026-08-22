@@ -113,7 +113,17 @@ const JTScan = (function(){
     const emaEma = arr => ema(ema(arr, lengthD), lengthD);
     const numer = emaEma(relRange.slice(mulai));
     const denom = emaEma(hlRange.slice(mulai));
-    const inti  = numer.map((v,i)=> denom[i]===0 ? 0 : 200*(v/denom[i]));
+    /* Penyebutnya diberi LANTAI, bukan cuma diuji sama-dengan-nol. Rentang
+       tertinggi-terendah yang nyaris nol -- pasar yang benar-benar diam,
+       atau koin yang berhenti diperdagangkan -- membuat 200*(v/denom)
+       melar jadi angka raksasa. Satu titik sebesar itu memaksa panel SMI
+       menskalakan diri ke jutaan, dan seluruh garis SMI yang sebenarnya
+       jadi rata di dasar panel. Nilainya sendiri dipulangkan 0, sama
+       seperti sebelumnya: pasar tanpa rentang memang tidak punya momentum
+       ke arah mana pun. Sengaja TIDAK dipulangkan null seperti `na` di
+       Pine -- ema() di berkas ini tidak mengenal null, dan null yang
+       masuk ke sana akan menarik garis sinyalnya ke nol berhari-hari. */
+    const inti  = numer.map((v,i)=> (!isFinite(denom[i]) || Math.abs(denom[i]) < 1e-12) ? 0 : 200*(v/denom[i]));
     const sig   = ema(inti, lengthEMA);
     const smi=new Array(n).fill(null), signal=new Array(n).fill(null);
     for(let i=0;i<inti.length;i++){ smi[mulai+i]=inti[i]; signal[mulai+i]=sig[i]; }
