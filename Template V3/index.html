@@ -100,6 +100,42 @@
       })();
     </script>
 
+    <!-- ── TEMA DIPASANG SEBELUM GAMBAR PERTAMA ──────────────────────────
+         Dilaporkan pemilik: dengan tema terang, refresh paksa (Ctrl+Shift+R)
+         menampilkan layar HITAM selama memuat, lalu melompat jadi putih
+         begitu selesai.
+
+         Bukan hal wajar, dan sebabnya di baris kedua berkas ini:
+         <html class="dark">. Dokumen ini gelap sejak byte pertama, dan
+         `data-tema` baru dipasang oleh React — sesudah modulnya diunduh,
+         diurai, dan dipasang. Di muatan bercache jeda itu beberapa
+         milidetik dan tidak tertangkap mata; di refresh paksa ia jadi
+         lamanya seluruh unduhan.
+
+         Skrip ini SENGAJA tanpa defer dan tanpa type=module — sama seperti
+         penyelamat alamat di atasnya, dan dengan alasan yang sama persis:
+         keduanya menunda eksekusi sampai dokumen selesai diurai, yang
+         berarti sesudah gambar pertama. Yang diperbaiki justru gambar
+         pertama itu.
+
+         Kuncinya 'jt.tema', sama dengan yang dipakai TombolTema. Dibaca
+         di dalam try: peramban mode privat melempar saat localStorage
+         disentuh, dan tema yang gagal dibaca bukan alasan menggagalkan
+         seluruh halaman.
+
+         Latar juga ditulis langsung ke elemennya, bukan cuma diserahkan ke
+         atribut. Lembar gaya masih boleh belum tiba pada saat ini; atribut
+         tanpa gaya tidak mewarnai apa pun, sedangkan satu baris ini
+         mewarnai. -->
+    <script>
+      (function () {
+        var terang = false;
+        try { terang = localStorage.getItem('jt.tema') === 'terang'; } catch (e) { /* privat */ }
+        if (terang) document.documentElement.setAttribute('data-tema', 'terang');
+        document.documentElement.style.backgroundColor = terang ? '#ffffff' : '#09090b';
+      })();
+    </script>
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
