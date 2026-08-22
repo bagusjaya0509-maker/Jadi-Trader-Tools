@@ -89,6 +89,31 @@ const WARNA: Record<string, string> = {
   black: '#18181b',
 };
 
+/* ── NAMA PINE v4 TANPA NAMESPACE ────────────────────────────────────────
+   Pine v5 memindahkan hampir semua fungsi ke dalam namespace: `sma` jadi
+   `ta.sma`, `max` jadi `math.max`. Mesin ini ditulis untuk v5.
+
+   Tapi skrip yang beredar di TradingView -- dan yang orang tempelkan ke
+   sini -- sebagian besar masih v4, karena skrip populer jarang ditulis
+   ulang. Menolaknya dengan "fungsi sma belum didukung" membuat mesin ini
+   tampak jauh lebih sempit daripada kenyataannya: perhitungannya SUDAH ada,
+   cuma namanya beda satu awalan.
+
+   Dipetakan HANYA ke fungsi yang benar-benar ada di berkas ini. Memetakan
+   nama ke sesuatu yang juga belum ada cuma memindahkan galatnya, dan pesan
+   galat yang menyebut nama yang tidak pernah ditulis orangnya lebih
+   membingungkan daripada pesan aslinya. */
+const ALIAS_V4: Record<string, string> = {
+  sma: 'ta.sma', ema: 'ta.ema', rma: 'ta.rma', rsi: 'ta.rsi',
+  change: 'ta.change', atr: 'ta.atr',
+  highest: 'ta.highest', lowest: 'ta.lowest',
+  pivothigh: 'ta.pivothigh', pivotlow: 'ta.pivotlow',
+  max: 'math.max', min: 'math.min', abs: 'math.abs',
+  round: 'math.round', floor: 'math.floor', ceil: 'math.ceil',
+  sqrt: 'math.sqrt', pow: 'math.pow', avg: 'math.avg',
+  tostring: 'str.tostring',
+};
+
 function warnaTransp(hex: string, transp: number): string {
   const m = /^#([0-9a-fA-F]{6})/.exec(hex);
   if (!m) return hex;
@@ -279,8 +304,15 @@ function uraiBlok(baris: { teks: string; no: number; indent: number }[], mulai: 
 
     const isi = b.teks;
     /* Baris yang murni kosmetik/di luar jangkauan panel dicatat, bukan
-       digalatkan — skrip tetap jalan tanpa mereka. */
-    if (/^(table\.|alertcondition\s*\(|alert\s*\(|barcolor\s*\(|bgcolor\s*\(|fill\s*\()/.test(isi)) {
+       digalatkan — skrip tetap jalan tanpa mereka.
+
+       `fill(` SUDAH TIDAK di sini. Ia dibuang di tahap urai, jadi bentuk
+       fill(plotA, plotB) yang kini digambar tidak akan pernah sampai ke
+       evaluator — dan penanganannya di sana tampak tidak bekerja tanpa satu
+       pun galat. Penyaringan bentuk yang belum didukung dipindah ke
+       evaluator, yang bisa MELIHAT argumennya; pengurai cuma melihat teks
+       dan tidak bisa membedakan fill antar plot dari fill antar hline. */
+    if (/^(table\.|alertcondition\s*\(|alert\s*\(|barcolor\s*\(|bgcolor\s*\()/.test(isi)) {
       dilewati.push(`baris ${b.no}: ${isi.slice(0, 44)} — dilewati (kosmetik/di luar panel)`);
       i++;
       continue;
@@ -550,7 +582,11 @@ class Mesin {
   idGambar = 1;
   bar = 0;
   kedalamanFungsi = 0;
-  plotNilai = new Map<string, { warna: string; nilai: (number | null)[] }>();
+  plotNilai = new Map<string, { warna: string; nilai: (number | null)[]; sembunyi?: boolean }>();
+  /* Isian antar-plot dari fill(plotA, plotB). Dikumpulkan di sini, bukan di
+     `gambar` seperti linefill: yang ini lahir per BAR selama skrip berjalan,
+     bukan sebagai objek yang bisa dihapus lagi. */
+  isianPlot: IsianPine[] = [];
   penanda: PenandaPine[] = [];
   hlines: { nilai: number; warna: string }[] = [];
   cacheTa = new Map<string, (number | null)[]>();
@@ -646,8 +682,42 @@ class Mesin {
          di sini membuat riwayatnya jalan sendiri, tanpa penanganan
          khusus di mana pun. */
       case 'time': case 'time_close': return l.times;
+      /* TURUNAN sebagai DERET, bukan cuma nilai per bar.
+         ta.sma/ta.ema dan kawan-kawan mencari sumbernya lewat deretBawaan
+         dan JATUH KE `close` kalau namanya tidak dikenal -- tanpa galat.
+         Jadi sebelum ini `sma(hl2, 20)` diam-diam menghitung sma(close,20):
+         angka yang salah, tanpa satu pun tanda bahwa ia salah. */
+      case 'hl2': case 'hlc3': case 'ohlc4': case 'tr': return this.deretTurunan(nama);
       default: return null;
     }
+  }
+
+  /* Dihitung sekali per deret lalu disimpan: dipanggil per bar, dan
+     menyusun ulang seluruh larik tiap bar membuat skrip 3000 lilin
+     mengerjakan jutaan operasi untuk jawaban yang tidak pernah berubah. */
+  private turunan = new Map<string, number[]>();
+  private deretTurunan(nama: string): number[] {
+    const ada = this.turunan.get(nama);
+    if (ada) return ada;
+    const l = this.l, n = l.closes.length;
+    const out = new Array<number>(n);
+    for (let i = 0; i < n; i++) {
+      if (nama === 'hl2') out[i] = (l.highs[i] + l.lows[i]) / 2;
+      else if (nama === 'hlc3') out[i] = (l.highs[i] + l.lows[i] + l.closes[i]) / 3;
+      else if (nama === 'ohlc4') out[i] = (l.opens[i] + l.highs[i] + l.lows[i] + l.closes[i]) / 4;
+      else {
+        /* True range. Bar pertama tidak punya close sebelumnya, dan Pine
+           memakai high-low apa adanya di sana. */
+        const hl = l.highs[i] - l.lows[i];
+        out[i] = i === 0 ? hl : Math.max(
+          hl,
+          Math.abs(l.highs[i] - l.closes[i - 1]),
+          Math.abs(l.lows[i] - l.closes[i - 1]),
+        );
+      }
+    }
+    this.turunan.set(nama, out);
+    return out;
   }
 
   eval(e: Ekspr, baris: number): Nilai {
@@ -806,6 +876,13 @@ class Mesin {
   }
 
   panggil(e: Extract<Ekspr, { j: 'panggil' }>, baris: number): Nilai {
+    /* Nama v4 diterjemahkan ke padanan v5 SEBELUM apa pun yang lain.
+       Fungsi buatan skrip menang: orang yang menulis `f(x) => ...` bernama
+       `avg` berhak memakai miliknya sendiri, dan membajaknya jadi math.avg
+       akan mengubah hasil skripnya tanpa memberi tahu apa pun. */
+    const aliasV4 = ALIAS_V4[e.nama];
+    if (aliasV4 && !this.fungsi.has(e.nama)) e = { ...e, nama: aliasV4 };
+
     /* i = -1 dipakai pemanggil untuk "hanya lewat nama" — tanpa penjaga
        bawah, e.arg[-1] lolos dan mesinnya jatuh di tengah bar. */
     const arg = (i: number) => (i >= 0 && i < e.arg.length ? this.eval(e.arg[i], baris) : null);
@@ -928,7 +1005,24 @@ class Mesin {
             : e.nama === 'input.color' ? 'color'
             : e.nama === 'input.string' ? 'string'
             : e.nama === 'input'
-              ? (typeof bawaan === 'boolean' ? 'bool' : typeof bawaan === 'string' ? 'string' : 'float')
+              /* `type=input.integer` gaya v4. DIBACA DARI POHONNYA, bukan
+                 dievaluasi: `input.integer` bukan nilai yang dikenal mesin
+                 ini, dan mengevaluasinya akan melempar "variabel belum
+                 didefinisikan" untuk argumen yang sebenarnya cuma
+                 keterangan. Tanpa ini ATR Period tampil sebagai kolom
+                 desimal — bisa diisi 10,5 untuk sesuatu yang dihitung
+                 dalam jumlah bar. */
+              ? (() => {
+                  const t = e.namaArg.type;
+                  const nm = t && t.j === 'nama' ? t.v : '';
+                  if (nm === 'input.integer' || nm === 'input.int') return 'int' as const;
+                  if (nm === 'input.bool') return 'bool' as const;
+                  if (nm === 'input.string') return 'string' as const;
+                  if (nm === 'input.float') return 'float' as const;
+                  return typeof bawaan === 'boolean' ? 'bool' as const
+                       : typeof bawaan === 'string' ? 'string' as const
+                       : 'float' as const;
+                })()
               : 'lain';
           this.daftarInput.push({
             kunci, judul: judul || kunci,
@@ -1160,8 +1254,23 @@ class Mesin {
            nilainya dengan warna bawaan menggambar garis yang di TradingView
            tidak pernah ada. */
         if ('color' in e.namaArg && warnaV == null) return null;
+        /* linewidth=0 berarti TIDAK DIGAMBAR. Di Pine itu cara membuat plot
+           penanda yang cuma dipakai sebagai batas fill -- Supertrend memakai
+           `plot(ohlc4, linewidth=0)` persis untuk itu. Tanpa penghormatan
+           ini, garis bantu yang di TradingView tak terlihat tergambar di
+           sini sebagai garis melintang di tengah lilin: bukan galat, tapi
+           jelas bukan indikator yang orangnya tempelkan.
+
+           Nilainya TETAP disimpan -- fill() di bawah membutuhkannya. Yang
+           disembunyikan cuma garisnya. */
+        const lebarV = this.angka(dapat('linewidth', -1));
+        if (lebarV === 0) p.sembunyi = true;
         p.nilai[this.bar] = this.angka(arg(0));
-        return null;
+        /* Judulnya dipulangkan sebagai PEGANGAN: `upPlot = plot(...)` lalu
+           `fill(mPlot, upPlot, ...)` adalah bentuk baku di Pine, dan tanpa
+           nilai balik apa pun fill tidak punya cara menemukan seri mana
+           yang dimaksud. */
+        return judul;
       }
       case 'plotshape': case 'plotchar': {
         const v = arg(0);
@@ -1194,7 +1303,53 @@ class Mesin {
 
       /* ── diabaikan dengan sadar ── */
       case 'indicator': case 'study': case 'strategy':
-      case 'alert': case 'alertcondition': case 'bgcolor': case 'barcolor': case 'fill':
+        if (!this.dilewatiSekali.has(e.nama)) {
+          this.dilewatiSekali.add(e.nama);
+          this.dilewati.push(`${e.nama}() — dilewati (kosmetik/peringatan di luar panel)`);
+        }
+        return null;
+
+      case 'fill': {
+        /* Bentuk fill(plotA, plotB, color): dua pegangan judul yang
+           dipulangkan plot(). Digambar sebagai satu segi empat per bar --
+           bentuk yang sama dengan linefill, jadi penggambar kanvasnya tidak
+           perlu tahu bedanya.
+
+           Bentuk lain (fill antar hline, fill dengan gradien) belum
+           ditangani dan tetap jatuh ke daftar "dilewati" di bawah. */
+        const ka = arg(0), kb = arg(1);
+        const pa = typeof ka === 'string' ? this.plotNilai.get(ka) : undefined;
+        const pb = typeof kb === 'string' ? this.plotNilai.get(kb) : undefined;
+        if (pa && pb) {
+          if (this.bar > 0) {
+            const i = this.bar, j = i - 1;
+            const y1a = pa.nilai[j], y1b = pb.nilai[j], y2a = pa.nilai[i], y2b = pb.nilai[i];
+            const warnaV = dapat('color', 2);
+            /* Bar yang salah satu ujungnya kosong DILEWATI, bukan dijembatani:
+               plot bersyarat memang putus saat trennya berbalik, dan
+               menyambungnya akan mewarnai daerah yang di TradingView memang
+               kosong. */
+            if (y1a != null && y1b != null && y2a != null && y2b != null && typeof warnaV === 'string') {
+              /* Bawaan transp fill di Pine 90 -- nyaris tembus pandang.
+                 Memakai warna pekat apa adanya akan menutupi lilin yang
+                 justru sedang dibaca. */
+              const tr = this.angka(dapat('transp', -1));
+              this.isianPlot.push({
+                x1: j, y1a, y1b, x2: i, y2a, y2b,
+                warna: warnaTransp(warnaV, tr == null ? 90 : tr),
+                perpanjang: 'none',
+              });
+            }
+          }
+          return null;
+        }
+        if (!this.dilewatiSekali.has(e.nama)) {
+          this.dilewatiSekali.add(e.nama);
+          this.dilewati.push(`${e.nama}() — bentuk ini dilewati (hanya fill antar plot yang digambar)`);
+        }
+        return null;
+      }
+      case 'alert': case 'alertcondition': case 'bgcolor': case 'barcolor':
       case 'table.cell': case 'table.clear':
         if (!this.dilewatiSekali.has(e.nama)) {
           this.dilewatiSekali.add(e.nama);
@@ -1348,7 +1503,7 @@ export function jalankanPineBar(kode: string, l: Lilin, tf = '4h',
   /* ── Objek gambar → bentuk chart kita ─────────────────────────────── */
   const segmen: SegmenPine[] = [];
   const kotak: KotakPine[] = [];
-  const isian: IsianPine[] = [];
+  const isian: IsianPine[] = [...mesin.isianPlot];
   for (const g of mesin.gambar.values()) {
     const d = g.data;
     const num = (v: Nilai) => (typeof v === 'number' && isFinite(v) ? v : null);
@@ -1414,7 +1569,9 @@ export function jalankanPineBar(kode: string, l: Lilin, tf = '4h',
   }
 
   return {
-    plotSeri: [...mesin.plotNilai.entries()].map(([judul, p]) => ({ judul, warna: p.warna, nilai: p.nilai })),
+    plotSeri: [...mesin.plotNilai.entries()]
+      .filter(([, p]) => !p.sembunyi)
+      .map(([judul, p]) => ({ judul, warna: p.warna, nilai: p.nilai })),
     segmen,
     penanda: mesin.penanda,
     kotak,

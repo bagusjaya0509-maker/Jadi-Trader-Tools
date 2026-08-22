@@ -4,7 +4,7 @@ import { Play, Trash2, TriangleAlert, CheckCircle2, RotateCcw, X, Plus, Square,
 import { cn } from '@/lib/utils';
 import { bacaKoneksi, PROXY_BAWAAN } from '@/lib/koneksi';
 import { auth } from '@/lib/firebase';
-import { jalankanPine, CONTOH_PINE, type HasilPine, type InputPine } from '@/lib/pine';
+import { jalankanPine, CONTOH_PINE, SUPERTREND_PINE, type HasilPine, type InputPine } from '@/lib/pine';
 import type { Lilin } from '@/lib/pasar';
 import { susunPermintaanPine, terapkanTambalanPine, fiturHilang } from '@/lib/pine-tambalan';
 
@@ -66,10 +66,53 @@ function namaDariKode(kode: string): string {
   return m ? m[1] : 'Skrip tanpa nama';
 }
 
+/* ── Skrip bawaan ────────────────────────────────────────────────────────
+   Ditawarkan SEKALI, lalu tidak pernah dipaksakan lagi. Menambahkannya
+   hanya ke daftar awal berarti ia tidak akan pernah sampai ke orang yang
+   sudah punya daftar tersimpan — yaitu semua orang yang sudah memakai
+   editor ini. Menambahkannya tiap kali daftar dibaca lebih buruk lagi:
+   skrip yang dihapus orangnya akan hidup kembali setiap muat ulang, dan
+   tombol Hapus yang tidak menghapus adalah tombol yang berbohong.
+
+   Jalan tengahnya satu penanda kecil: id bawaan yang PERNAH ditawarkan
+   dicatat, dan yang sudah tercatat tidak ditawarkan lagi apa pun nasibnya. */
+const KUNCI_BAWAAN_DITAWARKAN = 'jt.pineBawaanDitawarkan';
+
+const SKRIP_BAWAAN: { id: string; nama: string; kode: string }[] = [
+  { id: 'bawaan-supertrend', nama: 'Supertrend', kode: SUPERTREND_PINE },
+];
+
+/* MURNI — tidak menulis apa pun.
+   Sempat menandai "sudah ditawarkan" di sini juga, dan itu salah: fungsi ini
+   dipanggil dari inisialisator useState, yang SENGAJA dijalankan dua kali
+   oleh React StrictMode justru untuk menyingkap efek samping seperti itu.
+   Panggilan pertama menandai, panggilan kedua membaca tandanya sendiri lalu
+   menyimpulkan tidak ada yang perlu ditawarkan — dan skrip bawaannya tidak
+   pernah muncul, tanpa satu pun galat. Penandaannya sekarang di efek. */
+function tawarkanBawaan(d: SkripPine[]): SkripPine[] {
+  let sudah: string[] = [];
+  try { sudah = JSON.parse(localStorage.getItem(KUNCI_BAWAAN_DITAWARKAN) ?? '[]'); } catch { /* privat */ }
+  if (!Array.isArray(sudah)) sudah = [];
+  const punyaId = new Set(d.map((s) => s.id));
+  const baru = SKRIP_BAWAAN.filter((b) => !sudah.includes(b.id) && !punyaId.has(b.id));
+  return baru.length ? [...d, ...baru.map((b) => ({ ...b, aktif: false }))] : d;
+}
+
+/** Menandai seluruh skrip bawaan sudah pernah ditawarkan. Dipanggil sekali
+ *  dari efek: menulis nilai yang sama dua kali tidak berakibat apa-apa, jadi
+ *  StrictMode boleh menjalankannya berulang. */
+function tandaiBawaanDitawarkan() {
+  let sudah: string[] = [];
+  try { sudah = JSON.parse(localStorage.getItem(KUNCI_BAWAAN_DITAWARKAN) ?? '[]'); } catch { /* privat */ }
+  if (!Array.isArray(sudah)) sudah = [];
+  const gabung = [...new Set([...sudah, ...SKRIP_BAWAAN.map((b) => b.id)])];
+  try { localStorage.setItem(KUNCI_BAWAAN_DITAWARKAN, JSON.stringify(gabung)); } catch { /* privat */ }
+}
+
 function bacaDaftar(): SkripPine[] {
   try {
     const d = JSON.parse(localStorage.getItem(KUNCI_DAFTAR) ?? '[]') as SkripPine[];
-    if (Array.isArray(d) && d.length) return d;
+    if (Array.isArray(d) && d.length) return tawarkanBawaan(d);
   } catch { /* rusak → mulai ulang */ }
   /* Migrasi dari era satu-kotak: skrip lama jadi entri pertama daftar. */
   try {
@@ -78,7 +121,7 @@ function bacaDaftar(): SkripPine[] {
       return [{ id: 's1', nama: namaDariKode(lama), kode: lama, aktif: false }];
     }
   } catch { /* privat */ }
-  return [{ id: 's1', nama: namaDariKode(CONTOH_PINE), kode: CONTOH_PINE, aktif: false }];
+  return tawarkanBawaan([{ id: 's1', nama: namaDariKode(CONTOH_PINE), kode: CONTOH_PINE, aktif: false }]);
 }
 
 function simpanDaftar(d: SkripPine[]) {
@@ -177,6 +220,10 @@ export function DockPine({ buka, tab, aturTab, onTutup, lilin, simbol, tf, hingg
   onKendali: (k: KendaliPine) => void;
 }) {
   const [daftar, setDaftar] = useState<SkripPine[]>(bacaDaftar);
+  /* Sesudah daftarnya terbentuk, bukan sebelum: yang ditandai adalah
+     "sudah pernah muncul di layar", dan itu baru benar setelah ia memang
+     masuk ke daftar yang dipakai. */
+  useEffect(() => { tandaiBawaanDitawarkan(); }, []);
   const [idPilih, setIdPilih] = useState(() => {
     const d = bacaDaftar();
     return (d.find((s) => s.aktif) ?? d[0]).id;
