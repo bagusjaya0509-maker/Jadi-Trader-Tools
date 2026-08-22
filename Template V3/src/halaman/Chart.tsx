@@ -4,7 +4,7 @@ import {
   Play, Loader2, RefreshCw, Radio, TriangleAlert, History,
   Layers, ChevronDown, Settings2, Code2, X, Ruler, Rows3, Square, Eraser, Minus, TrendingUp,
   FlaskConical, GripHorizontal, Maximize2, Minimize2, SquareArrowUp, SquareArrowDown,
-  Palette } from 'lucide-react';
+  Palette, RotateCcw } from 'lucide-react';
 import { PanelNews } from '@/components/panel-news';
 import { simpanDraf } from '@/lib/draf-sinyal';
 import { Panel, PanelHead, KartuKpi, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
@@ -3290,12 +3290,8 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                 {/* Terbuka ke ATAS: tombolnya duduk di dasar halaman, dan
                     panel yang terbuka ke bawah dari sana keluar layar. */}
                 <div className="absolute bottom-full right-0 z-40 mb-1 w-72 rounded-lg border border-zinc-800 bg-zinc-950 p-1.5 text-left shadow-2xl">
-                  <div className="flex items-center justify-between px-2 pb-1 pt-0.5">
+                  <div className="px-2 pb-1 pt-0.5">
                     <span className="text-[10px] font-medium uppercase tracking-wider text-zinc-600">Lilin</span>
-                    <button onClick={() => setTampilan({ ...TAMPILAN_AWAL })} disabled={tampilanBawaan}
-                      className="cursor-pointer rounded px-1.5 py-0.5 text-[11px] text-zinc-400 transition-colors hover:bg-zinc-900 hover:text-zinc-100 disabled:cursor-default disabled:text-zinc-700 disabled:hover:bg-transparent">
-                      Bawaan
-                    </button>
                   </div>
                   <div className="grid grid-cols-2 gap-1.5 px-2 pb-1.5">
                     {MEDAN_WARNA.map(([kunci, label]) => (
@@ -3347,6 +3343,26 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                     <p className="mt-1 text-[10px] leading-snug text-zinc-600">
                       Kosongkan untuk memakai nama pasangan dan timeframe. Baris kecil di bawahnya tetap jenis pasarnya.
                     </p>
+                  </div>
+
+                  {/* Pemulih duduk di DASAR panel, sesudah semua seksi, dan
+                      selebar panelnya. Versi sebelumnya menaruhnya di baris
+                      judul "Lilin" — dari sana ia terbaca sebagai pemulih
+                      warna lilin saja, padahal ia mengembalikan latar dan
+                      tanda air juga. Tombol yang cakupannya lebih luas dari
+                      yang terbaca adalah tombol yang menghapus pekerjaan
+                      orang tanpa peringatan.
+
+                      Mati sendiri saat semuanya memang sudah bawaan: itu
+                      sekaligus jawaban atas "apa setelanku sudah kembali?"
+                      tanpa perlu memeriksa satu per satu. */}
+                  <div className="mt-1 border-t border-zinc-800/70 px-2 pb-0.5 pt-1.5">
+                    <button onClick={() => setTampilan({ ...TAMPILAN_AWAL })} disabled={tampilanBawaan}
+                      title={tampilanBawaan ? 'Semua setelan sudah bawaan' : 'Kembalikan warna lilin, latar, dan tanda air ke bawaan'}
+                      className="flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-md border border-zinc-800 px-2 py-1.5 text-[11.5px] text-zinc-300 transition-colors hover:border-zinc-700 hover:bg-zinc-900 hover:text-zinc-100 disabled:cursor-default disabled:border-zinc-900 disabled:text-zinc-700 disabled:hover:border-zinc-900 disabled:hover:bg-transparent disabled:hover:text-zinc-700">
+                      <RotateCcw className="size-3" strokeWidth={2} />
+                      {tampilanBawaan ? 'Sudah bawaan' : 'Kembalikan ke bawaan'}
+                    </button>
                   </div>
                 </div>
               </>
