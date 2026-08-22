@@ -302,8 +302,8 @@ function TombolTema({ ciut = false }: { ciut?: boolean }) {
       value={tema === 'terang'}
       onToggle={() => setTema(keTerang ? 'terang' : 'gelap')}
       title={nama}
-      iconOn={<Moon className="size-3 text-zinc-300" strokeWidth={2} />}
-      iconOff={<Sun className="size-3 text-zinc-300" strokeWidth={2} />}
+      iconOn={<Moon className="size-2.5 text-zinc-300" strokeWidth={2.2} />}
+      iconOff={<Sun className="size-2.5 text-zinc-300" strokeWidth={2.2} />}
     />
   );
 }
@@ -750,7 +750,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           ciut && 'md:w-[68px]'
         )}
       >
-        <div className="flex h-14 items-center gap-2.5 px-4">
+        {/* px-5, BUKAN px-4. Diukur: logo merek dulu duduk 16 px dari
+            tepi sementara ikon-ikon nav di bawahnya 20 px — merek
+            menggantung 4 px lebih ke kiri daripada seluruh kolom di
+            bawahnya. Selisih sekecil itu tidak terbaca sebagai angka,
+            tapi terbaca sebagai "ada yang miring".
+
+            Saat MENCIUT barisnya dipusatkan, sama seperti ikon nav yang
+            memakai justify-center px-0. Sebelumnya logonya tetap
+            menempel kiri sementara semua ikon di bawahnya di tengah —
+            dan itu yang paling kelihatan, karena di keadaan itu logonya
+            satu-satunya benda di barisnya. */}
+        <div className={cn('flex h-14 items-center gap-2.5 px-5',
+                            ciut && 'md:justify-center md:gap-0 md:px-0')}>
           {/* Merek mengarah ke beranda. Logo yang tidak bisa diklik adalah
               salah satu hal pertama yang dicoba orang saat ingin keluar dari
               sebuah aplikasi — dan tidak terjadi apa-apa selalu terbaca

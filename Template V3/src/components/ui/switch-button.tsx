@@ -54,9 +54,9 @@ export function Switch({
      Tailwind yang bertabrakan (w-12 dan w-9 sekaligus) tidak diselesaikan
      urutan penulisannya melainkan urutan di lembar gayanya — jadi yang
      menang tidak bisa diramalkan dari kode ini. */
-  const lebar = kecil ? 'w-9' : 'w-12';
-  const tuas = kecil ? 'size-4' : 'size-6';
-  const isi = kecil ? 'size-3' : 'size-5';
+  const lebar = kecil ? 'w-8' : 'w-12';
+  const tuas = kecil ? 'size-3.5' : 'size-6';
+  const isi = kecil ? 'size-2.5' : 'size-5';
 
   return (
     <button
