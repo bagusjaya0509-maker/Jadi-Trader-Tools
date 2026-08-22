@@ -10,7 +10,7 @@ import type { TradeUji } from '@/lib/backtest';
 import type { SegmenPine, PenandaPine, KotakPine, IsianPine } from '@/lib/pine-bar';
 import { PenggambarIsi } from '@/lib/plugin-isi';
 import { PenggambarAlat, type GambarAlat, type AlatPegang } from '@/lib/plugin-alat';
-import { PenggambarPita } from '@/lib/plugin-pita';
+import { PenggambarJenuh } from '@/lib/plugin-jenuh';
 import { useTema, temaSekarang, WARNA_CHART } from '@/lib/tema';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -128,34 +128,24 @@ const WARNA_SMI_EMA = '#fbbf24';
    screener akan berbeda pendapat tentang koin yang sama. */
 const AMBANG_SMI = 50;
 
-/* Pita jenuh beli / jenuh jual, padanan tiga `fill()` di tab Style
-   TradingView: satu pita redup di antara ambang, satu gradien hijau di
-   atasnya, satu gradien merah di bawahnya. Alfanya kecil dengan sengaja --
-   ini latar untuk membaca posisi garis, bukan data yang dibaca sendiri. */
-const WARNA_PITA_SMI = {
-  gelap: {
-    tengah: 'rgba(96,165,250,.05)',
-    obAtas: 'rgba(34,197,94,.20)', obBawah: 'rgba(34,197,94,0)',
-    osAtas: 'rgba(239,68,68,0)', osBawah: 'rgba(239,68,68,.20)',
-  },
-  terang: {
-    tengah: 'rgba(37,99,235,.055)',
-    obAtas: 'rgba(22,163,74,.16)', obBawah: 'rgba(22,163,74,0)',
-    osAtas: 'rgba(220,38,38,0)', osBawah: 'rgba(220,38,38,.16)',
-  },
+/* Kantong jenuh: MERAH di atas ambang beli, HIJAU di bawah ambang jual.
+   Arah warnanya sengaja begitu -- yang diwarnai adalah peringatan, bukan
+   arah harga. Kurva yang menembus ke atas berarti sudah terlalu jauh
+   dibeli, dan itu bahaya bagi yang mau ikut naik.
+
+   Sempat digambar sebagai pita mendatar selebar panel. Itu salah: pita
+   mewarnai seluruh jalur ambang sepanjang waktu, termasuk ribuan bar yang
+   tidak pernah jenuh, dan warna yang selalu ada berhenti berarti apa-apa. */
+const WARNA_JENUH_SMI = {
+  gelap: { beli: 'rgba(248,113,113,.30)', jual: 'rgba(52,211,153,.30)' },
+  terang: { beli: 'rgba(220,38,38,.20)', jual: 'rgba(5,150,105,.20)' },
 } as const;
 
-/* Batas luar gradien. 120, bukan 100: SMI bisa melewati 100 sesaat, dan
-   gradien yang berhenti tepat di 100 meninggalkan potongan kosong di puncak
-   lonjakan -- persis di tempat yang paling ingin dilihat. */
-const LUAR_PITA_SMI = 120;
-
-function pitaSmiUntuk(tema: 'gelap' | 'terang') {
-  const w = WARNA_PITA_SMI[tema];
+function wilayahJenuhUntuk(tema: 'gelap' | 'terang', nilai: (number | null)[]) {
+  const w = WARNA_JENUH_SMI[tema];
   return [
-    { atas: AMBANG_SMI, bawah: -AMBANG_SMI, warnaAtas: w.tengah, warnaBawah: w.tengah },
-    { atas: LUAR_PITA_SMI, bawah: AMBANG_SMI, warnaAtas: w.obAtas, warnaBawah: w.obBawah },
-    { atas: -AMBANG_SMI, bawah: -LUAR_PITA_SMI, warnaAtas: w.osAtas, warnaBawah: w.osBawah },
+    { nilai, ambang: AMBANG_SMI, arah: 'atas' as const, warna: w.beli },
+    { nilai, ambang: -AMBANG_SMI, arah: 'bawah' as const, warna: w.jual },
   ];
 }
 
@@ -207,6 +197,7 @@ export function ChartLilin({
   garisSeret, onSeret, onKlikGaris, onHapusGaris, hamparanBawah, segmen, penandaPine, kotakPine, isianPine,
   alat, onAlatSelesai, gambarAlat, gambarPilih, onPilihGambar, onUbahGambar,
   posisiMt5, onUbahPosisi, hargaAsk, kunciUkuran, bagikanFoto, tandaAir, tampilan, pitaSmi,
+  hamparanKiri, onUjungKiri,
 }: {
   /** Nama pasangan yang dicetak samar di tengah area harga, seperti
    *  TradingView. `utama` nama simbolnya, `sub` baris kecil di bawahnya --
@@ -260,6 +251,13 @@ export function ChartLilin({
   /** Panel yang ditumpangkan di bagian bawah area harga — dipakai kendali
    *  replay, supaya ia menyatu dengan grafik alih-alih memanjangkan halaman. */
   hamparanBawah?: React.ReactNode;
+  /** Ditumpangkan di tepi KIRI area harga. Dipakai tombol "Muat lebih lama":
+   *  ia cuma berarti saat orangnya sudah menggeser sampai mentok ke kiri, dan
+   *  di sanalah matanya sedang berada. */
+  hamparanKiri?: React.ReactNode;
+  /** Dipanggil saat jendela pandang menyentuh / meninggalkan bar pertama.
+   *  Hanya saat BERUBAH, bukan tiap piksel geseran. */
+  onUjungKiri?: (di: boolean) => void;
   /** Trendline miring dari Pine (line.new) — bar → waktu di sini. */
   segmen?: SegmenPine[];
   /** Label BUY/SELL dari Pine (label.new / plotshape). */
@@ -306,7 +304,7 @@ export function ChartLilin({
      dari opsi chart, jadi applyOptions saat tema berganti tidak akan
      menyentuhnya kalau pegangannya dibuang begitu saja. */
   const garisAmbang = useRef<IPriceLine[]>([]);
-  const pitaPrim = useRef<PenggambarPita | null>(null);
+  const jenuhPrim = useRef<PenggambarJenuh | null>(null);
   const garisPos = useRef<IPriceLine[]>([]);
   const isiPine = useRef<PenggambarIsi | null>(null);
   const alatPrim = useRef<PenggambarAlat | null>(null);
@@ -588,6 +586,44 @@ export function ChartLilin({
     } catch { /* chartnya sudah dibuang */ }
   }, [rupa.latar, tema]);
 
+  /* -- Ujung kiri riwayat -----------------------------------------------
+     Dilanggan SEKALI (efek berdependensi kosong): pustaka memanggil balik
+     tiap geseran, dan berlangganan ulang tiap data disegarkan akan menumpuk
+     pendengar di chart yang sama.
+
+     Yang dilaporkan cuma PERUBAHAN keadaan. Menggeser satu piksel di daerah
+     ujung membangkitkan puluhan panggilan balik, dan setState pada nilai
+     yang sama tetap menempuh seluruh jalur render React. */
+  const onUjungRef = useRef(onUjungKiri);
+  onUjungRef.current = onUjungKiri;
+  const cekUjung = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    const c = chart.current;
+    if (!c) return;
+    let lalu: boolean | null = null;
+    const cek = () => {
+      let di = false;
+      try {
+        const r = c.timeScale().getVisibleLogicalRange();
+        /* <= 1, bukan <= 0: bar pertama sudah terhitung "mentok" begitu ia
+           masuk layar. Menunggu sampai persis 0 berarti tombolnya baru
+           muncul sesudah orangnya menabrak dinding. */
+        di = !!r && Number(r.from) <= 1;
+      } catch { /* chartnya sudah dibuang */ }
+      if (di !== lalu) { lalu = di; onUjungRef.current?.(di); }
+    };
+    cekUjung.current = cek;
+    c.timeScale().subscribeVisibleLogicalRangeChange(cek);
+    cek();
+    return () => {
+      cekUjung.current = null;
+      try { c.timeScale().unsubscribeVisibleLogicalRangeChange(cek); } catch { /* sudah dibuang */ }
+    };
+  }, []);
+  /* Data berubah = jumlah bar berubah = "mentok" bisa berubah tanpa satu pun
+     geseran. Menyisipkan 1000 lilin lama harus MEMATIKAN tombolnya sendiri. */
+  useEffect(() => { cekUjung.current?.(); }, [lilin]);
+
   /* -- Tanda air nama pasangan ------------------------------------------
      Plugin pane bawaan lightweight-charts v5 (createTextWatermark),
      dipasang di pane 0 -- pane harga. Bukan elemen DOM yang dihamparkan:
@@ -752,7 +788,7 @@ export function ChartLilin({
     seriSmi.current.forEach((s) => { try { c.removeSeries(s); } catch { /* sudah lepas */ } });
     seriSmi.current = [];
     garisAmbang.current = [];
-    pitaPrim.current = null;
+    jenuhPrim.current = null;
     if (!smi || !lilin.times.length) return;
 
     const buat = (warna: string, tebal: 1 | 2) => {
@@ -764,14 +800,16 @@ export function ChartLilin({
     buat(WARNA_SMI, 2);
     buat(WARNA_SMI_EMA, 1);
 
-    /* Pita ditempel di seri PERTAMA -- seri SMI-nya sendiri, bukan EMA-nya.
+    /* Ditempel di seri PERTAMA -- seri SMI-nya sendiri, bukan EMA-nya.
        Primitive membaca sumbu harga lewat serinya, dan kedua seri berbagi
-       sumbu yang sama, jadi mana pun benar; yang pertama dipilih supaya
-       pitanya ikut hidup-mati bersama garis yang ambangnya ia tandai. */
-    const pitaPrimBaru = new PenggambarPita();
-    seriSmi.current[0].attachPrimitive(pitaPrimBaru);
-    pitaPrim.current = pitaPrimBaru;
-    pitaPrimBaru.setData(pitaSmiRef.current ? pitaSmiUntuk(temaSekarang()) : []);
+       sumbu yang sama; yang pertama dipilih supaya kantongnya ikut hidup-mati
+       bersama garis yang ambangnya ia tandai.
+
+       Datanya dikosongkan di sini dan diisi efek di bawah, supaya cuma ada
+       SATU tempat yang tahu cara menyusunnya. */
+    const jenuhBaru = new PenggambarJenuh();
+    seriSmi.current[0].attachPrimitive(jenuhBaru);
+    jenuhPrim.current = jenuhBaru;
 
     /* Ambang jenuh +50 / -50 — angka yang SAMA dengan SMI_OB dan SMI_OS di
        jt-scan-core, yaitu ambang yang dipakai kartu sinyal untuk menyebut
@@ -789,15 +827,23 @@ export function ChartLilin({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [smi === null, lilin.times.length === 0]);
 
-  /* Pita menyala/padam dan berganti tema TANPA membongkar serinya. Efek di
-     atas sengaja berdependensi sesempit mungkin supaya panel SMI tidak
-     lenyap-sekejap tiap data disegarkan; menaruh `pitaSmi` di sana akan
-     mengembalikan persis masalah itu setiap skrip Pine dijalankan. */
-  const pitaSmiRef = useRef(pitaSmi);
-  pitaSmiRef.current = pitaSmi;
+  /* Kantong jenuh menyala/padam, berganti tema, dan mengikuti data TANPA
+     membongkar serinya. Efek di atas sengaja berdependensi sesempit mungkin
+     supaya panel SMI tidak lenyap-sekejap tiap data disegarkan; menaruh
+     `pitaSmi` di sana akan mengembalikan persis masalah itu setiap skrip
+     Pine dijalankan. */
   useEffect(() => {
-    pitaPrim.current?.setData(pitaSmi ? pitaSmiUntuk(tema) : []);
-  }, [pitaSmi, tema, smi, lilin]);
+    const p = jenuhPrim.current;
+    if (!p) return;
+    if (!pitaSmi || !smi) { p.setData([]); return; }
+    /* Dipotong pada batas yang SAMA dengan serinya. Tanpa ini kantongnya
+       menjulur melewati bar terakhir replay -- mewarnai jenuh yang, di dalam
+       latihan itu, belum terjadi. */
+    const batas = hingga === undefined
+      ? lilin.times.length
+      : Math.max(1, Math.min(lilin.times.length, hingga + 1));
+    p.setData(wilayahJenuhUntuk(tema, smi.smi.slice(0, batas)));
+  }, [pitaSmi, tema, smi, lilin, hingga]);
 
   /* Data SMI dipotong lewat setData pada seri yang SAMA — pembatas panel
      tidak tersentuh, jadi ia diam selama replay berjalan bar demi bar. */
@@ -2123,6 +2169,13 @@ export function ChartLilin({
       )}
 
       {pojok && <div className="absolute left-2 top-2 z-20">{pojok}</div>}
+
+      {/* Tepi kiri area harga, setengah tinggi -- bukan di dasar bersama
+          kendali replay. Yang memanggilnya adalah gerakan menggeser ke kiri,
+          dan mata orangnya sedang di tepi itu, bukan di bawah. */}
+      {hamparanKiri && (
+        <div className="absolute left-2 top-1/2 z-20 -translate-y-1/2">{hamparanKiri}</div>
+      )}
 
       {/* Kendali replay ditumpangkan di dasar area harga, bukan di panel
           terpisah di bawah chart — latarnya tembus supaya menyatu dengan

@@ -4,7 +4,7 @@ import {
   Play, Loader2, RefreshCw, Radio, TriangleAlert, History,
   Layers, ChevronDown, Settings2, Code2, X, Ruler, Rows3, Square, Eraser, Minus, TrendingUp,
   FlaskConical, GripHorizontal, Maximize2, Minimize2, SquareArrowUp, SquareArrowDown,
-  Palette, RotateCcw } from 'lucide-react';
+  Settings, RotateCcw } from 'lucide-react';
 import { PanelNews } from '@/components/panel-news';
 import { simpanDraf } from '@/lib/draf-sinyal';
 import { Panel, PanelHead, KartuKpi, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
@@ -238,6 +238,9 @@ export default function ChartBacktest() {
   const [riwayatLama, setRiwayatLama] = useState<Lilin | null>(null);
   const [muatLama, setMuatLama] = useState(false);
   const [habisRiwayat, setHabisRiwayat] = useState(false);
+  /* Jendela pandang sedang menyentuh bar paling tua. Dilaporkan ChartLilin,
+     dan hanya saat BERUBAH -- lihat catatan di sana. */
+  const [diUjungKiri, setDiUjungKiri] = useState(false);
 
   /* Potongan lama dibuang tiap ganti simbol atau timeframe — riwayat BTC
      harian tidak berarti apa-apa di chart ETH 15 menit, dan menyambungnya
@@ -2709,6 +2712,37 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                           tandaAir={tandaAir}
                           tampilan={tampilan}
                           pitaSmi={smiAsli}
+                          onUjungKiri={setDiUjungKiri}
+                          /* Binance memberi maksimum 1000 lilin PER
+                             PERMINTAAN, bukan seluruhnya. Tombol ini menarik
+                             potongan berikutnya ke belakang lalu
+                             menyambungnya — ditekan tiga kali di TF harian,
+                             chartnya mundur sampai 2018.
+
+                             Muncul HANYA saat jendela pandang sudah mentok ke
+                             kiri. Sebelum itu ia tidak dicari siapa pun, dan
+                             tombol yang selalu ada di tepi chart menutupi
+                             lilin yang justru sedang dibaca.
+
+                             MT5 tidak punya rute untuk meminta lilin lebih
+                             tua, jadi tidak ditawarkan sama sekali di sana —
+                             lebih jujur daripada tombol yang selalu menjawab
+                             "tidak ada". */
+                          hamparanKiri={diUjungKiri && !simbol.startsWith('MT5:') ? (
+                            habisRiwayat ? (
+                              <span className="rounded border border-zinc-800 bg-zinc-950/90 px-2 py-1 text-[10.5px] leading-none text-zinc-600 shadow">
+                                riwayat terjauh
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => void muatLebihLama()}
+                                disabled={muatLama}
+                                title="Tarik 1000 lilin sebelum yang paling tua"
+                                className="cursor-pointer rounded border border-zinc-700 bg-zinc-950/90 px-2 py-1 text-[10.5px] leading-none text-zinc-300 shadow transition-colors hover:border-zinc-600 hover:text-zinc-100 disabled:cursor-not-allowed disabled:opacity-50">
+                                {muatLama ? 'Memuat…' : '← Muat lebih lama'}
+                              </button>
+                            )
+                          ) : undefined}
                           pojok={aksi ? (
                             <div ref={pojokRef}>
                             <PojokOrder
@@ -3236,60 +3270,26 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
           </div>
         </div>
         <div className="flex items-center justify-between gap-3 border-t border-zinc-800/80 px-4 py-2 text-[11.5px] text-zinc-600">
-          <span className="flex min-w-0 items-center gap-2 truncate">
-            <span className="truncate">
-              {lilinGabung.times.length} lilin · {simbol} {TF.find((x) => x.nilai === tf)?.label} · lewat proxy VPS
-              {hasil?.trade.length ? ` · ${hasil.trade.length} penanda trade` : ''}
-            </span>
-            {/* Binance memberi maksimum 1000 lilin PER PERMINTAAN, bukan
-                seluruhnya. Tombol ini menarik potongan berikutnya ke belakang
-                dan menyambungnya — ditekan tiga kali di TF harian, chartnya
-                mundur sampai 2018.
-
-                Ditaruh di kaki chart, bukan di bilah kendali atas: ia baru
-                dicari SESUDAH orangnya menggulir mentok ke kiri, dan di situlah
-                matanya sudah berada. MT5 tidak punya rute untuk meminta lilin
-                lebih tua, jadi tombolnya tidak ditawarkan sama sekali di sana —
-                lebih jujur daripada tombol yang selalu menjawab "tidak ada". */}
-            {!simbol.startsWith('MT5:') && !habisRiwayat && (
-              <button
-                onClick={() => void muatLebihLama()}
-                disabled={muatLama}
-                title="Tarik 1000 lilin sebelum yang paling tua"
-                className="shrink-0 cursor-pointer rounded border border-zinc-800 px-2 py-0.5 text-[11px] text-zinc-400 transition-colors hover:border-zinc-700 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-50">
-                {muatLama ? 'Memuat…' : '← Muat lebih lama'}
-              </button>
-            )}
-            {habisRiwayat && (
-              <span className="shrink-0 text-zinc-700">riwayat terjauh</span>
-            )}
-          </span>
-          {/* Backtest disembunyikan di balik ikon di pojok chart, bukan
-              dibentangkan di bawahnya. Alasannya bukan sekadar ruang:
-              hasilnya masih beta, dan panel yang selalu terbuka membuat
-              angkanya terbaca sebagai bagian tetap halaman — padahal ia
-              sedang diuji. Yang dibuka atas kemauan sendiri dibaca dengan
-              kewaspadaan yang berbeda. */}
-          {/* Setelan tampilan berdiri SENDIRI, tidak menumpang menu
-              indikator. Menu indikator menjawab "apa yang digambar"; ini
-              menjawab "bagaimana rupanya". Menggabungkan keduanya membuat
-              daftar indikator harus digulir melewati petak warna setiap kali
-              orang cuma mau menyalakan SNR. */}
+          {/* Gerigi duduk di pojok paling kiri kaki chart, TANPA teks. Ia
+              setelan yang dibuka sesekali lalu ditutup; label tetap di sana
+              menuntut perhatian setiap kali mata menyapu kaki chart, padahal
+              yang dibaca di baris ini adalah jumlah lilin dan sumbernya. */}
           <div className="relative shrink-0">
             <button
               onClick={() => setMenuTampilan((v) => !v)}
               title="Setelan tampilan chart"
-              className={cn('flex cursor-pointer items-center gap-1.5 rounded px-2 py-1 text-[11px] transition-colors',
+              aria-label="Setelan tampilan chart"
+              className={cn('flex cursor-pointer items-center rounded p-1 transition-colors',
                 menuTampilan ? 'text-zinc-200' : 'text-zinc-500 hover:text-zinc-300')}>
-              <Palette className="size-3" strokeWidth={2} />
-              Tampilan
+              <Settings className="size-3.5" strokeWidth={2} />
             </button>
             {menuTampilan && (
               <>
                 <div className="fixed inset-0 z-30" onClick={() => setMenuTampilan(false)} />
-                {/* Terbuka ke ATAS: tombolnya duduk di dasar halaman, dan
-                    panel yang terbuka ke bawah dari sana keluar layar. */}
-                <div className="absolute bottom-full right-0 z-40 mb-1 w-72 rounded-lg border border-zinc-800 bg-zinc-950 p-1.5 text-left shadow-2xl">
+                {/* Terbuka ke ATAS dan ke KANAN. Tombolnya di pojok kiri
+                    bawah: panel yang terbuka ke bawah atau ke kiri dari sana
+                    keluar layar. */}
+                <div className="absolute bottom-full left-0 z-40 mb-1 w-72 rounded-lg border border-zinc-800 bg-zinc-950 p-1.5 text-left shadow-2xl">
                   <div className="px-2 pb-1 pt-0.5">
                     <span className="text-[10px] font-medium uppercase tracking-wider text-zinc-600">Lilin</span>
                   </div>
@@ -3368,6 +3368,18 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
               </>
             )}
           </div>
+          <span className="flex min-w-0 items-center gap-2 truncate">
+            <span className="truncate">
+              {lilinGabung.times.length} lilin · {simbol} {TF.find((x) => x.nilai === tf)?.label} · lewat proxy VPS
+              {hasil?.trade.length ? ` · ${hasil.trade.length} penanda trade` : ''}
+            </span>
+          </span>
+          {/* Backtest disembunyikan di balik ikon di pojok chart, bukan
+              dibentangkan di bawahnya. Alasannya bukan sekadar ruang:
+              hasilnya masih beta, dan panel yang selalu terbuka membuat
+              angkanya terbaca sebagai bagian tetap halaman — padahal ia
+              sedang diuji. Yang dibuka atas kemauan sendiri dibaca dengan
+              kewaspadaan yang berbeda. */}
           <button
             onClick={() => setBacktestBuka((v) => !v)}
             title={backtestBuka ? 'Tutup panel Backtest' : 'Buka panel Backtest (beta)'}
