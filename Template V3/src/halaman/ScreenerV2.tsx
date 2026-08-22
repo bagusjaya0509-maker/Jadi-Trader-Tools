@@ -304,6 +304,45 @@ const CSS_TANPA_CANGKANG = `
   [data-tema='terang'] .ema-screener .es-priority-btn:hover {
     background: #fdf6e7 !important;
   }
+
+  /* ── DUA TOMBOL YANG DIKUNCI LEWAT ID ─────────────────────────────
+     "Cari Sinyal Pantau" tetap tidak terbaca meski aturan
+     .es-priority-btn di atas sudah benar. Sebabnya bukan kelasnya —
+     V2 punya aturan TERPISAH ber-ID untuknya (baris 1349):
+
+         #esLiveTradeBtn, #esPantauBtn { color:#fff !important; ... }
+
+     Satu id itu bernilai (1,0,0); selektor saya di atas cuma (0,3,0).
+     Keduanya !important, jadi yang menentukan kekhususannya — dan id
+     menang. Itu sebabnya "Cari Sinyal SNR H4" ikut berubah sementara
+     tetangganya tidak: yang kedua punya aturan id, yang pertama tidak.
+
+     Disapu dulu sebelum ditambal: di SELURUH berkas V2 hanya ADA SATU
+     aturan yang memaksa teks putih dengan !important, yaitu ini. Jadi
+     memperbaikinya menutup seluruh kelas masalahnya, bukan satu contoh.
+
+     Idnya dipakai balik supaya (1,1,0) > (1,0,0). #esLiveTradeBtn ikut
+     meski kotak Live Trading sedang disembunyikan — ia berbagi aturan
+     yang sama persis, dan meninggalkannya berarti menanam bug yang
+     muncul entah kapan nanti saat kotak itu ditampilkan lagi.
+
+     Teksnya netral gelap, BUKAN emas seperti tombol di atas. Di tema
+     gelap tombol ini memang sengaja dibedakan: putih polos + kedip,
+     bukan emas — dan perbedaan itu ikut dipertahankan.
+
+     Kedipnya TIDAK dimatikan. chScanGlow cuma menganimasikan box-shadow
+     merah<->hijau; ia penanda "tombol ini yang memulai pemindaian", dan
+     itu berlaku di tema mana pun. */
+  [data-tema='terang'] #esPantauBtn,
+  [data-tema='terang'] #esLiveTradeBtn {
+    color: #0f172a !important;
+    background: #ffffff !important;
+    border-color: #cbd5e1 !important;
+  }
+  [data-tema='terang'] #esPantauBtn:hover,
+  [data-tema='terang'] #esLiveTradeBtn:hover {
+    background: #f1f5f9 !important;
+  }
   [data-tema='terang'] .es-section-head,
   [data-tema='terang'] .es-priority-header {
     color: #0f172a !important;
