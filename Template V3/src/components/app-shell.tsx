@@ -8,6 +8,7 @@ import {
   Sun, Moon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Switch } from '@/components/ui/switch-button';
 import { BADAN, WA_LINK } from '@/lib/badan';
 import { useAuth } from '@/lib/auth';
 import { useKabarAgen, umurKabar } from '@/lib/kabar';
@@ -256,7 +257,7 @@ function bacaTema(): Tema {
   catch { return 'gelap'; }
 }
 
-function TombolTema() {
+function TombolTema({ ciut = false }: { ciut?: boolean }) {
   const [tema, setTema] = useState<Tema>(bacaTema);
 
   useEffect(() => {
@@ -267,19 +268,42 @@ function TombolTema() {
   }, [tema]);
 
   const keTerang = tema === 'gelap';
+  const nama = keTerang ? 'Ganti ke tema terang' : 'Ganti ke tema gelap';
+
+  /* ── SEMPIT: ikon saja ──────────────────────────────────────────────
+     Sakelar gesernya selebar 48 px dan sidebar yang menciut cuma 68 px —
+     dipaksa masuk, ia mendorong logonya keluar. Yang tampil di situ
+     tombol ikon seperti sebelumnya.
+
+     Lambangnya menunjukkan TUJUAN, bukan keadaan sekarang — sama seperti
+     pemindah suasana di halaman depan, supaya dua tombol di satu produk
+     tidak berbicara dengan dua bahasa berbeda. */
+  if (ciut) {
+    return (
+      <button
+        onClick={() => setTema(keTerang ? 'terang' : 'gelap')}
+        title={nama} aria-label={nama}
+        className="cursor-pointer text-zinc-400 transition-colors hover:text-zinc-100"
+      >
+        {keTerang ? <Sun className="size-[18px]" strokeWidth={1.8} />
+                  : <Moon className="size-[18px]" strokeWidth={1.8} />}
+      </button>
+    );
+  }
+
+  /* value = sedang TERANG. Dibaca begitu, bukan "keTerang", karena sakelar
+     menyatakan KEADAAN — posisi tuasnya harus menjawab "sekarang mode
+     apa", bukan "kalau ditekan jadi apa". Ikonnya yang tetap bicara
+     tujuan, dan keduanya tidak bertabrakan: tuas di kanan berarti terang,
+     dan yang tergambar di tuas itu bulan — jalan keluarnya. */
   return (
-    <button
-      onClick={() => setTema(keTerang ? 'terang' : 'gelap')}
-      title={keTerang ? 'Ganti ke tema terang' : 'Ganti ke tema gelap'}
-      aria-label={keTerang ? 'Ganti ke tema terang' : 'Ganti ke tema gelap'}
-      className="cursor-pointer text-zinc-400 transition-colors hover:text-zinc-100"
-    >
-      {/* Lambangnya menunjukkan TUJUAN, bukan keadaan sekarang — sama
-          seperti pemindah suasana di halaman depan, supaya dua tombol di
-          satu produk tidak berbicara dengan dua bahasa berbeda. */}
-      {keTerang ? <Sun className="size-[18px]" strokeWidth={1.8} />
-                : <Moon className="size-[18px]" strokeWidth={1.8} />}
-    </button>
+    <Switch
+      value={tema === 'terang'}
+      onToggle={() => setTema(keTerang ? 'terang' : 'gelap')}
+      title={nama}
+      iconOn={<Moon className="size-4 text-zinc-300" strokeWidth={1.8} />}
+      iconOff={<Sun className="size-4 text-zinc-300" strokeWidth={1.8} />}
+    />
   );
 }
 
@@ -740,8 +764,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </span>
             )}
           </Link>
+          {/* Sakelar tema DI SINI, bukan lagi di bilah atas. Permintaan
+              pemilik. Letaknya juga masuk akal: tema itu setelan tampilan
+              seluruh aplikasi, bukan sesuatu yang berhubungan dengan
+              halaman yang sedang dibuka — dan bilah atas isinya hal-hal
+              yang menempel pada halaman itu.
+
+              ml-auto pindah ke sini karena ia yang sekarang jadi benda
+              pertama di sisi kanan; tombol tutup di sebelahnya tinggal
+              mengikut. */}
+          <span className={cn('ml-auto', ciut && 'md:hidden')}><TombolTema /></span>
           <button onClick={() => setLaci(false)} aria-label="Tutup menu"
-            className="ml-auto cursor-pointer text-zinc-500 hover:text-zinc-100 md:hidden">
+            className="cursor-pointer text-zinc-500 hover:text-zinc-100 md:hidden">
             <X className="size-4" />
           </button>
         </div>
@@ -873,7 +907,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="ml-auto flex items-center gap-3">
-            <TombolTema />
+            {/* Sakelar tema tinggal di sidebar. Ia MUNCUL LAGI di sini
+                hanya saat sidebar-nya menciut di layar lebar: isi barisnya
+                tinggal 36 px, dan sakelar selebar 48 px akan mendorong
+                logonya keluar. Bentuknya ikon, persis tempat asalnya —
+                jadi yang berpindah cuma satu kendali, bukan dua kendali
+                berbeda untuk hal yang sama. */}
+            {ciut && <span className="hidden md:block"><TombolTema ciut /></span>}
             <Pesan />
             <Lonceng />
             <MenuPengguna />
