@@ -139,10 +139,35 @@ export async function ambilKlines(simbol: string, tf: string, batas = 200, segar
        sudah disamakan dengan /api/klines, jadi seluruh halaman — chart,
        indikator, replay, backtest — bekerja tanpa tahu bedanya. */
     const mt5 = simbol.startsWith('MT5:');
-    const r = await fetch(mt5
+    const alamat = mt5
       ? `${dasar()}/api/mt5/klines?symbol=${encodeURIComponent(simbol.slice(4))}&interval=${tf}&limit=${batas}`
-      : `${dasar()}/api/klines?symbol=${encodeURIComponent(simbol)}&interval=${tf}&limit=${batas}&market=${pasarPilihan}${segar ? '&fresh=1' : ''}`);
-    if (!r.ok) return KOSONG;
+      : `${dasar()}/api/klines?symbol=${encodeURIComponent(simbol)}&interval=${tf}&limit=${batas}&market=${pasarPilihan}${segar ? '&fresh=1' : ''}`;
+
+    /* -- Coba ulang, HANYA untuk jalur chart hidup (segar) ---------------
+       Chart menarik ulang tiap 3 detik. Satu kedipan koneksi -- dan sambungan
+       tethering memang berkedip -- membuat satu permintaan gagal, dan tanpa
+       percobaan ulang kegagalan sekejap itu langsung jadi peringatan di
+       layar orangnya.
+
+       SENGAJA tidak berlaku untuk screener (`segar` false): satu pemindaian
+       menyentuh puluhan simbol sekaligus, dan mengulang semuanya saat Binance
+       benar-benar mati berarti pemindaian yang gagal dua kali lebih lama.
+       Chart itu satu simbol, satu permintaan -- di sanalah pengulangan murah.
+
+       Galat 4xx TIDAK diulang: simbol yang tidak ada tetap tidak ada pada
+       percobaan kedua, dan mengulangnya cuma menunda jawaban yang sudah pasti. */
+    const percobaan = segar ? 3 : 1;
+    let r: Response | null = null;
+    for (let ke = 0; ke < percobaan; ke++) {
+      if (ke > 0) await new Promise((res) => setTimeout(res, ke * 400));
+      try {
+        r = await fetch(alamat);
+      } catch { r = null; }             // jaringan putus -- layak diulang
+      if (r && r.ok) break;
+      if (r && r.status >= 400 && r.status < 500) return KOSONG;
+      r = null;
+    }
+    if (!r) return KOSONG;
     const j = await r.json();
     /* Spec MT5 (dolar per lot per 1.0 harga) menumpang balasan klines —
        dihitung EA dari tick value broker + mata uang akun, disimpan di

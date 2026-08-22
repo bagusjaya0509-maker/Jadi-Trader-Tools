@@ -255,6 +255,12 @@ export default function ChartBacktest() {
     if (x && TF.some((y) => y.nilai === x)) setTf(x);
   }, [cari]);
   const [lilin, setLilin] = useState<Lilin>({ opens: [], highs: [], lows: [], closes: [], times: [] });
+  /* Dibaca di dalam penarikan data untuk memutuskan apakah kegagalan layak
+     jadi peringatan. Ref, bukan state: penarikannya berjalan di dalam efek
+     yang sengaja TIDAK berdependensi pada lilin -- kalau iya, setiap data
+     masuk akan membatalkan dan menjadwalkan ulang pollingnya sendiri. */
+  const lilinRef = useRef(lilin);
+  lilinRef.current = lilin;
   /* Riwayat tambahan hasil "Muat lebih lama", DISIMPAN TERPISAH dari `lilin`.
      ────────────────────────────────────────────────────────────────────
      `lilin` disegarkan tiap 3 detik oleh polling harga. Kalau potongan lama
@@ -1781,13 +1787,29 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
         const l = await ambilKlines(simbol, tf, simbol.startsWith('MT5:') ? 15000 : 1000, true);
         if (!hidup) return;
         if (!l.closes.length) {
-          setGalat(simbol.startsWith('MT5:')
-            ? 'Belum ada data dari terminal MT5 — buka MT5 dengan EA Trade-Fi Sync v2 terpasang; chart terisi begitu EA mengirim (± tiap 5 menit).'
-            : 'Data tidak diterima. Proxy VPS mungkin sedang tidak menjawab.');
+          /* Polling yang gagal TIDAK memasang peringatan kalau chartnya sudah
+             berisi. Penarikan berulang tiap 3 detik: satu kedipan koneksi
+             cukup untuk menggagalkan satu permintaan, dan memasang peringatan
+             merah di atas chart yang sedang tergambar baik-baik saja
+             memberitahu orangnya ada yang rusak padahal tidak ada.
+
+             Yang tampil tetap lilin terakhir yang berhasil -- sama seperti
+             sebelumnya, karena setLilin memang cuma dipanggil saat berhasil.
+             Yang berubah hanya: kegagalan sementara berhenti berteriak.
+             Kalau memang chartnya kosong, peringatannya tetap muncul. */
+          if (!lilinRef.current.closes.length) {
+            setGalat(simbol.startsWith('MT5:')
+              ? 'Belum ada data dari terminal MT5 — buka MT5 dengan EA Trade-Fi Sync v2 terpasang; chart terisi begitu EA mengirim (± tiap 5 menit).'
+              : 'Data tidak diterima. Proxy VPS mungkin sedang tidak menjawab.');
+          }
         }
         else { setLilin(l); setGalat(''); }
       } catch (e) {
-        if (hidup) setGalat(e instanceof Error ? e.message : 'Gagal mengambil data');
+        /* Alasan yang sama: galat tak terduga di tengah polling tidak boleh
+           menghapus chart yang sudah terbaca. */
+        if (hidup && !lilinRef.current.closes.length) {
+          setGalat(e instanceof Error ? e.message : 'Gagal mengambil data');
+        }
       } finally {
         if (hidup) setMemuat(false);
       }
@@ -2810,7 +2832,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                              tua, jadi tidak ditawarkan sama sekali di sana —
                              lebih jujur daripada tombol yang selalu menjawab
                              "tidak ada". */
-                          hamparanKiri={diUjungKiri && !simbol.startsWith('MT5:') ? (
+                          hamparanTengah={diUjungKiri && !simbol.startsWith('MT5:') ? (
                             habisRiwayat ? (
                               <span className="rounded border border-zinc-800 bg-zinc-950/90 px-2 py-1 text-[10.5px] leading-none text-zinc-600 shadow">
                                 riwayat terjauh

@@ -197,7 +197,7 @@ export function ChartLilin({
   garisSeret, onSeret, onKlikGaris, onHapusGaris, hamparanBawah, segmen, penandaPine, kotakPine, isianPine,
   alat, onAlatSelesai, gambarAlat, gambarPilih, onPilihGambar, onUbahGambar,
   posisiMt5, onUbahPosisi, hargaAsk, kunciUkuran, bagikanFoto, tandaAir, tampilan, pitaSmi,
-  hamparanKiri, onUjungKiri,
+  hamparanTengah, onUjungKiri,
 }: {
   /** Nama pasangan yang dicetak samar di tengah area harga, seperti
    *  TradingView. `utama` nama simbolnya, `sub` baris kecil di bawahnya --
@@ -251,10 +251,11 @@ export function ChartLilin({
   /** Panel yang ditumpangkan di bagian bawah area harga — dipakai kendali
    *  replay, supaya ia menyatu dengan grafik alih-alih memanjangkan halaman. */
   hamparanBawah?: React.ReactNode;
-  /** Ditumpangkan di tepi KIRI area harga. Dipakai tombol "Muat lebih lama":
-   *  ia cuma berarti saat orangnya sudah menggeser sampai mentok ke kiri, dan
-   *  di sanalah matanya sedang berada. */
-  hamparanKiri?: React.ReactNode;
+  /** Ditumpangkan MENGAMBANG DI TENGAH area harga. Dipakai kartu "Muat lebih
+   *  lama": ia cuma muncul saat orangnya sudah menggeser mentok ke kiri, dan
+   *  di tengah ia terbaca sebagai satu ajakan, bukan tempelan di pinggir yang
+   *  mudah terlewat. */
+  hamparanTengah?: React.ReactNode;
   /** Dipanggil saat jendela pandang menyentuh / meninggalkan bar pertama.
    *  Hanya saat BERUBAH, bukan tiap piksel geseran. */
   onUjungKiri?: (di: boolean) => void;
@@ -2170,11 +2171,15 @@ export function ChartLilin({
 
       {pojok && <div className="absolute left-2 top-2 z-20">{pojok}</div>}
 
-      {/* Tepi kiri area harga, setengah tinggi -- bukan di dasar bersama
-          kendali replay. Yang memanggilnya adalah gerakan menggeser ke kiri,
-          dan mata orangnya sedang di tepi itu, bukan di bawah. */}
-      {hamparanKiri && (
-        <div className="absolute left-2 top-1/2 z-20 -translate-y-1/2">{hamparanKiri}</div>
+      {/* Mengambang di TENGAH area harga.
+          pointer-events-none di pembungkusnya, auto di isinya: pembungkus
+          selebar chart yang menangkap tetikus akan mematikan geser, zoom, dan
+          seluruh alat gambar di bawahnya -- kartu kecil yang membekukan
+          chart adalah harga yang jauh terlalu mahal untuk sebuah ajakan. */}
+      {hamparanTengah && (
+        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
+          <div className="pointer-events-auto">{hamparanTengah}</div>
+        </div>
       )}
 
       {/* Kendali replay ditumpangkan di dasar area harga, bukan di panel
