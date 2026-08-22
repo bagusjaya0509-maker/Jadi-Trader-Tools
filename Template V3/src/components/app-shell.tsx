@@ -298,11 +298,12 @@ function TombolTema({ ciut = false }: { ciut?: boolean }) {
      dan yang tergambar di tuas itu bulan — jalan keluarnya. */
   return (
     <Switch
+      kecil
       value={tema === 'terang'}
       onToggle={() => setTema(keTerang ? 'terang' : 'gelap')}
       title={nama}
-      iconOn={<Moon className="size-4 text-zinc-300" strokeWidth={1.8} />}
-      iconOff={<Sun className="size-4 text-zinc-300" strokeWidth={1.8} />}
+      iconOn={<Moon className="size-3 text-zinc-300" strokeWidth={2} />}
+      iconOff={<Sun className="size-3 text-zinc-300" strokeWidth={2} />}
     />
   );
 }

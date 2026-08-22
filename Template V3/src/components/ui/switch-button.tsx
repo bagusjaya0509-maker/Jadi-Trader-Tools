@@ -30,6 +30,14 @@ type SwitchProps = {
    *  bisa dikenali orang yang memakai pembaca layar sama saja tidak ada. */
   title?: string;
   ariaLabel?: string;
+  /** Ukuran kecil: setinggi satu baris teks, bukan setinggi tombol.
+   *
+   *  Diperlukan sejak sakelarnya duduk di sebelah merek di sidebar. Diukur
+   *  di sana: teksnya 14 px dengan tinggi baris 21 px dan logonya 19 px,
+   *  sementara sakelar bawaannya 28 px — ia jadi benda paling tinggi di
+   *  baris itu, dan mata membaca yang paling tinggi sebagai yang paling
+   *  penting. Yang paling penting di baris itu mereknya. */
+  kecil?: boolean;
 };
 
 export function Switch({
@@ -40,7 +48,16 @@ export function Switch({
   className = '',
   title,
   ariaLabel,
+  kecil = false,
 }: SwitchProps) {
+  /* Kelas ditulis PENUH per ukuran, bukan disambung dari potongan. Kelas
+     Tailwind yang bertabrakan (w-12 dan w-9 sekaligus) tidak diselesaikan
+     urutan penulisannya melainkan urutan di lembar gayanya — jadi yang
+     menang tidak bisa diramalkan dari kode ini. */
+  const lebar = kecil ? 'w-9' : 'w-12';
+  const tuas = kecil ? 'size-4' : 'size-6';
+  const isi = kecil ? 'size-3' : 'size-5';
+
   return (
     <button
       type="button"
@@ -52,13 +69,13 @@ export function Switch({
          mana. */
       role="switch"
       aria-checked={value}
-      className={`bg-card-foreground/15 flex w-12 cursor-pointer rounded-full p-0.5 ${
+      className={`bg-card-foreground/15 flex ${lebar} cursor-pointer rounded-full p-0.5 ${
         value ? 'justify-end' : 'justify-start'
       } ${className}`}
       onClick={onToggle}
     >
       <motion.div
-        className="flex justify-center items-center size-6 rounded-full bg-background"
+        className={`flex justify-center items-center ${tuas} rounded-full bg-background`}
         layout
         transition={{
           type: 'spring',
@@ -73,7 +90,7 @@ export function Switch({
             animate={{ opacity: 1, rotate: 0 }}
             exit={{ opacity: 0, rotate: 60 }}
             transition={{ duration: 0.3 }}
-            className="flex justify-center items-center size-5"
+            className={`flex justify-center items-center ${isi}`}
           >
             {iconOn}
           </motion.div>
@@ -84,7 +101,7 @@ export function Switch({
             animate={{ opacity: 1, rotate: 0 }}
             exit={{ opacity: 0, rotate: -60 }}
             transition={{ duration: 0.3 }}
-            className="flex justify-center items-center size-5"
+            className={`flex justify-center items-center ${isi}`}
           >
             {iconOff}
           </motion.div>
