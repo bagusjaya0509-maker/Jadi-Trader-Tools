@@ -619,12 +619,25 @@ export function ChartLilin({
 
         const el = tempelRef.current;
         if (el && x0 != null) {
-          /* Di RUANG KOSONG sebelah kiri lilin tertua kalau ruangnya cukup;
-             kalau tidak, menempel di kanannya. Kartu yang selalu di kanan
-             akan menutupi lilin yang justru sedang dibaca; kartu yang selalu
-             di kiri akan keluar layar begitu bar tertuanya menyentuh tepi. */
+          /* SELALU di sebelah KIRI lilin tertua — di ruang kosong sebelum
+             riwayatnya dimulai, tempat lilin yang mau ditarik itu nanti
+             berada. Kartunya ikut bergeser ke kiri bersama chartnya.
+
+             Dulu ada pembalik: kalau ruang di kiri tidak cukup, kartunya
+             melompat ke KANAN lilin tertua. Niatnya menjaga kartunya tetap
+             terlihat, tapi yang terasa dipakai adalah kartu yang menghindar
+             — digeser ke kiri, ia malah maju ke kanan, melawan arah tangan.
+             Pemilik menyebutnya persis begitu, dan ia benar: benda yang
+             bergerak berlawanan dengan geseran terbaca sebagai rusak, bukan
+             sebagai pintar.
+
+             Yang tersisa cuma penjaga tepi: kartunya boleh menyusul ke kiri
+             sampai mentok tepi chart, lalu berhenti di situ dan dilewati
+             lilin. Tanpa penjaga ini ia hanyut keluar layar dan tombol
+             "Muat lebih lama" jadi tidak bisa ditekan sama sekali — kartu
+             yang tidak terjangkau sama saja dengan kartu yang tidak ada. */
           const lebarKartu = el.offsetWidth || 176;
-          const kiri = x0 > lebarKartu + 20 ? x0 - lebarKartu - 12 : x0 + 12;
+          const kiri = Math.max(8, x0 - lebarKartu - 12);
           el.style.transform = `translate(${Math.round(kiri)}px, -50%)`;
         }
       } catch { /* chartnya sudah dibuang */ }
