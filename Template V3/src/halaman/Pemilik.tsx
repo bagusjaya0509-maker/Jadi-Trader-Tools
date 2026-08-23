@@ -173,6 +173,36 @@ export default function Pemilik() {
   }, [penjualan.data, lisensiTerjual, harga]);
 
 
+  /* Recent sales = lisensi + catatan tangan, DIURUT BERSAMA.
+     Tanpa ini panel Revenue bilang "5 lisensi" sementara tabel di bawahnya
+     bilang "Belum ada penjualan" — dua bagian layar yang sama-sama benar
+     menurut sumbernya sendiri, dan sama-sama salah bagi yang membacanya.
+
+     Baris lisensi TIDAK bisa dihapus dari sini. Sumber kebenarannya panel
+     Akses & Lisensi di Maintenance; tombol hapus di dua tempat untuk satu
+     catatan adalah cara membuat keduanya berselisih. */
+  const barisJual = useMemo(() => {
+    const namaPaket = (p?: string) =>
+      p === 'tahunan' ? 'Tahunan' : p === 'premium3' ? 'Premium 3 bulan' : p === 'testing' ? 'Testing' : 'Akses';
+    const dariLisensi = lisensiTerjual.map((x) => ({
+      kunci: 'L' + x.id,
+      waktu: x.diputusPada || x.waktu,
+      produk: 'Lisensi — ' + namaPaket(x.paket),
+      pembeli: x.email || x.nama || x.uid,
+      nilai: hargaLisensi(x),
+      /* Harga TERCATAT vs harga DITAKSIR. Permintaan lama tidak menyimpan
+         hargaSaat, jadi angkanya diturunkan dari tabel harga sekarang —
+         dan orang yang membaca laporan berhak tahu mana yang mana. */
+      taksiran: !(Number.isFinite(x.hargaSaat) && (x.hargaSaat as number) > 0),
+      manual: false as const, id: '',
+    }));
+    const dariTangan = penjualan.data.map((p) => ({
+      kunci: 'M' + p.id, waktu: p.waktu, produk: p.produk, pembeli: p.pembeli,
+      nilai: p.nilai, taksiran: false, manual: true as const, id: p.id,
+    }));
+    return [...dariLisensi, ...dariTangan].sort((a, b) => b.waktu - a.waktu);
+  }, [lisensiTerjual, penjualan.data, harga]);
+
   async function tambahPenjualan() {
     const nilai = Number(form.nilai);
     if (!form.produk.trim()) { setPesan('Nama produk wajib diisi.'); return; }
@@ -302,7 +332,7 @@ export default function Pemilik() {
                     sendiri. Sudut membulat HANYA di potongan atas — kalau
                     keduanya membulat, tumpukannya terlihat seperti dua
                     batang terpisah yang kebetulan bersentuhan. */}
-                <Bar dataKey="lisensi" stackId="a" name="Lisensi" fill="#10b981" fillOpacity={0.85} maxBarSize={26} />
+                <Bar dataKey="lisensi" stackId="a" name="Lisensi" fill="#10b981" fillOpacity={0.85} radius={[3, 3, 0, 0]} maxBarSize={26} />
                 <Bar dataKey="manual" stackId="a" name="Manual" fill="#38bdf8" fillOpacity={0.75} radius={[3, 3, 0, 0]} maxBarSize={26} />
               </BarChart>
             </ResponsiveContainer>
@@ -438,30 +468,40 @@ export default function Pemilik() {
 
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Panel>
-          <PanelHead judul="Recent sales" sub="Penjualan terakhir yang tercatat." />
+          <PanelHead judul="Recent sales" sub="Lisensi berbayar dan catatan tangan, diurut bersama." />
           <div className="px-5 pb-5">
-            <Kabar memuat={penjualan.memuat} galat={penjualan.galat} kosong={!penjualan.data.length}
-                   teksKosong="Belum ada penjualan." />
-            {penjualan.data.length > 0 && (
-              <TabelBungkus className={gulirJika(penjualan.data.length, 10, 'max-h-[480px]')}>
+            <Kabar memuat={penjualan.memuat || permintaan.memuat} galat={penjualan.galat} kosong={!barisJual.length}
+                   teksKosong="Belum ada pemasukan." />
+            {barisJual.length > 0 && (
+              <TabelBungkus className={gulirJika(barisJual.length, 10, 'max-h-[480px]')}>
                 <Tabel>
                   <thead><tr><Th>Tanggal</Th><Th>Produk</Th><Th className="text-right">Nilai</Th><Th /></tr></thead>
                   <tbody>
-                    {penjualan.data.slice(0, 12).map((p) => (
-                      <Tr key={p.id}>
+                    {barisJual.slice(0, 12).map((p) => (
+                      <Tr key={p.kunci}>
                         <Td className="whitespace-nowrap text-zinc-500">{tanggalPendek(p.waktu)}</Td>
                         <Td className="text-zinc-300">
                           {p.produk}
                           {p.pembeli && <div className="text-[11px] text-zinc-600">{p.pembeli}</div>}
                         </Td>
-                        <Td className="angka text-right text-emerald-500">{fmt(p.nilai)}</Td>
+                        <Td className="angka text-right text-emerald-500">
+                          {p.taksiran && <span className="mr-0.5 text-zinc-600" title="Permintaan lama tidak menyimpan harganya — angka ini diturunkan dari tabel harga sekarang">≈</span>}
+                          {fmt(p.nilai)}
+                        </Td>
                         <Td className="text-right">
-                          <button
-                            onClick={() => void jalankan(() => hapusPenjualan(p.id), 'Catatan penjualan dihapus.', penjualan.muatUlang)}
-                            disabled={sibuk || !pemilik} aria-label={`Hapus catatan ${p.produk}`}
-                            className="cursor-pointer rounded p-1 text-zinc-600 transition-colors hover:bg-zinc-800 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-40">
-                            <Trash2 className="size-3.5" />
-                          </button>
+                          {p.manual ? (
+                            <button
+                              onClick={() => void jalankan(() => hapusPenjualan(p.id), 'Catatan penjualan dihapus.', penjualan.muatUlang)}
+                              disabled={sibuk || !pemilik} aria-label={`Hapus catatan ${p.produk}`}
+                              className="cursor-pointer rounded p-1 text-zinc-600 transition-colors hover:bg-zinc-800 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-40">
+                              <Trash2 className="size-3.5" />
+                            </button>
+                          ) : (
+                            <span className="whitespace-nowrap text-[10px] uppercase tracking-wider text-zinc-700"
+                                  title="Terisi sendiri dari Akses & Lisensi — hapus permintaannya di sana kalau perlu">
+                              otomatis
+                            </span>
+                          )}
                         </Td>
                       </Tr>
                     ))}
