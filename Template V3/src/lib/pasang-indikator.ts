@@ -1,0 +1,107 @@
+import { SUPERTREND_PINE } from '@/lib/pine';
+
+/* ════════════════════════════════════════════════════════════════════════
+   PASANG INDIKATOR DARI MARKETPLACE KE CHART
+   ════════════════════════════════════════════════════════════════════════
+   Marketplace menjual dua jenis barang yang sangat berbeda: EA MetaTrader,
+   yang harus diunduh lalu dipasang di terminal sendiri, dan indikator Pine,
+   yang sepenuhnya hidup di dalam aplikasi ini. Yang kedua tidak punya alasan
+   untuk menyuruh orang menyalin-tempel kode: aplikasinya sendiri yang
+   menyimpan daftar skrip, jadi ia bisa memasangnya sendiri.
+
+   Berkas ini menulis ke penyimpanan yang SAMA dengan dock Pine
+   (`jt.pineDaftar`) — bukan penyimpanan kedua yang harus disamakan. Dua
+   daftar skrip yang seharusnya sama adalah dua daftar yang cepat atau
+   lambat berbeda, dan yang berbeda di sini adalah indikator mana yang
+   sebenarnya tergambar di chart.
+   ════════════════════════════════════════════════════════════════════════ */
+
+const KUNCI_DAFTAR = 'jt.pineDaftar';
+
+interface SkripTersimpan { id: string; nama: string; kode: string; aktif: boolean }
+
+/** Indikator Pine yang bisa dipasang langsung, dipetakan dari id produk
+ *  marketplace. Produk yang tidak ada di sini — EA MT5, misalnya — tidak
+ *  menampilkan tombol pasang sama sekali; tombol yang ada tapi tidak
+ *  melakukan apa-apa lebih buruk daripada tombol yang tidak ada. */
+export const INDIKATOR_TERPASANG: Record<string, { nama: string; kode: string }> = {
+  'supertrend-indikator': { nama: 'Supertrend', kode: SUPERTREND_PINE },
+};
+
+/** Cocokkan produk katalog dengan indikator yang bisa dipasang.
+ *
+ *  DICOCOKKAN LEWAT ID **ATAU** NAMA, dan itu bukan kelonggaran malas.
+ *  Katalog yang tayang hidup di Firestore dan disusun lewat halaman
+ *  Maintenance — id-nya diketik orang, bukan ditulis di kode ini. Kalau
+ *  cocoknya hanya lewat id, satu huruf berbeda saat mengetik membuat tombol
+ *  pasangnya hilang tanpa satu pun galat yang menjelaskan kenapa.
+ *
+ *  Nama dinormalkan: huruf kecil, tanpa spasi dan tanda hubung. Jadi
+ *  "Supertrend", "Super Trend", dan "super-trend" sama-sama kena. */
+function normal(t: string): string {
+  return t.toLowerCase().replace(/[\s_-]+/g, '');
+}
+
+export function kunciIndikator(produk: { id: string; nama: string }): string | null {
+  if (produk.id in INDIKATOR_TERPASANG) return produk.id;
+  const n = normal(produk.nama);
+  for (const [kunci, ind] of Object.entries(INDIKATOR_TERPASANG)) {
+    if (normal(ind.nama) === n) return kunci;
+  }
+  return null;
+}
+
+export function bisaDipasang(produk: { id: string; nama: string }): boolean {
+  return kunciIndikator(produk) !== null;
+}
+
+export type HasilPasang = 'baru' | 'diperbarui' | 'sudahAda' | 'gagal';
+
+/** Pasang indikator ke daftar skrip Pine, lalu jadikan ia yang aktif.
+ *
+ *  Kalau namanya sudah ada, kodenya DIPERBARUI alih-alih ditambah sebagai
+ *  salinan kedua. Dua skrip bernama sama di satu daftar memaksa orang menebak
+ *  mana yang sedang tergambar, dan menebak salah berarti membaca chart yang
+ *  bukan yang ia kira. */
+export function pasangIndikator(produk: { id: string; nama: string }): HasilPasang {
+  const kunci = kunciIndikator(produk);
+  const ind = kunci ? INDIKATOR_TERPASANG[kunci] : undefined;
+  if (!ind || !kunci) return 'gagal';
+  try {
+    const mentah = localStorage.getItem(KUNCI_DAFTAR);
+    const daftar: SkripTersimpan[] = mentah ? JSON.parse(mentah) : [];
+    if (!Array.isArray(daftar)) return 'gagal';
+
+    const adaIdx = daftar.findIndex((s) => s && s.nama === ind.nama);
+    /* Semua skrip lain dinonaktifkan: dock Pine menggambar yang `aktif`, dan
+       memasang indikator yang tidak langsung tampil terbaca sebagai
+       pemasangan yang gagal. */
+    const lain = daftar.map((s) => ({ ...s, aktif: false }));
+
+    if (adaIdx >= 0) {
+      const sama = daftar[adaIdx].kode === ind.kode;
+      lain[adaIdx] = { ...lain[adaIdx], kode: ind.kode, aktif: true };
+      localStorage.setItem(KUNCI_DAFTAR, JSON.stringify(lain));
+      tandaiBerubah();
+      return sama ? 'sudahAda' : 'diperbarui';
+    }
+
+    lain.push({ id: 'pasar-' + kunci, nama: ind.nama, kode: ind.kode, aktif: true });
+    localStorage.setItem(KUNCI_DAFTAR, JSON.stringify(lain));
+    tandaiBerubah();
+    return 'baru';
+  } catch {
+    /* localStorage ditolak (mode privat). Tidak ada tempat menyimpan, jadi
+       tidak ada yang bisa dijanjikan. */
+    return 'gagal';
+  }
+}
+
+/* Halaman Chart mungkin sedang terbuka di tab lain. Event `storage` hanya
+   menyala di tab LAIN, tidak di tab yang menulis — jadi kalau nanti dock
+   Pine perlu menyegarkan dirinya di tab yang sama, sinyalnya harus dikirim
+   sendiri. Disiarkan sekarang supaya penerimanya bisa ditambahkan tanpa
+   menyentuh berkas ini lagi. */
+function tandaiBerubah() {
+  try { window.dispatchEvent(new CustomEvent('jt:pine-daftar-berubah')); } catch { /* nonaktif */ }
+}

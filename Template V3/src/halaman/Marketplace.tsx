@@ -8,6 +8,83 @@ import { PeragaProduk } from '@/components/peraga-produk';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { cn, tanggalPendek } from '@/lib/utils';
 import { type Produk } from '@/data/contoh';
+import { bisaDipasang, pasangIndikator } from '@/lib/pasang-indikator';
+
+/* ════════════════════════════════════════════════════════════════════════
+   TOMBOL PASANG KE CHART
+   ════════════════════════════════════════════════════════════════════════
+   Hanya untuk indikator Pine, yang seluruhnya hidup di dalam aplikasi ini.
+   EA MetaTrader tidak pernah menampilkannya: ia harus diunduh dan dipasang
+   di terminal sendiri, dan tombol "Pasang" yang tidak memasang apa pun lebih
+   buruk daripada tidak ada tombol.
+
+   SIAPA YANG BOLEH:
+     · pemilik — selalu
+     · indikator gratis — siapa pun yang paketnya bukan Event Terbatas
+     · indikator berbayar — pemegang paket TAHUNAN
+
+   Paket tahunan dipakai sebagai tanda "sudah membeli" karena itulah satu-
+   satunya tingkat langganan yang tercatat per akun di sistem ini. Catatan
+   pembelian per produk belum ada; begitu ada, syaratnya ditambahkan di SATU
+   tempat ini, bukan disebar ke tiap kartu.
+
+   Komponen tersendiri, bukan potongan di dalam map kartu: ia menyimpan pesan
+   hasilnya sendiri, dan satu state pesan yang dibagi seluruh kartu akan
+   membuat menekan tombol di satu kartu memunculkan kabar di kartu lain. */
+function TombolPasangChart({ produk }: { produk: Produk }) {
+  const { pemilik } = useAuth();
+  const { paket, memuat } = usePaket();
+  const [pesan, setPesan] = useState('');
+  const [gagal, setGagal] = useState(false);
+
+  if (!bisaDipasang(produk)) return null;
+
+  const gratis = produk.harga === 0;
+  const kunciEvent = gratis && !pemilik && (memuat || paket.paket === 'gratis');
+  const boleh = pemilik || (gratis ? !kunciEvent : paket.paket === 'tahunan');
+  const alasan = boleh
+    ? 'Pasang ke Chart & Entry'
+    : gratis
+      ? 'Isi Marketplace belum termasuk paket Event Terbatas'
+      : 'Perlu paket Tahunan untuk memasang indikator berbayar';
+
+  function pasang() {
+    const h = pasangIndikator(produk);
+    setGagal(h === 'gagal');
+    setPesan(
+      h === 'gagal' ? 'Gagal memasang — penyimpanan peramban ditolak.'
+      : h === 'sudahAda' ? 'Sudah terpasang — diaktifkan di chart.'
+      : h === 'diperbarui' ? 'Versi terbaru dipasang & diaktifkan.'
+      : 'Terpasang — buka Chart & Entry.');
+    setTimeout(() => setPesan(''), 4000);
+  }
+
+  return (
+    <span className="relative">
+      <button
+        onClick={() => boleh && pasang()}
+        disabled={!boleh}
+        title={alasan}
+        aria-label={alasan}
+        className={cn('flex items-center rounded-md border px-2 py-1.5 transition-colors',
+          boleh
+            ? 'cursor-pointer border-emerald-600/50 text-emerald-400 hover:border-emerald-500 hover:text-emerald-300'
+            : 'cursor-not-allowed border-zinc-800 text-zinc-700')}
+      >
+        <Download className="size-3.5" strokeWidth={2} />
+      </button>
+      {/* Kabar hasil digantung DI ATAS tombolnya, bukan disisipkan ke dalam
+          kartu: kartu yang tiba-tiba bertambah tinggi menggeser seluruh grid
+          di bawahnya, dan yang bergeser justru kartu yang sedang dibaca. */}
+      {pesan && (
+        <span className={cn('absolute bottom-full right-0 mb-1.5 w-max max-w-[15rem] rounded-md border px-2 py-1 text-[11px] shadow-xl',
+          gagal ? 'border-red-500/40 bg-zinc-950 text-red-300' : 'border-emerald-600/40 bg-zinc-950 text-emerald-300')}>
+          {pesan}
+        </span>
+      )}
+    </span>
+  );
+}
 import { useProduk, simpanKatalogProduk } from '@/lib/data';
 import { useAuth } from '@/lib/auth';
 import { usePaket } from '@/lib/paket';
@@ -483,13 +560,20 @@ export default function Marketplace() {
                     <div className="angka mt-0.5 text-[11px] text-zinc-600">{rupiah(p.harga, kursUsd)}</div>
                   )}
                 </div>
-                <button
-                  onClick={() => setAktif(p)}
-                  className="cursor-pointer rounded-md border border-zinc-800 px-3 py-1.5 text-[12px]
-                             text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100"
-                >
-                  Detail
-                </button>
+                <div className="flex items-center gap-1.5">
+                  {/* Ikon pasang di KIRI Detail — permintaan pemilik. Ikon,
+                      bukan tombol berlabel: Detail adalah jalan utama tiap
+                      kartu, dan dua tombol berteks sama besar membuat mata
+                      memilih dulu sebelum membaca. */}
+                  <TombolPasangChart produk={p} />
+                  <button
+                    onClick={() => setAktif(p)}
+                    className="cursor-pointer rounded-md border border-zinc-800 px-3 py-1.5 text-[12px]
+                               text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100"
+                  >
+                    Detail
+                  </button>
+                </div>
               </div>
               </div>
             </Panel>

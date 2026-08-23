@@ -242,6 +242,14 @@ export const PRODUK: Produk[] = [
     ringkas: 'Versi SMI yang dipakai di Area Pantau — dengan garis EMA pembanding dan gradasi overbought/oversold.',
     fitur: ['Skala -100 s/d +100', 'Garis EMA pembanding', 'Gradasi jenuh', 'Panjang bisa diatur'],
   },
+  {
+    /* id-nya WAJIB sama dengan kunci di INDIKATOR_TERPASANG — itulah yang
+       menyambungkan kartu ini dengan kode yang dipasang ke chart. */
+    id: 'supertrend-indikator', nama: 'Supertrend', versi: 'Pine v4 · overlay · semua timeframe',
+    harga: 0, premium: false,
+    ringkas: 'Supertrend berbasis ATR dengan pita naik-turun yang berganti warna saat tren berbalik — versi yang berjalan di mesin Pine aplikasi ini, bukan tempelan TradingView.',
+    fitur: ['Periode ATR bisa diatur', 'Faktor pengali bebas', 'Pita hijau/merah mengikuti arah tren', 'Penanda titik balik'],
+  },
 ];
 
 /* ── Panel Pemilik ────────────────────────────────────────────────────── */
