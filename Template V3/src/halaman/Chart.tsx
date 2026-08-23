@@ -4,12 +4,13 @@ import {
   Play, Loader2, RefreshCw, Radio, TriangleAlert, History,
   Layers, ChevronDown, Settings2, Code2, X, Ruler, Rows3, Square, Eraser, Minus, TrendingUp,
   FlaskConical, GripHorizontal, Maximize2, Minimize2, SquareArrowUp, SquareArrowDown,
-  Settings, RotateCcw } from 'lucide-react';
+  Settings, RotateCcw, LayoutGrid } from 'lucide-react';
 import { PanelNews } from '@/components/panel-news';
 import { simpanDraf } from '@/lib/draf-sinyal';
 import { Panel, PanelHead, KartuKpi, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn, uang, persen, harga, tanggalPendek } from '@/lib/utils';
 import { ChartLilin, TAMPILAN_BAWAAN, type Garis, type GarisHarga, type GarisSeret, type PosisiChartMt5, type TampilanChart } from '@/components/chart-lilin';
+import { POLOS, kirimBus, nyalakanMulti, replayDipegangLain, pegangReplay } from '@/lib/multi-chart';
 import { PanelReplay, type AksiOrder, type JenisEntry } from '@/components/panel-replay';
 import { PojokOrder } from '@/components/pojok-order';
 import { kirimOrderNyata, ubahSlTpNyata, batalPendingNyata, tutupPosisiNyata, tickSimbol, keTick, type MetodeTp } from '@/lib/order-nyata';
@@ -343,6 +344,17 @@ export default function ChartBacktest() {
      Tanpa ini klik di chart sesudahnya masih dianggap membidik dan
      melempar posisi replay yang sudah berjalan. */
   useEffect(() => { if (replayIdx !== null) setBidikReplay(false); }, [replayIdx]);
+
+  /* Replay dikunci SATU konteks pada satu waktu — beberapa panel multi-chart
+     yang me-replay bersamaan saling berebut CPU sampai semuanya tersendat.
+     Kuncinya dipegang selama replay hidup; pelepasnya jalan saat replay
+     selesai ATAU panelnya ditutup. Deps-nya boolean, bukan replayIdx utuh:
+     kunci tidak perlu dilepas-pasang tiap bar maju. */
+  const sedangReplay = replayIdx !== null;
+  useEffect(() => {
+    if (!sedangReplay) return;
+    return pegangReplay();
+  }, [sedangReplay]);
 
   /* ── Jatah replay untuk pengunjung preview ────────────────────────────
      `!pengguna` bukan pelengkap: penanda preview hidup di sessionStorage
@@ -1127,6 +1139,16 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
 
        Ini juga sebabnya bug ini bertahan lama: tidak ada galat, tidak ada
        data yang rusak, dan yang salah cuma satu kata yang tidak ditulis. */
+    /* Di dalam panel multi-chart / jendela chart lepasan, halaman ini
+       TIDAK berpindah — drafnya sudah tersimpan (localStorage, dibagi
+       semua jendela se-origin), jadi cukup menyuruh jendela tools membuka
+       formulirnya. Panel kecil yang tiba-tiba berisi halaman Copy Signal
+       bukan yang dimaksud siapa pun, dan chartnya sendiri tetap utuh. */
+    if (POLOS) {
+      kirimBus({ jenis: 'navigasi', ke: '/copy-signal?sub=posting' });
+      setKabarKirimSinyal('Draf terkirim — formulir posting terbuka di jendela tools.');
+      return;
+    }
     navigasi('/copy-signal?sub=posting');
   }
   /* Setelan order sungguhan — hidup di halaman supaya label risiko di
@@ -2653,6 +2675,13 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                   muatPaket();
                   if (!h.boleh) { setKabarReplay(h.alasan ?? 'Jatah replay sudah habis.'); return; }
                 }
+                /* Konteks lain (panel multi-chart / jendela lepasan) sedang
+                   me-replay: tolak DI SINI, sebelum jatah paket terpakai
+                   sia-sia untuk sesi yang tidak akan dimulai. */
+                if (replayDipegangLain()) {
+                  setKabarReplay('Replay sedang berjalan di panel lain. Replay dibatasi satu panel bergiliran supaya tidak memberatkan — tutup dulu yang di sana.');
+                  return;
+                }
                 setKabarReplay('');
                 setBidikReplay((v) => !v);
               }}
@@ -3557,6 +3586,17 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
               pengguna. Jumlah penanda trade dipertahankan -- ia hanya muncul
               sehabis backtest, dan orang yang baru menjalankan backtest
               sedang mencarinya. */}
+          {/* Multi-chart, persis di kanan gerigi. DISEMBUNYIKAN di mode
+              polos: panel yang bisa membelah dirinya jadi empat panel lagi
+              adalah cermin yang saling memantul. */}
+          {!POLOS && (
+            <button onClick={() => nyalakanMulti(simbol, tf)}
+              title="Multi-chart — bagi layar jadi beberapa panel chart"
+              aria-label="Multi-chart"
+              className="flex shrink-0 cursor-pointer items-center rounded p-1 text-zinc-500 transition-colors hover:text-zinc-300">
+              <LayoutGrid className="size-3.5" strokeWidth={2} />
+            </button>
+          )}
           <span className="flex min-w-0 items-center gap-2 truncate">
             {hasil?.trade.length ? (
               <span className="truncate">{hasil.trade.length} penanda trade</span>

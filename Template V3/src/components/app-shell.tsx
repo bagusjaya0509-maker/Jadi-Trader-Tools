@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { NavLink, useLocation, Link, useSearchParams } from 'react-router-dom';
+import { NavLink, useLocation, Link, useSearchParams, useNavigate } from 'react-router-dom';
 import {
   LayoutGrid, BarChart3, Briefcase, Users, Plug, CandlestickChart,
   Wallet, TrendingUp, Wrench, CreditCard, LifeBuoy, BookOpen,
@@ -9,6 +9,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Switch } from '@/components/ui/switch-button';
+import { MultiChart } from '@/components/multi-chart';
+import { POLOS, dengarBus } from '@/lib/multi-chart';
 import { BADAN, WA_LINK } from '@/lib/badan';
 import { useAuth } from '@/lib/auth';
 import { useKabarAgen, umurKabar } from '@/lib/kabar';
@@ -729,6 +731,32 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const terbaru = CHANGELOG[0];
 
+  /* ── Bus antar-jendela ────────────────────────────────────────────────
+     Panel multi-chart (iframe/popup) yang perlu membuka halaman lain —
+     posting Copy Signal — MENYURUH jendela tools ini berpindah lewat bus,
+     alih-alih berpindah sendiri di dalam panel kecilnya. Hanya jendela
+     utama yang mendengar: konteks polos tidak pernah memasang pendengar,
+     jadi pesan satu panel tidak memindahkan panel-panel lain. */
+  const arahkan = useNavigate();
+  useEffect(() => {
+    if (POLOS) return;
+    return dengarBus((p) => {
+      if (p && p.jenis === 'navigasi' && typeof p.ke === 'string' && p.ke.startsWith('/')) {
+        arahkan(p.ke);
+      }
+    });
+  }, [arahkan]);
+
+  /* ── Mode polos: isi tanpa kerangka ───────────────────────────────────
+     Dipakai iframe panel multi-chart dan jendela chart lepasan. Sidebar
+     dan bilah atas milik JENDELA TOOLS; menumbuhkannya di dalam panel
+     seperempat layar cuma memakan tempat untuk navigasi yang memang tidak
+     boleh terjadi di sana. Hooks di atas tetap berjalan (aturan React) —
+     yang berbeda hanya bingkainya. */
+  if (POLOS) {
+    return <div className="min-h-screen bg-zinc-950 text-zinc-100">{children}</div>;
+  }
+
   return (
     <div className="flex min-h-screen bg-zinc-950 text-zinc-100">
       <div
@@ -935,7 +963,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         <PitaLangganan />
 
-        <main className="min-w-0 flex-1">{children}</main>
+        {/* relative: grid multi-chart menimpa area konten INI SAJA —
+            sidebar dan header tetap hidup, jadi jendela tools tetap bisa
+            dipakai berpindah halaman selagi chart-chartnya berjalan. */}
+        <main className="relative min-w-0 flex-1">
+          {children}
+          {/* Dipasang di sini, bukan di rute /chart-entry: komponen yang
+              hidup di rute ikut mati saat rutenya ditinggalkan, dan iframe
+              yang mati kehilangan seluruh keadaannya. Di sini ia cuma
+              disembunyikan — panelnya terus berjalan di belakang halaman
+              mana pun yang sedang dibuka. */}
+          <MultiChart />
+        </main>
       </div>
 
     </div>

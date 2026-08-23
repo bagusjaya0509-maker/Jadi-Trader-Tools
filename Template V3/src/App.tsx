@@ -5,6 +5,7 @@ import { PenyediaAuth, useAuth } from '@/lib/auth';
 import { modePreview } from '@/lib/preview';
 import { catatKunjungan } from '@/lib/admin';
 import { AppShell } from '@/components/app-shell';
+import { useMulti, POLOS } from '@/lib/multi-chart';
 import Pendaratan from '@/halaman/Pendaratan';
 import Akses from '@/halaman/Akses';
 
@@ -272,6 +273,20 @@ function Penjaga({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+/** Chart tunggal MENGALAH saat multi-chart aktif. Grid multi (di AppShell)
+ *  menimpa area konten, tapi halaman di bawahnya tetap dirender React —
+ *  membiarkan Chart penuh tetap terpasang berarti satu chart tak terlihat
+ *  ikut menarik lilin tiap 3 detik dari balik grid. */
+function RuteChartEntry() {
+  const m = useMulti();
+  /* !POLOS wajib: keadaan multi dibagi lewat localStorage ke SEMUA konteks
+     se-origin — termasuk iframe panel itu sendiri. Tanpa pengecualian ini,
+     panel membaca "multi sedang aktif" lalu ikut mengalah jadi placeholder,
+     dan keempat panelnya kosong serempak. Panel selalu merender chart. */
+  if (m.aktif && !POLOS) return <div className="min-h-[70vh]" />;
+  return <ChartBacktest />;
+}
+
 function Kerangka() {
   const { memuat, pemilik, langganan, pengguna } = useAuth();
   const lokasi = useLocation();
@@ -396,7 +411,7 @@ export default function App() {
             <Route path="/dashboard"      element={<Dashboard />} />
             <Route path="/screener"       element={<Screener />} />
             <Route path="/screener-react" element={<ScreenerReact />} />
-            <Route path="/chart-entry"    element={<ChartBacktest />} />
+            <Route path="/chart-entry"    element={<RuteChartEntry />} />
             <Route path="/journal"        element={<Jurnal />} />
             <Route path="/personal-area"  element={<PersonalArea />} />
             <Route path="/marketplace"    element={<Marketplace />} />
