@@ -409,16 +409,33 @@ export default function Pemilik() {
               <BarChart data={perBulan} margin={{ top: 8, right: 12, left: 8, bottom: 0 }}>
                 <CartesianGrid vertical={false} stroke="currentColor" strokeOpacity={0.09} />
                 <XAxis dataKey="bulan" tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} width={44}
-                       tickFormatter={(v) => `$${v}`} />
+                {/* Sumbunya IKUT sakelar mata uang. Dulu ditulis mati
+                    `$${v}`: dengan tampilan IDR, kartu Revenue berbunyi
+                    "Rp 89.500" sementara sumbu di bawahnya berbunyi "$8"
+                    untuk data yang sama persis. Disingkat rb/jt karena
+                    "Rp 143.200" tidak muat di lebar sumbu. */}
+                <YAxis tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} width={tampil === 'IDR' ? 56 : 44}
+                       tickFormatter={(v) => {
+                         if (!v) return '0';
+                         if (tampil !== 'IDR') return `$${v}`;
+                         const rp = v * kurs;
+                         return rp >= 1_000_000 ? `Rp${(rp / 1_000_000).toFixed(1)}jt` : `Rp${Math.round(rp / 1000)}rb`;
+                       }} />
                 <Tooltip content={<TipGrafik />} cursor={{ fill: 'currentColor', fillOpacity: 0.06 }} />
                 {/* Bertumpuk pada stackId yang sama: tinggi total = omzet
                     bulan itu, sementara tiap potongnya tetap terbaca
-                    sendiri. Sudut membulat HANYA di potongan atas — kalau
-                    keduanya membulat, tumpukannya terlihat seperti dua
-                    batang terpisah yang kebetulan bersentuhan. */}
-                <Bar dataKey="lisensi" stackId="a" name="Lisensi" fill="#10b981" fillOpacity={0.85} radius={[3, 3, 0, 0]} maxBarSize={26} />
-                <Bar dataKey="manual" stackId="a" name="Manual" fill="#38bdf8" fillOpacity={0.75} radius={[3, 3, 0, 0]} maxBarSize={26} />
+                    sendiri.
+
+                    TANPA `radius`, dan itu bukan selera. Recharts menggambar
+                    batang ber-radius sebagai <path>, dan pada batang yang
+                    juga ber-stackId perhitungan tingginya rusak: batang
+                    bernilai $5 pada sumbu 0-8 tergambar setinggi 2,9 px
+                    -- persis seangka radiusnya -- lalu hilang sama sekali
+                    begitu komponennya dipasang ulang. Terukur di peramban,
+                    bukan dugaan. Sudut siku adalah harga yang murah untuk
+                    batang yang tingginya benar. */}
+                <Bar dataKey="lisensi" stackId="a" name="Lisensi" fill="#10b981" fillOpacity={0.85} maxBarSize={26} />
+                <Bar dataKey="manual" stackId="a" name="Manual" fill="#38bdf8" fillOpacity={0.75} maxBarSize={26} />
               </BarChart>
             </ResponsiveContainer>
             </div>
