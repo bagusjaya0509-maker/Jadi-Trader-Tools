@@ -836,7 +836,14 @@ export default function Marketplace() {
           }
         />
         <div className="grid grid-cols-1 gap-4 px-5 pb-5 lg:grid-cols-3">
-          <div className="space-y-3 lg:col-span-2">
+          {/* Jarak antar ulasan dinaikkan dari 12 px ke 20 px, dan tiap
+              ulasan dapat garis pemisah tipis di bawahnya kecuali yang
+              terakhir. Begitu bingkainya dicabut, dua ulasan berurutan
+              kehilangan satu-satunya penanda di mana yang satu berakhir —
+              dan yang tersisa cuma jarak, yang tidak cukup begitu ulasannya
+              panjang. Garis rambut mengembalikan batas itu tanpa
+              mengembalikan kotaknya. */}
+          <div className="space-y-5 lg:col-span-2">
             {ulasan.memuat && <div className="py-6 text-center text-[12.5px] text-zinc-600">Memuat ulasan…</div>}
             {!ulasan.memuat && ulasan.data.length === 0 && (
               <div className="rounded-lg border border-dashed border-zinc-800 py-8 text-center text-[12.5px] text-zinc-600">
@@ -844,7 +851,7 @@ export default function Marketplace() {
               </div>
             )}
             {ulasan.data.map((u) => (
-              <div key={u.id} className="rounded-lg border border-zinc-800/60 p-4">
+              <div key={u.id} className="border-b border-zinc-800/50 pb-5 last:border-0 last:pb-0">
                 <div className="flex flex-wrap items-center gap-2">
                   {/* Foto profil Google kalau ada, huruf awal kalau tidak.
                       `referrerPolicy` wajib: tanpa itu Google menolak melayani
