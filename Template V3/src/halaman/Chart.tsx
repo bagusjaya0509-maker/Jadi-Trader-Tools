@@ -2660,14 +2660,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
           celah yang tidak simetris dengan garis lurus di sebelahnya
           terbaca sebagai salah pasang. Siku membuat keempat garis bertemu
           sebagai satu kotak utuh. */}
-      {/* `relative` DI SINI, bukan di pembungkus grafik di dalamnya: kaki
-          chart mengambang dengan `absolute bottom-0`, dan induk langsungnya
-          adalah kartu ini. Sempat dipasang di pembungkus grafik — yang bukan
-          induknya — sehingga kakinya melompati kartu, menempel ke <main>
-          (yang ber-relative demi grid multi-chart), lalu mendarat di dasar
-          HALAMAN, 550 px di bawah chartnya. Tidak ada galat; ikonnya cuma
-          pindah ke tempat yang salah. */}
-      <Panel className={cn('relative', POLOS ? 'rounded-none border-0 bg-transparent' : 'rounded-none bg-transparent')}>
+      <Panel className={POLOS ? 'rounded-none border-0 bg-transparent' : 'rounded-none bg-transparent'}>
         {/* `relative`: jangkar bagi panel News dan menu Indikator di HP.
             Keduanya dilepas dari tombolnya di layar kecil dan digantung
             ke bilah ini, supaya lebarnya mengikuti bilah dan tidak bisa
@@ -2936,7 +2929,8 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
           </div>
         )}
 
-        <div className="border-t border-zinc-800/80 px-2 pb-2">
+        {/* `relative`: jangkar hamparan kaki chart yang ada DI DALAMNYA. */}
+        <div className="relative border-t border-zinc-800/80 px-2 pb-2">
           {/* relative + overflow-hidden: rumah semua hamparan chart — legend,
               alat gambar, dock Pine, dan watchlist yang meluncur dari kanan.
               Tanpa overflow-hidden, panel yang sedang tersembunyi
@@ -3675,200 +3669,217 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
               <div className="h-[3px] w-16 rounded-full bg-zinc-800 transition-colors group-hover:bg-zinc-500" />
             </div>
           )}
+          {/* MENGAMBANG DI DASAR CHART, bukan baris tersendiri — permintaan
+              pemilik. Dilepas dari aliran, jadi satu baris hilang dari tinggi
+              halaman dan ikonnya masuk ke dalam bingkai chart.
+
+              pointer-events-none di wadahnya, auto di tiap kendali: pegangan
+              seret tinggi ada TEPAT di bawah baris ini, dan wadah yang
+              menangkap klik akan mematikannya di sepanjang lebar chart demi
+              tiga tombol kecil. Yang menangkap hanya tombolnya sendiri.
+
+              Ketiganya diberi latar gelap tembus pandang: mereka kini duduk di
+              atas lilin, dan teks tanpa latar di atas lilin merah-hijau
+              berubah keterbacaannya tiap kali harga bergerak. */}
+          <div className={cn('pointer-events-none absolute inset-x-0 bottom-0 z-10 flex items-center gap-3 px-4 py-2 text-[11.5px] text-zinc-600',
+            POLOS && 'hidden')}>
+            {/* Gerigi duduk di pojok paling kiri kaki chart, TANPA teks. Ia
+                setelan yang dibuka sesekali lalu ditutup; label tetap di sana
+                menuntut perhatian setiap kali mata menyapu kaki chart, padahal
+                yang dibaca di baris ini adalah jumlah lilin dan sumbernya. */}
+            <div className="pointer-events-auto relative shrink-0">
+              <button
+                onClick={bukaTutupTampilan}
+                title="Setelan tampilan chart"
+                aria-label="Setelan tampilan chart"
+                className={cn('flex cursor-pointer items-center rounded p-1 transition-colors',
+                  menuTampilan ? 'text-zinc-200' : 'text-zinc-500 hover:text-zinc-300')}>
+                <Settings className="size-3.5" strokeWidth={2} />
+              </button>
+              {menuTampilan && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={batalTampilan} />
+                  {/* Terbuka ke ATAS dan ke KANAN. Tombolnya di pojok kiri
+                      bawah: panel yang terbuka ke bawah atau ke kiri dari sana
+                      keluar layar. */}
+                  <div className="absolute bottom-full left-0 z-40 mb-1 w-72 rounded-lg border border-zinc-800 bg-zinc-950 p-1.5 text-left shadow-2xl">
+                    <div className="px-2 pb-1 pt-0.5">
+                      <span className="text-[10px] font-medium uppercase tracking-wider text-zinc-600">Lilin</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-1.5 px-2 pb-1.5">
+                      {MEDAN_WARNA.map(([kunci, label]) => (
+                        <label key={kunci} className="flex cursor-pointer items-center gap-2 rounded-md border border-zinc-800 px-2 py-1.5 transition-colors hover:bg-zinc-900">
+                          {/* Petak warnanya distel tangan: bawaan peramban
+                              memberi kotak berbingkai tebal dengan padding
+                              dalam yang tidak bisa diikuti ukuran mana pun. */}
+                          <input type="color" value={tampilan[kunci]} aria-label={label}
+                                 onChange={(e) => setTampilan((t) => ({ ...t, [kunci]: e.target.value }))}
+                                 className="size-5 shrink-0 cursor-pointer rounded border border-zinc-700 bg-transparent p-0 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:rounded-sm [&::-webkit-color-swatch]:border-0" />
+                          <span className="min-w-0">
+                            <span className="block truncate text-[11.5px] text-zinc-200">{label}</span>
+                            <span className="block font-mono text-[10px] uppercase text-zinc-600">{tampilan[kunci]}</span>
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+
+                    <div className="mt-1 border-t border-zinc-800/70 px-2 pb-1.5 pt-1.5">
+                      <div className="flex items-center gap-2">
+                        {/* Nilainya #09090b saat "ikut tema" supaya petaknya
+                            menunjukkan warna yang benar-benar tampak sekarang,
+                            bukan hitam pekat yang tidak dipakai di mana pun. */}
+                        <input type="color" value={tampilan.latar ?? '#09090b'} aria-label="Warna latar chart"
+                               onChange={(e) => setTampilan((t) => ({ ...t, latar: e.target.value }))}
+                               className="size-5 shrink-0 cursor-pointer rounded border border-zinc-700 bg-transparent p-0 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:rounded-sm [&::-webkit-color-swatch]:border-0" />
+                        <span className="min-w-0 grow">
+                          <span className="block text-[11.5px] text-zinc-200">Latar chart</span>
+                          <span className="block font-mono text-[10px] uppercase text-zinc-600">{tampilan.latar ?? 'ikut tema'}</span>
+                        </span>
+                        <button onClick={() => setTampilan((t) => ({ ...t, latar: null }))} disabled={tampilan.latar === null}
+                          className="shrink-0 cursor-pointer rounded px-1.5 py-0.5 text-[11px] text-zinc-400 transition-colors hover:bg-zinc-900 hover:text-zinc-100 disabled:cursor-default disabled:text-zinc-700 disabled:hover:bg-transparent">
+                          Ikut tema
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Pasar kripto: futures bawaan, spot atas permintaan.
+                        Berlaku untuk SEMUA data kripto -- chart, screener,
+                        backtest -- bukan chart ini saja; dua bagian layar yang
+                        membaca pasar berbeda akan berbeda pendapat tentang
+                        koin yang sama. Trade-Fi tidak tersentuh tombol ini. */}
+                    <div className="mt-1 border-t border-zinc-800/70 px-2 pb-1.5 pt-1.5">
+                      <span className="block text-[11.5px] text-zinc-200">Pasar kripto</span>
+                      <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+                        {([['futures', 'Futures'], ['spot', 'Spot']] as const).map(([nilai, label]) => (
+                          <button key={nilai}
+                            onClick={() => setPasarUi(nilai)}
+                            className={cn('cursor-pointer rounded-md border px-2 py-1.5 text-[11.5px] transition-colors',
+                              pasarUi === nilai
+                                ? 'border-emerald-600/60 bg-emerald-500/10 text-emerald-300'
+                                : 'border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200')}>
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="mt-1 text-[10px] leading-snug text-zinc-600">
+                        Berlaku untuk chart, screener, dan backtest. Simbol yang tidak punya pasar terpilih otomatis memakai pasar satunya.
+                      </p>
+                    </div>
+
+                    <div className="mt-1 border-t border-zinc-800/70 px-2 pb-1.5 pt-1.5">
+                      <label className="flex cursor-pointer items-center gap-2.5">
+                        <input type="checkbox" checked={tampilan.tandaAir}
+                               onChange={(e) => setTampilan((t) => ({ ...t, tandaAir: e.target.checked }))}
+                               className="size-3.5 cursor-pointer accent-emerald-500" />
+                        <span className="text-[12px] text-zinc-200">Tanda air</span>
+                      </label>
+                      <input type="text" value={tampilan.tandaAirTeks} disabled={!tampilan.tandaAir}
+                             onChange={(e) => setTampilan((t) => ({ ...t, tandaAirTeks: e.target.value.slice(0, 40) }))}
+                             placeholder={airOtomatis} aria-label="Teks tanda air"
+                             className="mt-1.5 w-full rounded border border-zinc-800 bg-zinc-900/60 px-2 py-1 text-[11.5px] text-zinc-200 placeholder:text-zinc-600 focus:border-zinc-700 focus:outline-none disabled:cursor-not-allowed disabled:opacity-40" />
+                      <p className="mt-1 text-[10px] leading-snug text-zinc-600">
+                        Kosongkan untuk memakai nama pasangan dan timeframe. Baris kecil di bawahnya tetap jenis pasarnya.
+                      </p>
+                    </div>
+
+                    {/* Pemulih duduk di DASAR panel, sesudah semua seksi, dan
+                        selebar panelnya. Versi sebelumnya menaruhnya di baris
+                        judul "Lilin" — dari sana ia terbaca sebagai pemulih
+                        warna lilin saja, padahal ia mengembalikan latar dan
+                        tanda air juga. Tombol yang cakupannya lebih luas dari
+                        yang terbaca adalah tombol yang menghapus pekerjaan
+                        orang tanpa peringatan.
+
+                        Mati sendiri saat semuanya memang sudah bawaan: itu
+                        sekaligus jawaban atas "apa setelanku sudah kembali?"
+                        tanpa perlu memeriksa satu per satu. */}
+                    <div className="mt-1 border-t border-zinc-800/70 px-2 pb-0.5 pt-1.5">
+                      <button onClick={() => setTampilan({ ...TAMPILAN_AWAL })} disabled={tampilanBawaan}
+                        title={tampilanBawaan ? 'Semua setelan sudah bawaan' : 'Kembalikan warna lilin, latar, dan tanda air ke bawaan'}
+                        className="flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-md border border-zinc-800 px-2 py-1.5 text-[11.5px] text-zinc-400 transition-colors hover:border-zinc-700 hover:bg-zinc-900 hover:text-zinc-200 disabled:cursor-default disabled:border-zinc-900 disabled:text-zinc-700 disabled:hover:border-zinc-900 disabled:hover:bg-transparent disabled:hover:text-zinc-700">
+                        <RotateCcw className="size-3" strokeWidth={2} />
+                        {tampilanBawaan ? 'Sudah bawaan' : 'Kembalikan ke bawaan'}
+                      </button>
+                      {/* Simpan yang menonjol, Batal yang polos: sesudah
+                          mengutak-atik warna, tindakan yang hampir selalu
+                          dimaksudkan adalah menyimpan. */}
+                      <div className="mt-1.5 flex gap-1.5">
+                        <button onClick={batalTampilan}
+                          className="flex-1 cursor-pointer rounded-md border border-zinc-800 px-2 py-1.5 text-[11.5px] text-zinc-400 transition-colors hover:border-zinc-700 hover:bg-zinc-900 hover:text-zinc-200">
+                          Batal
+                        </button>
+                        <button onClick={simpanTampilan}
+                          className="flex-1 cursor-pointer rounded-md bg-emerald-600 px-2 py-1.5 text-[11.5px] font-medium text-white transition-colors hover:bg-emerald-500">
+                          Simpan
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+            {/* Keterangan "N lilin · simbol · lewat proxy VPS" DIHAPUS atas
+                permintaan pemilik: informasi teknis yang tidak dibaca siapa pun
+                dalam pemakaian normal, tapi tampil permanen di layar setiap
+                pengguna. Jumlah penanda trade dipertahankan -- ia hanya muncul
+                sehabis backtest, dan orang yang baru menjalankan backtest
+                sedang mencarinya. */}
+            <span className="flex min-w-0 items-center gap-2 truncate">
+              {hasil?.trade.length ? (
+                <span className="truncate">{hasil.trade.length} penanda trade</span>
+              ) : null}
+            </span>
+            {/* Multi-chart di UJUNG KANAN kaki chart — permintaan pemilik.
+                ml-auto mendorongnya melewati sisa isi baris; Backtest tidak
+                ikut terdorong karena sudah absolute. DISEMBUNYIKAN di mode
+                polos: panel yang bisa membelah dirinya jadi empat panel lagi
+                adalah cermin yang saling memantul. */}
+            {!POLOS && (
+              <button onClick={() => nyalakanMulti(simbol, tf)}
+                title="Multi-chart — bagi layar jadi beberapa panel chart"
+                aria-label="Multi-chart"
+                className="pointer-events-auto ml-auto flex shrink-0 cursor-pointer items-center rounded bg-zinc-950/70 p-1 text-zinc-500 backdrop-blur-sm transition-colors hover:text-zinc-300">
+                <LayoutGrid className="size-3.5" strokeWidth={2} />
+              </button>
+            )}
+          </div>
         </div>
         {/* Seluruh kaki chart — gerigi setelan, Backtest, ikon multi —
             disembunyikan di mode panel atas permintaan pemilik: dasar tiap
             panel jadi bersih, dan ketiganya adalah kendali seluruh ruang
             kerja, bukan kendali satu panel. Semuanya tetap ada di chart
             tunggal, satu klik "Tutup multi-chart" jauhnya. */}
-        {/* MENGAMBANG DI DASAR CHART, bukan baris tersendiri — permintaan
-            pemilik. Dilepas dari aliran, jadi satu baris hilang dari tinggi
-            halaman dan ikonnya masuk ke dalam bingkai chart.
 
-            pointer-events-none di wadahnya, auto di tiap kendali: pegangan
-            seret tinggi ada TEPAT di bawah baris ini, dan wadah yang
-            menangkap klik akan mematikannya di sepanjang lebar chart demi
-            tiga tombol kecil. Yang menangkap hanya tombolnya sendiri.
+        {/* BACKTEST TETAP DI BAWAH, tidak ikut naik ke dalam chart.
+            Permintaan pemilik, dan alasannya jelas begitu dipakai: gerigi
+            dan ikon multi adalah SAKELAR — ditekan sekali, selesai, dan
+            hamparan kecil di pojok cocok untuk itu. Backtest adalah PINTU:
+            ia membuka panel setinggi layar tepat di bawahnya, dan pintu
+            yang berdiri di dalam ruangan yang ia buka membuat orang
+            kehilangan arah begitu isinya muncul.
 
-            Ketiganya diberi latar gelap tembus pandang: mereka kini duduk di
-            atas lilin, dan teks tanpa latar di atas lilin merah-hijau
-            berubah keterbacaannya tiap kali harga bergerak. */}
-        <div className={cn('pointer-events-none absolute inset-x-0 bottom-0 z-10 flex items-center gap-3 px-4 py-2 text-[11.5px] text-zinc-600',
+            Barisnya sendiri, bukan menumpang hamparan: ia harus tetap ada
+            saat panelnya terbuka, dan hamparan di dasar chart akan tertutup
+            isi panel itu.
+
+            Disembunyikan di mode polos, sama dengan hamparan di atasnya —
+            panel seperempat layar bukan tempat membaca hasil backtest. */}
+        {/* RATA KANAN, sejajar di bawah ikon multi-chart. Ia punya panelnya
+            sendiri, jadi menaruhnya di tengah membuat satu-satunya benda di
+            baris ini menggantung tanpa apa pun di kiri-kanannya. pr-4 sama
+            dengan px-4 hamparan di atasnya, supaya tepi kanannya segaris
+            dengan ikon multi. */}
+        <div className={cn('flex items-center justify-end border-t border-zinc-800/80 py-1.5 pr-4',
           POLOS && 'hidden')}>
-          {/* Gerigi duduk di pojok paling kiri kaki chart, TANPA teks. Ia
-              setelan yang dibuka sesekali lalu ditutup; label tetap di sana
-              menuntut perhatian setiap kali mata menyapu kaki chart, padahal
-              yang dibaca di baris ini adalah jumlah lilin dan sumbernya. */}
-          <div className="pointer-events-auto relative shrink-0">
-            <button
-              onClick={bukaTutupTampilan}
-              title="Setelan tampilan chart"
-              aria-label="Setelan tampilan chart"
-              className={cn('flex cursor-pointer items-center rounded p-1 transition-colors',
-                menuTampilan ? 'text-zinc-200' : 'text-zinc-500 hover:text-zinc-300')}>
-              <Settings className="size-3.5" strokeWidth={2} />
-            </button>
-            {menuTampilan && (
-              <>
-                <div className="fixed inset-0 z-30" onClick={batalTampilan} />
-                {/* Terbuka ke ATAS dan ke KANAN. Tombolnya di pojok kiri
-                    bawah: panel yang terbuka ke bawah atau ke kiri dari sana
-                    keluar layar. */}
-                <div className="absolute bottom-full left-0 z-40 mb-1 w-72 rounded-lg border border-zinc-800 bg-zinc-950 p-1.5 text-left shadow-2xl">
-                  <div className="px-2 pb-1 pt-0.5">
-                    <span className="text-[10px] font-medium uppercase tracking-wider text-zinc-600">Lilin</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-1.5 px-2 pb-1.5">
-                    {MEDAN_WARNA.map(([kunci, label]) => (
-                      <label key={kunci} className="flex cursor-pointer items-center gap-2 rounded-md border border-zinc-800 px-2 py-1.5 transition-colors hover:bg-zinc-900">
-                        {/* Petak warnanya distel tangan: bawaan peramban
-                            memberi kotak berbingkai tebal dengan padding
-                            dalam yang tidak bisa diikuti ukuran mana pun. */}
-                        <input type="color" value={tampilan[kunci]} aria-label={label}
-                               onChange={(e) => setTampilan((t) => ({ ...t, [kunci]: e.target.value }))}
-                               className="size-5 shrink-0 cursor-pointer rounded border border-zinc-700 bg-transparent p-0 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:rounded-sm [&::-webkit-color-swatch]:border-0" />
-                        <span className="min-w-0">
-                          <span className="block truncate text-[11.5px] text-zinc-200">{label}</span>
-                          <span className="block font-mono text-[10px] uppercase text-zinc-600">{tampilan[kunci]}</span>
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-
-                  <div className="mt-1 border-t border-zinc-800/70 px-2 pb-1.5 pt-1.5">
-                    <div className="flex items-center gap-2">
-                      {/* Nilainya #09090b saat "ikut tema" supaya petaknya
-                          menunjukkan warna yang benar-benar tampak sekarang,
-                          bukan hitam pekat yang tidak dipakai di mana pun. */}
-                      <input type="color" value={tampilan.latar ?? '#09090b'} aria-label="Warna latar chart"
-                             onChange={(e) => setTampilan((t) => ({ ...t, latar: e.target.value }))}
-                             className="size-5 shrink-0 cursor-pointer rounded border border-zinc-700 bg-transparent p-0 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:rounded-sm [&::-webkit-color-swatch]:border-0" />
-                      <span className="min-w-0 grow">
-                        <span className="block text-[11.5px] text-zinc-200">Latar chart</span>
-                        <span className="block font-mono text-[10px] uppercase text-zinc-600">{tampilan.latar ?? 'ikut tema'}</span>
-                      </span>
-                      <button onClick={() => setTampilan((t) => ({ ...t, latar: null }))} disabled={tampilan.latar === null}
-                        className="shrink-0 cursor-pointer rounded px-1.5 py-0.5 text-[11px] text-zinc-400 transition-colors hover:bg-zinc-900 hover:text-zinc-100 disabled:cursor-default disabled:text-zinc-700 disabled:hover:bg-transparent">
-                        Ikut tema
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Pasar kripto: futures bawaan, spot atas permintaan.
-                      Berlaku untuk SEMUA data kripto -- chart, screener,
-                      backtest -- bukan chart ini saja; dua bagian layar yang
-                      membaca pasar berbeda akan berbeda pendapat tentang
-                      koin yang sama. Trade-Fi tidak tersentuh tombol ini. */}
-                  <div className="mt-1 border-t border-zinc-800/70 px-2 pb-1.5 pt-1.5">
-                    <span className="block text-[11.5px] text-zinc-200">Pasar kripto</span>
-                    <div className="mt-1.5 grid grid-cols-2 gap-1.5">
-                      {([['futures', 'Futures'], ['spot', 'Spot']] as const).map(([nilai, label]) => (
-                        <button key={nilai}
-                          onClick={() => setPasarUi(nilai)}
-                          className={cn('cursor-pointer rounded-md border px-2 py-1.5 text-[11.5px] transition-colors',
-                            pasarUi === nilai
-                              ? 'border-emerald-600/60 bg-emerald-500/10 text-emerald-300'
-                              : 'border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200')}>
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                    <p className="mt-1 text-[10px] leading-snug text-zinc-600">
-                      Berlaku untuk chart, screener, dan backtest. Simbol yang tidak punya pasar terpilih otomatis memakai pasar satunya.
-                    </p>
-                  </div>
-
-                  <div className="mt-1 border-t border-zinc-800/70 px-2 pb-1.5 pt-1.5">
-                    <label className="flex cursor-pointer items-center gap-2.5">
-                      <input type="checkbox" checked={tampilan.tandaAir}
-                             onChange={(e) => setTampilan((t) => ({ ...t, tandaAir: e.target.checked }))}
-                             className="size-3.5 cursor-pointer accent-emerald-500" />
-                      <span className="text-[12px] text-zinc-200">Tanda air</span>
-                    </label>
-                    <input type="text" value={tampilan.tandaAirTeks} disabled={!tampilan.tandaAir}
-                           onChange={(e) => setTampilan((t) => ({ ...t, tandaAirTeks: e.target.value.slice(0, 40) }))}
-                           placeholder={airOtomatis} aria-label="Teks tanda air"
-                           className="mt-1.5 w-full rounded border border-zinc-800 bg-zinc-900/60 px-2 py-1 text-[11.5px] text-zinc-200 placeholder:text-zinc-600 focus:border-zinc-700 focus:outline-none disabled:cursor-not-allowed disabled:opacity-40" />
-                    <p className="mt-1 text-[10px] leading-snug text-zinc-600">
-                      Kosongkan untuk memakai nama pasangan dan timeframe. Baris kecil di bawahnya tetap jenis pasarnya.
-                    </p>
-                  </div>
-
-                  {/* Pemulih duduk di DASAR panel, sesudah semua seksi, dan
-                      selebar panelnya. Versi sebelumnya menaruhnya di baris
-                      judul "Lilin" — dari sana ia terbaca sebagai pemulih
-                      warna lilin saja, padahal ia mengembalikan latar dan
-                      tanda air juga. Tombol yang cakupannya lebih luas dari
-                      yang terbaca adalah tombol yang menghapus pekerjaan
-                      orang tanpa peringatan.
-
-                      Mati sendiri saat semuanya memang sudah bawaan: itu
-                      sekaligus jawaban atas "apa setelanku sudah kembali?"
-                      tanpa perlu memeriksa satu per satu. */}
-                  <div className="mt-1 border-t border-zinc-800/70 px-2 pb-0.5 pt-1.5">
-                    <button onClick={() => setTampilan({ ...TAMPILAN_AWAL })} disabled={tampilanBawaan}
-                      title={tampilanBawaan ? 'Semua setelan sudah bawaan' : 'Kembalikan warna lilin, latar, dan tanda air ke bawaan'}
-                      className="flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-md border border-zinc-800 px-2 py-1.5 text-[11.5px] text-zinc-400 transition-colors hover:border-zinc-700 hover:bg-zinc-900 hover:text-zinc-200 disabled:cursor-default disabled:border-zinc-900 disabled:text-zinc-700 disabled:hover:border-zinc-900 disabled:hover:bg-transparent disabled:hover:text-zinc-700">
-                      <RotateCcw className="size-3" strokeWidth={2} />
-                      {tampilanBawaan ? 'Sudah bawaan' : 'Kembalikan ke bawaan'}
-                    </button>
-                    {/* Simpan yang menonjol, Batal yang polos: sesudah
-                        mengutak-atik warna, tindakan yang hampir selalu
-                        dimaksudkan adalah menyimpan. */}
-                    <div className="mt-1.5 flex gap-1.5">
-                      <button onClick={batalTampilan}
-                        className="flex-1 cursor-pointer rounded-md border border-zinc-800 px-2 py-1.5 text-[11.5px] text-zinc-400 transition-colors hover:border-zinc-700 hover:bg-zinc-900 hover:text-zinc-200">
-                        Batal
-                      </button>
-                      <button onClick={simpanTampilan}
-                        className="flex-1 cursor-pointer rounded-md bg-emerald-600 px-2 py-1.5 text-[11.5px] font-medium text-white transition-colors hover:bg-emerald-500">
-                        Simpan
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-          {/* Keterangan "N lilin · simbol · lewat proxy VPS" DIHAPUS atas
-              permintaan pemilik: informasi teknis yang tidak dibaca siapa pun
-              dalam pemakaian normal, tapi tampil permanen di layar setiap
-              pengguna. Jumlah penanda trade dipertahankan -- ia hanya muncul
-              sehabis backtest, dan orang yang baru menjalankan backtest
-              sedang mencarinya. */}
-          <span className="flex min-w-0 items-center gap-2 truncate">
-            {hasil?.trade.length ? (
-              <span className="truncate">{hasil.trade.length} penanda trade</span>
-            ) : null}
-          </span>
-          {/* Backtest disembunyikan di balik ikon di pojok chart, bukan
-              dibentangkan di bawahnya. Alasannya bukan sekadar ruang:
-              hasilnya masih beta, dan panel yang selalu terbuka membuat
-              angkanya terbaca sebagai bagian tetap halaman — padahal ia
-              sedang diuji. Yang dibuka atas kemauan sendiri dibaca dengan
-              kewaspadaan yang berbeda. */}
           <button
             onClick={() => setBacktestBuka((v) => !v)}
             title={backtestBuka ? 'Tutup panel Backtest' : 'Buka panel Backtest (beta)'}
-            className={cn('pointer-events-auto absolute left-1/2 flex shrink-0 -translate-x-1/2 cursor-pointer items-center gap-1.5 rounded bg-zinc-950/70 px-2 py-1 text-[11px] backdrop-blur-sm transition-colors',
+            className={cn('flex cursor-pointer items-center gap-1.5 rounded px-2 py-1 text-[11px] transition-colors',
               backtestBuka ? 'text-zinc-200' : 'text-zinc-500 hover:text-zinc-300')}>
             <FlaskConical className="size-3" strokeWidth={2} />
             Backtest
             <span className="rounded bg-amber-500/15 px-1 text-[9.5px] text-amber-400/90">beta</span>
           </button>
-          {/* Multi-chart di UJUNG KANAN kaki chart — permintaan pemilik.
-              ml-auto mendorongnya melewati sisa isi baris; Backtest tidak
-              ikut terdorong karena sudah absolute. DISEMBUNYIKAN di mode
-              polos: panel yang bisa membelah dirinya jadi empat panel lagi
-              adalah cermin yang saling memantul. */}
-          {!POLOS && (
-            <button onClick={() => nyalakanMulti(simbol, tf)}
-              title="Multi-chart — bagi layar jadi beberapa panel chart"
-              aria-label="Multi-chart"
-              className="pointer-events-auto ml-auto flex shrink-0 cursor-pointer items-center rounded bg-zinc-950/70 p-1 text-zinc-500 backdrop-blur-sm transition-colors hover:text-zinc-300">
-              <LayoutGrid className="size-3.5" strokeWidth={2} />
-            </button>
-          )}
         </div>
 
         {/* SELALU terpasang, tampil hanya saat dibuka. Efeknya tetap jalan
