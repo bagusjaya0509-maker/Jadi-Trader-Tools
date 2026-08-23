@@ -65,6 +65,20 @@
     <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32.png" />
     <link rel="icon" type="image/png" sizes="48x48" href="./favicon-48.png" />
     <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+
+    <!-- ── PASANG SEBAGAI APLIKASI ──────────────────────────────────────
+         Jalurnya RELATIF ('./manifest.webmanifest'), dan isi manifestnya
+         pun relatif. Situs ini tayang di DUA tempat dengan basis berbeda:
+         jaditrader.co.id di akar, dan GitHub Pages di /Jadi-Trader-Tools/v3/.
+         Jalur mutlak seperti /pwa-192.png benar di yang pertama dan 404 di
+         yang kedua; jalur relatif diselesaikan terhadap alamat manifestnya
+         sendiri, jadi keduanya benar tanpa dua berkas.
+
+         Yang didapat orang setelah memasang: jendela tanpa bilah alamat —
+         termasuk panel multi-chart yang dilepas ke monitor lain, yang
+         selama ini terpaksa membawa bilah alamat karena Chrome mewajibkannya
+         pada jendela popup biasa. -->
+    <link rel="manifest" href="./manifest.webmanifest" />
     <!-- Warna bilah alamat di Chrome Android — disamakan dengan latar
          aplikasi supaya bilahnya menyatu, bukan jadi pita putih di atas
          halaman gelap. -->
@@ -139,12 +153,12 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
-    <script type="module" crossorigin src="./assets/index-DMRd83Ue.js"></script>
+    <script type="module" crossorigin src="./assets/index-y99jTcP9.js"></script>
     <link rel="modulepreload" crossorigin href="./assets/react-C97iXi1P.js">
     <link rel="modulepreload" crossorigin href="./assets/firebase-CPiwU80D.js">
     <link rel="stylesheet" crossorigin href="./assets/index-X6d45bQP.css">
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"></div>
   </body>
 </html>
