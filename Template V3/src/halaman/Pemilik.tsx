@@ -4,7 +4,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGri
 import {
   Plus, Trash2, KeyRound, ShieldAlert, TrendingDown,
 } from 'lucide-react';
-import { Panel, PanelHead, KartuKpi, TipGrafik, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
+import { Panel, PanelHead, KartuKpi, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn, tanggalPendek } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 import { useKurs } from '@/lib/kurs';
@@ -122,6 +122,39 @@ const namaPemakai = (email?: string, catatan?: string, uid?: string) => {
    Tandanya ikut nilainya supaya batang kecil yang negatif menjulur ke
    bawah, bukan ke atas. */
 const tinggiMinimal = (v: number | null | undefined) => (v ? (v < 0 ? -3 : 3) : 0);
+
+/* Tooltip khusus grafik kas — SATU baris, batang yang sedang disentuh saja.
+   TipGrafik bawaan menampilkan seluruh deret sekaligus: mengarahkan kursor
+   ke balok merah tetap memunculkan angka lisensi dan manual di atasnya,
+   dan yang dicari mata justru tertimbun di antara dua angka yang tidak
+   ditanyakan. Dipasangkan dengan `shared={false}` pada <Tooltip>, yang
+   membuat Recharts mengirim hanya batang di bawah kursor.
+
+   Ia juga tahu sakelar mata uang. Yang bawaan mencetak angka mentah, jadi
+   di mode IDR tooltipnya berkata "-217.99" sementara sumbu di sebelahnya
+   berkata "−Rp3.9jt" untuk data yang sama.
+
+   Tandanya dipisah dari angkanya: pengeluaran disimpan negatif supaya
+   baloknya menjulur ke bawah, tapi "−$217.99" lebih terbaca daripada
+   "$-217.99". */
+function TipKas({ active, payload, label, fmt }: any) {
+  if (!active || !payload?.length) return null;
+  const p = payload[0];
+  const nilai = Number(p?.value) || 0;
+  const keluar = nilai < 0;
+  return (
+    <div className="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 shadow-xl">
+      <div className="text-[11px] text-zinc-500">{label}</div>
+      <div className="mt-1 flex items-center gap-2">
+        <span className="size-2 shrink-0 rounded-full" style={{ background: p?.color }} />
+        <span className="text-[12px] text-zinc-400">{p?.name}</span>
+        <span className={cn('angka ml-auto pl-3 text-[12.5px]', keluar ? 'text-red-400' : 'text-emerald-400')}>
+          {keluar ? '−' : '+'}{fmt(Math.abs(nilai))}
+        </span>
+      </div>
+    </div>
+  );
+}
 
 const gulirJika = (jumlah: number, ambang: number, tinggi: string) =>
   jumlah > ambang ? `${tinggi} overflow-y-auto gulir-senyap` : '';
@@ -473,7 +506,12 @@ export default function Pemilik() {
                          const rp = n * kurs;
                          return rp >= 1_000_000 ? `${tanda}Rp${(rp / 1_000_000).toFixed(1)}jt` : `${tanda}Rp${Math.round(rp / 1000)}rb`;
                        }} />
-                <Tooltip content={<TipGrafik />} cursor={{ fill: 'currentColor', fillOpacity: 0.06 }} />
+                {/* `shared={false}` — inilah yang membuat tooltipnya
+                    mengikuti BATANG, bukan bulannya. Tanpa itu Recharts
+                    memicu per sumbu-X dan mengirim seluruh deret bulan itu
+                    sekaligus, berapa pun batang yang sedang disentuh. */}
+                <Tooltip shared={false} content={<TipKas fmt={fmt} />}
+                         cursor={{ fill: 'currentColor', fillOpacity: 0.06 }} />
                 {/* Bertumpuk pada stackId yang sama: tinggi total = omzet
                     bulan itu, sementara tiap potongnya tetap terbaca
                     sendiri.
