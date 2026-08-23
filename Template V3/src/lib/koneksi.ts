@@ -54,6 +54,38 @@ export interface Koneksi {
 
 const KOSONG: Koneksi = { url: '', token: '' };
 
+/** Rapikan alamat backend yang diketik orang.
+ *
+ *  SKEMA WAJIB ADA, dan ini bukan kerapian: `fetch('jaditrader.co.id/api/x')`
+ *  bukan permintaan ke host itu — tanpa skema, peramban membacanya sebagai
+ *  alamat RELATIF dan mengubahnya jadi
+ *  `https://<situs-ini>/jaditrader.co.id/api/x`. Yang menjawab lalu server
+ *  situsnya sendiri, dengan index.html.
+ *
+ *  Akibatnya persis yang terjadi 23 Agu 2026: kode pasangan MT5 melaporkan
+ *  "Backend menjawab 404", chart melaporkan "Data tidak diterima", dan
+ *  sebelumnya `Unexpected token '<', "<!doctype"` — tiga gejala yang
+ *  terdengar seperti tiga masalah berbeda, semuanya dari satu kolom isian
+ *  yang kekurangan delapan huruf. Tidak ada satu pun galat yang menunjuk ke
+ *  kolom itu.
+ *
+ *  https, bukan http: backend ini memang dilayani Caddy dengan TLS, dan
+ *  halaman https tidak diizinkan memanggil http (mixed content) — menebak
+ *  http akan mengganti satu kegagalan diam dengan kegagalan diam yang lain.
+ *
+ *  Dipasang di BACAAN, bukan cuma di penyimpanan: alamat yang sudah terlanjur
+ *  tersimpan tanpa skema harus ikut sembuh tanpa orangnya perlu mengetik
+ *  ulang apa pun. */
+export function rapikanUrl(url: string): string {
+  const u = url.trim().replace(/\/+$/, '');
+  if (!u) return '';
+  if (/^https?:\/\//i.test(u)) return u;
+  /* Alamat relatif yang memang disengaja ('/api-ku') dibiarkan: itu
+     permintaan ke situs ini sendiri, dan itu sah. */
+  if (u.startsWith('/')) return u;
+  return 'https://' + u;
+}
+
 export function bacaKoneksi(): Koneksi {
   if (typeof window === 'undefined') return KOSONG;
   /* Belum login = tidak ada koneksi. Menampilkan token siapa pun kepada
@@ -63,7 +95,7 @@ export function bacaKoneksi(): Koneksi {
     const mentah = window.localStorage.getItem(kunciUntuk(uidKini));
     if (!mentah) return KOSONG;
     const isi = JSON.parse(mentah);
-    return { url: String(isi.url ?? ''), token: String(isi.token ?? '') };
+    return { url: rapikanUrl(String(isi.url ?? '')), token: String(isi.token ?? '') };
   } catch {
     return KOSONG;
   }
