@@ -133,6 +133,19 @@ export function tambahPanel() {
   tulis({ aktif: true, panel: [...simpanan.panel, { id: idBaru(), ...c }] });
 }
 
+/** Catat simbol/TF yang SEDANG dipakai sebuah panel. Dipanggil dari
+ *  laporan panel, bukan ditebak dari alamat iframe — alamat itu cuma titik
+ *  berangkat dan tidak berubah lagi sesudahnya.
+ *
+ *  Menulis hanya kalau memang berbeda: setiap penulisan menyiar ke semua
+ *  konteks, dan panel yang melapor ulang nilai yang sama akan memicu putaran
+ *  render tanpa henti. */
+export function perbaruiPanel(id: string, simbol: string, tf: string) {
+  const p = simpanan.panel.find((x) => x.id === id);
+  if (!p || (p.simbol === simbol && p.tf === tf)) return;
+  tulis({ ...simpanan, panel: simpanan.panel.map((x) => (x.id === id ? { ...x, simbol, tf } : x)) });
+}
+
 export function hapusPanel(id: string) {
   const sisa = simpanan.panel.filter((p) => p.id !== id);
   /* Panel terakhir ditutup = mode multinya selesai. Grid kosong yang tetap
@@ -149,7 +162,14 @@ export type PesanBus =
   | { jenis: 'navigasi'; ke: string }
   /* Kirim simbol ke SATU panel. `panel` wajib: bus menyiar ke semua konteks
      se-origin, jadi pesan tanpa alamat akan diambil setiap panel. */
-  | { jenis: 'simbol'; panel: string; simbol: string };
+  | { jenis: 'simbol'; panel: string; simbol: string }
+  /* Grid -> panel: buka/tutup bilah kepala. Sakelarnya hidup di baris nomor
+     panel, jadi perintahnya harus menyeberang ke dalam iframe. */
+  | { jenis: 'kepala'; panel: string; sembunyi: boolean }
+  /* Panel -> grid: "simbol saya sekarang begini". Tanpa ini label panel
+     menyebut simbol AWAL selamanya, dan begitu satu pasangan dikirim ke
+     panel itu, judulnya beserta menu klik-kanan mulai berbohong. */
+  | { jenis: 'lapor'; panel: string; simbol: string; tf: string };
 
 let kanal: BroadcastChannel | null = null;
 function bus(): BroadcastChannel | null {

@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { LayoutGrid, Plus, X, GripVertical, ExternalLink, Undo2, Maximize2, Minimize2 } from 'lucide-react';
+import { LayoutGrid, Plus, X, GripVertical, ExternalLink, Undo2, Maximize2, Minimize2, ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
-  useMulti, matikanMulti, tambahPanel, hapusPanel, MAKS_PANEL, type PanelMulti,
+  useMulti, matikanMulti, tambahPanel, hapusPanel, perbaruiPanel, kirimBus, dengarBus,
+  MAKS_PANEL, type PanelMulti,
 } from '@/lib/multi-chart';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -40,6 +41,31 @@ export function MultiChart() {
      luar state: objek Window tidak bisa dan tidak perlu memicu render. */
   const [lepas, setLepas] = useState<Record<string, boolean>>({});
   const jendela = useRef(new Map<string, Window>());
+
+  /* ── Kepala panel dikendalikan DARI SINI ──────────────────────────────
+     Sakelarnya duduk di baris nomor panel, sejajar ikon lepas-jendela —
+     permintaan pemilik, dan ia memperbaiki tumpukan: dulu baris nomor panel
+     dan strip di dalam panel sama-sama menuliskan simbol dan TF, dua baris
+     untuk satu keterangan.
+
+     `true` berarti TERBUKA. Bawaannya tertutup, sama dengan bawaan di dalam
+     panel — dua sisi yang menyimpan keadaan yang sama harus berangkat dari
+     nilai yang sama, atau ikonnya akan berbohong sampai ditekan sekali. */
+  const [kepalaBuka, setKepalaBuka] = useState<Record<string, boolean>>({});
+  const gantiKepala = (id: string) => {
+    const buka = !kepalaBuka[id];
+    setKepalaBuka((k) => ({ ...k, [id]: buka }));
+    kirimBus({ jenis: 'kepala', panel: id, sembunyi: !buka });
+  };
+
+  /* Panel melapor simbol/TF-nya sendiri; label di baris nomor panel dan menu
+     "buka di panel mana" keduanya membacanya dari sini. Tanpa laporan ini
+     keduanya menyebut simbol AWAL selamanya. */
+  useEffect(() => dengarBus((p) => {
+    if (p && p.jenis === 'lapor' && typeof p.panel === 'string') {
+      perbaruiPanel(p.panel, p.simbol, p.tf);
+    }
+  }), []);
 
   /* Belahan grid 2 kolom: persen kolom kiri dan baris atas. Disimpan di
      state saja — susunan ruang kerja layak diatur ulang per sesi, dan
@@ -258,8 +284,23 @@ export function MultiChart() {
                  onDrop={() => { tukar(seret, p.id); setSeret(''); }}
                  className="flex h-7 shrink-0 cursor-grab items-center gap-2 border-b border-zinc-800/60 bg-zinc-950 px-2 active:cursor-grabbing">
               <GripVertical className="size-3.5 shrink-0 text-zinc-600" />
-              <span className="truncate text-[11px] text-zinc-500">Panel {i + 1} · mulai {p.simbol} {p.tf}</span>
+              {/* Tanpa kata "mulai": simbolnya kini dilaporkan panel dan
+                  selalu yang sedang tampil, jadi tidak ada lagi yang perlu
+                  dijelaskan sebagai titik berangkat. */}
+              <span className="truncate text-[11px] text-zinc-500">
+                Panel {i + 1} · <span className="angka text-zinc-400">{p.simbol} {p.tf}</span>
+              </span>
               <span className="ml-auto flex shrink-0 items-center gap-1">
+                {!lepas[p.id] && (
+                  <button onClick={() => gantiKepala(p.id)}
+                    title={kepalaBuka[p.id]
+                      ? 'Sembunyikan kepala panel — beri ruang untuk chart'
+                      : 'Tampilkan kepala panel — simbol, timeframe, indikator, replay'}
+                    aria-label={kepalaBuka[p.id] ? 'Sembunyikan kepala panel' : 'Tampilkan kepala panel'}
+                    className="cursor-pointer rounded p-1 text-zinc-600 transition-colors hover:text-zinc-300">
+                    {kepalaBuka[p.id] ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
+                  </button>
+                )}
                 {!lepas[p.id] && (
                   <button onClick={() => bukaJendela(p, i === 0)}
                     title="Lepas jadi jendela sendiri — tarik ke monitor lain"

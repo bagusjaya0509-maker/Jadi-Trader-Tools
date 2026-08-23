@@ -381,13 +381,32 @@ export default function ChartBacktest() {
      meleset di sana terasa seperti chartnya hilang. Yang tersembunyi tidak
      bisa ditabrak. */
   const [posisiSembunyi, setPosisiSembunyi] = useState(POLOS);
-  const gantiKepala = (v: boolean) => {
-    setKepalaSembunyi(v);
-    /* Tinggi chart dihitung dari offsetHeight bilah ini; sembunyi berarti
-       0. Pengukurnya digantung ke event resize — picu yang itu juga,
-       daripada menambah jalur hitung kedua. */
-    setTimeout(() => window.dispatchEvent(new Event('resize')), 0);
-  };
+  /* Sakelarnya TIDAK ada di sini lagi — ia pindah ke baris nomor panel di
+     grid, sejajar ikon lepas-jendela. Dulu ada dua tempat yang menuliskan
+     simbol dan TF: baris nomor panel di grid, dan strip ringkas di dalam
+     panel. Dua baris berisi keterangan yang sama, bertumpuk, adalah dua
+     kali ruang untuk satu keterangan. Panel sekarang cuma MENURUT. */
+  useEffect(() => {
+    if (!POLOS || !ID_PANEL) return;
+    return dengarBus((p) => {
+      if (p && p.jenis === 'kepala' && p.panel === ID_PANEL) {
+        setKepalaSembunyi(!!p.sembunyi);
+        /* Tinggi chart dihitung dari posisi chart; bilah yang muncul atau
+           hilang menggesernya. Pengukurnya digantung ke event resize — picu
+           yang itu juga, daripada menambah jalur hitung kedua. */
+        setTimeout(() => window.dispatchEvent(new Event('resize')), 0);
+      }
+    });
+  }, []);
+
+  /* Lapor ke grid tiap simbol/TF berubah, dari sebab APA PUN — dipilih di
+     bilah kepala, dikirim lewat klik kanan, atau dipulihkan dari alamat.
+     Grid memakainya untuk judul panel dan untuk menu "buka di panel mana",
+     yang keduanya harus menyebut isi panel SEKARANG. */
+  useEffect(() => {
+    if (!POLOS || !ID_PANEL) return;
+    kirimBus({ jenis: 'lapor', panel: ID_PANEL, simbol, tf });
+  }, [simbol, tf]);
   /* Mode bidik dibatalkan tiap ganti simbol/timeframe — bidikan untuk
      chart lain tidak berarti apa-apa di sini. */
   useEffect(() => { setBidikReplay(false); }, [simbol, tf]);
@@ -2592,17 +2611,6 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
             Keduanya dilepas dari tombolnya di layar kecil dan digantung
             ke bilah ini, supaya lebarnya mengikuti bilah dan tidak bisa
             keluar layar berapa pun posisi tombol pemicunya. */}
-        {POLOS && kepalaSembunyi && (
-          <div className="flex items-center justify-between gap-2 px-3 py-1">
-            <span className="angka truncate text-[11px] text-zinc-500">{simbol} · {tf}</span>
-            <button onClick={() => gantiKepala(false)}
-              title="Tampilkan kepala panel"
-              aria-label="Tampilkan kepala panel"
-              className="flex shrink-0 cursor-pointer items-center rounded p-0.5 text-zinc-500 transition-colors hover:text-zinc-200">
-              <ChevronDown className="size-3.5" />
-            </button>
-          </div>
-        )}
         {/* `hidden`, bukan dilepas dari pohon: ref bilahChart dipakai
             pengukur tinggi chart, dan menu News/Indikator digantung ke div
             ini. Elemen display:none ber-offsetHeight 0 — persis angka yang
@@ -2841,15 +2849,6 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
               className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100 sm:px-2.5">
               {layarPenuh ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
             </button>
-
-            {POLOS && (
-              <button onClick={() => gantiKepala(true)}
-                title="Sembunyikan kepala panel — beri ruang untuk chart"
-                aria-label="Sembunyikan kepala panel"
-                className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100 sm:px-2.5">
-                <ChevronUp className="size-3.5" />
-              </button>
-            )}
           </div>
         </div>
 
