@@ -2818,18 +2818,55 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                         + Buat / tempel
                       </button>
                     </div>
+                    {/* Baris skrip = SATU tombol pasang/lepas + tiga ikon
+                        yang dulu melayang di chart. Bukan satu tombol besar
+                        lagi: tombol di dalam tombol tidak sah di HTML, dan
+                        peramban menyusunnya jadi bersaudara yang klik-nya
+                        saling merebut. Jadi barisnya kini div, dengan tombol
+                        utama yang memuai mengisi sisa ruang. */}
                     {(kendaliPine?.daftar ?? []).map((s) => (
-                      <button key={s.id}
-                        onClick={() => {
-                          if (!kendaliPine) return;
-                          if (s.aktif) kendaliPine.nonaktif(); else kendaliPine.jalankan(s.id);
-                          setMenuInd(false);
-                        }}
-                        className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-zinc-900">
-                        <span className={cn('size-2 shrink-0 rounded-full', s.aktif ? 'bg-emerald-500' : 'border border-zinc-700')} />
-                        <span className="min-w-0 grow truncate text-[12px] text-zinc-200">{s.nama}</span>
-                        <span className="shrink-0 text-[10.5px] text-zinc-600">{s.aktif ? 'aktif' : 'pasang'}</span>
-                      </button>
+                      <div key={s.id} className="flex items-center rounded-md pr-1 transition-colors hover:bg-zinc-900">
+                        <button
+                          onClick={() => {
+                            if (!kendaliPine) return;
+                            if (s.aktif) kendaliPine.nonaktif(); else kendaliPine.jalankan(s.id);
+                            setMenuInd(false);
+                          }}
+                          title={s.aktif ? 'Lepas dari chart' : 'Pasang di chart'}
+                          className="flex min-w-0 grow cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 text-left">
+                          <span className={cn('size-2 shrink-0 rounded-full', s.aktif ? 'bg-emerald-500' : 'border border-zinc-700')} />
+                          <span className="min-w-0 grow truncate text-[12px] text-zinc-200">{s.nama}</span>
+                          {/* Kata "aktif" DIHAPUS untuk yang sedang jalan:
+                              titik hijau sudah mengatakannya, dan ruang itu
+                              sekarang dipakai ketiga ikon. "pasang" tetap —
+                              ia mengajak, bukan melaporkan. */}
+                          {!s.aktif && <span className="shrink-0 text-[10.5px] text-zinc-600">pasang</span>}
+                        </button>
+                        {/* Hanya untuk yang sedang terpasang. Menyetel input
+                            atau melepas skrip yang tidak ada di chart adalah
+                            perintah tanpa sasaran. */}
+                        {s.aktif && (
+                          <>
+                            {pineInfo?.adaInput && (
+                              <button onClick={() => { bukaDock('input'); setMenuInd(false); }}
+                                title="Setelan input" aria-label="Setelan input"
+                                className="shrink-0 cursor-pointer rounded p-1 text-zinc-500 transition-colors hover:text-zinc-100">
+                                <Settings2 className="size-3.5" />
+                              </button>
+                            )}
+                            <button onClick={() => { bukaDock('editor'); setMenuInd(false); }}
+                              title="Buka kodenya" aria-label="Buka kodenya"
+                              className="shrink-0 cursor-pointer rounded p-1 text-zinc-500 transition-colors hover:text-zinc-100">
+                              <Code2 className="size-3.5" />
+                            </button>
+                            <button onClick={() => kendaliPine?.nonaktif()}
+                              title="Lepas dari chart" aria-label="Lepas dari chart"
+                              className="shrink-0 cursor-pointer rounded p-1 text-zinc-500 transition-colors hover:text-red-400">
+                              <X className="size-3.5" />
+                            </button>
+                          </>
+                        )}
+                      </div>
                     ))}
                   </div>
                 </>
@@ -3504,46 +3541,19 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
               memuat ? 'text-zinc-500' : 'text-emerald-500')}>
               <Radio className="size-2.5" /> {memuat ? 'memuat' : 'live · 3 dtk'}
             </div>
-            {pineInfo && (
-              /* Tanpa latar: nama indikator adalah KETERANGAN chart, bukan
-                     kartu tersendiri. Kotak gelap di atas lilin justru menutup
-                     data yang sedang dibaca. */
-              <div className="pointer-events-auto flex items-center gap-1 px-1 py-0.5">
-                <span className="max-w-[200px] truncate text-[11px] text-zinc-200" title={pineInfo.nama}>{pineInfo.nama}</span>
-                {pineInfo.adaInput && (
-                  <button onClick={() => bukaDock('input')} title="Setelan input"
-                    className="cursor-pointer rounded p-0.5 text-zinc-500 transition-colors hover:text-zinc-100">
-                    <Settings2 className="size-3" />
-                  </button>
-                )}
-                <button onClick={() => bukaDock('editor')} title="Buka kodenya"
-                  className="cursor-pointer rounded p-0.5 text-zinc-500 transition-colors hover:text-zinc-100">
-                  <Code2 className="size-3" />
-                </button>
-                <button onClick={() => kendaliPine?.nonaktif()} title="Lepas dari chart"
-                  className="cursor-pointer rounded p-0.5 text-zinc-500 transition-colors hover:text-red-400">
-                  <X className="size-3" />
-                </button>
-              </div>
-            )}
-            {tampilSnr && (
-              <div className="pointer-events-auto flex items-center gap-1 px-1 py-0.5">
-                <span className="text-[11px] text-zinc-300">Zona SNR</span>
-                <button onClick={() => setTampilSnr(false)} title="Sembunyikan"
-                  className="cursor-pointer rounded p-0.5 text-zinc-500 transition-colors hover:text-red-400">
-                  <X className="size-3" />
-                </button>
-              </div>
-            )}
-            {tampilSmi && (
-              <div className="pointer-events-auto flex items-center gap-1 px-1 py-0.5">
-                <span className="text-[11px] text-zinc-300">SMI</span>
-                <button onClick={() => setTampilSmi(false)} title="Sembunyikan"
-                  className="cursor-pointer rounded p-0.5 text-zinc-500 transition-colors hover:text-red-400">
-                  <X className="size-3" />
-                </button>
-              </div>
-            )}
+            {/* NAMA INDIKATOR DIBUANG DARI CHART atas permintaan pemilik.
+                Dulu di sini berbaris "Supertrend", "Zona SNR", "SMI",
+                masing-masing dengan ikonnya sendiri.
+
+                Alasannya masuk akal begitu indikatornya lebih dari satu:
+                tiga baris teks di pojok kanan-atas menutupi lilin justru di
+                sisi yang paling sering dibaca -- harga terkini. Dan daftar
+                yang sama sudah ada di panel Indikator di bilah atas, lengkap
+                dengan pencacahnya. Satu daftar, bukan dua yang harus
+                dijaga tetap sepakat.
+
+                Ketiga ikonnya -- setelan input, buka kode, lepas -- ikut
+                pindah ke baris skrip di panel itu. */}
           </div>
 
           {/* ── Alat gambar — bilah TEGAK di sisi kiri chart ─────────
@@ -3693,11 +3703,58 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
               di dasarnya, bukan sebaliknya. */}
           <div className={cn('pointer-events-none absolute inset-x-0 bottom-0 z-[25] flex items-center gap-3 px-4 py-2 text-[11.5px] text-zinc-600',
             POLOS && 'hidden')}>
-            {/* Gerigi duduk di pojok paling kiri kaki chart, TANPA teks. Ia
-                setelan yang dibuka sesekali lalu ditutup; label tetap di sana
-                menuntut perhatian setiap kali mata menyapu kaki chart, padahal
-                yang dibaca di baris ini adalah jumlah lilin dan sumbernya. */}
-            <div className="pointer-events-auto relative shrink-0">
+            {/* GERIGI PINDAH KE UJUNG KANAN, berjejer dengan ikon multi —
+                lihat kelompok ikon di bawah. Dulu ia sendirian di pojok kiri,
+                terpisah sejauh lebar chart dari satu-satunya sakelar lain di
+                baris ini; dua kendali sejenis yang dipakai bergantian tidak
+                punya alasan duduk di ujung yang berlawanan. */}
+            <span className="flex min-w-0 items-center gap-2 truncate">
+              {hasil?.trade.length ? (
+                <span className="truncate">{hasil.trade.length} penanda trade</span>
+              ) : null}
+            </span>
+
+            {/* ── Kelompok ikon: multi-chart lalu gerigi ─────────────────
+                Posisinya DIUKUR, bukan dikira-kira, dan inilah percobaan
+                keempat — tiga yang pertama menggeser dengan angka yang
+                kelihatan masuk akal di kode lalu meleset di layar.
+
+                Dua acuan yang diminta pemilik, keduanya diukur di peramban:
+
+                  · Tegak — baris label sumbu waktu membentang y 796-824,
+                    berpusat di 810. Tanpa geseran, ikonnya berpusat di 826.
+                    Selisihnya 16 px, jadi -translate-y-4.
+
+                  · Datar — celah antara tulisan "Backtest" dan lencana
+                    "beta" di baris bawah membentang x 1437-1443, berpusat
+                    di 1440. Kelompok ini lebarnya 50 px (22 + celah 6 + 22)
+                    dan tepi kanan alaminya di 1478, jadi celah ANTAR-IKON
+                    jatuh di 1453. Selisihnya 13 px, jadi -translate-x-[13px].
+
+                Hasilnya: celah antar-ikon tepat segaris dengan celah
+                "Backtest beta" di bawahnya, dan keduanya duduk di sudut
+                1410-1480 x 796-824 -- petak kosong tempat sumbu waktu
+                bertemu sumbu harga, satu-satunya bagian kaki chart yang
+                tidak pernah berisi angka.
+
+                TRANSFORM, bukan margin. Pelajaran mahal dari percobaan
+                sebelumnya: margin pada satu anak menambah tinggi SELURUH
+                baris flex, dan baris yang berjangkar ke dasar tumbuh ke
+                atas -- membawa serta tetangga yang tidak diminta pindah.
+                Transform menggeser gambarnya saja. */}
+            <div className="pointer-events-auto ml-auto flex shrink-0 -translate-x-[13px] -translate-y-4 items-center gap-1.5">
+              {!POLOS && (
+                <button onClick={() => nyalakanMulti(simbol, tf)}
+                  title="Multi-chart — bagi layar jadi beberapa panel chart"
+                  aria-label="Multi-chart"
+                  className="flex cursor-pointer items-center rounded p-1 text-zinc-500 transition-colors hover:text-zinc-300">
+                  <LayoutGrid className="size-3.5" strokeWidth={2} />
+                </button>
+              )}
+              {/* Tanpa latar gelap, sama seperti gerigi. Latar itu dulu perlu
+                  saat ikonnya melayang di atas lilin; di petak kosong sudut
+                  sumbu ia hanya jadi kotak yang tidak menutupi apa-apa. */}
+              <div className="relative">
               <button
                 onClick={bukaTutupTampilan}
                 title="Setelan tampilan chart"
@@ -3709,10 +3766,11 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
               {menuTampilan && (
                 <>
                   <div className="fixed inset-0 z-30" onClick={batalTampilan} />
-                  {/* Terbuka ke ATAS dan ke KANAN. Tombolnya di pojok kiri
-                      bawah: panel yang terbuka ke bawah atau ke kiri dari sana
-                      keluar layar. */}
-                  <div className="absolute bottom-full left-0 z-40 mb-1 w-72 rounded-lg border border-zinc-800 bg-zinc-950 p-1.5 text-left shadow-2xl">
+                  {/* Terbuka ke ATAS dan ke KIRI. Dulu left-0, dari waktu
+                      gerigi masih di pojok kiri; dari tempatnya yang baru di
+                      x~1443, panel selebar 288 px yang berjangkar ke kiri
+                      berakhir di 1731 -- jauh di luar layar 1500 px. */}
+                  <div className="absolute bottom-full right-0 z-40 mb-1 w-72 rounded-lg border border-zinc-800 bg-zinc-950 p-1.5 text-left shadow-2xl">
                     <div className="px-2 pb-1 pt-0.5">
                       <span className="text-[10px] font-medium uppercase tracking-wider text-zinc-600">Lilin</span>
                     </div>
@@ -3827,42 +3885,8 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                   </div>
                 </>
               )}
+              </div>
             </div>
-            {/* Keterangan "N lilin · simbol · lewat proxy VPS" DIHAPUS atas
-                permintaan pemilik: informasi teknis yang tidak dibaca siapa pun
-                dalam pemakaian normal, tapi tampil permanen di layar setiap
-                pengguna. Jumlah penanda trade dipertahankan -- ia hanya muncul
-                sehabis backtest, dan orang yang baru menjalankan backtest
-                sedang mencarinya. */}
-            <span className="flex min-w-0 items-center gap-2 truncate">
-              {hasil?.trade.length ? (
-                <span className="truncate">{hasil.trade.length} penanda trade</span>
-              ) : null}
-            </span>
-            {/* Multi-chart di UJUNG KANAN kaki chart — permintaan pemilik.
-                ml-auto mendorongnya melewati sisa isi baris; Backtest tidak
-                ikut terdorong karena sudah absolute. DISEMBUNYIKAN di mode
-                polos: panel yang bisa membelah dirinya jadi empat panel lagi
-                adalah cermin yang saling memantul. */}
-            {!POLOS && (
-              <button onClick={() => nyalakanMulti(simbol, tf)}
-                title="Multi-chart — bagi layar jadi beberapa panel chart"
-                aria-label="Multi-chart"
-                /* DIANGKAT dari sudut lewat TRANSFORM, bukan margin. Sudut
-                 kanan-bawah chart bukan ruang kosong — di sana bertemu kolom
-                 harga di kanan dan baris waktu di bawah, dan ikon yang duduk
-                 di persimpangan keduanya menutupi dua keterangan sekaligus.
-
-                 Sempat dipakai `mb-9`, dan gerigi setelan di ujung kiri ikut
-                 terangkat: margin bawah pada satu anak menambah tinggi
-                 SELURUH baris flex, dan baris yang berjangkar ke dasar akan
-                 tumbuh ke atas — membawa serta tetangganya yang tidak
-                 diminta pindah. Transform menggeser gambarnya saja dan tidak
-                 menyentuh tata letak sama sekali. */
-              className="pointer-events-auto ml-auto flex shrink-0 -translate-x-12 -translate-y-9 cursor-pointer items-center rounded bg-zinc-950/70 p-1 text-zinc-500 backdrop-blur-sm transition-colors hover:text-zinc-300">
-                <LayoutGrid className="size-3.5" strokeWidth={2} />
-              </button>
-            )}
           </div>
         </div>
         {/* Seluruh kaki chart — gerigi setelan, Backtest, ikon multi —
