@@ -90,15 +90,31 @@ const TAB = [
 ] as const;
 type IdTab = typeof TAB[number]['id'];
 
+/* Warna naik seiring tingkat: abu untuk gratis, biru, ungu, lalu EMAS di
+   puncak. Urutan yang sudah dikenali mata dari mana pun — bukan lima warna
+   acak yang harus dihafal dulu sebelum panelnya bisa dibaca sekilas. */
 const KELOMPOK_LISENSI = [
-  { id: 'gratis',   judul: 'Gratis',              sub: () => 'Akses 30 hari tanpa biaya, dari kuota gratis.' },
-  { id: 'testing',  judul: 'Testing — New Launch', sub: (f: (n: number) => string, h?: { hargaTesting: number; hargaTestingCoret: number }) =>
+  { id: 'gratis',   judul: 'Gratis',              tepi: 'border-l-zinc-600',    titik: 'bg-zinc-500',    angka: 'bg-zinc-800 text-zinc-400',        sub: () => 'Akses 30 hari tanpa biaya, dari kuota gratis.' },
+  { id: 'testing',  judul: 'Testing — New Launch', tepi: 'border-l-sky-500', titik: 'bg-sky-500', angka: 'bg-sky-500/15 text-sky-300', sub: (f: (n: number) => string, h?: { hargaTesting: number; hargaTestingCoret: number }) =>
       h ? (h.hargaTestingCoret > h.hargaTesting ? `${f(h.hargaTesting)} · dari ${f(h.hargaTestingCoret)}` : f(h.hargaTesting)) : '' },
-  { id: 'premium3', judul: 'Premium 3 Bulan',     sub: (f: (n: number) => string, h?: { hargaPremium3: number }) => (h ? f(h.hargaPremium3) : '') },
-  { id: 'tahunan',  judul: 'Tahunan',             sub: (f: (n: number) => string, h?: { hargaTahunan: number }) => (h ? f(h.hargaTahunan) : '') },
-  { id: 'market',   judul: 'Produk Marketplace',  sub: () => 'Indikator dan EA yang dibeli terpisah dari paket akses.' },
-  { id: 'lain',     judul: 'Aktivasi Manual',     sub: () => 'Diaktifkan langsung lewat panel, tanpa permintaan dari pembeli — biasanya uji coba.' },
+  { id: 'premium3', judul: 'Premium 3 Bulan',     tepi: 'border-l-violet-500', titik: 'bg-violet-500', angka: 'bg-violet-500/15 text-violet-300', sub: (f: (n: number) => string, h?: { hargaPremium3: number }) => (h ? f(h.hargaPremium3) : '') },
+  { id: 'tahunan',  judul: 'Tahunan',             tepi: 'border-l-amber-400', titik: 'bg-amber-400', angka: 'bg-amber-400/15 text-amber-300', sub: (f: (n: number) => string, h?: { hargaTahunan: number }) => (h ? f(h.hargaTahunan) : '') },
+  { id: 'market',   judul: 'Produk Marketplace',  tepi: 'border-l-emerald-500', titik: 'bg-emerald-500', angka: 'bg-emerald-500/15 text-emerald-300', sub: () => 'Indikator dan EA yang dibeli terpisah dari paket akses.' },
+  { id: 'lain',     judul: 'Aktivasi Manual',     tepi: 'border-l-zinc-700', titik: 'bg-zinc-600', angka: 'bg-zinc-800 text-zinc-500', sub: () => 'Diaktifkan langsung lewat panel, tanpa permintaan dari pembeli — biasanya uji coba.' },
 ] as const;
+
+/* Nama yang ditampilkan untuk satu pemakai.
+   Yang masuk lewat Discord tidak punya surel, dan backend TIDAK menyimpan
+   nama tampilan Discord-nya — yang ada cuma `uid: "discord:<angka>"`.
+   Dulu baris begitu tampil sebagai "—", yang tidak memberi tahu apa pun.
+   Angkanya sendiri berguna: ia bisa ditempel ke pencarian Discord dan
+   langsung menemukan orangnya. */
+const namaPemakai = (email?: string, catatan?: string, uid?: string) => {
+  if (email) return email;
+  if (catatan) return catatan;
+  if (uid?.startsWith('discord:')) return 'Discord · ' + uid.slice('discord:'.length);
+  return uid || '—';
+};
 
 const gulirJika = (jumlah: number, ambang: number, tinggi: string) =>
   jumlah > ambang ? `${tinggi} overflow-y-auto gulir-senyap` : '';
@@ -178,7 +194,7 @@ export default function Pemilik() {
      dua kali dan tidak ada satu pun tanda di layar. Dua warna berdampingan
      membuat kembarannya langsung kelihatan. */
   const perBulan = useMemo(() => {
-    type Bulan = { bulan: string; lisensi: number; manual: number; jumlah: number };
+    type Bulan = { bulan: string; lisensi: number; manual: number; keluar: number; jumlah: number };
     const peta = new Map<string, Bulan>();
     const ambil = (t: number): Bulan => {
       const d = new Date(t);
@@ -186,7 +202,7 @@ export default function Pemilik() {
       let b = peta.get(kunci);
       if (!b) {
         b = { bulan: d.toLocaleDateString('id-ID', { month: 'short', year: '2-digit' }),
-              lisensi: 0, manual: 0, jumlah: 0 };
+              lisensi: 0, manual: 0, keluar: 0, jumlah: 0 };
         peta.set(kunci, b);
       }
       return b;
@@ -199,8 +215,13 @@ export default function Pemilik() {
       const b = ambil(p.waktu);
       b.manual += p.nilai; b.jumlah += 1;
     });
+    /* Pengeluaran ikut, sebagai batang MERAH di sebelah batang pemasukan.
+       Grafik yang cuma menggambar uang masuk selalu membuat usaha tampak
+       lebih sehat daripada kenyataannya — dan di bulan ini pengeluarannya
+       empat puluh kali pemasukan. Angka itu tidak boleh perlu dicari. */
+    pengeluaran.data.forEach((p) => { ambil(p.waktu).keluar += p.nilai; });
     return [...peta.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([, v]) => v);
-  }, [penjualan.data, lisensiTerjual, harga]);
+  }, [penjualan.data, pengeluaran.data, lisensiTerjual, harga]);
 
 
   /* Recent sales = lisensi + catatan tangan, DIURUT BERSAMA.
@@ -217,8 +238,13 @@ export default function Pemilik() {
     const dariLisensi = lisensiTerjual.map((x) => ({
       kunci: 'L' + x.id,
       waktu: x.diputusPada || x.waktu,
-      produk: 'Lisensi — ' + namaPaket(x.paket),
-      pembeli: x.email || x.nama || x.uid,
+      /* Produk dan KATEGORI dipisah, sejajar dengan tabel Pengeluaran di
+         atasnya: di sana "Keperluan | Kategori", di sini "Produk | Paket".
+         Dua tabel uang yang bentuknya sama bisa dibaca dengan satu
+         kebiasaan mata, bukan dua. */
+      produk: x.produk && x.produk !== 'jadi-trader-v3' ? x.produk : 'Lisensi akses',
+      kategori: namaPaket(x.paket),
+      pembeli: namaPemakai(x.email, x.nama, x.uid),
       nilai: hargaLisensi(x),
       /* Harga TERCATAT vs harga DITAKSIR. Permintaan lama tidak menyimpan
          hargaSaat, jadi angkanya diturunkan dari tabel harga sekarang —
@@ -227,7 +253,7 @@ export default function Pemilik() {
       manual: false as const, id: '',
     }));
     const dariTangan = penjualan.data.map((p) => ({
-      kunci: 'M' + p.id, waktu: p.waktu, produk: p.produk, pembeli: p.pembeli,
+      kunci: 'M' + p.id, waktu: p.waktu, produk: p.produk, kategori: 'Dicatat tangan', pembeli: p.pembeli,
       nilai: p.nilai, taksiran: false, manual: true as const, id: p.id,
     }));
     return [...dariLisensi, ...dariTangan].sort((a, b) => b.waktu - a.waktu);
@@ -394,8 +420,8 @@ export default function Pemilik() {
 
       {/* ── Penjualan per bulan ── */}
       <Panel className="mt-4">
-        <PanelHead judul="Penjualan per Bulan"
-                   sub="Lisensi berbayar terisi sendiri dari Maintenance, dihitung memakai harga yang berlaku saat permintaannya dibuat. Batang manual untuk pemasukan di luar lisensi." />
+        <PanelHead judul="Pemasukan vs Pengeluaran per Bulan"
+                   sub="Hijau lisensi, biru catatan tangan, merah pengeluaran. Lisensi berbayar terisi sendiri dari Maintenance, dihitung memakai harga yang berlaku saat permintaannya dibuat." />
         <div className={cn('h-[240px] px-2 pb-4', perBulan.length > 6 && 'overflow-x-auto gulir-senyap')}>
           {perBulan.length === 0 ? (
             <div className="px-3 pt-3">
@@ -434,8 +460,15 @@ export default function Pemilik() {
                     begitu komponennya dipasang ulang. Terukur di peramban,
                     bukan dugaan. Sudut siku adalah harga yang murah untuk
                     batang yang tingginya benar. */}
-                <Bar dataKey="lisensi" stackId="a" name="Lisensi" fill="#10b981" fillOpacity={0.85} maxBarSize={26} />
-                <Bar dataKey="manual" stackId="a" name="Manual" fill="#38bdf8" fillOpacity={0.75} maxBarSize={26} />
+                {/* DUA tumpukan bersebelahan, bukan satu. Pemasukan
+                    (lisensi + manual) menumpuk jadi satu batang; pengeluaran
+                    berdiri di sebelahnya dengan stackId berbeda — itulah cara
+                    Recharts memisahkan kolom. Menumpuk keluar di atas masuk
+                    akan membaca sebagai "total", padahal keduanya berlawanan
+                    arah. */}
+                <Bar dataKey="lisensi" stackId="masuk" name="Lisensi" fill="#10b981" fillOpacity={0.85} maxBarSize={22} />
+                <Bar dataKey="manual" stackId="masuk" name="Manual" fill="#38bdf8" fillOpacity={0.75} maxBarSize={22} />
+                <Bar dataKey="keluar" stackId="keluar" name="Pengeluaran" fill="#ef4444" fillOpacity={0.7} maxBarSize={22} />
               </BarChart>
             </ResponsiveContainer>
             </div>
@@ -463,6 +496,62 @@ export default function Pemilik() {
               <Plus className="size-3.5" /> Catat
             </button>
           </div>
+        </div>
+      </Panel>
+
+      {/* ── Recent sales ───────────────────────────────────────────────
+          DI ATAS Pengeluaran, dan berbentuk sama persis dengannya:
+          Tanggal | Produk | Kategori | Nilai. Dua tabel uang yang bentuknya
+          seragam bisa dibaca dengan satu kebiasaan mata, dan urutannya
+          mengikuti arah uang — yang masuk dulu, baru yang keluar. */}
+      <Panel className="mt-4">
+        <PanelHead judul="Recent sales" sub="Lisensi berbayar dan catatan tangan, diurut bersama."
+                   kanan={
+                     <span className="angka text-[12.5px] text-emerald-400/90">
+                       +{fmt(totalPenjualan)}
+                     </span>
+                   } />
+        <div className="px-5 pb-5">
+          <Kabar memuat={penjualan.memuat || permintaan.memuat} galat={penjualan.galat} kosong={!barisJual.length}
+                 teksKosong="Belum ada pemasukan." />
+          {barisJual.length > 0 && (
+            <TabelBungkus className={gulirJika(barisJual.length, 6, 'max-h-[300px]')}>
+              <Tabel>
+                <thead><tr><Th>Tanggal</Th><Th>Produk</Th><Th>Kategori</Th><Th className="text-right">Nilai</Th><Th /></tr></thead>
+                <tbody>
+                  {barisJual.slice(0, 20).map((p) => (
+                    <Tr key={p.kunci}>
+                      <Td className="whitespace-nowrap text-zinc-500">{tanggalPendek(p.waktu)}</Td>
+                      <Td className="text-zinc-200">
+                        {p.produk}
+                        {p.pembeli && <div className="text-[11px] text-zinc-600">{p.pembeli}</div>}
+                      </Td>
+                      <Td className="text-zinc-500">{p.kategori}</Td>
+                      <Td className="angka text-right text-emerald-500">
+                        {p.taksiran && <span className="mr-0.5 text-zinc-600" title="Permintaan lama tidak menyimpan harganya — angka ini diturunkan dari tabel harga sekarang">≈</span>}
+                        {fmt(p.nilai)}
+                      </Td>
+                      <Td className="text-right">
+                        {p.manual ? (
+                          <button
+                            onClick={() => void jalankan(() => hapusPenjualan(p.id), 'Catatan penjualan dihapus.', penjualan.muatUlang)}
+                            disabled={sibuk || !pemilik} aria-label={`Hapus catatan ${p.produk}`}
+                            className="cursor-pointer rounded p-1 text-zinc-600 transition-colors hover:bg-zinc-800 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-40">
+                            <Trash2 className="size-3.5" />
+                          </button>
+                        ) : (
+                          <span className="whitespace-nowrap text-[10px] uppercase tracking-wider text-zinc-700"
+                                title="Terisi sendiri dari Akses & Lisensi — hapus permintaannya di sana kalau perlu">
+                            otomatis
+                          </span>
+                        )}
+                      </Td>
+                    </Tr>
+                  ))}
+                </tbody>
+              </Tabel>
+            </TabelBungkus>
+          )}
         </div>
       </Panel>
 
@@ -568,60 +657,6 @@ export default function Pemilik() {
         </div>
       </Panel>
 
-      {/* Recent sales SENDIRIAN dan selebar penuh. Dulu satu baris tiga
-          kolom bersama Activity dan Client health; Activity pindah ke
-          Maintenance, Client health pindah ke tab Lisensi & Klien, dan
-          grid yang ditinggalkan dua penghuninya cuma menyisakan ruang
-          kosong di sebelah kanan. */}
-      <div className="mt-4">
-        <Panel>
-          <PanelHead judul="Recent sales" sub="Lisensi berbayar dan catatan tangan, diurut bersama." />
-          <div className="px-5 pb-5">
-            <Kabar memuat={penjualan.memuat || permintaan.memuat} galat={penjualan.galat} kosong={!barisJual.length}
-                   teksKosong="Belum ada pemasukan." />
-            {barisJual.length > 0 && (
-              <TabelBungkus className={gulirJika(barisJual.length, 10, 'max-h-[480px]')}>
-                <Tabel>
-                  <thead><tr><Th>Tanggal</Th><Th>Produk</Th><Th className="text-right">Nilai</Th><Th /></tr></thead>
-                  <tbody>
-                    {barisJual.slice(0, 12).map((p) => (
-                      <Tr key={p.kunci}>
-                        <Td className="whitespace-nowrap text-zinc-500">{tanggalPendek(p.waktu)}</Td>
-                        <Td className="text-zinc-300">
-                          {p.produk}
-                          {p.pembeli && <div className="text-[11px] text-zinc-600">{p.pembeli}</div>}
-                        </Td>
-                        <Td className="angka text-right text-emerald-500">
-                          {p.taksiran && <span className="mr-0.5 text-zinc-600" title="Permintaan lama tidak menyimpan harganya — angka ini diturunkan dari tabel harga sekarang">≈</span>}
-                          {fmt(p.nilai)}
-                        </Td>
-                        <Td className="text-right">
-                          {p.manual ? (
-                            <button
-                              onClick={() => void jalankan(() => hapusPenjualan(p.id), 'Catatan penjualan dihapus.', penjualan.muatUlang)}
-                              disabled={sibuk || !pemilik} aria-label={`Hapus catatan ${p.produk}`}
-                              className="cursor-pointer rounded p-1 text-zinc-600 transition-colors hover:bg-zinc-800 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-40">
-                              <Trash2 className="size-3.5" />
-                            </button>
-                          ) : (
-                            <span className="whitespace-nowrap text-[10px] uppercase tracking-wider text-zinc-700"
-                                  title="Terisi sendiri dari Akses & Lisensi — hapus permintaannya di sana kalau perlu">
-                              otomatis
-                            </span>
-                          )}
-                        </Td>
-                      </Tr>
-                    ))}
-                  </tbody>
-                </Tabel>
-              </TabelBungkus>
-            )}
-          </div>
-        </Panel>
-
-
-      </div>
-
       </>)}
 
       {tab === 'lisensi' && (<>
@@ -634,7 +669,7 @@ export default function Pemilik() {
               {klien.data.map((k) => (
                 <div key={k.uid} className="flex items-center justify-between rounded-lg border border-zinc-800/60 p-3">
                   <div className="min-w-0">
-                    <div className="truncate text-[13px] text-zinc-200">{k.email || k.uid}</div>
+                    <div className="truncate text-[13px] text-zinc-200">{namaPemakai(k.email, k.nama, k.uid)}</div>
                     <div className="text-[11.5px] text-zinc-500">
                       {k.nama ? `${k.nama} · ` : ''}{jamLalu(k.terakhir)}
                     </div>
@@ -663,9 +698,14 @@ export default function Pemilik() {
                nyata: lisensi yang diaktifkan tangan tanpa permintaan. */
             if (k.id === 'lain' && !baris.length) return null;
             return (
-              <Panel key={k.id}>
-                <PanelHead judul={k.judul} sub={(k.sub as (f: (n: number) => string, h?: typeof harga) => string)(fmt, harga)}
-                           kanan={<span className="angka text-[12px] text-zinc-500">{baris.length}</span>} />
+              <Panel key={k.id} className={cn('border-l-2', k.tepi)}>
+                <PanelHead
+                  judul={<span className="flex items-center gap-2">
+                    <span className={cn('size-2 shrink-0 rounded-full', k.titik)} />
+                    {k.judul}
+                  </span>}
+                  sub={(k.sub as (f: (n: number) => string, h?: typeof harga) => string)(fmt, harga)}
+                  kanan={<span className={cn('angka rounded px-1.5 py-0.5 text-[12px]', k.angka)}>{baris.length}</span>} />
                 <div className="px-5 pb-5">
                   {!baris.length ? (
                     <div className="py-4 text-center text-[12px] text-zinc-600">Belum ada.</div>
@@ -683,7 +723,7 @@ export default function Pemilik() {
                             return (
                               <Tr key={l.sidik}>
                                 {k.id === 'market' && <Td className="text-zinc-300">{l.produk}</Td>}
-                                <Td className="text-zinc-400">{m?.email || l.catatan || '—'}</Td>
+                                <Td className="text-zinc-400">{namaPemakai(m?.email, l.catatan || m?.nama, m?.uid)}</Td>
                                 {/* Sidik, bukan kodenya. Backend memang tidak
                                     pernah menyimpan kode aslinya. */}
                                 <Td className="angka text-zinc-600">{l.sidik}</Td>
@@ -691,13 +731,13 @@ export default function Pemilik() {
                                 <Td className="text-right">
                                   <button
                                     onClick={() => {
-                                      if (!confirm(`Cabut lisensi "${m?.email || l.catatan || l.sidik}"?
+                                      if (!confirm(`Cabut lisensi "${namaPemakai(m?.email, l.catatan || m?.nama, m?.uid) || l.sidik}"?
 
 Pemakainya langsung kehilangan akses.`)) return;
                                       void jalankan(() => cabutLisensi(l.sidik), 'Lisensi dicabut.', lisensi.muatUlang);
                                     }}
                                     disabled={sibuk || !pemilik}
-                                    aria-label={`Cabut lisensi ${m?.email || l.sidik}`}
+                                    aria-label={`Cabut lisensi ${namaPemakai(m?.email, m?.nama, m?.uid)}`}
                                     className="flex cursor-pointer items-center gap-1 rounded px-2 py-1 text-[11.5px] text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-40">
                                     <KeyRound className="size-3.5" /> Cabut
                                   </button>
