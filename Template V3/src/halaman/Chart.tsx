@@ -3727,9 +3727,13 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                     di 1440. Supaya celah ANTAR-IKON jatuh tepat di sana,
                     tepi kanan kelompok harus di 1465 -> right 29 px.
 
-                  · Tegak — baris label sumbu waktu membentang y 796-824,
-                    berpusat di 810. Tepi bawah kelompok jadi 821
-                    -> bottom 24 px (bottom-6).
+                  · Tegak — bottom 12 px (bottom-3). Semula 24 px, yang
+                    menaruh ikon tepat di pusat baris label sumbu waktu
+                    (y 796-824, pusat 810). Pemilik minta diturunkan
+                    setengahnya: 24 -> 12, jadi pusatnya turun ke 822 dan
+                    ikonnya duduk di tepi bawah baris sumbu, bukan di
+                    tengahnya. Masih 12 px di atas baris Backtest yang
+                    mulai di y 845, jadi keduanya tidak bersinggungan.
 
                 Hasilnya: celah antar-ikon tepat segaris dengan celah
                 "Backtest beta" di bawahnya, dan keduanya duduk di petak
@@ -3756,7 +3760,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                 baris, tidak membuat kotak penampung untuk fixed. `bottom`
                 diukur dari tepi bawah hamparan yang berjangkar `bottom-0`,
                 jadi angkanya tidak ikut berubah saat isi baris kosong. */}
-            <div className="pointer-events-auto absolute bottom-6 right-[29px] flex items-center gap-1.5">
+            <div className="pointer-events-auto absolute bottom-3 right-[29px] flex items-center gap-1.5">
               {!POLOS && (
                 <button onClick={() => nyalakanMulti(simbol, tf)}
                   title="Multi-chart — bagi layar jadi beberapa panel chart"
