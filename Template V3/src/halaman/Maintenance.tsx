@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Upload, Trash2, RotateCcw, Plus, FileCode2, Image as ImageIcon, ShieldAlert } from 'lucide-react';
 import { PanelModerasiSinyal } from '@/components/panel-moderasi-sinyal';
+import PanelLaporanPengguna from '@/components/panel-laporan-pengguna';
 import { Panel, PanelHead, KartuKpi } from '@/components/efferd-ui';
 import { cn } from '@/lib/utils';
 import { useProduk, simpanKatalogProduk } from '@/lib/data';
@@ -217,6 +218,11 @@ const TAB = [
      sebagai satu jenis tindakan — dan tombol hapus di antara tombol beli
      adalah tombol hapus yang cepat atau lambat tertekan. */
   { id: 'moderasi', label: 'Moderasi Sinyal', judul: 'Moderasi Sinyal',            sub: 'Menurunkan sinyal yang melanggar. Kewajiban pengawasan PSE, bukan alat penyuntingan — penulisnya sendiri tidak bisa menghapus rekam jejaknya.' },
+  /* Pindah dari Sales Report, tempatnya dulu panel "Activity". Sales Report
+     menjawab "usahanya untung berapa"; daftar ini menjawab "apa yang
+     rusak". Dua pertanyaan yang tidak pernah ditanyakan bersamaan, dan yang
+     kedua selalu kalah perhatian di sebelah angka pemasukan. */
+  { id: 'bug',     label: 'Error & Fixing',  judul: 'Error & Fixing',             sub: 'Bug, saran, dan error yang dikirim pengguna dari dalam aplikasi.' },
 ] as const;
 type IdTab = typeof TAB[number]['id'];
 
@@ -468,6 +474,7 @@ export default function Maintenance() {
       {tab === 'konten' && <PanelTeksBeranda />}
 
       {tab === 'moderasi' && <PanelModerasiSinyal />}
+      {tab === 'bug' && <PanelLaporanPengguna />}
 
       {tab === 'produk' && (<>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">

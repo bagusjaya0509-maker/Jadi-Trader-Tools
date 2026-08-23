@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import {
-  Clock, Plus, RefreshCw, Trash2, KeyRound, ShieldAlert, TrendingDown,
+  Plus, Trash2, KeyRound, ShieldAlert, TrendingDown,
 } from 'lucide-react';
 import { Panel, PanelHead, KartuKpi, TipGrafik, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn, tanggalPendek } from '@/lib/utils';
@@ -9,11 +9,11 @@ import { useAuth } from '@/lib/auth';
 import { useKurs } from '@/lib/kurs';
 import { useHargaPaket } from '@/lib/harga-akses';
 import {
-  useKlien, usePenjualan, usePengeluaran, useLaporan, useLisensi,
+  useKlien, usePenjualan, usePengeluaran, useLisensi,
   type PermintaanLisensi,
   usePermintaanLisensi,
   catatPenjualan, hapusPenjualan, catatPengeluaran, hapusPengeluaran,
-  tandaiLaporan, cabutLisensi,
+  cabutLisensi,
 } from '@/lib/admin';
 
 /* Traffic & Sales memakai kerangka Efferd yang sama persis dengan Dashboard:
@@ -75,6 +75,20 @@ function Kabar({ memuat, galat, kosong, teksKosong }: {
  *
  *  Tingginya ditaksir dari tinggi baris yang sesungguhnya: baris tabel
  *  py-3 + border ≈ 45 px, kartu klien p-3 dua baris + gap ≈ 72 px. */
+/* Lima tingkat lisensi, urut dari yang paling murah. Sub-judulnya sebuah
+   FUNGSI, bukan untai jadi: harganya diambil dari setelan Maintenance dan
+   halaman ini punya sakelar USD/IDR — angka yang ditulis mati di sini akan
+   berbohong dua kali, saat harganya diubah dan saat tampilannya ditukar. */
+const KELOMPOK_LISENSI = [
+  { id: 'gratis',   judul: 'Gratis',              sub: () => 'Akses 30 hari tanpa biaya, dari kuota gratis.' },
+  { id: 'testing',  judul: 'Testing — New Launch', sub: (f: (n: number) => string, h?: { hargaTesting: number; hargaTestingCoret: number }) =>
+      h ? (h.hargaTestingCoret > h.hargaTesting ? `${f(h.hargaTesting)} · dari ${f(h.hargaTestingCoret)}` : f(h.hargaTesting)) : '' },
+  { id: 'premium3', judul: 'Premium 3 Bulan',     sub: (f: (n: number) => string, h?: { hargaPremium3: number }) => (h ? f(h.hargaPremium3) : '') },
+  { id: 'tahunan',  judul: 'Tahunan',             sub: (f: (n: number) => string, h?: { hargaTahunan: number }) => (h ? f(h.hargaTahunan) : '') },
+  { id: 'market',   judul: 'Produk Marketplace',  sub: () => 'Indikator dan EA yang dibeli terpisah dari paket akses.' },
+  { id: 'lain',     judul: 'Aktivasi Manual',     sub: () => 'Diaktifkan langsung lewat panel, tanpa permintaan dari pembeli — biasanya uji coba.' },
+] as const;
+
 const gulirJika = (jumlah: number, ambang: number, tinggi: string) =>
   jumlah > ambang ? `${tinggi} overflow-y-auto gulir-senyap` : '';
 
@@ -84,7 +98,6 @@ export default function Pemilik() {
   const penjualan = usePenjualan();
   const pengeluaran = usePengeluaran();
   const { kurs, setKurs, tampil, setTampil, fmt } = useKurs();
-  const laporan = useLaporan();
   const lisensi = useLisensi();
   /* Permintaan lisensi dipakai untuk menautkan tiap kode aktif ke pembelinya.
      Kode yang tidak punya pasangan permintaan berarti diaktifkan tangan lewat
@@ -202,6 +215,37 @@ export default function Pemilik() {
     }));
     return [...dariLisensi, ...dariTangan].sort((a, b) => b.waktu - a.waktu);
   }, [lisensiTerjual, penjualan.data, harga]);
+
+  /* ── LISENSI DIGOLONGKAN per tingkat harga ────────────────────────────
+     Satu tabel berisi 24 baris tidak menjawab pertanyaan yang sebenarnya
+     ditanyakan pemilik ke halaman ini: berapa yang gratis, berapa yang
+     bayar, dan bayar yang mana. Menghitungnya dengan mata dari satu daftar
+     panjang adalah pekerjaan yang komputernya bisa lakukan.
+
+     Tingkatnya diambil dari PERMINTAAN yang berpasangan, bukan dari
+     lisensinya — barisan lisensi hanya menyimpan sidik kode, produk, dan
+     tanggal. Pasangannya lewat `sidik`; surel dipakai sebagai cadangan
+     untuk baris lama yang sidiknya belum tercatat. */
+  const golongan = (l: { sidik: string; produk: string; catatan: string }) => {
+    if (l.produk && l.produk !== 'jadi-trader-v3') return 'market';
+    const m = permintaan.data.find(
+      (x) => x.sidik === l.sidik || (x.status === 'disetujui' && !!x.email && x.email === l.catatan));
+    /* Tanpa permintaan berpasangan = diaktifkan tangan lewat panel V2,
+       biasanya uji coba. Tidak dipaksa masuk "Gratis": itu akan membuat
+       daftar gratis terlihat lebih panjang daripada kuota yang sebenarnya
+       terpakai, dan kuota itulah yang dipakai memutuskan kapan pendaftaran
+       ditutup. */
+    if (!m) return 'lain';
+    if (m.jenis !== 'bayar') return 'gratis';
+    return m.paket === 'tahunan' ? 'tahunan' : m.paket === 'premium3' ? 'premium3' : 'testing';
+  };
+  const perGolongan = useMemo(() => {
+    const kotak: Record<string, typeof lisensi.data> = {
+      gratis: [], testing: [], premium3: [], tahunan: [], market: [], lain: [],
+    };
+    lisensi.data.forEach((l) => { kotak[golongan(l)].push(l); });
+    return kotak;
+  }, [lisensi.data, permintaan.data]);
 
   async function tambahPenjualan() {
     const nilai = Number(form.nilai);
@@ -466,7 +510,10 @@ export default function Pemilik() {
         </div>
       </Panel>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+      {/* DUA kolom sekarang, dulu tiga. Panel "Activity" pindah ke
+          Maintenance -> Error & Fixing; membiarkan gridnya tetap tiga
+          menyisakan kolom kosong selebar sepertiga layar. */}
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Panel>
           <PanelHead judul="Recent sales" sub="Lisensi berbayar dan catatan tangan, diurut bersama." />
           <div className="px-5 pb-5">
@@ -532,114 +579,85 @@ export default function Pemilik() {
           </div>
         </Panel>
 
-        <Panel>
-          <PanelHead judul="Activity" sub="Laporan bug, saran, dan error dari pengguna."
-                     kanan={
-                       <button onClick={laporan.muatUlang} title="Segarkan"
-                               className="cursor-pointer rounded p-1 text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-200">
-                         <RefreshCw className={cn('size-3.5', laporan.memuat && 'animate-spin')} />
-                       </button>
-                     } />
-          {/* Batas tingginya sudah ada sejak awal; yang ditambahkan
-              penyembunyian batang dan ambang jumlah — di bawah sebelas
-              laporan panelnya tidak perlu dipotong sama sekali. */}
-          <div className={cn('px-5 pb-5', gulirJika(laporan.data.length, 6, 'max-h-[416px]'))}>
-            <Kabar memuat={laporan.memuat} galat={laporan.galat} kosong={!laporan.data.length}
-                   teksKosong="Belum ada laporan." />
-            {laporan.data.slice(0, 40).map((l) => (
-              <div key={l.id} className="flex gap-3 py-2.5">
-                <div className="mt-1 flex size-6 shrink-0 items-center justify-center rounded-full border border-zinc-800 bg-zinc-900">
-                  <Clock className="size-3 text-zinc-500" strokeWidth={2} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className={cn(
-                      'rounded px-1.5 py-0.5 text-[10px] uppercase',
-                      l.jenis === 'error' ? 'bg-red-500/10 text-red-400'
-                        : l.jenis === 'saran' ? 'bg-emerald-500/10 text-emerald-500'
-                        : 'bg-amber-500/10 text-amber-400'
-                    )}>{l.jenis}</span>
-                    {l.status === 'baru' ? (
-                      <button
-                        onClick={() => void jalankan(() => tandaiLaporan(l.id, 'selesai'), 'Laporan ditandai selesai.', laporan.muatUlang)}
-                        disabled={sibuk || !pemilik}
-                        className="cursor-pointer text-[10px] text-zinc-500 underline-offset-2 transition-colors hover:text-emerald-500 hover:underline disabled:cursor-not-allowed disabled:opacity-50">
-                        tandai selesai
-                      </button>
-                    ) : (
-                      <span className="text-[10px] text-emerald-600/80">{l.status}</span>
-                    )}
-                  </div>
-                  <div className="mt-1 line-clamp-3 text-[12.5px] text-zinc-300">{l.pesan}</div>
-                  <div className="text-[11.5px] text-zinc-600">
-                    {l.halaman}{l.email ? ` · ${l.email}` : ''} · {jamLalu(l.waktu)}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </Panel>
       </div>
 
-      {/* ── Lisensi ── */}
-      <Panel className="mt-4">
-        <PanelHead judul="Aktivasi & Lisensi" sub="Kode lisensi produk yang sedang aktif."
-                   kanan={<span className="angka text-[12px] text-zinc-500">{lisensi.data.length} aktif</span>} />
-        <div className="px-5 pb-5">
-          <Kabar memuat={lisensi.memuat} galat={lisensi.galat} kosong={!lisensi.data.length}
-                 teksKosong="Belum ada lisensi aktif." />
-          {lisensi.data.length > 0 && (
-            <TabelBungkus>
-              <Tabel>
-                <thead><tr><Th>Produk</Th><Th>Pemilik</Th><Th>Asal</Th><Th>Sidik</Th><Th>Aktif sejak</Th><Th /></tr></thead>
-                <tbody>
-                  {lisensi.data.map((l) => {
-                    const dariMinta = permintaan.data.find((x) => x.sidik === l.sidik || (x.status === 'disetujui' && x.email && x.email === l.catatan));
-                    return (
-                    <Tr key={l.sidik}>
-                      <Td className="text-zinc-300">{l.produk}</Td>
-                      <Td className="text-zinc-400">{dariMinta?.email || l.catatan || '—'}</Td>
-                      <Td>
-                        {dariMinta ? (
-                          <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] text-emerald-500">
-                            permintaan disetujui
-                          </span>
-                        ) : (
-                          <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-500"
-                                title="Diaktifkan langsung lewat panel, tanpa permintaan dari pembeli — biasanya uji coba">
-                            aktivasi manual
-                          </span>
-                        )}
-                      </Td>
-                      {/* Sidik, bukan kodenya. Backend memang tidak pernah
-                          menyimpan kode aslinya — hanya hash-nya. */}
-                      <Td className="angka text-zinc-600">{l.sidik}</Td>
-                      <Td className="whitespace-nowrap text-zinc-500">{tanggalPendek(l.tgl)}</Td>
-                      <Td className="text-right">
-                        <button
-                          onClick={() => {
-                            if (!confirm(`Cabut lisensi "${l.catatan || l.sidik}"?\n\nPemakainya langsung kehilangan akses.`)) return;
-                            void jalankan(() => cabutLisensi(l.sidik), 'Lisensi dicabut.', lisensi.muatUlang);
-                          }}
-                          disabled={sibuk || !pemilik}
-                          className="flex cursor-pointer items-center gap-1 rounded px-2 py-1 text-[11.5px] text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-40">
-                          <KeyRound className="size-3.5" /> Cabut
-                        </button>
-                      </Td>
-                    </Tr>
-                    );
-                  })}
-                </tbody>
-              </Tabel>
-            </TabelBungkus>
-          )}
-          <p className="mt-3 text-[11.5px] leading-relaxed text-zinc-600">
-            Backend hanya menyimpan SIDIK kodenya, bukan kode aslinya — bocornya berkas lisensi
-            tidak membuat siapa pun bisa mengunduh produk. Kode yang bisa dibaca ulang hanya ada
-            di baris permintaan yang disetujui, di halaman Maintenance.
-          </p>
+      {/* ── Lisensi, dibagi per tingkat ── */}
+      <div className="mt-4 flex items-center justify-between px-1">
+        <h2 className="text-[14px] font-medium text-zinc-200">Aktivasi &amp; Lisensi</h2>
+        <span className="angka text-[12px] text-zinc-500">{lisensi.data.length} aktif</span>
+      </div>
+      <Kabar memuat={lisensi.memuat} galat={lisensi.galat} kosong={!lisensi.data.length}
+             teksKosong="Belum ada lisensi aktif." />
+
+      {lisensi.data.length > 0 && (
+        <div className="mt-2 grid grid-cols-1 gap-4 xl:grid-cols-2">
+          {KELOMPOK_LISENSI.map((k) => {
+            const baris = perGolongan[k.id] ?? [];
+            /* Golongan "lain" hanya muncul kalau memang ada isinya —
+               pemilik minta lima panel, dan panel keenam yang selalu kosong
+               cuma jadi pertanyaan tanpa jawaban. Ia tetap ada untuk kasus
+               nyata: lisensi yang diaktifkan tangan tanpa permintaan. */
+            if (k.id === 'lain' && !baris.length) return null;
+            return (
+              <Panel key={k.id}>
+                <PanelHead judul={k.judul} sub={(k.sub as (f: (n: number) => string, h?: typeof harga) => string)(fmt, harga)}
+                           kanan={<span className="angka text-[12px] text-zinc-500">{baris.length}</span>} />
+                <div className="px-5 pb-5">
+                  {!baris.length ? (
+                    <div className="py-4 text-center text-[12px] text-zinc-600">Belum ada.</div>
+                  ) : (
+                    <TabelBungkus className={gulirJika(baris.length, 8, 'max-h-[360px]')}>
+                      <Tabel>
+                        <thead><tr>
+                          {k.id === 'market' && <Th>Produk</Th>}
+                          <Th>Pemilik</Th><Th>Sidik</Th><Th>Aktif sejak</Th><Th />
+                        </tr></thead>
+                        <tbody>
+                          {baris.map((l) => {
+                            const m = permintaan.data.find(
+                              (x) => x.sidik === l.sidik || (x.status === 'disetujui' && !!x.email && x.email === l.catatan));
+                            return (
+                              <Tr key={l.sidik}>
+                                {k.id === 'market' && <Td className="text-zinc-300">{l.produk}</Td>}
+                                <Td className="text-zinc-400">{m?.email || l.catatan || '—'}</Td>
+                                {/* Sidik, bukan kodenya. Backend memang tidak
+                                    pernah menyimpan kode aslinya. */}
+                                <Td className="angka text-zinc-600">{l.sidik}</Td>
+                                <Td className="whitespace-nowrap text-zinc-500">{tanggalPendek(l.tgl)}</Td>
+                                <Td className="text-right">
+                                  <button
+                                    onClick={() => {
+                                      if (!confirm(`Cabut lisensi "${m?.email || l.catatan || l.sidik}"?
+
+Pemakainya langsung kehilangan akses.`)) return;
+                                      void jalankan(() => cabutLisensi(l.sidik), 'Lisensi dicabut.', lisensi.muatUlang);
+                                    }}
+                                    disabled={sibuk || !pemilik}
+                                    aria-label={`Cabut lisensi ${m?.email || l.sidik}`}
+                                    className="flex cursor-pointer items-center gap-1 rounded px-2 py-1 text-[11.5px] text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-40">
+                                    <KeyRound className="size-3.5" /> Cabut
+                                  </button>
+                                </Td>
+                              </Tr>
+                            );
+                          })}
+                        </tbody>
+                      </Tabel>
+                    </TabelBungkus>
+                  )}
+                </div>
+              </Panel>
+            );
+          })}
         </div>
-      </Panel>
+      )}
+
+      <p className="mt-3 px-1 text-[11.5px] leading-relaxed text-zinc-600">
+        Tingkatnya dibaca dari permintaan yang berpasangan di Maintenance, bukan dari barisan
+        lisensinya — yang itu hanya menyimpan SIDIK kode, bukan kode aslinya. Bocornya berkas
+        lisensi tidak membuat siapa pun bisa mengunduh produk; kode yang bisa dibaca ulang hanya
+        ada di baris permintaan yang disetujui.
+      </p>
     </div>
   );
 }

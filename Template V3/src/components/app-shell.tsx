@@ -168,6 +168,7 @@ const NAV = [
           { ke: '/maintenance?tab=trafik',  label: 'Trafik & Server' },
           { ke: '/maintenance?tab=pine',    label: 'Mesin Pine' },
           { ke: '/maintenance?tab=konten',  label: 'Situs & Konten' },
+          { ke: '/maintenance?tab=bug',     label: 'Error & Fixing' },
         ] },
     ],
   },
