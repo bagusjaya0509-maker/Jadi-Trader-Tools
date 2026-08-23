@@ -2653,7 +2653,14 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
           untuk memisahkan apa pun; yang benar-benar memisahkan garis
           tepinya. Menghapus latarnya membuat chart menyatu dengan
           halamannya dan yang tersisa persis pembatasnya saja. */}
-      <Panel className={POLOS ? 'rounded-none border-0 bg-transparent' : 'bg-transparent'}>
+      {/* SUDUT SIKU, bukan membulat — permintaan pemilik. Sudut membulat
+          masuk akal saat kartunya berdiri sendiri di tengah halaman; begitu
+          tepinya cuma satu piksel dari pembatas sidebar dan bilah atas,
+          lengkungan itu menyisakan celah segitiga di keempat pojok, dan
+          celah yang tidak simetris dengan garis lurus di sebelahnya
+          terbaca sebagai salah pasang. Siku membuat keempat garis bertemu
+          sebagai satu kotak utuh. */}
+      <Panel className={POLOS ? 'rounded-none border-0 bg-transparent' : 'rounded-none bg-transparent'}>
         {/* `relative`: jangkar bagi panel News dan menu Indikator di HP.
             Keduanya dilepas dari tombolnya di layar kecil dan digantung
             ke bilah ini, supaya lebarnya mengikuti bilah dan tidak bisa
@@ -4028,7 +4035,17 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
             </button>
           )}
           {!(POLOS && posisiSembunyi) && (
-            <div className={cn('grid grid-cols-1 gap-4 lg:grid-cols-2', POLOS ? 'mt-0' : 'mt-4')}>
+            /* JARAKNYA DIKEMBALIKAN seperti sebelum halaman ini dirapatkan.
+                Yang diminta rapat cuma bidang GRAFIK — ia dibaca dengan mata
+                menyapu lebar, dan tiap piksel di sisinya berarti. Tabel
+                dibaca baris per baris; menempelkannya ke pembatas sidebar
+                justru membuat kolom pertamanya terhimpit dan lebih sulit
+                dibaca, bukan lebih lega.
+
+                px-4 sm:px-6 di atas p-px halaman = 17/25 px, praktis sama
+               dengan 16/24 px yang dulu. */
+            <div className={cn('grid grid-cols-1 gap-4 lg:grid-cols-2',
+              POLOS ? 'mt-0' : 'mt-4 px-4 pb-4 sm:px-6 sm:pb-6')}>
               <PanelPosisiTerbuka sumber="kripto" onSunting={bukaSunting} onTutup={tutupDariTabel} tanpaBingkai={POLOS} tanpaLatar />
               <PanelPosisiTerbuka sumber="forex" onSunting={bukaSunting} onTutup={tutupDariTabel} tanpaBingkai={POLOS} tanpaLatar />
             </div>
