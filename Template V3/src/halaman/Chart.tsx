@@ -2623,16 +2623,18 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
        memakan ±10% panel seperempat layar untuk ruang kosong, dan
        pembatas grid sudah memisahkan panel satu dari yang lain.
 
-       Halaman biasa: jaraknya dipangkas dari 16-24 px jadi 8 px atas
-       permintaan pemilik. Sesudah latar kartunya dihilangkan, ruang kosong
-       itu tidak lagi memisahkan apa pun -- yang memisahkan garis tepi
-       kartu dan garis pembatas sidebar, dan keduanya kini nyaris
-       bersentuhan. Yang didapat: chart selebar mungkin tanpa satu pun
-       elemen dihilangkan.
+       Halaman biasa: jaraknya dipangkas dari 16-24 px jadi SATU piksel
+       atas permintaan pemilik ("99 persen menempel"). Sesudah latar
+       kartunya dihilangkan, ruang kosong itu tidak lagi memisahkan apa pun
+       -- yang memisahkan garis tepi kartu dan garis pembatas sidebar. Yang
+       didapat: chart selebar mungkin tanpa satu pun elemen dihilangkan.
 
-       8 px, bukan 0: dua garis yang benar-benar menempel terbaca sebagai
-       satu garis tebal yang salah gambar, bukan sebagai dua pembatas. */
-    <div className={POLOS ? '' : 'p-2'}>
+       1 px, bukan 0. Nol membuat kedua garis 1 px itu berdempet jadi satu
+       pita 2 px yang terbaca sebagai garis tebal salah gambar, bukan
+       sebagai dua pembatas. Satu piksel sela sudah cukup bagi mata untuk
+       mengenali keduanya sebagai dua benda, dan pada layar biasa jaraknya
+       praktis tidak terlihat. */
+    <div className={POLOS ? '' : 'p-px'}>
       {/* ── Bilah kendali ── */}
       {/* Pembungkus ber-ref: Panel komponen fungsi tanpa forwardRef, jadi
           ref tidak bisa dipasang langsung padanya. Div ini yang dinaikkan
