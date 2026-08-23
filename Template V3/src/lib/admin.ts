@@ -624,6 +624,16 @@ export interface PermintaanLisensi {
    *  pemohon bisa membacanya lagi di halaman aksesnya — surel bisa masuk
    *  spam, halaman itu tidak. */
   pesan?: string;
+  /** Harga BERLAKU SAAT permintaan dibuat, dalam dolar. Disimpan server
+   *  sejak fitur promo ada. Ini sumber uang yang paling tepat untuk laporan
+   *  penjualan: harga paket bisa dinaikkan besok, dan pemasukan bulan lalu
+   *  tidak boleh ikut berubah karenanya. Kosong di permintaan lama. */
+  hargaSaat?: number;
+  /** Permintaan ini dibuat saat harga promo berlaku. */
+  promo?: boolean;
+  /** Kapan disetujui/ditolak. Untuk laporan bulanan inilah tanggal uangnya
+   *  masuk — bukan `waktu`, yang cuma kapan orang menekan tombol minta. */
+  diputusPada?: number;
   /** Akhir masa 30 hari, dihitung dari saat disetujui. Kosong selama
    *  permintaannya belum diputus. */
   berakhir?: number;
@@ -649,6 +659,26 @@ export function usePermintaanLisensi(): Hasil<PermintaanLisensi[]> {
          ini hilang — dan panelnya cuma tampil tanpa jenis dan tanpa masa
          berlaku, tanpa satu pun tanda kenapa. Sudah pernah terjadi. */
       jenis: x.jenis === 'bayar' ? 'bayar' : x.jenis === 'gratis' ? 'gratis' : undefined,
+      /* EMPAT MEDAN DI BAWAH INI DULU HILANG DI SINI.
+         Server mengirimkannya, tipe di atas menjanjikannya, tapi mapper ini
+         tidak menyalinnya — dan karena semuanya opsional, tsc diam saja.
+         Akibatnya dua fitur rusak tanpa satu pun galat:
+
+           · `paket` selalu undefined, jadi menu Ubah Paket menandai
+             "testing" sebagai paket berjalan untuk SIAPA PUN, termasuk
+             pembeli tahunan.
+           · `pesan` selalu kosong, jadi catatan yang ditulis pemilik saat
+             menyetujui/menolak tidak pernah muncul kembali di panelnya —
+             padahal tersimpan di server dan terkirim lewat surel.
+
+         Menyalin medan satu per satu memang aman terhadap data sampah, tapi
+         harganya begini: setiap medan baru yang lupa ditambahkan jadi
+         kehilangan yang senyap. */
+      paket: x.paket === 'testing' || x.paket === 'premium3' || x.paket === 'tahunan' ? x.paket : undefined,
+      pesan: x.pesan ? String(x.pesan) : undefined,
+      hargaSaat: Number.isFinite(Number(x.hargaSaat)) ? Number(x.hargaSaat) : undefined,
+      promo: x.promo === true,
+      diputusPada: Number(x.diputusPada) || undefined,
       berakhir: Number(x.berakhir) || undefined,
       kode: x.kode ? String(x.kode) : undefined,
       sidik: x.sidik ? String(x.sidik) : undefined,

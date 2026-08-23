@@ -7,8 +7,10 @@ import { Panel, PanelHead, KartuKpi, TipGrafik, TabelBungkus, Tabel, Th, Td, Tr 
 import { cn, tanggalPendek } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 import { useKurs } from '@/lib/kurs';
+import { useHargaPaket } from '@/lib/harga-akses';
 import {
   useKlien, usePenjualan, usePengeluaran, useLaporan, useLisensi,
+  type PermintaanLisensi,
   usePermintaanLisensi,
   catatPenjualan, hapusPenjualan, catatPengeluaran, hapusPengeluaran,
   tandaiLaporan, cabutLisensi,
@@ -89,13 +91,49 @@ export default function Pemilik() {
      panel V2 — biasanya uji coba, dan itu perlu terlihat sebagai apa adanya
      alih-alih tercampur dengan pembelian sungguhan. */
   const permintaan = usePermintaanLisensi();
+  /* Tabel harga paket, dari setelan Maintenance yang sama dengan halaman
+     harga. Dipakai sebagai CADANGAN saja — permintaan yang sudah menyimpan
+     `hargaSaat` memakai angkanya sendiri. */
+  const harga = useHargaPaket();
 
   const [pesan, setPesan] = useState('');
   const [form, setForm] = useState({ produk: '', pembeli: '', nilai: '', catatan: '' });
   const [formKeluar, setFormKeluar] = useState({ keperluan: '', kategori: '', nilai: '', catatan: '', mata: 'usd' });
   const [sibuk, setSibuk] = useState(false);
 
-  const totalPenjualan = penjualan.data.reduce((s, p) => s + p.nilai, 0);
+  /* ── PEMASUKAN LISENSI, dihitung sendiri dari Maintenance ────────────
+     Tiap permintaan berbayar yang DISETUJUI adalah satu penjualan. Tidak
+     perlu dicatat ulang dengan tangan, dan tidak boleh: dua daftar untuk
+     satu kejadian akan selalu berselisih, dan yang salah selalu yang tidak
+     sedang dilihat.
+
+     Harganya diambil dari `hargaSaat` — harga yang berlaku SAAT permintaan
+     dibuat. Ini penting: harga paket bisa dinaikkan besok, dan pemasukan
+     bulan lalu tidak boleh ikut berubah karenanya. Permintaan lama belum
+     punya medan itu, jadi ada cadangan dari tabel harga sekarang; paket
+     kosong diperlakukan sebagai testing, sama dengan cara panel lisensi
+     menampilkannya.
+
+     Tanggalnya `diputusPada`, bukan `waktu`: yang dicatat laporan ini
+     adalah kapan uangnya masuk, bukan kapan orang menekan tombol minta. */
+  const hargaLisensi = (x: PermintaanLisensi): number => {
+    if (Number.isFinite(x.hargaSaat) && (x.hargaSaat as number) > 0) return x.hargaSaat as number;
+    if (x.paket === 'tahunan') return harga.hargaTahunan;
+    if (x.paket === 'premium3') return harga.hargaPremium3;
+    return harga.hargaTesting;
+  };
+  const lisensiTerjual = useMemo(
+    () => permintaan.data.filter((x) => x.status === 'disetujui' && x.jenis === 'bayar'),
+    [permintaan.data]);
+  const totalLisensi = useMemo(
+    () => lisensiTerjual.reduce((s, x) => s + hargaLisensi(x), 0),
+    [lisensiTerjual, harga]);
+
+  const totalManual = penjualan.data.reduce((s, p) => s + p.nilai, 0);
+  /* Omzet = lisensi otomatis + catatan tangan. Yang kedua tetap ada untuk
+     pemasukan di luar lisensi — produk marketplace, jasa, apa pun yang
+     tidak lewat panel Akses. */
+  const totalPenjualan = totalLisensi + totalManual;
   const totalPengeluaran = pengeluaran.data.reduce((s, p) => s + p.nilai, 0);
   /* Laba BERSIH, bukan omzet. Halaman yang cuma menampilkan pemasukan
      membuat usaha terlihat lebih sehat daripada kenyataannya — dan itu
@@ -103,22 +141,36 @@ export default function Pemilik() {
   const labaBersih = totalPenjualan - totalPengeluaran;
 
 
-  /* Penjualan per bulan, dari catatan penjualan yang sungguhan. Panel ini
-     dulu menggambar `PORTO_BULANAN` — pemasukan & pengeluaran pribadi dalam
-     rupiah yang tidak punya sumber di mana pun. */
+  /* Penjualan per bulan — DUA deret, bukan satu jumlah gabungan.
+     Lisensi terisi sendiri dari Maintenance; manual dari kotak di bawah.
+     Sengaja dipisah: kalau keduanya dilebur jadi satu batang, penjualan
+     lisensi yang tanpa sengaja dicatat ulang dengan tangan akan terhitung
+     dua kali dan tidak ada satu pun tanda di layar. Dua warna berdampingan
+     membuat kembarannya langsung kelihatan. */
   const perBulan = useMemo(() => {
-    const peta = new Map<string, { bulan: string; nilai: number; jumlah: number }>();
-    penjualan.data.forEach((p) => {
-      const d = new Date(p.waktu);
+    type Bulan = { bulan: string; lisensi: number; manual: number; jumlah: number };
+    const peta = new Map<string, Bulan>();
+    const ambil = (t: number): Bulan => {
+      const d = new Date(t);
       const kunci = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      const b = peta.get(kunci) ?? {
-        bulan: d.toLocaleDateString('id-ID', { month: 'short', year: '2-digit' }), nilai: 0, jumlah: 0,
-      };
-      b.nilai += p.nilai; b.jumlah += 1;
-      peta.set(kunci, b);
+      let b = peta.get(kunci);
+      if (!b) {
+        b = { bulan: d.toLocaleDateString('id-ID', { month: 'short', year: '2-digit' }),
+              lisensi: 0, manual: 0, jumlah: 0 };
+        peta.set(kunci, b);
+      }
+      return b;
+    };
+    lisensiTerjual.forEach((x) => {
+      const b = ambil(x.diputusPada || x.waktu);
+      b.lisensi += hargaLisensi(x); b.jumlah += 1;
+    });
+    penjualan.data.forEach((p) => {
+      const b = ambil(p.waktu);
+      b.manual += p.nilai; b.jumlah += 1;
     });
     return [...peta.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([, v]) => v);
-  }, [penjualan.data]);
+  }, [penjualan.data, lisensiTerjual, harga]);
 
 
   async function tambahPenjualan() {
@@ -206,8 +258,11 @@ export default function Pemilik() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {/* Rinciannya disebut, bukan cuma jumlahnya. Angka gabungan tanpa
+            asal-usul membuat orang menebak — dan tebakan pertama yang wajar
+            adalah "ini cuma yang saya catat tangan". */}
         <KartuKpi label="Revenue" nilai={fmt(totalPenjualan)}
-                  catatan={`${penjualan.data.length} penjualan tercatat`} />
+                  catatan={`${lisensiTerjual.length} lisensi (${fmt(totalLisensi)}) + ${penjualan.data.length} manual (${fmt(totalManual)})`} />
         <KartuKpi label="Active clients" nilai={String(klien.data.length)}
                   catatan="akun yang pernah masuk" />
         <KartuKpi label="Pengeluaran" nilai={fmt(totalPengeluaran)}
@@ -224,12 +279,13 @@ export default function Pemilik() {
 
       {/* ── Penjualan per bulan ── */}
       <Panel className="mt-4">
-        <PanelHead judul="Penjualan per Bulan" sub="Dari catatan penjualan yang kamu masukkan." />
+        <PanelHead judul="Penjualan per Bulan"
+                   sub="Lisensi berbayar terisi sendiri dari Maintenance, dihitung memakai harga yang berlaku saat permintaannya dibuat. Batang manual untuk pemasukan di luar lisensi." />
         <div className={cn('h-[240px] px-2 pb-4', perBulan.length > 6 && 'overflow-x-auto gulir-senyap')}>
           {perBulan.length === 0 ? (
             <div className="px-3 pt-3">
               <Kabar memuat={penjualan.memuat} galat={penjualan.galat} kosong
-                     teksKosong="Belum ada penjualan tercatat. Tambahkan lewat kotak di bawah." />
+                     teksKosong="Belum ada pemasukan. Panel ini terisi sendiri begitu ada permintaan berbayar yang disetujui di Maintenance — atau tambahkan penjualan lain lewat kotak di bawah." />
             </div>
           ) : (
             <div className="h-full"
@@ -241,7 +297,13 @@ export default function Pemilik() {
                 <YAxis tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} width={44}
                        tickFormatter={(v) => `$${v}`} />
                 <Tooltip content={<TipGrafik />} cursor={{ fill: 'currentColor', fillOpacity: 0.06 }} />
-                <Bar dataKey="nilai" name="Penjualan" fill="#10b981" fillOpacity={0.8} radius={[3, 3, 0, 0]} maxBarSize={26} />
+                {/* Bertumpuk pada stackId yang sama: tinggi total = omzet
+                    bulan itu, sementara tiap potongnya tetap terbaca
+                    sendiri. Sudut membulat HANYA di potongan atas — kalau
+                    keduanya membulat, tumpukannya terlihat seperti dua
+                    batang terpisah yang kebetulan bersentuhan. */}
+                <Bar dataKey="lisensi" stackId="a" name="Lisensi" fill="#10b981" fillOpacity={0.85} maxBarSize={26} />
+                <Bar dataKey="manual" stackId="a" name="Manual" fill="#38bdf8" fillOpacity={0.75} radius={[3, 3, 0, 0]} maxBarSize={26} />
               </BarChart>
             </ResponsiveContainer>
             </div>
