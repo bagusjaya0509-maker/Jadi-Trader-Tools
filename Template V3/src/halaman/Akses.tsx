@@ -337,8 +337,24 @@ export default function Akses() {
             <div className="flex items-center gap-2 text-[14px] font-medium text-red-400">
               <XCircle className="size-4" /> Permintaan sebelumnya tidak disetujui
             </div>
-            <p className="mt-1.5 text-[12.5px] leading-relaxed text-zinc-400">
-              Tambahkan keterangan di kolom bawah, lalu kirim ulang.
+            {/* ALASANNYA DITAMPILKAN, bukan cuma kata "tidak disetujui".
+                Kata itu sendirian tidak memberi tahu apa yang harus
+                dilakukan berikutnya, dan orang yang tidak tahu apa yang
+                kurang akan mengirim ulang permintaan yang sama persis. */}
+            {terakhir.pesan ? (
+              <div className="mt-3 rounded-lg border-l-2 border-red-500/50 bg-zinc-950/50 px-3 py-2">
+                <div className="text-[10.5px] font-medium uppercase tracking-wider text-zinc-500">
+                  Catatan dari pemilik
+                </div>
+                <p className="mt-1 whitespace-pre-wrap text-[12.5px] leading-relaxed text-zinc-200">
+                  {terakhir.pesan}
+                </p>
+              </div>
+            ) : null}
+            <p className="mt-3 text-[12.5px] leading-relaxed text-zinc-400">
+              {terakhir.pesan
+                ? 'Penuhi dulu yang disebut di atas, lalu kirim ulang lewat kolom di bawah.'
+                : 'Tambahkan keterangan di kolom bawah, lalu kirim ulang.'}
             </p>
           </div>
         ) : null}

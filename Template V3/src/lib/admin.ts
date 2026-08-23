@@ -620,6 +620,10 @@ export interface PermintaanLisensi {
    *  Kosong berarti gratis, atau berbayar dari sebelum fitur ini ada —
    *  keduanya diperlakukan sebagai paket termurah saat ditampilkan. */
   paket?: '' | 'testing' | 'premium3' | 'tahunan';
+  /** Alasan yang ditulis pemilik saat memutuskan. Disimpan di server supaya
+   *  pemohon bisa membacanya lagi di halaman aksesnya — surel bisa masuk
+   *  spam, halaman itu tidak. */
+  pesan?: string;
   /** Akhir masa 30 hari, dihitung dari saat disetujui. Kosong selama
    *  permintaannya belum diputus. */
   berakhir?: number;
@@ -651,8 +655,19 @@ export function usePermintaanLisensi(): Hasil<PermintaanLisensi[]> {
     })), []);
 }
 
-export const putuskanLisensi = (id: string, tindakan: 'setujui' | 'tolak', kode?: string) =>
-  kirim('/api/lisensi/permintaan/putuskan', { id, tindakan, ...(kode ? { kode } : {}) });
+/** Putuskan permintaan akses, dengan pesan opsional untuk pemohonnya.
+ *
+ *  Pesannya disimpan di server DAN dikirim lewat surel. Dua jalur untuk satu
+ *  kabar bukan pemborosan: surel bisa masuk spam atau tidak pernah dibuka,
+ *  sementara halaman aksesnya selalu bisa dibuka lagi kapan saja. */
+export const putuskanLisensi = (
+  id: string, tindakan: 'setujui' | 'tolak', kode?: string, pesan?: string,
+) =>
+  kirim('/api/lisensi/permintaan/putuskan', {
+    id, tindakan,
+    ...(kode ? { kode } : {}),
+    ...(pesan && pesan.trim() ? { pesan: pesan.trim() } : {}),
+  });
 
 /** Paket yang bisa dipasang tangan dari panel Akses & Lisensi. */
 export type PaketManual = 'gratis' | 'testing' | 'premium3' | 'tahunan';

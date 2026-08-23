@@ -61,6 +61,10 @@ export interface Permintaan {
   waktu: number;
   berakhir?: number;
   kode?: string;
+  /** Alasan yang ditulis pemilik saat menyetujui atau menolak. Kosong kalau
+   *  ia memutuskan tanpa berkata apa-apa. */
+  pesan?: string;
+  diputusPada?: number;
 }
 
 async function kepalaLogin(): Promise<Record<string, string>> {

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, X, RefreshCw, Copy, KeyRound, ShieldAlert, Trash2, Globe, Package, ArrowUpCircle } from 'lucide-react';
+import { Check, X, RefreshCw, Copy, KeyRound, ShieldAlert, Trash2, Globe, Package, ArrowUpCircle, MessageCircle } from 'lucide-react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { DaftarLipat, NomorBaris } from '@/components/daftar-lipat';
 import { useKuota } from '@/lib/akses';
@@ -89,14 +89,31 @@ export function PanelLisensi() {
      ditindak, dan ia harus terlihat tanpa menggulir maupun membuka lipatan. */
   const urut = [...data].sort((a, b) => b.waktu - a.waktu);
 
+  /* Pesan untuk PEMOHON, per baris. Disimpan per id, bukan satu kotak untuk
+     seluruh daftar: pemilik bisa membuka dua kotak sekaligus lalu menekan
+     tombol di baris yang salah, dan alasan penolakan yang mendarat di orang
+     yang keliru adalah kesalahan yang sulit ditarik kembali. */
+  const [kotakPesan, setKotakPesan] = useState<Record<string, string>>({});
+  const [pesanTerbuka, setPesanTerbuka] = useState('');
+
   async function putuskan(id: string, tindakan: 'setujui' | 'tolak') {
-    if (tindakan === 'tolak' && !confirm('Tolak permintaan ini?')) return;
+    const catatan = (kotakPesan[id] || '').trim();
+    if (tindakan === 'tolak' && !confirm(
+      catatan
+        ? `Tolak permintaan ini dan kirim pesan berikut ke pemohon?
+
+"${catatan}"`
+        : 'Tolak permintaan ini TANPA pesan? Pemohon hanya akan melihat kata "tidak disetujui" tanpa tahu apa yang kurang.'
+    )) return;
     setSibuk(id); setPesan('');
     try {
-      const j: any = await putuskanLisensi(id, tindakan);
+      const j: any = await putuskanLisensi(id, tindakan, undefined, catatan);
+      const kabar = catatan ? ' Pesan dikirim ke surel & halaman aksesnya.' : '';
       setPesan(tindakan === 'setujui'
-        ? `Disetujui. Kode ${j.kode} sudah aktif — salin dan kirim ke pembeli.`
-        : 'Permintaan ditolak.');
+        ? `Disetujui. Kode ${j.kode} sudah aktif — salin dan kirim ke pembeli.${kabar}`
+        : `Permintaan ditolak.${kabar}`);
+      setKotakPesan((k) => { const b = { ...k }; delete b[id]; return b; });
+      setPesanTerbuka('');
       muatUlang();
     } catch (e) {
       setPesan('Gagal: ' + (e instanceof Error ? e.message : 'tidak diketahui'));
@@ -274,6 +291,20 @@ export function PanelLisensi() {
                         className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 py-1.5 text-[12px] text-zinc-400 transition-colors hover:border-red-500/30 hover:text-red-400 disabled:opacity-50">
                         <X className="size-3.5" /> Tolak
                       </button>
+                      {/* Kotak pesan dilipat, bukan selalu terbuka: sebagian
+                          besar persetujuan tidak perlu alasan apa pun, dan
+                          kolom kosong di tiap baris membuat daftar kerja ini
+                          dua kali lebih panjang tanpa menambah satu keputusan
+                          pun. */}
+                      <button onClick={() => setPesanTerbuka(pesanTerbuka === x.id ? '' : x.id)}
+                        title="Tulis pesan untuk pemohon — dikirim ke surel dan halaman aksesnya"
+                        aria-label="Tulis pesan untuk pemohon"
+                        className={cn('flex cursor-pointer items-center rounded-md border px-2 py-1.5 transition-colors',
+                          kotakPesan[x.id]
+                            ? 'border-emerald-600/50 text-emerald-400'
+                            : 'border-zinc-800 text-zinc-500 hover:border-zinc-700 hover:text-zinc-300')}>
+                        <MessageCircle className="size-3.5" />
+                      </button>
                     </>
                   ) : null}
 
@@ -365,6 +396,55 @@ export function PanelLisensi() {
                   </button>
                 </div>
               </div>
+
+              {/* Kotak pesan: DI BAWAH baris, melebar penuh. Alasan penolakan
+                  hampir selalu lebih dari beberapa kata, dan kolom sempit di
+                  antara tombol-tombol memaksa orang menulis pendek justru di
+                  tempat yang paling butuh penjelasan. */}
+              {pesanTerbuka === x.id && x.status === 'baru' && (
+                <div className="mt-3 border-t border-zinc-800/60 pt-3">
+                  <label htmlFor={`pesan-${x.id}`} className="block text-[11px] font-medium uppercase tracking-wider text-zinc-500">
+                    Pesan untuk {x.email || 'pemohon'}
+                  </label>
+                  <textarea
+                    id={`pesan-${x.id}`}
+                    value={kotakPesan[x.id] || ''}
+                    onChange={(e) => setKotakPesan((k) => ({ ...k, [x.id]: e.target.value.slice(0, 600) }))}
+                    rows={3}
+                    placeholder="Contoh: Pembayaran untuk paket ini belum kami terima. Kirim bukti transfernya lewat halaman Marketplace, lalu ajukan lagi."
+                    className="mt-1.5 w-full resize-y rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-[12.5px] leading-relaxed text-zinc-200 outline-none transition-colors placeholder:text-zinc-700 focus:border-zinc-600"
+                  />
+                  <div className="mt-1.5 flex items-center justify-between gap-3">
+                    <span className="text-[11px] text-zinc-600">
+                      Dikirim ke surel pemohon sekaligus tampil di halaman aksesnya.
+                    </span>
+                    <span className="angka shrink-0 text-[11px] text-zinc-700">
+                      {(kotakPesan[x.id] || '').length}/600
+                    </span>
+                  </div>
+                  {/* Tombolnya yang di atas — di sini cuma pengingat, supaya
+                      tidak ada dua pasang Setujui/Tolak di satu baris yang
+                      sama. Dua tombol dengan nama sama dan hasil sama adalah
+                      cara tercepat membuat orang ragu mana yang benar. */}
+                  <p className="mt-2 text-[11.5px] text-zinc-500">
+                    Sudah ditulis? Tekan <span className="text-zinc-300">Setujui</span> atau{' '}
+                    <span className="text-zinc-300">Tolak</span> di atas — pesan ini ikut terkirim.
+                  </p>
+                </div>
+              )}
+
+              {/* Pesan yang SUDAH terkirim, pada baris yang sudah diputus.
+                  Tanpa ini pemilik tidak punya cara mengingat apa yang sudah
+                  ia katakan, dan pemohon yang bertanya lagi akan dijawab
+                  dengan alasan yang berbeda dari yang pertama. */}
+              {x.status !== 'baru' && x.pesan ? (
+                <div className="mt-2.5 flex items-start gap-2 border-t border-zinc-800/60 pt-2.5">
+                  <MessageCircle className="mt-0.5 size-3.5 shrink-0 text-zinc-600" />
+                  <p className="min-w-0 whitespace-pre-wrap text-[12px] leading-relaxed text-zinc-400">
+                    {x.pesan}
+                  </p>
+                </div>
+              ) : null}
             </div>
           )}
         />
