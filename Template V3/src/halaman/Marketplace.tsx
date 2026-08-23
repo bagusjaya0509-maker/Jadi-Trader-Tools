@@ -478,7 +478,16 @@ export default function Marketplace() {
           "khusus pemilik" yang isinya cuma tanda hubung tidak memberi apa pun
           kepada pengunjung selain kebingungan. */}
 
-      <Panel>
+      {/* TANPA garis tepi, permintaan pemilik. Kartu produk di dalamnya
+          sudah punya bingkainya masing-masing, dan bingkai di sekeliling
+          bingkai membuat etalase terbaca sebagai satu kotak besar berisi
+          kotak-kotak kecil — bukan sebagai deretan barang.
+
+          `border-0` menimpa `border` bawaan Panel karena `cn` memakai
+          twMerge; menambah kelas tanpa itu cuma menghasilkan dua kelas
+          border yang bertengkar, dan yang menang tergantung urutan di
+          berkas CSS hasil bangun. */}
+      <Panel className="border-0">
         <PanelHead
           judul="Products"
           sub="Indikator TradingView dan Expert Advisor MetaTrader yang dipakai di terminal ini."
