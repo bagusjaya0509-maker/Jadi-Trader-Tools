@@ -259,7 +259,7 @@ function kePosisiPublik(p: any, i: number): Posisi {
  *
  *  Dokumen ini juga sengaja publik: pengunjung yang belum berlangganan tetap
  *  bisa melihat posisi pemilik — itu memang bagian dari etalasenya. */
-export function usePosisi(): HasilData<Posisi[]> & { pending: OrderBursa[]; stop: OrderBursa[] } {
+export function usePosisi(): HasilData<Posisi[]> & { pending: OrderBursa[]; stop: OrderBursa[]; bursaAktif: boolean } {
   const { pengguna, memuat: memuatAuth, pemilik } = useAuth();
   const [data, setData] = useState<Posisi[]>(POSISI_TERBUKA);
   const [memuat, setMemuat] = useState(true);
@@ -376,6 +376,9 @@ export function usePosisi(): HasilData<Posisi[]> & { pending: OrderBursa[]; stop
   if (!memuatAuth && !pengguna) {
     return {
       data: POSISI_KRIPTO_CONTOH, pending: PENDING_KRIPTO_CONTOH, stop: STOP_KRIPTO_CONTOH,
+      /* Data contoh: tidak ada bursa di belakangnya, dan memang tidak
+         mengaku begitu — subjudulnya sudah diurus label "contoh". */
+      bursaAktif: false,
       memuat: false, contoh: true, galat: null,
     };
   }
@@ -414,6 +417,15 @@ export function usePosisi(): HasilData<Posisi[]> & { pending: OrderBursa[]; stop
   return {
     data: pemilik || aktif ? gabungan : [],
     pending, stop,
+    /* Apakah daftar ini benar-benar dibacakan BURSA, atau cuma dokumen
+       publik screener. Dua hal yang sangat berbeda, dan sebelum ini panelnya
+       menyebut keduanya "Order yang sedang berjalan di Binance".
+
+       Tanpa App Token, yang tampil adalah dokumen yang ditulis screener V2
+       dan hanya diperbarui selama halaman itu terbuka — posisi yang sudah
+       tertutup bisa tertinggal berhari-hari di sana. Menyebutnya berjalan di
+       bursa adalah klaim yang tidak bisa ditopang apa pun. */
+    bursaAktif: aktif,
     /* `contoh` berarti "ini bukan datamu, ini contoh". Dokumen publik itu
        data sungguhan, jadi labelnya hanya muncul kalau dokumennya memang
        belum ada. */

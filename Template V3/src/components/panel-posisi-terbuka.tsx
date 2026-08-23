@@ -67,7 +67,7 @@ export function PanelPosisiTerbuka({ sumber, onSunting, onTutup, tanpaBingkai }:
    *  sendiri, bukan menumpang klik baris yang sama dengan "lihat di chart". */
   onTutup?: (o: OrderSunting) => void;
 }) {
-  const { data: posisiKripto, pending: pendingKripto, stop: stopKripto, contoh: kriptoContoh } = usePosisi();
+  const { data: posisiKripto, pending: pendingKripto, stop: stopKripto, contoh: kriptoContoh, bursaAktif } = usePosisi();
   const mt5 = useAkunMt5();
 
   /* ── Order yang baru saja dikirim, belum terlihat di bursa ────────────
@@ -305,7 +305,16 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
            Terbuka" memaksa membaca sub-judulnya dulu untuk tahu yang
            mana. */
         judul={sumber === 'kripto' ? 'Posisi Terbuka — Kripto' : 'Order Terbuka — Trade-Fi'}
-        sub={sumber === 'kripto' ? 'Order yang sedang berjalan di Binance.' : 'Dari MetaTrader 5, lewat EA JadiTraderSync.'}
+        /* Subjudulnya menyebut SUMBERNYA apa adanya. "Berjalan di Binance"
+           hanya benar kalau daftarnya memang dibacakan bursa; tanpa App
+           Token yang tampil dokumen screener, dan menyebutnya sama adalah
+           satu-satunya kalimat di panel ini yang bisa keliru tanpa ada
+           angka yang salah. */
+        sub={sumber !== 'kripto'
+          ? 'Dari MetaTrader 5, lewat EA JadiTraderSync.'
+          : bursaAktif
+            ? 'Order yang sedang berjalan di Binance.'
+            : 'Dari catatan screener — App Token belum diisi, jadi belum dicocokkan ke Binance.'}
         kanan={
           total === null
             ? <span className="text-[11.5px] text-zinc-500">{baris.length} posisi</span>
