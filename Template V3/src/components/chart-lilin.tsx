@@ -631,13 +631,21 @@ export function ChartLilin({
              bergerak berlawanan dengan geseran terbaca sebagai rusak, bukan
              sebagai pintar.
 
-             Yang tersisa cuma penjaga tepi: kartunya boleh menyusul ke kiri
-             sampai mentok tepi chart, lalu berhenti di situ dan dilewati
-             lilin. Tanpa penjaga ini ia hanyut keluar layar dan tombol
-             "Muat lebih lama" jadi tidak bisa ditekan sama sekali — kartu
-             yang tidak terjangkau sama saja dengan kartu yang tidak ada. */
+             TANPA penjaga tepi, dan itu sengaja. Sempat ada `Math.max(8, …)`
+             supaya kartunya tidak pernah hilang; akibatnya ia parkir di tepi
+             kiri lalu DITIMPA lilin yang terus berjalan — persis kelakuan
+             yang mau dihilangkan, cuma pindah tempat. Sekarang ia benar-benar
+             ikut, sampai keluar layar kalau memang begitu.
+
+             Itu tidak membuat tombolnya tak terjangkau, karena cara orang
+             sampai ke sana memang berlawanan: untuk MENARIK riwayat lebih
+             tua, chartnya digeser sampai muncul ruang kosong sebelum lilin
+             pertama — dan di ruang kosong itulah kartunya berada, makin
+             lebar ruangnya makin jelas ia terlihat. Kartunya menghilang
+             justru pada keadaan ia tidak dibutuhkan: saat layar penuh lilin
+             dan tidak ada ruang kosong sama sekali. */
           const lebarKartu = el.offsetWidth || 176;
-          const kiri = Math.max(8, x0 - lebarKartu - 12);
+          const kiri = x0 - lebarKartu - 12;
           el.style.transform = `translate(${Math.round(kiri)}px, -50%)`;
         }
       } catch { /* chartnya sudah dibuang */ }
