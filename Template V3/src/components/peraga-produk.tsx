@@ -327,24 +327,43 @@ function PeragaSupertrend() {
 
   return (
     <Bingkai judul="Pita mengunci di satu sisi selama tren bertahan, lalu melompat ke seberang saat harga menembusnya">
-      {titik.map((t, i) => {
-        const sebelum = titik[i - 1] ?? t;
-        return lilin(t.x, sebelum.y, t.y, Math.min(sebelum.y, t.y) - 4, Math.max(sebelum.y, t.y) + 4, i);
-      })}
+      <Tirai id="st-tirai" />
 
-      {ruas.map((r, i) => (
-        <path key={i} d={r.d} fill="none" strokeWidth="1.8" strokeLinejoin="round"
-              stroke={r.naik ? '#10b981' : '#ef4444'} />
-      ))}
+      {/* SEMUA yang bergerak masuk ke dalam tirai — lilin, pita, dan penanda
+          titik balik. Kalau pitanya ditaruh di luar, ia sudah tergambar penuh
+          sejak awal dan lompatannya terlewat: yang paling ingin dilihat orang
+          justru jadi satu-satunya bagian yang tidak pernah terjadi di depan
+          matanya. Keterangan tetapnya di luar, supaya terbaca sejak detik
+          pertama. */}
+      <g clipPath="url(#st-tirai)">
+        {titik.map((t, i) => {
+          const sebelum = titik[i - 1] ?? t;
+          return lilin(t.x, sebelum.y, t.y, Math.min(sebelum.y, t.y) - 4, Math.max(sebelum.y, t.y) + 4, i);
+        })}
 
-      {/* Titik balik ditandai. Tanpa penanda, lompatan pitanya terbaca
-          sebagai garis putus — cacat gambar, bukan kejadian. */}
-      {balikDi.map((t, i) => (
-        <g key={`b${i}`}>
-          <line x1={t.x} y1="18" x2={t.x} y2="132" stroke="#52525b" strokeWidth="1" strokeDasharray="3 4" />
-          <circle cx={t.x} cy={t.garis} r="3.2" fill={t.naik ? '#10b981' : '#ef4444'} />
-        </g>
-      ))}
+        {ruas.map((r, i) => (
+          <path key={i} d={r.d} fill="none" strokeWidth="1.8" strokeLinejoin="round"
+                stroke={r.naik ? '#10b981' : '#ef4444'} />
+        ))}
+
+        {/* Titik balik ditandai. Tanpa penanda, lompatan pitanya terbaca
+            sebagai garis putus — cacat gambar, bukan kejadian. */}
+        {balikDi.map((t, i) => (
+          <g key={`b${i}`}>
+            <line x1={t.x} y1="18" x2={t.x} y2="132" stroke="#52525b" strokeWidth="1" strokeDasharray="3 4" />
+            {/* TANPA transformOrigin inline. Kelas .peraga-denyut sudah
+                memakai transform-box: fill-box, jadi origin-nya relatif ke
+                kotak lingkaran itu sendiri; menyetel origin dalam koordinat
+                viewBox di sini justru melemparkan denyutnya ke pojok. */}
+            <circle className="peraga-denyut" cx={t.x} cy={t.garis} r="3.2"
+                    fill={t.naik ? '#10b981' : '#ef4444'} />
+          </g>
+        ))}
+      </g>
+
+      {/* Garis pemutar menyapu bersama tirainya — tanpa itu lilin seperti
+          tumbuh sendiri, bukan seperti sedang dibaca maju. */}
+      <Pemutar />
 
       <text x="24" y="16" fill="#10b981" fontSize="8.5" fontFamily="IBM Plex Mono">pita di BAWAH = tren naik</text>
       <text x="396" y="16" fill="#ef4444" fontSize="8.5" fontFamily="IBM Plex Mono" textAnchor="end">pita di ATAS = tren turun</text>
