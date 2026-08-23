@@ -3719,30 +3719,44 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                 keempat — tiga yang pertama menggeser dengan angka yang
                 kelihatan masuk akal di kode lalu meleset di layar.
 
-                Dua acuan yang diminta pemilik, keduanya diukur di peramban:
-
-                  · Tegak — baris label sumbu waktu membentang y 796-824,
-                    berpusat di 810. Tanpa geseran, ikonnya berpusat di 826.
-                    Selisihnya 16 px, jadi -translate-y-4.
+                Kelompok ini lebarnya 50 px: ikon 22 + celah 6 + ikon 22.
+                Hamparan induknya membentang x 266-1494, y 807-845.
 
                   · Datar — celah antara tulisan "Backtest" dan lencana
                     "beta" di baris bawah membentang x 1437-1443, berpusat
-                    di 1440. Kelompok ini lebarnya 50 px (22 + celah 6 + 22)
-                    dan tepi kanan alaminya di 1478, jadi celah ANTAR-IKON
-                    jatuh di 1453. Selisihnya 13 px, jadi -translate-x-[13px].
+                    di 1440. Supaya celah ANTAR-IKON jatuh tepat di sana,
+                    tepi kanan kelompok harus di 1465 -> right 29 px.
+
+                  · Tegak — baris label sumbu waktu membentang y 796-824,
+                    berpusat di 810. Tepi bawah kelompok jadi 821
+                    -> bottom 24 px (bottom-6).
 
                 Hasilnya: celah antar-ikon tepat segaris dengan celah
-                "Backtest beta" di bawahnya, dan keduanya duduk di sudut
-                1410-1480 x 796-824 -- petak kosong tempat sumbu waktu
+                "Backtest beta" di bawahnya, dan keduanya duduk di petak
+                1410-1480 x 796-824 -- sudut kosong tempat sumbu waktu
                 bertemu sumbu harga, satu-satunya bagian kaki chart yang
                 tidak pernah berisi angka.
 
-                TRANSFORM, bukan margin. Pelajaran mahal dari percobaan
-                sebelumnya: margin pada satu anak menambah tinggi SELURUH
-                baris flex, dan baris yang berjangkar ke dasar tumbuh ke
-                atas -- membawa serta tetangga yang tidak diminta pindah.
-                Transform menggeser gambarnya saja. */}
-            <div className="pointer-events-auto ml-auto flex shrink-0 -translate-x-[13px] -translate-y-4 items-center gap-1.5">
+                ABSOLUTE, bukan transform, dan sama sekali bukan margin.
+                Ketiganya sempat dicoba:
+
+                  · Margin menambah tinggi SELURUH baris flex, dan baris
+                    yang berjangkar ke dasar tumbuh ke atas -- membawa
+                    serta tetangga yang tidak diminta pindah. Itu yang
+                    dulu menyeret gerigi ikut naik.
+
+                  · Transform memang cuma menggeser gambarnya, TAPI ia
+                    membuat kotak penampung baru untuk keturunan
+                    `position: fixed`. Lapisan penutup panel gerigi di
+                    dalam sini `fixed inset-0` -- di bawah leluhur
+                    ber-transform ia menciut jadi 50x22 px, dan klik di
+                    luar panel berhenti menutupnya.
+
+                Absolute tidak punya dua cacat itu: tidak menyentuh tinggi
+                baris, tidak membuat kotak penampung untuk fixed. `bottom`
+                diukur dari tepi bawah hamparan yang berjangkar `bottom-0`,
+                jadi angkanya tidak ikut berubah saat isi baris kosong. */}
+            <div className="pointer-events-auto absolute bottom-6 right-[29px] flex items-center gap-1.5">
               {!POLOS && (
                 <button onClick={() => nyalakanMulti(simbol, tf)}
                   title="Multi-chart — bagi layar jadi beberapa panel chart"
