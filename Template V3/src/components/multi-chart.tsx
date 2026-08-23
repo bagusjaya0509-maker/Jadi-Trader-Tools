@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { LayoutGrid, Plus, X, GripVertical, ExternalLink, Undo2 } from 'lucide-react';
+import { LayoutGrid, Plus, X, GripVertical, ExternalLink, Undo2, Maximize2, Minimize2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   useMulti, matikanMulti, tambahPanel, hapusPanel, MAKS_PANEL, type PanelMulti,
@@ -47,6 +47,70 @@ export function MultiChart() {
   const [barisPct, setBarisPct] = useState(50);
   const wadahRef = useRef<HTMLDivElement | null>(null);
   const geser = useRef<'' | 'kolom' | 'baris'>('');
+
+  /* ── Layar penuh SELURUH grid ─────────────────────────────────────────
+     Polanya disamakan dengan layar penuh chart tunggal, termasuk kedua
+     pelajaran yang sudah dibayar di sana:
+
+     1. Keadaannya diikuti dari EVENT `fullscreenchange`, bukan dari tombol.
+        Orang keluar dengan Esc jauh lebih sering daripada menekan tombolnya
+        lagi, dan state yang cuma di-toggle akan tertinggal menyala.
+     2. Ada mode SEMU untuk peramban tanpa Fullscreen API (iOS Safari) atau
+        yang menolak permintaannya. Di sana requestFullscreen tidak melempar
+        apa pun — ia cuma tidak terjadi, dan tombolnya diam tanpa jejak. */
+  const bingkaiRef = useRef<HTMLDivElement | null>(null);
+  const [penuhAsli, setPenuhAsli] = useState(false);
+  const [penuhSemu, setPenuhSemu] = useState(false);
+  const penuh = penuhAsli || penuhSemu;
+
+  useEffect(() => {
+    const ubah = () => setPenuhAsli(document.fullscreenElement === bingkaiRef.current);
+    document.addEventListener('fullscreenchange', ubah);
+    return () => document.removeEventListener('fullscreenchange', ubah);
+  }, []);
+
+  /* Esc harus bekerja di mode semu juga — mode yang cuma bisa ditutup lewat
+     satu tombol kecil terasa seperti jebakan. Gulir badan dikunci selama
+     menyala supaya halaman di belakang tidak ikut bergeser. */
+  useEffect(() => {
+    if (!penuhSemu) return;
+    const tekan = (e: KeyboardEvent) => { if (e.key === 'Escape') setPenuhSemu(false); };
+    document.addEventListener('keydown', tekan);
+    const asal = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', tekan);
+      document.body.style.overflow = asal;
+    };
+  }, [penuhSemu]);
+
+  const gantiPenuh = () => {
+    const el = bingkaiRef.current;
+    if (!el) return;
+    if (penuhSemu) { setPenuhSemu(false); return; }
+    if (document.fullscreenElement) { void document.exitFullscreen(); return; }
+    /* Dicek DULU, bukan dicoba lalu ditangkap: di iOS Safari
+       requestFullscreen tidak ada sama sekali, jadi `?.()` menghasilkan
+       undefined tanpa melempar apa pun — tidak ada yang bisa ditangkap. */
+    if (document.fullscreenEnabled && typeof el.requestFullscreen === 'function') {
+    /* requestFullscreen bisa gagal DUA CARA, dan keduanya harus jatuh ke
+       mode semu:
+
+       1. Promise-nya ditolak (izin, kebijakan) -> .catch()
+       2. Ia MELEMPAR SERENTAK. Terukur di peramban tersemat:
+          "TypeError: Permissions check failed" keluar sebelum promise-nya
+          sempat ada, jadi .catch() tidak pernah tersentuh dan galatnya
+          melompat keluar dari penangan klik. Yang terlihat orang: tombol
+          ditekan, tidak ada yang bergerak, tidak ada yang bisa dilaporkan.
+
+       try/catch DI LUAR menangkap keduanya. */
+      try {
+        void el.requestFullscreen().catch(() => setPenuhSemu(true));
+      } catch { setPenuhSemu(true); }
+      return;
+    }
+    setPenuhSemu(true);
+  };
 
   useEffect(() => {
     setUrut((u) => {
@@ -135,8 +199,13 @@ export function MultiChart() {
   const selesaiGeser = () => { geser.current = ''; };
 
   return (
-    <div className={cn(
-      'absolute inset-0 z-30 flex flex-col bg-zinc-950',
+    /* Kelas posisinya BERGANTIAN, bukan ditumpuk: `absolute` dan `fixed`
+       sama-sama utility position dengan bobot sama, jadi yang menang
+       ditentukan urutan di berkas CSS hasil build — bukan urutan tulis di
+       sini. Menumpuk keduanya berarti menyerahkan tata letak pada undian. */
+    <div ref={bingkaiRef} className={cn(
+      'flex flex-col bg-zinc-950',
+      penuhSemu ? 'fixed inset-0 z-[60]' : 'absolute inset-0 z-30',
       !tampil && 'hidden'
     )}>
       <div className="flex h-10 shrink-0 items-center gap-3 border-b border-zinc-800/80 px-3">
@@ -152,10 +221,23 @@ export function MultiChart() {
         <span className="hidden min-w-0 truncate text-[11px] text-zinc-600 lg:block">
           Seret kepala panel untuk menukar posisi · ikon ↗ melepas panel jadi jendela sendiri untuk monitor lain
         </span>
-        <button onClick={matikanMulti}
+        <button onClick={gantiPenuh}
+          title={penuh ? 'Keluar dari layar penuh (Esc)' : 'Layar penuh — semua panel chart'}
+          aria-label={penuh ? 'Keluar dari layar penuh' : 'Layar penuh multi-chart'}
           className="ml-auto flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2 py-1 text-[11.5px] text-zinc-400 transition-colors hover:border-zinc-700 hover:text-zinc-200">
-          <X className="size-3" /> Tutup multi-chart
+          {penuh ? <Minimize2 className="size-3" /> : <Maximize2 className="size-3" />}
+          <span className="hidden sm:inline">{penuh ? 'Keluar layar penuh' : 'Layar penuh'}</span>
         </button>
+        {/* Tutup TIDAK ditawarkan selagi layar penuh. Menutup mode saat itu
+            juga melepas bingkainya dari DOM, dan peramban keluar dari layar
+            penuh sebagai efek samping — dua hal terjadi dari satu klik,
+            yang satunya tidak diminta. Keluar dulu, baru tutup. */}
+        {!penuh && (
+          <button onClick={matikanMulti}
+            className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2 py-1 text-[11.5px] text-zinc-400 transition-colors hover:border-zinc-700 hover:text-zinc-200">
+            <X className="size-3" /> Tutup multi-chart
+          </button>
+        )}
       </div>
 
       <div ref={wadahRef} className="relative min-h-0 flex-1"
@@ -204,8 +286,14 @@ export function MultiChart() {
                 </button>
               </div>
             ) : (
+              /* `fullscreen` WAJIB ada di allow. Tanpa itu tombol layar
+                 penuh MILIK CHART di dalam panel gagal dengan
+                 "Permissions check failed" — iframe tidak mewarisi izin
+                 fullscreen dari induknya, ia harus diberikan. Terlewat
+                 saat panel pertama kali dibuat, dan tidak berbunyi seperti
+                 galat: tombolnya cuma diam. */
               <iframe src={ALAMAT(p, i === 0)} title={`Chart ${p.simbol} ${p.tf}`}
-                      allow="clipboard-read; clipboard-write"
+                      allow="clipboard-read; clipboard-write; fullscreen"
                       className="min-h-0 w-full flex-1 border-0" />
             )}
 

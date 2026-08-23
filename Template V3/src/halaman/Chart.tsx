@@ -339,8 +339,15 @@ export default function ChartBacktest() {
   const [bidikReplay, setBidikReplay] = useState(false);
   /* Kepala panel (bilah Simbol/TF/harga/kendali) bisa disembunyikan — HANYA
      di mode panel multi-chart. Di panel seperempat layar, bilah setinggi
-     ±90px itu porsi yang serius; chart tunggal tidak butuh sakelar ini. */
-  const [kepalaSembunyi, setKepalaSembunyi] = useState(false);
+     ±90px itu porsi yang serius; chart tunggal tidak butuh sakelar ini.
+
+     BAWAANNYA TERSEMBUNYI di mode panel (permintaan pemilik). Alasannya
+     bukan sekadar hemat ruang: simbol dan timeframe tiap panel sudah
+     dipilih SEBELUM grid dibuka, jadi bilah pemilih itu menempati porsi
+     terbesar panel untuk keputusan yang sudah selesai diambil. Yang masih
+     dibutuhkan — simbol dan TF mana ini — tetap terbaca di strip ringkas
+     penggantinya, dan satu klik mengembalikannya kalau memang mau diubah. */
+  const [kepalaSembunyi, setKepalaSembunyi] = useState(POLOS);
   const gantiKepala = (v: boolean) => {
     setKepalaSembunyi(v);
     /* Tinggi chart dihitung dari offsetHeight bilah ini; sembunyi berarti
@@ -2354,7 +2361,20 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
        undefined tanpa melempar apa pun — tidak ada yang bisa ditangkap,
        dan tombolnya diam. */
     if (document.fullscreenEnabled && typeof el.requestFullscreen === 'function') {
-      void el.requestFullscreen().catch(() => setPenuhSemu(true));
+    /* requestFullscreen bisa gagal DUA CARA, dan keduanya harus jatuh ke
+       mode semu:
+
+       1. Promise-nya ditolak (izin, kebijakan) -> .catch()
+       2. Ia MELEMPAR SERENTAK. Terukur di peramban tersemat:
+          "TypeError: Permissions check failed" keluar sebelum promise-nya
+          sempat ada, jadi .catch() tidak pernah tersentuh dan galatnya
+          melompat keluar dari penangan klik. Yang terlihat orang: tombol
+          ditekan, tidak ada yang bergerak, tidak ada yang bisa dilaporkan.
+
+       try/catch DI LUAR menangkap keduanya. */
+      try {
+        void el.requestFullscreen().catch(() => setPenuhSemu(true));
+      } catch { setPenuhSemu(true); }
       return;
     }
     setPenuhSemu(true);
