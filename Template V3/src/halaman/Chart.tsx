@@ -3892,7 +3892,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
           <div className="border-t border-zinc-800/80">
       {/* ── Backtest (beta) — tampil hanya kalau dibuka dari ikon di
              pojok bawah chart ── */}
-          <div className="mt-4 rounded-lg border border-amber-500/25 bg-amber-500/[0.04] px-4 py-2.5 text-[12px] leading-relaxed text-amber-200/80">
+          <div className="mt-px border border-amber-500/25 bg-amber-500/[0.04] px-4 py-2.5 text-[12px] leading-relaxed text-amber-200/80">
             <span className="font-medium">Backtest masih beta.</span>
             <span className="text-amber-200/60">
               {' '}Angkanya dihitung dari data lilin yang sedang tampil dan belum memperhitungkan
@@ -3901,7 +3901,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
             </span>
           </div>
       {/* ── Setelan uji ── */}
-          <Panel className="mt-4 bg-transparent">
+          <Panel className="mt-px rounded-none bg-transparent">
             <PanelHead
               judul="Backtest"
               sub="Dihitung dengan indikator yang sama persis dengan Screener Entry."
@@ -3948,7 +3948,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
           {/* ── Hasil ── */}
           {hasil && (
             hasil.catatan ? (
-              <Panel className="mt-4 bg-transparent px-5 py-6 text-center text-[12.5px] text-zinc-500">{hasil.catatan}</Panel>
+              <Panel className="mt-px rounded-none bg-transparent px-5 py-6 text-center text-[12.5px] text-zinc-500">{hasil.catatan}</Panel>
             ) : (
               <>
                 <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
@@ -3966,7 +3966,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                             catatan="penurunan terdalam dari puncak" />
                 </div>
 
-                <Panel className="mt-4 bg-transparent">
+                <Panel className="mt-px rounded-none bg-transparent">
                   <PanelHead judul="Daftar Trade" sub={`${hasil.jumlah} transaksi — penandanya ikut tergambar di chart.`} />
                   <div className="px-5 pb-5">
                     <TabelBungkus className="max-h-[380px] overflow-y-auto">
