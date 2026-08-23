@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import {
   Play, Loader2, RefreshCw, Radio, TriangleAlert, History,
-  Layers, ChevronDown, Settings2, Code2, X, Ruler, Rows3, Square, Eraser, Minus, TrendingUp,
+  Layers, ChevronDown, ChevronUp, Settings2, Code2, X, Ruler, Rows3, Square, Eraser, Minus, TrendingUp,
   FlaskConical, GripHorizontal, Maximize2, Minimize2, SquareArrowUp, SquareArrowDown,
   Settings, RotateCcw, LayoutGrid } from 'lucide-react';
 import { PanelNews } from '@/components/panel-news';
@@ -10,7 +10,7 @@ import { simpanDraf } from '@/lib/draf-sinyal';
 import { Panel, PanelHead, KartuKpi, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn, uang, persen, harga, tanggalPendek } from '@/lib/utils';
 import { ChartLilin, TAMPILAN_BAWAAN, type Garis, type GarisHarga, type GarisSeret, type PosisiChartMt5, type TampilanChart } from '@/components/chart-lilin';
-import { POLOS, kirimBus, nyalakanMulti, replayDipegangLain, pegangReplay } from '@/lib/multi-chart';
+import { POLOS, UTAMA, kirimBus, nyalakanMulti, replayDipegangLain, pegangReplay } from '@/lib/multi-chart';
 import { PanelReplay, type AksiOrder, type JenisEntry } from '@/components/panel-replay';
 import { PojokOrder } from '@/components/pojok-order';
 import { kirimOrderNyata, ubahSlTpNyata, batalPendingNyata, tutupPosisiNyata, tickSimbol, keTick, type MetodeTp } from '@/lib/order-nyata';
@@ -337,6 +337,17 @@ export default function ChartBacktest() {
      dalam mode berbahaya. Sekali pakai membalik bebannya: modenya jelas
      menyala, dipakai sekali, lalu hilang. */
   const [bidikReplay, setBidikReplay] = useState(false);
+  /* Kepala panel (bilah Simbol/TF/harga/kendali) bisa disembunyikan — HANYA
+     di mode panel multi-chart. Di panel seperempat layar, bilah setinggi
+     ±90px itu porsi yang serius; chart tunggal tidak butuh sakelar ini. */
+  const [kepalaSembunyi, setKepalaSembunyi] = useState(false);
+  const gantiKepala = (v: boolean) => {
+    setKepalaSembunyi(v);
+    /* Tinggi chart dihitung dari offsetHeight bilah ini; sembunyi berarti
+       0. Pengukurnya digantung ke event resize — picu yang itu juga,
+       daripada menambah jalur hitung kedua. */
+    setTimeout(() => window.dispatchEvent(new Event('resize')), 0);
+  };
   /* Mode bidik dibatalkan tiap ganti simbol/timeframe — bidikan untuk
      chart lain tidak berarti apa-apa di sini. */
   useEffect(() => { setBidikReplay(false); }, [simbol, tf]);
@@ -2481,7 +2492,22 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
             Keduanya dilepas dari tombolnya di layar kecil dan digantung
             ke bilah ini, supaya lebarnya mengikuti bilah dan tidak bisa
             keluar layar berapa pun posisi tombol pemicunya. */}
-        <div ref={bilahChart} className="relative flex flex-wrap items-end gap-3 p-4">
+        {POLOS && kepalaSembunyi && (
+          <div className="flex items-center justify-between gap-2 px-3 py-1">
+            <span className="angka truncate text-[11px] text-zinc-500">{simbol} · {tf}</span>
+            <button onClick={() => gantiKepala(false)}
+              title="Tampilkan kepala panel"
+              aria-label="Tampilkan kepala panel"
+              className="flex shrink-0 cursor-pointer items-center rounded p-0.5 text-zinc-500 transition-colors hover:text-zinc-200">
+              <ChevronDown className="size-3.5" />
+            </button>
+          </div>
+        )}
+        {/* `hidden`, bukan dilepas dari pohon: ref bilahChart dipakai
+            pengukur tinggi chart, dan menu News/Indikator digantung ke div
+            ini. Elemen display:none ber-offsetHeight 0 — persis angka yang
+            diinginkan pengukurnya. */}
+        <div ref={bilahChart} className={cn('relative flex flex-wrap items-end gap-3 p-4', POLOS && kepalaSembunyi && 'hidden')}>
           <div className="static min-w-[168px] sm:relative">
             <label className="mb-1 block text-[11px] text-zinc-500">Simbol</label>
             {/* Diketik dulu, DIKOMIT belakangan.
@@ -2715,6 +2741,15 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
               className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100 sm:px-2.5">
               {layarPenuh ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
             </button>
+
+            {POLOS && (
+              <button onClick={() => gantiKepala(true)}
+                title="Sembunyikan kepala panel — beri ruang untuk chart"
+                aria-label="Sembunyikan kepala panel"
+                className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100 sm:px-2.5">
+                <ChevronUp className="size-3.5" />
+              </button>
+            )}
           </div>
         </div>
 
@@ -3444,7 +3479,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
             <div className="h-[3px] w-16 rounded-full bg-zinc-800 transition-colors group-hover:bg-zinc-500" />
           </div>
         </div>
-        <div className="flex items-center justify-between gap-3 border-t border-zinc-800/80 px-4 py-2 text-[11.5px] text-zinc-600">
+        <div className="relative flex items-center gap-3 border-t border-zinc-800/80 px-4 py-2 text-[11.5px] text-zinc-600">
           {/* Gerigi duduk di pojok paling kiri kaki chart, TANPA teks. Ia
               setelan yang dibuka sesekali lalu ditutup; label tetap di sana
               menuntut perhatian setiap kali mata menyapu kaki chart, padahal
@@ -3586,17 +3621,6 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
               pengguna. Jumlah penanda trade dipertahankan -- ia hanya muncul
               sehabis backtest, dan orang yang baru menjalankan backtest
               sedang mencarinya. */}
-          {/* Multi-chart, persis di kanan gerigi. DISEMBUNYIKAN di mode
-              polos: panel yang bisa membelah dirinya jadi empat panel lagi
-              adalah cermin yang saling memantul. */}
-          {!POLOS && (
-            <button onClick={() => nyalakanMulti(simbol, tf)}
-              title="Multi-chart — bagi layar jadi beberapa panel chart"
-              aria-label="Multi-chart"
-              className="flex shrink-0 cursor-pointer items-center rounded p-1 text-zinc-500 transition-colors hover:text-zinc-300">
-              <LayoutGrid className="size-3.5" strokeWidth={2} />
-            </button>
-          )}
           <span className="flex min-w-0 items-center gap-2 truncate">
             {hasil?.trade.length ? (
               <span className="truncate">{hasil.trade.length} penanda trade</span>
@@ -3611,12 +3635,25 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
           <button
             onClick={() => setBacktestBuka((v) => !v)}
             title={backtestBuka ? 'Tutup panel Backtest' : 'Buka panel Backtest (beta)'}
-            className={cn('flex shrink-0 cursor-pointer items-center gap-1.5 rounded px-2 py-1 text-[11px] transition-colors',
+            className={cn('absolute left-1/2 flex shrink-0 -translate-x-1/2 cursor-pointer items-center gap-1.5 rounded px-2 py-1 text-[11px] transition-colors',
               backtestBuka ? 'text-zinc-200' : 'text-zinc-500 hover:text-zinc-300')}>
             <FlaskConical className="size-3" strokeWidth={2} />
             Backtest
             <span className="rounded bg-amber-500/15 px-1 text-[9.5px] text-amber-400/90">beta</span>
           </button>
+          {/* Multi-chart di UJUNG KANAN kaki chart — permintaan pemilik.
+              ml-auto mendorongnya melewati sisa isi baris; Backtest tidak
+              ikut terdorong karena sudah absolute. DISEMBUNYIKAN di mode
+              polos: panel yang bisa membelah dirinya jadi empat panel lagi
+              adalah cermin yang saling memantul. */}
+          {!POLOS && (
+            <button onClick={() => nyalakanMulti(simbol, tf)}
+              title="Multi-chart — bagi layar jadi beberapa panel chart"
+              aria-label="Multi-chart"
+              className="ml-auto flex shrink-0 cursor-pointer items-center rounded p-1 text-zinc-500 transition-colors hover:text-zinc-300">
+              <LayoutGrid className="size-3.5" strokeWidth={2} />
+            </button>
+          )}
         </div>
 
         {/* SELALU terpasang, tampil hanya saat dibuka. Efeknya tetap jalan
@@ -3784,10 +3821,15 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
       {/* Tanpa judul section: tiap panel sudah menyebut pasarnya sendiri,
           persis seperti di Dashboard. Judul di atas dua panel yang
           masing-masing sudah berjudul cuma mengulang. */}
-      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <PanelPosisiTerbuka sumber="kripto" onSunting={bukaSunting} onTutup={tutupDariTabel} />
-        <PanelPosisiTerbuka sumber="forex" onSunting={bukaSunting} onTutup={tutupDariTabel} />
-      </div>
+      {/* Di panel multi-chart, tabel ini HANYA milik panel utama (utama=1,
+          panel pertama grid). Empat salinan tabel yang isinya sama persis
+          membuat tiap panel memanjang ke bawah tanpa menambah informasi. */}
+      {(!POLOS || UTAMA) && (
+        <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <PanelPosisiTerbuka sumber="kripto" onSunting={bukaSunting} onTutup={tutupDariTabel} />
+          <PanelPosisiTerbuka sumber="forex" onSunting={bukaSunting} onTutup={tutupDariTabel} />
+        </div>
+      )}
     </div>
   );
 }

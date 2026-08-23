@@ -21,8 +21,8 @@ import {
    melepas panel jadi jendela sendiri untuk monitor lain.
    ════════════════════════════════════════════════════════════════════════ */
 
-const ALAMAT = (p: PanelMulti) =>
-  `/chart-entry?simbol=${encodeURIComponent(p.simbol)}&tf=${encodeURIComponent(p.tf)}&polos=1`;
+const ALAMAT = (p: PanelMulti, utama = false) =>
+  `/chart-entry?simbol=${encodeURIComponent(p.simbol)}&tf=${encodeURIComponent(p.tf)}&polos=1${utama ? '&utama=1' : ''}`;
 
 export function MultiChart() {
   const m = useMulti();
@@ -102,8 +102,8 @@ export function MultiChart() {
     });
   };
 
-  const bukaJendela = (p: PanelMulti) => {
-    const w = window.open(ALAMAT(p), 'jt-panel-' + p.id, 'popup=yes,width=1100,height=720');
+  const bukaJendela = (p: PanelMulti, utama: boolean) => {
+    const w = window.open(ALAMAT(p, utama), 'jt-panel-' + p.id, 'popup=yes,width=1100,height=720');
     if (!w) return; /* diblokir pemblokir popup — panelnya tetap di grid */
     jendela.current.set(p.id, w);
     setLepas((l) => ({ ...l, [p.id]: true }));
@@ -178,7 +178,7 @@ export function MultiChart() {
               <span className="truncate text-[11px] text-zinc-500">Panel {i + 1} · mulai {p.simbol} {p.tf}</span>
               <span className="ml-auto flex shrink-0 items-center gap-1">
                 {!lepas[p.id] && (
-                  <button onClick={() => bukaJendela(p)}
+                  <button onClick={() => bukaJendela(p, i === 0)}
                     title="Lepas jadi jendela sendiri — tarik ke monitor lain"
                     className="cursor-pointer rounded p-1 text-zinc-600 transition-colors hover:text-zinc-300">
                     <ExternalLink className="size-3" />
@@ -204,7 +204,7 @@ export function MultiChart() {
                 </button>
               </div>
             ) : (
-              <iframe src={ALAMAT(p)} title={`Chart ${p.simbol} ${p.tf}`}
+              <iframe src={ALAMAT(p, i === 0)} title={`Chart ${p.simbol} ${p.tf}`}
                       allow="clipboard-read; clipboard-write"
                       className="min-h-0 w-full flex-1 border-0" />
             )}

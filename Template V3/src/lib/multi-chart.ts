@@ -38,6 +38,15 @@ export const POLOS: boolean = (() => {
   catch { return false; }
 })();
 
+/* Panel PERTAMA grid membawa &utama=1: dialah satu-satunya yang tetap
+   merender tabel Posisi Terbuka di bawah chartnya. Empat salinan tabel
+   yang sama membuat tiap panel memanjang ke bawah tanpa menambah satu
+   informasi pun — posisinya memang sama di semua panel. */
+export const UTAMA: boolean = (() => {
+  try { return new URLSearchParams(window.location.search).get('utama') === '1'; }
+  catch { return false; }
+})();
+
 function bacaSimpanan(): KeadaanMulti {
   try {
     const d = JSON.parse(localStorage.getItem(KUNCI) ?? 'null');
