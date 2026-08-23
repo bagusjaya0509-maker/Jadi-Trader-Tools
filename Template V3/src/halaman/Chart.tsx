@@ -4035,19 +4035,21 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
             </button>
           )}
           {!(POLOS && posisiSembunyi) && (
-            /* JARAKNYA DIKEMBALIKAN seperti sebelum halaman ini dirapatkan.
-                Yang diminta rapat cuma bidang GRAFIK — ia dibaca dengan mata
-                menyapu lebar, dan tiap piksel di sisinya berarti. Tabel
-                dibaca baris per baris; menempelkannya ke pembatas sidebar
-                justru membuat kolom pertamanya terhimpit dan lebih sulit
-                dibaca, bukan lebih lega.
+            /* SEJAJAR DENGAN GRAFIK, bukan berjarak sendiri. Sempat dibuat
+               berjarak seperti sebelumnya, dan hasilnya justru terlihat
+               tidak disengaja: satu kotak menempel ke pembatas, kotak di
+               bawahnya menjorok ke dalam, tanpa apa pun yang menjelaskan
+               kenapa. Keseragaman di sini lebih berarti daripada kelegaan
+               tabelnya.
 
-                px-4 sm:px-6 di atas p-px halaman = 17/25 px, praktis sama
-               dengan 16/24 px yang dulu. */
-            <div className={cn('grid grid-cols-1 gap-4 lg:grid-cols-2',
-              POLOS ? 'mt-0' : 'mt-4 px-4 pb-4 sm:px-6 sm:pb-6')}>
-              <PanelPosisiTerbuka sumber="kripto" onSunting={bukaSunting} onTutup={tutupDariTabel} tanpaBingkai={POLOS} tanpaLatar />
-              <PanelPosisiTerbuka sumber="forex" onSunting={bukaSunting} onTutup={tutupDariTabel} tanpaBingkai={POLOS} tanpaLatar />
+               gap-px, bukan gap-4: celah ANTAR kartu harus sama dengan celah
+               ke tepi. Celah luar 1 px dengan celah tengah 16 px membuat
+               kedua kartu terbaca sebagai dua benda terpisah yang kebetulan
+               berdekatan, bukan sebagai satu bidang yang terbagi. */
+            <div className={cn('grid grid-cols-1 lg:grid-cols-2',
+              POLOS ? 'mt-0 gap-4' : 'mt-px gap-px')}>
+              <PanelPosisiTerbuka sumber="kripto" onSunting={bukaSunting} onTutup={tutupDariTabel} tanpaBingkai={POLOS} menyatu />
+              <PanelPosisiTerbuka sumber="forex" onSunting={bukaSunting} onTutup={tutupDariTabel} tanpaBingkai={POLOS} menyatu />
             </div>
           )}
         </>

@@ -53,15 +53,21 @@ export interface OrderSunting {
   tiket?: string;
 }
 
-export function PanelPosisiTerbuka({ sumber, onSunting, onTutup, tanpaBingkai, tanpaLatar }: {
+export function PanelPosisiTerbuka({ sumber, onSunting, onTutup, tanpaBingkai, menyatu }: {
   /** Lepas garis tepi dan latar kartu. Dipakai di panel multi-chart, yang
    *  sudah punya garis pemisahnya sendiri — kartu bergaris di dalam kotak
    *  bergaris menghasilkan dua garis sejajar berjarak beberapa piksel. */
   tanpaBingkai?: boolean;
-  /** Lepas LATARNYA saja, garis tepinya tetap. Berbeda maksud dengan
-   *  `tanpaBingkai`: yang ini menyatukan kartu dengan warna halaman supaya
-   *  yang tersisa cuma outline-nya. */
-  tanpaLatar?: boolean;
+  /** Satukan kartu ini dengan bidang di sekitarnya: tanpa latar, sudutnya
+   *  siku, garis tepinya TETAP. Berbeda maksud dengan `tanpaBingkai`, yang
+   *  membuang garisnya juga.
+   *
+   *  Latar dan sudut diurus satu prop karena keduanya satu keputusan, bukan
+   *  dua. Kartu tanpa latar yang sudutnya masih membulat menyisakan celah
+   *  segitiga di tiap pojok saat ia berdampingan rapat dengan kotak lain —
+   *  yang terbaca sebagai salah pasang, bukan sebagai lengkungan. Memisahkan
+   *  keduanya jadi dua prop cuma menyediakan cara untuk salah. */
+  menyatu?: boolean;
   sumber: Sumber;
   /** Klik baris = buka order itu di chart. Tanpa ini barisnya tidak bisa
    *  diklik sama sekali. */
@@ -303,7 +309,7 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
        mengikuti kolom kalender di sebelahnya. Kotak tinggi yang isinya
        dua baris terbaca seperti ada yang gagal dimuat. */
     <Panel className={cn('self-start',
-      tanpaBingkai ? 'rounded-none border-0 bg-transparent' : tanpaLatar && 'bg-transparent')}>
+      tanpaBingkai ? 'rounded-none border-0 bg-transparent' : menyatu && 'rounded-none bg-transparent')}>
       <PanelHead
         /* Judul menyebut PASARNYA, sama persis dengan Dashboard —
            dua panel berdampingan yang sama-sama berjudul "Posisi
