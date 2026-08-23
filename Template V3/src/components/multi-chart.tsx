@@ -4,7 +4,7 @@ import { LayoutGrid, Plus, X, GripVertical, ExternalLink, Undo2, Maximize2, Mini
 import { cn } from '@/lib/utils';
 import {
   useMulti, matikanMulti, tambahPanel, hapusPanel, perbaruiPanel, kirimBus, dengarBus,
-  MAKS_PANEL, type PanelMulti,
+  MAKS_PANEL, TF_PANEL, type PanelMulti,
 } from '@/lib/multi-chart';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -51,6 +51,23 @@ export function MultiChart() {
      `true` berarti TERBUKA. Bawaannya tertutup, sama dengan bawaan di dalam
      panel — dua sisi yang menyimpan keadaan yang sama harus berangkat dari
      nilai yang sama, atau ikonnya akan berbohong sampai ditekan sekali. */
+  /* Menu timeframe yang menggantung dari label panel. Menyimpan id panel,
+     bukan indeksnya: panel bisa ditutup selagi menunya terbuka, dan indeks
+     akan menunjuk ke tetangganya. */
+  const [menuTf, setMenuTf] = useState<{ id: string; x: number; y: number } | null>(null);
+  useEffect(() => {
+    if (!menuTf) return;
+    const tutup = () => setMenuTf(null);
+    const tekan = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenuTf(null); };
+    const t = setTimeout(() => document.addEventListener('click', tutup), 0);
+    document.addEventListener('keydown', tekan);
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener('click', tutup);
+      document.removeEventListener('keydown', tekan);
+    };
+  }, [menuTf]);
+
   const [kepalaBuka, setKepalaBuka] = useState<Record<string, boolean>>({});
   const gantiKepala = (id: string) => {
     const buka = !kepalaBuka[id];
@@ -287,8 +304,21 @@ export function MultiChart() {
               {/* Tanpa kata "mulai": simbolnya kini dilaporkan panel dan
                   selalu yang sedang tampil, jadi tidak ada lagi yang perlu
                   dijelaskan sebagai titik berangkat. */}
-              <span className="truncate text-[11px] text-zinc-500">
-                Panel {i + 1} · <span className="angka text-zinc-400">{p.simbol} {p.tf}</span>
+              <span className="flex min-w-0 items-center gap-1 truncate text-[11px] text-zinc-500">
+                Panel {i + 1} · <span className="angka truncate text-zinc-400">{p.simbol}</span>
+                {/* TF-nya sebuah TOMBOL, bukan teks. Ia bagian keterangan
+                    yang paling sering diubah, dan di baris ini ia sudah
+                    tertulis — menjadikannya bisa diklik memangkas jalan
+                    "buka kepala panel, cari pemilih, tutup lagi". */}
+                <button onClick={(e) => {
+                          e.stopPropagation();
+                          const r = e.currentTarget.getBoundingClientRect();
+                          setMenuTf(menuTf?.id === p.id ? null : { id: p.id, x: r.left, y: r.bottom + 2 });
+                        }}
+                        title="Ganti timeframe panel ini"
+                        className="angka shrink-0 cursor-pointer rounded px-1 text-zinc-300 transition-colors hover:bg-zinc-800/80 hover:text-zinc-100">
+                  {p.tf}
+                </button>
               </span>
               <span className="ml-auto flex shrink-0 items-center gap-1">
                 {!lepas[p.id] && (
@@ -352,6 +382,21 @@ export function MultiChart() {
           </div>
         ))}
 
+        {/* Sel kosong grid diisi ajakan, bukan dibiarkan hitam. Menutup satu
+            panel dari empat menyisakan lubang seukuran seperempat layar yang
+            terbaca sebagai "ada yang gagal dimuat" — padahal itu ruang yang
+            memang tersedia. */}
+        {m.panel.length < MAKS_PANEL && m.panel.length < kolom * baris && (
+          <div style={{ order: 999 }}
+               className="flex min-h-0 min-w-0 items-center justify-center border border-dashed border-zinc-800/70">
+            <button onClick={tambahPanel}
+              className="flex cursor-pointer flex-col items-center gap-1.5 rounded-md px-4 py-3 text-zinc-600 transition-colors hover:bg-zinc-900/60 hover:text-zinc-300">
+              <Plus className="size-5" />
+              <span className="text-[11.5px]">Tambah chart</span>
+            </button>
+          </div>
+        )}
+
         {belahKolom && (
           <div onPointerDown={mulaiGeser('kolom')} onPointerMove={saatGeser}
                onPointerUp={selesaiGeser} onPointerCancel={selesaiGeser}
@@ -367,6 +412,28 @@ export function MultiChart() {
                style={{ top: `${barisPct}%` }} />
         )}
       </div>
+
+      {menuTf && (
+        <div style={{ left: menuTf.x, top: menuTf.y }}
+             onClick={(e) => e.stopPropagation()}
+             className="fixed z-[80] min-w-[132px] overflow-hidden rounded-md border border-zinc-800 bg-zinc-950 py-1 shadow-xl">
+          <div className="border-b border-zinc-800/80 px-2.5 pb-1.5 pt-1 text-[10.5px] text-zinc-500">
+            Timeframe
+          </div>
+          {TF_PANEL.map((t) => {
+            const kini = m.panel.find((x) => x.id === menuTf.id)?.tf;
+            return (
+              <button key={t.nilai}
+                onClick={() => { kirimBus({ jenis: 'tf', panel: menuTf.id, tf: t.nilai }); setMenuTf(null); }}
+                className={cn('flex w-full cursor-pointer items-center justify-between gap-3 px-2.5 py-1.5 text-left text-[11.5px] transition-colors hover:bg-zinc-900',
+                  t.nilai === kini ? 'text-emerald-400' : 'text-zinc-300')}>
+                {t.label}
+                <span className="angka text-[10px] text-zinc-600">{t.nilai}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

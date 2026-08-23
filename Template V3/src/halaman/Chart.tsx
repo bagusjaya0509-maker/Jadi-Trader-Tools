@@ -361,6 +361,9 @@ export default function ChartBacktest() {
       if (p && p.jenis === 'simbol' && p.panel === ID_PANEL && typeof p.simbol === 'string') {
         setSimbol(p.simbol);
       }
+      if (p && p.jenis === 'tf' && p.panel === ID_PANEL && typeof p.tf === 'string') {
+        setTf(p.tf);
+      }
     });
   }, []);
 
@@ -381,6 +384,32 @@ export default function ChartBacktest() {
      meleset di sana terasa seperti chartnya hilang. Yang tersembunyi tidak
      bisa ditabrak. */
   const [posisiSembunyi, setPosisiSembunyi] = useState(POLOS);
+  /* ── Menu timeframe lewat KLIK KANAN di chart ─────────────────────────
+     Hanya di mode polos. Panel yang dilepas jadi jendela sendiri tidak
+     punya baris nomor panel — di sanalah pemilih TF hidup — jadi tanpa ini
+     satu-satunya cara ganti timeframe di jendela lepasan adalah membuka
+     bilah kepala dulu. Klik kanan langsung di chart memotong dua langkah,
+     dan berlaku sama di panel maupun di jendela lepasan. */
+  const [menuTf, setMenuTf] = useState<{ x: number; y: number } | null>(null);
+  useEffect(() => {
+    if (!menuTf) return;
+    const tutup = () => setMenuTf(null);
+    const tekan = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenuTf(null); };
+    /* Ditunda satu putaran: klik kanan yang MEMBUKA menu masih menggelinding
+       saat pendengar dipasang, dan tanpa penundaan ia menutup menunya
+       sendiri. */
+    const t = setTimeout(() => {
+      document.addEventListener('click', tutup);
+      document.addEventListener('contextmenu', tutup);
+    }, 0);
+    document.addEventListener('keydown', tekan);
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener('click', tutup);
+      document.removeEventListener('contextmenu', tutup);
+      document.removeEventListener('keydown', tekan);
+    };
+  }, [menuTf]);
   /* Sakelarnya TIDAK ada di sini lagi — ia pindah ke baris nomor panel di
      grid, sejajar ikon lepas-jendela. Dulu ada dua tempat yang menuliskan
      simbol dan TF: baris nomor panel di grid, dan strip ringkas di dalam
@@ -2884,7 +2913,31 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
               menyusut saat pembatas ditarik, jadi lilin di tepi kanan
               tidak pernah tertutup daftar. */}
           <div className="flex">
-          <div ref={areaChart} className="relative min-w-0 grow overflow-hidden">
+          <div ref={areaChart} className="relative min-w-0 grow overflow-hidden"
+               onContextMenu={POLOS ? (e) => {
+                 /* Alat gambar memakai klik KIRI; klik kanan di chart tidak
+                    dipakai apa pun, jadi tidak ada yang direbut di sini. */
+                 e.preventDefault();
+                 setMenuTf({ x: e.clientX, y: e.clientY });
+               } : undefined}>
+            {menuTf && (
+              <div style={{ left: menuTf.x + 2, top: menuTf.y + 2 }}
+                   onClick={(e) => e.stopPropagation()}
+                   onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                   className="fixed z-[70] min-w-[132px] overflow-hidden rounded-md border border-zinc-800 bg-zinc-950 py-1 shadow-xl">
+                <div className="border-b border-zinc-800/80 px-2.5 pb-1.5 pt-1 text-[10.5px] text-zinc-500">
+                  Timeframe
+                </div>
+                {TF.map((t) => (
+                  <button key={t.nilai} onClick={() => { setTf(t.nilai); setMenuTf(null); }}
+                    className={cn('flex w-full cursor-pointer items-center justify-between gap-3 px-2.5 py-1.5 text-left text-[11.5px] transition-colors hover:bg-zinc-900',
+                      t.nilai === tf ? 'text-emerald-400' : 'text-zinc-300')}>
+                    {t.label}
+                    <span className="angka text-[10px] text-zinc-600">{t.nilai}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           {lilin.times.length > 0
             ? <ChartLilin key={`${simbol}|${tf}|${kunciChart}`}
                           lilin={lilinGabung} garis={garis} trade={replayIdx === null ? hasil?.trade : undefined}

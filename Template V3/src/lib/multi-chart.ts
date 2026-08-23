@@ -169,7 +169,24 @@ export type PesanBus =
   /* Panel -> grid: "simbol saya sekarang begini". Tanpa ini label panel
      menyebut simbol AWAL selamanya, dan begitu satu pasangan dikirim ke
      panel itu, judulnya beserta menu klik-kanan mulai berbohong. */
-  | { jenis: 'lapor'; panel: string; simbol: string; tf: string };
+  | { jenis: 'lapor'; panel: string; simbol: string; tf: string }
+  /* Grid -> panel: ganti timeframe. Terpisah dari 'simbol' supaya memilih
+     TF tidak ikut menulis ulang simbolnya, dan sebaliknya. */
+  | { jenis: 'tf'; panel: string; tf: string };
+
+/** Daftar timeframe untuk menu di grid dan menu klik-kanan panel lepasan.
+ *  Nilainya WAJIB sama dengan tabel TF di halaman Chart — dua daftar yang
+ *  seharusnya sama adalah dua daftar yang cepat atau lambat berbeda, dan
+ *  yang berbeda di sini adalah timeframe yang dikirim ke proxy. */
+export const TF_PANEL: { nilai: string; label: string }[] = [
+  { nilai: '1m', label: '1 Menit' },
+  { nilai: '5m', label: '5 Menit' },
+  { nilai: '15m', label: '15 Menit' },
+  { nilai: '30m', label: '30 Menit' },
+  { nilai: '1h', label: '1 Jam' },
+  { nilai: '4h', label: '4 Jam' },
+  { nilai: '1d', label: 'Harian' },
+];
 
 let kanal: BroadcastChannel | null = null;
 function bus(): BroadcastChannel | null {
