@@ -2621,8 +2621,18 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
   return (
     /* Mode panel: TANPA jarak halaman. Padding 16-24 px di keempat sisi
        memakan ±10% panel seperempat layar untuk ruang kosong, dan
-       pembatas grid sudah memisahkan panel satu dari yang lain. */
-    <div className={POLOS ? '' : 'p-4 sm:p-6'}>
+       pembatas grid sudah memisahkan panel satu dari yang lain.
+
+       Halaman biasa: jaraknya dipangkas dari 16-24 px jadi 8 px atas
+       permintaan pemilik. Sesudah latar kartunya dihilangkan, ruang kosong
+       itu tidak lagi memisahkan apa pun -- yang memisahkan garis tepi
+       kartu dan garis pembatas sidebar, dan keduanya kini nyaris
+       bersentuhan. Yang didapat: chart selebar mungkin tanpa satu pun
+       elemen dihilangkan.
+
+       8 px, bukan 0: dua garis yang benar-benar menempel terbaca sebagai
+       satu garis tebal yang salah gambar, bukan sebagai dua pembatas. */
+    <div className={POLOS ? '' : 'p-2'}>
       {/* ── Bilah kendali ── */}
       {/* Pembungkus ber-ref: Panel komponen fungsi tanpa forwardRef, jadi
           ref tidak bisa dipasang langsung padanya. Div ini yang dinaikkan
