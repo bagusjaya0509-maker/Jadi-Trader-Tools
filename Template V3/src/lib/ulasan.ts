@@ -1,5 +1,8 @@
-import { useEffect, useState } from 'react';
-import { collection, onSnapshot, addDoc, deleteDoc, doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  collection, onSnapshot, addDoc, deleteDoc, doc, setDoc, serverTimestamp,
+  query, where, limit, orderBy, getCountFromServer,
+} from 'firebase/firestore';
 import { db } from '@/lib/data';
 import { auth } from '@/lib/firebase';
 
@@ -44,7 +47,12 @@ export function useUlasan(): { data: Ulasan[]; memuat: boolean; galat: string | 
   const [galat, setGalat] = useState<string | null>(null);
 
   useEffect(() => {
-    return onSnapshot(collection(db, 'ulasan'),
+    /* DIBATASI 50 dan diurut di server. Halaman ini tujuan iklan: tiap
+       pengunjung membaca sebanyak dokumen yang dikirim pendengar ini, dan
+       tanpa batas biayanya tumbuh selamanya mengikuti jumlah ulasan —
+       dikalikan jumlah pengunjung. Lima puluh ulasan terbaru sudah lebih
+       dari cukup untuk halaman jualan. */
+    return onSnapshot(query(collection(db, 'ulasan'), orderBy('waktu', 'desc'), limit(50)),
       (s) => {
         setData(s.docs.map((d): Ulasan => {
           const v = d.data();
@@ -145,31 +153,60 @@ export interface Balasan {
 
 const idSuka = (ulasanId: string, uid: string) => `${ulasanId}__${uid}`;
 
-/** Suka per ulasan: berapa banyak, dan apakah AKU sudah menyukainya. */
-export function useSuka(): { jumlah: Record<string, number>; punyaku: Set<string>; siap: boolean } {
+/** Suka: HANYA milikku yang didengarkan, jumlahnya dihitung terpisah.
+ *
+ *  Dulu ini mendengarkan SELURUH koleksi `ulasanSuka`. Biayanya satu baca
+ *  per dokumen suka, per pengunjung, tiap kali halaman dibuka — jadi seribu
+ *  pengunjung iklan dikali tiga ratus suka adalah tiga ratus ribu baca
+ *  sehari, untuk angka kecil di samping ikon jempol.
+ *
+ *  Sekarang dua bagian yang dipisah karena sifatnya memang berbeda:
+ *
+ *    · "apakah AKU menyukai" — kueri `where('uid','==',aku)`. Isinya cuma
+ *      sebanyak ulasan yang pernah kusukai, bukan sebanyak suka sedunia.
+ *      Pengunjung yang belum masuk tidak menjalankan kueri ini sama sekali.
+ *
+ *    · "berapa jumlahnya" — `getCountFromServer`, yang ditagih satu baca
+ *      per seribu dokumen, bukan satu per dokumen. Ia sekali jalan, bukan
+ *      pendengar: angka suka tidak perlu berubah sendiri di layar orang
+ *      yang sedang membaca ulasan. */
+export function useSuka(ulasanIds: string[]): {
+  jumlah: Record<string, number>; punyaku: Set<string>; hitungUlang: () => void;
+} {
   const [jumlah, setJumlah] = useState<Record<string, number>>({});
   const [punyaku, setPunyaku] = useState<Set<string>>(new Set());
-  const [siap, setSiap] = useState(false);
+  const [putaran, setPutaran] = useState(0);
   const aku = auth.currentUser?.uid ?? '';
+  /* Digabung jadi satu untai supaya efeknya tidak berjalan ulang tiap
+     render — array baru dengan isi sama tetap dianggap berubah oleh React. */
+  const kunci = ulasanIds.join(',');
 
   useEffect(() => {
-    return onSnapshot(collection(db, 'ulasanSuka'),
-      (s) => {
-        const n: Record<string, number> = {};
-        const milikku = new Set<string>();
-        s.docs.forEach((d) => {
-          const v = d.data();
-          const uid = String(v.ulasanId ?? '');
-          if (!uid) return;
-          n[uid] = (n[uid] ?? 0) + 1;
-          if (aku && String(v.uid ?? '') === aku) milikku.add(uid);
-        });
-        setJumlah(n); setPunyaku(milikku); setSiap(true);
-      },
-      (e) => { console.warn('suka:', e); setSiap(true); });
+    if (!aku) { setPunyaku(new Set()); return; }
+    return onSnapshot(query(collection(db, 'ulasanSuka'), where('uid', '==', aku)),
+      (s) => setPunyaku(new Set(s.docs.map((d) => String(d.data().ulasanId ?? '')))),
+      (e) => console.warn('suka saya:', e));
   }, [aku]);
 
-  return { jumlah, punyaku, siap };
+  useEffect(() => {
+    let hidup = true;
+    const ids = kunci ? kunci.split(',') : [];
+    if (!ids.length) { setJumlah({}); return; }
+    (async () => {
+      const hasil: Record<string, number> = {};
+      await Promise.all(ids.map(async (id) => {
+        try {
+          const c = await getCountFromServer(
+            query(collection(db, 'ulasanSuka'), where('ulasanId', '==', id)));
+          hasil[id] = c.data().count;
+        } catch (e) { console.warn('hitung suka:', e); }
+      }));
+      if (hidup) setJumlah(hasil);
+    })();
+    return () => { hidup = false; };
+  }, [kunci, putaran]);
+
+  return { jumlah, punyaku, hitungUlang: useCallback(() => setPutaran((n) => n + 1), []) };
 }
 
 /** Menyukai / batal menyukai. Idempoten: menekan dua kali kembali ke semula. */
@@ -181,19 +218,32 @@ export async function tukarSuka(ulasanId: string, sedangSuka: boolean) {
   else await setDoc(ref, { ulasanId, uid: p.uid, waktu: serverTimestamp() });
 }
 
-/** Balasan, dikelompokkan per ulasan dan diurut dari yang paling lama —
- *  percakapan dibaca dari atas ke bawah, bukan sebaliknya. */
-export function useBalasan(): { per: Record<string, Balasan[]>; memuat: boolean } {
-  const [per, setPer] = useState<Record<string, Balasan[]>>({});
-  const [memuat, setMemuat] = useState(true);
+/** Balasan SATU ulasan, dimuat hanya saat percakapannya dibuka.
+ *
+ *  Dulu seluruh koleksi `ulasanBalasan` diunduh setiap halaman dibuka —
+ *  termasuk balasan milik ulasan yang tidak pernah dilihat pengunjungnya.
+ *  Sekarang tidak ada satu pun balasan terbaca sampai ada yang menekan
+ *  "Balas".
+ *
+ *  Tanpa `orderBy` di server, dan itu disengaja: `where` + `orderBy` pada
+ *  medan berbeda menuntut indeks komposit yang harus dibuat tangan di
+ *  Console, dan kueri tanpa indeks itu GAGAL — bukan melambat, gagal. Lima
+ *  puluh balasan diurut di browser tidak terasa oleh siapa pun. */
+export function useBalasanUlasan(ulasanId: string, aktif: boolean): {
+  data: Balasan[]; memuat: boolean;
+} {
+  const [data, setData] = useState<Balasan[]>([]);
+  const [memuat, setMemuat] = useState(false);
 
   useEffect(() => {
-    return onSnapshot(collection(db, 'ulasanBalasan'),
+    if (!aktif || !ulasanId) { setData([]); return; }
+    setMemuat(true);
+    return onSnapshot(
+      query(collection(db, 'ulasanBalasan'), where('ulasanId', '==', ulasanId), limit(50)),
       (s) => {
-        const kotak: Record<string, Balasan[]> = {};
-        s.docs.forEach((d) => {
+        setData(s.docs.map((d): Balasan => {
           const v = d.data();
-          const b: Balasan = {
+          return {
             id: d.id,
             ulasanId: String(v.ulasanId ?? ''),
             uid: String(v.uid ?? ''),
@@ -202,16 +252,13 @@ export function useBalasan(): { per: Record<string, Balasan[]>; memuat: boolean 
             isi: String(v.isi ?? ''),
             waktu: v.waktu?.toMillis?.() ?? Date.now(),
           };
-          if (!b.ulasanId) return;
-          (kotak[b.ulasanId] ??= []).push(b);
-        });
-        Object.values(kotak).forEach((a) => a.sort((x, y) => x.waktu - y.waktu));
-        setPer(kotak); setMemuat(false);
+        }).sort((x, y) => x.waktu - y.waktu));
+        setMemuat(false);
       },
       (e) => { console.warn('balasan:', e); setMemuat(false); });
-  }, []);
+  }, [ulasanId, aktif]);
 
-  return { per, memuat };
+  return { data, memuat };
 }
 
 export async function kirimBalasan(ulasanId: string, isi: string) {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Check, Crown, Download, Copy, X, Star, MessageCircle, ExternalLink, KeyRound, Loader2, Trash2,
@@ -9,7 +9,7 @@ import { Panel, PanelHead } from '@/components/efferd-ui';
 import { cn, tanggalPendek } from '@/lib/utils';
 import { type Produk } from '@/data/contoh';
 import { bisaDipasang, pasangIndikator } from '@/lib/pasang-indikator';
-import { useSuka, tukarSuka, useBalasan, kirimBalasan, hapusBalasan, type Balasan } from '@/lib/ulasan';
+import { useSuka, tukarSuka, useBalasanUlasan, kirimBalasan, hapusBalasan } from '@/lib/ulasan';
 
 /* ════════════════════════════════════════════════════════════════════════
    TOMBOL PASANG KE CHART
@@ -389,11 +389,16 @@ function MintaKode({ produk, lynk }: { produk: string; lynk?: string }) {
    ke cache lokal sebelum jaringan menjawab, jadi angkanya berubah seketika
    lewat onSnapshot; menambah keadaan optimis sendiri di sini cuma membuat
    dua sumber kebenaran yang bisa berselisih. */
-function KakiUlasan({ ulasanId, suka, akuSuka, balasan, bolehTulis, uidAku, pemilik }: {
-  ulasanId: string; suka: number; akuSuka: boolean; balasan: Balasan[];
+function KakiUlasan({ ulasanId, suka, akuSuka, hitungUlangSuka, bolehTulis, uidAku, pemilik }: {
+  ulasanId: string; suka: number; akuSuka: boolean; hitungUlangSuka: () => void;
   bolehTulis: boolean; uidAku: string; pemilik: boolean;
 }) {
   const [buka, setBuka] = useState(false);
+  /* Balasan baru diambil dari server SESUDAH `buka` jadi true. Pengunjung
+     yang cuma membaca ulasan tidak membayar satu baca pun untuk percakapan
+     yang tidak ia buka — dan halaman ini tujuan iklan, jadi sebagian besar
+     pengunjung memang cuma membaca. */
+  const { data: balasan } = useBalasanUlasan(ulasanId, buka);
   const [teks, setTeks] = useState('');
   const [sibuk, setSibuk] = useState(false);
   const [galat, setGalat] = useState('');
@@ -412,7 +417,11 @@ function KakiUlasan({ ulasanId, suka, akuSuka, balasan, bolehTulis, uidAku, pemi
     <>
       <div className="mt-3 flex items-center gap-1 border-t border-zinc-800/50 pt-2.5">
         <button
-          onClick={() => { void tukarSuka(ulasanId, akuSuka).catch((e) => setGalat(e.message)); }}
+          onClick={() => {
+            void tukarSuka(ulasanId, akuSuka)
+              .then(() => hitungUlangSuka())
+              .catch((e) => setGalat(e.message));
+          }}
           disabled={!bolehTulis}
           title={bolehTulis ? (akuSuka ? 'Batal menyukai' : 'Suka ulasan ini') : 'Masuk dulu untuk menyukai'}
           aria-pressed={akuSuka}
@@ -427,7 +436,10 @@ function KakiUlasan({ ulasanId, suka, akuSuka, balasan, bolehTulis, uidAku, pemi
           title={bolehTulis ? 'Balas ulasan ini' : 'Masuk dulu untuk membalas'}
           className="flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-[11.5px] text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-300 disabled:cursor-not-allowed disabled:opacity-50">
           <CornerDownRight className="size-3.5" /> Balas
-          {balasan.length > 0 && <span className="angka text-zinc-600">{balasan.length}</span>}
+          {/* Angkanya baru muncul SESUDAH dibuka. Menampilkannya sejak awal
+              menuntut penghitungan untuk tiap ulasan pada tiap kunjungan —
+              persis biaya yang sedang dihindari. */}
+          {buka && balasan.length > 0 && <span className="angka text-zinc-600">{balasan.length}</span>}
         </button>
       </div>
 
@@ -598,8 +610,10 @@ export default function Marketplace() {
     }
   }
   const ulasan = useUlasan();
-  const suka = useSuka();
-  const balasan = useBalasan();
+  /* Id-nya diambil dari ulasan yang BENAR-BENAR tampil, bukan dari koleksi:
+     jumlah suka dihitung satu kueri per ulasan, jadi daftarnya harus sependek
+     yang terlihat di layar. */
+  const suka = useSuka(useMemo(() => ulasan.data.map((u) => u.id), [ulasan.data]));
 
   const [bintang, setBintang] = useState(5);
   const [tulisan, setTulisan] = useState('');
@@ -875,7 +889,7 @@ export default function Marketplace() {
                   ulasanId={u.id}
                   suka={suka.jumlah[u.id] ?? 0}
                   akuSuka={suka.punyaku.has(u.id)}
-                  balasan={balasan.per[u.id] ?? []}
+                  hitungUlangSuka={suka.hitungUlang}
                   bolehTulis={!!pengguna}
                   uidAku={pengguna?.uid ?? ''}
                   pemilik={pemilik}
