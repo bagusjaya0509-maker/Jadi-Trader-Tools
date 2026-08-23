@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from 'recharts';
 import {
   Plus, Trash2, KeyRound, ShieldAlert, TrendingDown,
 } from 'lucide-react';
@@ -215,11 +215,16 @@ export default function Pemilik() {
       const b = ambil(p.waktu);
       b.manual += p.nilai; b.jumlah += 1;
     });
-    /* Pengeluaran ikut, sebagai batang MERAH di sebelah batang pemasukan.
-       Grafik yang cuma menggambar uang masuk selalu membuat usaha tampak
-       lebih sehat daripada kenyataannya — dan di bulan ini pengeluarannya
-       empat puluh kali pemasukan. Angka itu tidak boleh perlu dicari. */
-    pengeluaran.data.forEach((p) => { ambil(p.waktu).keluar += p.nilai; });
+    /* Pengeluaran disimpan NEGATIF, dan itu bukan sekadar tanda minus di
+       angka: dengan stackId yang sama, Recharts menggambar nilai negatif
+       TURUN dari garis nol. Hasilnya satu kolom per bulan — pemasukan
+       tumbuh ke atas, pengeluaran menjulur ke bawah — bukan dua batang
+       terpisah yang harus dirapatkan dengan menebak lebar celah.
+
+       Bonusnya: susunannya tidak berubah bentuk saat bulan bertambah.
+       Dua batang bersebelahan akan makin renggang atau makin sempit
+       tergantung berapa bulan yang tergambar; satu kolom tidak. */
+    pengeluaran.data.forEach((p) => { ambil(p.waktu).keluar -= p.nilai; });
     return [...peta.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([, v]) => v);
   }, [penjualan.data, pengeluaran.data, lisensiTerjual, harga]);
 
@@ -421,7 +426,7 @@ export default function Pemilik() {
       {/* ── Penjualan per bulan ── */}
       <Panel className="mt-4">
         <PanelHead judul="Pemasukan vs Pengeluaran per Bulan"
-                   sub="Hijau lisensi, biru catatan tangan, merah pengeluaran. Lisensi berbayar terisi sendiri dari Maintenance, dihitung memakai harga yang berlaku saat permintaannya dibuat." />
+                   sub="Satu kolom per bulan: pemasukan ke atas (hijau lisensi, biru catatan tangan), pengeluaran ke bawah (merah). Lisensi berbayar terisi sendiri dari Maintenance." />
         <div className={cn('h-[240px] px-2 pb-4', perBulan.length > 6 && 'overflow-x-auto gulir-senyap')}>
           {perBulan.length === 0 ? (
             <div className="px-3 pt-3">
@@ -443,9 +448,15 @@ export default function Pemilik() {
                 <YAxis tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} width={tampil === 'IDR' ? 56 : 44}
                        tickFormatter={(v) => {
                          if (!v) return '0';
-                         if (tampil !== 'IDR') return `$${v}`;
-                         const rp = v * kurs;
-                         return rp >= 1_000_000 ? `Rp${(rp / 1_000_000).toFixed(1)}jt` : `Rp${Math.round(rp / 1000)}rb`;
+                         /* Tandanya dipisah dulu. Tanpa ini, pembulatan
+                            rupiah menghasilkan "Rp-3.9jt" — minus terselip
+                            di antara satuan dan angka, tempat mata tidak
+                            mencarinya. */
+                         const tanda = v < 0 ? '−' : '';
+                         const n = Math.abs(v);
+                         if (tampil !== 'IDR') return `${tanda}$${n}`;
+                         const rp = n * kurs;
+                         return rp >= 1_000_000 ? `${tanda}Rp${(rp / 1_000_000).toFixed(1)}jt` : `${tanda}Rp${Math.round(rp / 1000)}rb`;
                        }} />
                 <Tooltip content={<TipGrafik />} cursor={{ fill: 'currentColor', fillOpacity: 0.06 }} />
                 {/* Bertumpuk pada stackId yang sama: tinggi total = omzet
@@ -460,12 +471,18 @@ export default function Pemilik() {
                     begitu komponennya dipasang ulang. Terukur di peramban,
                     bukan dugaan. Sudut siku adalah harga yang murah untuk
                     batang yang tingginya benar. */}
-                {/* DUA tumpukan bersebelahan, bukan satu. Pemasukan
-                    (lisensi + manual) menumpuk jadi satu batang; pengeluaran
-                    berdiri di sebelahnya dengan stackId berbeda — itulah cara
-                    Recharts memisahkan kolom. Menumpuk keluar di atas masuk
-                    akan membaca sebagai "total", padahal keduanya berlawanan
-                    arah. */}
+                {/* SATU tumpukan, dua arah. Pemasukan positif menumpuk ke
+                    atas, pengeluaran negatif menjulur ke bawah dari garis
+                    nol — stackId yang sama justru yang membuatnya terpisah
+                    dengan benar, karena Recharts memisahkan berdasarkan
+                    TANDA, bukan berdasarkan kolom.
+
+                    Sempat dicoba dua stackId bersebelahan: dengan satu bulan
+                    saja, kedua batang terlempar ke tengah-tengah paruhnya
+                    masing-masing dan berjarak ratusan piksel — Recharts
+                    membagi lebar per slot, dan maxBarSize hanya mengecilkan
+                    batangnya, bukan slotnya. */}
+                <ReferenceLine y={0} stroke="currentColor" strokeOpacity={0.35} />
                 {/* `minPointSize` WAJIB di sini, bukan hiasan. Pengeluaran
                     bulan ini empat puluh kali pemasukan, jadi pada sumbu yang
                     sama batang $5 tingginya 4 px — dan Recharts tidak
@@ -477,9 +494,9 @@ export default function Pemilik() {
                     memang setimpang itu, dan justru itulah yang perlu
                     terlihat. Yang diperbaiki cuma agar batang kecilnya tetap
                     punya wujud yang bisa dilihat dan disentuh tetikus. */}
-                <Bar dataKey="lisensi" stackId="masuk" name="Lisensi" fill="#10b981" fillOpacity={0.85} maxBarSize={22} minPointSize={3} />
-                <Bar dataKey="manual" stackId="masuk" name="Manual" fill="#38bdf8" fillOpacity={0.75} maxBarSize={22} minPointSize={3} />
-                <Bar dataKey="keluar" stackId="keluar" name="Pengeluaran" fill="#ef4444" fillOpacity={0.7} maxBarSize={22} minPointSize={3} />
+                <Bar dataKey="lisensi" stackId="a" name="Lisensi" fill="#10b981" fillOpacity={0.85} maxBarSize={34} minPointSize={3} />
+                <Bar dataKey="manual" stackId="a" name="Manual" fill="#38bdf8" fillOpacity={0.75} maxBarSize={34} minPointSize={3} />
+                <Bar dataKey="keluar" stackId="a" name="Pengeluaran" fill="#ef4444" fillOpacity={0.7} maxBarSize={34} minPointSize={-3} />
               </BarChart>
             </ResponsiveContainer>
             </div>
