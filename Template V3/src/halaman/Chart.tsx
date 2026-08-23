@@ -3681,7 +3681,17 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
               Ketiganya diberi latar gelap tembus pandang: mereka kini duduk di
               atas lilin, dan teks tanpa latar di atas lilin merah-hijau
               berubah keterbacaannya tiap kali harga bergerak. */}
-          <div className={cn('pointer-events-none absolute inset-x-0 bottom-0 z-10 flex items-center gap-3 px-4 py-2 text-[11.5px] text-zinc-600',
+          {/* z-25: DI ATAS bilah alat gambar (z-20), DI BAWAH dock Pine
+              (z-30). Angkanya bukan selera — hamparan ini membuat KONTEKS
+              TUMPUKAN sendiri, jadi panel setelan di dalamnya (z-40) tidak
+              pernah bisa melampaui apa pun yang wadahnya sendiri kalahkan.
+
+              Sempat z-10, dan bilah alat menembus panel setelan yang sedang
+              terbuka: ikon pensil melayang di atas kotak warna. Sempat pula
+              z-30, yang menyamakannya dengan dock Pine — dan panel yang
+              menutupi separuh chart pantas berada di atas tiga ikon kecil
+              di dasarnya, bukan sebaliknya. */}
+          <div className={cn('pointer-events-none absolute inset-x-0 bottom-0 z-[25] flex items-center gap-3 px-4 py-2 text-[11.5px] text-zinc-600',
             POLOS && 'hidden')}>
             {/* Gerigi duduk di pojok paling kiri kaki chart, TANPA teks. Ia
                 setelan yang dibuka sesekali lalu ditutup; label tetap di sana
