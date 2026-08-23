@@ -94,6 +94,34 @@ export interface Rilis {
 /* Urutan: terbaru dulu. CHANGELOG[0] yang tampil di kotak sidebar. */
 export const CHANGELOG: Rilis[] = [
   {
+    versi: 'v3.5',
+    tanggal: '23 Agustus 2026',
+    judul: 'Ulasan yang bisa dijawab, laporan yang mengisi sendiri',
+    ringkas: 'Suka dan balasan di Marketplace, Sales Report terbagi dua, dan pemasukan lisensi terhitung otomatis.',
+    sorotan:
+      'Dua hal yang selama ini dikerjakan tangan sekarang berjalan sendiri. Pemasukan dari lisensi berbayar tidak ' +
+      'perlu dicatat ulang — ia terhitung langsung dari permintaan yang kamu setujui di Maintenance, memakai harga ' +
+      'yang berlaku saat permintaannya dibuat. Dan ulasan di Marketplace berhenti jadi papan satu arah: siapa pun ' +
+      'yang sudah masuk bisa menyukai dan membalasnya.',
+    butir: [
+      { jenis: 'baru', teks: 'Suka dan balasan di tiap ulasan Marketplace — terbuka untuk semua pengguna yang sudah masuk.' },
+      { jenis: 'baru', teks: 'Saringan etalase: All Product, Premium, Indikator, EA MT5, dan Free, masing-masing membawa jumlahnya.' },
+      { jenis: 'baru', teks: 'Sales Report dibagi dua: Cash Flow untuk uang masuk-keluar, Lisensi & Klien untuk siapa yang memakai.' },
+      { jenis: 'baru', teks: 'Pemasukan lisensi terhitung sendiri dari Maintenance, lengkap dengan grafik pemasukan vs pengeluaran per bulan.' },
+      { jenis: 'baru', teks: 'Aktivasi & Lisensi dipecah per tingkat — Gratis, Testing, Premium 3 Bulan, Tahunan, dan Produk Marketplace — masing-masing berwarna sendiri.' },
+      { jenis: 'baru', teks: 'Pesan otomatis saat permintaan akses disetujui atau ditolak: sampai ke surel pemohon sekaligus tampil di halaman aksesnya.' },
+      { jenis: 'baru', teks: 'Peraga cara kerja Supertrend di Marketplace — pita yang berpindah sisi saat tren berbalik.' },
+      { jenis: 'baru', teks: 'Laporan bug dan saran pengguna pindah ke Maintenance → Error & Fixing, dengan saringan yang belum dibereskan.' },
+      { jenis: 'peningkatan', teks: 'Nama indikator tidak lagi menutupi lilin — daftarnya kini di panel Indikator, lengkap dengan setelan input, buka kode, dan lepas.' },
+      { jenis: 'peningkatan', teks: 'Panel akun menyebut nama paketmu, bukan cuma "Aktif", plus keterangan Copy Signal termasuk atau tidak.' },
+      { jenis: 'peningkatan', teks: 'Kurva saldo di kartu analis digambar melengkung — mulus, tapi puncaknya tetap persis puncak datanya.' },
+      { jenis: 'perbaikan', teks: 'Pembeli paket berbayar sempat dibaca sebagai pengguna gratis, sehingga Copy Signal terkunci untuk yang sudah membayar. Seluruh lisensi aktif diperbaiki.' },
+      { jenis: 'perbaikan', teks: 'Kartu "Riwayat lebih lama" di chart berhenti melompat ke kanan saat chart digeser ke kiri.' },
+      { jenis: 'perbaikan', teks: 'Catatan pemilik pada permintaan yang sudah diputus tidak pernah muncul kembali di panelnya — sekarang tersimpan dan terbaca.' },
+      { jenis: 'perbaikan', teks: 'Halaman Marketplace jauh lebih hemat kuota: ulasan, suka, dan balasan tidak lagi diunduh seluruhnya tiap kunjungan.' },
+    ],
+  },
+  {
     versi: 'v3.4',
     tanggal: '10 Agustus 2026',
     judul: 'Order sungguhan dari Area Entry',
