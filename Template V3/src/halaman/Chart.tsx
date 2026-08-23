@@ -2635,7 +2635,13 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
           bergaris di dalam kotak bergaris menghasilkan dua garis sejajar
           berjarak beberapa piksel, yang terbaca sebagai cacat penataan
           alih-alih sebagai pemisah. */}
-      <Panel className={POLOS ? 'rounded-none border-0 bg-transparent' : undefined}>
+      {/* TANPA LATAR, garis tepinya tinggal — permintaan pemilik. Latar
+          kartu di halaman ini cuma satu tingkat lebih terang daripada
+          halamannya, cukup untuk terbaca sebagai kotak tapi tidak cukup
+          untuk memisahkan apa pun; yang benar-benar memisahkan garis
+          tepinya. Menghapus latarnya membuat chart menyatu dengan
+          halamannya dan yang tersisa persis pembatasnya saja. */}
+      <Panel className={POLOS ? 'rounded-none border-0 bg-transparent' : 'bg-transparent'}>
         {/* `relative`: jangkar bagi panel News dan menu Indikator di HP.
             Keduanya dilepas dari tombolnya di layar kecil dan digantung
             ke bilah ini, supaya lebarnya mengikuti bilah dan tidak bisa
@@ -3876,7 +3882,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
             </span>
           </div>
       {/* ── Setelan uji ── */}
-          <Panel className="mt-4">
+          <Panel className="mt-4 bg-transparent">
             <PanelHead
               judul="Backtest"
               sub="Dihitung dengan indikator yang sama persis dengan Screener Entry."
@@ -3923,7 +3929,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
           {/* ── Hasil ── */}
           {hasil && (
             hasil.catatan ? (
-              <Panel className="mt-4 px-5 py-6 text-center text-[12.5px] text-zinc-500">{hasil.catatan}</Panel>
+              <Panel className="mt-4 bg-transparent px-5 py-6 text-center text-[12.5px] text-zinc-500">{hasil.catatan}</Panel>
             ) : (
               <>
                 <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
@@ -3941,7 +3947,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                             catatan="penurunan terdalam dari puncak" />
                 </div>
 
-                <Panel className="mt-4">
+                <Panel className="mt-4 bg-transparent">
                   <PanelHead judul="Daftar Trade" sub={`${hasil.jumlah} transaksi — penandanya ikut tergambar di chart.`} />
                   <div className="px-5 pb-5">
                     <TabelBungkus className="max-h-[380px] overflow-y-auto">
@@ -4011,8 +4017,8 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
           )}
           {!(POLOS && posisiSembunyi) && (
             <div className={cn('grid grid-cols-1 gap-4 lg:grid-cols-2', POLOS ? 'mt-0' : 'mt-4')}>
-              <PanelPosisiTerbuka sumber="kripto" onSunting={bukaSunting} onTutup={tutupDariTabel} tanpaBingkai={POLOS} />
-              <PanelPosisiTerbuka sumber="forex" onSunting={bukaSunting} onTutup={tutupDariTabel} tanpaBingkai={POLOS} />
+              <PanelPosisiTerbuka sumber="kripto" onSunting={bukaSunting} onTutup={tutupDariTabel} tanpaBingkai={POLOS} tanpaLatar />
+              <PanelPosisiTerbuka sumber="forex" onSunting={bukaSunting} onTutup={tutupDariTabel} tanpaBingkai={POLOS} tanpaLatar />
             </div>
           )}
         </>
