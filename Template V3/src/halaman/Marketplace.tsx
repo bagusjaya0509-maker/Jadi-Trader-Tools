@@ -2,13 +2,14 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Check, Crown, Download, Copy, X, Star, MessageCircle, ExternalLink, KeyRound, Loader2, Trash2,
-  GripHorizontal,
+  GripHorizontal, Store, MessagesSquare, ThumbsUp, CornerDownRight, Send,
 } from 'lucide-react';
 import { PeragaProduk } from '@/components/peraga-produk';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { cn, tanggalPendek } from '@/lib/utils';
 import { type Produk } from '@/data/contoh';
 import { bisaDipasang, pasangIndikator } from '@/lib/pasang-indikator';
+import { useSuka, tukarSuka, useBalasan, kirimBalasan, hapusBalasan, type Balasan } from '@/lib/ulasan';
 
 /* ════════════════════════════════════════════════════════════════════════
    TOMBOL PASANG KE CHART
@@ -378,6 +379,112 @@ function MintaKode({ produk, lynk }: { produk: string; lynk?: string }) {
   );
 }
 
+/* ── Kaki kartu ulasan: suka + balasan ───────────────────────────────────
+   Komponen SENDIRI, bukan JSX di dalam .map(). Kotak balasannya punya
+   keadaan terbuka/tertutup dan isi ketikan masing-masing; ditulis inline,
+   satu useState harus melayani semua kartu — dan mengetik balasan di satu
+   ulasan akan memunculkan huruf yang sama di ulasan lainnya.
+
+   Menyukai TIDAK menunggu server. Firestore sudah menerapkan perubahannya
+   ke cache lokal sebelum jaringan menjawab, jadi angkanya berubah seketika
+   lewat onSnapshot; menambah keadaan optimis sendiri di sini cuma membuat
+   dua sumber kebenaran yang bisa berselisih. */
+function KakiUlasan({ ulasanId, suka, akuSuka, balasan, bolehTulis, uidAku, pemilik }: {
+  ulasanId: string; suka: number; akuSuka: boolean; balasan: Balasan[];
+  bolehTulis: boolean; uidAku: string; pemilik: boolean;
+}) {
+  const [buka, setBuka] = useState(false);
+  const [teks, setTeks] = useState('');
+  const [sibuk, setSibuk] = useState(false);
+  const [galat, setGalat] = useState('');
+
+  async function kirim() {
+    setSibuk(true); setGalat('');
+    try {
+      await kirimBalasan(ulasanId, teks);
+      setTeks(''); setBuka(false);
+    } catch (e) {
+      setGalat(e instanceof Error ? e.message : 'Gagal mengirim balasan.');
+    } finally { setSibuk(false); }
+  }
+
+  return (
+    <>
+      <div className="mt-3 flex items-center gap-1 border-t border-zinc-800/50 pt-2.5">
+        <button
+          onClick={() => { void tukarSuka(ulasanId, akuSuka).catch((e) => setGalat(e.message)); }}
+          disabled={!bolehTulis}
+          title={bolehTulis ? (akuSuka ? 'Batal menyukai' : 'Suka ulasan ini') : 'Masuk dulu untuk menyukai'}
+          aria-pressed={akuSuka}
+          className={cn('flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-[11.5px] transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+            akuSuka ? 'text-emerald-400 hover:bg-emerald-500/10' : 'text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300')}>
+          <ThumbsUp className={cn('size-3.5', akuSuka && 'fill-emerald-400/25')} />
+          {suka > 0 && <span className="angka">{suka}</span>}
+        </button>
+        <button
+          onClick={() => setBuka((v) => !v)}
+          disabled={!bolehTulis}
+          title={bolehTulis ? 'Balas ulasan ini' : 'Masuk dulu untuk membalas'}
+          className="flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-[11.5px] text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-300 disabled:cursor-not-allowed disabled:opacity-50">
+          <CornerDownRight className="size-3.5" /> Balas
+          {balasan.length > 0 && <span className="angka text-zinc-600">{balasan.length}</span>}
+        </button>
+      </div>
+
+      {/* Balasan MASUK KE DALAM garis kiri, bukan kartu tersendiri. Kotak di
+          dalam kotak membuat percakapan terlihat seperti daftar baru;
+          garis tepi kiri cukup untuk mengatakan "ini menjawab yang di
+          atas". */}
+      {balasan.length > 0 && (
+        <div className="mt-2 space-y-2 border-l border-zinc-800 pl-3">
+          {balasan.map((b) => (
+            <div key={b.id} className="flex items-start gap-2">
+              {b.foto ? (
+                <img src={b.foto} alt="" width={20} height={20} loading="lazy" referrerPolicy="no-referrer"
+                     className="mt-0.5 size-5 shrink-0 rounded-full bg-zinc-800 object-cover"
+                     onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+              ) : (
+                <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-[9px] font-semibold text-zinc-300">
+                  {b.nama.charAt(0).toUpperCase()}
+                </span>
+              )}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-[11.5px] text-zinc-300">{b.nama}</span>
+                  <span className="text-[10.5px] text-zinc-600">{tanggalPendek(b.waktu)}</span>
+                  {(pemilik || uidAku === b.uid) && (
+                    <button onClick={() => { if (confirm('Hapus balasan ini?')) void hapusBalasan(b.id); }}
+                            aria-label="Hapus balasan"
+                            className="ml-auto cursor-pointer rounded p-0.5 text-zinc-700 transition-colors hover:text-red-400">
+                      <Trash2 className="size-3" />
+                    </button>
+                  )}
+                </div>
+                <p className="whitespace-pre-line text-[12px] leading-relaxed text-zinc-400">{b.isi}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {buka && (
+        <div className="mt-2 flex items-start gap-2 border-l border-zinc-800 pl-3">
+          <textarea rows={2} value={teks} onChange={(e) => setTeks(e.target.value)} maxLength={400}
+            placeholder="Tulis balasanmu…"
+            className="min-w-0 flex-1 resize-y rounded-md border border-zinc-800 bg-zinc-900/60 p-2 text-[12px] text-zinc-100 outline-none placeholder:text-zinc-600 hover:border-zinc-700 focus-visible:border-zinc-600" />
+          <button onClick={() => void kirim()} disabled={sibuk || !teks.trim()}
+            aria-label="Kirim balasan"
+            className="mt-0.5 flex cursor-pointer items-center gap-1.5 rounded-md bg-zinc-100 px-2.5 py-2 text-[11.5px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50">
+            {sibuk ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
+          </button>
+        </div>
+      )}
+
+      {galat && <p className="mt-1.5 text-[11px] text-amber-400/90">{galat}</p>}
+    </>
+  );
+}
+
 export default function Marketplace() {
   /* Kurs untuk keterangan rupiah di bawah harga dolar. Diambil sekali di
      sini, bukan di dalam tiap kartu — angkanya sama untuk semua produk. */
@@ -449,6 +556,8 @@ export default function Marketplace() {
     }
   }
   const ulasan = useUlasan();
+  const suka = useSuka();
+  const balasan = useBalasan();
 
   const [bintang, setBintang] = useState(5);
   const [tulisan, setTulisan] = useState('');
@@ -470,8 +579,21 @@ export default function Marketplace() {
     } finally { setKirimSibuk(false); }
   }
 
+  /* Jarak ke tepi DIRAPATKAN — p-4/p-6 jadi p-3/p-4. Halaman ini etalase:
+     yang berharga di sini lebar kartu produk, bukan ruang kosong di antara
+     kartu dan garis sidebar. Halaman lain sengaja tidak diikutkan;
+     masing-masing punya alasan sendiri untuk lapang.
+
+     Komentarnya di LUAR `return (`, bukan komentar-JSX di dalamnya: di
+     sana belum ada elemen JSX yang menampungnya, dan kurung kurawalnya
+     dibaca sebagai awal sebuah objek.
+
+     Catatan untuk yang menyunting nanti: JANGAN menulis pasangan pembuka
+     dan penutup komentar JSX di dalam komentar blok seperti ini. Penutup
+     bintang-garisnya mengakhiri komentar ini lebih awal, dan sisa
+     kalimatnya jatuh ke luar sebagai kode. Sudah terjadi. */
   return (
-    <div className="p-4 sm:p-6">
+    <div className="p-3 sm:p-4">
       {/* Baris KPI dibuang. Halaman ini dilihat calon pembeli, dan tiga dari
           empat kartunya adalah angka dapur: berapa lisensi aktif, berapa
           pendapatan. Itu milik Traffic & Sales, bukan etalase — dan kartu
@@ -494,7 +616,7 @@ export default function Marketplace() {
           CSS hasil bangun. */}
       <Panel className="border-0 bg-transparent">
         <PanelHead
-          judul="Products"
+          judul={<span className="flex items-center gap-2"><Store className="size-4 text-zinc-500" />Products</span>}
           sub="Indikator TradingView dan Expert Advisor MetaTrader yang dipakai di terminal ini."
           /* PanelDiscord DICABUT dari sini. Judul panel "Products" adalah
              tempat orang mencari produk; kotak komunitas di sebelahnya
@@ -596,13 +718,19 @@ export default function Marketplace() {
       </Panel>
 
       {/* ── Testimoni + rating ── */}
+      {/* GARIS PEMISAH SEKSI. Begitu kedua panel kehilangan bingkainya,
+          tidak ada lagi yang memberi tahu di mana etalase berakhir dan
+          ulasan dimulai — keduanya jadi satu gulungan panjang tanpa sendi.
+          Satu garis mengembalikan batas itu tanpa mengembalikan kotaknya. */}
+      <div className="mt-6 border-t border-zinc-800/80" />
+
       {/* Tanpa garis tepi dan tanpa latar, seragam dengan panel Products di
           atasnya. Isinya sudah berbingkai sendiri — kartu ulasan, kotak
           tulis-ulasan, dan ajakan Discord — jadi bingkai pembungkusnya cuma
           lapisan keempat yang tidak menambah keterangan apa pun. */}
-      <Panel className="mt-4 border-0 bg-transparent">
+      <Panel className="mt-2 border-0 bg-transparent">
         <PanelHead
-          judul="Ulasan Pengguna"
+          judul={<span className="flex items-center gap-2"><MessagesSquare className="size-4 text-zinc-500" />Ulasan Pengguna</span>}
           sub="Ditulis langsung oleh pemakai, bukan kutipan pilihan."
           kanan={
             <div className="flex items-center gap-2">
@@ -665,6 +793,16 @@ export default function Marketplace() {
                 </div>
                 <p className="mt-2 whitespace-pre-line text-[12.5px] leading-relaxed text-zinc-400">{u.isi}</p>
                 {u.produk && <div className="mt-2 text-[11px] text-zinc-600">tentang {u.produk}</div>}
+
+                <KakiUlasan
+                  ulasanId={u.id}
+                  suka={suka.jumlah[u.id] ?? 0}
+                  akuSuka={suka.punyaku.has(u.id)}
+                  balasan={balasan.per[u.id] ?? []}
+                  bolehTulis={!!pengguna}
+                  uidAku={pengguna?.uid ?? ''}
+                  pemilik={pemilik}
+                />
               </div>
             ))}
           </div>

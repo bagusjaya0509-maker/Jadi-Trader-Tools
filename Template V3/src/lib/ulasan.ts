@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { collection, onSnapshot, addDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, deleteDoc, doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/data';
 import { auth } from '@/lib/firebase';
 
@@ -112,4 +112,122 @@ export async function kirimUlasan(u: { bintang: number; isi: string; produk: str
 
 export async function hapusUlasan(id: string) {
   await deleteDoc(doc(db, 'ulasan', id));
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   SUKA & BALASAN
+   ════════════════════════════════════════════════════════════════════════
+   Keduanya koleksi DATAR di akar, bukan subkoleksi di dalam tiap ulasan.
+   Alasannya jumlah pendengar: subkoleksi berarti satu onSnapshot per
+   ulasan, jadi seratus ulasan membuka seratus sambungan. Koleksi datar
+   cukup dua — satu untuk semua suka, satu untuk semua balasan — berapa pun
+   ulasannya.
+
+   Id dokumen suka sengaja `${ulasanId}__${uid}`, bukan id acak. Itu yang
+   membuat satu orang hanya bisa menyukai satu kali: tulisan kedua menimpa
+   dokumen yang sama alih-alih menambah baris baru, dan aturan Firestore
+   bisa memastikan idnya cocok dengan penulisnya. Dengan id acak, siapa pun
+   bisa mengirim seribu suka untuk ulasan yang sama.
+
+   Aturan Firestore-lah yang menegakkan semua itu. Kode di sini cuma
+   antarmuka, dan siapa pun bisa melewatinya lewat konsol peramban.
+   ════════════════════════════════════════════════════════════════════════ */
+
+export interface Balasan {
+  id: string;
+  ulasanId: string;
+  uid: string;
+  nama: string;
+  foto: string;
+  isi: string;
+  waktu: number;
+}
+
+const idSuka = (ulasanId: string, uid: string) => `${ulasanId}__${uid}`;
+
+/** Suka per ulasan: berapa banyak, dan apakah AKU sudah menyukainya. */
+export function useSuka(): { jumlah: Record<string, number>; punyaku: Set<string>; siap: boolean } {
+  const [jumlah, setJumlah] = useState<Record<string, number>>({});
+  const [punyaku, setPunyaku] = useState<Set<string>>(new Set());
+  const [siap, setSiap] = useState(false);
+  const aku = auth.currentUser?.uid ?? '';
+
+  useEffect(() => {
+    return onSnapshot(collection(db, 'ulasanSuka'),
+      (s) => {
+        const n: Record<string, number> = {};
+        const milikku = new Set<string>();
+        s.docs.forEach((d) => {
+          const v = d.data();
+          const uid = String(v.ulasanId ?? '');
+          if (!uid) return;
+          n[uid] = (n[uid] ?? 0) + 1;
+          if (aku && String(v.uid ?? '') === aku) milikku.add(uid);
+        });
+        setJumlah(n); setPunyaku(milikku); setSiap(true);
+      },
+      (e) => { console.warn('suka:', e); setSiap(true); });
+  }, [aku]);
+
+  return { jumlah, punyaku, siap };
+}
+
+/** Menyukai / batal menyukai. Idempoten: menekan dua kali kembali ke semula. */
+export async function tukarSuka(ulasanId: string, sedangSuka: boolean) {
+  const p = auth.currentUser;
+  if (!p) throw new Error('Masuk dulu untuk menyukai ulasan.');
+  const ref = doc(db, 'ulasanSuka', idSuka(ulasanId, p.uid));
+  if (sedangSuka) await deleteDoc(ref);
+  else await setDoc(ref, { ulasanId, uid: p.uid, waktu: serverTimestamp() });
+}
+
+/** Balasan, dikelompokkan per ulasan dan diurut dari yang paling lama —
+ *  percakapan dibaca dari atas ke bawah, bukan sebaliknya. */
+export function useBalasan(): { per: Record<string, Balasan[]>; memuat: boolean } {
+  const [per, setPer] = useState<Record<string, Balasan[]>>({});
+  const [memuat, setMemuat] = useState(true);
+
+  useEffect(() => {
+    return onSnapshot(collection(db, 'ulasanBalasan'),
+      (s) => {
+        const kotak: Record<string, Balasan[]> = {};
+        s.docs.forEach((d) => {
+          const v = d.data();
+          const b: Balasan = {
+            id: d.id,
+            ulasanId: String(v.ulasanId ?? ''),
+            uid: String(v.uid ?? ''),
+            nama: String(v.nama ?? 'Pengguna'),
+            foto: String(v.foto ?? ''),
+            isi: String(v.isi ?? ''),
+            waktu: v.waktu?.toMillis?.() ?? Date.now(),
+          };
+          if (!b.ulasanId) return;
+          (kotak[b.ulasanId] ??= []).push(b);
+        });
+        Object.values(kotak).forEach((a) => a.sort((x, y) => x.waktu - y.waktu));
+        setPer(kotak); setMemuat(false);
+      },
+      (e) => { console.warn('balasan:', e); setMemuat(false); });
+  }, []);
+
+  return { per, memuat };
+}
+
+export async function kirimBalasan(ulasanId: string, isi: string) {
+  const p = auth.currentUser;
+  if (!p) throw new Error('Masuk dulu untuk membalas.');
+  if (!isi.trim()) throw new Error('Tulis dulu balasannya.');
+  await addDoc(collection(db, 'ulasanBalasan'), {
+    ulasanId,
+    uid: p.uid,
+    nama: p.displayName || (p.email ?? '').split('@')[0] || 'Pengguna',
+    foto: p.photoURL ?? '',
+    isi: isi.trim().slice(0, 400),
+    waktu: serverTimestamp(),
+  });
+}
+
+export async function hapusBalasan(id: string) {
+  await deleteDoc(doc(db, 'ulasanBalasan', id));
 }
