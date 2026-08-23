@@ -196,11 +196,41 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
     return jarak * unitPerHarga;
   }
 
+  /* ── POSISI YANG SUDAH MELEWATI STOPNYA SENDIRI ───────────────────────
+     Dokumen `public/posisiTerbuka` ditulis screener V2 dan HANYA selama
+     halaman itu terbuka. Posisi yang tertutup saat screener tidak berjalan
+     tertinggal di sana — terukur pada MANAUSDT: entry 0,06330 dengan TP
+     0,06530, sementara pasarnya sudah 0,07250. Harga melewati targetnya
+     11% yang lalu, dan barisnya masih tertulis "sedang berjalan".
+
+     Yang dipakai sebagai penilai adalah SL dan TP MILIK POSISI ITU SENDIRI,
+     bukan ambang karangan: kalau harga sudah melewati exit yang ditetapkan
+     rencananya, posisi itu menurut rencananya sendiri sudah selesai.
+
+     Hanya berlaku untuk baris yang TIDAK didukung bursa (`jumlah` kosong).
+     Posisi yang dilaporkan akun Binance tidak perlu ditebak — kalau ia ada
+     di daftar bursa, ia memang masih terbuka, berapa pun harganya. */
+  function raguKarena(p: typeof posisiKripto[number], kini?: number): string | undefined {
+    if (p.jumlah !== undefined) return undefined;
+    if (!kini || !(kini > 0)) return undefined;
+    const buy = p.arah === 'BUY';
+    const lewatTp = p.tp > 0 && (buy ? kini >= p.tp : kini <= p.tp);
+    const lewatSl = p.sl > 0 && (buy ? kini <= p.sl : kini >= p.sl);
+    if (!lewatTp && !lewatSl) return undefined;
+    return `Harga sekarang ${fHarga(kini)} sudah melewati ${lewatTp ? 'TP' : 'SL'} `
+      + `${fHarga(lewatTp ? p.tp : p.sl)}. Posisi ini datang dari dokumen publik screener, `
+      + `yang hanya diperbarui selama halaman screener terbuka — kemungkinan besar sudah `
+      + `tertutup dan catatannya belum ikut diperbarui. Kalau ternyata masih terbuka, `
+      + `berarti order stopnya tidak jalan dan perlu diperiksa langsung di Binance.`;
+  }
+
   const baris: BarisPosisi[] = sumber === 'kripto'
     ? posisiKripto.map((p) => {
         const unit = p.jumlah ?? 0;
+        const kini = kriptoContoh ? p.hargaKini : hargaPasar[p.simbol];
         return {
           kunci: p.id, simbol: p.simbol, arah: p.arah,
+          ragu: raguKarena(p, kini),
           ket: p.tf && p.tf !== '—' ? p.tf : p.venue,
           ukuran: p.jumlah ? p.jumlah.toLocaleString('id-ID', { maximumFractionDigits: 4 }) : '',
           /* Data nyata: HANYA harga pasar. `p.hargaKini` dari dokumen publik
@@ -208,7 +238,7 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
              menulis "+0,00%" — yang terbaca "harga tidak bergerak" padahal
              artinya "harganya tidak kita ketahui". Contoh punya harganya
              sendiri dan memang boleh dipakai. */
-          entry: p.entry, hargaKini: kriptoContoh ? p.hargaKini : hargaPasar[p.simbol],
+          entry: p.entry, hargaKini: kini,
           sl: p.sl, tp: p.tp,
           pnl: p.pnlFloat,
           ukuranUsd: unit > 0 && p.entry > 0 ? unit * p.entry : undefined,

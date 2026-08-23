@@ -24,6 +24,12 @@ export interface BarisPosisi {
   kunci: string;
   simbol: string;
   arah: 'BUY' | 'SELL';
+  /** Alasan baris ini patut diragukan, siap tampil. Kosong = tidak ada.
+   *
+   *  Dipakai posisi yang datang dari dokumen publik screener: dokumen itu
+   *  hanya ditulis ulang selama halaman screener terbuka, jadi posisi yang
+   *  sudah tertutup bisa tertinggal di sana berhari-hari. */
+  ragu?: string;
   /** Sudah lengkap dengan satuannya: "223,8 THETA" atau "0,01 lot". */
   ukuran: string;
   /** Nilai posisi dalam DOLAR (jumlah x entry).
@@ -109,11 +115,23 @@ export function TabelPosisi({ baris, kosong, onKlikBaris, onTutup }: {
                   title={onKlikBaris ? 'Buka di chart untuk mengubah SL/TP' : undefined}
                   className={onKlikBaris ? 'cursor-pointer transition-colors hover:bg-zinc-800/40' : undefined}>
                 <Td>
-                  <span className="text-zinc-200">{b.simbol}</span>
+                  <span className={b.ragu ? 'text-zinc-400' : 'text-zinc-200'}>{b.simbol}</span>
                   <span className={cn('ml-1.5 text-[10.5px]',
                     b.arah === 'BUY' ? 'text-emerald-500' : 'text-red-400')}>
                     {b.arah}
                   </span>
+                  {/* DITANDAI, BUKAN DISEMBUNYIKAN. Menyembunyikannya akan
+                      menutupi dua kemungkinan yang berbeda jauh: posisinya
+                      memang sudah tertutup dan dokumennya basi (tidak apa),
+                      atau order stopnya GAGAL dan posisinya masih terbuka
+                      tanpa perlindungan (harus segera diketahui). Baris yang
+                      hilang diam-diam tidak pernah menanyakan yang kedua. */}
+                  {b.ragu && (
+                    <span title={b.ragu}
+                      className="ml-1.5 rounded bg-amber-500/15 px-1 text-[9.5px] font-semibold text-amber-400/90">
+                      perlu diperiksa
+                    </span>
+                  )}
                   {/* SL yang belum dipasang ditulis terang-terangan dengan
                       warna peringatan. Menyamarkannya jadi tanda hubung
                       membuat posisi tak terlindungi terlihat sama dengan

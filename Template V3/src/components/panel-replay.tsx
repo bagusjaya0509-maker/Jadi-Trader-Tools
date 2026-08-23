@@ -181,7 +181,16 @@ export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, aturAks
       masukWaktu: lilin.times[posisi.masukIdx], keluarWaktu: lilin.times[idx],
     }]);
     setPosisi(null);
-    setPesan(`${kena.kena} kena di ${fHarga(kena.harga)} — ${uang(pnl, true)}`);
+    /* PEMUTARNYA IKUT BERHENTI. Sebelum ini posisinya ditutup tapi barnya
+       terus melaju, jadi kabar "TP kena" lewat begitu saja sementara chart
+       sudah puluhan bar di depan — orang baru sadar sesudah tidak ada lagi
+       yang bisa dilihat dari kejadiannya.
+
+       Berhenti di bar tempat stopnya kena adalah inti latihan replay: yang
+       perlu diperiksa bukan angka akhirnya, melainkan seperti apa pasarnya
+       tepat sebelum dan sesudah keputusan itu selesai. */
+    setMain(false);
+    setPesan(`${kena.kena} kena di ${fHarga(kena.harga)} — ${uang(pnl, true)} · replay dijeda`);
   }, [idx, posisi, lilin]);
 
   /* Bar aktif: bar replay kalau sedang berjalan, bar TERAKHIR kalau tidak —
