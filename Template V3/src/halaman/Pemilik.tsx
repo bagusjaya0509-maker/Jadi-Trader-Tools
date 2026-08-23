@@ -486,37 +486,22 @@ export default function Pemilik() {
           )}
         </div>
 
-        {/* Pencatatan manual — Lynk tidak mengirim webhook ke backend, jadi
-            satu-satunya cara penjualan masuk ke laporan adalah dicatat di
-            sini. Tanpa kotak ini, panel penjualan selamanya kosong. */}
-        <div className="border-t border-zinc-800/80 px-5 py-4">
-          <div className="mb-2 text-[11px] text-zinc-500">Catat penjualan baru</div>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-5">
-            <input value={form.produk} onChange={(e) => setForm({ ...form, produk: e.target.value })}
-                   placeholder="Produk" disabled={!pemilik}
-                   className="h-9 rounded-md border border-zinc-800 bg-zinc-900/60 px-3 text-[12.5px] text-zinc-100 outline-none hover:border-zinc-700 focus-visible:border-zinc-600 disabled:opacity-50 sm:col-span-2" />
-            <input value={form.pembeli} onChange={(e) => setForm({ ...form, pembeli: e.target.value })}
-                   placeholder="Pembeli (email)" disabled={!pemilik}
-                   className="h-9 rounded-md border border-zinc-800 bg-zinc-900/60 px-3 text-[12.5px] text-zinc-100 outline-none hover:border-zinc-700 focus-visible:border-zinc-600 disabled:opacity-50" />
-            <input value={form.nilai} onChange={(e) => setForm({ ...form, nilai: e.target.value })}
-                   placeholder="Nilai ($)" inputMode="decimal" disabled={!pemilik}
-                   className="angka h-9 rounded-md border border-zinc-800 bg-zinc-900/60 px-3 text-[12.5px] text-zinc-100 outline-none hover:border-zinc-700 focus-visible:border-zinc-600 disabled:opacity-50" />
-            <button onClick={() => void tambahPenjualan()} disabled={sibuk || !pemilik}
-                    title={pemilik ? undefined : 'Hanya pemilik yang boleh mencatat penjualan'}
-                    className="flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-md bg-zinc-100 px-3 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50">
-              <Plus className="size-3.5" /> Catat
-            </button>
-          </div>
-        </div>
       </Panel>
 
-      {/* ── Recent sales ───────────────────────────────────────────────
-          DI ATAS Pengeluaran, dan berbentuk sama persis dengannya:
-          Tanggal | Produk | Kategori | Nilai. Dua tabel uang yang bentuknya
-          seragam bisa dibaca dengan satu kebiasaan mata, dan urutannya
-          mengikuti arah uang — yang masuk dulu, baru yang keluar. */}
+      {/* ── Pemasukan ──────────────────────────────────────────────────
+          DI ATAS Pengeluaran, dan bentuknya kembar dengannya: tabel
+          Tanggal | Produk | Kategori | Nilai, lalu kotak pencatatan di
+          kaki panel. Dua tabel uang yang seragam bisa dibaca dengan satu
+          kebiasaan mata, dan urutannya mengikuti arah uang — yang masuk
+          dulu, baru yang keluar.
+
+          Kotak "catat penjualan" DULU menempel di panel grafik. Tempatnya
+          salah: grafik adalah tempat MEMBACA, formulir adalah tempat
+          MENULIS, dan yang ditulis di sana muncul sebagai baris di tabel
+          ini — bukan di grafik itu. Sekarang formulir dan hasilnya duduk
+          di panel yang sama, persis seperti Pengeluaran. */}
       <Panel className="mt-4">
-        <PanelHead judul="Recent sales" sub="Lisensi berbayar dan catatan tangan, diurut bersama."
+        <PanelHead judul="Pemasukan" sub="Lisensi berbayar terisi sendiri dari Maintenance; sisanya dicatat tangan di kotak bawah."
                    kanan={
                      <span className="angka text-[12.5px] text-emerald-400/90">
                        +{fmt(totalPenjualan)}
@@ -563,6 +548,28 @@ export default function Pemilik() {
               </Tabel>
             </TabelBungkus>
           )}
+        </div>
+        {/* Pencatatan manual — Lynk tidak mengirim webhook ke backend, jadi
+            satu-satunya cara penjualan masuk ke laporan adalah dicatat di
+            sini. Tanpa kotak ini, panel penjualan selamanya kosong. */}
+        <div className="border-t border-zinc-800/80 px-5 py-4">
+          <div className="mb-2 text-[11px] text-zinc-500">Catat penjualan baru</div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-5">
+            <input value={form.produk} onChange={(e) => setForm({ ...form, produk: e.target.value })}
+                   placeholder="Produk" disabled={!pemilik}
+                   className="h-9 rounded-md border border-zinc-800 bg-zinc-900/60 px-3 text-[12.5px] text-zinc-100 outline-none hover:border-zinc-700 focus-visible:border-zinc-600 disabled:opacity-50 sm:col-span-2" />
+            <input value={form.pembeli} onChange={(e) => setForm({ ...form, pembeli: e.target.value })}
+                   placeholder="Pembeli (email)" disabled={!pemilik}
+                   className="h-9 rounded-md border border-zinc-800 bg-zinc-900/60 px-3 text-[12.5px] text-zinc-100 outline-none hover:border-zinc-700 focus-visible:border-zinc-600 disabled:opacity-50" />
+            <input value={form.nilai} onChange={(e) => setForm({ ...form, nilai: e.target.value })}
+                   placeholder="Nilai ($)" inputMode="decimal" disabled={!pemilik}
+                   className="angka h-9 rounded-md border border-zinc-800 bg-zinc-900/60 px-3 text-[12.5px] text-zinc-100 outline-none hover:border-zinc-700 focus-visible:border-zinc-600 disabled:opacity-50" />
+            <button onClick={() => void tambahPenjualan()} disabled={sibuk || !pemilik}
+                    title={pemilik ? undefined : 'Hanya pemilik yang boleh mencatat penjualan'}
+                    className="flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-md bg-zinc-100 px-3 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50">
+              <Plus className="size-3.5" /> Catat
+            </button>
+          </div>
         </div>
       </Panel>
 
