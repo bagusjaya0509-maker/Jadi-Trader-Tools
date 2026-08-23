@@ -116,6 +116,13 @@ const namaPemakai = (email?: string, catatan?: string, uid?: string) => {
   return uid || '—';
 };
 
+/* Tinggi minimum satu batang. Nol tetap NOL — sebagai angka tetap,
+   `minPointSize` juga berlaku untuk nilai kosong, dan batang manual yang
+   tidak berisi apa-apa akan tergambar 3 px menindih batang di sebelahnya.
+   Tandanya ikut nilainya supaya batang kecil yang negatif menjulur ke
+   bawah, bukan ke atas. */
+const tinggiMinimal = (v: number | null | undefined) => (v ? (v < 0 ? -3 : 3) : 0);
+
 const gulirJika = (jumlah: number, ambang: number, tinggi: string) =>
   jumlah > ambang ? `${tinggi} overflow-y-auto gulir-senyap` : '';
 
@@ -426,7 +433,7 @@ export default function Pemilik() {
       {/* ── Penjualan per bulan ── */}
       <Panel className="mt-4">
         <PanelHead judul="Pemasukan vs Pengeluaran per Bulan"
-                   sub="Satu kolom per bulan: pemasukan ke atas (hijau lisensi, biru catatan tangan), pengeluaran ke bawah (merah). Lisensi berbayar terisi sendiri dari Maintenance." />
+                   sub="Dua batang per bulan: pemasukan ke atas (hijau lisensi, biru catatan tangan), pengeluaran ke bawah (merah). Lisensi berbayar terisi sendiri dari Maintenance." />
         <div className={cn('h-[240px] px-2 pb-4', perBulan.length > 6 && 'overflow-x-auto gulir-senyap')}>
           {perBulan.length === 0 ? (
             <div className="px-3 pt-3">
@@ -437,7 +444,15 @@ export default function Pemilik() {
             <div className="h-full"
                  style={perBulan.length > 6 ? { minWidth: perBulan.length * 64 } : undefined}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={perBulan} margin={{ top: 8, right: 12, left: 8, bottom: 0 }}>
+              {/* `barSize` PASTI, bukan `maxBarSize`. Inilah sebabnya dua
+                  batang sempat terlempar ratusan piksel: tanpa barSize,
+                  Recharts membagi lebar pita bulan rata untuk tiap deret
+                  lalu memusatkan batang di dalam slotnya sendiri —
+                  maxBarSize cuma mengecilkan batangnya, slotnya tetap
+                  selebar separuh grafik. Dengan barSize pasti, kedua
+                  batang dikemas berdampingan lalu dipusatkan BERSAMA,
+                  jadi jaraknya tetap 3 px entah satu bulan atau dua belas. */}
+              <BarChart data={perBulan} barSize={22} barGap={3} margin={{ top: 8, right: 12, left: 8, bottom: 0 }}>
                 <CartesianGrid vertical={false} stroke="currentColor" strokeOpacity={0.09} />
                 <XAxis dataKey="bulan" tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} />
                 {/* Sumbunya IKUT sakelar mata uang. Dulu ditulis mati
@@ -471,17 +486,15 @@ export default function Pemilik() {
                     begitu komponennya dipasang ulang. Terukur di peramban,
                     bukan dugaan. Sudut siku adalah harga yang murah untuk
                     batang yang tingginya benar. */}
-                {/* SATU tumpukan, dua arah. Pemasukan positif menumpuk ke
-                    atas, pengeluaran negatif menjulur ke bawah dari garis
-                    nol — stackId yang sama justru yang membuatnya terpisah
-                    dengan benar, karena Recharts memisahkan berdasarkan
-                    TANDA, bukan berdasarkan kolom.
+                {/* DUA batang berdampingan, permintaan pemilik: satu kolom
+                    berisi keduanya membuat orang harus mengurai dulu mana
+                    yang masuk dan mana yang keluar sebelum bisa
+                    membandingkannya.
 
-                    Sempat dicoba dua stackId bersebelahan: dengan satu bulan
-                    saja, kedua batang terlempar ke tengah-tengah paruhnya
-                    masing-masing dan berjarak ratusan piksel — Recharts
-                    membagi lebar per slot, dan maxBarSize hanya mengecilkan
-                    batangnya, bukan slotnya. */}
+                    Pengeluaran tetap BERNILAI NEGATIF, jadi ia menjulur ke
+                    bawah garis nol sementara pemasukan tumbuh ke atas.
+                    Arah yang berlawanan itu yang membuat keduanya terbaca
+                    tanpa perlu membaca warnanya dulu. */}
                 <ReferenceLine y={0} stroke="currentColor" strokeOpacity={0.35} />
                 {/* `minPointSize` WAJIB di sini, bukan hiasan. Pengeluaran
                     bulan ini empat puluh kali pemasukan, jadi pada sumbu yang
@@ -494,9 +507,21 @@ export default function Pemilik() {
                     memang setimpang itu, dan justru itulah yang perlu
                     terlihat. Yang diperbaiki cuma agar batang kecilnya tetap
                     punya wujud yang bisa dilihat dan disentuh tetikus. */}
-                <Bar dataKey="lisensi" stackId="a" name="Lisensi" fill="#10b981" fillOpacity={0.85} maxBarSize={34} minPointSize={3} />
-                <Bar dataKey="manual" stackId="a" name="Manual" fill="#38bdf8" fillOpacity={0.75} maxBarSize={34} minPointSize={3} />
-                <Bar dataKey="keluar" stackId="a" name="Pengeluaran" fill="#ef4444" fillOpacity={0.7} maxBarSize={34} minPointSize={-3} />
+                {/* `minPointSize` SEBAGAI FUNGSI, bukan angka tetap. Sebagai
+                    angka ia berlaku juga untuk nilai NOL: batang manual yang
+                    kosong tetap digambar 3 px, menindih batang lisensi tepat
+                    di tempat yang sama — dan serpihan di atas garis nol tampak
+                    biru padahal uangnya datang dari lisensi yang hijau.
+                    Terukur: keduanya di y 479 dengan tinggi 3.
+
+                    Tandanya ikut nilainya supaya batang kecil yang negatif
+                    menjulur ke bawah, bukan ke atas. */}
+                <Bar dataKey="lisensi" stackId="masuk" name="Lisensi" fill="#10b981" fillOpacity={0.85}
+                     minPointSize={tinggiMinimal} />
+                <Bar dataKey="manual" stackId="masuk" name="Manual" fill="#38bdf8" fillOpacity={0.75}
+                     minPointSize={tinggiMinimal} />
+                <Bar dataKey="keluar" stackId="keluar" name="Pengeluaran" fill="#ef4444" fillOpacity={0.7}
+                     minPointSize={tinggiMinimal} />
               </BarChart>
             </ResponsiveContainer>
             </div>
