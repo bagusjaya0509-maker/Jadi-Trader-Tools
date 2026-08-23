@@ -3848,13 +3848,18 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
               <button onClick={() => nyalakanMulti(simbol, tf)}
                 title="Multi-chart — bagi layar jadi beberapa panel chart"
                 aria-label="Multi-chart"
-                /* mb-9 mr-12: DIANGKAT dari sudut, bukan menempel di pojok.
-                 Sudut kanan-bawah chart bukan ruang kosong — di sana bertemu
-                 kolom harga di kanan dan baris waktu di bawah, dan ikon yang
-                 duduk di persimpangan keduanya menutupi dua keterangan
-                 sekaligus. Digeser masuk sampai lepas dari kolom harga dan
-                 naik sampai di atas baris waktu. */
-              className="pointer-events-auto mb-9 ml-auto mr-12 flex shrink-0 cursor-pointer items-center rounded bg-zinc-950/70 p-1 text-zinc-500 backdrop-blur-sm transition-colors hover:text-zinc-300">
+                /* DIANGKAT dari sudut lewat TRANSFORM, bukan margin. Sudut
+                 kanan-bawah chart bukan ruang kosong — di sana bertemu kolom
+                 harga di kanan dan baris waktu di bawah, dan ikon yang duduk
+                 di persimpangan keduanya menutupi dua keterangan sekaligus.
+
+                 Sempat dipakai `mb-9`, dan gerigi setelan di ujung kiri ikut
+                 terangkat: margin bawah pada satu anak menambah tinggi
+                 SELURUH baris flex, dan baris yang berjangkar ke dasar akan
+                 tumbuh ke atas — membawa serta tetangganya yang tidak
+                 diminta pindah. Transform menggeser gambarnya saja dan tidak
+                 menyentuh tata letak sama sekali. */
+              className="pointer-events-auto ml-auto flex shrink-0 -translate-x-12 -translate-y-9 cursor-pointer items-center rounded bg-zinc-950/70 p-1 text-zinc-500 backdrop-blur-sm transition-colors hover:text-zinc-300">
                 <LayoutGrid className="size-3.5" strokeWidth={2} />
               </button>
             )}
