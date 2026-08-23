@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import {
   Plus, Trash2, KeyRound, ShieldAlert, TrendingDown,
@@ -79,6 +80,16 @@ function Kabar({ memuat, galat, kosong, teksKosong }: {
    FUNGSI, bukan untai jadi: harganya diambil dari setelan Maintenance dan
    halaman ini punya sakelar USD/IDR — angka yang ditulis mati di sini akan
    berbohong dua kali, saat harganya diubah dan saat tampilannya ditukar. */
+/* DUA sub-halaman. Halaman ini menjawab dua pertanyaan yang tidak pernah
+   ditanyakan bersamaan: "uangnya ke mana" dan "siapa saja yang pakai".
+   Sebelumnya keduanya bertumpuk dalam satu gulungan sepanjang tiga layar,
+   dan yang di bawah praktis tidak pernah terbuka. */
+const TAB = [
+  { id: 'kas',     label: 'Cash Flow',      judul: 'Cash Flow',        sub: 'Pemasukan, pengeluaran, dan laba bersih. Lisensi berbayar terhitung sendiri dari Maintenance.' },
+  { id: 'lisensi', label: 'Lisensi & Klien', judul: 'Lisensi & Klien', sub: 'Siapa yang punya akses, di tingkat mana, dan seberapa sering mereka masuk.' },
+] as const;
+type IdTab = typeof TAB[number]['id'];
+
 const KELOMPOK_LISENSI = [
   { id: 'gratis',   judul: 'Gratis',              sub: () => 'Akses 30 hari tanpa biaya, dari kuota gratis.' },
   { id: 'testing',  judul: 'Testing — New Launch', sub: (f: (n: number) => string, h?: { hargaTesting: number; hargaTestingCoret: number }) =>
@@ -108,6 +119,12 @@ export default function Pemilik() {
      harga. Dipakai sebagai CADANGAN saja — permintaan yang sudah menyimpan
      `hargaSaat` memakai angkanya sendiri. */
   const harga = useHargaPaket();
+  /* Tab disimpan di ALAMAT, bukan di useState: pemilik menaruh tautan
+     langsung ke sub-halaman di sidebar, dan tab yang cuma hidup di memori
+     akan selalu membuka yang pertama betapa pun tautannya berkata lain. */
+  const [cariTab, setCariTab] = useSearchParams();
+  const tab: IdTab = TAB.some((t) => t.id === cariTab.get('tab')) ? (cariTab.get('tab') as IdTab) : 'kas';
+  const setTab = (id: IdTab) => setCariTab(id === 'kas' ? {} : { tab: id }, { replace: true });
 
   const [pesan, setPesan] = useState('');
   const [form, setForm] = useState({ produk: '', pembeli: '', nilai: '', catatan: '' });
@@ -331,6 +348,30 @@ export default function Pemilik() {
         </span>
       </div>
 
+
+      {/* Bilah tab DI BAWAH sakelar mata uang: sakelar itu berlaku untuk
+          kedua tab — tingkat lisensi pun menampilkan harga — jadi ia bukan
+          milik salah satunya. */}
+      <div className="mb-5 flex gap-1 overflow-x-auto border-b border-zinc-800/80">
+        {TAB.map((t) => (
+          <button key={t.id} onClick={() => setTab(t.id)}
+            className={cn('shrink-0 cursor-pointer border-b-2 px-3.5 py-2.5 text-[12.5px] transition-colors',
+              tab === t.id ? 'border-zinc-100 text-zinc-100' : 'border-transparent text-zinc-500 hover:text-zinc-300')}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+      {(() => {
+        const aktif = TAB.find((t) => t.id === tab)!;
+        return (
+          <div className="mb-4">
+            <h2 className="text-[15px] font-medium text-zinc-100">{aktif.judul}</h2>
+            <p className="mt-0.5 text-[12.5px] leading-relaxed text-zinc-500">{aktif.sub}</p>
+          </div>
+        );
+      })()}
+
+      {tab === 'kas' && (<>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {/* Rinciannya disebut, bukan cuma jumlahnya. Angka gabungan tanpa
             asal-usul membuat orang menebak — dan tebakan pertama yang wajar
@@ -510,10 +551,12 @@ export default function Pemilik() {
         </div>
       </Panel>
 
-      {/* DUA kolom sekarang, dulu tiga. Panel "Activity" pindah ke
-          Maintenance -> Error & Fixing; membiarkan gridnya tetap tiga
-          menyisakan kolom kosong selebar sepertiga layar. */}
-      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+      {/* Recent sales SENDIRIAN dan selebar penuh. Dulu satu baris tiga
+          kolom bersama Activity dan Client health; Activity pindah ke
+          Maintenance, Client health pindah ke tab Lisensi & Klien, dan
+          grid yang ditinggalkan dua penghuninya cuma menyisakan ruang
+          kosong di sebelah kanan. */}
+      <div className="mt-4">
         <Panel>
           <PanelHead judul="Recent sales" sub="Lisensi berbayar dan catatan tangan, diurut bersama." />
           <div className="px-5 pb-5">
@@ -559,27 +602,31 @@ export default function Pemilik() {
           </div>
         </Panel>
 
-        <Panel>
-          <PanelHead judul="Client health" sub="Akun yang pernah masuk dan seberapa aktif."
-                     kanan={<span className="angka text-[12px] text-zinc-500">{klien.data.length}</span>} />
-          <div className={cn('space-y-2.5 px-5 pb-5', gulirJika(klien.data.length, 10, 'max-h-[560px]'))}>
-            <Kabar memuat={klien.memuat} galat={klien.galat} kosong={!klien.data.length}
-                   teksKosong="Belum ada klien yang masuk." />
-            {klien.data.map((k) => (
-              <div key={k.uid} className="flex items-center justify-between rounded-lg border border-zinc-800/60 p-3">
-                <div className="min-w-0">
-                  <div className="truncate text-[13px] text-zinc-200">{k.email || k.uid}</div>
-                  <div className="text-[11.5px] text-zinc-500">
-                    {k.nama ? `${k.nama} · ` : ''}{jamLalu(k.terakhir)}
-                  </div>
-                </div>
-                <span className="angka shrink-0 text-[12.5px] text-zinc-400">{k.kunjungan}×</span>
-              </div>
-            ))}
-          </div>
-        </Panel>
 
       </div>
+
+      </>)}
+
+      {tab === 'lisensi' && (<>
+          <Panel>
+            <PanelHead judul="Client health" sub="Akun yang pernah masuk dan seberapa aktif."
+                       kanan={<span className="angka text-[12px] text-zinc-500">{klien.data.length}</span>} />
+            <div className={cn('space-y-2.5 px-5 pb-5', gulirJika(klien.data.length, 10, 'max-h-[560px]'))}>
+              <Kabar memuat={klien.memuat} galat={klien.galat} kosong={!klien.data.length}
+                     teksKosong="Belum ada klien yang masuk." />
+              {klien.data.map((k) => (
+                <div key={k.uid} className="flex items-center justify-between rounded-lg border border-zinc-800/60 p-3">
+                  <div className="min-w-0">
+                    <div className="truncate text-[13px] text-zinc-200">{k.email || k.uid}</div>
+                    <div className="text-[11.5px] text-zinc-500">
+                      {k.nama ? `${k.nama} · ` : ''}{jamLalu(k.terakhir)}
+                    </div>
+                  </div>
+                  <span className="angka shrink-0 text-[12.5px] text-zinc-400">{k.kunjungan}×</span>
+                </div>
+              ))}
+            </div>
+          </Panel>
 
       {/* ── Lisensi, dibagi per tingkat ── */}
       <div className="mt-4 flex items-center justify-between px-1">
@@ -658,6 +705,7 @@ Pemakainya langsung kehilangan akses.`)) return;
         lisensi tidak membuat siapa pun bisa mengunduh produk; kode yang bisa dibaca ulang hanya
         ada di baris permintaan yang disetujui.
       </p>
+      </>)}
     </div>
   );
 }

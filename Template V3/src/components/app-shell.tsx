@@ -158,7 +158,11 @@ const NAV = [
     hanyaPemilik: true,
     IkonGrup: Crown,
     butir: [
-      { ke: '/owner',     label: 'Sales Report', Ikon: TrendingUp },
+      { ke: '/owner',     label: 'Sales Report', Ikon: TrendingUp,
+        sub: [
+          { ke: '/owner',                label: 'Cash Flow' },
+          { ke: '/owner?tab=lisensi',    label: 'Lisensi & Klien' },
+        ] },
       { ke: '/maintenance', label: 'Maintenance',     Ikon: Wrench,
         sub: [
           { ke: '/maintenance',             label: 'Akses & Lisensi' },
