@@ -274,6 +274,28 @@ export default function Akses() {
                 : <>Berlaku sampai {langganan.berakhir?.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
                    {langganan.sisaHari !== null && <> · sisa {langganan.sisaHari} hari</>}.</>}
             </p>
+            {/* CATATAN PEMILIK PADA PERSETUJUAN.
+                Dulu hanya penolakan yang menampilkannya: rantai kondisi di
+                bawah berbunyi baru -> ditolak -> null, dan yang disetujui
+                tidak pernah sampai ke sana karena kartu "Akses aktif" inilah
+                yang menang lebih dulu. Jadi pesan persetujuan tersimpan di
+                server dan terkirim lewat surel, tapi tidak pernah terlihat
+                di halaman orangnya — separuh janji fiturnya diam-diam tidak
+                ditepati.
+
+                `pemilik` sengaja tidak disaring keluar: kalau suatu saat
+                pemilik menyetujui permintaannya sendiri untuk menguji, ia
+                justru harus melihat hasilnya persis seperti pembeli. */}
+            {terakhir?.status === 'disetujui' && terakhir.pesan ? (
+              <div className="mt-3 rounded-lg border-l-2 border-emerald-500/50 bg-zinc-950/40 px-3 py-2">
+                <div className="text-[10.5px] font-medium uppercase tracking-wider text-zinc-500">
+                  Catatan dari pemilik
+                </div>
+                <p className="mt-1 whitespace-pre-wrap text-[12.5px] leading-relaxed text-zinc-200">
+                  {terakhir.pesan}
+                </p>
+              </div>
+            ) : null}
             <Link to={tujuan}
               className="mt-4 inline-flex items-center gap-2 rounded-md bg-zinc-100 px-5 py-2.5 text-[13px] font-semibold text-zinc-950 transition-colors hover:bg-white">
               Buka aplikasi
