@@ -10,6 +10,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Switch } from '@/components/ui/switch-button';
 import { MultiChart } from '@/components/multi-chart';
+import { TombolPasang } from '@/components/tombol-pasang';
 import { POLOS, dengarBus } from '@/lib/multi-chart';
 import { BADAN, WA_LINK } from '@/lib/badan';
 import { useAuth } from '@/lib/auth';
@@ -911,6 +912,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <BookOpen className="size-4 shrink-0" strokeWidth={1.8} />
             {!ciut && <span>Documentation</span>}
           </NavLink>
+          {/* Muncul sendiri HANYA di peramban yang benar-benar bisa memasang,
+              dan hilang sendiri begitu terpasang — komponennya memulangkan
+              null di luar itu. Ditaruh di kaki sidebar, bukan di bilah atas:
+              ini tawaran sekali seumur pemakaian, bukan kendali harian. */}
+          <TombolPasang ciut={ciut} />
           {/* Baris hak cipta sekaligus jalan masuk ke halaman Legal. Ditaruh
               di sini, bukan sebagai butir nav tersendiri: disclaimer dan
               ketentuan bukan alat yang dipakai sehari-hari, jadi menaruhnya
