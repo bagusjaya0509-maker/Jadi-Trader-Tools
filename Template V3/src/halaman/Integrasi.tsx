@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   CheckCircle2, Circle, Copy, Eye, EyeOff, RefreshCw, Download,
@@ -8,7 +8,7 @@ import {
 import { Panel, PanelHead, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { TutorialVps } from '@/components/tutorial-vps';
 import { cn } from '@/lib/utils';
-import { bacaKoneksi, simpanKoneksi, hapusKoneksi, koneksiLengkap, PROXY_BAWAAN } from '@/lib/koneksi';
+import { bacaKoneksi, simpanKoneksi, hapusKoneksi, koneksiLengkap, rapikanUrl, PROXY_BAWAAN } from '@/lib/koneksi';
 import { useKodeMt5, useAkunMt5, versiKurangDari, VERSI_EA_PENDING } from '@/lib/akun';
 import { tautanBerkas } from '@/lib/admin';
 import { useAuth } from '@/lib/auth';
@@ -209,15 +209,64 @@ export default function Integrasi() {
   const [tersimpan, setTersimpan] = useState(koneksiLengkap(awal));
   const [pesan, setPesan] = useState('');
 
-  const binanceTersambung = tersimpan;
-  const bisaSimpan = url.trim().length > 0 && token.trim().length > 0;
+  /* ── ALAMATNYA DIUJI, BUKAN CUMA DISIMPAN ─────────────────────────────
+     Sebelum ini statusnya `tersambung = tersimpan` — yang sebenarnya cuma
+     berarti "ada isinya", bukan "alamatnya bekerja". Alamat salah ketik
+     tetap berlabel tersambung, lalu kegagalannya muncul di tempat lain:
+     kode pasangan MT5 menjawab 404, chart menjawab "proxy tidak menjawab".
+     Terjadi sungguhan 23 Agu 2026 pada alamat tanpa https:// — tiga gejala
+     berjauhan dari satu kolom isian, dan panel ini justru menyatakan
+     sambungannya sehat.
 
-  function simpanUji() {
+     Diuji ke /api/health karena itu rute PUBLIK: ia menjawab tanpa token,
+     jadi hasilnya menilai ALAMATNYA saja. Kalau tokennya yang salah, itu
+     kegagalan lain dengan pesan lain — mencampur keduanya membuat orang
+     mengganti token padahal alamatnya yang keliru. */
+  type Uji = 'belum' | 'menguji' | 'ok' | 'bukanBackend' | 'takTerjangkau';
+  const [uji, setUji] = useState<Uji>('belum');
+
+  const periksaAlamat = useCallback(async (alamat: string) => {
+    const a = rapikanUrl(alamat);
+    if (!a) { setUji('belum'); return; }
+    setUji('menguji');
+    try {
+      const r = await fetch(`${a}/api/health`, { headers: { Accept: 'application/json' } });
+      /* Jawaban 200 saja TIDAK cukup. Alamat relatif dan domain nyasar
+         sama-sama menjawab 200 — dengan index.html. Yang membedakan backend
+         sungguhan adalah bentuk jawabannya. */
+      const j = r.ok ? await r.json().catch(() => null) : null;
+      setUji(j && j.ok === true ? 'ok' : 'bukanBackend');
+    } catch {
+      /* Gagal fetch = DNS salah, server mati, CORS ditolak, atau halaman
+         https memanggil http. Semuanya berarti satu hal bagi orangnya:
+         alamat itu tidak menjawab dari peramban ini. */
+      setUji('takTerjangkau');
+    }
+  }, []);
+
+  /* Diperiksa saat halaman dibuka juga, bukan cuma saat Simpan ditekan:
+     alamat yang tersimpan sejak kemarin bisa mati hari ini, dan lencana yang
+     hanya jujur pada detik penyimpanan tidak menolong siapa pun. */
+  useEffect(() => {
+    if (awal.url.trim()) void periksaAlamat(awal.url);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const binanceTersambung = tersimpan && uji === 'ok';
+  const bisaSimpan = url.trim().length > 0 && token.trim().length > 0;
+  /* Ditampilkan kalau ketikannya dirapikan — supaya orangnya melihat skema
+     yang ditambahkan, bukan menebak kenapa tiba-tiba jalan. */
+  const urlRapi = rapikanUrl(url);
+  const urlDirapikan = url.trim().length > 0 && urlRapi !== url.trim();
+
+  async function simpanUji() {
     if (!bisaSimpan) { setPesan('Backend URL dan App Token harus terisi keduanya.'); return; }
-    simpanKoneksi({ url: url.trim(), token: token.trim() });
+    simpanKoneksi({ url: urlRapi, token: token.trim() });
+    setUrl(urlRapi);
     setTersimpan(true);
-    setPesan('Tersimpan. Open Real Order di Area Entry sekarang aktif.');
-    setTimeout(() => setPesan(''), 4000);
+    setPesan('Tersimpan — menguji alamatnya…');
+    await periksaAlamat(urlRapi);
+    setPesan('');
   }
 
   function putuskan() {
@@ -335,7 +384,11 @@ export default function Integrasi() {
           />
           <Ubin
             Ikon={Server} nama="Binance Futures" hidup={binanceTersambung}
-            ket={binanceTersambung ? 'Lewat proxy VPS sendiri' : 'Backend URL / token belum diisi'}
+            ket={binanceTersambung ? 'Lewat proxy VPS sendiri'
+            : uji === 'menguji' ? 'Menguji alamat backend…'
+            : uji === 'bukanBackend' ? 'Alamat menjawab, tapi bukan backend Jadi Trader'
+            : uji === 'takTerjangkau' ? 'Alamat backend tidak terjangkau'
+            : 'Backend URL / token belum diisi'}
             stat={[['Mode', binanceTersambung ? labelMode : '—'], ['Trade masuk', '94 kripto']]}
           />
           <GarisLatensi />
@@ -541,6 +594,32 @@ export default function Integrasi() {
                 <p className="mt-1.5 text-[11.5px] text-zinc-600">
                   Proxy VPS. Binance diblokir sebagian ISP Indonesia — tanpa proxy ini, data pasar tidak masuk.
                 </p>
+                {urlDirapikan && (
+                  <p className="mt-1 text-[11.5px] text-zinc-500">
+                    Akan disimpan sebagai <span className="font-mono text-zinc-300">{urlRapi}</span> —
+                    tanpa <span className="font-mono">https://</span>, peramban membacanya sebagai alamat di
+                    dalam situs ini, bukan alamat servermu.
+                  </p>
+                )}
+                {uji === 'bukanBackend' && (
+                  <p className="mt-1 text-[11.5px] text-amber-400/90">
+                    Alamat ini menjawab, tapi bukan dengan jawaban backend Jadi Trader. Biasanya berarti
+                    alamatnya nyasar ke situs lain, atau ke halaman web ini sendiri.
+                  </p>
+                )}
+                {uji === 'takTerjangkau' && (
+                  <p className="mt-1 text-[11.5px] text-red-400/90">
+                    Peramban tidak bisa membaca jawaban dari alamat ini. Bisa karena domainnya salah
+                    ketik, servernya mati, alamatnya <span className="font-mono">http://</span> sementara
+                    halaman ini <span className="font-mono">https://</span>, atau servernya hidup tapi
+                    bukan backend Jadi Trader sehingga menolak dibaca dari halaman ini.
+                  </p>
+                )}
+                {uji === 'ok' && (
+                  <p className="mt-1 text-[11.5px] text-emerald-500/90">
+                    Alamat terjawab backend Jadi Trader.
+                  </p>
+                )}
               </div>
 
               <div>
