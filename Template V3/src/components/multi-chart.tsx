@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { LayoutGrid, Plus, X, GripVertical, ExternalLink, Undo2, Maximize2, Minimize2, ChevronDown, ChevronUp } from 'lucide-react';
+import { LayoutGrid, Plus, X, GripVertical, ExternalLink, Undo2, Maximize2, Minimize2, ChevronDown, ChevronUp, Search } from 'lucide-react';
+import { ambilTickers, daftarSimbolMt5 } from '@/lib/pasar';
 import { cn } from '@/lib/utils';
 import {
   useMulti, matikanMulti, tambahPanel, hapusPanel, perbaruiPanel, kirimBus, dengarBus,
@@ -67,6 +68,54 @@ export function MultiChart() {
       document.removeEventListener('keydown', tekan);
     };
   }, [menuTf]);
+
+  /* ── Panel cari pasangan ──────────────────────────────────────────────
+     "Tambah chart" dulu langsung menaruh pasangan dari daftar calon —
+     tebakan yang benar sesekali dan salah selebihnya, lalu orangnya harus
+     mengganti simbolnya sendiri sesudah panelnya lahir. Sekarang ia bertanya
+     dulu. */
+  const [cariBuka, setCariBuka] = useState(false);
+  const [ketik, setKetik] = useState('');
+  const [tfBaru, setTfBaru] = useState('4h');
+  const [semuaSimbol, setSemuaSimbol] = useState<string[]>([]);
+  const kotakCari = useRef<HTMLInputElement | null>(null);
+
+  /* Daftar simbol diambil SEKALI saat panel cari pertama kali dibuka, bukan
+     saat grid dipasang: kebanyakan sesi tidak pernah menambah chart, dan
+     dua permintaan jaringan untuk fitur yang tidak dipakai adalah dua
+     permintaan yang tidak perlu ada. */
+  useEffect(() => {
+    if (!cariBuka || semuaSimbol.length) return;
+    let hidup = true;
+    void (async () => {
+      const [tk, mt5] = await Promise.all([
+        ambilTickers().catch(() => ({} as Record<string, unknown>)),
+        daftarSimbolMt5().catch(() => [] as string[]),
+      ]);
+      if (!hidup) return;
+      setSemuaSimbol([...Object.keys(tk).sort(), ...mt5.map((s) => 'MT5:' + s)]);
+    })();
+    return () => { hidup = false; };
+  }, [cariBuka, semuaSimbol.length]);
+
+  useEffect(() => { if (cariBuka) setTimeout(() => kotakCari.current?.focus(), 30); }, [cariBuka]);
+
+  const hasilCari = (() => {
+    const q = ketik.trim().toUpperCase();
+    const sumber = semuaSimbol.length ? semuaSimbol : [];
+    if (!q) return sumber.slice(0, 40);
+    /* Yang DIAWALI kata kuncinya naik ke atas: mengetik "BTC" harus
+       memunculkan BTCUSDT lebih dulu daripada WBTCUSDT. */
+    const awal = sumber.filter((s) => s.startsWith(q));
+    const tengah = sumber.filter((s) => !s.startsWith(q) && s.includes(q));
+    return [...awal, ...tengah].slice(0, 40);
+  })();
+
+  const pilihPasangan = (s: string) => {
+    tambahPanel({ simbol: s, tf: tfBaru });
+    setCariBuka(false);
+    setKetik('');
+  };
 
   const [kepalaBuka, setKepalaBuka] = useState<Record<string, boolean>>({});
   const gantiKepala = (id: string) => {
@@ -252,13 +301,23 @@ export function MultiChart() {
       penuhSemu ? 'fixed inset-0 z-[60]' : 'absolute inset-0 z-30',
       !tampil && 'hidden'
     )}>
-      <div className="flex h-10 shrink-0 items-center gap-3 border-b border-zinc-800/80 px-3">
+      {/* Selagi LAYAR PENUH bilah ini menyingkir dan baru muncul saat kursor
+          mendekat tepi atas. Layar penuh diminta supaya chartnya sebesar
+          mungkin; bilah tetap setinggi 40 px memakan kembali sebagian dari
+          yang baru saja diberikan. Ia MUNCUL, bukan hilang selamanya —
+          jalan keluarnya ada di bilah itu, dan mode yang hanya bisa
+          ditinggalkan lewat tombol yang tidak terlihat adalah jebakan.
+          (Esc tetap bekerja, tapi tidak semua orang menebaknya.) */}
+      <div className={cn('group/bilah flex shrink-0 items-center gap-3 border-b border-zinc-800/80 px-3 transition-all duration-200',
+        penuh
+          ? 'h-2 overflow-hidden border-transparent opacity-0 hover:h-10 hover:overflow-visible hover:border-zinc-800/80 hover:opacity-100'
+          : 'h-10')}>
         <span className="flex items-center gap-2 text-[12.5px] font-medium text-zinc-200">
           <LayoutGrid className="size-3.5 text-zinc-400" strokeWidth={2} />
           Multi-Chart
           <span className="angka text-[11px] text-zinc-600">{m.panel.length}/{MAKS_PANEL}</span>
         </span>
-        <button onClick={tambahPanel} disabled={m.panel.length >= MAKS_PANEL}
+        <button onClick={() => setCariBuka(true)} disabled={m.panel.length >= MAKS_PANEL}
           className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2 py-1 text-[11.5px] text-zinc-400 transition-colors hover:border-zinc-700 hover:text-zinc-200 disabled:cursor-default disabled:opacity-40">
           <Plus className="size-3" /> Tambah chart
         </button>
@@ -389,7 +448,7 @@ export function MultiChart() {
         {m.panel.length < MAKS_PANEL && m.panel.length < kolom * baris && (
           <div style={{ order: 999 }}
                className="flex min-h-0 min-w-0 items-center justify-center border border-dashed border-zinc-800/70">
-            <button onClick={tambahPanel}
+            <button onClick={() => setCariBuka(true)}
               className="flex cursor-pointer flex-col items-center gap-1.5 rounded-md px-4 py-3 text-zinc-600 transition-colors hover:bg-zinc-900/60 hover:text-zinc-300">
               <Plus className="size-5" />
               <span className="text-[11.5px]">Tambah chart</span>
@@ -412,6 +471,63 @@ export function MultiChart() {
                style={{ top: `${barisPct}%` }} />
         )}
       </div>
+
+      {cariBuka && (
+        <div onClick={() => setCariBuka(false)}
+             className="fixed inset-0 z-[90] flex items-start justify-center bg-black/60 pt-[12vh]">
+          <div onClick={(e) => e.stopPropagation()}
+               className="flex max-h-[70vh] w-[min(30rem,92vw)] flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 shadow-2xl">
+            <div className="flex items-center gap-2 border-b border-zinc-800/80 px-3 py-2.5">
+              <Search className="size-4 shrink-0 text-zinc-600" />
+              <input ref={kotakCari} value={ketik}
+                     onChange={(e) => setKetik(e.target.value)}
+                     onKeyDown={(e) => {
+                       if (e.key === 'Escape') setCariBuka(false);
+                       /* Enter mengambil hasil TERATAS. Untuk orang yang sudah
+                          tahu simbolnya, mengetik lalu Enter jauh lebih cepat
+                          daripada mengetik lalu mencari barisnya dengan mata. */
+                       if (e.key === 'Enter' && hasilCari[0]) pilihPasangan(hasilCari[0]);
+                     }}
+                     placeholder="Cari pasangan — BTC, ETH, XAU…"
+                     className="min-w-0 grow bg-transparent text-[13px] text-zinc-100 outline-none placeholder:text-zinc-600" />
+              <button onClick={() => setCariBuka(false)}
+                className="cursor-pointer rounded p-1 text-zinc-600 transition-colors hover:text-zinc-300">
+                <X className="size-3.5" />
+              </button>
+            </div>
+
+            <div className="flex items-center gap-1 border-b border-zinc-800/80 px-3 py-2">
+              <span className="mr-1 text-[11px] text-zinc-500">Timeframe</span>
+              {TF_PANEL.map((t) => (
+                <button key={t.nilai} onClick={() => setTfBaru(t.nilai)}
+                  className={cn('angka cursor-pointer rounded px-1.5 py-0.5 text-[11px] transition-colors',
+                    t.nilai === tfBaru ? 'bg-emerald-600 text-white' : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200')}>
+                  {t.nilai}
+                </button>
+              ))}
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              {!semuaSimbol.length ? (
+                <p className="px-3 py-6 text-center text-[12px] text-zinc-600">Memuat daftar pasangan…</p>
+              ) : !hasilCari.length ? (
+                <p className="px-3 py-6 text-center text-[12px] text-zinc-600">
+                  Tidak ada pasangan yang cocok dengan “{ketik}”.
+                </p>
+              ) : hasilCari.map((s) => (
+                <button key={s} onClick={() => pilihPasangan(s)}
+                  className="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-zinc-900">
+                  <span className="angka grow truncate text-[12.5px] text-zinc-200">{s}</span>
+                  {s.startsWith('MT5:') && (
+                    <span className="shrink-0 rounded bg-amber-500/15 px-1 text-[8.5px] font-semibold tracking-wide text-amber-300">MT5</span>
+                  )}
+                  <span className="angka shrink-0 text-[11px] text-zinc-600">{tfBaru}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {menuTf && (
         <div style={{ left: menuTf.x, top: menuTf.y }}

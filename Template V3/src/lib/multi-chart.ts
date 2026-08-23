@@ -126,10 +126,16 @@ export function nyalakanMulti(simbolAwal: string, tfAwal: string) {
 
 export function matikanMulti() { tulis({ aktif: false, panel: [] }); }
 
-export function tambahPanel() {
+/** Tambah panel. Tanpa argumen ia memilih sendiri dari daftar calon —
+ *  dipakai jalur lama dan sebagai jaring pengaman. Dengan argumen, ia
+ *  memakai pasangan yang orangnya pilih sendiri di panel pencarian. */
+export function tambahPanel(pilihan?: { simbol: string; tf: string }) {
   if (!simpanan.aktif || simpanan.panel.length >= MAKS_PANEL) return;
-  const terpakai = new Set(simpanan.panel.map((p) => p.simbol + '|' + p.tf));
-  const c = CALON.find((x) => !terpakai.has(x.simbol + '|' + x.tf)) ?? { simbol: 'BTCUSDT', tf: '4h' };
+  let c = pilihan;
+  if (!c) {
+    const terpakai = new Set(simpanan.panel.map((p) => p.simbol + '|' + p.tf));
+    c = CALON.find((x) => !terpakai.has(x.simbol + '|' + x.tf)) ?? { simbol: 'BTCUSDT', tf: '4h' };
+  }
   tulis({ aktif: true, panel: [...simpanan.panel, { id: idBaru(), ...c }] });
 }
 
