@@ -483,11 +483,16 @@ export default function Marketplace() {
           bingkai membuat etalase terbaca sebagai satu kotak besar berisi
           kotak-kotak kecil — bukan sebagai deretan barang.
 
-          `border-0` menimpa `border` bawaan Panel karena `cn` memakai
-          twMerge; menambah kelas tanpa itu cuma menghasilkan dua kelas
-          border yang bertengkar, dan yang menang tergantung urutan di
-          berkas CSS hasil bangun. */}
-      <Panel className="border-0">
+          Latarnya ikut dibuang. Tanpa garis tepi, `bg-zinc-900/40` cuma
+          menyisakan slab abu membulat yang tidak menjelaskan dirinya —
+          batas yang terasa tapi tidak terlihat. Sekalian transparan, dan
+          kartu produknya duduk langsung di atas halaman.
+
+          `border-0` dan `bg-transparent` menimpa bawaan Panel karena `cn`
+          memakai twMerge; menambah kelas tanpa itu cuma menghasilkan dua
+          kelas yang bertengkar, dan yang menang tergantung urutan di berkas
+          CSS hasil bangun. */}
+      <Panel className="border-0 bg-transparent">
         <PanelHead
           judul="Products"
           sub="Indikator TradingView dan Expert Advisor MetaTrader yang dipakai di terminal ini."
@@ -591,7 +596,11 @@ export default function Marketplace() {
       </Panel>
 
       {/* ── Testimoni + rating ── */}
-      <Panel className="mt-4">
+      {/* Tanpa garis tepi dan tanpa latar, seragam dengan panel Products di
+          atasnya. Isinya sudah berbingkai sendiri — kartu ulasan, kotak
+          tulis-ulasan, dan ajakan Discord — jadi bingkai pembungkusnya cuma
+          lapisan keempat yang tidak menambah keterangan apa pun. */}
+      <Panel className="mt-4 border-0 bg-transparent">
         <PanelHead
           judul="Ulasan Pengguna"
           sub="Ditulis langsung oleh pemakai, bukan kutipan pilihan."
