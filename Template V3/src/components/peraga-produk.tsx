@@ -265,6 +265,93 @@ function PeragaGeserSlTp() {
   );
 }
 
+/** Supertrend: pita ATR yang BERPINDAH SISI saat tren berbalik.
+ *
+ *  Yang digambar bukan "garis yang mengikuti harga" — itu deskripsi semua
+ *  moving average. Yang khas dari Supertrend adalah pitanya mengunci di satu
+ *  sisi selama tren bertahan, lalu MELOMPAT ke seberang begitu harga
+ *  menembusnya. Jadi lompatannya yang jadi tokoh utama peraga ini, bukan
+ *  garisnya.
+ *
+ *  Nilainya dihitung dengan aturan yang sama dengan indikatornya —
+ *  mengetat searah tren, tidak pernah mundur — bukan digambar tangan.
+ *  Garis yang "kelihatan benar" tapi sesekali melonggar akan mengajarkan
+ *  hal yang salah tentang cara kerjanya. */
+function PeragaSupertrend() {
+  /* Harga ditulis tetap, bukan acak: peraga yang berubah tiap render tidak
+     bisa dipakai membandingkan apa pun, dan tangkapan layarnya di dokumen
+     tidak akan pernah cocok dengan yang dilihat orang. Satuannya koordinat
+     SVG — y kecil berarti harga TINGGI. */
+  const HARGA = [108, 104, 106, 99, 94, 96, 88, 82, 85, 76, 70, 64, 58, 62, 55,
+                 68, 78, 86, 82, 95, 104, 99, 112, 100, 88, 78, 70];
+  const JARAK = 15; // pengganti ATR × pengali
+
+  const titik: { x: number; y: number; garis: number; naik: boolean; balik: boolean }[] = [];
+  let naik = true;
+  let garis = HARGA[0] + JARAK;
+  HARGA.forEach((h, i) => {
+    let balik = false;
+    if (naik) {
+      /* Mengetat saja: pita naik ikut harga tapi tidak pernah turun lagi.
+         Itu yang membuatnya jadi trailing stop, bukan rata-rata. */
+      garis = Math.min(garis, h + JARAK);
+      if (h > garis) { naik = false; garis = h - JARAK; balik = true; }
+    } else {
+      garis = Math.max(garis, h - JARAK);
+      if (h < garis) { naik = true; garis = h + JARAK; balik = true; }
+    }
+    titik.push({ x: 20 + i * 14.5, y: h, garis, naik, balik });
+  });
+
+  /* Dipecah jadi ruas-ruas sewarna. Satu polyline untuk seluruh garis akan
+     memaksa satu warna, dan warna itulah keterangan utamanya. */
+  const ruas: { d: string; naik: boolean }[] = [];
+  titik.forEach((t, i) => {
+    const sebelum = titik[i - 1];
+    if (!sebelum || t.balik) { ruas.push({ d: `M${t.x},${t.garis}`, naik: t.naik }); return; }
+    const akhir = ruas[ruas.length - 1];
+    /* Tangga, bukan diagonal: nilainya berubah SEKALI per bar dan bertahan
+       sampai bar berikutnya. Garis miring menyiratkan perubahan mulus yang
+       tidak pernah terjadi. */
+    akhir.d += ` L${t.x},${sebelum.garis} L${t.x},${t.garis}`;
+  });
+
+  /* DUA pembalikan, bukan satu — naik ke turun lalu kembali naik. Peraga
+     yang cuma menunjukkan satu lompatan menyisakan pertanyaan apakah pitanya
+     bisa kembali; yang kedua menjawabnya tanpa satu kata pun.
+
+     Deretnya diuji: pita tidak pernah berada di sisi yang salah pada satu
+     bar pun, dan bar terakhir berhenti di x=397 — masih di dalam bingkai
+     420 px. */
+  const balikDi = titik.filter((t) => t.balik);
+
+  return (
+    <Bingkai judul="Pita mengunci di satu sisi selama tren bertahan, lalu melompat ke seberang saat harga menembusnya">
+      {titik.map((t, i) => {
+        const sebelum = titik[i - 1] ?? t;
+        return lilin(t.x, sebelum.y, t.y, Math.min(sebelum.y, t.y) - 4, Math.max(sebelum.y, t.y) + 4, i);
+      })}
+
+      {ruas.map((r, i) => (
+        <path key={i} d={r.d} fill="none" strokeWidth="1.8" strokeLinejoin="round"
+              stroke={r.naik ? '#10b981' : '#ef4444'} />
+      ))}
+
+      {/* Titik balik ditandai. Tanpa penanda, lompatan pitanya terbaca
+          sebagai garis putus — cacat gambar, bukan kejadian. */}
+      {balikDi.map((t, i) => (
+        <g key={`b${i}`}>
+          <line x1={t.x} y1="18" x2={t.x} y2="132" stroke="#52525b" strokeWidth="1" strokeDasharray="3 4" />
+          <circle cx={t.x} cy={t.garis} r="3.2" fill={t.naik ? '#10b981' : '#ef4444'} />
+        </g>
+      ))}
+
+      <text x="24" y="16" fill="#10b981" fontSize="8.5" fontFamily="IBM Plex Mono">pita di BAWAH = tren naik</text>
+      <text x="396" y="16" fill="#ef4444" fontSize="8.5" fontFamily="IBM Plex Mono" textAnchor="end">pita di ATAS = tren turun</text>
+    </Bingkai>
+  );
+}
+
 /* Kunci peta HARUS sama dengan id di katalog Firestore, bukan dengan nama
    produknya. Indikator V3 tayang dengan id `jadi-traderindicator-v3`;
    selama kuncinya ditulis `jadi-trader-v3`, peraganya tidak pernah
@@ -276,6 +363,7 @@ const PETA: Record<string, React.ReactNode> = {
   'jadi-trader-sync': <PeragaSync />,
   'trade-fi-sync-v2': <><PeragaTradeFi /><PeragaGeserSlTp /></>,
   'smi-indikator': <PeragaSmi />,
+  'supertrend-indikator': <PeragaSupertrend />,
   'news-gap-hunter-v2': <PeragaSnr />,
 };
 
