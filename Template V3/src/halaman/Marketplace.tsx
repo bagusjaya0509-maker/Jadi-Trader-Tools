@@ -500,6 +500,24 @@ function KakiUlasan({ ulasanId, suka, akuSuka, balasan, bolehTulis, uidAku, pemi
   );
 }
 
+/* ── Saringan etalase ────────────────────────────────────────────────────
+   Jenisnya dibaca dari medan `versi`, bukan dari medan tersendiri: katalog
+   nyata sudah menuliskannya di sana ("Pine v6 · overlay", "MQL5 · v2.03"),
+   dan menambah medan baru berarti tiap produk lama harus disunting satu per
+   satu sebelum saringannya berguna.
+
+   `premium` memang medan sendiri — ia yang menyalakan mahkota di kartu, jadi
+   memakai harga sebagai gantinya akan membuat lencana dan saringan bisa
+   berselisih pendapat tentang produk yang sama. */
+const SARING = [
+  { id: 'semua',     label: 'All Product', cocok: () => true },
+  { id: 'premium',   label: 'Premium',     cocok: (p: Produk) => !!p.premium },
+  { id: 'indikator', label: 'Indikator',   cocok: (p: Produk) => /pine/i.test(p.versi) },
+  { id: 'ea',        label: 'EA MT5',      cocok: (p: Produk) => /mql|mt5|expert advisor/i.test(p.versi) },
+  { id: 'gratis',    label: 'Free',        cocok: (p: Produk) => !p.harga },
+] as const;
+type IdSaring = typeof SARING[number]['id'];
+
 export default function Marketplace() {
   /* Kurs untuk keterangan rupiah di bawah harga dolar. Diambil sekali di
      sini, bukan di dalam tiap kartu — angkanya sama untuk semua produk. */
@@ -549,7 +567,16 @@ export default function Marketplace() {
   const [seret, setSeret] = useState<string | null>(null);
   const [sasaran, setSasaran] = useState<string | null>(null);
   const [kabarUrut, setKabarUrut] = useState('');
-  const bisaUrut = !!pemilik && mentah.length === PRODUK.length && mentah.length > 1;
+  const [saring, setSaring] = useState<IdSaring>('semua');
+  const TAMPIL = PRODUK.filter(SARING.find((x) => x.id === saring)!.cocok);
+
+  /* Seret DIMATIKAN saat saringan aktif. `jatuhkan` memang mencari indeks
+     berdasarkan id di array mentah, jadi datanya tidak akan rusak — tapi
+     memindahkan kartu ke posisi kartu lain dalam daftar tersaring
+     menghasilkan urutan yang tidak bisa dilihat maupun diperkirakan
+     penyeretnya, karena produk di antara keduanya sedang disembunyikan. */
+  const bisaUrut = !!pemilik && saring === 'semua'
+    && mentah.length === PRODUK.length && mentah.length > 1;
 
   async function jatuhkan(idTujuan: string) {
     const dariId = seret;
@@ -646,14 +673,48 @@ export default function Marketplace() {
             ) : undefined
           }
         />
+        {/* Bilah saringan TEPAT DI BAWAH keterangan panel, bukan di sisi
+            kanan judul. Ia mengubah isi yang ada di bawahnya, jadi tempatnya
+            di antara judul dan isi itu — bukan berjejer dengan judul, di mana
+            ia terbaca sebagai hiasan kepala.
+
+            Jumlahnya ikut tertulis. Tab kosong yang baru ketahuan kosong
+            SESUDAH diklik membuat orang mengira etalasenya rusak; angka nol
+            di label mengatakannya sebelum tangan bergerak. */}
+        <div className="flex gap-1 overflow-x-auto px-5 pb-3">
+          {SARING.map((t) => {
+            const jumlah = PRODUK.filter(t.cocok).length;
+            const aktif = saring === t.id;
+            return (
+              <button key={t.id} onClick={() => setSaring(t.id)}
+                aria-pressed={aktif}
+                className={cn('flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] transition-colors',
+                  aktif
+                    ? 'border-zinc-600 bg-zinc-800/70 text-zinc-100'
+                    : 'border-zinc-800 text-zinc-500 hover:border-zinc-700 hover:text-zinc-300')}>
+                {t.label}
+                <span className={cn('angka text-[10.5px]', aktif ? 'text-zinc-400' : 'text-zinc-600')}>{jumlah}</span>
+              </button>
+            );
+          })}
+        </div>
+
         {kabarUrut && <div className="px-5 pb-2 text-[11.5px] text-zinc-500">{kabarUrut}</div>}
         {/* Kolom MENGIKUTI jumlah produk (maks 4). Empat kolom dengan tiga
             produk menyisakan satu lubang kosong permanen di kanan — kartu
             yang melebar mengisi barisnya jauh lebih enak dilihat daripada
             rongga yang tidak pernah terisi. */}
+        {/* Kolomnya mengikuti jumlah YANG TAMPIL, bukan seluruh katalog.
+            Kalau ikut katalog, menyaring sampai tersisa satu produk
+            menyisakan tiga lubang kosong di kanannya. */}
+        {TAMPIL.length === 0 ? (
+          <div className="mx-5 mb-5 rounded-lg border border-dashed border-zinc-800 py-10 text-center text-[12.5px] text-zinc-600">
+            Belum ada produk di kategori ini.
+          </div>
+        ) : (
         <div className={cn('grid grid-cols-1 gap-4 px-5 pb-5 sm:grid-cols-2',
-          PRODUK.length >= 4 ? 'xl:grid-cols-4' : PRODUK.length === 3 ? 'xl:grid-cols-3' : '')}>
-          {PRODUK.map((p) => (
+          TAMPIL.length >= 4 ? 'xl:grid-cols-4' : TAMPIL.length === 3 ? 'xl:grid-cols-3' : '')}>
+          {TAMPIL.map((p) => (
             <Panel key={p.id}
                    draggable={bisaUrut}
                    onDragStart={() => setSeret(p.id)}
@@ -730,6 +791,7 @@ export default function Marketplace() {
             </Panel>
           ))}
         </div>
+        )}
       </Panel>
 
       {/* ── Testimoni + rating ── */}
