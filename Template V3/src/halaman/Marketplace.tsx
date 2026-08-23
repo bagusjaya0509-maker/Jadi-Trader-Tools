@@ -452,8 +452,23 @@ function KakiUlasan({ ulasanId, suka, akuSuka, balasan, bolehTulis, uidAku, pemi
                 <div className="flex items-center gap-2">
                   <span className="text-[11.5px] text-zinc-300">{b.nama}</span>
                   <span className="text-[10.5px] text-zinc-600">{tanggalPendek(b.waktu)}</span>
+                  {/* Kegagalannya DIKATAKAN, tidak ditelan. Firestore menolak
+                      lewat Promise, jadi `void` tanpa catch menghasilkan tombol
+                      yang ditekan lalu tidak terjadi apa-apa — dan yang
+                      menekannya menyimpulkan aplikasi rusak, bukan bahwa ia
+                      memang tidak berhak.
+
+                      Komentar ini DI ATAS kondisionalnya, bukan sesudah
+                      `&& (`: di sana parser sedang menunggu sebuah ekspresi,
+                      dan kurung kurawal komentar-JSX dibaca sebagai objek. */}
                   {(pemilik || uidAku === b.uid) && (
-                    <button onClick={() => { if (confirm('Hapus balasan ini?')) void hapusBalasan(b.id); }}
+                    <button onClick={() => {
+                              if (!confirm('Hapus balasan ini?')) return;
+                              void hapusBalasan(b.id).catch((e) =>
+                                setGalat(e?.code === 'permission-denied'
+                                  ? 'Balasan ini bukan milikmu, jadi tidak bisa dihapus.'
+                                  : (e instanceof Error ? e.message : 'Gagal menghapus balasan.')));
+                            }}
                             aria-label="Hapus balasan"
                             className="ml-auto cursor-pointer rounded p-0.5 text-zinc-700 transition-colors hover:text-red-400">
                       <Trash2 className="size-3" />
