@@ -3,6 +3,7 @@ import { Plus, X, GripVertical, Pencil, FolderPlus } from 'lucide-react';
 import { cn, harga as fHarga } from '@/lib/utils';
 import { ambilTickers, hargaTickMt5, daftarSimbolMt5, type Ticker } from '@/lib/pasar';
 import { SIMBOL_DASAR } from '@/lib/simbol';
+import { useMulti, kirimBus, ID_PANEL } from '@/lib/multi-chart';
 
 /* ════════════════════════════════════════════════════════════════════════
    WATCHLIST CHART — kolom kanan dengan PEMBATAS yang diseret
@@ -79,6 +80,42 @@ export function WatchChart({ simbol, onPilih, onLebar }: {
   simbol: string;
   onPilih: (s: string) => void;
 }) {
+  /* ── Menu klik kanan: kirim pasangan ini ke panel mana ────────────────
+     Hanya hidup di mode multi-chart. Klik KIRI tetap membuka di panel ini
+     sendiri seperti biasa — menu ini untuk tujuan yang LAIN, dan menaruh
+     keduanya di satu gerakan akan membuat pilihan yang paling sering
+     dipakai jadi yang paling lambat. */
+  const multi = useMulti();
+  const [menuPanel, setMenuPanel] = useState<{ simbol: string; x: number; y: number } | null>(null);
+  useEffect(() => {
+    if (!menuPanel) return;
+    const tutup = () => setMenuPanel(null);
+    const tekan = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenuPanel(null); };
+    /* Ditunda satu putaran: klik kanan yang MEMBUKA menu masih menggelinding
+       saat pendengar ini dipasang, dan tanpa penundaan ia langsung menutup
+       menunya sendiri. */
+    const t = setTimeout(() => {
+      document.addEventListener('click', tutup);
+      document.addEventListener('contextmenu', tutup);
+    }, 0);
+    document.addEventListener('keydown', tekan);
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener('click', tutup);
+      document.removeEventListener('contextmenu', tutup);
+      document.removeEventListener('keydown', tekan);
+    };
+  }, [menuPanel]);
+
+  const kirimKePanel = (idPanel: string, s: string) => {
+    setMenuPanel(null);
+    /* Panel SENDIRI tidak lewat bus: BroadcastChannel tidak mengirim balik
+       ke pengirimnya, jadi memilih panel tempat watchlist ini hidup akan
+       terlihat seperti klik yang tidak terjadi apa-apa. */
+    if (idPanel === ID_PANEL) { onPilih(s); return; }
+    kirimBus({ jenis: 'simbol', panel: idPanel, simbol: s });
+  };
+
   const [seksi, setSeksi] = useState<SeksiWatch[]>(bacaSeksi);
   const [tickers, setTickers] = useState<Record<string, Ticker>>({});
   const [tickMt5, setTickMt5] = useState<Record<string, { bid: number; waktu: number }>>({});
@@ -222,6 +259,29 @@ export function WatchChart({ simbol, onPilih, onLebar }: {
 
   return (
     <div className="flex shrink-0" style={{ width: lebar + 6 }}>
+      {menuPanel && (
+        /* fixed + koordinat kursor: menu di dalam kolom watchlist yang
+           bergulir akan terpotong oleh overflow induknya persis saat ia
+           dibuka di baris paling bawah — yaitu tempat menu paling sering
+           dibutuhkan. */
+        <div style={{ left: menuPanel.x + 2, top: menuPanel.y + 2 }}
+             onClick={(e) => e.stopPropagation()}
+             className="fixed z-[70] min-w-[190px] overflow-hidden rounded-md border border-zinc-800 bg-zinc-950 py-1 shadow-xl">
+          <div className="border-b border-zinc-800/80 px-2.5 pb-1.5 pt-1 text-[10.5px] text-zinc-500">
+            Buka <span className="angka text-zinc-300">{menuPanel.simbol}</span> di
+          </div>
+          {multi.panel.map((p, i) => (
+            <button key={p.id} onClick={() => kirimKePanel(p.id, menuPanel.simbol)}
+              className="flex w-full cursor-pointer items-center gap-2 px-2.5 py-1.5 text-left text-[11.5px] text-zinc-300 transition-colors hover:bg-zinc-900">
+              <span className="shrink-0 rounded bg-zinc-800/80 px-1.5 py-0.5 text-[10px] text-zinc-400">
+                Panel {i + 1}
+              </span>
+              <span className="angka truncate text-zinc-500">{p.simbol} {p.tf}</span>
+              {p.id === ID_PANEL && <span className="ml-auto shrink-0 text-[10px] text-emerald-500">ini</span>}
+            </button>
+          ))}
+        </div>
+      )}
       {/* GARIS PEMBATAS — menyatu dengan watchlist, bukan tombol terpisah.
           Selalu ada walau watchlist tertutup: itulah satu-satunya cara
           membukanya kembali, dan pegangan yang menghilang saat tertutup
@@ -339,6 +399,15 @@ export function WatchChart({ simbol, onPilih, onLebar }: {
                        onDrop={(e) => { e.preventDefault(); e.stopPropagation(); jatuhkan(); }}
                        onDragEnd={() => { seretW.current = null; setSasar(null); }}
                        onClick={() => onPilih(s)}
+                       onContextMenu={(e) => {
+                         /* Hanya di mode multi-chart. Di chart tunggal
+                            tidak ada "panel lain" untuk dituju, dan menu
+                            berisi satu pilihan yang sama dengan klik kiri
+                            cuma menghalangi menu bawaan peramban. */
+                         if (!multi.aktif) return;
+                         e.preventDefault();
+                         setMenuPanel({ simbol: s, x: e.clientX, y: e.clientY });
+                       }}
                        className={cn('group flex cursor-pointer items-center gap-1.5 px-2 py-2 transition-colors hover:bg-zinc-900/70',
                          s === simbol && 'bg-zinc-900/50',
                          /* Garis penanda tempat jatuh: sisi atas baris ini. */

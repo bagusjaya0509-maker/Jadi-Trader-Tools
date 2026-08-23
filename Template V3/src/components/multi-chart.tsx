@@ -22,7 +22,8 @@ import {
    ════════════════════════════════════════════════════════════════════════ */
 
 const ALAMAT = (p: PanelMulti, utama = false) =>
-  `/chart-entry?simbol=${encodeURIComponent(p.simbol)}&tf=${encodeURIComponent(p.tf)}&polos=1${utama ? '&utama=1' : ''}`;
+  `/chart-entry?simbol=${encodeURIComponent(p.simbol)}&tf=${encodeURIComponent(p.tf)}`
+  + `&polos=1&panel=${encodeURIComponent(p.id)}${utama ? '&utama=1' : ''}`;
 
 export function MultiChart() {
   const m = useMulti();

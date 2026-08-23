@@ -47,6 +47,15 @@ export const UTAMA: boolean = (() => {
   catch { return false; }
 })();
 
+/** Id panel yang sedang dijalankan konteks ini, dari `&panel=`. Kosong di
+ *  jendela tools. Dipakai untuk menerima kiriman simbol yang DITUJUKAN ke
+ *  panel ini saja — tanpa alamat, satu pilihan di watchlist akan mengubah
+ *  simbol semua panel sekaligus. */
+export const ID_PANEL: string = (() => {
+  try { return new URLSearchParams(window.location.search).get('panel') ?? ''; }
+  catch { return ''; }
+})();
+
 function bacaSimpanan(): KeadaanMulti {
   try {
     const d = JSON.parse(localStorage.getItem(KUNCI) ?? 'null');
@@ -136,7 +145,11 @@ export function hapusPanel(id: string) {
    BroadcastChannel menjangkau iframe DAN popup se-origin, dan tidak
    mengirim balik ke pengirimnya sendiri — persis yang dibutuhkan: panel
    berbicara, jendela utama mendengar. */
-export type PesanBus = { jenis: 'navigasi'; ke: string };
+export type PesanBus =
+  | { jenis: 'navigasi'; ke: string }
+  /* Kirim simbol ke SATU panel. `panel` wajib: bus menyiar ke semua konteks
+     se-origin, jadi pesan tanpa alamat akan diambil setiap panel. */
+  | { jenis: 'simbol'; panel: string; simbol: string };
 
 let kanal: BroadcastChannel | null = null;
 function bus(): BroadcastChannel | null {

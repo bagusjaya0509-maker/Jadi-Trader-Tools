@@ -10,7 +10,7 @@ import { simpanDraf } from '@/lib/draf-sinyal';
 import { Panel, PanelHead, KartuKpi, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn, uang, persen, harga, tanggalPendek } from '@/lib/utils';
 import { ChartLilin, TAMPILAN_BAWAAN, type Garis, type GarisHarga, type GarisSeret, type PosisiChartMt5, type TampilanChart } from '@/components/chart-lilin';
-import { POLOS, UTAMA, kirimBus, nyalakanMulti, replayDipegangLain, pegangReplay } from '@/lib/multi-chart';
+import { POLOS, UTAMA, ID_PANEL, kirimBus, dengarBus, nyalakanMulti, replayDipegangLain, pegangReplay } from '@/lib/multi-chart';
 import { PanelReplay, type AksiOrder, type JenisEntry } from '@/components/panel-replay';
 import { PojokOrder } from '@/components/pojok-order';
 import { kirimOrderNyata, ubahSlTpNyata, batalPendingNyata, tutupPosisiNyata, tickSimbol, keTick, type MetodeTp } from '@/lib/order-nyata';
@@ -337,6 +337,33 @@ export default function ChartBacktest() {
      dalam mode berbahaya. Sekali pakai membalik bebannya: modenya jelas
      menyala, dipakai sekali, lalu hilang. */
   const [bidikReplay, setBidikReplay] = useState(false);
+  /* ── Gulir tanpa batang di mode panel ─────────────────────────────────
+     Bukan mematikan gulirnya: roda tetap bekerja, yang hilang cuma batang
+     abu-abu di tepi. Di panel seperempat layar batang itu memakan lebar
+     yang berarti dan mengumumkan "ada yang tidak muat" pada panel yang
+     isinya justru sudah pas.
+
+     Kelasnya dipasang ke <html> karena itulah yang menggulir di dalam
+     iframe — menaruhnya di div mana pun tidak akan tersentuh. */
+  useEffect(() => {
+    if (!POLOS) return;
+    document.documentElement.classList.add('gulir-senyap');
+    return () => document.documentElement.classList.remove('gulir-senyap');
+  }, []);
+
+  /* ── Terima simbol yang DIKIRIM ke panel ini ───────────────────────────
+     Watchlist di panel utama menawarkan "buka di Panel N" lewat klik kanan;
+     yang sampai ke sini cuma pesan yang menyebut id panel ini. Tanpa
+     penyaringan itu, satu pilihan akan mengubah simbol semua panel. */
+  useEffect(() => {
+    if (!POLOS || !ID_PANEL) return;
+    return dengarBus((p) => {
+      if (p && p.jenis === 'simbol' && p.panel === ID_PANEL && typeof p.simbol === 'string') {
+        setSimbol(p.simbol);
+      }
+    });
+  }, []);
+
   /* Kepala panel (bilah Simbol/TF/harga/kendali) bisa disembunyikan — HANYA
      di mode panel multi-chart. Di panel seperempat layar, bilah setinggi
      ±90px itu porsi yang serius; chart tunggal tidak butuh sakelar ini.
@@ -348,6 +375,12 @@ export default function ChartBacktest() {
      dibutuhkan — simbol dan TF mana ini — tetap terbaca di strip ringkas
      penggantinya, dan satu klik mengembalikannya kalau memang mau diubah. */
   const [kepalaSembunyi, setKepalaSembunyi] = useState(POLOS);
+  /* Tabel Posisi/Order Terbuka: ada tombol sembunyikan, dan di mode panel
+     BAWAANNYA tersembunyi. Alasan pemilik konkret — menggulir ke bawah
+     untuk melihat tabel membuat chartnya keluar layar, dan satu klik yang
+     meleset di sana terasa seperti chartnya hilang. Yang tersembunyi tidak
+     bisa ditabrak. */
+  const [posisiSembunyi, setPosisiSembunyi] = useState(POLOS);
   const gantiKepala = (v: boolean) => {
     setKepalaSembunyi(v);
     /* Tinggi chart dihitung dari offsetHeight bilah ini; sembunyi berarti
@@ -3535,7 +3568,14 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                     lilin={lilinGabung} simbol={simbol} tf={tf} hingga={replayIdx ?? undefined}
                     aturHasil={setPine} onInfo={setPineInfo} onKendali={setKendaliPine} />
           </div>
-          <WatchChart simbol={simbol} onPilih={setSimbol} onLebar={setLebarWatch} />
+          {/* Watchlist beserta garis pembatasnya ditiadakan di panel BIASA:
+              di lebar seperempat layar ia memakan ruang chart yang justru
+              jadi alasan panel itu ada. Tetap hidup di panel UTAMA — dari
+              sanalah pasangan dikirim ke panel lain lewat klik kanan, jadi
+              satu watchlist melayani seluruh grid. */}
+          {(!POLOS || UTAMA) && (
+            <WatchChart simbol={simbol} onPilih={setSimbol} onLebar={setLebarWatch} />
+          )}
           </div>
           {/* Pegangan tinggi chart: diseret = diatur, dilepas = dikunci dan
               diingat sebagai bawaan, klik dua kali = kembali otomatis. */}
@@ -3904,10 +3944,26 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
           panel pertama grid). Empat salinan tabel yang isinya sama persis
           membuat tiap panel memanjang ke bawah tanpa menambah informasi. */}
       {(!POLOS || UTAMA) && (
-        <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <PanelPosisiTerbuka sumber="kripto" onSunting={bukaSunting} onTutup={tutupDariTabel} />
-          <PanelPosisiTerbuka sumber="forex" onSunting={bukaSunting} onTutup={tutupDariTabel} />
-        </div>
+        <>
+          {/* Sakelar hanya ada di mode panel. Di chart tunggal tabel ini
+              duduk di bawah chart tanpa mengganggu apa pun, dan sakelar
+              untuk sesuatu yang tidak mengganggu cuma menambah kendali
+              yang harus dipahami. */}
+          {POLOS && (
+            <button onClick={() => setPosisiSembunyi((v) => !v)}
+              aria-label={posisiSembunyi ? 'Tampilkan posisi terbuka' : 'Sembunyikan posisi terbuka'}
+              className="mt-1 flex w-full cursor-pointer items-center gap-1.5 border-t border-zinc-800/80 px-3 py-1.5 text-[11px] text-zinc-500 transition-colors hover:text-zinc-300">
+              {posisiSembunyi ? <ChevronDown className="size-3.5" /> : <ChevronUp className="size-3.5" />}
+              {posisiSembunyi ? 'Posisi & order terbuka' : 'Sembunyikan posisi & order'}
+            </button>
+          )}
+          {!(POLOS && posisiSembunyi) && (
+            <div className={cn('grid grid-cols-1 gap-4 lg:grid-cols-2', POLOS ? 'mt-0' : 'mt-4')}>
+              <PanelPosisiTerbuka sumber="kripto" onSunting={bukaSunting} onTutup={tutupDariTabel} tanpaBingkai={POLOS} />
+              <PanelPosisiTerbuka sumber="forex" onSunting={bukaSunting} onTutup={tutupDariTabel} tanpaBingkai={POLOS} />
+            </div>
+          )}
+        </>
       )}
     </div>
   );
