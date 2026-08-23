@@ -4,6 +4,7 @@ import { LogOut, ChevronRight, TriangleAlert, Eye, Loader2 } from 'lucide-react'
 import { useAuth } from '@/lib/auth';
 import { discordSiap, mulaiLoginDiscord } from '@/lib/analisa';
 import { modePreview, akhiriPreview } from '@/lib/preview';
+import { usePaket, LABEL_PAKET } from '@/lib/paket';
 import { cn } from '@/lib/utils';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -79,6 +80,7 @@ export function TombolMasuk({ penuh }: { penuh?: boolean }) {
 /** Avatar + menu. Menggantikan bulatan abu-abu mati di bilah atas. */
 export function MenuPengguna() {
   const { pengguna, langganan, keluar, pemilik, memuat } = useAuth();
+  const { paket: paketku, memuat: memuatPaket } = usePaket();
   const [buka, setBuka] = useState(false);
 
   /* Selama auth belum menjawab, TIDAK menampilkan apa pun yang menyimpulkan.
@@ -171,6 +173,40 @@ export function MenuPengguna() {
                   <span className="angka text-[11.5px] text-zinc-500">sisa {langganan.sisaHari} hari</span>
                 )}
               </div>
+
+              {/* NAMA PAKETNYA, bukan cuma "Aktif".
+                  ──────────────────────────────────────────────────────────
+                  "Aktif" menjawab boleh-masuk-atau-tidak, dan itu pertanyaan
+                  yang sudah terjawab begitu halamannya terbuka. Yang tidak
+                  terjawab: paket yang mana — dan itulah yang menentukan Copy
+                  Signal terbuka atau terkunci.
+
+                  Sumbernya /api/paket, SUMBER YANG SAMA dengan yang memagari
+                  fiturnya. Bukan dari status langganan di atasnya: keduanya
+                  berasal dari tempat berbeda, dan pernah berselisih sampai
+                  pembeli berbayar dibaca sebagai pengguna gratis oleh
+                  pagarnya sementara baris ini tetap berkata "Aktif". Kalau
+                  nanti berselisih lagi, layar ini yang akan
+                  memperlihatkannya lebih dulu. */}
+              {!pemilik && !memuatPaket && paketku.aktif && (
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  <span className={cn('rounded px-1.5 py-0.5 text-[10.5px]',
+                    paketku.paket === 'tahunan' ? 'bg-amber-400/15 text-amber-300'
+                      : paketku.paket === 'premium3' ? 'bg-violet-500/15 text-violet-300'
+                      : paketku.paket === 'testing' ? 'bg-sky-500/15 text-sky-300'
+                      : paketku.paket === 'pratinjau' ? 'bg-zinc-700/60 text-zinc-300'
+                      : 'bg-zinc-800 text-zinc-400')}>
+                    {LABEL_PAKET[paketku.paket]}
+                  </span>
+                  {/* Copy Signal disebut TERPISAH karena itu satu-satunya
+                      pembeda yang paling sering ditanyakan — dan orang yang
+                      baru membayar perlu melihat bahwa ia sudah ikut,
+                      tanpa harus membuka halamannya untuk mencoba. */}
+                  <span className={cn('text-[10.5px]', paketku.copySignal ? 'text-emerald-500' : 'text-zinc-600')}>
+                    {paketku.copySignal ? 'termasuk Copy Signal' : 'tanpa Copy Signal'}
+                  </span>
+                </div>
+              )}
               {/* Pemilik tidak punya tagihan dan tidak perlu meminta akses —
                   keduanya tautan yang menuju halaman yang tidak menjawab
                   apa pun untuknya. */}
