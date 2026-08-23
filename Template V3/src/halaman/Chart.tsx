@@ -2660,7 +2660,14 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
           celah yang tidak simetris dengan garis lurus di sebelahnya
           terbaca sebagai salah pasang. Siku membuat keempat garis bertemu
           sebagai satu kotak utuh. */}
-      <Panel className={POLOS ? 'rounded-none border-0 bg-transparent' : 'rounded-none bg-transparent'}>
+      {/* `relative` DI SINI, bukan di pembungkus grafik di dalamnya: kaki
+          chart mengambang dengan `absolute bottom-0`, dan induk langsungnya
+          adalah kartu ini. Sempat dipasang di pembungkus grafik — yang bukan
+          induknya — sehingga kakinya melompati kartu, menempel ke <main>
+          (yang ber-relative demi grid multi-chart), lalu mendarat di dasar
+          HALAMAN, 550 px di bawah chartnya. Tidak ada galat; ikonnya cuma
+          pindah ke tempat yang salah. */}
+      <Panel className={cn('relative', POLOS ? 'rounded-none border-0 bg-transparent' : 'rounded-none bg-transparent')}>
         {/* `relative`: jangkar bagi panel News dan menu Indikator di HP.
             Keduanya dilepas dari tombolnya di layar kecil dan digantung
             ke bilah ini, supaya lebarnya mengikuti bilah dan tidak bisa
@@ -3674,13 +3681,25 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
             panel jadi bersih, dan ketiganya adalah kendali seluruh ruang
             kerja, bukan kendali satu panel. Semuanya tetap ada di chart
             tunggal, satu klik "Tutup multi-chart" jauhnya. */}
-        <div className={cn('relative flex items-center gap-3 border-t border-zinc-800/80 px-4 py-2 text-[11.5px] text-zinc-600',
+        {/* MENGAMBANG DI DASAR CHART, bukan baris tersendiri — permintaan
+            pemilik. Dilepas dari aliran, jadi satu baris hilang dari tinggi
+            halaman dan ikonnya masuk ke dalam bingkai chart.
+
+            pointer-events-none di wadahnya, auto di tiap kendali: pegangan
+            seret tinggi ada TEPAT di bawah baris ini, dan wadah yang
+            menangkap klik akan mematikannya di sepanjang lebar chart demi
+            tiga tombol kecil. Yang menangkap hanya tombolnya sendiri.
+
+            Ketiganya diberi latar gelap tembus pandang: mereka kini duduk di
+            atas lilin, dan teks tanpa latar di atas lilin merah-hijau
+            berubah keterbacaannya tiap kali harga bergerak. */}
+        <div className={cn('pointer-events-none absolute inset-x-0 bottom-0 z-10 flex items-center gap-3 px-4 py-2 text-[11.5px] text-zinc-600',
           POLOS && 'hidden')}>
           {/* Gerigi duduk di pojok paling kiri kaki chart, TANPA teks. Ia
               setelan yang dibuka sesekali lalu ditutup; label tetap di sana
               menuntut perhatian setiap kali mata menyapu kaki chart, padahal
               yang dibaca di baris ini adalah jumlah lilin dan sumbernya. */}
-          <div className="relative shrink-0">
+          <div className="pointer-events-auto relative shrink-0">
             <button
               onClick={bukaTutupTampilan}
               title="Setelan tampilan chart"
@@ -3831,7 +3850,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
           <button
             onClick={() => setBacktestBuka((v) => !v)}
             title={backtestBuka ? 'Tutup panel Backtest' : 'Buka panel Backtest (beta)'}
-            className={cn('absolute left-1/2 flex shrink-0 -translate-x-1/2 cursor-pointer items-center gap-1.5 rounded px-2 py-1 text-[11px] transition-colors',
+            className={cn('pointer-events-auto absolute left-1/2 flex shrink-0 -translate-x-1/2 cursor-pointer items-center gap-1.5 rounded bg-zinc-950/70 px-2 py-1 text-[11px] backdrop-blur-sm transition-colors',
               backtestBuka ? 'text-zinc-200' : 'text-zinc-500 hover:text-zinc-300')}>
             <FlaskConical className="size-3" strokeWidth={2} />
             Backtest
@@ -3846,7 +3865,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
             <button onClick={() => nyalakanMulti(simbol, tf)}
               title="Multi-chart — bagi layar jadi beberapa panel chart"
               aria-label="Multi-chart"
-              className="ml-auto flex shrink-0 cursor-pointer items-center rounded p-1 text-zinc-500 transition-colors hover:text-zinc-300">
+              className="pointer-events-auto ml-auto flex shrink-0 cursor-pointer items-center rounded bg-zinc-950/70 p-1 text-zinc-500 backdrop-blur-sm transition-colors hover:text-zinc-300">
               <LayoutGrid className="size-3.5" strokeWidth={2} />
             </button>
           )}
