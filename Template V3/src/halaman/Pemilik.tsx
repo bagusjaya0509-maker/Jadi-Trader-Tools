@@ -466,9 +466,20 @@ export default function Pemilik() {
                     Recharts memisahkan kolom. Menumpuk keluar di atas masuk
                     akan membaca sebagai "total", padahal keduanya berlawanan
                     arah. */}
-                <Bar dataKey="lisensi" stackId="masuk" name="Lisensi" fill="#10b981" fillOpacity={0.85} maxBarSize={22} />
-                <Bar dataKey="manual" stackId="masuk" name="Manual" fill="#38bdf8" fillOpacity={0.75} maxBarSize={22} />
-                <Bar dataKey="keluar" stackId="keluar" name="Pengeluaran" fill="#ef4444" fillOpacity={0.7} maxBarSize={22} />
+                {/* `minPointSize` WAJIB di sini, bukan hiasan. Pengeluaran
+                    bulan ini empat puluh kali pemasukan, jadi pada sumbu yang
+                    sama batang $5 tingginya 4 px — dan Recharts tidak
+                    menggambarnya sama sekali. Terukur: ketiga kelompok ada di
+                    DOM, dua di antaranya tanpa satu pun elemen di dalamnya.
+
+                    Sumbunya tetap LINEAR. Skala logaritmik akan membuat
+                    keduanya sama tinggi dan itu bohong — perbandingannya
+                    memang setimpang itu, dan justru itulah yang perlu
+                    terlihat. Yang diperbaiki cuma agar batang kecilnya tetap
+                    punya wujud yang bisa dilihat dan disentuh tetikus. */}
+                <Bar dataKey="lisensi" stackId="masuk" name="Lisensi" fill="#10b981" fillOpacity={0.85} maxBarSize={22} minPointSize={3} />
+                <Bar dataKey="manual" stackId="masuk" name="Manual" fill="#38bdf8" fillOpacity={0.75} maxBarSize={22} minPointSize={3} />
+                <Bar dataKey="keluar" stackId="keluar" name="Pengeluaran" fill="#ef4444" fillOpacity={0.7} maxBarSize={22} minPointSize={3} />
               </BarChart>
             </ResponsiveContainer>
             </div>
