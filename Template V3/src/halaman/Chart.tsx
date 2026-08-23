@@ -2380,9 +2380,48 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
     setPenuhSemu(true);
   }, [penuhSemu]);
 
+  /* ── TINGGI OTOMATIS DI MODE PANEL ────────────────────────────────────
+     Tanpa ini panel memakai rumus chart tunggal, yang lantainya 460 px.
+     Di panel seperempat layar (±330 px) isinya pasti melimpah: halaman
+     tergulung dan sumbu waktu terpotong, dan orangnya harus menyeret
+     pembatas grid untuk mengepaskan tiap panel satu per satu.
+
+     Diukur dari POSISI CHART YANG SEBENARNYA (`areaChart`), bukan dari
+     menjumlahkan tinggi bagian-bagian di atasnya. Yang di atas chart
+     berubah-ubah — bilah kepala bisa disembunyikan, pita galat dan kabar
+     replay muncul-hilang — dan setiap penjumlahan tangan akan meleset
+     persis sebanyak bagian yang lupa dihitung. Jarak dari puncak chart ke
+     dasar jendela selalu benar tanpa tahu apa saja yang ada di atasnya.
+
+     Tidak ada umpan balik: `top` ditentukan oleh yang DI ATAS chart, bukan
+     oleh tinggi chart itu sendiri. */
+  const [tinggiPanel, setTinggiPanel] = useState(0);
+  useEffect(() => {
+    if (!POLOS) return;
+    const ukur = () => {
+      const atas = areaChart.current?.getBoundingClientRect().top ?? 0;
+      /* 10 px, DIUKUR bukan ditaksir: dengan 6 px panel masih menyisakan
+         2 px limpahan — cukup untuk memunculkan bilah gulir setipis rambut
+         di tiap panel, yang terbaca sebagai "ada yang tidak muat" padahal
+         chartnya sendiri sudah pas. Lantainya 150: di bawah itu chart tidak
+         terbaca lagi, dan lebih baik panelnya bergulir sedikit daripada
+         menampilkan kanvas setinggi dua baris teks. */
+      setTinggiPanel(Math.max(150, Math.round(window.innerHeight - atas - 10)));
+    };
+    ukur();
+    /* Dua kali: sekali sekarang, sekali setelah tata letak selesai —
+       pengukuran pertama berjalan sebelum bilah kepala sempat menghilang,
+       jadi `top`-nya masih yang lama. */
+    const t = setTimeout(ukur, 120);
+    window.addEventListener('resize', ukur);
+    return () => { clearTimeout(t); window.removeEventListener('resize', ukur); };
+  }, [kepalaSembunyi, tampilSmi, galat, kabarReplay]);
+
   const tinggiChart = layarPenuh && tinggiLayarPenuh
     ? tinggiLayarPenuh
-    : tinggiManual ?? Math.max(460, tinggiLayar - (tampilSmi ? 343 : 303));
+    : POLOS && tinggiPanel
+      ? tinggiPanel
+      : tinggiManual ?? Math.max(460, tinggiLayar - (tampilSmi ? 343 : 303));
   const mulaiSeretTinggi = useCallback((e: React.PointerEvent) => {
     e.preventDefault();
     const awalY = e.clientY, awalT = tinggiChart;
@@ -2499,7 +2538,10 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
   }
 
   return (
-    <div className="p-4 sm:p-6">
+    /* Mode panel: TANPA jarak halaman. Padding 16-24 px di keempat sisi
+       memakan ±10% panel seperempat layar untuk ruang kosong, dan
+       pembatas grid sudah memisahkan panel satu dari yang lain. */
+    <div className={POLOS ? '' : 'p-4 sm:p-6'}>
       {/* ── Bilah kendali ── */}
       {/* Pembungkus ber-ref: Panel komponen fungsi tanpa forwardRef, jadi
           ref tidak bisa dipasang langsung padanya. Div ini yang dinaikkan
@@ -2507,7 +2549,12 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
       <div ref={kartuChart}
            className={cn(layarPenuh && 'bg-zinc-950 p-1.5',
                          penuhSemu && 'fixed inset-0 z-50 overflow-y-auto')}>
-      <Panel>
+      {/* Garis tepi kartu DIHILANGKAN di mode panel — permintaan pemilik.
+          Di grid, tiap panel sudah punya garis pemisahnya sendiri; kartu
+          bergaris di dalam kotak bergaris menghasilkan dua garis sejajar
+          berjarak beberapa piksel, yang terbaca sebagai cacat penataan
+          alih-alih sebagai pemisah. */}
+      <Panel className={POLOS ? 'rounded-none border-0 bg-transparent' : undefined}>
         {/* `relative`: jangkar bagi panel News dan menu Indikator di HP.
             Keduanya dilepas dari tombolnya di layar kecil dan digantung
             ke bilah ini, supaya lebarnya mengikuti bilah dan tidak bisa
@@ -3492,14 +3539,26 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
           </div>
           {/* Pegangan tinggi chart: diseret = diatur, dilepas = dikunci dan
               diingat sebagai bawaan, klik dua kali = kembali otomatis. */}
-          <div onPointerDown={mulaiSeretTinggi}
-               onDoubleClick={() => { setTinggiManual(null); try { localStorage.removeItem('jt.tinggiChart'); } catch { /* privat */ } }}
-               title="Seret untuk mengatur tinggi chart — dilepas, ukurannya diingat. Klik dua kali: kembali otomatis."
-               className="group flex h-3 w-full cursor-ns-resize touch-none items-center justify-center">
-            <div className="h-[3px] w-16 rounded-full bg-zinc-800 transition-colors group-hover:bg-zinc-500" />
-          </div>
+          {/* Pegangan seret tinggi tidak ada gunanya di mode panel: tinggi
+              chart di sana dihitung otomatis dari ruang yang tersedia, dan
+              angka manual justru mengembalikan pemotongan yang baru saja
+              dihilangkan. */}
+          {!POLOS && (
+            <div onPointerDown={mulaiSeretTinggi}
+                 onDoubleClick={() => { setTinggiManual(null); try { localStorage.removeItem('jt.tinggiChart'); } catch { /* privat */ } }}
+                 title="Seret untuk mengatur tinggi chart — dilepas, ukurannya diingat. Klik dua kali: kembali otomatis."
+                 className="group flex h-3 w-full cursor-ns-resize touch-none items-center justify-center">
+              <div className="h-[3px] w-16 rounded-full bg-zinc-800 transition-colors group-hover:bg-zinc-500" />
+            </div>
+          )}
         </div>
-        <div className="relative flex items-center gap-3 border-t border-zinc-800/80 px-4 py-2 text-[11.5px] text-zinc-600">
+        {/* Seluruh kaki chart — gerigi setelan, Backtest, ikon multi —
+            disembunyikan di mode panel atas permintaan pemilik: dasar tiap
+            panel jadi bersih, dan ketiganya adalah kendali seluruh ruang
+            kerja, bukan kendali satu panel. Semuanya tetap ada di chart
+            tunggal, satu klik "Tutup multi-chart" jauhnya. */}
+        <div className={cn('relative flex items-center gap-3 border-t border-zinc-800/80 px-4 py-2 text-[11.5px] text-zinc-600',
+          POLOS && 'hidden')}>
           {/* Gerigi duduk di pojok paling kiri kaki chart, TANPA teks. Ia
               setelan yang dibuka sesekali lalu ditutup; label tetap di sana
               menuntut perhatian setiap kali mata menyapu kaki chart, padahal
