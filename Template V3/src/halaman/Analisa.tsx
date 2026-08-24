@@ -2929,52 +2929,19 @@ export default function Analisa() {
                         kaki kartu berapa pun tinggi kakinya — tidak ada
                         angka piksel yang harus dijaga tetap cocok kalau
                         suatu saat isi kakinya bertambah satu baris. */}
-                    <span className="relative block flex-1">
-                    {/* Wilayah kurva: 62% kanan, di belakang isi kartu. */}
-                    {/* pointer-events dinyalakan: kurvanya sekarang bisa
-                        ditunjuk untuk membaca P/L per titik. Klik tetap
-                        menembus ke tombolnya — ia induk elemen ini, jadi
-                        peristiwanya naik ke sana seperti biasa. */}
-                    <span className="absolute inset-y-0 right-0 z-0 block w-[62%]">
-                      <span aria-hidden className="absolute inset-0 block"
-                            style={{ background: `linear-gradient(to left, ${warnaAksen}1f, transparent 78%)` }} />
-                      {/* Titik-titik raster, memudar ke kiri. Ia memberi
-                          kedalaman tanpa menambah garis — dan garis lagi di
-                          kartu yang sudah bertepi cuma menambah kebisingan. */}
-                      <span aria-hidden className="absolute inset-0 block"
-                            style={{ color: warnaAksen, opacity: 0.1,
-                                     WebkitMaskImage: 'linear-gradient(to right, transparent, black 55%)',
-                                     maskImage: 'linear-gradient(to right, transparent, black 55%)' }}>
-                        <svg className="h-full w-full">
-                          <defs>
-                            <pattern id={'kisi-' + uid} width="14" height="14" patternUnits="userSpaceOnUse">
-                              <circle cx="1" cy="1" r="1" fill="currentColor" />
-                            </pattern>
-                          </defs>
-                          <rect width="100%" height="100%" fill={'url(#kisi-' + uid + ')'} />
-                        </svg>
-                      </span>
-                      {/* TINGGI PIKSEL, bukan persen tinggi kartu.
-                          Dengan h-[76%], tinggi kurvanya bergantung tinggi
-                          KARTUNYA — dan tinggi kartu berubah tiap grid
-                          menyusun ulang barisnya (kartu satu baris selalu
-                          setinggi yang tertinggi). Jadi mengubah ukuran
-                          jendela membuat kurvanya melompat naik-turun
-                          walaupun datanya sama sekali tidak berubah, dan
-                          yang melihatnya menyangka angkanya ikut berubah.
+                    {/* KEPALA KARTU BERDIRI DI LUAR WILAYAH KURVA.
+                        Sebelumnya kepala (avatar, nama, winrate) duduk DI
+                        DALAM kotak yang sama dengan kurvanya, jadi begitu
+                        kurvanya cukup tinggi, puncaknya dan garis acuan
+                        putus-putusnya memotong nama dan angka winrate.
+                        Yang terbaca bukan latar di belakang tulisan,
+                        melainkan garis yang mencoret tulisan.
 
-                          152px BUKAN angka karangan: lapisan tempat kurva ini
-                          duduk terukur 200px di layar, dan 76% darinya adalah
-                          152. Jadi tampilannya sama persis dengan sebelumnya —
-                          yang hilang cuma lompatannya. Tebakan pertama (128px)
-                          meleset 24px, dan 24px itu muncul sebagai latar gelap
-                          yang menjalar ke atas di belakang angkanya. */}
-                      <SparklineSaldo sinyal={sinyal} interaktif
-                                      kelas="absolute inset-x-0 bottom-0 h-[152px] w-full"
-                                      modal={performa?.modal ?? 1000} />
-                    </span>
-
-                    <span className="pointer-events-none relative z-10 block px-4 pb-3 pt-4">
+                        Menaruhnya di baris terpisah menyelesaikannya di
+                        tingkat tata letak, bukan dengan menahan-nahan
+                        tinggi kurvanya: kurva setinggi apa pun tidak
+                        punya ruang untuk sampai ke sana. */}
+                    <span className="pointer-events-none relative z-10 block px-4 pt-4">
                       <span className="flex items-start gap-2.5 pr-8">
                         {/* TITIK HADIR MENEMPEL DI AVATAR, bukan di sebelah
                             nama. Permintaan pemilik, dan letaknya memang
@@ -3038,7 +3005,56 @@ export default function Analisa() {
                           {r.winrate !== null ? persen(r.winrate) : '—'}
                         </span>
                       </span>
+                    </span>
 
+                    <span className="relative block flex-1">
+                    {/* Wilayah kurva: 62% kanan, di belakang isi kartu. */}
+                    {/* pointer-events dinyalakan: kurvanya sekarang bisa
+                        ditunjuk untuk membaca P/L per titik. Klik tetap
+                        menembus ke tombolnya — ia induk elemen ini, jadi
+                        peristiwanya naik ke sana seperti biasa. */}
+                    <span className="absolute inset-y-0 right-0 z-0 block w-[62%]">
+                      <span aria-hidden className="absolute inset-0 block"
+                            style={{ background: `linear-gradient(to left, ${warnaAksen}1f, transparent 78%)` }} />
+                      {/* Titik-titik raster, memudar ke kiri. Ia memberi
+                          kedalaman tanpa menambah garis — dan garis lagi di
+                          kartu yang sudah bertepi cuma menambah kebisingan. */}
+                      <span aria-hidden className="absolute inset-0 block"
+                            style={{ color: warnaAksen, opacity: 0.1,
+                                     WebkitMaskImage: 'linear-gradient(to right, transparent, black 55%)',
+                                     maskImage: 'linear-gradient(to right, transparent, black 55%)' }}>
+                        <svg className="h-full w-full">
+                          <defs>
+                            <pattern id={'kisi-' + uid} width="14" height="14" patternUnits="userSpaceOnUse">
+                              <circle cx="1" cy="1" r="1" fill="currentColor" />
+                            </pattern>
+                          </defs>
+                          <rect width="100%" height="100%" fill={'url(#kisi-' + uid + ')'} />
+                        </svg>
+                      </span>
+                      {/* MENGISI WILAYAHNYA, tanpa angka piksel sama sekali.
+                          Dengan h-[76%], tinggi kurvanya bergantung tinggi
+                          KARTUNYA — dan tinggi kartu berubah tiap grid
+                          menyusun ulang barisnya (kartu satu baris selalu
+                          setinggi yang tertinggi). Jadi mengubah ukuran
+                          jendela membuat kurvanya melompat naik-turun
+                          walaupun datanya sama sekali tidak berubah, dan
+                          yang melihatnya menyangka angkanya ikut berubah.
+
+                          Angka tetap apa pun akhirnya salah di salah satu
+                          sisi: terlalu pendek menyisakan latar gelap menjalar
+                          ke atas, terlalu tinggi memotong kepala kartu — dan
+                          dua-duanya sudah terjadi. Sekarang kurvanya cuma
+                          mengisi kotak yang tersisa antara kepala dan kaki.
+                          Kotak itu yang menentukan batasnya, jadi tidak ada
+                          angka yang harus dijaga tetap cocok saat isinya
+                          berubah. */}
+                      <SparklineSaldo sinyal={sinyal} interaktif
+                                      kelas="absolute inset-0 w-full"
+                                      modal={performa?.modal ?? 1000} />
+                    </span>
+
+                    <span className="pointer-events-none relative z-10 block px-4 pb-3 pt-3">
                       {/* ANGKA BESAR: estimasi hasil. Satu-satunya angka
                           sebesar ini di kartu, dan itu memang yang dicari
                           orang yang sedang memilih siapa ditiru. */}
