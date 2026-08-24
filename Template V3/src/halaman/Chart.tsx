@@ -514,12 +514,59 @@ export default function ChartBacktest() {
      SIMBOL+TF: kotak support BTC 1 jam tidak ada urusannya dengan ETH. */
   const [alat, setAlat] = useState<AlatPegang | null>(null);
   const [gambarAlat, setGambarAlat] = useState<GambarAlat[]>([]);
+
+  /* ── URUNG (Ctrl+Z) ──────────────────────────────────────────────────
+     Tumpukan potret `gambarAlat` SEBELUM tiap perubahan. Potret utuh, bukan
+     daftar perintah yang bisa dibalik: jumlah gambarnya puluhan, satu potret
+     cuma beberapa kilobita, dan perintah-yang-dibalik butuh pasangan balikan
+     untuk tiap jenis perubahan -- termasuk yang belum ditulis nanti. Yang
+     lupa dibuatkan pasangannya akan gagal diam-diam, dan urung yang salah
+     lebih buruk daripada tidak ada urung.
+
+     Di ref, bukan state: menekan Ctrl+Z tidak boleh menggambar ulang halaman
+     hanya karena tumpukannya berubah, dan penangan papan tik di bawah butuh
+     nilai terkini tanpa dipasang ulang tiap kali riwayatnya bertambah.
+
+     `gambarRef` cermin state yang sudah dipasang. Potretnya diambil DI LUAR
+     pembaru setState -- menyentuh ref di dalam pembaru berarti efek samping
+     di jalur yang React boleh jalankan dua kali di mode ketat, dan
+     tumpukannya akan berisi entri kembar. */
+  const gambarRef = useRef(gambarAlat);
+  gambarRef.current = gambarAlat;
+  const riwayatGambar = useRef<{ tumpuk: GambarAlat[][]; tanda: string; waktu: number }>(
+    { tumpuk: [], tanda: '', waktu: 0 });
+
+  const catatRiwayat = useCallback((tanda = '') => {
+    const r = riwayatGambar.current;
+    const kini = Date.now();
+    /* PEREDAM SERETAN. Menggeser gambar memanggil ubahGambar puluhan kali
+       per detik dari penangan gerak mouse; tanpa ini satu seretan jadi
+       puluhan langkah urung, dan Ctrl+Z cuma menggeser gambarnya balik
+       beberapa piksel -- terbaca sebagai fitur yang rusak.
+
+       Jendelanya dihitung dari panggilan TERAKHIR, bukan yang pertama, jadi
+       seretan sepanjang apa pun tetap satu langkah selama jarinya tidak
+       berhenti. Berhenti lebih dari sedetik memang layak jadi langkah baru:
+       di situ orangnya sudah selesai dengan gerakan yang satu. */
+    if (tanda && tanda === r.tanda && kini - r.waktu < 1000) { r.waktu = kini; return; }
+    r.tumpuk.push(gambarRef.current);
+    /* Dibatasi supaya tab yang dibuka seharian tidak menyimpan ribuan
+       potret. Yang tertua dibuang -- urung sejauh 60 langkah sudah jauh
+       melampaui yang pernah dipakai orang dalam satu sesi menggambar. */
+    if (r.tumpuk.length > 60) r.tumpuk.shift();
+    r.tanda = tanda; r.waktu = kini;
+  }, []);
+
   useEffect(() => {
     try {
       const d = JSON.parse(localStorage.getItem(`jt.alat.${simbol}|${tf}`) ?? '[]') as GambarAlat[];
       setGambarAlat(Array.isArray(d) ? d : []);
     } catch { setGambarAlat([]); }
     setAlat(null);
+    /* Riwayat urung ikut dibuang. Gambar milik SIMBOL+TF, jadi potret dari
+       BTC 1 jam yang dipulihkan di atas ETH 4 jam akan menempelkan gambar
+       yang tidak pernah ada di sana -- lalu menyimpannya ke kunci ETH. */
+    riwayatGambar.current = { tumpuk: [], tanda: '', waktu: 0 };
   }, [simbol, tf]);
   /* Hasil Pine dari simbol lama DIBUANG saat chart berganti — garis di
      level 64.000 milik BTC yang tergambar di chart ONE 0,0009 membuat
@@ -528,6 +575,7 @@ export default function ChartBacktest() {
   useEffect(() => { setPine(null); }, [simbol, tf]);
   const tambahGambar = useCallback((g: Omit<GambarAlat, 'id'>) => {
     const id = 'g' + Date.now();
+    catatRiwayat();
     setGambarAlat((d) => {
       const b = [...d, { ...g, id }];
       try { localStorage.setItem(`jt.alat.${simbol}|${tf}`, JSON.stringify(b)); } catch { /* privat */ }
@@ -549,6 +597,9 @@ export default function ChartBacktest() {
      lalu kembali ke tempat lama saat halaman dibuka ulang lebih
      menjengkelkan daripada gambar yang tidak bisa dipindah sama sekali. */
   const ubahGambar = useCallback((id: string, ubah: Partial<GambarAlat>) => {
+    /* Bertanda id gambarnya: seretan panjang jadi SATU langkah urung, tapi
+       menggeser gambar lain sesudahnya tetap langkah tersendiri. */
+    catatRiwayat('ubah:' + id);
     setGambarAlat((d) => {
       const b = d.map((g) => (g.id === id ? { ...g, ...ubah } : g));
       try { localStorage.setItem(`jt.alat.${simbol}|${tf}`, JSON.stringify(b)); } catch { /* privat */ }
@@ -571,6 +622,7 @@ export default function ChartBacktest() {
       const t = document.activeElement?.tagName;
       if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT') return;
       if ((e.key === 'Delete' || e.key === 'Backspace') && gambarPilih) {
+        catatRiwayat();
         setGambarAlat((d) => {
           const b = d.filter((g) => g.id !== gambarPilih);
           try { localStorage.setItem(`jt.alat.${simbol}|${tf}`, JSON.stringify(b)); } catch { /* privat */ }
@@ -579,10 +631,31 @@ export default function ChartBacktest() {
         setGambarPilih(null);
       }
       if (e.key === 'Escape') setGambarPilih(null);
+      /* Ctrl+Z (Cmd+Z di Mac). Ditaruh SESUDAH penjaga INPUT/TEXTAREA di
+         atas: di dalam kolom teks, Ctrl+Z milik kolom itu, dan merebutnya
+         akan mengurungkan gambar sementara orangnya sedang membetulkan
+         ketikan di kolom simbol. */
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
+        const r = riwayatGambar.current;
+        const sebelum = r.tumpuk.pop();
+        /* preventDefault HANYA kalau benar-benar ada yang diurungkan.
+           Menahannya saat tumpukan kosong akan mematikan urung bawaan
+           peramban di seluruh halaman tanpa memberi apa pun sebagai
+           gantinya. */
+        if (!sebelum) return;
+        e.preventDefault();
+        r.tanda = ''; r.waktu = 0;
+        setGambarAlat(sebelum);
+        try { localStorage.setItem(`jt.alat.${simbol}|${tf}`, JSON.stringify(sebelum)); } catch { /* privat */ }
+        /* Pilihan dilepas kalau gambarnya sudah tidak ada di potret yang
+           dipulihkan -- pilihan yang menunjuk gambar yang tidak tergambar
+           membuat tombol hapus menyala untuk sesuatu yang tak terlihat. */
+        setGambarPilih((sekarang) => (sekarang && sebelum.some((g) => g.id === sekarang) ? sekarang : null));
+      }
     };
     window.addEventListener('keydown', tekan);
     return () => window.removeEventListener('keydown', tekan);
-  }, [gambarPilih, simbol, tf]);
+  }, [gambarPilih, simbol, tf, catatRiwayat]);
   /* BAWAANNYA TERLIPAT — alasan yang sama dengan panel order: di layar
      ponsel bilah alat gambar memakan tepi chart sebelum ada satu pun
      gambar yang ingin dibuat. Yang pernah membukanya sendiri tetap
@@ -3639,6 +3712,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
             <button
               onClick={() => {
                 if (gambarPilih) {
+                  catatRiwayat();
                   setGambarAlat((d) => {
                     const b = d.filter((g) => g.id !== gambarPilih);
                     try { localStorage.setItem(`jt.alat.${simbol}|${tf}`, JSON.stringify(b)); } catch { /* privat */ }
@@ -3649,6 +3723,9 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                 }
                 if (!gambarAlat.length) return;
                 if (!confirm(`Hapus ${gambarAlat.length} gambar di ${simbol} ${tf}?`)) return;
+                /* Justru yang PALING perlu bisa diurung: satu klik keliru di
+                   sini menghapus seluruh gambar di simbol ini sekaligus. */
+                catatRiwayat();
                 setGambarAlat([]);
                 try { localStorage.setItem(`jt.alat.${simbol}|${tf}`, '[]'); } catch { /* privat */ }
               }}
