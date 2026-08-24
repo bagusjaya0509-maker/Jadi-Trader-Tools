@@ -3020,7 +3020,7 @@ export default function Analisa() {
                             )}
                           </span>
                           <span className="block truncate text-[10.5px] text-zinc-500">
-                            Terakhir posting {tanggalPendek(terakhirPosting)}
+                            Last post {tanggalPendek(terakhirPosting)}
                             {uid === pengguna?.uid && ' · kanalmu'}
                           </span>
                         </span>
