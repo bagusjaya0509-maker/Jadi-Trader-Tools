@@ -767,10 +767,37 @@ export default function Integrasi() {
                   Di tab <span className="text-zinc-300">Common</span> centang
                   <span className="text-zinc-300"> Allow Algo Trading</span>.</>
               } />
-              <Langkah no={6} judul="Isi Kode Pasangan" anak={
-                <>Di tab <span className="text-zinc-300">Inputs</span>, isi
-                  <span className="angka text-zinc-300"> KodePasangan</span> dengan kode
-                  <span className="angka text-zinc-300"> {kodeMt5 ?? 'JTM5-XXXX-XXXX'}</span> di atas, lalu OK.
+              {/* DUA input, bukan satu. Sebelumnya langkah ini cuma menyebut
+                  KodePasangan, dan AlamatServer tidak pernah disebut di
+                  langkah mana pun — alamatnya cuma muncul di langkah 4 untuk
+                  daftar izin WebRequest, yang tempatnya lain sama sekali.
+
+                  Akibatnya berantai: AlamatServer bawaannya kosong, EA
+                  berhenti di "MENUNGGU ALAMAT SERVER", dan pesannya dulu
+                  menyuruh mengisi "alamat backend-mu sendiri" — jadi
+                  pembelinya menyimpulkan ia harus menyewa server sendiri,
+                  padahal satu server memang dipakai bersama dan yang
+                  memisahkan datanya adalah Kode Pasangan.
+
+                  Alamatnya diambil dari `alamatBackend` yang SAMA dengan
+                  langkah 4, bukan ditulis ulang: dua tempat yang menuliskan
+                  alamat yang sama akan berselisih begitu backend-nya pindah,
+                  dan yang satu tidak akan mengingatkan soal yang lain. */}
+              <Langkah no={6} judul="Isi dua input di tab Inputs" anak={
+                <>Di tab <span className="text-zinc-300">Inputs</span> ada dua yang wajib diisi.
+                  <span className="mt-1.5 flex items-center gap-2">
+                    <span className="angka shrink-0 text-zinc-500">AlamatServer</span>
+                    <code className="angka rounded border border-zinc-800 bg-zinc-900 px-2 py-1 text-[11.5px] text-zinc-300">{alamatBackend}</code>
+                    <button onClick={() => void navigator.clipboard.writeText(alamatBackend).then(() => setTersalin('url6'))}
+                            className="cursor-pointer rounded p-1 text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
+                            aria-label="Salin alamat server">
+                      {tersalin === 'url6' ? <CheckCircle2 className="size-3.5 text-emerald-500" /> : <Copy className="size-3.5" />}
+                    </button>
+                  </span>
+                  <span className="mt-1 block">
+                    Lalu <span className="angka text-zinc-300">KodePasangan</span> dengan kode
+                    <span className="angka text-zinc-300"> {kodeMt5 ?? 'JTM5-XXXX-XXXX'}</span> di atas, lalu OK.
+                  </span>
                   <span className="mt-1 block text-zinc-600">Pastikan tombol <b className="text-zinc-500">Algo Trading</b> di
                   toolbar berwarna hijau. Kalau merah, EA terpasang tapi tidak berjalan.</span></>
               } />
