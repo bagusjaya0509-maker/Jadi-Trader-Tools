@@ -108,10 +108,18 @@ export function KartuAgenSiaga({ agen }: { agen: AgenHadir }) {
 
         {/* Kalimat penutup menyebut keadaannya apa adanya: belum ada sinyal,
             dan itu memang cara kerjanya. Tanpa kalimat ini kartunya terbaca
-            seperti kartu analis yang datanya belum termuat. */}
+            seperti kartu analis yang datanya belum termuat.
+
+            DIPENDEKKAN JADI DUA BARIS, dan itu bukan soal gaya bahasa. Kartu
+            ini yang paling tinggi di raknya (218px lawan 202px milik kartu
+            analis biasa), dan di grid kartu satu baris selalu ikut setinggi
+            yang tertinggi — jadi tiga baris kalimat di sini membuat kartu
+            analis di sebelahnya menyisakan sejalur gelap mati di bawah
+            isinya. Satu baris yang dihemat di sini menghapus jalur itu di
+            semua tetangganya. */}
         <p className="mt-2 text-[10.5px] leading-relaxed text-zinc-600">
-          Belum ada sinyal. Agen ini hanya memposting saat aturannya terpenuhi —
-          menunggu tanpa entry adalah keadaan normalnya, bukan kemacetan.
+          Belum ada sinyal. Diam itu normal — agen memposting hanya saat
+          aturannya terpenuhi.
         </p>
       </div>
     </div>

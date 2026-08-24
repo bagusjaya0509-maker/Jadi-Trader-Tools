@@ -2945,11 +2945,14 @@ export default function Analisa() {
                           walaupun datanya sama sekali tidak berubah, dan
                           yang melihatnya menyangka angkanya ikut berubah.
 
-                          128px kira-kira sama dengan 76% pada kartu berisi,
-                          jadi tampilan yang sudah dikenal tidak bergeser —
-                          yang hilang cuma lompatannya. */}
+                          152px BUKAN angka karangan: lapisan tempat kurva ini
+                          duduk terukur 200px di layar, dan 76% darinya adalah
+                          152. Jadi tampilannya sama persis dengan sebelumnya —
+                          yang hilang cuma lompatannya. Tebakan pertama (128px)
+                          meleset 24px, dan 24px itu muncul sebagai latar gelap
+                          yang menjalar ke atas di belakang angkanya. */}
                       <SparklineSaldo sinyal={sinyal} interaktif
-                                      kelas="absolute inset-x-0 bottom-0 h-[128px] w-full"
+                                      kelas="absolute inset-x-0 bottom-0 h-[152px] w-full"
                                       modal={performa?.modal ?? 1000} />
                     </span>
 

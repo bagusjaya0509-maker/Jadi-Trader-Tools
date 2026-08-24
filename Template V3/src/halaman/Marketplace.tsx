@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Check, Crown, Download, Copy, X, Star, MessageCircle, ExternalLink, KeyRound, Loader2, Trash2,
@@ -10,6 +10,57 @@ import { cn, tanggalPendek } from '@/lib/utils';
 import { type Produk } from '@/data/contoh';
 import { bisaDipasang, pasangIndikator } from '@/lib/pasang-indikator';
 import { useSuka, tukarSuka, useBalasanUlasan, kirimBalasan, hapusBalasan } from '@/lib/ulasan';
+
+/* ── RINGKASAN KARTU: dipotong tiga baris ────────────────────────────────
+   Sebelumnya keterangan produk ditulis seutuhnya dan kartunya dibiarkan
+   memanjang mengikutinya. Di grid, kartu satu baris SELALU setinggi kartu
+   tertinggi — jadi satu produk berketerangan sebelas baris memaksa tiga
+   tetangganya menyediakan delapan baris kosong yang tidak berisi apa pun.
+   Yang terlihat bukan kartu yang lapang, melainkan kartu yang gagal terisi.
+
+   Tiga baris dipilih karena itu yang sudah terbaca rapi pada produk-produk
+   pendek yang ada sekarang — bukan angka yang dikarang, tapi tinggi yang
+   memang sudah berhasil di layar.
+
+   TAUTANNYA MUNCUL HANYA KALAU MEMANG ADA YANG DIPOTONG, dan itu diukur,
+   bukan ditebak dari jumlah huruf: huruf yang sama menghasilkan jumlah baris
+   yang berbeda di lebar kolom yang berbeda. "Lihat selengkapnya" pada
+   keterangan yang sudah utuh adalah janji yang tidak ditepati — ditekan, dan
+   yang terbuka ternyata teks yang sama persis. */
+function RingkasKartu({ teks, onBuka }: { teks: string; onBuka: () => void }) {
+  const ref = useRef<HTMLParagraphElement>(null);
+  const [potong, setPotong] = useState(false);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    /* line-clamp memakai -webkit-box + overflow:hidden, jadi scrollHeight
+       tetap setinggi teks seutuhnya sementara clientHeight terkunci tiga
+       baris. Selisihnya itulah yang tidak terlihat. Toleransi 1px untuk
+       pembulatan pecahan piksel di layar ber-DPI tinggi. */
+    const ukur = () => setPotong(el.scrollHeight > el.clientHeight + 1);
+    ukur();
+    /* Diukur ulang saat lebar kolom berubah — jendela dibesar-kecilkan atau
+       grid berpindah dari empat kolom ke dua. Keterangan yang muat di kolom
+       lebar bisa terpotong di kolom sempit, dan sebaliknya. */
+    const ro = new ResizeObserver(ukur);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [teks]);
+
+  return (
+    <div className="mt-3 flex-1">
+      <p ref={ref} className="line-clamp-3 text-[12.5px] leading-relaxed text-zinc-400">{teks}</p>
+      {potong && (
+        <button onClick={onBuka}
+                className="mt-1 cursor-pointer text-[12px] text-zinc-500 underline-offset-2
+                           transition-colors hover:text-zinc-300 hover:underline">
+          lihat selengkapnya
+        </button>
+      )}
+    </div>
+  );
+}
 
 /* ════════════════════════════════════════════════════════════════════════
    TOMBOL PASANG KE CHART
@@ -759,11 +810,15 @@ export default function Marketplace() {
               )}
               <div className="flex flex-1 flex-col p-5">
               <div className="flex items-start justify-between gap-2">
-                <h3 className="text-[15px] font-semibold tracking-tight text-zinc-100">{p.nama}</h3>
+                {/* Dua baris, tidak lebih. Nama produk memang tidak pantas
+                    dipotong, tapi nama sepanjang empat baris menggeser tinggi
+                    seluruh barisnya — dan sampai sekarang tidak ada nama yang
+                    melewati dua. */}
+                <h3 className="line-clamp-2 text-[15px] font-semibold tracking-tight text-zinc-100">{p.nama}</h3>
                 {p.premium && <Crown className="size-4 shrink-0 text-amber-400" />}
               </div>
               <div className="mt-1 text-[11.5px] text-zinc-600">{p.versi}</div>
-              <p className="mt-3 flex-1 text-[12.5px] leading-relaxed text-zinc-400">{p.ringkas}</p>
+              <RingkasKartu teks={p.ringkas} onBuka={() => setAktif(p)} />
               <div className="mt-4 flex items-end justify-between gap-3">
                 {/* Harga lama dicoret DI SEBELAH harga berlaku, bukan
                     menggantikannya: yang harus terbaca lebih dulu adalah
