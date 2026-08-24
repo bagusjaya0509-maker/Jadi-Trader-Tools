@@ -322,7 +322,18 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
            satu-satunya kalimat di panel ini yang bisa keliru tanpa ada
            angka yang salah. */
         sub={sumber !== 'kripto'
-          ? 'Dari MetaTrader 5, lewat EA JadiTraderSync.'
+          /* Broker dan nomor akun DI SINI, bukan di lencana harga chart.
+             Lencana itu duduk di sebelah angka harga dan harus pendek supaya
+             terbaca sekilas; keterangan panjang di sana justru mendorong
+             harganya menyempit. Di kepala panel ini ruangnya ada, dan
+             pertanyaannya memang "order ini di akun mana" — bukan "chart ini
+             sumbernya apa". */
+          ? (() => {
+              const ak = mt5.daftarAkun.find((a) => a.login === mt5.loginAktif);
+              return ak
+                ? `${ak.broker || 'MetaTrader 5'} · ${ak.login}`
+                : 'Dari MetaTrader 5, lewat EA JadiTraderSync.';
+            })()
           : bursaAktif
             ? 'Order yang sedang berjalan di Binance.'
             : 'Dari catatan screener — App Token belum diisi, jadi belum dicocokkan ke Binance.'}

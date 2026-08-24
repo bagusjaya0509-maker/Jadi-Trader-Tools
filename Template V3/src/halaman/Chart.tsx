@@ -1939,13 +1939,8 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
   const airOtomatis = (mt5 ? bacaNamaMt5(simbol.slice(4)) : simbol) + ', ' + tf.toUpperCase();
   const tandaAir = useMemo(() => {
     if (!tampilan.tandaAir) return undefined;
-    /* Nama APA ADANYA di terminal orangnya. Untuk feed acuan ia tetap nama
-       dasar — server memang tidak menyiarkan akhiran broker pemilik. */
-    const nama = mt5 ? bacaNamaMt5(simbol.slice(4)) : simbol;
-    /* Sengaja dihitung dengan cara yang SAMA dengan airOtomatis di atas.
-       Dua tempat yang mengeja satu nama dengan aturan berbeda adalah cara
-       tanda air ini bisa menampilkan XAUUSD di baris atas dan XAUUSDc di
-       baris bawah — persis keluhan yang sedang dibetulkan. */
+    /* Nama simbolnya sekarang HANYA di baris atas, lewat airOtomatis —
+       lihat catatan di bawah soal kenapa baris bawah tidak mengulanginya. */
     const jenis = bacaPasar(simbol);
     const pasar = mt5 ? 'TRADE-FI' : jenis === 'futures' ? 'PERP' : jenis === 'spot' ? 'SPOT' : '';
     /* Teks sendiri hanya mengganti baris ATAS. Baris bawah tetap jenis
@@ -1960,14 +1955,18 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
 
        Hanya untuk Trade-Fi: chart kripto memang tidak punya broker, dan
        menambahkan baris kosong di sana cuma mengotori. */
-    const broker = mt5
-      ? (bacaAcuanMt5(simbol.slice(4))
-          ? 'ACUAN'
-          : (akunMt5.daftarAkun.find((a) => a.login === akunMt5.loginAktif)?.broker || ''))
-      : '';
+    /* Baris bawah TIDAK mengulang nama simbolnya — baris atas sudah
+       menulisnya besar-besar tepat di atasnya, dan mengulangnya dua kali
+       hanya membuat tanda airnya lebih ramai tanpa menambah satu pun
+       keterangan. Yang tersisa keterangan jenis pasarnya saja.
+
+       Kecuali untuk feed acuan: di sana "ACUAN" tetap ditulis, karena itu
+       peringatan — bukan label. Yang membaca grafik acuan sambil mengira itu
+       brokernya sendiri harus punya lebih dari satu tempat untuk sadar. */
+    const bawah = mt5 ? (bacaAcuanMt5(simbol.slice(4)) ? 'ACUAN' : 'TRADE-FI') : pasar;
     return {
       utama: tampilan.tandaAirTeks.trim() || airOtomatis,
-      sub: pasar ? nama + ' ' + (broker || pasar) : undefined,
+      sub: bawah || undefined,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [simbol, tf, mt5, lilin, airOtomatis, tampilan.tandaAir, tampilan.tandaAirTeks,
@@ -2903,13 +2902,18 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                   </span>
                 );
               }
-              const label = ak ? (ak.broker || 'MT5') : 'MT5';
+              /* PENDEK. Lencana ini duduk tepat di sebelah angka harga, dan
+                 keterangan panjang di sini mendorong harganya menyempit —
+                 padahal harga yang justru dibaca tiap detik. Broker dan nomor
+                 akunnya pindah ke kepala panel "Order Terbuka — Trade-Fi",
+                 tempat pertanyaannya memang "order ini di akun mana".
+                 Rinciannya tetap ada di judul (tooltip) lencana ini. */
               return (
                 <span className="mb-1 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-amber-300"
                       title={ak
                         ? `OHLC dari terminal ${ak.broker || 'MT5'} akun ${ak.login}, dikirim EA Trade-Fi Sync tiap beberapa menit. Order REAL di simbol ini berangkat ke terminal itu, bukan Binance.`
                         : 'OHLC dari terminal MT5-mu, dikirim EA Trade-Fi Sync. Order REAL di simbol ini berangkat ke MT5, bukan Binance.'}>
-                  TRADE-FI · {label}{ak ? ' · ' + ak.login : ''}
+                  TRADE-FI
                 </span>
               );
             })()}
