@@ -93,13 +93,35 @@ function bacaTinggiSmi(): number {
  *  `latar` null berarti IKUT TEMA, bukan hitam. Menyimpan warna tema sebagai
  *  nilai tetap akan membekukannya: orang yang memilih latar saat mode gelap
  *  lalu pindah ke mode terang akan mendapat chart hitam di halaman putih,
- *  tanpa tahu kenapa. */
+ *  tanpa tahu kenapa.
+ *
+ *  `garisNaik`/`garisTurun` null berarti IKUT BADAN, dan null-nya penting.
+ *  Sebelum ada medan ini, outline lilin memang selalu memakai warna badan;
+ *  kalau bawaannya diisi warna tetap, orang yang sudah menyetel badannya
+ *  jadi hijau terang akan tiba-tiba mendapat outline hijau bawaan di
+ *  sekelilingnya -- perubahan yang tidak ia minta, muncul sendiri saat
+ *  pembaruan dipasang. Null menjaga tampilan lamanya persis.
+ *
+ *  `kisi` false menyembunyikan garis bantu vertikal dan horizontal. Ia
+ *  boolean, bukan warna: menyembunyikan dengan cara mengisi 'transparent'
+ *  membuat keadaan mati tidak bisa dibedakan dari warna yang kebetulan
+ *  transparan, dan `warnaSah` di halaman Chart akan membuangnya saat
+ *  dibaca ulang.
+ *
+ *  Bahwa lightweight-charts menerima `visible: false` pada grid dipakai
+ *  langsung, bukan diakali dengan warna transparan: garis transparan tetap
+ *  digambar, dan tetap membayar ongkosnya tiap frame. */
 export interface TampilanChart {
   naik: string;
   turun: string;
   ekorNaik: string;
   ekorTurun: string;
+  /** null = ikut warna badan. Lihat catatan di atas. */
+  garisNaik: string | null;
+  garisTurun: string | null;
   latar: string | null;
+  /** true = garis bantu tampil. */
+  kisi: boolean;
 }
 
 /** Diekspor karena halaman Chart perlu angka yang SAMA untuk tombol
@@ -110,7 +132,10 @@ export const TAMPILAN_BAWAAN: TampilanChart = {
   turun: '#f87171',
   ekorNaik: '#10b981',
   ekorTurun: '#f87171',
+  garisNaik: null,
+  garisTurun: null,
   latar: null,
+  kisi: true,
 };
 
 /* -- Warna panel SMI -----------------------------------------------------
@@ -366,8 +391,19 @@ export function ChartLilin({
     turun: tampilan?.turun || TAMPILAN_BAWAAN.turun,
     ekorNaik: tampilan?.ekorNaik || TAMPILAN_BAWAAN.ekorNaik,
     ekorTurun: tampilan?.ekorTurun || TAMPILAN_BAWAAN.ekorTurun,
+    /* `??` dan BUKAN `||`: null di sini punya arti (ikut badan), sementara
+       `||` akan menyamakannya dengan string kosong dan menghapus bedanya. */
+    garisNaik: tampilan?.garisNaik ?? null,
+    garisTurun: tampilan?.garisTurun ?? null,
     latar: tampilan?.latar ?? null,
+    kisi: tampilan?.kisi ?? true,
   };
+  /* Outline yang benar-benar dipakai. Dihitung sekali di sini supaya tiga
+     tempat yang memasangnya -- saat seri dibuat, saat warnanya diubah, dan
+     larik dependensi efeknya -- tidak masing-masing menuliskan aturan
+     jatuh-ke-badan sendiri dan suatu hari berselisih. */
+  const garisNaikPakai = rupa.garisNaik ?? rupa.naik;
+  const garisTurunPakai = rupa.garisTurun ?? rupa.turun;
   const rupaRef = useRef(rupa);
   rupaRef.current = rupa;
 
@@ -384,8 +420,11 @@ export function ChartLilin({
         fontSize: 11,
       },
       grid: {
-        vertLines: { color: WARNA_CHART[temaSekarang()].kisi },
-        horzLines: { color: WARNA_CHART[temaSekarang()].kisi },
+        /* `visible` dibaca dari ref karena efek ini berdependensi kosong --
+           nilainya dibekukan saat mount, dan efek di bawah yang mengurus
+           perubahan sesudahnya. */
+        vertLines: { color: WARNA_CHART[temaSekarang()].kisi, visible: rupaRef.current.kisi },
+        horzLines: { color: WARNA_CHART[temaSekarang()].kisi, visible: rupaRef.current.kisi },
       },
       rightPriceScale: { borderColor: WARNA_CHART[temaSekarang()].batasSkala },
       timeScale: { borderColor: WARNA_CHART[temaSekarang()].batasSkala, timeVisible: true, secondsVisible: false },
@@ -433,7 +472,11 @@ export function ChartLilin({
     ukurLagi.current = ukurUlang;
     seri.current = c.addSeries(CandlestickSeries, {
       upColor: rupaRef.current.naik, downColor: rupaRef.current.turun,
-      borderUpColor: rupaRef.current.naik, borderDownColor: rupaRef.current.turun,
+      /* Outline jatuh ke warna badan kalau belum disetel sendiri -- itu
+         tampilan yang sudah dikenal orang sebelum medan ini ada, dan
+         pembaruan tidak boleh mengubah chart yang tidak diminta diubah. */
+      borderUpColor: rupaRef.current.garisNaik ?? rupaRef.current.naik,
+      borderDownColor: rupaRef.current.garisTurun ?? rupaRef.current.turun,
       wickUpColor: rupaRef.current.ekorNaik, wickDownColor: rupaRef.current.ekorTurun,
       priceFormat: { type: 'price', ...formatHarga(lilin.closes) },
     });
@@ -548,7 +591,14 @@ export function ChartLilin({
     const w = WARNA_CHART[tema];
     c.applyOptions({
       layout: { textColor: w.teks },
-      grid: { vertLines: { color: w.kisi }, horzLines: { color: w.kisi } },
+      /* Kenapa `rupa.kisi` ikut di sini, bukan di efeknya sendiri: grid
+         hanya punya DUA tempat pemasangan (saat dibuat dan di sini), dan
+         menambah tempat ketiga berarti tiga salinan aturan yang sama.
+         `rupa.kisi` cukup ditambahkan ke larik dependensi efek ini. */
+      grid: {
+        vertLines: { color: w.kisi, visible: rupa.kisi },
+        horzLines: { color: w.kisi, visible: rupa.kisi },
+      },
       rightPriceScale: { borderColor: w.batasSkala },
       timeScale: { borderColor: w.batasSkala },
       crosshair: {
@@ -562,7 +612,8 @@ export function ChartLilin({
     garisAmbang.current.forEach((g) => {
       try { g.applyOptions({ color: w.garisNol }); } catch { /* serinya sudah dibongkar */ }
     });
-  }, [tema]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tema, rupa.kisi]);
 
   /* -- Warna lilin & latar ----------------------------------------------
      Lewat applyOptions, bukan dengan membuat ulang serinya. Membuat ulang
@@ -574,12 +625,16 @@ export function ChartLilin({
     try {
       s.applyOptions({
         upColor: rupa.naik, downColor: rupa.turun,
-        borderUpColor: rupa.naik, borderDownColor: rupa.turun,
+        borderUpColor: garisNaikPakai, borderDownColor: garisTurunPakai,
         wickUpColor: rupa.ekorNaik, wickDownColor: rupa.ekorTurun,
       });
     } catch { /* serinya sudah dibongkar */ }
+    /* Yang didaftarkan nilai yang BENAR-BENAR dipakai, bukan `rupa.garisNaik`
+       mentahnya. Kalau outline sedang ikut badan, mengubah warna badan harus
+       ikut menggeser outline-nya -- dan itu hanya terbaca dari nilai
+       sesudah jatuh-ke-badan. */
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rupa.naik, rupa.turun, rupa.ekorNaik, rupa.ekorTurun]);
+  }, [rupa.naik, rupa.turun, rupa.ekorNaik, rupa.ekorTurun, garisNaikPakai, garisTurunPakai]);
 
   /* Latar dipisah dari efek tema di atas, dan sengaja BERJALAN SESUDAHNYA:
      'transparent' berarti menyerahkan latarnya ke halaman, yang sudah ikut

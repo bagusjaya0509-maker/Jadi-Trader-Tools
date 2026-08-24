@@ -153,7 +153,13 @@ export type SetelanTampilan = TampilanChart & { tandaAir: boolean; tandaAirTeks:
 
 const TAMPILAN_AWAL: SetelanTampilan = { ...TAMPILAN_BAWAAN, tandaAir: true, tandaAirTeks: '' };
 
-/** Empat petak warna di panel setelan, urut baca: badan dulu baru ekor. */
+/** Petak warna di panel setelan, urut baca: badan dulu baru ekor.
+ *
+ *  Outline TIDAK ada di sini walaupun ia juga warna. Petak di daftar ini
+ *  memakai `<input type="color">` polos yang tidak bisa menyimpan null,
+ *  sementara outline butuh keadaan ketiga -- "ikut badan" -- yang justru
+ *  jadi bawaannya. Ia dapat barisnya sendiri di panel, sebentuk dengan
+ *  baris "Latar chart" yang punya persoalan yang sama. */
 const MEDAN_WARNA = [
   ['naik', 'Badan naik'], ['turun', 'Badan turun'],
   ['ekorNaik', 'Ekor naik'], ['ekorTurun', 'Ekor turun'],
@@ -170,7 +176,17 @@ function bacaTampilan(): SetelanTampilan {
     (['naik', 'turun', 'ekorNaik', 'ekorTurun'] as const).forEach((k) => {
       if (warnaSah(o[k])) hasil[k] = o[k];
     });
+    /* Outline: null itu NILAI YANG SAH (ikut badan), jadi ia diperiksa
+       terpisah dari warnanya. Kalau cuma `warnaSah` yang dipakai, orang yang
+       sengaja mengembalikan outline ke ikut-badan akan mendapati pilihannya
+       diam-diam kembali ke warna lamanya tiap halaman dimuat -- karena null
+       ditolak dan nilai bawaan yang menang. */
+    (['garisNaik', 'garisTurun'] as const).forEach((k) => {
+      if (warnaSah(o[k])) hasil[k] = o[k] as string;
+      else if (o[k] === null) hasil[k] = null;
+    });
     if (warnaSah(o.latar)) hasil.latar = o.latar;
+    if (typeof o.kisi === 'boolean') hasil.kisi = o.kisi;
     if (typeof o.tandaAir === 'boolean') hasil.tandaAir = o.tandaAir;
     if (typeof o.tandaAirTeks === 'string') hasil.tandaAirTeks = o.tandaAirTeks.slice(0, 40);
   };
@@ -3807,6 +3823,59 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                           </span>
                         </label>
                       ))}
+                    </div>
+
+                    {/* -- Outline lilin -------------------------------------
+                        Dua baris sendiri, bukan dua petak lagi di grid warna
+                        di atas. Petak di grid itu `<input type="color">`
+                        polos yang tidak bisa menyimpan null, sementara
+                        outline justru BAWAANNYA null: ikut warna badan,
+                        persis tampilan sebelum setelan ini ada.
+
+                        Bentuknya sengaja disamakan dengan baris "Latar
+                        chart" di bawah -- keduanya punya persoalan yang
+                        sama (warna + satu keadaan "otomatis"), jadi
+                        keduanya layak dibaca dengan cara yang sama. */}
+                    <div className="mt-1 border-t border-zinc-800/70 px-2 pb-1.5 pt-1.5">
+                      <span className="block text-[11.5px] text-zinc-200">Outline lilin</span>
+                      {([['garisNaik', 'naik', 'naik'], ['garisTurun', 'turun', 'turun']] as const).map(([kunci, badan, label]) => (
+                        <div key={kunci} className="mt-1.5 flex items-center gap-2">
+                          {/* Petaknya menunjukkan warna BADAN saat sedang ikut
+                              badan -- itu memang warna yang tampak di layar
+                              sekarang. Menaruh hitam di sini akan menyarankan
+                              outline hitam yang tidak dipakai di mana pun. */}
+                          <input type="color" value={tampilan[kunci] ?? tampilan[badan]}
+                                 aria-label={`Warna outline lilin ${label}`}
+                                 onChange={(e) => setTampilan((t) => ({ ...t, [kunci]: e.target.value }))}
+                                 className="size-5 shrink-0 cursor-pointer rounded border border-zinc-700 bg-transparent p-0 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:rounded-sm [&::-webkit-color-swatch]:border-0" />
+                          <span className="min-w-0 grow">
+                            <span className="block text-[11.5px] capitalize text-zinc-200">{label}</span>
+                            <span className="block font-mono text-[10px] uppercase text-zinc-600">{tampilan[kunci] ?? 'ikut badan'}</span>
+                          </span>
+                          <button onClick={() => setTampilan((t) => ({ ...t, [kunci]: null }))} disabled={tampilan[kunci] === null}
+                            className="shrink-0 cursor-pointer rounded px-1.5 py-0.5 text-[11px] text-zinc-400 transition-colors hover:bg-zinc-900 hover:text-zinc-100 disabled:cursor-default disabled:text-zinc-700 disabled:hover:bg-transparent">
+                            Ikut badan
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* -- Garis bantu ---------------------------------------
+                        Sakelar, bukan pemilih warna. Warnanya sudah ikut tema
+                        dan sudah benar di terang maupun gelap; yang orang
+                        minta bukan warna lain, melainkan chart yang bersih. */}
+                    <div className="mt-1 border-t border-zinc-800/70 px-2 pb-1.5 pt-1.5">
+                      <label className="flex cursor-pointer items-center gap-2">
+                        <input type="checkbox" checked={tampilan.kisi}
+                               onChange={(e) => setTampilan((t) => ({ ...t, kisi: e.target.checked }))}
+                               className="size-3.5 shrink-0 cursor-pointer accent-emerald-500" />
+                        <span className="min-w-0 grow">
+                          <span className="block text-[11.5px] text-zinc-200">Garis bantu</span>
+                          <span className="block text-[10px] text-zinc-600">
+                            {tampilan.kisi ? 'Kisi vertikal & horizontal tampil' : 'Chart bersih tanpa kisi'}
+                          </span>
+                        </span>
+                      </label>
                     </div>
 
                     <div className="mt-1 border-t border-zinc-800/70 px-2 pb-1.5 pt-1.5">
