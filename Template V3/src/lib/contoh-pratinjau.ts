@@ -67,7 +67,11 @@ export const AKUN_MT5_CONTOH: StatusAkun = {
   ket: 'Data contoh — sambungkan MetaTrader 5 untuk melihat akunmu',
   posisi: POSISI_MT5,
   pending: PENDING_MT5,
-  versiEa: '2.07',
+  versiEa: '2.10',
+  /* Contoh untuk pengunjung yang belum masuk: SATU terminal, supaya pemilih
+     akunnya tidak muncul dan menjanjikan fitur yang belum ia punya. */
+  daftarAkun: [],
+  loginAktif: null,
 };
 
 /* ── Copy Signal ─────────────────────────────────────────────────────────

@@ -9,7 +9,8 @@ import { Panel, PanelHead, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/
 import { TutorialVps } from '@/components/tutorial-vps';
 import { cn } from '@/lib/utils';
 import { bacaKoneksi, simpanKoneksi, hapusKoneksi, koneksiLengkap, rapikanUrl, PROXY_BAWAAN } from '@/lib/koneksi';
-import { useKodeMt5, useAkunMt5, versiKurangDari, VERSI_EA_PENDING } from '@/lib/akun';
+import { useKodeMt5, useAkunMt5, versiKurangDari, VERSI_EA_PENDING,
+         pilihAkunMt5 } from '@/lib/akun';
 import { tautanBerkas } from '@/lib/admin';
 import { useAuth } from '@/lib/auth';
 import { usePaket } from '@/lib/paket';
@@ -301,7 +302,8 @@ export default function Integrasi() {
      Mati SELAMA MASIH MEMUAT juga, bukan cuma sesudah paketnya diketahui.
      Menebak ke arah longgar berarti tombolnya sempat hidup sekejap untuk
      orang yang tidak berhak — dan sekejap itu cukup untuk satu klik. */
-  const { pemilik } = useAuth();
+  const { pemilik, pengguna } = useAuth();
+  const uidAku = pengguna?.uid ?? null;
   const { paket, memuat: memuatPaket } = usePaket();
   const kunciEvent = !pemilik && (memuatPaket || paket.paket === 'gratis');
   const alasanKunci = kunciEvent
@@ -424,6 +426,68 @@ export default function Integrasi() {
               </div>
             </div>
 
+            {/* ── PEMILIH TERMINAL ────────────────────────────────────
+                Muncul HANYA kalau memang ada lebih dari satu. Pemilih dengan
+                satu pilihan bukan pemilihan — ia cuma memberi tahu bahwa ada
+                keputusan yang harus diambil, padahal tidak ada.
+
+                Satu orang boleh memasang EA di beberapa broker sekaligus:
+                demo dan real, atau dua broker berbeda. Yang memisahkan
+                datanya adalah nomor akun MT5, bukan nama simbol — dua broker
+                sama-sama punya XAUUSD, dan EA sengaja memangkas akhiran
+                brokernya (XAUUSDc menjadi XAUUSD), jadi tanpa pemisahan ini
+                keduanya saling menimpa dan chart menampilkan harga broker
+                yang salah.
+
+                Yang dipilih di sini menentukan APA YANG DILIHAT: saldo di
+                Dashboard, posisi di panel order, lilin di Chart, dan terminal
+                mana yang menerima tombol Kirim. */}
+            {statusMt5.daftarAkun.length > 1 && (
+              <div className="mb-4">
+                <div className="mb-1.5 text-[11.5px] font-medium uppercase tracking-wider text-zinc-500">
+                  Terminal yang ditampilkan
+                </div>
+                <div className="space-y-1.5">
+                  {statusMt5.daftarAkun.map((a) => {
+                    const aktif = a.login === statusMt5.loginAktif;
+                    return (
+                      <button key={a.login}
+                        onClick={() => uidAku && pilihAkunMt5(uidAku, a.login)}
+                        className={cn('flex w-full cursor-pointer items-center gap-2.5 rounded-md border px-3 py-2 text-left transition-colors',
+                          aktif ? 'border-emerald-600/60 bg-emerald-500/10'
+                                : 'border-zinc-800 hover:border-zinc-700')}>
+                        {/* Titik hidup/mati, bukan kata: statusnya dibaca
+                            sekilas sambil membandingkan beberapa baris. */}
+                        <span className={cn('size-2 shrink-0 rounded-full',
+                          a.terhubung ? 'bg-emerald-500' : 'bg-zinc-700')}
+                          title={a.terhubung ? 'EA melapor' : 'EA tidak melapor'} />
+                        <span className="min-w-0 flex-1">
+                          <span className={cn('angka block truncate text-[12.5px]',
+                            aktif ? 'text-emerald-300' : 'text-zinc-200')}>{a.login}</span>
+                          <span className="block truncate text-[10.5px] text-zinc-500">
+                            {a.broker || 'broker tidak disebut'}
+                            {a.versiEa ? ' · EA v' + a.versiEa : ''}
+                          </span>
+                        </span>
+                        <span className="shrink-0 text-right">
+                          <span className="angka block text-[12px] text-zinc-300">
+                            {a.ekuitas.toFixed(2)} {a.mataUang}
+                          </span>
+                          <span className="block text-[10.5px] text-zinc-600">
+                            {a.posisi} posisi{a.pending ? ' · ' + a.pending + ' pending' : ''}
+                          </span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="mt-1.5 text-[11.5px] leading-relaxed text-zinc-600">
+                  Pilihan ini tersimpan di perangkat ini saja — laptop dan ponsel boleh
+                  melihat terminal yang berbeda tanpa saling mengganggu.
+                </p>
+              </div>
+            )}
+
             <div className="mb-4">
               <div className="mb-1.5 text-[11.5px] font-medium uppercase tracking-wider text-zinc-500">
                 Pairing code
@@ -445,7 +509,7 @@ export default function Integrasi() {
                   onClick={() => void kodeM.buatBaru()}
                   disabled={kodeM.memuat || kunciEvent}
                   className="flex cursor-pointer items-center rounded-md border border-zinc-800 px-3 text-zinc-400 transition-colors hover:border-zinc-700 hover:text-zinc-100 disabled:opacity-40"
-                  title={kodeMt5 ? "Buat kode baru — EA yang sekarang akan terputus" : "Buat kode pasangan"}
+                  title="Buat kode untuk terminal BARU — terminal yang sudah tersambung tidak terputus"
                   aria-label="Buat kode baru"
                 >
                   <RefreshCw className={cn("size-3.5", kodeM.memuat && "animate-spin")} />

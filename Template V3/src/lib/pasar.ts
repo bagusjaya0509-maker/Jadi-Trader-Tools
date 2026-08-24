@@ -1,4 +1,5 @@
 import { bacaKoneksi, PROXY_BAWAAN } from '@/lib/koneksi';
+import { auth } from '@/lib/firebase';
 
 /* ════════════════════════════════════════════════════════════════════════
    DATA PASAR — klines & ticker lewat proxy VPS
@@ -157,11 +158,16 @@ export async function ambilKlines(simbol: string, tf: string, batas = 200, segar
        Galat 4xx TIDAK diulang: simbol yang tidak ada tetap tidak ada pada
        percobaan kedua, dan mengulangnya cuma menunda jawaban yang sudah pasti. */
     const percobaan = segar ? 3 : 1;
+    /* Rute MT5 butuh token; rute Binance tidak dan tidak boleh diberi —
+       menempelkan Bearer di permintaan publik cuma membocorkan token ke
+       jalur yang tidak memerlukannya. */
+    const kepalaLilin = mt5 ? await kepalaMt5() : null;
+    if (mt5 && !kepalaLilin) return KOSONG;
     let r: Response | null = null;
     for (let ke = 0; ke < percobaan; ke++) {
       if (ke > 0) await new Promise((res) => setTimeout(res, ke * 400));
       try {
-        r = await fetch(alamat);
+        r = await fetch(alamat, kepalaLilin ? { headers: kepalaLilin } : undefined);
       } catch { r = null; }             // jaringan putus -- layak diulang
       if (r && r.ok) break;
       if (r && r.status >= 400 && r.status < 500) return KOSONG;
@@ -236,11 +242,31 @@ export function bacaSpekMt5(simbolDasar: string): number | null {
   return SPEK_MT5.get(simbolDasar) ?? null;
 }
 
+/* ── RUTE MT5 SEKARANG BUTUH LOGIN ──────────────────────────────────────
+   Selama data MT5 disimpan global — satu laci untuk semua broker — ketiga
+   rutenya terbuka tanpa autentikasi, dan itu berarti siapa pun tanpa akun
+   bisa membaca daftar simbol DAN harga hidup dari terminal SEMUA pengguna.
+   Sejak datanya dipisah per pengguna, rutenya menuntut token: tanpa itu
+   server tidak tahu laci siapa yang harus dibuka.
+
+   Diam saat belum login — memulangkan kosong, BUKAN melempar. Halaman Chart
+   memanggil ini tiap beberapa detik, dan pengunjung yang belum masuk memang
+   tidak punya terminal MT5. Itu keadaan normal, bukan galat yang pantas
+   diteriakkan ke konsol tiga kali semenit. */
+async function kepalaMt5(): Promise<Record<string, string> | null> {
+  const u = auth.currentUser;
+  if (!u) return null;
+  try { return { Authorization: 'Bearer ' + (await u.getIdToken()) }; }
+  catch { return null; }
+}
+
 /** Simbol MT5 yang datanya sudah ada di server — EA di chart pair lain
  *  otomatis menambah daftarnya. */
 export async function daftarSimbolMt5(): Promise<string[]> {
   try {
-    const r = await fetch(`${dasar()}/api/mt5/simbol`);
+    const kepala = await kepalaMt5();
+    if (!kepala) return [];
+    const r = await fetch(`${dasar()}/api/mt5/simbol`, { headers: kepala });
     const j = await r.json();
     return Array.isArray(j?.simbol) ? j.simbol.filter((x: unknown) => typeof x === 'string') : [];
   } catch { return []; }
@@ -249,7 +275,9 @@ export async function daftarSimbolMt5(): Promise<string[]> {
 /** Tick MT5 terakhir per simbol dasar — harga watchlist Trade-Fi. */
 export async function hargaTickMt5(): Promise<Record<string, { bid: number; waktu: number }>> {
   try {
-    const r = await fetch(`${dasar()}/api/mt5/simbol`);
+    const kepala = await kepalaMt5();
+    if (!kepala) return {};
+    const r = await fetch(`${dasar()}/api/mt5/simbol`, { headers: kepala });
     const j = await r.json();
     return j?.harga && typeof j.harga === 'object' ? j.harga : {};
   } catch { return {}; }

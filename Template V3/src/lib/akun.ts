@@ -83,6 +83,28 @@ export interface StatusAkun {
    *  persis di layar — kosong — dan itulah yang bikin orang mengira
    *  order-nya tidak terkirim padahal terpasang rapi di terminal. */
   versiEa: string;
+  /** Semua terminal MT5 yang pernah melapor untuk akun web ini.
+   *
+   *  Satu orang boleh memasang EA di beberapa broker sekaligus — demo dan
+   *  real, atau dua broker berbeda. Yang memisahkan datanya adalah nomor
+   *  akun MT5, bukan nama simbol: dua broker sama-sama punya XAUUSD, dan
+   *  EA sengaja memangkas akhiran brokernya (XAUUSDc -> XAUUSD), jadi tanpa
+   *  pemisahan ini keduanya saling menimpa. */
+  daftarAkun: AkunMt5Ringkas[];
+  /** Nomor akun yang SEDANG ditampilkan. null kalau belum ada yang melapor. */
+  loginAktif: string | null;
+}
+
+export interface AkunMt5Ringkas {
+  login: string;
+  broker: string;
+  mataUang: string;
+  ekuitas: number;
+  versiEa: string;
+  diterima: number;
+  terhubung: boolean;
+  posisi: number;
+  pending: number;
 }
 
 /** Versi EA paling awal yang mengirim daftar pending order. */
@@ -101,7 +123,7 @@ export function versiKurangDari(a: string, b: string): boolean {
   return false;
 }
 
-const BELUM: StatusAkun = { terhubung: null, saldo: null, ekuitas: null, mataUang: null, ket: 'Memeriksa…', posisi: [], pending: [], versiEa: '' };
+const BELUM: StatusAkun = { terhubung: null, saldo: null, ekuitas: null, mataUang: null, ket: 'Memeriksa…', posisi: [], pending: [], versiEa: '', daftarAkun: [], loginAktif: null };
 
 /* ── Saldo terakhir yang diketahui, per akun ──────────────────────────────
    Server menyimpan laporan EA terakhir DI MEMORI — restart pm2 menghapusnya,
@@ -123,6 +145,11 @@ function dariSimpanan(uid: string, sebab: string): StatusAkun | null {
     return {
       terhubung: false, saldo: s.saldo, ekuitas: s.ekuitas, mataUang: s.mataUang,
       ket: `${sebab} — saldo terakhir (${tgl})`, posisi: [], pending: [], versiEa: '',
+      /* Daftar terminal sengaja KOSONG di jalur cadangan ini: yang disimpan
+         di perangkat cuma saldo terakhir, bukan daftar akun. Pemilih akun
+         yang menampilkan daftar basi lebih menyesatkan daripada pemilih
+         yang menghilang sampai server menjawab lagi. */
+      daftarAkun: [], loginAktif: null,
     };
   } catch { return null; }
 }
@@ -143,6 +170,32 @@ function keUsd(nilai: number, mataUang: string | null) {
    berbarengan. */
 const pendengarAkun = new Set<() => void>();
 export function segarkanAkunMt5() { pendengarAkun.forEach((f) => f()); }
+
+/* ── TERMINAL MANA YANG SEDANG DILIHAT ──────────────────────────────────
+   Disimpan per-uid di perangkat ini, bukan di server. Pilihan "sedang lihat
+   akun yang mana" itu milik LAYAR, bukan milik akunnya: orang yang membuka
+   situs di laptop dan di ponsel boleh melihat terminal berbeda di keduanya
+   tanpa saling mengganggu.
+
+   Kosong = biarkan server memilih, dan server memilih yang laporannya paling
+   baru. Itu bawaan yang benar: terminal yang sedang jalan hampir selalu yang
+   sedang dimaksud. */
+function kunciPilihan(uid: string) { return 'jt.mt5Akun.' + uid; }
+
+export function bacaPilihanAkunMt5(uid: string): string {
+  try { return localStorage.getItem(kunciPilihan(uid)) || ''; } catch { return ''; }
+}
+
+export function pilihAkunMt5(uid: string, login: string) {
+  try {
+    if (login) localStorage.setItem(kunciPilihan(uid), login);
+    else localStorage.removeItem(kunciPilihan(uid));
+  } catch { /* mode privat */ }
+  /* Segera, tanpa menunggu putaran 30 detik. Pemilih akun yang baru menyala
+     beberapa puluh detik kemudian terbaca sebagai tombol yang tidak bekerja,
+     dan orangnya akan menekannya lagi. */
+  segarkanAkunMt5();
+}
 
 export function useAkunMt5(): StatusAkun {
   const [st, setSt] = useState<StatusAkun>(BELUM);
@@ -196,7 +249,9 @@ export function useAkunMt5(): StatusAkun {
       if (!u) return;
       try {
         const token = await u.getIdToken();
-        const r = await fetch(`${dasar()}/api/mt5/status`, { headers: { Authorization: 'Bearer ' + token } });
+        const pilihan = bacaPilihanAkunMt5(u.uid);
+        const r = await fetch(`${dasar()}/api/mt5/status${pilihan ? '?login=' + encodeURIComponent(pilihan) : ''}`,
+                              { headers: { Authorization: 'Bearer ' + token } });
         if (!hidup) return;
         if (!r.ok) { gagalLunak(() => dariSimpanan(u.uid, 'Backend tidak menjawab') ?? { ...BELUM, terhubung: false, ket: 'Backend tidak menjawab' }); return; }
         const j = await r.json();
@@ -259,6 +314,8 @@ export function useAkunMt5(): StatusAkun {
           posisi: eaHidup ? posisi : [],
           pending: eaHidup ? pending : [],
           versiEa: String(j?.data?.versiEa || ''),
+          daftarAkun: Array.isArray(j?.akun) ? j.akun : [],
+          loginAktif: j?.login ? String(j.login) : null,
         });
       } catch {
         if (hidup) gagalLunak(() => dariSimpanan(auth.currentUser?.uid ?? '', 'Backend tak terjangkau')
@@ -397,6 +454,7 @@ export function useAkunBinance(): StatusAkun {
         setSt({
           terhubung: true, saldo, ekuitas: isFinite(ekuitas) ? ekuitas : saldo,
           mataUang: 'USDT', ket: 'Binance Futures', posisi: [], pending: [], versiEa: '',
+          daftarAkun: [], loginAktif: null,
         });
       } catch {
         if (hidup) setSt({ ...BELUM, terhubung: false, ket: 'Tidak bisa menghubungi backend' });
