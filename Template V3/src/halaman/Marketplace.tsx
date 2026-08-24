@@ -998,7 +998,19 @@ export default function Marketplace() {
               {aktif.detail && (
                 <div className="mb-6">
                   <div className="mb-2 text-[11.5px] font-medium uppercase tracking-wider text-zinc-500">Penjelasan</div>
-                  <p className="text-[13px] leading-[1.8] text-zinc-400">{aktif.detail}</p>
+                  {/* whitespace-pre-line, dan tanpanya bagian ini RUSAK.
+                      `detail` teks polos berparagraf — judul bagian, butir
+                      bertanda titik, langkah bernomor. Di <p> biasa semua
+                      baris barunya diruntuhkan jadi spasi, dan hasilnya satu
+                      dinding teks di mana "YANG HARUS KAMU TAHU" menempel di
+                      ekor kalimat sebelumnya. Halaman jualan yang tidak bisa
+                      dipindai mata sama saja dengan halaman yang tidak
+                      dibaca.
+
+                      `pre-line`, bukan `pre-wrap`: baris baru dipertahankan
+                      tapi spasi berlebih tetap diruntuhkan, jadi teks yang
+                      ditempel dari mana pun tidak membawa lekukan aneh. */}
+                  <p className="whitespace-pre-line text-[13px] leading-[1.8] text-zinc-400">{aktif.detail}</p>
                 </div>
               )}
 
