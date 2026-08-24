@@ -2836,12 +2836,27 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                 {gerak >= 0 ? '+' : ''}{gerak.toFixed(2)}%
               </span>
             )}
-            {simbol.startsWith('MT5:') && (
-              <span className="mb-1 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-amber-300"
-                    title="OHLC dari terminal MT5-mu, dikirim EA Trade-Fi Sync v2 tiap beberapa menit. Order REAL di simbol ini berangkat ke MT5, bukan Binance.">
-                TRADE-FI · MT5
-              </span>
-            )}
+            {simbol.startsWith('MT5:') && (() => {
+              /* Lencana ini menyebut BROKER, bukan cuma "MT5". Ia duduk tepat
+                 di sebelah harga — tempat mata jatuh sebelum menekan Buy —
+                 jadi di sinilah kekeliruan akun paling mahal. Exness cent dan
+                 HFM standar punya XAUUSD yang sama namanya dan harga yang
+                 mirip; yang membedakan cuma nilai lot, seratus kali lipat.
+
+                 Nomor akun ikut karena satu orang bisa punya DUA akun di
+                 broker yang sama (demo dan real Exness, misalnya) — nama
+                 brokernya identik, nomornya tidak. */
+              const ak = akunMt5.daftarAkun.find((a) => a.login === akunMt5.loginAktif);
+              const label = ak ? (ak.broker || 'MT5') : 'MT5';
+              return (
+                <span className="mb-1 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-amber-300"
+                      title={ak
+                        ? `OHLC dari terminal ${ak.broker || 'MT5'} akun ${ak.login}, dikirim EA Trade-Fi Sync tiap beberapa menit. Order REAL di simbol ini berangkat ke terminal itu, bukan Binance.`
+                        : 'OHLC dari terminal MT5-mu, dikirim EA Trade-Fi Sync. Order REAL di simbol ini berangkat ke MT5, bukan Binance.'}>
+                  TRADE-FI · {label}{ak ? ' · ' + ak.login : ''}
+                </span>
+              );
+            })()}
             {/* Hitung mundurnya sekarang MENEMPEL di sisi skala harga di dalam
                 chart, sejajar label harga — sama seperti TradingView. Di
                 bilah atas ia jauh dari tempat mata sedang berada. */}
