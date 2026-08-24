@@ -2379,11 +2379,29 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
      epoch (00:00, 04:00, 08:00 untuk 4 jam), jadi sisa waktunya bisa
      dihitung tanpa tahu kapan lilin terakhir dibuka. */
   /* Teks yang sedang diketik di kotak simbol, terpisah dari simbol aktif. */
-  const [ketik, setKetik] = useState(simbol);
-  useEffect(() => { setKetik(simbol); }, [simbol]);
+  /* Ejaan untuk DITAMPILKAN di kotak simbol. `simbol` sendiri tetap nama
+     dasar — ia kunci routing yang dipakai mencari lilin di penyimpanan, dan
+     mengganti nilainya berarti mencari simbol yang tidak ada di sana. Yang
+     berbeda cuma yang terbaca orang. */
+  const tampilSimbol = useCallback((s: string) =>
+    (s.startsWith('MT5:') ? 'MT5:' + bacaNamaMt5(s.slice(4)) : s), []);
+
+  const [ketik, setKetik] = useState(() => tampilSimbol(simbol));
+  useEffect(() => { setKetik(tampilSimbol(simbol)); }, [simbol, tampilSimbol]);
+
+  /* Nama asli baru diketahui SESUDAH lilin pertamanya tiba — sebelum itu
+     peta namanya masih kosong dan kotaknya terpaksa menulis nama dasar.
+     Efek ini membetulkannya begitu datanya sampai.
+
+     Hanya mengganti kalau isinya PERSIS ejaan routing, yaitu belum disentuh
+     siapa pun. Tanpa penjaga itu, tiap penyegaran data akan menghapus apa
+     yang sedang diketik orangnya di tengah kalimat. */
+  useEffect(() => {
+    setKetik((k) => (k === simbol ? tampilSimbol(simbol) : k));
+  }, [simbol, lilin, tampilSimbol]);
   function komitSimbol() {
     const mentah = ketik.trim();
-    if (!mentah) { setKetik(simbol); return; }
+    if (!mentah) { setKetik(tampilSimbol(simbol)); return; }
 
     /* ── DICOCOKKAN KE DAFTAR MT5 DULU ────────────────────────────────
        Orang mengetik "XAUUSD" karena itu nama yang ia kenal. Yang tahu
@@ -2404,7 +2422,8 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
       || bacaNamaMt5(s).toLowerCase() === tanpaAwalan.toLowerCase());
     if (cocokMt5) {
       const penuh = 'MT5:' + cocokMt5;
-      setKetik(penuh);
+      /* Yang tampil ejaan terminalnya; yang dikirim tetap nama dasar. */
+      setKetik('MT5:' + bacaNamaMt5(cocokMt5));
       if (penuh !== simbol) setSimbol(penuh);
       return;
     }
@@ -2418,7 +2437,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
        yang mengira grafiknya sedang menampilkan apa yang tertulis.
        Titik, garis bawah, dan pagar ikut diizinkan: nama simbol broker
        memakainya ("EURUSD.m", "#AAPL"). */
-    if (!/^(MT5:)?[A-Za-z0-9._#-]{2,20}$/.test(v)) { setKetik(simbol); return; }
+    if (!/^(MT5:)?[A-Za-z0-9._#-]{2,20}$/.test(v)) { setKetik(tampilSimbol(simbol)); return; }
     if (v !== simbol) setSimbol(v);
   }
 
