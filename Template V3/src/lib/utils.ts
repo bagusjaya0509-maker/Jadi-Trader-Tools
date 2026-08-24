@@ -37,3 +37,23 @@ export function harga(n: number | null | undefined) {
 export function tanggalPendek(ms: number) {
   return new Date(ms).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' });
 }
+
+/** Tanggal angka penuh: `12-08-26` (hari-bulan-tahun).
+ *
+ *  Dipakai di tempat yang butuh TAHUNNYA ikut terbaca. `tanggalPendek`
+ *  sengaja membuang tahun supaya ringkas, dan itu benar untuk rentang yang
+ *  jelas-jelas baru — tapi salah untuk cap "terakhir posting": analis yang
+ *  berhenti sepuluh bulan lalu tertulis "24 Agu", persis sama dengan yang
+ *  memposting kemarin. Yang membaca menyangka kanalnya masih hidup.
+ *
+ *  Urutan hari-bulan-tahun, bukan bulan-hari: itu urutan yang dipakai di
+ *  Indonesia, dan 12-08-26 tidak boleh sempat terbaca sebagai 8 Desember.
+ *
+ *  `en-GB` dipilih karena ia memang memulangkan dd/mm/yy — locale `id-ID`
+ *  memakai garis miring juga, tapi tahunnya empat angka pada sebagian mesin.
+ *  Pemisahnya diganti tanda hubung supaya seragam di mana pun ia dirender. */
+export function tanggalAngka(ms: number) {
+  return new Date(ms)
+    .toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' })
+    .replace(/\//g, '-');
+}

@@ -25,7 +25,7 @@ import { AvatarAnalis } from '@/components/avatar-analis';
 import { KartuAgenSiaga } from '@/components/kartu-agen-siaga';
 import { ringkasKanal, type RingkasKanal } from '@/lib/ringkas-kanal';
 import { usePinAnalis } from '@/lib/pin-analis';
-import { cn, uang, persen, harga as fHarga, tanggalPendek } from '@/lib/utils';
+import { cn, uang, persen, harga as fHarga, tanggalPendek, tanggalAngka } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 import { useRiwayat, useSaldoAwal } from '@/lib/data';
 import { useHargaPasar, useHargaTradeFi } from '@/lib/harga';
@@ -3020,7 +3020,7 @@ export default function Analisa() {
                             )}
                           </span>
                           <span className="block truncate text-[10.5px] text-zinc-500">
-                            Last post {tanggalPendek(terakhirPosting)}
+                            Last post {tanggalAngka(terakhirPosting)}
                             {uid === pengguna?.uid && ' · kanalmu'}
                           </span>
                         </span>
