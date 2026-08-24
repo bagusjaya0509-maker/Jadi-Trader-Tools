@@ -162,7 +162,6 @@ export async function ambilKlines(simbol: string, tf: string, batas = 200, segar
        menempelkan Bearer di permintaan publik cuma membocorkan token ke
        jalur yang tidak memerlukannya. */
     const kepalaLilin = mt5 ? await kepalaMt5() : null;
-    if (mt5 && !kepalaLilin) return KOSONG;
     let r: Response | null = null;
     for (let ke = 0; ke < percobaan; ke++) {
       if (ke > 0) await new Promise((res) => setTimeout(res, ke * 400));
@@ -178,6 +177,10 @@ export async function ambilKlines(simbol: string, tf: string, batas = 200, segar
     /* Spec MT5 (dolar per lot per 1.0 harga) menumpang balasan klines —
        dihitung EA dari tick value broker + mata uang akun, disimpan di
        sini untuk dipakai tiket order menghitung dolar SL/TP. */
+    /* Ditandai supaya layar bisa menyebutnya apa adanya. Grafik acuan yang
+       tidak diberi label akan dibaca orang sebagai harga brokernya sendiri —
+       dan ia baru sadar keliru saat ordernya meleset. */
+    if (mt5) ACUAN_MT5.set(simbol.slice(4), !!j?.acuan);
     if (mt5 && j?.spec && Number(j.spec.nilaiLot) > 0) {
       SPEK_MT5.set(simbol.slice(4), Number(j.spec.nilaiLot));
     }
@@ -262,11 +265,21 @@ async function kepalaMt5(): Promise<Record<string, string> | null> {
 
 /** Simbol MT5 yang datanya sudah ada di server — EA di chart pair lain
  *  otomatis menambah daftarnya. */
+/** Simbol MT5 mana yang datanya datang dari feed ACUAN pemilik, bukan dari
+ *  terminal pemakainya sendiri. */
+const ACUAN_MT5 = new Map<string, boolean>();
+export function bacaAcuanMt5(simbolDasar: string): boolean {
+  return ACUAN_MT5.get(simbolDasar) === true;
+}
+
 export async function daftarSimbolMt5(): Promise<string[]> {
   try {
+    /* Tanpa token pun tetap dipanggil: server memulangkan feed ACUAN milik
+       pemilik untuk yang belum memasang EA. Menahannya di sini akan membuat
+       Trade-Fi terlihat kosong bagi calon pembeli — persis orang yang paling
+       perlu melihat bahwa fiturnya bekerja. */
     const kepala = await kepalaMt5();
-    if (!kepala) return [];
-    const r = await fetch(`${dasar()}/api/mt5/simbol`, { headers: kepala });
+    const r = await fetch(`${dasar()}/api/mt5/simbol`, kepala ? { headers: kepala } : undefined);
     const j = await r.json();
     return Array.isArray(j?.simbol) ? j.simbol.filter((x: unknown) => typeof x === 'string') : [];
   } catch { return []; }
@@ -276,8 +289,7 @@ export async function daftarSimbolMt5(): Promise<string[]> {
 export async function hargaTickMt5(): Promise<Record<string, { bid: number; waktu: number }>> {
   try {
     const kepala = await kepalaMt5();
-    if (!kepala) return {};
-    const r = await fetch(`${dasar()}/api/mt5/simbol`, { headers: kepala });
+    const r = await fetch(`${dasar()}/api/mt5/simbol`, kepala ? { headers: kepala } : undefined);
     const j = await r.json();
     return j?.harga && typeof j.harga === 'object' ? j.harga : {};
   } catch { return {}; }

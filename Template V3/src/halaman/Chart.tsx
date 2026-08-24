@@ -22,7 +22,7 @@ import type { AlatPegang, GambarAlat } from '@/lib/plugin-alat';
 import type { HasilPine } from '@/lib/pine';
 import { bacaSetelanChart, simpanSetelanChart, usulSlTp } from '@/lib/replay';
 import { atr } from '@/lib/jt-scan-core';
-import { ambilKlines, ambilKlinesSebelum, aturPasarKripto, bacaPasar, bacaSpekMt5, bacaTickMt5, daftarSimbolMt5, pasarKripto, type Lilin } from '@/lib/pasar';
+import { ambilKlines, ambilKlinesSebelum, aturPasarKripto, bacaAcuanMt5, bacaPasar, bacaSpekMt5, bacaTickMt5, daftarSimbolMt5, pasarKripto, type Lilin } from '@/lib/pasar';
 import { useAkunMt5, segarkanAkunMt5 } from '@/lib/akun';
 /* Langsung dari admin, BUKAN lewat usePosisi(): yang dibutuhkan di sini
    cuma daftar order bursa, sementara usePosisi() juga memasang listener
@@ -1951,7 +1951,9 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
        Hanya untuk Trade-Fi: chart kripto memang tidak punya broker, dan
        menambahkan baris kosong di sana cuma mengotori. */
     const broker = mt5
-      ? (akunMt5.daftarAkun.find((a) => a.login === akunMt5.loginAktif)?.broker || '')
+      ? (bacaAcuanMt5(simbol.slice(4))
+          ? 'ACUAN'
+          : (akunMt5.daftarAkun.find((a) => a.login === akunMt5.loginAktif)?.broker || ''))
       : '';
     return {
       utama: tampilan.tandaAirTeks.trim() || airOtomatis,
@@ -2846,7 +2848,23 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                  Nomor akun ikut karena satu orang bisa punya DUA akun di
                  broker yang sama (demo dan real Exness, misalnya) — nama
                  brokernya identik, nomornya tidak. */
+              /* ACUAN vs MILIK SENDIRI — dua keadaan yang TIDAK BOLEH
+                 terlihat sama. Grafik acuan datang dari terminal pemilik
+                 situs, bukan dari broker pembacanya; harganya bisa meleset
+                 beberapa dolar dan nilai lotnya bisa berbeda seratus kali.
+                 Yang membaca grafik acuan sambil mengira itu brokernya
+                 sendiri baru sadar keliru saat ordernya meleset — jadi
+                 warnanya pun dibedakan, bukan cuma kalimatnya. */
+              const dariAcuan = bacaAcuanMt5(simbol.slice(4));
               const ak = akunMt5.daftarAkun.find((a) => a.login === akunMt5.loginAktif);
+              if (dariAcuan) {
+                return (
+                  <span className="mb-1 rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-sky-300"
+                        title="Grafik ACUAN dari terminal Jadi Trader, bukan dari brokermu. Pasang EA Trade-Fi Sync di MT5-mu supaya chart memakai harga brokermu sendiri — spread dan nilai lot tiap broker berbeda.">
+                    ACUAN · belum pasang EA
+                  </span>
+                );
+              }
               const label = ak ? (ak.broker || 'MT5') : 'MT5';
               return (
                 <span className="mb-1 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-amber-300"
