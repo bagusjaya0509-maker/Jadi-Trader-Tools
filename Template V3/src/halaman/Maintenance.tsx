@@ -257,13 +257,13 @@ export default function Maintenance() {
      memakai input tak terkendali tanpa satu pun handler — mengetik apa pun
      di sana lalu menekan "Simpan produk" tidak pernah terjadi apa-apa. */
   const [pilih, setPilih] = useState('');
-  const [form, setForm] = useState({ id: '', nama: '', harga: '', hargaAsal: '', versi: '', ringkas: '', fitur: '', sampul: '', lynk: '' });
+  const [form, setForm] = useState({ id: '', nama: '', harga: '', hargaAsal: '', versi: '', ringkas: '', fitur: '', sampul: '', lynk: '', detail: '' });
   const [unggahSibuk, setUnggahSibuk] = useState(false);
 
   function muatKeForm(id: string) {
     setPilih(id);
     const p = tayang.find((x) => x.id === id);
-    if (!p) { setForm({ id: '', nama: '', harga: '', hargaAsal: '', versi: '', ringkas: '', fitur: '', sampul: '', lynk: '' }); return; }
+    if (!p) { setForm({ id: '', nama: '', harga: '', hargaAsal: '', versi: '', ringkas: '', fitur: '', sampul: '', lynk: '', detail: '' }); return; }
     setForm({
       id: String(p.id ?? ''),
       nama: String(p.nama ?? ''),
@@ -274,6 +274,7 @@ export default function Maintenance() {
       hargaAsal: p.hargaAsal ? String(p.hargaAsal) : '',
       versi: String(p.versi ?? ''),
       lynk: String((p as { lynk?: string }).lynk ?? ''),
+      detail: String((p as { detail?: string }).detail ?? ''),
       ringkas: String(p.ringkas ?? ''),
       fitur: Array.isArray(p.fitur) ? p.fitur.join('\n') : '',
       /* Sampul = gambar PERTAMA. Katalog tidak punya field sampul terpisah,
@@ -328,6 +329,8 @@ export default function Maintenance() {
          dikosongkan". */
       ...(form.lynk.trim() ? { lynk: form.lynk.trim() } : { lynk: undefined }),
       ringkas: form.ringkas.trim(),
+      /* Sama seperti lynk: DIHAPUS saat dikosongkan, bukan disimpan ''. */
+      ...(form.detail.trim() ? { detail: form.detail.trim() } : { detail: undefined }),
       fitur: form.fitur.split('\n').map((s) => s.trim()).filter(Boolean),
       premium: (Number(form.harga) || 0) > 0,
       gambar: form.sampul
@@ -690,6 +693,39 @@ export default function Maintenance() {
                 <textarea rows={3} value={form.fitur} onChange={(e) => setForm({ ...form, fitur: e.target.value })}
                   disabled={!pemilik}
                   className="w-full resize-y rounded-md border border-zinc-800 bg-zinc-900/60 p-3 text-[12.5px] text-zinc-100 outline-none hover:border-zinc-700 focus-visible:border-zinc-600 disabled:opacity-50" />
+              </div>
+              {/* -- Detail panjang ------------------------------------------
+                  Ikut hilang dari formulir ini bersama `lynk`, dan celahnya
+                  lebih berbahaya: `ringkas` cuma dua baris di kartu, sementara
+                  `detail` adalah halaman jualannya — di situ harga, batasan,
+                  dan cara pasang ditulis. Teks yang tidak bisa disunting
+                  BERBOHONG diam-diam begitu produknya berubah, dan yang
+                  membacanya calon pembeli, bukan pemiliknya.
+
+                  Ketahuan dari Trade-Fi Sync: detailnya masih menulis "order
+                  lewat web sementara ini MARKET saja" padahal EA-nya sudah
+                  lama memasang pending order, dan masih menyebut harga
+                  perkenalan $2 padahal katalognya $7. Satu menjual produknya
+                  lebih rendah dari kemampuannya, satu lagi membuat pembeli
+                  merasa dibohongi di halaman checkout. */}
+              <div className="mt-3">
+                <label className="mb-1 block text-[11px] text-zinc-500">
+                  Detail panjang <span className="text-zinc-600">(halaman produk — baris kosong memisahkan paragraf)</span>
+                </label>
+                <textarea rows={8} value={form.detail} onChange={(e) => setForm({ ...form, detail: e.target.value })}
+                  disabled={!pemilik}
+                  className="w-full resize-y rounded-md border border-zinc-800 bg-zinc-900/60 p-3 text-[12.5px] leading-relaxed text-zinc-100 outline-none hover:border-zinc-700 focus-visible:border-zinc-600 disabled:opacity-50" />
+                {/* Harga disebut di DUA tempat yang tidak saling tahu: angka
+                    di kolom Harga, dan kalimat di detail. Yang satu berubah
+                    tanpa yang lain adalah cara paling mudah memasang klaim
+                    palsu di halaman jualan sendiri. */}
+                {/\$\s?\d/.test(form.detail) && (
+                  <p className="mt-1 text-[10.5px] leading-relaxed text-amber-400/90">
+                    Detail menyebut angka dolar. Pastikan cocok dengan Harga (${Number(form.harga) || 0}
+                    {Number(form.hargaAsal) > (Number(form.harga) || 0) ? ` dicoret dari $${Number(form.hargaAsal)}` : ''}) —
+                    harga di teks tidak ikut berubah sendiri saat kolom Harga diubah.
+                  </p>
+                )}
               </div>
               <button onClick={() => void simpanProduk()} disabled={menyimpan || !pemilik}
                 className="mt-3 cursor-pointer rounded-md bg-zinc-100 px-4 py-2 text-[12.5px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50">
