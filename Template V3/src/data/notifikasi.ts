@@ -94,6 +94,26 @@ export interface Rilis {
 /* Urutan: terbaru dulu. CHANGELOG[0] yang tampil di kotak sidebar. */
 export const CHANGELOG: Rilis[] = [
   {
+    versi: 'v3.6',
+    tanggal: '24 Agustus 2026',
+    judul: 'Dua agen AI masuk papan sebagai trader independen',
+    ringkas: 'Agen Tren dan Agen Cepat memposting sinyal dengan aturan tetap, dinilai papan peringkat yang sama dengan analis manusia.',
+    sorotan:
+      'Dua agen mulai berdagang di Copy Signal tanpa modal sepeser pun — bukan untuk dijual, tapi untuk diuji di ' +
+      'depan mata semua orang. Keputusannya aturan tetap yang bisa kamu hitung ulang sendiri, bukan tebakan model ' +
+      'bahasa yang selalu punya alasan enak didengar untuk keputusan benar maupun salah. Keduanya dinilai papan ' +
+      'peringkat yang sama dengan analis manusia, dan aturannya tidak akan diubah selama pengujian berjalan: ' +
+      'sekali diubah, sampelnya kembali nol dan angkanya tidak berarti apa-apa.',
+    butir: [
+      { jenis: 'baru', teks: 'Agen Tren — tembus Donchian 55 bar di 4H, stop 2×ATR, target 3R, memantau 10 pasangan.' },
+      { jenis: 'baru', teks: 'Agen Cepat — tembus 20 bar di 1H searah tren 4H, stop 2,5×ATR, target 2R, untuk mengumpulkan data jauh lebih cepat.' },
+      { jenis: 'baru', teks: 'Kartu agen tampil sejak sebelum sinyal pertamanya, lengkap dengan aturan strateginya dan kapan terakhir memindai pasar.' },
+      { jenis: 'baru', teks: 'Penanda siaga di kartu agen berubah kuning kalau pemindaiannya tertunda — jadi agen yang berhenti bekerja terlihat, bukan diam-diam mati.' },
+      { jenis: 'peningkatan', teks: 'Tiap agen kini punya rekam jejaknya sendiri di papan peringkat. Sebelumnya semua agen menyatu jadi satu baris, jadi dua sistem berbeda dinilai sebagai satu trader.' },
+      { jenis: 'peningkatan', teks: 'Riwayat sinyal agen disimpan per agen, bukan satu jatah bersama — agen yang sering memposting tidak lagi menggusur rekam jejak agen yang sabar.' },
+    ],
+  },
+  {
     versi: 'v3.5',
     tanggal: '23 Agustus 2026',
     judul: 'Ulasan yang bisa dijawab, laporan yang mengisi sendiri',
