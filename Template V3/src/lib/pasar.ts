@@ -180,7 +180,13 @@ export async function ambilKlines(simbol: string, tf: string, batas = 200, segar
     /* Ditandai supaya layar bisa menyebutnya apa adanya. Grafik acuan yang
        tidak diberi label akan dibaca orang sebagai harga brokernya sendiri —
        dan ia baru sadar keliru saat ordernya meleset. */
-    if (mt5) ACUAN_MT5.set(simbol.slice(4), !!j?.acuan);
+    if (mt5) {
+      const dasar = simbol.slice(4);
+      ACUAN_MT5.set(dasar, !!j?.acuan);
+      /* Feed acuan memulangkan nama polos — akhiran broker pemilik bukan
+         akhiran broker pembacanya, jadi ia tidak disiarkan. */
+      if (typeof j?.nama === 'string' && j.nama) NAMA_MT5.set(dasar, j.nama);
+    }
     if (mt5 && j?.spec && Number(j.spec.nilaiLot) > 0) {
       SPEK_MT5.set(simbol.slice(4), Number(j.spec.nilaiLot));
     }
@@ -272,6 +278,20 @@ export function bacaAcuanMt5(simbolDasar: string): boolean {
   return ACUAN_MT5.get(simbolDasar) === true;
 }
 
+/** Nama simbol APA ADANYA di terminal orangnya (XAUUSDc, BTCUSDm, …).
+ *
+ *  EA memangkas akhiran broker sebelum mengirim lilin, jadi kuncinya selalu
+ *  nama dasar. Yang di MT5-nya tertulis "XAUUSDc" lalu di web tertulis
+ *  "XAUUSD" wajar bertanya apakah itu pasangan yang sama — dan di akun sen,
+ *  dua nama mirip memang bisa berarti nilai lot yang berbeda seratus kali.
+ *
+ *  UNTUK DITAMPILKAN SAJA. Kunci pencarian data tetap nama dasar; kalau
+ *  keduanya ikut berubah, lilin yang sudah tersimpan jadi yatim. */
+const NAMA_MT5 = new Map<string, string>();
+export function bacaNamaMt5(simbolDasar: string): string {
+  return NAMA_MT5.get(simbolDasar) || simbolDasar;
+}
+
 export async function daftarSimbolMt5(): Promise<string[]> {
   try {
     /* Tanpa token pun tetap dipanggil: server memulangkan feed ACUAN milik
@@ -281,6 +301,13 @@ export async function daftarSimbolMt5(): Promise<string[]> {
     const kepala = await kepalaMt5();
     const r = await fetch(`${dasar()}/api/mt5/simbol`, kepala ? { headers: kepala } : undefined);
     const j = await r.json();
+    /* Peta nama ikut diserap di sini supaya daftar simbol pun sudah bisa
+       menampilkan ejaan terminal orangnya, bukan menunggu chartnya dibuka. */
+    if (j?.nama && typeof j.nama === 'object') {
+      for (const [dasar, nama] of Object.entries(j.nama)) {
+        if (typeof nama === 'string' && nama) NAMA_MT5.set(dasar, nama);
+      }
+    }
     return Array.isArray(j?.simbol) ? j.simbol.filter((x: unknown) => typeof x === 'string') : [];
   } catch { return []; }
 }

@@ -22,7 +22,7 @@ import type { AlatPegang, GambarAlat } from '@/lib/plugin-alat';
 import type { HasilPine } from '@/lib/pine';
 import { bacaSetelanChart, simpanSetelanChart, usulSlTp } from '@/lib/replay';
 import { atr } from '@/lib/jt-scan-core';
-import { ambilKlines, ambilKlinesSebelum, aturPasarKripto, bacaAcuanMt5, bacaPasar, bacaSpekMt5, bacaTickMt5, daftarSimbolMt5, pasarKripto, type Lilin } from '@/lib/pasar';
+import { ambilKlines, ambilKlinesSebelum, aturPasarKripto, bacaAcuanMt5, bacaNamaMt5, bacaPasar, bacaSpekMt5, bacaTickMt5, daftarSimbolMt5, pasarKripto, type Lilin } from '@/lib/pasar';
 import { useAkunMt5, segarkanAkunMt5 } from '@/lib/akun';
 /* Langsung dari admin, BUKAN lewat usePosisi(): yang dibutuhkan di sini
    cuma daftar order bursa, sementara usePosisi() juga memasang listener
@@ -1935,7 +1935,9 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
   const airOtomatis = (mt5 ? simbol.slice(4) : simbol) + ', ' + tf.toUpperCase();
   const tandaAir = useMemo(() => {
     if (!tampilan.tandaAir) return undefined;
-    const nama = mt5 ? simbol.slice(4) : simbol;
+    /* Nama APA ADANYA di terminal orangnya. Untuk feed acuan ia tetap nama
+       dasar — server memang tidak menyiarkan akhiran broker pemilik. */
+    const nama = mt5 ? bacaNamaMt5(simbol.slice(4)) : simbol;
     const jenis = bacaPasar(simbol);
     const pasar = mt5 ? 'TRADE-FI' : jenis === 'futures' ? 'PERP' : jenis === 'spot' ? 'SPOT' : '';
     /* Teks sendiri hanya mengganti baris ATAS. Baris bawah tetap jenis
@@ -2386,7 +2388,12 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
        Tanpa peduli huruf besar-kecil, dan tanpa peduli apakah awalan
        "MT5:" ikut diketik. */
     const tanpaAwalan = mentah.replace(/^MT5:/i, '');
-    const cocokMt5 = simbolMt5.find((s) => s.toLowerCase() === tanpaAwalan.toLowerCase());
+    /* Dicocokkan terhadap DUA ejaan: nama dasar dan nama asli terminalnya.
+       Orang yang menyalin "XAUUSDc" dari MT5-nya harus ketemu, dan itu justru
+       ejaan yang paling mungkin ia ketik. */
+    const cocokMt5 = simbolMt5.find((s) =>
+      s.toLowerCase() === tanpaAwalan.toLowerCase()
+      || bacaNamaMt5(s).toLowerCase() === tanpaAwalan.toLowerCase());
     if (cocokMt5) {
       const penuh = 'MT5:' + cocokMt5;
       setKetik(penuh);
@@ -2421,7 +2428,11 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
   const saranSimbol = useMemo(() => {
     const q = ketik.trim().replace(/^MT5:/i, '').toLowerCase();
     const semua = [
-      ...simbolMt5.map((s) => ({ nilai: 'MT5:' + s, label: s, sumber: 'Trade-Fi · MT5' })),
+      /* LABEL memakai ejaan terminal orangnya (XAUUSDc), NILAI tetap nama
+         dasar (MT5:XAUUSD) — itu kunci yang dipakai mencari lilinnya. Kalau
+         nilainya ikut berubah, rutenya mencari simbol yang tidak ada di
+         penyimpanan dan chartnya kosong tanpa pesan apa pun. */
+      ...simbolMt5.map((s) => ({ nilai: 'MT5:' + s, label: bacaNamaMt5(s), sumber: 'Trade-Fi · MT5' })),
       ...SIMBOL_DASAR.map((s) => ({ nilai: s, label: s, sumber: 'Kripto · Binance' })),
     ];
     return (q ? semua.filter((o) => o.label.toLowerCase().includes(q)) : semua).slice(0, 40);
