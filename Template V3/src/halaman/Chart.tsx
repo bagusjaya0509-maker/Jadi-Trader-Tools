@@ -248,6 +248,32 @@ export default function ChartBacktest() {
      masuk akan membatalkan dan menjadwalkan ulang pollingnya sendiri. */
   const lilinRef = useRef(lilin);
   lilinRef.current = lilin;
+
+  /* ── LILIN DIKOSONGKAN SAAT SIMBOL/TF BERGANTI ────────────────────────
+     Ada aturan sengaja di jalur penarikan data: penarikan yang GAGAL tidak
+     boleh menghapus chart yang sudah tergambar. Itu benar untuk kedipan
+     koneksi pada simbol yang sama — memasang peringatan merah di atas chart
+     yang baik-baik saja memberitahu orangnya ada yang rusak padahal tidak.
+
+     Tapi aturan itu tidak membedakan "gagal menarik simbol yang SAMA" dari
+     "simbol BARU yang memang tidak punya data". Akibatnya: mengetik simbol
+     yang tidak ada — mis. EURUSD tanpa awalan MT5: — meninggalkan lilin
+     simbol sebelumnya di layar sementara seluruh label berganti. Chart
+     menampilkan harga EMAS 4677 dengan tulisan besar "EURUSD, 1H", dan
+     tidak ada satu pun tanda bahwa itu keliru.
+
+     Ini kelas kesalahan yang paling berbahaya di aplikasi trading: bukan
+     galat yang terlihat, melainkan angka yang salah yang terlihat benar.
+     Orang bisa mengambil keputusan di atasnya.
+
+     Dikosongkan DI SINI, sebelum penarikan pertama simbol barunya, jadi
+     kegagalan pada simbol baru meninggalkan chart kosong beserta pesannya —
+     sementara kegagalan pada simbol yang sama tetap tidak menghapus apa pun,
+     persis seperti sebelumnya. */
+  useEffect(() => {
+    setLilin({ opens: [], highs: [], lows: [], closes: [], times: [] });
+    lilinRef.current = { opens: [], highs: [], lows: [], closes: [], times: [] };
+  }, [simbol, tf]);
   /* Riwayat tambahan hasil "Muat lebih lama", DISIMPAN TERPISAH dari `lilin`.
      ────────────────────────────────────────────────────────────────────
      `lilin` disegarkan tiap 3 detik oleh polling harga. Kalau potongan lama
@@ -2021,9 +2047,13 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
              Yang berubah hanya: kegagalan sementara berhenti berteriak.
              Kalau memang chartnya kosong, peringatannya tetap muncul. */
           if (!lilinRef.current.closes.length) {
+            /* Permintaannya BERHASIL tapi kosong — itu lebih sering berarti
+               simbolnya tidak ada daripada proxinya mati. Menyalahkan proxy
+               untuk simbol yang salah ketik mengirim orangnya memeriksa
+               server selama setengah jam. */
             setGalat(simbol.startsWith('MT5:')
-              ? 'Belum ada data dari terminal MT5 — buka MT5 dengan EA Trade-Fi Sync v2 terpasang; chart terisi begitu EA mengirim (± tiap 5 menit).'
-              : 'Data tidak diterima. Proxy VPS mungkin sedang tidak menjawab.');
+              ? 'Belum ada data dari terminal MT5 untuk simbol ini — pastikan EA Trade-Fi Sync terpasang di chart pasangan itu; datanya masuk ± tiap 5 menit.'
+              : `Tidak ada data untuk "${simbol}". Pasangan kripto Binance berakhiran USDT (mis. EURUSDT); untuk pasangan MetaTrader pakai awalan MT5: dan pastikan EA-nya terpasang.`);
           }
         }
         else { setLilin(l); setGalat(''); }
