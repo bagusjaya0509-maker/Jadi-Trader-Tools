@@ -1928,9 +1928,10 @@ export function ChartLilin({
   useEffect(() => {
     const s = seri.current;
     if (!s) return;
-    const buat = (price: number, color: string, title: string, lineStyle: number, kunci?: string) => {
+    const buat = (price: number, color: string, title: string, lineStyle: number,
+                  kunci?: string, axisLabelVisible = true) => {
       try {
-        const g = s.createPriceLine({ price, color, lineWidth: 1, lineStyle, axisLabelVisible: true, title });
+        const g = s.createPriceLine({ price, color, lineWidth: 1, lineStyle, axisLabelVisible, title });
         garisPosMt5.current.push(g);
         if (kunci) petaGarisMt5.current.set(kunci, g);
       } catch { /* seri sedang dibongkar ulang */ }
@@ -1945,14 +1946,89 @@ export function ChartLilin({
        dua garis TP sama-sama berbunyi "TP". Yang membedakan tinggal
        harganya di sumbu kanan, dan nomor lengkapnya tetap ada di tabel
        Posisi Terbuka. */
+    /* ── SATU LEVEL, SATU GARIS ─────────────────────────────────────────
+       Layering di akun cent membuka belasan order dengan SL yang SAMA
+       PERSIS. Satu garis per posisi berarti belasan garis bertumpuk di
+       piksel yang sama, masing-masing menuntut kotak angkanya sendiri di
+       sumbu kanan — dan sumbu harga berubah jadi kolom "SL 80100.00" yang
+       diulang enam kali, menutupi harga yang justru sedang dibaca.
+
+       Digabung berdasarkan PETAK TICK, bukan selisih float: dua level yang
+       tercetak sama di layar memang satu level bagi pembacanya, dan
+       4398,507 − 4398,506 = 0,0009999999995 sudah cukup untuk menggagalkan
+       perbandingan selisih.
+
+       Warna ikut jadi kunci. Entry BUY hijau dan entry SELL merah di harga
+       yang sama persis (posisi terkunci) adalah dua hal berbeda; menyatukan
+       keduanya berarti salah satunya digambar dengan warna lawan arahnya —
+       dan warna itulah yang dibaca lebih dulu daripada angkanya. */
     const daftar = posisiMt5 ?? [];
+    const fmtG = (s.options() as { priceFormat?: { minMove?: number } }).priceFormat;
+    const tickG = fmtG?.minMove && fmtG.minMove > 0 ? fmtG.minMove : 1e-6;
+    const petakG = (x: number) => Math.round(x / tickG);
+
+    type Level = { price: number; color: string; title: string; style: number; kunci: string[] };
+    const unik = new Map<string, Level>();
+    const kumpul = (price: number, color: string, title: string, style: number, kunci?: string) => {
+      const k = `${title}|${color}|${petakG(price)}`;
+      const ada = unik.get(k);
+      /* Tiket yang berbagi garis DIDAFTARKAN SEMUA. Peta ini yang dipakai
+         seretan SL/TP; kalau cuma tiket pertama yang terdaftar, menyeret SL
+         tiket kedua tidak menggerakkan apa pun di layar walau perintahnya
+         terkirim. Menyeret salah satunya menggerakkan garis bersamanya —
+         memang begitu yang terlihat benar, dan begitu servernya menjawab,
+         level yang berubah otomatis memisahkan diri jadi garis sendiri. */
+      if (ada) { if (kunci) ada.kunci.push(kunci); return; }
+      unik.set(k, { price, color, title, style, kunci: kunci ? [kunci] : [] });
+    };
+
     daftar.forEach((p) => {
       const u = ubahRef.current && ubahRef.current.tiket === p.tiket ? ubahRef.current : null;
-      buat(p.entry, p.arah === 'BUY' ? '#10b981' : '#f87171', '', 2);
+      kumpul(p.entry, p.arah === 'BUY' ? '#10b981' : '#f87171', '', 2);
       const slPos = u ? u.sl : p.sl;
-      if (slPos > 0) buat(slPos, '#f87171', 'SL', 1, p.tiket + '-sl');
+      if (slPos > 0) kumpul(slPos, '#f87171', 'SL', 1, p.tiket + '-sl');
       const tpPos = u ? u.tp : p.tp;
-      if (tpPos > 0) buat(tpPos, '#10b981', 'TP', 1, p.tiket + '-tp');
+      if (tpPos > 0) kumpul(tpPos, '#10b981', 'TP', 1, p.tiket + '-tp');
+    });
+
+    /* ── LABEL YANG AKAN BERTABRAKAN DISEMBUNYIKAN ──────────────────────
+       Menggabung yang sama persis belum cukup. Layering juga membuka order
+       di harga yang BERBEDA TIPIS — 77259,52 / 77259,13 / 77258,55 — dan
+       sumbu harga memaksa kotak-kotaknya saling menghindar, jadi tiga level
+       yang berjarak satu dolar tergambar sebagai tiga baris berjauhan yang
+       memanjang ke atas.
+
+       Yang disembunyikan LABELNYA saja; garisnya tetap digambar di harga
+       aslinya masing-masing. Tidak ada level yang hilang dari chart — yang
+       hilang cuma angka kembar yang tidak terbaca.
+
+       SL dan TP didahulukan daripada entry: kalau harus memilih satu angka
+       untuk sekelompok level berdempetan, yang paling dicari mata adalah
+       batas rugi dan target, bukan harga masuk yang sudah lewat.
+
+       Ambangnya PIKSEL, bukan harga — yang menyebabkan tabrakan memang
+       tinggi kotaknya di layar, dan ambang dalam harga akan salah di tiap
+       zoom dan tiap simbol. Dihitung saat garisnya dibangun; sesudah
+       zoom jauh ke dalam, beberapa label bisa tetap tersembunyi sampai
+       posisinya berubah. Itu diterima: memasang ulang seluruh price line
+       tiap frame zoom jauh lebih mahal daripada satu angka yang telat
+       muncul. */
+    const TINGGI_LABEL = 15;
+    const urut = [...unik.values()].sort((a, b) => {
+      const bobot = (x: Level) => (x.title ? 0 : 1); // SL/TP dulu, entry belakangan
+      return bobot(a) - bobot(b) || b.price - a.price;
+    });
+    const yTerpakai: number[] = [];
+    urut.forEach((lv) => {
+      let label = true;
+      const y = s.priceToCoordinate(lv.price);
+      if (y != null) {
+        if (yTerpakai.some((v) => Math.abs(v - y) < TINGGI_LABEL)) label = false;
+        else yTerpakai.push(y);
+      }
+      buat(lv.price, lv.color, lv.title, lv.style, undefined, label);
+      const g = garisPosMt5.current[garisPosMt5.current.length - 1];
+      if (g) lv.kunci.forEach((k) => petaGarisMt5.current.set(k, g));
     });
     return () => {
       garisPosMt5.current.forEach((g) => { try { s.removePriceLine(g); } catch { /* dibongkar */ } });
