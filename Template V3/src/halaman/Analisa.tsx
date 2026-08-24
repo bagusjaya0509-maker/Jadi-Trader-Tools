@@ -2936,8 +2936,20 @@ export default function Analisa() {
                           <rect width="100%" height="100%" fill={'url(#kisi-' + uid + ')'} />
                         </svg>
                       </span>
+                      {/* TINGGI PIKSEL, bukan persen tinggi kartu.
+                          Dengan h-[76%], tinggi kurvanya bergantung tinggi
+                          KARTUNYA — dan tinggi kartu berubah tiap grid
+                          menyusun ulang barisnya (kartu satu baris selalu
+                          setinggi yang tertinggi). Jadi mengubah ukuran
+                          jendela membuat kurvanya melompat naik-turun
+                          walaupun datanya sama sekali tidak berubah, dan
+                          yang melihatnya menyangka angkanya ikut berubah.
+
+                          128px kira-kira sama dengan 76% pada kartu berisi,
+                          jadi tampilan yang sudah dikenal tidak bergeser —
+                          yang hilang cuma lompatannya. */}
                       <SparklineSaldo sinyal={sinyal} interaktif
-                                      kelas="absolute inset-x-0 bottom-0 h-[76%] w-full"
+                                      kelas="absolute inset-x-0 bottom-0 h-[128px] w-full"
                                       modal={performa?.modal ?? 1000} />
                     </span>
 
@@ -3009,11 +3021,27 @@ export default function Analisa() {
                       {/* ANGKA BESAR: estimasi hasil. Satu-satunya angka
                           sebesar ini di kartu, dan itu memang yang dicari
                           orang yang sedang memilih siapa ditiru. */}
-                      <span className={cn('mt-3 block text-[34px] font-medium leading-none tracking-tight',
-                        p ? (p.hasilDolar >= 0 ? 'text-emerald-400' : 'text-red-400') : 'text-zinc-600')}>
-                        {p ? uang(p.hasilDolar, true) : '—'}
+                      {/* BELUM ADA HASIL ITU KEADAAN, BUKAN KEKOSONGAN.
+                          Analis yang sinyalnya masih berjalan semua tidak
+                          punya angka hasil — dan sebuah "—" setinggi 34px
+                          berwarna zinc-600 di atas latar gelap terbaca
+                          sebagai kartu yang gagal termuat, bukan sebagai
+                          jawaban. Kartunya lalu terlihat separuh rusak
+                          justru pada analis yang baru mulai, yaitu yang
+                          paling butuh terlihat wajar. */}
+                      {p ? (
+                        <span className={cn('mt-3 block text-[34px] font-medium leading-none tracking-tight',
+                          p.hasilDolar >= 0 ? 'text-emerald-400' : 'text-red-400')}>
+                          {uang(p.hasilDolar, true)}
+                        </span>
+                      ) : (
+                        <span className="mt-3 block text-[15px] font-medium leading-[34px] text-zinc-500">
+                          Belum ada hasil
+                        </span>
+                      )}
+                      <span className="mt-1 block text-[10.5px] text-zinc-600">
+                        {p ? 'estimasi dari modal $1.000' : 'sinyalnya masih berjalan — hasilnya dihitung saat kena TP atau SL'}
                       </span>
-                      <span className="mt-1 block text-[10.5px] text-zinc-600">estimasi dari modal $1.000</span>
                       {/* Lencana risiko DI KIRI, tepat di bawah baris estimasi.
                           Permintaan pemilik, dan urutannya jadi menurun rapi:
                           angka hasilnya, keterangan dari modal berapa, lalu
