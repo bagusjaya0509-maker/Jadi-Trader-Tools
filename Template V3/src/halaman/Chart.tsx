@@ -1963,7 +1963,14 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
        Kecuali untuk feed acuan: di sana "ACUAN" tetap ditulis, karena itu
        peringatan — bukan label. Yang membaca grafik acuan sambil mengira itu
        brokernya sendiri harus punya lebih dari satu tempat untuk sadar. */
-    const bawah = mt5 ? (bacaAcuanMt5(simbol.slice(4)) ? 'ACUAN' : 'TRADE-FI') : pasar;
+    /* Kripto menyebut BURSANYA juga, bukan cuma jenis kontraknya. Sekarang
+       ada dua sumber data di aplikasi ini — Binance dan terminal MT5 — dan
+       tanda air yang cuma menulis "PERP" menjawab setengah pertanyaan:
+       kontraknya apa, tapi bukan datanya dari mana. Sisi Trade-Fi sudah
+       menyebut sumbernya; sisi kripto jadi setara. */
+    const bawah = mt5
+      ? (bacaAcuanMt5(simbol.slice(4)) ? 'ACUAN' : 'TRADE-FI')
+      : (pasar ? pasar + ' · Binance' : '');
     return {
       utama: tampilan.tandaAirTeks.trim() || airOtomatis,
       sub: bawah || undefined,
