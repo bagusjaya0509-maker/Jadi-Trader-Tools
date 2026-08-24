@@ -1932,12 +1932,20 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
      sebagai placeholder kolom teks di panel setelan. Placeholder yang
      menampilkan nilai otomatis yang sesungguhnya membuat aturan "kosongkan
      untuk otomatis" terlihat, bukan cuma tertulis. */
-  const airOtomatis = (mt5 ? simbol.slice(4) : simbol) + ', ' + tf.toUpperCase();
+  /* Ejaan terminalnya sendiri di sini juga, bukan cuma di baris bawah.
+     Baris ATAS itu yang besar dan yang benar-benar dibaca; membetulkan baris
+     bawah saja meninggalkan dua ejaan berbeda dalam satu tanda air, dan itu
+     lebih membingungkan daripada satu ejaan yang salah. */
+  const airOtomatis = (mt5 ? bacaNamaMt5(simbol.slice(4)) : simbol) + ', ' + tf.toUpperCase();
   const tandaAir = useMemo(() => {
     if (!tampilan.tandaAir) return undefined;
     /* Nama APA ADANYA di terminal orangnya. Untuk feed acuan ia tetap nama
        dasar — server memang tidak menyiarkan akhiran broker pemilik. */
     const nama = mt5 ? bacaNamaMt5(simbol.slice(4)) : simbol;
+    /* Sengaja dihitung dengan cara yang SAMA dengan airOtomatis di atas.
+       Dua tempat yang mengeja satu nama dengan aturan berbeda adalah cara
+       tanda air ini bisa menampilkan XAUUSD di baris atas dan XAUUSDc di
+       baris bawah — persis keluhan yang sedang dibetulkan. */
     const jenis = bacaPasar(simbol);
     const pasar = mt5 ? 'TRADE-FI' : jenis === 'futures' ? 'PERP' : jenis === 'spot' ? 'SPOT' : '';
     /* Teks sendiri hanya mengganti baris ATAS. Baris bawah tetap jenis
