@@ -2922,6 +2922,39 @@ export default function Analisa() {
                       sebelum dasar kartu — persis rongga yang terlihat. */}
                   <button onClick={() => setKanalBuka(uid)}
                     className="relative flex w-full flex-1 cursor-pointer flex-col overflow-hidden text-left">
+                    {/* BIAS WARNA — LAPISAN TERSENDIRI, SEPANJANG KARTU.
+                        Dulu ia satu lapisan dengan kurvanya. Begitu wilayah
+                        kurva dipersempit supaya tidak mencoret nama dan
+                        winrate, sapuan hijau/merahnya ikut terpotong dan
+                        pojok kanan atas kartu jadi polos — kartunya terbaca
+                        seperti separuh termuat.
+
+                        Keduanya memang tidak perlu dibatasi hal yang sama.
+                        Bias itu wash mendatar, rata dari atas ke bawah, jadi
+                        ia boleh menyentuh tepi atas tanpa mengganggu satu
+                        huruf pun. Yang bisa mencoret tulisan cuma GARIS
+                        kurvanya, dan cuma itu yang perlu dikurung. */}
+                    <span aria-hidden className="pointer-events-none absolute inset-y-0 right-0 z-0 block w-[62%]">
+                        <span aria-hidden className="absolute inset-0 block"
+                              style={{ background: `linear-gradient(to left, ${warnaAksen}1f, transparent 78%)` }} />
+                        {/* Titik-titik raster, memudar ke kiri. Ia memberi
+                            kedalaman tanpa menambah garis — dan garis lagi di
+                            kartu yang sudah bertepi cuma menambah kebisingan. */}
+                        <span aria-hidden className="absolute inset-0 block"
+                              style={{ color: warnaAksen, opacity: 0.1,
+                                       WebkitMaskImage: 'linear-gradient(to right, transparent, black 55%)',
+                                       maskImage: 'linear-gradient(to right, transparent, black 55%)' }}>
+                          <svg className="h-full w-full">
+                            <defs>
+                              <pattern id={'kisi-' + uid} width="14" height="14" patternUnits="userSpaceOnUse">
+                                <circle cx="1" cy="1" r="1" fill="currentColor" />
+                              </pattern>
+                            </defs>
+                            <rect width="100%" height="100%" fill={'url(#kisi-' + uid + ')'} />
+                          </svg>
+                        </span>
+                    </span>
+
                     {/* WILAYAH ISI — tumbuh mengisi sisa kartu, dan inilah
                         yang membatasi kurvanya. Lapisan kurva memakai
                         `inset-y-0` terhadap kotak ini, bukan terhadap
@@ -3014,24 +3047,6 @@ export default function Analisa() {
                         menembus ke tombolnya — ia induk elemen ini, jadi
                         peristiwanya naik ke sana seperti biasa. */}
                     <span className="absolute inset-y-0 right-0 z-0 block w-[62%]">
-                      <span aria-hidden className="absolute inset-0 block"
-                            style={{ background: `linear-gradient(to left, ${warnaAksen}1f, transparent 78%)` }} />
-                      {/* Titik-titik raster, memudar ke kiri. Ia memberi
-                          kedalaman tanpa menambah garis — dan garis lagi di
-                          kartu yang sudah bertepi cuma menambah kebisingan. */}
-                      <span aria-hidden className="absolute inset-0 block"
-                            style={{ color: warnaAksen, opacity: 0.1,
-                                     WebkitMaskImage: 'linear-gradient(to right, transparent, black 55%)',
-                                     maskImage: 'linear-gradient(to right, transparent, black 55%)' }}>
-                        <svg className="h-full w-full">
-                          <defs>
-                            <pattern id={'kisi-' + uid} width="14" height="14" patternUnits="userSpaceOnUse">
-                              <circle cx="1" cy="1" r="1" fill="currentColor" />
-                            </pattern>
-                          </defs>
-                          <rect width="100%" height="100%" fill={'url(#kisi-' + uid + ')'} />
-                        </svg>
-                      </span>
                       {/* MENGISI WILAYAHNYA, tanpa angka piksel sama sekali.
                           Dengan h-[76%], tinggi kurvanya bergantung tinggi
                           KARTUNYA — dan tinggi kartu berubah tiap grid
