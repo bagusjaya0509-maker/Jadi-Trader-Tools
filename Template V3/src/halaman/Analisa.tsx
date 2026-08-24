@@ -2797,7 +2797,58 @@ export default function Analisa() {
           <p className="mb-2.5 text-[11.5px] text-zinc-600">
             Klik kanan kartu analis (atau tekan-tahan di layar sentuh) untuk menyematkannya ke atas.
           </p>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {/* LEBAR KARTU yang dibatasi, bukan jumlah kolomnya.
+              ────────────────────────────────────────────────────────────
+              Dulu `sm:grid-cols-2 lg:grid-cols-3` — jumlah kolomnya tetap,
+              jadi tiap kartu ikut melebar tanpa batas mengikuti jendela. Di
+              monitor lebar, tiga kartu selebar 500px masing-masing berisi
+              nama pendek dan satu angka; ruangnya habis untuk kekosongan,
+              dan matanya harus menyapu jauh untuk membandingkan dua kartu
+              yang bersebelahan.
+
+              Menaikkan jumlah kolom saja tidak menyelesaikannya: dengan
+              batas lima kolom, monitor 2560px tetap menghasilkan kartu
+              490px. Yang harus dipatok lebar kartunya.
+
+              `auto-fill` + `minmax(17rem, 1fr)` membuat kolomnya lahir dan
+              hilang sendiri mengikuti ruang — 1 kolom di ponsel sampai 5 di
+              layar lebar, tanpa satu pun titik henti ditulis tangan.
+
+              `max-w-[106rem]` yang mengunci atasnya di LIMA. Enam kolom
+              butuh 6x272px + 5x16px jarak = 1712px; dengan wadah berhenti
+              di 1696px, kolom keenam tidak akan pernah muat. Di situ tiap
+              kartu 326px — dan itu lebar TERBESAR yang mungkin terjadi di
+              monitor sebesar apa pun.
+
+              LEBAR MINIMUMNYA BEDA di bawah `lg`, dan itu bukan kerewelan.
+              Dengan satu minimum 17rem, tablet 768px (yang ruangnya tinggal
+              526px sesudah sidebar) jatuh ke SATU kolom selebar 526px —
+              persis keluhan yang sedang dibetulkan, cuma pindah ke layar
+              yang lebih kecil. Dengan satu minimum 15rem, laptop 1280px
+              dapat empat kolom 248px, dan baris statistik di kaki kartu
+              ('5 menang - 5 kalah - 1 jalan') tidak muat di lebar itu.
+              Dua minimum menyelesaikan keduanya: 15rem selama ruangnya
+              sempit, 17rem begitu ada ruang untuk isi kartu yang penuh.
+
+              Hasil terukurnya: 375px -> 1 kolom, 768px -> 2, 1280px -> 3
+              (sama seperti sebelumnya), 1440px -> 4, dan 1920px ke atas
+              tetap 5 kolom 326px sampai monitor 4K sekalipun. Itu keunggulan auto-fill yang tidak
+              bisa ditiru titik henti tetap: dengan `xl:grid-cols-4`, di
+              lebar tepat sebelum kolom bertambah kartunya sempat melar
+              sampai 420px — persis keluhan yang sedang dibetulkan, cuma
+              pindah ke pita lebar yang lebih sempit. Auto-fill menambah
+              kolom begitu ruangnya cukup, jadi lonjakan itu tidak pernah
+              terjadi.
+
+              Ia juga tidak bergantung pada lebar sidebar. Titik henti
+              membandingkan lebar VIEWPORT, jadi ia bisa meleset dua piksel
+              dan menjatuhkan tablet ke satu kolom selebar 526px; auto-fill
+              mengukur ruang yang benar-benar tersedia.
+
+              Sisa ruang di kanan pada layar sangat lebar memang disengaja.
+              Itu harga dari kartu yang tetap terbaca; meregangkannya sampai
+              tepi cuma memindahkan masalahnya ke dalam kartu. */}
+          <div className="grid max-w-[106rem] gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(100%,15rem),1fr))] lg:[grid-template-columns:repeat(auto-fill,minmax(min(100%,17rem),1fr))]">
             {/* Agen yang BELUM punya sinyal, di depan. Begitu tembusan
                 pertamanya datang ia otomatis pindah jadi kartu analis biasa
                 lewat `kanal` — saringan di bawah yang mengurusnya, jadi
