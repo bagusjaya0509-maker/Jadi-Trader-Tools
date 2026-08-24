@@ -2883,7 +2883,7 @@ export default function Analisa() {
                     e.preventDefault();
                     setMenuPin({ uid, x: e.clientX, y: e.clientY });
                   }}
-                  className={cn('relative rounded-xl border bg-zinc-900/40 transition-colors',
+                  className={cn('relative flex flex-col rounded-xl border bg-zinc-900/40 transition-colors',
                     /* Tepi kartu TIDAK lagi ikut menguning saat disematkan.
                         Sematan itu urusan tampilan SATU orang — ia tidak
                         mengubah apa pun tentang analisnya — sementara tepi
@@ -2910,8 +2910,18 @@ export default function Analisa() {
                       Kurvanya jadi latar, bukan kotak sendiri: bentuk
                       perjalanan hasil adalah KONTEKS angka itu, bukan
                       barang kedua yang setara dengannya. */}
+                  {/* `flex-1` — TOMBOLNYA WAJIB IKUT MELAR SETINGGI KARTU.
+                      Di grid, kartu satu baris ditarik setinggi kartu
+                      tertinggi (kartu agen siaga lebih tinggi dari kartu
+                      analis biasa). Tarikan itu mengenai KARTUNYA; tombol di
+                      dalamnya tetap setinggi isinya sendiri, dan selisihnya
+                      tertinggal sebagai jalur gelap mati di bawah isi kartu.
+
+                      Lapisan kurva memakai `inset-y-0` terhadap tombol ini,
+                      jadi selama tombolnya pendek kurvanya pun berhenti
+                      sebelum dasar kartu — persis rongga yang terlihat. */}
                   <button onClick={() => setKanalBuka(uid)}
-                    className="relative block w-full cursor-pointer overflow-hidden text-left">
+                    className="relative block w-full flex-1 cursor-pointer overflow-hidden text-left">
                     {/* Wilayah kurva: 62% kanan, di belakang isi kartu. */}
                     {/* pointer-events dinyalakan: kurvanya sekarang bisa
                         ditunjuk untuk membaca P/L per titik. Klik tetap

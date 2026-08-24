@@ -828,7 +828,13 @@ export default function Marketplace() {
                     ditagih; rupiah di sini keterangan, sama seperti di
                     halaman harga. Menukar posisinya berarti menjanjikan
                     angka rupiah yang tidak dijamin kursnya. */}
-                <div>
+                {/* TINGGI BLOK HARGA DIPATOK. Produk berbayar punya baris
+                    rupiah di bawah dolarnya; produk gratis tidak. Selisihnya
+                    terukur 47px lawan 28px — dan di grid itu muncul sebagai
+                    kartu gratis yang lebih pendek dari tetangganya, atau
+                    seluruh baris ikut tinggi demi satu kartu berbayar.
+                    Ruangnya disediakan untuk keduanya. */}
+                <div className="min-h-[47px]">
                   <div className="angka flex items-baseline gap-2 text-xl font-semibold tracking-tight">
                     {p.harga === 0
                       ? <span className="text-emerald-500">Free</span>
