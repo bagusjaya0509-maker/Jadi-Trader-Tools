@@ -120,6 +120,37 @@ export async function daftarAnalisa(): Promise<RingkasAnalisa[]> {
   return j.daftar ?? [];
 }
 
+/** Agen yang terdaftar di papan, TERMASUK yang belum pernah memposting.
+ *
+ *  Agen memposting hanya saat ada setup, dan agen tren bisa diam berhari-hari
+ *  menunggu tembusan. Selama itu ia tidak punya satu pun baris di daftar
+ *  analisa, jadi kartunya tidak mungkin dibangun dari sana — papannya terlihat
+ *  seolah tidak punya agen sama sekali.
+ *
+ *  Isinya didaftarkan agen SENDIRI tiap kali memindai, bukan ditulis ulang di
+ *  server maupun di sini. Menyalin nama dan parameter strategi ke dua tempat
+ *  berarti salah satunya pasti tertinggal saat yang lain diubah. */
+export interface AgenHadir {
+  uid: string;
+  nama: string;
+  tf: string;
+  strategi: string;
+  /** Berapa pasangan yang dipantau tiap pindai. */
+  pasangan: number;
+  /** Cap waktu pindai terakhir. Ini juga satu-satunya cara melihat penjadwal
+   *  di server masih hidup tanpa membuka SSH — cron yang mati tidak mengeluh,
+   *  ia cuma berhenti. */
+  terakhirPindai: number;
+  totalPindai: number;
+  terakhirSinyal: number | null;
+  sinyalTotal: number;
+}
+
+export async function daftarAgenHadir(): Promise<AgenHadir[]> {
+  const j = await panggil('/api/analisa/agen-hadir', {}, false);
+  return j.agen ?? [];
+}
+
 export async function kirimAnalisa(d: {
   judul: string; pasangan: string; arah: 'BUY' | 'SELL'; harga: number;
   ringkas: string; isi: IsiAnalisa; nama: string; pasar: 'kripto' | 'tradefi';

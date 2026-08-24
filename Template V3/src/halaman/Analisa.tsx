@@ -22,6 +22,7 @@ import { PotongGambar } from '@/components/potong-gambar';
 import { HitungPosisi } from '@/components/hitung-posisi';
 import { ambilDraf } from '@/lib/draf-sinyal';
 import { AvatarAnalis } from '@/components/avatar-analis';
+import { KartuAgenSiaga } from '@/components/kartu-agen-siaga';
 import { ringkasKanal, type RingkasKanal } from '@/lib/ringkas-kanal';
 import { usePinAnalis } from '@/lib/pin-analis';
 import { cn, uang, persen, harga as fHarga, tanggalPendek } from '@/lib/utils';
@@ -35,8 +36,9 @@ import {
   daftarAnalisa, kirimAnalisa, bukaIsi, mintaAkses,
   ambilProfilAnalis, simpanProfilAnalis,
   statusSaya, putuskanAkses, tambahGambar, ambilPerforma,
-  batalkanAnalisa, bisaDibatalkan, keadaanSinyal,
+  batalkanAnalisa, bisaDibatalkan, keadaanSinyal, daftarAgenHadir,
   type RingkasAnalisa, type IsiAnalisa, type PermintaanMasuk, type Performa,
+  type AgenHadir,
 } from '@/lib/analisa';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -1359,6 +1361,10 @@ export default function Analisa() {
   const { data: riwayat } = useRiwayat();
   const saldoAwal = useSaldoAwal();
   const [daftar, setDaftar] = useState<RingkasAnalisa[]>([]);
+  /* Agen yang terdaftar tapi BELUM memposting apa pun. Kartunya tidak bisa
+     dibangun dari `daftar` — tidak ada barisnya di sana sampai tembusan
+     pertama datang, dan agen tren bisa menunggu berhari-hari. */
+  const [agenHadir, setAgenHadir] = useState<AgenHadir[]>([]);
   /* Harga terkini tiap pasangan, dipakai kartu sinyal untuk menjawab satu
      pertanyaan: rencana ini masih terpakai atau harganya sudah lewat?
 
@@ -1678,6 +1684,9 @@ export default function Analisa() {
 
   const segarkan = () => {
     void daftarAnalisa().then(setDaftar).finally(() => setMemuat(false));
+    /* Gagal diam-diam: daftar agen itu pelengkap, dan papan analis tidak
+       boleh ikut kosong cuma karena satu rute tambahan tidak menjawab. */
+    void daftarAgenHadir().then(setAgenHadir).catch(() => { /* papan jalan tanpa kartu agen */ });
     /* Contoh HANYA untuk yang belum punya akses. Pemilik dan pelanggan
        aktif — satu-satunya orang yang bisa benar-benar menirukan sinyal —
        selalu melihat rekam jejak sungguhan. */
@@ -2739,7 +2748,11 @@ export default function Analisa() {
         <div className="flex items-center justify-center gap-2 py-10 text-[13px] text-zinc-500">
           <Loader2 className="size-4 animate-spin" /> Memuat analisa…
         </div>
-      ) : daftar.length === 0 ? (
+      ) : daftar.length === 0 && agenHadir.length === 0 ? (
+        /* Syarat agenHadir WAJIB ikut. Tanpa itu, papan tanpa satu pun
+           analisa manusia akan menyembunyikan kartu agen juga — padahal
+           agennya sudah terdaftar dan sedang memindai, dan justru di papan
+           yang masih sepi itulah kartunya paling perlu terlihat. */
         <Panel className="px-5 py-10 text-center text-[13px] text-zinc-500">
           Belum ada analisa. Jadilah yang pertama memposting.
         </Panel>
@@ -2764,6 +2777,12 @@ export default function Analisa() {
         /* Uang yang dipertaruhkan per sinyal menurut model papan peringkat.
            Dipakai menyatakan drawdown dalam satuan risiko, bukan dolar. */
         const risikoPerSinyal = (performa?.modal ?? 1000) * (performa?.risikoPersen ?? 1) / 100;
+        /* Agen terdaftar yang belum punya kanal sama sekali. Disaring
+           terhadap `kanal`, bukan terhadap daftar sinyal mentah: begitu
+           agennya memposting satu sinyal saja, kanalnya lahir dan ia harus
+           HILANG dari sini — dua kartu untuk satu agen di layar yang sama
+           terbaca sebagai kerusakan. */
+        const agenSiaga = agenHadir.filter((ag) => !kanal.has(ag.uid));
         const terpilih = kanalBuka ? kanal.get(kanalBuka) ?? [] : [];
 
         return kanalBuka === null ? (
@@ -2779,6 +2798,15 @@ export default function Analisa() {
             Klik kanan kartu analis (atau tekan-tahan di layar sentuh) untuk menyematkannya ke atas.
           </p>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {/* Agen yang BELUM punya sinyal, di depan. Begitu tembusan
+                pertamanya datang ia otomatis pindah jadi kartu analis biasa
+                lewat `kanal` — saringan di bawah yang mengurusnya, jadi
+                tidak akan pernah tampil dua kali.
+
+                Di depan, bukan di belakang: kartu ini paling informatif saat
+                papannya masih sepi, dan di ekor daftar ia justru tidak
+                terlihat persis pada keadaan itu. */}
+            {agenSiaga.map((ag) => <KartuAgenSiaga key={ag.uid} agen={ag} />)}
             {kanalUrut.map(([uid, sinyal]) => {
               const a0 = sinyal[0];
               /* Batas waktu rekam jejak kartu ini. Dihitung dari seluruh
