@@ -814,7 +814,7 @@ export default function Marketplace() {
                     dipotong, tapi nama sepanjang empat baris menggeser tinggi
                     seluruh barisnya — dan sampai sekarang tidak ada nama yang
                     melewati dua. */}
-                <h3 className="line-clamp-2 text-[15px] font-semibold tracking-tight text-zinc-100">{p.nama}</h3>
+                <h3 className="line-clamp-2 min-h-[45px] text-[15px] font-semibold tracking-tight text-zinc-100">{p.nama}</h3>
                 {p.premium && <Crown className="size-4 shrink-0 text-amber-400" />}
               </div>
               <div className="mt-1 text-[11.5px] text-zinc-600">{p.versi}</div>

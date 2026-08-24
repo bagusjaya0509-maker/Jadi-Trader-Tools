@@ -2921,7 +2921,15 @@ export default function Analisa() {
                       jadi selama tombolnya pendek kurvanya pun berhenti
                       sebelum dasar kartu — persis rongga yang terlihat. */}
                   <button onClick={() => setKanalBuka(uid)}
-                    className="relative block w-full flex-1 cursor-pointer overflow-hidden text-left">
+                    className="relative flex w-full flex-1 cursor-pointer flex-col overflow-hidden text-left">
+                    {/* WILAYAH ISI — tumbuh mengisi sisa kartu, dan inilah
+                        yang membatasi kurvanya. Lapisan kurva memakai
+                        `inset-y-0` terhadap kotak ini, bukan terhadap
+                        tombolnya, jadi kurvanya berhenti tepat di garis atas
+                        kaki kartu berapa pun tinggi kakinya — tidak ada
+                        angka piksel yang harus dijaga tetap cocok kalau
+                        suatu saat isi kakinya bertambah satu baris. */}
+                    <span className="relative block flex-1">
                     {/* Wilayah kurva: 62% kanan, di belakang isi kartu. */}
                     {/* pointer-events dinyalakan: kurvanya sekarang bisa
                         ditunjuk untuk membaca P/L per titik. Klik tetap
@@ -2966,7 +2974,7 @@ export default function Analisa() {
                                       modal={performa?.modal ?? 1000} />
                     </span>
 
-                    <span className="pointer-events-none relative z-10 block px-4 pt-4">
+                    <span className="pointer-events-none relative z-10 block px-4 pb-3 pt-4">
                       <span className="flex items-start gap-2.5 pr-8">
                         {/* TITIK HADIR MENEMPEL DI AVATAR, bukan di sebelah
                             nama. Permintaan pemilik, dan letaknya memang
@@ -3062,13 +3070,14 @@ export default function Analisa() {
                           angka besarnya dan terbaca seperti saingannya. */}
                       <LencanaKanal r={r} className="mt-2" />
                     </span>
+                    </span>
 
                     {/* KAKI KARTU — buram, di atas kurvanya.
                         Hitungan di kiri, rentang waktunya di kanan pada
                         BARIS YANG SAMA (permintaan pemilik). Keduanya
                         keterangan tentang deretan sinyal yang sama: berapa
                         banyak, dan sepanjang apa. */}
-                    <span className="relative z-10 mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-zinc-800/70 bg-zinc-950 px-4 py-2.5">
+                    <span className="relative z-10 mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-zinc-800/70 bg-zinc-950 px-4 py-2.5">
                       <BarisHitung r={r} />
                       <span className="angka ml-auto shrink-0 text-[10px] text-zinc-600">
                         {tanggalPendek(mulaiPosting)} – {tanggalPendek(terakhirPosting)}
