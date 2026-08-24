@@ -306,6 +306,12 @@ export async function sinkronRiwayatMt5(
       : 'EA belum melapor. Pastikan Algo Trading menyala di MT5.');
   }
 
+  /* Nomor akun terminal yang sedang dipilih. Dipakai menyusun id riwayat —
+     lihat catatan panjang di bawah. Diambil dari `j.login` (yang server
+     pulangkan sebagai akun terpilih), BUKAN dari `j.data.akun.login`: yang
+     terakhir tidak selalu terisi di laporan EA lama. */
+  const loginAkun = String(j?.login || j?.data?.akun?.login || '');
+
   /* Akun sen: nilainya harus dibagi 100, sama seperti saldo dan posisi. */
   const mu: string | null = j?.data?.akun?.mataUang ?? null;
   const sen = !!mu && /cent|USC/i.test(mu);
@@ -320,12 +326,30 @@ export async function sinkronRiwayatMt5(
   let dalamBatch = 0;
 
   for (const t of riwayat) {
-    /* Id dari nomor tiket broker. Itulah yang membuat sinkron ulang aman:
-       transaksi yang sama selalu menghasilkan id yang sama, jadi menekan
-       tombolnya dua kali tidak menggandakan apa pun. */
+    /* Id dari NOMOR AKUN + nomor tiket. Itulah yang membuat sinkron ulang
+       aman: transaksi yang sama selalu menghasilkan id yang sama, jadi
+       menekan tombolnya dua kali tidak menggandakan apa pun.
+
+       NOMOR AKUNNYA WAJIB IKUT, dan ini bukan kerapian. Nomor tiket unik
+       PER BROKER, bukan global — Exness dan HFM sama-sama punya tiket
+       12345. Selama id-nya cuma `mt5-<tiket>`, trade dari broker kedua
+       MENIMPA trade broker pertama di jurnal: jumlah trade berkurang, atau
+       sebuah baris tiba-tiba berganti pair dan lot. Bukan galat, cuma angka
+       yang salah — jenis kerusakan yang paling lama tidak ketahuan.
+
+       Peluangnya bukan teoretis: banyak broker memulai penomoran dari angka
+       rendah, jadi tabrakan justru paling mungkin di trade-trade awal.
+
+       ENTRI LAMA DIPERTAHANKAN pada id lamanya. Kalau `mt5-<tiket>` sudah
+       ada di jurnal, itu yang dipakai — mengganti id-nya akan menyisakan
+       dokumen lama sebagai yatim DAN menulis salinan baru, jadi satu trade
+       terhitung dua kali. Yang berformat lama tetap lama, yang baru pakai
+       format baru, dan keduanya tidak pernah bertabrakan. */
     const tiket = String(t.tiket ?? '');
     if (!tiket) { dilewati++; continue; }
-    const id = `mt5-${tiket}`;
+    const idLama = `mt5-${tiket}`;
+    const id = sudahAda.has(idLama) ? idLama
+      : (loginAkun ? `mt5-${loginAkun}-${tiket}` : idLama);
     if (sudahAda.has(id)) { dilewati++; continue; }
 
     const laba = Number(t.labaBersih ?? t.profit) || 0;

@@ -1941,12 +1941,25 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
     /* Teks sendiri hanya mengganti baris ATAS. Baris bawah tetap jenis
        pasarnya: itu keterangan yang tidak bisa diarang orangnya, dan justru
        paling berguna ketika baris atasnya sudah diganti jadi nama sendiri. */
+    /* Nama BROKER, bukan sekadar "TRADE-FI". Sejak satu orang bisa memasang
+       EA di beberapa broker sekaligus, "BTCUSD TRADE-FI" tidak lagi memberi
+       tahu apa pun yang menentukan: Exness cent dan HFM standar punya
+       BTCUSD yang sama namanya, harga yang mirip, dan nilai lot yang berbeda
+       seratus kali. Grafik yang tidak menyebut brokernya membuat orang
+       membaca chart satu akun sambil mengira sedang melihat yang lain.
+
+       Hanya untuk Trade-Fi: chart kripto memang tidak punya broker, dan
+       menambahkan baris kosong di sana cuma mengotori. */
+    const broker = mt5
+      ? (akunMt5.daftarAkun.find((a) => a.login === akunMt5.loginAktif)?.broker || '')
+      : '';
     return {
       utama: tampilan.tandaAirTeks.trim() || airOtomatis,
-      sub: pasar ? nama + ' ' + pasar : undefined,
+      sub: pasar ? nama + ' ' + (broker || pasar) : undefined,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [simbol, tf, mt5, lilin, airOtomatis, tampilan.tandaAir, tampilan.tandaAirTeks]);
+  }, [simbol, tf, mt5, lilin, airOtomatis, tampilan.tandaAir, tampilan.tandaAirTeks,
+      akunMt5.daftarAkun, akunMt5.loginAktif]);
 
   /* ── Data realtime ──────────────────────────────────────────────────
      Ditarik ulang tiap 15 detik, sama dengan umur cache di lib/pasar.ts —
