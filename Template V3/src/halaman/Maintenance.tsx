@@ -257,13 +257,13 @@ export default function Maintenance() {
      memakai input tak terkendali tanpa satu pun handler — mengetik apa pun
      di sana lalu menekan "Simpan produk" tidak pernah terjadi apa-apa. */
   const [pilih, setPilih] = useState('');
-  const [form, setForm] = useState({ id: '', nama: '', harga: '', hargaAsal: '', versi: '', ringkas: '', fitur: '', sampul: '' });
+  const [form, setForm] = useState({ id: '', nama: '', harga: '', hargaAsal: '', versi: '', ringkas: '', fitur: '', sampul: '', lynk: '' });
   const [unggahSibuk, setUnggahSibuk] = useState(false);
 
   function muatKeForm(id: string) {
     setPilih(id);
     const p = tayang.find((x) => x.id === id);
-    if (!p) { setForm({ id: '', nama: '', harga: '', hargaAsal: '', versi: '', ringkas: '', fitur: '', sampul: '' }); return; }
+    if (!p) { setForm({ id: '', nama: '', harga: '', hargaAsal: '', versi: '', ringkas: '', fitur: '', sampul: '', lynk: '' }); return; }
     setForm({
       id: String(p.id ?? ''),
       nama: String(p.nama ?? ''),
@@ -273,6 +273,7 @@ export default function Maintenance() {
          "$50  $0" yang terbaca sebagai barang gratis. */
       hargaAsal: p.hargaAsal ? String(p.hargaAsal) : '',
       versi: String(p.versi ?? ''),
+      lynk: String((p as { lynk?: string }).lynk ?? ''),
       ringkas: String(p.ringkas ?? ''),
       fitur: Array.isArray(p.fitur) ? p.fitur.join('\n') : '',
       /* Sampul = gambar PERTAMA. Katalog tidak punya field sampul terpisah,
@@ -318,6 +319,14 @@ export default function Maintenance() {
         ? { hargaAsal: Number(form.hargaAsal) }
         : { hargaAsal: undefined }),
       versi: form.versi.trim(),
+      /* Tautan checkout. DIHAPUS, bukan disimpan string kosong, saat
+         dikosongkan: Marketplace menggerbang tombol belinya dengan
+         `{lynk && ...}` dan string kosong memang jatuh ke falsy -- tapi
+         field kosong yang tetap tersimpan membuat katalog mentahnya
+         penuh kunci yang tidak berarti apa-apa, dan pembaca berikutnya
+         harus menebak apakah '' berarti "belum diisi" atau "sengaja
+         dikosongkan". */
+      ...(form.lynk.trim() ? { lynk: form.lynk.trim() } : { lynk: undefined }),
       ringkas: form.ringkas.trim(),
       fitur: form.fitur.split('\n').map((s) => s.trim()).filter(Boolean),
       premium: (Number(form.harga) || 0) > 0,
@@ -636,6 +645,39 @@ export default function Maintenance() {
                     placeholder="Pine v6 · overlay" disabled={!pemilik}
                     className="h-9 w-full rounded-md border border-zinc-800 bg-zinc-900/60 px-3 text-[12.5px] text-zinc-100 outline-none placeholder:text-zinc-600 hover:border-zinc-700 focus-visible:border-zinc-600 disabled:opacity-50" />
                 </div>
+              </div>
+              {/* -- Tautan checkout ------------------------------------------
+                  Kolom ini SEBELUMNYA TIDAK ADA, dan ketiadaannya diam-diam
+                  mematikan penjualan: Marketplace menggerbang tombol "Beli di
+                  toko" dengan `{lynk && ...}`, jadi produk tanpa tautan tidak
+                  menampilkan tombol apa pun -- bukan tombol mati yang terlihat
+                  rusak, melainkan tidak ada sama sekali. Dari luar halamannya
+                  terlihat baik-baik saja, dan tidak ada yang tahu barangnya
+                  tidak bisa dibeli sampai ada yang mencoba membelinya.
+
+                  Field-nya sendiri sudah lama ada di katalog dan sudah
+                  diwariskan dengan benar oleh `...lama` saat menyimpan; yang
+                  hilang cuma cara mengisinya tanpa membuka Firestore. */}
+              <div className="mt-3">
+                <label className="mb-1 block text-[11px] text-zinc-500">
+                  Tautan checkout <span className="text-zinc-600">(Lynk / toko — kosongkan kalau belum dijual)</span>
+                </label>
+                <input value={form.lynk} onChange={(e) => setForm({ ...form, lynk: e.target.value })}
+                  placeholder="https://lynk.id/toko/xxxx/checkout" disabled={!pemilik} inputMode="url"
+                  className="h-9 w-full rounded-md border border-zinc-800 bg-zinc-900/60 px-3 font-mono text-[12px] text-zinc-100 outline-none placeholder:text-zinc-600 hover:border-zinc-700 focus-visible:border-zinc-600 disabled:opacity-50" />
+                {/* Diperingatkan SEBELUM disimpan. Produk berbayar tanpa
+                    tautan adalah barang yang dipajang tapi tidak bisa
+                    dibeli, dan itu tidak terlihat di halaman etalasenya. */}
+                {!form.lynk.trim() && (Number(form.harga) || 0) > 0 && (
+                  <p className="mt-1 text-[10.5px] leading-relaxed text-amber-400/90">
+                    Produk berbayar tanpa tautan checkout — tombol "Beli di toko" tidak akan muncul di Marketplace.
+                  </p>
+                )}
+                {form.lynk.trim() !== '' && !/^https:\/\//i.test(form.lynk.trim()) && (
+                  <p className="mt-1 text-[10.5px] leading-relaxed text-amber-400/90">
+                    Tautan harus diawali https:// — tanpa itu tombolnya akan menuju alamat relatif di dalam situs ini.
+                  </p>
+                )}
               </div>
               <div className="mt-3">
                 <label className="mb-1 block text-[11px] text-zinc-500">Ringkasan — muncul di kartu produk</label>
