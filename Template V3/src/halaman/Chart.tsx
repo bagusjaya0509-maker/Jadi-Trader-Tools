@@ -1701,6 +1701,34 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
      render yang sama — dan React menjalankannya berurutan, jadi yang di
      atas membersihkan lebih dulu dan yang di bawah mengisinya kembali.
      Dibalik, yang tayang justru chart kosong. */
+  /* ── LEVEL YANG BUKAN MILIK SIMBOL INI DIBUANG DARI DATANYA ──────────
+     Menyaringnya saat MENGGAMBAR saja tidak cukup, dan itu terbukti waktu
+     diuji: dengan alamat ?simbol=BTCUSDT&entry=4632&sl=4637&tp=4626, garis
+     di chart memang tidak muncul — tapi panel tiketnya tetap terbuka
+     berisi 4632,3 / 4637,8 / 4626,7 di atas chart Bitcoin. Itu justru
+     bahaya yang sesungguhnya: satu tekan Kirim di panel itu menghitung
+     ukuran dari level pasar yang sama sekali berbeda.
+
+     Jadi rencananya dibuang dari STATE, bukan cuma disembunyikan dari
+     layar. Menyembunyikan sesuatu yang masih bisa ditekan bukan penjagaan.
+
+     Kenapa efek terpisah, bukan disaring saat rencananya dipasang: waktu
+     alamat dibaca, lilinnya belum datang — tidak ada harga pembanding sama
+     sekali. Efek ini menunggu sampai ada lilin, baru menilai.
+
+     Ambang 10x sengaja longgar; rencana trade tidak pernah berjarak
+     sepuluh kali lipat dari harga berjalan untuk instrumen yang sama. */
+  useEffect(() => {
+    const acuan = lilin.closes[lilin.closes.length - 1];
+    if (!acuan) return;
+    const nyasar = (x?: number) => !!x && (x / acuan > 10 || x / acuan < 0.1);
+    if (!nyasar(rencana.entry) && !nyasar(rencana.sl) && !nyasar(rencana.tp)) return;
+    setRencana({});
+    setDraf(null);
+    setDariSinyal(false);
+    entryDigeser.current = false;
+  }, [simbol, lilin.closes, rencana.entry, rencana.sl, rencana.tp]);
+
   const simbolTiket = useRef(simbol);
   useEffect(() => {
     if (simbolTiket.current === simbol) return;
