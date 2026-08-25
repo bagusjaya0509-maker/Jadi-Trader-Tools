@@ -1,5 +1,5 @@
 /* ════════════════════════════════════════════════════════════════════════
-   MOMENTUM CANDLE SEKOLAH TRADING — versi yang jalan di mesin Pine aplikasi
+   MOMENTUM CANDLE SETRA — versi yang jalan di mesin Pine aplikasi
    ════════════════════════════════════════════════════════════════════════
    Skrip aslinya (Riski Aditama / Sekolah Trading) ditulis untuk TradingView
    dan DISERTAKAN UTUH sebagai berkas unduhan produk. Yang di bawah ini versi
@@ -36,7 +36,7 @@
    ════════════════════════════════════════════════════════════════════════ */
 
 export const MOMENTUM_CANDLE_PINE = `//@version=6
-indicator("Momentum Candle Sekolah Trading", overlay=true)
+indicator("Momentum Candle Setra", overlay=true)
 
 // ===== 1. Mode candle =====
 modeCandle = input.string("Agresif", "Mode Candle", options=["Agresif", "Konservatif"])

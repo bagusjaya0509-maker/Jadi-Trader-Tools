@@ -27,8 +27,8 @@ interface SkripTersimpan { id: string; nama: string; kode: string; aktif: boolea
  *  melakukan apa-apa lebih buruk daripada tombol yang tidak ada. */
 export const INDIKATOR_TERPASANG: Record<string, { nama: string; kode: string }> = {
   'supertrend-indikator': { nama: 'Supertrend', kode: SUPERTREND_PINE },
-  'momentum-candle-sekolah-trading': {
-    nama: 'Momentum Candle Sekolah Trading', kode: MOMENTUM_CANDLE_PINE,
+  'momentum-candle-setra': {
+    nama: 'Momentum Candle Setra', kode: MOMENTUM_CANDLE_PINE,
   },
 };
 
