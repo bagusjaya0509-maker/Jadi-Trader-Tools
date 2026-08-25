@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn, uang, harga } from '@/lib/utils';
 
@@ -326,9 +327,16 @@ export function TabelPosisi({ baris, kosong, onKlikBaris, onTutup }: {
                     <button
                       onClick={(e) => { e.stopPropagation();
                         setDilepas((p) => ({ ...p, [b.kunci]: !p[b.kunci] })); }}
+                      /* Ikon, bukan kata. Tapi judulnya WAJIB tetap ada:
+                         panah sendirian tidak memberi tahu berapa banyak
+                         yang akan terbuka, dan lencana "19x" di kolom Pair
+                         ada di seberang tabel. Yang ragu tinggal menyentuh. */
                       title={buka ? 'Gabungkan kembali jadi satu baris' : 'Tampilkan ' + jml + ' order aslinya'}
-                      className="cursor-pointer rounded border border-zinc-800 px-2 py-0.5 text-[11px] text-zinc-400 transition-colors hover:border-sky-500/40 hover:text-sky-300">
-                      {buka ? 'Gabung' : 'Lepas'}
+                      aria-label={buka ? 'Gabungkan kembali' : 'Lepas ' + jml + ' order'}
+                      aria-expanded={!!buka}
+                      className="inline-flex cursor-pointer items-center rounded border border-zinc-800 p-1 text-zinc-500 transition-colors hover:border-sky-500/40 hover:text-sky-300">
+                      {buka ? <ChevronUp className="size-3.5" strokeWidth={2} />
+                            : <ChevronDown className="size-3.5" strokeWidth={2} />}
                     </button>
                   </Td>
                 )}
