@@ -75,26 +75,40 @@ export function pasangIndikator(produk: { id: string; nama: string }): HasilPasa
   const kunci = kunciIndikator(produk);
   const ind = kunci ? INDIKATOR_TERPASANG[kunci] : undefined;
   if (!ind || !kunci) return 'gagal';
+  return pasangKodePine(kunci, ind.nama, ind.kode);
+}
+
+/* ── PASANG KODE YANG DATANG DARI LUAR ──────────────────────────────────
+   Indikator BERBAYAR tidak boleh ikut tertanam di berkas ini. Apa pun yang
+   ada di sini ikut terkirim ke setiap pengunjung sebagai bagian dari bundel
+   JavaScript — siapa pun bisa membukanya lewat devtools dan mengambil produk
+   yang dijual $47 tanpa membayar sepeser pun. Paywall-nya jadi hiasan.
+
+   Karena itu kode indikator berbayar tetap di server, di balik pemeriksaan
+   lisensi, dan baru sampai ke sini SESUDAH servernya meloloskan kodenya.
+   Fungsi ini yang memasangnya. */
+export function pasangKodePine(kunci: string, nama: string, kode: string): HasilPasang {
+  if (!kode || !kode.trim()) return 'gagal';
   try {
     const mentah = localStorage.getItem(KUNCI_DAFTAR);
     const daftar: SkripTersimpan[] = mentah ? JSON.parse(mentah) : [];
     if (!Array.isArray(daftar)) return 'gagal';
 
-    const adaIdx = daftar.findIndex((s) => s && s.nama === ind.nama);
+    const adaIdx = daftar.findIndex((s) => s && s.nama === nama);
     /* Semua skrip lain dinonaktifkan: dock Pine menggambar yang `aktif`, dan
        memasang indikator yang tidak langsung tampil terbaca sebagai
        pemasangan yang gagal. */
     const lain = daftar.map((s) => ({ ...s, aktif: false }));
 
     if (adaIdx >= 0) {
-      const sama = daftar[adaIdx].kode === ind.kode;
-      lain[adaIdx] = { ...lain[adaIdx], kode: ind.kode, aktif: true };
+      const sama = daftar[adaIdx].kode === kode;
+      lain[adaIdx] = { ...lain[adaIdx], kode, aktif: true };
       localStorage.setItem(KUNCI_DAFTAR, JSON.stringify(lain));
       tandaiBerubah();
       return sama ? 'sudahAda' : 'diperbarui';
     }
 
-    lain.push({ id: 'pasar-' + kunci, nama: ind.nama, kode: ind.kode, aktif: true });
+    lain.push({ id: 'pasar-' + kunci, nama, kode, aktif: true });
     localStorage.setItem(KUNCI_DAFTAR, JSON.stringify(lain));
     tandaiBerubah();
     return 'baru';

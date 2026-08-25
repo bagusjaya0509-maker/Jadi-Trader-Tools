@@ -9,7 +9,7 @@ import { PeragaProduk } from '@/components/peraga-produk';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { cn, tanggalPendek } from '@/lib/utils';
 import { type Produk } from '@/data/contoh';
-import { bisaDipasang, pasangIndikator } from '@/lib/pasang-indikator';
+import { bisaDipasang, pasangIndikator, pasangKodePine } from '@/lib/pasang-indikator';
 import { useSuka, tukarSuka, useBalasanUlasan, kirimBalasan, hapusBalasan } from '@/lib/ulasan';
 
 /* ── RINGKASAN KARTU: dipotong tiga baris ────────────────────────────────
@@ -212,6 +212,18 @@ function AmbilSumber({ produk }: { produk: Produk }) {
   const { pengguna, pemilik } = useAuth();
   const gratis = produk.harga === 0;
 
+  /* ── INDIKATOR PINE BERBAYAR: DIPASANG, BUKAN DISALIN ────────────────
+     Dibedakan dari EA lewat `unduhan`. EA MetaTrader punya berkas .ex5/.mq5
+     yang HARUS diunduh — ia jalan di terminal sendiri, bukan di sini, jadi
+     menyodorkan tombol "Terapkan ke Chart" untuknya adalah janji kosong.
+     Indikator Pine tidak punya `unduhan` dan sumbernya .txt.
+
+     Alurnya tetap berbayar dulu: kolom kode lisensi di atas, server yang
+     memeriksa, dan kodenya baru turun kalau lisensinya benar-benar lolos.
+     Yang berubah cuma apa yang terjadi SESUDAH itu — dulu masuk papan klip
+     dan orangnya harus menempel sendiri, sekarang langsung terpasang. */
+  const indikatorPine = !produk.unduhan && jenisSumber(produk.berkas) === 'txt';
+
   /* ── PRODUK GRATIS PUN TIDAK TERMASUK PAKET EVENT TERBATAS ────────────
      Kartu harga sudah menyatakannya: "Free Indikator & EA di Marketplace"
      dicoret di paket gratis. Yang gratis di sini berarti tidak perlu KODE
@@ -237,6 +249,17 @@ function AmbilSumber({ produk }: { produk: Produk }) {
          menyamar sebagai catatan build, identik dengan V2, supaya salinan
          yang beredar bisa ditelusuri kembali ke pemegang lisensinya. */
       const isi = gratis ? mentah : sisipkanPenanda(mentah, rapi);
+
+      if (indikatorPine) {
+        const h = pasangKodePine(produk.id, produk.nama, isi);
+        setTerbuka(true);
+        setGagal(h === 'gagal');
+        setKabar(h === 'gagal'
+          ? 'Lisensi lolos, tapi gagal memasang — penyimpanan peramban ditolak.'
+          : 'Terpasang & aktif. Buka Chart & Entry untuk melihatnya.');
+        return;
+      }
+
       await navigator.clipboard.writeText(isi);
       if (!gratis) {
         try { localStorage.setItem(KUNCI_LISENSI, rapi); } catch { /* mode privat */ }
@@ -300,8 +323,10 @@ function AmbilSumber({ produk }: { produk: Produk }) {
           disabled={sibuk || kunciEvent || (!gratis && (kode.trim().length < 8 || !setuju))}
           className="flex cursor-pointer items-center gap-2 rounded-full bg-zinc-100 px-6 py-3 text-[13px] font-semibold
                      text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50">
-          {sibuk ? <Loader2 className="size-4 animate-spin" /> : gratis ? <Copy className="size-4" /> : <KeyRound className="size-4" />}
-          {gratis ? 'Salin Kode' : 'Buka & Salin Kode'}
+          {sibuk ? <Loader2 className="size-4 animate-spin" />
+            : gratis ? <Copy className="size-4" />
+            : <KeyRound className="size-4" />}
+          {gratis ? 'Salin Kode' : indikatorPine ? 'Buka & Terapkan ke Chart' : 'Buka & Salin Kode'}
         </button>
         {/* Berkas biner (.ex5/.mq5) tidak bisa disalin sebagai teks, jadi
             jalurnya unduhan langsung. Muncul kalau katalog menyatakan
@@ -871,7 +896,23 @@ export default function Marketplace() {
                       bukan tombol berlabel: Detail adalah jalan utama tiap
                       kartu, dan dua tombol berteks sama besar membuat mata
                       memilih dulu sebelum membaca. */}
-                  <TombolPasangChart produk={p} />
+                  {bisaDipasang(p) ? <TombolPasangChart produk={p} /> : (
+                    /* Indikator Pine BERBAYAR: lambangnya ada, tapi ia
+                       membuka Detail — bukan memasang. Kodenya tidak ada di
+                       peramban sampai lisensinya lolos, jadi tombol yang
+                       langsung memasang di sini adalah tombol yang tidak
+                       mungkin berhasil. Yang dituju memang halaman
+                       lisensinya. */
+                    !p.unduhan && p.harga > 0 && jenisSumber(p.berkas) === 'txt' && (
+                      <button onClick={() => setAktif(p)}
+                        title="Terapkan ke Chart — buka lisensimu dulu"
+                        aria-label="Terapkan ke Chart — buka lisensimu dulu"
+                        className="flex cursor-pointer items-center rounded-md border border-zinc-800 px-2 py-1.5
+                                   text-zinc-500 transition-colors hover:border-zinc-700 hover:text-zinc-300">
+                        <LineChart className="size-3.5" strokeWidth={2} />
+                      </button>
+                    )
+                  )}
                   <button
                     onClick={() => setAktif(p)}
                     className="cursor-pointer rounded-md border border-zinc-800 px-3 py-1.5 text-[12px]
