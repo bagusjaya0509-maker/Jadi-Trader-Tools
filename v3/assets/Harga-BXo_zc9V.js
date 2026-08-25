@@ -1,0 +1,1 @@
+import{f as r}from"./index-CVq5W-OP.js";import{P as i}from"./ruixen-pricing05-nHaI2RZO.js";import"./react-C97iXi1P.js";import"./firebase-CPiwU80D.js";import"./card-DbxU3Ldg.js";function a(){return r.jsx("div",{className:"p-4 sm:p-6 [&>section]:py-4 sm:[&>section]:py-6",children:r.jsx(i,{})})}export{a as default};
