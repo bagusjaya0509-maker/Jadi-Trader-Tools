@@ -311,6 +311,7 @@ export function Dashboard() {
                    dokumen publik sengaja tidak menyiarkan ukuran posisi
                    karena itu membocorkan besar akun. */
                 ukuran: p.jumlah ? p.jumlah.toLocaleString('id-ID', { maximumFractionDigits: 4 }) : '',
+                ukuranNum: p.jumlah,
                 entry: p.entry,
                 hargaKini: p.hargaKini,
                 sl: p.sl, tp: p.tp,
@@ -417,6 +418,7 @@ export function Dashboard() {
                 simbol: p.simbol,
                 arah: p.arah,
                 ukuran: `${p.lot} lot`,
+                ukuranNum: p.lot,
                 entry: p.hargaBuka,
                 hargaKini: p.hargaKini,
                 sl: p.sl, tp: p.tp,

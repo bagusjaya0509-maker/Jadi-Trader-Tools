@@ -126,6 +126,7 @@ export function PanelPosisiTerbuka({ sumber, onSunting, onTutup, tanpaBingkai, m
     : [...mt5.pending].sort((a, b) => b.waktu - a.waktu).map((o) => ({
         kunci: o.tiket, simbol: o.simbol, arah: o.arah,
         ukuran: `${o.lot} lot`,
+        ukuranNum: o.lot,
         jenis: o.jenis.replace('_', ' '),
         /* MT5 lain cerita: SL/TP menempel di order pending-nya sendiri,
            jadi angka dari EA memang sudah terpasang — bukan rencana. */
@@ -243,6 +244,7 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
           ragu: raguKarena(p, kini),
           ket: p.tf && p.tf !== '—' ? p.tf : p.venue,
           ukuran: p.jumlah ? p.jumlah.toLocaleString('id-ID', { maximumFractionDigits: 4 }) : '',
+          ukuranNum: p.jumlah,
           /* Data nyata: HANYA harga pasar. `p.hargaKini` dari dokumen publik
              selalu sama dengan entry, jadi memakainya sebagai cadangan akan
              menulis "+0,00%" — yang terbaca "harga tidak bergerak" padahal
@@ -267,6 +269,7 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
           kunci: p.tiket, simbol: p.simbol, arah: p.arah,
           ket: `#${p.tiket}`,
           ukuran: `${p.lot} lot`,
+          ukuranNum: p.lot,
           entry: p.hargaBuka, hargaKini: p.hargaKini, sl: p.sl, tp: p.tp,
           pnl: p.profit,
           tiket: p.tiket,

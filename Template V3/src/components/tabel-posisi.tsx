@@ -33,6 +33,20 @@ export interface BarisPosisi {
   ragu?: string;
   /** Sudah lengkap dengan satuannya: "223,8 THETA" atau "0,01 lot". */
   ukuran: string;
+  /** Ukuran sebagai ANGKA, untuk dijumlah saat baris digabung.
+   *
+   *  Kenapa tidak diurai balik dari `ukuran` saja: teks itu ditulis untuk
+   *  dibaca manusia, dan format angkanya TIDAK seragam antar sumber. Lot
+   *  MT5 keluar sebagai "0.05 lot" (titik desimal, dari toString), jumlah
+   *  koin keluar sebagai "223,8 THETA" (koma desimal, dari toLocaleString
+   *  id-ID). Pengurai yang menebak salah satunya pasti salah membaca yang
+   *  lain -- dan itu benar-benar terjadi: "0.05" dan "0.1" terbaca 5 dan 1,
+   *  jadi dua order 0,15 lot dilaporkan 6 lot. Enam kali lipat, tanpa satu
+   *  pun galat.
+   *
+   *  Menghitung dari teks tampilan memang selalu salah. Angkanya dibawa
+   *  utuh dari sumbernya. */
+  ukuranNum?: number;
   /** Nilai posisi dalam DOLAR (jumlah x entry).
    *
    *  Kenapa bukan sekadar menempelkan "$" di depan `ukuran`: 298 itu
@@ -106,7 +120,8 @@ function satuanUkuran(teks: string): string {
 }
 
 function gabungBaris(g: BarisPosisi[]): BarisPosisi {
-  const bobot = g.map((b) => angkaUkuran(b.ukuran) || 1);
+  const bobot = g.map((b) => (b.ukuranNum !== undefined ? b.ukuranNum : angkaUkuran(b.ukuran)) || 1);
+  const adaAngka = g.every((b) => b.ukuranNum !== undefined);
   const total = bobot.reduce((a, b) => a + b, 0);
   const rata = (ambil: (b: BarisPosisi) => number) =>
     g.reduce((a, b, i) => a + ambil(b) * bobot[i], 0) / total;
@@ -130,8 +145,14 @@ function gabungBaris(g: BarisPosisi[]): BarisPosisi {
     kunci: 'gabung|' + g[0].simbol + '|' + g[0].arah,
     simbol: g[0].simbol,
     arah: g[0].arah,
-    ukuran: total.toLocaleString('id-ID', { maximumFractionDigits: 4 })
-          + (satuan ? ' ' + satuan : ''),
+    /* Ditulis dengan gaya yang SAMA dengan baris anaknya, supaya induk dan
+       anak tidak terlihat seperti dua satuan yang berbeda: lot memakai
+       titik desimal (mengikuti toString), jumlah koin memakai koma. */
+    ukuran: !adaAngka ? '—'
+      : (satuan === 'lot' ? String(Number(total.toFixed(2)))
+                          : total.toLocaleString('id-ID', { maximumFractionDigits: 4 }))
+        + (satuan ? ' ' + satuan : ''),
+    ukuranNum: adaAngka ? total : undefined,
     ukuranUsd: jumlah((b) => b.ukuranUsd),
     entry: rata((b) => b.entry),
     hargaKini: g.find((b) => b.hargaKini !== undefined)?.hargaKini,
