@@ -1,5 +1,6 @@
 import { SUPERTREND_PINE } from '@/lib/pine';
 import { MOMENTUM_CANDLE_PINE } from '@/lib/pine-momentum-candle';
+import { SMI_PINE } from '@/lib/pine-smi';
 
 /* ════════════════════════════════════════════════════════════════════════
    PASANG INDIKATOR DARI MARKETPLACE KE CHART
@@ -29,6 +30,9 @@ export const INDIKATOR_TERPASANG: Record<string, { nama: string; kode: string }>
   'supertrend-indikator': { nama: 'Supertrend', kode: SUPERTREND_PINE },
   'momentum-candle-setra': {
     nama: 'Momentum Candle Setra', kode: MOMENTUM_CANDLE_PINE,
+  },
+  'smi-indikator': {
+    nama: 'Stochastic Momentum Index (SMI)', kode: SMI_PINE,
   },
 };
 
