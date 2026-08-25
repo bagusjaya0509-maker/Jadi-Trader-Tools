@@ -54,18 +54,23 @@ const kartu = {
 /** Satu angka besar + keterangan kecil, dipisah garis tipis. */
 function Angka({ nilai, label, warna }: { nilai: string; label: string; warna?: string }) {
   return (
-    <div className="flex min-w-0 flex-1 flex-col items-center px-1.5 text-center">
-      <span className={cn('angka w-full truncate text-[13px] font-semibold', warna ?? 'text-zinc-100')}
-            title={nilai}>
+    <div className="flex min-w-0 flex-1 flex-col items-center justify-center px-1.5 text-center">
+      {/* TURUN BARIS, bukan dipotong. Sel selebar ~90 px sementara sisa
+          pratinjau bisa berbunyi "3 jam 12 menit" — dipotong, yang terbaca
+          "3 jam 1…", dan angka yang salah baca lebih buruk daripada baris
+          kedua. Tinggi barisnya menyesuaikan sendiri karena kotaknya
+          items-stretch. */}
+      <span className={cn('angka text-[12.5px] font-semibold leading-tight break-words',
+                          warna ?? 'text-zinc-100')}>
         {nilai}
       </span>
-      <span className="mt-0.5 text-[10px] text-zinc-500">{label}</span>
+      <span className="mt-0.5 text-[10px] leading-tight text-zinc-500">{label}</span>
     </div>
   );
 }
 
 function Garis() {
-  return <span className="h-7 w-px shrink-0 bg-zinc-800" aria-hidden />;
+  return <span className="w-px shrink-0 self-stretch bg-zinc-800" aria-hidden />;
 }
 
 /** Tombol ganti gambar. Berlabel teks, BUKAN ikon telanjang.
@@ -259,7 +264,7 @@ export function KartuProfil({ tutup }: { tutup: () => void }) {
         </div>
 
         {/* ── Tiga angka ─────────────────────────────────────────────── */}
-        <div className="mt-3.5 flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900/40 px-1 py-2.5">
+        <div className="mt-3.5 flex items-stretch justify-between rounded-lg border border-zinc-800 bg-zinc-900/40 px-1 py-2.5">
           <Angka nilai={sisa} label="sisa"
                  warna={pemilik ? 'text-amber-300'
                    : langganan.status === 'habis' ? 'text-red-400'
@@ -267,7 +272,12 @@ export function KartuProfil({ tutup }: { tutup: () => void }) {
           <Garis />
           <Angka nilai={berakhir} label="berakhir" />
           <Garis />
-          <Angka nilai={teksHarga} label={satuanPaket(paketku.paket, harga) || 'harga'} />
+          {/* Satuannya IKUT harganya. Pemilik tidak punya harga, jadi ia
+              juga tidak punya "per tahun" — menuliskannya di bawah tanda
+              hubung berarti menyebut jangka waktu untuk angka yang tidak
+              ada. */}
+          <Angka nilai={teksHarga}
+                 label={(!pemilik && satuanPaket(paketku.paket, harga)) || 'harga'} />
         </div>
 
         {/* Padanan rupiah di baris sendiri, bukan di dalam kotak: ia
