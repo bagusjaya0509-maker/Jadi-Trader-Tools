@@ -57,3 +57,20 @@ export function tanggalAngka(ms: number) {
     .toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' })
     .replace(/\//g, '-');
 }
+
+/** "3 jam 12 menit", "48 menit", "kurang dari semenit".
+ *
+ *  Tinggal di sini, bukan di gerbang.tsx tempat asalnya, karena sekarang
+ *  dipakai tiga layar: pita langganan, pita pratinjau, dan kartu profil.
+ *  Satu penulisan berarti ketiganya tidak mungkin membulatkan dengan cara
+ *  yang berbeda -- dan sisa waktu yang berbeda di dua sudut layar yang
+ *  sama adalah jenis bug yang membuat orang berhenti mempercayai angkanya. */
+export function sisaTerbaca(ms: number): string {
+  if (ms <= 0) return 'habis';
+  const menit = Math.floor(ms / 60_000);
+  if (menit < 1) return 'kurang dari semenit';
+  const jam = Math.floor(menit / 60);
+  const sisaMenit = menit % 60;
+  if (jam < 1) return `${menit} menit`;
+  return sisaMenit ? `${jam} jam ${sisaMenit} menit` : `${jam} jam`;
+}

@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { LogOut, ChevronRight, TriangleAlert, Eye, Loader2 } from 'lucide-react';
+import { TriangleAlert, Eye, Loader2 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { discordSiap, mulaiLoginDiscord } from '@/lib/analisa';
 import { modePreview, akhiriPreview } from '@/lib/preview';
-import { usePaket, LABEL_PAKET } from '@/lib/paket';
-import { cn } from '@/lib/utils';
+import { KartuProfil } from '@/components/kartu-profil';
+import { AvatarAnalis } from '@/components/avatar-analis';
+import { fotoTersimpan } from '@/lib/profil-pengguna';
+import { cn, sisaTerbaca } from '@/lib/utils';
 
 /* ════════════════════════════════════════════════════════════════════════
    GERBANG — masuk, status langganan, dan penanda data contoh
@@ -79,8 +81,7 @@ export function TombolMasuk({ penuh }: { penuh?: boolean }) {
 
 /** Avatar + menu. Menggantikan bulatan abu-abu mati di bilah atas. */
 export function MenuPengguna() {
-  const { pengguna, langganan, keluar, pemilik, memuat } = useAuth();
-  const { paket: paketku, memuat: memuatPaket } = usePaket();
+  const { pengguna, memuat } = useAuth();
   const [buka, setBuka] = useState(false);
 
   /* Selama auth belum menjawab, TIDAK menampilkan apa pun yang menyimpulkan.
@@ -110,7 +111,14 @@ export function MenuPengguna() {
   if (!pengguna && modePreview()) return null;
   if (!pengguna) return <TombolMasuk />;
 
-  const huruf = (pengguna.displayName || pengguna.email || '?').trim()[0].toUpperCase();
+  /* Foto yang DIUNGGAH SENDIRI menang atas foto Google — orang yang repot
+     menggantinya di kartu profil sedang menyatakan foto akun Google-nya
+     bukan yang ia mau dipakai.
+
+     Dibaca dari cermin localStorage, bukan dari jaringan: bulatan 28 px ini
+     digambar di setiap halaman, dan satu permintaan jaringan per pemuatan
+     halaman demi sebuah avatar adalah ongkos yang dibayar semua orang. */
+  const fotoBilah = fotoTersimpan(pengguna.uid) || pengguna.photoURL || '';
 
   return (
     <div className="relative">
@@ -119,129 +127,34 @@ export function MenuPengguna() {
         aria-label="Menu akun"
         className="block cursor-pointer overflow-hidden rounded-full ring-1 ring-zinc-700 transition-colors hover:ring-zinc-500"
       >
-        {pengguna.photoURL ? (
-          /* referrerPolicy wajib: lh3.googleusercontent.com membalas 403
-             untuk permintaan dengan Referer yang tidak dikenalnya, dan
-             fotonya jadi kotak kosong di domain sendiri. */
-          <img src={pengguna.photoURL} alt="" referrerPolicy="no-referrer" className="size-7 object-cover" />
-        ) : (
-          <span className="flex size-7 items-center justify-center bg-gradient-to-br from-zinc-600 to-zinc-800 text-[11px] font-semibold text-zinc-100">
-            {huruf}
-          </span>
-        )}
+        {/* AvatarAnalis, bukan <img> sendiri: ia sudah membawa
+            referrerPolicy="no-referrer" (lh3.googleusercontent.com membalas
+            403 untuk Referer yang tidak dikenalnya) DAN penadah onError yang
+            jatuh ke huruf awal. Penadah itu bukan kemewahan di sini — foto
+            yang diunggah menunjuk berkas di VPS, dan berkas bisa hilang saat
+            pemulihan; tanpa penadah yang tampil kotak rusak bawaan peramban,
+            yang terbaca sebagai aplikasi rusak. */}
+        <AvatarAnalis
+          nama={pengguna.displayName || pengguna.email || '?'}
+          foto={fotoBilah} uid={pengguna.uid}
+          className="size-7" kelasHuruf="text-[11px]"
+        />
       </button>
 
       {buka && (
         <>
+          {/* Lapisan penangkap klik-di-luar. Tetap di z-40 supaya kartunya
+              (z-50) berada di atasnya, dan tetap `fixed inset-0` supaya
+              klik di sudut mana pun menutup menunya — termasuk di atas
+              chart yang punya penangan klik sendiri. */}
           <div className="fixed inset-0 z-40" onClick={() => setBuka(false)} />
-          <div className="absolute right-0 top-9 z-50 w-[258px] overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 shadow-2xl">
-            <div className="border-b border-zinc-800 px-4 py-3">
-              <div className="truncate text-[12.5px] text-zinc-100">{pengguna.displayName || 'Tanpa nama'}</div>
-              <div className="truncate text-[11.5px] text-zinc-500">{pengguna.email}</div>
-              {pemilik && (
-                <span className="mt-1.5 inline-block rounded bg-amber-500/12 px-1.5 py-0.5 text-[10px] font-medium text-amber-400">
-                  Pemilik
-                </span>
-              )}
-            </div>
-
-            <div className="border-b border-zinc-800 px-4 py-3">
-              <div className="text-[11px] uppercase tracking-wider text-zinc-600">Akses</div>
-              <div className="mt-1 flex items-baseline gap-2">
-                {/* Pemilik didahulukan atas status langganan — sama alasannya
-                    dengan PitaLangganan: gerbang memakai dua sumber, dan
-                    membaca satu saja menulis "Habis" untuk orang yang
-                    aksesnya justru tidak bisa dicabut. */}
-                <span className={cn('text-[13px]',
-                  pemilik ? 'text-amber-400'
-                    : langganan.status === 'aktif' ? 'text-emerald-400'
-                    : langganan.status === 'pratinjau' ? 'text-sky-300'
-                    : langganan.status === 'habis' ? 'text-red-400' : 'text-zinc-400')}>
-                  {pemilik ? 'Penuh'
-                    : langganan.status === 'aktif' ? 'Aktif'
-                    : langganan.status === 'pratinjau' ? 'Pratinjau'
-                    : langganan.status === 'habis' ? 'Habis' : 'Belum diketahui'}
-                </span>
-                {/* Pratinjau diukur JAM, langganan diukur hari — memakai satu
-                    satuan untuk keduanya menulis "sisa 1 hari" untuk sisa dua
-                    menit, dan itu kebohongan yang baru ketahuan saat layarnya
-                    mendadak terkunci. */}
-                {!pemilik && langganan.status === 'pratinjau' && langganan.sisaMs !== null && (
-                  <span className="angka text-[11.5px] text-zinc-500">sisa {sisaTerbaca(langganan.sisaMs)}</span>
-                )}
-                {!pemilik && langganan.status === 'aktif' && langganan.sisaHari !== null && (
-                  <span className="angka text-[11.5px] text-zinc-500">sisa {langganan.sisaHari} hari</span>
-                )}
-              </div>
-
-              {/* NAMA PAKETNYA, bukan cuma "Aktif".
-                  ──────────────────────────────────────────────────────────
-                  "Aktif" menjawab boleh-masuk-atau-tidak, dan itu pertanyaan
-                  yang sudah terjawab begitu halamannya terbuka. Yang tidak
-                  terjawab: paket yang mana — dan itulah yang menentukan Copy
-                  Signal terbuka atau terkunci.
-
-                  Sumbernya /api/paket, SUMBER YANG SAMA dengan yang memagari
-                  fiturnya. Bukan dari status langganan di atasnya: keduanya
-                  berasal dari tempat berbeda, dan pernah berselisih sampai
-                  pembeli berbayar dibaca sebagai pengguna gratis oleh
-                  pagarnya sementara baris ini tetap berkata "Aktif". Kalau
-                  nanti berselisih lagi, layar ini yang akan
-                  memperlihatkannya lebih dulu. */}
-              {!pemilik && !memuatPaket && paketku.aktif && (
-                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                  <span className={cn('rounded px-1.5 py-0.5 text-[10.5px]',
-                    paketku.paket === 'tahunan' ? 'bg-amber-400/15 text-amber-300'
-                      : paketku.paket === 'premium3' ? 'bg-violet-500/15 text-violet-300'
-                      : paketku.paket === 'testing' ? 'bg-sky-500/15 text-sky-300'
-                      : paketku.paket === 'pratinjau' ? 'bg-zinc-700/60 text-zinc-300'
-                      : 'bg-zinc-800 text-zinc-400')}>
-                    {LABEL_PAKET[paketku.paket]}
-                  </span>
-                  {/* Copy Signal disebut TERPISAH karena itu satu-satunya
-                      pembeda yang paling sering ditanyakan — dan orang yang
-                      baru membayar perlu melihat bahwa ia sudah ikut,
-                      tanpa harus membuka halamannya untuk mencoba. */}
-                  <span className={cn('text-[10.5px]', paketku.copySignal ? 'text-emerald-500' : 'text-zinc-600')}>
-                    {paketku.copySignal ? 'termasuk Copy Signal' : 'tanpa Copy Signal'}
-                  </span>
-                </div>
-              )}
-              {/* Pemilik tidak punya tagihan dan tidak perlu meminta akses —
-                  keduanya tautan yang menuju halaman yang tidak menjawab
-                  apa pun untuknya. */}
-              {!pemilik && (
-                <Link to={langganan.status === 'aktif' ? '/billing' : '/akses'} onClick={() => setBuka(false)}
-                  className="mt-2 inline-flex items-center gap-1 text-[12px] text-zinc-300 hover:text-zinc-100">
-                  {langganan.status === 'aktif' ? 'Kelola tagihan' : 'Minta akses penuh'} <ChevronRight className="size-3" />
-                </Link>
-              )}
-            </div>
-
-            <button
-              onClick={() => { setBuka(false); keluar(); }}
-              className="flex w-full cursor-pointer items-center gap-2.5 px-4 py-3 text-left text-[12.5px] text-zinc-300 transition-colors hover:bg-zinc-900 hover:text-zinc-100"
-            >
-              <LogOut className="size-3.5" /> Keluar
-            </button>
+          <div className="absolute right-0 top-9 z-50">
+            <KartuProfil tutup={() => setBuka(false)} />
           </div>
         </>
       )}
     </div>
   );
-}
-
-/** "3 jam 12 menit", "48 menit", "kurang dari semenit". Dipakai di dua
- *  tempat, jadi ditulis sekali di sini supaya keduanya tidak pernah
- *  membulatkan dengan cara yang berbeda. */
-export function sisaTerbaca(ms: number): string {
-  if (ms <= 0) return 'habis';
-  const menit = Math.floor(ms / 60_000);
-  if (menit < 1) return 'kurang dari semenit';
-  const jam = Math.floor(menit / 60);
-  const sisaMenit = menit % 60;
-  if (jam < 1) return `${menit} menit`;
-  return sisaMenit ? `${jam} jam ${sisaMenit} menit` : `${jam} jam`;
 }
 
 /* ════════════════════════════════════════════════════════════════════════

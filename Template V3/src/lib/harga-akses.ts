@@ -120,6 +120,33 @@ export function rupiah(usd: number, kurs: number): string {
   return '≈ Rp ' + n.toLocaleString('id-ID');
 }
 
+/* ── PETA PAKET -> HARGA ────────────────────────────────────────────────
+   Sebelum ini tidak ada. Tiap layar yang butuh harga sebuah paket menulis
+   percabangannya sendiri, dan Pemilik.tsx bahkan menjatuhkan paket tanpa
+   harga ke hargaTesting -- masuk akal di sana (semua yang dijualnya memang
+   paket testing), berbahaya di mana pun selain itu.
+
+   null BUKAN nol. Paket 'gratis' dan 'pratinjau' tidak punya harga sama
+   sekali, dan itu berbeda dengan berharga nol: yang satu tidak dijual,
+   yang lain dijual seharga nol. Layar yang menerima null bisa menulis
+   "Gratis"; layar yang menerima 0 akan menulis "$0" dan membuat orang
+   bertanya-tanya apakah nanti muncul tagihan. */
+export function hargaPaket(nama: string, h: HargaPaket): number | null {
+  if (nama === 'tahunan') return h.hargaTahunan;
+  if (nama === 'premium3') return h.hargaPremium3;
+  if (nama === 'testing') return h.hargaTesting;
+  return null;
+}
+
+/** Untuk berapa lama harga itu berlaku. Angka tanpa satuan di kartu profil
+ *  membuat $79 terbaca sebagai harga bulanan. */
+export function satuanPaket(nama: string, h: HargaPaket): string {
+  if (nama === 'tahunan') return 'per tahun';
+  if (nama === 'premium3') return 'per 3 bulan';
+  if (nama === 'testing') return 'per ' + h.hari + ' hari';
+  return '';
+}
+
 export function useHargaPaket(): HargaPaket {
   const [h, setH] = useState<HargaPaket>(HARGA_BAWAAN);
   useEffect(() => {
