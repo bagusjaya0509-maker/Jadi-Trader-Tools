@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn, uang, harga } from '@/lib/utils';
 
@@ -65,6 +66,85 @@ export interface BarisPosisi {
   imbalUsd?: number;
 }
 
+/* ════════════════════════════════════════════════════════════════════════
+   PENGGABUNGAN ORDER BERLAPIS
+   ════════════════════════════════════════════════════════════════════════
+   Layering menghasilkan sepuluh baris BTCUSDc SELL yang isinya hampir
+   sama, dan tabel yang menampilkannya satu per satu memaksa orang
+   menjumlahkan sendiri di kepala untuk menjawab pertanyaan yang paling
+   dasar: sebenarnya saya pegang berapa, di harga rata-rata berapa, dan
+   sedang rugi berapa. Sepuluh angka kecil menutupi satu angka besar.
+
+   Digabung menurut simbol + arah, dan HANYA kalau memang ada lebih dari
+   satu. Penggabung yang menggabung satu baris cuma menambah lapisan
+   tanpa memberi apa pun.
+
+   ENTRY DIRATA-RATA MENURUT UKURAN, bukan dibagi rata. Order 0,05 lot di
+   75.890 dan 0,02 lot di 76.204 tidak berhenti di tengah-tengah keduanya
+   — yang besar menarik lebih kuat. Rata-rata polos akan memberi harga
+   yang tidak pernah jadi titik impas posisinya, dan kolom Gerak yang
+   dihitung darinya ikut salah.
+
+   RISK, TARGET, DAN P/L DIJUMLAH, bukan dirata-rata. Ketiganya uang; yang
+   ingin diketahui pemiliknya total yang dipertaruhkan dan total yang
+   sedang mengambang, bukan rata-rata per order.
+
+   SL & TP juga dirata-rata menurut ukuran. Kalau nilainya berbeda-beda,
+   itu disebut apa adanya di baris keterangan — angka gabungan yang
+   menyamar sebagai satu level tunggal lebih buruk daripada angka yang
+   mengaku dirinya campuran. */
+
+/** Ambil angka dari "0,05 lot" atau "223,8 THETA". Format Indonesia:
+ *  titik ribuan, koma desimal. */
+function angkaUkuran(teks: string): number {
+  const t = (teks || '').trim().split(/\s+/)[0] || '';
+  const x = Number(t.replace(/\./g, '').replace(',', '.'));
+  return Number.isFinite(x) && x > 0 ? x : 0;
+}
+function satuanUkuran(teks: string): string {
+  return (teks || '').trim().split(/\s+/).slice(1).join(' ');
+}
+
+function gabungBaris(g: BarisPosisi[]): BarisPosisi {
+  const bobot = g.map((b) => angkaUkuran(b.ukuran) || 1);
+  const total = bobot.reduce((a, b) => a + b, 0);
+  const rata = (ambil: (b: BarisPosisi) => number) =>
+    g.reduce((a, b, i) => a + ambil(b) * bobot[i], 0) / total;
+  /* Dijumlah HANYA kalau semua barisnya punya angkanya. Satu order tanpa
+     SL membuat total risikonya tidak diketahui — dan menuliskan jumlah
+     yang sembilan dari sepuluh berarti melaporkan risiko lebih kecil dari
+     yang sebenarnya. */
+  const jumlah = (ambil: (b: BarisPosisi) => number | undefined) => {
+    if (g.some((b) => ambil(b) === undefined)) return undefined;
+    return g.reduce((a, b) => a + (ambil(b) as number), 0);
+  };
+  const seragam = (ambil: (b: BarisPosisi) => number) =>
+    g.every((b) => ambil(b) === ambil(g[0]));
+
+  const beda: string[] = [];
+  if (!seragam((b) => b.sl)) beda.push('SL');
+  if (!seragam((b) => b.tp)) beda.push('TP');
+
+  const satuan = satuanUkuran(g[0].ukuran);
+  return {
+    kunci: 'gabung|' + g[0].simbol + '|' + g[0].arah,
+    simbol: g[0].simbol,
+    arah: g[0].arah,
+    ukuran: total.toLocaleString('id-ID', { maximumFractionDigits: 4 })
+          + (satuan ? ' ' + satuan : ''),
+    ukuranUsd: jumlah((b) => b.ukuranUsd),
+    entry: rata((b) => b.entry),
+    hargaKini: g.find((b) => b.hargaKini !== undefined)?.hargaKini,
+    sl: rata((b) => b.sl),
+    tp: rata((b) => b.tp),
+    pnl: jumlah((b) => b.pnl),
+    risikoUsd: jumlah((b) => b.risikoUsd),
+    imbalUsd: jumlah((b) => b.imbalUsd),
+    ket: g.length + ' order' + (beda.length ? ' · ' + beda.join(' & ') + ' beragam' : ''),
+    ragu: g.map((b) => b.ragu).find(Boolean),
+  };
+}
+
 export function TabelPosisi({ baris, kosong, onKlikBaris, onTutup }: {
   baris: BarisPosisi[];
   /** Tombol Tutup per baris. Kolomnya hanya muncul kalau diberikan. */
@@ -76,8 +156,32 @@ export function TabelPosisi({ baris, kosong, onKlikBaris, onTutup }: {
   /** Kalimat saat tidak ada posisi. */
   kosong: string;
 }) {
+  /* Kelompok mana yang sedang DILEPAS. Bawaannya digabung: pertanyaan
+     pertama orang selalu "totalnya berapa", bukan "order ke-tujuh isinya
+     apa". Yang perlu melihat satu-satu tinggal menekan Lepas. */
+  const [dilepas, setDilepas] = useState<Record<string, boolean>>({});
+
   if (!baris.length) {
     return <div className="py-5 text-center text-[12.5px] text-zinc-600">{kosong}</div>;
+  }
+
+  /* Dikelompokkan menurut simbol + arah, urutan kemunculan dipertahankan
+     supaya posisi tidak melompat-lompat tiap harga berubah. */
+  const kelompok: BarisPosisi[][] = [];
+  const dimana = new Map<string, number>();
+  for (const b of baris) {
+    const k = b.simbol + '|' + b.arah;
+    const i = dimana.get(k);
+    if (i === undefined) { dimana.set(k, kelompok.length); kelompok.push([b]); }
+    else kelompok[i].push(b);
+  }
+  const tampil: { b: BarisPosisi; jml?: number; buka?: boolean; anak?: boolean }[] = [];
+  for (const kel of kelompok) {
+    if (kel.length < 2) { tampil.push({ b: kel[0] }); continue; }
+    const induk = gabungBaris(kel);
+    const buka = !!dilepas[induk.kunci];
+    tampil.push({ b: induk, jml: kel.length, buka });
+    if (buka) for (const a of kel) tampil.push({ b: a, anak: true });
   }
 
   return (
@@ -101,7 +205,7 @@ export function TabelPosisi({ baris, kosong, onKlikBaris, onTutup }: {
           </tr>
         </thead>
         <tbody>
-          {baris.map((b) => {
+          {tampil.map(({ b, jml, buka, anak }) => {
             /* Gerak butuh harga berjalan. Tanpa itu kolomnya diisi tanda
                hubung — BUKAN 0%, yang akan terbaca sebagai "harga tidak
                bergerak" padahal artinya "harganya tidak kita ketahui". */
@@ -111,10 +215,16 @@ export function TabelPosisi({ baris, kosong, onKlikBaris, onTutup }: {
               : null;
             return (
               <Tr key={b.kunci}
-                  onClick={onKlikBaris ? () => onKlikBaris(b) : undefined}
-                  title={onKlikBaris ? 'Buka di chart untuk mengubah SL/TP' : undefined}
-                  className={onKlikBaris ? 'cursor-pointer transition-colors hover:bg-zinc-800/40' : undefined}>
-                <Td>
+                  /* Baris gabungan TIDAK bisa diklik: kuncinya sintetis dan
+                     tidak menunjuk order mana pun, jadi membukanya di chart
+                     akan menyunting sesuatu yang tidak ada. */
+                  onClick={onKlikBaris && !jml ? () => onKlikBaris(b) : undefined}
+                  title={onKlikBaris && !jml ? 'Buka di chart untuk mengubah SL/TP' : undefined}
+                  className={cn(
+                    onKlikBaris && !jml ? 'cursor-pointer transition-colors hover:bg-zinc-800/40' : undefined,
+                    anak && 'bg-zinc-900/30')}>
+                <Td className={anak ? 'pl-6' : undefined}>
+                  {anak && <span className="mr-1 text-zinc-700">└</span>}
                   <span className={b.ragu ? 'text-zinc-400' : 'text-zinc-200'}>{b.simbol}</span>
                   <span className={cn('ml-1.5 text-[10.5px]',
                     b.arah === 'BUY' ? 'text-emerald-500' : 'text-red-400')}>
@@ -130,6 +240,12 @@ export function TabelPosisi({ baris, kosong, onKlikBaris, onTutup }: {
                     <span title={b.ragu}
                       className="ml-1.5 rounded bg-amber-500/15 px-1 text-[9.5px] font-semibold text-amber-400/90">
                       perlu diperiksa
+                    </span>
+                  )}
+                  {jml && (
+                    <span title={jml + ' order digabung jadi satu baris'}
+                      className="ml-1.5 rounded bg-sky-500/15 px-1 text-[9.5px] font-semibold text-sky-300/90">
+                      {jml}x
                     </span>
                   )}
                   {/* SL yang belum dipasang ditulis terang-terangan dengan
@@ -179,7 +295,23 @@ export function TabelPosisi({ baris, kosong, onKlikBaris, onTutup }: {
                   b.pnl === undefined ? 'text-zinc-600' : b.pnl >= 0 ? 'text-emerald-500' : 'text-red-400')}>
                   {b.pnl === undefined ? '—' : uang(b.pnl, true)}
                 </Td>
-                {onTutup && (
+                {onTutup && jml && (
+                  <Td className="text-right">
+                    {/* Baris induk TIDAK diberi tombol Tutup. Satu klik yang
+                        menutup sepuluh posisi sekaligus adalah tindakan yang
+                        tidak bisa dibatalkan dan tidak terbaca dari kata
+                        \"Tutup\" — yang ingin menutup, melepasnya dulu lalu
+                        memilih sendiri mana yang ditutup. */}
+                    <button
+                      onClick={(e) => { e.stopPropagation();
+                        setDilepas((p) => ({ ...p, [b.kunci]: !p[b.kunci] })); }}
+                      title={buka ? 'Gabungkan kembali jadi satu baris' : 'Tampilkan ' + jml + ' order aslinya'}
+                      className="cursor-pointer rounded border border-zinc-800 px-2 py-0.5 text-[11px] text-zinc-400 transition-colors hover:border-sky-500/40 hover:text-sky-300">
+                      {buka ? 'Gabung' : 'Lepas'}
+                    </button>
+                  </Td>
+                )}
+                {onTutup && !jml && (
                   <Td className="text-right">
                     {/* stopPropagation: barisnya juga bisa diklik (buka di
                         chart), dan tanpa ini menekan Tutup menjalankan
