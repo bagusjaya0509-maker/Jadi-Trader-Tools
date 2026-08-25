@@ -1,7 +1,9 @@
 import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ChevronRight, Image as IkonGambar, Loader2, LogOut, Trash2, UserRound } from 'lucide-react';
+import {
+  ChevronRight, Image as IkonGambar, Loader2, LogOut, Palette, Rocket, Trash2, UserRound,
+} from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { usePaket, LABEL_PAKET } from '@/lib/paket';
 import { useHargaPaket, hargaPaket, satuanPaket, usd, rupiah } from '@/lib/harga-akses';
@@ -147,6 +149,12 @@ export function KartuProfil({ tutup }: { tutup: () => void }) {
   const harga = useHargaPaket();
   const { profil, setProfil } = useProfilPengguna(true);
   const [sibuk, setSibuk] = useState<JenisGambar | null>(null);
+  /* Kendali gambar TERSEMBUNYI sampai diminta. Dua tombol berlabel yang
+     selalu terpampang membuat kartu ini terbaca seperti formulir setelan,
+     padahal yang dicari orang sembilan dari sepuluh kali cuma sisa
+     langganannya. Yang jarang dipakai tidak boleh menempati ruang yang
+     sama dengan yang sering dibaca. */
+  const [bukaTampilan, setBukaTampilan] = useState(false);
   const [galat, setGalat] = useState('');
 
   if (!pengguna) return null;
@@ -226,6 +234,37 @@ export function KartuProfil({ tutup }: { tutup: () => void }) {
                className="size-full object-cover" />
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/70 to-transparent" />
+
+        {/* Lencana paket PINDAH KE BANNER, meninggalkan slot di samping nama
+            untuk ikon tampilan. Ia identitas, bukan kendali — dan di banner
+            ia justru lebih terbaca: satu-satunya teks di bidang itu.
+            Latarnya sendiri wajib gelap dan berkabut; banner diisi gambar
+            pilihan orangnya, dan teks tanpa alas di atas foto cerah hilang. */}
+        <span className={cn(
+          'absolute left-3 top-3 max-w-[150px] truncate rounded px-1.5 py-0.5 text-[10.5px] backdrop-blur-sm',
+          memuatPaket && !pemilik ? 'animate-pulse bg-zinc-800/80 text-transparent' : warnaPaket,
+        )} title={'Paket ' + labelPaket}>
+          {memuatPaket && !pemilik ? '     ' : labelPaket}
+        </span>
+
+        {/* ROKET menggantikan ikon markah di acuannya.
+            ──────────────────────────────────────────────────────────────
+            Markah menyimpan profil orang lain untuk dilihat nanti; di kartu
+            profil SENDIRI ia tidak menyimpan apa pun. Tempatnya dipakai
+            untuk satu-satunya tindakan yang memang milik pojok itu: naik
+            paket.
+
+            Pemilik tetap melihatnya, tapi kalimatnya berubah. Ia tidak bisa
+            "upgrade" apa pun — yang dijualnya miliknya sendiri; yang masuk
+            akal untuknya cuma melihat halaman harganya. */}
+        <Link
+          to="/harga" onClick={tutup}
+          title={pemilik ? 'Lihat halaman harga' : 'Upgrade paket'}
+          aria-label={pemilik ? 'Lihat halaman harga' : 'Upgrade paket'}
+          className="absolute right-3 top-3 flex size-8 items-center justify-center rounded-lg border border-white/10 bg-zinc-950/50 text-zinc-300 backdrop-blur-sm transition-colors hover:border-[#ffcd75]/40 hover:bg-zinc-950/70 hover:text-[#ffcd75]"
+        >
+          <Rocket className="size-4" />
+        </Link>
       </div>
 
       {/* Avatar menimpa tepi bawah banner, persis seperti acuannya. Cincin
@@ -240,9 +279,10 @@ export function KartuProfil({ tutup }: { tutup: () => void }) {
       </div>
 
       <div className="px-4 pb-4 pt-3">
-        {/* Nama & email di kiri, identitas paket di kanan — menempati slot
-            yang di acuannya berisi ikon peralatan. Paketnya memang jawaban
-            atas pertanyaan yang sama: dengan apa orang ini bekerja. */}
+        {/* Nama & email di kiri, ikon tampilan di kanan — persis slot yang
+            di acuannya berisi ikon peralatan berlabel "Tools". Lencana
+            paketnya sudah pindah ke banner, jadi slot ini bebas untuk satu
+            kendali yang memang berupa alat. */}
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="truncate text-[13.5px] font-semibold text-zinc-100" title={nama}>{nama}</div>
@@ -250,16 +290,23 @@ export function KartuProfil({ tutup }: { tutup: () => void }) {
               {pengguna.email}
             </div>
           </div>
-          <div className="flex shrink-0 flex-col items-end gap-1">
-            {memuatPaket && !pemilik ? (
-              <span className="h-[19px] w-16 animate-pulse rounded bg-zinc-800" aria-hidden />
-            ) : (
-              <span className={cn('max-w-[110px] truncate rounded px-1.5 py-0.5 text-[10.5px]', warnaPaket)}
-                    title={labelPaket}>
-                {labelPaket}
-              </span>
-            )}
-            <span className="text-[10px] text-zinc-600">paket</span>
+          <div className="flex shrink-0 flex-col items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setBukaTampilan((v) => !v)}
+              aria-expanded={bukaTampilan}
+              title={bukaTampilan ? 'Tutup pengaturan tampilan' : 'Ganti foto profil & banner'}
+              aria-label={bukaTampilan ? 'Tutup pengaturan tampilan' : 'Ganti foto profil & banner'}
+              className={cn(
+                'flex size-7 cursor-pointer items-center justify-center rounded-md border transition-colors',
+                bukaTampilan
+                  ? 'border-sky-500/40 bg-sky-500/10 text-sky-300'
+                  : 'border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200',
+              )}
+            >
+              <Palette className="size-3.5" />
+            </button>
+            <span className="text-[10px] text-zinc-600">tampilan</span>
           </div>
         </div>
 
@@ -303,9 +350,9 @@ export function KartuProfil({ tutup }: { tutup: () => void }) {
           </Link>
         )}
 
-        {/* ── Pengaturan gambar ──────────────────────────────────────── */}
+        {/* ── Pengaturan gambar — muncul dari ikon lukis ─────────────── */}
+        {bukaTampilan && (
         <div className="mt-3.5 border-t border-zinc-800 pt-3">
-          <div className="mb-1.5 text-[10px] uppercase tracking-wider text-zinc-600">Tampilan profil</div>
           <div className="flex items-center gap-2">
             <TombolGambar jenis="foto" label="Foto" ikon={UserRound}
                           ada={!!profil.foto} sibuk={sibuk} pilih={pilihGambar} hapus={buangGambar} />
@@ -317,6 +364,7 @@ export function KartuProfil({ tutup }: { tutup: () => void }) {
               membuang satu-satunya petunjuk yang bisa ditindaklanjuti. */}
           {galat && <p className="mt-1.5 text-[11px] leading-relaxed text-red-400">{galat}</p>}
         </div>
+        )}
 
         <button
           onClick={() => { tutup(); void keluar(); }}
