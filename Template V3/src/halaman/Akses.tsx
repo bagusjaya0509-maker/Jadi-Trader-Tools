@@ -159,10 +159,11 @@ export default function Akses() {
       <div className="relative hidden flex-1 overflow-hidden bg-zinc-950 lg:block">
         {kuota.tampilanAkses === 'lonceng' ? (
           <>
-            {/* Loncengnya menggantung dari langit-langit, jadi ia perlu
-                ruang di ATASNYA — bukan dipusatkan di tengah kotak.
-                Pemusatan bawaannya membuat talinya terpotong rata di tepi
-                atas seperti tiang, bukan tali yang datang dari luar layar. */}
+            {/* Talinya sengaja setinggi 50vh dan MELEWATI tepi atas panel
+                — overflow-hidden di pembungkusnya yang memotongnya. Itu
+                yang membuat loncengnya terbaca menggantung dari sesuatu di
+                luar layar, bukan berdiri di atas tiang yang berakhir rapi
+                di dalam kotak. */}
             <BellNotify
               size={420}
               showButton={false}
