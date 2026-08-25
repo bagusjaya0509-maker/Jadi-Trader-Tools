@@ -1,4 +1,5 @@
 import { SUPERTREND_PINE } from '@/lib/pine';
+import { MOMENTUM_CANDLE_PINE } from '@/lib/pine-momentum-candle';
 
 /* ════════════════════════════════════════════════════════════════════════
    PASANG INDIKATOR DARI MARKETPLACE KE CHART
@@ -26,6 +27,9 @@ interface SkripTersimpan { id: string; nama: string; kode: string; aktif: boolea
  *  melakukan apa-apa lebih buruk daripada tombol yang tidak ada. */
 export const INDIKATOR_TERPASANG: Record<string, { nama: string; kode: string }> = {
   'supertrend-indikator': { nama: 'Supertrend', kode: SUPERTREND_PINE },
+  'momentum-candle-sekolah-trading': {
+    nama: 'Momentum Candle Sekolah Trading', kode: MOMENTUM_CANDLE_PINE,
+  },
 };
 
 /** Cocokkan produk katalog dengan indikator yang bisa dipasang.
