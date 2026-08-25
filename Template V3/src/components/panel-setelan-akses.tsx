@@ -141,6 +141,7 @@ export function PanelSetelanAkses() {
         nilaiMarketplace: ubah.nilaiMarketplace ?? st.nilaiMarketplace,
         kursUsd: ubah.kursUsd ?? st.kursUsd,
         eventGratis: ubah.eventGratis ?? st.eventGratis,
+        tampilanAkses: ubah.tampilanAkses ?? st.tampilanAkses,
         linkTesting: ubah.linkTesting ?? st.linkTesting,
         linkPremium3: ubah.linkPremium3 ?? st.linkPremium3,
         linkTahunan: ubah.linkTahunan ?? st.linkTahunan,
@@ -215,6 +216,57 @@ export function PanelSetelanAkses() {
                 catatan="berlaku untuk persetujuan berikutnya"
                 atur={(n) => setSt({ ...st, hari: Math.max(1, n) })}
               />
+            </div>
+
+            {/* ── TAMPILAN HALAMAN AKSES ────────────────────────────────
+                Sakelar tampilan, bukan setelan harga — tapi tinggal di
+                panel yang sama karena halamannya sama. Memberinya panel
+                sendiri berarti satu judul lagi untuk dilewati demi satu
+                pilihan.
+
+                Berlaku untuk SEMUA pengunjung, termasuk yang belum punya
+                akun: nilainya ikut di jawaban publik /api/akses/kuota. */}
+            <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-3">
+              <div className="text-[12.5px] text-zinc-200">Tampilan halaman akses</div>
+              <div className="mt-0.5 text-[11px] leading-relaxed text-zinc-500">
+                Panel kiri halaman <span className="text-zinc-400">/akses</span>. Berlaku untuk semua
+                pengunjung, langsung setelah disimpan. Yang tidak dipakai tetap tersimpan — bisa
+                ditukar bolak-balik kapan saja.
+              </div>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {([
+                  { nilai: 'foto' as const, judul: 'Foto', sub: 'Gambar merek hero-bg.webp' },
+                  { nilai: 'lonceng' as const, judul: 'Lonceng', sub: 'Lonceng bercahaya, animasi CSS' },
+                ]).map((o) => {
+                  const aktif = (st.tampilanAkses ?? 'foto') === o.nilai;
+                  return (
+                    <button
+                      key={o.nilai}
+                      type="button"
+                      onClick={() => void simpan({ tampilanAkses: o.nilai })}
+                      disabled={sibuk || aktif}
+                      aria-pressed={aktif}
+                      className={cn(
+                        'flex items-start gap-2.5 rounded-md border p-2.5 text-left transition-colors disabled:cursor-default',
+                        aktif
+                          ? 'border-emerald-500/40 bg-emerald-500/5'
+                          : 'cursor-pointer border-zinc-800 bg-zinc-950 hover:border-zinc-700',
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          'mt-0.5 size-3.5 shrink-0 rounded-full border',
+                          aktif ? 'border-emerald-500 bg-emerald-500' : 'border-zinc-700',
+                        )}
+                      />
+                      <span className="min-w-0">
+                        <span className="block text-[12.5px] text-zinc-200">{o.judul}</span>
+                        <span className="block text-[11px] text-zinc-500">{o.sub}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             {/* ── HARGA PAKET ───────────────────────────────────────────

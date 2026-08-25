@@ -31,6 +31,11 @@ export interface Kuota {
    *  saat pendaftaran tutup cuma mengundang pertanyaan yang jawabannya
    *  "tidak bisa". */
   bukaPermintaan: boolean;
+  /** Gambar apa yang dipasang di sisi kiri halaman akses. Datang dari
+   *  server, bukan dari pilihan tiap peramban: yang diatur pemilik di
+   *  Maintenance adalah tampilan yang DILIHAT SEMUA ORANG. Pilihan yang
+   *  disimpan di localStorage cuma mengubah layar pemiliknya sendiri. */
+  tampilanAkses: 'foto' | 'lonceng';
 }
 
 export const KUOTA_KOSONG: Kuota = {
@@ -41,6 +46,11 @@ export const KUOTA_KOSONG: Kuota = {
      server bilang pendaftaran ditutup. Lebih baik terlambat sedetik daripada
      menampilkan sesuatu yang langsung ditarik kembali. */
   bukaPermintaan: false,
+  /* Bawaan 'foto', dan ini penting: nilai ini yang terpakai selama jawaban
+     server belum datang. Foto adalah yang sudah ada sejak awal, jadi
+     memasangnya lebih dulu berarti halaman tidak pernah berkedip
+     menampilkan sesuatu yang lain sebelum menetap. */
+  tampilanAkses: 'foto',
 };
 
 /** Link checkout Rp 17.900. Produknya bernama "Request Access". */
@@ -164,6 +174,7 @@ export async function simpanSetelanAkses(nilai: {
   hargaTesting?: number; hargaTestingCoret?: number;
   hargaPremium3?: number; hargaTahunan?: number; nilaiMarketplace?: number;
   kursUsd?: number; eventGratis?: boolean;
+  tampilanAkses?: 'foto' | 'lonceng';
   linkTesting?: string; linkPremium3?: string; linkTahunan?: string;
 }): Promise<SetelanAkses> {
   const r = await fetch(`${dasar()}/api/akses/setelan`, {

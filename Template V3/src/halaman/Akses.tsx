@@ -9,6 +9,7 @@ import {
   useKuota, mintaAkses, permintaanSaya, masukDiscord, aktifkanKode, LINK_BAYAR,
   type Permintaan,
 } from '@/lib/akses';
+import { BellNotify } from '@/components/ui/bell-notify';
 import { cn } from '@/lib/utils';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -142,16 +143,48 @@ export default function Akses() {
         .delay-500 { animation-delay: 0.5s; }
       `}</style>
 
-      {/* Kiri: gambar merek. Disembunyikan di layar sempit — di HP, gambar
-          setinggi separuh layar cuma mendorong isinya turun. */}
-      <div className="relative hidden flex-1 overflow-hidden lg:block">
-        <img
-          src={`${import.meta.env.BASE_URL}hero-bg.webp`}
-          alt=""
-          className="absolute inset-0 size-full object-cover"
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-zinc-950/40 via-zinc-950/20 to-zinc-950" />
-        <div className="absolute bottom-10 left-10 right-10">
+      {/* Kiri: panel merek. Disembunyikan di layar sempit — di HP, panel
+          setinggi separuh layar cuma mendorong isinya turun.
+
+          ISINYA DIPILIH DARI MAINTENANCE, bukan ditentukan di sini. Foto
+          dan lonceng dua-duanya tinggal di berkas ini; yang server kirim
+          cuma namanya. Mengganti tampilan berarti menggeser satu sakelar,
+          bukan menyunting kode lalu menunggu build selesai — dan yang
+          lama tidak ke mana-mana, jadi kembali ke foto sama murahnya
+          dengan pindah ke lonceng.
+
+          Keterangan mereknya di luar percabangan supaya tetap ada apa pun
+          yang dipilih: itu satu-satunya bagian yang memberi tahu orang
+          mereka sedang berada di mana. */}
+      <div className="relative hidden flex-1 overflow-hidden bg-zinc-950 lg:block">
+        {kuota.tampilanAkses === 'lonceng' ? (
+          <>
+            {/* Loncengnya menggantung dari langit-langit, jadi ia perlu
+                ruang di ATASNYA — bukan dipusatkan di tengah kotak.
+                Pemusatan bawaannya membuat talinya terpotong rata di tepi
+                atas seperti tiang, bukan tali yang datang dari luar layar. */}
+            <BellNotify
+              size={420}
+              showButton={false}
+              disableToggle
+              className="!absolute inset-0"
+            />
+            {/* Tirai gelap ke arah kolom isi — sama seperti pada foto —
+                supaya sisi kanannya menyatu dengan panel di sebelahnya,
+                bukan berhenti mendadak di garis pembatas. */}
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-zinc-950" />
+          </>
+        ) : (
+          <>
+            <img
+              src={`${import.meta.env.BASE_URL}hero-bg.webp`}
+              alt=""
+              className="absolute inset-0 size-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-zinc-950/40 via-zinc-950/20 to-zinc-950" />
+          </>
+        )}
+        <div className="pointer-events-none absolute bottom-10 left-10 right-10">
           <div className="text-[15px] font-medium tracking-tight text-zinc-100">
             Jadi Trader <span className="text-zinc-400">Tools</span>
           </div>
