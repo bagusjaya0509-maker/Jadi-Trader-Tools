@@ -965,8 +965,21 @@ export default function ChartBacktest() {
     return false;
   }
 
+  /* Dua penjaga gabungan di bawah ini SENGAJA ADA meskipun panelnya sudah
+     tidak menggambar tombol Kirim maupun Tutup untuk baris gabungan.
+
+     Bukan kehati-hatian berlebihan: akhiriOrder() juga dipanggil dari
+     tutupDariTabel() dengan objek yang dioper langsung, tanpa lewat panel
+     sama sekali. Penjaga yang cuma hidup di lapisan tampilan akan bocor
+     begitu pemanggil kedua muncul -- dan yang bocor di sini adalah perintah
+     UBAH bertiket kosong, atau TUTUP seukuran gabungan yang menutup sesuatu
+     yang bukan satu posisi. */
   async function kirimSunting() {
     if (!sunting) return;
+    if (sunting.gabungan) {
+      setSuntingKabar('Ini gabungan ' + sunting.gabungan + ' order. Lepas gabungannya di tabel, lalu pilih ordernya satu per satu.');
+      return;
+    }
     /* Dibulatkan lagi tepat sebelum kirim: angka yang DIKETIK tangan
        tidak lewat jalur seretan, dan 63160.98886568123 yang ditempel
        dari mana pun akan ditolak bursa sama saja. */
@@ -1128,7 +1141,13 @@ export default function ChartBacktest() {
      menghitung P/L dengan rumus sendiri akan berselisih cepat atau
      lambat, dan yang satu pasti salah. */
   const pnlSunting = useMemo(() => {
-    if (!sunting || sunting.jenis !== 'posisi') return null;
+    /* Gabungan tidak punya P/L tunggal yang bisa dicari. Pencarian di
+       bawah mengambil SATU posisi menurut simbol -- untuk tumpukan 19
+       order ia akan memulangkan P/L salah satunya saja lalu memasangnya
+       sebagai P/L seluruh tumpukan. Angka gabungannya sudah benar di
+       kolom P/L tabel; di sini lebih baik tidak ada angka daripada angka
+       yang salah sembilan belas kali lipat. */
+    if (!sunting || sunting.jenis !== 'posisi' || sunting.gabungan) return null;
     if (sunting.pasar === 'mt5') {
       const p = akunMt5.posisi.find((x) => x.tiket === sunting.tiket);
       return p ? p.profit : null;
@@ -1197,6 +1216,14 @@ export default function ChartBacktest() {
   async function akhiriOrder(dipilih?: OrderSunting) {
     const sunting = dipilih ?? suntingAktif.current;
     if (!sunting) return;
+    if (sunting.gabungan) {
+      /* alert, bukan diam. Kalau perintah ini pernah sampai ke sini, yang
+         menekannya sedang mengira ia menutup sebuah posisi -- dan tidak
+         terjadi apa-apa tanpa penjelasan terbaca sebagai tombol rusak,
+         lalu ditekan lagi. */
+      alert('Ini gabungan ' + sunting.gabungan + ' order.\n\nLepas gabungannya di tabel lalu tutup satu per satu \u2014 satu klik yang menutup ' + sunting.gabungan + ' posisi sekaligus tidak bisa dibatalkan.');
+      return;
+    }
     const nama = `${sunting.simbol} ${sunting.arah}`;
     const pesan = sunting.jenis === 'pending'
       ? `Batalkan pending order ${nama}?
@@ -2239,16 +2266,30 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
          SL milik order yang sedang dibatalkan adalah perintah yang tidak
          punya sasaran, dan membiarkannya bisa diseret mengundang orang
          mengirim perubahan ke order yang sebentar lagi tidak ada. */
+      /* GABUNGAN: garisnya tampil, tapi MATI.
+         ──────────────────────────────────────────────────────────────
+         Baris gabungan tidak menunjuk satu order pun, jadi menyeret SL-nya
+         adalah perintah tanpa sasaran. Garisnya tetap digambar karena
+         justru itu yang dicari orang saat mengklik baris berlapis: harga
+         rata-rata tertimbang adalah titik impas seluruh tumpukan, dan itu
+         satu-satunya tempat angka tersebut terlihat di chart.
+
+         Keterangannya menyebut jumlah ordernya, bukan cuma arahnya --
+         garis yang tidak mau digeser tanpa penjelasan terbaca sebagai
+         antarmuka rusak, bukan sebagai garis yang memang bukan kendali. */
       const sedangHapus = !!hapusMenunggu;
-      const ketEntry = sedangHapus ? '· menghapus…' : `· ${sunting.arah}`;
-      const ketStop = sedangHapus ? '· menghapus…' : '';
+      const gabung = sunting.gabungan;
+      const ketEntry = sedangHapus ? '· menghapus…'
+        : gabung ? `· ${sunting.arah} · rata-rata ${gabung} order`
+        : `· ${sunting.arah}`;
+      const ketStop = sedangHapus ? '· menghapus…' : gabung ? '· rata-rata' : '';
       if (sunting.entry) g.push({
         id: 'entry', harga: sunting.entry, warna: sedangHapus ? '#71717a' : '#d4d4d8', label: 'Entry',
         ket: ketEntry,
-        bisaSeret: !sedangHapus,
+        bisaSeret: !sedangHapus && !gabung,
       });
-      if (suntingSl) g.push({ id: 'sl', harga: suntingSl, warna: sedangHapus ? '#7f5f5f' : '#f87171', label: 'SL', ket: ketStop, bisaSeret: !sedangHapus });
-      if (suntingTp) g.push({ id: 'tp', harga: suntingTp, warna: sedangHapus ? '#4a6b5e' : '#10b981', label: 'TP', ket: ketStop, bisaSeret: !sedangHapus });
+      if (suntingSl) g.push({ id: 'sl', harga: suntingSl, warna: sedangHapus ? '#7f5f5f' : '#f87171', label: 'SL', ket: ketStop, bisaSeret: !sedangHapus && !gabung });
+      if (suntingTp) g.push({ id: 'tp', harga: suntingTp, warna: sedangHapus ? '#4a6b5e' : '#10b981', label: 'TP', ket: ketStop, bisaSeret: !sedangHapus && !gabung });
       return g;
     }
     const sumber = aksiPosisi
@@ -3238,6 +3279,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                           garisSeret={garisSeret}
                           onSeret={(id, h) => {
                             if (sunting) {
+                              if (sunting.gabungan) return;
                               /* Acuan presisi diambil dari SL/TP yang sudah
                                  ada lebih dulu, bukan dari entry: harga entry
                                  di bursa adalah RATA-RATA fill, jadi desimalnya
@@ -3683,6 +3725,30 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                                   </span>
                                 </div>
                               )}
+                              {/* GABUNGAN: keterangan, bukan kendali.
+                                  ──────────────────────────────────────
+                                  Isian SL/TP dan tombol Kirim di bawah ini
+                                  semuanya bekerja pada SATU order. Baris
+                                  gabungan tidak punya satu pun -- ia
+                                  ringkasan. Menampilkan kendalinya lalu
+                                  menolak saat ditekan lebih buruk daripada
+                                  tidak menampilkannya sama sekali: yang
+                                  ditawarkan layar harus bisa dilakukan.
+
+                                  Yang TETAP tampil di atas: simbol, arah,
+                                  dan P/L berjalan. Ketiganya benar untuk
+                                  gabungan persis seperti untuk order
+                                  tunggal. */}
+                              {sunting.gabungan ? (
+                                <div className="mt-1.5 text-[10.5px] leading-relaxed text-zinc-500">
+                                  Garis di harga rata-rata{' '}
+                                  <span className="text-zinc-300">{sunting.gabungan} order</span>
+                                  {' '}— itu titik impas tumpukannya.
+                                  <span className="mt-1 block text-zinc-600">
+                                    Untuk mengubah SL/TP, lepas gabungannya di tabel lalu pilih ordernya.
+                                  </span>
+                                </div>
+                              ) : (<>
                               {/* Klik kolomnya = garisnya langsung muncul di
                                   harga sekarang, siap diseret. Sebelumnya
                                   order tanpa SL sama sekali tidak punya garis
@@ -3722,6 +3788,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                                   Tutup panel
                                 </button>
                               </div>
+                              </>)}
                               {suntingKabar && (
                                 <div className="mt-1 text-[10px] leading-relaxed text-zinc-400">{suntingKabar}</div>
                               )}

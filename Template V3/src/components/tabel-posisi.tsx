@@ -48,6 +48,15 @@ export interface BarisPosisi {
    *  Menghitung dari teks tampilan memang selalu salah. Angkanya dibawa
    *  utuh dari sumbernya. */
   ukuranNum?: number;
+  /** Level mana yang BERBEDA-BEDA di antara order yang digabung.
+   *
+   *  Rata-rata sepuluh SL yang berlainan menghasilkan angka yang tidak
+   *  dimiliki satu order pun. Di tabel ia cuma keterangan, tapi begitu
+   *  angka itu digambar sebagai garis di chart ia berubah jadi janji:
+   *  "kalau harga sampai sini saya keluar". Yang sebenarnya terjadi
+   *  sepuluh stop tersapu satu per satu di sepuluh harga berbeda.
+   *  Penerimanya perlu tahu bedanya. */
+  gabungBeda?: ('SL' | 'TP')[];
   /** Nilai posisi dalam DOLAR (jumlah x entry).
    *
    *  Kenapa bukan sekadar menempelkan "$" di depan `ukuran`: 298 itu
@@ -137,7 +146,7 @@ function gabungBaris(g: BarisPosisi[]): BarisPosisi {
   const seragam = (ambil: (b: BarisPosisi) => number) =>
     g.every((b) => ambil(b) === ambil(g[0]));
 
-  const beda: string[] = [];
+  const beda: ('SL' | 'TP')[] = [];
   if (!seragam((b) => b.sl)) beda.push('SL');
   if (!seragam((b) => b.tp)) beda.push('TP');
 
@@ -162,6 +171,7 @@ function gabungBaris(g: BarisPosisi[]): BarisPosisi {
     pnl: jumlah((b) => b.pnl),
     risikoUsd: jumlah((b) => b.risikoUsd),
     imbalUsd: jumlah((b) => b.imbalUsd),
+    gabungBeda: beda.length ? beda : undefined,
     ket: g.length + ' order' + (beda.length ? ' · ' + beda.join(' & ') + ' beragam' : ''),
     ragu: g.map((b) => b.ragu).find(Boolean),
   };
@@ -174,7 +184,15 @@ export function TabelPosisi({ baris, kosong, onKlikBaris, onTutup }: {
   /** Klik baris = buka order ini di chart untuk disunting. Kalau tidak
    *  diberikan, barisnya tidak bisa diklik sama sekali — bukan bisa
    *  diklik tapi tidak melakukan apa-apa. */
-  onKlikBaris?: (b: BarisPosisi) => void;
+  /** Baris diklik. Argumen kedua terisi HANYA untuk baris gabungan, berisi
+   *  berapa order yang ada di dalamnya.
+   *
+   *  Dioper dari sini, bukan ditebak pemanggil dari awalan kunci 'gabung|':
+   *  tabel ini yang membentuk kelompoknya, jadi ia satu-satunya yang tahu
+   *  pasti. Pemanggil yang mengurai untai kunci akan berhenti benar begitu
+   *  bentuk kuncinya diubah -- dan diamnya tidak terlihat sebagai galat,
+   *  melainkan sebagai perintah yang dikirim ke order yang tidak ada. */
+  onKlikBaris?: (b: BarisPosisi, gabungan?: number) => void;
   /** Kalimat saat tidak ada posisi. */
   kosong: string;
 }) {
@@ -206,6 +224,8 @@ export function TabelPosisi({ baris, kosong, onKlikBaris, onTutup }: {
     if (buka) for (const a of kel) tampil.push({ b: a, anak: true });
   }
 
+  const adaGabungan = tampil.some((t) => !!t.jml);
+
   return (
     <TabelBungkus>
       <Tabel>
@@ -223,7 +243,9 @@ export function TabelPosisi({ baris, kosong, onKlikBaris, onTutup }: {
             <Th className="text-right">Risk SL</Th>
             <Th className="text-right">Target TP</Th>
             <Th className="text-right">P/L</Th>
-            {onTutup && <Th />}
+            {/* Kepala kolom terakhir muncul kalau ADA yang akan mengisinya:
+                tombol Tutup, atau tombol Lepas milik baris gabungan. */}
+            {(onTutup || adaGabungan) && <Th />}
           </tr>
         </thead>
         <tbody>
@@ -235,15 +257,33 @@ export function TabelPosisi({ baris, kosong, onKlikBaris, onTutup }: {
             const gerak = bisaGerak
               ? ((b.hargaKini! - b.entry) / b.entry) * 100 * (b.arah === 'BUY' ? 1 : -1)
               : null;
+            /* BARIS GABUNGAN JUGA BISA DIKLIK.
+               ────────────────────────────────────────────────────────
+               Dulu tidak: kuncinya sintetis dan tidak menunjuk order
+               mana pun, jadi membukanya di chart membuka jalur yang
+               bisa mengirim perubahan ke order yang tidak ada.
+
+               Tapi menutup kliknya menutup terlalu banyak. Yang paling
+               sering dilakukan orang di tabel ini bukan mengubah SL/TP,
+               melainkan MELIHAT -- pindah chart ke pair itu dan melihat
+               di mana posisinya duduk terhadap harga sekarang. Untuk
+               posisi berlapis, yang ingin dilihat justru harga rata-rata
+               tertimbangnya, karena itulah titik impas gabungannya. Baris
+               induk adalah satu-satunya tempat angka itu ada.
+
+               Jadi kliknya dikembalikan, dan yang dijaga dipindahkan ke
+               hilir: `gabungan` ikut dioper, dan penerimanya yang
+               mematikan seret SL/TP serta tombol Kirim. Melihat boleh,
+               mengirim tidak. */
             return (
               <Tr key={b.kunci}
-                  /* Baris gabungan TIDAK bisa diklik: kuncinya sintetis dan
-                     tidak menunjuk order mana pun, jadi membukanya di chart
-                     akan menyunting sesuatu yang tidak ada. */
-                  onClick={onKlikBaris && !jml ? () => onKlikBaris(b) : undefined}
-                  title={onKlikBaris && !jml ? 'Buka di chart untuk mengubah SL/TP' : undefined}
+                  onClick={onKlikBaris ? () => onKlikBaris(b, jml) : undefined}
+                  title={onKlikBaris
+                    ? (jml ? 'Buka di chart — garis di harga rata-rata ' + jml + ' order'
+                           : 'Buka di chart untuk mengubah SL/TP')
+                    : undefined}
                   className={cn(
-                    onKlikBaris && !jml ? 'cursor-pointer transition-colors hover:bg-zinc-800/40' : undefined,
+                    onKlikBaris ? 'cursor-pointer transition-colors hover:bg-zinc-800/40' : undefined,
                     anak && 'bg-zinc-900/30')}>
                 <Td className={anak ? 'pl-6' : undefined}>
                   {anak && <span className="mr-1 text-zinc-700">└</span>}
@@ -317,7 +357,17 @@ export function TabelPosisi({ baris, kosong, onKlikBaris, onTutup }: {
                   b.pnl === undefined ? 'text-zinc-600' : b.pnl >= 0 ? 'text-emerald-500' : 'text-red-400')}>
                   {b.pnl === undefined ? '—' : uang(b.pnl, true)}
                 </Td>
-                {onTutup && jml && (
+                {/* PENJAGANYA `jml`, BUKAN `onTutup`.
+                    ──────────────────────────────────────────────────────
+                    Dulu keduanya digandeng, dan akibatnya baru terlihat di
+                    Dashboard: di sana onTutup memang sengaja tidak dioper
+                    (menutup posisi bukan urusan halaman ringkasan), jadi
+                    seluruh kolom terakhir hilang -- termasuk tombol Lepas.
+                    Baris "3x" tampil di sana tanpa satu pun cara membukanya,
+                    dan tiga order di dalamnya tidak bisa dilihat sama
+                    sekali. Melepas gabungan tidak mengubah apa pun di
+                    broker; ia tidak punya alasan menumpang izin menutup. */}
+                {!!jml && (
                   <Td className="text-right">
                     {/* Baris induk TIDAK diberi tombol Tutup. Satu klik yang
                         menutup sepuluh posisi sekaligus adalah tindakan yang
@@ -340,6 +390,12 @@ export function TabelPosisi({ baris, kosong, onKlikBaris, onTutup }: {
                     </button>
                   </Td>
                 )}
+                {/* Sel KOSONG supaya jumlah sel tiap baris sama.
+                    Tanpa ini, di Dashboard (yang tidak mengoper onTutup)
+                    baris tunggal kehilangan sel terakhirnya sementara baris
+                    gabungan punya — dan tabelnya jadi bergerigi di tepi
+                    kanan tanpa ada yang salah di datanya. */}
+                {!onTutup && !jml && adaGabungan && <Td />}
                 {onTutup && !jml && (
                   <Td className="text-right">
                     {/* stopPropagation: barisnya juga bisa diklik (buka di

@@ -51,6 +51,14 @@ export interface OrderSunting {
   ukuran: number;
   /** Tiket MT5, atau id order pending kripto. */
   tiket?: string;
+  /** Berapa order yang diringkas jadi satu baris. Terisi HANYA untuk baris
+   *  gabungan; undefined berarti order tunggal yang sungguhan.
+   *
+   *  Ada di sini karena chart tidak punya cara lain mengetahuinya. `tiket`
+   *  kosong TIDAK bisa dipakai sebagai penanda: posisi kripto tidak pernah
+   *  punya tiket sama sekali, jadi memakai itu akan mengunci separuh
+   *  pemakai dari mengubah SL/TP order tunggal mereka sendiri. */
+  gabungan?: number;
 }
 
 export function PanelPosisiTerbuka({ sumber, onSunting, onTutup, tanpaBingkai, menyatu }: {
@@ -283,7 +291,7 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
      begitu tombol Tutup ditambahkan, menyalinnya berarti dua salinan yang
      bisa menyimpang — dan yang menyimpang di sini adalah order MANA yang
      ditutup. */
-  function keOrder(b: BarisPosisi): OrderSunting {
+  function keOrder(b: BarisPosisi, gabungan?: number): OrderSunting {
     return {
       pasar: sumber === 'kripto' ? 'kripto' : 'mt5',
       jenis: 'posisi',
@@ -292,14 +300,35 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
       simbolChart: sumber === 'kripto' ? b.simbol : `MT5:${simbolDasarMt5(b.simbol)}`,
       simbol: b.simbol,
       arah: b.arah,
-      entry: b.entry, sl: b.sl, tp: b.tp,
+      entry: b.entry,
+      /* Level yang BERAGAM di antara order yang digabung TIDAK diteruskan.
+         0 di sini berarti "tidak ada garis", dan itu memang keadaan yang
+         sebenarnya: tidak ada satu harga pun yang bisa disebut SL posisi
+         ini. Menggambar rata-ratanya akan memasang garis yang tidak
+         dimiliki order mana pun, tepat di tempat orang membaca janji
+         kapan ia keluar.
+
+         Entry beda urusan dan tetap diteruskan: rata-rata tertimbangnya
+         justru titik impas tumpukan yang sungguhan, bukan taksiran. */
+      sl: gabungan && b.gabungBeda?.includes('SL') ? 0 : b.sl,
+      tp: gabungan && b.gabungBeda?.includes('TP') ? 0 : b.tp,
       /* Ukuran dibaca dari sumber aslinya, bukan dari teks berformat di
          kolom Size — "1.234,5" akan jadi 1,2345 kalau diurai sebagai
-         angka Inggris. */
-      ukuran: sumber === 'kripto'
-        ? (posisiKripto.find((p) => p.id === b.kunci)?.jumlah ?? 0)
-        : (mt5.posisi.find((p) => p.tiket === b.kunci)?.lot ?? 0),
+         angka Inggris.
+
+         Baris gabungan tidak punya padanan di daftar sumber -- kuncinya
+         sintetis, jadi pencariannya PASTI gagal dan `?? 0` mengubah
+         kegagalan itu jadi angka nol yang tampak sah. Totalnya sudah
+         dihitung benar di `ukuranNum` waktu barisnya digabung; dipakai
+         langsung supaya panel tidak pernah melaporkan 0 lot untuk sesuatu
+         yang jelas-jelas terbuka. */
+      ukuran: gabungan
+        ? (b.ukuranNum ?? 0)
+        : sumber === 'kripto'
+          ? (posisiKripto.find((p) => p.id === b.kunci)?.jumlah ?? 0)
+          : (mt5.posisi.find((p) => p.tiket === b.kunci)?.lot ?? 0),
       tiket: b.tiket,
+      gabungan: gabungan,
     };
   }
 
@@ -362,7 +391,7 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
         <TabelPosisi
           baris={baris}
           onTutup={onTutup && ((b) => onTutup(keOrder(b)))}
-          onKlikBaris={onSunting && ((b) => onSunting(keOrder(b)))}
+          onKlikBaris={onSunting && ((b, gabungan) => onSunting(keOrder(b, gabungan)))}
           kosong={sumber === 'kripto'
             ? 'Tidak ada posisi kripto terbuka.'
             : mt5.terhubung === true ? 'Tidak ada posisi MT5 terbuka.' : mt5.ket}
