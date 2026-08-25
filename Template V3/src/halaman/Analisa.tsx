@@ -3004,15 +3004,26 @@ export default function Analisa() {
                                 "Aisyah" — nama orang yang justru paling perlu
                                 lencananya, karena namanya sama sekali tidak
                                 menyebut agen. */}
-                            {/* Lencananya DILEWATI kalau namanya sendiri sudah menyebut AI.
-                                Agen bawaan bernama "AI Agent", dan lencana "AI"
-                                di sebelahnya membuat barisnya berbunyi "AI Agent
-                                AI" — pengulangan yang terbaca seperti kesalahan.
+                            {/* SEMUA kartu agen dapat lencananya, tanpa kecuali.
+                                ────────────────────────────────────────────────
+                                Dulu dilewati kalau namanya sudah menyebut "AI",
+                                supaya agen bawaan tidak berbunyi "AI Agent AI".
+                                Agen itu sudah tidak ada, dan aturannya tertinggal
+                                sebagai jebakan: agen bernama "AI Telg" kehilangan
+                                lencananya, lalu di papan terlihat persis seperti
+                                kartu analis manusia.
 
-                                Dicocokkan sebagai KATA UTUH: pola longgar juga
-                                kena pada "Zainal" dan "Aisyah", nama orang yang
-                                justru paling perlu lencananya. */}
-                            {a0.agen && !/(^|[^a-z])ai([^a-z]|$)/i.test(a0.nama) && (
+                                Lencananya bukan pengulangan nama — ia penanda
+                                warna yang dibaca sekilas untuk memisahkan agen
+                                dari orang. Nama yang kebetulan menyebut AI tidak
+                                mengubah kebutuhan itu.
+
+                                Penentunya `a0.agen` saja, dan itu memang cukup:
+                                medan itu dipasang server hanya untuk kiriman
+                                agen. Analis manusia tidak pernah memilikinya,
+                                jadi "Zainal" dan "Aisyah" tidak mungkin kebagian
+                                lencana gara-gara huruf di namanya. */}
+                            {a0.agen && (
                               <span title="Ditulis agen AI, bukan orang"
                                     className="pointer-events-auto inline-flex shrink-0 items-center gap-1 rounded bg-violet-500/15 px-1.5 py-0.5 text-[9.5px] font-medium text-violet-300">
                                 <Sparkles className="size-2.5" /> AI
