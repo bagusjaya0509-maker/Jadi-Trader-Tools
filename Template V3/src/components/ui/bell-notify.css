@@ -126,3 +126,21 @@
 
 .bell-root .hidden-button{ opacity: 0; pointer-events: none; }
 
+
+/* Hormati setelan "kurangi gerak" milik sistem operasi.
+   ────────────────────────────────────────────────────────────────────
+   Loncengnya berayun dan sinarnya berputar TERUS-MENERUS, dan halaman
+   akses adalah halaman yang orang buka sambil membaca — bukan yang
+   dilewati sekejap. Untuk sebagian orang gerakan tak berhenti di sudut
+   mata memicu pusing, dan mereka sudah menyatakannya sekali lewat setelan
+   sistem; halaman ini tidak perlu bertanya lagi.
+
+   Yang dimatikan CUMA gerakannya. Semua warna, cahaya, dan bayangannya
+   tetap utuh — yang diminta dikurangi gerak, bukan dihapus gambarnya. */
+@media (prefers-reduced-motion: reduce){
+  .bell-root .bell-container,
+  .bell-root .bell-rays::before,
+  .bell-root .button,
+  .bell-root .button::before { animation: none; }
+}
+
