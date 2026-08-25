@@ -2,6 +2,7 @@ import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Check, Crown, Download, Copy, X, Star, MessageCircle, ExternalLink, KeyRound, Loader2, Trash2,
+  LineChart,
   GripHorizontal, Store, MessagesSquare, ThumbsUp, CornerDownRight, Send,
 } from 'lucide-react';
 import { PeragaProduk } from '@/components/peraga-produk';
@@ -83,7 +84,12 @@ function RingkasKartu({ teks, onBuka }: { teks: string; onBuka: () => void }) {
    Komponen tersendiri, bukan potongan di dalam map kartu: ia menyimpan pesan
    hasilnya sendiri, dan satu state pesan yang dibagi seluruh kartu akan
    membuat menekan tombol di satu kartu memunculkan kabar di kartu lain. */
-function TombolPasangChart({ produk }: { produk: Produk }) {
+/* `besar`: versi berlabel untuk modal detail. Di kartu ia cukup ikon —
+   kartunya sempit dan tombol berteks di sana berebut ruang dengan Detail.
+   Di modal justru sebaliknya: itu SATU-SATUNYA jalan mendapatkan
+   indikatornya, dan jalan satu-satunya tidak pantas berupa ikon 14 piksel
+   yang harus ditebak artinya. */
+function TombolPasangChart({ produk, besar }: { produk: Produk; besar?: boolean }) {
   const { pemilik } = useAuth();
   const { paket, memuat } = usePaket();
   const [pesan, setPesan] = useState('');
@@ -118,12 +124,25 @@ function TombolPasangChart({ produk }: { produk: Produk }) {
         disabled={!boleh}
         title={alasan}
         aria-label={alasan}
-        className={cn('flex items-center rounded-md border px-2 py-1.5 transition-colors',
+        className={cn('flex items-center transition-colors',
+          besar
+            ? 'gap-2 rounded-full px-6 py-3 text-[13px] font-semibold'
+            : 'rounded-md border px-2 py-1.5',
           boleh
-            ? 'cursor-pointer border-emerald-600/50 text-emerald-400 hover:border-emerald-500 hover:text-emerald-300'
-            : 'cursor-not-allowed border-zinc-800 text-zinc-700')}
+            ? (besar
+                ? 'cursor-pointer bg-zinc-100 text-zinc-950 hover:bg-white'
+                : 'cursor-pointer border-emerald-600/50 text-emerald-400 hover:border-emerald-500 hover:text-emerald-300')
+            : (besar
+                ? 'cursor-not-allowed bg-zinc-800 text-zinc-500'
+                : 'cursor-not-allowed border-zinc-800 text-zinc-700'))}
       >
-        <Download className="size-3.5" strokeWidth={2} />
+        {/* IKON GRAFIK, BUKAN PANAH UNDUH. Tombol ini tidak mengunduh apa
+            pun — ia menaruh indikatornya ke chart di dalam aplikasi. Panah
+            unduh di sebelah kata "Detail" terbaca sebagai "ambil berkasnya",
+            dan sesudah jalur unduhan dicabut itu jadi janji yang tidak ada
+            isinya. */}
+        <LineChart className={besar ? 'size-4' : 'size-3.5'} strokeWidth={2} />
+        {besar && 'Terapkan ke Chart'}
       </button>
       {/* Kabar hasil digantung DI ATAS tombolnya, bukan disisipkan ke dalam
           kartu: kartu yang tiba-tiba bertambah tinggi menggeser seluruh grid
@@ -1106,8 +1125,36 @@ export default function Marketplace() {
                 </ul>
               </div>
 
-              {/* Pengambilan sumber — gratis maupun berlisensi. */}
-              <AmbilSumber produk={aktif} />
+              {/* ── SATU JALAN MASUK UNTUK INDIKATOR ─────────────────────
+                  Indikator Pine yang bisa dipasang TIDAK lagi menawarkan
+                  "Salin Kode" maupun unduhan. Permintaan pemilik, dan ia
+                  benar pada dua hal sekaligus:
+
+                  Pertama, indikator ini hidup DI DALAM aplikasi. Menyodorkan
+                  kode mentahnya lebih dulu berarti menyuruh orang menempel
+                  sendiri sesuatu yang sudah bisa dipasang satu klik — dan
+                  yang menempel manual akan punya salinan yang tidak pernah
+                  ikut diperbarui.
+
+                  Kedua, kode yang tidak bisa dibawa keluar tidak bisa
+                  disebarkan. Untuk indikator yang logikanya milik orang
+                  lain, itu bukan sekadar kerapian.
+
+                  Produk lain — EA MetaTrader — tetap lewat jalur lama: ia
+                  memang HARUS diunduh, karena ia jalan di terminal sendiri,
+                  bukan di sini. */}
+              {bisaDipasang(aktif)
+                ? (
+                  <div>
+                    <TombolPasangChart produk={aktif} besar />
+                    <p className="mt-2.5 max-w-[560px] text-[12.5px] leading-relaxed text-zinc-500">
+                      Indikator ini dipakai di dalam aplikasi. Sekali ditekan, ia langsung
+                      tergambar di Chart &amp; Entry dan ikut terbarui sendiri saat versinya
+                      naik — tidak ada kode yang perlu kamu tempel sendiri.
+                    </p>
+                  </div>
+                )
+                : <AmbilSumber produk={aktif} />}
 
               {/* Peringatan HANYA untuk produk berbayar, dan ditaruh TEPAT
                   sebelum jalur pembeliannya. Yang gratis tidak menimbulkan
