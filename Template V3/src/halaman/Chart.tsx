@@ -210,6 +210,23 @@ function rapikanSimbol(s: string): string {
   return /^MT5:/i.test(t) ? 'MT5:' + t.slice(4) : t.toUpperCase();
 }
 
+/* Nama parameter simbol dibaca DUA EJAAN: `simbol` (dipakai semua tautan
+   di dalam aplikasi) dan `symbol` (yang ditulis orang, dan yang dipakai
+   alat luar mana pun).
+
+   Bukan kerapian. Kalau ejaannya tidak dikenali, simbolnya diam-diam
+   diabaikan dan chart jatuh ke simbol terakhir yang diingat -- SEMENTARA
+   entry/sl/tp dari alamat yang sama tetap terbaca, karena nama ketiganya
+   memang sudah benar. Hasilnya level emas 4.632 tergambar di chart Bitcoin
+   79.269: tidak ada galat, tidak ada peringatan, cuma tiga label harga yang
+   menempel di dasar layar sementara panel tiketnya ikut hidup.
+
+   Persis itu yang terjadi pada alamat
+   ?symbol=MT5:XAUUSD&entry=4632.29&sl=4637.84&tp=4626.74 */
+function ambilSimbol(cari: URLSearchParams): string {
+  return cari.get('simbol') || cari.get('symbol') || '';
+}
+
 export default function ChartBacktest() {
   /* Simbol & timeframe boleh datang dari alamatnya: `#/chart?simbol=ETHUSDT`.
      Itulah yang dipakai menu klik-kanan di Screener Entry untuk membuka koin
@@ -222,7 +239,7 @@ export default function ChartBacktest() {
   const awal = bacaSetelanChart();
   const { data: posisiBursa, order: orderBursa, segarkan: segarkanBursa } = usePosisiBinance();
   const akunMt5 = useAkunMt5();
-  const [simbol, setSimbol] = useState(() => rapikanSimbol(cari.get('simbol') || awal.simbol || 'BTCUSDT'));
+  const [simbol, setSimbol] = useState(() => rapikanSimbol(ambilSimbol(cari) || awal.simbol || 'BTCUSDT'));
   /* Daftar timeframe yang boleh datang dari alamat — DIAMBIL dari TF, bukan
      ditulis ulang. Dulu ini array terpisah berisi lima nilai, dan saat 1m
      dan 30m ditambahkan ke TF, `?tf=1m` diam-diam jatuh ke 4h: tautan yang
@@ -236,7 +253,7 @@ export default function ChartBacktest() {
   /* Alamat yang berubah saat halaman sudah terbuka ikut diikuti — klik kanan
      di screener dua kali berturut-turut harus berpindah dua kali. */
   useEffect(() => {
-    const s = cari.get('simbol');
+    const s = ambilSimbol(cari) || null;
     if (s) setSimbol(rapikanSimbol(s));
     const x = (cari.get('tf') || '').toLowerCase();
     if (x && TF.some((y) => y.nilai === x)) setTf(x);
@@ -1700,7 +1717,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
 
        Jadi kalau alamat yang sedang berlaku memang menunjuk simbol ini DAN
        membawa levelnya, tiketnya dibiarkan — level itu memang miliknya. */
-    const simbolAlamat = rapikanSimbol(cari.get('simbol') || '');
+    const simbolAlamat = rapikanSimbol(ambilSimbol(cari));
     const bawaLevel = !!(cari.get('entry') || cari.get('sl') || cari.get('tp'));
     if (simbolAlamat === simbol && bawaLevel) return;
 
@@ -2292,11 +2309,47 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
       if (suntingTp) g.push({ id: 'tp', harga: suntingTp, warna: sedangHapus ? '#4a6b5e' : '#10b981', label: 'TP', ket: ketStop, bisaSeret: !sedangHapus && !gabung });
       return g;
     }
+    /* ── PENJAGA SKALA ────────────────────────────────────────────────
+       Level yang jaraknya berkali-kali lipat dari harga berjalan BUKAN
+       milik simbol yang sedang tampil, dan menggambarnya tidak pernah
+       benar. Emas di 4.632 pada chart Bitcoin di 79.269 tergambar sebagai
+       tiga label yang menempel di dasar layar -- dan panel tiketnya ikut
+       hidup, jadi satu tekan Kirim di situ menghitung ukuran dari level
+       pasar yang sama sekali berbeda.
+
+       Penyebab langsungnya sudah diperbaiki di atas (ejaan parameter),
+       tapi penjaga ini menutup SELURUH KELASNYA: tautan lama yang masih
+       beredar, tautan salin-tempel yang simbolnya terpotong, atau apa pun
+       yang belum terpikir. Level yang tidak masuk skala DIBUANG, bukan
+       digambar kecil-kecil di pojok.
+
+       Ambang 10x sengaja longgar: rencana trade tidak pernah berjarak
+       sepuluh kali lipat dari harga berjalan untuk instrumen yang sama,
+       jadi tidak ada level sah yang bisa tersaring. Yang tersaring hanya
+       level milik instrumen lain.
+
+       Posisi & pending order NYATA tidak ikut disaring -- keduanya datang
+       dari broker beserta simbolnya sendiri dan sudah disaring di sumber. */
+    /* Acuannya jatuh ke harga lilin terakhir kalau modul order tidak hidup.
+       Tanpa cadangan itu penjaganya mati persis pada keadaan yang paling
+       mungkin membawa level nyasar: chart yang dibuka dari sebuah tautan,
+       sebelum apa pun sempat tersambung.
+
+       Dibaca dari REF, bukan dari state: memo ini tidak perlu dihitung
+       ulang tiap lilin baru datang, dan harga yang telat satu lilin tidak
+       mungkin mengubah penilaian berskala sepuluh kali lipat. */
+    const tutupTerakhir = lilinRef.current.closes[lilinRef.current.closes.length - 1];
+    const acuanSkala = aksi?.hargaKini || tutupTerakhir || 0;
+    const seSkala = (x?: number) => {
+      if (!x || !acuanSkala) return x;
+      const r = x / acuanSkala;
+      return r > 0.1 && r < 10 ? x : undefined;
+    };
     const sumber = aksiPosisi
       ? { entry: aksiPosisi.masuk, sl: aksiPosisi.sl, tp: aksiPosisi.tp }
       : aksiTunda
       ? { entry: aksiTunda.entry, sl: aksiTunda.sl, tp: aksiTunda.tp }
-      : rencana;
+      : { entry: seSkala(rencana.entry), sl: seSkala(rencana.sl), tp: seSkala(rencana.tp) };
     const kunci = !!aksiPosisi || !!aksiTunda;
     const g: GarisSeret[] = [];
 
