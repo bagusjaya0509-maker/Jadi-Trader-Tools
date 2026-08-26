@@ -6,10 +6,12 @@ import { useAuth } from '@/lib/auth';
 import { daftarSimbolMt5 } from '@/lib/pasar';
 import { simbolDasarMt5 } from '@/lib/simbol';
 import { kirimPerintahMt5, tungguHasilMt5 } from '@/lib/mt5-order';
+import { useAkunMt5 } from '@/lib/akun';
 import {
-  bacaSetelanRisiko, simpanSetelanRisiko, kontrakBawaan, kontrakBerlaku, besarPip,
-  lotUntukCopy, type SetelanRisiko, type JenisAkun,
+  bacaSetelanRisiko, kontrakBawaan, kontrakBerlaku, deteksiJenisAkun, besarPip,
+  lotUntukCopy,
 } from '@/lib/ukuran-posisi';
+import { daftarLangganan } from '@/lib/copy-langganan';
 
 /* ════════════════════════════════════════════════════════════════════════
    COPY TRADE — TRADE-FI (MT5)
@@ -42,7 +44,7 @@ export function PanelCopyTradeFi({ pasangan, arah, entry, sl, tp, penulis, tutup
   tutup: () => void;
 }) {
   const { pengguna } = useAuth();
-  const [n, setN] = useState<SetelanRisiko>(() => bacaSetelanRisiko(pengguna?.uid));
+  const akun = useAkunMt5();
   /* Ukuran kontrak TIDAK ikut disimpan: ia milik SIMBOLNYA, bukan milik
      orangnya. Satu slot simpanan untuk angka yang berbeda tiap simbol
      berarti nilai emas terbawa ke sinyal EURUSD berikutnya. */
@@ -56,19 +58,18 @@ export function PanelCopyTradeFi({ pasangan, arah, entry, sl, tp, penulis, tutup
 
      Bawaannya diturunkan dari modal x persen yang tersimpan, jadi orang
      yang sudah menyetel risikonya tidak menemukan kolom kosong. */
+  /* Bawaannya dari LANGGANAN yang sudah disetel orangnya, bukan angka
+     pabrik. Yang sudah menetapkan batas rugi di panel Copy Signal tidak
+     seharusnya menetapkannya lagi tiap kali menyalin satu sinyal. */
   const [rugiMaks, setRugiMaks] = useState(() => {
+    const l = daftarLangganan(pengguna?.uid).find((x) => x.rugiMaks > 0);
+    if (l) return l.rugiMaks;
     const x = bacaSetelanRisiko(pengguna?.uid);
     return Math.max(1, Math.round(x.modal * (x.risiko / 100) * 100) / 100);
   });
-  /* Jenis akun ikut ke sini karena panel INI yang mengirim ordernya.
-     Cent yang dikira standar memasang lot seratus kali terlalu besar —
-     kesalahan yang tidak bisa ditarik kembali sesudah ordernya masuk. */
-  const [jenisAkun, setJenisAkun] = useState<JenisAkun>('standar');
   const [sibuk, setSibuk] = useState(false);
   const [kabar, setKabar] = useState('');
   const [selesai, setSelesai] = useState(false);
-
-  useEffect(() => { simpanSetelanRisiko(n, pengguna?.uid); }, [n, pengguna?.uid]);
 
   /* ── NAMA SIMBOL DI BROKER PENGGUNA, bukan nama di sinyalnya ─────────
      Analis menulis "XAUUSD"; terminal orang yang meniru mungkin menamainya
@@ -97,6 +98,9 @@ export function PanelCopyTradeFi({ pasangan, arah, entry, sl, tp, penulis, tutup
      benar-benar bekerja: sinyal ber-SL lebar otomatis dapat lot lebih kecil,
      jadi angka rugi di bawah tetap sama berapa pun analis melebarkan
      stopnya. */
+  /* DIBACA dari mata uang terminal, tidak ditanyakan — jawabannya sudah
+     dipegang aplikasi, dan salah jawab menggeser lot seratus kali. */
+  const jenisAkun = deteksiJenisAkun(akun.mataUang);
   const kontrakEfektif = kontrakBerlaku(kontrak, jenisAkun);
   const h = useMemo(
     () => lotUntukCopy({ lotDiminta: 0, rugiMaks, kontrak: kontrakEfektif, jarakHarga }),
@@ -141,9 +145,6 @@ export function PanelCopyTradeFi({ pasangan, arah, entry, sl, tp, penulis, tutup
     } finally { setSibuk(false); }
   }
 
-  const ubah = (k: keyof SetelanRisiko) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setN((s) => ({ ...s, [k]: Math.max(0, Number(e.target.value) || 0) }));
-
   return createPortal(
     <div className="fixed inset-0 z-[80] flex items-center justify-center p-4"
          onClick={tutup}>
@@ -184,25 +185,14 @@ export function PanelCopyTradeFi({ pasangan, arah, entry, sl, tp, penulis, tutup
             ))}
           </div>
 
-          <div className="mt-2.5 flex items-center gap-1.5">
-            <span className="text-[10.5px] text-zinc-500">Jenis akun</span>
-            {(['standar', 'cent'] as const).map((v) => (
-              <button key={v} onClick={() => setJenisAkun(v)}
-                title={v === 'cent'
-                  ? 'Akun cent — 1 lot bernilai seperseratus akun standar'
-                  : 'Akun standar — 1 lot penuh'}
-                className={cn('cursor-pointer rounded border px-2 py-0.5 text-[10.5px] uppercase transition-colors',
-                  jenisAkun === v ? 'border-zinc-500 bg-zinc-800/60 text-zinc-100'
-                                  : 'border-zinc-800 text-zinc-500 hover:border-zinc-700')}>
-                {v}
-              </button>
-            ))}
-            {jenisAkun === 'cent' && (
-              <span className="text-[10px] text-amber-300/80">1 lot = 1/100 standar</span>
-            )}
+          <div className="mt-2.5 text-[10.5px] text-zinc-500">
+            Akun terbaca sebagai{' '}
+            <span className={jenisAkun === 'cent' ? 'text-amber-300' : 'text-zinc-300'}>{jenisAkun}</span>
+            {jenisAkun === 'cent' && ' — 1 lot = 1/100 standar'}
+            {akun.saldo != null && <span className="text-zinc-700"> · saldo {uang(akun.saldo)}</span>}
           </div>
 
-          <div className="mt-2.5 grid grid-cols-3 gap-2">
+          <div className="mt-2.5 grid grid-cols-2 gap-2">
             {/* DOLAR, bukan persen. Yang dirasakan orang saat posisinya merah
                 bukan persen melainkan dolar, dan persen menuntut ia mengalikan
                 di kepalanya lebih dulu untuk tahu apa yang dipertaruhkan. */}
@@ -211,10 +201,6 @@ export function PanelCopyTradeFi({ pasangan, arah, entry, sl, tp, penulis, tutup
               <input value={rugiMaks} inputMode="decimal"
                 onChange={(e) => setRugiMaks(Math.max(0, Number(e.target.value) || 0))}
                 className={cn(ISIAN, 'angka border-amber-500/30')} />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-[10.5px] text-zinc-500">Modal ($)</span>
-              <input value={n.modal} onChange={ubah('modal')} inputMode="decimal" className={cn(ISIAN, 'angka')} />
             </label>
             {/* Ukuran kontrak BISA DISUNTING: ia ditebak dari nama simbolnya,
                 dan broker tidak sepakat (emas 100 oz di sebagian, 10 di

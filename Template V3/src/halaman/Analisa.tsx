@@ -22,6 +22,7 @@ import { SparklineSaldo } from '@/components/kurva-saldo';
 import { PotongGambar } from '@/components/potong-gambar';
 import { HitungPosisi } from '@/components/hitung-posisi';
 import { PanelCopyAnalis } from '@/components/panel-copy-analis';
+import { PanelCopyTradeFi } from '@/components/panel-copy-tradefi';
 import { daftarLangganan, hapusLangganan, type LanggananCopy } from '@/lib/copy-langganan';
 import { ambilDraf } from '@/lib/draf-sinyal';
 import { AvatarAnalis } from '@/components/avatar-analis';
@@ -555,6 +556,28 @@ function KartuAnalisa({ a, status, milikku, onSegarkan, performa, hargaKini }: {
     } finally { setSibuk(false); }
   }
 
+  /* ── SALIN SINYAL INI ────────────────────────────────────────────────
+     Levelnya tidak ikut di ringkasan kartu — dijemput saat diminta, sama
+     seperti "Buka di Chart". Dijemput di sini juga berarti ikonnya tidak
+     pernah membuka panel kosong. */
+  const [copyBuka, setCopyBuka] = useState(false);
+  const [copyIsi, setCopyIsi] = useState<IsiAnalisa | null>(null);
+
+  async function bukaCopy() {
+    if (sibuk) return;
+    const punya = isi ?? copyIsi;
+    if (punya) { setCopyIsi(punya); setCopyBuka(true); return; }
+    setSibuk(true); setKabar('');
+    try {
+      const h = await bukaIsi(a.id);
+      setIsi(h.isi);
+      setCopyIsi(h.isi);
+      setCopyBuka(true);
+    } catch (e) {
+      setKabar(e instanceof Error ? e.message : 'Gagal mengambil level sinyal ini.');
+    } finally { setSibuk(false); }
+  }
+
   async function muatIsi() {
     setSibuk(true); setKabar('');
     try {
@@ -1008,6 +1031,26 @@ function KartuAnalisa({ a, status, milikku, onSegarkan, performa, hargaKini }: {
                 <Lock className="size-3.5" /> Buka di Chart
               </span>
             )}
+            {/* IKON SAJA, tanpa tulisan. Baris ini dirancang untuk dua tombol
+                bertulisan; yang ketiga bertulisan membuat "Buka analisa" pecah
+                dua baris dan yang terakhir terpotong tepi kartu — itu yang
+                terjadi waktu tombol bertulisan dicoba di sini.
+
+                Ikon tanpa keterangan biasanya tebakan, tapi tidak di sini:
+                lambang salin sudah dipakai untuk arti yang sama di sudut
+                kartu kanal dan di menu klik kanan, jadi ia sudah dikenali
+                sebelum sampai ke baris ini. Judulnya menanggung sisanya.
+
+                Trade-Fi saja, dan tidak untuk yang sudah selesai — kena TP
+                atau SL berarti peluangnya lewat. */}
+            {!pasarKripto(a) && bisaBuka && !selesai && (
+              <button onClick={() => void bukaCopy()} disabled={sibuk}
+                title="Salin sinyal ini ke akun MT5-mu — lotnya dihitung dari batas rugimu"
+                aria-label="Salin sinyal ini"
+                className="flex size-[30px] shrink-0 cursor-pointer items-center justify-center rounded-md border border-sky-500/40 bg-sky-500/10 text-sky-300 transition-colors hover:border-sky-500/60 hover:bg-sky-500/15 disabled:cursor-not-allowed disabled:opacity-50">
+                {sibuk ? <Loader2 className="size-3.5 animate-spin" /> : <IkonCopy className="size-3.5" />}
+              </button>
+            )}
 
             {/* TOMBOL MODERASI DICABUT — permintaan pemilik.
 
@@ -1025,6 +1068,18 @@ function KartuAnalisa({ a, status, milikku, onSegarkan, performa, hargaKini }: {
           </div>
         )}
         {kabar && <p className="mt-2 text-[12px] text-amber-300/90">{kabar}</p>}
+
+        {copyBuka && copyIsi && (
+          <PanelCopyTradeFi
+            pasangan={a.pasangan}
+            arah={a.arah}
+            entry={copyIsi.entry}
+            sl={copyIsi.sl}
+            tp={copyIsi.tp}
+            penulis={a.nama}
+            tutup={() => setCopyBuka(false)}
+          />
+        )}
 
       </div>
 
@@ -1131,8 +1186,9 @@ const TAMPIL_RAK_SINYAL = false;
    Menunya sengaja cuma berisi SATU tindakan. Menu sekali-pakai yang
    isinya satu baris lebih jujur daripada menu yang diisi tindakan lain
    supaya terlihat pantas jadi menu. */
-function MenuPin({ x, y, disemat, pilih, tutup }: {
-  x: number; y: number; disemat: boolean; pilih: () => void; tutup: () => void;
+function MenuPin({ x, y, disemat, diikuti, pilih, copy, tutup }: {
+  x: number; y: number; disemat: boolean; diikuti: boolean;
+  pilih: () => void; copy: () => void; tutup: () => void;
 }) {
   const kotak = useRef<HTMLDivElement | null>(null);
   const [pos, setPos] = useState({ x, y });
@@ -1181,6 +1237,16 @@ function MenuPin({ x, y, disemat, pilih, tutup }: {
   return createPortal(
     <div ref={kotak} role="menu" style={{ left: pos.x, top: pos.y }}
       className="fixed z-[70] min-w-[188px] overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950 py-1 shadow-xl shadow-black/60">
+      {/* COPY SIGNAL DULUAN. Klik kanan di kartu analis paling sering
+          dimaksudkan untuk mengikutinya — menyematkan cuma urusan tampilan,
+          sementara ini yang menyangkut uang. Yang lebih sering dituju duduk
+          lebih dekat ke kursor. */}
+      <button role="menuitem" onClick={() => { copy(); tutup(); }}
+        className="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left text-[12.5px] text-zinc-300 transition-colors hover:bg-zinc-900 hover:text-zinc-100">
+        <IkonCopy className={cn('size-3.5', diikuti ? 'text-emerald-400' : 'text-zinc-500')} />
+        {diikuti ? 'Ubah setelan copy' : 'Copy Signal'}
+      </button>
+      <div className="my-1 h-px bg-zinc-800/80" />
       <button role="menuitem" onClick={() => { pilih(); tutup(); }}
         className="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left text-[12.5px] text-zinc-300 transition-colors hover:bg-zinc-900 hover:text-zinc-100">
         <Pin className={cn('size-3.5', disemat ? 'fill-current text-amber-400' : 'text-zinc-500')} />
@@ -1677,7 +1743,11 @@ export default function Analisa() {
   /* Panel Copy Signal se-analis. Dibuka dari tombol kanan atas kalender
      performa — sengaja bisa dibuka SEBELUM ada sinyal jalan, karena di
      situlah ukuran posisi seharusnya ditetapkan. */
-  const [copyAnalis, setCopyAnalis] = useState(false);
+  /* SIAPA yang sedang disetel, bukan sekadar "panelnya terbuka". Panel ini
+     kini dibuka dari tiga tempat — klik kanan kartu kanal, ikon di kartu
+     sinyal, dan tombol di Performa Signal — dan dua di antaranya tidak
+     berada di dalam kanal mana pun. Boolean cuma cukup untuk yang ketiga. */
+  const [copyUntuk, setCopyUntuk] = useState<{ uid: string; nama: string; pasangan?: string } | null>(null);
   /* Pesan sekilas — muncul, dibaca, hilang sendiri. Dipakai untuk keadaan
      yang tidak pantas menempati halaman: "belum mengikuti siapa pun" adalah
      ketiadaan, dan ketiadaan tidak butuh ruang tetap di layar. */
@@ -1701,7 +1771,8 @@ export default function Analisa() {
        orangnya sendiri lewat klik kanan.
 
        Yang dibutuhkan cuma URUTANNYA. Kartu yang diikuti naik ke atas
-       lewat komparator, tanpa satu pun sematan berpindah tangan. */   }, [pengguna?.uid, copyAnalis, sub]);
+       lewat komparator, tanpa satu pun sematan berpindah tangan. */
+  }, [pengguna?.uid, copyUntuk, sub]);
   const [masuk, setMasuk] = useState<PermintaanMasuk[]>([]);
   const [statusku, setStatusku] = useState<Record<string, string>>({});
   const [memuat, setMemuat] = useState(true);
@@ -2385,6 +2456,19 @@ export default function Analisa() {
           keduanya menempati ruang yang sama dan bergantian — sama seperti
           kartu analis berganti isi saat tab dipindah, tanpa hamparan yang
           menutupi halaman. */}
+      {/* SATU tempat menggambar panelnya, bukan satu per pintu. Tiga pintu
+          cuma mengisi `copyUntuk`; yang membuka panelnya tetap baris ini.
+          Kalau tiap pintu menggambar panelnya sendiri, tiga salinan markup
+          yang sama harus diubah bersamaan tiap kali panelnya berubah. */}
+      {copyUntuk && (
+        <PanelCopyAnalis
+          analisUid={copyUntuk.uid}
+          analisNama={copyUntuk.nama}
+          contohPasangan={copyUntuk.pasangan}
+          tutup={() => setCopyUntuk(null)}
+        />
+      )}
+
       {sub === 'diikuti' && (
         <SignalDiikuti
           keRuang={(uid) => { setKanalBuka(uid); setSub('market'); }}
@@ -3547,7 +3631,16 @@ export default function Analisa() {
           {menuPin && (
             <MenuPin x={menuPin.x} y={menuPin.y}
               disemat={disematkan(menuPin.uid)}
+              diikuti={diikutiSet.has(menuPin.uid)}
               pilih={() => ubahPin(menuPin.uid)}
+              copy={() => {
+                const isi = kanal.get(menuPin.uid) ?? [];
+                setCopyUntuk({
+                  uid: menuPin.uid,
+                  nama: isi[0]?.nama || 'Analis ini',
+                  pasangan: isi[0]?.pasangan,
+                });
+              }}
               tutup={() => setMenuPin(null)} />
           )}
           </>
@@ -3599,15 +3692,11 @@ export default function Analisa() {
                 return (
                   <>
                     <PerformaKalender sinyal={terpilih}
-                                      onCopy={() => setCopyAnalis(true)} />
-                    {copyAnalis && (
-                      <PanelCopyAnalis
-                        analisUid={kanalBuka ?? ''}
-                        analisNama={terpilih[0]?.nama || 'Analis ini'}
-                        contohPasangan={terpilih[0]?.pasangan}
-                        tutup={() => setCopyAnalis(false)}
-                      />
-                    )}
+                      onCopy={() => setCopyUntuk({
+                        uid: kanalBuka ?? '',
+                        nama: terpilih[0]?.nama || 'Analis ini',
+                        pasangan: terpilih[0]?.pasangan,
+                      })} />
                   </>
                 );
               }

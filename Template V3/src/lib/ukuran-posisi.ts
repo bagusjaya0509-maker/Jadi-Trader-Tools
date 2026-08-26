@@ -177,6 +177,20 @@ export function bulatkanLot(lot: number): number {
  *  memasang lot seratus kali terlalu besar. */
 export type JenisAkun = 'standar' | 'cent';
 
+/** Jenis akun DIBACA, bukan ditanyakan.
+ *
+ *  Penandanya ada di mata uang terminal: akun cent Exness memakai USC/EUC,
+ *  sebagian broker menuliskannya "USD Cent" apa adanya. Aturan yang sama
+ *  sudah lama dipakai lib/akun.ts untuk mengubah saldo cent jadi dolar —
+ *  dipakai ulang di sini supaya keduanya mustahil berselisih pendapat
+ *  tentang akun yang sama.
+ *
+ *  Menanyakannya ke orang adalah pertanyaan yang jawabannya sudah dipegang
+ *  aplikasi, dan salah jawab di situ menggeser ukuran posisi seratus kali. */
+export function deteksiJenisAkun(mataUang: string | null | undefined): JenisAkun {
+  return /cent|USC/i.test(String(mataUang ?? '')) ? 'cent' : 'standar';
+}
+
 /** Ukuran kontrak yang BERLAKU, sesudah jenis akun diperhitungkan.
  *  Dipakai di semua perkalian dolar supaya faktor seratus itu tidak pernah
  *  terlupa di salah satu tempat saja. */
