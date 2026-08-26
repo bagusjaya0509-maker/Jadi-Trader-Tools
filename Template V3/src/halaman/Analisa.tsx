@@ -184,7 +184,19 @@ function BarisHitung({ r, kuIkuti }: { r: RingkasKanal; kuIkuti?: boolean }) {
      dari seluruh sinyal kanal ini, dan satu orang yang menyalin lima
      sinyal terhitung lima. Data kepala orangnya tidak ada, dan label yang
      menyebut "orang" akan mengarang angka yang tidak dimiliki. */
-  const bagian: Array<[string, number]> = [['disalin', r.pengcopy]];
+  /* KAMU IKUT DIHITUNG. Sebelumnya angkanya murni dari server — berapa kali
+     sinyal kanal ini dibeli orang — dan langganan penyalinan yang tersimpan
+     di perangkat tidak menyentuhnya sama sekali.
+
+     Akibatnya kontradiksi di layar yang sama: lencana "KAMU IKUTI" menyala
+     tepat di sebelah angka "0 disalin". Dua keterangan yang saling
+     membantah di satu baris membuat keduanya berhenti dipercaya.
+
+     Menambahkan diri sendiri BUKAN mengarang: kalau kamu mengikutinya,
+     penyalinnya memang minimal satu, dan satu itu kamu. Yang belum bisa
+     dihitung adalah penyalin ORANG LAIN — itu menunggu rute langganan di
+     server. Sampai itu ada, angka ini "sekurang-kurangnya", bukan total. */
+  const bagian: Array<[string, number]> = [['disalin', r.pengcopy + (kuIkuti ? 1 : 0)]];
 
   /* ── "DISALIN" TIDAK MENGHITUNG LANGGANANMU, DAN ITU MEMANG BEGITU ──
      Laporan pemilik: sudah menekan "Ikuti analis ini" pada Agen Momentum,
@@ -227,7 +239,9 @@ function BarisHitung({ r, kuIkuti }: { r: RingkasKanal; kuIkuti?: boolean }) {
       )}
       {bagian.map(([nama, nilai]) => (
         <span key={nama} className="whitespace-nowrap"
-              title={nama === 'batal' ? 'Ditarik penulisnya sebelum harganya datang' : undefined}>
+              title={nama === 'disalin'
+                ? 'Pembelian sinyal kanal ini, ditambah langgananmu sendiri kalau ada. Penyalin orang lain belum terhitung — menunggu rute langganan di server.'
+                : nama === 'batal' ? 'Ditarik penulisnya sebelum harganya datang' : undefined}>
           <span className="angka text-[13px] font-semibold tabular-nums text-zinc-300">{nilai}</span>
           <span className="ml-1 text-[9.5px] text-zinc-600">{nama}</span>
         </span>
