@@ -1375,7 +1375,7 @@ function SignalDiikuti() {
           pantas berdesakan di satu baris bersama tombol yang membatalkannya.
           Grid yang sama dengan kartu kanal supaya halaman ini terasa
           sekeluarga dengan tempat asalnya. */}
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         {daftar.map((l) => (
           <Panel key={l.analisUid} className="flex flex-col gap-2.5 p-4">
             <div className="flex items-center gap-2">
@@ -2451,7 +2451,15 @@ export default function Analisa() {
       {sub === 'diikuti' && createPortal(
         <div className="fixed inset-0 z-[65] overflow-y-auto bg-black/70 p-3 backdrop-blur-sm sm:p-6"
              onClick={() => setSub('market')}>
-          <div className="mx-auto w-full max-w-5xl" onClick={(e) => e.stopPropagation()}>
+          {/* KERANGKANYA DISALIN PERSIS dari panel Posting Signal di bawah:
+              max-w-3xl, tombol Tutup di kanan atas, dan isinya duduk
+              LANGSUNG di atas hamparan — tanpa kartu pembungkus.
+
+              Pembungkus itu yang salah di percobaan sebelumnya: isi halaman
+              ini sendiri sudah berupa kartu-kartu, jadi membungkusnya lagi
+              menghasilkan kartu di dalam kartu — berat, dan tidak mirip
+              dengan panel yang seharusnya jadi contohnya. */}
+          <div className="mx-auto w-full max-w-3xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-2 flex items-center justify-end">
               <button onClick={() => setSub('market')}
                 title="Kembali ke Market Signal"
@@ -2459,9 +2467,7 @@ export default function Analisa() {
                 <X className="size-3.5" /> Tutup
               </button>
             </div>
-            <Panel className="p-4 sm:p-5">
-              <SignalDiikuti />
-            </Panel>
+            <SignalDiikuti />
           </div>
         </div>,
         document.body,
