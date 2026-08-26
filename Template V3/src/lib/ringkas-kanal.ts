@@ -35,6 +35,14 @@ export type TingkatRisiko = 'Rendah' | 'Sedang' | 'Tinggi' | null;
 
 export interface RingkasKanal {
   total: number;
+  /** Berapa kali sinyal kanal ini disalin orang, dijumlah dari seluruh
+   *  sinyalnya.
+   *
+   *  PENYALINAN, bukan kepala orang. Satu orang yang menyalin lima sinyal
+   *  terhitung lima. Data pembedanya memang tidak ada di ringkasan, dan
+   *  menyebutnya "orang" berarti mengarang angka yang tidak dimiliki —
+   *  jadi labelnya di layar berbunyi "disalin", bukan "pengikut". */
+  pengcopy: number;
   /** Sudah kena TP. */
   profit: number;
   /** Sudah kena SL. */
@@ -140,6 +148,7 @@ export function ringkasKanal(
 
   return {
     total: sinyal.length, profit, rugi, batal, berjalan,
+    pengcopy: sinyal.reduce((j, s) => j + (Number(s.jumlahPembeli) || 0), 0),
     pending: pendingDaftar.length,
     pendingTerbaru: pendingDaftar.reduce((t, s) => Math.max(t, s.dibuat || 0), 0),
     winrate, gaya, risiko, alasanRisiko,

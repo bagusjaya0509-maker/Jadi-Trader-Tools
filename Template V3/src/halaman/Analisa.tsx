@@ -23,6 +23,7 @@ import { PotongGambar } from '@/components/potong-gambar';
 import { HitungPosisi } from '@/components/hitung-posisi';
 import { PanelCopyTradeFi } from '@/components/panel-copy-tradefi';
 import { PanelCopyAnalis } from '@/components/panel-copy-analis';
+import { daftarLangganan, hapusLangganan, type LanggananCopy } from '@/lib/copy-langganan';
 import { ambilDraf } from '@/lib/draf-sinyal';
 import { AvatarAnalis } from '@/components/avatar-analis';
 import { KartuAgenSiaga } from '@/components/kartu-agen-siaga';
@@ -170,13 +171,21 @@ function BarisHitung({ r }: { r: RingkasKanal }) {
      satunya bedanya ia disembunyikan waktu nol, karena kanal yang tidak
      pernah membatalkan apa pun tidak perlu memakai ruang untuk mengatakan
      "nol batal". */
-  const bagian: Array<[string, number]> = [
-    ['menang', r.profit],
-    ['kalah', r.rugi],
-    ['jalan', r.berjalan],
-    ['pending', r.pending],
-  ];
-  if (r.batal > 0) bagian.push(['batal', r.batal]);
+  /* ── SATU ANGKA, BUKAN LIMA ──────────────────────────────────────
+     Dulu berisi menang/kalah/jalan/pending/batal. Kelimanya benar, tapi
+     tidak satu pun menjawab pertanyaan yang dibawa orang ke daftar kanal:
+     "analis ini diikuti orang atau tidak?"
+
+     Rekam jejaknya tidak hilang — winrate ada di kepala kartu yang sama,
+     dan rinciannya menunggu satu klik di dalam kanalnya. Yang dicabut
+     cuma lima angka yang menuntut dibaca satu per satu di layar tempat
+     orang sedang MEMILIH, belum menilai.
+
+     Disebut "disalin", bukan "pengikut": angkanya menjumlah penyalinan
+     dari seluruh sinyal kanal ini, dan satu orang yang menyalin lima
+     sinyal terhitung lima. Data kepala orangnya tidak ada, dan label yang
+     menyebut "orang" akan mengarang angka yang tidak dimiliki. */
+  const bagian: Array<[string, number]> = [['disalin', r.pengcopy]];
 
   /* ── ANGKANYA BESAR, LABELNYA KECIL, SEMUANYA ABU ──────────────────
      Bentuk ini diminta pemilik dari contoh kartu yang ia kirim (205 peak
@@ -1098,6 +1107,7 @@ const SUB = [
   { id: 'market',   label: 'Market Signal' },
   { id: 'performa', label: 'Performa Signal' },
   { id: 'posting',  label: 'Posting Signal' },
+  { id: 'diikuti',  label: 'Signal Diikuti' },
 ] as const;
 type IdSub = typeof SUB[number]['id'];
 
@@ -1311,6 +1321,81 @@ function RakSinyal({ ket, children }: { ket: string; children: React.ReactNode }
   );
 }
 
+/* ════════════════════════════════════════════════════════════════════════
+   SIGNAL DIIKUTI — analis yang penyalinannya sudah disetel orang ini
+   ════════════════════════════════════════════════════════════════════════
+   Menempati slot sidebar yang dulu dipakai "Posting Signal". Memposting
+   adalah pekerjaan sesekali dan sekarang punya tombol + mengambang;
+   yang dibuka BERULANG adalah daftar ini — untuk memeriksa setelan, dan
+   untuk berhenti mengikuti tanpa harus mencari kanalnya satu per satu.
+   ════════════════════════════════════════════════════════════════════════ */
+function SignalDiikuti() {
+  const { pengguna } = useAuth();
+  const [daftar, setDaftar] = useState<LanggananCopy[]>([]);
+
+  useEffect(() => { setDaftar(daftarLangganan(pengguna?.uid)); }, [pengguna?.uid]);
+
+  function lepas(uid: string) {
+    if (!pengguna) return;
+    hapusLangganan(pengguna.uid, uid);
+    setDaftar(daftarLangganan(pengguna.uid));
+  }
+
+  if (!pengguna) {
+    return (
+      <p className="rounded-lg border border-zinc-800/60 px-4 py-6 text-center text-[12px] text-zinc-500">
+        Masuk dulu untuk melihat analis yang kamu ikuti.
+      </p>
+    );
+  }
+
+  if (daftar.length === 0) {
+    return (
+      <div className="rounded-lg border border-zinc-800/60 px-4 py-8 text-center">
+        <div className="text-[12.5px] text-zinc-400">Belum mengikuti analis mana pun</div>
+        <div className="mx-auto mt-1 max-w-[320px] text-[11.5px] leading-relaxed text-zinc-600">
+          Buka sebuah kanal, masuk ke Performa Signal, lalu tekan Copy Signal untuk
+          menetapkan lot dan batas rugimu.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {daftar.map((l) => (
+        <div key={l.analisUid}
+             className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-zinc-800/70 bg-zinc-900/30 px-3 py-2.5">
+          <span className="text-[13px] font-medium text-zinc-100">{l.analisNama}</span>
+          <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[9.5px] uppercase tracking-wide text-zinc-400">
+            {l.jenisAkun === 'cent' ? 'cent' : 'standar'}
+          </span>
+          {/* Yang ditulis SETELANNYA, bukan cuma namanya. Daftar yang hanya
+              menyebut nama memaksa membuka satu per satu untuk mengingat
+              berapa yang dipertaruhkan di masing-masing — dan itu justru
+              pertanyaan yang membawa orang ke halaman ini. */}
+          <span className="text-[11px] text-zinc-500">
+            {l.mode === 'lot'
+              ? <>lot tetap <span className="angka text-zinc-300">{l.lotTetap}</span></>
+              : <>lot menyesuaikan SL</>}
+          </span>
+          <span className="text-[11px] text-zinc-500">
+            rugi maks <span className="angka text-amber-300/90">{uang(l.rugiMaks)}</span>
+          </span>
+          <button onClick={() => lepas(l.analisUid)}
+            className="ml-auto cursor-pointer rounded border border-red-500/40 px-2 py-1 text-[11px] text-red-300 transition-colors hover:bg-red-500/10">
+            Batalkan Copy
+          </button>
+        </div>
+      ))}
+      <p className="pt-1 text-[10.5px] leading-relaxed text-zinc-600">
+        Setelan ini tersimpan untuk akunmu. Penyalinan otomatis saat sinyal baru
+        terbit dijalankan pengikut di VPS — bagian itu masih dibangun.
+      </p>
+    </div>
+  );
+}
+
 function pasarKripto(s: RingkasAnalisa): boolean {
   if (s.pasar) return s.pasar === 'kripto';
   return /USDT$/i.test(s.pasangan || '');
@@ -1447,7 +1532,7 @@ export default function Analisa() {
        lain, di saat yang lain. Menaruhnya sebagai tab berarti tiap
        pengunjung yang cuma mencari sinyal harus melewati satu pilihan yang
        tidak pernah ia butuhkan. */
-    .filter((s) => (diDepan ? s.id === 'market' : s.id !== 'posting'))
+    .filter((s) => (diDepan ? s.id === 'market' : s.id !== 'posting' && s.id !== 'diikuti'))
     .map((s) => (!diDepan && s.id === 'market' ? { ...s, label: 'Daftar Signal' } : s));
 
   /* Masuk kanal, yang pertama terlihat Performa Signal — keputusan pemilik.
@@ -1469,7 +1554,7 @@ export default function Analisa() {
      berada di DAFTAR KANAL — tempat tombol + itu berdiri. Di dalam kanal
      ia tetap ditolak, karena di sana memang tidak ada pintunya. */
   const subSah = (id: IdSub) =>
-    id === 'posting' ? diDepan : tabTampil.some((s) => s.id === id);
+    id === 'posting' || id === 'diikuti' ? diDepan : tabTampil.some((s) => s.id === id);
   const sub: IdSub = subMinta && subSah(subMinta) ? subMinta : bawaanSub;
 
   /* Bawaan tidak ditulis ke alamat, tab lain ditulis. Kalau 'market' selalu
@@ -2172,14 +2257,10 @@ export default function Analisa() {
             tambah catatan — dan menebak di halaman yang bisa menerbitkan
             sesuatu yang permanen bukan tebakan yang murah. Di ponsel
             ruangnya memang tidak ada, dan title-nya yang menanggung. */}
-        {diDepan && (
-          <button onClick={() => setSub('posting')}
-            title="Posting sinyal baru — rencananya permanen setelah terbit"
-            className="ml-auto flex cursor-pointer items-center gap-1.5 rounded-md bg-zinc-100 px-2.5 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white">
-            <Plus className="size-3.5" />
-            <span className="hidden sm:inline">Posting Signal</span>
-          </button>
-        )}
+        {/* TOMBOLNYA PINDAH KE POJOK KANAN BAWAH, mengambang — lihat
+            catatannya di dekat tombolnya. Di kepala halaman ia berebut
+            baris dengan tab dan disclaimer, dan di ponsel tulisannya hilang
+            sehingga tinggal ikon + yang bisa berarti apa saja. */}
 
         {/* Badan disclaimer. w-full = flex-wrap menurunkannya ke baris
             sendiri, di bawah kepalanya dan di bawah tombol Posting.
@@ -2289,6 +2370,29 @@ export default function Analisa() {
           pembungkusnya. Keadaan formulir tetap tinggal di komponen
           halaman, jadi menutup jendela di tengah pengisian tidak membuang
           apa yang sudah diketik: ia masih ada saat dibuka lagi. */}
+      {/* ── TOMBOL + MENGAMBANG ──────────────────────────────────────
+          size-14 (56 px): di atas ambang sasaran sentuh 44 px dan cukup
+          besar untuk terlihat tanpa dicari.
+
+          `fixed` mengukur diri terhadap JENDELA, jadi ia tetap di pojok
+          yang sama saat jendelanya diubah ukuran — tanpa satu baris JS pun.
+          Diletakkan di sini, bukan di dalam badan halaman: `fixed` di dalam
+          elemen ber-transform berhenti mengukur ke jendela, dan badan
+          halaman memang punya leluhur ber-transform di beberapa keadaan.
+
+          Disembunyikan saat formulir postingnya sedang terbuka — tombol
+          yang membuka sesuatu yang sudah terbuka cuma menimpa isinya. */}
+      {diDepan && sub !== 'posting' && (
+        <button onClick={() => setSub('posting')}
+          title="Posting sinyal baru — rencananya permanen setelah terbit"
+          aria-label="Posting sinyal baru"
+          className="fixed bottom-6 right-6 z-40 flex size-14 cursor-pointer items-center justify-center rounded-full bg-zinc-100 text-zinc-950 shadow-2xl shadow-black/40 transition-transform hover:scale-105 hover:bg-white active:scale-95">
+          <Plus className="size-6" strokeWidth={2.5} />
+        </button>
+      )}
+
+      {sub === 'diikuti' && <SignalDiikuti />}
+
       {sub === 'posting' && createPortal(
         <div className="fixed inset-0 z-[65] overflow-y-auto bg-black/70 p-3 backdrop-blur-sm sm:p-6"
              {...tutupPosting}>

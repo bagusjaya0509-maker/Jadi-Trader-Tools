@@ -116,7 +116,11 @@ const NAV = [
       { ke: '/copy-signal',        label: 'Copy Signal',      Ikon: Copy,
         sub: [
           { ke: '/copy-signal',             label: 'Market Signal' },
-          { ke: '/copy-signal?sub=posting', label: 'Posting Signal' },
+          /* Slot ini dulu "Posting Signal". Memposting kini punya tombol +
+              mengambang di halamannya, dan yang lebih pantas menempati satu
+              baris tetap di sidebar adalah hal yang orang buka BERULANG:
+              daftar analis yang ia ikuti. */
+          { ke: '/copy-signal?sub=diikuti', label: 'Signal Diikuti' },
         ] },
       { ke: '/integrations',   label: 'Integrations',     Ikon: Plug,
         sub: [
