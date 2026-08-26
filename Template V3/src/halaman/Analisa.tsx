@@ -7,7 +7,7 @@ import {
   Loader2, Lock, Unlock, Send, X, CheckCircle2,
   TrendingUp, TrendingDown, ArrowUp, ArrowDown, RefreshCw, Radar, Sparkles, ImagePlus, Images, Flag, Ban, Trash2, Plus,
   Settings2, UserRound, Pin, TriangleAlert, ArrowLeft, CandlestickChart, ChevronDown, ChevronRight,
-  ChevronLeft, Copy as IkonCopy,
+  ChevronLeft, Copy as IkonCopy, Users,
 } from 'lucide-react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { PanelSinyal } from '@/components/panel-sinyal';
@@ -2415,13 +2415,56 @@ export default function Analisa() {
 
           Disembunyikan saat formulir postingnya sedang terbuka — tombol
           yang membuka sesuatu yang sudah terbuka cuma menimpa isinya. */}
-      {diDepan && sub !== 'posting' && (
+      {/* Dua tombol mengambang, bertumpuk. Yang atas membuka daftar yang
+          diikuti, yang bawah memposting — keduanya pintu ke layar lain dari
+          halaman yang sama, jadi keduanya pantas duduk di sudut yang sama.
+          Yang membuka daftar diberi bentuk sekunder supaya + tetap jadi
+          tindakan utama di halaman ini. */}
+      {diDepan && sub === 'market' && (
+        <button onClick={() => setSub('diikuti')}
+          title="Analis yang kamu ikuti — lot, batas rugi, dan pembatalannya"
+          aria-label="Signal Diikuti"
+          className="fixed bottom-24 right-6 z-40 flex size-14 cursor-pointer items-center justify-center rounded-full border border-zinc-700 bg-zinc-900 text-zinc-200 shadow-2xl shadow-black/40 transition-transform hover:scale-105 hover:border-zinc-500 active:scale-95">
+          <Users className="size-5" strokeWidth={2} />
+        </button>
+      )}
+
+      {diDepan && sub !== 'posting' && sub !== 'diikuti' && (
         <button onClick={() => setSub('posting')}
           title="Posting sinyal baru — rencananya permanen setelah terbit"
           aria-label="Posting sinyal baru"
           className="fixed bottom-6 right-6 z-40 flex size-14 cursor-pointer items-center justify-center rounded-full bg-zinc-100 text-zinc-950 shadow-2xl shadow-black/40 transition-transform hover:scale-105 hover:bg-white active:scale-95">
           <Plus className="size-6" strokeWidth={2.5} />
         </button>
+      )}
+
+      {/* ── SAMA POLANYA DENGAN POSTING SIGNAL ────────────────────────
+          Dua percobaan sebelumnya salah dengan cara yang sama: daftarnya
+          digambar SEBAGAI BAGIAN dari badan Market Signal, jadi ia muncul
+          di bawah papan peringkat, tabel, dan disclaimer — pembaca harus
+          menggulir melewati seluruh halaman lain untuk sampai ke sana.
+
+          Posting Signal sudah lama memecahkan persoalan yang sama: tombolnya
+          tinggal di Market Signal, tapi begitu dibuka ia mengambil ALIH
+          layar sebagai portal. Halaman ini mengikuti pola itu apa adanya —
+          satu pola untuk dua pintu yang sifatnya sama. */}
+      {sub === 'diikuti' && createPortal(
+        <div className="fixed inset-0 z-[65] overflow-y-auto bg-black/70 p-3 backdrop-blur-sm sm:p-6"
+             onClick={() => setSub('market')}>
+          <div className="mx-auto w-full max-w-5xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-2 flex items-center justify-end">
+              <button onClick={() => setSub('market')}
+                title="Kembali ke Market Signal"
+                className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-700 bg-zinc-900 px-2.5 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-500 hover:text-zinc-100">
+                <X className="size-3.5" /> Tutup
+              </button>
+            </div>
+            <Panel className="p-4 sm:p-5">
+              <SignalDiikuti />
+            </Panel>
+          </div>
+        </div>,
+        document.body,
       )}
 
       {sub === 'posting' && createPortal(
@@ -3092,13 +3135,6 @@ export default function Analisa() {
            terbaca sebagai kerusakan. */
         const agenSiaga = agenHadir.filter((ag) => !kanal.has(ag.uid));
         const terpilih = kanalBuka ? kanal.get(kanalBuka) ?? [] : [];
-
-        /* SUB-HALAMAN SENDIRI, bukan sisipan di tengah daftar kanal.
-           Versi pertama menaruhnya di antara disclaimer dan kartu-kartu
-           kanal, dan di sana ia terbaca sebagai potongan yang nyasar —
-           bukan sebagai halaman yang memang dituju orangnya lewat sidebar.
-           Sekarang ia MENGGANTI badan halaman, persis seperti tab lain. */
-        if (kanalBuka === null && sub === 'diikuti') return <SignalDiikuti />;
 
         return kanalBuka === null ? (
           <>
