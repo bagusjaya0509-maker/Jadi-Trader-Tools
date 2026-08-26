@@ -165,7 +165,7 @@ function LencanaKanal({ r, className }: { r: RingkasKanal; className?: string })
  *  Angka nol tetap ditulis, tidak disembunyikan — "0 kalah" dari 12 sinyal
  *  adalah keterangan, dan menghilangkannya membuat kartunya terbaca seperti
  *  belum pernah diuji. */
-function BarisHitung({ r }: { r: RingkasKanal }) {
+function BarisHitung({ r, kuIkuti }: { r: RingkasKanal; kuIkuti?: boolean }) {
   /* Batal ikut ke dalam deret yang sama, bukan ditempel belakangan dengan
      bentuknya sendiri. Ia hitungan sinyal seperti empat lainnya; satu-
      satunya bedanya ia disembunyikan waktu nol, karena kanal yang tidak
@@ -187,6 +187,22 @@ function BarisHitung({ r }: { r: RingkasKanal }) {
      menyebut "orang" akan mengarang angka yang tidak dimiliki. */
   const bagian: Array<[string, number]> = [['disalin', r.pengcopy]];
 
+  /* ── "DISALIN" TIDAK MENGHITUNG LANGGANANMU, DAN ITU MEMANG BEGITU ──
+     Laporan pemilik: sudah menekan "Ikuti analis ini" pada Agen Momentum,
+     tapi angka disalin tetap 0.
+
+     Angka itu datang dari server — berapa kali sinyal kanal ini DIBELI
+     orang. Menekan Ikuti cuma menyimpan setelan penyalinan di perangkat
+     ini; tidak ada satu pun permintaan yang berangkat ke server, jadi
+     tidak ada yang bisa dihitungnya. Menaikkan angkanya di layar tanpa
+     ada yang berubah di server berarti mengarang angka publik dari
+     tindakan pribadi — dan angka itu dibaca orang lain untuk menilai
+     analisnya.
+
+     Yang benar-benar bisa dikatakan jujur di sini adalah keadaan ORANG
+     INI: kamu mengikutinya atau tidak. Itu yang ditampilkan, sebagai
+     lencana terpisah di sebelah angkanya. */
+
   /* ── ANGKANYA BESAR, LABELNYA KECIL, SEMUANYA ABU ──────────────────
      Bentuk ini diminta pemilik dari contoh kartu yang ia kirim (205 peak
      / 100 low / 166 avg), dan alasannya kuat: yang dibaca ANGKANYA, dan
@@ -204,6 +220,12 @@ function BarisHitung({ r }: { r: RingkasKanal }) {
      <button>, dan div di sana bukan susunan yang sah. */
   return (
     <span className="inline-flex flex-wrap items-baseline gap-x-3 gap-y-1">
+      {kuIkuti && (
+        <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[9.5px] font-medium uppercase tracking-wide text-emerald-400"
+              title="Kamu sudah menyetel penyalinan untuk analis ini">
+          kamu ikuti
+        </span>
+      )}
       {bagian.map(([nama, nilai]) => (
         <span key={nama} className="whitespace-nowrap"
               title={nama === 'batal' ? 'Ditarik penulisnya sebelum harganya datang' : undefined}>
@@ -1677,6 +1699,13 @@ export default function Analisa() {
      performa — sengaja bisa dibuka SEBELUM ada sinyal jalan, karena di
      situlah ukuran posisi seharusnya ditetapkan. */
   const [copyAnalis, setCopyAnalis] = useState(false);
+  /* Kumpulan analis yang penyalinannya sudah disetel orang ini. Dibaca
+     ulang tiap panel Copy ditutup — menekan Ikuti di sana harus langsung
+     terlihat di kartu kanalnya, bukan menunggu halaman dimuat lagi. */
+  const [diikutiSet, setDiikutiSet] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    setDiikutiSet(new Set(daftarLangganan(pengguna?.uid).map((l) => l.analisUid)));
+  }, [pengguna?.uid, copyAnalis, sub]);
   const [masuk, setMasuk] = useState<PermintaanMasuk[]>([]);
   const [statusku, setStatusku] = useState<Record<string, string>>({});
   const [memuat, setMemuat] = useState(true);
@@ -2354,6 +2383,22 @@ export default function Analisa() {
       </div>
 
 
+      {/* ── HALAMAN, BUKAN POP-UP ──────────────────────────────────────
+          Ditaruh persis di tempat badan Market Signal, dan badan itu
+          disembunyikan saat sub-nya bukan 'market' (baris di bawah). Jadi
+          keduanya menempati ruang yang sama dan bergantian — sama seperti
+          kartu analis berganti isi saat tab dipindah, tanpa hamparan yang
+          menutupi halaman. */}
+      {sub === 'diikuti' && (
+        <div className="mb-3 flex items-center gap-2">
+          <button onClick={() => setSub('market')}
+            className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-600 hover:text-zinc-100">
+            <ArrowLeft className="size-3.5" /> Kembali
+          </button>
+        </div>
+      )}
+      {sub === 'diikuti' && <SignalDiikuti />}
+
       <div className={cn(sub !== 'market' && 'hidden')}>
       {/* ── Rak sinyal pantauan: empat slot ───────────────────────────
          Duduk di halaman Copy Signal, bukan dashboard: sinyal komunitas
@@ -2438,41 +2483,6 @@ export default function Analisa() {
           className="fixed bottom-6 right-6 z-40 flex size-14 cursor-pointer items-center justify-center rounded-full bg-zinc-100 text-zinc-950 shadow-2xl shadow-black/40 transition-transform hover:scale-105 hover:bg-white active:scale-95">
           <Plus className="size-6" strokeWidth={2.5} />
         </button>
-      )}
-
-      {/* ── SAMA POLANYA DENGAN POSTING SIGNAL ────────────────────────
-          Dua percobaan sebelumnya salah dengan cara yang sama: daftarnya
-          digambar SEBAGAI BAGIAN dari badan Market Signal, jadi ia muncul
-          di bawah papan peringkat, tabel, dan disclaimer — pembaca harus
-          menggulir melewati seluruh halaman lain untuk sampai ke sana.
-
-          Posting Signal sudah lama memecahkan persoalan yang sama: tombolnya
-          tinggal di Market Signal, tapi begitu dibuka ia mengambil ALIH
-          layar sebagai portal. Halaman ini mengikuti pola itu apa adanya —
-          satu pola untuk dua pintu yang sifatnya sama. */}
-      {sub === 'diikuti' && createPortal(
-        <div className="fixed inset-0 z-[65] overflow-y-auto bg-black/70 p-3 backdrop-blur-sm sm:p-6"
-             onClick={() => setSub('market')}>
-          {/* KERANGKANYA DISALIN PERSIS dari panel Posting Signal di bawah:
-              max-w-3xl, tombol Tutup di kanan atas, dan isinya duduk
-              LANGSUNG di atas hamparan — tanpa kartu pembungkus.
-
-              Pembungkus itu yang salah di percobaan sebelumnya: isi halaman
-              ini sendiri sudah berupa kartu-kartu, jadi membungkusnya lagi
-              menghasilkan kartu di dalam kartu — berat, dan tidak mirip
-              dengan panel yang seharusnya jadi contohnya. */}
-          <div className="mx-auto w-full max-w-3xl" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-2 flex items-center justify-end">
-              <button onClick={() => setSub('market')}
-                title="Kembali ke Market Signal"
-                className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-700 bg-zinc-900 px-2.5 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-500 hover:text-zinc-100">
-                <X className="size-3.5" /> Tutup
-              </button>
-            </div>
-            <SignalDiikuti />
-          </div>
-        </div>,
-        document.body,
       )}
 
       {sub === 'posting' && createPortal(
@@ -3479,7 +3489,7 @@ export default function Analisa() {
                         keterangan tentang deretan sinyal yang sama: berapa
                         banyak, dan sepanjang apa. */}
                     <span className="relative z-10 mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-zinc-800/70 bg-zinc-950 px-4 py-2.5">
-                      <BarisHitung r={r} />
+                      <BarisHitung r={r} kuIkuti={diikutiSet.has(uid)} />
                       <span className="angka ml-auto shrink-0 text-[10px] text-zinc-600">
                         {tanggalPendek(mulaiPosting)} – {tanggalPendek(terakhirPosting)}
                       </span>
