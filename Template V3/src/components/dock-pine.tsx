@@ -235,6 +235,11 @@ export interface KendaliPine {
   daftar: { id: string; nama: string; aktif: boolean }[];
   jalankan: (id: string) => void;
   nonaktif: () => void;
+  /** Hapus skrip dari DAFTAR, bukan sekadar melepasnya dari chart.
+   *  Dipakai menu Indikator supaya skrip bisa dibuang tanpa membuka dock
+   *  editornya dulu — daftar skripnya ada di sana, jadi pembuangannya
+   *  pantas ada di sana juga. */
+  hapus: (id: string) => void;
 }
 
 export function DockPine({ buka, tab, aturTab, onTutup, lilin, simbol, tf, hingga, aturHasil, onInfo, onKendali }: {
@@ -388,12 +393,30 @@ export function DockPine({ buka, tab, aturTab, onTutup, lilin, simbol, tf, hingg
 
   /* Menu Indikator di luar sana butuh daftar + kendali. Dikirim ulang tiap
      daftarnya berubah. */
+  /* Menerima ID, bukan memakai yang sedang dipilih. Menu Indikator
+     menghapus baris yang ditunjuk kursornya — yang belum tentu skrip yang
+     sedang terbuka di editor, dan menghapus "yang sedang dipilih" saat
+     orang menunjuk baris lain adalah menghapus yang salah. */
+  const hapusId = useCallback((id: string) => {
+    const d = acuan.current.daftar;
+    if (d.length <= 1) return;
+    const sasaran = d.find((s) => s.id === id);
+    if (!sasaran) return;
+    if (!confirm(`Hapus skrip "${sasaran.nama}"?`)) return;
+    ubahDaftar((x) => x.filter((s) => s.id !== id));
+    const sisa = acuan.current.daftar.filter((s) => s.id !== id);
+    setIdPilih((kini) => (kini === id ? sisa[0]?.id ?? '' : kini));
+    if (sasaran.aktif) { setHasil(null); aturHasil(null); onInfo(null); }
+  }, [ubahDaftar, aturHasil, onInfo]);
+
+  function hapusSkrip() { hapusId(idPilih); }
+
   useEffect(() => {
     onKendali({
       daftar: daftar.map(({ id, nama, aktif: a }) => ({ id, nama, aktif: a })),
-      jalankan, nonaktif,
+      jalankan, nonaktif, hapus: hapusId,
     });
-  }, [daftar, jalankan, nonaktif, onKendali]);
+  }, [daftar, jalankan, nonaktif, hapusId, onKendali]);
 
   /* ── Skrip aktif dijalankan SENDIRI saat data pertama siap ──────────
      Itulah arti "tersimpan default": indikator yang kemarin terpasang
@@ -449,15 +472,6 @@ export function DockPine({ buka, tab, aturTab, onTutup, lilin, simbol, tf, hingg
     setIdPilih(id);
   }
 
-  function hapusSkrip() {
-    if (daftar.length <= 1) return;
-    if (!confirm(`Hapus skrip "${pilih?.nama}"?`)) return;
-    const hapusAktif = pilih?.aktif;
-    ubahDaftar((d) => d.filter((s) => s.id !== idPilih));
-    const sisa = acuan.current.daftar.filter((s) => s.id !== idPilih);
-    setIdPilih(sisa[0]?.id ?? '');
-    if (hapusAktif) { setHasil(null); aturHasil(null); onInfo(null); }
-  }
 
   const kelompok: [string, InputPine[]][] = [];
   (hasil?.input ?? []).forEach((inp) => {

@@ -3326,13 +3326,26 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                               className="shrink-0 cursor-pointer rounded p-1 text-zinc-500 transition-colors hover:text-zinc-100">
                               <Code2 className="size-3.5" />
                             </button>
-                            <button onClick={() => kendaliPine?.nonaktif()}
-                              title="Lepas dari chart" aria-label="Lepas dari chart"
-                              className="shrink-0 cursor-pointer rounded p-1 text-zinc-500 transition-colors hover:text-red-400">
-                              <X className="size-3.5" />
-                            </button>
                           </>
                         )}
+                        {/* SILANG = HAPUS SKRIPNYA, bukan melepas dari chart.
+                            Melepas sudah jadi tugas baris utamanya — menekan
+                            namanya memasang, menekan lagi melepas — jadi
+                            silang yang cuma melepas mengerjakan hal yang
+                            sudah punya kendali sendiri, dan menyisakan
+                            daftar skrip yang tidak bisa dibersihkan tanpa
+                            membuka dock editor dulu.
+
+                            Tampil di SEMUA baris, bukan cuma yang terpasang:
+                            yang paling ingin dibuang orang justru skrip yang
+                            tidak pernah ia pakai. Konfirmasinya ada di
+                            hapusId — permanen, jadi wajib ditanya. */}
+                        <button onClick={() => kendaliPine?.hapus(s.id)}
+                          disabled={(kendaliPine?.daftar.length ?? 0) <= 1}
+                          title="Hapus skrip ini" aria-label="Hapus skrip ini"
+                          className="shrink-0 cursor-pointer rounded p-1 text-zinc-600 transition-colors hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-30">
+                          <X className="size-3.5" />
+                        </button>
                       </div>
                     ))}
                   </div>
