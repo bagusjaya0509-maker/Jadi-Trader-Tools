@@ -32,6 +32,9 @@ export interface LanggananCopy {
   modal: number;
   risiko: number;
   kontrak: number;
+  /** Standar atau cent. Mengubah setiap angka dolar dengan faktor seratus,
+   *  jadi ia ikut disimpan — bukan ditebak ulang tiap panel dibuka. */
+  jenisAkun: 'standar' | 'cent';
   sejak: number;
 }
 

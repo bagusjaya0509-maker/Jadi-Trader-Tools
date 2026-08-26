@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Copy, TriangleAlert, CircleCheck, Plug } from 'lucide-react';
+import { X, Copy, TriangleAlert, CircleCheck, Plug, ChevronUp, ChevronDown } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { cn, uang } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 import { useAkunMt5 } from '@/lib/akun';
 import {
-  bacaSetelanRisiko, simpanSetelanRisiko, kontrakBawaan,
-  lotUntukCopy, type SetelanRisiko,
+  bacaSetelanRisiko, simpanSetelanRisiko, kontrakBawaan, kontrakBerlaku,
+  langkahLot, lotUntukCopy, type SetelanRisiko, type JenisAkun,
 } from '@/lib/ukuran-posisi';
 import {
   bacaLangganan, simpanLangganan, hapusLangganan, type LanggananCopy,
@@ -77,6 +77,13 @@ export function PanelCopyAnalis({ analisUid, analisNama, contohPasangan, tutup }
     const s = bacaSetelanRisiko(pengguna?.uid);
     return Math.max(1, Math.round(s.modal * (s.risiko / 100) * 100) / 100);
   });
+  const [jenisAkun, setJenisAkun] = useState<JenisAkun>('standar');
+  /* JARAK SL ACUAN untuk mengikat lot <-> rugi dua arah. Panel ini dibuka
+     saat belum ada sinyal, jadi harus ada satu jarak yang disepakati supaya
+     "naikkan lot" punya jawaban dolar. Yang dipilih orangnya sendiri, dan
+     terlihat — mengikat ke angka tersembunyi berarti dolarnya berubah tanpa
+     sebab yang bisa ditunjuk. */
+  const [acuan, setAcuan] = useState(5);
   const [langganan, setLangganan] = useState<LanggananCopy | null>(null);
   const [kabar, setKabar] = useState('');
 
@@ -97,15 +104,33 @@ export function PanelCopyAnalis({ analisUid, analisNama, contohPasangan, tutup }
     setLotTetap(l.lotTetap);
     setKontrak(l.kontrak);
     if (l.rugiMaks > 0) setRugiMaks(l.rugiMaks);
+    if (l.jenisAkun) setJenisAkun(l.jenisAkun);
   }, [pengguna?.uid, analisUid]);
+
+  const kontrakEfektif = kontrakBerlaku(kontrak, jenisAkun);
 
   const contoh = useMemo(() => CONTOH_JARAK.map((c) => {
     const h = lotUntukCopy({
       lotDiminta: mode === 'lot' ? lotTetap : 0,
-      rugiMaks, kontrak, jarakHarga: c.harga,
+      rugiMaks, kontrak: kontrakEfektif, jarakHarga: c.harga,
     });
     return { ...c, ...h };
-  }), [rugiMaks, kontrak, mode, lotTetap]);
+  }), [rugiMaks, kontrakEfektif, mode, lotTetap]);
+
+  /* ── IKATAN DUA ARAH ────────────────────────────────────────────────
+     Menaikkan lot MENAIKKAN angka rugi maks, karena itulah akibatnya:
+     lot lebih besar pada jarak SL yang sama berarti dolar yang lebih besar.
+     Arah sebaliknya sudah berjalan lewat lotUntukCopy — mengetik dolar
+     mengecilkan lotnya sendiri.
+
+     Dipisah jadi fungsi, bukan efek: efek yang menulis balik ke state yang
+     ia amati adalah gelung yang cuma kebetulan berhenti. */
+  function pakaiLot(lotBaru: number) {
+    setLotTetap(lotBaru);
+    if (acuan > 0 && kontrakEfektif > 0) {
+      setRugiMaks(Math.round(lotBaru * kontrakEfektif * acuan * 100) / 100);
+    }
+  }
 
   /* Persen DITURUNKAN dari dolar, bukan disimpan terpisah. Dua angka yang
      mengatakan hal yang sama tapi disimpan sendiri-sendiri pasti berselisih
@@ -121,7 +146,7 @@ export function PanelCopyAnalis({ analisUid, analisNama, contohPasangan, tutup }
       analisUid, analisNama, mode,
       lotTetap: Math.max(0.01, lotTetap),
       rugiMaks: Math.max(0, rugiMaks),
-      modal: n.modal, risiko: n.risiko, kontrak,
+      modal: n.modal, risiko: n.risiko, kontrak, jenisAkun,
       sejak: langganan?.sejak ?? Date.now(),
     };
     simpanLangganan(pengguna!.uid, isi);
@@ -184,6 +209,29 @@ export function PanelCopyAnalis({ analisUid, analisNama, contohPasangan, tutup }
             <div className="mt-1.5 truncate text-[10px] text-zinc-600">{akun.ket}</div>
           </div>
 
+          {/* JENIS AKUN. Ditaruh menempel pada kotak akunnya, bukan di
+              antara isian angka: ia menerangkan AKUN, dan salah memilihnya
+              menggeser setiap angka dolar di bawah dengan faktor seratus.
+              Yang mengira akunnya cent padahal standar akan memasang lot
+              seratus kali terlalu besar. */}
+          <div className="mt-2 flex items-center gap-1.5">
+            <span className="text-[10.5px] text-zinc-500">Jenis akun</span>
+            {(['standar', 'cent'] as const).map((v) => (
+              <button key={v} onClick={() => setJenisAkun(v)}
+                title={v === 'cent'
+                  ? 'Akun cent — 1 lot bernilai seperseratus akun standar'
+                  : 'Akun standar — 1 lot penuh'}
+                className={cn('cursor-pointer rounded border px-2 py-0.5 text-[10.5px] uppercase transition-colors',
+                  jenisAkun === v ? 'border-zinc-500 bg-zinc-800/60 text-zinc-100'
+                                  : 'border-zinc-800 text-zinc-500 hover:border-zinc-700')}>
+                {v}
+              </button>
+            ))}
+            {jenisAkun === 'cent' && (
+              <span className="text-[10px] text-amber-300/80">1 lot = 1/100 standar</span>
+            )}
+          </div>
+
           <div className="mt-3 flex items-baseline gap-2">
             <span className="text-[11px] text-zinc-500">Mengikuti</span>
             <span className="truncate text-[13px] font-semibold text-zinc-100">{analisNama}</span>
@@ -216,9 +264,25 @@ export function PanelCopyAnalis({ analisUid, analisNama, contohPasangan, tutup }
             {mode === 'lot' ? (
               <label className="block">
                 <span className="mb-1 block text-[10.5px] text-zinc-500">Lot tiap sinyal</span>
-                <input value={lotTetap} inputMode="decimal"
-                  onChange={(e) => setLotTetap(Math.max(0, Number(e.target.value) || 0))}
-                  className={cn(ISIAN, 'angka')} />
+                {/* Naik-turun 0,01 — langkah terkecil yang diterima hampir
+                    semua broker MT5. Mengetik tetap bisa; tombolnya untuk
+                    yang menyetel sambil melihat dolarnya bergerak, dan itu
+                    justru cara orang menemukan lot yang pas. */}
+                <div className="flex items-stretch gap-1">
+                  <input value={lotTetap} inputMode="decimal"
+                    onChange={(e) => pakaiLot(Math.max(0, Number(e.target.value) || 0))}
+                    className={cn(ISIAN, 'angka')} />
+                  <div className="flex shrink-0 flex-col gap-px">
+                    {([[1, ChevronUp], [-1, ChevronDown]] as const).map(([arah, Ikon]) => (
+                      <button key={arah} type="button"
+                        onClick={() => pakaiLot(langkahLot(lotTetap, arah))}
+                        aria-label={arah === 1 ? 'Naikkan lot 0,01' : 'Turunkan lot 0,01'}
+                        className="flex flex-1 cursor-pointer items-center justify-center rounded border border-zinc-800 px-1 text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-100">
+                        <Ikon className="size-3" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </label>
             ) : (
               <label className="block">
@@ -233,6 +297,26 @@ export function PanelCopyAnalis({ analisUid, analisNama, contohPasangan, tutup }
                 className={cn(ISIAN, 'angka')} />
             </label>
           </div>
+
+          {/* Jarak SL yang dipakai mengikat lot dengan dolar. Tanpa ini
+              "naikkan lot" tidak punya jawaban dolar sama sekali, karena
+              belum ada sinyal yang jarak SL-nya bisa dipakai. */}
+          {mode === 'lot' && (
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10.5px] text-zinc-500">
+              <span>Dolarnya dihitung pada</span>
+              {CONTOH_JARAK.map((c) => (
+                <button key={c.harga} onClick={() => {
+                  setAcuan(c.harga);
+                  setRugiMaks(Math.round(lotTetap * kontrakEfektif * c.harga * 100) / 100);
+                }}
+                  className={cn('cursor-pointer rounded border px-1.5 py-0.5 transition-colors',
+                    acuan === c.harga ? 'border-zinc-500 text-zinc-200'
+                                      : 'border-zinc-800 hover:border-zinc-600 hover:text-zinc-200')}>
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Penerjemah dua arah. Ditulis sebagai kalimat, bukan kolom
               ketiga: ia keterangan atas angka di atasnya, bukan angka

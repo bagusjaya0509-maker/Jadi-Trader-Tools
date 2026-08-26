@@ -166,6 +166,33 @@ export function bulatkanLot(lot: number): number {
   return Math.floor(lot * 100) / 100;
 }
 
+/** Standar atau CENT. Bukan detail administratif — ia mengubah setiap angka
+ *  dolar di layar dengan faktor seratus.
+ *
+ *  Di akun cent, saldo dan untung-rugi dicatat dalam sen mata uangnya, dan
+ *  1 lot menggerakkan seperseratus dari yang digerakkan 1 lot akun standar.
+ *  Orang yang memakai akun cent lalu membaca hitungan versi standar akan
+ *  melihat kerugian seratus kali lipat dari yang sebenarnya — dan lebih
+ *  berbahaya sebaliknya: yang mengira akunnya cent padahal standar
+ *  memasang lot seratus kali terlalu besar. */
+export type JenisAkun = 'standar' | 'cent';
+
+/** Ukuran kontrak yang BERLAKU, sesudah jenis akun diperhitungkan.
+ *  Dipakai di semua perkalian dolar supaya faktor seratus itu tidak pernah
+ *  terlupa di salah satu tempat saja. */
+export function kontrakBerlaku(kontrak: number, jenis: JenisAkun): number {
+  return jenis === 'cent' ? kontrak / 100 : kontrak;
+}
+
+/** Naik-turun satu anak tangga lot. 0,01 = langkah terkecil yang diterima
+ *  hampir semua broker MT5. Dibulatkan lewat perkalian bilangan bulat
+ *  karena 0.1 + 0.01 di float menghasilkan 0.11000000000000001, dan angka
+ *  itu ditolak broker sebagai lot yang tidak sah. */
+export function langkahLot(lot: number, arah: 1 | -1, langkah = 0.01): number {
+  const n = Math.round(lot * 100) + Math.round(langkah * 100) * arah;
+  return Math.max(0.01, n / 100);
+}
+
 export interface LotCopy {
   /** Lot yang benar-benar dikirim, sudah dibulatkan dan sudah dibatasi. */
   lot: number;

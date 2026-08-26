@@ -7,8 +7,8 @@ import { daftarSimbolMt5 } from '@/lib/pasar';
 import { simbolDasarMt5 } from '@/lib/simbol';
 import { kirimPerintahMt5, tungguHasilMt5 } from '@/lib/mt5-order';
 import {
-  bacaSetelanRisiko, simpanSetelanRisiko, kontrakBawaan, besarPip,
-  lotUntukCopy, type SetelanRisiko,
+  bacaSetelanRisiko, simpanSetelanRisiko, kontrakBawaan, kontrakBerlaku, besarPip,
+  lotUntukCopy, type SetelanRisiko, type JenisAkun,
 } from '@/lib/ukuran-posisi';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -60,6 +60,10 @@ export function PanelCopyTradeFi({ pasangan, arah, entry, sl, tp, penulis, tutup
     const x = bacaSetelanRisiko(pengguna?.uid);
     return Math.max(1, Math.round(x.modal * (x.risiko / 100) * 100) / 100);
   });
+  /* Jenis akun ikut ke sini karena panel INI yang mengirim ordernya.
+     Cent yang dikira standar memasang lot seratus kali terlalu besar —
+     kesalahan yang tidak bisa ditarik kembali sesudah ordernya masuk. */
+  const [jenisAkun, setJenisAkun] = useState<JenisAkun>('standar');
   const [sibuk, setSibuk] = useState(false);
   const [kabar, setKabar] = useState('');
   const [selesai, setSelesai] = useState(false);
@@ -93,9 +97,10 @@ export function PanelCopyTradeFi({ pasangan, arah, entry, sl, tp, penulis, tutup
      benar-benar bekerja: sinyal ber-SL lebar otomatis dapat lot lebih kecil,
      jadi angka rugi di bawah tetap sama berapa pun analis melebarkan
      stopnya. */
+  const kontrakEfektif = kontrakBerlaku(kontrak, jenisAkun);
   const h = useMemo(
-    () => lotUntukCopy({ lotDiminta: 0, rugiMaks, kontrak, jarakHarga }),
-    [rugiMaks, kontrak, jarakHarga]);
+    () => lotUntukCopy({ lotDiminta: 0, rugiMaks, kontrak: kontrakEfektif, jarakHarga }),
+    [rugiMaks, kontrakEfektif, jarakHarga]);
   const lot = h.lot;
   /* Rugi SESUDAH pembulatan lot, bukan angka yang diketik. Lot dibulatkan ke
      bawah, jadi yang benar-benar dipertaruhkan selalu sedikit lebih kecil —
@@ -179,7 +184,25 @@ export function PanelCopyTradeFi({ pasangan, arah, entry, sl, tp, penulis, tutup
             ))}
           </div>
 
-          <div className="mt-3 grid grid-cols-3 gap-2">
+          <div className="mt-2.5 flex items-center gap-1.5">
+            <span className="text-[10.5px] text-zinc-500">Jenis akun</span>
+            {(['standar', 'cent'] as const).map((v) => (
+              <button key={v} onClick={() => setJenisAkun(v)}
+                title={v === 'cent'
+                  ? 'Akun cent — 1 lot bernilai seperseratus akun standar'
+                  : 'Akun standar — 1 lot penuh'}
+                className={cn('cursor-pointer rounded border px-2 py-0.5 text-[10.5px] uppercase transition-colors',
+                  jenisAkun === v ? 'border-zinc-500 bg-zinc-800/60 text-zinc-100'
+                                  : 'border-zinc-800 text-zinc-500 hover:border-zinc-700')}>
+                {v}
+              </button>
+            ))}
+            {jenisAkun === 'cent' && (
+              <span className="text-[10px] text-amber-300/80">1 lot = 1/100 standar</span>
+            )}
+          </div>
+
+          <div className="mt-2.5 grid grid-cols-3 gap-2">
             {/* DOLAR, bukan persen. Yang dirasakan orang saat posisinya merah
                 bukan persen melainkan dolar, dan persen menuntut ia mengalikan
                 di kepalanya lebih dulu untuk tahu apa yang dipertaruhkan. */}
