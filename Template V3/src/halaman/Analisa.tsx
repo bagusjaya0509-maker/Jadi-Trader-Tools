@@ -7,6 +7,7 @@ import {
   Loader2, Lock, Unlock, Send, X, CheckCircle2,
   TrendingUp, TrendingDown, ArrowUp, ArrowDown, RefreshCw, Radar, Sparkles, ImagePlus, Images, Flag, Ban, Trash2, Plus,
   Settings2, UserRound, Pin, TriangleAlert, ArrowLeft, CandlestickChart, ChevronDown, ChevronRight,
+  ChevronLeft,
 } from 'lucide-react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { PanelSinyal } from '@/components/panel-sinyal';
@@ -1142,6 +1143,114 @@ function MenuPin({ x, y, disemat, pilih, tutup }: {
  *  yang berakhiran USDT pasti kripto, sisanya Trade-Fi. Tanpa cadangan itu
  *  sinyal lama semuanya jatuh ke satu kelompok yang salah, dan yang paling
  *  lama justru yang paling banyak dipakai menilai rekam jejak. */
+/* ════════════════════════════════════════════════════════════════════════
+   RAK SINYAL — keterangan raknya sekaligus kendali gesernya
+   ════════════════════════════════════════════════════════════════════════
+   Rak kartu digulir mendatar. Sebelumnya itu diserahkan sepenuhnya pada
+   batang gulir bawaan peramban, dan batang setebal 9 px di bawah tiap
+   kelompok membuat halaman yang sudah penuh kartu bertepi jadi bergaris
+   abu-abu di mana-mana -- padahal isyarat "masih ada lagi di kanan" cuma
+   perlu disampaikan sekali.
+
+   Panahnya duduk di baris keterangan, bukan di tiap kelompok. Satu rak bisa
+   berisi dua kelompok (Kripto dan Trade-Fi) dan keduanya bagian dari
+   jawaban yang sama; dua pasang panah untuk satu pertanyaan cuma memaksa
+   orang memilih panah mana yang ia maksud.
+
+   MUNCUL HANYA KALAU ADA YANG BISA DIGESER. Panah mati yang selalu
+   terpampang mengajarkan orang untuk berhenti melihatnya, dan sesudah itu
+   ia tidak lagi berfungsi sebagai isyarat saat isinya memang meluber.
+   ════════════════════════════════════════════════════════════════════════ */
+function RakSinyal({ ket, children }: { ket: string; children: React.ReactNode }) {
+  const wadah = useRef<HTMLDivElement>(null);
+  const [bisa, setBisa] = useState({ kiri: false, kanan: false });
+
+  const raks = () => Array.from(
+    wadah.current?.querySelectorAll<HTMLElement>('[data-rak]') ?? []);
+
+  /* Diukur dari SEMUA kelompok sekaligus: selama masih ada satu yang bisa
+     digeser ke arah itu, panahnya masih ada gunanya. Toleransi 2 px karena
+     scrollLeft pecahan (zoom peramban, layar HiDPI) tidak pernah persis
+     menyentuh batasnya. */
+  const ukur = () => {
+    const d = raks();
+    setBisa({
+      kiri: d.some((el) => el.scrollLeft > 2),
+      kanan: d.some((el) => el.scrollLeft + el.clientWidth < el.scrollWidth - 2),
+    });
+  };
+
+  /* SEMUA pengamat dipasang pada WADAHNYA, sekali saat dipasang — bukan pada
+     tiap rak dengan `children` sebagai dependensi.
+
+     `children` adalah objek baru di tiap render, dan halaman ini render ulang
+     mengikuti harga yang berdetak. Dependensi itu berarti seluruh pendengar
+     dan ResizeObserver dibongkar-pasang beberapa detik sekali, selamanya,
+     untuk hasil yang sama persis.
+
+     scroll TIDAK menggelembung, jadi pendengarnya dipasang di fase CAPTURE —
+     itu yang membuat satu pendengar di wadah cukup untuk berapa pun jumlah
+     rak di dalamnya. Pengamat mutasi menutup sisanya: rak yang muncul atau
+     hilang saat orang berpindah tab tetap terukur tanpa perlu dependensi. */
+  useEffect(() => {
+    const w = wadah.current;
+    if (!w) return;
+    ukur();
+    w.addEventListener('scroll', ukur, true);
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(ukur) : null;
+    ro?.observe(w);
+    const mo = typeof MutationObserver !== 'undefined' ? new MutationObserver(ukur) : null;
+    mo?.observe(w, { childList: true, subtree: true });
+    window.addEventListener('resize', ukur);
+    return () => {
+      w.removeEventListener('scroll', ukur, true);
+      ro?.disconnect();
+      mo?.disconnect();
+      window.removeEventListener('resize', ukur);
+    };
+  }, []);
+
+  /* Segeser SATU KARTU lebih, bukan selebar rak penuh. Menggeser tepat
+     selebar layar membuat kartu yang tadi di tepi kanan lenyap sama sekali,
+     dan orang kehilangan sambungannya. Menyisakan satu kartu di layar
+     adalah jangkar yang membuat gerakannya terbaca. */
+  const geser = (arah: 1 | -1) => {
+    raks().forEach((el) => {
+      const langkah = Math.max(el.clientWidth - 340, 340);
+      el.scrollBy({ left: arah * langkah, behavior: 'smooth' });
+    });
+  };
+
+  const Panah = ({ arah, mati }: { arah: 1 | -1; mati: boolean }) => (
+    <button
+      type="button"
+      onClick={() => geser(arah)}
+      disabled={mati}
+      aria-label={arah === -1 ? 'Geser rak ke kiri' : 'Geser rak ke kanan'}
+      className={cn('flex size-6 items-center justify-center rounded border transition-colors',
+        mati
+          ? 'cursor-not-allowed border-zinc-800/60 text-zinc-700'
+          : 'cursor-pointer border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-100')}>
+      {arah === -1 ? <ChevronLeft className="size-3.5" /> : <ChevronRight className="size-3.5" />}
+    </button>
+  );
+
+  return (
+    <>
+      <div className="mb-3 flex items-start gap-3">
+        <p className="min-w-0 flex-1 text-[11.5px] leading-relaxed text-zinc-600">{ket}</p>
+        {(bisa.kiri || bisa.kanan) && (
+          <div className="flex shrink-0 items-center gap-1">
+            <Panah arah={-1} mati={!bisa.kiri} />
+            <Panah arah={1} mati={!bisa.kanan} />
+          </div>
+        )}
+      </div>
+      <div ref={wadah}>{children}</div>
+    </>
+  );
+}
+
 function pasarKripto(s: RingkasAnalisa): boolean {
   if (s.pasar) return s.pasar === 'kripto';
   return /USDT$/i.test(s.pasangan || '');
@@ -3300,8 +3409,7 @@ export default function Analisa() {
                       );
                     })}
                   </div>
-                  <p className="mb-3 text-[11.5px] leading-relaxed text-zinc-600">{pilih.ket}</p>
-
+                  <RakSinyal ket={pilih.ket}>
                   {tampil.length === 0 ? (
                     <p className="rounded-lg border border-zinc-800/60 px-4 py-6 text-center text-[12px] text-zinc-600">
                       Tidak ada sinyal di ruangan ini.
@@ -3342,7 +3450,13 @@ export default function Analisa() {
                                 kartu bertepi. */}
                             <span className="h-px flex-1 bg-zinc-800/70" />
                           </div>
-                          <div className="flex items-stretch gap-4 overflow-x-auto pb-1">
+                          {/* data-rak: penanda yang dicari RakSinyal untuk
+                              menggeser. gulir-senyap menyembunyikan batang
+                              gulirnya — gesernya sendiri TIDAK dimatikan,
+                              jadi roda mouse mendatar, geser dua jari, dan
+                              usap di HP tetap bekerja seperti biasa. Yang
+                              hilang cuma gambarnya. */}
+                          <div data-rak className="gulir-senyap flex items-stretch gap-4 overflow-x-auto pb-1">
                             {g.isi.map((a) => (
                               <div key={a.id} className="flex w-[320px] shrink-0">
                                 <KartuAnalisa a={a} status={statusku[a.id]}
@@ -3355,6 +3469,7 @@ export default function Analisa() {
                       ))}
                     </div>
                   )}
+                  </RakSinyal>
                 </>
               );
             })()}
