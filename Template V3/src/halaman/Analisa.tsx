@@ -119,10 +119,15 @@ const BATAS_SL_TF: Record<string, number> = {
   '1d': 13, '3d': 22, '1w': 40, '1M': 70,
 };
 
+/* TANPA GARIS TEPI. Kartu analis sudah punya garis tepinya sendiri, dan di
+   dalamnya berdiri winrate, kurva, serta baris hitungan yang semuanya polos.
+   Satu-satunya lencana yang dikotaki jadi terbaca seperti tombol — dan
+   lencana ini bukan sesuatu yang bisa ditekan. Warnanya tetap membawa arti
+   yang sama; yang dicabut cuma kotaknya. */
 const WARNA_RISIKO: Record<string, string> = {
-  Rendah: 'border-emerald-500/30 text-emerald-400/90',
-  Sedang: 'border-amber-500/30 text-amber-400/90',
-  Tinggi: 'border-rose-500/30 text-rose-400/90',
+  Rendah: 'bg-emerald-500/10 text-emerald-400/90',
+  Sedang: 'bg-amber-500/10 text-amber-400/90',
+  Tinggi: 'bg-rose-500/10 text-rose-400/90',
 };
 
 function LencanaKanal({ r, className }: { r: RingkasKanal; className?: string }) {
@@ -152,8 +157,8 @@ function LencanaKanal({ r, className }: { r: RingkasKanal; className?: string })
       <span title={r.slPersen !== null
               ? `${r.alasanRisiko} Jarak SL rata-rata ${r.slPersen}% dari harga, dihitung dari sinyalnya yang sudah selesai. Berapa persen MODALmu yang berisiko tergantung ukuran lot yang kamu pakai sendiri.`
               : r.alasanRisiko}
-            className={cn('rounded border px-1.5 py-0.5 text-[10px]',
-              r.risiko ? WARNA_RISIKO[r.risiko] : 'border-zinc-800 text-zinc-600')}>
+            className={cn('rounded px-1.5 py-0.5 text-[10px]',
+              r.risiko ? WARNA_RISIKO[r.risiko] : 'bg-zinc-800/60 text-zinc-500')}>
         {r.risiko ? `Risiko ${r.risiko.toLowerCase()}` : 'Risiko belum dinilai'}
         {r.slPersen !== null && (
           <span className="angka opacity-80"> · SL {r.slPersen}%</span>
