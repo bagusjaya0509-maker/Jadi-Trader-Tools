@@ -456,16 +456,51 @@ export function PenyediaAuth({ children }: { children: React.ReactNode }) {
     galat,
     masuk: async () => {
       setGalat(null);
+      /* ── SAFARI LANGSUNG KE REDIRECT, TIDAK LEWAT POPUP ──────────────
+         Laporan nyata: pengguna MacBook menekan Masuk dan cuma mendapat
+         "Gagal masuk. Coba lagi." tanpa kode.
+
+         Safari memperlakukan popup lebih keras daripada peramban lain.
+         Jendela yang dibuka bukan sebagai akibat LANGSUNG dari klik —
+         dan signInWithPopup membuka jendelanya sesudah beberapa langkah
+         internal SDK — sering ditolak diam-diam, dengan galat yang tidak
+         selalu bernama auth/popup-blocked. Saat kodenya bukan itu,
+         cadangan redirect di bawah tidak pernah jalan.
+
+         Redirect memang jalur yang benar di sini: sejak authDomain
+         dipindah ke jaditrader.co.id (lihat lib/firebase.ts), seluruh
+         alurnya satu origin, jadi ITP tidak punya storage pihak ketiga
+         untuk diblokir. Popup tidak memberi keuntungan apa pun yang
+         sepadan dengan risikonya di peramban ini.
+
+         WebKit di iOS juga tertangkap: Chrome dan Firefox di iPhone
+         semuanya Safari di balik kulitnya, dan mewarisi perilaku yang
+         sama persis. */
+      const ua = typeof navigator === 'undefined' ? '' : navigator.userAgent;
+      const webkit = /^((?!chrome|android).)*safari/i.test(ua) || /iPad|iPhone|iPod/.test(ua);
+
       try {
-        await signInWithPopup(auth, penyediaGoogle);
-      } catch (e: any) {
-        /* Popup diblokir peramban adalah kejadian biasa, bukan kegagalan —
-           alihkan ke mode redirect daripada menyalahkan pengguna. */
-        if (e?.code === 'auth/popup-blocked' || e?.code === 'auth/operation-not-supported-in-this-environment') {
+        if (webkit) {
           await signInWithRedirect(auth, penyediaGoogle);
           return;
         }
+        await signInWithPopup(auth, penyediaGoogle);
+      } catch (e: any) {
         if (e?.code === 'auth/popup-closed-by-user' || e?.code === 'auth/cancelled-popup-request') return;
+        /* Popup diblokir peramban adalah kejadian biasa, bukan kegagalan —
+           alihkan ke mode redirect daripada menyalahkan pengguna.
+
+           PUNYA try SENDIRI. Sebelumnya panggilan ini telanjang di dalam
+           catch: kalau redirect-nya ikut gagal, penolakannya lolos keluar
+           dari `masuk` tanpa pernah menyentuh setGalat — layarnya diam,
+           dan tidak ada satu pun jejak yang bisa ditelusuri. */
+        if (!webkit && (e?.code === 'auth/popup-blocked'
+            || e?.code === 'auth/operation-not-supported-in-this-environment')) {
+          try {
+            await signInWithRedirect(auth, penyediaGoogle);
+            return;
+          } catch (e2) { setGalat(pesanAuth(e2)); return; }
+        }
         setGalat(pesanAuth(e));
       }
     },
@@ -512,7 +547,27 @@ export function pesanAuth(e: unknown): string {
   if (dasar) return `${dasar} (${kode})`;
   /* Kode yang belum dikenal: tampilkan KODENYA, bukan kalimat Inggris SDK.
      Kode pendek bisa dibacakan lewat telepon; kalimat SDK tidak. */
-  return kode ? `Gagal masuk — ${kode}. Kirim kode ini kalau berulang.` : 'Gagal masuk. Coba lagi.';
+  if (kode) return `Gagal masuk — ${kode}. Kirim kode ini kalau berulang.`;
+
+  /* ── TANPA `code` SAMA SEKALI ────────────────────────────────────────
+     Inilah yang benar-benar dilihat pengguna MacBook: "Gagal masuk. Coba
+     lagi." — kalimat yang tidak menyisakan APA PUN untuk ditelusuri, dan
+     karena itu keluhannya tidak bisa ditindaklanjuti sama sekali.
+
+     Galat tanpa `code` bukan galat Firebase: ia TypeError, galat jaringan
+     mentah, atau apa pun yang dilempar di luar SDK. Namanya dan sepotong
+     pesannya ditampilkan apa adanya. Bahasa Inggris di tengah kalimat
+     Indonesia memang jelek — tapi jauh lebih jelek adalah tangkapan layar
+     yang tidak bisa dipakai memperbaiki apa pun.
+
+     Dipotong 90 huruf: yang berguna selalu di awal, dan jejak tumpukan
+     sepanjang layar cuma menakuti orang yang membacanya. */
+  const nama = String((e as { name?: unknown })?.name ?? '').trim();
+  const pesan = String((e as { message?: unknown })?.message ?? '').trim().slice(0, 90);
+  const jejak = [nama, pesan].filter(Boolean).join(': ');
+  return jejak
+    ? `Gagal masuk — ${jejak}. Kirim tulisan ini kalau berulang.`
+    : 'Gagal masuk. Coba lagi.';
 }
 
 export function useAuth() {
