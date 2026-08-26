@@ -8,7 +8,7 @@ import { simbolDasarMt5 } from '@/lib/simbol';
 import { kirimPerintahMt5, tungguHasilMt5 } from '@/lib/mt5-order';
 import {
   bacaSetelanRisiko, simpanSetelanRisiko, kontrakBawaan, besarPip,
-  hitungUkuran, bulatkanLot, type SetelanRisiko,
+  lotUntukCopy, type SetelanRisiko,
 } from '@/lib/ukuran-posisi';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -49,6 +49,17 @@ export function PanelCopyTradeFi({ pasangan, arah, entry, sl, tp, penulis, tutup
   const [kontrak, setKontrak] = useState(() => kontrakBawaan(pasangan));
   const [simbolBroker, setSimbolBroker] = useState<string | null>(null);
   const [memuatSimbol, setMemuatSimbol] = useState(true);
+  /* BATAS RUGI DOLAR — sama persis dengan yang dipakai panel langganan.
+     Di sinilah ia paling penting: panel inilah yang benar-benar mengirim
+     order. Batas yang cuma hidup di layar setelan dan tidak ikut ke jalur
+     eksekusi bukan batas, ia hiasan.
+
+     Bawaannya diturunkan dari modal x persen yang tersimpan, jadi orang
+     yang sudah menyetel risikonya tidak menemukan kolom kosong. */
+  const [rugiMaks, setRugiMaks] = useState(() => {
+    const x = bacaSetelanRisiko(pengguna?.uid);
+    return Math.max(1, Math.round(x.modal * (x.risiko / 100) * 100) / 100);
+  });
   const [sibuk, setSibuk] = useState(false);
   const [kabar, setKabar] = useState('');
   const [selesai, setSelesai] = useState(false);
@@ -76,25 +87,29 @@ export function PanelCopyTradeFi({ pasangan, arah, entry, sl, tp, penulis, tutup
     return () => { hidup = false; };
   }, [pasangan]);
 
-  const u = useMemo(
-    () => hitungUkuran({ entry, sl, kripto: false, pasangan, setelan: n, kontrak }),
-    [entry, sl, pasangan, n, kontrak]);
-
-  const lot = bulatkanLot(u.lot);
+  const jarakHarga = Math.abs(entry - sl);
   const pip = besarPip(pasangan);
-  /* Risiko SESUDAH pembulatan, bukan yang diminta. Lot dibulatkan ke bawah,
-     jadi yang benar-benar dipertaruhkan selalu sedikit lebih kecil dari
-     angka yang diketik — dan yang ditampilkan harus yang benar-benar
-     terjadi, bukan yang diinginkan. */
-  const risikoNyata = lot * kontrak * u.jarakHarga;
+  /* Jarak SL SINYAL INI yang dipakai, bukan contoh. Di sinilah batas dolar
+     benar-benar bekerja: sinyal ber-SL lebar otomatis dapat lot lebih kecil,
+     jadi angka rugi di bawah tetap sama berapa pun analis melebarkan
+     stopnya. */
+  const h = useMemo(
+    () => lotUntukCopy({ lotDiminta: 0, rugiMaks, kontrak, jarakHarga }),
+    [rugiMaks, kontrak, jarakHarga]);
+  const lot = h.lot;
+  /* Rugi SESUDAH pembulatan lot, bukan angka yang diketik. Lot dibulatkan ke
+     bawah, jadi yang benar-benar dipertaruhkan selalu sedikit lebih kecil —
+     dan yang ditampilkan harus yang benar-benar terjadi. */
+  const risikoNyata = h.rugi;
+  const jarakPersen = entry > 0 ? (jarakHarga / entry) * 100 : 0;
 
   const sisiBenar = arah === 'BUY' ? sl < entry && tp > entry : sl > entry && tp < entry;
   const halangan = !pengguna ? 'Masuk dulu untuk memakai Copy Trade.'
-    : !u.sah ? u.sebab
+    : !(entry > 0) || !(sl > 0) ? 'Sinyal ini belum punya entry dan SL yang bisa dihitung.'
     : !sisiBenar ? 'SL/TP sinyal ini berada di sisi yang salah terhadap entry — tidak dikirim.'
+    : h.sebab ? h.sebab
     : memuatSimbol ? ''
     : !simbolBroker ? `Terminal MT5-mu tidak punya simbol yang cocok dengan ${pasangan}. Pastikan EA jalan dan simbolnya tampil di Market Watch.`
-    : lot < 0.01 ? `Lot hasil hitungan ${u.lot.toFixed(4)} di bawah 0,01 — terlalu kecil untuk dikirim. Naikkan modal atau persen risikonya.`
     : '';
 
   async function copySatu() {
@@ -165,13 +180,18 @@ export function PanelCopyTradeFi({ pasangan, arah, entry, sl, tp, penulis, tutup
           </div>
 
           <div className="mt-3 grid grid-cols-3 gap-2">
+            {/* DOLAR, bukan persen. Yang dirasakan orang saat posisinya merah
+                bukan persen melainkan dolar, dan persen menuntut ia mengalikan
+                di kepalanya lebih dulu untuk tahu apa yang dipertaruhkan. */}
+            <label className="block">
+              <span className="mb-1 block text-[10.5px] text-amber-300/80">Rugi maks ($)</span>
+              <input value={rugiMaks} inputMode="decimal"
+                onChange={(e) => setRugiMaks(Math.max(0, Number(e.target.value) || 0))}
+                className={cn(ISIAN, 'angka border-amber-500/30')} />
+            </label>
             <label className="block">
               <span className="mb-1 block text-[10.5px] text-zinc-500">Modal ($)</span>
               <input value={n.modal} onChange={ubah('modal')} inputMode="decimal" className={cn(ISIAN, 'angka')} />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-[10.5px] text-zinc-500">Risiko (%)</span>
-              <input value={n.risiko} onChange={ubah('risiko')} inputMode="decimal" className={cn(ISIAN, 'angka')} />
             </label>
             {/* Ukuran kontrak BISA DISUNTING: ia ditebak dari nama simbolnya,
                 dan broker tidak sepakat (emas 100 oz di sebagian, 10 di
@@ -186,11 +206,11 @@ export function PanelCopyTradeFi({ pasangan, arah, entry, sl, tp, penulis, tutup
           </div>
 
           <div className="mt-3 space-y-1 rounded-lg border border-zinc-800/70 bg-zinc-900/30 p-2.5 text-[11px]">
-            <Baris k="Jarak SL" v={u.sah
-              ? `${u.jarakHarga.toFixed(pip < 0.01 ? 5 : 2)} (${(u.jarakHarga / pip).toFixed(0)} pip · ${u.jarakPersen.toFixed(2)}%)`
+            <Baris k="Jarak SL" v={jarakHarga > 0
+              ? `${jarakHarga.toFixed(pip < 0.01 ? 5 : 2)} (${(jarakHarga / pip).toFixed(0)} pip · ${jarakPersen.toFixed(2)}%)`
               : '—'} />
-            <Baris k="Risiko diminta" v={u.sah ? uang(u.risikoDolar) : '—'} />
-            <Baris k="Risiko sebenarnya" v={lot >= 0.01 ? uang(risikoNyata) : '—'}
+            <Baris k="Batas rugimu" v={rugiMaks > 0 ? uang(rugiMaks) : '—'} />
+            <Baris k="Rugi kalau SL kena" v={lot >= 0.01 ? uang(risikoNyata) : '—'}
               ket="setelah lot dibulatkan ke bawah" />
             <div className="mt-1.5 flex items-baseline gap-2 border-t border-zinc-800/70 pt-2">
               <span className="text-[11px] text-zinc-500">Lot dikirim</span>
@@ -232,9 +252,11 @@ export function PanelCopyTradeFi({ pasangan, arah, entry, sl, tp, penulis, tutup
               — dan panel yang diam soal itu membuat orang mengira sekali
               tekan berarti tidak bisa mundur lagi. */}
           <p className="mt-2.5 text-[10.5px] leading-relaxed text-zinc-600">
-            Entry-nya mengikuti rencana analis. Kalau harga belum menyentuhnya, EA
-            memasangnya sebagai pending — batalkan lewat tabel Order Terbuka di
-            Chart &amp; Entry.
+            Lot dihitung dari <span className="text-amber-300/90">batas rugimu</span>,
+            bukan dari lot analis — SL yang lebih lebar berarti lot yang lebih kecil,
+            bukan rugi yang lebih besar. Entry-nya mengikuti rencana analis; kalau
+            harga belum menyentuhnya, EA memasangnya sebagai pending — batalkan lewat
+            tabel Order Terbuka di Chart &amp; Entry.
           </p>
         </div>
       </div>

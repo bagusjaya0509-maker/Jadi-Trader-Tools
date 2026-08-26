@@ -17,9 +17,18 @@
 export interface LanggananCopy {
   analisUid: string;
   analisNama: string;
-  /** 'lot' = lot tetap tiap sinyal. 'risiko' = lot dihitung dari jarak SL. */
+  /** 'lot' = lot tetap tiap sinyal, TETAP dibatasi rugiMaks.
+   *  'risiko' = lot dihitung supaya rugi saat SL kena persis rugiMaks. */
   mode: 'lot' | 'risiko';
   lotTetap: number;
+  /** BATAS RUGI PER TRADE, dalam dolar. Angka terpenting di catatan ini.
+   *
+   *  Yang menentukan berapa dolar hilang saat SL kena adalah lot DIKALI
+   *  jarak SL — dan jarak SL milik analis, bukan milik yang meniru. Analis
+   *  yang melebarkan stopnya mengalikan kerugian peniru tanpa peniru
+   *  mengubah apa pun. Batas ini yang membalik arahnya: kerugiannya yang
+   *  dipatok, lotnya yang menyesuaikan. */
+  rugiMaks: number;
   modal: number;
   risiko: number;
   kontrak: number;

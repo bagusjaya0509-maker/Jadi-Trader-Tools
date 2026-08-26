@@ -165,3 +165,72 @@ export function hitungUkuran(p: {
 export function bulatkanLot(lot: number): number {
   return Math.floor(lot * 100) / 100;
 }
+
+export interface LotCopy {
+  /** Lot yang benar-benar dikirim, sudah dibulatkan dan sudah dibatasi. */
+  lot: number;
+  /** Rugi kalau SL kena, memakai lot di atas. */
+  rugi: number;
+  /** Lot diperkecil karena melewati batas rugi yang ditetapkan peniru. */
+  dibatasi: boolean;
+  /** Lot yang diminta sebelum dibatasi — dipakai menerangkan pemotongannya. */
+  lotDiminta: number;
+  sebab: string;
+}
+
+/**
+ * Lot untuk MENIRU sinyal orang lain, dengan BATAS RUGI milik peniru.
+ *
+ * Inilah inti perlindungannya. Yang menentukan berapa dolar hilang saat SL
+ * kena adalah lot DIKALI jarak SL — dan jarak SL itu milik analis, bukan
+ * milik yang meniru. Analis yang melebarkan stop dari 20 poin ke 200 poin
+ * mengalikan kerugian peniru sepuluh kali lipat tanpa peniru mengubah apa
+ * pun, dan tanpa ia diberi tahu.
+ *
+ * Batas dolar membalik arahnya: yang dipatok kerugiannya, dan LOT yang
+ * menyesuaikan. Stop yang melebar berarti lot yang mengecil, bukan rugi
+ * yang membengkak.
+ *
+ * Berlaku juga pada mode LOT TETAP. Lot tetap yang tidak dibatasi punya
+ * persis kelemahan yang sama — dan orang memilih lot tetap justru karena
+ * ingin sederhana, bukan karena ingin tanpa pengaman.
+ *
+ * @param lotDiminta 0 = hitung dari batas rugi. >0 = lot tetap yang diminta.
+ */
+export function lotUntukCopy(p: {
+  lotDiminta: number;
+  rugiMaks: number;
+  kontrak: number;
+  jarakHarga: number;
+}): LotCopy {
+  const { lotDiminta, rugiMaks, kontrak, jarakHarga } = p;
+  const kosong = { lot: 0, rugi: 0, dibatasi: false, lotDiminta: 0, sebab: '' };
+
+  if (!(kontrak > 0) || !(jarakHarga > 0)) {
+    return { ...kosong, sebab: 'Jarak SL atau ukuran kontraknya belum masuk akal.' };
+  }
+  if (!(rugiMaks > 0)) {
+    return { ...kosong, sebab: 'Tetapkan dulu batas rugi maksimal per trade.' };
+  }
+
+  /* Lot terbesar yang kerugiannya masih di dalam batas. Dibulatkan KE BAWAH
+     supaya pembulatannya sendiri tidak melampaui batas yang dijaga. */
+  const lotBatas = bulatkanLot(rugiMaks / (kontrak * jarakHarga));
+  const diminta = lotDiminta > 0 ? bulatkanLot(lotDiminta) : lotBatas;
+  const lot = Math.min(diminta, lotBatas);
+
+  if (lot < 0.01) {
+    return {
+      ...kosong, lotDiminta: diminta,
+      sebab: `Untuk menahan rugi di bawah ${rugiMaks} dolar pada jarak SL ini, lotnya harus ${
+        (rugiMaks / (kontrak * jarakHarga)).toFixed(4)} — di bawah 0,01 dan tidak bisa dikirim. Naikkan batas rugimu, atau lewati sinyal ini.`,
+    };
+  }
+  return {
+    lot,
+    rugi: lot * kontrak * jarakHarga,
+    dibatasi: lot < diminta,
+    lotDiminta: diminta,
+    sebab: '',
+  };
+}

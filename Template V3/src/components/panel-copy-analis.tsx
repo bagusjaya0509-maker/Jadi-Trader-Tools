@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/auth';
 import { useAkunMt5 } from '@/lib/akun';
 import {
   bacaSetelanRisiko, simpanSetelanRisiko, kontrakBawaan,
-  hitungUkuran, bulatkanLot, type SetelanRisiko,
+  lotUntukCopy, type SetelanRisiko,
 } from '@/lib/ukuran-posisi';
 import {
   bacaLangganan, simpanLangganan, hapusLangganan, type LanggananCopy,
@@ -67,6 +67,16 @@ export function PanelCopyAnalis({ analisUid, analisNama, contohPasangan, tutup }
      yang tetap dan lotnya yang menyesuaikan tiap sinyal. */
   const [mode, setMode] = useState<'risiko' | 'lot'>('risiko');
   const [lotTetap, setLotTetap] = useState(0.01);
+  /* BATAS RUGI dalam DOLAR, bukan persen. Persen menuntut orang mengalikan
+     di kepalanya sebelum tahu apa yang dipertaruhkan, dan yang ia rasakan
+     saat posisinya merah bukan persen melainkan dolar. Persennya tetap ada
+     di bawah sebagai penerjemah dua arah — mengetik salah satunya mengisi
+     yang lain — supaya yang terbiasa berpikir dalam persen tidak kehilangan
+     caranya. */
+  const [rugiMaks, setRugiMaks] = useState(() => {
+    const s = bacaSetelanRisiko(pengguna?.uid);
+    return Math.max(1, Math.round(s.modal * (s.risiko / 100) * 100) / 100);
+  });
   const [langganan, setLangganan] = useState<LanggananCopy | null>(null);
   const [kabar, setKabar] = useState('');
 
@@ -86,16 +96,21 @@ export function PanelCopyAnalis({ analisUid, analisNama, contohPasangan, tutup }
     setMode(l.mode);
     setLotTetap(l.lotTetap);
     setKontrak(l.kontrak);
+    if (l.rugiMaks > 0) setRugiMaks(l.rugiMaks);
   }, [pengguna?.uid, analisUid]);
 
   const contoh = useMemo(() => CONTOH_JARAK.map((c) => {
-    const u = hitungUkuran({
-      entry: 1000, sl: 1000 - c.harga, kripto: false,
-      pasangan: contohPasangan, setelan: n, kontrak,
+    const h = lotUntukCopy({
+      lotDiminta: mode === 'lot' ? lotTetap : 0,
+      rugiMaks, kontrak, jarakHarga: c.harga,
     });
-    const lot = mode === 'lot' ? lotTetap : bulatkanLot(u.lot);
-    return { ...c, lot, risiko: lot * kontrak * c.harga };
-  }), [n, kontrak, mode, lotTetap, contohPasangan]);
+    return { ...c, ...h };
+  }), [rugiMaks, kontrak, mode, lotTetap]);
+
+  /* Persen DITURUNKAN dari dolar, bukan disimpan terpisah. Dua angka yang
+     mengatakan hal yang sama tapi disimpan sendiri-sendiri pasti berselisih
+     suatu hari, dan yang berselisih di sini ukuran posisi. */
+  const persenDariModal = n.modal > 0 ? (rugiMaks / n.modal) * 100 : 0;
 
   const belumLogin = !pengguna;
   const belumTerhubung = akun.terhubung === false;
@@ -105,6 +120,7 @@ export function PanelCopyAnalis({ analisUid, analisNama, contohPasangan, tutup }
     const isi: LanggananCopy = {
       analisUid, analisNama, mode,
       lotTetap: Math.max(0.01, lotTetap),
+      rugiMaks: Math.max(0, rugiMaks),
       modal: n.modal, risiko: n.risiko, kontrak,
       sejak: langganan?.sejak ?? Date.now(),
     };
@@ -185,24 +201,29 @@ export function PanelCopyAnalis({ analisUid, analisNama, contohPasangan, tutup }
             ))}
           </div>
 
+          {/* ── BATAS RUGI: SELALU TAMPIL, DI KEDUA MODE ────────────────
+              Ini pengamannya, dan pengaman yang menghilang saat orang
+              memilih "lot tetap" bukan pengaman. Lot tetap yang tidak
+              dibatasi punya persis kelemahan yang sama: stop yang melebar
+              mengalikan kerugian tanpa satu pun angka di sini berubah. */}
           <div className="mt-2.5 grid grid-cols-3 gap-2">
-            {mode === 'risiko' ? (
-              <>
-                <label className="block">
-                  <span className="mb-1 block text-[10.5px] text-zinc-500">Modal ($)</span>
-                  <input value={n.modal} onChange={ubah('modal')} inputMode="decimal" className={cn(ISIAN, 'angka')} />
-                </label>
-                <label className="block">
-                  <span className="mb-1 block text-[10.5px] text-zinc-500">Risiko (%)</span>
-                  <input value={n.risiko} onChange={ubah('risiko')} inputMode="decimal" className={cn(ISIAN, 'angka')} />
-                </label>
-              </>
-            ) : (
-              <label className="col-span-2 block">
+            <label className="block">
+              <span className="mb-1 block text-[10.5px] text-amber-300/80">Rugi maks ($)</span>
+              <input value={rugiMaks} inputMode="decimal"
+                onChange={(e) => setRugiMaks(Math.max(0, Number(e.target.value) || 0))}
+                className={cn(ISIAN, 'angka border-amber-500/30')} />
+            </label>
+            {mode === 'lot' ? (
+              <label className="block">
                 <span className="mb-1 block text-[10.5px] text-zinc-500">Lot tiap sinyal</span>
                 <input value={lotTetap} inputMode="decimal"
                   onChange={(e) => setLotTetap(Math.max(0, Number(e.target.value) || 0))}
                   className={cn(ISIAN, 'angka')} />
+              </label>
+            ) : (
+              <label className="block">
+                <span className="mb-1 block text-[10.5px] text-zinc-500">Modal ($)</span>
+                <input value={n.modal} onChange={ubah('modal')} inputMode="decimal" className={cn(ISIAN, 'angka')} />
               </label>
             )}
             <label className="block">
@@ -212,6 +233,31 @@ export function PanelCopyAnalis({ analisUid, analisNama, contohPasangan, tutup }
                 className={cn(ISIAN, 'angka')} />
             </label>
           </div>
+
+          {/* Penerjemah dua arah. Ditulis sebagai kalimat, bukan kolom
+              ketiga: ia keterangan atas angka di atasnya, bukan angka
+              keempat yang harus diisi. Bisa diklik untuk mengisinya dari
+              persen — yang terbiasa berpikir "1% dari modal" tidak perlu
+              menghitung sendiri. */}
+          {mode === 'risiko' && (
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10.5px] text-zinc-500">
+              <span>= <span className="angka text-zinc-300">{persenDariModal.toFixed(2)}%</span> dari modal.</span>
+              <span className="text-zinc-700">Pakai:</span>
+              {[0.5, 1, 2].map((v) => (
+                <button key={v} onClick={() => setRugiMaks(Math.round(n.modal * (v / 100) * 100) / 100)}
+                  className="cursor-pointer rounded border border-zinc-800 px-1.5 py-0.5 transition-colors hover:border-zinc-600 hover:text-zinc-200">
+                  {v}%
+                </button>
+              ))}
+              {akun.saldo != null && (
+                <button onClick={() => setN((s) => ({ ...s, modal: Math.round(akun.saldo!) }))}
+                  title="Isi modal dari saldo akun brokermu"
+                  className="cursor-pointer rounded border border-zinc-800 px-1.5 py-0.5 transition-colors hover:border-zinc-600 hover:text-zinc-200">
+                  modal = saldo
+                </button>
+              )}
+            </div>
+          )}
 
           {/* ── AKIBATNYA, DALAM DOLAR ─────────────────────────────────
               Inilah alasan panel ini dibuka lebih dulu. "Risiko 1%" tidak
@@ -225,16 +271,29 @@ export function PanelCopyAnalis({ analisUid, analisNama, contohPasangan, tutup }
               {contoh.map((c) => (
                 <div key={c.label} className="flex items-baseline gap-2 text-[11.5px]">
                   <span className="text-zinc-500">{c.label}</span>
-                  <span className="angka ml-auto text-zinc-400">{c.lot.toFixed(2)} lot</span>
-                  <span className={cn('angka w-16 text-right', c.risiko > 0 ? 'text-red-400' : 'text-zinc-600')}>
-                    −{uang(c.risiko)}
+                  {/* Pemotongan DIKATAKAN, bukan cuma terjadi. Lot yang
+                      diam-diam mengecil terbaca sebagai hitungan yang salah;
+                      lot yang mengecil DENGAN alasannya terbaca sebagai
+                      pengaman yang bekerja. */}
+                  {c.dibatasi && (
+                    <span className="rounded bg-amber-500/15 px-1 text-[9.5px] text-amber-300">
+                      dipotong dari {c.lotDiminta.toFixed(2)}
+                    </span>
+                  )}
+                  <span className="angka ml-auto text-zinc-400">
+                    {c.lot > 0 ? c.lot.toFixed(2) + ' lot' : '—'}
+                  </span>
+                  <span className={cn('angka w-16 text-right', c.rugi > 0 ? 'text-red-400' : 'text-zinc-600')}>
+                    {c.rugi > 0 ? '−' + uang(c.rugi) : '—'}
                   </span>
                 </div>
               ))}
             </div>
             <div className="mt-1.5 text-[10px] leading-relaxed text-zinc-600">
-              Angka contoh, bukan sinyal sungguhan. Lot sebenarnya dihitung dari
-              jarak SL tiap sinyal saat ia terbit.
+              Angka contoh, bukan sinyal sungguhan — lot sebenarnya dihitung dari
+              jarak SL tiap sinyal saat ia terbit. Yang tetap: ruginya tidak pernah
+              melewati <span className="angka text-amber-300/90">{uang(rugiMaks)}</span>,
+              seberapa lebar pun analis memasang stopnya.
             </div>
           </div>
 
@@ -245,8 +304,9 @@ export function PanelCopyAnalis({ analisUid, analisNama, contohPasangan, tutup }
             {langganan ? <CircleCheck className="mt-px size-3.5 shrink-0" />
                        : <TriangleAlert className="mt-px size-3.5 shrink-0" />}
             {langganan
-              ? `Terdaftar mengikuti ${analisNama}. Setelan tersimpan: ${
-                  langganan.mode === 'lot' ? `${langganan.lotTetap} lot tetap` : `${langganan.risiko}% dari ${uang(langganan.modal)}`}.`
+              ? `Terdaftar mengikuti ${analisNama}. ${
+                  langganan.mode === 'lot' ? `${langganan.lotTetap} lot tiap sinyal` : 'Lot menyesuaikan jarak SL'
+                }, rugi dibatasi ${uang(langganan.rugiMaks)} per trade.`
               : 'Belum mengikuti analis ini.'}
           </div>
 
