@@ -1362,37 +1362,70 @@ function SignalDiikuti() {
   }
 
   return (
-    <div className="space-y-2">
-      {daftar.map((l) => (
-        <div key={l.analisUid}
-             className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-zinc-800/70 bg-zinc-900/30 px-3 py-2.5">
-          <span className="text-[13px] font-medium text-zinc-100">{l.analisNama}</span>
-          <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[9.5px] uppercase tracking-wide text-zinc-400">
-            {l.jenisAkun === 'cent' ? 'cent' : 'standar'}
-          </span>
-          {/* Yang ditulis SETELANNYA, bukan cuma namanya. Daftar yang hanya
-              menyebut nama memaksa membuka satu per satu untuk mengingat
-              berapa yang dipertaruhkan di masing-masing — dan itu justru
-              pertanyaan yang membawa orang ke halaman ini. */}
-          <span className="text-[11px] text-zinc-500">
-            {l.mode === 'lot'
-              ? <>lot tetap <span className="angka text-zinc-300">{l.lotTetap}</span></>
-              : <>lot menyesuaikan SL</>}
-          </span>
-          <span className="text-[11px] text-zinc-500">
-            rugi maks <span className="angka text-amber-300/90">{uang(l.rugiMaks)}</span>
-          </span>
-          <button onClick={() => lepas(l.analisUid)}
-            className="ml-auto cursor-pointer rounded border border-red-500/40 px-2 py-1 text-[11px] text-red-300 transition-colors hover:bg-red-500/10">
-            Batalkan Copy
-          </button>
-        </div>
-      ))}
-      <p className="pt-1 text-[10.5px] leading-relaxed text-zinc-600">
-        Setelan ini tersimpan untuk akunmu. Penyalinan otomatis saat sinyal baru
-        terbit dijalankan pengikut di VPS — bagian itu masih dibangun.
+    <>
+      <div className="mb-3">
+        <h2 className="text-[14px] font-medium text-zinc-100">Signal Diikuti</h2>
+        <p className="mt-0.5 text-[11.5px] text-zinc-500">
+          {daftar.length} analis · setelan penyalinan tersimpan untuk akunmu
+        </p>
+      </div>
+
+      {/* KARTU, bukan baris tipis. Tiap analis di sini membawa angka yang
+          menentukan uang — lot dan batas rugi — dan angka seperti itu tidak
+          pantas berdesakan di satu baris bersama tombol yang membatalkannya.
+          Grid yang sama dengan kartu kanal supaya halaman ini terasa
+          sekeluarga dengan tempat asalnya. */}
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {daftar.map((l) => (
+          <Panel key={l.analisUid} className="flex flex-col gap-2.5 p-4">
+            <div className="flex items-center gap-2">
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-[11px] font-semibold text-zinc-300">
+                {(l.analisNama || '?').slice(0, 1).toUpperCase()}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-zinc-100">
+                {l.analisNama}
+              </span>
+              <span className="shrink-0 rounded bg-zinc-800 px-1.5 py-0.5 text-[9.5px] uppercase tracking-wide text-zinc-400">
+                {l.jenisAkun === 'cent' ? 'cent' : 'standar'}
+              </span>
+            </div>
+
+            {/* Angka risikonya diberi kotaknya sendiri. Yang dicari orang di
+                halaman ini persis dua hal: berapa lot, dan sampai berapa
+                ruginya. Menyelipkannya sebagai kalimat membuat keduanya
+                harus dibaca, bukan dilihat. */}
+            <div className="grid grid-cols-2 gap-2 rounded-lg border border-zinc-800/70 bg-zinc-900/30 p-2.5">
+              <div>
+                <div className="text-[9.5px] uppercase tracking-wide text-zinc-600">Ukuran</div>
+                <div className="angka text-[12.5px] text-zinc-200">
+                  {l.mode === 'lot' ? `${l.lotTetap} lot` : 'ikut jarak SL'}
+                </div>
+              </div>
+              <div>
+                <div className="text-[9.5px] uppercase tracking-wide text-zinc-600">Rugi maks</div>
+                <div className="angka text-[12.5px] text-amber-300/90">{uang(l.rugiMaks)}</div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-[10.5px] text-zinc-600">
+                sejak {tanggalPendek(l.sejak)}
+              </span>
+              <button onClick={() => lepas(l.analisUid)}
+                className="ml-auto cursor-pointer rounded-md border border-red-500/40 px-2.5 py-1 text-[11.5px] text-red-300 transition-colors hover:bg-red-500/10">
+                Batalkan Copy
+              </button>
+            </div>
+          </Panel>
+        ))}
+      </div>
+
+      <p className="mt-3 text-[10.5px] leading-relaxed text-zinc-600">
+        Penyalinan otomatis saat sinyal baru terbit dijalankan pengikut di VPS —
+        bagian itu masih dibangun. Sementara ini sinyal bisa disalin satu per satu
+        lewat tombol <span className="text-zinc-400">Copy trade</span> di kartu sinyal.
       </p>
-    </div>
+    </>
   );
 }
 
@@ -2391,8 +2424,6 @@ export default function Analisa() {
         </button>
       )}
 
-      {sub === 'diikuti' && <SignalDiikuti />}
-
       {sub === 'posting' && createPortal(
         <div className="fixed inset-0 z-[65] overflow-y-auto bg-black/70 p-3 backdrop-blur-sm sm:p-6"
              {...tutupPosting}>
@@ -3061,6 +3092,13 @@ export default function Analisa() {
            terbaca sebagai kerusakan. */
         const agenSiaga = agenHadir.filter((ag) => !kanal.has(ag.uid));
         const terpilih = kanalBuka ? kanal.get(kanalBuka) ?? [] : [];
+
+        /* SUB-HALAMAN SENDIRI, bukan sisipan di tengah daftar kanal.
+           Versi pertama menaruhnya di antara disclaimer dan kartu-kartu
+           kanal, dan di sana ia terbaca sebagai potongan yang nyasar —
+           bukan sebagai halaman yang memang dituju orangnya lewat sidebar.
+           Sekarang ia MENGGANTI badan halaman, persis seperti tab lain. */
+        if (kanalBuka === null && sub === 'diikuti') return <SignalDiikuti />;
 
         return kanalBuka === null ? (
           <>
