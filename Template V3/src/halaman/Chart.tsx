@@ -2362,6 +2362,25 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
      MENJAMIN sekarang cuma satu, dan ia mustahil dilewati sumber baru. */
   const modeNyata = aksi?.mode === 'real';
 
+  /* ── RENCANA YANG SUDAH JADI ORDER SUNGGUHAN ──────────────────────
+     Dua keputusan yang masing-masing benar, bertemu jadi bug:
+
+     (a) Sesudah order real berangkat, `rencana` SENGAJA dipertahankan —
+         level yang sedang menjaga uang tidak boleh hilang dari layar tepat
+         saat ia mulai berlaku.
+     (b) REAL -> COPY sengaja TIDAK membersihkan rencana — orangnya sedang
+         mengubah rencananya jadi sinyal untuk diposting, dan levelnya
+         justru yang ia bawa.
+
+     Bertemunya: level order SUNGGUHAN ikut terbawa ke layar berlabel COPY,
+     dan tergambar sebagai garis yang tampak masih bisa diseret.
+
+     Penandanya di sini. Rencana yang BELUM dikirim tetap boleh dibawa ke
+     COPY (itu fiturnya); yang SUDAH jadi order tidak boleh — ia bukan
+     rencana lagi, ia posisi, dan posisi digambar jalur lain yang sudah
+     bergerbang mode. */
+  const rencanaTerkirim = useRef(false);
+
   const aksiPosisi = aksi?.posisi ?? null;
   const aksiTunda = aksi?.tunda ?? null;
 
@@ -3644,6 +3663,20 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                                   setDraf(null);
                                   entryDigeser.current = false;
                                 }
+                                /* SUDAH JADI ORDER = TIDAK IKUT PINDAH MODE.
+                                   Berlaku juga untuk 'menuju-copy': yang boleh
+                                   dibawa ke COPY adalah RENCANA, dan rencana
+                                   yang sudah dikirim bukan rencana lagi. Tanpa
+                                   ini, garis order sungguhan tetap tergambar
+                                   di layar berlabel COPY — persis keluhan
+                                   "baru kirim, langsung ganti mode, garisnya
+                                   masih ada". */
+                                if (m !== 'real' && rencanaTerkirim.current) {
+                                  setRencana({});
+                                  setDraf(null);
+                                  entryDigeser.current = false;
+                                }
+                                if (m === 'real') rencanaTerkirim.current = false;
                                 /* ORDER NYATA YANG SEDANG DISUNTING IKUT DILEPAS.
                                    ────────────────────────────────────────────
                                    Selama ini keluar dari REAL cuma BERHENTI
@@ -3676,6 +3709,11 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                               onPilih={(arah) => {
                                 setDraf(arah);
                                 setKabarNyata('');
+                                /* Tiket BARU: penandanya gugur. Menekan
+                                   BUY/SELL berarti orangnya menyusun rencana
+                                   berikutnya, bukan menatap order yang sudah
+                                   berangkat. */
+                                rencanaTerkirim.current = false;
                                 /* COPY DARI TAUTAN dimatikan di sini, COPY YANG
                                    DIPILIH SENDIRI TIDAK.
                                    ────────────────────────────────────────────
@@ -3835,6 +3873,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                                              tidak masuk. */
                                           segarkanAkunMt5();
                                           setDraf(null);
+                                          rencanaTerkirim.current = true;
                                         }
                                       })
                                       .catch((e) => setKabarNyata(e instanceof Error ? e.message : 'Gagal mengirim perintah'))
@@ -3862,7 +3901,10 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                                        sedang menjaga uang justru hilang dari
                                        layar tepat saat ia mulai berlaku.
                                        Yang ditutup cuma tiketnya. */
-                                    if (h.pesan !== 'Dibatalkan.') setDraf(null);
+                                    if (h.pesan !== 'Dibatalkan.') {
+                                      setDraf(null);
+                                      rencanaTerkirim.current = true;
+                                    }
                                   }).catch((e) => {
                                     setKabarNyata(e instanceof Error ? e.message : 'Gagal mengirim order');
                                   }).finally(() => setSibukNyata(false));
