@@ -1664,6 +1664,10 @@ export function ChartLilin({
   type UbahMt5 = {
     tiket: string; sl: number; tp: number;
     bidang: 'sl' | 'tp'; sibuk: boolean; terkirim: boolean;
+    /** Nilai broker PADA SAAT tombol Kirim ditekan. Dipakai penutup di
+     *  bawah untuk tahu bahwa broker sudah bergerak — walau tidak persis
+     *  ke nilai yang diminta. */
+    slKirim?: number; tpKirim?: number;
   };
   const [ubah, setUbah] = useState<UbahMt5 | null>(null);
   const ubahRef = useRef<UbahMt5 | null>(null);
@@ -2213,8 +2217,45 @@ export function ChartLilin({
        digit simbol sebelum memasangnya, jadi 2412.3456 yang dikirim
        kembali sebagai 2412.35 — dan itu tetap "sudah terpasang". */
     const dekat = (a: number, b: number) => Math.abs(a - b) <= Math.max(Math.abs(b) * 1e-5, 1e-9);
-    if (dekat(ubah.sl, p.sl) && dekat(ubah.tp, p.tp)) aturUbah(null);
+    if (dekat(ubah.sl, p.sl) && dekat(ubah.tp, p.tp)) { aturUbah(null); return; }
+
+    /* ── BROKER SUDAH BERGERAK = PRATINJAU SELESAI ────────────────────
+       Syarat di atas menuntut KEDUA nilai cocok. Kalau broker cuma
+       menerima sebagiannya — SL dipasang, TP ditolak karena terlalu dekat
+       harga, misalnya — syarat itu tidak pernah terpenuhi dan pratinjaunya
+       NYANGKUT selamanya: garis di harga yang diminta terus tergambar di
+       samping garis yang benar-benar terpasang, dan dua-duanya berlabel.
+
+       Yang menyesatkan bukan garis gandanya, melainkan garis yang
+       menyatakan SL ada di tempat yang sebenarnya bukan.
+
+       Begitu broker MENJAWAB — nilainya berubah dari yang tercatat saat
+       Kirim ditekan, ke mana pun ia mendarat — jawabannya itulah yang
+       benar. Pratinjau dibubarkan, dan yang tersisa di layar adalah nilai
+       broker apa adanya. */
+    if (ubah.terkirim && ubah.slKirim !== undefined && ubah.tpKirim !== undefined
+        && (!dekat(ubah.slKirim, p.sl) || !dekat(ubah.tpKirim, p.tp))) {
+      aturUbah(null);
+    }
   }, [posisiMt5, ubah, aturUbah]);
+
+  /* ── BATAS WAKTU PRATINJAU ──────────────────────────────────────────
+     Jaring terakhir. Penutup di atas bergantung pada laporan EA yang
+     BERUBAH; kalau brokernya menolak seluruh ubahan tanpa mengubah apa
+     pun, tidak ada perubahan yang bisa dipakai sebagai tanda dan
+     pratinjaunya menetap.
+
+     Delapan detik: laporan EA datang tiap beberapa detik, jadi jalur
+     normal selalu menang lebih dulu. Yang tersisa di layar sesudah ini
+     adalah nilai broker sesungguhnya — keadaan yang benar, walau bukan
+     yang diminta. */
+  useEffect(() => {
+    if (!ubah || !ubah.terkirim || ubah.sibuk) return;
+    const t = setTimeout(() => {
+      if (ubahRef.current && ubahRef.current.terkirim && !seretUbah.current) aturUbah(null);
+    }, 8000);
+    return () => clearTimeout(t);
+  }, [ubah, aturUbah]);
 
   /* Seret SL/TP posisi — pendengar di window, alasan yang sama dengan
      seret garis tiket: kursor selalu lolos dari strip setipis 14 px.
@@ -2267,7 +2308,11 @@ export function ChartLilin({
   async function kirimUbah() {
     if (!ubah || !onUbahPosisi || ubah.sibuk) return;
     const kirim = ubah;
-    aturUbah({ ...kirim, sibuk: true });
+    /* Nilai broker DIPOTRET SEBELUM dikirim. Sesudahnya ia mungkin sudah
+       berubah, dan potret yang diambil belakangan tidak bisa lagi
+       membedakan "broker menjawab" dari "broker diam". */
+    const p0 = (acuan.current.posisiMt5 ?? []).find((x) => x.tiket === kirim.tiket);
+    aturUbah({ ...kirim, sibuk: true, slKirim: p0 ? p0.sl : kirim.sl, tpKirim: p0 ? p0.tp : kirim.tp });
     const ok = await onUbahPosisi(kirim.tiket, kirim.sl, kirim.tp);
     /* Sukses: tombolnya hilang tapi PRATINJAUNYA bertahan sampai laporan
        EA menyusul (efek penutup di atas yang membubarkannya). Gagal:
@@ -2275,6 +2320,15 @@ export function ChartLilin({
        atau Batal. */
     const u = ubahRef.current;
     if (u && u.tiket === kirim.tiket) aturUbah({ ...u, sibuk: false, terkirim: ok });
+    /* GAGAL = pratinjaunya dibubarkan, bukan ditinggal di layar.
+       Sebelumnya tombolnya sengaja dibiarkan supaya bisa dicoba lagi —
+       tapi selama itu garisnya tetap menggambar SL di tempat yang broker
+       TOLAK. Kalau perlu digeser lagi, garis aslinya masih ada dan masih
+       bisa ditarik; yang tidak boleh bertahan adalah gambar yang salah. */
+    if (!ok) {
+      const v = ubahRef.current;
+      if (v && v.tiket === kirim.tiket && !seretUbah.current) aturUbah(null);
+    }
   }
 
   const idxAkhir = (hingga === undefined ? lilin.closes.length : Math.min(lilin.closes.length, hingga + 1)) - 1;
