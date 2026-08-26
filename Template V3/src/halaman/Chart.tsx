@@ -1596,6 +1596,18 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
       const h = await tungguHasilMt5(id);
       const sukses = h.status === 'sukses';
       setKabarNyata(sukses ? `SL/TP #${tiket} terpasang di MT5 — ${h.pesan}` : `Ubahan #${tiket}: ${h.pesan}`);
+      /* LAPORAN BARU DIMINTA, BUKAN DITUNGGU.
+         ──────────────────────────────────────────────────────────────
+         Daftar posisi dipoll tiap 30 detik (JEDA_MS di lib/akun). Tanpa
+         permintaan ini, sesudah SL berhasil dipindahkan chart masih
+         menggambar nilai LAMA sampai setengah menit berikutnya — dan
+         pratinjau seretan bertahan selama itu juga, karena satu-satunya
+         tanda "sudah terpasang" adalah laporan yang belum datang.
+
+         Diminta juga saat GAGAL: yang perlu dipastikan bukan cuma
+         perubahannya masuk, tapi juga bahwa yang tergambar setelahnya
+         adalah keadaan broker sesungguhnya. */
+      segarkanAkunMt5();
       return sukses;
     } catch (e) {
       setKabarNyata(e instanceof Error ? e.message : 'Gagal mengirim ubahan SL/TP');

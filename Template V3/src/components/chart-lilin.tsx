@@ -2240,20 +2240,32 @@ export function ChartLilin({
   }, [posisiMt5, ubah, aturUbah]);
 
   /* ── BATAS WAKTU PRATINJAU ──────────────────────────────────────────
-     Jaring terakhir. Penutup di atas bergantung pada laporan EA yang
-     BERUBAH; kalau brokernya menolak seluruh ubahan tanpa mengubah apa
-     pun, tidak ada perubahan yang bisa dipakai sebagai tanda dan
-     pratinjaunya menetap.
+     Jaring terakhir. Penutup di atas bergantung pada laporan yang BERUBAH;
+     kalau brokernya menolak seluruh ubahan tanpa mengubah apa pun, tidak
+     ada perubahan yang bisa dipakai sebagai tanda dan pratinjaunya
+     menetap.
 
-     Delapan detik: laporan EA datang tiap beberapa detik, jadi jalur
-     normal selalu menang lebih dulu. Yang tersisa di layar sesudah ini
-     adalah nilai broker sesungguhnya — keadaan yang benar, walau bukan
-     yang diminta. */
+     LIMA detik, dan angka itu punya dasar. Daftar posisi dipoll tiap 30
+     detik, jadi menunggu poll berikutnya bukan pilihan — karena itu
+     pemanggil (ubahPosisiMt5) MEMINTA laporan baru begitu perintahnya
+     dikonfirmasi. Laporan itu tiba sedetik dua detik kemudian, dan jalur
+     normal di atas yang membubarkan pratinjaunya.
+
+     Pewaktu ini hanya untuk sisa kasusnya: laporan datang tapi tidak ada
+     yang berubah karena brokernya menolak. Lima detik cukup untuk
+     kedatangan laporan yang sudah diminta, dan cukup singkat supaya garis
+     yang salah tidak lama-lama dipandangi.
+
+     Versi pertama memakai delapan detik dengan alasan "laporan EA datang
+     tiap beberapa detik" — keliru, dan bukan cuma soal kelamaan: tanpa
+     permintaan laporan di atas, pewaktu apa pun yang lebih pendek dari 30
+     detik akan membubarkan pratinjau SEBELUM broker sempat melapor, dan
+     garisnya balik ke nilai lama padahal kirimnya berhasil. */
   useEffect(() => {
     if (!ubah || !ubah.terkirim || ubah.sibuk) return;
     const t = setTimeout(() => {
       if (ubahRef.current && ubahRef.current.terkirim && !seretUbah.current) aturUbah(null);
-    }, 8000);
+    }, 5000);
     return () => clearTimeout(t);
   }, [ubah, aturUbah]);
 
