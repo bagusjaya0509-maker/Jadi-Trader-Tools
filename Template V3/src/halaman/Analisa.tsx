@@ -2290,10 +2290,26 @@ export default function Analisa() {
             tambah catatan — dan menebak di halaman yang bisa menerbitkan
             sesuatu yang permanen bukan tebakan yang murah. Di ponsel
             ruangnya memang tidak ada, dan title-nya yang menanggung. */}
-        {/* TOMBOLNYA PINDAH KE POJOK KANAN BAWAH, mengambang — lihat
-            catatannya di dekat tombolnya. Di kepala halaman ia berebut
-            baris dengan tab dan disclaimer, dan di ponsel tulisannya hilang
-            sehingga tinggal ikon + yang bisa berarti apa saja. */}
+        {/* TOMBOL PUTIH DI KEPALA HALAMAN — tempat dan gaya yang persis
+            ditinggalkan "Posting Signal".
+
+            Slot itu tidak dikosongkan, ia BERGANTI ISI. Memposting adalah
+            pekerjaan sesekali dan kini punya tombol + mengambang; yang
+            pantas menempati tempat paling terlihat di halaman ini adalah
+            hal yang dibuka berulang — daftar analis yang diikuti.
+
+            Putih pekat, bukan bertepi: di halaman ini ia satu-satunya
+            tindakan di baris kepala, dan tindakan tunggal yang tidak
+            menonjol sama saja dengan tidak ada. Tulisannya hilang di
+            ponsel dan ikonnya yang menanggung, sama seperti sebelumnya. */}
+        {diDepan && (
+          <button onClick={() => setSub('diikuti')}
+            title="Analis yang kamu ikuti — lot, batas rugi, dan pembatalannya"
+            className="ml-auto flex cursor-pointer items-center gap-1.5 rounded-md bg-zinc-100 px-2.5 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white">
+            <Users className="size-3.5" />
+            <span className="hidden sm:inline">Signal Diikuti</span>
+          </button>
+        )}
 
         {/* Badan disclaimer. w-full = flex-wrap menurunkannya ke baris
             sendiri, di bawah kepalanya dan di bawah tombol Posting.
@@ -2415,20 +2431,6 @@ export default function Analisa() {
 
           Disembunyikan saat formulir postingnya sedang terbuka — tombol
           yang membuka sesuatu yang sudah terbuka cuma menimpa isinya. */}
-      {/* Dua tombol mengambang, bertumpuk. Yang atas membuka daftar yang
-          diikuti, yang bawah memposting — keduanya pintu ke layar lain dari
-          halaman yang sama, jadi keduanya pantas duduk di sudut yang sama.
-          Yang membuka daftar diberi bentuk sekunder supaya + tetap jadi
-          tindakan utama di halaman ini. */}
-      {diDepan && sub === 'market' && (
-        <button onClick={() => setSub('diikuti')}
-          title="Analis yang kamu ikuti — lot, batas rugi, dan pembatalannya"
-          aria-label="Signal Diikuti"
-          className="fixed bottom-24 right-6 z-40 flex size-14 cursor-pointer items-center justify-center rounded-full border border-zinc-700 bg-zinc-900 text-zinc-200 shadow-2xl shadow-black/40 transition-transform hover:scale-105 hover:border-zinc-500 active:scale-95">
-          <Users className="size-5" strokeWidth={2} />
-        </button>
-      )}
-
       {diDepan && sub !== 'posting' && sub !== 'diikuti' && (
         <button onClick={() => setSub('posting')}
           title="Posting sinyal baru — rencananya permanen setelah terbit"
