@@ -3532,6 +3532,34 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                                   setDraf(null);
                                   entryDigeser.current = false;
                                 }
+                                /* ORDER NYATA YANG SEDANG DISUNTING IKUT DILEPAS.
+                                   ────────────────────────────────────────────
+                                   Selama ini keluar dari REAL cuma BERHENTI
+                                   MENGGAMBAR garisnya (lihat penjaga mode di
+                                   garisSeret) — `sunting` sendiri tetap
+                                   menunjuk order sungguhan itu. Akibatnya
+                                   panel ubah SL/TP tetap hidup di layar yang
+                                   sudah berlabel DEMO/COPY, dan tombol
+                                   Kirim-nya masih mengarah ke bursa. Menekan
+                                   Kirim di sana mengubah order sungguhan dari
+                                   mode latihan.
+
+                                   Berlaku untuk COPY juga: 'menuju-copy' boleh
+                                   menyelamatkan RENCANA (level yang mau
+                                   diposting jadi sinyal), tapi tidak boleh
+                                   menyelamatkan pegangan ke order broker —
+                                   sinyal yang diposting bukan order siapa pun.
+
+                                   Sengaja tanpa syarat `sebab`: apa pun
+                                   alasannya, begitu modenya bukan real, tidak
+                                   ada order nyata yang boleh tetap terpegang. */
+                                if (m !== 'real') {
+                                  setSunting(null);
+                                  setPanelUbah(false);
+                                  setSuntingSlTeks('');
+                                  setSuntingTpTeks('');
+                                  setSuntingKabar('');
+                                }
                               }}
                               onPilih={(arah) => {
                                 setDraf(arah);

@@ -1,7 +1,8 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext } from 'react';
 import type { ReactNode } from 'react';
 import { ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useMuncul } from '@/lib/gerak';
 
 /* ════════════════════════════════════════════════════════════════════════
    PANEL KABAR — satu bentuk untuk lonceng DAN amplop
@@ -37,22 +38,6 @@ const LUWES = 'ease-[cubic-bezier(0.4,0,0.2,1)]';
    mengoper prop lewat semua itu cuma menambah tempat untuk lupa. */
 const Ktx = createContext<{ tampil: boolean; diam: boolean }>({ tampil: false, diam: false });
 
-/* Pengguna yang meminta gerak dikurangi tidak mendapat animasi apa pun —
-   panelnya langsung utuh. Bukan versi lebih cepat: nol. */
-function useDiam() {
-  const [diam, setDiam] = useState(
-    () => typeof window !== 'undefined'
-      && window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  );
-  useEffect(() => {
-    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const ubah = () => setDiam(mq.matches);
-    mq.addEventListener('change', ubah);
-    return () => mq.removeEventListener('change', ubah);
-  }, []);
-  return diam;
-}
-
 export function PanelKabar({
   ikon, judul, ringkas, tutup, children,
 }: {
@@ -62,34 +47,9 @@ export function PanelKabar({
   tutup: () => void;
   children: ReactNode;
 }) {
-  const diam = useDiam();
-
-  /* DUA KEADAAN, bukan satu. Panelnya dipasang dalam keadaan terlipat, lalu
-     sebingkai kemudian dibuka. Kalau kelas "terbuka" dipakai sejak render
-     pertama, elemennya LAHIR di keadaan akhir dan browser tidak punya dua
-     nilai untuk ditransisikan — panelnya muncul kaku, dan animasi berjenjang
-     di bawah tidak pernah terlihat sama sekali. */
-  const [tampil, setTampil] = useState(false);
-  useEffect(() => {
-    if (diam) { setTampil(true); return; }
-    /* DUA PEMICU, dan yang kedua bukan hiasan: requestAnimationFrame BERHENTI
-       BERDETAK di tab yang tidak dikomposisi (latar, jendela tertutup,
-       pratinjau yang tidak ditampilkan). Kalau ia satu-satunya pemicu,
-       panelnya tersangkut di keadaan awal — terpasang, terbaca oleh pembaca
-       layar, tapi opacity 0 dan tinggi 0. Terukur: 600 ms sesudah diklik
-       masih opacity "0". Pewaktu tetap jalan di sana, jadi ia yang menjamin
-       panelnya selalu sampai ke keadaan terbuka. */
-    let dua = 0;
-    const satu = requestAnimationFrame(() => {
-      dua = requestAnimationFrame(() => setTampil(true));
-    });
-    const jaring = setTimeout(() => setTampil(true), 120);
-    return () => {
-      cancelAnimationFrame(satu);
-      cancelAnimationFrame(dua);
-      clearTimeout(jaring);
-    };
-  }, [diam]);
+  /* Tanpa argumen: komponen ini HANYA dipasang saat panelnya dibuka, jadi
+     pemasangannya sendiri sudah jadi tandanya. */
+  const { tampil, diam } = useMuncul();
 
   /* ── DI PONSEL MELEBAR KE LAYAR, BUKAN MENGGANTUNG DI TOMBOLNYA ──
      Lebar tetap yang tepi kanannya menempel pada tombol lonceng membuat

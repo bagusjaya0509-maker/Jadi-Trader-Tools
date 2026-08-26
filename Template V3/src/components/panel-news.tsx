@@ -1,6 +1,7 @@
 import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Newspaper, X, Loader2, TriangleAlert } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useMuncul } from '@/lib/gerak';
 import { bacaKoneksi, PROXY_BAWAAN } from '@/lib/koneksi';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -200,6 +201,32 @@ export function PanelNews() {
   const barisDepan = useRef<HTMLDivElement>(null);
   const wadahDaftar = useRef<HTMLDivElement>(null);
 
+  /* `buka` DIOPER, tidak dibiarkan kosong: markup panel ini menempel di
+     komponen yang sama dengan tombolnya, dan komponen itu tidak ikut dilepas
+     saat panelnya tutup. Tanpa argumen, hook ini menyala sekali saat halaman
+     dimuat dan sudah terlanjur `true` jauh sebelum ada yang mengklik —
+     panelnya muncul tanpa gerak sama sekali. */
+  const { tampil: muncul, diam } = useMuncul(buka);
+
+  /* Gerak berjenjang untuk blok-blok DI ATAS daftar. Nilainya kecil dan
+     cepat: ini panel yang dibuka orang untuk memeriksa satu hal sebelum
+     entry, jadi yang boleh ditambahkan cuma kesan "terbuka", bukan
+     pertunjukan yang harus ditunggu selesai.
+
+     TIDAK dipasang per-baris kalender. Dua alasan, keduanya nyata:
+     ─ Gulir otomatis ke hari ini mengukur selisih getBoundingClientRect
+       antara satu baris dan wadahnya. Rect IKUT menghitung transform, jadi
+       baris yang sedang tergeser 6 px membuat gulirnya mendarat 6 px meleset.
+       Transform pada wadah aman karena menggeser keduanya sama banyak;
+       transform pada barisnya sendiri tidak.
+     ─ Judul hari memakai position: sticky di dalam daftar. Menaruh transform
+       pada anak-anak wadah gulir membuat mereka berhenti menempel. */
+  const jenjang = (ms: number) => ({
+    kelas: cn('transition-all duration-300 ease-out motion-reduce:transition-none',
+      muncul ? 'translate-y-0 opacity-100' : '-translate-y-1 opacity-0'),
+    gaya: { transitionDelay: muncul && !diam ? ms + 'ms' : '0ms' },
+  });
+
   /* Esc menutup. Panel melayang yang cuma bisa ditutup dengan menemukan
      tombol X-nya memaksa orang mencari, padahal tangannya sudah di papan
      ketik karena baru saja mengetik ukuran order. */
@@ -319,8 +346,22 @@ export function PanelNews() {
              bukan terhadap tombol. inset-x-0 lalu membuatnya selebar
              bilah itu — tidak bisa keluar layar, berapa pun posisi
              tombolnya. Di layar lebar semuanya kembali seperti semula. */}
-          <div className="absolute inset-x-0 top-full z-40 mt-1 flex max-h-[min(70vh,420px)] w-auto flex-col overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950 shadow-2xl sm:inset-x-auto sm:right-0 sm:w-[min(92vw,380px)]">
-            <div className="flex items-center gap-2 border-b border-zinc-800 px-3.5 py-2.5">
+          {/* Bentuk panelnya TIDAK diubah — lebar, sudut, batas tinggi, dan
+              perilaku di HP persis seperti sebelumnya. Yang ditambahkan cuma
+              keadaan awal untuk ditransisikan: naik 6 px dan tembus pandang.
+              Sengaja tanpa scale: teks 11-12 px yang diskalakan 0,97 terbaca
+              buram selama transisinya, dan buram di angka rilis ekonomi
+              bukan harga yang pantas dibayar untuk gerak yang lebih ramai. */}
+          <div
+            style={{ transitionDelay: '0ms' }}
+            className={cn(
+              'absolute inset-x-0 top-full z-40 mt-1 flex max-h-[min(70vh,420px)] w-auto flex-col overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950 shadow-2xl sm:inset-x-auto sm:right-0 sm:w-[min(92vw,380px)]',
+              'origin-top transition-all duration-200 ease-out motion-reduce:transition-none',
+              muncul ? 'translate-y-0 opacity-100' : '-translate-y-1.5 opacity-0',
+            )}
+          >
+            <div style={jenjang(0).gaya}
+                 className={cn('flex items-center gap-2 border-b border-zinc-800 px-3.5 py-2.5', jenjang(0).kelas)}>
               <Newspaper className="size-3.5 text-zinc-400" />
               <span className="text-[12.5px] font-medium text-zinc-200">Kalender Ekonomi</span>
               <button onClick={() => setBuka(false)} aria-label="Tutup kalender"
@@ -329,7 +370,8 @@ export function PanelNews() {
               </button>
             </div>
 
-            <div className="flex gap-2 border-b border-zinc-800 px-3.5 py-2">
+            <div style={jenjang(40).gaya}
+                 className={cn('flex gap-2 border-b border-zinc-800 px-3.5 py-2', jenjang(40).kelas)}>
               {[
                 { nilai: cur, set: setCur, opsi: MATA_UANG.map((v) => ({ v, t: v === 'major' ? 'Major' : v === 'all' ? 'Semua' : v })) },
                 { nilai: dampak, set: setDampak, opsi: DAMPAK },
@@ -350,8 +392,10 @@ export function PanelNews() {
                 yang paling ingin didengar sebelum entry. */}
             {!memuat && !galat && (
               berikut ? (
-                <div className={cn('border-b px-3.5 py-2.5 text-[11.5px] leading-relaxed',
-                  siaga ? 'border-amber-500/30 bg-amber-500/[0.07] text-amber-200' : 'border-zinc-800 text-zinc-400')}>
+                <div style={jenjang(80).gaya}
+                  className={cn('border-b px-3.5 py-2.5 text-[11.5px] leading-relaxed',
+                  siaga ? 'border-amber-500/30 bg-amber-500/[0.07] text-amber-200' : 'border-zinc-800 text-zinc-400',
+                  jenjang(80).kelas)}>
                   Berikutnya <b className="text-zinc-100">{berikut.judul}</b> ({berikut.mataUang}) pukul{' '}
                   <span className="angka">{new Date(berikut.waktu).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</span>
                   {' · '}{fmtSelisih(berikut.waktu - kini) || 'sebentar lagi'}
@@ -363,13 +407,23 @@ export function PanelNews() {
                   )}
                 </div>
               ) : (
-                <div className="border-b border-zinc-800 px-3.5 py-2.5 text-[11.5px] leading-relaxed text-zinc-500">
+                <div style={jenjang(80).gaya}
+                  className={cn('border-b border-zinc-800 px-3.5 py-2.5 text-[11.5px] leading-relaxed text-zinc-500',
+                    jenjang(80).kelas)}>
                   Tidak ada rilis dampak tinggi yang tersisa minggu ini.
                 </div>
               )
             )}
 
-            <div ref={wadahDaftar} className="min-h-0 flex-1 overflow-y-auto px-3.5 py-2">
+            {/* HANYA opacity, tanpa geser. Wadah ini yang diukur gulir
+                otomatis, dan opacity tidak menyentuh tata letak maupun rect —
+                geser sekecil apa pun di sini akan memindahkan titik
+                mendaratnya. */}
+            <div ref={wadahDaftar}
+              style={{ transitionDelay: muncul && !diam ? '110ms' : '0ms' }}
+              className={cn('min-h-0 flex-1 overflow-y-auto px-3.5 py-2',
+                'transition-opacity duration-300 ease-out motion-reduce:transition-none',
+                muncul ? 'opacity-100' : 'opacity-0')}>
               {memuat ? (
                 <div className="flex items-center gap-2 py-6 text-[12px] text-zinc-500">
                   <Loader2 className="size-3.5 animate-spin" /> Memuat kalender…
