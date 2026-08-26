@@ -12,6 +12,7 @@ import {
   lotUntukCopy,
 } from '@/lib/ukuran-posisi';
 import { daftarLangganan } from '@/lib/copy-langganan';
+import { catatCopy } from '@/lib/tanda-copy';
 
 /* ════════════════════════════════════════════════════════════════════════
    COPY TRADE — TRADE-FI (MT5)
@@ -135,6 +136,11 @@ export function PanelCopyTradeFi({ pasangan, arah, entry, sl, tp, penulis, tutup
       });
       const h = await tungguHasilMt5(id);
       if (h.status === 'sukses') {
+        /* Dicatat supaya posisinya nanti bisa dikenali sebagai salinan di
+           tabel Posisi Terbuka — terminal tidak menyimpan asal-usul order,
+           dan sesudah beberapa hari tidak ada lagi yang bisa membedakannya
+           dari order yang dipasang sendiri. */
+        catatCopy(pengguna?.uid, { simbol: simbolBroker, arah, lot, analis: penulis });
         setSelesai(true);
         setKabar(`Terkirim — ${h.pesan}`);
       } else {

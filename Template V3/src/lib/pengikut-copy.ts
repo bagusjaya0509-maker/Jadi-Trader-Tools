@@ -6,6 +6,7 @@ import { simbolDasarMt5 } from '@/lib/simbol';
 import { kirimPerintahMt5, tungguHasilMt5 } from '@/lib/mt5-order';
 import { kontrakBerlaku, deteksiJenisAkun, lotUntukCopy } from '@/lib/ukuran-posisi';
 import { useAkunMt5 } from '@/lib/akun';
+import { catatCopy, petaCopy, tandaSinyal, tandaiBatalSelesai } from '@/lib/tanda-copy';
 
 /* ════════════════════════════════════════════════════════════════════════
    PENGIKUT COPY — menyalin sinyal baru ke akun MT5 sendiri
@@ -175,8 +176,55 @@ export function usePengikutCopy(uid: string | null | undefined, jeda = 60_000) {
                 aksi: 'BUKA', simbol, arah: s.arah, lot: h.lot,
                 sl: isi.sl, tp: isi.tp, entry: isi.entry,
               });
-              await tungguHasilMt5(id);
+              const hasil = await tungguHasilMt5(id);
+              /* DICATAT HANYA KALAU BENAR-BENAR TERPASANG. Tanda "salinan"
+                 untuk order yang tidak pernah ada akan menempel di posisi
+                 manual pertama yang kebetulan seukuran — keterangan palsu
+                 tentang dari mana sebuah order berasal. */
+              if (hasil.status === 'sukses') {
+                catatCopy(uid!, {
+                  simbol, arah: s.arah, lot: h.lot,
+                  analis: l.analisNama || 'Analis',
+                  sinyal: s.id,
+                });
+              }
             } catch { /* satu sinyal gagal tidak boleh menghentikan sisanya */ }
+          }
+        }
+
+        /* ── SINYAL YANG DITARIK ANALISNYA ────────────────────────────
+           Yang dibatalkan HANYA order yang belum terisi. Sinyal yang
+           ditarik setelah harganya kena artinya analisnya berhenti
+           memantau, bukan bahwa posisi yang sudah berjalan harus ditutup
+           rugi pada detik itu juga — menutup paksa posisi hidup adalah
+           keputusan uang yang tidak pernah diminta siapa pun.
+
+           Tiketnya diikat dulu lewat petaCopy: catatan salinan lahir
+           beberapa detik sebelum tiketnya ada, dan tanpa pengikatan itu
+           tidak ada yang bisa ditunjuk untuk dibatalkan. */
+        const ditarik = semua.filter((s) => perAnalis.has(s.uid) && s.hasil === 'batal');
+        if (ditarik.length) {
+          petaCopy(uid!, [...akun.posisi, ...akun.pending].map((p) => ({
+            tiket: p.tiket, simbol: p.simbol, arah: p.arah, lot: p.lot,
+          })));
+          for (const s of ditarik) {
+            if (!hidup) break;
+            const t = tandaSinyal(uid!, s.id);
+            if (!t || t.batalSelesai || !t.tiket) continue;
+            if (!akun.pending.some((o) => o.tiket === t.tiket)) {
+              /* Sudah jadi posisi: dibiarkan berjalan, dan penandanya
+                 ditutup supaya putaran berikutnya tidak memeriksanya lagi.
+                 Kalau tiketnya tidak ada di kedua daftar, itu bisa berarti
+                 EA sedang tersendat — dibiarkan, putaran berikutnya
+                 melihatnya lagi. */
+              if (akun.posisi.some((o) => o.tiket === t.tiket)) tandaiBatalSelesai(uid!, s.id);
+              continue;
+            }
+            try {
+              const { id } = await kirimPerintahMt5({ aksi: 'TUTUP', tiket: t.tiket });
+              const r = await tungguHasilMt5(id);
+              if (r.status === 'sukses') tandaiBatalSelesai(uid!, s.id);
+            } catch { /* satu gagal tidak menghentikan sisanya */ }
           }
         }
 

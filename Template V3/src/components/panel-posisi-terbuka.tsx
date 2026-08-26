@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Copy } from 'lucide-react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { cn, uang, harga as fHarga } from '@/lib/utils';
 import { usePosisi } from '@/lib/data';
@@ -12,6 +13,8 @@ import { cariStopNyasar } from '@/lib/stop-nyasar';
 import { batalPendingNyata } from '@/lib/order-nyata';
 import { useOrderSementara, sapuYangSudahAda } from '@/lib/order-sementara';
 import { barisPendingKripto, rencanaLokal } from '@/lib/pending-kripto';
+import { useAuth } from '@/lib/auth';
+import { petaCopy } from '@/lib/tanda-copy';
 
 /* ════════════════════════════════════════════════════════════════════════
    POSISI TERBUKA — dipindah dari Jurnal ke Chart & Backtest
@@ -87,6 +90,16 @@ export function PanelPosisiTerbuka({ sumber, onSunting, onTutup, tanpaBingkai, m
 }) {
   const { data: posisiKripto, pending: pendingKripto, stop: stopKripto, contoh: kriptoContoh, bursaAktif } = usePosisi();
   const mt5 = useAkunMt5();
+  const { pengguna } = useAuth();
+  /* TIKET MANA YANG SALINAN. Dihitung dari daftar posisi hidup, bukan
+     sekadar dibaca: catatan salinan lahir sebelum tiketnya ada (EA yang
+     mengeksekusi, beberapa detik kemudian), jadi penjodohan pertamanya
+     terjadi di sini — sekali, lalu tiketnya diikat permanen. */
+  const tandaCopy = useMemo(
+    () => petaCopy(pengguna?.uid, [...mt5.posisi, ...mt5.pending].map((p) => ({
+      tiket: p.tiket, simbol: p.simbol, arah: p.arah, lot: p.lot,
+    }))),
+    [pengguna?.uid, mt5.posisi, mt5.pending]);
 
   /* ── Order yang baru saja dikirim, belum terlihat di bursa ────────────
      Jembatan beberapa detik antara menekan Kirim dan putaran baca
@@ -128,11 +141,13 @@ export function PanelPosisiTerbuka({ sumber, onSunting, onTutup, tanpaBingkai, m
      menyimpang — yang satu menampilkan SL/TP, yang lain tidak. */
   const pending = sumber === 'kripto'
     ? barisPendingKripto(pendingKripto, stopKripto, rencana)
+        .map((o) => ({ ...o, copy: undefined as string | undefined }))
     /* Yang paling BARU dipasang di atas. Order pending dibuat berurutan
        waktu, dan yang baru saja dikirim adalah yang sedang dipikirkan —
        menaruhnya di ekor daftar berarti ia harus dicari dulu. */
     : [...mt5.pending].sort((a, b) => b.waktu - a.waktu).map((o) => ({
         kunci: o.tiket, simbol: o.simbol, arah: o.arah,
+        copy: tandaCopy.get(o.tiket),
         ukuran: `${o.lot} lot`,
         ukuranNum: o.lot,
         jenis: o.jenis.replace('_', ' '),
@@ -275,6 +290,7 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
         const unit = nilaiLot ? p.lot * nilaiLot : 0;
         return {
           kunci: p.tiket, simbol: p.simbol, arah: p.arah,
+          copy: tandaCopy.get(p.tiket),
           ket: `#${p.tiket}`,
           ukuran: `${p.lot} lot`,
           ukuranNum: p.lot,
@@ -532,6 +548,12 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
                   <div className="flex items-center justify-between gap-2">
                     <span className="flex min-w-0 items-center gap-2">
                       <span className="truncate text-[12.5px] text-zinc-200">{o.simbol}</span>
+                      {o.copy && (
+                        <span title={`Order ini masuk otomatis karena kamu mengikuti ${o.copy} di Copy Signal.`}
+                              aria-label={'Salinan sinyal ' + o.copy}>
+                          <Copy className="-ml-1 size-3 shrink-0 text-sky-400/80" />
+                        </span>
+                      )}
                       <span className={cn('text-[10.5px]',
                         o.arah === 'BUY' ? 'text-emerald-500' : 'text-red-400')}>
                         {o.jenis}

@@ -1,0 +1,156 @@
+import { simbolDasarMt5 } from '@/lib/simbol';
+
+/* ════════════════════════════════════════════════════════════════════════
+   TANDA COPY — posisi mana yang datang dari sinyal orang lain
+   ════════════════════════════════════════════════════════════════════════
+   Sesudah beberapa hari, tabel posisi terbuka berisi campuran: order yang
+   dipasang sendiri dan order yang masuk otomatis karena mengikuti analis.
+   Dari terminal keduanya identik — MT5 tidak menyimpan "ini salinan siapa".
+   Yang tahu asal-usulnya hanya aplikasi ini, pada detik ia mengirimnya.
+   Jadi di situlah dicatat.
+
+   ── KENAPA TIDAK LANGSUNG PAKAI TIKET ───────────────────────────────────
+   Karena tiketnya belum ada saat perintah dikirim. Web menaruh perintah di
+   antrean; EA yang mengeksekusinya beberapa detik kemudian, dan nomor tiket
+   lahir di sana. Yang bisa dicatat pada saat mengirim cuma niatnya: simbol,
+   arah, dan lot.
+
+   ── PENGIKATAN SEKALI, LALU TIKET SELAMANYA ─────────────────────────────
+   Maka pencocokannya dua tahap. Catatan yang belum punya tiket dijodohkan
+   dengan posisi hidup yang simbol + arah + lotnya sama; begitu ketemu,
+   tiketnya DIIKAT dan disimpan. Sesudah itu pencocokannya lewat tiket saja.
+
+   Ini penting justru karena SL dan TP boleh berubah. Kalau tandanya
+   bergantung pada level, menggeser stop akan menghapus keterangan "ini
+   salinan" — padahal menggeser stop adalah hal yang wajar dilakukan pada
+   posisi salinan.
+
+   Penjodohan pertama memang bisa keliru kalau ada dua order dengan simbol,
+   arah, dan lot yang persis sama dibuka berbarengan — satu manual, satu
+   salinan. Yang tertukar cuma LABELNYA; tidak ada order yang ikut berpindah
+   karenanya. Itu harga yang wajar untuk keterangan yang bertahan.
+   ════════════════════════════════════════════════════════════════════════ */
+
+export interface TandaCopy {
+  /** Nama simbol seperti yang dikirim ke broker: "XAUUSDc", bukan "XAUUSD". */
+  simbol: string;
+  arah: 'BUY' | 'SELL';
+  lot: number;
+  /** Nama analis yang sinyalnya ditiru — yang ditampilkan saat ikonnya
+   *  disentuh. */
+  analis: string;
+  waktu: number;
+  /** Terisi sesudah catatan ini berhasil dijodohkan dengan satu posisi
+   *  hidup. Sejak itu, cuma ini yang dipakai mencocokkan. */
+  tiket?: string;
+  /** Sinyal analis yang melahirkan order ini. Dibutuhkan saat analisnya
+   *  MENARIK sinyalnya: yang dibatalkan harus order dari sinyal itu, bukan
+   *  order lain yang kebetulan sepasang dan searah. */
+  sinyal?: string;
+  /** Penarikan sinyalnya sudah diurus. Tanpa ini, sinyal yang berstatus
+   *  batal akan mengirim perintah pembatalan lagi di SETIAP putaran — ke
+   *  tiket yang sudah tidak ada, selamanya. */
+  batalSelesai?: boolean;
+}
+
+const KUNCI = (uid: string) => `jt.copy.tanda.${uid}`;
+/** Catatan disimpan 200 terakhir. Yang lebih tua dari itu pasti sudah
+ *  tertutup berkali-kali; menyimpannya selamanya cuma melewatkan batas
+ *  localStorage. */
+const BATAS = 200;
+
+export function bacaTanda(uid?: string | null): TandaCopy[] {
+  if (!uid) return [];
+  try {
+    const j = JSON.parse(localStorage.getItem(KUNCI(uid)) || '[]');
+    return Array.isArray(j) ? (j as TandaCopy[]) : [];
+  } catch { return []; }
+}
+
+function simpan(uid: string, d: TandaCopy[]) {
+  try { localStorage.setItem(KUNCI(uid), JSON.stringify(d.slice(-BATAS))); }
+  catch { /* mode privat — tandanya hilang, ordernya tidak */ }
+}
+
+/** Dipanggil TEPAT sesudah satu order salinan berhasil dikirim. */
+export function catatCopy(uid: string | null | undefined, t: Omit<TandaCopy, 'waktu'>) {
+  if (!uid) return;
+  const d = bacaTanda(uid);
+  d.push({ ...t, waktu: Date.now() });
+  simpan(uid, d);
+}
+
+/** Catatan salinan untuk satu sinyal tertentu. */
+export function tandaSinyal(uid: string | null | undefined, sinyal: string): TandaCopy | undefined {
+  if (!uid) return undefined;
+  return bacaTanda(uid).find((t) => t.sinyal === sinyal);
+}
+
+/** Menyetel penanda "penarikan sinyal ini sudah diurus". */
+export function tandaiBatalSelesai(uid: string | null | undefined, sinyal: string) {
+  if (!uid) return;
+  const d = bacaTanda(uid);
+  let berubah = false;
+  for (const t of d) {
+    if (t.sinyal === sinyal && !t.batalSelesai) { t.batalSelesai = true; berubah = true; }
+  }
+  if (berubah) simpan(uid, d);
+}
+
+function samaSimbol(a: string, b: string): boolean {
+  if (a.toUpperCase() === b.toUpperCase()) return true;
+  return simbolDasarMt5(a) === simbolDasarMt5(b);
+}
+
+export interface PosisiUntukTanda {
+  tiket: string;
+  simbol: string;
+  arah: 'BUY' | 'SELL';
+  lot: number;
+}
+
+/**
+ * Peta tiket → nama analis untuk posisi yang sedang terbuka.
+ *
+ * Sekalian mengikat catatan yang belum punya tiket, jadi ia MENULIS ke
+ * penyimpanan saat ada yang baru terjodoh. Aman dipanggil berulang: sesudah
+ * pengikatan pertama, panggilan berikutnya tidak mengubah apa-apa.
+ */
+export function petaCopy(uid: string | null | undefined, posisi: PosisiUntukTanda[]): Map<string, string> {
+  const peta = new Map<string, string>();
+  if (!uid || posisi.length === 0) return peta;
+
+  const d = bacaTanda(uid);
+  if (d.length === 0) return peta;
+
+  const hidup = new Set(posisi.map((p) => p.tiket));
+  /* Tiket yang sudah diikat catatan lain tidak boleh direbut catatan kedua:
+     dua salinan berbeda tidak menunjuk satu order yang sama. */
+  const terpakai = new Set<string>();
+  for (const t of d) {
+    if (t.tiket && hidup.has(t.tiket)) {
+      peta.set(t.tiket, t.analis);
+      terpakai.add(t.tiket);
+    }
+  }
+
+  /* Catatan terlama dijodohkan lebih dulu — urutan yang sama dengan urutan
+     ordernya dikirim. */
+  let berubah = false;
+  for (const t of d) {
+    if (t.tiket) continue;
+    const cocok = posisi.find((p) =>
+      !terpakai.has(p.tiket)
+      && p.arah === t.arah
+      && Math.abs(p.lot - t.lot) < 0.005
+      && samaSimbol(p.simbol, t.simbol));
+    if (!cocok) continue;
+    t.tiket = cocok.tiket;
+    terpakai.add(cocok.tiket);
+    peta.set(cocok.tiket, t.analis);
+    berubah = true;
+  }
+  if (berubah) simpan(uid, d);
+
+  return peta;
+}

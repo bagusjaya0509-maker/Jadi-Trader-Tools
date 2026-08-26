@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, Copy } from 'lucide-react';
 import { TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn, uang, harga } from '@/lib/utils';
 
@@ -32,6 +32,14 @@ export interface BarisPosisi {
    *  hanya ditulis ulang selama halaman screener terbuka, jadi posisi yang
    *  sudah tertutup bisa tertinggal di sana berhari-hari. */
   ragu?: string;
+  /** Nama analis yang sinyalnya disalin, kalau posisi ini memang salinan.
+   *  Kosong = dipasang sendiri.
+   *
+   *  Ditandai di sebelah nama pair karena pertanyaannya muncul justru saat
+   *  posisinya sedang bergerak melawan: "ini keputusan saya atau bukan?"
+   *  Order salinan dan order sendiri terlihat persis sama di terminal, dan
+   *  yang tahu bedanya cuma aplikasi ini. */
+  copy?: string;
   /** Sudah lengkap dengan satuannya: "223,8 THETA" atau "0,01 lot". */
   ukuran: string;
   /** Ukuran sebagai ANGKA, untuk dijumlah saat baris digabung.
@@ -174,6 +182,11 @@ function gabungBaris(g: BarisPosisi[]): BarisPosisi {
     gabungBeda: beda.length ? beda : undefined,
     ket: g.length + ' order' + (beda.length ? ' · ' + beda.join(' & ') + ' beragam' : ''),
     ragu: g.map((b) => b.ragu).find(Boolean),
+    /* Satu salinan di antara lima order sendiri sudah cukup untuk menandai
+       baris induknya. Menyembunyikannya karena "yang lain bukan salinan"
+       berarti keterangan itu cuma ada di baris anak yang harus dibuka
+       dulu — dan yang ingin tahu asal-usulnya justru melihat induknya. */
+    copy: g.map((b) => b.copy).find(Boolean),
   };
 }
 
@@ -288,6 +301,12 @@ export function TabelPosisi({ baris, kosong, onKlikBaris, onTutup }: {
                 <Td className={anak ? 'pl-6' : undefined}>
                   {anak && <span className="mr-1 text-zinc-700">└</span>}
                   <span className={b.ragu ? 'text-zinc-400' : 'text-zinc-200'}>{b.simbol}</span>
+                  {b.copy && (
+                    <span title={`Posisi ini masuk otomatis karena kamu mengikuti ${b.copy} di Copy Signal.`}
+                          aria-label={'Salinan sinyal ' + b.copy}>
+                      <Copy className="ml-1 inline-block size-3 -translate-y-px text-sky-400/80" />
+                    </span>
+                  )}
                   <span className={cn('ml-1.5 text-[10.5px]',
                     b.arah === 'BUY' ? 'text-emerald-500' : 'text-red-400')}>
                     {b.arah}
