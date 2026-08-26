@@ -22,6 +22,7 @@ import { NEWS, PESAN, CHANGELOG } from '@/data/notifikasi';
 import { PanelKabar, GrupKabar, BarisKabar, KosongKabar } from '@/components/panel-kabar';
 import { LogoJT } from '@/components/logo-jt';
 import { usePermintaanLisensi } from '@/lib/admin';
+import { usePengikutCopy } from '@/lib/pengikut-copy';
 
 /* ════════════════════════════════════════════════════════════════════════
    APP SHELL — rekonstruksi Efferd Dashboard 2
@@ -614,7 +615,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [laci, setLaci] = useState(false);
   const [ciut, setCiut] = useState(false);
   const { pathname, search } = useLocation();
-  const { pemilik } = useAuth();
+  const { pemilik, pengguna } = useAuth();
   const judul = JUDUL[pathname] ?? 'Dashboard';
 
   /* ── Sub-menu yang terbuka di sidebar ─────────────────────────────────
@@ -715,6 +716,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     mq.addEventListener('change', ubah);
     return () => mq.removeEventListener('change', ubah);
   }, []);
+
+  /* ── PENGIKUT COPY SIGNAL ─────────────────────────────────────────
+     Dinyalakan di KERANGKA, bukan di halaman Copy Signal. Sinyal analis
+     terbit kapan saja, dan orang yang mengikutinya hampir tidak pernah
+     sedang menatap halaman itu — biasanya ia di Chart, di Jurnal, atau
+     membiarkan tabnya terbuka di latar. Pengikut yang cuma hidup di satu
+     halaman berarti fiturnya cuma bekerja saat diawasi.
+
+     Ia diam sendiri kalau tidak ada langganan, kalau belum masuk, atau
+     kalau EA belum melapor — jadi memasangnya di sini tidak menambah
+     beban bagi yang tidak memakainya. */
+  usePengikutCopy(pengguna?.uid);
 
   const terbaru = CHANGELOG[0];
 
