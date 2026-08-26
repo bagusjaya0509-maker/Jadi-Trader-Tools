@@ -46,6 +46,45 @@ import { catatCopy, petaCopy, tandaSinyal, tandaiBatalSelesai } from '@/lib/tand
 
 const KUNCI_SUDAH = (uid: string) => `jt.copy.sudah.${uid}`;
 const KUNCI_JALAN = (uid: string) => `jt.copy.jalan.${uid}`;
+const KUNCI_LOG = (uid: string) => `jt.copy.log.${uid}`;
+
+/* ── CATATAN KEJADIAN ─────────────────────────────────────────────────
+   Sebelum ini, sinyal yang tidak jadi disalin hilang tanpa jejak: setiap
+   pemeriksaan yang gagal cuma `continue`, dan yang terlihat di layar
+   adalah tidak terjadi apa-apa. Tidak terjadi apa-apa punya sepuluh sebab
+   yang berbeda — EA mati, simbolnya tidak ada di broker, sinyalnya terbit
+   sebelum diikuti, lotnya membulat jadi nol — dan menyamakan semuanya
+   membuat fiturnya mustahil dipercaya: orang tidak bisa membedakan
+   "sistemnya rusak" dari "memang tidak seharusnya masuk". */
+export interface LogCopy {
+  waktu: number;
+  sinyal: string;
+  pasangan: string;
+  analis: string;
+  hasil: 'terkirim' | 'dilewati' | 'gagal';
+  sebab: string;
+}
+
+export function bacaLogCopy(uid?: string | null): LogCopy[] {
+  if (!uid) return [];
+  try {
+    const j = JSON.parse(localStorage.getItem(KUNCI_LOG(uid)) || '[]');
+    return Array.isArray(j) ? (j as LogCopy[]).slice().reverse() : [];
+  } catch { return []; }
+}
+
+function catat(uid: string, e: Omit<LogCopy, 'waktu'>) {
+  try {
+    const d: LogCopy[] = JSON.parse(localStorage.getItem(KUNCI_LOG(uid)) || '[]');
+    /* Sebab yang sama untuk sinyal yang sama tidak ditulis ulang. Sinyal
+       yang dilewati karena alasan menetap akan diperiksa lagi tiap menit,
+       dan tanpa ini catatannya penuh oleh satu kejadian yang sama. */
+    const akhir = d[d.length - 1];
+    if (akhir && akhir.sinyal === e.sinyal && akhir.sebab === e.sebab) return;
+    d.push({ ...e, waktu: Date.now() });
+    localStorage.setItem(KUNCI_LOG(uid), JSON.stringify(d.slice(-40)));
+  } catch { /* mode privat */ }
+}
 
 /** Sinyal yang SUDAH pernah disalin. Dibatasi 500 terakhir — daftar yang
  *  tumbuh selamanya akhirnya melewati batas localStorage, dan yang gagal
@@ -141,19 +180,21 @@ export function usePengikutCopy(uid: string | null | undefined, jeda = 60_000) {
           for (const s of antre) {
             if (!hidup) break;
             const l = perAnalis.get(s.uid)!;
-            /* DITANDAI DULU, baru dikirim. Kalau tab ditutup di tengah
-               pengiriman, sinyal ini hilang — dan kehilangan satu salinan
-               jauh lebih murah daripada mengirimnya dua kali saat aplikasi
-               dibuka lagi. */
-            tandai(uid!, s.id);
+            const jejak = { sinyal: s.id, pasangan: s.pasangan, analis: l.analisNama || 'Analis' };
             try {
               const { isi } = await bukaIsi(s.id);
-              if (!(isi.entry > 0) || !(isi.sl > 0)) continue;
+              if (!(isi.entry > 0) || !(isi.sl > 0)) {
+                catat(uid!, { ...jejak, hasil: 'dilewati', sebab: 'Sinyalnya belum punya entry dan SL yang bisa dihitung.' });
+                continue;
+              }
 
               const cari = s.pasangan.replace(/^MT5:/i, '').toUpperCase();
               const simbol = simbolku.find((x) => x.toUpperCase() === cari)
                           ?? simbolku.find((x) => simbolDasarMt5(x) === cari);
-              if (!simbol) continue;
+              if (!simbol) {
+                catat(uid!, { ...jejak, hasil: 'dilewati', sebab: `Terminalmu tidak punya simbol yang cocok dengan ${cari}. Tampilkan simbolnya di Market Watch MT5.` });
+                continue;
+              }
 
               const h = lotUntukCopy({
                 lotDiminta: 0,
@@ -161,7 +202,10 @@ export function usePengikutCopy(uid: string | null | undefined, jeda = 60_000) {
                 kontrak: kontrakBerlaku(l.kontrak, jenis),
                 jarakHarga: Math.abs(isi.entry - isi.sl),
               });
-              if (h.lot < 0.01) continue;
+              if (h.lot < 0.01) {
+                catat(uid!, { ...jejak, hasil: 'dilewati', sebab: h.sebab || `Batas rugi $${l.rugiMaks} terlalu kecil untuk jarak SL sinyal ini — lotnya membulat jadi nol.` });
+                continue;
+              }
 
               /* SISI SL/TP DIPERIKSA di sini juga, walau panel manual sudah
                  memeriksanya. Tidak ada manusia yang melihat layar saat ini
@@ -170,7 +214,23 @@ export function usePengikutCopy(uid: string | null | undefined, jeda = 60_000) {
               const benar = s.arah === 'BUY'
                 ? isi.sl < isi.entry && (!isi.tp || isi.tp > isi.entry)
                 : isi.sl > isi.entry && (!isi.tp || isi.tp < isi.entry);
-              if (!benar) continue;
+              if (!benar) {
+                catat(uid!, { ...jejak, hasil: 'dilewati', sebab: 'SL/TP sinyalnya ada di sisi yang salah terhadap entry.' });
+                continue;
+              }
+
+              /* DITANDAI DI SINI, tepat sebelum berangkat — bukan di awal
+                 putaran seperti sebelumnya.
+
+                 Menandainya di awal memang mencegah order ganda, tapi ia
+                 juga membakar sinyal yang BELUM PERNAH dikirim: satu
+                 kegagalan sementara (daftar simbol EA belum sempat termuat,
+                 jaringan tersendat) menandainya "sudah" selamanya, dan
+                 sinyal itu tidak akan pernah dicoba lagi walau semenit
+                 kemudian semuanya normal. Sifat yang penting cuma satu —
+                 tercatat SEBELUM perintahnya berangkat — dan itu tetap
+                 dipegang di sini. */
+              tandai(uid!, s.id);
 
               const { id } = await kirimPerintahMt5({
                 aksi: 'BUKA', simbol, arah: s.arah, lot: h.lot,
@@ -187,8 +247,15 @@ export function usePengikutCopy(uid: string | null | undefined, jeda = 60_000) {
                   analis: l.analisNama || 'Analis',
                   sinyal: s.id,
                 });
+                catat(uid!, { ...jejak, hasil: 'terkirim', sebab: `${s.arah} ${h.lot} lot ${simbol} — ${hasil.pesan}` });
+              } else {
+                catat(uid!, { ...jejak, hasil: 'gagal', sebab: hasil.pesan || `Terminal menjawab: ${hasil.status}` });
               }
-            } catch { /* satu sinyal gagal tidak boleh menghentikan sisanya */ }
+            } catch (e) {
+              /* Satu sinyal gagal tidak boleh menghentikan sisanya — tapi
+                 kegagalannya tetap harus terlihat. */
+              catat(uid!, { ...jejak, hasil: 'gagal', sebab: e instanceof Error ? e.message : 'Gagal mengirim perintah.' });
+            }
           }
         }
 

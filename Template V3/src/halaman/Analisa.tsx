@@ -22,6 +22,7 @@ import { SparklineSaldo } from '@/components/kurva-saldo';
 import { PotongGambar } from '@/components/potong-gambar';
 import { HitungPosisi } from '@/components/hitung-posisi';
 import { PanelCopyAnalis } from '@/components/panel-copy-analis';
+import { StatusAutoCopy } from '@/components/status-auto-copy';
 import { PanelCopyTradeFi } from '@/components/panel-copy-tradefi';
 import { daftarLangganan, hapusLangganan, type LanggananCopy } from '@/lib/copy-langganan';
 import { ambilDraf } from '@/lib/draf-sinyal';
@@ -1071,6 +1072,7 @@ function KartuAnalisa({ a, status, milikku, onSegarkan, performa, hargaKini }: {
 
         {copyBuka && copyIsi && (
           <PanelCopyTradeFi
+            analisUid={a.uid}
             pasangan={a.pasangan}
             arah={a.arah}
             entry={copyIsi.entry}
@@ -1422,6 +1424,8 @@ function SignalDiikuti({ keRuang, onKosong }: {
 
   return (
     <>
+      <StatusAutoCopy />
+
       <div className="mb-3">
         <h2 className="text-[14px] font-medium text-zinc-100">Signal Diikuti</h2>
         <p className="mt-0.5 text-[11.5px] text-zinc-500">

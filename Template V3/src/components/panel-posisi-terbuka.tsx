@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Copy } from 'lucide-react';
+import { Copy, Trash2, Loader2 } from 'lucide-react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { cn, uang, harga as fHarga } from '@/lib/utils';
 import { usePosisi } from '@/lib/data';
-import { useAkunMt5, versiKurangDari, VERSI_EA_PENDING } from '@/lib/akun';
+import { useAkunMt5, versiKurangDari, VERSI_EA_PENDING, segarkanAkunMt5 } from '@/lib/akun';
+import { kirimPerintahMt5, tungguHasilMt5 } from '@/lib/mt5-order';
 import { useHargaPasar } from '@/lib/harga';
 import { bacaSpekMt5 } from '@/lib/pasar';
 import { TabelPosisi, type BarisPosisi } from '@/components/tabel-posisi';
@@ -172,6 +173,11 @@ export function PanelPosisiTerbuka({ sumber, onSunting, onTutup, tanpaBingkai, m
       ? cariStopNyasar(stopKripto, posisiKripto.map((p) => ({ simbol: p.simbol, jumlah: p.jumlah ?? 0 })), pendingKripto)
       : []),
     [sumber, stopKripto, posisiKripto, pendingKripto]);
+  /* Tiket yang sedang dibatalkan. Satu per satu, bukan penanda boolean
+     bersama: dua order menunggu di daftar yang sama, dan penanda tunggal
+     akan memutar spinner di baris yang tidak sedang diapa-apakan. */
+  const [batalTiket, setBatalTiket] = useState<string | null>(null);
+  const [batalKabar, setBatalKabar] = useState('');
   const [sibukBersih, setSibukBersih] = useState(false);
   const [kabarBersih, setKabarBersih] = useState('');
 
@@ -301,6 +307,35 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
           imbalUsd: uangDari(p.tp > 0 ? Math.abs(p.tp - p.hargaBuka) : 0, unit),
         };
       });
+
+  /* ── BATALKAN ORDER YANG BELUM TERISI ─────────────────────────────
+     Sampai sekarang membatalkan pending Trade-Fi menuntut jalan memutar:
+     klik barisnya, tunggu chart-nya termuat, cari tombolnya di panel order.
+     Padahal yang diinginkan cuma satu hal, dan pada order yang BELUM TERISI
+     hal itu tidak mempertaruhkan apa pun — tidak ada posisi yang ditutup
+     rugi, cuma niat yang ditarik kembali.
+
+     EA memakai satu perintah untuk posisi maupun pending: terminal yang
+     tahu tiket itu milik yang mana. */
+  async function batalkanPending(tiket: string) {
+    if (batalTiket) return;
+    setBatalTiket(tiket);
+    setBatalKabar('');
+    try {
+      const { id } = await kirimPerintahMt5({ aksi: 'TUTUP', tiket });
+      const h = await tungguHasilMt5(id);
+      if (h.status === 'sukses') {
+        /* Dipaksa membaca ulang. Tanpa ini daftarnya menunggu putaran 30
+           detik berikutnya, dan order yang sudah hilang dari terminal tetap
+           terpampang di layar seolah pembatalannya tidak jalan. */
+        segarkanAkunMt5();
+      } else {
+        setBatalKabar(h.pesan || `Terminal menjawab: ${h.status}`);
+      }
+    } catch (e) {
+      setBatalKabar(e instanceof Error ? e.message : 'Gagal mengirim perintah batal.');
+    } finally { setBatalTiket(null); }
+  }
 
   /* Satu bentuk OrderSunting untuk DUA pemakai: klik baris (lihat di chart)
      dan tombol Tutup. Dulu bentuknya ditulis inline di satu tempat saja;
@@ -560,7 +595,26 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
                       </span>
                       <span className="angka shrink-0 text-[11px] text-zinc-400">{o.ukuran}</span>
                     </span>
-                    <span className="angka shrink-0 text-[12px] text-amber-400/90">{fHarga(o.harga)}</span>
+                    <span className="flex shrink-0 items-center gap-1.5">
+                      <span className="angka text-[12px] text-amber-400/90">{fHarga(o.harga)}</span>
+                      {/* Hanya untuk Trade-Fi. Pending kripto di daftar ini
+                          sebagian RENCANA lokal yang belum ada di bursa,
+                          dan satu ikon yang kadang menghapus order sungguhan
+                          kadang cuma catatan sendiri adalah ikon yang tidak
+                          bisa dipercaya. */}
+                      {sumber !== 'kripto' && (
+                        <button type="button"
+                          onClick={(e) => { e.stopPropagation(); void batalkanPending(o.kunci); }}
+                          disabled={batalTiket !== null}
+                          title="Batalkan order ini di MT5"
+                          aria-label={`Batalkan ${o.arah} ${o.simbol}`}
+                          className="rounded p-0.5 text-zinc-600 transition-colors hover:bg-red-500/10 hover:text-red-400 disabled:opacity-40">
+                          {batalTiket === o.kunci
+                            ? <Loader2 className="size-3.5 animate-spin" />
+                            : <Trash2 className="size-3.5" />}
+                        </button>
+                      )}
+                    </span>
                   </div>
                   {/* SL/TP hanya ditulis kalau order-nya memang membawanya.
                       Untuk entry kripto yang menggantung, angkanya RENCANA —
@@ -583,6 +637,9 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
                 </div>
               ))}
             </div>
+            {batalKabar && (
+              <p className="mt-2 text-[11px] text-red-400/90">{batalKabar}</p>
+            )}
           </div>
         )}
       </div>

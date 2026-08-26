@@ -35,7 +35,11 @@ import { catatCopy } from '@/lib/tanda-copy';
 
 const ISIAN = 'w-full rounded-md border border-zinc-800 bg-zinc-950 px-2 py-1.5 text-[12px] text-zinc-200 outline-none transition-colors focus:border-zinc-600';
 
-export function PanelCopyTradeFi({ pasangan, arah, entry, sl, tp, penulis, tutup }: {
+export function PanelCopyTradeFi({ analisUid, pasangan, arah, entry, sl, tp, penulis, tutup }: {
+  /** Analis pemilik sinyalnya. Dipakai untuk menjawab satu pertanyaan yang
+   *  selalu muncul di panel ini: "kalau saya tekan ini, sinyal berikutnya
+   *  ikut masuk sendiri atau tidak?" */
+  analisUid?: string;
   pasangan: string;
   arah: 'BUY' | 'SELL';
   entry: number;
@@ -68,6 +72,12 @@ export function PanelCopyTradeFi({ pasangan, arah, entry, sl, tp, penulis, tutup
     const x = bacaSetelanRisiko(pengguna?.uid);
     return Math.max(1, Math.round(x.modal * (x.risiko / 100) * 100) / 100);
   });
+  /* SATU SINYAL, BUKAN LANGGANAN — dan itu harus dikatakan di sini.
+     Tombol bergambar salin di kartu sinyal terlihat seperti sakelar "ikuti
+     analis ini", padahal ia mengirim satu order lalu selesai. Orang yang
+     salah membacanya akan menunggu sinyal berikutnya masuk sendiri, dan
+     yang ia tunggu tidak akan pernah datang. */
+  const diikuti = !!analisUid && daftarLangganan(pengguna?.uid).some((l) => l.analisUid === analisUid);
   const [sibuk, setSibuk] = useState(false);
   const [kabar, setKabar] = useState('');
   const [selesai, setSelesai] = useState(false);
@@ -260,6 +270,21 @@ export function PanelCopyTradeFi({ pasangan, arah, entry, sl, tp, penulis, tutup
           {kabar && (
             <div className={cn('mt-2 text-[11px] leading-relaxed',
               selesai ? 'text-emerald-400' : 'text-zinc-400')}>{kabar}</div>
+          )}
+
+          {/* APA YANG TERJADI SESUDAH INI — pertanyaan yang selalu muncul di
+              panel ini, dan sampai sekarang tidak dijawab di mana pun.
+              Tombol ini menyalin SATU sinyal; yang membuat sinyal berikutnya
+              masuk sendiri adalah mengikuti analisnya, dan keduanya terlihat
+              sama dari luar. */}
+          {analisUid && (
+            <p className={cn('mt-2.5 rounded-md px-2 py-1.5 text-[10.5px] leading-relaxed',
+              diikuti ? 'bg-emerald-500/[0.07] text-emerald-300/90'
+                      : 'bg-zinc-800/50 text-zinc-400')}>
+              {diikuti
+                ? `Kamu sudah mengikuti ${penulis} — sinyal berikutnya masuk sendiri tanpa panel ini, selama aplikasi terbuka.`
+                : `Ini menyalin SATU sinyal saja. Supaya sinyal ${penulis} berikutnya masuk otomatis, ikuti analisnya lewat klik kanan kartunya di Copy Signal.`}
+            </p>
           )}
 
           {/* Dikatakan SEKARANG, bukan setelah orangnya mencari-cari. Order
