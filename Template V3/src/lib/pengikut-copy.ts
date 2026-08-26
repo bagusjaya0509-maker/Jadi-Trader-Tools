@@ -4,7 +4,7 @@ import { daftarLangganan } from '@/lib/copy-langganan';
 import { daftarSimbolMt5 } from '@/lib/pasar';
 import { simbolDasarMt5 } from '@/lib/simbol';
 import { kirimPerintahMt5, tungguHasilMt5 } from '@/lib/mt5-order';
-import { kontrakBerlaku, deteksiJenisAkun, lotUntukCopy } from '@/lib/ukuran-posisi';
+import { kontrakBawaan, kontrakBerlaku, deteksiJenisAkun, lotUntukCopy } from '@/lib/ukuran-posisi';
 import { useAkunMt5 } from '@/lib/akun';
 import { bacaTanda, catatCopy, petaCopy, tandaSinyal, tandaiBatalSelesai } from '@/lib/tanda-copy';
 
@@ -205,10 +205,20 @@ export function usePengikutCopy(uid: string | null | undefined, jeda = 60_000) {
                 continue;
               }
 
+              /* KONTRAK DARI PASANGAN SINYALNYA, bukan dari langganan.
+                 Langganan menyimpan satu angka kontrak yang dibekukan dari
+                 pasangan CONTOH saat orangnya menekan "Ikuti" — dan ukuran
+                 kontrak milik SIMBOLNYA, bukan milik orangnya. Yang ikut
+                 dari kartu BTCUSDT membawa 100.000 ke sinyal emas yang
+                 kontraknya 100: lot hasil hitungannya seribu kali terlalu
+                 kecil, membulat ke nol, dan SEMUA sinyalnya dilewati dengan
+                 pesan "lotnya harus 0.0001". Itu persis yang terjadi pada
+                 pemiliknya, 26 Agu 2026 — dan yang membongkarnya justru
+                 catatan kejadian yang menuliskan angkanya apa adanya. */
               const h = lotUntukCopy({
                 lotDiminta: 0,
                 rugiMaks: l.rugiMaks,
-                kontrak: kontrakBerlaku(l.kontrak, jenis),
+                kontrak: kontrakBerlaku(kontrakBawaan(cari), jenis),
                 jarakHarga: Math.abs(isi.entry - isi.sl),
               });
               if (h.lot < 0.01) {
