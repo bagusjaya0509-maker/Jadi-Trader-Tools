@@ -227,6 +227,11 @@ function ambilSimbol(cari: URLSearchParams): string {
   return cari.get('simbol') || cari.get('symbol') || '';
 }
 
+/* Identitasnya harus TETAP. Array literal baru tiap render membuat ChartLilin
+   membongkar-pasang seluruh price line-nya tiap kali — dan halaman ini render
+   ulang tiap tick harga. */
+const KOSONG_POSISI: PosisiChartMt5[] = [];
+
 export default function ChartBacktest() {
   /* Simbol & timeframe boleh datang dari alamatnya: `#/chart?simbol=ETHUSDT`.
      Itulah yang dipakai menu klik-kanan di Screener Entry untuk membuka koin
@@ -2336,6 +2341,27 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
 
   /* Posisi yang sedang terbuka MENANG atas rencana: kalau sudah masuk, yang
      digambar adalah level posisinya, bukan rancangan sebelumnya. */
+  /* ════════════════════════════════════════════════════════════════
+     SATU GERBANG UNTUK SELURUH GARIS UANG SUNGGUHAN
+     ════════════════════════════════════════════════════════════════
+     Bug ini sudah kambuh berkali-kali: pindah ke DEMO atau COPY, tapi
+     garis posisi/order NYATA masih tergambar. Tiap kali diperbaiki di
+     tempat kejadiannya, dan tiap kali muncul lagi dari sumber garis yang
+     lain.
+
+     Sebabnya bukan salah satu gerbangnya — sebabnya JUMLAHNYA. Syarat
+     `aksi?.mode === 'real'` disalin ke tiap sumber garis: posisi MT5,
+     order menggantung, garis seret, garis Ask. Empat tempat berarti empat
+     kesempatan untuk lupa, dan sumber garis KELIMA yang ditambahkan
+     nanti akan lupa lagi — karena tidak ada yang memaksanya ingat.
+
+     Gerbangnya sekarang di PINTU, bukan di tiap kamar: satu-satunya jalan
+     garis nyata sampai ke ChartLilin adalah lewat prop-prop di bawah, dan
+     semuanya dikosongkan sekaligus saat modenya bukan real. Gerbang di
+     dalam tiap sumber DIBIARKAN — dua lapis tidak berbahaya. Tapi yang
+     MENJAMIN sekarang cuma satu, dan ia mustahil dilewati sumber baru. */
+  const modeNyata = aksi?.mode === 'real';
+
   const aksiPosisi = aksi?.posisi ?? null;
   const aksiTunda = aksi?.tunda ?? null;
 
@@ -3427,7 +3453,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
             ? <ChartLilin key={`${simbol}|${tf}|${kunciChart}`}
                           lilin={lilinGabung} garis={garis} trade={replayIdx === null ? hasil?.trade : undefined}
                           tinggi={tinggiChart} hingga={replayIdx ?? undefined} smi={smi}
-                          garisHarga={[...garisHarga, ...garisZona, ...garisOrder]}
+                          garisHarga={[...garisHarga, ...garisZona, ...(modeNyata ? garisOrder : [])]}
                           /* Klik chart HANYA berlaku saat mode bidik menyala —
                               sekali, untuk menentukan titik mulai replay.
                               Sesudah itu modenya padam dan klik kembali tidak
@@ -3490,9 +3516,9 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                           gambarPilih={gambarPilih}
                           onPilihGambar={setGambarPilih}
                           onUbahGambar={ubahGambar}
-                          posisiMt5={posisiMt5Chart}
+                          posisiMt5={modeNyata ? posisiMt5Chart : KOSONG_POSISI}
                           onUbahPosisi={simbol.startsWith('MT5:') ? ubahPosisiMt5 : undefined}
-                          hargaAsk={askTampil}
+                          hargaAsk={modeNyata ? askTampil : undefined}
                           kunciUkuran={lebarWatch}
                           mundur={DURASI_TF[tf] ? jamMundur(detik) : undefined}
                           hamparanBawah={kendaliReplay}
