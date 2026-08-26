@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   createChart, CandlestickSeries, LineSeries, createSeriesMarkers, createTextWatermark,
+  CrosshairMode,
   type IChartApi, type ISeriesApi, type ISeriesMarkersPluginApi, type IPriceLine, type Logical, type Time,
   type ITextWatermarkPluginApi,
 } from 'lightweight-charts';
@@ -429,6 +430,25 @@ export function ChartLilin({
       rightPriceScale: { borderColor: WARNA_CHART[temaSekarang()].batasSkala },
       timeScale: { borderColor: WARNA_CHART[temaSekarang()].batasSkala, timeVisible: true, secondsVisible: false },
       crosshair: {
+        /* ── NORMAL, BUKAN MAGNET ──────────────────────────────────────
+           Bawaan pustaka adalah Magnet: selama kursor berada DI ATAS data,
+           garis mendatarnya melompat ke harga lilin terdekat alih-alih
+           mengikuti kursor. Di ruang kosong sebelah kanan — di depan lilin
+           terakhir — tidak ada yang bisa ditempeli, jadi di sana ia
+           mengikuti kursor dengan benar.
+
+           Itulah persis gejala yang dilaporkan: "di atas lilin koordinatnya
+           menempel di lilin, di depan lilin baru benar". Bukan dua perilaku
+           yang berbeda, melainkan satu mode yang cuma punya sesuatu untuk
+           ditempeli di salah satunya.
+
+           Magnet salah untuk chart ini. Garis putus-putusnya dipakai
+           MEMBACA HARGA di titik yang ditunjuk mata — menaruh SL, mengukur
+           jarak, membaca level — dan harga yang melompat ke OHLC terdekat
+           menjawab pertanyaan yang tidak diajukan. Yang ingin menempel ke
+           harga lilin sudah punya alatnya sendiri: garis, kotak SNR, dan
+           fibonacci. */
+        mode: CrosshairMode.Normal,
         vertLine: { color: WARNA_CHART[temaSekarang()].bidik, labelBackgroundColor: WARNA_CHART[temaSekarang()].labelBidik },
         horzLine: { color: WARNA_CHART[temaSekarang()].bidik, labelBackgroundColor: WARNA_CHART[temaSekarang()].labelBidik },
       },
