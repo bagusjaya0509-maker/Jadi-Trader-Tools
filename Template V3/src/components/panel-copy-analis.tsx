@@ -398,9 +398,7 @@ export function PanelCopyAnalis({ analisUid, analisNama, contohPasangan, tutup }
               apa pun adalah kebohongan di layar yang mengurus uang. */}
           <p className="mt-2 text-[10.5px] leading-relaxed text-zinc-600">
             Setelan ini tersimpan untuk akunmu. Penyalinan otomatis saat sinyal baru
-            terbit dijalankan pengikut di VPS — bagian itu masih dibangun. Sementara
-            ini sinyal bisa disalin satu per satu lewat tombol{' '}
-            <span className="text-zinc-400">Copy trade</span> di kartu sinyal.
+            terbit dijalankan pengikut di VPS — bagian itu masih dibangun.
           </p>
 
           {kabar && <div className="mt-2 text-[11px] text-zinc-400">{kabar}</div>}
