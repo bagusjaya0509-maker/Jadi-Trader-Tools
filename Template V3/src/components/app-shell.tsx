@@ -5,6 +5,7 @@ import {
   Wallet, TrendingUp, Wrench, CreditCard, LifeBuoy, BookOpen,
   PanelLeft, Bell, Mail, X, Sparkles, MessageCircle, Send, AtSign,
   AlertTriangle, Newspaper, ChevronRight, ChevronDown, Copy, Radar, UserCircle2, Crown,
+  CheckCircle2,
   Sun, Moon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -18,6 +19,7 @@ import { useKabarAgen, umurKabar } from '@/lib/kabar';
 import { useKabarPribadi } from '@/lib/kabar-pribadi';
 import { MenuPengguna, PitaLangganan } from '@/components/gerbang';
 import { NEWS, PESAN, CHANGELOG } from '@/data/notifikasi';
+import { PanelKabar, GrupKabar, BarisKabar, KosongKabar } from '@/components/panel-kabar';
 import { LogoJT } from '@/components/logo-jt';
 import { usePermintaanLisensi } from '@/lib/admin';
 
@@ -331,6 +333,7 @@ function Lonceng() {
   const agen = useKabarAgen();
 
   const totalBelum = belum + agen.belum;
+  const kabar = agen.kabar.slice(0, 8);
 
   return (
     <div className="relative" ref={ref}>
@@ -348,95 +351,73 @@ function Lonceng() {
       </button>
 
       {buka && (
-        /* ── DI PONSEL MELEBAR KE LAYAR, BUKAN MENGGANTUNG DI TOMBOLNYA ──
-           Dulu selalu `absolute right-0 w-[340px]`: lebarnya tetap, dan
-           tepi kanannya menempel pada tombol lonceng — yang duduk jauh dari
-           tepi layar karena masih ada avatar di sebelahnya. Terukur di
-           lebar 375: panelnya mulai di x = -120, jadi seperlima isinya
-           terpotong di luar layar kiri. Judul "Berita Pasar" pun terbaca
-           separuh.
+        <PanelKabar
+          ikon={<Newspaper className="size-5" strokeWidth={1.8} />}
+          judul={totalBelum > 0 ? `${totalBelum} kabar baru` : 'Berita Pasar'}
+          ringkas="Kejadian pasar & sinyal agen"
+          tutup={() => setBuka(false)}
+        >
+          {kabar.length > 0 && (
+            <GrupKabar
+              ikon={<Radar className="size-3 text-red-400" strokeWidth={2} />}
+              label="Agen Pemburu Sinyal"
+            />
+          )}
+          {kabar.map((k, i) => (
+            <BarisKabar
+              key={k.id}
+              urutan={i}
+              warna={k.jenis === 'sinyal' ? 'hijau' : 'biru'}
+              ikon={k.jenis === 'sinyal'
+                ? <Radar className="size-4" strokeWidth={2} />
+                : <MessageCircle className="size-4" strokeWidth={2} />}
+              tanda={k.pair}
+              judul={k.judul}
+              detail={[k.detail, k.sumber].filter(Boolean).join(' · ') || undefined}
+              waktu={umurKabar(k.waktu)}
+              aksi={k.jenis === 'sinyal' && (
+                <Link to="/copy-signal" onClick={() => setBuka(false)}
+                      className="text-[11px] text-zinc-400 underline-offset-2 hover:text-zinc-100 hover:underline">
+                  Lihat levelnya
+                </Link>
+              )}
+            />
+          ))}
 
-           Di ponsel ia sekarang `fixed` selebar layar dikurangi margin,
-           digantung di bawah header (56 px, terukur). Fixed, bukan
-           absolute: ia harus mengukur diri terhadap JENDELA, bukan
-           terhadap tombol yang posisinya bisa bergeser mengikuti isi
-           header.
+          {NEWS.length > 0 && (
+            <GrupKabar
+              ikon={<Newspaper className="size-3 text-zinc-500" strokeWidth={2} />}
+              label="Kalender & berita"
+            />
+          )}
+          {NEWS.map((n, i) => (
+            <BarisKabar
+              key={n.id}
+              urutan={kabar.length + i}
+              warna={n.dampak === 'tinggi' ? 'merah' : n.dampak === 'sedang' ? 'kuning' : 'netral'}
+              ikon={n.dampak === 'tinggi'
+                ? <AlertTriangle className="size-4" strokeWidth={2} />
+                : n.dampak === 'sedang'
+                  ? <TrendingUp className="size-4" strokeWidth={2} />
+                  : <Newspaper className="size-4" strokeWidth={2} />}
+              tanda={n.mata}
+              judul={n.judul}
+              detail={n.detail}
+              waktu={n.waktu}
+            />
+          ))}
 
-           Dari sm ke atas kembali ke perilaku lama — di sana 340 px muat
-           dan menggantung di tombolnya justru lebih tepat. */
-        <div className="fixed inset-x-3 top-14 z-50 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 shadow-2xl sm:absolute sm:inset-x-auto sm:right-0 sm:top-9 sm:w-[340px]">
-          <div className="flex items-center gap-2 border-b border-zinc-800 px-4 py-3">
-            <Newspaper className="size-4 text-zinc-400" strokeWidth={1.8} />
-            <span className="text-[13px] font-medium text-zinc-100">Berita Pasar</span>
-            <span className="ml-auto text-[11px] text-zinc-600">{totalBelum} baru</span>
-          </div>
-          <div className="max-h-[380px] overflow-y-auto">
-            {/* ── Kabar agen Pemburu Sinyal ── */}
-            {agen.kabar.length > 0 && (
-              <div className="border-b border-zinc-800/70 bg-zinc-900/30">
-                <div className="flex items-center gap-1.5 px-4 pb-1 pt-2.5">
-                  <Radar className="size-3 text-red-400" strokeWidth={2} />
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-                    Agen Pemburu Sinyal
-                  </span>
-                </div>
-                {agen.kabar.slice(0, 8).map((k) => (
-                  <div key={k.id} className="border-b border-zinc-800/40 px-4 py-2.5 last:border-0">
-                    <div className="flex items-center gap-2">
-                      <span className={cn('rounded px-1.5 py-0.5 text-[9.5px] font-medium uppercase',
-                        k.jenis === 'sinyal' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-sky-500/15 text-sky-400')}>
-                        {k.jenis === 'sinyal' ? 'sinyal' : 'postingan'}
-                      </span>
-                      {k.pair && <span className="angka text-[11px] text-zinc-500">{k.pair}</span>}
-                      <span className="ml-auto text-[11px] text-zinc-600">{umurKabar(k.waktu)}</span>
-                    </div>
-                    <div className="mt-1.5 text-[12.5px] leading-snug text-zinc-200">{k.judul}</div>
-                    {k.detail && <div className="mt-0.5 text-[11.5px] leading-snug text-zinc-500">{k.detail}</div>}
-                    <div className="mt-1 flex items-center gap-2">
-                      {k.sumber && <span className="truncate text-[10.5px] text-zinc-600">{k.sumber}</span>}
-                      {k.jenis === 'sinyal' && (
-                        <Link to="/copy-signal" onClick={() => setBuka(false)}
-                              className="ml-auto shrink-0 text-[10.5px] text-zinc-400 underline-offset-2 hover:text-zinc-100 hover:underline">
-                          Lihat levelnya
-                        </Link>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-            {NEWS.map((n) => (
-              <div key={n.id} className={cn('border-b border-zinc-800/50 px-4 py-3 last:border-0', n.baru && 'bg-zinc-900/40')}>
-                <div className="flex items-center gap-2">
-                  <span className={cn(
-                    'rounded px-1.5 py-0.5 text-[9.5px] font-medium uppercase',
-                    n.dampak === 'tinggi' ? 'bg-red-500/15 text-red-400'
-                      : n.dampak === 'sedang' ? 'bg-amber-500/15 text-amber-400'
-                      : 'bg-zinc-700/30 text-zinc-400'
-                  )}>
-                    {n.dampak}
-                  </span>
-                  <span className="angka text-[11px] text-zinc-500">{n.mata}</span>
-                  <span className="ml-auto text-[11px] text-zinc-600">{n.waktu}</span>
-                </div>
-                <div className="mt-1.5 text-[12.5px] text-zinc-200">{n.judul}</div>
-                {n.detail && <div className="mt-0.5 text-[11.5px] text-zinc-500">{n.detail}</div>}
-              </div>
-            ))}
-            {/* Benar-benar kosong = belum ada kejadian pasar yang tercatat.
-                Dikatakan apa adanya; kotak kosong tanpa kalimat terbaca
-                seperti panel yang gagal memuat. */}
-            {agen.kabar.length === 0 && NEWS.length === 0 && (
-              <div className="px-4 py-8 text-center">
-                <Newspaper className="mx-auto size-5 text-zinc-700" strokeWidth={1.6} />
-                <div className="mt-2 text-[12.5px] text-zinc-400">Belum ada kabar pasar</div>
-                <div className="mx-auto mt-1 max-w-[240px] text-[11.5px] leading-snug text-zinc-600">
-                  Sinyal dari agen Pemburu Sinyal muncul di sini begitu ada yang masuk.
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+          {/* Benar-benar kosong = belum ada kejadian pasar yang tercatat.
+              Dikatakan apa adanya; kotak kosong tanpa kalimat terbaca
+              seperti panel yang gagal memuat. */}
+          {kabar.length === 0 && NEWS.length === 0 && (
+            <KosongKabar
+              ikon={<Newspaper className="size-5" strokeWidth={1.6} />}
+              judul="Belum ada kabar pasar"
+              detail="Sinyal dari agen Pemburu Sinyal muncul di sini begitu ada yang masuk."
+            />
+          )}
+        </PanelKabar>
       )}
     </div>
   );
@@ -474,6 +455,7 @@ function Pesan() {
   };
 
   const totalBelum = belum + pribadiBelum;
+  const akun = pribadi.slice(0, 6);
 
   return (
     <div className="relative" ref={ref}>
@@ -484,6 +466,9 @@ function Pesan() {
       >
         <Mail className="size-[18px]" strokeWidth={1.8} />
         {totalBelum > 0 && (
+          /* text-[#fff] SENGAJA hex mentah, bukan zinc: skala zinc dibalik
+             di tema terang, sedangkan bg-red-500 di bawahnya tidak. Angka
+             yang ikut membalik jadi gelap-di-atas-merah. */
           <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-[#fff]">
             {totalBelum}
           </span>
@@ -491,83 +476,75 @@ function Pesan() {
       </button>
 
       {buka && (
-        /* Sama persis dengan dropdown berita di atas — lihat catatannya di
-           sana. Ditulis dua kali karena keduanya komponen terpisah; kalau
-           salah satu diubah, yang lain WAJIB ikut. */
-        <div className="fixed inset-x-3 top-14 z-50 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 shadow-2xl sm:absolute sm:inset-x-auto sm:right-0 sm:top-9 sm:w-[340px]">
-          <div className="flex items-center gap-2 border-b border-zinc-800 px-4 py-3">
-            <Mail className="size-4 text-zinc-400" strokeWidth={1.8} />
-            <span className="text-[13px] font-medium text-zinc-100">Pemberitahuan</span>
-            <span className="ml-auto text-[11px] text-zinc-600">{totalBelum} belum dibaca</span>
-          </div>
-          <div className="max-h-[380px] overflow-y-auto">
-            {/* ── Kabar akun: kejadian NYATA milik orang ini ──
-                Paling atas karena paling perlu ditindak. Kosong = tidak ada
-                yang terjadi; sengaja TIDAK diisi contoh supaya panelnya
-                tetap bisa dipercaya saat benar-benar berbunyi. */}
-            {pribadi.length > 0 && (
-              <div className="border-b border-zinc-800/70 bg-zinc-900/30">
-                <div className="flex items-center gap-1.5 px-4 pb-1 pt-2.5">
-                  <UserCircle2 className="size-3 text-amber-400" strokeWidth={2} />
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-                    Akun kamu
-                  </span>
-                </div>
-                {pribadi.slice(0, 6).map((k) => (
-                  <div key={k.id} className="border-b border-zinc-800/40 px-4 py-2.5 last:border-0">
-                    <div className="flex items-center gap-2">
-                      <span className={cn('rounded px-1.5 py-0.5 text-[9.5px] font-medium uppercase',
-                        k.jenis === 'akses' ? 'bg-emerald-500/15 text-emerald-400'
-                          : k.jenis === 'peringatan' ? 'bg-amber-500/15 text-amber-400'
-                          : 'bg-zinc-700/30 text-zinc-400')}>
-                        {k.jenis === 'akses' ? 'akses' : k.jenis === 'peringatan' ? 'perhatian' : 'sesi'}
-                      </span>
-                      <span className="ml-auto text-[11px] text-zinc-600">{umurKabar(k.waktu)}</span>
-                    </div>
-                    <div className="mt-1.5 text-[12.5px] leading-snug text-zinc-200">{k.judul}</div>
-                    {k.detail && <div className="mt-0.5 text-[11.5px] leading-snug text-zinc-500">{k.detail}</div>}
-                  </div>
-                ))}
-              </div>
-            )}
+        <PanelKabar
+          ikon={<Mail className="size-5" strokeWidth={1.8} />}
+          judul={totalBelum > 0 ? `${totalBelum} belum dibaca` : 'Pemberitahuan'}
+          ringkas="Kabar akun & pengumuman"
+          tutup={() => setBuka(false)}
+        >
+          {/* ── Kabar akun: kejadian NYATA milik orang ini ──
+              Paling atas karena paling perlu ditindak. Kosong = tidak ada
+              yang terjadi; sengaja TIDAK diisi contoh supaya panelnya
+              tetap bisa dipercaya saat benar-benar berbunyi. */}
+          {akun.length > 0 && (
+            <GrupKabar
+              ikon={<UserCircle2 className="size-3 text-amber-400" strokeWidth={2} />}
+              label="Akun kamu"
+            />
+          )}
+          {akun.map((k, i) => (
+            <BarisKabar
+              key={k.id}
+              urutan={i}
+              warna={k.jenis === 'akses' ? 'hijau' : k.jenis === 'peringatan' ? 'kuning' : 'netral'}
+              ikon={k.jenis === 'akses'
+                ? <CheckCircle2 className="size-4" strokeWidth={2} />
+                : k.jenis === 'peringatan'
+                  ? <AlertTriangle className="size-4" strokeWidth={2} />
+                  : <UserCircle2 className="size-4" strokeWidth={2} />}
+              judul={k.judul}
+              detail={k.detail}
+              waktu={umurKabar(k.waktu)}
+            />
+          ))}
 
-            {PESAN.map((p) => (
-              <div key={p.id} className={cn('flex gap-3 border-b border-zinc-800/50 px-4 py-3 last:border-0', p.baru && 'bg-zinc-900/40')}>
-                <div className={cn(
-                  'mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full',
-                  p.jenis === 'peringatan' ? 'bg-amber-500/15 text-amber-400' : 'bg-zinc-800 text-zinc-400'
-                )}>
-                  {p.jenis === 'peringatan'
-                    ? <AlertTriangle className="size-3.5" strokeWidth={2} />
-                    : <Sparkles className="size-3.5" strokeWidth={2} />}
-                </div>
-                <div className="min-w-0">
-                  <div className="text-[12.5px] text-zinc-200">{p.judul}</div>
-                  <div className="mt-0.5 text-[11.5px] leading-relaxed text-zinc-500">{p.isi}</div>
-                  {p.aksi && (
-                    <Link to={p.aksiKe ?? '#'} onClick={() => setBuka(false)}
-                      className="mt-1.5 inline-flex items-center gap-1 text-[11.5px] text-zinc-300 hover:text-zinc-100">
-                      {p.aksi} <ChevronRight className="size-3" />
-                    </Link>
-                  )}
-                  <div className="mt-1 text-[11px] text-zinc-600">{p.waktu}</div>
-                </div>
-              </div>
-            ))}
-            {/* Kosong = belum ada apa pun yang terjadi pada akun ini. Itu
-                keadaan yang WAJAR untuk orang yang baru masuk, jadi
-                kalimatnya menenangkan, bukan meminta maaf. */}
-            {pribadi.length === 0 && PESAN.length === 0 && (
-              <div className="px-4 py-8 text-center">
-                <Mail className="mx-auto size-5 text-zinc-700" strokeWidth={1.6} />
-                <div className="mt-2 text-[12.5px] text-zinc-400">Belum ada pemberitahuan</div>
-                <div className="mx-auto mt-1 max-w-[240px] text-[11.5px] leading-snug text-zinc-600">
-                  Kabar tentang akunmu — akses disetujui, sesi baru — muncul di sini.
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+          {PESAN.length > 0 && (
+            <GrupKabar
+              ikon={<Sparkles className="size-3 text-zinc-500" strokeWidth={2} />}
+              label="Pengumuman"
+            />
+          )}
+          {PESAN.map((p, i) => (
+            <BarisKabar
+              key={p.id}
+              urutan={akun.length + i}
+              warna={p.jenis === 'peringatan' ? 'kuning' : 'netral'}
+              ikon={p.jenis === 'peringatan'
+                ? <AlertTriangle className="size-4" strokeWidth={2} />
+                : <Sparkles className="size-4" strokeWidth={2} />}
+              judul={p.judul}
+              detail={p.isi}
+              waktu={p.waktu}
+              aksi={p.aksi && (
+                <Link to={p.aksiKe ?? '#'} onClick={() => setBuka(false)}
+                      className="inline-flex items-center gap-1 text-[11px] text-zinc-300 hover:text-zinc-100">
+                  {p.aksi} <ChevronRight className="size-3" />
+                </Link>
+              )}
+            />
+          ))}
+
+          {/* Kosong = belum ada apa pun yang terjadi pada akun ini. Itu
+              keadaan yang WAJAR untuk orang yang baru masuk, jadi
+              kalimatnya menenangkan, bukan meminta maaf. */}
+          {akun.length === 0 && PESAN.length === 0 && (
+            <KosongKabar
+              ikon={<Mail className="size-5" strokeWidth={1.6} />}
+              judul="Belum ada pemberitahuan"
+              detail="Kabar tentang akunmu — akses disetujui, sesi baru — muncul di sini."
+            />
+          )}
+        </PanelKabar>
       )}
     </div>
   );
