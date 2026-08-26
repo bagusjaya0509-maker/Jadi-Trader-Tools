@@ -1351,7 +1351,7 @@ function RakSinyal({ ket, children }: { ket: string; children: React.ReactNode }
    yang dibuka BERULANG adalah daftar ini — untuk memeriksa setelan, dan
    untuk berhenti mengikuti tanpa harus mencari kanalnya satu per satu.
    ════════════════════════════════════════════════════════════════════════ */
-function SignalDiikuti() {
+function SignalDiikuti({ keRuang }: { keRuang?: (uid: string) => void }) {
   const { pengguna } = useAuth();
   const [daftar, setDaftar] = useState<LanggananCopy[]>([]);
 
@@ -1399,7 +1399,16 @@ function SignalDiikuti() {
           sekeluarga dengan tempat asalnya. */}
       <div className="grid gap-3 sm:grid-cols-2">
         {daftar.map((l) => (
-          <Panel key={l.analisUid} className="flex flex-col gap-2.5 p-4">
+          /* SELURUH KARTU jadi pintunya, bukan tombol kecil tambahan.
+             Yang dicari orang sesudah memeriksa setelannya adalah sinyal
+             analisnya — dan pintu ke sana yang paling mudah ditemukan
+             adalah kartu yang sedang ia baca. Tombol Batalkan Copy di
+             dalamnya menghentikan rambatan supaya menekan "batal" tidak
+             ikut membuka ruangannya. */
+          <Panel key={l.analisUid}
+                 onClick={() => keRuang?.(l.analisUid)}
+                 className={cn('flex flex-col gap-2.5 p-4 transition-colors',
+                   keRuang && 'cursor-pointer hover:border-zinc-700')}>
             <div className="flex items-center gap-2">
               <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-[11px] font-semibold text-zinc-300">
                 {(l.analisNama || '?').slice(0, 1).toUpperCase()}
@@ -1433,7 +1442,7 @@ function SignalDiikuti() {
               <span className="text-[10.5px] text-zinc-600">
                 sejak {tanggalPendek(l.sejak)}
               </span>
-              <button onClick={() => lepas(l.analisUid)}
+              <button onClick={(e) => { e.stopPropagation(); lepas(l.analisUid); }}
                 className="ml-auto cursor-pointer rounded-md border border-red-500/40 px-2.5 py-1 text-[11.5px] text-red-300 transition-colors hover:bg-red-500/10">
                 Batalkan Copy
               </button>
@@ -2397,7 +2406,9 @@ export default function Analisa() {
           </button>
         </div>
       )}
-      {sub === 'diikuti' && <SignalDiikuti />}
+      {sub === 'diikuti' && (
+        <SignalDiikuti keRuang={(uid) => { setKanalBuka(uid); setSub('market'); }} />
+      )}
 
       <div className={cn(sub !== 'market' && 'hidden')}>
       {/* ── Rak sinyal pantauan: empat slot ───────────────────────────
