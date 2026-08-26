@@ -23,6 +23,7 @@ import { PotongGambar } from '@/components/potong-gambar';
 import { HitungPosisi } from '@/components/hitung-posisi';
 import { PanelCopyAnalis } from '@/components/panel-copy-analis';
 import { StatusAutoCopy } from '@/components/status-auto-copy';
+import { LogAktivitas } from '@/components/log-aktivitas';
 import { PanelCopyTradeFi } from '@/components/panel-copy-tradefi';
 import { daftarLangganan, hapusLangganan, type LanggananCopy } from '@/lib/copy-langganan';
 import { ambilDraf } from '@/lib/draf-sinyal';
@@ -3687,6 +3688,12 @@ export default function Analisa() {
                 harganya sudah tersentuh SUDAH jadi posisi berjalan.
                 Menghitungnya sebagai "menunggu harga" akan menjanjikan
                 peluang yang sebenarnya sudah lewat. */}
+            {/* Log kejadian di ATAS rak keadaan: rak menjawab "sinyal itu
+                sekarang bagaimana", log menjawab "analisnya barusan
+                melakukan apa" — dan pertanyaan kedua yang lebih dulu
+                ditanyakan orang yang mengikuti. */}
+            {sub !== 'performa' && <LogAktivitas sinyal={terpilih} />}
+
             {(() => {
               /* Tab Performa mengganti BADAN kanal saja — kepalanya di atas
                  sengaja dibiarkan berdiri, lihat catatan di pembungkusnya.

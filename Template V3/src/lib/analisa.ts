@@ -256,8 +256,16 @@ export function keadaanSinyal(a: RingkasAnalisa): KeadaanSinyal {
 }
 
 export function bisaDibatalkan(a: RingkasAnalisa, uidku?: string): boolean {
-  return !!uidku && a.uid === uidku && !a.hasil && !a.terisi
-    && !!a.jenisEntry && !/^market$/i.test(a.jenisEntry);
+  /* Sembunyikan hanya kalau DIKETAHUI Market — bukan menunggu jenisnya
+     diketahui. jenisEntry baru ditulis penilai pada lintasan pertamanya,
+     jadi mensyaratkan `!!a.jenisEntry` membuat SETIAP sinyal baru tanpa
+     tombol Batalkan selama beberapa menit ("Menunggu penilaian"), lalu
+     tombolnya muncul sendiri — dan itu terbaca sebagai bug kumat-kumatan,
+     karena memang begitu. Penjamin sesungguhnya tetap `terisi` (ditulis
+     dari lilin, tidak pernah dicabut) dan gerbang server. */
+  if (!uidku || a.uid !== uidku) return false;
+  if (a.hasil || a.terisi) return false;
+  return !(a.jenisEntry && /^market$/i.test(a.jenisEntry));
 }
 
 export async function hapusAnalisa(id: string) {
