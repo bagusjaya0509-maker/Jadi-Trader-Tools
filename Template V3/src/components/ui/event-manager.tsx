@@ -58,6 +58,11 @@ export interface EventManagerProps {
   /** Tombol itu mati. Dipakai saat fiturnya belum dibangun — tombol yang
    *  ada tapi mati menerangkan rencana; tombol yang hilang tidak. */
   tombolBaruMati?: boolean
+  /** Tombol kanan atas mengerjakan HAL LAIN, bukan membuka dialog "acara
+   *  baru" bawaan komponen ini. Dipakai kalender performa: di sana tombol
+   *  itu bernama "Copy Signal" dan tidak ada acara yang bisa dibuat sama
+   *  sekali — kalendernya hanya-baca. */
+  onTombolBaru?: () => void
   judulTombolBaru?: string
   /** Sembunyikan penyaring Warna.
    *
@@ -97,6 +102,7 @@ export function EventManager({
   labelTombolBaru = "Baru",
   tombolBaruMati = false,
   judulTombolBaru,
+  onTombolBaru,
   hanyaBaca = false,
   sembunyikanFilterWarna = false,
   petunjukCari = "Cari…",
@@ -338,6 +344,7 @@ export function EventManager({
 
           <Button
             onClick={() => {
+              if (onTombolBaru) { onTombolBaru(); return }
               setIsCreating(true)
               setIsDialogOpen(true)
             }}

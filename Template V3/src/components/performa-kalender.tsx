@@ -133,7 +133,11 @@ export function keAcara(sinyal: RingkasAnalisa[]): Event[] {
   });
 }
 
-export default function PerformaKalender({ sinyal }: { sinyal: RingkasAnalisa[] }) {
+export default function PerformaKalender({ sinyal, onCopy }: {
+  sinyal: RingkasAnalisa[];
+  /** Tugas tombol "Copy Signal" di kanan atas. Tanpa ini tombolnya mati. */
+  onCopy?: () => void;
+}) {
   const acara = useMemo(() => keAcara(sinyal), [sinyal]);
 
   /* Kategori & tag DITURUNKAN dari sinyalnya, bukan didaftar tangan —
@@ -166,8 +170,17 @@ export default function PerformaKalender({ sinyal }: { sinyal: RingkasAnalisa[] 
          jelas: apa yang sebenarnya bisa diketik ke dalamnya. */
       petunjukCari="Cari sinyal — XAUUSD, BUY, M15, SL…"
       labelTombolBaru="Copy Signal"
-      tombolBaruMati
-      judulTombolBaru="Copy Signal belum aktif — sistemnya masih dibangun"
+      /* HIDUP kalau pemanggilnya memberi tugas. Sebelumnya tombol ini
+         dimatikan sampai "sistemnya jadi" — dan itu urutan yang keliru:
+         yang perlu ditetapkan orang SEBELUM ikut adalah berapa lot dan
+         berapa dolar risikonya, dan keputusan itu justru terdorong ke
+         detik-detik terburuk kalau panelnya baru boleh dibuka saat sinyal
+         sudah berjalan. */
+      tombolBaruMati={!onCopy}
+      judulTombolBaru={onCopy
+        ? 'Atur lot dan risikomu, lalu ikuti analis ini'
+        : 'Copy Signal belum aktif — sistemnya masih dibangun'}
+      onTombolBaru={onCopy}
     />
   );
 }

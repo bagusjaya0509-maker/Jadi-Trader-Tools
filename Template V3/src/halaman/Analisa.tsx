@@ -22,6 +22,7 @@ import { SparklineSaldo } from '@/components/kurva-saldo';
 import { PotongGambar } from '@/components/potong-gambar';
 import { HitungPosisi } from '@/components/hitung-posisi';
 import { PanelCopyTradeFi } from '@/components/panel-copy-tradefi';
+import { PanelCopyAnalis } from '@/components/panel-copy-analis';
 import { ambilDraf } from '@/lib/draf-sinyal';
 import { AvatarAnalis } from '@/components/avatar-analis';
 import { KartuAgenSiaga } from '@/components/kartu-agen-siaga';
@@ -1554,6 +1555,10 @@ export default function Analisa() {
     hargaPasar[pasangan] ?? hargaMt5[simbolDasarMt5(pasangan)];
   /* Sub-halaman kanal: berjalan / menunggu harga / selesai. */
   const [rakAktif, setRakAktif] = useState<'jalan' | 'nunggu' | 'selesai' | 'batal'>('jalan');
+  /* Panel Copy Signal se-analis. Dibuka dari tombol kanan atas kalender
+     performa — sengaja bisa dibuka SEBELUM ada sinyal jalan, karena di
+     situlah ukuran posisi seharusnya ditetapkan. */
+  const [copyAnalis, setCopyAnalis] = useState(false);
   const [masuk, setMasuk] = useState<PermintaanMasuk[]>([]);
   const [statusku, setStatusku] = useState<Record<string, string>>({});
   const [memuat, setMemuat] = useState(true);
@@ -3368,7 +3373,22 @@ export default function Analisa() {
 
                  Isinya masih data contoh bawaan komponennya dan belum
                  tersambung ke sinyal siapa pun. Menunggu instruksi. */
-              if (sub === 'performa') return <PerformaKalender sinyal={terpilih} />;
+              if (sub === 'performa') {
+                return (
+                  <>
+                    <PerformaKalender sinyal={terpilih}
+                                      onCopy={() => setCopyAnalis(true)} />
+                    {copyAnalis && (
+                      <PanelCopyAnalis
+                        analisUid={kanalBuka ?? ''}
+                        analisNama={terpilih[0]?.nama || 'Analis ini'}
+                        contohPasangan={terpilih[0]?.pasangan}
+                        tutup={() => setCopyAnalis(false)}
+                      />
+                    )}
+                  </>
+                );
+              }
               /* BATAL DIPISAH DARI SELESAI.
                  ────────────────────────────────────────────────────────────
                  Dulu keduanya satu rak, dan itu menyamakan dua hal yang
