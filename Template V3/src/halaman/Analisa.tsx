@@ -1740,7 +1740,15 @@ export default function Analisa() {
      Dihitung dari daftar publik yang memang sudah dimuat halaman ini, jadi
      tidak ada permintaan tambahan ke server untuk mengetahuinya. */
   const BATAS_SINYAL = 20;
-  const sinyalku = pengguna ? daftar.filter((a) => a.uid === pengguna.uid).length : 0;
+  /* YANG DIHITUNG HANYA SINYAL HIDUP — sama persis dengan penjaga di
+     `POST /api/analisa` (VPS, 26 Agu 2026). Daftar penandanya WAJIB sama di
+     kedua tempat: layar yang memakai daftar berbeda dari server akan
+     memberi izin yang lalu ditolak, atau menahan orang yang sebenarnya
+     boleh — dan keduanya terbaca sebagai kerusakan. */
+  const SELESAI: (string | null | undefined)[] = ['sl', 'tp', 'batal'];
+  const sinyalku = pengguna
+    ? daftar.filter((a) => a.uid === pengguna.uid && !SELESAI.includes(a.hasil)).length
+    : 0;
   const kuotaHabis = !!pengguna && sinyalku >= BATAS_SINYAL;
 
   /* Agen yang terdaftar tapi BELUM memposting apa pun. Kartunya tidak bisa
@@ -2618,7 +2626,7 @@ export default function Analisa() {
                   kuotaHabis ? 'bg-red-500/10 text-red-400'
                     : sinyalku >= BATAS_SINYAL - 2 ? 'bg-amber-500/10 text-amber-300/90'
                     : 'text-zinc-500')}>
-                  <span className="angka">{sinyalku}</span> dari {BATAS_SINYAL} sinyal terpakai
+                  <span className="angka">{sinyalku}</span> dari {BATAS_SINYAL} sinyal aktif
                 </span>
               )}
               <button onClick={() => setSub('market')}
@@ -2639,17 +2647,18 @@ export default function Analisa() {
             {kuotaHabis && bolehPosting && (
               <div className="mb-3 rounded-lg border border-red-500/25 bg-red-500/[0.06] px-3.5 py-3">
                 <p className="text-[12.5px] font-medium text-red-300">
-                  Kuota sinyalmu penuh — {BATAS_SINYAL} dari {BATAS_SINYAL} terpakai.
+                  Kuota penuh — {BATAS_SINYAL} sinyal aktif berjalan bersamaan.
                 </p>
                 <p className="mt-1 text-[11.5px] leading-relaxed text-zinc-400">
-                  Server menolak sinyal ke-{BATAS_SINYAL + 1}. Batas ini disengaja: sinyal tidak bisa
-                  dihapus setelah terbit, dan tanpa batas satu akun bisa membanjiri papan
-                  peringkat dengan puluhan tebakan lalu menonjolkan yang kebetulan kena.
-                  Batasnya membuat rekam jejak berarti sesuatu.
+                  Yang dihitung cuma sinyal yang masih hidup: menggantung menunggu harga, atau
+                  sedang berjalan. Sinyal yang sudah kena TP/SL tidak ikut dihitung sama sekali —
+                  itu rekam jejak, dan makin banyak makin bagus.
                 </p>
                 <p className="mt-1 text-[11.5px] leading-relaxed text-zinc-500">
-                  Isian di bawah tetap tersimpan di layar ini, jadi tidak ada yang hilang —
-                  tapi tombol Posting akan ditolak server sampai kuotanya dilonggarkan.
+                  Batasnya disengaja: satu akun tidak boleh membanjiri papan peringkat dengan
+                  puluhan rencana sekaligus lalu menonjolkan yang kebetulan kena. Tunggu salah
+                  satu rencanamu selesai, atau batalkan yang belum tersentuh harga. Isian di
+                  bawah tetap tersimpan di layar ini.
                 </p>
               </div>
             )}
