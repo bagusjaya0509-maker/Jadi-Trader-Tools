@@ -7,7 +7,7 @@ import {
   Loader2, Lock, Unlock, Send, X, CheckCircle2,
   TrendingUp, TrendingDown, ArrowUp, ArrowDown, RefreshCw, Radar, Sparkles, ImagePlus, Images, Flag, Ban, Trash2, Plus,
   Settings2, UserRound, Pin, TriangleAlert, ArrowLeft, CandlestickChart, ChevronDown, ChevronRight,
-  ChevronLeft,
+  ChevronLeft, Copy as IkonCopy,
 } from 'lucide-react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { PanelSinyal } from '@/components/panel-sinyal';
@@ -21,6 +21,7 @@ import PerformaKalender from '@/components/performa-kalender';
 import { SparklineSaldo } from '@/components/kurva-saldo';
 import { PotongGambar } from '@/components/potong-gambar';
 import { HitungPosisi } from '@/components/hitung-posisi';
+import { PanelCopyTradeFi } from '@/components/panel-copy-tradefi';
 import { ambilDraf } from '@/lib/draf-sinyal';
 import { AvatarAnalis } from '@/components/avatar-analis';
 import { KartuAgenSiaga } from '@/components/kartu-agen-siaga';
@@ -503,6 +504,28 @@ function KartuAnalisa({ a, status, milikku, onSegarkan, performa, hargaKini }: {
     } finally { setSibuk(false); }
   }
 
+  /* ── COPY TRADE ──────────────────────────────────────────────────────
+     Panelnya butuh LEVEL, dan level itu tidak ikut di ringkasan kartu —
+     sama seperti "Buka di Chart", ia dijemput saat diminta. Dijemput di
+     sini juga berarti tombolnya tidak pernah membuka panel kosong. */
+  const [copyBuka, setCopyBuka] = useState(false);
+  const [copyIsi, setCopyIsi] = useState<IsiAnalisa | null>(null);
+
+  async function bukaCopy() {
+    if (sibuk) return;
+    const punya = isi ?? copyIsi;
+    if (punya) { setCopyIsi(punya); setCopyBuka(true); return; }
+    setSibuk(true); setKabar('');
+    try {
+      const h = await bukaIsi(a.id);
+      setIsi(h.isi);
+      setCopyIsi(h.isi);
+      setCopyBuka(true);
+    } catch (e) {
+      setKabar(e instanceof Error ? e.message : 'Gagal mengambil level sinyal ini.');
+    } finally { setSibuk(false); }
+  }
+
   async function muatIsi() {
     setSibuk(true); setKabar('');
     try {
@@ -956,6 +979,30 @@ function KartuAnalisa({ a, status, milikku, onSegarkan, performa, hargaKini }: {
                 <Lock className="size-3.5" /> Buka di Chart
               </span>
             )}
+            {/* ── COPY TRADE, TRADE-FI SAJA ───────────────────────────────
+                Kripto sengaja belum punya tombol ini. Bukan karena rumusnya
+                sulit, tapi karena jalurnya lain: MT5 lewat antrean perintah
+                yang sudah dijaga login dan dieksekusi EA di terminal orangnya
+                sendiri, sementara kripto menuntut kunci API bursa. Satu
+                tombol dengan dua arti keamanan adalah tombol yang tidak bisa
+                dijelaskan dengan jujur.
+
+                TIDAK muncul untuk sinyal yang SUDAH SELESAI. Kena TP atau SL
+                berarti peluangnya sudah lewat; menawarkan Copy di situ
+                mengajak orang masuk ke rencana yang sudah tamat. Levelnya
+                gratis dibaca — itu memang gunanya — tapi bukan untuk
+                dieksekusi.
+
+                Ikut syarat `bisaBuka` yang sama dengan chart: yang levelnya
+                belum boleh dibuka juga belum boleh menirunya. */}
+            {!pasarKripto(a) && bisaBuka && !selesai && (
+              <button onClick={() => void bukaCopy()} disabled={sibuk}
+                title="Tiru sinyal ini ke akun MT5-mu — lotnya dihitung dari modal dan risikomu sendiri"
+                className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-sky-500/40 bg-sky-500/10 px-3 py-1.5 text-[12px] font-medium text-sky-300 transition-colors hover:border-sky-500/60 hover:bg-sky-500/15 disabled:cursor-not-allowed disabled:opacity-50">
+                {sibuk ? <Loader2 className="size-3.5 animate-spin" /> : <IkonCopy className="size-3.5" />}
+                Copy trade
+              </button>
+            )}
             {/* TOMBOL MODERASI DICABUT — permintaan pemilik.
 
                 YANG DICABUT TOMBOLNYA, BUKAN KEMAMPUANNYA. Rute
@@ -972,6 +1019,18 @@ function KartuAnalisa({ a, status, milikku, onSegarkan, performa, hargaKini }: {
           </div>
         )}
         {kabar && <p className="mt-2 text-[12px] text-amber-300/90">{kabar}</p>}
+
+        {copyBuka && copyIsi && (
+          <PanelCopyTradeFi
+            pasangan={a.pasangan}
+            arah={a.arah}
+            entry={copyIsi.entry}
+            sl={copyIsi.sl}
+            tp={copyIsi.tp}
+            penulis={a.nama}
+            tutup={() => setCopyBuka(false)}
+          />
+        )}
       </div>
 
       {formBatal && (
