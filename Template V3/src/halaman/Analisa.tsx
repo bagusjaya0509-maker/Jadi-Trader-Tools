@@ -1351,11 +1351,21 @@ function RakSinyal({ ket, children }: { ket: string; children: React.ReactNode }
    yang dibuka BERULANG adalah daftar ini — untuk memeriksa setelan, dan
    untuk berhenti mengikuti tanpa harus mencari kanalnya satu per satu.
    ════════════════════════════════════════════════════════════════════════ */
-function SignalDiikuti({ keRuang }: { keRuang?: (uid: string) => void }) {
+function SignalDiikuti({ keRuang, onKosong }: {
+  keRuang?: (uid: string) => void;
+  onKosong?: () => void;
+}) {
   const { pengguna } = useAuth();
   const [daftar, setDaftar] = useState<LanggananCopy[]>([]);
 
   useEffect(() => { setDaftar(daftarLangganan(pengguna?.uid)); }, [pengguna?.uid]);
+
+  /* Dilaporkan ke pemanggil, bukan diputuskan sendiri: komponen ini tidak
+     tahu apa-apa soal sub-halaman, dan yang bisa memindahkannya cuma yang
+     memegang keadaan itu. */
+  useEffect(() => {
+    if (pengguna && daftarLangganan(pengguna.uid).length === 0) onKosong?.();
+  }, [pengguna, onKosong]);
 
   function lepas(uid: string) {
     if (!pengguna) return;
@@ -1371,17 +1381,15 @@ function SignalDiikuti({ keRuang }: { keRuang?: (uid: string) => void }) {
     );
   }
 
-  if (daftar.length === 0) {
-    return (
-      <div className="rounded-lg border border-zinc-800/60 px-4 py-8 text-center">
-        <div className="text-[12.5px] text-zinc-400">Belum mengikuti analis mana pun</div>
-        <div className="mx-auto mt-1 max-w-[320px] text-[11.5px] leading-relaxed text-zinc-600">
-          Buka sebuah kanal, masuk ke Performa Signal, lalu tekan Copy Signal untuk
-          menetapkan lot dan batas rugimu.
-        </div>
-      </div>
-    );
-  }
+  /* KOSONG = TIDAK ADA HALAMAN, bukan halaman berisi kalimat.
+     Kotak "belum mengikuti siapa pun" yang menetap di layar memakan seluruh
+     ruang untuk mengatakan bahwa tidak ada apa-apa — dan orang yang
+     membacanya sudah tahu itu sejak ia menekan tombolnya. Yang ia butuhkan
+     cuma tahu KE MANA harus pergi, dan itu cukup lewat sekali.
+
+     Jadi halamannya tidak dibuka sama sekali: kembali ke Market Signal, dan
+     pesannya lewat sebagai notifikasi sekilas. */
+  if (daftar.length === 0) return null;
 
   return (
     <>
@@ -1708,6 +1716,15 @@ export default function Analisa() {
      performa — sengaja bisa dibuka SEBELUM ada sinyal jalan, karena di
      situlah ukuran posisi seharusnya ditetapkan. */
   const [copyAnalis, setCopyAnalis] = useState(false);
+  /* Pesan sekilas — muncul, dibaca, hilang sendiri. Dipakai untuk keadaan
+     yang tidak pantas menempati halaman: "belum mengikuti siapa pun" adalah
+     ketiadaan, dan ketiadaan tidak butuh ruang tetap di layar. */
+  const [sekilas, setSekilas] = useState('');
+  useEffect(() => {
+    if (!sekilas) return;
+    const t = setTimeout(() => setSekilas(''), 5000);
+    return () => clearTimeout(t);
+  }, [sekilas]);
   /* Kumpulan analis yang penyalinannya sudah disetel orang ini. Dibaca
      ulang tiap panel Copy ditutup — menekan Ikuti di sana harus langsung
      terlihat di kartu kanalnya, bukan menunggu halaman dimuat lagi. */
@@ -2399,15 +2416,25 @@ export default function Analisa() {
           kartu analis berganti isi saat tab dipindah, tanpa hamparan yang
           menutupi halaman. */}
       {sub === 'diikuti' && (
-        <div className="mb-3 flex items-center gap-2">
-          <button onClick={() => setSub('market')}
-            className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-600 hover:text-zinc-100">
-            <ArrowLeft className="size-3.5" /> Kembali
-          </button>
-        </div>
+        <SignalDiikuti
+          keRuang={(uid) => { setKanalBuka(uid); setSub('market'); }}
+          onKosong={() => {
+            setSub('market');
+            setSekilas('Belum mengikuti analis mana pun — buka kanal, masuk Performa Signal, lalu tekan Copy Signal.');
+          }}
+        />
       )}
-      {sub === 'diikuti' && (
-        <SignalDiikuti keRuang={(uid) => { setKanalBuka(uid); setSub('market'); }} />
+
+      {/* Pesan sekilas. Fixed di bawah-tengah supaya ia tidak menggeser
+          apa pun saat muncul dan hilang — pesan yang mendorong tata letak
+          membuat halaman berkedut dua kali untuk satu kalimat. */}
+      {sekilas && createPortal(
+        <div className="fixed inset-x-0 bottom-6 z-[70] flex justify-center px-4">
+          <div className="max-w-[440px] rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2.5 text-[11.5px] leading-relaxed text-zinc-200 shadow-2xl shadow-black/50">
+            {sekilas}
+          </div>
+        </div>,
+        document.body,
       )}
 
       <div className={cn(sub !== 'market' && 'hidden')}>
