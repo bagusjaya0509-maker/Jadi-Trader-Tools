@@ -1726,6 +1726,23 @@ export default function Analisa() {
   const { data: riwayat } = useRiwayat();
   const saldoAwal = useSaldoAwal();
   const [daftar, setDaftar] = useState<RingkasAnalisa[]>([]);
+
+  /* ── KUOTA 20 SINYAL, DIHITUNG DI LAYAR SUPAYA TERLIHAT SEBELUM DIPAKAI
+     ────────────────────────────────────────────────────────────────────
+     Batasnya milik SERVER (`POST /api/analisa` menolak yang ke-21), dan itu
+     tidak berubah di sini — angka ini cuma cermin, bukan gerbang kedua.
+
+     Kenapa dicerminkan sama sekali: penolakannya datang di detik TERAKHIR,
+     sesudah judul, alasan, level, dan tangkapan chart selesai disusun.
+     Pemiliknya sendiri kena — 20 dari 20 terpakai — dan yang hilang bukan
+     satu klik melainkan seluruh pekerjaan menyusun sinyalnya.
+
+     Dihitung dari daftar publik yang memang sudah dimuat halaman ini, jadi
+     tidak ada permintaan tambahan ke server untuk mengetahuinya. */
+  const BATAS_SINYAL = 20;
+  const sinyalku = pengguna ? daftar.filter((a) => a.uid === pengguna.uid).length : 0;
+  const kuotaHabis = !!pengguna && sinyalku >= BATAS_SINYAL;
+
   /* Agen yang terdaftar tapi BELUM memposting apa pun. Kartunya tidak bisa
      dibangun dari `daftar` — tidak ada barisnya di sana sampai tembusan
      pertama datang, dan agen tren bisa menunggu berhari-hari. */
@@ -2592,13 +2609,50 @@ export default function Analisa() {
         <div className="fixed inset-0 z-[65] overflow-y-auto bg-black/70 p-3 backdrop-blur-sm sm:p-6"
              {...tutupPosting}>
           <div className="mx-auto w-full max-w-3xl" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-2 flex items-center justify-end">
+            <div className="mb-2 flex items-center justify-end gap-2">
+              {/* Sisa kuota berdiri di KEPALA formulir, bukan di kaki dekat
+                  tombolnya: yang perlu tahu ia tinggal punya satu slot
+                  adalah orang yang BELUM mulai mengetik. */}
+              {pengguna && bolehPosting && (
+                <span className={cn('mr-auto rounded px-2 py-1 text-[11.5px]',
+                  kuotaHabis ? 'bg-red-500/10 text-red-400'
+                    : sinyalku >= BATAS_SINYAL - 2 ? 'bg-amber-500/10 text-amber-300/90'
+                    : 'text-zinc-500')}>
+                  <span className="angka">{sinyalku}</span> dari {BATAS_SINYAL} sinyal terpakai
+                </span>
+              )}
               <button onClick={() => setSub('market')}
                 title="Tutup — isian yang sudah diketik tidak hilang"
                 className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-700 bg-zinc-900 px-2.5 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-500 hover:text-zinc-100">
                 <X className="size-3.5" /> Tutup
               </button>
             </div>
+
+            {/* PENOLAKANNYA DIJELASKAN DI ATAS, bukan sesudah dicoba.
+                Pesan servernya berbunyi "Hapus yang lama dulu" — saran yang
+                TIDAK BISA dijalankan analis biasa: tombol hapus sengaja
+                dicabut dan formulir ini sendiri menjanjikan sinyal tidak
+                bisa dihapus setelah terbit. Menyalin kalimat itu apa adanya
+                berarti menyuruh orang melakukan hal yang kami sendiri
+                larang, jadi yang ditulis di sini keadaannya yang
+                sebenarnya. */}
+            {kuotaHabis && bolehPosting && (
+              <div className="mb-3 rounded-lg border border-red-500/25 bg-red-500/[0.06] px-3.5 py-3">
+                <p className="text-[12.5px] font-medium text-red-300">
+                  Kuota sinyalmu penuh — {BATAS_SINYAL} dari {BATAS_SINYAL} terpakai.
+                </p>
+                <p className="mt-1 text-[11.5px] leading-relaxed text-zinc-400">
+                  Server menolak sinyal ke-{BATAS_SINYAL + 1}. Batas ini disengaja: sinyal tidak bisa
+                  dihapus setelah terbit, dan tanpa batas satu akun bisa membanjiri papan
+                  peringkat dengan puluhan tebakan lalu menonjolkan yang kebetulan kena.
+                  Batasnya membuat rekam jejak berarti sesuatu.
+                </p>
+                <p className="mt-1 text-[11.5px] leading-relaxed text-zinc-500">
+                  Isian di bawah tetap tersimpan di layar ini, jadi tidak ada yang hilang —
+                  tapi tombol Posting akan ditolak server sampai kuotanya dilonggarkan.
+                </p>
+              </div>
+            )}
 
       {/* Permintaan masuk untuk analisaku */}
       {masuk.length > 0 && (
