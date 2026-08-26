@@ -1694,17 +1694,14 @@ export default function Analisa() {
   useEffect(() => {
     const set = new Set(daftarLangganan(pengguna?.uid).map((l) => l.analisUid));
     setDiikutiSet(set);
-    /* IKUT DISEMATKAN. Analis yang penyalinannya sudah disetel adalah
-       analis yang paling sering dibuka orangnya — membiarkannya tenggelam
-       di urutan sinyal-terbaru berarti ia harus dicari tiap kali.
+    /* SEMATANNYA TIDAK DISENTUH. Percobaan sebelumnya benar-benar
+       memasang pin untuk tiap analis yang diikuti, dan itu meninggalkan
+       jejak yang tidak diminta: berhenti mengikuti tidak melepasnya, dan
+       melepasnya otomatis akan mencabut sematan yang mungkin dipasang
+       orangnya sendiri lewat klik kanan.
 
-       HANYA memasang, tidak pernah melepas: `ubahPin` itu sakelar, jadi
-       memanggilnya tanpa memeriksa akan MELEPAS sematan yang sudah ada
-       tiap kali efek ini jalan. Melepas sematan juga bukan urusan fitur
-       ini — yang menyematkan sendiri lewat klik kanan berhak
-       mempertahankannya walau ia berhenti mengikuti. */
-    set.forEach((uid) => { if (!disematkan(uid)) ubahPin(uid); });
-  }, [pengguna?.uid, copyAnalis, sub]);
+       Yang dibutuhkan cuma URUTANNYA. Kartu yang diikuti naik ke atas
+       lewat komparator, tanpa satu pun sematan berpindah tangan. */   }, [pengguna?.uid, copyAnalis, sub]);
   const [masuk, setMasuk] = useState<PermintaanMasuk[]>([]);
   const [statusku, setStatusku] = useState<Record<string, string>>({});
   const [memuat, setMemuat] = useState(true);
@@ -3149,9 +3146,14 @@ export default function Analisa() {
         /* Yang disematkan naik ke atas, sisanya tetap urut sinyal terbaru.
            Sematan hanya mengubah tampilan orang yang menyematkan — lihat
            lib/pin-analis.ts soal kenapa ia tidak dibuat bersama. */
+        /* DIIKUTI setara DISEMATKAN untuk urutan. Analis yang penyalinannya
+           sudah disetel adalah yang paling sering dibuka orangnya —
+           membiarkannya tenggelam di urutan sinyal-terbaru berarti ia harus
+           dicari tiap kali. Tapi ia naik TANPA jadi sematan: yang berubah
+           urutannya saja, bukan daftar pin milik orangnya. */
+        const naik = (uid: string) => (disematkan(uid) || diikutiSet.has(uid) ? 1 : 0);
         const kanalUrut = [...kanal.entries()].sort((x, y) => {
-          const px = disematkan(x[0]) ? 1 : 0, py = disematkan(y[0]) ? 1 : 0;
-          return py - px || y[1][0].dibuat - x[1][0].dibuat;
+          return naik(y[0]) - naik(x[0]) || y[1][0].dibuat - x[1][0].dibuat;
         });
         const perfDari = (uid: string) => performa?.analis.find((p) => p.uid === uid) ?? null;
         /* Uang yang dipertaruhkan per sinyal menurut model papan peringkat.
@@ -3419,21 +3421,6 @@ export default function Analisa() {
                             satu angka dengan panahnya, sejajar nama. Di
                             bawah ia dulu bersaing dengan angka hasil; di
                             sini ia jelas jadi keterangan, bukan saingan. */}
-                        {/* LAMBANG, BUKAN TULISAN. Lencana "KAMU IKUTI"
-                            sebelumnya duduk di kaki kartu bersama angka —
-                            teks berkotak di deretan angka membuat matanya
-                            berhenti dua kali untuk satu keterangan yang
-                            cuma perlu dikenali sekilas.
-
-                            Di kepala, sejajar winrate: satu ikon kecil yang
-                            terbaca tanpa dibaca. Judulnya yang menanggung
-                            keterangannya buat yang perlu memastikan. */}
-                        {diikutiSet.has(uid) && (
-                          <span title="Kamu mengikuti analis ini — setelan penyalinannya tersimpan"
-                                className="flex shrink-0 items-center text-emerald-400">
-                            <IkonCopy className="size-3.5" strokeWidth={2.2} />
-                          </span>
-                        )}
                         <span className={cn('flex shrink-0 items-center gap-1 text-[12.5px] font-medium',
                           r.winrate === null ? 'text-zinc-600' : r.winrate >= 50 ? 'text-emerald-400' : 'text-red-400')}>
                           <span className="text-[9.5px] font-normal text-zinc-500">WR</span>
@@ -3534,10 +3521,23 @@ export default function Analisa() {
 
                       Sematan milik penontonnya sendiri dan tidak mengubah
                       urutan papan untuk orang lain. Lihat lib/pin-analis.ts. */}
-                  {disemat && (
-                    <span title="Disematkan — kanal ini naik ke atas, hanya untuk tampilanmu"
-                          className="pointer-events-none absolute right-2 top-2 z-10 p-1.5 text-amber-400">
-                      <Pin className="size-3.5 fill-current" />
+                  {/* SATU SUDUT, SATU IKON. Diikuti menang atas disematkan:
+                      keduanya berarti "kartu ini naik ke atas", dan dua ikon
+                      yang mengatakan hal sama di sudut yang sama cuma
+                      menyuruh orang menebak mana yang berlaku.
+
+                      Yang diikuti memang otomatis naik (lihat komparator di
+                      atas), jadi pinnya tidak perlu diperlihatkan — statusnya
+                      sudah terbaca dari ikon copy-nya. */}
+                  {(diikutiSet.has(uid) || disemat) && (
+                    <span title={diikutiSet.has(uid)
+                            ? 'Kamu mengikuti analis ini — kanalnya naik ke atas'
+                            : 'Disematkan — kanal ini naik ke atas, hanya untuk tampilanmu'}
+                          className={cn('pointer-events-none absolute right-2 top-2 z-10 p-1.5',
+                            diikutiSet.has(uid) ? 'text-emerald-400' : 'text-amber-400')}>
+                      {diikutiSet.has(uid)
+                        ? <IkonCopy className="size-3.5" strokeWidth={2.2} />
+                        : <Pin className="size-3.5 fill-current" />}
                     </span>
                   )}
                 </div>
