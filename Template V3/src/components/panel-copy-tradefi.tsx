@@ -35,7 +35,11 @@ import { catatCopy } from '@/lib/tanda-copy';
 
 const ISIAN = 'w-full rounded-md border border-zinc-800 bg-zinc-950 px-2 py-1.5 text-[12px] text-zinc-200 outline-none transition-colors focus:border-zinc-600';
 
-export function PanelCopyTradeFi({ analisUid, pasangan, arah, entry, sl, tp, penulis, tutup }: {
+export function PanelCopyTradeFi({ sinyalId, analisUid, pasangan, arah, entry, sl, tp, penulis, tutup }: {
+  /** Sinyal yang sedang disalin. Ikut dicatat supaya salinan manual pun
+   *  ikut ditarik kalau analisnya menarik sinyalnya — yang disalin tetap
+   *  rencana orang lain, entah tombolnya ditekan tangan atau tidak. */
+  sinyalId?: string;
   /** Analis pemilik sinyalnya. Dipakai untuk menjawab satu pertanyaan yang
    *  selalu muncul di panel ini: "kalau saya tekan ini, sinyal berikutnya
    *  ikut masuk sendiri atau tidak?" */
@@ -150,7 +154,7 @@ export function PanelCopyTradeFi({ analisUid, pasangan, arah, entry, sl, tp, pen
            tabel Posisi Terbuka — terminal tidak menyimpan asal-usul order,
            dan sesudah beberapa hari tidak ada lagi yang bisa membedakannya
            dari order yang dipasang sendiri. */
-        catatCopy(pengguna?.uid, { simbol: simbolBroker, arah, lot, analis: penulis });
+        catatCopy(pengguna?.uid, { simbol: simbolBroker, arah, lot, analis: penulis, sinyal: sinyalId });
         setSelesai(true);
         setKabar(`Terkirim — ${h.pesan}`);
       } else {

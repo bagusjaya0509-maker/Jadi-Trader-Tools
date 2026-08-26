@@ -242,10 +242,20 @@ export function PanelCopyAnalis({ analisUid, analisNama, contohPasangan, tutup }
               : 'Belum mengikuti analis ini.'}
           </div>
 
+          {/* KALIMAT INI PERNAH BERBOHONG. Sampai 26 Agu 2026 ia berbunyi
+              "penyalinan otomatis masih dibangun" — dan tetap berbunyi begitu
+              berminggu-minggu SESUDAH penyalinnya benar-benar berjalan.
+              Akibatnya bukan sekadar keterangan basi: pemiliknya sendiri
+              mengira fiturnya belum ada dan menyalin satu per satu dengan
+              tangan. Janji yang tertinggal lebih berbahaya daripada panel
+              yang belum sempat dibuat. */}
           <p className="mt-2 text-[10.5px] leading-relaxed text-zinc-600">
-            Setelan ini tersimpan untuk akunmu. Penyalinan otomatis saat sinyal baru
-            terbit dijalankan pengikut di VPS — bagian itu masih dibangun. Sementara
-            ini sinyalnya disalin lewat ikon salin di kartu sinyalnya.
+            Begitu disimpan, sinyal <span className="text-zinc-400">baru</span> dari analis ini
+            masuk sendiri ke terminalmu — tidak perlu menekan apa pun lagi. Sinyal yang
+            terbit sebelum ini tidak ikut. Kalau analisnya menarik sinyalnya, salinanmu
+            ikut ditarik: order yang menunggu dibatalkan, posisi yang terlanjur terisi
+            ditutup di harga pasar. Berjalan selama aplikasi ini terbuka, dipindai tiap
+            menit — statusnya bisa dilihat di sub-halaman Signal Diikuti.
           </p>
 
           {kabar && <div className="mt-2 text-[11px] text-zinc-400">{kabar}</div>}

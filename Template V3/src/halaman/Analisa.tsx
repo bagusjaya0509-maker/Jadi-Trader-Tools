@@ -1072,6 +1072,7 @@ function KartuAnalisa({ a, status, milikku, onSegarkan, performa, hargaKini }: {
 
         {copyBuka && copyIsi && (
           <PanelCopyTradeFi
+            sinyalId={a.id}
             analisUid={a.uid}
             pasangan={a.pasangan}
             arah={a.arah}

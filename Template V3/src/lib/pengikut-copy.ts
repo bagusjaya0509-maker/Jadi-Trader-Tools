@@ -6,7 +6,7 @@ import { simbolDasarMt5 } from '@/lib/simbol';
 import { kirimPerintahMt5, tungguHasilMt5 } from '@/lib/mt5-order';
 import { kontrakBerlaku, deteksiJenisAkun, lotUntukCopy } from '@/lib/ukuran-posisi';
 import { useAkunMt5 } from '@/lib/akun';
-import { catatCopy, petaCopy, tandaSinyal, tandaiBatalSelesai } from '@/lib/tanda-copy';
+import { bacaTanda, catatCopy, petaCopy, tandaSinyal, tandaiBatalSelesai } from '@/lib/tanda-copy';
 
 /* ════════════════════════════════════════════════════════════════════════
    PENGIKUT COPY — menyalin sinyal baru ke akun MT5 sendiri
@@ -42,6 +42,10 @@ import { catatCopy, petaCopy, tandaSinyal, tandaiBatalSelesai } from '@/lib/tand
       dan kehilangan satu salinan jauh lebih murah daripada mengirim dua.
    4. Satu per satu, berurutan. Sepuluh sinyal terbit berbarengan tidak
       boleh jadi sepuluh permintaan serentak ke terminal yang sama.
+   5. Yang ditarik analisnya ditarik juga di sini — order menunggu maupun
+      posisi yang terlanjur terisi. Mengikuti berarti mengikuti sampai
+      keluarnya; salinan yang ditinggalkan berjalan sendiri adalah posisi
+      yang tidak ada lagi yang memantaunya.
    ════════════════════════════════════════════════════════════════════════ */
 
 const KUNCI_SUDAH = (uid: string) => `jt.copy.sudah.${uid}`;
@@ -153,7 +157,12 @@ export function usePengikutCopy(uid: string | null | undefined, jeda = 60_000) {
     async function putaran() {
       if (!hidup || sibuk.current) return;
       const langganan = daftarLangganan(uid);
-      if (langganan.length === 0) return;
+      /* Tidak melanggan siapa pun BUKAN berarti tidak ada apa-apa yang perlu
+         diurus: salinan manual juga meninggalkan catatan, dan penarikan
+         sinyalnya tetap harus sampai. Berhenti di sini kalau keduanya kosong
+         akan membuat satu-satunya orang yang menyalin dengan tangan menjadi
+         satu-satunya orang yang tidak pernah ditarik. */
+      if (langganan.length === 0 && bacaTanda(uid).length === 0) return;
 
       const akun = akunRef.current;
       /* EA belum melapor: tidak ada terminal yang bisa menerima perintah.
@@ -260,16 +269,40 @@ export function usePengikutCopy(uid: string | null | undefined, jeda = 60_000) {
         }
 
         /* ── SINYAL YANG DITARIK ANALISNYA ────────────────────────────
-           Yang dibatalkan HANYA order yang belum terisi. Sinyal yang
-           ditarik setelah harganya kena artinya analisnya berhenti
-           memantau, bukan bahwa posisi yang sudah berjalan harus ditutup
-           rugi pada detik itu juga — menutup paksa posisi hidup adalah
-           keputusan uang yang tidak pernah diminta siapa pun.
+           Ditarik berarti DITARIK: order yang masih menunggu dibatalkan,
+           dan salinan yang TERLANJUR TERISI ikut ditutup di harga pasar.
+
+           Awalnya yang sudah jadi posisi sengaja dibiarkan berjalan —
+           menutup paksa posisi hidup memang keputusan uang. Tapi
+           membiarkannya berarti sesuatu yang lebih buruk: pemiliknya
+           memegang posisi yang TIDAK ADA LAGI yang memantaunya. Analisnya
+           sudah pergi dari rencana itu, dan yang menyalin tidak pernah
+           menyatakan mau melanjutkan sendiri — ia menyatakan mau mengikuti.
+           Posisi yatim seperti itu justru yang paling sering dibiarkan
+           sampai kena SL. Diputuskan pemilik, 26 Agu 2026.
+
+           KENAPA INI BISA TERJADI SAMA SEKALI, padahal analis cuma boleh
+           menarik sinyal yang belum terisi: harga yang dilihat penilai dan
+           harga di broker si penyalin bukan harga yang sama. Entry yang
+           belum tersentuh di satu tempat sudah tersentuh di tempat lain,
+           dan selisih beberapa detik saja sudah cukup. Itu bukan kasus
+           langka yang bisa diabaikan — itu kasus BIASA di dua broker
+           berbeda.
+
+           Satu perintah untuk keduanya: EA memilih menutup posisi atau
+           menghapus pending menurut tiketnya, karena cuma terminal yang
+           tahu tiket itu milik yang mana.
 
            Tiketnya diikat dulu lewat petaCopy: catatan salinan lahir
            beberapa detik sebelum tiketnya ada, dan tanpa pengikatan itu
            tidak ada yang bisa ditunjuk untuk dibatalkan. */
-        const ditarik = semua.filter((s) => perAnalis.has(s.uid) && s.hasil === 'batal');
+        /* Bukan cuma analis yang dilangganani. Salinan MANUAL — satu sinyal
+           yang ditekan sendiri lewat ikon salin — juga rencana orang lain,
+           dan kalau orang itu menariknya, yang meniru tidak jadi lebih
+           berhak meneruskannya hanya karena tombolnya ditekan tangan.
+           Penandanya: ada catatan salinan lokal untuk sinyal itu. */
+        const ditarik = semua.filter((s) => s.hasil === 'batal'
+          && (perAnalis.has(s.uid) || !!tandaSinyal(uid!, s.id)));
         if (ditarik.length) {
           petaCopy(uid!, [...akun.posisi, ...akun.pending].map((p) => ({
             tiket: p.tiket, simbol: p.simbol, arah: p.arah, lot: p.lot,
@@ -278,20 +311,33 @@ export function usePengikutCopy(uid: string | null | undefined, jeda = 60_000) {
             if (!hidup) break;
             const t = tandaSinyal(uid!, s.id);
             if (!t || t.batalSelesai || !t.tiket) continue;
-            if (!akun.pending.some((o) => o.tiket === t.tiket)) {
-              /* Sudah jadi posisi: dibiarkan berjalan, dan penandanya
-                 ditutup supaya putaran berikutnya tidak memeriksanya lagi.
-                 Kalau tiketnya tidak ada di kedua daftar, itu bisa berarti
-                 EA sedang tersendat — dibiarkan, putaran berikutnya
-                 melihatnya lagi. */
-              if (akun.posisi.some((o) => o.tiket === t.tiket)) tandaiBatalSelesai(uid!, s.id);
-              continue;
-            }
+
+            const menggantung = akun.pending.some((o) => o.tiket === t.tiket);
+            const berjalan = akun.posisi.some((o) => o.tiket === t.tiket);
+            /* Tidak ada di kedua daftar. Bisa berarti ordernya memang sudah
+               tidak ada, bisa berarti EA sedang tersendat — dan keduanya
+               tidak bisa dibedakan dari sini. Dibiarkan tanpa penanda
+               selesai: putaran berikutnya melihatnya lagi. */
+            if (!menggantung && !berjalan) continue;
+
+            const jejak = { sinyal: s.id, pasangan: s.pasangan, analis: t.analis };
             try {
               const { id } = await kirimPerintahMt5({ aksi: 'TUTUP', tiket: t.tiket });
               const r = await tungguHasilMt5(id);
-              if (r.status === 'sukses') tandaiBatalSelesai(uid!, s.id);
-            } catch { /* satu gagal tidak menghentikan sisanya */ }
+              if (r.status === 'sukses') {
+                tandaiBatalSelesai(uid!, s.id);
+                catat(uid!, { ...jejak, hasil: 'terkirim', sebab: berjalan
+                  ? `Analis menarik sinyalnya — posisi #${t.tiket} ikut ditutup di harga pasar.`
+                  : `Analis menarik sinyalnya — order menunggu #${t.tiket} dibatalkan.` });
+              } else {
+                catat(uid!, { ...jejak, hasil: 'gagal', sebab: `Gagal menutup #${t.tiket}: ${r.pesan || r.status}` });
+              }
+            } catch (e) {
+              /* Satu gagal tidak menghentikan sisanya — tapi kegagalan
+                 MENUTUP posisi tidak boleh senyap: yang tertinggal adalah
+                 uang yang mengambang tanpa siapa pun memantaunya. */
+              catat(uid!, { ...jejak, hasil: 'gagal', sebab: e instanceof Error ? e.message : 'Gagal mengirim perintah tutup.' });
+            }
           }
         }
 
