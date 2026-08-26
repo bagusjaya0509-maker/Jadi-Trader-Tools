@@ -943,6 +943,10 @@ export default function ChartBacktest() {
        Jadi modenya ikut berpindah. Tidak ada yang perlu ditebak: kalau
        yang tampil order nyata, chartnya dalam mode nyata. */
     aksi?.gantiMode('real');
+    /* Sidik awal dipasang di sini juga. Tanpa ini efek "ikut broker" di
+       bawah melihat nilai broker sebagai perubahan pertama dan langsung
+       menyetel ulang isian yang baru saja diisi baris-baris di bawah. */
+    sidikBroker.current = `${o.tiket ?? o.simbol}|${o.sl}|${o.tp}`;
     setSunting(o);
     /* Garisnya dulu, panelnya belakangan. */
     setPanelUbah(false);
@@ -1172,6 +1176,76 @@ export default function ChartBacktest() {
     const p = posisiBursa.find((x) => x.simbol === sunting.simbol);
     return p ? p.pnl : null;
   }, [sunting, akunMt5.posisi, posisiBursa]);
+
+  /* ── ORDER YANG DISUNTING MENGIKUTI BROKER ──────────────────────────
+     Dua keluhan yang ternyata satu sebab: `sunting` tidak pernah menengok
+     lagi ke broker setelah dipilih.
+
+     (a) Tutup posisi di MT5 -> garisnya tetap di chart sampai halaman
+         dimuat ulang. Garis posisi (`posisiMt5`) memang ikut hilang, tapi
+         `sunting` masih memegang order itu dan `garisSeret` terus
+         menggambar entry/SL/TP-nya. Order yang sudah tidak ada tapi masih
+         bergaris terbaca sebagai posisi yang masih hidup -- kesalahan
+         paling mahal yang bisa dilakukan chart ini.
+
+     (b) Geser SL lalu Kirim -> garisnya jadi DUA. Yang satu garis posisi
+         di nilai broker yang belum berubah, yang satu garis seret di nilai
+         baru. Keduanya sah pada saat itu, tapi begitu broker menjawab,
+         tidak ada yang menarik isian panel ke nilai yang sudah terpasang,
+         jadi keduanya tinggal berdampingan.
+
+     Diselesaikan sekaligus: kalau ordernya lenyap, sunting dilepas; kalau
+     nilai brokernya BERGERAK, isian panel ikut disetel ke nilai itu, dan
+     garis seretnya jatuh tepat di atas garis posisi -- kembali jadi satu.
+
+     Disetel HANYA saat nilai brokernya berubah, bukan tiap laporan EA.
+     EA melapor tiap beberapa detik dengan angka yang sama; menyetel ulang
+     tiap laporan akan menghapus angka yang sedang diketik atau digeser
+     orangnya sebelum sempat ditekan Kirim. */
+  const sidikBroker = useRef('');
+  useEffect(() => {
+    const o = sunting;
+    /* Sedang mengirim: jangan disentuh. Di tengah pengiriman nilai broker
+       memang masih yang lama, dan menariknya balik ke situ persis
+       membatalkan apa yang sedang dikirim di depan mata orangnya. */
+    if (!o || suntingSibuk) return;
+    /* Baris gabungan tidak menunjuk satu order pun -- tidak ada yang bisa
+       dicari maupun disamakan. */
+    if (o.gabungan) { sidikBroker.current = ''; return; }
+
+    let kini: { sl: number; tp: number } | null = null;
+    if (o.pasar === 'mt5') {
+      const p = akunMt5.posisi.find((x) => x.tiket === o.tiket);
+      const t = akunMt5.pending.find((x) => x.tiket === o.tiket);
+      const sumber = p ?? t ?? null;
+      if (sumber) kini = { sl: sumber.sl, tp: sumber.tp };
+    } else if (o.jenis === 'pending') {
+      /* Pending kripto dikenali dari id-nya; SL/TP tidak dilaporkan di
+         daftar order, jadi yang diperiksa cuma masih-ada atau tidak. */
+      if (orderBursa.some((x) => x.id === (o.tiket ?? ''))) return;
+    } else if (posisiBursa.some((x) => x.simbol === o.simbol)) {
+      return;
+    }
+
+    if (!kini) {
+      /* HILANG DARI BROKER. Ditutup dari MT5, kena SL/TP, atau dibatalkan
+         dari mana pun -- semuanya berakhir sama: tidak ada lagi yang boleh
+         digambar maupun dikirimi perubahan. */
+      sidikBroker.current = '';
+      setSunting(null);
+      setPanelUbah(false);
+      setSuntingSlTeks('');
+      setSuntingTpTeks('');
+      setSuntingKabar('');
+      return;
+    }
+
+    const sidik = `${o.tiket ?? o.simbol}|${kini.sl}|${kini.tp}`;
+    if (sidik === sidikBroker.current) return;
+    sidikBroker.current = sidik;
+    setSuntingSlTeks(kini.sl ? String(kini.sl) : '');
+    setSuntingTpTeks(kini.tp ? String(kini.tp) : '');
+  }, [sunting, suntingSibuk, akunMt5.posisi, akunMt5.pending, posisiBursa, orderBursa]);
 
   /* Menutup order yang DIPILIH DARI TABEL, tanpa harus masuk mode sunting
      dulu. Fitur tutupnya sebenarnya sudah ada sejak lama, tapi tersembunyi
@@ -3825,6 +3899,29 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                                 <span className="text-[10px] text-zinc-500">
                                   {sunting.jenis === 'pending' ? 'pending' : 'posisi'} · {sunting.pasar === 'mt5' ? 'Trade-Fi' : 'Binance'}
                                 </span>
+                                {/* Menutup PANELNYA saja — garis ordernya tetap
+                                    di chart, jadi tinggal diklik lagi kalau
+                                    berubah pikiran.
+
+                                    Silang di pojok, bukan tombol bertulisan di
+                                    barisan bawah: di sana ia berdiri sebaris
+                                    dengan "Tutup posisi", dan dua kendali
+                                    bersebelahan yang sama-sama diawali "Tutup"
+                                    tapi satu menutup gambar sementara satunya
+                                    menutup uang adalah pasangan yang tidak
+                                    boleh dibiarkan.
+
+                                    stopPropagation: seluruh panel ini bisa
+                                    diseret lewat onPointerDown, dan tanpa ini
+                                    menekan silangnya ikut memulai seretan. */}
+                                <button
+                                  onPointerDown={(e) => e.stopPropagation()}
+                                  onClick={tutupPanelUbah}
+                                  aria-label="Tutup panel"
+                                  title="Tutup panel — garis ordernya tetap di chart"
+                                  className="ml-auto cursor-pointer self-center rounded p-0.5 text-zinc-600 transition-colors hover:bg-zinc-800 hover:text-zinc-200">
+                                  <X className="size-3" />
+                                </button>
                               </div>
                               {pnlSunting !== null && (
                                 <div className="mt-0.5 text-[10.5px] text-zinc-500">
@@ -3884,17 +3981,31 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                                   {suntingSibuk ? <Loader2 className="size-3 animate-spin" /> : null}
                                   Kirim
                                 </button>
+                                {/* LATARNYA MENYEBUT AKIBATNYA, bukan jenis
+                                    tombolnya. Merah di seluruh aplikasi ini
+                                    berarti "hati-hati"; di sini yang perlu
+                                    diketahui sebelum menekan bukan bahayanya
+                                    melainkan hasilnya: menutup sekarang itu
+                                    memanen atau merealisasikan rugi.
+
+                                    Sumbernya P/L berjalan yang sama dengan
+                                    yang tertulis di atas -- angka dan warna
+                                    tidak mungkin berselisih.
+
+                                    Pending order TIDAK diwarnai: ia belum
+                                    punya P/L sama sekali, dan hijau di
+                                    "Hapus order" akan menjanjikan untung yang
+                                    tidak ada. Begitu juga saat P/L belum
+                                    terbaca -- warna yang dikarang lebih buruk
+                                    daripada tidak berwarna. */}
                                 <button onClick={() => void akhiriOrder()} disabled={suntingSibuk}
-                                  className="cursor-pointer rounded px-2 py-1 text-[10.5px] text-red-400/90 transition-colors hover:bg-red-500/10 disabled:opacity-50">
+                                  className={cn('cursor-pointer rounded px-2 py-1 text-[10.5px] transition-colors disabled:opacity-50',
+                                    sunting.jenis === 'pending' || pnlSunting === null
+                                      ? 'text-red-400/90 hover:bg-red-500/10'
+                                      : pnlSunting >= 0
+                                        ? 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30'
+                                        : 'bg-red-500/20 text-red-300 hover:bg-red-500/30')}>
                                   {sunting.jenis === 'pending' ? 'Hapus order' : 'Tutup posisi'}
-                                </button>
-                                {/* Menutup PANELNYA saja — garis ordernya
-                                    tetap di chart, jadi tinggal diklik lagi
-                                    kalau berubah pikiran. Untuk melepas
-                                    garisnya, pakai tanda × di ujung garis. */}
-                                <button onClick={tutupPanelUbah}
-                                  className="cursor-pointer rounded px-2 py-1 text-[10.5px] text-zinc-500 transition-colors hover:text-zinc-300">
-                                  Tutup panel
                                 </button>
                               </div>
                               </>)}
