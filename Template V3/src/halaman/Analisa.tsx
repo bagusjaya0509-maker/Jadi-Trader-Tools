@@ -7,7 +7,7 @@ import {
   Loader2, Lock, Unlock, Send, X, CheckCircle2,
   TrendingUp, TrendingDown, ArrowUp, ArrowDown, RefreshCw, Radar, Sparkles, ImagePlus, Images, Flag, Ban, Trash2, Plus,
   Settings2, UserRound, Pin, TriangleAlert, ArrowLeft, CandlestickChart, ChevronDown, ChevronRight,
-  ChevronLeft, Users,
+  ChevronLeft, Users, Copy as IkonCopy,
 } from 'lucide-react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { PanelSinyal } from '@/components/panel-sinyal';
@@ -196,7 +196,17 @@ function BarisHitung({ r, kuIkuti }: { r: RingkasKanal; kuIkuti?: boolean }) {
      penyalinnya memang minimal satu, dan satu itu kamu. Yang belum bisa
      dihitung adalah penyalin ORANG LAIN — itu menunggu rute langganan di
      server. Sampai itu ada, angka ini "sekurang-kurangnya", bukan total. */
-  const bagian: Array<[string, number]> = [['disalin', r.pengcopy + (kuIkuti ? 1 : 0)]];
+  const bagian: Array<[string, number]> = [
+    ['disalin', r.pengcopy + (kuIkuti ? 1 : 0)],
+    /* SATU ANGKA UNTUK "MASIH HIDUP", bukan dua yang berdiri sendiri.
+       Berjalan dan menunggu harga memang dua keadaan berbeda, tapi
+       pertanyaan yang dibawa orang ke daftar kanal cuma satu: analis ini
+       ada yang bisa diikuti sekarang atau tidak? Memisahkannya jadi dua
+       angka memaksa mata menjumlahkan sendiri untuk menjawabnya, dan
+       perbedaannya baru berarti sesudah masuk ke kanalnya — di mana ia
+       memang sudah dipisah jadi dua rak. */
+    ['aktif', r.berjalan + r.pending],
+  ];
 
   /* ── "DISALIN" TIDAK MENGHITUNG LANGGANANMU, DAN ITU MEMANG BEGITU ──
      Laporan pemilik: sudah menekan "Ikuti analis ini" pada Agen Momentum,
@@ -231,15 +241,11 @@ function BarisHitung({ r, kuIkuti }: { r: RingkasKanal; kuIkuti?: boolean }) {
      <button>, dan div di sana bukan susunan yang sah. */
   return (
     <span className="inline-flex flex-wrap items-baseline gap-x-3 gap-y-1">
-      {kuIkuti && (
-        <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[9.5px] font-medium uppercase tracking-wide text-emerald-400"
-              title="Kamu sudah menyetel penyalinan untuk analis ini">
-          kamu ikuti
-        </span>
-      )}
       {bagian.map(([nama, nilai]) => (
         <span key={nama} className="whitespace-nowrap"
-              title={nama === 'disalin'
+              title={nama === 'aktif'
+                ? 'Sinyal yang masih hidup: sedang berjalan + menunggu harga'
+                : nama === 'disalin'
                 ? 'Pembelian sinyal kanal ini, ditambah langgananmu sendiri kalau ada. Penyalin orang lain belum terhitung — menunggu rute langganan di server.'
                 : nama === 'batal' ? 'Ditarik penulisnya sebelum harganya datang' : undefined}>
           <span className="angka text-[13px] font-semibold tabular-nums text-zinc-300">{nilai}</span>
@@ -1686,7 +1692,18 @@ export default function Analisa() {
      terlihat di kartu kanalnya, bukan menunggu halaman dimuat lagi. */
   const [diikutiSet, setDiikutiSet] = useState<Set<string>>(new Set());
   useEffect(() => {
-    setDiikutiSet(new Set(daftarLangganan(pengguna?.uid).map((l) => l.analisUid)));
+    const set = new Set(daftarLangganan(pengguna?.uid).map((l) => l.analisUid));
+    setDiikutiSet(set);
+    /* IKUT DISEMATKAN. Analis yang penyalinannya sudah disetel adalah
+       analis yang paling sering dibuka orangnya — membiarkannya tenggelam
+       di urutan sinyal-terbaru berarti ia harus dicari tiap kali.
+
+       HANYA memasang, tidak pernah melepas: `ubahPin` itu sakelar, jadi
+       memanggilnya tanpa memeriksa akan MELEPAS sematan yang sudah ada
+       tiap kali efek ini jalan. Melepas sematan juga bukan urusan fitur
+       ini — yang menyematkan sendiri lewat klik kanan berhak
+       mempertahankannya walau ia berhenti mengikuti. */
+    set.forEach((uid) => { if (!disematkan(uid)) ubahPin(uid); });
   }, [pengguna?.uid, copyAnalis, sub]);
   const [masuk, setMasuk] = useState<PermintaanMasuk[]>([]);
   const [statusku, setStatusku] = useState<Record<string, string>>({});
@@ -3402,6 +3419,21 @@ export default function Analisa() {
                             satu angka dengan panahnya, sejajar nama. Di
                             bawah ia dulu bersaing dengan angka hasil; di
                             sini ia jelas jadi keterangan, bukan saingan. */}
+                        {/* LAMBANG, BUKAN TULISAN. Lencana "KAMU IKUTI"
+                            sebelumnya duduk di kaki kartu bersama angka —
+                            teks berkotak di deretan angka membuat matanya
+                            berhenti dua kali untuk satu keterangan yang
+                            cuma perlu dikenali sekilas.
+
+                            Di kepala, sejajar winrate: satu ikon kecil yang
+                            terbaca tanpa dibaca. Judulnya yang menanggung
+                            keterangannya buat yang perlu memastikan. */}
+                        {diikutiSet.has(uid) && (
+                          <span title="Kamu mengikuti analis ini — setelan penyalinannya tersimpan"
+                                className="flex shrink-0 items-center text-emerald-400">
+                            <IkonCopy className="size-3.5" strokeWidth={2.2} />
+                          </span>
+                        )}
                         <span className={cn('flex shrink-0 items-center gap-1 text-[12.5px] font-medium',
                           r.winrate === null ? 'text-zinc-600' : r.winrate >= 50 ? 'text-emerald-400' : 'text-red-400')}>
                           <span className="text-[9.5px] font-normal text-zinc-500">WR</span>
