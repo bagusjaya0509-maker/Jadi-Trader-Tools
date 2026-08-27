@@ -220,7 +220,7 @@ export interface PosisiChartMt5 {
 
 export function ChartLilin({
   lilin, garis, trade, tinggi = 420, hingga, garisHarga, onKlikBar, smi, mundur, pojok,
-  garisSeret, onSeret, onKlikGaris, onHapusGaris, hamparanBawah, segmen, penandaPine, kotakPine, isianPine,
+  garisSeret, onSeret, onKlikGaris, onHapusGaris, onKlikKosong, hamparanBawah, segmen, penandaPine, kotakPine, isianPine,
   alat, onAlatSelesai, gambarAlat, gambarPilih, onPilihGambar, onUbahGambar,
   posisiMt5, onUbahPosisi, hargaAsk, kunciUkuran, bagikanFoto, tandaAir, tampilan, pitaSmi,
   hamparanBarTertua, onUjungKiri,
@@ -266,6 +266,11 @@ export function ChartLilin({
   garisSeret?: GarisSeret[];
   /** Dipanggil saat sebuah garis selesai digeser. */
   onSeret?: (id: GarisSeret['id'], harga: number) => void;
+  /** Klik pada KANVAS KOSONG — bukan pada garis, alat, atau panel.
+   *  Sentuhan pada garis ditangkap lapisan seretnya sendiri dan tidak
+   *  pernah sampai ke sini, jadi pemanggil boleh memakainya sebagai
+   *  "orangnya menaruh perhatian ke tempat lain". */
+  onKlikKosong?: () => void;
   /** Garisnya DISENTUH — diklik saja, atau diklik lalu diseret. Dipisah
    *  dari onSeret karena menyentuh dan menggeser adalah dua maksud yang
    *  berbeda: yang satu "saya mau mengurus garis ini", yang satu "nilainya
@@ -373,6 +378,7 @@ export function ChartLilin({
   /* Handler klik disimpan di ref supaya langganannya dipasang SEKALI.
      Melanggan ulang tiap render menumpuk pendengar di chart yang sama. */
   const klikRef = useRef(onKlikBar);
+  const kosongRef = useRef(onKlikKosong);
   /* Pemotret disimpan di ref, dan `bagikanFoto` juga — supaya efek pembuatan
      chart (yang sengaja berdependensi kosong agar chartnya tidak dibuat
      ulang tiap render) tetap memakai callback terbaru tanpa menjadikannya
@@ -382,6 +388,7 @@ export function ChartLilin({
   bagikanFotoRef.current = bagikanFoto;
   useEffect(() => { if (fotoRef.current) bagikanFoto?.(fotoRef.current); }, [bagikanFoto]);
   klikRef.current = onKlikBar;
+  kosongRef.current = onKlikKosong;
 
   /* Warna lilin dipegang di ref juga, dengan alasan yang sama seperti
      `bagikanFoto` di atas: efek pembuatan chart sengaja tidak berdependensi
@@ -511,6 +518,7 @@ export function ChartLilin({
     alatPrim.current = primAlat;
     c.subscribeClick((p) => {
       if (klikRef.current && typeof p.logical === 'number') klikRef.current(Math.round(p.logical));
+      kosongRef.current?.();
     });
 
     /* Pemotret diserahkan ke pemanggil SEBAGAI FUNGSI, bukan dengan

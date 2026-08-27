@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
+import { PanelCopyTradeFi } from '@/components/panel-copy-tradefi';
 import {
   Play, Loader2, RefreshCw, Radio, TriangleAlert, History,
   Layers, ChevronDown, ChevronUp, Settings2, Code2, X, Ruler, Rows3, Square, Eraser, Minus, TrendingUp,
@@ -1420,6 +1421,14 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
      DIMATIKAN begitu orangnya menekan BUY/SELL sendiri — TAPI HANYA untuk
      COPY yang datang dari level orang lain. Lihat `copyManual` di bawah. */
   const [dariSinyal, setDariSinyal] = useState(() => cari.get('untuk') === 'sinyal');
+  /* Identitas sinyal yang membuka halaman ini lewat "Buka di Chart" pada
+     kartu sinyal. Tiga hal bergantung padanya: tombol Batal yang pulang ke
+     halaman sinyalnya, ikon copy di tiket, dan panel perhitungan lotnya.
+     Kosong = jalur biasa, ketiganya tidak muncul. */
+  const sinyalAsal = cari.get('sinyal');
+  const kanalAsal = cari.get('kanal');
+  const analisAsal = cari.get('analis') || '';
+  const [copySinyalBuka, setCopySinyalBuka] = useState(false);
   /** COPY yang datang dari NIAT orangnya, bukan dari level orang lain.
    *
    *  Dua jalan masuk yang tampak sama tapi berbeda maknanya:
@@ -2033,6 +2042,38 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
      mengulang persis cacat yang baru diperbaiki. Kalau orangnya sudah
      memutuskan, tiketnya berhenti bergerak sendiri. */
   const entryDigeser = useRef(false);
+  /* ── SERETAN YANG DITINGGALKAN, DIKEMBALIKAN ─────────────────────────
+     Nilai garis SEBELUM seretan pertama disimpan di sini. Kalau orangnya
+     menyeret lalu tidak berbuat apa-apa — tidak Kirim, tidak Batal — dan
+     mengeklik kanvas kosong atau menekan Esc, garisnya kembali ke angka
+     ini. Tanpa jalan pulang itu, salah seret hanya bisa ditebus dengan
+     memuat ulang halaman — dan yang paling sering salah seret justru
+     garis rencana orang lain yang datang dari kartu sinyal.
+
+     Snapshot dibuang (tanpa dikembalikan) begitu ada TINDAKAN: Kirim,
+     Batal, mengetik angka sendiri, atau konteksnya berganti. Tindakan
+     berarti angkanya sudah jadi keputusan, bukan lagi seretan nyasar. */
+  const kembalikanSeret = useRef<() => void>(() => {});
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') kembalikanSeret.current(); };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, []);
+  const seretAsal = useRef<
+    | { jenis: 'rencana'; nilai: { entry?: number; sl?: number; tp?: number } }
+    | { jenis: 'sunting'; sl: number; tp: number }
+    | null
+  >(null);
+  /* Esc memakai pengembali yang SAMA dengan klik kanvas kosong — dua
+     pintu, satu perilaku. Diisi ulang TIAP RENDER supaya closure-nya
+     selalu memegang setter dan snapshot terbaru. */
+  kembalikanSeret.current = () => {
+    const a = seretAsal.current;
+    if (!a) return;
+    seretAsal.current = null;
+    if (a.jenis === 'sunting') { setSuntingSl(a.sl); setSuntingTp(a.tp); }
+    else setRencana(a.nilai);
+  };
   useEffect(() => {
     if (entryDigeser.current || aksiPosisi || seretTangan.current) return;
     const h = lilin.closes[lilin.closes.length - 1];
@@ -3501,10 +3542,20 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                             setReplayIdx(Math.max(0, Math.min(i, maks)));
                             setBidikReplay(false);
                           }) : undefined}
+                          onKlikKosong={() => {
+                            const a = seretAsal.current;
+                            if (!a) return;
+                            seretAsal.current = null;
+                            if (a.jenis === 'sunting') { setSuntingSl(a.sl); setSuntingTp(a.tp); }
+                            else setRencana(a.nilai);
+                          }}
                           garisSeret={garisSeret}
                           onSeret={(id, h) => {
                             if (sunting) {
                               if (sunting.gabungan) return;
+                              if (!seretAsal.current) {
+                                seretAsal.current = { jenis: 'sunting', sl: suntingSl, tp: suntingTp };
+                              }
                               /* Acuan presisi diambil dari SL/TP yang sudah
                                  ada lebih dulu, bukan dari entry: harga entry
                                  di bursa adalah RATA-RATA fill, jadi desimalnya
@@ -3523,6 +3574,9 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                                 if (rugi) setSuntingSl(hb); else setSuntingTp(hb);
                               }
                               return;
+                            }
+                            if (!seretAsal.current) {
+                              seretAsal.current = { jenis: 'rencana', nilai: { ...rencana } };
                             }
                             if (id === 'entry') entryDigeser.current = true;
                             seretTangan.current = true;
@@ -3656,6 +3710,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                               draf={draf} rencana={rencana} mode={aksi.mode}
                               jenis={labelJenis} risiko={aksi.risiko} qtyDemo={qtyTampil}
                               tunda={aksiTunda} onBatalTunda={aksi.batalTunda}
+                              onCopySinyal={sinyalAsal && kanalAsal ? () => setCopySinyalBuka(true) : undefined}
                               onGantiMode={(m, sebab) => {
                                 aksi.gantiMode(m);
                                 setKabarNyata('');
@@ -3815,6 +3870,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                                    penyusul harga otomatis harus berhenti
                                    menimpanya. */
                                 if (r.entry !== rencana.entry) entryDigeser.current = true;
+                                seretAsal.current = null;
                                 setRencana(r);
                               }}
                               onBatal={() => {
@@ -3825,6 +3881,13 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                                    coretan putih misterius memotong chart. */
                                 setDraf(null); setKabarNyata('');
                                 setRencana({});
+                                seretAsal.current = null;
+                                /* Datang dari kartu sinyal? Batal berarti
+                                   kembali ke tempat asalnya — bukan berdiri
+                                   di chart kosong mencari jalan pulang. */
+                                if (sinyalAsal && kanalAsal) {
+                                  navigasi('/copy-signal?kanal=' + encodeURIComponent(kanalAsal));
+                                }
                                 entryDigeser.current = false;
                                 seretTangan.current = false;
                                 /* Jangkar ikut dilepas: tiket berikutnya
@@ -3833,6 +3896,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                                 qtyDemo.current = 0; setQtyTampil(0);
                               }}
                               onKirim={() => {
+                                seretAsal.current = null;
                                 const { entry, sl, tp } = rencana;
                                 if (!draf || !entry || !sl || !tp) return;
                                 if (aksi.mode === 'real') {
@@ -4797,6 +4861,24 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
             </div>
           )}
         </>
+      )}
+
+      {/* Panel salin-satu untuk sinyal yang membuka halaman ini. Level yang
+          dipakai adalah yang SEDANG tampil di rencana — kalau orangnya
+          sempat menggeser garisnya, yang disalin ya rencananya sekarang,
+          bukan angka lama dari alamat. */}
+      {copySinyalBuka && sinyalAsal && (
+        <PanelCopyTradeFi
+          sinyalId={sinyalAsal}
+          analisUid={kanalAsal || undefined}
+          pasangan={simbol.replace(/^MT5:/i, '')}
+          arah={cari.get('arah') === 'SELL' ? 'SELL' : 'BUY'}
+          entry={Number(rencana.entry) || Number(cari.get('entry')) || 0}
+          sl={Number(rencana.sl) || Number(cari.get('sl')) || 0}
+          tp={Number(rencana.tp) || Number(cari.get('tp')) || 0}
+          penulis={analisAsal || 'Analis'}
+          tutup={() => setCopySinyalBuka(false)}
+        />
       )}
     </div>
   );

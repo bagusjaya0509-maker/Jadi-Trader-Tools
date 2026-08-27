@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
    lama untuk berpikir, cukup singkat supaya tidak menginap di atas
    lilin yang sedang dibaca. */
 const JEDA_LIPAT_SENDIRI_MS = 12_000;
-import { TrendingUp, TrendingDown, X, Check, Ban, CandlestickChart, Minus, Hourglass, Share2, ChevronsDownUp, ChevronsUpDown } from 'lucide-react';
+import { TrendingUp, TrendingDown, X, Check, Ban, CandlestickChart, Minus, Hourglass, Share2, Copy, ChevronsDownUp, ChevronsUpDown } from 'lucide-react';
 import { cn, uang, harga as fHarga } from '@/lib/utils';
 import { METODE_TP, type MetodeTp } from '@/lib/order-nyata';
 
@@ -125,7 +125,7 @@ function IsianAngka({ nilai, atur, langkah, min = 0, maks, desimal = 2, lebar, j
 }
 
 export function PojokOrder({
-  posisi, hargaKini, draf, rencana, mode, jenis, risiko, tunda, onBatalTunda, onKirimSinyal, kabarSinyal, dariSinyal, onGantiCopy,
+  posisi, hargaKini, draf, rencana, mode, jenis, risiko, tunda, onBatalTunda, onKirimSinyal, kabarSinyal, dariSinyal, onGantiCopy, onCopySinyal,
   onPilih, onUbah, onKirim, onBatal, onTutup, onGantiMode, onTukarArah, mati,
   nyataSetelan, aturNyata, sibukNyata, kabar, demoSetelan, aturDemo,
   catatan, aturCatatan, qtyDemo, mt5, lotMt5, aturLotMt5, nilaiLotMt5, desimalHarga = 6,
@@ -173,6 +173,11 @@ export function PojokOrder({
   /** Kirim rencana tiket ini ke formulir Copy Signal + tangkapan layar
    *  chart sebagai sampul. Tidak diberikan = tombolnya tidak muncul. */
   onKirimSinyal?: () => void;
+  /** Salin sinyal yang sedang dibuka ke MT5 sendiri — HANYA terisi saat
+   *  tiketnya datang dari tombol "Buka di Chart" di kartu sinyal, karena
+   *  hanya jalur itu yang membawa identitas sinyalnya. Tanpa identitas,
+   *  tombol salin cuma bisa menyalin tebakan. */
+  onCopySinyal?: () => void;
   /** Pesan hasil pengiriman (mis. level belum lengkap). */
   kabarSinyal?: string;
   /** Level di chart ini datang dari analisa Copy Signal. Menyalakan
@@ -626,6 +631,14 @@ export function PojokOrder({
               tombol Kirim; begitu Kirim tidak digambar, tanpa ini seluruh
               barisnya menggumpal ke kiri dan Batal melompat ke tempat yang
               tadi dipakai tombol utama. */}
+          {onCopySinyal && modeSekarang === 'copy' && (
+            <button onClick={onCopySinyal}
+              title="Copy 1 trade — buka panel perhitungan lot untuk sinyal ini"
+              aria-label="Copy sinyal ini ke MT5"
+              className="flex cursor-pointer items-center rounded border border-emerald-500/40 bg-emerald-500/10 p-1.5 text-emerald-300 transition-colors hover:bg-emerald-500/20">
+              <Copy className="size-3" />
+            </button>
+          )}
           {onKirimSinyal && modeSekarang === 'copy' && (
             <button onClick={onKirimSinyal} disabled={!arahBenar}
               title={arahBenar ? 'Kirim entry/SL/TP + tangkapan layar chart ke formulir Copy Signal'

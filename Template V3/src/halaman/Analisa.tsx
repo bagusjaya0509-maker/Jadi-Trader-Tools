@@ -554,7 +554,12 @@ function KartuAnalisa({ a, status, milikku, onSegarkan, performa, hargaKini }: {
   const alamatChart = (lv: IsiAnalisa | null) =>
     `/chart-entry?simbol=${encodeURIComponent((a.pasar === 'tradefi' ? 'MT5:' : '') + a.pasangan)}`
     + (a.tf ? `&tf=${a.tf}` : '')
-    + (lv ? `&arah=${a.arah}&entry=${lv.entry}&sl=${lv.sl}&tp=${lv.tp}` : '');
+    /* Identitas sinyal ikut dibawa: tanpa ini halaman chart tahu LEVELNYA
+       tapi tidak tahu SIAPA dan SINYAL MANA — jadi tombol Batal tidak tahu
+       harus pulang ke mana, dan ikon copy tidak tahu apa yang disalin. */
+    + (lv ? `&arah=${a.arah}&entry=${lv.entry}&sl=${lv.sl}&tp=${lv.tp}`
+          + `&sinyal=${encodeURIComponent(a.id)}&kanal=${encodeURIComponent(a.uid)}`
+          + `&analis=${encodeURIComponent(a.nama || '')}` : '');
   const tautanChart = alamatChart(isi);
   const bolehBatal = bisaDibatalkan(a, pengguna?.uid);
 
