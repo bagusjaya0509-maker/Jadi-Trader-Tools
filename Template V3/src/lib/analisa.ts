@@ -27,6 +27,10 @@ export interface RingkasAnalisa {
   foto?: string;
   arah: 'BUY' | 'SELL'; harga: number; ringkas: string; dibuat: number;
   jumlahPembeli: number;
+  /** Berapa ORANG yang benar-benar meng-copy sinyal ini — dicatat server
+   *  sekali per uid, dari panel manual maupun pengikut. Beda dari
+   *  jumlahPembeli, yang menghitung pembeli akses berbayar. */
+  jumlahCopy?: number;
   /** Ditulis agen AI, bukan pengguna. Dipasang HANYA oleh rute
    *  /api/analisa/agen yang dijaga App Token — kalau nilainya bisa dikirim
    *  lewat POST biasa, siapa pun yang login bisa menyamar jadi agen resmi. */
@@ -493,4 +497,20 @@ export async function discordSiap(): Promise<boolean> {
 export function mulaiLoginDiscord() {
   const balik = window.location.origin + window.location.pathname;
   window.location.href = `${DASAR}/api/auth/discord?balik=${encodeURIComponent(balik)}`;
+}
+
+/** Melapor "saya meng-copy sinyal ini" — server mencatatnya sekali per
+ *  orang, jadi aman dipanggil berulang. Kegagalannya dibiarkan diam:
+ *  hitungan tampilan tidak boleh menggagalkan alur yang mengirim order. */
+export async function catatDicopy(id: string): Promise<void> {
+  try {
+    const u = auth.currentUser;
+    if (!u) return;
+    const token = await u.getIdToken();
+    await fetch(`${DASAR}/api/analisa/dicopy`, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+  } catch { /* diam */ }
 }

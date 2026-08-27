@@ -46,6 +46,23 @@ module.exports = (app, { butuhLogin, batasLaju, express, DIR }) => {
      angka ini menangkap keadaan yang tidak wajar — spesifikasi simbol yang
      salah tebak, batas rugi yang salah ketik nol-nya. */
   const MAKS_LOT = Number(process.env.PENGIKUT_MAKS_LOT || 1);
+  const APP_TOKEN = process.env.APP_TOKEN || '';
+  const DASAR = 'http://127.0.0.1:' + (process.env.PORT || 4000);
+
+  /* Hitungan pengcopy di kartu sinyal dinaikkan lewat rute yang sama yang
+     dipakai peramban — bukan dengan menulis analisa.json langsung dari
+     sini. Dua penulis untuk satu berkas adalah cara kehilangan salah satu
+     tulisannya; rutenya sudah menegakkan "sekali per orang" untuk semua
+     jalur. Gagal jaringan dibiarkan diam: hitungan tampilan tidak boleh
+     menggagalkan putaran yang mengurus order sungguhan. */
+  function laporDicopy(idSinyal) {
+    if (!APP_TOKEN) return;
+    fetch(DASAR + '/api/analisa/dicopy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-App-Token': APP_TOKEN },
+      body: JSON.stringify({ id: idSinyal, uid: UID }),
+    }).catch(() => {});
+  }
   const JEDA_MS = 60_000;
 
   if (!UID) {
@@ -305,6 +322,7 @@ module.exports = (app, { butuhLogin, batasLaju, express, DIR }) => {
                        aksi: 'BUKA', idPerintah: id, waktu: Date.now() });
         d.tanda = d.tanda.slice(-200);
         catat(d, { ...jejak, hasil: 'terkirim', sebab: `${s.arah} ${lot} lot ${simbol} diantrekan — menunggu EA.` });
+        laporDicopy(s.id);
       }
 
       /* D. Sinyal yang ditarik analisnya → salinannya ikut ditarik.

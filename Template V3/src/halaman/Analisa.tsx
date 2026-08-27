@@ -202,7 +202,11 @@ function LencanaKanal({ r, className }: { r: RingkasKanal; className?: string })
  *  Angka nol tetap ditulis, tidak disembunyikan — "0 kalah" dari 12 sinyal
  *  adalah keterangan, dan menghilangkannya membuat kartunya terbaca seperti
  *  belum pernah diuji. */
-function BarisHitung({ r, kuIkuti }: { r: RingkasKanal; kuIkuti?: boolean }) {
+/* Prop `kuIkuti` DIPERTAHANKAN di tanda tangan walau tidak dibaca lagi:
+   pemanggilnya banyak, dan mencabutnya dari semua tempat cuma menambah
+   diff untuk hitungan yang kini datang dari catatan server. Garis bawah
+   menandainya sengaja tidak dipakai. */
+function BarisHitung({ r, kuIkuti: _kuIkuti }: { r: RingkasKanal; kuIkuti?: boolean }) {
   /* Batal ikut ke dalam deret yang sama, bukan ditempel belakangan dengan
      bentuknya sendiri. Ia hitungan sinyal seperti empat lainnya; satu-
      satunya bedanya ia disembunyikan waktu nol, karena kanal yang tidak
@@ -235,7 +239,11 @@ function BarisHitung({ r, kuIkuti }: { r: RingkasKanal; kuIkuti?: boolean }) {
      dihitung adalah penyalin ORANG LAIN — itu menunggu rute langganan di
      server. Sampai itu ada, angka ini "sekurang-kurangnya", bukan total. */
   const bagian: Array<[string, number]> = [
-    ['disalin', r.pengcopy + (kuIkuti ? 1 : 0)],
+    /* Tambahan +1 "kuIkuti" DICABUT: dulu satu-satunya cara mengakui
+       penyalin lokal adalah menebaknya dari langganan. Sekarang server
+       mencatat penyalin sungguhan per sinyal, dan angka tebakan di atas
+       angka catatan justru membuatnya tidak bisa dicocokkan. */
+    ['disalin', r.pengcopy],
     /* SATU ANGKA UNTUK "MASIH HIDUP", bukan dua yang berdiri sendiri.
        Berjalan dan menunggu harga memang dua keadaan berbeda, tapi
        pertanyaan yang dibawa orang ke daftar kanal cuma satu: analis ini
@@ -855,7 +863,11 @@ function KartuAnalisa({ a, status, milikku, onSegarkan, performa, hargaKini }: {
             ) : (
               <span className="text-zinc-600">belum ada sinyal selesai</span>
             )}
-            <span>{a.jumlahPembeli} pengcopy</span>
+            {/* jumlahCopy, BUKAN jumlahPembeli: label ini berbunyi "pengcopy"
+                dan pembacanya percaya pada kata itu. Angka pembeli akses yang
+                menyamar sebagai angka penyalin membuat sinyal yang barusan
+                di-copy pemiliknya sendiri tetap tertulis nol. */}
+            <span>{a.jumlahCopy ?? 0} pengcopy</span>
             {!!a.jumlahGambar && (
               <span className="flex items-center gap-1"><Images className="size-3" /> {a.jumlahGambar} foto</span>
             )}

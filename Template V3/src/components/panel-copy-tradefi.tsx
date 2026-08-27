@@ -13,6 +13,7 @@ import {
 } from '@/lib/ukuran-posisi';
 import { daftarLangganan } from '@/lib/copy-langganan';
 import { catatCopy } from '@/lib/tanda-copy';
+import { catatDicopy } from '@/lib/analisa';
 
 /* ════════════════════════════════════════════════════════════════════════
    COPY TRADE — TRADE-FI (MT5)
@@ -155,6 +156,7 @@ export function PanelCopyTradeFi({ sinyalId, analisUid, pasangan, arah, entry, s
            dan sesudah beberapa hari tidak ada lagi yang bisa membedakannya
            dari order yang dipasang sendiri. */
         catatCopy(pengguna?.uid, { simbol: simbolBroker, arah, lot, analis: penulis, sinyal: sinyalId });
+        if (sinyalId) void catatDicopy(sinyalId);
         setSelesai(true);
         setKabar(`Terkirim — ${h.pesan}`);
       } else {

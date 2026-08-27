@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { daftarAnalisa, bukaIsi, type RingkasAnalisa } from '@/lib/analisa';
+import { daftarAnalisa, bukaIsi, catatDicopy, type RingkasAnalisa } from '@/lib/analisa';
 import { daftarLangganan } from '@/lib/copy-langganan';
 import { daftarSimbolMt5 } from '@/lib/pasar';
 import { simbolDasarMt5 } from '@/lib/simbol';
@@ -279,6 +279,7 @@ export function usePengikutCopy(uid: string | null | undefined, jeda = 60_000) {
                   sinyal: s.id,
                 });
                 catat(uid!, { ...jejak, hasil: 'terkirim', sebab: `${s.arah} ${h.lot} lot ${simbol} — ${hasil.pesan}` });
+                void catatDicopy(s.id);
               } else {
                 catat(uid!, { ...jejak, hasil: 'gagal', sebab: hasil.pesan || `Terminal menjawab: ${hasil.status}` });
               }

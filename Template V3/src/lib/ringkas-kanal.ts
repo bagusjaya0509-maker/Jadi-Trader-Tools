@@ -148,7 +148,10 @@ export function ringkasKanal(
 
   return {
     total: sinyal.length, profit, rugi, batal, berjalan,
-    pengcopy: sinyal.reduce((j, s) => j + (Number(s.jumlahPembeli) || 0), 0),
+    /* jumlahCopy = orang yang benar-benar menyalin (dicatat server per
+       uid), bukan pembeli akses. Kartu analis berkata "disalin" — angkanya
+       harus berasal dari penyalinan. */
+    pengcopy: sinyal.reduce((j, s) => j + (Number(s.jumlahCopy) || 0), 0),
     pending: pendingDaftar.length,
     pendingTerbaru: pendingDaftar.reduce((t, s) => Math.max(t, s.dibuat || 0), 0),
     winrate, gaya, risiko, alasanRisiko,
