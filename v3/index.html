@@ -153,12 +153,58 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
-    <script type="module" crossorigin src="./assets/index-llfHSToH.js"></script>
+
+    <!-- ── Meta Pixel ──────────────────────────────────────────────────
+         Dataset "Jadi Trader Tools - Web", pixel 1707400253897614.
+
+         SKRIP JARINGANNYA DITUNDA sampai `load`. Halaman depan ini jalur
+         muat pertama, dan fbevents.js ~70 KB dari domain pihak ketiga —
+         menaruhnya di jalur render berarti membayar dengan kecepatan
+         halaman untuk data yang tidak mendesak satu detik pun.
+
+         Yang TIDAK ditunda: pembuatan `fbq` itu sendiri. Ia menampung
+         panggilan di antrean, jadi peristiwa yang terjadi sebelum
+         skripnya tiba tidak hilang — ia terkirim begitu skripnya datang.
+         Tanpa ini, orang yang membayar dalam dua detik pertama tidak
+         pernah terhitung. -->
+    <script>
+      !function (f, b, e, v, n, t, s) {
+        if (f.fbq) return;
+        n = f.fbq = function () {
+          n.callMethod ? n.callMethod.apply(n, arguments) : n.queue.push(arguments);
+        };
+        if (!f._fbq) f._fbq = n;
+        n.push = n; n.loaded = !0; n.version = '2.0'; n.queue = [];
+        function muat() {
+          t = b.createElement(e); t.async = !0; t.src = v;
+          s = b.getElementsByTagName(e)[0]; s.parentNode.insertBefore(t, s);
+        }
+        if (b.readyState === 'complete') muat();
+        else f.addEventListener('load', muat);
+      }(window, document, 'script', 'https://connect.facebook.net/en_US/fbevents.js');
+      /* Hanya di situs tayang. localhost dan pratinjau tidak boleh masuk
+         hitungan: trafik sendiri akan tercampur ke data belajar Meta, dan
+         ikut terpakai waktu menyusun audiens serupa. Penjaga yang sama ada
+         di src/lib/pixel.ts — keduanya menembak dari tempat berbeda, jadi
+         satu penjaga saja tidak cukup. */
+      if (/(^|\.)jaditrader\.co\.id$/.test(window.location.hostname)) {
+        fbq('init', '1707400253897614');
+        fbq('track', 'PageView');
+      }
+    </script>
+    <!-- ── akhir Meta Pixel ────────────────────────────────────────── -->
+    <script type="module" crossorigin src="./assets/index-aZwf18H9.js"></script>
     <link rel="modulepreload" crossorigin href="./assets/react-C97iXi1P.js">
     <link rel="modulepreload" crossorigin href="./assets/firebase-C69VjKEY.js">
     <link rel="stylesheet" crossorigin href="./assets/index-CMN983ob.css">
   </head>
   <body>
+    <!-- Penanda Meta Pixel untuk peramban tanpa JavaScript.
+         WAJIB di <body>: di dalam <head> sebuah <noscript> cuma boleh
+         berisi link/style/meta, dan <img> di sana menghentikan parser
+         HTML milik Vite saat membangun. -->
+    <noscript><img height="1" width="1" style="display:none" alt=""
+      src="https://www.facebook.com/tr?id=1707400253897614&ev=PageView&noscript=1" /></noscript>
     <div id="root"></div>
   </body>
 </html>
