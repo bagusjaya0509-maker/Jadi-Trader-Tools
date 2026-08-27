@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  getFirestore, collection, doc, onSnapshot, orderBy, limit, query, where, Timestamp,
+  collection, doc, onSnapshot, orderBy, limit, query, where, Timestamp,
   type DocumentData,
 } from 'firebase/firestore';
-import { app } from '@/lib/firebase';
+import { ambilDb } from '@/lib/firestore';
 import { useAuth } from '@/lib/auth';
 import { usePosisiBinance, type OrderBursa } from '@/lib/admin';
 import {
@@ -47,7 +47,11 @@ const BATAS_PER_SUMBER = 2000;
 /* Berkas ini hanya diimpor halaman-halaman yang dimuat malas, jadi impor
    statis Firestore di atas TIDAK ikut ke jalur muat awal. getFirestore aman
    dipanggil lagi di sini — Firebase mengembalikan instans yang sama. */
-export const db = getFirestore(app);
+/* Lewat `ambilDb()`, bukan `getFirestore(app)` langsung: instansnya perlu
+   dimulai dengan cache lokal, dan itu HANYA bisa sebelum getFirestore
+   pertama. Satu pintu supaya urutannya tidak bergantung siapa yang
+   kebetulan berjalan duluan — lihat lib/firestore.ts. */
+export const db = ambilDb();
 
 function ms(v: unknown): number {
   if (v instanceof Timestamp) return v.toMillis();

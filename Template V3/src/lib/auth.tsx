@@ -3,7 +3,7 @@ import {
   onAuthStateChanged, signInWithPopup, signInWithRedirect, getRedirectResult, signInWithCustomToken, signOut,
   type User,
 } from 'firebase/auth';
-import { app, auth, penyediaGoogle, UID_PEMILIK } from '@/lib/firebase';
+import { auth, penyediaGoogle, UID_PEMILIK } from '@/lib/firebase';
 import { catatKabarPribadi } from '@/lib/kabar-pribadi';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -177,9 +177,14 @@ async function pantauLangganan(
   uid: string,
   saatBerubah: (l: Langganan) => void,
 ): Promise<() => void> {
-  const { getFirestore, doc, getDoc, setDoc, serverTimestamp, Timestamp, onSnapshot } =
+  const { doc, getDoc, setDoc, serverTimestamp, Timestamp, onSnapshot } =
     await import('firebase/firestore');
-  const db = getFirestore(app);
+  /* Lewat pintu yang sama dengan data.ts. Fungsi INI biasanya berjalan
+     lebih dulu (status login diperiksa sejak awal), jadi kalau ia memanggil
+     getFirestore sendiri, instans tanpa cache sudah terlanjur dibuat dan
+     cache-nya diam-diam tidak pernah aktif. */
+  const { ambilDb } = await import('@/lib/firestore');
+  const db = ambilDb();
   const ref = doc(db, 'langganan', uid);
 
   let cuplikan = await getDoc(ref);
@@ -231,8 +236,9 @@ async function pantauLangganan(
  *  memasukkan orangnya seolah berhasil — layar terbuka sebentar, lalu
  *  terkunci lagi begitu status sungguhannya tiba. */
 export async function mulaiPratinjau(uid: string): Promise<'mulai' | 'sudahPernah'> {
-  const { getFirestore, doc, getDoc, setDoc, serverTimestamp } = await import('firebase/firestore');
-  const db = getFirestore(app);
+  const { doc, getDoc, setDoc, serverTimestamp } = await import('firebase/firestore');
+  const { ambilDb } = await import('@/lib/firestore');
+  const db = ambilDb();
   const ref = doc(db, 'langganan', uid);
 
   const ada = await getDoc(ref);
