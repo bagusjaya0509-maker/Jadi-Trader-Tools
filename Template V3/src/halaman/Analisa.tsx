@@ -154,6 +154,14 @@ function bacaAngka(teks: string): number {
   return Number(t) || 0;
 }
 
+/** Risiko per sinyal pada model contoh papan peringkat: 1% dari modal
+ *  $1.000. Satu konstanta, karena angka ini muncul di tiga tempat (papan
+ *  peringkat, kalender performa, P/L berjalan di kartu) dan tiga salinan
+ *  yang suatu hari berselisih adalah cara paling sunyi membuat dua panel
+ *  melaporkan hasil berbeda untuk sinyal yang sama. Server memakai angka
+ *  yang sama di `hasilDolar`. */
+const RISIKO_SINYAL = 10;
+
 const WARNA_RISIKO: Record<string, string> = {
   Rendah: 'bg-emerald-500/10 text-emerald-400/90',
   Sedang: 'bg-amber-500/10 text-amber-400/90',
@@ -580,6 +588,11 @@ function KartuAnalisa({ a, status, milikku, onSegarkan, performa, hargaKini }: {
     setAlasanPanjang(el.scrollHeight > el.clientHeight + 1);
   }, [isi, buka, alasanBuka]);
   const perfPenulis = performa?.analis.find((x) => x.uid === a.uid) ?? null;
+  /* Level yang dijemput tombol chart MENANG atas yang datang di daftar:
+     yang dijemput selalu paling baru, dan untuk sinyal berbayar yang sudah
+     dibeli cuma jalur itu yang punya angkanya. */
+  const level = isi ?? a.isiTerbuka ?? null;
+
 
   /* Tautan chart yang MENJEMPUT levelnya dulu.
      ──────────────────────────────────────────────────────────────────────
@@ -658,6 +671,23 @@ function KartuAnalisa({ a, status, milikku, onSegarkan, performa, hargaKini }: {
   }
 
   const selesai = a.hasil === 'sl' || a.hasil === 'tp' || a.hasil === 'batal';
+  /* ── P/L BERJALAN ────────────────────────────────────────────────────
+     Model risikonya SAMA dengan papan peringkat dan kalender: kena SL =
+     −$10 (1% dari modal contoh $1.000), kena TP = rr × $10. Jadi angka ini
+     duduk di skala yang sama dengan "hasil" sinyal yang sudah selesai —
+     kalau skalanya berbeda, dua angka di kartu yang sama tidak bisa
+     dibandingkan padahal keduanya bertuliskan dolar.
+
+     Hanya untuk sinyal yang BENAR-BENAR sedang berjalan: yang belum
+     tersentuh entry tidak punya P/L (belum ada posisi), dan yang sudah
+     selesai sudah punya lencana hasilnya sendiri. */
+  const pnlJalan = (() => {
+    if (selesai || !level || !hargaKini || keadaanSinyal(a) !== 'jalan') return null;
+    const jarakSl = Math.abs(level.entry - level.sl);
+    if (!(jarakSl > 0) || !(level.entry > 0)) return null;
+    const gerak = (hargaKini - level.entry) * (a.arah === 'BUY' ? 1 : -1);
+    return Math.round((gerak / jarakSl) * RISIKO_SINYAL * 100) / 100;
+  })();
 
   return (
     /* `relative` wajib: lencana AI Agent duduk absolut di pojok panel. */
@@ -869,7 +899,21 @@ function KartuAnalisa({ a, status, milikku, onSegarkan, performa, hargaKini }: {
                     {persen(perfPenulis.winrate)}
                   </span>
                 </span>
-                <span><span className="angka text-zinc-300">{perfPenulis.total}</span> selesai</span>
+                {/* "N selesai" DICABUT — permintaan pemilik. Ia angka milik
+                    ANALISNYA, bukan milik sinyal yang sedang dibaca, dan di
+                    kartu sinyal ia cuma mengulang apa yang sudah dikatakan
+                    winrate di sebelahnya. Yang menjawab "rencana ini sedang
+                    ke mana?" adalah P/L berjalan — dan itu yang menggantikan
+                    tempatnya. */}
+                {pnlJalan !== null && (
+                  <span title={`Perkiraan hasil kalau ditutup sekarang, dengan model risiko yang sama dengan papan peringkat: kena SL = −${uang(RISIKO_SINYAL)}. Bukan uangmu sungguhan — lotmu sendiri yang menentukan.`}>
+                    P/L jalan{' '}
+                    <span className={cn('angka font-semibold',
+                      pnlJalan > 0 ? 'text-emerald-400' : pnlJalan < 0 ? 'text-red-400' : 'text-zinc-300')}>
+                      {pnlJalan > 0 ? '+' : ''}{uang(pnlJalan)}
+                    </span>
+                  </span>
+                )}
               </>
             ) : (
               <span className="text-zinc-600">belum ada sinyal selesai</span>
@@ -883,8 +927,8 @@ function KartuAnalisa({ a, status, milikku, onSegarkan, performa, hargaKini }: {
                 Entry ditampilkan HANYA kalau isinya memang sudah boleh
                 dilihat orang ini — untuk sinyal berbayar yang belum dibuka,
                 level adalah barang yang dijual. */}
-            {isi && isi.entry > 0 && (
-              <span>entry <span className="angka text-zinc-300">{fHarga(isi.entry)}</span></span>
+            {level && level.entry > 0 && (
+              <span>entry <span className="angka text-zinc-300">{fHarga(level.entry)}</span></span>
             )}
             {!!a.jumlahGambar && (
               <span className="flex items-center gap-1"><Images className="size-3" /> {a.jumlahGambar} foto</span>

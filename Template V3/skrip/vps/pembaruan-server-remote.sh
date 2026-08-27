@@ -22,6 +22,7 @@ pulihkan() {
 cp /tmp/kartu-agen.baru.js kartu-agen.js
 cp /tmp/pengikut-copy-vps.baru.js pengikut-copy-vps.js
 node /tmp/tambah-dicopy.mjs server.js || pulihkan
+node /tmp/isi-di-daftar.mjs server.js || pulihkan
 node --check server.js || pulihkan
 node --check kartu-agen.js || pulihkan
 node --check pengikut-copy-vps.js || pulihkan
@@ -35,5 +36,5 @@ echo "   GET /api/analisa -> $KODE"
 [ "$KODE" = "200" ] || pulihkan
 pm2 logs binance-backend --lines 40 --nostream 2>/dev/null | grep -q "\[pengikut\] siap" || pulihkan
 pm2 logs pemantau-telegram --lines 15 --nostream 2>/dev/null | grep -q "pemantau hidup" || pulihkan
-rm -f /tmp/kartu-agen.baru.js /tmp/pengikut-copy-vps.baru.js /tmp/tambah-dicopy.mjs /tmp/pembaruan-server-remote.sh
-echo "   ketiganya hidup: zona 2 kartu + rute dicopy + pengikut pelapor"
+rm -f /tmp/kartu-agen.baru.js /tmp/pengikut-copy-vps.baru.js /tmp/tambah-dicopy.mjs /tmp/isi-di-daftar.mjs /tmp/pembaruan-server-remote.sh
+echo "   hidup: zona 2 kartu + rute dicopy + pengikut pelapor + level di daftar"
