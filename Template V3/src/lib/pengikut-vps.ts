@@ -33,6 +33,8 @@ export interface StatusPengikutVps {
   pindai?: number;
   langganan?: { analisUid: string; analisNama: string; rugiMaks: number; sejak: number }[];
   log?: LogPengikutVps[];
+  /** Tiket yang dibuka pengikut server — bahan ikon copy di tabel posisi. */
+  tanda?: { tiket: string; analis: string; simbol: string; arah: string; lot: number }[];
 }
 
 function dasar() {

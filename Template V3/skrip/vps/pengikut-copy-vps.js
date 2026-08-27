@@ -126,6 +126,29 @@ module.exports = (app, { butuhLogin, batasLaju, express, DIR }) => {
     return id;
   }
 
+  /* Harga acuan dari lilin 1m terakhir di feed mana pun yang punya
+     simbolnya. Kasarnya boleh beberapa menit — pagar yang memakainya
+     menoleransi setengah sampai dua kali, bukan pip. */
+  function hargaAcuanKasar(dasar) {
+    try {
+      const k = JSON.parse(fs.readFileSync(path.join(DIR, 'mt5-klines.json'), 'utf8'));
+      for (const uid of Object.keys(k)) {
+        for (const lg of Object.keys(k[uid] || {})) {
+          for (const sim of Object.keys(k[uid][lg] || {})) {
+            if (sim !== dasar && !sim.startsWith(dasar)) continue;
+            const b = k[uid][lg][sim]['1m'] || k[uid][lg][sim]['5m'];
+            const d = b && b.data;
+            if (Array.isArray(d) && d.length) {
+              const c = Number(d[d.length - 1][4]);
+              if (c > 0) return c;
+            }
+          }
+        }
+      }
+    } catch (e) { /* berkasnya sedang ditulis — putaran depan */ }
+    return null;
+  }
+
   function cariPerintah(m, id) {
     const per = (m.perintah || {})[UID] || {};
     for (const lg of Object.keys(per)) {
@@ -194,11 +217,25 @@ module.exports = (app, { butuhLogin, batasLaju, express, DIR }) => {
       }
 
       /* C. Sinyal baru → salin. Terlama duluan, urutan analisnya. */
-      const antre = semua
+      const kandidat = semua
         .filter((s) => d.langganan[s.uid])
         .filter((s) => !d.sudah.includes(s.id))
         .filter((s) => !/USDT$/i.test(s.pasangan))
-        .filter((s) => s.hasil !== 'sl' && s.hasil !== 'tp' && s.hasil !== 'batal')
+        .filter((s) => s.hasil !== 'sl' && s.hasil !== 'tp' && s.hasil !== 'batal');
+
+      /* Yang terbit SEBELUM langganan dilewati — itu pagar #2 dan tetap
+         berdiri. Tapi dilewati DENGAN SUARA: pemilik pernah menunggu
+         salinan dari sinyal yang diposting tiga menit sebelum ia menekan
+         Ikuti, dan tidak ada satu baris pun yang menjelaskan kenapa
+         terminalnya diam. Aturan yang tidak kelihatan tidak bisa
+         dibedakan dari kerusakan. Dedup log menahan banjirnya. */
+      for (const s of kandidat) {
+        if (Number(s.dibuat) > Number(d.langganan[s.uid].sejak || 0)) continue;
+        catat(d, { sinyal: s.id, pasangan: s.pasangan, analis: d.langganan[s.uid].analisNama || 'Analis',
+          hasil: 'dilewati', sebab: 'Terbit sebelum kamu menekan Ikuti — hanya sinyal baru yang disalin, riwayat tidak.' });
+      }
+
+      const antre = kandidat
         .filter((s) => Number(s.dibuat) > Number(d.langganan[s.uid].sejak || 0))
         .sort((a, b) => a.dibuat - b.dibuat);
 
@@ -232,6 +269,20 @@ module.exports = (app, { butuhLogin, batasLaju, express, DIR }) => {
             return X === dasar || X.replace(/[a-z]+$/,'').toUpperCase() === dasar || X.startsWith(dasar);
           });
         const simbol = dikenal || dasar;
+
+        /* PAGAR KEWAJARAN HARGA. Sinyal "jangan lupa FM" ditulis dengan
+           titik ribuan yang salah urai: entry 4,626 di pasar 4.634. Kalau
+           sinyal seperti itu lolos ke sini, jarak SL 0,01 dolar membuat
+           lot = rugiMaks/jarak meledak ke MAKS_LOT — dan yang terpasang
+           adalah pending 1 lot di harga yang tidak akan pernah datang.
+           Sinyal yang levelnya di luar setengah–dua kali harga pasar
+           bukan rencana yang bisa diikuti; ia salah ketik. */
+        const acuan = hargaAcuanKasar(dasar);
+        if (acuan && (entry / acuan < 0.5 || entry / acuan > 2)) {
+          catat(d, { ...jejak, hasil: 'dilewati',
+            sebab: `Entry ${entry} terlalu jauh dari harga pasar ${dasar} (±${acuan}) — kemungkinan salah tulis angka, tidak disalin.` });
+          continue;
+        }
 
         const kontrak = kontrakBawaan(dasar) / (jenisCent ? 100 : 1);
         const jarak = Math.abs(entry - sl);
@@ -299,6 +350,14 @@ module.exports = (app, { butuhLogin, batasLaju, express, DIR }) => {
       aktif: true, jalan: d.jalan, pindai: d.pindai,
       langganan: Object.entries(d.langganan).map(([uid, l]) => ({ analisUid: uid, ...l })),
       log: d.log.slice().reverse(),
+      /* Tanda salinan ikut dikirim supaya tabel posisi bisa menempelkan
+         ikon copy pada tiket yang dibuka PENGIKUT SERVER. Catatan peramban
+         hanya tahu salinan yang dikirim peramban sendiri — dua pencatat
+         yang tidak saling membaca membuat ikonnya hilang justru pada
+         salinan yang paling otomatis. */
+      tanda: d.tanda
+        .filter((t) => t.aksi === 'BUKA' && t.tiket)
+        .map((t) => ({ tiket: t.tiket, analis: t.analis, simbol: t.simbol, arah: t.arah, lot: t.lot })),
     });
   });
 

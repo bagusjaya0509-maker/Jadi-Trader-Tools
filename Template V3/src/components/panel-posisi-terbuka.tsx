@@ -16,6 +16,7 @@ import { useOrderSementara, sapuYangSudahAda } from '@/lib/order-sementara';
 import { barisPendingKripto, rencanaLokal } from '@/lib/pending-kripto';
 import { useAuth } from '@/lib/auth';
 import { petaCopy } from '@/lib/tanda-copy';
+import { statusPengikutVps } from '@/lib/pengikut-vps';
 
 /* ════════════════════════════════════════════════════════════════════════
    POSISI TERBUKA — dipindah dari Jurnal ke Chart & Backtest
@@ -96,11 +97,35 @@ export function PanelPosisiTerbuka({ sumber, onSunting, onTutup, tanpaBingkai, m
      sekadar dibaca: catatan salinan lahir sebelum tiketnya ada (EA yang
      mengeksekusi, beberapa detik kemudian), jadi penjodohan pertamanya
      terjadi di sini — sekali, lalu tiketnya diikat permanen. */
-  const tandaCopy = useMemo(
+  const petaLokal = useMemo(
     () => petaCopy(pengguna?.uid, [...mt5.posisi, ...mt5.pending].map((p) => ({
       tiket: p.tiket, simbol: p.simbol, arah: p.arah, lot: p.lot,
     }))),
     [pengguna?.uid, mt5.posisi, mt5.pending]);
+  /* Salinan PENGIKUT SERVER dicatat di VPS, bukan di localStorage — tanpa
+     pembacaan ini, ikon copy justru hilang pada salinan yang paling
+     otomatis. Digabung dengan catatan lokal; server menang saat tiketnya
+     sama karena ialah yang benar-benar mengirim ordernya. */
+  const [petaVps, setPetaVps] = useState<Map<string, string>>(new Map());
+  useEffect(() => {
+    if (!pengguna) return;
+    let hidup = true;
+    function tarik() {
+      void statusPengikutVps().then((s) => {
+        if (!hidup || !s?.aktif || !s.tanda) return;
+        setPetaVps(new Map(s.tanda.map((t) => [t.tiket, t.analis])));
+      });
+    }
+    tarik();
+    const jam = setInterval(tarik, 30_000);
+    return () => { hidup = false; clearInterval(jam); };
+  }, [pengguna]);
+  const tandaCopy = useMemo(() => {
+    if (petaVps.size === 0) return petaLokal;
+    const g = new Map(petaLokal);
+    petaVps.forEach((v, k) => g.set(k, v));
+    return g;
+  }, [petaLokal, petaVps]);
 
   /* ── Order yang baru saja dikirim, belum terlihat di bursa ────────────
      Jembatan beberapa detik antara menekan Kirim dan putaran baca
