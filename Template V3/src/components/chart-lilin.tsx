@@ -379,6 +379,10 @@ export function ChartLilin({
      Melanggan ulang tiap render menumpuk pendengar di chart yang sama. */
   const klikRef = useRef(onKlikBar);
   const kosongRef = useRef(onKlikKosong);
+  /* Uji-kena garis entry posisi. Isinya ditulis ulang tiap render (butuh
+     daftar posisi terbaru), tapi wadahnya tetap — langganan klik di bawah
+     dipasang sekali seumur chart. */
+  const klikPosRef = useRef<(y?: number) => void>(() => {});
   /* Pemotret disimpan di ref, dan `bagikanFoto` juga — supaya efek pembuatan
      chart (yang sengaja berdependensi kosong agar chartnya tidak dibuat
      ulang tiap render) tetap memakai callback terbaru tanpa menjadikannya
@@ -518,6 +522,7 @@ export function ChartLilin({
     alatPrim.current = primAlat;
     c.subscribeClick((p) => {
       if (klikRef.current && typeof p.logical === 'number') klikRef.current(Math.round(p.logical));
+      klikPosRef.current(p.point?.y);
       kosongRef.current?.();
     });
 
@@ -1712,6 +1717,29 @@ export function ChartLilin({
      jadi dua langkah yang disengaja, bukan satu klik refleks. */
   const [garisAktif, setGarisAktif] = useState<string | null>(null);
 
+  /* ══ POSISI YANG SEDANG DISOROT ═════════════════════════════════
+     Dengan beberapa posisi terbuka sekaligus, chart penuh garis merah dan
+     hijau yang semuanya berbunyi "SL" dan "TP" — dan tidak ada apa pun di
+     layar yang memberi tahu SL yang mana milik entry yang mana. Yang
+     terbaca cuma levelnya, dan tiga level berdempetan terlihat seperti satu
+     kelompok padahal milik tiga order berbeda.
+
+     Mengklik garis entry menyorot SATU posisi: entry, SL, dan TP-nya
+     berubah biru dan menebal bersamaan, jadi kelompoknya terbaca sekali
+     lihat. Warna sorotnya sengaja BUKAN hijau atau merah — dua warna itu
+     sudah dipakai untuk arah dan untung/rugi, dan memakainya untuk arti
+     ketiga membuat ketiganya kabur.
+
+     Sorotnya SEMENTARA: klik di tempat lain, tekan Esc, atau diamkan saja.
+     Sorot yang menetap berarti pemakainya harus ingat mematikannya, dan
+     yang lupa akan membaca posisi biru sebagai jenis posisi yang berbeda. */
+  const [sorotPos, setSorotPos] = useState<string | null>(null);
+  const sorotRef = useRef<string | null>(null);
+  const aturSorot = useCallback((t: string | null) => {
+    if (sorotRef.current === t) return;
+    sorotRef.current = t; setSorotPos(t);
+  }, []);
+
   const garisPosMt5 = useRef<IPriceLine[]>([]);
   /* Price line untuk garis SERET (Entry/SL/TP tiket & order yang disunting).
      Terpisah dari garisPosMt5 supaya keduanya bisa dibongkar sendiri-sendiri:
@@ -2002,6 +2030,58 @@ export function ChartLilin({
     chart.current?.applyOptions({ handleScroll: false, handleScale: false });
   }
 
+  /* Dipasang tiap render supaya daftar posisinya selalu yang terbaru.
+     Ambangnya PIKSEL (bukan harga): yang menentukan "kena" adalah jarak di
+     layar, dan ambang dalam harga akan salah di tiap zoom dan tiap simbol.
+     Yang TERDEKAT yang menang — di akun cent beberapa entry bisa berjarak
+     beberapa piksel saja, dan memilih yang pertama ketemu berarti menyorot
+     posisi tetangganya. */
+  klikPosRef.current = (y) => {
+    const s = seri.current;
+    const daftar = acuan.current.posisiMt5 ?? [];
+    if (!s || !daftar.length || y == null) { aturSorot(null); return; }
+    let kena: string | null = null;
+    let dekat = 7;
+    for (const p of daftar) {
+      if (!p.entry) continue;
+      const ye = s.priceToCoordinate(p.entry);
+      if (ye == null) continue;
+      const d = Math.abs(ye - y);
+      if (d < dekat) { dekat = d; kena = p.tiket; }
+    }
+    /* null = klik di tempat lain, dan itu memang perintah "kembali seperti
+       semula" — bukan keadaan yang perlu dipertahankan. */
+    aturSorot(kena);
+  };
+
+  /* Posisi yang tertutup tidak boleh meninggalkan sorot menggantung: sorot
+     ke tiket yang sudah tidak ada cuma membuat efek di bawah bekerja
+     sia-sia, dan warnanya menempel ke posisi lain begitu tiketnya dipakai
+     ulang. */
+  useEffect(() => {
+    if (sorotRef.current && !(posisiMt5 ?? []).some((p) => p.tiket === sorotRef.current)) {
+      aturSorot(null);
+    }
+  }, [posisiMt5, aturSorot]);
+
+  /* Bubar sendiri kalau didiamkan. Esc disediakan karena itu tombol yang
+     sudah dipakai membatalkan seretan garis di halaman ini — satu tombol,
+     satu arti.
+
+     Yang sedang DIPEGANG atau punya ubahan belum diputuskan dilewati:
+     warnanya justru sedang dipakai untuk melihat SL/TP mana yang digeser,
+     dan mencabutnya di tengah seretan persis membuang gunanya. */
+  useEffect(() => {
+    if (!sorotPos) return;
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') aturSorot(null); };
+    window.addEventListener('keydown', esc);
+    const t = setTimeout(() => {
+      if (seretUbah.current || ubahRef.current) return;
+      aturSorot(null);
+    }, 9000);
+    return () => { window.removeEventListener('keydown', esc); clearTimeout(t); };
+  }, [sorotPos, aturSorot]);
+
   /* ── Garis posisi MT5: PRICE LINE, bukan overlay DOM ────────────────
      createPriceLine menempel sampai KE DALAM sumbu harga dengan label
      kotak yang ikut bergerak bersama kanvas — persis garis posisi
@@ -2016,9 +2096,9 @@ export function ChartLilin({
     const s = seri.current;
     if (!s) return;
     const buat = (price: number, color: string, title: string, lineStyle: number,
-                  kunci?: string, axisLabelVisible = true) => {
+                  kunci?: string, axisLabelVisible = true, tebal: 1 | 2 = 1) => {
       try {
-        const g = s.createPriceLine({ price, color, lineWidth: 1, lineStyle, axisLabelVisible, title });
+        const g = s.createPriceLine({ price, color, lineWidth: tebal, lineStyle, axisLabelVisible, title });
         garisPosMt5.current.push(g);
         if (kunci) petaGarisMt5.current.set(kunci, g);
       } catch { /* seri sedang dibongkar ulang */ }
@@ -2054,9 +2134,9 @@ export function ChartLilin({
     const tickG = fmtG?.minMove && fmtG.minMove > 0 ? fmtG.minMove : 1e-6;
     const petakG = (x: number) => Math.round(x / tickG);
 
-    type Level = { price: number; color: string; title: string; style: number; kunci: string[] };
+    type Level = { price: number; color: string; title: string; style: number; kunci: string[]; sorot: boolean };
     const unik = new Map<string, Level>();
-    const kumpul = (price: number, color: string, title: string, style: number, kunci?: string) => {
+    const kumpul = (price: number, color: string, title: string, style: number, kunci?: string, sorot = false) => {
       const k = `${title}|${color}|${petakG(price)}`;
       const ada = unik.get(k);
       /* Tiket yang berbagi garis DIDAFTARKAN SEMUA. Peta ini yang dipakai
@@ -2066,16 +2146,20 @@ export function ChartLilin({
          memang begitu yang terlihat benar, dan begitu servernya menjawab,
          level yang berubah otomatis memisahkan diri jadi garis sendiri. */
       if (ada) { if (kunci) ada.kunci.push(kunci); return; }
-      unik.set(k, { price, color, title, style, kunci: kunci ? [kunci] : [] });
+      unik.set(k, { price, color, title, style, kunci: kunci ? [kunci] : [], sorot });
     };
 
+    /* Biru langit, bukan biru tua: latarnya zinc-950, dan biru gelap di
+       sana terbaca sebagai garis yang REDUP — kebalikan dari maksudnya. */
+    const SOROT = '#60a5fa';
     daftar.forEach((p) => {
       const u = ubahRef.current && ubahRef.current.tiket === p.tiket ? ubahRef.current : null;
-      kumpul(p.entry, p.arah === 'BUY' ? '#10b981' : '#f87171', '', 2);
+      const nyala = sorotPos === p.tiket;
+      kumpul(p.entry, nyala ? SOROT : p.arah === 'BUY' ? '#10b981' : '#f87171', '', 2, undefined, nyala);
       const slPos = u ? u.sl : p.sl;
-      if (slPos > 0) kumpul(slPos, '#f87171', 'SL', 1, p.tiket + '-sl');
+      if (slPos > 0) kumpul(slPos, nyala ? SOROT : '#f87171', 'SL', 1, p.tiket + '-sl', nyala);
       const tpPos = u ? u.tp : p.tp;
-      if (tpPos > 0) kumpul(tpPos, '#10b981', 'TP', 1, p.tiket + '-tp');
+      if (tpPos > 0) kumpul(tpPos, nyala ? SOROT : '#10b981', 'TP', 1, p.tiket + '-tp', nyala);
     });
 
     /* ── LABEL YANG AKAN BERTABRAKAN DISEMBUNYIKAN ──────────────────────
@@ -2102,7 +2186,11 @@ export function ChartLilin({
        muncul. */
     const TINGGI_LABEL = 15;
     const urut = [...unik.values()].sort((a, b) => {
-      const bobot = (x: Level) => (x.title ? 0 : 1); // SL/TP dulu, entry belakangan
+      /* Yang disorot paling depan: kalau harus memilih satu angka untuk
+         sekelompok level berdempetan, yang sedang DIMINTA dilihat orangnya
+         menang atas yang kebetulan ada di dekatnya. Sesudah itu urutan lama
+         berlaku apa adanya — SL/TP dulu, entry belakangan. */
+      const bobot = (x: Level) => (x.sorot ? 0 : x.title ? 1 : 2);
       return bobot(a) - bobot(b) || b.price - a.price;
     });
     const yTerpakai: number[] = [];
@@ -2113,7 +2201,7 @@ export function ChartLilin({
         if (yTerpakai.some((v) => Math.abs(v - y) < TINGGI_LABEL)) label = false;
         else yTerpakai.push(y);
       }
-      buat(lv.price, lv.color, lv.title, lv.style, undefined, label);
+      buat(lv.price, lv.color, lv.title, lv.style, undefined, label, lv.sorot ? 2 : 1);
       const g = garisPosMt5.current[garisPosMt5.current.length - 1];
       if (g) lv.kunci.forEach((k) => petaGarisMt5.current.set(k, g));
     });
@@ -2122,7 +2210,7 @@ export function ChartLilin({
       garisPosMt5.current = [];
       petaGarisMt5.current.clear();
     };
-  }, [posisiMt5, ubah]);
+  }, [posisiMt5, ubah, sorotPos]);
 
   /* ── Garis seret ikut menembus ke SUMBU HARGA ───────────────────────
      Overlay DOM di atas kanvas menggambar garis dan gagangnya, tapi
@@ -2470,7 +2558,8 @@ export function ChartLilin({
                else garisRef.current.delete('lab-' + p.tiket);
              }}
              className={cn('angka pointer-events-none absolute left-3 z-10 pr-1.5 text-right text-[10.5px] font-semibold tabular-nums',
-               p.arah === 'BUY' ? 'text-emerald-400' : 'text-red-400')}
+               sorotPos === p.tiket ? 'text-blue-400'
+                 : p.arah === 'BUY' ? 'text-emerald-400' : 'text-red-400')}
              style={{ transform: 'translateY(-100%)', visibility: 'hidden',
                textShadow: '0 1px 4px rgba(9,9,11,.95), 0 0 2px rgba(9,9,11,.9)' }}>
           {/* Arah dan lot saja. Nomor tiketnya dibuang bersama yang di
