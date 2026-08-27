@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { jejak } from '@/lib/pixel';
 import { auth } from '@/lib/firebase';
 import { bacaKoneksi, PROXY_BAWAAN } from '@/lib/koneksi';
 
@@ -119,6 +120,36 @@ export async function mintaAkses(opsi: {
   });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error || `Server menjawab ${r.status}`);
+
+  /* ── Peristiwa Meta dicatat DI SINI, bukan di halaman pemanggil ───────
+     Dua halaman memanggil fungsi ini — /akses (formulir) dan /aktivasi
+     (pulang dari Lynk). Menaruh pencatatannya di masing-masing halaman
+     berarti dua tempat yang harus ingat, dan halaman ketiga besok pasti
+     lupa. Di sini satu tempat menutupi semuanya.
+
+     `sudahAda` DILEWATI dengan sengaja: itu permintaan yang sudah pernah
+     dikirim, bukan pembelian baru. Menghitungnya lagi akan menggandakan
+     angka konversi dan membuat Meta belajar dari peristiwa yang tidak
+     pernah terjadi.
+
+     Pembedaan `bayar`:
+       bukti 'lynk' → PURCHASE. Orangnya baru saja membayar di Lynk dan
+                      dikirim balik ke /aktivasi. Ini uang sungguhan.
+       tanpa itu    → INITIATE_CHECKOUT. Ia mengaku sudah bayar lewat
+                      formulir dan masih menunggu pemilik memeriksanya.
+                      Belum tentu benar, jadi belum boleh disebut
+                      pembelian.
+
+     NILAI (value) belum dikirim, dan itu disengaja. Paket mana yang
+     dibeli baru diketahui saat pemilik menyetujuinya di Maintenance —
+     bukan di peramban. Mengarang nilainya di sini berarti mengajari Meta
+     angka yang salah. Nilainya menyusul lewat Conversions API dari VPS
+     pada saat persetujuan. */
+  if (!j.sudahAda) {
+    if (opsi.jenis === 'gratis') jejak('Lead');
+    else if ((opsi.bukti ?? '').startsWith('lynk')) jejak('Purchase');
+    else jejak('InitiateCheckout');
+  }
   return j;
 }
 
