@@ -101,3 +101,42 @@ export async function setJalanVps(jalan: boolean): Promise<boolean> {
     return r.ok;
   } catch { return false; }
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   PENGIKUT ANALIS — "berapa akun yang sedang menyalin analis ini"
+   ════════════════════════════════════════════════════════════════════════
+   Beda dari hitungan salinan per sinyal: begitu seseorang menekan Ikuti,
+   ia sudah menyalin SELURUH isi analis itu — market order, pending, dan
+   pembatalan — jadi ia terhitung satu penyalin pada detik itu juga, bukan
+   menunggu sinyal pertama terbit.
+
+   Yang tersimpan di server daftar uid (supaya sekali-per-orang tegak dan
+   berhenti mengikuti benar-benar mengurangi angkanya); yang KELUAR cuma
+   jumlahnya. Siapa mengikuti siapa bukan urusan orang lain.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/** Menyalakan/mematikan langganan di server. Diam saat gagal — hitungan
+ *  tampilan tidak boleh menggagalkan penyimpanan setelan yang sudah
+ *  berhasil di perangkat. */
+export async function kirimIkuti(analisUid: string, ikut: boolean): Promise<void> {
+  const t = await token();
+  if (!t) return;
+  try {
+    await fetch(`${dasar()}/api/analis/ikuti`, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ analisUid, ikut }),
+    });
+  } catch { /* diam */ }
+}
+
+/** Jumlah penyalin per analis. Publik, tanpa login — kartu analis dibaca
+ *  juga oleh pengunjung yang belum masuk. */
+export async function jumlahPengikut(): Promise<Record<string, number>> {
+  try {
+    const r = await fetch(`${dasar()}/api/analis/pengikut`);
+    if (!r.ok) return {};
+    const j = await r.json();
+    return (j && j.jumlah) || {};
+  } catch { return {}; }
+}

@@ -8,7 +8,7 @@ import { useAkunMt5 } from '@/lib/akun';
 import {
   kontrakBawaan, kontrakBerlaku, deteksiJenisAkun, lotUntukCopy,
 } from '@/lib/ukuran-posisi';
-import { simpanLanggananVps, hapusLanggananVps } from '@/lib/pengikut-vps';
+import { simpanLanggananVps, hapusLanggananVps, kirimIkuti } from '@/lib/pengikut-vps';
 import {
   bacaLangganan, simpanLangganan, hapusLangganan, type LanggananCopy,
 } from '@/lib/copy-langganan';
@@ -112,6 +112,10 @@ export function PanelCopyAnalis({ analisUid, analisNama, contohPasangan, tutup }
        gagal jaringan tidak boleh membatalkan penyimpanan lokal yang
        sudah berhasil. */
     void simpanLanggananVps({ analisUid, analisNama, rugiMaks: isi.rugiMaks });
+    /* Dicatat sebagai PENYALIN pada detik ini juga — bukan menunggu sinyal
+       pertama terbit. Orang yang menekan ini sudah menyalin seluruh isi
+       analisnya: market order, pending, dan pembatalan. */
+    void kirimIkuti(analisUid, true);
     setLangganan(isi);
     setKabar(`Tersimpan. Tiap sinyal ${analisNama} disalin dengan rugi dibatasi ${uang(rugiMaks)}.`);
   }
@@ -120,6 +124,7 @@ export function PanelCopyAnalis({ analisUid, analisNama, contohPasangan, tutup }
     if (!pengguna) return;
     hapusLangganan(pengguna.uid, analisUid);
     void hapusLanggananVps(analisUid);
+    void kirimIkuti(analisUid, false);
     setLangganan(null);
     setKabar('Berhenti mengikuti. Tidak ada sinyal analis ini yang akan disalin.');
   }

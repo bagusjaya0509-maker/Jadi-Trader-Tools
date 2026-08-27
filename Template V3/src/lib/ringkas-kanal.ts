@@ -103,6 +103,9 @@ export function ringkasKanal(
   sinyal: RingkasAnalisa[],
   perf: PerformaAnalis | null,
   risikoPerSinyal: number,
+  /** Berapa akun yang sedang menyalin analis ini (dari server).
+   *  undefined = belum terbaca; ditampilkan sebagai tanda hubung. */
+  pengikut?: number,
 ): RingkasKanal {
   const profit = sinyal.filter((s) => s.hasil === 'tp').length;
   const rugi = sinyal.filter((s) => s.hasil === 'sl').length;
@@ -149,18 +152,19 @@ export function ringkasKanal(
 
   return {
     total: sinyal.length, profit, rugi, batal, berjalan,
-    /* jumlahCopy = orang yang benar-benar menyalin (dicatat server per
-       uid), bukan pembeli akses. Kartu analis berkata "disalin" — angkanya
-       harus berasal dari penyalinan.
+    /* "DISALIN" = BERAPA AKUN YANG SEDANG MENYALIN ANALIS INI, bukan
+       berapa kali order dieksekusi.
+       ────────────────────────────────────────────────────────────────
+       Orang yang menekan Ikuti sudah menyalin SELURUH isi analisnya —
+       market order, pending, pembatalan — sejak detik itu. Menunggu sinyal
+       pertama terbit dulu baru menghitungnya membuat kartu berkata "0
+       disalin" kepada orang yang barusan menekan Ikuti, dan angka yang
+       membantah tindakan pembacanya sendiri berhenti dipercaya.
 
-       Kalau TIDAK SATU PUN sinyal membawa medannya, servernya belum punya
-       rute pencatat itu — dan yang jujur ditampilkan bukan "0 disalin"
-       melainkan tanda hubung. Nol yang berarti "belum ada yang menyalin"
-       dan nol yang berarti "kami belum bisa menghitung" adalah dua kabar
-       yang sangat berbeda bagi orang yang memilih siapa ditiru. */
-    pengcopy: sinyal.some((s) => s.jumlahCopy !== undefined)
-      ? sinyal.reduce((j, s) => j + (Number(s.jumlahCopy) || 0), 0)
-      : null,
+       Datang dari luar (`pengikut`), bukan dijumlah dari sinyal: langganan
+       itu milik ANALISNYA, bukan milik sinyal mana pun. null = server
+       belum melaporkan — tanda hubung, bukan nol. */
+    pengcopy: pengikut ?? null,
     pending: pendingDaftar.length,
     pendingTerbaru: pendingDaftar.reduce((t, s) => Math.max(t, s.dibuat || 0), 0),
     winrate, gaya, risiko, alasanRisiko,

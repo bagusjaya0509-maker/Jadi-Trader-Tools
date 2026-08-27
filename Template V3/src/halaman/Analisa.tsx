@@ -23,7 +23,7 @@ import { PotongGambar } from '@/components/potong-gambar';
 import { HitungPosisi } from '@/components/hitung-posisi';
 import { PanelCopyAnalis } from '@/components/panel-copy-analis';
 import { StatusAutoCopy } from '@/components/status-auto-copy';
-import { hapusLanggananVps } from '@/lib/pengikut-vps';
+import { hapusLanggananVps, kirimIkuti, jumlahPengikut } from '@/lib/pengikut-vps';
 import { LogAktivitas } from '@/components/log-aktivitas';
 import { PanelCopyTradeFi } from '@/components/panel-copy-tradefi';
 import { daftarLangganan, hapusLangganan, type LanggananCopy } from '@/lib/copy-langganan';
@@ -305,8 +305,8 @@ function BarisHitung({ r, kuIkuti: _kuIkuti }: { r: RingkasKanal; kuIkuti?: bool
                 ? 'Sinyal yang masih hidup: sedang berjalan + menunggu harga'
                 : nama === 'disalin'
                 ? (nilai === null
-                    ? 'Server ini belum punya pencatat penyalinan — angkanya belum bisa dihitung, dan tanda hubung lebih jujur daripada nol.'
-                    : 'Berapa ORANG yang benar-benar menyalin sinyal kanal ini ke terminalnya, dihitung sekali per orang per sinyal.')
+                    ? 'Belum terbaca dari server — tanda hubung, bukan nol.'
+                    : 'Berapa akun yang sedang menyalin analis ini: menekan Ikuti berarti menyalin SEMUA yang ia posting — market order, pending, maupun pembatalan.')
                 : nama === 'batal' ? 'Ditarik penulisnya sebelum harganya datang' : undefined}>
           <span className="angka text-[13px] font-semibold tabular-nums text-zinc-300">{nilai ?? '—'}</span>
           <span className="ml-1 text-[9.5px] text-zinc-600">{nama}</span>
@@ -1517,6 +1517,7 @@ function SignalDiikuti({ keRuang, onKosong }: {
        membatalkan apa-apa — order tetap masuk, dan pemiliknya tidak punya
        petunjuk kenapa. */
     void hapusLanggananVps(uid);
+    void kirimIkuti(uid, false);
     setDaftar(daftarLangganan(pengguna.uid));
   }
 
@@ -1876,6 +1877,18 @@ export default function Analisa() {
      simbol berakhiran USDT/USDC/BUSD/FDUSD, sisanya dicari di peta MT5.
      Menampilkan harga Binance untuk XAUUSD Exness adalah angka yang
      terlihat benar sambil menunjuk pasar yang berbeda. */
+  /* Hitungan penyalin per analis — dari server, bukan dari perangkat ini.
+     Disegarkan berkala supaya kartu tidak membeku di angka saat halaman
+     dibuka; 45 detik cukup karena yang berubah adalah orang menekan Ikuti,
+     bukan harga. */
+  const [pengikutPeta, setPengikutPeta] = useState<Record<string, number>>({});
+  useEffect(() => {
+    let hidup = true;
+    const tarik = () => { void jumlahPengikut().then((j) => { if (hidup) setPengikutPeta(j); }); };
+    tarik();
+    const jam = setInterval(tarik, 45_000);
+    return () => { hidup = false; clearInterval(jam); };
+  }, []);
   const hargaPasar = useHargaPasar(daftar.map((a) => a.pasangan));
   const hargaMt5 = useHargaTradeFi();
   /* Pasangan sinyal ditulis apa adanya oleh penulisnya ("XAUUSD"), sementara
@@ -3554,7 +3567,7 @@ export default function Analisa() {
               const mulaiPosting = Math.min(...waktuPosting);
               const terakhirPosting = Math.max(...waktuPosting);
               const p = perfDari(uid);
-              const r = ringkasKanal(sinyal, p, risikoPerSinyal);
+              const r = ringkasKanal(sinyal, p, risikoPerSinyal, pengikutPeta[uid]);
               /* Warna aksen kartu mengikuti arah hasilnya — sama dengan
                  warna kurvanya, supaya latar dan garis tidak berselisih. */
               const warnaAksen = p && p.hasilDolar < 0 ? '#f87171' : '#34d399';
