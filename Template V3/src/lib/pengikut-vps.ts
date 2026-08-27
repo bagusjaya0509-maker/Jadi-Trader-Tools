@@ -131,12 +131,20 @@ export async function kirimIkuti(analisUid: string, ikut: boolean): Promise<void
 }
 
 /** Jumlah penyalin per analis. Publik, tanpa login — kartu analis dibaca
- *  juga oleh pengunjung yang belum masuk. */
-export async function jumlahPengikut(): Promise<Record<string, number>> {
+ *  juga oleh pengunjung yang belum masuk.
+ *
+ *  MEMULANGKAN null SAAT GAGAL, bukan objek kosong — dan bedanya penting.
+ *  Server hanya menyebut analis yang PUNYA pengikut; analis tanpa pengikut
+ *  tidak punya kunci sama sekali. Jadi objek kosong berarti "tidak ada
+ *  siapa pun yang mengikuti siapa pun" (angka nol yang sah), sementara
+ *  null berarti "kami belum bisa bertanya". Menyamakan keduanya membuat
+ *  seluruh kartu menulis tanda hubung padahal jawabannya nol — persis
+ *  yang terjadi 27 Agu 2026. */
+export async function jumlahPengikut(): Promise<Record<string, number> | null> {
   try {
     const r = await fetch(`${dasar()}/api/analis/pengikut`);
-    if (!r.ok) return {};
+    if (!r.ok) return null;
     const j = await r.json();
     return (j && j.jumlah) || {};
-  } catch { return {}; }
+  } catch { return null; }
 }

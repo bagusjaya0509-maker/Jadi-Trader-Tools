@@ -1881,10 +1881,17 @@ export default function Analisa() {
      Disegarkan berkala supaya kartu tidak membeku di angka saat halaman
      dibuka; 45 detik cukup karena yang berubah adalah orang menekan Ikuti,
      bukan harga. */
-  const [pengikutPeta, setPengikutPeta] = useState<Record<string, number>>({});
+  /* null = BELUM TERBACA. Peta kosong ({}) berarti sesuatu yang sangat
+     berbeda: terbaca, dan memang belum ada satu pun pengikut. Server hanya
+     menyebut analis yang punya pengikut, jadi kunci yang TIDAK ADA sama
+     dengan nol — bukan "tidak diketahui". Menyamakan keduanya membuat
+     semua kartu menulis "—" padahal jawaban yang benar "0". */
+  const [pengikutPeta, setPengikutPeta] = useState<Record<string, number> | null>(null);
   useEffect(() => {
     let hidup = true;
-    const tarik = () => { void jumlahPengikut().then((j) => { if (hidup) setPengikutPeta(j); }); };
+    const tarik = () => {
+      void jumlahPengikut().then((j) => { if (hidup && j) setPengikutPeta(j); });
+    };
     tarik();
     const jam = setInterval(tarik, 45_000);
     return () => { hidup = false; clearInterval(jam); };
@@ -3567,7 +3574,10 @@ export default function Analisa() {
               const mulaiPosting = Math.min(...waktuPosting);
               const terakhirPosting = Math.max(...waktuPosting);
               const p = perfDari(uid);
-              const r = ringkasKanal(sinyal, p, risikoPerSinyal, pengikutPeta[uid]);
+              /* Petanya sudah terbaca → kunci yang tidak ada berarti NOL.
+                 Belum terbaca → undefined, dan kartunya menulis "—". */
+              const r = ringkasKanal(sinyal, p, risikoPerSinyal,
+                pengikutPeta ? (pengikutPeta[uid] ?? 0) : undefined);
               /* Warna aksen kartu mengikuti arah hasilnya — sama dengan
                  warna kurvanya, supaya latar dan garis tidak berselisih. */
               const warnaAksen = p && p.hasilDolar < 0 ? '#f87171' : '#34d399';
