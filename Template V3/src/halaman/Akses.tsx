@@ -1,4 +1,5 @@
 import { HARGA_PERINTIS_TEKS } from '@/lib/harga-akses';
+import { jejak } from '@/lib/pixel';
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
@@ -520,7 +521,13 @@ export default function Akses() {
                 rel="noopener noreferrer"
                 aria-disabled={!pahamRisiko}
                 title={!pahamRisiko ? 'Centang persetujuan risiko dulu' : undefined}
-                onClick={(e) => { if (!pahamRisiko) e.preventDefault(); }}
+                onClick={(e) => {
+                  if (!pahamRisiko) { e.preventDefault(); return; }
+                  /* Langkah checkout yang sesungguhnya: dari sini orangnya
+                     berangkat ke Lynk untuk membayar. Klik yang tertahan
+                     centang risiko TIDAK dihitung — ia tidak ke mana-mana. */
+                  jejak('InitiateCheckout');
+                }}
                 className={cn(
                   'inline-flex items-center gap-2 rounded-md px-5 py-2.5 text-[13px] font-semibold transition-colors',
                   !pahamRisiko
