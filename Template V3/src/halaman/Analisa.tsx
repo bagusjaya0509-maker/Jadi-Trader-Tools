@@ -3530,11 +3530,33 @@ export default function Analisa() {
               hilang sendiri mengikuti ruang — 1 kolom di ponsel sampai 5 di
               layar lebar, tanpa satu pun titik henti ditulis tangan.
 
-              `max-w-[106rem]` yang mengunci atasnya di LIMA. Enam kolom
-              butuh 6x272px + 5x16px jarak = 1712px; dengan wadah berhenti
-              di 1696px, kolom keenam tidak akan pernah muat. Di situ tiap
-              kartu 326px — dan itu lebar TERBESAR yang mungkin terjadi di
-              monitor sebesar apa pun.
+              BATAS ATASNYA DINAIKKAN 106rem -> 160rem, dan barisnya
+              DIPUSATKAN (27 Agu 2026, keluhan pemilik di monitor ultrawide).
+
+              Batas lama mengunci kolomnya di LIMA. Di layar 1920px itu pas,
+              tapi di monitor 3440px wadahnya berhenti di 1696px SEMENTARA
+              HALAMANNYA TIDAK — jadi kartunya menggerombol di kiri dan
+              separuh layar kanan kosong melompong. Yang salah bukan ukuran
+              kartunya (itu sudah benar), melainkan posisinya.
+
+              Yang diperbaiki dua hal, dan keduanya perlu:
+
+                · `mx-auto w-full` — begitu ruangnya melebihi wadah, sisanya
+                  dibagi RATA kiri-kanan alih-alih ditumpuk semua di kanan.
+                  Tanpa `w-full`, `mx-auto` tidak berbuat apa-apa pada grid
+                  yang lebarnya sudah otomatis.
+
+                · 160rem (2560px) — memberi ruang sampai SEMBILAN kolom
+                  sebelum pemusatan mengambil alih. Lebar kartunya sendiri
+                  TIDAK berubah: auto-fill menambah kolom, bukan melebarkan
+                  yang ada, jadi kartu tetap 272-326px persis seperti
+                  sekarang di layar mana pun.
+
+              Kenapa masih dibatasi sama sekali: tanpa batas, monitor 5K
+              memberi belasan kolom dalam satu baris — dan mata yang harus
+              menyapu selebar itu berhenti bisa membandingkan dua kartu yang
+              berjauhan. Sembilan sudah lebih dari cukup untuk daftar analis
+              yang jumlahnya belasan.
 
               LEBAR MINIMUMNYA BEDA di bawah `lg`, dan itu bukan kerewelan.
               Dengan satu minimum 17rem, tablet 768px (yang ruangnya tinggal
@@ -3564,7 +3586,7 @@ export default function Analisa() {
               Sisa ruang di kanan pada layar sangat lebar memang disengaja.
               Itu harga dari kartu yang tetap terbaca; meregangkannya sampai
               tepi cuma memindahkan masalahnya ke dalam kartu. */}
-          <div className="grid max-w-[106rem] gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(100%,15rem),1fr))] lg:[grid-template-columns:repeat(auto-fill,minmax(min(100%,17rem),1fr))]">
+          <div className="grid mx-auto w-full max-w-[160rem] gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(100%,15rem),1fr))] lg:[grid-template-columns:repeat(auto-fill,minmax(min(100%,17rem),1fr))]">
             {/* Agen yang BELUM punya sinyal, di depan. Begitu tembusan
                 pertamanya datang ia otomatis pindah jadi kartu analis biasa
                 lewat `kanal` — saringan di bawah yang mengurusnya, jadi
