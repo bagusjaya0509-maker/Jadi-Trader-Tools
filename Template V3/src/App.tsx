@@ -4,6 +4,7 @@ import { Loader2 } from 'lucide-react';
 import { PenyediaAuth, useAuth } from '@/lib/auth';
 import { modePreview } from '@/lib/preview';
 import { catatKunjungan } from '@/lib/admin';
+import { jejakHalaman } from '@/lib/pixel';
 import { AppShell } from '@/components/app-shell';
 import { useMulti, POLOS } from '@/lib/multi-chart';
 import Pendaratan from '@/halaman/Pendaratan';
@@ -166,6 +167,11 @@ function KeAtas() {
   useEffect(() => {
     const halaman = pathname === '/' ? 'v3-beranda' : 'v3-' + pathname.replace(/^\/+/, '');
     catatKunjungan(halaman);
+    /* Meta Pixel ikut di sini, alasan yang sama: BrowserRouter tidak memuat
+       ulang halaman, jadi PageView di <head> cuma menyala sekali seumur
+       kunjungan. Tanpa baris ini seluruh perjalanan sesudah halaman
+       pertama tidak terlihat sama sekali oleh Meta. */
+    jejakHalaman();
   }, [pathname]);
 
   /* Penanda dibersihkan setelah satu rute berhasil dimuat. Kalau dibiarkan,
