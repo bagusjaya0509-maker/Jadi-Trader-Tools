@@ -125,6 +125,35 @@ const BATAS_SL_TF: Record<string, number> = {
    Satu-satunya lencana yang dikotaki jadi terbaca seperti tombol — dan
    lencana ini bukan sesuatu yang bisa ditekan. Warnanya tetap membawa arti
    yang sama; yang dicabut cuma kotaknya. */
+/* ── Membaca angka yang DIKETIK MANUSIA, bukan angka yang lolos parser ──
+   Kolom Entry/SL/TP diisi tangan, dan orang Indonesia menulis harga emas
+   "4.626" — titik RIBUAN. Number() membacanya 4,626 dolar: sinyal terbit
+   dengan level seribu kali terlalu kecil, garisnya digambar di tempat yang
+   tidak pernah terlihat chart, dan penilai menunggu harga yang tidak akan
+   pernah datang. Itu bukan kasus rekaan — kartu "jangan lupa FM" milik
+   pengguna sungguhan terbit persis begitu, 27 Agu 2026.
+
+   Aturannya mengikuti cara menulis, bukan satu locale:
+     · ada titik DAN koma  → pemisah TERAKHIR itu desimalnya
+     · hanya koma          → satu koma = desimal ("4626,5"); banyak = ribuan
+     · hanya titik         → banyak titik = ribuan ("1.234.567");
+                             satu titik dibiarkan — "4.626" tidak bisa
+                             diputuskan dari teksnya sendiri, dan yang
+                             memutuskan penjaga harga pasar di posting(). */
+function bacaAngka(teks: string): number {
+  let t = String(teks || '').trim().replace(/\s/g, '');
+  if (!t) return 0;
+  const koma = t.lastIndexOf(','), titik = t.lastIndexOf('.');
+  if (koma >= 0 && titik >= 0) {
+    t = koma > titik ? t.replace(/\./g, '').replace(',', '.') : t.replace(/,/g, '');
+  } else if (koma >= 0) {
+    t = (t.match(/,/g) || []).length === 1 ? t.replace(',', '.') : t.replace(/,/g, '');
+  } else if ((t.match(/\./g) || []).length > 1) {
+    t = t.replace(/\./g, '');
+  }
+  return Number(t) || 0;
+}
+
 const WARNA_RISIKO: Record<string, string> = {
   Rendah: 'bg-emerald-500/10 text-emerald-400/90',
   Sedang: 'bg-amber-500/10 text-amber-400/90',
@@ -2197,6 +2226,43 @@ export default function Analisa() {
       setKabar(`Belum bisa diposting — isi dulu ${kurangIsi.join(', ')}.`);
       return;
     }
+    /* ── PENJAGA HARGA PASAR ───────────────────────────────────────────
+       Pengurai di atas menyerah pada satu bentuk: "4.626" dengan satu
+       titik. Dari teksnya sendiri ia sah sebagai empat-koma-enam maupun
+       empat-ribu-enam-ratus — yang bisa memutuskan cuma harga pasarnya.
+
+       Kalau ketiga level berjarak lebih dari separuh/dua kali harga
+       pasar, dicoba faktor 10/100/1000 dua arah; faktor yang membawa
+       entry ke ±20% pasar dianggap maksud penulisnya, kolomnya DIISI
+       ULANG dengan angka yang benar, dan posting dihentikan sekali —
+       orangnya melihat dulu angka barunya, baru menekan lagi. Menulis
+       diam-diam angka yang berbeda dari yang diketik, ke papan publik
+       yang permanen, bukan bantuan; itu kejutan. */
+    {
+      const e0 = bacaAngka(entry);
+      const pasarKini = hargaUntuk(pasangan.trim().toUpperCase());
+      if (e0 > 0 && pasarKini && (e0 / pasarKini < 0.5 || e0 / pasarKini > 2)) {
+        const faktor = [1000, 100, 10, 0.001, 0.01, 0.1]
+          .find((f) => Math.abs((e0 * f) / pasarKini - 1) < 0.2);
+        if (faktor) {
+          const rapikan = (v: string) => {
+            const n = bacaAngka(v) * faktor;
+            return n > 0 ? String(Number(n.toFixed(5))) : v;
+          };
+          setEntry(rapikan(entry)); setSl(rapikan(sl)); setTp(rapikan(tp));
+          setNada('galat');
+          setKabar(`Angkanya sepertinya tertulis ${faktor >= 1 ? 'dengan titik ribuan' : 'kelebihan nol'} — `
+            + `harga ${pasangan.trim().toUpperCase()} sekarang ${pasarKini.toLocaleString('id-ID')}. `
+            + `Entry/SL/TP sudah diperbaiki ke skala pasar; periksa dulu, lalu tekan Posting lagi.`);
+          return;
+        }
+        setNada('galat');
+        setKabar(`Entry ${e0.toLocaleString('id-ID')} terlalu jauh dari harga pasar `
+          + `${pasangan.trim().toUpperCase()} sekarang (${pasarKini.toLocaleString('id-ID')}). `
+          + `Periksa angkanya — sinyal dengan level yang tidak akan pernah tersentuh cuma membebani papanmu.`);
+        return;
+      }
+    }
     setSibuk(true); setKabar(''); setNada('info');
     try {
       const hasil = await kirimAnalisa({
@@ -2206,7 +2272,7 @@ export default function Analisa() {
         judul: (ringkas.trim() || `${pasangan.trim().toUpperCase()} · ${arah}`).slice(0, 80),
         pasangan: pasangan.trim().toUpperCase(), arah, pasar, tf: tfSinyal,
         harga: hargaUsd, ringkas: ringkas.trim(),
-        isi: { entry: Number(entry) || 0, sl: Number(sl) || 0, tp: Number(tp) || 0, alasan: alasan.trim() },
+        isi: { entry: bacaAngka(entry), sl: bacaAngka(sl), tp: bacaAngka(tp), alasan: alasan.trim() },
         /* Nama PROFIL didahulukan. Server menimpanya lagi saat membaca,
            jadi ini cuma cadangan — tapi cadangan yang benar: tanpa ini,
            rekaman baru menyimpan nama akun Google milik orang yang justru
@@ -2897,7 +2963,7 @@ export default function Analisa() {
                   berbahaya, karena SL yang dipersempit demi lolos aturan
                   adalah SL yang akan kena. */}
               {(() => {
-                const e0 = Number(entry), s0 = Number(sl);
+                const e0 = bacaAngka(entry), s0 = bacaAngka(sl);
                 if (!(e0 > 0) || !(s0 > 0)) return null;
                 const jarak = (Math.abs(e0 - s0) / e0) * 100;
                 /* Batas menurut TIMEFRAME, bukan satu angka untuk semua.
@@ -2943,7 +3009,7 @@ export default function Analisa() {
                   angka yang dilihat pembeli di rekam jejak berasal dari
                   aturan yang satu, bukan dua yang kebetulan mirip. */}
               {(() => {
-                const e = Number(entry), s = Number(sl), t = Number(tp);
+                const e = bacaAngka(entry), s = bacaAngka(sl), t = bacaAngka(tp);
                 if (!e || !s || !t) return null;
                 const jarakSl = Math.abs(e - s), jarakTp = Math.abs(t - e);
                 if (!jarakSl) return null;
