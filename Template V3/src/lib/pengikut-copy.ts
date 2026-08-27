@@ -7,6 +7,7 @@ import { kirimPerintahMt5, tungguHasilMt5 } from '@/lib/mt5-order';
 import { kontrakBawaan, kontrakBerlaku, deteksiJenisAkun, lotUntukCopy } from '@/lib/ukuran-posisi';
 import { useAkunMt5 } from '@/lib/akun';
 import { bacaTanda, catatCopy, petaCopy, tandaSinyal, tandaiBatalSelesai } from '@/lib/tanda-copy';
+import { statusPengikutVps } from '@/lib/pengikut-vps';
 
 /* ════════════════════════════════════════════════════════════════════════
    PENGIKUT COPY — menyalin sinyal baru ke akun MT5 sendiri
@@ -150,12 +151,23 @@ export function usePengikutCopy(uid: string | null | undefined, jeda = 60_000) {
      tengahnya dan keduanya mengirim sinyal yang sama. */
   const sibuk = useRef(false);
 
+  /* MUNDUR SAAT SERVER YANG MEMEGANG. Untuk akun pemilik, pengikutnya
+     hidup di VPS — dan dua pengikut untuk satu akun berarti SATU sinyal
+     menjadi DUA order. Keputusannya milik server (/api/copy/pengikut);
+     kalau servernya tidak terjangkau, jawabannya null dan sikap amannya
+     adalah TETAP berjalan: pengikut ganda dicegah `sudah` per sisi, tapi
+     pengikut nol berarti sinyal hilang tanpa ada yang mencatatnya. */
+  const serverPegang = useRef(false);
+
   useEffect(() => {
     if (!uid) return;
     let hidup = true;
+    void statusPengikutVps().then((s) => {
+      if (hidup && s?.aktif) serverPegang.current = true;
+    });
 
     async function putaran() {
-      if (!hidup || sibuk.current) return;
+      if (!hidup || sibuk.current || serverPegang.current) return;
       const langganan = daftarLangganan(uid);
       /* Tidak melanggan siapa pun BUKAN berarti tidak ada apa-apa yang perlu
          diurus: salinan manual juga meninggalkan catatan, dan penarikan

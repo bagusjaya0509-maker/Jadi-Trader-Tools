@@ -8,6 +8,7 @@ import { useAkunMt5 } from '@/lib/akun';
 import {
   kontrakBawaan, kontrakBerlaku, deteksiJenisAkun, lotUntukCopy,
 } from '@/lib/ukuran-posisi';
+import { simpanLanggananVps, hapusLanggananVps } from '@/lib/pengikut-vps';
 import {
   bacaLangganan, simpanLangganan, hapusLangganan, type LanggananCopy,
 } from '@/lib/copy-langganan';
@@ -105,6 +106,12 @@ export function PanelCopyAnalis({ analisUid, analisNama, contohPasangan, tutup }
       sejak: langganan?.sejak ?? Date.now(),
     };
     simpanLangganan(pengguna!.uid, isi);
+    /* Ikut dikirim ke pengikut server. Untuk akun pemilik inilah yang
+       membuat salinannya jalan 24 jam; untuk akun lain servernya menolak
+       dengan sopan dan pengikut perambannya yang bekerja. Fire-and-forget:
+       gagal jaringan tidak boleh membatalkan penyimpanan lokal yang
+       sudah berhasil. */
+    void simpanLanggananVps({ analisUid, analisNama, rugiMaks: isi.rugiMaks });
     setLangganan(isi);
     setKabar(`Tersimpan. Tiap sinyal ${analisNama} disalin dengan rugi dibatasi ${uang(rugiMaks)}.`);
   }
@@ -112,6 +119,7 @@ export function PanelCopyAnalis({ analisUid, analisNama, contohPasangan, tutup }
   function batal() {
     if (!pengguna) return;
     hapusLangganan(pengguna.uid, analisUid);
+    void hapusLanggananVps(analisUid);
     setLangganan(null);
     setKabar('Berhenti mengikuti. Tidak ada sinyal analis ini yang akan disalin.');
   }

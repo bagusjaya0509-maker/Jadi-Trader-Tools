@@ -5,6 +5,7 @@ import { useAuth } from '@/lib/auth';
 import { useAkunMt5 } from '@/lib/akun';
 import { daftarLangganan } from '@/lib/copy-langganan';
 import { bacaWaktuPindai, bacaLogCopy, type LogCopy } from '@/lib/pengikut-copy';
+import { statusPengikutVps, setJalanVps, type StatusPengikutVps } from '@/lib/pengikut-vps';
 
 /* ════════════════════════════════════════════════════════════════════════
    STATUS AUTO-COPY — apa yang sebenarnya sedang terjadi
@@ -55,6 +56,10 @@ export function StatusAutoCopy() {
   const [pindai, setPindai] = useState(0);
   const [log, setLog] = useState<LogCopy[]>([]);
   const [buka, setBuka] = useState(false);
+  /* Pengikut server (khusus pemilik). null = belum tahu / bukan pemilik —
+     kotaknya memakai data peramban seperti biasa. */
+  const [vps, setVps] = useState<StatusPengikutVps | null>(null);
+  const [sibukJeda, setSibukJeda] = useState(false);
 
   /* Dibaca ULANG tiap 15 detik. Penyalinnya berjalan di kerangka aplikasi
      dan menulis ke localStorage; tanpa pembacaan berkala, kotak yang
@@ -64,18 +69,38 @@ export function StatusAutoCopy() {
     function baca() {
       setPindai(bacaWaktuPindai(pengguna?.uid));
       setLog(bacaLogCopy(pengguna?.uid));
+      void statusPengikutVps().then((s) => { if (s?.aktif) setVps(s); });
     }
     baca();
     const jam = setInterval(baca, 15_000);
     return () => clearInterval(jam);
   }, [pengguna?.uid]);
 
+  async function tarikJeda(jalan: boolean) {
+    setSibukJeda(true);
+    try {
+      if (await setJalanVps(jalan)) {
+        const s = await statusPengikutVps();
+        if (s?.aktif) setVps(s);
+      }
+    } finally { setSibukJeda(false); }
+  }
+
   if (!pengguna) return null;
-  const jumlah = daftarLangganan(pengguna.uid).length;
-  if (jumlah === 0) return null;
+  const jumlahLokal = daftarLangganan(pengguna.uid).length;
+  /* Pengikut server yang memegang: statusnya, langganannya, dan lognya
+     datang DARI SERVER — angka peramban untuk akun ini cuma sisa sejarah.
+     Mencampur keduanya berarti kotak yang setengahnya bercerita tentang
+     pengikut yang sudah tidak jalan. */
+  const pegangVps = !!vps?.aktif;
+  const jumlah = pegangVps ? (vps?.langganan?.length ?? 0) : jumlahLokal;
+  if (jumlah === 0 && !pegangVps) return null;
 
   const eaHidup = akun.terhubung === true;
-  const pernah = pindai > 0;
+  const pindaiTampil = pegangVps ? (vps?.pindai ?? 0) : pindai;
+  const pernah = pindaiTampil > 0;
+  const logTampil: LogCopy[] = pegangVps ? ((vps?.log ?? []) as LogCopy[]) : log;
+  const jeda = pegangVps && vps?.jalan === false;
 
   return (
     <div className={cn('mb-3 rounded-lg border px-3 py-2.5',
@@ -83,17 +108,31 @@ export function StatusAutoCopy() {
               : 'border-amber-500/25 bg-amber-500/[0.05]')}>
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <span className={cn('size-1.5 shrink-0 rounded-full',
-          eaHidup ? 'animate-pulse bg-emerald-500' : 'bg-amber-400')} />
+          jeda ? 'bg-zinc-500' : eaHidup ? 'animate-pulse bg-emerald-500' : 'bg-amber-400')} />
         <span className="text-[12px] font-medium text-zinc-200">
-          {eaHidup ? 'Auto-copy aktif' : 'Auto-copy menunggu terminal'}
+          {jeda ? 'Auto-copy dijeda'
+            : pegangVps ? 'Auto-copy 24 jam — di server'
+            : eaHidup ? 'Auto-copy aktif' : 'Auto-copy menunggu terminal'}
         </span>
         <span className="text-[11.5px] text-zinc-500">
-          · {jumlah} analis · pindai terakhir {pernah ? `${jam(pindai)} (${selang(pindai)})` : 'belum pernah'}
+          · {jumlah} analis · pindai terakhir {pernah ? `${jam(pindaiTampil)} (${selang(pindaiTampil)})` : 'belum pernah'}
         </span>
-        {log.length > 0 && (
+        {/* SAKELAR JEDA — hanya untuk pengikut server. Fitur yang membuka
+            posisi saat pemiliknya tidur wajib punya satu tombol yang
+            menghentikannya seketika, di tempat statusnya dibaca. */}
+        {pegangVps && (
+          <button type="button" disabled={sibukJeda}
+            onClick={() => void tarikJeda(!!jeda)}
+            className={cn('rounded border px-2 py-0.5 text-[11px] transition-colors disabled:opacity-50',
+              jeda ? 'border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10'
+                   : 'border-zinc-700 text-zinc-400 hover:border-amber-500/40 hover:text-amber-300')}>
+            {jeda ? 'Lanjutkan' : 'Jeda'}
+          </button>
+        )}
+        {logTampil.length > 0 && (
           <button type="button" onClick={() => setBuka((b) => !b)}
             className="ml-auto rounded px-1.5 py-0.5 text-[11px] text-zinc-400 transition-colors hover:bg-zinc-800/70 hover:text-zinc-200">
-            {buka ? 'Tutup catatan' : `Catatan ${log.length}`}
+            {buka ? 'Tutup catatan' : `Catatan ${logTampil.length}`}
           </button>
         )}
       </div>
@@ -113,14 +152,21 @@ export function StatusAutoCopy() {
 
       {/* Keterbatasannya disebut di tempat orang menilai apakah fiturnya
           bekerja, bukan di halaman bantuan yang tidak akan dibuka. */}
-      <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
-        Penyalinan berjalan selama aplikasi ini terbuka, dipindai tiap menit.
-        Sinyal yang terbit saat semua tab tertutup tidak tersalin.
-      </p>
+      {pegangVps ? (
+        <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
+          Penyalinan berjalan di server, tiap menit, walau semua tab tertutup.
+          Yang tetap harus hidup cuma terminal MT5 dengan EA-nya.
+        </p>
+      ) : (
+        <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
+          Penyalinan berjalan selama aplikasi ini terbuka, dipindai tiap menit.
+          Sinyal yang terbit saat semua tab tertutup tidak tersalin.
+        </p>
+      )}
 
-      {buka && log.length > 0 && (
+      {buka && logTampil.length > 0 && (
         <div className="gulir-senyap mt-2 max-h-[220px] space-y-1 overflow-y-auto border-t border-zinc-800/60 pt-2">
-          {log.map((e, i) => {
+          {logTampil.map((e, i) => {
             const { Ikon, warna } = RUPA[e.hasil];
             return (
               <div key={e.waktu + '|' + i} className="flex items-start gap-2">

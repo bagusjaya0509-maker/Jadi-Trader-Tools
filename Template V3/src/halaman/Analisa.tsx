@@ -23,6 +23,7 @@ import { PotongGambar } from '@/components/potong-gambar';
 import { HitungPosisi } from '@/components/hitung-posisi';
 import { PanelCopyAnalis } from '@/components/panel-copy-analis';
 import { StatusAutoCopy } from '@/components/status-auto-copy';
+import { hapusLanggananVps } from '@/lib/pengikut-vps';
 import { LogAktivitas } from '@/components/log-aktivitas';
 import { PanelCopyTradeFi } from '@/components/panel-copy-tradefi';
 import { daftarLangganan, hapusLangganan, type LanggananCopy } from '@/lib/copy-langganan';
@@ -1408,6 +1409,11 @@ function SignalDiikuti({ keRuang, onKosong }: {
   function lepas(uid: string) {
     if (!pengguna) return;
     hapusLangganan(pengguna.uid, uid);
+    /* Server ikut dilepas. Melepas cuma di peramban sementara pengikut
+       server masih memegang setelannya berarti "Batalkan Copy" yang tidak
+       membatalkan apa-apa — order tetap masuk, dan pemiliknya tidak punya
+       petunjuk kenapa. */
+    void hapusLanggananVps(uid);
     setDaftar(daftarLangganan(pengguna.uid));
   }
 
