@@ -238,11 +238,15 @@ function BarisHitung({ r, kuIkuti: _kuIkuti }: { r: RingkasKanal; kuIkuti?: bool
      penyalinnya memang minimal satu, dan satu itu kamu. Yang belum bisa
      dihitung adalah penyalin ORANG LAIN — itu menunggu rute langganan di
      server. Sampai itu ada, angka ini "sekurang-kurangnya", bukan total. */
-  const bagian: Array<[string, number]> = [
+  const bagian: Array<[string, number | null]> = [
     /* Tambahan +1 "kuIkuti" DICABUT: dulu satu-satunya cara mengakui
        penyalin lokal adalah menebaknya dari langganan. Sekarang server
        mencatat penyalin sungguhan per sinyal, dan angka tebakan di atas
        angka catatan justru membuatnya tidak bisa dicocokkan. */
+    /* null = server belum punya rute pencatatnya (backend lama). Nol yang
+       berarti "belum ada yang menyalin" dan nol yang berarti "kami belum
+       bisa menghitung" adalah dua kabar berbeda, dan menyamakannya persis
+       yang membuat angka ini terbaca seperti rusak. */
     ['disalin', r.pengcopy],
     /* SATU ANGKA UNTUK "MASIH HIDUP", bukan dua yang berdiri sendiri.
        Berjalan dan menunggu harga memang dua keadaan berbeda, tapi
@@ -292,9 +296,11 @@ function BarisHitung({ r, kuIkuti: _kuIkuti }: { r: RingkasKanal; kuIkuti?: bool
               title={nama === 'aktif'
                 ? 'Sinyal yang masih hidup: sedang berjalan + menunggu harga'
                 : nama === 'disalin'
-                ? 'Pembelian sinyal kanal ini, ditambah langgananmu sendiri kalau ada. Penyalin orang lain belum terhitung — menunggu rute langganan di server.'
+                ? (nilai === null
+                    ? 'Server ini belum punya pencatat penyalinan — angkanya belum bisa dihitung, dan tanda hubung lebih jujur daripada nol.'
+                    : 'Berapa ORANG yang benar-benar menyalin sinyal kanal ini ke terminalnya, dihitung sekali per orang per sinyal.')
                 : nama === 'batal' ? 'Ditarik penulisnya sebelum harganya datang' : undefined}>
-          <span className="angka text-[13px] font-semibold tabular-nums text-zinc-300">{nilai}</span>
+          <span className="angka text-[13px] font-semibold tabular-nums text-zinc-300">{nilai ?? '—'}</span>
           <span className="ml-1 text-[9.5px] text-zinc-600">{nama}</span>
         </span>
       ))}
@@ -868,11 +874,18 @@ function KartuAnalisa({ a, status, milikku, onSegarkan, performa, hargaKini }: {
             ) : (
               <span className="text-zinc-600">belum ada sinyal selesai</span>
             )}
-            {/* jumlahCopy, BUKAN jumlahPembeli: label ini berbunyi "pengcopy"
-                dan pembacanya percaya pada kata itu. Angka pembeli akses yang
-                menyamar sebagai angka penyalin membuat sinyal yang barusan
-                di-copy pemiliknya sendiri tetap tertulis nol. */}
-            <span>{a.jumlahCopy ?? 0} pengcopy</span>
+            {/* HITUNGAN PENGCOPY DICABUT DARI SINI — permintaan pemilik.
+                Di kartu sinyal ia hampir selalu 0 atau 1 dan tidak menjawab
+                pertanyaan apa pun yang dibawa pembacanya; yang ia cari
+                justru LEVELNYA. Angka penyalin tetap hidup di kartu analis,
+                tempat ia memang jadi ukuran.
+
+                Entry ditampilkan HANYA kalau isinya memang sudah boleh
+                dilihat orang ini — untuk sinyal berbayar yang belum dibuka,
+                level adalah barang yang dijual. */}
+            {isi && isi.entry > 0 && (
+              <span>entry <span className="angka text-zinc-300">{fHarga(isi.entry)}</span></span>
+            )}
             {!!a.jumlahGambar && (
               <span className="flex items-center gap-1"><Images className="size-3" /> {a.jumlahGambar} foto</span>
             )}

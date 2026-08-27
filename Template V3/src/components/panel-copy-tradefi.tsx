@@ -12,7 +12,7 @@ import {
   lotUntukCopy,
 } from '@/lib/ukuran-posisi';
 import { daftarLangganan } from '@/lib/copy-langganan';
-import { catatCopy } from '@/lib/tanda-copy';
+import { catatCopy, bacaTanda } from '@/lib/tanda-copy';
 import { catatDicopy } from '@/lib/analisa';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -83,9 +83,22 @@ export function PanelCopyTradeFi({ sinyalId, analisUid, pasangan, arah, entry, s
      salah membacanya akan menunggu sinyal berikutnya masuk sendiri, dan
      yang ia tunggu tidak akan pernah datang. */
   const diikuti = !!analisUid && daftarLangganan(pengguna?.uid).some((l) => l.analisUid === analisUid);
+
   const [sibuk, setSibuk] = useState(false);
   const [kabar, setKabar] = useState('');
   const [selesai, setSelesai] = useState(false);
+  /* ── SUDAH PERNAH DISALIN? ────────────────────────────────────────────
+     Menyalin sinyal yang sama dua kali BOLEH — menambah lapis di rencana
+     yang sama adalah hal yang memang dilakukan orang. Yang tidak boleh
+     adalah melakukannya TANPA SADAR: pemilik menyalin satu sinyal dua kali
+     dan baru tahu dari daftar order bahwa risikonya jadi dua kali lipat.
+
+     Jadi ini peringatan, bukan gerbang. Dihitung dari catatan salinan di
+     perangkat ini; salinan yang dikirim pengikut server juga tercatat di
+     sana lewat penandanya sendiri. */
+  const salinanLalu = useMemo(
+    () => (sinyalId ? bacaTanda(pengguna?.uid).filter((t) => t.sinyal === sinyalId) : []),
+    [sinyalId, pengguna?.uid, selesai]);
 
   /* ── NAMA SIMBOL DI BROKER PENGGUNA, bukan nama di sinyalnya ─────────
      Analis menulis "XAUUSD"; terminal orang yang meniru mungkin menamainya
@@ -263,6 +276,16 @@ export function PanelCopyTradeFi({ sinyalId, analisUid, pasangan, arah, entry, s
             </div>
           )}
 
+          {salinanLalu.length > 0 && !selesai && (
+            <div className="mt-3 flex items-start gap-1.5 rounded-md border border-amber-500/30 bg-amber-500/[0.07] px-2.5 py-2 text-[11px] leading-relaxed text-amber-200/90">
+              <TriangleAlert className="mt-px size-3.5 shrink-0" />
+              <span>
+                Sinyal ini <span className="font-medium">sudah pernah kamu copy</span>
+                {' '}({salinanLalu.map((t) => `${t.lot} lot`).join(' + ')}). Menyalin lagi
+                menambah posisi kedua — risikonya berlipat, bukan menggantikan yang tadi.
+              </span>
+            </div>
+          )}
           <button
             onClick={() => void copySatu()}
             disabled={!!halangan || sibuk || selesai || memuatSimbol}
@@ -270,7 +293,8 @@ export function PanelCopyTradeFi({ sinyalId, analisUid, pasangan, arah, entry, s
               'bg-zinc-100 text-zinc-950 hover:bg-white',
               'disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500')}>
             {sibuk && <Loader2 className="size-3.5 animate-spin" />}
-            {selesai ? 'Sudah dikirim' : sibuk ? 'Mengirim…' : `Copy 1 trade — ${lot >= 0.01 ? lot.toFixed(2) : '0'} lot`}
+            {selesai ? 'Sudah dikirim' : sibuk ? 'Mengirim…'
+              : `${salinanLalu.length > 0 ? 'Copy lagi' : 'Copy 1 trade'} — ${lot >= 0.01 ? lot.toFixed(2) : '0'} lot`}
           </button>
 
           {kabar && (

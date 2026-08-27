@@ -127,16 +127,31 @@ export function petaCopy(uid: string | null | undefined, posisi: PosisiUntukTand
   /* Tiket yang sudah diikat catatan lain tidak boleh direbut catatan kedua:
      dua salinan berbeda tidak menunjuk satu order yang sama. */
   const terpakai = new Set<string>();
+  let berubah = false;
   for (const t of d) {
-    if (t.tiket && hidup.has(t.tiket)) {
+    if (!t.tiket) continue;
+    if (hidup.has(t.tiket)) {
       peta.set(t.tiket, t.analis);
       terpakai.add(t.tiket);
+      continue;
     }
+    /* ── IKATAN BASI DILEPAS ────────────────────────────────────────────
+       Tiketnya tidak ada lagi di terminal: ordernya sudah tertutup, atau
+       dibatalkan, atau — yang paling sering — pernah terikat ke order uji
+       yang lama hilang. Sebelumnya `if (t.tiket) continue` membuat catatan
+       seperti itu MATI SELAMANYA: ia tidak pernah cocok (tiketnya tidak
+       hidup) dan tidak pernah boleh menjodoh ulang. Akibatnya salinan
+       berikutnya yang seukuran berdiri tanpa ikon sama sekali.
+
+       Dilepas HANYA kalau daftar hidupnya memang berisi. EA yang sedang
+       mati melaporkan daftar kosong, dan melepas semua ikatan di situ
+       berarti membuang seluruh riwayat penandaan karena terminal kebetulan
+       tertutup. */
+    if (posisi.length > 0) { t.tiket = undefined; berubah = true; }
   }
 
   /* Catatan terlama dijodohkan lebih dulu — urutan yang sama dengan urutan
      ordernya dikirim. */
-  let berubah = false;
   for (const t of d) {
     if (t.tiket) continue;
     const cocok = posisi.find((p) =>

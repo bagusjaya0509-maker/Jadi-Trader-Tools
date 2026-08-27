@@ -42,7 +42,8 @@ export interface RingkasKanal {
    *  terhitung lima. Data pembedanya memang tidak ada di ringkasan, dan
    *  menyebutnya "orang" berarti mengarang angka yang tidak dimiliki —
    *  jadi labelnya di layar berbunyi "disalin", bukan "pengikut". */
-  pengcopy: number;
+  /** null = server belum melaporkan medannya sama sekali. */
+  pengcopy: number | null;
   /** Sudah kena TP. */
   profit: number;
   /** Sudah kena SL. */
@@ -150,8 +151,16 @@ export function ringkasKanal(
     total: sinyal.length, profit, rugi, batal, berjalan,
     /* jumlahCopy = orang yang benar-benar menyalin (dicatat server per
        uid), bukan pembeli akses. Kartu analis berkata "disalin" — angkanya
-       harus berasal dari penyalinan. */
-    pengcopy: sinyal.reduce((j, s) => j + (Number(s.jumlahCopy) || 0), 0),
+       harus berasal dari penyalinan.
+
+       Kalau TIDAK SATU PUN sinyal membawa medannya, servernya belum punya
+       rute pencatat itu — dan yang jujur ditampilkan bukan "0 disalin"
+       melainkan tanda hubung. Nol yang berarti "belum ada yang menyalin"
+       dan nol yang berarti "kami belum bisa menghitung" adalah dua kabar
+       yang sangat berbeda bagi orang yang memilih siapa ditiru. */
+    pengcopy: sinyal.some((s) => s.jumlahCopy !== undefined)
+      ? sinyal.reduce((j, s) => j + (Number(s.jumlahCopy) || 0), 0)
+      : null,
     pending: pendingDaftar.length,
     pendingTerbaru: pendingDaftar.reduce((t, s) => Math.max(t, s.dibuat || 0), 0),
     winrate, gaya, risiko, alasanRisiko,
