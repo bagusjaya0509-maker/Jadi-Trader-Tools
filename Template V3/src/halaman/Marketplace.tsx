@@ -10,7 +10,7 @@ import { Panel, PanelHead } from '@/components/efferd-ui';
 import { cn, tanggalPendek } from '@/lib/utils';
 import { type Produk } from '@/data/contoh';
 import { bisaDipasang, pasangIndikator, pasangKodePine } from '@/lib/pasang-indikator';
-import { useSuka, tukarSuka, useBalasanUlasan, kirimBalasan, hapusBalasan } from '@/lib/ulasan';
+import { useSuka, tukarSuka, useBalasanUlasan, useJumlahBalasan, kirimBalasan, hapusBalasan } from '@/lib/ulasan';
 
 /* ── RINGKASAN KARTU: dipotong tiga baris ────────────────────────────────
    Sebelumnya keterangan produk ditulis seutuhnya dan kartunya dibiarkan
@@ -484,8 +484,12 @@ function MintaKode({ produk, lynk }: { produk: string; lynk?: string }) {
    ke cache lokal sebelum jaringan menjawab, jadi angkanya berubah seketika
    lewat onSnapshot; menambah keadaan optimis sendiri di sini cuma membuat
    dua sumber kebenaran yang bisa berselisih. */
-function KakiUlasan({ ulasanId, suka, akuSuka, hitungUlangSuka, bolehTulis, uidAku, pemilik }: {
+function KakiUlasan({ ulasanId, suka, akuSuka, hitungUlangSuka, jumlahBalasan, hitungUlangBalasan, bolehTulis, uidAku, pemilik }: {
   ulasanId: string; suka: number; akuSuka: boolean; hitungUlangSuka: () => void;
+  /** Dihitung di induknya untuk SEMUA ulasan sekaligus — kalau tiap kaki
+   *  menghitung sendiri, satu ulasan yang dirender ulang menembakkan kueri
+   *  hitung baru tiap kali. */
+  jumlahBalasan: number; hitungUlangBalasan: () => void;
   bolehTulis: boolean; uidAku: string; pemilik: boolean;
 }) {
   const [buka, setBuka] = useState(false);
@@ -503,6 +507,7 @@ function KakiUlasan({ ulasanId, suka, akuSuka, hitungUlangSuka, bolehTulis, uidA
     try {
       await kirimBalasan(ulasanId, teks);
       setTeks(''); setBuka(false);
+      hitungUlangBalasan();
     } catch (e) {
       setGalat(e instanceof Error ? e.message : 'Gagal mengirim balasan.');
     } finally { setSibuk(false); }
@@ -523,18 +528,29 @@ function KakiUlasan({ ulasanId, suka, akuSuka, hitungUlangSuka, bolehTulis, uidA
           className={cn('flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-[11.5px] transition-colors disabled:cursor-not-allowed disabled:opacity-50',
             akuSuka ? 'text-emerald-400 hover:bg-emerald-500/10' : 'text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300')}>
           <ThumbsUp className={cn('size-3.5', akuSuka && 'fill-emerald-400/25')} />
-          {suka > 0 && <span className="angka">{suka}</span>}
+          {/* Angkanya SELALU ditulis, termasuk nol. Menyembunyikannya saat
+              nol membuat ikon jempol tanpa angka punya dua arti — "belum
+              ada yang menyukai" dan "hitungannya belum sampai" — dan yang
+              menekan pertama kali tidak melihat bukti tekanannya mendarat. */}
+          <span className="angka">{suka}</span>
         </button>
         <button
           onClick={() => setBuka((v) => !v)}
           disabled={!bolehTulis}
           title={bolehTulis ? 'Balas ulasan ini' : 'Masuk dulu untuk membalas'}
           className="flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-[11.5px] text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-300 disabled:cursor-not-allowed disabled:opacity-50">
-          <CornerDownRight className="size-3.5" /> Balas
-          {/* Angkanya baru muncul SESUDAH dibuka. Menampilkannya sejak awal
-              menuntut penghitungan untuk tiap ulasan pada tiap kunjungan —
-              persis biaya yang sedang dihindari. */}
-          {buka && balasan.length > 0 && <span className="angka text-zinc-600">{balasan.length}</span>}
+          <CornerDownRight className="size-3.5" />
+          {/* "2 balasan" MENGUNDANG; "Balas" cuma memerintah. Tombol yang
+              tidak menyebut ada percakapan di baliknya membuat percakapan
+              itu tidak pernah ditemukan siapa pun.
+
+              Isinya tetap ditunda sampai dibuka — yang dibaca di muka cuma
+              ANGKANYA, lewat kueri hitung yang ditagih satu baca per seribu
+              dokumen. Yang dulu dihindari adalah mengambil ISI tiap balasan
+              untuk tiap pengunjung; itu tetap dihindari. */}
+          {jumlahBalasan > 0
+            ? <><span className="angka">{jumlahBalasan}</span> balasan</>
+            : 'Balas'}
         </button>
       </div>
 
@@ -571,7 +587,14 @@ function KakiUlasan({ ulasanId, suka, akuSuka, hitungUlangSuka, bolehTulis, uidA
                   {(pemilik || uidAku === b.uid) && (
                     <button onClick={() => {
                               if (!confirm('Hapus balasan ini?')) return;
-                              void hapusBalasan(b.id).catch((e) =>
+                              void hapusBalasan(b.id)
+                                /* Angkanya ikut turun. Tanpa ini tombolnya
+                                   tetap menulis "2 balasan" untuk percakapan
+                                   yang tinggal satu — dan hitungan yang
+                                   membantah isinya sendiri lebih buruk
+                                   daripada tidak ada hitungan. */
+                                .then(() => hitungUlangBalasan())
+                                .catch((e) =>
                                 setGalat(e?.code === 'permission-denied'
                                   ? 'Balasan ini bukan milikmu, jadi tidak bisa dihapus.'
                                   : (e instanceof Error ? e.message : 'Gagal menghapus balasan.')));
@@ -708,7 +731,9 @@ export default function Marketplace() {
   /* Id-nya diambil dari ulasan yang BENAR-BENAR tampil, bukan dari koleksi:
      jumlah suka dihitung satu kueri per ulasan, jadi daftarnya harus sependek
      yang terlihat di layar. */
-  const suka = useSuka(useMemo(() => ulasan.data.map((u) => u.id), [ulasan.data]));
+  const idUlasan = useMemo(() => ulasan.data.map((u) => u.id), [ulasan.data]);
+  const suka = useSuka(idUlasan);
+  const balasanJumlah = useJumlahBalasan(idUlasan);
 
   const [bintang, setBintang] = useState(5);
   const [tulisan, setTulisan] = useState('');
@@ -1018,6 +1043,8 @@ export default function Marketplace() {
                   suka={suka.jumlah[u.id] ?? 0}
                   akuSuka={suka.punyaku.has(u.id)}
                   hitungUlangSuka={suka.hitungUlang}
+                  jumlahBalasan={balasanJumlah.jumlah[u.id] ?? 0}
+                  hitungUlangBalasan={balasanJumlah.hitungUlang}
                   bolehTulis={!!pengguna}
                   uidAku={pengguna?.uid ?? ''}
                   pemilik={pemilik}

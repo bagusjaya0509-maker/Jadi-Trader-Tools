@@ -209,6 +209,52 @@ export function useSuka(ulasanIds: string[]): {
   return { jumlah, punyaku, hitungUlang: useCallback(() => setPutaran((n) => n + 1), []) };
 }
 
+/** JUMLAH BALASAN per ulasan — tanpa mengambil isinya.
+ *
+ *  Isi percakapan tetap ditunda sampai orangnya membuka (satu baca per
+ *  balasan, dan sebagian besar pengunjung halaman iklan tidak pernah
+ *  membukanya). Yang dibaca di sini cuma ANGKANYA, lewat
+ *  `getCountFromServer` — ditagih satu baca per SERIBU dokumen, bukan satu
+ *  per dokumen. Pola yang sama persis dengan hitungan suka di atas.
+ *
+ *  Kenapa angkanya perlu terlihat sebelum dibuka: tombol bertuliskan
+ *  "Balas" tidak memberi tahu ada percakapan di baliknya, jadi percakapan
+ *  yang sudah ada tidak pernah ditemukan siapa pun. "2 balasan" adalah
+ *  undangan; "Balas" cuma perintah.
+ *
+ *  BIAYANYA TUMBUH SEIRING JUMLAH ULASAN, bukan jumlah balasan: satu kueri
+ *  hitung per ulasan per kunjungan. Untuk puluhan ulasan itu recehan; kalau
+ *  suatu hari ratusan, angkanya harus pindah jadi medan di dokumen
+ *  ulasannya sendiri (dinaikkan saat membalas), supaya ikut gratis bersama
+ *  daftar ulasan yang memang sudah dibaca. */
+export function useJumlahBalasan(ulasanIds: string[]): {
+  jumlah: Record<string, number>; hitungUlang: () => void;
+} {
+  const [jumlah, setJumlah] = useState<Record<string, number>>({});
+  const [putaran, setPutaran] = useState(0);
+  const kunci = ulasanIds.join(',');
+
+  useEffect(() => {
+    let hidup = true;
+    const ids = kunci ? kunci.split(',') : [];
+    if (!ids.length) { setJumlah({}); return; }
+    (async () => {
+      const hasil: Record<string, number> = {};
+      await Promise.all(ids.map(async (id) => {
+        try {
+          const c = await getCountFromServer(
+            query(collection(db, 'ulasanBalasan'), where('ulasanId', '==', id)));
+          hasil[id] = c.data().count;
+        } catch (e) { console.warn('hitung balasan:', e); }
+      }));
+      if (hidup) setJumlah(hasil);
+    })();
+    return () => { hidup = false; };
+  }, [kunci, putaran]);
+
+  return { jumlah, hitungUlang: useCallback(() => setPutaran((n) => n + 1), []) };
+}
+
 /** Menyukai / batal menyukai. Idempoten: menekan dua kali kembali ke semula. */
 export async function tukarSuka(ulasanId: string, sedangSuka: boolean) {
   const p = auth.currentUser;
