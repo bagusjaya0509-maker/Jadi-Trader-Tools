@@ -23,7 +23,7 @@ import { PotongGambar } from '@/components/potong-gambar';
 import { HitungPosisi } from '@/components/hitung-posisi';
 import { PanelCopyAnalis } from '@/components/panel-copy-analis';
 import { StatusAutoCopy } from '@/components/status-auto-copy';
-import { hapusLanggananVps, kirimIkuti, jumlahPengikut } from '@/lib/pengikut-vps';
+import { hapusLanggananVps, kirimIkuti, jumlahPengikut, PERISTIWA_PENGIKUT, type KabarPengikut } from '@/lib/pengikut-vps';
 import { LogAktivitas } from '@/components/log-aktivitas';
 import { PanelCopyTradeFi } from '@/components/panel-copy-tradefi';
 import { daftarLangganan, hapusLangganan, type LanggananCopy } from '@/lib/copy-langganan';
@@ -1893,8 +1893,18 @@ export default function Analisa() {
       void jumlahPengikut().then((j) => { if (hidup && j) setPengikutPeta(j); });
     };
     tarik();
+    /* SEKETIKA saat ada yang menekan Ikuti/Batalkan di mana pun di halaman
+       ini — angka dari server ditempelkan langsung, tanpa menunggu tarikan
+       berkala. Penarikan 45 detik tetap ada untuk menangkap perubahan dari
+       perangkat atau orang LAIN. */
+    const dengar = (e: Event) => {
+      const d = (e as CustomEvent<KabarPengikut>).detail;
+      if (!d || !hidup) return;
+      setPengikutPeta((lama) => ({ ...(lama || {}), [d.analisUid]: d.jumlah }));
+    };
+    window.addEventListener(PERISTIWA_PENGIKUT, dengar);
     const jam = setInterval(tarik, 45_000);
-    return () => { hidup = false; clearInterval(jam); };
+    return () => { hidup = false; clearInterval(jam); window.removeEventListener(PERISTIWA_PENGIKUT, dengar); };
   }, []);
   const hargaPasar = useHargaPasar(daftar.map((a) => a.pasangan));
   const hargaMt5 = useHargaTradeFi();

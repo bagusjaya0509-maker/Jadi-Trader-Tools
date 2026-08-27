@@ -115,6 +115,15 @@ export async function setJalanVps(jalan: boolean): Promise<boolean> {
    jumlahnya. Siapa mengikuti siapa bukan urusan orang lain.
    ════════════════════════════════════════════════════════════════════════ */
 
+/** Kabar "hitungan pengikut analis ini baru berubah", disiarkan ke seluruh
+ *  halaman. Tanpa ini kartu baru tahu saat penarikan berkala berikutnya —
+ *  dan menunggu 45 detik untuk melihat akibat tombol yang BARU SAJA ditekan
+ *  membuat tombolnya terasa tidak bekerja. Server sudah memulangkan angka
+ *  barunya seketika; yang kurang cuma yang mendengarkan. */
+export const PERISTIWA_PENGIKUT = 'jt:pengikut-berubah';
+
+export interface KabarPengikut { analisUid: string; jumlah: number }
+
 /** Menyalakan/mematikan langganan di server. Diam saat gagal — hitungan
  *  tampilan tidak boleh menggagalkan penyimpanan setelan yang sudah
  *  berhasil di perangkat. */
@@ -122,11 +131,20 @@ export async function kirimIkuti(analisUid: string, ikut: boolean): Promise<void
   const t = await token();
   if (!t) return;
   try {
-    await fetch(`${dasar()}/api/analis/ikuti`, {
+    const r = await fetch(`${dasar()}/api/analis/ikuti`, {
       method: 'POST',
       headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' },
       body: JSON.stringify({ analisUid, ikut }),
     });
+    const j = await r.json().catch(() => null);
+    /* Angka dari SERVER yang disiarkan, bukan tebakan "+1" di layar. Kalau
+       orangnya menekan Ikuti dua kali, atau sudah mengikuti dari perangkat
+       lain, tebakan lokal akan meleset sementara jawaban server tidak. */
+    if (r.ok && j && typeof j.jumlah === 'number') {
+      window.dispatchEvent(new CustomEvent<KabarPengikut>(PERISTIWA_PENGIKUT, {
+        detail: { analisUid, jumlah: j.jumlah },
+      }));
+    }
   } catch { /* diam */ }
 }
 
