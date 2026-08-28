@@ -18,6 +18,19 @@ const fs = require('fs');
 const path = require('path');
 
 const NAMA_AGEN = process.env.TG_AGEN_NAMA || 'AI Telg';
+
+/* ── SATU PROSES, BANYAK RUANG ─────────────────────────────────────────
+   Sejak pemantau membaca lebih dari satu ruang, nama agen tidak bisa lagi
+   jadi tetapan modul: tiap ruang punya kartunya sendiri di papan. Nama
+   dari pemanggil yang menang, dan NAMA_AGEN tinggal jadi cadangan supaya
+   alat uji lama (yang tidak menyebut nama) tetap jalan apa adanya.
+
+   Server menurunkan uid kartu dari nama tampilannya, jadi nama yang salah
+   tidak melempar galat — ia diam-diam menulis ke kartu ORANG LAIN. */
+function namaDari(opsi) {
+  const n = opsi && opsi.agen ? String(opsi.agen).trim() : '';
+  return n || NAMA_AGEN;
+}
 const DASAR = 'http://127.0.0.1:' + (process.env.PORT || 4000);
 const APP_TOKEN = process.env.APP_TOKEN || '';
 const MT5_KLINES = path.join(__dirname, 'mt5-klines.json');
@@ -123,7 +136,8 @@ async function kirimKartu(sn, opsi = {}) {
   if (!semuaEntry.length) { catat('  kartu dilewati — entry tidak diketahui'); return null; }
   let idPertama = null;
   for (let ke = 0; ke < semuaEntry.length; ke++) {
-    const id = await kirimSatuKartu(sn, semuaEntry[ke], ke, semuaEntry.length, { tautan, teks, catat });
+    const id = await kirimSatuKartu(sn, semuaEntry[ke], ke, semuaEntry.length,
+      { tautan, teks, catat, agen: opsi.agen });
     if (id && !idPertama) idPertama = id;
   }
   return idPertama;
@@ -159,39 +173,57 @@ async function kirimSatuKartu(sn, entry, ke, dari, opsi) {
   }
 
   const kripto = /USDT$/.test(sn.pasangan);
+  /* ── ASAL SUMBERNYA TIDAK DITULIS DI MANA PUN ────────────────────────
+     Keputusan pemilik, 28 Agu 2026. Kartu ini terbaca publik: siapa pun
+     yang membuka Copy Signal melihatnya, termasuk orang yang belum masuk.
+     Menyebut nama ruangnya, apalagi menempelkan tautan pesan aslinya,
+     sama dengan menerbitkan alamat sumber berbayar orang lain ke halaman
+     yang terindeks mesin pencari.
+
+     Yang TETAP ditulis: bahwa level ini DITERUSKAN, bukan hasil analisa
+     sistem ini. Itu bukan soal asal-usul melainkan soal tidak mengaku-aku,
+     dan menghapusnya akan membuat kartunya berbohong. Tautan aslinya tetap
+     tersimpan di arsip VPS (sinyal-telegram.json) yang tidak pernah
+     disajikan ke publik — pemilik masih bisa memeriksa sendiri. */
   const badan = {
-    agenNama: NAMA_AGEN,
+    agenNama: namaDari(opsi),
     pasangan: sn.pasangan,
     tf: '15m',
     arah: sn.arah,
     pasar: kripto ? 'kripto' : 'tradefi',
     judul: sn.pasangan + ' ' + sn.arah
          + (dari > 1 ? ' — zona, lapis ' + (ke + 1) + '/' + dari + ' @ ' + entry
-                     : ' — dari grup sinyal'),
-    ringkas: 'Dibaca otomatis dari ruang sinyal Telegram yang diikuti pemilik'
-           + (sn.pasanganDitebak ? '. Pasangan tidak disebut di pesannya, ditebak ' + sn.pasangan : '')
+                     : ' — hasil pantauan agen'),
+    ringkas: 'Level diteruskan agen pemantau, bukan analisa sistem ini'
+           + (sn.dariGambar ? '. Dibaca dari chart yang diposting' : '')
+           + (sn.pasanganDitebak ? '. Pasangan tidak disebut, ditebak ' + sn.pasangan : '')
            + '.',
     isi: {
       entry: entry,
       sl: sn.sl || 0,
       tp: (sn.tp && sn.tp[0]) || 0,
-      /* SUMBERNYA DITULIS TERANG-TERANGAN, berikut tautan ke pesan
-         aslinya. Sinyal ini bukan hasil analisa sistem ini sendiri, dan
-         kartu yang tidak menyebutkannya memberi kesan sebaliknya kepada
-         siapa pun yang membacanya nanti. */
-      alasan: 'Sumber: ruang sinyal Telegram (bukan analisa sistem ini).\n'
-            + (tautan ? 'Pesan asli: ' + tautan + '\n' : '')
-            + '\n'
+      /* KUTIPAN PESANNYA IKUT DIBUANG, bukan cuma tautannya.
+         ──────────────────────────────────────────────────────────────
+         Kutipan mentah adalah kalimat yang bisa dicari kata demi kata,
+         dan satu kalimat khas sudah cukup menuntun orang ke ruang
+         asalnya — persis kebocoran yang mau ditutup, cuma lewat pintu
+         lain. Angka yang berguna (zona, TP berjenjang, berapa pesan yang
+         menyusunnya) tetap ditulis; yang hilang cuma kalimat orangnya. */
+      alasan: 'Level ini DITERUSKAN dari ruang pantauan agen, bukan hasil '
+            + 'analisa sistem ini. Asal ruangnya tidak dipublikasikan.\n\n'
+            + (sn.dariGambar
+               ? 'Dibaca dari chart yang diposting di ruang itu — angkanya '
+                 + 'diambil dari label harga yang tercetak di gambarnya.\n'
+               : '')
             + (sn.entry ? ''
                : sn.rentang
-                 ? 'Pesannya memberi zona ' + sn.rentang.join(' - ')
+                 ? 'Sumbernya memberi zona ' + sn.rentang.join(' - ')
                    + '. Zona adalah cara masuk berlapis, jadi tiap ujungnya diterbitkan '
                    + 'sebagai kartu sendiri — ini lapis ' + (ke + 1) + ' dari ' + dari
                    + ', entry ' + entry + ', SL/TP sama untuk semua lapis.\n'
                  : 'Entry tidak disebut — dipakai harga pasar saat sinyal terbaca.\n')
             + ((sn.tp || []).length > 1 ? 'TP berjenjang: ' + sn.tp.join(' / ') + '\n' : '')
-            + (sn.potongan > 1 ? 'Disusun dari ' + sn.potongan + ' pesan berurutan.\n' : '')
-            + (teks ? '\nKutipan pesan:\n' + String(teks).slice(0, 900) : ''),
+            + (sn.potongan > 1 ? 'Disusun dari ' + sn.potongan + ' pesan berurutan.\n' : ''),
     },
   };
 
@@ -203,7 +235,7 @@ async function kirimSatuKartu(sn, entry, ke, dari, opsi) {
     });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) { catat('  kartu ditolak', r.status, JSON.stringify(j).slice(0, 140)); return null; }
-    catat('  kartu terkirim ke', NAMA_AGEN, '·', sn.pasangan, sn.arah,
+    catat('  kartu terkirim ke', namaDari(opsi), '·', sn.pasangan, sn.arah,
       'entry', entry, 'sl', sn.sl || '-', 'tp', (sn.tp || [])[0] || '-');
     return j.id || null;
   } catch (e) {
@@ -217,7 +249,7 @@ async function kirimSatuKartu(sn, entry, ke, dari, opsi) {
  *  Tanpa ini kartunya baru muncul saat Bang Pras memposting — dan sampai
  *  saat itu tidak ada cara membedakan "agennya hidup, grupnya sepi" dari
  *  "agennya mati". Keduanya sama-sama papan kosong. */
-async function daftarHadir(catat = console.log) {
+async function daftarHadir(catat = console.log, opsi = {}) {
   try {
     const r = await fetch(DASAR + '/api/analisa/agen/hadir', {
       method: 'POST',
@@ -228,15 +260,20 @@ async function daftarHadir(catat = console.log) {
            400 tanpa menjelaskan yang mana. Ketahuan saat diuji.
            `pasangan` juga ANGKA di sini (berapa banyak yang dipantau),
            bukan daftar namanya. */
-        nama: NAMA_AGEN,
-        strategi: 'Membaca ruang sinyal Telegram yang diikuti pemilik. Tidak '
-                + 'menganalisa sendiri: ia menyusun sinyal dari pesan berurutan '
-                + '(arah, zona, SL/TP) lalu memposting apa adanya.',
+        nama: namaDari(opsi),
+        /* Strateginya menjelaskan CARA KERJANYA tanpa menyebut ruangnya —
+           dua hal yang mudah tercampur. Yang perlu diketahui pembaca
+           kartu: agen ini tidak menganalisa sendiri. Dari mana levelnya
+           datang bukan bagian dari itu. */
+        strategi: opsi.strategi
+                || 'Meneruskan level dari ruang pantauan tertutup. Tidak '
+                 + 'menganalisa sendiri: ia menyusun sinyal dari pesan berurutan '
+                 + '(arah, zona, SL/TP) lalu memposting apa adanya.',
         pasangan: 1,
         tf: '15m',
       }),
     });
-    catat(r.ok ? 'terdaftar di papan sebagai ' + NAMA_AGEN
+    catat(r.ok ? 'terdaftar di papan sebagai ' + namaDari(opsi)
                 : 'daftar hadir ditolak ' + r.status);
   } catch (e) { catat('daftar hadir gagal:', e.message); }
 }
