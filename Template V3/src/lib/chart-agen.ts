@@ -27,6 +27,14 @@ export interface ChartPantauan {
   waktu: number;
   kb: number;
   sembunyi: boolean;
+  /** Sudah dipindahkan pemilik ke seksi koinnya.
+   *
+   *  OPSIONAL, dan `undefined` berarti SUDAH — bukan belum. Baris arsip yang
+   *  ditulis sebelum medan ini ada tidak membawanya sama sekali, dan
+   *  memperlakukan "tidak ada" sebagai belum-dipilah akan membuat seluruh
+   *  arsip lama membanjiri rak Baru sekaligus. Yang baru disimpan dengan
+   *  `false` yang tegas. */
+  terpilah?: boolean;
   catatan: string;
   sinyalId: string | null;
 }
@@ -74,7 +82,7 @@ export async function gambarChart(id: string): Promise<string | null> {
   } catch { return null; }
 }
 
-export async function tandaiChart(id: string, isi: { sembunyi?: boolean; catatan?: string }): Promise<boolean> {
+export async function tandaiChart(id: string, isi: { sembunyi?: boolean; catatan?: string; terpilah?: boolean }): Promise<boolean> {
   const t = await token();
   if (!t) return false;
   try {

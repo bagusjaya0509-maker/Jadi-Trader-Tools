@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
-import { EyeOff, GripHorizontal, Loader2, PenLine, RefreshCw, Trash2, Undo2, X } from 'lucide-react';
+import { EyeOff, FolderInput, GripHorizontal, Loader2, PenLine, RefreshCw, Trash2, Undo2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   daftarChart, gambarChart, tandaiChart, hapusChart, jadikanSinyal,
@@ -217,14 +217,14 @@ function GambarChart({ id, alt }: { id: string; alt: string }) {
 
   if (gagal) {
     return (
-      <div className="flex h-40 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900/60 text-[12px] text-zinc-500">
+      <div className="flex h-40 items-center justify-center border-b border-zinc-800 bg-zinc-900/60 text-[12px] text-zinc-500">
         Gambarnya tidak bisa diambil.
       </div>
     );
   }
   if (!url) {
     return (
-      <div className="flex h-40 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900/60">
+      <div className="flex h-40 items-center justify-center border-b border-zinc-800 bg-zinc-900/60">
         <Loader2 className="size-4 animate-spin text-zinc-600" />
       </div>
     );
@@ -237,8 +237,12 @@ function GambarChart({ id, alt }: { id: string; alt: string }) {
       <button type="button" onClick={() => setBuka(true)}
         title="Buka besar — jendelanya bisa digeser"
         className="block w-full cursor-zoom-in">
+        {/* TANPA border & sudut membulat sendiri. Kartunya sekarang yang
+            memotong sudutnya (overflow-hidden), dan gambar yang membawa
+            bingkainya sendiri di dalam kartu berbingkai menghasilkan dua
+            garis sejajar berjarak satu piksel. */}
         <img src={url} alt={alt}
-             className="w-full rounded-lg border border-zinc-800 transition-opacity hover:opacity-90" />
+             className="w-full transition-opacity hover:opacity-90" />
       </button>
       {buka && <JendelaGambar url={url} judul={alt} tutup={() => setBuka(false)} />}
     </>
@@ -324,6 +328,21 @@ function FormLevel({ chart, selesai }: { chart: ChartPantauan; selesai: () => vo
   );
 }
 
+/* ── FORMULIR LEVEL DIPADAMKAN ──────────────────────────────────────────
+   Keputusan pemilik: tombol "Tetapkan area entry" tidak terpakai — level
+   ditetapkan langsung di Chart & Entry sesudah menjiplak, bukan diketik dari
+   panel ini.
+
+   KODENYA SENGAJA TIDAK DIHAPUS. Rute servernya masih hidup
+   (/api/agen/chart/:id/sinyal, lengkap dengan pemeriksaan sisi SL/TP dan
+   penerbitan kartu atas nama agennya), dan formulir ini satu-satunya
+   pemakainya. Membuangnya berarti mengerjakan ulang keduanya kalau suatu
+   hari jalur itu diperlukan lagi.
+
+   Ubah ke `true` untuk menampilkannya kembali — tombol dan formulirnya
+   muncul bersamaan. */
+const FORM_LEVEL_TAMPIL = false;
+
 export function PanelChartAgen() {
   const [chart, setChart] = useState<ChartPantauan[] | null>(null);
   const [gagal, setGagal] = useState(false);
@@ -389,15 +408,30 @@ export function PanelChartAgen() {
      baru saja diperbarui memang yang paling ingin dilihat, dan daftar
      berabjad menaruh koin yang diam berbulan-bulan di atas hanya karena
      namanya dimulai huruf A. */
+  /* ── RAK "BARU" DI PALING ATAS ──────────────────────────────────────
+     Chart yang baru diambil agen berkumpul di satu rak paling atas, apa pun
+     koinnya, sampai pemilik memindahkannya. Alasannya bukan kerapian:
+     dikelompokkan langsung per koin, chart baru akan terselip di tengah
+     seksi yang isinya sudah belasan — dan yang baru datang adalah justru
+     yang paling perlu dilihat.
+
+     `terpilah === false` yang masuk rak ini, BUKAN "tidak terpilah".
+     Arsip lama tidak membawa medan itu sama sekali, dan menganggap
+     "tidak ada" berarti belum-dipilah akan menumpahkan seluruh arsip ke
+     rak Baru sekaligus. */
   const seksi = (() => {
+    const urut = [...daftar].sort((a, b) => b.waktu - a.waktu);
+    const baru = urut.filter((c) => c.terpilah === false);
+    const sisa = urut.filter((c) => c.terpilah !== false);
+
     const peta = new Map<string, ChartPantauan[]>();
-    for (const c of [...daftar].sort((a, b) => b.waktu - a.waktu)) {
+    for (const c of sisa) {
       const kunci = tebakPasangan(c.keterangan) || 'Lainnya';
       const isi = peta.get(kunci);
       if (isi) isi.push(c); else peta.set(kunci, [c]);
     }
-    return [...peta.entries()]
-      .map(([nama, isi]) => ({ nama, isi }))
+    const koin = [...peta.entries()]
+      .map(([nama, isi]) => ({ nama, isi, baru: false }))
       .sort((a, b) => {
         /* "Lainnya" selalu paling bawah: isinya chart yang pasangannya
            tidak terbaca, dan itu keranjang sisa — bukan koin yang kebetulan
@@ -406,7 +440,18 @@ export function PanelChartAgen() {
         if (b.nama === 'Lainnya') return -1;
         return b.isi[0].waktu - a.isi[0].waktu;
       });
+
+    return baru.length ? [{ nama: 'Baru masuk', isi: baru, baru: true }, ...koin] : koin;
   })();
+
+  /* Memindahkan satu chart ke seksi koinnya. Layarnya berubah SEKETIKA
+     (tanpa menunggu server) supaya kartunya terlihat berpindah tepat saat
+     ditekan; tarikan sesudahnya yang menyamakan dengan keadaan server. */
+  async function pilah(c: ChartPantauan) {
+    setChart((d) => (d || []).map((x) => (x.id === c.id ? { ...x, terpilah: true } : x)));
+    await tandaiChart(c.id, { terpilah: true });
+    void tarik();
+  }
 
   return (
     <div className="space-y-4">
@@ -459,83 +504,81 @@ export function PanelChartAgen() {
               Garisnya melintang penuh, bukan cuma di bawah tulisannya:
               yang perlu ditandai batas antar KELOMPOK, dan garis sepanjang
               tulisan cuma menghias judulnya. */}
-          <div className="sticky top-0 z-10 -mx-1 mb-3 border-b border-zinc-700 bg-zinc-950/95 px-1 pb-1.5 pt-2 backdrop-blur-sm">
+          <div className={cn('sticky top-0 z-10 -mx-1 mb-3 border-b bg-zinc-950/95 px-1 pb-1.5 pt-2 backdrop-blur-sm',
+            sk.baru ? 'border-amber-500/40' : 'border-zinc-700')}>
             <div className="flex items-baseline gap-2">
-              <span aria-hidden className="h-3.5 w-[3px] shrink-0 self-center rounded-full bg-violet-400/80" />
-              <h3 className="text-[13.5px] font-semibold tracking-tight text-zinc-100">{sk.nama}</h3>
+              <span aria-hidden className={cn('h-3.5 w-[3px] shrink-0 self-center rounded-full',
+                sk.baru ? 'bg-amber-400' : 'bg-violet-400/80')} />
+              <h3 className={cn('text-[13.5px] font-semibold tracking-tight',
+                sk.baru ? 'text-amber-300' : 'text-zinc-100')}>{sk.nama}</h3>
               <span className="text-[11px] text-zinc-500">
                 {sk.isi.length} chart · terbaru {umur(sk.isi[0].waktu)}
               </span>
+              {sk.baru && (
+                <span className="ml-auto text-[10.5px] text-zinc-600">
+                  Pindahkan ke seksi koinnya setelah dilihat
+                </span>
+              )}
             </div>
           </div>
           <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(100%,26rem),1fr))]">
             {sk.isi.map((c) => (
               <div key={c.id}
-                className={cn('rounded-xl border border-zinc-800 bg-zinc-900/40 p-3 transition-opacity',
+                /* TANPA PADDING di pembungkusnya. Gambarnya menyentuh tepi
+                   kiri, kanan, dan atas kartu; yang berpadding cuma bagian
+                   teks di bawahnya. overflow-hidden yang membuat sudut
+                   gambarnya ikut membulat mengikuti kartunya. */
+                className={cn('overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/40 transition-opacity',
                   c.sembunyi && 'opacity-55')}>
-                {/* SATU BARIS: nama koin di kiri, umur & ukuran di kanan.
-                    Dulu yang tertulis "AI Chart" — nama AGEN, sama persis di
-                    kesebelas kartu, jadi ia tidak pernah membedakan apa pun.
-                    Yang membedakan koinnya, dan itu yang dicari mata.
-
-                    Waktunya naik ke baris yang sama, tidak lagi menumpuk di
-                    bawahnya: dua baris teks kecil di kepala kartu memakan
-                    tinggi yang lebih berguna untuk gambarnya, dan di grid
-                    tinggi satu kartu menaikkan seluruh barisnya. */}
-                <div className="mb-2 flex items-baseline gap-2">
-                  <p className="min-w-0 truncate text-[12.5px] font-semibold tracking-tight text-zinc-100">
-                    {tebakPasangan(c.keterangan) || c.agen}
-                  </p>
-                  <span className="ml-auto shrink-0 text-[10.5px] tabular-nums text-zinc-600">
-                    {umur(c.waktu)} · {c.kb} KB
-                  </span>
-                </div>
+                {/* NAMA KOIN TIDAK DIULANG DI SINI.
+                    ─────────────────────────────────────────────────────
+                    Kepala seksi di atasnya sudah menyebutnya, dan tiap kartu
+                    di dalam seksi itu memang koin yang sama — mengulangnya
+                    di setiap kartu berarti tiga baris identik berturut-turut
+                    yang tidak menjawab pertanyaan apa pun. Yang membedakan
+                    kartu-kartu dalam satu seksi keterangan dan waktunya. */}
+                {/* Nama koin muncul HANYA di rak Baru. Di seksi koin ia
+                    diulang dari kepala seksinya dan tidak menjawab apa pun;
+                    di rak Baru isinya campur, jadi justru itu yang pertama
+                    perlu diketahui — "grafik apa yang barusan masuk". */}
+                {sk.baru && (
+                  <div className="flex items-baseline gap-2 px-3 pb-2 pt-2.5">
+                    <p className="min-w-0 truncate text-[12.5px] font-semibold tracking-tight text-amber-300">
+                      {tebakPasangan(c.keterangan) || 'Belum terbaca'}
+                    </p>
+                  </div>
+                )}
 
                 <GambarChart id={c.id} alt={c.keterangan || 'Chart pantauan'} />
 
-                {c.keterangan && (
-                  <p className="mt-2 whitespace-pre-wrap text-[12.5px] leading-relaxed text-zinc-300">
-                    {c.keterangan}
-                  </p>
-                )}
+                <div className="p-3">
+                  {c.keterangan && (
+                    <p className="whitespace-pre-wrap text-[12.5px] leading-relaxed text-zinc-300">
+                      {c.keterangan}
+                    </p>
+                  )}
 
-                {c.sinyalId && (
-                  <p className="mt-2 text-[12px] text-emerald-400">Sudah diterbitkan sebagai sinyal.</p>
-                )}
+                  {c.sinyalId && (
+                    <p className="mt-2 text-[12px] text-emerald-400">Sudah diterbitkan sebagai sinyal.</p>
+                  )}
 
-                {buka === c.id && (
-                  <FormLevel chart={c} selesai={() => { setBuka(null); void tarik(); }} />
-                )}
+                  {FORM_LEVEL_TAMPIL && buka === c.id && (
+                    <FormLevel chart={c} selesai={() => { setBuka(null); void tarik(); }} />
+                  )}
 
-                {/* SATU BARIS KAKI untuk semua tindakan kartu ini.
-                    ─────────────────────────────────────────────────────
-                    Ikon mata & sampah dulu duduk di kepala, berdampingan
-                    dengan nama dan waktu — dua hal yang cuma dibaca,
-                    ditempeli dua tombol yang MENGUBAH dan salah satunya
-                    menghapus. Sekarang semua yang bisa ditekan berkumpul di
-                    kaki: yang dibaca di atas, yang dilakukan di bawah.
-
-                    Barisnya tetap digambar walau formulirnya terbuka, cuma
-                    dua pintunya yang menyingkir — supaya menghapus atau
-                    menandai selesai tidak menuntut menutup formulir dulu.
-
-                    DUA PINTU ITU dua pekerjaan berbeda, bukan jalan pintas
-                    satu sama lain: yang kiri menetapkan level dari angka
-                    yang sudah terbaca di gambarnya, yang kanan membawa
-                    gambarnya ke chart sungguhan untuk dijiplak dulu — dipakai
-                    saat zonanya masih perlu dicocokkan ke harga berjalan.
-
-                    Sebaris, bukan bertumpuk: kartu-kartu ini duduk di grid,
-                    dan tinggi yang bertambah di satu kartu ikut menaikkan
-                    seluruh barisnya. */}
-                <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-                  {/* Fragment WAJIB: dua elemen bersaudara (tombol + tautan)
-                      dalam satu ekspresi JSX tidak bisa berdiri tanpa induk. */}
-                  {buka !== c.id && (<>
-                    <button onClick={() => setBuka(c.id)}
-                      className="cursor-pointer rounded-md border border-zinc-700 px-2.5 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-500 hover:text-zinc-100">
-                      {c.sinyalId ? 'Terbitkan lagi' : 'Tetapkan area entry'}
-                    </button>
+                  {/* Baris tindakan. Tetap digambar walau formulirnya terbuka
+                      supaya menghapus atau menandai selesai tidak menuntut
+                      menutup formulir dulu, dan ml-auto menahan ikonnya di
+                      ujung kanan dalam kedua keadaan: letak tombol hapus yang
+                      berpindah-pindah adalah tombol hapus yang cepat atau
+                      lambat tersenggol. */}
+                  <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                    {FORM_LEVEL_TAMPIL && buka !== c.id && (
+                      <button onClick={() => setBuka(c.id)}
+                        className="cursor-pointer rounded-md border border-zinc-700 px-2.5 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-500 hover:text-zinc-100">
+                        {c.sinyalId ? 'Terbitkan lagi' : 'Tetapkan area entry'}
+                      </button>
+                    )}
                     {/* Alamatnya membawa id chart-nya. Halaman Chart & Entry yang
                         mengambil gambarnya sendiri — bukan dioper lewat state
                         navigasi: alamat yang lengkap bisa disalin, dibuka di tab
@@ -549,23 +592,36 @@ export function PanelChartAgen() {
                       <PenLine className="size-3.5" />
                       Jiplak di Chart &amp; Entry
                     </Link>
-                  </>)}
 
-                  {/* Didorong ke ujung kanan oleh ml-auto, jadi ia tetap di
-                      sana baik saat dua pintunya tampil maupun saat formulir
-                      menggantikannya — letak tombol hapus yang berpindah-pindah
-                      adalah tombol hapus yang cepat atau lambat tersenggol. */}
-                  <span className="ml-auto flex shrink-0 items-center gap-0.5">
-                    <button onClick={() => void sembunyikan(c)}
-                      title={c.sembunyi ? 'Kembalikan ke daftar' : 'Tandai selesai'}
-                      className="cursor-pointer rounded p-1.5 text-zinc-500 transition-colors hover:text-zinc-200">
-                      {c.sembunyi ? <Undo2 className="size-3.5" /> : <EyeOff className="size-3.5" />}
-                    </button>
-                    <button onClick={() => void buang(c)} title="Hapus berikut gambarnya"
-                      className="cursor-pointer rounded p-1.5 text-zinc-500 transition-colors hover:text-red-400">
-                      <Trash2 className="size-3.5" />
-                    </button>
-                  </span>
+                    {sk.baru && (
+                      <button onClick={() => void pilah(c)}
+                        title="Pindahkan ke seksi koinnya"
+                        className="flex cursor-pointer items-center gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 px-2.5 py-1.5 text-[12px] text-amber-300 transition-colors hover:border-amber-500/60 hover:text-amber-200">
+                        <FolderInput className="size-3.5" />
+                        Pindahkan ke section
+                      </button>
+                    )}
+
+                    <span className="ml-auto flex shrink-0 items-center gap-0.5">
+                      <button onClick={() => void sembunyikan(c)}
+                        title={c.sembunyi ? 'Kembalikan ke daftar' : 'Tandai selesai'}
+                        className="cursor-pointer rounded p-1.5 text-zinc-500 transition-colors hover:text-zinc-200">
+                        {c.sembunyi ? <Undo2 className="size-3.5" /> : <EyeOff className="size-3.5" />}
+                      </button>
+                      <button onClick={() => void buang(c)} title="Hapus berikut gambarnya"
+                        className="cursor-pointer rounded p-1.5 text-zinc-500 transition-colors hover:text-red-400">
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </span>
+                  </div>
+
+                  {/* Waktu di KAKI kartu, bukan di kepala. Ia keterangan
+                      arsip — berguna saat membandingkan dua pembaruan koin
+                      yang sama, tapi bukan hal pertama yang dicari mata saat
+                      menyapu rak. Yang pertama gambarnya. */}
+                  <p className="mt-2 text-[10.5px] tabular-nums text-zinc-600">
+                    {umur(c.waktu)} · {c.kb} KB
+                  </p>
                 </div>
               </div>
             ))}

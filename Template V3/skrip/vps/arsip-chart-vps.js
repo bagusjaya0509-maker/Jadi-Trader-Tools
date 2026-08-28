@@ -93,6 +93,12 @@ module.exports = (app, { butuhLogin, batasLaju, express, DIR }) => {
     if (!c) return res.status(404).json({ error: 'Tidak ada.' });
     const b = req.body || {};
     if (typeof b.sembunyi === 'boolean') c.sembunyi = b.sembunyi;
+    /* `terpilah` = sudah dipindahkan pemilik ke seksi koinnya.
+       ────────────────────────────────────────────────────────────────
+       Chart yang baru masuk berkumpul di rak "Baru" paling atas supaya
+       terlihat apa yang datang; sesudah dilihat, pemilik memindahkannya
+       dan ia menyatu ke seksi koinnya masing-masing. */
+    if (typeof b.terpilah === 'boolean') c.terpilah = b.terpilah;
     if (typeof b.catatan === 'string') c.catatan = b.catatan.slice(0, 500);
     tulis(daftar);
     res.json({ ok: true, chart: c });
@@ -214,6 +220,15 @@ module.exports.simpanChart = function simpanChart(DIR, { id, agen, keterangan, w
     berkas,
     kb: Math.round(bita.length / 1024),
     sembunyi: false,
+    /* TEGAS false, dan itu yang membedakannya dari arsip lama.
+       ────────────────────────────────────────────────────────────────
+       Baris lama tidak punya medan ini sama sekali, dan pembacanya
+       memperlakukan "tidak ada" sebagai SUDAH dipilah. Kalau yang baru
+       juga dibiarkan kosong, ia tidak akan pernah muncul di rak Baru;
+       kalau yang lama dianggap belum dipilah, sebelas chart yang sudah
+       lama ada akan membanjiri rak itu sekaligus. Satu nilai tegas di
+       sini menyelesaikan keduanya tanpa perlu memigrasi apa pun. */
+    terpilah: false,
     catatan: '',
     sinyalId: null,
   });
