@@ -47,13 +47,18 @@ KELUAR = os.path.join(AKAR, "public", "artikel")
 # Gambar kartu. Dipetakan per artikel supaya nyambung isinya, bukan diputar
 # asal — semuanya berkas yang sudah ada di public/ dan sudah dioptimalkan.
 GAMBAR = {
-    "cara-menghubungkan-mt5-ke-jurnal-trading-otomatis": "/parallax/gunung-lilin.webp",
-    "cara-membuat-api-key-binance-yang-aman":            "/hero-bg2.webp",
-    "kenapa-data-binance-tidak-masuk-di-indonesia":      "/parallax/langit.webp",
-    "akun-sen-mt5-jurnal-seratus-kali-lipat":            "/hero-bg3.webp",
-    "cara-memasang-indikator-pine-di-tradingview":       "/parallax/gunung-malam.webp",
+    "cara-menghubungkan-mt5-ke-jurnal-trading-otomatis":
+        "/artikel/gambar/cara-menghubungkan-mt5-ke-jurnal-trading-otomatis.webp",
+    "cara-membuat-api-key-binance-yang-aman":
+        "/artikel/gambar/cara-membuat-api-key-binance-yang-aman.webp",
+    "kenapa-data-binance-tidak-masuk-di-indonesia":
+        "/artikel/gambar/kenapa-data-binance-tidak-masuk-di-indonesia.webp",
+    "akun-sen-mt5-jurnal-seratus-kali-lipat":
+        "/artikel/gambar/akun-sen-mt5-jurnal-seratus-kali-lipat.webp",
+    "cara-memasang-indikator-pine-di-tradingview":
+        "/artikel/gambar/cara-memasang-indikator-pine-di-tradingview.webp",
 }
-GAMBAR_BAWAAN = "/hero-bg.webp"
+GAMBAR_BAWAAN = "/artikel/gambar/cara-menghubungkan-mt5-ke-jurnal-trading-otomatis.webp"
 
 GAYA = """
 :root{--bg:#09090b;--panel:#111114;--garis:#26262b;--teks:#e4e4e7;
