@@ -322,15 +322,18 @@ utama, sisa = A.ARTIKEL[:3], A.ARTIKEL[3:]
 kartu_html = "".join(kartu(a, i == 0) for i, a in enumerate(utama))
 sisa_html = ('<div class="kisi-sisa">' + "".join(kartu(a) for a in sisa) + "</div>") if sisa else ""
 
+# <title> dan <h1> sengaja BERBEDA. Judul tab harus menyebut topiknya
+# supaya terbaca di hasil pencarian ("Artikel — Panduan..."); judul di
+# halaman boleh langsung memanggil pembacanya, karena orang yang sudah
+# membuka halamannya tidak perlu diberi tahu ia sedang di mana.
 hub = (kepala("Artikel — Panduan Jadi Trader Tools",
-              "Panduan memakai Jadi Trader Tools dan dasar-dasar trading: "
-              "menghubungkan MT5, API Binance, membaca chart, dan mengelola risiko.",
+              A.AULA_DESKRIPSI,
               "/artikel/", lebar=True)
-       + '<section class="seksi"><span class="latar-label">ARTIKEL</span>'
-         '<h1 class="aula">Artikel</h1>'
-         '<p class="aula">Panduan memakai alatnya, dan dasar-dasar yang '
-         'membuat alat itu berguna.</p>'
-         '<div class="kisi">' + kartu_html + '</div>' + sisa_html + '</section>'
+       + '<section class="seksi"><span class="latar-label">%s</span>'
+         '<h1 class="aula">%s</h1>'
+         '<p class="aula">%s</p>'
+         % (esc(A.AULA_LABEL), esc(A.AULA_JUDUL), esc(A.AULA_DESKRIPSI))
+       + '<div class="kisi">' + kartu_html + '</div>' + sisa_html + '</section>'
        + EKOR)
 io.open(os.path.join(KELUAR, "index.html"), "w", encoding="utf-8").write(hub)
 print("  %-52s %5d huruf" % ("(halaman daftar)", len(hub)))
