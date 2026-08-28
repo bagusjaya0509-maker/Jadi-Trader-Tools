@@ -59,9 +59,30 @@ code{background:#1c1c20;border:1px solid var(--garis);border-radius:4px;
 .terkait{margin-top:44px;border-top:1px solid var(--garis);padding-top:22px}
 .terkait h2{font-size:15px;color:var(--redup);margin:0 0 10px;
   text-transform:uppercase;letter-spacing:.06em}
-.terkait a{display:block;margin-bottom:8px;text-decoration:none;
+.terkait a{display:inline-block;text-decoration:none;
   color:var(--teks);font-weight:500}
+/* width:fit-content — TANPA ini pembungkusnya selebar kolom, dan kartu
+   pratinjau yang dipusatkan dengan left:50% mendarat 87px di kanan
+   tautannya. Diukur, bukan dikira. */
+.terkait .pratinjau{display:block;width:fit-content;margin-bottom:8px}
 .terkait a:hover{color:var(--aksen)}
+
+/* ── pratinjau tautan: tiruan link-preview.tsx tanpa JavaScript ───────── */
+.pratinjau{position:relative;display:inline-block}
+.pratinjau > .kartu-p{position:absolute;bottom:calc(100% + 10px);left:50%;
+  z-index:20;padding:4px;background:#fff;border:2px solid transparent;
+  border-radius:12px;box-shadow:0 20px 45px rgba(0,0,0,.55);
+  opacity:0;pointer-events:none;
+  transform:translate(-50%,20px) scale(.6);transform-origin:bottom center;
+  transition:opacity .18s ease,transform .32s cubic-bezier(.34,1.56,.64,1)}
+.pratinjau > .kartu-p img{display:block;width:200px;height:125px;
+  object-fit:cover;border-radius:8px}
+.pratinjau:hover > .kartu-p,
+.pratinjau:focus-within > .kartu-p{opacity:1;transform:translate(-50%,0) scale(1)}
+/* Di layar sentuh tidak ada kursor yang melayang, jadi kartunya tidak akan
+   pernah muncul — dan kalau ia muncul waktu disentuh, ia justru menutupi
+   tautan yang hendak ditekan. */
+@media(hover:none){.pratinjau > .kartu-p{display:none}}
 footer{margin-top:52px;border-top:1px solid var(--garis);padding-top:20px;
   color:#71717a;font-size:13px}
 .label{display:inline-block;font-size:11px;letter-spacing:.08em;
@@ -111,8 +132,16 @@ footer{margin-top:52px;border-top:1px solid var(--garis);padding-top:20px;
   .kisi-sisa{grid-template-columns:repeat(3,1fr)}
   .kartu.utama{grid-column:span 1;grid-row:span 2}
   .latar-label{font-size:340px;left:-16%}
-  .seksi h1.aula{font-size:56px}
+  /* Satu baris, dan ukurannya DITURUNKAN sampai muat — bukan sebaliknya.
+     Diukur di peramban: kolom 1.080px, judulnya 50 karakter, jadi 38px
+     yang muat dengan sisa napas. nowrap hanya di sini; di layar sempit
+     judul dipaksa satu baris akan mengecil sampai tidak terbaca. */
+  .seksi h1.aula{font-size:38px;white-space:nowrap}
 }
+/* 44px membuat teksnya 1.080px di wadah 1.080px — pas, tapi nol sisa.
+   Lebar huruf bisa berbeda sedikit antar peramban dan antar sistem, dan
+   yang "pas" di sini akan terlipat di tempat lain tanpa ada yang tahu. */
+@media(min-width:1280px){.seksi h1.aula{font-size:41px}}
 @media(max-width:520px){h1{font-size:27px}.bungkus{padding:20px 16px 64px}
   .seksi h1.aula{font-size:30px}.latar-label{font-size:110px}
   .seksi p.aula{font-size:17px;line-height:1.8}}
