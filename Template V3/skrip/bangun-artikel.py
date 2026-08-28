@@ -433,3 +433,45 @@ io.open(os.path.join(AKAR, "public", "sitemap.xml"), "w", encoding="utf-8").writ
 
 print("\n  %d artikel + 1 halaman daftar" % len(A.ARTIKEL))
 print("  sitemap.xml: %d alamat" % (len(TETAP) + len(A.ARTIKEL)))
+
+# ── salinan TypeScript untuk halaman React ──────────────────────────────
+import json as _json
+
+def _blok(a):
+    return [{"jenis": j, "isi": (x if isinstance(x, list) else str(x))}
+            for j, x in a["isi"]]
+
+_data = [{
+    "slug": a["slug"], "jenis": a["jenis"], "judul": a["judul"],
+    "ringkas": a["ringkas"], "menit": menitBaca(a),
+    "gambar": GAMBAR.get(a["slug"], GAMBAR_BAWAAN),
+    "isi": _blok(a),
+    "terkait": [{"slug": s, "judul": peta[s]["judul"],
+                 "gambar": GAMBAR.get(s, GAMBAR_BAWAAN)}
+                for s in a.get("terkait", []) if s in peta],
+} for a in A.ARTIKEL]
+
+_KEPALA = """/* DIBUAT OTOMATIS oleh skrip/bangun-artikel.py \u2014 jangan disunting tangan.
+   Sumbernya skrip/artikel-isi.py; berkas ini ditulis ULANG tiap kali artikel
+   dibangun, jadi suntingan di sini hilang tanpa peringatan. */
+
+export type BlokJenis = 'p' | 'h2' | 'ul' | 'ol' | 'catatan';
+
+export interface Blok { jenis: BlokJenis; isi: string | string[] }
+
+export interface Terkait { slug: string; judul: string; gambar: string }
+
+export interface Artikel {
+  slug: string; jenis: string; judul: string; ringkas: string;
+  menit: number; gambar: string; isi: Blok[]; terkait: Terkait[];
+}
+
+export const ARTIKEL: Artikel[] = """
+
+_ts = _KEPALA + _json.dumps(_data, ensure_ascii=False, indent=2) + ";" + chr(10)
+
+_dirTs = os.path.join(AKAR, "src", "artikel")
+os.makedirs(_dirTs, exist_ok=True)
+io.open(os.path.join(_dirTs, "isi.ts"), "w", encoding="utf-8").write(_ts)
+print("  src/artikel/isi.ts: %d artikel, %d huruf" % (len(_data), len(_ts)))
+
