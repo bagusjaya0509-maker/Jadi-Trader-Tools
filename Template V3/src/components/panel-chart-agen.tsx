@@ -378,20 +378,22 @@ export function PanelChartAgen() {
               <div key={c.id}
                 className={cn('rounded-xl border border-zinc-800 bg-zinc-900/40 p-3 transition-opacity',
                   c.sembunyi && 'opacity-55')}>
-                <div className="mb-2 flex items-start gap-2">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[12px] font-medium text-zinc-300">{c.agen}</p>
-                    <p className="text-[11px] text-zinc-600">{umur(c.waktu)} · {c.kb} KB</p>
-                  </div>
-                  <button onClick={() => void sembunyikan(c)}
-                    title={c.sembunyi ? 'Kembalikan ke daftar' : 'Tandai selesai'}
-                    className="cursor-pointer rounded p-1 text-zinc-500 transition-colors hover:text-zinc-200">
-                    {c.sembunyi ? <Undo2 className="size-3.5" /> : <EyeOff className="size-3.5" />}
-                  </button>
-                  <button onClick={() => void buang(c)} title="Hapus berikut gambarnya"
-                    className="cursor-pointer rounded p-1 text-zinc-500 transition-colors hover:text-red-400">
-                    <Trash2 className="size-3.5" />
-                  </button>
+                {/* SATU BARIS: nama koin di kiri, umur & ukuran di kanan.
+                    Dulu yang tertulis "AI Chart" — nama AGEN, sama persis di
+                    kesebelas kartu, jadi ia tidak pernah membedakan apa pun.
+                    Yang membedakan koinnya, dan itu yang dicari mata.
+
+                    Waktunya naik ke baris yang sama, tidak lagi menumpuk di
+                    bawahnya: dua baris teks kecil di kepala kartu memakan
+                    tinggi yang lebih berguna untuk gambarnya, dan di grid
+                    tinggi satu kartu menaikkan seluruh barisnya. */}
+                <div className="mb-2 flex items-baseline gap-2">
+                  <p className="min-w-0 truncate text-[12.5px] font-semibold tracking-tight text-zinc-100">
+                    {tebakPasangan(c.keterangan) || c.agen}
+                  </p>
+                  <span className="ml-auto shrink-0 text-[10.5px] tabular-nums text-zinc-600">
+                    {umur(c.waktu)} · {c.kb} KB
+                  </span>
                 </div>
 
                 <GambarChart id={c.id} alt={c.keterangan || 'Chart pantauan'} />
@@ -406,20 +408,35 @@ export function PanelChartAgen() {
                   <p className="mt-2 text-[12px] text-emerald-400">Sudah diterbitkan sebagai sinyal.</p>
                 )}
 
-                {buka === c.id ? (
+                {buka === c.id && (
                   <FormLevel chart={c} selesai={() => { setBuka(null); void tarik(); }} />
-                ) : (
-                  /* DUA PINTU BERDAMPINGAN, dan keduanya memang dua pekerjaan
-                     yang berbeda: yang kiri menetapkan level dari angka yang
-                     sudah terbaca di gambarnya, yang kanan membawa gambarnya ke
-                     chart sungguhan untuk dijiplak dulu. Yang kedua bukan jalan
-                     pintas ke yang pertama; ia yang dipakai saat zonanya masih
-                     perlu dicocokkan ke harga yang berjalan.
+                )}
 
-                     Sebaris, bukan bertumpuk: kartu-kartu ini duduk di grid,
-                     dan tinggi yang bertambah di satu kartu ikut menaikkan
-                     seluruh barisnya. */
-                  <div className="mt-2.5 flex flex-wrap gap-1.5">
+                {/* SATU BARIS KAKI untuk semua tindakan kartu ini.
+                    ─────────────────────────────────────────────────────
+                    Ikon mata & sampah dulu duduk di kepala, berdampingan
+                    dengan nama dan waktu — dua hal yang cuma dibaca,
+                    ditempeli dua tombol yang MENGUBAH dan salah satunya
+                    menghapus. Sekarang semua yang bisa ditekan berkumpul di
+                    kaki: yang dibaca di atas, yang dilakukan di bawah.
+
+                    Barisnya tetap digambar walau formulirnya terbuka, cuma
+                    dua pintunya yang menyingkir — supaya menghapus atau
+                    menandai selesai tidak menuntut menutup formulir dulu.
+
+                    DUA PINTU ITU dua pekerjaan berbeda, bukan jalan pintas
+                    satu sama lain: yang kiri menetapkan level dari angka
+                    yang sudah terbaca di gambarnya, yang kanan membawa
+                    gambarnya ke chart sungguhan untuk dijiplak dulu — dipakai
+                    saat zonanya masih perlu dicocokkan ke harga berjalan.
+
+                    Sebaris, bukan bertumpuk: kartu-kartu ini duduk di grid,
+                    dan tinggi yang bertambah di satu kartu ikut menaikkan
+                    seluruh barisnya. */}
+                <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                  {/* Fragment WAJIB: dua elemen bersaudara (tombol + tautan)
+                      dalam satu ekspresi JSX tidak bisa berdiri tanpa induk. */}
+                  {buka !== c.id && (<>
                     <button onClick={() => setBuka(c.id)}
                       className="cursor-pointer rounded-md border border-zinc-700 px-2.5 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-500 hover:text-zinc-100">
                       {c.sinyalId ? 'Terbitkan lagi' : 'Tetapkan area entry'}
@@ -437,8 +454,24 @@ export function PanelChartAgen() {
                       <PenLine className="size-3.5" />
                       Jiplak di Chart &amp; Entry
                     </Link>
-                  </div>
-                )}
+                  </>)}
+
+                  {/* Didorong ke ujung kanan oleh ml-auto, jadi ia tetap di
+                      sana baik saat dua pintunya tampil maupun saat formulir
+                      menggantikannya — letak tombol hapus yang berpindah-pindah
+                      adalah tombol hapus yang cepat atau lambat tersenggol. */}
+                  <span className="ml-auto flex shrink-0 items-center gap-0.5">
+                    <button onClick={() => void sembunyikan(c)}
+                      title={c.sembunyi ? 'Kembalikan ke daftar' : 'Tandai selesai'}
+                      className="cursor-pointer rounded p-1.5 text-zinc-500 transition-colors hover:text-zinc-200">
+                      {c.sembunyi ? <Undo2 className="size-3.5" /> : <EyeOff className="size-3.5" />}
+                    </button>
+                    <button onClick={() => void buang(c)} title="Hapus berikut gambarnya"
+                      className="cursor-pointer rounded p-1.5 text-zinc-500 transition-colors hover:text-red-400">
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  </span>
+                </div>
               </div>
             ))}
           </div>
