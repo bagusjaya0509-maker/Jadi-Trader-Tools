@@ -23,7 +23,17 @@ import path from 'node:path';
    ════════════════════════════════════════════════════════════════════════ */
 export default defineConfig({
   plugins: [react()],
-  resolve: { alias: { '@': path.resolve(__dirname, './src') } },
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+      /* `next/image` dan `next/link` DISEDIAKAN, bukan disunting keluar dari
+         komponennya. Komponen kiriman pemilik ditulis untuk Next.js; alih-alih
+         mengubah kodenya (yang sudah berkali-kali diminta jangan), modulnya
+         yang dibuat ada. Lihat src/shim/. */
+      'next/image': path.resolve(__dirname, './src/shim/next-image.tsx'),
+      'next/link': path.resolve(__dirname, './src/shim/next-link.tsx'),
+    },
+  },
   build: {
     outDir: 'public',
     /* WAJIB false. outDir menunjuk ke public/, dan mengosongkannya berarti
