@@ -107,6 +107,7 @@ const Aktivasi      = lazy(() => muat(() => import('@/halaman/Aktivasi')));
 const Template      = lazy(() => muat(() => import('@/halaman/Template')));
 const Pratinjau     = lazy(() => muat(() => import('@/halaman/Pratinjau')));
 const Preview       = lazy(() => muat(() => import('@/halaman/Preview')));
+const Testing       = lazy(() => muat(() => import('@/halaman/Testing')));
 const ChartBacktest = lazy(() => muat(() => import('@/halaman/Chart')));
 const Jurnal        = lazy(() => muat(() => import('@/halaman/Jurnal')));
 const PersonalArea  = lazy(() => muat(() => import('@/halaman/PersonalArea')));
@@ -397,6 +398,10 @@ export default function App() {
               orang yang sedang menimbang produk tidak boleh disuruh
               mendaftar untuk melihat bentuk barangnya. */}
           <Route path="/preview" element={<Preview />} />
+          {/* Halaman uji komponen kiriman pemilik. Demo Aceternity
+              ditempel apa adanya; tidak diindeks, tidak ditautkan dari
+              mana pun — ia memang cuma untuk dilihat. */}
+          <Route path="/testing" element={<Testing />} />
           <Route path="/akses" element={<Akses />} />
           {/* Tujuan link kiriman otomatis Lynk sesudah pembayaran. DI LUAR
               gerbang: orang yang baru membayar belum punya akses apa pun,
