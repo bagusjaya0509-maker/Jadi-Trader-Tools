@@ -59,9 +59,30 @@ code{background:#1c1c20;border:1px solid var(--garis);border-radius:4px;
 .terkait{margin-top:44px;border-top:1px solid var(--garis);padding-top:22px}
 .terkait h2{font-size:15px;color:var(--redup);margin:0 0 10px;
   text-transform:uppercase;letter-spacing:.06em}
-.terkait a{display:block;margin-bottom:8px;text-decoration:none;
+.terkait a{display:inline-block;text-decoration:none;
   color:var(--teks);font-weight:500}
+/* width:fit-content — TANPA ini pembungkusnya selebar kolom, dan kartu
+   pratinjau yang dipusatkan dengan left:50% mendarat 87px di kanan
+   tautannya. Diukur, bukan dikira. */
+.terkait .pratinjau{display:block;width:fit-content;margin-bottom:8px}
 .terkait a:hover{color:var(--aksen)}
+
+/* ── pratinjau tautan: tiruan link-preview.tsx tanpa JavaScript ───────── */
+.pratinjau{position:relative;display:inline-block}
+.pratinjau > .kartu-p{position:absolute;bottom:calc(100% + 10px);left:50%;
+  z-index:20;padding:4px;background:#fff;border:2px solid transparent;
+  border-radius:12px;box-shadow:0 20px 45px rgba(0,0,0,.55);
+  opacity:0;pointer-events:none;
+  transform:translate(-50%,20px) scale(.6);transform-origin:bottom center;
+  transition:opacity .18s ease,transform .32s cubic-bezier(.34,1.56,.64,1)}
+.pratinjau > .kartu-p img{display:block;width:200px;height:125px;
+  object-fit:cover;border-radius:8px}
+.pratinjau:hover > .kartu-p,
+.pratinjau:focus-within > .kartu-p{opacity:1;transform:translate(-50%,0) scale(1)}
+/* Di layar sentuh tidak ada kursor yang melayang, jadi kartunya tidak akan
+   pernah muncul — dan kalau ia muncul waktu disentuh, ia justru menutupi
+   tautan yang hendak ditekan. */
+@media(hover:none){.pratinjau > .kartu-p{display:none}}
 footer{margin-top:52px;border-top:1px solid var(--garis);padding-top:20px;
   color:#71717a;font-size:13px}
 .label{display:inline-block;font-size:11px;letter-spacing:.08em;
@@ -111,8 +132,16 @@ footer{margin-top:52px;border-top:1px solid var(--garis);padding-top:20px;
   .kisi-sisa{grid-template-columns:repeat(3,1fr)}
   .kartu.utama{grid-column:span 1;grid-row:span 2}
   .latar-label{font-size:340px;left:-16%}
-  .seksi h1.aula{font-size:56px}
+  /* Satu baris, dan ukurannya DITURUNKAN sampai muat — bukan sebaliknya.
+     Diukur di peramban: kolom 1.080px, judulnya 50 karakter, jadi 38px
+     yang muat dengan sisa napas. nowrap hanya di sini; di layar sempit
+     judul dipaksa satu baris akan mengecil sampai tidak terbaca. */
+  .seksi h1.aula{font-size:38px;white-space:nowrap}
 }
+/* 44px membuat teksnya 1.080px di wadah 1.080px — pas, tapi nol sisa.
+   Lebar huruf bisa berbeda sedikit antar peramban dan antar sistem, dan
+   yang "pas" di sini akan terlipat di tempat lain tanpa ada yang tahu. */
+@media(min-width:1280px){.seksi h1.aula{font-size:41px}}
 @media(max-width:520px){h1{font-size:27px}.bungkus{padding:20px 16px 64px}
   .seksi h1.aula{font-size:30px}.latar-label{font-size:110px}
   .seksi p.aula{font-size:17px;line-height:1.8}}
@@ -128,7 +157,7 @@ footer{margin-top:52px;border-top:1px solid var(--garis);padding-top:20px;
     <a href="/akses">Harga</a>
   </nav>
 </header>
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Cara Membuat API Key Binance yang Aman untuk Screener dan Chart","description":"Satu centang yang tidak boleh diaktifkan, kenapa API key tidak pernah masuk ke peramban, dan apa bedanya dengan App Token.","mainEntityOfPage":"https://jaditrader.co.id/artikel/cara-membuat-api-key-binance-yang-aman/","inLanguage":"id-ID","publisher":{"@type":"Organization","name":"Jadi Trader Tools","url":"https://jaditrader.co.id"}}</script><article><span class="label">Panduan &middot; 2 menit baca</span><h1>Cara Membuat API Key Binance yang Aman untuk Screener dan Chart</h1><p class="ringkas">Satu centang yang tidak boleh diaktifkan, kenapa API key tidak pernah masuk ke peramban, dan apa bedanya dengan App Token.</p><p>API key Binance itu kunci rumah. Ia dibuat sekali, ditempel sekali, lalu dilupakan — dan justru karena dilupakan itulah ia berbahaya. Halaman ini soal cara membuatnya sehingga kalaupun bocor, kerugiannya terbatas.</p><h2>Satu centang yang menentukan segalanya</h2><p>Saat membuat API key di Binance, <b>jangan centang Withdraw</b>. Kalaupun key-nya bocor, penerimanya tidak bisa menarik saldomu ke mana pun. Ini bukan saran kehati-hatian umum — ini beda antara kehilangan kendali order dan kehilangan uangnya.</p><div class="catatan">Aturan yang sama berlaku untuk kunci apa pun yang kamu buat di bursa mana pun: berikan izin sesempit yang dibutuhkan alatnya, bukan seluas yang diizinkan bursanya.</div><h2>Kenapa perlu VPS sendiri</h2><p>Binance diblokir sebagian ISP Indonesia. Permintaan dari peramban di jaringan itu tidak pernah sampai, dan gejalanya membingungkan: chart kosong, screener tidak mengisi, tanpa pesan galat yang jelas.</p><p>Karena itu permintaannya dilewatkan proxy di server di luar jaringan tersebut. Konsekuensinya sekaligus keuntungannya: API key-nya tinggal di berkas <code>.env</code> di VPS milikmu sendiri, dan tidak pernah dikirim ke peramban, ke situs ini, atau ke mana pun.</p><h2>App Token bukan API key</h2><p>Dua hal ini sering tertukar, padahal fungsinya berlawanan arah:</p><ul><li><b>API key Binance</b> — kunci antara VPS-mu dan Binance. Hanya ada di VPS. Tidak pernah keluar dari sana.</li><li><b>App Token</b> — kata sandi 64 karakter antara peramban dan VPS-mu. Ia yang membuktikan bahwa yang memerintah adalah kamu.</li></ul><p>Siapa pun yang memegang App Token bisa membuka dan menutup posisi di akunmu. Perlakukan seperti kata sandi, bukan seperti alamat.</p><div class="catatan">Backend URL dan App Token tersimpan di perangkat yang kamu pakai saja — keduanya tidak pernah dikirim ke server kami.</div><h2>Yang tidak pernah kami simpan</h2><ul><li>API key dan secret Binance</li><li>Nomor kartu</li><li>Kata sandi MT5 dan kata sandi investor</li></ul><p>Yang disimpan: email, status langganan, dan riwayat transaksi yang dikirim EA.</p><h2>Kalau data pasar tetap tidak masuk</h2><p>Ganti DNS bisa menolong sementara, tapi yang andal tetap proxy VPS yang diatur di halaman Integrations. Tutorial lengkapnya — dari membuat API key sampai <code>pm2 startup</code>, dengan perintah siap salin — ada di sana.</p></article><div class="ajakan"><p>Semua yang dijelaskan di atas bisa dicoba tanpa membayar dan tanpa mendaftar lebih dulu lewat halaman pratinjau — akses penuh 24 jam.</p><a class="tombol" href="/preview">Coba tanpa daftar &rarr;</a></div><div class="terkait"><h2>Baca juga</h2><a href="/artikel/cara-menghubungkan-mt5-ke-jurnal-trading-otomatis/">Cara Menghubungkan MetaTrader 5 ke Jurnal Trading Otomatis</a><a href="/artikel/kenapa-data-binance-tidak-masuk-di-indonesia/">Kenapa Data Binance Tidak Masuk di Indonesia, dan Cara Mengatasinya</a></div>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Cara Membuat API Key Binance yang Aman untuk Screener dan Chart","description":"Satu centang yang tidak boleh diaktifkan, kenapa API key tidak pernah masuk ke peramban, dan apa bedanya dengan App Token.","mainEntityOfPage":"https://jaditrader.co.id/artikel/cara-membuat-api-key-binance-yang-aman/","inLanguage":"id-ID","publisher":{"@type":"Organization","name":"Jadi Trader Tools","url":"https://jaditrader.co.id"}}</script><article><span class="label">Panduan &middot; 2 menit baca</span><h1>Cara Membuat API Key Binance yang Aman untuk Screener dan Chart</h1><p class="ringkas">Satu centang yang tidak boleh diaktifkan, kenapa API key tidak pernah masuk ke peramban, dan apa bedanya dengan App Token.</p><p>API key Binance itu kunci rumah. Ia dibuat sekali, ditempel sekali, lalu dilupakan — dan justru karena dilupakan itulah ia berbahaya. Halaman ini soal cara membuatnya sehingga kalaupun bocor, kerugiannya terbatas.</p><h2>Satu centang yang menentukan segalanya</h2><p>Saat membuat API key di Binance, <b>jangan centang Withdraw</b>. Kalaupun key-nya bocor, penerimanya tidak bisa menarik saldomu ke mana pun. Ini bukan saran kehati-hatian umum — ini beda antara kehilangan kendali order dan kehilangan uangnya.</p><div class="catatan">Aturan yang sama berlaku untuk kunci apa pun yang kamu buat di bursa mana pun: berikan izin sesempit yang dibutuhkan alatnya, bukan seluas yang diizinkan bursanya.</div><h2>Kenapa perlu VPS sendiri</h2><p>Binance diblokir sebagian ISP Indonesia. Permintaan dari peramban di jaringan itu tidak pernah sampai, dan gejalanya membingungkan: chart kosong, screener tidak mengisi, tanpa pesan galat yang jelas.</p><p>Karena itu permintaannya dilewatkan proxy di server di luar jaringan tersebut. Konsekuensinya sekaligus keuntungannya: API key-nya tinggal di berkas <code>.env</code> di VPS milikmu sendiri, dan tidak pernah dikirim ke peramban, ke situs ini, atau ke mana pun.</p><h2>App Token bukan API key</h2><p>Dua hal ini sering tertukar, padahal fungsinya berlawanan arah:</p><ul><li><b>API key Binance</b> — kunci antara VPS-mu dan Binance. Hanya ada di VPS. Tidak pernah keluar dari sana.</li><li><b>App Token</b> — kata sandi 64 karakter antara peramban dan VPS-mu. Ia yang membuktikan bahwa yang memerintah adalah kamu.</li></ul><p>Siapa pun yang memegang App Token bisa membuka dan menutup posisi di akunmu. Perlakukan seperti kata sandi, bukan seperti alamat.</p><div class="catatan">Backend URL dan App Token tersimpan di perangkat yang kamu pakai saja — keduanya tidak pernah dikirim ke server kami.</div><h2>Yang tidak pernah kami simpan</h2><ul><li>API key dan secret Binance</li><li>Nomor kartu</li><li>Kata sandi MT5 dan kata sandi investor</li></ul><p>Yang disimpan: email, status langganan, dan riwayat transaksi yang dikirim EA.</p><h2>Kalau data pasar tetap tidak masuk</h2><p>Ganti DNS bisa menolong sementara, tapi yang andal tetap proxy VPS yang diatur di halaman Integrations. Tutorial lengkapnya — dari membuat API key sampai <code>pm2 startup</code>, dengan perintah siap salin — ada di sana.</p></article><div class="ajakan"><p>Semua yang dijelaskan di atas bisa dicoba tanpa membayar dan tanpa mendaftar lebih dulu lewat halaman pratinjau — akses penuh 24 jam.</p><a class="tombol" href="/preview">Coba tanpa daftar &rarr;</a></div><div class="terkait"><h2>Baca juga</h2><span class="pratinjau"><span class="kartu-p"><img src="/artikel/gambar/cara-menghubungkan-mt5-ke-jurnal-trading-otomatis.webp" width="200" height="125" loading="lazy" decoding="async" alt=""></span><a href="/artikel/cara-menghubungkan-mt5-ke-jurnal-trading-otomatis/">Cara Menghubungkan MetaTrader 5 ke Jurnal Trading Otomatis</a></span><span class="pratinjau"><span class="kartu-p"><img src="/artikel/gambar/kenapa-data-binance-tidak-masuk-di-indonesia.webp" width="200" height="125" loading="lazy" decoding="async" alt=""></span><a href="/artikel/kenapa-data-binance-tidak-masuk-di-indonesia/">Kenapa Data Binance Tidak Masuk di Indonesia, dan Cara Mengatasinya</a></span></div>
 <footer>
   <p>Edukasi, bukan rekomendasi finansial. Trading mengandung risiko kehilangan modal.</p>
   <p><a href="/">jaditrader.co.id</a> &middot; <a href="/legal">Legal</a></p>
