@@ -1721,6 +1721,22 @@ export default function Analisa() {
       b.delete('sub');
       return b;
     }, { replace: true });
+  /* Masuk kanal DAN memilih tabnya dalam SATU tulisan ke alamat.
+     ────────────────────────────────────────────────────────────────────
+     Tidak bisa dengan memanggil setKanalBuka lalu setSub: yang pertama
+     sengaja MENGHAPUS `sub` (masuk kanal selalu mulai dari tab bawaannya),
+     dan pembaruan fungsional react-router menerima nilai dari closure
+     render — bukan hasil panggilan sebelumnya di tick yang sama. Jadi yang
+     kedua akan menulis ?sub=chart TANPA ?kanal, dan tabnya ditolak sendiri
+     oleh subSah karena kanalnya tidak terbuka. */
+  const bukaKanalKeTab = (uid: string, id: string) =>
+    setCariSub((p) => {
+      const b = new URLSearchParams(p);
+      b.set('kanal', uid);
+      b.set('sub', id);
+      return b;
+    }, { replace: true });
+
   const { disematkan, ubahPin } = usePinAnalis();
   /** Kanal yang sedang diklik-kanan, beserta titik munculnya menu. null =
    *  tidak ada menu terbuka. */
@@ -3636,7 +3652,15 @@ export default function Analisa() {
                 Di depan, bukan di belakang: kartu ini paling informatif saat
                 papannya masih sepi, dan di ekor daftar ia justru tidak
                 terlihat persis pada keadaan itu. */}
-            {agenSiaga.map((ag) => <KartuAgenSiaga key={ag.uid} agen={ag} />)}
+            {agenSiaga.map((ag) => (
+              <KartuAgenSiaga key={ag.uid} agen={ag}
+                /* Hanya kartu AI Chart, dan hanya untuk pemiliknya. Isi
+                   ruangnya chart bertanda air sumbernya; pintu yang terlihat
+                   oleh orang lain cuma akan mengantar ke penolakan server. */
+                keRuang={pemilik && ag.uid === UID_KANAL_CHART
+                  ? () => bukaKanalKeTab(ag.uid, 'chart')
+                  : undefined} />
+            ))}
             {kanalUrut.map(([uid, sinyal]) => {
               const a0 = sinyal[0];
               /* Batas waktu rekam jejak kartu ini. Dihitung dari seluruh
@@ -4002,7 +4026,7 @@ export default function Analisa() {
                 sekarang bagaimana", log menjawab "analisnya barusan
                 melakukan apa" — dan pertanyaan kedua yang lebih dulu
                 ditanyakan orang yang mengikuti. */}
-            {sub !== 'performa' && <LogAktivitas sinyal={terpilih} />}
+            {sub !== 'performa' && sub !== 'chart' && <LogAktivitas sinyal={terpilih} />}
 
             {(() => {
               /* Tab Performa mengganti BADAN kanal saja — kepalanya di atas
@@ -4010,6 +4034,13 @@ export default function Analisa() {
 
                  Isinya masih data contoh bawaan komponennya dan belum
                  tersambung ke sinyal siapa pun. Menunggu instruksi. */
+              /* Tab Chart Pantauan menggantikan SELURUH badan kanal.
+                 Panelnya digambar lebih atas (tepat di bawah bilah tab),
+                 jadi kalau badan ini tidak dihentikan di sini, rak sinyal
+                 dan log aktivitas ikut menumpuk di bawahnya — dan di kanal
+                 yang memang belum punya sinyal, yang muncul deretan rak
+                 kosong yang membingungkan. */
+              if (sub === 'chart') return null;
               if (sub === 'performa') {
                 return (
                   <>

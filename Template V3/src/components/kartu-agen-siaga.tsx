@@ -55,7 +55,19 @@ function jedaSingkat(ms: number) {
   return `${Math.floor(jam / 24)} hari lalu`;
 }
 
-export function KartuAgenSiaga({ agen }: { agen: AgenHadir }) {
+/** @param keRuang  Kalau ada, kartunya punya PINTU MASUK.
+ *
+ *  Bawaannya tidak ada, dan itu benar untuk hampir semua agen: kartu siaga
+ *  berarti agennya belum memposting apa pun, jadi kanalnya benar-benar
+ *  kosong — pintu yang membuka ruang kosong cuma memindahkan kekecewaan
+ *  satu klik lebih dalam.
+ *
+ *  Kecualinya kartu yang PUNYA ISI SELAIN SINYAL. Kartu AI Chart begitu:
+ *  ia ruang kerja pemiliknya, penuh chart yang menunggu disaring, dan
+ *  "belum ada sinyal" justru keadaan normalnya. Tanpa pintu, satu-satunya
+ *  jalan ke sana adalah mengetik alamatnya sendiri — dan itu persis yang
+ *  dilaporkan sebagai "tidak bisa diklik". */
+export function KartuAgenSiaga({ agen, keRuang }: { agen: AgenHadir; keRuang?: () => void }) {
   const diam = Date.now() - agen.terakhirPindai > batasDiam(agen.tf);
 
   return (
@@ -121,6 +133,18 @@ export function KartuAgenSiaga({ agen }: { agen: AgenHadir }) {
           Belum ada sinyal. Diam itu normal — agen memposting hanya saat
           aturannya terpenuhi.
         </p>
+
+        {/* Tombol, BUKAN seluruh kartu yang bisa diklik. Kartu ini menerima
+            klik kanan untuk menyematkan, dan bidang klik yang menutupi
+            seluruh kartu membuat dua niat berebut area yang sama —
+            keliru sekali saja sudah cukup membuat orang berhenti memakai
+            keduanya. */}
+        {keRuang && (
+          <button onClick={keRuang}
+            className="mt-3 w-full cursor-pointer rounded-md border border-violet-500/30 bg-violet-500/10 py-1.5 text-[11.5px] font-medium text-violet-300 transition-colors hover:border-violet-500/50 hover:text-violet-200">
+            Buka ruang penyaringan
+          </button>
+        )}
       </div>
     </div>
   );
