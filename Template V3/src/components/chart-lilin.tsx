@@ -223,7 +223,7 @@ export function ChartLilin({
   garisSeret, onSeret, onKlikGaris, onHapusGaris, onKlikKosong, hamparanBawah, segmen, penandaPine, kotakPine, isianPine,
   alat, onAlatSelesai, gambarAlat, gambarPilih, onPilihGambar, onUbahGambar,
   posisiMt5, onUbahPosisi, hargaAsk, kunciUkuran, bagikanFoto, tandaAir, tampilan, pitaSmi,
-  jiplak,
+  jiplak, onUbahJiplak,
   hamparanBarTertua, onUjungKiri,
 }: {
   /** Nama pasangan yang dicetak samar di tengah area harga, seperti
@@ -343,6 +343,12 @@ export function ChartLilin({
    *  panelnya. Menebak angkanya sendiri berarti menaruh garis harga di
    *  tempat yang tidak pernah dikatakan siapa pun. */
   jiplak?: { url: string; lebar: number; hargaAtas: number; hargaBawah: number } | null;
+  /** Mengubah harga tepi gambar. Isiannya duduk DI KAKI panel acuan, bukan
+   *  di panel setelan di bilah alat: angkanya dibaca dari sumbu harga di
+   *  gambar itu sendiri, jadi kotak isiannya harus berada di layar yang
+   *  sama dengan gambarnya. Menaruhnya di popover berarti menutup gambarnya
+   *  untuk mengetik angka yang cuma bisa dibaca dari gambar itu. */
+  onUbahJiplak?: (p: { hargaAtas?: number; hargaBawah?: number }) => void;
   posisiMt5?: PosisiChartMt5[];
   /** Kirim SL/TP baru sebuah posisi ke EA; resolve true kalau EA sukses.
    *  Tanpa handler ini SL/TP posisinya tidak bisa diseret sama sekali. */
@@ -1737,6 +1743,12 @@ export function ChartLilin({
   /* Jiplak: cuma elemennya yang perlu dipegang. Sejak ia pindah ke panel
      sendiri, tidak ada lagi seretan, tambatan, maupun keadaan yang harus
      dijaga — letaknya sepenuhnya turunan dari harga yang diketik. */
+  /* Kotak ketik harga untuk garis harga (alat rayH), dibuka klik ganda.
+     Menyeretnya sudah bisa sejak awal, tapi seretan tidak pernah bisa
+     mendarat di angka BULAT yang orangnya punya di kepala — dan garis
+     harga justru dipakai untuk menandai angka yang sudah diketahui. */
+  const [ketikRay, setKetikRay] = useState<{ id: string; nilai: string; x: number; y: number } | null>(null);
+
   const jiplakEl = useRef<HTMLImageElement | null>(null);
   const jiplakRef = useRef(jiplak);
   jiplakRef.current = jiplak;
@@ -2405,6 +2417,55 @@ export function ChartLilin({
     };
   }, [garisSeret, posisiMt5, ubah]);
 
+  /* ── Klik ganda garis harga → ketik angkanya ────────────────────────
+     Uji-kenanya sengaja diulang di sini alih-alih dipakai bersama dengan
+     pemilih gambar: yang ini HANYA peduli rayH, dan menumpang di pemilih
+     berarti setiap klik ganda di gambar jenis apa pun ikut membuka kotak
+     ketik yang tidak berlaku untuknya. */
+  useEffect(() => {
+    const el = kotak.current;
+    if (!el || !onUbahGambar) return;
+    const ganda = (e: MouseEvent) => {
+      const s = seri.current;
+      if (!s) return;
+      const r = el.getBoundingClientRect();
+      const px = e.clientX - r.left, py = e.clientY - r.top;
+      const c = chart.current;
+      if (!c) return;
+      /* Koordinat waktu dihitung dengan cara yang SAMA PERSIS dengan
+         pemilih gambar di atas: timeToCoordinate dulu, lalu jatuh ke
+         logicalToCoordinate untuk waktu yang belum punya bar. Dua rumus
+         berbeda untuk pertanyaan yang sama akan membuat klik ganda meleset
+         tepat di ruang kosong sebelah kanan — tempat garis harga justru
+         paling sering ditaruh. */
+      const X = (t: number): number | null => {
+        const x = c.timeScale().timeToCoordinate(Math.floor(t / 1000) as Time);
+        if (x != null) return x;
+        const times = acuan.current.lilin.times;
+        if (times.length < 2) return null;
+        return c.timeScale().logicalToCoordinate(
+          (times.length - 1 + (t - times[times.length - 1]) / tfRef.current) as Logical);
+      };
+      for (const g of (acuanPilih.current.gambarAlat ?? [])) {
+        if (g.jenis !== 'rayH') continue;
+        const y1 = s.priceToCoordinate(g.h1);
+        const x1 = X(g.t1);
+        if (y1 == null || x1 == null) continue;
+        if (px >= x1 - 8 && Math.abs(py - y1) <= 7) {
+          /* Nilai awalnya harga garis itu sendiri, bukan kotak kosong:
+             yang dilakukan orang di sini hampir selalu MEMBETULKAN angka
+             yang sudah ada, bukan menulis dari nol. */
+          setKetikRay({ id: g.id, nilai: String(g.h1), x: px, y: py });
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+      }
+    };
+    el.addEventListener('dblclick', ganda);
+    return () => el.removeEventListener('dblclick', ganda);
+  }, [onUbahGambar]);
+
   /* ── Angka garis harga masuk ke SUMBU ──────────────────────────────
      `lineVisible: false` — yang diminta cuma kotak angkanya di kolom sumbu,
      bukan garis kedua. Garis rayanya sendiri digambar penggambar alat di
@@ -2639,6 +2700,40 @@ export function ChartLilin({
           <img ref={jiplakEl} src={jiplak.url} alt="" draggable={false}
                className="absolute inset-x-0 w-full select-none"
                style={{ top: 0 }} />
+
+          {/* ── ISIAN HARGA, DI KAKI PANELNYA ──────────────────────────
+              Di sini, bukan di panel setelan bilah alat. Angkanya dibaca
+              dari sumbu harga di gambar yang ADA DI ATASNYA — kotak isian
+              yang menutup gambarnya berarti menyuruh orang mengingat angka
+              yang barusan ia lihat lalu mengetiknya buta.
+
+              Latarnya pekat, bukan tembus: gambar chart di belakangnya
+              penuh garis dan angka, dan kotak isian tembus di atasnya
+              adalah kotak yang isinya tidak terbaca. */}
+          {onUbahJiplak && (
+            <div className="absolute inset-x-0 bottom-0 z-10 flex items-end gap-1.5 border-t border-zinc-800 bg-zinc-950/95 px-2 py-1.5 backdrop-blur-sm">
+              {([['hargaAtas', 'Harga atas'], ['hargaBawah', 'Harga bawah']] as const).map(([k, label]) => (
+                <label key={k} className="min-w-0 flex-1">
+                  <span className="block text-[9.5px] leading-tight text-zinc-500">{label}</span>
+                  <input
+                    className="mt-0.5 w-full rounded border border-zinc-800 bg-zinc-900 px-1.5 py-1 text-[11.5px] tabular-nums text-zinc-100 outline-none placeholder:text-zinc-700 focus:border-zinc-600"
+                    inputMode="decimal" placeholder="—"
+                    defaultValue={jiplak[k] ? String(jiplak[k]) : ''}
+                    /* onBlur, BUKAN onChange. Diproses tiap ketikan, angka
+                       setengah jadi seperti "79" akan langsung meregangkan
+                       gambarnya ke ketinggian yang tidak masuk akal, dan
+                       yang mengetik melihat gambarnya melompat-lompat
+                       sebelum ia selesai. defaultValue + onBlur membuat
+                       kotaknya milik peramban sampai jarinya lepas. */
+                    onBlur={(e) => {
+                      const v = Number(e.target.value.trim().replace(',', '.'));
+                      onUbahJiplak({ [k]: isFinite(v) && v > 0 ? v : 0 });
+                    }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }} />
+                </label>
+              ))}
+            </div>
+          )}
         </div>
       )}
       <div className="relative min-w-0 flex-1 overflow-hidden" onPointerDownCapture={() => setGarisAktif(null)}>
@@ -2768,6 +2863,41 @@ export function ChartLilin({
               Batal
             </button>
           )}
+        </div>
+      )}
+
+      {/* Kotak ketik harga garis — muncul di tempat garisnya diklik ganda,
+          bukan di pojok tetap: yang sedang diperbaiki orangnya ada di sana,
+          dan kotak yang muncul jauh dari benda yang diubahnya memaksa mata
+          bolak-balik selama mengetik. */}
+      {ketikRay && (
+        <div className="absolute z-30 flex items-center gap-1 rounded-md border border-zinc-700 bg-zinc-950/95 p-1 shadow-xl backdrop-blur-sm"
+             style={{ left: Math.max(4, Math.min(ketikRay.x - 60, (kotak.current?.clientWidth || 400) - 168)),
+                      top: Math.max(4, ketikRay.y - 34) }}>
+          <input autoFocus inputMode="decimal" value={ketikRay.nilai}
+            onChange={(e) => setKetikRay({ ...ketikRay, nilai: e.target.value })}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                const v = Number(ketikRay.nilai.trim().replace(',', '.'));
+                if (isFinite(v) && v > 0) onUbahGambar?.(ketikRay.id, { h1: v, h2: v });
+                setKetikRay(null);
+              }
+              if (e.key === 'Escape') setKetikRay(null);
+            }}
+            className="w-28 rounded border border-zinc-800 bg-zinc-900 px-1.5 py-1 text-[12px] tabular-nums text-zinc-100 outline-none focus:border-zinc-600" />
+          <button
+            onClick={() => {
+              const v = Number(ketikRay.nilai.trim().replace(',', '.'));
+              /* Angka yang tidak masuk akal DIABAIKAN, bukan dipasang.
+                 Garis harga di harga 0 atau NaN akan hilang dari layar
+                 tanpa jejak, dan yang mengetiknya akan mengira garisnya
+                 terhapus. */
+              if (isFinite(v) && v > 0) onUbahGambar?.(ketikRay.id, { h1: v, h2: v });
+              setKetikRay(null);
+            }}
+            className="cursor-pointer rounded bg-zinc-100 px-2 py-1 text-[11.5px] font-semibold text-zinc-950 transition-colors hover:bg-white">
+            OK
+          </button>
         </div>
       )}
 

@@ -118,27 +118,11 @@ export function JiplakChart({ nilai, ubah }: {
           {nilai && (
             <div className="mb-2 space-y-2 rounded-md border border-zinc-800 bg-zinc-900/60 p-2">
               <p className="text-[10.5px] leading-relaxed text-zinc-500">
-                Isi harga di tepi ATAS dan BAWAH gambarnya — dibaca dari sumbu
-                harga di gambar itu sendiri. Levelnya lalu sejajar dengan chart
-                di kanan.
+                Harga tepi atas &amp; bawah gambarnya diisi di KAKI panel acuan,
+                tepat di bawah chart-nya — bukan di sini. Angkanya dibaca dari
+                sumbu harga di gambar itu, jadi kotaknya harus ada di layar
+                yang sama dengan gambarnya.
               </p>
-              <div className="grid grid-cols-2 gap-1.5">
-                {([['hargaAtas', 'Harga atas'], ['hargaBawah', 'Harga bawah']] as const).map(([k, label]) => (
-                  <label key={k} className="block">
-                    <span className="text-[10.5px] text-zinc-500">{label}</span>
-                    <input
-                      className="mt-0.5 w-full rounded border border-zinc-800 bg-zinc-950 px-1.5 py-1 text-[11.5px] text-zinc-100 outline-none placeholder:text-zinc-700 focus:border-zinc-600"
-                      inputMode="decimal" placeholder="—"
-                      value={nilai[k] ? String(nilai[k]) : ''}
-                      /* Titik ATAU koma: papan angka ponsel di Indonesia
-                         memberi koma, dan Number('4,6') itu NaN. */
-                      onChange={(e) => {
-                        const v = Number(e.target.value.trim().replace(',', '.'));
-                        ubah({ ...nilai, [k]: isFinite(v) && v > 0 ? v : 0 });
-                      }} />
-                  </label>
-                ))}
-              </div>
 
               <label className="block">
                 <span className="flex items-center justify-between text-[11px] text-zinc-500">

@@ -3639,6 +3639,13 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                           onPilihGambar={setGambarPilih}
                           onUbahGambar={ubahGambar}
                           jiplak={jiplak}
+                          /* Isian harganya duduk di kaki panel acuan, di
+                             dalam ChartLilin — halaman ini cuma menyimpan
+                             hasilnya. Digabung, bukan ditimpa: yang berubah
+                             satu medan, dan mengirim objek utuh dari sana
+                             berarti medan lain ikut ditulis ulang setiap
+                             kali salah satunya disunting. */
+                          onUbahJiplak={(p) => setJiplak((j) => (j ? { ...j, ...p } : j))}
                           posisiMt5={modeNyata ? posisiMt5Chart : KOSONG_POSISI}
                           onUbahPosisi={simbol.startsWith('MT5:') ? ubahPosisiMt5 : undefined}
                           hargaAsk={modeNyata ? askTampil : undefined}
