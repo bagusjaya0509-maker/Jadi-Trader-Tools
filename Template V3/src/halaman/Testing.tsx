@@ -27,36 +27,38 @@ export function LinkPreviewDemoSecond() {
   return (
     <div className="flex justify-center items-start h-[40rem] flex-col px-4">
       <p className="text-neutral-500 dark:text-neutral-400 text-xl md:text-3xl max-w-3xl  text-left mb-10">
-        Visit{" "}
+        Baca{" "}
         <LinkPreview
-          url="https://ui.aceternity.com"
+          url="/artikel/cara-menghubungkan-mt5-ke-jurnal-trading-otomatis/"
+          imageSrc="/artikel/gambar/cara-menghubungkan-mt5-ke-jurnal-trading-otomatis.webp"
+          isStatic
           className="font-bold bg-clip-text text-transparent bg-gradient-to-br from-purple-500 to-pink-500"
         >
-          Aceternity UI
+          cara menyambungkan MT5
         </LinkPreview>{" "}
-        and for amazing Tailwind and Framer Motion components.
+        supaya jurnal tradingmu terisi sendiri dari broker.
       </p>
 
       <p className="text-neutral-500 dark:text-neutral-400 text-xl md:text-3xl max-w-3xl  text-left ">
-        I listen to{" "}
+        Yang paling sering ditanya:{" "}
         <LinkPreview
-          url="https://www.youtube.com/watch?v=S-z6vyR89Ig&list=RDMM&index=3"
-          imageSrc="https://ui.aceternity.com/_next/image?url=%2Fimages%2Fimraan-hashmi.jpeg&w=640&q=50"
+          url="/artikel/cara-membuat-api-key-binance-yang-aman/"
+          imageSrc="/artikel/gambar/cara-membuat-api-key-binance-yang-aman.webp"
           isStatic
           className="font-bold"
         >
-          this guy
+          API key Binance
         </LinkPreview>{" "}
-        and I watch{" "}
+        dan{" "}
         <LinkPreview
-          url="/templates"
-          imageSrc="https://ui.aceternity.com/_next/image?url=%2Fimages%2Ffight-club.jpeg&w=640&q=50"
+          url="/artikel/akun-sen-mt5-jurnal-seratus-kali-lipat/"
+          imageSrc="/artikel/gambar/akun-sen-mt5-jurnal-seratus-kali-lipat.webp"
           isStatic
           className="font-bold"
         >
-          this movie
+          akun sen di MT5
         </LinkPreview>{" "}
-        twice a day
+        hampir tiap minggu
       </p>
     </div>
   );
