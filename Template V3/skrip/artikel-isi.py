@@ -27,6 +27,26 @@ menuliskannya akan menyesatkan diam-diam. Pembaca disuruh menyalinnya dari
 halaman Integrations, satu-satunya tempat yang selalu benar.
 """
 
+# ── kepala halaman daftar ───────────────────────────────────────────────
+# "Artikel" saja itu LABEL, bukan kalimat — ia menamai halamannya tapi tidak
+# memberi satu pun alasan untuk membaca. Yang dipakai di bawah menyebut
+# gejalanya langsung, karena orang yang mendarat di sini datang membawa satu
+# masalah tertentu, bukan rasa ingin tahu umum.
+#
+# Dua kalimat penggantinya kalau yang sekarang mau ditukar:
+#   "Yang tidak diajarkan waktu kamu buka akun"
+#   "Baca dulu sebelum buka chart berikutnya"
+AULA_JUDUL = "Yang bikin kamu berhenti di tengah jalan"
+
+AULA_DESKRIPSI = ("MT5 tidak mau kirim data. Chart kripto kosong. Jurnal "
+                  "terlihat seratus kali lebih untung dari kenyataan. Tiap "
+                  "masalahnya punya halamannya sendiri di sini.")
+
+# Label raksasa di belakang judul. Pendek, karena ia elemen grafis — bukan
+# kalimat yang dibaca.
+AULA_LABEL = "ARTIKEL"
+
+
 # ── potongan yang dipakai berulang ──────────────────────────────────────
 CTA = ("Semua yang dijelaskan di atas bisa dicoba tanpa membayar dan tanpa "
        "mendaftar lebih dulu lewat halaman pratinjau — akses penuh 24 jam.")
