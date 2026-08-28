@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Crosshair, Images, Loader2, Lock, Maximize2, X } from 'lucide-react';
+import { Images, Loader2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { daftarChart, gambarChart, type ChartPantauan } from '@/lib/chart-agen';
 
@@ -11,46 +11,40 @@ import { daftarChart, gambarChart, type ChartPantauan } from '@/lib/chart-agen';
    berjalan. Persis kertas kalkir di atas gambar: yang di bawah cuma acuan,
    yang jadi tetap yang digambar sendiri.
 
-   ── KENAPA PENGGESER DIGANTI SERETAN ────────────────────────────────────
-   Versi pertama memberi penggeser skala + geser mendatar/tegak, dan gambarnya
-   dipasang dengan transform persen. Laporan pemilik: sulit dipaskan. Benar,
-   tapi sebab yang sebenarnya lebih dalam daripada penggesernya kurang halus:
+   ── TIGA PERCOBAAN, DAN KENAPA YANG KETIGA YANG DIPAKAI ─────────────────
+   1. Hamparan dengan transform persen. Bisa dipaskan, tapi paskannya hilang
+      begitu chart digeser sekali — gambarnya terikat ke LAYAR, bukan ke
+      harga.
+   2. Hamparan dengan tambatan koordinat chart. Menempel benar dan ikut
+      bergerak, tapi tetap sulit dipakai: dua chart yang ditumpuk berarti dua
+      kisi, dua rangkaian lilin, dan dua warna berebut ruang yang sama.
+      Menipiskan opasitasnya cuma memilih mana yang lebih sulit dibaca.
+   3. LAYAR TERBELAH. Gambar acuan di kiri dengan ketajaman PENUH, chart
+      sungguhan di kanan tanpa apa pun di atasnya. Keputusan pemilik, dan
+      benar: acuan itu untuk DIBACA, bukan untuk dijiplak garis demi garis.
 
-   transform persen mengikat gambar ke LAYAR, bukan ke harga. Jadi sekalipun
-   berhasil dipaskan sempurna, satu geseran chart saja sudah membuatnya
-   meleset lagi — gambarnya diam sementara lilin di bawahnya berjalan.
-   Memaskan sesuatu yang tidak bisa tetap pas adalah pekerjaan tanpa ujung.
+   ── YANG MENYAMBUNGKAN KEDUANYA: HARGA, DIISI TANGAN ────────────────────
+   Harga atas dan bawah gambarnya diketik sendiri — dibaca dari sumbu harga
+   di gambar itu. Begitu terisi, gambarnya digeser dan diregangkan supaya
+   level yang sama jatuh di ketinggian yang sama dengan chart di kanan: zona
+   di kiri bisa dibaca lurus mendatar ke kanan, tanpa menghitung apa pun.
 
-   Sekarang keempat sudutnya ditambatkan ke KOORDINAT CHART (indeks logis
-   untuk mendatar, harga untuk tegak). Sekali dipaskan, ia menempel pada
-   lilinnya: ikut geser, ikut zoom, ikut tarikan sumbu harga. Dan karena
-   tambatannya berupa koordinat, memaskannya jadi wajar dilakukan LANGSUNG
-   di gambarnya — seret untuk memindah, gulir untuk memperbesar.
-
-   ── MODE ATUR vs KUNCI ──────────────────────────────────────────────────
-   Seretan menuntut lapisannya menangkap tetikus, dan lapisan yang menangkap
-   tetikus mematikan geser, zoom, dan seluruh alat gambar chart di bawahnya.
-   Jadi ia cuma menyala di mode Atur. Begitu dikunci, lapisannya kembali
-   tembus total dan chart-nya utuh seperti tidak ada apa-apa di atasnya.
+   Sengaja TIDAK ditebak dari gambarnya. Angka hasil tebakan yang dipakai
+   menaruh garis harga adalah kesalahan yang tidak kelihatan sebagai
+   kesalahan — ia cuma terlihat seperti level yang meleset sedikit.
    ════════════════════════════════════════════════════════════════════════ */
-
-export interface TambatJiplak { kiri: number; kanan: number; atas: number; bawah: number }
 
 export interface AturJiplak {
   id: string;
   url: string;
-  opacity: number;
-  /** Menangkap tetikus untuk diseret/digulir. Mati = chart utuh kembali. */
-  atur: boolean;
-  /** null = belum dipaskan; ChartLilin yang menghitung pas-awalnya dari
-   *  rentang yang sedang terlihat, lalu melapor balik. */
-  tambat: TambatJiplak | null;
+  /** Bagian lebar layar untuk panel acuan (0,2–0,6). */
+  lebar: number;
+  /** Harga di tepi atas & bawah GAMBAR. 0 = belum diisi. */
+  hargaAtas: number;
+  hargaBawah: number;
 }
 
-/* Menyala di mode Atur sejak awal: gambar yang baru dipasang HAMPIR SELALU
-   perlu dipaskan dulu, dan menyuruh orangnya menekan satu tombol lagi untuk
-   memulai pekerjaan yang sudah pasti ia lakukan cuma menambah langkah. */
-export const JIPLAK_BAWAAN = { opacity: 0.34, atur: true, tambat: null };
+export const JIPLAK_BAWAAN = { lebar: 0.42, hargaAtas: 0, hargaBawah: 0 };
 
 export function JiplakChart({ nilai, ubah }: {
   nilai: AturJiplak | null;
@@ -123,49 +117,43 @@ export function JiplakChart({ nilai, ubah }: {
 
           {nilai && (
             <div className="mb-2 space-y-2 rounded-md border border-zinc-800 bg-zinc-900/60 p-2">
-              {/* Sakelar mode. Ditulis sebagai KEADAAN SEKARANG, bukan
-                  sebagai perintah: tombol yang berbunyi "Kunci" saat sedang
-                  terkunci selalu ambigu — dibaca "sudah terkunci" oleh
-                  separuh orang dan "tekan untuk mengunci" oleh separuhnya. */}
-              <div className="flex overflow-hidden rounded-md border border-zinc-800">
-                {([[true, 'Atur', Crosshair], [false, 'Kunci', Lock]] as const).map(([v, label, Ikon]) => (
-                  <button key={label} onClick={() => ubah({ ...nilai, atur: v })}
-                    className={cn('flex flex-1 cursor-pointer items-center justify-center gap-1 py-1.5 text-[11.5px] font-medium transition-colors',
-                      nilai.atur === v ? 'bg-zinc-800 text-zinc-100' : 'text-zinc-500 hover:text-zinc-300')}>
-                    <Ikon className="size-3" />{label}
-                  </button>
+              <p className="text-[10.5px] leading-relaxed text-zinc-500">
+                Isi harga di tepi ATAS dan BAWAH gambarnya — dibaca dari sumbu
+                harga di gambar itu sendiri. Levelnya lalu sejajar dengan chart
+                di kanan.
+              </p>
+              <div className="grid grid-cols-2 gap-1.5">
+                {([['hargaAtas', 'Harga atas'], ['hargaBawah', 'Harga bawah']] as const).map(([k, label]) => (
+                  <label key={k} className="block">
+                    <span className="text-[10.5px] text-zinc-500">{label}</span>
+                    <input
+                      className="mt-0.5 w-full rounded border border-zinc-800 bg-zinc-950 px-1.5 py-1 text-[11.5px] text-zinc-100 outline-none placeholder:text-zinc-700 focus:border-zinc-600"
+                      inputMode="decimal" placeholder="—"
+                      value={nilai[k] ? String(nilai[k]) : ''}
+                      /* Titik ATAU koma: papan angka ponsel di Indonesia
+                         memberi koma, dan Number('4,6') itu NaN. */
+                      onChange={(e) => {
+                        const v = Number(e.target.value.trim().replace(',', '.'));
+                        ubah({ ...nilai, [k]: isFinite(v) && v > 0 ? v : 0 });
+                      }} />
+                  </label>
                 ))}
               </div>
 
-              <p className="text-[10.5px] leading-relaxed text-zinc-500">
-                {nilai.atur
-                  ? 'Seret untuk memindah, gulir untuk memperbesar. Tahan Shift = melebar saja, Alt = meninggi saja. Chart di bawahnya berhenti merespons selama mode ini.'
-                  : 'Gambarnya menempel pada harga dan waktu — ikut bergerak saat chart digeser atau di-zoom.'}
-              </p>
-
               <label className="block">
                 <span className="flex items-center justify-between text-[11px] text-zinc-500">
-                  Ketebalan
-                  <span className="tabular-nums text-zinc-400">{Math.round(nilai.opacity * 100)}%</span>
+                  Lebar panel
+                  <span className="tabular-nums text-zinc-400">{Math.round(nilai.lebar * 100)}%</span>
                 </span>
-                <input type="range" min={0.05} max={0.9} step={0.01} value={nilai.opacity}
-                       onChange={(e) => ubah({ ...nilai, opacity: Number(e.target.value) })}
+                <input type="range" min={0.2} max={0.6} step={0.01} value={nilai.lebar}
+                       onChange={(e) => ubah({ ...nilai, lebar: Number(e.target.value) })}
                        className="mt-1 w-full cursor-pointer accent-zinc-300" />
               </label>
 
-              <div className="flex gap-1.5">
-                {/* `tambat: null` = "hitung ulang pas-awalnya". Angkanya
-                    dikembalikan ChartLilin, bukan dikarang di sini —
-                    pemanggil tidak memegang skala chart-nya. */}
-                <button onClick={() => ubah({ ...nilai, tambat: null })}
-                  className="flex flex-1 cursor-pointer items-center justify-center gap-1 rounded border border-zinc-700 py-1 text-[11px] text-zinc-300 transition-colors hover:text-zinc-100">
-                  <Maximize2 className="size-3" /> Paskan ulang
-                </button>
-                <button onClick={lepas}
-                  className="flex-1 cursor-pointer rounded border border-zinc-700 py-1 text-[11px] text-zinc-400 transition-colors hover:text-red-400">
-                  Lepas
-                </button>
-              </div>
+              <button onClick={lepas}
+                className="w-full cursor-pointer rounded border border-zinc-700 py-1 text-[11px] text-zinc-400 transition-colors hover:text-red-400">
+                Tutup panel acuan
+              </button>
             </div>
           )}
 

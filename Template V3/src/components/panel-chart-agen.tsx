@@ -21,6 +21,44 @@ import {
    dua sisanya cuma membuat pintunya tidak terlihat.
    ════════════════════════════════════════════════════════════════════════ */
 
+/* ── PASANGAN DITEBAK DARI KETERANGANNYA ──────────────────────────────
+   Supaya menekan "Jiplak di Chart & Entry" langsung mendarat di pair yang
+   benar, bukan di simbol terakhir yang kebetulan terbuka lalu harus dicari
+   sendiri. Bolak-balik itu yang dikeluhkan pemilik.
+
+   Cocokkan DARI DAFTAR, bukan mengarang "<kata pertama> + USDT". Keterangan
+   di ruang itu ditulis manusia dengan nama panjang ("HYPERLIQUID", "Bitcoin",
+   "Gold"), dan menempelkan USDT ke kata apa pun akan menghasilkan simbol
+   yang tidak ada — chart lalu terbuka kosong tanpa memberi tahu kenapa.
+
+   Tidak ketemu = tidak menyebut simbol sama sekali, dan Chart & Entry
+   membuka apa yang sudah terbuka. Menebak salah lebih buruk daripada tidak
+   menebak: yang satu diam, yang lain memindahkan orang ke pasar yang salah
+   sambil terlihat yakin. */
+const KAMUS_PASANGAN: [RegExp, string][] = [
+  [/xau|gold|emas/i, 'XAUUSD'],
+  [/btc|bitcoin/i, 'BTCUSDT'],
+  [/eth|ethereum/i, 'ETHUSDT'],
+  [/sol|solana/i, 'SOLUSDT'],
+  [/hype|hyperliquid/i, 'HYPEUSDT'],
+  [/ena|ethena/i, 'ENAUSDT'],
+  [/virtual/i, 'VIRTUALUSDT'],
+  [/pump/i, 'PUMPUSDT'],
+  [/bnb/i, 'BNBUSDT'],
+  [/xrp|ripple/i, 'XRPUSDT'],
+  [/doge/i, 'DOGEUSDT'],
+  [/ada|cardano/i, 'ADAUSDT'],
+  [/avax/i, 'AVAXUSDT'],
+  [/link/i, 'LINKUSDT'],
+  [/sui/i, 'SUIUSDT'],
+];
+
+export function tebakPasangan(keterangan: string): string | null {
+  const t = String(keterangan || '');
+  for (const [pola, simbol] of KAMUS_PASANGAN) if (pola.test(t)) return simbol;
+  return null;
+}
+
 function umur(t: number) {
   const d = Math.max(0, Date.now() - t);
   const m = Math.round(d / 60000);
@@ -303,7 +341,11 @@ export function PanelChartAgen() {
                     mengambil gambarnya sendiri — bukan dioper lewat state
                     navigasi: alamat yang lengkap bisa disalin, dibuka di tab
                     baru, dan dimuat ulang tanpa kehilangan jiplakannya. */}
-                <Link to={`/chart-entry?jiplak=${encodeURIComponent(c.id)}`}
+                <Link to={`/chart-entry?jiplak=${encodeURIComponent(c.id)}`
+                  + (tebakPasangan(c.keterangan) ? `&simbol=${tebakPasangan(c.keterangan)}` : '')}
+                  title={tebakPasangan(c.keterangan)
+                    ? `Buka ${tebakPasangan(c.keterangan)} dengan chart ini di sampingnya`
+                    : 'Pasangannya tidak terbaca dari keterangan — chart yang sedang terbuka dipakai apa adanya'}
                   className="flex cursor-pointer items-center gap-1.5 rounded-md border border-violet-500/30 bg-violet-500/10 px-2.5 py-1.5 text-[12px] text-violet-300 transition-colors hover:border-violet-500/50 hover:text-violet-200">
                   <PenLine className="size-3.5" />
                   Jiplak di Chart &amp; Entry

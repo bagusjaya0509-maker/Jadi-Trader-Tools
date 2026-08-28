@@ -4,6 +4,7 @@ import { PanelCopyTradeFi } from '@/components/panel-copy-tradefi';
 import {
   Play, Loader2, RefreshCw, Radio, TriangleAlert, History,
   Layers, ChevronDown, ChevronUp, Settings2, Code2, X, Ruler, Rows3, Square, Eraser, Minus, TrendingUp,
+  MoveRight,
   FlaskConical, GripHorizontal, Maximize2, Minimize2, SquareArrowUp, SquareArrowDown,
   Settings, RotateCcw, LayoutGrid } from 'lucide-react';
 import { PanelNews } from '@/components/panel-news';
@@ -3638,12 +3639,6 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                           onPilihGambar={setGambarPilih}
                           onUbahGambar={ubahGambar}
                           jiplak={jiplak}
-                          /* Tambatan disimpan di state halaman, bukan di
-                             ChartLilin: ia harus bertahan saat komponen
-                             chart dibongkar-pasang (ganti simbol, ganti TF,
-                             layar penuh) — dan ref di dalam komponen ikut
-                             hilang bersamanya. */
-                          onUbahJiplak={(t) => setJiplak((j) => (j ? { ...j, tambat: t } : j))}
                           posisiMt5={modeNyata ? posisiMt5Chart : KOSONG_POSISI}
                           onUbahPosisi={simbol.startsWith('MT5:') ? ubahPosisiMt5 : undefined}
                           hargaAsk={modeNyata ? askTampil : undefined}
@@ -4303,6 +4298,11 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
             {pemilik && <JiplakChart nilai={jiplak} ubah={setJiplak} />}
             {([
               ['garis', TrendingUp, 'Garis tren — tarik dari titik ke titik', ''],
+              /* Garis harga: sekali klik, bukan tarikan. Ditaruh tepat di
+                 bawah garis tren karena keduanya sama-sama "garis" bagi yang
+                 mencarinya — yang membedakan cuma satu miring, satu mendatar
+                 menancap di harga. */
+              ['rayH', MoveRight, 'Garis harga — klik sekali di level yang mau ditandai, menjulur ke kanan', 'text-amber-400'],
               ['ukur', Ruler, 'Ukur % kenaikan / penurunan — klik lalu tarik', ''],
               ['fib', Rows3, 'Fibonacci retracement — tarik dari swing ke swing', ''],
               ['kotak', Square, 'Kotak SNR manual — tarik membentuk zonanya', ''],

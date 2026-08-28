@@ -18,7 +18,7 @@ import type {
    bar terakhir + durasi timeframe.
    ════════════════════════════════════════════════════════════════════════ */
 
-export type JenisAlat = 'ukur' | 'fib' | 'kotak' | 'garis' | 'posisi';
+export type JenisAlat = 'ukur' | 'fib' | 'kotak' | 'garis' | 'posisi' | 'rayH';
 
 /** Alat yang bisa DIPEGANG di bilah.
 
@@ -115,7 +115,10 @@ export class PenggambarAlat implements ISeriesPrimitive<Time> {
         draw: (target: TargetKanvas) => {
           const s = this.seri;
           if (!s || (!this.gambar.length && !this.pratinjau)) return;
-          target.useMediaCoordinateSpace(({ context: ctx }) => {
+          /* `mediaSize` ikut diambil: garis harga menjulur sampai TEPI
+             panel, dan tepi itu cuma diketahui dari sini — koordinat
+             gambarnya sendiri tidak tahu selebar apa kanvasnya. */
+          target.useMediaCoordinateSpace(({ context: ctx, mediaSize }) => {
             ctx.font = "10px 'IBM Plex Sans', sans-serif";
             ctx.textBaseline = 'middle';
             const Y = (v: number) => s.priceToCoordinate(v);
@@ -154,7 +157,13 @@ export class PenggambarAlat implements ISeriesPrimitive<Time> {
                  ditarik untuk diperpanjang. */
               const terpilih = 'id' in g && !!g.id && g.id === this.pilih;
               if (terpilih) {
-                const titik: [number, number][] = g.jenis === 'garis'
+                const titik: [number, number][] = g.jenis === 'rayH'
+                  /* Satu pegangan saja: garis harga cuma punya SATU titik
+                     yang berarti — pangkalnya. Ujung kanannya ditentukan
+                     tepi panel, bukan oleh orangnya, jadi pegangan di sana
+                     akan menjanjikan tarikan yang tidak ada. */
+                  ? [[x1, y1]]
+                  : g.jenis === 'garis'
                   ? [[x1, y1], [x2, y2]]
                   : g.jenis === 'posisi'
                     /* Posisi punya TIGA harga dan satu rentang waktu, bukan
@@ -278,6 +287,49 @@ export class PenggambarAlat implements ISeriesPrimitive<Time> {
                   chip(kiri + 4, y1, rugi > 0 ? `RR 1:${(untung / rugi).toFixed(2)}` : 'RR —', '228,228,231');
                   chip(kanan - 4, y1, `Entry ${hargaTeks(g.h1)}`, '228,228,231', true);
                 }
+                continue;
+              }
+
+              if (g.jenis === 'rayH') {
+                /* GARIS HARGA — menjulur ke KANAN saja, dari titik yang
+                   diklik sampai tepi panel.
+                   ────────────────────────────────────────────────────────
+                   Bukan garis penuh selebar chart: yang ditandai orang
+                   adalah level yang berlaku SEJAK saat itu, dan garis yang
+                   juga menjulur ke masa lalu mengaku level itu sudah
+                   berlaku sebelum ia ada. Model yang sama dengan horizontal
+                   ray di TradingView, dan itu memang yang diminta.
+
+                   Angkanya ditulis di UJUNG KANAN, di kolom yang sama
+                   dengan sumbu harga — tempat mata sudah terbiasa mencari
+                   angka. Ditulis di ujung kiri ia akan menabrak lilin. */
+                const y = y1;
+                const xMulai = x1;
+                const xUjung = mediaSize.width;
+                ctx.strokeStyle = 'rgba(250,204,21,.95)';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(xMulai, y); ctx.lineTo(xUjung, y);
+                ctx.stroke();
+                /* Titik pangkal: penanda bahwa garisnya PUNYA awal, dan
+                   pegangan yang terlihat untuk menyeretnya. */
+                ctx.fillStyle = 'rgba(250,204,21,.95)';
+                ctx.beginPath();
+                ctx.arc(xMulai, y, 3, 0, Math.PI * 2);
+                ctx.fill();
+
+                const teks = hargaTeks(g.h1);
+                ctx.font = '600 10px "IBM Plex Sans", sans-serif';
+                const w = ctx.measureText(teks).width + 8;
+                const xk = Math.max(xMulai + 6, xUjung - w - 4);
+                ctx.fillStyle = 'rgba(250,204,21,.95)';
+                ctx.beginPath();
+                ctx.roundRect(xk, y - 7.5, w, 15, 3);
+                ctx.fill();
+                ctx.fillStyle = '#09090b';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(teks, xk + w / 2, y);
                 continue;
               }
 
