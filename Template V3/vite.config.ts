@@ -39,7 +39,17 @@ export default defineConfig({
   base: './',
   plugins: [react(), tailwindcss(), penandaVersi()],
   define: { __JT_VERSI__: JSON.stringify(VERSI_BUILD) },
-  resolve: { alias: { '@': path.resolve(__dirname, './src') } },
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+      /* `next/image` dan `next/link` DISEDIAKAN, bukan disunting keluar dari
+         komponennya. Komponen kiriman pemilik ditulis untuk Next.js; alih-alih
+         mengubah kodenya (yang sudah berkali-kali diminta jangan), modulnya
+         yang dibuat ada. Lihat src/shim/. */
+      'next/image': path.resolve(__dirname, './src/shim/next-image.tsx'),
+      'next/link': path.resolve(__dirname, './src/shim/next-link.tsx'),
+    },
+  },
   build: {
     /* Pustaka besar dipisah dari kode kita sendiri. Kode aplikasi berubah
        hampir tiap rilis; Recharts dan Firebase hampir tidak pernah. Kalau
