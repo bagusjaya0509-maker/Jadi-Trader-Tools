@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import type { LucideIcon } from 'lucide-react';
 import {
   LineChart, NotebookPen, Radar, Copy, Plug, LayoutDashboard,
-  FileText, Shield, HelpCircle, ScrollText, Store,
+  FileText, Shield, HelpCircle, ScrollText, Store, BookOpen,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MenuToggleIcon } from '@/components/ui/menu-toggle-icon';
@@ -53,6 +53,12 @@ const produkLinks: LinkItem[] = [
 ];
 
 const perusahaanLinks: LinkItem[] = [
+  /* Artikel ditaruh PALING ATAS di kelompok ini, bukan di bawah Changelog.
+     Ia satu-satunya halaman di sini yang ditulis untuk orang yang BELUM
+     memakai produknya — dan sampai 27 Agu 2026 tidak ada satu pun tautan
+     menujunya dari dalam situs, jadi lima artikel yang sudah tayang tidak
+     bisa ditemukan kecuali lewat Google. */
+  { title: 'Artikel',      href: '/artikel/',     icon: BookOpen,   description: 'Panduan MT5, API Binance, dan dasar trading' },
   { title: 'Marketplace',  href: '/marketplace',  icon: Store,      description: 'EA, indikator, dan lisensi' },
   { title: 'Dokumentasi',  href: '/dokumentasi',  icon: FileText,   description: 'Panduan pemasangan & pemakaian' },
   { title: 'Changelog',    href: '/changelog',    icon: ScrollText, description: 'Apa yang baru di tiap rilis' },
