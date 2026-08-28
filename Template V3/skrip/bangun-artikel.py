@@ -300,6 +300,15 @@ def kepala(judul, ringkas, jalur, kunci="", lebar=False):
 """
 
 
+EKOR_SKRIP = """
+<!-- Komponen link-preview Aceternity yang SUNGGUHAN — Radix HoverCard +
+     framer-motion, dibundel terpisah dari aplikasi. `defer` dan diletakkan
+     paling akhir: seluruh teks artikel sudah ada di HTML sebelum berkas ini
+     diminta, jadi crawler dan pembaca tanpa JavaScript tidak kehilangan
+     satu huruf pun kalau ia gagal dimuat. -->
+<script defer src="/artikel-pratinjau.js"></script>
+"""
+
 EKOR = """
 <footer>
   <p>Edukasi, bukan rekomendasi finansial. Trading mengandung risiko kehilangan modal.</p>
@@ -341,8 +350,9 @@ for a in A.ARTIKEL:
                      '<span class="pratinjau">'
                      '<span class="kartu-p"><img src="%s" width="200" height="125" '
                      'loading="lazy" decoding="async" alt=""></span>'
-                     '<a href="/artikel/%s/">%s</a></span>'
-                     % (GAMBAR.get(t["slug"], GAMBAR_BAWAAN), t["slug"], esc(t["judul"]))
+                     '<a href="/artikel/%s/" data-pratinjau data-gambar="%s">%s</a></span>'
+                     % (GAMBAR.get(t["slug"], GAMBAR_BAWAAN), t["slug"],
+                        GAMBAR.get(t["slug"], GAMBAR_BAWAAN), esc(t["judul"]))
                      for t in tautan) + "</div>")
 
     ajakan = ('<div class="ajakan"><p>%s</p>'
@@ -355,7 +365,7 @@ for a in A.ARTIKEL:
               '<h1>%s</h1><p class="ringkas">%s</p>%s</article>'
               % ("Panduan" if a["jenis"] == "fitur" else "Edukasi",
                  menitBaca(a), esc(a["judul"]), esc(a["ringkas"]), isi)
-            + ajakan + terkait + EKOR)
+            + ajakan + terkait + EKOR_SKRIP + EKOR)
 
     folder = os.path.join(KELUAR, a["slug"])
     os.makedirs(folder, exist_ok=True)
