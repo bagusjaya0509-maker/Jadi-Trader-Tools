@@ -42,6 +42,7 @@ const { StringSession } = require('teleproto/sessions');
 const { Perangkai } = require('./rangkai');
 const { kirimKartu, layakKartu, daftarHadir, NAMA_AGEN } = require('./kartu-agen');
 const mata = require('./mata-chart');
+const { simpanChart } = require('./arsip-chart-vps');
 
 /* TIDAK ADA MODEL BAHASA DI JALUR INI, dan itu disengaja.
    ──────────────────────────────────────────────────────────────────────
@@ -110,6 +111,13 @@ function bacaRuang() {
          bawaannya MATI dan hanya dinyalakan untuk ruang yang memang
          memerlukannya. */
       gambar: process.env[a + '_GAMBAR'] === '1',
+      /* Chart disimpan mentah untuk DIBACA PEMILIK di panelnya sendiri.
+         Berbeda dari `gambar` di atas dan tidak saling menggantikan:
+         yang satu menyuruh mesin menebak levelnya, yang ini menyerahkan
+         penilaiannya kepada orang. Keputusan pemilik 28 Agu 2026 — ruang
+         chart memang jarang menulis SL/TP, jadi tebakan mesin hampir tidak
+         pernah menghasilkan kartu sementara ongkosnya tetap jalan. */
+      arsip: process.env[a + '_ARSIP'] === '1',
       keKartu: (process.env[a + '_KE_KARTU'] || process.env.TG_KE_KARTU || '1') !== '0',
       strategi: String(process.env[a + '_STRATEGI'] || '').trim(),
     });
@@ -227,7 +235,9 @@ async function siapkanRuang(client, r) {
      membandingkan dengan TG_GRUP apa adanya tidak akan pernah cocok. */
   r.kunciRuang = String(ruang.id);
   catat('memantau:', ruang.title || ruang.username || r.grup,
-    '· agen', r.agen + (r.gambar ? ' · baca gambar NYALA' : ''));
+    '· agen', r.agen
+    + (r.gambar ? ' · baca gambar NYALA' : '')
+    + (r.arsip ? ' · arsip chart NYALA' : ''));
 
   /* ── Topik mana ────────────────────────────────────────────────────────
      Dicari sekali di awal. Kalau grupnya bukan forum, hasilnya null dan
@@ -529,8 +539,10 @@ async function siapkanRuang(client, r) {
         await lonceng({
           id: 'tg-' + kunci.replace(/[^\w-]/g, ''),
           judul: adaGambar ? 'Chart baru di ruang pantauan' : 'Postingan baru di ruang pantauan',
-          detail: adaGambar ? 'Sedang dibaca levelnya.'
-                            : 'Ada angka, belum terbaca sebagai sinyal lengkap.',
+          detail: adaGambar
+            ? (r.arsip ? 'Tersimpan di panel chart — menunggu ditinjau.'
+                       : 'Sedang dibaca levelnya.')
+            : 'Ada angka, belum terbaca sebagai sinyal lengkap.',
           sumber: r.agen,
           jenis: 'pantau',
           tautan: '',
@@ -555,6 +567,33 @@ async function siapkanRuang(client, r) {
          Ruang yang menulis levelnya di keterangan gambar akan terbaca
          gratis lewat jalur teks, dan memanggil model untuk sesuatu yang
          sudah terbaca cuma membakar jatah. */
+      /* ── ARSIP CHART UNTUK PEMILIK ──────────────────────────────────
+         Dilakukan LEBIH DULU dan tidak bergantung pada apa pun sesudahnya:
+         menyimpan gambarnya adalah tujuan tersendiri, bukan sisa dari
+         percobaan menguraikannya. Gagal di sini tidak menghentikan apa pun.
+
+         Nol biaya — tidak ada model yang dipanggil di jalur ini. */
+      if (r.arsip && adaGambar) {
+        try {
+          const bita = typeof pesan.downloadMedia === 'function'
+            ? await pesan.downloadMedia()
+            : await client.downloadMedia(pesan);
+          if (bita && bita.length) {
+            const berkas = simpanChart(__dirname, {
+              id: kunci.replace(/[^\w-]/g, ''),
+              agen: r.agen,
+              keterangan: teks,
+              waktu: baris.waktu,
+              bita,
+            });
+            if (berkas) catat('  chart diarsipkan untuk pemilik:', berkas,
+              '(' + Math.round(bita.length / 1024) + ' KB)');
+          }
+        } catch (e) {
+          catat('  chart gagal diarsipkan (diabaikan):', e && e.message);
+        }
+      }
+
       let mataHasil = null;
       if (!sinyal && r.gambar && adaGambar) {
         const b = await bacaGambar(r, pesan, teks);

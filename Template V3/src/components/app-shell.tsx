@@ -122,6 +122,12 @@ const NAV = [
               baris tetap di sidebar adalah hal yang orang buka BERULANG:
               daftar analis yang ia ikuti. */
           { ke: '/copy-signal?sub=diikuti', label: 'Signal Diikuti' },
+          /* Chart mentah dari ruang pantauan, berikut tanda air sumbernya.
+             `hanyaPemilik` menyaringnya dari sidebar orang lain — tapi yang
+             benar-benar menjaganya rute servernya, yang menolak selain uid
+             pemilik. Menyembunyikan menu bukan pengamanan; ia cuma menahan
+             pintu yang tidak berguna dari layar yang tidak memerlukannya. */
+          { ke: '/copy-signal?sub=chart', label: 'Chart Pantauan', hanyaPemilik: true },
         ] },
       { ke: '/integrations',   label: 'Integrations',     Ikon: Plug,
         sub: [
@@ -883,7 +889,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   </div>
                   {sub && !ciut && subTerbuka(ke) && (
                     <div className="mb-1 ml-[17px] space-y-0.5 border-l border-zinc-800 py-1 pl-3">
-                      {subDinamis(ke, sub).map((s: any) => (
+                      {subDinamis(ke, sub)
+                        .filter((s: any) => !s.hanyaPemilik || pemilik)
+                        .map((s: any) => (
                         <BarisSub key={s.ke} butir={s} aktif={subAktif}
                                   tutupLaci={() => setLaci(false)} />
                       ))}

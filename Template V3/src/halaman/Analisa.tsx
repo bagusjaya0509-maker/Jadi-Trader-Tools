@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { usePaket, LABEL_PAKET } from '@/lib/paket';
@@ -1249,6 +1249,12 @@ function SlotAgen({ urutan }: { urutan: number }) {
    menebak-nebak apakah keduanya benda yang sama. Di dalam ruang satu analis
    ia juga salah tempat: memposting sinyal bukan sesuatu yang dilakukan
    "di dalam" kanal orang lain. */
+/* Dimuat malas: panel ini cuma bisa dibuka pemilik, dan menyeret kodenya ke
+   dalam bundel halaman berarti setiap pengunjung Copy Signal mengunduh layar
+   yang tidak akan pernah ia lihat. */
+const PanelChartAgen = lazy(() =>
+  import('@/components/panel-chart-agen').then((m) => ({ default: m.PanelChartAgen })));
+
 const SUB = [
   /* URUTANNYA: 'market' duluan, dan di dalam kanal ia yang terbuka
      pertama — keputusan pemilik, mengubah yang sebelumnya.
@@ -1261,6 +1267,10 @@ const SUB = [
   { id: 'performa', label: 'Performa Signal' },
   { id: 'posting',  label: 'Posting Signal' },
   { id: 'diikuti',  label: 'Signal Diikuti' },
+  /* Ruang kerja pemilik, bukan sudut pandang lain atas daftar sinyal. Sama
+     seperti 'diikuti' dan 'posting', ia tidak ikut deretan tab — dituju
+     lewat sidebar, dan hanya sah untuk pemilik. */
+  { id: 'chart',    label: 'Chart Pantauan' },
 ] as const;
 type IdSub = typeof SUB[number]['id'];
 
@@ -1753,7 +1763,9 @@ export default function Analisa() {
        lain, di saat yang lain. Menaruhnya sebagai tab berarti tiap
        pengunjung yang cuma mencari sinyal harus melewati satu pilihan yang
        tidak pernah ia butuhkan. */
-    .filter((s) => (diDepan ? s.id === 'market' : s.id !== 'posting' && s.id !== 'diikuti'))
+    .filter((s) => (diDepan
+      ? s.id === 'market'
+      : s.id !== 'posting' && s.id !== 'diikuti' && s.id !== 'chart'))
     .map((s) => (!diDepan && s.id === 'market' ? { ...s, label: 'Daftar Signal' } : s));
 
   /* Masuk kanal, yang pertama terlihat Performa Signal — keputusan pemilik.
@@ -1775,7 +1787,14 @@ export default function Analisa() {
      berada di DAFTAR KANAL — tempat tombol + itu berdiri. Di dalam kanal
      ia tetap ditolak, karena di sana memang tidak ada pintunya. */
   const subSah = (id: IdSub) =>
-    id === 'posting' || id === 'diikuti' ? diDepan : tabTampil.some((s) => s.id === id);
+    /* 'chart' menuntut DUA syarat, dan keduanya perlu. `diDepan` supaya ia
+       tidak terbuka di dalam kanal orang lain (di situ ia salah tempat),
+       dan `pemilik` supaya alamat yang ditebak-tebak tidak membuka arsip
+       bertanda air ke pengunjung mana pun. Gerbang sungguhannya tetap di
+       server; yang ini menjaga layarnya tidak pernah mencoba. */
+    id === 'chart' ? diDepan && pemilik
+      : id === 'posting' || id === 'diikuti' ? diDepan
+      : tabTampil.some((s) => s.id === id);
   const sub: IdSub = subMinta && subSah(subMinta) ? subMinta : bawaanSub;
 
   /* Bawaan tidak ditulis ke alamat, tab lain ditulis. Kalau 'market' selalu
@@ -2679,6 +2698,12 @@ export default function Analisa() {
           contohPasangan={copyUntuk.pasangan}
           tutup={() => setCopyUntuk(null)}
         />
+      )}
+
+      {sub === 'chart' && pemilik && (
+        <Suspense fallback={<div className="py-10 text-[13px] text-zinc-500">Memuat panel…</div>}>
+          <PanelChartAgen />
+        </Suspense>
       )}
 
       {sub === 'diikuti' && (
