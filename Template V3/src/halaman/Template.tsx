@@ -5,7 +5,7 @@ import type { LucideIcon } from 'lucide-react';
 import {
   ArrowRightIcon, EyeIcon,
   GlobeIcon, LayersIcon, UserPlusIcon, Users, Star,
-  FileText, Shield, RotateCcw, Handshake, HelpCircle, BarChart, PlugIcon,
+  FileText, Shield, RotateCcw, Handshake, HelpCircle, BarChart, PlugIcon, BookOpen,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ParallaxComponent } from '@/components/ui/parallax-scrolling';
@@ -404,6 +404,14 @@ const productLinks: LinkItem[] = [
 ];
 
 const companyLinks: LinkItem[] = [
+  /* Artikel PALING ATAS. Ia satu-satunya halaman di kelompok ini yang
+     ditulis untuk orang yang BELUM memakai produknya, dan sampai 27 Agu
+     2026 tidak ada satu pun tautan menujunya dari dalam situs — lima
+     artikel yang sudah tayang cuma bisa ditemukan lewat Google.
+
+     `/artikel/` berkas HTML statis di luar router React. Aman di sini
+     karena menu ini memakai <a href> polos, bukan <Link>. */
+  { title: 'Artikel',        href: '/artikel/', description: 'Panduan MT5, API Binance, dan dasar trading', icon: BookOpen },
   { title: 'Personal Area',  href: '/personal', description: 'Rekap performa dan evaluasi caramu berdagang', icon: Users },
   { title: 'Papan peringkat', href: '/copy',    description: 'Rekam jejak analis, dihitung dari sinyal yang selesai', icon: Star },
   { title: 'Jadi analis',    href: '/copy?sub=posting', description: 'Posting sinyalmu sendiri — semua orang boleh', icon: Handshake },
