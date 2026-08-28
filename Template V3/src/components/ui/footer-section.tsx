@@ -241,6 +241,13 @@ function Footerdemo() {
                 mencabut yang pertama saja meninggalkan yang kedua tetap
                 tayang. */}
             <nav className="flex gap-4">
+              {/* <a> polos, BUKAN <Link>: /artikel/ berkas HTML statis di luar
+                  router React. <Link> akan menanganinya di sisi klien, router
+                  tidak punya rute itu, dan pengunjung mendarat di halaman
+                  kosong — padahal alamatnya benar. */}
+              <a href="/artikel/" className="text-muted-foreground transition-colors hover:text-foreground">
+                Artikel
+              </a>
               <Link to="/legal" className="text-muted-foreground transition-colors hover:text-foreground">
                 Disclaimer &amp; privasi
               </Link>
