@@ -1809,6 +1809,10 @@ export function ChartLilin({
      semua price line tiap gerakan. */
   const petaGarisMt5 = useRef<Map<string, IPriceLine>>(new Map());
   const garisAsk = useRef<IPriceLine | null>(null);
+  /* Price line untuk GARIS HARGA (alat rayH) — hanya label sumbunya.
+     Terpisah dari dua daftar price line lain supaya bisa dibongkar sendiri:
+     yang ini berubah tiap kali orangnya menambah atau menghapus garis. */
+  const garisRayHarga = useRef<IPriceLine[]>([]);
 
   /* Nilai terbaru dibaca dari ref di dalam rAF. Kalau dibaca dari closure,
      loopnya harus dipasang ulang tiap render — dan itu mengalahkan
@@ -2400,6 +2404,40 @@ export function ChartLilin({
       garisSeretHarga.current = [];
     };
   }, [garisSeret, posisiMt5, ubah]);
+
+  /* ── Angka garis harga masuk ke SUMBU ──────────────────────────────
+     `lineVisible: false` — yang diminta cuma kotak angkanya di kolom sumbu,
+     bukan garis kedua. Garis rayanya sendiri digambar penggambar alat di
+     kanvas, menjulur ke kanan saja; price line tidak bisa melakukan itu
+     (ia selalu selebar panel), jadi keduanya berbagi tugas: satu menggambar
+     bentuknya, satu menaruh angkanya di tempat yang benar.
+
+     Dibongkar-pasang seluruhnya tiap kali daftar gambarnya berubah.
+     Menyeret gambar yang sudah ada memang membuat efek ini jalan lagi —
+     tapi itu sudah keadaan yang memicu render React penuh, jadi tidak ada
+     ongkos baru yang ditambahkan di sini. */
+  useEffect(() => {
+    const s = seri.current;
+    if (!s) return;
+    for (const g of (gambarAlat ?? [])) {
+      if (g.jenis !== 'rayH') continue;
+      try {
+        garisRayHarga.current.push(s.createPriceLine({
+          price: g.h1,
+          color: 'rgba(250,204,21,.95)',
+          lineWidth: 1,
+          lineStyle: 0,
+          lineVisible: false,
+          axisLabelVisible: true,
+          title: '',
+        }));
+      } catch (e) { /* seri sedang dibongkar ulang */ }
+    }
+    return () => {
+      garisRayHarga.current.forEach((g) => { try { s.removePriceLine(g); } catch { /* dibongkar */ } });
+      garisRayHarga.current = [];
+    };
+  }, [gambarAlat]);
 
   /* Harga permintaan (ask): garis titik jarang — jaraknya ke garis harga
      bid adalah SPREAD, dan di emas spread bukan pembulatan. Garisnya

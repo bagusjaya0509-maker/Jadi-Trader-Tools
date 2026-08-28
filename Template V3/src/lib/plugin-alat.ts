@@ -318,18 +318,20 @@ export class PenggambarAlat implements ISeriesPrimitive<Time> {
                 ctx.arc(xMulai, y, 3, 0, Math.PI * 2);
                 ctx.fill();
 
-                const teks = hargaTeks(g.h1);
-                ctx.font = '600 10px "IBM Plex Sans", sans-serif';
-                const w = ctx.measureText(teks).width + 8;
-                const xk = Math.max(xMulai + 6, xUjung - w - 4);
-                ctx.fillStyle = 'rgba(250,204,21,.95)';
-                ctx.beginPath();
-                ctx.roundRect(xk, y - 7.5, w, 15, 3);
-                ctx.fill();
-                ctx.fillStyle = '#09090b';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(teks, xk + w / 2, y);
+                /* ANGKANYA TIDAK DITULIS DI SINI.
+                   ────────────────────────────────────────────────────────
+                   Versi pertama mencetaknya sebagai kotak kuning di ujung
+                   kanan kanvas. Terbaca, tapi salah tempat: ia mengambang
+                   di atas lilin sementara SEMUA angka harga lain di layar
+                   ini — harga berjalan, SL, TP, Ask — duduk di dalam kolom
+                   sumbu harga. Satu angka yang berdiri di luar barisan
+                   memaksa mata mencarinya di tempat yang berbeda tiap kali.
+
+                   Sekarang angkanya ditumpangkan ke sumbu lewat price line
+                   ber-`lineVisible: false` di chart-lilin — jadi yang
+                   keluar cuma kotak angkanya, di kolom yang sama dengan
+                   harga berjalan, sementara garis rayanya tetap digambar di
+                   sini. */
                 continue;
               }
 
