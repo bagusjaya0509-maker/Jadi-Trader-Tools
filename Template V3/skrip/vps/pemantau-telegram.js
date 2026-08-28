@@ -42,7 +42,15 @@ const { StringSession } = require('teleproto/sessions');
 const { Perangkai } = require('./rangkai');
 const { kirimKartu, layakKartu, daftarHadir, NAMA_AGEN } = require('./kartu-agen');
 const mata = require('./mata-chart');
-const { simpanChart } = require('./arsip-chart-vps');
+const { simpanChart, catatAktivitas } = require('./arsip-chart-vps');
+
+/* Pembungkus yang MENELAN GALAT. Catatan aktivitas adalah kenyamanan; ia
+   tidak boleh punya kuasa menjatuhkan telinga 24 jam. Ruang yang tidak
+   mengarsip tidak menulis apa-apa — agen teks tidak punya panel ini. */
+function jejak(r, isi) {
+  if (!r || !r.arsip) return;
+  try { catatAktivitas(__dirname, isi); } catch (e) { /* diabaikan */ }
+}
 
 /* TIDAK ADA MODEL BAHASA DI JALUR INI, dan itu disengaja.
    ──────────────────────────────────────────────────────────────────────
@@ -312,6 +320,19 @@ async function siapkanRuang(client, r) {
   };
   await r.segarkanAdmin();
   setInterval(() => { void r.segarkanAdmin(); }, 60 * 60 * 1000);
+
+  jejak(r, {
+    ruang: {
+      agen: r.agen,
+      judul: ruang.title || r.grup,
+      topik: r.topikAkhir,
+      admin: r.admin.size,
+      nyala: Date.now(),
+      denyut: Date.now(),
+      terhubung: true,
+    },
+    log: { agen: r.agen, jenis: 'nyala', pesan: 'Pemantau menyala · topik ' + r.topikAkhir + ' · ' + r.admin.size + ' admin' },
+  });
 }
 
 
@@ -490,7 +511,22 @@ async function siapkanRuang(client, r) {
          diposting anonim akan terbaca sepi selamanya. */
       const dari = pesan.senderId ? String(pesan.senderId) : '';
       if (r.hanyaAdmin && r.admin.size && dari
-          && dari !== r.kunciRuang && !r.admin.has(dari)) return;
+          && dari !== r.kunciRuang && !r.admin.has(dari)) {
+        /* DICATAT, tidak cuma dibuang. Ini penolakan yang paling mahal
+           kalau salah: satu admin baru yang belum masuk daftar berarti
+           SELURUH postingannya hilang, dan hilangnya terlihat persis sama
+           dengan ruang yang sedang sepi.
+
+           Dicatat SESUDAH saringan topik, jadi yang tercatat cuma pesan
+           yang memang berada di ruang yang dipantau — bukan seluruh lalu
+           lintas grup. */
+        jejak(r, { log: {
+          agen: r.agen, jenis: 'lewat',
+          pesan: 'Pengirim ' + dari + ' bukan admin terdaftar · "'
+            + String(pesan.message || '(gambar)').replace(/\s+/g, ' ').slice(0, 60) + '"',
+        } });
+        return;
+      }
       /* Daftar admin BELUM PERNAH terbaca: pesannya tetap disimpan dan
          tetap membunyikan lonceng -- kabar tidak boleh hilang -- tapi
          tidak boleh jadi kartu. Kartu adalah klaim bahwa admin grup
@@ -586,8 +622,14 @@ async function siapkanRuang(client, r) {
               waktu: baris.waktu,
               bita,
             });
-            if (berkas) catat('  chart diarsipkan untuk pemilik:', berkas,
-              '(' + Math.round(bita.length / 1024) + ' KB)');
+            if (berkas) {
+              catat('  chart diarsipkan untuk pemilik:', berkas,
+                '(' + Math.round(bita.length / 1024) + ' KB)');
+              jejak(r, { log: {
+                agen: r.agen, jenis: 'simpan',
+                pesan: (teks || '(tanpa keterangan)').replace(/\s+/g, ' ').slice(0, 90),
+              } });
+            }
           }
         } catch (e) {
           catat('  chart gagal diarsipkan (diabaikan):', e && e.message);
@@ -754,6 +796,13 @@ async function siapkanRuang(client, r) {
   setInterval(async () => {
     const nyambung = !!(client && client.connected);
     catat('denyut —', nyambung ? 'terhubung' : 'PUTUS', '· arsip', arsipAmbil().length, 'pesan');
+    /* Denyut TIDAK menambah baris log, cuma memperbarui keadaan ruangnya.
+       Satu baris tiap jam akan mendorong kejadian yang sebenarnya keluar
+       dari daftar dalam tiga hari, dan yang dicari orangnya justru
+       kejadian itu. */
+    for (const r of hidup) {
+      jejak(r, { ruang: { agen: r.agen, denyut: Date.now(), terhubung: nyambung, admin: r.admin.size } });
+    }
     if (nyambung) return;
     try {
       await client.connect();

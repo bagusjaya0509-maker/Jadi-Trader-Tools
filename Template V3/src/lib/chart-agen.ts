@@ -107,6 +107,44 @@ export async function hapusChart(id: string): Promise<boolean> {
   } catch { return false; }
 }
 
+/* ── AKTIVITAS AGEN ──────────────────────────────────────────────────────
+   Menjawab pertanyaan yang tidak bisa dijawab daftar chart-nya sendiri:
+   "agennya bekerja, atau ruangnya memang sepi?" Dua keadaan itu
+   menghasilkan daftar yang sama persis — tidak bertambah. */
+
+export interface RuangAgen {
+  agen: string;
+  judul: string;
+  topik: number | null;
+  admin: number;
+  nyala: number;
+  denyut: number;
+  terhubung: boolean;
+}
+
+export interface JejakAgen {
+  waktu: number;
+  agen: string;
+  /** `nyala` pemantau menyala · `simpan` chart diarsipkan · `lewat` pesan
+   *  ditolak saringan. Yang ketiga yang paling berharga: saringan yang
+   *  menolak diam-diam adalah cara paling rapi kehilangan postingan. */
+  jenis: 'nyala' | 'simpan' | 'lewat';
+  pesan: string;
+}
+
+export async function aktivitasChart(): Promise<{ log: JejakAgen[]; ruang: RuangAgen[] } | null> {
+  const t = await token();
+  if (!t) return null;
+  try {
+    const r = await fetch(`${dasar()}/api/agen/chart/aktivitas`, {
+      headers: { Authorization: 'Bearer ' + t },
+    });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return { log: Array.isArray(j?.log) ? j.log : [], ruang: Array.isArray(j?.ruang) ? j.ruang : [] };
+  } catch { return null; }
+}
+
 export interface LevelSinyal {
   pasangan: string; arah: 'BUY' | 'SELL';
   entry: number; sl: number; tp: number;

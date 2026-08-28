@@ -68,6 +68,23 @@ module.exports = (app, { butuhLogin, batasLaju, express, DIR }) => {
     res.json({ ok: true, chart: daftar, total: baca().length });
   });
 
+  /* ── Log aktivitas agen ───────────────────────────────────────────────
+     Menjawab satu pertanyaan yang tidak bisa dijawab arsipnya sendiri:
+     "agennya bekerja, atau ruangnya memang sepi?" Dua keadaan itu
+     menghasilkan arsip yang sama persis — tidak bertambah — dan tanpa
+     catatan ini satu-satunya cara membedakannya adalah masuk ke VPS lalu
+     membaca log pm2.
+
+     Yang paling berharga di sini bukan baris "tersimpan", melainkan baris
+     "dilewati": saringan yang menolak diam-diam adalah cara paling rapi
+     kehilangan postingan tanpa pernah tahu. */
+  app.get('/api/agen/chart/aktivitas', batasLaju, butuhLogin, hanyaPemilik, (req, res) => {
+    let d = { log: [], ruang: [] };
+    try { d = JSON.parse(fs.readFileSync(path.join(DIR, 'chart-aktivitas.json'), 'utf8')); }
+    catch (e) { /* belum pernah ditulis — pemantau baru pertama kali nyala */ }
+    res.json({ ok: true, log: d.log || [], ruang: d.ruang || [] });
+  });
+
   /* ── Gambarnya ────────────────────────────────────────────────────────
      Dilayani dari memori, bukan lewat express.static. Static akan membuat
      seluruh folder bisa ditebak alamatnya oleh siapa pun yang tahu nama
@@ -194,6 +211,46 @@ module.exports = (app, { butuhLogin, batasLaju, express, DIR }) => {
   });
 
   console.log('[arsip-chart] siap · ' + (UID ? 'pemilik ' + UID.slice(0, 8) + '…' : 'UID PEMILIK KOSONG — semua ditolak'));
+};
+
+/* ── CATATAN AKTIVITAS ────────────────────────────────────────────────────
+   Ditulis pemantau, dibaca rute di atas. Berkas, bukan memori bersama:
+   pemantau dan backend dua proses terpisah, dan berkas adalah satu-satunya
+   saluran yang keduanya sudah pakai (chart-arsip.json juga begitu).
+
+   `ruang` menyimpan keadaan TERAKHIR tiap ruang — denyut, jumlah admin,
+   topik yang dipatok. Itu jawaban "agennya hidup?"; `log` jawaban "apa saja
+   yang lewat?". Dua pertanyaan berbeda, jadi dua bentuk berbeda: yang satu
+   ditimpa, yang satu ditumpuk.
+
+   Dibatasi 80 baris. Log yang tumbuh tanpa batas akan membuat rutenya
+   mengirim berkas satu megabita ke peramban tiap kali panelnya dibuka. */
+const AKTIVITAS_MAKS = 80;
+
+module.exports.catatAktivitas = function catatAktivitas(DIR, baris) {
+  const F = path.join(DIR, 'chart-aktivitas.json');
+  let d = { log: [], ruang: [] };
+  try { d = JSON.parse(fs.readFileSync(F, 'utf8')); } catch (e) { /* baru */ }
+  if (!Array.isArray(d.log)) d.log = [];
+  if (!Array.isArray(d.ruang)) d.ruang = [];
+
+  if (baris.ruang) {
+    /* Keadaan ruang DITIMPA, bukan ditumpuk: yang dicari orangnya "denyut
+       terakhir kapan", bukan riwayat seluruh denyut sejak dinyalakan. */
+    const i = d.ruang.findIndex((r) => r.agen === baris.ruang.agen);
+    if (i >= 0) d.ruang[i] = { ...d.ruang[i], ...baris.ruang };
+    else d.ruang.push(baris.ruang);
+  }
+  if (baris.log) {
+    d.log.unshift({ waktu: Date.now(), ...baris.log });
+    d.log = d.log.slice(0, AKTIVITAS_MAKS);
+  }
+
+  try {
+    const semen = F + '.tmp';
+    fs.writeFileSync(semen, JSON.stringify(d, null, 2));
+    fs.renameSync(semen, F);
+  } catch (e) { /* disk penuh — catatan bukan alasan menjatuhkan pemantau */ }
 };
 
 /* ── Dipakai pemantau untuk menyimpan satu chart ──────────────────────────

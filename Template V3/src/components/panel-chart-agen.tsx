@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
-import { EyeOff, FolderInput, GripHorizontal, Loader2, PenLine, RefreshCw, Trash2, Undo2, X } from 'lucide-react';
+import {
+  ChevronDown, EyeOff, FolderInput, GripHorizontal, Loader2, PenLine,
+  RefreshCw, Trash2, Undo2, X,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
-  daftarChart, gambarChart, tandaiChart, hapusChart, jadikanSinyal,
-  type ChartPantauan,
+  daftarChart, gambarChart, tandaiChart, hapusChart, jadikanSinyal, aktivitasChart,
+  type ChartPantauan, type JejakAgen, type RuangAgen,
 } from '@/lib/chart-agen';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -343,6 +346,98 @@ function FormLevel({ chart, selesai }: { chart: ChartPantauan; selesai: () => vo
    muncul bersamaan. */
 const FORM_LEVEL_TAMPIL = false;
 
+/* ── BILAH AKTIVITAS AGEN ───────────────────────────────────────────────
+   Rak chart yang tidak bertambah punya DUA sebab yang terlihat sama persis:
+   agennya mati, atau ruangnya memang sepi. Tanpa bilah ini satu-satunya
+   cara membedakannya adalah masuk ke VPS dan membaca log pm2.
+
+   Denyutnya yang menjawab "hidup?" — pemantau menuliskannya tiap jam, jadi
+   apa pun yang lebih tua dari dua jam berarti ia berhenti melapor. Dua jam,
+   bukan satu: satu denyut yang terlewat karena restart atau jaringan
+   berkedip adalah kejadian biasa, dan alarm yang berbunyi untuk kejadian
+   biasa adalah alarm yang dimatikan orang. */
+function BilahAktivitas() {
+  const [data, setData] = useState<{ log: JejakAgen[]; ruang: RuangAgen[] } | null>(null);
+  const [buka, setBuka] = useState(false);
+
+  useEffect(() => {
+    let hidup = true;
+    const tarik = () => { void aktivitasChart().then((d) => { if (hidup && d) setData(d); }); };
+    tarik();
+    const t = setInterval(tarik, 120000);
+    return () => { hidup = false; clearInterval(t); };
+  }, []);
+
+  if (!data || !data.ruang.length) return null;
+
+  const BATAS_DENYUT = 2 * 60 * 60 * 1000;
+  const sehat = data.ruang.every((r) => r.terhubung && Date.now() - r.denyut < BATAS_DENYUT);
+  const denyutTua = Math.min(...data.ruang.map((r) => r.denyut));
+  /* Yang ditolak saringan dihitung terpisah dan ditulis di bilah utamanya,
+     bukan disembunyikan di dalam daftar: satu pun penolakan berarti ada
+     postingan yang TIDAK sampai, dan itu kabar yang tidak boleh menunggu
+     seseorang membuka daftar dulu. */
+  const ditolak = data.log.filter((l) => l.jenis === 'lewat').length;
+
+  return (
+    <div className="rounded-lg border border-zinc-800 bg-zinc-900/40">
+      <button onClick={() => setBuka((v) => !v)}
+        className="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left">
+        <span aria-hidden className={cn('size-2 shrink-0 rounded-full',
+          sehat ? 'bg-emerald-400' : 'bg-amber-400')} />
+        <span className="text-[12px] font-medium text-zinc-200">
+          {sehat ? 'Agen berjalan' : 'Agen tidak melapor'}
+        </span>
+        <span className="min-w-0 truncate text-[11px] text-zinc-500">
+          {data.ruang.map((r) => r.agen).join(', ')} · denyut {umur(denyutTua)}
+        </span>
+        {ditolak > 0 && (
+          <span className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10.5px] font-medium text-amber-300">
+            {ditolak} ditolak saringan
+          </span>
+        )}
+        <ChevronDown className={cn('ml-auto size-3.5 shrink-0 text-zinc-500 transition-transform',
+          buka && 'rotate-180')} />
+      </button>
+
+      {buka && (
+        <div className="border-t border-zinc-800 px-3 py-2">
+          <div className="mb-2 space-y-1">
+            {data.ruang.map((r) => (
+              <p key={r.agen} className="text-[11px] text-zinc-500">
+                <span className="text-zinc-300">{r.agen}</span> · {r.judul} · topik {r.topik ?? '—'}
+                {' · '}{r.admin} admin · denyut {umur(r.denyut)}
+                {!r.terhubung && <span className="text-amber-400"> · SAMBUNGAN PUTUS</span>}
+              </p>
+            ))}
+          </div>
+
+          {data.log.length === 0 ? (
+            <p className="py-2 text-[11.5px] text-zinc-600">
+              Belum ada kejadian sejak pemantau menyala. Rak yang kosong berarti
+              ruangnya memang sepi, bukan agennya berhenti.
+            </p>
+          ) : (
+            <div className="max-h-64 space-y-0.5 overflow-y-auto">
+              {data.log.map((l, i) => (
+                <div key={l.waktu + '-' + i} className="flex items-baseline gap-2 py-0.5">
+                  <span className={cn('shrink-0 text-[10px] font-medium uppercase tracking-wide',
+                    l.jenis === 'simpan' ? 'text-emerald-400'
+                      : l.jenis === 'lewat' ? 'text-amber-400' : 'text-zinc-500')}>
+                    {l.jenis === 'simpan' ? 'simpan' : l.jenis === 'lewat' ? 'ditolak' : 'nyala'}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-[11.5px] text-zinc-400">{l.pesan}</span>
+                  <span className="shrink-0 text-[10.5px] tabular-nums text-zinc-600">{umur(l.waktu)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function PanelChartAgen() {
   const [chart, setChart] = useState<ChartPantauan[] | null>(null);
   const [gagal, setGagal] = useState(false);
@@ -477,6 +572,8 @@ export function PanelChartAgen() {
           <RefreshCw className="size-3.5" />
         </button>
       </div>
+
+      <BilahAktivitas />
 
       {gagal && (
         <p className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-[12.5px] text-amber-300">
