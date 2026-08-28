@@ -59,9 +59,30 @@ code{background:#1c1c20;border:1px solid var(--garis);border-radius:4px;
 .terkait{margin-top:44px;border-top:1px solid var(--garis);padding-top:22px}
 .terkait h2{font-size:15px;color:var(--redup);margin:0 0 10px;
   text-transform:uppercase;letter-spacing:.06em}
-.terkait a{display:block;margin-bottom:8px;text-decoration:none;
+.terkait a{display:inline-block;text-decoration:none;
   color:var(--teks);font-weight:500}
+/* width:fit-content — TANPA ini pembungkusnya selebar kolom, dan kartu
+   pratinjau yang dipusatkan dengan left:50% mendarat 87px di kanan
+   tautannya. Diukur, bukan dikira. */
+.terkait .pratinjau{display:block;width:fit-content;margin-bottom:8px}
 .terkait a:hover{color:var(--aksen)}
+
+/* ── pratinjau tautan: tiruan link-preview.tsx tanpa JavaScript ───────── */
+.pratinjau{position:relative;display:inline-block}
+.pratinjau > .kartu-p{position:absolute;bottom:calc(100% + 10px);left:50%;
+  z-index:20;padding:4px;background:#fff;border:2px solid transparent;
+  border-radius:12px;box-shadow:0 20px 45px rgba(0,0,0,.55);
+  opacity:0;pointer-events:none;
+  transform:translate(-50%,20px) scale(.6);transform-origin:bottom center;
+  transition:opacity .18s ease,transform .32s cubic-bezier(.34,1.56,.64,1)}
+.pratinjau > .kartu-p img{display:block;width:200px;height:125px;
+  object-fit:cover;border-radius:8px}
+.pratinjau:hover > .kartu-p,
+.pratinjau:focus-within > .kartu-p{opacity:1;transform:translate(-50%,0) scale(1)}
+/* Di layar sentuh tidak ada kursor yang melayang, jadi kartunya tidak akan
+   pernah muncul — dan kalau ia muncul waktu disentuh, ia justru menutupi
+   tautan yang hendak ditekan. */
+@media(hover:none){.pratinjau > .kartu-p{display:none}}
 footer{margin-top:52px;border-top:1px solid var(--garis);padding-top:20px;
   color:#71717a;font-size:13px}
 .label{display:inline-block;font-size:11px;letter-spacing:.08em;
@@ -111,8 +132,16 @@ footer{margin-top:52px;border-top:1px solid var(--garis);padding-top:20px;
   .kisi-sisa{grid-template-columns:repeat(3,1fr)}
   .kartu.utama{grid-column:span 1;grid-row:span 2}
   .latar-label{font-size:340px;left:-16%}
-  .seksi h1.aula{font-size:56px}
+  /* Satu baris, dan ukurannya DITURUNKAN sampai muat — bukan sebaliknya.
+     Diukur di peramban: kolom 1.080px, judulnya 50 karakter, jadi 38px
+     yang muat dengan sisa napas. nowrap hanya di sini; di layar sempit
+     judul dipaksa satu baris akan mengecil sampai tidak terbaca. */
+  .seksi h1.aula{font-size:38px;white-space:nowrap}
 }
+/* 44px membuat teksnya 1.080px di wadah 1.080px — pas, tapi nol sisa.
+   Lebar huruf bisa berbeda sedikit antar peramban dan antar sistem, dan
+   yang "pas" di sini akan terlipat di tempat lain tanpa ada yang tahu. */
+@media(min-width:1280px){.seksi h1.aula{font-size:41px}}
 @media(max-width:520px){h1{font-size:27px}.bungkus{padding:20px 16px 64px}
   .seksi h1.aula{font-size:30px}.latar-label{font-size:110px}
   .seksi p.aula{font-size:17px;line-height:1.8}}
@@ -128,7 +157,7 @@ footer{margin-top:52px;border-top:1px solid var(--garis);padding-top:20px;
     <a href="/akses">Harga</a>
   </nav>
 </header>
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Akun Sen di MT5 Bisa Membuat Jurnalmu Terlihat 100× Lebih Untung","description":"Kenapa akun cent perlu diperlakukan berbeda, dan bagaimana saldo, swap, komisi, serta winrate gabungan dihitung.","mainEntityOfPage":"https://jaditrader.co.id/artikel/akun-sen-mt5-jurnal-seratus-kali-lipat/","inLanguage":"id-ID","publisher":{"@type":"Organization","name":"Jadi Trader Tools","url":"https://jaditrader.co.id"}}</script><article><span class="label">Panduan &middot; 1 menit baca</span><h1>Akun Sen di MT5 Bisa Membuat Jurnalmu Terlihat 100× Lebih Untung</h1><p class="ringkas">Kenapa akun cent perlu diperlakukan berbeda, dan bagaimana saldo, swap, komisi, serta winrate gabungan dihitung.</p><p>Akun sen memakai satuan yang seratus kali lebih kecil dari akun biasa. Kalau angkanya masuk jurnal apa adanya, seluruh riwayatmu terbaca seratus kali lebih untung dari kenyataan — dan yang berbahaya bukan angkanya, melainkan keputusan yang kamu ambil dari angka itu.</p><p>Akun sen dideteksi dari mata uang akun MT5, lalu dibagi 100 sebelum masuk jurnal.</p><h2>Saldo dihitung dari transaksi yang sudah selesai</h2><p>Saldo di Dashboard dan Journal berasal dari satu sumber: saldo awal ditambah seluruh P/L yang sudah direalisasi. Posisi yang masih terbuka tidak ikut — ia tampil terpisah sebagai floating.</p><p>Alasannya sederhana: mencampur keduanya membuat kurva ekuitas berubah tiap detik tanpa ada satu pun transaksi yang benar-benar terjadi. Kurva yang bergerak sendiri tidak bisa dipakai menilai apa pun.</p><h2>Swap dan komisi masuk ke dalam P/L</h2><p>Keduanya dihitung ke dalam P/L tiap transaksi, bukan dijadikan baris sendiri. Jadi angka yang kamu lihat adalah yang benar-benar masuk atau keluar dari akun, bukan angka kotor sebelum biaya.</p><h2>Winrate gabungan memakai jumlah transaksi</h2><p>Forex dan kripto disimpan terpisah lalu digabung saat ditampilkan. Winrate gabungannya dihitung dari jumlah transaksi, <b>bukan</b> rata-rata dua winrate.</p><p>Bedanya besar: 9 dari 10 trade forex menang dan 1 dari 90 trade kripto menang bukan berarti winrate-mu 50%. Rata-rata dua persentase menyembunyikan bahwa hampir semua transaksimu ada di sisi yang kalah.</p><h2>Kolom emosi tidak memengaruhi angka</h2><p>Kolom emosi dan alasan entry diisi manual, dan sengaja tidak dipakai menghitung apa pun. Gunanya muncul belakangan — saat pola "entry karena FOMO" sudah cukup banyak untuk dijumlahkan.</p></article><div class="ajakan"><p>Semua yang dijelaskan di atas bisa dicoba tanpa membayar dan tanpa mendaftar lebih dulu lewat halaman pratinjau — akses penuh 24 jam.</p><a class="tombol" href="/preview">Coba tanpa daftar &rarr;</a></div><div class="terkait"><h2>Baca juga</h2><a href="/artikel/cara-menghubungkan-mt5-ke-jurnal-trading-otomatis/">Cara Menghubungkan MetaTrader 5 ke Jurnal Trading Otomatis</a></div>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Akun Sen di MT5 Bisa Membuat Jurnalmu Terlihat 100× Lebih Untung","description":"Kenapa akun cent perlu diperlakukan berbeda, dan bagaimana saldo, swap, komisi, serta winrate gabungan dihitung.","mainEntityOfPage":"https://jaditrader.co.id/artikel/akun-sen-mt5-jurnal-seratus-kali-lipat/","inLanguage":"id-ID","publisher":{"@type":"Organization","name":"Jadi Trader Tools","url":"https://jaditrader.co.id"}}</script><article><span class="label">Panduan &middot; 1 menit baca</span><h1>Akun Sen di MT5 Bisa Membuat Jurnalmu Terlihat 100× Lebih Untung</h1><p class="ringkas">Kenapa akun cent perlu diperlakukan berbeda, dan bagaimana saldo, swap, komisi, serta winrate gabungan dihitung.</p><p>Akun sen memakai satuan yang seratus kali lebih kecil dari akun biasa. Kalau angkanya masuk jurnal apa adanya, seluruh riwayatmu terbaca seratus kali lebih untung dari kenyataan — dan yang berbahaya bukan angkanya, melainkan keputusan yang kamu ambil dari angka itu.</p><p>Akun sen dideteksi dari mata uang akun MT5, lalu dibagi 100 sebelum masuk jurnal.</p><h2>Saldo dihitung dari transaksi yang sudah selesai</h2><p>Saldo di Dashboard dan Journal berasal dari satu sumber: saldo awal ditambah seluruh P/L yang sudah direalisasi. Posisi yang masih terbuka tidak ikut — ia tampil terpisah sebagai floating.</p><p>Alasannya sederhana: mencampur keduanya membuat kurva ekuitas berubah tiap detik tanpa ada satu pun transaksi yang benar-benar terjadi. Kurva yang bergerak sendiri tidak bisa dipakai menilai apa pun.</p><h2>Swap dan komisi masuk ke dalam P/L</h2><p>Keduanya dihitung ke dalam P/L tiap transaksi, bukan dijadikan baris sendiri. Jadi angka yang kamu lihat adalah yang benar-benar masuk atau keluar dari akun, bukan angka kotor sebelum biaya.</p><h2>Winrate gabungan memakai jumlah transaksi</h2><p>Forex dan kripto disimpan terpisah lalu digabung saat ditampilkan. Winrate gabungannya dihitung dari jumlah transaksi, <b>bukan</b> rata-rata dua winrate.</p><p>Bedanya besar: 9 dari 10 trade forex menang dan 1 dari 90 trade kripto menang bukan berarti winrate-mu 50%. Rata-rata dua persentase menyembunyikan bahwa hampir semua transaksimu ada di sisi yang kalah.</p><h2>Kolom emosi tidak memengaruhi angka</h2><p>Kolom emosi dan alasan entry diisi manual, dan sengaja tidak dipakai menghitung apa pun. Gunanya muncul belakangan — saat pola "entry karena FOMO" sudah cukup banyak untuk dijumlahkan.</p></article><div class="ajakan"><p>Semua yang dijelaskan di atas bisa dicoba tanpa membayar dan tanpa mendaftar lebih dulu lewat halaman pratinjau — akses penuh 24 jam.</p><a class="tombol" href="/preview">Coba tanpa daftar &rarr;</a></div><div class="terkait"><h2>Baca juga</h2><span class="pratinjau"><span class="kartu-p"><img src="/artikel/gambar/cara-menghubungkan-mt5-ke-jurnal-trading-otomatis.webp" width="200" height="125" loading="lazy" decoding="async" alt=""></span><a href="/artikel/cara-menghubungkan-mt5-ke-jurnal-trading-otomatis/">Cara Menghubungkan MetaTrader 5 ke Jurnal Trading Otomatis</a></span></div>
 <footer>
   <p>Edukasi, bukan rekomendasi finansial. Trading mengandung risiko kehilangan modal.</p>
   <p><a href="/">jaditrader.co.id</a> &middot; <a href="/legal">Legal</a></p>
