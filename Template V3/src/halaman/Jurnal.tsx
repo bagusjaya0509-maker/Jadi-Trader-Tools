@@ -148,6 +148,10 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
   /* Setoran & penarikan masuk ke SALDO, bukan ke P/L — jadi ia digabung ke
      saldo awal, bukan ke daftar transaksi. Kalau ikut ke transaksi, menyetor
      uang akan terbaca sebagai trade yang menang. */
+  /* Dipanggil di sini, BUKAN di Jurnal: kisi dua kolomnya milik blok ini,
+     dan tiap blok (Trade-Fi & Kripto) punya kolom kanannya sendiri — satu
+     pengukuran bersama akan memaksa keduanya setinggi yang terpanjang. */
+  const sejajar = useTinggiSejajar();
   const modalAwal = saldoAwal + arusBersih(arus, sumber);
   const stat = statGabungan(trade, modalAwal);
   const kurva = useMemo(() => kurvaEkuitas(trade, modalAwal), [trade, modalAwal]);
@@ -385,7 +389,7 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
               tiap panel berhenti setinggi isinya sendiri, dan begitu jendela
               diubah keduanya berakhir compang-camping. */}
           <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <div className="flex min-w-0 flex-col gap-4 lg:col-span-2">
+            <div ref={sejajar.kiri} className="flex min-w-0 flex-col gap-4 lg:col-span-2">
             <Panel>
               <PanelHead
                 judul="Kurva Ekuitas"
@@ -506,7 +510,13 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
                     dilihat di kode hampir selalu memotong baris terakhir di
                     tengah — dan baris yang terpotong terbaca sebagai bug,
                     bukan sebagai batas. */}
-                <TabelBungkus className="max-h-[433px] overflow-y-auto">
+                {/* maxHeight dari pengukuran, dengan 433px sebagai jatuhan
+                    saat pengukurannya belum sempat jalan (render pertama) atau
+                    saat kolomnya bertumpuk di layar sempit. Angka lama itu
+                    tetap angka yang sah — 28 + 9×45, tinggi 9 baris utuh —
+                    cuma tidak lagi satu-satunya. */}
+                <TabelBungkus ref={sejajar.tabel} className="overflow-y-auto"
+                  style={{ maxHeight: sejajar.tinggi ?? 433 }}>
                   <Tabel>
                     <thead className="sticky top-0 bg-zinc-950">
                       <tr>
@@ -568,7 +578,7 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
             {/* Kolom kanan: kalender + Pola Emosi PERSIS di bawahnya,
                 selebar kalendernya — dan karena kolom kanan memanjang,
                 Posisi Terbuka di kiri ikut meregang menyamainya. */}
-            <div className="flex min-w-0 flex-col gap-4">
+            <div ref={sejajar.kanan} className="flex min-w-0 flex-col gap-4">
               <Panel className="flex min-w-0 flex-col">
                 <PanelHead judul="Kalender P/L" sub="Klik panah atau nama bulan untuk berpindah." />
                 <div className="flex grow flex-col justify-start px-5 pb-5"><KalenderPl pl={pl} /></div>
@@ -618,6 +628,66 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
       )}
     </section>
   );
+}
+
+/* ── TINGGI RIWAYAT MENGIKUTI KOLOM KANAN ────────────────────────────────
+   Dulu `max-h-[433px]` — dihitung sekali dari 9 baris × 45px, dan sejak itu
+   tidak pernah berubah. Akibatnya dua hal yang keduanya terlihat: di layar
+   pendek tabelnya menjulur melewati Pola Emosi, di layar tinggi ia berhenti
+   di tengah sementara kolom kanan memanjang jauh ke bawah. Compang-camping
+   di kedua arah.
+
+   Yang diukur bukan tinggi tabelnya, melainkan RUANG SISA: tinggi kolom
+   kanan dikurangi segala sesuatu di kolom kiri SELAIN tabelnya (kurva
+   ekuitas, kepala panel, bilah tombol). Sisanya diberikan ke daftar, dan
+   daftar yang lebih panjang dari itu digulir.
+
+   ── KENAPA TIDAK CUKUP DENGAN FLEXBOX ─────────────────────────────────
+   Kolom kiri memang meregang setinggi baris grid-nya, tapi tinggi baris itu
+   sendiri diputuskan dari isi TERTINGGI di antara keduanya — dan isi kolom
+   kiri termasuk tabel yang tingginya belum dibatasi. Jadi flex murni
+   melingkar: tabel menentukan tinggi baris, tinggi baris menentukan tabel.
+   Satu pengukuran memutus lingkaran itu.
+
+   ── KENAPA TIDAK ADA LOOP ─────────────────────────────────────────────
+   `lainnya` dihitung sebagai (tinggi kolom kiri − tinggi tabel) yang keduanya
+   dibaca di frame yang sama, jadi nilainya tidak ikut berubah saat batas
+   barunya dipasang. Ditambah ambang 6 px: perubahan yang lebih kecil dari
+   itu diabaikan, sehingga pembulatan sub-piksel tidak bisa membuat dua nilai
+   saling mendorong selamanya. */
+function useTinggiSejajar() {
+  const kiri = useRef<HTMLDivElement | null>(null);
+  const kanan = useRef<HTMLDivElement | null>(null);
+  const tabel = useRef<HTMLDivElement | null>(null);
+  const [tinggi, setTinggi] = useState<number | null>(null);
+
+  useEffect(() => {
+    const ukur = () => {
+      const a = kiri.current, b = kanan.current, t = tabel.current;
+      if (!a || !b || !t) return;
+      /* Di bawah lg kedua kolom BERTUMPUK, bukan berdampingan — tidak ada
+         yang perlu disejajarkan, dan memaksakan tinggi kolom kanan ke
+         tabelnya di ponsel menghasilkan daftar sepanjang dua layar. */
+      if (window.innerWidth < 1024) { setTinggi(null); return; }
+      const lainnya = a.offsetHeight - t.offsetHeight;
+      /* Lantai 240 px: kolom kanan bisa saja pendek (bulan tanpa transaksi,
+         Pola Emosi kosong), dan daftar riwayat setinggi tiga baris lebih
+         buruk daripada sedikit tidak sejajar. */
+      const sisa = Math.max(240, Math.round(b.offsetHeight - lainnya));
+      setTinggi((lama) => (lama !== null && Math.abs(lama - sisa) < 6 ? lama : sisa));
+    };
+    ukur();
+    /* ResizeObserver, bukan cuma window.resize: kolom kanan berubah tinggi
+       tanpa jendelanya berubah — ganti bulan di kalender menambah satu baris,
+       dan Pola Emosi tumbuh mengikuti jumlah emosi yang tercatat. */
+    const po = new ResizeObserver(ukur);
+    if (kiri.current) po.observe(kiri.current);
+    if (kanan.current) po.observe(kanan.current);
+    window.addEventListener('resize', ukur);
+    return () => { po.disconnect(); window.removeEventListener('resize', ukur); };
+  }, []);
+
+  return { kiri, kanan, tabel, tinggi };
 }
 
 export default function Jurnal() {

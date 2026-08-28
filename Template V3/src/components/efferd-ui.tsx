@@ -1,3 +1,4 @@
+import { forwardRef } from 'react';
 import { ArrowUpRight, ArrowDownRight, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -140,9 +141,16 @@ export function TipGrafik({ active, payload, label }: any) {
 
 /* Tabel ringan dengan gaya Efferd. Pembungkus overflow WAJIB: yang boleh
    menggeser adalah tabelnya, bukan halamannya. */
-export function TabelBungkus({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn('overflow-x-auto', className)} {...props} />;
-}
+/* MENERUSKAN REF, dan itu bukan kelengkapan formalitas: tinggi daftar
+   riwayat di Jurnal diukur dari elemen ini, dan komponen yang menelan
+   ref-nya memaksa pemanggil membungkusnya lagi dengan div kosong — satu
+   lapisan tambahan yang ikut menghitung padding dan membuat pengukurannya
+   meleset. */
+export const TabelBungkus = forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+  function TabelBungkus({ className, ...props }, ref) {
+    return <div ref={ref} className={cn('overflow-x-auto', className)} {...props} />;
+  },
+);
 export function Tabel({ className, ...props }: React.TableHTMLAttributes<HTMLTableElement>) {
   return <table className={cn('w-full border-collapse text-[13px]', className)} {...props} />;
 }
