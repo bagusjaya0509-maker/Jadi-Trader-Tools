@@ -55,7 +55,7 @@ function jedaSingkat(ms: number) {
   return `${Math.floor(jam / 24)} hari lalu`;
 }
 
-/** @param keRuang  Kalau ada, kartunya punya PINTU MASUK.
+/** @param keRuang  Kalau ada, KARTUNYA bisa diklik untuk masuk.
  *
  *  Bawaannya tidak ada, dan itu benar untuk hampir semua agen: kartu siaga
  *  berarti agennya belum memposting apa pun, jadi kanalnya benar-benar
@@ -71,7 +71,31 @@ export function KartuAgenSiaga({ agen, keRuang }: { agen: AgenHadir; keRuang?: (
   const diam = Date.now() - agen.terakhirPindai > batasDiam(agen.tf);
 
   return (
-    <div className="relative overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/40">
+    /* KARTUNYA SENDIRI yang diklik, bukan tombol di dalamnya.
+       ──────────────────────────────────────────────────────────────────
+       Versi pertama memasang tombol "Buka ruang penyaringan" di kaki
+       kartu. Bekerja, tapi salah: kartu ini SUDAH yang paling tinggi di
+       raknya (218px lawan 202px milik kartu analis), dan di grid satu
+       baris selalu ikut setinggi yang tertinggi — jadi satu tombol di
+       sini melarkan SETIAP kartu di barisnya. Keputusan pemilik: cukup
+       kartunya yang bisa diklik.
+
+       Aman ditumpuk begitu karena kartu siaga TIDAK menerima klik kanan
+       untuk menyemat (hanya kartu analis yang punya), jadi tidak ada dua
+       niat yang berebut bidang yang sama.
+
+       role + tabIndex + Enter/Spasi dipasang hanya SAAT bisa diklik: div
+       yang tidak melakukan apa-apa tapi mengaku tombol adalah janji palsu
+       bagi pembaca layar, dan singgahan tab yang tidak menuju ke mana pun
+       cuma memperpanjang jalan orang yang memakai papan ketik. */
+    <div onClick={keRuang}
+         role={keRuang ? 'button' : undefined}
+         tabIndex={keRuang ? 0 : undefined}
+         onKeyDown={keRuang ? (e) => {
+           if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); keRuang(); }
+         } : undefined}
+         className={cn('relative overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/40',
+           keRuang && 'cursor-pointer transition-colors hover:border-violet-500/40')}>
       {/* Latar sapuan radar, sangat redup. Kartu ini tidak punya kurva saldo
           seperti tetangganya, dan tanpa apa pun di belakangnya ia terbaca
           seperti kartu yang gagal dimuat, bukan kartu yang sedang menunggu. */}
@@ -133,18 +157,6 @@ export function KartuAgenSiaga({ agen, keRuang }: { agen: AgenHadir; keRuang?: (
           Belum ada sinyal. Diam itu normal — agen memposting hanya saat
           aturannya terpenuhi.
         </p>
-
-        {/* Tombol, BUKAN seluruh kartu yang bisa diklik. Kartu ini menerima
-            klik kanan untuk menyematkan, dan bidang klik yang menutupi
-            seluruh kartu membuat dua niat berebut area yang sama —
-            keliru sekali saja sudah cukup membuat orang berhenti memakai
-            keduanya. */}
-        {keRuang && (
-          <button onClick={keRuang}
-            className="mt-3 w-full cursor-pointer rounded-md border border-violet-500/30 bg-violet-500/10 py-1.5 text-[11.5px] font-medium text-violet-300 transition-colors hover:border-violet-500/50 hover:text-violet-200">
-            Buka ruang penyaringan
-          </button>
-        )}
       </div>
     </div>
   );
