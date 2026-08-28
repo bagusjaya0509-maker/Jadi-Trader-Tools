@@ -36,11 +36,9 @@ halaman Integrations, satu-satunya tempat yang selalu benar.
 # Dua kalimat penggantinya kalau yang sekarang mau ditukar:
 #   "Yang tidak diajarkan waktu kamu buka akun"
 #   "Baca dulu sebelum buka chart berikutnya"
-AULA_JUDUL = "Yang bikin kamu berhenti di tengah jalan"
+AULA_JUDUL = "Jadi Trader Artikel | Perdalam Pemahamanmu Disini."
 
-AULA_DESKRIPSI = ("MT5 tidak mau kirim data. Chart kripto kosong. Jurnal "
-                  "terlihat seratus kali lebih untung dari kenyataan. Tiap "
-                  "masalahnya punya halamannya sendiri di sini.")
+AULA_DESKRIPSI = "Latih Psikologi & Skill Trading Dalam 1 Halaman Tools."
 
 # Label raksasa di belakang judul. Pendek, karena ia elemen grafis — bukan
 # kalimat yang dibaca.
