@@ -1,79 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!--
-  Sampai 17 Agu 2026 berkas ini berisi SATU alamat, dan penjelasannya panjang:
-  aplikasinya memakai HashRouter, seluruh halaman hidup di belakang tanda
-  pagar, dan Google membuang segala sesuatu sesudah "#" — jadi menuliskan
-  /#/marketplace di sini tidak membuatnya terindeks, ia cuma membuat Search
-  Console melaporkan duplikat.
-
-  Alasan itu sudah dicabut. Rutenya kini alamat sungguhan yang benar-benar
-  dikirim ke server, dan server sudah tahu cara menjawabnya (FALLBACK_SPA di
-  server.js). Maka daftar di bawah barulah berarti.
-
-  YANG MASUK HANYA HALAMAN YANG BISA DIBACA TANPA LOGIN. Mendaftarkan
-  /dashboard atau /journal di sini bukan cuma sia-sia — perayap yang
-  membukanya menerima layar minta-akses, dan Search Console mencatatnya
-  sebagai halaman tipis berisi konten yang sama berulang-ulang. Itu menurunkan
-  penilaian seluruh situs, bukan menaikkan halaman yang didaftarkan.
-
-  Karena itu daftar ini pendek, dan memang seharusnya pendek: sebuah aplikasi
-  di balik login tidak punya banyak halaman publik, dan berpura-pura punya
-  tidak menolong siapa pun.
--->
+<!-- Dibuat skrip/bangun-artikel.py. Jangan disunting tangan:
+     berkas ini ditulis ULANG tiap kali artikel dibangun. -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>https://jaditrader.co.id/</loc>
-    <changefreq>weekly</changefreq>
-    <priority>1.0</priority>
-  </url>
-  <!-- /preview SENGAJA TIDAK DIDAFTARKAN, meski ia halaman publik terbaik
-       yang kita punya.
-
-       Halaman itu bukan halaman: ia menyalakan mode preview lalu langsung
-       melempar pengunjung ke /dashboard. Bagi perayap artinya alamat sitemap
-       yang berakhir di jalur yang justru dilarang robots.txt — dan Search
-       Console melaporkannya sebagai galat, bukan sebagai halaman.
-
-       Diketahui dari kejadian nyata: permintaan indeks untuk /preview DITOLAK
-       dengan "indexing issues were detected with the URL". Jalan masuknya
-       tetap ada lewat tombol di halaman depan, yang memang tempatnya. -->
-  <url>
-    <!-- Halaman masuk / permintaan akses. Publik, dan memang tujuan pencarian
-         bermerek ("jadi trader tools login"). -->
-    <loc>https://jaditrader.co.id/akses</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <!-- Disclaimer, ketentuan, dan kebijakan privasi. WAJIB terbaca sebelum
-         orang membayar, jadi ia harus bisa ditemukan lewat pencarian juga. -->
-    <loc>https://jaditrader.co.id/legal</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
-  </url>
-  <url>
-    <!-- Catatan rilis. Halaman publik yang isinya benar-benar berubah, dan
-         itu yang membuat perayap kembali. -->
-    <loc>https://jaditrader.co.id/changelog</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
-    <!-- DOKUMENTASI. Dibuka untuk publik 21 Agu 2026 — sebelum itu ia di
-         balik gerbang langganan dan perayap cuma menerima layar
-         minta-akses.
-
-         Prioritasnya 0.8, di bawah halaman depan saja: sepuluh bagiannya
-         menjawab pertanyaan yang benar-benar diketik orang di Google
-         ("cara hitung lot", "sambungkan MT5 ke jurnal", "kenapa SL kena
-         terus"), dan itu membuatnya halaman dengan peluang masuk pencarian
-         paling besar yang situs ini punya.
-
-         Alamatnya /docs, BUKAN /dokumentasi — yang kedua cuma pengalih,
-         dan mendaftarkan pengalih di sitemap dilaporkan Search Console
-         sebagai "Page with redirect", bukan sebagai halaman. -->
-    <loc>https://jaditrader.co.id/docs</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
-  </url>
+  <url><loc>https://jaditrader.co.id/</loc></url>
+  <url><loc>https://jaditrader.co.id/preview</loc></url>
+  <url><loc>https://jaditrader.co.id/akses</loc></url>
+  <url><loc>https://jaditrader.co.id/legal</loc></url>
+  <url><loc>https://jaditrader.co.id/changelog</loc></url>
+  <url><loc>https://jaditrader.co.id/docs</loc></url>
+  <url><loc>https://jaditrader.co.id/belajar/</loc></url>
+  <url><loc>https://jaditrader.co.id/belajar/cara-menghubungkan-mt5-ke-jurnal-trading-otomatis/</loc></url>
+  <url><loc>https://jaditrader.co.id/belajar/cara-membuat-api-key-binance-yang-aman/</loc></url>
+  <url><loc>https://jaditrader.co.id/belajar/kenapa-data-binance-tidak-masuk-di-indonesia/</loc></url>
+  <url><loc>https://jaditrader.co.id/belajar/akun-sen-mt5-jurnal-seratus-kali-lipat/</loc></url>
+  <url><loc>https://jaditrader.co.id/belajar/cara-memasang-indikator-pine-di-tradingview/</loc></url>
 </urlset>

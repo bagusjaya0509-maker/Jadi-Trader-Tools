@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Belajar — Panduan Jadi Trader Tools</title>
+<meta name="description" content="Panduan memakai Jadi Trader Tools dan dasar-dasar trading: menghubungkan MT5, API Binance, membaca chart, dan mengelola risiko.">
+
+<link rel="canonical" href="https://jaditrader.co.id/belajar/">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Belajar — Panduan Jadi Trader Tools">
+<meta property="og:description" content="Panduan memakai Jadi Trader Tools dan dasar-dasar trading: menghubungkan MT5, API Binance, membaca chart, dan mengelola risiko.">
+<meta property="og:url" content="https://jaditrader.co.id/belajar/">
+<meta property="og:site_name" content="Jadi Trader Tools">
+<meta property="og:locale" content="id_ID">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+:root{--bg:#09090b;--panel:#111114;--garis:#26262b;--teks:#e4e4e7;
+  --redup:#a1a1aa;--aksen:#60a5fa}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--teks);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  -webkit-font-smoothing:antialiased}
+a{color:var(--aksen)}
+.bungkus{max-width:720px;margin:0 auto;padding:28px 20px 80px}
+header.atas{border-bottom:1px solid var(--garis);margin-bottom:36px;
+  padding-bottom:18px;display:flex;gap:16px;align-items:baseline;flex-wrap:wrap}
+header.atas a.merek{color:var(--teks);text-decoration:none;font-weight:700;
+  letter-spacing:-.02em}
+header.atas nav a{color:var(--redup);text-decoration:none;font-size:14px;
+  margin-right:14px}
+header.atas nav a:hover{color:var(--teks)}
+h1{font-size:34px;line-height:1.22;letter-spacing:-.02em;margin:0 0 14px}
+h2{font-size:22px;line-height:1.3;letter-spacing:-.015em;margin:38px 0 12px}
+p{margin:0 0 16px}
+ul,ol{margin:0 0 18px;padding-left:22px}
+li{margin-bottom:9px}
+code{background:#1c1c20;border:1px solid var(--garis);border-radius:4px;
+  padding:1px 6px;font-size:.88em;font-family:ui-monospace,SFMono-Regular,
+  Menlo,monospace;color:#d4d4d8;white-space:nowrap}
+.ringkas{color:var(--redup);font-size:18px;line-height:1.6;margin:0 0 26px}
+.catatan{background:var(--panel);border:1px solid var(--garis);
+  border-left:3px solid var(--aksen);border-radius:6px;padding:14px 16px;
+  margin:0 0 20px;color:var(--redup);font-size:15px}
+.catatan b{color:var(--teks)}
+.ajakan{background:var(--panel);border:1px solid var(--garis);border-radius:10px;
+  padding:22px;margin:44px 0 0}
+.ajakan p{margin:0 0 14px;color:var(--redup)}
+.ajakan a.tombol{display:inline-block;background:var(--teks);color:#09090b;
+  text-decoration:none;font-weight:600;font-size:14px;padding:10px 18px;
+  border-radius:7px}
+.terkait{margin-top:44px;border-top:1px solid var(--garis);padding-top:22px}
+.terkait h2{font-size:15px;color:var(--redup);margin:0 0 10px;
+  text-transform:uppercase;letter-spacing:.06em}
+.terkait a{display:block;margin-bottom:8px;text-decoration:none;
+  color:var(--teks);font-weight:500}
+.terkait a:hover{color:var(--aksen)}
+footer{margin-top:52px;border-top:1px solid var(--garis);padding-top:20px;
+  color:#71717a;font-size:13px}
+.daftar-artikel{list-style:none;padding:0}
+.daftar-artikel li{border-bottom:1px solid var(--garis);padding:18px 0;margin:0}
+.daftar-artikel a{font-size:19px;font-weight:600;text-decoration:none;
+  color:var(--teks);letter-spacing:-.01em}
+.daftar-artikel a:hover{color:var(--aksen)}
+.daftar-artikel p{margin:6px 0 0;color:var(--redup);font-size:15px}
+.label{display:inline-block;font-size:11px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--redup);border:1px solid var(--garis);
+  border-radius:99px;padding:2px 9px;margin-bottom:10px}
+@media(max-width:520px){h1{font-size:27px}.bungkus{padding:20px 16px 64px}}
+</style>
+</head>
+<body>
+<div class="bungkus">
+<header class="atas">
+  <a class="merek" href="/">Jadi Trader Tools</a>
+  <nav>
+    <a href="/belajar/">Belajar</a>
+    <a href="/preview">Coba gratis</a>
+    <a href="/akses">Harga</a>
+  </nav>
+</header>
+<article><h1>Belajar</h1><p class="ringkas">Panduan memakai alatnya, dan dasar-dasar yang membuat alat itu berguna.</p><h2>Panduan alat</h2><ul class="daftar-artikel"><li><a href="/belajar/cara-menghubungkan-mt5-ke-jurnal-trading-otomatis/">Cara Menghubungkan MetaTrader 5 ke Jurnal Trading Otomatis</a><p>Enam langkah memasang EA JadiTraderSync di MT5 supaya setiap transaksi masuk ke jurnal sendiri — tanpa menyalin satu baris pun dari riwayat.</p></li><li><a href="/belajar/cara-membuat-api-key-binance-yang-aman/">Cara Membuat API Key Binance yang Aman untuk Screener dan Chart</a><p>Satu centang yang tidak boleh diaktifkan, kenapa API key tidak pernah masuk ke peramban, dan apa bedanya dengan App Token.</p></li><li><a href="/belajar/kenapa-data-binance-tidak-masuk-di-indonesia/">Kenapa Data Binance Tidak Masuk di Indonesia, dan Cara Mengatasinya</a><p>Chart kosong dan screener yang tidak mengisi biasanya bukan bug aplikasi — melainkan blokir di jaringan ISP-mu.</p></li><li><a href="/belajar/akun-sen-mt5-jurnal-seratus-kali-lipat/">Akun Sen di MT5 Bisa Membuat Jurnalmu Terlihat 100× Lebih Untung</a><p>Kenapa akun cent perlu diperlakukan berbeda, dan bagaimana saldo, swap, komisi, serta winrate gabungan dihitung.</p></li><li><a href="/belajar/cara-memasang-indikator-pine-di-tradingview/">Cara Memasang Indikator Pine di TradingView (dan Satu Sebab Gagal yang Paling Sering)</a><p>Menempel kode Pine, menyimpannya ke favorit, dan kenapa indikator v6 tidak mau dikompilasi di layout lama.</p></li></ul></article>
+<footer>
+  <p>Edukasi, bukan rekomendasi finansial. Trading mengandung risiko kehilangan modal.</p>
+  <p><a href="/">jaditrader.co.id</a> &middot; <a href="/legal">Legal</a></p>
+</footer>
+</div>
+</body>
+</html>
