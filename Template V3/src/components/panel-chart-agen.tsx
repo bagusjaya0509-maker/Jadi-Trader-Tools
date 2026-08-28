@@ -35,22 +35,55 @@ import {
    membuka apa yang sudah terbuka. Menebak salah lebih buruk daripada tidak
    menebak: yang satu diam, yang lain memindahkan orang ke pasar yang salah
    sambil terlihat yakin. */
+/* BATAS KATA SAJA TIDAK CUKUP — SEBAGIAN TICKER WAJIB HURUF BESAR.
+   ──────────────────────────────────────────────────────────────────────
+   Dua kesalahan berturut-turut di sini, dan keduanya senyap.
+
+   Pertama polanya kehilangan `\b` sewaktu ditulis ke berkas — yang tertulis
+   malah karakter backspace sungguhan, jadi TIDAK SATU PUN pola pernah
+   cocok dan semua chart jatuh ke "Lainnya". Tidak ada galat, cuma
+   pengelompokan yang diam-diam tidak pernah terjadi.
+
+   Sesudah `\b` dikembalikan, muncul kesalahan kedua yang batas kata justru
+   tidak bisa tolong: TICKER PENDEK YANG SAMA PERSIS DENGAN KATA INDONESIA.
+   "tidak ADA sinyal" bukan Cardano. "harga SUdah" bukan Sui. "LINK grup"
+   bukan Chainlink. `\bada\b` mencocokkannya dengan benar — memang itu kata
+   utuh — dan justru karena itu ia salah.
+
+   Jalan keluarnya bukan pola yang lebih pintar, melainkan pengamatan
+   sederhana: di ruang itu ticker SELALU ditulis huruf besar ("ENA daily",
+   "PUMP 1 jam", "HYPERLIQUID 1 JAM"), sementara kata biasa tidak. Jadi
+   ticker yang bertabrakan kehilangan bendera `i`-nya; nama panjang yang
+   tidak mungkin salah tangkap (bitcoin, solana, cardano) tetap longgar.
+
+   Kalau suatu hari ada keterangan yang menulis "ena" huruf kecil, ia jatuh
+   ke "Lainnya" — dan itu kegagalan yang benar: satu chart perlu
+   dikelompokkan tangan, bukan sepuluh chart masuk koin yang salah. */
 const KAMUS_PASANGAN: [RegExp, string][] = [
-  [/xau|gold|emas/i, 'XAUUSD'],
-  [/btc|bitcoin/i, 'BTCUSDT'],
-  [/eth|ethereum/i, 'ETHUSDT'],
-  [/sol|solana/i, 'SOLUSDT'],
-  [/hype|hyperliquid/i, 'HYPEUSDT'],
-  [/ena|ethena/i, 'ENAUSDT'],
-  [/virtual/i, 'VIRTUALUSDT'],
-  [/pump/i, 'PUMPUSDT'],
-  [/bnb/i, 'BNBUSDT'],
-  [/xrp|ripple/i, 'XRPUSDT'],
-  [/doge/i, 'DOGEUSDT'],
-  [/ada|cardano/i, 'ADAUSDT'],
-  [/avax/i, 'AVAXUSDT'],
-  [/link/i, 'LINKUSDT'],
-  [/sui/i, 'SUIUSDT'],
+  /* Longgar — nama panjang, tidak bersarang di kata Indonesia mana pun. */
+  [/\bxau|\bgold\b|\bemas\b/i, 'XAUUSD'],
+  [/\bbtc\b|\bbitcoin\b/i, 'BTCUSDT'],
+  [/\bethereum\b/i, 'ETHUSDT'],
+  [/\bsolana\b/i, 'SOLUSDT'],
+  [/\bhyperliquid\b/i, 'HYPEUSDT'],
+  [/\bethena\b/i, 'ENAUSDT'],
+  [/\bvirtual\b/i, 'VIRTUALUSDT'],
+  [/\bcardano\b/i, 'ADAUSDT'],
+  [/\bripple\b/i, 'XRPUSDT'],
+  [/\bdoge\b/i, 'DOGEUSDT'],
+  [/\bavax\b/i, 'AVAXUSDT'],
+  [/\bbnb\b/i, 'BNBUSDT'],
+  [/\bxrp\b/i, 'XRPUSDT'],
+
+  /* KETAT — huruf besar saja. Lihat catatan di atas. */
+  [/\bETH\b/, 'ETHUSDT'],
+  [/\bSOL\b/, 'SOLUSDT'],
+  [/\bHYPE\b/, 'HYPEUSDT'],
+  [/\bENA\b/, 'ENAUSDT'],
+  [/\bPUMP\b/, 'PUMPUSDT'],
+  [/\bADA\b/, 'ADAUSDT'],
+  [/\bLINK\b/, 'LINKUSDT'],
+  [/\bSUI\b/, 'SUIUSDT'],
 ];
 
 export function tebakPasangan(keterangan: string): string | null {
@@ -321,15 +354,24 @@ export function PanelChartAgen() {
       )}
 
       {seksi.map((sk) => (
-        <section key={sk.nama}>
-          {/* Kepala seksi menempel saat digulir: dengan tiga-empat chart per
-              koin, nama koinnya keluar dari layar tepat ketika orangnya
-              sedang membandingkan isinya. */}
-          <div className="sticky top-0 z-10 -mx-1 mb-2 flex items-baseline gap-2 bg-zinc-950/90 px-1 py-1.5 backdrop-blur-sm">
-            <h3 className="text-[13px] font-semibold tracking-tight text-zinc-200">{sk.nama}</h3>
-            <span className="text-[11px] text-zinc-600">
-              {sk.isi.length} chart · terbaru {umur(sk.isi[0].waktu)}
-            </span>
+        <section key={sk.nama} className="pb-2">
+          {/* Kepala seksi MENEMPEL saat digulir dan punya GARIS yang jelas.
+              Versi pertama cuma menebalkan namanya, dan di layar penuh
+              kartu gelap yang seragam itu tenggelam — dari jauh raknya
+              terbaca sebagai satu deretan panjang lagi, persis keluhan yang
+              mau diselesaikan.
+
+              Garisnya melintang penuh, bukan cuma di bawah tulisannya:
+              yang perlu ditandai batas antar KELOMPOK, dan garis sepanjang
+              tulisan cuma menghias judulnya. */}
+          <div className="sticky top-0 z-10 -mx-1 mb-3 border-b border-zinc-700 bg-zinc-950/95 px-1 pb-1.5 pt-2 backdrop-blur-sm">
+            <div className="flex items-baseline gap-2">
+              <span aria-hidden className="h-3.5 w-[3px] shrink-0 self-center rounded-full bg-violet-400/80" />
+              <h3 className="text-[13.5px] font-semibold tracking-tight text-zinc-100">{sk.nama}</h3>
+              <span className="text-[11px] text-zinc-500">
+                {sk.isi.length} chart · terbaru {umur(sk.isi[0].waktu)}
+              </span>
+            </div>
           </div>
           <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(100%,26rem),1fr))]">
             {sk.isi.map((c) => (
