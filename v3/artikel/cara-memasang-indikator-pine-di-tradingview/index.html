@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cara Memasang Indikator Pine di TradingView (dan Satu Sebab Gagal yang Paling Sering) — Jadi Trader Tools</title>
+<meta name="description" content="Menempel kode Pine, menyimpannya ke favorit, dan kenapa indikator v6 tidak mau dikompilasi di layout lama.">
+<meta name="keywords" content="cara pasang indikator tradingview, pine editor, pine script v6, indikator smi">
+<link rel="canonical" href="https://jaditrader.co.id/artikel/cara-memasang-indikator-pine-di-tradingview/">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Cara Memasang Indikator Pine di TradingView (dan Satu Sebab Gagal yang Paling Sering) — Jadi Trader Tools">
+<meta property="og:description" content="Menempel kode Pine, menyimpannya ke favorit, dan kenapa indikator v6 tidak mau dikompilasi di layout lama.">
+<meta property="og:url" content="https://jaditrader.co.id/artikel/cara-memasang-indikator-pine-di-tradingview/">
+<meta property="og:site_name" content="Jadi Trader Tools">
+<meta property="og:locale" content="id_ID">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+:root{--bg:#09090b;--panel:#111114;--garis:#26262b;--teks:#e4e4e7;
+  --redup:#a1a1aa;--aksen:#60a5fa}
+*{box-sizing:border-box}
+/* overflow-x disembunyikan KARENA label raksasa di belakang judul memang
+   dirancang meluber ke kiri (left:-16%). Diukur di peramban: dokumennya
+   1.348px pada viewport 1.280px, jadi halaman ini bisa digeser ke samping —
+   cacat yang paling terasa justru di ponsel. */
+html{overflow-x:hidden}
+body{margin:0;overflow-x:hidden;background:var(--bg);color:var(--teks);
+  font:16px/1.75 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  -webkit-font-smoothing:antialiased}
+a{color:var(--aksen)}
+.bungkus{max-width:720px;margin:0 auto;padding:28px 20px 80px}
+.lebar{max-width:1120px}
+header.atas{border-bottom:1px solid var(--garis);margin-bottom:36px;
+  padding-bottom:18px;display:flex;gap:16px;align-items:baseline;flex-wrap:wrap}
+header.atas a.merek{color:var(--teks);text-decoration:none;font-weight:700;
+  letter-spacing:-.02em}
+header.atas nav a{color:var(--redup);text-decoration:none;font-size:14px;
+  margin-right:14px}
+header.atas nav a:hover{color:var(--teks)}
+h1{font-size:34px;line-height:1.22;letter-spacing:-.02em;margin:0 0 14px}
+h2{font-size:22px;line-height:1.3;letter-spacing:-.015em;margin:38px 0 12px}
+p{margin:0 0 16px}
+ul,ol{margin:0 0 18px;padding-left:22px}
+li{margin-bottom:9px}
+code{background:#1c1c20;border:1px solid var(--garis);border-radius:4px;
+  padding:1px 6px;font-size:.88em;font-family:ui-monospace,SFMono-Regular,
+  Menlo,monospace;color:#d4d4d8;white-space:nowrap}
+.ringkas{color:var(--redup);font-size:18px;line-height:1.6;margin:0 0 26px}
+.catatan{background:var(--panel);border:1px solid var(--garis);
+  border-left:3px solid var(--aksen);border-radius:6px;padding:14px 16px;
+  margin:0 0 20px;color:var(--redup);font-size:15px}
+.catatan b{color:var(--teks)}
+.ajakan{background:var(--panel);border:1px solid var(--garis);border-radius:10px;
+  padding:22px;margin:44px 0 0}
+.ajakan p{margin:0 0 14px;color:var(--redup)}
+.ajakan a.tombol{display:inline-block;background:var(--teks);color:#09090b;
+  text-decoration:none;font-weight:600;font-size:14px;padding:10px 18px;
+  border-radius:7px}
+.terkait{margin-top:44px;border-top:1px solid var(--garis);padding-top:22px}
+.terkait h2{font-size:15px;color:var(--redup);margin:0 0 10px;
+  text-transform:uppercase;letter-spacing:.06em}
+.terkait a{display:block;margin-bottom:8px;text-decoration:none;
+  color:var(--teks);font-weight:500}
+.terkait a:hover{color:var(--aksen)}
+footer{margin-top:52px;border-top:1px solid var(--garis);padding-top:20px;
+  color:#71717a;font-size:13px}
+.label{display:inline-block;font-size:11px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--redup);border:1px solid var(--garis);
+  border-radius:99px;padding:2px 9px;margin-bottom:10px}
+
+/* ── halaman daftar: tiruan blog-posts.tsx ────────────────────────────── */
+.seksi{position:relative;margin:40px 0 0;padding:24px 0 0}
+.seksi h1.aula{text-align:center;font-size:40px;font-weight:600;
+  line-height:1.4;letter-spacing:-.02em;margin:0 0 8px}
+.latar-label{position:absolute;top:-40px;left:-8%;z-index:-1;user-select:none;
+  font-size:180px;font-weight:800;line-height:1;color:rgba(228,228,231,.028);
+  pointer-events:none;white-space:nowrap}
+.seksi p.aula{max-width:800px;margin:0 auto 34px;text-align:center;
+  font-size:20px;line-height:2;color:rgba(228,228,231,.5)}
+.kisi{display:grid;grid-template-columns:1fr;gap:20px}
+.kartu{position:relative;display:flex;flex-direction:column;justify-content:flex-end;
+  overflow:hidden;border-radius:20px;background-size:cover;background-position:center;
+  background-repeat:no-repeat;padding:20px;color:#fff;text-decoration:none;
+  min-height:300px;transition:transform .3s ease}
+.kartu:hover{transform:scale(.98) rotate(.3deg)}
+.kartu .tirai{position:absolute;left:0;right:0;bottom:0;height:130%;
+  background:linear-gradient(to top,rgba(0,0,0,.86),rgba(0,0,0,.15) 55%,transparent);
+  transition:height .5s ease}
+.kartu:hover .tirai{height:100%}
+.kartu .isi{position:relative;display:flex;align-items:flex-end;gap:12px}
+.kartu .teks{display:flex;flex:1;flex-direction:column;gap:12px}
+.kartu h2{margin:0;font-size:26px;line-height:1.2;font-weight:600;
+  letter-spacing:-.02em;color:#fff}
+.kartu .chip{align-self:flex-start;background:rgba(255,255,255,.28);
+  backdrop-filter:blur(8px);border-radius:6px;padding:2px 9px;font-size:14px;
+  color:#fff}
+.kartu .baca{font-size:17px;font-weight:600;color:#fff}
+.kartu svg.panah{flex:none;transition:transform .3s ease}
+.kartu:hover svg.panah{transform:translateX(8px)}
+@media(min-width:768px){
+  .kisi{grid-template-columns:1fr 1fr}
+  .kartu.utama{grid-column:span 2;grid-row:span 2;min-height:420px}
+  .kartu h2{font-size:30px}
+  .kartu.utama h2{font-size:36px}
+}
+.kisi-sisa{display:grid;grid-template-columns:1fr;gap:20px;margin-top:20px}
+.kisi-sisa .kartu{min-height:240px}
+@media(min-width:768px){.kisi-sisa{grid-template-columns:1fr 1fr}}
+@media(min-width:1024px){
+  .kisi{grid-template-columns:1fr .62fr}
+  .kisi-sisa{grid-template-columns:repeat(3,1fr)}
+  .kartu.utama{grid-column:span 1;grid-row:span 2}
+  .latar-label{font-size:340px;left:-16%}
+  .seksi h1.aula{font-size:56px}
+}
+@media(max-width:520px){h1{font-size:27px}.bungkus{padding:20px 16px 64px}
+  .seksi h1.aula{font-size:30px}.latar-label{font-size:110px}
+  .seksi p.aula{font-size:17px;line-height:1.8}}
+</style>
+</head>
+<body>
+<div class="bungkus">
+<header class="atas">
+  <a class="merek" href="/">Jadi Trader Tools</a>
+  <nav>
+    <a href="/artikel/">Artikel</a>
+    <a href="/preview">Coba gratis</a>
+    <a href="/akses">Harga</a>
+  </nav>
+</header>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Cara Memasang Indikator Pine di TradingView (dan Satu Sebab Gagal yang Paling Sering)","description":"Menempel kode Pine, menyimpannya ke favorit, dan kenapa indikator v6 tidak mau dikompilasi di layout lama.","mainEntityOfPage":"https://jaditrader.co.id/artikel/cara-memasang-indikator-pine-di-tradingview/","inLanguage":"id-ID","publisher":{"@type":"Organization","name":"Jadi Trader Tools","url":"https://jaditrader.co.id"}}</script><article><span class="label">Panduan &middot; 1 menit baca</span><h1>Cara Memasang Indikator Pine di TradingView (dan Satu Sebab Gagal yang Paling Sering)</h1><p class="ringkas">Menempel kode Pine, menyimpannya ke favorit, dan kenapa indikator v6 tidak mau dikompilasi di layout lama.</p><p>Indikator Pine dipasang lewat Pine Editor di TradingView. Prosesnya pendek, dan satu-satunya langkah yang sering dilewati justru yang membuatnya berguna besok.</p><h2>Langkahnya</h2><ol><li>Buka <code>Pine Editor</code> di bagian bawah layar TradingView.</li><li>Tempel kode indikatornya.</li><li>Klik <code>Add to chart</code>.</li><li><b>Simpan ke favorit.</b> Tanpa ini, indikatornya hanya menempel di layout yang sedang terbuka, dan besok kamu harus menempel ulang.</li></ol><h2>Kalau gagal dikompilasi, cek versinya</h2><p>Versi Pine tertulis di kartu tiap produk. Indikator v6 <b>tidak bisa</b> dikompilasi di layout yang masih dikunci ke v5 — dan pesan galatnya biasanya menunjuk baris kode, bukan menyebut versinya, sehingga mudah disalahartikan sebagai kode yang rusak.</p><h2>Indikator dan Expert Advisor itu dua hal berbeda</h2><ul><li><b>Jadi Trader V3</b> — overlay: channel, duplikat channel 1 & 2, zona SNR multi-timeframe, dan sinyal BUY/SELL.</li><li><b>Stochastic Momentum Index</b> — panel terpisah, SMI yang sama dengan yang dipakai Area Pantau.</li><li><b>News &amp; GAP Hunter V2</b> — overlay untuk XAUUSD dan forex.</li><li><b>JadiTraderSync</b> — ini <b>EA MT5</b>, bukan indikator TradingView. Tempatnya di <code>MQL5/Experts</code>, bukan di Pine Editor.</li></ul><div class="catatan">Kesalahan yang sering terjadi: mencoba menempel EA MT5 ke Pine Editor. Keduanya bahasa yang berbeda dan platform yang berbeda.</div></article><div class="ajakan"><p>Semua yang dijelaskan di atas bisa dicoba tanpa membayar dan tanpa mendaftar lebih dulu lewat halaman pratinjau — akses penuh 24 jam.</p><a class="tombol" href="/preview">Coba tanpa daftar &rarr;</a></div><div class="terkait"><h2>Baca juga</h2><a href="/artikel/cara-menghubungkan-mt5-ke-jurnal-trading-otomatis/">Cara Menghubungkan MetaTrader 5 ke Jurnal Trading Otomatis</a></div>
+<footer>
+  <p>Edukasi, bukan rekomendasi finansial. Trading mengandung risiko kehilangan modal.</p>
+  <p><a href="/">jaditrader.co.id</a> &middot; <a href="/legal">Legal</a></p>
+</footer>
+</div>
+</body>
+</html>
