@@ -39,7 +39,7 @@ import { SIMBOL_DASAR, simbolDasarMt5 } from '@/lib/simbol';
 import { useAuth } from '@/lib/auth';
 import { modePreview, jatahTerpakai, pakaiJatah } from '@/lib/preview';
 import { usePaket, pakaiKuota, teksSisa } from '@/lib/paket';
-import { JiplakChart, type AturJiplak } from '@/components/jiplak-chart';
+import { JiplakChart, JIPLAK_BAWAAN, type AturJiplak } from '@/components/jiplak-chart';
 
 /* ════════════════════════════════════════════════════════════════════════
    CHART & BACKTEST
@@ -2409,6 +2409,34 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
      tampilan. Yang tersimpan di localStorage akan menempel di layar orang
      berhari-hari kemudian tanpa ia ingat pernah memasangnya. */
   const [jiplak, setJiplak] = useState<AturJiplak | null>(null);
+
+  /* ── DIBUKA DARI PANEL CHART PANTAUAN ────────────────────────────────
+     `?jiplak=<id>` membawa satu chart arsip langsung terpasang. Tanpa ini
+     pintu dari panelnya cuma mendaratkan orang di Chart & Entry kosong,
+     lalu ia harus mencari sendiri chart yang BARUSAN ia klik — di daftar
+     yang isinya belasan chart mirip.
+
+     Sekali saja per id: `terpasang` menahan pemasangan ulang saat render
+     berikutnya, dan tanpa itu setiap render menarik gambarnya lagi. */
+  const jiplakMinta = cari.get('jiplak');
+  const jiplakTerpasang = useRef<string | null>(null);
+  useEffect(() => {
+    if (!pemilik || !jiplakMinta || jiplakTerpasang.current === jiplakMinta) return;
+    jiplakTerpasang.current = jiplakMinta;
+    let hidup = true;
+    let dipakai: string | null = null;
+    void import('@/lib/chart-agen').then(({ gambarChart }) => gambarChart(jiplakMinta)).then((u) => {
+      if (!hidup) { if (u) URL.revokeObjectURL(u); return; }
+      if (!u) return;
+      dipakai = u;
+      setJiplak({ id: jiplakMinta, url: u, ...JIPLAK_BAWAAN });
+    });
+    /* Object URL yang belum sempat terpakai dilepas saat halamannya
+       ditinggalkan di tengah pengambilan. Yang SUDAH terpasang dilepas
+       oleh JiplakChart saat diganti atau dilepas — bukan di sini, kalau
+       tidak gambarnya mati begitu efek ini dibersihkan. */
+    return () => { hidup = false; if (dipakai && !jiplakTerpasang.current) URL.revokeObjectURL(dipakai); };
+  }, [pemilik, jiplakMinta]);
 
   /* ── RENCANA YANG SUDAH JADI ORDER SUNGGUHAN ──────────────────────
      Dua keputusan yang masing-masing benar, bertemu jadi bug:

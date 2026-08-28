@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { EyeOff, Loader2, RefreshCw, Trash2, Undo2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { EyeOff, Loader2, PenLine, RefreshCw, Trash2, Undo2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   daftarChart, gambarChart, tandaiChart, hapusChart, jadikanSinyal,
@@ -276,15 +277,38 @@ export function PanelChartAgen() {
               </p>
             )}
 
-            {c.sinyalId ? (
+            {c.sinyalId && (
               <p className="mt-2 text-[12px] text-emerald-400">Sudah diterbitkan sebagai sinyal.</p>
-            ) : buka === c.id ? (
+            )}
+
+            {buka === c.id ? (
               <FormLevel chart={c} selesai={() => { setBuka(null); void tarik(); }} />
             ) : (
-              <button onClick={() => setBuka(c.id)}
-                className="mt-2.5 cursor-pointer rounded-md border border-zinc-700 px-2.5 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-500 hover:text-zinc-100">
-                Tetapkan area entry
-              </button>
+              /* DUA PINTU BERDAMPINGAN, dan keduanya memang dua pekerjaan
+                 yang berbeda: yang kiri menetapkan level dari angka yang
+                 sudah terbaca di gambarnya, yang kanan membawa gambarnya ke
+                 chart sungguhan untuk dijiplak dulu. Yang kedua bukan jalan
+                 pintas ke yang pertama; ia yang dipakai saat zonanya masih
+                 perlu dicocokkan ke harga yang berjalan.
+
+                 Sebaris, bukan bertumpuk: kartu-kartu ini duduk di grid,
+                 dan tinggi yang bertambah di satu kartu ikut menaikkan
+                 seluruh barisnya. */
+              <div className="mt-2.5 flex flex-wrap gap-1.5">
+                <button onClick={() => setBuka(c.id)}
+                  className="cursor-pointer rounded-md border border-zinc-700 px-2.5 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-500 hover:text-zinc-100">
+                  {c.sinyalId ? 'Terbitkan lagi' : 'Tetapkan area entry'}
+                </button>
+                {/* Alamatnya membawa id chart-nya. Halaman Chart & Entry yang
+                    mengambil gambarnya sendiri — bukan dioper lewat state
+                    navigasi: alamat yang lengkap bisa disalin, dibuka di tab
+                    baru, dan dimuat ulang tanpa kehilangan jiplakannya. */}
+                <Link to={`/chart-entry?jiplak=${encodeURIComponent(c.id)}`}
+                  className="flex cursor-pointer items-center gap-1.5 rounded-md border border-violet-500/30 bg-violet-500/10 px-2.5 py-1.5 text-[12px] text-violet-300 transition-colors hover:border-violet-500/50 hover:text-violet-200">
+                  <PenLine className="size-3.5" />
+                  Jiplak di Chart &amp; Entry
+                </Link>
+              </div>
             )}
           </div>
         ))}
