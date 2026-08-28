@@ -246,6 +246,40 @@ export function PanelChartAgen() {
 
   const daftar = chart || [];
 
+  /* ── DIKELOMPOKKAN PER KOIN, TERBARU DI ATAS ────────────────────────
+     Satu koin sering punya dua-tiga chart pembaruan berturut-turut, dan
+     dalam satu rak panjang mereka terserak di antara koin lain — jadi
+     membandingkan "yang mana yang terakhir" butuh menyapu seluruh halaman.
+
+     Diurutkan dari `waktu`, BUKAN dari urutan berkasnya. Pengisi awal
+     menelusuri Telegram dari yang terbaru sambil memakai unshift, jadi
+     yang tertua justru berakhir paling depan di berkas — dan mengandalkan
+     urutan simpan berarti tampilan ikut salah tiap kali arsipnya diisi
+     ulang. Waktu pesan tidak bisa berbohong begitu.
+
+     Seksi juga diurutkan dari isi TERBARUNYA, bukan menurut abjad: yang
+     baru saja diperbarui memang yang paling ingin dilihat, dan daftar
+     berabjad menaruh koin yang diam berbulan-bulan di atas hanya karena
+     namanya dimulai huruf A. */
+  const seksi = (() => {
+    const peta = new Map<string, ChartPantauan[]>();
+    for (const c of [...daftar].sort((a, b) => b.waktu - a.waktu)) {
+      const kunci = tebakPasangan(c.keterangan) || 'Lainnya';
+      const isi = peta.get(kunci);
+      if (isi) isi.push(c); else peta.set(kunci, [c]);
+    }
+    return [...peta.entries()]
+      .map(([nama, isi]) => ({ nama, isi }))
+      .sort((a, b) => {
+        /* "Lainnya" selalu paling bawah: isinya chart yang pasangannya
+           tidak terbaca, dan itu keranjang sisa — bukan koin yang kebetulan
+           paling baru. */
+        if (a.nama === 'Lainnya') return 1;
+        if (b.nama === 'Lainnya') return -1;
+        return b.isi[0].waktu - a.isi[0].waktu;
+      });
+  })();
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
@@ -286,75 +320,88 @@ export function PanelChartAgen() {
         </div>
       )}
 
-      <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(100%,26rem),1fr))]">
-        {daftar.map((c) => (
-          <div key={c.id}
-            className={cn('rounded-xl border border-zinc-800 bg-zinc-900/40 p-3 transition-opacity',
-              c.sembunyi && 'opacity-55')}>
-            <div className="mb-2 flex items-start gap-2">
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[12px] font-medium text-zinc-300">{c.agen}</p>
-                <p className="text-[11px] text-zinc-600">{umur(c.waktu)} · {c.kb} KB</p>
-              </div>
-              <button onClick={() => void sembunyikan(c)}
-                title={c.sembunyi ? 'Kembalikan ke daftar' : 'Tandai selesai'}
-                className="cursor-pointer rounded p-1 text-zinc-500 transition-colors hover:text-zinc-200">
-                {c.sembunyi ? <Undo2 className="size-3.5" /> : <EyeOff className="size-3.5" />}
-              </button>
-              <button onClick={() => void buang(c)} title="Hapus berikut gambarnya"
-                className="cursor-pointer rounded p-1 text-zinc-500 transition-colors hover:text-red-400">
-                <Trash2 className="size-3.5" />
-              </button>
-            </div>
-
-            <GambarChart id={c.id} alt={c.keterangan || 'Chart pantauan'} />
-
-            {c.keterangan && (
-              <p className="mt-2 whitespace-pre-wrap text-[12.5px] leading-relaxed text-zinc-300">
-                {c.keterangan}
-              </p>
-            )}
-
-            {c.sinyalId && (
-              <p className="mt-2 text-[12px] text-emerald-400">Sudah diterbitkan sebagai sinyal.</p>
-            )}
-
-            {buka === c.id ? (
-              <FormLevel chart={c} selesai={() => { setBuka(null); void tarik(); }} />
-            ) : (
-              /* DUA PINTU BERDAMPINGAN, dan keduanya memang dua pekerjaan
-                 yang berbeda: yang kiri menetapkan level dari angka yang
-                 sudah terbaca di gambarnya, yang kanan membawa gambarnya ke
-                 chart sungguhan untuk dijiplak dulu. Yang kedua bukan jalan
-                 pintas ke yang pertama; ia yang dipakai saat zonanya masih
-                 perlu dicocokkan ke harga yang berjalan.
-
-                 Sebaris, bukan bertumpuk: kartu-kartu ini duduk di grid,
-                 dan tinggi yang bertambah di satu kartu ikut menaikkan
-                 seluruh barisnya. */
-              <div className="mt-2.5 flex flex-wrap gap-1.5">
-                <button onClick={() => setBuka(c.id)}
-                  className="cursor-pointer rounded-md border border-zinc-700 px-2.5 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-500 hover:text-zinc-100">
-                  {c.sinyalId ? 'Terbitkan lagi' : 'Tetapkan area entry'}
-                </button>
-                {/* Alamatnya membawa id chart-nya. Halaman Chart & Entry yang
-                    mengambil gambarnya sendiri — bukan dioper lewat state
-                    navigasi: alamat yang lengkap bisa disalin, dibuka di tab
-                    baru, dan dimuat ulang tanpa kehilangan jiplakannya. */}
-                <Link to={`/chart-entry?jiplak=${encodeURIComponent(c.id)}`
-                  + (tebakPasangan(c.keterangan) ? `&simbol=${tebakPasangan(c.keterangan)}` : '')}
-                  title={tebakPasangan(c.keterangan)
-                    ? `Buka ${tebakPasangan(c.keterangan)} dengan chart ini di sampingnya`
-                    : 'Pasangannya tidak terbaca dari keterangan — chart yang sedang terbuka dipakai apa adanya'}
-                  className="flex cursor-pointer items-center gap-1.5 rounded-md border border-violet-500/30 bg-violet-500/10 px-2.5 py-1.5 text-[12px] text-violet-300 transition-colors hover:border-violet-500/50 hover:text-violet-200">
-                  <PenLine className="size-3.5" />
-                  Jiplak di Chart &amp; Entry
-                </Link>
-              </div>
-            )}
+      {seksi.map((sk) => (
+        <section key={sk.nama}>
+          {/* Kepala seksi menempel saat digulir: dengan tiga-empat chart per
+              koin, nama koinnya keluar dari layar tepat ketika orangnya
+              sedang membandingkan isinya. */}
+          <div className="sticky top-0 z-10 -mx-1 mb-2 flex items-baseline gap-2 bg-zinc-950/90 px-1 py-1.5 backdrop-blur-sm">
+            <h3 className="text-[13px] font-semibold tracking-tight text-zinc-200">{sk.nama}</h3>
+            <span className="text-[11px] text-zinc-600">
+              {sk.isi.length} chart · terbaru {umur(sk.isi[0].waktu)}
+            </span>
           </div>
-        ))}
-      </div>
+          <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(100%,26rem),1fr))]">
+            {sk.isi.map((c) => (
+              <div key={c.id}
+                className={cn('rounded-xl border border-zinc-800 bg-zinc-900/40 p-3 transition-opacity',
+                  c.sembunyi && 'opacity-55')}>
+                <div className="mb-2 flex items-start gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[12px] font-medium text-zinc-300">{c.agen}</p>
+                    <p className="text-[11px] text-zinc-600">{umur(c.waktu)} · {c.kb} KB</p>
+                  </div>
+                  <button onClick={() => void sembunyikan(c)}
+                    title={c.sembunyi ? 'Kembalikan ke daftar' : 'Tandai selesai'}
+                    className="cursor-pointer rounded p-1 text-zinc-500 transition-colors hover:text-zinc-200">
+                    {c.sembunyi ? <Undo2 className="size-3.5" /> : <EyeOff className="size-3.5" />}
+                  </button>
+                  <button onClick={() => void buang(c)} title="Hapus berikut gambarnya"
+                    className="cursor-pointer rounded p-1 text-zinc-500 transition-colors hover:text-red-400">
+                    <Trash2 className="size-3.5" />
+                  </button>
+                </div>
+
+                <GambarChart id={c.id} alt={c.keterangan || 'Chart pantauan'} />
+
+                {c.keterangan && (
+                  <p className="mt-2 whitespace-pre-wrap text-[12.5px] leading-relaxed text-zinc-300">
+                    {c.keterangan}
+                  </p>
+                )}
+
+                {c.sinyalId && (
+                  <p className="mt-2 text-[12px] text-emerald-400">Sudah diterbitkan sebagai sinyal.</p>
+                )}
+
+                {buka === c.id ? (
+                  <FormLevel chart={c} selesai={() => { setBuka(null); void tarik(); }} />
+                ) : (
+                  /* DUA PINTU BERDAMPINGAN, dan keduanya memang dua pekerjaan
+                     yang berbeda: yang kiri menetapkan level dari angka yang
+                     sudah terbaca di gambarnya, yang kanan membawa gambarnya ke
+                     chart sungguhan untuk dijiplak dulu. Yang kedua bukan jalan
+                     pintas ke yang pertama; ia yang dipakai saat zonanya masih
+                     perlu dicocokkan ke harga yang berjalan.
+
+                     Sebaris, bukan bertumpuk: kartu-kartu ini duduk di grid,
+                     dan tinggi yang bertambah di satu kartu ikut menaikkan
+                     seluruh barisnya. */
+                  <div className="mt-2.5 flex flex-wrap gap-1.5">
+                    <button onClick={() => setBuka(c.id)}
+                      className="cursor-pointer rounded-md border border-zinc-700 px-2.5 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-500 hover:text-zinc-100">
+                      {c.sinyalId ? 'Terbitkan lagi' : 'Tetapkan area entry'}
+                    </button>
+                    {/* Alamatnya membawa id chart-nya. Halaman Chart & Entry yang
+                        mengambil gambarnya sendiri — bukan dioper lewat state
+                        navigasi: alamat yang lengkap bisa disalin, dibuka di tab
+                        baru, dan dimuat ulang tanpa kehilangan jiplakannya. */}
+                    <Link to={`/chart-entry?jiplak=${encodeURIComponent(c.id)}`
+                      + (tebakPasangan(c.keterangan) ? `&simbol=${tebakPasangan(c.keterangan)}` : '')}
+                      title={tebakPasangan(c.keterangan)
+                        ? `Buka ${tebakPasangan(c.keterangan)} dengan chart ini di sampingnya`
+                        : 'Pasangannya tidak terbaca dari keterangan — chart yang sedang terbuka dipakai apa adanya'}
+                      className="flex cursor-pointer items-center gap-1.5 rounded-md border border-violet-500/30 bg-violet-500/10 px-2.5 py-1.5 text-[12px] text-violet-300 transition-colors hover:border-violet-500/50 hover:text-violet-200">
+                      <PenLine className="size-3.5" />
+                      Jiplak di Chart &amp; Entry
+                    </Link>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      ))}
     </div>
   );
 }
