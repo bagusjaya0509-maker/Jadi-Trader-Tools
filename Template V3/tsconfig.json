@@ -20,7 +20,9 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "baseUrl": ".",
-    "paths": { "@/*": ["./src/*"] }
+    "paths": {
+      "next/image": ["./src/shim/next-image.tsx"],
+      "next/link": ["./src/shim/next-link.tsx"], "@/*": ["./src/*"] }
   },
   "include": ["src"]
 }
