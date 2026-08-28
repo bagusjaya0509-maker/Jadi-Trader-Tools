@@ -122,12 +122,14 @@ const NAV = [
               baris tetap di sidebar adalah hal yang orang buka BERULANG:
               daftar analis yang ia ikuti. */
           { ke: '/copy-signal?sub=diikuti', label: 'Signal Diikuti' },
-          /* Chart mentah dari ruang pantauan, berikut tanda air sumbernya.
-             `hanyaPemilik` menyaringnya dari sidebar orang lain — tapi yang
-             benar-benar menjaganya rute servernya, yang menolak selain uid
-             pemilik. Menyembunyikan menu bukan pengamanan; ia cuma menahan
-             pintu yang tidak berguna dari layar yang tidak memerlukannya. */
-          { ke: '/copy-signal?sub=chart', label: 'Chart Pantauan', hanyaPemilik: true },
+          /* Chart Pantauan SENGAJA TIDAK DI SINI. Sempat dipasang sebagai
+             sub-menu sendiri dan itu keliru: ia bukan cara lain melihat
+             Copy Signal, melainkan isi dari SATU kanal — kanal AI Chart,
+             yang kebetulan milik pemiliknya sendiri. Sub-menu sejajar
+             "Market Signal" menyiratkan ia berlaku untuk seluruh halaman,
+             dan itu membingungkan persis seperti yang dilaporkan.
+
+             Tempatnya sekarang: tab ketiga di dalam kanal AI Chart. */
         ] },
       { ke: '/integrations',   label: 'Integrations',     Ikon: Plug,
         sub: [

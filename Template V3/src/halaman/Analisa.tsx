@@ -1272,6 +1272,19 @@ const SUB = [
      lewat sidebar, dan hanya sah untuk pemilik. */
   { id: 'chart',    label: 'Chart Pantauan' },
 ] as const;
+
+/* Kanal mana yang punya ruang penyaringan chart.
+   ──────────────────────────────────────────────────────────────────────
+   Server menurunkan uid agen dari nama tampilannya (`uidAgenDari`), jadi
+   'AI Chart' -> 'agen:ai-chart'. Ditulis tegas di sini, BUKAN ditebak dari
+   nama kartunya: mencocokkan nama berarti kartu mana pun yang kebetulan
+   dinamai serupa ikut membuka arsipnya, dan nama kartu bisa diganti dari
+   .env tanpa ada yang ingat berkas ini.
+
+   Kalau namanya suatu hari diganti, uid-nya ikut berganti dan tab ini
+   hilang sendiri — kegagalan yang terlihat, bukan yang diam-diam membuka
+   pintu. */
+const UID_KANAL_CHART = 'agen:ai-chart';
 type IdSub = typeof SUB[number]['id'];
 
 /* Rak "Sinyal Pantauan" DISEMBUNYIKAN sementara — agennya masih jauh dari
@@ -1765,7 +1778,10 @@ export default function Analisa() {
        tidak pernah ia butuhkan. */
     .filter((s) => (diDepan
       ? s.id === 'market'
-      : s.id !== 'posting' && s.id !== 'diikuti' && s.id !== 'chart'))
+      : s.id !== 'posting' && s.id !== 'diikuti'
+        /* Tab ketiga, dan HANYA di kanal AI Chart milik pemiliknya:
+           ruang penyaringan chart tidak punya arti di kanal orang lain. */
+        && (s.id !== 'chart' || (pemilik && kanalBuka === UID_KANAL_CHART))))
     .map((s) => (!diDepan && s.id === 'market' ? { ...s, label: 'Daftar Signal' } : s));
 
   /* Masuk kanal, yang pertama terlihat Performa Signal — keputusan pemilik.
@@ -1792,7 +1808,7 @@ export default function Analisa() {
        dan `pemilik` supaya alamat yang ditebak-tebak tidak membuka arsip
        bertanda air ke pengunjung mana pun. Gerbang sungguhannya tetap di
        server; yang ini menjaga layarnya tidak pernah mencoba. */
-    id === 'chart' ? diDepan && pemilik
+    id === 'chart' ? !diDepan && pemilik && kanalBuka === UID_KANAL_CHART
       : id === 'posting' || id === 'diikuti' ? diDepan
       : tabTampil.some((s) => s.id === id);
   const sub: IdSub = subMinta && subSah(subMinta) ? subMinta : bawaanSub;
@@ -2700,7 +2716,7 @@ export default function Analisa() {
         />
       )}
 
-      {sub === 'chart' && pemilik && (
+      {sub === 'chart' && pemilik && kanalBuka === UID_KANAL_CHART && (
         <Suspense fallback={<div className="py-10 text-[13px] text-zinc-500">Memuat panel…</div>}>
           <PanelChartAgen />
         </Suspense>

@@ -222,7 +222,7 @@ export function ChartLilin({
   lilin, garis, trade, tinggi = 420, hingga, garisHarga, onKlikBar, smi, mundur, pojok,
   garisSeret, onSeret, onKlikGaris, onHapusGaris, onKlikKosong, hamparanBawah, segmen, penandaPine, kotakPine, isianPine,
   alat, onAlatSelesai, gambarAlat, gambarPilih, onPilihGambar, onUbahGambar,
-  posisiMt5, onUbahPosisi, hargaAsk, kunciUkuran, bagikanFoto, tandaAir, tampilan, pitaSmi,
+  posisiMt5, onUbahPosisi, hargaAsk, kunciUkuran, bagikanFoto, tandaAir, tampilan, pitaSmi, jiplak,
   hamparanBarTertua, onUjungKiri,
 }: {
   /** Nama pasangan yang dicetak samar di tengah area harga, seperti
@@ -316,6 +316,11 @@ export function ChartLilin({
    *  Tanpa handler ini gambar tetap beku setelah tertempel. */
   onUbahGambar?: (id: string, ubah: Partial<Pick<GambarAlat, 't1' | 'h1' | 't2' | 'h2' | 'h3'>>) => void;
   /** Posisi MT5 terbuka — price line entry/SL/TP + PnL + seret SL/TP. */
+  /** Gambar jiplakan di BELAKANG lilin — chart orang lain yang dipakai
+   *  sebagai acuan menyusun zona, seperti menjiplak sketsa di atas meja
+   *  kaca. `pointer-events-none`, jadi ia tidak pernah merebut satu pun
+   *  klik, seret, atau zoom dari chart-nya. */
+  jiplak?: { url: string; opacity: number; skala: number; x: number; y: number } | null;
   posisiMt5?: PosisiChartMt5[];
   /** Kirim SL/TP baru sebuah posisi ke EA; resolve true kalau EA sukses.
    *  Tanpa handler ini SL/TP posisinya tidak bisa diseret sama sekali. */
@@ -2476,7 +2481,33 @@ export function ChartLilin({
        gagang garis di bawah memakai pointerdown, dan sentuhan yang jadi
        seretan tidak pernah membangkitkan mousedown sama sekali. */
     <div className="relative overflow-hidden" onPointerDownCapture={() => setGarisAktif(null)}>
-      <div ref={kotak} style={{ height: tinggi }} className="w-full" />
+      {/* ── JIPLAKAN, DI LAPISAN PALING BAWAH ───────────────────────────
+          Latar chart memang sudah 'transparent' (lihat layout saat dibuat),
+          jadi apa pun di belakangnya benar-benar tembus — tidak perlu
+          mengutak-atik warna apa pun.
+
+          DUA HAL YANG MENAHANNYA TETAP DI BAWAH:
+          · ditulis SEBELUM wadah chart di DOM, dan
+          · wadah chart-nya diberi `relative`.
+          Tanpa `relative`, wadah chart adalah kotak biasa yang tidak
+          diposisikan — dan elemen ter-absolut SELALU tergambar di atas
+          kotak biasa, berapa pun urutan DOM-nya. Jiplakannya akan menutupi
+          lilin, persis kebalikan dari yang diminta.
+
+          pointer-events-none MUTLAK: satu lapisan penuh yang menangkap
+          tetikus akan mematikan geser, zoom, dan seluruh alat gambar di
+          bawahnya. Semua pengaturannya (opasitas, skala, geser) dikerjakan
+          lewat panelnya, bukan dengan menyeret gambarnya. */}
+      {jiplak && (
+        <img src={jiplak.url} alt=""
+             draggable={false}
+             className="pointer-events-none absolute inset-0 h-full w-full select-none object-contain"
+             style={{
+               opacity: jiplak.opacity,
+               transform: `translate(${jiplak.x}%, ${jiplak.y}%) scale(${jiplak.skala})`,
+             }} />
+      )}
+      <div ref={kotak} style={{ height: tinggi }} className="relative w-full" />
 
       {/* Hitung mundur DI DALAM label harga, bukan di sebelahnya.
           ────────────────────────────────────────────────────────────────

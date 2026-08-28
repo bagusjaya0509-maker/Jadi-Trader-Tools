@@ -39,6 +39,7 @@ import { SIMBOL_DASAR, simbolDasarMt5 } from '@/lib/simbol';
 import { useAuth } from '@/lib/auth';
 import { modePreview, jatahTerpakai, pakaiJatah } from '@/lib/preview';
 import { usePaket, pakaiKuota, teksSisa } from '@/lib/paket';
+import { JiplakChart, type AturJiplak } from '@/components/jiplak-chart';
 
 /* ════════════════════════════════════════════════════════════════════════
    CHART & BACKTEST
@@ -525,7 +526,7 @@ export default function ChartBacktest() {
      dan bisa TERTINGGAL di tab yang sama setelah orangnya masuk. Membaca
      modePreview() saja akan membatasi replay milik pelanggan yang sudah
      membayar — kegagalan yang paling mahal dari dua kemungkinan salah. */
-  const { pengguna } = useAuth();
+  const { pengguna, pemilik } = useAuth();
   const tamuPreview = modePreview() && !pengguna;
   /* Dua pagar berbeda untuk dua orang berbeda: `tamuPreview` menjaga
      pengunjung yang belum punya akun, `paketku` menjaga batas paket orang
@@ -2403,6 +2404,12 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
      MENJAMIN sekarang cuma satu, dan ia mustahil dilewati sumber baru. */
   const modeNyata = aksi?.mode === 'real';
 
+  /* Chart acuan yang dijiplak di belakang lilin. Di ingatan saja, tidak
+     disimpan: ia alat bantu sesaat saat menyusun zona, bukan setelan
+     tampilan. Yang tersimpan di localStorage akan menempel di layar orang
+     berhari-hari kemudian tanpa ia ingat pernah memasangnya. */
+  const [jiplak, setJiplak] = useState<AturJiplak | null>(null);
+
   /* ── RENCANA YANG SUDAH JADI ORDER SUNGGUHAN ──────────────────────
      Dua keputusan yang masing-masing benar, bertemu jadi bug:
 
@@ -3602,6 +3609,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                           gambarPilih={gambarPilih}
                           onPilihGambar={setGambarPilih}
                           onUbahGambar={ubahGambar}
+                          jiplak={jiplak}
                           posisiMt5={modeNyata ? posisiMt5Chart : KOSONG_POSISI}
                           onUbahPosisi={simbol.startsWith('MT5:') ? ubahPosisiMt5 : undefined}
                           hargaAsk={modeNyata ? askTampil : undefined}
@@ -4254,6 +4262,11 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                 bilahnya supaya terbaca sebagai pegangan, bukan sebagai
                 tombol keempat yang kebetulan bergaris. */}
             <GripHorizontal className="size-3.5 shrink-0 text-zinc-700" />
+            {/* Jiplak chart — HANYA pemilik. Arsipnya digerbangi uid pemilik
+                di server, jadi tombol ini untuk orang lain cuma akan membuka
+                daftar kosong; menampilkannya berarti menjanjikan sesuatu
+                yang tidak pernah bisa dipakai. */}
+            {pemilik && <JiplakChart nilai={jiplak} ubah={setJiplak} />}
             {([
               ['garis', TrendingUp, 'Garis tren — tarik dari titik ke titik', ''],
               ['ukur', Ruler, 'Ukur % kenaikan / penurunan — klik lalu tarik', ''],

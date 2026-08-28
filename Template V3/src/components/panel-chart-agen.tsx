@@ -210,12 +210,16 @@ export function PanelChartAgen() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
+        {/* Nama agennya TIDAK diulang di sini — kepala kanal di atas sudah
+            menyebutnya. Yang perlu dijelaskan cuma satu hal yang tidak
+            terlihat dari mana pun: bahwa isi tab ini tidak tampil ke siapa
+            pun selain dirinya, sampai ia sendiri menerbitkannya. */}
         <div className="min-w-0 flex-1">
-          <h2 className="text-[15px] font-semibold text-zinc-100">Chart Pantauan</h2>
+          <h2 className="text-[15px] font-semibold text-zinc-100">Ruang penyaringan</h2>
           <p className="mt-0.5 text-[12.5px] text-zinc-500">
-            Chart yang diposting di ruang pantauan agen, tersimpan apa adanya.
-            Hanya Anda yang bisa melihat halaman ini — tetapkan sendiri area
-            entry-nya sebelum diterbitkan.
+            Chart yang diambil agen, tersimpan apa adanya dan hanya terlihat
+            oleh Anda. Tetapkan sendiri zona, SL, dan TP-nya — baru setelah
+            diterbitkan ia tampil di publik sebagai sinyal kartu ini.
           </p>
         </div>
         <button onClick={() => setSemua((v) => !v)}
