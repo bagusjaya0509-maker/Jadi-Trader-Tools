@@ -222,7 +222,8 @@ export function ChartLilin({
   lilin, garis, trade, tinggi = 420, hingga, garisHarga, onKlikBar, smi, mundur, pojok,
   garisSeret, onSeret, onKlikGaris, onHapusGaris, onKlikKosong, hamparanBawah, segmen, penandaPine, kotakPine, isianPine,
   alat, onAlatSelesai, gambarAlat, gambarPilih, onPilihGambar, onUbahGambar,
-  posisiMt5, onUbahPosisi, hargaAsk, kunciUkuran, bagikanFoto, tandaAir, tampilan, pitaSmi, jiplak,
+  posisiMt5, onUbahPosisi, hargaAsk, kunciUkuran, bagikanFoto, tandaAir, tampilan, pitaSmi,
+  jiplak, onUbahJiplak,
   hamparanBarTertua, onUjungKiri,
 }: {
   /** Nama pasangan yang dicetak samar di tengah area harga, seperti
@@ -318,9 +319,33 @@ export function ChartLilin({
   /** Posisi MT5 terbuka — price line entry/SL/TP + PnL + seret SL/TP. */
   /** Gambar jiplakan di BELAKANG lilin — chart orang lain yang dipakai
    *  sebagai acuan menyusun zona, seperti menjiplak sketsa di atas meja
-   *  kaca. `pointer-events-none`, jadi ia tidak pernah merebut satu pun
-   *  klik, seret, atau zoom dari chart-nya. */
-  jiplak?: { url: string; opacity: number; skala: number; x: number; y: number } | null;
+   *  kaca.
+   *
+   *  ── DITAMBATKAN KE HARGA & WAKTU, BUKAN KE PERSEN LAYAR ─────────────
+   *  Versi pertama memakai transform persen. Ia bisa dipaskan, TAPI
+   *  paskannya cuma bertahan sampai chart digeser sekali: gambarnya diam
+   *  di layar sementara lilin di bawahnya berjalan. Dilaporkan pemilik,
+   *  dan memang begitu — masalahnya bukan penggesernya kurang halus,
+   *  melainkan gambarnya tidak tahu apa-apa soal harga.
+   *
+   *  Sekarang keempat sudutnya disimpan sebagai KOORDINAT CHART: kiri/kanan
+   *  indeks logis (bukan waktu — logis tetap sah di luar rentang data,
+   *  waktu tidak), atas/bawah harga. Penempatannya dihitung ulang di
+   *  pasang(), rAF yang sama yang menggerakkan label harga — jadi ia ikut
+   *  geser, zoom, tarik sumbu harga, dan ubah tinggi panel tanpa satu pun
+   *  penanganan tambahan.
+   *
+   *  `tambat: null` berarti "belum dipaskan" — chart-nya yang menghitung
+   *  pas-awalnya dari rentang yang sedang terlihat, lalu melapor lewat
+   *  onUbahJiplak. Pemanggil tidak bisa menghitungnya sendiri; ia tidak
+   *  memegang skala chart-nya. */
+  jiplak?: {
+    url: string; opacity: number; atur: boolean;
+    tambat: { kiri: number; kanan: number; atas: number; bawah: number } | null;
+  } | null;
+  /** Dipanggil saat tambatannya berubah — hasil seretan, gulir, atau
+   *  perhitungan pas-awal. Pemanggil yang menyimpannya. */
+  onUbahJiplak?: (t: { kiri: number; kanan: number; atas: number; bawah: number }) => void;
   posisiMt5?: PosisiChartMt5[];
   /** Kirim SL/TP baru sebuah posisi ke EA; resolve true kalau EA sukses.
    *  Tanpa handler ini SL/TP posisinya tidak bisa diseret sama sekali. */
@@ -1687,6 +1712,22 @@ export function ChartLilin({
      jepitan bisa jatuh di wilayah yang penyembunyinya anggap "di luar". */
   const paneHargaRef = useRef(0);
 
+  /* ── Tambatan jiplak, dipegang di REF ───────────────────────────────
+     Alasannya sama dengan seretan SL/TP di bawah: menyeret berarti puluhan
+     pembaruan per detik, dan menyentuh state React di tiap gerakan
+     menggambar ulang SELURUH chart tiap kali. Ref-nya yang bergerak,
+     pasang() yang membacanya, dan state induk baru disentuh sekali saat
+     jarinya diangkat. */
+  const jiplakEl = useRef<HTMLImageElement | null>(null);
+  const jiplakPos = useRef<{ kiri: number; kanan: number; atas: number; bawah: number } | null>(null);
+  const jiplakSeret = useRef<{ x: number; y: number; awal: { kiri: number; kanan: number; atas: number; bawah: number } } | null>(null);
+  const ubahJiplakRef = useRef(onUbahJiplak);
+  ubahJiplakRef.current = onUbahJiplak;
+  /* Tambatan dari induk MENANG, kecuali saat sedang diseret — kalau tidak,
+     render yang kebetulan terjadi di tengah seretan akan menarik gambarnya
+     balik ke posisi terakhir yang tersimpan. */
+  if (!jiplakSeret.current) jiplakPos.current = jiplak ? jiplak.tambat : null;
+
   /* ── Ubahan SL/TP posisi MT5 ────────────────────────────────────────
      Satu ubahan hidup pada satu waktu: nilai yang sedang diseret MENANG
      atas nilai broker di garisnya (pratinjau), lalu menunggu tombol
@@ -1783,6 +1824,50 @@ export function ChartLilin({
     /* Nilai seretan dibaca dari ref, bukan state — rAF ini yang membuat
        strip & tombol mengikuti kursor tanpa render React per gerakan. */
     const ub = ubahRef.current;
+
+    /* ── Jiplakan: dari koordinat chart ke piksel ────────────────────
+       Dikerjakan di sini, bukan di efeknya sendiri, supaya ia bergerak di
+       FRAME YANG SAMA dengan lilinnya. Dipisah ke efek dengan pendengar
+       sendiri, gambarnya akan tertinggal sepersekian detik di belakang
+       kanvas tiap kali chart digeser — dan jiplakan yang tertinggal justru
+       menipu, karena ia terlihat seperti zona yang meleset. */
+    const gj = jiplakEl.current;
+    if (gj) {
+      let t = jiplakPos.current;
+      /* Belum pernah dipaskan: pas-awal dari yang sedang terlihat, lalu
+         DILAPORKAN ke induk supaya tersimpan. Dihitung di sini karena cuma
+         chart yang tahu rentangnya. */
+      if (!t) {
+        const rl = c.timeScale().getVisibleLogicalRange() as { from: number; to: number } | null;
+        const paneH = paneHargaRef.current || kotak.current?.clientHeight || 0;
+        const hAtas = s.coordinateToPrice(2);
+        const hBawah = s.coordinateToPrice(Math.max(paneH - 2, 4));
+        if (rl && hAtas != null && hBawah != null) {
+          t = { kiri: rl.from, kanan: rl.to, atas: hAtas, bawah: hBawah };
+          jiplakPos.current = t;
+          ubahJiplakRef.current?.(t);
+        }
+      }
+      if (t) {
+        const ts = c.timeScale();
+        const x1 = ts.logicalToCoordinate(t.kiri as never);
+        const x2 = ts.logicalToCoordinate(t.kanan as never);
+        const y1 = s.priceToCoordinate(t.atas);
+        const y2 = s.priceToCoordinate(t.bawah);
+        if (x1 != null && x2 != null && y1 != null && y2 != null && x2 > x1 && y2 > y1) {
+          gj.style.left = x1 + 'px';
+          gj.style.top = y1 + 'px';
+          gj.style.width = (x2 - x1) + 'px';
+          gj.style.height = (y2 - y1) + 'px';
+          gj.style.visibility = 'visible';
+        } else {
+          /* Di luar jangkauan (mis. digeser jauh dari datanya). Disembunyikan
+             apa adanya — gambar yang dipaksa tampil di koordinat karangan
+             lebih membingungkan daripada gambar yang hilang sementara. */
+          gj.style.visibility = 'hidden';
+        }
+      }
+    }
 
     /* Lebar skala harga dibaca tiap kali, bukan sekali: ia berubah sendiri
        begitu angkanya bertambah satu digit. */
@@ -1882,7 +1967,21 @@ export function ChartLilin({
      requestAnimationFrame berhenti total saat tabnya tidak terlihat. Tanpa
      panggilan langsung ini, membuka halaman di tab latar lalu berpindah ke
      sana akan menampilkan garis dan label yang belum punya posisi. */
-  useEffect(pasang, [pasang, garisSeret, lilin, hingga, mundur, smi, posisiMt5, ubah]);
+  /* Penunjuk ke pasang() yang SELALU mutakhir. Dipakai penangan seretan
+     jiplak untuk memaksa satu penempatan ulang di tengah gerakan: rAF di
+     bawah melewati frame yang sidik jarinya tidak berubah, dan menyeret
+     GAMBARNYA memang tidak mengubah apa pun di sisi chart — jadi tanpa
+     panggilan tegas ini gambarnya diam sampai ada hal lain yang bergerak. */
+  const pasangRef = useRef(pasang);
+  pasangRef.current = pasang;
+
+  /* `jiplak` IKUT DEPENDENSI, dan ini bukan kelengkapan formalitas. Loop
+     rAF melewati frame yang sidik jarinya tidak berubah — dan memasang
+     gambar jiplakan tidak mengubah satu pun nilai di sidik jari itu
+     (rentang, ukuran, sumbu harga semuanya tetap). Tanpa baris ini,
+     gambar yang dipasang saat chart sedang diam akan tetap `visibility:
+     hidden` sampai ada hal lain yang kebetulan bergerak. */
+  useEffect(pasang, [pasang, garisSeret, lilin, hingga, mundur, smi, posisiMt5, ubah, jiplak]);
 
   /* ── LOOP rAF: TETAP JALAN, TAPI BERHENTI BEKERJA SAAT TIDAK ADA YANG
         BERUBAH ───────────────────────────────────────────────────────────
@@ -2499,13 +2598,83 @@ export function ChartLilin({
           bawahnya. Semua pengaturannya (opasitas, skala, geser) dikerjakan
           lewat panelnya, bukan dengan menyeret gambarnya. */}
       {jiplak && (
-        <img src={jiplak.url} alt=""
-             draggable={false}
-             className="pointer-events-none absolute inset-0 h-full w-full select-none object-contain"
-             style={{
-               opacity: jiplak.opacity,
-               transform: `translate(${jiplak.x}%, ${jiplak.y}%) scale(${jiplak.skala})`,
-             }} />
+        <img ref={jiplakEl} src={jiplak.url} alt="" draggable={false}
+             onPointerDown={jiplak.atur ? (e) => {
+               const t = jiplakPos.current;
+               if (!t) return;
+               e.preventDefault();
+               e.currentTarget.setPointerCapture(e.pointerId);
+               jiplakSeret.current = { x: e.clientX, y: e.clientY, awal: { ...t } };
+             } : undefined}
+             onPointerMove={jiplak.atur ? (e) => {
+               const d = jiplakSeret.current;
+               const c = chart.current, sr = seri.current;
+               if (!d || !c || !sr) return;
+               /* Geseran diterjemahkan lewat SKALA CHART, bukan
+                  ditambahkan sebagai piksel: satu piksel bernilai lain di
+                  tiap tingkat zoom, dan menyimpannya sebagai piksel
+                  berarti tambatannya berubah arti begitu zoom-nya berubah. */
+               const l0 = c.timeScale().coordinateToLogical(0 as never);
+               const l1 = c.timeScale().coordinateToLogical((e.clientX - d.x) as never);
+               const p0 = sr.coordinateToPrice(0);
+               const p1 = sr.coordinateToPrice(e.clientY - d.y);
+               if (l0 == null || l1 == null || p0 == null || p1 == null) return;
+               const dl = (l1 as number) - (l0 as number);
+               const dp = p1 - p0;
+               jiplakPos.current = {
+                 kiri: d.awal.kiri + dl, kanan: d.awal.kanan + dl,
+                 atas: d.awal.atas + dp, bawah: d.awal.bawah + dp,
+               };
+               pasangRef.current();
+             } : undefined}
+             onPointerUp={jiplak.atur ? () => {
+               if (!jiplakSeret.current) return;
+               jiplakSeret.current = null;
+               if (jiplakPos.current) ubahJiplakRef.current?.(jiplakPos.current);
+             } : undefined}
+             onWheel={jiplak.atur ? (e) => {
+               const t = jiplakPos.current;
+               const c = chart.current, sr = seri.current;
+               if (!t || !c || !sr) return;
+               e.preventDefault();
+               const kotakR = e.currentTarget.parentElement?.getBoundingClientRect();
+               if (!kotakR) return;
+               /* Diperbesar DARI TITIK KURSOR, bukan dari tengah gambar.
+                  Membesarkan dari tengah membuat bagian yang sedang
+                  diperhatikan orangnya justru lari dari bawah kursornya. */
+               const lx = c.timeScale().coordinateToLogical((e.clientX - kotakR.left) as never);
+               const py = sr.coordinateToPrice(e.clientY - kotakR.top);
+               if (lx == null || py == null) return;
+               const f = e.deltaY < 0 ? 1.08 : 1 / 1.08;
+               /* SATU SUMBU SAJA saat Shift/Alt ditahan, dan itu bukan
+                  kemewahan. Dua chart yang berbeda hampir tidak pernah
+                  punya perbandingan tinggi-lebar yang sama: rentang harga
+                  di gambarnya bisa 6% sementara di chart ini 2%. Skala
+                  seragam tidak akan pernah bisa menyamakan keduanya —
+                  sumbu tegak dan mendatar memang harus bisa disetel
+                  sendiri-sendiri.
+
+                  Shift = mendatar saja (kebiasaan gulir-samping yang sudah
+                  dikenal), Alt = tegak saja. */
+               const fx = e.altKey ? 1 : f;
+               const fy = e.shiftKey ? 1 : f;
+               const baru = {
+                 kiri: (lx as number) + (t.kiri - (lx as number)) * fx,
+                 kanan: (lx as number) + (t.kanan - (lx as number)) * fx,
+                 atas: py + (t.atas - py) * fy,
+                 bawah: py + (t.bawah - py) * fy,
+               };
+               jiplakPos.current = baru;
+               pasangRef.current();
+               ubahJiplakRef.current?.(baru);
+             } : undefined}
+             className={cn('absolute select-none',
+               /* pointer-events MENYALA hanya di mode Atur. Di mode kunci ia
+                  mutlak mati: satu lapisan yang menangkap tetikus akan
+                  mematikan geser, zoom, dan seluruh alat gambar di
+                  bawahnya. */
+               jiplak.atur ? 'cursor-move touch-none' : 'pointer-events-none')}
+             style={{ opacity: jiplak.opacity, visibility: 'hidden' }} />
       )}
       <div ref={kotak} style={{ height: tinggi }} className="relative w-full" />
 

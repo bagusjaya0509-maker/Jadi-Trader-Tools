@@ -3638,6 +3638,12 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                           onPilihGambar={setGambarPilih}
                           onUbahGambar={ubahGambar}
                           jiplak={jiplak}
+                          /* Tambatan disimpan di state halaman, bukan di
+                             ChartLilin: ia harus bertahan saat komponen
+                             chart dibongkar-pasang (ganti simbol, ganti TF,
+                             layar penuh) — dan ref di dalam komponen ikut
+                             hilang bersamanya. */
+                          onUbahJiplak={(t) => setJiplak((j) => (j ? { ...j, tambat: t } : j))}
                           posisiMt5={modeNyata ? posisiMt5Chart : KOSONG_POSISI}
                           onUbahPosisi={simbol.startsWith('MT5:') ? ubahPosisiMt5 : undefined}
                           hargaAsk={modeNyata ? askTampil : undefined}

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Images, Loader2, X } from 'lucide-react';
+import { Crosshair, Images, Loader2, Lock, Maximize2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { daftarChart, gambarChart, type ChartPantauan } from '@/lib/chart-agen';
 
@@ -11,46 +11,46 @@ import { daftarChart, gambarChart, type ChartPantauan } from '@/lib/chart-agen';
    berjalan. Persis kertas kalkir di atas gambar: yang di bawah cuma acuan,
    yang jadi tetap yang digambar sendiri.
 
-   ── SEMUA PENGATURAN DI PANEL, TIDAK ADA YANG DISERET DI CHART ─────────
-   Menyeret gambarnya langsung memang lebih enak — tapi itu menuntut
-   lapisannya menangkap tetikus, dan satu lapisan penuh yang menangkap
-   tetikus mematikan geser, zoom, dan seluruh alat gambar di bawahnya.
-   Harga itu terlalu mahal untuk kenyamanan menyeret. Jadi lapisannya
-   `pointer-events-none` mutlak, dan penyetelnya di sini.
+   ── KENAPA PENGGESER DIGANTI SERETAN ────────────────────────────────────
+   Versi pertama memberi penggeser skala + geser mendatar/tegak, dan gambarnya
+   dipasang dengan transform persen. Laporan pemilik: sulit dipaskan. Benar,
+   tapi sebab yang sebenarnya lebih dalam daripada penggesernya kurang halus:
 
-   ── HANYA PEMILIK ──────────────────────────────────────────────────────
-   Arsipnya digerbangi uid pemilik di server; komponen ini cuma tidak
-   dipasang untuk orang lain. Kalau toh terpasang, daftarnya pulang null
-   dan yang tampil kalimat "tidak ada" — bukan kebocoran.
+   transform persen mengikat gambar ke LAYAR, bukan ke harga. Jadi sekalipun
+   berhasil dipaskan sempurna, satu geseran chart saja sudah membuatnya
+   meleset lagi — gambarnya diam sementara lilin di bawahnya berjalan.
+   Memaskan sesuatu yang tidak bisa tetap pas adalah pekerjaan tanpa ujung.
+
+   Sekarang keempat sudutnya ditambatkan ke KOORDINAT CHART (indeks logis
+   untuk mendatar, harga untuk tegak). Sekali dipaskan, ia menempel pada
+   lilinnya: ikut geser, ikut zoom, ikut tarikan sumbu harga. Dan karena
+   tambatannya berupa koordinat, memaskannya jadi wajar dilakukan LANGSUNG
+   di gambarnya — seret untuk memindah, gulir untuk memperbesar.
+
+   ── MODE ATUR vs KUNCI ──────────────────────────────────────────────────
+   Seretan menuntut lapisannya menangkap tetikus, dan lapisan yang menangkap
+   tetikus mematikan geser, zoom, dan seluruh alat gambar chart di bawahnya.
+   Jadi ia cuma menyala di mode Atur. Begitu dikunci, lapisannya kembali
+   tembus total dan chart-nya utuh seperti tidak ada apa-apa di atasnya.
    ════════════════════════════════════════════════════════════════════════ */
+
+export interface TambatJiplak { kiri: number; kanan: number; atas: number; bawah: number }
 
 export interface AturJiplak {
   id: string;
   url: string;
   opacity: number;
-  skala: number;
-  x: number;
-  y: number;
+  /** Menangkap tetikus untuk diseret/digulir. Mati = chart utuh kembali. */
+  atur: boolean;
+  /** null = belum dipaskan; ChartLilin yang menghitung pas-awalnya dari
+   *  rentang yang sedang terlihat, lalu melapor balik. */
+  tambat: TambatJiplak | null;
 }
 
-export const JIPLAK_BAWAAN = { opacity: 0.28, skala: 1, x: 0, y: 0 };
-
-function Geser({ label, nilai, min, maks, langkah, satuan, ubah }: {
-  label: string; nilai: number; min: number; maks: number; langkah: number;
-  satuan: string; ubah: (n: number) => void;
-}) {
-  return (
-    <label className="block">
-      <span className="flex items-center justify-between text-[11px] text-zinc-500">
-        {label}
-        <span className="tabular-nums text-zinc-400">{Math.round(nilai * (satuan === '%' ? 100 : 1))}{satuan}</span>
-      </span>
-      <input type="range" min={min} max={maks} step={langkah} value={nilai}
-             onChange={(e) => ubah(Number(e.target.value))}
-             className="mt-1 w-full cursor-pointer accent-zinc-300" />
-    </label>
-  );
-}
+/* Menyala di mode Atur sejak awal: gambar yang baru dipasang HAMPIR SELALU
+   perlu dipaskan dulu, dan menyuruh orangnya menekan satu tombol lagi untuk
+   memulai pekerjaan yang sudah pasti ia lakukan cuma menambah langkah. */
+export const JIPLAK_BAWAAN = { opacity: 0.34, atur: true, tambat: null };
 
 export function JiplakChart({ nilai, ubah }: {
   nilai: AturJiplak | null;
@@ -71,9 +71,6 @@ export function JiplakChart({ nilai, ubah }: {
     void daftarChart(true).then((d) => { setChart(d || []); setMuat(false); });
   }, [buka, chart]);
 
-  /* Klik di luar menutup. Bukan hiasan: panel ini menutupi lilin, dan
-     panel yang menutupi lilin harus bisa disingkirkan tanpa mencari
-     tombolnya. */
   useEffect(() => {
     if (!buka) return;
     const luar = (e: PointerEvent) => {
@@ -83,7 +80,7 @@ export function JiplakChart({ nilai, ubah }: {
     return () => window.removeEventListener('pointerdown', luar);
   }, [buka]);
 
-  /* Object URL yang sedang terpasang DILEPAS saat diganti atau saat
+  /* Object URL yang sedang terpasang dilepas saat diganti atau saat
      komponennya pergi. Tanpa ini tiap penggantian gambar meninggalkan satu
      salinan penuh di memori tab sampai tabnya ditutup. */
   const urlLama = useRef<string | null>(null);
@@ -125,19 +122,44 @@ export function JiplakChart({ nilai, ubah }: {
           </div>
 
           {nilai && (
-            <div className="mb-2 space-y-1.5 rounded-md border border-zinc-800 bg-zinc-900/60 p-2">
-              <Geser label="Ketebalan" nilai={nilai.opacity} min={0.05} maks={0.9} langkah={0.01}
-                     satuan="%" ubah={(n) => ubah({ ...nilai, opacity: n })} />
-              <Geser label="Skala" nilai={nilai.skala} min={0.4} maks={2.5} langkah={0.01}
-                     satuan="×" ubah={(n) => ubah({ ...nilai, skala: n })} />
-              <Geser label="Geser mendatar" nilai={nilai.x} min={-60} maks={60} langkah={1}
-                     satuan="%" ubah={(n) => ubah({ ...nilai, x: n })} />
-              <Geser label="Geser tegak" nilai={nilai.y} min={-60} maks={60} langkah={1}
-                     satuan="%" ubah={(n) => ubah({ ...nilai, y: n })} />
-              <div className="flex gap-1.5 pt-0.5">
-                <button onClick={() => ubah({ ...nilai, ...JIPLAK_BAWAAN })}
-                  className="flex-1 cursor-pointer rounded border border-zinc-700 py-1 text-[11px] text-zinc-300 transition-colors hover:text-zinc-100">
-                  Atur ulang
+            <div className="mb-2 space-y-2 rounded-md border border-zinc-800 bg-zinc-900/60 p-2">
+              {/* Sakelar mode. Ditulis sebagai KEADAAN SEKARANG, bukan
+                  sebagai perintah: tombol yang berbunyi "Kunci" saat sedang
+                  terkunci selalu ambigu — dibaca "sudah terkunci" oleh
+                  separuh orang dan "tekan untuk mengunci" oleh separuhnya. */}
+              <div className="flex overflow-hidden rounded-md border border-zinc-800">
+                {([[true, 'Atur', Crosshair], [false, 'Kunci', Lock]] as const).map(([v, label, Ikon]) => (
+                  <button key={label} onClick={() => ubah({ ...nilai, atur: v })}
+                    className={cn('flex flex-1 cursor-pointer items-center justify-center gap-1 py-1.5 text-[11.5px] font-medium transition-colors',
+                      nilai.atur === v ? 'bg-zinc-800 text-zinc-100' : 'text-zinc-500 hover:text-zinc-300')}>
+                    <Ikon className="size-3" />{label}
+                  </button>
+                ))}
+              </div>
+
+              <p className="text-[10.5px] leading-relaxed text-zinc-500">
+                {nilai.atur
+                  ? 'Seret untuk memindah, gulir untuk memperbesar. Tahan Shift = melebar saja, Alt = meninggi saja. Chart di bawahnya berhenti merespons selama mode ini.'
+                  : 'Gambarnya menempel pada harga dan waktu — ikut bergerak saat chart digeser atau di-zoom.'}
+              </p>
+
+              <label className="block">
+                <span className="flex items-center justify-between text-[11px] text-zinc-500">
+                  Ketebalan
+                  <span className="tabular-nums text-zinc-400">{Math.round(nilai.opacity * 100)}%</span>
+                </span>
+                <input type="range" min={0.05} max={0.9} step={0.01} value={nilai.opacity}
+                       onChange={(e) => ubah({ ...nilai, opacity: Number(e.target.value) })}
+                       className="mt-1 w-full cursor-pointer accent-zinc-300" />
+              </label>
+
+              <div className="flex gap-1.5">
+                {/* `tambat: null` = "hitung ulang pas-awalnya". Angkanya
+                    dikembalikan ChartLilin, bukan dikarang di sini —
+                    pemanggil tidak memegang skala chart-nya. */}
+                <button onClick={() => ubah({ ...nilai, tambat: null })}
+                  className="flex flex-1 cursor-pointer items-center justify-center gap-1 rounded border border-zinc-700 py-1 text-[11px] text-zinc-300 transition-colors hover:text-zinc-100">
+                  <Maximize2 className="size-3" /> Paskan ulang
                 </button>
                 <button onClick={lepas}
                   className="flex-1 cursor-pointer rounded border border-zinc-700 py-1 text-[11px] text-zinc-400 transition-colors hover:text-red-400">
