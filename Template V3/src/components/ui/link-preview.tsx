@@ -1,4 +1,6 @@
+"use client";
 import * as HoverCardPrimitive from "@radix-ui/react-hover-card";
+import Image from "next/image";
 import { encode } from "qss";
 import React from "react";
 import {
@@ -7,24 +9,8 @@ import {
   useMotionValue,
   useSpring,
 } from "framer-motion";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
-
-/* ════════════════════════════════════════════════════════════════════════
-   DUA BARIS YANG DIUBAH DARI KODE ASLINYA, DAN CUMA DUA
-   ════════════════════════════════════════════════════════════════════════
-   Aslinya mengimpor `next/image` dan `next/link`. Proyek ini Vite + React
-   Router, bukan Next.js — kedua modul itu tidak ada, dan menempelkannya apa
-   adanya membuat build gagal dengan galat resolusi modul yang tidak
-   menyebut Next sama sekali.
-
-   Penggantinya sepadan satu lawan satu:
-     next/image  ->  <img loading="lazy" decoding="async">
-     next/link   ->  <a>   (tautan di sini menuju halaman artikel statis,
-                            yang memang di luar router React)
-
-   Selebihnya — Radix HoverCard, framer-motion spring, qss, perhitungan
-   offset kursor — dibiarkan persis seperti aslinya.
-   ════════════════════════════════════════════════════════════════════════ */
 
 type LinkPreviewProps = {
   children: React.ReactNode;
@@ -32,10 +18,8 @@ type LinkPreviewProps = {
   className?: string;
   width?: number;
   height?: number;
-  /** Ada demi kesamaan API dengan kode aslinya. next/image memakainya untuk
-   *  pengoptimalnya sendiri; <img> biasa tidak punya padanannya, jadi nilai
-   *  ini tidak dibaca — dan itu lebih jujur daripada berpura-pura dipakai. */
   quality?: number;
+  layout?: string;
 } & (
   | { isStatic: true; imageSrc: string }
   | { isStatic?: false; imageSrc?: never }
@@ -47,6 +31,8 @@ export const LinkPreview = ({
   className,
   width = 200,
   height = 125,
+  quality = 50,
+  layout = "fixed",
   isStatic = false,
   imageSrc = "",
 }: LinkPreviewProps) => {
@@ -81,8 +67,8 @@ export const LinkPreview = ({
 
   const translateX = useSpring(x, springConfig);
 
-  const handleMouseMove = (event: React.MouseEvent<HTMLAnchorElement>) => {
-    const targetRect = (event.target as HTMLElement).getBoundingClientRect();
+  const handleMouseMove = (event: any) => {
+    const targetRect = event.target.getBoundingClientRect();
     const eventOffsetX = event.clientX - targetRect.left;
     const offsetFromCenter = (eventOffsetX - targetRect.width / 2) / 2; // Reduce the effect to make it subtle
     x.set(offsetFromCenter);
@@ -92,12 +78,13 @@ export const LinkPreview = ({
     <>
       {isMounted ? (
         <div className="hidden">
-          <img
+          <Image
             src={src}
             width={width}
             height={height}
-            loading="lazy"
-            decoding="async"
+            quality={quality}
+            layout={layout}
+            priority={true}
             alt="hidden image"
           />
         </div>
@@ -144,21 +131,22 @@ export const LinkPreview = ({
                   x: translateX,
                 }}
               >
-                <a
+                <Link
                   href={url}
                   className="block p-1 bg-white border-2 border-transparent shadow rounded-xl hover:border-neutral-200 dark:hover:border-neutral-800"
                   style={{ fontSize: 0 }}
                 >
-                  <img
+                  <Image
                     src={isStatic ? imageSrc : src}
                     width={width}
                     height={height}
-                    loading="lazy"
-                    decoding="async"
+                    quality={quality}
+                    layout={layout}
+                    priority={true}
                     className="rounded-lg"
                     alt="preview image"
                   />
-                </a>
+                </Link>
               </motion.div>
             )}
           </AnimatePresence>
