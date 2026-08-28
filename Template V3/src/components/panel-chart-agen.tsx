@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
-import { EyeOff, Loader2, PenLine, RefreshCw, Trash2, Undo2 } from 'lucide-react';
+import { EyeOff, GripHorizontal, Loader2, PenLine, RefreshCw, Trash2, Undo2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   daftarChart, gambarChart, tandaiChart, hapusChart, jadikanSinyal,
@@ -102,6 +103,90 @@ function umur(t: number) {
   return Math.round(j / 24) + ' hari lalu';
 }
 
+/* ── JENDELA GAMBAR — mengambang, bisa diseret ──────────────────────────
+   Dulu gambarnya dibuka di TAB BARU. Bekerja, tapi salah untuk pekerjaan
+   ini: menetapkan area entry menuntut melihat chart-nya SAMBIL mengetik
+   angkanya, dan tab baru justru memindahkan orangnya menjauh dari kotak
+   isian yang mau ia isi. Bolak-balik tab untuk satu angka.
+
+   Jendela mengambang menyelesaikan keduanya: gambarnya besar, panelnya
+   tetap di belakang, dan kalau ia menutupi kotak yang mau diisi — geser
+   saja.
+
+   ── TANPA LATAR GELAP, DAN ITU DISENGAJA ────────────────────────────────
+   Jendela ini BUKAN modal. Latar gelap yang menutup halaman menyatakan
+   "urus ini dulu, yang lain menunggu" — padahal yang dikerjakan orangnya
+   justru membandingkan gambar ini DENGAN panel di belakangnya. Menggelapkan
+   yang dibandingkan mengalahkan tujuannya.
+
+   Karena itu pula ia tidak mengunci gulir dan tidak menangkap klik di luar
+   dirinya: dua jendela boleh terbuka sekaligus untuk membandingkan dua
+   chart, dan panel di belakangnya tetap bisa dipakai.
+
+   DIPORTALKAN KE BODY. Panel induknya punya overflow dan tumpukan sendiri;
+   jendela yang lahir di dalamnya akan terpotong tepat saat diseret keluar
+   batas panel — dan terpotongnya baru terlihat sesudah diseret. */
+function JendelaGambar({ url, judul, tutup }: { url: string; judul: string; tutup: () => void }) {
+  /* Mulai di tengah layar, sedikit ke atas: gambar chart lebih lebar
+     daripada tinggi, dan titik tengah sejati membuat kaki jendelanya
+     menggantung di bawah lipatan pada layar pendek. */
+  const [pos, setPos] = useState(() => ({
+    x: Math.max(12, (window.innerWidth - Math.min(920, window.innerWidth - 40)) / 2),
+    y: Math.max(12, window.innerHeight * 0.08),
+  }));
+  const seret = useRef<{ dx: number; dy: number } | null>(null);
+
+  useEffect(() => {
+    const tekan = (e: KeyboardEvent) => { if (e.key === 'Escape') tutup(); };
+    window.addEventListener('keydown', tekan);
+    return () => window.removeEventListener('keydown', tekan);
+  }, [tutup]);
+
+  return createPortal(
+    <div className="fixed z-[70] w-[min(920px,calc(100vw-24px))] overflow-hidden rounded-xl border border-zinc-700 bg-zinc-950 shadow-2xl"
+         style={{ left: pos.x, top: pos.y }}>
+      {/* Bilah judul = gagang seret. Seluruh jendela bisa saja dibuat
+          menyeret, tapi gambarnya perlu tetap bisa disorot dan disalin —
+          dan bidang seret yang menelan seluruh isi membuat setiap klik di
+          gambar menggeser jendelanya sedikit. */}
+      <div
+        onPointerDown={(e) => {
+          if ((e.target as HTMLElement).closest('button')) return;
+          e.currentTarget.setPointerCapture(e.pointerId);
+          seret.current = { dx: e.clientX - pos.x, dy: e.clientY - pos.y };
+        }}
+        onPointerMove={(e) => {
+          const d = seret.current;
+          if (!d) return;
+          /* DIJEPIT ke dalam layar, dan yang dijepit tepi KIRI-ATAS-nya
+             saja: jendela yang boleh keluar sepenuhnya bisa hilang tanpa
+             cara memanggilnya kembali, sementara menjepit keempat sisinya
+             membuat jendela yang lebih besar dari layar tidak bisa digeser
+             untuk melihat bagian bawahnya. */
+          setPos({
+            x: Math.min(Math.max(-40, e.clientX - d.dx), window.innerWidth - 120),
+            y: Math.min(Math.max(0, e.clientY - d.dy), window.innerHeight - 44),
+          });
+        }}
+        onPointerUp={() => { seret.current = null; }}
+        className="flex cursor-move touch-none items-center gap-2 border-b border-zinc-800 bg-zinc-900/80 px-3 py-2">
+        <GripHorizontal className="size-3.5 shrink-0 text-zinc-600" />
+        <span className="min-w-0 flex-1 truncate text-[12px] text-zinc-300">{judul}</span>
+        <button onClick={tutup} title="Tutup (Esc)"
+          className="cursor-pointer rounded p-1 text-zinc-500 transition-colors hover:text-zinc-100">
+          <X className="size-4" />
+        </button>
+      </div>
+      {/* Tinggi dibatasi tinggi layar supaya chart yang sangat jangkung
+          tetap muat utuh; sisanya digulir di dalam jendelanya sendiri. */}
+      <div className="max-h-[78vh] overflow-auto bg-zinc-950">
+        <img src={url} alt={judul} className="w-full select-none" draggable={false} />
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 /* ── Gambar bertoken ────────────────────────────────────────────────────
    Dipisah jadi komponennya sendiri supaya object URL-nya punya siklus hidup
    yang sama persis dengan yang menampilkannya. Ditaruh di induknya, satu
@@ -110,6 +195,10 @@ function umur(t: number) {
 function GambarChart({ id, alt }: { id: string; alt: string }) {
   const [url, setUrl] = useState<string | null>(null);
   const [gagal, setGagal] = useState(false);
+  /* Jendelanya dipegang DI SINI, bukan di induknya: object URL-nya lahir
+     dan mati di komponen ini, dan jendela yang hidup di tempat lain bisa
+     memegang URL yang sudah dicabut. */
+  const [buka, setBuka] = useState(false);
 
   useEffect(() => {
     let hidup = true;
@@ -141,12 +230,18 @@ function GambarChart({ id, alt }: { id: string; alt: string }) {
     );
   }
   return (
-    /* Dibuka di tab baru saat diklik: chart penuh angka kecil, dan versi
-       yang muat di kartu tidak pernah cukup untuk membaca level. */
-    <a href={url} target="_blank" rel="noreferrer" className="block">
-      <img src={url} alt={alt}
-           className="w-full rounded-lg border border-zinc-800 transition-opacity hover:opacity-90" />
-    </a>
+    <>
+      {/* Tombol, bukan tautan: yang terjadi bukan berpindah tempat melainkan
+          membuka jendela di halaman yang sama. Tautan yang tidak menautkan ke
+          mana pun membohongi menu klik-kanan dan penunjuk status peramban. */}
+      <button type="button" onClick={() => setBuka(true)}
+        title="Buka besar — jendelanya bisa digeser"
+        className="block w-full cursor-zoom-in">
+        <img src={url} alt={alt}
+             className="w-full rounded-lg border border-zinc-800 transition-opacity hover:opacity-90" />
+      </button>
+      {buka && <JendelaGambar url={url} judul={alt} tutup={() => setBuka(false)} />}
+    </>
   );
 }
 
