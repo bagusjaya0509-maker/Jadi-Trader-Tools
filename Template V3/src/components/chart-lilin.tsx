@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   createChart, CandlestickSeries, LineSeries, createSeriesMarkers, createTextWatermark,
   CrosshairMode,
@@ -223,7 +223,7 @@ export function ChartLilin({
   garisSeret, onSeret, onKlikGaris, onHapusGaris, onKlikKosong, hamparanBawah, segmen, penandaPine, kotakPine, isianPine,
   alat, onAlatSelesai, gambarAlat, gambarPilih, onPilihGambar, onUbahGambar,
   posisiMt5, onUbahPosisi, hargaAsk, kunciUkuran, bagikanFoto, tandaAir, tampilan, pitaSmi,
-  jiplak, onUbahJiplak,
+  jiplak, onUbahJiplak, panelKiri,
   hamparanBarTertua, onUjungKiri,
 }: {
   /** Nama pasangan yang dicetak samar di tengah area harga, seperti
@@ -349,6 +349,18 @@ export function ChartLilin({
    *  dalam satu sesi, dan keadaan yang tinggal di dalamnya akan hilang tiap
    *  kali — memaksa orang memaskan gambar yang sama berulang-ulang. */
   onUbahJiplak?: (p: { lebar?: number; zoom?: number; x?: number; y?: number }) => void;
+  /** Isi panel kiri saat TIDAK sedang menjiplak gambar.
+   *
+   *  Ditambahkan supaya layar terbelahnya dipakai ulang, bukan dibuat dua
+   *  kali. Panel acuan jiplak sudah membawa seluruh yang sulit — lebar yang
+   *  bisa ditarik, batas yang bisa dipegang, chart yang menyusut sendiri
+   *  lewat flex-1. Menyalin semua itu untuk sebuah daftar berarti dua tata
+   *  letak yang harus sepakat selamanya soal cara membelah layar.
+   *
+   *  Jiplak MENANG kalau keduanya ada: gambar acuan dan daftar tidak bisa
+   *  menempati satu ruang, dan yang sedang dijiplak orang lebih spesifik
+   *  daripada daftar yang cuma menunggu diklik. */
+  panelKiri?: ReactNode;
   posisiMt5?: PosisiChartMt5[];
   /** Kirim SL/TP baru sebuah posisi ke EA; resolve true kalau EA sukses.
    *  Tanpa handler ini SL/TP posisinya tidak bisa diseret sama sekali. */
@@ -1765,7 +1777,14 @@ export function ChartLilin({
   const jz = jiplak ? jiplak.zoom || 1 : 1;
   const jx = (jiplak ? jiplak.x || 0 : 0) + (geserJiplak ? geserJiplak.x : 0);
   const jy = (jiplak ? jiplak.y || 0 : 0) + (geserJiplak ? geserJiplak.y : 0);
-  const jLebar = lebarSeret ?? (jiplak ? jiplak.lebar : 0.42);
+  /* Lebar panel daftar dipegang LOKAL, sementara lebar panel jiplak dipegang
+     pemanggil. Bedanya disengaja: setelan jiplak ikut satu gambar tertentu
+     dan pantas bertahan saat gambarnya dilepas-pasang, sedangkan daftar
+     posisi cuma cara melihat — dan menaruhnya di keadaan halaman berarti
+     satu prop lagi yang harus dialirkan lewat empat lapis. */
+  const [lebarDaftar, setLebarDaftar] = useState(0.28);
+  const adaKiri = !!jiplak || !!panelKiri;
+  const jLebar = lebarSeret ?? (jiplak ? jiplak.lebar : lebarDaftar);
 
   /* Roda dipasang TANGAN, bukan lewat onWheel. Peramban memasang pendengar
      wheel sebagai pasif di banyak jalur, dan preventDefault yang diabaikan
@@ -2721,15 +2740,18 @@ export function ChartLilin({
        Chart-nya menyusut sendiri lewat flex-1, dan ResizeObserver yang
        sudah terpasang di wadahnya yang memberi tahu pustakanya. */
     <div ref={bungkusRef} className="flex">
-      {jiplak && (
+      {adaKiri && (
         <>
         <div ref={jiplakPanel}
              className={cn('relative shrink-0 overflow-hidden bg-zinc-950',
-               geserJiplak ? 'cursor-grabbing' : 'cursor-grab')}
+               jiplak && (geserJiplak ? 'cursor-grabbing' : 'cursor-grab'))}
              style={{ width: `${(jLebar * 100).toFixed(2)}%`, height: tinggi }}
-             onDoubleClick={() => onUbahJiplak && onUbahJiplak({ zoom: 1, x: 0, y: 0 })}
+             onDoubleClick={() => jiplak && onUbahJiplak && onUbahJiplak({ zoom: 1, x: 0, y: 0 })}
              onPointerDown={(e) => {
-               if (!onUbahJiplak || e.button !== 0) return;
+               /* Seretan hanya untuk gambar. Panel daftar punya gulirannya
+                  sendiri, dan menangkap pointer di sana akan mematikan
+                  seleksi teks serta gulir jari di layar sentuh. */
+               if (!jiplak || !onUbahJiplak || e.button !== 0) return;
                e.currentTarget.setPointerCapture(e.pointerId);
                const x0 = e.clientX; const y0 = e.clientY;
                const el = e.currentTarget;
@@ -2759,15 +2781,21 @@ export function ChartLilin({
               panel" berapa pun ukuran berkas aslinya. Tanpa itu, gambar
               1300px dan gambar 700px mulai dari perbesaran yang berbeda dan
               angka zoom-nya tidak berarti apa-apa. */}
+          {!jiplak && panelKiri && (
+            <div className="h-full overflow-y-auto">{panelKiri}</div>
+          )}
+
+          {jiplak && (
           <img src={jiplak.url} alt="" draggable={false}
                className="absolute left-0 top-0 w-full origin-top-left select-none"
                style={{ transform: `translate(${jx}px, ${jy}px) scale(${jz})` }} />
+          )}
 
           {/* Perbesaran ditulis, dan cuma saat bukan 1. Angka yang selalu
               ada di sudut gambar jadi bagian dari gambar itu dan berhenti
               dibaca; yang muncul hanya saat keadaannya tidak wajar justru
               terbaca. */}
-          {Math.abs(jz - 1) > 0.01 && (
+          {jiplak && Math.abs(jz - 1) > 0.01 && (
             <span className="pointer-events-none absolute left-1.5 top-1.5 rounded bg-zinc-950/80 px-1.5 py-0.5 text-[10px] tabular-nums text-zinc-400">
               {Math.round(jz * 100)}%
             </span>
@@ -2785,7 +2813,8 @@ export function ChartLilin({
           className="group relative w-1 shrink-0 cursor-col-resize"
           style={{ height: tinggi }}
           onPointerDown={(e) => {
-            if (!onUbahJiplak || e.button !== 0) return;
+            if (e.button !== 0) return;
+            if (jiplak && !onUbahJiplak) return;
             e.preventDefault();
             const el = e.currentTarget;
             el.setPointerCapture(e.pointerId);
@@ -2814,7 +2843,9 @@ export function ChartLilin({
                  Chart.tsx menggambar ulang seluruh isi halaman, dan
                  melakukannya enam puluh kali sedetik selama batasnya
                  dipegang membuat seretan yang seharusnya ringan tersendat. */
-              if (v !== null) onUbahJiplak({ lebar: v });
+              if (v === null) return;
+              if (jiplak && onUbahJiplak) onUbahJiplak({ lebar: v });
+              else setLebarDaftar(v);
             };
             el.addEventListener('pointermove', gerak);
             el.addEventListener('pointerup', lepas);

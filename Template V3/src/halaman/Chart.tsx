@@ -41,6 +41,7 @@ import { useAuth } from '@/lib/auth';
 import { modePreview, jatahTerpakai, pakaiJatah } from '@/lib/preview';
 import { usePaket, pakaiKuota, teksSisa } from '@/lib/paket';
 import { JiplakChart, JIPLAK_BAWAAN, type AturJiplak } from '@/components/jiplak-chart';
+import type { PosisiDompet } from '@/lib/wallet-agen';
 
 /* ════════════════════════════════════════════════════════════════════════
    CHART & BACKTEST
@@ -289,6 +290,73 @@ function rapikanSimbol(s: string): string {
 
    Persis itu yang terjadi pada alamat
    ?symbol=MT5:XAUUSD&entry=4632.29&sl=4637.84&tp=4626.74 */
+/* ════════════════════════════════════════════════════════════════════════
+   DAFTAR POSISI DOMPET, DI PANEL KIRI CHART
+   ════════════════════════════════════════════════════════════════════════
+   Dibuka dari kartu dompet lewat `?dompet=<alamat>`. Gunanya satu: dompet
+   yang memegang enam belas posisi menuntut enam belas kali bolak-balik ke
+   panel Copy Signal kalau chartnya harus dibuka satu per satu. Dengan
+   daftarnya duduk di samping chart, berpindah pasangan tinggal satu klik.
+
+   Memakai slot panel kiri yang SAMA dengan gambar jiplak — lebar yang bisa
+   ditarik, batas yang bisa dipegang, chart yang menyusut sendiri. Tidak ada
+   tata letak kedua yang harus dijaga sepakat.
+
+   Baris yang simbolnya tidak ada di Binance TETAP DITAMPILKAN. Token yang
+   lahir dan hidup di Hyperliquid saja (PURR, CASHCAT) akan membuka chart
+   kosong, dan itu lebih jujur daripada daftar yang diam-diam berbeda dari
+   yang orang lihat di dompetnya. */
+function DaftarPosisiDompet({ posisi, aktif, pilih }: {
+  posisi: PosisiDompet[];
+  aktif: string;
+  pilih: (simbol: string) => void;
+}) {
+  const simbolDari = (koin: string) => String(koin || '').toUpperCase().replace(/^@/, '') + 'USDT';
+  const nama = posisi.length ? posisi[0].nama : '';
+  const total = posisi.reduce((n, p) => n + p.pnl, 0);
+
+  return (
+    <div className="flex h-full flex-col">
+      <div className="sticky top-0 z-10 border-b border-zinc-800 bg-zinc-950 px-2.5 py-1.5">
+        <p className="truncate text-[12px] font-semibold text-zinc-100">{nama || 'Dompet pantauan'}</p>
+        <p className="text-[10.5px] text-zinc-600">
+          {posisi.length} posisi ·{' '}
+          <span className={total >= 0 ? 'text-emerald-400/90' : 'text-red-400/90'}>
+            {total >= 0 ? '+' : '−'}${Math.abs(total).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
+          </span>{' '}mengambang
+        </p>
+      </div>
+      <div className="min-h-0 flex-1">
+        {posisi.map((p, i) => {
+          const sim = simbolDari(p.koin);
+          const ini = sim === aktif;
+          return (
+            <button key={p.koin + i} onClick={() => pilih(sim)}
+              className={cn('flex w-full cursor-pointer flex-col gap-0.5 border-b border-zinc-800/60 px-2.5 py-1.5 text-left transition-colors',
+                ini ? 'bg-zinc-800/70' : 'hover:bg-zinc-900')}>
+              <span className="flex items-baseline gap-1.5">
+                <span className={cn('text-[12px] font-semibold', ini ? 'text-zinc-50' : 'text-zinc-200')}>{p.koin}</span>
+                <span className={cn('text-[10.5px] font-semibold',
+                  p.arah === 'LONG' ? 'text-emerald-400' : 'text-red-400')}>{p.arah}</span>
+                {p.leverage > 0 && <span className="text-[10px] text-zinc-600">{p.leverage}×</span>}
+                <span className={cn('ml-auto text-[11px] font-medium tabular-nums',
+                  p.pnl >= 0 ? 'text-emerald-400' : 'text-red-400')}>
+                  {p.pnl >= 0 ? '+' : '−'}${Math.abs(p.pnl).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
+                </span>
+              </span>
+              <span className="text-[10px] tabular-nums text-zinc-600">
+                entry {p.entry}
+                {p.likuidasi > 0 && <span className="text-amber-400/70"> · likuidasi {p.likuidasi}</span>}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+
 function ambilSimbol(cari: URLSearchParams): string {
   return cari.get('simbol') || cari.get('symbol') || '';
 }
@@ -2509,6 +2577,40 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
 
      Sekali saja per id: `terpasang` menahan pemasangan ulang saat render
      berikutnya, dan tanpa itu setiap render menarik gambarnya lagi. */
+  /* ── DAFTAR POSISI DOMPET ────────────────────────────────────────────
+     Ditarik sekali per alamat, lalu disegarkan tiap menit — sama irama
+     dengan pemantau di server, jadi angka mengambang di daftar ini tidak
+     pernah lebih dari satu putaran tertinggal dari panelnya. */
+  const dompetMinta = cari.get('dompet');
+  const [posisiDompet, setPosisiDompet] = useState<PosisiDompet[]>([]);
+  useEffect(() => {
+    if (!pemilik || !dompetMinta) { setPosisiDompet([]); return; }
+    let hidup = true;
+    const tarik = () => {
+      void import('@/lib/wallet-agen').then(({ keadaanDompet }) => keadaanDompet()).then((d) => {
+        if (!hidup || !d) return;
+        setPosisiDompet(d.posisi.filter((p) => p.alamat === dompetMinta));
+      });
+    };
+    tarik();
+    const jam = setInterval(tarik, 60000);
+    return () => { hidup = false; clearInterval(jam); };
+  }, [pemilik, dompetMinta]);
+
+  /* Chart berpindah ke posisi PERTAMA begitu daftarnya tiba — sekali saja.
+     Mendarat di BTCUSDT bawaan sementara daftar di sebelahnya berisi enam
+     belas posisi lain berarti satu klik yang seharusnya tidak perlu, dan
+     memaksanya tiap penyegaran akan menarik orang kembali ke baris pertama
+     tiap menit sementara ia sedang membaca baris kesembilan. */
+  const dompetDilompati = useRef<string | null>(null);
+  useEffect(() => {
+    if (!dompetMinta || !posisiDompet.length) return;
+    if (dompetDilompati.current === dompetMinta) return;
+    if (ambilSimbol(cari)) { dompetDilompati.current = dompetMinta; return; }
+    dompetDilompati.current = dompetMinta;
+    setSimbol(rapikanSimbol(posisiDompet[0].koin.toUpperCase().replace(/^@/, '') + 'USDT'));
+  }, [dompetMinta, posisiDompet, cari]);
+
   const jiplakMinta = cari.get('jiplak');
   const jiplakTerpasang = useRef<string | null>(null);
   useEffect(() => {
@@ -3736,6 +3838,14 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                              berarti medan lain ikut ditulis ulang setiap
                              kali salah satunya disunting. */
                           onUbahJiplak={(p) => setJiplak((j) => (j ? { ...j, ...p } : j))}
+                          /* Jiplak menang kalau keduanya diminta: gambar
+                             acuan dan daftar tidak bisa menempati satu
+                             ruang, dan yang sedang dijiplak lebih spesifik
+                             daripada daftar yang menunggu diklik. */
+                          panelKiri={!jiplak && posisiDompet.length ? (
+                            <DaftarPosisiDompet posisi={posisiDompet} aktif={simbol}
+                              pilih={(x) => setSimbol(rapikanSimbol(x))} />
+                          ) : undefined}
                           posisiMt5={modeNyata ? posisiMt5Chart : KOSONG_POSISI}
                           onUbahPosisi={simbol.startsWith('MT5:') ? ubahPosisiMt5 : undefined}
                           hargaAsk={modeNyata ? askTampil : undefined}

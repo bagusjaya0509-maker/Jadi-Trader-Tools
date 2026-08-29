@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronRight, Loader2, Plus, RefreshCw, Trash2, Trophy, Wallet, X } from 'lucide-react';
+import { ChevronRight, List, Loader2, Plus, RefreshCw, Trash2, Trophy, Wallet, X } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { SparklineSaldo } from '@/components/kurva-saldo';
 import {
@@ -503,6 +504,21 @@ function bukaPosisi(log: TransaksiDompet[], koin: string, arah: 'LONG' | 'SHORT'
   return { waktu: mulai, utuh: size >= ukuran * 0.99 };
 }
 
+/* ── NAMA KOIN HYPERLIQUID -> SIMBOL CHART ────────────────────────────
+   Hyperliquid menyebut perp-nya dengan nama pendek: BTC, ETH, ARB. Chart di
+   situs ini memakai simbol Binance: BTCUSDT. Penyambungnya cuma menempelkan
+   USDT — dan itu benar untuk hampir semuanya.
+
+   Yang TIDAK punya pasangan di Binance (PURR, CASHCAT, FXMR — token yang
+   lahir dan hidup di Hyperliquid saja) akan membuka chart kosong. Itu
+   dibiarkan apa adanya, bukan disembunyikan: menghilangkan barisnya berarti
+   daftar posisi yang tidak cocok dengan yang dilihat orang di dompetnya,
+   dan itu kebingungan yang lebih mahal daripada satu chart kosong yang
+   sudah punya keterangannya sendiri. */
+function simbolChart(koin: string) {
+  return String(koin || '').toUpperCase().replace(/^@/, '') + 'USDT';
+}
+
 function tanggalJam(ms: number) {
   return new Date(ms).toLocaleString('id-ID', {
     day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
@@ -550,6 +566,18 @@ function RincianDompet({ w, posisi, log, tutup }: {
             <span className="block truncate text-[13px] font-semibold text-zinc-100">{w.nama}</span>
             <span className="block truncate font-mono text-[10.5px] text-zinc-600">{w.alamat}</span>
           </h4>
+          {/* Membawa SELURUH daftar, bukan satu koin. Membuka delapan
+              posisi satu per satu berarti delapan kali bolak-balik ke panel
+              ini; dengan daftarnya ikut ke chart, berpindah pasangan tinggal
+              satu klik di sebelah kiri. */}
+          {posisi.length > 0 && (
+            <Link to={`/chart-entry?dompet=${encodeURIComponent(w.alamat)}`}
+              title="Buka semua posisi dompet ini sebagai daftar di samping chart"
+              className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-zinc-700 px-2.5 py-1 text-[11.5px] text-zinc-300 transition-colors hover:border-zinc-500 hover:text-zinc-100">
+              <List className="size-3.5" />
+              List in Chart
+            </Link>
+          )}
           <button onClick={tutup} title="Tutup (Esc)"
             className="cursor-pointer rounded p-1 text-zinc-500 transition-colors hover:text-zinc-100">
             <X className="size-4" />
@@ -562,7 +590,15 @@ function RincianDompet({ w, posisi, log, tutup }: {
           {posisi.map((p, i) => (
             <div key={p.koin + i} className="rounded-md border border-zinc-800 bg-zinc-950/60 p-2.5">
               <div className="flex items-baseline gap-2">
-                <span className="text-[12.5px] font-semibold text-zinc-100">{p.koin}</span>
+                {/* Nama koinnya SENDIRI yang jadi tautan, bukan tombol
+                    terpisah di sebelahnya. Yang ingin dilihat orang saat
+                    membaca baris ini adalah chart koin itu, dan nama koin
+                    adalah tempat pertama yang jarinya tuju. */}
+                <Link to={`/chart-entry?simbol=${simbolChart(p.koin)}`}
+                  title={'Buka chart ' + simbolChart(p.koin)}
+                  className="text-[12.5px] font-semibold text-zinc-100 underline decoration-zinc-700 decoration-dotted underline-offset-4 transition-colors hover:text-white hover:decoration-zinc-400">
+                  {p.koin}
+                </Link>
                 <span className={cn('text-[11.5px] font-semibold',
                   p.arah === 'LONG' ? 'text-emerald-400' : 'text-red-400')}>{p.arah}</span>
                 {p.leverage > 0 && <span className="text-[11px] text-zinc-600">{p.leverage}×</span>}
