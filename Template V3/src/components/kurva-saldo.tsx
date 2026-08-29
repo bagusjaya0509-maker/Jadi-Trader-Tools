@@ -174,8 +174,18 @@ function jalur(nilai: number[], W: number, H: number, pad: number, modal: number
  *  akan pernah tahu ukurannya sendiri.
  */
 export function SparklineSaldo(
-  { sinyal, modal, kelas, interaktif }: {
-    sinyal: RingkasAnalisa[]; modal: number; kelas?: string;
+  { sinyal, titik, modal, kelas, interaktif }: {
+    sinyal?: RingkasAnalisa[];
+    /** Titik siap pakai, dipakai pemanggil yang sumbernya BUKAN sinyal —
+     *  dompet on-chain, misalnya, yang kurvanya realisasi kumulatif dari
+     *  fill penutup.
+     *
+     *  Ditambahkan supaya gambarnya SATU, bukan dua. Menyalin path
+     *  kubik-monoton ke panel dompet berarti dua tempat yang harus sepakat
+     *  selamanya soal cara menggambar uang — dan yang satu pasti tertinggal
+     *  saat yang lain diperbaiki. */
+    titik?: { saldo: number; waktu: number }[];
+    modal: number; kelas?: string;
     /** Menyalakan penunjuk: garis tegak, titik, dan kotak berisi P/L pada
      *  posisi tetikus. Mati secara bawaan — kurva sekecil 40 px di kartu
      *  lama tidak punya ruang untuk ditunjuk, dan penunjuk yang muncul di
@@ -183,8 +193,9 @@ export function SparklineSaldo(
     interaktif?: boolean;
   },
 ) {
-  const nilai = useMemo(() => titikSaldo(sinyal, modal), [sinyal, modal]);
-  const rinci = useMemo(() => titikSaldoRinci(sinyal, modal), [sinyal, modal]);
+  const rinci = useMemo(
+    () => titik ?? titikSaldoRinci(sinyal ?? [], modal), [titik, sinyal, modal]);
+  const nilai = useMemo(() => rinci.map((t) => t.saldo), [rinci]);
   /** Titik yang sedang ditunjuk. null = tetikusnya sedang tidak di atas. */
   const [tunjuk, setTunjuk] = useState<number | null>(null);
   const kotak = useRef<HTMLSpanElement | null>(null);

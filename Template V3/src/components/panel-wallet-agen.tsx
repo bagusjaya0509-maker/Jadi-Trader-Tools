@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Loader2, Plus, RefreshCw, Trash2, Trophy, Wallet } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { SparklineSaldo } from '@/components/kurva-saldo';
 import {
   keadaanDompet, tambahDompet, hapusDompet, peringkatDompet,
   type KeadaanDompet, type TransaksiDompet, type PosisiDompet, type Peringkat,
@@ -264,150 +265,268 @@ function PapanPeringkat({ pantau }: { pantau: (alamat: string, nama: string) => 
 }
 
 /* ════════════════════════════════════════════════════════════════════════
-   SATU KARTU PER DOMPET
+   KARTU DOMPET — sebentuk dengan kartu analis di Copy Signal
    ════════════════════════════════════════════════════════════════════════
-   Versi pertama menaruh SEMUA posisi dalam satu kisi dan SEMUA transaksi
-   dalam satu daftar, dengan nama dompetnya dicetak kecil di sudut tiap
-   baris. Dengan satu dompet itu terbaca. Dengan enam, tiga puluh satu
-   posisi, dan dua ratus transaksi, yang tersisa cuma dinding angka —
-   pertanyaan "dompet ini sedang pegang apa" menuntut mata menyisir seluruh
-   halaman dan menyaringnya sendiri.
+   Dua bentuk sudah dicoba dan keduanya ditolak pemilik. Yang pertama:
+   semua posisi dalam satu kisi, semua transaksi dalam satu daftar, nama
+   dompetnya dicetak kecil di sudut tiap baris — dinding angka begitu
+   dompetnya lebih dari satu. Yang kedua: baris terlipat dengan ringkasan
+   di kepalanya — rapi, tapi tidak ada satu pun angka yang MASUK sendiri ke
+   mata; semuanya harus dibaca satu per satu.
 
-   Pengelompokan mengembalikan pertanyaan itu ke tempatnya. Satu kartu satu
-   dompet, dan yang di dalamnya cuma miliknya.
+   Bentuk ketiga meniru kartu yang sudah ada di halaman yang sama. Kartu
+   analis di Copy Signal menjawab "siapa yang sedang bagus" dalam sekali
+   pandang: satu angka besar, satu kurva, satu badge menang. Dompet adalah
+   pertanyaan yang persis sama, dan menjawabnya dengan bentuk yang berbeda
+   di halaman yang sama cuma memaksa orang belajar dua bahasa.
 
-   TERTUTUP SEBAGAI BAWAAN. Barisan kepala kartu sudah memuat seluruh angka
-   ringkasnya — berapa posisi, untung mengambang, berapa transaksi, berapa
-   persen menang, realisasi. Enam kartu terbuka sekaligus mengembalikan
-   dinding yang baru saja dibongkar; yang dicari orang biasanya satu dompet,
-   dan satu klik lebih murah daripada menggulir enam layar.
+   ── KURVANYA REALISASI, BUKAN NILAI AKUN ────────────────────────────────
+   Nilai akun ikut naik-turun karena setoran dan penarikan, dan dompet yang
+   menarik untungnya keluar akan menggambar terjun bebas yang terbaca
+   sebagai kerugian besar. Yang digambar di sini jumlah berjalan dari
+   closedPnl tiap fill penutup — apa yang benar-benar dihasilkan
+   perdagangannya, sejak kita mulai memantau.
 
-   Rapor yang dulu berdiri sendiri di bawah dihapus: angkanya persis yang
-   sekarang ada di kepala kartu, dan dua tempat yang menampilkan hal yang
-   sama adalah dua tempat yang bisa berbeda. */
-function KartuDompet({ w, posisi, log, hapus }: {
+   ── ANGKA BESARNYA REALISASI, MENGAMBANG DI BAWAHNYA ────────────────────
+   Keduanya perlu ada dan tidak boleh dijumlahkan. Realisasi sudah terjadi;
+   mengambang bisa hilang dalam satu jam. Menjumlahkannya jadi satu angka
+   membuat posisi yang sedang untung terbaca seperti untung yang sudah
+   diamankan.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/** Warna monogram dari alamatnya. Bukan hiasan: enam kartu abu-abu yang
+ *  seragam menuntut membaca teks untuk membedakannya, dan warna yang tetap
+ *  per alamat membuat kartu yang sama dikenali dari sudut mata. */
+function ronaAlamat(a: string) {
+  let n = 0;
+  for (let i = 2; i < a.length; i++) n = (n * 31 + a.charCodeAt(i)) % 360;
+  return n;
+}
+
+/* ── FILL BUKAN TRADE, DAN ITU MENGUBAH SEGALANYA ──────────────────────
+   Versi pertama menghitung tiap fill berisi closedPnl sebagai satu
+   penutupan. Data sungguhan langsung menunjukkan kenapa itu salah: satu
+   dompet memulangkan 107 baris "Close Long" pada PURR, semuanya rugi,
+   semuanya dalam hitungan detik, semuanya di harga yang sama sampai empat
+   angka di belakang koma. Itu BUKAN 107 kekalahan — itu SATU posisi yang
+   dilepas, dan mesin pencocokan bursanya memotongnya jadi 107 keping.
+
+   Menghitungnya per fill membuat win rate ditentukan oleh cara bursa
+   kebetulan mengiris order, bukan oleh keputusan orangnya. Satu keluar
+   yang terpotong seratus keping menenggelamkan sembilan puluh kemenangan
+   yang kebetulan terisi sekali jalan.
+
+   Fill berurutan pada koin dan arah yang sama, berjarak kurang dari lima
+   menit, dihitung SATU penutupan dan pnl-nya dijumlahkan. Lima menit
+   longgar untuk pelepasan bertahap dan masih terlalu pendek untuk
+   menyatukan dua keputusan yang benar-benar berbeda. */
+export interface Penutupan { koin: string; dir: string; pnl: number; waktu: number }
+
+const JEDA_SATU_KELUAR = 5 * 60 * 1000;
+
+function penutupanDompet(log: TransaksiDompet[]): Penutupan[] {
+  /* `log` datang terbaru di depan; dibalik dulu. Pengelompokan yang
+     berjalan mundur akan memotong kelompoknya di tempat yang salah. */
+  const tutup = log.filter((l) => l.pnl !== 0).slice().sort((x, y) => x.waktu - y.waktu);
+  const out: Penutupan[] = [];
+  for (const l of tutup) {
+    const g = out[out.length - 1];
+    if (g && g.koin === l.koin && g.dir === l.dir && l.waktu - g.waktu <= JEDA_SATU_KELUAR) {
+      g.pnl += l.pnl;
+      g.waktu = l.waktu;
+    } else {
+      out.push({ koin: l.koin, dir: l.dir, pnl: l.pnl, waktu: l.waktu });
+    }
+  }
+  return out;
+}
+
+/** Realisasi kumulatif, satu langkah per PENUTUPAN — bukan per fill. */
+function titikDompet(tutup: Penutupan[]) {
+  const out = [{ saldo: 0, waktu: tutup.length ? tutup[0].waktu : Date.now() }];
+  let n = 0;
+  for (const l of tutup) { n += l.pnl; out.push({ saldo: n, waktu: l.waktu }); }
+  return out;
+}
+
+function KartuDompet({ w, posisi, log, dipilih, pilih, hapus }: {
   w: { alamat: string; nama: string; sejak: number };
   posisi: PosisiDompet[];
   log: TransaksiDompet[];
+  dipilih: boolean;
+  pilih: () => void;
   hapus: () => void;
 }) {
-  const [buka, setBuka] = useState(false);
-
   const mengambang = posisi.reduce((n, p) => n + p.pnl, 0);
   const akun = posisi.length ? posisi[0].nilaiAkun : 0;
-  /* pnl bukan nol = fill yang MENUTUP sesuatu. Fill pembuka selalu membawa
-     closedPnl nol, dan menghitungnya sebagai kekalahan menenggelamkan
-     persentase menang dompet mana pun ke angka yang tidak berarti apa-apa. */
-  const tutup = log.filter((l) => l.pnl !== 0);
+  const tutup = penutupanDompet(log);
   const menang = tutup.filter((l) => l.pnl > 0).length;
   const nyata = tutup.reduce((n, l) => n + l.pnl, 0);
+  const titik = titikDompet(tutup);
+  const rona = ronaAlamat(w.alamat);
 
   return (
-    <div className="rounded-lg border border-zinc-800 bg-zinc-900/30">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
-        <button onClick={() => setBuka((v) => !v)}
-          className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left">
-          <span aria-hidden className={cn('text-zinc-600 transition-transform', buka && 'rotate-90')}>›</span>
-          <span className="truncate text-[13px] font-semibold text-zinc-100">{w.nama}</span>
-          <span className="hidden font-mono text-[10.5px] text-zinc-600 sm:inline">
+    <div onClick={pilih}
+      className={cn('group relative flex cursor-pointer flex-col overflow-hidden rounded-xl border bg-zinc-900/40 transition-colors',
+        dipilih ? 'border-zinc-500' : 'border-zinc-800 hover:border-zinc-700')}>
+
+      <div className="flex items-center gap-2 px-3 pt-2.5">
+        <span aria-hidden
+          className="flex size-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold text-zinc-950"
+          style={{ background: `hsl(${rona} 55% 62%)` }}>
+          {(w.nama.trim()[0] || '0').toUpperCase()}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[12.5px] font-semibold text-zinc-100">{w.nama}</span>
+          <span className="block font-mono text-[10px] text-zinc-600">
             {w.alamat.slice(0, 6)}…{w.alamat.slice(-4)}
           </span>
-        </button>
-
-        <span className="text-[11.5px] text-zinc-500">
-          {posisi.length ? posisi.length + ' posisi' : 'tanpa posisi'}
-          {akun > 0 && <span className="text-zinc-600"> · akun ${uangRingkas(akun)}</span>}
-        </span>
-        {posisi.length > 0 && (
-          <span className={cn('text-[12.5px] font-semibold tabular-nums',
-            mengambang >= 0 ? 'text-emerald-400' : 'text-red-400')}
-            title="Untung/rugi yang belum direalisasi dari posisi terbuka">
-            {mengambang >= 0 ? '+' : '−'}{uangRingkas(Math.abs(mengambang))}
-          </span>
-        )}
-
-        <span className="text-[11.5px] text-zinc-600">
-          {log.length} transaksi
-          {tutup.length > 0 && <> · menang {Math.round((menang / tutup.length) * 100)}%</>}
         </span>
         {tutup.length > 0 && (
-          <span className={cn('text-[11.5px] font-medium tabular-nums',
-            nyata >= 0 ? 'text-emerald-400/80' : 'text-red-400/80')}
-            title="Realisasi dari penutupan yang kita saksikan sendiri">
-            {nyata >= 0 ? '+' : '−'}{uangRingkas(Math.abs(nyata))}
+          <span className={cn('shrink-0 text-[10.5px] font-medium',
+            menang / tutup.length >= 0.5 ? 'text-emerald-400' : 'text-red-400')}
+            title={menang + ' menang dari ' + tutup.length + ' penutupan yang kita saksikan. '
+              + 'Fill berurutan pada koin & arah yang sama dalam lima menit dihitung satu penutupan.'}>
+            WR {Math.round((menang / tutup.length) * 100)}%
           </span>
         )}
-
-        <button onClick={hapus} title="Berhenti memantau"
-          className="cursor-pointer rounded p-1 text-zinc-700 transition-colors hover:text-red-400">
+        <button onClick={(e) => { e.stopPropagation(); hapus(); }} title="Berhenti memantau"
+          className="shrink-0 cursor-pointer rounded p-1 text-zinc-800 transition-colors hover:text-red-400 group-hover:text-zinc-600">
           <Trash2 className="size-3.5" />
         </button>
       </div>
 
-      {buka && (
-        <div className="space-y-2 border-t border-zinc-800 p-3">
-          {posisi.length > 0 && (
-            <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(min(100%,17rem),1fr))]">
-              {posisi.map((p, i) => (
-                <div key={p.koin + i} className="rounded-md border border-zinc-800 bg-zinc-950/60 p-2.5">
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-[12.5px] font-semibold text-zinc-100">{p.koin}</span>
-                    <span className={cn('text-[11.5px] font-semibold',
-                      p.arah === 'LONG' ? 'text-emerald-400' : 'text-red-400')}>{p.arah}</span>
-                    {p.leverage > 0 && <span className="text-[11px] text-zinc-600">{p.leverage}×</span>}
-                    <span className={cn('ml-auto text-[12.5px] font-semibold tabular-nums',
-                      p.pnl >= 0 ? 'text-emerald-400' : 'text-red-400')}>
-                      {p.pnl >= 0 ? '+' : ''}{uangRingkas(p.pnl)}
-                    </span>
-                  </div>
-                  <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px] text-zinc-500">
-                    <span>Entry <span className="tabular-nums text-zinc-300">{p.entry}</span></span>
-                    <span>Nilai <span className="tabular-nums text-zinc-300">${uangRingkas(p.nilai)}</span></span>
-                    <span>Ukuran <span className="tabular-nums text-zinc-300">{p.ukuran}</span></span>
-                    {p.likuidasi > 0 && (
-                      <span>Likuidasi <span className="tabular-nums text-amber-400/90">{p.likuidasi}</span></span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+      <div className="px-3 pt-1.5">
+        <span className={cn('block text-[22px] font-semibold leading-none tabular-nums',
+          nyata > 0 ? 'text-emerald-400' : nyata < 0 ? 'text-red-400' : 'text-zinc-400')}>
+          {nyata > 0 ? '+' : nyata < 0 ? '−' : ''}${uangRingkas(Math.abs(nyata))}
+        </span>
+        <span className="mt-0.5 block text-[10.5px] text-zinc-600">
+          realisasi sejak dipantau · {tutup.length} penutupan
+        </span>
+      </div>
 
-          {log.length === 0 ? (
-            <p className="text-[11.5px] leading-relaxed text-zinc-600">
-              Belum ada transaksi sejak dompet ini mulai dipantau. Riwayat
-              sebelumnya sengaja tidak ditarik — daftar ini catatan pantauan
-              kita, bukan salinan riwayat dompetnya.
-            </p>
-          ) : (
-            <div className="max-h-56 overflow-y-auto rounded-md border border-zinc-800">
-              {log.map((l, i) => (
-                <div key={l.hash + l.waktu + i}
-                  className="flex flex-wrap items-baseline gap-x-2.5 border-b border-zinc-800/60 px-2.5 py-1.5 last:border-b-0">
-                  <span className="text-[12px] font-semibold text-zinc-100">{l.koin}</span>
-                  <span className={cn('text-[11px] font-medium', warnaDir(l.dir))}>{l.dir || l.arah}</span>
-                  <span className="text-[11px] tabular-nums text-zinc-400">{l.ukuran} @ {l.harga}</span>
-                  <span className="text-[11px] tabular-nums text-zinc-600">${uangRingkas(l.nilai)}</span>
-                  {l.pnl !== 0 && (
-                    <span className={cn('text-[11px] font-semibold tabular-nums',
-                      l.pnl > 0 ? 'text-emerald-400' : 'text-red-400')}>
-                      {l.pnl > 0 ? '+' : ''}{uangRingkas(l.pnl)}
-                    </span>
-                  )}
-                  <span className="ml-auto text-[10px] text-zinc-600">{umur(l.waktu)}</span>
-                </div>
-              ))}
+      {/* Kurva menempel ke tepi bawah kartu, tanpa jarak kiri-kanan. Kurva
+          yang mengambang di tengah kotak berpadding terbaca sebagai gambar
+          kecil yang ditempel; yang menyentuh tepinya terbaca sebagai dasar
+          kartunya. */}
+      {/* Kurva baru digambar kalau ADA yang bisa digambar. Satu titik
+          menghasilkan path 'M0,y' — tidak terlihat sama sekali, tapi tetap
+          memakan enam belas baris tinggi, dan pita kosong di tengah kartu
+          terbaca sebagai grafik yang gagal dimuat. */}
+      {titik.length >= 2 ? (
+        <SparklineSaldo titik={titik} modal={0} kelas="mt-1.5 h-16 w-full" />
+      ) : (
+        <p className="mt-1.5 flex h-16 items-center px-3 text-[10.5px] leading-relaxed text-zinc-700">
+          Kurva muncul sesudah penutupan posisi pertama yang kita saksikan.
+        </p>
+      )}
+
+      <div className="flex flex-wrap items-baseline gap-x-2 border-t border-zinc-800/70 px-3 py-1.5 text-[10.5px] text-zinc-600">
+        {posisi.length > 0 ? (
+          <>
+            <span className="text-zinc-500">{posisi.length} posisi</span>
+            <span className={cn('font-medium tabular-nums',
+              mengambang >= 0 ? 'text-emerald-400/90' : 'text-red-400/90')}
+              title="Untung/rugi yang BELUM direalisasi — bisa hilang dalam satu jam">
+              {mengambang >= 0 ? '+' : '−'}${uangRingkas(Math.abs(mengambang))} mengambang
+            </span>
+          </>
+        ) : (
+          <span>tanpa posisi terbuka</span>
+        )}
+        <span className="ml-auto">
+          {akun > 0 ? 'akun $' + uangRingkas(akun) : umur(w.sejak)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/* ── RINCIAN SATU DOMPET, DI BAWAH KISI KARTUNYA ────────────────────────
+   Bukan di dalam kartunya. Kartu yang memuai saat diklik mendorong semua
+   kartu di baris yang sama, dan kisi yang melompat tiap kali seseorang
+   melihat isi sebuah kartu membuat sisanya sulit dipilih.
+
+   Pola yang sama dengan papan analis di halaman ini: kartunya memilih,
+   ruang di bawahnya menampilkan. */
+function RincianDompet({ w, posisi, log }: {
+  w: { alamat: string; nama: string };
+  posisi: PosisiDompet[];
+  log: TransaksiDompet[];
+}) {
+  return (
+    <section className="rounded-lg border border-zinc-800 bg-zinc-900/30 p-3">
+      <h4 className="mb-2 flex flex-wrap items-baseline gap-x-2 text-[12.5px] font-semibold text-zinc-100">
+        {w.nama}
+        <span className="font-mono text-[10.5px] font-normal text-zinc-600">{w.alamat}</span>
+      </h4>
+
+      {posisi.length > 0 && (
+        <div className="mb-2 grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(min(100%,17rem),1fr))]">
+          {posisi.map((p, i) => (
+            <div key={p.koin + i} className="rounded-md border border-zinc-800 bg-zinc-950/60 p-2.5">
+              <div className="flex items-baseline gap-2">
+                <span className="text-[12.5px] font-semibold text-zinc-100">{p.koin}</span>
+                <span className={cn('text-[11.5px] font-semibold',
+                  p.arah === 'LONG' ? 'text-emerald-400' : 'text-red-400')}>{p.arah}</span>
+                {p.leverage > 0 && <span className="text-[11px] text-zinc-600">{p.leverage}×</span>}
+                <span className={cn('ml-auto text-[12.5px] font-semibold tabular-nums',
+                  p.pnl >= 0 ? 'text-emerald-400' : 'text-red-400')}>
+                  {p.pnl >= 0 ? '+' : ''}{uangRingkas(p.pnl)}
+                </span>
+              </div>
+              <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px] text-zinc-500">
+                <span>Entry <span className="tabular-nums text-zinc-300">{p.entry}</span></span>
+                <span>Nilai <span className="tabular-nums text-zinc-300">${uangRingkas(p.nilai)}</span></span>
+                <span>Ukuran <span className="tabular-nums text-zinc-300">{p.ukuran}</span></span>
+                {p.likuidasi > 0 && (
+                  <span>Likuidasi <span className="tabular-nums text-amber-400/90">{p.likuidasi}</span></span>
+                )}
+              </div>
             </div>
-          )}
+          ))}
         </div>
       )}
-    </div>
+
+      {log.length === 0 ? (
+        <p className="text-[11.5px] leading-relaxed text-zinc-600">
+          Belum ada transaksi sejak dompet ini mulai dipantau. Riwayat
+          sebelumnya sengaja tidak ditarik — daftar ini catatan pantauan kita,
+          bukan salinan riwayat dompetnya.
+        </p>
+      ) : (
+        <div className="max-h-64 overflow-y-auto rounded-md border border-zinc-800">
+          {log.map((l, i) => (
+            <div key={l.hash + l.waktu + i}
+              className="flex flex-wrap items-baseline gap-x-2.5 border-b border-zinc-800/60 px-2.5 py-1.5 last:border-b-0">
+              <span className="text-[12px] font-semibold text-zinc-100">{l.koin}</span>
+              <span className={cn('text-[11px] font-medium', warnaDir(l.dir))}>{l.dir || l.arah}</span>
+              <span className="text-[11px] tabular-nums text-zinc-400">{l.ukuran} @ {l.harga}</span>
+              <span className="text-[11px] tabular-nums text-zinc-600">${uangRingkas(l.nilai)}</span>
+              {l.pnl !== 0 && (
+                <span className={cn('text-[11px] font-semibold tabular-nums',
+                  l.pnl > 0 ? 'text-emerald-400' : 'text-red-400')}>
+                  {l.pnl > 0 ? '+' : ''}{uangRingkas(l.pnl)}
+                </span>
+              )}
+              <span className="ml-auto text-[10px] text-zinc-600">{umur(l.waktu)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
 export function PanelWalletAgen() {
   const [d, setD] = useState<KeadaanDompet | null>(null);
   const [gagal, setGagal] = useState(false);
+  /* Dompet yang sedang dibuka rinciannya. null = belum ada, dan itu keadaan
+     awal yang benar: kisi kartunya sudah menjawab pertanyaan yang paling
+     sering ditanyakan, dan rincian yang terbuka sendiri cuma mendorongnya
+     ke luar layar. */
+  const [pilih, setPilih] = useState<string | null>(null);
   const [muat, setMuat] = useState(true);
   const pertama = useRef(true);
 
@@ -506,10 +625,10 @@ export function PanelWalletAgen() {
             <h3 className="mb-2 border-b border-zinc-800 pb-1.5 text-[13px] font-semibold text-zinc-200">
               Dompet yang dipantau <span className="font-normal text-zinc-600">· {dompet.length}</span>
               <span className="ml-2 text-[11px] font-normal text-zinc-600">
-                Klik namanya untuk membuka posisi &amp; transaksinya
+                Klik kartunya untuk melihat posisi &amp; transaksinya
               </span>
             </h3>
-            <div className="space-y-1.5">
+            <div className="grid gap-2.5 [grid-template-columns:repeat(auto-fill,minmax(min(100%,15.5rem),1fr))]">
               {dompet.map((w) => (
                 <KartuDompet key={w.alamat} w={w}
                   /* Disaring per kartu, bukan dikelompokkan sekali di atas.
@@ -519,10 +638,22 @@ export function PanelWalletAgen() {
                      yang menambahkannya mengira penambahannya gagal. */
                   posisi={posisi.filter((p) => p.alamat === w.alamat)}
                   log={log.filter((l) => l.alamat === w.alamat)}
+                  dipilih={pilih === w.alamat}
+                  pilih={() => setPilih((v) => (v === w.alamat ? null : w.alamat))}
                   hapus={() => { void hapusDompet(w.alamat).then(() => tarik()); }} />
               ))}
             </div>
           </section>
+
+          {/* Rincian muncul HANYA saat ada yang dipilih. Kotak kosong
+              bertuliskan "pilih dompet" cuma memakai ruang untuk mengatakan
+              bahwa belum ada yang dikatakan. */}
+          {dompet.some((w) => w.alamat === pilih) && (
+            <RincianDompet
+              w={dompet.find((w) => w.alamat === pilih)!}
+              posisi={posisi.filter((p) => p.alamat === pilih)}
+              log={log.filter((l) => l.alamat === pilih)} />
+          )}
         </>
       )}
     </div>
