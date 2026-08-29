@@ -129,6 +129,69 @@ function Angka({ label, nilai, atur, langkah = 1, min = 0 }: {
    pertimbangan itu memaksa mulai dari awal. */
 const JEDA_LIPAT_ALAT_MS = 20_000;
 
+/* ── GAMBAR ALAT MILIK SIMBOL, BUKAN SIMBOL+TIMEFRAME ────────────────────
+   Dulu kuncinya `jt.alat.<simbol>|<tf>`, jadi garis yang ditarik di Harian
+   tidak ada sama sekali saat chart yang sama dibuka di 4 jam. Itu keliru
+   membaca apa yang ditandai orang: level 2.437 pada ETH adalah level yang
+   sama pada timeframe mana pun — yang berganti cuma seberapa jauh ke
+   belakang layarnya melihat, bukan harganya.
+
+   Ujung gambar disimpan sebagai stempel waktu mutlak dan harga, dan
+   penggambarnya sudah tahu memetakan waktu yang tidak jatuh persis di satu
+   bar (lewat sumbu logika). Jadi tidak ada yang perlu dihitung ulang saat
+   timeframe-nya berganti — yang menahannya selama ini cuma kuncinya. */
+const kunciAlat = (simbol: string) => `jt.alat.${simbol}`;
+
+function simpanAlat(simbol: string, daftar: GambarAlat[]) {
+  try { localStorage.setItem(kunciAlat(simbol), JSON.stringify(daftar)); }
+  catch { /* mode privat, atau kuotanya penuh */ }
+}
+
+/** Membaca gambar satu simbol, SEKALIGUS mengangkat yang masih tersimpan di
+ *  kunci per-timeframe yang lama.
+ *
+ *  Pemindahannya wajib, bukan kerapian: tanpa ini perubahan kunci akan
+ *  terbaca sebagai "semua gambar saya hilang" — kerusakan yang jauh lebih
+ *  buruk daripada cacat yang sedang diperbaiki. */
+function bacaAlat(simbol: string): GambarAlat[] {
+  const kunci = kunciAlat(simbol);
+  let daftar: GambarAlat[] = [];
+  try {
+    const d = JSON.parse(localStorage.getItem(kunci) ?? '[]');
+    if (Array.isArray(d)) daftar = d;
+  } catch { /* rusak — diperlakukan kosong, lalu ditimpa di bawah */ }
+
+  let lama: string[] = [];
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      /* Awalan LENGKAP dengan garis tegaknya. Tanpa itu `jt.alat.BTC`
+         ikut menyapu `jt.alat.BTCUSDT|1h`, dan gambar simbol lain
+         berpindah ke simbol yang salah tanpa ada yang tahu. */
+      if (k && k.startsWith(kunci + '|')) lama.push(k);
+    }
+  } catch { return daftar; }
+  if (!lama.length) return daftar;
+
+  /* Diurutkan supaya hasil gabungannya tidak bergantung pada urutan
+     localStorage, yang tidak dijamin peramban mana pun. */
+  lama = lama.sort();
+  const ada = new Set(daftar.map((g) => g.id));
+  for (const k of lama) {
+    try {
+      const d = JSON.parse(localStorage.getItem(k) ?? '[]');
+      if (Array.isArray(d)) {
+        for (const g of d) {
+          if (g && g.id && !ada.has(g.id)) { ada.add(g.id); daftar.push(g as GambarAlat); }
+        }
+      }
+    } catch { /* satu kunci rusak tidak boleh menjatuhkan sisanya */ }
+    try { localStorage.removeItem(k); } catch { /* privat */ }
+  }
+  simpanAlat(simbol, daftar);
+  return daftar;
+}
+
 /* -- Tampilan chart pilihan orangnya --------------------------------------
    Disimpan sendiri di localStorage, BUKAN lewat simpanSetelanChart: setelan
    di sana dikunci per simbol+timeframe, sementara warna adalah selera yang
@@ -609,16 +672,41 @@ export default function ChartBacktest() {
   }, []);
 
   useEffect(() => {
-    try {
-      const d = JSON.parse(localStorage.getItem(`jt.alat.${simbol}|${tf}`) ?? '[]') as GambarAlat[];
-      setGambarAlat(Array.isArray(d) ? d : []);
-    } catch { setGambarAlat([]); }
+    setGambarAlat(bacaAlat(simbol));
     setAlat(null);
-    /* Riwayat urung ikut dibuang. Gambar milik SIMBOL+TF, jadi potret dari
-       BTC 1 jam yang dipulihkan di atas ETH 4 jam akan menempelkan gambar
-       yang tidak pernah ada di sana -- lalu menyimpannya ke kunci ETH. */
+    /* Riwayat urung ikut dibuang. Gambar milik SIMBOL, jadi potret dari BTC
+       yang dipulihkan di atas ETH akan menempelkan gambar yang tidak pernah
+       ada di sana -- lalu menyimpannya ke kunci ETH.
+
+       BERGANTUNG PADA SIMBOL SAJA. Berganti timeframe tidak lagi memuat
+       ulang apa pun: gambarnya memang himpunan yang sama, dan membuang
+       riwayat urung tiap kali orang menengok 4 jam lalu kembali ke Harian
+       akan menghapus jejak yang justru paling ingin diurungkan. */
     riwayatGambar.current = { tumpuk: [], tanda: '', waktu: 0 };
-  }, [simbol, tf]);
+  }, [simbol]);
+
+  /* ── PANEL LAIN DI MULTI-CHART ──────────────────────────────────────
+     Tiap panel iframe punya halaman Chart-nya sendiri, dan localStorage
+     dibagi di antara mereka. Tanpa pendengar ini, garis yang ditarik di
+     panel Harian tidak muncul di panel 4 jam sampai salah satunya dimuat
+     ulang -- persis keluhan yang sedang diperbaiki, cuma berpindah dari
+     antar-timeframe ke antar-panel.
+
+     `storage` memang tidak berbunyi di tab yang menulisnya sendiri, dan itu
+     yang membuatnya aman dipakai di sini: panel yang sedang digambari tidak
+     akan menimpa dirinya di tengah seretan. */
+  useEffect(() => {
+    const kunci = kunciAlat(simbol);
+    const dengar = (e: StorageEvent) => {
+      if (e.key !== kunci) return;
+      try {
+        const d = JSON.parse(e.newValue ?? '[]');
+        if (Array.isArray(d)) setGambarAlat(d as GambarAlat[]);
+      } catch { /* tulisan setengah jadi -- dilewati, yang berikutnya utuh */ }
+    };
+    window.addEventListener('storage', dengar);
+    return () => window.removeEventListener('storage', dengar);
+  }, [simbol]);
   /* Hasil Pine dari simbol lama DIBUANG saat chart berganti — garis di
      level 64.000 milik BTC yang tergambar di chart ONE 0,0009 membuat
      skala harga meledak dan grafiknya "rusak". Skrip aktif dihitung ulang
@@ -629,7 +717,7 @@ export default function ChartBacktest() {
     catatRiwayat();
     setGambarAlat((d) => {
       const b = [...d, { ...g, id }];
-      try { localStorage.setItem(`jt.alat.${simbol}|${tf}`, JSON.stringify(b)); } catch { /* privat */ }
+      simpanAlat(simbol, b);
       return b;
     });
     /* Alat posisi langsung TERPILIH begitu ditempel. Angkanya cuma tampil
@@ -642,26 +730,28 @@ export default function ChartBacktest() {
        tinggal menekan alatnya lagi; alat yang menempel diam-diam membuat
        seretan chart berikutnya jadi kotak yang tidak diminta. */
     setAlat(null);
-  }, [simbol, tf]);
-  /* Menggeser gambar / menarik ujungnya. Disimpan ke localStorage pada
-     kunci simbol|tf yang SAMA dengan penambahan — gambar yang dipindah
-     lalu kembali ke tempat lama saat halaman dibuka ulang lebih
-     menjengkelkan daripada gambar yang tidak bisa dipindah sama sekali. */
+  }, [simbol]);
+  /* Menggeser gambar / menarik ujungnya. Disimpan ke kunci simbol yang SAMA
+     dengan penambahan — gambar yang dipindah lalu kembali ke tempat lama
+     saat halaman dibuka ulang lebih menjengkelkan daripada gambar yang
+     tidak bisa dipindah sama sekali. */
   const ubahGambar = useCallback((id: string, ubah: Partial<GambarAlat>) => {
     /* Bertanda id gambarnya: seretan panjang jadi SATU langkah urung, tapi
        menggeser gambar lain sesudahnya tetap langkah tersendiri. */
     catatRiwayat('ubah:' + id);
     setGambarAlat((d) => {
       const b = d.map((g) => (g.id === id ? { ...g, ...ubah } : g));
-      try { localStorage.setItem(`jt.alat.${simbol}|${tf}`, JSON.stringify(b)); } catch { /* privat */ }
+      simpanAlat(simbol, b);
       return b;
     });
-  }, [simbol, tf]);
+  }, [simbol]);
   /* Gambar TERPILIH: klik gambarnya di mode kursor biasa, hapus dengan
      Delete/Backspace, batal pilih dengan Escape. */
   const [gambarPilih, setGambarPilih] = useState<string | null>(null);
-  /* Ganti simbol/TF: yang terpilih sudah tidak ada di layar. */
-  useEffect(() => { setGambarPilih(null); }, [simbol, tf]);
+  /* Ganti SIMBOL: yang terpilih sudah tidak ada di layar. Ganti timeframe
+     tidak lagi membatalkan pilihan — gambarnya masih di sana, cuma dilihat
+     dari jarak yang lain. */
+  useEffect(() => { setGambarPilih(null); }, [simbol]);
   /* MEMEGANG alat baru membatalkan pilihan, tapi MELEPASNYA tidak. Dulu
      keduanya satu efek dengan `alat` di daftar kebergantungan, dan itu
      baik-baik saja selama tidak ada alat yang memilih hasilnya sendiri:
@@ -676,7 +766,7 @@ export default function ChartBacktest() {
         catatRiwayat();
         setGambarAlat((d) => {
           const b = d.filter((g) => g.id !== gambarPilih);
-          try { localStorage.setItem(`jt.alat.${simbol}|${tf}`, JSON.stringify(b)); } catch { /* privat */ }
+          simpanAlat(simbol, b);
           return b;
         });
         setGambarPilih(null);
@@ -697,7 +787,7 @@ export default function ChartBacktest() {
         e.preventDefault();
         r.tanda = ''; r.waktu = 0;
         setGambarAlat(sebelum);
-        try { localStorage.setItem(`jt.alat.${simbol}|${tf}`, JSON.stringify(sebelum)); } catch { /* privat */ }
+        simpanAlat(simbol, sebelum);
         /* Pilihan dilepas kalau gambarnya sudah tidak ada di potret yang
            dipulihkan -- pilihan yang menunjuk gambar yang tidak tergambar
            membuat tombol hapus menyala untuk sesuatu yang tak terlihat. */
@@ -4338,22 +4428,22 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                   catatRiwayat();
                   setGambarAlat((d) => {
                     const b = d.filter((g) => g.id !== gambarPilih);
-                    try { localStorage.setItem(`jt.alat.${simbol}|${tf}`, JSON.stringify(b)); } catch { /* privat */ }
+                    simpanAlat(simbol, b);
                     return b;
                   });
                   setGambarPilih(null);
                   return;
                 }
                 if (!gambarAlat.length) return;
-                if (!confirm(`Hapus ${gambarAlat.length} gambar di ${simbol} ${tf}?`)) return;
+                if (!confirm(`Hapus ${gambarAlat.length} gambar di ${simbol}? Berlaku di semua timeframe.`)) return;
                 /* Justru yang PALING perlu bisa diurung: satu klik keliru di
                    sini menghapus seluruh gambar di simbol ini sekaligus. */
                 catatRiwayat();
                 setGambarAlat([]);
-                try { localStorage.setItem(`jt.alat.${simbol}|${tf}`, '[]'); } catch { /* privat */ }
+                simpanAlat(simbol, []);
               }}
               disabled={!gambarAlat.length && !gambarPilih}
-              title={gambarPilih ? 'Hapus gambar terpilih (Delete)' : 'Hapus semua gambar di simbol & timeframe ini'}
+              title={gambarPilih ? 'Hapus gambar terpilih (Delete)' : 'Hapus semua gambar di simbol ini (semua timeframe)'}
               className="flex size-7 cursor-pointer items-center justify-center rounded text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-35">
               <Eraser className="size-3.5" />
             </button>
