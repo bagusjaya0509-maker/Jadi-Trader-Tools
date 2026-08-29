@@ -332,23 +332,23 @@ export function ChartLilin({
    *  demi garis — dan chart sungguhan di kanan, utuh tanpa apa pun di
    *  atasnya.
    *
-   *  ── YANG MENYAMBUNGKAN KEDUANYA: HARGA ──────────────────────────────
-   *  `hargaAtas`/`hargaBawah` diisi tangan, dibaca dari sumbu harga di
-   *  gambarnya sendiri. Begitu terisi, gambarnya digeser dan diregangkan
-   *  supaya level yang SAMA jatuh di ketinggian yang SAMA dengan chart di
-   *  kanan. Jadi zona di gambar kiri bisa dibaca lurus mendatar ke kanan,
-   *  tanpa menghitung apa pun.
+   *  ── YANG MENYAMBUNGKAN KEDUANYA: MATA ───────────────────────────────
+   *  Roda untuk zoom, seret untuk menggeser, klik dua kali untuk kembali.
+   *  `zoom` 1 berarti selebar panelnya, `x`/`y` geseran dalam piksel dari
+   *  pojok kiri-atas panel.
    *
-   *  Nol berarti belum diisi: gambarnya ditampilkan apa adanya, selebar
-   *  panelnya. Menebak angkanya sendiri berarti menaruh garis harga di
-   *  tempat yang tidak pernah dikatakan siapa pun. */
-  jiplak?: { url: string; lebar: number; hargaAtas: number; hargaBawah: number } | null;
-  /** Mengubah harga tepi gambar. Isiannya duduk DI KAKI panel acuan, bukan
-   *  di panel setelan di bilah alat: angkanya dibaca dari sumbu harga di
-   *  gambar itu sendiri, jadi kotak isiannya harus berada di layar yang
-   *  sama dengan gambarnya. Menaruhnya di popover berarti menutup gambarnya
-   *  untuk mengetik angka yang cuma bisa dibaca dari gambar itu. */
-  onUbahJiplak?: (p: { hargaAtas?: number; hargaBawah?: number }) => void;
+   *  Versi sebelumnya menambatkan tepi atas & bawah gambar ke dua harga
+   *  yang diketik tangan, lalu meregangkannya supaya level yang sama jatuh
+   *  di ketinggian yang sama. Betul secara hitungan, dan tetap dibuang:
+   *  untuk memakainya orang harus membaca dua angka dari gambar,
+   *  mengetiknya, lalu memeriksa hasilnya — dan begitu chart di kanan
+   *  di-zoom, dua angka itu tidak salah, cuma tidak lagi menolong. */
+  jiplak?: { url: string; lebar: number; zoom: number; x: number; y: number } | null;
+  /** Mengubah lebar panel, zoom, dan geseran gambarnya. Ketiganya dipegang
+   *  pemanggil, bukan di sini: panel ini bisa dipasang-lepas berkali-kali
+   *  dalam satu sesi, dan keadaan yang tinggal di dalamnya akan hilang tiap
+   *  kali — memaksa orang memaskan gambar yang sama berulang-ulang. */
+  onUbahJiplak?: (p: { lebar?: number; zoom?: number; x?: number; y?: number }) => void;
   posisiMt5?: PosisiChartMt5[];
   /** Kirim SL/TP baru sebuah posisi ke EA; resolve true kalau EA sukses.
    *  Tanpa handler ini SL/TP posisinya tidak bisa diseret sama sekali. */
@@ -1749,9 +1749,56 @@ export function ChartLilin({
      harga justru dipakai untuk menandai angka yang sudah diketahui. */
   const [ketikRay, setKetikRay] = useState<{ id: string; nilai: string; x: number; y: number } | null>(null);
 
-  const jiplakEl = useRef<HTMLImageElement | null>(null);
-  const jiplakRef = useRef(jiplak);
-  jiplakRef.current = jiplak;
+  /* ── ZOOM & GESER GAMBAR ACUAN ──────────────────────────────────────
+     Nilainya dipegang pemanggil (`jiplak.zoom/x/y`), tapi selama jari masih
+     menekan, yang dipakai keadaan lokal di bawah — bukan karena React
+     lambat, melainkan karena seretan yang tiap piksel melewati setState di
+     komponen induk akan ikut menggambar ulang seluruh chart. Yang dikirim
+     ke atas cuma nilai akhirnya, saat jari lepas. */
+  const jiplakNilai = useRef(jiplak);
+  jiplakNilai.current = jiplak;
+  const jiplakPanel = useRef<HTMLDivElement | null>(null);
+  const bungkusRef = useRef<HTMLDivElement | null>(null);
+  const [geserJiplak, setGeserJiplak] = useState<{ x: number; y: number } | null>(null);
+  const [lebarSeret, setLebarSeret] = useState<number | null>(null);
+
+  const jz = jiplak ? jiplak.zoom || 1 : 1;
+  const jx = (jiplak ? jiplak.x || 0 : 0) + (geserJiplak ? geserJiplak.x : 0);
+  const jy = (jiplak ? jiplak.y || 0 : 0) + (geserJiplak ? geserJiplak.y : 0);
+  const jLebar = lebarSeret ?? (jiplak ? jiplak.lebar : 0.42);
+
+  /* Roda dipasang TANGAN, bukan lewat onWheel. Peramban memasang pendengar
+     wheel sebagai pasif di banyak jalur, dan preventDefault yang diabaikan
+     berarti halamannya ikut menggulir tiap kali gambarnya di-zoom — cacat
+     yang cuma muncul di peramban tertentu, jadi gampang lolos. */
+  const jiplakAda = !!jiplak;
+  useEffect(() => {
+    const el = jiplakPanel.current;
+    if (!jiplakAda || !el || !onUbahJiplak) return;
+    const roda = (e: WheelEvent) => {
+      e.preventDefault();
+      const j = jiplakNilai.current;
+      if (!j) return;
+      const r = el.getBoundingClientRect();
+      const px = e.clientX - r.left;
+      const py = e.clientY - r.top;
+      const z0 = j.zoom || 1;
+      const z1 = Math.min(8, Math.max(0.2, z0 * (e.deltaY < 0 ? 1.12 : 1 / 1.12)));
+      if (z1 === z0) return;
+      /* Titik di bawah kursor DIPERTAHANKAN. Zoom yang selalu berpusat di
+         pojok kiri-atas membuat orang mengejar bagian gambar yang ia
+         tunjuk: setiap satu langkah roda melemparkannya keluar layar, dan
+         satu langkah zoom jadi butuh satu seretan pembetulan. */
+      const k = z1 / z0;
+      onUbahJiplak({
+        zoom: z1,
+        x: px - (px - (j.x || 0)) * k,
+        y: py - (py - (j.y || 0)) * k,
+      });
+    };
+    el.addEventListener('wheel', roda, { passive: false });
+    return () => el.removeEventListener('wheel', roda);
+  }, [jiplakAda, onUbahJiplak]);
 
   /* ── Ubahan SL/TP posisi MT5 ────────────────────────────────────────
      Satu ubahan hidup pada satu waktu: nilai yang sedang diseret MENANG
@@ -1861,30 +1908,12 @@ export function ChartLilin({
        acuan yang tertinggal justru menipu, karena ia terlihat seperti zona
        yang meleset.
 
-       Hanya sumbu TEGAK yang disejajarkan. Sumbu waktunya sengaja tidak:
-       chart acuan hampir selalu punya rentang waktu yang lain, dan
-       memaksakannya sejajar akan meregangkan gambarnya sampai tidak
-       terbaca. Yang dicari orang dari gambar itu levelnya, bukan
-       tanggalnya. */
-    const gj = jiplakEl.current;
-    const jp = jiplakRef.current;
-    if (gj && jp) {
-      const punyaHarga = jp.hargaAtas > 0 && jp.hargaBawah > 0 && jp.hargaAtas > jp.hargaBawah;
-      const yA = punyaHarga ? s.priceToCoordinate(jp.hargaAtas) : null;
-      const yB = punyaHarga ? s.priceToCoordinate(jp.hargaBawah) : null;
-      if (yA != null && yB != null && yB > yA) {
-        gj.style.top = yA + 'px';
-        gj.style.height = (yB - yA) + 'px';
-      } else {
-        /* Belum diisi (atau angkanya tidak masuk akal): tampil apa adanya
-           dari atas panel. Dikosongkan TEGAS, bukan dibiarkan — nilai sisa
-           dari pengisian sebelumnya akan menahan gambarnya di ketinggian
-           yang sudah tidak berarti apa-apa. */
-        gj.style.top = '0px';
-        gj.style.height = '';
-      }
-    }
-
+       Gambar jiplakan TIDAK ikut dihitung di sini lagi. Dulu tepi atas &
+       bawahnya ditambatkan ke dua harga yang diketik tangan, jadi ia harus
+       ditempatkan ulang tiap frame bersama garis-garis lain. Sekarang
+       posisinya murni transform CSS yang diatur tangan — tidak ada yang
+       perlu dihitung ulang saat chart bergerak, dan satu penumpang berat
+       hilang dari jalur yang jalan enam puluh kali sedetik. */
     /* Lebar skala harga dibaca tiap kali, bukan sekali: ia berubah sendiri
        begitu angkanya bertambah satu digit. */
     let lebar = 0;
@@ -1983,21 +2012,22 @@ export function ChartLilin({
      requestAnimationFrame berhenti total saat tabnya tidak terlihat. Tanpa
      panggilan langsung ini, membuka halaman di tab latar lalu berpindah ke
      sana akan menampilkan garis dan label yang belum punya posisi. */
-  /* Penunjuk ke pasang() yang SELALU mutakhir. Dipakai penangan seretan
-     jiplak untuk memaksa satu penempatan ulang di tengah gerakan: rAF di
-     bawah melewati frame yang sidik jarinya tidak berubah, dan menyeret
-     GAMBARNYA memang tidak mengubah apa pun di sisi chart — jadi tanpa
-     panggilan tegas ini gambarnya diam sampai ada hal lain yang bergerak. */
-  const pasangRef = useRef(pasang);
-  pasangRef.current = pasang;
+  /* Panel jiplak ikut dependensi lewat DUA nilai, bukan objek utuhnya.
+     ────────────────────────────────────────────────────────────────────
+     Alasannya tetap sama seperti dulu: loop rAF melewati frame yang sidik
+     jarinya tidak berubah, dan membuka panel acuan tidak mengubah satu pun
+     nilai di sidik jari itu — chart cuma menyempit. Tanpa pemicu tegas,
+     garis dan label di atasnya tetap di koordinat lamanya sampai ada hal
+     lain yang kebetulan bergerak.
 
-  /* `jiplak` IKUT DEPENDENSI, dan ini bukan kelengkapan formalitas. Loop
-     rAF melewati frame yang sidik jarinya tidak berubah — dan memasang
-     gambar jiplakan tidak mengubah satu pun nilai di sidik jari itu
-     (rentang, ukuran, sumbu harga semuanya tetap). Tanpa baris ini,
-     gambar yang dipasang saat chart sedang diam akan tetap `visibility:
-     hidden` sampai ada hal lain yang kebetulan bergerak. */
-  useEffect(pasang, [pasang, garisSeret, lilin, hingga, mundur, smi, posisiMt5, ubah, jiplak]);
+     Tapi objek `jiplak` UTUH berubah tiap satu langkah roda zoom, dan
+     `pasang()` membaca geometri chart lalu menulis DOM untuk setiap
+     hamparan — memanggilnya tiap langkah roda berarti satu layout paksa
+     per langkah, untuk gambar yang tidak ada hubungannya dengan chart.
+     Yang benar-benar mengubah tata letak cuma dua: panelnya ada atau
+     tidak, dan selebar apa. */
+  const jiplakId = jiplak ? jiplak.url : '';
+  useEffect(pasang, [pasang, garisSeret, lilin, hingga, mundur, smi, posisiMt5, ubah, jiplakId, jLebar]);
 
   /* ── LOOP rAF: TETAP JALAN, TAPI BERHENTI BEKERJA SAAT TIDAK ADA YANG
         BERUBAH ───────────────────────────────────────────────────────────
@@ -2690,51 +2720,112 @@ export function ChartLilin({
 
        Chart-nya menyusut sendiri lewat flex-1, dan ResizeObserver yang
        sudah terpasang di wadahnya yang memberi tahu pustakanya. */
-    <div className="flex">
+    <div ref={bungkusRef} className="flex">
       {jiplak && (
-        <div className="relative shrink-0 overflow-hidden border-r border-zinc-800 bg-zinc-950"
-             style={{ width: `${Math.round(jiplak.lebar * 100)}%`, height: tinggi }}>
+        <>
+        <div ref={jiplakPanel}
+             className={cn('relative shrink-0 overflow-hidden bg-zinc-950',
+               geserJiplak ? 'cursor-grabbing' : 'cursor-grab')}
+             style={{ width: `${(jLebar * 100).toFixed(2)}%`, height: tinggi }}
+             onDoubleClick={() => onUbahJiplak && onUbahJiplak({ zoom: 1, x: 0, y: 0 })}
+             onPointerDown={(e) => {
+               if (!onUbahJiplak || e.button !== 0) return;
+               e.currentTarget.setPointerCapture(e.pointerId);
+               const x0 = e.clientX; const y0 = e.clientY;
+               const el = e.currentTarget;
+               const gerak = (g: PointerEvent) =>
+                 setGeserJiplak({ x: g.clientX - x0, y: g.clientY - y0 });
+               const lepas = (g: PointerEvent) => {
+                 el.removeEventListener('pointermove', gerak);
+                 el.removeEventListener('pointerup', lepas);
+                 el.removeEventListener('pointercancel', lepas);
+                 setGeserJiplak(null);
+                 const j = jiplakNilai.current;
+                 /* Dikirim ke atas SEKALI, di sini. Geseran nol tidak
+                    dikirim: klik biasa di atas gambar bukan geseran, dan
+                    setiap kiriman menggambar ulang chart di sebelahnya. */
+                 const dx = g.clientX - x0; const dy = g.clientY - y0;
+                 if (j && (dx || dy)) onUbahJiplak({ x: (j.x || 0) + dx, y: (j.y || 0) + dy });
+               };
+               el.addEventListener('pointermove', gerak);
+               el.addEventListener('pointerup', lepas);
+               el.addEventListener('pointercancel', lepas);
+             }}>
           {/* Ketajaman PENUH — tidak ada opasitas yang dikurangi. Gambar ini
               tidak menutupi apa pun, jadi tidak ada alasan menyulitkannya
-              dibaca. */}
-          <img ref={jiplakEl} src={jiplak.url} alt="" draggable={false}
-               className="absolute inset-x-0 w-full select-none"
-               style={{ top: 0 }} />
+              dibaca.
 
-          {/* ── ISIAN HARGA, DI KAKI PANELNYA ──────────────────────────
-              Di sini, bukan di panel setelan bilah alat. Angkanya dibaca
-              dari sumbu harga di gambar yang ADA DI ATASNYA — kotak isian
-              yang menutup gambarnya berarti menyuruh orang mengingat angka
-              yang barusan ia lihat lalu mengetiknya buta.
+              `w-full` tetap dasarnya, jadi zoom 1 SELALU berarti "selebar
+              panel" berapa pun ukuran berkas aslinya. Tanpa itu, gambar
+              1300px dan gambar 700px mulai dari perbesaran yang berbeda dan
+              angka zoom-nya tidak berarti apa-apa. */}
+          <img src={jiplak.url} alt="" draggable={false}
+               className="absolute left-0 top-0 w-full origin-top-left select-none"
+               style={{ transform: `translate(${jx}px, ${jy}px) scale(${jz})` }} />
 
-              Latarnya pekat, bukan tembus: gambar chart di belakangnya
-              penuh garis dan angka, dan kotak isian tembus di atasnya
-              adalah kotak yang isinya tidak terbaca. */}
-          {onUbahJiplak && (
-            <div className="absolute inset-x-0 bottom-0 z-10 flex items-end gap-1.5 border-t border-zinc-800 bg-zinc-950/95 px-2 py-1.5 backdrop-blur-sm">
-              {([['hargaAtas', 'Harga atas'], ['hargaBawah', 'Harga bawah']] as const).map(([k, label]) => (
-                <label key={k} className="min-w-0 flex-1">
-                  <span className="block text-[9.5px] leading-tight text-zinc-500">{label}</span>
-                  <input
-                    className="mt-0.5 w-full rounded border border-zinc-800 bg-zinc-900 px-1.5 py-1 text-[11.5px] tabular-nums text-zinc-100 outline-none placeholder:text-zinc-700 focus:border-zinc-600"
-                    inputMode="decimal" placeholder="—"
-                    defaultValue={jiplak[k] ? String(jiplak[k]) : ''}
-                    /* onBlur, BUKAN onChange. Diproses tiap ketikan, angka
-                       setengah jadi seperti "79" akan langsung meregangkan
-                       gambarnya ke ketinggian yang tidak masuk akal, dan
-                       yang mengetik melihat gambarnya melompat-lompat
-                       sebelum ia selesai. defaultValue + onBlur membuat
-                       kotaknya milik peramban sampai jarinya lepas. */
-                    onBlur={(e) => {
-                      const v = Number(e.target.value.trim().replace(',', '.'));
-                      onUbahJiplak({ [k]: isFinite(v) && v > 0 ? v : 0 });
-                    }}
-                    onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }} />
-                </label>
-              ))}
-            </div>
+          {/* Perbesaran ditulis, dan cuma saat bukan 1. Angka yang selalu
+              ada di sudut gambar jadi bagian dari gambar itu dan berhenti
+              dibaca; yang muncul hanya saat keadaannya tidak wajar justru
+              terbaca. */}
+          {Math.abs(jz - 1) > 0.01 && (
+            <span className="pointer-events-none absolute left-1.5 top-1.5 rounded bg-zinc-950/80 px-1.5 py-0.5 text-[10px] tabular-nums text-zinc-400">
+              {Math.round(jz * 100)}%
+            </span>
           )}
+
         </div>
+
+        {/* ── BATAS YANG DITARIK ────────────────────────────────────────
+            Empat piksel yang bisa dipegang, bukan garis satu piksel: batas
+            setipis gambarnya sendiri menuntut ketepatan mouse yang tidak
+            ada hubungannya dengan pekerjaan yang sedang dilakukan. Garis
+            yang TERLIHAT tetap setipis satu piksel di tengahnya — yang
+            dilebarkan daerah tangkapnya, bukan tampilannya. */}
+        <div
+          className="group relative w-1 shrink-0 cursor-col-resize"
+          style={{ height: tinggi }}
+          onPointerDown={(e) => {
+            if (!onUbahJiplak || e.button !== 0) return;
+            e.preventDefault();
+            const el = e.currentTarget;
+            el.setPointerCapture(e.pointerId);
+            const hitung = (g: PointerEvent) => {
+              const w = bungkusRef.current;
+              if (!w) return null;
+              const r = w.getBoundingClientRect();
+              if (r.width <= 0) return null;
+              /* Dijepit 15–75%. Batas bawahnya menjaga gambar tetap
+                 berguna, batas atasnya menjaga chart tetap bisa dipakai —
+                 panel acuan yang menutup seluruh layar berarti tidak ada
+                 lagi yang dijiplak. */
+              return Math.min(0.75, Math.max(0.15, (g.clientX - r.left) / r.width));
+            };
+            const gerak = (g: PointerEvent) => { const v = hitung(g); if (v !== null) setLebarSeret(v); };
+            const lepas = (g: PointerEvent) => {
+              el.removeEventListener('pointermove', gerak);
+              el.removeEventListener('pointerup', lepas);
+              el.removeEventListener('pointercancel', lepas);
+              const v = hitung(g);
+              setLebarSeret(null);
+              /* Baru di sini dikirim ke atas. Lebarnya SUDAH berubah tiap
+                 piksel lewat keadaan lokal, jadi yang dihemat bukan ukur
+                 ulang kanvasnya -- itu tetap terjadi, dan memang harus.
+                 Yang dihemat render ulang halaman induknya: `setJiplak` di
+                 Chart.tsx menggambar ulang seluruh isi halaman, dan
+                 melakukannya enam puluh kali sedetik selama batasnya
+                 dipegang membuat seretan yang seharusnya ringan tersendat. */
+              if (v !== null) onUbahJiplak({ lebar: v });
+            };
+            el.addEventListener('pointermove', gerak);
+            el.addEventListener('pointerup', lepas);
+            el.addEventListener('pointercancel', lepas);
+          }}>
+          <span aria-hidden
+            className="pointer-events-none absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-zinc-800 transition-colors group-hover:bg-zinc-500" />
+          <span aria-hidden
+            className="pointer-events-none absolute left-1/2 top-1/2 h-8 w-[3px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-zinc-500 opacity-0 transition-opacity group-hover:opacity-100" />
+        </div>
+        </>
       )}
       <div className="relative min-w-0 flex-1 overflow-hidden" onPointerDownCapture={() => setGarisAktif(null)}>
       <div ref={kotak} style={{ height: tinggi }} className="relative w-full" />

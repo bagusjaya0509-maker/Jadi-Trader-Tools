@@ -23,28 +23,32 @@ import { daftarChart, gambarChart, type ChartPantauan } from '@/lib/chart-agen';
       sungguhan di kanan tanpa apa pun di atasnya. Keputusan pemilik, dan
       benar: acuan itu untuk DIBACA, bukan untuk dijiplak garis demi garis.
 
-   ── YANG MENYAMBUNGKAN KEDUANYA: HARGA, DIISI TANGAN ────────────────────
-   Harga atas dan bawah gambarnya diketik sendiri — dibaca dari sumbu harga
-   di gambar itu. Begitu terisi, gambarnya digeser dan diregangkan supaya
-   level yang sama jatuh di ketinggian yang sama dengan chart di kanan: zona
-   di kiri bisa dibaca lurus mendatar ke kanan, tanpa menghitung apa pun.
+   ── YANG MENYAMBUNGKAN KEDUANYA: MATA, BUKAN ANGKA ──────────────────────
+   Dulu harga tepi atas & bawah gambarnya diketik tangan, lalu gambarnya
+   diregangkan supaya level yang sama jatuh di ketinggian yang sama dengan
+   chart di kanan. Betul secara hitungan, dan tetap dibuang — karena untuk
+   memakainya orang harus membaca dua angka dari sumbu harga di gambar,
+   mengetiknya, lalu memeriksa hasilnya; dan begitu chart di kanan di-zoom,
+   dua angka itu tidak salah, cuma tidak lagi menolong.
 
-   Sengaja TIDAK ditebak dari gambarnya. Angka hasil tebakan yang dipakai
-   menaruh garis harga adalah kesalahan yang tidak kelihatan sebagai
-   kesalahan — ia cuma terlihat seperti level yang meleset sedikit.
+   Sekarang gambarnya digeser dan di-zoom langsung dengan roda dan seretan,
+   seperti gambar lain mana pun. Menyamakan levelnya jadi pekerjaan mata,
+   selesai dalam sedetik, dan tidak ada angka yang perlu benar lebih dulu.
    ════════════════════════════════════════════════════════════════════════ */
 
 export interface AturJiplak {
   id: string;
   url: string;
-  /** Bagian lebar layar untuk panel acuan (0,2–0,6). */
+  /** Bagian lebar layar untuk panel acuan. Diubah dengan menarik batasnya. */
   lebar: number;
-  /** Harga di tepi atas & bawah GAMBAR. 0 = belum diisi. */
-  hargaAtas: number;
-  hargaBawah: number;
+  /** Perbesaran gambar. 1 = selebar panelnya. */
+  zoom: number;
+  /** Geseran gambar dalam piksel, dari pojok kiri-atas panel. */
+  x: number;
+  y: number;
 }
 
-export const JIPLAK_BAWAAN = { lebar: 0.42, hargaAtas: 0, hargaBawah: 0 };
+export const JIPLAK_BAWAAN = { lebar: 0.42, zoom: 1, x: 0, y: 0 };
 
 export function JiplakChart({ nilai, ubah }: {
   nilai: AturJiplak | null;
@@ -118,21 +122,15 @@ export function JiplakChart({ nilai, ubah }: {
           {nilai && (
             <div className="mb-2 space-y-2 rounded-md border border-zinc-800 bg-zinc-900/60 p-2">
               <p className="text-[10.5px] leading-relaxed text-zinc-500">
-                Harga tepi atas &amp; bawah gambarnya diisi di KAKI panel acuan,
-                tepat di bawah chart-nya — bukan di sini. Angkanya dibaca dari
-                sumbu harga di gambar itu, jadi kotaknya harus ada di layar
-                yang sama dengan gambarnya.
+                Roda untuk zoom, seret untuk menggeser, klik dua kali untuk
+                mengembalikan. Batas antara gambar dan chart ditarik dengan
+                mouse.
               </p>
 
-              <label className="block">
-                <span className="flex items-center justify-between text-[11px] text-zinc-500">
-                  Lebar panel
-                  <span className="tabular-nums text-zinc-400">{Math.round(nilai.lebar * 100)}%</span>
-                </span>
-                <input type="range" min={0.2} max={0.6} step={0.01} value={nilai.lebar}
-                       onChange={(e) => ubah({ ...nilai, lebar: Number(e.target.value) })}
-                       className="mt-1 w-full cursor-pointer accent-zinc-300" />
-              </label>
+              <button onClick={() => ubah({ ...nilai, zoom: 1, x: 0, y: 0 })}
+                className="w-full cursor-pointer rounded border border-zinc-800 py-1 text-[11px] text-zinc-400 transition-colors hover:text-zinc-100">
+                Kembalikan ukuran gambar
+              </button>
 
               <button onClick={lepas}
                 className="w-full cursor-pointer rounded border border-zinc-700 py-1 text-[11px] text-zinc-400 transition-colors hover:text-red-400">
