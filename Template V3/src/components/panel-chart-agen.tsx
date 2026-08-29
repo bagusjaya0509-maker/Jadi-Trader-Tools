@@ -244,7 +244,11 @@ function GambarChart({ id, alt }: { id: string; alt: string }) {
             memotong sudutnya (overflow-hidden), dan gambar yang membawa
             bingkainya sendiri di dalam kartu berbingkai menghasilkan dua
             garis sejajar berjarak satu piksel. */}
-        <img src={url} alt={alt}
+        {/* loading="lazy" sejak arsipnya 59 chart, bukan 13. Semua sekaligus
+            berarti hampir lima megabita tiap kali halaman ini dibuka, dan
+            yang membukanya sering menumpang tethering. Yang di luar layar
+            menunggu sampai digulir ke sana. */}
+        <img src={url} alt={alt} loading="lazy" decoding="async"
              className="w-full transition-opacity hover:opacity-90" />
       </button>
       {buka && <JendelaGambar url={url} judul={alt} tutup={() => setBuka(false)} />}
