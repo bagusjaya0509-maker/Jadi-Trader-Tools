@@ -264,6 +264,21 @@ function BarisHitung({ r, kuIkuti: _kuIkuti }: { r: RingkasKanal; kuIkuti?: bool
        perbedaannya baru berarti sesudah masuk ke kanalnya — di mana ia
        memang sudah dipisah jadi dua rak. */
     ['aktif', r.berjalan + r.pending],
+    /* ── TOTAL SINYAL, DI KANAN "AKTIF" ────────────────────────────────
+       "0 aktif" sendirian punya dua arti yang sangat berbeda: analis yang
+       sudah memposting enam belas kali dan kebetulan sedang tidak punya
+       setup, dan analis yang belum pernah memposting apa pun. Keduanya
+       menulis nol yang sama persis, dan yang membaca daftar kanal justru
+       sedang memilih di antara mereka.
+
+       Angka di sebelahnya yang memisahkannya. "0 aktif · 16 Signal" berarti
+       sedang sepi; "0 aktif · 0 Signal" berarti belum mulai.
+
+       Dihitung dari sinyal kanalnya sendiri, bukan dari rekam jejak server:
+       yang terakhir cuma memuat sinyal yang SUDAH SELESAI, dan yang
+       ditanyakan di sini berapa banyak yang pernah ia terbitkan — termasuk
+       yang masih berjalan dan yang ditarik. */
+    ['Signal', r.total],
   ];
 
   /* ── "DISALIN" TIDAK MENGHITUNG LANGGANANMU, DAN ITU MEMANG BEGITU ──
@@ -301,7 +316,9 @@ function BarisHitung({ r, kuIkuti: _kuIkuti }: { r: RingkasKanal; kuIkuti?: bool
     <span className="inline-flex flex-wrap items-baseline gap-x-3 gap-y-1">
       {bagian.map(([nama, nilai]) => (
         <span key={nama} className="whitespace-nowrap"
-              title={nama === 'aktif'
+              title={nama === 'Signal'
+                ? 'Seluruh sinyal yang pernah diterbitkan kanal ini — termasuk yang masih berjalan dan yang dibatalkan'
+                : nama === 'aktif'
                 ? 'Sinyal yang masih hidup: sedang berjalan + menunggu harga'
                 : nama === 'disalin'
                 ? (nilai === null
