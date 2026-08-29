@@ -361,6 +361,13 @@ export function PanelWalletAgen() {
   const dompet = d?.dompet || [];
   const posisi = d?.posisi || [];
   const log = d?.log || [];
+  /* Nama dibaca dari daftar dompet, BUKAN dari yang ikut tersimpan di tiap
+     baris. Keduanya sama sampai dompetnya diganti nama — sesudah itu 181
+     baris lama masih membawa nama lamanya, dan satu dompet muncul di layar
+     sebagai dua orang yang berbeda. Nama milik dompetnya; baris transaksi
+     cuma menumpang menyebutnya. */
+  const namaDompet = new Map(dompet.map((w) => [w.alamat, w.nama]));
+  const sebut = (alamat: string, cadangan: string) => namaDompet.get(alamat) || cadangan;
   const BATAS_DENYUT = 5 * 60 * 1000;
   const sehat = !!d && d.denyut > 0 && Date.now() - d.denyut < BATAS_DENYUT;
 
@@ -473,7 +480,7 @@ export function PanelWalletAgen() {
                       )}
                     </div>
                     <p className="mt-1.5 text-[10.5px] text-zinc-600">
-                      {p.nama} · akun ${uangRingkas(p.nilaiAkun)}
+                      {sebut(p.alamat, p.nama)} · akun ${uangRingkas(p.nilaiAkun)}
                     </p>
                   </div>
                 ))}
@@ -513,7 +520,7 @@ export function PanelWalletAgen() {
                         {t.pnl > 0 ? '+' : ''}{uangRingkas(t.pnl)}
                       </span>
                     )}
-                    <span className="ml-auto text-[10.5px] text-zinc-600">{t.nama} · {umur(t.waktu)}</span>
+                    <span className="ml-auto text-[10.5px] text-zinc-600">{sebut(t.alamat, t.nama)} · {umur(t.waktu)}</span>
                   </div>
                 ))}
               </div>
