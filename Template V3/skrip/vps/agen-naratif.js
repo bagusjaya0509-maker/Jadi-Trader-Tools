@@ -73,7 +73,24 @@ const { klines, atr, ema } = require('./agen-sinyal');
 const TOKEN = process.env.APP_TOKEN;
 const LOKAL = 'http://127.0.0.1:' + (process.env.PORT || 4000);
 const KUNCI = process.env.OPENROUTER_API_KEY || '';
+/* ── MODEL PER PERAN, BUKAN SATU UNTUK SEMUA ──────────────────────────
+   Tiga pekerjaan di berkas ini menuntut hal yang berbeda:
+
+     PENGUSUL   membaca lembar fakta terstruktur dan memilih dari delapan
+                nomor level. Ruang keputusannya sempit — bagian yang sulit
+                (menghitung level, ATR, gerbang) sudah dikerjakan kode.
+     PENYANGGAH mencari cacat yang tidak disebut siapa pun. Ini penalaran
+                terbuka, dan di sinilah model yang lebih kuat punya ruang.
+     PENYULING  membaca puluhan catatan hasil dan menolak pola yang cuma
+                kebetulan. Menahan diri dari menyimpulkan terlalu cepat
+                justru lebih sulit daripada menyimpulkan.
+
+   Dipisah supaya modelnya bisa ditimbang per pekerjaan lewat .env, tanpa
+   menyentuh kode — dan supaya menaikkan satu peran tidak ikut menaikkan
+   ongkos dua peran lain yang tidak memerlukannya. */
 const MODEL = (process.env.NARATIF_MODEL || 'anthropic/claude-sonnet-5').trim();
+const MODEL_SANGGAH = (process.env.NARATIF_MODEL_SANGGAH || MODEL).trim();
+const MODEL_SULING = (process.env.NARATIF_MODEL_SULING || MODEL_SANGGAH).trim();
 
 const NAMA = process.env.NARATIF_NAMA || 'Agen Naratif';
 const TF = process.env.NARATIF_TF || '4h';
@@ -120,6 +137,55 @@ function swing(bar, kiri = 2, kanan = 2) {
     if (lo) bawah.push({ harga: bar[i].l, umurBar: bar.length - 1 - i });
   }
   return { atas, bawah };
+}
+
+/* ── STRUKTUR PASAR, DILABELI KODE ────────────────────────────────────
+   Swing-nya sudah ada sejak awal, tapi dulu model harus menyimpulkan sendiri
+   apakah rangkaiannya menaik atau menurun, dan apakah struktur terakhir
+   sudah tertembus. Menyerahkan itu ke pembacaan berarti menyerahkan
+   kesimpulan yang bisa dihitung — dan hitungan tidak pernah salah baca.
+
+   Yang dilabeli:
+     HH/LH  puncak lebih tinggi / lebih rendah dari puncak sebelumnya
+     HL/LL  lembah lebih tinggi / lebih rendah dari lembah sebelumnya
+     tren   naik kalau puncak DAN lembah terakhir sama-sama menaik, turun
+            kalau sama-sama menurun, campur kalau bertentangan
+     tembus BOS  harga menutup melewati puncak/lembah terakhir SEARAH tren
+            CHoCH harga menutup melewatinya BERLAWANAN tren — pertanda
+                  struktur berganti, dan itu kabar yang berbeda sama sekali
+
+   Dipakai `close`, bukan `high`/`low`, untuk menyatakan tembusan. Sumbu yang
+   menusuk level lalu ditarik kembali adalah kejadian yang sangat berbeda
+   dari penutupan di seberangnya, dan menyamakan keduanya membuat setiap
+   penyapuan likuiditas terbaca sebagai perubahan struktur. */
+function strukturPasar(bar) {
+  const { atas, bawah } = swing(bar);
+  if (atas.length < 2 || bawah.length < 2) return null;
+
+  /* umurBar besar = lama. Diurutkan jadi kronologis (tertua dulu). */
+  const urutWaktu = (d) => d.slice().sort((x, y) => y.umurBar - x.umurBar);
+  const A = urutWaktu(atas);
+  const B = urutWaktu(bawah);
+
+  const a1 = A[A.length - 1], a2 = A[A.length - 2];
+  const b1 = B[B.length - 1], b2 = B[B.length - 2];
+  const labelAtas = a1.harga > a2.harga ? 'HH' : 'LH';
+  const labelBawah = b1.harga > b2.harga ? 'HL' : 'LL';
+
+  const tren = labelAtas === 'HH' && labelBawah === 'HL' ? 'naik'
+    : labelAtas === 'LH' && labelBawah === 'LL' ? 'turun' : 'campur';
+
+  const tutup = bar[bar.length - 1].c;
+  let tembus = null;
+  if (tutup > a1.harga) tembus = tren === 'turun' ? 'CHoCH naik' : 'BOS naik';
+  else if (tutup < b1.harga) tembus = tren === 'naik' ? 'CHoCH turun' : 'BOS turun';
+
+  return {
+    puncakTerakhir: { label: labelAtas, harga: a1.harga, umurBar: a1.umurBar },
+    lembahTerakhir: { label: labelBawah, harga: b1.harga, umurBar: b1.umurBar },
+    tren,
+    tembus,
+  };
 }
 
 /* ── MENU LEVEL ───────────────────────────────────────────────────────
@@ -189,12 +255,29 @@ async function jsonAman(url) {
 }
 
 async function posisiPasar(pasangan) {
-  const [prem, oi, ls] = await Promise.all([
+  const [prem, oi, ls, top, taker] = await Promise.all([
     jsonAman(FAPI + '/fapi/v1/premiumIndex?symbol=' + pasangan),
     jsonAman(FAPI + '/futures/data/openInterestHist?symbol=' + pasangan + '&period=4h&limit=7'),
     jsonAman(FAPI + '/futures/data/globalLongShortAccountRatio?symbol=' + pasangan + '&period=4h&limit=2'),
+    /* Rasio posisi trader TOP, berbeda dari rasio akun di atasnya — yang
+       satu menimbang uang, yang lain menghitung kepala. Selisih keduanya
+       sendiri sudah keterangan: akun ritel condong long sementara trader
+       besar condong short adalah keadaan yang berbeda dari keduanya
+       sepakat. */
+    jsonAman(FAPI + '/futures/data/topLongShortPositionRatio?symbol=' + pasangan + '&period=4h&limit=1'),
+    /* Taker buy/sell: sisi mana yang menyerang, bukan sisi mana yang
+       menunggu. Order pasif tidak menggerakkan harga; taker yang
+       menggerakkannya. */
+    jsonAman(FAPI + '/futures/data/takerlongshortRatio?symbol=' + pasangan + '&period=4h&limit=1'),
   ]);
-  const out = { fundingPersen: null, oiUbah24jPersen: null, rasioLongShort: null };
+  const out = { fundingPersen: null, oiUbah24jPersen: null, rasioLongShort: null,
+    rasioPosisiTop: null, takerBuySell: null };
+  if (Array.isArray(top) && top.length) {
+    out.rasioPosisiTop = Number(Number(top[0].longShortRatio).toFixed(3));
+  }
+  if (Array.isArray(taker) && taker.length) {
+    out.takerBuySell = Number(Number(taker[0].buySellRatio).toFixed(3));
+  }
   if (prem && prem.lastFundingRate !== undefined) {
     out.fundingPersen = Number((Number(prem.lastFundingRate) * 100).toFixed(4));
   }
@@ -209,6 +292,38 @@ async function posisiPasar(pasangan) {
   return out;
 }
 
+/* ── KONTEKS TIMEFRAME ATAS ───────────────────────────────────────────
+   Sinyal 4 jam tanpa konteks harian itu setengah buta. Alasan paling umum
+   sebuah target tidak pernah tercapai bukan analisanya salah, melainkan ada
+   level harian tepat di depan target itu yang tidak terlihat dari 4 jam.
+
+   Yang dikirim sedikit dengan sengaja: arah tren harian, dan satu level
+   harian terdekat di atas serta di bawah harga. Mengirim seluruh chart
+   harian cuma memindahkan pekerjaan memilih ke model, padahal yang ia
+   butuhkan cuma jawaban "ada dinding di depan atau tidak". */
+async function konteksHarian(pasangan, harga, a) {
+  let bar;
+  try { bar = await klines(pasangan, '1d', 160); } catch (e) { return null; }
+  if (!bar || bar.length < 60) return null;
+  const tutup = bar.map((b) => b.c);
+  const e20 = ema(tutup.slice(-60), 20);
+  const e50 = ema(tutup.slice(-150), 50);
+  const st = strukturPasar(bar);
+  const { atas, bawah } = swing(bar);
+  const dekatAtas = atas.filter((x) => x.harga > harga).sort((x, y) => x.harga - y.harga)[0];
+  const dekatBawah = bawah.filter((x) => x.harga < harga).sort((x, y) => y.harga - x.harga)[0];
+  return {
+    ema20: rapikan(e20, harga),
+    ema50: rapikan(e50, harga),
+    tren: st ? st.tren : null,
+    hargaDiAtasEma20: harga > e20,
+    levelAtasTerdekat: dekatAtas ? { harga: rapikan(dekatAtas.harga, harga),
+      jarakAtr4h: Number((Math.abs(dekatAtas.harga - harga) / a).toFixed(2)) } : null,
+    levelBawahTerdekat: dekatBawah ? { harga: rapikan(dekatBawah.harga, harga),
+      jarakAtr4h: Number((Math.abs(dekatBawah.harga - harga) / a).toFixed(2)) } : null,
+  };
+}
+
 /* ── LEMBAR FAKTA ─────────────────────────────────────────────────────
    Semua yang dilihat model, dan tidak ada yang lain. Ditulis kode dari
    lilin sungguhan; model tidak pernah menyentuh sumber datanya sendiri. */
@@ -219,6 +334,13 @@ async function lembarFakta(pasangan, bar) {
   const e20 = ema(tutup.slice(-60), 20);
   const e50 = ema(tutup.slice(-150), 50);
   const e200 = tutup.length >= 200 ? ema(tutup, 200) : null;
+
+  /* Rata-rata 20 bar, dan bar berjalan sudah dibuang di klines() — jadi
+     pembandingnya lilin yang sudah tutup semua. Memasukkan bar berjalan
+     membuat volume "rendah" di awal bar dan "normal" di akhirnya, untuk
+     keadaan pasar yang persis sama. */
+  const vol20 = bar.slice(-20).map((b) => b.v);
+  const volRata = vol20.reduce((x, y) => x + y, 0) / (vol20.length || 1);
 
   const n = 60;
   const potong = bar.slice(-n);
@@ -239,11 +361,22 @@ async function lembarFakta(pasangan, bar) {
     posisiDalamRange: Number(((harga - terendah) / (tertinggi - terendah || 1) * 100).toFixed(1)),
     /* Dua belas bar terakhir apa adanya. Model butuh bentuk pergerakannya,
        bukan cuma ringkasannya — tapi dua ratus bar cuma menaikkan ongkos
-       tanpa menambah yang bisa dipakainya. */
+       tanpa menambah yang bisa dipakainya.
+
+       VOLUME IKUT, dan dulu tidak. Lilin dari Binance sudah membawanya sejak
+       awal; medannya cuma tidak diteruskan. Itu kelalaian yang mahal —
+       tembusan tanpa volume dan tembusan dengan volume adalah dua kejadian
+       berbeda, dan tanpa medan ini model tidak punya cara membedakannya.
+       Dinyatakan sebagai KELIPATAN rata-rata, bukan angka mentah: "1,8x"
+       berarti sesuatu di semua pasangan, "24.318" tidak berarti apa-apa
+       sampai dibandingkan dengan yang lain. */
     bar12: bar.slice(-12).map((b) => ({
       o: rapikan(b.o, harga), h: rapikan(b.h, harga),
       l: rapikan(b.l, harga), c: rapikan(b.c, harga),
+      volX: volRata > 0 ? Number((b.v / volRata).toFixed(2)) : null,
     })),
+    struktur: strukturPasar(bar),
+    harian: await konteksHarian(pasangan, harga, a),
     pasar_: await posisiPasar(pasangan),
     level: menuLevel(bar, harga, a).map((l) => ({
       id: l.id,
@@ -273,7 +406,7 @@ async function lembarFakta(pasangan, bar) {
    Percobaan kedua menambahkan perintah ringkas DAN menaikkan batasnya.
    Kalau tetap terpotong, gugur — lebih baik satu pasangan dilewati daripada
    JSON separuh yang dipaksa terbaca. */
-async function panggilSekali(pesan, maksToken) {
+async function panggilSekali(pesan, maksToken, model) {
   const ac = new AbortController();
   const jamHenti = setTimeout(() => ac.abort(), 60000);
   try {
@@ -286,7 +419,7 @@ async function panggilSekali(pesan, maksToken) {
         'HTTP-Referer': 'https://jaditrader.co.id',
         'X-Title': 'Jadi Trader - Agen Naratif',
       },
-      body: JSON.stringify({ model: MODEL, temperature: 0, max_tokens: maksToken, messages: pesan }),
+      body: JSON.stringify({ model: model || MODEL, temperature: 0, max_tokens: maksToken, messages: pesan }),
     });
     if (!r.ok) {
       const teks = await r.text().catch(() => '');
@@ -311,13 +444,13 @@ async function panggilSekali(pesan, maksToken) {
   }
 }
 
-async function panggil(pesan, maksToken = 1500) {
-  const a = await panggilSekali(pesan, maksToken);
+async function panggil(pesan, maksToken = 1500, model) {
+  const a = await panggilSekali(pesan, maksToken, model);
   if (!a.galat || !/finish=length/.test(a.galat)) return a;
   const ringkas = pesan.concat([{ role: 'system', content:
     'Jawabanmu barusan terpotong karena terlalu panjang. Jawab lagi, LANGSUNG '
     + 'JSON-nya saja, dan buat medan "alasan" maksimal 45 kata.' }]);
-  return panggilSekali(ringkas, Math.min(4000, maksToken * 2));
+  return panggilSekali(ringkas, Math.min(4000, maksToken * 2), model);
 }
 
 /* Keluaran model diperlakukan sebagai TEKS KOTOR, bukan JSON. Model rutin
@@ -430,7 +563,17 @@ function promptUsul(f) {
     { role: 'system', content: PERAN },
     ...pesanPelajaran(),
     { role: 'user', content:
-`Lembar fakta ${f.pasangan} timeframe ${f.tf}:
+`Arti medan yang mungkin belum jelas:
+- level: swing yang benar-benar ada. jarakAtr = berapa ATR dari harga sekarang.
+- struktur.tren: naik = puncak & lembah terakhir sama-sama menaik.
+  tembus BOS = lanjut searah tren; CHoCH = melawan tren, pertanda berganti.
+- bar12[].volX: volume bar itu sebagai kelipatan rata-rata 20 bar. 1,0 = biasa.
+- harian: konteks timeframe atas. levelAtasTerdekat.jarakAtr4h diukur dalam ATR 4 jam.
+- pasar.rasioLongShort menghitung AKUN; rasioPosisiTop menimbang POSISI trader
+  besar. Keduanya berselisih jauh = ritel dan pemain besar tidak sepakat.
+- pasar.takerBuySell > 1 berarti pembeli lebih agresif menyerang.
+
+Lembar fakta ${f.pasangan} timeframe ${f.tf}:
 
 ${JSON.stringify(f, null, 1)}
 
@@ -562,7 +705,7 @@ async function periksaSatu(pasangan, sedangJalan, jurnal) {
     return null;
   }
 
-  const j2 = await panggil(promptSanggah(f, u, f.harga), 900);
+  const j2 = await panggil(promptSanggah(f, u, f.harga), 900, MODEL_SANGGAH);
   if (j2.galat) { catat(' ', pasangan, '· penyanggah gagal:', j2.galat, '— tidak diterbitkan'); return null; }
   const v = uraikan(j2.isi);
   /* Penyanggah yang jawabannya tidak terbaca dihitung MENJATUHKAN, bukan
@@ -708,7 +851,7 @@ Data forward test:
 ${JSON.stringify(bahan, null, 1)}
 
 Tulis ulang catatan pelajarannya.` },
-  ], 1200);
+  ], 1200, MODEL_SULING);
 
   if (j.galat) { catat('gagal menulis pelajaran:', j.galat); return; }
   const teks = String(j.isi || '').trim();
@@ -724,8 +867,8 @@ Tulis ulang catatan pelajarannya.` },
 async function utama() {
   if (!KUNCI) { console.error('OPENROUTER_API_KEY kosong — agen naratif tidak bisa jalan.'); process.exit(1); }
   if (process.argv.includes('--nilai')) { await nilaiDiri(); return; }
-  catat('agen naratif ·', NAMA, '·', MODEL, '·', PASANGAN.join(', '), '·', TF,
-    KERING ? '· MODE KERING' : '');
+  catat('agen naratif ·', NAMA, '· usul', MODEL, '· sanggah', MODEL_SANGGAH,
+    '·', PASANGAN.join(', '), '·', TF, KERING ? '· MODE KERING' : '');
 
   /* Pasangan yang sinyalnya masih hidup dilewati. Menumpuk dua sinyal arah
      berlawanan di pasangan yang sama pada papan yang sama membuat kanalnya
