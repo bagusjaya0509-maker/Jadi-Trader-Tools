@@ -64,6 +64,7 @@ module.exports = (app, { butuhLogin, batasLaju, express, DIR }) => {
       dompet: p.dompet || [],
       log: a.log || [],
       posisi: a.posisi || [],
+      seumur: a.seumur || {},
       denyut: a.denyut || 0,
       galat: a.galat || '',
     });
@@ -202,6 +203,10 @@ module.exports.catatWallet = function catatWallet(DIR, baris) {
     d.log = [...baris.log, ...d.log].sort((a, b) => b.waktu - a.waktu).slice(0, AKTIVITAS_MAKS);
   }
   if (Array.isArray(baris.posisi)) d.posisi = baris.posisi;
+  /* DITIMPA, bukan digabung — sama seperti posisi. Ia potret hitungan
+     terakhir atas seluruh riwayat, dan menggabungnya dengan potret
+     sebelumnya berarti menjumlahkan riwayat yang sama dua kali. */
+  if (baris.seumur && typeof baris.seumur === 'object') d.seumur = baris.seumur;
   if (baris.denyut) d.denyut = baris.denyut;
   if (typeof baris.galat === 'string') d.galat = baris.galat;
 

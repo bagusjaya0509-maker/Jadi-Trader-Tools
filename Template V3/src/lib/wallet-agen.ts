@@ -36,10 +36,27 @@ export interface TransaksiDompet {
   harga: number; ukuran: number; nilai: number; pnl: number; hash: string;
 }
 
+/** Rekam jejak dompet menurut BURSA, bukan menurut catatan kita.
+ *
+ *  Bukan "seumur hidup": Hyperliquid memulangkan maksimal 2000 fill, jadi
+ *  untuk dompet ramai ini cuma satu-dua bulan terakhir. `terpotong` menandai
+ *  yang menyentuh batas itu — WR dari 2000 fill terakhir dan WR dari seluruh
+ *  hidup dompet adalah dua klaim berbeda, dan cuma satu yang bisa dibuktikan. */
+export interface RiwayatBursa {
+  fill: number;
+  terpotong: boolean;
+  tutup: number;
+  menang: number;
+  realisasi: number;
+  /** Waktu fill tertua yang dipulangkan bursa. */
+  sejak: number;
+}
+
 export interface KeadaanDompet {
   dompet: DompetPantau[];
   posisi: PosisiDompet[];
   log: TransaksiDompet[];
+  seumur: Record<string, RiwayatBursa>;
   denyut: number;
   galat: string;
 }
@@ -66,6 +83,7 @@ export async function keadaanDompet(): Promise<KeadaanDompet | null> {
       dompet: Array.isArray(j?.dompet) ? j.dompet : [],
       posisi: Array.isArray(j?.posisi) ? j.posisi : [],
       log: Array.isArray(j?.log) ? j.log : [],
+      seumur: (j && typeof j.seumur === 'object' && j.seumur) || {},
       denyut: Number(j?.denyut) || 0,
       galat: String(j?.galat || ''),
     };

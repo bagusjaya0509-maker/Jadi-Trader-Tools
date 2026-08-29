@@ -118,6 +118,64 @@ function keBaris(alamat, nama, f) {
   };
 }
 
+/* ── WR SEPANJANG RIWAYAT BURSA ────────────────────────────────────────
+   Dihitung dari `fills` yang MEMANG SUDAH ditarik tiap pindaian. Tidak ada
+   panggilan tambahan, tidak ada ongkos tambahan — sebelumnya seluruh array
+   itu disaring lalu dibuang, padahal ia memuat riwayat yang justru paling
+   ingin diketahui orang saat menimbang sebuah dompet.
+
+   ── BUKAN "SEUMUR HIDUP", DAN ITU HARUS DITULIS ─────────────────────
+   Hyperliquid memulangkan MAKSIMAL 2000 fill. Untuk dompet ramai itu cuma
+   satu sampai dua bulan terakhir; untuk dompet sepi bisa bertahun. Jadi
+   yang jujur disebut "sepanjang riwayat yang diberi bursa", bukan seumur
+   hidup — dan tanggal fill tertuanya ikut disimpan supaya layar bisa
+   mengatakan sejak kapan angkanya berlaku.
+
+   `terpotong` menandai dompet yang riwayatnya memang menyentuh batas itu:
+   WR 85% dari 2000 fill terakhir dan WR 85% dari seluruh hidup dompet
+   adalah dua klaim yang berbeda, dan cuma satu yang bisa kita buktikan.
+
+   Pengelompokan fill jadi penutupan memakai aturan yang SAMA dengan yang
+   di layar (koin+arah sama, jarak < 5 menit = satu penutupan). Kalau
+   berbeda, dua angka WR di kartu yang sama akan dihitung dengan dua
+   penggaris — dan yang membaca tidak punya cara tahu. */
+const JEDA_SATU_KELUAR = 5 * 60 * 1000;
+
+function riwayatBursa(fills) {
+  const tutup = (Array.isArray(fills) ? fills : [])
+    .filter((f) => Number(f.closedPnl) !== 0)
+    .slice()
+    .sort((a, b) => (Number(a.time) || 0) - (Number(b.time) || 0));
+
+  const grup = [];
+  for (const l of tutup) {
+    const g = grup[grup.length - 1];
+    const koin = String(l.coin || '');
+    const dir = String(l.dir || '');
+    const t = Number(l.time) || 0;
+    if (g && g.koin === koin && g.dir === dir && t - g.waktu <= JEDA_SATU_KELUAR) {
+      g.pnl += Number(l.closedPnl) || 0;
+      g.waktu = t;
+    } else {
+      grup.push({ koin, dir, pnl: Number(l.closedPnl) || 0, waktu: t });
+    }
+  }
+
+  const menang = grup.filter((g) => g.pnl > 0).length;
+  const waktu = (Array.isArray(fills) ? fills : []).map((f) => Number(f.time) || 0).filter(Boolean);
+  return {
+    fill: Array.isArray(fills) ? fills.length : 0,
+    /* 2000 adalah batas yang diberikan bursa, bukan angka yang kita pilih.
+       Ditulis sebagai perbandingan, bukan dipatok, supaya kalau batasnya
+       berubah suatu hari penandanya ikut benar dengan sendirinya. */
+    terpotong: Array.isArray(fills) && fills.length >= 2000,
+    tutup: grup.length,
+    menang,
+    realisasi: Math.round(grup.reduce((n, g) => n + g.pnl, 0) * 100) / 100,
+    sejak: waktu.length ? Math.min(...waktu) : 0,
+  };
+}
+
 async function pindai() {
   const dompet = bacaDompet(DIR);
   if (!dompet.length) {
@@ -129,6 +187,7 @@ async function pindai() {
   const batas = batasTerakhir(DIR);
   const semuaBaru = [];
   const semuaPosisi = [];
+  const seumur = {};
   const gagal = [];
 
   for (const d of dompet) {
@@ -170,6 +229,8 @@ async function pindai() {
          Riwayat lama juga bukan yang dijanjikan panel ini: yang dicatat
          adalah apa yang dilakukan dompet SELAMA kita memantaunya, supaya
          tiap baris punya waktu yang benar-benar kita saksikan. */
+      seumur[d.alamat] = riwayatBursa(fills);
+
       const sejak = batas[d.alamat] || Number(d.sejak) || Date.now();
       const baru = (Array.isArray(fills) ? fills : [])
         .filter((f) => (Number(f.time) || 0) > sejak)
@@ -185,6 +246,7 @@ async function pindai() {
   catatWallet(DIR, {
     log: semuaBaru,
     posisi: semuaPosisi,
+    seumur,
     denyut: Date.now(),
     /* Kegagalan DITULIS, bukan cuma dicetak ke log pm2. Dompet yang gagal
        dibaca menghasilkan panel tanpa posisi — sama persis dengan dompet

@@ -6,7 +6,7 @@ import { SparklineSaldo } from '@/components/kurva-saldo';
 import {
   keadaanDompet, tambahDompet, hapusDompet, peringkatDompet,
   type KeadaanDompet, type TransaksiDompet, type PosisiDompet, type Peringkat,
-  type JendelaPeringkat, type PitaAkun,
+  type JendelaPeringkat, type PitaAkun, type RiwayatBursa,
 } from '@/lib/wallet-agen';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -350,10 +350,11 @@ function titikDompet(tutup: Penutupan[]) {
   return out;
 }
 
-function KartuDompet({ w, posisi, log, dipilih, pilih, hapus }: {
+function KartuDompet({ w, posisi, log, bursa, dipilih, pilih, hapus }: {
   w: { alamat: string; nama: string; sejak: number };
   posisi: PosisiDompet[];
   log: TransaksiDompet[];
+  bursa?: RiwayatBursa;
   dipilih: boolean;
   pilih: () => void;
   hapus: () => void;
@@ -383,14 +384,43 @@ function KartuDompet({ w, posisi, log, dipilih, pilih, hapus }: {
             {w.alamat.slice(0, 6)}…{w.alamat.slice(-4)}
           </span>
         </span>
-        {tutup.length > 0 && (
-          <span className={cn('shrink-0 text-[10.5px] font-medium',
-            menang / tutup.length >= 0.5 ? 'text-emerald-400' : 'text-red-400')}
-            title={menang + ' menang dari ' + tutup.length + ' penutupan yang kita saksikan. '
-              + 'Fill berurutan pada koin & arah yang sama dalam lima menit dihitung satu penutupan.'}>
-            WR {Math.round((menang / tutup.length) * 100)}%
-          </span>
-        )}
+        {/* ── DUA WR, DAN URUTANNYA DISENGAJA ────────────────────────
+            Yang ATAS milik kita: penutupan yang benar-benar kita saksikan
+            sendiri sejak dompet ini dipantau. Kecil sampelnya, tapi ia
+            satu-satunya angka yang bisa kita pertanggungjawabkan sepenuhnya.
+
+            Yang BAWAH milik bursa: sepanjang riwayat yang Hyperliquid mau
+            berikan. Jauh lebih banyak sampelnya, dan itulah gunanya — tapi
+            ia riwayat yang kita terima, bukan yang kita saksikan.
+
+            Ditulis bertumpuk, bukan bersebelahan: dua persentase sejajar di
+            satu baris terbaca sebagai satu angka yang terbelah, dan yang
+            membacanya harus menebak mana yang mana. */}
+        <span className="shrink-0 text-right leading-tight">
+          {tutup.length > 0 && (
+            <span className={cn('block text-[10.5px] font-medium',
+              menang / tutup.length >= 0.5 ? 'text-emerald-400' : 'text-red-400')}
+              title={menang + ' menang dari ' + tutup.length + ' penutupan yang KITA saksikan sejak '
+                + 'dompet ini dipantau. Fill berurutan pada koin & arah yang sama dalam lima menit '
+                + 'dihitung satu penutupan.'}>
+              WR {Math.round((menang / tutup.length) * 100)}%
+            </span>
+          )}
+          {bursa && bursa.tutup > 0 && (
+            <span className={cn('block text-[9.5px]',
+              bursa.menang / bursa.tutup >= 0.5 ? 'text-emerald-400/70' : 'text-red-400/70')}
+              title={bursa.menang + ' menang dari ' + bursa.tutup + ' penutupan sepanjang '
+                + bursa.fill + ' transaksi yang diberikan bursa'
+                + (bursa.sejak ? ', sejak ' + tanggalJam(bursa.sejak) : '') + '. '
+                + (bursa.terpotong
+                    ? 'Hyperliquid memulangkan maksimal 2000 transaksi — riwayat sebelum itu tidak terbaca, '
+                      + 'jadi ini BUKAN angka seumur hidup dompetnya.'
+                    : 'Seluruh riwayat dompet ini terbaca.')}>
+              {bursa.tutup} tutup · {Math.round((bursa.menang / bursa.tutup) * 100)}%
+              {bursa.terpotong && <span className="text-zinc-600"> ·2rb</span>}
+            </span>
+          )}
+        </span>
         <button onClick={(e) => { e.stopPropagation(); hapus(); }} title="Berhenti memantau"
           className="shrink-0 cursor-pointer rounded p-1 text-zinc-800 transition-colors hover:text-red-400 group-hover:text-zinc-600">
           <Trash2 className="size-3.5" />
@@ -404,6 +434,11 @@ function KartuDompet({ w, posisi, log, dipilih, pilih, hapus }: {
         </span>
         <span className="mt-0.5 block text-[10.5px] text-zinc-600">
           realisasi sejak dipantau · {tutup.length} penutupan
+          {bursa && bursa.tutup > 0 && (
+            <span className="block text-zinc-700">
+              riwayat bursa {bursa.realisasi >= 0 ? '+' : '−'}${uangRingkas(Math.abs(bursa.realisasi))}
+            </span>
+          )}
         </span>
       </div>
 
@@ -794,6 +829,7 @@ export function PanelWalletAgen() {
                      yang menambahkannya mengira penambahannya gagal. */
                   posisi={posisi.filter((p) => p.alamat === w.alamat)}
                   log={log.filter((l) => l.alamat === w.alamat)}
+                  bursa={d?.seumur?.[w.alamat]}
                   dipilih={pilih === w.alamat}
                   pilih={() => setPilih((v) => (v === w.alamat ? null : w.alamat))}
                   hapus={() => { void hapusDompet(w.alamat).then(() => tarik()); }} />
