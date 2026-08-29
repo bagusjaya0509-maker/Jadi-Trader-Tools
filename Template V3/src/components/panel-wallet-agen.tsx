@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Loader2, Plus, RefreshCw, Trash2, Trophy, Wallet } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   keadaanDompet, tambahDompet, hapusDompet, peringkatDompet,
-  type KeadaanDompet, type TransaksiDompet, type Peringkat,
+  type KeadaanDompet, type TransaksiDompet, type PosisiDompet, type Peringkat,
   type JendelaPeringkat, type PitaAkun,
 } from '@/lib/wallet-agen';
 
@@ -189,9 +189,15 @@ function PapanPeringkat({ pantau }: { pantau: (alamat: string, nama: string) => 
           {muat ? 'Mengambil papan peringkat…' : 'Tidak ada dompet yang lolos saringan.'}
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-zinc-800">
+        <div className="max-h-[21rem] overflow-auto rounded-lg border border-zinc-800">
+          {/* Sepuluh baris terlihat, sisanya digulir DI DALAM kotak ini.
+              Empat puluh baris sekaligus mendorong daftar dompet yang
+              dipantau jauh ke bawah layar — dan yang dipantau itulah yang
+              dibuka tiap hari, sementara papan peringkat cuma disentuh
+              sesekali saat mencari yang baru. Kepala tabelnya menempel
+              supaya judul kolom tidak hilang di baris kesebelas. */}
           <table className="w-full min-w-[560px] border-collapse text-[12px]">
-            <thead>
+            <thead className="sticky top-0 z-10 bg-zinc-950">
               <tr className="border-b border-zinc-800 text-[10.5px] uppercase tracking-wide text-zinc-600">
                 <th className="w-8 px-2 py-1.5 text-right font-medium">#</th>
                 <th className="px-2 py-1.5 text-left font-medium">Dompet</th>
@@ -257,72 +263,145 @@ function PapanPeringkat({ pantau }: { pantau: (alamat: string, nama: string) => 
   );
 }
 
-/* ── RAPOR DARI CATATAN SENDIRI ─────────────────────────────────────────
-   Papan peringkat menjawab "siapa yang menang menurut bursanya". Rapor ini
-   menjawab pertanyaan yang berbeda dan jauh lebih penting sebelum ada tombol
-   salin: apa yang KITA saksikan sendiri sejak dompet ini dipantau.
+/* ════════════════════════════════════════════════════════════════════════
+   SATU KARTU PER DOMPET
+   ════════════════════════════════════════════════════════════════════════
+   Versi pertama menaruh SEMUA posisi dalam satu kisi dan SEMUA transaksi
+   dalam satu daftar, dengan nama dompetnya dicetak kecil di sudut tiap
+   baris. Dengan satu dompet itu terbaca. Dengan enam, tiga puluh satu
+   posisi, dan dua ratus transaksi, yang tersisa cuma dinding angka —
+   pertanyaan "dompet ini sedang pegang apa" menuntut mata menyisir seluruh
+   halaman dan menyaringnya sendiri.
 
-   Yang dihitung cuma yang benar-benar ada di data: fill yang menutup posisi
-   membawa closedPnl, jadi menang-kalah dan realisasinya bisa dihitung tepat.
-   Durasi tahan TIDAK dihitung — itu menuntut pemasangan setiap penutupan ke
-   pembukaannya, dan angka hasil pasangan yang salah lebih buruk daripada
-   kolom yang jujur tidak ada. */
-function RaporDompet({ log, dompet }: {
+   Pengelompokan mengembalikan pertanyaan itu ke tempatnya. Satu kartu satu
+   dompet, dan yang di dalamnya cuma miliknya.
+
+   TERTUTUP SEBAGAI BAWAAN. Barisan kepala kartu sudah memuat seluruh angka
+   ringkasnya — berapa posisi, untung mengambang, berapa transaksi, berapa
+   persen menang, realisasi. Enam kartu terbuka sekaligus mengembalikan
+   dinding yang baru saja dibongkar; yang dicari orang biasanya satu dompet,
+   dan satu klik lebih murah daripada menggulir enam layar.
+
+   Rapor yang dulu berdiri sendiri di bawah dihapus: angkanya persis yang
+   sekarang ada di kepala kartu, dan dua tempat yang menampilkan hal yang
+   sama adalah dua tempat yang bisa berbeda. */
+function KartuDompet({ w, posisi, log, hapus }: {
+  w: { alamat: string; nama: string; sejak: number };
+  posisi: PosisiDompet[];
   log: TransaksiDompet[];
-  dompet: { alamat: string; nama: string; sejak: number }[];
+  hapus: () => void;
 }) {
-  const rapor = useMemo(() => {
-    const peta = new Map<string, { nama: string; sejak: number; n: number; tutup: number; menang: number; nyata: number }>();
-    for (const d of dompet) peta.set(d.alamat, { nama: d.nama, sejak: d.sejak, n: 0, tutup: 0, menang: 0, nyata: 0 });
-    for (const l of log) {
-      const r = peta.get(l.alamat);
-      if (!r) continue;
-      r.n++;
-      /* pnl bukan nol = fill yang MENUTUP sesuatu. Fill pembuka selalu
-         membawa closedPnl nol, dan menghitungnya sebagai kekalahan akan
-         menenggelamkan win rate dompet mana pun ke angka yang tidak
-         berarti apa-apa. */
-      if (l.pnl !== 0) { r.tutup++; r.nyata += l.pnl; if (l.pnl > 0) r.menang++; }
-    }
-    return [...peta.entries()].map(([alamat, r]) => ({ alamat, ...r }));
-  }, [log, dompet]);
+  const [buka, setBuka] = useState(false);
 
-  if (!rapor.length) return null;
+  const mengambang = posisi.reduce((n, p) => n + p.pnl, 0);
+  const akun = posisi.length ? posisi[0].nilaiAkun : 0;
+  /* pnl bukan nol = fill yang MENUTUP sesuatu. Fill pembuka selalu membawa
+     closedPnl nol, dan menghitungnya sebagai kekalahan menenggelamkan
+     persentase menang dompet mana pun ke angka yang tidak berarti apa-apa. */
+  const tutup = log.filter((l) => l.pnl !== 0);
+  const menang = tutup.filter((l) => l.pnl > 0).length;
+  const nyata = tutup.reduce((n, l) => n + l.pnl, 0);
 
   return (
-    <section>
-      <h3 className="mb-2 border-b border-zinc-800 pb-1.5 text-[13px] font-semibold text-zinc-200">
-        Rapor <span className="font-normal text-zinc-600">· dari catatan kita sendiri</span>
-      </h3>
-      <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(min(100%,17rem),1fr))]">
-        {rapor.map((r) => (
-          <div key={r.alamat} className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-3">
-            <div className="flex items-baseline gap-2">
-              <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-zinc-100">{r.nama}</span>
-              <span className={cn('text-[12.5px] font-semibold tabular-nums',
-                r.nyata >= 0 ? 'text-emerald-400' : 'text-red-400')}>
-                {r.nyata >= 0 ? '+' : '−'}{uangRingkas(Math.abs(r.nyata))}
-              </span>
-            </div>
-            <div className="mt-1 flex flex-wrap gap-x-3 text-[11.5px] text-zinc-500">
-              <span>{r.n} transaksi</span>
-              <span>{r.tutup} tutup</span>
-              {r.tutup > 0 && (
-                <span>menang <span className="tabular-nums text-zinc-300">
-                  {Math.round((r.menang / r.tutup) * 100)}%
-                </span></span>
-              )}
-            </div>
-            <p className="mt-1 text-[10.5px] text-zinc-600">Dipantau sejak {umur(r.sejak)}</p>
-          </div>
-        ))}
+    <div className="rounded-lg border border-zinc-800 bg-zinc-900/30">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
+        <button onClick={() => setBuka((v) => !v)}
+          className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left">
+          <span aria-hidden className={cn('text-zinc-600 transition-transform', buka && 'rotate-90')}>›</span>
+          <span className="truncate text-[13px] font-semibold text-zinc-100">{w.nama}</span>
+          <span className="hidden font-mono text-[10.5px] text-zinc-600 sm:inline">
+            {w.alamat.slice(0, 6)}…{w.alamat.slice(-4)}
+          </span>
+        </button>
+
+        <span className="text-[11.5px] text-zinc-500">
+          {posisi.length ? posisi.length + ' posisi' : 'tanpa posisi'}
+          {akun > 0 && <span className="text-zinc-600"> · akun ${uangRingkas(akun)}</span>}
+        </span>
+        {posisi.length > 0 && (
+          <span className={cn('text-[12.5px] font-semibold tabular-nums',
+            mengambang >= 0 ? 'text-emerald-400' : 'text-red-400')}
+            title="Untung/rugi yang belum direalisasi dari posisi terbuka">
+            {mengambang >= 0 ? '+' : '−'}{uangRingkas(Math.abs(mengambang))}
+          </span>
+        )}
+
+        <span className="text-[11.5px] text-zinc-600">
+          {log.length} transaksi
+          {tutup.length > 0 && <> · menang {Math.round((menang / tutup.length) * 100)}%</>}
+        </span>
+        {tutup.length > 0 && (
+          <span className={cn('text-[11.5px] font-medium tabular-nums',
+            nyata >= 0 ? 'text-emerald-400/80' : 'text-red-400/80')}
+            title="Realisasi dari penutupan yang kita saksikan sendiri">
+            {nyata >= 0 ? '+' : '−'}{uangRingkas(Math.abs(nyata))}
+          </span>
+        )}
+
+        <button onClick={hapus} title="Berhenti memantau"
+          className="cursor-pointer rounded p-1 text-zinc-700 transition-colors hover:text-red-400">
+          <Trash2 className="size-3.5" />
+        </button>
       </div>
-      <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-600">
-        Hanya yang tercatat sejak dompet mulai dipantau — riwayat sebelumnya
-        sengaja tidak ditarik. Angka di bawah beberapa puluh penutupan belum
-        berarti apa-apa; ia perlu waktu, bukan penafsiran.
-      </p>
-    </section>
+
+      {buka && (
+        <div className="space-y-2 border-t border-zinc-800 p-3">
+          {posisi.length > 0 && (
+            <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(min(100%,17rem),1fr))]">
+              {posisi.map((p, i) => (
+                <div key={p.koin + i} className="rounded-md border border-zinc-800 bg-zinc-950/60 p-2.5">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-[12.5px] font-semibold text-zinc-100">{p.koin}</span>
+                    <span className={cn('text-[11.5px] font-semibold',
+                      p.arah === 'LONG' ? 'text-emerald-400' : 'text-red-400')}>{p.arah}</span>
+                    {p.leverage > 0 && <span className="text-[11px] text-zinc-600">{p.leverage}×</span>}
+                    <span className={cn('ml-auto text-[12.5px] font-semibold tabular-nums',
+                      p.pnl >= 0 ? 'text-emerald-400' : 'text-red-400')}>
+                      {p.pnl >= 0 ? '+' : ''}{uangRingkas(p.pnl)}
+                    </span>
+                  </div>
+                  <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px] text-zinc-500">
+                    <span>Entry <span className="tabular-nums text-zinc-300">{p.entry}</span></span>
+                    <span>Nilai <span className="tabular-nums text-zinc-300">${uangRingkas(p.nilai)}</span></span>
+                    <span>Ukuran <span className="tabular-nums text-zinc-300">{p.ukuran}</span></span>
+                    {p.likuidasi > 0 && (
+                      <span>Likuidasi <span className="tabular-nums text-amber-400/90">{p.likuidasi}</span></span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {log.length === 0 ? (
+            <p className="text-[11.5px] leading-relaxed text-zinc-600">
+              Belum ada transaksi sejak dompet ini mulai dipantau. Riwayat
+              sebelumnya sengaja tidak ditarik — daftar ini catatan pantauan
+              kita, bukan salinan riwayat dompetnya.
+            </p>
+          ) : (
+            <div className="max-h-56 overflow-y-auto rounded-md border border-zinc-800">
+              {log.map((l, i) => (
+                <div key={l.hash + l.waktu + i}
+                  className="flex flex-wrap items-baseline gap-x-2.5 border-b border-zinc-800/60 px-2.5 py-1.5 last:border-b-0">
+                  <span className="text-[12px] font-semibold text-zinc-100">{l.koin}</span>
+                  <span className={cn('text-[11px] font-medium', warnaDir(l.dir))}>{l.dir || l.arah}</span>
+                  <span className="text-[11px] tabular-nums text-zinc-400">{l.ukuran} @ {l.harga}</span>
+                  <span className="text-[11px] tabular-nums text-zinc-600">${uangRingkas(l.nilai)}</span>
+                  {l.pnl !== 0 && (
+                    <span className={cn('text-[11px] font-semibold tabular-nums',
+                      l.pnl > 0 ? 'text-emerald-400' : 'text-red-400')}>
+                      {l.pnl > 0 ? '+' : ''}{uangRingkas(l.pnl)}
+                    </span>
+                  )}
+                  <span className="ml-auto text-[10px] text-zinc-600">{umur(l.waktu)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -361,13 +440,11 @@ export function PanelWalletAgen() {
   const dompet = d?.dompet || [];
   const posisi = d?.posisi || [];
   const log = d?.log || [];
-  /* Nama dibaca dari daftar dompet, BUKAN dari yang ikut tersimpan di tiap
-     baris. Keduanya sama sampai dompetnya diganti nama — sesudah itu 181
-     baris lama masih membawa nama lamanya, dan satu dompet muncul di layar
-     sebagai dua orang yang berbeda. Nama milik dompetnya; baris transaksi
-     cuma menumpang menyebutnya. */
-  const namaDompet = new Map(dompet.map((w) => [w.alamat, w.nama]));
-  const sebut = (alamat: string, cadangan: string) => namaDompet.get(alamat) || cadangan;
+  /* Nama tidak lagi perlu dicari dari tiap baris: pengelompokan per kartu
+     membuat namanya dibaca sekali dari daftar dompet, dan salinan nama yang
+     ikut tersimpan di tiap transaksi tidak pernah dipakai lagi. Itu sekaligus
+     menutup cacat yang sempat terlihat — mengganti nama dompet dulu
+     meninggalkan ratusan baris yang masih menuliskan nama lamanya. */
   const BATAS_DENYUT = 5 * 60 * 1000;
   const sehat = !!d && d.denyut > 0 && Date.now() - d.denyut < BATAS_DENYUT;
 
@@ -425,106 +502,26 @@ export function PanelWalletAgen() {
         </div>
       ) : (
         <>
-          {/* ── Dompet yang dipantau ─────────────────────────────────── */}
-          <div className="flex flex-wrap gap-1.5">
-            {dompet.map((w) => (
-              <span key={w.alamat}
-                className="flex items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900/60 py-1 pl-2.5 pr-1 text-[11.5px] text-zinc-300">
-                {w.nama}
-                <span className="font-mono text-[10.5px] text-zinc-600">
-                  {w.alamat.slice(0, 6)}…{w.alamat.slice(-4)}
-                </span>
-                <button onClick={() => { void hapusDompet(w.alamat).then(() => tarik()); }}
-                  title="Berhenti memantau" className="cursor-pointer rounded p-0.5 text-zinc-600 transition-colors hover:text-red-400">
-                  <Trash2 className="size-3" />
-                </button>
+          <section>
+            <h3 className="mb-2 border-b border-zinc-800 pb-1.5 text-[13px] font-semibold text-zinc-200">
+              Dompet yang dipantau <span className="font-normal text-zinc-600">· {dompet.length}</span>
+              <span className="ml-2 text-[11px] font-normal text-zinc-600">
+                Klik namanya untuk membuka posisi &amp; transaksinya
               </span>
-            ))}
-          </div>
-
-          <RaporDompet log={log} dompet={dompet} />
-
-          {/* ── Posisi terbuka ───────────────────────────────────────── */}
-          <section>
-            <h3 className="mb-2 border-b border-zinc-800 pb-1.5 text-[13px] font-semibold text-zinc-200">
-              Posisi terbuka <span className="font-normal text-zinc-600">· {posisi.length}</span>
             </h3>
-            {posisi.length === 0 ? (
-              <p className="py-3 text-[12.5px] text-zinc-600">
-                Tidak ada posisi terbuka. Dompet yang sedang menunggu memang
-                terlihat begini — bukan berarti agennya berhenti.
-              </p>
-            ) : (
-              <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(min(100%,20rem),1fr))]">
-                {posisi.map((p, i) => (
-                  <div key={p.alamat + p.koin + i}
-                    className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-3">
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-[13px] font-semibold text-zinc-100">{p.koin}</span>
-                      <span className={cn('text-[11.5px] font-semibold',
-                        p.arah === 'LONG' ? 'text-emerald-400' : 'text-red-400')}>{p.arah}</span>
-                      {p.leverage > 0 && (
-                        <span className="text-[11px] text-zinc-600">{p.leverage}×</span>
-                      )}
-                      <span className={cn('ml-auto text-[12.5px] font-semibold tabular-nums',
-                        p.pnl >= 0 ? 'text-emerald-400' : 'text-red-400')}>
-                        {p.pnl >= 0 ? '+' : ''}{uangRingkas(p.pnl)}
-                      </span>
-                    </div>
-                    <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11.5px] text-zinc-500">
-                      <span>Entry <span className="tabular-nums text-zinc-300">{p.entry}</span></span>
-                      <span>Nilai <span className="tabular-nums text-zinc-300">${uangRingkas(p.nilai)}</span></span>
-                      <span>Ukuran <span className="tabular-nums text-zinc-300">{p.ukuran}</span></span>
-                      {p.likuidasi > 0 && (
-                        <span>Likuidasi <span className="tabular-nums text-amber-400/90">{p.likuidasi}</span></span>
-                      )}
-                    </div>
-                    <p className="mt-1.5 text-[10.5px] text-zinc-600">
-                      {sebut(p.alamat, p.nama)} · akun ${uangRingkas(p.nilaiAkun)}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-
-          {/* ── Setiap transaksi ─────────────────────────────────────── */}
-          <section>
-            <h3 className="mb-2 border-b border-zinc-800 pb-1.5 text-[13px] font-semibold text-zinc-200">
-              Transaksi <span className="font-normal text-zinc-600">· {log.length} tercatat</span>
-            </h3>
-            {log.length === 0 ? (
-              <p className="py-3 text-[12.5px] text-zinc-600">
-                Belum ada transaksi sejak dompet ini mulai dipantau. Yang lama
-                sengaja tidak ditarik — daftar ini riwayat pantauan kita, bukan
-                salinan riwayat dompetnya.
-              </p>
-            ) : (
-              <div className="max-h-[520px] overflow-y-auto rounded-lg border border-zinc-800">
-                {log.map((t: TransaksiDompet, i) => (
-                  <div key={t.hash + t.waktu + i}
-                    className="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5 border-b border-zinc-800/60 px-3 py-2 last:border-b-0">
-                    <span className="text-[12.5px] font-semibold text-zinc-100">{t.koin}</span>
-                    <span className={cn('text-[11.5px] font-medium', warnaDir(t.dir))}>
-                      {t.dir || t.arah}
-                    </span>
-                    <span className="text-[11.5px] tabular-nums text-zinc-400">
-                      {t.ukuran} @ {t.harga}
-                    </span>
-                    <span className="text-[11.5px] tabular-nums text-zinc-600">
-                      ${uangRingkas(t.nilai)}
-                    </span>
-                    {t.pnl !== 0 && (
-                      <span className={cn('text-[11.5px] font-semibold tabular-nums',
-                        t.pnl > 0 ? 'text-emerald-400' : 'text-red-400')}>
-                        {t.pnl > 0 ? '+' : ''}{uangRingkas(t.pnl)}
-                      </span>
-                    )}
-                    <span className="ml-auto text-[10.5px] text-zinc-600">{sebut(t.alamat, t.nama)} · {umur(t.waktu)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
+            <div className="space-y-1.5">
+              {dompet.map((w) => (
+                <KartuDompet key={w.alamat} w={w}
+                  /* Disaring per kartu, bukan dikelompokkan sekali di atas.
+                     Dompet yang BELUM punya posisi maupun transaksi tetap
+                     harus muncul — pengelompokan yang membuang yang kosong
+                     akan menghilangkan dompet yang baru ditambahkan, dan
+                     yang menambahkannya mengira penambahannya gagal. */
+                  posisi={posisi.filter((p) => p.alamat === w.alamat)}
+                  log={log.filter((l) => l.alamat === w.alamat)}
+                  hapus={() => { void hapusDompet(w.alamat).then(() => tarik()); }} />
+              ))}
+            </div>
           </section>
         </>
       )}
