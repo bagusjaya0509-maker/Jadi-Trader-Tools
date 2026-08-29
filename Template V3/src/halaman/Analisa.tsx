@@ -1254,6 +1254,8 @@ function SlotAgen({ urutan }: { urutan: number }) {
    yang tidak akan pernah ia lihat. */
 const PanelChartAgen = lazy(() =>
   import('@/components/panel-chart-agen').then((m) => ({ default: m.PanelChartAgen })));
+const PanelWalletAgen = lazy(() =>
+  import('@/components/panel-wallet-agen').then((m) => ({ default: m.PanelWalletAgen })));
 
 const SUB = [
   /* URUTANNYA: 'market' duluan, dan di dalam kanal ia yang terbuka
@@ -1271,6 +1273,10 @@ const SUB = [
      seperti 'diikuti' dan 'posting', ia tidak ikut deretan tab — dituju
      lewat sidebar, dan hanya sah untuk pemilik. */
   { id: 'chart',    label: 'Chart Pantauan' },
+  /* Ruang kerja pemilik yang kedua: dompet on-chain yang dipantau. Sama
+     seperti 'chart', ia tidak ikut deretan tab umum — dituju dari kartu
+     agennya sendiri. */
+  { id: 'wallet',   label: 'Dompet Pantauan' },
 ] as const;
 
 /* Kanal mana yang punya ruang penyaringan chart.
@@ -1285,6 +1291,10 @@ const SUB = [
    hilang sendiri — kegagalan yang terlihat, bukan yang diam-diam membuka
    pintu. */
 const UID_KANAL_CHART = 'agen:ai-chart';
+/* 'AI Wallet' -> 'agen:ai-wallet' lewat uidAgenDari di server. Ditulis
+   tegas dengan alasan yang sama seperti kanal chart: mencocokkan nama
+   berarti kartu mana pun yang dinamai serupa ikut membuka ruangnya. */
+const UID_KANAL_WALLET = 'agen:ai-wallet';
 type IdSub = typeof SUB[number]['id'];
 
 /* Rak "Sinyal Pantauan" DISEMBUNYIKAN sementara — agennya masih jauh dari
@@ -1797,7 +1807,8 @@ export default function Analisa() {
       : s.id !== 'posting' && s.id !== 'diikuti'
         /* Tab ketiga, dan HANYA di kanal AI Chart milik pemiliknya:
            ruang penyaringan chart tidak punya arti di kanal orang lain. */
-        && (s.id !== 'chart' || (pemilik && kanalBuka === UID_KANAL_CHART))))
+        && (s.id !== 'chart' || (pemilik && kanalBuka === UID_KANAL_CHART))
+        && (s.id !== 'wallet' || (pemilik && kanalBuka === UID_KANAL_WALLET))))
     .map((s) => (!diDepan && s.id === 'market' ? { ...s, label: 'Daftar Signal' } : s));
 
   /* Masuk kanal, yang pertama terlihat Performa Signal — keputusan pemilik.
@@ -1824,7 +1835,8 @@ export default function Analisa() {
        dan `pemilik` supaya alamat yang ditebak-tebak tidak membuka arsip
        bertanda air ke pengunjung mana pun. Gerbang sungguhannya tetap di
        server; yang ini menjaga layarnya tidak pernah mencoba. */
-    id === 'chart' ? !diDepan && pemilik && kanalBuka === UID_KANAL_CHART
+    id === 'wallet' ? !diDepan && pemilik && kanalBuka === UID_KANAL_WALLET
+      : id === 'chart' ? !diDepan && pemilik && kanalBuka === UID_KANAL_CHART
       : id === 'posting' || id === 'diikuti' ? diDepan
       : tabTampil.some((s) => s.id === id);
   const sub: IdSub = subMinta && subSah(subMinta) ? subMinta : bawaanSub;
@@ -2730,6 +2742,12 @@ export default function Analisa() {
           contohPasangan={copyUntuk.pasangan}
           tutup={() => setCopyUntuk(null)}
         />
+      )}
+
+      {sub === 'wallet' && pemilik && kanalBuka === UID_KANAL_WALLET && (
+        <Suspense fallback={<div className="py-10 text-[13px] text-zinc-500">Memuat panel…</div>}>
+          <PanelWalletAgen />
+        </Suspense>
       )}
 
       {sub === 'chart' && pemilik && kanalBuka === UID_KANAL_CHART && (
@@ -3657,8 +3675,8 @@ export default function Analisa() {
                 /* Hanya kartu AI Chart, dan hanya untuk pemiliknya. Isi
                    ruangnya chart bertanda air sumbernya; pintu yang terlihat
                    oleh orang lain cuma akan mengantar ke penolakan server. */
-                keRuang={pemilik && ag.uid === UID_KANAL_CHART
-                  ? () => bukaKanalKeTab(ag.uid, 'chart')
+                keRuang={pemilik && (ag.uid === UID_KANAL_CHART || ag.uid === UID_KANAL_WALLET)
+                  ? () => bukaKanalKeTab(ag.uid, ag.uid === UID_KANAL_WALLET ? 'wallet' : 'chart')
                   : undefined} />
             ))}
             {kanalUrut.map(([uid, sinyal]) => {
@@ -4026,7 +4044,7 @@ export default function Analisa() {
                 sekarang bagaimana", log menjawab "analisnya barusan
                 melakukan apa" — dan pertanyaan kedua yang lebih dulu
                 ditanyakan orang yang mengikuti. */}
-            {sub !== 'performa' && sub !== 'chart' && <LogAktivitas sinyal={terpilih} />}
+            {sub !== 'performa' && sub !== 'chart' && sub !== 'wallet' && <LogAktivitas sinyal={terpilih} />}
 
             {(() => {
               /* Tab Performa mengganti BADAN kanal saja — kepalanya di atas
@@ -4040,7 +4058,7 @@ export default function Analisa() {
                  dan log aktivitas ikut menumpuk di bawahnya — dan di kanal
                  yang memang belum punya sinyal, yang muncul deretan rak
                  kosong yang membingungkan. */
-              if (sub === 'chart') return null;
+              if (sub === 'chart' || sub === 'wallet') return null;
               if (sub === 'performa') {
                 return (
                   <>
