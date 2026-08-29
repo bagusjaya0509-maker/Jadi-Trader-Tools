@@ -48,6 +48,17 @@ function umurDompet(ms: number) {
   return (hari / 365).toFixed(1) + ' thn';
 }
 
+/* RR di atas 99 ditulis "99+", bukan angkanya. Data sungguhan memulangkan
+   876 dan 429 — benar secara hitungan, tapi artinya cuma "hampir tidak
+   pernah rugi berarti di jendela ini", bukan "sepuluh kali lebih baik
+   daripada yang 87". Angka empat digit di kolom sempit juga mendorong kolom
+   lain keluar layar untuk keterangan yang tidak bertambah. */
+function rrTeks(v: number) {
+  if (v >= 100) return '99+';
+  if (v >= 10) return v.toFixed(1);
+  return v.toFixed(2);
+}
+
 function uangRingkas(v: number) {
   const a = Math.abs(v);
   if (a >= 1_000_000) return (v / 1_000_000).toFixed(2) + ' jt';
@@ -273,7 +284,7 @@ function PapanPeringkat({ pantau }: { pantau: (alamat: string, nama: string) => 
                           + ' vs rata-rata rugi $' + uangRingkas(w.rinci.kalahRata)
                           + (w.rinci.tutup < 10 ? ' — baru ' + w.rinci.tutup
                               + ' penutupan, belum cukup untuk disimpulkan' : '')}>
-                        {w.rinci.rr.toFixed(2)}
+                        {rrTeks(w.rinci.rr)}
                       </span>
                     ) : <span className="text-zinc-700">—</span>}
                   </td>
@@ -496,7 +507,7 @@ function KartuDompet({ w, posisi, log, bursa, dipilih, pilih, hapus }: {
               {bursa.tutup} tutup · {Math.round((bursa.menang / bursa.tutup) * 100)}%
               {bursa.rr !== null && (
                 <span className={cn('ml-1', bursa.rr >= 1 ? 'text-emerald-400/70' : 'text-amber-400/80')}>
-                  RR {bursa.rr.toFixed(2)}
+                  RR {rrTeks(bursa.rr)}
                 </span>
               )}
               {bursa.terpotong && <span className="text-zinc-600"> ·2rb</span>}
