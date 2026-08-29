@@ -42,6 +42,7 @@ import { modePreview, jatahTerpakai, pakaiJatah } from '@/lib/preview';
 import { usePaket, pakaiKuota, teksSisa } from '@/lib/paket';
 import { JiplakChart, JIPLAK_BAWAAN, type AturJiplak } from '@/components/jiplak-chart';
 import type { PosisiDompet } from '@/lib/wallet-agen';
+import { PanelBelah } from '@/components/panel-belah';
 
 /* ════════════════════════════════════════════════════════════════════════
    CHART & BACKTEST
@@ -306,10 +307,11 @@ function rapikanSimbol(s: string): string {
    lahir dan hidup di Hyperliquid saja (PURR, CASHCAT) akan membuka chart
    kosong, dan itu lebih jujur daripada daftar yang diam-diam berbeda dari
    yang orang lihat di dompetnya. */
-function DaftarPosisiDompet({ posisi, aktif, pilih }: {
+function DaftarPosisiDompet({ posisi, aktif, pilih, keluar }: {
   posisi: PosisiDompet[];
   aktif: string;
   pilih: (simbol: string) => void;
+  keluar: () => void;
 }) {
   const simbolDari = (koin: string) => String(koin || '').toUpperCase().replace(/^@/, '') + 'USDT';
   const nama = posisi.length ? posisi[0].nama : '';
@@ -317,7 +319,8 @@ function DaftarPosisiDompet({ posisi, aktif, pilih }: {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="sticky top-0 z-10 border-b border-zinc-800 bg-zinc-950 px-2.5 py-1.5">
+      <div className="sticky top-0 z-10 flex items-start gap-2 border-b border-zinc-800 bg-zinc-950 px-2.5 py-1.5">
+        <div className="min-w-0 flex-1">
         <p className="truncate text-[12px] font-semibold text-zinc-100">{nama || 'Dompet pantauan'}</p>
         <p className="text-[10.5px] text-zinc-600">
           {posisi.length} posisi ·{' '}
@@ -325,6 +328,15 @@ function DaftarPosisiDompet({ posisi, aktif, pilih }: {
             {total >= 0 ? '+' : '−'}${Math.abs(total).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
           </span>{' '}mengambang
         </p>
+        </div>
+        {/* Pintu keluar. Mode belah dua ini dimasuki dari halaman lain, dan
+            tanpa jalan pulang satu-satunya cara keluar adalah menyunting
+            alamatnya sendiri — yang tidak akan terpikir oleh siapa pun yang
+            sedang membaca chart. */}
+        <button onClick={keluar} title="Tutup daftar dan kembali"
+          className="shrink-0 cursor-pointer rounded p-1 text-zinc-600 transition-colors hover:bg-zinc-800 hover:text-zinc-100">
+          <X className="size-3.5" />
+        </button>
       </div>
       <div className="min-h-0 flex-1">
         {posisi.map((p, i) => {
@@ -2611,6 +2623,32 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
     setSimbol(rapikanSimbol(posisiDompet[0].koin.toUpperCase().replace(/^@/, '') + 'USDT'));
   }, [dompetMinta, posisiDompet, cari]);
 
+  /* ── GARIS OTOMATIS UNTUK POSISI YANG SEDANG DILIHAT ────────────────
+     Diminta pemilik: mengklik koin harus langsung menggambar entry-nya.
+
+     Yang digambar cuma yang BENAR-BENAR ada di data: harga masuk dan harga
+     likuidasi. SL dan TP sengaja tidak — dompet-dompet ini diperiksa lewat
+     frontendOpenOrders dan tidak satu pun memasang order pemicu. Menggambar
+     garis SL yang tidak pernah dipasang pemiliknya berarti mengarang
+     rencana orang lain, di layar yang dipakai meniru rencana itu.
+
+     Likuidasi diberi warna amber, bukan merah: ia bukan stop yang dipilih,
+     melainkan batas yang dipaksakan bursa. Dua hal yang sangat berbeda dan
+     tidak boleh terbaca sama. */
+  const garisDompet = useMemo<GarisHarga[]>(() => {
+    if (!posisiDompet.length) return [];
+    const p = posisiDompet.find(
+      (x) => x.koin.toUpperCase().replace(/^@/, '') + 'USDT' === simbol.replace(/^MT5:/i, ''));
+    if (!p) return [];
+    const g: GarisHarga[] = [];
+    if (p.entry > 0) {
+      g.push({ harga: p.entry, warna: p.arah === 'LONG' ? 'rgba(52,211,153,.85)' : 'rgba(248,113,113,.85)',
+        label: p.arah + ' ' + p.ukuran });
+    }
+    if (p.likuidasi > 0) g.push({ harga: p.likuidasi, warna: 'rgba(251,191,36,.75)', label: 'Likuidasi' });
+    return g;
+  }, [posisiDompet, simbol]);
+
   const jiplakMinta = cari.get('jiplak');
   const jiplakTerpasang = useRef<string | null>(null);
   useEffect(() => {
@@ -3750,11 +3788,35 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                 ))}
               </div>
             )}
+          {/* ── DAFTAR DOMPET DI LUAR ChartLilin, BUKAN DI DALAMNYA ────
+              ChartLilin dipasang dengan key yang memuat `simbol`, jadi
+              seluruh komponennya dibongkar-pasang tiap kali pasangannya
+              berganti. Untuk chart itu memang disengaja. Tapi daftar yang
+              duduk di dalamnya ikut mati bersamanya, dan yang terlihat
+              orang adalah panel kiri yang berkedip tiap pindah koin.
+
+              Kedipnya tidak bisa dihilangkan dari dalam subpohon yang
+              dikunci — apa pun di sana ikut dibongkar. Jadi panelnya berdiri
+              di luar, dan yang berganti cuma chart di kanannya.
+
+              Jiplak TIDAK dipindah: panel acuannya memang harus sejajar
+              dengan kanvas, dan ia tetap di dalam ChartLilin. */}
+          <PanelBelah tinggi={tinggiChart}
+            kiri={!jiplak && posisiDompet.length ? (
+              <DaftarPosisiDompet posisi={posisiDompet} aktif={simbol}
+                pilih={(x) => setSimbol(rapikanSimbol(x))}
+                keluar={() => {
+                  const q = new URLSearchParams(cari);
+                  q.delete('dompet');
+                  setPosisiDompet([]);
+                  navigasi({ search: q.toString() ? '?' + q.toString() : '' }, { replace: true });
+                }} />
+            ) : undefined}>
           {lilin.times.length > 0
             ? <ChartLilin key={`${simbol}|${tf}|${kunciChart}`}
                           lilin={lilinGabung} garis={garis} trade={replayIdx === null ? hasil?.trade : undefined}
                           tinggi={tinggiChart} hingga={replayIdx ?? undefined} smi={smi}
-                          garisHarga={[...garisHarga, ...garisZona, ...(modeNyata ? garisOrder : [])]}
+                          garisHarga={[...garisHarga, ...garisZona, ...garisDompet, ...(modeNyata ? garisOrder : [])]}
                           /* Klik chart HANYA berlaku saat mode bidik menyala —
                               sekali, untuk menentukan titik mulai replay.
                               Sesudah itu modenya padam dan klik kembali tidak
@@ -3838,14 +3900,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                              berarti medan lain ikut ditulis ulang setiap
                              kali salah satunya disunting. */
                           onUbahJiplak={(p) => setJiplak((j) => (j ? { ...j, ...p } : j))}
-                          /* Jiplak menang kalau keduanya diminta: gambar
-                             acuan dan daftar tidak bisa menempati satu
-                             ruang, dan yang sedang dijiplak lebih spesifik
-                             daripada daftar yang menunggu diklik. */
-                          panelKiri={!jiplak && posisiDompet.length ? (
-                            <DaftarPosisiDompet posisi={posisiDompet} aktif={simbol}
-                              pilih={(x) => setSimbol(rapikanSimbol(x))} />
-                          ) : undefined}
+
                           posisiMt5={modeNyata ? posisiMt5Chart : KOSONG_POSISI}
                           onUbahPosisi={simbol.startsWith('MT5:') ? ubahPosisiMt5 : undefined}
                           hargaAsk={modeNyata ? askTampil : undefined}
@@ -4267,6 +4322,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                     </>
                   ) : 'Tidak ada data untuk simbol ini.'}
               </div>}
+          </PanelBelah>
 
           {/* ── Bilah SUNTING order ────────────────────────────────
               Muncul hanya saat sebuah order dipilih dari panel Posisi
