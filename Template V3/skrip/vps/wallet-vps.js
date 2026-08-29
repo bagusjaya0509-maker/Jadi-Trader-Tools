@@ -34,6 +34,7 @@ module.exports = (app, { butuhLogin, batasLaju, express, DIR }) => {
   const PANTAU = path.join(DIR, 'wallet-pantau.json');
   const AKTIVITAS = path.join(DIR, 'wallet-aktivitas.json');
   const PERINGKAT = path.join(DIR, 'wallet-peringkat.json');
+  const PERINGKAT_RINCI = path.join(DIR, 'wallet-peringkat-rinci.json');
 
   function baca(F, bawaan) {
     try { return JSON.parse(fs.readFileSync(F, 'utf8')); } catch (e) { return bawaan; }
@@ -134,6 +135,13 @@ module.exports = (app, { butuhLogin, batasLaju, express, DIR }) => {
     /* Disaring dan diurutkan DI SINI, bukan di peramban. Kirim 190 KB tiap
        kali orang berganti jendela waktu itu mahal untuk sambungan yang
        sering menumpang tethering; yang benar-benar dibaca cuma 40 baris. */
+    /* Rincian ditempel dari berkas terpisah, dan yang tidak punya dibiarkan
+       KOSONG — bukan diisi nol. Cuma barisan teratas yang diperkaya (userFills
+       632 KB per dompet, 953 dompet mustahil), dan nol di kolom win rate
+       terbaca sebagai "tidak pernah menang" — kebalikan dari "belum
+       diperiksa". */
+    const rinci = (baca(PERINGKAT_RINCI, { rinci: {} }) || {}).rinci || {};
+
     const daftar = p.daftar
       .filter((x) => x && x.w && x.w[jendela] && x.akun >= pBawah && x.akun < pAtas)
       .sort((a, b) => (b.w[jendela].pnl || 0) - (a.w[jendela].pnl || 0))
@@ -145,6 +153,7 @@ module.exports = (app, { butuhLogin, batasLaju, express, DIR }) => {
         pnl: x.w[jendela].pnl,
         vlm: x.w[jendela].vlm,
         dipantau: dipantau.has(x.alamat),
+        rinci: rinci[x.alamat] || null,
       }));
 
     res.json({

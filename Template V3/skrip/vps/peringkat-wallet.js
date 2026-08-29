@@ -118,6 +118,164 @@ const PITA = [
   { id: 'semua', bawah: 0, atas: Infinity },
 ];
 
+/* ══ MEMPERKAYA BARIS TERATAS ══════════════════════════════════════════
+   Papan peringkat cuma menjawab "siapa yang untung". Tiga hal yang membuat
+   orang benar-benar bisa memilih siapa yang dipantau tidak ada di sana:
+   seberapa sering ia menang, sudah berapa lama ia hidup, dan sekarang
+   sedang memegang apa.
+
+   ── ONGKOSNYA SANGAT TIMPANG, DAN ITU MEMBENTUK RANCANGANNYA ─────────
+   Diukur di VPS ini untuk satu dompet:
+
+       clearinghouseState            6 KB   291 ms   -> posisi terbuka
+       userNonFundingLedgerUpdates   4 KB    86 ms   -> umur dompet
+       userFills                   632 KB   420 ms   -> win rate
+
+   Dua yang pertama praktis gratis. Yang ketiga seratus lima puluh kali
+   lebih berat, dan 953 dompet berarti 600 MB per putaran — mustahil.
+
+   Jadi yang diperkaya cuma barisan TERATAS yang benar-benar dilihat orang:
+   30 teratas per pita ukuran akun pada jendela bulan, yang memang tampilan
+   bawaan panelnya. Sisanya menulis tanda hubung — dan tanda hubung yang
+   jujur lebih baik daripada angka yang dikarang untuk mengisi kolom.
+
+   ── UMUR DARI BUKU BESAR, BUKAN DARI FILL ───────────────────────────
+   Temuan yang mengubah kualitas angkanya: `userFills` dibatasi 2000 baris,
+   jadi fill tertuanya BUKAN awal hidup dompet — untuk dompet ramai ia cuma
+   dua bulan lalu. `userNonFundingLedgerUpdates` memulangkan setoran dan
+   penarikan sejak awal, dan baris tertuanya adalah setoran pertama: umur
+   yang sebenarnya. Untuk dompet yang diuji, fill tertua 30 Juni 2026
+   sementara setoran pertama 1 Mei 2025 — selisih sebelas bulan.
+
+   Dan ia 158 kali lebih murah daripada sumber yang salah itu. */
+const PERKAYA_PER_PITA = Number(process.env.WALLET_PERKAYA || 30);
+const KELUAR_RINCI = path.join(__dirname, 'wallet-peringkat-rinci.json');
+
+const tidur = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/* ── DIBATASI LAJU, DAN INI DIPELAJARI DARI KEGAGALAN ──────────────────
+   Percobaan pertama menembak 90 dompet secepat mungkin dan selesai dalam 12
+   detik — yang mustahil untuk 270 permintaan yang salah satunya 632 KB.
+   Hasilnya: cuma 20 dari 90 yang terisi. Sisanya ditolak Hyperliquid, dan
+   penolakannya cepat, senyap, serta terbaca sebagai "sukses tapi kosong".
+
+   Kegagalan yang cepat memang selalu terlihat seperti keberhasilan yang
+   cepat, dan itu sebabnya durasi yang terlalu bagus untuk dipercaya patut
+   dicurigai sebelum hasilnya diperiksa.
+
+   Sekarang satu percobaan ulang dengan jeda, dan jeda tetap antar dompet.
+   Sembilan puluh dompet jadi sekitar dua menit — tidak masalah untuk cron
+   yang jalan empat kali sehari. */
+const JEDA_LAJU = Number(process.env.WALLET_JEDA_LAJU || 1200);
+
+async function hlq(badan, ulang = 1) {
+  try {
+    const r = await fetch('https://api.hyperliquid.xyz/info', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(badan), signal: AbortSignal.timeout(25000),
+    });
+    if (r.status === 429 || r.status >= 500) {
+      if (ulang > 0) { await tidur(3000); return hlq(badan, ulang - 1); }
+      return null;
+    }
+    if (!r.ok) return null;
+    return await r.json();
+  } catch (e) {
+    if (ulang > 0) { await tidur(2000); return hlq(badan, ulang - 1); }
+    return null;
+  }
+}
+
+/* Aturan pengelompokan yang SAMA dengan pemantau dan layar: koin+arah sama,
+   jarak kurang dari lima menit = satu penutupan. Tiga tempat menghitung
+   win rate, dan tiga penggaris yang berbeda berarti tiga angka yang tidak
+   bisa dibandingkan dengan apa pun. */
+/* ── RR RATA-RATA: UKURAN MENANG DIBAGI UKURAN KALAH ───────────────────
+   Win rate sendirian menipu. Trader yang menang 80% tapi tiap kalah
+   menghapus empat kemenangan sedang rugi pelan-pelan, dan angka 80% itu
+   yang membuatnya terlihat hebat. Yang melengkapinya rasio ukuran: rata-rata
+   penutupan untung dibagi rata-rata penutupan rugi.
+
+   Dua-duanya diperlukan dan tidak bisa saling menggantikan. WR 40% dengan
+   RR 3 lebih menguntungkan daripada WR 70% dengan RR 0,3, dan tidak ada
+   satu angka pun yang bisa mengatakan itu sendirian.
+
+   Dihitung dari PENUTUPAN yang sudah dikelompokkan, bukan dari fill: satu
+   keluar yang terpotong seratus keping akan memberi seratus "kerugian
+   kecil" dan meruntuhkan rata-ratanya. */
+function wrDari(fills) {
+  const tutup = (Array.isArray(fills) ? fills : [])
+    .filter((f) => Number(f.closedPnl) !== 0)
+    .sort((a, b) => (Number(a.time) || 0) - (Number(b.time) || 0));
+  const g = [];
+  for (const l of tutup) {
+    const k = g[g.length - 1];
+    const t = Number(l.time) || 0;
+    if (k && k.koin === l.coin && k.dir === l.dir && t - k.waktu <= 300000) {
+      k.pnl += Number(l.closedPnl) || 0; k.waktu = t;
+    } else {
+      g.push({ koin: l.coin, dir: l.dir, pnl: Number(l.closedPnl) || 0, waktu: t });
+    }
+  }
+  const menang = g.filter((x) => x.pnl > 0).length;
+  const untung = g.filter((x) => x.pnl > 0).map((x) => x.pnl);
+  const rugi = g.filter((x) => x.pnl < 0).map((x) => Math.abs(x.pnl));
+  const rata = (d) => (d.length ? d.reduce((a, b) => a + b, 0) / d.length : 0);
+  const mRata = rata(untung);
+  const kRata = rata(rugi);
+  /* null kalau belum pernah rugi — RR tak hingga bukan angka yang bisa
+     dibandingkan, dan menuliskannya sebagai angka besar membuat dompet
+     dengan tiga trade menang terlihat mengalahkan semuanya. */
+  const rr = kRata > 0 && mRata > 0 ? Math.round((mRata / kRata) * 100) / 100 : null;
+  return {
+    tutup: g.length, menang,
+    wr: g.length ? Math.round(menang / g.length * 100) : null,
+    rr,
+    menangRata: Math.round(mRata),
+    kalahRata: Math.round(kRata),
+  };
+}
+
+async function perkaya(alamat) {
+  const [isi, buku, fills] = await Promise.all([
+    hlq({ type: 'clearinghouseState', user: alamat }),
+    hlq({ type: 'userNonFundingLedgerUpdates', user: alamat, startTime: 0 }),
+    hlq({ type: 'userFills', user: alamat }),
+  ]);
+
+  const posisi = [];
+  for (const p of ((isi && isi.assetPositions) || [])) {
+    const po = p.position || {};
+    const sz = Number(po.szi) || 0;
+    if (!sz) continue;
+    posisi.push({
+      koin: String(po.coin || '?'),
+      arah: sz > 0 ? 'L' : 'S',
+      nilai: Math.round(Math.abs(Number(po.positionValue) || 0)),
+      pnl: Math.round(Number(po.unrealizedPnl) || 0),
+    });
+  }
+  posisi.sort((a, b) => b.nilai - a.nilai);
+
+  const waktuBuku = (Array.isArray(buku) ? buku : []).map((x) => Number(x.time) || 0).filter(Boolean);
+  const w = wrDari(fills);
+
+  return {
+    posisi: posisi.slice(0, 6),
+    jmlPosisi: posisi.length,
+    /* Setoran pertama = umur sebenarnya. 0 kalau buku besarnya tidak
+       terbaca — dan nol DIBEDAKAN dari "baru saja dibuat" di layar. */
+    lahir: waktuBuku.length ? Math.min(...waktuBuku) : 0,
+    wr: w.wr,
+    rr: w.rr,
+    menangRata: w.menangRata,
+    kalahRata: w.kalahRata,
+    tutup: w.tutup,
+    fill: Array.isArray(fills) ? fills.length : 0,
+    terpotong: Array.isArray(fills) && fills.length >= 2000,
+  };
+}
+
 (async () => {
   const t0 = Date.now();
   catat('menarik papan peringkat…');
@@ -187,6 +345,45 @@ const PITA = [
   const semenKeluar = KELUAR + '.tmp';
   fs.writeFileSync(semenKeluar, JSON.stringify(isi));
   fs.renameSync(semenKeluar, KELUAR);
+
+  /* ── Perkaya barisan teratas ────────────────────────────────────────
+     Berurutan, bukan berbarengan. Tiga puluh respons userFills sekaligus
+     berarti sekitar 19 MB tertahan di memori pada saat yang sama, di VPS
+     yang cuma punya 275 MB sisa — dan skrip ini sudah memakai 200 MB untuk
+     mem-parse papannya sendiri beberapa detik sebelumnya. */
+  const perluRinci = [];
+  for (const p of PITA) {
+    const d = daftar
+      .filter((x) => x.w.month && x.akun >= p.bawah && x.akun < p.atas)
+      .sort((a, b) => b.w.month.pnl - a.w.month.pnl)
+      .slice(0, PERKAYA_PER_PITA);
+    for (const x of d) if (!perluRinci.includes(x.alamat)) perluRinci.push(x.alamat);
+  }
+  catat('memperkaya', perluRinci.length, 'dompet teratas…');
+
+  const rinci = {};
+  let n = 0;
+  for (const a of perluRinci) {
+    try {
+      const d = await perkaya(a);
+      /* Yang KOSONG tidak disimpan. Baris tanpa WR maupun umur berarti
+         permintaannya ditolak, bukan dompetnya tidak punya riwayat — dan
+         menyimpannya membuat putaran berikutnya mengira ia sudah diperiksa. */
+      if (d.wr !== null || d.lahir || d.jmlPosisi) {
+        d.waktu = Date.now();
+        rinci[a] = d;
+        n++;
+      }
+    } catch (e) { /* satu dompet gagal tidak menjatuhkan sisanya */ }
+    await tidur(JEDA_LAJU);
+  }
+  try {
+    const semenR = KELUAR_RINCI + '.tmp';
+    fs.writeFileSync(semenR, JSON.stringify({ diperbarui: Date.now(), rinci }));
+    fs.renameSync(semenR, KELUAR_RINCI);
+    catat('rincian tersimpan ·', n, 'dompet ·',
+      Math.round(fs.statSync(KELUAR_RINCI).size / 1024), 'KB');
+  } catch (e) { catat('rincian gagal disimpan:', e.message); }
   catat('tersimpan', daftar.length, 'dompet ·',
     Math.round(fs.statSync(KELUAR).size / 1024), 'KB ·',
     ((Date.now() - t0) / 1000).toFixed(1), 'detik total');

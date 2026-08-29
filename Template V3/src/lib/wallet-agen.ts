@@ -47,6 +47,10 @@ export interface RiwayatBursa {
   terpotong: boolean;
   tutup: number;
   menang: number;
+  /** Rata-rata untung dibagi rata-rata rugi. null = belum pernah rugi. */
+  rr: number | null;
+  menangRata: number;
+  kalahRata: number;
   realisasi: number;
   /** Waktu fill tertua yang dipulangkan bursa. */
   sejak: number;
@@ -136,6 +140,22 @@ export type JendelaPeringkat = 'day' | 'week' | 'month' | 'allTime';
  *  angka dari sumber ini yang bisa dipertanggungjawabkan. */
 export type PitaAkun = 'kecil' | 'menengah' | 'semua';
 
+/** Rincian yang ditarik terpisah untuk barisan teratas saja.
+ *  null = belum diperiksa, BUKAN nol. */
+export interface RinciPeringkat {
+  posisi: { koin: string; arah: 'L' | 'S'; nilai: number; pnl: number }[];
+  jmlPosisi: number;
+  /** Setoran pertama ke dompetnya — umur yang sebenarnya, bukan fill tertua. */
+  lahir: number;
+  wr: number | null;
+  rr: number | null;
+  menangRata: number;
+  kalahRata: number;
+  tutup: number;
+  fill: number;
+  terpotong: boolean;
+}
+
 export interface BarisPeringkat {
   alamat: string;
   /** Nama yang dipasang pemiliknya sendiri — teks pihak lain. Ditampilkan
@@ -145,6 +165,7 @@ export interface BarisPeringkat {
   pnl: number;
   vlm: number;
   dipantau: boolean;
+  rinci: RinciPeringkat | null;
 }
 
 export interface Peringkat {

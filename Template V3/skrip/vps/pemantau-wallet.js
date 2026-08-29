@@ -162,6 +162,26 @@ function riwayatBursa(fills) {
   }
 
   const menang = grup.filter((g) => g.pnl > 0).length;
+/* ── RR RATA-RATA: UKURAN MENANG DIBAGI UKURAN KALAH ───────────────────
+   Win rate sendirian menipu. Trader yang menang 80% tapi tiap kalah
+   menghapus empat kemenangan sedang rugi pelan-pelan, dan angka 80% itu
+   yang membuatnya terlihat hebat. Yang melengkapinya rasio ukuran: rata-rata
+   penutupan untung dibagi rata-rata penutupan rugi.
+
+   Dua-duanya diperlukan dan tidak bisa saling menggantikan. WR 40% dengan
+   RR 3 lebih menguntungkan daripada WR 70% dengan RR 0,3, dan tidak ada
+   satu angka pun yang bisa mengatakan itu sendirian.
+
+   Dihitung dari PENUTUPAN yang sudah dikelompokkan, bukan dari fill: satu
+   keluar yang terpotong seratus keping akan memberi seratus "kerugian
+   kecil" dan meruntuhkan rata-ratanya. */
+  const untung = grup.filter((x) => x.pnl > 0).map((x) => x.pnl);
+  const rugi = grup.filter((x) => x.pnl < 0).map((x) => Math.abs(x.pnl));
+  const rata = (d) => (d.length ? d.reduce((a, b) => a + b, 0) / d.length : 0);
+  const mRata = rata(untung);
+  const kRata = rata(rugi);
+  const rr = kRata > 0 && mRata > 0 ? Math.round((mRata / kRata) * 100) / 100 : null;
+
   const waktu = (Array.isArray(fills) ? fills : []).map((f) => Number(f.time) || 0).filter(Boolean);
   return {
     fill: Array.isArray(fills) ? fills.length : 0,
@@ -171,6 +191,9 @@ function riwayatBursa(fills) {
     terpotong: Array.isArray(fills) && fills.length >= 2000,
     tutup: grup.length,
     menang,
+    rr,
+    menangRata: Math.round(mRata),
+    kalahRata: Math.round(kRata),
     realisasi: Math.round(grup.reduce((n, g) => n + g.pnl, 0) * 100) / 100,
     sejak: waktu.length ? Math.min(...waktu) : 0,
   };

@@ -36,6 +36,18 @@ function umur(t: number) {
   return Math.round(j / 24) + ' hari lalu';
 }
 
+/* Umur dompet dalam kata, bukan tanggal. "8 bulan" langsung bisa ditimbang;
+   "1 Mei 2025" menuntut pembacanya berhitung sendiri tiap kali. */
+function umurDompet(ms: number) {
+  if (!ms) return null;
+  const hari = Math.floor((Date.now() - ms) / 86400000);
+  if (hari < 1) return 'hari ini';
+  if (hari < 60) return hari + ' hari';
+  const bulan = Math.round(hari / 30);
+  if (bulan < 24) return bulan + ' bln';
+  return (hari / 365).toFixed(1) + ' thn';
+}
+
 function uangRingkas(v: number) {
   const a = Math.abs(v);
   if (a >= 1_000_000) return (v / 1_000_000).toFixed(2) + ' jt';
@@ -198,14 +210,17 @@ function PapanPeringkat({ pantau }: { pantau: (alamat: string, nama: string) => 
               dibuka tiap hari, sementara papan peringkat cuma disentuh
               sesekali saat mencari yang baru. Kepala tabelnya menempel
               supaya judul kolom tidak hilang di baris kesebelas. */}
-          <table className="w-full min-w-[560px] border-collapse text-[12px]">
+          <table className="w-full min-w-[900px] border-collapse text-[12px]">
             <thead className="sticky top-0 z-10 bg-zinc-950">
               <tr className="border-b border-zinc-800 text-[10.5px] uppercase tracking-wide text-zinc-600">
                 <th className="w-8 px-2 py-1.5 text-right font-medium">#</th>
                 <th className="px-2 py-1.5 text-left font-medium">Dompet</th>
                 <th className="px-2 py-1.5 text-right font-medium">Akun</th>
                 <th className="px-2 py-1.5 text-right font-medium">P/L</th>
-                <th className="px-2 py-1.5 text-right font-medium">Volume</th>
+                <th className="px-2 py-1.5 text-right font-medium" title="Menang dari penutupan sepanjang riwayat yang diberikan bursa">WR</th>
+                <th className="px-2 py-1.5 text-right font-medium" title="Rata-rata untung dibagi rata-rata rugi. WR tinggi dengan RR rendah bisa tetap merugi.">RR</th>
+                <th className="px-2 py-1.5 text-right font-medium" title="Sejak setoran pertama ke dompet ini">Umur</th>
+                <th className="px-2 py-1.5 text-left font-medium">Posisi sekarang</th>
                 <th className="w-20 px-2 py-1.5" />
               </tr>
             </thead>
@@ -227,10 +242,65 @@ function PapanPeringkat({ pantau }: { pantau: (alamat: string, nama: string) => 
                     w.pnl >= 0 ? 'text-emerald-400' : 'text-red-400')}>
                     {w.pnl >= 0 ? '+' : '−'}{uangRingkas(Math.abs(w.pnl))}
                   </td>
-                  {/* Volume nol DITULIS sebagai garis, bukan "$0". Sebagian
-                      akun besar memang tidak dilaporkan volumenya di jendela
-                      itu, dan nol yang tegas terbaca sebagai "tidak pernah
-                      transaksi" — kebalikan dari yang sebenarnya. */}
+                  {/* Tanda hubung berarti BELUM DIPERIKSA, bukan nol. Cuma
+                      barisan teratas yang diperkaya — userFills 632 KB per
+                      dompet, dan 953 dompet mustahil ditarik tiap putaran. */}
+                  <td className="px-2 py-1.5 text-right tabular-nums">
+                    {/* Di bawah sepuluh penutupan, angkanya DIREDUPKAN —
+                        bukan disembunyikan. WR 100% dari satu trade benar
+                        secara hitungan dan tidak berarti apa-apa, dan warna
+                        hijau penuh di sebelahnya membuatnya terbaca seperti
+                        rekam jejak. */}
+                    {w.rinci && w.rinci.wr !== null ? (
+                      <span className={cn(w.rinci.tutup < 10 ? 'text-zinc-500'
+                        : w.rinci.wr >= 50 ? 'text-emerald-400' : 'text-red-400')}
+                        title={w.rinci.tutup + ' penutupan dari ' + w.rinci.fill + ' transaksi'
+                          + (w.rinci.terpotong ? ' (dibatasi 2000 oleh bursa)' : '')}>
+                        {w.rinci.wr}%
+                        <span className="ml-1 text-[9.5px] text-zinc-600">{w.rinci.tutup}</span>
+                      </span>
+                    ) : <span className="text-zinc-700">—</span>}
+                  </td>
+                  {/* RR di sebelah WR, dan itu disengaja: keduanya tidak
+                      berarti apa-apa sendirian. Menang 80% dengan RR 0,3
+                      adalah kerugian pelan, dan angka 80% itu yang membuatnya
+                      terlihat hebat. */}
+                  <td className="px-2 py-1.5 text-right tabular-nums">
+                    {w.rinci && w.rinci.rr !== null ? (
+                      <span className={cn(w.rinci.tutup < 10 ? 'text-zinc-500'
+                        : w.rinci.rr >= 1 ? 'text-emerald-400/90' : 'text-amber-400/90')}
+                        title={'Rata-rata untung $' + uangRingkas(w.rinci.menangRata)
+                          + ' vs rata-rata rugi $' + uangRingkas(w.rinci.kalahRata)
+                          + (w.rinci.tutup < 10 ? ' — baru ' + w.rinci.tutup
+                              + ' penutupan, belum cukup untuk disimpulkan' : '')}>
+                        {w.rinci.rr.toFixed(2)}
+                      </span>
+                    ) : <span className="text-zinc-700">—</span>}
+                  </td>
+                  <td className="px-2 py-1.5 text-right tabular-nums text-zinc-500">
+                    {w.rinci && w.rinci.lahir ? umurDompet(w.rinci.lahir) : <span className="text-zinc-700">—</span>}
+                  </td>
+                  {/* Posisi terbuka RINGKAS, tiga terbesar. Daftar penuh di
+                      kolom tabel akan melebarkan barisnya sampai kolom lain
+                      terdorong keluar layar — dan yang menjawab "dia sedang
+                      pegang apa" memang tiga terbesarnya. */}
+                  <td className="max-w-[13rem] px-2 py-1.5">
+                    {!w.rinci ? <span className="text-zinc-700">—</span>
+                      : w.rinci.jmlPosisi === 0 ? <span className="text-zinc-700">kosong</span>
+                      : (
+                        <span className="flex flex-wrap gap-x-1.5 gap-y-0.5">
+                          {w.rinci.posisi.slice(0, 3).map((p) => (
+                            <span key={p.koin} className="whitespace-nowrap text-[11px]">
+                              <span className="text-zinc-300">{p.koin}</span>
+                              <span className={cn('ml-0.5', p.arah === 'L' ? 'text-emerald-400' : 'text-red-400')}>{p.arah}</span>
+                            </span>
+                          ))}
+                          {w.rinci.jmlPosisi > 3 && (
+                            <span className="text-[10px] text-zinc-600">+{w.rinci.jmlPosisi - 3}</span>
+                          )}
+                        </span>
+                      )}
+                  </td>
                   <td className="px-2 py-1.5 text-right tabular-nums text-zinc-600">
                     {w.vlm > 0 ? '$' + uangRingkas(w.vlm) : '—'}
                   </td>
@@ -254,7 +324,14 @@ function PapanPeringkat({ pantau }: { pantau: (alamat: string, nama: string) => 
       )}
 
       <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-600">
-        Semua angka di sini milik Hyperliquid; tidak ada yang kita hitung
+        RR = rata-rata untung dibagi rata-rata rugi; ia melengkapi WR, tidak
+        menggantikannya. Angka abu-abu berarti di bawah sepuluh penutupan —
+        benar secara hitungan, belum berarti sebagai rekam jejak. Menang 80% dengan RR 0,3 tetap merugi pelan-pelan.
+        WR, RR, umur, dan posisi cuma terisi untuk barisan teratas tiap pita —
+        menarik riwayat lengkap 953 dompet berarti 600 MB tiap putaran. Tanda
+        hubung berarti belum diperiksa, bukan nol. Umur dihitung dari setoran
+        pertama ke dompetnya, bukan dari transaksi tertua yang terbaca.
+        Selebihnya angka Hyperliquid; tidak ada yang kita hitung
         sendiri. Kolom persen sengaja tidak ada — ROI terbitan bursanya
         memberi 115.524% untuk akun 30 ribu dolar, dan dua rasio pengganti
         yang dicoba sama tidak masuk akalnya. Papan ini menunjukkan siapa yang
@@ -417,6 +494,11 @@ function KartuDompet({ w, posisi, log, bursa, dipilih, pilih, hapus }: {
                       + 'jadi ini BUKAN angka seumur hidup dompetnya.'
                     : 'Seluruh riwayat dompet ini terbaca.')}>
               {bursa.tutup} tutup · {Math.round((bursa.menang / bursa.tutup) * 100)}%
+              {bursa.rr !== null && (
+                <span className={cn('ml-1', bursa.rr >= 1 ? 'text-emerald-400/70' : 'text-amber-400/80')}>
+                  RR {bursa.rr.toFixed(2)}
+                </span>
+              )}
               {bursa.terpotong && <span className="text-zinc-600"> ·2rb</span>}
             </span>
           )}
@@ -437,6 +519,9 @@ function KartuDompet({ w, posisi, log, bursa, dipilih, pilih, hapus }: {
           {bursa && bursa.tutup > 0 && (
             <span className="block text-zinc-700">
               riwayat bursa {bursa.realisasi >= 0 ? '+' : '−'}${uangRingkas(Math.abs(bursa.realisasi))}
+              {bursa.rr !== null && (
+                <> · menang ${uangRingkas(bursa.menangRata)} vs rugi ${uangRingkas(bursa.kalahRata)}</>
+              )}
             </span>
           )}
         </span>
