@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Loader2, Plus, RefreshCw, Trash2, Trophy, Wallet } from 'lucide-react';
+import { ChevronRight, Loader2, Plus, RefreshCw, Trash2, Trophy, Wallet, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SparklineSaldo } from '@/components/kurva-saldo';
 import {
@@ -439,6 +439,17 @@ function KartuDompet({ w, posisi, log, dipilih, pilih, hapus }: {
           {akun > 0 ? 'akun $' + uangRingkas(akun) : umur(w.sejak)}
         </span>
       </div>
+
+      {/* ── TANDA BISA DIKLIK, DITULIS ────────────────────────────────
+          Kartu yang seluruh badannya bisa diklik tapi tidak punya satu pun
+          tanda yang mengatakannya akan diperlakukan sebagai gambar. Itu
+          persis yang terjadi: rinciannya sudah ada dan terbuka dengan
+          benar, tapi tidak ada yang tahu harus mengklik. Kursor berubah
+          jadi tangan cuma terlihat SESUDAH orang mencoba. */}
+      <div className="flex items-center justify-center gap-1 border-t border-zinc-800/70 bg-zinc-900/40 py-1 text-[10.5px] text-zinc-500 transition-colors group-hover:bg-zinc-800/50 group-hover:text-zinc-300">
+        Lihat posisi &amp; transaksi
+        <ChevronRight className="size-3" />
+      </div>
     </div>
   );
 }
@@ -450,17 +461,46 @@ function KartuDompet({ w, posisi, log, dipilih, pilih, hapus }: {
 
    Pola yang sama dengan papan analis di halaman ini: kartunya memilih,
    ruang di bawahnya menampilkan. */
-function RincianDompet({ w, posisi, log }: {
+function RincianDompet({ w, posisi, log, tutup }: {
   w: { alamat: string; nama: string };
   posisi: PosisiDompet[];
   log: TransaksiDompet[];
+  tutup: () => void;
 }) {
+  /* Escape menutup. Lapisan yang cuma bisa ditutup lewat satu tombol kecil
+     di sudut adalah lapisan yang terasa menjebak. */
+  useEffect(() => {
+    const tekan = (e: KeyboardEvent) => { if (e.key === 'Escape') tutup(); };
+    window.addEventListener('keydown', tekan);
+    return () => window.removeEventListener('keydown', tekan);
+  }, [tutup]);
+
   return (
-    <section className="rounded-lg border border-zinc-800 bg-zinc-900/30 p-3">
-      <h4 className="mb-2 flex flex-wrap items-baseline gap-x-2 text-[12.5px] font-semibold text-zinc-100">
-        {w.nama}
-        <span className="font-mono text-[10.5px] font-normal text-zinc-600">{w.alamat}</span>
-      </h4>
+    /* ── DI ATAS HALAMAN, BUKAN DI BAWAH KISINYA ──────────────────────
+       Versi sebelumnya menaruh rincian ini tepat di bawah kisi kartu.
+       Secara kode benar, dan tetap gagal dipakai: dengan tujuh kartu, ujung
+       kisinya sudah berada di garis bawah layar — jadi mengklik kartu
+       memang membuka sesuatu, hanya saja di tempat yang tidak terlihat
+       tanpa menggulir. Yang mengkliknya menyimpulkan kartunya tidak bisa
+       dibuka, dan itu kesimpulan yang wajar.
+
+       Lapisan tidak punya masalah itu: ia muncul di tempat mata sudah
+       berada. */
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-zinc-950/70 p-4 backdrop-blur-sm"
+         onClick={tutup}>
+      <section onClick={(e) => e.stopPropagation()}
+        className="flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-zinc-700 bg-zinc-950 shadow-2xl">
+        <div className="flex items-center gap-2 border-b border-zinc-800 px-3 py-2">
+          <h4 className="min-w-0 flex-1">
+            <span className="block truncate text-[13px] font-semibold text-zinc-100">{w.nama}</span>
+            <span className="block truncate font-mono text-[10.5px] text-zinc-600">{w.alamat}</span>
+          </h4>
+          <button onClick={tutup} title="Tutup (Esc)"
+            className="cursor-pointer rounded p-1 text-zinc-500 transition-colors hover:text-zinc-100">
+            <X className="size-4" />
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-3">
 
       {posisi.length > 0 && (
         <div className="mb-2 grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(min(100%,17rem),1fr))]">
@@ -496,7 +536,7 @@ function RincianDompet({ w, posisi, log }: {
           bukan salinan riwayat dompetnya.
         </p>
       ) : (
-        <div className="max-h-64 overflow-y-auto rounded-md border border-zinc-800">
+        <div className="rounded-md border border-zinc-800">
           {log.map((l, i) => (
             <div key={l.hash + l.waktu + i}
               className="flex flex-wrap items-baseline gap-x-2.5 border-b border-zinc-800/60 px-2.5 py-1.5 last:border-b-0">
@@ -515,7 +555,9 @@ function RincianDompet({ w, posisi, log }: {
           ))}
         </div>
       )}
-    </section>
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -645,14 +687,15 @@ export function PanelWalletAgen() {
             </div>
           </section>
 
-          {/* Rincian muncul HANYA saat ada yang dipilih. Kotak kosong
-              bertuliskan "pilih dompet" cuma memakai ruang untuk mengatakan
-              bahwa belum ada yang dikatakan. */}
+          {/* Lapisan rincian. Muncul HANYA saat ada yang dipilih — dan
+              karena ia lapisan, tidak ada ruang kosong yang tertinggal saat
+              tidak ada. */}
           {dompet.some((w) => w.alamat === pilih) && (
             <RincianDompet
               w={dompet.find((w) => w.alamat === pilih)!}
               posisi={posisi.filter((p) => p.alamat === pilih)}
-              log={log.filter((l) => l.alamat === pilih)} />
+              log={log.filter((l) => l.alamat === pilih)}
+              tutup={() => setPilih(null)} />
           )}
         </>
       )}
