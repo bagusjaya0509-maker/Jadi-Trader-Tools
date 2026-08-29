@@ -42,7 +42,7 @@ const { StringSession } = require('teleproto/sessions');
 const { Perangkai } = require('./rangkai');
 const { kirimKartu, layakKartu, daftarHadir, NAMA_AGEN } = require('./kartu-agen');
 const mata = require('./mata-chart');
-const { simpanChart, catatAktivitas } = require('./arsip-chart-vps');
+const { simpanChart, catatAktivitas, idChartTersimpan, puncakArsip } = require('./arsip-chart-vps');
 
 /* Pembungkus yang MENELAN GALAT. Catatan aktivitas adalah kenyamanan; ia
    tidak boleh punya kuasa menjatuhkan telinga 24 jam. Ruang yang tidak
@@ -611,9 +611,43 @@ async function siapkanRuang(client, r) {
          Nol biaya — tidak ada model yang dipanggil di jalur ini. */
       if (r.arsip && adaGambar) {
         try {
-          const bita = typeof pesan.downloadMedia === 'function'
+          let bita = typeof pesan.downloadMedia === 'function'
             ? await pesan.downloadMedia()
             : await client.downloadMedia(pesan);
+
+          /* ── JALUR CADANGAN, DAN KENAPA IA HARUS ADA ────────────────
+             Objek pesan yang datang bersama pembaruan langsung kadang
+             memulangkan gambar KOSONG tanpa melempar apa pun. Bentuk
+             kegagalan itu yang paling mahal: `if (bita && bita.length)`
+             lewat begitu saja, tidak ada baris log yang tertulis, dan
+             arsipnya berhenti bertambah sementara semua yang lain --
+             pm2 `online`, denyut tiap jam, "pesan baru" di log -- terus
+             mengatakan agennya bekerja. Persis yang terjadi 28-29 Agu
+             2026: dua chart hilang, nol pesan galat.
+
+             Mengambil ulang pesannya lewat getMessages memulangkan objek
+             yang lengkap. Itu jalur yang sama dengan isi-arsip-chart.js,
+             yang tidak pernah gagal mengunduh. */
+          if (!bita || !bita.length) {
+            catat('  gambar kosong dari pembaruan langsung — diambil ulang');
+            try {
+              const [ulang] = await client.getMessages(r.ruang, { ids: pesan.id });
+              if (ulang) bita = await client.downloadMedia(ulang);
+            } catch (e2) { catat('  ambil ulang gagal:', e2 && e2.message); }
+          }
+
+          /* Kalau tetap kosong sesudah dicoba dua kali, itu DICATAT. Sapuan
+             berkala akan menyusulnya nanti, tapi diamnya sendiri tidak
+             boleh diwariskan lagi. */
+          if (!bita || !bita.length) {
+            catat('  chart TIDAK bisa diunduh · pesan', pesan.id, '— menunggu sapuan');
+            jejak(r, { log: {
+              agen: r.agen, jenis: 'lewat',
+              pesan: 'Gambar gagal diunduh, akan disusul sapuan · "'
+                + (teks || '(tanpa keterangan)').replace(/\s+/g, ' ').slice(0, 60) + '"',
+            } });
+          }
+
           if (bita && bita.length) {
             const berkas = simpanChart(__dirname, {
               id: kunci.replace(/[^\w-]/g, ''),
@@ -774,8 +808,127 @@ async function siapkanRuang(client, r) {
     await daftarHadir(catat, { agen: r.agen, strategi: r.strategi || undefined });
   }
 
+  /* ── SAPUAN: JARING PENGAMAN ARSIP CHART ────────────────────────────
+     Pendengar Telegram menangkap pesan yang datang SELAGI ia mendengar.
+     Yang lewat saat proses mati, saat soketnya putus sebentar, atau saat
+     unduhannya memulangkan kosong -- hilang selamanya, karena tidak ada
+     yang pernah menengok ke belakang.
+
+     Sapuan menengok ke belakang. Ia membaca kembali pesan terakhir di
+     topik yang dipantau, dan menyimpan gambar mana pun yang belum ada di
+     indeks. Itu membuat arsipnya sembuh sendiri sesudah gangguan apa pun,
+     bukan cuma yang sudah diketahui bentuknya.
+
+     Id yang sudah ada DIPERIKSA SEBELUM mengunduh. Kalau dibalik,
+     sapuan tiap sepuluh menit akan menarik belasan megabita berulang-ulang
+     hanya untuk membuang semuanya di baris berikutnya.
+
+     Saringan admin sengaja TIDAK dipakai di sini, beda dengan jalur
+     langsung. Yang disimpan sapuan cuma masuk ke arsip pemilik -- ia tidak
+     pernah jadi kartu sinyal, jadi tidak ada klaim "admin mengeluarkan
+     sinyal" yang perlu dijaga. Menolak gambar karena pengirimnya belum
+     terbaca sebagai admin justru membuat jaring pengaman ini bocor persis
+     saat daftar adminnya gagal terbaca. */
+  const SAPU_JEDA = Math.max(2, Number(process.env.CHART_SAPU_MENIT || 10)) * 60 * 1000;
+  const SAPU_DALAM = Math.max(20, Number(process.env.CHART_SAPU_DALAM || 60));
+
+  async function sapuArsip(alasan) {
+    for (const r of hidup) {
+      if (!r.arsip || !r.ruang) continue;
+      let baru = 0;
+      const riwayat = [];
+      try {
+        const punya = idChartTersimpan(__dirname);
+        /* Waktu chart terbaru yang SUDAH dipegang, dibaca sebelum sapuan
+           menambah apa pun. Ia yang memisahkan dua temuan yang bentuknya
+           sama tapi artinya berbeda: yang lebih baru dari ini adalah kabar
+           yang benar-benar terlewat, yang lebih lama adalah riwayat yang
+           memang belum pernah ditarik. Cuma yang pertama pantas muncul di
+           rak "Baru masuk". */
+        const batasBaru = puncakArsip(__dirname);
+        /* ── DIBACA PER TOPIK, BUKAN PER GRUP ──────────────────────────
+           Versi pertama sapuan ini membaca 60 pesan terakhir GRUPNYA, lalu
+           menyaring topiknya sesudah itu. Di grup 45 ribu anggota, 60 pesan
+           terakhir habis oleh obrolan umum dalam hitungan menit -- dan
+           saringan topiknya membuang semuanya. Sapuan berjalan bersih, tidak
+           melaporkan galat apa pun, dan tidak pernah menemukan satu chart
+           pun. Diuji dengan menghapus satu chart dari indeks: sapuan tidak
+           mengembalikannya.
+
+           `replyTo` menyuruh Telegram sendiri yang memilih topiknya, jadi 60
+           pesan yang datang memang 60 posting terakhir di ruang chart --
+           hitungan hari, bukan menit. Saringan topik di bawah tetap
+           dipertahankan sebagai sabuk kedua. */
+        const pilih = { limit: SAPU_DALAM };
+        if (r.topikAkhir && r.topikAkhir !== 1) pilih.replyTo = r.topikAkhir;
+        for await (const m of client.iterMessages(r.ruang, pilih)) {
+          const topikId = r.topikAkhir;
+          if (topikId !== null && topikId !== undefined) {
+            const rt = m.replyTo;
+            const idTopik = rt ? (rt.replyToTopId || (rt.forumTopic ? rt.replyToMsgId : null) || null) : null;
+            if (topikId === 1) { if (idTopik !== null && idTopik !== 1) continue; }
+            else if (idTopik !== topikId) continue;
+          }
+          if (!m.photo && !(m.media && m.media.photo)) continue;
+
+          const id = (r.kunciRuang + ':' + m.id).replace(/[^\w-]/g, '');
+          if (punya.has(id)) continue;
+
+          const bita = await client.downloadMedia(m);
+          if (!bita || !bita.length) continue;
+          const teks = String(m.message || '').trim();
+          const waktu = m.date ? m.date * 1000 : Date.now();
+          const berkas = simpanChart(__dirname, {
+            id, agen: r.agen, keterangan: teks, waktu, bita,
+            terpilah: !(batasBaru > 0 && waktu > batasBaru),
+          });
+          if (!berkas) continue;
+          baru++;
+          const kabarTerlewat = batasBaru > 0 && waktu > batasBaru;
+          if (kabarTerlewat) riwayat.push(teks);
+          catat('  sapuan menyusul chart:', berkas,
+            '(' + Math.round(bita.length / 1024) + ' KB)',
+            teks.replace(/\s+/g, ' ').slice(0, 40));
+          /* Satu baris aktivitas HANYA untuk yang benar-benar terlewat.
+             Riwayat lama diringkas jadi satu baris di bawah: sapuan pertama
+             menarik 47 chart sekaligus, dan 47 baris "disusul sapuan" akan
+             mendorong seluruh riwayat kerja agen keluar dari daftar yang
+             cuma memuat 80 baris — daftar yang gunanya membuktikan agen
+             bekerja malah jadi tidak bisa dibaca. */
+          if (kabarTerlewat) {
+            jejak(r, { log: {
+              agen: r.agen, jenis: 'simpan',
+              pesan: 'Disusul sapuan, terlewat saat datang · "'
+                + (teks || '(tanpa keterangan)').replace(/\s+/g, ' ').slice(0, 70) + '"',
+            } });
+          }
+        }
+      } catch (e) {
+        catat('sapuan', r.agen, 'gagal (diabaikan):', e && e.message);
+      }
+      /* Yang nol TIDAK dicatat ke daftar aktivitas, cuma ke log. Sapuan
+         berjalan enam kali sejam; menuliskan "tidak ada yang baru" tiap
+         kali akan mendorong kejadian yang sebenarnya keluar dari daftar
+         dalam beberapa jam, dan justru kejadian itu yang dicari orang. */
+      if (baru) {
+        catat('sapuan', alasan, '·', r.agen, '·', baru, 'chart baru');
+        const lama = baru - riwayat.length;
+        if (lama > 0) {
+          jejak(r, { log: {
+            agen: r.agen, jenis: 'simpan',
+            pesan: 'Sapuan menarik ' + lama + ' chart lama dari riwayat ruang',
+          } });
+        }
+      }
+    }
+  }
+
+  await sapuArsip('awal');
+  setInterval(() => { void sapuArsip('berkala'); }, SAPU_JEDA);
+
   catat('pemantau hidup ·', hidup.map((r) => r.agen).join(', ')
-    + ' · ' + hidup.length + ' ruang. Menunggu pesan — tidak memindai apa pun.');
+    + ' · ' + hidup.length + ' ruang · sapuan arsip tiap '
+    + (SAPU_JEDA / 60000) + ' menit.');
 
   /* Denyut sekali sejam ke log, supaya "sepi" bisa dibedakan dari "mati".
      Tanpa ini, log yang kosong selama dua hari punya dua arti yang sangat
@@ -793,9 +946,18 @@ async function siapkanRuang(client, r) {
      menyambung lagi -- lalu keluar dengan kode galat kalau tetap gagal,
      supaya pm2 menghidupkannya kembali dari nol. Mati keras yang terlihat
      mengalahkan hidup yang berpura-pura. */
+  const DENYUT_JEDA = Math.max(1, Number(process.env.TG_DENYUT_MENIT || 5)) * 60 * 1000;
+  /* Ke berkas keadaan tiap lima menit, tapi ke LOG cuma sekali sejam.
+     Keduanya punya pembaca yang berbeda: panel butuh angka yang segar,
+     log butuh tetap bisa dibaca dua hari ke belakang. Satu jeda untuk
+     keduanya selalu salah untuk salah satunya. */
+  let denyutKe = 0;
   setInterval(async () => {
     const nyambung = !!(client && client.connected);
-    catat('denyut —', nyambung ? 'terhubung' : 'PUTUS', '· arsip', arsipAmbil().length, 'pesan');
+    const keLog = (denyutKe++ % Math.max(1, Math.round(3600000 / DENYUT_JEDA))) === 0;
+    if (keLog || !nyambung) {
+      catat('denyut —', nyambung ? 'terhubung' : 'PUTUS', '· arsip', arsipAmbil().length, 'pesan');
+    }
     /* Denyut TIDAK menambah baris log, cuma memperbarui keadaan ruangnya.
        Satu baris tiap jam akan mendorong kejadian yang sebenarnya keluar
        dari daftar dalam tiga hari, dan yang dicari orangnya justru
@@ -811,7 +973,16 @@ async function siapkanRuang(client, r) {
       catat('denyut — gagal menyambung ulang:', e.message, '· keluar supaya pm2 menghidupkan ulang');
       process.exit(1);
     }
-  }, 60 * 60 * 1000);
+  /* ── KENAPA LIMA MENIT, BUKAN SEJAM ────────────────────────────────
+     Denyut sejam membuat agen yang sehat terbaca mati. Panelnya menulis
+     "denyut 28 menit lalu" dan itu betul-betul angkanya -- tapi yang
+     dibaca pemiliknya adalah "agennya berhenti setengah jam lalu", lalu
+     ia mencari kerusakan yang tidak ada. Denyut yang jarang bukan cuma
+     kurang berguna: ia menghasilkan alarm palsu ke arah sebaliknya.
+
+     Lima menit cukup rapat supaya "baru saja" hampir selalu benar, dan
+     cukup jarang supaya logya tidak jadi bising. */
+  }, DENYUT_JEDA);
 })().catch((e) => {
   console.error('[' + jam() + '] pemantau berhenti:', e && e.message ? e.message : e);
   process.exit(1);

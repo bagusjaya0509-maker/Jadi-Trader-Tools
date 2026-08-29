@@ -253,12 +253,37 @@ module.exports.catatAktivitas = function catatAktivitas(DIR, baris) {
   } catch (e) { /* disk penuh — catatan bukan alasan menjatuhkan pemantau */ }
 };
 
+/** Id chart yang SUDAH tersimpan. Dipakai sapuan untuk tahu mana yang
+ *  perlu diunduh — tanpa ini sapuan harus mengunduh setiap gambar dulu baru
+ *  menyadari ia sudah punya, dan sapuan tiap sepuluh menit akan menarik
+ *  belasan megabita berulang-ulang untuk tidak menyimpan apa pun.
+ *
+ *  Ditaruh di sini, bukan di pemantau, karena bentuk indeksnya milik berkas
+ *  ini. Dua penulis yang harus sepakat selamanya adalah kesepakatan yang
+ *  cepat atau lambat putus. */
+module.exports.idChartTersimpan = function idChartTersimpan(DIR) {
+  try {
+    const d = JSON.parse(fs.readFileSync(path.join(DIR, 'chart-arsip.json'), 'utf8'));
+    return new Set((d.chart || []).map((c) => String(c.id)));
+  } catch (e) { return new Set(); }
+};
+
+/** Waktu chart TERBARU yang sudah tersimpan, 0 kalau arsipnya kosong.
+ *  Sapuan memakainya untuk membedakan kabar yang terlewat dari riwayat
+ *  yang memang belum pernah ditarik. */
+module.exports.puncakArsip = function puncakArsip(DIR) {
+  try {
+    const d = JSON.parse(fs.readFileSync(path.join(DIR, 'chart-arsip.json'), 'utf8'));
+    return (d.chart || []).reduce((t, c) => Math.max(t, Number(c.waktu) || 0), 0);
+  } catch (e) { return 0; }
+};
+
 /* ── Dipakai pemantau untuk menyimpan satu chart ──────────────────────────
    Ditempel ke module.exports supaya pemantau bisa memakainya tanpa
    menyalakan express. Kalau kodenya disalin ke pemantau, bentuk indeksnya
    punya dua penulis — dan dua penulis yang harus sepakat selamanya adalah
    kesepakatan yang cepat atau lambat putus. */
-module.exports.simpanChart = function simpanChart(DIR, { id, agen, keterangan, waktu, bita }) {
+module.exports.simpanChart = function simpanChart(DIR, { id, agen, keterangan, waktu, bita, terpilah }) {
   const GAMBAR_DIR = path.join(DIR, 'chart-arsip');
   const INDEKS = path.join(DIR, 'chart-arsip.json');
   const MAKS = Number(process.env.CHART_ARSIP_MAKS || 150);
@@ -277,7 +302,7 @@ module.exports.simpanChart = function simpanChart(DIR, { id, agen, keterangan, w
     berkas,
     kb: Math.round(bita.length / 1024),
     sembunyi: false,
-    /* TEGAS false, dan itu yang membedakannya dari arsip lama.
+    /* TEGAS bernilai, dan itu yang membedakannya dari arsip lama.
        ────────────────────────────────────────────────────────────────
        Baris lama tidak punya medan ini sama sekali, dan pembacanya
        memperlakukan "tidak ada" sebagai SUDAH dipilah. Kalau yang baru
@@ -285,7 +310,12 @@ module.exports.simpanChart = function simpanChart(DIR, { id, agen, keterangan, w
        kalau yang lama dianggap belum dipilah, sebelas chart yang sudah
        lama ada akan membanjiri rak itu sekaligus. Satu nilai tegas di
        sini menyelesaikan keduanya tanpa perlu memigrasi apa pun. */
-    terpilah: false,
+    /* Bawaannya false — chart yang baru datang memang belum dipilah, dan
+       itu yang menaruhnya di rak "Baru masuk". Sapuan boleh menimpanya:
+       yang ia temukan dari riwayat lama BUKAN kabar baru, dan menaruh
+       lima puluh chart lama di rak itu sekaligus membuat rak yang gunanya
+       menandai yang baru jadi tidak bisa dipakai untuk apa pun. */
+    terpilah: terpilah === true,
     catatan: '',
     sinyalId: null,
   });
