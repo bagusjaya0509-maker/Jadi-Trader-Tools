@@ -454,6 +454,61 @@ function KartuDompet({ w, posisi, log, dipilih, pilih, hapus }: {
   );
 }
 
+/* ── SEJAK KAPAN POSISI INI TERBUKA ─────────────────────────────────────
+   Hyperliquid TIDAK memulangkan waktu buka bersama posisinya.
+   `clearinghouseState` memberi koin, ukuran, harga masuk, leverage, dan
+   harga likuidasi — tidak ada satu pun stempel waktu. Jadi angkanya harus
+   disusun sendiri dari fill yang kita saksikan.
+
+   Ukuran berjalan dihitung ulang dari nol: `dir` yang memuat "Open"
+   menambah, yang memuat "Close" mengurangi. Saat ukurannya berpindah dari
+   nol ke lebih dari nol, di situlah posisinya dibuka; saat kembali ke nol,
+   catatannya dilupakan. Cara ini tahan terhadap penambahan bertahap dan
+   penutupan sebagian — dua hal yang lazim dan yang membuat "ambil fill
+   pembuka terakhir" memberi jawaban yang salah.
+
+   ── TIGA JAWABAN, BUKAN DUA ───────────────────────────────────────────
+   Yang penting bukan cuma tanggalnya, tapi seberapa jauh ia bisa dipercaya:
+
+     · UTUH  — seluruh posisinya terbentuk di depan mata kita. Tanggalnya
+               benar-benar tanggal posisi itu dibuka.
+     · SEBAGIAN — kita cuma menyaksikan penambahannya. Posisi induknya sudah
+               ada sebelum dompet ini dipantau, dan tanggal yang kita punya
+               bukan tanggal buka, melainkan tanggal ditambah.
+     · TIDAK ADA — tidak satu pun fill pembukanya kita lihat.
+
+   Menyatukan yang kedua dan yang pertama akan mencetak tanggal yang tampak
+   pasti untuk posisi yang sebenarnya jauh lebih tua. Di panel yang dipakai
+   menilai berapa lama seseorang menahan posisi, itu kesalahan yang mahal. */
+function bukaPosisi(log: TransaksiDompet[], koin: string, arah: 'LONG' | 'SHORT', ukuran: number) {
+  const sisi = arah === 'LONG' ? 'long' : 'short';
+  const f = log.filter((l) => l.koin === koin).slice().sort((a, b) => a.waktu - b.waktu);
+  let size = 0;
+  let mulai: number | null = null;
+  for (const l of f) {
+    const d = (l.dir || '').toLowerCase();
+    if (!d.includes(sisi)) continue;
+    if (d.includes('open')) {
+      if (size <= 1e-9) mulai = l.waktu;
+      size += l.ukuran;
+    } else if (d.includes('close')) {
+      size -= l.ukuran;
+      if (size <= 1e-9) { size = 0; mulai = null; }
+    }
+  }
+  if (mulai === null) return null;
+  /* Ambang 99%, bukan sama persis: ukuran datang sebagai desimal dari dua
+     sumber yang membulatkannya berbeda, dan selisih di angka keenam tidak
+     boleh mengubah "utuh" jadi "sebagian". */
+  return { waktu: mulai, utuh: size >= ukuran * 0.99 };
+}
+
+function tanggalJam(ms: number) {
+  return new Date(ms).toLocaleString('id-ID', {
+    day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
+  });
+}
+
 /* ── RINCIAN SATU DOMPET, DI BAWAH KISI KARTUNYA ────────────────────────
    Bukan di dalam kartunya. Kartu yang memuai saat diklik mendorong semua
    kartu di baris yang sama, dan kisi yang melompat tiap kali seseorang
@@ -524,6 +579,29 @@ function RincianDompet({ w, posisi, log, tutup }: {
                   <span>Likuidasi <span className="tabular-nums text-amber-400/90">{p.likuidasi}</span></span>
                 )}
               </div>
+              {(() => {
+                const b = bukaPosisi(log, p.koin, p.arah, p.ukuran);
+                if (!b) {
+                  return (
+                    <p className="mt-1 border-t border-zinc-800/60 pt-1 text-[10.5px] text-zinc-600">
+                      Sudah terbuka sebelum dompet ini dipantau
+                    </p>
+                  );
+                }
+                return (
+                  <p className={cn('mt-1 border-t border-zinc-800/60 pt-1 text-[10.5px]',
+                    b.utuh ? 'text-zinc-400' : 'text-zinc-600')}>
+                    {b.utuh ? 'Dibuka ' : 'Ditambah '}
+                    <span className="tabular-nums text-zinc-300">{tanggalJam(b.waktu)}</span>
+                    <span className="text-zinc-600"> · {umur(b.waktu)}</span>
+                    {!b.utuh && (
+                      <span className="block text-zinc-600">
+                        sebagian sudah terbuka sebelum dipantau
+                      </span>
+                    )}
+                  </p>
+                );
+              })()}
             </div>
           ))}
         </div>
