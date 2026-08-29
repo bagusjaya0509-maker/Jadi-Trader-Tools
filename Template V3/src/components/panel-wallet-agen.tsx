@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Loader2, Plus, RefreshCw, Trash2, Wallet } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Loader2, Plus, RefreshCw, Trash2, Trophy, Wallet } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
-  keadaanDompet, tambahDompet, hapusDompet,
-  type KeadaanDompet, type TransaksiDompet,
+  keadaanDompet, tambahDompet, hapusDompet, peringkatDompet,
+  type KeadaanDompet, type TransaksiDompet, type Peringkat,
+  type JendelaPeringkat, type PitaAkun,
 } from '@/lib/wallet-agen';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -92,6 +93,239 @@ function FormTambah({ selesai }: { selesai: () => void }) {
   );
 }
 
+/* ════════════════════════════════════════════════════════════════════════
+   PAPAN PERINGKAT — menjawab "dompet mana", bukan cuma "dompet ini apa"
+   ════════════════════════════════════════════════════════════════════════
+   Sampai sekarang menambah dompet berarti menempel alamat 42 karakter yang
+   harus dicari sendiri di luar. Itu bukan alur kerja; itu penghalang yang
+   membuat fiturnya nyaris tidak pernah dipakai lebih dari sekali.
+
+   TIDAK ADA KOLOM PERSEN. Tiga kandidat dicoba dengan data sungguhan dan
+   ketiganya menghasilkan angka enam digit yang tidak bisa dijelaskan —
+   alasannya panjang dan ditulis di peringkat-wallet.js. Yang bisa
+   dipertanggungjawabkan cuma untung dalam dolar; supaya dana raksasa tidak
+   selamanya menguasai puncak, yang dipilih adalah DENGAN SIAPA
+   perbandingannya dilakukan.
+   ════════════════════════════════════════════════════════════════════════ */
+
+const PITA: { id: PitaAkun; label: string; jelas: string }[] = [
+  { id: 'kecil', label: 'Di bawah $1 jt', jelas: 'Akun perorangan — ukuran yang paling mirip dengan kita' },
+  { id: 'menengah', label: '$1–10 jt', jelas: 'Akun besar, tapi masih dikelola orang' },
+  { id: 'semua', label: 'Semua', jelas: 'Termasuk dana institusi bernilai miliaran dolar' },
+];
+
+const JENDELA: { id: JendelaPeringkat; label: string }[] = [
+  { id: 'day', label: 'Hari' },
+  { id: 'week', label: 'Pekan' },
+  { id: 'month', label: 'Bulan' },
+  { id: 'allTime', label: 'Semua' },
+];
+
+function PapanPeringkat({ pantau }: { pantau: (alamat: string, nama: string) => Promise<void> }) {
+  const [jendela, setJendela] = useState<JendelaPeringkat>('month');
+  /* Bawaannya pita kecil, bukan "semua". Yang membuka papan ini mencari
+     dompet untuk ditiru, dan dana kelola dua miliar dolar tidak bisa ditiru
+     oleh siapa pun di sini -- membiarkannya di puncak layar pertama berarti
+     jawaban pertama yang dilihat orang selalu jawaban yang salah. */
+  const [pita, setPita] = useState<PitaAkun>('kecil');
+  const [p, setP] = useState<Peringkat | null>(null);
+  const [muat, setMuat] = useState(true);
+  const [sibuk, setSibuk] = useState<string | null>(null);
+
+  useEffect(() => {
+    let hidup = true;
+    setMuat(true);
+    void peringkatDompet(jendela, pita, 40).then((d) => {
+      if (!hidup) return;
+      /* Hasil null MEMPERTAHANKAN daftar lama, sama seperti di panel utama:
+         satu tarikan gagal saat jaringan berkedip bukan kabar bahwa papannya
+         kosong. */
+      if (d) setP(d);
+      setMuat(false);
+    });
+    return () => { hidup = false; };
+  }, [jendela, pita]);
+
+  const pilihan = 'cursor-pointer rounded px-2 py-1 text-[11.5px] transition-colors';
+  const aktif = 'bg-zinc-100 text-zinc-950';
+  const diam = 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100';
+
+  return (
+    <section>
+      <h3 className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-zinc-800 pb-1.5">
+        <Trophy className="size-3.5 text-zinc-500" />
+        <span className="text-[13px] font-semibold text-zinc-200">Papan peringkat Hyperliquid</span>
+        {p && p.diperbarui > 0 && (
+          <span className="text-[11px] font-normal text-zinc-600">
+            · {umur(p.diperbarui)} · dari {p.total.toLocaleString('id-ID')} dompet,
+            akun minimal ${(p.minAkun / 1000).toFixed(0)} rb
+          </span>
+        )}
+      </h3>
+
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <div className="flex gap-0.5 rounded-md border border-zinc-800 p-0.5">
+          {JENDELA.map((j) => (
+            <button key={j.id} onClick={() => setJendela(j.id)}
+              className={cn(pilihan, jendela === j.id ? aktif : diam)}>{j.label}</button>
+          ))}
+        </div>
+        <div className="flex gap-0.5 rounded-md border border-zinc-800 p-0.5">
+          {PITA.map((p) => (
+            <button key={p.id} onClick={() => setPita(p.id)} title={p.jelas}
+              className={cn(pilihan, pita === p.id ? aktif : diam)}>{p.label}</button>
+          ))}
+        </div>
+        {muat && <Loader2 className="size-3.5 animate-spin text-zinc-600" />}
+      </div>
+
+      {p?.belumAda ? (
+        <p className="rounded-lg border border-zinc-800 bg-zinc-900/40 px-3 py-4 text-[12.5px] leading-relaxed text-zinc-500">
+          Papan peringkat belum pernah ditarik. Skripnya berjalan sendiri tiap
+          enam jam; daftar ini terisi pada putaran berikutnya.
+        </p>
+      ) : !p || p.daftar.length === 0 ? (
+        <p className="py-3 text-[12.5px] text-zinc-600">
+          {muat ? 'Mengambil papan peringkat…' : 'Tidak ada dompet yang lolos saringan.'}
+        </p>
+      ) : (
+        <div className="overflow-x-auto rounded-lg border border-zinc-800">
+          <table className="w-full min-w-[560px] border-collapse text-[12px]">
+            <thead>
+              <tr className="border-b border-zinc-800 text-[10.5px] uppercase tracking-wide text-zinc-600">
+                <th className="w-8 px-2 py-1.5 text-right font-medium">#</th>
+                <th className="px-2 py-1.5 text-left font-medium">Dompet</th>
+                <th className="px-2 py-1.5 text-right font-medium">Akun</th>
+                <th className="px-2 py-1.5 text-right font-medium">P/L</th>
+                <th className="px-2 py-1.5 text-right font-medium">Volume</th>
+                <th className="w-20 px-2 py-1.5" />
+              </tr>
+            </thead>
+            <tbody>
+              {p.daftar.map((w, i) => (
+                <tr key={w.alamat} className="border-b border-zinc-800/60 last:border-b-0 hover:bg-zinc-900/40">
+                  <td className="px-2 py-1.5 text-right tabular-nums text-zinc-600">{i + 1}</td>
+                  <td className="px-2 py-1.5">
+                    {/* Nama dipasang pemiliknya sendiri — teks pihak lain.
+                        Ditampilkan apa adanya, dan alamatnya tetap ikut:
+                        nama boleh apa saja, alamat yang menentukan. */}
+                    {w.nama && <span className="mr-1.5 text-zinc-200">{w.nama}</span>}
+                    <span className="font-mono text-[10.5px] text-zinc-500">
+                      {w.alamat.slice(0, 8)}…{w.alamat.slice(-6)}
+                    </span>
+                  </td>
+                  <td className="px-2 py-1.5 text-right tabular-nums text-zinc-400">${uangRingkas(w.akun)}</td>
+                  <td className={cn('px-2 py-1.5 text-right font-semibold tabular-nums',
+                    w.pnl >= 0 ? 'text-emerald-400' : 'text-red-400')}>
+                    {w.pnl >= 0 ? '+' : '−'}{uangRingkas(Math.abs(w.pnl))}
+                  </td>
+                  {/* Volume nol DITULIS sebagai garis, bukan "$0". Sebagian
+                      akun besar memang tidak dilaporkan volumenya di jendela
+                      itu, dan nol yang tegas terbaca sebagai "tidak pernah
+                      transaksi" — kebalikan dari yang sebenarnya. */}
+                  <td className="px-2 py-1.5 text-right tabular-nums text-zinc-600">
+                    {w.vlm > 0 ? '$' + uangRingkas(w.vlm) : '—'}
+                  </td>
+                  <td className="px-2 py-1.5 text-right">
+                    {w.dipantau ? (
+                      <span className="text-[11px] text-emerald-400/80">Dipantau</span>
+                    ) : (
+                      <button
+                        onClick={() => { setSibuk(w.alamat); void pantau(w.alamat, w.nama).finally(() => setSibuk(null)); }}
+                        disabled={sibuk === w.alamat}
+                        className="cursor-pointer rounded border border-zinc-700 px-2 py-0.5 text-[11px] text-zinc-300 transition-colors hover:border-zinc-500 hover:text-zinc-100 disabled:opacity-50">
+                        {sibuk === w.alamat ? '…' : 'Pantau'}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-600">
+        Semua angka di sini milik Hyperliquid; tidak ada yang kita hitung
+        sendiri. Kolom persen sengaja tidak ada — ROI terbitan bursanya
+        memberi 115.524% untuk akun 30 ribu dolar, dan dua rasio pengganti
+        yang dicoba sama tidak masuk akalnya. Papan ini menunjukkan siapa yang
+        sedang menang, bukan siapa yang layak disalin. Yang kedua dijawab
+        rapor di bawah, sesudah dompetnya dipantau cukup lama.
+      </p>
+    </section>
+  );
+}
+
+/* ── RAPOR DARI CATATAN SENDIRI ─────────────────────────────────────────
+   Papan peringkat menjawab "siapa yang menang menurut bursanya". Rapor ini
+   menjawab pertanyaan yang berbeda dan jauh lebih penting sebelum ada tombol
+   salin: apa yang KITA saksikan sendiri sejak dompet ini dipantau.
+
+   Yang dihitung cuma yang benar-benar ada di data: fill yang menutup posisi
+   membawa closedPnl, jadi menang-kalah dan realisasinya bisa dihitung tepat.
+   Durasi tahan TIDAK dihitung — itu menuntut pemasangan setiap penutupan ke
+   pembukaannya, dan angka hasil pasangan yang salah lebih buruk daripada
+   kolom yang jujur tidak ada. */
+function RaporDompet({ log, dompet }: {
+  log: TransaksiDompet[];
+  dompet: { alamat: string; nama: string; sejak: number }[];
+}) {
+  const rapor = useMemo(() => {
+    const peta = new Map<string, { nama: string; sejak: number; n: number; tutup: number; menang: number; nyata: number }>();
+    for (const d of dompet) peta.set(d.alamat, { nama: d.nama, sejak: d.sejak, n: 0, tutup: 0, menang: 0, nyata: 0 });
+    for (const l of log) {
+      const r = peta.get(l.alamat);
+      if (!r) continue;
+      r.n++;
+      /* pnl bukan nol = fill yang MENUTUP sesuatu. Fill pembuka selalu
+         membawa closedPnl nol, dan menghitungnya sebagai kekalahan akan
+         menenggelamkan win rate dompet mana pun ke angka yang tidak
+         berarti apa-apa. */
+      if (l.pnl !== 0) { r.tutup++; r.nyata += l.pnl; if (l.pnl > 0) r.menang++; }
+    }
+    return [...peta.entries()].map(([alamat, r]) => ({ alamat, ...r }));
+  }, [log, dompet]);
+
+  if (!rapor.length) return null;
+
+  return (
+    <section>
+      <h3 className="mb-2 border-b border-zinc-800 pb-1.5 text-[13px] font-semibold text-zinc-200">
+        Rapor <span className="font-normal text-zinc-600">· dari catatan kita sendiri</span>
+      </h3>
+      <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(min(100%,17rem),1fr))]">
+        {rapor.map((r) => (
+          <div key={r.alamat} className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-3">
+            <div className="flex items-baseline gap-2">
+              <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-zinc-100">{r.nama}</span>
+              <span className={cn('text-[12.5px] font-semibold tabular-nums',
+                r.nyata >= 0 ? 'text-emerald-400' : 'text-red-400')}>
+                {r.nyata >= 0 ? '+' : '−'}{uangRingkas(Math.abs(r.nyata))}
+              </span>
+            </div>
+            <div className="mt-1 flex flex-wrap gap-x-3 text-[11.5px] text-zinc-500">
+              <span>{r.n} transaksi</span>
+              <span>{r.tutup} tutup</span>
+              {r.tutup > 0 && (
+                <span>menang <span className="tabular-nums text-zinc-300">
+                  {Math.round((r.menang / r.tutup) * 100)}%
+                </span></span>
+              )}
+            </div>
+            <p className="mt-1 text-[10.5px] text-zinc-600">Dipantau sejak {umur(r.sejak)}</p>
+          </div>
+        ))}
+      </div>
+      <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-600">
+        Hanya yang tercatat sejak dompet mulai dipantau — riwayat sebelumnya
+        sengaja tidak ditarik. Angka di bawah beberapa puluh penutupan belum
+        berarti apa-apa; ia perlu waktu, bukan penafsiran.
+      </p>
+    </section>
+  );
+}
+
 export function PanelWalletAgen() {
   const [d, setD] = useState<KeadaanDompet | null>(null);
   const [gagal, setGagal] = useState(false);
@@ -164,6 +398,15 @@ export function PanelWalletAgen() {
 
       <FormTambah selesai={() => void tarik()} />
 
+      {/* Papan peringkat di ATAS daftar dompet, bukan di bawah. Yang dicari
+          orang saat membuka panel ini pada hari-hari awal adalah "dompet
+          mana", bukan "dompet yang sudah saya pilih sedang apa" — dan yang
+          dicari lebih sering pantas duduk lebih dekat ke atas. */}
+      <PapanPeringkat pantau={async (alamat, nama) => {
+        await tambahDompet(alamat, nama || alamat.slice(0, 10) + '…');
+        await tarik();
+      }} />
+
       {dompet.length === 0 ? (
         <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 px-4 py-10 text-center">
           <Wallet className="mx-auto mb-2 size-5 text-zinc-700" />
@@ -191,6 +434,8 @@ export function PanelWalletAgen() {
               </span>
             ))}
           </div>
+
+          <RaporDompet log={log} dompet={dompet} />
 
           {/* ── Posisi terbuka ───────────────────────────────────────── */}
           <section>

@@ -33,6 +33,7 @@ module.exports = (app, { butuhLogin, batasLaju, express, DIR }) => {
   const UID = process.env.PENGIKUT_UID || process.env.PORTO_UID || '';
   const PANTAU = path.join(DIR, 'wallet-pantau.json');
   const AKTIVITAS = path.join(DIR, 'wallet-aktivitas.json');
+  const PERINGKAT = path.join(DIR, 'wallet-peringkat.json');
 
   function baca(F, bawaan) {
     try { return JSON.parse(fs.readFileSync(F, 'utf8')); } catch (e) { return bawaan; }
@@ -95,6 +96,63 @@ module.exports = (app, { butuhLogin, batasLaju, express, DIR }) => {
     p.dompet.push({ alamat, nama, sejak: Date.now(), aktif: true });
     tulis(PANTAU, p);
     res.json({ ok: true, dompet: p.dompet });
+  });
+
+  /* ── PAPAN PERINGKAT ──────────────────────────────────────────────────
+     Menjawab "dompet mana yang layak dipantau" — pertanyaan yang tersisa
+     dari fase pertama, dan satu-satunya alasan alamat 42 karakter harus
+     dicari sendiri di luar sampai sekarang.
+
+     Rute ini TIDAK menarik apa pun dari Hyperliquid. Papan aslinya 36 MB dan
+     44 ribu baris; peringkat-wallet.js yang menariknya di proses tersendiri
+     empat kali sehari, lalu meninggalkan ringkasan 190 KB di sini. Kalau
+     penarikannya dikerjakan di dalam server ini, satu permintaan panel akan
+     membekukan SELURUH API selama beberapa detik — termasuk order yang
+     sedang dikirim orang lain. */
+  app.get('/api/agen/wallet/peringkat', batasLaju, butuhLogin, hanyaPemilik, (req, res) => {
+    const p = baca(PERINGKAT, null);
+    if (!p || !Array.isArray(p.daftar)) {
+      return res.json({ ok: true, daftar: [], diperbarui: 0, belumAda: true });
+    }
+    const q = req.query || {};
+    const jendela = ['day', 'week', 'month', 'allTime'].includes(String(q.jendela))
+      ? String(q.jendela) : 'month';
+    /* Pita ukuran akun. Diurutkan SELALU dari untung terbesar; yang bisa
+       dipilih cuma dengan siapa perbandingannya dilakukan. Alasan panjangnya
+       ada di peringkat-wallet.js -- tiga kandidat kolom persen dicoba dengan
+       data sungguhan dan ketiganya menghasilkan angka yang tak terjelaskan. */
+    const pita = { kecil: [0, 1e6], menengah: [1e6, 1e7], semua: [0, Infinity] };
+    const [pBawah, pAtas] = pita[String(q.pita)] || pita.semua;
+    const batas = Math.min(120, Math.max(5, Number(q.batas) || 40));
+
+    /* Alamat yang SUDAH dipantau ikut ditandai, bukan dibuang dari daftar.
+       Membuangnya membuat dompet terbaik menghilang dari papan begitu
+       dipantau, dan yang melihatnya mengira peringkatnya berubah. */
+    const dipantau = new Set(((baca(PANTAU, { dompet: [] }).dompet) || []).map((d) => d.alamat));
+
+    /* Disaring dan diurutkan DI SINI, bukan di peramban. Kirim 190 KB tiap
+       kali orang berganti jendela waktu itu mahal untuk sambungan yang
+       sering menumpang tethering; yang benar-benar dibaca cuma 40 baris. */
+    const daftar = p.daftar
+      .filter((x) => x && x.w && x.w[jendela] && x.akun >= pBawah && x.akun < pAtas)
+      .sort((a, b) => (b.w[jendela].pnl || 0) - (a.w[jendela].pnl || 0))
+      .slice(0, batas)
+      .map((x) => ({
+        alamat: x.alamat,
+        nama: x.nama || '',
+        akun: x.akun,
+        pnl: x.w[jendela].pnl,
+        vlm: x.w[jendela].vlm,
+        dipantau: dipantau.has(x.alamat),
+      }));
+
+    res.json({
+      ok: true, jendela, pita: String(q.pita || 'semua'),
+      diperbarui: p.diperbarui || 0,
+      total: p.total || 0,
+      minAkun: p.minAkun || 0,
+      daftar,
+    });
   });
 
   app.delete('/api/agen/wallet/:alamat', batasLaju, butuhLogin, hanyaPemilik, (req, res) => {

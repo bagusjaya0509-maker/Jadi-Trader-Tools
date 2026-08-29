@@ -103,3 +103,59 @@ export async function hapusDompet(alamat: string): Promise<boolean> {
     return r.ok;
   } catch { return false; }
 }
+
+/* ── PAPAN PERINGKAT ────────────────────────────────────────────────────
+   Sampai sekarang satu-satunya cara menambah dompet adalah menempel alamat
+   42 karakter yang harus dicari sendiri di luar. Papan peringkat menjawab
+   pertanyaan yang sebenarnya: dompet mana yang layak dipantau.
+
+   Disaring dan diurutkan DI SERVER. Papan aslinya 36 MB; yang sampai ke
+   sini 40 baris yang benar-benar dibaca. */
+
+export type JendelaPeringkat = 'day' | 'week' | 'month' | 'allTime';
+/** Pita ukuran akun — dengan siapa perbandingannya dilakukan. Tidak ada
+ *  pilihan urutan: papan ini SELALU diurut dari untung terbesar, satu-satunya
+ *  angka dari sumber ini yang bisa dipertanggungjawabkan. */
+export type PitaAkun = 'kecil' | 'menengah' | 'semua';
+
+export interface BarisPeringkat {
+  alamat: string;
+  /** Nama yang dipasang pemiliknya sendiri — teks pihak lain. Ditampilkan
+   *  apa adanya sebagai teks, tidak pernah lebih dari itu. */
+  nama: string;
+  akun: number;
+  pnl: number;
+  vlm: number;
+  dipantau: boolean;
+}
+
+export interface Peringkat {
+  daftar: BarisPeringkat[];
+  diperbarui: number;
+  total: number;
+  minAkun: number;
+  /** Skrip penariknya belum pernah jalan — beda dengan "tidak ada yang
+   *  lolos saringan", dan layar harus bisa membedakan keduanya. */
+  belumAda: boolean;
+}
+
+export async function peringkatDompet(
+  jendela: JendelaPeringkat, pita: PitaAkun, batas = 40,
+): Promise<Peringkat | null> {
+  const t = await token();
+  if (!t) return null;
+  try {
+    const q = `jendela=${jendela}&pita=${pita}&batas=${batas}`;
+    const r = await fetch(`${dasar()}/api/agen/wallet/peringkat?${q}`,
+      { headers: { Authorization: 'Bearer ' + t } });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return {
+      daftar: Array.isArray(j?.daftar) ? j.daftar : [],
+      diperbarui: Number(j?.diperbarui) || 0,
+      total: Number(j?.total) || 0,
+      minAkun: Number(j?.minAkun) || 0,
+      belumAda: !!j?.belumAda,
+    };
+  } catch { return null; }
+}
