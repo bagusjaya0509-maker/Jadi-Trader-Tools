@@ -33,6 +33,9 @@ jumlah katanya sendiri, jadi ia angka sungguhan.
 Pakai:  python skrip/bangun-artikel.py
 """
 import io, os, re, sys
+import json as _json_tgl
+import hashlib as _hash
+import datetime as _dt
 from PIL import Image
 from importlib import import_module
 
@@ -497,6 +500,42 @@ print("  %-52s %5d huruf" % ("(halaman daftar)", len(hub)))
 # Ditulis ULANG seluruhnya, bukan ditambal: sitemap tambalan menumpuk alamat
 # artikel yang sudah dihapus dan tidak ada yang mengingatkan.
 TETAP = ["/", "/preview", "/akses", "/legal", "/changelog", "/docs", "/artikel/"]
+
+# ── <lastmod>, DAN KENAPA IA TIDAK BOLEH "HARI INI" ──────────────────────
+# Tergoda menulis tanggal hari ini untuk semua alamat tiap kali membangun.
+# Itu justru merusak gunanya: kalau tiap build seluruh sitemap mengaku
+# berubah, Google belajar bahwa tanggal di situs ini tidak berarti apa-apa,
+# lalu mengabaikannya — dan sinyalnya hilang untuk selamanya, termasuk untuk
+# artikel yang BENAR-BENAR berubah.
+#
+# Jadi tanggalnya diikatkan ke ISINYA. Sidik jari isi artikel disimpan di
+# skrip/lastmod.json; tanggal cuma bergerak kalau sidik jarinya bergeser.
+# Membangun ulang tanpa menyunting apa pun tidak mengubah satu tanggal pun.
+#
+# Yang disidik ISI, bukan HTML jadinya: mengganti warna atau lebar kolom
+# mengubah HTML seluruh artikel sekaligus, dan itu bukan alasan menyuruh
+# Google merayapi semuanya lagi.
+#
+# Halaman TETAP tidak diberi lastmod. Isinya digambar React dan tidak lewat
+# skrip ini, jadi tanggal apa pun yang ditulis di sini cuma tebakan —
+# dan lastmod yang ditebak lebih buruk daripada lastmod yang tidak ada.
+CATATAN_TGL = os.path.join(D, "lastmod.json")
+try:
+    _tgl = _json_tgl.load(io.open(CATATAN_TGL, encoding="utf-8"))
+except Exception:
+    _tgl = {}
+
+HARI_INI = _dt.date.today().isoformat()
+
+def lastmod(slug, a):
+    """Tanggal ubah terakhir artikel, digerakkan sidik jari isinya."""
+    sidik = _hash.sha256(repr((a["judul"], a["ringkas"], a["isi"])).encode("utf-8")).hexdigest()[:16]
+    lama = _tgl.get(slug)
+    if lama and lama.get("sidik") == sidik:
+        return lama["tanggal"]
+    _tgl[slug] = {"sidik": sidik, "tanggal": HARI_INI}
+    return HARI_INI
+
 baris = ['<?xml version="1.0" encoding="UTF-8"?>',
          "<!-- Dibuat skrip/bangun-artikel.py. Jangan disunting tangan:",
          "     berkas ini ditulis ULANG tiap kali artikel dibangun. -->",
@@ -504,8 +543,15 @@ baris = ['<?xml version="1.0" encoding="UTF-8"?>',
 for j in TETAP:
     baris.append("  <url><loc>%s%s</loc></url>" % (SITUS, j))
 for a in A.ARTIKEL:
-    baris.append("  <url><loc>%s/artikel/%s/</loc></url>" % (SITUS, a["slug"]))
+    baris.append("  <url><loc>%s/artikel/%s/</loc><lastmod>%s</lastmod></url>"
+                 % (SITUS, a["slug"], lastmod(a["slug"], a)))
 baris.append("</urlset>")
+
+io.open(CATATAN_TGL, "w", encoding="utf-8").write(
+    _json_tgl.dumps(_tgl, ensure_ascii=False, indent=2, sort_keys=True) + "\n")
+_berubah = sum(1 for v in _tgl.values() if v["tanggal"] == HARI_INI)
+print("  lastmod: %d artikel bertanggal %s, %d tetap seperti sebelumnya"
+      % (_berubah, HARI_INI, len(_tgl) - _berubah))
 io.open(os.path.join(AKAR, "public", "sitemap.xml"), "w", encoding="utf-8").write(
     "\n".join(baris) + "\n")
 
@@ -516,7 +562,17 @@ print("  sitemap.xml: %d alamat" % (len(TETAP) + len(A.ARTIKEL)))
 import json as _json
 
 def _blok(a):
-    return [{"jenis": j, "isi": (x if isinstance(x, list) else str(x))}
+    """Blok artikel jadi bentuk yang bisa dibaca TypeScript.
+
+    tuple WAJIB ikut dihitung, bukan cuma list. Blok "gambar" isinya tuple
+    (berkas, keterangan); isinstance(x, list) memulangkan False untuk tuple,
+    jadi ia jatuh ke str(x) dan yang tertulis di isi.ts adalah repr Python
+    mentah — "('a.webp', 'Langkah 3...')" sebagai SATU string.
+
+    Tidak ada yang meledak waktu itu terjadi: berkasnya tetap ditulis, build
+    artikel tetap sukses, dan salahnya baru muncul di tempat lain (tsc) atau
+    tidak muncul sama sekali sampai ada yang memakai datanya."""
+    return [{"jenis": j, "isi": (list(x) if isinstance(x, (list, tuple)) else str(x))}
             for j, x in a["isi"]]
 
 _data = [{
@@ -533,7 +589,10 @@ _KEPALA = """/* DIBUAT OTOMATIS oleh skrip/bangun-artikel.py \u2014 jangan disun
    Sumbernya skrip/artikel-isi.py; berkas ini ditulis ULANG tiap kali artikel
    dibangun, jadi suntingan di sini hilang tanpa peringatan. */
 
-export type BlokJenis = 'p' | 'h2' | 'ul' | 'ol' | 'catatan';
+export type BlokJenis = 'p' | 'h2' | 'ul' | 'ol' | 'catatan' | 'gambar';
+
+/* Untuk 'gambar', isi berbentuk [berkas, keterangan] — dua unsur,
+   bukan daftar butir seperti pada 'ul'/'ol'. */
 
 export interface Blok { jenis: BlokJenis; isi: string | string[] }
 
