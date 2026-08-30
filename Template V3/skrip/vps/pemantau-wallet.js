@@ -439,6 +439,27 @@ async function bunyikanPosisiBaru(lama, baru) {
    untuk angka yang sama persis. */
 const UMUR_SEGAR = 6 * 60 * 60 * 1000;
 
+/* ══ KENAPA RIWAYAT PENUH TIDAK BOLEH DITARIK TIAP MENIT ═══════════════
+   Versi pertama memanggil `userFills` di SETIAP putaran — 632 KB per
+   dompet, tiap 60 detik. Dengan sepuluh dompet itu 7,4 GB PER HARI, untuk
+   data yang 99,99% sama dengan menit sebelumnya. Sebagai perbandingan,
+   seluruh VPS ini baru memindahkan 33 GB masuk dalam 7,5 minggu uptime.
+
+   Yang benar-benar dibutuhkan tiap putaran cuma fill BARU sejak yang
+   terakhir tercatat, dan Hyperliquid punya rutenya: `userFillsByTime`
+   dengan `startTime`. Untuk jendela beberapa menit ia memulangkan 0,0 KB.
+
+   Diuji sebelum dipakai, dan uji pertamanya nyaris menipu: enam dompet
+   dibandingkan pada jendela enam jam dan semuanya memulangkan nol lawan
+   nol — "cocok" yang tidak membuktikan apa pun. Baru pada jendela yang
+   memang berisi fill perbandingannya berarti: 337, 1.042, dan 1.935 fill
+   cocok satu per satu lewat hash+waktu+ukuran. Isinya sama persis.
+
+   Riwayat PENUH tetap ditarik, tapi enam jam sekali — ia cuma dipakai
+   menghitung WR, RR, dan umur riwayat, dan ketiganya tidak berubah berarti
+   dalam hitungan menit. */
+const RIWAYAT_SEGAR = Number(process.env.WALLET_RIWAYAT_JAM || 6) * 60 * 60 * 1000;
+
 async function segarkanUmur(dompet, lamaSeumur) {
   const out = {};
   for (const d of dompet) {
@@ -471,6 +492,13 @@ async function pindai() {
 
   await segarkanPetaSpot();
   const batas = batasTerakhir(DIR);
+  /* Dibaca SEKALI di awal putaran, bukan per dompet: ia menentukan apakah
+     riwayat penuh perlu ditarik, dan membacanya belasan kali dari berkas
+     yang sama cuma menambah I/O untuk jawaban yang identik. */
+  let seumurLama = {};
+  try { seumurLama = JSON.parse(fs.readFileSync(path.join(DIR, 'wallet-aktivitas.json'), 'utf8')).seumur || {}; }
+  catch (e) { /* putaran pertama */ }
+
   const semuaBaru = [];
   const semuaPosisi = [];
   const seumur = {};
@@ -478,9 +506,28 @@ async function pindai() {
 
   for (const d of dompet) {
     try {
+      /* Batas waktu dihitung DULU: ia yang menentukan jendela permintaan,
+         bukan cuma dipakai menyaring hasilnya. Di situlah penghematannya. */
+      const sejak = batas[d.alamat] || Number(d.sejak) || Date.now();
+
+      /* Riwayat penuh cuma kalau belum pernah ada, atau sudah basi. Kalau
+         tidak, yang ditarik hanya fill sesudah `sejak` — beberapa kilobita,
+         sering nol. */
+      const seumurLamaIni = seumurLama[d.alamat];
+      const perluPenuh = !seumurLamaIni
+        || !seumurLamaIni.dicek
+        || Date.now() - seumurLamaIni.dicek > RIWAYAT_SEGAR;
+
       const [isi, fills] = await Promise.all([
         tanya({ type: 'clearinghouseState', user: d.alamat }),
-        tanya({ type: 'userFills', user: d.alamat }),
+        perluPenuh
+          ? tanya({ type: 'userFills', user: d.alamat })
+          /* startTime, BUKAN startTime+1: pagar `> sejak` di bawah tetap
+             dipasang, jadi fill tepat di batasnya tidak masuk dua kali.
+             Menggeser batasnya di sini akan membuat dua tempat memutuskan
+             hal yang sama, dan dua tempat yang harus sepakat selamanya
+             cepat atau lambat berselisih. */
+          : tanya({ type: 'userFillsByTime', user: d.alamat, startTime: sejak }),
       ]);
 
       const nilaiAkun = Number(isi?.marginSummary?.accountValue) || 0;
@@ -515,9 +562,19 @@ async function pindai() {
          Riwayat lama juga bukan yang dijanjikan panel ini: yang dicatat
          adalah apa yang dilakukan dompet SELAMA kita memantaunya, supaya
          tiap baris punya waktu yang benar-benar kita saksikan. */
-      seumur[d.alamat] = riwayatBursa(fills);
+      /* Ditulis HANYA dari riwayat penuh. Menghitung WR dari jendela
+         beberapa menit akan memberi "0 penutupan, WR kosong" dan menimpa
+         angka yang benar dengan angka yang tidak berarti — kerusakan yang
+         terlihat seperti dompet yang tiba-tiba kehilangan rekam jejaknya.
 
-      const sejak = batas[d.alamat] || Number(d.sejak) || Date.now();
+         Kalau tarikan penuhnya gagal, yang lama DIPERTAHANKAN. Data lama
+         yang benar mengalahkan data baru yang kosong. */
+      if (perluPenuh && Array.isArray(fills) && fills.length) {
+        seumur[d.alamat] = riwayatBursa(fills);
+        seumur[d.alamat].dicek = Date.now();
+      } else if (seumurLamaIni) {
+        seumur[d.alamat] = seumurLamaIni;
+      }
       const baru = (Array.isArray(fills) ? fills : [])
         .filter((f) => (Number(f.time) || 0) > sejak)
         .map((f) => keBaris(d.alamat, d.nama, f));
@@ -536,9 +593,6 @@ async function pindai() {
   /* Umur digabung ke `seumur` yang sudah ada, bukan berkas sendiri: keduanya
      menjawab pertanyaan yang sama ("dompet ini sudah berapa lama dan
      sebagus apa") dan dibaca bersamaan di layar. */
-  let seumurLama = {};
-  try { seumurLama = JSON.parse(fs.readFileSync(path.join(DIR, 'wallet-aktivitas.json'), 'utf8')).seumur || {}; }
-  catch (e) { /* baru */ }
   const umur = await segarkanUmur(dompet, seumurLama);
   for (const a of Object.keys(umur)) {
     seumur[a] = Object.assign({}, seumur[a] || {}, umur[a]);
