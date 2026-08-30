@@ -32,6 +32,7 @@ export default defineConfig({
          yang dibuat ada. Lihat src/shim/. */
       'next/image': path.resolve(__dirname, './src/shim/next-image.tsx'),
       'next/link': path.resolve(__dirname, './src/shim/next-link.tsx'),
+      'motion/react': path.resolve(__dirname, './src/shim/motion-react.ts'),
     },
   },
   build: {
