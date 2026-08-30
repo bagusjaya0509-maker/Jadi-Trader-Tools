@@ -301,6 +301,17 @@ ARTIKEL = [
           "Klik <code>Add to chart</code>.",
           "<b>Simpan ke favorit.</b> Tanpa ini, indikatornya hanya menempel di "
           "layout yang sedang terbuka, dan besok kamu harus menempel ulang."]),
+  # Tampilan "Favorites", BUKAN "My scripts". Keduanya menjelaskan langkah 4,
+  # dan "My scripts" bahkan lebih jelas karena bintangnya ada yang terisi dan
+  # ada yang tidak. Tapi daftar itu memuat SELURUH nama skrip milik pemilik,
+  # termasuk yang belum dirilis — menerbitkannya sama dengan mengumumkan
+  # daftar produk yang belum diumumkan.
+  ("gambar", ("tradingview-langkah-4-favorit.webp",
+              "Langkah 4 — tombol <code>Indicators</code> di toolbar atas, lalu "
+              "<b>Favorites</b>. Indikator yang bintangnya sudah terisi akan "
+              "selalu ada di daftar ini, di layout mana pun kamu membukanya. "
+              "Yang belum difavoritkan cuma menempel di layout yang sedang "
+              "terbuka.")),
 
   ("h2", "Kalau gagal dikompilasi, cek versinya"),
   ("p", "Versi Pine tertulis di kartu tiap produk. Indikator v6 <b>tidak bisa</b> "
