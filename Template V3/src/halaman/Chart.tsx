@@ -41,7 +41,7 @@ import { useAuth } from '@/lib/auth';
 import { modePreview, jatahTerpakai, pakaiJatah } from '@/lib/preview';
 import { usePaket, pakaiKuota, teksSisa } from '@/lib/paket';
 import { JiplakChart, JIPLAK_BAWAAN, type AturJiplak } from '@/components/jiplak-chart';
-import type { PosisiDompet } from '@/lib/wallet-agen';
+import type { PosisiDompet, KeadaanDompet } from '@/lib/wallet-agen';
 import { PanelBelah } from '@/components/panel-belah';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -307,6 +307,69 @@ function rapikanSimbol(s: string): string {
    lahir dan hidup di Hyperliquid saja (PURR, CASHCAT) akan membuka chart
    kosong, dan itu lebih jujur daripada daftar yang diam-diam berbeda dari
    yang orang lihat di dompetnya. */
+/* ── DAFTAR KONSENSUS DI PANEL KIRI ────────────────────────────────────
+   Saudara kandung DaftarPosisiDompet, dan sengaja dibuat semirip mungkin:
+   dua daftar yang berperilaku sama harus terlihat sama.
+
+   Bedanya isinya. Yang satu menjawab "dompet ini pegang apa saja", yang ini
+   menjawab "koin ini dipegang siapa saja, dan sebagus apa rekam jejak
+   mereka". Yang kedua itulah yang dipakai memilih koin mana yang layak
+   dibuka chartnya — dan sebelum ini, menjawabnya berarti bolak-balik ke
+   Copy Signal untuk tiap koin. */
+function DaftarKonsensus({ grup, aktif, pilih, keluar }: {
+  grup: { koin: string; nL: number; nS: number; wrL: number | null; wrS: number | null;
+          entry: number; nilai: number }[];
+  aktif: string;
+  pilih: (simbol: string) => void;
+  keluar: () => void;
+}) {
+  return (
+    <div className="flex h-full flex-col">
+      <div className="sticky top-0 z-10 flex items-start gap-2 border-b border-zinc-800 bg-zinc-950 px-2.5 py-1.5">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[12px] font-semibold text-zinc-100">Konsensus dompet</p>
+          <p className="text-[10.5px] text-zinc-600">{grup.length} koin · WR rata-rata tiap sisi</p>
+        </div>
+        <button onClick={keluar} title="Tutup daftar dan kembali"
+          className="shrink-0 cursor-pointer rounded p-1 text-zinc-600 transition-colors hover:bg-zinc-800 hover:text-zinc-100">
+          <X className="size-3.5" />
+        </button>
+      </div>
+      <div className="min-h-0 flex-1">
+        {grup.map((g) => {
+          const sim = g.koin + 'USDT';
+          const ini = sim === aktif;
+          return (
+            <button key={g.koin} onClick={() => pilih(sim)}
+              className={cn('flex w-full cursor-pointer flex-col gap-0.5 border-b border-zinc-800/60 px-2.5 py-1.5 text-left transition-colors',
+                ini ? 'bg-zinc-800/70' : 'hover:bg-zinc-900')}>
+              <span className="flex flex-wrap items-baseline gap-x-1.5">
+                <span className={cn('text-[12px] font-semibold', ini ? 'text-zinc-50' : 'text-zinc-200')}>{g.koin}</span>
+                {g.nL > 0 && (
+                  <span className="text-[10.5px] font-semibold text-emerald-400">
+                    {g.nL}L{g.wrL !== null && <span className="font-normal text-zinc-600"> {g.wrL}%</span>}
+                  </span>
+                )}
+                {g.nS > 0 && (
+                  <span className="text-[10.5px] font-semibold text-red-400">
+                    {g.nS}S{g.wrS !== null && <span className="font-normal text-zinc-600"> {g.wrS}%</span>}
+                  </span>
+                )}
+                <span className="ml-auto text-[10px] tabular-nums text-zinc-600">
+                  ${g.nilai >= 1e6 ? (g.nilai / 1e6).toFixed(1) + 'jt' : Math.round(g.nilai / 1000) + 'rb'}
+                </span>
+              </span>
+              <span className="text-[10px] tabular-nums text-zinc-600">
+                rata entry {g.entry ? g.entry.toFixed(g.entry > 100 ? 0 : 4) : '—'}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function DaftarPosisiDompet({ posisi, aktif, pilih, keluar }: {
   posisi: PosisiDompet[];
   aktif: string;
@@ -2594,26 +2657,76 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
      dengan pemantau di server, jadi angka mengambang di daftar ini tidak
      pernah lebih dari satu putaran tertinggal dari panelnya. */
   const dompetMinta = cari.get('dompet');
+  /* `?konsensus=1` memakai penarikan yang SAMA — bedanya cuma apa yang
+     disaring darinya. Menariknya dua kali untuk dua tampilan atas data yang
+     identik berarti dua permintaan yang bisa berselisih isinya. */
+  const konsensusMinta = cari.get('konsensus') === '1';
   const [posisiDompet, setPosisiDompet] = useState<PosisiDompet[]>([]);
+  const [semuaDompet, setSemuaDompet] = useState<KeadaanDompet | null>(null);
   useEffect(() => {
-    if (!pemilik || !dompetMinta) { setPosisiDompet([]); return; }
+    if (!pemilik || (!dompetMinta && !konsensusMinta)) { setPosisiDompet([]); setSemuaDompet(null); return; }
     let hidup = true;
     const tarik = () => {
       void import('@/lib/wallet-agen').then(({ keadaanDompet }) => keadaanDompet()).then((d) => {
         if (!hidup || !d) return;
-        setPosisiDompet(d.posisi.filter((p) => p.alamat === dompetMinta));
+        setSemuaDompet(d);
+        setPosisiDompet(dompetMinta ? d.posisi.filter((p) => p.alamat === dompetMinta) : []);
       });
     };
     tarik();
     const jam = setInterval(tarik, 60000);
     return () => { hidup = false; clearInterval(jam); };
-  }, [pemilik, dompetMinta]);
+  }, [pemilik, dompetMinta, konsensusMinta]);
+
+  /* Dikelompokkan di sini, bukan di panelnya: hitungannya dipakai DUA kali —
+     sekali untuk daftarnya, sekali untuk garis rata-rata entry di chart. */
+  const grupKonsensus = useMemo(() => {
+    if (!konsensusMinta || !semuaDompet) return [];
+    const seumur = semuaDompet.seumur || {};
+    const peta = new Map<string, { koin: string; L: PosisiDompet[]; S: PosisiDompet[] }>();
+    for (const p of semuaDompet.posisi) {
+      const k = p.koin.toUpperCase();
+      if (!peta.has(k)) peta.set(k, { koin: k, L: [], S: [] });
+      (p.arah === 'LONG' ? peta.get(k)!.L : peta.get(k)!.S).push(p);
+    }
+    const wrRata = (sisi: PosisiDompet[]) => {
+      const v = sisi.map((p) => seumur[p.alamat]).filter((r) => r && r.tutup > 0)
+        .map((r) => (r.menang / r.tutup) * 100);
+      return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : null;
+    };
+    return [...peta.values()]
+      .filter((g) => g.L.length + g.S.length >= 2)
+      .map((g) => {
+        const dominan = g.L.length >= g.S.length ? g.L : g.S;
+        const e = dominan.map((p) => p.entry).filter((x) => x > 0);
+        return {
+          koin: g.koin, nL: g.L.length, nS: g.S.length,
+          wrL: wrRata(g.L), wrS: wrRata(g.S),
+          entry: e.length ? e.reduce((a, b) => a + b, 0) / e.length : 0,
+          arahDominan: (g.L.length >= g.S.length ? 'LONG' : 'SHORT') as 'LONG' | 'SHORT',
+          nilai: [...g.L, ...g.S].reduce((a, p) => a + p.nilai, 0),
+        };
+      })
+      .sort((a, b) => (b.nL + b.nS) - (a.nL + a.nS));
+  }, [konsensusMinta, semuaDompet]);
 
   /* Chart berpindah ke posisi PERTAMA begitu daftarnya tiba — sekali saja.
      Mendarat di BTCUSDT bawaan sementara daftar di sebelahnya berisi enam
      belas posisi lain berarti satu klik yang seharusnya tidak perlu, dan
      memaksanya tiap penyegaran akan menarik orang kembali ke baris pertama
      tiap menit sementara ia sedang membaca baris kesembilan. */
+  /* Sama alasannya dengan mode dompet: mendarat di BTCUSDT bawaan sementara
+     daftar di sebelahnya berisi enam koin lain berarti satu klik yang
+     seharusnya tidak perlu. Sekali saja — memaksanya tiap penyegaran akan
+     menarik orang kembali ke baris pertama tiap menit. */
+  const konsensusDilompati = useRef(false);
+  useEffect(() => {
+    if (!konsensusMinta || !grupKonsensus.length || konsensusDilompati.current) return;
+    konsensusDilompati.current = true;
+    if (ambilSimbol(cari)) return;
+    setSimbol(rapikanSimbol(grupKonsensus[0].koin + 'USDT'));
+  }, [konsensusMinta, grupKonsensus, cari]);
+
   const dompetDilompati = useRef<string | null>(null);
   useEffect(() => {
     if (!dompetMinta || !posisiDompet.length) return;
@@ -2648,6 +2761,24 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
     if (p.likuidasi > 0) g.push({ harga: p.likuidasi, warna: 'rgba(251,191,36,.75)', label: 'Likuidasi' });
     return g;
   }, [posisiDompet, simbol]);
+
+  /* ── GARIS RATA-RATA ENTRY KONSENSUS ─────────────────────────────────
+     Satu garis, dan ia yang paling berguna dari seluruh mode ini: harga
+     yang dianggap layak oleh dompet-dompet yang sepakat. Jarak harga
+     sekarang terhadapnya langsung menjawab apakah ikut masuk sekarang
+     masih setara atau sudah terlambat — pertanyaan yang selama ini dijawab
+     dengan mengingat angka dari halaman lain. */
+  const garisKonsensus = useMemo<GarisHarga[]>(() => {
+    if (!grupKonsensus.length) return [];
+    const bersih = simbol.replace(/^MT5:/i, '').toUpperCase();
+    const g = grupKonsensus.find((x) => x.koin + 'USDT' === bersih);
+    if (!g || !g.entry) return [];
+    return [{
+      harga: g.entry,
+      warna: g.arahDominan === 'LONG' ? 'rgba(52,211,153,.7)' : 'rgba(248,113,113,.7)',
+      label: 'Rata ' + (g.arahDominan === 'LONG' ? g.nL + 'L' : g.nS + 'S'),
+    }];
+  }, [grupKonsensus, simbol]);
 
   const jiplakMinta = cari.get('jiplak');
   const jiplakTerpasang = useRef<string | null>(null);
@@ -3802,7 +3933,16 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
               Jiplak TIDAK dipindah: panel acuannya memang harus sejajar
               dengan kanvas, dan ia tetap di dalam ChartLilin. */}
           <PanelBelah tinggi={tinggiChart}
-            kiri={!jiplak && posisiDompet.length ? (
+            kiri={!jiplak && grupKonsensus.length ? (
+              <DaftarKonsensus grup={grupKonsensus} aktif={simbol}
+                pilih={(x) => setSimbol(rapikanSimbol(x))}
+                keluar={() => {
+                  const q = new URLSearchParams(cari);
+                  q.delete('konsensus');
+                  setSemuaDompet(null);
+                  navigasi({ search: q.toString() ? '?' + q.toString() : '' }, { replace: true });
+                }} />
+            ) : !jiplak && posisiDompet.length ? (
               <DaftarPosisiDompet posisi={posisiDompet} aktif={simbol}
                 pilih={(x) => setSimbol(rapikanSimbol(x))}
                 keluar={() => {
@@ -3816,7 +3956,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
             ? <ChartLilin key={`${simbol}|${tf}|${kunciChart}`}
                           lilin={lilinGabung} garis={garis} trade={replayIdx === null ? hasil?.trade : undefined}
                           tinggi={tinggiChart} hingga={replayIdx ?? undefined} smi={smi}
-                          garisHarga={[...garisHarga, ...garisZona, ...garisDompet, ...(modeNyata ? garisOrder : [])]}
+                          garisHarga={[...garisHarga, ...garisZona, ...garisDompet, ...garisKonsensus, ...(modeNyata ? garisOrder : [])]}
                           /* Klik chart HANYA berlaku saat mode bidik menyala —
                               sekali, untuk menentukan titik mulai replay.
                               Sesudah itu modenya padam dan klik kembali tidak

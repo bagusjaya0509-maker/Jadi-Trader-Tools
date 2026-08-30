@@ -1136,6 +1136,16 @@ function KonsensusPasar({ posisi, dompet, seumur, log }: {
         <span className="text-[11px] font-normal text-zinc-600">
           · koin yang dipegang lebih dari satu dompet · WR & umur dari riwayat bursa
         </span>
+        {/* Pintu yang sama bentuknya dengan "List in Chart" di kartu dompet,
+            dan itu disengaja: dua daftar yang berperilaku sama harus terlihat
+            sama, kalau tidak orang harus belajar dua kali untuk satu
+            kebiasaan. */}
+        <Link to="/chart-entry?konsensus=1"
+          title="Buka daftar konsensus di samping chart — klik koin untuk berpindah"
+          className="ml-auto flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-zinc-700 px-2.5 py-1 text-[11.5px] text-zinc-300 transition-colors hover:border-zinc-500 hover:text-zinc-100">
+          <List className="size-3.5" />
+          List in Chart
+        </Link>
       </h3>
 
       <div className="space-y-1.5">
