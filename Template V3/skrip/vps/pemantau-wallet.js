@@ -429,6 +429,39 @@ async function bunyikanPosisiBaru(lama, baru) {
   }
 }
 
+/* ── UMUR DOMPET, DARI SETORAN PERTAMA ─────────────────────────────────
+   Bukan dari fill tertua: userFills dibatasi 2000 baris, jadi untuk dompet
+   ramai transaksi tertuanya cuma dua bulan lalu — bukan awal hidupnya.
+   Buku besar setoran memulangkan seluruh riwayatnya dan cuma 4 KB.
+
+   Ditarik SEKALI per enam jam, bukan tiap pindaian. Umur dompet berubah nol
+   kali dalam sehari, dan menariknya tiap menit berarti 1.440 permintaan
+   untuk angka yang sama persis. */
+const UMUR_SEGAR = 6 * 60 * 60 * 1000;
+
+async function segarkanUmur(dompet, lamaSeumur) {
+  const out = {};
+  for (const d of dompet) {
+    const lama = lamaSeumur && lamaSeumur[d.alamat];
+    if (lama && lama.lahir && Date.now() - (lama.lahirDicek || 0) < UMUR_SEGAR) {
+      out[d.alamat] = { lahir: lama.lahir, lahirDicek: lama.lahirDicek };
+      continue;
+    }
+    try {
+      const r = await fetch(API, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'userNonFundingLedgerUpdates', user: d.alamat, startTime: 0 }),
+        signal: AbortSignal.timeout(20000),
+      });
+      if (!r.ok) continue;
+      const j = await r.json();
+      const w = (Array.isArray(j) ? j : []).map((x) => Number(x.time) || 0).filter(Boolean);
+      if (w.length) out[d.alamat] = { lahir: Math.min(...w), lahirDicek: Date.now() };
+    } catch (e) { /* satu gagal tidak menjatuhkan sisanya */ }
+  }
+  return out;
+}
+
 async function pindai() {
   const dompet = bacaDompet(DIR);
   if (!dompet.length) {
@@ -499,6 +532,17 @@ async function pindai() {
   /* Potret LAMA dibaca sebelum ditimpa — sesudahnya tidak ada lagi cara
      tahu apa yang berubah. */
   const posisiLama = posisiSebelumnya(DIR);
+
+  /* Umur digabung ke `seumur` yang sudah ada, bukan berkas sendiri: keduanya
+     menjawab pertanyaan yang sama ("dompet ini sudah berapa lama dan
+     sebagus apa") dan dibaca bersamaan di layar. */
+  let seumurLama = {};
+  try { seumurLama = JSON.parse(fs.readFileSync(path.join(DIR, 'wallet-aktivitas.json'), 'utf8')).seumur || {}; }
+  catch (e) { /* baru */ }
+  const umur = await segarkanUmur(dompet, seumurLama);
+  for (const a of Object.keys(umur)) {
+    seumur[a] = Object.assign({}, seumur[a] || {}, umur[a]);
+  }
 
   /* Dibunyikan SEBELUM disimpan? Tidak — sesudah. Kalau prosesnya mati di
      tengah, catatan yang sudah tersimpan tanpa lonceng lebih baik daripada

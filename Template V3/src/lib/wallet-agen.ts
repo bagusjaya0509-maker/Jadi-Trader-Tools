@@ -54,6 +54,10 @@ export interface RiwayatBursa {
   realisasi: number;
   /** Waktu fill tertua yang dipulangkan bursa. */
   sejak: number;
+  /** Setoran pertama ke dompetnya — umur yang sebenarnya, bukan fill tertua.
+   *  0/undefined kalau buku besarnya belum terbaca. */
+  lahir?: number;
+  lahirDicek?: number;
 }
 
 /** Penanda "koin ini sedang saya tiru dari dompet itu". Cuma penanda —

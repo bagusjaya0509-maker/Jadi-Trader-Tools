@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronRight, List, Loader2, Plus, RefreshCw, Trash2, Trophy, Wallet, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronRight, List, Loader2, Plus, RefreshCw, Trash2, Trophy, Users, Wallet, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { SparklineSaldo } from '@/components/kurva-saldo';
@@ -1015,6 +1015,225 @@ function PosisiTiruan({ tiru, dompet, posisi, ubahTiru, ubahOto }: {
   );
 }
 
+/* ════════════════════════════════════════════════════════════════════════
+   KONSENSUS — berapa dompet sepakat, dan seberapa bagus yang sepakat itu
+   ════════════════════════════════════════════════════════════════════════
+   "Tiga puluh dari empat puluh dompet long BTC" terdengar seperti kabar
+   besar, dan sering bukan. Yang menentukan bukan jumlahnya, melainkan SIAPA
+   — tiga puluh dompet dengan win rate 45% yang sepakat cuma kerumunan;
+   enam dompet dengan win rate 80% yang sepakat adalah keterangan.
+
+   Karena itu kartu ini SELALU menyandingkan tiga hal, dan tidak pernah
+   memisahkannya:
+
+     · berapa dompet di tiap sisi
+     · WR RATA-RATA mereka menurut riwayat bursa
+     · umur rata-rata dompetnya
+
+   Sisi yang menang jumlah tapi kalah rekam jejak ditandai — itu justru
+   keadaan yang paling sering salah dibaca, dan satu-satunya alasan kolom WR
+   ada di sini.
+
+   ── HARGA MASUK DAN KAPAN ─────────────────────────────────────────────
+   Tiap baris membawa harga entry dompetnya dan, kalau pembukaannya kita
+   saksikan, kapan itu terjadi. Rata-rata entry sisi yang sepakat adalah
+   angka yang paling langsung berguna: ia harga yang mereka anggap layak,
+   dan jarak harga sekarang terhadapnya menentukan apakah ikut masuk
+   sekarang masih setara atau sudah terlambat.
+
+   ── YANG TIDAK DIHITUNG DI SINI ───────────────────────────────────────
+   Tidak ada skor gabungan, tidak ada "sinyal konsensus". Menjumlahkan
+   jumlah dompet, win rate, dan umur jadi satu angka berarti memilihkan
+   bobotnya untuk orang lain — dan bobot itu justru keputusan yang sedang
+   ia ambil. */
+function KonsensusPasar({ posisi, dompet, seumur, log }: {
+  posisi: PosisiDompet[];
+  dompet: DompetPantau[];
+  seumur: Record<string, RiwayatBursa>;
+  log: TransaksiDompet[];
+}) {
+  const [buka, setBuka] = useState<string | null>(null);
+
+  const grup = useMemo(() => {
+    const peta = new Map<string, { koin: string; long: PosisiDompet[]; short: PosisiDompet[] }>();
+    for (const p of posisi) {
+      const k = p.koin.toUpperCase();
+      if (!peta.has(k)) peta.set(k, { koin: k, long: [], short: [] });
+      (p.arah === 'LONG' ? peta.get(k)!.long : peta.get(k)!.short).push(p);
+    }
+
+    const rata = (d: number[]) => (d.length ? d.reduce((a, b) => a + b, 0) / d.length : 0);
+    const nilaiSisi = (sisi: PosisiDompet[]) => {
+      /* Cuma dompet yang PUNYA rekam jejak yang ikut rata-rata WR-nya.
+         Memasukkan yang belum terukur sebagai nol akan menyeret turun
+         angkanya karena alasan yang tidak ada hubungannya dengan kualitas. */
+      const wr = sisi.map((p) => seumur[p.alamat])
+        .filter((r) => r && r.tutup > 0)
+        .map((r) => (r.menang / r.tutup) * 100);
+      const umurHari = sisi.map((p) => seumur[p.alamat]?.lahir)
+        .filter((x): x is number => !!x)
+        .map((x) => (Date.now() - x) / 86400000);
+      return {
+        n: sisi.length,
+        wr: wr.length ? Math.round(rata(wr)) : null,
+        wrDari: wr.length,
+        umur: umurHari.length ? Math.round(rata(umurHari)) : null,
+        entry: rata(sisi.map((p) => p.entry).filter((x) => x > 0)),
+        nilai: sisi.reduce((a, p) => a + p.nilai, 0),
+      };
+    };
+
+    return [...peta.values()]
+      .map((g) => ({ ...g, L: nilaiSisi(g.long), S: nilaiSisi(g.short) }))
+      .filter((g) => g.long.length + g.short.length >= 2)
+      .sort((a, b) => (b.long.length + b.short.length) - (a.long.length + a.short.length));
+    /* Tipe eksplisit di sini, bukan dibiarkan disimpulkan: rantai
+       map->filter->sort yang panjang membuat TS kehilangan jejaknya di
+       pemakai, dan galatnya muncul dua ratus baris jauh dari sebabnya. */
+  }, [posisi, seumur]);
+
+  if (!grup.length) return null;
+  const namaDari = new Map(dompet.map((d) => [d.alamat, d.nama]));
+
+  const barisDompet = (sisi: PosisiDompet[]) => sisi
+    .slice()
+    .sort((a, b) => (seumur[b.alamat]?.tutup ? (seumur[b.alamat].menang / seumur[b.alamat].tutup) : 0)
+                  - (seumur[a.alamat]?.tutup ? (seumur[a.alamat].menang / seumur[a.alamat].tutup) : 0))
+    .map((p) => {
+      const r = seumur[p.alamat];
+      const b = bukaPosisi(log.filter((l) => l.alamat === p.alamat), p.koin, p.arah, p.ukuran);
+      return (
+        <div key={p.alamat + p.koin}
+          className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 border-b border-zinc-800/50 px-2 py-1 last:border-b-0">
+          <span className="min-w-0 flex-1 truncate text-[11.5px] text-zinc-300">
+            {namaDari.get(p.alamat) || p.alamat.slice(0, 10)}
+          </span>
+          <span className={cn('w-12 text-right text-[11px] tabular-nums',
+            !r || !r.tutup ? 'text-zinc-700'
+              : r.menang / r.tutup >= 0.5 ? 'text-emerald-400' : 'text-red-400')}>
+            {r && r.tutup ? Math.round((r.menang / r.tutup) * 100) + '%' : '—'}
+          </span>
+          <span className="w-14 text-right text-[10.5px] tabular-nums text-zinc-600">
+            {r?.lahir ? umurDompet(r.lahir) : '—'}
+          </span>
+          <span className="w-20 text-right text-[10.5px] tabular-nums text-zinc-500">{p.entry}</span>
+          <span className="w-24 text-right text-[10px] tabular-nums text-zinc-600">
+            {b ? (b.utuh ? '' : '≥') + tanggalJam(b.waktu) : 'sebelum dipantau'}
+          </span>
+          <span className={cn('w-16 text-right text-[11px] font-medium tabular-nums',
+            p.pnl >= 0 ? 'text-emerald-400' : 'text-red-400')}>
+            {p.pnl >= 0 ? '+' : '−'}${uangRingkas(Math.abs(p.pnl))}
+          </span>
+        </div>
+      );
+    });
+
+  return (
+    <section>
+      <h3 className="mb-2 flex flex-wrap items-center gap-x-2 border-b border-zinc-800 pb-1.5">
+        <Users className="size-3.5 text-zinc-500" />
+        <span className="text-[13px] font-semibold text-zinc-200">Konsensus dompet</span>
+        <span className="text-[11px] font-normal text-zinc-600">
+          · koin yang dipegang lebih dari satu dompet · WR & umur dari riwayat bursa
+        </span>
+      </h3>
+
+      <div className="space-y-1.5">
+        {grup.map((g) => {
+          const dominan = g.L.n >= g.S.n ? g.L : g.S;
+          const lawan = g.L.n >= g.S.n ? g.S : g.L;
+          /* Sisi mayoritas yang rekam jejaknya justru lebih buruk daripada
+             minoritas — keadaan yang paling sering salah dibaca, dan alasan
+             kolom WR ada di kartu ini sama sekali. */
+          const mayoritasLemah = !!(lawan.n > 0 && dominan.wr !== null && lawan.wr !== null
+            && lawan.wr - dominan.wr >= 15);
+          const terbuka = buka === g.koin;
+          return (
+            <div key={g.koin} className={cn('rounded-lg border bg-zinc-900/30',
+              mayoritasLemah ? 'border-amber-500/30' : 'border-zinc-800')}>
+              <button onClick={() => setBuka(terbuka ? null : g.koin)}
+                className="flex w-full cursor-pointer flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-left">
+                <span aria-hidden className={cn('text-zinc-600 transition-transform', terbuka && 'rotate-90')}>›</span>
+                <span className="text-[13px] font-semibold text-zinc-100">{g.koin}</span>
+
+                {g.L.n > 0 && (
+                  <span className="text-[11.5px]">
+                    <span className="font-semibold text-emerald-400">{g.L.n} LONG</span>
+                    {g.L.wr !== null && (
+                      <span className="ml-1 text-zinc-500">WR {g.L.wr}%
+                        <span className="text-zinc-700"> ({g.L.wrDari})</span>
+                      </span>
+                    )}
+                  </span>
+                )}
+                {g.S.n > 0 && (
+                  <span className="text-[11.5px]">
+                    <span className="font-semibold text-red-400">{g.S.n} SHORT</span>
+                    {g.S.wr !== null && (
+                      <span className="ml-1 text-zinc-500">WR {g.S.wr}%
+                        <span className="text-zinc-700"> ({g.S.wrDari})</span>
+                      </span>
+                    )}
+                  </span>
+                )}
+
+                <span className="ml-auto text-[10.5px] text-zinc-600">
+                  rata entry {dominan.entry ? dominan.entry.toFixed(dominan.entry > 100 ? 0 : 4) : '—'}
+                  {dominan.umur !== null && <> · umur rata {Math.round(dominan.umur / 30)} bln</>}
+                  {' · $' + uangRingkas(g.L.nilai + g.S.nilai)}
+                </span>
+              </button>
+
+              {mayoritasLemah && (
+                <p className="flex items-start gap-1.5 border-t border-zinc-800/60 px-3 py-1.5 text-[11px] leading-relaxed text-amber-300">
+                  <TriangleAlert className="mt-0.5 size-3 shrink-0" />
+                  Sisi yang lebih ramai justru punya rekam jejak lebih buruk
+                  ({dominan.wr}% lawan {lawan.wr}%). Jumlah dompet dan kualitas
+                  dompet menunjuk ke arah yang berbeda di koin ini.
+                </p>
+              )}
+
+              {terbuka && (
+                <div className="border-t border-zinc-800 p-2">
+                  <div className="flex flex-wrap items-baseline gap-x-2 px-2 pb-1 text-[9.5px] uppercase tracking-wide text-zinc-600">
+                    <span className="min-w-0 flex-1">Dompet</span>
+                    <span className="w-12 text-right">WR</span>
+                    <span className="w-14 text-right">Umur</span>
+                    <span className="w-20 text-right">Entry</span>
+                    <span className="w-24 text-right">Dibuka</span>
+                    <span className="w-16 text-right">P/L</span>
+                  </div>
+                  {g.long.length > 0 && (
+                    <>
+                      <p className="px-2 py-0.5 text-[10px] font-semibold text-emerald-400/80">LONG · {g.long.length}</p>
+                      {barisDompet(g.long)}
+                    </>
+                  )}
+                  {g.short.length > 0 && (
+                    <>
+                      <p className="mt-1 px-2 py-0.5 text-[10px] font-semibold text-red-400/80">SHORT · {g.short.length}</p>
+                      {barisDompet(g.short)}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-600">
+        Jumlah dompet bukan sinyal. Tiga puluh dompet dengan WR 45% yang
+        sepakat cuma kerumunan; enam dompet dengan WR 80% yang sepakat adalah
+        keterangan. Angka dalam kurung di sebelah WR = berapa dompet di sisi
+        itu yang rekam jejaknya sudah terukur. Tanda “≥” di kolom Dibuka
+        berarti kita cuma menyaksikan penambahannya, bukan pembukaan
+        pertamanya.
+      </p>
+    </section>
+  );
+}
+
 export function PanelWalletAgen() {
   const [d, setD] = useState<KeadaanDompet | null>(null);
   const [gagal, setGagal] = useState(false);
@@ -1117,6 +1336,9 @@ export function PanelWalletAgen() {
         </div>
       ) : (
         <>
+          <KonsensusPasar posisi={posisi} dompet={dompet}
+            seumur={d?.seumur || {}} log={log} />
+
           <PosisiTiruan tiru={d?.tiru || []} dompet={dompet} posisi={posisi}
             ubahTiru={(a, k, nyala) => {
               void (nyala ? tandaiTiru(a, k) : batalTiru(a, k)).then(() => tarik());
