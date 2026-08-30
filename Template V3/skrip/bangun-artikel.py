@@ -33,6 +33,7 @@ jumlah katanya sendiri, jadi ia angka sungguhan.
 Pakai:  python skrip/bangun-artikel.py
 """
 import io, os, re, sys
+from PIL import Image
 from importlib import import_module
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -119,6 +120,20 @@ li::marker{color:#525252}
 code{background:#141414;border:1px solid var(--garis);border-radius:5px;
   padding:1px 7px;font-size:.82em;font-family:ui-monospace,SFMono-Regular,
   Menlo,monospace;color:var(--teks);white-space:nowrap}
+
+/* ── tangkapan layar di dalam artikel ─────────────────────────────────
+   max-width:100% WAJIB. Preflight Tailwind tidak ada di halaman ini, jadi
+   gambar 1.272px yang dipasang apa adanya akan melebihi kolom 780px dan
+   mendorong seluruh halaman melebar — gulir mendatar di HP, dan penyebabnya
+   tidak kelihatan dari CSS mana pun kecuali ini.
+
+   height:auto menemani width:100%: tanpa itu atribut height di HTML-nya
+   tetap dipakai peramban dan gambarnya jadi gepeng waktu lebarnya menyusut. */
+figure.gambar{margin:0 0 26px}
+figure.gambar img{display:block;width:100%;max-width:100%;height:auto;
+  border:1px solid var(--garis);border-radius:10px;background:var(--panel)}
+figure.gambar figcaption{color:#737373;font-size:.72em;line-height:1.5;
+  margin-top:10px}
 
 .ringkas{color:var(--redup);margin:0 0 34px}
 .label{display:inline-block;font-size:12px;letter-spacing:.1em;
@@ -282,7 +297,34 @@ def blok(jenis, isi):
         return '<div class="catatan">%s</div>' % kaya(isi)
     if jenis in ("ul", "ol"):
         return "<%s>%s</%s>" % (jenis, "".join("<li>%s</li>" % kaya(x) for x in isi), jenis)
+    if jenis == "gambar":
+        return gambarBlok(*isi)
     raise SystemExit("Jenis blok tidak dikenal: " + jenis)
+
+
+def gambarBlok(berkas, keterangan):
+    """Satu tangkapan layar beserta keterangannya.
+
+    UKURANNYA DIBACA DARI BERKASNYA, tidak diketik tangan. Atribut width dan
+    height wajib ada supaya peramban menyediakan ruangnya sebelum gambarnya
+    turun — tanpa itu teks di bawahnya melompat waktu gambar selesai dimuat,
+    dan itu terhitung Cumulative Layout Shift oleh Google. Angka yang diketik
+    tangan akan berselisih dengan berkasnya pada penggantian gambar pertama,
+    dan tidak ada yang memberi tahu.
+
+    Berkas yang tidak ada dihentikan di sini, bukan dibiarkan jadi gambar
+    rusak di halaman yang sudah tayang.
+    """
+    jalur = os.path.join(KELUAR, "gambar", berkas)
+    if not os.path.exists(jalur):
+        raise SystemExit("Gambar tidak ada: " + jalur)
+    with Image.open(jalur) as im:
+        w, h = im.size
+    return ('<figure class="gambar">'
+            '<img src="/artikel/gambar/%s" width="%d" height="%d" '
+            'loading="lazy" decoding="async" alt="%s">'
+            '<figcaption>%s</figcaption></figure>'
+            % (berkas, w, h, esc(keterangan), kaya(keterangan)))
 
 
 def menitBaca(a):
