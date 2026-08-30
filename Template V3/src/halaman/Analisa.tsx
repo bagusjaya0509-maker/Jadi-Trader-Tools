@@ -1825,13 +1825,36 @@ export default function Analisa() {
         /* Tab ketiga, dan HANYA di kanal AI Chart milik pemiliknya:
            ruang penyaringan chart tidak punya arti di kanal orang lain. */
         && (s.id !== 'chart' || (pemilik && kanalBuka === UID_KANAL_CHART))
-        && (s.id !== 'wallet' || (pemilik && kanalBuka === UID_KANAL_WALLET))))
+        && (s.id !== 'wallet' || (pemilik && kanalBuka === UID_KANAL_WALLET))
+        /* ── KANAL DOMPET: SATU HALAMAN SAJA ────────────────────────────
+           'Daftar Signal' dan 'Performa Signal' disembunyikan di sini, dan
+           HANYA di sini. Keduanya bukan milik kanal dompet — mereka tab
+           bersama yang dipakai setiap kanal analis, dan `performa-signal.tsx`
+           menavigasi ke `?sub=performa` dari tempat lain. Mencabutnya dari
+           daftar akan mematikan navigasi itu untuk seluruh analis lain.
+
+           Alasan menyembunyikannya di kanal ini: agen dompet tidak pernah
+           menerbitkan sinyal. Kedua tab itu akan selamanya kosong, dan tab
+           kosong yang permanen mengajari orang bahwa tab di halaman ini
+           tidak selalu berisi — pelajaran yang lalu ia bawa ke tab yang
+           sebenarnya berisi. */
+        && !(kanalBuka === UID_KANAL_WALLET && (s.id === 'market' || s.id === 'performa'))))
     .map((s) => (!diDepan && s.id === 'market' ? { ...s, label: 'Daftar Signal' } : s));
 
   /* Masuk kanal, yang pertama terlihat Performa Signal — keputusan pemilik.
      Orang membuka kanal seseorang untuk menimbang apakah ia layak diikuti,
      dan itu pertanyaan tentang rekam jejak, bukan tentang sinyal terbarunya. */
-  const bawaanSub: IdSub = 'market';
+  /* ── BAWAAN IKUT KANALNYA ────────────────────────────────────────────
+     'market' benar untuk hampir semua kanal, dan SALAH untuk kanal dompet
+     sejak kedua tab sinyalnya disembunyikan di sana. Tanpa baris ini, orang
+     yang membuka kanal dompet tanpa menyebut sub akan mendarat di tab yang
+     tombolnya sudah tidak ada di mana pun — halaman yang isinya kosong
+     sementara satu-satunya tab yang terlihat justru tidak terpilih.
+
+     Persis jenis cacat yang lahir dari perubahan yang benar di satu tempat
+     dan tidak diikuti di tempat yang bergantung padanya. */
+  const bawaanSub: IdSub = (!diDepan && pemilik && kanalBuka === UID_KANAL_WALLET)
+    ? 'wallet' : 'market';
   /* KESAHIHAN 'posting' TIDAK LAGI DIUKUR DARI DAFTAR TAB.
      ────────────────────────────────────────────────────────────────────
      Baris ini dulu cuma menanyakan "apakah subMinta ada di tabTampil".
