@@ -30,7 +30,20 @@ body{margin:0;overflow-x:hidden;background:var(--bg);color:var(--teks);
   font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
   font-size:20px;line-height:1.5;-webkit-font-smoothing:antialiased}
 
-.bungkus{max-width:768px;margin:0 auto;padding:28px 20px 96px}
+/* 1.120px, BUKAN 768px lagi (30 Agu 2026).
+   768px diambil dari peraga link-preview Aceternity, dan untuk peraga dua
+   kalimat itu memang pas. Untuk artikel penuh tidak: diukur di peramban,
+   kolom 768px dengan huruf 30px cuma memuat 37,7 huruf per baris. Bacaan
+   panjang yang enak ada di 60-75; di bawah 45 mata harus pindah baris
+   terlalu sering dan halamannya terasa sempit — dan itu yang dilaporkan
+   pemilik. Di 1.120px angkanya jadi 53,2.
+
+   Angkanya sengaja SAMA dengan .lebar milik halaman daftar. Selama ini
+   keduanya berbeda (768 lawan 1.120), jadi logo dan menu di kepala
+   BERGESER waktu pengunjung mengklik dari daftar artikel ke artikelnya.
+   Sekarang tidak lagi. .lebar dibiarkan ada supaya markah halaman daftar
+   tidak perlu disentuh. */
+.bungkus{max-width:1120px;margin:0 auto;padding:28px 20px 96px}
 .lebar{max-width:1120px}
 
 header.atas{border-bottom:1px solid var(--garis);margin-bottom:44px;
