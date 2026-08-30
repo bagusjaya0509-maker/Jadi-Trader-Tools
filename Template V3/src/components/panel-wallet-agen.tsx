@@ -174,6 +174,65 @@ function PapanPeringkat({ pantau }: { pantau: (alamat: string, nama: string) => 
     return () => { hidup = false; };
   }, [jendela, pita]);
 
+  /* ── WALLET VIEW — koin yang dipegang LEBIH DARI SATU dompet ────────
+     Papan ini menjawab "dompet mana yang bagus". Yang tidak dijawabnya:
+     apakah dompet-dompet bagus itu kebetulan sedang memegang koin yang
+     sama. Jawabannya sudah ada di kolom "Posisi sekarang" — tapi tersebar
+     di empat puluh baris, dan menghitungnya dengan mata berarti tidak
+     pernah dihitung.
+
+     ── AMBANG DUA, DAN KENAPA ────────────────────────────────────────
+     Satu dompet memegang satu koin bukan kesepakatan, itu cuma satu orang
+     punya pendapat. Yang dicari di sini pertemuan pendapat, jadi koin yang
+     cuma dipegang satu dompet tidak ditampilkan sama sekali.
+
+     ── PENYEBUTNYA IKUT DITULIS ──────────────────────────────────────
+     "5 BTC L" tanpa keterangan terbaca sebagai "5 dari 40". Padahal
+     pengayaan posisi cuma menjangkau sebagian papan — sisanya belum punya
+     data posisi sama sekali, dan menghitungnya sebagai "tidak memegang"
+     adalah menyimpulkan sesuatu dari ketidaktahuan. Jumlah dompet yang
+     benar-benar terbaca ditulis di sebelahnya. */
+  const ringkas = useMemo(() => {
+    const baris = p?.daftar || [];
+    const berisi = baris.filter((r) => r.rinci && r.rinci.posisi.length > 0);
+    const adaData = baris.filter((r) => r.rinci).length;
+    const peta = new Map();
+
+    for (const r of berisi) {
+      /* Dijaga lagi di sini, bukan hanya di `filter` di atas: penyempitan
+         tipe tidak ikut menyeberangi batas `filter`, dan pagar yang cuma
+         ada di satu sisi adalah pagar yang hilang saat kodenya disusun
+         ulang nanti. */
+      if (!r.rinci) continue;
+      /* Satu dompet dihitung SEKALI per koin+arah. Bursa memang memulangkan
+         satu baris per koin, tapi dijaga di sini supaya angkanya tetap
+         berarti "berapa DOMPET" — bukan "berapa baris" — apa pun yang
+         dikirim bursa nanti. */
+      const unik = new Set();
+      for (const q of r.rinci.posisi) {
+        const koin = String(q.koin).toUpperCase();
+        const k = koin + '|' + q.arah;
+        if (unik.has(k)) continue;
+        unik.add(k);
+        const c = peta.get(k) || { koin, arah: q.arah, n: 0, nilai: 0 };
+        c.n += 1;
+        c.nilai += Math.abs(Number(q.nilai) || 0);
+        peta.set(k, c);
+      }
+    }
+
+    const semua = [...peta.values()];
+    return {
+      dompet: berisi.length,
+      belumTerbaca: baris.length - adaData,
+      sendirian: semua.filter((x) => x.n === 1).length,
+      /* Urut jumlah dompet dulu, nilai dolar sebagai pemutus seri: dua koin
+         yang sama-sama dipegang tiga dompet dibedakan oleh seberapa besar
+         uang yang ditaruh di sana. */
+      isi: semua.filter((x) => x.n >= 2).sort((a, b) => b.n - a.n || b.nilai - a.nilai),
+    };
+  }, [p]);
+
   const pilihan = 'cursor-pointer rounded px-2 py-1 text-[11.5px] transition-colors';
   const aktif = 'bg-zinc-100 text-zinc-950';
   const diam = 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100';
@@ -205,6 +264,47 @@ function PapanPeringkat({ pantau }: { pantau: (alamat: string, nama: string) => 
           ))}
         </div>
         {muat && <Loader2 className="size-3.5 animate-spin text-zinc-600" />}
+
+        {/* Menempel ke KANAN baris saringan, bukan baris sendiri: ia
+            ringkasan dari daftar yang sedang disaring, jadi tempatnya
+            sejajar dengan saringannya. Menggulir mendatar kalau koinnya
+            banyak — membiarkannya membungkus akan mendorong tabelnya turun
+            setiap kali pasar sedang ramai. */}
+        {p && !p.belumAda && ringkas.dompet > 0 && (
+          <div className="ml-auto flex min-w-0 max-w-full items-center gap-1.5 sm:max-w-[58%]">
+            <span className="shrink-0 text-[10px] uppercase tracking-wide text-zinc-600"
+                  title={'Koin yang dipegang lebih dari satu dompet di papan ini.'
+                       + ' Dihitung dari ' + ringkas.dompet + ' dompet yang posisinya terbaca'
+                       + (ringkas.belumTerbaca ? ', ' + ringkas.belumTerbaca + ' dompet belum punya data posisi' : '')
+                       + (ringkas.sendirian ? '. ' + ringkas.sendirian + ' koin lain cuma dipegang satu dompet dan tidak ditampilkan' : '')}>
+              Wallet View
+            </span>
+
+            {ringkas.isi.length === 0 ? (
+              <span className="truncate text-[11px] text-zinc-600">
+                belum ada koin yang dipegang 2 dompet
+              </span>
+            ) : (
+              <div className="flex min-w-0 items-center gap-1 overflow-x-auto">
+                {ringkas.isi.map((x) => (
+                  <span key={x.koin + x.arah}
+                    title={x.n + ' dompet memegang ' + x.koin + ' ' + (x.arah === 'L' ? 'LONG' : 'SHORT')
+                         + ' · nilai gabungan ' + uangRingkas(x.nilai)}
+                    className="shrink-0 whitespace-nowrap rounded border border-zinc-800 bg-zinc-900/60 px-1.5 py-0.5 text-[11px] tabular-nums text-zinc-300">
+                    {x.n} {x.koin}{' '}
+                    <span className={x.arah === 'L' ? 'text-emerald-500' : 'text-red-400'}>
+                      {x.arah}
+                    </span>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            <span className="shrink-0 whitespace-nowrap text-[10px] text-zinc-600">
+              dari {ringkas.dompet}
+            </span>
+          </div>
+        )}
       </div>
 
       {p?.belumAda ? (
