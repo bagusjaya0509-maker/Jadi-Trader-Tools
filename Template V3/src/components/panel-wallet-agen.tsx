@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { SparklineSaldo } from '@/components/kurva-saldo';
 import {
-  keadaanDompet, tambahDompet, hapusDompet, peringkatDompet, tandaiTiru, batalTiru,
+  keadaanDompet, tambahDompet, hapusDompet, peringkatDompet, tandaiTiru, batalTiru, aturOtoTutup,
   type KeadaanDompet, type TransaksiDompet, type PosisiDompet, type Peringkat,
   type JendelaPeringkat, type PitaAkun, type RiwayatBursa, type PenandaTiru,
   type DompetPantau,
@@ -337,9 +337,25 @@ function PapanPeringkat({ pantau }: { pantau: (alamat: string, nama: string) => 
         </div>
       )}
 
-      <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-600">
-        RR = rata-rata untung dibagi rata-rata rugi; ia melengkapi WR, tidak
-        menggantikannya. Angka abu-abu berarti di bawah sepuluh penutupan —
+      {/* div, bukan p: <details> adalah elemen blok dan paragraf tidak boleh
+          memuatnya. Peramban akan menutup paragrafnya sendiri di tengah, dan
+          separuh keterangannya keluar dari kotak yang seharusnya
+          membungkusnya. */}
+      <div className="mt-1.5 text-[11px] leading-relaxed text-zinc-600">
+        {/* Keterangannya dilipat. Delapan kalimat di bawah tabel dibaca
+            sekali lalu jadi dinding teks yang didorong mata setiap kali —
+            tapi membuangnya berarti menghapus satu-satunya tempat yang
+            menjelaskan kenapa ada tanda hubung dan kenapa angka tertentu
+            abu-abu. Kalimat pertama tetap terlihat karena ia yang paling
+            sering dibutuhkan; sisanya menunggu diminta. */}
+        <details className="group/ket">
+          <summary className="cursor-pointer list-none marker:content-none">
+          RR = rata-rata untung dibagi rata-rata rugi; ia melengkapi WR, tidak
+        menggantikannya.{' '}
+          <span className="text-zinc-500 underline decoration-dotted underline-offset-2 group-open/ket:hidden">Baca selengkapnya</span>
+          <span className="hidden text-zinc-500 underline decoration-dotted underline-offset-2 group-open/ket:inline">Tutup</span>
+          </summary>
+          <span className="mt-1 block">Angka abu-abu berarti di bawah sepuluh penutupan —
         benar secara hitungan, belum berarti sebagai rekam jejak. Menang 80% dengan RR 0,3 tetap merugi pelan-pelan.
         WR, RR, umur, dan posisi cuma terisi untuk barisan teratas tiap pita —
         menarik riwayat lengkap 953 dompet berarti 600 MB tiap putaran. Tanda
@@ -350,8 +366,9 @@ function PapanPeringkat({ pantau }: { pantau: (alamat: string, nama: string) => 
         memberi 115.524% untuk akun 30 ribu dolar, dan dua rasio pengganti
         yang dicoba sama tidak masuk akalnya. Papan ini menunjukkan siapa yang
         sedang menang, bukan siapa yang layak disalin. Yang kedua dijawab
-        rapor di bawah, sesudah dompetnya dipantau cukup lama.
-      </p>
+        rapor di bawah, sesudah dompetnya dipantau cukup lama.</span>
+        </details>
+      </div>
     </section>
   );
 }
@@ -849,11 +866,12 @@ function RincianDompet({ w, posisi, log, tiru, ubahTiru, tutup }: {
      · ARAH BERBEDA. Kita long sementara dompetnya short di koin yang sama
        berarti salah satunya salah baca, dan biasanya kita.
    ════════════════════════════════════════════════════════════════════════ */
-function PosisiTiruan({ tiru, dompet, posisi, ubahTiru }: {
+function PosisiTiruan({ tiru, dompet, posisi, ubahTiru, ubahOto }: {
   tiru: PenandaTiru[];
   dompet: DompetPantau[];
   posisi: PosisiDompet[];
   ubahTiru: (alamat: string, koin: string, nyala: boolean) => void;
+  ubahOto: (alamat: string, koin: string, nyala: boolean) => void;
 }) {
   /* Posisi SENDIRI dari bursa. Hook-nya sudah dipakai di tempat lain dan
      menyegarkan tiap 30 detik; memanggilnya lagi di sini tidak menambah
@@ -938,6 +956,42 @@ function PosisiTiruan({ tiru, dompet, posisi, ubahTiru }: {
                 )}
               </div>
             </div>
+
+            {/* ── SAKELAR AUTO-CLOSE ────────────────────────────────────
+                Menyalakannya berarti memberi izin mengirim satu perintah
+                tutup ke bursa tanpa ditanya lagi. Karena itu ditulis
+                panjang, bukan disingkat jadi ikon: sakelar yang mengeluarkan
+                uang tidak boleh sekecil sakelar yang mengubah warna.
+
+                Padam sendiri sesudah sekali dipakai. Izin yang menetap
+                selamanya adalah izin yang diberikan sekali untuk keadaan
+                yang sudah lama berubah. */}
+            <label className={cn('mt-1.5 flex cursor-pointer items-start gap-2 rounded-md border px-2 py-1.5 transition-colors',
+              b.otoTutup ? 'border-amber-500/40 bg-amber-500/5' : 'border-zinc-800 hover:border-zinc-700')}>
+              <input type="checkbox" checked={!!b.otoTutup}
+                onChange={(e) => ubahOto(b.alamat, b.koin, e.target.checked)}
+                className="mt-0.5 size-3.5 shrink-0 cursor-pointer accent-amber-400" />
+              <span className="min-w-0 flex-1">
+                <span className={cn('block text-[11.5px] font-medium',
+                  b.otoTutup ? 'text-amber-300' : 'text-zinc-400')}>
+                  Tutup posisiku otomatis saat dompet ini melepas {b.koin}
+                </span>
+                <span className="block text-[10.5px] leading-relaxed text-zinc-600">
+                  Market reduce-only — secara struktur tidak bisa membuka posisi.
+                  Butuh dua pindaian berturut-turut, dan padam sendiri sesudah
+                  sekali dipakai.
+                  {b.konfirmasi ? ' · konfirmasi ' + b.konfirmasi + '/2' : ''}
+                </span>
+                {b.terakhir && (
+                  <span className={cn('block text-[10.5px]',
+                    b.terakhir.sukses ? 'text-emerald-400/80' : 'text-red-400')}>
+                    {b.terakhir.sukses
+                      ? 'Terakhir: ditutup ' + b.terakhir.jumlah + ' · ' + umur(b.terakhir.waktu)
+                      : 'Percobaan terakhir GAGAL — posisinya mungkin masih terbuka'}
+                  </span>
+                )}
+              </span>
+            </label>
 
             {(b.sumberTutup || b.arahBeda) && (
               <p className={cn('mt-1.5 flex items-start gap-1.5 text-[11px] leading-relaxed',
@@ -1066,7 +1120,8 @@ export function PanelWalletAgen() {
           <PosisiTiruan tiru={d?.tiru || []} dompet={dompet} posisi={posisi}
             ubahTiru={(a, k, nyala) => {
               void (nyala ? tandaiTiru(a, k) : batalTiru(a, k)).then(() => tarik());
-            }} />
+            }}
+            ubahOto={(a, k, nyala) => { void aturOtoTutup(a, k, nyala).then(() => tarik()); }} />
 
           <section>
             <h3 className="mb-2 border-b border-zinc-800 pb-1.5 text-[13px] font-semibold text-zinc-200">

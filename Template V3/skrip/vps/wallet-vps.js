@@ -208,6 +208,30 @@ module.exports = (app, { butuhLogin, batasLaju, express, DIR }) => {
     res.json({ ok: true, tiru: d.tiru });
   });
 
+  /* ── SAKELAR AUTO-CLOSE, PER PENANDA ──────────────────────────────────
+     Dinyalakan satu per satu, bukan satu sakelar untuk semuanya. Menyalakan
+     seluruh tiruan sekaligus berarti satu klik memberi izin menutup posisi
+     yang bahkan belum dipikirkan — dan izin yang diberikan borongan adalah
+     izin yang tidak pernah benar-benar ditimbang.
+
+     BAWAANNYA MATI, dan tidak ada cara menyalakannya kecuali di layar. */
+  app.post('/api/agen/wallet/tiru/oto', batasLaju, butuhLogin, hanyaPemilik, express.json(), (req, res) => {
+    const b = req.body || {};
+    const alamat = String(b.alamat || '').toLowerCase();
+    const koin = String(b.koin || '').toUpperCase();
+    const d = baca(TIRU, { tiru: [] });
+    const t = (d.tiru || []).find((x) => x.alamat === alamat && x.koin === koin);
+    if (!t) return res.status(404).json({ error: 'Penanda tiruan tidak ditemukan.' });
+    t.otoTutup = b.otoTutup === true;
+    /* Hitungan konfirmasi DIRESET tiap kali sakelarnya disentuh. Kalau
+       tidak, sakelar yang dimatikan lalu dinyalakan lagi akan mewarisi
+       hitungan lama dan bisa langsung mengeksekusi pada pindaian pertama —
+       tanpa kesempatan satu putaran pun untuk diperiksa. */
+    t.konfirmasi = 0;
+    tulis(TIRU, d);
+    res.json({ ok: true, tiru: d.tiru });
+  });
+
   app.delete('/api/agen/wallet/tiru/:alamat/:koin', batasLaju, butuhLogin, hanyaPemilik, (req, res) => {
     const alamat = String(req.params.alamat || '').toLowerCase();
     const koin = String(req.params.koin || '').toUpperCase();

@@ -27,6 +27,7 @@
 'use strict';
 
 require('dotenv').config();
+const fs = require('fs');
 const path = require('path');
 const { bacaDompet, catatWallet, batasTerakhir } = require('./wallet-vps');
 
@@ -252,6 +253,182 @@ async function bunyikanTiruan(baru, dompet) {
   }
 }
 
+/* ══ AUTO-CLOSE ════════════════════════════════════════════════════════
+   Menutup posisi tiruan saat dompet sumbernya sudah tidak memegangnya lagi.
+   HANYA menutup. Membuka posisi tidak ada di berkas ini dan tidak akan
+   ditambahkan tanpa keputusan terpisah.
+
+   ── KENAPA MENUTUP BOLEH DIOTOMATISKAN DAN MEMBUKA BELUM ──────────────
+   Keduanya sama-sama mengirim uang sungguhan, tapi tidak sama risikonya.
+   Perintah tutup dikirim dengan `reduceOnly` — bursa menolaknya kalau ia
+   akan menambah posisi, jadi kesalahan terburuk yang mungkin terjadi adalah
+   keluar dari posisi yang seharusnya ditahan. Perintah buka tidak punya
+   pagar setara: kesalahan terburuknya adalah masuk ke posisi yang tidak
+   pernah diinginkan siapa pun, dengan ukuran yang salah, di koin yang
+   salah.
+
+   ── LIMA PAGAR ────────────────────────────────────────────────────────
+   1. Cuma koin yang DITANDAI ditiru, dan cuma yang sakelarnya dinyalakan
+      satu per satu. Tidak ada satu sakelar untuk semuanya.
+   2. Cuma saat dompet sumbernya BENAR-BENAR FLAT di koin itu — bukan
+      berkurang, bukan separuh. Pengurangan sebagian adalah keputusan yang
+      berbeda, dan menirunya menuntut ukuran yang harus dihitung.
+   3. DUA PINDAIAN berturut-turut. Satu jawaban API yang kebetulan kosong
+      cukup untuk menutup posisi yang sebenarnya masih hidup, dan itu
+      kesalahan yang tidak bisa dibatalkan.
+   4. `reduceOnly` di sisi bursa. Pagar terakhir yang tidak bergantung pada
+      benarnya kode di sini.
+   5. Sakelar mati darurat lewat WALLET_OTO_TUTUP=0, dan tiap eksekusi
+      berbunyi di lonceng serta tercatat di log aktivitas.
+
+   Yang TIDAK ada: menutup posisi yang tidak pernah ditandai. Kalau
+   penandanya hilang, penjaganya diam — bukan menebak. */
+const OTO_AKTIF = process.env.WALLET_OTO_TUTUP !== '0';
+const KONFIRMASI_PERLU = Math.max(2, Number(process.env.WALLET_OTO_KONFIRMASI || 2));
+
+function tulisTiru(DIR, tiru) {
+  const F = path.join(DIR, 'wallet-tiru.json');
+  try {
+    const semen = F + '.tmp';
+    require('fs').writeFileSync(semen, JSON.stringify({ tiru }, null, 2));
+    require('fs').renameSync(semen, F);
+  } catch (e) { /* penanda gagal ditulis bukan alasan menjatuhkan pemantau */ }
+}
+
+async function posisikuBursa() {
+  if (!APP_TOKEN) return null;
+  try {
+    const r = await fetch(DASAR + '/api/positions', {
+      headers: { 'X-App-Token': APP_TOKEN }, signal: AbortSignal.timeout(20000),
+    });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return (j.positions || []).filter((p) => Math.abs(Number(p.positionAmt) || 0) > 0);
+  } catch (e) { return null; }
+}
+
+async function jagaTiruan(posisiDompet) {
+  if (!OTO_AKTIF) return;
+  const tiru = bacaTiru(DIR);
+  const perlu = tiru.filter((t) => t.otoTutup === true);
+  if (!perlu.length) return;
+
+  const punyaku = await posisikuBursa();
+  /* null = TIDAK BISA BERTANYA ke bursa. Diam, bukan menutup: bursa yang
+     tidak menjawab dan bursa yang menjawab "tidak ada posisi" terlihat sama
+     dari sini, dan yang kedua tidak boleh disimpulkan dari yang pertama. */
+  if (punyaku === null) { catat('auto-close: posisi bursa tidak terbaca, dilewati'); return; }
+
+  let berubah = false;
+  for (const t of perlu) {
+    const simbol = t.koin + 'USDT';
+    const milik = punyaku.find((p) => String(p.symbol).toUpperCase() === simbol);
+    const sumberMasih = posisiDompet.some(
+      (p) => p.alamat === t.alamat && String(p.koin).toUpperCase() === t.koin);
+
+    /* Sumbernya masih pegang, ATAU aku memang tidak punya posisi -> tidak
+       ada yang perlu dikerjakan, dan hitungan konfirmasinya direset. */
+    if (sumberMasih || !milik) {
+      if (t.konfirmasi) { t.konfirmasi = 0; berubah = true; }
+      continue;
+    }
+
+    t.konfirmasi = (t.konfirmasi || 0) + 1;
+    berubah = true;
+    if (t.konfirmasi < KONFIRMASI_PERLU) {
+      catat('auto-close: ' + t.koin + ' menunggu konfirmasi ' + t.konfirmasi + '/' + KONFIRMASI_PERLU);
+      continue;
+    }
+
+    const jumlah = Math.abs(Number(milik.positionAmt) || 0);
+    const arah = Number(milik.positionAmt) > 0 ? 'BUY' : 'SELL';
+    catat('auto-close: MENUTUP', simbol, arah, jumlah, '— sumbernya sudah flat');
+    try {
+      const r = await fetch(DASAR + '/api/trade/futures/close', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-App-Token': APP_TOKEN },
+        body: JSON.stringify({ symbol: simbol, side: arah, quantity: jumlah }),
+        signal: AbortSignal.timeout(25000),
+      });
+      const j = await r.json().catch(() => ({}));
+      const sukses = r.ok && !j.error;
+      catat(sukses ? '   tertutup' : '   GAGAL: ' + JSON.stringify(j).slice(0, 200));
+
+      await lonceng({
+        id: 'oto-tutup-' + simbol + '-' + Date.now(),
+        judul: sukses ? 'Posisi ' + simbol + ' ditutup otomatis' : 'Auto-close ' + simbol + ' GAGAL',
+        detail: sukses
+          ? 'Dompet yang kamu tiru sudah tidak memegang ' + t.koin + '. Posisi ' + arah + ' '
+            + jumlah + ' ditutup dengan market reduce-only.'
+          : 'Percobaan menutup ditolak bursa. Posisinya MASIH TERBUKA — periksa sendiri sekarang.',
+        sumber: NAMA_AGEN, jenis: 'pantau', tautan: '', waktu: Date.now(),
+      });
+
+      /* Penandanya dimatikan sesudah dieksekusi, berhasil maupun gagal.
+         Berhasil: tidak ada lagi yang perlu ditutup. Gagal: mencoba lagi
+         tiap menit tanpa ada yang melihat adalah cara mengirim dua puluh
+         order gagal sebelum orangnya bangun. */
+      t.otoTutup = false;
+      t.konfirmasi = 0;
+      t.terakhir = { waktu: Date.now(), sukses, jumlah, arah };
+    } catch (e) {
+      catat('   auto-close galat:', e && e.message);
+      t.konfirmasi = 0;
+    }
+  }
+  if (berubah) tulisTiru(DIR, tiru);
+}
+
+/* ── DOMPET BARU SAJA MEMBUKA POSISI ───────────────────────────────────
+   Auto-open sengaja belum dibangun; ini penggantinya, dan untuk sementara
+   mungkin lebih baik: kabarnya sampai dalam hitungan detik, tapi yang
+   memutuskan tetap orang.
+
+   ── DIBANDINGKAN ANTAR PINDAIAN, BUKAN DIBACA DARI FILL ───────────────
+   Fill "Open Long" muncul setiap kali dompet MENAMBAH posisi. Satu masuk
+   bertahap bisa memberi dua puluh fill pembuka, dan dua puluh lonceng untuk
+   satu keputusan adalah lonceng yang segera dimatikan orang.
+
+   Yang dicari kejadian yang berbeda: koin yang tadinya TIDAK ADA di daftar
+   posisi dompet itu, sekarang ada. Itu terjadi sekali per posisi, berapa
+   pun jumlah fill yang membentuknya — dan itulah yang benar-benar berarti
+   "dia baru saja membuka sesuatu". */
+function kunciPosisi(p) { return p.alamat + '|' + String(p.koin).toUpperCase(); }
+
+function posisiSebelumnya(DIR) {
+  try {
+    const d = JSON.parse(fs.readFileSync(path.join(DIR, 'wallet-aktivitas.json'), 'utf8'));
+    return new Set((d.posisi || []).map(kunciPosisi));
+  } catch (e) { return null; }
+}
+
+async function bunyikanPosisiBaru(lama, baru) {
+  /* null = belum pernah ada potret sebelumnya. Diam: seluruh isi dompet akan
+     terlihat "baru dibuka", dan belasan lonceng sekaligus untuk posisi yang
+     sudah lama ada adalah kabar yang salah. */
+  if (lama === null) return;
+  for (const p of baru) {
+    if (lama.has(kunciPosisi(p))) continue;
+    const jamBuka = new Date().toLocaleString('id-ID', {
+      day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
+    });
+    await lonceng({
+      /* Menit ikut di dalam id: kalau posisi yang sama muncul-hilang-muncul
+         dalam satu menit karena jawaban API berkedip, loncengnya tidak
+         berbunyi dua kali. */
+      id: 'buka-' + kunciPosisi(p).replace(/[^\w|]/g, '') + '-' + Math.floor(Date.now() / 60000),
+      judul: p.nama + ' membuka ' + p.arah + ' ' + p.koin,
+      detail: 'Entry ' + p.entry + ' · ukuran ' + p.ukuran
+            + (p.leverage ? ' · ' + p.leverage + 'x' : '')
+            + ' · nilai $' + Math.round(p.nilai).toLocaleString('id-ID')
+            + (p.likuidasi ? ' · likuidasi ' + p.likuidasi : '')
+            + ' · terpantau ' + jamBuka,
+      sumber: NAMA_AGEN, jenis: 'pantau', tautan: '', waktu: Date.now(),
+    });
+    catat('  lonceng posisi baru:', p.nama, p.arah, p.koin, '@', p.entry);
+  }
+}
+
 async function pindai() {
   const dompet = bacaDompet(DIR);
   if (!dompet.length) {
@@ -319,6 +496,10 @@ async function pindai() {
     }
   }
 
+  /* Potret LAMA dibaca sebelum ditimpa — sesudahnya tidak ada lagi cara
+     tahu apa yang berubah. */
+  const posisiLama = posisiSebelumnya(DIR);
+
   /* Dibunyikan SEBELUM disimpan? Tidak — sesudah. Kalau prosesnya mati di
      tengah, catatan yang sudah tersimpan tanpa lonceng lebih baik daripada
      lonceng yang berbunyi untuk transaksi yang tidak pernah tercatat. */
@@ -334,8 +515,18 @@ async function pindai() {
     galat: gagal.join(' · '),
   });
 
+  try { await bunyikanPosisiBaru(posisiLama, semuaPosisi); }
+  catch (e) { catat('lonceng posisi baru gagal:', e && e.message); }
+
   try { await bunyikanTiruan(semuaBaru, dompet); }
   catch (e) { catat('lonceng tiruan gagal:', e && e.message); }
+
+  /* Dijalankan dengan potret posisi yang BARU SAJA dibaca di putaran ini,
+     bukan dengan berkas yang tersimpan. Membaca ulang berkasnya berarti
+     memutuskan dari data yang usianya satu putaran — dan satu putaran cukup
+     untuk sebuah posisi dibuka lagi. */
+  try { await jagaTiruan(semuaPosisi); }
+  catch (e) { catat('auto-close gagal:', e && e.message); }
 }
 
 /** Mendaftarkan diri di papan supaya kartunya ADA sebelum transaksi

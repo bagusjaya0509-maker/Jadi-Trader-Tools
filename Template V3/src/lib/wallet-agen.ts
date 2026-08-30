@@ -62,6 +62,12 @@ export interface PenandaTiru {
   alamat: string;
   koin: string;
   waktu: number;
+  /** Tutup posisiku otomatis saat dompet sumbernya sudah flat di koin ini.
+   *  Mati sebagai bawaan, dan padam sendiri sesudah sekali dieksekusi. */
+  otoTutup?: boolean;
+  /** Berapa pindaian berturut-turut sumbernya terlihat flat. */
+  konfirmasi?: number;
+  terakhir?: { waktu: number; sukses: boolean; jumlah: number; arah: string };
 }
 
 export interface KeadaanDompet {
@@ -132,6 +138,19 @@ export async function tandaiTiru(alamat: string, koin: string): Promise<boolean>
       method: 'POST',
       headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' },
       body: JSON.stringify({ alamat, koin }),
+    });
+    return r.ok;
+  } catch { return false; }
+}
+
+export async function aturOtoTutup(alamat: string, koin: string, otoTutup: boolean): Promise<boolean> {
+  const t = await token();
+  if (!t) return false;
+  try {
+    const r = await fetch(`${dasar()}/api/agen/wallet/tiru/oto`, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ alamat, koin, otoTutup }),
     });
     return r.ok;
   } catch { return false; }
