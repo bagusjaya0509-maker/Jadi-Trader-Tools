@@ -35,6 +35,7 @@ module.exports = (app, { butuhLogin, batasLaju, express, DIR }) => {
   const AKTIVITAS = path.join(DIR, 'wallet-aktivitas.json');
   const PERINGKAT = path.join(DIR, 'wallet-peringkat.json');
   const PERINGKAT_RINCI = path.join(DIR, 'wallet-peringkat-rinci.json');
+  const TIRU = path.join(DIR, 'wallet-tiru.json');
 
   function baca(F, bawaan) {
     try { return JSON.parse(fs.readFileSync(F, 'utf8')); } catch (e) { return bawaan; }
@@ -66,6 +67,7 @@ module.exports = (app, { butuhLogin, batasLaju, express, DIR }) => {
       log: a.log || [],
       posisi: a.posisi || [],
       seumur: a.seumur || {},
+      tiru: (baca(TIRU, { tiru: [] }).tiru) || [],
       denyut: a.denyut || 0,
       galat: a.galat || '',
     });
@@ -163,6 +165,56 @@ module.exports = (app, { butuhLogin, batasLaju, express, DIR }) => {
       minAkun: p.minAkun || 0,
       daftar,
     });
+  });
+
+  /* ── POSISI YANG DITIRU ───────────────────────────────────────────────
+     Menandai "koin X di dompet ini sedang saya tiru". Yang disimpan cuma
+     PENANDA — pasangan koin dan alamat — bukan order, bukan ukuran, bukan
+     satu pun angka yang bisa dipakai mengeksekusi apa pun.
+
+     Gunanya dua, dan keduanya soal melihat, bukan soal bertindak:
+
+       1. Menyandingkan posisi sendiri dengan posisi dompet yang ditiru di
+          satu layar. Tanpa itu, membandingkan keduanya berarti membuka
+          Binance di satu tab dan panel ini di tab lain, lalu mengingat
+          angkanya di kepala.
+
+       2. Membunyikan lonceng saat dompet sumbernya bergerak di koin yang
+          ditiru. Itu kabar yang paling mahal kalau terlambat: orang yang
+          ditiru menutup posisinya sementara posisi kita masih terbuka.
+
+     TIDAK ada eksekusi di sini, dan itu disengaja. Lihat catatan panjang di
+     pemantau soal kenapa auto-open/auto-close belum dibangun. */
+  app.get('/api/agen/wallet/tiru', batasLaju, butuhLogin, hanyaPemilik, (req, res) => {
+    res.json({ ok: true, tiru: (baca(TIRU, { tiru: [] }).tiru) || [] });
+  });
+
+  app.post('/api/agen/wallet/tiru', batasLaju, butuhLogin, hanyaPemilik, express.json(), (req, res) => {
+    const b = req.body || {};
+    const alamat = String(b.alamat || '').trim().toLowerCase();
+    const koin = String(b.koin || '').trim().toUpperCase();
+    if (!/^0x[0-9a-f]{40}$/.test(alamat) || !koin) {
+      return res.status(400).json({ error: 'Alamat atau koin tidak sah.' });
+    }
+    const d = baca(TIRU, { tiru: [] });
+    d.tiru = d.tiru || [];
+    /* Satu koin per dompet. Menandai dua kali bukan dua tiruan — itu satu
+       tiruan yang diklik dua kali, dan menyimpannya dua kali membuat
+       loncengnya berbunyi dua kali untuk satu kejadian. */
+    if (!d.tiru.some((t) => t.alamat === alamat && t.koin === koin)) {
+      d.tiru.push({ alamat, koin, waktu: Date.now() });
+      tulis(TIRU, d);
+    }
+    res.json({ ok: true, tiru: d.tiru });
+  });
+
+  app.delete('/api/agen/wallet/tiru/:alamat/:koin', batasLaju, butuhLogin, hanyaPemilik, (req, res) => {
+    const alamat = String(req.params.alamat || '').toLowerCase();
+    const koin = String(req.params.koin || '').toUpperCase();
+    const d = baca(TIRU, { tiru: [] });
+    d.tiru = (d.tiru || []).filter((t) => !(t.alamat === alamat && t.koin === koin));
+    tulis(TIRU, d);
+    res.json({ ok: true, tiru: d.tiru });
   });
 
   app.delete('/api/agen/wallet/:alamat', batasLaju, butuhLogin, hanyaPemilik, (req, res) => {

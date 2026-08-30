@@ -4,10 +4,13 @@ import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { SparklineSaldo } from '@/components/kurva-saldo';
 import {
-  keadaanDompet, tambahDompet, hapusDompet, peringkatDompet,
+  keadaanDompet, tambahDompet, hapusDompet, peringkatDompet, tandaiTiru, batalTiru,
   type KeadaanDompet, type TransaksiDompet, type PosisiDompet, type Peringkat,
-  type JendelaPeringkat, type PitaAkun, type RiwayatBursa,
+  type JendelaPeringkat, type PitaAkun, type RiwayatBursa, type PenandaTiru,
+  type DompetPantau,
 } from '@/lib/wallet-agen';
+import { usePosisiBinance } from '@/lib/admin';
+import { Copy as IkonTiru, TriangleAlert } from 'lucide-react';
 
 /* ════════════════════════════════════════════════════════════════════════
    RUANG DOMPET PANTAUAN — fase mencatat
@@ -663,10 +666,12 @@ function tanggalJam(ms: number) {
 
    Pola yang sama dengan papan analis di halaman ini: kartunya memilih,
    ruang di bawahnya menampilkan. */
-function RincianDompet({ w, posisi, log, tutup }: {
+function RincianDompet({ w, posisi, log, tiru, ubahTiru, tutup }: {
   w: { alamat: string; nama: string };
   posisi: PosisiDompet[];
   log: TransaksiDompet[];
+  tiru: PenandaTiru[];
+  ubahTiru: (koin: string, nyala: boolean) => void;
   tutup: () => void;
 }) {
   /* Escape menutup. Lapisan yang cuma bisa ditutup lewat satu tombol kecil
@@ -737,6 +742,26 @@ function RincianDompet({ w, posisi, log, tutup }: {
                   p.pnl >= 0 ? 'text-emerald-400' : 'text-red-400')}>
                   {p.pnl >= 0 ? '+' : ''}{uangRingkas(p.pnl)}
                 </span>
+                {/* Menandai, BUKAN mengeksekusi. Tombolnya cuma mencatat
+                    "koin ini saya tiru dari dompet ini" — tidak ada order
+                    yang dikirim ke mana pun. Yang didapat: posisinya
+                    disandingkan dengan posisi kita di satu layar, dan
+                    lonceng berbunyi saat dompet ini bergerak di koin itu. */}
+                {(() => {
+                  const nyala = tiru.some((x) => x.alamat === w.alamat
+                    && x.koin === p.koin.toUpperCase());
+                  return (
+                    <button onClick={() => ubahTiru(p.koin.toUpperCase(), !nyala)}
+                      title={nyala
+                        ? 'Berhenti menandai koin ini sebagai tiruan'
+                        : 'Tandai: saya meniru posisi ini. Tidak ada order yang dikirim.'}
+                      className={cn('shrink-0 cursor-pointer rounded p-1 transition-colors',
+                        nyala ? 'text-emerald-400 hover:text-emerald-300'
+                              : 'text-zinc-700 hover:text-zinc-300')}>
+                      <IkonTiru className="size-3.5" />
+                    </button>
+                  );
+                })()}
               </div>
               <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px] text-zinc-500">
                 <span>Entry <span className="tabular-nums text-zinc-300">{p.entry}</span></span>
@@ -803,6 +828,136 @@ function RincianDompet({ w, posisi, log, tutup }: {
         </div>
       </section>
     </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   POSISI TIRUAN — punya sendiri disandingkan dengan yang ditiru
+   ════════════════════════════════════════════════════════════════════════
+   Menjawab satu pertanyaan yang sebelumnya menuntut dua tab dan ingatan:
+   posisi yang saya buka meniru dompet itu, sekarang bagaimana keadaannya
+   DIBANDING aslinya.
+
+   Yang disandingkan cuma yang benar-benar ada di kedua sisi. Posisi sendiri
+   dibaca dari bursa (bukan dari catatan), posisi dompet dibaca dari rantai.
+   Tidak ada satu pun angka di sini yang diperkirakan.
+
+   ── DUA PERINGATAN, DAN KEDUANYA MAHAL KALAU TERLAMBAT ────────────────
+     · SUMBERNYA SUDAH TUTUP sementara posisi kita masih terbuka. Ini
+       keadaan paling berbahaya di seluruh panel: yang ditiru sudah keluar,
+       dan yang meniru masih menanggung risikonya tanpa tahu.
+     · ARAH BERBEDA. Kita long sementara dompetnya short di koin yang sama
+       berarti salah satunya salah baca, dan biasanya kita.
+   ════════════════════════════════════════════════════════════════════════ */
+function PosisiTiruan({ tiru, dompet, posisi, ubahTiru }: {
+  tiru: PenandaTiru[];
+  dompet: DompetPantau[];
+  posisi: PosisiDompet[];
+  ubahTiru: (alamat: string, koin: string, nyala: boolean) => void;
+}) {
+  /* Posisi SENDIRI dari bursa. Hook-nya sudah dipakai di tempat lain dan
+     menyegarkan tiap 30 detik; memanggilnya lagi di sini tidak menambah
+     permintaan karena ia berbagi keadaan yang sama. */
+  const { data: punyaku } = usePosisiBinance();
+  const nama = new Map(dompet.map((d) => [d.alamat, d.nama]));
+
+  if (!tiru.length) return null;
+
+  const baris = tiru.map((x) => {
+    const sumber = posisi.find((p) => p.alamat === x.alamat && p.koin.toUpperCase() === x.koin);
+    const milik = punyaku.find((p) => p.simbol.toUpperCase() === x.koin + 'USDT');
+    const arahku = milik ? (milik.arah === 'BUY' ? 'LONG' : 'SHORT') : null;
+    return {
+      ...x,
+      namaDompet: nama.get(x.alamat) || x.alamat.slice(0, 10) + '…',
+      sumber, milik, arahku,
+      sumberTutup: !sumber && !!milik,
+      arahBeda: !!(sumber && arahku && sumber.arah !== arahku),
+    };
+  });
+
+  return (
+    <section>
+      <h3 className="mb-2 flex flex-wrap items-center gap-x-2 border-b border-zinc-800 pb-1.5">
+        <span className="text-[13px] font-semibold text-zinc-200">Posisi tiruan</span>
+        <span className="text-[11px] font-normal text-zinc-600">
+          · {baris.length} ditandai · posisimu dari Binance, posisi dompet dari rantai
+        </span>
+      </h3>
+
+      <div className="space-y-1.5">
+        {baris.map((b) => (
+          <div key={b.alamat + b.koin}
+            className={cn('rounded-lg border bg-zinc-900/30 px-3 py-2',
+              b.sumberTutup ? 'border-amber-500/40' : b.arahBeda ? 'border-red-500/40' : 'border-zinc-800')}>
+
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <span className="text-[13px] font-semibold text-zinc-100">{b.koin}</span>
+              <span className="text-[11px] text-zinc-500">meniru {b.namaDompet}</span>
+              <button onClick={() => ubahTiru(b.alamat, b.koin, false)}
+                title="Berhenti menandai"
+                className="ml-auto cursor-pointer rounded p-0.5 text-zinc-700 transition-colors hover:text-red-400">
+                <Trash2 className="size-3" />
+              </button>
+            </div>
+
+            <div className="mt-1.5 grid gap-2 sm:grid-cols-2">
+              {/* Punyaku */}
+              <div className="rounded-md border border-zinc-800 bg-zinc-950/60 p-2">
+                <p className="text-[10px] uppercase tracking-wide text-zinc-600">Posisiku</p>
+                {b.milik ? (
+                  <p className="mt-0.5 flex flex-wrap items-baseline gap-x-2 text-[11.5px]">
+                    <span className={cn('font-semibold',
+                      b.arahku === 'LONG' ? 'text-emerald-400' : 'text-red-400')}>{b.arahku}</span>
+                    <span className="tabular-nums text-zinc-400">{b.milik.jumlah} @ {b.milik.entry}</span>
+                    <span className={cn('ml-auto font-semibold tabular-nums',
+                      b.milik.pnl >= 0 ? 'text-emerald-400' : 'text-red-400')}>
+                      {b.milik.pnl >= 0 ? '+' : '−'}${uangRingkas(Math.abs(b.milik.pnl))}
+                    </span>
+                  </p>
+                ) : (
+                  <p className="mt-0.5 text-[11.5px] text-zinc-600">Belum ada posisi terbuka di {b.koin}USDT</p>
+                )}
+              </div>
+
+              {/* Dompet yang ditiru */}
+              <div className="rounded-md border border-zinc-800 bg-zinc-950/60 p-2">
+                <p className="text-[10px] uppercase tracking-wide text-zinc-600">Dompet</p>
+                {b.sumber ? (
+                  <p className="mt-0.5 flex flex-wrap items-baseline gap-x-2 text-[11.5px]">
+                    <span className={cn('font-semibold',
+                      b.sumber.arah === 'LONG' ? 'text-emerald-400' : 'text-red-400')}>{b.sumber.arah}</span>
+                    <span className="tabular-nums text-zinc-400">{b.sumber.ukuran} @ {b.sumber.entry}</span>
+                    <span className={cn('ml-auto font-semibold tabular-nums',
+                      b.sumber.pnl >= 0 ? 'text-emerald-400' : 'text-red-400')}>
+                      {b.sumber.pnl >= 0 ? '+' : '−'}${uangRingkas(Math.abs(b.sumber.pnl))}
+                    </span>
+                  </p>
+                ) : (
+                  <p className="mt-0.5 text-[11.5px] text-amber-300">Sudah tidak punya posisi di {b.koin}</p>
+                )}
+              </div>
+            </div>
+
+            {(b.sumberTutup || b.arahBeda) && (
+              <p className={cn('mt-1.5 flex items-start gap-1.5 text-[11px] leading-relaxed',
+                b.sumberTutup ? 'text-amber-300' : 'text-red-400')}>
+                <TriangleAlert className="mt-0.5 size-3 shrink-0" />
+                {b.sumberTutup
+                  ? 'Dompet yang kamu tiru sudah menutup posisinya, sementara posisimu masih terbuka.'
+                  : 'Arahmu berlawanan dengan dompet yang kamu tiru di koin yang sama.'}
+              </p>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-600">
+        Menandai tiruan TIDAK mengirim order apa pun — ia cuma menyandingkan
+        angkanya dan membunyikan lonceng saat dompet sumbernya bergerak di koin
+        itu. Buka dan tutup posisinya tetap kamu sendiri.
+      </p>
+    </section>
   );
 }
 
@@ -908,6 +1063,11 @@ export function PanelWalletAgen() {
         </div>
       ) : (
         <>
+          <PosisiTiruan tiru={d?.tiru || []} dompet={dompet} posisi={posisi}
+            ubahTiru={(a, k, nyala) => {
+              void (nyala ? tandaiTiru(a, k) : batalTiru(a, k)).then(() => tarik());
+            }} />
+
           <section>
             <h3 className="mb-2 border-b border-zinc-800 pb-1.5 text-[13px] font-semibold text-zinc-200">
               Dompet yang dipantau <span className="font-normal text-zinc-600">· {dompet.length}</span>
@@ -941,6 +1101,10 @@ export function PanelWalletAgen() {
               w={dompet.find((w) => w.alamat === pilih)!}
               posisi={posisi.filter((p) => p.alamat === pilih)}
               log={log.filter((l) => l.alamat === pilih)}
+              tiru={d?.tiru || []}
+              ubahTiru={(koin, nyala) => {
+                void (nyala ? tandaiTiru(pilih!, koin) : batalTiru(pilih!, koin)).then(() => tarik());
+              }}
               tutup={() => setPilih(null)} />
           )}
         </>

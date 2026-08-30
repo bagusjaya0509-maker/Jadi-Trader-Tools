@@ -199,6 +199,59 @@ function riwayatBursa(fills) {
   };
 }
 
+/* ── LONCENG UNTUK KOIN YANG DITIRU ────────────────────────────────────
+   Berbunyi HANYA untuk pasangan dompet+koin yang ditandai ditiru. Kalau
+   setiap transaksi setiap dompet berbunyi, loncengnya akan berdering
+   ratusan kali sehari dan yang pertama kali diabaikan orang adalah lonceng
+   yang selalu berbunyi.
+
+   Yang paling penting dari semua kabar di sini: dompet yang ditiru MENUTUP
+   posisinya sementara posisi kita masih terbuka. Itu keadaan yang mahal
+   kalau terlambat diketahui, dan satu-satunya alasan lonceng ini ada. */
+function bacaTiru(DIR) {
+  try {
+    const d = JSON.parse(require('fs').readFileSync(path.join(DIR, 'wallet-tiru.json'), 'utf8'));
+    return (d.tiru || []);
+  } catch (e) { return []; }
+}
+
+async function lonceng(baris) {
+  if (!APP_TOKEN) return;
+  try {
+    await fetch(DASAR + '/api/kabar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-App-Token': APP_TOKEN },
+      body: JSON.stringify(baris),
+      signal: AbortSignal.timeout(15000),
+    });
+  } catch (e) { catat('lonceng gagal:', e && e.message); }
+}
+
+async function bunyikanTiruan(baru, dompet) {
+  const tiru = bacaTiru(DIR);
+  if (!tiru.length || !baru.length) return;
+  const nama = new Map(dompet.map((d) => [d.alamat, d.nama]));
+
+  for (const l of baru) {
+    const cocok = tiru.some((t) => t.alamat === l.alamat && t.koin === String(l.koin).toUpperCase());
+    if (!cocok) continue;
+    const menutup = /close/i.test(l.dir || '');
+    await lonceng({
+      /* Id memuat hash fill-nya: satu transaksi cuma boleh berbunyi sekali,
+         dan pindaian berikutnya tidak boleh mengulanginya. */
+      id: 'tiru-' + String(l.hash || '').slice(0, 24) + '-' + l.koin,
+      judul: (menutup ? 'Dompet yang kamu tiru MENUTUP ' : 'Dompet yang kamu tiru menambah ') + l.koin,
+      detail: (nama.get(l.alamat) || 'Dompet') + ' · ' + (l.dir || l.arah) + ' ' + l.ukuran
+            + ' @ ' + l.harga + (l.pnl ? ' · realisasi ' + Math.round(l.pnl) : ''),
+      sumber: NAMA_AGEN,
+      jenis: 'pantau',
+      tautan: '',
+      waktu: l.waktu,
+    });
+    catat('  lonceng tiruan:', l.koin, l.dir);
+  }
+}
+
 async function pindai() {
   const dompet = bacaDompet(DIR);
   if (!dompet.length) {
@@ -266,6 +319,9 @@ async function pindai() {
     }
   }
 
+  /* Dibunyikan SEBELUM disimpan? Tidak — sesudah. Kalau prosesnya mati di
+     tengah, catatan yang sudah tersimpan tanpa lonceng lebih baik daripada
+     lonceng yang berbunyi untuk transaksi yang tidak pernah tercatat. */
   catatWallet(DIR, {
     log: semuaBaru,
     posisi: semuaPosisi,
@@ -277,6 +333,9 @@ async function pindai() {
        dibedakan dari layar. */
     galat: gagal.join(' · '),
   });
+
+  try { await bunyikanTiruan(semuaBaru, dompet); }
+  catch (e) { catat('lonceng tiruan gagal:', e && e.message); }
 }
 
 /** Mendaftarkan diri di papan supaya kartunya ADA sebelum transaksi

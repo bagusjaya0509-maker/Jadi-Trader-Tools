@@ -56,11 +56,20 @@ export interface RiwayatBursa {
   sejak: number;
 }
 
+/** Penanda "koin ini sedang saya tiru dari dompet itu". Cuma penanda —
+ *  tidak ada order, ukuran, atau apa pun yang bisa dipakai mengeksekusi. */
+export interface PenandaTiru {
+  alamat: string;
+  koin: string;
+  waktu: number;
+}
+
 export interface KeadaanDompet {
   dompet: DompetPantau[];
   posisi: PosisiDompet[];
   log: TransaksiDompet[];
   seumur: Record<string, RiwayatBursa>;
+  tiru: PenandaTiru[];
   denyut: number;
   galat: string;
 }
@@ -88,6 +97,7 @@ export async function keadaanDompet(): Promise<KeadaanDompet | null> {
       posisi: Array.isArray(j?.posisi) ? j.posisi : [],
       log: Array.isArray(j?.log) ? j.log : [],
       seumur: (j && typeof j.seumur === 'object' && j.seumur) || {},
+      tiru: Array.isArray(j?.tiru) ? j.tiru : [],
       denyut: Number(j?.denyut) || 0,
       galat: String(j?.galat || ''),
     };
@@ -112,6 +122,30 @@ export async function tambahDompet(alamat: string, nama: string): Promise<{ ok: 
   } catch {
     return { ok: false, pesan: 'Tidak bisa menghubungi server.' };
   }
+}
+
+export async function tandaiTiru(alamat: string, koin: string): Promise<boolean> {
+  const t = await token();
+  if (!t) return false;
+  try {
+    const r = await fetch(`${dasar()}/api/agen/wallet/tiru`, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ alamat, koin }),
+    });
+    return r.ok;
+  } catch { return false; }
+}
+
+export async function batalTiru(alamat: string, koin: string): Promise<boolean> {
+  const t = await token();
+  if (!t) return false;
+  try {
+    const r = await fetch(
+      `${dasar()}/api/agen/wallet/tiru/${encodeURIComponent(alamat)}/${encodeURIComponent(koin)}`,
+      { method: 'DELETE', headers: { Authorization: 'Bearer ' + t } });
+    return r.ok;
+  } catch { return false; }
 }
 
 export async function hapusDompet(alamat: string): Promise<boolean> {
