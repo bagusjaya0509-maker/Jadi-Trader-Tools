@@ -98,6 +98,26 @@ ARTIKEL = [
     "<code>KodePasangan</code> (kode dari halaman Integrations, bentuknya "
     "seperti JTM5-XXXX-XXXX). Lalu OK.",
   ]),
+  # Tangkapan layar SUNGGUHAN dari MT5, bukan gambar hiasan. Ditaruh sesudah
+  # daftarnya, bukan di dalam tiap <li>: gambar di dalam butir bernomor
+  # memutus penomorannya di sebagian peramban, dan langkah yang nomornya
+  # kacau lebih membingungkan daripada langkah tanpa gambar.
+  #
+  # Cuma dua langkah yang bergambar, dan itu disengaja — dua ini yang
+  # paling sering ditanya karena letaknya tersembunyi di dalam menu.
+  # Langkah yang sudah jelas dari kalimatnya tidak dibuatkan gambar; gambar
+  # yang tidak menjelaskan apa pun cuma memperberat halaman.
+  ("gambar", ("mt5-langkah-3-navigator.webp",
+              "Langkah 3 — panel Navigator sesudah disegarkan. "
+              "<b>JadiTraderSync</b> muncul di bawah daftar Expert Advisors. "
+              "Kalau belum ada di situ, berkas .ex5-nya belum masuk ke folder "
+              "yang benar dan langkah 2 perlu diulang.")),
+  ("gambar", ("mt5-langkah-4-webrequest.webp",
+              "Langkah 4 — <code>Tools &rarr; Options &rarr; Experts</code>. "
+              "Yang wajib: <b>Allow WebRequest for listed URL</b> tercentang, "
+              "dan alamat servernya ada di daftar. Dua baris di atasnya "
+              "sengaja ditutup karena itu isi daftar milik akun contoh; "
+              "punyamu akan berbeda.")),
   ("catatan", "Pastikan tombol <b>Algo Trading</b> di toolbar MT5 berwarna "
               "hijau. Kalau merah, EA-nya terpasang tapi tidak berjalan sama "
               "sekali — dan tidak ada pesan galat yang memberitahumu."),
