@@ -36,7 +36,7 @@ on:
     branches: [main]
     paths:
       - 'Template V3/**'
-      - 'ema-cross-screener_3.html'
+      - 'Template V2 Premium/ema-cross-screener_3.html'
       - '.github/workflows/bangun-v3.yml'
   workflow_dispatch:        # bisa dijalankan manual dari tab Actions
 
@@ -149,8 +149,32 @@ jobs:
             rm -rf /root/v3.lama
             [ -d /root/v3 ] && mv /root/v3 /root/v3.lama || true
             mv /root/v3.baru /root/v3
+
+            # ── ASET RILIS SEBELUMNYA IKUT DIBAWA MASUK ────────────────
+            # Sebelum ini, satu deploy membuat SELURUH potongan rilis lama
+            # menjadi 404 seketika. Peramban yang sedang membuka situs masih
+            # memegang index.html lama beserta daftar nama potongannya; klik
+            # berikutnya ke halaman yang potongannya belum diunduh langsung
+            # gagal, dan layarnya hitam sampai di-refresh paksa. Diukur:
+            # Chart-B8QRgvBW.js dari rilis sebelumnya -> 404.
+            #
+            # Nama berkasnya berhash, jadi dua rilis tidak pernah bertabrakan
+            # nama untuk isi yang berbeda. `-n` menjaga rilis baru selalu
+            # menang seandainya namanya sama persis.
+            if [ -d /root/v3.lama/assets ]; then
+              cp -rn /root/v3.lama/assets/. /root/v3/assets/ 2>/dev/null || true
+            fi
+
+            # Dan dipangkas, kalau tidak ia menumpuk selamanya: rilis
+            # berikutnya menyalin salinan hari ini, yang sudah memuat salinan
+            # kemarin. Tujuh hari cukup untuk tab yang ditinggal terbuka
+            # semalam, dan tetap membuang yang tidak mungkin dipakai lagi.
+            # Berkas rilis BARU selalu bermtime hari ini, jadi tidak pernah
+            # ikut terbuang.
+            find /root/v3/assets -type f -mtime +7 -delete 2>/dev/null || true
+
             rm -f /tmp/v3.tar.gz
-            echo "V3 terpasang: $(find /root/v3 -type f | wc -l) berkas"
+            echo "V3 terpasang: $(find /root/v3 -type f | wc -l) berkas ($(du -sh /root/v3 | cut -f1))"
           '
 
       # Screener V2 WAJIB satu domain dengan V3. Ia ditanam dalam iframe, dan
@@ -160,16 +184,11 @@ jobs:
       # simulasi yang sudah disembunyikan akan muncul lagi dan nama
       # "Koin Hunter"/"Zona Pantau" kembali ke nama lama, tanpa satu pun
       # pesan galat. Berkasnya berdiri sendiri, 500 kB, tanpa JS/CSS lokal.
-      #
-      # Jalurnya AKAR repo, bukan "Template V2 Premium/..." — folder itu cuma
-      # ada di vault lokal pemilik. Salah jalur di sini baru ketahuan saat
-      # VPS_SSH_KEY terpasang (15 Agu 2026): sebelum itu seluruh langkah VPS
-      # terlewati diam-diam, jadi workflow tampak hijau.
       - name: Kirim screener V2 ke VPS
         if: env.PUNYA_KUNCI == 'true'
         run: |
           scp -i ~/.ssh/deploy -o BatchMode=yes \
-            "ema-cross-screener_3.html" \
+            "Template V2 Premium/ema-cross-screener_3.html" \
             root@103.253.145.38:/root/v2/ema-cross-screener_3.html
           echo "Screener V2 tersinkron."
 
