@@ -72,20 +72,24 @@ body{margin:0;overflow-x:hidden;background:var(--bg);color:var(--teks);
   font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
   font-size:20px;line-height:1.5;-webkit-font-smoothing:antialiased}
 
-/* 1.120px, BUKAN 768px lagi (30 Agu 2026).
-   768px diambil dari peraga link-preview Aceternity, dan untuk peraga dua
-   kalimat itu memang pas. Untuk artikel penuh tidak: diukur di peramban,
-   kolom 768px dengan huruf 30px cuma memuat 37,7 huruf per baris. Bacaan
-   panjang yang enak ada di 60-75; di bawah 45 mata harus pindah baris
-   terlalu sering dan halamannya terasa sempit — dan itu yang dilaporkan
-   pemilik. Di 1.120px angkanya jadi 53,2.
+/* ── SATU LEBAR UNTUK SELURUH HALAMAN ARTIKEL ─────────────────────────
+   820px, dan angka ini menempel pada SEMUANYA: kepala, judul, badan teks,
+   kotak ajakan, kartu "Baca juga", kaki. Tidak ada satu pun elemen yang
+   punya lebar sendiri.
 
-   Angkanya sengaja SAMA dengan .lebar milik halaman daftar. Selama ini
-   keduanya berbeda (768 lawan 1.120), jadi logo dan menu di kepala
-   BERGESER waktu pengunjung mengklik dari daftar artikel ke artikelnya.
-   Sekarang tidak lagi. .lebar dibiarkan ada supaya markah halaman daftar
-   tidak perlu disentuh. */
-.bungkus{max-width:1120px;margin:0 auto;padding:28px 20px 96px}
+   Sebelumnya halamannya 1.120px sementara badan teksnya dipatok 54ch
+   (852px). Panjang barisnya memang jadi benar, tapi TEPI KANAN judul dan
+   tepi kanan paragraf berhenti di tempat yang berbeda — 228px selisihnya,
+   dan itu yang terlihat jomplang. Patokan terpisah itu dicabut.
+
+   Konsekuensinya halaman menyempit dari 1.120px ke 820px, dan itu memang
+   harga yang dibayar: satu lebar untuk semua berarti lebar itu harus
+   ditentukan oleh yang paling menuntut, yaitu panjang baris teks. Pada
+   huruf 21px, 820px memberi 76 huruf per baris.
+
+   .lebar (1.120px) tinggal dipakai halaman DAFTAR artikel, yang isinya
+   kartu bergambar, bukan teks yang dibaca berbaris-baris. */
+.bungkus{max-width:820px;margin:0 auto;padding:28px 20px 96px}
 .lebar{max-width:1120px}
 
 header.atas{border-bottom:1px solid var(--garis);margin-bottom:44px;
@@ -102,29 +106,6 @@ h1{font-size:38px;line-height:1.14;letter-spacing:-.03em;margin:0 0 20px;
   color:var(--teks);font-weight:600}
 h2{font-size:26px;line-height:1.25;letter-spacing:-.02em;margin:56px 0 18px;
   color:var(--teks);font-weight:600}
-
-/* ── PANJANG BARIS DIPATOK DALAM `ch`, BUKAN DALAM PIKSEL ──────────────
-   `.bungkus` 1.120px itu lebar HALAMAN — kepala, kaki, kotak ajakan, dan
-   kartu "Baca juga" memang seharusnya selebar itu, sejajar dengan halaman
-   daftar. Tapi BARIS TEKS tidak boleh selebar itu: pada huruf 25px, kolom
-   1.080px memuat 86 huruf per baris, jauh di atas pita nyaman 60-75. Mata
-   kehilangan jejak baris waktu kembali ke kiri.
-
-   Dua-duanya bisa didapat: halamannya tetap 1.120px, teksnya saja yang
-   dipatok. Dan satuannya `ch` — lebar angka "0" pada huruf elemen itu
-   sendiri — bukan piksel. Bedanya bukan gaya:
-
-     • Dipatok piksel, tiap kali ukuran huruf diubah panjang barisnya ikut
-       berubah dan harus dihitung ulang. Itu yang baru saja terjadi.
-     • Dipatok `ch`, panjang barisnya TETAP kira-kira sekian huruf berapa
-       pun ukuran hurufnya. Ia membetulkan dirinya sendiri.
-
-   Karena `ch` mengikuti huruf elemennya, aturan ini otomatis tidak
-   mengekang h1 dan h2: pada 47px, 60ch jauh lebih lebar dari wadahnya,
-   jadi judul tetap memakai lebar penuh. Yang terkekang cuma badan teks.
-   Angkanya dikalibrasi, bukan dikarang: 60ch memberi kapasitas 78 huruf
-   (masih di atas pita), 54ch memberi 70. Yang dipakai 54ch. */
-article p, article ul, article ol, .ringkas, .catatan{max-width:54ch}
 
 p{margin:0 0 26px;color:var(--redup)}
 p b,li b,p strong,li strong{color:var(--teks);font-weight:700}
@@ -191,38 +172,32 @@ footer a{color:#737373}
 @media(hover:none){.pratinjau > .kartu-p{display:none}}
 
 /* ── layar lebar ──────────────────────────────────────────────────────
-   30px → 25px pada 30 Agu 2026, atas permintaan pemilik.
+   30px → 25px → 21px. Pemilik meminta dua kali diperkecil; ini yang kedua.
 
-   ANGKA PERTAMA YANG SAYA PAKAI SALAH, dan ini catatannya supaya tidak
-   terulang. Huruf-per-baris saya hitung dengan Range.getClientRects()
-   dibagi jumlah huruf — dan getClientRects() memulangkan SATU RECT PER
-   KOTAK INLINE, bukan per baris. Paragraf yang memuat <b> atau <code>
-   jadi terhitung punya baris jauh lebih banyak daripada yang terlihat,
-   dan angkanya jatuh ~25% di bawah kenyataan. Sempat terbaca 53,2 padahal
-   sesungguhnya 59,4.
+   Cara mengukurnya sempat salah dan sudah diperbaiki (lihat Catatan):
+   Range.getClientRects() memulangkan satu rect per KOTAK INLINE, bukan per
+   baris, jadi paragraf ber-<b>/<code> terhitung punya baris jauh lebih
+   banyak dari yang terlihat. Yang benar: kelompokkan rect menurut posisi
+   atasnya, buang baris terakhir tiap paragraf, dan tunggu
+   document.fonts.ready sebelum mengukur apa pun.
 
-   Cara yang benar: kumpulkan seluruh rect lalu KELOMPOKKAN menurut posisi
-   atasnya — satu kelompok = satu baris visual, berapa pun kotak inline di
-   dalamnya. Buang baris terakhir tiap paragraf; ia pendek karena
-   paragrafnya habis, bukan karena kolomnya.
+   Diukur dengan cara itu pada kolom 820px: 22px → 73 huruf per baris,
+   21px → 76, 20px → 80. Pita nyaman 60-75. 21px yang dipakai — sedikit di
+   atas pita, dan itu pilihan sadar: menariknya ke dalam pita menuntut
+   kolomnya menyempit lagi ke 780px, sementara pemilik sudah pernah
+   menyebut halaman selebar itu terlalu sempit.
 
-   Diukur ulang dengan cara itu, pada kolom 1.120px:
-       30px → 59,4    27px → 67,8    25px → 70,2    23px → 74,8
-   Pita nyaman 60-75. 23px menyentuh batas atasnya, jadi yang dipakai
-   25px: cukup mengecil untuk terasa bedanya, masih di dalam pita.
-
-   Judul turun dengan rasio yang sama (×25/30) supaya susunannya tidak
-   berubah, cuma mengecil seluruhnya. line-height 1,45 → 1,50: baris yang
-   lebih panjang butuh jarak sedikit lebih longgar supaya mata tidak
-   tersasar waktu kembali ke kiri. */
+   Judul turun dengan rasio yang sama (×21/25) supaya susunannya tidak
+   berubah, cuma mengecil seluruhnya. */
 @media(min-width:768px){
-  body{font-size:25px;line-height:1.5}
-  h1{font-size:47px}
-  h2{font-size:28px;margin-top:60px}
-  p{margin-bottom:27px}
-  li{margin-bottom:15px}
+  body{font-size:21px;line-height:1.55}
+  h1{font-size:39px}
+  h2{font-size:24px;margin-top:52px}
+  p{margin-bottom:24px}
+  li{margin-bottom:13px}
   header.atas a.merek{font-size:17px}
   header.atas nav a{font-size:16px}
+}
 }
 }
 
