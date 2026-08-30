@@ -42,7 +42,8 @@ const { StringSession } = require('teleproto/sessions');
 const { Perangkai } = require('./rangkai');
 const { kirimKartu, layakKartu, daftarHadir, NAMA_AGEN } = require('./kartu-agen');
 const mata = require('./mata-chart');
-const { simpanChart, catatAktivitas, idChartTersimpan, puncakArsip } = require('./arsip-chart-vps');
+const { simpanChart, catatAktivitas, idChartTersimpan, idChartDibuang,
+  puncakArsip } = require('./arsip-chart-vps');
 
 /* Pembungkus yang MENELAN GALAT. Catatan aktivitas adalah kenyamanan; ia
    tidak boleh punya kuasa menjatuhkan telinga 24 jam. Ruang yang tidak
@@ -838,7 +839,18 @@ async function siapkanRuang(client, r) {
       let baru = 0;
       const riwayat = [];
       try {
+        /* Yang sudah ada DAN yang sudah dibuang, digabung jadi satu
+           pertanyaan: "apakah aku pernah berurusan dengan pesan ini?"
+           Itu pertanyaan yang benar. "Apakah aku memilikinya sekarang"
+           memperlakukan penghapusan sebagai chart yang belum pernah
+           ditarik, dan mengembalikannya pada sapuan berikutnya.
+
+           Disaring di SINI, sebelum `downloadMedia`. Menyaringnya sesudah
+           mengunduh akan tetap benar hasilnya, tapi membayar ratusan
+           kilobita tiap sepuluh menit untuk gambar yang langsung dibuang
+           lagi. */
         const punya = idChartTersimpan(__dirname);
+        for (const id of idChartDibuang(__dirname)) punya.add(id);
         /* Waktu chart terbaru yang SUDAH dipegang, dibaca sebelum sapuan
            menambah apa pun. Ia yang memisahkan dua temuan yang bentuknya
            sama tapi artinya berbeda: yang lebih baru dari ini adalah kabar

@@ -133,6 +133,14 @@ module.exports = (app, { butuhLogin, batasLaju, express, DIR }) => {
     if (c.berkas) {
       try { fs.unlinkSync(path.join(GAMBAR_DIR, path.basename(c.berkas))); } catch (e) { /* sudah hilang */ }
     }
+    /* Dicatat SEBELUM indeksnya ditulis. Kalau prosesnya mati di antara
+       keduanya, yang tertinggal adalah nisan untuk chart yang masih ada —
+       dan itu cuma berarti ia tidak akan ditarik ulang seandainya nanti
+       dihapus lagi. Urutan sebaliknya meninggalkan chart yang hilang dari
+       indeks tanpa nisan, dan sapuan berikutnya mengembalikannya: persis
+       cacat yang sedang diperbaiki. */
+    try { module.exports.tandaiBuang(DIR, c.id); }
+    catch (e) { /* nisan gagal ditulis bukan alasan menggagalkan penghapusan */ }
     tulis(daftar);
     res.json({ ok: true, sisa: daftar.length });
   });
@@ -261,6 +269,53 @@ module.exports.catatAktivitas = function catatAktivitas(DIR, baris) {
  *  Ditaruh di sini, bukan di pemantau, karena bentuk indeksnya milik berkas
  *  ini. Dua penulis yang harus sepakat selamanya adalah kesepakatan yang
  *  cepat atau lambat putus. */
+/* ══ NISAN — ID CHART YANG SUDAH DIBUANG ═══════════════════════════════
+   Chart yang dihapus muncul lagi beberapa menit kemudian. Bukan gangguan
+   kecil: itu membuat tombol hapusnya berbohong.
+
+   Sebabnya sapuan bertanya "apa yang sudah kupunya?" ke INDEKS, dan indeks
+   cuma tahu apa yang ADA sekarang. Menghapus sebuah chart mengeluarkan
+   id-nya dari sana — dan begitu id-nya hilang, pesan Telegram yang sama
+   kembali terbaca sebagai temuan baru yang belum pernah ditarik. Sapuan
+   bekerja persis seperti seharusnya; yang salah pertanyaannya.
+
+   Ada dua keadaan yang bentuknya sama dan artinya berlawanan:
+
+       "belum pernah kuambil"   -> ambil
+       "sudah kuambil, dibuang" -> JANGAN ambil
+
+   Indeks tidak bisa membedakannya, karena keduanya sama-sama berarti
+   "tidak ada di daftar". Jadi yang dibuang dicatat terpisah dan disimpan
+   selamanya. Daftarnya cuma berisi id, sekitar 40 bita per baris; seribu
+   penghapusan pun tidak sampai 40 KB.
+
+   TIDAK dipangkas. Memangkas yang tertua berarti menghidupkan kembali
+   chart yang paling lama dibuang — persis cacat yang sedang diperbaiki,
+   cuma datangnya lebih lambat. */
+function berkasBuang(DIR) { return path.join(DIR, 'chart-buang.json'); }
+
+module.exports.idChartDibuang = function idChartDibuang(DIR) {
+  try {
+    const d = JSON.parse(fs.readFileSync(berkasBuang(DIR), 'utf8'));
+    return new Set((d.buang || []).map((x) => String(x.id)));
+  } catch (e) { return new Set(); }
+};
+
+module.exports.tandaiBuang = function tandaiBuang(DIR, id) {
+  let d = { buang: [] };
+  try { d = JSON.parse(fs.readFileSync(berkasBuang(DIR), 'utf8')); } catch (e) { /* baru */ }
+  if (!Array.isArray(d.buang)) d.buang = [];
+  if (d.buang.some((x) => String(x.id) === String(id))) return;
+  d.buang.push({ id: String(id), waktu: Date.now() });
+  /* Tulis ke berkas sementara lalu ganti nama: nisan yang tersimpan
+     separuh saat proses mati akan gagal di-parse, dan berkas nisan yang
+     gagal dibaca berarti SELURUH penghapusan yang pernah dilakukan
+     terlupakan sekaligus. */
+  const semen = berkasBuang(DIR) + '.tmp';
+  fs.writeFileSync(semen, JSON.stringify(d, null, 2));
+  fs.renameSync(semen, berkasBuang(DIR));
+};
+
 module.exports.idChartTersimpan = function idChartTersimpan(DIR) {
   try {
     const d = JSON.parse(fs.readFileSync(path.join(DIR, 'chart-arsip.json'), 'utf8'));
@@ -292,6 +347,15 @@ module.exports.simpanChart = function simpanChart(DIR, { id, agen, keterangan, w
   let daftar = [];
   try { daftar = JSON.parse(fs.readFileSync(INDEKS, 'utf8')).chart || []; } catch (e) { /* baru */ }
   if (daftar.some((c) => c.id === id)) return null;   // sudah ada
+
+  /* Pagar KEDUA, di titik yang dilewati semua jalan masuk. Sapuan sudah
+     menyaring nisannya lebih dulu supaya gambarnya tidak perlu diunduh
+     sama sekali; pagar di sini yang menjamin jalan masuk BERIKUTNYA —
+     yang belum ditulis siapa pun hari ini — tidak bisa diam-diam
+     menghidupkan lagi chart yang sudah dibuang. */
+  try {
+    if (module.exports.idChartDibuang(DIR).has(String(id))) return null;
+  } catch (e) { /* nisan tak terbaca: jangan halangi penyimpanan */ }
 
   const berkas = id.replace(/[^\w-]/g, '') + '.jpg';
   fs.writeFileSync(path.join(GAMBAR_DIR, berkas), bita);
