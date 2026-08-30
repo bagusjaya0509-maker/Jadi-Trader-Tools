@@ -145,3 +145,55 @@ export const GAYA_TOC = `
 #jt-toc .ease-out{transition-timing-function:cubic-bezier(0,0,.2,1)}
 #jt-toc .group:hover .group-hover\\:translate-x-1{translate:.25rem 0}
 `;
+
+/* ════════════════════════════════════════════════════════════════════════
+   KELAS TAILWIND UNTUK grid-pattern — LATAR HALAMAN BACA ARTIKEL
+   ════════════════════════════════════════════════════════════════════════
+   Alasannya sama dengan blok di atas: halaman artikel tidak memuat
+   Tailwind, jadi kelas yang betul-betul dipakai komponen ini ditulis
+   ulang, dan dipagari #jt-grid supaya tidak menyentuh apa pun.
+
+   `fill-gray-400/30` dan `stroke-gray-400/30` disalin apa adanya dari
+   komponennya — gray-400 Tailwind = #9ca3af.
+
+   Yang perlu diingat soal SVG: `fill` dan `stroke` diwarisi anak-anaknya,
+   dan itu memang dipakai komponennya — <rect> pengisi pola mengambil
+   fill dari kelas di <svg>, sementara <path> di dalam <pattern> mengambil
+   stroke dari sana juga. Jadi kedua properti itu dipasang di elemen <svg>,
+   bukan di anak-anaknya.
+   ════════════════════════════════════════════════════════════════════════ */
+export const GAYA_GRID = `
+#jt-grid{position:fixed;inset:0;z-index:-1;pointer-events:none;
+  /* z-index -1: latar body dicat lebih dulu, lalu lapisan ini, lalu isi
+     halaman yang z-index-nya auto. Isi artikel tidak perlu disentuh sama
+     sekali supaya tetap di atas. */
+  overflow:hidden}
+#jt-grid .pointer-events-none{pointer-events:none}
+#jt-grid .absolute{position:absolute}
+#jt-grid .inset-0{inset:0}
+#jt-grid .h-full{height:100%}
+#jt-grid .w-full{width:100%}
+#jt-grid .fill-gray-400\\/30{fill:rgba(156,163,175,.3)}
+#jt-grid .stroke-gray-400\\/30{stroke:rgba(156,163,175,.3)}
+#jt-grid .overflow-visible{overflow:visible}
+
+/* Topeng gradien milik peraga pemilik. Nama kelasnya nilai sembarang
+   Tailwind, jadi kurung siku, titik dua, kurung biasa, dan komanya WAJIB
+   dilarikan dengan garis miring terbalik di pemilih CSS — kalau tidak,
+   seluruh aturannya dibuang peramban tanpa satu pun pesan galat.
+   Garis bawah di nama kelas berarti spasi di nilainya.
+
+   GARIS MIRING TERBALIKNYA DITULIS DUA KALI, dan itu wajib: berkas ini
+   template literal JavaScript, dan garis miring terbalik tunggal sudah
+   punya arti sendiri di sana — JS memakannya, dan yang sampai ke CSS
+   tinggal kurung sikunya saja. Pemilihnya jadi tidak sah, dan peramban
+   membuang aturannya diam-diam. Persis itu yang terjadi pada percobaan
+   pertama: tiga aturan hilang tanpa jejak, dan yang memberi tahu cuma
+   pengukuran — fill terbaca hitam, mask terbaca none.
+
+   Catatan kedua: JANGAN pakai tanda petik miring di komentar ini. Ia
+   menutup template literal-nya, dan galatnya menunjuk baris yang salah. */
+#jt-grid .\\[mask-image\\:linear-gradient\\(to_bottom_right\\,white\\,transparent\\,transparent\\)\\]{
+  -webkit-mask-image:linear-gradient(to bottom right,white,transparent,transparent);
+  mask-image:linear-gradient(to bottom right,white,transparent,transparent)}
+`;
