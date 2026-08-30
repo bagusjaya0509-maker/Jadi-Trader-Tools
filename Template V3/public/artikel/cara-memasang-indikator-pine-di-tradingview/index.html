@@ -78,6 +78,20 @@ code{background:#141414;border:1px solid var(--garis);border-radius:5px;
   padding:1px 7px;font-size:.82em;font-family:ui-monospace,SFMono-Regular,
   Menlo,monospace;color:var(--teks);white-space:nowrap}
 
+/* ── tangkapan layar di dalam artikel ─────────────────────────────────
+   max-width:100% WAJIB. Preflight Tailwind tidak ada di halaman ini, jadi
+   gambar 1.272px yang dipasang apa adanya akan melebihi kolom 780px dan
+   mendorong seluruh halaman melebar — gulir mendatar di HP, dan penyebabnya
+   tidak kelihatan dari CSS mana pun kecuali ini.
+
+   height:auto menemani width:100%: tanpa itu atribut height di HTML-nya
+   tetap dipakai peramban dan gambarnya jadi gepeng waktu lebarnya menyusut. */
+figure.gambar{margin:0 0 26px}
+figure.gambar img{display:block;width:100%;max-width:100%;height:auto;
+  border:1px solid var(--garis);border-radius:10px;background:var(--panel)}
+figure.gambar figcaption{color:#737373;font-size:.72em;line-height:1.5;
+  margin-top:10px}
+
 .ringkas{color:var(--redup);margin:0 0 34px}
 .label{display:inline-block;font-size:12px;letter-spacing:.1em;
   text-transform:uppercase;color:#737373;border:1px solid var(--garis);
