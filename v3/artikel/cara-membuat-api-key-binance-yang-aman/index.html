@@ -61,6 +61,29 @@ h1{font-size:38px;line-height:1.14;letter-spacing:-.03em;margin:0 0 20px;
 h2{font-size:26px;line-height:1.25;letter-spacing:-.02em;margin:56px 0 18px;
   color:var(--teks);font-weight:600}
 
+/* ── PANJANG BARIS DIPATOK DALAM `ch`, BUKAN DALAM PIKSEL ──────────────
+   `.bungkus` 1.120px itu lebar HALAMAN — kepala, kaki, kotak ajakan, dan
+   kartu "Baca juga" memang seharusnya selebar itu, sejajar dengan halaman
+   daftar. Tapi BARIS TEKS tidak boleh selebar itu: pada huruf 25px, kolom
+   1.080px memuat 86 huruf per baris, jauh di atas pita nyaman 60-75. Mata
+   kehilangan jejak baris waktu kembali ke kiri.
+
+   Dua-duanya bisa didapat: halamannya tetap 1.120px, teksnya saja yang
+   dipatok. Dan satuannya `ch` — lebar angka "0" pada huruf elemen itu
+   sendiri — bukan piksel. Bedanya bukan gaya:
+
+     • Dipatok piksel, tiap kali ukuran huruf diubah panjang barisnya ikut
+       berubah dan harus dihitung ulang. Itu yang baru saja terjadi.
+     • Dipatok `ch`, panjang barisnya TETAP kira-kira sekian huruf berapa
+       pun ukuran hurufnya. Ia membetulkan dirinya sendiri.
+
+   Karena `ch` mengikuti huruf elemennya, aturan ini otomatis tidak
+   mengekang h1 dan h2: pada 47px, 60ch jauh lebih lebar dari wadahnya,
+   jadi judul tetap memakai lebar penuh. Yang terkekang cuma badan teks.
+   Angkanya dikalibrasi, bukan dikarang: 60ch memberi kapasitas 78 huruf
+   (masih di atas pita), 54ch memberi 70. Yang dipakai 54ch. */
+article p, article ul, article ol, .ringkas, .catatan{max-width:54ch}
+
 p{margin:0 0 26px;color:var(--redup)}
 p b,li b,p strong,li strong{color:var(--teks);font-weight:700}
 article a{color:var(--teks);font-weight:700;text-decoration:none}
@@ -125,15 +148,40 @@ footer a{color:#737373}
    tautan yang hendak ditekan. */
 @media(hover:none){.pratinjau > .kartu-p{display:none}}
 
-/* ── layar lebar: ukuran peraga Aceternity yang sesungguhnya ──────────── */
+/* ── layar lebar ──────────────────────────────────────────────────────
+   30px → 25px pada 30 Agu 2026, atas permintaan pemilik.
+
+   ANGKA PERTAMA YANG SAYA PAKAI SALAH, dan ini catatannya supaya tidak
+   terulang. Huruf-per-baris saya hitung dengan Range.getClientRects()
+   dibagi jumlah huruf — dan getClientRects() memulangkan SATU RECT PER
+   KOTAK INLINE, bukan per baris. Paragraf yang memuat <b> atau <code>
+   jadi terhitung punya baris jauh lebih banyak daripada yang terlihat,
+   dan angkanya jatuh ~25% di bawah kenyataan. Sempat terbaca 53,2 padahal
+   sesungguhnya 59,4.
+
+   Cara yang benar: kumpulkan seluruh rect lalu KELOMPOKKAN menurut posisi
+   atasnya — satu kelompok = satu baris visual, berapa pun kotak inline di
+   dalamnya. Buang baris terakhir tiap paragraf; ia pendek karena
+   paragrafnya habis, bukan karena kolomnya.
+
+   Diukur ulang dengan cara itu, pada kolom 1.120px:
+       30px → 59,4    27px → 67,8    25px → 70,2    23px → 74,8
+   Pita nyaman 60-75. 23px menyentuh batas atasnya, jadi yang dipakai
+   25px: cukup mengecil untuk terasa bedanya, masih di dalam pita.
+
+   Judul turun dengan rasio yang sama (×25/30) supaya susunannya tidak
+   berubah, cuma mengecil seluruhnya. line-height 1,45 → 1,50: baris yang
+   lebih panjang butuh jarak sedikit lebih longgar supaya mata tidak
+   tersasar waktu kembali ke kiri. */
 @media(min-width:768px){
-  body{font-size:30px;line-height:1.45}
-  h1{font-size:56px}
-  h2{font-size:34px;margin-top:72px}
-  p{margin-bottom:32px}
-  li{margin-bottom:18px}
+  body{font-size:25px;line-height:1.5}
+  h1{font-size:47px}
+  h2{font-size:28px;margin-top:60px}
+  p{margin-bottom:27px}
+  li{margin-bottom:15px}
   header.atas a.merek{font-size:17px}
   header.atas nav a{font-size:16px}
+}
 }
 
 /* ── halaman daftar: tiruan blog-posts.tsx ────────────────────────────── */
