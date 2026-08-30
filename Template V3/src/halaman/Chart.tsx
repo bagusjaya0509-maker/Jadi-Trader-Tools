@@ -41,7 +41,9 @@ import { useAuth } from '@/lib/auth';
 import { modePreview, jatahTerpakai, pakaiJatah } from '@/lib/preview';
 import { usePaket, pakaiKuota, teksSisa } from '@/lib/paket';
 import { JIPLAK_BAWAAN, type AturJiplak } from '@/components/jiplak-chart';
-import type { PosisiDompet, KeadaanDompet } from '@/lib/wallet-agen';
+import type { PosisiDompet, KeadaanDompet, Peringkat,
+  JendelaPeringkat, PitaAkun } from '@/lib/wallet-agen';
+import { peringkatDompet } from '@/lib/wallet-agen';
 import { PanelBelah } from '@/components/panel-belah';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -316,19 +318,26 @@ function rapikanSimbol(s: string): string {
    mereka". Yang kedua itulah yang dipakai memilih koin mana yang layak
    dibuka chartnya — dan sebelum ini, menjawabnya berarti bolak-balik ke
    Copy Signal untuk tiap koin. */
-function DaftarKonsensus({ grup, aktif, pilih, keluar }: {
+/* Satu daftar untuk DUA sumber: konsensus dompet pantauan, dan Wallet View
+   dari papan peringkat. Bentuk datanya sengaja disamakan di pemanggil
+   supaya komponennya cukup satu — dua daftar yang berperilaku sama tapi
+   ditulis dua kali akan berbeda dalam sebulan, dan yang berbeda selalu
+   bagian yang jarang dilihat. */
+function DaftarKonsensus({ grup, aktif, pilih, keluar, judul, sub }: {
   grup: { koin: string; nL: number; nS: number; wrL: number | null; wrS: number | null;
           entry: number; nilai: number }[];
   aktif: string;
   pilih: (simbol: string) => void;
   keluar: () => void;
+  judul?: string;
+  sub?: string;
 }) {
   return (
     <div className="flex h-full flex-col">
       <div className="sticky top-0 z-10 flex items-start gap-2 border-b border-zinc-800 bg-zinc-950 px-2.5 py-1.5">
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[12px] font-semibold text-zinc-100">Konsensus dompet</p>
-          <p className="text-[10.5px] text-zinc-600">{grup.length} koin · WR rata-rata tiap sisi</p>
+          <p className="truncate text-[12px] font-semibold text-zinc-100">{judul || 'Konsensus dompet'}</p>
+          <p className="text-[10.5px] text-zinc-600">{sub || grup.length + ' koin · WR rata-rata tiap sisi'}</p>
         </div>
         <button onClick={keluar} title="Tutup daftar dan kembali"
           className="shrink-0 cursor-pointer rounded p-1 text-zinc-600 transition-colors hover:bg-zinc-800 hover:text-zinc-100">
@@ -2678,6 +2687,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
      disaring darinya. Menariknya dua kali untuk dua tampilan atas data yang
      identik berarti dua permintaan yang bisa berselisih isinya. */
   const konsensusMinta = cari.get('konsensus') === '1';
+  const walletviewMinta = cari.get('walletview') === '1';
   const [posisiDompet, setPosisiDompet] = useState<PosisiDompet[]>([]);
   const [semuaDompet, setSemuaDompet] = useState<KeadaanDompet | null>(null);
   useEffect(() => {
@@ -2697,6 +2707,61 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
 
   /* Dikelompokkan di sini, bukan di panelnya: hitungannya dipakai DUA kali —
      sekali untuk daftarnya, sekali untuk garis rata-rata entry di chart. */
+  /* ── WALLET VIEW ──────────────────────────────────────────────────
+     Sumbernya papan peringkat, bukan dompet pantauan — dua kumpulan yang
+     berbeda, dan tidak boleh dicampur. Saringannya dibaca dari URL supaya
+     daftar di sini persis sama dengan yang tadi dilihat di panelnya. */
+  const [papan, setPapan] = useState<Peringkat | null>(null);
+  useEffect(() => {
+    if (!pemilik || !walletviewMinta) { setPapan(null); return; }
+    let hidup = true;
+    const j = (cari.get('j') || 'month') as JendelaPeringkat;
+    const pt = (cari.get('pita') || 'kecil') as PitaAkun;
+    void peringkatDompet(j, pt, 40).then((d) => { if (hidup && d) setPapan(d); });
+    return () => { hidup = false; };
+  }, [pemilik, walletviewMinta, cari]);
+
+  const grupWalletView = useMemo(() => {
+    if (!walletviewMinta || !papan) return [];
+    type Sisi = { wr: number | null; nilai: number; entry: number }[];
+    const peta = new Map<string, { koin: string; L: Sisi; S: Sisi }>();
+    for (const b of papan.daftar) {
+      if (!b.rinci) continue;
+      /* Satu dompet satu suara per koin+arah — alasannya sama dengan di
+         panelnya, dan disalin ke sini justru supaya keduanya tidak bisa
+         berselisih hitungan. */
+      const unik = new Set<string>();
+      for (const q of b.rinci.posisi) {
+        const k = String(q.koin).toUpperCase();
+        const kk = k + '|' + q.arah;
+        if (unik.has(kk)) continue;
+        unik.add(kk);
+        if (!peta.has(k)) peta.set(k, { koin: k, L: [], S: [] });
+        (q.arah === 'L' ? peta.get(k)!.L : peta.get(k)!.S).push({
+          wr: b.rinci.wr, nilai: Math.abs(q.nilai) || 0, entry: Number(q.entry) || 0,
+        });
+      }
+    }
+    const wrRata = (sisi: Sisi) => {
+      const v = sisi.map((x) => x.wr).filter((x): x is number => x !== null);
+      return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : null;
+    };
+    return [...peta.values()]
+      .filter((g) => g.L.length + g.S.length >= 2)
+      .map((g) => {
+        const dominan = g.L.length >= g.S.length ? g.L : g.S;
+        const e = dominan.map((x) => x.entry).filter((x) => x > 0);
+        return {
+          koin: g.koin, nL: g.L.length, nS: g.S.length,
+          wrL: wrRata(g.L), wrS: wrRata(g.S),
+          entry: e.length ? e.reduce((a, b) => a + b, 0) / e.length : 0,
+          arahDominan: (g.L.length >= g.S.length ? 'LONG' : 'SHORT') as 'LONG' | 'SHORT',
+          nilai: [...g.L, ...g.S].reduce((a, x) => a + x.nilai, 0),
+        };
+      })
+      .sort((a, b) => (b.nL + b.nS) - (a.nL + a.nS));
+  }, [walletviewMinta, papan]);
+
   const grupKonsensus = useMemo(() => {
     if (!konsensusMinta || !semuaDompet) return [];
     const seumur = semuaDompet.seumur || {};
@@ -2727,6 +2792,18 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
       .sort((a, b) => (b.nL + b.nS) - (a.nL + a.nS));
   }, [konsensusMinta, semuaDompet]);
 
+  /* ── SATU DAFTAR, DUA SUMBER ───────────────────────────────────────
+     Konsensus dompet dan Wallet View menjawab pertanyaan yang sama dengan
+     kumpulan dompet yang berbeda. Dari sini ke bawah keduanya diperlakukan
+     sebagai satu daftar — lompatan simbol, garis rata entry, dan panel
+     kirinya tidak perlu tahu asalnya, dan tiap tempat yang harus tahu
+     adalah satu tempat lagi yang bisa lupa diperbarui.
+
+     Konsensus menang kalau keduanya diminta bersamaan: ia dari dompet yang
+     Anda pilih sendiri, dan pilihan sendiri lebih spesifik daripada papan
+     peringkat yang disusun bursa. */
+  const grupKiri = grupKonsensus.length ? grupKonsensus : grupWalletView;
+
   /* Chart berpindah ke posisi PERTAMA begitu daftarnya tiba — sekali saja.
      Mendarat di BTCUSDT bawaan sementara daftar di sebelahnya berisi enam
      belas posisi lain berarti satu klik yang seharusnya tidak perlu, dan
@@ -2738,11 +2815,12 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
      menarik orang kembali ke baris pertama tiap menit. */
   const konsensusDilompati = useRef(false);
   useEffect(() => {
-    if (!konsensusMinta || !grupKonsensus.length || konsensusDilompati.current) return;
+    if ((!konsensusMinta && !walletviewMinta) || !grupKiri.length
+        || konsensusDilompati.current) return;
     konsensusDilompati.current = true;
     if (ambilSimbol(cari)) return;
-    setSimbol(rapikanSimbol(grupKonsensus[0].koin + 'USDT'));
-  }, [konsensusMinta, grupKonsensus, cari]);
+    setSimbol(rapikanSimbol(grupKiri[0].koin + 'USDT'));
+  }, [konsensusMinta, walletviewMinta, grupKiri, cari]);
 
   const dompetDilompati = useRef<string | null>(null);
   useEffect(() => {
@@ -2786,16 +2864,16 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
      masih setara atau sudah terlambat — pertanyaan yang selama ini dijawab
      dengan mengingat angka dari halaman lain. */
   const garisKonsensus = useMemo<GarisHarga[]>(() => {
-    if (!grupKonsensus.length) return [];
+    if (!grupKiri.length) return [];
     const bersih = simbol.replace(/^MT5:/i, '').toUpperCase();
-    const g = grupKonsensus.find((x) => x.koin + 'USDT' === bersih);
+    const g = grupKiri.find((x) => x.koin + 'USDT' === bersih);
     if (!g || !g.entry) return [];
     return [{
       harga: g.entry,
       warna: g.arahDominan === 'LONG' ? 'rgba(52,211,153,.7)' : 'rgba(248,113,113,.7)',
       label: 'Rata ' + (g.arahDominan === 'LONG' ? g.nL + 'L' : g.nS + 'S'),
     }];
-  }, [grupKonsensus, simbol]);
+  }, [grupKiri, simbol]);
 
   const jiplakMinta = cari.get('jiplak');
   const jiplakTerpasang = useRef<string | null>(null);
@@ -3950,13 +4028,26 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
               Jiplak TIDAK dipindah: panel acuannya memang harus sejajar
               dengan kanvas, dan ia tetap di dalam ChartLilin. */}
           <PanelBelah tinggi={tinggiChart} onLebar={setSisaKiri}
-            kiri={!jiplak && grupKonsensus.length ? (
-              <DaftarKonsensus grup={grupKonsensus} aktif={simbol}
+            kiri={!jiplak && grupKiri.length ? (
+              <DaftarKonsensus grup={grupKiri}
+                judul={grupKonsensus.length ? 'Konsensus dompet' : 'Wallet View'}
+                sub={grupKonsensus.length
+                  ? grupKiri.length + ' koin · WR rata-rata tiap sisi'
+                  : grupKiri.length + ' koin · papan peringkat, min. 2 dompet'}
+                aktif={simbol}
                 pilih={(x) => setSimbol(rapikanSimbol(x))}
                 keluar={() => {
+                  /* Dua-duanya dibuang, bukan yang sedang aktif saja.
+                     Menutup daftar sementara satu parameter tertinggal di
+                     URL berarti daftar yang lain langsung menggantikannya —
+                     tombol tutup yang malah menukar isi. */
                   const q = new URLSearchParams(cari);
                   q.delete('konsensus');
+                  q.delete('walletview');
+                  q.delete('j');
+                  q.delete('pita');
                   setSemuaDompet(null);
+                  setPapan(null);
                   navigasi({ search: q.toString() ? '?' + q.toString() : '' }, { replace: true });
                 }} />
             ) : !jiplak && posisiDompet.length ? (

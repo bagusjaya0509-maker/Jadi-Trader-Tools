@@ -303,6 +303,19 @@ function PapanPeringkat({ pantau }: { pantau: (alamat: string, nama: string) => 
             <span className="shrink-0 whitespace-nowrap text-[10px] text-zinc-600">
               dari {ringkas.dompet}
             </span>
+
+            {/* Membawa jendela DAN pita yang sedang dipilih. Tanpa keduanya
+                daftar di chart akan disusun dari saringan bawaan, dan dua
+                layar yang mengaku menampilkan hal yang sama tapi isinya
+                berbeda lebih buruk daripada tidak ada tombolnya sama
+                sekali. */}
+            {ringkas.isi.length > 0 && (
+              <Link to={`/chart-entry?walletview=1&j=${jendela}&pita=${pita}`}
+                title="Buka daftar Wallet View di samping chart — klik koin untuk berpindah"
+                className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-zinc-700 px-2 py-1 text-[11px] text-zinc-300 transition-colors hover:border-zinc-500 hover:text-zinc-100">
+                <List className="size-3.5" /> List in Chart
+              </Link>
+            )}
           </div>
         )}
       </div>

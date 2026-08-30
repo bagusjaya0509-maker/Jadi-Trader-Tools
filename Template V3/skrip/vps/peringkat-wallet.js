@@ -149,6 +149,39 @@ const PITA = [
 
    Dan ia 158 kali lebih murah daripada sumber yang salah itu. */
 const PERKAYA_PER_PITA = Number(process.env.WALLET_PERKAYA || 30);
+
+/* ══ DUA TAHAP, KARENA ONGKOSNYA BEDA SERATUS KALI ═════════════════════
+   Versi pertama memperkaya 30 teratas per pita, dan hanya pada jendela
+   BULAN. Akibatnya kolom "Posisi sekarang" kosong untuk sebelas dari empat
+   puluh baris — dan begitu saringan jendelanya diganti ke Hari atau Semua,
+   yang muncul barisan dompet yang belum pernah diperiksa sama sekali.
+
+   Yang dulu menyatukan keduanya: satu fungsi menarik ketiga sumbernya
+   sekaligus. Padahal ongkosnya sama sekali tidak sebanding —
+
+       clearinghouseState     6 KB    -> posisi terbuka
+       ledgerUpdates          4 KB    -> umur dompet
+       userFills            632 KB    -> win rate, RR
+
+   Posisi seratus kali lebih murah daripada riwayat. Menyatukannya berarti
+   membayar harga riwayat untuk mendapatkan posisi, dan itulah kenapa
+   jangkauannya terpaksa dipersempit sampai kolomnya bolong.
+
+   Sekarang dipisah:
+
+     TAHAP RINGAN  — posisi saja, untuk SETIAP baris yang mungkin tampil
+                     di layar: 40 teratas × 3 pita × 4 jendela. Sekitar 200
+                     dompet unik, 6 KB masing-masing = ±1,2 MB per putaran.
+     TAHAP PENUH   — posisi + umur + WR + RR, tetap 30 teratas per pita
+                     pada jendela bulan. Di sinilah 632 KB-nya dibayar,
+                     dan cuma untuk baris yang benar-benar dibandingkan
+                     orang saat memilih dompet.
+
+   Yang penuh dijalankan LEBIH DULU. Kalau putarannya terpotong di tengah,
+   yang hilang harus bagian yang paling tidak dirindukan. */
+const TAMPIL_PER_PITA = Number(process.env.WALLET_TAMPIL || 40);
+const JEDA_RINGAN = Number(process.env.WALLET_JEDA_RINGAN || 700);
+const JENDELA_SEMUA = ['day', 'week', 'month', 'allTime'];
 const KELUAR_RINCI = path.join(__dirname, 'wallet-peringkat-rinci.json');
 
 const tidur = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -236,6 +269,43 @@ function wrDari(fills) {
   };
 }
 
+/* Posisi SAJA. Satu permintaan, 6 KB. Dipakai untuk barisan yang cuma
+   perlu mengisi kolom "Posisi sekarang" dan rangkuman Wallet View. */
+async function posisiSaja(alamat) {
+  const isi = await hlq({ type: 'clearinghouseState', user: alamat });
+  /* null = permintaannya gagal, BUKAN dompetnya kosong. Dua-duanya terlihat
+     sama dari sini kalau tidak dibedakan, dan menyimpan yang gagal sebagai
+     "sudah diperiksa, tidak punya posisi" adalah kabar bohong yang tidak
+     akan pernah diperiksa ulang. */
+  if (!isi) return null;
+
+  const posisi = [];
+  for (const p of ((isi.assetPositions) || [])) {
+    const po = p.position || {};
+    const sz = Number(po.szi) || 0;
+    if (!sz) continue;
+    posisi.push({
+      koin: String(po.coin || '?'),
+      arah: sz > 0 ? 'L' : 'S',
+      nilai: Math.round(Math.abs(Number(po.positionValue) || 0)),
+      pnl: Math.round(Number(po.unrealizedPnl) || 0),
+      entry: Number(po.entryPx) || 0,
+    });
+  }
+  posisi.sort((a, b) => b.nilai - a.nilai);
+
+  return {
+    posisi: posisi.slice(0, 12),
+    jmlPosisi: posisi.length,
+    /* Ditandai supaya layar tahu bedanya "belum diperiksa" dan "diperiksa,
+       tapi hanya posisinya". Tanda hubung di kolom WR untuk baris ringan
+       adalah jawaban yang benar, bukan kekurangan yang perlu ditutupi. */
+    ringan: true,
+    lahir: 0, wr: null, rr: null,
+    menangRata: 0, kalahRata: 0, tutup: 0, fill: 0, terpotong: false,
+  };
+}
+
 async function perkaya(alamat) {
   const [isi, buku, fills] = await Promise.all([
     hlq({ type: 'clearinghouseState', user: alamat }),
@@ -253,6 +323,11 @@ async function perkaya(alamat) {
       arah: sz > 0 ? 'L' : 'S',
       nilai: Math.round(Math.abs(Number(po.positionValue) || 0)),
       pnl: Math.round(Number(po.unrealizedPnl) || 0),
+      /* Harga masuknya ikut dibawa. Sudah ada di jawaban yang sama, tidak
+         menambah satu permintaan pun — dan tanpanya layar cuma bisa bilang
+         "enam dompet long BTC" tanpa bisa bilang di harga berapa, yang
+         justru bagian yang menentukan masih layak ikut atau sudah telat. */
+      entry: Number(po.entryPx) || 0,
     });
   }
   posisi.sort((a, b) => b.nilai - a.nilai);
@@ -261,7 +336,11 @@ async function perkaya(alamat) {
   const w = wrDari(fills);
 
   return {
-    posisi: posisi.slice(0, 6),
+    /* Dua belas, bukan enam. Angka ini bukan cuma soal panjang tampilan:
+       rangkuman "berapa dompet memegang koin X" dihitung dari daftar INI,
+       jadi memotongnya di enam berarti dompet dengan sepuluh posisi diam-
+       diam tidak dihitung untuk empat koin terakhirnya. */
+    posisi: posisi.slice(0, 12),
     jmlPosisi: posisi.length,
     /* Setoran pertama = umur sebenarnya. 0 kalau buku besarnya tidak
        terbaca — dan nol DIBEDAKAN dari "baru saja dibuat" di layar. */
@@ -351,15 +430,33 @@ async function perkaya(alamat) {
      berarti sekitar 19 MB tertahan di memori pada saat yang sama, di VPS
      yang cuma punya 275 MB sisa — dan skrip ini sudah memakai 200 MB untuk
      mem-parse papannya sendiri beberapa detik sebelumnya. */
+  const teratas = (jendela, pita, batas) => daftar
+    .filter((x) => x.w[jendela] && x.akun >= pita.bawah && x.akun < pita.atas)
+    .sort((a, b) => b.w[jendela].pnl - a.w[jendela].pnl)
+    .slice(0, batas)
+    .map((x) => x.alamat);
+
   const perluRinci = [];
   for (const p of PITA) {
-    const d = daftar
-      .filter((x) => x.w.month && x.akun >= p.bawah && x.akun < p.atas)
-      .sort((a, b) => b.w.month.pnl - a.w.month.pnl)
-      .slice(0, PERKAYA_PER_PITA);
-    for (const x of d) if (!perluRinci.includes(x.alamat)) perluRinci.push(x.alamat);
+    for (const a of teratas('month', p, PERKAYA_PER_PITA)) {
+      if (!perluRinci.includes(a)) perluRinci.push(a);
+    }
   }
-  catat('memperkaya', perluRinci.length, 'dompet teratas…');
+
+  /* Semua yang BISA muncul di layar, lintas jendela dan lintas pita. Yang
+     sudah masuk daftar penuh dikeluarkan — memeriksanya dua kali cuma
+     membuang waktu untuk jawaban yang identik. */
+  const perluPosisi = [];
+  for (const j of JENDELA_SEMUA) {
+    for (const p of PITA) {
+      for (const a of teratas(j, p, TAMPIL_PER_PITA)) {
+        if (!perluRinci.includes(a) && !perluPosisi.includes(a)) perluPosisi.push(a);
+      }
+    }
+  }
+
+  catat('memperkaya', perluRinci.length, 'dompet teratas (penuh) +',
+        perluPosisi.length, 'dompet (posisi saja)…');
 
   const rinci = {};
   let n = 0;
@@ -377,6 +474,23 @@ async function perkaya(alamat) {
     } catch (e) { /* satu dompet gagal tidak menjatuhkan sisanya */ }
     await tidur(JEDA_LAJU);
   }
+
+  /* Tahap ringan. Jedanya lebih pendek karena permintaannya seratus kali
+     lebih kecil — tapi tetap ADA, karena yang dibatasi bursa jumlah
+     permintaan, bukan jumlah bita. */
+  let nr = 0;
+  for (const a of perluPosisi) {
+    try {
+      const d = await posisiSaja(a);
+      /* Dompet yang benar-benar flat TETAP disimpan. Ia berbeda dengan
+         dompet yang belum diperiksa, dan layar menghitung penyebutnya dari
+         perbedaan itu — "dari 19 dompet yang terbaca" cuma jujur kalau
+         yang flat ikut terhitung sebagai terbaca. */
+      if (d) { d.waktu = Date.now(); rinci[a] = d; nr++; }
+    } catch (e) { /* satu dompet gagal tidak menjatuhkan sisanya */ }
+    await tidur(JEDA_RINGAN);
+  }
+  catat('posisi saja tersimpan ·', nr, 'dompet');
   try {
     const semenR = KELUAR_RINCI + '.tmp';
     fs.writeFileSync(semenR, JSON.stringify({ diperbarui: Date.now(), rinci }));

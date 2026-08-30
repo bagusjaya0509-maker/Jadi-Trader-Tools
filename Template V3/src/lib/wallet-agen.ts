@@ -200,7 +200,10 @@ export type PitaAkun = 'kecil' | 'menengah' | 'semua';
 /** Rincian yang ditarik terpisah untuk barisan teratas saja.
  *  null = belum diperiksa, BUKAN nol. */
 export interface RinciPeringkat {
-  posisi: { koin: string; arah: 'L' | 'S'; nilai: number; pnl: number }[];
+  /** `entry` baru ada sejak pengayaan dua tahap; baris lama yang tersimpan
+   *  sebelum itu tidak punya, jadi ia opsional dan harus dijaga saat
+   *  dipakai — bukan dianggap selalu ada. */
+  posisi: { koin: string; arah: 'L' | 'S'; nilai: number; pnl: number; entry?: number }[];
   jmlPosisi: number;
   /** Setoran pertama ke dompetnya — umur yang sebenarnya, bukan fill tertua. */
   lahir: number;
@@ -211,6 +214,10 @@ export interface RinciPeringkat {
   tutup: number;
   fill: number;
   terpotong: boolean;
+  /** Diperiksa posisinya SAJA — WR, RR, dan umurnya tidak pernah ditarik.
+   *  Bukan kekurangan data, melainkan pilihan: riwayat seratus kali lebih
+   *  mahal daripada posisi, dan tidak setiap baris perlu membayarnya. */
+  ringan?: boolean;
 }
 
 export interface BarisPeringkat {
