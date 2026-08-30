@@ -1,5 +1,7 @@
 import { createRoot } from 'react-dom/client';
 import { LinkPreview } from '@/components/ui/link-preview';
+import { DynamicIslandTOC } from '@/components/ui/dynamic-island-toc';
+import { GAYA_TOC } from './artikel-toc-gaya';
 
 /* ════════════════════════════════════════════════════════════════════════
    PRATINJAU TAUTAN DI HALAMAN ARTIKEL STATIS
@@ -55,7 +57,44 @@ function pasangGaya() {
   document.head.appendChild(el);
 }
 
+/* ── DAFTAR ISI MELAYANG ─────────────────────────────────────────────────
+   Komponen dynamic-island-toc kiriman pemilik, dipasang di halaman baca
+   artikel. Ia dipasang lewat berkas ini — bukan dengan menjadikan halaman
+   artikel rute React — karena alasan yang sama dengan link-preview di atas:
+   teks artikelnya harus tetap ada di HTML mentah.
+
+   Ia juga TIDAK menyentuh susunan halaman. Seluruh yang digambarnya
+   berposisi `fixed`, hidup di dalam <div id="jt-toc"> yang ditempel di
+   ujung <body>, jadi tidak satu pun elemen artikel bergeser, berganti
+   huruf, atau berganti ukuran karenanya.
+
+   PEMILIHNYA DIBIARKAN BAWAAN. Bawaannya "article h1, article h2, …" dan
+   halaman artikel ini kebetulan sudah cocok: judul dan seluruh subjudul
+   ada di dalam <article>, sementara "Baca juga" duduk di luarnya sehingga
+   tidak ikut terdaftar. Tidak ada yang perlu diubah di kedua sisi.
+
+   Digerbangi keberadaan judul: kalau halaman tanpa <article h1..h4>
+   suatu saat ikut memuat berkas ini, pulau kosong bertuliskan "Contents"
+   tidak akan muncul di sana. */
+function pasangDaftarIsi() {
+  if (document.getElementById('jt-toc')) return;
+  if (!document.querySelector('article h1, article h2, article h3, article h4')) return;
+
+  const gaya = document.createElement('style');
+  gaya.id = 'jt-toc-gaya';
+  gaya.textContent = GAYA_TOC;
+  document.head.appendChild(gaya);
+
+  const wadah = document.createElement('div');
+  wadah.id = 'jt-toc';
+  document.body.appendChild(wadah);
+
+  createRoot(wadah).render(<DynamicIslandTOC />);
+}
+
 function pasang() {
+  pasangDaftarIsi();
+
   const tautan = document.querySelectorAll<HTMLAnchorElement>('a[data-pratinjau]');
   if (!tautan.length) return;
   pasangGaya();
