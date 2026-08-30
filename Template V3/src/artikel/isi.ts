@@ -2,7 +2,10 @@
    Sumbernya skrip/artikel-isi.py; berkas ini ditulis ULANG tiap kali artikel
    dibangun, jadi suntingan di sini hilang tanpa peringatan. */
 
-export type BlokJenis = 'p' | 'h2' | 'ul' | 'ol' | 'catatan';
+export type BlokJenis = 'p' | 'h2' | 'ul' | 'ol' | 'catatan' | 'gambar';
+
+/* Untuk 'gambar', isi berbentuk [berkas, keterangan] — dua unsur,
+   bukan daftar butir seperti pada 'ul'/'ol'. */
 
 export interface Blok { jenis: BlokJenis; isi: string | string[] }
 
@@ -19,7 +22,7 @@ export const ARTIKEL: Artikel[] = [
     "jenis": "fitur",
     "judul": "Cara Menghubungkan MetaTrader 5 ke Jurnal Trading Otomatis",
     "ringkas": "Enam langkah memasang EA JadiTraderSync di MT5 supaya setiap transaksi masuk ke jurnal sendiri — tanpa menyalin satu baris pun dari riwayat.",
-    "menit": 2,
+    "menit": 3,
     "gambar": "/artikel/gambar/cara-menghubungkan-mt5-ke-jurnal-trading-otomatis.webp",
     "isi": [
       {
@@ -55,6 +58,20 @@ export const ARTIKEL: Artikel[] = [
           "<b>Izinkan alamat server.</b> <code>Tools → Options → Expert Advisors</code>, centang <code>Allow WebRequest for listed URL</code>, lalu tambahkan alamat server yang tertulis di halaman Integrations. Salin persis, tanpa garis miring di ujung — MT5 mencocokkannya huruf per huruf, dan satu karakter beda membuat EA gagal tanpa pesan yang menjelaskan.",
           "<b>Seret ke chart mana pun.</b> Chart apa saja, timeframe apa saja: EA ini tidak membaca harga, jadi pilihan chart tidak berpengaruh. Di tab <code>Common</code> centang <code>Allow Algo Trading</code>.",
           "<b>Isi dua input.</b> Di tab <code>Inputs</code> ada dua yang wajib: <code>AlamatServer</code> (alamat yang sama dengan langkah 4) dan <code>KodePasangan</code> (kode dari halaman Integrations, bentuknya seperti JTM5-XXXX-XXXX). Lalu OK."
+        ]
+      },
+      {
+        "jenis": "gambar",
+        "isi": [
+          "mt5-langkah-3-navigator.webp",
+          "Langkah 3 — panel Navigator sesudah disegarkan. <b>JadiTraderSync</b> muncul di bawah daftar Expert Advisors. Kalau belum ada di situ, berkas .ex5-nya belum masuk ke folder yang benar dan langkah 2 perlu diulang."
+        ]
+      },
+      {
+        "jenis": "gambar",
+        "isi": [
+          "mt5-langkah-4-webrequest.webp",
+          "Langkah 4 — <code>Tools &rarr; Options &rarr; Experts</code>. Yang wajib: <b>Allow WebRequest for listed URL</b> tercentang, dan alamat servernya ada di daftar. Dua baris di atasnya sengaja ditutup karena itu isi daftar milik akun contoh; punyamu akan berbeda."
         ]
       },
       {
@@ -337,6 +354,13 @@ export const ARTIKEL: Artikel[] = [
           "Tempel kode indikatornya.",
           "Klik <code>Add to chart</code>.",
           "<b>Simpan ke favorit.</b> Tanpa ini, indikatornya hanya menempel di layout yang sedang terbuka, dan besok kamu harus menempel ulang."
+        ]
+      },
+      {
+        "jenis": "gambar",
+        "isi": [
+          "tradingview-langkah-4-favorit.webp",
+          "Langkah 4 — tombol <code>Indicators</code> di toolbar atas, lalu <b>Favorites</b>. Indikator yang bintangnya sudah terisi akan selalu ada di daftar ini, di layout mana pun kamu membukanya. Yang belum difavoritkan cuma menempel di layout yang sedang terbuka."
         ]
       },
       {
