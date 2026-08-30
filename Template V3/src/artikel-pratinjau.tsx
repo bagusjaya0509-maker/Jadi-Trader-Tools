@@ -1,7 +1,8 @@
 import { createRoot } from 'react-dom/client';
 import { LinkPreview } from '@/components/ui/link-preview';
 import { DynamicIslandTOC } from '@/components/ui/dynamic-island-toc';
-import { GAYA_TOC } from './artikel-toc-gaya';
+import { GridPattern } from '@/components/ui/grid-pattern';
+import { GAYA_TOC, GAYA_GRID } from './artikel-toc-gaya';
 
 /* ════════════════════════════════════════════════════════════════════════
    PRATINJAU TAUTAN DI HALAMAN ARTIKEL STATIS
@@ -92,7 +93,47 @@ function pasangDaftarIsi() {
   createRoot(wadah).render(<DynamicIslandTOC />);
 }
 
+/* ── LATAR KISI ──────────────────────────────────────────────────────────
+   Komponen grid-pattern kiriman pemilik, dipakai sebagai latar halaman
+   baca artikel. Ditempel apa adanya; yang saya tulis cuma lapisan tempat
+   ia duduk.
+
+   Setelan yang dipakai = peraga `GridPatternLinearGradient` milik pemilik
+   sendiri (20×20, x=-1, y=-1, topeng gradien lurus), bukan karangan saya.
+   Dari tiga peraga yang dikirim, itu satu-satunya yang tidak memakai
+   topeng lingkaran — dan topeng lingkaran mengunci kisinya ke TENGAH
+   kotak, yang masuk akal untuk kotak peraga 500px tapi tidak untuk
+   halaman yang digulir sepanjang 3.000px.
+
+   Lapisannya `fixed`, jadi kisinya diam waktu halaman digulir. Kalau ia
+   ikut bergulir, garis-garisnya bergerak di belakang teks yang sedang
+   dibaca — dan latar tidak boleh menarik perhatian ke dirinya sendiri. */
+function pasangLatarKisi() {
+  if (document.getElementById('jt-grid')) return;
+  if (!document.querySelector('article h1')) return;
+
+  const gaya = document.createElement('style');
+  gaya.id = 'jt-grid-gaya';
+  gaya.textContent = GAYA_GRID;
+  document.head.appendChild(gaya);
+
+  const wadah = document.createElement('div');
+  wadah.id = 'jt-grid';
+  document.body.appendChild(wadah);
+
+  createRoot(wadah).render(
+    <GridPattern
+      width={20}
+      height={20}
+      x={-1}
+      y={-1}
+      className="[mask-image:linear-gradient(to_bottom_right,white,transparent,transparent)]"
+    />,
+  );
+}
+
 function pasang() {
+  pasangLatarKisi();
   pasangDaftarIsi();
 
   const tautan = document.querySelectorAll<HTMLAnchorElement>('a[data-pratinjau]');
