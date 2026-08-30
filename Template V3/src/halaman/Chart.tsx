@@ -40,7 +40,7 @@ import { SIMBOL_DASAR, simbolDasarMt5 } from '@/lib/simbol';
 import { useAuth } from '@/lib/auth';
 import { modePreview, jatahTerpakai, pakaiJatah } from '@/lib/preview';
 import { usePaket, pakaiKuota, teksSisa } from '@/lib/paket';
-import { JiplakChart, JIPLAK_BAWAAN, type AturJiplak } from '@/components/jiplak-chart';
+import { JIPLAK_BAWAAN, type AturJiplak } from '@/components/jiplak-chart';
 import type { PosisiDompet, KeadaanDompet } from '@/lib/wallet-agen';
 import { PanelBelah } from '@/components/panel-belah';
 
@@ -973,6 +973,18 @@ export default function ChartBacktest() {
     } catch { /* privat */ }
     return null;
   });
+  /* ── TEPI KIRI CHART, BUKAN TEPI KIRI AREA ────────────────────────
+     `areaChart` memuat panel kiri (daftar dompet/konsensus/acuan jiplak)
+     DAN grafiknya. Semua hamparan dijangkarkan ke sana, jadi begitu panel
+     kirinya terbuka, `left: 8` berhenti berarti "di tepi lilin" dan mulai
+     berarti "di atas daftar" — bilah alat gambar duduk menimpa isi panel,
+     yang justru terlihat seperti bilahnya yang salah tempat.
+
+     Panelnya melaporkan berapa piksel yang ia makan; angka itu ditambahkan
+     ke letak bilahnya dan dikurangkan dari jepitan seretannya. Letak yang
+     TERSIMPAN tetap relatif terhadap chart, jadi menutup panel tidak
+     memindahkan bilah yang sudah ditaruh orangnya. */
+  const [sisaKiri, setSisaKiri] = useState(0);
   const areaChart = useRef<HTMLDivElement>(null);
   /** Kartu chart utuh — bilah kendali DAN grafiknya. Inilah yang dinaikkan
    *  ke layar penuh; `areaChart` tetap dipakai untuk mengukur lebar kanvas. */
@@ -992,7 +1004,7 @@ export default function ChartBacktest() {
        SEBENARNYA di layar — bukan dari angka bawaan yang tidak ada. */
     const awal = {
       x: e.clientX, y: e.clientY,
-      lx: letakAlat ? letakAlat.x : (b0 ? kotakBilah.left - b0.left : 8),
+      lx: letakAlat ? letakAlat.x : (b0 ? kotakBilah.left - b0.left - sisaKiri : 8),
       ly: letakAlat ? letakAlat.y : (b0 ? kotakBilah.top - b0.top : 8),
     };
     const batas = () => areaChart.current?.getBoundingClientRect();
@@ -1004,7 +1016,7 @@ export default function ChartBacktest() {
       /* Dijepit di dalam area chart, disisakan 36 px supaya bilahnya
          tidak bisa diseret keluar layar dan hilang selamanya. */
       return {
-        x: Math.max(4, Math.min(b.width - 36, x)),
+        x: Math.max(4, Math.min(b.width - sisaKiri - 36, x)),
         y: Math.max(4, Math.min(b.height - 36, y)),
       };
     };
@@ -1077,9 +1089,14 @@ export default function ChartBacktest() {
   /* Satu tempat menghitung posisi bilah alat, dipakai kedua wujudnya
      (terlipat dan terbuka) supaya keduanya tidak pernah menyimpang. */
   const gayaAlat: React.CSSProperties = letakAlat
-    ? { left: letakAlat.x, top: letakAlat.y,
+    ? { left: letakAlat.x + sisaKiri, top: letakAlat.y,
         transform: geserAlat ? `translateY(${geserAlat}px)` : undefined }
-    : { transform: `translateY(calc(-50% + ${geserAlat}px))` };
+    /* `left` inline juga untuk letak bawaannya — kelas `left-2` tidak bisa
+       ikut bergeser saat panel kirinya membuka, dan bilah yang bawaannya
+       menimpa daftar adalah cacat yang dilihat orang lebih dulu daripada
+       bilah yang pernah dipindah. */
+    : { left: sisaKiri + 8,
+        transform: `translateY(calc(-50% + ${geserAlat}px))` };
 
   function aturAlatTutup(v: boolean) {
     setAlatTutup(v);
@@ -3932,7 +3949,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
 
               Jiplak TIDAK dipindah: panel acuannya memang harus sejajar
               dengan kanvas, dan ia tetap di dalam ChartLilin. */}
-          <PanelBelah tinggi={tinggiChart}
+          <PanelBelah tinggi={tinggiChart} onLebar={setSisaKiri}
             kiri={!jiplak && grupKonsensus.length ? (
               <DaftarKonsensus grup={grupKonsensus} aktif={simbol}
                 pilih={(x) => setSimbol(rapikanSimbol(x))}
@@ -4040,6 +4057,17 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                              berarti medan lain ikut ditulis ulang setiap
                              kali salah satunya disunting. */
                           onUbahJiplak={(p) => setJiplak((j) => (j ? { ...j, ...p } : j))}
+                          /* Parameter URL-nya ikut dibuang. Kalau tidak,
+                             `?jiplak=` yang tertinggal akan memasang ulang
+                             gambar yang sama pada muat berikutnya — tombol
+                             tutup yang tidak benar-benar menutup. */
+                          onLepasJiplak={() => {
+                            setJiplak(null);
+                            jiplakTerpasang.current = null;
+                            const q = new URLSearchParams(cari);
+                            q.delete('jiplak');
+                            navigasi({ search: q.toString() ? '?' + q.toString() : '' }, { replace: true });
+                          }}
 
                           posisiMt5={modeNyata ? posisiMt5Chart : KOSONG_POSISI}
                           onUbahPosisi={simbol.startsWith('MT5:') ? ubahPosisiMt5 : undefined}
@@ -4678,7 +4706,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
               onPointerEnter={bangunkanAlat}
               style={gayaAlat}
               className={cn('absolute z-20 flex size-7 cursor-pointer items-center justify-center rounded-lg border border-zinc-800/80 bg-zinc-950/85 text-zinc-500 backdrop-blur-sm transition-[color,transform] duration-300 hover:text-zinc-200',
-                !letakAlat && 'left-2 top-1/2')}>
+                !letakAlat && 'top-1/2')}>
               <Ruler className="size-3.5" />
             </button>
           ) : (
@@ -4687,18 +4715,26 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                ref={(el) => { alatRef.current = el; }}
                style={gayaAlat}
                className={cn('absolute z-20 flex cursor-move touch-none flex-col items-center gap-0.5 rounded-lg border border-zinc-800/80 bg-zinc-950/85 p-1 backdrop-blur-sm transition-transform duration-300',
-                 !letakAlat && 'left-2 top-1/2')}>
+                 !letakAlat && 'top-1/2')}>
             {/* Pegangan seret di ujung ATAS — memberi tahu bilahnya bisa
                 dipindah tanpa perlu dicoba dulu. GripHorizontal, bukan
                 Vertical: titik-titiknya harus melintang terhadap arah
                 bilahnya supaya terbaca sebagai pegangan, bukan sebagai
                 tombol keempat yang kebetulan bergaris. */}
             <GripHorizontal className="size-3.5 shrink-0 text-zinc-700" />
-            {/* Jiplak chart — HANYA pemilik. Arsipnya digerbangi uid pemilik
-                di server, jadi tombol ini untuk orang lain cuma akan membuka
-                daftar kosong; menampilkannya berarti menjanjikan sesuatu
-                yang tidak pernah bisa dipakai. */}
-            {pemilik && <JiplakChart nilai={jiplak} ubah={setJiplak} />}
+            {/* ── KENAPA JIPLAK TIDAK ADA DI SINI LAGI ──────────────────
+                Dulu tombolnya duduk di bilah ini, digerbangi `pemilik`.
+                Gerbangnya benar, tapi tempatnya salah: bilah alat gambar
+                adalah perkakas trading yang dipakai SEMUA pengguna, dan
+                menaruh pintu ke arsip pribadi di tengahnya berarti satu
+                gerbang yang keliru — satu kali salah membaca peran, satu
+                kali render sebelum peran terbaca — memamerkan sesuatu yang
+                tidak boleh terlihat.
+
+                Sekarang jalan masuknya cuma satu: daftar arsip di ruang
+                analis, yang menautkan `?jiplak=<id>` dan sudah digerbangi
+                di sisi server. Jalan keluarnya ikut pindah, ke tombol ✕ di
+                gambar acuannya sendiri. */}
             {([
               ['garis', TrendingUp, 'Garis tren — tarik dari titik ke titik', ''],
               /* Garis harga: sekali klik, bukan tarikan. Ditaruh tepat di

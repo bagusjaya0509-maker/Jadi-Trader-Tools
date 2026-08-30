@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -30,18 +30,53 @@ import { cn } from '@/lib/utils';
    memang harus sejajar dengan kanvasnya.
    ════════════════════════════════════════════════════════════════════════ */
 
-export function PanelBelah({ kiri, lebarAwal = 0.28, tinggi, children }: {
+export function PanelBelah({ kiri, lebarAwal = 0.28, tinggi, onLebar, children }: {
   /** Isi panel kiri. null/undefined = tidak membelah sama sekali. */
   kiri?: ReactNode;
   lebarAwal?: number;
   /** Tinggi panel kiri, disamakan dengan tinggi chart di kanannya. */
   tinggi: number;
+  /** Lebar yang DIMAKAN panel ini di sebelah kiri, dalam piksel — panelnya
+   *  plus pembatasnya. 0 saat tidak membelah.
+   *
+   *  Ada karena hamparan di luar sini tidak punya cara lain mengetahuinya.
+   *  Bilah alat gambar dijangkarkan ke area chart, dan area itu sekarang
+   *  memuat panel ini juga: `left: 8` yang dulu berarti "8 px dari tepi
+   *  kiri lilin" berubah diam-diam menjadi "8 px dari tepi kiri DAFTAR",
+   *  dan bilahnya duduk menimpa isi panel. Lebarnya dikirim ke atas supaya
+   *  yang melayang bisa menghitung tepi chart yang sebenarnya.
+   *
+   *  Piksel, bukan persen: yang memakainya menaruh `left` dalam piksel,
+   *  dan menyeberangkan satuan di tengah jalan berarti dua tempat yang
+   *  harus sepakat selamanya. */
+  onLebar?: (px: number) => void;
   children: ReactNode;
 }) {
   const [lebar, setLebar] = useState(lebarAwal);
   const [seret, setSeret] = useState<number | null>(null);
   const [bungkus, setBungkus] = useState<HTMLDivElement | null>(null);
   const w = seret ?? lebar;
+
+  /* Diukur dari elemen sungguhan, bukan dihitung dari persen dikali lebar
+     jendela: pembungkusnya ikut menyusut saat watchlist meluncur masuk, dan
+     angka yang diturunkan dari jendela akan tetap percaya diri padahal
+     salah.
+
+     Dipasang SEBELUM `if (!kiri)` — sesudah cabang yang keluar lebih awal,
+     efeknya cuma hidup sebagian waktu, dan jumlah hook yang berubah antar
+     render adalah galat React, bukan pilihan gaya. */
+  const kosong = !kiri;
+  useEffect(() => {
+    if (!onLebar) return;
+    if (kosong || !bungkus) { onLebar(0); return; }
+    /* +4: pembatasnya sendiri selebar 4 px. Tepi chart mulai sesudah
+       PEMBATAS, bukan sesudah panelnya. */
+    const kirim = () => onLebar(Math.round(bungkus.getBoundingClientRect().width * w) + 4);
+    kirim();
+    const ro = new ResizeObserver(kirim);
+    ro.observe(bungkus);
+    return () => ro.disconnect();
+  }, [onLebar, kosong, bungkus, w]);
 
   if (!kiri) return <>{children}</>;
 

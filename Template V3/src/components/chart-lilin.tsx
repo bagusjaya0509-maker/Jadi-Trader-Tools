@@ -223,7 +223,7 @@ export function ChartLilin({
   garisSeret, onSeret, onKlikGaris, onHapusGaris, onKlikKosong, hamparanBawah, segmen, penandaPine, kotakPine, isianPine,
   alat, onAlatSelesai, gambarAlat, gambarPilih, onPilihGambar, onUbahGambar,
   posisiMt5, onUbahPosisi, hargaAsk, kunciUkuran, bagikanFoto, tandaAir, tampilan, pitaSmi,
-  jiplak, onUbahJiplak, panelKiri,
+  jiplak, onUbahJiplak, onLepasJiplak, panelKiri,
   hamparanBarTertua, onUjungKiri,
 }: {
   /** Nama pasangan yang dicetak samar di tengah area harga, seperti
@@ -349,6 +349,12 @@ export function ChartLilin({
    *  dalam satu sesi, dan keadaan yang tinggal di dalamnya akan hilang tiap
    *  kali — memaksa orang memaskan gambar yang sama berulang-ulang. */
   onUbahJiplak?: (p: { lebar?: number; zoom?: number; x?: number; y?: number }) => void;
+  /** Melepas gambar acuannya. Ada di sini karena satu-satunya tombolnya
+   *  dulu duduk di bilah alat gambar — bilah yang dilihat SEMUA pengguna,
+   *  padahal arsipnya milik pemilik saja. Bilahnya dibersihkan, jadi jalan
+   *  keluarnya pindah ke gambar yang sedang dipasang: di situlah orang
+   *  mencarinya saat ingin menutupnya. */
+  onLepasJiplak?: () => void;
   /** Isi panel kiri saat TIDAK sedang menjiplak gambar.
    *
    *  Ditambahkan supaya layar terbelahnya dipakai ulang, bukan dibuat dua
@@ -2799,6 +2805,20 @@ export function ChartLilin({
             <span className="pointer-events-none absolute left-1.5 top-1.5 rounded bg-zinc-950/80 px-1.5 py-0.5 text-[10px] tabular-nums text-zinc-400">
               {Math.round(jz * 100)}%
             </span>
+          )}
+
+          {/* Menutup panel acuan. `stopPropagation` di pointerdown, bukan
+              cuma di click: panel ini menangkap pointer untuk menggeser
+              gambar, dan tanpa dihentikan lebih dulu, menekan tombolnya
+              akan memulai seretan — tombol yang menggeser gambar alih-alih
+              menutupnya. */}
+          {jiplak && onLepasJiplak && (
+            <button onPointerDown={(e) => e.stopPropagation()}
+                    onClick={onLepasJiplak}
+                    title="Tutup panel acuan"
+                    className="absolute right-1.5 top-1.5 flex size-6 cursor-pointer items-center justify-center rounded bg-zinc-950/80 text-[13px] leading-none text-zinc-400 backdrop-blur-sm transition-colors hover:bg-zinc-900 hover:text-zinc-100">
+              ✕
+            </button>
           )}
 
         </div>
