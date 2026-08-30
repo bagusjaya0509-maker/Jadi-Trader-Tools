@@ -201,7 +201,37 @@
          HTML milik Vite saat membangun. -->
     <noscript><img height="1" width="1" style="display:none" alt=""
       src="https://www.facebook.com/tr?id=1707400253897614&ev=PageView&noscript=1" /></noscript>
-    <div id="root"></div>
+    <!-- ── ISI CADANGAN DI DALAM #root ──────────────────────────────────
+         React MENIMPA seluruh isi #root saat ia mount, jadi tidak satu
+         pun pengunjung ber-JavaScript melihat bagian ini. Yang melihatnya
+         cuma dua: perayap yang membaca HTML sebelum menjalankan skrip,
+         dan orang yang JavaScript-nya mati.
+
+         KENAPA ADA. HTML mentah beranda ini tidak memuat SATU PUN tautan
+         ke /artikel/ — diukur dengan curl, hasilnya nol. Tautannya baru
+         ada sesudah React jalan. Google memang menjalankan JavaScript,
+         tapi itu antrean kedua yang jauh lebih lambat, dan sampai antrean
+         itu tiba artikel-artikelnya tidak punya satu pun tautan masuk.
+         Search Console mengatakannya apa adanya untuk artikel MT5:
+         "Referring page: None detected".
+
+         Ini BUKAN teks tersembunyi. Ia tidak disembunyikan dengan CSS,
+         tidak dijejali kata kunci, dan isinya sama dengan menu yang
+         sungguhan. Ia halaman yang berfungsi untuk yang tidak bisa
+         menjalankan skrip — persis kegunaan yang dimaksudkan isi cadangan
+         #root. Menyembunyikannya dengan display:none justru yang akan
+         membuatnya jadi masalah. -->
+    <div id="root">
+      <h1>Jadi Trader Tools</h1>
+      <p>Chart replay, screener, dan jurnal trading otomatis.</p>
+      <nav>
+        <a href="/artikel/">Artikel &amp; panduan</a> &middot;
+        <a href="/preview">Coba gratis</a> &middot;
+        <a href="/akses">Harga</a> &middot;
+        <a href="/docs">Dokumentasi</a> &middot;
+        <a href="/legal">Legal</a>
+      </nav>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
