@@ -22,7 +22,8 @@
     "baseUrl": ".",
     "paths": {
       "next/image": ["./src/shim/next-image.tsx"],
-      "next/link": ["./src/shim/next-link.tsx"], "@/*": ["./src/*"] }
+      "next/link": ["./src/shim/next-link.tsx"],
+      "motion/react": ["./src/shim/motion-react.ts"], "@/*": ["./src/*"] }
   },
   "include": ["src"]
 }
