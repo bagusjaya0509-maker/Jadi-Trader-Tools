@@ -1,0 +1,211 @@
+# ════════════════════════════════════════════════════════════════════════
+# BANGUN & TERBITKAN V3 OTOMATIS
+# ════════════════════════════════════════════════════════════════════════
+# Taruh berkas ini di repo sebagai:  .github/workflows/bangun-v3.yml
+#
+# Kenapa ini layak dipasang: situs ini selama ini diunggah lewat antarmuka
+# web GitHub. Cara itu tidak punya pengaman apa pun — tidak ada yang memberi
+# tahu kalau satu berkas terlewat, dan berkas di assets/ namanya berubah tiap
+# build. Satu berkas tertinggal = halaman blank tanpa pesan error.
+#
+# Dengan workflow ini, yang diunggah adalah SUMBER-nya. Hasil build dibuat
+# GitHub sendiri, jadi mustahil ada yang terlewat.
+#
+# ── YANG DILAKUKAN ─────────────────────────────────────────────────────
+# 1. Membangun Template V3, lalu menaruh hasilnya di folder v3/ pada branch
+#    yang sama. Situs HTML di akar TIDAK disentuh — keduanya tetap hidup.
+# 2. Mengirim hasil yang SAMA ke VPS, kalau kuncinya sudah dipasang.
+#
+# Sengaja TIDAK memakai actions/deploy-pages: aksi itu mengganti SELURUH
+# situs dengan artefak yang diunggahnya, jadi halaman HTML lama akan hilang.
+#
+# ── KENAPA VPS IKUT DIKIRIM DARI SINI ──────────────────────────────────
+# Dulu ada DUA jalur terbitan: workflow ini ke GitHub Pages, dan
+# `npm run deploy` dari komputer ke VPS. Dua jalur berarti dua kemungkinan
+# isi — dan yang paling sering terjadi bukan salah satunya rusak, melainkan
+# salah satunya TERTINGGAL satu versi tanpa ada yang sadar.
+#
+# Sekarang satu push memperbarui keduanya. `npm run deploy` tetap ada untuk
+# keadaan darurat, tapi tidak lagi jadi langkah rutin.
+# ════════════════════════════════════════════════════════════════════════
+
+name: Bangun V3
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Template V3/**'
+      - 'Template V2 Premium/ema-cross-screener_3.html'
+      - '.github/workflows/bangun-v3.yml'
+  workflow_dispatch:        # bisa dijalankan manual dari tab Actions
+
+# Menulis balik ke repo, jadi butuh izin tulis.
+permissions:
+  contents: write
+
+# Kalau ada dua push beruntun, yang lama dibatalkan — tanpa ini keduanya
+# menulis ke folder yang sama dan bisa saling menimpa.
+concurrency:
+  group: bangun-v3
+  cancel-in-progress: true
+
+jobs:
+  bangun:
+    runs-on: ubuntu-latest
+
+    env:
+      # Alamat backend yang dipakai bundel. Diambil dari variabel repo
+      # (Settings → Secrets and variables → Actions → Variables) supaya
+      # pindah ke domain sendiri TIDAK perlu menyentuh satu baris kode pun.
+      # Kalau belum diisi, kode memakai sslip.io seperti sebelumnya.
+      VITE_BACKEND: ${{ vars.VITE_BACKEND }}
+      # Dievaluasi sekali di sini: `secrets` tidak bisa dipakai langsung
+      # di `if` milik step, tapi env yang menampungnya bisa.
+      PUNYA_KUNCI: ${{ secrets.VPS_SSH_KEY != '' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: 'Template V3/package-lock.json'
+
+      # `npm ci` bukan `npm install`: ci memakai package-lock apa adanya,
+      # jadi hasil build di GitHub sama persis dengan yang diuji di komputer.
+      - name: Pasang dependensi
+        working-directory: 'Template V3'
+        run: npm ci
+
+      - name: Bangun
+        working-directory: 'Template V3'
+        run: npm run build
+
+      # Folder v3/ dikosongkan dulu. Nama berkas di assets/ berhash dan
+      # berubah tiap build; tanpa dibersihkan, sisa build lama menumpuk
+      # selamanya dan repo membengkak tanpa ada yang memakainya.
+      - name: Pindahkan hasil ke v3/
+        run: |
+          rm -rf v3
+          mkdir -p v3
+          cp -r "Template V3/dist/." v3/
+
+      - name: Commit kalau ada yang berubah
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add v3
+          if git diff --staged --quiet; then
+            echo "Tidak ada perubahan pada hasil build."
+          else
+            git commit -m "Bangun V3 otomatis dari ${GITHUB_SHA::7}"
+            git push
+          fi
+
+      # ── Kirim ke VPS ───────────────────────────────────────────────────
+      # Dilewati diam-diam kalau VPS_SSH_KEY belum dipasang, supaya workflow
+      # ini aman dipasang lebih dulu daripada kuncinya. Yang gagal separuh
+      # jalan lebih membingungkan daripada yang jujur bilang dilewati.
+      - name: Lewati VPS (kunci belum dipasang)
+        if: env.PUNYA_KUNCI != 'true'
+        run: |
+          echo "VPS_SSH_KEY belum ada di repo secrets — pengiriman ke VPS dilewati."
+          echo "Pasang dengan:  gh secret set VPS_SSH_KEY < ~/.ssh/id_jaditrader_deploy"
+
+      - name: Siapkan kunci SSH
+        if: env.PUNYA_KUNCI == 'true'
+        env:
+          KUNCI: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          # printf, bukan echo: echo di beberapa shell menelan baris terakhir
+          # kunci OpenSSH, dan kunci yang kurang satu baris ditolak tanpa
+          # pesan yang menyebut penyebabnya.
+          printf '%s\n' "$KUNCI" > ~/.ssh/deploy
+          chmod 600 ~/.ssh/deploy
+          # Sidik jari host disimpan lebih dulu. Tanpa ini ssh berhenti
+          # menunggu jawaban "yes" yang tidak akan pernah datang di CI.
+          ssh-keyscan -H 103.253.145.38 >> ~/.ssh/known_hosts 2>/dev/null
+
+      # Folder ditukar, bukan disalin di atasnya. Nama berkas di assets/
+      # berhash dan berubah tiap rilis; menyalin di atas folder lama
+      # meninggalkan berkas rilis sebelumnya selamanya, dan dalam sepuluh
+      # rilis /root/v3 berisi sepuluh set assets tanpa cara tahu mana yang
+      # masih terpakai. Kalau ekstraksinya gagal di tengah, folder yang
+      # sedang tayang belum tersentuh sama sekali.
+      - name: Kirim V3 ke VPS
+        if: env.PUNYA_KUNCI == 'true'
+        run: |
+          tar czf v3.tar.gz -C "Template V3/dist" .
+          scp -i ~/.ssh/deploy -o BatchMode=yes v3.tar.gz root@103.253.145.38:/tmp/v3.tar.gz
+          ssh -i ~/.ssh/deploy -o BatchMode=yes root@103.253.145.38 '
+            set -e
+            rm -rf /root/v3.baru && mkdir -p /root/v3.baru
+            tar xzf /tmp/v3.tar.gz -C /root/v3.baru
+            test -f /root/v3.baru/index.html
+            test -d /root/v3.baru/assets
+            rm -rf /root/v3.lama
+            [ -d /root/v3 ] && mv /root/v3 /root/v3.lama || true
+            mv /root/v3.baru /root/v3
+
+            # ── ASET RILIS SEBELUMNYA IKUT DIBAWA MASUK ────────────────
+            # Sebelum ini, satu deploy membuat SELURUH potongan rilis lama
+            # menjadi 404 seketika. Peramban yang sedang membuka situs masih
+            # memegang index.html lama beserta daftar nama potongannya; klik
+            # berikutnya ke halaman yang potongannya belum diunduh langsung
+            # gagal, dan layarnya hitam sampai di-refresh paksa. Diukur:
+            # Chart-B8QRgvBW.js dari rilis sebelumnya -> 404.
+            #
+            # Nama berkasnya berhash, jadi dua rilis tidak pernah bertabrakan
+            # nama untuk isi yang berbeda. `-n` menjaga rilis baru selalu
+            # menang seandainya namanya sama persis.
+            if [ -d /root/v3.lama/assets ]; then
+              cp -rn /root/v3.lama/assets/. /root/v3/assets/ 2>/dev/null || true
+            fi
+
+            # Dan dipangkas, kalau tidak ia menumpuk selamanya: rilis
+            # berikutnya menyalin salinan hari ini, yang sudah memuat salinan
+            # kemarin. Tujuh hari cukup untuk tab yang ditinggal terbuka
+            # semalam, dan tetap membuang yang tidak mungkin dipakai lagi.
+            # Berkas rilis BARU selalu bermtime hari ini, jadi tidak pernah
+            # ikut terbuang.
+            find /root/v3/assets -type f -mtime +7 -delete 2>/dev/null || true
+
+            rm -f /tmp/v3.tar.gz
+            echo "V3 terpasang: $(find /root/v3 -type f | wc -l) berkas ($(du -sh /root/v3 | cut -f1))"
+          '
+
+      # Screener V2 WAJIB satu domain dengan V3. Ia ditanam dalam iframe, dan
+      # V3 menyuntikkan CSS + mengganti nama section ke dalam bingkai itu —
+      # keduanya MUSTAHIL kalau beda domain (peramban melarang menyentuh isi
+      # iframe lintas-domain). Kalau V2 disajikan dari domain lain, panel
+      # simulasi yang sudah disembunyikan akan muncul lagi dan nama
+      # "Koin Hunter"/"Zona Pantau" kembali ke nama lama, tanpa satu pun
+      # pesan galat. Berkasnya berdiri sendiri, 500 kB, tanpa JS/CSS lokal.
+      - name: Kirim screener V2 ke VPS
+        if: env.PUNYA_KUNCI == 'true'
+        run: |
+          scp -i ~/.ssh/deploy -o BatchMode=yes \
+            "Template V2 Premium/ema-cross-screener_3.html" \
+            root@103.253.145.38:/root/v2/ema-cross-screener_3.html
+          echo "Screener V2 tersinkron."
+
+      # Diperiksa lewat internet, bukan lewat SSH: yang perlu dibuktikan
+      # bukan "berkasnya ada di disk" melainkan "orang di luar bisa
+      # membukanya".
+      - name: Periksa hasilnya hidup
+        if: env.PUNYA_KUNCI == 'true'
+        run: |
+          ALAMAT="${VITE_BACKEND:-https://103-253-145-38.sslip.io}"
+          for jalur in "/v3/" "/v2/ema-cross-screener_3.html" "/api/health"; do
+            kode=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "$ALAMAT$jalur")
+            echo "$kode  $ALAMAT$jalur"
+            if [ "$kode" != "200" ]; then
+              echo "::error::$ALAMAT$jalur menjawab $kode, bukan 200"
+              echo "Kembalikan versi sebelumnya di VPS dengan:"
+              echo "  rm -rf /root/v3 && mv /root/v3.lama /root/v3"
+              exit 1
+            fi
+          done

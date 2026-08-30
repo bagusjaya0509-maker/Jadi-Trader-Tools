@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
-import { useEffect, lazy, Suspense, type ReactNode } from 'react';
+import { useEffect, lazy, Suspense, Component, type ReactNode } from 'react';
 import { Loader2 } from 'lucide-react';
 import { PenyediaAuth, useAuth } from '@/lib/auth';
 import { modePreview } from '@/lib/preview';
@@ -355,6 +355,55 @@ function Alias({ ke }: { ke: string }) {
   return <Navigate to={ke + search + hash} replace />;
 }
 
+/* ══ JARING PENGAMAN TERAKHIR ══════════════════════════════════════════
+   `muat` sudah menangkap potongan rute yang gagal diunduh dan memuat ulang
+   halaman sendiri. Tapi ia cuma menjaga SATU jalan masuk — `import()` yang
+   dibungkusnya. Galat yang datang dari tempat lain (impor dinamis di dalam
+   halaman, kesalahan render yang tidak terduga) menembusnya, dan React yang
+   tidak punya batas galat akan MELEPAS SELURUH POHON: layar hitam, tanpa
+   satu kata pun tentang apa yang terjadi.
+
+   Layar hitam adalah kegagalan terburuk yang bisa ditampilkan sebuah
+   aplikasi. Ia tidak memberi tahu apa yang salah, tidak memberi jalan
+   keluar, dan menyerahkan tebakan "mungkin refresh?" kepada orang yang
+   sedang memegang posisi terbuka.
+
+   Kelas, bukan fungsi: menangkap galat render adalah satu-satunya hal yang
+   sampai hari ini masih belum punya padanan hook. */
+class BatasGalat extends Component<{ children: ReactNode }, { galat: Error | null }> {
+  constructor(p: { children: ReactNode }) { super(p); this.state = { galat: null }; }
+  static getDerivedStateFromError(galat: Error) { return { galat }; }
+
+  render() {
+    if (!this.state.galat) return this.props.children;
+    /* Pesannya menyebut sebab yang PALING MUNGKIN, bukan daftar semua
+       kemungkinan. Sembilan dari sepuluh kali penyebabnya versi baru yang
+       baru saja terbit, dan tombolnya menyelesaikan itu. */
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-zinc-950 px-6 text-center">
+        <p className="text-[15px] font-semibold text-zinc-100">Halaman ini gagal dimuat</p>
+        <p className="max-w-sm text-[13px] leading-relaxed text-zinc-500">
+          Biasanya karena versi baru situs baru saja terbit sementara tab ini
+          masih memegang versi lama. Memuat ulang menyelesaikannya.
+        </p>
+        <button
+          onClick={() => {
+            /* Parameter yang selalu berubah, bukan reload biasa: alasannya
+               sama dengan di `muat` — muat ulang biasa boleh mengambil
+               index.html dari cache, dan daftar nama potongan yang lama
+               kembali lagi. */
+            const u = new URL(window.location.href);
+            u.searchParams.set('r', Date.now().toString(36));
+            window.location.replace(u.toString());
+          }}
+          className="cursor-pointer rounded-md border border-zinc-700 px-4 py-1.5 text-[13px] text-zinc-200 transition-colors hover:border-zinc-500 hover:bg-zinc-900">
+          Muat ulang
+        </button>
+      </div>
+    );
+  }
+}
+
 export default function App() {
   return (
     <PenyediaAuth>
@@ -372,6 +421,7 @@ export default function App() {
 
             Ditaruh di sini, bukan ditambal satu per satu di tiap rute: rute
             yang ditambahkan besok ikut terlindungi tanpa perlu diingat. */}
+        <BatasGalat>
         <Suspense fallback={<Menunggu />}>
         <Routes>
           {/* PINTU DEPAN, dua wajah — lihat PintuDepan di atas. Belum login
@@ -473,6 +523,7 @@ export default function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         </Suspense>
+        </BatasGalat>
       </BrowserRouter>
     </PenyediaAuth>
   );
