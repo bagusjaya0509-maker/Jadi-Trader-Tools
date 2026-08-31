@@ -27,7 +27,21 @@ import { cn } from '@/lib/utils';
    ══════════════════════════════════════════════════════════════════════ */
 
 const LAMA_MORPH = 1.5;    // detik satu lelehan
-const LAMA_DIAM = 0.5;     // detik berhenti di kata utuh
+
+/* ── BERAPA LAMA SEBUAH KATA DIAM SEBELUM MELELEH LAGI ────────────────
+   Aslinya 0,5 detik untuk semua kata. Dengan lelehan 1,5 detik itu berarti
+   satu kata utuh cuma bertahan setengah detik dari dua detik siklusnya —
+   tiga perempat waktunya layar menampilkan huruf yang sedang buram.
+
+   Sekarang 1,4 detik untuk kata biasa: cukup untuk dibaca tanpa terasa
+   berhenti.
+
+   Dan kata PERTAMA dapat jatah sendiri, 3,4 detik. Ia bukan sekadar salah
+   satu dari delapan kata — ia nama produknya, satu-satunya yang harus
+   diingat orang yang baru mendarat di halaman ini. Kata sifat yang lewat
+   boleh cepat; namanya tidak. */
+const LAMA_DIAM = 1.4;     // detik berhenti di kata biasa
+const LAMA_DIAM_AWAL = 3.4; // detik berhenti di kata pertama (nama produk)
 
 function kurangGerak(): boolean {
   try {
@@ -88,10 +102,19 @@ function useMorph(teks: string[]) {
     maju.current -= diam.current;
     diam.current = 0;
     let bagian = maju.current / LAMA_MORPH;
-    if (bagian > 1) { diam.current = LAMA_DIAM; bagian = 1; }
+    if (bagian > 1) {
+      /* Kata yang SEDANG SELESAI muncul adalah yang berikutnya, karena
+         `indeks` baru bertambah beberapa baris di bawah. Salah satu langkah
+         di sini membuat jeda panjangnya jatuh ke kata sebelum atau sesudah
+         nama produknya — terlihat seperti satu kata acak yang lebih lambat
+         daripada yang lain. */
+      const berikut = (indeks.current + 1) % teks.length;
+      diam.current = berikut === 0 ? LAMA_DIAM_AWAL : LAMA_DIAM;
+      bagian = 1;
+    }
     pasangGaya(bagian);
     if (bagian === 1) indeks.current++;
-  }, [pasangGaya]);
+  }, [pasangGaya, teks.length]);
 
   const tahan = useCallback(() => {
     maju.current = 0;
