@@ -149,7 +149,11 @@ const JENDELA: { id: JendelaPeringkat; label: string }[] = [
   { id: 'allTime', label: 'Semua' },
 ];
 
-function PapanPeringkat({ pantau }: { pantau: (alamat: string, nama: string) => Promise<void> }) {
+/* `pantau` boleh kosong: papannya tetap berguna dibaca siapa pun — ia
+   menjawab "dompet mana yang bagus" — tapi memantau berarti MENULIS ke
+   daftar pemilik, dan tombol yang selalu gagal lebih buruk daripada tombol
+   yang tidak ada. */
+function PapanPeringkat({ pantau }: { pantau?: (alamat: string, nama: string) => Promise<void> }) {
   const [jendela, setJendela] = useState<JendelaPeringkat>('month');
   /* Bawaannya pita kecil, bukan "semua". Yang membuka papan ini mencari
      dompet untuk ditiru, dan dana kelola dua miliar dolar tidak bisa ditiru
@@ -434,6 +438,12 @@ function PapanPeringkat({ pantau }: { pantau: (alamat: string, nama: string) => 
                   <td className="px-2 py-1.5 text-right">
                     {w.dipantau ? (
                       <span className="text-[11px] text-emerald-400/80">Dipantau</span>
+                    ) : !pantau ? (
+                      /* Tanpa izin menulis, kolomnya dibiarkan kosong.
+                         Menampilkan tombol yang pasti ditolak server berarti
+                         menjanjikan sesuatu dua kali: sekali saat terlihat,
+                         sekali lagi saat diklik. */
+                      <span className="text-[11px] text-zinc-700">—</span>
                     ) : (
                       <button
                         onClick={() => { setSibuk(w.alamat); void pantau(w.alamat, w.nama).finally(() => setSibuk(null)); }}
@@ -578,7 +588,8 @@ function KartuDompet({ w, posisi, log, bursa, dipilih, pilih, hapus }: {
   bursa?: RiwayatBursa;
   dipilih: boolean;
   pilih: () => void;
-  hapus: () => void;
+  /** Tak diisi = pembacanya bukan pemilik; ikon hapusnya tidak dirender. */
+  hapus?: () => void;
 }) {
   const mengambang = posisi.reduce((n, p) => n + p.pnl, 0);
   const akun = posisi.length ? posisi[0].nilaiAkun : 0;
@@ -647,10 +658,16 @@ function KartuDompet({ w, posisi, log, bursa, dipilih, pilih, hapus }: {
             </span>
           )}
         </span>
-        <button onClick={(e) => { e.stopPropagation(); hapus(); }} title="Berhenti memantau"
-          className="shrink-0 cursor-pointer rounded p-1 text-zinc-800 transition-colors hover:text-red-400 group-hover:text-zinc-600">
-          <Trash2 className="size-3.5" />
-        </button>
+        {/* Tidak dirender untuk yang bukan pemilik. Ikon tempat sampah
+            yang terlihat tapi ditolak server memberi kesan daftar ini bisa
+            dirapikan siapa saja — dan yang mengkliknya baru tahu sesudah
+            mencoba menghapus punya orang lain. */}
+        {hapus && (
+          <button onClick={(e) => { e.stopPropagation(); hapus(); }} title="Berhenti memantau"
+            className="shrink-0 cursor-pointer rounded p-1 text-zinc-800 transition-colors hover:text-red-400 group-hover:text-zinc-600">
+            <Trash2 className="size-3.5" />
+          </button>
+        )}
       </div>
 
       <div className="px-3 pt-1.5">
@@ -1357,7 +1374,7 @@ function KonsensusPasar({ posisi, dompet, seumur, log }: {
   );
 }
 
-export function PanelWalletAgen() {
+export function PanelWalletAgen({ pemilik = false }: { pemilik?: boolean }) {
   const [d, setD] = useState<KeadaanDompet | null>(null);
   const [gagal, setGagal] = useState(false);
   /* Dompet yang sedang dibuka rinciannya. null = belum ada, dan itu keadaan
@@ -1437,24 +1454,30 @@ export function PanelWalletAgen() {
         </p>
       )}
 
-      <FormTambah selesai={() => void tarik()} />
+      {/* Menambah dompet menulis ke daftar PEMILIK. Untuk orang lain
+          formulirnya tidak dirender sama sekali — bukan dinonaktifkan:
+          kotak isian yang menolak sesudah diketik penuh membuang waktu
+          orang untuk memberitahunya sesuatu yang sudah diketahui sejak
+          sebelum ia mulai mengetik. */}
+      {pemilik && <FormTambah selesai={() => void tarik()} />}
 
       {/* Papan peringkat di ATAS daftar dompet, bukan di bawah. Yang dicari
           orang saat membuka panel ini pada hari-hari awal adalah "dompet
           mana", bukan "dompet yang sudah saya pilih sedang apa" — dan yang
           dicari lebih sering pantas duduk lebih dekat ke atas. */}
-      <PapanPeringkat pantau={async (alamat, nama) => {
+      <PapanPeringkat pantau={pemilik ? (async (alamat, nama) => {
         await tambahDompet(alamat, nama || alamat.slice(0, 10) + '…');
         await tarik();
-      }} />
+      }) : undefined} />
 
       {dompet.length === 0 ? (
         <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 px-4 py-10 text-center">
           <Wallet className="mx-auto mb-2 size-5 text-zinc-700" />
           <p className="text-[13px] text-zinc-400">Belum ada dompet yang dipantau.</p>
           <p className="mx-auto mt-1 max-w-md text-[12px] leading-relaxed text-zinc-600">
-            Tempel alamat dompet Hyperliquid di kotak di atas. Posisi dan
-            transaksinya mulai tercatat pada pindaian berikutnya.
+            {pemilik
+              ? 'Tempel alamat dompet Hyperliquid di kotak di atas. Posisi dan transaksinya mulai tercatat pada pindaian berikutnya.'
+              : 'Daftarnya disusun pemilik situs. Begitu ada dompet yang dipantau, posisi dan rekam jejaknya muncul di sini.'}
           </p>
         </div>
       ) : (
@@ -1462,11 +1485,21 @@ export function PanelWalletAgen() {
           <KonsensusPasar posisi={posisi} dompet={dompet}
             seumur={d?.seumur || {}} log={log} />
 
-          <PosisiTiruan tiru={d?.tiru || []} dompet={dompet} posisi={posisi}
-            ubahTiru={(a, k, nyala) => {
-              void (nyala ? tandaiTiru(a, k) : batalTiru(a, k)).then(() => tarik());
-            }}
-            ubahOto={(a, k, nyala) => { void aturOtoTutup(a, k, nyala).then(() => tarik()); }} />
+          {/* HANYA pemilik. Isinya posisi di akun bursa yang sungguhan,
+              dan sakelar auto-close di dalamnya menutup posisi memakai SATU
+              kunci API yang ada di .env — kunci pemilik. Orang lain yang
+              menyalakannya akan menutup posisi pemilik dengan uang pemilik.
+
+              Digerbangi di sini DAN di server: penanda tiruannya tidak ikut
+              di jawaban publik, jadi walau gerbang layar ini luput, yang
+              bisa dirender tetap kosong. */}
+          {pemilik && (
+            <PosisiTiruan tiru={d?.tiru || []} dompet={dompet} posisi={posisi}
+              ubahTiru={(a, k, nyala) => {
+                void (nyala ? tandaiTiru(a, k) : batalTiru(a, k)).then(() => tarik());
+              }}
+              ubahOto={(a, k, nyala) => { void aturOtoTutup(a, k, nyala).then(() => tarik()); }} />
+          )}
 
           <section>
             <h3 className="mb-2 border-b border-zinc-800 pb-1.5 text-[13px] font-semibold text-zinc-200">
@@ -1488,7 +1521,9 @@ export function PanelWalletAgen() {
                   bursa={d?.seumur?.[w.alamat]}
                   dipilih={pilih === w.alamat}
                   pilih={() => setPilih((v) => (v === w.alamat ? null : w.alamat))}
-                  hapus={() => { void hapusDompet(w.alamat).then(() => tarik()); }} />
+                  hapus={pemilik
+                    ? () => { void hapusDompet(w.alamat).then(() => tarik()); }
+                    : undefined} />
               ))}
             </div>
           </section>

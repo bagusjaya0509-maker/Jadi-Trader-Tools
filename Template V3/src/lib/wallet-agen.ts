@@ -95,19 +95,42 @@ async function token(): Promise<string | null> {
 }
 
 /** null = tidak bisa bertanya, bukan "kosong". Dua jawaban yang berbeda. */
+/** Keadaan dompet pantauan. TANPA token: isinya data rantai publik, dan
+ *  pengunjung yang belum login pun boleh melihatnya.
+ *
+ *  Penanda tiruan ditarik TERPISAH dan hanya berhasil untuk pemilik. Ia
+ *  sengaja tidak ikut di jawaban utama: menyatukannya berarti satu rute
+ *  membawa dua tingkat kerahasiaan sekaligus, dan gerbang yang harus
+ *  memilah isi jawabannya sendiri adalah gerbang yang cepat atau lambat
+ *  salah memilah. */
 export async function keadaanDompet(): Promise<KeadaanDompet | null> {
-  const t = await token();
-  if (!t) return null;
   try {
-    const r = await fetch(`${dasar()}/api/agen/wallet`, { headers: { Authorization: 'Bearer ' + t } });
+    const r = await fetch(`${dasar()}/api/agen/wallet`);
     if (!r.ok) return null;
     const j = await r.json();
+
+    /* Gagal = bukan pemilik, dan itu keadaan yang WAJAR di sini — bukan
+       galat yang perlu dilaporkan. Daftarnya kosong, dan panel "Posisi
+       tiruan" memang tidak dirender untuk orang lain. */
+    let tiru: PenandaTiru[] = [];
+    try {
+      const t = await token();
+      if (t) {
+        const rt = await fetch(`${dasar()}/api/agen/wallet/tiru`,
+          { headers: { Authorization: 'Bearer ' + t } });
+        if (rt.ok) {
+          const jt = await rt.json();
+          if (Array.isArray(jt?.tiru)) tiru = jt.tiru;
+        }
+      }
+    } catch { /* bukan pemilik, atau jaringan berkedip */ }
+
     return {
       dompet: Array.isArray(j?.dompet) ? j.dompet : [],
       posisi: Array.isArray(j?.posisi) ? j.posisi : [],
       log: Array.isArray(j?.log) ? j.log : [],
       seumur: (j && typeof j.seumur === 'object' && j.seumur) || {},
-      tiru: Array.isArray(j?.tiru) ? j.tiru : [],
+      tiru,
       denyut: Number(j?.denyut) || 0,
       galat: String(j?.galat || ''),
     };
@@ -245,12 +268,9 @@ export interface Peringkat {
 export async function peringkatDompet(
   jendela: JendelaPeringkat, pita: PitaAkun, batas = 40,
 ): Promise<Peringkat | null> {
-  const t = await token();
-  if (!t) return null;
   try {
     const q = `jendela=${jendela}&pita=${pita}&batas=${batas}`;
-    const r = await fetch(`${dasar()}/api/agen/wallet/peringkat?${q}`,
-      { headers: { Authorization: 'Bearer ' + t } });
+    const r = await fetch(`${dasar()}/api/agen/wallet/peringkat?${q}`);
     if (!r.ok) return null;
     const j = await r.json();
     return {

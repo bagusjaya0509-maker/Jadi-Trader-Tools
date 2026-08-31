@@ -58,7 +58,23 @@ module.exports = (app, { butuhLogin, batasLaju, express, DIR }) => {
      tiga permintaan yang selalu berangkat berbarengan cuma menambah tiga
      kali ongkos jabat tangan untuk data yang tidak pernah dipakai
      sendiri-sendiri. */
-  app.get('/api/agen/wallet', batasLaju, butuhLogin, hanyaPemilik, (req, res) => {
+  /* ── DUA RUTE BACA TERBUKA UNTUK SIAPA SAJA ───────────────────────────
+     Isinya data rantai PUBLIK: posisi dompet yang alamatnya memang terbuka
+     di Hyperliquid, dan papan peringkat yang diterbitkan bursanya sendiri.
+     Tidak ada satu pun yang rahasia — yang membuatnya berharga bukan
+     kerahasiaannya, melainkan bahwa ada yang mengumpulkan dan menghitungnya.
+
+     YANG TIDAK IKUT TERBUKA, dan tidak boleh:
+       - `tiru` — penanda posisi mana yang DITIRU pemilik. Itu bukan data
+         rantai, itu keputusan dagang orangnya sendiri, dan ia pindah ke
+         rute /tiru yang tetap digerbangi.
+       - Menambah, menghapus, menandai tiruan, dan sakelar auto-close.
+         Semuanya menulis, dan sebagiannya menggerakkan uang sungguhan di
+         SATU kunci bursa yang ada di .env — kunci pemilik. Pengguna lain
+         yang menyalakan auto-close akan menutup posisi pemilik dengan uang
+         pemilik. Itu bukan fitur yang kurang matang; itu fitur yang tidak
+         boleh ada sampai tiap orang memasang kuncinya sendiri. */
+  app.get('/api/agen/wallet', batasLaju, (req, res) => {
     const p = baca(PANTAU, { dompet: [] });
     const a = baca(AKTIVITAS, { log: [], posisi: [], denyut: 0, galat: '' });
     res.json({
@@ -67,7 +83,6 @@ module.exports = (app, { butuhLogin, batasLaju, express, DIR }) => {
       log: a.log || [],
       posisi: a.posisi || [],
       seumur: a.seumur || {},
-      tiru: (baca(TIRU, { tiru: [] }).tiru) || [],
       denyut: a.denyut || 0,
       galat: a.galat || '',
     });
@@ -113,7 +128,7 @@ module.exports = (app, { butuhLogin, batasLaju, express, DIR }) => {
      penarikannya dikerjakan di dalam server ini, satu permintaan panel akan
      membekukan SELURUH API selama beberapa detik — termasuk order yang
      sedang dikirim orang lain. */
-  app.get('/api/agen/wallet/peringkat', batasLaju, butuhLogin, hanyaPemilik, (req, res) => {
+  app.get('/api/agen/wallet/peringkat', batasLaju, (req, res) => {
     const p = baca(PERINGKAT, null);
     if (!p || !Array.isArray(p.daftar)) {
       return res.json({ ok: true, daftar: [], diperbarui: 0, belumAda: true });

@@ -1829,7 +1829,7 @@ export default function Analisa() {
         /* Tab ketiga, dan HANYA di kanal AI Chart milik pemiliknya:
            ruang penyaringan chart tidak punya arti di kanal orang lain. */
         && (s.id !== 'chart' || (pemilik && kanalBuka === UID_KANAL_CHART))
-        && (s.id !== 'wallet' || (pemilik && kanalBuka === UID_KANAL_WALLET))
+        && (s.id !== 'wallet' || kanalBuka === UID_KANAL_WALLET)
         /* ── KANAL DOMPET: SATU HALAMAN SAJA ────────────────────────────
            'Daftar Signal' dan 'Performa Signal' disembunyikan di sini, dan
            HANYA di sini. Keduanya bukan milik kanal dompet — mereka tab
@@ -1857,7 +1857,7 @@ export default function Analisa() {
 
      Persis jenis cacat yang lahir dari perubahan yang benar di satu tempat
      dan tidak diikuti di tempat yang bergantung padanya. */
-  const bawaanSub: IdSub = (!diDepan && pemilik && kanalBuka === UID_KANAL_WALLET)
+  const bawaanSub: IdSub = (!diDepan && kanalBuka === UID_KANAL_WALLET)
     ? 'wallet' : 'market';
   /* KESAHIHAN 'posting' TIDAK LAGI DIUKUR DARI DAFTAR TAB.
      ────────────────────────────────────────────────────────────────────
@@ -1879,7 +1879,7 @@ export default function Analisa() {
        dan `pemilik` supaya alamat yang ditebak-tebak tidak membuka arsip
        bertanda air ke pengunjung mana pun. Gerbang sungguhannya tetap di
        server; yang ini menjaga layarnya tidak pernah mencoba. */
-    id === 'wallet' ? !diDepan && pemilik && kanalBuka === UID_KANAL_WALLET
+    id === 'wallet' ? !diDepan && kanalBuka === UID_KANAL_WALLET
       : id === 'chart' ? !diDepan && pemilik && kanalBuka === UID_KANAL_CHART
       : id === 'posting' || id === 'diikuti' ? diDepan
       : tabTampil.some((s) => s.id === id);
@@ -2810,9 +2810,12 @@ export default function Analisa() {
         />
       )}
 
-      {sub === 'wallet' && pemilik && kanalBuka === UID_KANAL_WALLET && (
+      {sub === 'wallet' && kanalBuka === UID_KANAL_WALLET && (
         <Suspense fallback={<div className="py-10 text-[13px] text-zinc-500">Memuat panel…</div>}>
-          <PanelWalletAgen />
+          {/* Panelnya dibaca siapa saja; `pemilik` cuma menentukan apa yang
+              bisa DIUBAH dari dalamnya. Dua hal yang berbeda dan selama ini
+              dijawab satu gerbang yang sama. */}
+          <PanelWalletAgen pemilik={pemilik} />
         </Suspense>
       )}
 
@@ -3741,7 +3744,11 @@ export default function Analisa() {
                 /* Hanya kartu AI Chart, dan hanya untuk pemiliknya. Isi
                    ruangnya chart bertanda air sumbernya; pintu yang terlihat
                    oleh orang lain cuma akan mengantar ke penolakan server. */
-                keRuang={pemilik && (ag.uid === UID_KANAL_CHART || ag.uid === UID_KANAL_WALLET)
+                /* Wallet terbuka untuk semua; Chart TIDAK. Arsip chart
+                   membawa tanda air ruang sumbernya di dalam piksel gambar,
+                   dan itu satu-satunya alasan keduanya diperlakukan beda. */
+                keRuang={(ag.uid === UID_KANAL_WALLET
+                  || (pemilik && ag.uid === UID_KANAL_CHART))
                   ? () => bukaKanalKeTab(ag.uid, ag.uid === UID_KANAL_WALLET ? 'wallet' : 'chart')
                   : undefined} />
             ))}
