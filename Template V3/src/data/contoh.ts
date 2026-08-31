@@ -257,7 +257,7 @@ export const PRODUK: Produk[] = [
     fitur: [
       'Level dari harga wick, bukan angka bulat',
       'Bertahan sampai swing berikutnya',
-      'Warna ikut sisi harga: di atas ungu, di bawah merah',
+      'Empat level di atas harga, empat di bawah',
       'Kekuatan swing bisa diputar sendiri',
     ],
   },

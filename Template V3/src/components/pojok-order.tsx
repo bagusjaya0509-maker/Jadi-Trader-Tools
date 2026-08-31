@@ -392,6 +392,29 @@ export function PojokOrder({
       ? false
       : draf === 'BUY' ? sl < entry && tp > entry : sl > entry && tp < entry;
 
+    /* -- YANG HILANG BUKAN YANG SALAH SISI -----------------------------
+       Keduanya sama-sama mengunci tombol Kirim, tapi jalan keluarnya
+       berlawanan: yang satu "isi angkanya", yang satu "tukar angkanya".
+       Sebelum ini keduanya diberi satu kalimat yang sama, dan kalimat itu
+       cuma benar untuk salah satunya.
+
+       Lebih buruk lagi, kalimatnya ditaruh di `title` sebuah tombol yang
+       SEDANG DISABLED — dan tombol disabled tidak menerima peristiwa tetikus
+       di Chrome, jadi tooltip-nya tidak pernah muncul. Yang terlihat orang
+       cuma tombol kelabu tanpa satu pun keterangan.
+
+       Kasus nyatanya datang dari lonceng agen Telegram: sinyal yang cuma
+       menyebut arah dan zona masuk membuka tiket dengan SL dan TP kosong.
+       Ordernya memang tidak boleh berangkat tanpa SL — tapi orangnya berhak
+       tahu ia tinggal mengisi dua kotak, bukan menebak aplikasinya rusak. */
+    const kurang = ([!entry && 'Entry', !sl && 'SL', !tp && 'TP']
+      .filter(Boolean) as string[]);
+    const alasanKunci = kurang.length
+      ? kurang.join(' & ') + ' belum diisi — ketik angkanya, atau seret garisnya di chart.'
+      : arahBenar ? ''
+      : draf === 'BUY' ? 'Untuk BUY: SL harus DI BAWAH entry dan TP di atasnya.'
+                       : 'Untuk SELL: SL harus DI ATAS entry dan TP di bawahnya.';
+
     const Isian = ({ k, label, warna }: { k: 'entry' | 'sl' | 'tp'; label: string; warna: string }) => (
       <label className="block">
         <span className="mb-0.5 block text-[9.5px] uppercase tracking-wide" style={{ color: warna }}>{label}</span>
@@ -610,7 +633,7 @@ export function PojokOrder({
               satunya alasan tiket itu ada. */}
           {modeSekarang !== 'copy' && (
             <button onClick={onKirim} disabled={!arahBenar || mati || sibukNyata}
-              title={arahBenar ? undefined : 'SL dan TP harus berada di sisi yang benar terhadap entry'}
+              title={arahBenar ? undefined : alasanKunci}
               className={cn('ml-auto flex cursor-pointer items-center gap-1 rounded px-2.5 py-1 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40',
                 nyata ? 'bg-red-500/25 text-red-200 hover:bg-red-500/35'
                       : 'bg-zinc-100 text-zinc-950 hover:bg-white')}>
@@ -642,10 +665,18 @@ export function PojokOrder({
           {onKirimSinyal && modeSekarang === 'copy' && (
             <button onClick={onKirimSinyal} disabled={!arahBenar}
               title={arahBenar ? 'Kirim entry/SL/TP + tangkapan layar chart ke formulir Copy Signal'
-                               : 'SL dan TP harus berada di sisi yang benar terhadap entry'}
+                               : alasanKunci}
               className="ml-auto flex cursor-pointer items-center gap-1 rounded border border-sky-500/40 bg-sky-500/10 px-2 py-1 text-[11px] text-sky-300 transition-colors hover:bg-sky-500/20 disabled:cursor-not-allowed disabled:opacity-40">
               <Share2 className="size-3" /> Ke Copy Signal
             </button>
+          )}
+          {/* Sebaris di bawah tombolnya, memakai pola yang sama dengan
+              `kabarSinyal` di bawah: `w-full` membuatnya turun ke barisnya
+              sendiri alih-alih memepet tombol Batal. Cuma muncul kalau
+              tombolnya memang terkunci — tiket yang lengkap tidak perlu
+              diberi tahu apa-apa. */}
+          {!arahBenar && alasanKunci && (
+            <span className="w-full px-1 text-[10.5px] leading-tight text-amber-300/90">{alasanKunci}</span>
           )}
           {/* Alasan gagalnya DITAMPILKAN. Tombol yang diam saat ditekan
               membuat orang menekannya berulang kali sambil menebak apa

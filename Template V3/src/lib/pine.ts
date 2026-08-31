@@ -228,6 +228,10 @@ function rsi(d: Deret, p: number): Deret {
 class Pengurai {
   private teks = '';
   private pos = 0;
+  /** Nilai argumen bernama yang PUNYA arti hitung — sejauh ini `defval=` —
+   *  dari pemanggilan fungsi terakhir yang diurai. Lihat catatan di
+   *  `argumen()` tentang kenapa yang satu ini tidak boleh ikut dibuang. */
+  private argBernama: Record<string, Deret> = {};
   constructor(private lingkup: Map<string, Deret>, private n: number, private l: Lilin) {}
 
   urai(teks: string): Deret {
@@ -425,7 +429,8 @@ class Pengurai {
   private argumen(): Deret[] {
     if (!this.ambil('(')) throw new Error('kurung buka hilang');
     const arg: Deret[] = [];
-    if (this.ambil(')')) return arg;
+    const bernamaNilai: Record<string, Deret> = {};
+    if (this.ambil(')')) { this.argBernama = bernamaNilai; return arg; }
     for (;;) {
       this.lewatiSpasi();
       /* Argumen BERNAMA (title=, minval=, color=, display=) dilompati:
@@ -435,7 +440,23 @@ class Pengurai {
       const bernama = /^([A-Za-z_][A-Za-z0-9_]*)\s*=(?!=)/.exec(this.teks.slice(this.pos));
       if (bernama) {
         this.pos += bernama[0].length;
-        this.lompatiNilai();
+        /* -- `defval=` ADALAH PENGECUALIANNYA -----------------------------
+           Semua argumen bernama lain memang metadata. `defval=` tidak: ia
+           NILAI ITU SENDIRI. Skrip Pine v4 menulis seluruh inputnya begitu
+           — `input(title="ATR Period", type=input.integer, defval=10)` —
+           dan membuangnya membuat setiap input bernilai NaN.
+
+           Gejalanya jauh dari sebabnya: yang muncul bukan "input kosong",
+           melainkan `sma: panjang periode harus angka` di baris lain, di
+           fungsi yang kebetulan memakai variabel itu. Satu skrip v4 utuh
+           bisa ditolak seluruhnya karena satu kata yang dilewati di sini. */
+        if (bernama[1] === 'defval') {
+          const jaga = this.pos;
+          try { bernamaNilai.defval = this.ternary(); }
+          catch { this.pos = jaga; this.lompatiNilai(); }
+        } else {
+          this.lompatiNilai();
+        }
         arg.push(konstanta(NaN, this.n));
       } else if (this.lihat('"') || this.lihat("'")) {
         /* String posisi (judul) — dicatat sebagai NaN; plot() membaca judul
@@ -449,7 +470,7 @@ class Pengurai {
         arg.push(this.ternary());
       }
       if (this.ambil(',')) continue;
-      if (this.ambil(')')) return arg;
+      if (this.ambil(')')) { this.argBernama = bernamaNilai; return arg; }
       throw new Error('koma atau kurung tutup hilang');
     }
   }
@@ -460,8 +481,21 @@ class Pengurai {
     return Math.max(1, Math.round(v));
   }
 
+  /** Sama seperti `bulat`, tapi TANPA batas bawah 1 — dan tanpa melempar.
+   *  Dipakai untuk indeks yang nol-nya berarti sesuatu: "pivot ke-0" adalah
+   *  yang terbaru. Memaksanya jadi 1 membuat level pertama dan kedua
+   *  menggambar garis yang sama persis, dan yang terlihat bukan galat
+   *  melainkan indikator yang kehilangan satu level tanpa alasan. */
+  private cacah(d: Deret | undefined, bawaan: number): number {
+    const v = d?.find((x) => x != null && isFinite(x));
+    return v == null || !isFinite(v) ? bawaan : Math.max(0, Math.round(v));
+  }
+
   private panggil(id: string): Deret {
     const a = this.argumen();
+    /* Diambil SEKARANG. Apa pun di bawah yang mengurai argumen lagi akan
+       menimpanya, dan yang dibutuhkan adalah milik pemanggilan ini. */
+    const bernama = this.argBernama;
     const n = this.n, l = this.l;
     const satu = () => a[0] ?? konstanta(NaN, n);
 
@@ -491,10 +525,15 @@ class Pengurai {
 
       /* input.* mengembalikan nilai BAWAANNYA — di TradingView nilainya bisa
          diubah lewat dialog setelan; di sini dialognya adalah mengedit
-         angka default-nya langsung di skrip. */
+         angka default-nya langsung di skrip.
+
+         Dua penulisan sama-sama dipakai orang: v5 menaruh nilainya di
+         posisi pertama (`input.int(10, "Periode")`), v4 menamainya
+         (`input(title="Periode", defval=10)`). Yang bernama didahulukan
+         karena kalau ia ada, posisi pertamanya pasti judul — bukan angka. */
       case 'input': case 'input.int': case 'input.float': case 'input.bool':
       case 'input.source': case 'input.string': case 'input.timeframe':
-        return satu();
+        return bernama.defval ?? satu();
 
       case 'math.round': return satu().map((x) => (x == null ? null : Math.round(x)));
       case 'math.floor': return satu().map((x) => (x == null ? null : Math.floor(x)));
@@ -537,7 +576,7 @@ class Pengurai {
       case 'jt.pivotHighKe': case 'jt.pivotLowKe': {
         const kiri = a[0] ? this.bulat(a[0], id) : 10;
         const kanan = a[1] ? this.bulat(a[1], id) : kiri;
-        const ke = a[2] ? this.bulat(a[2], id) : 0;
+        const ke = this.cacah(a[2], 0);
         const tinggi = id === 'jt.pivotHighKe';
         const p = findPivots(tinggi ? l.highs : l.lows, kiri, kanan, tinggi) as { index: number; value: number }[];
         const out: Deret = new Array(n).fill(null);
@@ -840,9 +879,8 @@ export function jalankanPine(kode: string, l: Lilin, tf = '4h',
 export const GARIS_SAKTI_PINE = `//@version=4
 study("Garis Sakti — SNR", overlay=true)
 
-kiri  = input(title="Kekuatan swing (bar kiri)",  type=input.integer, defval=12)
-kanan = input(title="Konfirmasi (bar kanan)",     type=input.integer, defval=12)
-jml   = input(title="Berapa level tiap sisi",     type=input.integer, defval=4)
+kiri  = input(title="Kekuatan swing (bar kiri)", type=input.integer, defval=12)
+kanan = input(title="Konfirmasi (bar kanan)",    type=input.integer, defval=12)
 
 // Level dipaku ke ujung lilin dan dibawa maju sampai pivot berikutnya.
 // ke=0 pivot terbaru, ke=1 sebelumnya, dst — makin besar makin tua.
@@ -855,17 +893,19 @@ s2 = jt.pivotLowKe(kiri, kanan, 1)
 s3 = jt.pivotLowKe(kiri, kanan, 2)
 s4 = jt.pivotLowKe(kiri, kanan, 3)
 
-// Warna ditentukan SISI, bukan asal levelnya. Sebuah puncak lama yang
-// sudah ditembus ke atas berhenti jadi resistance dan mulai jadi support —
-// dan garisnya harus ikut berganti, kalau tidak ia berbohong.
-plot(r1, title="R1", color = r1 > close ? color.purple : color.red, linewidth=1)
-plot(r2, title="R2", color = r2 > close ? color.purple : color.red, linewidth=1)
-plot(r3, title="R3", color = jml > 2 ? (r3 > close ? color.purple : color.red) : na, linewidth=1)
-plot(r4, title="R4", color = jml > 3 ? (r4 > close ? color.purple : color.red) : na, linewidth=1)
-plot(s1, title="S1", color = s1 < close ? color.red : color.purple, linewidth=1)
-plot(s2, title="S2", color = s2 < close ? color.red : color.purple, linewidth=1)
-plot(s3, title="S3", color = jml > 2 ? (s3 < close ? color.red : color.purple) : na, linewidth=1)
-plot(s4, title="S4", color = jml > 3 ? (s4 < close ? color.red : color.purple) : na, linewidth=1)
+// Warnanya TETAP: merah untuk level yang lahir dari puncak, hijau untuk
+// yang lahir dari lembah. Mesin Pine di aplikasi ini membaca warna
+// sekali dari kodenya, bukan tiap bar — jadi warna yang "berganti saat
+// ditembus" akan membeku di salah satu pilihannya dan berbohong
+// sepanjang sisa chart.
+plot(r1, title="R1", color=color.red, linewidth=1)
+plot(r2, title="R2", color=color.red, linewidth=1)
+plot(r3, title="R3", color=color.red, linewidth=1)
+plot(r4, title="R4", color=color.red, linewidth=1)
+plot(s1, title="S1", color=color.green, linewidth=1)
+plot(s2, title="S2", color=color.green, linewidth=1)
+plot(s3, title="S3", color=color.green, linewidth=1)
+plot(s4, title="S4", color=color.green, linewidth=1)
 `;
 
 export const SUPERTREND_PINE = `//@version=4
