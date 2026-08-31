@@ -396,5 +396,369 @@ export const ARTIKEL: Artikel[] = [
         "gambar": "/artikel/gambar/cara-menghubungkan-mt5-ke-jurnal-trading-otomatis.webp"
       }
     ]
+  },
+  {
+    "slug": "cara-membuat-jurnal-trading-di-excel",
+    "jenis": "edukasi",
+    "judul": "Cara Membuat Jurnal Trading di Excel (dan Kapan Excel Mulai Merepotkan)",
+    "ringkas": "Kolom apa saja yang wajib ada, rumus winrate dan profit factor yang benar, dan tiga hal yang membuat jurnal Excel berhenti diisi.",
+    "menit": 2,
+    "gambar": "/artikel/gambar/cara-membuat-jurnal-trading-di-excel.webp",
+    "isi": [
+      {
+        "jenis": "p",
+        "isi": "Jurnal trading di Excel itu titik awal yang benar. Gratis, seluruhnya kamu yang pegang, dan tidak ada yang perlu didaftarkan. Halaman ini soal cara membuatnya supaya betul-betul terpakai — dan soal titik di mana Excel biasanya mulai ditinggalkan."
+      },
+      {
+        "jenis": "h2",
+        "isi": "Kolom yang wajib ada"
+      },
+      {
+        "jenis": "p",
+        "isi": "Jurnal gagal bukan karena kolomnya kurang, tapi karena kolomnya terlalu banyak. Sepuluh ini sudah cukup untuk menjawab hampir semua pertanyaan yang nanti kamu ajukan ke diri sendiri:"
+      },
+      {
+        "jenis": "ol",
+        "isi": [
+          "<b>Tanggal &amp; jam entry</b> — jam penting; banyak orang baru sadar rugi terbesarnya menumpuk di jam tertentu.",
+          "<b>Pair / simbol</b>",
+          "<b>Arah</b> — buy atau sell.",
+          "<b>Lot</b>",
+          "<b>Harga entry</b>",
+          "<b>Stop loss</b> — diisi <i>sebelum</i> posisi jalan, bukan sesudah.",
+          "<b>Take profit</b>",
+          "<b>Harga exit</b>",
+          "<b>P/L bersih</b> — sesudah swap dan komisi, bukan angka kotor.",
+          "<b>Alasan entry</b> — satu kalimat. Ini kolom yang paling sering dikosongkan, dan paling berguna waktu dibaca ulang sebulan kemudian."
+        ]
+      },
+      {
+        "jenis": "catatan",
+        "isi": "Kolom <b>emosi</b> boleh ditambah, tapi jangan dijadikan angka. Gunanya muncul belakangan — saat pola \"entry karena takut ketinggalan\" sudah cukup banyak untuk dijumlahkan."
+      },
+      {
+        "jenis": "h2",
+        "isi": "Rumus yang sering salah"
+      },
+      {
+        "jenis": "p",
+        "isi": "Dua angka ini yang paling sering dihitung keliru, dan keduanya menyesatkan ke arah yang sama: membuat hasilmu terlihat lebih baik dari kenyataan."
+      },
+      {
+        "jenis": "p",
+        "isi": "<b>Winrate.</b> Kalau kolom P/L ada di <code>I</code>, winrate-nya <code>=COUNTIF(I:I,\">0\")/COUNT(I:I)</code>. Yang sering terjadi: pembaginya dipakai <code>COUNTA</code>, dan baris kosong ikut terhitung sebagai transaksi."
+      },
+      {
+        "jenis": "p",
+        "isi": "<b>Profit factor.</b> Total untung dibagi total rugi: <code>=SUMIF(I:I,\">0\")/ABS(SUMIF(I:I,\"&lt;0\"))</code>. Angka ini lebih jujur daripada winrate. Winrate 80% dengan profit factor 0,7 berarti kamu sering menang kecil dan sesekali kalah besar — dan akunnya tetap habis."
+      },
+      {
+        "jenis": "p",
+        "isi": "<b>Kalau akunmu akun cent</b>, seluruh angka P/L harus dibagi 100 sebelum masuk jurnal. Kalau tidak, riwayatmu terbaca seratus kali lebih untung dari kenyataan."
+      },
+      {
+        "jenis": "h2",
+        "isi": "Tiga hal yang membuat jurnal Excel berhenti diisi"
+      },
+      {
+        "jenis": "ul",
+        "isi": [
+          "<b>Pengisiannya manual.</b> Sesudah trade ke-30, mengetik ulang sepuluh kolom terasa seperti pekerjaan. Yang pertama dilewati biasanya trade yang rugi — dan itu justru yang paling perlu dicatat.",
+          "<b>Diisi dari ingatan.</b> Dicatat malam hari, dari yang teringat. Ingatan memihak diri sendiri: yang menang diingat lengkap, yang kalah diingat samar.",
+          "<b>Tidak pernah dibaca ulang.</b> Berkas terisi rapi selama tiga bulan, lalu tidak pernah dibuka lagi. Jurnal yang tidak dibaca sama saja dengan jurnal yang tidak ada."
+        ]
+      },
+      {
+        "jenis": "h2",
+        "isi": "Kapan Excel sudah tidak cukup"
+      },
+      {
+        "jenis": "p",
+        "isi": "Selama kamu masih rutin mengisinya, Excel tidak perlu diganti. Penggantinya baru masuk akal kalau yang berhenti adalah pengisiannya, bukan tradingnya."
+      },
+      {
+        "jenis": "p",
+        "isi": "Bedanya cuma satu: dari mana datanya datang. Di Excel kamu yang mengetik; kalau terminalmu yang mengirim sendiri tiap transaksi tertutup, kolom angkanya tidak pernah bolong dan tidak pernah dibulatkan oleh ingatan. Yang tersisa buatmu cuma kolom alasan entry — satu kalimat yang memang cuma kamu yang tahu."
+      }
+    ],
+    "terkait": [
+      {
+        "slug": "cara-menghubungkan-mt5-ke-jurnal-trading-otomatis",
+        "judul": "Cara Menghubungkan MetaTrader 5 ke Jurnal Trading Otomatis",
+        "gambar": "/artikel/gambar/cara-menghubungkan-mt5-ke-jurnal-trading-otomatis.webp"
+      },
+      {
+        "slug": "akun-sen-mt5-jurnal-seratus-kali-lipat",
+        "judul": "Akun Sen di MT5 Bisa Membuat Jurnalmu Terlihat 100× Lebih Untung",
+        "gambar": "/artikel/gambar/akun-sen-mt5-jurnal-seratus-kali-lipat.webp"
+      }
+    ]
+  },
+  {
+    "slug": "cara-backtest-strategi-trading-gratis",
+    "jenis": "edukasi",
+    "judul": "Cara Backtest Strategi Trading Gratis di TradingView dan MT5",
+    "ringkas": "Tiga cara backtest tanpa bayar, batas masing-masing, dan sebab paling sering hasil backtest jauh lebih bagus daripada hasil live.",
+    "menit": 2,
+    "gambar": "/artikel/gambar/cara-backtest-strategi-trading-gratis.webp",
+    "isi": [
+      {
+        "jenis": "p",
+        "isi": "Backtest itu menguji aturan entry-mu pada harga yang sudah lewat. Tujuannya bukan mencari strategi yang menang terus — tapi mengetahui seperti apa rasanya kalah beruntun sebelum uang sungguhan ikut."
+      },
+      {
+        "jenis": "h2",
+        "isi": "1. Replay chart — paling jujur, paling lambat"
+      },
+      {
+        "jenis": "p",
+        "isi": "Chart dimundurkan ke tanggal tertentu, lalu dimajukan satu lilin sekali. Kamu memutuskan tanpa bisa melihat lilin berikutnya."
+      },
+      {
+        "jenis": "p",
+        "isi": "Ini satu-satunya cara yang menguji <b>kamu</b>, bukan cuma aturannya. Backtest yang dilihat sekaligus dari kanan ke kiri selalu terlihat gampang, karena matamu sudah tahu ke mana harga pergi."
+      },
+      {
+        "jenis": "p",
+        "isi": "Di TradingView fiturnya bernama <code>Bar Replay</code> dan tersedia di paket gratis dengan batas: timeframe harian ke atas saja. Untuk intraday ia berbayar."
+      },
+      {
+        "jenis": "h2",
+        "isi": "2. Strategy Tester MT5 — paling cepat, paling gampang menipu"
+      },
+      {
+        "jenis": "p",
+        "isi": "Kalau aturanmu sudah berbentuk EA, MT5 bisa menjalankan lima tahun data dalam hitungan menit lewat <code>View &rarr; Strategy Tester</code>. Gratis, dan datanya diambil dari brokermu sendiri."
+      },
+      {
+        "jenis": "p",
+        "isi": "Tiga hal yang membuat hasilnya terlalu bagus, dan ketiganya diam:"
+      },
+      {
+        "jenis": "ul",
+        "isi": [
+          "<b>Model \"Open prices only\"</b> — paling cepat, dan paling jauh dari kenyataan. Pakai <code>Every tick based on real ticks</code>.",
+          "<b>Spread tetap.</b> Bawaannya spread ideal. Di jam berita spread melebar, dan justru di situ banyak SL tersentuh.",
+          "<b>Komisi dan swap tidak ikut</b> kalau simbolnya tidak diatur seperti akun sungguhanmu."
+        ]
+      },
+      {
+        "jenis": "h2",
+        "isi": "3. Backtest manual di Excel — paling merepotkan, paling dimengerti"
+      },
+      {
+        "jenis": "p",
+        "isi": "Gulir chart ke belakang, catat tiap setup yang memenuhi aturanmu ke spreadsheet, lalu hitung hasilnya. Lambat, tapi kamu jadi hafal seperti apa setupmu terlihat — dan itu tidak didapat dari laporan yang dihasilkan mesin."
+      },
+      {
+        "jenis": "h2",
+        "isi": "Kenapa backtest bagus tapi live babak belur"
+      },
+      {
+        "jenis": "p",
+        "isi": "Hampir selalu satu dari empat ini, dan tidak satu pun berhubungan dengan strateginya:"
+      },
+      {
+        "jenis": "ol",
+        "isi": [
+          "<b>Kamu tahu masa depannya.</b> Waktu backtest, lilin sesudahnya sudah ada di layar. Otak memakainya tanpa kamu sadari.",
+          "<b>Aturannya berubah di tengah jalan.</b> Sesudah tiga kali kalah beruntun, ambangnya digeser sedikit. Di backtest penggeseran itu tidak tercatat di mana pun.",
+          "<b>Biaya tidak dihitung.</b> Spread, komisi, dan swap kecil per transaksi, tapi seratus transaksi kemudian ia bukan angka kecil lagi.",
+          "<b>Lotnya berbeda.</b> Di backtest lot tetap. Di live lot dinaikkan waktu yakin dan diturunkan waktu takut — dan itu strategi yang berbeda dari yang diuji."
+        ]
+      },
+      {
+        "jenis": "catatan",
+        "isi": "Aturan praktis: backtest yang tidak pernah menunjukkan periode rugi beruntun bukan strategi bagus, melainkan backtest yang salah. Setiap strategi punya periode buruk; kalau tidak kelihatan, artinya periode itu belum diuji."
+      }
+    ],
+    "terkait": [
+      {
+        "slug": "cara-memasang-indikator-pine-di-tradingview",
+        "judul": "Cara Memasang Indikator Pine di TradingView (dan Satu Sebab Gagal yang Paling Sering)",
+        "gambar": "/artikel/gambar/cara-memasang-indikator-pine-di-tradingview.webp"
+      },
+      {
+        "slug": "cara-membuat-jurnal-trading-di-excel",
+        "judul": "Cara Membuat Jurnal Trading di Excel (dan Kapan Excel Mulai Merepotkan)",
+        "gambar": "/artikel/gambar/cara-membuat-jurnal-trading-di-excel.webp"
+      }
+    ]
+  },
+  {
+    "slug": "cara-pasang-ea-di-mt5-pc-dan-android",
+    "jenis": "edukasi",
+    "judul": "Cara Pasang EA di MT5 (dan Kenapa Tidak Bisa di Android atau iPhone)",
+    "ringkas": "Langkah memasang Expert Advisor di MT5 desktop, dan jawaban jujur untuk pertanyaan yang paling sering muncul soal HP.",
+    "menit": 2,
+    "gambar": "/artikel/gambar/cara-pasang-ea-di-mt5-pc-dan-android.webp",
+    "isi": [
+      {
+        "jenis": "p",
+        "isi": "Pertanyaan ini muncul terus dengan dua bentuk: cara memasangnya di PC, dan cara memasangnya di HP. Yang kedua jawabannya pendek, dan lebih baik diketahui sekarang daripada sesudah dua jam mencari."
+      },
+      {
+        "jenis": "h2",
+        "isi": "Di Android dan iPhone: tidak bisa, dan bukan karena salah setelan"
+      },
+      {
+        "jenis": "p",
+        "isi": "Aplikasi MetaTrader 5 untuk Android dan iOS <b>tidak menjalankan EA sama sekali</b>. Bukan disembunyikan di menu, bukan perlu izin tambahan — memang tidak ada. Aplikasi HP dibuat untuk melihat chart dan mengirim order manual."
+      },
+      {
+        "jenis": "p",
+        "isi": "Jadi kalau kamu mencari menu <code>Experts</code> di aplikasi HP dan tidak ketemu, tidak ada yang salah dengan HP-mu."
+      },
+      {
+        "jenis": "p",
+        "isi": "Yang sebenarnya dilakukan orang yang \"menjalankan EA dari HP\": EA-nya jalan di MT5 desktop pada sebuah VPS yang menyala 24 jam, dan HP cuma dipakai memantau. Itu dua hal yang berbeda."
+      },
+      {
+        "jenis": "h2",
+        "isi": "Di PC: enam langkah"
+      },
+      {
+        "jenis": "ol",
+        "isi": [
+          "Buka <code>File &rarr; Open Data Folder</code>. Jangan mencarinya lewat Windows Explorer — tiap terminal MT5 punya foldernya sendiri di lokasi yang panjang dan acak.",
+          "Masuk ke <code>MQL5\\Experts</code>, salin berkas <code>.ex5</code> atau <code>.mq5</code> ke situ.",
+          "Kembali ke MT5, buka Navigator dengan <code>Ctrl+N</code>, klik kanan <code>Expert Advisors &rarr; Refresh</code>.",
+          "Seret nama EA-nya ke chart mana pun.",
+          "Di tab <code>Common</code>, centang <code>Allow Algo Trading</code>.",
+          "Pastikan tombol <b>Algo Trading</b> di toolbar berwarna hijau."
+        ]
+      },
+      {
+        "jenis": "catatan",
+        "isi": "Kalau EA-nya perlu menghubungi alamat internet, alamat itu wajib dimasukkan ke <code>Tools &rarr; Options &rarr; Experts &rarr; Allow WebRequest for listed URL</code>. Tanpa itu EA berjalan tapi tidak mengirim apa-apa, dan tidak ada pesan galat yang menjelaskan."
+      },
+      {
+        "jenis": "h2",
+        "isi": "Beda .mq5 dan .ex5"
+      },
+      {
+        "jenis": "ul",
+        "isi": [
+          "<code>.ex5</code> — sudah dikompilasi, tinggal pakai. Kodenya tidak bisa dibaca.",
+          "<code>.mq5</code> — kode sumbernya. Perlu dibuka di MetaEditor dan ditekan <code>Compile</code> dulu sampai menghasilkan .ex5."
+        ]
+      },
+      {
+        "jenis": "p",
+        "isi": "Kalau EA-nya muncul di Navigator tapi tidak bisa diseret ke chart, biasanya yang tersalin cuma .mq5 dan belum pernah dikompilasi."
+      },
+      {
+        "jenis": "h2",
+        "isi": "Satu peringatan soal EA gratisan"
+      },
+      {
+        "jenis": "p",
+        "isi": "Pencarian \"EA MT5 free download\" menghasilkan banyak sekali berkas. EA berjalan dengan izin penuh atas akunmu: ia bisa membuka dan menutup posisi tanpa bertanya. Berkas .ex5 tidak bisa dibaca isinya, jadi tidak ada cara memeriksa apa yang ia lakukan sebelum ia melakukannya."
+      },
+      {
+        "jenis": "p",
+        "isi": "Kalau tetap mau mencoba, coba di akun demo dulu — bukan di akun kecil yang \"tidak apa-apa kalau habis\"."
+      }
+    ],
+    "terkait": [
+      {
+        "slug": "cara-menghubungkan-mt5-ke-jurnal-trading-otomatis",
+        "judul": "Cara Menghubungkan MetaTrader 5 ke Jurnal Trading Otomatis",
+        "gambar": "/artikel/gambar/cara-menghubungkan-mt5-ke-jurnal-trading-otomatis.webp"
+      },
+      {
+        "slug": "akun-sen-mt5-jurnal-seratus-kali-lipat",
+        "judul": "Akun Sen di MT5 Bisa Membuat Jurnalmu Terlihat 100× Lebih Untung",
+        "gambar": "/artikel/gambar/akun-sen-mt5-jurnal-seratus-kali-lipat.webp"
+      }
+    ]
+  },
+  {
+    "slug": "cara-hitung-lot-forex-dan-akun-cent",
+    "jenis": "edukasi",
+    "judul": "Cara Hitung Lot Forex dari Risiko (dan Bedanya di Akun Cent)",
+    "ringkas": "Rumus lot yang berangkat dari jarak stop loss, bukan dari perasaan — plus koreksi yang wajib dipakai di akun cent.",
+    "menit": 2,
+    "gambar": "/artikel/gambar/cara-hitung-lot-forex-dan-akun-cent.webp",
+    "isi": [
+      {
+        "jenis": "p",
+        "isi": "Kebanyakan orang menentukan lot lebih dulu, lalu menaruh stop loss di tempat yang enak dilihat. Urutan itu terbalik, dan itu sebab paling umum satu transaksi bisa menghabiskan sepertiga akun."
+      },
+      {
+        "jenis": "h2",
+        "isi": "Urutannya: risiko dulu, lot belakangan"
+      },
+      {
+        "jenis": "ol",
+        "isi": [
+          "<b>Tentukan berapa rupiah yang boleh hilang</b> di transaksi ini. Umumnya 1–2% dari saldo. Saldo 10 juta, risiko 1% = Rp100.000.",
+          "<b>Tentukan di mana setupmu gugur.</b> Ini titik stop loss, dan ia ditentukan chart — bukan oleh angka yang enak diingat.",
+          "<b>Ukur jaraknya dalam pip</b> dari entry ke titik itu.",
+          "<b>Baru hitung lotnya.</b>"
+        ]
+      },
+      {
+        "jenis": "h2",
+        "isi": "Rumusnya"
+      },
+      {
+        "jenis": "p",
+        "isi": "<b>Lot = Risiko ÷ (Jarak SL dalam pip × Nilai per pip per lot)</b>"
+      },
+      {
+        "jenis": "p",
+        "isi": "Untuk pair dengan USD di belakang (EURUSD, GBPUSD), 1 lot standar bernilai sekitar $10 per pip. Contoh: risiko $100, stop loss 50 pip. Lot = 100 ÷ (50 × 10) = <b>0,2 lot</b>."
+      },
+      {
+        "jenis": "p",
+        "isi": "Untuk XAUUSD 1 lot umumnya $10 per 0,1 pergerakan harga, dan tiap broker bisa berbeda. Periksa <code>Specification</code> simbolnya, jangan pakai angka dari artikel mana pun — termasuk yang ini."
+      },
+      {
+        "jenis": "h2",
+        "isi": "Di akun cent, satuannya seratus kali lebih kecil"
+      },
+      {
+        "jenis": "p",
+        "isi": "Akun cent menampilkan saldo dalam sen, bukan dolar. Saldo yang tertulis 50.000 berarti $500. Ini sumber kesalahan yang mahal: 1 lot di akun cent bukan 1 lot di akun standar."
+      },
+      {
+        "jenis": "ul",
+        "isi": [
+          "<b>Saldo:</b> bagi 100 untuk mendapat nilai dolarnya.",
+          "<b>Risiko:</b> hitung dari saldo dolarnya, bukan dari angka layar.",
+          "<b>Lot:</b> 1 lot cent ≈ 0,01 lot standar.",
+          "<b>Jurnal:</b> seluruh P/L wajib dibagi 100. Kalau tidak, riwayatmu terbaca seratus kali lebih untung dari kenyataan."
+        ]
+      },
+      {
+        "jenis": "catatan",
+        "isi": "Akun cent gunanya melatih <b>kebiasaan</b> dengan uang kecil, bukan mengejar untung kecil. Kalau lot-nya dibesarkan sampai risikonya setara akun standar, seluruh gunanya hilang."
+      },
+      {
+        "jenis": "h2",
+        "isi": "Kalau masih dihitung pakai kalkulator HP"
+      },
+      {
+        "jenis": "p",
+        "isi": "Tidak ada yang salah dengan kalkulator. Yang salah adalah saat hitungan itu dilewati — dan ia paling sering dilewati persis di keadaan yang paling butuh: waktu harga bergerak cepat dan kamu takut ketinggalan."
+      },
+      {
+        "jenis": "p",
+        "isi": "Itu sebabnya aturan lot lebih baik dipindahkan keluar dari kepala. Aturan yang ada di kepala harus diingat waktu panik; aturan yang ada di alat jalan sendiri."
+      }
+    ],
+    "terkait": [
+      {
+        "slug": "akun-sen-mt5-jurnal-seratus-kali-lipat",
+        "judul": "Akun Sen di MT5 Bisa Membuat Jurnalmu Terlihat 100× Lebih Untung",
+        "gambar": "/artikel/gambar/akun-sen-mt5-jurnal-seratus-kali-lipat.webp"
+      },
+      {
+        "slug": "cara-membuat-jurnal-trading-di-excel",
+        "judul": "Cara Membuat Jurnal Trading di Excel (dan Kapan Excel Mulai Merepotkan)",
+        "gambar": "/artikel/gambar/cara-membuat-jurnal-trading-di-excel.webp"
+      }
+    ]
   }
 ];
