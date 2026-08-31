@@ -913,6 +913,44 @@ async function siapkanRuang(client, r) {
               pesan: 'Disusul sapuan, terlewat saat datang · "'
                 + (teks || '(tanpa keterangan)').replace(/\s+/g, ' ').slice(0, 70) + '"',
             } });
+
+            /* ── LONCENGNYA IKUT BERBUNYI DI SINI ────────────────────────
+               Dilaporkan pemilik: chart XAUUSD dua jam lalu sudah ada di
+               panel Chart Pantauan, tapi loncengnya tidak pernah berbunyi.
+
+               Sebabnya cuma jalur MASUK LANGSUNG yang membunyikan lonceng.
+               Sapuan menyimpan chartnya, menulis baris aktivitas, lalu
+               diam — dan sapuan justru yang menangani kasus paling perlu
+               dikabari: pesan yang datang saat pendengarnya sedang mati,
+               entah karena restart atau sambungan Telegram terputus.
+               Persis keadaan yang bikin sapuan ada.
+
+               Akibatnya panel dan lonceng bercerita berbeda tentang
+               kejadian yang sama, dan yang salah justru yang lebih sering
+               dilihat orang.
+
+               ── ID-NYA SAMA PERSIS DENGAN JALUR LANGSUNG ────────────────
+               `tg-<kunciRuang><idPesan>`. Server menimpa kabar ber-id sama
+               alih-alih menumpuknya, jadi chart yang sempat berbunyi lewat
+               jalur langsung TIDAK berbunyi dua kali saat sapuan
+               menemukannya lagi. Dedupnya datang dari id yang cocok, bukan
+               dari daftar tambahan yang harus dijaga tetap sinkron.
+
+               HANYA yang `kabarTerlewat` — lebih baru daripada puncak
+               arsip. Tanpa syarat itu, sapuan pertama pada riwayat lama
+               akan membunyikan 47 lonceng sekaligus, dan lonceng yang
+               membanjir adalah lonceng yang dimatikan orang. */
+            try {
+              await lonceng({
+                id: 'tg-' + id,
+                judul: 'Chart baru di ruang pantauan',
+                detail: 'Tersimpan di panel chart — menunggu ditinjau.',
+                sumber: r.agen,
+                jenis: 'pantau',
+                tautan: '',
+                waktu,
+              });
+            } catch (e) { catat('  lonceng sapuan gagal:', e && e.message); }
           }
         }
       } catch (e) {
