@@ -177,6 +177,12 @@ const NAV = [
         sub: [
           { ke: '/owner',                label: 'Cash Flow' },
           { ke: '/owner?tab=lisensi',    label: 'Lisensi & Klien' },
+          /* Reminder berdiri sebagai menu sendiri, bukan tersembunyi di
+             dalam tab Lisensi. Ia dibuka dengan pertanyaan yang berbeda —
+             "siapa yang harus dihubungi hari ini", bukan "siapa saja yang
+             punya akses" — dan halaman yang cuma bisa ditemukan lewat
+             halaman lain akan dibuka setengah sesering yang seharusnya. */
+          { ke: '/owner?tab=reminder',   label: 'Reminder' },
         ] },
       { ke: '/maintenance', label: 'Maintenance',     Ikon: Wrench,
         sub: [

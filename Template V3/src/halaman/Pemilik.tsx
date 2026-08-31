@@ -87,12 +87,40 @@ function Kabar({ memuat, galat, kosong, teksKosong }: {
 const TAB = [
   { id: 'kas',     label: 'Cash Flow',      judul: 'Cash Flow',        sub: 'Pemasukan, pengeluaran, dan laba bersih. Lisensi berbayar terhitung sendiri dari Maintenance.' },
   { id: 'lisensi', label: 'Lisensi & Klien', judul: 'Lisensi & Klien', sub: 'Siapa yang punya akses, di tingkat mana, dan seberapa sering mereka masuk.' },
+  { id: 'reminder', label: 'Reminder', judul: 'Reminder', sub: 'Siapa yang masanya hampir habis — dan siapa yang sudah lewat.' },
 ] as const;
 type IdTab = typeof TAB[number]['id'];
 
 /* Warna naik seiring tingkat: abu untuk gratis, biru, ungu, lalu EMAS di
    puncak. Urutan yang sudah dikenali mata dari mana pun — bukan lima warna
    acak yang harus dihafal dulu sebelum panelnya bisa dibaca sekilas. */
+/* ══ SISA MASA LISENSI ═════════════════════════════════════════════════
+   Dihitung dari `berakhir` yang SUDAH ada di permintaannya, bukan ditaksir
+   dari tanggal aktif ditambah tiga puluh hari. Paketnya bermacam-macam —
+   testing, tiga bulan, tahunan — dan menaksir dari satu angka berarti tiga
+   dari empat paket ditampilkan salah.
+
+   Dibulatkan KE ATAS, dan itu bukan detail kosmetik: lisensi yang berakhir
+   dua jam lagi harus terbaca "1 hari lagi", bukan "0 hari lagi" yang
+   terlihat seperti sudah mati. Yang benar-benar nol cuma yang memang sudah
+   lewat, dan itu dibedakan lewat tanda negatif. */
+function sisaHari(berakhir?: number): number | null {
+  if (!berakhir) return null;
+  return Math.ceil((berakhir - Date.now()) / 86400000);
+}
+
+/** Teks + warna untuk sisa masa. Satu tempat, dipakai tabel lisensi DAN
+ *  halaman Reminder — dua layar yang menghitung hal sama sendiri-sendiri
+ *  cepat atau lambat menampilkan dua angka berbeda untuk orang yang sama. */
+function rupaSisa(n: number | null): { teks: string; kelas: string } {
+  if (n === null) return { teks: '—', kelas: 'text-zinc-600' };
+  if (n < 0) return { teks: `lewat ${Math.abs(n)} hari`, kelas: 'text-red-400' };
+  if (n === 0) return { teks: 'habis hari ini', kelas: 'text-red-400' };
+  if (n === 1) return { teks: '1 hari lagi', kelas: 'text-red-400' };
+  if (n <= 7) return { teks: `${n} hari lagi`, kelas: 'text-amber-300' };
+  return { teks: `${n} hari lagi`, kelas: 'text-zinc-400' };
+}
+
 const KELOMPOK_LISENSI = [
   { id: 'gratis',   judul: 'Gratis',              tepi: 'border-l-zinc-600',    titik: 'bg-zinc-500',    angka: 'bg-zinc-800 text-zinc-400',        sub: () => 'Akses 30 hari tanpa biaya, dari kuota gratis.' },
   { id: 'testing',  judul: 'Testing — New Launch', tepi: 'border-l-sky-500', titik: 'bg-sky-500', angka: 'bg-sky-500/15 text-sky-300', sub: (f: (n: number) => string, h?: { hargaTesting: number; hargaTestingCoret: number }) =>
@@ -812,7 +840,7 @@ export default function Pemilik() {
                       <Tabel>
                         <thead><tr>
                           {k.id === 'market' && <Th>Produk</Th>}
-                          <Th>Pemilik</Th><Th>Sidik</Th><Th>Aktif sejak</Th><Th />
+                          <Th>Pemilik</Th><Th>Sidik</Th><Th>Aktif sejak</Th><Th>Sisa</Th><Th />
                         </tr></thead>
                         <tbody>
                           {baris.map((l) => {
@@ -826,6 +854,14 @@ export default function Pemilik() {
                                     pernah menyimpan kode aslinya. */}
                                 <Td className="angka text-zinc-600">{l.sidik}</Td>
                                 <Td className="whitespace-nowrap text-zinc-500">{tanggalPendek(l.tgl)}</Td>
+                                {/* Sisa masa, bukan tanggal berakhirnya.
+                                    Tanggal menuntut orangnya menghitung
+                                    sendiri terhadap hari ini; angka sisa
+                                    menjawab pertanyaan yang sebenarnya
+                                    ditanyakan — "masih lama atau tidak". */}
+                                <Td className={cn('whitespace-nowrap', rupaSisa(sisaHari(m?.berakhir)).kelas)}>
+                                  {rupaSisa(sisaHari(m?.berakhir)).teks}
+                                </Td>
                                 <Td className="text-right">
                                   <button
                                     onClick={() => {
@@ -860,6 +896,113 @@ Pemakainya langsung kehilangan akses.`)) return;
         lisensi tidak membuat siapa pun bisa mengunduh produk; kode yang bisa dibaca ulang hanya
         ada di baris permintaan yang disetujui.
       </p>
+      </>)}
+
+      {/* ══ REMINDER ══════════════════════════════════════════════════════
+          Daftar yang sama dengan tab Lisensi, disaring dan diurutkan dari
+          yang paling mendesak. Bukan data baru: sumbernya `berakhir` yang
+          sudah dipakai kolom Sisa di sebelah, jadi dua layar ini tidak bisa
+          berselisih tentang orang yang sama.
+
+          Kenapa perlu halaman sendiri padahal kolomnya sudah ada: kolom
+          menjawab "berapa sisa si A", halaman ini menjawab "siapa saja yang
+          harus dihubungi hari ini". Pertanyaan kedua tidak bisa dijawab
+          dengan memindai lima panel berisi puluhan baris. */}
+      {tab === 'reminder' && (<>
+        {(() => {
+          const baris = lisensi.data.map((l) => {
+            const m = permintaan.data.find(
+              (x) => x.sidik === l.sidik || (x.status === 'disetujui' && !!x.email && x.email === l.catatan));
+            return { l, m, sisa: sisaHari(m?.berakhir), email: m?.email || '' };
+          }).filter((x) => x.sisa !== null) as
+            { l: typeof lisensi.data[number]; m: typeof permintaan.data[number] | undefined; sisa: number; email: string }[];
+
+          /* Tiga kelompok, batasnya persis yang diminta: seminggu dan sehari.
+             `lewat` ikut ditampilkan meski tidak diminta — ia justru yang
+             paling mendesak, dan menyembunyikannya berarti orang yang sudah
+             kehilangan akses tidak pernah muncul di daftar siapa pun. */
+          const KEL = [
+            { id: 'lewat', judul: 'Sudah lewat', sub: 'Masanya habis dan aksesnya sudah berhenti.',
+              tepi: 'border-l-red-500', angka: 'bg-red-500/15 text-red-300',
+              isi: baris.filter((x) => x.sisa < 0) },
+            { id: 'h1', judul: 'H-1 · hari ini sampai besok', sub: 'Sisa satu hari atau kurang — ini yang paling mendesak dihubungi.',
+              tepi: 'border-l-amber-400', angka: 'bg-amber-400/15 text-amber-300',
+              isi: baris.filter((x) => x.sisa >= 0 && x.sisa <= 1) },
+            { id: 'h7', judul: 'H-7 · seminggu lagi', sub: 'Sisa dua sampai tujuh hari. Waktu yang pas untuk menawarkan perpanjangan.',
+              tepi: 'border-l-sky-500', angka: 'bg-sky-500/15 text-sky-300',
+              isi: baris.filter((x) => x.sisa >= 2 && x.sisa <= 7) },
+          ];
+
+          const semuaEmail = [...new Set(KEL.flatMap((k) => k.isi.map((x) => x.email)).filter(Boolean))];
+
+          return (<>
+            <Kabar memuat={lisensi.memuat} galat={lisensi.galat} kosong={false} teksKosong="" />
+
+            <div className="mt-1 grid grid-cols-1 gap-4 xl:grid-cols-3">
+              {KEL.map((k) => (
+                <Panel key={k.id} className={cn('border-l-2', k.tepi)}>
+                  <PanelHead judul={k.judul} sub={k.sub}
+                    kanan={<span className={cn('angka rounded px-1.5 py-0.5 text-[12px]', k.angka)}>{k.isi.length}</span>} />
+                  <div className="px-5 pb-5">
+                    {!k.isi.length ? (
+                      <div className="py-4 text-center text-[12px] text-zinc-600">Tidak ada.</div>
+                    ) : (
+                      <div className={cn('space-y-2', gulirJika(k.isi.length, 8, 'max-h-[360px]'))}>
+                        {k.isi.sort((a, b) => a.sisa - b.sisa).map((x) => (
+                          <div key={x.l.sidik} className="rounded-lg border border-zinc-800/60 p-2.5">
+                            <div className="flex items-baseline justify-between gap-2">
+                              <span className="min-w-0 truncate text-[12.5px] text-zinc-200">
+                                {namaPemakai(x.m?.email, x.l.catatan || x.m?.nama, x.m?.uid)}
+                              </span>
+                              <span className={cn('shrink-0 whitespace-nowrap text-[11.5px]', rupaSisa(x.sisa).kelas)}>
+                                {rupaSisa(x.sisa).teks}
+                              </span>
+                            </div>
+                            <div className="mt-0.5 flex items-baseline justify-between gap-2 text-[11px] text-zinc-600">
+                              <span className="truncate">{x.l.produk || x.m?.paket || '—'}</span>
+                              <span className="shrink-0">berakhir {tanggalPendek(x.m?.berakhir ?? 0)}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </Panel>
+              ))}
+            </div>
+
+            {/* ── MENGIRIMNYA BELUM ADA DI SINI, DAN ITU DISENGAJA ──────────
+                Mengirim surel massal adalah tindakan yang tidak bisa
+                ditarik kembali: satu klik menyentuh puluhan kotak masuk
+                orang lain, dan salah satu kalimat di dalamnya tidak bisa
+                diralat sesudah terkirim. Tombol semacam itu tidak pantas
+                muncul diam-diam bersama fitur yang diminta hari ini.
+
+                Yang disediakan sekarang jalan tercepat yang aman: seluruh
+                alamatnya disalin sekali klik, lalu Anda yang memutuskan
+                mau lewat apa dan berbunyi apa. */}
+            <Panel className="mt-4">
+              <PanelHead judul="Kirim pengingat"
+                sub="Salin alamatnya, lalu kirim lewat surel atau lonceng aplikasi." />
+              <div className="flex flex-wrap items-center gap-2 px-5 pb-5">
+                <button
+                  onClick={() => {
+                    void navigator.clipboard.writeText(semuaEmail.join(', '))
+                      .then(() => alert(semuaEmail.length + ' alamat disalin.'))
+                      .catch(() => alert('Gagal menyalin — peramban menolak akses papan klip.'));
+                  }}
+                  disabled={!semuaEmail.length}
+                  className="cursor-pointer rounded-md border border-zinc-700 px-3 py-1.5 text-[12.5px] text-zinc-200 transition-colors hover:border-zinc-500 hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-40">
+                  Salin {semuaEmail.length} alamat
+                </button>
+                <span className="text-[11.5px] text-zinc-600">
+                  Pengiriman otomatis (surel massal / lonceng aplikasi) belum dinyalakan —
+                  minta saya kerjakan kalau daftarnya sudah terasa benar.
+                </span>
+              </div>
+            </Panel>
+          </>);
+        })()}
       </>)}
     </div>
   );
