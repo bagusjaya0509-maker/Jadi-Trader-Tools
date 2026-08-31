@@ -388,12 +388,29 @@ function Lonceng() {
               judul={k.judul}
               detail={[k.detail, k.sumber].filter(Boolean).join(' · ') || undefined}
               waktu={umurKabar(k.waktu)}
-              aksi={k.jenis === 'sinyal' && (
+              /* Tautan yang DIBAWA kabarnya menang atas tujuan tetap.
+                 Agen yang tahu persis ke mana kejadiannya menunjuk lebih
+                 tahu daripada aturan umum di layar ini — dan aturan umum
+                 itulah yang selama ini mengirim semua orang ke satu
+                 halaman yang sama.
+
+                 Cuma jalur di dalam situs ini. Isi kabar datang dari
+                 server dan bisa berubah tanpa layar ini ikut diperbarui;
+                 alamat absolut di sini berarti sebuah lonceng bisa
+                 memindahkan orang ke situs lain. Garis miring KEDUA
+                 ditolak — `//situslain.com` alamat absolut yang menyamar
+                 jadi jalur relatif. */
+              aksi={(k.tautan && k.tautan.startsWith('/') && !k.tautan.startsWith('//')) ? (
+                <Link to={k.tautan} onClick={() => setBuka(false)}
+                      className="inline-flex items-center gap-1 text-[11px] text-zinc-400 underline-offset-2 hover:text-zinc-100 hover:underline">
+                  Buka di chart <ChevronRight className="size-3" />
+                </Link>
+              ) : k.jenis === 'sinyal' ? (
                 <Link to="/copy-signal" onClick={() => setBuka(false)}
                       className="text-[11px] text-zinc-400 underline-offset-2 hover:text-zinc-100 hover:underline">
                   Lihat levelnya
                 </Link>
-              )}
+              ) : undefined}
             />
           ))}
 

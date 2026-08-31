@@ -246,7 +246,7 @@ async function bunyikanTiruan(baru, dompet) {
             + ' @ ' + l.harga + (l.pnl ? ' · realisasi ' + Math.round(l.pnl) : ''),
       sumber: NAMA_AGEN,
       jenis: 'pantau',
-      tautan: '',
+      tautan: tautanDompet(l.alamat, l.koin),
       waktu: l.waktu,
     });
     catat('  lonceng tiruan:', l.koin, l.dir);
@@ -361,7 +361,11 @@ async function jagaTiruan(posisiDompet) {
           ? 'Dompet yang kamu tiru sudah tidak memegang ' + t.koin + '. Posisi ' + arah + ' '
             + jumlah + ' ditutup dengan market reduce-only.'
           : 'Percobaan menutup ditolak bursa. Posisinya MASIH TERBUKA — periksa sendiri sekarang.',
-        sumber: NAMA_AGEN, jenis: 'pantau', tautan: '', waktu: Date.now(),
+        /* Ikut membawa alamat: yang paling ingin dilihat orang sesudah
+           membaca "posisinya ditutup otomatis" adalah chart koin itu,
+           beserta apa yang sedang dipegang dompet sumbernya sekarang. */
+        sumber: NAMA_AGEN, jenis: 'pantau',
+        tautan: tautanDompet(t.alamat, t.koin), waktu: Date.now(),
       });
 
       /* Penandanya dimatikan sesudah dieksekusi, berhasil maupun gagal.
@@ -423,7 +427,8 @@ async function bunyikanPosisiBaru(lama, baru) {
             + ' · nilai $' + Math.round(p.nilai).toLocaleString('id-ID')
             + (p.likuidasi ? ' · likuidasi ' + p.likuidasi : '')
             + ' · terpantau ' + jamBuka,
-      sumber: NAMA_AGEN, jenis: 'pantau', tautan: '', waktu: Date.now(),
+      sumber: NAMA_AGEN, jenis: 'pantau',
+      tautan: tautanDompet(p.alamat, p.koin), waktu: Date.now(),
     });
     catat('  lonceng posisi baru:', p.nama, p.arah, p.koin, '@', p.entry);
   }
@@ -481,6 +486,33 @@ async function segarkanUmur(dompet, lamaSeumur) {
     } catch (e) { /* satu gagal tidak menjatuhkan sisanya */ }
   }
   return out;
+}
+
+/* ══ ALAMAT YANG DITUJU SEBUAH LONCENG ═════════════════════════════════
+   Sampai sekarang tiap lonceng dompet dikirim dengan `tautan: ''` — ia
+   memberi tahu ada kejadian, lalu berhenti di situ. Yang membacanya harus
+   membuka Chart & Entry sendiri, mengetik simbolnya sendiri, dan mencari
+   sendiri dompet mana yang tadi disebut. Tiga langkah untuk mengerjakan
+   satu hal yang sudah diketahui persis oleh loncengnya.
+
+   `?dompet=` bukan parameter baru: ia sudah dipakai tombol "List in Chart"
+   di kartu dompet, dan sudah membuka panel kiri berisi seluruh posisi
+   dompet itu — persis bilah yang sama dengan panel acuan jiplak. Yang
+   kurang cuma satu: tidak ada yang pernah menuliskannya ke dalam lonceng.
+
+   ── KENAPA SIMBOLNYA IKUT, DAN KENAPA IA BISA MELESET ────────────────
+   Koin di Hyperliquid tidak selalu punya pasangan USDT di Binance (PURR,
+   CASHCAT, dan sebagian koin kecil lain). Untuk koin-koin itu chartnya
+   akan kosong — tapi panel kirinya TETAP terisi seluruh posisi dompetnya,
+   jadi yang mendarat di sana masih bisa mengklik koin lain. Mendarat di
+   chart kosong dengan daftar yang benar di sebelahnya lebih baik daripada
+   tidak punya pintu sama sekali. */
+function tautanDompet(alamat, koin) {
+  const k = String(koin || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const a = String(alamat || '').toLowerCase();
+  if (!a) return '';
+  return '/chart-entry?simbol=' + encodeURIComponent(k + 'USDT')
+       + '&dompet=' + encodeURIComponent(a);
 }
 
 async function pindai() {
