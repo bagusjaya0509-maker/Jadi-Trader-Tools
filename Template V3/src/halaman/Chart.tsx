@@ -280,6 +280,45 @@ function rapikanSimbol(s: string): string {
   return /^MT5:/i.test(t) ? 'MT5:' + t.slice(4) : t.toUpperCase();
 }
 
+/* ── PASANGAN PENGGANTI YANG MUNGKIN DIMAKSUD ────────────────────────────
+   Koin yang datang dari daftar chart pantauan dan dari dompet Hyperliquid
+   memakai penamaan bursanya sendiri, dan sebagiannya tidak ada di Binance
+   dengan nama itu. Yang paling sering: awalan `k` untuk kelipatan seribu —
+   kPEPE di Hyperliquid adalah 1000PEPE di Binance, dan PEPE polos di spot.
+
+   Yang dikembalikan CUMA TEBAKAN NAMA. Fungsi ini tidak tahu, dan tidak
+   berpura-pura tahu, apakah dua nama itu aset yang sama; kelipatannya pun
+   berbeda. Karena itu hasilnya ditawarkan sebagai tombol, tidak pernah
+   dipakai sendiri — chart yang diam-diam berpindah ke harga seribu kali
+   beda adalah kesalahan yang tidak terlihat sampai ada order dikirim.
+
+   Kosong kalau tidak ada tebakan yang layak. Menawarkan sesuatu untuk tiap
+   salah ketik akan membuat tombolnya berhenti berarti. */
+function alternatifSimbol(simbol: string): string[] {
+  const s = String(simbol || '').toUpperCase();
+  /* MT5 punya dunia nama sendiri (sufiks broker: c, .m, micro) dan tebakan
+     di sana lebih sering salah daripada benar. */
+  if (!s || s.startsWith('MT5:')) return [];
+
+  const m = s.match(/^(.+?)(USDT|USDC|USD)$/);
+  if (!m) return [];
+  const [, dasar, mata] = m;
+
+  const calon: string[] = [];
+  /* K di depan = kelipatan seribu di Hyperliquid. Dua kemungkinan di
+     Binance: nama polosnya (spot) dan 1000-nya (futures). */
+  if (/^K[A-Z0-9]{2,}$/.test(dasar)) {
+    calon.push(dasar.slice(1) + mata, '1000' + dasar.slice(1) + mata);
+  }
+  /* Arah sebaliknya, untuk yang datang dengan nama Binance ke tempat yang
+     memakai nama polos. */
+  if (/^1000[A-Z0-9]{2,}$/.test(dasar)) calon.push(dasar.slice(4) + mata);
+  /* USDC jarang punya pasangan di Binance; USDT hampir selalu ada. */
+  if (mata === 'USDC') calon.push(dasar + 'USDT');
+
+  return [...new Set(calon)].filter((x) => x !== s).slice(0, 3);
+}
+
 /* Nama parameter simbol dibaca DUA EJAAN: `simbol` (dipakai semua tautan
    di dalam aplikasi) dan `symbol` (yang ditulis orang, dan yang dipakai
    alat luar mana pun).
@@ -481,6 +520,28 @@ export default function ChartBacktest() {
     const x = (cari.get('tf') || '').toLowerCase();
     if (x && TF.some((y) => y.nilai === x)) setTf(x);
   }, [cari]);
+
+  /* ── ALAMAT IKUT SIMBOL, BUKAN CUMA SEBALIKNYA ─────────────────────
+     Dilaporkan pemilik: mengganti pasangan lalu me-refresh mengembalikan
+     koin LAMA — koin yang tadi dibuka dari daftar chart pantauan.
+
+     Sebabnya alirannya cuma satu arah. `?simbol=` dibaca ke dalam state,
+     tapi tidak ada satu tempat pun yang menuliskannya kembali: kotak simbol
+     mengubah state saja. Sesudah refresh, alamatlah yang menang — dan
+     alamat itu masih menyimpan koin dari tautan yang dibuka setengah jam
+     lalu. Kotak isian dan alamat menunjuk dua koin berbeda, dan yang
+     dipercaya peramban justru yang tidak terlihat.
+
+     `replace`, bukan `push`: mengetik simbol bukan perpindahan halaman, dan
+     tombol Kembali yang harus ditekan enam kali karena orangnya mencoba
+     enam koin adalah tombol Kembali yang rusak. */
+  useEffect(() => {
+    if ((ambilSimbol(cari) || '') === simbol) return;
+    const q = new URLSearchParams(cari);
+    q.set('simbol', simbol);
+    navigasi({ search: '?' + q.toString() }, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [simbol]);
   const [lilin, setLilin] = useState<Lilin>({ opens: [], highs: [], lows: [], closes: [], times: [] });
   /* Dibaca di dalam penarikan data untuk memutuskan apakah kegagalan layak
      jadi peringatan. Ref, bukan state: penarikannya berjalan di dalam efek
@@ -599,6 +660,9 @@ export default function ChartBacktest() {
   }
   const [memuat, setMemuat] = useState(true);
   const [galat, setGalat] = useState('');
+  /* Pasangan pengganti yang MUNGKIN dimaksud, saat simbolnya tidak
+     berdata. Kosong = tidak ada tebakan yang layak ditawarkan. */
+  const [usulSimbol, setUsulSimbol] = useState<string[]>([]);
   const [segar, setSegar] = useState(0);
   const [kunciChart, setKunciChart] = useState(0);
   const [set, setSet] = useState<Setelan>(SETELAN_BAWAAN);
@@ -2532,12 +2596,13 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                simbolnya tidak ada daripada proxinya mati. Menyalahkan proxy
                untuk simbol yang salah ketik mengirim orangnya memeriksa
                server selama setengah jam. */
+            setUsulSimbol(alternatifSimbol(simbol));
             setGalat(simbol.startsWith('MT5:')
               ? 'Belum ada data dari terminal MT5 untuk simbol ini — pastikan EA Trade-Fi Sync terpasang di chart pasangan itu; datanya masuk ± tiap 5 menit.'
               : `Tidak ada data untuk "${simbol}". Pasangan kripto Binance berakhiran USDT (mis. EURUSDT); untuk pasangan MetaTrader pakai awalan MT5: dan pastikan EA-nya terpasang.`);
           }
         }
-        else { setLilin(l); setGalat(''); }
+        else { setLilin(l); setGalat(''); setUsulSimbol([]); }
       } catch (e) {
         /* Alasan yang sama: galat tak terduga di tengah polling tidak boleh
            menghapus chart yang sudah terbaca. */
@@ -3975,7 +4040,34 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
         {galat && (
           <div className="flex items-start gap-2 border-t border-zinc-800/80 px-4 py-3">
             <TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-500" />
-            <span className="text-[12.5px] text-amber-200/90">{galat}</span>
+            <div className="min-w-0">
+              <span className="text-[12.5px] text-amber-200/90">{galat}</span>
+
+              {/* ── USUL, BUKAN PERPINDAHAN OTOMATIS ──────────────────────
+                  Chart bisa menebak bahwa KPEPEUSDT yang datang dari daftar
+                  chart pantauan sama dengan PEPEUSDT di Binance. Yang TIDAK
+                  bisa ditebaknya: apakah dua nama itu benar-benar aset yang
+                  sama, dan berapa kelipatannya. kPEPE Hyperliquid = 1000
+                  PEPE; berpindah diam-diam berarti menampilkan chart dengan
+                  harga seribu kali beda dari yang diminta, tanpa satu pun
+                  tanda bahwa penggantian terjadi.
+
+                  Jadi tebakannya ditawarkan, dan yang menekan tombolnya
+                  orang yang tahu koin apa yang sedang dicarinya. */}
+              {usulSimbol.length > 0 && (
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  <span className="text-[11.5px] text-zinc-500">Mungkin maksudnya:</span>
+                  {usulSimbol.map((u) => (
+                    <button key={u} onClick={() => setSimbol(rapikanSimbol(u))}
+                      title={`Ganti simbol ke ${u} — periksa sendiri apakah ini aset yang sama`}
+                      className="cursor-pointer rounded-md border border-amber-500/40 px-2 py-0.5 text-[11.5px] text-amber-200/90 transition-colors hover:border-amber-400 hover:bg-amber-500/10">
+                      {u}
+                    </button>
+                  ))}
+                  <span className="text-[11px] text-zinc-600">· pastikan sendiri asetnya sama</span>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
