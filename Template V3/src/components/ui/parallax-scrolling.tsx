@@ -7,6 +7,15 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import Lenis from '@studio-freight/lenis';
 import { Moon, Sun } from 'lucide-react';
 import './parallax-scrolling.css';
+import { TeksMorph } from '@/components/ui/teks-morph';
+
+/* Delapan kata, berputar terus. Yang pertama nama produknya — ia yang
+   terlihat saat animasinya belum mulai, dan ia yang harus dikenali orang
+   yang baru mendarat di halaman ini. */
+const KATA_JUDUL = [
+  'Jadi Trader', 'Profitable', 'Up Skill', 'Jurnaling',
+  'Charting', 'Screening', 'Copying', 'Executing',
+];
 import { LogoJT } from '@/components/logo-jt';
 
 export function ParallaxComponent() {
@@ -159,7 +168,13 @@ export function ParallaxComponent() {
                  {...({ fetchpriority: 'low' } as Record<string, string>)}
                  width="800" data-parallax-layer="2" alt="" className="parallax__layer-img parallax__layer-malam" />
             <div data-parallax-layer="3" className="parallax__layer-title">
-              <h2 className="parallax__title">Jadi Trader</h2>
+              {/* Kata-katanya menyebut apa yang BISA DILAKUKAN di sini,
+                  bukan sifat yang diklaim. "Profitable" satu-satunya yang
+                  berupa hasil, dan ia sengaja ditaruh kedua — sesudah nama
+                  produknya, supaya terbaca sebagai tujuan, bukan janji. */}
+              <h2 className="parallax__title">
+                <TeksMorph teks={KATA_JUDUL} />
+              </h2>
             </div>
             <img src="/parallax/depan.webp" loading="eager" width="800" data-parallax-layer="4" alt="" className="parallax__layer-img" />
           </div>

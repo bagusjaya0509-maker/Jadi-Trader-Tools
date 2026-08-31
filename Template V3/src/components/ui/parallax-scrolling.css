@@ -96,6 +96,41 @@
   letter-spacing: -0.03em;
   text-align: center;
   color: #fff;
+
+  /* Rumah dua lapis teks yang bertumpuk. Tingginya dikunci satu baris —
+     tanpa itu judulnya setinggi nol (kedua anaknya absolut) dan lapisan
+     parallax di bawahnya naik menutupinya. */
+  position: relative;
+  display: block;
+  height: 1em;
+}
+
+/* Dua lapis persis bertindih. `inset-inline: 0` supaya keduanya selebar
+   induknya dan `text-align: center` tetap berlaku untuk masing-masing. */
+.teks-morph {
+  position: relative;
+  display: block;
+  inset-inline: 0;
+  height: 1em;
+  /* Filter ambang batas yang menyambungkan dua huruf buram jadi satu
+     bentuk. `blur(0.6px)` sesudahnya menghaluskan tepi bergerigi yang
+     ditinggalkan ambang batas. */
+  filter: url(#jt-ambang) blur(0.6px);
+}
+
+.teks-morph__lapis {
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  display: inline-block;
+  width: 100%;
+}
+
+/* Yang menyetel perangkatnya mengurangi gerak tidak perlu ikut membayar
+   ongkos filter SVG yang dihitung ulang tiap bingkai — dan tanpa animasi,
+   filternya memang tidak menyatukan apa pun. */
+@media (prefers-reduced-motion: reduce) {
+  .teks-morph { filter: none; }
 }
 
 /* Peluruhan ke hitam di kaki gambar — supaya lapisan terbawah menyatu
