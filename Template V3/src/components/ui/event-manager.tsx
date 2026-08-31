@@ -229,8 +229,14 @@ export function EventManager({
     setDraggedEvent(null)
   }, [])
 
+  /* hanyaBaca menjaga dialog rincian tapi tadinya tidak menjaga drop --
+     pengunjung bisa menyeret sinyal analis ke tanggal lain dan rekam
+     jejaknya tampil salah sampai dimuat ulang. Murni visual-lokal, tapi
+     kalender rekam jejak yang bisa diubah-ubah pengunjung bukan rekam
+     jejak. */
   const handleDrop = useCallback(
     (date: Date, hour?: number) => {
+      if (hanyaBaca) return;
       if (!draggedEvent) return
 
       const duration = draggedEvent.endTime.getTime() - draggedEvent.startTime.getTime()
@@ -250,17 +256,21 @@ export function EventManager({
       onEventUpdate?.(draggedEvent.id, updatedEvent)
       setDraggedEvent(null)
     },
-    [draggedEvent, onEventUpdate],
+    [draggedEvent, onEventUpdate, hanyaBaca],
   )
 
   const navigateDate = useCallback(
     (direction: "prev" | "next") => {
       setCurrentDate((prev) => {
-        const newDate = new Date(prev)
         if (view === "month") {
-          newDate.setMonth(prev.getMonth() + (direction === "next" ? 1 : -1))
+          /* Hari dikunci ke tanggal 1. `setMonth` pada tanggal berjalan
+             meluap saat harinya tidak ada di bulan tujuan: 31 Mei "mundur"
+             ke 31 April yang tidak ada, jadi mendarat di 1 Mei -- tombol
+             prev terlihat tidak jalan. 31 Jan "maju" jadi 3 Mar -- Februari
+             terlewati seluruhnya. Tampilan bulan tidak butuh harinya. */
+          return new Date(prev.getFullYear(), prev.getMonth() + (direction === "next" ? 1 : -1), 1)
         }
-        return newDate
+        return new Date(prev)
       })
     },
     [view],

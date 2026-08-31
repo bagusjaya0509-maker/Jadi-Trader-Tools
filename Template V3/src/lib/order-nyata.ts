@@ -65,7 +65,12 @@ async function ambilFilter(dasar: string, simbol: string, kepala: Record<string,
 }
 
 function keStep(n: number, step: number, presisi: number | null) {
-  const v = Math.floor(n / step) * step;
+  /* Pembagiannya dirapikan dulu. 0.07/0.001 di IEEE-754 adalah
+     69.99999999999999, dan Math.floor memotongnya jadi 69 -- SL/TP atau
+     qty yang terkirim SATU STEP lebih kecil dari yang tertulis di tiket.
+     toPrecision(12) membuang debu binernya tanpa menyentuh nilai yang
+     memang bukan kelipatan step. */
+  const v = Math.floor(Number((n / step).toPrecision(12))) * step;
   return v.toFixed(presisi ?? 6);
 }
 

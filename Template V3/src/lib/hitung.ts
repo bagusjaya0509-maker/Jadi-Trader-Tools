@@ -299,7 +299,12 @@ export function saldoDuaBulan(
 export function plPerHari(trade: Trade[]) {
   const peta = new Map<string, number>();
   trade.filter((t) => !t.latihan).forEach((t) => {
-    const k = new Date(t.waktu).toISOString().slice(0, 10);
+    /* Kunci tanggal LOKAL, bukan toISOString (= UTC). Kalender yang
+       membacanya menyusun sel dari tanggal lokal, jadi kunci UTC membuat
+       semua transaksi sebelum jam 07.00 WIB jatuh ke sel kemarin --
+       trade dini hari tampil di hari yang salah. */
+    const d = new Date(t.waktu);
+    const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     peta.set(k, (peta.get(k) ?? 0) + t.pnl);
   });
   return peta;

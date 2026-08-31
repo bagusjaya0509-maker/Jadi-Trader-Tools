@@ -21,6 +21,7 @@ echo "→ mengunggah berkas"
 ssh -i "$KUNCI" -o BatchMode=yes "$VPS" 'mkdir -p /tmp/agen'
 scp -i "$KUNCI" -o BatchMode=yes \
   "$DI/pemantau-telegram.js" "$DI/kartu-agen.js" \
+  "$DI/rangkai.js" "$DI/pasangan-chart.js" \
   "$DI/mata-chart.js" "$DI/bersihkan-jejak.mjs" \
   "$VPS:/tmp/agen/" >/dev/null
 scp -i "$KUNCI" -o BatchMode=yes \

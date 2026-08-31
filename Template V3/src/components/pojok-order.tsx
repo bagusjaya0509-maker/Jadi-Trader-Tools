@@ -124,6 +124,49 @@ function IsianAngka({ nilai, atur, langkah, min = 0, maks, desimal = 2, lebar, j
   );
 }
 
+/* -- KENAPA INI DI LUAR PojokOrder, DAN KENAPA ADA `draf` ------------
+   Versi lamanya dideklarasikan DI DALAM render: tiap ketukan mengubah
+   state rencana, PojokOrder render ulang, dan `const Isian = ...`
+   menghasilkan fungsi baru. Bagi React itu TIPE KOMPONEN BARU, jadi
+   <input>-nya dibongkar-pasang dan fokus ketik lepas setelah tiap
+   karakter -- bahkan detak harga berkala saja cukup untuk menendang
+   kursor keluar di tengah pengetikan.
+
+   Dan onChange lamanya `Number(v) || undefined`: mengetik "0" (langkah
+   pertama menulis 0,065 untuk koin sen) menghasilkan 0 yang falsy, jadi
+   kolomnya langsung dikosongkan lagi -- harga di bawah 1 mustahil
+   diketik. Pola draf mentah yang sama dengan IsianAngka di atas
+   memperbaiki keduanya: teks yang sedang diketik hidup di state lokal,
+   dan yang dikirim ke atas hanya angka yang benar-benar terbentuk. */
+function IsianHarga({ label, warna, nilai, desimal, onAngka }: {
+  label: string;
+  warna: string;
+  nilai: number | undefined;
+  desimal: number;
+  onAngka: (n: number | undefined) => void;
+}) {
+  const [draf, setDraf] = useState<string | null>(null);
+  const teks = draf ?? (nilai === undefined ? '' : String(Number(nilai.toFixed(desimal))));
+  return (
+    <label className="block">
+      <span className="mb-0.5 block text-[9.5px] uppercase tracking-wide" style={{ color: warna }}>{label}</span>
+      <input value={teks} inputMode="decimal"
+             onChange={(e) => {
+               const v = e.target.value;
+               setDraf(v);
+               if (v.trim() === '') { onAngka(undefined); return; }
+               const n = Number(v.replace(',', '.'));
+               /* Nol dan pecahan setengah jadi ("0.", "0.0") dibiarkan
+                  tinggal di draf saja -- dikirim ke atas begitu angkanya
+                  benar-benar positif. */
+               if (isFinite(n) && n > 0) onAngka(n);
+             }}
+             onBlur={() => setDraf(null)}
+             className={cn(KELAS_ISIAN, 'angka w-[86px]')} />
+    </label>
+  );
+}
+
 export function PojokOrder({
   posisi, hargaKini, draf, rencana, mode, jenis, risiko, tunda, onBatalTunda, onKirimSinyal, kabarSinyal, dariSinyal, onGantiCopy, onCopySinyal,
   onPilih, onUbah, onKirim, onBatal, onTutup, onGantiMode, onTukarArah, mati,
@@ -415,16 +458,6 @@ export function PojokOrder({
       : draf === 'BUY' ? 'Untuk BUY: SL harus DI BAWAH entry dan TP di atasnya.'
                        : 'Untuk SELL: SL harus DI ATAS entry dan TP di bawahnya.';
 
-    const Isian = ({ k, label, warna }: { k: 'entry' | 'sl' | 'tp'; label: string; warna: string }) => (
-      <label className="block">
-        <span className="mb-0.5 block text-[9.5px] uppercase tracking-wide" style={{ color: warna }}>{label}</span>
-        <input value={rencana[k] === undefined ? '' : String(Number(rencana[k]!.toFixed(desimalHarga)))}
-               inputMode="decimal"
-               onChange={(e) => onUbah({ ...rencana, [k]: Number(e.target.value) || undefined })}
-               className={cn(KELAS_ISIAN, 'angka w-[86px]')} />
-      </label>
-    );
-
     return (
       /* max-w di HP: tiket ini duduk sebagai hamparan di pojok kiri-atas
          chart, dan tanpa batas ia melebar mengikuti isinya sampai ~306 px —
@@ -477,9 +510,12 @@ export function PojokOrder({
         </div>
 
         <div className="flex items-end gap-1.5">
-          <Isian k="entry" label="Entry" warna="#d4d4d8" />
-          <Isian k="sl" label="SL" warna="#f87171" />
-          <Isian k="tp" label="TP" warna="#10b981" />
+          <IsianHarga label="Entry" warna="#d4d4d8" nilai={rencana.entry} desimal={desimalHarga}
+                      onAngka={(n) => onUbah({ ...rencana, entry: n })} />
+          <IsianHarga label="SL" warna="#f87171" nilai={rencana.sl} desimal={desimalHarga}
+                      onAngka={(n) => onUbah({ ...rencana, sl: n })} />
+          <IsianHarga label="TP" warna="#10b981" nilai={rencana.tp} desimal={desimalHarga}
+                      onAngka={(n) => onUbah({ ...rencana, tp: n })} />
         </div>
 
         {catatan && aturCatatan && !ringkas && (
