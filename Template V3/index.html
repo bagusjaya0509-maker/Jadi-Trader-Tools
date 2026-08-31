@@ -194,6 +194,75 @@
     </script>
     <!-- ── akhir Meta Pixel ────────────────────────────────────────── -->
   </head>
+    <!-- ── KEDIPAN ISI CADANGAN, DIJADIKAN LAYAR MUAT ────────────────────
+         Dilaporkan pemilik: mengetik jaditrader.co.id lalu Enter
+         memperlihatkan judul dan sederet tautan polos di atas latar hitam
+         selama sepersekian detik, lalu hilang.
+
+         Itu isi cadangan #root di bawah. Ia memang harus ada — perayap dan
+         pengunjung tanpa JavaScript cuma melihat itu — tapi selama ini
+         tampil TANPA gaya sama sekali: judul serif bawaan peramban,
+         tautan biru bergaris bawah, menempel di pojok kiri atas. Yang
+         terlihat bukan halaman yang sedang dimuat, melainkan halaman yang
+         rusak.
+
+         Jendelanya bukan milidetik. Sebelum React bisa menimpanya,
+         peramban harus mengunduh dan mengurai +-1,4 MB JavaScript; di
+         sambungan lambat itu hitungan detik, dan detik-detik itulah kesan
+         pertama setiap pengunjung baru.
+
+         Yang diperbaiki TAMPILANNYA, bukan keberadaannya. Tidak ada yang
+         disembunyikan: teks, tautan, dan strukturnya sama persis, cuma
+         ditata supaya yang berkedip terlihat memang bagian dari situsnya.
+         Menyembunyikannya dengan display:none akan menghapus satu-satunya
+         hal yang dibaca perayap — dan itu justru yang dulu bikin artikel
+         tidak punya tautan masuk.
+
+         DISARANGKAN DI #pramuat, bukan di #root. Aturan yang menempel pada
+         #root akan tetap berlaku SESUDAH React mount — flex dan
+         min-height-nya akan ikut menata seluruh aplikasi. Anak yang
+         dihapus React membawa pergi seluruh gayanya sendiri. -->
+    <style>
+      #pramuat {
+        min-height: 100dvh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: .75rem;
+        padding: 2rem 1.5rem;
+        text-align: center;
+        font-family: 'IBM Plex Sans', system-ui, sans-serif;
+        color: #a1a1aa;
+      }
+      #pramuat h1 {
+        margin: 0;
+        font-family: 'Space Grotesk', system-ui, sans-serif;
+        font-size: 1.35rem;
+        font-weight: 600;
+        letter-spacing: -.01em;
+        color: #fafafa;
+      }
+      #pramuat p { margin: 0; font-size: .875rem; max-width: 28rem; line-height: 1.6; }
+      #pramuat nav { font-size: .8125rem; color: #52525b; }
+      #pramuat nav a { color: #71717a; text-decoration: none; }
+      #pramuat nav a:hover { color: #d4d4d8; text-decoration: underline; }
+      /* Putaran kecil, bukan bilah kemajuan: yang ditunggu tidak punya
+         persentase yang bisa dipercaya, dan bilah yang melompat dari 30%
+         ke selesai lebih mengganggu daripada tidak ada bilah sama sekali. */
+      #pramuat .putar {
+        width: 1.1rem; height: 1.1rem; margin-top: .5rem;
+        border: 2px solid #27272a; border-top-color: #71717a;
+        border-radius: 50%;
+        animation: pramuatPutar .7s linear infinite;
+      }
+      @keyframes pramuatPutar { to { transform: rotate(360deg); } }
+      /* Yang menyetel perangkatnya mengurangi gerak tidak dipaksa melihat
+         sesuatu berputar hanya karena halaman sedang sibuk. */
+      @media (prefers-reduced-motion: reduce) {
+        #pramuat .putar { animation: none; border-top-color: #27272a; }
+      }
+    </style>
   <body>
     <!-- Penanda Meta Pixel untuk peramban tanpa JavaScript.
          WAJIB di <body>: di dalam <head> sebuah <noscript> cuma boleh
@@ -222,15 +291,18 @@
          #root. Menyembunyikannya dengan display:none justru yang akan
          membuatnya jadi masalah. -->
     <div id="root">
-      <h1>Jadi Trader Tools</h1>
-      <p>Chart replay, screener, dan jurnal trading otomatis.</p>
-      <nav>
-        <a href="/artikel/">Artikel &amp; panduan</a> &middot;
-        <a href="/preview">Coba gratis</a> &middot;
-        <a href="/akses">Harga</a> &middot;
-        <a href="/docs">Dokumentasi</a> &middot;
-        <a href="/legal">Legal</a>
-      </nav>
+      <div id="pramuat">
+        <h1>Jadi Trader Tools</h1>
+        <p>Chart replay, screener, dan jurnal trading otomatis.</p>
+        <nav>
+          <a href="/artikel/">Artikel &amp; panduan</a> &middot;
+          <a href="/preview">Coba gratis</a> &middot;
+          <a href="/akses">Harga</a> &middot;
+          <a href="/docs">Dokumentasi</a> &middot;
+          <a href="/legal">Legal</a>
+        </nav>
+        <div class="putar"></div>
+      </div>
     </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
