@@ -108,6 +108,10 @@ const Template      = lazy(() => muat(() => import('@/halaman/Template')));
 const Pratinjau     = lazy(() => muat(() => import('@/halaman/Pratinjau')));
 const Preview       = lazy(() => muat(() => import('@/halaman/Preview')));
 const Testing       = lazy(() => muat(() => import('@/halaman/Testing')));
+/* Peraga tema Blogger kiriman pemilik. lazy() seperti yang lain: ia
+   memuat huruf dari CDN luar dan tidak pernah dibuka pengunjung biasa,
+   jadi tidak boleh ikut ke bundel awal. */
+const Blog          = lazy(() => muat(() => import('@/halaman/Blog')));
 const ChartBacktest = lazy(() => muat(() => import('@/halaman/Chart')));
 const Jurnal        = lazy(() => muat(() => import('@/halaman/Jurnal')));
 const PersonalArea  = lazy(() => muat(() => import('@/halaman/PersonalArea')));
@@ -452,6 +456,7 @@ export default function App() {
               ditempel apa adanya; tidak diindeks, tidak ditautkan dari
               mana pun — ia memang cuma untuk dilihat. */}
           <Route path="/testing" element={<Testing />} />
+          <Route path="/blog" element={<Blog />} />
           <Route path="/akses" element={<Akses />} />
           {/* Tujuan link kiriman otomatis Lynk sesudah pembayaran. DI LUAR
               gerbang: orang yang baru membayar belum punya akses apa pun,
