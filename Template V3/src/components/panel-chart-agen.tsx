@@ -74,6 +74,7 @@ const KAMUS_PASANGAN: [RegExp, string][] = [
   [/\bvirtual\b/i, 'VIRTUALUSDT'],
   [/\bcardano\b/i, 'ADAUSDT'],
   [/\bripple\b/i, 'XRPUSDT'],
+  [/\bzcash\b/i, 'ZECUSDT'],
   [/\bdoge\b/i, 'DOGEUSDT'],
   [/\bavax\b/i, 'AVAXUSDT'],
   [/\bbnb\b/i, 'BNBUSDT'],
@@ -88,6 +89,16 @@ const KAMUS_PASANGAN: [RegExp, string][] = [
   [/\bADA\b/, 'ADAUSDT'],
   [/\bLINK\b/, 'LINKUSDT'],
   [/\bSUI\b/, 'SUIUSDT'],
+  /* Ditulis "Zec" di ruang sumbernya — huruf besar cuma di depan,
+     jadi pola ketat huruf-besar-semua tidak menangkapnya dan chartnya
+     jatuh ke "Belum terbaca". Diberi bendera `i` sendiri karena "zec"
+     tidak bersarang di kata Indonesia mana pun.
+
+     KEMBARAN dari tabel yang sama di skrip/vps/pasangan-chart.js.
+     Server harus bisa menebak pasangannya SENDIRI sebelum
+     membunyikan lonceng, karena isi pesannya tidak pernah boleh ikut
+     keluar ke /api/kabar yang terbuka. Ubah keduanya bersamaan. */
+  [/\bzec\b/i, 'ZECUSDT'],
 ];
 
 export function tebakPasangan(keterangan: string): string | null {

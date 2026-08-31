@@ -221,6 +221,40 @@ function arsipSimpan() {
 }
 
 /* ── LONCENG ───────────────────────────────────────────────────────────── */
+const { tebakPasangan } = require('./pasangan-chart');
+
+/* Jam POSTING-nya, dalam waktu Jakarta. Server ini berjalan di UTC, dan
+   "diposting 06.14" untuk chart yang di layar orangnya terbit pukul 13.14
+   adalah keterangan yang lebih membingungkan daripada tidak ada keterangan.
+
+   Yang ditulis waktu pesannya dibuat di ruang sumber, BUKAN waktu kita
+   menemukannya. Keduanya bisa berjarak sepuluh menit kalau ia disusul
+   sapuan, dan yang ingin diketahui orang adalah kapan analisnya menerbitkan
+   -- bukan kapan mesin kita sempat melihat. */
+function jamJakarta(ms) {
+  try {
+    return new Date(ms).toLocaleTimeString('id-ID', {
+      timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit',
+    }).replace(/\./, ':') + ' WIB';
+  } catch (e) { return ''; }
+}
+
+/* Judul dan detail lonceng chart, dipakai DUA jalur: pesan yang tertangkap
+   langsung, dan yang disusul sapuan. Ditulis sekali supaya keduanya tidak
+   pernah bercerita berbeda tentang kejadian yang sama -- persis cacat yang
+   baru saja diperbaiki di jalur satunya. */
+function kabarChart(teks, waktu, tersimpan) {
+  const pas = tebakPasangan(teks);
+  return {
+    pas: pas || '',
+    judul: pas ? 'Chart ' + pas + ' baru di ruang pantauan'
+               : 'Chart baru di ruang pantauan',
+    detail: 'Diposting ' + jamJakarta(waktu)
+      + (tersimpan ? ' · tersimpan di panel chart, menunggu ditinjau.'
+                   : ' · sedang dibaca levelnya.'),
+  };
+}
+
 async function lonceng(baris) {
   if (!APP_TOKEN) { catat('APP_TOKEN kosong — lonceng dilewati'); return; }
   try {
@@ -573,15 +607,17 @@ async function siapkanRuang(client, r) {
          membocorkan apa pun. Obrolan biasa tidak berbunyi sama sekali. */
       const layakBunyi = mungkinSinyal(teks) || (r.gambar && adaGambar);
       if (layakBunyi) {
+        const k = kabarChart(teks, baris.waktu, !!r.arsip);
         await lonceng({
           id: 'tg-' + kunci.replace(/[^\w-]/g, ''),
-          judul: adaGambar ? 'Chart baru di ruang pantauan' : 'Postingan baru di ruang pantauan',
-          detail: adaGambar
-            ? (r.arsip ? 'Tersimpan di panel chart — menunggu ditinjau.'
-                       : 'Sedang dibaca levelnya.')
+          judul: adaGambar ? k.judul : 'Postingan baru di ruang pantauan',
+          detail: adaGambar ? k.detail
             : 'Ada angka, belum terbaca sebagai sinyal lengkap.',
           sumber: r.agen,
           jenis: 'pantau',
+          /* Lencana kecil di depan judul. Yang menyeberang cuma NAMA
+             pasangan hasil uraian kita sendiri — bukan keterangannya. */
+          pair: adaGambar ? k.pas : '',
           tautan: '',
           waktu: baris.waktu,
         });
@@ -830,7 +866,16 @@ async function siapkanRuang(client, r) {
      sinyal" yang perlu dijaga. Menolak gambar karena pengirimnya belum
      terbaca sebagai admin justru membuat jaring pengaman ini bocor persis
      saat daftar adminnya gagal terbaca. */
-  const SAPU_JEDA = Math.max(2, Number(process.env.CHART_SAPU_MENIT || 10)) * 60 * 1000;
+  /* Tiga menit, bukan sepuluh. Sapuan adalah jaring untuk pesan yang
+     datang saat pendengarnya mati — dan justru di keadaan itulah jeda
+     sepuluh menit paling terasa: kabar yang sudah tersimpan di panel baru
+     berbunyi sepuluh menit kemudian. Dengan denyut lonceng di peramban 60
+     detik, terlambat terburuknya turun dari ±11 menit jadi ±4 menit.
+
+     Ongkosnya satu `iterMessages` (batas 60 pesan) per ruang per putaran,
+     dan unduhan HANYA untuk chart yang benar-benar baru — dua puluh
+     putaran per jam untuk dua ruang tidak mendekati batas mana pun. */
+  const SAPU_JEDA = Math.max(2, Number(process.env.CHART_SAPU_MENIT || 3)) * 60 * 1000;
   const SAPU_DALAM = Math.max(20, Number(process.env.CHART_SAPU_DALAM || 60));
 
   async function sapuArsip(alasan) {
@@ -941,12 +986,14 @@ async function siapkanRuang(client, r) {
                akan membunyikan 47 lonceng sekaligus, dan lonceng yang
                membanjir adalah lonceng yang dimatikan orang. */
             try {
+              const k = kabarChart(teks, waktu, true);
               await lonceng({
                 id: 'tg-' + id,
-                judul: 'Chart baru di ruang pantauan',
-                detail: 'Tersimpan di panel chart — menunggu ditinjau.',
+                judul: k.judul,
+                detail: k.detail,
                 sumber: r.agen,
                 jenis: 'pantau',
+                pair: k.pas,
                 tautan: '',
                 waktu,
               });
