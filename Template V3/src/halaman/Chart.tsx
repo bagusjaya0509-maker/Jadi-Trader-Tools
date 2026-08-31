@@ -1751,12 +1751,28 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
        semua jendela se-origin), jadi cukup menyuruh jendela tools membuka
        formulirnya. Panel kecil yang tiba-tiba berisi halaman Copy Signal
        bukan yang dimaksud siapa pun, dan chartnya sendiri tetap utuh. */
+    /* ── ALAMAT PULANG IKUT DIBAWA ────────────────────────────────────
+       Formulir posting adalah SINGGAHAN, bukan tujuan. Yang membukanya
+       datang dari chart dengan tiket order di layar, dan sebagian akan
+       membatalkannya di tengah jalan — SL-nya belum pas, harganya sudah
+       lari. Menutup formulir lalu mendarat di daftar sinyal orang lain
+       berarti chart yang tadi ditinggalkan harus dicari sendiri, lengkap
+       dengan simbol dan timeframe-nya.
+
+       Alamatnya diambil dari halaman yang SEDANG dibuka, bukan dirakit
+       dari `simbol` dan `tf`. Merakitnya sendiri berarti menebak ulang
+       apa yang sudah diketahui persis — dan tebakan itu akan meleset
+       untuk setiap parameter yang ditambahkan nanti (jiplak, konsensus,
+       walletview) tanpa ada yang ingat memperbaruinya di sini. */
+    const pulang = encodeURIComponent(window.location.pathname + window.location.search);
+    const tujuan = '/copy-signal?sub=posting&dari=' + pulang;
+
     if (POLOS) {
-      kirimBus({ jenis: 'navigasi', ke: '/copy-signal?sub=posting' });
+      kirimBus({ jenis: 'navigasi', ke: tujuan });
       setKabarKirimSinyal('Draf terkirim — formulir posting terbuka di jendela tools.');
       return;
     }
-    navigasi('/copy-signal?sub=posting');
+    navigasi(tujuan);
   }
   /* Setelan order sungguhan — hidup di halaman supaya label risiko di
      garis chart dihitung dari angka yang SAMA dengan yang akan dikirim. */

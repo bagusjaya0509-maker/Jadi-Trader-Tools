@@ -1677,6 +1677,10 @@ export default function Analisa() {
      state: sidebar sekarang punya sub-menu yang menunjuk langsung ke sini,
      dan tab yang tidak bisa dituju lewat alamat tidak bisa ditaut siapa pun. */
   const [cariSub, setCariSub] = useSearchParams();
+  /* Dipakai tombol Tutup formulir posting untuk kembali ke halaman asalnya.
+     `setCariSub` tidak bisa dipakai: ia cuma menyunting query halaman INI,
+     sementara yang dituju rute yang sama sekali lain. */
+  const pindahHalaman = useNavigate();
   /* null = alamatnya tidak menyebut tab sama sekali. Dibedakan dari
      'market' karena tab bawaannya sekarang BERGANTUNG KEADAAN: di daftar
      kanal 'market', di dalam kanal 'performa'. Kalau yang kosong langsung
@@ -1901,7 +1905,29 @@ export default function Analisa() {
      jendelanya dibuka — dan React melempar "Rendered more hooks than during
      the previous render", persis bug yang barusan diperbaiki di
      Marketplace. */
-  const tutupPosting = useTutupLuar(() => setSub('market'));
+  /* ── KEMBALI KE TEMPAT ASAL, BUKAN KE HALAMAN INI ─────────────────
+     Dulu Tutup selalu memanggil setSub('market') — apa pun asalnya. Untuk
+     yang menekan tombol + di halaman ini itu benar. Untuk yang datang
+     dari Chart & Entry, ia mendarat di daftar sinyal orang lain, dan
+     chart yang sedang dikerjakannya harus dibuka ulang dari nol.
+
+     Alamat asalnya dibawa di `?dari=`. Kalau tidak ada — dibuka langsung,
+     atau ditekan dari halaman ini — perilakunya sama seperti dulu. */
+  const kembaliDariPosting = () => {
+    const dari = cariSub.get('dari');
+    /* HANYA jalur di dalam situs ini. `dari` datang dari URL, dan URL bisa
+       ditulis siapa saja: tanpa pagar ini sebuah tautan yang tampak wajar
+       bisa membuat tombol Tutup melempar orang ke situs lain. Diawali satu
+       garis miring, dan garis KEDUA ditolak — `//situslain.com` adalah
+       alamat absolut yang menyamar sebagai jalur relatif. */
+    if (dari && dari.startsWith('/') && !dari.startsWith('//')) {
+      pindahHalaman(dari);
+      return;
+    }
+    setSub('market');
+  };
+
+  const tutupPosting = useTutupLuar(kembaliDariPosting);
 
   /* ── Peringatan risiko: tampil 3 detik, lalu menyusut sendiri ──────────
      Keputusan pemilik 17 Agu 2026, sesudah sempat dicoba jadi kaki halaman
@@ -2920,7 +2946,7 @@ export default function Analisa() {
                   <span className="angka">{sinyalku}</span> dari {BATAS_SINYAL} sinyal aktif
                 </span>
               )}
-              <button onClick={() => setSub('market')}
+              <button onClick={kembaliDariPosting}
                 title="Tutup — isian yang sudah diketik tidak hilang"
                 className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-700 bg-zinc-900 px-2.5 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-500 hover:text-zinc-100">
                 <X className="size-3.5" /> Tutup
