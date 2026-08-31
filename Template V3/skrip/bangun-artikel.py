@@ -61,6 +61,17 @@ GAMBAR = {
         "/artikel/gambar/akun-sen-mt5-jurnal-seratus-kali-lipat.webp",
     "cara-memasang-indikator-pine-di-tradingview":
         "/artikel/gambar/cara-memasang-indikator-pine-di-tradingview.webp",
+    # Empat sampul tipografi, dibuat sendiri. Foto stoknya cuma lima; tanpa
+    # ini empat kartu di satu layar memperlihatkan foto yang sama persis, dan
+    # itu terbaca sebagai halaman yang tidak diurus.
+    "cara-membuat-jurnal-trading-di-excel":
+        "/artikel/gambar/cara-membuat-jurnal-trading-di-excel.webp",
+    "cara-backtest-strategi-trading-gratis":
+        "/artikel/gambar/cara-backtest-strategi-trading-gratis.webp",
+    "cara-pasang-ea-di-mt5-pc-dan-android":
+        "/artikel/gambar/cara-pasang-ea-di-mt5-pc-dan-android.webp",
+    "cara-hitung-lot-forex-dan-akun-cent":
+        "/artikel/gambar/cara-hitung-lot-forex-dan-akun-cent.webp",
 }
 GAMBAR_BAWAAN = "/artikel/gambar/cara-menghubungkan-mt5-ke-jurnal-trading-otomatis.webp"
 
