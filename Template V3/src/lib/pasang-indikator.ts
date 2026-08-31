@@ -1,4 +1,4 @@
-import { SUPERTREND_PINE, GARIS_SAKTI_PINE } from '@/lib/pine';
+import { SUPERTREND_PINE } from '@/lib/pine';
 import { MOMENTUM_CANDLE_PINE } from '@/lib/pine-momentum-candle';
 import { SMI_PINE } from '@/lib/pine-smi';
 
@@ -33,9 +33,6 @@ export const INDIKATOR_TERPASANG: Record<string, { nama: string; kode: string }>
   },
   'smi-indikator': {
     nama: 'Stochastic Momentum Index (SMI)', kode: SMI_PINE,
-  },
-  'garis-sakti-snr': {
-    nama: 'Garis Sakti SNR', kode: GARIS_SAKTI_PINE,
   },
 };
 

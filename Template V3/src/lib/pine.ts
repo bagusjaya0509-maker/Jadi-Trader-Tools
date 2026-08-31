@@ -888,38 +888,6 @@ export function jalankanPine(kode: string, l: Lilin, tf = '4h',
 
    Dipasang di H4 sesuai aslinya. Mesin ini menghitung di timeframe chart
    yang sedang dibuka, jadi levelnya H4 hanya kalau chartnya H4. */
-export const GARIS_SAKTI_PINE = `//@version=4
-study("Garis Sakti — SNR", overlay=true)
-
-kiri  = input(title="Kekuatan swing (bar kiri)", type=input.integer, defval=12)
-kanan = input(title="Konfirmasi (bar kanan)",    type=input.integer, defval=12)
-
-// Level dipaku ke ujung lilin dan dibawa maju sampai pivot berikutnya.
-// ke=0 pivot terbaru, ke=1 sebelumnya, dst — makin besar makin tua.
-r1 = jt.pivotHighKe(kiri, kanan, 0)
-r2 = jt.pivotHighKe(kiri, kanan, 1)
-r3 = jt.pivotHighKe(kiri, kanan, 2)
-r4 = jt.pivotHighKe(kiri, kanan, 3)
-s1 = jt.pivotLowKe(kiri, kanan, 0)
-s2 = jt.pivotLowKe(kiri, kanan, 1)
-s3 = jt.pivotLowKe(kiri, kanan, 2)
-s4 = jt.pivotLowKe(kiri, kanan, 3)
-
-// Warnanya TETAP: merah untuk level yang lahir dari puncak, hijau untuk
-// yang lahir dari lembah. Mesin Pine di aplikasi ini membaca warna
-// sekali dari kodenya, bukan tiap bar — jadi warna yang "berganti saat
-// ditembus" akan membeku di salah satu pilihannya dan berbohong
-// sepanjang sisa chart.
-plot(r1, title="R1", color=color.red, linewidth=1)
-plot(r2, title="R2", color=color.red, linewidth=1)
-plot(r3, title="R3", color=color.red, linewidth=1)
-plot(r4, title="R4", color=color.red, linewidth=1)
-plot(s1, title="S1", color=color.green, linewidth=1)
-plot(s2, title="S2", color=color.green, linewidth=1)
-plot(s3, title="S3", color=color.green, linewidth=1)
-plot(s4, title="S4", color=color.green, linewidth=1)
-`;
-
 export const SUPERTREND_PINE = `//@version=4
 study("Supertrend", overlay = true, format=format.price, precision=2, resolution="")
 

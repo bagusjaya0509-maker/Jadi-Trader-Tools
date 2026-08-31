@@ -4,7 +4,7 @@ import { Play, Trash2, TriangleAlert, CheckCircle2, RotateCcw, X, Plus, Square,
 import { cn } from '@/lib/utils';
 import { bacaKoneksi, PROXY_BAWAAN } from '@/lib/koneksi';
 import { auth } from '@/lib/firebase';
-import { jalankanPine, CONTOH_PINE, SUPERTREND_PINE, GARIS_SAKTI_PINE, type HasilPine, type InputPine } from '@/lib/pine';
+import { jalankanPine, CONTOH_PINE, SUPERTREND_PINE, type HasilPine, type InputPine } from '@/lib/pine';
 import type { Lilin } from '@/lib/pasar';
 import { susunPermintaanPine, terapkanTambalanPine, fiturHilang } from '@/lib/pine-tambalan';
 
@@ -97,11 +97,6 @@ const SKRIP_BAWAAN: { id: string; nama: string; kode: string; sidikLama: string[
          tuybxh — versi pertama, Buy/Sell menyala
          gjb2ys — Buy/Sell dimatikan, penanda bulat masih ada */
     sidikLama: ['tuybxh', 'gjb2ys'],
-  },
-  {
-    id: 'bawaan-garis-sakti', nama: 'Garis Sakti — SNR', kode: GARIS_SAKTI_PINE,
-    /* Belum pernah punya versi terdahulu. */
-    sidikLama: [],
   },
 ];
 

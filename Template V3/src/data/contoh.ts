@@ -250,17 +250,6 @@ export const PRODUK: Produk[] = [
     ringkas: 'Supertrend berbasis ATR dengan pita naik-turun yang berganti warna saat tren berbalik — versi yang berjalan di mesin Pine aplikasi ini, bukan tempelan TradingView.',
     fitur: ['Periode ATR bisa diatur', 'Faktor pengali bebas', 'Pita hijau/merah mengikuti arah tren', 'Penanda titik balik'],
   },
-  {
-    id: 'garis-sakti-snr', nama: 'Garis Sakti SNR', versi: 'Pine · overlay · pasang di H4',
-    harga: 0, premium: false,
-    ringkas: 'Level support-resisten yang dipaku ke ujung lilin, bukan ditaruh di angka bulat — dan dibawa maju sampai ada swing baru, jadi level yang lahir tiga minggu lalu tetap terlihat hari ini.',
-    fitur: [
-      'Level dari harga wick, bukan angka bulat',
-      'Bertahan sampai swing berikutnya',
-      'Empat level di atas harga, empat di bawah',
-      'Kekuatan swing bisa diputar sendiri',
-    ],
-  },
 ];
 
 /* ── Panel Pemilik ────────────────────────────────────────────────────── */
