@@ -1,4 +1,4 @@
-import { SUPERTREND_PINE } from '@/lib/pine';
+import { SUPERTREND_PINE, GARIS_SAKTI_PINE } from '@/lib/pine';
 import { MOMENTUM_CANDLE_PINE } from '@/lib/pine-momentum-candle';
 import { SMI_PINE } from '@/lib/pine-smi';
 
@@ -34,6 +34,9 @@ export const INDIKATOR_TERPASANG: Record<string, { nama: string; kode: string }>
   'smi-indikator': {
     nama: 'Stochastic Momentum Index (SMI)', kode: SMI_PINE,
   },
+  'garis-sakti-snr': {
+    nama: 'Garis Sakti SNR', kode: GARIS_SAKTI_PINE,
+  },
 };
 
 /** Cocokkan produk katalog dengan indikator yang bisa dipasang.
@@ -47,7 +50,13 @@ export const INDIKATOR_TERPASANG: Record<string, { nama: string; kode: string }>
  *  Nama dinormalkan: huruf kecil, tanpa spasi dan tanda hubung. Jadi
  *  "Supertrend", "Super Trend", dan "super-trend" sama-sama kena. */
 function normal(t: string): string {
-  return t.toLowerCase().replace(/[\s_-]+/g, '');
+  /* Tanda pisah PANJANG ikut dibuang, bukan cuma hubung biasa. Nama produk
+     diketik di halaman Maintenance, dan judul yang rapi biasanya memakai
+     em-dash — sementara yang mengetiknya cepat memakai hubung biasa. Dua
+     tulisan yang dimaksudkan sama akan gagal cocok karena satu karakter
+     yang bahkan tidak terlihat bedanya, dan gejalanya persis yang paling
+     sulit dilacak: tombol Pasang tidak muncul, tanpa satu pun galat. */
+  return t.toLowerCase().replace(/[\s_\-‐-―]+/g, '');
 }
 
 export function kunciIndikator(produk: { id: string; nama: string }): string | null {
