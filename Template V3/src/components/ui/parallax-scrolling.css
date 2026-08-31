@@ -120,9 +120,20 @@
   display: block;
   inset-inline: 0;
   height: 1em;
-  /* Filter ambang batas yang menyambungkan dua huruf buram jadi satu
-     bentuk. `blur(0.6px)` sesudahnya menghaluskan tepi bergerigi yang
-     ditinggalkan ambang batas. */
+}
+
+/* ── FILTERNYA CUMA HIDUP SAAT MELELEH ──────────────────────────────────
+   Ambang batas memaksa tiap piksel jadi sepenuhnya ada atau sepenuhnya
+   hilang. Itu yang menyambungkan dua huruf buram jadi satu bentuk — tapi ia
+   juga membuang antialias yang biasanya menghaluskan lengkung huruf. Saat
+   teksnya DIAM, yang tersisa cuma kerugiannya: tepi bergerigi dan sedikit
+   kabur dari `blur(0.6px)`, tanpa ada yang perlu disambungkan.
+
+   Jadi filternya dipasang dan dilepas mengikuti keadaan. Kelas ini
+   ditambahkan komponennya saat lelehan berjalan, dan dilepas begitu kata
+   utuh mulai diam — di situ huruf kembali dirender peramban dengan
+   antialias penuh, setajam teks biasa. */
+.teks-morph--leleh {
   filter: url(#jt-ambang) blur(0.6px);
 }
 
@@ -143,7 +154,7 @@
    ongkos filter SVG yang dihitung ulang tiap bingkai — dan tanpa animasi,
    filternya memang tidak menyatukan apa pun. */
 @media (prefers-reduced-motion: reduce) {
-  .teks-morph { filter: none; }
+  .teks-morph--leleh { filter: none; }
 }
 
 /* Peluruhan ke hitam di kaki gambar — supaya lapisan terbawah menyatu

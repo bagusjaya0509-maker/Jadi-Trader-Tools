@@ -41,7 +41,7 @@ const LAMA_MORPH = 1.5;    // detik satu lelehan
    diingat orang yang baru mendarat di halaman ini. Kata sifat yang lewat
    boleh cepat; namanya tidak. */
 const LAMA_DIAM = 1.4;     // detik berhenti di kata biasa
-const LAMA_DIAM_AWAL = 3.4; // detik berhenti di kata pertama (nama produk)
+const LAMA_DIAM_AWAL = 5.0; // detik berhenti di kata pertama (nama produk)
 
 function kurangGerak(): boolean {
   try {
@@ -57,6 +57,27 @@ function useMorph(teks: string[]) {
 
   const a = useRef<HTMLSpanElement>(null);
   const b = useRef<HTMLSpanElement>(null);
+  const wadah = useRef<HTMLSpanElement>(null);
+
+  /* ── FILTER DILEPAS SAAT KATANYA DIAM ──────────────────────────────
+     Ambang batas memaksa tiap piksel jadi sepenuhnya ada atau hilang — itu
+     yang menyambungkan dua huruf buram jadi satu bentuk. Tapi ia juga
+     membuang antialias yang menghaluskan lengkung huruf, dan `blur(0.6px)`
+     menambah kabur tipis di atasnya.
+
+     Selama meleleh, keduanya dibutuhkan. Begitu katanya diam, yang tersisa
+     cuma kerugiannya: tepi bergerigi dan sedikit kabur pada teks yang
+     seharusnya setajam judul biasa.
+
+     Diingat di ref supaya kelasnya tidak ditulis ulang enam puluh kali per
+     detik — DOM yang disentuh tiap bingkai tanpa ada yang berubah adalah
+     kerja yang seluruhnya terbuang. */
+  const filterNyala = useRef(false);
+  const pasangFilter = useCallback((nyala: boolean) => {
+    if (filterNyala.current === nyala || !wadah.current) return;
+    filterNyala.current = nyala;
+    wadah.current.classList.toggle('teks-morph--leleh', nyala);
+  }, []);
 
   const pasangGaya = useCallback((bagian: number) => {
     const [p, q] = [a.current, b.current];
@@ -112,11 +133,13 @@ function useMorph(teks: string[]) {
       diam.current = berikut === 0 ? LAMA_DIAM_AWAL : LAMA_DIAM;
       bagian = 1;
     }
+    pasangFilter(true);
     pasangGaya(bagian);
     if (bagian === 1) indeks.current++;
-  }, [pasangGaya, teks.length]);
+  }, [pasangGaya, pasangFilter, teks.length]);
 
   const tahan = useCallback(() => {
+    pasangFilter(false);
     maju.current = 0;
     const [p, q] = [a.current, b.current];
     if (!p || !q) return;
@@ -124,7 +147,7 @@ function useMorph(teks: string[]) {
     q.style.opacity = '100%';
     p.style.filter = 'none';
     p.style.opacity = '0%';
-  }, []);
+  }, [pasangFilter]);
 
   useEffect(() => {
     /* Yang menyetel perangkatnya mengurangi gerak tidak dipaksa melihat
@@ -146,7 +169,7 @@ function useMorph(teks: string[]) {
     return () => cancelAnimationFrame(bingkai);
   }, [lelehkan, tahan]);
 
-  return { a, b };
+  return { a, b, wadah };
 }
 
 /* Filter ambang batas: piksel yang setengah transparan dipaksa jadi
@@ -169,12 +192,15 @@ function FilterAmbang() {
 }
 
 export function TeksMorph({ teks, className }: { teks: string[]; className?: string }) {
-  const { a, b } = useMorph(teks);
+  const { a, b, wadah } = useMorph(teks);
   return (
     /* `aria-label` memuat kata pertamanya dan isinya disembunyikan dari
        pembaca layar: kalimat yang berganti tiap dua detik akan dibacakan
        ulang tanpa henti, dan itu bukan judul — itu gangguan. */
-    <span className={cn('teks-morph', className)} aria-label={teks[0]}>
+    /* Kelas lelehnya TIDAK dipasang di sini. Bingkai pertama halaman
+       menampilkan kata utuh yang diam — memberinya filter berarti judulnya
+       bergerigi selama satu detik pertama, tepat saat orang membacanya. */
+    <span ref={wadah} className={cn('teks-morph', className)} aria-label={teks[0]}>
       <span aria-hidden="true" ref={a} className="teks-morph__lapis" />
       <span aria-hidden="true" ref={b} className="teks-morph__lapis" />
       <FilterAmbang />
