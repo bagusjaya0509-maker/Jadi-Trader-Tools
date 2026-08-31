@@ -2705,10 +2705,17 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
        dua kali, dan dua garis bertumpuk di tempat yang sama cuma menebalkan
        garis entry tanpa memberi tahu apa pun. */
     if (a === b) return [];
-    const angka = (v: number) => (v > 100 ? v.toFixed(0) : v.toFixed(4));
+    /* Label KOSONG, dan itu disengaja. `title` digambar sebagai kotak yang
+       menjorok ke dalam kanvas, sementara harganya SUDAH tertulis di sumbu
+       kanan oleh `axisLabelVisible`. Dua tempat untuk satu angka berarti
+       satu di antaranya cuma menutupi lilin — dan yang menutupi lilin
+       adalah yang di dalam kanvas.
+
+       Pola yang sama dipakai zona SNR di bawah: cuma garis tengahnya yang
+       diberi nama ("R"/"S"), batas-batasnya dibiarkan tanpa teks. */
     return [
-      { harga: b, warna: 'rgba(255,255,255,.32)', label: angka(b) },
-      { harga: a, warna: 'rgba(255,255,255,.32)', label: angka(a) },
+      { harga: b, warna: 'rgba(255,255,255,.32)', label: '' },
+      { harga: a, warna: 'rgba(255,255,255,.32)', label: '' },
     ];
   }, [cari]);
 
