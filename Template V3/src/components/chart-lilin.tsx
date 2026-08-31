@@ -494,20 +494,12 @@ export function ChartLilin({
            nilainya dibekukan saat mount, dan efek di bawah yang mengurus
            perubahan sesudahnya. */
         vertLines: { color: WARNA_CHART[temaSekarang()].kisi, visible: rupaRef.current.kisi },
-        /* ── KISI MENDATAR PADAM ────────────────────────────────────────
-           Diminta pemilik: garis di level 100 dan 0 pada panel SMI.
-
-           Keduanya garis KISI biasa — digambar di tiap penanda skala harga,
-           dan di panel SMI penandanya kebetulan 100 / 0 / -100. Pustaka ini
-           tidak punya sakelar kisi per-panel, jadi memadamkannya di SMI
-           berarti memadamkannya di mana pun. Itu pilihan sadar, bukan
-           kelalaian: harganya masih terbaca di sumbu kanan, sementara yang
-           hilang cuma garis yang membelah panel indikator setinggi 80 px
-           jadi tiga.
-
-           Yang TEGAK sengaja dibiarkan hidup — itu yang baru saja diminta
-           supaya terlihat, dan warna keduanya memang medan terpisah. */
-        horzLines: { visible: false },
+        /* Warna SENDIRI, bukan warna yang sama dengan yang tegak.
+           Garis tegak perlu 7% supaya bertahan saat menyeberangi lilin;
+           garis mendatar pada 7% membuat panel SMI setinggi 80 px terlihat
+           terbelah tiga oleh penanda 100 / 0 / -100. Dua kebutuhan yang
+           berbeda, dan pustakanya memang menyediakan dua medan. */
+        horzLines: { color: WARNA_CHART[temaSekarang()].kisiMendatar, visible: rupaRef.current.kisi },
       },
       rightPriceScale: { borderColor: WARNA_CHART[temaSekarang()].batasSkala },
       timeScale: { borderColor: WARNA_CHART[temaSekarang()].batasSkala, timeVisible: true, secondsVisible: false },
@@ -712,7 +704,7 @@ export function ChartLilin({
          `rupa.kisi` cukup ditambahkan ke larik dependensi efek ini. */
       grid: {
         vertLines: { color: w.kisi, visible: rupa.kisi },
-        horzLines: { visible: false },
+        horzLines: { color: w.kisiMendatar, visible: rupa.kisi },
       },
       rightPriceScale: { borderColor: w.batasSkala },
       timeScale: { borderColor: w.batasSkala },

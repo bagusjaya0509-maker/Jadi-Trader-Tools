@@ -67,6 +67,20 @@ export const WARNA_CHART = {
        Tujuh persen masih bisikan — di bidang kosong ia nyaris tak terlihat
        — tapi cukup untuk bertahan saat menyeberangi badan lilin. */
     kisi: 'rgba(255,255,255,.07)',
+    /* Kisi MENDATAR punya angkanya sendiri, dan sengaja tetap di 4% —
+       nilai yang dipakai sejak awal.
+
+       Keduanya dulu satu angka, dan itu yang bikin salah. Saat angkanya
+       dinaikkan supaya garis TEGAK bertahan menyeberangi lilin, garis
+       mendatar ikut naik — dan di panel SMI yang cuma setinggi 80 px,
+       penandanya jatuh tepat di 100 / 0 / -100 sehingga panelnya terlihat
+       terbelah tiga.
+
+       Dipisah, bukan salah satunya dimatikan: garis mendatar di chart utama
+       itu tempat mata membaca level harga, dan mematikannya untuk
+       menyelesaikan masalah di panel indikator adalah menukar satu gangguan
+       kecil dengan satu kehilangan besar. */
+    kisiMendatar: 'rgba(255,255,255,.04)',
     batasSkala: 'rgba(255,255,255,.08)',
     bidik: 'rgba(255,255,255,.2)',
     labelBidik: '#27272a',
@@ -87,6 +101,7 @@ export const WARNA_CHART = {
        jadi angka yang sama terasa lebih ramai. Diturunkan sedikit supaya
        kisinya tetap berbisik. */
     kisi: 'rgba(0,0,0,.09)',
+    kisiMendatar: 'rgba(0,0,0,.06)',
     batasSkala: 'rgba(0,0,0,.12)',
     bidik: 'rgba(0,0,0,.35)',
     labelBidik: '#334155',
