@@ -262,6 +262,49 @@ function simbolChart(pasangan) {
   return '';
 }
 
+/* ══ ALAMAT YANG LANGSUNG MENGGAMBAR LEVELNYA ══════════════════════════
+   Chart & Entry sudah bisa menerima `arah`, `entry`, `sl`, dan `tp` lewat
+   alamat, dan menggambarnya sebagai garis — jalur itu dipakai kartu sinyal
+   di ruang analis sejak lama. Yang kurang cuma satu: lonceng tidak pernah
+   mengisinya, jadi yang mengklik "Lihat levelnya" mendarat di daftar kartu
+   dan harus membuka chartnya sendiri, lalu mengetik ulang tiga angka yang
+   sudah tertulis di loncengnya.
+
+   ── SATU TP, BUKAN SEMUANYA ──────────────────────────────────────────
+   Chart menerima satu `tp`. Yang dikirim TP PERTAMA — target terdekat, dan
+   satu-satunya yang benar-benar menentukan apakah sebuah entry masih masuk
+   akal sekarang. TP kedua dan ketiga tetap tertulis lengkap di detail
+   loncengnya.
+
+   ── RENTANG DIJADIKAN SATU ANGKA ─────────────────────────────────────
+   Sebagian sinyal menyebut zona ("4601-4610"), bukan satu harga. Yang
+   dipakai titik tengahnya. Menggambar dua garis batas zona akan lebih
+   tepat, tapi chart cuma punya satu medan entry — dan garis di tengah zona
+   lebih berguna daripada garis di salah satu tepinya, yang akan terbaca
+   sebagai harga masuk yang pasti padahal bukan. */
+function tautanSinyal(sinyal) {
+  const s = simbolChart(sinyal && sinyal.pasangan);
+  if (!s) return '';
+
+  const rentang = Array.isArray(sinyal.rentang) ? sinyal.rentang.map(Number).filter(Boolean) : [];
+  const entry = Number(sinyal.entry)
+    || (rentang.length === 2 ? (rentang[0] + rentang[1]) / 2 : rentang[0] || 0);
+  const sl = Number(sinyal.sl) || 0;
+  const tp = Number((Array.isArray(sinyal.tp) ? sinyal.tp : [])[0]) || 0;
+
+  /* Tanpa entry maupun SL tidak ada yang bisa digambar, dan tautan yang
+     membuka chart kosong sama saja dengan tidak ada tautan. Pasangannya
+     saja tetap dibuka — itu masih menjawab "koin apa". */
+  if (!entry && !sl) return tautanChart(sinyal.pasangan, '');
+
+  const q = ['simbol=' + encodeURIComponent(s)];
+  if (sinyal.arah) q.push('arah=' + encodeURIComponent(sinyal.arah));
+  if (entry) q.push('entry=' + entry);
+  if (sl) q.push('sl=' + sl);
+  if (tp) q.push('tp=' + tp);
+  return '/chart-entry?' + q.join('&');
+}
+
 /** Alamat Chart & Entry untuk sebuah pasangan. `idArsip` opsional: kalau
  *  ada, gambar acuannya ikut terpasang -- tapi cuma untuk pemilik, karena
  *  arsipnya digerbangi di server. Untuk yang lain parameternya diabaikan
@@ -820,16 +863,15 @@ async function siapkanRuang(client, r) {
           sumber: r.agen,
           jenis: sinyal.jenis,
           pair: sinyal.pasangan,
-          /* Yang berjenis 'sinyal' SENGAJA dibiarkan kosong: layar lonceng
-             sudah mengarahkannya ke kartu sinyalnya sendiri, dan di sana
-             ada level, gerbang beli, serta rekam jejak analisnya — lebih
-             lengkap daripada chart kosong.
+          /* Dulu yang berjenis 'sinyal' dibiarkan kosong supaya layar
+             mengarahkannya ke kartu sinyalnya. Diminta pemilik diubah: yang
+             ingin dilihat lebih dulu adalah LEVELNYA di atas lilin — kartu
+             menyebut angkanya, chart menunjukkan di mana angka itu jatuh
+             terhadap harga sekarang.
 
-             Yang 'pantau' belum punya kartu (kartu cuma dibuat kalau arah,
-             entry, SL, dan TP lengkap), jadi tanpa ini ia satu-satunya
-             lonceng yang tidak menuju ke mana pun. */
-          tautan: sinyal.jenis === 'sinyal' ? ''
-            : tautanChart(sinyal.pasangan, sinyal.dariGambar ? kunci.replace(/[^\w-]/g, '') : ''),
+             Keduanya memakai pembuat alamat yang sama; bedanya cuma yang
+             'pantau' belum tentu punya level lengkap. */
+          tautan: tautanSinyal(sinyal),
           waktu: baris.waktu,
         });
 
