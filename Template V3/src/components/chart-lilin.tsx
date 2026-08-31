@@ -481,6 +481,13 @@ export function ChartLilin({
         textColor: WARNA_CHART[temaSekarang()].teks,
         fontFamily: "'IBM Plex Sans', -apple-system, sans-serif",
         fontSize: 11,
+        /* Pembatas panel SMI. Kalau tidak diisi, pustakanya memakai abu
+           terang bawaannya — garis putih membelah chart di tema gelap. */
+        panes: {
+          separatorColor: WARNA_CHART[temaSekarang()].pisahPane,
+          separatorHoverColor: WARNA_CHART[temaSekarang()].pisahPaneSorot,
+          enableResize: true,
+        },
       },
       grid: {
         /* `visible` dibaca dari ref karena efek ini berdependensi kosong --
@@ -674,7 +681,18 @@ export function ChartLilin({
     if (!c) return;
     const w = WARNA_CHART[tema];
     c.applyOptions({
-      layout: { textColor: w.teks },
+      /* Ikut diperbarui di sini, bukan cuma saat dibuat: berganti tema
+         tanpa ini meninggalkan pembatas berwarna tema sebelumnya — dan yang
+         paling terlihat justru arah gelap->terang, saat garis yang tadinya
+         pas jadi nyaris hilang. */
+      layout: {
+        textColor: w.teks,
+        panes: {
+          separatorColor: w.pisahPane,
+          separatorHoverColor: w.pisahPaneSorot,
+          enableResize: true,
+        },
+      },
       /* Kenapa `rupa.kisi` ikut di sini, bukan di efeknya sendiri: grid
          hanya punya DUA tempat pemasangan (saat dibuat dan di sini), dan
          menambah tempat ketiga berarti tiga salinan aturan yang sama.

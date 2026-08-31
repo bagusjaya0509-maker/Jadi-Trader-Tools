@@ -54,11 +54,30 @@ export function useTema(): Tema {
 export const WARNA_CHART = {
   gelap: {
     teks: '#a1a1aa',
-    kisi: 'rgba(255,255,255,.04)',
+    /* 4% -> 7%. Dinaikkan bukan karena kisinya kurang terang, tapi karena
+       garis TEGAK-nya praktis hilang.
+
+       Keduanya memakai warna yang sama, tapi tidak sama nasibnya: garis
+       mendatar duduk di tiap label skala harga — rapat, sejajar, dan mata
+       menangkapnya sebagai pola. Garis tegak cuma digambar di penanda
+       waktu, segelintir saja selebar layar, dan tiap satunya harus melewati
+       kerumunan lilin. Pada 4% ia kalah oleh lilin yang dilewatinya, dan
+       chartnya terbaca "cuma punya garis mendatar".
+
+       Tujuh persen masih bisikan — di bidang kosong ia nyaris tak terlihat
+       — tapi cukup untuk bertahan saat menyeberangi badan lilin. */
+    kisi: 'rgba(255,255,255,.07)',
     batasSkala: 'rgba(255,255,255,.08)',
     bidik: 'rgba(255,255,255,.2)',
     labelBidik: '#27272a',
     garisNol: 'rgba(255,255,255,.14)',
+    /* Pembatas antara panel lilin dan panel SMI. Tanpa nilai ini pustakanya
+       memakai bawaannya sendiri — abu terang yang di atas latar hampir
+       hitam terbaca sebagai GARIS PUTIH membelah chart. Ia pembatas, bukan
+       pengumuman: tugasnya memberi tahu ada dua panel, bukan menarik mata
+       ke dirinya sendiri. */
+    pisahPane: 'rgba(255,255,255,.06)',
+    pisahPaneSorot: 'rgba(255,255,255,.16)',
   },
   terang: {
     teks: '#52525b',
@@ -67,10 +86,12 @@ export const WARNA_CHART = {
        juga — tapi mata jauh lebih peka pada garis gelap di bidang terang,
        jadi angka yang sama terasa lebih ramai. Diturunkan sedikit supaya
        kisinya tetap berbisik. */
-    kisi: 'rgba(0,0,0,.06)',
+    kisi: 'rgba(0,0,0,.09)',
     batasSkala: 'rgba(0,0,0,.12)',
     bidik: 'rgba(0,0,0,.35)',
     labelBidik: '#334155',
     garisNol: 'rgba(0,0,0,.18)',
+    pisahPane: 'rgba(0,0,0,.09)',
+    pisahPaneSorot: 'rgba(0,0,0,.2)',
   },
 } as const;
