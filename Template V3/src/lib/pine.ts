@@ -586,9 +586,21 @@ class Pengurai {
            — dan chart H4 setahun sudah cukup untuk terasa. */
         const sah: number[] = [];
         let kk = 0;
+        /* -- SATU BAR KOSONG DI TITIK LOMPATAN ------------------------
+           Tanpa ini, penggambar chart menyambung level lama ke level baru
+           dengan ruas TEGAK, dan delapan garis yang saling melompat
+           terbaca sebagai kotak-kotak — bukan peta level.
+
+           Chart memecah garis jadi seri terpisah tiap kali nilainya null,
+           jadi satu bar bolong sudah cukup untuk memutusnya. Satu bar dari
+           ratusan tidak terlihat mata; ruas tegak setinggi seribu dolar
+           sangat terlihat. */
+        let lalu: number | null = null;
         for (let i = 0; i < n; i++) {
           while (kk < p.length && p[kk].index + kanan <= i) { sah.push(p[kk].value); kk++; }
-          out[i] = sah.length > ke ? sah[sah.length - 1 - ke] : null;
+          const kini = sah.length > ke ? sah[sah.length - 1 - ke] : null;
+          out[i] = lalu != null && kini != null && kini !== lalu ? null : kini;
+          lalu = kini;
         }
         return out;
       }
