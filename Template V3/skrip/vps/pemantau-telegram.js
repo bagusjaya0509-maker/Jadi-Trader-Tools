@@ -239,6 +239,40 @@ function jamJakarta(ms) {
   } catch (e) { return ''; }
 }
 
+/* ══ KE MANA SEBUAH LONCENG MENUNJUK ═══════════════════════════════════
+   Semua lonceng Telegram selama ini dikirim dengan `tautan: ''`. Yang
+   membacanya harus membuka Chart & Entry sendiri lalu mengetik pasangannya
+   -- padahal loncengnya sudah tahu pasangan apa yang dibicarakan.
+
+   ── SATU PEMETAAN YANG TIDAK BOLEH DITEBAK ───────────────────────────
+   Emas ditulis `XAUUSD` di mana-mana, tapi chart di aplikasi ini
+   mengambilnya lewat MetaTrader: alamatnya `MT5:XAUUSD`. Tanpa awalan itu
+   yang terbuka halaman kosong berisi peringatan "tidak ada data" -- tautan
+   yang berfungsi hanya sampai halaman, bukan sampai jawaban.
+
+   Selain itu: pasangan kripto sudah berakhiran USDT dan dipakai apa adanya.
+   Yang TIDAK dikenali tidak dibuatkan tautan sama sekali. Tautan yang
+   mendarat di halaman kosong lebih buruk daripada tidak ada tautan: yang
+   pertama membuang klik DAN kepercayaan, yang kedua cuma tidak membantu. */
+function simbolChart(pasangan) {
+  const p = String(pasangan || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (!p) return '';
+  if (p === 'XAUUSD' || p === 'GOLD') return 'MT5:XAUUSD';
+  if (/USDT$/.test(p)) return p;
+  return '';
+}
+
+/** Alamat Chart & Entry untuk sebuah pasangan. `idArsip` opsional: kalau
+ *  ada, gambar acuannya ikut terpasang -- tapi cuma untuk pemilik, karena
+ *  arsipnya digerbangi di server. Untuk yang lain parameternya diabaikan
+ *  diam-diam dan mereka tetap mendarat di pasangan yang benar. */
+function tautanChart(pasangan, idArsip) {
+  const s = simbolChart(pasangan);
+  if (!s) return '';
+  return '/chart-entry?simbol=' + encodeURIComponent(s)
+       + (idArsip ? '&jiplak=' + encodeURIComponent(idArsip) : '');
+}
+
 /* Judul dan detail lonceng chart, dipakai DUA jalur: pesan yang tertangkap
    langsung, dan yang disusul sapuan. Ditulis sekali supaya keduanya tidak
    pernah bercerita berbeda tentang kejadian yang sama -- persis cacat yang
@@ -618,7 +652,9 @@ async function siapkanRuang(client, r) {
           /* Lencana kecil di depan judul. Yang menyeberang cuma NAMA
              pasangan hasil uraian kita sendiri — bukan keterangannya. */
           pair: adaGambar ? k.pas : '',
-          tautan: '',
+          /* Postingan tanpa gambar tidak dibuatkan tautan: tidak ada chart
+             yang bisa dituju, dan tidak ada pasangan yang tertebak. */
+          tautan: adaGambar ? tautanChart(k.pas, kunci.replace(/[^\w-]/g, '')) : '',
           waktu: baris.waktu,
         });
       }
@@ -736,7 +772,10 @@ async function siapkanRuang(client, r) {
           sumber: r.agen,
           jenis: 'pantau',
           pair: mataHasil.pasangan || '',
-          tautan: '',
+          /* Zona dibaca DARI gambar, jadi gambarnya ikut dibawa: yang
+             membacanya ingin membandingkan zona itu dengan lilin yang
+             sebenarnya, dan itu paling cepat kalau keduanya sejajar. */
+          tautan: tautanChart(mataHasil.pasangan, kunci.replace(/[^\w-]/g, '')),
           waktu: baris.waktu,
         });
         catat('  zona dikabarkan ke lonceng');
@@ -781,7 +820,16 @@ async function siapkanRuang(client, r) {
           sumber: r.agen,
           jenis: sinyal.jenis,
           pair: sinyal.pasangan,
-          tautan: '',
+          /* Yang berjenis 'sinyal' SENGAJA dibiarkan kosong: layar lonceng
+             sudah mengarahkannya ke kartu sinyalnya sendiri, dan di sana
+             ada level, gerbang beli, serta rekam jejak analisnya — lebih
+             lengkap daripada chart kosong.
+
+             Yang 'pantau' belum punya kartu (kartu cuma dibuat kalau arah,
+             entry, SL, dan TP lengkap), jadi tanpa ini ia satu-satunya
+             lonceng yang tidak menuju ke mana pun. */
+          tautan: sinyal.jenis === 'sinyal' ? ''
+            : tautanChart(sinyal.pasangan, sinyal.dariGambar ? kunci.replace(/[^\w-]/g, '') : ''),
           waktu: baris.waktu,
         });
 
@@ -994,7 +1042,7 @@ async function siapkanRuang(client, r) {
                 sumber: r.agen,
                 jenis: 'pantau',
                 pair: k.pas,
-                tautan: '',
+                tautan: tautanChart(k.pas, id),
                 waktu,
               });
             } catch (e) { catat('  lonceng sapuan gagal:', e && e.message); }
