@@ -37,7 +37,8 @@ export type { SegmenPine, PenandaPine, KotakPine, IsianPine, InputPine } from '@
      · ta.*        : sma, ema, rma, wma, atr, rsi, highest, lowest, change,
                      crossover, crossunder, stdev
      · lain        : math.abs/max/min, nz(), na
-     · khusus JT   : jt.smi(), jt.smiSignal(), jt.pivotHigh(), jt.pivotLow()
+     · khusus JT   : jt.smi(), jt.smiSignal(), jt.pivotHigh(), jt.pivotLow(),
+                     jt.pivotHighKe(kiri, kanan, ke), jt.pivotLowKe(...)
      · keluaran    : plot(ekspresi, title=..., color=color.xxx)
                      hline(nilai, ...)
 
@@ -520,6 +521,39 @@ class Pengurai {
       /* Fungsi khusus Jadi Trader — perhitungan yang SAMA dengan screener. */
       case 'jt.smi': return (smiSeries(l.highs, l.lows, l.closes, SMI_K, SMI_D, SMI_EMA)?.smi ?? []) as Deret;
       case 'jt.smiSignal': return (smiSeries(l.highs, l.lows, l.closes, SMI_K, SMI_D, SMI_EMA)?.signal ?? []) as Deret;
+      /* ── PIVOT KE-N, BUKAN CUMA YANG TERAKHIR ──────────────────────
+         `jt.pivotHigh` memulangkan satu level: pivot terbaru, dibawa maju.
+         Itu cukup untuk "resistance terdekat", tapi tidak cukup untuk
+         menggambar SEKUMPULAN level sekaligus — dan kumpulan itulah yang
+         dipakai orang saat membaca peta harga, bukan satu garis.
+
+         `ke` menghitung mundur dari yang terbaru: 0 = pivot terakhir,
+         1 = sebelumnya, dan seterusnya. Dengan begitu satu skrip bisa
+         menggambar delapan level sekaligus tanpa delapan fungsi berbeda.
+
+         Yang DIBAWA MAJU tetap nilainya, sama seperti aslinya: sebuah level
+         yang lahir dari wick tiga minggu lalu harus tetap terlihat hari
+         ini, kalau tidak ia bukan level melainkan penanda kejadian. */
+      case 'jt.pivotHighKe': case 'jt.pivotLowKe': {
+        const kiri = a[0] ? this.bulat(a[0], id) : 10;
+        const kanan = a[1] ? this.bulat(a[1], id) : kiri;
+        const ke = a[2] ? this.bulat(a[2], id) : 0;
+        const tinggi = id === 'jt.pivotHighKe';
+        const p = findPivots(tinggi ? l.highs : l.lows, kiri, kanan, tinggi) as { index: number; value: number }[];
+        const out: Deret = new Array(n).fill(null);
+        /* Daftar pivot yang SUDAH SAH pada tiap bar dikumpulkan berjalan,
+           lalu diambil elemen ke-`ke` dari belakang. Menghitungnya ulang
+           dari nol tiap bar akan membuat skrip ini O(n²) pada chart panjang
+           — dan chart H4 setahun sudah cukup untuk terasa. */
+        const sah: number[] = [];
+        let kk = 0;
+        for (let i = 0; i < n; i++) {
+          while (kk < p.length && p[kk].index + kanan <= i) { sah.push(p[kk].value); kk++; }
+          out[i] = sah.length > ke ? sah[sah.length - 1 - ke] : null;
+        }
+        return out;
+      }
+
       case 'jt.pivotHigh': case 'jt.pivotLow': {
         const kiri = a[0] ? this.bulat(a[0], id) : 10;
         const kanan = a[1] ? this.bulat(a[1], id) : kiri;
@@ -780,6 +814,60 @@ export function jalankanPine(kode: string, l: Lilin, tf = '4h',
  *  max), `tr`, `:=` dengan riwayat sendiri, plotshape berlabel, dan fill
  *  antar plot. Kalau suatu hari salah satunya rusak, skrip ini yang pertama
  *  memperlihatkannya. */
+/* ══ GARIS SAKTI — LEVEL SNR YANG DIPAKU KE UJUNG LILIN ═════════════════
+   Disusun dari pengamatan 283 posting harian sebuah ruang analisa, Feb–Agu
+   2026, dengan level yang angkanya TERBACA di sumbu harga. Tiga hal yang
+   terbukti di sana dan ditiru di sini:
+
+     1. Levelnya presisi tiga desimal — dibaca dari ujung lilin, bukan
+        ditaruh di angka bulat. Karena itu `jt.pivotHighKe` dipakai apa
+        adanya: nilainya MEMANG harga wick-nya.
+     2. Levelnya BERTAHAN berminggu-minggu, bukan digambar ulang tiap hari.
+        4.879,295 dan 4.817,715 muncul identik di 9, 16, dan 23 April.
+        Karena itu pivot dibawa maju, bukan dilukis sekali lalu hilang.
+     3. Warnanya mengikuti posisi terhadap harga SEKARANG, bukan melekat ke
+        levelnya: di atas harga ungu, di bawah merah. Level yang ditembus
+        berganti warna sendiri — satu set garis, dua peran.
+
+   YANG TIDAK SAYA TIRU, karena tidak pernah dipublikasikan: aturan mana
+   swing yang layak jadi level. Itu penilaian orangnya. Di sini ia jadi satu
+   angka yang bisa Anda putar — `Kekuatan swing`. Naikkan sampai garis yang
+   keluar sepadat punya dia, dan Anda tahu persis apa yang sedang Anda
+   samakan.
+
+   Dipasang di H4 sesuai aslinya. Mesin ini menghitung di timeframe chart
+   yang sedang dibuka, jadi levelnya H4 hanya kalau chartnya H4. */
+export const GARIS_SAKTI_PINE = `//@version=4
+study("Garis Sakti — SNR", overlay=true)
+
+kiri  = input(title="Kekuatan swing (bar kiri)",  type=input.integer, defval=12)
+kanan = input(title="Konfirmasi (bar kanan)",     type=input.integer, defval=12)
+jml   = input(title="Berapa level tiap sisi",     type=input.integer, defval=4)
+
+// Level dipaku ke ujung lilin dan dibawa maju sampai pivot berikutnya.
+// ke=0 pivot terbaru, ke=1 sebelumnya, dst — makin besar makin tua.
+r1 = jt.pivotHighKe(kiri, kanan, 0)
+r2 = jt.pivotHighKe(kiri, kanan, 1)
+r3 = jt.pivotHighKe(kiri, kanan, 2)
+r4 = jt.pivotHighKe(kiri, kanan, 3)
+s1 = jt.pivotLowKe(kiri, kanan, 0)
+s2 = jt.pivotLowKe(kiri, kanan, 1)
+s3 = jt.pivotLowKe(kiri, kanan, 2)
+s4 = jt.pivotLowKe(kiri, kanan, 3)
+
+// Warna ditentukan SISI, bukan asal levelnya. Sebuah puncak lama yang
+// sudah ditembus ke atas berhenti jadi resistance dan mulai jadi support —
+// dan garisnya harus ikut berganti, kalau tidak ia berbohong.
+plot(r1, title="R1", color = r1 > close ? color.purple : color.red, linewidth=1)
+plot(r2, title="R2", color = r2 > close ? color.purple : color.red, linewidth=1)
+plot(r3, title="R3", color = jml > 2 ? (r3 > close ? color.purple : color.red) : na, linewidth=1)
+plot(r4, title="R4", color = jml > 3 ? (r4 > close ? color.purple : color.red) : na, linewidth=1)
+plot(s1, title="S1", color = s1 < close ? color.red : color.purple, linewidth=1)
+plot(s2, title="S2", color = s2 < close ? color.red : color.purple, linewidth=1)
+plot(s3, title="S3", color = jml > 2 ? (s3 < close ? color.red : color.purple) : na, linewidth=1)
+plot(s4, title="S4", color = jml > 3 ? (s4 < close ? color.red : color.purple) : na, linewidth=1)
+`;
+
 export const SUPERTREND_PINE = `//@version=4
 study("Supertrend", overlay = true, format=format.price, precision=2, resolution="")
 
