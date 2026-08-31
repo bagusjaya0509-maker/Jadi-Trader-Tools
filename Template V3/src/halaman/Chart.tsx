@@ -2686,6 +2686,32 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
      dan batas bawah. Pita utuh butuh seri area tersendiri; tiga garis tipis
      menyampaikan hal yang sama dengan sepersepuluh kerumitannya, dan batas
      itulah yang sebenarnya dibaca saat menilai sentuhan. */
+  /* ── ZONA ENTRY: DUA BATASNYA, BUKAN CUMA TITIK TENGAHNYA ───────────
+     Sinyal sering menyebut zona ("4449-4456"), bukan satu harga. Tiket
+     order memang cuma bisa memuat satu angka — satu order punya satu harga
+     masuk — tapi CHART tidak punya batasan itu, dan yang dibuang saat cuma
+     titik tengahnya digambar justru bagian yang menentukan: seberapa lebar
+     ruang masuknya, dan apakah harga sekarang masih di dalamnya.
+
+     Digambar tipis dan tanpa warna arah. Ia bukan level keputusan seperti
+     SL dan TP; ia daerah. Memberinya warna dan ketebalan yang sama akan
+     membuat lima garis berteriak sama keras, dan yang paling penting —
+     SL — kehilangan tempatnya. */
+  const garisZonaEntry = useMemo<GarisHarga[]>(() => {
+    const z = (cari.get('zona') || '').split('-').map(Number).filter((x) => Number.isFinite(x) && x > 0);
+    if (z.length !== 2) return [];
+    const [a, b] = z[0] <= z[1] ? [z[0], z[1]] : [z[1], z[0]];
+    /* Zona setipis nol bukan zona — itu satu harga yang kebetulan ditulis
+       dua kali, dan dua garis bertumpuk di tempat yang sama cuma menebalkan
+       garis entry tanpa memberi tahu apa pun. */
+    if (a === b) return [];
+    const angka = (v: number) => (v > 100 ? v.toFixed(0) : v.toFixed(4));
+    return [
+      { harga: b, warna: 'rgba(255,255,255,.32)', label: angka(b) },
+      { harga: a, warna: 'rgba(255,255,255,.32)', label: angka(a) },
+    ];
+  }, [cari]);
+
   const garisZona = useMemo(() => {
     if (!zona) return [];
     const g: GarisHarga[] = [];
@@ -4172,7 +4198,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
             ? <ChartLilin key={`${simbol}|${tf}|${kunciChart}`}
                           lilin={lilinGabung} garis={garis} trade={replayIdx === null ? hasil?.trade : undefined}
                           tinggi={tinggiChart} hingga={replayIdx ?? undefined} smi={smi}
-                          garisHarga={[...garisHarga, ...garisZona, ...garisDompet, ...garisKonsensus, ...(modeNyata ? garisOrder : [])]}
+                          garisHarga={[...garisHarga, ...garisZonaEntry, ...garisZona, ...garisDompet, ...garisKonsensus, ...(modeNyata ? garisOrder : [])]}
                           /* Klik chart HANYA berlaku saat mode bidik menyala —
                               sekali, untuk menentukan titik mulai replay.
                               Sesudah itu modenya padam dan klik kembali tidak

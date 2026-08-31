@@ -300,6 +300,11 @@ function tautanSinyal(sinyal) {
   const q = ['simbol=' + encodeURIComponent(s)];
   if (sinyal.arah) q.push('arah=' + encodeURIComponent(sinyal.arah));
   if (entry) q.push('entry=' + entry);
+  /* Dua batas zonanya ikut, terpisah dari `entry`. Tiket order memang cuma
+     bisa memuat satu harga masuk, tapi chart bisa menunjukkan daerahnya —
+     dan seberapa lebar ruang masuk itu, plus apakah harga sekarang masih di
+     dalamnya, justru yang dibaca orang sebelum memutuskan. */
+  if (rentang.length === 2 && rentang[0] !== rentang[1]) q.push('zona=' + rentang[0] + '-' + rentang[1]);
   if (sl) q.push('sl=' + sl);
   if (tp) q.push('tp=' + tp);
   return '/chart-entry?' + q.join('&');
