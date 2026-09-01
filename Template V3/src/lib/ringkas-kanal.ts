@@ -1,4 +1,4 @@
-import type { RingkasAnalisa, PerformaAnalis } from '@/lib/analisa';
+import type { RingkasAnalisa } from '@/lib/analisa';
 
 /* ════════════════════════════════════════════════════════════════════════
    RINGKASAN KANAL ANALIS — semuanya DITURUNKAN, tidak satu pun diklaim
@@ -99,9 +99,23 @@ function drawdownSatuan(harian: Record<string, number>, risikoPerSinyal: number)
   return terdalam / risikoPerSinyal;
 }
 
+/** Yang BENAR-BENAR dibaca dari performa di berkas ini: dua medan, tidak
+ *  lebih. Sengaja ditulis sebagai bentuk sendiri alih-alih menuntut
+ *  `PerformaAnalis` utuh, karena ada dua sumber sah yang mengisinya:
+ *
+ *    - papan peringkat dari server, yang MILIK SATU BULAN, dan
+ *    - hitungan kartu dari sinyal analisnya sendiri, sepanjang masa.
+ *
+ *  `PerformaAnalis` tetap cocok dengan bentuk ini, jadi pemanggil lama
+ *  tidak berubah sedikit pun. */
+export interface SumberPenilaian {
+  harian?: Record<string, number>;
+  slPersen?: number | null;
+}
+
 export function ringkasKanal(
   sinyal: RingkasAnalisa[],
-  perf: PerformaAnalis | null,
+  perf: SumberPenilaian | null,
   risikoPerSinyal: number,
   /** Berapa akun yang sedang menyalin analis ini (dari server).
    *  undefined = belum terbaca; ditampilkan sebagai tanda hubung. */

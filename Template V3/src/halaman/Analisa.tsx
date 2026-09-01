@@ -3762,13 +3762,52 @@ export default function Analisa() {
               const mulaiPosting = Math.min(...waktuPosting);
               const terakhirPosting = Math.max(...waktuPosting);
               const p = perfDari(uid);
+              /* ── KARTU INI BUKAN PAPAN PERINGKAT ────────────────────
+                 `perfDari` membaca papan, dan papan itu sengaja MILIK
+                 SATU BULAN — reset tiap tanggal 1, dan itu benar untuk
+                 papan. Tapi kartu ini bukan papan: winrate, jumlah
+                 sinyal, rentang tanggalnya, dan kurva ekuitasnya semua
+                 sepanjang masa.
+
+                 Mengambil SATU angka dari sumber bulanan di antara angka
+                 sepanjang-masa membuat setiap tanggal 1 seluruh kartu
+                 berbunyi "Belum ada hasil — sinyalnya masih berjalan"
+                 tepat di atas kurva yang membuktikan sebaliknya, lengkap
+                 dengan winrate di kepalanya. Terbaca sebagai aplikasi
+                 yang kehilangan data, bukan sebagai bulan baru.
+
+                 Dihitung dari sinyalnya sendiri dengan rumus yang SAMA
+                 dengan server — `hasilDolar` tiap sinyal sudah dihitung
+                 di sana memakai modal dan risiko yang sama — jadi di
+                 dalam satu bulan angkanya tetap identik dengan papan.
+                 Yang berubah cuma: ia tidak lagi hilang saat bulan
+                 berganti.
+
+                 `slPersen` tetap dari server: ia diturunkan dari level
+                 entry/SL yang tidak selalu terbuka di sisi ini. */
+              const selesaiKartu = sinyal.filter((s) => typeof s.hasilDolar === 'number');
+              const hasilKartu = selesaiKartu.length
+                ? selesaiKartu.reduce((t, s) => t + (s.hasilDolar as number), 0)
+                : null;
+              const perfKartu = selesaiKartu.length ? {
+                /* Kunci hari LOKAL — kalender kanal membacanya lokal juga,
+                   dan dua penulisan tanggal yang berbeda untuk sinyal yang
+                   sama akan menggeser penilaian risikonya. */
+                harian: selesaiKartu.reduce<Record<string, number>>((h, s) => {
+                  const d = new Date(s.waktuHasil || s.dibuat);
+                  const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                  h[k] = (h[k] ?? 0) + (s.hasilDolar as number);
+                  return h;
+                }, {}),
+                slPersen: p?.slPersen ?? null,
+              } : null;
               /* Petanya sudah terbaca → kunci yang tidak ada berarti NOL.
                  Belum terbaca → undefined, dan kartunya menulis "—". */
-              const r = ringkasKanal(sinyal, p, risikoPerSinyal,
+              const r = ringkasKanal(sinyal, perfKartu, risikoPerSinyal,
                 pengikutPeta ? (pengikutPeta[uid] ?? 0) : undefined);
               /* Warna aksen kartu mengikuti arah hasilnya — sama dengan
                  warna kurvanya, supaya latar dan garis tidak berselisih. */
-              const warnaAksen = p && p.hasilDolar < 0 ? '#f87171' : '#34d399';
+              const warnaAksen = hasilKartu !== null && hasilKartu < 0 ? '#f87171' : '#34d399';
               const disemat = disematkan(uid);
               return (
                 /* Bukan satu <button> besar lagi: tombol pin ada DI DALAM
@@ -3989,10 +4028,10 @@ export default function Analisa() {
                           jawaban. Kartunya lalu terlihat separuh rusak
                           justru pada analis yang baru mulai, yaitu yang
                           paling butuh terlihat wajar. */}
-                      {p ? (
+                      {hasilKartu !== null ? (
                         <span className={cn('mt-3 block text-[34px] font-medium leading-none tracking-tight',
-                          p.hasilDolar >= 0 ? 'text-emerald-400' : 'text-red-400')}>
-                          {uang(p.hasilDolar, true)}
+                          hasilKartu >= 0 ? 'text-emerald-400' : 'text-red-400')}>
+                          {uang(hasilKartu, true)}
                         </span>
                       ) : (
                         <span className="mt-3 block text-[15px] font-medium leading-[34px] text-zinc-500">
@@ -4000,7 +4039,7 @@ export default function Analisa() {
                         </span>
                       )}
                       <span className="mt-1 block text-[10.5px] text-zinc-600">
-                        {p ? 'estimasi dari modal $1.000' : 'sinyalnya masih berjalan — hasilnya dihitung saat kena TP atau SL'}
+                        {hasilKartu !== null ? 'estimasi dari modal $1.000' : 'sinyalnya masih berjalan — hasilnya dihitung saat kena TP atau SL'}
                       </span>
                       {/* Lencana risiko DI KIRI, tepat di bawah baris estimasi.
                           Permintaan pemilik, dan urutannya jadi menurun rapi:
