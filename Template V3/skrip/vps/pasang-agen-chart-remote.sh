@@ -30,10 +30,6 @@ trap pulihkan ERR
 cp /tmp/agen/pemantau-telegram.js pemantau-telegram.js
 cp /tmp/agen/kartu-agen.js        kartu-agen.js
 cp /tmp/agen/mata-chart.js        mata-chart.js
-# rangkai.js & pasangan-chart.js: dependensi require() pemantau -- tanpa
-# keduanya pemantau mati MODULE_NOT_FOUND di VPS yang baru dipasang.
-[ -f /tmp/agen/rangkai.js ] && cp /tmp/agen/rangkai.js rangkai.js
-[ -f /tmp/agen/pasangan-chart.js ] && cp /tmp/agen/pasangan-chart.js pasangan-chart.js
 cp /tmp/agen/bersihkan-jejak.mjs  bersihkan-jejak.mjs
 
 node --check pemantau-telegram.js

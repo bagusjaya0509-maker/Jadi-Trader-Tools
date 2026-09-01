@@ -539,38 +539,9 @@ export default function ChartBacktest() {
     if ((ambilSimbol(cari) || '') === simbol) return;
     const q = new URLSearchParams(cari);
     q.set('simbol', simbol);
-    /* -- LEVEL SINYAL TIDAK IKUT PINDAH PASANGAN -----------------------
-       Tautan sinyal membawa entry/sl/tp/arah/zona untuk SATU pasangan.
-       Saat orangnya pindah ke pasangan lain, parameter itu tadinya
-       tertinggal di alamat -- dan efek pemasang level, yang kuncinya
-       memuat simbol, memasang ulang level ETH di chart emas begitu
-       skalanya kebetulan mirip. Refresh lebih parah: tiket penuh hidup
-       lagi untuk pair yang salah.
-
-       Dibuang DI SINI, bukan di pemasangnya, karena di sinilah pasangan
-       benar-benar berganti: pemuatan pertama dari tautan tidak lewat sini
-       (state lahir dari alamat, jadi keduanya sudah sama). */
-    for (const k of ['entry', 'sl', 'tp', 'arah', 'zona', 'sinyal', 'kanal', 'analis', 'untuk']) {
-      q.delete(k);
-    }
     navigasi({ search: '?' + q.toString() }, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [simbol]);
-
-  /* -- ALAMAT IKUT TIMEFRAME, ALASAN YANG SAMA DENGAN SIMBOL ----------
-     Tanpa ini alirannya satu arah: ?tf= dibaca ke state, tapi pemilih TF
-     hanya setTf. Setiap kali alamat ditulis ulang oleh hal lain (ganti
-     simbol, menutup panel dompet), efek pembaca di atas menemukan tf=4h
-     basi dari tautan awal dan melempar chart balik ke 4h -- padahal
-     orangnya sedang kerja di 15m. Ditulis balik, pembacaan ulang jadi
-     no-op. */
-  useEffect(() => {
-    if ((cari.get('tf') || '').toLowerCase() === tf) return;
-    const q = new URLSearchParams(cari);
-    q.set('tf', tf);
-    navigasi({ search: '?' + q.toString() }, { replace: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tf]);
   const [lilin, setLilin] = useState<Lilin>({ opens: [], highs: [], lows: [], closes: [], times: [] });
   /* Dibaca di dalam penarikan data untuk memutuskan apakah kegagalan layak
      jadi peringatan. Ref, bukan state: penarikannya berjalan di dalam efek

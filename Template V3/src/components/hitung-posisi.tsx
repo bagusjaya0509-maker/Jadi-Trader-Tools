@@ -182,10 +182,7 @@ function Kripto({ entry, jarakPersen, risikoDolar, n }: {
   entry: number; jarakPersen: number; risikoDolar: number; n: Simpanan;
 }) {
   const nilaiPosisi = risikoDolar / (jarakPersen / 100);
-  /* Modal kosong (0) membuat 0/0 = NaN dan barisnya tercetak "NaNx".
-     Nol berarti belum diisi -- tampilkan cabang "tidak perlu leverage"
-     alih-alih angka rusak. */
-  const levMin = n.modal > 0 ? nilaiPosisi / n.modal : 0;
+  const levMin = nilaiPosisi / n.modal;
   const marginTerpakai = n.leverage > 0 ? nilaiPosisi / n.leverage : 0;
   const kurangMargin = marginTerpakai > n.modal;
   /* Di atas 10x, satu gerak kecil melawan sudah memakan sebagian besar

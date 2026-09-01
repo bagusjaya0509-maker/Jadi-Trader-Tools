@@ -596,7 +596,7 @@ function Bantuan({ ciut }: { ciut: boolean }) {
      cepat malah tersesat di daftar artikel. */
   const SALURAN = [
     { Ikon: MessageCircle, label: 'WhatsApp', ket: BADAN.waTampil, href: WA_LINK, warna: 'text-emerald-400' },
-    { Ikon: Send, label: 'Discord', ket: 'Diskusi & komunitas', href: 'https://discord.gg/zcEMgxwY4', warna: 'text-indigo-400' },
+    { Ikon: Send, label: 'Discord', ket: 'Diskusi & komunitas', href: '#', warna: 'text-indigo-400' },
     /* Email USAHA, bukan email pribadi pemilik. Alamat pribadi di halaman
        bantuan berarti alamat itu ikut tersebar ke setiap pengguna, tidak
        bisa didelegasikan ke siapa pun, dan terbaca sebagai hobi ketimbang

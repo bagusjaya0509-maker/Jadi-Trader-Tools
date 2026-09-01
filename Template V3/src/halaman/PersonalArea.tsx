@@ -92,15 +92,7 @@ export default function PersonalArea() {
   /* Riwayat bulanan DICATAT, bukan dikarang. Tiap kali halaman dibuka, porto
      bersih bulan berjalan ditulis ulang — jadi grafiknya tumbuh sejak hari
      pertama dipakai, bukan menampilkan enam bulan yang tidak pernah terjadi. */
-  /* Bulan LOKAL, bukan toISOString (= UTC). Sebelum jam 07.00 WIB di
-     tanggal 1, kunci UTC masih menunjuk bulan LALU -- suntingan porto di
-     jendela itu menimpa angka penutup bulan lalu di Firestore secara
-     permanen. porto.ts (bulananContoh) dan label grafiknya sendiri sudah
-     memakai waktu lokal. */
-  const kunciBulan = (() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-  })();
+  const kunciBulan = new Date().toISOString().slice(0, 7);
   /* Yang dicatat adalah nilai TERSIMPAN, bukan nilai yang sudah disesuaikan
      harga pasar. Kalau harga yang dipakai, angkanya berubah tiap kali harga
      bergerak — dan setiap pergerakan memicu satu tulisan ke Firestore. Satu
@@ -140,24 +132,10 @@ export default function PersonalArea() {
     finally { setSibuk(false); }
   }
 
-  /* -- PARSER RUPIAH, BUKAN Number() POLOS ---------------------------
-     Kolomnya bertuliskan "Nilai (Rp)" dan pemakainya orang Indonesia:
-     "500.000" berarti lima ratus ribu. Number("500.000") = 500 -- lolos
-     isFinite dan tersimpan DIAM-DIAM seribu kali lebih kecil; total aset,
-     porsi pai, dan riwayat bulanan Firestore ikut salah. "1.500.000"
-     malah NaN dan ditolak. Aturannya di sini: koma = desimal; titik yang
-     diikuti tepat 3 digit = pemisah ribuan. */
-  function angkaRupiah(teks: string): number {
-    let t = teks.replace(/[^\d.,-]/g, '');
-    t = t.replace(/\.(?=\d{3}(\D|$))/g, '');
-    t = t.replace(',', '.');
-    return Number(t);
-  }
-
   function tambahPos() {
-    const nilai = angkaRupiah(baru.nilai);
+    const nilai = Number(baru.nilai.replace(/[^\d.-]/g, ''));
     if (!baru.nama.trim()) { setPesan('Nama pos wajib diisi.'); return; }
-    if (!isFinite(nilai)) { setPesan('Nilai harus berupa angka \u2014 tulis 500000 atau 500.000.'); return; }
+    if (!isFinite(nilai)) { setPesan('Nilai harus berupa angka.'); return; }
     const sim = baru.simbol.trim().toUpperCase();
     /* Harga saat dicatat disimpan bersama posnya. Itulah titik nol yang
        membuat "nilai kini" punya arti — tanpanya pos bersimbol cuma angka

@@ -289,18 +289,9 @@ export function DockPine({ buka, tab, aturTab, onTutup, lilin, simbol, tf, hingg
   const pilih = daftar.find((s) => s.id === idPilih) ?? daftar[0];
   const aktif = daftar.find((s) => s.aktif) ?? null;
 
-  /* -- STABIL, DAN ITU BUKAN GAYA ------------------------------------
-     `ubahDaftar` masuk daftar dependensi `hapusId`, dan `hapusId` masuk
-     dependensi efek yang memanggil `onKendali` -- setter state di halaman
-     Chart. Sebagai fungsi biasa, identitasnya baru tiap render: hapusId
-     ikut baru, efeknya jalan tiap render, setKendaliPine menerima objek
-     baru, Chart render ulang, dan putarannya tertutup. React menghentikan
-     lingkaran itu dengan "Maximum update depth exceeded" dan halaman
-     chart rusak. Isinya sendiri sudah aman dibekukan: setDaftar bentuk
-     fungsional tidak membaca apa pun dari closure. */
-  const ubahDaftar = useCallback((f: (d: SkripPine[]) => SkripPine[]) => {
+  function ubahDaftar(f: (d: SkripPine[]) => SkripPine[]) {
     setDaftar((d) => { const b = f(d); simpanDaftar(b); return b; });
-  }, []);
+  }
 
   /* Memanggil agen Dokter Pine. Lewat backend kita, bukan langsung ke n8n:
      alamat & credential agen tidak boleh sampai ke browser. Jawabannya
