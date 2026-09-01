@@ -193,6 +193,11 @@ ATURAN:
 - "arah" diisi hanya kalau tergambar atau tertulis jelas (panah, label BUY/
   SELL, tulisan "long"/"short"). Zona merah di atas harga bukan bukti SELL.
 - "zona" untuk kotak area (support/resistance/demand/supply): [bawah, atas].
+- "pasangan" DISALIN dari judul kecil di pojok KIRI ATAS area chart
+  ("SOLUSD - 1D - CRYPTO" -> SOLUSD; "Solana / USDT" -> SOLUSDT). Judul itu
+  hampir selalu ada. JANGAN memakai tanda air besar di tengah gambar - itu
+  nama analisnya, bukan nama koin. Kalau judulnya benar-benar tidak terbaca,
+  sebutkan nama koin yang kamu lihat di awal "catatan".
 - Kalau gambarnya bukan chart trading, pulangkan semua null dengan
   "catatan" menjelaskan isinya.`;
 
@@ -322,8 +327,20 @@ async function bacaGambarChart(bita, ket = '', tipe = 'image/jpeg', waktuMs = 0,
      memeriksa hal yang sama sebelum mengunduh gambarnya — dan itu memang
      disengaja. Gerbang yang cuma hidup di satu tempat akan bocor begitu
      pemanggil kedua muncul, dan yang bocor di sini adalah uang. */
-  const izin = bolehBaca(waktuMs);
-  if (!izin.boleh) return { galat: izin.alasan };
+  /* Bacaan MANUAL melewati saklar, tapi TIDAK melewati jatah harian.
+     Bedanya penting: saklar menjawab "apakah agen ini boleh bekerja
+     sendiri", dan tombol yang ditekan pemilik memang bukan kerja sendiri.
+     Jatah menjawab "berapa banyak yang boleh keluar hari ini", dan itu
+     berlaku untuk siapa pun yang menekan apa pun.
+
+     Jendela tanggal juga dilewati di sini — bukan karena ia tidak berlaku,
+     tapi karena pemanggil manual sudah memilih sendiri chart mana yang
+     dibaca. Memeriksanya dua kali dengan dua jendela yang berbeda hanya
+     menghasilkan penolakan yang tidak bisa dijelaskan ke orangnya. */
+  if (opsi.manual !== true) {
+    const izin = bolehBaca(waktuMs);
+    if (!izin.boleh) return { galat: izin.alasan };
+  }
   if (!KUNCI) return { galat: 'OPENROUTER_API_KEY kosong' };
   if (!bita || !bita.length) return { galat: 'gambar kosong' };
   if (bita.length > MAKS_BITA) return { galat: 'gambar ' + Math.round(bita.length / 1024) + ' KB — di atas batas' };
@@ -385,7 +402,24 @@ async function bacaGambarChart(bita, ket = '', tipe = 'image/jpeg', waktuMs = 0,
   try { d = JSON.parse(bersih); }
   catch (e) { return { galat: 'jawaban bukan JSON: ' + bersih.slice(0, 120) }; }
 
-  const pasangan = d.pasangan ? String(d.pasangan).toUpperCase().replace(/[^A-Z0-9]/g, '') : null;
+  let pasangan = d.pasangan ? String(d.pasangan).toUpperCase().replace(/[^A-Z0-9]/g, '') : null;
+  /* ── CADANGAN: NAMA KOIN DIGALI DARI CATATAN ──────────────────────
+     Terukur 1 Sep 2026: Sonnet memulangkan `pasangan: null` untuk chart
+     yang judulnya jelas berbunyi "SOLUSD - 1D - CRYPTO", sementara
+     catatannya sendiri dibuka dengan "Chart SOLUSD 1D dengan dua zona...".
+     Namanya ADA, cuma tidak di medan yang diminta.
+
+     Itu bukan kejadian sepele. Tanpa nama, tidak ada harga pasar; tanpa
+     harga pasar, tidak ada wasit; tanpa wasit, angka yang seribu kali
+     meleset ikut lolos. Satu medan kosong menjatuhkan seluruh rantainya.
+
+     Digali dengan pola tiket bursa (huruf besar 5-12, memuat USD), bukan
+     kamus nama koin: kamus akan selalu ketinggalan koin baru, dan koin
+     baru justru yang paling sering diposting. */
+  if (!pasangan) {
+    const m = String(d.catatan || '').match(/\b([A-Z]{2,9}USDT?|[A-Z]{3,10}\/USDT?)\b/);
+    if (m) pasangan = m[1].toUpperCase().replace(/[^A-Z0-9]/g, '');
+  }
 
   /* ── ANGKANYA DIADU DENGAN HARGA PASAR ────────────────────────────
      `cariHarga` disuntik pemanggil, bukan di-fetch di sini: berkas ini
@@ -399,6 +433,26 @@ async function bacaGambarChart(bita, ket = '', tipe = 'image/jpeg', waktuMs = 0,
     catch (e) { harga = 0; }
   }
   const lv = sahihkanLevel(d, harga);
+  /* ── TANPA WASIT, TIDAK ADA ANGKA ─────────────────────────────────
+     Ini yang tadinya bocor. `uraiAngka` tanpa acuan meloloskan angka yang
+     TIDAK AMBIGU — dan "60000" tidak ambigu, ia cuma salah. Bacaan nyata
+     hari ini memulangkan zona [60000, 65000] untuk SOL yang sedang di
+     $102; keduanya lolos karena tidak ada koma maupun titik yang bisa
+     ditafsirkan dua cara.
+
+     Pagar `pasti` memang menahannya jadi kartu. Tapi angka itu tetap
+     tampil di lonceng dan di panel, dan zona seribu kali meleset yang
+     terbaca meyakinkan lebih buruk daripada zona yang tidak ada.
+
+     Jadi tanpa harga pasar, seluruh angkanya dibuang dan alasannya
+     ditulis. Yang tersisa tetap berguna: pasangan, arah, dan kalimat
+     penjelasnya — itu yang membuat loncengnya masih layak berbunyi. */
+  const tanpaWasit = !(harga > 0);
+  if (tanpaWasit) {
+    const adaAngka = lv.entry || lv.sl || lv.zona || (lv.tp && lv.tp.length);
+    if (adaAngka) lv.gugur.push('semua angka — harga pasar ' + (pasangan || 'koin ini') + ' tidak terbaca');
+    lv.entry = null; lv.sl = null; lv.tp = []; lv.zona = null;
+  }
 
   /* ── `pasti` DIHITUNG, BUKAN DIAKUI ───────────────────────────────
      Model yang mengaku yakin adalah pendapat; angka yang cocok dengan harga
@@ -427,6 +481,9 @@ async function bacaGambarChart(bita, ket = '', tipe = 'image/jpeg', waktuMs = 0,
        tanpa jejak terbaca sebagai "chartnya memang tidak menyebutkan" —
        padahal ia disebutkan dan kita yang menolaknya. */
     gugur: lv.gugur,
+    /* Dibedakan dari "angkanya salah": yang ini berarti kita tidak punya
+       alat untuk menilainya sama sekali. Layar harus mengatakan yang mana. */
+    tanpaWasit,
     hargaPasar: harga || null,
     catatan: String(d.catatan || '').slice(0, 200),
     model: MODEL,

@@ -229,6 +229,31 @@ export async function simpanMata(v: { aktif: boolean; dari: string | null; sampa
   }
 }
 
+/** Menyuruh AI membaca chart arsip SEKARANG, sekali jalan.
+ *
+ *  Pasangan dari saklar: saklar mematikan yang otomatis, ini yang
+ *  menghidupkan sekali. Yang sudah pernah dibaca dilewati kecuali
+ *  `ulangi` — menekan tombolnya dua kali tidak boleh membayar dua kali
+ *  untuk gambar yang sama. */
+export async function bacaSekarang(v: { dari?: string | null; sampai?: string | null; ulangi?: boolean }):
+  Promise<{ ok: true; dibaca: number; sisaAntre: number; pesan: string } | { ok: false; pesan: string }> {
+  const t = await token();
+  if (!t) return { ok: false, pesan: 'Belum masuk.' };
+  try {
+    const r = await fetch(`${dasar()}/api/agen/chart/mata/baca`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + t },
+      body: JSON.stringify({ dari: v.dari || null, sampai: v.sampai || null, ulangi: v.ulangi === true }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return { ok: false, pesan: j.error || 'Gagal membaca.' };
+    return { ok: true, dibaca: Number(j.dibaca) || 0, sisaAntre: Number(j.sisaAntre) || 0,
+             pesan: String(j.pesan || '') };
+  } catch (e) {
+    return { ok: false, pesan: e instanceof Error ? e.message : 'Gagal membaca.' };
+  }
+}
+
 export interface LevelSinyal {
   pasangan: string; arah: 'BUY' | 'SELL';
   entry: number; sl: number; tp: number;

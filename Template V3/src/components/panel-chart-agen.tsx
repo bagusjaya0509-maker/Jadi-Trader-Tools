@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import {
   daftarChart, gambarChart, tandaiChart, hapusChart, jadikanSinyal, aktivitasChart,
   type ChartPantauan, type JejakAgen, type RuangAgen,
-  bacaMata, simpanMata, type KeadaanMata,
+  bacaMata, simpanMata, bacaSekarang, type KeadaanMata,
 } from '@/lib/chart-agen';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -389,6 +389,7 @@ function SaklarMata() {
   const [aturBuka, setAturBuka] = useState(false);
   const [sibuk, setSibuk] = useState(false);
   const [kabar, setKabar] = useState('');
+  const [membaca, setMembaca] = useState(false);
   const sidik = useRef('');
 
   const muat = useCallback(async () => {
@@ -467,7 +468,30 @@ function SaklarMata() {
             className="cursor-pointer rounded-md border border-zinc-800 px-2 py-1 text-[11px] text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-100 disabled:cursor-default disabled:opacity-50">
             Rentang tanggal
           </button>
-          <button onClick={() => void simpan({ aktif: !aktif })} disabled={sibuk}
+          {/* ── BACA SEKARANG ─────────────────────────────────────
+              Inti dari seluruh permintaan pemilik: AI tidak pernah jalan
+              sendiri, ia berangkat saat tombol ini ditekan. Membaca dari
+              ARSIP di disk, bukan dari Telegram — jadi ia tetap bekerja
+              walau pemantau Telegram sedang mati, dan tetap menghormati
+              rentang tanggal yang sedang terpasang.
+
+              Sengaja ditaruh SEBELUM tombol Hentikan/Nyalakan: ini yang
+              paling sering ditekan, dan yang paling sering ditekan pantas
+              duduk lebih dulu di jalur baca kiri-ke-kanan. */}
+          <button onClick={async () => {
+              setMembaca(true); setKabar('');
+              const h = await bacaSekarang({ dari: dari || null, sampai: sampai || null });
+              setMembaca(false);
+              setKabar(h.ok ? h.pesan + (h.sisaAntre ? ' Masih ada ' + h.sisaAntre + ' menunggu — tekan lagi.' : '')
+                            : h.pesan);
+              sidik.current = '';
+              await muat();
+            }} disabled={membaca || sibuk}
+            title="Suruh AI membaca chart arsip sekarang, sekali jalan"
+            className="cursor-pointer rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-300 transition-colors hover:bg-emerald-500/20 disabled:cursor-default disabled:opacity-50">
+            {membaca ? 'Membaca…' : 'Baca sekarang'}
+          </button>
+          <button onClick={() => void simpan({ aktif: !aktif })} disabled={sibuk || membaca}
             className={cn('cursor-pointer rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors disabled:cursor-default disabled:opacity-60',
               aktif ? 'bg-zinc-100 text-zinc-950 hover:bg-white'
                     : 'bg-emerald-500 text-zinc-950 hover:bg-emerald-400')}>

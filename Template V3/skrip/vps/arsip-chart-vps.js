@@ -160,6 +160,122 @@ module.exports = (app, { butuhLogin, batasLaju, express, DIR }) => {
     }
   });
 
+  /* ── BACA SEKARANG ────────────────────────────────────────────────────
+     Diminta pemilik: "biar AI-nya ga kerja terus terusan, lumayan hemat
+     token." Ini pasangan dari saklar — saklar mematikan yang otomatis,
+     tombol ini yang menghidupkan sekali jalan.
+
+     Membaca dari ARSIP DI DISK, bukan dari Telegram. Chart-nya memang sudah
+     tersimpan di sini sejak ia masuk (pengarsipan tidak berbiaya token),
+     jadi tidak ada alasan melibatkan proses pemantau — yang berarti tombol
+     ini tetap bekerja walau pemantau Telegram sedang mati.
+
+     Yang SUDAH pernah dibaca dilewati. Menekan tombolnya dua kali tidak
+     boleh membayar dua kali untuk gambar yang sama, dan itu kesalahan yang
+     paling mudah dilakukan orang yang tidak yakin klik pertamanya masuk. */
+  const BATAS_SEKALI = Math.max(1, Number(process.env.MATA_BATAS_MANUAL || 8));
+
+  /* Harga pasar sebagai wasit angka — alasan lengkapnya di mata-chart.js.
+     Disalin ringkas ke sini alih-alih dibagi dengan pemantau: keduanya
+     proses pm2 yang berbeda, dan modul bersama tidak akan membuat
+     petanya bersama. */
+  let tickerSimpan = { waktu: 0, peta: new Map() };
+  async function hargaPasar(koin) {
+    const kini = Date.now();
+    if (kini - tickerSimpan.waktu > 60000) {
+      try {
+        const r = await fetch(DASAR + '/api/tickers', { signal: AbortSignal.timeout(20000) });
+        if (r.ok) {
+          const j = await r.json();
+          const peta = new Map();
+          for (const t of (j && Array.isArray(j.data) ? j.data : [])) {
+            const h = Number(t && t.lastPrice);
+            if (t && t.symbol && isFinite(h) && h > 0) peta.set(String(t.symbol).toUpperCase(), h);
+          }
+          if (peta.size) tickerSimpan = { waktu: kini, peta };
+        }
+      } catch (e) { /* proxy bisu — angkanya gugur, dan itu aman */ }
+    }
+    const peta = tickerSimpan.peta;
+    const k = String(koin || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (!peta.size || !k) return 0;
+    for (const c of [k, k + 'USDT', k + 'USD', k.replace(/USD$/, 'USDT')]) {
+      if (peta.has(c)) return peta.get(c);
+    }
+    for (let n = k.length; n >= 3; n--) {
+      const c = k.slice(0, n) + 'USDT';
+      if (peta.has(c)) return peta.get(c);
+    }
+    return 0;
+  }
+
+  app.post('/api/agen/chart/mata/baca', batasLaju, butuhLogin, hanyaPemilik, express.json(), async (req, res) => {
+    const b = req.body || {};
+    const tgl = (v) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
+    const dari = tgl(b.dari);
+    const sampai = tgl(b.sampai);
+    const ulangi = b.ulangi === true;
+
+    const daftar = baca();
+    /* Diurutkan dari yang TERBARU. Kalau yang ada lima puluh chart dan
+       jatahnya delapan, yang paling ingin dilihat orang selalu yang baru
+       masuk — bukan delapan yang paling tua. */
+    const antre = daftar
+      .filter((c) => {
+        if (!c || !c.berkas) return false;
+        if (!ulangi && c.mata) return false;
+        const t = mata.tglWib(Number(c.waktu) || 0);
+        if (dari && t < dari) return false;
+        if (sampai && t > sampai) return false;
+        return true;
+      })
+      .sort((a, b2) => (Number(b2.waktu) || 0) - (Number(a.waktu) || 0));
+
+    if (!antre.length) {
+      return res.json({ ok: true, dibaca: 0, sisaAntre: 0,
+        pesan: 'Tidak ada chart yang perlu dibaca di rentang itu.' });
+    }
+    if (mata.sisaJatah() <= 0) {
+      return res.json({ ok: true, dibaca: 0, sisaAntre: antre.length,
+        pesan: 'Jatah harian ' + mata.JATAH_HARIAN + ' gambar sudah habis. Coba lagi besok.' });
+    }
+
+    const ambil = antre.slice(0, Math.min(BATAS_SEKALI, mata.sisaJatah()));
+    let dibaca = 0;
+    let gagal = 0;
+    for (const c of ambil) {
+      let bita = null;
+      try { bita = fs.readFileSync(path.join(GAMBAR_DIR, c.berkas)); }
+      catch (e) { gagal++; continue; }
+      const h = await mata.bacaGambarChart(bita, c.keterangan || '', 'image/jpeg',
+        Number(c.waktu) || 0, { manual: true, cariHarga: hargaPasar });
+      if (!h || h.galat) { gagal++; c.mataGalat = (h && h.galat) || 'tidak terbaca'; continue; }
+      /* Disimpan APA ADANYA ke barisnya. Panel yang menampilkannya nanti
+         tidak perlu memanggil apa pun lagi, dan bacaan yang sudah dibayar
+         tidak hilang saat halamannya ditutup. */
+      c.mata = {
+        waktu: Date.now(),
+        pasangan: h.pasangan, arah: h.arah, zona: h.zona,
+        entry: h.entry, sl: h.sl, tp: h.tp,
+        pasti: h.pasti, catatan: h.catatan,
+        gugur: h.gugur || [], hargaPasar: h.hargaPasar || null,
+        model: h.model,
+      };
+      delete c.mataGalat;
+      dibaca++;
+    }
+    tulis(daftar);
+    res.json({
+      ok: true, dibaca, gagal,
+      sisaAntre: Math.max(0, antre.length - ambil.length),
+      sisaJatah: mata.sisaJatah(),
+      pesan: dibaca
+        ? dibaca + ' chart dibaca' + (gagal ? ', ' + gagal + ' gagal' : '')
+          + '. Sisa jatah hari ini ' + mata.sisaJatah() + '.'
+        : 'Tidak ada yang berhasil dibaca' + (gagal ? ' (' + gagal + ' gagal)' : '') + '.',
+    });
+  });
+
   /* ── Gambarnya ────────────────────────────────────────────────────────
      Dilayani dari memori, bukan lewat express.static. Static akan membuat
      seluruh folder bisa ditebak alamatnya oleh siapa pun yang tahu nama
