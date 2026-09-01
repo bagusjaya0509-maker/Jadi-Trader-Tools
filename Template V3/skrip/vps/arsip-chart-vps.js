@@ -85,6 +85,56 @@ module.exports = (app, { butuhLogin, batasLaju, express, DIR }) => {
     res.json({ ok: true, log: d.log || [], ruang: d.ruang || [] });
   });
 
+  /* ── SAKLAR AI PEMBACA CHART ──────────────────────────────────────────
+     Setelannya milik mata-chart.js, dan dibaca lewat modul itu — bukan
+     dengan menyusun ulang jalur berkasnya di sini. Dua tempat yang
+     menghitung jalur yang sama adalah dua tempat yang bisa berselisih, dan
+     selisihnya akan terbaca sebagai "tombolnya ditekan tapi tidak ada
+     yang berubah": panel menulis ke satu berkas, pemantau membaca yang
+     lain, dan tidak ada satu pun galat yang muncul.
+
+     Prosesnya memang berbeda — rute ini hidup di backend web, yang
+     membacanya hidup di pemantau Telegram — tapi berkasnya satu, dan itu
+     yang menjadikannya saklar sungguhan. */
+  const mata = require('./mata-chart');
+
+  app.get('/api/agen/chart/mata', batasLaju, butuhLogin, hanyaPemilik, (req, res) => {
+    res.json({
+      ok: true,
+      setelan: mata.bacaSetelan(),
+      jatah: { harian: mata.JATAH_HARIAN, pakai: mata.pakaiJatah(), sisa: mata.sisaJatah() },
+      model: mata.MODEL,
+    });
+  });
+
+  app.post('/api/agen/chart/mata', batasLaju, butuhLogin, hanyaPemilik, express.json(), (req, res) => {
+    const b = req.body || {};
+    /* Bentuk tanggal DIPERIKSA, bukan dipercaya. Yang lolos setengah jadi
+       ("2026-9-3") akan dibandingkan sebagai teks dengan "2026-09-03" dan
+       hasilnya salah tanpa satu pun galat — jendela yang membuang gambar
+       yang seharusnya masuk, sunyi total. */
+    const tgl = (v) => {
+      if (v === null || v === undefined || v === '') return null;
+      const s = String(v).trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return undefined;
+      return s;
+    };
+    const dari = tgl(b.dari);
+    const sampai = tgl(b.sampai);
+    if (dari === undefined || sampai === undefined) {
+      return res.status(400).json({ error: 'Tanggal harus berbentuk YYYY-MM-DD.' });
+    }
+    if (dari && sampai && dari > sampai) {
+      return res.status(400).json({ error: 'Tanggal mulai ada sesudah tanggal akhir.' });
+    }
+    try {
+      const isi = mata.tulisSetelan({ aktif: b.aktif !== false, dari, sampai });
+      res.json({ ok: true, setelan: isi });
+    } catch (e) {
+      res.status(500).json({ error: 'Gagal menyimpan setelan: ' + ((e && e.message) || '?') });
+    }
+  });
+
   /* ── Gambarnya ────────────────────────────────────────────────────────
      Dilayani dari memori, bukan lewat express.static. Static akan membuat
      seluruh folder bisa ditebak alamatnya oleh siapa pun yang tahu nama

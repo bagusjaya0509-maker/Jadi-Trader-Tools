@@ -79,6 +79,92 @@ function jatahTambah() {
  *  saat jatahnya habis — "dilewati" tanpa sebab terbaca seperti kerusakan. */
 function sisaJatah() { return Math.max(0, JATAH_HARIAN - jatahBaca().pakai); }
 
+/** Berapa yang sudah terpakai hari ini. Dipasangkan dengan sisaJatah()
+ *  supaya panel bisa menulis "12 dari 40" tanpa berhitung sendiri —
+ *  perhitungan yang sama di dua tempat adalah dua tempat untuk salah. */
+function pakaiJatah() { return jatahBaca().pakai; }
+
+/* ── SAKLAR & JENDELA TANGGAL ─────────────────────────────────────────────
+   Pagar ongkos keempat, dan satu-satunya yang dipegang TANGAN pemiliknya.
+
+   Tiga pagar di atas menjawab "seberapa banyak"; yang ini menjawab
+   "sekarang, atau tidak sama sekali". Ruang chart bisa ramai berhari-hari
+   tanpa satu pun setup yang layak dibaca — dan selama itu tiap gambar tetap
+   memanggil model penglihatan, satu per satu, sampai jatahnya habis. Uang
+   yang keluar untuk membaca gambar yang tidak akan dipakai siapa pun.
+
+   Dua kendali, sengaja terpisah:
+
+     aktif  false = tidak ada satu pun panggilan model yang berangkat.
+            Berhenti TOTAL, bukan diperlambat.
+
+     dari / sampai  jendela tanggal (YYYY-MM-DD, WIB, keduanya inklusif).
+            Gambar di luar jendela dilewati tanpa dibaca. Dipakai untuk
+            "nyalakan lagi, tapi cuma untuk chart tanggal 3 sampai 5" —
+            menyalakan ulang tanpa batas tanggal berarti seluruh antrean
+            yang menumpuk selama mati ikut dibaca sekaligus, dan itu
+            kebalikan dari berhemat.
+
+   Disimpan di BERKAS, bukan di env: env cuma terbaca saat proses menyala,
+   jadi mematikannya akan menuntut restart pm2 — dan sesuatu yang menahan
+   pengeluaran harus bisa ditekan dari layar dalam satu detik. Berkas ini
+   juga jembatan antar-proses: yang menulis backend web, yang membaca
+   pemantau Telegram, dan keduanya proses pm2 yang berbeda. */
+const BERKAS_SETELAN = path.join(__dirname, 'mata-setelan.json');
+const SETELAN_BAWAAN = { aktif: true, dari: null, sampai: null, diubah: 0 };
+
+function bacaSetelan() {
+  try {
+    const d = JSON.parse(fs.readFileSync(BERKAS_SETELAN, 'utf8'));
+    return {
+      /* `!== false`, bukan `=== true`: berkas lama yang belum punya medan
+         ini harus terbaca sebagai MENYALA. Bawaan mati akan mematikan
+         agennya diam-diam pada pembaruan pertama, dan tidak ada satu pun
+         pesan di layar yang menjelaskan kenapa. */
+      aktif: d.aktif !== false,
+      dari: typeof d.dari === 'string' && d.dari ? d.dari : null,
+      sampai: typeof d.sampai === 'string' && d.sampai ? d.sampai : null,
+      diubah: Number(d.diubah) || 0,
+    };
+  } catch (e) { return { ...SETELAN_BAWAAN }; }
+}
+
+function tulisSetelan(v) {
+  const isi = {
+    aktif: v.aktif !== false,
+    dari: v.dari || null,
+    sampai: v.sampai || null,
+    diubah: Date.now(),
+  };
+  fs.writeFileSync(BERKAS_SETELAN + '.tmp', JSON.stringify(isi, null, 2));
+  fs.renameSync(BERKAS_SETELAN + '.tmp', BERKAS_SETELAN);
+  return isi;
+}
+
+/** Tanggal menurut WIB, bukan UTC.
+ *
+ *  Pemiliknya memilih tanggal di kalendernya sendiri, dan VPS-nya berjalan
+ *  di UTC. Tanpa pergeseran ini, chart yang diposting pukul 01.00 WIB
+ *  tercatat sebagai hari SEBELUMNYA — jendela "3 sampai 5" akan diam-diam
+ *  membuang tujuh jam pertama tiap harinya. */
+function tglWib(ms) {
+  return new Date(ms + 7 * 3600 * 1000).toISOString().slice(0, 10);
+}
+
+/** Boleh dibaca atau tidak, berikut ALASANNYA.
+ *
+ *  Alasan ikut dipulangkan karena log yang berbunyi "dilewati" tanpa sebab
+ *  terbaca sebagai kerusakan — dan yang paling mahal dari kerusakan palsu
+ *  adalah waktu yang dihabiskan mencarinya. */
+function bolehBaca(waktuMs) {
+  const s = bacaSetelan();
+  if (!s.aktif) return { boleh: false, alasan: 'AI chart dihentikan dari panel', setelan: s };
+  const t = tglWib(Number(waktuMs) || Date.now());
+  if (s.dari && t < s.dari) return { boleh: false, alasan: 'chart ' + t + ' lebih tua dari batas ' + s.dari, setelan: s };
+  if (s.sampai && t > s.sampai) return { boleh: false, alasan: 'chart ' + t + ' lewat batas ' + s.sampai, setelan: s };
+  return { boleh: true, alasan: '', setelan: s };
+}
+
 const PERINTAH = `Kamu membaca SATU tangkapan layar chart trading dari ruang analisa.
 Tugasmu melaporkan apa yang BENAR-BENAR TERGAMBAR di sana. Bukan menganalisa,
 bukan menyarankan, bukan melengkapi yang tidak ada.
@@ -119,7 +205,13 @@ ATURAN:
  *           dibaca. null berarti "tidak tahu" — pemanggil TIDAK boleh
  *           menganggapnya "tidak ada sinyal".
  */
-async function bacaGambarChart(bita, ket = '', tipe = 'image/jpeg') {
+async function bacaGambarChart(bita, ket = '', tipe = 'image/jpeg', waktuMs = 0) {
+  /* Gerbang PALING DEPAN, sebelum apa pun yang berbiaya. Pemanggilnya sudah
+     memeriksa hal yang sama sebelum mengunduh gambarnya — dan itu memang
+     disengaja. Gerbang yang cuma hidup di satu tempat akan bocor begitu
+     pemanggil kedua muncul, dan yang bocor di sini adalah uang. */
+  const izin = bolehBaca(waktuMs);
+  if (!izin.boleh) return { galat: izin.alasan };
   if (!KUNCI) return { galat: 'OPENROUTER_API_KEY kosong' };
   if (!bita || !bita.length) return { galat: 'gambar kosong' };
   if (bita.length > MAKS_BITA) return { galat: 'gambar ' + Math.round(bita.length / 1024) + ' KB — di atas batas' };
@@ -234,4 +326,7 @@ function keSinyal(hasil, idPesan) {
   };
 }
 
-module.exports = { bacaGambarChart, keSinyal, sisaJatah, JATAH_HARIAN, MODEL };
+module.exports = {
+  bacaGambarChart, keSinyal, sisaJatah, pakaiJatah, JATAH_HARIAN, MODEL,
+  bacaSetelan, tulisSetelan, bolehBaca, tglWib,
+};

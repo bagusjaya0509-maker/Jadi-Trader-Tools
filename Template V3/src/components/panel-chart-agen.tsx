@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import {
   daftarChart, gambarChart, tandaiChart, hapusChart, jadikanSinyal, aktivitasChart,
   type ChartPantauan, type JejakAgen, type RuangAgen,
+  bacaMata, simpanMata, type KeadaanMata,
 } from '@/lib/chart-agen';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -361,6 +362,149 @@ function FormLevel({ chart, selesai }: { chart: ChartPantauan; selesai: () => vo
    muncul bersamaan. */
 const FORM_LEVEL_TAMPIL = false;
 
+
+/* ── SAKLAR AI PEMBACA CHART ────────────────────────────────────────────
+   Diminta pemilik, dan alasannya soal uang: tiap gambar yang masuk ruang
+   chart memanggil model penglihatan, satu per satu, sampai jatah hariannya
+   habis. Ruang bisa ramai berhari-hari tanpa satu pun setup yang layak
+   dibaca — dan selama itu ongkosnya tetap berjalan.
+
+   Dua kendali, sengaja terpisah:
+
+     · Hentikan  — berhenti TOTAL. Tidak ada panggilan model yang berangkat,
+       dan gambarnya bahkan tidak diunduh dari Telegram.
+
+     · Rentang tanggal — dipakai saat MENYALAKAN LAGI. Tanpa batas tanggal,
+       menyalakan ulang berarti seluruh antrean yang menumpuk selama mati
+       ikut dibaca sekaligus; itu kebalikan dari berhemat.
+
+   Berdiri sendiri, tidak menumpang di bilah aktivitas: bilah itu
+   menghilang saat pemantau belum pernah melapor, dan saklar yang lenyap
+   justru pada saat orangnya ingin mematikan sesuatu adalah saklar yang
+   tidak bisa dipercaya. */
+function SaklarMata() {
+  const [mata, setMata] = useState<KeadaanMata | null>(null);
+  const [dari, setDari] = useState('');
+  const [sampai, setSampai] = useState('');
+  const [aturBuka, setAturBuka] = useState(false);
+  const [sibuk, setSibuk] = useState(false);
+  const [kabar, setKabar] = useState('');
+  const sidik = useRef('');
+
+  const muat = useCallback(async () => {
+    const d = await bacaMata();
+    if (!d) return;
+    setMata(d);
+    /* Isian hanya disetel ulang kalau nilai SERVER berubah. Menyetelnya
+       tiap tarikan akan menghapus tanggal yang sedang diketik orangnya —
+       panel ini menarik ulang tiap dua menit, dan dua menit lebih pendek
+       daripada waktu yang dibutuhkan untuk mengisi dua kolom tanggal. */
+    const s = `${d.setelan.dari || ''}|${d.setelan.sampai || ''}|${d.setelan.diubah}`;
+    if (s !== sidik.current) {
+      sidik.current = s;
+      setDari(d.setelan.dari || '');
+      setSampai(d.setelan.sampai || '');
+    }
+  }, []);
+
+  useEffect(() => {
+    void muat();
+    const t = setInterval(() => { void muat(); }, 120000);
+    return () => clearInterval(t);
+  }, [muat]);
+
+  if (!mata) return null;
+
+  const aktif = mata.setelan.aktif;
+
+  async function simpan(ubah: { aktif?: boolean; pakaiTanggal?: boolean }) {
+    if (!mata) return;
+    setSibuk(true); setKabar('');
+    const h = await simpanMata({
+      aktif: ubah.aktif ?? mata.setelan.aktif,
+      dari: ubah.pakaiTanggal === false ? null : (dari || null),
+      sampai: ubah.pakaiTanggal === false ? null : (sampai || null),
+    });
+    setSibuk(false);
+    if (!h.ok) { setKabar(h.pesan); return; }
+    sidik.current = '';
+    await muat();
+    setKabar(h.setelan.aktif ? 'Tersimpan — agen membaca lagi.' : 'Dihentikan. Tidak ada panggilan model yang berangkat.');
+  }
+
+  const adaRentang = !!(mata.setelan.dari || mata.setelan.sampai);
+
+  return (
+    <div className={cn('rounded-lg border', aktif ? 'border-zinc-800 bg-zinc-900/40' : 'border-amber-500/30 bg-amber-500/5')}>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 px-3 py-2">
+        <span aria-hidden className={cn('size-2 shrink-0 rounded-full', aktif ? 'bg-emerald-400' : 'bg-amber-400')} />
+        <span className="text-[12px] font-medium text-zinc-200">
+          {aktif ? 'AI baca chart menyala' : 'AI baca chart DIHENTIKAN'}
+        </span>
+        <span className="text-[11px] text-zinc-500">
+          {aktif
+            ? mata.jatah.pakai + ' dari ' + mata.jatah.harian + ' gambar hari ini'
+            : 'tidak ada gambar yang dibaca, tidak ada token yang keluar'}
+        </span>
+        {adaRentang && (
+          <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10.5px] text-zinc-400">
+            {mata.setelan.dari || '…'} → {mata.setelan.sampai || '…'}
+          </span>
+        )}
+
+        <div className="ml-auto flex shrink-0 items-center gap-1.5">
+          <button onClick={() => setAturBuka((v) => !v)} disabled={sibuk}
+            className="cursor-pointer rounded-md border border-zinc-800 px-2 py-1 text-[11px] text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-100 disabled:cursor-default disabled:opacity-50">
+            Rentang tanggal
+          </button>
+          <button onClick={() => void simpan({ aktif: !aktif })} disabled={sibuk}
+            className={cn('cursor-pointer rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors disabled:cursor-default disabled:opacity-60',
+              aktif ? 'bg-zinc-100 text-zinc-950 hover:bg-white'
+                    : 'bg-emerald-500 text-zinc-950 hover:bg-emerald-400')}>
+            {sibuk ? 'Menyimpan…' : aktif ? 'Hentikan' : 'Nyalakan'}
+          </button>
+        </div>
+      </div>
+
+      {aturBuka && (
+        <div className="border-t border-zinc-800/70 px-3 py-2.5">
+          <p className="mb-2 text-[11.5px] leading-relaxed text-zinc-500">
+            Hanya chart yang diposting dalam rentang ini yang dibaca AI. Tanggal
+            memakai WIB dan keduanya ikut terhitung. Kosongkan salah satunya untuk
+            membiarkan sisi itu tanpa batas — kosong dua-duanya berarti semua
+            tanggal dibaca.
+          </p>
+          <div className="flex flex-wrap items-end gap-2">
+            <label className="min-w-[130px] flex-1">
+              <span className="mb-1 block text-[10.5px] uppercase tracking-wide text-zinc-600">Dari tanggal</span>
+              <input type="date" value={dari} onChange={(e) => setDari(e.target.value)}
+                className="angka h-8 w-full rounded-md border border-zinc-800 bg-zinc-900 px-2 text-[12px] text-zinc-200 outline-none focus-visible:border-zinc-600" />
+            </label>
+            <label className="min-w-[130px] flex-1">
+              <span className="mb-1 block text-[10.5px] uppercase tracking-wide text-zinc-600">Sampai tanggal</span>
+              <input type="date" value={sampai} onChange={(e) => setSampai(e.target.value)}
+                className="angka h-8 w-full rounded-md border border-zinc-800 bg-zinc-900 px-2 text-[12px] text-zinc-200 outline-none focus-visible:border-zinc-600" />
+            </label>
+            <button onClick={() => void simpan({})} disabled={sibuk}
+              className="h-8 cursor-pointer rounded-md bg-zinc-100 px-3 text-[11.5px] font-semibold text-zinc-950 transition-colors hover:bg-white disabled:cursor-default disabled:opacity-60">
+              Simpan
+            </button>
+            <button onClick={() => { setDari(''); setSampai(''); void simpan({ pakaiTanggal: false }); }}
+              disabled={sibuk || !adaRentang}
+              className="h-8 cursor-pointer rounded-md border border-zinc-800 px-2.5 text-[11.5px] text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-100 disabled:cursor-default disabled:opacity-40">
+              Hapus batas
+            </button>
+          </div>
+        </div>
+      )}
+
+      {kabar && (
+        <p className="border-t border-zinc-800/70 px-3 py-1.5 text-[11.5px] text-zinc-400">{kabar}</p>
+      )}
+    </div>
+  );
+}
+
 /* ── BILAH AKTIVITAS AGEN ───────────────────────────────────────────────
    Rak chart yang tidak bertambah punya DUA sebab yang terlihat sama persis:
    agennya mati, atau ruangnya memang sepi. Tanpa bilah ini satu-satunya
@@ -588,6 +732,7 @@ export function PanelChartAgen() {
         </button>
       </div>
 
+      <SaklarMata />
       <BilahAktivitas />
 
       {gagal && (

@@ -145,6 +145,72 @@ export async function aktivitasChart(): Promise<{ log: JejakAgen[]; ruang: Ruang
   } catch { return null; }
 }
 
+/* ══ SAKLAR AI PEMBACA CHART ═════════════════════════════════════════════
+   Satu-satunya bagian pemantau yang memanggil model penglihatan, dan
+   satu-satunya yang ongkosnya naik seiring ramainya ruang. Dua kendali:
+   nyala/mati, dan jendela tanggal chart mana yang boleh dibaca. */
+export interface SetelanMata {
+  aktif: boolean;
+  /** YYYY-MM-DD, WIB, inklusif. null = tanpa batas di sisi itu. */
+  dari: string | null;
+  sampai: string | null;
+  diubah: number;
+}
+
+export interface KeadaanMata {
+  setelan: SetelanMata;
+  jatah: { harian: number; pakai: number; sisa: number };
+  model: string;
+}
+
+export async function bacaMata(): Promise<KeadaanMata | null> {
+  const t = await token();
+  if (!t) return null;
+  try {
+    const r = await fetch(`${dasar()}/api/agen/chart/mata`, {
+      headers: { Authorization: 'Bearer ' + t },
+    });
+    if (!r.ok) return null;
+    const j = await r.json();
+    if (!j?.setelan) return null;
+    return {
+      setelan: {
+        aktif: j.setelan.aktif !== false,
+        dari: j.setelan.dari || null,
+        sampai: j.setelan.sampai || null,
+        diubah: Number(j.setelan.diubah) || 0,
+      },
+      jatah: {
+        harian: Number(j.jatah?.harian) || 0,
+        pakai: Number(j.jatah?.pakai) || 0,
+        sisa: Number(j.jatah?.sisa) || 0,
+      },
+      model: String(j.model || ''),
+    };
+  } catch { return null; }
+}
+
+/** Memulangkan pesan galatnya apa adanya — penolakan di sini berbunyi
+ *  "Tanggal mulai ada sesudah tanggal akhir", kalimat yang menjelaskan
+ *  persis apa yang perlu diperbaiki. */
+export async function simpanMata(v: { aktif: boolean; dari: string | null; sampai: string | null }):
+  Promise<{ ok: true; setelan: SetelanMata } | { ok: false; pesan: string }> {
+  const t = await token();
+  if (!t) return { ok: false, pesan: 'Belum masuk.' };
+  try {
+    const r = await fetch(`${dasar()}/api/agen/chart/mata`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + t },
+      body: JSON.stringify(v),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return { ok: false, pesan: j.error || 'Gagal menyimpan.' };
+    return { ok: true, setelan: j.setelan };
+  } catch (e) {
+    return { ok: false, pesan: e instanceof Error ? e.message : 'Gagal menyimpan.' };
+  }
+}
+
 export interface LevelSinyal {
   pasangan: string; arah: 'BUY' | 'SELL';
   entry: number; sl: number; tp: number;

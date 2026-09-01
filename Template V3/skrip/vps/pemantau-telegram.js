@@ -545,6 +545,16 @@ async function siapkanRuang(client, r) {
      tidak boleh mati gara-gara satu gambar rusak atau satu panggilan model
      yang habis waktu. */
   async function bacaGambar(r, pesan, teks) {
+    /* Saklar dan jendela tanggal diperiksa SEBELUM unduhan, bukan sesudah.
+       Gambar Telegram berukuran ratusan kilobita; mengunduhnya lebih dulu
+       lalu menolaknya berarti membayar bandwidth untuk keputusan yang sudah
+       bisa diambil sejak sebelum satu bita pun bergerak. */
+    const waktuPesan = pesan.date ? pesan.date * 1000 : Date.now();
+    const izin = mata.bolehBaca(waktuPesan);
+    if (!izin.boleh) {
+      catat('  gambar dilewati —', izin.alasan);
+      return null;
+    }
     if (mata.sisaJatah() <= 0) {
       catat('  gambar dilewati — jatah harian', mata.JATAH_HARIAN, 'sudah habis');
       return null;
@@ -562,7 +572,7 @@ async function siapkanRuang(client, r) {
       catat('  gambar gagal diunduh:', e && e.message);
       return null;
     }
-    const hasil = await mata.bacaGambarChart(bita, teks);
+    const hasil = await mata.bacaGambarChart(bita, teks, 'image/jpeg', waktuPesan);
     if (!hasil || hasil.galat) {
       catat('  mata gagal:', (hasil && hasil.galat) || 'jawaban kosong');
       return null;
