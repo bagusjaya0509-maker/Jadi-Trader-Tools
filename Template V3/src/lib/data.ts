@@ -219,18 +219,20 @@ export function useRiwayat(): HasilData<Trade[]> {
   };
 }
 
-/* Pilihan pengguna atas data contoh: 'kosong' = mulai dari nol,
-   'biarkan' = tetap tampilkan contoh (spanduknya saja yang hilang). */
-export function bacaPilihanContoh(uid: string): 'kosong' | 'biarkan' | null {
-  try {
-    const v = localStorage.getItem(`jt.pilihanContoh.${uid}`);
-    return v === 'kosong' || v === 'biarkan' ? v : null;
-  } catch { return null; }
-}
-export function simpanPilihanContoh(uid: string, v: 'kosong' | 'biarkan') {
-  try { localStorage.setItem(`jt.pilihanContoh.${uid}`, v); } catch { /* privat */ }
-  window.dispatchEvent(new CustomEvent('jt:pilihan-contoh'));
-}
+/* Pilihan pengguna atas data contoh PINDAH ke `@/lib/pilihan-contoh`.
+   Diekspor ulang dari sini supaya pemanggil lama tidak perlu diubah.
+
+   Dipindah karena keduanya murni localStorage, sementara berkas INI
+   menarik seluruh SDK Firestore. Selama mereka tinggal di sini, satu
+   pembacaan localStorage dari `lib/contoh-pratinjau.ts` menyeret 647 kB
+   Firestore ke bundel awal — ke halaman depan, ke pengunjung yang belum
+   login sekalipun.
+
+   Yang TIDAK butuh Firestore sebaiknya mengambil langsung dari
+   `@/lib/pilihan-contoh`; mengambilnya lewat sini menyeret berkas ini
+   ikut serta. */
+import { bacaPilihanContoh } from '@/lib/pilihan-contoh';
+export { bacaPilihanContoh, simpanPilihanContoh } from '@/lib/pilihan-contoh';
 
 /** Satu baris `public/posisiTerbuka` -> bentuk `Posisi`. */
 function kePosisiPublik(p: any, i: number): Posisi {

@@ -183,7 +183,10 @@ export const AKTIVITAS_CONTOH: AktivitasContoh[] = [
    Yang belum masuk tidak punya uid, jadi tidak punya pilihan tersimpan —
    dan memang seharusnya begitu: pengunjung yang sedang menimbang produk
    justru orang yang paling butuh melihat layarnya terisi. */
-import { bacaPilihanContoh } from '@/lib/data';
+/* DARI `@/lib/pilihan-contoh`, BUKAN `@/lib/data`. Berkas ini dipakai
+   `lib/akun.ts` yang ikut bundel awal; mengambilnya dari data.ts menyeret
+   647 kB Firestore ke halaman depan untuk satu pembacaan localStorage. */
+import { bacaPilihanContoh } from '@/lib/pilihan-contoh';
 import { auth } from '@/lib/firebase';
 
 /** Boleh menampilkan data contoh?
