@@ -633,6 +633,30 @@
     padding:2px 6px;
     border-radius:0 0 5px 5px;
   }
+  /* Ikon buka-di-chart, pojok kanan atas kartu.
+     Selalu terlihat, tidak muncul-saat-hover: di layar sentuh tidak ada
+     hover, dan tombol yang cuma ada untuk tetikus bukan tombol. */
+  .es-chart-btn{
+    position:absolute;
+    top:8px; right:8px;
+    width:26px; height:26px;
+    display:inline-flex; align-items:center; justify-content:center;
+    background: rgba(255,255,255,.05);
+    border:1px solid var(--border);
+    border-radius:7px;
+    color: var(--muted);
+    cursor:pointer;
+    padding:0;
+    transition: background .15s, color .15s, border-color .15s;
+    z-index:3;
+  }
+  .es-chart-btn:hover{
+    background: rgba(255,255,255,.12);
+    color: var(--text);
+    border-color: var(--gold);
+  }
+  .es-chart-btn svg{ width:14px; height:14px; display:block; }
+
   .es-card-fav-star{
     position:absolute;
     top:-1px; left:10px;
@@ -4548,6 +4572,15 @@
       : 'Tidak ada (10c)';
     return `<div class="es-card" data-symbol="${r.symbol}" data-tf="${r.tfValue}">
       <span class="es-card-fav-star" title="Koin favorit">&#9733;</span>
+      <button class="es-chart-btn" type="button" data-jt-chart="1"
+              title="Buka di Chart &amp; Entry - daftar hasil pindai ikut di panel kiri"
+              aria-label="Buka di Chart dan Entry">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"
+             stroke-linecap="round" aria-hidden="true">
+          <path d="M3 2v11.5h11"/><path d="M5.5 5v5.5M5.5 4v1M5.5 10.5v1"/>
+          <path d="M9 3.5v6M9 2.5v1M9 9.5v1"/><path d="M12.5 6.5v4M12.5 5.5v1M12.5 10.5v1"/>
+        </svg>
+      </button>
       <div class="es-card-top">
         <div><span class="es-rank">TF ${r.tfLabel}</span><span class="es-symbol">${r.symbol.replace('USDT','')}</span></div>
         <span class="es-cap-tag">${r.cap==='big'?'BIG CAP':'LOW/MID CAP'}</span>
@@ -10176,6 +10209,52 @@
        Fase capture berjalan LEBIH DULU, jadi keduanya sama-sama jalan —
        sinyalnya tetap terpilih seperti sebelumnya, dan chart-nya ikut
        terbuka. Tidak ada tugas lama yang dicabut. */
+    /* -- DAFTAR KOIN YANG SEDANG DILIHAT --------------------------------
+       Diambil dari DOM, bukan dari window.__esLastResults. Alasannya: hasil
+       pindai tersimpan di TIGA variabel berbeda (Koin Hunter, Sinyal
+       Prioritas, Prioritas ICT) dan kartu Pantau tidak punya variabel sama
+       sekali. Membaca DOM berlaku untuk kelima bagian tanpa satu pun
+       cabang, dan yang terbaca memang persis yang sedang dilihat orangnya.
+
+       Dibatasi ke WADAH kartu yang diklik. Mengambil seluruh halaman berarti
+       mencampur Koin Hunter dengan Zona Pantau dalam satu daftar -- dua
+       pemindaian dengan aturan berbeda yang kebetulan tampil di satu
+       halaman. Yang dimaksud orang saat menekan ikon di satu bagian adalah
+       bagian ITU.
+
+       Angka diurai dengan pencocokan, bukan pembuangan karakter: teks
+       perubahannya berbunyi "-1.23% 24h", dan membuang semua yang bukan
+       angka menghasilkan "-1.2324". */
+    function jtAngkaPertama(teks){
+      if(!teks) return 0;
+      var m = String(teks).replace(/,/g, '').match(/-?\d+(?:\.\d+)?/);
+      return m ? parseFloat(m[0]) : 0;
+    }
+
+    function jtKumpulkanDaftar(kartu){
+      var wadah = kartu && kartu.parentElement;
+      if(!wadah) return [];
+      var semua = wadah.querySelectorAll('[data-symbol][data-tf]');
+      var out = [];
+      for(var i=0; i<semua.length && out.length<60; i++){
+        var k = semua[i];
+        var sim = k.getAttribute('data-symbol');
+        if(!sim) continue;
+        var hrg = k.querySelector('.es-price');
+        var chg = k.querySelector('.es-chg');
+        var arah = k.getAttribute('data-arah') || '';
+        out.push({
+          simbol: sim,
+          tf: k.getAttribute('data-tf') || '',
+          harga: hrg ? jtAngkaPertama(hrg.textContent) : 0,
+          ubah24: chg ? jtAngkaPertama(chg.textContent) : 0,
+          cap: /BIG\s*CAP/i.test(k.textContent || '') ? 'big' : 'low',
+          arah: (arah === 'BUY' || arah === 'SELL') ? arah : ''
+        });
+      }
+      return out;
+    }
+
     function jtBukaChartDariKartu(kartu){
       if(!kartu) return;
       var simbol = kartu.getAttribute('data-symbol');
@@ -10187,7 +10266,12 @@
       var arah = kartu.getAttribute('data-arah') || '';
       if(window.parent !== window){
         try{
-          window.parent.postMessage({ jt: 'buka-chart', simbol: simbol, tf: tf, sl: sl, tp: tp, arah: arah }, window.location.origin);
+          /* `daftar` ditambahkan: induk memasangnya di panel kiri Chart
+             supaya koin berikutnya tinggal ditekan. Induk versi lama yang
+             belum mengenalnya cuma mengabaikan medan ini -- kartunya tetap
+             terbuka seperti sebelumnya. */
+          window.parent.postMessage({ jt: 'buka-chart', simbol: simbol, tf: tf, sl: sl, tp: tp, arah: arah,
+                                      daftar: jtKumpulkanDaftar(kartu) }, window.location.origin);
           return;
         }catch(e){ /* induk beda asal — jatuh ke tab baru di bawah */ }
       }
@@ -10202,6 +10286,21 @@
          terbuka tanpa garis rencana. Yang ditolak cuma kartu tanpa simbol,
          dan itu sudah dijaga di dalam fungsinya. */
       jtBukaChartDariKartu(badge.closest('[data-symbol]'));
+    }, true);
+
+    /* Ikon chart di kartu. Pendengarnya TERPISAH dari badge di atas dan
+       memanggil stopPropagation: kartu Koin Hunter punya klik-nya sendiri
+       (memilih koin), dan tanpa ini satu tekan di ikon menjalankan keduanya.
+
+       Fase capture, sama alasannya dengan pendengar badge -- klik di dalam
+       kartu bisa dihentikan sebelum sampai ke sini. */
+    document.addEventListener('click', function(e){
+      if(!e.target || !e.target.closest) return;
+      var ikon = e.target.closest('.es-chart-btn');
+      if(!ikon) return;
+      e.preventDefault();
+      e.stopPropagation();
+      jtBukaChartDariKartu(ikon.closest('[data-symbol]'));
     }, true);
 
     let simbolAktif = null, bagianAktif = null, kartuAktifEl = null;

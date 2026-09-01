@@ -4,6 +4,7 @@ import { Loader2, ExternalLink, TriangleAlert, RotateCcw, Radar, ArrowRight, Loc
 import { useAuth } from '@/lib/auth';
 import { modePreview, jatahTerpakai, pakaiJatah } from '@/lib/preview';
 import { usePaket, pakaiKuota, LABEL_PAKET } from '@/lib/paket';
+import { simpanDaftarScreener } from '@/lib/screener-belah';
 
 /* ════════════════════════════════════════════════════════════════════════
    SCREENER ENTRY — screener V2 yang ASLI, ditanam apa adanya
@@ -431,6 +432,23 @@ export default function ScreenerV2() {
         if (isFinite(n) && n > 0) q.set(k, String(n));
       }
       if (d.arah === 'BUY' || d.arah === 'SELL') q.set('arah', d.arah);
+
+      /* -- HASIL PINDAI IKUT, KALAU BINGKAINYA MENGIRIMNYA ---------------
+         Kartu screener punya ikon chart yang mengirim seluruh hasil
+         pindainya, bukan cuma simbol yang diklik. Chart memasangnya di
+         panel kiri, jadi koin berikutnya tinggal ditekan -- tidak perlu
+         kembali ke Screener, memindai ulang, lalu mencari barisnya lagi.
+
+         Isinya dibersihkan di `simpanDaftarScreener`, bukan di sini:
+         pemeriksaan asal cuma menjawab "dari mana", dan yang menentukan
+         boleh-tidaknya masuk ke layar adalah BENTUKNYA.
+
+         Ambang DUA baris, bukan satu. Membelah layar untuk daftar berisi
+         satu koin berarti memakan sepertiga lebar chart demi baris yang
+         sudah jadi judul chartnya sendiri. */
+      const nBaris = simpanDaftarScreener(d.daftar);
+      if (nBaris > 1) q.set('screener', '1');
+
       arahkan(`/chart-entry?${q}`);
     };
     window.addEventListener('message', dengar);
