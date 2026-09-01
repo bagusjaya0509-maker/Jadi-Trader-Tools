@@ -413,6 +413,10 @@ export interface Performa {
   /** Bulan yang sedang diperingkatkan, `YYYY-MM`. */
   periode?: string;
   periodeLalu?: string;
+  /** true = `periode` BUKAN bulan berjalan, melainkan bulan terakhir yang
+   *  punya hasil. Layar WAJIB menuliskannya: peringkat bulan lalu yang
+   *  dikira peringkat bulan ini adalah rekam jejak yang salah tanggal. */
+  mundur?: boolean;
   /** Ambang yang dipakai server. Dikirim, tidak disalin ulang di layar. */
   aturan?: AturanPapan;
   analis: PerformaAnalis[];
@@ -446,11 +450,43 @@ export async function ambilPerforma(bolehContoh = false): Promise<Performa> {
      Tetap disusun ulang, tidak diganti spread: daftar ini juga yang
      menjamin bentuknya sesuai tipe kalau server suatu saat memulangkan
      sesuatu yang lain. Yang perlu diingat cuma menambahkan barisnya. */
-  const nyata: Performa = {
+  let nyata: Performa = {
     modal: j.modal ?? 1000, risikoPersen: j.risikoPersen ?? 1,
     analis: j.analis ?? [], berjalan: j.berjalan ?? 0,
     periode: j.periode, periodeLalu: j.periodeLalu, aturan: j.aturan,
   };
+
+  /* ── BULAN BARU BUKAN PAPAN KOSONG ────────────────────────────────
+     Papan ini sengaja milik satu bulan, dan itu tetap benar. Tapi tiap
+     tanggal 1 bulan berjalan belum punya satu pun sinyal yang kena TP
+     atau SL, jadi papannya kosong total -- di kepala halaman, tempat
+     orang memutuskan sinyal siapa yang ditiru. Rekam jejak yang ada
+     tidak hilang ke mana-mana; ia cuma ada di bulan sebelah.
+
+     Jadi kalau bulan berjalan kosong, yang ditampilkan bulan terakhir
+     yang berisi -- ditandai `mundur` supaya layar bisa mengatakan bulan
+     mana yang sedang dibaca. Peringkat bulan lalu yang dikira peringkat
+     bulan ini adalah rekam jejak yang salah tanggal, dan itu lebih buruk
+     daripada papan kosong.
+
+     `berjalan` TETAP dari bulan berjalan: berapa sinyal yang sedang
+     jalan adalah fakta hari ini, bukan fakta bulan lalu. */
+  if (!nyata.analis.length && j.periodeLalu) {
+    try {
+      const l = await panggil(
+        '/api/analisa/performa?periode=' + encodeURIComponent(String(j.periodeLalu)), {}, false);
+      if ((l.analis ?? []).length) {
+        nyata = {
+          modal: l.modal ?? nyata.modal, risikoPersen: l.risikoPersen ?? nyata.risikoPersen,
+          analis: l.analis, berjalan: nyata.berjalan,
+          periode: l.periode ?? String(j.periodeLalu), periodeLalu: l.periodeLalu,
+          aturan: l.aturan ?? nyata.aturan, mundur: true,
+        };
+      }
+    } catch { /* Bulan lalu gagal dibaca. Papan kosong masih jauh lebih
+                 baik daripada halaman yang gagal termuat seluruhnya. */ }
+  }
+
   if (!bolehContoh) return nyata;
 
   /* Papan peringkat baru berarti sesudah ada beberapa sinyal selesai. Di

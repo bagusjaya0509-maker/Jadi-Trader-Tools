@@ -124,6 +124,17 @@ function CatatanAsumsi({ modal, risikoPersen }: { modal: number; risikoPersen: n
 
 /* ── 1. Papan peringkat untuk kepala Market Signal ────────────────────── */
 
+const NAMA_BULAN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+
+/** `2026-08` -> `Agustus 2026`. Bulan ditulis dengan NAMANYA, bukan
+ *  angkanya: papan ini dibaca sekilas di kepala halaman, dan "2026-08" di
+ *  sana menuntut pembacanya menerjemahkan sendiri. */
+function namaBulan(p: string): string {
+  const [t, b] = p.split('-').map(Number);
+  return NAMA_BULAN[b - 1] ? `${NAMA_BULAN[b - 1]} ${t}` : p;
+}
+
 export function PapanPeringkatSignal({ data }: { data: Performa | null }) {
   const { pengguna } = useAuth();
   const navigasi = useNavigate();
@@ -202,6 +213,17 @@ export function PapanPeringkatSignal({ data }: { data: Performa | null }) {
 
   return (
     <div className="mb-4">
+      {/* BULAN MANA YANG SEDANG DIBACA -- cuma muncul saat papannya
+          mundur. Bulan berjalan tidak perlu diberi label: itu yang
+          diharapkan orang, dan keterangan untuk keadaan normal cuma
+          menambah baris yang dilewati mata. */}
+      {data.mundur && data.periode && (
+        <p className="mb-2 px-1 text-[11.5px] leading-relaxed text-amber-200/70">
+          Menampilkan peringkat <span className="font-medium">{namaBulan(data.periode)}</span> —
+          bulan berjalan belum punya sinyal yang kena TP atau SL.
+          {data.berjalan > 0 && ` Sekarang ${data.berjalan} sinyal masih berjalan.`}
+        </p>
+      )}
       {/* Dulu tombol lipat "Sembunyikan papan peringkat". Dicabut atas
           permintaan pemilik, dan memang tidak punya pekerjaan: papan ini
           SATU-SATUNYA isi kepala halaman, jadi melipatnya cuma menyisakan
