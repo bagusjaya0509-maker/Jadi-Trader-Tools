@@ -287,6 +287,23 @@ async function bunyikanTiruan(baru, dompet) {
 const OTO_AKTIF = process.env.WALLET_OTO_TUTUP !== '0';
 const KONFIRMASI_PERLU = Math.max(2, Number(process.env.WALLET_OTO_KONFIRMASI || 2));
 
+/* -- AUTO-OPEN: HARUS DINYALAKAN, TIDAK BISA LUPA DIMATIKAN ----------
+   Perhatikan bedanya dengan baris di atas. Auto-close memakai `!== '0'`
+   -- hidup kecuali sengaja dimatikan. Auto-open memakai `=== '1'` --
+   MATI kecuali sengaja dinyalakan.
+
+   Ketidaksimetrisan itu disengaja, dan alasannya sama dengan alasan
+   auto-open tidak pernah ada di berkas ini sampai sekarang: perintah
+   tutup dikirim reduceOnly dan kesalahan terburuknya keluar dari posisi
+   yang seharusnya ditahan. Perintah buka tidak punya pagar setara. Sesuatu
+   yang bisa memasukkan uang ke posisi baru tidak boleh menyala hanya
+   karena tidak ada yang menuliskan angka nol di berkas env. */
+const BUKA_AKTIF = process.env.WALLET_OTO_BUKA === '1';
+/* Berapa posisi salinan boleh hidup bersamaan. Bukan batas dolar -- itu
+   sudah dijaga rutenya di server; ini batas BANYAKNYA, supaya dompet yang
+   membuka sepuluh koin sekaligus tidak menyeret kita ikut sepuluh. */
+const BUKA_MAKS_POSISI = Math.max(1, Number(process.env.WALLET_OTO_BUKA_MAKS || 3));
+
 function tulisTiru(DIR, tiru) {
   const F = path.join(DIR, 'wallet-tiru.json');
   try {
@@ -306,6 +323,154 @@ async function posisikuBursa() {
     const j = await r.json();
     return (j.positions || []).filter((p) => Math.abs(Number(p.positionAmt) || 0) > 0);
   } catch (e) { return null; }
+}
+
+/* ══ MENIRU PEMBUKAAN POSISI ═══════════════════════════════════════════
+   Kembaran jagaTiruan di sisi sebaliknya. Yang perlu dijelaskan bukan cara
+   kerjanya -- itu terbaca dari kodenya -- melainkan kapan ia MENOLAK
+   bekerja, karena di situlah seluruh keamanannya berada.
+
+   ── HANYA PERALIHAN, BUKAN KEADAAN ────────────────────────────────────
+   Pemicunya BUKAN "dompet sumber sedang memegang koin ini". Kalau begitu,
+   menyalakan sakelarnya hari ini akan langsung menyalin posisi yang sudah
+   dibuka tiga hari lalu di harga yang sudah jauh lewat -- persis kebalikan
+   dari yang diminta, yaitu ikut MASUK saat ia masuk.
+
+   Yang dipicu peralihan `tidak pegang` -> `pegang`, dan peralihan itu cuma
+   bisa dilihat kalau keadaan sebelumnya diingat. Itu guna `sumberPegang`.
+
+   Perhatikan bahwa `undefined` -> pegang TIDAK menghitung. Pindaian
+   pertama sesudah sakelarnya dinyalakan cuma MENCATAT keadaan, tidak
+   bertindak. Tanpa aturan itu, menyalakan sakelar sama saja dengan
+   menyalin apa pun yang kebetulan sedang terbuka saat itu.
+
+   ── PAGAR LAIN ────────────────────────────────────────────────────────
+   1. Sakelar per pasangan dompet+koin, dinyalakan satu per satu.
+   2. Dua pindaian berturut-turut, sama dengan sisi tutup.
+   3. Tidak menambah posisi yang sudah kita punya di simbol itu.
+   4. Batas banyaknya posisi salinan yang hidup bersamaan.
+   5. Batas dolar dan leverage ada di rute servernya, bukan di sini --
+      gerbang terakhir sebelum uang bergerak tidak boleh cuma ada di
+      pemanggil.
+   6. Koin yang tidak ada di Binance dilaporkan, bukan didiamkan. */
+async function kirimSalin(simbol, arah, usd, leverage) {
+  const r = await fetch(DASAR + '/api/trade/futures/salin', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-App-Token': APP_TOKEN },
+    body: JSON.stringify({ symbol: simbol, side: arah, usd, leverage }),
+    signal: AbortSignal.timeout(30000),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || ('server menjawab ' + r.status));
+  return j;
+}
+
+async function bukaTiruan(posisiDompet) {
+  if (!BUKA_AKTIF) return;
+  const tiru = bacaTiru(DIR);
+  const perlu = tiru.filter((t) => t.otoBuka === true && Number(t.usd) > 0);
+  if (!perlu.length) return;
+
+  const punyaku = await posisikuBursa();
+  /* Sama seperti sisi tutup: bursa yang bisu dan bursa yang menjawab
+     "tidak ada posisi" terlihat sama dari sini, dan yang kedua tidak boleh
+     disimpulkan dari yang pertama. */
+  if (punyaku === null) { catat('auto-open: posisi bursa tidak terbaca, dilewati'); return; }
+
+  let berubah = false;
+  for (const t of perlu) {
+    const sumber = posisiDompet.find(
+      (p) => p.alamat === t.alamat && String(p.koin).toUpperCase() === t.koin);
+    const pegangSekarang = !!sumber;
+    const pegangTadi = t.sumberPegang;
+    if (pegangTadi !== pegangSekarang) { t.sumberPegang = pegangSekarang; berubah = true; }
+
+    if (!pegangSekarang) {
+      if (t.bukaKonfirmasi) { t.bukaKonfirmasi = 0; berubah = true; }
+      continue;
+    }
+    /* Pindaian pertama: catat saja. Lihat catatan panjang di atas. */
+    if (pegangTadi !== false) continue;
+
+    let simbol;
+    try {
+      simbol = await simbolBinance(t.koin, { dasar: DASAR, token: APP_TOKEN, catat });
+    } catch (e) {
+      catat('  auto-open: simbol', t.koin, 'belum bisa dipastikan -', e && e.message);
+      continue;
+    }
+
+    if (!simbol) {
+      /* Jawaban, bukan galat -- dan jawaban yang HARUS sampai ke orangnya,
+         kalau tidak ia menyangka salinannya berjalan padahal koin itu
+         dilewati diam-diam. Dibunyikan sekali per koin; penandanya baru
+         dilepas kalau suatu saat koinnya benar-benar listing. */
+      if (t.takAdaDiBinance !== true) {
+        t.takAdaDiBinance = true; berubah = true;
+        await lonceng({
+          id: 'salin-tiada-' + String(t.alamat).slice(0, 10) + '-' + t.koin,
+          judul: t.koin + ' tidak ada di Binance \u2014 tidak disalin',
+          detail: 'Dompet yang kamu tiru membuka ' + t.koin + ', tapi koin itu tidak terdaftar di '
+                + 'Binance Futures. Posisinya tidak dibuka di sana.',
+          sumber: NAMA_AGEN, jenis: 'wallet', waktu: Date.now(),
+        });
+        catat('  auto-open:', t.koin, 'tidak ada di Binance - dilewati');
+      }
+      continue;
+    }
+    if (t.takAdaDiBinance) { t.takAdaDiBinance = false; berubah = true; }
+
+    /* Sudah pegang simbol itu -> tidak menambah. Menambah adalah keputusan
+       berbeda dengan ukuran yang harus dihitung sendiri. */
+    if (punyaku.find((p) => String(p.symbol).toUpperCase() === simbol)) {
+      if (t.bukaKonfirmasi) { t.bukaKonfirmasi = 0; berubah = true; }
+      continue;
+    }
+
+    t.bukaKonfirmasi = (t.bukaKonfirmasi || 0) + 1; berubah = true;
+    if (t.bukaKonfirmasi < KONFIRMASI_PERLU) {
+      catat('  auto-open:', t.koin, 'konfirmasi', t.bukaKonfirmasi + '/' + KONFIRMASI_PERLU);
+      continue;
+    }
+
+    if (punyaku.length >= BUKA_MAKS_POSISI) {
+      catat('  auto-open:', t.koin, 'ditahan - sudah', punyaku.length, 'posisi terbuka (batas', BUKA_MAKS_POSISI + ')');
+      continue;
+    }
+
+    const arah = sumber.arah === 'SHORT' ? 'SELL' : 'BUY';
+    const usd = Number(t.usd);
+    const lev = Math.max(1, Number(t.leverage) || 1);
+    try {
+      const hasil = await kirimSalin(simbol, arah, usd, lev);
+      t.bukaKonfirmasi = 0;
+      t.terakhirBuka = Date.now();
+      t.simbolBuka = simbol;
+      berubah = true;
+      /* Ditandai supaya penjaga tutup punya pasangannya: yang dibuka
+         otomatis wajib bisa ditutup otomatis juga. */
+      if (t.otoTutup !== true) { t.otoTutup = true; }
+      catat('  AUTO-OPEN', arah, simbol, 'qty', hasil.quantity, '(~' + usd + ' USD, ' + lev + 'x)');
+      await lonceng({
+        id: 'salin-buka-' + simbol + '-' + Date.now(),
+        judul: 'Salin dompet: ' + arah + ' ' + simbol,
+        detail: 'Mengikuti ' + (sumber.nama || t.alamat.slice(0, 8)) + ' yang membuka ' + sumber.arah
+              + ' ' + t.koin + '. Ukuran ' + usd + ' USD, leverage ' + lev + 'x, qty ' + hasil.quantity + '.',
+        sumber: NAMA_AGEN, jenis: 'wallet', waktu: Date.now(),
+        tautan: '/chart-entry?simbol=' + simbol,
+      });
+    } catch (e) {
+      catat('  auto-open GAGAL', simbol + ':', e && e.message);
+      await lonceng({
+        id: 'salin-gagal-' + simbol + '-' + Date.now(),
+        judul: 'Salin dompet gagal: ' + simbol,
+        detail: String((e && e.message) || 'tidak diketahui'),
+        sumber: NAMA_AGEN, jenis: 'wallet', waktu: Date.now(),
+      });
+    }
+  }
+
+  if (berubah) tulisTiru(DIR, tiru);
 }
 
 async function jagaTiruan(posisiDompet) {
@@ -681,6 +846,13 @@ async function pindai() {
      untuk sebuah posisi dibuka lagi. */
   try { await jagaTiruan(semuaPosisi); }
   catch (e) { catat('auto-close gagal:', e && e.message); }
+
+  /* SESUDAH auto-close, bukan sebelum. Kalau sebuah koin ditutup dan
+     dibuka lagi dalam satu putaran, urutan ini yang benar: keluar dulu,
+     baru pertimbangkan masuk. Urutan terbalik akan melihat posisi yang
+     sebentar lagi ditutup sebagai "sudah punya" lalu melewatkannya. */
+  try { await bukaTiruan(semuaPosisi); }
+  catch (e) { catat('auto-open gagal:', e && e.message); }
 }
 
 /** Mendaftarkan diri di papan supaya kartunya ADA sebelum transaksi

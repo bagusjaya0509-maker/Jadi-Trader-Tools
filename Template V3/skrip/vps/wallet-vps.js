@@ -247,6 +247,58 @@ module.exports = (app, { butuhLogin, batasLaju, express, DIR }) => {
     res.json({ ok: true, tiru: d.tiru });
   });
 
+  /* -- SAKELAR AUTO-OPEN, UKURAN, DAN LEVERAGE -------------------------
+     Terpisah dari rute auto-close di atas, dan itu bukan kerapian: menutup
+     dan membuka adalah dua izin yang berbeda beratnya. Menggabungkannya
+     jadi satu rute berarti satu permintaan bisa menyalakan keduanya, dan
+     yang lebih berat ikut menyala karena kebetulan berada di badan yang
+     sama.
+
+     `usd` adalah MARGIN -- uang yang dipertaruhkan -- bukan nilai posisi.
+     Nilai posisinya usd x leverage. Di 1x keduanya sama, dan 1x yang
+     dipakai; kolom leverage ada supaya suatu hari bisa disesuaikan tanpa
+     membongkar apa pun.
+
+     Batas di sini SENGAJA longgar (500) -- ia cuma penjaga salah ketik.
+     Batas yang sesungguhnya SALIN_MAKS_USD di server, gerbang terakhir
+     sebelum uang bergerak, dan batas itu tidak bisa diubah dari layar. */
+  app.post('/api/agen/wallet/tiru/buka', batasLaju, butuhLogin, hanyaPemilik, express.json(), (req, res) => {
+    const b = req.body || {};
+    const alamat = String(b.alamat || '').toLowerCase();
+    const koin = String(b.koin || '').toUpperCase();
+    const d = baca(TIRU, { tiru: [] });
+    const t = (d.tiru || []).find((x) => x.alamat === alamat && x.koin === koin);
+    if (!t) return res.status(404).json({ error: 'Penanda tiruan tidak ditemukan.' });
+
+    if (b.usd !== undefined) {
+      const u = Number(b.usd);
+      if (!(u > 0) || u > 500) return res.status(400).json({ error: 'Ukuran harus antara 1 dan 500 USD.' });
+      t.usd = Math.round(u * 100) / 100;
+    }
+    if (b.leverage !== undefined) {
+      const l = Math.round(Number(b.leverage) || 1);
+      if (!(l >= 1 && l <= 20)) return res.status(400).json({ error: 'Leverage harus 1 sampai 20.' });
+      t.leverage = l;
+    }
+    if (b.otoBuka !== undefined) {
+      if (b.otoBuka === true && !(Number(t.usd) > 0)) {
+        return res.status(400).json({ error: 'Isi dulu ukuran ordernya sebelum menyalakan auto-open.' });
+      }
+      t.otoBuka = b.otoBuka === true;
+      /* Hitungan konfirmasi DAN ingatan keadaan sumber sama-sama direset.
+         Alasan konfirmasi sama dengan di rute auto-close. Alasan
+         `sumberPegang` lebih penting: pemantau cuma bertindak pada
+         peralihan tidak-pegang -> pegang, dan ingatan lama membuat sakelar
+         yang baru dinyalakan mengira peralihan itu sudah terjadi. Dihapus,
+         pindaian berikutnya memulai dari nol -- mencatat dulu, tidak
+         bertindak. */
+      t.bukaKonfirmasi = 0;
+      delete t.sumberPegang;
+    }
+    tulis(TIRU, d);
+    res.json({ ok: true, tiru: d.tiru });
+  });
+
   app.delete('/api/agen/wallet/tiru/:alamat/:koin', batasLaju, butuhLogin, hanyaPemilik, (req, res) => {
     const alamat = String(req.params.alamat || '').toLowerCase();
     const koin = String(req.params.koin || '').toUpperCase();
