@@ -184,14 +184,32 @@ export type PesanBus =
  *  Nilainya WAJIB sama dengan tabel TF di halaman Chart — dua daftar yang
  *  seharusnya sama adalah dua daftar yang cepat atau lambat berbeda, dan
  *  yang berbeda di sini adalah timeframe yang dikirim ke proxy. */
+/* ── SATU DAFTAR TIMEFRAME UNTUK SELURUH APLIKASI ────────────────────────
+   Dulu daftar ini ditulis DUA KALI — sekali di sini untuk panel multi-chart,
+   sekali lagi di `Chart.tsx` untuk halaman utamanya — dengan isi yang sama
+   persis. Dua salinan yang harus sepakat selamanya, dan yang satu pasti
+   tertinggal saat yang lain diperbaiki: menambah Weekly berarti mengingat
+   dua tempat, dan yang lupa tidak menghasilkan satu galat pun. Panelnya
+   cuma diam-diam kehilangan satu pilihan.
+
+   Sekarang Chart.tsx mengimpor dari sini. Ia SUDAH mengimpor modul ini
+   untuk bus dan kunci replay, jadi tidak ada ketergantungan baru yang
+   ditambahkan — cuma satu nama lagi dari pintu yang sama.
+
+   ── LABELNYA SINGKATAN, PERMINTAAN PEMILIK 1 SEP 2026 ──────────────────
+   "1 Menit" jadi "1M", dan seterusnya. Nilai internalnya TIDAK ikut berubah
+   ('1m', '5m', …) — itu yang dikirim ke bursa dan ditulis ke alamat halaman,
+   dan menyentuhnya akan mematahkan setiap tautan chart yang pernah dibagikan.
+   Yang berubah cuma yang dibaca mata. */
 export const TF_PANEL: { nilai: string; label: string }[] = [
-  { nilai: '1m', label: '1 Menit' },
-  { nilai: '5m', label: '5 Menit' },
-  { nilai: '15m', label: '15 Menit' },
-  { nilai: '30m', label: '30 Menit' },
-  { nilai: '1h', label: '1 Jam' },
-  { nilai: '4h', label: '4 Jam' },
-  { nilai: '1d', label: 'Harian' },
+  { nilai: '1m', label: '1M' },
+  { nilai: '5m', label: '5M' },
+  { nilai: '15m', label: '15M' },
+  { nilai: '30m', label: '30M' },
+  { nilai: '1h', label: '1H' },
+  { nilai: '4h', label: '4H' },
+  { nilai: '1d', label: 'Daily' },
+  { nilai: '1w', label: 'Weekly' },
 ];
 
 let kanal: BroadcastChannel | null = null;

@@ -12,7 +12,7 @@ import { simpanDraf } from '@/lib/draf-sinyal';
 import { Panel, PanelHead, KartuKpi, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn, uang, persen, harga, tanggalPendek } from '@/lib/utils';
 import { ChartLilin, TAMPILAN_BAWAAN, type Garis, type GarisHarga, type GarisSeret, type PosisiChartMt5, type TampilanChart } from '@/components/chart-lilin';
-import { POLOS, UTAMA, ID_PANEL, kirimBus, dengarBus, nyalakanMulti, replayDipegangLain, pegangReplay } from '@/lib/multi-chart';
+import { POLOS, UTAMA, ID_PANEL, TF_PANEL, kirimBus, dengarBus, nyalakanMulti, replayDipegangLain, pegangReplay } from '@/lib/multi-chart';
 import { PanelReplay, type AksiOrder, type JenisEntry } from '@/components/panel-replay';
 import { PojokOrder } from '@/components/pojok-order';
 import { kirimOrderNyata, ubahSlTpNyata, batalPendingNyata, tutupPosisiNyata, tickSimbol, keTick, type MetodeTp } from '@/lib/order-nyata';
@@ -66,15 +66,12 @@ import { bacaDaftarScreener, hapusDaftarScreener, type BarisScreener } from '@/l
    web — jalur itu menunggu VPS Windows tersendiri.
    ════════════════════════════════════════════════════════════════════════ */
 
-const TF = [
-  { nilai: '1m', label: '1 Menit' },
-  { nilai: '5m', label: '5 Menit' },
-  { nilai: '15m', label: '15 Menit' },
-  { nilai: '30m', label: '30 Menit' },
-  { nilai: '1h', label: '1 Jam' },
-  { nilai: '4h', label: '4 Jam' },
-  { nilai: '1d', label: 'Harian' },
-];
+/* Daftarnya tinggal di `lib/multi-chart.ts` — SATU sumber untuk halaman ini
+   dan untuk panel multi-chart. Dulu keduanya menyimpan salinan sendiri yang
+   isinya sama persis, dan menambah satu timeframe berarti mengingat dua
+   tempat. Yang lupa tidak menghasilkan galat: panelnya cuma diam-diam
+   kehilangan pilihan itu. */
+const TF = TF_PANEL;
 
 /** Timeframe yang BENAR-BENAR dikirim EA Trade-Fi.
  *  ──────────────────────────────────────────────────────────────────────
