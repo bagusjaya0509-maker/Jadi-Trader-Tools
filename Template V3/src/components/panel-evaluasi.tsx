@@ -50,9 +50,34 @@ function warnaSkor(n: number) {
   return '#ef4444';
 }
 
+/* Rentang tanggal yang BENAR-BENAR ada di jurnalnya.
+   ──────────────────────────────────────────────────────────────────────
+   Dilaporkan pemilik 1 Sep 2026: menekan "30 hari" lalu "90 hari" tidak
+   mengubah apa pun, dan ia tidak bisa tahu apakah itu rusak atau memang
+   begitu. Ternyata memang begitu — seluruh jurnalnya waktu itu 52 hari,
+   jadi "90 hari" dan "Semua" menyeleksi himpunan yang sama persis.
+
+   Panelnya benar tapi DIAM soal itu, dan tombol yang benar-tapi-diam
+   terbaca persis seperti tombol rusak. Jadi rentangnya sekarang disebut,
+   dan pilihan yang lebih lebar daripada datanya ditandai.
+
+   Baris tanpa cap waktu (`waktu` 0 — trade yang belum punya waktu keluar)
+   DIBUANG dari hitungan. Satu baris bernilai 0 membuat rentangnya terbaca
+   sejak 1970, dan angka itu akan muncul di layar sebagai fakta. */
+function rentangData(trade: Trade[]) {
+  const w = trade.map((t) => t.waktu).filter((x) => x > 0);
+  if (!w.length) return null;
+  const awal = Math.min(...w);
+  const akhir = Math.max(...w);
+  return { awal, akhir, hari: Math.max(1, Math.round((Date.now() - awal) / 86_400_000)) };
+}
+
+const TANGGAL = new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short' });
+
 export function PanelEvaluasi({ trade, saldoAwal }: { trade: Trade[]; saldoAwal: number }) {
   const [hari, setHari] = useState(0);
   const hasil = useMemo(() => evaluasi(saring(trade, hari), saldoAwal), [trade, hari, saldoAwal]);
+  const rentang = useMemo(() => rentangData(trade), [trade]);
 
   const warna = warnaSkor(hasil.skorTotal);
   const dataRadar = hasil.butir.map((b) => ({
@@ -75,14 +100,37 @@ export function PanelEvaluasi({ trade, saldoAwal }: { trade: Trade[]; saldoAwal:
         judul="Evaluasi Performa"
         sub="Ukuran yang dipakai firma evaluasi — dihitung dari jurnalmu sendiri."
         kanan={
-          <div className="flex overflow-hidden rounded-md border border-zinc-800">
-            {RENTANG.map((r) => (
-              <button key={r.hari} onClick={() => setHari(r.hari)}
-                className={cn('cursor-pointer px-2.5 py-1 text-[11.5px] transition-colors',
-                  hari === r.hari ? 'bg-zinc-100 text-zinc-950' : 'text-zinc-400 hover:text-zinc-200')}>
-                {r.label}
-              </button>
-            ))}
+          <div className="flex shrink-0 flex-col items-end gap-1">
+            <div className="flex overflow-hidden rounded-md border border-zinc-800">
+              {RENTANG.map((r) => {
+                /* Lebih lebar daripada umur jurnalnya = memilih semuanya.
+                   Tetap BISA DITEKAN — ia tidak salah, cuma tidak mengubah
+                   apa-apa, dan mematikannya akan menyembunyikan fakta itu
+                   alih-alih menjelaskannya. */
+                const mubazir = !!rentang && r.hari > 0 && r.hari >= rentang.hari;
+                return (
+                  <button key={r.hari} onClick={() => setHari(r.hari)}
+                    title={mubazir
+                      ? `Jurnalmu baru ${rentang!.hari} hari — ${r.label} mencakup semuanya, sama dengan Semua.`
+                      : undefined}
+                    className={cn('cursor-pointer px-2.5 py-1 text-[11.5px] transition-colors',
+                      hari === r.hari ? 'bg-zinc-100 text-zinc-950'
+                        : mubazir ? 'text-zinc-600 hover:text-zinc-400'
+                        : 'text-zinc-400 hover:text-zinc-200')}>
+                    {r.label}
+                  </button>
+                );
+              })}
+            </div>
+            {/* Rentang yang sungguhan ada. Ini yang menjawab "kenapa
+                tombolnya tidak mengubah apa-apa" sebelum pertanyaannya
+                sempat muncul. */}
+            {rentang && (
+              <span className="text-[11px] text-zinc-600">
+                {TANGGAL.format(rentang.awal)} – {TANGGAL.format(rentang.akhir)}
+                {' · '}<span className="angka">{rentang.hari}</span> hari
+              </span>
+            )}
           </div>
         }
       />
