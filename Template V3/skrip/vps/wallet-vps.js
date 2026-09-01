@@ -327,8 +327,25 @@ module.exports = (app, { butuhLogin, batasLaju, express, DIR }) => {
      sedang dipakai memutuskan. */
   const SALIN = path.join(DIR, 'wallet-salin.json');
 
+  /* Tiga daftar sekaligus, bukan tiga rute.
+     ──────────────────────────────────────────────────────────────────
+     Setelan, log aksi, dan riwayat posisi tertutup selalu dibaca
+     bersamaan oleh satu panel -- memecahnya jadi tiga rute berarti tiga
+     perjalanan jaringan dan tiga kemungkinan salah satunya tertinggal
+     satu putaran di belakang yang lain. Ketiganya tinggal di berkas yang
+     sama, jadi memulangkannya sekaligus juga tidak menambah kerja.
+
+     Log dibalik di sini (terbaru dulu): mesin menulisnya berurutan maju
+     karena itu yang murah untuk pemangkasan, tapi yang dibaca orang
+     selalu yang paling akhir terjadi. */
   app.get('/api/agen/wallet/salin', batasLaju, butuhLogin, hanyaPemilik, (req, res) => {
-    res.json({ ok: true, salin: (baca(SALIN, { salin: [] }).salin) || [] });
+    const d = baca(SALIN, { salin: [], log: [], riwayat: [] });
+    res.json({
+      ok: true,
+      salin: d.salin || [],
+      log: (d.log || []).slice().reverse(),
+      riwayat: (d.riwayat || []).slice().reverse(),
+    });
   });
 
   app.post('/api/agen/wallet/salin', batasLaju, butuhLogin, hanyaPemilik, express.json(), (req, res) => {

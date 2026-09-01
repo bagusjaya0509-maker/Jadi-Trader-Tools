@@ -429,6 +429,75 @@ const adaptorBursa = {
     return { bursa: 'hyperliquid', simbol: h.koin };
   },
 
+  /* ── POTRET POSISI KITA SENDIRI, SATU BENTUK UNTUK DUA BURSA ──────
+     Mesin salinan cuma perlu tahu "posisi ini sekarang bagaimana" dan
+     tidak boleh peduli bahwa Binance menyebutnya `unRealizedProfit`
+     sementara Hyperliquid menyebutnya `unrealizedPnl`. Penerjemahannya
+     berhenti di sini, seperti buka dan tutup di atas.
+
+     Kegagalan dipulangkan sebagai daftar KOSONG untuk bursa yang bisu,
+     bukan sebagai lemparan: kalau Hyperliquid sedang tidak menjawab,
+     posisi Binance tetap layak ditampilkan. Yang hilang cuma separuh
+     angkanya, dan itu jauh lebih baik daripada panel kosong. */
+  async posisiku() {
+    const keluar = [];
+
+    const bn = await posisikuBursa();
+    for (const p of (bn || [])) {
+      const qty = Number(p.positionAmt) || 0;
+      if (!qty) continue;
+      const entry = Number(p.entryPrice) || 0;
+      const mark = Number(p.markPrice) || 0;
+      const lev = Number(p.leverage) || 0;
+      /* Nilai posisi dari harga PASAR, bukan harga masuk: yang ditanyakan
+         adalah seberapa besar posisi ini sekarang, bukan seberapa besar ia
+         waktu dibuka. Jatuh ke harga masuk kalau mark belum terbaca. */
+      const nilai = Math.abs(Number(p.notional) || (Math.abs(qty) * (mark || entry)));
+      /* Cross tidak punya margin terpisah -- yang benar untuknya adalah
+         nilai posisi dibagi leverage, dan itulah angka yang dipakai bursa
+         sendiri saat menghitung margin yang tertahan. */
+      const isolasi = Number(p.isolatedMargin) || 0;
+      keluar.push({
+        bursa: 'binance',
+        simbol: String(p.symbol || '').toUpperCase(),
+        koin: String(p.symbol || '').toUpperCase().replace(/(USDT|USDC|BUSD)$/, ''),
+        arah: qty > 0 ? 'LONG' : 'SHORT',
+        qty: Math.abs(qty), entry, mark, notional: nilai,
+        margin: isolasi > 0 ? isolasi : (lev > 0 ? nilai / lev : 0),
+        upnl: Number(p.unRealizedProfit) || 0,
+        likuidasi: Number(p.liquidationPrice) || 0,
+        leverage: lev,
+      });
+    }
+
+    if (HL.siap()) {
+      try {
+        const s = await HL.saldoHl();
+        for (const p of (s.posisi || [])) {
+          const uk = Number(p.ukuran) || 0;
+          keluar.push({
+            bursa: 'hyperliquid',
+            simbol: String(p.koin || '').toUpperCase(),
+            koin: String(p.koin || '').toUpperCase(),
+            arah: p.arah,
+            qty: uk,
+            entry: Number(p.entry) || 0,
+            /* Hyperliquid tidak memulangkan mark secara langsung; nilai
+               posisi dibagi ukuran ADALAH harga pasarnya. */
+            mark: uk > 0 ? (Number(p.nilai) || 0) / uk : 0,
+            notional: Number(p.nilai) || 0,
+            margin: Number(p.margin) || 0,
+            upnl: Number(p.pnl) || 0,
+            likuidasi: Number(p.likuidasi) || 0,
+            leverage: Number(p.leverage) || 0,
+          });
+        }
+      } catch (e) { catat('  posisiku: Hyperliquid bisu -', (e && e.message) || '?'); }
+    }
+
+    return keluar;
+  },
+
   async tutup({ koin, simbol, bursa, arah }) {
     if (bursa === 'hyperliquid') { await HL.tutupHl(simbol || koin); return; }
 

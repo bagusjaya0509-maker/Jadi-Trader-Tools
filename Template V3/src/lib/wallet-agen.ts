@@ -127,9 +127,74 @@ export interface SetelanSalin {
    *  mencatat, tidak membuka apa pun. */
   pegang?: string[];
   /** Posisi salinan yang SEDANG kita pegang, per koin. */
-  punyaku?: Record<string, { bursa: string; simbol: string; arah: string; waktu: number }>;
+  punyaku?: Record<string, PosisiSalinan>;
   konfirmasiBuka?: Record<string, number>;
   konfirmasiTutup?: Record<string, number>;
+}
+
+/** Satu posisi salinan yang sedang terbuka.
+ *
+ *  Empat medan pertama ditulis saat ordernya berangkat dan tidak pernah
+ *  berubah lagi; `hidup` disegarkan pemantau tiap putaran dari bursa.
+ *  Dipisah begitu bukan demi kerapian: `usd` dan `leverage` adalah setelan
+ *  SAAT DIBUKA, dan posisi yang dibuka dengan $30 tidak berubah jadi $50
+ *  hanya karena setelannya dinaikkan sesudahnya. */
+export interface PosisiSalinan {
+  bursa: string;
+  simbol: string;
+  arah: string;
+  waktu: number;
+  usd?: number;
+  leverage?: number;
+  /** Arah dompet sumbernya: LONG / SHORT. */
+  arahSumber?: string;
+  /** Potret dari bursa. `terbaca: false` = posisinya tidak ketemu di
+   *  jawaban bursa terakhir — angkanya yang tertinggal sudah basi, dan
+   *  layar harus mengatakannya alih-alih menampilkannya seolah segar. */
+  hidup?: {
+    terbaca: boolean;
+    qty: number; entry: number; harga: number; nilai: number;
+    margin: number; pnl: number; roe: number;
+    likuidasi: number; leverage: number; waktu: number;
+  };
+}
+
+/** Satu baris log aksi mesin salinan. */
+export interface LogSalin {
+  waktu: number;
+  /** buka · tutup · tahan · gagal · konfirmasi · catat */
+  jenis: string;
+  alamat: string;
+  koin: string;
+  pesan: string;
+}
+
+/** Satu posisi salinan yang SUDAH tertutup, beserta hasilnya. */
+export interface RiwayatSalin {
+  waktu: number;
+  dibuka: number;
+  alamat: string;
+  nama: string;
+  koin: string;
+  simbol: string;
+  bursa: string;
+  arah: string;
+  usd: number;
+  leverage: number;
+  entry: number;
+  keluar: number;
+  /** null = hasilnya tidak pernah terbaca dari bursa. Berbeda dari nol,
+   *  yang berarti impas — dan winrate yang menghitung "tidak tahu" sebagai
+   *  impas berbohong ke arah yang tidak bisa dikoreksi belakangan. */
+  pnl: number | null;
+  roe: number | null;
+}
+
+/** Tiga daftar yang selalu dibaca bersamaan oleh panel Posisi Copy. */
+export interface IsiSalin {
+  salin: SetelanSalin[];
+  log: LogSalin[];
+  riwayat: RiwayatSalin[];
 }
 
 export interface KeadaanDompet {
@@ -273,18 +338,29 @@ export async function batalTiru(alamat: string, koin: string): Promise<boolean> 
   } catch { return false; }
 }
 
-/** Daftar setelan salin. Pemilik saja — digerbangi server. */
-export async function daftarSalin(): Promise<SetelanSalin[]> {
+/** Setelan salin + log aksi + riwayat posisi tertutup. Pemilik saja —
+ *  digerbangi server.
+ *
+ *  Ketiganya dipulangkan satu rute karena satu panel selalu membacanya
+ *  bersamaan. Kegagalan memulangkan tiga daftar KOSONG, bukan melempar:
+ *  panel ini menumpang di kartu yang juga menampilkan dompet pantauan, dan
+ *  setelan yang tidak terbaca tidak boleh menjatuhkan keduanya. */
+export async function daftarSalin(): Promise<IsiSalin> {
+  const kosong: IsiSalin = { salin: [], log: [], riwayat: [] };
   const t = await token();
-  if (!t) return [];
+  if (!t) return kosong;
   try {
     const r = await fetch(`${dasar()}/api/agen/wallet/salin`, {
       headers: { Authorization: 'Bearer ' + t },
     });
-    if (!r.ok) return [];
+    if (!r.ok) return kosong;
     const j = await r.json();
-    return Array.isArray(j.salin) ? j.salin : [];
-  } catch { return []; }
+    return {
+      salin: Array.isArray(j.salin) ? j.salin : [],
+      log: Array.isArray(j.log) ? j.log : [],
+      riwayat: Array.isArray(j.riwayat) ? j.riwayat : [],
+    };
+  } catch { return kosong; }
 }
 
 /** Simpan setelan salin untuk satu dompet. Mengirim SELURUH setelan

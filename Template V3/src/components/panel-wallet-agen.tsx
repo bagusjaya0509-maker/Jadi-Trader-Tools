@@ -7,6 +7,7 @@ import { SparklineSaldo } from '@/components/kurva-saldo';
 import {
   keadaanDompet, tambahDompet, hapusDompet, peringkatDompet, tandaiTiru, batalTiru,
   daftarSalin, simpanSalin, hapusSalin, type SetelanSalin,
+  type IsiSalin, type LogSalin, type RiwayatSalin, type PosisiSalinan,
   type KeadaanDompet, type TransaksiDompet, type PosisiDompet, type Peringkat,
   type JendelaPeringkat, type PitaAkun, type RiwayatBursa, type PenandaTiru,
   type DompetPantau,
@@ -1386,8 +1387,60 @@ function KonsensusPasar({ posisi, dompet, seumur, log }: {
    yang dibaca sambil mencari. "Posisi Copy" menjawab apa yang sedang
    berjalan dengan uang sungguhan — dan yang kedua dibuka orang dengan
    maksud yang sama sekali lain, sering kali dengan tergesa. */
-function PosisiCopy({ salin, dompet, buka, muat }: {
+/* ── Angka uang di panel ini SELALU dolar bursa ────────────────────────
+   Bukan rupiah, dan bukan "ringkas". Yang dibandingkan orang di sini
+   adalah margin $30 dengan PnL -$1,84 — dua angka kecil yang selisih
+   sennya berarti, dan pembulatan ke "0,0 rb" menghapus persis bagian yang
+   sedang dibaca. */
+function usdTanda(v: number) {
+  return (v > 0 ? '+$' : v < 0 ? '-$' : '$') + Math.abs(v).toFixed(2);
+}
+
+/* Harga dengan jumlah desimal yang mengikuti besarnya. BTC di 79.000 tidak
+   butuh enam desimal; PEPE di 0,0000082 tidak bisa hidup tanpanya. */
+function hrgAdaptif(v: number) {
+  if (!v) return '—';
+  const a = Math.abs(v);
+  if (a >= 1000) return v.toFixed(2);
+  if (a >= 1) return v.toFixed(4);
+  if (a >= 0.01) return v.toFixed(5);
+  return v.toPrecision(4);
+}
+
+function durasi(dari: number, sampai: number) {
+  const m = Math.max(0, Math.round((sampai - dari) / 60000));
+  if (m < 60) return m + ' mnt';
+  const j = m / 60;
+  if (j < 24) return (j < 10 ? j.toFixed(1) : Math.round(j)) + ' jam';
+  return (j / 24).toFixed(1) + ' hari';
+}
+
+const RONA_LOG: Record<string, string> = {
+  buka: 'bg-emerald-500/15 text-emerald-300',
+  tutup: 'bg-sky-500/15 text-sky-300',
+  gagal: 'bg-red-500/15 text-red-300',
+  tahan: 'bg-amber-500/15 text-amber-300',
+  konfirmasi: 'bg-zinc-800 text-zinc-400',
+  catat: 'bg-zinc-800 text-zinc-500',
+};
+
+/** Satu angka besar dengan labelnya. Dipakai dua baris ringkasan di bawah. */
+function Angka({ judul, nilai, warna, sub }: {
+  judul: string; nilai: string; warna?: string; sub?: string;
+}) {
+  return (
+    <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 px-3 py-2">
+      <span className="block text-[10.5px] uppercase tracking-wide text-zinc-600">{judul}</span>
+      <span className={cn('angka mt-0.5 block text-[18px] font-medium', warna || 'text-zinc-100')}>{nilai}</span>
+      {sub && <span className="mt-0.5 block text-[10.5px] text-zinc-600">{sub}</span>}
+    </div>
+  );
+}
+
+function PosisiCopy({ salin, log, riwayat, dompet, buka, muat }: {
   salin: SetelanSalin[];
+  log: LogSalin[];
+  riwayat: RiwayatSalin[];
   dompet: DompetPantau[];
   buka: (w: { alamat: string; nama: string }) => void;
   muat: boolean;
@@ -1399,13 +1452,36 @@ function PosisiCopy({ salin, dompet, buka, muat }: {
      pegang apa" — dan jawaban itu tersebar di beberapa kartu kalau
      dikelompokkan menurut asalnya. */
   const posisi = salin.flatMap((s) =>
-    Object.entries(s.punyaku || {}).map(([koin, p]) => ({
+    Object.entries((s.punyaku || {}) as Record<string, PosisiSalinan>).map(([koin, p]) => ({
       koin, ...p, alamat: s.alamat,
       dompet: nama.get(s.alamat) || s.nama || s.alamat.slice(0, 8) + '…',
-      usd: s.usd, leverage: s.leverage,
+      /* Setelan saat DIBUKA lebih benar daripada setelan sekarang; yang
+         sekarang cuma dipakai kalau posisinya lahir sebelum medan ini ada. */
+      usd: p.usd ?? s.usd, leverage: p.leverage ?? s.leverage,
     })));
 
   const hidup = salin.filter((s) => s.aktif);
+
+  /* ── Angka berjalan ──────────────────────────────────────────────────
+     Dijumlahkan hanya dari posisi yang potretnya TERBACA. Posisi yang
+     angkanya basi tidak dihitung nol — nol adalah pernyataan, dan
+     menjumlahkan "tidak tahu" sebagai nol membuat total margin terlihat
+     lebih kecil daripada yang benar-benar tertahan di bursa. */
+  const terbaca = posisi.filter((p) => p.hidup?.terbaca);
+  const margin = terbaca.reduce((t, p) => t + (p.hidup?.margin || 0), 0);
+  const pnlJalan = terbaca.reduce((t, p) => t + (p.hidup?.pnl || 0), 0);
+  const nilaiPosisi = terbaca.reduce((t, p) => t + (p.hidup?.nilai || 0), 0);
+  const belumTerbaca = posisi.length - terbaca.length;
+
+  /* ── Hasil yang sudah selesai ────────────────────────────────────────
+     Winrate dihitung dari trade yang PnL-nya benar-benar terbaca saja.
+     Yang tidak terbaca tetap ditampilkan di daftar, tapi tidak ikut
+     memilih — angka kemenangan yang mengandung tebakan lebih buruk
+     daripada angka kemenangan dari sampel yang lebih kecil. */
+  const dinilai = riwayat.filter((r) => r.pnl !== null);
+  const realisasi = dinilai.reduce((t, r) => t + (r.pnl || 0), 0);
+  const menang = dinilai.filter((r) => (r.pnl || 0) > 0).length;
+  const winrate = dinilai.length ? (menang / dinilai.length) * 100 : null;
 
   if (muat && !salin.length) {
     return (
@@ -1417,20 +1493,37 @@ function PosisiCopy({ salin, dompet, buka, muat }: {
 
   return (
     <div className="space-y-5">
-      {/* ── RINGKASAN TIGA ANGKA ────────────────────────────────────── */}
-      <div className="grid grid-cols-3 gap-2">
-        {[
-          ['Dompet disalin', String(hidup.length), hidup.length ? 'text-emerald-400' : 'text-zinc-500'],
-          ['Posisi terbuka', String(posisi.length), posisi.length ? 'text-zinc-100' : 'text-zinc-500'],
-          ['Nilai per order', hidup.length
-            ? '$' + [...new Set(hidup.map((s) => s.usd))].join(' / $')
-            : '—', 'text-zinc-300'],
-        ].map(([judul, nilai, warna]) => (
-          <div key={judul} className="rounded-lg border border-zinc-800 bg-zinc-900/40 px-3 py-2">
-            <span className="block text-[10.5px] uppercase tracking-wide text-zinc-600">{judul}</span>
-            <span className={cn('angka mt-0.5 block text-[18px] font-medium', warna)}>{nilai}</span>
-          </div>
-        ))}
+      {/* ── RINGKASAN: YANG SEDANG BERJALAN ─────────────────────────── */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <Angka judul="Dompet disalin" nilai={String(hidup.length)}
+          warna={hidup.length ? 'text-emerald-400' : 'text-zinc-500'}
+          sub={hidup.length ? '$' + [...new Set(hidup.map((s) => s.usd))].join(' / $') + ' per order' : undefined} />
+        <Angka judul="Posisi terbuka" nilai={String(posisi.length)}
+          warna={posisi.length ? 'text-zinc-100' : 'text-zinc-500'}
+          sub={nilaiPosisi > 0 ? 'nilai $' + nilaiPosisi.toFixed(0) : undefined} />
+        <Angka judul="Margin terpakai" nilai={margin > 0 ? '$' + margin.toFixed(2) : '—'}
+          warna={margin > 0 ? 'text-zinc-100' : 'text-zinc-500'}
+          sub={belumTerbaca > 0 ? belumTerbaca + ' posisi belum terbaca' : undefined} />
+        <Angka judul="PnL berjalan" nilai={terbaca.length ? usdTanda(pnlJalan) : '—'}
+          warna={!terbaca.length ? 'text-zinc-500' : pnlJalan > 0 ? 'text-emerald-400' : pnlJalan < 0 ? 'text-red-400' : 'text-zinc-300'}
+          sub={margin > 0 ? ((pnlJalan / margin) * 100).toFixed(1) + '% dari margin' : undefined} />
+      </div>
+
+      {/* ── RINGKASAN: YANG SUDAH SELESAI ───────────────────────────── */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <Angka judul="Realized" nilai={dinilai.length ? usdTanda(realisasi) : '—'}
+          warna={!dinilai.length ? 'text-zinc-500' : realisasi > 0 ? 'text-emerald-400' : realisasi < 0 ? 'text-red-400' : 'text-zinc-300'}
+          sub={dinilai.length ? dinilai.length + ' posisi tertutup' : 'belum ada yang tertutup'} />
+        <Angka judul="Winrate" nilai={winrate === null ? '—' : winrate.toFixed(0) + '%'}
+          warna={winrate === null ? 'text-zinc-500' : winrate >= 50 ? 'text-emerald-400' : 'text-red-400'}
+          sub={winrate === null ? undefined : menang + ' menang · ' + (dinilai.length - menang) + ' kalah'} />
+        <Angka judul="Total (jalan + selesai)"
+          nilai={terbaca.length || dinilai.length ? usdTanda(pnlJalan + realisasi) : '—'}
+          warna={!terbaca.length && !dinilai.length ? 'text-zinc-500'
+            : pnlJalan + realisasi > 0 ? 'text-emerald-400' : pnlJalan + realisasi < 0 ? 'text-red-400' : 'text-zinc-300'} />
+        <Angka judul="Aksi tercatat" nilai={String(log.length)}
+          warna={log.length ? 'text-zinc-300' : 'text-zinc-500'}
+          sub={log.length ? umur(log[0].waktu) : undefined} />
       </div>
 
       {/* ── POSISI YANG SEDANG TERBUKA ──────────────────────────────── */}
@@ -1449,23 +1542,141 @@ function PosisiCopy({ salin, dompet, buka, muat }: {
           </p>
         ) : (
           <div className="space-y-1.5">
-            {posisi.map((p) => (
-              <div key={p.alamat + p.koin}
-                className="flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-lg border border-zinc-800 bg-zinc-900/30 px-3 py-2">
-                <span className="text-[13px] font-semibold text-zinc-100">{p.simbol || p.koin}</span>
-                <span className={cn('text-[11.5px] font-semibold',
-                  p.arah === 'BUY' ? 'text-emerald-400' : 'text-red-400')}>
-                  {p.arah === 'BUY' ? 'LONG' : 'SHORT'}
+            {posisi.map((p) => {
+              const h = p.hidup;
+              const segar = !!h?.terbaca;
+              /* Jarak ke likuidasi dalam PERSEN, bukan selisih harga.
+                 "$412 lagi" tidak bisa ditimbang tanpa tahu harganya
+                 berapa; "8% lagi" langsung terbaca sebagai bahaya. */
+              const keLikuidasi = segar && h!.likuidasi > 0 && h!.harga > 0
+                ? Math.abs((h!.harga - h!.likuidasi) / h!.harga) * 100 : null;
+              const gerak = segar && h!.entry > 0 && h!.harga > 0
+                ? ((h!.harga - h!.entry) / h!.entry) * 100 : null;
+              return (
+                <div key={p.alamat + p.koin}
+                  className="rounded-lg border border-zinc-800 bg-zinc-900/30 px-3 py-2">
+                  {/* Baris atas: identitas posisi. */}
+                  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                    <span className="text-[13px] font-semibold text-zinc-100">{p.simbol || p.koin}</span>
+                    <span className={cn('text-[11.5px] font-semibold',
+                      p.arah === 'BUY' ? 'text-emerald-400' : 'text-red-400')}>
+                      {p.arah === 'BUY' ? 'LONG' : 'SHORT'}
+                    </span>
+                    <span className={cn('rounded px-1.5 py-0.5 text-[10.5px]',
+                      p.bursa === 'hyperliquid' ? 'bg-sky-500/15 text-sky-300' : 'bg-amber-500/15 text-amber-300')}>
+                      {p.bursa === 'hyperliquid' ? 'Hyperliquid' : 'Binance'}
+                    </span>
+                    <span className="angka text-[11px] text-zinc-500">
+                      ${p.usd} · {p.leverage ?? 1}×
+                    </span>
+                    <span className="text-[11px] text-zinc-600">meniru {p.dompet}</span>
+                    <span className="ml-auto text-[11px] text-zinc-600">{umur(p.waktu)}</span>
+                  </div>
+
+                  {/* Baris bawah: angka dari bursa. Ditampilkan hanya kalau
+                      potretnya segar — angka basi yang dipajang seolah
+                      terkini adalah kesalahan yang paling mahal di panel
+                      berisi uang sungguhan. */}
+                  {segar ? (
+                    <div className="mt-1.5 grid grid-cols-2 gap-x-4 gap-y-1 border-t border-zinc-800/70 pt-1.5 sm:grid-cols-4">
+                      <div>
+                        <span className="block text-[10px] uppercase tracking-wide text-zinc-600">Ukuran</span>
+                        <span className="angka text-[11.5px] text-zinc-300">
+                          {h!.qty} <span className="text-zinc-600">≈ ${h!.nilai.toFixed(2)}</span>
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] uppercase tracking-wide text-zinc-600">Masuk → pasar</span>
+                        <span className="angka text-[11.5px] text-zinc-300">
+                          {hrgAdaptif(h!.entry)} → {hrgAdaptif(h!.harga)}
+                          {gerak !== null && (
+                            <span className={cn('ml-1', gerak >= 0 ? 'text-emerald-500/80' : 'text-red-400/80')}>
+                              {gerak >= 0 ? '+' : ''}{gerak.toFixed(2)}%
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] uppercase tracking-wide text-zinc-600">Margin</span>
+                        <span className="angka text-[11.5px] text-zinc-300">
+                          ${h!.margin.toFixed(2)}
+                          {keLikuidasi !== null && (
+                            <span className={cn('ml-1 text-[10.5px]',
+                              keLikuidasi < 15 ? 'text-red-400' : 'text-zinc-600')}>
+                              liq {keLikuidasi.toFixed(0)}%
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] uppercase tracking-wide text-zinc-600">PnL berjalan</span>
+                        <span className={cn('angka text-[11.5px] font-medium',
+                          h!.pnl > 0 ? 'text-emerald-400' : h!.pnl < 0 ? 'text-red-400' : 'text-zinc-300')}>
+                          {usdTanda(h!.pnl)}
+                          <span className="ml-1 text-[10.5px] opacity-70">
+                            {h!.roe >= 0 ? '+' : ''}{h!.roe.toFixed(1)}%
+                          </span>
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="mt-1.5 flex items-center gap-1.5 border-t border-zinc-800/70 pt-1.5 text-[11px] text-zinc-600">
+                      <TriangleAlert className="size-3 shrink-0 text-amber-500/70" />
+                      Angka posisinya belum terbaca dari bursa. Pemantau memindai tiap 60 detik;
+                      kalau tetap kosong, posisinya mungkin sudah tertutup di luar salinan.
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* ── HASIL YANG SUDAH TERTUTUP ───────────────────────────────── */}
+      <section>
+        <h3 className="mb-2 flex flex-wrap items-center gap-x-2 border-b border-zinc-800 pb-1.5">
+          <span className="text-[13px] font-semibold text-zinc-200">Hasil tertutup</span>
+          <span className="text-[11px] font-normal text-zinc-600">
+            · PnL dipotret sesaat sebelum order tutup berangkat, bukan dari fill bursa
+          </span>
+        </h3>
+        {!riwayat.length ? (
+          <p className="rounded-lg border border-dashed border-zinc-800 px-4 py-5 text-[12px] leading-relaxed text-zinc-500">
+            Belum ada posisi salinan yang tertutup. Baris pertama muncul begitu salah satu
+            dompet sumber melepas koin yang sedang kamu salin.
+          </p>
+        ) : (
+          <div className="space-y-1">
+            {riwayat.slice(0, 25).map((r, i) => (
+              <div key={r.waktu + r.koin + i}
+                className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 rounded-lg border border-zinc-800/70 px-3 py-1.5">
+                <span className="text-[12.5px] font-medium text-zinc-200">{r.simbol || r.koin}</span>
+                <span className={cn('text-[11px] font-semibold',
+                  r.arah === 'BUY' ? 'text-emerald-500/80' : 'text-red-400/80')}>
+                  {r.arah === 'BUY' ? 'LONG' : 'SHORT'}
                 </span>
-                <span className={cn('rounded px-1.5 py-0.5 text-[10.5px]',
-                  p.bursa === 'hyperliquid' ? 'bg-sky-500/15 text-sky-300' : 'bg-amber-500/15 text-amber-300')}>
-                  {p.bursa === 'hyperliquid' ? 'Hyperliquid' : 'Binance'}
+                <span className="text-[10.5px] text-zinc-600">
+                  {r.bursa === 'hyperliquid' ? 'Hyperliquid' : 'Binance'} · ${r.usd} {r.leverage}×
                 </span>
-                <span className="angka text-[11px] text-zinc-500">
-                  ${p.usd} · {p.leverage ?? 1}×
+                {r.entry > 0 && (
+                  <span className="angka text-[10.5px] text-zinc-600">
+                    {hrgAdaptif(r.entry)} → {hrgAdaptif(r.keluar)}
+                  </span>
+                )}
+                <span className="text-[10.5px] text-zinc-600">
+                  {r.dibuka ? durasi(r.dibuka, r.waktu) : ''} · {umur(r.waktu)}
                 </span>
-                <span className="text-[11px] text-zinc-600">meniru {p.dompet}</span>
-                <span className="ml-auto text-[11px] text-zinc-600">{umur(p.waktu)}</span>
+                <span className={cn('angka ml-auto text-[12px] font-medium',
+                  r.pnl === null ? 'text-zinc-600'
+                    : r.pnl > 0 ? 'text-emerald-400' : r.pnl < 0 ? 'text-red-400' : 'text-zinc-300')}>
+                  {r.pnl === null ? 'tak terbaca' : usdTanda(r.pnl)}
+                  {r.roe !== null && (
+                    <span className="ml-1 text-[10.5px] opacity-70">
+                      {r.roe >= 0 ? '+' : ''}{r.roe.toFixed(1)}%
+                    </span>
+                  )}
+                </span>
               </div>
             ))}
           </div>
@@ -1487,6 +1698,12 @@ function PosisiCopy({ salin, dompet, buka, muat }: {
           <div className="space-y-1.5">
             {salin.map((s) => {
               const terbuka = Object.keys(s.punyaku || {});
+              /* Hasil PER DOMPET, bukan cuma total. Yang diputuskan orang di
+                 baris ini adalah "dompet ini layak diteruskan atau tidak",
+                 dan total gabungan tidak pernah bisa menjawabnya. */
+              const punyaDia = riwayat.filter((r) => r.alamat === s.alamat && r.pnl !== null);
+              const hasilDia = punyaDia.reduce((t, r) => t + (r.pnl || 0), 0);
+              const menangDia = punyaDia.filter((r) => (r.pnl || 0) > 0).length;
               return (
                 <button key={s.alamat}
                   onClick={() => buka({ alamat: s.alamat, nama: nama.get(s.alamat) || s.nama || s.alamat })}
@@ -1508,6 +1725,15 @@ function PosisiCopy({ salin, dompet, buka, muat }: {
                   {terbuka.length > 0 && (
                     <span className="text-[11px] text-zinc-400">{terbuka.length} posisi: {terbuka.join(', ')}</span>
                   )}
+                  {punyaDia.length > 0 && (
+                    <span className="text-[11px] text-zinc-500">
+                      <span className={cn('angka font-medium',
+                        hasilDia > 0 ? 'text-emerald-400' : hasilDia < 0 ? 'text-red-400' : 'text-zinc-300')}>
+                        {usdTanda(hasilDia)}
+                      </span>{' '}
+                      dari {punyaDia.length} trade · {Math.round((menangDia / punyaDia.length) * 100)}% menang
+                    </span>
+                  )}
                   {/* Berapa koin yang SEDANG dipegang dompet sumbernya —
                       pembanding yang menjelaskan kenapa salinan kita cuma
                       sekian: sisanya sudah terbuka sebelum salinan menyala. */}
@@ -1519,6 +1745,42 @@ function PosisiCopy({ salin, dompet, buka, muat }: {
                 </button>
               );
             })}
+          </div>
+        )}
+      </section>
+
+      {/* ── LOG AKSI ────────────────────────────────────────────────────
+          Yang paling sering ditanyakan tentang mesin salinan bukan "kenapa
+          ia membuka", melainkan "kenapa ia TIDAK membuka" — dan pertanyaan
+          itu cuma bisa dijawab kalau penolakan ikut tercatat, bukan cuma
+          keberhasilan. Jadi konfirmasi yang belum genap, posisi yang
+          ditahan karena kuota penuh, dan order yang ditolak bursa semuanya
+          punya barisnya sendiri di sini. */}
+      <section>
+        <h3 className="mb-2 flex flex-wrap items-center gap-x-2 border-b border-zinc-800 pb-1.5">
+          <span className="text-[13px] font-semibold text-zinc-200">Log aksi</span>
+          <span className="text-[11px] font-normal text-zinc-600">
+            · termasuk yang TIDAK jadi dikerjakan, berikut alasannya
+          </span>
+        </h3>
+        {!log.length ? (
+          <p className="rounded-lg border border-dashed border-zinc-800 px-4 py-5 text-[12px] leading-relaxed text-zinc-500">
+            Log masih kosong. Ia mulai terisi pada pindaian berikutnya —
+            pemantau memindai tiap 60 detik.
+          </p>
+        ) : (
+          <div className="gulir-senyap max-h-[320px] space-y-0.5 overflow-y-auto pr-1">
+            {log.slice(0, 80).map((b, i) => (
+              <div key={b.waktu + b.jenis + i}
+                className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 rounded px-2 py-1 text-[11.5px] odd:bg-zinc-900/30">
+                <span className="angka shrink-0 text-[10.5px] text-zinc-600">{tanggalJam(b.waktu)}</span>
+                <span className={cn('shrink-0 rounded px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-wide',
+                  RONA_LOG[b.jenis] || 'bg-zinc-800 text-zinc-500')}>
+                  {b.jenis}
+                </span>
+                <span className="min-w-0 flex-1 text-zinc-400">{b.pesan}</span>
+              </div>
+            ))}
           </div>
         )}
       </section>
@@ -1537,7 +1799,8 @@ export function PanelWalletAgen({ pemilik = false }: { pemilik?: boolean }) {
   /* Setelan salin ditarik terpisah dari keadaan dompet: ia milik pemilik
      saja dan digerbangi server, jadi menggabungkannya ke jawaban publik
      berarti menambah satu jalan bocor tanpa satu pun manfaat. */
-  const [salin, setSalin] = useState<SetelanSalin[]>([]);
+  const [isiSalin, setIsiSalin] = useState<IsiSalin>({ salin: [], log: [], riwayat: [] });
+  const salin = isiSalin.salin;
   /* Sub-halaman DI DALAM kartu ini, bukan di sidebar Copy Signal. Yang di
      sidebar berlaku untuk seluruh halaman Copy Signal; ini cuma dua cara
      melihat isi satu kanal. Menaruhnya di sidebar akan menyiratkan ia
@@ -1560,7 +1823,7 @@ export function PanelWalletAgen({ pemilik = false }: { pemilik?: boolean }) {
        posisi yang tampil di sub-halaman selalu bercerita hal yang sama.
        Gagal diam-diam: setelan yang tidak terbaca cuma membuat ikonnya
        tidak menyala, bukan menjatuhkan seluruh panel. */
-    setSalin(await daftarSalin());
+    setIsiSalin(await daftarSalin());
     setMuat(false);
   }, []);
 
@@ -1649,8 +1912,8 @@ export function PanelWalletAgen({ pemilik = false }: { pemilik?: boolean }) {
       )}
 
       {tab === 'salin' ? (
-        <PosisiCopy salin={salin} dompet={dompet} muat={muat}
-          buka={(w) => setDialogSalin(w)} />
+        <PosisiCopy salin={salin} log={isiSalin.log} riwayat={isiSalin.riwayat}
+          dompet={dompet} muat={muat} buka={(w) => setDialogSalin(w)} />
       ) : (<>
 
       {pemilik && <FormTambah selesai={() => void tarik()} />}
@@ -1662,13 +1925,13 @@ export function PanelWalletAgen({ pemilik = false }: { pemilik?: boolean }) {
           simpan={async (v) => {
             const h = await simpanSalin({ alamat: dialogSalin.alamat, nama: dialogSalin.nama, ...v });
             if (!h.ok) { alert(h.pesan || 'Gagal menyimpan.'); return; }
-            setSalin(await daftarSalin());
+            setIsiSalin(await daftarSalin());
             setDialogSalin(null);
           }}
           hapus={async () => {
             const h = await hapusSalin(dialogSalin.alamat);
             if (!h.ok) { alert(h.pesan || 'Gagal menghapus.'); return; }
-            setSalin(await daftarSalin());
+            setIsiSalin(await daftarSalin());
             setDialogSalin(null);
           }} />
       )}

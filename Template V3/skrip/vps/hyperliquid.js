@@ -108,12 +108,23 @@ async function saldoHl() {
   return {
     bisaDipakai: diPerps + diSpot,
     diPerps, diSpot,
+    /* Lima medan pertama sudah lama dipakai; sisanya ditambahkan untuk
+       panel Posisi Copy, yang harus bisa menjawab "uangku terpakai berapa
+       dan seberapa jauh dari likuidasi" -- dua pertanyaan yang tidak bisa
+       dijawab dari nilai posisi dan PnL saja.
+
+       Semuanya sudah ada di jawaban clearinghouseState; yang kurang selama
+       ini cuma pengambilannya. Tidak ada panggilan tambahan ke Hyperliquid. */
     posisi: (perp?.assetPositions || []).map((p) => ({
       koin: p.position.coin,
       arah: Number(p.position.szi) > 0 ? 'LONG' : 'SHORT',
       ukuran: Math.abs(Number(p.position.szi)),
       nilai: Number(p.position.positionValue) || 0,
       pnl: Number(p.position.unrealizedPnl) || 0,
+      entry: Number(p.position.entryPx) || 0,
+      margin: Number(p.position.marginUsed) || 0,
+      likuidasi: Number(p.position.liquidationPx) || 0,
+      leverage: Number(p.position.leverage && p.position.leverage.value) || 0,
     })),
   };
 }
