@@ -77,6 +77,15 @@ export interface PenandaTiru {
   /** Buka posisi otomatis saat dompet sumbernya MULAI memegang koin ini.
    *  Mati sebagai bawaan, dan tidak bisa dinyalakan sebelum `usd` diisi. */
   otoBuka?: boolean;
+  /** Bursa tujuan salinan, dipilih per dompet.
+   *  'dua' = Binance diutamakan, Hyperliquid jadi jaring untuk koin yang
+   *  tidak terdaftar di Binance. Kosong = 'binance'. */
+  bursa?: 'binance' | 'hyperliquid' | 'dua';
+  /** Bursa tempat posisi TERAKHIR benar-benar dibuka. Dipakai penjaga
+   *  tutup supaya ia mencari posisinya di tempat yang benar. */
+  bursaBuka?: string | null;
+  /** Koin tidak terdaftar di bursa yang dipilih (mode hyperliquid). */
+  takAdaDiBursa?: boolean;
   /** Ukuran order dalam USD. MARGIN -- uang yang dipertaruhkan -- bukan
    *  nilai posisi. Nilai posisinya usd x leverage; di 1x keduanya sama. */
   usd?: number;
@@ -209,7 +218,7 @@ export async function aturOtoTutup(alamat: string, koin: string, otoTutup: boole
  *  mengetik ukuran tidak diam-diam ikut menyalakan sakelarnya. */
 export async function aturBuka(
   alamat: string, koin: string,
-  ubah: { otoBuka?: boolean; usd?: number; leverage?: number },
+  ubah: { otoBuka?: boolean; usd?: number; leverage?: number; bursa?: string },
 ): Promise<{ ok: boolean; pesan?: string }> {
   const t = await token();
   if (!t) return { ok: false, pesan: 'Belum masuk.' };

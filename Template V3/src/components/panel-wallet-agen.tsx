@@ -1002,7 +1002,7 @@ function PosisiTiruan({ tiru, dompet, posisi, ubahTiru, ubahOto, ubahBuka }: {
   posisi: PosisiDompet[];
   ubahTiru: (alamat: string, koin: string, nyala: boolean) => void;
   ubahOto: (alamat: string, koin: string, nyala: boolean) => void;
-  ubahBuka: (alamat: string, koin: string, ubah: { otoBuka?: boolean; usd?: number; leverage?: number }) => void;
+  ubahBuka: (alamat: string, koin: string, ubah: { otoBuka?: boolean; usd?: number; leverage?: number; bursa?: string }) => void;
 }) {
   /* Posisi SENDIRI dari bursa. Hook-nya sudah dipakai di tempat lain dan
      menyegarkan tiap 30 detik; memanggilnya lagi di sini tidak menambah
@@ -1148,6 +1148,34 @@ function PosisiTiruan({ tiru, dompet, posisi, ubahTiru, ubahOto, ubahBuka }: {
                 lalu ditolak lebih buruk daripada tombol yang menunggu. */}
             <div className={cn('mt-1.5 rounded-md border px-2 py-1.5 transition-colors',
               b.otoBuka ? 'border-red-500/40 bg-red-500/5' : 'border-zinc-800')}>
+              {/* -- KE BURSA MANA SALINANNYA DIKIRIM ------------------
+                  Dipilih per dompet, bukan satu setelan untuk semuanya:
+                  dompet yang isinya koin besar cocok di Binance, yang
+                  sering menyentuh koin kecil cuma ada di Hyperliquid, dan
+                  memaksa keduanya memakai satu pilihan berarti salah satu
+                  selalu dilayani setengah.
+
+                  "Keduanya" MENGUTAMAKAN Binance dan memakai Hyperliquid
+                  hanya untuk koin yang tidak terdaftar di sana. Ditulis di
+                  keterangannya supaya tidak ada yang menebak urutannya. */}
+              <label className="mb-1.5 block">
+                <span className="mb-0.5 block text-[9.5px] uppercase tracking-wide text-zinc-500">Bursa tujuan</span>
+                <select value={b.bursa ?? 'binance'}
+                  onChange={(e) => ubahBuka(b.alamat, b.koin, { bursa: e.target.value })}
+                  className="w-full cursor-pointer rounded border border-zinc-700 bg-zinc-900 px-1.5 py-1 text-[12px] text-zinc-100 outline-none focus:border-zinc-500">
+                  <option value="binance">Binance saja</option>
+                  <option value="hyperliquid">Hyperliquid saja</option>
+                  <option value="dua">Keduanya — Binance dulu, Hyperliquid kalau koinnya tidak ada</option>
+                </select>
+                <span className="mt-0.5 block text-[10.5px] leading-relaxed text-zinc-600">
+                  {b.bursa === 'hyperliquid'
+                    ? 'Bursa asal dompetnya — instrumen dan harganya sama persis dengan yang ditiru.'
+                    : b.bursa === 'dua'
+                      ? 'Koin yang ada di Binance disalin di sana; sisanya otomatis ke Hyperliquid.'
+                      : 'Koin yang tidak terdaftar di Binance akan dilewati.'}
+                </span>
+              </label>
+
               <div className="flex flex-wrap items-end gap-2">
                 <label className="block">
                   <span className="mb-0.5 block text-[9.5px] uppercase tracking-wide text-zinc-500">Ukuran $</span>
@@ -1181,6 +1209,10 @@ function PosisiTiruan({ tiru, dompet, posisi, ubahTiru, ubahOto, ubahBuka }: {
                   <span className={cn('block text-[11.5px] font-medium',
                     b.otoBuka ? 'text-red-300' : 'text-zinc-400')}>
                     Buka posisiku otomatis saat dompet ini MULAI pegang {b.koin}
+                    <span className="ml-1 font-normal text-zinc-500">
+                      di {b.bursa === 'hyperliquid' ? 'Hyperliquid'
+                        : b.bursa === 'dua' ? 'Binance/Hyperliquid' : 'Binance'}
+                    </span>
                   </span>
                   <span className="block text-[10.5px] leading-relaxed text-zinc-600">
                     Market, tanpa SL/TP — pintu keluarnya sakelar di atas. Yang dipicu
@@ -1190,7 +1222,9 @@ function PosisiTiruan({ tiru, dompet, posisi, ubahTiru, ubahOto, ubahBuka }: {
                   </span>
                   {b.terakhirBuka && (
                     <span className="block text-[10.5px] text-emerald-400/80">
-                      Terakhir dibuka: {b.simbolBuka} · {umur(b.terakhirBuka)}
+                      Terakhir dibuka: {b.simbolBuka}
+                      {b.bursaBuka ? ' di ' + (b.bursaBuka === 'hyperliquid' ? 'Hyperliquid' : 'Binance') : ''}
+                      {' · '}{umur(b.terakhirBuka)}
                     </span>
                   )}
                 </span>

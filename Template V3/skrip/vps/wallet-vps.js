@@ -280,6 +280,13 @@ module.exports = (app, { butuhLogin, batasLaju, express, DIR }) => {
       if (!(l >= 1 && l <= 20)) return res.status(400).json({ error: 'Leverage harus 1 sampai 20.' });
       t.leverage = l;
     }
+    if (b.bursa !== undefined) {
+      const v = String(b.bursa).toLowerCase();
+      if (!['binance', 'hyperliquid', 'dua'].includes(v)) {
+        return res.status(400).json({ error: 'Bursa harus binance, hyperliquid, atau dua.' });
+      }
+      t.bursa = v;
+    }
     if (b.otoBuka !== undefined) {
       if (b.otoBuka === true && !(Number(t.usd) > 0)) {
         return res.status(400).json({ error: 'Isi dulu ukuran ordernya sebelum menyalakan auto-open.' });

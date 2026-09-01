@@ -31,6 +31,7 @@ const fs = require('fs');
 const path = require('path');
 const { bacaDompet, catatWallet, batasTerakhir } = require('./wallet-vps');
 const { simbolBinance } = require('./simbol-bursa');
+const HL = require('./hyperliquid');
 
 const DIR = __dirname;
 const API = 'https://api.hyperliquid.xyz/info';
@@ -365,6 +366,29 @@ async function kirimSalin(simbol, arah, usd, leverage) {
   return j;
 }
 
+/* ══ MEMILIH BURSA ═════════════════════════════════════════════════════
+   Pilihan penggunanya, per dompet, disimpan di `t.bursa`:
+
+     'binance'      cuma Binance. Koin yang tidak ada di sana dilewati.
+     'hyperliquid'  cuma Hyperliquid. Bursa asal dompetnya, jadi tidak ada
+                    penerjemahan nama dan tidak ada koin yang hilang.
+     'dua'          Binance DIUTAMAKAN; Hyperliquid jadi jaring untuk koin
+                    yang tidak terdaftar di Binance.
+
+   Kenapa Binance yang diutamakan pada 'dua' dan bukan sebaliknya: itu
+   keputusan pemilik, dan alasannya masuk akal -- jalur Binance yang sedang
+   diuji, dan menyalin di bursa BERBEDA dari sumbernya adalah justru yang
+   ingin ia amati. Hyperliquid lebih setia, tapi kesetiaan bukan satu-
+   satunya yang sedang diukur di sini.
+
+   Bawaan `undefined` diperlakukan 'binance': penanda yang dibuat sebelum
+   pilihan ini ada tidak boleh tiba-tiba mengirim order ke bursa yang tidak
+   pernah dipilih siapa pun. */
+function bursaPenanda(t) {
+  const b = String(t.bursa || 'binance').toLowerCase();
+  return (b === 'hyperliquid' || b === 'dua') ? b : 'binance';
+}
+
 async function bukaTiruan(posisiDompet) {
   if (!BUKA_AKTIF) return;
   const tiru = bacaTiru(DIR);
@@ -392,12 +416,112 @@ async function bukaTiruan(posisiDompet) {
     /* Pindaian pertama: catat saja. Lihat catatan panjang di atas. */
     if (pegangTadi !== false) continue;
 
+    const bursa = bursaPenanda(t);
+
+    /* -- HYPERLIQUID SAJA: tidak perlu bertanya ke Binance sama sekali -- */
+    if (bursa === 'hyperliquid') {
+      if (!HL.siap()) {
+        catat('  auto-open:', t.koin, 'dilewati - Hyperliquid belum aktif (HL_AKTIF)');
+        continue;
+      }
+      const aset = await HL.asetHl(t.koin).catch(() => null);
+      if (!aset) {
+        if (t.takAdaDiBursa !== true) {
+          t.takAdaDiBursa = true; berubah = true;
+          await lonceng({
+            id: 'salin-tiada-hl-' + String(t.alamat).slice(0, 10) + '-' + t.koin,
+            judul: t.koin + ' tidak ada di Hyperliquid \u2014 tidak disalin',
+            detail: 'Dompet yang kamu tiru membuka ' + t.koin + ', tapi koin itu tidak '
+                  + 'diperdagangkan di Hyperliquid perps.',
+            sumber: NAMA_AGEN, jenis: 'wallet', waktu: Date.now(),
+          });
+        }
+        continue;
+      }
+      if (t.takAdaDiBursa) { t.takAdaDiBursa = false; berubah = true; }
+
+      const punyaHl = await HL.saldoHl().catch(() => null);
+      if (!punyaHl) { catat('  auto-open: saldo Hyperliquid tidak terbaca, dilewati'); continue; }
+      if (punyaHl.posisi.some((p) => String(p.koin).toUpperCase() === aset.nama.toUpperCase())) {
+        if (t.bukaKonfirmasi) { t.bukaKonfirmasi = 0; berubah = true; }
+        continue;
+      }
+
+      t.bukaKonfirmasi = (t.bukaKonfirmasi || 0) + 1; berubah = true;
+      if (t.bukaKonfirmasi < KONFIRMASI_PERLU) {
+        catat('  auto-open:', t.koin, 'HL konfirmasi', t.bukaKonfirmasi + '/' + KONFIRMASI_PERLU);
+        continue;
+      }
+      if (punyaHl.posisi.length >= BUKA_MAKS_POSISI) {
+        catat('  auto-open:', t.koin, 'ditahan - sudah', punyaHl.posisi.length, 'posisi di HL');
+        continue;
+      }
+
+      try {
+        const h = await HL.bukaHl({
+          koin: aset.nama, arah: sumber.arah === 'SHORT' ? 'SELL' : 'BUY',
+          usd: Number(t.usd), leverage: Math.max(1, Number(t.leverage) || 1),
+        });
+        t.bukaKonfirmasi = 0; t.terakhirBuka = Date.now();
+        t.simbolBuka = aset.nama; t.bursaBuka = 'hyperliquid'; berubah = true;
+        if (t.otoTutup !== true) t.otoTutup = true;
+        catat('  AUTO-OPEN HL', h.arah, h.koin, 'ukuran', h.ukuran,
+              h.terisi ? '(terisi ' + h.terisi.ukuran + ' @ ' + h.terisi.harga + ')' : '(belum terisi)');
+        await lonceng({
+          id: 'salin-buka-hl-' + aset.nama + '-' + Date.now(),
+          judul: 'Salin dompet di Hyperliquid: ' + h.arah + ' ' + h.koin,
+          detail: 'Mengikuti ' + (sumber.nama || t.alamat.slice(0, 8)) + ' yang membuka '
+                + sumber.arah + ' ' + t.koin + '. Ukuran ' + t.usd + ' USD, ' + h.leverage + 'x'
+                + (h.terisi ? ', terisi ' + h.terisi.ukuran + ' @ ' + h.terisi.harga : '') + '.',
+          sumber: NAMA_AGEN, jenis: 'wallet', waktu: Date.now(),
+        });
+      } catch (e) {
+        catat('  auto-open HL GAGAL', t.koin + ':', e && e.message);
+        await lonceng({
+          id: 'salin-gagal-hl-' + t.koin + '-' + Date.now(),
+          judul: 'Salin dompet gagal di Hyperliquid: ' + t.koin,
+          detail: String((e && e.message) || 'tidak diketahui'),
+          sumber: NAMA_AGEN, jenis: 'wallet', waktu: Date.now(),
+        });
+      }
+      continue;
+    }
+
     let simbol;
     try {
       simbol = await simbolBinance(t.koin, { dasar: DASAR, token: APP_TOKEN, catat });
     } catch (e) {
       catat('  auto-open: simbol', t.koin, 'belum bisa dipastikan -', e && e.message);
       continue;
+    }
+
+    /* -- 'dua': Binance tidak punya koinnya -> dilempar ke Hyperliquid -- */
+    if (!simbol && bursa === 'dua' && HL.siap()) {
+      const aset = await HL.asetHl(t.koin).catch(() => null);
+      if (aset) {
+        t.bukaKonfirmasi = (t.bukaKonfirmasi || 0) + 1; berubah = true;
+        if (t.bukaKonfirmasi < KONFIRMASI_PERLU) continue;
+        try {
+          const h = await HL.bukaHl({
+            koin: aset.nama, arah: sumber.arah === 'SHORT' ? 'SELL' : 'BUY',
+            usd: Number(t.usd), leverage: Math.max(1, Number(t.leverage) || 1),
+          });
+          t.bukaKonfirmasi = 0; t.terakhirBuka = Date.now();
+          t.simbolBuka = aset.nama; t.bursaBuka = 'hyperliquid'; berubah = true;
+          if (t.otoTutup !== true) t.otoTutup = true;
+          catat('  AUTO-OPEN HL (jaring)', h.arah, h.koin, h.ukuran);
+          await lonceng({
+            id: 'salin-buka-hl-' + aset.nama + '-' + Date.now(),
+            judul: 'Salin di Hyperliquid: ' + h.arah + ' ' + h.koin,
+            detail: t.koin + ' tidak ada di Binance, jadi disalin di Hyperliquid. Ukuran '
+                  + t.usd + ' USD, ' + h.leverage + 'x.',
+            sumber: NAMA_AGEN, jenis: 'wallet', waktu: Date.now(),
+          });
+        } catch (e) {
+          catat('  auto-open HL (jaring) GAGAL', t.koin + ':', e && e.message);
+        }
+        continue;
+      }
     }
 
     if (!simbol) {
@@ -487,6 +611,34 @@ async function jagaTiruan(posisiDompet) {
 
   let berubah = false;
   for (const t of perlu) {
+    /* -- DITUTUP DI TEMPAT IA DIBUKA ----------------------------------
+       `bursaBuka` dicatat saat posisinya dibuka. Tanpa itu penjaga ini
+       akan mencari posisi Hyperliquid di daftar posisi Binance, tidak
+       menemukannya, lalu menyimpulkan "tidak punya apa-apa" -- dan posisi
+       sungguhan di Hyperliquid ditinggal terbuka selamanya. */
+    if (t.bursaBuka === 'hyperliquid') {
+      if (!HL.siap()) continue;
+      const sumberMasihHl = posisiDompet.some(
+        (p) => p.alamat === t.alamat && String(p.koin).toUpperCase() === t.koin);
+      if (sumberMasihHl) { if (t.konfirmasi) { t.konfirmasi = 0; berubah = true; } continue; }
+      t.konfirmasi = (t.konfirmasi || 0) + 1; berubah = true;
+      if (t.konfirmasi < KONFIRMASI_PERLU) continue;
+      try {
+        const h = await HL.tutupHl(t.simbolBuka || t.koin);
+        t.konfirmasi = 0; t.otoTutup = false; t.bursaBuka = null; berubah = true;
+        if (!h.kosong) {
+          catat('  AUTO-CLOSE HL', t.koin, 'ditutup', h.ditutup);
+          await lonceng({
+            id: 'salin-tutup-hl-' + t.koin + '-' + Date.now(),
+            judul: 'Posisi ' + t.koin + ' ditutup di Hyperliquid',
+            detail: 'Dompet yang kamu tiru sudah tidak memegang ' + t.koin + '.',
+            sumber: NAMA_AGEN, jenis: 'wallet', waktu: Date.now(),
+          });
+        }
+      } catch (e) { catat('  auto-close HL GAGAL', t.koin + ':', e && e.message); }
+      continue;
+    }
+
     /* -- NAMA KOINNYA DITERJEMAHKAN, BUKAN DITEMPELI 'USDT' -----------
        Dulu di sini `t.koin + 'USDT'`. Untuk BTC benar; untuk kPEPE ia
        menghasilkan KPEPEUSDT -- simbol yang tidak pernah ada di Binance,
