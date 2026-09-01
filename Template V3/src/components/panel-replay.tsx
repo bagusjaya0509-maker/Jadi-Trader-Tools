@@ -62,6 +62,20 @@ export interface AksiOrder {
 
    `sm:` mengembalikan perilaku lama di layar lebar, supaya tampilan desktop
    yang sudah benar tidak ikut berubah. */
+/* -- KENAPA TIDAK ADA `ml-auto` DI TOMBOL KELUAR ---------------------
+   Dulu tombol Keluar di kedua baris kendali memakai `sm:ml-auto`, yang
+   memakunya ke ujung KANAN baris. Selama lebar barisnya belum mantap --
+   dan lebarnya memang baru mantap beberapa saat sesudah chart selesai
+   diukur -- tombol itu melompat: mula-mula duduk rapat di sebelah
+   keterangan, lalu terlempar ke ujung kanan layar.
+
+   Yang dilaporkan pemilik: "replaynya memendek beberapa detik kemudian
+   memanjang". Bukan animasi, bukan data yang datang belakangan; cuma satu
+   tombol yang posisinya bergantung pada sisa ruang kosong.
+
+   Sekarang seluruh isi baris mengalir dari kiri dengan jarak tetap. Tidak
+   ada yang bergantung pada lebar wadahnya, jadi tidak ada yang berubah
+   waktu lebar itu berubah. */
 const BARIS_KENDALI =
   'flex items-center gap-1.5 overflow-x-auto ' +
   '[-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ' +
@@ -445,7 +459,7 @@ export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, aturAks
           Klik di chart untuk memilih titik mulai
         </span>
         <button onClick={onBatalBidik} title="Batal"
-          className="flex shrink-0 cursor-pointer items-center gap-1 rounded-md border border-zinc-700/70 bg-zinc-900/70 px-2 py-1.5 text-[11.5px] text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200 sm:ml-auto">
+          className="flex shrink-0 cursor-pointer items-center gap-1 rounded-md border border-zinc-700/70 bg-zinc-900/70 px-2 py-1.5 text-[11.5px] text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200">
           <X className="size-3.5" /> Keluar
         </button>
       </div>
@@ -486,7 +500,7 @@ export function PanelReplay({ lilin, simbol, tf, idx, setIdx, aturGaris, aturAks
           bar {idx + 1}/{lilin.closes.length} · {tanggalPendek(lilin.times[idx])}
         </span>
         <button onClick={keluar} title="Keluar dari replay"
-          className="flex shrink-0 cursor-pointer items-center gap-1 rounded-md border border-zinc-700/70 bg-zinc-900/70 px-2 py-1.5 text-[11.5px] text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200 sm:ml-auto">
+          className="flex shrink-0 cursor-pointer items-center gap-1 rounded-md border border-zinc-700/70 bg-zinc-900/70 px-2 py-1.5 text-[11.5px] text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200">
           <X className="size-3.5" /> Keluar
         </button>
       </div>
