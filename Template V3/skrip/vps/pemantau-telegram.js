@@ -539,6 +539,54 @@ async function siapkanRuang(client, r) {
     r.sudahJadiKartu = new Set();
   }
 
+  /* ── HARGA PASAR SEBAGAI WASIT ANGKA ───────────────────────────────
+     Angka yang dibaca dari gambar tidak punya arti sampai ada pembanding.
+     "81,355" bisa berarti delapan puluh satu koma tiga atau delapan puluh
+     satu ribu, dan yang menentukan bukan tata bahasa melainkan berapa harga
+     koin itu sungguhan. Lihat catatan panjang di mata-chart.js.
+
+     Seluruh daftar ticker ditarik sekaligus lalu disimpan semenit: satu
+     gambar bisa memuat lima angka, dan lima permintaan jaringan untuk lima
+     angka dari koin yang sama adalah pemborosan yang tidak menambah
+     ketepatan apa pun.
+
+     Gagal = peta kosong = seluruh angka gugur di sisi mata-chart. Itu
+     memang perilaku yang diinginkan: tanpa wasit, tidak ada keputusan. */
+  let tickerSimpan = { waktu: 0, peta: new Map() };
+  async function hargaPasar(koin) {
+    const kini = Date.now();
+    if (kini - tickerSimpan.waktu > 60000) {
+      try {
+        const r = await fetch(DASAR + '/api/tickers', { signal: AbortSignal.timeout(20000) });
+        if (r.ok) {
+          const j = await r.json();
+          const peta = new Map();
+          for (const t of (j && Array.isArray(j.data) ? j.data : [])) {
+            const h = Number(t && t.lastPrice);
+            if (t && t.symbol && isFinite(h) && h > 0) peta.set(String(t.symbol).toUpperCase(), h);
+          }
+          if (peta.size) tickerSimpan = { waktu: kini, peta };
+        }
+      } catch (e) { /* proxy bisu — angkanya gugur, dan itu aman */ }
+    }
+    const peta = tickerSimpan.peta;
+    if (!peta.size) return 0;
+    const k = String(koin || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (!k) return 0;
+    /* Nama panjang dari judul chart ("SOLANA") tidak ada di daftar bursa.
+       Dicoba berurutan dari yang paling mungkin; yang tidak ketemu sama
+       sekali memulangkan nol, dan nol berarti "tidak ada wasit". */
+    const calon = [k, k + 'USDT', k + 'USD', k.replace(/USD$/, 'USDT')];
+    for (const c of calon) if (peta.has(c)) return peta.get(c);
+    /* Awalan: "SOLANA" tidak akan ketemu, tapi "SOL" ada. Dicoba dari nama
+       terpanjang supaya "ETH" tidak merebut milik "ETHFI". */
+    for (let n = k.length; n >= 3; n--) {
+      const c = k.slice(0, n) + 'USDT';
+      if (peta.has(c)) return peta.get(c);
+    }
+    return 0;
+  }
+
   /* ── MEMBACA ZONA DARI GAMBAR ──────────────────────────────────────
      Hanya untuk ruang yang memang isinya tangkapan layar chart. Kegagalan
      di sini SELALU dijawab null dan tidak pernah dilempar: telinga 24 jam
@@ -572,7 +620,8 @@ async function siapkanRuang(client, r) {
       catat('  gambar gagal diunduh:', e && e.message);
       return null;
     }
-    const hasil = await mata.bacaGambarChart(bita, teks, 'image/jpeg', waktuPesan);
+    const hasil = await mata.bacaGambarChart(bita, teks, 'image/jpeg', waktuPesan,
+      { cariHarga: hargaPasar });
     if (!hasil || hasil.galat) {
       catat('  mata gagal:', (hasil && hasil.galat) || 'jawaban kosong');
       return null;
@@ -581,6 +630,12 @@ async function siapkanRuang(client, r) {
       '· zona', hasil.zona ? hasil.zona.join('-') : '-',
       '· sl', hasil.sl || '-', '· tp', hasil.tp.join('/') || '-',
       hasil.pasti ? '· ANGKA TERCETAK' : '· taksiran dari posisi',
+      /* Angka yang GUGUR ikut dicatat. Level yang hilang tanpa jejak
+         terbaca sebagai "chartnya memang tidak menyebutkan" — padahal ia
+         disebutkan dan kita yang menolaknya karena tidak masuk akal
+         terhadap harga pasar. Bedanya besar saat mencari sebab. */
+      hasil.hargaPasar ? '· pasar ' + hasil.hargaPasar : '· TANPA harga pasar',
+      (hasil.gugur && hasil.gugur.length) ? '· GUGUR ' + hasil.gugur.join(',') : '',
       '· sisa jatah', mata.sisaJatah());
     const sn = mata.keSinyal(hasil, r.kunciRuang + '-' + pesan.id);
     if (!sn) catat('  mata: belum cukup jadi sinyal —', hasil.catatan || 'tidak lengkap');

@@ -196,6 +196,118 @@ ATURAN:
 - Kalau gambarnya bukan chart trading, pulangkan semua null dengan
   "catatan" menjelaskan isinya.`;
 
+
+/* ══ ANGKA DI CHART DITULIS DUA GAYA, DAN SALAH BACA = 1000x ═════════════
+   Ditemukan 1 Sep 2026 saat menguji model penglihatan lokal, tapi ini
+   BUKAN cacat model itu — ia mengenai model mana pun, termasuk Sonnet.
+
+   Ruang chart memakai TradingView dengan dua setelan bahasa yang berbeda,
+   dan keduanya muncul di ruang yang sama:
+
+       chart A (Inggris)   : 75.86      titik = desimal
+       chart B (Indonesia) : 81,355     KOMA = desimal, jadi $81,36
+
+   Model membaca "81,355" lalu memulangkan 81355 — koma diperlakukan sebagai
+   pemisah ribuan, seperti kebiasaan Inggris. Angkanya seribu kali terlalu
+   besar, dan yang paling berbahaya: angka itu MEMANG TERCETAK, jadi model
+   berhak menandainya `pasti: true` dan ia berhak jadi kartu. Order di harga
+   yang mustahil, dengan seluruh pengaman menyalakan lampu hijau.
+
+   Menuliskan aturannya di perintah tidak cukup — perintah bisa dilanggar,
+   dan pelanggarannya tidak menghasilkan galat apa pun. Jadi penafsirannya
+   dipindah ke KODE, dan kode diberi satu hal yang tidak dimiliki model:
+   HARGA PASAR SUNGGUHAN dari koin itu.
+
+   Dengan harga acuan, "81,355" tidak lagi ambigu: dua tafsir yang mungkin
+   adalah 81355 dan 81,355, dan yang benar jelas yang mana kalau SOL memang
+   sedang di $81. Tanpa harga acuan, keduanya sama masuk akalnya — dan di
+   situ jawaban yang benar adalah MENYERAH, bukan menebak.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/** Semua tafsir yang mungkin dari satu angka tercetak. */
+function calonAngka(teks) {
+  const s = String(teks == null ? '' : teks).trim().replace(/[^\d.,]/g, '');
+  if (!s) return [];
+  const c = new Set();
+  /* Gaya Inggris: titik desimal, koma ribuan. */
+  c.add(Number(s.replace(/,/g, '')));
+  /* Gaya Indonesia: koma desimal, titik ribuan. */
+  c.add(Number(s.replace(/\./g, '').replace(',', '.')));
+  return [...c].filter((n) => isFinite(n) && n > 0);
+}
+
+/** Angka tercetak -> angka sungguhan, dipilih dengan HARGA PASAR sebagai wasit.
+ *
+ *  null berarti "tidak bisa dipastikan" dan itu jawaban yang sah — bukan
+ *  kegagalan. Level yang tidak bisa dipastikan lebih baik hilang daripada
+ *  terpasang seribu kali meleset.
+ *
+ *  Ambang 5x sengaja longgar: zona target yang jauh memang bisa dua-tiga kali
+ *  harga sekarang, dan menyempitkannya akan membuang level yang benar. Yang
+ *  perlu ditangkap ambang ini cuma satu kelas kesalahan, dan kesalahan itu
+ *  besarnya 1000x. */
+function uraiAngka(teks, acuan) {
+  const c = calonAngka(teks);
+  if (!c.length) return null;
+  if (!(acuan > 0)) {
+    /* Tanpa acuan: hanya angka yang TIDAK AMBIGU yang diterima. "75.86"
+       punya dua tafsir (75,86 dan 7586) — keduanya sah tanpa konteks, jadi
+       tidak ada dasar untuk memilih. */
+    return c.length === 1 ? c[0] : null;
+  }
+  let baik = null;
+  let jarak = Infinity;
+  for (const n of c) {
+    const d = Math.abs(Math.log(n / acuan));
+    if (d < jarak) { jarak = d; baik = n; }
+  }
+  return jarak <= Math.log(5) ? baik : null;
+}
+
+/** Membetulkan seluruh level sebuah bacaan terhadap harga pasar.
+ *
+ *  Yang dipulangkan objek BARU beserta laporan berapa angka yang gugur —
+ *  pemanggil butuh tahu itu untuk memutuskan `pasti`, dan menyembunyikannya
+ *  di dalam berarti keputusan itu diambil di tempat yang tidak melihatnya. */
+function sahihkanLevel(d, harga) {
+  const lolos = [];
+  const gugur = [];
+  const satu = (nilai) => {
+    if (nilai === null || nilai === undefined || nilai === '') return null;
+    const n = uraiAngka(nilai, harga);
+    if (n === null) { gugur.push(String(nilai)); return null; }
+    lolos.push(n);
+    return n;
+  };
+  const zona = Array.isArray(d.zona) && d.zona.length === 2
+    ? [satu(d.zona[0]), satu(d.zona[1])] : null;
+  return {
+    entry: satu(d.entry),
+    sl: satu(d.sl),
+    tp: (Array.isArray(d.tp) ? d.tp : []).map(satu).filter((x) => x !== null),
+    zona: zona && zona[0] && zona[1] ? [Math.min(zona[0], zona[1]), Math.max(zona[0], zona[1])] : null,
+    lolos: lolos.length,
+    gugur,
+  };
+}
+
+/** Nama instrumen dari judul chart yang disalin apa adanya.
+ *
+ *  "Solana / USDT - 30 - MEXC" -> SOLUSDT ... tidak. Nama panjangnya bukan
+ *  simbol bursa, dan menebak "Solana" -> "SOL" berarti memelihara kamus yang
+ *  akan selalu ketinggalan. Yang diambil BAGIAN PERTAMA saja, dibersihkan;
+ *  penerjemahan ke simbol bursa sudah punya tempatnya sendiri di
+ *  simbol-bursa.js, yang memang bertanya ke Binance. */
+function pasanganDariJudul(judul) {
+  const t = String(judul || '').split(/[·|\u2022]|\s[-\u2013]\s/)[0].trim();
+  if (!t) return null;
+  const bersih = t.toUpperCase().replace(/[^A-Z0-9/]/g, '');
+  if (!bersih || bersih.length < 3) return null;
+  /* "SOLANA/USDT" -> "SOLANA"; sisi kanan hampir selalu USDT/USD dan tidak
+     menambah keterangan apa pun untuk pencarian simbol. */
+  return bersih.split('/')[0].slice(0, 20);
+}
+
 /** Membaca satu gambar chart.
  *
  *  @param {Buffer} bita     berkas gambarnya
@@ -205,7 +317,7 @@ ATURAN:
  *           dibaca. null berarti "tidak tahu" — pemanggil TIDAK boleh
  *           menganggapnya "tidak ada sinyal".
  */
-async function bacaGambarChart(bita, ket = '', tipe = 'image/jpeg', waktuMs = 0) {
+async function bacaGambarChart(bita, ket = '', tipe = 'image/jpeg', waktuMs = 0, opsi = {}) {
   /* Gerbang PALING DEPAN, sebelum apa pun yang berbiaya. Pemanggilnya sudah
      memeriksa hal yang sama sebelum mengunduh gambarnya — dan itu memang
      disengaja. Gerbang yang cuma hidup di satu tempat akan bocor begitu
@@ -273,22 +385,49 @@ async function bacaGambarChart(bita, ket = '', tipe = 'image/jpeg', waktuMs = 0)
   try { d = JSON.parse(bersih); }
   catch (e) { return { galat: 'jawaban bukan JSON: ' + bersih.slice(0, 120) }; }
 
-  const angka = (x) => {
-    const n = Number(x);
-    return isFinite(n) && n > 0 ? n : null;
-  };
+  const pasangan = d.pasangan ? String(d.pasangan).toUpperCase().replace(/[^A-Z0-9]/g, '') : null;
+
+  /* ── ANGKANYA DIADU DENGAN HARGA PASAR ────────────────────────────
+     `cariHarga` disuntik pemanggil, bukan di-fetch di sini: berkas ini
+     sengaja tidak tahu apa-apa tentang backend, dan itu yang membuatnya
+     bisa diuji tanpa jaringan. Kalau tidak disuntik — atau kalau harganya
+     tidak ketemu — level yang ambigu GUGUR, bukan diterima apa adanya.
+     Menyerah lebih murah daripada order di harga yang mustahil. */
+  let harga = 0;
+  if (typeof opsi.cariHarga === 'function' && pasangan) {
+    try { harga = Number(await opsi.cariHarga(pasangan)) || 0; }
+    catch (e) { harga = 0; }
+  }
+  const lv = sahihkanLevel(d, harga);
+
+  /* ── `pasti` DIHITUNG, BUKAN DIAKUI ───────────────────────────────
+     Model yang mengaku yakin adalah pendapat; angka yang cocok dengan harga
+     pasar adalah bukti. Yang dipakai bukti.
+
+     Tiga syarat, dan ketiganya perlu:
+       (a) modelnya sendiri bilang angkanya TERCETAK, bukan ditaksir;
+       (b) harga pasarnya terbaca, jadi ada wasit yang memutuskan;
+       (c) tidak satu pun angka yang gugur saat diadu dengan harga itu.
+
+     Uji lapangan 1 Sep 2026: satu bacaan mengaku `pasti: true` dengan entry
+     81355 untuk SOL yang sedang di $81. Syarat (c) menggugurkannya. */
+  const pasti = d.pasti === true && harga > 0 && lv.gugur.length === 0;
+
   return {
-    pasangan: d.pasangan ? String(d.pasangan).toUpperCase().replace(/[^A-Z0-9]/g, '') : null,
+    pasangan,
     arah: d.arah === 'BUY' || d.arah === 'SELL' ? d.arah : null,
-    zona: Array.isArray(d.zona) && d.zona.length === 2 && angka(d.zona[0]) && angka(d.zona[1])
-      ? [Math.min(angka(d.zona[0]), angka(d.zona[1])), Math.max(angka(d.zona[0]), angka(d.zona[1]))]
-      : null,
-    entry: angka(d.entry),
-    sl: angka(d.sl),
-    tp: (Array.isArray(d.tp) ? d.tp : []).map(angka).filter(Boolean),
+    zona: lv.zona,
+    entry: lv.entry,
+    sl: lv.sl,
+    tp: lv.tp,
     /* Bawaannya FALSE. Model yang lupa mengisi medan ini tidak boleh
        diperlakukan sebagai model yang yakin — kelalaian bukan keyakinan. */
-    pasti: d.pasti === true,
+    pasti,
+    /* Angka yang gugur DITULIS, bukan dibuang diam-diam. Level yang hilang
+       tanpa jejak terbaca sebagai "chartnya memang tidak menyebutkan" —
+       padahal ia disebutkan dan kita yang menolaknya. */
+    gugur: lv.gugur,
+    hargaPasar: harga || null,
     catatan: String(d.catatan || '').slice(0, 200),
     model: MODEL,
   };
@@ -329,4 +468,5 @@ function keSinyal(hasil, idPesan) {
 module.exports = {
   bacaGambarChart, keSinyal, sisaJatah, pakaiJatah, JATAH_HARIAN, MODEL,
   bacaSetelan, tulisSetelan, bolehBaca, tglWib,
+  calonAngka, uraiAngka, sahihkanLevel, pasanganDariJudul,
 };
