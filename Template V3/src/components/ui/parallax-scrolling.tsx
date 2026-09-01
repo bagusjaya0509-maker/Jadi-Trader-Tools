@@ -9,6 +9,7 @@ import { Moon, Sun } from 'lucide-react';
 import './parallax-scrolling.css';
 
 import { LogoJT } from '@/components/logo-jt';
+import { AnimatedText } from '@/components/ui/animated-shiny-text';
 
 export function ParallaxComponent() {
   const parallaxRef = useRef<HTMLDivElement>(null);
@@ -160,15 +161,35 @@ export function ParallaxComponent() {
                  {...({ fetchpriority: 'low' } as Record<string, string>)}
                  width="800" data-parallax-layer="2" alt="" className="parallax__layer-img parallax__layer-malam" />
             <div data-parallax-layer="3" className="parallax__layer-title">
-              {/* SATU nama, diam. Tidak ada kata kedua yang berputar di
-                  sebelahnya — keputusan pemilik 1 September 2026 sesudah
+              {/* SATU nama, berkilau. Tidak ada kata kedua yang berputar
+                  di sebelahnya — keputusan pemilik 1 September 2026 sesudah
                   melihatnya tayang: "Jadi Trader Executing" 21 karakter,
                   dan di layar 1280px pun ia menyentuh tepi kanan.
 
-                  Yang hilang cuma hiasannya. Yang tersisa justru satu-
-                  satunya hal yang memang harus dikenali orang yang baru
-                  mendarat di sini. */}
-              <h2 className="parallax__title">Jadi Trader</h2>
+                  ── KENAPA GRADIENNYA TIDAK MEMAKAI BAWAAN ────────────────
+                  Bawaan komponennya berujung `#000`. Di atas latar polos
+                  itu benar; di atas FOTO gunung ini ujung sapuannya bukan
+                  membaur ke gelap melainkan MENGHILANG — hurufnya jadi
+                  lubang yang menampilkan fotonya sendiri. Kedua ujungnya
+                  dibuat tetap terang, dan yang menyapu di tengahnya putih
+                  penuh.
+
+                  3 detik, bukan 1: satu detik terbaca berkedip, dan yang
+                  berkedip di judul terbesar halaman menarik mata terus-
+                  menerus ke tempat yang tidak menuntut apa-apa.
+
+                  `as="h2"` karena halaman ini sudah punya <h1> sendiri di
+                  Template.tsx. `textClassName` diisi supaya ukurannya tetap
+                  datang dari `.parallax__title`, bukan dari lima kelas
+                  bawaan komponennya. */}
+              <AnimatedText
+                as="h2"
+                text="Jadi Trader"
+                className="w-full py-0"
+                textClassName="parallax__title"
+                gradientColors="linear-gradient(90deg, #7fa8d4, #ffffff, #7fa8d4)"
+                gradientAnimationDuration={3}
+              />
             </div>
             <img src="/parallax/depan.webp" loading="eager" width="800" data-parallax-layer="4" alt="" className="parallax__layer-img" />
           </div>
