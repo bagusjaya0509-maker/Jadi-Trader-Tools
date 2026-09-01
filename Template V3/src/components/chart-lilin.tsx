@@ -1775,6 +1775,10 @@ export function ChartLilin({
   const labelRef = useRef<HTMLDivElement>(null);
   const garisRef = useRef<Map<string, HTMLDivElement>>(new Map());
   const hamparanRef = useRef<HTMLDivElement>(null);
+  /* Lebar skala harga yang terakhir terukur. Ada semata-mata supaya
+     hamparan kendali replay bisa LAHIR di tempat yang benar -- lihat
+     catatan panjang di JSX-nya. Tidak dipakai untuk menghitung apa pun. */
+  const lebarSkala = useRef(0);
   const seret = useRef<{ id: string; mulaiY: number } | null>(null);
   /* Tinggi panel harga, diisi pasang() saat terbaca. Penjepit seret dan
      penyembunyi label memakai angka yang SAMA — kalau tidak, harga hasil
@@ -2027,6 +2031,7 @@ export function ChartLilin({
     /* Kendali replay berhenti tepat di garis harga, tidak menerobos ke bawah
        skalanya — panel yang menutupi angka harga membuat satu-satunya hal
        yang selalu ingin dibaca jadi tidak terbaca. */
+    if (lebar) lebarSkala.current = lebar;
     if (hamparanRef.current) hamparanRef.current.style.right = (lebar + 4) + 'px';
 
     /* Tinggi panel SMI dibaca balik dari chart-nya.
@@ -3090,14 +3095,40 @@ export function ChartLilin({
       {/* left-14: logo atribusi TradingView duduk di pojok kiri bawah panel
           harga, dan lisensi lightweight-charts mensyaratkan ia terlihat —
           kendalinya yang minggir, bukan logonya. */}
-      {/* right-2 HANYA di ponsel (sm:right-auto mengembalikannya di layar
-          lebar). Bilah kendalinya digeser mendatar di sana, dan sebuah
-          wadah yang lebarnya "auto" tidak pernah bisa menggeser apa pun —
-          ia cuma tumbuh sampai isinya muat lalu meluber keluar chart. Batas
-          kanan inilah yang memberinya lebar untuk digeser. */}
+      {/* -- LAHIR DI TEMPAT YANG BENAR, BUKAN DIPINDAHKAN KE SANA ------
+          Dilaporkan pemilik: bar replay "awalnya pendek terus memanjang".
+
+          Sebabnya kelas dan JS memerintahkan dua hal yang berlawanan.
+          Kelasnya dulu `right-2 sm:right-auto`: di layar lebar `right` jadi
+          auto, sehingga wadahnya selebar isinya saja -- pendek. Lalu
+          putaran gambar pertama menimpanya dengan `style.right = lebar
+          skala harga`, dan wadahnya seketika membentang sampai tepi skala.
+          Penggeser di dalamnya `w-full`, jadi yang terlihat orang: bar
+          pendek yang tiba-tiba memanjang.
+
+          Hal yang sama terjadi tegak lurus: `bottom` bawaannya 120 px mati,
+          lalu diganti tinggi panel SMI yang sebenarnya.
+
+          Sekarang keduanya lahir dari angka yang SAMA dengan yang akan
+          dipakai JS sesudahnya -- lebar skala terakhir yang terukur dan
+          tinggi SMI tersimpan. Chart sudah hidup jauh sebelum orang menekan
+          Replay, jadi kedua angka itu sudah benar saat hamparan ini mount.
+          Yang menimpa kemudian menimpa dengan nilai yang sama, dan tidak
+          ada yang bergerak.
+
+          `right` tetap ada di segala lebar layar, bukan cuma di ponsel:
+          bilah kendalinya digeser mendatar di layar sempit, dan wadah yang
+          lebarnya "auto" tidak pernah bisa menggeser apa pun -- ia cuma
+          tumbuh sampai isinya muat lalu meluber keluar chart.
+
+          56 px cuma jaring pengaman untuk hal yang mustahil: hamparan mount
+          sebelum chart pernah digambar sekali pun. */}
       {hamparanBawah && (
-        <div ref={hamparanRef} className="absolute left-14 right-2 z-20 sm:right-auto"
-             style={{ bottom: smi ? 120 : 34 }}>
+        <div ref={hamparanRef} className="absolute left-14 z-20"
+             style={{
+               bottom: smi ? tinggiSmi.current + 36 : 34,
+               right: (lebarSkala.current || 56) + 4,
+             }}>
           {hamparanBawah}
         </div>
       )}
