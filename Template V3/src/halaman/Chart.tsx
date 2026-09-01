@@ -3864,7 +3864,18 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
               </>
             )}
           </div>
-          <div className="min-w-[120px]">
+          {/* Selebar isinya, bukan 120 px.
+              ──────────────────────────────────────────────────────────
+              `min-w-[120px]` masuk akal waktu labelnya berbunyi "15 Menit".
+              Sejak label jadi singkatan, yang terpanjang cuma "Weekly" --
+              dan sisanya jadi ruang kosong yang tidak dipakai apa pun
+              sambil mendorong harga terakhir menjauh dari simbolnya.
+
+              96 px, bukan pas-pasan: panah bawaan `select` digambar sistem
+              operasi dan lebarnya berbeda-beda antar peramban. Menyisakan
+              napas lebih murah daripada label yang terpotong di mesin yang
+              tidak pernah saya lihat. */}
+          <div className="w-[96px] shrink-0">
             <label className="mb-1 block text-[11px] text-zinc-500">Timeframe</label>
             <select value={tf} onChange={(e) => setTf(e.target.value)} className={cn(KELAS_ISIAN, 'cursor-pointer')}>
               {TF.map((x) => <option key={x.nilai} value={x.nilai}>{x.label}</option>)}
