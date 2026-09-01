@@ -213,17 +213,6 @@ export function PapanPeringkatSignal({ data }: { data: Performa | null }) {
 
   return (
     <div className="mb-4">
-      {/* BULAN MANA YANG SEDANG DIBACA -- cuma muncul saat papannya
-          mundur. Bulan berjalan tidak perlu diberi label: itu yang
-          diharapkan orang, dan keterangan untuk keadaan normal cuma
-          menambah baris yang dilewati mata. */}
-      {data.mundur && data.periode && (
-        <p className="mb-2 px-1 text-[11.5px] leading-relaxed text-amber-200/70">
-          Menampilkan peringkat <span className="font-medium">{namaBulan(data.periode)}</span> —
-          bulan berjalan belum punya sinyal yang kena TP atau SL.
-          {data.berjalan > 0 && ` Sekarang ${data.berjalan} sinyal masih berjalan.`}
-        </p>
-      )}
       {/* Dulu tombol lipat "Sembunyikan papan peringkat". Dicabut atas
           permintaan pemilik, dan memang tidak punya pekerjaan: papan ini
           SATU-SATUNYA isi kepala halaman, jadi melipatnya cuma menyisakan
@@ -307,6 +296,19 @@ export function PapanPeringkatSignal({ data }: { data: Performa | null }) {
             <p className="text-[11px] leading-relaxed text-zinc-600">
               Papan ini <span className="text-zinc-400">dimulai ulang setiap awal bulan</span> —
               yang diperingkatkan hasil bulan berjalan, bukan sepanjang masa.{' '}
+              {/* Bulan mana yang SEDANG dibaca. Ditaruh di sini, bukan jadi
+                  spanduk di atas papan: pertanyaannya sama persis dengan
+                  yang baru saja dijawab kalimat di atasnya — "angka ini
+                  sebenarnya bulan apa" — dan memecahnya jadi dua tempat
+                  membuat pembacanya menemukan separuh jawaban lebih dulu.
+                  Cuma muncul saat papannya memang mundur. */}
+              {data.mundur && data.periode && (
+                <span className="text-zinc-400">
+                  Yang tampil sekarang peringkat {namaBulan(data.periode)}, karena bulan berjalan
+                  belum punya sinyal yang kena TP atau SL
+                  {data.berjalan > 0 ? ` — ${data.berjalan} sinyal masih berjalan` : ''}.{' '}
+                </span>
+              )}
               Diurutkan dari estimasi hasil, bukan dari jumlah pengikut atau
               banyaknya posting. {totalSinyal < 20 && (
                 <span className="text-amber-500/80">
