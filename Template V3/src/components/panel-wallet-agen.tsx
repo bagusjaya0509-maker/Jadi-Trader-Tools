@@ -1010,7 +1010,43 @@ function PosisiTiruan({ tiru, dompet, posisi, ubahTiru, ubahOto, ubahBuka }: {
   const { data: punyaku } = usePosisiBinance();
   const nama = new Map(dompet.map((d) => [d.alamat, d.nama]));
 
-  if (!tiru.length) return null;
+  /* -- KOSONG BUKAN ALASAN MENGHILANG --------------------------------
+     Dulu di sini `return null`. Akibatnya seluruh kendali salin -- sakelar,
+     ukuran, pemilih bursa -- TIDAK PUNYA WUJUD sampai penanda pertama
+     dibuat, sementara tombol pembuat penandanya sendiri terkubur satu klik
+     di dalam "Lihat posisi & transaksi". Fitur yang tidak bisa ditemukan
+     sama saja dengan fitur yang tidak ada, dan itu persis yang terjadi:
+     pemiliknya mencari tombolnya dan tidak menemukannya.
+
+     Sekarang seksinya selalu ada dan MENGAJARKAN jalan masuknya. */
+  if (!tiru.length) {
+    return (
+      <section>
+        <h3 className="mb-2 flex flex-wrap items-center gap-x-2 border-b border-zinc-800 pb-1.5">
+          <span className="text-[13px] font-semibold text-zinc-200">Salin Dompet</span>
+          <span className="text-[11px] font-normal text-zinc-600">· belum ada yang disalin</span>
+        </h3>
+        <div className="rounded-lg border border-dashed border-zinc-800 px-4 py-4">
+          <p className="text-[12px] leading-relaxed text-zinc-400">
+            Belum ada koin yang ditandai. Untuk mulai menyalin sebuah dompet:
+          </p>
+          <ol className="mt-2 space-y-1 text-[11.5px] leading-relaxed text-zinc-500">
+            <li>1. Di daftar <span className="text-zinc-300">Dompet yang dipantau</span> di bawah,
+              tekan <span className="text-zinc-300">Lihat posisi &amp; transaksi</span>.</li>
+            <li>2. Pada posisi yang ingin ditiru, tekan ikon salin di ujung kanan barisnya.</li>
+            <li>3. Kartunya akan muncul di sini, lengkap dengan pilihan bursa, ukuran order,
+              leverage, dan sakelar buka/tutup otomatis.</li>
+          </ol>
+          <p className="mt-2.5 text-[11px] leading-relaxed text-zinc-600">
+            Menandai TIDAK mengirim order apa pun. Ia cuma mencatat
+            &ldquo;koin ini saya tiru dari dompet ini&rdquo; supaya posisinya bisa disandingkan
+            dan loncengnya berbunyi. Order baru berangkat kalau kamu sendiri yang menyalakan
+            sakelarnya di kartu itu.
+          </p>
+        </div>
+      </section>
+    );
+  }
 
   const baris = tiru.map((x) => {
     const sumber = posisi.find((p) => p.alamat === x.alamat && p.koin.toUpperCase() === x.koin);
@@ -1028,9 +1064,20 @@ function PosisiTiruan({ tiru, dompet, posisi, ubahTiru, ubahOto, ubahBuka }: {
   return (
     <section>
       <h3 className="mb-2 flex flex-wrap items-center gap-x-2 border-b border-zinc-800 pb-1.5">
-        <span className="text-[13px] font-semibold text-zinc-200">Posisi tiruan</span>
+        <span className="text-[13px] font-semibold text-zinc-200">Salin Dompet</span>
         <span className="text-[11px] font-normal text-zinc-600">
-          · {baris.length} ditandai · posisimu dari Binance, posisi dompet dari rantai
+          · {baris.length} ditandai
+          {(() => {
+            /* Yang benar-benar HIDUP disebut terpisah dari yang sekadar
+               ditandai. Keduanya berbeda jauh artinya: ditandai cuma
+               mencatat, hidup berarti order akan berangkat sendiri. */
+            const buka = tiru.filter((x) => x.otoBuka).length;
+            const tutup = tiru.filter((x) => x.otoTutup).length;
+            return (buka || tutup)
+              ? ` · ${buka} auto-buka, ${tutup} auto-tutup AKTIF`
+              : ' · semua sakelar mati';
+          })()}
+          {' '}· posisimu dari bursa, posisi dompet dari rantai
         </span>
       </h3>
 
@@ -1569,6 +1616,34 @@ export function PanelWalletAgen({ pemilik = false }: { pemilik?: boolean }) {
           sebelum ia mulai mengetik. */}
       {pemilik && <FormTambah selesai={() => void tarik()} />}
 
+      {/* -- SALIN DOMPET DI PALING ATAS -----------------------------------
+          Ia satu-satunya bagian panel ini yang bisa MENGGERAKKAN UANG
+          sendiri. Papan peringkat dan konsensus menjawab "dompet mana yang
+          bagus"; seksi ini menjawab "apa yang sedang berjalan atas namaku
+          sekarang", dan pertanyaan kedua selalu lebih mendesak daripada
+          yang pertama.
+
+          Dulu ia duduk di bawah konsensus DAN menghilang saat kosong, jadi
+          pemiliknya sendiri tidak bisa menemukan kendalinya. Dua kesalahan
+          yang saling menyembunyikan.
+
+          HANYA pemilik: sakelar di dalamnya mengirim order memakai satu
+          kunci API di .env — kunci pemilik. Digerbangi di sini DAN di
+          server; penanda tiruannya tidak ikut di jawaban publik, jadi walau
+          gerbang layar ini luput, yang bisa dirender tetap kosong.
+
+          Digerbangi `dompet.length` juga: keterangan kosongnya menyuruh
+          orang menekan sesuatu di daftar dompet di bawah, dan menyuruh
+          menekan sesuatu yang belum ada adalah petunjuk yang menyesatkan. */}
+      {pemilik && dompet.length > 0 && (
+        <PosisiTiruan tiru={d?.tiru || []} dompet={dompet} posisi={posisi}
+          ubahTiru={(a, k, nyala) => {
+            void (nyala ? tandaiTiru(a, k) : batalTiru(a, k)).then(() => tarik());
+          }}
+          ubahOto={(a, k, nyala) => { void aturOtoTutup(a, k, nyala).then(() => tarik()); }}
+          ubahBuka={(a, k, u) => { void aturBuka(a, k, u).then((h) => { if (!h.ok && h.pesan) alert(h.pesan); tarik(); }); }} />
+      )}
+
       {/* Papan peringkat di ATAS daftar dompet, bukan di bawah. Yang dicari
           orang saat membuka panel ini pada hari-hari awal adalah "dompet
           mana", bukan "dompet yang sudah saya pilih sedang apa" — dan yang
@@ -1592,23 +1667,6 @@ export function PanelWalletAgen({ pemilik = false }: { pemilik?: boolean }) {
         <>
           <KonsensusPasar posisi={posisi} dompet={dompet}
             seumur={d?.seumur || {}} log={log} />
-
-          {/* HANYA pemilik. Isinya posisi di akun bursa yang sungguhan,
-              dan sakelar auto-close di dalamnya menutup posisi memakai SATU
-              kunci API yang ada di .env — kunci pemilik. Orang lain yang
-              menyalakannya akan menutup posisi pemilik dengan uang pemilik.
-
-              Digerbangi di sini DAN di server: penanda tiruannya tidak ikut
-              di jawaban publik, jadi walau gerbang layar ini luput, yang
-              bisa dirender tetap kosong. */}
-          {pemilik && (
-            <PosisiTiruan tiru={d?.tiru || []} dompet={dompet} posisi={posisi}
-              ubahTiru={(a, k, nyala) => {
-                void (nyala ? tandaiTiru(a, k) : batalTiru(a, k)).then(() => tarik());
-              }}
-              ubahOto={(a, k, nyala) => { void aturOtoTutup(a, k, nyala).then(() => tarik()); }}
-              ubahBuka={(a, k, u) => { void aturBuka(a, k, u).then((h) => { if (!h.ok && h.pesan) alert(h.pesan); tarik(); }); }} />
-          )}
 
           <section>
             <h3 className="mb-2 border-b border-zinc-800 pb-1.5 text-[13px] font-semibold text-zinc-200">
