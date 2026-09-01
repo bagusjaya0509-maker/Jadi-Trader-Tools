@@ -53,6 +53,21 @@ export function PanelBelah({ kiri, lebarAwal = 0.28, tinggi, onLebar, children }
   children: ReactNode;
 }) {
   const [lebar, setLebar] = useState(lebarAwal);
+
+  /* Lebar awal DIIKUTI saat pemanggilnya mengubahnya.
+     ──────────────────────────────────────────────────────────────────────
+     `useState(lebarAwal)` cuma membaca sekali seumur komponen, dan komponen
+     ini TIDAK dibongkar saat panel kirinya berganti isi — `kiri` yang jadi
+     kosong atau terisi, bukan PanelBelah yang mati dan hidup lagi.
+
+     Akibatnya panel yang butuh ruang lebih (screener, yang membawa kartu
+     selebar layar) mewarisi 28% milik daftar dompet, dan pemakainya harus
+     menyeret pembatasnya sendiri tiap kali membukanya.
+
+     Yang sudah DISERET tangan tidak ditimpa: `seret` menyimpan nilai
+     seretan terakhir, dan mengubah lebar di bawah tangan orang yang sedang
+     menariknya adalah kejutan, bukan bantuan. */
+  useEffect(() => { setLebar(lebarAwal); }, [lebarAwal]);
   const [seret, setSeret] = useState<number | null>(null);
   const [bungkus, setBungkus] = useState<HTMLDivElement | null>(null);
   const w = seret ?? lebar;

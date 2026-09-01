@@ -4,7 +4,6 @@ import { Loader2, ExternalLink, TriangleAlert, RotateCcw, Radar, ArrowRight, Loc
 import { useAuth } from '@/lib/auth';
 import { modePreview, jatahTerpakai, pakaiJatah } from '@/lib/preview';
 import { usePaket, pakaiKuota, LABEL_PAKET } from '@/lib/paket';
-import { simpanDaftarScreener } from '@/lib/screener-belah';
 
 /* ════════════════════════════════════════════════════════════════════════
    SCREENER ENTRY — screener V2 yang ASLI, ditanam apa adanya
@@ -369,7 +368,34 @@ function cnSampul(terkunci: boolean) {
   ].join(' ');
 }
 
-export default function ScreenerV2() {
+/* ── HALAMAN INI JUGA DIPAKAI SEBAGAI PANEL DI CHART & ENTRY ───────────
+   Diminta pemilik 1 Sep 2026: seluruh isi Screener Area bisa dibuka di
+   sebelah chart, bukan cuma satu koin yang dipilih.
+
+   Yang dirender di sana adalah komponen INI, apa adanya — bukan salinan
+   bingkainya. Alasannya bukan kerapian melainkan GERBANG: halaman ini
+   memanggil `pakaiKuota('screener')` dan menangani tamu preview, dan
+   screener adalah alat berbayar yang tiap pindainya memanggil proxy untuk
+   ratusan simbol. Menyalin bingkainya ke Chart tanpa menyalin gerbangnya
+   akan mengubah `/chart-entry?screener=1` jadi screener gratis tanpa batas.
+   Dengan memakai komponennya sendiri, tidak ada gerbang kedua yang bisa
+   tertinggal saat yang pertama diperbaiki.
+
+   Dua prop, keduanya opsional supaya pemakaian sebagai HALAMAN tidak
+   berubah sama sekali. */
+export default function ScreenerV2({ tinggi, onPilihSimbol }: {
+  /** Tinggi wadah dalam piksel. Kosong = dipakai sebagai halaman penuh,
+   *  dan tingginya dihitung dari layar seperti sebelumnya. */
+  tinggi?: number;
+  /** Diisi saat ditanam: klik kartu MENYURUH induknya berpindah simbol,
+   *  alih-alih menavigasi halaman.
+   *
+   *  Penting justru saat ditanam DI /chart-entry: menavigasi ke rute yang
+   *  sama akan membongkar-pasang panelnya sendiri di tengah klik, dan
+   *  screener yang memuat ulang tiap kali satu koin dipilih adalah
+   *  kebalikan dari gunanya. */
+  onPilihSimbol?: (v: { simbol: string; tf?: string; sl?: number; tp?: number; arah?: 'BUY' | 'SELL' }) => void;
+} = {}) {
   /* ── TEMA INDUK DISALIN KE DALAM BINGKAI ──────────────────────────────
      Ini yang terlewat dua kali, dan sekali sempat merusak tema gelap.
 
@@ -446,14 +472,28 @@ export default function ScreenerV2() {
          Ambang DUA baris, bukan satu. Membelah layar untuk daftar berisi
          satu koin berarti memakan sepertiga lebar chart demi baris yang
          sudah jadi judul chartnya sendiri. */
-      const nBaris = simpanDaftarScreener(d.daftar);
-      if (nBaris > 1) q.set('screener', '1');
+      /* DITANAM: induknya yang berpindah simbol, halamannya tidak
+         ke mana-mana. */
+      if (onPilihSimbol) {
+        const n = (k: string) => { const x = Number(d[k]); return isFinite(x) && x > 0 ? x : undefined; };
+        onPilihSimbol({
+          simbol: d.simbol,
+          tf: typeof d.tf === 'string' && d.tf ? d.tf : undefined,
+          sl: n('sl'), tp: n('tp'),
+          arah: d.arah === 'BUY' || d.arah === 'SELL' ? d.arah : undefined,
+        });
+        return;
+      }
 
+      /* Sebagai HALAMAN: pindah ke Chart & Entry, dan bawa panel screener
+         ikut terbuka di sebelahnya — itu yang membuat koin berikutnya
+         tinggal ditekan tanpa kembali ke sini. */
+      q.set('screener', '1');
       arahkan(`/chart-entry?${q}`);
     };
     window.addEventListener('message', dengar);
     return () => window.removeEventListener('message', dengar);
-  }, [arahkan]);
+  }, [arahkan, onPilihSimbol]);
 
   const [alamat, setAlamat] = useState<string | null>(null);
   const [gagal, setGagal] = useState(false);
@@ -708,7 +748,8 @@ export default function ScreenerV2() {
       {/* bg-zinc-950 di WADAHNYA, bukan cuma di dalam bingkai. Inilah
           warna yang terlihat selama bingkainya belum siap — dan karena ia
           token, ia putih di tema terang tanpa satu baris tambahan. */}
-      <div className="bg-zinc-950" style={{ height: 'calc(100vh - 56px)' }}>
+      {/* Tinggi dari induk kalau ditanam; dari layar kalau jadi halaman. */}
+      <div className="bg-zinc-950" style={{ height: tinggi ? `${tinggi}px` : 'calc(100vh - 56px)' }}>
         {!siap && (
           <div className="absolute inset-0 flex items-center justify-center gap-2.5 text-[13px] text-zinc-500">
             <Loader2 className="size-4 animate-spin" /> Memuat screener…

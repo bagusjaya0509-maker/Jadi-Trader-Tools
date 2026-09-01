@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { PanelCopyTradeFi } from '@/components/panel-copy-tradefi';
 import {
@@ -45,7 +45,15 @@ import type { PosisiDompet, KeadaanDompet, Peringkat,
   JendelaPeringkat, PitaAkun } from '@/lib/wallet-agen';
 import { peringkatDompet } from '@/lib/wallet-agen';
 import { PanelBelah } from '@/components/panel-belah';
-import { bacaDaftarScreener, hapusDaftarScreener, type BarisScreener } from '@/lib/screener-belah';
+/* Halaman Screener UTUH, dipasang di panel kiri. Bukan salinan bingkainya:
+   komponen itu membawa gerbang kuotanya sendiri, dan screener adalah alat
+   berbayar yang tiap pindainya memanggil proxy untuk ratusan simbol.
+   Menyalin bingkainya tanpa gerbangnya akan mengubah alamat ini jadi
+   screener gratis tanpa batas.
+
+   `lazy`, bukan impor statis: berkasnya 43 kB dan mayoritas kunjungan ke
+   chart tidak membukanya. */
+const ScreenerTertanam = lazy(() => import('@/halaman/ScreenerV2'));
 
 /* ════════════════════════════════════════════════════════════════════════
    CHART & BACKTEST
@@ -360,77 +368,6 @@ function alternatifSimbol(simbol: string): string[] {
    supaya komponennya cukup satu — dua daftar yang berperilaku sama tapi
    ditulis dua kali akan berbeda dalam sebulan, dan yang berbeda selalu
    bagian yang jarang dilihat. */
-/* ── DAFTAR HASIL PINDAI SCREENER ─────────────────────────────────────
-   Bentuknya sengaja disamakan dengan DaftarKonsensus di bawahnya: dua
-   daftar yang menempati slot yang sama persis, dibuka dengan maksud yang
-   sama ("telusuri koin ini satu per satu"), harus terbaca sebagai satu
-   pola — bukan dua komponen yang kebetulan bertetangga.
-
-   Yang berbeda cuma kolomnya, karena yang ditanyakan memang berbeda:
-   konsensus menjawab "berapa dompet di sisi mana", screener menjawab
-   "harganya berapa dan bergerak ke mana".
-
-   TF ikut per baris. Hasil pindai screener bisa mencampur timeframe dalam
-   satu daftar -- kartu Koin Hunter 4h berdampingan dengan Sinyal Prioritas
-   15m -- dan membuka semuanya di timeframe chart yang sedang aktif berarti
-   menampilkan sinyal yang tidak pernah ada di sana. */
-function DaftarScreener({ baris, aktif, pilih, keluar }: {
-  baris: BarisScreener[];
-  aktif: string;
-  pilih: (simbol: string, tf: string) => void;
-  keluar: () => void;
-}) {
-  return (
-    <div className="flex h-full flex-col">
-      <div className="sticky top-0 z-10 flex items-start gap-2 border-b border-zinc-800 bg-zinc-950 px-2.5 py-1.5">
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[12px] font-semibold text-zinc-100">Hasil Screener</p>
-          <p className="text-[10.5px] text-zinc-600">{baris.length} koin · dari pemindaian terakhir</p>
-        </div>
-        <button onClick={keluar} title="Tutup daftar dan kembali"
-          className="shrink-0 cursor-pointer rounded p-1 text-zinc-600 transition-colors hover:bg-zinc-800 hover:text-zinc-100">
-          <X className="size-3.5" />
-        </button>
-      </div>
-      <div className="min-h-0 flex-1">
-        {baris.map((b) => {
-          const ini = b.simbol === aktif;
-          const naik = b.ubah24 >= 0;
-          return (
-            <button key={b.simbol + b.tf} onClick={() => pilih(b.simbol, b.tf)}
-              className={cn('flex w-full cursor-pointer flex-col gap-0.5 border-b border-zinc-800/60 px-2.5 py-1.5 text-left transition-colors',
-                ini ? 'bg-zinc-800/70' : 'hover:bg-zinc-900')}>
-              <span className="flex flex-wrap items-baseline gap-x-1.5">
-                <span className={cn('text-[12px] font-semibold', ini ? 'text-zinc-50' : 'text-zinc-200')}>
-                  {b.simbol.replace(/USDT$/, '')}
-                </span>
-                <span className="rounded bg-zinc-800 px-1 text-[9.5px] uppercase tracking-wide text-zinc-400">{b.tf}</span>
-                {b.arah && (
-                  <span className={cn('text-[10.5px] font-semibold',
-                    b.arah === 'BUY' ? 'text-emerald-400' : 'text-red-400')}>
-                    {b.arah === 'BUY' ? 'LONG' : 'SHORT'}
-                  </span>
-                )}
-              </span>
-              <span className="flex flex-wrap items-baseline gap-x-2">
-                {b.harga > 0 && (
-                  <span className="angka text-[10.5px] text-zinc-500">
-                    {b.harga >= 1 ? b.harga.toLocaleString('en-US', { maximumFractionDigits: 4 }) : b.harga.toPrecision(4)}
-                  </span>
-                )}
-                <span className={cn('angka text-[10.5px]', naik ? 'text-emerald-500/80' : 'text-red-400/80')}>
-                  {naik ? '+' : ''}{b.ubah24.toFixed(2)}%
-                </span>
-                {b.cap === 'big' && <span className="text-[9.5px] text-zinc-700">BIG CAP</span>}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 function DaftarKonsensus({ grup, aktif, pilih, keluar, judul, sub }: {
   grup: { koin: string; nL: number; nS: number; wrL: number | null; wrS: number | null;
           entry: number; nilai: number }[];
@@ -2927,20 +2864,11 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
   const walletviewMinta = cari.get('walletview') === '1';
 
   /* -- DAFTAR SCREENER DI PANEL KIRI --------------------------------
-     Datang dari ikon chart di kartu Screener Area. Isinya TIDAK lewat
-     alamat halaman -- hasil pindai bisa puluhan baris -- melainkan
-     sessionStorage; lihat lib/screener-belah.ts untuk alasannya dan untuk
-     pembersihannya.
-
-     Dibaca sekali per perubahan parameter, bukan tiap render: daftarnya
-     tidak berubah selama halaman ini terbuka, dan membacanya ulang tiap
-     render berarti mengurai JSON puluhan baris di jalur yang juga
-     menggambar lilin. */
+     Dinyalakan dari Screener Area, dan yang tampil di panel kiri adalah
+     HALAMAN SCREENER ITU SENDIRI -- seluruh sectionnya, bukan ringkasan
+     per koin. Klik kartu di dalamnya memindah chart di sebelahnya tanpa
+     halaman ini berpindah ke mana pun. */
   const screenerMinta = cari.get('screener') === '1';
-  const [daftarScreener, setDaftarScreener] = useState<BarisScreener[]>([]);
-  useEffect(() => {
-    setDaftarScreener(screenerMinta ? bacaDaftarScreener() : []);
-  }, [screenerMinta]);
   const [posisiDompet, setPosisiDompet] = useState<PosisiDompet[]>([]);
   const [semuaDompet, setSemuaDompet] = useState<KeadaanDompet | null>(null);
   useEffect(() => {
@@ -4312,24 +4240,47 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
               Jiplak TIDAK dipindah: panel acuannya memang harus sejajar
               dengan kanvas, dan ia tetap di dalam ChartLilin. */}
           <PanelBelah tinggi={tinggiChart} onLebar={setSisaKiri}
-            kiri={!jiplak && daftarScreener.length > 1 ? (
-              /* Screener didahulukan: ia dibuka lewat satu klik yang
-                 disengaja dari halaman lain, sementara konsensus dan
-                 wallet view menyala dari parameter yang bisa tertinggal di
-                 alamat. Yang baru saja ditekan orang menang. */
-              <DaftarScreener baris={daftarScreener} aktif={simbol}
-                pilih={(sim, tfBaris) => { setSimbol(rapikanSimbol(sim)); setTf(tfBaris); }}
-                keluar={() => {
-                  const q = new URLSearchParams(cari);
-                  q.delete('screener');
-                  /* Daftarnya IKUT DIBUANG, bukan cuma parameternya.
-                     Ditinggal di sessionStorage, ia akan muncul lagi begitu
-                     ada yang membuka chart dari screener berikutnya --
-                     dengan isi pemindaian yang lama. */
-                  hapusDaftarScreener();
-                  setDaftarScreener([]);
-                  navigasi({ search: q.toString() ? '?' + q.toString() : '' }, { replace: true });
-                }} />
+            /* Screener membawa kartu selebar layar; 28% membuatnya terpotong
+               jadi satu kolom sempit. Daftar dompet tetap 28% -- isinya baris
+               teks pendek, dan melebarkannya cuma memakan chart. */
+            lebarAwal={screenerMinta ? 0.42 : 0.28}
+            kiri={!jiplak && screenerMinta ? (
+              /* Screener didahulukan: ia dinyalakan lewat satu klik yang
+                 disengaja dari halaman lain, sementara konsensus dan wallet
+                 view menyala dari parameter yang bisa tertinggal di alamat.
+                 Yang baru saja ditekan orang menang. */
+              <div className="flex h-full flex-col">
+                <div className="sticky top-0 z-10 flex items-start gap-2 border-b border-zinc-800 bg-zinc-950 px-2.5 py-1.5">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[12px] font-semibold text-zinc-100">Screener Area</p>
+                    <p className="text-[10.5px] text-zinc-600">klik kartu untuk memindah chart di sebelah</p>
+                  </div>
+                  <button onClick={() => {
+                    const q = new URLSearchParams(cari);
+                    q.delete('screener');
+                    navigasi({ search: q.toString() ? '?' + q.toString() : '' }, { replace: true });
+                  }} title="Tutup screener"
+                    className="shrink-0 cursor-pointer rounded p-1 text-zinc-600 transition-colors hover:bg-zinc-800 hover:text-zinc-100">
+                    <X className="size-3.5" />
+                  </button>
+                </div>
+                <div className="min-h-0 flex-1">
+                  <Suspense fallback={
+                    <p className="flex items-center gap-2 px-2.5 py-6 text-[12px] text-zinc-500">
+                      <Loader2 className="size-3.5 animate-spin" /> Memuat screener…
+                    </p>
+                  }>
+                    {/* 34 px = tinggi kepala panel di atasnya. Tanpa dikurangi,
+                        bingkainya melebihi wadahnya dan baris terakhir screener
+                        tidak pernah bisa dijangkau. */}
+                    <ScreenerTertanam tinggi={Math.max(240, tinggiChart - 34)}
+                      onPilihSimbol={(v) => {
+                        setSimbol(rapikanSimbol(v.simbol));
+                        if (v.tf) setTf(v.tf);
+                      }} />
+                  </Suspense>
+                </div>
+              </div>
             ) : !jiplak && grupKiri.length ? (
               <DaftarKonsensus grup={grupKiri}
                 judul={grupKonsensus.length ? 'Konsensus dompet' : 'Wallet View'}
