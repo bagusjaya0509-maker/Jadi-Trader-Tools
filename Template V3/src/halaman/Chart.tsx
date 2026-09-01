@@ -36,7 +36,7 @@ import {
   jalankanUji, garisIndikator, siapkanSnr, zonaSnrDari, deretSmi, SETELAN_BAWAAN,
   type Setelan, type HasilUji,
 } from '@/lib/backtest';
-import { SIMBOL_DASAR, simbolDasarMt5 } from '@/lib/simbol';
+import { simbolDasarMt5, useSimbol, bacaAktif, tambahSimbol } from '@/lib/simbol';
 import { useAuth } from '@/lib/auth';
 import { modePreview, jatahTerpakai, pakaiJatah } from '@/lib/preview';
 import { usePaket, pakaiKuota, teksSisa } from '@/lib/paket';
@@ -1926,6 +1926,46 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
   /* Simbol MT5 yang tersedia — EA yang dipasang di chart pair lain otomatis
      menambah daftar ini, tanpa menyentuh kode web. */
   const [simbolMt5, setSimbolMt5] = useState<string[]>(['XAUUSD']);
+  /* Daftar simbol HIDUP — ikut berubah saat koin ditambah dari sini, dari
+     Screener, atau dari tab lain. Menggantikan konstanta `SIMBOL_DASAR`
+     yang dibekukan saat modul dimuat. */
+  const { aktif: simbolAktif } = useSimbol();
+
+  /* ── KOIN YANG DICARI SENDIRI IKUT TERCATAT ─────────────────────────
+     Dilaporkan pemilik: mengetik USELESSUSDT memunculkan chartnya, tapi
+     namanya tidak pernah ada di kotak cari sesudah itu. Ia harus diketik
+     ulang huruf per huruf tiap kali.
+
+     Sebabnya dua, dan keduanya di berkas ini:
+       · `tambahSimbol()` SUDAH ada di lib/simbol.ts dan bekerja, tapi cuma
+         dipanggil dari halaman Screener React. Chart & Entry tidak pernah
+         memanggilnya.
+       · Kotak carinya membaca `SIMBOL_DASAR` -- larik tulis tangan yang
+         dibekukan saat modul dimuat -- jadi mencatat pun percuma; daftar
+         yang dibaca bukan daftar yang ditulis.
+
+     DICATAT SESUDAH LILINNYA DATANG, bukan saat diketik. Salah ketik yang
+     langsung tercatat akan menempel di daftar selamanya sebagai simbol yang
+     tidak pernah bisa dimuat, dan tidak ada di layar ini yang menjelaskan
+     dari mana ia datang.
+
+     Dijaga `Set`: pengambilan lilin berulang tiap 3 detik, dan menulis ke
+     localStorage tiga kali per detik untuk simbol yang sama adalah kerja
+     yang seluruhnya dibuang. Yang sudah ada di daftar juga ditandai --
+     supaya tidak ada satu pun penulisan untuk koin yang memang sudah
+     tercatat sejak awal. */
+  const simbolTercatat = useRef<Set<string>>(new Set());
+  const catatSimbol = useCallback((s: string) => {
+    /* MT5 punya sumber daftarnya sendiri (dilaporkan EA), dan menaruh nama
+       broker di daftar kripto membuatnya muncul di kotak cari sebagai
+       pasangan Binance yang tidak pernah ada. */
+    if (!s || s.startsWith('MT5:')) return;
+    if (simbolTercatat.current.has(s)) return;
+    simbolTercatat.current.add(s);
+    if (bacaAktif().includes(s)) return;
+    tambahSimbol(s);
+  }, []);
+
   useEffect(() => {
     let hidup = true;
     const tarik = () => void daftarSimbolMt5().then((d) => { if (hidup && d.length) setSimbolMt5(d); });
@@ -2688,7 +2728,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
               : `Tidak ada data untuk "${simbol}". Pasangan kripto Binance berakhiran USDT (mis. EURUSDT); untuk pasangan MetaTrader pakai awalan MT5: dan pastikan EA-nya terpasang.`);
           }
         }
-        else { setLilin(l); setGalat(''); setUsulSimbol([]); }
+        else { setLilin(l); setGalat(''); setUsulSimbol([]); catatSimbol(simbol); }
       } catch (e) {
         /* Alasan yang sama: galat tak terduga di tengah polling tidak boleh
            menghapus chart yang sudah terbaca. */
@@ -2710,7 +2750,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
        rate limit Binance untuk satu chart. */
     const jam = setInterval(tarik, 3_000);
     return () => { hidup = false; clearInterval(jam); };
-  }, [simbol, tf, segar, replayIdx !== null]);
+  }, [simbol, tf, segar, replayIdx !== null, catatSimbol]);
 
   /* Hasil backtest DIBUANG saat simbol/timeframe/setelan berubah. Tabel
      trade dari BTC 4 jam yang masih terpampang di bawah chart ETH 5 menit
@@ -3498,10 +3538,14 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
          nilainya ikut berubah, rutenya mencari simbol yang tidak ada di
          penyimpanan dan chartnya kosong tanpa pesan apa pun. */
       ...simbolMt5.map((s) => ({ nilai: 'MT5:' + s, label: bacaNamaMt5(s), sumber: 'Trade-Fi · MT5' })),
-      ...SIMBOL_DASAR.map((s) => ({ nilai: s, label: s, sumber: 'Kripto · Binance' })),
+      /* Daftar HIDUP, bukan `SIMBOL_DASAR` yang beku. Inilah yang membuat
+         koin hasil pencarian sendiri muncul di sini pada kunjungan
+         berikutnya -- dan yang membuat koin yang diblokir dari Screener
+         benar-benar hilang dari sini juga. */
+      ...simbolAktif.map((s) => ({ nilai: s, label: s, sumber: 'Kripto · Binance' })),
     ];
     return (q ? semua.filter((o) => o.label.toLowerCase().includes(q)) : semua).slice(0, 40);
-  }, [ketik, simbolMt5]);
+  }, [ketik, simbolMt5, simbolAktif]);
 
   function pilihSimbol(v: string) {
     setKetik(v);
