@@ -804,8 +804,48 @@ export default function ScreenerV2({ tinggi, onPilihSimbol }: {
                    terlihat orang. Selektor Parallel Signal lewat induknya
                    [data-section] karena kelas .es-priority-title dipakai
                    tiga section berbeda. */
-                const j1 = d.querySelector('.es-pantau-title');
+                const j1 = d.querySelector('.es-pantau-title') as HTMLElement | null;
                 if (j1) j1.textContent = 'Koin Hunter';
+                /* -- Ikon chart DI JUDUL, bukan di tiap kartu ----------
+                   Percobaan pertama menaruh ikon ini di kartu koin, dan
+                   ia tidak pernah muncul: kartu Koin Hunter dibangun
+                   fungsi yang berbeda dari yang kena tambalan. Tapi yang
+                   ketahuan sesudahnya lebih penting daripada salah
+                   sasarannya -- satu ikon per kartu berarti satu ajakan
+                   pindah halaman diulang tiga puluh enam kali di satu
+                   layar, padahal yang dibuka SELALU halaman yang sama.
+
+                   Di judul ia jadi satu kendali untuk satu section: buka
+                   Chart & Entry, dan seluruh Koin Hunter ikut terpasang
+                   di panel kiri -- koin berikutnya tinggal ditekan dari
+                   sana, tanpa kembali ke sini.
+
+                   Tidak dipasang saat screener-nya SEDANG ditanam di
+                   Chart & Entry: di situ tombol "buka di Chart & Entry"
+                   menunjuk ke tempat yang sedang ditempati orangnya. */
+                if (j1 && !onPilihSimbol && !d.getElementById('jt-buka-chart')) {
+                  const b = d.createElement('button');
+                  b.id = 'jt-buka-chart';
+                  b.type = 'button';
+                  b.title = 'Buka di Chart & Entry \u2014 Koin Hunter ikut terpasang di panel kiri';
+                  b.setAttribute('aria-label', 'Buka di Chart dan Entry');
+                  b.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true" style="width:15px;height:15px;display:block"><path d="M3 2v11.5h11"/><path d="M5.5 5v5.5M5.5 4v1M5.5 10.5v1"/><path d="M9 3.5v6M9 2.5v1M9 9.5v1"/><path d="M12.5 6.5v4M12.5 5.5v1M12.5 10.5v1"/></svg>';
+                  b.style.cssText = 'display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;flex:0 0 auto;border:1px solid #3a3f4b;border-radius:6px;background:transparent;color:inherit;cursor:pointer;padding:0;opacity:.75';
+                  b.addEventListener('mouseenter', () => { b.style.opacity = '1'; });
+                  b.addEventListener('mouseleave', () => { b.style.opacity = '.75'; });
+                  b.addEventListener('click', (ev) => {
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                    arahkan('/chart-entry?screener=1');
+                  });
+                  /* Judulnya jadi baris flex supaya ikon dan teks sejajar
+                     di tengah. Tanpa ini tombol 26 px duduk di garis dasar
+                     teks dan menggantung setengah huruf lebih rendah. */
+                  j1.style.display = 'flex';
+                  j1.style.alignItems = 'center';
+                  j1.style.gap = '8px';
+                  j1.insertBefore(b, j1.firstChild);
+                }
                 const j2 = d.querySelector('[data-section="crosshunter"] .es-priority-title');
                 if (j2) j2.textContent = 'Zona Pantau';
                 /* Padding kiri body diatur langsung di elemennya, bukan lewat

@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, X, GripVertical, Pencil, FolderPlus } from 'lucide-react';
 import { cn, harga as fHarga } from '@/lib/utils';
 import { ambilTickers, hargaTickMt5, daftarSimbolMt5, type Ticker } from '@/lib/pasar';
-import { SIMBOL_DASAR } from '@/lib/simbol';
+import { SIMBOL_DASAR, useSimbol } from '@/lib/simbol';
 import { useMulti, kirimBus, ID_PANEL } from '@/lib/multi-chart';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -133,6 +133,56 @@ export function WatchChart({ simbol, onPilih, onLebar }: {
   const [sasar, setSasar] = useState<{ seksi: string; idx: number } | null>(null);
 
   const semuaSimbol = seksi.flatMap((k) => k.simbol);
+  /* Daftar simbol yang boleh diusulkan. Diambil dari daftar AKTIF, bukan
+     SIMBOL_DASAR saja: koin yang ditemukan lewat pencarian manual (USELESS,
+     XAUT, apa pun yang belum ada di daftar bawaan) tercatat di sana, dan
+     tanpa ini mengetik namanya di watchlist tidak menawarkan apa-apa
+     walaupun koinnya jelas ada di Binance.
+
+     Digabung, bukan menggantikan: kunci daftar aktif dipakai bersama
+     screener V2, dan V2 boleh menulisnya lebih pendek. Menggantung pada
+     daftar itu sendirian berarti usulan watchlist bisa menyusut karena
+     sesuatu yang terjadi di halaman lain. */
+  const { aktif: simbolAktif, diblokir } = useSimbol();
+  const kolamSimbol = useMemo(() => {
+    const buang = new Set(diblokir);
+    const keluar: string[] = [];
+    const sudah = new Set<string>();
+    for (const s of [...simbolAktif, ...SIMBOL_DASAR]) {
+      if (buang.has(s) || sudah.has(s)) continue;
+      sudah.add(s);
+      keluar.push(s);
+    }
+    return keluar;
+  }, [simbolAktif, diblokir]);
+
+  /* ── Usulan baru muncul SESUDAH ada huruf yang diketik ──────────────
+     Sebelumnya `datalist` diisi seluruh daftar, jadi sekali kotaknya
+     disentuh peramban menurunkan ratusan baris menutupi watchlist yang
+     justru sedang dibaca -- daftar sepanjang itu bukan bantuan, ia
+     penghalang. Sekarang isinya KOSONG selama belum ada ketikan, dan
+     kotak yang datalist-nya kosong tidak memunculkan apa pun.
+
+     Yang cocok di AWAL nama didahulukan: mengetik "BTC" mencari BTCUSDT,
+     bukan setiap koin yang kebetulan mengandung tiga huruf itu di tengah.
+     Dibatasi 40 baris -- lebih dari itu tidak dibaca siapa pun, dan yang
+     dicari orang selalu ada di kelompok pertama. */
+  const usulSimbol = useMemo(() => {
+    const q = ketik.trim().toUpperCase();
+    if (!q) return [] as { nilai: string; ket?: string }[];
+    const dipakai = new Set(semuaSimbol);
+    const awal: { nilai: string; ket?: string }[] = [];
+    const tengah: { nilai: string; ket?: string }[] = [];
+    const taruh = (nilai: string, ket?: string) => {
+      if (dipakai.has(nilai)) return;
+      const i = nilai.indexOf(q);
+      if (i === 0) awal.push({ nilai, ket });
+      else if (i > 0) tengah.push({ nilai, ket });
+    };
+    for (const s of pilihanMt5) taruh('MT5:' + s, 'Trade-Fi — MT5');
+    for (const s of kolamSimbol) taruh(s);
+    return [...awal, ...tengah].slice(0, 40);
+  }, [ketik, pilihanMt5, kolamSimbol, semuaSimbol]);
 
   function simpanSeksi(d: SeksiWatch[]) {
     setSeksi(d);
@@ -321,10 +371,10 @@ export function WatchChart({ simbol, onPilih, onLebar }: {
                    placeholder="Tambah pair…"
                    className="angka h-7 min-w-0 grow rounded border border-zinc-800 bg-zinc-900 px-2 text-[11.5px] text-zinc-200 outline-none focus-visible:border-zinc-600" />
             <datalist id="watchSimbol">
-              {pilihanMt5.filter((s) => !semuaSimbol.includes('MT5:' + s)).map((s) => (
-                <option key={'MT5:' + s} value={'MT5:' + s}>Trade-Fi — MT5</option>
+              {usulSimbol.map((u) => (
+                u.ket ? <option key={u.nilai} value={u.nilai}>{u.ket}</option>
+                      : <option key={u.nilai} value={u.nilai} />
               ))}
-              {SIMBOL_DASAR.filter((s) => !semuaSimbol.includes(s)).map((s) => <option key={s} value={s} />)}
             </datalist>
             <button onClick={tambah} title="Tambah ke seksi pertama"
               className="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded border border-zinc-800 text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-100">

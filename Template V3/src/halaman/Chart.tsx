@@ -1267,6 +1267,25 @@ export default function ChartBacktest() {
     setSuntingTpTeks(sunting?.tp ? String(sunting.tp) : '');
   }
 
+  /* -- Melepas order yang sedang dilihat -----------------------------
+     Kebalikan dari bukaSunting: chart kembali seperti sebelum barisnya
+     diklik. Semua yang dipasang di sana dilepas di sini -- kalau tidak,
+     order berikutnya yang dipilih akan mewarisi sisa yang lama: teks SL
+     yang belum sempat dikirim, pesan galat dari order sebelumnya, atau
+     tick simbol yang salah karena masih milik koin yang tadi.
+
+     sidikBroker ikut dikosongkan supaya efek "ikut broker" memperlakukan
+     pemilihan berikutnya sebagai perubahan pertama, bukan lanjutan. */
+  function lepasSunting() {
+    setSunting(null);
+    setPanelUbah(false);
+    setSuntingSlTeks('');
+    setSuntingTpTeks('');
+    setSuntingKabar('');
+    setTickAktif(0);
+    sidikBroker.current = '';
+  }
+
   function bukaSunting(o: OrderSunting) {
     setSimbol(rapikanSimbol(o.simbolChart));
     /* PINDAH KE MODE REAL, otomatis.
@@ -1947,10 +1966,22 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
     if (aksi?.mode !== 'real') return '[]';
     if (!simbol.startsWith('MT5:')) return '[]';
     const dasarS = simbol.slice(4);
+    /* -- Yang SEDANG DIPILIH digambar sekali saja --------------------
+       Mengklik baris Trade-Fi memasang entry/SL/TP-nya sebagai garis
+       seret (garisSeret), sementara posisi yang sama juga digambar di
+       sini sebagai garis posisi broker. Levelnya identik, jadi hasilnya
+       dua garis bertumpuk di piksel yang sama dengan dua label berebut
+       tempat di sumbu kanan -- dan yang di bawah tidak pernah terbaca.
+
+       Yang dilepas garis brokernya, bukan garis seretnya: yang dipilih
+       orangnya adalah order ITU, dan garis seret yang bisa ditarik
+       adalah kendalinya. Begitu pilihannya dilepas -- klik di kanvas
+       kosong -- garis broker kembali apa adanya. */
+    const disunting = sunting?.pasar === 'mt5' ? sunting.tiket : undefined;
     return JSON.stringify(akunMt5.posisi
-      .filter((p) => p.simbol.toUpperCase().indexOf(dasarS) === 0)
+      .filter((p) => p.simbol.toUpperCase().indexOf(dasarS) === 0 && p.tiket !== disunting)
       .map((p) => ({ tiket: p.tiket, arah: p.arah, lot: p.lot, entry: p.hargaBuka, sl: p.sl, tp: p.tp })));
-  }, [simbol, akunMt5.posisi, aksi?.mode]);
+  }, [simbol, akunMt5.posisi, aksi?.mode, sunting]);
   const posisiMt5Chart = useMemo(() => JSON.parse(kunciPosisiMt5) as PosisiChartMt5[], [kunciPosisiMt5]);
   /* Tick bid/ask menumpang balasan klines MT5 yang memang sudah dipoll —
      dibaca ulang tiap render, dan render datang tiap data lilin segar. */
@@ -4345,11 +4376,41 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                             setBidikReplay(false);
                           }) : undefined}
                           onKlikKosong={() => {
+                            /* Seretan yang belum diputuskan dikembalikan
+                               dulu. Klik di tempat lain adalah PEMBATALAN,
+                               bukan persetujuan diam-diam. */
                             const a = seretAsal.current;
-                            if (!a) return;
-                            seretAsal.current = null;
-                            if (a.jenis === 'sunting') { setSuntingSl(a.sl); setSuntingTp(a.tp); }
-                            else setRencana(a.nilai);
+                            if (a) {
+                              seretAsal.current = null;
+                              if (a.jenis === 'sunting') { setSuntingSl(a.sl); setSuntingTp(a.tp); }
+                              else setRencana(a.nilai);
+                            }
+                            /* -- Klik di luar garis MENUTUP order itu ----
+                               Mengklik baris di Posisi Terbuka menggambar
+                               entry/SL/TP-nya di chart. Dulu garis itu
+                               tinggal di sana sampai ada yang menekan x di
+                               labelnya -- jadi sesudah sekadar mengintip
+                               "stop saya di mana", chart ditinggali garis
+                               order yang tidak sedang diurus siapa pun,
+                               dan garis order yang menganggur tidak bisa
+                               dibedakan dari garis order yang sedang
+                               dipertimbangkan.
+
+                               Berlaku sama untuk kripto dan Trade-Fi:
+                               keduanya lewat `sunting` yang sama.
+
+                               DUA LANGKAH kalau panel ubahnya terbuka.
+                               Panel itu berisi tombol Kirim dan Tutup
+                               posisi, dan isiannya bisa sedang diketik.
+                               Satu klik nyasar di chart tidak boleh
+                               sekaligus membuang ketikan DAN menghilangkan
+                               ordernya dari layar; klik pertama menutup
+                               panel (dan mengembalikan level ke nilai
+                               broker, persis seperti tombol silangnya),
+                               klik kedua baru melepas garisnya. */
+                            if (!suntingAktif.current) return;
+                            if (panelUbah) { tutupPanelUbah(); return; }
+                            lepasSunting();
                           }}
                           garisSeret={garisSeret}
                           onSeret={(id, h) => {

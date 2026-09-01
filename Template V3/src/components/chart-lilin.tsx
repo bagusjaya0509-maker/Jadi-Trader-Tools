@@ -434,6 +434,10 @@ export function ChartLilin({
      daftar posisi terbaru), tapi wadahnya tetap — langganan klik di bawah
      dipasang sekali seumur chart. */
   const klikPosRef = useRef<(y?: number) => void>(() => {});
+  /* Pembatal pratinjau seretan SL/TP posisi MT5. Wadahnya di ref dengan
+     alasan yang sama seperti klikPosRef: isinya butuh keadaan terbaru,
+     langganan kliknya dipasang sekali seumur chart. */
+  const batalUbahRef = useRef<() => void>(() => {});
   /* Pemotret disimpan di ref, dan `bagikanFoto` juga — supaya efek pembuatan
      chart (yang sengaja berdependensi kosong agar chartnya tidak dibuat
      ulang tiap render) tetap memakai callback terbaru tanpa menjadikannya
@@ -586,6 +590,7 @@ export function ChartLilin({
     c.subscribeClick((p) => {
       if (klikRef.current && typeof p.logical === 'number') klikRef.current(Math.round(p.logical));
       klikPosRef.current(p.point?.y);
+      batalUbahRef.current();
       kosongRef.current?.();
     });
 
@@ -2255,6 +2260,24 @@ export function ChartLilin({
     /* null = klik di tempat lain, dan itu memang perintah "kembali seperti
        semula" — bukan keadaan yang perlu dipertahankan. */
     aturSorot(kena);
+  };
+
+  /* -- Klik di luar garis = seretan SL/TP itu TIDAK JADI --------------
+     Aturan yang sama dengan sorot posisi tepat di atas, dan alasannya
+     sama: sesudah menyeret SL lalu menoleh ke tempat lain di chart,
+     yang tertinggal adalah garis di level yang belum pernah dikirim ke
+     broker -- gambar yang bilang "stop saya sudah di sini" padahal
+     tombol Kirim tidak pernah ditekan.
+
+     Yang SEDANG dikirim dan yang SUDAH terkirim dilewati. Yang pertama
+     akan membatalkan sesuatu yang sudah berangkat; yang kedua adalah
+     pratinjau sah yang memang menunggu laporan EA menyusul, dan
+     mencabutnya membuat garisnya melompat balik ke nilai lama selama
+     beberapa detik -- persis kebalikan dari yang benar. */
+  batalUbahRef.current = () => {
+    const u = ubahRef.current;
+    if (!u || u.sibuk || u.terkirim || seretUbah.current) return;
+    aturUbah(null);
   };
 
   /* Posisi yang tertutup tidak boleh meninggalkan sorot menggantung: sorot
