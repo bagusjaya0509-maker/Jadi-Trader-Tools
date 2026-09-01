@@ -471,11 +471,19 @@ export async function ambilPerforma(bolehContoh = false): Promise<Performa> {
 
      `berjalan` TETAP dari bulan berjalan: berapa sinyal yang sedang
      jalan adalah fakta hari ini, bukan fakta bulan lalu. */
-  if (!nyata.analis.length && j.periodeLalu) {
+  /* Yang menentukan BUKAN "daftarnya kosong", melainkan "tidak ada satu pun
+     yang bisa diperingkatkan". Bedanya nyata dan sudah kejadian: 1 September
+     daftarnya berisi satu analis dengan dua sinyal selesai — cukup untuk
+     mengisi larik, jauh dari cukup untuk masuk papan. Papannya tetap kosong,
+     tapi syarat lama tidak lagi terpenuhi, jadi peringkat Agustus tidak
+     pernah dipanggil dan yang terlihat papan kosong dengan satu baris
+     "belum layak" di bawahnya. */
+  const adaLayak = nyata.analis.some((a) => a.layak !== false);
+  if (!adaLayak && j.periodeLalu) {
     try {
       const l = await panggil(
         '/api/analisa/performa?periode=' + encodeURIComponent(String(j.periodeLalu)), {}, false);
-      if ((l.analis ?? []).length) {
+      if ((l.analis ?? []).some((a: { layak?: boolean }) => a.layak !== false)) {
         nyata = {
           modal: l.modal ?? nyata.modal, risikoPersen: l.risikoPersen ?? nyata.risikoPersen,
           analis: l.analis, berjalan: nyata.berjalan,

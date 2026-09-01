@@ -1376,6 +1376,156 @@ function KonsensusPasar({ posisi, dompet, seumur, log }: {
   );
 }
 
+/* ══ SUB-HALAMAN: POSISI COPY ══════════════════════════════════════════
+   Semua yang menyangkut salinan dikumpulkan di satu tempat: dompet mana
+   yang disalin, setelan masing-masing, dan posisi apa yang sedang terbuka
+   atas namanya.
+
+   Dipisah dari daftar dompet karena keduanya menjawab pertanyaan yang
+   berbeda. "Dompet Pantauan" menjawab siapa yang sedang diamati — daftar
+   yang dibaca sambil mencari. "Posisi Copy" menjawab apa yang sedang
+   berjalan dengan uang sungguhan — dan yang kedua dibuka orang dengan
+   maksud yang sama sekali lain, sering kali dengan tergesa. */
+function PosisiCopy({ salin, dompet, buka, muat }: {
+  salin: SetelanSalin[];
+  dompet: DompetPantau[];
+  buka: (w: { alamat: string; nama: string }) => void;
+  muat: boolean;
+}) {
+  const nama = new Map(dompet.map((d) => [d.alamat, d.nama]));
+
+  /* Posisi salinan diratakan jadi satu daftar, bukan dikelompokkan per
+     dompet. Yang ditanyakan orang saat membuka halaman ini "aku sedang
+     pegang apa" — dan jawaban itu tersebar di beberapa kartu kalau
+     dikelompokkan menurut asalnya. */
+  const posisi = salin.flatMap((s) =>
+    Object.entries(s.punyaku || {}).map(([koin, p]) => ({
+      koin, ...p, alamat: s.alamat,
+      dompet: nama.get(s.alamat) || s.nama || s.alamat.slice(0, 8) + '…',
+      usd: s.usd, leverage: s.leverage,
+    })));
+
+  const hidup = salin.filter((s) => s.aktif);
+
+  if (muat && !salin.length) {
+    return (
+      <p className="flex items-center gap-2 py-8 text-[13px] text-zinc-500">
+        <Loader2 className="size-4 animate-spin" /> Memuat setelan salinan…
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* ── RINGKASAN TIGA ANGKA ────────────────────────────────────── */}
+      <div className="grid grid-cols-3 gap-2">
+        {[
+          ['Dompet disalin', String(hidup.length), hidup.length ? 'text-emerald-400' : 'text-zinc-500'],
+          ['Posisi terbuka', String(posisi.length), posisi.length ? 'text-zinc-100' : 'text-zinc-500'],
+          ['Nilai per order', hidup.length
+            ? '$' + [...new Set(hidup.map((s) => s.usd))].join(' / $')
+            : '—', 'text-zinc-300'],
+        ].map(([judul, nilai, warna]) => (
+          <div key={judul} className="rounded-lg border border-zinc-800 bg-zinc-900/40 px-3 py-2">
+            <span className="block text-[10.5px] uppercase tracking-wide text-zinc-600">{judul}</span>
+            <span className={cn('angka mt-0.5 block text-[18px] font-medium', warna)}>{nilai}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* ── POSISI YANG SEDANG TERBUKA ──────────────────────────────── */}
+      <section>
+        <h3 className="mb-2 flex flex-wrap items-center gap-x-2 border-b border-zinc-800 pb-1.5">
+          <span className="text-[13px] font-semibold text-zinc-200">Posisi salinan terbuka</span>
+          <span className="text-[11px] font-normal text-zinc-600">
+            · dibuka otomatis mengikuti dompet sumbernya, ditutup saat ia melepas
+          </span>
+        </h3>
+        {!posisi.length ? (
+          <p className="rounded-lg border border-dashed border-zinc-800 px-4 py-5 text-[12px] leading-relaxed text-zinc-500">
+            Belum ada posisi salinan. Ia muncul di sini begitu salah satu dompet yang
+            kamu salin membuka posisi BARU — posisi yang sudah terbuka sebelum salinan
+            dinyalakan sengaja tidak diikuti.
+          </p>
+        ) : (
+          <div className="space-y-1.5">
+            {posisi.map((p) => (
+              <div key={p.alamat + p.koin}
+                className="flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-lg border border-zinc-800 bg-zinc-900/30 px-3 py-2">
+                <span className="text-[13px] font-semibold text-zinc-100">{p.simbol || p.koin}</span>
+                <span className={cn('text-[11.5px] font-semibold',
+                  p.arah === 'BUY' ? 'text-emerald-400' : 'text-red-400')}>
+                  {p.arah === 'BUY' ? 'LONG' : 'SHORT'}
+                </span>
+                <span className={cn('rounded px-1.5 py-0.5 text-[10.5px]',
+                  p.bursa === 'hyperliquid' ? 'bg-sky-500/15 text-sky-300' : 'bg-amber-500/15 text-amber-300')}>
+                  {p.bursa === 'hyperliquid' ? 'Hyperliquid' : 'Binance'}
+                </span>
+                <span className="angka text-[11px] text-zinc-500">
+                  ${p.usd} · {p.leverage ?? 1}×
+                </span>
+                <span className="text-[11px] text-zinc-600">meniru {p.dompet}</span>
+                <span className="ml-auto text-[11px] text-zinc-600">{umur(p.waktu)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* ── SETELAN PER DOMPET ──────────────────────────────────────── */}
+      <section>
+        <h3 className="mb-2 flex flex-wrap items-center gap-x-2 border-b border-zinc-800 pb-1.5">
+          <span className="text-[13px] font-semibold text-zinc-200">Dompet yang disalin</span>
+          <span className="text-[11px] font-normal text-zinc-600">· {salin.length} setelan</span>
+        </h3>
+        {!salin.length ? (
+          <p className="rounded-lg border border-dashed border-zinc-800 px-4 py-5 text-[12px] leading-relaxed text-zinc-500">
+            Belum ada dompet yang disalin. Buka tab <span className="text-zinc-300">Dompet Pantauan</span>,
+            lalu tekan ikon salin di kartu dompet mana pun untuk mengaturnya.
+          </p>
+        ) : (
+          <div className="space-y-1.5">
+            {salin.map((s) => {
+              const terbuka = Object.keys(s.punyaku || {});
+              return (
+                <button key={s.alamat}
+                  onClick={() => buka({ alamat: s.alamat, nama: nama.get(s.alamat) || s.nama || s.alamat })}
+                  className={cn('flex w-full flex-wrap items-baseline gap-x-3 gap-y-1 rounded-lg border px-3 py-2 text-left transition-colors',
+                    s.aktif ? 'border-emerald-500/40 bg-emerald-500/5 hover:border-emerald-500/60'
+                            : 'border-zinc-800 hover:border-zinc-700')}>
+                  <span className="text-[12.5px] font-medium text-zinc-100">
+                    {nama.get(s.alamat) || s.nama || 'Tanpa nama'}
+                  </span>
+                  <span className={cn('rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase',
+                    s.aktif ? 'bg-emerald-500/20 text-emerald-300' : 'bg-zinc-800 text-zinc-500')}>
+                    {s.aktif ? 'hidup' : 'mati'}
+                  </span>
+                  <span className="angka text-[11px] text-zinc-500">
+                    ${s.usd} · {s.leverage ?? 1}× ·{' '}
+                    {s.bursa === 'hyperliquid' ? 'Hyperliquid'
+                      : s.bursa === 'dua' ? 'Binance + Hyperliquid' : 'Binance'}
+                  </span>
+                  {terbuka.length > 0 && (
+                    <span className="text-[11px] text-zinc-400">{terbuka.length} posisi: {terbuka.join(', ')}</span>
+                  )}
+                  {/* Berapa koin yang SEDANG dipegang dompet sumbernya —
+                      pembanding yang menjelaskan kenapa salinan kita cuma
+                      sekian: sisanya sudah terbuka sebelum salinan menyala. */}
+                  {Array.isArray(s.pegang) && (
+                    <span className="ml-auto text-[11px] text-zinc-600">
+                      sumber pegang {s.pegang.length} koin
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
 export function PanelWalletAgen({ pemilik = false }: { pemilik?: boolean }) {
   const [d, setD] = useState<KeadaanDompet | null>(null);
   const [gagal, setGagal] = useState(false);
@@ -1388,6 +1538,11 @@ export function PanelWalletAgen({ pemilik = false }: { pemilik?: boolean }) {
      saja dan digerbangi server, jadi menggabungkannya ke jawaban publik
      berarti menambah satu jalan bocor tanpa satu pun manfaat. */
   const [salin, setSalin] = useState<SetelanSalin[]>([]);
+  /* Sub-halaman DI DALAM kartu ini, bukan di sidebar Copy Signal. Yang di
+     sidebar berlaku untuk seluruh halaman Copy Signal; ini cuma dua cara
+     melihat isi satu kanal. Menaruhnya di sidebar akan menyiratkan ia
+     sejajar "Market Signal", dan itu keliru. */
+  const [tab, setTab] = useState<'dompet' | 'salin'>('dompet');
   const [dialogSalin, setDialogSalin] = useState<{ alamat: string; nama: string } | null>(null);
   const salinPeta = useMemo(() => new Map(salin.map((x) => [x.alamat, x])), [salin]);
   const [muat, setMuat] = useState(true);
@@ -1474,6 +1629,30 @@ export function PanelWalletAgen({ pemilik = false }: { pemilik?: boolean }) {
           kotak isian yang menolak sesudah diketik penuh membuang waktu
           orang untuk memberitahunya sesuatu yang sudah diketahui sejak
           sebelum ia mulai mengetik. */}
+      {/* Cuma pemilik yang punya dua sisi: pembaca lain tidak punya salinan
+          apa pun, dan tab yang isinya selalu kosong cuma menambah satu
+          keputusan yang tidak perlu diambil siapa pun. */}
+      {pemilik && (
+        <div className="flex gap-1 border-b border-zinc-800">
+          {([['dompet', 'Dompet Pantauan'], ['salin', 'Posisi Copy']] as const).map(([id, label]) => (
+            <button key={id} onClick={() => setTab(id)}
+              className={cn('-mb-px cursor-pointer border-b-2 px-3 py-1.5 text-[12.5px] transition-colors',
+                tab === id ? 'border-zinc-100 font-medium text-zinc-100'
+                           : 'border-transparent text-zinc-500 hover:text-zinc-300')}>
+              {label}
+              {id === 'salin' && salin.some((x) => x.aktif) && (
+                <span className="ml-1.5 inline-block size-1.5 rounded-full bg-emerald-400 align-middle" />
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {tab === 'salin' ? (
+        <PosisiCopy salin={salin} dompet={dompet} muat={muat}
+          buka={(w) => setDialogSalin(w)} />
+      ) : (<>
+
       {pemilik && <FormTambah selesai={() => void tarik()} />}
       {dialogSalin && (
         <DialogSalin
@@ -1563,6 +1742,7 @@ export function PanelWalletAgen({ pemilik = false }: { pemilik?: boolean }) {
           )}
         </>
       )}
+      </>)}
     </div>
   );
 }
