@@ -93,11 +93,10 @@
      karakter, dua kali lipat kata tunggal terpanjang yang dulu ada di
      sini. Pada 10vw ia lewat tepi layar bahkan di monitor 1280px.
 
-     8vw, bukan 8,5: titik paling sempit justru 640px -- lebar tepat saat
-     judulnya berhenti menumpuk dan jadi satu baris. Di sana 8,5vw menyisakan
-     10% saja, dan font cadangan terukur 3% lebih lebar daripada IBM Plex
-     Sans. Sisa 7% bukan margin, itu kebetulan. */
-  font-size: clamp(2.5rem, 8vw, 7rem);
+     KEMBALI ke 10vw sejak judulnya kembali satu nama saja. Angka ini
+     memang dipilih dulu untuk untai "Jadi Trader" persis, dan sekarang
+     itu lagi yang ada di sini. */
+  font-size: clamp(2.25rem, 10vw, 9rem);
   line-height: 0.95;
   font-weight: 600;
   letter-spacing: -0.03em;

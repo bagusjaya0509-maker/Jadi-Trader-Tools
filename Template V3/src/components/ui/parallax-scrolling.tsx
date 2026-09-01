@@ -7,23 +7,7 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import Lenis from '@studio-freight/lenis';
 import { Moon, Sun } from 'lucide-react';
 import './parallax-scrolling.css';
-import TextLoop from '@/components/ui/text-loop';
 
-/* "Jadi Trader" sekarang DIAM di kiri, tidak ikut berputar.
-
-   Dulu ia kata pertama dalam antrean yang sama — terlihat sebentar, lalu
-   hilang selama tujuh kata berikutnya. Artinya nama produknya absen dari
-   layar hampir sepanjang waktu orang menatap hero-nya, dan pengunjung yang
-   mendarat di detik keempat tidak pernah melihatnya sama sekali.
-
-   Sisanya menyebut apa yang BISA DILAKUKAN di sini, bukan sifat yang
-   diklaim. "Profitable" satu-satunya yang berupa hasil, dan ia sengaja
-   ditaruh pertama — tepat di sebelah nama produknya, supaya terbaca
-   sebagai tujuan, bukan janji. */
-const KATA_PUTAR = [
-  'Profitable', 'Up Skill', 'Jurnaling',
-  'Charting', 'Screening', 'Copying', 'Executing',
-];
 import { LogoJT } from '@/components/logo-jt';
 
 export function ParallaxComponent() {
@@ -176,29 +160,15 @@ export function ParallaxComponent() {
                  {...({ fetchpriority: 'low' } as Record<string, string>)}
                  width="800" data-parallax-layer="2" alt="" className="parallax__layer-img parallax__layer-malam" />
             <div data-parallax-layer="3" className="parallax__layer-title">
-              {/* -- KENAPA UKURANNYA DITIMPA DUA KALI --------------------
-                  TextLoop membawa `text-4xl md:text-7xl` sebagai bawaan.
-                  `cn`-nya memakai tailwind-merge, jadi satu kelas ukuran
-                  dari sini cukup untuk mengalahkan `text-4xl` — TAPI TIDAK
-                  `md:text-7xl`: tailwind-merge cuma mendamaikan kelas dalam
-                  varian yang sama, dan `md:` varian yang berbeda. Tanpa
-                  baris `md:` di bawah, judulnya benar di ponsel lalu
-                  melompat ke 72px begitu layarnya 768px.
+              {/* SATU nama, diam. Tidak ada kata kedua yang berputar di
+                  sebelahnya — keputusan pemilik 1 September 2026 sesudah
+                  melihatnya tayang: "Jadi Trader Executing" 21 karakter,
+                  dan di layar 1280px pun ia menyentuh tepi kanan.
 
-                  Ukurannya sendiri datang dari `.parallax__title`.
-
-                  Menumpuk ke bawah di ponsel, sebaris di layar lebar:
-                  "Jadi Trader Profitable" 22 karakter, dan pada lebar 375px
-                  ia lewat tepi layar berapa pun ukuran fontnya diturunkan
-                  sebelum jadi terlalu kecil untuk sebuah hero. */}
-              <h2 className="parallax__title">
-                <TextLoop
-                  staticText="Jadi Trader"
-                  rotatingTexts={KATA_PUTAR}
-                  className="w-full flex-col justify-center text-[length:inherit] font-[inherit] tracking-[inherit] sm:flex-row md:text-[length:inherit]"
-                  staticTextClassName="mr-0 sm:mr-3"
-                />
-              </h2>
+                  Yang hilang cuma hiasannya. Yang tersisa justru satu-
+                  satunya hal yang memang harus dikenali orang yang baru
+                  mendarat di sini. */}
+              <h2 className="parallax__title">Jadi Trader</h2>
             </div>
             <img src="/parallax/depan.webp" loading="eager" width="800" data-parallax-layer="4" alt="" className="parallax__layer-img" />
           </div>
