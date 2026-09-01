@@ -185,52 +185,6 @@
   .es-econ-calendar-body::-webkit-scrollbar-track{ background: var(--panel-2); border-radius:4px; }
   .es-econ-calendar-body::-webkit-scrollbar-thumb{ background: var(--border); border-radius:4px; }
   .es-econ-calendar-body::-webkit-scrollbar-thumb:hover{ background: var(--dim); }
-  /* ===== Pop-up pengingat News ===== */
-  .es-news-pop-overlay{
-    display:none;
-    position:fixed; inset:0; z-index:120;
-    background: rgba(0,0,0,0.55);
-    align-items:center; justify-content:center;
-    padding:16px;
-  }
-  .es-news-pop-overlay.open{ display:flex; }
-  .es-news-pop-card{
-    width:min(420px, 100%);
-    background: var(--panel);
-    border:1px solid var(--bear);
-    border-radius:12px;
-    box-shadow:0 18px 50px rgba(0,0,0,0.6);
-    padding:18px 18px 16px;
-  }
-  .es-news-pop-title{
-    font-family: var(--font-display);
-    font-weight:700;
-    font-size:16px;
-    color: var(--bear);
-    margin-bottom:12px;
-  }
-  .es-news-pop-body{ display:flex; flex-direction:column; gap:8px; margin-bottom:14px; }
-  .es-news-pop-row{
-    display:flex; align-items:center; gap:8px; flex-wrap:wrap;
-    font-family: var(--font-mono); font-size:12px;
-    background: var(--panel-2);
-    border:1px solid var(--border);
-    border-radius:8px;
-    padding:8px 10px;
-  }
-  .es-news-pop-jam{ font-weight:700; color: var(--text); }
-  .es-news-pop-cur{ color: var(--gold); font-weight:700; }
-  .es-news-pop-judul{ color: var(--text); flex:1; min-width:120px; }
-  .es-news-pop-sisa{ color: var(--muted); font-size:11px; }
-  .es-news-pop-close{
-    display:block; width:100%;
-    background: var(--panel-2);
-    border:1px solid var(--border);
-    color: var(--text);
-    font-family: var(--font-mono); font-weight:600; font-size:12.5px;
-    padding:9px 14px; border-radius:8px; cursor:pointer;
-  }
-  .es-news-pop-close:hover{ background: var(--panel); border-color: var(--bear); }
 
   .es-econ-head-row{
     display:flex; align-items:center; justify-content:space-between; gap:8px;
@@ -2277,7 +2231,7 @@
     .es-priority-controls .es-ai-regime{ height:38px; }
 
     /* ---- Pop-up ---- */
-    .es-reset-card, .es-preorder-card, .es-news-pop-card{ width:100%; max-width:100%; }
+    .es-reset-card, .es-preorder-card{ width:100%; max-width:100%; }
     .es-coin-search-pop{ width: calc(100vw - 32px); }
   }
 
@@ -2543,15 +2497,6 @@
       </div>
     </div>
   </div>
-  <!-- Pop-up pengingat News: muncul saat buka web & 10 menit sebelum tiap rilis dampak tinggi -->
-  <div class="es-news-pop-overlay" id="esNewsPopup">
-    <div class="es-news-pop-card">
-      <div class="es-news-pop-title" id="esNewsPopupTitle">&#9888; Pengingat News</div>
-      <div class="es-news-pop-body" id="esNewsPopupBody"></div>
-      <button type="button" class="es-news-pop-close" id="esNewsPopupClose">Tutup</button>
-    </div>
-  </div>
-
   <div class="es-header">
     <div>
       <div class="es-title">
@@ -9873,81 +9818,16 @@
 
   function renderEcon(){ renderEconNext(); renderEconList(); }
 
-  // ═══════════════════════════════════════════════════════
-  // ████████  POP-UP PENGINGAT NEWS  ████████
-  // ═══════════════════════════════════════════════════════
-  // Muncul (1) saat web dibuka, dan (2) 10 menit menjelang tiap rilis dampak
-  // tinggi. User bisa menutupnya; pengingat 10-menit dijadwalkan per event.
-  const NEWS_LEAD_MS = 10 * 60 * 1000;
-  const newsPopupEl      = document.getElementById('esNewsPopup');
-  const newsPopupTitleEl = document.getElementById('esNewsPopupTitle');
-  const newsPopupBodyEl  = document.getElementById('esNewsPopupBody');
-  const newsPopupCloseEl = document.getElementById('esNewsPopupClose');
-  let newsReminderTimers = [];
-  const newsReminderShown = new Set();
-  let newsPopupPembukaanTampil = false;
-
-  function newsEventKey(e){ return e.waktu + '|' + e.judul; }
-
-  function newsHighImpactMendatang(){
-    if(!econEvents) return [];
-    const now = Date.now();
-    return econEvents
-      .filter(e => e.dampak === 'high' && econCurLolos(e.mataUang) && e.waktu > now)
-      .sort((a,b)=> a.waktu - b.waktu);
-  }
-
-  function showNewsPopup(events, alasan){
-    if(!newsPopupEl || !events || !events.length) return;
-    const now = Date.now();
-    newsPopupTitleEl.innerHTML = (alasan === '10menit')
-      ? '&#9888; 10 Menit Menjelang News'
-      : '&#9888; Pengingat News Berdampak Tinggi';
-    newsPopupBodyEl.innerHTML = events.map(e=>{
-      const jam = new Date(e.waktu).toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'});
-      const sisa = econFmtSelisih(e.waktu - now) || '-';
-      return '<div class="es-news-pop-row">'
-        + '<span class="es-news-pop-jam">' + jam + '</span>'
-        + '<span class="es-news-pop-cur">' + e.mataUang + '</span>'
-        + '<span class="es-news-pop-judul">' + e.judul + '</span>'
-        + '<span class="es-news-pop-sisa">dalam ' + sisa + '</span>'
-        + '</div>';
-    }).join('');
-    newsPopupEl.classList.add('open');
-  }
-  function tutupNewsPopup(){ if(newsPopupEl) newsPopupEl.classList.remove('open'); }
-
-  function setupNewsReminders(){
-    newsReminderTimers.forEach(t => clearTimeout(t));
-    newsReminderTimers = [];
-    const highs = newsHighImpactMendatang();
-    // (1) Pop-up saat web dibuka - sekali saja per sesi.
-    if(!newsPopupPembukaanTampil && highs.length){
-      newsPopupPembukaanTampil = true;
-      showNewsPopup(highs.slice(0, 4), 'pembukaan');
-    }
-    // (2) Jadwalkan pengingat 10 menit sebelum tiap event.
-    const now = Date.now();
-    highs.forEach(e=>{
-      const key = newsEventKey(e);
-      if(newsReminderShown.has(key)) return;
-      const delay = (e.waktu - NEWS_LEAD_MS) - now;
-      if(delay > 0){
-        const t = setTimeout(()=>{
-          if(newsReminderShown.has(key)) return;
-          newsReminderShown.add(key);
-          showNewsPopup([e], '10menit');
-        }, delay);
-        newsReminderTimers.push(t);
-      } else if(e.waktu > now){
-        // sudah <10 menit & belum pernah ditampilkan -> tampilkan sekarang
-        newsReminderShown.add(key);
-        showNewsPopup([e], '10menit');
-      }
-    });
-  }
-  if(newsPopupCloseEl) newsPopupCloseEl.addEventListener('click', tutupNewsPopup);
-  if(newsPopupEl) newsPopupEl.addEventListener('click', (e)=>{ if(e.target === newsPopupEl) tutupNewsPopup(); });
+  // POP-UP PENGINGAT NEWS -- DICABUT (permintaan pemilik).
+  //
+  // Dulu lapisan gelap menutupi seluruh screener begitu halamannya dibuka,
+  // lalu muncul lagi 10 menit menjelang tiap rilis dampak tinggi. Yang
+  // ditutupinya adalah hasil pindai yang baru saja selesai dihitung -- jadi
+  // ia selalu datang tepat pada detik orangnya paling ingin melihat layar.
+  //
+  // Pengingatnya sekarang ada di Chart & Entry, di tempat keputusannya
+  // benar-benar diambil. Panel kalender ekonomi di bawah TETAP ada dan
+  // tetap terisi; yang hilang cuma lapisan yang menghalangi.
 
   function ambilEconCalendar(){
     // /api/news adalah endpoint PUBLIK (tidak butuh token), jadi pakai sumber
@@ -9967,7 +9847,6 @@
         if(econNextEl) econNextEl.style.display = '';
         if(econFilterSel) econFilterSel.parentElement.style.display = '';
         renderEcon();
-        setupNewsReminders();
       })
       .catch(function(){
         // Sekali gagal -> pakai widget lama sebagai cadangan, jangan biarkan
