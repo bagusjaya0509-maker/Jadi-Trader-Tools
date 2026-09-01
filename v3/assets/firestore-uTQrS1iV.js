@@ -1,1 +1,0 @@
-import{I as r}from"./index-e3ZkM6er.js";import{initializeFirestore as e,persistentLocalCache as i,persistentMultipleTabManager as a,getFirestore as n}from"./index.esm-Dmfrd2N2.js";import"./react-BGzhFICo.js";import"./firebase-Csnso1ng.js";let t=null;function c(){if(t)return t;try{t=e(r,{localCache:i({tabManager:a()})})}catch{t=n(r)}return t}export{c as ambilDb};
