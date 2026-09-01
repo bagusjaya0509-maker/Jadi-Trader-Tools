@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronRight, List, Loader2, Plus, RefreshCw, Trash2, Trophy, Users, Wallet, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { SparklineSaldo } from '@/components/kurva-saldo';
 import {
-  keadaanDompet, tambahDompet, hapusDompet, peringkatDompet, tandaiTiru, batalTiru, aturOtoTutup, aturBuka,
+  keadaanDompet, tambahDompet, hapusDompet, peringkatDompet, tandaiTiru, batalTiru,
+  daftarSalin, simpanSalin, hapusSalin, type SetelanSalin,
   type KeadaanDompet, type TransaksiDompet, type PosisiDompet, type Peringkat,
   type JendelaPeringkat, type PitaAkun, type RiwayatBursa, type PenandaTiru,
   type DompetPantau,
 } from '@/lib/wallet-agen';
-import { usePosisiBinance } from '@/lib/admin';
 import { Copy as IkonTiru, TriangleAlert } from 'lucide-react';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -581,7 +582,7 @@ function titikDompet(tutup: Penutupan[]) {
   return out;
 }
 
-function KartuDompet({ w, posisi, log, bursa, dipilih, pilih, hapus }: {
+function KartuDompet({ w, posisi, log, bursa, dipilih, pilih, hapus, salin, salinAktif }: {
   w: { alamat: string; nama: string; sejak: number };
   posisi: PosisiDompet[];
   log: TransaksiDompet[];
@@ -590,6 +591,10 @@ function KartuDompet({ w, posisi, log, bursa, dipilih, pilih, hapus }: {
   pilih: () => void;
   /** Tak diisi = pembacanya bukan pemilik; ikon hapusnya tidak dirender. */
   hapus?: () => void;
+  /** Membuka popup setelan salin. Tak diisi = bukan pemilik. */
+  salin?: () => void;
+  /** Salinan dompet ini sedang hidup — ikonnya menyala. */
+  salinAktif?: boolean;
 }) {
   const mengambang = posisi.reduce((n, p) => n + p.pnl, 0);
   const akun = posisi.length ? posisi[0].nilaiAkun : 0;
@@ -662,6 +667,25 @@ function KartuDompet({ w, posisi, log, bursa, dipilih, pilih, hapus }: {
             yang terlihat tapi ditolak server memberi kesan daftar ini bisa
             dirapikan siapa saja — dan yang mengkliknya baru tahu sesudah
             mencoba menghapus punya orang lain. */}
+        {/* ── SALIN DOMPET INI ──────────────────────────────────────
+            Di kepala kartu, bukan terkubur di dalam rinciannya. Yang
+            ditawarkan kartu ini cuma dua hal: berhenti memantau, dan
+            menyalin. Keduanya pantas terlihat tanpa membuka apa pun.
+
+            Menyala hijau saat salinannya HIDUP — supaya sekilas pandang
+            ke seluruh daftar sudah menjawab "dompet mana yang sedang
+            berjalan atas namaku". */}
+        {salin && (
+          <button onClick={(e) => { e.stopPropagation(); salin(); }}
+            title={salinAktif
+              ? 'Salinan HIDUP — order berangkat sendiri. Klik untuk mengubah setelannya.'
+              : 'Salin dompet ini: atur bursa, ukuran order, dan leverage.'}
+            className={cn('shrink-0 cursor-pointer rounded p-1 transition-colors',
+              salinAktif ? 'text-emerald-400 hover:text-emerald-300'
+                         : 'text-zinc-800 hover:text-zinc-300 group-hover:text-zinc-600')}>
+            <IkonTiru className="size-3.5" />
+          </button>
+        )}
         {hapus && (
           <button onClick={(e) => { e.stopPropagation(); hapus(); }} title="Berhenti memantau"
             className="shrink-0 cursor-pointer rounded p-1 text-zinc-800 transition-colors hover:text-red-400 group-hover:text-zinc-600">
@@ -996,307 +1020,130 @@ function RincianDompet({ w, posisi, log, tiru, ubahTiru, tutup }: {
      · ARAH BERBEDA. Kita long sementara dompetnya short di koin yang sama
        berarti salah satunya salah baca, dan biasanya kita.
    ════════════════════════════════════════════════════════════════════════ */
-function PosisiTiruan({ tiru, dompet, posisi, ubahTiru, ubahOto, ubahBuka }: {
-  tiru: PenandaTiru[];
-  dompet: DompetPantau[];
-  posisi: PosisiDompet[];
-  ubahTiru: (alamat: string, koin: string, nyala: boolean) => void;
-  ubahOto: (alamat: string, koin: string, nyala: boolean) => void;
-  ubahBuka: (alamat: string, koin: string, ubah: { otoBuka?: boolean; usd?: number; leverage?: number; bursa?: string }) => void;
+/* ══ POPUP SETELAN SALIN ═══════════════════════════════════════════════
+   SATU formulir, SATU tombol Simpan. Bukan sekumpulan sakelar yang
+   masing-masing menyimpan sendiri — di formulir yang bisa memindahkan uang,
+   keadaan setengah tersimpan adalah keadaan yang bisa dipakai pemantau di
+   tengah putaran, dan tidak ada yang pernah bermaksud menyimpannya. */
+function DialogSalin({ w, awal, tutup, simpan, hapus }: {
+  w: { alamat: string; nama: string };
+  awal?: SetelanSalin;
+  tutup: () => void;
+  simpan: (v: { aktif: boolean; bursa: string; usd: number; leverage: number }) => Promise<void>;
+  hapus?: () => Promise<void>;
 }) {
-  /* Posisi SENDIRI dari bursa. Hook-nya sudah dipakai di tempat lain dan
-     menyegarkan tiap 30 detik; memanggilnya lagi di sini tidak menambah
-     permintaan karena ia berbagi keadaan yang sama. */
-  const { data: punyaku } = usePosisiBinance();
-  const nama = new Map(dompet.map((d) => [d.alamat, d.nama]));
+  const [bursa, setBursa] = useState<string>(awal?.bursa ?? 'binance');
+  const [usd, setUsd] = useState(String(awal?.usd ?? 30));
+  const [lev, setLev] = useState(awal?.leverage ?? 1);
+  const [aktif, setAktif] = useState(!!awal?.aktif);
+  const [sibuk, setSibuk] = useState(false);
 
-  /* -- KOSONG BUKAN ALASAN MENGHILANG --------------------------------
-     Dulu di sini `return null`. Akibatnya seluruh kendali salin -- sakelar,
-     ukuran, pemilih bursa -- TIDAK PUNYA WUJUD sampai penanda pertama
-     dibuat, sementara tombol pembuat penandanya sendiri terkubur satu klik
-     di dalam "Lihat posisi & transaksi". Fitur yang tidak bisa ditemukan
-     sama saja dengan fitur yang tidak ada, dan itu persis yang terjadi:
-     pemiliknya mencari tombolnya dan tidak menemukannya.
+  const nilai = Number(usd);
+  const sah = nilai > 0 && nilai <= 500;
+  const terbuka = Object.keys(awal?.punyaku || {});
 
-     Sekarang seksinya selalu ada dan MENGAJARKAN jalan masuknya. */
-  if (!tiru.length) {
-    return (
-      <section>
-        <h3 className="mb-2 flex flex-wrap items-center gap-x-2 border-b border-zinc-800 pb-1.5">
-          <span className="text-[13px] font-semibold text-zinc-200">Salin Dompet</span>
-          <span className="text-[11px] font-normal text-zinc-600">· belum ada yang disalin</span>
-        </h3>
-        <div className="rounded-lg border border-dashed border-zinc-800 px-4 py-4">
-          <p className="text-[12px] leading-relaxed text-zinc-400">
-            Belum ada koin yang ditandai. Untuk mulai menyalin sebuah dompet:
-          </p>
-          <ol className="mt-2 space-y-1 text-[11.5px] leading-relaxed text-zinc-500">
-            <li>1. Di daftar <span className="text-zinc-300">Dompet yang dipantau</span> di bawah,
-              tekan <span className="text-zinc-300">Lihat posisi &amp; transaksi</span>.</li>
-            <li>2. Pada posisi yang ingin ditiru, tekan ikon salin di ujung kanan barisnya.</li>
-            <li>3. Kartunya akan muncul di sini, lengkap dengan pilihan bursa, ukuran order,
-              leverage, dan sakelar buka/tutup otomatis.</li>
-          </ol>
-          <p className="mt-2.5 text-[11px] leading-relaxed text-zinc-600">
-            Menandai TIDAK mengirim order apa pun. Ia cuma mencatat
-            &ldquo;koin ini saya tiru dari dompet ini&rdquo; supaya posisinya bisa disandingkan
-            dan loncengnya berbunyi. Order baru berangkat kalau kamu sendiri yang menyalakan
-            sakelarnya di kartu itu.
-          </p>
-        </div>
-      </section>
-    );
-  }
-
-  const baris = tiru.map((x) => {
-    const sumber = posisi.find((p) => p.alamat === x.alamat && p.koin.toUpperCase() === x.koin);
-    const milik = punyaku.find((p) => p.simbol.toUpperCase() === x.koin + 'USDT');
-    const arahku = milik ? (milik.arah === 'BUY' ? 'LONG' : 'SHORT') : null;
-    return {
-      ...x,
-      namaDompet: nama.get(x.alamat) || x.alamat.slice(0, 10) + '…',
-      sumber, milik, arahku,
-      sumberTutup: !sumber && !!milik,
-      arahBeda: !!(sumber && arahku && sumber.arah !== arahku),
-    };
-  });
-
-  return (
-    <section>
-      <h3 className="mb-2 flex flex-wrap items-center gap-x-2 border-b border-zinc-800 pb-1.5">
-        <span className="text-[13px] font-semibold text-zinc-200">Salin Dompet</span>
-        <span className="text-[11px] font-normal text-zinc-600">
-          · {baris.length} ditandai
-          {(() => {
-            /* Yang benar-benar HIDUP disebut terpisah dari yang sekadar
-               ditandai. Keduanya berbeda jauh artinya: ditandai cuma
-               mencatat, hidup berarti order akan berangkat sendiri. */
-            const buka = tiru.filter((x) => x.otoBuka).length;
-            const tutup = tiru.filter((x) => x.otoTutup).length;
-            return (buka || tutup)
-              ? ` · ${buka} auto-buka, ${tutup} auto-tutup AKTIF`
-              : ' · semua sakelar mati';
-          })()}
-          {' '}· posisimu dari bursa, posisi dompet dari rantai
-        </span>
-      </h3>
-
-      <div className="space-y-1.5">
-        {baris.map((b) => (
-          <div key={b.alamat + b.koin}
-            className={cn('rounded-lg border bg-zinc-900/30 px-3 py-2',
-              b.sumberTutup ? 'border-amber-500/40' : b.arahBeda ? 'border-red-500/40' : 'border-zinc-800')}>
-
-            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <span className="text-[13px] font-semibold text-zinc-100">{b.koin}</span>
-              <span className="text-[11px] text-zinc-500">meniru {b.namaDompet}</span>
-              <button onClick={() => ubahTiru(b.alamat, b.koin, false)}
-                title="Berhenti menandai"
-                className="ml-auto cursor-pointer rounded p-0.5 text-zinc-700 transition-colors hover:text-red-400">
-                <Trash2 className="size-3" />
-              </button>
-            </div>
-
-            <div className="mt-1.5 grid gap-2 sm:grid-cols-2">
-              {/* Punyaku */}
-              <div className="rounded-md border border-zinc-800 bg-zinc-950/60 p-2">
-                <p className="text-[10px] uppercase tracking-wide text-zinc-600">Posisiku</p>
-                {b.milik ? (
-                  <p className="mt-0.5 flex flex-wrap items-baseline gap-x-2 text-[11.5px]">
-                    <span className={cn('font-semibold',
-                      b.arahku === 'LONG' ? 'text-emerald-400' : 'text-red-400')}>{b.arahku}</span>
-                    <span className="tabular-nums text-zinc-400">{b.milik.jumlah} @ {b.milik.entry}</span>
-                    <span className={cn('ml-auto font-semibold tabular-nums',
-                      b.milik.pnl >= 0 ? 'text-emerald-400' : 'text-red-400')}>
-                      {b.milik.pnl >= 0 ? '+' : '−'}${uangRingkas(Math.abs(b.milik.pnl))}
-                    </span>
-                  </p>
-                ) : (
-                  <p className="mt-0.5 text-[11.5px] text-zinc-600">Belum ada posisi terbuka di {b.koin}USDT</p>
-                )}
-              </div>
-
-              {/* Dompet yang ditiru */}
-              <div className="rounded-md border border-zinc-800 bg-zinc-950/60 p-2">
-                <p className="text-[10px] uppercase tracking-wide text-zinc-600">Dompet</p>
-                {b.sumber ? (
-                  <p className="mt-0.5 flex flex-wrap items-baseline gap-x-2 text-[11.5px]">
-                    <span className={cn('font-semibold',
-                      b.sumber.arah === 'LONG' ? 'text-emerald-400' : 'text-red-400')}>{b.sumber.arah}</span>
-                    <span className="tabular-nums text-zinc-400">{b.sumber.ukuran} @ {b.sumber.entry}</span>
-                    <span className={cn('ml-auto font-semibold tabular-nums',
-                      b.sumber.pnl >= 0 ? 'text-emerald-400' : 'text-red-400')}>
-                      {b.sumber.pnl >= 0 ? '+' : '−'}${uangRingkas(Math.abs(b.sumber.pnl))}
-                    </span>
-                  </p>
-                ) : (
-                  <p className="mt-0.5 text-[11.5px] text-amber-300">Sudah tidak punya posisi di {b.koin}</p>
-                )}
-              </div>
-            </div>
-
-            {/* ── SAKELAR AUTO-CLOSE ────────────────────────────────────
-                Menyalakannya berarti memberi izin mengirim satu perintah
-                tutup ke bursa tanpa ditanya lagi. Karena itu ditulis
-                panjang, bukan disingkat jadi ikon: sakelar yang mengeluarkan
-                uang tidak boleh sekecil sakelar yang mengubah warna.
-
-                Padam sendiri sesudah sekali dipakai. Izin yang menetap
-                selamanya adalah izin yang diberikan sekali untuk keadaan
-                yang sudah lama berubah. */}
-            <label className={cn('mt-1.5 flex cursor-pointer items-start gap-2 rounded-md border px-2 py-1.5 transition-colors',
-              b.otoTutup ? 'border-amber-500/40 bg-amber-500/5' : 'border-zinc-800 hover:border-zinc-700')}>
-              <input type="checkbox" checked={!!b.otoTutup}
-                onChange={(e) => ubahOto(b.alamat, b.koin, e.target.checked)}
-                className="mt-0.5 size-3.5 shrink-0 cursor-pointer accent-amber-400" />
-              <span className="min-w-0 flex-1">
-                <span className={cn('block text-[11.5px] font-medium',
-                  b.otoTutup ? 'text-amber-300' : 'text-zinc-400')}>
-                  Tutup posisiku otomatis saat dompet ini melepas {b.koin}
-                </span>
-                <span className="block text-[10.5px] leading-relaxed text-zinc-600">
-                  Market reduce-only — secara struktur tidak bisa membuka posisi.
-                  Butuh dua pindaian berturut-turut, dan padam sendiri sesudah
-                  sekali dipakai.
-                  {b.konfirmasi ? ' · konfirmasi ' + b.konfirmasi + '/2' : ''}
-                </span>
-                {b.terakhir && (
-                  <span className={cn('block text-[10.5px]',
-                    b.terakhir.sukses ? 'text-emerald-400/80' : 'text-red-400')}>
-                    {b.terakhir.sukses
-                      ? 'Terakhir: ditutup ' + b.terakhir.jumlah + ' · ' + umur(b.terakhir.waktu)
-                      : 'Percobaan terakhir GAGAL — posisinya mungkin masih terbuka'}
-                  </span>
-                )}
-              </span>
-            </label>
-
-            {/* ── KOIN INI TIDAK ADA DI BINANCE ─────────────────────────
-                Dilaporkan, bukan didiamkan. Tanpa baris ini orangnya
-                menyangka salinannya berjalan untuk semua koin, padahal
-                yang satu ini dilewati tiap kali — dan ia baru tahu saat
-                menghitung hasil yang tidak pernah datang. */}
-            {b.takAdaDiBinance && (
-              <p className="mt-1.5 rounded-md border border-sky-500/30 bg-sky-500/5 px-2 py-1.5 text-[11px] leading-relaxed text-sky-200/80">
-                <span className="font-medium">{b.koin} tidak ada di Binance Futures.</span>{' '}
-                Posisinya tidak dibuka di sana. Koin seperti ini nanti dilayani lewat
-                jalur Hyperliquid.
-              </p>
-            )}
-
-            {/* ── SAKELAR AUTO-OPEN ─────────────────────────────────────
-                Ditaruh DI BAWAH auto-close, dan warnanya merah sementara
-                yang di atas kuning. Bukan selera: yang di atas mengeluarkan
-                uang dari posisi, yang ini memasukkannya ke posisi baru.
-                Dua izin yang berbeda beratnya tidak boleh terlihat sama.
-
-                Ukurannya diisi DULU — sakelarnya sendiri ditolak server
-                kalau ukurannya masih kosong, dan tombol yang bisa ditekan
-                lalu ditolak lebih buruk daripada tombol yang menunggu. */}
-            <div className={cn('mt-1.5 rounded-md border px-2 py-1.5 transition-colors',
-              b.otoBuka ? 'border-red-500/40 bg-red-500/5' : 'border-zinc-800')}>
-              {/* -- KE BURSA MANA SALINANNYA DIKIRIM ------------------
-                  Dipilih per dompet, bukan satu setelan untuk semuanya:
-                  dompet yang isinya koin besar cocok di Binance, yang
-                  sering menyentuh koin kecil cuma ada di Hyperliquid, dan
-                  memaksa keduanya memakai satu pilihan berarti salah satu
-                  selalu dilayani setengah.
-
-                  "Keduanya" MENGUTAMAKAN Binance dan memakai Hyperliquid
-                  hanya untuk koin yang tidak terdaftar di sana. Ditulis di
-                  keterangannya supaya tidak ada yang menebak urutannya. */}
-              <label className="mb-1.5 block">
-                <span className="mb-0.5 block text-[9.5px] uppercase tracking-wide text-zinc-500">Bursa tujuan</span>
-                <select value={b.bursa ?? 'binance'}
-                  onChange={(e) => ubahBuka(b.alamat, b.koin, { bursa: e.target.value })}
-                  className="w-full cursor-pointer rounded border border-zinc-700 bg-zinc-900 px-1.5 py-1 text-[12px] text-zinc-100 outline-none focus:border-zinc-500">
-                  <option value="binance">Binance saja</option>
-                  <option value="hyperliquid">Hyperliquid saja</option>
-                  <option value="dua">Keduanya — Binance dulu, Hyperliquid kalau koinnya tidak ada</option>
-                </select>
-                <span className="mt-0.5 block text-[10.5px] leading-relaxed text-zinc-600">
-                  {b.bursa === 'hyperliquid'
-                    ? 'Bursa asal dompetnya — instrumen dan harganya sama persis dengan yang ditiru.'
-                    : b.bursa === 'dua'
-                      ? 'Koin yang ada di Binance disalin di sana; sisanya otomatis ke Hyperliquid.'
-                      : 'Koin yang tidak terdaftar di Binance akan dilewati.'}
-                </span>
-              </label>
-
-              <div className="flex flex-wrap items-end gap-2">
-                <label className="block">
-                  <span className="mb-0.5 block text-[9.5px] uppercase tracking-wide text-zinc-500">Ukuran $</span>
-                  <input type="number" min={1} max={500} step={5}
-                    defaultValue={b.usd ?? ''}
-                    placeholder="30"
-                    onBlur={(e) => {
-                      const v = Number(e.target.value);
-                      if (v > 0 && v !== b.usd) ubahBuka(b.alamat, b.koin, { usd: v });
-                    }}
-                    className="angka w-[74px] rounded border border-zinc-700 bg-zinc-900 px-1.5 py-1 text-[12px] text-zinc-100 outline-none focus:border-zinc-500" />
-                </label>
-                <label className="block">
-                  <span className="mb-0.5 block text-[9.5px] uppercase tracking-wide text-zinc-500">Leverage</span>
-                  <select value={b.leverage ?? 1}
-                    onChange={(e) => ubahBuka(b.alamat, b.koin, { leverage: Number(e.target.value) })}
-                    className="angka w-[62px] cursor-pointer rounded border border-zinc-700 bg-zinc-900 px-1.5 py-1 text-[12px] text-zinc-100 outline-none focus:border-zinc-500">
-                    {[1, 2, 3].map((x) => <option key={x} value={x}>{x}×</option>)}
-                  </select>
-                </label>
-                <span className="mb-1 text-[10.5px] text-zinc-600">
-                  {b.usd ? 'nilai posisi ~$' + (b.usd * (b.leverage ?? 1)).toFixed(0) : 'isi ukuran dulu'}
-                </span>
-              </div>
-
-              <label className="mt-1.5 flex cursor-pointer items-start gap-2">
-                <input type="checkbox" checked={!!b.otoBuka}
-                  onChange={(e) => ubahBuka(b.alamat, b.koin, { otoBuka: e.target.checked })}
-                  className="mt-0.5 size-3.5 shrink-0 cursor-pointer accent-red-400" />
-                <span className="min-w-0 flex-1">
-                  <span className={cn('block text-[11.5px] font-medium',
-                    b.otoBuka ? 'text-red-300' : 'text-zinc-400')}>
-                    Buka posisiku otomatis saat dompet ini MULAI pegang {b.koin}
-                    <span className="ml-1 font-normal text-zinc-500">
-                      di {b.bursa === 'hyperliquid' ? 'Hyperliquid'
-                        : b.bursa === 'dua' ? 'Binance/Hyperliquid' : 'Binance'}
-                    </span>
-                  </span>
-                  <span className="block text-[10.5px] leading-relaxed text-zinc-600">
-                    Market, tanpa SL/TP — pintu keluarnya sakelar di atas. Yang dipicu
-                    saat dompetnya BARU membuka, bukan saat ia sedang punya: pindaian
-                    pertama sesudah ini dinyalakan cuma mencatat.
-                    {b.bukaKonfirmasi ? ' · konfirmasi ' + b.bukaKonfirmasi + '/2' : ''}
-                  </span>
-                  {b.terakhirBuka && (
-                    <span className="block text-[10.5px] text-emerald-400/80">
-                      Terakhir dibuka: {b.simbolBuka}
-                      {b.bursaBuka ? ' di ' + (b.bursaBuka === 'hyperliquid' ? 'Hyperliquid' : 'Binance') : ''}
-                      {' · '}{umur(b.terakhirBuka)}
-                    </span>
-                  )}
-                </span>
-              </label>
-            </div>
-
-            {(b.sumberTutup || b.arahBeda) && (
-              <p className={cn('mt-1.5 flex items-start gap-1.5 text-[11px] leading-relaxed',
-                b.sumberTutup ? 'text-amber-300' : 'text-red-400')}>
-                <TriangleAlert className="mt-0.5 size-3 shrink-0" />
-                {b.sumberTutup
-                  ? 'Dompet yang kamu tiru sudah menutup posisinya, sementara posisimu masih terbuka.'
-                  : 'Arahmu berlawanan dengan dompet yang kamu tiru di koin yang sama.'}
-              </p>
-            )}
+  return createPortal(
+    <div onClick={tutup}
+      className="fixed inset-0 z-[70] flex items-end justify-center bg-black/60 p-3 backdrop-blur-sm sm:items-center">
+      <div onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-md rounded-xl border border-zinc-700 bg-zinc-950 shadow-2xl">
+        <div className="flex items-start gap-2 border-b border-zinc-800 px-4 py-3">
+          <div className="min-w-0 flex-1">
+            <h3 className="text-[14px] font-semibold text-zinc-100">Salin dompet ini</h3>
+            <p className="mt-0.5 truncate text-[11.5px] text-zinc-500">
+              {w.nama} · <span className="angka">{w.alamat.slice(0, 10)}…{w.alamat.slice(-6)}</span>
+            </p>
           </div>
-        ))}
-      </div>
+          <button onClick={tutup} className="cursor-pointer rounded p-1 text-zinc-500 hover:text-zinc-200">
+            <X className="size-4" />
+          </button>
+        </div>
 
-      <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-600">
-        Menandai tiruan TIDAK mengirim order apa pun — ia cuma menyandingkan
-        angkanya dan membunyikan lonceng saat dompet sumbernya bergerak di koin
-        itu. Buka dan tutup posisinya tetap kamu sendiri.
-      </p>
-    </section>
+        <div className="space-y-3 px-4 py-3">
+          <label className="block">
+            <span className="mb-1 block text-[11px] uppercase tracking-wide text-zinc-500">Bursa tujuan</span>
+            <select value={bursa} onChange={(e) => setBursa(e.target.value)}
+              className="w-full cursor-pointer rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-[13px] text-zinc-100 outline-none focus:border-zinc-500">
+              <option value="binance">Binance saja</option>
+              <option value="hyperliquid">Hyperliquid saja</option>
+              <option value="dua">Keduanya — Binance dulu, Hyperliquid kalau koinnya tidak ada</option>
+            </select>
+            <span className="mt-1 block text-[11px] leading-relaxed text-zinc-600">
+              {bursa === 'hyperliquid'
+                ? 'Bursa asal dompetnya — instrumen dan harganya sama persis dengan yang ditiru.'
+                : bursa === 'dua'
+                  ? 'Koin yang ada di Binance disalin di sana; sisanya otomatis ke Hyperliquid.'
+                  : 'Koin yang tidak terdaftar di Binance akan dilewati.'}
+            </span>
+          </label>
+
+          <div className="flex gap-3">
+            <label className="block flex-1">
+              <span className="mb-1 block text-[11px] uppercase tracking-wide text-zinc-500">Ukuran per order ($)</span>
+              <input value={usd} onChange={(e) => setUsd(e.target.value)} inputMode="decimal"
+                className="angka w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-[13px] text-zinc-100 outline-none focus:border-zinc-500" />
+            </label>
+            <label className="block w-24">
+              <span className="mb-1 block text-[11px] uppercase tracking-wide text-zinc-500">Leverage</span>
+              <select value={lev} onChange={(e) => setLev(Number(e.target.value))}
+                className="angka w-full cursor-pointer rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-[13px] text-zinc-100 outline-none focus:border-zinc-500">
+                {[1, 2, 3].map((x) => <option key={x} value={x}>{x}×</option>)}
+              </select>
+            </label>
+          </div>
+          <p className="text-[11px] leading-relaxed text-zinc-600">
+            Yang diisi MARGIN — uang yang dipertaruhkan. Nilai posisinya{' '}
+            <span className="angka text-zinc-400">${sah ? (nilai * lev).toFixed(0) : '—'}</span>.
+            Di 1× keduanya sama, dan tanpa leverage tidak ada likuidasi: kerugian terburuk
+            dikunci oleh ukuran ordernya sendiri.
+          </p>
+
+          <label className={cn('flex cursor-pointer items-start gap-2 rounded-md border px-3 py-2 transition-colors',
+            aktif ? 'border-red-500/40 bg-red-500/5' : 'border-zinc-800 hover:border-zinc-700')}>
+            <input type="checkbox" checked={aktif} onChange={(e) => setAktif(e.target.checked)}
+              className="mt-0.5 size-3.5 shrink-0 cursor-pointer accent-red-400" />
+            <span className="min-w-0 flex-1">
+              <span className={cn('block text-[12.5px] font-medium', aktif ? 'text-red-300' : 'text-zinc-300')}>
+                Nyalakan salinan
+              </span>
+              <span className="block text-[11px] leading-relaxed text-zinc-600">
+                Apa pun yang dompet ini BUKA akan diikuti, dan apa pun yang ia TUTUP ikut ditutup.
+                Order berangkat sendiri tanpa ditanya lagi. Pindaian pertama sesudah disimpan
+                hanya mencatat — posisi yang sudah terbuka sekarang tidak ikut disalin.
+              </span>
+            </span>
+          </label>
+
+          {terbuka.length > 0 && (
+            <p className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-[11px] leading-relaxed text-amber-200/80">
+              Sedang memegang {terbuka.length} posisi salinan: {terbuka.join(', ')}.
+              Mematikan sakelar menghentikan salinan BARU; posisi yang sudah terbuka tetap
+              ditutup saat dompet sumbernya melepasnya.
+            </p>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2 border-t border-zinc-800 px-4 py-3">
+          {hapus && awal && (
+            <button disabled={sibuk}
+              onClick={() => { setSibuk(true); void hapus().finally(() => setSibuk(false)); }}
+              className="cursor-pointer rounded-md border border-zinc-700 px-2.5 py-1.5 text-[12px] text-zinc-400 transition-colors hover:border-red-500/50 hover:text-red-300 disabled:opacity-40">
+              Hapus setelan
+            </button>
+          )}
+          <button onClick={tutup}
+            className="ml-auto cursor-pointer rounded-md border border-zinc-700 px-3 py-1.5 text-[12.5px] text-zinc-300 transition-colors hover:border-zinc-500">
+            Batal
+          </button>
+          <button disabled={!sah || sibuk}
+            onClick={() => { setSibuk(true); void simpan({ aktif, bursa, usd: nilai, leverage: lev }).finally(() => setSibuk(false)); }}
+            className="cursor-pointer rounded-md bg-zinc-100 px-3 py-1.5 text-[12.5px] font-semibold text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-40">
+            {sibuk ? 'Menyimpan…' : 'Simpan'}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -1537,6 +1384,12 @@ export function PanelWalletAgen({ pemilik = false }: { pemilik?: boolean }) {
      sering ditanyakan, dan rincian yang terbuka sendiri cuma mendorongnya
      ke luar layar. */
   const [pilih, setPilih] = useState<string | null>(null);
+  /* Setelan salin ditarik terpisah dari keadaan dompet: ia milik pemilik
+     saja dan digerbangi server, jadi menggabungkannya ke jawaban publik
+     berarti menambah satu jalan bocor tanpa satu pun manfaat. */
+  const [salin, setSalin] = useState<SetelanSalin[]>([]);
+  const [dialogSalin, setDialogSalin] = useState<{ alamat: string; nama: string } | null>(null);
+  const salinPeta = useMemo(() => new Map(salin.map((x) => [x.alamat, x])), [salin]);
   const [muat, setMuat] = useState(true);
   const pertama = useRef(true);
 
@@ -1546,6 +1399,13 @@ export function PanelWalletAgen({ pemilik = false }: { pemilik?: boolean }) {
     /* null = tidak bisa bertanya. Daftar lama DIPERTAHANKAN: satu tarikan
        gagal saat jaringan berkedip bukan kabar bahwa dompetnya kosong. */
     if (k) { setD(k); setGagal(false); } else setGagal(true);
+    /* Setelan salin ikut ditarik di putaran yang sama. Keadaan berjalannya
+       (`punyaku`, hitungan konfirmasi) ditulis pemantau tiap 60 detik, jadi
+       menariknya bersama keadaan dompet membuat ikon salin di kartu dan
+       posisi yang tampil di sub-halaman selalu bercerita hal yang sama.
+       Gagal diam-diam: setelan yang tidak terbaca cuma membuat ikonnya
+       tidak menyala, bukan menjatuhkan seluruh panel. */
+    setSalin(await daftarSalin());
     setMuat(false);
   }, []);
 
@@ -1615,33 +1475,23 @@ export function PanelWalletAgen({ pemilik = false }: { pemilik?: boolean }) {
           orang untuk memberitahunya sesuatu yang sudah diketahui sejak
           sebelum ia mulai mengetik. */}
       {pemilik && <FormTambah selesai={() => void tarik()} />}
-
-      {/* -- SALIN DOMPET DI PALING ATAS -----------------------------------
-          Ia satu-satunya bagian panel ini yang bisa MENGGERAKKAN UANG
-          sendiri. Papan peringkat dan konsensus menjawab "dompet mana yang
-          bagus"; seksi ini menjawab "apa yang sedang berjalan atas namaku
-          sekarang", dan pertanyaan kedua selalu lebih mendesak daripada
-          yang pertama.
-
-          Dulu ia duduk di bawah konsensus DAN menghilang saat kosong, jadi
-          pemiliknya sendiri tidak bisa menemukan kendalinya. Dua kesalahan
-          yang saling menyembunyikan.
-
-          HANYA pemilik: sakelar di dalamnya mengirim order memakai satu
-          kunci API di .env — kunci pemilik. Digerbangi di sini DAN di
-          server; penanda tiruannya tidak ikut di jawaban publik, jadi walau
-          gerbang layar ini luput, yang bisa dirender tetap kosong.
-
-          Digerbangi `dompet.length` juga: keterangan kosongnya menyuruh
-          orang menekan sesuatu di daftar dompet di bawah, dan menyuruh
-          menekan sesuatu yang belum ada adalah petunjuk yang menyesatkan. */}
-      {pemilik && dompet.length > 0 && (
-        <PosisiTiruan tiru={d?.tiru || []} dompet={dompet} posisi={posisi}
-          ubahTiru={(a, k, nyala) => {
-            void (nyala ? tandaiTiru(a, k) : batalTiru(a, k)).then(() => tarik());
+      {dialogSalin && (
+        <DialogSalin
+          w={dialogSalin}
+          awal={salinPeta.get(dialogSalin.alamat)}
+          tutup={() => setDialogSalin(null)}
+          simpan={async (v) => {
+            const h = await simpanSalin({ alamat: dialogSalin.alamat, nama: dialogSalin.nama, ...v });
+            if (!h.ok) { alert(h.pesan || 'Gagal menyimpan.'); return; }
+            setSalin(await daftarSalin());
+            setDialogSalin(null);
           }}
-          ubahOto={(a, k, nyala) => { void aturOtoTutup(a, k, nyala).then(() => tarik()); }}
-          ubahBuka={(a, k, u) => { void aturBuka(a, k, u).then((h) => { if (!h.ok && h.pesan) alert(h.pesan); tarik(); }); }} />
+          hapus={async () => {
+            const h = await hapusSalin(dialogSalin.alamat);
+            if (!h.ok) { alert(h.pesan || 'Gagal menghapus.'); return; }
+            setSalin(await daftarSalin());
+            setDialogSalin(null);
+          }} />
       )}
 
       {/* Papan peringkat di ATAS daftar dompet, bukan di bawah. Yang dicari
@@ -1690,7 +1540,9 @@ export function PanelWalletAgen({ pemilik = false }: { pemilik?: boolean }) {
                   pilih={() => setPilih((v) => (v === w.alamat ? null : w.alamat))}
                   hapus={pemilik
                     ? () => { void hapusDompet(w.alamat).then(() => tarik()); }
-                    : undefined} />
+                    : undefined}
+                  salin={pemilik ? () => setDialogSalin({ alamat: w.alamat, nama: w.nama }) : undefined}
+                  salinAktif={!!salinPeta.get(w.alamat)?.aktif} />
               ))}
             </div>
           </section>

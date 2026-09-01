@@ -315,6 +315,92 @@ module.exports = (app, { butuhLogin, batasLaju, express, DIR }) => {
     res.json({ ok: true, tiru: d.tiru });
   });
 
+  /* ══ SALIN DOMPET — SATU SETELAN UNTUK SATU DOMPET ══════════════════
+     Menggantikan penandaan per koin. Yang disimpan cuma niatnya: ke bursa
+     mana, sebesar apa, dan hidup atau tidak. Koin mana yang disalin bukan
+     urusan setelan ini -- itu keputusan dompetnya, dan menyalinnya berarti
+     mengikuti keputusan itu apa adanya.
+
+     Keadaan berjalannya (`pegang`, `punyaku`, hitungan konfirmasi) ditulis
+     PEMANTAU, bukan rute ini. Rute ini tidak pernah menyentuhnya supaya
+     menyimpan setelan di tengah putaran tidak menghapus ingatan yang
+     sedang dipakai memutuskan. */
+  const SALIN = path.join(DIR, 'wallet-salin.json');
+
+  app.get('/api/agen/wallet/salin', batasLaju, butuhLogin, hanyaPemilik, (req, res) => {
+    res.json({ ok: true, salin: (baca(SALIN, { salin: [] }).salin) || [] });
+  });
+
+  app.post('/api/agen/wallet/salin', batasLaju, butuhLogin, hanyaPemilik, express.json(), (req, res) => {
+    const b = req.body || {};
+    const alamat = String(b.alamat || '').trim().toLowerCase();
+    if (!/^0x[0-9a-f]{40}$/.test(alamat)) {
+      return res.status(400).json({ error: 'Alamat dompet tidak sah.' });
+    }
+    const bursa = String(b.bursa || 'binance').toLowerCase();
+    if (!['binance', 'hyperliquid', 'dua'].includes(bursa)) {
+      return res.status(400).json({ error: 'Bursa harus binance, hyperliquid, atau dua.' });
+    }
+    const usd = Number(b.usd);
+    if (!(usd > 0) || usd > 500) {
+      return res.status(400).json({ error: 'Ukuran harus antara 1 dan 500 USD.' });
+    }
+    const leverage = Math.round(Number(b.leverage) || 1);
+    if (!(leverage >= 1 && leverage <= 20)) {
+      return res.status(400).json({ error: 'Leverage harus 1 sampai 20.' });
+    }
+
+    const d = baca(SALIN, { salin: [] });
+    d.salin = d.salin || [];
+    let s = d.salin.find((x) => x.alamat === alamat);
+    if (!s) { s = { alamat, dibuat: Date.now() }; d.salin.push(s); }
+
+    const nyalaBaru = b.aktif === true;
+    /* -- INGATAN DIHAPUS SAAT SAKELARNYA BERUBAH ---------------------
+       Pemantau cuma bertindak pada PERUBAHAN daftar koin, dan `pegang`
+       adalah pembanding terakhirnya. Sakelar yang dimatikan lalu
+       dinyalakan lagi sesudah dompetnya bergerak akan mewarisi
+       perbandingan basi, lalu menyalin belasan koin sekaligus sebagai
+       "baru" -- padahal semuanya sudah lama terbuka.
+
+       Dihapus, pindaian berikutnya memulai dari nol: mencatat dulu, tidak
+       bertindak. `punyaku` TIDAK dihapus -- posisi yang sudah terlanjur
+       dibuka tetap harus bisa ditutup. */
+    if (s.aktif !== nyalaBaru) {
+      delete s.pegang;
+      s.konfirmasiBuka = {};
+      s.konfirmasiTutup = {};
+    }
+    s.aktif = nyalaBaru;
+    s.bursa = bursa;
+    s.usd = Math.round(usd * 100) / 100;
+    s.leverage = leverage;
+    if (b.nama !== undefined) s.nama = String(b.nama).slice(0, 60);
+    s.diubah = Date.now();
+
+    tulis(SALIN, d);
+    res.json({ ok: true, salin: d.salin });
+  });
+
+  app.delete('/api/agen/wallet/salin/:alamat', batasLaju, butuhLogin, hanyaPemilik, (req, res) => {
+    const alamat = String(req.params.alamat || '').toLowerCase();
+    const d = baca(SALIN, { salin: [] });
+    const s = (d.salin || []).find((x) => x.alamat === alamat);
+    /* Menolak menghapus setelan yang masih memegang posisi salinan.
+       Menghapusnya berarti pemantau kehilangan catatan bahwa posisi itu
+       miliknya, dan posisi sungguhan ditinggal terbuka tanpa ada yang
+       merasa bertanggung jawab menutupnya. */
+    if (s && s.punyaku && Object.keys(s.punyaku).length) {
+      return res.status(409).json({
+        error: 'Masih ada ' + Object.keys(s.punyaku).length + ' posisi salinan terbuka. '
+             + 'Matikan salinannya dulu dan tunggu posisinya tertutup.',
+      });
+    }
+    d.salin = (d.salin || []).filter((x) => x.alamat !== alamat);
+    tulis(SALIN, d);
+    res.json({ ok: true, salin: d.salin });
+  });
+
   app.delete('/api/agen/wallet/:alamat', batasLaju, butuhLogin, hanyaPemilik, (req, res) => {
     const alamat = String(req.params.alamat || '').toLowerCase();
     const p = baca(PANTAU, { dompet: [] });

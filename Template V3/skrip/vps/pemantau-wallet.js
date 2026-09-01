@@ -32,6 +32,7 @@ const path = require('path');
 const { bacaDompet, catatWallet, batasTerakhir } = require('./wallet-vps');
 const { simbolBinance } = require('./simbol-bursa');
 const HL = require('./hyperliquid');
+const SalinDompet = require('./salin-dompet');
 
 const DIR = __dirname;
 const API = 'https://api.hyperliquid.xyz/info';
@@ -384,6 +385,84 @@ async function kirimSalin(simbol, arah, usd, leverage) {
    Bawaan `undefined` diperlakukan 'binance': penanda yang dibuat sebelum
    pilihan ini ada tidak boleh tiba-tiba mengirim order ke bursa yang tidak
    pernah dipilih siapa pun. */
+/* ══ ADAPTOR BURSA UNTUK MESIN SALIN ═══════════════════════════════════
+   Mesin salin tidak tahu apa-apa tentang Binance maupun Hyperliquid — ia
+   cuma memanggil `buka` dan `tutup`. Seluruh pengetahuan tentang bursa
+   tinggal di sini, dan itu yang membuat mesinnya bisa diuji dengan bursa
+   tiruan tanpa satu pun sambungan jaringan.
+
+   Perutean 'dua': Binance DIUTAMAKAN, Hyperliquid jadi jaring untuk koin
+   yang tidak terdaftar di sana. */
+const adaptorBursa = {
+  async buka({ koin, arah, usd, leverage, bursa }) {
+    const mauHl = bursa === 'hyperliquid';
+    const mauDua = bursa === 'dua';
+
+    if (!mauHl) {
+      let simbol = null;
+      try {
+        simbol = await simbolBinance(koin, { dasar: DASAR, token: APP_TOKEN, catat });
+      } catch (e) {
+        /* Bursa bisu -- BUKAN "koinnya tidak ada". Dilempar supaya mesin
+           mencatatnya sebagai kegagalan dan mencoba lagi, bukan sebagai
+           koin yang perlu dilempar ke Hyperliquid. */
+        throw new Error('Binance belum bisa ditanya: ' + (e && e.message));
+      }
+      if (simbol) {
+        const r = await fetch(DASAR + '/api/trade/futures/salin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-App-Token': APP_TOKEN },
+          body: JSON.stringify({ symbol: simbol, side: arah, usd, leverage }),
+          signal: AbortSignal.timeout(30000),
+        });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j.error || ('server menjawab ' + r.status));
+        return { bursa: 'binance', simbol };
+      }
+      if (!mauDua) throw new Error(koin + ' tidak ada di Binance Futures');
+    }
+
+    if (!HL.siap()) throw new Error('Hyperliquid belum aktif (HL_AKTIF)');
+    const aset = await HL.asetHl(koin);
+    if (!aset) throw new Error(koin + ' tidak ada di Binance maupun Hyperliquid');
+    const h = await HL.bukaHl({ koin: aset.nama, arah, usd, leverage });
+    return { bursa: 'hyperliquid', simbol: h.koin };
+  },
+
+  async tutup({ koin, simbol, bursa, arah }) {
+    if (bursa === 'hyperliquid') { await HL.tutupHl(simbol || koin); return; }
+
+    /* Ukurannya DIBACA dari bursa, bukan diingat dari waktu membuka.
+       Posisi bisa terisi sebagian, ditambah tangan, atau sudah tertutup
+       sendiri kena likuidasi -- dan menutup memakai angka yang kita catat
+       dulu berarti mengirim perintah untuk posisi yang mungkin sudah tidak
+       berbentuk seperti itu lagi. */
+    const punyaku = await posisikuBursa();
+    if (punyaku === null) throw new Error('posisi bursa tidak terbaca');
+    const pos = punyaku.find((p) => String(p.symbol).toUpperCase() === String(simbol).toUpperCase());
+    if (!pos) return;   // sudah tidak ada -- tidak ada yang perlu ditutup
+
+    const jumlah = Math.abs(Number(pos.positionAmt) || 0);
+    if (!(jumlah > 0)) return;
+
+    const r = await fetch(DASAR + '/api/trade/futures/close', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-App-Token': APP_TOKEN },
+      body: JSON.stringify({
+        symbol: simbol,
+        /* Arah ORDER PENUTUP, kebalikan dari arah posisinya. Dibaca dari
+           tanda positionAmt, bukan dari `arah` yang kita catat: yang di
+           bursa itulah yang sedang ditutup. */
+        side: Number(pos.positionAmt) > 0 ? 'SELL' : 'BUY',
+        quantity: String(jumlah),
+      }),
+      signal: AbortSignal.timeout(30000),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || ('server menjawab ' + r.status));
+  },
+};
+
 function bursaPenanda(t) {
   const b = String(t.bursa || 'binance').toLowerCase();
   return (b === 'hyperliquid' || b === 'dua') ? b : 'binance';
@@ -1005,6 +1084,15 @@ async function pindai() {
      sebentar lagi ditutup sebagai "sudah punya" lalu melewatkannya. */
   try { await bukaTiruan(semuaPosisi); }
   catch (e) { catat('auto-open gagal:', e && e.message); }
+
+  /* ── SALIN DOMPET (per dompet, menggantikan penandaan per koin) ──── */
+  try {
+    await SalinDompet.putaran({
+      dir: DIR, posisiDompet: semuaPosisi, catat,
+      lonceng: (b) => lonceng({ ...b, sumber: NAMA_AGEN, jenis: 'wallet', waktu: Date.now() }),
+      bursa: adaptorBursa,
+    });
+  } catch (e) { catat('salin dompet gagal:', e && e.message); }
 }
 
 /** Mendaftarkan diri di papan supaya kartunya ADA sebelum transaksi

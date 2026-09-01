@@ -104,6 +104,34 @@ export interface PenandaTiru {
   simbolBuka?: string;
 }
 
+/* ══ SETELAN SALIN — SATU PER DOMPET ══════════════════════════════════
+   Menggantikan penandaan per koin. Yang disimpan cuma niatnya: ke bursa
+   mana, sebesar apa, dan hidup atau tidak. Koin mana yang disalin bukan
+   urusan setelan ini — itu keputusan dompetnya. */
+export interface SetelanSalin {
+  alamat: string;
+  nama?: string;
+  /** Hidup. Selama false, tidak ada order yang berangkat. */
+  aktif?: boolean;
+  bursa?: 'binance' | 'hyperliquid' | 'dua';
+  /** MARGIN per order dalam USD — uang yang dipertaruhkan, bukan nilai
+   *  posisi. Nilai posisinya usd x leverage. */
+  usd?: number;
+  leverage?: number;
+  dibuat?: number;
+  diubah?: number;
+
+  /* ── Keadaan berjalan, ditulis PEMANTAU. Layar hanya membacanya. ── */
+  /** Koin yang dipegang dompet sumber menurut pindaian terakhir.
+   *  `undefined` = belum pernah diamati; pindaian berikutnya cuma
+   *  mencatat, tidak membuka apa pun. */
+  pegang?: string[];
+  /** Posisi salinan yang SEDANG kita pegang, per koin. */
+  punyaku?: Record<string, { bursa: string; simbol: string; arah: string; waktu: number }>;
+  konfirmasiBuka?: Record<string, number>;
+  konfirmasiTutup?: Record<string, number>;
+}
+
 export interface KeadaanDompet {
   dompet: DompetPantau[];
   posisi: PosisiDompet[];
@@ -243,6 +271,54 @@ export async function batalTiru(alamat: string, koin: string): Promise<boolean> 
       { method: 'DELETE', headers: { Authorization: 'Bearer ' + t } });
     return r.ok;
   } catch { return false; }
+}
+
+/** Daftar setelan salin. Pemilik saja — digerbangi server. */
+export async function daftarSalin(): Promise<SetelanSalin[]> {
+  const t = await token();
+  if (!t) return [];
+  try {
+    const r = await fetch(`${dasar()}/api/agen/wallet/salin`, {
+      headers: { Authorization: 'Bearer ' + t },
+    });
+    if (!r.ok) return [];
+    const j = await r.json();
+    return Array.isArray(j.salin) ? j.salin : [];
+  } catch { return []; }
+}
+
+/** Simpan setelan salin untuk satu dompet. Mengirim SELURUH setelan
+ *  sekaligus — popup-nya memang satu formulir dengan satu tombol Simpan,
+ *  dan mengirimnya sepotong-sepotong berarti ada keadaan setengah tersimpan
+ *  yang bisa dipakai pemantau di tengah putaran. */
+export async function simpanSalin(ubah: {
+  alamat: string; nama?: string; aktif: boolean;
+  bursa: string; usd: number; leverage: number;
+}): Promise<{ ok: boolean; pesan?: string }> {
+  const t = await token();
+  if (!t) return { ok: false, pesan: 'Belum masuk.' };
+  try {
+    const r = await fetch(`${dasar()}/api/agen/wallet/salin`, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' },
+      body: JSON.stringify(ubah),
+    });
+    if (r.ok) return { ok: true };
+    const j = await r.json().catch(() => ({}));
+    return { ok: false, pesan: j.error || `Server menjawab ${r.status}` };
+  } catch { return { ok: false, pesan: 'Tidak bisa menghubungi server.' }; }
+}
+
+export async function hapusSalin(alamat: string): Promise<{ ok: boolean; pesan?: string }> {
+  const t = await token();
+  if (!t) return { ok: false, pesan: 'Belum masuk.' };
+  try {
+    const r = await fetch(`${dasar()}/api/agen/wallet/salin/${encodeURIComponent(alamat)}`,
+      { method: 'DELETE', headers: { Authorization: 'Bearer ' + t } });
+    if (r.ok) return { ok: true };
+    const j = await r.json().catch(() => ({}));
+    return { ok: false, pesan: j.error || `Server menjawab ${r.status}` };
+  } catch { return { ok: false, pesan: 'Tidak bisa menghubungi server.' }; }
 }
 
 export async function hapusDompet(alamat: string): Promise<boolean> {
