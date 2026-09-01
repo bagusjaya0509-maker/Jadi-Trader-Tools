@@ -223,30 +223,64 @@
          min-height-nya akan ikut menata seluruh aplikasi. Anak yang
          dihapus React membawa pergi seluruh gayanya sendiri. -->
     <style>
+      /* -- YANG DILIHAT MATA: SPLASH MEREK, BUKAN PARAGRAF ASING -------
+         Dilaporkan pemilik 1 Sep 2026: layar pertama ini terbaca seperti
+         halaman lain yang berkedip sebentar sebelum situsnya muncul. Dan
+         memang begitu — judul kecil, satu kalimat, sebaris tautan, semuanya
+         di tengah layar hitam. Tidak ada satu pun yang mengatakan "ini
+         situs yang sama yang sebentar lagi tampil".
+
+         TIDAK BISA disembunyikan; alasannya panjang di komentar #root di
+         bawah, dan singkatnya: tautan-tautan itu satu-satunya jalan masuk
+         perayap ke /artikel/. Jadi yang diubah RUPANYA, bukan
+         keberadaannya.
+
+         Sekarang: lambang + nama besar di tengah, seukuran dan sefont
+         judul hero yang akan menggantikannya. Begitu React mount, fotonya
+         muncul di belakang sementara namanya nyaris tidak bergeser --
+         yang terbaca "gambarnya baru datang", bukan "halamannya berganti".
+
+         Kalimat dan tautannya turun ke kaki layar, diredupkan seperti
+         footer. Tetap terlihat, tetap bisa diklik, tetap terbaca perayap.
+         Tidak ada display:none dan tidak ada teks tersembunyi. */
       #pramuat {
         min-height: 100dvh;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: .75rem;
-        padding: 2rem 1.5rem;
+        gap: .9rem;
+        padding: 2rem 1.5rem 5.5rem;
         text-align: center;
         font-family: 'IBM Plex Sans', system-ui, sans-serif;
         color: #a1a1aa;
+        position: relative;
       }
+      #pramuat .lambang { width: 3.25rem; height: auto; color: #fafafa; opacity: .9; }
+      /* Sefont dan sebobot `.parallax__title`, dan clamp-nya sedikit lebih
+         kecil karena untainya "Jadi Trader Tools" -- enam huruf lebih
+         panjang daripada "Jadi Trader" yang dipakai hero. */
       #pramuat h1 {
         margin: 0;
-        font-family: 'Space Grotesk', system-ui, sans-serif;
-        font-size: 1.35rem;
+        font-family: 'IBM Plex Sans', system-ui, sans-serif;
+        font-size: clamp(1.9rem, 7.5vw, 4.5rem);
         font-weight: 600;
-        letter-spacing: -.01em;
+        letter-spacing: -.03em;
+        line-height: .95;
         color: #fafafa;
       }
-      #pramuat p { margin: 0; font-size: .875rem; max-width: 28rem; line-height: 1.6; }
-      #pramuat nav { font-size: .8125rem; color: #52525b; }
-      #pramuat nav a { color: #71717a; text-decoration: none; }
-      #pramuat nav a:hover { color: #d4d4d8; text-decoration: underline; }
+      /* Kaki layar: dijangkarkan ke bawah supaya bagian tengahnya bersih. */
+      #pramuat p,
+      #pramuat nav {
+        position: absolute;
+        left: 1.5rem;
+        right: 1.5rem;
+        margin: 0;
+      }
+      #pramuat p { bottom: 3.1rem; font-size: .8125rem; line-height: 1.5; color: #52525b; }
+      #pramuat nav { bottom: 1.4rem; font-size: .75rem; color: #3f3f46; }
+      #pramuat nav a { color: #52525b; text-decoration: none; }
+      #pramuat nav a:hover { color: #a1a1aa; text-decoration: underline; }
       /* Putaran kecil, bukan bilah kemajuan: yang ditunggu tidak punya
          persentase yang bisa dipercaya, dan bilah yang melompat dari 30%
          ke selesai lebih mengganggu daripada tidak ada bilah sama sekali. */
@@ -292,6 +326,9 @@
          membuatnya jadi masalah. -->
     <div id="root">
       <div id="pramuat">
+        <svg class="lambang" viewBox="0 0 983 1040" fill="none" role="img" aria-label="Jadi Trader Tools">
+          <path fill="currentColor" fill-rule="evenodd" d="M487 0L510 2L530 13L542 27L550 49L549 624L602 631L649 643L652 641L652 235L657 216L665 204L676 194L688 188L700 185L722 186L740 194L750 203L759 217L763 231L763 634L793 641L817 650L822 655L822 661L818 666L806 673L782 682L737 693L699 699L652 703L651 679L606 667L550 661L549 710L435 710L433 661L376 668L335 679L332 681L332 702L326 703L259 695L211 685L181 675L168 668L161 660L162 655L175 646L220 634L222 234L227 216L234 205L251 191L270 185L291 186L311 195L326 212L333 235L332 643L334 644L381 632L430 626L435 623L437 47L444 28L458 12L472 4L487 0ZM178 570L180 570L180 611L141 622L113 636L97 653L95 659L97 670L108 683L118 690L149 704L196 716L262 727L401 739L462 741L561 740L695 730L763 720L816 709L852 696L873 684L886 670L888 659L882 646L863 631L829 617L803 611L803 570L830 574L871 585L908 599L939 615L961 631L973 644L981 661L982 675L975 694L959 712L941 725L915 739L877 754L833 767L760 782L743 814L726 835L652 793L551 798L549 800L550 976L588 968L629 953L663 935L688 918L704 905L743 863L763 831L775 803L840 803L833 828L817 862L781 913L752 943L702 980L657 1004L598 1025L544 1036L512 1039L457 1039L427 1036L378 1026L334 1011L283 985L245 958L210 925L176 880L154 837L144 803L208 803L220 830L242 865L255 881L292 916L324 938L364 958L396 969L433 976L433 798L330 793L257 835L239 812L223 782L145 767L77 745L55 735L28 718L16 707L5 692L0 675L3 657L11 643L35 622L74 601L105 589L178 570Z" />
+        </svg>
         <h1>Jadi Trader Tools</h1>
         <p>Chart replay, screener, dan jurnal trading otomatis.</p>
         <nav>
