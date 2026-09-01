@@ -2513,7 +2513,9 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
     /* Nama simbolnya sekarang HANYA di baris atas, lewat airOtomatis —
        lihat catatan di bawah soal kenapa baris bawah tidak mengulanginya. */
     const jenis = bacaPasar(simbol);
-    const pasar = mt5 ? 'TRADE-FI' : jenis === 'futures' ? 'PERP' : jenis === 'spot' ? 'SPOT' : '';
+    const pasar = mt5 ? 'TRADE-FI'
+      : jenis === 'futures' || jenis === 'hyperliquid' ? 'PERP'
+      : jenis === 'spot' ? 'SPOT' : '';
     /* Teks sendiri hanya mengganti baris ATAS. Baris bawah tetap jenis
        pasarnya: itu keterangan yang tidak bisa diarang orangnya, dan justru
        paling berguna ketika baris atasnya sudah diganti jadi nama sendiri. */
@@ -2539,9 +2541,21 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
        tanda air yang cuma menulis "PERP" menjawab setengah pertanyaan:
        kontraknya apa, tapi bukan datanya dari mana. Sisi Trade-Fi sudah
        menyebut sumbernya; sisi kripto jadi setara. */
+    /* -- BURSANYA DIBACA, BUKAN DITULIS MATI --------------------------
+       Dulu di sini `pasar + ' · Binance'` apa adanya. Itu benar selama
+       kripto cuma punya satu sumber. Sejak proxy jatuh ke Hyperliquid untuk
+       koin yang tidak terdaftar di Binance, tanda air yang tetap menulis
+       "Binance" berbohong tentang satu-satunya hal yang tidak bisa
+       diverifikasi pembacanya sendiri: dari mana lilin ini datang.
+
+       Dan itu bukan kesalahan kosmetik. Harga koin yang sama bisa berbeda
+       antar bursa, dan orang yang membaca chart Hyperliquid sambil mengira
+       itu Binance akan menaruh level di angka yang tidak pernah tersentuh
+       di tempat ia mengeksekusi. */
+    const bursaKripto = jenis === 'hyperliquid' ? 'Hyperliquid' : 'Binance';
     const bawah = mt5
       ? (bacaAcuanMt5(simbol.slice(4)) ? 'ACUAN' : 'TRADE-FI')
-      : (pasar ? pasar + ' · Binance' : '');
+      : (pasar ? pasar + ' · ' + bursaKripto : '');
     return {
       utama: tampilan.tandaAirTeks.trim() || airOtomatis,
       sub: bawah || undefined,

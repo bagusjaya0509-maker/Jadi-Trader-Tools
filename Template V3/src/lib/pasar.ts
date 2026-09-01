@@ -209,7 +209,9 @@ export async function ambilKlines(simbol: string, tf: string, batas = 200, segar
        backend -- keduanya akan salah untuk sebagian koin, dan menulis jenis
        pasar yang keliru di chart adalah kebohongan di tempat orang menakar
        seberani apa masuk. */
-    if (j?.market === 'spot' || j?.market === 'futures') PASAR.set(simbol, j.market);
+    if (j?.market === 'spot' || j?.market === 'futures' || j?.market === 'hyperliquid') {
+      PASAR.set(simbol, j.market);
+    }
 
     const baris: any[] = Array.isArray(j) ? j : (j?.data ?? []);
     if (!Array.isArray(baris) || !baris.length) return KOSONG;
@@ -228,11 +230,16 @@ export async function ambilKlines(simbol: string, tf: string, batas = 200, segar
   }
 }
 
-const PASAR = new Map<string, 'spot' | 'futures'>();
+const PASAR = new Map<string, 'spot' | 'futures' | 'hyperliquid'>();
 
 /** Pasar yang melayani simbol ini menurut balasan proxy terakhir, atau null
- *  kalau belum pernah diminta. Dipakai tanda air chart. */
-export function bacaPasar(simbol: string): 'spot' | 'futures' | null {
+ *  kalau belum pernah diminta. Dipakai tanda air chart.
+ *
+ *  `hyperliquid` ada sejak proxy jatuh ke sana untuk koin yang tidak
+ *  terdaftar di Binance. Dibedakan, bukan disamakan dengan 'futures':
+ *  keduanya memang kontrak perpetual, tapi yang ditanyakan tanda air bukan
+ *  cuma "kontraknya apa" melainkan "datanya dari mana". */
+export function bacaPasar(simbol: string): 'spot' | 'futures' | 'hyperliquid' | null {
   return PASAR.get(simbol) ?? null;
 }
 
