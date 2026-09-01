@@ -260,14 +260,19 @@ function PanelAman({ k, muat, periksa }: {
 }
 
 /* ══ SATU BARIS ═══════════════════════════════════════════════════════════ */
-function Baris({ k, jaringan, muat, aksi }: {
+function Baris({ k, jaringan, sibuk, aksi }: {
   k: KoinPantau;
   jaringan: Record<string, InfoJaringan>;
-  muat: string;
+  /* Kunci gabungan "alamat:aksi", bukan alamat saja. Sempat alamat saja, dan
+     akibatnya tombol keamanan tidak pernah berkata "Memeriksa…" — barisnya
+     memang sibuk, tapi yang sibuk aksi yang lain. Satu penanda sibuk untuk
+     dua tombol berarti salah satunya selalu berbohong. */
+  sibuk: string;
   aksi: {
     periksa: () => void; hapus: () => void; aman: () => void; baca: () => void;
   };
 }) {
+  const muat = sibuk.startsWith(k.alamat + ':') ? sibuk.slice(k.alamat.length + 1) : '';
   const listing = k.status === 'listing' && k.pasar;
   const lipat = kelipatan(k);
   const presale = hargaPresale(k);
@@ -534,12 +539,12 @@ export default function CoinListing() {
             Sudah listing
           </h3>
           {sudah.map((k) => (
-            <Baris key={k.jaringan + k.alamat} k={k} jaringan={jaringan} muat={sibuk === k.alamat ? 'periksa' : ''}
+            <Baris key={k.jaringan + k.alamat} k={k} jaringan={jaringan} sibuk={sibuk}
               aksi={{
-                periksa: () => void jalankan(k.alamat, () => periksaSekarang(k.jaringan, k.alamat)),
-                hapus: () => void jalankan(k.alamat, () => hapusKoin(k.jaringan, k.alamat)),
-                aman: () => void jalankan(k.alamat, () => periksaKeamanan(k.jaringan, k.alamat)),
-                baca: () => void jalankan(k.alamat, () => tandaiDibaca(k.alamat)),
+                periksa: () => void jalankan(k.alamat + ':periksa', () => periksaSekarang(k.jaringan, k.alamat)),
+                hapus: () => void jalankan(k.alamat + ':hapus', () => hapusKoin(k.jaringan, k.alamat)),
+                aman: () => void jalankan(k.alamat + ':aman', () => periksaKeamanan(k.jaringan, k.alamat)),
+                baca: () => void jalankan(k.alamat + ':baca', () => tandaiDibaca(k.alamat)),
               }} />
           ))}
         </section>
@@ -551,11 +556,11 @@ export default function CoinListing() {
             Menunggu listing
           </h3>
           {menunggu.map((k) => (
-            <Baris key={k.jaringan + k.alamat} k={k} jaringan={jaringan} muat={sibuk === k.alamat ? 'periksa' : ''}
+            <Baris key={k.jaringan + k.alamat} k={k} jaringan={jaringan} sibuk={sibuk}
               aksi={{
-                periksa: () => void jalankan(k.alamat, () => periksaSekarang(k.jaringan, k.alamat)),
-                hapus: () => void jalankan(k.alamat, () => hapusKoin(k.jaringan, k.alamat)),
-                aman: () => void jalankan(k.alamat, () => periksaKeamanan(k.jaringan, k.alamat)),
+                periksa: () => void jalankan(k.alamat + ':periksa', () => periksaSekarang(k.jaringan, k.alamat)),
+                hapus: () => void jalankan(k.alamat + ':hapus', () => hapusKoin(k.jaringan, k.alamat)),
+                aman: () => void jalankan(k.alamat + ':aman', () => periksaKeamanan(k.jaringan, k.alamat)),
                 baca: () => {},
               }} />
           ))}
