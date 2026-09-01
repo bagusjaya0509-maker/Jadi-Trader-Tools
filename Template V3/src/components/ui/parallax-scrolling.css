@@ -87,22 +87,37 @@
 
 .parallax__title {
   margin: 0;
-  /* Diturunkan dari 13vw: "Jadi Trader" tiga huruf lebih panjang
-     daripada kata sebelumnya dan pada 13vw ia melewati tepi layar
-     375 px. */
-  font-size: clamp(2.25rem, 10vw, 9rem);
+  /* Diturunkan LAGI dari 10vw, kali ini karena judulnya berubah bentuk:
+     dulu satu kata bergantian, sekarang "Jadi Trader" + satu kata yang
+     berganti. Pasangan terpanjangnya "Jadi Trader Profitable" — 22
+     karakter, dua kali lipat kata tunggal terpanjang yang dulu ada di
+     sini. Pada 10vw ia lewat tepi layar bahkan di monitor 1280px.
+
+     8vw, bukan 8,5: titik paling sempit justru 640px -- lebar tepat saat
+     judulnya berhenti menumpuk dan jadi satu baris. Di sana 8,5vw menyisakan
+     10% saja, dan font cadangan terukur 3% lebih lebar daripada IBM Plex
+     Sans. Sisa 7% bukan margin, itu kebetulan. */
+  font-size: clamp(2.5rem, 8vw, 7rem);
   line-height: 0.95;
   font-weight: 600;
   letter-spacing: -0.03em;
   text-align: center;
   color: #fff;
 
-  /* Rumah dua lapis teks yang bertumpuk. Tingginya dikunci satu baris —
-     tanpa itu judulnya setinggi nol (kedua anaknya absolut) dan lapisan
-     parallax di bawahnya naik menutupinya. */
+  /* Tingginya IKUT ISINYA lagi.
+
+     Dulu dikunci `1em` karena TeksMorph menumpuk dua lapis teks yang
+     keduanya `absolute` — isinya nol, jadi tingginya harus dipaksa. Tidak
+     ada satu pun anak TextLoop yang absolut, jadi paksaan itu sekarang
+     justru merusak: di ponsel judulnya menumpuk jadi dua baris, dan kotak
+     setinggi satu baris memotong baris keduanya.
+
+     Aman dipasang auto karena `.parallax__layer-title` sudah
+     `align-items: center` — judulnya tetap di tengah berapa pun
+     tingginya. */
   position: relative;
   display: block;
-  height: 1em;
+  height: auto;
   /* LEBAR PENUH, dan ini bukan hiasan.
 
      Judulnya anak sebuah flex container, jadi lebarnya mengikuti isinya.

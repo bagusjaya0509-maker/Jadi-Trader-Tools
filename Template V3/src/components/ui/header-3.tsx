@@ -16,6 +16,7 @@ import {
   NavigationMenuTrigger,
 } from '@/components/ui/navigation-menu';
 import { cn } from '@/lib/utils';
+import { LogoJT } from '@/components/logo-jt';
 
 /* ════════════════════════════════════════════════════════════════════════
    HEADER halaman Pendaratan — struktur mengikuti header-3 (sshahaider)
@@ -88,7 +89,18 @@ export function Header() {
       <nav className="mx-auto flex h-14 w-full max-w-5xl items-center justify-between px-4">
         <div className="flex items-center gap-5">
           <a href="/pendaratan" className="hover:bg-accent flex items-center gap-2 rounded-md p-2">
-            <img src="brand/logo-ikon-256.png" alt="" className="size-5 rounded" />
+            {/* -- LOGO DIGAMBAR, BUKAN DIMUAT ------------------------------
+                Dulu <img src="brand/logo-ikon-256.png"> -- lambang LAMA
+                (lilin dengan garis tren emas), berbeda dari yang dipakai
+                sidebar dan favicon. Halaman depan justru satu-satunya
+                tempat orang bertemu merek ini pertama kali, dan di situlah
+                ia memakai lambang yang tidak dipakai di mana pun lagi.
+
+                Sumbernya juga relatif tanpa garis miring awal, jadi ia
+                pecah di rute mana pun selain akar. Kebetulan header ini
+                cuma dipasang di halaman pendaratan, jadi tidak pernah
+                terlihat -- tapi ia menunggu. */}
+            <LogoJT className="size-5 shrink-0 text-foreground" />
             <span className="text-sm font-semibold tracking-tight text-foreground">
               Jadi Trader <span className="text-muted-foreground font-normal">Tools</span>
             </span>
