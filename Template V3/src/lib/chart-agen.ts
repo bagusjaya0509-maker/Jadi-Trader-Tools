@@ -157,10 +157,22 @@ export interface SetelanMata {
   diubah: number;
 }
 
+/** Ruang Telegram beserta DUA sakelarnya di .env. `gambar` yang mati
+ *  berarti ruang itu tidak pernah menyuapi model — apa pun isi saklar
+ *  panel. `arsip` yang hidup berarti chart-nya tetap tersimpan untuk
+ *  dibaca sendiri, dan itu tidak berbiaya token sama sekali. */
+export interface RuangMata {
+  awalan: string;
+  agen: string;
+  gambar: boolean;
+  arsip: boolean;
+}
+
 export interface KeadaanMata {
   setelan: SetelanMata;
   jatah: { harian: number; pakai: number; sisa: number };
   model: string;
+  ruang: RuangMata[];
 }
 
 export async function bacaMata(): Promise<KeadaanMata | null> {
@@ -186,6 +198,12 @@ export async function bacaMata(): Promise<KeadaanMata | null> {
         sisa: Number(j.jatah?.sisa) || 0,
       },
       model: String(j.model || ''),
+      ruang: Array.isArray(j.ruang) ? j.ruang.map((r: RuangMata) => ({
+        awalan: String(r.awalan || ''),
+        agen: String(r.agen || ''),
+        gambar: r.gambar === true,
+        arsip: r.arsip === true,
+      })) : [],
     };
   } catch { return null; }
 }

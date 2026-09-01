@@ -99,11 +99,36 @@ module.exports = (app, { butuhLogin, batasLaju, express, DIR }) => {
   const mata = require('./mata-chart');
 
   app.get('/api/agen/chart/mata', batasLaju, butuhLogin, hanyaPemilik, (req, res) => {
+    /* ── GERBANG KEDUA IKUT DILAPORKAN ─────────────────────────────
+       Saklar di panel bukan satu-satunya yang menentukan AI membaca atau
+       tidak. Tiap ruang Telegram punya `TG*_GAMBAR` sendiri di .env, dan
+       ruang yang nilainya 0 tidak pernah menyuapi model apa pun.
+
+       Tanpa laporan ini, panel akan menulis "AI baca chart menyala"
+       untuk keadaan yang sebenarnya tidak membaca apa-apa — dan tidak
+       ada bentuk kebohongan layar yang lebih halus daripada saklar yang
+       menyala di atas kabel yang putus.
+
+       Sengaja dibaca dari env, bukan dari berkas keadaan pemantau: yang
+       menentukan memang env, dan menyalinnya ke tempat lain cuma
+       menciptakan satu salinan yang bisa basi. */
+    const AWALAN = ['TG', 'TG2', 'TG3', 'TG4'];
+    const ruang = [];
+    for (const a of AWALAN) {
+      if (!String(process.env[a + '_GRUP'] || '').trim()) continue;
+      ruang.push({
+        awalan: a,
+        agen: String(process.env[a + '_AGEN_NAMA'] || a).trim(),
+        gambar: process.env[a + '_GAMBAR'] === '1',
+        arsip: process.env[a + '_ARSIP'] === '1',
+      });
+    }
     res.json({
       ok: true,
       setelan: mata.bacaSetelan(),
       jatah: { harian: mata.JATAH_HARIAN, pakai: mata.pakaiJatah(), sisa: mata.sisaJatah() },
       model: mata.MODEL,
+      ruang,
     });
   });
 

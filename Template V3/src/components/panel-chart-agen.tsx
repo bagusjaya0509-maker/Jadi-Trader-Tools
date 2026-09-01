@@ -416,6 +416,14 @@ function SaklarMata() {
   if (!mata) return null;
 
   const aktif = mata.setelan.aktif;
+  /* Saklar panel menyala TIDAK sama dengan AI sedang bekerja. Ruang yang
+     TG*_GAMBAR-nya nol tidak pernah menyuapi model, dan kalau semua ruang
+     begitu maka saklar ini tidak mengubah apa pun sampai env-nya diubah.
+     Keadaan itu punya tampilannya sendiri di bawah — bukan disamarkan
+     jadi "menyala". */
+  const adaPenyuap = mata.ruang.some((r) => r.gambar);
+  const adaArsip = mata.ruang.some((r) => r.arsip);
+  const bekerja = aktif && adaPenyuap;
 
   async function simpan(ubah: { aktif?: boolean; pakaiTanggal?: boolean }) {
     if (!mata) return;
@@ -435,16 +443,18 @@ function SaklarMata() {
   const adaRentang = !!(mata.setelan.dari || mata.setelan.sampai);
 
   return (
-    <div className={cn('rounded-lg border', aktif ? 'border-zinc-800 bg-zinc-900/40' : 'border-amber-500/30 bg-amber-500/5')}>
+    <div className={cn('rounded-lg border', bekerja ? 'border-zinc-800 bg-zinc-900/40' : 'border-amber-500/30 bg-amber-500/5')}>
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 px-3 py-2">
-        <span aria-hidden className={cn('size-2 shrink-0 rounded-full', aktif ? 'bg-emerald-400' : 'bg-amber-400')} />
+        <span aria-hidden className={cn('size-2 shrink-0 rounded-full', bekerja ? 'bg-emerald-400' : 'bg-amber-400')} />
         <span className="text-[12px] font-medium text-zinc-200">
-          {aktif ? 'AI baca chart menyala' : 'AI baca chart DIHENTIKAN'}
+          {!aktif ? 'AI baca chart DIHENTIKAN'
+            : adaPenyuap ? 'AI baca chart menyala'
+            : 'AI baca chart tidak menerima gambar'}
         </span>
         <span className="text-[11px] text-zinc-500">
-          {aktif
-            ? mata.jatah.pakai + ' dari ' + mata.jatah.harian + ' gambar hari ini'
-            : 'tidak ada gambar yang dibaca, tidak ada token yang keluar'}
+          {!aktif ? 'tidak ada gambar yang dibaca, tidak ada token yang keluar'
+            : adaPenyuap ? mata.jatah.pakai + ' dari ' + mata.jatah.harian + ' gambar hari ini'
+            : 'tidak ada ruang yang menyuapinya — token tetap nol'}
         </span>
         {adaRentang && (
           <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10.5px] text-zinc-400">
@@ -495,6 +505,34 @@ function SaklarMata() {
               Hapus batas
             </button>
           </div>
+        </div>
+      )}
+
+      {/* ── KENAPA SAKLAR HIJAU PUN BISA TIDAK MEMBACA ────────────────
+          Dijelaskan di layar, bukan dibiarkan jadi teka-teki. Yang paling
+          membingungkan dari dua gerbang berlapis adalah saat yang satu
+          hijau dan yang lain merah tanpa keduanya terlihat bersamaan. */}
+      {aktif && !adaPenyuap && (
+        <p className="border-t border-zinc-800/70 px-3 py-2 text-[11.5px] leading-relaxed text-zinc-400">
+          Saklar ini menyala, tapi tidak ada ruang Telegram yang menyerahkan
+          gambarnya ke AI — <span className="angka text-zinc-300">TG*_GAMBAR</span> di
+          .env VPS bernilai 0 untuk semua ruang. Selama begitu, tidak ada
+          panggilan model yang berangkat berapa pun setelan di sini.
+          {adaArsip && ' Chart-nya tetap diarsipkan ke rak di bawah — pengarsipan tidak memakai token sama sekali.'}
+        </p>
+      )}
+
+      {mata.ruang.length > 0 && (
+        <div className="border-t border-zinc-800/70 px-3 py-1.5">
+          {mata.ruang.map((r) => (
+            <p key={r.awalan} className="text-[10.5px] text-zinc-600">
+              <span className="text-zinc-400">{r.agen}</span>
+              {' · '}dibaca AI: <span className={r.gambar ? 'text-emerald-400' : 'text-zinc-500'}>
+                {r.gambar ? 'ya' : 'tidak'}</span>
+              {' · '}diarsipkan: <span className={r.arsip ? 'text-emerald-400' : 'text-zinc-500'}>
+                {r.arsip ? 'ya' : 'tidak'}</span>
+            </p>
+          ))}
         </div>
       )}
 
