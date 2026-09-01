@@ -65,7 +65,26 @@ async function ambilFilter(dasar: string, simbol: string, kepala: Record<string,
 }
 
 function keStep(n: number, step: number, presisi: number | null) {
-  const v = Math.floor(n / step) * step;
+  /* -- PEMBAGIANNYA DIRAPIKAN DULU ---------------------------------
+     `n / step` di IEEE-754 sering meleset sedikit DI BAWAH bilangan
+     bulat yang seharusnya, dan Math.floor mengubah meleset sedikit itu
+     jadi kesalahan SATU STEP PENUH:
+
+         3.3   / 0.1   = 32.99999999999999  -> floor 32 -> 3.2
+         117.6 / 0.1   = 1175.9999999999998 -> floor 1175 -> 117.5
+         0.29  / 0.01  = 28.999999999999996 -> floor 28  -> 0.28
+
+     Yang terkirim ke Binance lalu berbeda dari yang tertulis di tiket --
+     bukan karena pembulatan step bursa, melainkan karena aritmetika kita
+     sendiri. Selisihnya kecil (satu tick) tapi ia nyata, dan ia menggeser
+     SL/TP serta qty ke arah yang tidak pernah diminta siapa pun.
+
+     toPrecision(12) membuang debu binernya sebelum dibulatkan ke bawah.
+     Dua belas angka penting jauh di atas presisi harga bursa mana pun,
+     jadi nilai yang memang BUKAN kelipatan step tetap turun ke step di
+     bawahnya seperti seharusnya -- yang berubah cuma yang sebenarnya
+     sudah pas. */
+  const v = Math.floor(Number((n / step).toPrecision(12))) * step;
   return v.toFixed(presisi ?? 6);
 }
 
