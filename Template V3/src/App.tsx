@@ -124,6 +124,10 @@ const Dokumentasi   = lazy(() => muat(() => import('@/halaman/Dokumentasi')));
 const Changelog     = lazy(() => muat(() => import('@/halaman/Changelog')));
 const Legal         = lazy(() => muat(() => import('@/halaman/Legal')));
 const CopyTrading   = lazy(() => muat(() => import('@/halaman/Analisa')));
+/* Coin Listing dimuat malas seperti yang lain. Ia memanggil GeckoTerminal
+   tiap 60 detik selama terbuka, jadi memasukkannya ke bundel awal berarti
+   membayarnya di setiap halaman yang bukan dia. */
+const CoinListing   = lazy(() => muat(() => import('@/halaman/CoinListing')));
 const HalamanHarga  = lazy(() => muat(() => import('@/halaman/Harga')));
 const Markas        = lazy(() => muat(() => import('@/halaman/Markas')));
 const Sosmed        = lazy(() => muat(() => import('@/halaman/Sosmed')));
@@ -482,6 +486,7 @@ export default function App() {
             <Route path="/personal-area"  element={<PersonalArea />} />
             <Route path="/marketplace"    element={<Marketplace />} />
             <Route path="/copy-signal"    element={<CopyTrading />} />
+            <Route path="/coin-listing"   element={<CoinListing />} />
             <Route path="/integrations"   element={<Integrasi />} />
             <Route path="/owner"          element={<Pemilik />} />
             <Route path="/social"         element={<Sosmed />} />

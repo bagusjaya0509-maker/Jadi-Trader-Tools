@@ -131,6 +131,15 @@ const NAV = [
 
              Tempatnya sekarang: tab ketiga di dalam kanal AI Chart. */
         ] },
+      /* Coin Listing di Workspace, bukan di Trading. Bedanya: menu
+         Trading dibuka untuk MEMUTUSKAN sesuatu hari ini — dashboard,
+         screener, jurnal semuanya dibaca sambil menimbang posisi. Halaman
+         ini dibuka untuk MENUNGGU, dan yang ditunggunya berhari-hari.
+
+         Tanpa sub-menu: ia satu daftar, satu pertanyaan. Sub-menu yang
+         cuma memfilter daftar yang sama menyiratkan ada dua tempat
+         berbeda, padahal cuma ada satu. */
+      { ke: '/coin-listing',   label: 'Coin Listing',     Ikon: Radar },
       { ke: '/integrations',   label: 'Integrations',     Ikon: Plug,
         sub: [
           { ke: '/integrations',             label: 'Connection' },
@@ -207,6 +216,7 @@ const JUDUL: Record<string, string> = {
   '/journal': 'Journal',
   '/personal-area': 'Personal Area',
   '/copy-signal': 'Copy Signal',
+  '/coin-listing': 'Coin Listing',
   '/marketplace': 'Marketplace',
   '/integrations': 'Integrations',
   '/owner': 'Sales Report',
