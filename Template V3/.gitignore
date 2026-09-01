@@ -11,3 +11,6 @@ kunci-firebase.json
 .env.*
 dev.log
 *.log
+
+# Rahasia pekerja mata lokal — TIDAK boleh ikut ke repo
+skrip/mata-lokal.env

@@ -620,8 +620,60 @@ async function siapkanRuang(client, r) {
       catat('  gambar gagal diunduh:', e && e.message);
       return null;
     }
-    const hasil = await mata.bacaGambarChart(bita, teks, 'image/jpeg', waktuPesan,
-      { cariHarga: hargaPasar });
+    /* ── PENYARING GRATIS DI DEPAN PANGGILAN BERBAYAR ───────────────
+       Model penglihatan di PC pemilik dipakai lebih dulu — bukan untuk
+       membaca level, melainkan untuk MENGENALI. Diukur 1 Sep 2026 dengan
+       chart sungguhan: nama instrumen, tulisan di gambar, dan arah panah
+       ia kuasai; angka tidak (lihat catatan di mata-lokal.mjs).
+
+       Dua hal yang didapat, dan keduanya berharga:
+
+       (a) Gambar yang BUKAN chart tidak pernah sampai ke model berbayar.
+           Itu penghematan yang sungguhan, karena satu-satunya cara
+           mengetahuinya dulu adalah dengan membayar untuk bertanya.
+
+       (b) Nama instrumen dari judul chart diteruskan sebagai acuan harga.
+           Kalau model berbayar salah menyebut pasangan -- dan ia pernah
+           menyebut tanda air analis sebagai nama koin -- wasit angkanya
+           tetap menemukan harga yang benar.
+
+       PC mati = tidak ada yang berubah. Jawaban `lokal:false` datang dalam
+       nol detik, dan alirannya lanjut ke jalur berbayar persis seperti
+       sebelum berkas ini ada. Penyaring yang menahan pekerjaan saat ia
+       sendiri tidak tersedia bukan penghematan, itu kerusakan. */
+    let petunjukKoin = '';
+    try {
+      const rl = await fetch(DASAR + '/api/otak/gambar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-App-Token': APP_TOKEN },
+        body: JSON.stringify({ gambar: bita.toString('base64'), tungguMs: 180000 }),
+        signal: AbortSignal.timeout(200000),
+      });
+      const jl = await rl.json().catch(() => ({}));
+      if (jl && jl.lokal && jl.jawaban) {
+        const dl = JSON.parse(String(jl.jawaban).replace(/^\s*```(?:json)?/i, '').replace(/```\s*$/, ''));
+        if (dl && dl.chart === false) {
+          catat('  mata lokal: bukan chart —', String(dl.catatan || '').slice(0, 70),
+                '· panggilan berbayar DILEWATI');
+          return null;
+        }
+        petunjukKoin = mata.pasanganDariJudul(dl && dl.judul) || '';
+        catat('  mata lokal:', petunjukKoin || '?', '·', (dl && dl.panah) || '-',
+              '·', ((dl && dl.teks_gambar) || []).slice(0, 4).join('/') || '-');
+      } else if (jl && jl.alasan) {
+        catat('  mata lokal dilewati —', jl.alasan);
+      }
+    } catch (e) {
+      catat('  mata lokal gagal:', (e && e.message) || '?', '— lanjut ke berbayar');
+    }
+
+    const hasil = await mata.bacaGambarChart(bita, teks, 'image/jpeg', waktuPesan, {
+      /* Petunjuk dari pengenalan lokal dipakai LEBIH DULU; nama dari model
+         berbayar jadi cadangan. Yang lokal melihat judul chart apa adanya,
+         yang berbayar menyimpulkan -- dan menyalin lebih sulit salah
+         daripada menyimpulkan. */
+      cariHarga: async (pasangan) => (await hargaPasar(petunjukKoin)) || (await hargaPasar(pasangan)),
+    });
     if (!hasil || hasil.galat) {
       catat('  mata gagal:', (hasil && hasil.galat) || 'jawaban kosong');
       return null;
