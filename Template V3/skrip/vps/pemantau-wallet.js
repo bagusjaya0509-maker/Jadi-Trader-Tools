@@ -30,6 +30,7 @@ require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const { bacaDompet, catatWallet, batasTerakhir } = require('./wallet-vps');
+const { simbolBinance } = require('./simbol-bursa');
 
 const DIR = __dirname;
 const API = 'https://api.hyperliquid.xyz/info';
@@ -321,7 +322,30 @@ async function jagaTiruan(posisiDompet) {
 
   let berubah = false;
   for (const t of perlu) {
-    const simbol = t.koin + 'USDT';
+    /* -- NAMA KOINNYA DITERJEMAHKAN, BUKAN DITEMPELI 'USDT' -----------
+       Dulu di sini `t.koin + 'USDT'`. Untuk BTC benar; untuk kPEPE ia
+       menghasilkan KPEPEUSDT -- simbol yang tidak pernah ada di Binance,
+       tidak pernah cocok dengan posisi mana pun, dan GAGAL TANPA SUARA:
+       penjaganya cuma menyimpulkan "aku tidak punya posisi itu" lalu
+       berjalan terus. Sakelar auto-close-nya menyala di layar tapi tidak
+       pernah bisa mengeksekusi apa pun. */
+    let simbol;
+    try {
+      simbol = await simbolBinance(t.koin, { dasar: DASAR, token: APP_TOKEN, catat });
+    } catch (e) {
+      /* BISU, bukan "tidak ada". Bursa yang tidak menjawab tidak boleh
+         membuat penjaga ini menyimpulkan apa pun -- alasan yang sama
+         dengan penjaga `punyaku === null` di atas. */
+      catat('  auto-close: simbol', t.koin, 'belum bisa dipastikan -', e && e.message);
+      continue;
+    }
+    if (!simbol) {
+      /* Koinnya memang tidak terdaftar di Binance Futures. Kalau begitu
+         posisi tiruannya tidak mungkin pernah dibuka di sana, jadi tidak
+         ada yang perlu ditutup. Bukan galat -- jawaban. */
+      if (t.konfirmasi) { t.konfirmasi = 0; berubah = true; }
+      continue;
+    }
     const milik = punyaku.find((p) => String(p.symbol).toUpperCase() === simbol);
     const sumberMasih = posisiDompet.some(
       (p) => p.alamat === t.alamat && String(p.koin).toUpperCase() === t.koin);
