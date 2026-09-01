@@ -2739,10 +2739,25 @@ export default function Analisa() {
             tindakan di baris kepala, dan tindakan tunggal yang tidak
             menonjol sama saja dengan tidak ada. Tulisannya hilang di
             ponsel dan ikonnya yang menanggung, sama seperti sebelumnya. */}
+        {/* -- SAKELAR, BUKAN JALAN SATU ARAH ------------------------------
+            Dulu ia hanya `setSub('diikuti')`. Tombolnya tetap terlihat
+            sesudah ditekan -- dan terlihat MENYALA, seolah masih bisa
+            ditekan -- tapi menekannya lagi cuma menyetel keadaan yang sudah
+            berlaku. Tidak ada jalan pulang selain menekan menu lain, dan
+            yang menekannya menyimpulkan panelnya tidak bisa ditutup.
+
+            Tombol yang berubah rupa saat aktif SUDAH berjanji ia sakelar.
+            Sekarang janjinya ditepati. */}
         {diDepan && (
-          <button onClick={() => setSub('diikuti')}
-            title="Analis yang kamu ikuti — lot, batas rugi, dan pembatalannya"
-            className="ml-auto flex cursor-pointer items-center gap-1.5 rounded-md bg-zinc-100 px-2.5 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white">
+          <button onClick={() => setSub(sub === 'diikuti' ? 'market' : 'diikuti')}
+            title={sub === 'diikuti'
+              ? 'Tutup daftar analis yang kamu ikuti'
+              : 'Analis yang kamu ikuti — lot, batas rugi, dan pembatalannya'}
+            aria-pressed={sub === 'diikuti'}
+            className={cn('ml-auto flex cursor-pointer items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors',
+              sub === 'diikuti'
+                ? 'border border-zinc-600 bg-zinc-800 text-zinc-100 hover:bg-zinc-700'
+                : 'bg-zinc-100 text-zinc-950 hover:bg-white')}>
             <Users className="size-3.5" />
             <span className="hidden sm:inline">Signal Diikuti</span>
           </button>
