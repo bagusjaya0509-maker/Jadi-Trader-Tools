@@ -72,6 +72,27 @@ export interface PenandaTiru {
   /** Berapa pindaian berturut-turut sumbernya terlihat flat. */
   konfirmasi?: number;
   terakhir?: { waktu: number; sukses: boolean; jumlah: number; arah: string };
+
+  /* -- SISI BUKA ---------------------------------------------------- */
+  /** Buka posisi otomatis saat dompet sumbernya MULAI memegang koin ini.
+   *  Mati sebagai bawaan, dan tidak bisa dinyalakan sebelum `usd` diisi. */
+  otoBuka?: boolean;
+  /** Ukuran order dalam USD. MARGIN -- uang yang dipertaruhkan -- bukan
+   *  nilai posisi. Nilai posisinya usd x leverage; di 1x keduanya sama. */
+  usd?: number;
+  leverage?: number;
+  /** Berapa pindaian berturut-turut sumbernya terlihat baru membuka. */
+  bukaKonfirmasi?: number;
+  /** Apakah sumbernya sedang memegang, menurut pindaian TERAKHIR. Ini yang
+   *  membuat pemantau bisa membedakan "baru membuka" dari "sedang punya" --
+   *  `undefined` berarti belum pernah diamati, dan itu TIDAK memicu apa
+   *  pun. */
+  sumberPegang?: boolean;
+  /** Koin ini tidak terdaftar di Binance Futures. Ditandai server supaya
+   *  layar bisa mengatakannya alih-alih diam. */
+  takAdaDiBinance?: boolean;
+  terakhirBuka?: number;
+  simbolBuka?: string;
 }
 
 export interface KeadaanDompet {
@@ -181,6 +202,27 @@ export async function aturOtoTutup(alamat: string, koin: string, otoTutup: boole
     });
     return r.ok;
   } catch { return false; }
+}
+
+/** Sakelar auto-open, ukuran, dan leverage. Ketiganya lewat SATU rute
+ *  tapi masing-masing opsional: layar mengirim cuma yang berubah, jadi
+ *  mengetik ukuran tidak diam-diam ikut menyalakan sakelarnya. */
+export async function aturBuka(
+  alamat: string, koin: string,
+  ubah: { otoBuka?: boolean; usd?: number; leverage?: number },
+): Promise<{ ok: boolean; pesan?: string }> {
+  const t = await token();
+  if (!t) return { ok: false, pesan: 'Belum masuk.' };
+  try {
+    const r = await fetch(`${dasar()}/api/agen/wallet/tiru/buka`, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ alamat, koin, ...ubah }),
+    });
+    if (r.ok) return { ok: true };
+    const j = await r.json().catch(() => ({}));
+    return { ok: false, pesan: j.error || `Server menjawab ${r.status}` };
+  } catch { return { ok: false, pesan: 'Tidak bisa menghubungi server.' }; }
 }
 
 export async function batalTiru(alamat: string, koin: string): Promise<boolean> {

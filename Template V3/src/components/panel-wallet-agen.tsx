@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { SparklineSaldo } from '@/components/kurva-saldo';
 import {
-  keadaanDompet, tambahDompet, hapusDompet, peringkatDompet, tandaiTiru, batalTiru, aturOtoTutup,
+  keadaanDompet, tambahDompet, hapusDompet, peringkatDompet, tandaiTiru, batalTiru, aturOtoTutup, aturBuka,
   type KeadaanDompet, type TransaksiDompet, type PosisiDompet, type Peringkat,
   type JendelaPeringkat, type PitaAkun, type RiwayatBursa, type PenandaTiru,
   type DompetPantau,
@@ -996,12 +996,13 @@ function RincianDompet({ w, posisi, log, tiru, ubahTiru, tutup }: {
      · ARAH BERBEDA. Kita long sementara dompetnya short di koin yang sama
        berarti salah satunya salah baca, dan biasanya kita.
    ════════════════════════════════════════════════════════════════════════ */
-function PosisiTiruan({ tiru, dompet, posisi, ubahTiru, ubahOto }: {
+function PosisiTiruan({ tiru, dompet, posisi, ubahTiru, ubahOto, ubahBuka }: {
   tiru: PenandaTiru[];
   dompet: DompetPantau[];
   posisi: PosisiDompet[];
   ubahTiru: (alamat: string, koin: string, nyala: boolean) => void;
   ubahOto: (alamat: string, koin: string, nyala: boolean) => void;
+  ubahBuka: (alamat: string, koin: string, ubah: { otoBuka?: boolean; usd?: number; leverage?: number }) => void;
 }) {
   /* Posisi SENDIRI dari bursa. Hook-nya sudah dipakai di tempat lain dan
      menyegarkan tiap 30 detik; memanggilnya lagi di sini tidak menambah
@@ -1122,6 +1123,79 @@ function PosisiTiruan({ tiru, dompet, posisi, ubahTiru, ubahOto }: {
                 )}
               </span>
             </label>
+
+            {/* ── KOIN INI TIDAK ADA DI BINANCE ─────────────────────────
+                Dilaporkan, bukan didiamkan. Tanpa baris ini orangnya
+                menyangka salinannya berjalan untuk semua koin, padahal
+                yang satu ini dilewati tiap kali — dan ia baru tahu saat
+                menghitung hasil yang tidak pernah datang. */}
+            {b.takAdaDiBinance && (
+              <p className="mt-1.5 rounded-md border border-sky-500/30 bg-sky-500/5 px-2 py-1.5 text-[11px] leading-relaxed text-sky-200/80">
+                <span className="font-medium">{b.koin} tidak ada di Binance Futures.</span>{' '}
+                Posisinya tidak dibuka di sana. Koin seperti ini nanti dilayani lewat
+                jalur Hyperliquid.
+              </p>
+            )}
+
+            {/* ── SAKELAR AUTO-OPEN ─────────────────────────────────────
+                Ditaruh DI BAWAH auto-close, dan warnanya merah sementara
+                yang di atas kuning. Bukan selera: yang di atas mengeluarkan
+                uang dari posisi, yang ini memasukkannya ke posisi baru.
+                Dua izin yang berbeda beratnya tidak boleh terlihat sama.
+
+                Ukurannya diisi DULU — sakelarnya sendiri ditolak server
+                kalau ukurannya masih kosong, dan tombol yang bisa ditekan
+                lalu ditolak lebih buruk daripada tombol yang menunggu. */}
+            <div className={cn('mt-1.5 rounded-md border px-2 py-1.5 transition-colors',
+              b.otoBuka ? 'border-red-500/40 bg-red-500/5' : 'border-zinc-800')}>
+              <div className="flex flex-wrap items-end gap-2">
+                <label className="block">
+                  <span className="mb-0.5 block text-[9.5px] uppercase tracking-wide text-zinc-500">Ukuran $</span>
+                  <input type="number" min={1} max={500} step={5}
+                    defaultValue={b.usd ?? ''}
+                    placeholder="30"
+                    onBlur={(e) => {
+                      const v = Number(e.target.value);
+                      if (v > 0 && v !== b.usd) ubahBuka(b.alamat, b.koin, { usd: v });
+                    }}
+                    className="angka w-[74px] rounded border border-zinc-700 bg-zinc-900 px-1.5 py-1 text-[12px] text-zinc-100 outline-none focus:border-zinc-500" />
+                </label>
+                <label className="block">
+                  <span className="mb-0.5 block text-[9.5px] uppercase tracking-wide text-zinc-500">Leverage</span>
+                  <select value={b.leverage ?? 1}
+                    onChange={(e) => ubahBuka(b.alamat, b.koin, { leverage: Number(e.target.value) })}
+                    className="angka w-[62px] cursor-pointer rounded border border-zinc-700 bg-zinc-900 px-1.5 py-1 text-[12px] text-zinc-100 outline-none focus:border-zinc-500">
+                    {[1, 2, 3].map((x) => <option key={x} value={x}>{x}×</option>)}
+                  </select>
+                </label>
+                <span className="mb-1 text-[10.5px] text-zinc-600">
+                  {b.usd ? 'nilai posisi ~$' + (b.usd * (b.leverage ?? 1)).toFixed(0) : 'isi ukuran dulu'}
+                </span>
+              </div>
+
+              <label className="mt-1.5 flex cursor-pointer items-start gap-2">
+                <input type="checkbox" checked={!!b.otoBuka}
+                  onChange={(e) => ubahBuka(b.alamat, b.koin, { otoBuka: e.target.checked })}
+                  className="mt-0.5 size-3.5 shrink-0 cursor-pointer accent-red-400" />
+                <span className="min-w-0 flex-1">
+                  <span className={cn('block text-[11.5px] font-medium',
+                    b.otoBuka ? 'text-red-300' : 'text-zinc-400')}>
+                    Buka posisiku otomatis saat dompet ini MULAI pegang {b.koin}
+                  </span>
+                  <span className="block text-[10.5px] leading-relaxed text-zinc-600">
+                    Market, tanpa SL/TP — pintu keluarnya sakelar di atas. Yang dipicu
+                    saat dompetnya BARU membuka, bukan saat ia sedang punya: pindaian
+                    pertama sesudah ini dinyalakan cuma mencatat.
+                    {b.bukaKonfirmasi ? ' · konfirmasi ' + b.bukaKonfirmasi + '/2' : ''}
+                  </span>
+                  {b.terakhirBuka && (
+                    <span className="block text-[10.5px] text-emerald-400/80">
+                      Terakhir dibuka: {b.simbolBuka} · {umur(b.terakhirBuka)}
+                    </span>
+                  )}
+                </span>
+              </label>
+            </div>
 
             {(b.sumberTutup || b.arahBeda) && (
               <p className={cn('mt-1.5 flex items-start gap-1.5 text-[11px] leading-relaxed',
@@ -1498,7 +1572,8 @@ export function PanelWalletAgen({ pemilik = false }: { pemilik?: boolean }) {
               ubahTiru={(a, k, nyala) => {
                 void (nyala ? tandaiTiru(a, k) : batalTiru(a, k)).then(() => tarik());
               }}
-              ubahOto={(a, k, nyala) => { void aturOtoTutup(a, k, nyala).then(() => tarik()); }} />
+              ubahOto={(a, k, nyala) => { void aturOtoTutup(a, k, nyala).then(() => tarik()); }}
+              ubahBuka={(a, k, u) => { void aturBuka(a, k, u).then((h) => { if (!h.ok && h.pesan) alert(h.pesan); tarik(); }); }} />
           )}
 
           <section>
