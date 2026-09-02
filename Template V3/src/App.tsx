@@ -340,7 +340,24 @@ function Kerangka() {
      Dikecualikan DI SINI, bukan dengan memindahkan rutenya keluar
      Kerangka: halamannya tetap butuh AppShell di sekelilingnya, dan rute
      yang dipindah keluar kehilangan seluruh bingkainya. */
-  if (!import.meta.env.DEV && !preview && lokasi.pathname !== '/docs'
+  /* ── /harga IKUT DIBUKA, 2 Sep 2026 ─────────────────────────────────
+     Alasannya persis sama dengan /docs di atas, dan satu tingkat lebih
+     tajam: halaman harga di balik gerbang langganan hanya bisa dilihat
+     orang yang SUDAH membayar. Yang butuh membacanya justru yang belum,
+     atau yang masa gratisnya baru habis.
+
+     Yang membuatnya mendesak: surat pengingat masa akses mengirim orang
+     ke sini. Selama /harga digerbangi, tombol "Lihat paket & harga" di
+     surat itu memantulkan penerimanya ke layar minta-akses -- surat yang
+     mengajak melihat harga, mendarat di tempat yang tidak menyebut harga
+     sama sekali.
+
+     Aman dibuka: halaman/Harga.tsx tidak menyentuh useAuth, langganan,
+     maupun Firestore. Ia cuma membungkus komponen Pricing_05 yang sama
+     dengan yang dipakai halaman pendaratan. Tidak ada data siapa pun di
+     dalamnya untuk bocor. */
+  const TERBUKA = new Set(['/docs', '/harga']);
+  if (!import.meta.env.DEV && !preview && !TERBUKA.has(lokasi.pathname)
       && !(pemilik || langganan.status === 'aktif' || langganan.status === 'pratinjau')) {
     return <Navigate to={`/akses?dari=${encodeURIComponent(lokasi.pathname)}`} replace />;
   }

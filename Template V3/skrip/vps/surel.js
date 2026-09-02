@@ -672,7 +672,19 @@ async function kirimSuratPengingat({ email, nama, berakhir, sisaHari }) {
   const sisa = Number(sisaHari);
   const lewat = sisa <= 0;
   const sapaan = nama ? 'Halo ' + String(nama).trim() + ',' : 'Halo,';
-  const tautan = SITUS + '/akses';
+  /* ── KE DAFTAR PAKET, BUKAN KE HALAMAN MASUK ────────────────────────
+     Diminta pemilik 2 Sep 2026: "untuk yang email reminder langsung
+     arahkan ke harga paket."
+
+     Dan itu benar secara isi, bukan cuma selera. Orang yang menerima surat
+     ini SUDAH punya akun -- ia sudah mendaftar, sudah dipakaikan akses
+     gratis selama 30 hari. Mengirimnya ke halaman masuk berarti menjawab
+     pertanyaan yang tidak ia punya. Yang belum ia lihat adalah harganya.
+
+     /harga sengaja dikeluarkan dari gerbang di App.tsx pada hari yang sama;
+     tanpa itu tautan ini memantul ke layar minta-akses. Kalau suatu saat
+     gerbang itu dipasang kembali, tautan DI SINI ikut mati diam-diam. */
+  const tautan = SITUS + '/harga';
 
   /* Judulnya menyebut TANGGAL, bukan "segera". Orang yang membuka kotak
      masuknya seminggu kemudian masih tahu persis apa yang dibicarakan --
@@ -704,7 +716,7 @@ async function kirimSuratPengingat({ email, nama, berakhir, sisaHari }) {
     'Berakhir    : ' + sampai,
     lewat ? '' : 'Sisa waktu  : ' + sisa + ' hari',
     '',
-    'Lihat pilihan akses di sini:',
+    'Lihat paket dan harganya di sini:',
     tautan,
     '',
     penjelasan,
@@ -729,7 +741,7 @@ async function kirimSuratPengingat({ email, nama, berakhir, sisaHari }) {
     ${lewat ? '' : `<tr><td style="padding:3px 16px 3px 0;color:#71717a">Sisa waktu</td><td style="padding:3px 0"><strong>${amanHtml(String(sisa))} hari</strong></td></tr>`}
   </table>
   <p style="margin:0 0 18px">
-    <a href="${tautan}" style="display:inline-block;background:#18181b;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-weight:600">Lihat pilihan akses</a>
+    <a href="${tautan}" style="display:inline-block;background:#18181b;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-weight:600">Lihat paket &amp; harga</a>
   </p>
   <p style="margin:0 0 12px;color:#52525b">${amanHtml(penjelasan)}</p>
   <p style="margin:0;color:#52525b">Kalau ada yang mau ditanyakan sebelum memutuskan, balas surat ini.</p>`,
