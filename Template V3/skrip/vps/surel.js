@@ -135,10 +135,92 @@ function tanggalIndo(ms) {
   } catch { return ''; }
 }
 
-/* Surat sengaja pendek dan tanpa gambar. Email panjang bergambar dari
-   pengirim yang belum dikenal adalah bentuk yang paling sering ditandai
-   spam — dan surat pertama dari sebuah merek adalah surat yang paling
-   tidak boleh nyasar ke folder spam. */
+
+/* ══ BINGKAI SURAT ════════════════════════════════════════════════════════
+   Kop dan kaki tinggal di SATU tempat, dan tiap surat cuma menyetor badannya.
+
+   Bukan demi hemat baris. Sebelumnya blok tanda tangan yang sama disalin di
+   tiga surat dan sudah mulai menyimpang -- dua bertema terang, satu gelap.
+   Orang yang menerima dua di antaranya punya alasan wajar untuk curiga salah
+   satunya palsu, dan surat berisi tautan akses adalah persis jenis surat yang
+   paling sering dicurigai. Waktu surat keempat (pengingat masa gratis habis)
+   ditulis nanti, ia mewarisi kop ini tanpa disalin lagi.
+
+   ── KENAPA TABEL, BUKAN DIV ─────────────────────────────────────────────
+   HTML surat memang kuno. Outlook di Windows merender lewat mesin Word, yang
+   tidak mengenal flexbox maupun grid; div bersusun di sana runtuh jadi satu
+   kolom kiri. Tabel bersarang dengan lebar sebagai ATRIBUT (bukan cuma CSS)
+   adalah satu-satunya tata letak yang bisa dipercaya di semua klien.
+
+   ── GAMBAR BOLEH HILANG ─────────────────────────────────────────────────
+   Banyak klien tidak memuat gambar sampai penerimanya menekan "tampilkan
+   gambar". Jadi nama merek ditulis sebagai TEKS di sebelah logo, bukan
+   dijadikan bagian dari gambarnya. Kalau logonya diblokir, kop ini tetap
+   terbaca -- yang hilang cuma hiasannya. Tidak ada satu pun informasi surat
+   yang tinggal di dalam gambar.
+
+   Lebarnya dikunci 600px: patokan lama yang bertahan karena panel baca
+   Outlook memang selebar itu. */
+const HURUF = "system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+const KOP_GAMBAR = SITUS + '/brand/email-kop-128.png';
+
+function bungkusSurat({ isi, pratinjau }) {
+  /* Baris abu-abu di sebelah judul surat pada daftar kotak masuk. Tanpa ini
+     Gmail mengambil kalimat pertama badan surat apa adanya. Ekor karakter tak
+     terlihat itu mendorong sisa badan keluar dari cuplikan -- kalau tidak,
+     pratinjaunya tersambung jadi satu kalimat aneh. */
+  const sisip = pratinjau
+    ? `<div style="display:none;max-height:0;overflow:hidden;mso-hide:all">${amanHtml(pratinjau)}${'&#8199;&#65279;'.repeat(80)}</div>`
+    : '';
+
+  return `<!doctype html>
+<html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<meta name="color-scheme" content="light"><title>Jadi Trader Tools</title></head>
+<body style="margin:0;padding:0;background:#f4f4f5">${sisip}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f4f4f5">
+<tr><td align="center" style="padding:24px 12px">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#ffffff;border:1px solid #e4e4e7;border-radius:12px">
+
+  <tr><td style="padding:22px 28px 16px">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+      <td valign="middle" style="padding-right:11px">
+        <img src="${KOP_GAMBAR}" width="34" height="34" alt="" style="display:block;width:34px;height:34px;border:0;border-radius:8px">
+      </td>
+      <td valign="middle" style="font-family:${HURUF};font-size:15px;font-weight:700;color:#18181b;letter-spacing:-.01em">Jadi Trader Tools</td>
+    </tr></table>
+  </td></tr>
+  <tr><td style="padding:0 28px"><div style="height:1px;background:#e4e4e7;font-size:0;line-height:0">&nbsp;</div></td></tr>
+
+  <tr><td style="padding:22px 28px 8px;font-family:${HURUF};font-size:14px;line-height:1.65;color:#18181b">
+${isi}
+  </td></tr>
+
+  <tr><td style="padding:8px 28px 24px">
+    <div style="height:1px;background:#e4e4e7;font-size:0;line-height:0;margin-bottom:14px">&nbsp;</div>
+    <p style="margin:0;font-family:${HURUF};font-size:12px;line-height:1.65;color:#71717a">
+      <strong style="color:#52525b">Jadi Trader Tools</strong> &middot; PT Solusi Bursa Nusantara<br>
+      Alat bantu analisa pasar. <strong>Bukan nasihat investasi.</strong><br>
+      <a href="${SITUS}/legal" style="color:#71717a">Ketentuan lengkap</a> &middot;
+      <a href="mailto:${BALAS_KE}" style="color:#71717a">${BALAS_KE}</a>
+    </p>
+    <p style="margin:10px 0 0;font-family:${HURUF};font-size:11px;line-height:1.6;color:#a1a1aa">
+      Kamu menerima surat ini karena mendaftar di jaditrader.co.id.
+    </p>
+  </td></tr>
+
+</table>
+</td></tr></table>
+</body></html>`;
+}
+
+/* Surat sengaja pendek. Satu logo kecil di kop, selebihnya teks.
+
+   Catatan ini dulu berbunyi "tanpa gambar" dan alasannya masih berlaku:
+   surat panjang penuh gambar dari pengirim yang belum dikenal adalah bentuk
+   yang paling sering ditandai spam, dan surat pertama dari sebuah merek
+   adalah surat yang paling tidak boleh nyasar ke sana. Yang berubah cuma
+   takarannya -- satu gambar 1 KB di kop, bukan spanduk. Rasio teks terhadap
+   gambar tetap berat di sisi teks, dan itu yang dihitung penyaring. */
 function susunSurat({ nama, kode, berakhir, jenis }) {
   const sapaan = nama ? `Halo ${nama},` : 'Halo,';
   const sampai = berakhir ? tanggalIndo(berakhir) : '';
@@ -165,8 +247,9 @@ function susunSurat({ nama, kode, berakhir, jenis }) {
     `Ketentuan lengkap: ${SITUS}/legal`,
   ].filter((b) => b !== null).join('\n');
 
-  const html = `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;font-size:14px;line-height:1.65;color:#18181b;max-width:520px">
-  <p style="margin:0 0 14px">${amanHtml(sapaan)}</p>
+  const html = bungkusSurat({
+    pratinjau: 'Permintaan aksesmu sudah disetujui — masuk pakai akun yang sama.',
+    isi: `<p style="margin:0 0 14px">${amanHtml(sapaan)}</p>
   <p style="margin:0 0 18px">Permintaan aksesmu ke <strong>Jadi Trader Tools</strong> sudah disetujui.</p>
   <table style="border-collapse:collapse;margin:0 0 20px;font-size:13.5px">
     <tr><td style="padding:3px 16px 3px 0;color:#71717a">Jenis akses</td><td style="padding:3px 0"><strong>${amanHtml(label)}</strong></td></tr>
@@ -176,14 +259,8 @@ function susunSurat({ nama, kode, berakhir, jenis }) {
   <p style="margin:0 0 18px">
     <a href="${SITUS}" style="display:inline-block;background:#18181b;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-weight:600">Masuk ke Jadi Trader Tools</a>
   </p>
-  <p style="margin:0 0 18px;color:#52525b">Pakai akun yang sama dengan yang kamu daftarkan — aksesnya sudah menempel di akun itu, jadi biasanya kamu tidak perlu memasukkan kode apa pun. Kalau setelah masuk kamu masih terkunci, balas email ini dan sertakan kode di atas.</p>
-  <hr style="border:none;border-top:1px solid #e4e4e7;margin:22px 0 14px">
-  <p style="margin:0;font-size:12px;color:#71717a">
-    Jadi Trader Tools · PT Solusi Bursa Nusantara<br>
-    Alat bantu analisa pasar. <strong>Bukan nasihat investasi.</strong><br>
-    <a href="${SITUS}/legal" style="color:#71717a">Ketentuan lengkap</a>
-  </p>
-</div>`;
+  <p style="margin:0;color:#52525b">Pakai akun yang sama dengan yang kamu daftarkan — aksesnya sudah menempel di akun itu, jadi biasanya kamu tidak perlu memasukkan kode apa pun. Kalau setelah masuk kamu masih terkunci, balas email ini dan sertakan kode di atas.</p>`,
+  });
 
   return { teks, html };
 }
@@ -372,19 +449,46 @@ function susunSuratKeputusan({ nama, keputusan, pesan, produk }) {
     + (pesan ? '\nCatatan dari kami:\n' + pesan + '\n' : '')
     + '\n' + penutup + '\n\n-- Jadi Trader Tools\nhttps://jaditrader.co.id';
 
-  const html = '<!doctype html><html><body style="margin:0;padding:24px;background:#09090b;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#e4e4e7">'
-    + '<div style="max-width:520px;margin:0 auto;border:1px solid #27272a;border-radius:12px;padding:24px;background:#0f0f11">'
-    + '<h1 style="margin:0 0 12px;font-size:17px;color:#fafafa">' + amanHtml(judul) + '</h1>'
-    + '<p style="margin:0 0 8px;font-size:14px;line-height:1.6;color:#a1a1aa">' + amanHtml(sapa) + '</p>'
-    + '<p style="margin:0 0 14px;font-size:14px;line-height:1.6;color:#a1a1aa">' + amanHtml(pembuka) + '</p>'
-    + (produk ? '<p style="margin:0 0 14px;font-size:13px;color:#71717a">Produk: <span style="color:#d4d4d8">' + amanHtml(produk) + '</span></p>' : '')
-    + (pesan ? '<div style="margin:0 0 16px;border-left:3px solid ' + (setuju ? '#10b981' : '#f59e0b') + ';padding:10px 14px;background:#18181b;border-radius:0 8px 8px 0">'
-        + '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#71717a;margin-bottom:6px">Catatan dari kami</div>'
-        + '<div style="font-size:14px;line-height:1.6;color:#e4e4e7;white-space:pre-wrap">' + amanHtml(pesan) + '</div></div>' : '')
-    + '<p style="margin:0 0 20px;font-size:14px;line-height:1.6;color:#a1a1aa">' + amanHtml(penutup) + '</p>'
-    + '<a href="https://jaditrader.co.id" style="display:inline-block;background:#10b981;color:#052e21;text-decoration:none;font-weight:600;font-size:14px;padding:10px 18px;border-radius:8px">Buka Jadi Trader Tools</a>'
-    + '<p style="margin:20px 0 0;font-size:12px;color:#52525b">Surat ini dikirim otomatis dari jaditrader.co.id</p>'
-    + '</div></body></html>';
+  /* ── DULU SATU-SATUNYA SURAT BERTEMA GELAP ────────────────────────────
+     Latarnya #09090b sementara dua surat lain putih. Bukan pilihan gaya --
+     ia ditulis belakangan dan meniru tampilan aplikasinya, bukan surat-surat
+     sebelumnya. Sekarang ketiganya lewat bungkusSurat() yang sama.
+
+     Terang, bukan gelap, karena surat berlatar gelap justru paling rapuh:
+     klien yang punya mode gelap sendiri akan MEMBALIK warna yang sudah
+     gelap, dan hasilnya teks abu di atas abu. Latar putih dibalik jadi
+     gelap dengan rapi; latar gelap dibalik jadi berantakan. */
+  const catatanHtml = pesan
+    ? '<div style="margin:0 0 18px;border-left:3px solid ' + (setuju ? '#10b981' : '#f59e0b')
+      + ';padding:10px 14px;background:#fafafa;border-radius:0 8px 8px 0">'
+      + '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#71717a;margin-bottom:6px">Catatan dari kami</div>'
+      + '<div style="font-size:14px;line-height:1.6;color:#3f3f46;white-space:pre-wrap">' + amanHtml(pesan) + '</div></div>'
+    : '';
+
+  /* Tombolnya cuma untuk yang disetujui. Sebelumnya surat penolakan pun
+     memakai tombol "Buka Jadi Trader Tools" -- mengajak orang masuk ke
+     tempat yang baru saja dibilang belum bisa ia masuki. Yang ditawarkan
+     ke mereka adalah membalas surat ini, dan itu sudah ada di penutup. */
+  const tombolHtml = setuju
+    ? '<p style="margin:0 0 18px"><a href="' + SITUS + '" style="display:inline-block;background:#18181b;color:#fff;'
+      + 'text-decoration:none;padding:10px 20px;border-radius:6px;font-weight:600">Masuk ke Jadi Trader Tools</a></p>'
+    : '';
+
+  const html = bungkusSurat({
+    pratinjau: setuju
+      ? 'Permintaan aksesmu sudah disetujui — aksesnya aktif sekarang.'
+      : 'Permintaan aksesmu belum bisa disetujui. Balas surat ini kalau ada yang keliru.',
+    isi: '<p style="margin:0 0 14px">' + amanHtml(sapa) + '</p>'
+      + '<p style="margin:0 0 18px">' + amanHtml(pembuka) + '</p>'
+      + (produk
+        ? '<table style="border-collapse:collapse;margin:0 0 18px;font-size:13.5px">'
+          + '<tr><td style="padding:3px 16px 3px 0;color:#71717a">Produk</td>'
+          + '<td style="padding:3px 0"><strong>' + amanHtml(produk) + '</strong></td></tr></table>'
+        : '')
+      + catatanHtml
+      + tombolHtml
+      + '<p style="margin:0;color:#52525b">' + amanHtml(penutup) + '</p>',
+  });
 
   return { teks, html, subjek: judul };
 }
@@ -485,8 +589,9 @@ async function kirimSuratAksesOtomatis({ email, nama, kode, berakhir, hari }) {
     'Ketentuan lengkap: ' + SITUS + '/legal',
   ].filter(function (b) { return b !== ''; }).join('\n');
 
-  const html = `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;font-size:14px;line-height:1.65;color:#18181b;max-width:520px">
-  <p style="margin:0 0 14px">${amanHtml(sapaan)}</p>
+  const html = bungkusSurat({
+    pratinjau: 'Akses event gratismu sudah aktif — tidak perlu menunggu ditinjau.',
+    isi: `<p style="margin:0 0 14px">${amanHtml(sapaan)}</p>
   <p style="margin:0 0 18px">Akses <strong>event gratis</strong> Jadi Trader Tools sudah aktif di akunmu. Tidak perlu menunggu ditinjau.</p>
   <table style="border-collapse:collapse;margin:0 0 20px;font-size:13.5px">
     <tr><td style="padding:3px 16px 3px 0;color:#71717a">Jenis akses</td><td style="padding:3px 0"><strong>Akses gratis (event)</strong></td></tr>
@@ -496,14 +601,8 @@ async function kirimSuratAksesOtomatis({ email, nama, kode, berakhir, hari }) {
   <p style="margin:0 0 18px">
     <a href="${amanHtml(tautan)}" style="display:inline-block;background:#18181b;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-weight:600">Buka akses saya</a>
   </p>
-  <p style="margin:0 0 18px;color:#52525b">Tautan itu terikat ke akun yang mendaftar — dibuka dengan akun lain, ia ditolak. Jadi aman kalau surat ini kebetulan diteruskan. Kalau tombolnya tidak bisa diklik, masuk lebih dulu lalu tempel kode cadangan di halaman Akses.</p>
-  <hr style="border:none;border-top:1px solid #e4e4e7;margin:22px 0 14px">
-  <p style="margin:0;font-size:12px;color:#71717a">
-    Jadi Trader Tools · PT Solusi Bursa Nusantara<br>
-    Alat bantu analisa pasar. <strong>Bukan nasihat investasi.</strong><br>
-    <a href="${SITUS}/legal" style="color:#71717a">Ketentuan lengkap</a>
-  </p>
-</div>`;
+  <p style="margin:0;color:#52525b">Tautan itu terikat ke akun yang mendaftar — dibuka dengan akun lain, ia ditolak. Jadi aman kalau surat ini kebetulan diteruskan. Kalau tombolnya tidak bisa diklik, masuk lebih dulu lalu tempel kode cadangan di halaman Akses.</p>`,
+  });
 
   try {
     if (j === 'api') {
