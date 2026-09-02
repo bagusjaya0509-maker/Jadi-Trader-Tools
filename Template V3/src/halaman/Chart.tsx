@@ -1427,10 +1427,36 @@ export default function ChartBacktest() {
           tp1Quantity: tpBaru ? qty : undefined,
         });
 
+        /* ── HYPERLIQUID SUDAH MENGGANTINYA SEKALIGUS ────────────────────
+           Dua bursa, dua cara mengganti stop, dan bedanya menentukan:
+
+             Binance      pasang yang baru, lalu batalkan yang lama satu per
+                          satu dari sini (order lama tidak hilang sendiri).
+             Hyperliquid  `pasangSltpHl` MENCABUT semua trigger koin itu
+                          lebih dulu, baru memasang yang baru — satu tarikan
+                          napas di server.
+
+           Jadi untuk Hyperliquid, oid lama sudah tidak ada saat baris di
+           bawah menjangkaunya. Pembatalannya melempar "tidak ketemu", itu
+           dihitung gagal, dan layar melaporkan "order lama gagal dibatalkan,
+           batalkan manual di Binance" untuk order yang justru sudah rapi
+           tercabut — di bursa yang bahkan bukan Binance.
+
+           Dilaporkan pemilik 2 Sep 2026 saat menggeser SL CASHCAT. Diperiksa
+           langsung ke Hyperliquid: stop barunya terpasang, yang lama memang
+           sudah tidak ada. Peringatannya yang keliru, bukan ordernya.
+
+           Peringatan palsu tentang uang lebih berbahaya daripada diam: ia
+           mengirim orang membuka aplikasi bursa untuk membereskan sesuatu
+           yang tidak perlu dibereskan, dan pelan-pelan mengajarinya
+           mengabaikan peringatan yang sama saat suatu hari benar. */
+        const borongan = bacaPasar(sunting.simbol) === 'hyperliquid';
         const sisa: string[] = [];
-        for (const o of stopLama) {
-          try { await batalPendingNyata({ symbol: sunting.simbol, orderId: o.id, isAlgo: true }); }
-          catch { sisa.push(`${o.jenis} ${o.pemicu}`); }
+        if (!borongan) {
+          for (const o of stopLama) {
+            try { await batalPendingNyata({ symbol: sunting.simbol, orderId: o.id, isAlgo: true }); }
+            catch { sisa.push(`${o.jenis} ${o.pemicu}`); }
+          }
         }
         /* Sisa yang gagal dibatalkan DIKATAKAN, tidak ditelan. Stop yatim
            yang tertinggal akan menembak posisi berikutnya, dan pemiliknya
@@ -1440,7 +1466,7 @@ export default function ChartBacktest() {
              tidak perlu menunggu konfirmasi, karena keadaannya sudah
              jelas keliru. */
           segarkanBursa();
-          setSuntingKabar(`SL/TP baru terpasang, tapi ${sisa.length} order lama gagal dibatalkan (${sisa.join(', ')}). Batalkan manual di Binance.`);
+          setSuntingKabar(`SL/TP baru terpasang, tapi ${sisa.length} order lama gagal dibatalkan (${sisa.join(', ')}). Batalkan manual di ${borongan ? 'Hyperliquid' : 'Binance'}.`);
         } else {
           setSuntingKabar('Terkirim — menunggu bursa mencatatnya…');
           const tercatat = await tungguStopBursa(sunting.simbol, slBaru, tpBaru);
@@ -1723,13 +1749,19 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
         /* SEMUA stop dibersihkan setelah posisinya tertutup. Stop yatim
            yang tertinggal tidak melakukan apa-apa hari ini — lalu menembak
            posisi berikutnya di pair yang sama, entah kapan. */
+        /* Alasan yang sama dengan jalur ubah SL/TP: `tutupHl` mencabut
+           sendiri stop yang tersisa begitu posisinya tertutup PENUH, jadi
+           membatalkannya lagi dari sini cuma menghasilkan galat palsu. */
+        const boronganTutup = bacaPasar(sunting.simbol) === 'hyperliquid';
         const sisaTutup: string[] = [];
-        for (const o of milik.filter((x) => x.jenis === 'SL' || x.jenis === 'TP')) {
-          try { await batalPendingNyata({ symbol: sunting.simbol, orderId: o.id, isAlgo: true }); }
-          catch { sisaTutup.push(`${o.jenis} ${o.pemicu}`); }
+        if (!boronganTutup) {
+          for (const o of milik.filter((x) => x.jenis === 'SL' || x.jenis === 'TP')) {
+            try { await batalPendingNyata({ symbol: sunting.simbol, orderId: o.id, isAlgo: true }); }
+            catch { sisaTutup.push(`${o.jenis} ${o.pemicu}`); }
+          }
         }
         setSuntingKabar(sisaTutup.length
-          ? `Posisi ditutup, tapi ${sisaTutup.length} stop lama gagal dibatalkan (${sisaTutup.join(', ')}). Batalkan manual di Binance.`
+          ? `Posisi ditutup, tapi ${sisaTutup.length} stop lama gagal dibatalkan (${sisaTutup.join(', ')}). Batalkan manual di ${bacaPasar(sunting.simbol) === 'hyperliquid' ? 'Hyperliquid' : 'Binance'}.`
           : 'Posisi ditutup dan semua stop-nya dibersihkan.');
         segarkanBursa();
         setSunting(null);
@@ -4941,7 +4973,9 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                                   {sunting.arah}
                                 </span>
                                 <span className="text-[10px] text-zinc-500">
-                                  {sunting.jenis === 'pending' ? 'pending' : 'posisi'} · {sunting.pasar === 'mt5' ? 'Trade-Fi' : 'Binance'}
+                                  {sunting.jenis === 'pending' ? 'pending' : 'posisi'} · {sunting.pasar === 'mt5'
+                                    ? 'Trade-Fi'
+                                    : bacaPasar(sunting.simbol) === 'hyperliquid' ? 'Hyperliquid' : 'Binance'}
                                 </span>
                                 {/* Menutup PANELNYA saja — garis ordernya tetap
                                     di chart, jadi tinggal diklik lagi kalau
