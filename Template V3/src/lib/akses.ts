@@ -319,6 +319,30 @@ export async function kirimPengingat(sidik: string[], ulangi = false): Promise<{
   };
 }
 
+/** Pengingat lewat LONCENG, bukan surel.
+ *
+ *  Jalannya lewat `uid`, jadi ia sampai ke orang yang tidak punya alamat
+ *  surel sama sekali. Bedanya dengan jalur surat, dan ini menentukan cara
+ *  memakainya: lonceng hanya terbaca kalau orangnya MEMBUKA aplikasi. Ia
+ *  bukan pengganti surat untuk yang sudah lama tidak masuk — ia satu-satunya
+ *  jalan bagi yang memang tidak bisa disurati. */
+export async function kirimLoncengPengingat(sidik: string[]): Promise<{
+  terkirim: number; diminta: number; hasil: HasilKirim[];
+}> {
+  const r = await fetch(`${dasar()}/api/lisensi/pengingat/lonceng`, {
+    method: 'POST',
+    headers: kepalaPemilik(),
+    body: JSON.stringify({ sidik }),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || `Server menjawab ${r.status}`);
+  return {
+    terkirim: Number(j.terkirim) || 0,
+    diminta: Number(j.diminta) || 0,
+    hasil: (j.hasil ?? []) as HasilKirim[],
+  };
+}
+
 /** Login Discord: backend menyelesaikan OAuth lalu mengarahkan balik dengan
  *  `#discord=<token>`, yang sudah ditangani di lib/auth.tsx saat modul dimuat.
  *

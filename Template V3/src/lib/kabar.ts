@@ -49,8 +49,31 @@ export function useKabarAgen(): { kabar: KabarAgen[]; belum: number; tandai: () 
 
   useEffect(() => {
     let hidup = true;
+    /* ── TOKEN IKUT KALAU ADA, DAN TIDAK WAJIB ────────────────────────
+        /api/kabar tetap terbuka untuk tamu: lonceng yang kosong sampai
+        orangnya login membuat kabar agen — yang memang untuk umum — tidak
+        pernah terlihat oleh pengunjung.
+
+        Yang dibuka token ini cuma bagian PRIBADI-nya: pengingat masa akses
+        yang dialamatkan lewat uid, satu-satunya jalan menghubungi orang
+        yang tidak punya alamat surel. Tanpa token, server mengirim persis
+        apa yang ia kirim sebelumnya.
+
+        `getIdToken()` gagal diam-diam kalau sesinya sudah basi; kegagalan
+        itu jatuh ke permintaan tanpa token, bukan ke lonceng yang kosong. */
     const tarik = () => {
-      fetch(`${dasar()}/api/kabar`)
+      void (async () => {
+        let kepala: Record<string, string> = {};
+        try {
+          const { auth } = await import('@/lib/firebase');
+          const u = auth.currentUser;
+          if (u) kepala = { Authorization: 'Bearer ' + (await u.getIdToken()) };
+        } catch { /* tamu, atau sesi basi -> ambil yang umum saja */ }
+        tarikDengan(kepala);
+      })();
+    };
+    const tarikDengan = (kepala: Record<string, string>) => {
+      fetch(`${dasar()}/api/kabar`, { headers: kepala })
         .then((r) => r.json())
         .then((j) => {
           if (!hidup || !Array.isArray(j?.kabar)) return;

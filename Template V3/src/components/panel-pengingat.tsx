@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, RotateCcw, Send, MailWarning } from 'lucide-react';
+import { Loader2, RotateCcw, Send, MailWarning, Bell } from 'lucide-react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { DaftarLipat, NomorBaris } from '@/components/daftar-lipat';
 import { cn, tanggalPendek } from '@/lib/utils';
 import {
-  daftarPengingat, kirimPengingat,
+  daftarPengingat, kirimPengingat, kirimLoncengPengingat,
   type BarisPengingat, type RingkasPengingat, type HasilKirim,
 } from '@/lib/akses';
 
@@ -58,11 +58,15 @@ export function PanelPengingat() {
   const [memuat, setMemuat] = useState(false);
   const [galat, setGalat] = useState('');
   const [pilih, setPilih] = useState<Set<string>>(new Set());
-  const [sibuk, setSibuk] = useState(false);
-  const [hasil, setHasil] = useState<HasilKirim[] | null>(null);
+  const [sibuk, setSibuk] = useState<'' | 'surel' | 'lonceng'>('');
+  const [hasil, setHasil] = useState<{ lewat: 'surel' | 'lonceng'; baris: HasilKirim[] } | null>(null);
 
   const JEDA = 3 * 86400000;
   const bisaDikirimi = useCallback((b: BarisPengingat) => Boolean(b.email), []);
+  /* Lonceng butuh uid, bukan alamat — itulah gunanya. Dua pemakai Discord
+     yang alamatnya tidak pernah tersimpan tetap punya uid, jadi mereka bisa
+     dicentang di sini meski baris surelnya mati. */
+  const bisaLonceng = useCallback((b: BarisPengingat) => Boolean(b.uid), []);
   const siap = useCallback(
     (b: BarisPengingat) => Boolean(b.email) && Date.now() - b.pengingatPada > JEDA,
     [JEDA]);
@@ -119,29 +123,43 @@ export function PanelPengingat() {
     });
   }
 
-  async function kirim() {
-    if (!terpilih.length) return;
-    const contoh = terpilih.slice(0, 3).map((b) => b.email).join('\n');
-    const lagi = terpilih.length > 3 ? `\n…dan ${terpilih.length - 3} lagi` : '';
-    if (!confirm(
-      `Kirim pengingat ke ${terpilih.length} orang?\n\n${contoh}${lagi}\n\n`
-      + 'Surat yang sudah keluar tidak bisa ditarik kembali.'
-    )) return;
+  /* Satu fungsi untuk dua jalur, karena yang berbeda cuma sasaran dan
+     kalimat konfirmasinya. Menulisnya jadi dua fungsi berarti pagar-pagar
+     yang sama (daftar kosong, konfirmasi, muat ulang) disalin dua kali —
+     dan yang satu pasti tertinggal saat salah satunya diperbaiki. */
+  async function kirim(lewat: 'surel' | 'lonceng') {
+    const sasaran = terpilih.filter(lewat === 'surel' ? bisaDikirimi : bisaLonceng);
+    if (!sasaran.length) return;
 
-    setSibuk(true); setGalat(''); setHasil(null);
+    const contoh = sasaran.slice(0, 3).map((b) => b.email || b.nama || b.uid).join('\n');
+    const lagi = sasaran.length > 3 ? `\n…dan ${sasaran.length - 3} lagi` : '';
+    const kepala = lewat === 'surel'
+      ? `Kirim SURAT pengingat ke ${sasaran.length} orang?`
+      : `Kirim pengingat lewat LONCENG aplikasi ke ${sasaran.length} orang?`;
+    const ekor = lewat === 'surel'
+      ? 'Surat yang sudah keluar tidak bisa ditarik kembali.'
+      : 'Lonceng hanya terbaca kalau orangnya membuka aplikasi.';
+    if (!confirm(`${kepala}\n\n${contoh}${lagi}\n\n${ekor}`)) return;
+
+    setSibuk(lewat); setGalat(''); setHasil(null);
     try {
+      const sidik = sasaran.map((b) => b.sidik);
       /* `ulangi` menyusul pilihan pemilik, bukan dipaksa true. Kalau ia
          sengaja mencentang orang yang baru dikirimi, itu keputusannya —
-         tapi harus ia yang mencentang. */
-      const adaYangDiulang = terpilih.some((b) => !siap(b));
-      const j = await kirimPengingat(terpilih.map((b) => b.sidik), adaYangDiulang);
-      setHasil(j.hasil);
+         tapi harus ia yang mencentang. Jalur lonceng tidak punya jeda:
+         kabar dengan id yang sama menimpa, tidak menumpuk. */
+      const j = lewat === 'surel'
+        ? await kirimPengingat(sidik, sasaran.some((b) => !siap(b)))
+        : await kirimLoncengPengingat(sidik);
+      setHasil({ lewat, baris: j.hasil });
       await muat(dalam);
     } catch (e) {
       setGalat(e instanceof Error ? e.message : 'Gagal mengirim');
-    } finally { setSibuk(false); }
+    } finally { setSibuk(''); }
   }
 
+  const pilihSurel = terpilih.filter(bisaDikirimi);
+  const pilihLonceng = terpilih.filter(bisaLonceng);
   const semuaSiap = daftar.filter(siap);
   const semuaSiapTercentang = semuaSiap.length > 0
     && semuaSiap.every((b) => pilih.has(b.sidik));
@@ -217,14 +235,20 @@ export function PanelPengingat() {
               kosong={null}
               render={(b, no) => {
                 const bisa = bisaDikirimi(b);
+                const lonceng = bisaLonceng(b);
+                /* Dicentang kalau ia bisa dihubungi LEWAT JALUR MANA PUN.
+                   Sebelumnya syaratnya alamat surel saja, dan akibatnya dua
+                   pemakai Discord tidak bisa dipilih sama sekali — padahal
+                   justru merekalah yang cuma bisa dijangkau lonceng. */
+                const dapatDipilih = bisa || lonceng;
                 const baru = bisa && !siap(b);
-                const h = hasil?.find((x) => x.sidik === b.sidik);
+                const h = hasil?.baris.find((x) => x.sidik === b.sidik);
                 return (
                   <div key={b.sidik}
                     className={cn('rounded-lg border p-3',
                       bisa ? 'border-zinc-800/60' : 'border-amber-500/20 bg-amber-500/[0.03]')}>
                     <div className="flex items-start gap-3">
-                      <input type="checkbox" disabled={!bisa}
+                      <input type="checkbox" disabled={!dapatDipilih}
                         checked={pilih.has(b.sidik)}
                         onChange={() => balik(b.sidik)}
                         className="mt-0.5 size-3.5 cursor-pointer accent-zinc-300 disabled:cursor-not-allowed disabled:opacity-30" />
@@ -255,15 +279,17 @@ export function PanelPengingat() {
                         </div>
                         {!bisa && (
                           <p className="mt-1.5 text-[11.5px] text-zinc-500">
-                            Lisensinya aktif, tapi tidak ada permintaan beralamat yang cocok dengan
-                            uid-nya — kemungkinan diaktifkan tangan lewat kode. Orang ini tidak bisa
-                            dikabari dari sini.
+                            {lonceng
+                              ? 'Alamat surelnya tidak pernah tersimpan — biasanya karena masuk lewat Discord. Tidak bisa disurati, tapi MASIH bisa dikabari lewat lonceng aplikasi: centang lalu pakai tombol Lonceng.'
+                              : 'Tidak punya alamat surel maupun uid. Orang ini tidak bisa dikabari dari sini sama sekali.'}
                           </p>
                         )}
                         {h && (
                           <p className={cn('mt-1.5 text-[11.5px]',
                             h.terkirim ? 'text-emerald-300/90' : 'text-amber-300/90')}>
-                            {h.terkirim ? 'Terkirim.' : `Tidak terkirim — ${h.alasan || 'sebab tidak diketahui'}`}
+                            {h.terkirim
+                              ? (hasil?.lewat === 'lonceng' ? 'Terkirim ke lonceng.' : 'Terkirim lewat surel.')
+                              : `Tidak terkirim — ${h.alasan || 'sebab tidak diketahui'}`}
                           </p>
                         )}
                       </div>
@@ -273,21 +299,36 @@ export function PanelPengingat() {
               }}
             />
 
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              <button onClick={() => void kirim()} disabled={sibuk || !terpilih.length}
+            {/* Dua tombol, dan angkanya DIHITUNG SENDIRI-SENDIRI dari
+                pilihan yang sama. Kalau keduanya memakai `terpilih.length`,
+                tombol surel akan menjanjikan mengirimi orang yang tidak
+                punya alamat — lalu melapor gagal untuk sesuatu yang memang
+                tidak mungkin sejak awal. */}
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <button onClick={() => void kirim('surel')}
+                disabled={Boolean(sibuk) || !pilihSurel.length}
                 className="flex cursor-pointer items-center gap-2 rounded-md border border-zinc-700 bg-zinc-800 px-3.5 py-2 text-[12.5px] font-medium text-zinc-100 transition-colors hover:border-zinc-600 hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40">
-                {sibuk ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
-                {sibuk ? 'Mengirim…' : `Kirim ke ${terpilih.length} orang`}
+                {sibuk === 'surel' ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
+                {sibuk === 'surel' ? 'Mengirim…' : `Kirim surat ke ${pilihSurel.length}`}
+              </button>
+              <button onClick={() => void kirim('lonceng')}
+                disabled={Boolean(sibuk) || !pilihLonceng.length}
+                className="flex cursor-pointer items-center gap-2 rounded-md border border-zinc-800 px-3.5 py-2 text-[12.5px] text-zinc-300 transition-colors hover:border-zinc-600 hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-40">
+                {sibuk === 'lonceng' ? <Loader2 className="size-3.5 animate-spin" /> : <Bell className="size-3.5" />}
+                {sibuk === 'lonceng' ? 'Mengirim…' : `Lonceng ke ${pilihLonceng.length}`}
               </button>
               {hasil && (
                 <span className="text-[12px] text-zinc-400">
-                  {hasil.filter((x) => x.terkirim).length} terkirim dari {hasil.length} yang dicoba.
+                  {hasil.baris.filter((x) => x.terkirim).length} terkirim dari {hasil.baris.length} yang dicoba.
                 </span>
               )}
             </div>
             <p className="mt-2 text-[11.5px] text-zinc-600">
-              Dikirim satu per satu dengan jeda 0,7 detik — batas laju Resend. Dua puluh orang
-              memakan sekitar 15 detik, jadi jangan tutup halamannya.
+              <strong className="font-medium text-zinc-500">Surat</strong> dikirim satu per satu dengan
+              jeda 0,7 detik — batas laju Resend; dua puluh orang memakan sekitar 15 detik, jadi jangan
+              tutup halamannya. <strong className="font-medium text-zinc-500">Lonceng</strong> sampai
+              seketika lewat uid, jadi ia menjangkau yang tidak punya alamat surel — tapi baru terbaca
+              saat orangnya membuka aplikasi.
             </p>
           </>
         )}
