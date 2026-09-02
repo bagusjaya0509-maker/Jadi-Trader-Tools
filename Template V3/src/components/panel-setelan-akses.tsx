@@ -141,6 +141,7 @@ export function PanelSetelanAkses() {
         nilaiMarketplace: ubah.nilaiMarketplace ?? st.nilaiMarketplace,
         kursUsd: ubah.kursUsd ?? st.kursUsd,
         eventGratis: ubah.eventGratis ?? st.eventGratis,
+        otoGratis: ubah.otoGratis ?? st.otoGratis,
         tampilanAkses: ubah.tampilanAkses ?? st.tampilanAkses,
         linkTesting: ubah.linkTesting ?? st.linkTesting,
         linkPremium3: ubah.linkPremium3 ?? st.linkPremium3,
@@ -297,6 +298,40 @@ export function PanelSetelanAkses() {
                 >
                   <span className={cn('absolute top-0.5 size-5 rounded-full bg-white transition-all',
                     st.eventGratis ? 'left-[22px]' : 'left-0.5')} />
+                </button>
+              </div>
+
+              {/* ── PERSETUJUAN OTOMATIS ────────────────────────────────
+                  Sengaja BERDAMPINGAN dengan sakelar kartu di atas dan
+                  bukan di panel lain: keduanya tentang akses gratis, dan
+                  memisahkannya berarti satu dinyalakan tanpa yang lain
+                  terlihat. Warnanya sengaja berbeda — yang ini memberikan
+                  akses sungguhan tanpa ada yang melihat, dan sakelar
+                  seperti itu tidak pantas terlihat serupa dengan sakelar
+                  yang cuma menyembunyikan kartu. */}
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-zinc-800 bg-zinc-950/40 p-3">
+                <div className="min-w-0">
+                  <div className="text-[12.5px] text-zinc-200">
+                    Akses gratis {st.otoGratis ? 'disetujui SENDIRI' : 'menunggu kamu setujui'}
+                  </div>
+                  <div className="text-[11px] leading-relaxed text-zinc-500">
+                    {st.otoGratis
+                      ? 'Pendaftar langsung dapat email berisi tautan akses, tanpa kamu tekan apa pun. Kuota gratis tetap berlaku, dan tautannya hanya sah untuk akun yang mendaftar.'
+                      : 'Setiap permintaan gratis menunggu tombol Setujui. Nyalakan ini supaya event gratis jalan sendiri.'}
+                    <span className="block text-zinc-600">Yang berbayar tidak pernah ikut otomatis — buktinya harus dilihat orang.</span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => void simpan({ otoGratis: !st.otoGratis })}
+                  disabled={sibuk}
+                  aria-label={st.otoGratis ? 'Matikan persetujuan otomatis' : 'Nyalakan persetujuan otomatis'}
+                  className={cn(
+                    'relative h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors disabled:opacity-50',
+                    st.otoGratis ? 'bg-amber-500' : 'bg-zinc-700',
+                  )}
+                >
+                  <span className={cn('absolute top-0.5 size-5 rounded-full bg-white transition-all',
+                    st.otoGratis ? 'left-[22px]' : 'left-0.5')} />
                 </button>
               </div>
 

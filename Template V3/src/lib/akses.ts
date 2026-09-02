@@ -107,7 +107,12 @@ export function useKuota(): { kuota: Kuota; memuat: boolean; galat: string | nul
 /* ── Pengguna: kirim permintaan & lihat miliknya sendiri ─────────────── */
 export async function mintaAkses(opsi: {
   jenis: 'gratis' | 'bayar'; catatan?: string; bukti?: string;
-}): Promise<{ ok: boolean; sudahAda?: boolean; id?: string }> {
+}): Promise<{ ok: boolean; sudahAda?: boolean; id?: string;
+  /* Terisi kalau permintaannya langsung disetujui sendiri (akses gratis
+     dengan saklar otomatis menyala). Halaman pemanggil memakainya untuk
+     bilang "sudah aktif" alih-alih "menunggu ditinjau" — dua kalimat yang
+     tidak boleh tertukar. */
+  oto?: boolean; kode?: string; berakhir?: number }> {
   const r = await fetch(`${dasar()}/api/lisensi/minta`, {
     method: 'POST',
     headers: await kepalaLogin(),
@@ -187,6 +192,8 @@ export interface SetelanAkses extends Kuota {
   nilaiMarketplace: number;
   kursUsd: number;
   eventGratis: boolean;
+  /** Akses gratis disetujui sendiri, tanpa pemilik menekan tombol. */
+  otoGratis: boolean;
   linkTesting: string;
   linkPremium3: string;
   linkTahunan: string;
@@ -204,7 +211,7 @@ export async function simpanSetelanAkses(nilai: {
   bukaPermintaan?: boolean; gratisTotal?: number; bayarTotal?: number; hari?: number;
   hargaTesting?: number; hargaTestingCoret?: number;
   hargaPremium3?: number; hargaTahunan?: number; nilaiMarketplace?: number;
-  kursUsd?: number; eventGratis?: boolean;
+  kursUsd?: number; eventGratis?: boolean; otoGratis?: boolean;
   tampilanAkses?: 'foto' | 'lonceng';
   linkTesting?: string; linkPremium3?: string; linkTahunan?: string;
 }): Promise<SetelanAkses> {

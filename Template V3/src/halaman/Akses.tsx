@@ -1,6 +1,6 @@
 import { HARGA_PERINTIS_TEKS } from '@/lib/harga-akses';
 import { jejak } from '@/lib/pixel';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft, CheckCircle2, Clock, Eye, KeyRound, Loader2, LogOut, ShieldCheck, XCircle,
@@ -67,14 +67,16 @@ export default function Akses() {
      diberikan sadar setiap kali orang meminta akses — centang yang sudah
      terisi sendiri saat halaman dibuka bukan persetujuan, cuma hiasan. */
   const [pahamRisiko, setPahamRisiko] = useState(false);
-  const [kode, setKode] = useState('');
+  const [kode, setKode] = useState(() => (params.get('kode') || '').toUpperCase().slice(0, 19));
   const [sibukKode, setSibukKode] = useState(false);
   const [kabarKode, setKabarKode] = useState('');
 
-  async function tukarKode() {
+  async function tukarKode(paksa?: string) {
+    const dipakai = (paksa || kode).trim().toUpperCase();
+    if (!dipakai) return;
     setSibukKode(true); setKabarKode('');
     try {
-      const h = await aktifkanKode(kode);
+      const h = await aktifkanKode(dipakai);
       setKabarKode(
         h.firestoreOk === false
           ? 'Kode diterima, tapi masa berlakunya gagal disimpan. Hubungi admin sebelum mencoba lagi.'
@@ -85,6 +87,33 @@ export default function Akses() {
       setKabarKode(e instanceof Error ? e.message : 'Gagal menukar kode');
     } finally { setSibukKode(false); }
   }
+
+  /* ── TAUTAN DARI SURAT DITUKAR SENDIRI ──────────────────────────────
+     Surat akses otomatis membawa `?kode=JT3-...`. Yang menerimanya sudah
+     mengerjakan bagiannya — mendaftar, lalu mengklik. Menyuruhnya menyalin
+     dua belas karakter ke kolom di bawah adalah satu langkah lagi tempat
+     orang berhenti, dan langkah itu tidak menambah keamanan apa pun:
+     kodenya sudah terikat ke akunnya sejak diterbitkan.
+
+     Ditunggu sampai `pengguna` ada. Tautannya sering dibuka dari aplikasi
+     surel yang belum membawa sesi login; menukarkannya saat itu cuma
+     menghasilkan galat "belum masuk" untuk orang yang tidak melakukan
+     kesalahan apa pun. Begitu ia masuk, penukarannya jalan sendiri.
+
+     `sekali` menjaga supaya render ulang tidak mengirim penukaran kedua —
+     kode yang sudah dipakai akun ini akan dijawab 409 oleh server, dan
+     pesan "sudah dipakai akun lain" untuk akunnya sendiri adalah kabar
+     yang membingungkan tanpa sebab. */
+  const kodeOtomatis = useRef(false);
+  useEffect(() => {
+    const dariTautan = (params.get('kode') || '').trim().toUpperCase();
+    if (!dariTautan || !pengguna || kodeOtomatis.current) return;
+    kodeOtomatis.current = true;
+    setKode(dariTautan);
+    setKabarKode('Menukarkan kode dari tautan…');
+    void tukarKode(dariTautan);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pengguna?.uid]);
 
   /* Permintaan sendiri dibaca ulang tiap kali orangnya berganti — bukan
      sekali saat modul dimuat. Orang yang keluar lalu masuk dengan akun lain
