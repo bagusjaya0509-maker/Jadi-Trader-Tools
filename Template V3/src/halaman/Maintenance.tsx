@@ -11,7 +11,6 @@ import { tanggalPendek } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 import { PanelLisensi, LencanaJenis, namaProduk } from '@/components/panel-lisensi';
 import { PanelSetelanAkses } from '@/components/panel-setelan-akses';
-import { PanelPengingat } from '@/components/panel-pengingat';
 import { PanelTrafikSistem } from '@/components/panel-trafik-sistem';
 import { PanelKesehatan } from '@/components/panel-kesehatan';
 import { PanelLangganan } from '@/components/panel-langganan';
@@ -475,13 +474,12 @@ export default function Maintenance() {
           <PanelLisensi />
           <PanelLisensiAktif />
         </div>
-        {/* Di luar grid dua kolom, dan sengaja. Panel ini daftar bercentang
-            dengan alamat surel penuh di tiap baris; dipaksa selebar setengah
-            layar, alamatnya terpotong justru pada bagian yang menentukan
-            apakah pemiliknya berani menekan Kirim. */}
-        <div className="mt-5">
-          <PanelPengingat />
-        </div>
+        {/* Pengingat Masa Akses PERNAH di sini, dipindah 2 Sep 2026 ke
+            Sales Report -> Reminder atas permintaan pemilik. Tempat ini
+            memang keliru: halaman ini untuk MENGUBAH setelan, sedangkan
+            "siapa yang harus dihubungi minggu ini" adalah pertanyaan yang
+            dibuka berulang -- dan sub-halaman Reminder sudah ada di sana
+            khusus untuk pertanyaan itu. */}
       </>)}
 
       {tab === 'sistem' && <PanelKesehatan />}

@@ -5,6 +5,7 @@ import {
   Plus, Trash2, KeyRound, ShieldAlert, TrendingDown,
 } from 'lucide-react';
 import { Panel, PanelHead, KartuKpi, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
+import { PanelPengingat } from '@/components/panel-pengingat';
 import { cn, tanggalPendek } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 import { useKurs } from '@/lib/kurs';
@@ -933,8 +934,6 @@ Pemakainya langsung kehilangan akses.`)) return;
               isi: baris.filter((x) => x.sisa >= 2 && x.sisa <= 7) },
           ];
 
-          const semuaEmail = [...new Set(KEL.flatMap((k) => k.isi.map((x) => x.email)).filter(Boolean))];
-
           return (<>
             <Kabar memuat={lisensi.memuat} galat={lisensi.galat} kosong={false} teksKosong="" />
 
@@ -971,36 +970,33 @@ Pemakainya langsung kehilangan akses.`)) return;
               ))}
             </div>
 
-            {/* ── MENGIRIMNYA BELUM ADA DI SINI, DAN ITU DISENGAJA ──────────
-                Mengirim surel massal adalah tindakan yang tidak bisa
-                ditarik kembali: satu klik menyentuh puluhan kotak masuk
-                orang lain, dan salah satu kalimat di dalamnya tidak bisa
-                diralat sesudah terkirim. Tombol semacam itu tidak pantas
-                muncul diam-diam bersama fitur yang diminta hari ini.
+            {/* ── PENAMPUNG SEMENTARA SUDAH DIGANTI YANG SUNGGUHAN ────────
+                Di sini dulu ada panel "Salin N alamat" beserta catatan yang
+                berbunyi: "Pengiriman otomatis belum dinyalakan -- minta saya
+                kerjakan kalau daftarnya sudah terasa benar."
 
-                Yang disediakan sekarang jalan tercepat yang aman: seluruh
-                alamatnya disalin sekali klik, lalu Anda yang memutuskan
-                mau lewat apa dan berbunyi apa. */}
-            <Panel className="mt-4">
-              <PanelHead judul="Kirim pengingat"
-                sub="Salin alamatnya, lalu kirim lewat surel atau lonceng aplikasi." />
-              <div className="flex flex-wrap items-center gap-2 px-5 pb-5">
-                <button
-                  onClick={() => {
-                    void navigator.clipboard.writeText(semuaEmail.join(', '))
-                      .then(() => alert(semuaEmail.length + ' alamat disalin.'))
-                      .catch(() => alert('Gagal menyalin — peramban menolak akses papan klip.'));
-                  }}
-                  disabled={!semuaEmail.length}
-                  className="cursor-pointer rounded-md border border-zinc-700 px-3 py-1.5 text-[12.5px] text-zinc-200 transition-colors hover:border-zinc-500 hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-40">
-                  Salin {semuaEmail.length} alamat
-                </button>
-                <span className="text-[11.5px] text-zinc-600">
-                  Pengiriman otomatis (surel massal / lonceng aplikasi) belum dinyalakan —
-                  minta saya kerjakan kalau daftarnya sudah terasa benar.
-                </span>
-              </div>
-            </Panel>
+                Daftarnya sudah terasa benar, jadi ini dikerjakan. Tombol
+                salin dicabut, bukan disimpan berdampingan: dua cara mengirim
+                pengingat di satu layar berarti pemiliknya harus memilih
+                setiap kali, dan yang satu diam-diam melewatkan pagar-pagar
+                yang dipasang di yang lain.
+
+                Kehati-hatian yang dulu jadi alasan menahan tombolnya TIDAK
+                dibuang, cuma dipindah ke dalam panelnya: daftar dibaca dulu,
+                centang per orang, jeda 3 hari, dan konfirmasi yang menyebut
+                jumlahnya. Yang hilang cuma langkah menyalin alamat ke
+                aplikasi lain.
+
+                ── KENAPA ANGKANYA BISA BEDA DENGAN TIGA KARTU DI ATAS ─────
+                Kartu-kartu itu menghitung SELURUH lisensi aktif, termasuk
+                yang berbayar. Panel ini hanya akses GRATIS -- suratnya
+                memang surat "masa gratismu habis", dan mengirimkannya ke
+                orang yang sudah membayar adalah kesalahan yang tidak bisa
+                ditarik kembali. Bedanya disengaja, bukan dua hitungan yang
+                berselisih. */}
+            <div className="mt-4">
+              <PanelPengingat />
+            </div>
           </>);
         })()}
       </>)}
