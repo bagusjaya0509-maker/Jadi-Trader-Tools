@@ -4,7 +4,8 @@ import { uang, harga as fHarga } from '@/lib/utils';
 import { mulaiKirim, tandaiTerkirim, tandaiGagal } from '@/lib/order-sementara';
 
 /* ════════════════════════════════════════════════════════════════════════
-   ORDER SUNGGUHAN KE BINANCE FUTURES — satu jalur untuk seluruh V3
+   ORDER SUNGGUHAN — satu jalur untuk seluruh V3, DUA bursa
+   (Binance Futures dan Hyperliquid perps; yang memilih `bursaSimbol`)
    ════════════════════════════════════════════════════════════════════════
    Bentuk permintaannya MENGIKUTI Area Entry V2 baris demi baris: qty
    dibulatkan dengan aturan simbol dari `/api/symbol-filters`, TP1 = level
@@ -207,7 +208,19 @@ export async function kirimOrderNyata(p: PermintaanNyata): Promise<{ pesan: stri
     `SL ${slStr} · TP1 ${tp1Kirim} (qty ${qty1})${tp2Kirim ? ` · TP2 ${tp2Kirim} (qty ${qty2Kirim})` : ''}`,
     `Metode: ${METODE_TP.find((m) => m.nilai === p.metode)?.label}`,
   ].join('\n');
-  if (!confirm(`Kirim order SUNGGUHAN ke Binance?\n\n${rincian}\n\nUang sungguhan akan bergerak.`)) {
+  /* ── KALIMAT INI DULU SELALU MENULIS "ke Binance" ─────────────────────
+     Ia salah sejak jalur Hyperliquid ada, dan salahnya jenis yang paling
+     buruk: bukan diam, melainkan MEYAKINKAN orangnya tentang hal yang
+     keliru, tepat pada detik ia menimbang uang sungguhan.
+
+     Ketahuan bukan dari membaca kode, melainkan dari memeriksa bundel yang
+     BENAR-BENAR tayang dan menemukan kalimat lama masih di sana — sesudah
+     versi yang sudah diperbaiki dikira sudah terpasang. */
+  const bTujuan = bursaSimbol(p.simbol);
+  const kalimatBursa = bTujuan === 'hyperliquid' ? 'Kirim order SUNGGUHAN ke Hyperliquid?'
+    : bTujuan === 'binance' ? 'Kirim order SUNGGUHAN ke Binance?'
+    : 'Kirim order SUNGGUHAN? (bursanya dipilih server — pasar simbol ini belum terbaca di layar)';
+  if (!confirm(`${kalimatBursa}\n\n${rincian}\n\nUang sungguhan akan bergerak.`)) {
     return { pesan: 'Dibatalkan.', pending: false };
   }
 

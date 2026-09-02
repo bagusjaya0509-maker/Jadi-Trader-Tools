@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 const JEDA_LIPAT_SENDIRI_MS = 12_000;
 import { TrendingUp, TrendingDown, X, Check, Ban, CandlestickChart, Minus, Hourglass, Share2, Copy, ChevronsDownUp, ChevronsUpDown } from 'lucide-react';
 import { cn, uang, harga as fHarga } from '@/lib/utils';
+import { bacaPasar } from '@/lib/pasar';
 import { METODE_TP, type MetodeTp } from '@/lib/order-nyata';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -129,7 +130,12 @@ export function PojokOrder({
   onPilih, onUbah, onKirim, onBatal, onTutup, onGantiMode, onTukarArah, mati,
   nyataSetelan, aturNyata, sibukNyata, kabar, demoSetelan, aturDemo,
   catatan, aturCatatan, qtyDemo, mt5, lotMt5, aturLotMt5, nilaiLotMt5, desimalHarga = 6,
+  simbol,
 }: {
+  /** Simbol yang sedang dibuka — dipakai HANYA untuk memberi tahu ke bursa
+   *  mana order akan berangkat. Opsional supaya pemanggil lama tidak pecah;
+   *  tanpa itu lencananya tidak digambar, bukan menebak. */
+  simbol?: string;
   posisi: { arah: 'BUY' | 'SELL'; masuk: number; sl: number; tp: number; pnl: number; risiko: number; unit: number } | null;
   hargaKini?: number;
   /** Label jenis order hasil letak garis entry: "Market", "Buy Limit", dst. */
@@ -709,6 +715,30 @@ export function PojokOrder({
     <div onPointerEnter={bangunkan} onPointerDown={bangunkan}
          className="flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900/85 px-1.5 py-1.5 backdrop-blur-sm">
       {Lencana}
+      {/* ── KE BURSA MANA ────────────────────────────────────────────────
+          Cuma digambar di mode order sungguhan: di mode latihan tidak ada
+          uang yang berpindah, dan lencana bursa di sana cuma menambah satu
+          hal untuk dibaca tanpa menjawab apa pun.
+
+          Diturunkan dari pasar chart yang sedang tampil — bukan saklar
+          sendiri, supaya tidak ada dua sumber kebenaran yang bisa
+          berselisih tentang ke mana uangnya pergi. */}
+      {simbol && modeSekarang === 'real' && (() => {
+        const p = bacaPasar(simbol);
+        const hl = p === 'hyperliquid';
+        return (
+          <span
+            title={p
+              ? `Order berangkat ke ${hl ? 'Hyperliquid' : 'Binance'} — mengikuti pasar chart yang sedang tampil.`
+              : 'Pasar simbol ini belum terbaca di layar; server yang memilih bursanya.'}
+            className={cn('shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium',
+              hl ? 'bg-sky-500/15 text-sky-300'
+              : p ? 'bg-amber-500/15 text-amber-300'
+              : 'bg-zinc-700/50 text-zinc-400')}>
+            {hl ? 'Hyperliquid' : p ? 'Binance' : 'auto'}
+          </span>
+        );
+      })()}
       <button onClick={() => onPilih('BUY')} disabled={mati}
         className="flex cursor-pointer items-center gap-1 rounded bg-emerald-500/20 px-2.5 py-1 text-[11.5px] font-semibold text-emerald-300 transition-colors hover:bg-emerald-500/30 disabled:cursor-not-allowed disabled:opacity-40">
         <TrendingUp className="size-3.5" /> BUY

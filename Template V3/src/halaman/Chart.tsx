@@ -4589,6 +4589,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                           pojok={aksi ? (
                             <div ref={pojokRef}>
                             <PojokOrder
+                              simbol={simbol}
                               posisi={aksi.posisi} hargaKini={aksi.hargaKini}
                               draf={draf} rencana={rencana} mode={aksi.mode}
                               jenis={labelJenis} risiko={aksi.risiko} qtyDemo={qtyTampil}
