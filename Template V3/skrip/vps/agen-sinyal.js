@@ -342,6 +342,251 @@ const ema = (nilai, n) => {
   return nilai.reduce((a, v, i) => (i ? v * k + a * (1 - k) : v));
 };
 
+
+/* ══ HITUNGAN SNR — PORTING HARFIAH DARI SCREENER V2 ══════════════════════
+   Semua fungsi di blok ini disalin baris demi baris dari
+   Template V2 Premium/ema-cross-screener_3.html, bukan ditulis ulang dari
+   ingatan tentang "apa itu SNR". Alasannya diminta pemilik dengan kalimat
+   "logicnya sesuai perhitungan": kalau angkanya menyimpang sedikit saja dari
+   yang dulu ia lihat di layar, agen ini bukan lagi menguji metode itu — ia
+   menguji tafsiran saya tentang metode itu, dan hasilnya tidak bisa dipakai
+   untuk memutuskan apa pun.
+
+   Kesetaraannya diuji, bukan diklaim: skrip/uji/uji-snr-vs-v2.js memotong
+   fungsi ASLI dari berkas HTML-nya, menjalankan keduanya di deret harga acak
+   yang sama, lalu membandingkan bar demi bar.
+
+   ── DUA FUNGSI YANG SUDAH ADA DI BERKAS INI TIDAK BISA DIPAKAI ──────────
+   `ema()` di atas mengembalikan SATU ANGKA (reduce tanpa larik); smiSeries
+   butuh DERET. Dan `atr()` di atas rata-rata biasa dari n TR terakhir,
+   sedangkan screener memakai perataan Wilder. Zona SNR lebarnya ATR x 0,5 —
+   memakai ATR yang berbeda berarti kotak yang berbeda, dan sentuhan yang
+   berbeda. Jadi keduanya diporting terpisah dengan nama sendiri, bukan
+   dipaksa memakai yang sudah ada. */
+
+/** EMA yang mengembalikan DERET (screener: ema). */
+function emaSeri(nilai, n) {
+  const k = 2 / (n + 1);
+  const keluar = [nilai[0]];
+  for (let i = 1; i < nilai.length; i++) keluar.push(nilai[i] * k + keluar[i - 1] * (1 - k));
+  return keluar;
+}
+
+/** ATR perataan Wilder (screener: atr). Berbeda dari atr() di atas. */
+function atrWilder(bar, n) {
+  const j = bar.length;
+  const tr = new Array(j).fill(0);
+  for (let i = 0; i < j; i++) {
+    if (i === 0) { tr[i] = bar[i].h - bar[i].l; continue; }
+    tr[i] = Math.max(bar[i].h - bar[i].l,
+                     Math.abs(bar[i].h - bar[i - 1].c),
+                     Math.abs(bar[i].l - bar[i - 1].c));
+  }
+  const keluar = new Array(j).fill(null);
+  if (j <= n) return keluar;
+  let jum = 0;
+  for (let i = 1; i <= n; i++) jum += tr[i];
+  keluar[n] = jum / n;
+  for (let i = n + 1; i < j; i++) keluar[i] = (keluar[i - 1] * (n - 1) + tr[i]) / n;
+  return keluar;
+}
+
+/** Pivot (screener: findPivots). Bar ke-i pivot kalau tidak ada yang lebih
+ *  tinggi (atau lebih rendah) di `kiri` bar sebelumnya dan `kanan` sesudahnya. */
+function cariPivot(nilai, kiri, kanan, tinggi) {
+  const keluar = [];
+  for (let i = kiri; i < nilai.length - kanan; i++) {
+    let pivot = true;
+    for (let j = i - kiri; j <= i + kanan; j++) {
+      if (j === i) continue;
+      if (tinggi ? nilai[j] > nilai[i] : nilai[j] < nilai[i]) { pivot = false; break; }
+    }
+    if (pivot) keluar.push({ i: i, nilai: nilai[i] });
+  }
+  return keluar;
+}
+
+const SMI_K = 14, SMI_D = 3, SMI_EMA = 3;
+const SMI_OB = 50, SMI_OS = -50;
+
+/** Stochastic Momentum Index (screener: smiSeries). */
+function smiSeri(bar, panjangK, panjangD, panjangEma) {
+  const j = bar.length;
+  const rel = new Array(j).fill(null);
+  const rentang = new Array(j).fill(null);
+  for (let i = panjangK - 1; i < j; i++) {
+    let hh = -Infinity, ll = Infinity;
+    for (let k = i - panjangK + 1; k <= i; k++) {
+      if (bar[k].h > hh) hh = bar[k].h;
+      if (bar[k].l < ll) ll = bar[k].l;
+    }
+    rel[i] = bar[i].c - (hh + ll) / 2;
+    rentang[i] = hh - ll;
+  }
+  const mulai = panjangK - 1;
+  if (mulai >= j) return { smi: new Array(j).fill(null), sinyal: new Array(j).fill(null) };
+  const emaEma = (a) => emaSeri(emaSeri(a, panjangD), panjangD);
+  const atas = emaEma(rel.slice(mulai));
+  const bawah = emaEma(rentang.slice(mulai));
+  const inti = atas.map((v, i) => (bawah[i] === 0 ? 0 : 200 * (v / bawah[i])));
+  const sig = emaSeri(inti, panjangEma);
+  const smi = new Array(j).fill(null), sinyal = new Array(j).fill(null);
+  for (let i = 0; i < inti.length; i++) { smi[mulai + i] = inti[i]; sinyal[mulai + i] = sig[i]; }
+  return { smi: smi, sinyal: sinyal };
+}
+
+/** SMI ekstrem (screener: cekSmiEkstrem). Arah = arah pembalikan yang mungkin. */
+function smiEkstrem(bar) {
+  const st = smiSeri(bar, SMI_K, SMI_D, SMI_EMA);
+  const j = st.smi.length;
+  const k = st.smi[j - 1], kSblm = st.smi[j - 2];
+  if (k === null || k === undefined) return null;
+  let kondisi = null;
+  if (k <= SMI_OS) kondisi = 'oversold';
+  else if (k >= SMI_OB) kondisi = 'overbought';
+  if (!kondisi) return null;
+  let mulaiBalik = false;
+  if (kSblm !== null && kSblm !== undefined) {
+    mulaiBalik = kondisi === 'oversold' ? (k > kSblm) : (k < kSblm);
+  }
+  return { kondisi: kondisi, arah: kondisi === 'oversold' ? 'BUY' : 'SELL', k: k, mulaiBalik: mulaiBalik };
+}
+
+/** Sentuhan zona SNR 4 jam oleh satu candle (screener: snrTouchH4M5).
+ *  Zona = pivot(10,10) 4 jam, maksimal 2 per sisi, pita ATR(14) x 0,5.
+ *  "Sentuh" = EKOR masuk ke dalam pita; yang menembus habis bukan sentuhan. */
+function sentuhZonaSnr(bar4, kandil) {
+  const a = atrWilder(bar4, 14)[bar4.length - 1];
+  if (!(a > 0)) return null;
+  const tol = a * 0.5;
+  const res = cariPivot(bar4.map((b) => b.h), 10, 10, true).slice(-2).map((p) => p.nilai);
+  const sup = cariPivot(bar4.map((b) => b.l), 10, 10, false).slice(-2).map((p) => p.nilai);
+
+  const o = kandil.o, hi = kandil.h, lo = kandil.l, c = kandil.c;
+  const badan = Math.abs(c - o);
+  const ekorAtas = hi - Math.max(o, c);
+  const ekorBawah = Math.min(o, c) - lo;
+
+  let terbaik = null;
+  res.forEach((lvl) => {
+    if (hi >= lvl - tol && hi <= lvl + tol) {
+      const jarak = Math.abs(hi - lvl);
+      if (!terbaik || jarak < terbaik.jarak) {
+        terbaik = { sisi: 'R', level: lvl, jarak: jarak, arah: 'SELL', tolak: ekorAtas > badan, tol: tol };
+      }
+    }
+  });
+  sup.forEach((lvl) => {
+    if (lo <= lvl + tol && lo >= lvl - tol) {
+      const jarak = Math.abs(lo - lvl);
+      if (!terbaik || jarak < terbaik.jarak) {
+        terbaik = { sisi: 'S', level: lvl, jarak: jarak, arah: 'BUY', tolak: ekorBawah > badan, tol: tol };
+      }
+    }
+  });
+  return terbaik;
+}
+
+/** SL di luar kotak SNR + setengah tinggi kotaknya (screener: slFromSnrZone).
+ *  Kotak = level +- ATR*0,5, jadi tingginya ATR; setengahnya ruang sapuan. */
+function slDariZonaSnr(arah, harga, bar4, atrNow) {
+  const tolZona = atrNow * 0.5;
+  const sapuan = atrNow * 0.5;
+  if (arah === 'SELL') {
+    const res = cariPivot(bar4.map((b) => b.h), 10, 10, true).slice(-2).map((p) => p.nilai);
+    const lvl = res.length ? Math.max.apply(null, res) : null;
+    const dasar = (lvl != null && lvl > harga)
+      ? lvl : Math.max.apply(null, bar4.slice(-15).map((b) => b.h));
+    return dasar + tolZona + sapuan;
+  }
+  const sup = cariPivot(bar4.map((b) => b.l), 10, 10, false).slice(-2).map((p) => p.nilai);
+  const lvl = sup.length ? Math.min.apply(null, sup) : null;
+  const dasar = (lvl != null && lvl < harga)
+    ? lvl : Math.min.apply(null, bar4.slice(-15).map((b) => b.l));
+  return dasar - tolZona - sapuan;
+}
+
+/* ══ AGEN SNR ═════════════════════════════════════════════════════════════
+   Dua syarat, keduanya wajib, persis seperti di screener:
+
+     1. SMI di 4 JAM ekstrem  -> oversold = BUY, overbought = SELL
+     2. Candle 5 MENIT menyentuh zona SNR yang ditarik dari 4 jam
+
+   Arah datang dari kondisi besar, waktu masuk dari sentuhan halus.
+   Entry market, SL di luar kotak + ruang sapuan, TP 1:1 dengan SL.
+
+   ── SATU PENYIMPANGAN YANG DISENGAJA, DAN HARUS DIKETAHUI ───────────────
+   Screener memeriksa candle 5 menit yang MASIH BERJALAN — pertanyaannya di
+   sana "sedang menyentuh", karena orangnya sedang melihat layar dan bisa
+   menekan tombol saat itu juga.
+
+   Agen ini berjalan terjadwal, dan klines() sudah membuang lilin berjalan.
+   Jadi yang diperiksa candle 5 menit yang BARU TUTUP. Bukan kelalaian:
+   sentuhan pada candle berjalan bisa hilang sebelum candle itu tutup, dan
+   sinyal yang diposting dari ekor yang kemudian lenyap adalah sinyal yang
+   tidak pernah benar-benar ada. Papan peringkat menilainya sungguhan;
+   ia tidak boleh menilai sesuatu yang menguap.
+
+   ── KENAPA ADA SNR LURUS PADAHAL YANG DIMINTA YANG BALIK ────────────────
+   `snr` didefinisikan karena `snrBalik` menyebarnya, dan mendefinisikan
+   sesuatu di sini TIDAK membuatnya berjalan: agen dipilih lewat argumen
+   baris perintah, jadi yang jalan hanya yang dijadwalkan. Ia ada supaya
+   pembanding lurusnya tinggal dijadwalkan kalau suatu saat pemilik ingin
+   tahu apakah membalik memang menolong — tanpa itu, papan peringkatnya
+   cuma punya satu angka tanpa acuan. */
+function evaluasiSnr(s, bar, bar4) {
+  if (!bar4 || bar4.length < 60 || !bar.length) return null;
+
+  const smi = smiEkstrem(bar4);
+  if (!smi) return null;                        // 4 jam tidak ekstrem -> bukan kandidat
+
+  const x = bar[bar.length - 1];                // candle 5 menit yang baru tutup
+  const sentuh = sentuhZonaSnr(bar4, x);
+  if (!sentuh) return null;                     // tidak menyentuh zona -> bukan kandidat
+  if (s.wajibTolak && !sentuh.tolak) return null;
+  if (s.wajibSearah && sentuh.arah !== smi.arah) return null;
+
+  const a = atrWilder(bar4, 14)[bar4.length - 1];
+  if (!(a > 0)) return null;
+
+  const harga = x.c;
+  const sl = slDariZonaSnr(smi.arah, harga, bar4, a);
+  const risiko = Math.abs(harga - sl);
+  if (!(risiko > 0)) return null;
+  const risikoPersen = (risiko / harga) * 100;
+  if (risikoPersen > s.risikoMaks || risikoPersen < s.risikoMin) return null;
+
+  /* Ongkos bolak-balik harus muat jauh di dalam risikonya. Tanpa pagar ini,
+     setup dengan stop sangat rapat terlihat bagus di atas kertas lalu habis
+     dimakan biaya — cacat yang sama sudah dijaga di agen-agen lain. */
+  if (risiko < harga * s.ongkosPp * 4) return null;
+
+  const tp = smi.arah === 'BUY' ? harga + risiko : harga - risiko;
+
+  const dasar = {
+    jarak: risiko, atr: a, batas: sentuh.level, waktu: x.t, contoh: x.c,
+    kakiLimit: null, sisiZona: sentuh.sisi, levelZona: sentuh.level,
+    smiK: smi.k, smiKondisi: smi.kondisi, mulaiBalik: smi.mulaiBalik,
+    tolak: sentuh.tolak, searah: sentuh.arah === smi.arah,
+  };
+
+  if (s.balik) {
+    /* Dicerminkan di sekitar entry, cara yang SAMA dengan Agen Momentum
+       Balik. Karena TP-nya 1:1 dengan SL, pencerminan menukar tempat
+       keduanya dan perbandingannya tetap 1:1 — jadi yang berubah benar-benar
+       cuma sisinya, bukan ukuran risikonya. */
+    return Object.assign({}, dasar, {
+      arah: smi.arah === 'BUY' ? 'SELL' : 'BUY',
+      entry: harga,
+      sl: 2 * harga - sl,
+      tp: 2 * harga - tp,
+      arahAsli: smi.arah,
+    });
+  }
+
+  return Object.assign({}, dasar, { arah: smi.arah, entry: harga, sl: sl, tp: tp });
+}
+
 /* ══ AGEN MOMENTUM BALIK — cermin dari Agen Momentum ═══════════════════════
    Diminta pemilik: metode PERSIS sama, posisinya diambil terbalik.
 
@@ -364,6 +609,65 @@ STRATEGI.momentumBalik = {
   nama: 'Agen Momentum Balik',
   balik: true,
 };
+
+/* ══ AGEN SNR ═════════════════════════════════════════════════════════════
+   Metode yang dulu ada di screener sebagai "Sinyal SNR", diminta pemilik
+   dihidupkan lagi sebagai agen — dengan posisi TERBALIK.
+
+   Angka-angka di bawah TIDAK dipilih di sini. Semuanya datang dari
+   ema-cross-screener_3.html apa adanya:
+
+     SMI 14/3/3, ambang +-50   cekSmiEkstrem
+     pivot 10 kiri / 10 kanan  findPivots, maksimal 2 zona per sisi
+     lebar pita ATR(14) x 0,5  srAtrMult di indikator Jadi Trader V3
+     SL = tepi kotak + ATR*0,5 slFromSnrZone (ruang sapuan likuiditas)
+     TP 1:1 dengan SL          cariSinyalSnrH4M5
+     risiko 0,03% - 12%        pagar yang sama
+
+   Yang saya tambahkan cuma `ongkosPp`: screener tidak punya pagar ongkos
+   karena ia cuma MENAMPILKAN kandidat untuk dinilai mata, sementara agen ini
+   memposting sinyal yang dinilai papan peringkat sungguhan. Setup dengan stop
+   sangat rapat menang di atas kertas lalu habis dimakan biaya. */
+STRATEGI.snr = {
+  nama: 'Agen SNR',
+  jenis: 'snr',
+  /* TF-nya DUA, dan itu inti metodenya: arah dari 4 jam, waktu masuk dari
+     5 menit. `tf` di sini yang dipakai pelari untuk mengambil lilin utama;
+     yang 4 jam diambil terpisah, lihat penyambungannya di bawah. */
+  tf: '5m',
+  sumber: 'binance',
+  pasangan: ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT', 'DOGEUSDT',
+             'ADAUSDT', 'AVAXUSDT', 'LINKUSDT', 'TONUSDT', 'DOTUSDT', 'LTCUSDT',
+             'NEARUSDT', 'APTUSDT', 'ATOMUSDT', 'ARBUSDT', 'OPUSDT', 'INJUSDT',
+             'SUIUSDT', 'SEIUSDT', 'TIAUSDT'],
+  risikoMin: 0.03,
+  risikoMaks: 12,
+  ongkosPp: 0.0008,      // Binance Futures taker pp, sama dengan agen kripto lain
+  /* Dua saringan yang di screener berupa PILIHAN di layar, di sini dimatikan
+     supaya yang diforward-test adalah metode dasarnya — bukan metode dasar
+     plus dua tapisan yang belum pernah diukur.
+
+       wajibTolak   ekor penolakan harus lebih panjang dari badan
+       wajibSearah  sisi zona harus searah SMI (oversold ketemu support)
+
+     Screener menampilkan `searah` sebagai penanda, bukan sebagai syarat, dan
+     catatannya menyebut tegas: sisi zona berlawanan "bukan alasan membuang
+     kandidatnya". Jadi bawaannya mengikuti itu. */
+  wajibTolak: false,
+  wajibSearah: false,
+  barKedaluwarsa: 12,    // 12 x 5 menit = satu jam
+};
+
+/* Yang DIMINTA pemilik. Sama persis dengan di atas kecuali satu bendera —
+   dan `balik` itu tidak menyentuh satu pun syarat masuknya: deteksi SMI,
+   penarikan zona, sentuhan, dan jarak SL/TP dihitung dengan angka yang sama.
+   Yang dicerminkan hanya sisinya, di sekitar entry. */
+STRATEGI.snrBalik = {
+  ...STRATEGI.snr,
+  nama: 'Agen SNR Balik',
+  balik: true,
+};
+
 
 /* Pembulatan mengikuti banyak desimal harga simbolnya. Angka dengan sembilan
    desimal ditolak Binance, dan di papan publik terbaca sebagai kecerobohan. */
@@ -691,6 +995,7 @@ function evaluasiFvg(s, bar) {
    jawab tidak menyertakan lilin berjalan. `bar4h` hanya dipakai kalau
    strateginya menyaring arah tren. */
 function evaluasi(s, bar, bar4h) {
+  if (s.jenis === 'snr') return evaluasiSnr(s, bar, bar4h);
   if (s.jenis === 'momentum') return evaluasiMomentum(s, bar);
   if (s.jenis === 'fvg') return evaluasiFvg(s, bar);
   if (s.jenis === 'fable') return evaluasiFable(s, bar);
@@ -793,6 +1098,45 @@ function bungkus(kunci, s, pasangan, sn) {
               + 'target ' + s.rrTp + 'R. Tembusan ke bawah sengaja diabaikan \u2014 sisi jual terukur rugi. '
               + 'Batal sendiri kalau tidak tertembus dalam ' + s.barKedaluwarsa + ' bar. '
               + 'Aturan tetap, hasil riset sendiri \u2014 forward test satu instrumen.',
+      },
+    };
+  }
+
+  if (s.jenis === 'snr') {
+    const arahAsal = sn.arahAsli || sn.arah;
+    const zona = sn.sisiZona === 'R' ? 'resistance' : 'support';
+    const kondisi = sn.smiKondisi === 'oversold' ? 'oversold' : 'overbought';
+    /* Kalimat ini yang menjaga kartunya tidak terbaca seperti kerusakan.
+       Tanpa itu, pembaca melihat "SMI oversold" berdampingan dengan posisi
+       SELL dan menyimpulkan ada yang salah — padahal itu justru yang
+       sedang diuji. */
+    const kataBalik = s.balik ? ' Posisi diambil TERBALIK dari arah metodenya.' : '';
+    return {
+      pasangan: pasangan, tf: s.tf, arah: sn.arah, agenNama: s.nama,
+      pasar: /USDT$/.test(pasangan) ? 'kripto' : 'tradefi',
+      judul: pasangan.replace('USDT', '') + ' ' + sn.arah + ' \u2014 SNR + SMI 4H',
+      ringkas: 'SMI 4 jam ' + kondisi + ' dan candle 5 menit menyentuh zona '
+             + zona + ' 4 jam.' + kataBalik + ' Stop di luar kotak zona ('
+             + persen + '%), target 1:1.',
+      isi: {
+        entry: rapikan(sn.entry, sn.contoh), sl: rapikan(sn.sl, sn.contoh),
+        tp: rapikan(sn.tp, sn.contoh),
+        alasan: 'SMI(14,3,3) di 4 jam menyentuh ' + kondisi + ' (' + sn.smiK.toFixed(1)
+              + ', ambang ' + (arahAsal === 'BUY' ? SMI_OS : SMI_OB) + ')'
+              + (sn.mulaiBalik ? ' dan sudah mulai berbalik' : ' dan masih meluncur') + '. '
+              + 'Candle 5 menit yang baru tutup menyentuh zona ' + zona + ' di '
+              + rapikan(sn.levelZona, sn.contoh) + ', ditarik dari pivot(10,10) 4 jam '
+              + 'dengan pita ATR(14)x0,5. Ekor '
+              + (sn.tolak ? 'penolakan lebih panjang dari badan' : 'tidak lebih panjang dari badan')
+              + '; sisi zona ' + (sn.searah ? 'searah' : 'berlawanan') + ' dengan SMI. '
+              + 'Stop di luar kotak ditambah setengah tinggi kotak sebagai ruang sapuan '
+              + 'likuiditas, target sejauh jarak yang sama (1:1). '
+              + 'Perhitungan diporting utuh dari screener \u2014 forward test.'
+              + (s.balik
+                 ? ' CERMIN: SMI, zona, sentuhan, dan jarak SL/TP PERSIS sama dengan '
+                 + 'Agen SNR; yang dibalik hanya sisinya \u2014 metode memberi '
+                 + arahAsal + ', dieksekusi ' + sn.arah + '.'
+                 : ''),
       },
     };
   }
@@ -973,6 +1317,11 @@ async function utama() {
         ? Math.max(s.emaLen * 3 + 30, 200)
         : s.jenis === 'fvg' ? 600
         : s.jenis === 'fable' ? 300
+        /* SNR cuma memeriksa SATU candle 5 menit — yang baru tutup. Yang
+           butuh sejarah panjang justru deret 4 jam-nya, dan itu diambil
+           terpisah di bawah. Menarik 130 bar 5 menit di sini berarti 21 jam
+           data yang tidak pernah dibaca, dikalikan 21 pasangan tiap putaran. */
+        : s.jenis === 'snr' ? 40
         : Math.max(s.lookback + 40, 130);
       /* Mode 'auto': pasangan berakhiran USDT diambil dari Binance, selain itu
          dari feed MT5 pemilik. Agen FVG memindai keduanya sekaligus, dan
@@ -1005,7 +1354,14 @@ async function utama() {
         }
       }
 
-      const b4 = s.filterTren ? await klines(p, '4h', 130) : null;
+      /* Deret 4 jam dipakai dua agen dengan kebutuhan berbeda: filter tren
+         cukup 130 bar, sedangkan SNR butuh 250 — pivot(10,10) memakan 20 bar
+         di tiap ujungnya dan SMI(14,3,3) punya pemanasannya sendiri, jadi
+         deret pendek menghasilkan zona yang berbeda dari yang dilihat orang
+         di screener. Angkanya disamakan dengan fetchKlines di sana. */
+      const b4 = (s.jenis === 'snr')
+        ? await klines(p, '4h', 250)
+        : s.filterTren ? await klines(p, '4h', 130) : null;
       const sn = evaluasi(s, bar, b4);
       if (sn) {
         hasil.push(bungkus(pilih, s, p, sn));
