@@ -162,7 +162,7 @@ function susunSurat({ nama, kode, berakhir, jenis }) {
     '—',
     'Jadi Trader Tools · PT Solusi Bursa Nusantara',
     'Alat bantu analisa pasar. Bukan nasihat investasi.',
-    `Ketentuan lengkap: ${SITUS}/#/legal`,
+    `Ketentuan lengkap: ${SITUS}/legal`,
   ].filter((b) => b !== null).join('\n');
 
   const html = `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;font-size:14px;line-height:1.65;color:#18181b;max-width:520px">
@@ -181,7 +181,7 @@ function susunSurat({ nama, kode, berakhir, jenis }) {
   <p style="margin:0;font-size:12px;color:#71717a">
     Jadi Trader Tools · PT Solusi Bursa Nusantara<br>
     Alat bantu analisa pasar. <strong>Bukan nasihat investasi.</strong><br>
-    <a href="${SITUS}/#/legal" style="color:#71717a">Ketentuan lengkap</a>
+    <a href="${SITUS}/legal" style="color:#71717a">Ketentuan lengkap</a>
   </p>
 </div>`;
 
@@ -290,7 +290,7 @@ async function kirimSuratPermintaanMasuk({ email, nama, produk, jenis, bukti, ca
 
   const teks = 'Ada permintaan akses baru di Jadi Trader Tools.\n\n'
     + baris.map(([k, v]) => k + ': ' + v).join('\n')
-    + '\n\nSetujui atau tolak di: ' + SITUS + '/#/maintenance'
+    + '\n\nSetujui atau tolak di: ' + SITUS + '/maintenance'
     + '\n\nSurat ini otomatis — tidak perlu dibalas.';
 
   const html = '<div style="font-family:system-ui,-apple-system,Segoe UI,sans-serif;'
@@ -302,7 +302,7 @@ async function kirimSuratPermintaanMasuk({ email, nama, produk, jenis, bukti, ca
         '<tr><td style="padding:4px 14px 4px 0;color:#71717a;vertical-align:top">' + amanHtml(k)
         + '</td><td style="padding:4px 0;color:#e4e4e7">' + amanHtml(String(v)) + '</td></tr>').join('')
     + '</table>'
-    + '<p style="margin:18px 0 0"><a href="' + SITUS + '/#/maintenance" '
+    + '<p style="margin:18px 0 0"><a href="' + SITUS + '/maintenance" '
     + 'style="display:inline-block;background:#fafafa;color:#09090b;padding:9px 16px;'
     + 'border-radius:7px;text-decoration:none;font-size:13px;font-weight:600">Buka panel persetujuan</a></p>'
     + '<p style="margin:16px 0 0;font-size:11px;color:#52525b">Surat otomatis dari ' + SITUS + '</p>'
@@ -347,11 +347,14 @@ async function kirimSuratPermintaanMasuk({ email, nama, produk, jenis, bukti, ca
    Pesannya di-escape sebelum masuk HTML. Pemilik mengetik teks biasa, dan
    satu tanda kurung siku yang tidak sengaja akan merusak seluruh isi surat
    di sebagian klien surel. */
-function amanHtml(t) {
-  return String(t == null ? '' : t)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
+/* Kembarannya DIBUANG 1 Sep 2026. Berkas ini sempat punya dua amanHtml:
+   yang di atas meloloskan tanda petik tunggal jadi &#39;, yang di sini
+   tidak. Deklarasi fungsi diangkat ke atas, jadi yang BELAKANGAN menang --
+   artinya versi yang lebih lemah itulah yang dipakai seluruh berkas,
+   termasuk oleh surat-surat yang ditulis dengan asumsi versi kuat.
+
+   Tidak ada galat, tidak ada peringatan. Cuma satu karakter yang diam-diam
+   berhenti dijaga di tempat yang justru menerima nama orang asing. */
 
 function susunSuratKeputusan({ nama, keputusan, pesan, produk }) {
   const sapa = nama ? 'Halo ' + nama + ',' : 'Halo,';
@@ -440,52 +443,73 @@ async function kirimSuratAksesOtomatis({ email, nama, kode, berakhir, hari }) {
     return { terkirim: false, alasan: 'surel belum dikonfigurasi' };
   }
 
+  /* ── SATU GAYA UNTUK SEMUA SURAT ────────────────────────────────────
+     Disamakan dengan susunSurat() di atas: sapaan, satu kalimat pembuka,
+     TABEL RINCIAN, tombol, penjelasan, lalu blok tanda tangan.
+
+     Bukan soal selera. Tiga surat dengan tiga tata letak membuat orang
+     yang menerima dua di antaranya bertanya-tanya apakah yang satu palsu --
+     dan surat berisi tautan akses adalah persis jenis surat yang paling
+     sering dicurigai. Keseragaman di sini fungsinya keamanan, bukan rapi.
+
+     SELURUH nilai yang disisipkan lewat amanHtml(). Nama pendaftar datang
+     dari akun Google/Discord orang lain; ia boleh berisi tanda kutip,
+     kurung siku, apa pun. Menempelkannya mentah ke HTML berarti tata letak
+     surat ditentukan oleh nama orang asing. */
   const tautan = SITUS + '/akses?kode=' + encodeURIComponent(String(kode || ''));
-  const sampai = berakhir
-    ? new Date(berakhir).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
-    : '';
-  const sapa = nama ? String(nama).split(' ')[0] : 'Halo';
-  const subjek = 'Akses Jadi Trader Tools kamu sudah aktif';
+  const sapaan = nama ? 'Halo ' + String(nama).trim() + ',' : 'Halo,';
+  const sampai = berakhir ? tanggalIndo(berakhir) : '';
 
   const teks = [
-    sapa + ',',
+    sapaan,
     '',
-    'Akses event gratis kamu sudah AKTIF — tidak perlu menunggu ditinjau.',
+    'Akses event gratis Jadi Trader Tools sudah aktif di akunmu.',
+    'Tidak perlu menunggu ditinjau.',
     '',
-    'Buka tautan ini dan aksesnya langsung terpasang:',
+    'Jenis akses    : Akses gratis (event)',
+    sampai ? 'Berlaku sampai : ' + sampai + (hari ? ' (' + hari + ' hari)' : '') : '',
+    'Kode cadangan  : ' + kode,
+    '',
+    'Buka aksesmu di sini:',
     tautan,
     '',
-    'Kode cadangan kalau tautannya tidak bisa diklik: ' + kode,
-    (sampai ? 'Berlaku sampai ' + sampai + (hari ? ' (' + hari + ' hari)' : '') + '.' : ''),
+    'Tautan itu terikat ke akun yang mendaftar. Kalau dibuka dengan akun',
+    'lain, ia ditolak -- jadi aman kalau surat ini kebetulan diteruskan.',
     '',
-    'Tautan ini terikat ke akun yang mendaftar — dibuka dengan akun lain,',
-    'ia akan ditolak. Jadi tidak perlu khawatir kalau emailnya diteruskan.',
+    'Kalau tautannya tidak bisa diklik, masuk lebih dulu lalu tempel kode',
+    'cadangan di halaman Akses.',
     '',
-    'Butuh bantuan? Balas surat ini.',
+    '--',
+    'Jadi Trader Tools - PT Solusi Bursa Nusantara',
+    'Alat bantu analisa pasar. Bukan nasihat investasi.',
     'Ketentuan lengkap: ' + SITUS + '/legal',
-  ].filter(function (x) { return x !== null; }).join('\n');
+  ].filter(function (b) { return b !== ''; }).join('\n');
 
-  const html = `<div style="font-family:system-ui,-apple-system,Segoe UI,sans-serif;max-width:520px;margin:0 auto;color:#18181b">
-  <p style="font-size:15px">${sapa},</p>
-  <p style="font-size:15px;line-height:1.6">Akses <b>event gratis</b> kamu sudah <b>aktif</b> — tidak perlu menunggu ditinjau.</p>
-  <p style="margin:24px 0">
-    <a href="${tautan}" style="display:inline-block;background:#18181b;color:#fff;text-decoration:none;padding:12px 22px;border-radius:6px;font-weight:600">Buka akses saya</a>
+  const html = `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;font-size:14px;line-height:1.65;color:#18181b;max-width:520px">
+  <p style="margin:0 0 14px">${amanHtml(sapaan)}</p>
+  <p style="margin:0 0 18px">Akses <strong>event gratis</strong> Jadi Trader Tools sudah aktif di akunmu. Tidak perlu menunggu ditinjau.</p>
+  <table style="border-collapse:collapse;margin:0 0 20px;font-size:13.5px">
+    <tr><td style="padding:3px 16px 3px 0;color:#71717a">Jenis akses</td><td style="padding:3px 0"><strong>Akses gratis (event)</strong></td></tr>
+    ${sampai ? `<tr><td style="padding:3px 16px 3px 0;color:#71717a">Berlaku sampai</td><td style="padding:3px 0"><strong>${amanHtml(sampai)}</strong>${hari ? ` <span style="color:#71717a">(${amanHtml(hari)} hari)</span>` : ''}</td></tr>` : ''}
+    <tr><td style="padding:3px 16px 3px 0;color:#71717a">Kode cadangan</td><td style="padding:3px 0"><code style="background:#f4f4f5;padding:2px 6px;border-radius:4px">${amanHtml(kode)}</code></td></tr>
+  </table>
+  <p style="margin:0 0 18px">
+    <a href="${amanHtml(tautan)}" style="display:inline-block;background:#18181b;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-weight:600">Buka akses saya</a>
   </p>
-  <p style="font-size:13px;color:#52525b;line-height:1.6">
-    Kalau tombolnya tidak bisa diklik, salin kode ini di halaman Akses:<br>
-    <span style="font-family:ui-monospace,monospace;font-size:15px;letter-spacing:1px;color:#18181b">${kode}</span>
-  </p>
-  ${sampai ? `<p style="font-size:13px;color:#52525b">Berlaku sampai <b>${sampai}</b>${hari ? ' (' + hari + ' hari)' : ''}.</p>` : ''}
-  <p style="font-size:12.5px;color:#71717a;line-height:1.6;border-top:1px solid #e4e4e7;padding-top:14px;margin-top:22px">
-    Tautan ini terikat ke akun yang mendaftar — dibuka dengan akun lain, ia ditolak.
-    Jadi aman kalau suratnya kebetulan diteruskan.<br>
-    Butuh bantuan? Balas surat ini. · <a href="${SITUS}/legal" style="color:#71717a">Ketentuan</a>
+  <p style="margin:0 0 18px;color:#52525b">Tautan itu terikat ke akun yang mendaftar — dibuka dengan akun lain, ia ditolak. Jadi aman kalau surat ini kebetulan diteruskan. Kalau tombolnya tidak bisa diklik, masuk lebih dulu lalu tempel kode cadangan di halaman Akses.</p>
+  <hr style="border:none;border-top:1px solid #e4e4e7;margin:22px 0 14px">
+  <p style="margin:0;font-size:12px;color:#71717a">
+    Jadi Trader Tools · PT Solusi Bursa Nusantara<br>
+    Alat bantu analisa pasar. <strong>Bukan nasihat investasi.</strong><br>
+    <a href="${SITUS}/legal" style="color:#71717a">Ketentuan lengkap</a>
   </p>
 </div>`;
 
   try {
     if (j === 'api') {
-      const h = await kirimLewatApi({ email, teks, html, subjek });
+      /* SUBJEK yang sama dengan surat persetujuan: orang yang menerima
+         keduanya tidak perlu menebak apakah ini surat yang berbeda. */
+      const h = await kirimLewatApi({ email, teks, html, subjek: SUBJEK });
       if (h.terkirim) console.log('[surel] akses otomatis terkirim (api) ke', email, '·', h.id);
       else console.error('[surel] akses otomatis gagal (api) ke', email, '·', h.alasan);
       return h;
@@ -494,7 +518,7 @@ async function kirimSuratAksesOtomatis({ email, nama, kode, berakhir, hari }) {
     if (!t) return { terkirim: false, alasan: 'SMTP belum dikonfigurasi' };
     const info = await t.sendMail({
       from: `"${DARI_NAMA}" <${SMTP_USER}>`,
-      to: email, replyTo: BALAS_KE, subject: subjek, text: teks, html,
+      to: email, replyTo: BALAS_KE, subject: SUBJEK, text: teks, html,
     });
     console.log('[surel] akses otomatis terkirim (smtp) ke', email, '·', info.messageId);
     return { terkirim: true };
