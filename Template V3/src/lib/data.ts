@@ -354,12 +354,20 @@ export function usePosisi(): HasilData<Posisi[]> & { pending: OrderBursa[]; stop
             ...p, arah: b.arah, entry: b.entry || p.entry,
             sl: b.sl || p.sl, tp: b.tp || p.tp,
             jumlah: b.jumlah, pnlFloat: b.pnl,
+            /* Dokumen publik tidak tahu bursanya; yang tahu jawaban bursa
+               yang barusan menimpanya. Tanpa baris ini, posisi Hyperliquid
+               yang KEBETULAN juga tercatat di dokumen publik tetap
+               berlabel Binance. */
+            venue: b.bursa === 'hyperliquid' ? 'Hyperliquid' : 'Binance Live',
           }
         : {
             id: `bursa-${b.simbol}`,
             simbol: b.simbol, arah: b.arah, tf: '—',
             entry: b.entry, sl: b.sl, tp: b.tp, hargaKini: b.entry,
-            venue: 'Binance Live', buka: 0,
+            /* Dibaca dari bursanya sendiri. Dulu dikeraskan 'Binance Live',
+               dan sesudah jalur Hyperliquid ada itu jadi keterangan yang
+               SALAH — bukan kurang lengkap, salah. */
+            venue: b.bursa === 'hyperliquid' ? 'Hyperliquid' : 'Binance Live', buka: 0,
             jumlah: b.jumlah, pnlFloat: b.pnl,
           };
     });

@@ -51,7 +51,7 @@ export interface Posisi {
   sl: number;
   tp: number;
   hargaKini: number;
-  venue: 'Binance Live' | 'Simulasi' | 'MT5';
+  venue: 'Binance Live' | 'Hyperliquid' | 'Simulasi' | 'MT5';
   buka: number;
   /** Ukuran posisi dalam koin. Hanya terisi kalau datanya dari bursa —
    *  `public/posisiTerbuka` sengaja TIDAK menyiarkannya karena ukuran posisi

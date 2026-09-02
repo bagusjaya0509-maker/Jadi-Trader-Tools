@@ -405,6 +405,14 @@ export async function ujiLisensi(id: string, kode: string) {
    dokumen publik. */
 export interface PosisiBursa {
   simbol: string;
+  /** Bursa tempat posisi ini benar-benar hidup.
+   *
+   *  Ada sejak /api/positions menggabungkan Binance dan Hyperliquid. TIDAK
+   *  boleh ditebak dari nama simbol: keduanya sama-sama ditulis COINUSDT,
+   *  jadi menebak berarti melabeli posisi Hyperliquid sebagai Binance —
+   *  persis yang dilaporkan pemilik saat ASTER dan CASHCAT dibuka di
+   *  Hyperliquid tapi tabelnya menulis "Binance Live". */
+  bursa: 'binance' | 'hyperliquid';
   arah: 'BUY' | 'SELL';
   jumlah: number;
   entry: number;
@@ -547,6 +555,9 @@ export function usePosisiBinance(): {
           .filter((p: any) => Math.abs(Number(p.positionAmt)) > 0)
           .map((p: any): PosisiBursa => ({
             simbol: String(p.symbol ?? ''),
+            /* Bawaannya 'binance' — itu yang benar untuk jawaban lama yang
+               belum punya medan ini, bukan tebakan. */
+            bursa: p.bursa === 'hyperliquid' ? 'hyperliquid' : 'binance',
             arah: Number(p.positionAmt) > 0 ? 'BUY' : 'SELL',
             jumlah: Math.abs(Number(p.positionAmt)) || 0,
             entry: Number(p.entryPrice) || 0,

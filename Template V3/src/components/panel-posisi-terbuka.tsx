@@ -91,6 +91,22 @@ export function PanelPosisiTerbuka({ sumber, onSunting, onTutup, tanpaBingkai, m
   onTutup?: (o: OrderSunting) => void;
 }) {
   const { data: posisiKripto, pending: pendingKripto, stop: stopKripto, contoh: kriptoContoh, bursaAktif } = usePosisi();
+  /* ── SUBJUDUL MENYEBUT BURSA YANG SUNGGUH ADA ISINYA ─────────────────
+     Dulu tertulis "di Binance" apa pun isinya. Sesudah posisi Hyperliquid
+     bisa muncul di daftar yang sama, kalimat itu berhenti jadi kurang
+     lengkap dan mulai jadi SALAH — dilaporkan pemilik saat ASTER dan
+     CASHCAT yang ia buka di Hyperliquid tetap dilabeli Binance.
+
+     Dihitung dari isinya, bukan dari setelan: daftar yang cuma berisi
+     posisi Binance tidak perlu menyebut Hyperliquid, dan sebaliknya. */
+  const namaBursaAktif = (() => {
+    const punya = new Set(posisiKripto.map((p) => p.venue));
+    const hl = punya.has('Hyperliquid');
+    const bn = punya.has('Binance Live');
+    if (hl && bn) return 'Binance dan Hyperliquid';
+    if (hl) return 'Hyperliquid';
+    return 'Binance';
+  })();
   const mt5 = useAkunMt5();
   const { pengguna } = useAuth();
   /* TIKET MANA YANG SALINAN. Dihitung dari daftar posisi hidup, bukan
@@ -443,7 +459,7 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
                 : 'Dari MetaTrader 5, lewat EA JadiTraderSync.';
             })()
           : bursaAktif
-            ? 'Order yang sedang berjalan di Binance.'
+            ? `Order yang sedang berjalan di ${namaBursaAktif}.`
             : 'Dari catatan screener — App Token belum diisi, jadi belum dicocokkan ke Binance.'}
         kanan={
           total === null
