@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Loader2, ExternalLink, TriangleAlert, RotateCcw, Radar, ArrowRight, Lock } from 'lucide-react';
+import { ExternalLink, TriangleAlert, RotateCcw, Radar, ArrowRight, Lock } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { modePreview, jatahTerpakai, pakaiJatah } from '@/lib/preview';
 import { usePaket, pakaiKuota, LABEL_PAKET } from '@/lib/paket';
+import { Memuat } from '@/components/memuat';
 
 /* ════════════════════════════════════════════════════════════════════════
    SCREENER ENTRY — screener V2 yang ASLI, ditanam apa adanya
@@ -751,9 +752,7 @@ export default function ScreenerV2({ tinggi, onPilihSimbol }: {
       {/* Tinggi dari induk kalau ditanam; dari layar kalau jadi halaman. */}
       <div className="bg-zinc-950" style={{ height: tinggi ? `${tinggi}px` : 'calc(100vh - 56px)' }}>
         {!siap && (
-          <div className="absolute inset-0 flex items-center justify-center gap-2.5 text-[13px] text-zinc-500">
-            <Loader2 className="size-4 animate-spin" /> Memuat screener…
-          </div>
+          <Memuat className="absolute inset-0" pesan="Memuat screener…" />
         )}
         {alamat && (
           <iframe

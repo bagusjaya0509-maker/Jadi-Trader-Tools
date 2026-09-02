@@ -47,6 +47,7 @@ import {
   type RingkasAnalisa, type IsiAnalisa, type PermintaanMasuk, type Performa,
   type AgenHadir,
 } from '@/lib/analisa';
+import { Memuat } from '@/components/memuat';
 
 /* ════════════════════════════════════════════════════════════════════════
    COPY TRADING — analisa berbayar antar pengguna
@@ -3615,9 +3616,7 @@ export default function Analisa() {
          Maka daftar utamanya kartu kanal: satu kartu per analis dengan
          performanya, dan sinyal-sinyalnya terbuka SETELAH kanalnya dipilih. */}
       {memuat ? (
-        <div className="flex items-center justify-center gap-2 py-10 text-[13px] text-zinc-500">
-          <Loader2 className="size-4 animate-spin" /> Memuat analisa…
-        </div>
+        <Memuat pesan="Memuat analisa…" />
       ) : daftar.length === 0 && agenHadir.length === 0 ? (
         /* Syarat agenHadir WAJIB ikut. Tanpa itu, papan tanpa satu pun
            analisa manusia akan menyembunyikan kartu agen juga — padahal

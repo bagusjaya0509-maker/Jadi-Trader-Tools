@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
+import { Memuat } from '@/components/memuat';
 import { useEffect, lazy, Suspense, Component, type ReactNode } from 'react';
-import { Loader2 } from 'lucide-react';
 import { PenyediaAuth, useAuth } from '@/lib/auth';
 import { modePreview } from '@/lib/preview';
 import { catatKunjungan } from '@/lib/admin';
@@ -200,11 +200,11 @@ function KeAtas() {
  *  di tengah, bukan kerangka abu-abu: potongannya sampai dalam ratusan
  *  milidetik, dan kerangka yang berkedip lebih mengganggu daripada jeda. */
 function Menunggu() {
-  return (
-    <div className="flex h-[60vh] items-center justify-center">
-      <Loader2 className="size-5 animate-spin text-zinc-600" />
-    </div>
-  );
+  /* h-[60vh] DIPERTAHANKAN dan itu bukan pengecualian dari aturan "satu
+     posisi": ini fallback SEHALAMAN, jadi areanya memang layar, bukan
+     panel. Yang seragam adalah caranya memusatkan diri di dalam areanya —
+     dan itu dipegang <Memuat>, bukan ditulis lagi di sini. */
+  return <Memuat className="h-[60vh]" />;
 }
 
 /* ── PINTU DEPAN: dua wajah di satu alamat ──────────────────────────────

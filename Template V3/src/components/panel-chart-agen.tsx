@@ -1,16 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
-import {
-  ChevronDown, EyeOff, FolderInput, GripHorizontal, Loader2, PenLine,
-  RefreshCw, Trash2, Undo2, X,
-} from 'lucide-react';
+import { ChevronDown, EyeOff, FolderInput, GripHorizontal, PenLine, RefreshCw, Trash2, Undo2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   daftarChart, gambarChart, tandaiChart, hapusChart, jadikanSinyal, aktivitasChart,
   type ChartPantauan, type JejakAgen, type RuangAgen,
   bacaMata, simpanMata, bacaSekarang, type KeadaanMata,
 } from '@/lib/chart-agen';
+import { Memuat } from '@/components/memuat';
 
 /* ════════════════════════════════════════════════════════════════════════
    PANEL CHART PANTAUAN — ruang kerja pemilik, bukan halaman publik
@@ -239,9 +237,7 @@ function GambarChart({ id, alt }: { id: string; alt: string }) {
   }
   if (!url) {
     return (
-      <div className="flex h-40 items-center justify-center border-b border-zinc-800 bg-zinc-900/60">
-        <Loader2 className="size-4 animate-spin text-zinc-600" />
-      </div>
+      <Memuat className="h-40 min-h-0 border-b border-zinc-800 bg-zinc-900/60" />
     );
   }
   return (
@@ -701,9 +697,8 @@ export function PanelChartAgen() {
 
   if (muat) {
     return (
-      <div className="flex items-center gap-2 py-10 text-[13px] text-zinc-500">
-        <Loader2 className="size-4 animate-spin" /> Mengambil chart…
-      </div>
+      /* Dulu TANPA justify-center — spinner-nya menempel ke tepi kiri. */
+      <Memuat pesan="Mengambil chart…" />
     );
   }
 

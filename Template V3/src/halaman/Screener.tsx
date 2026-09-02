@@ -14,6 +14,7 @@ import {
   pindaiPantau, pindaiParallel,
   type SinyalPantau, type SinyalParallel, type ModeParallel,
 } from '@/lib/pindai';
+import { Memuat } from '@/components/memuat';
 
 /* ════════════════════════════════════════════════════════════════════════
    SCREENER ENTRY — memindai pasar sungguhan
@@ -249,11 +250,10 @@ function Kosong({ memuat, offline, jumlahDipindai, pesan }: {
   memuat: boolean; offline: boolean; jumlahDipindai: number; pesan: string;
 }) {
   if (memuat) {
-    return (
-      <div className="flex items-center justify-center gap-2.5 px-5 pb-10 pt-4 text-[13px] text-zinc-500">
-        <Loader2 className="size-4 animate-spin" /> Memindai {jumlahDipindai} koin…
-      </div>
-    );
+    /* Dulu `px-5 pb-10 pt-4` — spinner menempel tepat di bawah kepala panel,
+       sementara loader iframe V2 di halaman yang SAMA dipusatkan penuh.
+       Dua loader, dua tempat, satu halaman. Itu yang terlihat berpindah. */
+    return <Memuat pesan={`Memindai ${jumlahDipindai} koin…`} />;
   }
   if (offline) {
     return (

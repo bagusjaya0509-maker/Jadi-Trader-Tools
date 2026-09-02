@@ -13,6 +13,7 @@ import {
   type DompetPantau,
 } from '@/lib/wallet-agen';
 import { Copy as IkonTiru, TriangleAlert } from 'lucide-react';
+import { Memuat } from '@/components/memuat';
 
 /* ════════════════════════════════════════════════════════════════════════
    RUANG DOMPET PANTAUAN — fase mencatat
@@ -1838,9 +1839,10 @@ export function PanelWalletAgen({ pemilik = false }: { pemilik?: boolean }) {
 
   if (muat) {
     return (
-      <div className="flex items-center gap-2 py-10 text-[13px] text-zinc-500">
-        <Loader2 className="size-4 animate-spin" /> Mengambil keadaan dompet…
-      </div>
+      /* Dulu TANPA justify-center — menempel ke kiri, persis seperti
+         panel-chart-agen. Dua berkas, satu kekeliruan yang sama, karena
+         kelasnya memang disalin dari satu ke yang lain. */
+      <Memuat pesan="Mengambil keadaan dompet…" />
     );
   }
 
