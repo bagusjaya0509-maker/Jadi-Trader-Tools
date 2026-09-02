@@ -73,16 +73,24 @@ function KartuSaldo({ judul, saldoJurnal, akun, keIntegrasi }: {
           <div className="text-[12.5px] text-zinc-500">{banyakBursa ? 'Saldo per bursa' : judul}</div>
 
           {banyakBursa ? (
-            /* Yang pertama tetap paling besar — ia bursa utama dan yang
-               paling sering dibaca. Sisanya lebih kecil di sebelahnya,
-               bukan di bawahnya: kartu ini punya ruang mendatar yang
-               menganggur, dan menumpuk ke bawah mendorong sisa panel. */
-            <div className="mt-2 flex flex-wrap items-end gap-x-6 gap-y-2">
+            /* ── SEMUA BURSA UKURANNYA SAMA ────────────────────────────
+               Versi pertama membuat yang pertama 28px dan sisanya 20px,
+               dengan alasan "bursa utama". Itu keliru dan langsung terlihat
+               oleh pemilik: keduanya angka sejenis — saldo, dolar, dibaca
+               untuk pertanyaan yang sama — dan ukuran yang berbeda
+               menyiratkan kepentingan yang berbeda padahal tidak ada. Mana
+               yang "utama" juga bukan urusan kartu ini; ia cuma urutan
+               kemunculan di jawaban server.
+
+               Ukurannya turun sedikit saat bursanya tiga atau lebih supaya
+               barisnya tidak membungkus — tapi turun BERSAMA-SAMA, jadi
+               tetap tidak ada yang terlihat lebih penting. */
+            <div className="mt-2 flex flex-wrap items-end gap-x-7 gap-y-3">
               {rincian.map((b, i) => (
                 <div key={b.id || i} className="min-w-0">
                   <div className="truncate text-[11px] text-zinc-500">{b.nama}</div>
                   <div className={cn('angka mt-1 font-semibold leading-none tracking-tight text-zinc-100',
-                    i === 0 ? 'text-[28px]' : 'text-[20px]')}>
+                    rincian.length >= 3 ? 'text-[22px]' : 'text-[28px]')}>
                     {uang(b.saldo)}
                   </div>
                 </div>
@@ -432,8 +440,23 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
             <Panel>
               <PanelHead
                 judul="Kurva Ekuitas"
-                sub={`Dari ${uang(saldoAwal)} ke ${uang(stat.saldo)} · ${trade.length} transaksi.`}
-                kanan={saldoAwal > 0 ? <BadgeTren nilai={Number(((stat.bersih / saldoAwal) * 100).toFixed(1))} /> : undefined}
+                /* ── `modalAwal`, BUKAN `saldoAwal` ────────────────────────
+                   Kurvanya digambar dari `modalAwal` (baris di atas:
+                   kurvaEkuitas(trade, modalAwal)), yang sudah menghitung
+                   setoran & penarikan. Labelnya memakai `saldoAwal` mentah —
+                   jadi jurnal kripto yang saldoAwal-nya 0 menulis "Dari
+                   $0.00" untuk garis yang jelas-jelas mulai di $401.
+
+                   Angka yang tertulis dan garis yang tergambar berasal dari
+                   dua sumber berbeda, dan yang tertulis kalah benar. Sama
+                   variabelnya sekarang, jadi keduanya tidak bisa berselisih
+                   lagi.
+
+                   Lencana trennya ikut: pembaginya dulu `saldoAwal`, jadi
+                   untuk kripto ia SELALU 0 dan lencananya tidak pernah
+                   digambar sama sekali. */
+                sub={`Dari ${uang(modalAwal)} ke ${uang(stat.saldo)} · ${trade.length} transaksi.`}
+                kanan={modalAwal > 0 ? <BadgeTren nilai={Number(((stat.bersih / modalAwal) * 100).toFixed(1))} /> : undefined}
               />
               {/* Tinggi ikut lebar layar: 280 px di layar lebar terasa pas,
                   tapi di jendela sempit grafiknya jadi kotak tinggi yang
