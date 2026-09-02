@@ -89,9 +89,20 @@ export interface IsiListing {
   maks: number;
 }
 
+/* Kenapa gagalnya PENTING, bukan cuma bahwa ia gagal.
+   ────────────────────────────────────────────────────────────────────────
+   Sebelumnya ketiga sebab di bawah sama-sama berakhir sebagai `{ error }`
+   lalu dijadikan `null` oleh pemanggilnya — dan halaman menampilkan satu
+   kalimat untuk semuanya: "Masuk dulu untuk memakai halaman ini."
+
+   Akibatnya: VPS mati -> halaman menuduh sesi penggunanya. Orangnya keluar
+   lalu masuk lagi berkali-kali untuk memperbaiki sesuatu yang tidak rusak,
+   sementara sebab yang sebenarnya tidak pernah disebut di layar. */
+export type KodeGagal = 'LOGIN' | 'JARINGAN' | 'SERVER';
+
 async function panggil(jalan: string, opsi?: RequestInit): Promise<any> {
   const t = await token();
-  if (!t) return { error: 'Belum masuk.' };
+  if (!t) return { error: 'Belum masuk.', kode: 'LOGIN' as KodeGagal };
   try {
     const r = await fetch(`${dasar()}${jalan}`, {
       ...opsi,
@@ -101,17 +112,75 @@ async function panggil(jalan: string, opsi?: RequestInit): Promise<any> {
       },
     });
     const j = await r.json().catch(() => ({}));
-    if (!r.ok) return { error: j.error || `Gagal (${r.status})` };
+    if (!r.ok) {
+      /* 401 dari server berarti tokennya memang ditolak — itu sungguhan
+         soal login, dan harus dibedakan dari 500 yang bukan. */
+      return {
+        error: j.error || `Gagal (${r.status})`,
+        kode: (r.status === 401 ? 'LOGIN' : 'SERVER') as KodeGagal,
+      };
+    }
     return j;
   } catch (e) {
-    return { error: 'Tidak bisa menghubungi server.' };
+    return { error: 'Tidak bisa menghubungi server.', kode: 'JARINGAN' as KodeGagal };
   }
 }
 
-export async function ambilListing(): Promise<IsiListing | null> {
+export type HasilListing =
+  | { ok: true; isi: IsiListing }
+  | { ok: false; kode: KodeGagal; pesan: string };
+
+export async function ambilListing(): Promise<HasilListing> {
   const j = await panggil('/api/listing');
-  if (j.error) return null;
-  return { daftar: j.daftar || [], jaringan: j.jaringan || {}, maks: j.maks || 20 };
+  if (j.error) return { ok: false, kode: j.kode || 'SERVER', pesan: j.error };
+  return {
+    ok: true,
+    isi: { daftar: j.daftar || [], jaringan: j.jaringan || {}, maks: j.maks || 20 },
+  };
+}
+
+/* ── SENTIMEN PASAR ──────────────────────────────────────────────────────
+   Konteks, bukan sinyal. Indeksnya tidak tahu apa pun tentang token presale
+   yang ditunggu di halaman ini — ia mengukur suasana pasar kripto secara
+   keseluruhan, dan diperbarui sekali sehari.
+
+   `basi: true` datang dari server saat sumbernya sedang tidak terjangkau dan
+   yang dikirim adalah singgahan lama. Halaman WAJIB menampilkannya: angka
+   kemarin yang menyamar jadi angka hari ini adalah kebohongan kecil yang
+   dipakai orang untuk mengambil keputusan. */
+export interface Sentimen {
+  nilai: number;
+  label: string;
+  waktu: number;
+  kemarin: number | null;
+  pekanLalu: number | null;
+  riwayat: { t: number; v: number }[];
+  basi?: boolean;
+}
+
+export async function ambilSentimen(): Promise<Sentimen | null> {
+  const j = await panggil('/api/listing/sentimen');
+  if (j.error || !Number.isFinite(j.nilai)) return null;
+  return {
+    nilai: j.nilai, label: String(j.label || ''), waktu: Number(j.waktu) || 0,
+    kemarin: Number.isFinite(j.kemarin) ? j.kemarin : null,
+    pekanLalu: Number.isFinite(j.pekanLalu) ? j.pekanLalu : null,
+    riwayat: Array.isArray(j.riwayat) ? j.riwayat : [],
+    basi: j.basi === true,
+  };
+}
+
+/* Zona resmi indeksnya. Warnanya sengaja TIDAK memakai merah=buruk /
+   hijau=baik: di indeks ini "extreme greed" justru keadaan yang paling
+   sering mendahului koreksi, dan mewarnainya hijau berarti layar memberi
+   saran yang tidak pernah diminta. Yang dipakai gradasi dingin->hangat,
+   yang menyatakan SUHU pasar tanpa menilainya. */
+export function zonaSentimen(n: number): { nama: string; kelas: string; cincin: string } {
+  if (n <= 24) return { nama: 'Extreme Fear', kelas: 'text-sky-300',     cincin: '#7dd3fc' };
+  if (n <= 44) return { nama: 'Fear',         kelas: 'text-sky-200/80',  cincin: '#bae6fd' };
+  if (n <= 55) return { nama: 'Neutral',      kelas: 'text-zinc-300',    cincin: '#d4d4d8' };
+  if (n <= 74) return { nama: 'Greed',        kelas: 'text-amber-300',   cincin: '#fcd34d' };
+  return { nama: 'Extreme Greed',             kelas: 'text-orange-400',  cincin: '#fb923c' };
 }
 
 export async function simpanKoin(v: {

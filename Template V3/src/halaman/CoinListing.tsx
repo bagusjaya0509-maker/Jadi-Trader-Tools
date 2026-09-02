@@ -10,6 +10,7 @@ import {
   tandaiDibaca, hargaPresale, kelipatan, nilaiSekarang, tulisHarga, tulisUsd,
   type KoinPantau, type InfoJaringan,
 } from '@/lib/coin-listing';
+import { PanelSentimen } from '@/components/panel-sentimen';
 
 /* ════════════════════════════════════════════════════════════════════════
    COIN LISTING
@@ -426,7 +427,11 @@ export default function CoinListing() {
   const [jaringan, setJaringan] = useState<Record<string, InfoJaringan>>({});
   const [muat, setMuat] = useState(true);
   const [sibuk, setSibuk] = useState('');
-  const [masuk, setMasuk] = useState(true);
+  /* Dulu satu boolean `masuk`. Ia tidak cukup: `ambilListing` gagal karena
+     tiga sebab yang berbeda, dan memampatkannya jadi "sudah masuk / belum"
+     membuat VPS mati tampil sebagai sesi yang bermasalah. */
+  const [gagal, setGagal] = useState<{ kode: string; pesan: string } | null>(null);
+  const masuk = gagal === null;
   /* Alamat yang sudah pernah membunyikan notifikasi desktop di tab INI.
      Tanpa ini, tiap tarikan 60 detik akan membunyikan ulang alarm yang sama
      sampai tombolnya ditekan — dan notifikasi yang berulang untuk kabar
@@ -436,16 +441,16 @@ export default function CoinListing() {
   const tarik = useCallback(async () => {
     const j = await ambilListing();
     setMuat(false);
-    if (!j) { setMasuk(false); return; }
-    setMasuk(true);
-    setDaftar(j.daftar);
-    setJaringan(j.jaringan);
+    if (!j.ok) { setGagal({ kode: j.kode, pesan: j.pesan }); return; }
+    setGagal(null);
+    setDaftar(j.isi.daftar);
+    setJaringan(j.isi.jaringan);
 
     /* Notifikasi desktop justru untuk saat halaman ini TIDAK dilihat —
        itu keadaan normalnya. Izinnya diminta saat ada yang benar-benar
        perlu diberitahukan, bukan saat halaman dibuka: permintaan izin yang
        datang tanpa sebab hampir selalu ditolak. */
-    for (const k of j.daftar) {
+    for (const k of j.isi.daftar) {
       if (k.status !== 'listing' || k.dibaca !== false) continue;
       if (sudahBunyi.current.has(k.alamat)) continue;
       sudahBunyi.current.add(k.alamat);
@@ -516,11 +521,43 @@ export default function CoinListing() {
         </div>
       </Panel>
 
-      {!masuk && (
+      {gagal && (
         <Panel className="px-4 py-6 text-center">
-          <p className="text-[13px] text-zinc-400">Masuk dulu untuk memakai halaman ini.</p>
+          {gagal.kode === 'LOGIN' ? (
+            <p className="text-[13px] text-zinc-400">Masuk dulu untuk memakai halaman ini.</p>
+          ) : (
+            <>
+              {/* Sebab yang sebenarnya, dan tombol untuk mencobanya lagi.
+                  Halaman ini menarik ulang tiap 60 detik sendiri, tapi orang
+                  yang baru saja melihat galat tidak akan menunggu semenit
+                  untuk tahu apakah sudah pulih. */}
+              <p className="text-[13px] text-zinc-300">
+                {gagal.kode === 'JARINGAN'
+                  ? 'Server tidak terjangkau.'
+                  : 'Server menjawab dengan galat.'}
+              </p>
+              <p className="mx-auto mt-1 max-w-md text-[12px] leading-relaxed text-zinc-600">
+                Sesimu tidak bermasalah — yang gagal sambungan ke backend.
+                {gagal.pesan ? ' ' + gagal.pesan : ''}
+              </p>
+              <button onClick={() => void tarik()}
+                className="mt-3 cursor-pointer rounded-md border border-zinc-700 px-3 py-1.5 text-[12.5px] text-zinc-200 transition-colors hover:border-zinc-500 hover:bg-zinc-900">
+                Coba lagi
+              </button>
+            </>
+          )}
         </Panel>
       )}
+
+      {/* DI ATAS daftar koin, dan itu urutan yang disengaja: sentimen
+          adalah latar untuk membaca angka-angka di bawahnya. Ditaruh di
+          bawah, ia jadi catatan kaki yang tidak pernah dilihat lebih dulu.
+
+          Tidak digerbangi `masuk`: rutenya sendiri butuh login, jadi kalau
+          sesinya bermasalah panel ini yang bilang begitu sendiri — dan
+          menyembunyikannya saat backend mati berarti membuang satu-satunya
+          bagian halaman yang mungkin masih terisi dari singgahan. */}
+      <PanelSentimen />
 
       {masuk && <FormTambah jaringan={jaringan} selesai={() => void tarik()} />}
 

@@ -280,6 +280,94 @@ module.exports = (app, { butuhLogin, batasLaju, express, DIR }) => {
     return { semua, daftar: semua[req.uid] || [] };
   }
 
+
+  /* ══ SENTIMEN PASAR — FEAR & GREED ══════════════════════════════════════
+     Diminta pemilik untuk halaman ini. Kedudukannya perlu jelas sejak awal:
+     ini KONTEKS, bukan sinyal. Indeksnya tidak tahu apa pun tentang token
+     presale yang sedang ditunggu di sini — ia mengukur suasana pasar kripto
+     secara keseluruhan (volatilitas, momentum, dominasi BTC, tren pencarian).
+
+     Gunanya justru sesudah koinnya listing: hari pertama sebuah token adalah
+     hari paling ramai sepanjang umurnya, dan tahu pasar sedang serakah atau
+     ketakutan mengubah arti dari angka kelipatan yang muncul di kartu di
+     atasnya. Itu saja. Tidak ada pengambilan keputusan yang dititipkan ke
+     angka ini, dan halamannya tidak boleh berpura-pura sebaliknya.
+
+     ── SUMBER DAN SINGGAHAN ────────────────────────────────────────────────
+     alternative.me, gratis dan tanpa kunci. Indeksnya DIPERBARUI SEKALI
+     SEHARI — jawabannya sendiri membawa `time_until_update`. Jadi menariknya
+     tiap kali halaman dibuka berarti puluhan permintaan sehari untuk angka
+     yang sama persis.
+
+     Singgahannya di memori, bukan berkas: kalau prosesnya restart, satu
+     permintaan tambahan bukan ongkos yang perlu dihindari, sementara berkas
+     berarti satu lagi yang bisa rusak dan harus dibersihkan.
+
+     `sisa` disimpan supaya singgahannya berakhir SAAT indeksnya berganti,
+     bukan sesudah durasi tetap yang ditebak-tebak. Ditambah satu menit
+     kelonggaran — menarik tepat pada detik pergantian sering mendapat angka
+     lama yang belum sempat ditulis. */
+  let fngSinggah = null;   // { data, sampai }
+
+  app.get('/api/listing/sentimen', batasLaju, butuhLogin, async (req, res) => {
+    if (fngSinggah && Date.now() < fngSinggah.sampai) {
+      return res.json({ ...fngSinggah.data, dariSinggahan: true });
+    }
+    try {
+      const r = await axios.get('https://api.alternative.me/fng/?limit=30', { timeout: 12000 });
+      const baris = (r.data && r.data.data) || [];
+      if (!baris.length) throw new Error('jawaban kosong');
+
+      /* Urutan dari sumbernya TERBARU DULU. Dibalik di sini, sekali, supaya
+         yang membacanya di layar tidak perlu tahu urutan aslinya — grafik
+         yang tergambar mundur adalah kekeliruan yang sulit dilihat mata. */
+      const riwayat = baris
+        .map((x) => ({ t: Number(x.timestamp) * 1000, v: Number(x.value) }))
+        .filter((x) => x.t > 0 && Number.isFinite(x.v))
+        .sort((a, b) => a.t - b.t);
+      if (!riwayat.length) throw new Error('tidak ada angka yang sah');
+
+      const kini = riwayat[riwayat.length - 1];
+      const kemarin = riwayat.length > 1 ? riwayat[riwayat.length - 2].v : null;
+      /* Tujuh hari lalu, bukan "baris ke-7 dari belakang": sumbernya pernah
+         bolong satu hari, dan menghitung mundur per baris akan diam-diam
+         membandingkan dengan hari yang salah. */
+      const targetPekan = kini.t - 7 * 86400000;
+      const pekan = riwayat.reduce((baik, x) =>
+        Math.abs(x.t - targetPekan) < Math.abs(baik.t - targetPekan) ? x : baik, riwayat[0]);
+
+      const data = {
+        ok: true,
+        nilai: kini.v,
+        label: String(baris[0].value_classification || ''),
+        waktu: kini.t,
+        kemarin,
+        pekanLalu: pekan.t <= kini.t - 5 * 86400000 ? pekan.v : null,
+        riwayat,
+        sumber: 'alternative.me',
+      };
+
+      const sisa = Number((baris[0] || {}).time_until_update);
+      fngSinggah = {
+        data,
+        sampai: Date.now() + (Number.isFinite(sisa) && sisa > 0
+          ? (sisa + 60) * 1000
+          : 30 * 60 * 1000),   // sumbernya tidak menyebut -> 30 menit
+      };
+      res.json(data);
+    } catch (e) {
+      /* Singgahan basi lebih baik daripada panel kosong: angkanya berubah
+         sekali sehari, jadi nilai kemarin masih menjelaskan keadaan hari ini
+         jauh lebih baik daripada tanda strip. Tapi HARUS diberi tahu bahwa
+         ia basi — angka lama yang menyamar jadi angka sekarang adalah
+         kebohongan kecil yang dipakai orang untuk mengambil keputusan. */
+      if (fngSinggah) {
+        return res.json({ ...fngSinggah.data, basi: true, alasan: e.message });
+      }
+      res.status(502).json({ error: 'Sumber sentimen tidak terjangkau.' });
+    }
+  });
+
   app.get('/api/listing', batasLaju, butuhLogin, (req, res) => {
     const { daftar } = milikku(req);
     res.json({ ok: true, daftar, jaringan: JARINGAN, maks: MAKS });
