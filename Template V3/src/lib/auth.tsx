@@ -526,8 +526,41 @@ export function PenyediaAuth({ children }: { children: React.ReactNode }) {
            catch: kalau redirect-nya ikut gagal, penolakannya lolos keluar
            dari `masuk` tanpa pernah menyentuh setGalat — layarnya diam,
            dan tidak ada satu pun jejak yang bisa ditelusuri. */
+        /* ── GALAT TANPA KODE IKUT MEMICU REDIRECT, 2 Sep 2026 ────────────
+           Sebelumnya cadangan ini cuma berlaku untuk DUA kode Firebase.
+           Ditemukan saat pemilik mencoba masuk lewat peramban tertanam:
+           layarnya menulis "Gagal masuk — Error: Database is closing".
+
+           Diperiksa di peramban itu, bukan ditebak:
+               window.open(...)  ->  null        popup diblokir
+               indexedDB          ->  tulis & baca BERHASIL
+
+           Jadi popup-nya yang mati, bukan penyimpanannya. Tapi Firebase
+           tidak selalu melaporkannya sebagai auth/popup-blocked — waktu
+           jendelanya tidak pernah terbuka, pengelola auth-event-nya
+           merobohkan sendiri pegangan IndexedDB-nya dan yang terlempar
+           adalah Error biasa TANPA `code`.
+
+           Karena syarat di bawah menuntut kode tertentu, cadangan redirect
+           tidak pernah jalan justru pada keadaan yang paling membutuhkannya.
+
+           ── KENAPA INI BUKAN CUMA SOAL PERAMBAN CLAUDE ──────────────────
+           Peramban dalam-aplikasi memblokir popup dengan cara yang sama:
+           Instagram, Facebook, Telegram, TikTok. Situs ini dipasarkan lewat
+           Instagram — artinya sebagian orang yang menekan tautan di bio
+           mendarat di WebView Instagram, menekan Masuk, dan menerima
+           kalimat galat yang tidak bisa mereka apa-apakan. Mereka tidak
+           akan melapor; mereka cuma pergi.
+
+           `!e?.code` aman sebagai pemicu: galat BER-kode berarti Firebase
+           paham apa yang terjadi dan sudah ditangani di atas atau di
+           pesanAuth(). Yang tanpa kode berarti sesuatu rusak di bawah SDK —
+           dan redirect adalah satu-satunya jalur yang tidak butuh popup,
+           jadi mencobanya selalu lebih baik daripada menyerah. Kalau ia
+           ikut gagal, galatnya yang ditampilkan. */
         if (!webkit && (e?.code === 'auth/popup-blocked'
-            || e?.code === 'auth/operation-not-supported-in-this-environment')) {
+            || e?.code === 'auth/operation-not-supported-in-this-environment'
+            || !e?.code)) {
           try {
             await signInWithRedirect(auth, penyediaGoogle);
             return;
