@@ -527,13 +527,28 @@ function slDariZonaSnr(arah, harga, bar4, atrNow) {
    tidak pernah benar-benar ada. Papan peringkat menilainya sungguhan;
    ia tidak boleh menilai sesuatu yang menguap.
 
-   ── KENAPA ADA SNR LURUS PADAHAL YANG DIMINTA YANG BALIK ────────────────
-   `snr` didefinisikan karena `snrBalik` menyebarnya, dan mendefinisikan
-   sesuatu di sini TIDAK membuatnya berjalan: agen dipilih lewat argumen
-   baris perintah, jadi yang jalan hanya yang dijadwalkan. Ia ada supaya
-   pembanding lurusnya tinggal dijadwalkan kalau suatu saat pemilik ingin
-   tahu apakah membalik memang menolong — tanpa itu, papan peringkatnya
-   cuma punya satu angka tanpa acuan. */
+   ── YANG BERJALAN ADALAH `snr`, BUKAN `snrBalik` ────────────────────────
+   Sempat sebaliknya selama satu jam pada 2 Sep 2026, lalu dikoreksi
+   pemilik: "kalau pakai metode itu jangan di balik karena itu metode baku
+   saya, tinggal sesuaikan SL dan TP-nya saja."
+
+   Dan itu benar. Membalik masuk akal untuk Agen Momentum — di sana yang
+   diuji memang dugaan bahwa candle momentum sering jadi jebakan. SNR di
+   sini beda kedudukannya: ia metode acuan pemiliknya sendiri, yang dipakai
+   untuk menilai metode lain. Acuan yang dijalankan terbalik berhenti jadi
+   acuan, dan angka yang keluar darinya tidak bisa dipakai membandingkan
+   apa pun.
+
+   `snrBalik` TETAP didefinisikan di bawah, dan itu tidak berbahaya:
+   mendefinisikan strategi di berkas ini tidak membuatnya berjalan — agen
+   dipilih lewat argumen baris perintah, jadi yang jalan hanya yang
+   dijadwalkan di crontab.
+
+   PENYETELAN BERIKUTNYA DI SL DAN TP, bukan di arah. Yang bisa disentuh
+   tanpa merusak metodenya ada di objek strategi: `risikoMin`/`risikoMaks`
+   untuk saringan lebar stop, dan rumus TP di bawah (sekarang 1:1 dengan
+   SL, persis screener). Kalau TP-nya mau diubah jadi kelipatan lain,
+   satu-satunya baris yang perlu disentuh adalah tempat `tp` dihitung. */
 function evaluasiSnr(s, bar, bar4) {
   if (!bar4 || bar4.length < 60 || !bar.length) return null;
 
@@ -658,10 +673,17 @@ STRATEGI.snr = {
   barKedaluwarsa: 12,    // 12 x 5 menit = satu jam
 };
 
-/* Yang DIMINTA pemilik. Sama persis dengan di atas kecuali satu bendera —
-   dan `balik` itu tidak menyentuh satu pun syarat masuknya: deteksi SMI,
-   penarikan zona, sentuhan, dan jarak SL/TP dihitung dengan angka yang sama.
-   Yang dicerminkan hanya sisinya, di sekitar entry. */
+/* CERMIN — ADA, TAPI TIDAK DIJADWALKAN.
+   Sama persis dengan di atas kecuali satu bendera, dan `balik` itu tidak
+   menyentuh satu pun syarat masuknya: deteksi SMI, penarikan zona,
+   sentuhan, dan jarak SL/TP dihitung dengan angka yang sama. Yang
+   dicerminkan hanya sisinya, di sekitar entry.
+
+   Dibiarkan hidup di berkas ini karena ongkosnya nol dan ia sudah terbukti
+   bekerja (dua jalan kering 2 Sep 2026 menghasilkan cermin sempurna: entry
+   sama, SL dan TP bertukar). Kalau suatu saat ada metode LAIN yang pantas
+   diuji terbalik, polanya sudah ada di sini. Tapi bukan yang ini — SNR
+   adalah metode baku pemilik, dan acuan tidak dijalankan terbalik. */
 STRATEGI.snrBalik = {
   ...STRATEGI.snr,
   nama: 'Agen SNR Balik',
