@@ -17,7 +17,7 @@ import { mulaiKirim, tandaiTerkirim, tandaiGagal } from '@/lib/order-sementara';
    berhasil, SL gagal terpasang, posisi menggantung tanpa proteksi) tidak
    boleh terulang lewat jalur mana pun.
 
-   Entry LIMIT / STOP menggantung di Binance tanpa SL/TP; pemantau di bawah
+   Entry LIMIT / STOP menggantung di bursa tanpa SL/TP; pemantau di bawah
    memeriksa tiap 10 detik dan memasang SL/TP lewat `attach-sltp` begitu
    terisi — selama tab-nya masih terbuka.
    ════════════════════════════════════════════════════════════════════════ */
@@ -355,7 +355,10 @@ export async function kirimOrderNyata(p: PermintaanNyata): Promise<{ pesan: stri
   if (j.pending) {
     mulaiPantau({ simbol: p.simbol, arah: p.arah, qty: qtyStr, sl: slStr, tp1: tp1Kirim, qty1, tp2: tp2Kirim, qty2: qty2Kirim });
     return {
-      pesan: `Order ${labelJenis} menggantung di Binance. Halaman ini memantau tiap 10 detik dan memasang SL/TP begitu terisi — biarkan tab-nya terbuka.`,
+      /* Bursanya disebut, bukan diandaikan. Kalimat ini muncul tepat
+         sesudah uang berangkat, dan menyebut bursa yang salah di situ
+         mengirim orang memeriksa akun yang tidak ada ordernya. */
+      pesan: `Order ${labelJenis} menggantung di ${bTujuan === 'hyperliquid' ? 'Hyperliquid' : 'Binance'}. Halaman ini memantau tiap 10 detik dan memasang SL/TP begitu terisi — biarkan tab-nya terbuka.`,
       pending: true,
     };
   }

@@ -567,7 +567,12 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
                   </div>
                   {o.status === 'terkirim' && (
                     <div className="mt-0.5 text-[10px] text-zinc-600">
-                      Diterima bursa — barisnya pindah ke daftar di bawah begitu Binance mencatatnya.
+                      {/* "bursa", bukan "Binance": baris ini dipakai untuk
+                          Binance maupun Hyperliquid, dan kalimatnya sudah
+                          menyebut "Diterima bursa" satu baris sebelumnya —
+                          menyebut nama yang salah di kalimat kedua justru
+                          membatalkan yang benar di kalimat pertama. */}
+                      Diterima bursa — barisnya pindah ke daftar di bawah begitu bursanya mencatat.
                     </div>
                   )}
                   {o.status === 'gagal' && o.pesan && (
