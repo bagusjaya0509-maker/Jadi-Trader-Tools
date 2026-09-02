@@ -213,6 +213,19 @@ ${isi}
 </body></html>`;
 }
 
+/* ── TOMBOLNYA MENUNJUK /dashboard, BUKAN AKAR SITUS ────────────────────
+   Sampai 2 Sep 2026 tombol "Masuk ke Jadi Trader Tools" menunjuk
+   https://jaditrader.co.id begitu saja. Alamat itu halaman JUALAN: orang
+   yang aksesnya baru disetujui mendarat di materi pemasaran dan harus
+   mencari sendiri tombol masuknya.
+
+   /dashboard benar di kedua keadaan, dan itu sebabnya ia dipilih:
+     sudah masuk + aktif  -> langsung di dalam aplikasi
+     belum masuk          -> gerbang di App.tsx melempar ke
+                             /akses?dari=%2Fdashboard, dan halaman Akses
+                             membaca `dari` itu untuk tombol "Buka aplikasi"
+
+   Jadi tidak perlu menebak apakah penerimanya sedang punya sesi. */
 /* Surat sengaja pendek. Satu logo kecil di kop, selebihnya teks.
 
    Catatan ini dulu berbunyi "tanpa gambar" dan alasannya masih berlaku:
@@ -235,7 +248,7 @@ function susunSurat({ nama, kode, berakhir, jenis }) {
     kode ? `Kode aktivasi : ${kode}` : '',
     sampai ? `Berlaku sampai : ${sampai}` : '',
     '',
-    `Masuk di sini: ${SITUS}`,
+    `Masuk di sini: ${SITUS}/dashboard`,
     'Pakai akun yang sama dengan yang kamu daftarkan — aksesnya sudah menempel di akun itu,',
     'jadi biasanya kamu tidak perlu memasukkan kode apa pun.',
     '',
@@ -257,7 +270,7 @@ function susunSurat({ nama, kode, berakhir, jenis }) {
     ${sampai ? `<tr><td style="padding:3px 16px 3px 0;color:#71717a">Berlaku sampai</td><td style="padding:3px 0"><strong>${amanHtml(sampai)}</strong></td></tr>` : ''}
   </table>
   <p style="margin:0 0 18px">
-    <a href="${SITUS}" style="display:inline-block;background:#18181b;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-weight:600">Masuk ke Jadi Trader Tools</a>
+    <a href="${SITUS}/dashboard" style="display:inline-block;background:#18181b;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-weight:600">Masuk ke Jadi Trader Tools</a>
   </p>
   <p style="margin:0;color:#52525b">Pakai akun yang sama dengan yang kamu daftarkan — aksesnya sudah menempel di akun itu, jadi biasanya kamu tidak perlu memasukkan kode apa pun. Kalau setelah masuk kamu masih terkunci, balas email ini dan sertakan kode di atas.</p>`,
   });
@@ -470,7 +483,7 @@ function susunSuratKeputusan({ nama, keputusan, pesan, produk }) {
      tempat yang baru saja dibilang belum bisa ia masuki. Yang ditawarkan
      ke mereka adalah membalas surat ini, dan itu sudah ada di penutup. */
   const tombolHtml = setuju
-    ? '<p style="margin:0 0 18px"><a href="' + SITUS + '" style="display:inline-block;background:#18181b;color:#fff;'
+    ? '<p style="margin:0 0 18px"><a href="' + SITUS + '/dashboard" style="display:inline-block;background:#18181b;color:#fff;'
       + 'text-decoration:none;padding:10px 20px;border-radius:6px;font-weight:600">Masuk ke Jadi Trader Tools</a></p>'
     : '';
 

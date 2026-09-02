@@ -327,6 +327,14 @@ export async function kirimPengingat(sidik: string[], ulangi = false): Promise<{
  *  tidak dikenal", dan tombolnya cuma menampilkan JSON galat. Daftar itu ada
  *  supaya token login tidak bisa dialihkan ke situs orang lain. */
 export function masukDiscord() {
-  const balik = window.location.origin + window.location.pathname;
+  /* `search` IKUT, dan itu bukan kerapian. Halaman yang paling sering
+     dipakai untuk menekan tombol ini adalah /akses?kode=... yang datang
+     dari surat akses otomatis. Tanpa query-nya, orangnya dikembalikan ke
+     /akses polos dan kodenya lenyap.
+
+     Aman terhadap penjaga di server: BALIK_SAH dicocokkan dengan
+     startsWith(), jadi menambahkan query tidak membuat alamatnya ditolak.
+     Sudah diperiksa di server.js — bukan diasumsikan. */
+  const balik = window.location.origin + window.location.pathname + window.location.search;
   window.location.href = `${dasar()}/api/auth/discord?balik=${encodeURIComponent(balik)}`;
 }

@@ -48,7 +48,33 @@ if (typeof window !== 'undefined' && window.location.hash.startsWith('#discord='
   /* Hash dibersihkan LEBIH DULU, sebelum permintaan jaringan berangkat.
      Kalau ditunda sampai jawabannya datang, kode itu sempat terekam di
      riwayat — dan kalau permintaannya gagal, ia tertinggal di sana. */
-  window.history.replaceState(null, '', window.location.pathname + '#/dashboard');
+  /* ── DUA CACAT DALAM SATU BARIS, DIPERBAIKI 2 Sep 2026 ───────────────
+     Baris ini dulu berbunyi:
+
+         window.location.pathname + '#/dashboard'
+
+     `#/dashboard` itu alamat HashRouter. Aplikasinya pindah ke
+     BrowserRouter 17 Agu 2026, jadi sejak hari itu hash tersebut TIDAK
+     memindahkan siapa pun ke mana pun — ia cuma menempel di alamat.
+     Yang login lewat Discord tetap tertinggal di halaman asalnya, dengan
+     ekor mati di URL-nya.
+
+     Yang kedua lebih merugikan: `pathname` saja MEMBUANG query string.
+     Surat akses otomatis mengirim orang ke
+
+         /akses?kode=JT3-XXXX-XXXX-XXXX
+
+     dan penukaran otomatis di Akses.tsx membaca `?kode=` itu. Begitu
+     orangnya menekan "Login Discord" di halaman yang sama, baris ini
+     menghapus kodenya — lalu ia dikembalikan ke /akses polos dan disuruh
+     mengetik dua belas karakter yang tadi sudah ada di tangannya. Persis
+     langkah yang surat itu janjikan tidak perlu.
+
+     Sekarang: hash dibuang (tugasnya cuma membawa token, dan token itu
+     memang tidak boleh tertinggal di riwayat), query DIPERTAHANKAN, dan
+     halamannya tidak dipindah — biar gerbang dan halaman Akses yang
+     menentukan tujuan berikutnya, karena merekalah yang tahu `?dari=`. */
+  window.history.replaceState(null, '', window.location.pathname + window.location.search);
 
   void (async () => {
     try {
