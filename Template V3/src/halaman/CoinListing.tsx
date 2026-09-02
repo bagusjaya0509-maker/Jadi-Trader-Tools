@@ -11,6 +11,7 @@ import {
   type KoinPantau, type InfoJaringan,
 } from '@/lib/coin-listing';
 import { PanelSentimen } from '@/components/panel-sentimen';
+import { PanelJejakListing } from '@/components/panel-jejak-listing';
 
 /* ════════════════════════════════════════════════════════════════════════
    COIN LISTING
@@ -558,6 +559,11 @@ export default function CoinListing() {
           menyembunyikannya saat backend mati berarti membuang satu-satunya
           bagian halaman yang mungkin masih terisi dari singgahan. */}
       <PanelSentimen />
+
+      {/* Di bawah sentimen, di atas daftar pantauan sendiri. Urutannya
+          mengikuti cara membacanya: suasana pasar dulu, lalu kandidat yang
+          lintasannya naik, baru koin yang sudah kamu pegang. */}
+      <PanelJejakListing />
 
       {masuk && <FormTambah jaringan={jaringan} selesai={() => void tarik()} />}
 

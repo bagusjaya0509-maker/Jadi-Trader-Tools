@@ -247,3 +247,40 @@ export function tulisUsd(n: number): string {
   if (n >= 1e3) return '$' + (n / 1e3).toFixed(1) + ' rb';
   return '$' + n.toFixed(0);
 }
+
+/* ── JEJAK: LINTASAN, BUKAN POTRET ───────────────────────────────────────
+   Dibaca dari catatan harian yang ditulis cron di VPS. Rute ini tidak pernah
+   menarik data pasar sendiri — halaman yang dibuka sepuluh kali sehari tidak
+   boleh menembak GeckoTerminal sepuluh kali untuk angka yang cuma berubah
+   sekali sehari.
+
+   `hariTotal` vs `hariLangsung` adalah pembedaan yang menentukan: harga dan
+   volume bisa ditarik surut dari riwayat OHLCV, sedangkan likuiditas dan
+   pemegang tidak punya riwayat di mana pun. Panel memakai `hariLangsung`
+   untuk memutuskan kapan boleh bicara soal tren keduanya. */
+export interface BarisJejak {
+  jaringan: string; alamat: string; nama: string; simbol: string;
+  dex: string; kolam: string;
+  milikPemilik: boolean;
+  umurKolamHari: number | null;
+  harga: number | null; likuiditas: number | null;
+  volume24: number | null; fdv: number | null; pemegang: number | null;
+  trenVolume: number | null;
+  trenLikuiditas: number | null;
+  trenPemegang: number | null;
+  hariTotal: number;
+  hariLangsung: number;
+  riwayat: { t: string; h: number; v: number }[];
+}
+
+export async function ambilJejak(): Promise<
+  { koin: BarisJejak[]; diperbarui: number; belumAda?: boolean } | null
+> {
+  const j = await panggil('/api/listing/jejak');
+  if (j.error) return null;
+  return {
+    koin: (j.koin ?? []) as BarisJejak[],
+    diperbarui: Number(j.diperbarui) || 0,
+    belumAda: j.belumAda === true,
+  };
+}

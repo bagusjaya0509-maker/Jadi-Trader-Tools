@@ -74,6 +74,112 @@ function alamatSah(jaringan, alamat) {
   return j.pola === 'evm' ? POLA_EVM.test(alamat) : POLA_SOL.test(alamat);
 }
 
+/* ══ DIANGKAT KE LINGKUP MODUL, 2 Sep 2026 ══════════════════════════════
+   Keduanya dulu tinggal di dalam closure module.exports, dan itu cukup
+   selama cuma rute HTTP yang memakainya.
+
+   Sekarang jejak-listing.js -- pencatat harian yang jalan lewat cron --
+   membutuhkan hal yang SAMA PERSIS: kolam terdalam sebuah token, dan
+   fakta keamanannya. Menyalinnya ke sana berarti dua definisi untuk satu
+   aturan, dan yang satu pasti menyimpang saat yang lain diperbaiki.
+
+   Diperiksa sebelum dipindah: keduanya tidak menyentuh apa pun dari
+   closure -- tidak DIR, tidak baca()/tulis(), tidak req/res. Yang dipakai
+   cuma GT, JARINGAN, dan axios, ketiganya sudah di lingkup modul. Jadi
+   pemindahan ini murni, tanpa perubahan perilaku. */
+/* ── Kolam terdalam untuk satu alamat token ─────────────────────────────
+   GeckoTerminal mengembalikan SEMUA kolam token itu, dan untuk token yang
+   baru listing jumlahnya bisa belasan — kebanyakan kolam sampah dengan
+   likuiditas beberapa dolar yang dibuat bot dalam menit yang sama.
+
+   Yang dipilih yang likuiditasnya paling dalam. Bukan yang pertama, bukan
+   yang harganya paling tinggi: kolam dangkal memberi harga yang tidak
+   bisa dipakai siapa pun untuk membeli lebih dari beberapa dolar, dan
+   memajangnya sebagai "harga listing" adalah kabar bohong yang terlihat
+   persis seperti kabar baik. */
+async function cariKolam(jaringan, alamat) {
+  const r = await axios.get(`${GT}/networks/${jaringan}/tokens/${alamat}/pools`, {
+    timeout: 15000,
+    headers: { accept: 'application/json' },
+    validateStatus: (s) => s === 200 || s === 404,
+  });
+  if (r.status === 404) return null;                 // belum ada kolam sama sekali
+
+  const kolam = (r.data && r.data.data) || [];
+  if (!kolam.length) return null;
+
+  const terdalam = kolam.reduce((a, b) =>
+    Number(b.attributes?.reserve_in_usd || 0) > Number(a.attributes?.reserve_in_usd || 0) ? b : a);
+  const t = terdalam.attributes || {};
+
+  return {
+    kolam: t.address || String(terdalam.id || '').split('_').pop() || '',
+    nama: t.name || '',
+    dex: terdalam.relationships?.dex?.data?.id || '',
+    harga: Number(t.base_token_price_usd) || 0,
+    likuiditas: Number(t.reserve_in_usd) || 0,
+    volume24: Number(t.volume_usd?.h24) || 0,
+    fdv: Number(t.fdv_usd) || 0,
+    /* Umur kolam dari rantainya sendiri, bukan dari kapan KITA melihatnya.
+       Bedanya penting: kalau selisihnya jauh, berarti pemantau terlambat
+       dan pemakainya berhak tahu bahwa ia bukan orang pertama. */
+    dibuatKolam: t.pool_created_at ? Date.parse(t.pool_created_at) : 0,
+    jumlahKolam: kolam.length,
+  };
+}
+
+/* ── Fakta keamanan, bukan vonis ────────────────────────────────────────
+   GoPlus memberi belasan penanda; yang diambil hanya yang bisa dijelaskan
+   dalam satu kalimat kepada orang yang sedang buru-buru.
+
+   TIDAK ada skor gabungan dan tidak ada label "aman". Sudah terbukti di
+   sesi ini bahwa TRUMP yang asli — yang resmi, yang benar — punya 89,8%
+   pasokan di sepuluh dompet teratas, angka yang akan ditandai merah oleh
+   penyaring naif mana pun. Yang bisa diberikan mesin cuma faktanya;
+   kesimpulannya milik orang yang menanggung risikonya. */
+async function periksaAman(jaringan, alamat) {
+  const j = JARINGAN[jaringan];
+  if (!j) return null;
+
+  const url = j.goplus === 'solana'
+    ? `https://api.gopluslabs.io/api/v1/solana/token_security?contract_addresses=${alamat}`
+    : `https://api.gopluslabs.io/api/v1/token_security/${j.goplus}?contract_addresses=${alamat.toLowerCase()}`;
+
+  const r = await axios.get(url, { timeout: 15000 });
+  const hasil = r.data && r.data.result;
+  if (!hasil) return null;
+  const d = hasil[alamat] || hasil[alamat.toLowerCase()] || Object.values(hasil)[0];
+  if (!d) return null;
+
+  const ya = (v) => v === '1' || v === 1 || v === true;
+  const angka = (v) => (v == null || v === '' ? null : Number(v));
+
+  return {
+    diperiksa: Date.now(),
+    /* Bisa dicetak lagi sesuka pembuatnya — pasokan yang hari ini terbatas
+       bisa jadi tak terbatas besok. */
+    bisaCetak: ya(d.mintable?.status ?? d.is_mintable),
+    /* Saldo dompet mana pun bisa dibekukan pembuatnya. */
+    bisaBekukan: ya(d.freezable?.status ?? d.cannot_sell_all ?? d.is_blacklisted),
+    /* Kontraknya masih bisa diubah isinya sesudah kamu membeli. */
+    bisaDiubah: ya(d.upgradeable?.status ?? d.can_take_back_ownership),
+    pajakBeli: angka(d.buy_tax),
+    pajakJual: angka(d.sell_tax),
+    /* Persentase pasokan di sepuluh dompet teratas. Tinggi TIDAK sama
+       dengan penipuan — proyek resmi sering menahan mayoritas pasokannya
+       di dompet tim yang terkunci. Yang diberitahukan cuma angkanya. */
+    terpusat: (() => {
+      const h = d.holders || d.lp_holders || [];
+      if (!Array.isArray(h) || !h.length) return null;
+      const jum = h.slice(0, 10).reduce((a, x) => a + (Number(x.percent) || 0), 0);
+      return Math.round(jum * 1000) / 10;
+    })(),
+    pemegang: angka(d.holder_count),
+    namaAsli: d.token_name || d.metadata?.name || '',
+    simbolAsli: d.token_symbol || d.metadata?.symbol || '',
+  };
+}
+
 module.exports = (app, { butuhLogin, batasLaju, express, DIR }) => {
   const BERKAS = path.join(DIR, 'listing-pantau.json');
 
@@ -91,98 +197,9 @@ module.exports = (app, { butuhLogin, batasLaju, express, DIR }) => {
     fs.renameSync(semen, BERKAS);
   }
 
-  /* ── Kolam terdalam untuk satu alamat token ─────────────────────────────
-     GeckoTerminal mengembalikan SEMUA kolam token itu, dan untuk token yang
-     baru listing jumlahnya bisa belasan — kebanyakan kolam sampah dengan
-     likuiditas beberapa dolar yang dibuat bot dalam menit yang sama.
 
-     Yang dipilih yang likuiditasnya paling dalam. Bukan yang pertama, bukan
-     yang harganya paling tinggi: kolam dangkal memberi harga yang tidak
-     bisa dipakai siapa pun untuk membeli lebih dari beberapa dolar, dan
-     memajangnya sebagai "harga listing" adalah kabar bohong yang terlihat
-     persis seperti kabar baik. */
-  async function cariKolam(jaringan, alamat) {
-    const r = await axios.get(`${GT}/networks/${jaringan}/tokens/${alamat}/pools`, {
-      timeout: 15000,
-      headers: { accept: 'application/json' },
-      validateStatus: (s) => s === 200 || s === 404,
-    });
-    if (r.status === 404) return null;                 // belum ada kolam sama sekali
 
-    const kolam = (r.data && r.data.data) || [];
-    if (!kolam.length) return null;
 
-    const terdalam = kolam.reduce((a, b) =>
-      Number(b.attributes?.reserve_in_usd || 0) > Number(a.attributes?.reserve_in_usd || 0) ? b : a);
-    const t = terdalam.attributes || {};
-
-    return {
-      kolam: t.address || String(terdalam.id || '').split('_').pop() || '',
-      nama: t.name || '',
-      dex: terdalam.relationships?.dex?.data?.id || '',
-      harga: Number(t.base_token_price_usd) || 0,
-      likuiditas: Number(t.reserve_in_usd) || 0,
-      volume24: Number(t.volume_usd?.h24) || 0,
-      fdv: Number(t.fdv_usd) || 0,
-      /* Umur kolam dari rantainya sendiri, bukan dari kapan KITA melihatnya.
-         Bedanya penting: kalau selisihnya jauh, berarti pemantau terlambat
-         dan pemakainya berhak tahu bahwa ia bukan orang pertama. */
-      dibuatKolam: t.pool_created_at ? Date.parse(t.pool_created_at) : 0,
-      jumlahKolam: kolam.length,
-    };
-  }
-
-  /* ── Fakta keamanan, bukan vonis ────────────────────────────────────────
-     GoPlus memberi belasan penanda; yang diambil hanya yang bisa dijelaskan
-     dalam satu kalimat kepada orang yang sedang buru-buru.
-
-     TIDAK ada skor gabungan dan tidak ada label "aman". Sudah terbukti di
-     sesi ini bahwa TRUMP yang asli — yang resmi, yang benar — punya 89,8%
-     pasokan di sepuluh dompet teratas, angka yang akan ditandai merah oleh
-     penyaring naif mana pun. Yang bisa diberikan mesin cuma faktanya;
-     kesimpulannya milik orang yang menanggung risikonya. */
-  async function periksaAman(jaringan, alamat) {
-    const j = JARINGAN[jaringan];
-    if (!j) return null;
-
-    const url = j.goplus === 'solana'
-      ? `https://api.gopluslabs.io/api/v1/solana/token_security?contract_addresses=${alamat}`
-      : `https://api.gopluslabs.io/api/v1/token_security/${j.goplus}?contract_addresses=${alamat.toLowerCase()}`;
-
-    const r = await axios.get(url, { timeout: 15000 });
-    const hasil = r.data && r.data.result;
-    if (!hasil) return null;
-    const d = hasil[alamat] || hasil[alamat.toLowerCase()] || Object.values(hasil)[0];
-    if (!d) return null;
-
-    const ya = (v) => v === '1' || v === 1 || v === true;
-    const angka = (v) => (v == null || v === '' ? null : Number(v));
-
-    return {
-      diperiksa: Date.now(),
-      /* Bisa dicetak lagi sesuka pembuatnya — pasokan yang hari ini terbatas
-         bisa jadi tak terbatas besok. */
-      bisaCetak: ya(d.mintable?.status ?? d.is_mintable),
-      /* Saldo dompet mana pun bisa dibekukan pembuatnya. */
-      bisaBekukan: ya(d.freezable?.status ?? d.cannot_sell_all ?? d.is_blacklisted),
-      /* Kontraknya masih bisa diubah isinya sesudah kamu membeli. */
-      bisaDiubah: ya(d.upgradeable?.status ?? d.can_take_back_ownership),
-      pajakBeli: angka(d.buy_tax),
-      pajakJual: angka(d.sell_tax),
-      /* Persentase pasokan di sepuluh dompet teratas. Tinggi TIDAK sama
-         dengan penipuan — proyek resmi sering menahan mayoritas pasokannya
-         di dompet tim yang terkunci. Yang diberitahukan cuma angkanya. */
-      terpusat: (() => {
-        const h = d.holders || d.lp_holders || [];
-        if (!Array.isArray(h) || !h.length) return null;
-        const jum = h.slice(0, 10).reduce((a, x) => a + (Number(x.percent) || 0), 0);
-        return Math.round(jum * 1000) / 10;
-      })(),
-      pemegang: angka(d.holder_count),
-      namaAsli: d.token_name || d.metadata?.name || '',
-      simbolAsli: d.token_symbol || d.metadata?.symbol || '',
-    };
-  }
 
   /* ══ SATU BARIS DIPERIKSA ══════════════════════════════════════════════
      Mengembalikan true kalau ADA yang berubah dan berkasnya perlu ditulis.
@@ -368,6 +385,114 @@ module.exports = (app, { butuhLogin, batasLaju, express, DIR }) => {
     }
   });
 
+
+  /* ══ JEJAK — LINTASAN, BUKAN POTRET ═══════════════════════════════════════
+     Dibaca dari listing-jejak.json yang ditulis cron jejak-listing.js sekali
+     sehari. Rute ini MURNI membaca; ia tidak pernah menarik data pasar
+     sendiri, dan itu disengaja: halaman yang dibuka sepuluh kali sehari tidak
+     boleh menembak GeckoTerminal sepuluh kali untuk angka yang cuma berubah
+     sekali sehari.
+
+     ── KENAPA SELISIHNYA DIHITUNG DI SINI, BUKAN DI PANEL ─────────────────
+     Karena "volume 7 hari terakhir dibanding 7 hari sebelumnya" punya banyak
+     cara dihitung yang semuanya terdengar benar, dan dua tempat yang
+     menghitungnya sendiri-sendiri akan berselisih pada bulan yang barisnya
+     bolong. Panel menerima angka jadi; ia cuma menggambar.
+
+     ── BARIS SURUT vs BARIS LANGSUNG ──────────────────────────────────────
+     Baris bertanda `surut: true` ditarik dari riwayat OHLCV — ia punya harga
+     dan volume, TAPI TIDAK punya likuiditas maupun pemegang, karena kedua
+     angka itu memang tidak ada riwayatnya di mana pun.
+
+     Jadi tren likuiditas dan pemegang hanya bisa dihitung dari baris yang
+     kita ukur sendiri, dan itu baru menumpuk sejak hari pertama cron jalan.
+     `hariLangsung` dikirim supaya panel bisa mengatakan "butuh 12 hari lagi"
+     alih-alih menampilkan garis datar yang terlihat seperti data. */
+  app.get('/api/listing/jejak', batasLaju, butuhLogin, (req, res) => {
+    let j;
+    try { j = JSON.parse(fs.readFileSync(path.join(DIR, 'listing-jejak.json'), 'utf8')); }
+    catch (e) { return res.json({ ok: true, koin: [], diperbarui: 0, belumAda: true }); }
+
+    const HARI = 86400000;
+    const kini = Date.now();
+
+    /* Jumlah sederhana atas rentang tanggal. Baris yang tidak ada dilewati
+       tanpa dianggap nol: nol berarti "tidak ada perdagangan", sedangkan
+       tidak ada baris berarti "kami tidak melihat". Dua hal yang berbeda. */
+    const jumlah = (hari, dariHariLalu, sampaiHariLalu, medan) => {
+      let total = 0, ada = 0;
+      for (const tgl of Object.keys(hari)) {
+        const umur = (kini - Date.parse(tgl + 'T00:00:00Z')) / HARI;
+        if (umur < sampaiHariLalu || umur > dariHariLalu) continue;
+        const v = hari[tgl][medan];
+        if (v == null || !Number.isFinite(v)) continue;
+        total += v; ada++;
+      }
+      return ada ? { total, ada } : null;
+    };
+
+    const nilaiSekitar = (hari, hariLalu, medan) => {
+      let baik = null, jarak = Infinity;
+      for (const tgl of Object.keys(hari)) {
+        const v = hari[tgl][medan];
+        if (v == null || !Number.isFinite(v)) continue;
+        const umur = (kini - Date.parse(tgl + 'T00:00:00Z')) / HARI;
+        const d = Math.abs(umur - hariLalu);
+        if (d < jarak) { jarak = d; baik = v; }
+      }
+      /* Toleransi 3 hari. Membandingkan dengan angka 30 hari lalu lalu
+         menyebutnya "14 hari" adalah kekeliruan yang tidak terlihat di layar. */
+      return jarak <= 3 ? baik : null;
+    };
+
+    const koin = Object.keys(j.koin || {}).map((kk) => {
+      const c = j.koin[kk];
+      const hari = c.hari || {};
+      const tgl = Object.keys(hari).sort();
+      const terakhir = tgl.length ? hari[tgl[tgl.length - 1]] : null;
+      const langsung = tgl.filter((t) => hari[t].surut === false);
+
+      const v7 = jumlah(hari, 7, 0, 'volume24');
+      const v7Sblm = jumlah(hari, 14, 7, 'volume24');
+      /* Rata-rata per hari, bukan total: kalau salah satu jendela punya lima
+         baris dan yang lain tujuh, membandingkan totalnya menghukum jendela
+         yang datanya kurang lengkap. */
+      const trenVolume = (v7 && v7Sblm && v7Sblm.total > 0)
+        ? ((v7.total / v7.ada) / (v7Sblm.total / v7Sblm.ada) - 1) * 100 : null;
+
+      const likKini = terakhir ? terakhir.likuiditas : null;
+      const lik14 = nilaiSekitar(hari, 14, 'likuiditas');
+      const trenLikuiditas = (likKini && lik14 > 0) ? (likKini / lik14 - 1) * 100 : null;
+
+      const pegKini = terakhir ? terakhir.pemegang : null;
+      const peg14 = nilaiSekitar(hari, 14, 'pemegang');
+      const trenPemegang = (pegKini && peg14 > 0) ? (pegKini / peg14 - 1) * 100 : null;
+
+      return {
+        jaringan: c.jaringan, alamat: c.alamat, nama: c.nama || '', simbol: c.simbol || '',
+        dex: c.dex || '', kolam: c.kolam || '',
+        milikPemilik: c.milikPemilik === true,
+        umurKolamHari: c.dibuatKolam ? Math.round((kini - c.dibuatKolam) / HARI) : null,
+        harga: terakhir ? terakhir.harga : null,
+        likuiditas: likKini, volume24: terakhir ? terakhir.volume24 : null,
+        fdv: terakhir ? terakhir.fdv : null, pemegang: pegKini,
+        trenVolume, trenLikuiditas, trenPemegang,
+        hariTotal: tgl.length,
+        hariLangsung: langsung.length,
+        riwayat: tgl.map((t) => ({ t, h: hari[t].harga, v: hari[t].volume24 })),
+      };
+    });
+
+    /* Diurutkan dari TREN VOLUME, bukan dari besarnya likuiditas. Itu inti
+       alat ini: CATE punya likuiditas terbesar di antara kandidat 2 Sep 2026
+       dan volumenya runtuh 93% dalam sepuluh hari. Mengurutkan dari ukuran
+       akan menaruhnya di puncak — persis kekeliruan yang mau dihindari.
+       Yang belum punya tren (data belum cukup) turun ke bawah, bukan naik. */
+    koin.sort((a, b) => (b.trenVolume ?? -1e9) - (a.trenVolume ?? -1e9));
+
+    res.json({ ok: true, koin, diperbarui: j.diperbarui || 0 });
+  });
+
   app.get('/api/listing', batasLaju, butuhLogin, (req, res) => {
     const { daftar } = milikku(req);
     res.json({ ok: true, daftar, jaringan: JARINGAN, maks: MAKS });
@@ -468,3 +593,8 @@ module.exports = (app, { butuhLogin, batasLaju, express, DIR }) => {
     res.json({ ok: true, daftar });
   });
 };
+
+
+/* Dipakai jejak-listing.js. Diekspor sebagai properti pada fungsi utamanya
+   supaya `require('./listing-vps')(app, ...)` tetap bekerja apa adanya. */
+module.exports.alat = { GT, JARINGAN, cariKolam, periksaAman, alamatSah };
