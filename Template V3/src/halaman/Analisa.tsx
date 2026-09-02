@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { usePaket, LABEL_PAKET } from '@/lib/paket';
 import { useHargaPaket } from '@/lib/harga-akses';
 import {
@@ -1272,8 +1272,9 @@ function SlotAgen({ urutan }: { urutan: number }) {
    yang tidak akan pernah ia lihat. */
 const PanelChartAgen = lazy(() =>
   import('@/components/panel-chart-agen').then((m) => ({ default: m.PanelChartAgen })));
-const PanelWalletAgen = lazy(() =>
-  import('@/components/panel-wallet-agen').then((m) => ({ default: m.PanelWalletAgen })));
+/* PanelWalletAgen TIDAK diimpor di sini lagi. Panelnya pindah ke halaman
+   /wallet-tracking, dan membiarkan impornya menggantung berarti bundel Copy
+   Signal tetap menyeret kode yang tidak pernah ia render. */
 
 const SUB = [
   /* URUTANNYA: 'market' duluan, dan di dalam kanal ia yang terbuka
@@ -2826,13 +2827,21 @@ export default function Analisa() {
         />
       )}
 
+      {/* ── ISINYA PINDAH KE /wallet-tracking ─────────────────────────
+          Panel dompet dulu digambar DI SINI, di dalam kanal agen "AI
+          Wallet". Sekarang ia punya barisnya sendiri di sidebar bersama
+          Posisi Copy dan Coin Hunter.
+
+          Kartu agennya sengaja TIDAK dibuang dari daftar kanal: ia agen
+          yang sungguhan berjalan, dan mencabutnya dari daftar akan membuat
+          ia hilang dari papan tanpa alasan yang terlihat. Yang berubah cuma
+          apa yang terjadi saat kartunya dibuka — diantar ke halamannya.
+
+          Badan kanal di bawah sudah berhenti sendiri untuk sub 'wallet'
+          (lihat `if (sub === 'chart' || sub === 'wallet') return null`),
+          jadi tidak ada isi lain yang sempat berkedip di belakangnya. */}
       {sub === 'wallet' && kanalBuka === UID_KANAL_WALLET && (
-        <Suspense fallback={<div className="py-10 text-[13px] text-zinc-500">Memuat panel…</div>}>
-          {/* Panelnya dibaca siapa saja; `pemilik` cuma menentukan apa yang
-              bisa DIUBAH dari dalamnya. Dua hal yang berbeda dan selama ini
-              dijawab satu gerbang yang sama. */}
-          <PanelWalletAgen pemilik={pemilik} />
-        </Suspense>
+        <Navigate to="/wallet-tracking" replace />
       )}
 
       {sub === 'chart' && pemilik && kanalBuka === UID_KANAL_CHART && (

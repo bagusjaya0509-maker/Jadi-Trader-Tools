@@ -131,15 +131,33 @@ const NAV = [
 
              Tempatnya sekarang: tab ketiga di dalam kanal AI Chart. */
         ] },
-      /* Coin Listing di Workspace, bukan di Trading. Bedanya: menu
-         Trading dibuka untuk MEMUTUSKAN sesuatu hari ini — dashboard,
-         screener, jurnal semuanya dibaca sambil menimbang posisi. Halaman
-         ini dibuka untuk MENUNGGU, dan yang ditunggunya berhari-hari.
+      /* ── WALLET TRACKING ───────────────────────────────────────────
+         Di Workspace, bukan di Trading. Bedanya: menu Trading dibuka untuk
+         MEMUTUSKAN sesuatu hari ini — dashboard, screener, jurnal semuanya
+         dibaca sambil menimbang posisi. Yang di sini dibuka untuk
+         MENGAMATI, dan yang diamatinya bergerak berhari-hari.
 
-         Tanpa sub-menu: ia satu daftar, satu pertanyaan. Sub-menu yang
-         cuma memfilter daftar yang sama menyiratkan ada dua tempat
-         berbeda, padahal cuma ada satu. */
-      { ke: '/coin-listing',   label: 'Coin Listing',     Ikon: Radar },
+         Dulu barisnya bernama "Coin Listing" dan isinya satu daftar. Ia
+         sekarang menampung tiga hal yang semuanya menjawab pertanyaan yang
+         sama dari sudut berbeda — "uang orang lain sedang ke mana":
+
+           Dompet Pantauan — dompet perp on-chain yang dilacak
+           Posisi Copy     — yang kita ikuti, dan hasilnya
+           Coin Hunter     — koin presale yang ditunggu listingnya
+
+         Dua yang pertama pindah dari DALAM kanal "AI Wallet" di Copy
+         Signal, tempat mereka cuma bisa ditemukan sesudah orang membuka
+         kartu agen yang tepat. Halaman yang cuma bisa ditemukan lewat
+         halaman lain akan dibuka jauh lebih jarang daripada yang pantas. */
+      { ke: '/wallet-tracking', label: 'Wallet Tracking', Ikon: Radar,
+        sub: [
+          { ke: '/wallet-tracking',             label: 'Dompet Pantauan' },
+          /* Setelan salin digerbangi server dan pembaca lain tidak punya
+             satu pun barisnya. Menu yang selalu membuka layar kosong lebih
+             buruk daripada menu yang tidak ada. */
+          { ke: '/wallet-tracking?sub=copy',    label: 'Posisi Copy', hanyaPemilik: true },
+          { ke: '/wallet-tracking?sub=hunter',  label: 'Coin Hunter' },
+        ] },
       { ke: '/integrations',   label: 'Integrations',     Ikon: Plug,
         sub: [
           { ke: '/integrations',             label: 'Connection' },
@@ -216,7 +234,7 @@ const JUDUL: Record<string, string> = {
   '/journal': 'Journal',
   '/personal-area': 'Personal Area',
   '/copy-signal': 'Copy Signal',
-  '/coin-listing': 'Coin Listing',
+  '/wallet-tracking': 'Wallet Tracking',
   '/marketplace': 'Marketplace',
   '/integrations': 'Integrations',
   '/owner': 'Sales Report',

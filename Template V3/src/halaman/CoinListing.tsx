@@ -423,7 +423,13 @@ function Angka({ label, nilai, sub }: { label: string; nilai: string; sub?: stri
 }
 
 /* ══ HALAMAN ══════════════════════════════════════════════════════════════ */
-export default function CoinListing() {
+export default function CoinListing({ tanpaBantalan = false }: {
+  /* Dipakai saat halaman ini dirender sebagai TAB di dalam Wallet Tracking:
+     di sana pembungkusnya sudah memberi bantalan, dan dua bantalan bertumpuk
+     membuat isinya berjalan sendiri menjauh dari tepi — cacat yang cuma
+     terlihat di satu tab dari tiga, jadi ia mudah lolos. */
+  tanpaBantalan?: boolean;
+} = {}) {
   const [daftar, setDaftar] = useState<KoinPantau[]>([]);
   const [jaringan, setJaringan] = useState<Record<string, InfoJaringan>>({});
   const [muat, setMuat] = useState(true);
@@ -493,7 +499,7 @@ export default function CoinListing() {
   /* `p-4 sm:p-6` dipasang halamannya sendiri, bukan kerangka: <main> memang
      tanpa bantalan supaya halaman chart bisa memakai seluruh lebarnya. */
   return (
-    <div className="space-y-5 p-4 sm:p-6">
+    <div className={cn('space-y-5', !tanpaBantalan && 'p-4 sm:p-6')}>
       <Panel className="p-4">
         <div className="flex flex-wrap items-start gap-3">
           <Radar className="mt-0.5 size-5 shrink-0 text-zinc-400" />

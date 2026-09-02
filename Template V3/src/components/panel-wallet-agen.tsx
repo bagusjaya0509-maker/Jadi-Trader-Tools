@@ -972,6 +972,27 @@ function RincianDompet({ w, posisi, log, tiru, ubahTiru, tutup }: {
         </div>
       )}
 
+      {/* ── KEPALA YANG DULU TIDAK ADA ────────────────────────────────
+          Daftar di bawah ini adalah RIWAYAT ISIAN (fill), dan kisi di
+          atasnya adalah POSISI YANG MASIH HIDUP. Dua sumber yang berbeda:
+          posisi dari `clearinghouseState`, riwayat dari `userFills`.
+
+          Tanpa kepala, keduanya terbaca sebagai satu daftar panjang — dan
+          barisnya menulis "Open Long" apa adanya dari Hyperliquid, di mana
+          kata itu menerangkan APA YANG DILAKUKAN ISIAN ITU saat terjadi,
+          bukan keadaan sekarang. Posisi yang dibangun bertahap memberi dua
+          puluh baris "Open Long"; kalau kemudian ditutup, baris "Close
+          Long"-nya duduk di tempat lain pada daftar yang sama.
+
+          Dilaporkan pemilik 2 Sep 2026: ia membaca deretan "Open Long" di
+          sini sebagai posisi yang sedang berjalan. Kekeliruan yang wajar —
+          layarnya memang tidak pernah mengatakan sebaliknya. */}
+      <p className="mb-1.5 mt-3 text-[11.5px] text-zinc-500">
+        <span className="font-medium text-zinc-300">Riwayat transaksi</span>
+        {' — '}catatan tiap isian saat terjadi, bukan posisi yang sedang berjalan.
+        {' '}Posisi hidup ada di kartu-kartu {posisi.length > 0 ? 'di atas' : '(sekarang kosong)'}.
+      </p>
+
       {log.length === 0 ? (
         <p className="text-[11.5px] leading-relaxed text-zinc-600">
           Belum ada transaksi sejak dompet ini mulai dipantau. Riwayat
@@ -1789,7 +1810,18 @@ function PosisiCopy({ salin, log, riwayat, dompet, buka, muat }: {
   );
 }
 
-export function PanelWalletAgen({ pemilik = false }: { pemilik?: boolean }) {
+export function PanelWalletAgen({ pemilik = false, tab: tabLuar }: {
+  pemilik?: boolean;
+  /* Tab DARI LUAR, dipasok halaman Wallet Tracking yang membacanya dari
+     alamat. Saat prop ini ada, bilah tab internal tidak digambar sama
+     sekali — pemanggilnya sudah menggambar bilahnya sendiri, dan dua bilah
+     untuk pilihan yang sama persis adalah cacat yang paling mudah dibuat
+     saat memindahkan komponen ke halaman baru.
+
+     Tetap opsional supaya panel ini masih bisa berdiri sendiri di tempat
+     lain tanpa halaman yang mengurus alamatnya. */
+  tab?: 'dompet' | 'salin';
+}) {
   const [d, setD] = useState<KeadaanDompet | null>(null);
   const [gagal, setGagal] = useState(false);
   /* Dompet yang sedang dibuka rinciannya. null = belum ada, dan itu keadaan
@@ -1806,7 +1838,8 @@ export function PanelWalletAgen({ pemilik = false }: { pemilik?: boolean }) {
      sidebar berlaku untuk seluruh halaman Copy Signal; ini cuma dua cara
      melihat isi satu kanal. Menaruhnya di sidebar akan menyiratkan ia
      sejajar "Market Signal", dan itu keliru. */
-  const [tab, setTab] = useState<'dompet' | 'salin'>('dompet');
+  const [tabDalam, setTab] = useState<'dompet' | 'salin'>('dompet');
+  const tab = tabLuar ?? tabDalam;
   const [dialogSalin, setDialogSalin] = useState<{ alamat: string; nama: string } | null>(null);
   const salinPeta = useMemo(() => new Map(salin.map((x) => [x.alamat, x])), [salin]);
   const [muat, setMuat] = useState(true);
@@ -1897,7 +1930,7 @@ export function PanelWalletAgen({ pemilik = false }: { pemilik?: boolean }) {
       {/* Cuma pemilik yang punya dua sisi: pembaca lain tidak punya salinan
           apa pun, dan tab yang isinya selalu kosong cuma menambah satu
           keputusan yang tidak perlu diambil siapa pun. */}
-      {pemilik && (
+      {pemilik && !tabLuar && (
         <div className="flex gap-1 border-b border-zinc-800">
           {([['dompet', 'Dompet Pantauan'], ['salin', 'Posisi Copy']] as const).map(([id, label]) => (
             <button key={id} onClick={() => setTab(id)}

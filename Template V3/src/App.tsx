@@ -124,10 +124,11 @@ const Dokumentasi   = lazy(() => muat(() => import('@/halaman/Dokumentasi')));
 const Changelog     = lazy(() => muat(() => import('@/halaman/Changelog')));
 const Legal         = lazy(() => muat(() => import('@/halaman/Legal')));
 const CopyTrading   = lazy(() => muat(() => import('@/halaman/Analisa')));
-/* Coin Listing dimuat malas seperti yang lain. Ia memanggil GeckoTerminal
-   tiap 60 detik selama terbuka, jadi memasukkannya ke bundel awal berarti
-   membayarnya di setiap halaman yang bukan dia. */
-const CoinListing   = lazy(() => muat(() => import('@/halaman/CoinListing')));
+/* Coin Hunter (dulu halaman Coin Listing) tidak lagi punya rutenya sendiri —
+   ia tab di dalam Wallet Tracking dan dimuat malas dari sana. */
+/* Pembungkus tiga sub-halaman: Dompet Pantauan, Posisi Copy, Coin Hunter.
+   Ringan sendiri — isi beratnya dimuat malas lagi di dalamnya, per tab. */
+const WalletTracking = lazy(() => muat(() => import('@/halaman/WalletTracking')));
 const HalamanHarga  = lazy(() => muat(() => import('@/halaman/Harga')));
 const Markas        = lazy(() => muat(() => import('@/halaman/Markas')));
 const Sosmed        = lazy(() => muat(() => import('@/halaman/Sosmed')));
@@ -153,6 +154,7 @@ if (typeof window !== 'undefined') {
       () => import('@/halaman/PersonalArea'),
       () => import('@/halaman/Maintenance'),
       () => import('@/halaman/Pemilik'),
+      () => import('@/halaman/WalletTracking'),
     ].forEach((f, i) => setTimeout(() => { f().catch(() => { /* nanti saat dibuka */ }); }, i * 400));
   };
   if ('requestIdleCallback' in window) {
@@ -503,7 +505,17 @@ export default function App() {
             <Route path="/personal-area"  element={<PersonalArea />} />
             <Route path="/marketplace"    element={<Marketplace />} />
             <Route path="/copy-signal"    element={<CopyTrading />} />
-            <Route path="/coin-listing"   element={<CoinListing />} />
+            <Route path="/wallet-tracking" element={<WalletTracking />} />
+            {/* ── ALAMAT LAMA TETAP HIDUP ────────────────────────────────
+                /coin-listing sudah pernah dibagikan dan tersimpan di bookmark
+                orang. Ia sekarang tab ketiga di Wallet Tracking, jadi yang
+                membukanya diantar ke sana alih-alih mendarat di 404.
+
+                `replace` supaya tombol Kembali tidak memantul balik ke
+                alamat lama lalu dialihkan lagi — jebakan yang membuat
+                Kembali terlihat rusak. */}
+            <Route path="/coin-listing"
+              element={<Navigate to="/wallet-tracking?sub=hunter" replace />} />
             <Route path="/integrations"   element={<Integrasi />} />
             <Route path="/owner"          element={<Pemilik />} />
             <Route path="/social"         element={<Sosmed />} />
