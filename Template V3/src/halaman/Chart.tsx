@@ -1866,7 +1866,9 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
   /* Setelan order sungguhan — hidup di halaman supaya label risiko di
      garis chart dihitung dari angka yang SAMA dengan yang akan dikirim. */
   const [nyataSetelan, setNyataSetelan] = useState<{ modal: number; leverage: number; metode: MetodeTp }>(
-    { modal: 100, leverage: 4, metode: 'partial' });
+    /* metode 'tp1only', bukan 'partial': bawaan tidak boleh menambahkan
+       aturan yang tidak diminta. Lihat catatan panjang di METODE_TP. */
+    { modal: 100, leverage: 4, metode: 'tp1only' });
   /* Setelan latihan — dulu di panel bawah yang baru muncul saat replay;
      order demo tidak bergantung replay, jadi setelannya ikut tiket. */
   const [demoSetelan, setDemoSetelan] = useState({ modal: 1000, risikoPersen: 1, kaliAtr: 1.5, rr: 2 });

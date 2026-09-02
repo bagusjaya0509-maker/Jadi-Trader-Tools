@@ -24,11 +24,29 @@ import { mulaiKirim, tandaiTerkirim, tandaiGagal } from '@/lib/order-sementara';
 
 export type MetodeTp = 'partial' | 'nopartial' | 'tp1only' | 'tp2only' | 'slplus';
 
+/* ── URUTAN & LABEL: YANG PALING SEDERHANA DI ATAS ──────────────────────
+   `tp1only` naik ke puncak dan jadi bawaan (2 Sep 2026, permintaan pemilik:
+   "jangan langsung ditentukan tp parsial dll biar ga bingung").
+
+   Alasannya bukan selera. Bawaan lama `partial` diam-diam MENGUBAH dua hal
+   yang tidak diminta siapa pun: ukurannya dipotong separuh di TP1, dan TP2
+   dipasang di 2x jarak SL — level yang TIDAK PERNAH digambar orangnya di
+   chart. Jadi garis TP yang ia seret dengan hati-hati cuma berlaku untuk
+   setengah posisi, dan setengah lagi keluar di tempat yang ia tidak pilih.
+
+   `tp1only` tidak menambahkan apa pun: satu TP, di garis yang memang ia
+   taruh, untuk SELURUH ukuran. Yang mau partial tinggal memilihnya — dan
+   memilih sesuatu yang menambah aturan jauh lebih tidak berbahaya daripada
+   mendapatkannya tanpa memilih.
+
+   Labelnya juga diperbaiki. "(1x risiko)" mengandaikan TP-nya berada di 1R,
+   padahal ia berada di mana pun garis TP diletakkan — keterangan yang
+   menyebut angka yang belum tentu benar lebih buruk daripada tanpa angka. */
 export const METODE_TP: { nilai: MetodeTp; label: string }[] = [
+  { nilai: 'tp1only', label: 'SL & TP saja — satu TP di garismu, ukuran penuh' },
   { nilai: 'partial', label: 'TP1 & TP2 — partial 50% di TP1, SL ke BE' },
   { nilai: 'nopartial', label: 'TP1 & TP2 — SL ke BE di TP1, tanpa partial' },
-  { nilai: 'tp1only', label: 'SL & TP1 saja (1× risiko)' },
-  { nilai: 'tp2only', label: 'SL & TP2 saja (2× risiko)' },
+  { nilai: 'tp2only', label: 'SL & TP saja — TP di 2× jarak SL' },
   { nilai: 'slplus', label: 'SL+ — partial 50%, SL naik tiap 1× risiko' },
 ];
 
