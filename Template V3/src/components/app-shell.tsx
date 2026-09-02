@@ -224,6 +224,11 @@ const JUDUL: Record<string, string> = {
   '/billing': 'Billing',
   '/docs': 'Documentation',
   '/changelog': 'Changelog',
+  /* Dua rute ini terlewat dan jatuh ke bawaan 'Dashboard' -- jadi bilah
+     atasnya menulis "Dashboard" di atas daftar harga. Terlihat di ponsel
+     pemilik saat membuka /harga dari tautan surat pengingat. */
+  '/harga': 'Pricing',
+  '/social': 'Social',
 };
 
 /** Menutup panel saat diklik di luar. Dipakai tiga dropdown di bilah atas —

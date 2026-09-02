@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { TriangleAlert, Eye, Loader2 } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
+import { TriangleAlert, Eye, Loader2, LogIn } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { discordSiap, mulaiLoginDiscord } from '@/lib/analisa';
 import { modePreview, akhiriPreview } from '@/lib/preview';
@@ -83,6 +83,7 @@ export function TombolMasuk({ penuh }: { penuh?: boolean }) {
 export function MenuPengguna() {
   const { pengguna, memuat } = useAuth();
   const [buka, setBuka] = useState(false);
+  const lokasi = useLocation();
 
   /* Selama auth belum menjawab, TIDAK menampilkan apa pun yang menyimpulkan.
      ──────────────────────────────────────────────────────────────────────
@@ -109,7 +110,45 @@ export function MenuPengguna() {
      lengkap dengan kalimat yang menjelaskan kenapa. Satu ajakan yang
      dijelaskan mengalahkan dua tombol telanjang di pojok. */
   if (!pengguna && modePreview()) return null;
-  if (!pengguna) return <TombolMasuk />;
+
+  /* ── SATU TOMBOL, BUKAN DUA ──────────────────────────────────────────
+     Baris ini dulu berbunyi `return <TombolMasuk />`, dan itu cacat yang
+     sama persis dengan yang sudah dijelaskan tepat di atas untuk mode
+     preview -- cuma penjaganya kurang satu keadaan.
+
+     TombolMasuk menggambar DUA tombol bertumpuk (Google lalu Discord).
+     Slot ini setinggi avatar, 28 px. Yang kedua meluber keluar bilah dan
+     menindih isi halaman; yang pertama terpotong tepi atas. Dilaporkan
+     pemilik dari ponselnya di /harga.
+
+     Kenapa baru muncul sekarang padahal kodenya lama: sampai 21 Agu 2026
+     tidak ada satu pun halaman berkerangka yang bisa dibuka tanpa sesi.
+     /docs dibuka hari itu, /harga menyusul 2 Sep -- dan pengunjung tanpa
+     sesi yang BUKAN mode preview baru sejak itu bisa sampai ke sini.
+     Jadi cacatnya sudah ada dua minggu, cuma belum ada yang melihatnya.
+
+     Gantinya satu tautan sebesar avatar yang digantikannya, menuju /akses
+     -- halaman yang memang dirancang untuk masuk: kedua penyedia dengan
+     tata letak yang benar, kuota, dan persetujuan risikonya. Menjejalkan
+     itu semua ke pojok bilah adalah asal masalahnya.
+
+     `dari` dibawa lengkap dengan query supaya orangnya kembali ke tempat
+     yang sedang ia baca, bukan dilempar ke dashboard. */
+  if (!pengguna) {
+    const dari = encodeURIComponent(lokasi.pathname + lokasi.search);
+    return (
+      <Link
+        to={`/akses?dari=${dari}`}
+        className={cn(
+          'flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-md bg-zinc-100 px-2.5',
+          'text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white',
+        )}
+      >
+        <LogIn className="size-3.5" />
+        Masuk
+      </Link>
+    );
+  }
 
   /* Foto yang DIUNGGAH SENDIRI menang atas foto Google — orang yang repot
      menggantinya di kartu profil sedang menyatakan foto akun Google-nya
