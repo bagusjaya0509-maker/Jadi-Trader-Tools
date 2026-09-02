@@ -3,6 +3,7 @@ import { TriangleAlert, Loader2, ExternalLink, Radio } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { cn, uang, harga as fHarga } from '@/lib/utils';
 import { bacaKoneksi, koneksiLengkap } from '@/lib/koneksi';
+import { bacaPasar } from '@/lib/pasar';
 
 /* ════════════════════════════════════════════════════════════════════════
    ORDER SUNGGUHAN DARI HALAMAN CHART
@@ -60,6 +61,33 @@ export function KotakOrderNyata({ simbol, hargaKini, arahTerkunci, slAwal, tpAwa
   jenisAwal?: 'MARKET' | 'LIMIT' | 'STOP';
   onBatal?: () => void;
 }) {
+  /* ── BURSA TUJUAN MENGIKUTI CHART YANG SEDANG DILIHAT ─────────────────
+     Bukan saklar terpisah, dan bukan tebakan server. `bacaPasar` menyimpan
+     pasar yang BENAR-BENAR dipakai proxy untuk menggambar lilin simbol ini,
+     jadi order berangkat ke bursa yang candle-nya sedang ditatap orangnya.
+
+     Alternatifnya lebih buruk. Saklar sendiri menambah satu keputusan tiap
+     order dan pasti suatu saat tertinggal di posisi yang salah. Menyerahkan
+     ke tebakan server berarti layar tidak tahu ke mana ordernya pergi —
+     dan mengirim order Binance sambil menatap chart Hyperliquid adalah
+     jebakan yang cepat atau lambat menggigit.
+
+     ── "BELUM TAHU" BUKAN "BINANCE" ────────────────────────────────────
+     Versi pertama menjatuhkan pasar yang belum terbaca ke 'binance' dan
+     mengirimnya TEGAS. Itu keliru dengan cara yang mahal: medan yang tegas
+     mengalahkan tebakan server, jadi order CASHCAT — koin yang justru jadi
+     alasan jalur ini dibangun — akan dipaksa ke Binance dan ditolak di
+     sana, hanya karena layar kebetulan belum sempat mencatat pasarnya.
+
+     Sekarang medan itu DIHILANGKAN saat pasarnya belum terbaca, dan server
+     memakai tebakannya sendiri (ada di Binance? ke Binance; kalau tidak,
+     coba Hyperliquid). Bawaan yang benar untuk "tidak tahu" adalah diam,
+     bukan menebak dengan nada yakin. */
+  const pasarSimbol = bacaPasar(simbol);
+  const bursa: 'binance' | 'hyperliquid' | null =
+    pasarSimbol === 'hyperliquid' ? 'hyperliquid' : pasarSimbol ? 'binance' : null;
+  const namaBursa = bursa === 'hyperliquid' ? 'Hyperliquid'
+                  : bursa === 'binance' ? 'Binance' : 'otomatis';
   const koneksi = bacaKoneksi();
   const siap = koneksiLengkap(koneksi);
 
@@ -103,6 +131,7 @@ export function KotakOrderNyata({ simbol, hargaKini, arahTerkunci, slAwal, tpAwa
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'X-App-Token': koneksi.token.trim() },
           body: JSON.stringify({
+            ...(bursa ? { bursa } : {}),
             symbol: simbol, side: pj.arah, quantity: pj.qty,
             sl: pj.sl, tp1: pj.tp1, qty1: pj.qty1,
             ...(pj.tp2 && pj.qty2 ? { tp2: pj.tp2, qty2: pj.qty2 } : {}),
@@ -192,12 +221,22 @@ export function KotakOrderNyata({ simbol, hargaKini, arahTerkunci, slAwal, tpAwa
         `SL ${slStr} · TP1 ${tp1Kirim} (qty ${qty1})${tp2Kirim ? ` · TP2 ${tp2Kirim} (qty ${qty2Kirim})` : ''}`,
         `Metode: ${METODE.find((m) => m.nilai === metode)?.label}`,
       ].join('\n');
-      if (!confirm(`Kirim order SUNGGUHAN ke Binance?\n\n${rincian}\n\nUang sungguhan akan bergerak.`)) { setSibuk(false); return; }
+      /* Dulu selalu menulis "ke Binance". Kalimat konfirmasi yang menyebut
+         bursa yang salah lebih buruk daripada tidak menyebut bursa sama
+         sekali: ia meyakinkan orangnya tentang hal yang keliru, tepat pada
+         detik ia menimbang uang sungguhan. */
+      const kalimatBursa = bursa
+        ? `Kirim order SUNGGUHAN ke ${namaBursa}?`
+        : 'Kirim order SUNGGUHAN? (bursanya dipilih server — pasar simbol ini belum terbaca di layar)';
+      if (!confirm(`${kalimatBursa}\n\n${rincian}\n\nUang sungguhan akan bergerak.`)) { setSibuk(false); return; }
 
       const r = await fetch(`${dasar}/api/trade/futures`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-App-Token': koneksi.token.trim() },
         body: JSON.stringify({
+          /* Dikirim TEGAS. Server punya tebakannya sendiri sebagai cadangan,
+             tapi yang tahu chart mana yang sedang dibuka cuma layar ini. */
+          ...(bursa ? { bursa } : {}),
           symbol: simbol, side: arah, quantity: qtyStr, leverage,
           entryType: jenis === 'MARKET' ? 'MARKET' : jenis === 'LIMIT' ? 'LIMIT' : 'STOP_MARKET',
           entryPrice: jenis === 'MARKET' ? undefined : keStep(hargaEntry, tickSize, pP),
@@ -229,6 +268,22 @@ export function KotakOrderNyata({ simbol, hargaKini, arahTerkunci, slAwal, tpAwa
         <span className="text-[11.5px] font-medium uppercase tracking-wider text-red-400">
           Live · order sungguhan{arahTerkunci ? ` · ${arahTerkunci} ${simbol}` : ''}
           {jenis !== 'MARKET' && ` · ${jenis === 'STOP' ? 'Stop' : 'Limit'} @ ${hargaEntry ? fHarga(hargaEntry) : '—'}`}
+        </span>
+        {/* Lencana bursa, SELALU terlihat — bukan cuma saat Hyperliquid.
+            Lencana yang muncul hanya untuk satu keadaan mengajari orang
+            membaca ketiadaannya sebagai "biasa saja", dan ketiadaan yang
+            berarti sesuatu adalah tanda yang paling mudah terlewat. Warnanya
+            sama dengan yang dipakai panel Posisi Copy untuk bursa yang sama:
+            satu lambang, satu arti, di seluruh aplikasi. */}
+        <span
+          title={bursa
+            ? `Order berangkat ke ${namaBursa} — mengikuti pasar chart yang sedang tampil.`
+            : 'Pasar simbol ini belum terbaca di layar; server yang memilih bursanya.'}
+          className={cn('rounded px-1.5 py-0.5 text-[10.5px] font-medium',
+            bursa === 'hyperliquid' ? 'bg-sky-500/15 text-sky-300'
+            : bursa === 'binance' ? 'bg-amber-500/15 text-amber-300'
+            : 'bg-zinc-700/50 text-zinc-400')}>
+          {namaBursa}
         </span>
         <span className="ml-auto text-[11.5px] text-zinc-500">
           Nilai order <span className="angka text-zinc-300">{uang(nilaiOrder)}</span>

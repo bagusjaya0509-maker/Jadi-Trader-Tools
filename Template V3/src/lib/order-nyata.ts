@@ -1,4 +1,5 @@
 import { bacaKoneksi, koneksiLengkap, PROXY_BAWAAN } from '@/lib/koneksi';
+import { bacaPasar } from '@/lib/pasar';
 import { uang, harga as fHarga } from '@/lib/utils';
 import { mulaiKirim, tandaiTerkirim, tandaiGagal } from '@/lib/order-sementara';
 
@@ -46,6 +47,35 @@ export interface PermintaanNyata {
   /** Emosi & alasan dari tiket — masuk record posisi screener dan jurnal. */
   emosi?: string;
   alasan?: string;
+}
+
+/* ── BURSA TUJUAN, SATU SUMBER ────────────────────────────────────────────
+   Sama dengan yang dipakai kotak order di chart: pasar yang BENAR-BENAR
+   dipakai proxy untuk menggambar lilin simbol ini. Ditulis sekali di sini
+   supaya lima pemanggil di bawah tidak masing-masing menurunkannya sendiri
+   dan berselisih pada simbol yang kebetulan ada di dua bursa.
+
+     ── "BELUM TAHU" BUKAN "BINANCE" ────────────────────────────────────
+     Versi pertama menjatuhkan pasar yang belum terbaca ke 'binance' dan
+     mengirimnya TEGAS. Itu keliru dengan cara yang mahal: medan yang tegas
+     mengalahkan tebakan server, jadi order CASHCAT — koin yang justru jadi
+     alasan jalur ini dibangun — akan dipaksa ke Binance dan ditolak di
+     sana, hanya karena layar kebetulan belum sempat mencatat pasarnya.
+
+     Sekarang medan itu DIHILANGKAN saat pasarnya belum terbaca, dan server
+     memakai tebakannya sendiri (ada di Binance? ke Binance; kalau tidak,
+     coba Hyperliquid). Bawaan yang benar untuk "tidak tahu" adalah diam,
+     bukan menebak dengan nada yakin. */
+function bursaSimbol(simbol: string): 'binance' | 'hyperliquid' | null {
+  const p = bacaPasar(simbol);
+  return p === 'hyperliquid' ? 'hyperliquid' : p ? 'binance' : null;
+}
+
+/** Potongan `{ bursa }` yang boleh langsung disebar ke badan permintaan —
+ *  kosong kalau pasarnya belum terbaca. */
+function medanBursa(simbol: string): { bursa?: 'binance' | 'hyperliquid' } {
+  const b = bursaSimbol(simbol);
+  return b ? { bursa: b } : {};
 }
 
 /* Cache filter simbol seumur 10 menit. Bukan localStorage: aturan bursa
@@ -110,12 +140,33 @@ export async function kirimOrderNyata(p: PermintaanNyata): Promise<{ pesan: stri
      disetujui. Aturan presisi berubah nyaris tidak pernah (VPS pun
      menyimpannya 6 jam); menunggu jaringan untuk data yang sudah kita
      pegang membuat tombolnya terasa berat tanpa alasan. */
-  const f = await ambilFilter(dasar, p.simbol, kepala);
-  const stepSize: number = f.stepSize || 0.001;
-  const tickSize: number = f.tickSize || 0.01;
-  const qP: number | null = f.quantityPrecision ?? null;
-  const pP: number | null = f.pricePrecision ?? null;
-  const orderTypes: string[] = Array.isArray(f.orderTypes) ? f.orderTypes : [];
+  /* ── SIMBOL HYPERLIQUID TIDAK PUNYA FILTER BINANCE ────────────────────
+     `/api/symbol-filters` bertanya ke Binance. Untuk koin yang memang tidak
+     ada di sana, jawabannya kosong dan bawaannya dipakai — tickSize 0,01.
+
+     Itu MERUSAK, bukan cuma tidak akurat: CASHCAT diperdagangkan di 0,27,
+     jadi SL 0,2612 dibulatkan jadi 0,26 dan TP 0,2884 jadi 0,29. Angka yang
+     disetujui orangnya di dialog bukan angka yang berangkat, dan selisihnya
+     berada persis di tempat yang paling menentukan hasil trade-nya.
+
+     Hyperliquid punya aturan angkanya sendiri (5 angka penting, maksimal
+     6 - szDecimals desimal) dan `orderHl` di server sudah membulatkan dengan
+     aturan itu. Jadi jalur ini mengirim angka MENTAH dan membiarkan yang
+     tahu aturannya yang membulatkan. */
+  /* null (pasar belum terbaca) diperlakukan sebagai BUKAN Hyperliquid:
+     jalur Binance yang mengambil filter presisi adalah perilaku lama, dan
+     ketidaktahuan tidak boleh mengubahnya. */
+  const keHl = bursaSimbol(p.simbol) === 'hyperliquid';
+  const f = keHl ? {} as Record<string, never> : await ambilFilter(dasar, p.simbol, kepala);
+  const stepSize: number = keHl ? 0 : (f.stepSize || 0.001);
+  const tickSize: number = keHl ? 0 : (f.tickSize || 0.01);
+  const qP: number | null = keHl ? null : (f.quantityPrecision ?? null);
+  const pP: number | null = keHl ? null : (f.pricePrecision ?? null);
+  /* Kosong untuk Hyperliquid: dua pengaman di bawah menanyakan dukungan
+     STOP_MARKET/TAKE_PROFIT_MARKET, dan itu pertanyaan tentang Binance.
+     Menjawabnya dengan daftar kosong membuat keduanya dilewati — yang benar,
+     karena di Hyperliquid setiap perp mendukung trigger order. */
+  const orderTypes: string[] = keHl ? [] : (Array.isArray(f.orderTypes) ? f.orderTypes : []);
 
   /* Pengaman PALING PENTING — sama dengan V2. */
   if (orderTypes.length && (!orderTypes.includes('STOP_MARKET') || !orderTypes.includes('TAKE_PROFIT_MARKET'))) {
@@ -188,6 +239,7 @@ export async function kirimOrderNyata(p: PermintaanNyata): Promise<{ pesan: stri
     r = await fetch(`${dasar}/api/trade/futures`, {
       method: 'POST', headers: kepala,
       body: JSON.stringify({
+        ...medanBursa(p.simbol),
         symbol: p.simbol, side: p.arah, quantity: qtyStr, leverage: p.leverage,
         entryType: p.jenis === 'MARKET' ? 'MARKET' : p.jenis === 'LIMIT' ? 'LIMIT' : 'STOP_MARKET',
         entryPrice: p.jenis === 'MARKET' ? undefined : keStep(p.entry, tickSize, pP),
@@ -276,6 +328,7 @@ function mulaiPantau(d: { simbol: string; arah: 'BUY' | 'SELL'; qty: string; sl:
       await fetch(`${dasar}/api/trade/futures/attach-sltp`, {
         method: 'POST', headers: kepala,
         body: JSON.stringify({
+          ...medanBursa(d.simbol),
           symbol: d.simbol, side: d.arah, quantity: d.qty,
           sl: d.sl, tp1: d.tp1, qty1: d.qty1,
           ...(d.tp2 && d.qty2 ? { tp2: d.tp2, qty2: d.qty2 } : {}),
@@ -318,7 +371,7 @@ export async function ubahSlTpNyata(p: UbahSlTp): Promise<void> {
   const r = await fetch(`${dasar}/api/trade/futures/edit-sltp`, {
     method: 'POST',
     headers: { 'X-App-Token': token.trim(), 'Content-Type': 'application/json' },
-    body: JSON.stringify(p),
+    body: JSON.stringify({ ...p, ...medanBursa(p.symbol) }),
   });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) {
@@ -343,7 +396,8 @@ export async function batalPendingNyata(p: { symbol: string; orderId: string; is
   const r = await fetch(`${dasar}/api/trade/futures/cancel-order`, {
     method: 'POST',
     headers: { 'X-App-Token': token.trim(), 'Content-Type': 'application/json' },
-    body: JSON.stringify({ symbol: p.symbol, orderId: p.orderId, isAlgo: p.isAlgo !== false }),
+    body: JSON.stringify({ symbol: p.symbol, orderId: p.orderId, isAlgo: p.isAlgo !== false,
+                           ...medanBursa(p.symbol) }),
   });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(typeof j?.error === 'object' ? (j.error.msg ?? JSON.stringify(j.error)) : (j?.error ?? `Backend menjawab ${r.status}`));
@@ -362,7 +416,7 @@ export async function tutupPosisiNyata(p: {
   const r = await fetch(`${dasar}/api/trade/futures/close`, {
     method: 'POST',
     headers: { 'X-App-Token': token.trim(), 'Content-Type': 'application/json' },
-    body: JSON.stringify(p),
+    body: JSON.stringify({ ...p, ...medanBursa(p.symbol) }),
   });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(typeof j?.error === 'object' ? (j.error.msg ?? JSON.stringify(j.error)) : (j?.error ?? `Backend menjawab ${r.status}`));
