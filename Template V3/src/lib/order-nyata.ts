@@ -96,6 +96,23 @@ async function ambilFilter(dasar: string, simbol: string, kepala: Record<string,
 }
 
 function keStep(n: number, step: number, presisi: number | null) {
+  /* ── step <= 0 BERARTI "JANGAN BULATKAN DI SINI" ───────────────────
+     Dipakai jalur Hyperliquid, yang aturan angkanya bukan step/tick
+     melainkan "5 angka penting DAN maksimal 6 - szDecimals desimal" —
+     dan yang tahu szDecimals tiap koin cuma server.
+
+     Tanpa cabang ini, `n / 0` = Infinity, `Math.floor(Infinity) * 0` =
+     NaN, dan qty berangkat sebagai string "NaN". Itu bukan teori: order
+     CASHCAT pertama ditolak dengan "Ukuran NaN membulat jadi nol untuk
+     CASHCAT (0 desimal)" — 2 Sep 2026, dilaporkan pemilik dari layar.
+
+     toFixed(12) lalu buang nol ekor, BUKAN String(n): String memberi
+     notasi eksponen untuk angka kecil ("1e-7"), dan Hyperliquid menolak
+     harga berbentuk itu. */
+  if (!(step > 0)) {
+    return n.toFixed(12).replace(/0+$/, '').replace(/\.$/, '');
+  }
+
   /* -- PEMBAGIANNYA DIRAPIKAN DULU ---------------------------------
      `n / step` di IEEE-754 sering meleset sedikit DI BAWAH bilangan
      bulat yang seharusnya, dan Math.floor mengubah meleset sedikit itu
@@ -158,11 +175,21 @@ export async function kirimOrderNyata(p: PermintaanNyata): Promise<{ pesan: stri
      jalur Binance yang mengambil filter presisi adalah perilaku lama, dan
      ketidaktahuan tidak boleh mengubahnya. */
   const keHl = bursaSimbol(p.simbol) === 'hyperliquid';
-  const f = keHl ? {} as Record<string, never> : await ambilFilter(dasar, p.simbol, kepala);
-  const stepSize: number = keHl ? 0 : (f.stepSize || 0.001);
-  const tickSize: number = keHl ? 0 : (f.tickSize || 0.01);
-  const qP: number | null = keHl ? null : (f.quantityPrecision ?? null);
-  const pP: number | null = keHl ? null : (f.pricePrecision ?? null);
+  /* Filter TETAP diambil untuk Hyperliquid: rutenya sekarang menjawab
+     simbol HL juga. Yang dijawabnya cuma aturan UKURAN (szDecimals), dan
+     itu justru bagian yang paling perlu — qty angka TURUNAN yang dihitung
+     layar, jadi layar dan bursa wajib membulatkannya dengan cara yang sama.
+     Kalau tidak, angka yang disetujui di tiket bukan angka yang berangkat.
+
+     Harga sengaja dijawab null oleh server dan diteruskan sebagai 0 di
+     sini: aturan harga Hyperliquid dua lapis dan tidak bisa diwakili satu
+     tickSize. `keStep` dengan step 0 berarti "jangan bulatkan di sini" —
+     server yang punya `bulatHarga` yang mengerjakannya. */
+  const f = await ambilFilter(dasar, p.simbol, kepala);
+  const stepSize: number = Number(f.stepSize) > 0 ? Number(f.stepSize) : (keHl ? 0 : 0.001);
+  const tickSize: number = Number(f.tickSize) > 0 ? Number(f.tickSize) : (keHl ? 0 : 0.01);
+  const qP: number | null = f.quantityPrecision ?? null;
+  const pP: number | null = f.pricePrecision ?? null;
   /* Kosong untuk Hyperliquid: dua pengaman di bawah menanyakan dukungan
      STOP_MARKET/TAKE_PROFIT_MARKET, dan itu pertanyaan tentang Binance.
      Menjawabnya dengan daftar kosong membuat keduanya dilewati — yang benar,
