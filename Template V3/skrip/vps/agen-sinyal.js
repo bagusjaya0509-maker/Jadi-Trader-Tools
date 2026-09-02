@@ -643,6 +643,23 @@ STRATEGI.momentumBalik = {
    karena ia cuma MENAMPILKAN kandidat untuk dinilai mata, sementara agen ini
    memposting sinyal yang dinilai papan peringkat sungguhan. Setup dengan stop
    sangat rapat menang di atas kertas lalu habis dimakan biaya. */
+/* ══ AGEN CEPAT BALIK ═════════════════════════════════════════════════════
+   Diminta pemilik: "logic analisanya sama tapi dia ambil posisi terbaliknya."
+
+   Sama persis dengan Agen Cepat kecuali satu bendera. Tidak ada satu pun
+   angka yang disetel ulang — lookback 20, atrKali 2,5, rr 2,0, stopMin
+   0,35%, filter tren 4H, sepuluh pasangan yang sama. Kalau salah satunya
+   diubah, yang diuji bukan lagi cermin dari agen aslinya melainkan sistem
+   ketiga yang kebetulan mirip.
+
+   Konsekuensi filter tren yang tidak ikut dibalik ditulis lengkap di
+   evaluasi() — baca di sana sebelum menilai hasilnya. */
+STRATEGI.cepatBalik = {
+  ...STRATEGI.cepat,
+  nama: 'Agen Cepat Balik',
+  balik: true,
+};
+
 STRATEGI.snr = {
   nama: 'Agen SNR',
   jenis: 'snr',
@@ -1049,14 +1066,58 @@ function evaluasi(s, bar, bar4h) {
 
   const jarak = Math.max(a * s.atrKali, kini.c * s.stopMin);
   const entry = kini.c;
+  const sl = arah === 'BUY' ? entry - jarak : entry + jarak;
+  const tp = arah === 'BUY' ? entry + jarak * s.rr : entry - jarak * s.rr;
+  const batas = arah === 'BUY' ? tertinggi : terendah;
+
+  if (s.balik) {
+    /* ══ CERMIN ═══════════════════════════════════════════════════════════
+       Cara yang SAMA dengan Agen Momentum Balik: dicerminkan di sekitar
+       entry, bukan dihitung ulang dengan arah terbalik. Bedanya menentukan
+       — menghitung ulang akan memakai `tertinggi`/`terendah` dari sisi yang
+       salah dan menghasilkan jarak stop yang berbeda, jadi yang diuji bukan
+       lagi metode yang sama.
+
+       Dicerminkan begini, JARAK stop dan target tidak berubah sedikit pun:
+       stop tetap max(2,5xATR, 0,35%), target tetap 2R. Yang berpindah cuma
+       sisinya. Itulah arti "logika analisanya sama".
+
+       ── AKIBAT YANG HARUS DIKETAHUI SEBELUM MEMBACA HASILNYA ────────────
+       Filter tren 4H TIDAK ikut dibalik, dan itu disengaja: ia bagian dari
+       ANALISANYA, bukan bagian dari posisinya. Akibatnya agen ini secara
+       sistematis masuk MELAWAN tren 4 jam — karena saringannya meloloskan
+       tembusan yang searah tren, lalu sisinya dibalik.
+
+       Jadi yang sebenarnya diuji di sini: "tembusan searah tren di 1H lebih
+       sering gagal daripada berlanjut". Itu tesis yang masuk akal untuk
+       diuji — tembusan palsu memang jenis kegagalan yang paling sering
+       dikeluhkan orang — tapi ia BUKAN sekadar "kebalikan Agen Cepat".
+       Ia sistem lain dengan asumsi lain, dan papan peringkatnya harus
+       dibaca begitu. */
+    return {
+      arah: arah === 'BUY' ? 'SELL' : 'BUY',
+      entry: entry,
+      sl: 2 * entry - sl,
+      tp: 2 * entry - tp,
+      jarak: jarak,
+      atr: a,
+      batas: batas,
+      waktu: kini.t,
+      /* Arah ASLI dibawa supaya kartunya bisa jujur: "tembus ke atas,
+         posisi diambil SELL". Tanpa ini pembacanya melihat SELL untuk
+         tembusan naik dan menyangka ada yang rusak. */
+      arahAsli: arah,
+    };
+  }
+
   return {
     arah: arah,
     entry: entry,
-    sl: arah === 'BUY' ? entry - jarak : entry + jarak,
-    tp: arah === 'BUY' ? entry + jarak * s.rr : entry - jarak * s.rr,
+    sl: sl,
+    tp: tp,
     jarak: jarak,
     atr: a,
-    batas: arah === 'BUY' ? tertinggi : terendah,
+    batas: batas,
     waktu: kini.t,
   };
 }
@@ -1239,20 +1300,37 @@ function bungkus(kunci, s, pasangan, sn) {
     };
   }
 
+  /* Arah TEMBUSANNYA, bukan arah posisinya. Keduanya sama untuk agen biasa
+     dan berlawanan untuk yang dibalik — dan menulis "tutup di atas
+     tertinggi" untuk sebuah posisi SELL adalah kekeliruan yang akan
+     dilaporkan pembaca pertama yang teliti. */
+  const arahTembus = sn.arahAsli || sn.arah;
+  const kataBalik = s.balik ? ' Posisi diambil TERBALIK dari arah tembusannya.' : '';
   return {
     pasangan: pasangan, tf: s.tf, arah: sn.arah, agenNama: s.nama, pasar: 'kripto',
     judul: pasangan.replace('USDT', '') + ' ' + sn.arah + ' — '
-         + (kunci === 'tren' ? 'breakout tren' : 'intraday searah tren'),
-    ringkas: 'Tembus ' + s.lookback + ' bar ' + s.tf + '. Stop ' + s.atrKali
+         + (s.balik ? 'fade tembusan'
+            : kunci === 'tren' ? 'breakout tren' : 'intraday searah tren'),
+    ringkas: 'Tembus ' + s.lookback + ' bar ' + s.tf + '.' + kataBalik + ' Stop ' + s.atrKali
            + '×ATR (' + persen + '%), target ' + s.rr + 'R.',
     isi: {
       entry: rapikan(sn.entry, sn.entry), sl: rapikan(sn.sl, sn.entry), tp: rapikan(sn.tp, sn.entry),
-      alasan: 'Harga tutup ' + (sn.arah === 'BUY' ? 'di atas tertinggi' : 'di bawah terendah')
+      alasan: 'Harga tutup ' + (arahTembus === 'BUY' ? 'di atas tertinggi' : 'di bawah terendah')
             + ' ' + s.lookback + ' bar terakhir (' + rapikan(sn.batas, sn.entry) + '). '
             + 'ATR(14) = ' + rapikan(sn.atr, sn.entry) + ', stop ' + s.atrKali + '×ATR = '
             + persen + '%, target ' + s.rr + 'R. '
-            + (s.filterTren ? 'Searah tren EMA20/50 di 4H. ' : '')
-            + 'Aturan tetap — tanpa penilaian manusia maupun model bahasa. Forward test.',
+            + (s.filterTren
+               ? 'Tembusan ini searah tren EMA20/50 di 4H. '
+               : '')
+            + 'Aturan tetap — tanpa penilaian manusia maupun model bahasa. Forward test.'
+            + (s.balik
+               ? ' CERMIN: deteksi tembusan, filter tren, dan jarak SL/TP PERSIS sama '
+               + 'dengan Agen Cepat; yang dibalik hanya sisinya — tembusan '
+               + arahTembus + ' dieksekusi ' + sn.arah + '. '
+               + 'Karena filternya tidak ikut dibalik, posisi ini melawan tren 4 jam: '
+               + 'yang diuji adalah dugaan bahwa tembusan searah tren di 1H lebih sering '
+               + 'gagal daripada berlanjut.'
+               : ''),
     },
   };
 }
