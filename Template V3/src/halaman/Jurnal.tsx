@@ -48,16 +48,55 @@ function KartuSaldo({ judul, saldoJurnal, akun, keIntegrasi }: {
   const adaSaldoBroker = akun.saldo !== null;
   const selisih = adaSaldoBroker ? akun.saldo! - saldoJurnal : null;
 
+  /* ── SATU KARTU, BANYAK BURSA ────────────────────────────────────────
+     Keputusan pemilik 2 Sep 2026: saldo tiap bursa berdiri BERDAMPINGAN,
+     statistiknya tetap menyatu, dan totalnya menggantikan baris "dari
+     broker · jurnal" yang memang tidak dipakai membaca apa pun.
+
+     Dipecah cuma kalau memang ADA lebih dari satu tempat. Kartu MT5 dan
+     backend lama yang belum mengirim `rincian` tampil persis seperti dulu —
+     memecah satu angka jadi "satu bursa" cuma menambah baris tanpa
+     menambah kabar.
+
+     Kenapa dari larik, bukan dua medan bernama: broker berikutnya tinggal
+     muncul di sini tanpa satu baris pun disunting. Itu permintaan pemilik
+     yang sama — "kalau mau nambah broker pun di kemudian hari masih tetap
+     bisa jadi 1 jurnal yang utuh". */
+  const rincian = akun.rincian ?? [];
+  const banyakBursa = nyambung && rincian.length > 1;
+  const totalBursa = rincian.reduce((t, b) => t + b.saldo, 0);
+
   return (
     <Panel className="p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-[12.5px] text-zinc-500">{judul}</div>
-          <div className="angka mt-2 text-[28px] font-semibold leading-none tracking-tight text-zinc-100">
-            {uang(adaSaldoBroker ? akun.saldo! : saldoJurnal)}
-          </div>
+          <div className="text-[12.5px] text-zinc-500">{banyakBursa ? 'Saldo per bursa' : judul}</div>
+
+          {banyakBursa ? (
+            /* Yang pertama tetap paling besar — ia bursa utama dan yang
+               paling sering dibaca. Sisanya lebih kecil di sebelahnya,
+               bukan di bawahnya: kartu ini punya ruang mendatar yang
+               menganggur, dan menumpuk ke bawah mendorong sisa panel. */
+            <div className="mt-2 flex flex-wrap items-end gap-x-6 gap-y-2">
+              {rincian.map((b, i) => (
+                <div key={b.id || i} className="min-w-0">
+                  <div className="truncate text-[11px] text-zinc-500">{b.nama}</div>
+                  <div className={cn('angka mt-1 font-semibold leading-none tracking-tight text-zinc-100',
+                    i === 0 ? 'text-[28px]' : 'text-[20px]')}>
+                    {uang(b.saldo)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="angka mt-2 text-[28px] font-semibold leading-none tracking-tight text-zinc-100">
+              {uang(adaSaldoBroker ? akun.saldo! : saldoJurnal)}
+            </div>
+          )}
+
           <div className="mt-2.5 text-[12px] text-zinc-500">
-            {nyambung ? `dari broker · jurnal ${uang(saldoJurnal)}`
+            {banyakBursa ? <>Total {rincian.length} bursa <span className="angka text-zinc-300">{uang(totalBursa)}</span></>
+              : nyambung ? `dari broker · jurnal ${uang(saldoJurnal)}`
               : adaSaldoBroker ? `laporan terakhir EA · jurnal ${uang(saldoJurnal)}`
               : 'dihitung dari jurnal'}
           </div>

@@ -62,6 +62,16 @@ export interface PendingBroker {
   waktu: number;
 }
 
+/** Satu tempat uang berada. Sengaja LARIK di StatusAkun, bukan medan
+ *  bernama per bursa: broker berikutnya menambah satu entri, bukan satu
+ *  cabang di setiap pembacanya. */
+export interface RincianBursa {
+  id: string;
+  nama: string;
+  saldo: number;
+  ekuitas: number;
+}
+
 export interface StatusAkun {
   /** null = belum diketahui (masih memeriksa). */
   terhubung: boolean | null;
@@ -83,6 +93,9 @@ export interface StatusAkun {
    *  persis di layar — kosong — dan itulah yang bikin orang mengira
    *  order-nya tidak terkirim padahal terpasang rapi di terminal. */
   versiEa: string;
+  /** Saldo dipecah per bursa. KOSONG berarti "tidak dipecah" — backend lama,
+   *  atau broker yang memang cuma satu tempat (MT5). Kosong bukan nol. */
+  rincian?: RincianBursa[];
   /** Semua terminal MT5 yang pernah melapor untuk akun web ini.
    *
    *  Satu orang boleh memasang EA di beberapa broker sekaligus — demo dan
@@ -444,6 +457,17 @@ export function useAkunBinance(): StatusAkun {
            dibandingkan sebagai teks. */
         const saldo = Number(j?.totalWalletBalance);
         const ekuitas = Number(j?.totalMarginBalance ?? j?.totalWalletBalance);
+        /* Daftar per bursa. Kosong untuk backend lama yang belum
+           mengirimnya — dan kosong berarti "cuma Binance", persis keadaan
+           sebelum bursa kedua ada. */
+        const rincian: RincianBursa[] = Array.isArray(j?.bursa)
+          ? j.bursa.map((b: any) => ({
+              id: String(b.id ?? ''),
+              nama: String(b.nama ?? b.id ?? ''),
+              saldo: Number(b.saldo) || 0,
+              ekuitas: Number(b.ekuitas) || 0,
+            }))
+          : [];
         if (!isFinite(saldo)) { setSt({ ...BELUM, terhubung: false, ket: 'Balasan tidak dikenali' }); return; }
         /* Posisi Binance TIDAK diambil dari sini. `/api/account` memang
            membawa `positions`, tapi ratusan baris dengan qty 0 untuk setiap
@@ -455,6 +479,7 @@ export function useAkunBinance(): StatusAkun {
           terhubung: true, saldo, ekuitas: isFinite(ekuitas) ? ekuitas : saldo,
           mataUang: 'USDT', ket: 'Binance Futures', posisi: [], pending: [], versiEa: '',
           daftarAkun: [], loginAktif: null,
+          rincian,
         });
       } catch {
         if (hidup) setSt({ ...BELUM, terhubung: false, ket: 'Tidak bisa menghubungi backend' });
