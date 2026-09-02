@@ -5,6 +5,7 @@ import {
   Wallet, TrendingUp, Wrench, CreditCard, LifeBuoy, BookOpen,
   PanelLeft, Bell, Mail, X, Sparkles, MessageCircle, Send, AtSign,
   AlertTriangle, Newspaper, ChevronRight, ChevronDown, Copy, Radar, UserCircle2, Crown,
+  Footprints,
   CheckCircle2,
   Sun, Moon,
 } from 'lucide-react';
@@ -149,7 +150,14 @@ const NAV = [
          Signal, tempat mereka cuma bisa ditemukan sesudah orang membuka
          kartu agen yang tepat. Halaman yang cuma bisa ditemukan lewat
          halaman lain akan dibuka jauh lebih jarang daripada yang pantas. */
-      { ke: '/wallet-tracking', label: 'Wallet Tracking', Ikon: Radar,
+      /* Ikon: MENJEJAKI, bukan memindai. `Radar` diwarisi dari Coin
+         Listing dan artinya menyapu ruang untuk mencari yang belum
+         diketahui — itu benar untuk satu dari tiga tab. Dua tab lainnya
+         mengikuti langkah dompet yang SUDAH diketahui, dari belakang.
+         `Footprints` mengatakan itu, dan ia satu-satunya ikon sidebar yang
+         menggambarkan perbuatan, bukan benda — jadi tidak bisa tertukar
+         dengan lima belas ikon lain di kolom yang sama. */
+      { ke: '/wallet-tracking', label: 'Wallet Tracking', Ikon: Footprints,
         sub: [
           { ke: '/wallet-tracking',             label: 'Dompet Pantauan' },
           /* Setelan salin digerbangi server dan pembaca lain tidak punya
