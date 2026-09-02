@@ -628,7 +628,122 @@ async function kirimSuratAksesOtomatis({ email, nama, kode, berakhir, hari }) {
   }
 }
 
+
+/* ══ SURAT PENGINGAT MASA AKSES ═══════════════════════════════════════════
+   Surat pertama yang ditulis SESUDAH bingkainya ada, dan itu terlihat: ia
+   tidak menyalin kop maupun tanda tangan dari mana pun.
+
+   Satu fungsi untuk dua keadaan, bukan dua surat. Yang membedakan "tiga
+   hari lagi" dan "sudah berakhir kemarin" cuma tanggalnya; menulisnya jadi
+   dua fungsi berarti dua tempat yang harus diperbaiki tiap kali kalimatnya
+   berubah, dan yang satu pasti tertinggal.
+
+   ── YANG TIDAK BOLEH DIJANJIKAN ─────────────────────────────────────────
+   Kalimat "datamu tidak dihapus" dicek dulu ke kodenya, bukan ditulis
+   karena enak dibaca. Yang terjadi saat masa akses lewat: hitungLangganan()
+   di auth.tsx menjatuhkan statusnya ke 'habis' dan orangnya diarahkan ke
+   /akses. Tidak ada penyapu yang menghapus jurnal, catatan, atau setelan --
+   sudah dicari, memang tidak ada. Jadi kalimat itu boleh berdiri.
+
+   Kalau suatu hari penyapu itu dibuat, kalimat DI SINI yang harus ikut
+   diubah. Surat yang menjanjikan sesuatu yang tidak lagi benar lebih buruk
+   daripada surat yang tidak dikirim. */
+async function kirimSuratPengingat({ email, nama, berakhir, sisaHari }) {
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email))) {
+    return { terkirim: false, alasan: 'alamat email tidak ada atau tidak sah' };
+  }
+  const j = jalur();
+  if (!j) return { terkirim: false, alasan: 'surel belum dikonfigurasi' };
+
+  const sampai = tanggalIndo(berakhir);
+  const sisa = Number(sisaHari);
+  const lewat = sisa <= 0;
+  const sapaan = nama ? 'Halo ' + String(nama).trim() + ',' : 'Halo,';
+  const tautan = SITUS + '/akses';
+
+  /* Judulnya menyebut TANGGAL, bukan "segera". Orang yang membuka kotak
+     masuknya seminggu kemudian masih tahu persis apa yang dibicarakan --
+     dan "segera" di surat berumur seminggu tidak berarti apa-apa. */
+  const subjek = lewat
+    ? 'Akses gratis Jadi Trader Tools kamu sudah berakhir'
+    : 'Akses gratis Jadi Trader Tools berakhir ' + sampai;
+
+  const kalimat = lewat
+    ? 'Masa akses gratismu di Jadi Trader Tools berakhir pada ' + sampai + '.'
+    : 'Akses gratismu di Jadi Trader Tools berakhir ' + sampai
+      + ' — ' + sisa + ' hari lagi.';
+
+  const penjelasan = lewat
+    ? 'Kamu masih bisa masuk dengan akun yang sama, tapi halaman-halamannya '
+      + 'terkunci sampai aksesnya diperpanjang. Jurnal, catatan, dan setelanmu '
+      + 'tidak dihapus — semuanya kembali seperti semula begitu akses aktif lagi.'
+    : 'Sesudah tanggal itu kamu masih bisa masuk dengan akun yang sama, tapi '
+      + 'halaman-halamannya terkunci sampai aksesnya diperpanjang. Jurnal, '
+      + 'catatan, dan setelanmu tidak dihapus — semuanya kembali seperti semula '
+      + 'begitu akses aktif lagi.';
+
+  const teks = [
+    sapaan,
+    '',
+    kalimat,
+    '',
+    'Jenis akses : Akses gratis (event)',
+    'Berakhir    : ' + sampai,
+    lewat ? '' : 'Sisa waktu  : ' + sisa + ' hari',
+    '',
+    'Lihat pilihan akses di sini:',
+    tautan,
+    '',
+    penjelasan,
+    '',
+    'Kalau ada yang mau ditanyakan sebelum memutuskan, balas surat ini.',
+    '',
+    '--',
+    'Jadi Trader Tools - PT Solusi Bursa Nusantara',
+    'Alat bantu analisa pasar. Bukan nasihat investasi.',
+    'Ketentuan lengkap: ' + SITUS + '/legal',
+  ].filter(function (b) { return b !== ''; }).join('\n');
+
+  const html = bungkusSurat({
+    pratinjau: lewat
+      ? 'Masa akses gratismu sudah berakhir. Datamu tetap tersimpan.'
+      : 'Sisa ' + sisa + ' hari. Datamu tetap tersimpan apa pun keputusanmu.',
+    isi: `<p style="margin:0 0 14px">${amanHtml(sapaan)}</p>
+  <p style="margin:0 0 18px">${amanHtml(kalimat)}</p>
+  <table style="border-collapse:collapse;margin:0 0 20px;font-size:13.5px">
+    <tr><td style="padding:3px 16px 3px 0;color:#71717a">Jenis akses</td><td style="padding:3px 0"><strong>Akses gratis (event)</strong></td></tr>
+    <tr><td style="padding:3px 16px 3px 0;color:#71717a">Berakhir</td><td style="padding:3px 0"><strong>${amanHtml(sampai)}</strong></td></tr>
+    ${lewat ? '' : `<tr><td style="padding:3px 16px 3px 0;color:#71717a">Sisa waktu</td><td style="padding:3px 0"><strong>${amanHtml(String(sisa))} hari</strong></td></tr>`}
+  </table>
+  <p style="margin:0 0 18px">
+    <a href="${tautan}" style="display:inline-block;background:#18181b;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-weight:600">Lihat pilihan akses</a>
+  </p>
+  <p style="margin:0 0 12px;color:#52525b">${amanHtml(penjelasan)}</p>
+  <p style="margin:0;color:#52525b">Kalau ada yang mau ditanyakan sebelum memutuskan, balas surat ini.</p>`,
+  });
+
+  try {
+    if (j === 'api') {
+      const h = await kirimLewatApi({ email, teks, html, subjek });
+      if (h.terkirim) console.log('[surel] pengingat terkirim (api) ke', email, '·', h.id);
+      else console.error('[surel] pengingat gagal (api) ke', email, '·', h.alasan);
+      return h;
+    }
+    const t = ambilAngkut();
+    if (!t) return { terkirim: false, alasan: 'SMTP belum dikonfigurasi' };
+    const info = await t.sendMail({
+      from: `"${DARI_NAMA}" <${SMTP_USER}>`,
+      to: email, replyTo: BALAS_KE, subject: subjek, text: teks, html,
+    });
+    console.log('[surel] pengingat terkirim (smtp) ke', email, '·', info.messageId);
+    return { terkirim: true };
+  } catch (e) {
+    console.error('[surel] pengingat gagal ke', email, '·', e.message);
+    return { terkirim: false, alasan: e.message };
+  }
+}
+
 module.exports = {
   kirimSuratPersetujuan, kirimSuratPermintaanMasuk, kirimSuratKeputusan,
-  kirimSuratAksesOtomatis, statusSurel,
+  kirimSuratAksesOtomatis, kirimSuratPengingat, statusSurel,
 };

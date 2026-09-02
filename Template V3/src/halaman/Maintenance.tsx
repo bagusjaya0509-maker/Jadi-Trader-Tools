@@ -11,6 +11,7 @@ import { tanggalPendek } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 import { PanelLisensi, LencanaJenis, namaProduk } from '@/components/panel-lisensi';
 import { PanelSetelanAkses } from '@/components/panel-setelan-akses';
+import { PanelPengingat } from '@/components/panel-pengingat';
 import { PanelTrafikSistem } from '@/components/panel-trafik-sistem';
 import { PanelKesehatan } from '@/components/panel-kesehatan';
 import { PanelLangganan } from '@/components/panel-langganan';
@@ -473,6 +474,13 @@ export default function Maintenance() {
         <div className="grid gap-5 xl:grid-cols-2">
           <PanelLisensi />
           <PanelLisensiAktif />
+        </div>
+        {/* Di luar grid dua kolom, dan sengaja. Panel ini daftar bercentang
+            dengan alamat surel penuh di tiap baris; dipaksa selebar setengah
+            layar, alamatnya terpotong justru pada bagian yang menentukan
+            apakah pemiliknya berani menekan Kirim. */}
+        <div className="mt-5">
+          <PanelPengingat />
         </div>
       </>)}
 

@@ -249,6 +249,76 @@ export async function putuskanPermintaan(id: string, tindakan: 'setujui' | 'tola
   return j as { ok: boolean; status: string; kode?: string; berakhir?: number; firestoreOk?: boolean };
 }
 
+
+/* ── Pengingat masa akses ────────────────────────────────────────────────
+   Satu baris = satu LISENSI, bukan satu orang. Bedanya kelihatan kalau ada
+   yang punya dua lisensi aktif sekaligus; sekarang tidak ada (sudah dicek
+   di server: 0 alamat kembar, 0 uid kembar), tapi tipe ini tidak boleh
+   berpura-pura hal itu mustahil. */
+export interface BarisPengingat {
+  sidik: string;
+  uid: string;
+  produk: string;
+  berakhir: number;
+  /** Dibulatkan KE ATAS di server. Habis 20 jam lagi = 1 hari, bukan 0. */
+  sisaHari: number;
+  /** Tanggalnya sudah lewat. Suratnya berganti kalimat, bukan dibatalkan. */
+  lewat: boolean;
+  /** Kosong artinya orang ini TIDAK BISA dikabari sama sekali. */
+  email: string;
+  nama: string;
+  /** 0 = belum pernah. Dipakai untuk menahan kirim dua kali dalam 3 hari. */
+  pengingatPada: number;
+}
+
+export interface RingkasPengingat {
+  total: number;
+  siap: number;
+  tanpaEmail: number;
+  baruSaja: number;
+  lewat: number;
+}
+
+/** Hanya membaca. Panel WAJIB memanggil ini dulu dan menampilkan hasilnya:
+ *  surat yang sudah keluar tidak bisa ditarik kembali. */
+export async function daftarPengingat(dalam = 30): Promise<{
+  daftar: BarisPengingat[]; ringkas: RingkasPengingat; dalam: number;
+}> {
+  const r = await fetch(`${dasar()}/api/lisensi/pengingat?dalam=${dalam}`, { headers: kepalaPemilik() });
+  if (r.status === 401) throw new Error('App Token ditolak.');
+  if (!r.ok) throw new Error(`Server menjawab ${r.status}`);
+  const j = await r.json();
+  return {
+    daftar: (j.daftar ?? []) as BarisPengingat[],
+    ringkas: (j.ringkas ?? { total: 0, siap: 0, tanpaEmail: 0, baruSaja: 0, lewat: 0 }) as RingkasPengingat,
+    dalam: Number(j.dalam) || dalam,
+  };
+}
+
+export interface HasilKirim {
+  sidik: string; email?: string; terkirim: boolean; alasan?: string;
+}
+
+/** Penerimanya disebut satu per satu, bukan "semua yang cocok". Kalau
+ *  server yang memilih ulang, daftar di layar dan daftar yang dikirimi bisa
+ *  berbeda — cukup satu lisensi baru disetujui di sela-selanya. */
+export async function kirimPengingat(sidik: string[], ulangi = false): Promise<{
+  terkirim: number; diminta: number; hasil: HasilKirim[];
+}> {
+  const r = await fetch(`${dasar()}/api/lisensi/pengingat/kirim`, {
+    method: 'POST',
+    headers: kepalaPemilik(),
+    body: JSON.stringify({ sidik, ulangi }),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || `Server menjawab ${r.status}`);
+  return {
+    terkirim: Number(j.terkirim) || 0,
+    diminta: Number(j.diminta) || 0,
+    hasil: (j.hasil ?? []) as HasilKirim[],
+  };
+}
+
 /** Login Discord: backend menyelesaikan OAuth lalu mengarahkan balik dengan
  *  `#discord=<token>`, yang sudah ditangani di lib/auth.tsx saat modul dimuat.
  *
