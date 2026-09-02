@@ -82,9 +82,16 @@ export function useRingkasanAkun() {
   const saldoForex = mt5.saldo !== null ? mt5.saldo : forex.saldo;
   const saldoKripto = binance.saldo !== null ? binance.saldo : kripto.saldo;
   const totalSaldo = saldoForex + saldoKripto;
+  /* Nama bursanya dibaca dari `rincian`, bukan ditulis tetap 'Binance'.
+     Kalimatnya dulu berbunyi "live MT5 & Binance" untuk saldo yang sudah
+     memuat Hyperliquid — keterangan yang menyebut sumber lebih sedikit dari
+     yang sebenarnya menghitung. Backend lama yang belum mengirim rincian
+     tetap menulis 'Binance', persis seperti dulu. */
   const sumberSaldo = [
     mt5.terhubung === true ? 'MT5' : null,
-    binance.terhubung === true ? 'Binance' : null,
+    ...(binance.terhubung === true
+      ? (binance.rincian?.length ? binance.rincian.map((b) => b.nama) : ['Binance'])
+      : []),
   ].filter(Boolean) as string[];
 
   /* Kurva berangkat dari `totalSaldo` — titik jangkarnya, jadi harus dihitung

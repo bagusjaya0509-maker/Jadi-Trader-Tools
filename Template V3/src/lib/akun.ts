@@ -455,8 +455,19 @@ export function useAkunBinance(): StatusAkun {
         /* Bentuk balasan Binance Futures: totalWalletBalance & totalMarginBalance,
            keduanya string. Number() bukan pilihan gaya — tanpa itu saldo
            dibandingkan sebagai teks. */
-        const saldo = Number(j?.totalWalletBalance);
-        const ekuitas = Number(j?.totalMarginBalance ?? j?.totalWalletBalance);
+        /* ── `saldo` = SELURUH UANG DI JURNAL INI, BUKAN BINANCE SAJA ──────
+           Dulu `totalWalletBalance` mentah. Begitu Hyperliquid ikut, angka
+           itu berhenti menjawab pertanyaan yang ditanyakan pembacanya —
+           Dashboard bertanya "uangku berapa", bukan "uangku di Binance
+           berapa". Total Saldo di Dashboard melaporkan $1.078 untuk akun
+           yang isinya $1.442; kekurangan $364 yang tidak terlihat sebagai
+           galat, cuma sebagai angka yang salah.
+
+           `totalSaldo` dipakai kalau backend mengirimnya; kalau tidak
+           (backend lama), jatuh ke medan Binance seperti dulu. Rinciannya
+           tetap tersedia terpisah di `rincian` untuk yang perlu memecah. */
+        const saldo = Number(j?.totalSaldo ?? j?.totalWalletBalance);
+        const ekuitas = Number(j?.totalEkuitas ?? j?.totalMarginBalance ?? j?.totalWalletBalance);
         /* Daftar per bursa. Kosong untuk backend lama yang belum
            mengirimnya — dan kosong berarti "cuma Binance", persis keadaan
            sebelum bursa kedua ada. */
