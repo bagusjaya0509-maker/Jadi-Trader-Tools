@@ -593,6 +593,55 @@ async function posisiHl() {
   }).filter((p) => p.positionAmt !== 0);
 }
 
+/** Isian penutup sejak `sejakMs`, SUDAH DIKELOMPOKKAN jadi trade.
+ *
+ *  ── FILL BUKAN TRADE, DAN INI PELAJARAN YANG SUDAH MAHAL SEKALI ────────
+ *  Satu keputusan keluar bisa terisi puluhan kali. Panel dompet dulu
+ *  menghitung per fill dan menulis "WR 0% · 107 penutupan" untuk SATU trade
+ *  — win rate yang ditentukan cara bursa mengiris order, bukan keputusan
+ *  orangnya. Jurnal tidak boleh mengulanginya.
+ *
+ *  Dikelompokkan per `oid`, sama dengan jalur Binance yang mengelompokkan
+ *  per `orderId`. Bukan per jendela waktu seperti panel dompet: di sana kita
+ *  membaca dompet ORANG LAIN dan tidak punya oid yang bisa dipercaya, di
+ *  sini ordernya milik kita sendiri.
+ *
+ *  Yang tidak punya `closedPnl` DILEWATI — itu isian pembuka, dan posisi
+ *  yang baru dibuka bukan trade yang sudah selesai. */
+async function isianTutupHl(sejakMs) {
+  if (!siap()) return [];
+  const sejak = Number(sejakMs) > 0 ? Number(sejakMs) : Date.now() - 7 * 86400000;
+  const fills = await pustaka().info.userFillsByTime({ user: AKUN, startTime: sejak });
+
+  const per = new Map();
+  for (const f of (Array.isArray(fills) ? fills : [])) {
+    if (!Number(f.closedPnl)) continue;
+    const k = String(f.oid);
+    if (!per.has(k)) per.set(k, []);
+    per.get(k).push(f);
+  }
+
+  return [...per.entries()].map(([oid, grup]) => {
+    const qty = grup.reduce((t, f) => t + (Number(f.sz) || 0), 0);
+    const pnl = grup.reduce((t, f) => t + (Number(f.closedPnl) || 0), 0);
+    const biaya = grup.reduce((t, f) => t + (Number(f.fee) || 0), 0);
+    const keluar = grup.reduce((t, f) => t + (Number(f.px) || 0) * (Number(f.sz) || 0), 0) / (qty || 1);
+    const waktu = Math.max(...grup.map((f) => Number(f.time) || 0));
+    /* `dir` menyebutkannya langsung ("Close Long"), jadi arah posisinya
+       tidak perlu disimpulkan dari sisi fill. Sisi fill tetap jadi cadangan
+       kalau suatu saat `dir` kosong — dan menyimpulkannya TERBALIK adalah
+       kekeliruan yang cuma terlihat sesudah jurnalnya penuh. */
+    const dir = String(grup[0].dir || '');
+    const arah = /long/i.test(dir) ? 'BUY'
+      : /short/i.test(dir) ? 'SELL'
+      : (grup[0].side === 'B' ? 'SELL' : 'BUY');
+    return {
+      oid: String(oid), koin: grup[0].coin, simbol: keSimbol(grup[0].coin),
+      arah, qty, pnl, biaya, hargaKeluar: keluar, waktu, isian: grup.length,
+    };
+  }).sort((a, b) => a.waktu - b.waktu);
+}
+
 /** Order menggantung dalam BENTUK `daftar` milik /api/open-orders. */
 async function pendingHl() {
   if (!siap()) return [];
@@ -684,6 +733,6 @@ module.exports = {
      requireToken di server. Lihat catatan panjang di atas bukaHl. */
   orderHl, pasangSltpHl, batalTriggerHl, batalHl, slKeBeHl,
   /* Dipakai kedua jalur. */
-  tutupHl, posisiHl, pendingHl, keSimbol, keKoin,
+  tutupHl, posisiHl, pendingHl, isianTutupHl, keSimbol, keKoin,
   batas: { HL_MAKS_USD, HL_MAKS_LEV },
 };

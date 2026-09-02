@@ -256,6 +256,74 @@ export async function sinkronRiwayatBinance(sudahAda: Set<string>, sejakMs: numb
 }
 
 /* ════════════════════════════════════════════════════════════════════════
+   SINKRON RIWAYAT HYPERLIQUID
+   ════════════════════════════════════════════════════════════════════════
+   SATU jurnal, bursa jadi keterangan — bentuk yang diminta pemilik supaya
+   broker berikutnya tinggal masuk tanpa jurnal kedua.
+
+   Trade Hyperliquid ditulis ke `sumber: 'kripto'` yang SAMA dengan Binance,
+   jadi win rate, Net P/L, dan kurva ekuitas menghitung keduanya sekaligus.
+   Yang membedakannya cuma `alasan` — dan itu bukan penanda seadanya: kolom
+   Setup di Riwayat Trade memang menampilkan medan itu, jadi tiap baris
+   menyebut sendiri dari bursa mana ia datang.
+
+   ── ID DETERMINISTIK, PREFIKS BERBEDA ──────────────────────────────────
+   `hl<oid>` sejajar `bin<orderId>`. Prefiksnya wajib berbeda: oid
+   Hyperliquid dan orderId Binance sama-sama angka, dan tanpa prefiks dua
+   trade dari bursa berbeda bisa bertabrakan di satu id — yang kedua
+   menimpa yang pertama, diam-diam.
+
+   ── PENGELOMPOKAN DIKERJAKAN SERVER ────────────────────────────────────
+   Berbeda dari jalur Binance yang mengelompokkan fill di sini, jalur ini
+   menerima trade yang SUDAH utuh dari /api/hl/user-trades. Aturannya satu
+   tempat; aturan yang disalin ke layar akan berselisih dengan yang di
+   server pada hari salah satunya disunting.
+   ════════════════════════════════════════════════════════════════════════ */
+
+export async function sinkronRiwayatHyperliquid(
+  sudahAda: Set<string>, sejakMs: number,
+): Promise<HasilSinkronBin> {
+  const { bacaKoneksi, koneksiLengkap } = await import('@/lib/koneksi');
+  const k = bacaKoneksi();
+  if (!koneksiLengkap(k)) return { masuk: 0, dilewati: 0, galat: null };
+  const dasar = k.url.trim().replace(/\/+$/, '');
+  const kepala = { 'X-App-Token': k.token.trim() };
+
+  try {
+    const r = await fetch(dasar + '/api/hl/user-trades?since=' + sejakMs, { headers: kepala });
+    const j = await r.json();
+    if (!r.ok) return { masuk: 0, dilewati: 0, galat: j.error || ('hl/user-trades menjawab ' + r.status) };
+    /* Hyperliquid mati bukan galat yang perlu ditampilkan — jurnal Binance
+       tetap jalan, dan pesan merah untuk bursa yang memang belum dipakai
+       cuma bising. */
+    if (j.aktif === false) return { masuk: 0, dilewati: 0, galat: null };
+
+    let masuk = 0, dilewati = 0;
+    for (const t of (j.trades ?? [])) {
+      const id = 'hl' + t.oid;
+      if (sudahAda.has(id)) { dilewati++; continue; }
+      await simpanTrade({
+        id, sumber: 'kripto', pair: String(t.simbol || ''), arah: t.arah === 'SELL' ? 'SELL' : 'BUY',
+        lot: Number(Number(t.qty).toFixed(6)),
+        /* Harga masuk 0, sama dengan jalur Binance: isian PENUTUP tidak
+           menyebut harga masuknya, dan mengarangnya dari harga keluar
+           berarti menulis angka yang tidak pernah terjadi. */
+        masukHarga: 0, keluarHarga: Number(Number(t.hargaKeluar).toFixed(6)),
+        pnl: Number(Number(t.pnl).toFixed(4)), waktu: Number(t.waktu) || Date.now(),
+        emosiMasuk: 'Netral', emosiEvaluasi: 'Netral',
+        alasan: 'Sinkron Hyperliquid',
+        catatan: 'Ditutup di Hyperliquid (' + t.oid + ')'
+               + (Number(t.isian) > 1 ? ' · ' + t.isian + ' isian' : ''),
+      });
+      masuk++;
+    }
+    return { masuk, dilewati, galat: null };
+  } catch (e) {
+    return { masuk: 0, dilewati: 0, galat: e instanceof Error ? e.message : 'gagal sinkron Hyperliquid' };
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════════
    SINKRON RIWAYAT MT5
    ════════════════════════════════════════════════════════════════════════
    Jurnal Trade-Fi berhenti terisi setelah 9 Agustus, dan penyebabnya bukan

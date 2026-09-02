@@ -12,7 +12,7 @@ import type { Trade, Sumber } from '@/data/contoh';
 import { useAkunMt5, useAkunBinance, type StatusAkun } from '@/lib/akun';
 import { ModalTrade } from '@/components/modal-trade';
 import { KotakArus } from '@/components/kotak-arus';
-import { useArusKas, arusBersih, sinkronRiwayatMt5, sinkronRiwayatBinance, type Arus } from '@/lib/tulis-jurnal';
+import { useArusKas, arusBersih, sinkronRiwayatMt5, sinkronRiwayatBinance, sinkronRiwayatHyperliquid, type Arus } from '@/lib/tulis-jurnal';
 import { bacaStatistik, bacaPnl } from '@/lib/catatan-stat';
 import { Link } from 'react-router-dom';
 
@@ -309,10 +309,20 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
       const sudahAda = new Set(trade.map((t) => t.id));
       const terbaru = trade.reduce((s, t) => Math.max(s, t.waktu), 0);
       const sejak = terbaru > 0 ? terbaru - 3_600_000 : Date.now() - 7 * 86_400_000;
+      /* DUA BURSA, SATU PUTARAN. Berurutan, bukan Promise.all: keduanya
+         menulis ke koleksi yang sama dan `sudahAda` yang dipakai keduanya
+         adalah potret SEBELUM putaran ini — menjalankannya bersamaan tidak
+         mempercepat apa pun yang terasa, dan menambah satu cara baru untuk
+         dua penulis bertemu di satu id. */
       const h = await sinkronRiwayatBinance(sudahAda, sejak);
       if (!hidup) return;
-      if (h.galat) setPesanBin('');
-      else if (h.masuk > 0) setPesanBin(`${h.masuk} transaksi baru dari Binance masuk otomatis.`);
+      const hHl = await sinkronRiwayatHyperliquid(sudahAda, sejak);
+      if (!hidup) return;
+
+      const kabar: string[] = [];
+      if (!h.galat && h.masuk > 0) kabar.push(`${h.masuk} dari Binance`);
+      if (!hHl.galat && hHl.masuk > 0) kabar.push(`${hHl.masuk} dari Hyperliquid`);
+      setPesanBin(kabar.length ? `${kabar.join(' dan ')} masuk otomatis.` : '');
     };
     void jalan();
     const jam = setInterval(() => void jalan(), 5 * 60_000);
