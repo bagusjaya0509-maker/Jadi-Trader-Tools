@@ -29,6 +29,10 @@ export interface MasukanTrade {
   pair: string;
   arah: 'BUY' | 'SELL';
   lot: number;
+  /** Nilai posisi dalam DOLAR. Kolom "Size Order" jurnal kripto membaca
+   *  medan ini, bukan `lot` — 0,0182 BTC tidak berarti apa-apa sampai
+   *  dikalikan harganya. Opsional karena jurnal forex memakai lot. */
+  nilaiOrder?: number;
   masukHarga: number;
   keluarHarga: number;
   pnl: number;
@@ -74,7 +78,13 @@ export async function simpanTrade(m: MasukanTrade) {
     simbol: m.pair.trim().toUpperCase(),
     arah: m.arah,
     sumber: m.sumber,
-    ukuran: m.sumber === 'forex' ? { lot: m.lot } : { qty: m.lot },
+    /* `nilai` ditulis kalau pemanggilnya tahu — jalur sinkron tahu (qty x
+       harga keluar), pengisian tangan belum tentu. Tanpa medan ini, kolom
+       "Size Order" hanya bisa diisi lewat margin x leverage, dan sinkron
+       tidak punya keduanya: yang ia terima dari bursa cuma qty. */
+    ukuran: m.sumber === 'forex'
+      ? { lot: m.lot }
+      : { qty: m.lot, ...(m.nilaiOrder ? { nilai: m.nilaiOrder } : {}) },
     masukHarga: m.masukHarga,
     keluarHarga: m.keluarHarga,
     pnl: m.pnl,
@@ -241,6 +251,20 @@ export async function sinkronRiwayatBinance(sudahAda: Set<string>, sejakMs: numb
         await simpanTrade({
           id, sumber: 'kripto', pair: simbol, arah,
           lot: Number(qty.toFixed(6)),
+          /* ── KOLOM "SIZE ORDER" MEMBACA INI, BUKAN `lot` ─────────────
+             Untuk kripto kolomnya menampilkan NILAI DALAM DOLAR (keputusan
+             lama: 0,0182 BTC tidak berarti apa-apa sampai dikalikan
+             harganya). Sinkron dulu cuma menulis `lot`, jadi kolomnya
+             selalu tanda hubung untuk SEMUA trade hasil sinkron — dan
+             tanda hubung di situ berarti "tidak tersimpan", jadi ia
+             terbaca seperti data yang hilang, bukan seperti medan yang
+             memang tidak pernah diisi.
+
+             Dihitung dari harga KELUAR karena isian penutup memang tidak
+             menyebut harga masuknya. Bedanya kecil untuk trade yang wajar,
+             dan yang ditanyakan kolom ini memang "posisinya sebesar apa",
+             bukan "berapa persisnya saat entry". */
+          nilaiOrder: Number((qty * hargaKeluar).toFixed(2)),
           masukHarga: 0, keluarHarga: Number(hargaKeluar.toFixed(6)),
           pnl: Number(pnl.toFixed(4)), waktu,
           emosiMasuk: 'Netral', emosiEvaluasi: 'Netral',
@@ -305,6 +329,8 @@ export async function sinkronRiwayatHyperliquid(
       await simpanTrade({
         id, sumber: 'kripto', pair: String(t.simbol || ''), arah: t.arah === 'SELL' ? 'SELL' : 'BUY',
         lot: Number(Number(t.qty).toFixed(6)),
+        /* Sama dengan jalur Binance — lihat catatan di sana. */
+        nilaiOrder: Number((Number(t.qty) * Number(t.hargaKeluar)).toFixed(2)),
         /* Harga masuk 0, sama dengan jalur Binance: isian PENUTUP tidak
            menyebut harga masuknya, dan mengarangnya dari harga keluar
            berarti menulis angka yang tidak pernah terjadi. */

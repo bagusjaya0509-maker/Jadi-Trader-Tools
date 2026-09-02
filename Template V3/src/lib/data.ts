@@ -94,7 +94,12 @@ function keTrade(id: string, d: DocumentData): Trade {
        Kalau margin/leverage tidak ada di dokumennya, dibiarkan undefined:
        menebaknya dari qty x harga entry akan salah untuk transaksi yang
        sebagian TP-nya sudah kena. */
-    nilaiOrder: n(d.ukuran?.margin) && n(d.ukuran?.leverage)
+    /* `ukuran.nilai` MENANG kalau ada: ia ditulis oleh yang benar-benar
+       tahu nilainya saat transaksinya dicatat, bukan dihitung ulang dari
+       dua medan yang bisa saja tidak lengkap. Margin x leverage tetap jadi
+       cadangan untuk dokumen lama yang belum punya medan itu. */
+    nilaiOrder: n(d.ukuran?.nilai) ? n(d.ukuran.nilai)
+      : n(d.ukuran?.margin) && n(d.ukuran?.leverage)
       ? n(d.ukuran.margin) * n(d.ukuran.leverage)
       : undefined,
     leverage: n(d.ukuran?.leverage) || undefined,
