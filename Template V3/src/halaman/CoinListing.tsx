@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Radar, BellRing, Plus, Trash2, RefreshCw, ShieldAlert, ExternalLink,
-  Loader2, Wallet, AlertTriangle, X, Clock,
+  Loader2, Wallet, AlertTriangle, X, Clock, ShoppingCart,
 } from 'lucide-react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { cn } from '@/lib/utils';
@@ -12,6 +12,8 @@ import {
 } from '@/lib/coin-listing';
 import { PanelSentimen } from '@/components/panel-sentimen';
 import { PanelJejakListing } from '@/components/panel-jejak-listing';
+import { PanelBeliKoin } from '@/components/panel-beli-koin';
+import { jaringanDidukung } from '@/lib/dex-swap';
 
 /* ════════════════════════════════════════════════════════════════════════
    COIN LISTING
@@ -272,6 +274,7 @@ function Baris({ k, jaringan, sibuk, aksi }: {
   sibuk: string;
   aksi: {
     periksa: () => void; hapus: () => void; aman: () => void; baca: () => void;
+    beli: () => void;
   };
 }) {
   const muat = sibuk.startsWith(k.alamat + ':') ? sibuk.slice(k.alamat.length + 1) : '';
@@ -318,15 +321,50 @@ function Baris({ k, jaringan, sibuk, aksi }: {
               <Clock className="size-3" /> menunggu · dicek {jarak(k.diperiksa)}
             </span>
           )}
-          <button onClick={aksi.periksa} disabled={muat === 'periksa'}
-            title="Periksa sekarang, tidak menunggu putaran berikutnya"
-            className="ml-auto cursor-pointer rounded p-1 text-zinc-600 transition-colors hover:text-zinc-300 disabled:opacity-40">
-            <RefreshCw className={cn('size-3.5', muat === 'periksa' && 'animate-spin')} />
-          </button>
-          <button onClick={aksi.hapus} title="Berhenti memantau"
-            className="cursor-pointer rounded p-1 text-zinc-700 transition-colors hover:text-red-400">
-            <Trash2 className="size-3.5" />
-          </button>
+          {/* ── SATU KELOMPOK, BUKAN TIGA TOMBOL LEPAS ─────────────────
+              Barisnya `items-baseline`, dan itu benar untuk nama koin,
+              simbol, dan lencana jaringan — ketiganya teks yang memang harus
+              duduk di garis yang sama.
+
+              Tapi tombol bukan teks. Diukur di peramban sesudah tombol Beli
+              ditambahkan: pusatnya 5 px di bawah pusat dua ikon di
+              sebelahnya, karena yang disejajarkan garis dasar HURUF "Beli",
+              sementara dua tetangganya cuma ikon tanpa huruf sama sekali.
+
+              Bungkus `flex items-center` memisahkan urusan: di luar tetap
+              baseline untuk teksnya, di dalam pusat-ke-pusat untuk
+              tombolnya. `ml-auto` naik ke bungkusnya, jadi tidak ada lagi
+              `ml-auto` bersyarat yang harus ikut berubah tiap kali ada
+              tombol yang muncul atau hilang. */}
+          <div className="ml-auto flex shrink-0 items-center gap-1 self-center">
+            {/* BELI: HANYA SESUDAH LISTING. Sebelum ada kolam DEX tidak ada
+                apa pun untuk ditukar — agregatornya akan menjawab "tidak ada
+                rute", dan tombol yang selalu berakhir dengan galat adalah
+                tombol yang mengajari orang bahwa panelnya rusak.
+
+                Juga digerbangi jaringan: rantai yang bisa DIPANTAU lebih
+                banyak daripada yang bisa dilayani panel beli.
+
+                Berteks, bukan ikon seperti dua tetangganya — yang ini
+                membelanjakan uang, dan beda akibat sebaiknya terlihat
+                sebagai beda bentuk. */}
+            {listing && jaringanDidukung(k.jaringan) && (
+              <button onClick={aksi.beli}
+                title="Beli koin ini langsung dari dompetmu"
+                className="inline-flex h-[23px] shrink-0 cursor-pointer items-center gap-1 rounded border border-emerald-500/40 px-2 text-[11px] text-emerald-300 transition-colors hover:bg-emerald-500/15">
+                <ShoppingCart className="size-3" /> Beli
+              </button>
+            )}
+            <button onClick={aksi.periksa} disabled={muat === 'periksa'}
+              title="Periksa sekarang, tidak menunggu putaran berikutnya"
+              className="inline-flex size-[23px] cursor-pointer items-center justify-center rounded text-zinc-600 transition-colors hover:text-zinc-300 disabled:opacity-40">
+              <RefreshCw className={cn('size-3.5', muat === 'periksa' && 'animate-spin')} />
+            </button>
+            <button onClick={aksi.hapus} title="Berhenti memantau"
+              className="inline-flex size-[23px] cursor-pointer items-center justify-center rounded text-zinc-700 transition-colors hover:text-red-400">
+              <Trash2 className="size-3.5" />
+            </button>
+          </div>
         </div>
 
         {/* ── Isi utama ──────────────────────────────────────────────── */}
@@ -434,6 +472,7 @@ export default function CoinListing({ tanpaBantalan = false }: {
   const [jaringan, setJaringan] = useState<Record<string, InfoJaringan>>({});
   const [muat, setMuat] = useState(true);
   const [sibuk, setSibuk] = useState('');
+  const [beli, setBeli] = useState<KoinPantau | null>(null);
   /* Dulu satu boolean `masuk`. Ia tidak cukup: `ambilListing` gagal karena
      tiga sebab yang berbeda, dan memampatkannya jadi "sudah masuk / belum"
      membuat VPS mati tampil sebagai sesi yang bermasalah. */
@@ -573,6 +612,25 @@ export default function CoinListing({ tanpaBantalan = false }: {
 
       {masuk && <FormTambah jaringan={jaringan} selesai={() => void tarik()} />}
 
+      {/* Panel beli sebagai lapisan, bukan baris yang mekar di tempat.
+          Yang dibuka di sini menyita perhatian penuh sampai selesai, dan
+          panel yang mekar di tengah daftar membuat baris-baris di bawahnya
+          melompat — tepat saat orangnya sedang mengetik nominal. */}
+      {beli && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm sm:p-8"
+          /* `onMouseDown`, bukan `onClick`. Menutup pada klik berarti
+             menutup juga ketika orang memblok teks di dalam panel lalu
+             melepas tetikusnya di luar — pernah terjadi di modal sunting
+             trade, dan yang hilang saat itu adalah isian yang belum
+             tersimpan. Di sini yang hilang bisa nominal yang sedang
+             dihitung. */
+          onMouseDown={(e) => { if (e.target === e.currentTarget) setBeli(null); }}>
+          <div className="w-full max-w-md" onMouseDown={(e) => e.stopPropagation()}>
+            <PanelBeliKoin koin={beli} onTutup={() => setBeli(null)} />
+          </div>
+        </div>
+      )}
+
       {muat && (
         <p className="flex items-center gap-2 py-6 text-[13px] text-zinc-500">
           <Loader2 className="size-4 animate-spin" /> Memuat daftar pantauan…
@@ -594,6 +652,7 @@ export default function CoinListing({ tanpaBantalan = false }: {
                 hapus: () => void jalankan(k.alamat + ':hapus', () => hapusKoin(k.jaringan, k.alamat)),
                 aman: () => void jalankan(k.alamat + ':aman', () => periksaKeamanan(k.jaringan, k.alamat)),
                 baca: () => void jalankan(k.alamat + ':baca', () => tandaiDibaca(k.alamat)),
+                beli: () => setBeli(k),
               }} />
           ))}
         </section>
@@ -611,6 +670,7 @@ export default function CoinListing({ tanpaBantalan = false }: {
                 hapus: () => void jalankan(k.alamat + ':hapus', () => hapusKoin(k.jaringan, k.alamat)),
                 aman: () => void jalankan(k.alamat + ':aman', () => periksaKeamanan(k.jaringan, k.alamat)),
                 baca: () => {},
+                beli: () => setBeli(k),
               }} />
           ))}
         </section>
