@@ -11,7 +11,8 @@ import { PanelNews } from '@/components/panel-news';
 import { simpanDraf } from '@/lib/draf-sinyal';
 import { Panel, PanelHead, KartuKpi, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn, uang, persen, harga, tanggalPendek } from '@/lib/utils';
-import { ChartLilin, TAMPILAN_BAWAAN, type Garis, type GarisHarga, type GarisSeret, type PosisiChartMt5, type TampilanChart } from '@/components/chart-lilin';
+import { ChartLilin, TAMPILAN_BAWAAN, type Garis, type GarisHarga, type GarisKlik, type GarisSeret, type PosisiChartMt5, type TampilanChart } from '@/components/chart-lilin';
+import { barisPendingKripto, rencanaLokal } from '@/lib/pending-kripto';
 import { POLOS, UTAMA, ID_PANEL, TF_PANEL, kirimBus, dengarBus, nyalakanMulti, replayDipegangLain, pegangReplay } from '@/lib/multi-chart';
 import { PanelReplay, type AksiOrder, type JenisEntry } from '@/components/panel-replay';
 import { PojokOrder } from '@/components/pojok-order';
@@ -3349,7 +3350,16 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
      Satu garis per order, bukan satu garis per simbol: dua kali order di
      pair yang sama berarti dua kewajiban berbeda, dan meringkasnya jadi
      satu garis persis menyembunyikan order kedua. */
-  const garisOrder = useMemo(() => {
+  /* Garis pending PLUS bekal untuk membukanya.
+     ────────────────────────────────────────────────────────────────────
+     `GarisHarga` cuma butuh harga/warna/label; dua medan tambahan di sini
+     ikut menumpang supaya sumber garis dan sumber pilihan TIDAK PERNAH
+     terpisah. Kalau daftar klik dihitung di memo lain, keduanya bisa
+     menyimpang satu putaran — dan yang menyimpang adalah order MANA yang
+     dibuka saat garisnya disentuh. */
+  type GarisOrderChart = GarisHarga & { id: string; pilih: OrderSunting };
+
+  const garisOrder = useMemo<GarisOrderChart[]>(() => {
     /* MODE LATIHAN TIDAK MENAMPILKAN ORDER NYATA.
        ──────────────────────────────────────────────────────────────────
        Garis ini menggambarkan uang sungguhan yang sedang dipertaruhkan.
@@ -3379,7 +3389,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
          jadi harus dipanggil sebelum huruf besar dipaksakan. */
       const cocok = (s: string) => simbolDasarMt5(s) === nama;
 
-      const g: GarisHarga[] = [];
+      const g: GarisOrderChart[] = [];
 
       /* POSISI TERBUKA SENGAJA TIDAK DIGAMBAR DI SINI.
          ──────────────────────────────────────────────────────────────
@@ -3405,6 +3415,18 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
           harga: o.harga,
           warna: o.arah === 'BUY' ? 'rgba(251,191,36,.85)' : 'rgba(251,146,60,.85)',
           label: `${o.jenis.replace('_', ' ')}${banyakMt5 ? ` ${i + 1}` : ''}`,
+          id: o.tiket,
+          /* Bentuknya disamakan PERSIS dengan yang dibangun baris pending di
+             panel Posisi Terbuka — dua jalan masuk ke order yang sama harus
+             menghasilkan pilihan yang sama, kalau tidak satu di antaranya
+             mengubah sesuatu yang berbeda dari yang terlihat. */
+          pilih: {
+            pasar: 'mt5', jenis: 'pending',
+            simbolChart: `MT5:${simbolDasarMt5(o.simbol)}`,
+            simbol: o.simbol, arah: o.arah,
+            entry: o.harga, sl: o.sl, tp: o.tp,
+            ukuran: o.lot, tiket: o.tiket,
+          },
         });
       }
       return g;
@@ -3418,11 +3440,39 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
     /* Dinomori hanya kalau memang lebih dari satu: "Buy Stop 1" saat cuma
        ada satu order justru menimbulkan pertanyaan di mana yang kedua. */
     const banyak = milik.length > 1;
-    return milik.map((o, i): GarisHarga => ({
-      harga: o.pemicu || o.harga,
-      warna: o.arah === 'BUY' ? 'rgba(251,191,36,.85)' : 'rgba(251,146,60,.85)',
-      label: `${o.arah === 'BUY' ? 'Buy' : 'Sell'} ${/STOP/.test(o.tipe) ? 'Stop' : 'Limit'}${banyak ? ` ${i + 1}` : ''}`,
-    }));
+    /* SL/TP pending kripto TIDAK ada di ordernya sendiri — di Binance
+       Futures keduanya order kondisional terpisah yang cuma terikat pada
+       simbol. `barisPendingKripto` sudah menjodohkannya, dan dipakai ulang
+       di sini alih-alih ditulis lagi: penjodohan yang disalin akan
+       menyimpang dari panel pada hari salah satunya disunting. */
+    const petaPend = new Map(barisPendingKripto(
+      orderBursa.filter((o) => o.jenis === 'ENTRY'),
+      orderBursa.filter((o) => o.jenis === 'SL' || o.jenis === 'TP'),
+      rencanaLokal(),
+    ).map((b) => [b.kunci, b]));
+
+    return milik.map((o, i): GarisOrderChart => {
+      const b = petaPend.get(o.id);
+      return {
+        harga: o.pemicu || o.harga,
+        warna: o.arah === 'BUY' ? 'rgba(251,191,36,.85)' : 'rgba(251,146,60,.85)',
+        label: `${o.arah === 'BUY' ? 'Buy' : 'Sell'} ${/STOP/.test(o.tipe) ? 'Stop' : 'Limit'}${banyak ? ` ${i + 1}` : ''}`,
+        id: o.id,
+        pilih: {
+          pasar: 'kripto', jenis: 'pending',
+          simbolChart: o.simbol, simbol: o.simbol, arah: o.arah,
+          entry: o.pemicu || o.harga,
+          /* RENCANA TIDAK IKUT. SL/TP yang masih catatan lokal belum ada di
+             bursa; menggambarnya sebagai garis yang bisa diseret lalu
+             dikirim cuma menghasilkan galat — dan sebelum galatnya muncul,
+             layar sudah terlanjur memperlihatkan stop yang tidak menjaga
+             apa pun. Aturan yang sama dipakai panel. */
+          sl: b && !b.rencana ? b.sl : 0,
+          tp: b && !b.rencana ? b.tp : 0,
+          ukuran: o.qty, tiket: o.id,
+        },
+      };
+    });
   /* akunMt5.posisi DIKELUARKAN dari dependensi bersama blok yang memakainya.
      Bukan sekadar rapi-rapi: EA melapor tiap beberapa detik dengan array
      posisi BARU yang isinya sama, jadi dependensi ini menghitung ulang
@@ -3432,6 +3482,38 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
      ini. Posisi kini digambar ChartLilin lewat prop `posisiMt5`, yang
      identitasnya memang sudah distabilkan lewat kunci JSON. */
   }, [orderBursa, simbol, aksiTunda, akunMt5.pending, aksi?.mode]);
+
+  /* Sasaran klik untuk tiap garis pending. Diturunkan dari `garisOrder`,
+     bukan dihitung ulang — lihat catatan di atas memo itu. */
+  const garisKlikOrder = useMemo<GarisKlik[]>(
+    () => garisOrder.map((g) => ({
+      id: g.id, harga: g.harga, judul: `${g.label} — klik untuk mengubah`,
+    })),
+    [garisOrder]);
+
+  /* ── GARIS PENDING DISENTUH ────────────────────────────────────────────
+     Dilaporkan pemilik 2 Sep 2026: "kalau garis order diklik dia langsung
+     ke-select jadi biru, nah kalau limit order itu garisnya ga bisa
+     di-select jadi ga bisa diubah-ubah."
+
+     Sebabnya bukan gerbang yang lupa dibuka. Garis posisi lahir dari klik
+     baris di panel, jadi ia SUDAH berupa hamparan DOM begitu tergambar;
+     garis pending digambar chart sendiri sebagai price line, dan price line
+     tidak menerima klik dari siapa pun. Jalannya memang tidak pernah ada.
+
+     Panel ubahnya dibuka SEKALIGUS di sini, berbeda dari garis posisi yang
+     menunggu satu klik lagi. Alasannya bukan ketidakkonsistenan: untuk
+     posisi, klik pertama terjadi di TABEL dan sering cuma ingin melihat
+     "stop saya di mana", jadi garisnya dulu, panelnya belakangan. Garis
+     pending sudah tergambar sepanjang waktu tanpa diminta — satu-satunya
+     alasan orang mengarahkan kursor ke sana dan menekannya adalah karena
+     ia mau mengurus order itu. */
+  function pilihGarisOrder(id: string) {
+    const g = garisOrder.find((x) => x.id === id);
+    if (!g) return;
+    bukaSunting(g.pilih);
+    setPanelUbah(true);
+  }
 
   const terakhir = lilin.closes[lilin.closes.length - 1];
   const sebelumnya = lilin.closes[lilin.closes.length - 2];
@@ -4479,6 +4561,8 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                             seretTangan.current = true;
                             setRencana((r) => ({ ...r, [id]: h }));
                           }}
+                          garisKlik={modeNyata ? garisKlikOrder : undefined}
+                          onKlikGarisOrder={pilihGarisOrder}
                           onKlikGaris={() => setPanelUbah(true)}
                           onHapusGaris={(id) => {
                             /* Dalam mode sunting, × pada salah satu garis

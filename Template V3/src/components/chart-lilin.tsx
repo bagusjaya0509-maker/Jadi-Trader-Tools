@@ -201,6 +201,34 @@ export interface GarisSeret {
   bisaSeret?: boolean;
 }
 
+/** Garis yang bisa DIKLIK tapi tidak diseret — sasaran klik untuk garis yang
+ *  digambar sebagai price line bawaan.
+ *
+ *  ── KENAPA LAPISAN TERSENDIRI, BUKAN DIJADIKAN GarisSeret ───────────────
+ *  Dilaporkan pemilik 2 Sep 2026: garis posisi bisa diklik lalu diubah,
+ *  garis limit order tidak bisa sama sekali. Sebabnya bukan kelalaian —
+ *  `createPriceLine` milik lightweight-charts memang TIDAK punya event klik.
+ *  Apa pun yang harus menanggapi sentuhan wajib berupa elemen DOM.
+ *
+ *  Yang TIDAK dilakukan: memindahkan garis pending ke `GarisSeret`. Itu akan
+ *  menukar tampilannya — GarisSeret digambar putus-putus tanpa label sumbu,
+ *  sementara garis pending justru dikenali dari garis utuh berlabel "Buy
+ *  Limit" yang menembus ke sumbu harga. Memperbaiki kliknya dengan
+ *  mengorbankan tampilannya bukan perbaikan.
+ *
+ *  Jadi price line-nya DIBIARKAN apa adanya, dan yang ditambahkan cuma strip
+ *  bening setinggi 14 px tepat di levelnya. Tidak ada yang berubah di layar;
+ *  yang berubah cuma ada tidaknya sesuatu yang bisa disentuh di sana. */
+export interface GarisKlik {
+  /** Kunci order yang diwakili garis ini — dipulangkan apa adanya lewat
+   *  `onKlikGarisOrder`. Halaman chart yang tahu artinya, bukan komponen ini. */
+  id: string;
+  harga: number;
+  /** Tooltip saat kursor menggantung. Strip ini tidak kelihatan, jadi
+   *  inilah satu-satunya penjelasan bahwa ia bisa diklik. */
+  judul?: string;
+}
+
 /** Posisi MT5 terbuka yang digambar di chart — datang dari laporan EA.
  *
  *  Digambar sebagai PRICE LINE bawaan lightweight-charts, bukan elemen DOM
@@ -220,7 +248,7 @@ export interface PosisiChartMt5 {
 
 export function ChartLilin({
   lilin, garis, trade, tinggi = 420, hingga, garisHarga, onKlikBar, smi, mundur, pojok,
-  garisSeret, onSeret, onKlikGaris, onHapusGaris, onKlikKosong, hamparanBawah, segmen, penandaPine, kotakPine, isianPine,
+  garisSeret, onSeret, onKlikGaris, onHapusGaris, onKlikKosong, garisKlik, onKlikGarisOrder, hamparanBawah, segmen, penandaPine, kotakPine, isianPine,
   alat, onAlatSelesai, gambarAlat, gambarPilih, onPilihGambar, onUbahGambar,
   posisiMt5, onUbahPosisi, hargaAsk, kunciUkuran, bagikanFoto, tandaAir, tampilan, pitaSmi,
   jiplak, onUbahJiplak, onLepasJiplak, panelKiri,
@@ -280,6 +308,11 @@ export function ChartLilin({
   onKlikGaris?: (id: GarisSeret['id']) => void;
   /** Hapus satu garis lewat tombol ✕ di labelnya. */
   onHapusGaris?: (id: GarisSeret['id']) => void;
+  /** Sasaran klik untuk garis yang digambar sebagai price line — pending
+   *  order. Tanpa ini garisnya tetap tergambar, cuma tidak bisa disentuh. */
+  garisKlik?: GarisKlik[];
+  /** Salah satu `garisKlik` disentuh. */
+  onKlikGarisOrder?: (id: string) => void;
   /** Panel yang ditumpangkan di bagian bawah area harga — dipakai kendali
    *  replay, supaya ia menyatu dengan grafik alih-alih memanjangkan halaman. */
   hamparanBawah?: React.ReactNode;
@@ -1933,8 +1966,8 @@ export function ChartLilin({
   /* Nilai terbaru dibaca dari ref di dalam rAF. Kalau dibaca dari closure,
      loopnya harus dipasang ulang tiap render — dan itu mengalahkan
      tujuannya. */
-  const acuan = useRef({ garisSeret, lilin, hingga, posisiMt5 });
-  acuan.current = { garisSeret, lilin, hingga, posisiMt5 };
+  const acuan = useRef({ garisSeret, lilin, hingga, posisiMt5, garisKlik });
+  acuan.current = { garisSeret, lilin, hingga, posisiMt5, garisKlik };
 
   const hargaDariY = useCallback((y: number) => {
     const s = seri.current;
@@ -1953,7 +1986,7 @@ export function ChartLilin({
   const pasang = useCallback(() => {
     const s = seri.current, c = chart.current;
     if (!s || !c) return;
-    const { garisSeret: gs, lilin: l, hingga: hg, posisiMt5: pm } = acuan.current;
+    const { garisSeret: gs, lilin: l, hingga: hg, posisiMt5: pm, garisKlik: gk } = acuan.current;
     /* Nilai seretan dibaca dari ref, bukan state — rAF ini yang membuat
        strip & tombol mengikuti kursor tanpa render React per gerakan. */
     const ub = ubahRef.current;
@@ -1997,6 +2030,11 @@ export function ChartLilin({
     };
 
     (gs ?? []).forEach((g) => taruh(garisRef.current.get(g.id), g.harga));
+    /* Strip klik pending. Kuncinya diberi awalan supaya id order tidak
+       pernah bertabrakan dengan 'entry' / 'sl' / 'tp' — satu peta dipakai
+       bersama semua hamparan, dan dua penghuni berkunci sama berarti yang
+       satu menimpa letak yang lain tanpa galat apa pun. */
+    (gk ?? []).forEach((g) => taruh(garisRef.current.get('klik-' + g.id), g.harga));
 
     /* Hamparan posisi MT5. Garis-garisnya sendiri price line (digambar
        kanvas oleh chart-nya); yang ditempatkan di sini cuma tiga penumpang
@@ -2085,7 +2123,7 @@ export function ChartLilin({
      Yang benar-benar mengubah tata letak cuma dua: panelnya ada atau
      tidak, dan selebar apa. */
   const jiplakId = jiplak ? jiplak.url : '';
-  useEffect(pasang, [pasang, garisSeret, lilin, hingga, mundur, smi, posisiMt5, ubah, jiplakId, jLebar]);
+  useEffect(pasang, [pasang, garisSeret, lilin, hingga, mundur, smi, posisiMt5, ubah, jiplakId, jLebar, garisKlik]);
 
   /* ── LOOP rAF: TETAP JALAN, TAPI BERHENTI BEKERJA SAAT TIDAK ADA YANG
         BERUBAH ───────────────────────────────────────────────────────────
@@ -2949,6 +2987,38 @@ export function ChartLilin({
           <div className="text-[9.5px] opacity-75">{mundur}</div>
         </div>
       )}
+
+      {/* Sasaran klik garis pending. Bening dan setipis 14 px: garisnya
+          sendiri sudah digambar chart sebagai price line, yang ditaruh di
+          sini cuma tempat untuk menyentuhnya.
+
+          DI BAWAH garisSeret dalam urutan DOM dan satu tingkat z lebih
+          rendah. Kalau sebuah pending order sedang dipilih, garis Entry
+          seretnya duduk di harga yang sama persis — dan yang harus menang
+          adalah yang bisa DIGESER, karena itu satu-satunya dari keduanya
+          yang punya akibat.
+
+          Padam saat alat gambar menyala. Orang yang sedang menarik garis
+          tren tidak sedang menuju order mana pun, dan strip bening yang
+          menelan klik pertamanya terbaca sebagai alat yang rusak. */}
+      {!alat && (garisKlik ?? []).map((g) => (
+        <div key={'klik-' + g.id}
+             ref={(el) => {
+               if (el) garisRef.current.set('klik-' + g.id, el);
+               else garisRef.current.delete('klik-' + g.id);
+             }}
+             title={g.judul}
+             className="absolute left-0 right-0 z-[9] cursor-pointer touch-none"
+             style={{ transform: 'translateY(-50%)', height: 14, visibility: 'hidden' }}
+             onPointerDown={(e) => {
+               /* stopPropagation supaya klik ini tidak ikut terbaca sebagai
+                  "klik di kanvas kosong" — yang justru MELEPAS order yang
+                  barusan dipilih, satu tick sesudah dipilihnya. */
+               e.preventDefault();
+               e.stopPropagation();
+               onKlikGarisOrder?.(g.id);
+             }} />
+      ))}
 
       {/* Garis entry / SL / TP yang bisa digeser. */}
       {(garisSeret ?? []).map((g) => {
