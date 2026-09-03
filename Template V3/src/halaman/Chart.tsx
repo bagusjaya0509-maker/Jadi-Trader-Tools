@@ -5169,13 +5169,20 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
 
                   Sempat 268 px saat kolom dolar ditambahkan; sesudah kotak
                   isiannya berhenti melar, sisa itu tidak lagi ada gunanya. */}
-              <div className="w-[272px] shrink-0 rounded-lg border border-zinc-800/80 bg-zinc-950/85 p-2.5 text-[11.5px] backdrop-blur-sm">
+              <div className="w-[246px] shrink-0 rounded-lg border border-zinc-800/80 bg-zinc-950/85 p-2.5 text-[11.5px] backdrop-blur-sm">
                               <div className="flex items-baseline gap-1.5">
                                 <span className="text-zinc-200">{sunting.simbol}</span>
                                 <span className={cn('text-[10.5px]', sunting.arah === 'BUY' ? 'text-emerald-500' : 'text-red-400')}>
                                   {sunting.arah}
                                 </span>
-                                <span className="text-[10px] text-zinc-500">
+                                {/* `truncate` + `min-w-0`: nama bursa boleh dipotong
+                                    kalau simbolnya kebetulan panjang. Sebelumnya ia
+                                    memaksa SELURUH panel melebar demi satu kata —
+                                    "Hyperliquid" — dan lebar yang ditentukan kasus
+                                    terburuk membuat semua kasus lain kosong
+                                    melompong. */}
+                                <span className="min-w-0 truncate text-[10px] text-zinc-500"
+                                      title={`${sunting.jenis === 'pending' ? 'pending' : 'posisi'} di ${sunting.pasar === 'mt5' ? 'Trade-Fi' : bacaPasar(sunting.simbol) === 'hyperliquid' ? 'Hyperliquid' : 'Binance'}`}>
                                   {sunting.jenis === 'pending' ? 'pending' : 'posisi'} · {sunting.pasar === 'mt5'
                                     ? 'Trade-Fi'
                                     : bacaPasar(sunting.simbol) === 'hyperliquid' ? 'Hyperliquid' : 'Binance'}
@@ -5200,7 +5207,13 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                                   onClick={tutupPanelUbah}
                                   aria-label="Tutup panel"
                                   title="Tutup panel — garis ordernya tetap di chart"
-                                  className="ml-auto cursor-pointer self-center rounded p-0.5 text-zinc-600 transition-colors hover:bg-zinc-800 hover:text-zinc-200">
+                                  /* `ml-auto` DICABUT. Ia mendorong silang ke tepi
+                                     kanan panel, jadi seluruh ruang sisa menganga di
+                                     antara nama bursa dan silangnya — dan panel yang
+                                     lebarnya ditentukan oleh jarak itu terlihat besar
+                                     tanpa berisi apa pun. Sekarang silangnya duduk
+                                     langsung sesudah teksnya. */
+                                  className="ml-0.5 shrink-0 cursor-pointer self-center rounded p-0.5 text-zinc-600 transition-colors hover:bg-zinc-800 hover:text-zinc-200">
                                   <X className="size-3" />
                                 </button>
                               </div>
@@ -5319,10 +5332,30 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                                 </label>
                               ))}
                               <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                                {/* MEMANJANG mengisi barisnya. Diminta pemilik 3 Sep
+                                    2026: tombol sekecil "Kirim" di panel selebar ini
+                                    meninggalkan baris terakhir yang hampir seluruhnya
+                                    kosong, dan baris kosong di bawah dua baris berisi
+                                    terbaca sebagai panel yang belum selesai digambar.
+
+                                    `grow`, bukan `w-full`: untuk order pending ada
+                                    tombol "Hapus order" di sebelahnya, dan `w-full`
+                                    akan mendorongnya turun ke baris sendiri. `grow`
+                                    mengisi apa pun yang tersisa — penuh saat sendirian,
+                                    sisanya saat berdua.
+
+                                    "Ubah Posisi", bukan "Kirim": yang dikirim memang
+                                    perubahan, tapi kata "Kirim" tidak menyebut APA yang
+                                    dikirim — dan di panel yang juga punya tombol
+                                    penghapus, tombol yang tidak menyebutkan akibatnya
+                                    adalah tombol yang ditekan sambil menebak. Untuk
+                                    pending ia berbunyi "Ubah Order": yang disunting
+                                    memang belum jadi posisi, dan menyebutnya posisi
+                                    berarti menjanjikan sesuatu yang belum ada. */}
                                 <button onClick={() => void kirimSunting()} disabled={suntingSibuk}
-                                  className="flex cursor-pointer items-center gap-1 rounded bg-zinc-100 px-2 py-1 text-[10.5px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-60">
+                                  className="flex grow cursor-pointer items-center justify-center gap-1 rounded bg-zinc-100 px-2 py-1 text-[10.5px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-60">
                                   {suntingSibuk ? <Loader2 className="size-3 animate-spin" /> : null}
-                                  Kirim
+                                  {sunting.jenis === 'pending' ? 'Ubah Order' : 'Ubah Posisi'}
                                 </button>
                                 {/* LATARNYA MENYEBUT AKIBATNYA, bukan jenis
                                     tombolnya. Merah di seluruh aplikasi ini

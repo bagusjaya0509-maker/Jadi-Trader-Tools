@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronUp, Copy, Pencil } from 'lucide-react';
+import { ChevronDown, ChevronUp, Copy, Pen } from 'lucide-react';
 import { TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn, uang, harga } from '@/lib/utils';
 
@@ -448,6 +448,20 @@ export function TabelPosisi({ baris, kosong, onKlikBaris, onTutup, onUbah, onKli
                 {!onTutup && !onUbah && !jml && adaGabungan && <Td />}
                 {(onTutup || onUbah) && !jml && (
                   <Td className="text-right">
+                    {/* ── SATU BARIS, DIPAKSA ────────────────────────────────
+                        Diukur 3 Sep 2026 sesudah pemilik melaporkan keduanya
+                        "tidak sejajar": selisih tepi atas -24 px. Bukan beda
+                        ukuran — keduanya BERTUMPUK di dua baris, karena selnya
+                        terlalu sempit dan tombol sebaris biasa membungkus
+                        sendiri tanpa memberi tahu siapa pun.
+
+                        `flex` + `whitespace-nowrap` menutup seluruh kelasnya:
+                        selebar apa pun kolomnya, keduanya tetap sebaris.
+
+                        Pelajarannya dicatat di sini karena ia berulang: yang
+                        ditambahkan ke sel yang sudah berisi WAJIB diperiksa
+                        bersama penghuni lamanya, bukan sendirian. */}
+                    <div className="flex items-center justify-end gap-1 whitespace-nowrap">
                     {/* Pensil DULU, baru Tutup. Urutan ini disengaja: yang
                         kiri adalah yang sering dipakai dan bisa dibatalkan,
                         yang kanan yang jarang dan tidak bisa. Tangan yang
@@ -458,8 +472,16 @@ export function TabelPosisi({ baris, kosong, onKlikBaris, onTutup, onUbah, onKli
                         onClick={(e) => { e.stopPropagation(); onUbah(b); }}
                         title="Ubah SL/TP posisi ini"
                         aria-label={`Ubah SL/TP ${b.simbol}`}
-                        className="mr-1 inline-flex cursor-pointer items-center rounded border border-zinc-800 p-1 text-zinc-500 transition-colors hover:border-sky-500/40 hover:text-sky-300">
-                        <Pencil className="size-3.5" strokeWidth={2} />
+                        /* TANPA GARIS TEPI, dan tingginya DIPATOK 23 px supaya
+                           sama persis dengan tombol Tutup di sebelahnya —
+                           `items-center` meratakan tengahnya, tapi dua tinggi
+                           berbeda tetap terlihat sebagai dua benda yang tidak
+                           sepasang. Ikonnya `Pen`, bukan `Pencil`: pulpen
+                           berarti menulis yang menetap, pensil berarti coretan
+                           yang bisa dihapus — dan yang dikirim tombol ini
+                           berangkat ke bursa. */
+                        className="inline-flex size-[23px] shrink-0 cursor-pointer items-center justify-center rounded text-zinc-500 transition-colors hover:bg-sky-500/10 hover:text-sky-300">
+                        <Pen className="size-3.5" strokeWidth={2} />
                       </button>
                     )}
                     {/* stopPropagation: barisnya juga bisa diklik (buka di
@@ -471,10 +493,11 @@ export function TabelPosisi({ baris, kosong, onKlikBaris, onTutup, onUbah, onKli
                       <button
                         onClick={(e) => { e.stopPropagation(); onTutup(b); }}
                         title="Tutup posisi ini di harga pasar"
-                        className="cursor-pointer rounded border border-zinc-800 px-2 py-0.5 text-[11px] text-zinc-400 transition-colors hover:border-red-500/40 hover:text-red-400">
+                        className="inline-flex h-[23px] shrink-0 cursor-pointer items-center rounded border border-zinc-800 px-2 text-[11px] text-zinc-400 transition-colors hover:border-red-500/40 hover:text-red-400">
                         Tutup
                       </button>
                     )}
+                    </div>
                   </Td>
                 )}
               </Tr>
