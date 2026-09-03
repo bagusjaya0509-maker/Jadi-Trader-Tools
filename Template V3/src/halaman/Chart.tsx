@@ -6,7 +6,7 @@ import {
   Layers, ChevronDown, ChevronUp, Settings2, Code2, X, Ruler, Rows3, Square, Eraser, Minus, TrendingUp,
   MoveRight,
   FlaskConical, GripHorizontal, Maximize2, Minimize2, SquareArrowUp, SquareArrowDown,
-  Settings, RotateCcw, LayoutGrid } from 'lucide-react';
+  Settings, RotateCcw, LayoutGrid, Link2 } from 'lucide-react';
 import { PanelNews } from '@/components/panel-news';
 import { simpanDraf } from '@/lib/draf-sinyal';
 import { Panel, PanelHead, KartuKpi, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
@@ -22,6 +22,7 @@ import { DockPine, type InfoPine, type KendaliPine } from '@/components/dock-pin
 import { WatchChart } from '@/components/watch-chart';
 import { PanelPosisiTerbuka, type OrderSunting, type BandingSalinan } from '@/components/panel-posisi-terbuka';
 import { ChartBanding } from '@/components/chart-banding';
+import { PanelDex } from '@/components/panel-dex';
 import type { AlatPegang, GambarAlat } from '@/lib/plugin-alat';
 import type { HasilPine } from '@/lib/pine';
 import { bacaSetelanChart, simpanSetelanChart, usulSlTp } from '@/lib/replay';
@@ -1676,9 +1677,32 @@ export default function ChartBacktest() {
      tepat melainkan salah. */
   const [bandingSalin, setBandingSalin] = useState<BandingSalinan | null>(null);
 
+  /* ── PANEL DOMPET DI SISI CHART ──────────────────────────────────────
+     Bentuk B dari dua pilihan yang ditimbang bersama pemilik 3 Sep 2026.
+     Yang TIDAK dipilih: menjalin "mode dompet" ke seluruh Chart & Entry —
+     itu menyentuh tujuh titik pengirim order di dua berkas plus dua berkas
+     pembaca posisi, semuanya di jalur uang yang sekarang sudah jalan.
+
+     Yang dipilih: chartnya dari sini, panel ordernya dari `/dex` yang sudah
+     jadi dan sudah teruji. NOL cabang baru di jalur uang lama — panel itu
+     memang tidak pernah lewat sini; ia bicara langsung ke Hyperliquid dari
+     peramban.
+
+     Konsekuensi yang diterima dengan sadar: seret SL/TP di chart TIDAK
+     berlaku untuk posisi dompet. Garis-garis itu milik jalur backend, dan
+     membuatnya melayani dua tuan adalah persis percabangan yang sedang
+     dihindari. */
+  const [dexBuka, setDexBuka] = useState(false);
+
+  /* Satu slot kiri, dua penghuni. Yang terakhir dibuka menang, dan yang
+     kalah DITUTUP — bukan diantre: panel yang tiba-tiba muncul kembali saat
+     yang lain ditutup adalah panel yang tidak diminta siapa pun. */
+  function bukaDex(v: boolean) { setDexBuka(v); if (v) setBandingSalin(null); }
+
   function bukaBandingSalin(b: BandingSalinan) {
     setSimbol(rapikanSimbol(b.simbol));
     setBandingSalin(b);
+    setDexBuka(false);
   }
 
   /* Panel ikut tertutup saat simbolnya berpindah ke pasangan lain — dengan
@@ -4374,6 +4398,29 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
               {replayIdx !== null && <span className="angka text-[10.5px]">bar {replayIdx + 1}</span>}
             </button>
 
+            {/* ── DOMPET: PANEL ORDER NON-KUSTODIAL DI SISI CHART ────────
+                Pemilik saja, sampai ada pendapat hukum — gerbang yang sama
+                dengan halaman /dex, dipasang di penyambungnya dan bukan di
+                dalam panelnya. Panel adalah alat; yang berhak memutuskan
+                siapa boleh memegangnya adalah yang memasangnya.
+
+                Berpendar saat menyala, seperti tombol Replay: keduanya
+                mengubah ARTI dari apa yang ada di layar, dan keadaan yang
+                mengubah arti harus terlihat tanpa dicari. */}
+            {pemilik && (
+              <button onClick={() => bukaDex(!dexBuka)}
+                title={dexBuka
+                  ? 'Tutup panel dompet'
+                  : 'Trading dengan dompet sendiri — order langsung ke Hyperliquid, tidak lewat server'}
+                className={cn('flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border px-2 py-1.5 text-[12px] transition-colors sm:px-2.5',
+                  dexBuka
+                    ? 'border-sky-500/40 bg-sky-500/10 text-sky-300'
+                    : 'border-zinc-800 text-zinc-300 hover:border-zinc-700 hover:text-zinc-100')}>
+                <Link2 className="size-3.5" />
+                <span className={cn(dexBuka ? 'inline' : 'hidden sm:inline')}>Dompet</span>
+              </button>
+            )}
+
             <button onClick={gantiLayarPenuh}
               title={layarPenuh ? 'Keluar dari layar penuh (Esc)' : 'Layar penuh — chart saja'}
               aria-label={layarPenuh ? 'Keluar dari layar penuh' : 'Layar penuh'}
@@ -4612,7 +4659,21 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                             if (panelUbah) { tutupPanelUbah(); return; }
                             lepasSunting();
                           }}
-                          panelKiri={bandingSalin ? (
+                          panelKiri={dexBuka ? (
+                            <div className="flex h-full flex-col">
+                              <div className="flex items-center gap-2 border-b border-zinc-800 px-2.5 py-1.5">
+                                <span className="text-[11.5px] font-medium text-zinc-200">Dompet saya</span>
+                                <span className="truncate text-[10px] text-zinc-500">order langsung ke Hyperliquid</span>
+                                <button onClick={() => setDexBuka(false)} aria-label="Tutup panel dompet"
+                                        className="ml-auto shrink-0 cursor-pointer rounded p-0.5 text-zinc-600 transition-colors hover:bg-zinc-800 hover:text-zinc-200">
+                                  <X className="size-3.5" />
+                                </button>
+                              </div>
+                              <div className="min-h-0 grow">
+                                <PanelDex sempit koinChart={simbol.replace(/USDT$/, '')} />
+                              </div>
+                            </div>
+                          ) : bandingSalin ? (
                             <ChartBanding banding={bandingSalin} lilin={lilinGabung}
                                           tinggi={tinggiChart} tampilan={tampilan}
                                           onTutup={() => setBandingSalin(null)} />
