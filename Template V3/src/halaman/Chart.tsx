@@ -5262,21 +5262,35 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                                     onFocus={() => { if (!nilai && aksi?.hargaKini) atur(String(aksi.hargaKini)); }}
                                     onChange={(e) => atur(e.target.value.replace(/[^\d.,-]/g, '').replace(',', '.'))}
                                     className="angka h-6 shrink-0 rounded border border-zinc-800 bg-zinc-900/80 px-1.5 text-right text-[11px] text-zinc-200 outline-none placeholder:text-[9.5px] placeholder:text-zinc-700 focus-visible:border-zinc-600" />
-                                  {/* Lebar TETAP, bukan grow: angka dolarnya berubah
-                                      tiap piksel seretan, dan kolom yang ikut melar
-                                      membuat kotak isian di sebelahnya bergoyang selama
-                                      garisnya ditarik.
+                                  {/* ── DIDEKATKAN, DAN DIBERI LATAR ──────────────────
+                                      Dilaporkan pemilik 3 Sep 2026: angkanya terlalu jauh
+                                      dan terlihat aneh tanpa latar.
 
-                                      `ml-auto` mendorongnya ke tepi kanan, jadi ruang
-                                      sisa jatuh DI ANTARA angka harga dan angka dolar —
-                                      bukan menggantung di ujung baris. 58 px, bukan 54:
-                                      diukur di peramban, "-$1.234,56" makan 54 px pas,
-                                      dan pas berarti terpotong pada nilai berikutnya. */}
+                                      `ml-auto` DICABUT. Ia dulu mendorong angka dolar ke
+                                      tepi kanan panel, jadi seluruh ruang sisa jatuh tepat
+                                      di antara harga dan dolarnya — dua angka yang justru
+                                      satu kalimat ("di harga sekian, uangnya sekian")
+                                      dipisahkan sejauh mungkin. Sekarang ia duduk langsung
+                                      di sebelah isiannya, dan ruang sisa jatuh di ujung
+                                      baris tempat ia tidak memisahkan apa pun.
+
+                                      LATAR TANPA GARIS TEPI. Sebelumnya teks telanjang di
+                                      sebelah kotak isian bergaris — dua hal sederajat yang
+                                      digambar dengan dua bahasa berbeda, dan yang tanpa
+                                      kotak terbaca seperti tercecer. Latar tanpa garis
+                                      membuatnya sederajat tanpa menjadikannya isian kedua
+                                      yang mengundang diketik.
+
+                                      Lebar TETAP, bukan menyesuaikan isi: angkanya berubah
+                                      tiap piksel seretan, dan kotak yang ikut melar akan
+                                      berkedip-kedip sepanjang garisnya ditarik. 72 px =
+                                      54 px untuk "-$1.234,56" (diukur) + 12 px padding +
+                                      sisa. */}
                                   {(() => {
                                     const d = uangDiHarga(Number(nilai) || 0);
                                     return (
-                                      <span className={cn('angka ml-auto w-[58px] shrink-0 text-right text-[10.5px] tabular-nums',
-                                        d === null ? 'text-zinc-700' : d >= 0 ? 'text-emerald-500' : 'text-red-400')}>
+                                      <span className={cn('angka w-[72px] shrink-0 rounded bg-zinc-800/70 px-1.5 py-0.5 text-right text-[10.5px] tabular-nums',
+                                        d === null ? 'text-zinc-600' : d >= 0 ? 'text-emerald-500' : 'text-red-400')}>
                                         {d === null ? '—' : uang(d, true)}
                                       </span>
                                     );
