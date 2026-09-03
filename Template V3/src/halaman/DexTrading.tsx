@@ -307,15 +307,52 @@ export default function DexTrading() {
               <div className="mb-3 flex flex-wrap items-center gap-2">
                 <span className="angka rounded bg-zinc-800 px-2 py-1 text-[11.5px] text-zinc-200">{pendek(alamat)}</span>
                 <span className="text-[11px] text-zinc-500">chain {rantai || '—'}</span>
+                {/* ── DUA HALAMAN, DUA AKUN ────────────────────────────────
+                    Ditanyakan pemilik 3 Sep 2026: kalau saya trading di sini,
+                    ordernya muncul di Chart & Entry?
+
+                    Tidak, dan bedanya bukan soal tampilan melainkan soal AKUN.
+                    Chart & Entry memakai akun milik backend; halaman ini
+                    memakai dompet yang barusan Anda sambungkan. Di kasus
+                    pemilik keduanya bahkan bersaudara — yang satu sub-account
+                    dari yang satunya — dan Hyperliquid memperlakukan
+                    sub-account sebagai akun yang sepenuhnya terpisah: saldo
+                    sendiri, posisi sendiri.
+
+                    Ditulis DI LAYAR, bukan cuma di catatan ini. Orang yang
+                    melihat dua halaman menampilkan bursa yang sama akan
+                    mengira keduanya melihat uang yang sama, dan mereka akan
+                    terus mengiranya sampai ada yang mengatakan sebaliknya. */}
+                <span className="text-[11px] text-zinc-600"
+                      title="Chart & Entry memakai akun milik backend, bukan dompet ini. Posisi di kedua halaman tidak saling terlihat.">
+                  · akun dompet ini, terpisah dari Chart &amp; Entry
+                </span>
                 <button onClick={() => void segarkan(alamat)} className={cn(TOMBOL2, 'ml-auto')}>
                   <RefreshCw className="size-3" /> Segarkan
                 </button>
               </div>
 
+              {/* ── KETIGANYA MENYEBUT USDC, DAN ITU BUKAN KERINCIAN ──────────
+                  Dilaporkan pemilik 3 Sep 2026: akunnya jelas berisi XAUT, ZEC,
+                  HYPE, BTC, dan ETH di spot, tapi angka "Di spot" di sini cuma
+                  menampilkan USDC-nya.
+
+                  Angkanya BENAR dan sengaja: yang bisa jadi jaminan margin perp
+                  di Hyperliquid hanya USDC. Token spot lain adalah kepemilikan,
+                  bukan daya beli — menjumlahkannya ke sini akan menjanjikan
+                  ukuran posisi yang tidak akan diterima bursa.
+
+                  Yang salah label lamanya. "Di spot" untuk angka yang cuma
+                  menghitung satu token dari delapan terbaca sebagai laporan
+                  yang tidak lengkap, dan laporan uang yang terlihat tidak
+                  lengkap membuat orang berhenti mempercayai semua angka di
+                  sebelahnya juga. */}
               <div className="grid grid-cols-3 gap-3">
-                <Angka label="Bisa dipakai" nilai={keadaan ? uang(keadaan.bisaDipakai) : '—'} />
-                <Angka label="Di perps" nilai={keadaan ? uang(keadaan.diPerps) : '—'} />
-                <Angka label="Di spot" nilai={keadaan ? uang(keadaan.diSpot) : '—'} />
+                <Angka label="Bisa dipakai" nilai={keadaan ? uang(keadaan.bisaDipakai) : '—'}
+                       ket="USDC perps + spot" />
+                <Angka label="USDC di perps" nilai={keadaan ? uang(keadaan.diPerps) : '—'} />
+                <Angka label="USDC di spot" nilai={keadaan ? uang(keadaan.diSpot) : '—'}
+                       ket="Token spot lain tidak jadi margin" />
               </div>
 
               {!agenSiap ? (
@@ -358,9 +395,26 @@ export default function DexTrading() {
               )}
             </Kartu>
 
-            <Kartu judul="Posisi terbuka">
+            <Kartu judul="Posisi perp terbuka">
               {!keadaan?.posisi.length ? (
-                <p className="text-[12.5px] text-zinc-500">Belum ada posisi di akun ini.</p>
+                /* ── "POSISI" DAN "PUNYA TOKEN" ITU DUA HAL BERBEDA ──────────
+                   Pemilik membaca daftar Balances di Hyperliquid — XAUT, ZEC,
+                   HYPE beserta persen PNL-nya — sebagai posisi terbuka, lalu
+                   heran halaman ini menyebut kosong.
+
+                   Keduanya memang berbeda: spot berarti tokennya MILIK Anda,
+                   perp berarti Anda memegang posisi berleverage yang punya
+                   likuidasi. Halaman ini membaca `assetPositions`, dan itu
+                   perps saja.
+
+                   Kalimatnya karena itu tidak boleh cuma "belum ada posisi" —
+                   itu benar tapi terdengar seperti halamannya gagal membaca
+                   akun. Ia harus menyebut apa yang TIDAK dihitungnya. */
+                <p className="text-[12.5px] leading-relaxed text-zinc-500">
+                  Belum ada posisi perp di akun ini. Token yang Anda pegang di spot
+                  (XAUT, HYPE, dan seterusnya) tidak muncul di sini — itu kepemilikan,
+                  bukan posisi berleverage.
+                </p>
               ) : (
                 <div className="space-y-2">
                   {keadaan.posisi.map((p) => (
@@ -520,11 +574,12 @@ function Kartu({ judul, children }: { judul?: string; children: React.ReactNode 
   );
 }
 
-function Angka({ label, nilai }: { label: string; nilai: string }) {
+function Angka({ label, nilai, ket }: { label: string; nilai: string; ket?: string }) {
   return (
     <div>
       <div className="text-[10.5px] uppercase tracking-wide text-zinc-500">{label}</div>
       <div className="angka mt-0.5 text-[15px] font-semibold text-zinc-100">{nilai}</div>
+      {ket && <div className="mt-0.5 text-[10px] leading-snug text-zinc-600">{ket}</div>}
     </div>
   );
 }
