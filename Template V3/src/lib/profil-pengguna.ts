@@ -30,9 +30,34 @@ export interface ProfilPengguna {
   /** URL absolut, kosong kalau belum pernah diunggah. */
   foto: string;
   banner: string;
+  dompet: DompetTertaut[];
 }
 
-export const PROFIL_KOSONG: ProfilPengguna = { foto: '', banner: '' };
+/* ── ALAMAT DOMPET ON-CHAIN ─────────────────────────────────────────────
+   Kenapa disimpan padahal dompetnya sudah tersambung di peramban:
+   sambungan peramban HILANG. Ia hidup di satu perangkat, satu profil
+   peramban, dan lenyap begitu izinnya dicabut. Yang harus bertahan lebih
+   lama adalah tautannya — jurnal yang mengisi dirinya sendiri dari riwayat
+   on-chain perlu tahu alamat siapa yang dibaca, bahkan saat orangnya
+   sedang tidak membuka dompetnya sama sekali.
+
+   Alamat dompet BUKAN rahasia; ia tertulis di rantai. Yang dijaga adalah
+   PETANYA — siapa pemilik alamat yang mana — dan itu sebabnya ia duduk di
+   /api/profil yang cuma bisa dibaca pemiliknya, bukan di /api/analis/profil
+   yang publik.
+
+   Kunci pribadi dan seed phrase DITOLAK di server sebelum sempat tertulis
+   ke disk. Bukan karena kita menyangka ada yang mengirimnya dengan sengaja,
+   melainkan karena tempel-yang-salah itu nyata. */
+export interface DompetTertaut {
+  alamat: string;
+  pola: 'evm' | 'sol';
+  label: string;
+  ditambah: number;
+  terlihat: number;
+}
+
+export const PROFIL_KOSONG: ProfilPengguna = { foto: '', banner: '', dompet: [] };
 
 /* ── CERMIN LOKAL UNTUK AVATAR BILAH ATAS ───────────────────────────────
    Avatar di pojok kanan atas digambar di SETIAP halaman, sementara profil
@@ -119,7 +144,7 @@ export async function simpanGambarProfil(jenis: JenisGambar, berkas: File): Prom
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error || `Server menjawab ${r.status}`);
   if (auth.currentUser) simpanFotoLokal(auth.currentUser.uid, j.foto ?? '');
-  return { foto: j.foto ?? '', banner: j.banner ?? '' };
+  return { foto: j.foto ?? '', banner: j.banner ?? '', dompet: j.dompet ?? [] };
 }
 
 export async function hapusGambarProfil(jenis: JenisGambar): Promise<ProfilPengguna> {
@@ -129,7 +154,40 @@ export async function hapusGambarProfil(jenis: JenisGambar): Promise<ProfilPengg
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error || `Server menjawab ${r.status}`);
   if (auth.currentUser) simpanFotoLokal(auth.currentUser.uid, j.foto ?? '');
-  return { foto: j.foto ?? '', banner: j.banner ?? '' };
+  return { foto: j.foto ?? '', banner: j.banner ?? '', dompet: j.dompet ?? [] };
+}
+
+/** Tautkan satu alamat dompet ke akun ini. Mengirim alamat yang SAMA lagi
+ *  bukan galat — itu yang terjadi tiap kali halamannya dibuka; server cuma
+ *  memperbarui kapan terakhir terlihat. */
+export async function tautkanDompet(alamat: string, label?: string): Promise<DompetTertaut[]> {
+  const r = await fetch(`${dasar()}/api/profil/dompet`, {
+    method: 'POST', headers: await kepala(), body: JSON.stringify({ alamat, label }),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || `Server menjawab ${r.status}`);
+  return j.dompet ?? [];
+}
+
+export async function lepasDompet(alamat: string): Promise<DompetTertaut[]> {
+  const r = await fetch(`${dasar()}/api/profil/dompet`, {
+    method: 'POST', headers: await kepala(), body: JSON.stringify({ alamat, hapus: true }),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || `Server menjawab ${r.status}`);
+  return j.dompet ?? [];
+}
+
+/** Versi diam untuk dipanggil dari jalur "dompet baru saja tersambung".
+ *
+ *  Diam DENGAN SENGAJA. Yang baru saja dilakukan orangnya adalah
+ *  menyambungkan dompet supaya bisa trading; pesan galat merah tentang
+ *  penyimpanan profil di detik itu memberi tahu kegagalan yang tidak
+ *  menghalangi apa pun yang sedang ia kerjakan. Tautannya dicoba lagi
+ *  otomatis di sambungan berikutnya. */
+export function tautkanDompetDiam(alamat: string): void {
+  if (!auth.currentUser || !alamat) return;
+  void tautkanDompet(alamat).catch(() => {});
 }
 
 /** Dipanggil HANYA saat panelnya dibuka, bukan di tiap pemuatan halaman.
@@ -153,7 +211,7 @@ export function useProfilPengguna(hidup: boolean) {
       const r = await fetch(`${dasar()}/api/profil`, { headers: await kepala() });
       if (r.ok) {
         const j = await r.json();
-        setProfil({ foto: j.foto ?? '', banner: j.banner ?? '' });
+        setProfil({ foto: j.foto ?? '', banner: j.banner ?? '', dompet: j.dompet ?? [] });
         if (auth.currentUser) simpanFotoLokal(auth.currentUser.uid, j.foto ?? '');
       }
     } catch {

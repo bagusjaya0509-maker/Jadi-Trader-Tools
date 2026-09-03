@@ -9,6 +9,7 @@ import {
   type Kutipan,
 } from '@/lib/dex-swap';
 import type { KoinPantau, FaktaAman } from '@/lib/coin-listing';
+import { tautkanDompetDiam } from '@/lib/profil-pengguna';
 
 /* ════════════════════════════════════════════════════════════════════════
    BELI KOIN — tukar koin gas jaringannya dengan token yang sedang dipantau
@@ -68,15 +69,25 @@ export function PanelBeliKoin({ koin, onTutup }: { koin: KoinPantau; onTutup: ()
   useEffect(() => {
     let batal = false;
     void (pola === 'sol' ? alamatSolTersambung() : alamatTersambung())
-      .then((a) => { if (!batal && a) setDompet(a); });
+      .then((a) => { if (!batal && a) pakaiDompet(a); });
     return () => { batal = true; };
   }, [pola]);
 
   const sambung = async () => {
     setGalat('');
-    try { setDompet(pola === 'sol' ? await sambungSol() : await sambungDompet()); }
+    try { pakaiDompet(pola === 'sol' ? await sambungSol() : await sambungDompet()); }
     catch (e: any) { setGalat(pesan(e)); }
   };
+
+  /* Satu pintu, supaya penautan tidak bisa terlewat di salah satu dari dua
+     jalan masuk. Alamatnya ditautkan ke akun tiap kali ia diketahui —
+     termasuk saat ia sudah dipercaya sejak awal dan tidak ada tombol yang
+     ditekan sama sekali. Server memperlakukan alamat yang sama sebagai
+     "terlihat lagi", bukan sebagai galat. */
+  function pakaiDompet(a: string) {
+    setDompet(a);
+    tautkanDompetDiam(a);
+  }
 
   /* ── Kutipan otomatis, tapi TIDAK tiap ketukan ──────────────────────────
      500 ms sesudah ketikan terakhir. Dua sebab: agregatornya tidak perlu

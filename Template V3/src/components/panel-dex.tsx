@@ -6,6 +6,7 @@ import {
   adaDompet, sambungDompet, alamatTersambung, rantaiKini,
   bacaAgen, hapusAgen, agenKedaluwarsa, type AgenTersimpan,
 } from '@/lib/dex-dompet';
+import { tautkanDompetDiam } from '@/lib/profil-pengguna';
 import {
   setujuiAgen, keadaanAkun, orderTerbuka, kirimOrderDex, tutupPosisiDex,
   batalOrderDex, cariAset, hargaKini,
@@ -96,6 +97,7 @@ export function PanelDex({ koinChart, sempit }: {
       const a = await alamatTersambung();
       if (!a) return;
       setAlamat(a);
+      tautkanDompetDiam(a);
       setAgen(bacaAgen(a));
       setRantai(await rantaiKini());
     })();
@@ -112,6 +114,7 @@ export function PanelDex({ koinChart, sempit }: {
     const gantiAkun = (...a: unknown[]) => {
       const baru = (a[0] as string[])?.[0]?.toLowerCase() ?? null;
       setAlamat(baru);
+      if (baru) tautkanDompetDiam(baru);
       setAgen(baru ? bacaAgen(baru) : null);
       setKeadaan(null);
       setOrder([]);
@@ -218,6 +221,12 @@ export function PanelDex({ koinChart, sempit }: {
   const sambung = () => jalankan('sambung', async () => {
     const a = await sambungDompet();
     setAlamat(a);
+    /* Alamatnya ditautkan ke akun Google-nya. Bukan supaya panel ini bisa
+       bekerja — ia sudah bekerja tanpa itu — melainkan supaya tautannya
+       BERTAHAN sesudah sambungan peramban hilang. Jurnal yang mengisi
+       dirinya sendiri dari riwayat on-chain perlu tahu alamat siapa yang
+       harus dibaca saat dompetnya sedang tidak terbuka sama sekali. */
+    tautkanDompetDiam(a);
     setAgen(bacaAgen(a));
     setRantai(await rantaiKini());
   });
