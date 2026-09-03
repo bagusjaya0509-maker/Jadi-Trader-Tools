@@ -4,6 +4,7 @@ import {
   type DocumentData,
 } from 'firebase/firestore';
 import { ambilDb } from '@/lib/firestore';
+import { alasanJurnal, emosiJurnal } from '@/lib/medan-jurnal';
 import { useAuth } from '@/lib/auth';
 import { usePosisiBinance, type OrderBursa } from '@/lib/admin';
 import {
@@ -76,8 +77,13 @@ function keTrade(id: string, d: DocumentData): Trade {
     pnl: n(d.pnl),
     waktu: ms(d.keluarWaktu) || ms(d.masukWaktu),
     sumber,
-    emosi: d.psikologi?.emosiMasuk ?? undefined,
-    alasan: d.psikologi?.alasanMasuk ?? d.sebabKeluar ?? undefined,
+    /* Aturan siapa-pemilik-medan hidup di `medan-jurnal.ts`, BUKAN di sini.
+       Ia dibaca juga oleh modal sunting, dan dua salinan aturan yang sama
+       akan berselisih pada revisi berikutnya — dengan akibat yang paling
+       jahat: modal menampilkan nilai mesin, orangnya menekan Simpan, dan
+       tulisan tangannya tertimpa. */
+    emosi: emosiJurnal(d) || undefined,
+    alasan: alasanJurnal(d) || undefined,
     /* Transaksi latihan lama tidak punya field `latihan` — ia baru ada
        sejak perbaikan ini. Yang lama dikenali dari jejak yang memang
        sudah ditulis waktu itu: alasan "Latihan replay" atau catatan

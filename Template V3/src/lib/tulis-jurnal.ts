@@ -1,12 +1,13 @@
 import type { DompetTertaut } from '@/lib/profil-pengguna';
 import type { FillHl, MintaFill } from '@/lib/jurnal-dompet-inti';
-import { doc, setDoc, deleteDoc, collection, onSnapshot, Timestamp, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc, collection, onSnapshot, Timestamp, writeBatch } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import { db } from '@/lib/data';
 import { auth } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth';
 import { bacaKoneksi, PROXY_BAWAAN } from '@/lib/koneksi';
 import type { Sumber } from '@/data/contoh';
+import { catatanJurnal, emosiJurnal, emosiEvaluasiJurnal } from '@/lib/medan-jurnal';
 
 /* ════════════════════════════════════════════════════════════════════════
    MENULIS JURNAL — transaksi manual, setoran, dan penarikan
@@ -73,7 +74,43 @@ function idTrade(m: MasukanTrade) {
   return `m-${m.pair.replace(/[^A-Za-z0-9]/g, '')}-${m.waktu}`;
 }
 
-export async function simpanTrade(m: MasukanTrade) {
+/* ════════════════════════════════════════════════════════════════════════
+   MEDAN MESIN vs MEDAN TANGAN — kenapa `mesin: true` ada
+   ════════════════════════════════════════════════════════════════════════
+   Ditemukan pada tinjauan 3 Sep 2026, dan diam-diam menghapus data orang:
+
+   `setDoc(..., { merge: true })` menggabung per JALUR MEDAN, bukan per
+   objek. Jadi mengirim `psikologi: { emosiMasuk, emosiEvaluasi,
+   alasanMasuk, catatan }` menimpa keempatnya — selalu. Pengguna menandai
+   satu trade "Serakah" dan menulis "overtrade sesudah rugi"; putaran
+   sinkron berikutnya mengembalikannya jadi "Netral" dengan catatan
+   "Ditutup di Hyperliquid (5199)". Panel Pola Emosi pun kembali seragam,
+   yaitu satu-satunya bagian jurnal yang isinya benar-benar penilaian
+   sendiri.
+
+   Yang salah bukan merge-nya, melainkan bahwa satu tempat dipakai berdua:
+   MESIN tahu dari bursa mana trade itu datang; MANUSIA tahu apa yang ia
+   rasakan dan pelajari. Keduanya kini punya rumah sendiri:
+
+     psikologi.*   MILIK MANUSIA. Hanya ditulis lewat modal jurnal.
+     _sinkron.*    MILIK MESIN. Hanya ditulis jalur sinkron.
+
+   `keTrade` (data.ts) membaca `psikologi.alasanMasuk` LEBIH DULU, lalu
+   jatuh ke `_sinkron.alasan`. Jadi kolom Setup tetap berbunyi "Sinkron
+   Hyperliquid" selama belum ditimpa — dan begitu orangnya menulis setup-nya
+   sendiri di sana, tulisannya menang selamanya.
+
+   Emosi sengaja TIDAK diisi mesin sama sekali. "Netral" yang dulu ditulis
+   bukan fakta, melainkan tebakan yang menyamar jadi fakta: mesin tidak tahu
+   perasaan siapa pun. Trade hasil sinkron kini kosong emosinya sampai
+   orangnya mengisi, dan Pola Emosi cuma menghitung yang benar-benar
+   dicatat. */
+export interface PilihanSimpan {
+  /** true = penulis adalah jalur sinkron, bukan manusia. */
+  mesin?: boolean;
+}
+
+export async function simpanTrade(m: MasukanTrade, pilihan: PilihanSimpan = {}) {
   const uid = butuhUid();
   const id = m.id || idTrade(m);
   await setDoc(doc(db, 'users', uid, 'transaksi', id), {
@@ -92,21 +129,61 @@ export async function simpanTrade(m: MasukanTrade) {
     pnl: m.pnl,
     masukWaktu: Timestamp.fromMillis(m.waktu),
     keluarWaktu: Timestamp.fromMillis(m.waktu),
-    psikologi: {
-      emosiMasuk: m.emosiMasuk,
-      emosiEvaluasi: m.emosiEvaluasi,
-      alasanMasuk: m.alasan,
-      catatan: m.catatan,
-    },
+    ...(pilihan.mesin
+      ? { _sinkron: { alasan: m.alasan, catatan: m.catatan } }
+      : {
+        psikologi: {
+          emosiMasuk: m.emosiMasuk,
+          emosiEvaluasi: m.emosiEvaluasi,
+          alasanMasuk: m.alasan,
+          catatan: m.catatan,
+        },
+      }),
     kunciUrut: kunciUrut(m.sumber, m.waktu),
     latihan: !!m.latihan,
-    _asal: m.latihan ? 'replay-v3' : 'manual-v3',
+    _asal: m.latihan ? 'replay-v3' : pilihan.mesin ? 'sinkron-v3' : 'manual-v3',
   }, { merge: true });
   return id;
 }
 
 export async function hapusTrade(id: string) {
   await deleteDoc(doc(db, 'users', butuhUid(), 'transaksi', id));
+}
+
+/** Medan yang TIDAK dibawa objek `Trade` ringkas milik tabel.
+ *
+ *  `Trade` sengaja tidak memuatnya — tabel riwayat tidak menampilkan harga
+ *  masuk, catatan, maupun emosi evaluasi, dan membawa semuanya untuk 2.000
+ *  baris berarti memori yang dibayar setiap orang demi layar sunting yang
+ *  mungkin tidak pernah dibuka.
+ *
+ *  Jadi yang dibuka-lah yang membacanya: satu dokumen, satu pembacaan,
+ *  hanya saat pensil ditekan. */
+export interface TradePenuh {
+  masukHarga: number;
+  keluarHarga: number;
+  emosiMasuk: string;
+  emosiEvaluasi: string;
+  catatan: string;
+  latihan: boolean;
+}
+
+export async function bacaTrade(id: string): Promise<TradePenuh | null> {
+  const cuplik = await getDoc(doc(db, 'users', butuhUid(), 'transaksi', id));
+  if (!cuplik.exists()) return null;
+  const d = cuplik.data() as Record<string, any>;
+  const angka = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+  return {
+    masukHarga: angka(d.masukHarga),
+    keluarHarga: angka(d.keluarHarga),
+    /* Aturan yang SAMA PERSIS dengan tabel riwayat, dari berkas yang sama.
+       Kalau keduanya berselisih, modal menampilkan nilai mesin lalu Simpan
+       menimpa tulisan tangan — cacat yang justru sedang diperbaiki. */
+    emosiMasuk: emosiJurnal(d),
+    emosiEvaluasi: emosiEvaluasiJurnal(d),
+    catatan: catatanJurnal(d),
+    latihan: d.latihan === true,
+  };
 }
 
 /* ── Setoran & penarikan ─────────────────────────────────────────────── */
@@ -269,9 +346,9 @@ export async function sinkronRiwayatBinance(sudahAda: Set<string>, sejakMs: numb
           nilaiOrder: Number((qty * hargaKeluar).toFixed(2)),
           masukHarga: 0, keluarHarga: Number(hargaKeluar.toFixed(6)),
           pnl: Number(pnl.toFixed(4)), waktu,
-          emosiMasuk: 'Netral', emosiEvaluasi: 'Netral',
+          emosiMasuk: '', emosiEvaluasi: '',
           alasan: 'Sinkron Binance', catatan: 'Ditutup di Binance (' + orderId + ')',
-        });
+        }, { mesin: true });
         masuk++;
       }
     }
@@ -338,11 +415,11 @@ export async function sinkronRiwayatHyperliquid(
            berarti menulis angka yang tidak pernah terjadi. */
         masukHarga: 0, keluarHarga: Number(Number(t.hargaKeluar).toFixed(6)),
         pnl: Number(Number(t.pnl).toFixed(4)), waktu: Number(t.waktu) || Date.now(),
-        emosiMasuk: 'Netral', emosiEvaluasi: 'Netral',
+        emosiMasuk: '', emosiEvaluasi: '',
         alasan: 'Sinkron Hyperliquid',
         catatan: 'Ditutup di Hyperliquid (' + t.oid + ')'
                + (Number(t.isian) > 1 ? ' · ' + t.isian + ' isian' : ''),
-      });
+      }, { mesin: true });
       masuk++;
     }
     return { masuk, dilewati, galat: null };
@@ -481,7 +558,7 @@ export async function sinkronRiwayatDompet(
           masukHarga: t.masukLengkap ? Number(t.hargaMasuk.toFixed(6)) : 0,
           keluarHarga: Number(t.hargaKeluar.toFixed(6)),
           pnl: Number(t.pnl.toFixed(4)), waktu: t.waktu,
-          emosiMasuk: 'Netral', emosiEvaluasi: 'Netral',
+          emosiMasuk: '', emosiEvaluasi: '',
           /* Label yang SAMA dengan jalur server: kolom Setup menampilkan
              medan ini, dan dua label untuk bursa yang sama membingungkan. */
           alasan: 'Sinkron Hyperliquid',
@@ -490,7 +567,7 @@ export async function sinkronRiwayatDompet(
                  + (t.fee !== 0 ? ' · fee ' + t.fee.toFixed(4) : '')
                  + (t.masukLengkap ? '' : ' · harga masuk di luar jendela')
                  + ' · dompet ' + alamatPendek(d.alamat),
-        });
+        }, { mesin: true });
         if (++ditulis % 25 === 0) pilihan.lapor?.(`${hasil.masuk} trade ditulis…`);
       }
     }

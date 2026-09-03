@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { X, Trash2, Loader2 } from 'lucide-react';
 import { Panel } from '@/components/efferd-ui';
 import { cn } from '@/lib/utils';
-import { simpanTrade, hapusTrade, type MasukanTrade } from '@/lib/tulis-jurnal';
+import { simpanTrade, hapusTrade, bacaTrade, type MasukanTrade } from '@/lib/tulis-jurnal';
 import type { Trade, Sumber } from '@/data/contoh';
 import { useTutupLuar } from '@/lib/tutup-luar';
 
@@ -85,13 +85,66 @@ export function ModalTrade({ sumber, trade, tutup }: {
     keluarHarga: 0,
     pnl: trade?.pnl ?? 0,
     waktu: trade?.waktu ?? Date.now(),
-    emosiMasuk: trade?.emosi ?? 'Tenang',
+    /* 'Tenang' cuma untuk trade BARU, yang memang sedang dicatat orangnya.
+       Untuk trade yang sudah ada tapi belum punya emosi (semua hasil
+       sinkron), bawaannya 'Netral' — membuka pensil demi memperbaiki pair
+       lalu ikut menuliskan "Tenang" berarti mesin menaruh klaim perasaan di
+       jurnal orang, persis yang baru saja dihentikan di jalur sinkron. */
+    emosiMasuk: trade?.emosi ?? (trade ? 'Netral' : 'Tenang'),
     emosiEvaluasi: 'Netral',
     alasan: trade?.alasan ?? '',
     catatan: '',
+    /* Dibawa dari barisnya. Tanpa ini, menyunting hasil replay menjadikannya
+       transaksi sungguhan yang ikut dihitung ke Net P/L. */
+    latihan: trade?.latihan,
   }));
   const [sibuk, setSibuk] = useState(false);
   const [galat, setGalat] = useState('');
+
+  /* ── DOKUMEN ASLINYA DIBACA, BUKAN DITEBAK DARI BARIS TABEL ─────────────
+     Objek `Trade` yang dipegang tabel sengaja ringkas — ia tidak membawa
+     harga masuk, harga keluar, catatan, maupun emosi evaluasi. Sebelum ini
+     ketiadaan itu diisi konstanta: masukHarga 0, keluarHarga 0, catatan ''.
+
+     Akibatnya bukan cuma tampilan. Orang membuka pensil untuk mengganti
+     emosi saja, melihat "Harga entry 0" (angka yang salah, dibaca sebagai
+     kenyataan), menekan Simpan — dan `setDoc` merge menulis nol itu ke
+     dokumen yang harga aslinya tersimpan. Untuk trade hasil sinkron dompet,
+     yang hilang justru satu-satunya kelebihan jalur itu: harga masuk
+     rata-rata tertimbang, yang tidak bisa dipulihkan selain menarik ulang
+     seluruh riwayat.
+
+     Satu pembacaan, satu dokumen, hanya saat pensil ditekan. Kalau gagal,
+     isian harga dibiarkan kosong dan disebutkan — LEBIH BAIK KOSONG
+     DARIPADA NOL: kosong tidak menuntut apa-apa, nol adalah klaim. */
+  const [memuat, setMemuat] = useState(!!trade);
+  /* Dipisah dari `galat` biasa: yang ini MENGUNCI tombol Simpan, sedangkan
+     galat validasi cuma memberi tahu. Menyimpan tanpa tahu nilai yang
+     sekarang tersimpan berarti menimpa dengan tebakan. */
+  const [gagalMuat, setGagalMuat] = useState(false);
+  useEffect(() => {
+    if (!trade) return;
+    let hidup = true;
+    void bacaTrade(trade.id)
+      .then((d) => {
+        if (!hidup || !d) return;
+        setF((x) => ({
+          ...x,
+          masukHarga: d.masukHarga,
+          keluarHarga: d.keluarHarga,
+          /* Emosi & catatan tangan menang; kalau belum ada, catatan mesin
+             ditampilkan supaya keterangan oid/fee/dompet tidak lenyap saat
+             orangnya menyunting hal lain. */
+          emosiMasuk: d.emosiMasuk || x.emosiMasuk,
+          emosiEvaluasi: d.emosiEvaluasi || x.emosiEvaluasi,
+          catatan: d.catatan,
+          latihan: d.latihan,
+        }));
+      })
+      .catch(() => { if (hidup) setGagalMuat(true); })
+      .finally(() => { if (hidup) setMemuat(false); });
+    return () => { hidup = false; };
+  }, [trade]);
 
   /* Esc menutup. Modal yang hanya bisa ditutup dengan mouse selalu terasa
      seperti jebakan bagi yang mengetik cepat. */
@@ -104,6 +157,13 @@ export function ModalTrade({ sumber, trade, tutup }: {
   async function simpan() {
     if (!f.pair.trim()) { setGalat('Pair wajib diisi.'); return; }
     if (!isFinite(f.pnl)) { setGalat('P/L harus berupa angka.'); return; }
+    /* Menyimpan sebelum isiannya selesai dimuat berarti menulis nilai
+       sementara ke atas nilai yang sebenarnya — persis cacat yang jendela
+       pemuatan ini ada untuk menutup. Gagal muat MENGUNCI, bukan sekadar
+       memperingatkan: kalau kita tidak tahu isi dokumennya, satu-satunya
+       tindakan yang pasti tidak merusak adalah tidak menulis. */
+    if (memuat) { setGalat('Tunggu isiannya selesai dimuat.'); return; }
+    if (gagalMuat) { setGalat('Isian gagal dimuat — muat ulang halaman sebelum menyimpan.'); return; }
     setSibuk(true); setGalat('');
     try { await simpanTrade(f); tutup(); }
     catch (e) { setGalat(e instanceof Error ? e.message : 'Gagal menyimpan'); }
@@ -120,6 +180,7 @@ export function ModalTrade({ sumber, trade, tutup }: {
   }
 
   const satuan = sumber === 'forex' ? 'Lot' : 'Qty';
+  const belumJelas = memuat || gagalMuat;
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm sm:p-8"
@@ -162,15 +223,23 @@ export function ModalTrade({ sumber, trade, tutup }: {
                    onChange={(e) => setF({ ...f, lot: Number(e.target.value.replace(',', '.')) || 0 })}
                    className={cn(KELAS_ISIAN, 'angka')} />
           } />
+          {/* ── KOSONG SELAMA BELUM TAHU, BUKAN NOL ────────────────────
+              Nol adalah KLAIM: ia terbaca sebagai "harga masuknya memang
+              nol" dan diperlakukan begitu oleh yang membacanya. Selama
+              dokumen aslinya belum terbaca — atau ternyata gagal terbaca —
+              kotaknya dikosongkan dan dikunci. Kosong tidak mengklaim apa
+              pun, dan kotak terkunci menjelaskan sendiri kenapa. */}
           <Kolom label="Harga entry" anak={
-            <input value={String(f.masukHarga)} inputMode="decimal"
+            <input value={belumJelas ? '' : String(f.masukHarga)} inputMode="decimal"
+                   disabled={belumJelas} placeholder={memuat ? 'memuat…' : gagalMuat ? '—' : ''}
                    onChange={(e) => setF({ ...f, masukHarga: Number(e.target.value.replace(',', '.')) || 0 })}
-                   className={cn(KELAS_ISIAN, 'angka')} />
+                   className={cn(KELAS_ISIAN, 'angka disabled:opacity-50')} />
           } />
           <Kolom label="Harga exit" anak={
-            <input value={String(f.keluarHarga)} inputMode="decimal"
+            <input value={belumJelas ? '' : String(f.keluarHarga)} inputMode="decimal"
+                   disabled={belumJelas} placeholder={memuat ? 'memuat…' : gagalMuat ? '—' : ''}
                    onChange={(e) => setF({ ...f, keluarHarga: Number(e.target.value.replace(',', '.')) || 0 })}
-                   className={cn(KELAS_ISIAN, 'angka')} />
+                   className={cn(KELAS_ISIAN, 'angka disabled:opacity-50')} />
           } />
           <Kolom label="Profit / Loss (USD)" anak={
             <input value={String(f.pnl)} inputMode="decimal"
@@ -196,6 +265,13 @@ export function ModalTrade({ sumber, trade, tutup }: {
           } />
         </div>
 
+        {gagalMuat && (
+          <div className="mx-6 mb-2 rounded-md border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-[12px] leading-relaxed text-amber-200/90">
+            Isian trade ini gagal dimuat, jadi menyimpan dimatikan — kalau diteruskan,
+            harga dan catatan yang sudah tersimpan bisa tertimpa nilai kosong. Muat ulang
+            halaman lalu coba lagi.
+          </div>
+        )}
         {galat && <div className="px-6 pb-2 text-[12.5px] text-amber-300/90">{galat}</div>}
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-zinc-800/80 px-6 py-4">
@@ -210,9 +286,9 @@ export function ModalTrade({ sumber, trade, tutup }: {
                     className="cursor-pointer rounded-md border border-zinc-800 px-4 py-2 text-[12px] text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100 disabled:opacity-50">
               Batal
             </button>
-            <button onClick={() => void simpan()} disabled={sibuk}
-                    className="flex cursor-pointer items-center gap-2 rounded-md bg-zinc-100 px-4 py-2 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:opacity-50">
-              {sibuk && <Loader2 className="size-3.5 animate-spin" />} Simpan
+            <button onClick={() => void simpan()} disabled={sibuk || belumJelas}
+                    className="flex cursor-pointer items-center gap-2 rounded-md bg-zinc-100 px-4 py-2 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50">
+              {(sibuk || memuat) && <Loader2 className="size-3.5 animate-spin" />} Simpan
             </button>
           </div>
         </div>

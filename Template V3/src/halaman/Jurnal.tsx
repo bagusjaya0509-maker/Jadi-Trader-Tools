@@ -678,7 +678,14 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
                               : null}
                           </Td>
                           <Td className={cn('angka text-right', t.pnl >= 0 ? 'text-emerald-500' : 'text-red-400')}>{uang(t.pnl, true)}</Td>
-                          <Td className="whitespace-nowrap text-[12px] text-zinc-400">{t.emosi}</Td>
+                          {/* Tanda hubung, bukan sel kosong. Sejak jalur sinkron
+                              berhenti mengarang "Netral", trade hasil sinkron memang
+                              belum punya emosi — dan sel kosong terbaca sebagai
+                              data yang hilang, bukan sebagai medan yang memang
+                              menunggu diisi. */}
+                          <Td className="whitespace-nowrap text-[12px] text-zinc-400">
+                            {t.emosi || <span className="text-zinc-700">—</span>}
+                          </Td>
                           <Td className="max-w-[150px] truncate text-[12px] text-zinc-500" title={t.alasan}>{t.alasan}</Td>
                           <Td>
                             <button onClick={() => setModal(t)} disabled={!bisaTulis}
