@@ -5109,10 +5109,16 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                  className={cn('absolute z-20 cursor-move touch-none', !letakPakai && 'bottom-2 right-2')}>
               {/* Tanpa bingkai dan latar — ia bagian dari chart, bukan
                   kartu yang menumpang di atasnya. */}
-              {/* 210 -> 268 px: kolom dolar di samping SL/TP butuh 54 px plus
-                  jarak, dan memaksanya masuk lebar lama akan memepetkan kotak
-                  isian sampai harga berdesimal panjang terpotong di tengah. */}
-              <div className="w-[268px] shrink-0 text-[11.5px]">
+              {/* 252 px, DIUKUR bukan dikira. Yang menahan lebar panel ini bukan
+                  baris SL/TP melainkan baris KEPALANYA: "CASHCATUSDT BUY posisi ·
+                  Hyperliquid" beserta tombol silangnya makan 219 px di peramban.
+                  Simbol Binance jauh lebih pendek (BTCUSDT = 174 px), jadi yang
+                  menentukan justru pasangan terpanjang — nama koin Hyperliquid
+                  yang memang panjang-panjang.
+
+                  Sempat 268 px saat kolom dolar ditambahkan; sesudah kotak
+                  isiannya berhenti melar, sisa itu tidak lagi ada gunanya. */}
+              <div className="w-[252px] shrink-0 text-[11.5px]">
                               <div className="flex items-baseline gap-1.5">
                                 <span className="text-zinc-200">{sunting.simbol}</span>
                                 <span className={cn('text-[10.5px]', sunting.arah === 'BUY' ? 'text-emerald-500' : 'text-red-400')}>
@@ -5190,22 +5196,56 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                                  ['TP', suntingTpTeks, setSuntingTpTeks, 'text-emerald-500/90']] as const).map(([nama, nilai, atur, warna]) => (
                                 <label key={nama} className="mt-1 flex items-center gap-1.5">
                                   <span className={cn('w-5 text-[10.5px]', warna)}>{nama}</span>
+                                  {/* ── LEBARNYA MENGIKUTI ANGKANYA ──────────────────
+                                      Dulu `grow`, dan akibatnya diukur langsung di
+                                      peramban: panel 268 px menyisakan 182 px untuk
+                                      kotak isian, sementara "0,12615" cuma butuh 43 px.
+                                      Empat kali lipat ruang kosong di sebelah angka yang
+                                      justru paling sering dibaca — dilaporkan pemilik
+                                      3 Sep 2026 sebagai "terlalu panjang".
+
+                                      Satuan `ch` = lebar angka nol, dan `.angka` memakai
+                                      tabular-nums, jadi tiap digit benar-benar selebar
+                                      itu. +14px menutup padding kiri-kanan (6+6) beserta
+                                      garis tepinya.
+
+                                      Batas bawah 6 dan atas 12 dipasang karena keduanya
+                                      punya sebab: di bawah 6 kotaknya lebih kecil dari
+                                      sasaran sentuh yang wajar, dan di atas 12 ia mulai
+                                      mendorong kolom dolar keluar panel. Harga terpanjang
+                                      yang masuk akal — "0.00012345", 10 huruf — masih
+                                      duduk di dalamnya.
+
+                                      KOSONG dapat 11ch, bukan 6: yang harus muat saat itu
+                                      bukan angkanya melainkan tulisan ajakannya, dan kotak
+                                      yang memotong ajakannya sendiri tidak mengajak siapa
+                                      pun.
+
+                                      Spasi di sekitar `+` pada calc() WAJIB — calc tanpa
+                                      spasi diam-diam tidak berlaku, dan yang tersisa cuma
+                                      lebar bawaan peramban. */}
                                   <input
                                     value={nilai}
                                     inputMode="decimal"
                                     placeholder="seret garisnya"
+                                    style={{ width: `calc(${nilai ? Math.min(12, Math.max(6, nilai.length)) : 11}ch + 14px)` }}
                                     onFocus={() => { if (!nilai && aksi?.hargaKini) atur(String(aksi.hargaKini)); }}
                                     onChange={(e) => atur(e.target.value.replace(/[^\d.,-]/g, '').replace(',', '.'))}
-                                    className="angka h-6 min-w-0 grow rounded border border-zinc-800 bg-zinc-900/80 px-1.5 text-right text-[11px] text-zinc-200 outline-none placeholder:text-[9.5px] placeholder:text-zinc-700 focus-visible:border-zinc-600" />
-                                  {/* Lebar TETAP, bukan grow: angka dolarnya
-                                      berubah tiap piksel seretan, dan kolom
-                                      yang ikut melar membuat kotak isian di
-                                      sebelahnya bergoyang selama garisnya
-                                      ditarik. */}
+                                    className="angka h-6 shrink-0 rounded border border-zinc-800 bg-zinc-900/80 px-1.5 text-right text-[11px] text-zinc-200 outline-none placeholder:text-[9.5px] placeholder:text-zinc-700 focus-visible:border-zinc-600" />
+                                  {/* Lebar TETAP, bukan grow: angka dolarnya berubah
+                                      tiap piksel seretan, dan kolom yang ikut melar
+                                      membuat kotak isian di sebelahnya bergoyang selama
+                                      garisnya ditarik.
+
+                                      `ml-auto` mendorongnya ke tepi kanan, jadi ruang
+                                      sisa jatuh DI ANTARA angka harga dan angka dolar —
+                                      bukan menggantung di ujung baris. 58 px, bukan 54:
+                                      diukur di peramban, "-$1.234,56" makan 54 px pas,
+                                      dan pas berarti terpotong pada nilai berikutnya. */}
                                   {(() => {
                                     const d = uangDiHarga(Number(nilai) || 0);
                                     return (
-                                      <span className={cn('angka w-[54px] shrink-0 text-right text-[10.5px] tabular-nums',
+                                      <span className={cn('angka ml-auto w-[58px] shrink-0 text-right text-[10.5px] tabular-nums',
                                         d === null ? 'text-zinc-700' : d >= 0 ? 'text-emerald-500' : 'text-red-400')}>
                                         {d === null ? '—' : uang(d, true)}
                                       </span>
