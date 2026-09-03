@@ -5160,33 +5160,31 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                   memakai border-box, jadi p-2.5 memakan 20 px dari dalam.
                   272 - 20 = 252 px isi — persis lebar yang sudah diukur
                   menampung baris kepalanya. */}
-              {/* 252 px, DIUKUR bukan dikira. Yang menahan lebar panel ini bukan
-                  baris SL/TP melainkan baris KEPALANYA: "CASHCATUSDT BUY posisi ·
-                  Hyperliquid" beserta tombol silangnya makan 219 px di peramban.
-                  Simbol Binance jauh lebih pendek (BTCUSDT = 174 px), jadi yang
-                  menentukan justru pasangan terpanjang — nama koin Hyperliquid
-                  yang memang panjang-panjang.
+              {/* ── 208 px, DAN TIAP ANGKANYA DIUKUR ────────────────────────
+                  Riwayatnya: 210 -> 268 (kolom dolar masuk) -> 252 -> 246 -> 208.
+                  Yang menahannya selalu sama dan baru ketahuan sesudah tiap
+                  bagian diukur SENDIRI-SENDIRI:
 
-                  Sempat 268 px saat kolom dolar ditambahkan; sesudah kotak
-                  isiannya berhenti melar, sisa itu tidak lagi ada gunanya. */}
-              <div className="w-[246px] shrink-0 rounded-lg border border-zinc-800/80 bg-zinc-950/85 p-2.5 text-[11.5px] backdrop-blur-sm">
+                    kepala BERISI nama bursa   221 px   <- biang keladinya
+                    kepala tanpa nama bursa    129 px
+                    bursa + P/L satu baris     164 px
+                    baris SL/TP alami          165 px
+
+                  Nama bursa di baris kepala memaksa panel 221 px demi satu kata,
+                  dan sisanya menganggur di semua baris lain. Diturunkan ke baris
+                  kedua bersama P/L, penahannya jatuh ke baris SL/TP.
+
+                  186 px isi + 20 padding + 2 tepi = 208 px. Isian `grow`
+                  menghabiskan sisanya, jadi tidak ada lagi celah — tidak di
+                  tengah baris, tidak juga di ujungnya. */}
+              <div className="w-[208px] shrink-0 rounded-lg border border-zinc-800/80 bg-zinc-950/85 p-2.5 text-[11.5px] backdrop-blur-sm">
                               <div className="flex items-baseline gap-1.5">
                                 <span className="text-zinc-200">{sunting.simbol}</span>
                                 <span className={cn('text-[10.5px]', sunting.arah === 'BUY' ? 'text-emerald-500' : 'text-red-400')}>
                                   {sunting.arah}
                                 </span>
-                                {/* `truncate` + `min-w-0`: nama bursa boleh dipotong
-                                    kalau simbolnya kebetulan panjang. Sebelumnya ia
-                                    memaksa SELURUH panel melebar demi satu kata —
-                                    "Hyperliquid" — dan lebar yang ditentukan kasus
-                                    terburuk membuat semua kasus lain kosong
-                                    melompong. */}
-                                <span className="min-w-0 truncate text-[10px] text-zinc-500"
-                                      title={`${sunting.jenis === 'pending' ? 'pending' : 'posisi'} di ${sunting.pasar === 'mt5' ? 'Trade-Fi' : bacaPasar(sunting.simbol) === 'hyperliquid' ? 'Hyperliquid' : 'Binance'}`}>
-                                  {sunting.jenis === 'pending' ? 'pending' : 'posisi'} · {sunting.pasar === 'mt5'
-                                    ? 'Trade-Fi'
-                                    : bacaPasar(sunting.simbol) === 'hyperliquid' ? 'Hyperliquid' : 'Binance'}
-                                </span>
+                                {/* Nama bursa PINDAH ke baris kedua — lihat catatan di
+                                    atas lebar panel. */}
                                 {/* Menutup PANELNYA saja — garis ordernya tetap
                                     di chart, jadi tinggal diklik lagi kalau
                                     berubah pikiran.
@@ -5207,24 +5205,33 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                                   onClick={tutupPanelUbah}
                                   aria-label="Tutup panel"
                                   title="Tutup panel — garis ordernya tetap di chart"
-                                  /* `ml-auto` DICABUT. Ia mendorong silang ke tepi
-                                     kanan panel, jadi seluruh ruang sisa menganga di
-                                     antara nama bursa dan silangnya — dan panel yang
-                                     lebarnya ditentukan oleh jarak itu terlihat besar
-                                     tanpa berisi apa pun. Sekarang silangnya duduk
-                                     langsung sesudah teksnya. */
-                                  className="ml-0.5 shrink-0 cursor-pointer self-center rounded p-0.5 text-zinc-600 transition-colors hover:bg-zinc-800 hover:text-zinc-200">
+                                  /* `ml-auto` KEMBALI, dan kali ini benar. Yang dulu
+                                     salah bukan penempatannya di pojok — itu memang
+                                     tempat tombol tutup di dialog mana pun — melainkan
+                                     LEBAR PANELNYA: 272 px membuat jaraknya menganga
+                                     ratusan piksel. Panelnya sekarang 208 px, dan
+                                     jaraknya jadi sekadar jarak judul. */
+                                  className="ml-auto shrink-0 cursor-pointer self-center rounded p-0.5 text-zinc-600 transition-colors hover:bg-zinc-800 hover:text-zinc-200">
                                   <X className="size-3" />
                                 </button>
                               </div>
-                              {pnlSunting !== null && (
-                                <div className="mt-0.5 text-[10.5px] text-zinc-500">
-                                  P/L berjalan{' '}
+                              {/* Bursa DAN P/L dalam satu baris. Diukur: "posisi ·
+                                  Hyperliquid · P/L +$103,97" = 164 px, sementara baris
+                                  kepala berisi bursa memakan 221 px. Menurunkannya ke
+                                  sini memotong 57 px dari lebar minimum panel — dan
+                                  keduanya memang satu kalimat: di mana posisinya, dan
+                                  sedang bagaimana. */}
+                              <div className="mt-0.5 truncate text-[10.5px] text-zinc-500">
+                                {sunting.jenis === 'pending' ? 'pending' : 'posisi'} · {sunting.pasar === 'mt5'
+                                  ? 'Trade-Fi'
+                                  : bacaPasar(sunting.simbol) === 'hyperliquid' ? 'Hyperliquid' : 'Binance'}
+                                {pnlSunting !== null && (<>
+                                  {' · P/L '}
                                   <span className={cn('angka', pnlSunting >= 0 ? 'text-emerald-500' : 'text-red-400')}>
                                     {uang(pnlSunting, true)}
                                   </span>
-                                </div>
-                              )}
+                                </>)}
+                              </div>
                               {/* GABUNGAN: keterangan, bukan kendali.
                                   ──────────────────────────────────────
                                   Isian SL/TP dan tombol Kirim di bawah ini
@@ -5260,42 +5267,29 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                                  ['TP', suntingTpTeks, setSuntingTpTeks, 'text-emerald-500/90']] as const).map(([nama, nilai, atur, warna]) => (
                                 <label key={nama} className="mt-1 flex items-center gap-1.5">
                                   <span className={cn('w-5 text-[10.5px]', warna)}>{nama}</span>
-                                  {/* ── LEBARNYA MENGIKUTI ANGKANYA ──────────────────
-                                      Dulu `grow`, dan akibatnya diukur langsung di
-                                      peramban: panel 268 px menyisakan 182 px untuk
-                                      kotak isian, sementara "0,12615" cuma butuh 43 px.
-                                      Empat kali lipat ruang kosong di sebelah angka yang
-                                      justru paling sering dibaca — dilaporkan pemilik
-                                      3 Sep 2026 sebagai "terlalu panjang".
+                                  {/* ── MEMENUHI BARISNYA, SESUDAH PANELNYA DIPERAS ──
+                                      Sempat dibuat menyesuaikan panjang angkanya
+                                      (`calc(<n>ch + 14px)`) karena di panel 268 px ia
+                                      melar sampai 182 px untuk angka yang butuh 43.
 
-                                      Satuan `ch` = lebar angka nol, dan `.angka` memakai
-                                      tabular-nums, jadi tiap digit benar-benar selebar
-                                      itu. +14px menutup padding kiri-kanan (6+6) beserta
-                                      garis tepinya.
+                                      Tapi menyesuaikan isi memindahkan celahnya, bukan
+                                      menghapusnya: kotaknya mengecil dan ruang kosongnya
+                                      pindah ke ujung kanan baris. Dilaporkan lagi, dan
+                                      benar — celah di ujung sama menganggurnya dengan
+                                      celah di tengah.
 
-                                      Batas bawah 6 dan atas 12 dipasang karena keduanya
-                                      punya sebab: di bawah 6 kotaknya lebih kecil dari
-                                      sasaran sentuh yang wajar, dan di atas 12 ia mulai
-                                      mendorong kolom dolar keluar panel. Harga terpanjang
-                                      yang masuk akal — "0.00012345", 10 huruf — masih
-                                      duduk di dalamnya.
-
-                                      KOSONG dapat 11ch, bukan 6: yang harus muat saat itu
-                                      bukan angkanya melainkan tulisan ajakannya, dan kotak
-                                      yang memotong ajakannya sendiri tidak mengajak siapa
-                                      pun.
-
-                                      Spasi di sekitar `+` pada calc() WAJIB — calc tanpa
-                                      spasi diam-diam tidak berlaku, dan yang tersisa cuma
-                                      lebar bawaan peramban. */}
+                                      Yang menghapusnya: PANELNYA yang diperas sampai
+                                      sepas barisnya, lalu isian dibiarkan `grow`. Di
+                                      lebar isi 186 px, isian dapat 82 px — cukup untuk
+                                      "0.00012345" (63 px teks + 12 px padding + 2 px
+                                      tepi = 77 px) tanpa menyisakan lapangan kosong. */}
                                   <input
                                     value={nilai}
                                     inputMode="decimal"
                                     placeholder="seret garisnya"
-                                    style={{ width: `calc(${nilai ? Math.min(12, Math.max(6, nilai.length)) : 11}ch + 14px)` }}
                                     onFocus={() => { if (!nilai && aksi?.hargaKini) atur(String(aksi.hargaKini)); }}
                                     onChange={(e) => atur(e.target.value.replace(/[^\d.,-]/g, '').replace(',', '.'))}
-                                    className="angka h-6 shrink-0 rounded border border-zinc-800 bg-zinc-900/80 px-1.5 text-right text-[11px] text-zinc-200 outline-none placeholder:text-[9.5px] placeholder:text-zinc-700 focus-visible:border-zinc-600" />
+                                    className="angka h-6 min-w-0 grow rounded border border-zinc-800 bg-zinc-900/80 px-1.5 text-right text-[11px] text-zinc-200 outline-none placeholder:text-[9.5px] placeholder:text-zinc-700 focus-visible:border-zinc-600" />
                                   {/* ── DIDEKATKAN, DAN DIBERI LATAR ──────────────────
                                       Dilaporkan pemilik 3 Sep 2026: angkanya terlalu jauh
                                       dan terlihat aneh tanpa latar.
