@@ -1,3 +1,5 @@
+import type { DompetTertaut } from '@/lib/profil-pengguna';
+import type { FillHl, MintaFill } from '@/lib/jurnal-dompet-inti';
 import { doc, setDoc, deleteDoc, collection, onSnapshot, Timestamp, writeBatch } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import { db } from '@/lib/data';
@@ -346,6 +348,155 @@ export async function sinkronRiwayatHyperliquid(
     return { masuk, dilewati, galat: null };
   } catch (e) {
     return { masuk: 0, dilewati: 0, galat: e instanceof Error ? e.message : 'gagal sinkron Hyperliquid' };
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   SINKRON DARI DOMPET TERTAUT — jurnal yang mengisi dirinya sendiri
+   ════════════════════════════════════════════════════════════════════════
+   Jalur di atas (`sinkronRiwayatHyperliquid`) membaca akun HL PEMILIK yang
+   dikonfigurasi di VPS, lewat X-App-Token. Jalur ini membaca alamat dompet
+   yang ditautkan TIAP PENGGUNA ke akunnya (profil-pengguna.ts), langsung
+   dari api.hyperliquid.xyz — yang memang CORS terbuka dan tidak butuh
+   kunci untuk membaca riwayat alamat mana pun.
+
+   Langsung dari peramban, bukan lewat VPS, karena dua alasan yang tidak
+   sama beratnya: VPS tidak punya kredensial Firestore (jadi ia toh tidak
+   bisa menulis jurnal siapa pun), dan riwayat on-chain adalah data publik
+   — tidak ada yang perlu dilindungi dengan menyalurkannya lewat kita.
+
+   ── SATU KONVENSI ID DENGAN JALUR SERVER: hl<oid> ─────────────────────
+   Kalau pemilik menautkan dompet HL-nya sendiri, kedua jalur menulis
+   dokumen yang SAMA. Jalur ini membawa lebih banyak (harga masuk, fee),
+   jadi dokumennya berakhir dengan isi yang lebih lengkap — dan begitu
+   termuat di `sudahAda`, keduanya berhenti menulisnya.
+
+   ── PENGELOMPOKAN DI PERAMBAN, DAN ITU DISENGAJA ──────────────────────
+   Catatan di jalur server berbunyi "aturannya satu tempat". Di sini
+   aturannya justru dipindah ke `jurnal-dompet-inti.ts` yang bebas
+   dependensi dan diuji Node (18 kasus + rekonsiliasi Σ pnl pada 12 ribu
+   fill nyata). Yang penting bukan DI MANA aturannya, melainkan bahwa ia
+   punya uji yang berjalan tanpa peramban — dan jalur server tidak punya.
+
+   ── HITUNG DULU, TULIS KEMUDIAN ───────────────────────────────────────
+   `hanyaHitung` memulangkan berapa yang AKAN ditulis tanpa menulis apa
+   pun. Dompet yang aktif bisa punya ribuan trade, dan ribuan setDoc
+   adalah kuota Firestore harian yang habis tanpa peringatan. Panel
+   menampilkan angkanya dulu; orangnya yang memutuskan.
+   ════════════════════════════════════════════════════════════════════ */
+
+export interface HasilSinkronDompet extends HasilSinkronBin {
+  /** Dompet EVM yang diperiksa. */
+  dompet: number;
+  /** Fill yang terambil dari Hyperliquid. */
+  fill: number;
+  /** Trade bulat yang terbentuk di jendela. */
+  trade: number;
+  /** Jendela yang BENAR-BENAR terambil (ms) — bisa jauh lebih sempit dari
+   *  yang diminta: Hyperliquid hanya menyimpan belasan ribu fill terakhir. */
+  dari: number | null;
+  sampai: number | null;
+  terpotong: boolean;
+}
+
+const HASIL_KOSONG: HasilSinkronDompet = {
+  masuk: 0, dilewati: 0, galat: null, dompet: 0, fill: 0, trade: 0, dari: null, sampai: null, terpotong: false,
+};
+
+/* Daftar dompet disinggahkan 10 menit per uid. Efek auto-sinkron memanggil
+   jalur ini tiap 5 menit, dan menembak /api/profil tiap kali demi daftar
+   yang hampir tidak pernah berubah cuma membebani VPS. Dikunci per uid
+   supaya ganti akun di tab yang sama tidak meminjam daftar orang lain. */
+let singgahDompet: { uid: string; pada: number; daftar: DompetTertaut[] } | null = null;
+
+async function daftarDompetTertaut(): Promise<DompetTertaut[]> {
+  const uid = auth.currentUser?.uid || '';
+  if (singgahDompet && singgahDompet.uid === uid && Date.now() - singgahDompet.pada < 10 * 60_000) {
+    return singgahDompet.daftar;
+  }
+  const { ambilDompetTertaut } = await import('@/lib/profil-pengguna');
+  const daftar = await ambilDompetTertaut();
+  singgahDompet = { uid, pada: Date.now(), daftar };
+  return daftar;
+}
+
+/** Dipanggil panel sesudah menautkan/melepas dompet, supaya putaran
+ *  berikutnya tidak memakai daftar yang sudah usang. */
+export function lupakanSinggahDompet(): void { singgahDompet = null; }
+
+async function tanyaFillHl(badan: MintaFill): Promise<FillHl[]> {
+  const r = await fetch('https://api.hyperliquid.xyz/info', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'userFillsByTime', ...badan }),
+  });
+  if (!r.ok) throw new Error('Hyperliquid menjawab ' + r.status);
+  const j = await r.json();
+  return Array.isArray(j) ? j : [];
+}
+
+function alamatPendek(a: string): string {
+  return a.length > 12 ? a.slice(0, 6) + '…' + a.slice(-4) : a;
+}
+
+export async function sinkronRiwayatDompet(
+  sudahAda: Set<string>, sejakMs: number,
+  pilihan: { daftar?: DompetTertaut[]; hanyaHitung?: boolean; lapor?: (pesan: string) => void } = {},
+): Promise<HasilSinkronDompet> {
+  try {
+    const { tarikSemuaFill, kelompokkanFill } = await import('@/lib/jurnal-dompet-inti');
+    /* Hanya dompet EVM: Hyperliquid tidak mengenal alamat Solana. */
+    const daftar = (pilihan.daftar ?? await daftarDompetTertaut()).filter((d) => d.pola === 'evm');
+    if (!daftar.length) return { ...HASIL_KOSONG };
+
+    const hasil: HasilSinkronDompet = { ...HASIL_KOSONG, dompet: daftar.length };
+    for (const d of daftar) {
+      pilihan.lapor?.(`Menarik fill ${alamatPendek(d.alamat)}…`);
+      const { fills, terpotong } = await tarikSemuaFill(d.alamat, sejakMs, tanyaFillHl);
+      hasil.fill += fills.length;
+      hasil.terpotong = hasil.terpotong || terpotong;
+      if (fills.length) {
+        hasil.dari = Math.min(hasil.dari ?? Infinity, fills[0].time);
+        hasil.sampai = Math.max(hasil.sampai ?? -Infinity, fills[fills.length - 1].time);
+      }
+
+      const trades = kelompokkanFill(fills);
+      hasil.trade += trades.length;
+      let ditulis = 0;
+      for (const t of trades) {
+        const id = 'hl' + t.oid;
+        if (sudahAda.has(id)) { hasil.dilewati++; continue; }
+        hasil.masuk++;
+        if (pilihan.hanyaHitung) continue;
+
+        await simpanTrade({
+          id, sumber: 'kripto',
+          /* Sama dengan keSimbol() di server: koin + 'USDT'. */
+          pair: t.koin + 'USDT', arah: t.arah,
+          lot: Number(t.qty.toFixed(6)),
+          nilaiOrder: Number((t.qty * t.hargaKeluar).toFixed(2)),
+          /* Berbeda dari jalur server yang selalu 0: di sini kakinya
+             terlihat utuh, jadi rata-rata masuknya nyata — kecuali kaki
+             yang dimulai sebelum jendela, yang tetap 0 dan diberi
+             keterangan, bukan dikarang. */
+          masukHarga: t.masukLengkap ? Number(t.hargaMasuk.toFixed(6)) : 0,
+          keluarHarga: Number(t.hargaKeluar.toFixed(6)),
+          pnl: Number(t.pnl.toFixed(4)), waktu: t.waktu,
+          emosiMasuk: 'Netral', emosiEvaluasi: 'Netral',
+          /* Label yang SAMA dengan jalur server: kolom Setup menampilkan
+             medan ini, dan dua label untuk bursa yang sama membingungkan. */
+          alasan: 'Sinkron Hyperliquid',
+          catatan: 'Ditutup di Hyperliquid (' + t.oid + ')'
+                 + (t.isian > 1 ? ' · ' + t.isian + ' isian' : '')
+                 + (t.fee !== 0 ? ' · fee ' + t.fee.toFixed(4) : '')
+                 + (t.masukLengkap ? '' : ' · harga masuk di luar jendela')
+                 + ' · dompet ' + alamatPendek(d.alamat),
+        });
+        if (++ditulis % 25 === 0) pilihan.lapor?.(`${hasil.masuk} trade ditulis…`);
+      }
+    }
+    return hasil;
+  } catch (e) {
+    return { ...HASIL_KOSONG, galat: e instanceof Error ? e.message : 'gagal sinkron dompet' };
   }
 }
 

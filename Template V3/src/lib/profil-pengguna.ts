@@ -178,6 +178,15 @@ export async function lepasDompet(alamat: string): Promise<DompetTertaut[]> {
   return j.dompet ?? [];
 }
 
+/** Daftar dompet tertaut, tanpa hook — untuk jalur yang berjalan di luar
+ *  render (sinkron jurnal). Melempar kalau belum masuk. */
+export async function ambilDompetTertaut(): Promise<DompetTertaut[]> {
+  const r = await fetch(`${dasar()}/api/profil`, { headers: await kepala() });
+  if (!r.ok) throw new Error(`Server menjawab ${r.status}`);
+  const j = await r.json().catch(() => ({}));
+  return Array.isArray(j.dompet) ? j.dompet : [];
+}
+
 /** Versi diam untuk dipanggil dari jalur "dompet baru saja tersambung".
  *
  *  Diam DENGAN SENGAJA. Yang baru saja dilakukan orangnya adalah

@@ -12,7 +12,8 @@ import type { Trade, Sumber } from '@/data/contoh';
 import { useAkunMt5, useAkunBinance, type StatusAkun } from '@/lib/akun';
 import { ModalTrade } from '@/components/modal-trade';
 import { KotakArus } from '@/components/kotak-arus';
-import { useArusKas, arusBersih, sinkronRiwayatMt5, sinkronRiwayatBinance, sinkronRiwayatHyperliquid, type Arus } from '@/lib/tulis-jurnal';
+import { PanelJurnalDompet } from '@/components/panel-jurnal-dompet';
+import { useArusKas, arusBersih, sinkronRiwayatMt5, sinkronRiwayatBinance, sinkronRiwayatHyperliquid, sinkronRiwayatDompet, type Arus } from '@/lib/tulis-jurnal';
 import { bacaStatistik, bacaPnl } from '@/lib/catatan-stat';
 import { Link } from 'react-router-dom';
 
@@ -182,11 +183,18 @@ function CatatanKecil({ c }: { c: { nada: 'baik' | 'awas' | 'buruk'; teks: strin
    ranjau. Mengisinya juga akan memunculkan dua spanduk impor sekaligus di
    satu halaman, karena blok ini digambar dua kali (Trade-Fi dan Kripto).
    Pilihannya tinggal punya satu rumah: Dashboard. */
-function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun, labelSaldo, keIntegrasi, sumber, arus, bisaTulis, pemisah = false }: {
+function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun, labelSaldo, keIntegrasi, sumber, arus, bisaTulis, dataContoh, pemisah = false }: {
   judul: string; ket: string; Ikon: typeof Bitcoin;
   trade: Trade[]; saldoAwal: number; warna: string; idGradien: string;
   akun: StatusAkun; labelSaldo: string; keIntegrasi: string;
   sumber: Sumber; arus: Arus[]; bisaTulis: boolean;
+  /** `trade` di atas berisi DATA CONTOH, bukan milik penggunanya.
+   *
+   *  Namanya sengaja BUKAN `contoh` — nama itu pernah dipakai prop lain di
+   *  komponen ini (spanduk impor) dan dicabut karena berbahaya; lihat
+   *  catatan di atas. Yang ini tidak menggambar apa pun, ia cuma menutup
+   *  gerbang efek auto-sinkron. */
+  dataContoh: boolean;
   /** Garis pemisah tebal di atas judul — menandai pergantian jurnal. */
   pemisah?: boolean;
   /** Kripto: pola emosinya sudah terwakili di Trade-Fi; riwayatnya yang
@@ -302,12 +310,46 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
      dari /api/user-trades; ID dokumennya deterministic (bin<orderId>),
      jadi pengulangan tidak menggandakan baris. */
   const [pesanBin, setPesanBin] = useState('');
+
+  /* ── POTRET SEGAR LEWAT REF, BUKAN LEWAT DEP ────────────────────────────
+     Dulu `trade.length` jadi dep supaya `sudahAda` ikut segar. Dua cacat,
+     dua-duanya ditemukan pada tinjauan 3 Sep 2026 dan dua-duanya diam:
+
+     1. BEKU DI 2000. `useRiwayat` memakai limit(2000) per sumber, jadi
+        begitu jurnal kripto menyentuh 2000 baris, `trade.length` PERMANEN
+        2000. Efek tidak pernah dipasang ulang lagi, closure-nya memegang
+        array lama selamanya — dan tiap 5 menit trade yang baru saja ditulis
+        tidak ada di `sudahAda` beku itu, jadi ditulis ULANG. Selamanya.
+
+     2. BADAI PEMASANGAN ULANG. Di bawah 2000 justru kebalikannya: TIAP
+        dokumen yang masuk menaikkan `length`, membongkar-pasang efek, dan
+        memulai rantai `jalan()` baru. Menulis 500 trade dari panel berarti
+        ~500 rantai bertumpuk, masing-masing menyelesaikan seluruh sinkron
+        Binance dengan potret usang.
+
+     Ref selalu segar tanpa pernah jadi dep, jadi keduanya hilang sekaligus:
+     efek terpasang sekali, dan angkanya tetap yang terbaru saat dipakai. */
+  const tradeRef = useRef(trade);
+  tradeRef.current = trade;
+  /* Satu putaran pada satu waktu. Interval 5 menit biasanya lebih panjang
+     dari putarannya, tapi "biasanya" tidak berlaku saat backend lambat atau
+     saat dompet punya belasan ribu fill. */
+  const sedangSinkron = useRef(false);
+
   useEffect(() => {
-    if (!bisaTulis || sumber !== 'kripto') return;
+    /* `dataContoh` menutup gerbang. Tanpa itu, pengguna baru yang jurnalnya
+       masih kosong dihitung dari 94 trade CONTOH: `terbaru` jadi > 0, cabang
+       "7 hari" tidak pernah terpakai, dan jendelanya menyempit jadi sekitar
+       1,5 hari — persis pada orang yang paling butuh tarikan 7 hari itu. */
+    if (!bisaTulis || dataContoh || sumber !== 'kripto') return;
     let hidup = true;
     const jalan = async () => {
-      const sudahAda = new Set(trade.map((t) => t.id));
-      const terbaru = trade.reduce((s, t) => Math.max(s, t.waktu), 0);
+      if (sedangSinkron.current) return;
+      sedangSinkron.current = true;
+      try {
+      const kini = tradeRef.current;
+      const sudahAda = new Set(kini.map((t) => t.id));
+      const terbaru = kini.reduce((s, t) => Math.max(s, t.waktu), 0);
       const sejak = terbaru > 0 ? terbaru - 3_600_000 : Date.now() - 7 * 86_400_000;
       /* DUA BURSA, SATU PUTARAN. Berurutan, bukan Promise.all: keduanya
          menulis ke koleksi yang sama dan `sudahAda` yang dipakai keduanya
@@ -318,17 +360,24 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
       if (!hidup) return;
       const hHl = await sinkronRiwayatHyperliquid(sudahAda, sejak);
       if (!hidup) return;
+      /* Ketiga, dompet yang ditautkan pengguna sendiri — TERAKHIR, karena
+         ia memakai konvensi id yang sama dengan jalur HL pemilik (hl<oid>)
+         dan membawa isi yang lebih lengkap; kalau keduanya menulis oid yang
+         sama di satu putaran, yang lebih lengkap yang menetap. */
+      const hDompet = await sinkronRiwayatDompet(sudahAda, sejak);
+      if (!hidup) return;
 
       const kabar: string[] = [];
       if (!h.galat && h.masuk > 0) kabar.push(`${h.masuk} dari Binance`);
       if (!hHl.galat && hHl.masuk > 0) kabar.push(`${hHl.masuk} dari Hyperliquid`);
+      if (!hDompet.galat && hDompet.masuk > 0) kabar.push(`${hDompet.masuk} dari dompet tertaut`);
       setPesanBin(kabar.length ? `${kabar.join(' dan ')} masuk otomatis.` : '');
+      } finally { sedangSinkron.current = false; }
     };
     void jalan();
     const jam = setInterval(() => void jalan(), 5 * 60_000);
     return () => { hidup = false; clearInterval(jam); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bisaTulis, sumber, trade.length]);
+  }, [bisaTulis, dataContoh, sumber]);
   const pl = useMemo(() => plPerHari(trade), [trade]);
 
   const emosi = useMemo(() => {
@@ -795,7 +844,7 @@ export default function Jurnal() {
         Ikon={CandlestickChart} trade={forex} saldoAwal={saldoAwal}
         warna="text-amber-400" idGradien="gEqForex"
         akun={mt5} labelSaldo="Saldo MetaTrader 5" keIntegrasi="/integrations"
-        sumber="forex" arus={arus} bisaTulis={bisaTulis}
+        sumber="forex" arus={arus} bisaTulis={bisaTulis} dataContoh={contoh}
       />
 
       <BlokJurnal pemisah
@@ -803,8 +852,15 @@ export default function Jurnal() {
         Ikon={Bitcoin} trade={kripto} saldoAwal={0}
         warna="text-emerald-400" idGradien="gEqKripto"
         akun={binance} labelSaldo="Saldo Binance Futures" keIntegrasi="/integrations"
-        sumber="kripto" arus={arus} bisaTulis={bisaTulis}
+        sumber="kripto" arus={arus} bisaTulis={bisaTulis} dataContoh={contoh}
       />
+
+      {/* Di BAWAH jurnal kripto, di luar grid-nya. Panel ini bukan bagian
+          dari angka-angka di atasnya — ia pintu masuk data, dan pintu masuk
+          yang diselipkan di antara KPI dan grafik akan ikut dihitung oleh
+          `useTinggiSejajar` sebagai isi kolom. Hanya untuk yang bisa
+          menulis: pengunjung data contoh tidak punya dompet untuk ditaut. */}
+      {bisaTulis && !contoh && <PanelJurnalDompet trade={kripto} />}
     </div>
   );
 }
