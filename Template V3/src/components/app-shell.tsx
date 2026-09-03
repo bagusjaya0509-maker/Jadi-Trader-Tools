@@ -7,7 +7,7 @@ import {
   AlertTriangle, Newspaper, ChevronRight, ChevronDown, Copy, Radar, UserCircle2, Crown,
   Footprints,
   CheckCircle2,
-  Sun, Moon, Link2 } from 'lucide-react';
+  Sun, Moon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Switch } from '@/components/ui/switch-button';
 import { MultiChart } from '@/components/multi-chart';
@@ -109,18 +109,12 @@ const NAV = [
     butir: [
       { ke: '/personal-area',    label: 'Personal Area',    Ikon: Wallet },
       { ke: '/chart-entry',       label: 'Chart & Entry', Ikon: CandlestickChart },
-      /* ── DEX TRADING: BARIS SENDIRI, BUKAN ANAK WALLET TRACKING ─────
-         Sempat duduk sebagai sub-menu Wallet Tracking, dan itu salah
-         tempat. Wallet Tracking dibuka untuk mengamati uang ORANG LAIN;
-         halaman ini dibuka untuk memperdagangkan uang SENDIRI. Yang
-         menyamakan keduanya cuma kata "wallet".
-
-         Tempatnya di Workspace, tepat sesudah Chart & Entry: keduanya
-         permukaan tempat orang bertindak, bukan tempat ia mengamati.
-
-         `hanyaPemilik` sampai ada pendapat hukum — halamannya sendiri juga
-         digerbangi, ini cuma supaya menunya tidak menggoda. */
-      { ke: '/dex', label: 'DEX Trading', Ikon: Link2, hanyaPemilik: true },
+      /* DEX Trading TIDAK punya baris sidebar, dan itu keputusan pemilik
+         3 Sep 2026 sesudah panelnya dipasang di sisi chart: dua pintu ke
+         satu alat cuma memanjangkan menu. Pintunya sekarang tombol
+         "Dompet" di bilah kendali Chart & Entry. Rutenya /dex tetap hidup
+         sebagai halaman penuh — tautan lama tidak mati, dan layar sempit
+         masih punya tempat yang lapang. */
       { ke: '/marketplace', label: 'Marketplace',      Ikon: Users },
       /* `sub` membuat menu ini bisa dibuka dengan panah: sub-halamannya
          terlihat dari sidebar tanpa harus mendarat dulu di halamannya.

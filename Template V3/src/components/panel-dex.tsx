@@ -80,6 +80,8 @@ export function PanelDex({ koinChart, sempit }: {
   const [modalTeks, setModalTeks] = useState('10');
   const [levTeks, setLevTeks] = useState('2');
   const [hargaTeks, setHargaTeks] = useState('');
+  const [slTeks, setSlTeks] = useState('');
+  const [tpTeks, setTpTeks] = useState('');
   const [pasar, setPasar] = useState(0);
 
   const modal = Number(modalTeks) || 0;
@@ -260,7 +262,13 @@ export function PanelDex({ koinChart, sempit }: {
     const h = await kirimOrderDex({
       pemilik: alamat, koin: k, arah, modal, leverage: lev, jenis,
       hargaLimit: Number(hargaTeks) || undefined,
+      sl: Number(slTeks) || undefined,
+      tp: Number(tpTeks) || undefined,
     });
+    /* Kabar stop DIDAHULUKAN kalau ada. "Terisi 124 @ 0,24" yang benar tapi
+       menyembunyikan "SL gagal dipasang" adalah kalimat yang membuat orang
+       menutup layar dengan tenang di atas posisi telanjang. */
+    if (h.stopKabar) { setGalat(h.stopKabar); await segarkan(alamat); return; }
     setKabar(h.terisi
       ? `Terisi ${h.terisi.ukuran} ${h.koin} @ ${h.terisi.harga}.`
       : h.menggantung
@@ -526,6 +534,20 @@ export function PanelDex({ koinChart, sempit }: {
                          onChange={(e) => setHargaTeks(e.target.value)} />
                 </Bidang>
               )}
+
+              {/* OPSIONAL, dan kosong berarti TIDAK DIPASANG — bukan nol.
+                  Keduanya berangkat sebagai trigger reduce-only sesudah
+                  entry-nya terisi, disizing dari fill yang sungguhan. */}
+              <div className="grid grid-cols-2 gap-2">
+                <Bidang label="SL (opsional)">
+                  <input className={cn(KOTAK, 'angka')} inputMode="decimal" value={slTeks}
+                         placeholder="—" onChange={(e) => setSlTeks(e.target.value)} />
+                </Bidang>
+                <Bidang label="TP (opsional)">
+                  <input className={cn(KOTAK, 'angka')} inputMode="decimal" value={tpTeks}
+                         placeholder="—" onChange={(e) => setTpTeks(e.target.value)} />
+                </Bidang>
+              </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <Bidang label="Modal (USD)">

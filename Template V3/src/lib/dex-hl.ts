@@ -240,6 +240,9 @@ function agenAtauGalat(pemilik: string): AgenTersimpan {
 const SELISIH_PASAR = 0.03;
 
 export interface HasilOrderDex {
+  /** Terisi kalau ada yang perlu dikatakan tentang SL/TP-nya.
+   *  null / kosong = tidak ada yang perlu dikhawatirkan. */
+  stopKabar?: string | null;
   koin: string;
   arah: 'BUY' | 'SELL';
   ukuran: number;
@@ -261,6 +264,43 @@ export interface MintaOrderDex {
   jenis: 'MARKET' | 'LIMIT';
   /** Wajib untuk LIMIT, diabaikan untuk MARKET. */
   hargaLimit?: number;
+  /** Harga pemicu. 0 / kosong = tidak dipasang. */
+  sl?: number;
+  tp?: number;
+}
+
+/** Satu trigger reduce-only. Bentuknya disalin dari `orderTrigger` di
+ *  skrip/vps/hyperliquid.js — kembaran yang sudah terbukti di jalur pemilik.
+ *
+ *  `p` ditaruh DI BALIK pemicu, bukan sama dengan pemicunya: `isMarket` saja
+ *  tidak cukup, `p` tetap jadi batas seberapa jauh order boleh mengejar
+ *  sesudah terpicu. `p` yang sama persis bisa tidak terisi saat harga
+ *  melompat melewatinya — persis keadaan saat stop paling dibutuhkan. */
+function trigger(aset: AsetHl, beliMasuk: boolean, pemicu: number, ukuran: number,
+                 jenis: 'sl' | 'tp') {
+  const tutupBeli = !beliMasuk;
+  const px = bulatHarga(pemicu, aset.szDecimals);
+  const kejar = bulatHarga(pemicu * (tutupBeli ? 1 + SELISIH_PASAR : 1 - SELISIH_PASAR),
+                           aset.szDecimals);
+  return {
+    a: aset.indeks, b: tutupBeli, p: String(kejar), s: String(ukuran), r: true,
+    t: { trigger: { isMarket: true, triggerPx: String(px), tpsl: jenis } },
+  };
+}
+
+/** Hyperliquid MENERIMA stop di sisi yang salah — ia langsung terpicu dan
+ *  menutup posisi yang baru saja dibuka dalam hitungan detik, dan yang
+ *  terbaca orang cuma "posisi saya hilang sendiri". Penolakannya harus kita
+ *  sendiri yang melakukan. */
+function periksaSisi(beli: boolean, entry: number, sl: number, tp: number) {
+  if (sl > 0) {
+    if (beli && sl >= entry) throw new Error(`SL ${sl} harus DI BAWAH entry ${entry} untuk BUY.`);
+    if (!beli && sl <= entry) throw new Error(`SL ${sl} harus DI ATAS entry ${entry} untuk SELL.`);
+  }
+  if (tp > 0) {
+    if (beli && tp <= entry) throw new Error(`TP ${tp} harus DI ATAS entry ${entry} untuk BUY.`);
+    if (!beli && tp >= entry) throw new Error(`TP ${tp} harus DI BAWAH entry ${entry} untuk SELL.`);
+  }
 }
 
 export async function kirimOrderDex(m: MintaOrderDex): Promise<HasilOrderDex> {
@@ -291,6 +331,8 @@ export async function kirimOrderDex(m: MintaOrderDex): Promise<HasilOrderDex> {
     ? bulatHarga(hargaAcuan, aset.szDecimals)
     : bulatHarga(pasar * (beli ? 1 + SELISIH_PASAR : 1 - SELISIH_PASAR), aset.szDecimals);
 
+  periksaSisi(beli, hargaAcuan, Number(m.sl) || 0, Number(m.tp) || 0);
+
   const ex = klienAgen(agen);
 
   /* Leverage disetel DULU dan terpisah. Digabung ke order, kegagalannya
@@ -315,7 +357,39 @@ export async function kirimOrderDex(m: MintaOrderDex): Promise<HasilOrderDex> {
     | undefined;
   if (st?.error) throw new Error(st.error);
 
+  /* ── SL/TP DISIZING DARI FILL YANG SUNGGUHAN ────────────────────────
+     Bukan dari `ukuran` yang diminta. Order di sini limit IOC yang
+     menyeberangi buku, jadi ia BISA TERISI SEBAGIAN — dan stop seukuran
+     permintaan pada posisi yang cuma terisi 60% ditolak bursa, lalu yang
+     terbaca di layar cuma "gagal" tanpa sebab.
+
+     Untuk LIMIT yang belum terisi, stopnya TIDAK dipasang: Hyperliquid
+     menolak reduce-only tanpa posisi. Panelnya mengatakan itu apa adanya
+     alih-alih diam — stop yang dikira terpasang padahal tidak adalah
+     kebohongan yang baru ketahuan saat harganya lewat. */
+  const slN = Number(m.sl) || 0, tpN = Number(m.tp) || 0;
+  const terisiQty = st?.filled ? Number(st.filled.totalSz) : 0;
+  let stopKabar: string | null = null;
+  if ((slN > 0 || tpN > 0) && terisiQty > 0) {
+    const pesan = [];
+    if (slN > 0) pesan.push(trigger(aset, beli, slN, terisiQty, 'sl'));
+    if (tpN > 0) pesan.push(trigger(aset, beli, tpN, terisiQty, 'tp'));
+    try {
+      const h2 = await ex.order({ orders: pesan, grouping: 'na' });
+      const daftar = (h2?.response?.data?.statuses ?? []) as unknown[];
+      if (daftar.some((x) => typeof x === 'object' && x !== null && 'error' in x)) {
+        stopKabar = 'Posisi terbuka, tapi SL/TP GAGAL dipasang — pasang manual sekarang.';
+      }
+    } catch (e) {
+      stopKabar = 'Posisi terbuka, tapi SL/TP GAGAL dipasang ('
+                + (e instanceof Error ? e.message : '?') + ') — pasang manual sekarang.';
+    }
+  } else if ((slN > 0 || tpN > 0) && st?.resting) {
+    stopKabar = 'Order menggantung — SL/TP baru bisa dipasang sesudah ia terisi.';
+  }
+
   return {
+    stopKabar,
     koin: aset.nama,
     arah: m.arah,
     ukuran,
