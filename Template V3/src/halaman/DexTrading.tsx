@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Wallet, Loader2, ShieldCheck, TriangleAlert, RefreshCw, X, Unplug } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Wallet, Loader2, ShieldCheck, TriangleAlert, RefreshCw, X, Unplug, CandlestickChart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 import {
@@ -154,6 +155,24 @@ export default function DexTrading() {
   useEffect(() => {
     if (jenis === 'LIMIT' && !hargaTeks && pasar > 0) setHargaTeks(String(pasar));
   }, [jenis, hargaTeks, pasar]);
+
+  /* ── KOIN IKUT POSISI YANG SEDANG TERBUKA ──────────────────────────
+     Sekali saja, saat posisi pertama terbaca. Yang paling mungkin ingin
+     diurus orang yang baru membuka halaman ini adalah posisi yang SEDANG
+     berjalan — bukan BTC, yang cuma kebetulan jadi bawaan.
+
+     Sekali, bukan tiap penyegaran: sesudah itu koinnya milik orangnya. Isian
+     yang ditimpa tiap 15 detik adalah isian yang tidak bisa diketik. */
+  const koinTerisi = useRef(false);
+  useEffect(() => {
+    if (koinTerisi.current) return;
+    const p = keadaan?.posisi[0];
+    if (!p) return;
+    koinTerisi.current = true;
+    setKoin(p.koin);
+    setArah(p.arah === 'SHORT' ? 'SELL' : 'BUY');
+    setHargaTeks('');
+  }, [keadaan]);
 
   const nilaiPosisi = modal * lev;
   const hargaAcuan = jenis === 'LIMIT' ? (Number(hargaTeks) || 0) : pasar;
@@ -428,6 +447,21 @@ export default function DexTrading() {
                         p.pnl >= 0 ? 'text-emerald-400' : 'text-red-400')}>
                         {p.pnl >= 0 ? '+' : ''}{uang(p.pnl)}
                       </span>
+                      {/* Chart-nya di halaman lain, dan itu memang benar: yang
+                          di sana chart penuh dengan alat gambar, indikator,
+                          dan replay. Menyalinnya ke sini berarti dua chart
+                          yang harus dijaga tetap sepakat.
+
+                          TAPI ia cuma MELIHAT. Order dari Chart & Entry
+                          berangkat ke akun backend, bukan ke dompet yang
+                          tersambung di halaman ini — dan itu ditulis di
+                          judulnya supaya tidak ada yang menekan Kirim di sana
+                          sambil mengira ia sedang memakai dompetnya. */}
+                      <Link to={`/chart-entry?simbol=${p.koin}USDT`}
+                            title="Lihat pair ini di Chart & Entry — untuk analisa saja, ordernya tidak lewat dompet ini"
+                            className={TOMBOL2}>
+                        <CandlestickChart className="size-3" /> Chart
+                      </Link>
                       <button onClick={() => tutup(p.koin)} disabled={!!sibuk || !agenSiap} className={TOMBOL2}>
                         {sibuk === 'tutup-' + p.koin ? <Loader2 className="size-3 animate-spin" /> : null}
                         Tutup

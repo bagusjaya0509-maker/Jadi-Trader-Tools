@@ -7,8 +7,7 @@ import {
   AlertTriangle, Newspaper, ChevronRight, ChevronDown, Copy, Radar, UserCircle2, Crown,
   Footprints,
   CheckCircle2,
-  Sun, Moon,
-} from 'lucide-react';
+  Sun, Moon, Link2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Switch } from '@/components/ui/switch-button';
 import { MultiChart } from '@/components/multi-chart';
@@ -110,6 +109,18 @@ const NAV = [
     butir: [
       { ke: '/personal-area',    label: 'Personal Area',    Ikon: Wallet },
       { ke: '/chart-entry',       label: 'Chart & Entry', Ikon: CandlestickChart },
+      /* ── DEX TRADING: BARIS SENDIRI, BUKAN ANAK WALLET TRACKING ─────
+         Sempat duduk sebagai sub-menu Wallet Tracking, dan itu salah
+         tempat. Wallet Tracking dibuka untuk mengamati uang ORANG LAIN;
+         halaman ini dibuka untuk memperdagangkan uang SENDIRI. Yang
+         menyamakan keduanya cuma kata "wallet".
+
+         Tempatnya di Workspace, tepat sesudah Chart & Entry: keduanya
+         permukaan tempat orang bertindak, bukan tempat ia mengamati.
+
+         `hanyaPemilik` sampai ada pendapat hukum — halamannya sendiri juga
+         digerbangi, ini cuma supaya menunya tidak menggoda. */
+      { ke: '/dex', label: 'DEX Trading', Ikon: Link2, hanyaPemilik: true },
       { ke: '/marketplace', label: 'Marketplace',      Ikon: Users },
       /* `sub` membuat menu ini bisa dibuka dengan panah: sub-halamannya
          terlihat dari sidebar tanpa harus mendarat dulu di halamannya.
@@ -165,12 +176,6 @@ const NAV = [
              buruk daripada menu yang tidak ada. */
           { ke: '/wallet-tracking?sub=copy',    label: 'Posisi Copy', hanyaPemilik: true },
           { ke: '/wallet-tracking?sub=hunter',  label: 'Coin Hunter' },
-          /* Prototipe, pemilik saja. Ia mengirim order uang sungguhan dari
-             dompet pengunjung sendiri, dan yang menahan gerbangnya bukan
-             kesiapan kode melainkan kesiapan izin. Duduk di sini karena ia
-             menjawab pertanyaan yang sama dengan tiga tab lain — "uang
-             on-chain sedang ke mana" — cuma dari sisi uang SENDIRI. */
-          { ke: '/dex',                         label: 'DEX Trading', hanyaPemilik: true },
         ] },
       { ke: '/integrations',   label: 'Integrations',     Ikon: Plug,
         sub: [
@@ -921,7 +926,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <g.IkonGrup className="size-3.5 text-amber-400/70" strokeWidth={2} />
                 </div>
               )}
-              {g.butir.map(({ ke, label, Ikon, sub }: any) => (
+              {/* Butir tingkat atas kini ikut menghormati `hanyaPemilik`,
+                  sama seperti grup dan sub-butir yang sudah lebih dulu. Tanpa
+                  ini, satu-satunya cara menyembunyikan menu khusus pemilik
+                  adalah menaruhnya sebagai sub — dan itu memaksa halaman yang
+                  berdiri sendiri berpura-pura jadi anak halaman lain. */}
+              {g.butir.filter((b: any) => !b.hanyaPemilik || pemilik)
+                      .map(({ ke, label, Ikon, sub }: any) => (
                 <div key={ke}>
                   <div className="relative">
                     <NavLink to={ke} onClick={() => setLaci(false)} title={ciut ? label : undefined}
