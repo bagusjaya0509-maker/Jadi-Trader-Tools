@@ -129,6 +129,12 @@ const CopyTrading   = lazy(() => muat(() => import('@/halaman/Analisa')));
 /* Pembungkus tiga sub-halaman: Dompet Pantauan, Posisi Copy, Coin Hunter.
    Ringan sendiri — isi beratnya dimuat malas lagi di dalamnya, per tab. */
 const WalletTracking = lazy(() => muat(() => import('@/halaman/WalletTracking')));
+/* SENGAJA TIDAK IKUT PRAMUAT SENGGANG di bawah. Potongannya membawa SDK
+   Hyperliquid dan penanda tangan viem — beberapa ratus kilobyte yang cuma
+   berguna bagi orang yang benar-benar membuka halamannya. Menariknya diam-
+   diam untuk semua pengunjung adalah persis kebiasaan yang sudah pernah
+   membuat halaman depan berat. */
+const DexTrading    = lazy(() => muat(() => import('@/halaman/DexTrading')));
 const HalamanHarga  = lazy(() => muat(() => import('@/halaman/Harga')));
 const Markas        = lazy(() => muat(() => import('@/halaman/Markas')));
 const Sosmed        = lazy(() => muat(() => import('@/halaman/Sosmed')));
@@ -506,6 +512,7 @@ export default function App() {
             <Route path="/marketplace"    element={<Marketplace />} />
             <Route path="/copy-signal"    element={<CopyTrading />} />
             <Route path="/wallet-tracking" element={<WalletTracking />} />
+            <Route path="/dex" element={<DexTrading />} />
             {/* ── ALAMAT LAMA TETAP HIDUP ────────────────────────────────
                 /coin-listing sudah pernah dibagikan dan tersimpan di bookmark
                 orang. Ia sekarang tab ketiga di Wallet Tracking, jadi yang

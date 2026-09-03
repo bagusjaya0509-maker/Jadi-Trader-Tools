@@ -165,6 +165,12 @@ const NAV = [
              buruk daripada menu yang tidak ada. */
           { ke: '/wallet-tracking?sub=copy',    label: 'Posisi Copy', hanyaPemilik: true },
           { ke: '/wallet-tracking?sub=hunter',  label: 'Coin Hunter' },
+          /* Prototipe, pemilik saja. Ia mengirim order uang sungguhan dari
+             dompet pengunjung sendiri, dan yang menahan gerbangnya bukan
+             kesiapan kode melainkan kesiapan izin. Duduk di sini karena ia
+             menjawab pertanyaan yang sama dengan tiga tab lain — "uang
+             on-chain sedang ke mana" — cuma dari sisi uang SENDIRI. */
+          { ke: '/dex',                         label: 'DEX Trading', hanyaPemilik: true },
         ] },
       { ke: '/integrations',   label: 'Integrations',     Ikon: Plug,
         sub: [
@@ -243,6 +249,7 @@ const JUDUL: Record<string, string> = {
   '/personal-area': 'Personal Area',
   '/copy-signal': 'Copy Signal',
   '/wallet-tracking': 'Wallet Tracking',
+  '/dex': 'DEX Trading',
   '/marketplace': 'Marketplace',
   '/integrations': 'Integrations',
   '/owner': 'Sales Report',
