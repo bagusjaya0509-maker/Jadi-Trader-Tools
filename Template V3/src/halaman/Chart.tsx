@@ -5137,8 +5137,29 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                     ber-z-30, dan panel yang bisa menimpanya akan menutupi
                     navigasi. */
                  className={cn('absolute z-20 cursor-move touch-none', !letakPakai && 'bottom-2 right-2')}>
-              {/* Tanpa bingkai dan latar — ia bagian dari chart, bukan
-                  kartu yang menumpang di atasnya. */}
+              {/* ── LATARNYA DIKEMBALIKAN ────────────────────────────────
+                  Dulu di sini tertulis "tanpa bingkai dan latar — ia bagian
+                  dari chart, bukan kartu yang menumpang di atasnya". Niatnya
+                  benar untuk panel yang isinya cuma tiga baris teks tipis.
+
+                  Tapi panelnya sudah tidak begitu lagi: ada kotak isian
+                  bergaris, dan sejak angka dolar dapat latarnya sendiri,
+                  separuh isinya berkotak sementara separuhnya menembus lilin.
+                  Dilaporkan pemilik 3 Sep 2026 — "belum di background semua",
+                  dan setengah berlatar memang lebih buruk daripada dua-duanya:
+                  yang tidak berlatar terbaca sebagai tercecer, bukan sebagai
+                  menyatu.
+
+                  Gayanya DISAMAKAN dengan bilah alat gambar yang berdiri
+                  beberapa piksel di sebelahnya — rounded-lg, border-zinc-800/80,
+                  bg-zinc-950/85, backdrop-blur. Dua benda melayang di satu
+                  chart yang digambar dengan dua bahasa berbeda terbaca sebagai
+                  dua aplikasi.
+
+                  Lebarnya 252 -> 272 px, dan itu bukan pelebaran: Tailwind
+                  memakai border-box, jadi p-2.5 memakan 20 px dari dalam.
+                  272 - 20 = 252 px isi — persis lebar yang sudah diukur
+                  menampung baris kepalanya. */}
               {/* 252 px, DIUKUR bukan dikira. Yang menahan lebar panel ini bukan
                   baris SL/TP melainkan baris KEPALANYA: "CASHCATUSDT BUY posisi ·
                   Hyperliquid" beserta tombol silangnya makan 219 px di peramban.
@@ -5148,7 +5169,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
 
                   Sempat 268 px saat kolom dolar ditambahkan; sesudah kotak
                   isiannya berhenti melar, sisa itu tidak lagi ada gunanya. */}
-              <div className="w-[252px] shrink-0 text-[11.5px]">
+              <div className="w-[272px] shrink-0 rounded-lg border border-zinc-800/80 bg-zinc-950/85 p-2.5 text-[11.5px] backdrop-blur-sm">
                               <div className="flex items-baseline gap-1.5">
                                 <span className="text-zinc-200">{sunting.simbol}</span>
                                 <span className={cn('text-[10.5px]', sunting.arah === 'BUY' ? 'text-emerald-500' : 'text-red-400')}>
