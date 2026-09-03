@@ -289,9 +289,31 @@ export function DockPine({ buka, tab, aturTab, onTutup, lilin, simbol, tf, hingg
   const pilih = daftar.find((s) => s.id === idPilih) ?? daftar[0];
   const aktif = daftar.find((s) => s.aktif) ?? null;
 
-  function ubahDaftar(f: (d: SkripPine[]) => SkripPine[]) {
+  /* ── useCallback, DAN ITU BUKAN KERAPIAN ─────────────────────────────
+     Dulu ini `function ubahDaftar(...)` biasa — lahir ulang tiap render.
+     Akibatnya berantai dan tertutup rapat:
+
+       render -> `ubahDaftar` baru
+              -> `hapusId` baru (ia mencantumkannya di dependensi)
+              -> efek `onKendali` di bawah melihat dependensinya berubah
+              -> efek jalan, memanggil onKendali({...}) = setKendaliPine
+              -> Chart render ulang -> DockPine render ulang -> ulang dari atas
+
+     Terukur di peramban 3 Sep 2026 dengan penghitung sementara: efek itu
+     berjalan 1.104 kali dalam 6 detik pertama, lalu 690 kali lagi dalam 3
+     detik berikutnya — sekitar 230 kali per detik, selama halaman terbuka.
+     Konsol dev membanjir "Maximum update depth exceeded", dan inilah beban
+     tetap di balik keluhan lama "chart terasa berat".
+
+     Pasangan `ubahDaftar`/`hapusId` ini persis yang namanya sudah tercatat
+     di perbaikan lama; yang ini jalur keduanya, lewat `onKendali`.
+
+     Dependensi KOSONG, dan itu memang benar: `setDaftar` stabil dari React,
+     `simpanDaftar` fungsi tingkat modul, dan `f` datang sebagai argumen.
+     Tidak ada satu pun nilai render yang tertangkap di dalamnya. */
+  const ubahDaftar = useCallback((f: (d: SkripPine[]) => SkripPine[]) => {
     setDaftar((d) => { const b = f(d); simpanDaftar(b); return b; });
-  }
+  }, []);
 
   /* Memanggil agen Dokter Pine. Lewat backend kita, bukan langsung ke n8n:
      alamat & credential agen tidak boleh sampai ke browser. Jawabannya

@@ -261,6 +261,51 @@ async function putaran({ dir, posisiDompet, catat, lonceng, bursa }) {
         continue;
       }
       if (s.punyaku[k]) { delete s.konfirmasiBuka[k]; continue; }
+
+      /* ══ SATU KOIN, SATU POSISI ══════════════════════════════════════
+         Diminta pemilik 3 Sep 2026 sesudah ia menyalin beberapa dompet
+         sekaligus: "takut nanti ada double posisi, mending dibatalkan saja
+         oleh sistem."
+
+         Ketakutan itu berdasar, dan penjaga di atas TIDAK menutupinya —
+         `s.punyaku` cuma tahu isi dompet INI. Dua dompet yang kebetulan
+         sama-sama memegang ETH menghasilkan dua kali `bursa.buka`, dan di
+         bursa keduanya MENYATU jadi satu posisi berukuran dua kali lipat.
+
+         Yang membuatnya berbahaya bukan ukurannya, melainkan pembukuannya:
+         `punyaku` mencatat dua posisi $30 sementara yang ada satu posisi
+         $60. Begitu salah satu dompet menutup ETH, mesin menutup "bagiannya"
+         — dan angka yang tersisa di layar tidak lagi cocok dengan yang ada
+         di bursa. Kesalahan pembukuan uang tidak pernah berhenti di
+         pembukuan.
+
+         ── DUA PEMERIKSAAN, DAN KEDUANYA PERLU ─────────────────────────
+         1. Catatan sendiri (`punyaku` seluruh dompet). Selalu bisa dibaca,
+            tidak bergantung jaringan.
+         2. Potret posisi di bursa. Menangkap yang TIDAK ada di catatan kita
+            — posisi yang dibuka pemilik dengan tangan dari Chart & Entry.
+            Menyalin di atasnya akan membesarkan posisi manualnya diam-diam,
+            dan itu justru kejutan yang paling sulit ditelusuri.
+
+         Yang kedua dilewati kalau potretnya gagal diambil; yang pertama
+         tetap jalan. Penjaga yang mati bersama jaringan bukan penjaga.
+
+         Ditahan, BUKAN dibatalkan lalu dicoba lagi: hitungan konfirmasinya
+         sengaja tidak dihapus, jadi begitu koinnya bebas ia langsung layak
+         disalin tanpa menunggu dua pindaian dari nol. */
+      const dompetLain = hidup.find(
+        (x) => x !== s && x.punyaku && x.punyaku[k]);
+      if (dompetLain) {
+        jejak('tahan', s.alamat, k, 'salin ' + k + ': ditahan, koin ini sudah disalin dari '
+              + (dompetLain.nama || ringkas(dompetLain.alamat)) + ' — satu koin satu posisi');
+        continue;
+      }
+      if (potret && potret.some((p) => String(p.koin).toUpperCase() === String(k).toUpperCase())) {
+        jejak('tahan', s.alamat, k, 'salin ' + k + ': ditahan, posisi ' + k
+              + ' sudah terbuka di akun (kemungkinan dibuka manual) — satu koin satu posisi');
+        continue;
+      }
+
       if (Object.keys(s.punyaku).length >= MAKS_POSISI) {
         jejak('tahan', s.alamat, k, 'salin ' + k + ': ditahan, sudah ' + Object.keys(s.punyaku).length + ' posisi salinan');
         continue;
