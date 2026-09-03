@@ -539,6 +539,54 @@ async function batalHl({ koin, id }) {
   return { ok: true, koin: aset.nama, id: String(id) };
 }
 
+/** Order MASUK di harga pasar, ukuran apa adanya. Dipakai tombol Chasing.
+ *
+ *  ── TIGA HAL YANG SENGAJA TIDAK DILAKUKAN ─────────────────────────────
+ *  1. TIDAK menyentuh leverage. `orderHl` memanggil `updateLeverage` dan
+ *     bawaannya 1x — memakainya untuk chasing akan diam-diam menurunkan
+ *     leverage koin itu ke 1x, padahal yang diminta cuma "isi sekarang".
+ *     Leverage-nya sudah disetel saat pending itu dipasang.
+ *  2. TIDAK memasang SL/TP. Order yang dikejar sudah punya rencananya
+ *     sendiri di daftar order; memasang yang baru dari sini akan menumpuk.
+ *  3. TIDAK reduceOnly — ini order MEMBUKA, kebalikan dari `tutupHl` yang
+ *     bentuknya mirip. Satu huruf beda, dua akibat yang berlawanan.
+ *
+ *  IOC menyeberangi buku, sama dengan jalur market lain di berkas ini —
+ *  jadi ia bisa TERISI SEBAGIAN, dan yang memanggil wajib membaca `terisi`
+ *  alih-alih menganggap berhasil berarti penuh. */
+async function kejarHl({ koin, arah, quantity }) {
+  if (!siap()) throw new Error('Hyperliquid belum aktif');
+  const aset = await asetHl(keKoin(koin));
+  if (!aset) throw new Error(`${koin} tidak ada di Hyperliquid perps`);
+
+  const ukuran = bulatUkuran(Number(quantity), aset.szDecimals);
+  if (!(ukuran > 0)) throw new Error(`Ukuran ${quantity} membulat jadi nol untuk ${aset.nama}`);
+
+  const pasar = await hargaHl(aset.nama);
+  if (!(pasar > 0)) throw new Error(`Harga ${aset.nama} tidak terbaca`);
+
+  const beli = arah === 'BUY' || arah === 'LONG';
+  const hargaKirim = bulatHarga(pasar * (beli ? 1 + SELISIH_PASAR : 1 - SELISIH_PASAR),
+                                aset.szDecimals);
+
+  const hasil = await pustaka().ex.order({
+    orders: [{
+      a: aset.indeks, b: beli, p: String(hargaKirim), s: String(ukuran),
+      r: false, t: { limit: { tif: 'Ioc' } },
+    }],
+    grouping: 'na',
+  }, { vaultAddress: AKUN });
+
+  const st = hasil?.response?.data?.statuses?.[0];
+  if (st?.error) throw new Error(st.error);
+  const isi = st?.filled;
+  return {
+    ok: true, koin: aset.nama, arah: beli ? 'BUY' : 'SELL',
+    ukuran, hargaKirim,
+    terisi: isi ? { ukuran: Number(isi.totalSz), harga: Number(isi.avgPx) } : null,
+  };
+}
+
 /** Memindahkan SL ke harga masuk. TP yang sudah terpasang DIPERTAHANKAN:
  *  memindahkan stop bukan alasan membatalkan rencana keluarnya. */
 async function slKeBeHl(koin) {
@@ -744,6 +792,6 @@ module.exports = {
      requireToken di server. Lihat catatan panjang di atas bukaHl. */
   orderHl, pasangSltpHl, batalTriggerHl, batalHl, slKeBeHl,
   /* Dipakai kedua jalur. */
-  tutupHl, posisiHl, pendingHl, isianTutupHl, metaKonteksHl, keSimbol, keKoin,
+  tutupHl, kejarHl, posisiHl, pendingHl, isianTutupHl, metaKonteksHl, keSimbol, keKoin,
   batas: { HL_MAKS_USD, HL_MAKS_LEV },
 };

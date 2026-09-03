@@ -444,6 +444,53 @@ export async function ubahSlTpNyata(p: UbahSlTp): Promise<void> {
 }
 
 /** Batalkan pending order kripto yang belum ke-fill. */
+/** Hasil chasing. `terisi` null berarti bursa menerima ordernya tapi belum
+ *  melaporkan isian — bukan berarti gagal, dan bukan berarti berhasil. */
+export interface HasilKejar {
+  bursa: 'binance' | 'hyperliquid';
+  terisi: { ukuran: number; harga: number } | null;
+}
+
+/** Habiskan sebuah pending order di harga pasar.
+ *
+ *  Server MEMBATALKAN dulu, baru mengirim market — dan berhenti total kalau
+ *  pembatalannya gagal. Alasan lengkapnya di kepala rutenya; yang perlu
+ *  diketahui pemanggil cuma ini: galat dari sini datang dalam DUA rasa yang
+ *  berbeda akibatnya, dan `pesan` dari server yang membedakannya.
+ *
+ *    tahap 'batal'    tidak ada yang berubah, pending masih hidup
+ *    tahap 'market'   pendingnya SUDAH HILANG dan tidak ada posisi terbuka
+ *
+ *  Karena itu pesan server diteruskan apa adanya alih-alih diringkas jadi
+ *  "gagal" — dua keadaan itu menuntut perbuatan yang berbeda dari orangnya. */
+export async function kejarPendingNyata(p: {
+  symbol: string; orderId: string; side: 'BUY' | 'SELL'; quantity: number; isAlgo?: boolean;
+}): Promise<HasilKejar> {
+  const { url, token } = bacaKoneksi();
+  const dasar = (url.trim() || PROXY_BAWAAN).replace(/\/+$/, '');
+  if (!token.trim()) throw new Error('App Token belum diisi di Integrations.');
+  const r = await fetch(`${dasar}/api/trade/futures/kejar`, {
+    method: 'POST',
+    headers: { 'X-App-Token': token.trim(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      symbol: p.symbol, orderId: p.orderId, side: p.side,
+      quantity: p.quantity, isAlgo: p.isAlgo ?? false,
+      ...medanBursa(p.symbol),
+    }),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.pesan || j.error?.msg || j.error || `Backend menjawab ${r.status}`);
+  return {
+    bursa: j.bursa === 'hyperliquid' ? 'hyperliquid' : 'binance',
+    terisi: j.terisi
+      ? { ukuran: Number(j.terisi.ukuran), harga: Number(j.terisi.harga) }
+      /* Binance menjawab bentuknya sendiri; yang dipakai cuma dua angka. */
+      : Number(j.order?.executedQty) > 0
+        ? { ukuran: Number(j.order.executedQty), harga: Number(j.order.avgPrice) || 0 }
+        : null,
+  };
+}
+
 export async function batalPendingNyata(p: { symbol: string; orderId: string; isAlgo?: boolean }): Promise<void> {
   const { url, token } = bacaKoneksi();
   const dasar = (url.trim() || PROXY_BAWAAN).replace(/\/+$/, '');

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Copy, Trash2, Loader2 } from 'lucide-react';
+import { Copy, Trash2, Loader2, Zap } from 'lucide-react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { cn, uang, harga as fHarga } from '@/lib/utils';
 import { usePosisi } from '@/lib/data';
@@ -11,9 +11,9 @@ import { TabelPosisi, type BarisPosisi } from '@/components/tabel-posisi';
 import type { Sumber } from '@/data/contoh';
 import { simbolDasarMt5 } from '@/lib/simbol';
 import { cariStopNyasar } from '@/lib/stop-nyasar';
-import { batalPendingNyata } from '@/lib/order-nyata';
+import { batalPendingNyata, kejarPendingNyata } from '@/lib/order-nyata';
 import { useOrderSementara, sapuYangSudahAda } from '@/lib/order-sementara';
-import { barisPendingKripto, rencanaLokal } from '@/lib/pending-kripto';
+import { barisPendingKripto, rencanaLokal, type BarisPending } from '@/lib/pending-kripto';
 import { useAuth } from '@/lib/auth';
 import { petaCopy } from '@/lib/tanda-copy';
 import { statusPengikutVps } from '@/lib/pengikut-vps';
@@ -382,6 +382,86 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
     } finally { setBatalTiket(null); }
   }
 
+  /* ── CHASING: HABISKAN PENDING DI HARGA PASAR ──────────────────────
+     Diminta pemilik 3 Sep 2026. Order yang menggantung dan tidak kunjung
+     terisi, dibuat terisi sekarang juga.
+
+     KONFIRMASI WAJIB, dan kalimatnya menyebut angka. "Yakin?" tidak
+     memberi tahu apa-apa; yang perlu dibaca sebelum menekan adalah arah,
+     ukuran, dan bahwa harga masuknya akan BERBEDA dari harga yang tertulis
+     di barisnya — justru itu inti perbuatannya.
+
+     Urutan aman (batal dulu, market kemudian, dan berhenti kalau
+     pembatalan gagal) dikerjakan DI SERVER, bukan di sini. Dua permintaan
+     terpisah dari layar berarti jeda jaringan di antara keduanya, dan
+     jeda itu tepat di tempat yang paling tidak boleh punya jeda. */
+  const [kejarKunci, setKejarKunci] = useState<string | null>(null);
+  const [kejarKabar, setKejarKabar] = useState('');
+
+  async function kejarKripto(o: BarisPending) {
+    if (kejarKunci) return;
+    const asli = pendingKripto.find((x) => x.id === o.kunci);
+    if (!asli) { setKejarKabar('Order itu sudah tidak ada di daftar bursa.'); return; }
+    if (!confirm(`Habiskan order ini di harga pasar sekarang?\n\n`
+      + `${o.arah} ${o.simbol} — ${asli.qty}\n`
+      + `Harga limitnya ${fHarga(o.harga)} DIBATALKAN, lalu dibeli/dijual di harga pasar berjalan.\n\n`
+      + `Harga masuknya akan berbeda dari ${fHarga(o.harga)}.`)) return;
+
+    setKejarKunci(o.kunci);
+    setKejarKabar('');
+    try {
+      const h = await kejarPendingNyata({
+        symbol: asli.simbol, orderId: asli.id, side: asli.arah,
+        quantity: asli.qty, isAlgo: asli.algo,
+      });
+      setKejarKabar(h.terisi
+        ? `Terisi ${h.terisi.ukuran} ${o.simbol} @ ${fHarga(h.terisi.harga)}.`
+        : 'Terkirim — bursa belum melaporkan isiannya. Periksa Posisi Terbuka sebentar lagi.');
+    } catch (e) {
+      setKejarKabar(e instanceof Error ? e.message : 'Gagal mengejar order.');
+    } finally { setKejarKunci(null); }
+  }
+
+  /* Trade-Fi tidak punya rute `kejar` di server: perintahnya lewat EA, dan
+     EA hanya mengerti BUKA / UBAH / TUTUP. Jadi urutannya dikerjakan di
+     sini — tapi dengan aturan yang sama persis: TUTUP dulu, dan kalau
+     terminal tidak menjawab sukses, BUKA tidak pernah berangkat. */
+  async function kejarMt5(o: BarisPending) {
+    if (kejarKunci) return;
+    const asli = mt5.pending.find((x) => x.tiket === o.kunci);
+    if (!asli) { setKejarKabar('Order itu sudah tidak ada di daftar terminal.'); return; }
+    if (!confirm(`Habiskan order ini di harga pasar sekarang?\n\n`
+      + `${asli.arah} ${asli.simbol} — ${asli.lot} lot\n`
+      + `Pending #${asli.tiket} di ${fHarga(asli.harga)} DIBATALKAN, lalu dibuka di harga pasar.\n\n`
+      + `SL ${asli.sl ? fHarga(asli.sl) : '—'} dan TP ${asli.tp ? fHarga(asli.tp) : '—'} ikut dipasang di posisi barunya.`)) return;
+
+    setKejarKunci(o.kunci);
+    setKejarKabar('');
+    try {
+      const { id } = await kirimPerintahMt5({ aksi: 'TUTUP', tiket: asli.tiket });
+      const batal = await tungguHasilMt5(id);
+      if (batal.status !== 'sukses') {
+        setKejarKabar(`Pending gagal dibatalkan, jadi order pasar TIDAK dikirim. Terminal menjawab: ${batal.pesan || batal.status}`);
+        return;
+      }
+      /* `entry` sengaja TIDAK dikirim — kosong berarti eksekusi di harga
+         pasar. Mengirim harga pending-nya justru memasang pending baru di
+         tempat yang sama, yaitu kebalikan dari yang diminta. */
+      const { id: id2 } = await kirimPerintahMt5({
+        aksi: 'BUKA', simbol: asli.simbol, arah: asli.arah, lot: asli.lot,
+        sl: asli.sl || undefined, tp: asli.tp || undefined,
+      });
+      const buka = await tungguHasilMt5(id2);
+      segarkanAkunMt5();
+      setKejarKabar(buka.status === 'sukses'
+        ? `Berhasil — ${buka.pesan}`
+        : `Pending SUDAH dibatalkan, tapi order pasarnya gagal: ${buka.pesan || buka.status}. `
+          + 'Tidak ada posisi terbuka dan tidak ada pending yang tersisa.');
+    } catch (e) {
+      setKejarKabar(e instanceof Error ? e.message : 'Gagal mengejar order.');
+    } finally { setKejarKunci(null); }
+  }
+
   /* Satu bentuk OrderSunting untuk DUA pemakai: klik baris (lihat di chart)
      dan tombol Tutup. Dulu bentuknya ditulis inline di satu tempat saja;
      begitu tombol Tutup ditambahkan, menyalinnya berarti dua salinan yang
@@ -651,6 +731,25 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
                     </span>
                     <span className="flex shrink-0 items-center gap-1.5">
                       <span className="angka text-[12px] text-amber-400/90">{fHarga(o.harga)}</span>
+                      {/* CHASING. Digerbangi `!o.rencana`: baris rencana
+                          adalah catatan lokal yang belum jadi order di
+                          bursa, dan "habiskan di harga pasar" untuk sesuatu
+                          yang belum ada di bursa tidak punya arti — server
+                          akan menolaknya dengan galat yang menyebut order
+                          id yang tidak pernah dikenal siapa pun. */}
+                      {!o.rencana && (
+                        <button type="button"
+                          onClick={(e) => { e.stopPropagation();
+                            void (sumber === 'kripto' ? kejarKripto(o) : kejarMt5(o)); }}
+                          disabled={kejarKunci !== null || batalTiket !== null}
+                          title="Chasing — batalkan limitnya lalu isi di harga pasar sekarang"
+                          aria-label={`Chasing ${o.arah} ${o.simbol}`}
+                          className="rounded p-0.5 text-zinc-600 transition-colors hover:bg-amber-500/10 hover:text-amber-400 disabled:opacity-40">
+                          {kejarKunci === o.kunci
+                            ? <Loader2 className="size-3.5 animate-spin" />
+                            : <Zap className="size-3.5" />}
+                        </button>
+                      )}
                       {/* Hanya untuk Trade-Fi. Pending kripto di daftar ini
                           sebagian RENCANA lokal yang belum ada di bursa,
                           dan satu ikon yang kadang menghapus order sungguhan
@@ -693,6 +792,9 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
             </div>
             {batalKabar && (
               <p className="mt-2 text-[11px] text-red-400/90">{batalKabar}</p>
+            )}
+            {kejarKabar && (
+              <p className="mt-2 text-[11px] leading-relaxed text-zinc-400">{kejarKabar}</p>
             )}
           </div>
         )}
