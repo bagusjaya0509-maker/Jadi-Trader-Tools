@@ -20,7 +20,8 @@ import { kirimOrderNyata, ubahSlTpNyata, batalPendingNyata, tutupPosisiNyata, ti
 import { kirimPerintahMt5, tungguHasilMt5 } from '@/lib/mt5-order';
 import { DockPine, type InfoPine, type KendaliPine } from '@/components/dock-pine';
 import { WatchChart } from '@/components/watch-chart';
-import { PanelPosisiTerbuka, type OrderSunting } from '@/components/panel-posisi-terbuka';
+import { PanelPosisiTerbuka, type OrderSunting, type BandingSalinan } from '@/components/panel-posisi-terbuka';
+import { ChartBanding } from '@/components/chart-banding';
 import type { AlatPegang, GambarAlat } from '@/lib/plugin-alat';
 import type { HasilPine } from '@/lib/pine';
 import { bacaSetelanChart, simpanSetelanChart, usulSlTp } from '@/lib/replay';
@@ -1663,6 +1664,30 @@ export default function ChartBacktest() {
   /* Pensil di tabel: buka ordernya DAN panel ubahnya sekaligus.
      Berbeda dari klik baris, yang sengaja berhenti di garisnya saja —
      lihat catatan di prop `onUbah` milik TabelPosisi. */
+  /* ── PERBANDINGAN SALINAN: BELAHAN KIRI AREA CHART ──────────────────
+     Diminta pemilik 3 Sep 2026 — sebelumnya popup dua kolom angka. Popup
+     itu menjawab "berapa" tapi tidak "di mana": entry yang meleset 2,5%
+     terbaca sebagai satu baris teks, padahal yang ingin dilihat orang
+     adalah seberapa jauh garisnya dari garisnya sendiri di lilin yang sama.
+
+     Simbolnya DIPINDAH lebih dulu. Chart pembanding memakai lilin yang sama
+     dengan chart utama — kalau simbolnya tidak ikut pindah, panel kiri akan
+     menggambar garis entry ZEC di atas lilin BTC, dan itu bukan kurang
+     tepat melainkan salah. */
+  const [bandingSalin, setBandingSalin] = useState<BandingSalinan | null>(null);
+
+  function bukaBandingSalin(b: BandingSalinan) {
+    setSimbol(rapikanSimbol(b.simbol));
+    setBandingSalin(b);
+  }
+
+  /* Panel ikut tertutup saat simbolnya berpindah ke pasangan lain — dengan
+     alasan yang sama: perbandingan yang lilinnya sudah bukan miliknya lebih
+     buruk daripada tidak ada perbandingan. */
+  useEffect(() => {
+    if (bandingSalin && rapikanSimbol(bandingSalin.simbol) !== simbol) setBandingSalin(null);
+  }, [simbol, bandingSalin]);
+
   function ubahDariTabel(o: OrderSunting) {
     bukaSunting(o);
     setPanelUbah(true);
@@ -4587,6 +4612,11 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                             if (panelUbah) { tutupPanelUbah(); return; }
                             lepasSunting();
                           }}
+                          panelKiri={bandingSalin ? (
+                            <ChartBanding banding={bandingSalin} lilin={lilinGabung}
+                                          tinggi={tinggiChart} tampilan={tampilan}
+                                          onTutup={() => setBandingSalin(null)} />
+                          ) : undefined}
                           garisSeret={garisSeret}
                           onSeret={(id, h) => {
                             if (sunting) {
@@ -6020,7 +6050,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                berdekatan, bukan sebagai satu bidang yang terbagi. */
             <div className={cn('grid grid-cols-1 lg:grid-cols-2',
               POLOS ? 'mt-0 gap-4' : 'mt-px gap-px')}>
-              <PanelPosisiTerbuka sumber="kripto" onSunting={bukaSunting} onTutup={tutupDariTabel} onUbahSlTp={ubahDariTabel} tanpaBingkai={POLOS} menyatu />
+              <PanelPosisiTerbuka sumber="kripto" onSunting={bukaSunting} onTutup={tutupDariTabel} onUbahSlTp={ubahDariTabel} onBanding={bukaBandingSalin} tanpaBingkai={POLOS} menyatu />
               <PanelPosisiTerbuka sumber="forex" onSunting={bukaSunting} onTutup={tutupDariTabel} onUbahSlTp={ubahDariTabel} tanpaBingkai={POLOS} menyatu />
             </div>
           )}
