@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronUp, Copy } from 'lucide-react';
+import { ChevronDown, ChevronUp, Copy, Pencil } from 'lucide-react';
 import { TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn, uang, harga } from '@/lib/utils';
 
@@ -190,10 +190,23 @@ function gabungBaris(g: BarisPosisi[]): BarisPosisi {
   };
 }
 
-export function TabelPosisi({ baris, kosong, onKlikBaris, onTutup }: {
+export function TabelPosisi({ baris, kosong, onKlikBaris, onTutup, onUbah }: {
   baris: BarisPosisi[];
   /** Tombol Tutup per baris. Kolomnya hanya muncul kalau diberikan. */
   onTutup?: (b: BarisPosisi) => void;
+  /** Ikon pensil per baris — langsung ke panel ubah SL/TP di chart.
+   *
+   *  Klik BARIS sudah membuka ordernya di chart, tapi berhenti di situ:
+   *  panel ubahnya menunggu satu klik lagi pada garisnya. Itu benar untuk
+   *  maksud yang paling sering ("stop saya sekarang di mana"), dan salah
+   *  untuk maksud yang paling mendesak — posisi yang dibuka TANPA stop sama
+   *  sekali. Dilaporkan pemilik 3 Sep 2026 pada SUI yang dibuka di Binance
+   *  tanpa SL/TP: ia terlihat di panel, tapi tidak ada jalan dari panel itu
+   *  untuk memasangkannya.
+   *
+   *  Jadi pensilnya bukan jalan pintas untuk kenyamanan; ia satu-satunya
+   *  jalan yang menyebut dirinya sendiri. */
+  onUbah?: (b: BarisPosisi) => void;
   /** Klik baris = buka order ini di chart untuk disunting. Kalau tidak
    *  diberikan, barisnya tidak bisa diklik sama sekali — bukan bisa
    *  diklik tapi tidak melakukan apa-apa. */
@@ -258,7 +271,7 @@ export function TabelPosisi({ baris, kosong, onKlikBaris, onTutup }: {
             <Th className="text-right">P/L</Th>
             {/* Kepala kolom terakhir muncul kalau ADA yang akan mengisinya:
                 tombol Tutup, atau tombol Lepas milik baris gabungan. */}
-            {(onTutup || adaGabungan) && <Th />}
+            {(onTutup || onUbah || adaGabungan) && <Th />}
           </tr>
         </thead>
         <tbody>
@@ -414,20 +427,36 @@ export function TabelPosisi({ baris, kosong, onKlikBaris, onTutup }: {
                     baris tunggal kehilangan sel terakhirnya sementara baris
                     gabungan punya — dan tabelnya jadi bergerigi di tepi
                     kanan tanpa ada yang salah di datanya. */}
-                {!onTutup && !jml && adaGabungan && <Td />}
-                {onTutup && !jml && (
+                {!onTutup && !onUbah && !jml && adaGabungan && <Td />}
+                {(onTutup || onUbah) && !jml && (
                   <Td className="text-right">
+                    {/* Pensil DULU, baru Tutup. Urutan ini disengaja: yang
+                        kiri adalah yang sering dipakai dan bisa dibatalkan,
+                        yang kanan yang jarang dan tidak bisa. Tangan yang
+                        meleset satu tombol harus meleset ke arah yang lebih
+                        aman, bukan sebaliknya. */}
+                    {onUbah && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onUbah(b); }}
+                        title="Ubah SL/TP posisi ini"
+                        aria-label={`Ubah SL/TP ${b.simbol}`}
+                        className="mr-1 inline-flex cursor-pointer items-center rounded border border-zinc-800 p-1 text-zinc-500 transition-colors hover:border-sky-500/40 hover:text-sky-300">
+                        <Pencil className="size-3.5" strokeWidth={2} />
+                      </button>
+                    )}
                     {/* stopPropagation: barisnya juga bisa diklik (buka di
                         chart), dan tanpa ini menekan Tutup menjalankan
                         keduanya. Warna merah baru muncul saat disentuh —
                         tombol yang menyala merah terus mengundang klik
                         refleks pada tindakan yang tidak bisa dibatalkan. */}
-                    <button
-                      onClick={(e) => { e.stopPropagation(); onTutup(b); }}
-                      title="Tutup posisi ini di harga pasar"
-                      className="cursor-pointer rounded border border-zinc-800 px-2 py-0.5 text-[11px] text-zinc-400 transition-colors hover:border-red-500/40 hover:text-red-400">
-                      Tutup
-                    </button>
+                    {onTutup && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onTutup(b); }}
+                        title="Tutup posisi ini di harga pasar"
+                        className="cursor-pointer rounded border border-zinc-800 px-2 py-0.5 text-[11px] text-zinc-400 transition-colors hover:border-red-500/40 hover:text-red-400">
+                        Tutup
+                      </button>
+                    )}
                   </Td>
                 )}
               </Tr>

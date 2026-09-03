@@ -66,7 +66,7 @@ export interface OrderSunting {
   gabungan?: number;
 }
 
-export function PanelPosisiTerbuka({ sumber, onSunting, onTutup, tanpaBingkai, menyatu }: {
+export function PanelPosisiTerbuka({ sumber, onSunting, onTutup, onUbahSlTp, tanpaBingkai, menyatu }: {
   /** Lepas garis tepi dan latar kartu. Dipakai di panel multi-chart, yang
    *  sudah punya garis pemisahnya sendiri — kartu bergaris di dalam kotak
    *  bergaris menghasilkan dua garis sejajar berjarak beberapa piksel. */
@@ -89,6 +89,10 @@ export function PanelPosisiTerbuka({ sumber, onSunting, onTutup, tanpaBingkai, m
    *  adalah tindakan yang tidak bisa dibatalkan — ia harus punya tombolnya
    *  sendiri, bukan menumpang klik baris yang sama dengan "lihat di chart". */
   onTutup?: (o: OrderSunting) => void;
+  /** Ikon pensil per baris — buka ordernya di chart DENGAN panel ubah SL/TP
+   *  sudah terbuka. Bentuk datanya sama persis dengan `onSunting`; yang
+   *  berbeda cuma seberapa jauh penerimanya membuka. */
+  onUbahSlTp?: (o: OrderSunting) => void;
 }) {
   const { data: posisiKripto, pending: pendingKripto, stop: stopKripto, contoh: kriptoContoh, bursaAktif } = usePosisi();
   /* ── SUBJUDUL MENYEBUT BURSA YANG SUNGGUH ADA ISINYA ─────────────────
@@ -480,10 +484,14 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
             tercatat lewat panel tiket saat order dibuat — yang hilang
             cuma penyuntingannya di tabel ini, dan tempatnya dipakai
             untuk angka yang dibutuhkan saat posisi sedang berjalan. */}
+        {/* `onUbah` tanpa argumen kedua: pensil tidak pernah muncul di
+            baris gabungan (tabel menahannya lewat `!jml`), jadi order yang
+            sampai ke penerimanya selalu tunggal. */}
         <TabelPosisi
           baris={baris}
           onTutup={onTutup && ((b) => onTutup(keOrder(b)))}
           onKlikBaris={onSunting && ((b, gabungan) => onSunting(keOrder(b, gabungan)))}
+          onUbah={onUbahSlTp && ((b) => onUbahSlTp(keOrder(b)))}
           kosong={sumber === 'kripto'
             ? 'Tidak ada posisi kripto terbuka.'
             : mt5.terhubung === true ? 'Tidak ada posisi MT5 terbuka.' : mt5.ket}

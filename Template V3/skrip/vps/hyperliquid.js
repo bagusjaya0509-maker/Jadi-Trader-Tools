@@ -129,6 +129,17 @@ async function saldoHl() {
   };
 }
 
+/** Meta + konteks pasar seluruh perps sekaligus: `[meta, ctx]` sejajar
+ *  indeks. Satu panggilan memberi markPx DAN prevDayPx, jadi %24 jam bisa
+ *  dihitung tanpa permintaan kedua.
+ *
+ *  TIDAK di-cache seperti `meta()`: yang ini membawa HARGA, dan harga yang
+ *  disimpan setengah jam bukan harga. Pemanggilnya (`/api/tickers`) sudah
+ *  punya cache 15 detiknya sendiri. */
+async function metaKonteksHl() {
+  return pustaka().info.metaAndAssetCtxs();
+}
+
 /** Harga tengah sebuah koin. */
 async function hargaHl(koin) {
   const semua = await pustaka().info.allMids();
@@ -733,6 +744,6 @@ module.exports = {
      requireToken di server. Lihat catatan panjang di atas bukaHl. */
   orderHl, pasangSltpHl, batalTriggerHl, batalHl, slKeBeHl,
   /* Dipakai kedua jalur. */
-  tutupHl, posisiHl, pendingHl, isianTutupHl, keSimbol, keKoin,
+  tutupHl, posisiHl, pendingHl, isianTutupHl, metaKonteksHl, keSimbol, keKoin,
   batas: { HL_MAKS_USD, HL_MAKS_LEV },
 };

@@ -332,14 +332,22 @@ export async function hargaTickMt5(): Promise<Record<string, { bid: number; wakt
 export interface Ticker { lastPrice: number; ubah24j: number }
 
 let tickerCache: { waktu: number; isi: Record<string, Ticker> } | null = null;
+let tickerCacheHl: { waktu: number; isi: Record<string, Ticker> } | null = null;
 
 /** Semua ticker 24 jam sekaligus. Satu permintaan untuk ratusan simbol jauh
  *  lebih murah daripada satu permintaan per simbol. */
-export async function ambilTickers(): Promise<Record<string, Ticker>> {
-  if (tickerCache && Date.now() - tickerCache.waktu < UMUR_MS) return tickerCache.isi;
+/** `sertakanHl` menarik juga koin Hyperliquid yang tidak ada di Binance.
+ *
+ *  Diminta, bukan bawaan — dan cache-nya TERPISAH. Screener memakai daftar
+ *  ini sebagai semesta pemindaian; kalau satu pemanggil yang memintanya
+ *  mengisi cache bersama, screener akan memindai ratusan koin yang klinenya
+ *  tidak ia punya, hanya karena watchlist kebetulan dibuka lebih dulu. */
+export async function ambilTickers(sertakanHl = false): Promise<Record<string, Ticker>> {
+  const simpan = sertakanHl ? tickerCacheHl : tickerCache;
+  if (simpan && Date.now() - simpan.waktu < UMUR_MS) return simpan.isi;
   try {
-    const r = await fetch(`${dasar()}/api/tickers`);
-    if (!r.ok) return tickerCache?.isi ?? {};
+    const r = await fetch(`${dasar()}/api/tickers${sertakanHl ? '?hl=1' : ''}`);
+    if (!r.ok) return simpan?.isi ?? {};
     const j = await r.json();
     const daftar: any[] = Array.isArray(j) ? j : (j?.data ?? []);
     const peta: Record<string, Ticker> = {};
@@ -350,10 +358,11 @@ export async function ambilTickers(): Promise<Record<string, Ticker>> {
         ubah24j: Number(t.priceChangePercent) || 0,
       };
     }
-    tickerCache = { waktu: Date.now(), isi: peta };
+    if (sertakanHl) tickerCacheHl = { waktu: Date.now(), isi: peta };
+    else tickerCache = { waktu: Date.now(), isi: peta };
     return peta;
   } catch {
-    return tickerCache?.isi ?? {};
+    return simpan?.isi ?? {};
   }
 }
 

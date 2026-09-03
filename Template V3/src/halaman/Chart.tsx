@@ -1381,6 +1381,9 @@ export default function ChartBacktest() {
 
     setSuntingSibuk(true);
     setSuntingKabar('Mengirim perubahan…');
+    /* Ditulis di sini, dibaca sesudah `finally` — lihat catatannya di
+       ujung fungsi ini. */
+    let tuntas = false;
     try {
       if (sunting.pasar === 'mt5') {
         const { id } = await kirimPerintahMt5({
@@ -1398,6 +1401,7 @@ export default function ChartBacktest() {
            ulang supaya panel dan tabel berubah berbarengan. */
         if (hasil.status === 'sukses') segarkanAkunMt5();
         setSuntingKabar(hasil.status === 'sukses' ? `Berhasil — ${hasil.pesan}` : `Gagal: ${hasil.pesan}`);
+        if (hasil.status === 'sukses') tuntas = true;
       } else {
         /* Kripto: order lama DIBATALKAN lalu dipasang ulang di harga
            baru — itulah cara Binance mengubah conditional order, dan
@@ -1475,11 +1479,29 @@ export default function ChartBacktest() {
           setSuntingKabar(tercatat
             ? 'Berhasil — bursa sudah mencatat SL/TP barunya.'
             : 'Sudah dikirim dan diterima bursa, tapi daftar ordernya belum berubah. JANGAN kirim ulang — tiap kiriman memasang stop baru. Tunggu sebentar lalu periksa Posisi Terbuka.');
+          if (tercatat) tuntas = true;
         }
       }
     } catch (e) {
       setSuntingKabar(e instanceof Error ? e.message : 'Gagal mengirim perubahan');
     } finally { setSuntingSibuk(false); }
+
+    /* ── PANELNYA MENUTUP SENDIRI, TAPI HANYA KALAU BERHASIL ────────────
+       Diminta pemilik 3 Sep 2026: sesudah Kirim, panelnya tidak perlu
+       tinggal di layar.
+
+       Yang TIDAK ikut ditutup: kegagalan, dan dua keadaan setengah jadi —
+       stop lama yang gagal dibatalkan, dan bursa yang belum mencatat
+       perubahannya. Ketiganya punya kalimat yang harus dibaca, dan
+       `suntingKabar` cuma tergambar DI DALAM panel ini: menutupnya berarti
+       membuang satu-satunya tempat kalimat itu muncul. Yang paling mahal di
+       antaranya kalimat "JANGAN kirim ulang" — menghilangkannya justru
+       mengundang perbuatan yang ia larang.
+
+       `setPanelUbah(false)` langsung, BUKAN `tutupPanelUbah()`: yang kedua
+       mengembalikan isian ke nilai broker yang lama, dan itu perilaku
+       "batal" — kebalikan dari yang baru saja berhasil dikirim. */
+    if (tuntas) { setPanelUbah(false); setSuntingKabar(''); }
   }
 
   /* Batalkan pending / tutup posisi. Dipisah dari kirimSunting karena
@@ -1638,6 +1660,14 @@ export default function ChartBacktest() {
 
      Order-nya dibuka di chart lebih dulu supaya orangnya MELIHAT apa yang
      akan ditutup — konfirmasi berisi nama dan P/L tetap muncul sesudahnya. */
+  /* Pensil di tabel: buka ordernya DAN panel ubahnya sekaligus.
+     Berbeda dari klik baris, yang sengaja berhenti di garisnya saja —
+     lihat catatan di prop `onUbah` milik TabelPosisi. */
+  function ubahDariTabel(o: OrderSunting) {
+    bukaSunting(o);
+    setPanelUbah(true);
+  }
+
   function tutupDariTabel(o: OrderSunting) {
     bukaSunting(o);
     /* Satu putaran render supaya `sunting` sudah terisi saat akhiriOrder
@@ -1970,6 +2000,35 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
      posisinya hidup (dibuka dari web ataupun MT5), hilang sendiri saat
      SL/TP kena atau ditutup dari mana pun. */
   const nilaiLotMt5 = simbol.startsWith('MT5:') ? (bacaSpekMt5(simbol.slice(4)) ?? 100) : 0;
+
+  /* ── SL & TP DALAM DOLAR, DI SEBELAH ANGKANYA ────────────────────────
+     Diminta pemilik 3 Sep 2026. Harga saja menuntut orangnya menghitung
+     sendiri berapa uang yang dipertaruhkan tiap kali garisnya digeser —
+     dan itu perhitungan yang tidak pernah benar-benar dilakukan di tengah
+     seretan.
+
+     Rumusnya berbeda per pasar dan tidak bisa disatukan:
+       kripto    jumlah koin x jarak harga
+       Trade-Fi  lot x dolar per lot per 1,0 harga (dilaporkan EA)
+     Menyamakan keduanya berarti salah satunya meleset 100x lipat.
+
+     BERTANDA, bukan nilai mutlak. SL yang digeser MELEWATI entry (BUY: ke
+     atas) mengunci UNTUNG, bukan kerugian — menuliskannya sebagai angka
+     merah membuat orang mengira ia sedang memperbesar risiko justru pada
+     saat ia menghapusnya. Rumus yang sama dipakai SL dan TP; yang
+     membedakan hasilnya cuma di sisi mana harganya duduk. */
+  const unitSunting = useMemo(() => {
+    if (!sunting || sunting.gabungan) return 0;
+    return sunting.pasar === 'mt5' ? sunting.ukuran * nilaiLotMt5 : sunting.ukuran;
+  }, [sunting, nilaiLotMt5]);
+
+  /** null = tidak bisa dihitung. Ditulis apa adanya sebagai tanda hubung —
+   *  nol di tempat ini terbaca "tidak ada risiko", yang justru kebalikan
+   *  dari "tidak diketahui". */
+  function uangDiHarga(h: number): number | null {
+    if (!sunting || !(h > 0) || !(sunting.entry > 0) || !(unitSunting > 0)) return null;
+    return (h - sunting.entry) * unitSunting * (sunting.arah === 'BUY' ? 1 : -1);
+  }
   /* ── Posisi MT5 di chart — ala garis posisi MetaTrader ──────────────
      Setiap posisi terbuka di simbol ini digambar ChartLilin sebagai price
      line entry/SL/TP yang menembus ke sumbu harga. Bukan pengganti garis
@@ -5050,7 +5109,10 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                  className={cn('absolute z-20 cursor-move touch-none', !letakPakai && 'bottom-2 right-2')}>
               {/* Tanpa bingkai dan latar — ia bagian dari chart, bukan
                   kartu yang menumpang di atasnya. */}
-              <div className="w-[210px] shrink-0 text-[11.5px]">
+              {/* 210 -> 268 px: kolom dolar di samping SL/TP butuh 54 px plus
+                  jarak, dan memaksanya masuk lebar lama akan memepetkan kotak
+                  isian sampai harga berdesimal panjang terpotong di tengah. */}
+              <div className="w-[268px] shrink-0 text-[11.5px]">
                               <div className="flex items-baseline gap-1.5">
                                 <span className="text-zinc-200">{sunting.simbol}</span>
                                 <span className={cn('text-[10.5px]', sunting.arah === 'BUY' ? 'text-emerald-500' : 'text-red-400')}>
@@ -5131,10 +5193,24 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                                   <input
                                     value={nilai}
                                     inputMode="decimal"
-                                    placeholder="klik lalu seret garisnya"
+                                    placeholder="seret garisnya"
                                     onFocus={() => { if (!nilai && aksi?.hargaKini) atur(String(aksi.hargaKini)); }}
                                     onChange={(e) => atur(e.target.value.replace(/[^\d.,-]/g, '').replace(',', '.'))}
                                     className="angka h-6 min-w-0 grow rounded border border-zinc-800 bg-zinc-900/80 px-1.5 text-right text-[11px] text-zinc-200 outline-none placeholder:text-[9.5px] placeholder:text-zinc-700 focus-visible:border-zinc-600" />
+                                  {/* Lebar TETAP, bukan grow: angka dolarnya
+                                      berubah tiap piksel seretan, dan kolom
+                                      yang ikut melar membuat kotak isian di
+                                      sebelahnya bergoyang selama garisnya
+                                      ditarik. */}
+                                  {(() => {
+                                    const d = uangDiHarga(Number(nilai) || 0);
+                                    return (
+                                      <span className={cn('angka w-[54px] shrink-0 text-right text-[10.5px] tabular-nums',
+                                        d === null ? 'text-zinc-700' : d >= 0 ? 'text-emerald-500' : 'text-red-400')}>
+                                        {d === null ? '—' : uang(d, true)}
+                                      </span>
+                                    );
+                                  })()}
                                 </label>
                               ))}
                               <div className="mt-1.5 flex flex-wrap items-center gap-1">
@@ -5160,15 +5236,40 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                                     tidak ada. Begitu juga saat P/L belum
                                     terbaca -- warna yang dikarang lebih buruk
                                     daripada tidak berwarna. */}
-                                <button onClick={() => void akhiriOrder()} disabled={suntingSibuk}
-                                  className={cn('cursor-pointer rounded px-2 py-1 text-[10.5px] transition-colors disabled:opacity-50',
-                                    sunting.jenis === 'pending' || pnlSunting === null
-                                      ? 'text-red-400/90 hover:bg-red-500/10'
-                                      : pnlSunting >= 0
-                                        ? 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30'
-                                        : 'bg-red-500/20 text-red-300 hover:bg-red-500/30')}>
-                                  {sunting.jenis === 'pending' ? 'Hapus order' : 'Tutup posisi'}
-                                </button>
+{/* ── "TUTUP POSISI" DICABUT DARI SINI ─────────────────────────
+                                    Diminta pemilik 3 Sep 2026: "kadang saya
+                                    salah klik di sana".
+
+                                    Alasannya kuat. Panel ini dibuka untuk
+                                    SATU maksud — menggeser SL/TP — dan tombol
+                                    yang mengakhiri posisi berdiri sebaris
+                                    dengan tombol yang menyimpannya, berjarak
+                                    beberapa piksel, di panel yang bisa
+                                    diseret ke mana saja. Dua tindakan yang
+                                    akibatnya sejauh itu tidak boleh
+                                    bertetangga.
+
+                                    Tidak ada yang hilang: tombol Tutup ada di
+                                    tiap baris Posisi Terbuka, tempat orang
+                                    bisa membaca dulu P/L, size, dan simbolnya
+                                    sebelum menekan.
+
+                                    "Hapus order" untuk PENDING TETAP ADA, dan
+                                    itu bukan setengah hati. Pending kripto
+                                    tidak punya tombol hapus di panel tabel
+                                    (ikon tong sampah di sana sengaja hanya
+                                    untuk Trade-Fi, karena sebagian baris
+                                    kripto masih rencana lokal), jadi
+                                    mencabutnya di sini akan menghapus
+                                    satu-satunya jalan yang tersisa. Yang
+                                    dibuang tombol yang punya pengganti; yang
+                                    tinggal tombol yang tidak. */}
+                                {sunting.jenis === 'pending' && (
+                                  <button onClick={() => void akhiriOrder()} disabled={suntingSibuk}
+                                    className="cursor-pointer rounded px-2 py-1 text-[10.5px] text-red-400/90 transition-colors hover:bg-red-500/10 disabled:opacity-50">
+                                    Hapus order
+                                  </button>
+                                )}
                               </div>
                               </>)}
                               {suntingKabar && (
@@ -5879,8 +5980,8 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                berdekatan, bukan sebagai satu bidang yang terbagi. */
             <div className={cn('grid grid-cols-1 lg:grid-cols-2',
               POLOS ? 'mt-0 gap-4' : 'mt-px gap-px')}>
-              <PanelPosisiTerbuka sumber="kripto" onSunting={bukaSunting} onTutup={tutupDariTabel} tanpaBingkai={POLOS} menyatu />
-              <PanelPosisiTerbuka sumber="forex" onSunting={bukaSunting} onTutup={tutupDariTabel} tanpaBingkai={POLOS} menyatu />
+              <PanelPosisiTerbuka sumber="kripto" onSunting={bukaSunting} onTutup={tutupDariTabel} onUbahSlTp={ubahDariTabel} tanpaBingkai={POLOS} menyatu />
+              <PanelPosisiTerbuka sumber="forex" onSunting={bukaSunting} onTutup={tutupDariTabel} onUbahSlTp={ubahDariTabel} tanpaBingkai={POLOS} menyatu />
             </div>
           )}
         </>

@@ -197,7 +197,11 @@ export function WatchChart({ simbol, onPilih, onLebar }: {
   useEffect(() => {
     if (!terbuka) return;
     let hidup = true;
-    const tarikBinance = () => void ambilTickers().then((t) => { if (hidup) setTickers(t); }).catch(() => { /* diam */ });
+    /* `true` = koin Hyperliquid ikut. Watchlist adalah daftar yang DIPILIH
+       orangnya satu per satu; kalau ia menaruh CASHCAT di sana, ia memang
+       ingin melihat CASHCAT — bukan baris kosong yang terbaca seperti gagal
+       ditambahkan. Screener tetap memanggil tanpa bendera ini. */
+    const tarikBinance = () => void ambilTickers(true).then((t) => { if (hidup) setTickers(t); }).catch(() => { /* diam */ });
     const tarikMt5 = () => void hargaTickMt5().then((t) => { if (hidup) setTickMt5(t); }).catch(() => { /* diam */ });
     const tarikDaftar = () => void daftarSimbolMt5().then((d) => { if (hidup) setPilihanMt5(d); });
     tarikBinance();
