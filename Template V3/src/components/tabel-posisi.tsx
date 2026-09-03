@@ -190,7 +190,7 @@ function gabungBaris(g: BarisPosisi[]): BarisPosisi {
   };
 }
 
-export function TabelPosisi({ baris, kosong, onKlikBaris, onTutup, onUbah }: {
+export function TabelPosisi({ baris, kosong, onKlikBaris, onTutup, onUbah, onKlikCopy }: {
   baris: BarisPosisi[];
   /** Tombol Tutup per baris. Kolomnya hanya muncul kalau diberikan. */
   onTutup?: (b: BarisPosisi) => void;
@@ -207,6 +207,10 @@ export function TabelPosisi({ baris, kosong, onKlikBaris, onTutup, onUbah }: {
    *  Jadi pensilnya bukan jalan pintas untuk kenyamanan; ia satu-satunya
    *  jalan yang menyebut dirinya sendiri. */
   onUbah?: (b: BarisPosisi) => void;
+  /** Ikon salinan diklik. Tanpa ini ikonnya tetap tergambar tapi diam —
+   *  dan itu memang yang benar untuk salinan sinyal MT5, yang tidak punya
+   *  posisi sumber hidup untuk dibandingkan. */
+  onKlikCopy?: (b: BarisPosisi) => void;
   /** Klik baris = buka order ini di chart untuk disunting. Kalau tidak
    *  diberikan, barisnya tidak bisa diklik sama sekali — bukan bisa
    *  diklik tapi tidak melakukan apa-apa. */
@@ -315,10 +319,24 @@ export function TabelPosisi({ baris, kosong, onKlikBaris, onTutup, onUbah }: {
                   {anak && <span className="mr-1 text-zinc-700">└</span>}
                   <span className={b.ragu ? 'text-zinc-400' : 'text-zinc-200'}>{b.simbol}</span>
                   {b.copy && (
-                    <span title={`Posisi ini masuk otomatis karena kamu mengikuti ${b.copy} di Copy Signal.`}
-                          aria-label={'Salinan sinyal ' + b.copy}>
-                      <Copy className="ml-1 inline-block size-3 -translate-y-px text-sky-400/80" />
-                    </span>
+                    /* TOMBOL kalau ada yang menerimanya, KETERANGAN kalau
+                       tidak. Ikon yang terlihat bisa diklik padahal tidak
+                       melakukan apa-apa lebih buruk daripada ikon yang memang
+                       diam: yang pertama mengajari orang bahwa ikon di tabel
+                       ini tidak bisa dipercaya. */
+                    <button type="button"
+                      onClick={onKlikCopy ? (e) => { e.stopPropagation(); onKlikCopy(b); } : undefined}
+                      disabled={!onKlikCopy}
+                      title={onKlikCopy
+                        ? `Salinan dari ${b.copy} — klik untuk membandingkan dengan posisi sumbernya`
+                        : `Posisi ini masuk otomatis karena kamu mengikuti ${b.copy}.`}
+                      aria-label={'Salinan ' + b.copy}
+                      className={cn('ml-1 inline-flex size-4 -translate-y-px items-center justify-center rounded align-middle',
+                        onKlikCopy
+                          ? 'cursor-pointer text-sky-400/80 transition-colors hover:bg-sky-500/15 hover:text-sky-300'
+                          : 'cursor-default text-sky-400/80')}>
+                      <Copy className="size-3" />
+                    </button>
                   )}
                   <span className={cn('ml-1.5 text-[10.5px]',
                     b.arah === 'BUY' ? 'text-emerald-500' : 'text-red-400')}>

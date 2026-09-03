@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Copy, Trash2, Loader2, Zap } from 'lucide-react';
+import { Copy, Trash2, Loader2, Zap, X } from 'lucide-react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { cn, uang, harga as fHarga } from '@/lib/utils';
 import { usePosisi } from '@/lib/data';
@@ -17,6 +17,8 @@ import { barisPendingKripto, rencanaLokal, type BarisPending } from '@/lib/pendi
 import { useAuth } from '@/lib/auth';
 import { petaCopy } from '@/lib/tanda-copy';
 import { statusPengikutVps } from '@/lib/pengikut-vps';
+import { daftarSalin, keadaanDompet,
+         type SetelanSalin, type PosisiSalinan, type PosisiDompet } from '@/lib/wallet-agen';
 
 /* ════════════════════════════════════════════════════════════════════════
    POSISI TERBUKA — dipindah dari Jurnal ke Chart & Backtest
@@ -112,7 +114,7 @@ export function PanelPosisiTerbuka({ sumber, onSunting, onTutup, onUbahSlTp, tan
     return 'Binance';
   })();
   const mt5 = useAkunMt5();
-  const { pengguna } = useAuth();
+  const { pengguna, pemilik } = useAuth();
   /* TIKET MANA YANG SALINAN. Dihitung dari daftar posisi hidup, bukan
      sekadar dibaca: catatan salinan lahir sebelum tiketnya ada (EA yang
      mengeksekusi, beberapa detik kemudian), jadi penjodohan pertamanya
@@ -309,12 +311,77 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
       + `berarti order stopnya tidak jalan dan perlu diperiksa langsung di Binance.`;
   }
 
+  /* ── SALINAN DOMPET: SIAPA SUMBERNYA, DAN BAGAIMANA HASILNYA ────────
+     Mesin salin di VPS mencatat tiap posisi yang ia buka di `punyaku`,
+     berkunci koin, lengkap dengan potret hidupnya. Dompet sumbernya sendiri
+     dibaca terpisah lewat `keadaanDompet`. Dua sumber itu yang membuat
+     perbandingan berdampingan mungkin sama sekali.
+
+     Hanya pemilik: kedua rutenya digerbangi `hanyaPemilik` di server, dan
+     memanggilnya untuk orang lain cuma menghasilkan 403 tiap menit.
+
+     60 detik, bukan 30 seperti tabelnya: setelan salin berubah saat ada
+     posisi dibuka atau ditutup — hitungan menit, bukan detik. */
+  const [salin, setSalin] = useState<SetelanSalin[]>([]);
+  const [posDompet, setPosDompet] = useState<PosisiDompet[]>([]);
+  useEffect(() => {
+    if (!pemilik || sumber !== 'kripto') return;
+    let hidup = true;
+    const tarik = async () => {
+      try {
+        const [s, k] = await Promise.all([daftarSalin(), keadaanDompet()]);
+        if (!hidup) return;
+        setSalin(s.salin);
+        setPosDompet(k?.posisi ?? []);
+      } catch { /* panel tetap jalan tanpa tanda salinan */ }
+    };
+    void tarik();
+    const jam = setInterval(() => { void tarik(); }, 60_000);
+    return () => { hidup = false; clearInterval(jam); };
+  }, [pemilik, sumber]);
+
+  /* Berkunci SIMBOL, bukan koin: baris tabel menyebut "ZECUSDT" sementara
+     mesin salin menyimpannya sebagai "ZEC". Penerjemahannya sudah dikerjakan
+     mesin salin waktu ordernya berangkat (`punyaku[koin].simbol`), jadi di
+     sini tinggal dipakai — menerjemahkan ulang di layar berarti dua aturan
+     yang bisa menyimpang. */
+  const salinPerSimbol = useMemo(() => {
+    const peta = new Map<string, { nama: string; alamat: string; koin: string; salinan: PosisiSalinan }>();
+    for (const s of salin) {
+      for (const [koin, ps] of Object.entries(s.punyaku ?? {})) {
+        if (!ps?.simbol) continue;
+        peta.set(String(ps.simbol).toUpperCase(),
+                 { nama: s.nama || s.alamat, alamat: s.alamat, koin, salinan: ps });
+      }
+    }
+    return peta;
+  }, [salin]);
+
+  const [banding, setBanding] = useState<{
+    simbol: string; nama: string; koin: string;
+    salinan: PosisiSalinan; sumber: PosisiDompet | null;
+  } | null>(null);
+
+  function bukaBanding(b: BarisPosisi) {
+    const s = salinPerSimbol.get(b.simbol.toUpperCase());
+    if (!s) return;
+    setBanding({
+      simbol: b.simbol, nama: s.nama, koin: s.koin, salinan: s.salinan,
+      sumber: posDompet.find((p) => p.alamat === s.alamat
+                                 && p.koin.toUpperCase() === s.koin.toUpperCase()) ?? null,
+    });
+  }
+
   const baris: BarisPosisi[] = sumber === 'kripto'
     ? posisiKripto.map((p) => {
         const unit = p.jumlah ?? 0;
         const kini = kriptoContoh ? p.hargaKini : hargaPasar[p.simbol];
         return {
           kunci: p.id, simbol: p.simbol, arah: p.arah,
+          /* Nama dompetnya, bukan sekadar "copy". Yang ditanyakan orang saat
+             melihat ikon itu bukan "ini salinan?" melainkan "salinan SIAPA" —
+             dan jawabannya menentukan apakah ia mau menahannya atau tidak. */
+          copy: salinPerSimbol.get(p.simbol.toUpperCase())?.nama,
           ragu: raguKarena(p, kini),
           ket: p.tf && p.tf !== '—' ? p.tf : p.venue,
           ukuran: p.jumlah ? p.jumlah.toLocaleString('id-ID', { maximumFractionDigits: 4 }) : '',
@@ -572,6 +639,7 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
           onTutup={onTutup && ((b) => onTutup(keOrder(b)))}
           onKlikBaris={onSunting && ((b, gabungan) => onSunting(keOrder(b, gabungan)))}
           onUbah={onUbahSlTp && ((b) => onUbahSlTp(keOrder(b)))}
+          onKlikCopy={sumber === 'kripto' && salinPerSimbol.size ? bukaBanding : undefined}
           kosong={sumber === 'kripto'
             ? 'Tidak ada posisi kripto terbuka.'
             : mt5.terhubung === true ? 'Tidak ada posisi MT5 terbuka.' : mt5.ket}
@@ -799,6 +867,132 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
           </div>
         )}
       </div>
+      {banding && <DialogBanding b={banding} tutup={() => setBanding(null)} />}
     </Panel>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   BANDINGKAN SALINAN DENGAN SUMBERNYA
+   ════════════════════════════════════════════════════════════════════════
+   Pertanyaan yang dijawab panel ini cuma satu, dan ia pertanyaan yang
+   menentukan apakah copy trading layak diteruskan: SEBERAPA DEKAT hasil
+   saya dengan dompet yang saya ikuti?
+
+   Bukan "berapa untung saya" — itu sudah ada di tabel. Yang tidak ada di
+   mana pun adalah SELISIHNYA: entry saya lebih buruk berapa persen, dan ROE
+   saya tertinggal berapa. Dua angka itu yang memberi tahu apakah mesin
+   salinnya mengejar cukup cepat, dan tidak satu pun layar lain punya kedua
+   sisinya sekaligus.
+
+   ── ROE, BUKAN DOLAR, UNTUK MEMBANDINGKAN ─────────────────────────────
+   Dompet sumber memakai $50.000, kita memakai $30. Membandingkan P/L dolar
+   di antara keduanya tidak berarti apa-apa — yang sebanding cuma persen.
+   Dolarnya tetap ditulis, tapi sebagai keterangan, bukan sebagai pembanding.
+   ════════════════════════════════════════════════════════════════════════ */
+function DialogBanding({ b, tutup }: {
+  b: { simbol: string; nama: string; koin: string; salinan: PosisiSalinan; sumber: PosisiDompet | null };
+  tutup: () => void;
+}) {
+  const h = b.salinan.hidup;
+  const s = b.sumber;
+
+  /* ROE sumber tidak dilaporkan pemantau — dihitung dari yang ada. Nilai
+     posisi dibagi leverage memberi margin yang dipakainya; P/L dibagi itu
+     memberi ROE dalam arti yang sama dengan ROE kita. */
+  const marginSumber = s && s.leverage > 0 ? s.nilai / s.leverage : 0;
+  const roeSumber = marginSumber > 0 ? (s!.pnl / marginSumber) * 100 : null;
+  const roeKita = h?.terbaca && typeof h.roe === 'number' ? h.roe : null;
+
+  /* Selisih entry BERTANDA ARAH: untuk LONG, masuk lebih tinggi itu lebih
+     buruk; untuk SHORT, kebalikannya. Nilai mutlak akan menyebut keduanya
+     "meleset 0,3%" tanpa memberi tahu ke arah mana — dan arahnya yang
+     menentukan apakah itu kerugian atau justru keberuntungan. */
+  const beli = String(b.salinan.arahSumber || '').toUpperCase() !== 'SHORT';
+  const selisihEntry = s && s.entry > 0 && h?.entry
+    ? ((h.entry - s.entry) / s.entry) * 100 * (beli ? 1 : -1)
+    : null;
+
+  const pst = (n: number | null) => (n === null ? '—' : (n >= 0 ? '+' : '') + n.toFixed(2) + '%');
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/70 p-4"
+         onClick={tutup}>
+      <div className="w-full max-w-md rounded-lg border border-zinc-800 bg-zinc-900 p-4 shadow-xl"
+           onClick={(e) => e.stopPropagation()}>
+        <div className="mb-3 flex items-start gap-2">
+          <Copy className="mt-0.5 size-4 shrink-0 text-sky-400/80" />
+          <div className="min-w-0">
+            <h3 className="text-[13.5px] font-semibold text-zinc-100">{b.simbol}</h3>
+            <p className="mt-0.5 text-[11.5px] text-zinc-500">Salinan dari {b.nama}</p>
+          </div>
+          <button onClick={tutup} aria-label="Tutup"
+                  className="ml-auto cursor-pointer rounded p-1 text-zinc-600 transition-colors hover:bg-zinc-800 hover:text-zinc-200">
+            <X className="size-3.5" />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-[1fr_auto_1fr] gap-x-3 gap-y-2 text-[11.5px]">
+          <div className="text-[10.5px] uppercase tracking-wide text-zinc-500">Dompet sumber</div>
+          <div />
+          <div className="text-right text-[10.5px] uppercase tracking-wide text-zinc-500">Posisi saya</div>
+
+          <Baris kiri={s ? s.arah : '—'} tengah="Arah" kanan={b.salinan.arah} />
+          <Baris kiri={s ? fHarga(s.entry) : '—'} tengah="Entry" kanan={h?.entry ? fHarga(h.entry) : '—'} />
+          <Baris kiri={s ? uang(s.nilai) : '—'} tengah="Nilai" kanan={h?.nilai ? uang(h.nilai) : '—'} />
+          <Baris kiri={s ? s.leverage + 'x' : '—'} tengah="Leverage" kanan={(h?.leverage ?? b.salinan.leverage) + 'x'} />
+          <Baris kiri={s ? uang(s.pnl, true) : '—'} tengah="P/L" kanan={h?.pnl !== undefined ? uang(h.pnl, true) : '—'}
+                 warnaKiri={s ? s.pnl >= 0 : undefined} warnaKanan={h?.pnl !== undefined ? h.pnl >= 0 : undefined} />
+          <Baris kiri={pst(roeSumber)} tengah="ROE" kanan={pst(roeKita)}
+                 warnaKiri={roeSumber === null ? undefined : roeSumber >= 0}
+                 warnaKanan={roeKita === null ? undefined : roeKita >= 0} />
+        </div>
+
+        {/* Dua angka yang tidak ada di layar mana pun, dan justru keduanya
+            yang menjawab "mesin salin saya sudah cukup baik atau belum". */}
+        <div className="mt-3 space-y-1 border-t border-zinc-800 pt-3 text-[11.5px]">
+          <div className="flex items-center justify-between">
+            <span className="text-zinc-500">Entry saya vs sumber</span>
+            <span className={cn('angka', selisihEntry === null ? 'text-zinc-600'
+              : selisihEntry <= 0 ? 'text-emerald-500' : 'text-red-400')}>
+              {selisihEntry === null ? '—' : pst(selisihEntry)}
+              {selisihEntry !== null && (
+                <span className="ml-1 text-[10px] text-zinc-600">
+                  {selisihEntry <= 0 ? 'lebih baik' : 'lebih buruk'}
+                </span>
+              )}
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-zinc-500">Selisih ROE</span>
+            <span className={cn('angka', roeSumber === null || roeKita === null ? 'text-zinc-600'
+              : roeKita - roeSumber >= 0 ? 'text-emerald-500' : 'text-red-400')}>
+              {roeSumber === null || roeKita === null ? '—' : pst(roeKita - roeSumber)}
+            </span>
+          </div>
+        </div>
+
+        {!s && (
+          <p className="mt-3 rounded border border-amber-500/30 bg-amber-500/[0.06] px-2.5 py-2 text-[11px] leading-relaxed text-amber-200/90">
+            Posisi di dompet sumber sudah tidak terbaca — kemungkinan ia baru menutupnya.
+            Mesin salin akan menutup salinan ini pada putaran berikutnya.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Baris({ kiri, tengah, kanan, warnaKiri, warnaKanan }: {
+  kiri: string; tengah: string; kanan: string;
+  warnaKiri?: boolean; warnaKanan?: boolean;
+}) {
+  const w = (v?: boolean) => (v === undefined ? 'text-zinc-300' : v ? 'text-emerald-500' : 'text-red-400');
+  return (
+    <>
+      <div className={cn('angka', w(warnaKiri))}>{kiri}</div>
+      <div className="text-center text-[10.5px] text-zinc-600">{tengah}</div>
+      <div className={cn('angka text-right', w(warnaKanan))}>{kanan}</div>
+    </>
   );
 }
