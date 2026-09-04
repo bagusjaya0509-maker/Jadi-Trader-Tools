@@ -532,6 +532,53 @@ export async function saldoDompetHl(alamat: string): Promise<number | null> {
   } catch { return null; }
 }
 
+/* ════════════════════════════════════════════════════════════════════════
+   SALDO DOMPET TERTAUT — satu baris di kartu Saldo, tanpa panel
+   ════════════════════════════════════════════════════════════════════════
+   Dulu angka ini dilaporkan oleh panel "Dompet tertaut" di kaki jurnal.
+   Panel itu dihapus atas permintaan pemilik 4 Sep 2026 — sesudah saldonya
+   berjejer di kartu Saldo, panelnya cuma mengulang kabar yang sudah terbaca
+   di atas, dan pengulangan yang memakan seperempat layar terbaca sebagai dua
+   fitur yang kebetulan mirip.
+
+   Yang tidak boleh ikut hilang cuma ANGKANYA. Jadi pembacaannya pindah ke
+   sini: satu hook, dipanggil halaman jurnal, tanpa satu piksel pun UI.
+
+   Disegarkan saat daftar dompetnya berubah saja. Saldo yang dikejar tiap
+   detik cuma menambah permintaan untuk angka yang jarang bergerak, dan
+   halaman jurnal bukan papan pantau harga.
+   ════════════════════════════════════════════════════════════════════════ */
+export function useSaldoDompetTertaut(hidup: boolean) {
+  const [isi, setIsi] = useState<{ jumlah: number; saldo: number | null }>({ jumlah: 0, saldo: null });
+
+  useEffect(() => {
+    if (!hidup) { setIsi({ jumlah: 0, saldo: null }); return; }
+    let jalan = true;
+    void (async () => {
+      try {
+        /* HANYA EVM. Hyperliquid tidak mengenal alamat Solana, jadi dompet
+           Solana tidak punya saldo yang bisa dibaca di sini sama sekali. */
+        const daftar = (await daftarDompetTertaut()).filter((d) => d.pola === 'evm');
+        if (!jalan) return;
+        if (!daftar.length) { setIsi({ jumlah: 0, saldo: null }); return; }
+        const nilai = await Promise.all(daftar.map((d) => saldoDompetHl(d.alamat)));
+        if (!jalan) return;
+        const terbaca = nilai.filter((x): x is number => typeof x === 'number');
+        setIsi({
+          jumlah: daftar.length,
+          /* `null` = tidak satu pun terbaca. Berbeda dari nol, dan kartu
+             Saldo memang tidak boleh menampilkan baris $0 untuk dompet yang
+             sebenarnya cuma gagal dibaca. */
+          saldo: terbaca.length ? terbaca.reduce((t, x) => t + x, 0) : null,
+        });
+      } catch { if (jalan) setIsi({ jumlah: 0, saldo: null }); }
+    })();
+    return () => { jalan = false; };
+  }, [hidup]);
+
+  return isi;
+}
+
 async function tanyaFillHl(badan: MintaFill): Promise<FillHl[]> {
   const r = await fetch('https://api.hyperliquid.xyz/info', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },

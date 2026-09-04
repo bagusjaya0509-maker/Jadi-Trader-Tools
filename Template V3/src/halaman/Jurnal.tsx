@@ -12,8 +12,7 @@ import type { Trade, Sumber } from '@/data/contoh';
 import { useAkunMt5, useAkunBinance, type StatusAkun, type RincianBursa } from '@/lib/akun';
 import { ModalTrade } from '@/components/modal-trade';
 import { KotakArus } from '@/components/kotak-arus';
-import { PanelJurnalDompet } from '@/components/panel-jurnal-dompet';
-import { useArusKas, arusBersih, sinkronRiwayatMt5, sinkronRiwayatBinance, sinkronRiwayatHyperliquid, sinkronRiwayatDompet, type Arus } from '@/lib/tulis-jurnal';
+import { useArusKas, arusBersih, sinkronRiwayatMt5, sinkronRiwayatBinance, sinkronRiwayatHyperliquid, sinkronRiwayatDompet, useSaldoDompetTertaut, type Arus } from '@/lib/tulis-jurnal';
 import { bacaStatistik, bacaPnl } from '@/lib/catatan-stat';
 import { Link } from 'react-router-dom';
 
@@ -39,12 +38,6 @@ import { Link } from 'react-router-dom';
  *  persis (deposit, penarikan, biaya yang tidak masuk jurnal), dan
  *  menampilkan satu angka saja menyembunyikan selisih yang justru paling
  *  perlu diketahui. */
-/** Dolar penuh, tanpa sen. Dipakai saat tiga saldo atau lebih harus
- *  berjejer di kartu selebar seperempat kisi — lihat catatan di sana. */
-function bulat(n: number): string {
-  return '$' + Math.round(n).toLocaleString('en-US');
-}
-
 function KartuSaldo({ judul, saldoJurnal, akun, keIntegrasi }: {
   judul: string; saldoJurnal: number; akun: StatusAkun; keIntegrasi: string;
 }) {
@@ -92,57 +85,27 @@ function KartuSaldo({ judul, saldoJurnal, akun, keIntegrasi }: {
                Ukurannya turun sedikit saat bursanya tiga atau lebih supaya
                barisnya tidak membungkus — tapi turun BERSAMA-SAMA, jadi
                tetap tidak ada yang terlihat lebih penting. */
-            /* ── ANGKANYA MENGECIL DULU, BARU TURUN BARIS ──────────────
-               Dilaporkan pemilik 4 Sep 2026: mengecilkan jendela membuat
-               saldonya melebar ke bawah dan berhenti sejajar. Ukuran tetap
-               (22/28 px) memang tidak punya pilihan lain — kalau tidak muat,
-               ia membungkus.
+            /* ── UKURAN TETAP, DAN ITU KEPUTUSAN ────────────────────────
+               Sempat dibuat mengecil sendiri mengikuti lebar kartu
+               (container query + clamp) supaya tiga saldo tidak pernah turun
+               baris. Dibatalkan atas permintaan pemilik 4 Sep 2026: "jangan
+               dikecilkan, ruangnya masih sangat banyak."
 
-               Sekarang ukurannya mengikuti LEBAR KARTU, bukan lebar layar.
-               Itu bedanya container query: kartu yang sama duduk di grid
-               1/2/4 kolom, jadi lebar layar sama sekali tidak memberi tahu
-               berapa ruang yang benar-benar ia punya.
-
-               `clamp(15px, (16,5/n)cqi, 28px)`. Koefisiennya diturunkan dari
-               lebar teksnya sendiri — tiap angka butuh sekitar 6x tinggi
-               fontnya — lalu diukur di peramban. Hasilnya: dua saldo SELALU
-               sebaris (16-28 px dari lebar 240 sampai 560); tiga saldo
-               sebaris sejak 300 px, sementara versi lama sudah membungkus di
-               340 px. Di kartu lebar, keduanya tetap 28 px penuh — persis
-               seperti sebelumnya, karena "tanpa dikecilkan" memang lebih
-               baik selama muat.
-
-               `flex-wrap` SENGAJA DIPERTAHANKAN sebagai jalan terakhir, dan
-               angkanya TIDAK di-`truncate`. Di kartu yang sangat sempit,
-               membungkus jelek — tapi angka uang yang terpotong ellipsis
-               BERBOHONG, dan itu jauh lebih buruk daripada jelek. */
-            <div className="@container mt-2">
-              {/* ── SEJAJAR ITU YANG DIMINTA, JADI SEN YANG MENGALAH ──────
-                  Percobaan pertama cuma mengecilkan hurufnya. Tidak cukup:
-                  kartu ini duduk di kisi empat kolom, jadi lebar dalamnya
-                  sekitar 250 px — dan tiga angka sepanjang "$1.646,90" di
-                  situ menuntut huruf 10 px sebelum muat. Yang terjadi
-                  akhirnya membungkus, persis yang dikeluhkan pemilik.
-
-                  Maka yang dikorbankan SEN, bukan kesejajaran. Tiga saldo
-                  atau lebih dibulatkan ke dolar penuh: "$611 · $302 · $734"
-                  butuh sepertiga lebar "$610,82 · $302,29 · $733,79", dan
-                  dua sen pada saldo enam ratus dolar bukan angka yang
-                  dibaca siapa pun. Totalnya di bawah tetap utuh sampai sen.
-
-                  Sampai dua saldo, tidak ada yang berubah — tetap lengkap
-                  dan tetap 28 px di kartu lebar. */}
-              <div className="flex items-end gap-x-4">
-                {rincian.map((b, i) => (
-                  <div key={b.id || i} className="min-w-0 flex-1">
-                    <div className="truncate text-[11px] text-zinc-500">{b.nama}</div>
-                    <div className="angka mt-1 font-semibold leading-none tracking-tight text-zinc-100"
-                      style={{ fontSize: `clamp(14px, ${(19 / rincian.length).toFixed(2)}cqi, 28px)` }}>
-                      {rincian.length >= 3 ? bulat(b.saldo) : uang(b.saldo)}
-                    </div>
+               Ia benar — kartunya memang cukup lebar untuk tiga angka penuh
+               di 22 px, dan huruf yang mengecil demi kasus sempit yang jarang
+               terjadi membuat kasus yang sering terjadi ikut mengecil.
+               Membungkus di layar yang benar-benar sempit diterima sebagai
+               harganya. */
+            <div className="mt-2 flex flex-wrap items-end gap-x-7 gap-y-3">
+              {rincian.map((b, i) => (
+                <div key={b.id || i} className="min-w-0">
+                  <div className="truncate text-[11px] text-zinc-500">{b.nama}</div>
+                  <div className={cn('angka mt-1 font-semibold leading-none tracking-tight text-zinc-100',
+                    rincian.length >= 3 ? 'text-[22px]' : 'text-[28px]')}>
+                    {uang(b.saldo)}
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
           ) : (
             <div className="angka mt-2 text-[28px] font-semibold leading-none tracking-tight text-zinc-100">
@@ -230,7 +193,7 @@ function CatatanKecil({ c }: { c: { nada: 'baik' | 'awas' | 'buruk'; teks: strin
    ranjau. Mengisinya juga akan memunculkan dua spanduk impor sekaligus di
    satu halaman, karena blok ini digambar dua kali (Trade-Fi dan Kripto).
    Pilihannya tinggal punya satu rumah: Dashboard. */
-function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun, labelSaldo, keIntegrasi, sumber, arus, bisaTulis, dataContoh, rincianTambahan, panelBawah, pemisah = false }: {
+function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun, labelSaldo, keIntegrasi, sumber, arus, bisaTulis, dataContoh, rincianTambahan, pemisah = false }: {
   judul: string; ket: string; Ikon: typeof Bitcoin;
   trade: Trade[]; saldoAwal: number; warna: string; idGradien: string;
   akun: StatusAkun; labelSaldo: string; keIntegrasi: string;
@@ -247,10 +210,6 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
    *  `useAkunBinance`, karena hook itu memang cuma tahu akun backend; yang
    *  tahu dompet tertaut adalah profil penggunanya. */
   rincianTambahan?: RincianBursa[];
-  /** Ditempel di kaki blok, setelah tabel riwayat. Panel yang isinya khusus
-   *  satu sumber (dompet on-chain cuma berarti untuk kripto) tidak pantas
-   *  jadi cabang `if` di dalam blok yang dipakai dua jurnal. */
-  panelBawah?: React.ReactNode;
   /** Garis pemisah tebal di atas judul — menandai pergantian jurnal. */
   pemisah?: boolean;
   /** Kripto: pola emosinya sudah terwakili di Trade-Fi; riwayatnya yang
@@ -850,11 +809,6 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
         </button>
       )}
 
-      {/* SESUDAH tabel riwayat, bukan di antara kartu-kartu di atas.
-          `useTinggiSejajar` mengukur isi kolom kiri untuk menentukan tinggi
-          tabelnya; panel yang disisipkan di tengah kolom itu akan ikut
-          terhitung dan memendekkan tabelnya diam-diam. */}
-      {!kosong && panelBawah}
 
       {modal && (
         <ModalTrade sumber={sumber} trade={modal === 'baru' ? null : modal} tutup={() => setModal(null)} />
@@ -938,15 +892,9 @@ export default function Jurnal() {
   const binance = useAkunBinance();
 
   /* ── SALDO DOMPET TERTAUT IKUT BERJEJER ────────────────────────────────
-     Panelnya sendiri yang menariknya (ia sudah punya daftarnya), lalu
-     melaporkan ringkasannya ke sini. Arah itu disengaja: satu pembacaan
-     /api/profil, satu pembacaan saldo, dan tidak ada dua tempat yang bisa
-     berselisih tentang dompet mana yang tertaut.
-
-     `jumlah: 0` berarti panelnya sedang tidak menggambar apa pun — dan
-     saat itu barisnya juga tidak boleh muncul di kartu Saldo. */
-  const [ringkasDompet, setRingkasDompet] = useState<{ jumlah: number; saldo: number | null }>(
-    { jumlah: 0, saldo: null });
+     Cuma angkanya; panelnya sudah tidak ada. `jumlah: 0` berarti tidak ada
+     dompet EVM tertaut, dan saat itu barisnya juga tidak muncul di kartu. */
+  const ringkasDompet = useSaldoDompetTertaut(bisaTulis && !contoh);
   const rincianDompet = useMemo<RincianBursa[]>(() => (
     ringkasDompet.jumlah && ringkasDompet.saldo !== null
       ? [{
@@ -987,17 +935,6 @@ export default function Jurnal() {
         akun={binance} labelSaldo="Saldo Binance Futures" keIntegrasi="/integrations"
         sumber="kripto" arus={arus} bisaTulis={bisaTulis} dataContoh={contoh}
         rincianTambahan={rincianDompet}
-        /* DI DALAM blok kripto, bukan di bawah halaman. Diminta pemilik
-           4 Sep 2026, dan alasannya benar: isinya cuma berarti untuk jurnal
-           kripto — saldonya berjejer dengan saldo bursa di kartu yang sama,
-           dan trade yang ditariknya masuk ke kurva ekuitas dan riwayat yang
-           tepat di atasnya. Berdiri di luar, ia terbaca sebagai alat
-           terpisah yang kebetulan diletakkan di sana.
-
-           Panelnya sendiri yang menghilang saat tidak ada dompet tertaut. */
-        panelBawah={bisaTulis && !contoh
-          ? <PanelJurnalDompet trade={kripto} onRingkas={setRingkasDompet} />
-          : undefined}
       />
     </div>
   );
