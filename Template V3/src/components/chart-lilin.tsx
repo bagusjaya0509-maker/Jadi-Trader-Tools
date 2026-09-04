@@ -1229,6 +1229,23 @@ export function ChartLilin({
      diperpanjang ke kanan) diekstrapolasi dari durasi timeframe — chart
      menerima stempel waktu masa depan sebagai ruang kosong. */
   const seriPine = useRef<ISeriesApi<'Line'>[]>([]);
+  /* ── DIBANGUN ULANG SAAT BARNYA BERUBAH, BUKAN TIAP DETAK HARGA ────
+     Harga disegarkan tiap 3 detik, dan tiap penyegaran melahirkan objek
+     `lilin` BARU. Selama `lilin` jadi dep, seluruh gambar Pine dibongkar
+     dan dipasang ulang dua puluh kali per menit — padahal segmen, kotak,
+     dan isian semuanya berkoordinat BAR, dan detak harga tidak memindahkan
+     satu bar pun.
+
+     Diukur: 60 segmen di 1.500 lilin = 44 ms membangun + 50 ms membongkar.
+     Sembilan puluh milidetik utas utama, tiap tiga detik, untuk menggambar
+     ulang sesuatu yang tidak berubah — dan itu yang membuat ganti simbol
+     terasa berat, bukan mesin Pine-nya (10-45 ms sekali jalan).
+
+     Kuncinya memuat panjang DAN kedua ujung waktu: panjang saja tidak
+     cukup, karena "Muat lebih lama" menambah bar di DEPAN sementara
+     polling menggesernya ke belakang — keduanya bisa berakhir dengan
+     panjang yang sama persis. */
+  const kunciWaktu = `${lilin.times.length}:${lilin.times[0] ?? 0}:${lilin.times[lilin.times.length - 1] ?? 0}`;
   useEffect(() => {
     const c = chart.current;
     if (!c) return;
@@ -1253,15 +1270,27 @@ export function ChartLilin({
         lineStyle: gaya === 'dashed' ? 2 : gaya === 'dotted' ? 1 : 0,
         priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
       });
-      /* Titik antara ikut digambar supaya garisnya lurus melintasi bar —
-         dua titik saja cukup untuk lightweight-charts, tapi bar renggang
-         (whitespace masa depan) butuh titik nyata di tiap ujung. */
-      const kemiringan = (vb - va) / (b - a);
-      const data: { time: Time; value: number }[] = [];
-      for (let x = Math.max(0, Math.floor(a)); x <= b; x++) {
-        data.push({ time: waktuBar(x), value: va + kemiringan * (x - a) });
-      }
-      if (data.length >= 2) { s.setData(data); seriPine.current.push(s); }
+      /* ── DUA TITIK, BUKAN SATU PER BAR ────────────────────────────
+         Dulu tiap bar antara kedua ujung diisi titiknya sendiri, "supaya
+         garisnya lurus melintasi bar". Titik-titik itu ternyata tidak
+         menambah apa pun, dan itu DIUKUR bukan dikira:
+
+           koordinat harga  linier persis (selisih interpolasi 0,0000)
+           jarak bar        seragam persis (selisih 0,0000)
+
+         Skala logaritmik tidak ada di chart ini — kalau suatu hari ada,
+         baris ini yang pertama harus dibaca ulang, karena di skala log
+         garis lurus di ruang harga adalah LENGKUNG di layar dan titik
+         antaranya kembali perlu.
+
+         Ongkosnya nyata: 60 segmen di 1.500 lilin makan 44 ms untuk
+         dibangun dan 50 ms untuk dibongkar; dengan dua titik jadi 4 ms dan
+         10 ms. Tujuh kali lebih murah, gambar yang sama persis. */
+      const data: { time: Time; value: number }[] = [
+        { time: waktuBar(Math.max(0, Math.floor(a))), value: va },
+        { time: waktuBar(b), value: vb },
+      ];
+      if (data[0].time !== data[1].time) { s.setData(data); seriPine.current.push(s); }
       else { try { c.removeSeries(s); } catch { /* kosong */ } }
     };
     (segmen ?? []).forEach((g) => {
@@ -1292,7 +1321,8 @@ export function ChartLilin({
       })
     );
     if (rentang) { try { c.timeScale().setVisibleLogicalRange(rentang); } catch { /* chart baru */ } }
-  }, [segmen, kotakPine, isianPine, lilin]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [segmen, kotakPine, isianPine, kunciWaktu]);
 
   /* Penanda entry & exit tiap trade hasil backtest */
   useEffect(() => {

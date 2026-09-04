@@ -329,7 +329,14 @@ export async function hargaTickMt5(): Promise<Record<string, { bid: number; wakt
   } catch { return {}; }
 }
 
-export interface Ticker { lastPrice: number; ubah24j: number }
+export interface Ticker {
+  lastPrice: number;
+  ubah24j: number;
+  /** Bursa asal barisnya. `undefined` = Binance — server hanya menandai
+   *  baris Hyperliquid, karena menuliskannya di 3.600 baris Binance demi
+   *  keseragaman menambah puluhan kB ke jawaban yang memang diramping. */
+  bursa?: 'binance' | 'hyperliquid';
+}
 
 let tickerCache: { waktu: number; isi: Record<string, Ticker> } | null = null;
 let tickerCacheHl: { waktu: number; isi: Record<string, Ticker> } | null = null;
@@ -356,6 +363,7 @@ export async function ambilTickers(sertakanHl = false): Promise<Record<string, T
       peta[t.symbol] = {
         lastPrice: Number(t.lastPrice) || 0,
         ubah24j: Number(t.priceChangePercent) || 0,
+        bursa: t.bursa === 'hyperliquid' ? 'hyperliquid' : 'binance',
       };
     }
     if (sertakanHl) tickerCacheHl = { waktu: Date.now(), isi: peta };

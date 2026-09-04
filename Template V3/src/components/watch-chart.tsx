@@ -474,8 +474,25 @@ export function WatchChart({ simbol, onPilih, onLebar }: {
                           <span className="rounded bg-amber-500/15 px-1 text-[8.5px] font-semibold tracking-wide text-amber-300">MT5</span>
                         )}
                       </div>
-                      <div className="angka text-[11px] text-zinc-500">
-                        {mt5 ? (tk ? fHarga(tk.bid) : '—') : (t ? fHarga(t.lastPrice) : '—')}
+                      {/* ── ASAL BURSANYA, DI SAMPING HARGANYA ────────────
+                          Nama simbol sudah diterjemahkan ke gaya Binance
+                          (USELESS -> USELESSUSDT) supaya sisa aplikasi tidak
+                          perlu tahu bedanya — dan justru karena itu, layar
+                          kehilangan satu-satunya petunjuk koin ini datang
+                          dari mana. Diminta pemilik 4 Sep 2026.
+
+                          Hanya Hyperliquid yang diberi lencana. Binance
+                          adalah bawaannya: melencanai 1.100 baris membuat
+                          lencananya berhenti berarti apa-apa, dan yang
+                          ditanyakan orang memang "yang ini kok beda". */}
+                      <div className="flex items-center gap-1.5">
+                        <span className="angka text-[11px] text-zinc-500">
+                          {mt5 ? (tk ? fHarga(tk.bid) : '—') : (t ? fHarga(t.lastPrice) : '—')}
+                        </span>
+                        {!mt5 && t?.bursa === 'hyperliquid' && (
+                          <span title="Koin ini tidak ada di Binance — harga & ordernya lewat Hyperliquid"
+                            className="shrink-0 rounded bg-sky-500/15 px-1 text-[8.5px] font-semibold tracking-wide text-sky-300">HL</span>
+                        )}
                       </div>
                     </div>
                     <span className={cn('angka shrink-0 text-[11px]', mt5 ? 'text-zinc-600' : naik ? 'text-emerald-500' : 'text-red-400')}>
