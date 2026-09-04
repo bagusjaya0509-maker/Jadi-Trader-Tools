@@ -31,7 +31,12 @@ export function PanelHead({
      itu terusir ke `kanan`, tempat tombol berada, dan ia berhenti
      terbaca sebagai keterangan judul. */
   judul: React.ReactNode;
-  sub?: string;
+  /* Ikut React.ReactNode karena alasan yang sama dengan `judul`, ditambah
+     satu: di layar sempit sebagian keterangan lebih baik disembunyikan
+     daripada dibiarkan membungkus satu kata per baris. Itu keputusan
+     pemanggilnya — dia yang tahu keterangannya penting atau sekadar enak
+     ada — dan `string` memaksanya jadi keputusan komponen ini. */
+  sub?: React.ReactNode;
   kanan?: React.ReactNode;
   className?: string;
 }) {

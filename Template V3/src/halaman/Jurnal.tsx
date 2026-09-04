@@ -562,10 +562,29 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
                 isinya. */}
             <Panel className="min-w-0">
               <PanelHead
+                /* ── BOLEH TURUN BARIS DI LAYAR SEMPIT ──────────────────
+                   Kepala panel ini membawa tiga kendali di kanan (rentang,
+                   Sinkron, Tambah) yang totalnya ~330 px — diukur di 375 px:
+                   judulnya tersisa lima piksel, jadi "Riwayat Trade" pecah
+                   dua baris dan huruf terakhirnya tertimpa kotak rentang.
+
+                   `flex-wrap` membuat kendali turun ke baris sendiri saat
+                   tidak muat, alih-alih menggencet judul sampai nol. Dipasang
+                   di sini saja, bukan di PanelHead, karena panel lain tidak
+                   punya kendali sepanjang ini dan perubahan global akan
+                   mengubah kepala yang sekarang sudah benar. */
+                className="flex-wrap"
                 judul="Riwayat Trade"
-                sub={rangkum && barisTabel.length !== trade.length
+                /* DISEMBUNYIKAN DI LAYAR SEMPIT. Kalimatnya panjang, dan di
+                   lebar ponsel ia berbagi baris dengan tiga kendali di
+                   sebelah kanan — hasilnya kolom selebar satu kata yang
+                   memanjang belasan baris ke bawah dan mendorong tabelnya
+                   jauh dari layar. Isinya pun keterangan, bukan angka yang
+                   dicari: berapa baris yang tampil sudah terlihat sendiri
+                   dari tabelnya. */
+                sub={<span className="hidden sm:inline">{rangkum && barisTabel.length !== trade.length
                   ? `${Math.min(200, barisTabel.length)} baris dari ${barisTabel.length} — ${trade.length} transaksi asli dirangkum per pair, arah, dan hari.`
-                  : `${Math.min(200, trade.length)} transaksi terakhir dari ${trade.length}.`}
+                  : `${Math.min(200, trade.length)} transaksi terakhir dari ${trade.length}.`}</span>}
                 kanan={
                   <span className="flex items-center gap-2">
                   {/* Rangkum layering berjalan tanpa saklar di layar — akun cent
@@ -588,7 +607,13 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
                         title="Klik: tarik sekarang · Klik kanan: opsi auto-sinkron"
                         className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100 disabled:cursor-not-allowed disabled:opacity-50">
                         <RefreshCw className={cn('size-3.5', sinkron.sibuk && 'animate-spin')} />
-                        {sinkron.sibuk ? 'Menarik…' : 'Sinkron MT5'}
+                        {/* "Sinkron", bukan "Sinkron MT5". Kata MT5 tidak
+                            menambah apa pun — tombol ini cuma muncul di blok
+                            Trade-Fi, yang judulnya sudah menyebut MetaTrader 5
+                            — tapi ia menambah lebar, dan lebarnya diambil dari
+                            judul panel di sebelah kiri. Keterangan lengkapnya
+                            tetap ada di `title`. */}
+                        {sinkron.sibuk ? 'Menarik…' : 'Sinkron'}
                         {otomatis && <span className="size-1.5 rounded-full bg-emerald-500" title="Auto-sinkron menyala" />}
                       </button>
                       {menuSinkron && (
