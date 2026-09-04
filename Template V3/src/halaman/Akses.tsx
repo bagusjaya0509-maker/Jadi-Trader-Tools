@@ -1,4 +1,5 @@
 import { HARGA_PERINTIS_TEKS } from '@/lib/harga-akses';
+import { TeksKaskade } from '@/components/teks-kaskade';
 import { jejak } from '@/lib/pixel';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -276,13 +277,28 @@ export default function Akses() {
               Akses terbatas
             </span>
           </div>
+          {/* ── JUDUL BERKASKADE ────────────────────────────────────────
+              Tiap huruf berguling saat kursor menyentuh judulnya. Dipasang
+              di sini, bukan di hero: halaman ini satu-satunya yang tugasnya
+              MENGUNDANG, dan gerakan kecil yang menyambut sentuhan pertama
+              memang tempatnya di undangan.
+
+              GRADIEN EMAS DILEPAS, dan itu keharusan bukan pilihan.
+              Mekanismenya menggambar salinan tiap huruf dengan
+              `currentColor`; teks bergradien warnanya TRANSPARAN, jadi
+              salinannya tidak terlihat dan tidak ada yang berguling.
+              Emasnya tidak hilang dari judul — ia jadi warna PADAT di baris
+              kedua, dan bertukar tempat dengan putih saat disentuh. Yang
+              ditonjolkan tetap satu baris, persis aturan hero.
+
+              Gelombangnya MENYAMBUNG antar baris lewat `mulaiDari`: dua
+              baris yang mulai serempak terbaca sebagai dua judul yang
+              kebetulan bertumpuk, bukan satu kalimat. */}
           <h1 className="text-4xl font-medium leading-[0.95] tracking-tighter text-zinc-50 sm:text-5xl lg:text-[56px]">
-            Masuk ke<br />
-            {/* Gradien emas hanya di SATU baris, persis aturan hero: kalau
-                seluruh judul diberi gradien, tidak ada lagi yang ditonjolkan. */}
-            <span className="bg-gradient-to-br from-white via-white to-[#ffcd75] bg-clip-text text-transparent">
-              Jadi Trader Tools
-            </span>
+            <TeksKaskade teks="Masuk ke" warnaSentuh="#ffcd75" />
+            <br />
+            <TeksKaskade teks="Jadi Trader Tools" warna="#ffcd75" warnaSentuh="#ffffff"
+              mulaiDari={9} />
           </h1>
           <p className="max-w-[46ch] text-[15.5px] leading-relaxed text-zinc-400">
             Akses dibuka bertahap agar setiap pengguna baru mendapat pendampingan.
