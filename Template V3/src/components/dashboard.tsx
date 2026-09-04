@@ -144,23 +144,50 @@ export function Dashboard() {
      milidetik setelah jurnal) cuma menghasilkan satu tulisan. */
   const { pemilik } = useAuth();
   const sidikTerbit = useRef('');
+  /* ── KENAPA TIMERNYA TIDAK LAGI DIBATALKAN TIAP EFEK BERJALAN ──────────
+     Bentuk lama menjadwalkan setTimeout(2000) lalu MEMBATALKANNYA di
+     cleanup — pola peredam yang benar untuk nilai yang berubah sesekali.
+     Di sini nilainya tidak berubah sesekali: `angka` lahir baru tiap kali
+     salah satu pendengar berbunyi, dan di dashboard yang hidup itu lebih
+     sering daripada dua detik.
+
+     Akibatnya peredamnya kelaparan — dijadwal, dibatalkan, dijadwal lagi,
+     tidak pernah sampai meletus. Diukur langsung di peramban pemilik
+     4 Sep 2026 dengan menghitung panggilan setTimeout/clearTimeout selama
+     12 detik di halaman Dashboard: 9 dijadwalkan, 11 dibatalkan, 1 meletus.
+     Gejalanya, dokumen `public/ringkasanAkun` berhenti terbit 13 jam —
+     kartu halaman depan membeku di angka semalam tanpa satu pun galat.
+
+     Sekarang jadwal PERTAMA yang menang dan tidak pernah diganggu; nilai
+     terbarunya dijemput dari ref saat ia meletus. Hasilnya sama-sama satu
+     tulisan per dua detik, bedanya yang ini benar-benar terjadi. */
+  const bahanTerbit = useRef<{ r: typeof angka; trade: typeof RIWAYAT } | null>(null);
+  bahanTerbit.current = { r: angka, trade: RIWAYAT };
+  const jamTerbit = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     /* `contoh` ikut jadi penjaga: halaman depan menampilkan angka ini sebagai
        rekam jejak sungguhan, dan menerbitkan hitungan yang berasal dari
        transaksi contoh akan membuatnya berbohong. */
     if (!pemilik || !RIWAYAT.length || contoh) return;
-    /* Objek yang SAMA dengan yang digambar kartu hero — bukan disusun ulang
-       di sini. Menyusunnya ulang berarti dua daftar field yang harus
-       diperbarui bersamaan, dan yang satu pasti terlupa. */
-    const r = angka;
-    const sidik = JSON.stringify(r);
-    if (sidik === sidikTerbit.current) return;
-    const j = setTimeout(() => {
+    if (jamTerbit.current) return;              // sudah ada yang menunggu
+    jamTerbit.current = setTimeout(() => {
+      jamTerbit.current = null;
+      const b = bahanTerbit.current;
+      if (!b) return;
+      /* Objek yang SAMA dengan yang digambar kartu hero — bukan disusun
+         ulang di sini. Menyusunnya ulang berarti dua daftar field yang harus
+         diperbarui bersamaan, dan yang satu pasti terlupa. */
+      const sidik = JSON.stringify(b.r);
+      if (sidik === sidikTerbit.current) return;
       sidikTerbit.current = sidik;
-      void terbitkanRingkasan(r, RIWAYAT).catch((e) => console.warn('ringkasan tidak terbit:', e));
+      void terbitkanRingkasan(b.r, b.trade).catch((e) => console.warn('ringkasan tidak terbit:', e));
     }, 2000);
-    return () => clearTimeout(j);
   }, [pemilik, RIWAYAT.length, contoh, angka]);
+
+  /* Dibersihkan saat komponennya pergi, BUKAN tiap efek berjalan — itu
+     bedanya dengan bentuk lama, dan seluruh perbaikannya ada di beda itu. */
+  useEffect(() => () => { if (jamTerbit.current) clearTimeout(jamTerbit.current); }, []);
 
   /* Aktivitas dirakit dari KEJADIAN NYATA: transaksi terakhir yang ditutup,
      posisi yang sedang terbuka, dan status sambungan. Daftar sebelumnya

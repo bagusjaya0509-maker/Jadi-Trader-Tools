@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { ArrowDownToLine, ArrowUpFromLine, Trash2, Loader2 } from 'lucide-react';
+import { ArrowDownToLine, ArrowUpFromLine, Trash2 } from 'lucide-react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { cn, uang, tanggalPendek } from '@/lib/utils';
 import { simpanArus, hapusArus, arusBersih, type Arus } from '@/lib/tulis-jurnal';
+import { tulisLatar } from '@/lib/tulis-lokal';
 import type { Sumber } from '@/data/contoh';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -32,7 +33,9 @@ export function KotakArus({ sumber, arus, bisaTulis, ringkas = false }: {
   const [jenis, setJenis] = useState<'setor' | 'tarik'>('setor');
   const [nilai, setNilai] = useState('');
   const [catatan, setCatatan] = useState('');
-  const [sibuk, setSibuk] = useState(false);
+  /* Tidak ada lagi keadaan "sedang menyimpan": tulisannya berlaku sebelum
+     baris berikutnya berjalan. Menyisakan pemutar yang selalu mati cuma
+     menjanjikan penantian yang tidak pernah ada. */
   const [pesan, setPesan] = useState('');
   /* Kabar mengambang menutupi kolom di sebelahnya, jadi ia harus pergi
      sendiri — kabar sukses yang menetap selamanya berubah jadi penghalang
@@ -51,14 +54,19 @@ export function KotakArus({ sumber, arus, bisaTulis, ringkas = false }: {
   async function tambah() {
     const n = Number(nilai.replace(/[^\d.-]/g, ''));
     if (!isFinite(n) || n <= 0) { setPesan('Nilai harus angka lebih dari nol.'); return; }
-    setSibuk(true); setPesan('');
-    try {
-      await simpanArus({ sumber, jenis, nilai: n, waktu: Date.now(), catatan: catatan.trim() });
-      setNilai(''); setCatatan('');
-      setPesan(`${jenis === 'setor' ? 'Setoran' : 'Penarikan'} ${uang(n)} tercatat.`);
-    } catch (e) {
-      setPesan(e instanceof Error ? e.message : 'Gagal menyimpan');
-    } finally { setSibuk(false); }
+    /* TIDAK di-await, dan itu bukan kelalaian — lihat lib/tulis-lokal.ts.
+       Barisnya sudah muncul di daftar di bawah sebelum baris kode ini
+       selesai; yang ditunggu `await` cuma jawaban server, dan menunggunya
+       membuat tombol berputar serta formulir tetap terisi untuk sesuatu
+       yang sudah terjadi. Dilaporkan pemilik 4 Sep 2026: "loadingnya lama
+       tapi sebenarnya angkanya masuk kok". */
+    setPesan('');
+    tulisLatar(
+      simpanArus({ sumber, jenis, nilai: n, waktu: Date.now(), catatan: catatan.trim() }),
+      (pesan) => setPesan(pesan),
+    );
+    setNilai(''); setCatatan('');
+    setPesan(`${jenis === 'setor' ? 'Setoran' : 'Penarikan'} ${uang(n)} tercatat.`);
   }
 
   return (
@@ -114,9 +122,9 @@ export function KotakArus({ sumber, arus, bisaTulis, ringkas = false }: {
               tidak bergeser sepiksel pun; ia menutupi kolom di sebelahnya
               beberapa detik, lalu hilang sendiri. */}
           <div className="relative">
-            <button onClick={() => void tambah()} disabled={sibuk || !bisaTulis}
+            <button onClick={() => void tambah()} disabled={!bisaTulis}
               className="flex h-9 w-full cursor-pointer items-center justify-center gap-2 rounded-md bg-zinc-100 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50">
-              {sibuk && <Loader2 className="size-3.5 animate-spin" />} Catat
+              Catat
             </button>
             {pesan && (
               <span className="pointer-events-none absolute right-full top-1/2 mr-2 max-w-[220px] -translate-y-1/2 truncate

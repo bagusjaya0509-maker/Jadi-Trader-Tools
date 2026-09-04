@@ -6,6 +6,7 @@ import { rupiah, warnaKategori } from '@/data/porto';
 import { bacaLembar, keAsetDanKewajiban, type BarisImpor } from '@/lib/impor-porto';
 import type { IsiPorto } from '@/lib/porto';
 import { useTutupLuar } from '@/lib/tutup-luar';
+import { tulisLatar } from '@/lib/tulis-lokal';
 
 /* ════════════════════════════════════════════════════════════════════════
    IMPOR LEMBAR -> PRATINJAU -> SIMPAN
@@ -47,21 +48,29 @@ export function ModalImporPorto({ isi, simpan, tutup }: {
 
   async function simpanHasil() {
     if (!baris) return;
-    setSibuk(true); setGalat('');
+    /* Inilah putaran berputar tak berujung yang dilaporkan pemilik: modal
+       ini menunggu jawaban server untuk 23 pos yang sudah tersimpan dan
+       sudah tergambar di halaman di belakangnya. Sekarang ia menutup
+       seketika; lihat lib/tulis-lokal.ts. */
+    setGalat('');
     try {
       const { aset, kewajiban } = keAsetDanKewajiban(baris);
-      await simpan({
+      tulisLatar(simpan({
         /* "Ganti" mengosongkan dulu; "tambahkan" menyambung ke yang ada.
            Bawaannya mengganti, karena lembar seperti ini biasanya foto utuh
            kondisi terkini — tapi pilihannya harus terlihat, bukan ditebak. */
         aset: ganti ? aset : [...isi.aset, ...aset],
         kewajiban: ganti ? kewajiban : [...isi.kewajiban, ...kewajiban],
         bulanan: isi.bulanan,
-      });
+      }), (pesan) => alert('Portofolio belum tersimpan ke server: ' + pesan));
       tutup();
     } catch (e) {
+      /* Yang tersisa di sini cuma galat SEBELUM tulisan berangkat —
+         keAsetDanKewajiban() menolak barisnya. Itu memang harus menahan
+         jendelanya: tidak ada yang tersimpan untuk ditutup. */
       setGalat(e instanceof Error ? e.message : 'Gagal menyimpan');
-    } finally { setSibuk(false); }
+      setSibuk(false);
+    }
   }
 
   const dipakai = baris?.filter((b) => b.pakai) ?? [];

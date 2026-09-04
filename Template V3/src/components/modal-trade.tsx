@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { X, Trash2, Loader2 } from 'lucide-react';
 import { Panel } from '@/components/efferd-ui';
 import { cn } from '@/lib/utils';
+import { tulisLatar } from '@/lib/tulis-lokal';
 import { simpanTrade, hapusTrade, bacaTrade, type MasukanTrade } from '@/lib/tulis-jurnal';
 import type { Trade, Sumber } from '@/data/contoh';
 import { useTutupLuar } from '@/lib/tutup-luar';
@@ -98,7 +99,8 @@ export function ModalTrade({ sumber, trade, tutup }: {
        transaksi sungguhan yang ikut dihitung ke Net P/L. */
     latihan: trade?.latihan,
   }));
-  const [sibuk, setSibuk] = useState(false);
+  /* Lihat catatan yang sama di kotak-arus.tsx: yang tersisa untuk ditunggu
+     cuma PEMUATAN isian (`memuat`), bukan penyimpanannya. */
   const [galat, setGalat] = useState('');
 
   /* ── DOKUMEN ASLINYA DIBACA, BUKAN DITEBAK DARI BARIS TABEL ─────────────
@@ -164,19 +166,23 @@ export function ModalTrade({ sumber, trade, tutup }: {
        tindakan yang pasti tidak merusak adalah tidak menulis. */
     if (memuat) { setGalat('Tunggu isiannya selesai dimuat.'); return; }
     if (gagalMuat) { setGalat('Isian gagal dimuat — muat ulang halaman sebelum menyimpan.'); return; }
-    setSibuk(true); setGalat('');
-    try { await simpanTrade(f); tutup(); }
-    catch (e) { setGalat(e instanceof Error ? e.message : 'Gagal menyimpan'); }
-    finally { setSibuk(false); }
+    /* Ditutup SEKETIKA. Trade-nya sudah masuk cache lokal dan sudah
+       tergambar di tabel di belakang jendela ini; menahan jendelanya sampai
+       server menjawab berarti menahan orangnya untuk melihat sesuatu yang
+       sudah ada di layar. Galat yang datang belakangan tidak hilang — ia
+       muncul sebagai peringatan, dan datanya tetap diantre Firestore.
+       Lihat lib/tulis-lokal.ts. */
+    setGalat('');
+    tulisLatar(simpanTrade(f), (pesan) => alert('Trade belum tersimpan ke server: ' + pesan));
+    tutup();
   }
 
   async function buang() {
     if (!trade) return;
     if (!confirm(`Hapus trade ${trade.pair}?\n\nCatatan ini hilang dari jurnal untuk selamanya.`)) return;
-    setSibuk(true); setGalat('');
-    try { await hapusTrade(trade.id); tutup(); }
-    catch (e) { setGalat(e instanceof Error ? e.message : 'Gagal menghapus'); }
-    finally { setSibuk(false); }
+    setGalat('');
+    tulisLatar(hapusTrade(trade.id), (pesan) => alert('Trade belum terhapus di server: ' + pesan));
+    tutup();
   }
 
   const satuan = sumber === 'forex' ? 'Lot' : 'Qty';
@@ -276,19 +282,19 @@ export function ModalTrade({ sumber, trade, tutup }: {
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-zinc-800/80 px-6 py-4">
           {trade ? (
-            <button onClick={() => void buang()} disabled={sibuk}
+            <button onClick={() => void buang()}
                     className="flex cursor-pointer items-center gap-1.5 rounded-md border border-red-500/25 px-3 py-2 text-[12px] text-red-400 transition-colors hover:bg-red-500/10 disabled:opacity-50">
               <Trash2 className="size-3.5" /> Hapus Trade
             </button>
           ) : <span />}
           <div className="ml-auto flex gap-2">
-            <button onClick={tutup} disabled={sibuk}
+            <button onClick={tutup}
                     className="cursor-pointer rounded-md border border-zinc-800 px-4 py-2 text-[12px] text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100 disabled:opacity-50">
               Batal
             </button>
-            <button onClick={() => void simpan()} disabled={sibuk || belumJelas}
+            <button onClick={() => void simpan()} disabled={belumJelas}
                     className="flex cursor-pointer items-center gap-2 rounded-md bg-zinc-100 px-4 py-2 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50">
-              {(sibuk || memuat) && <Loader2 className="size-3.5 animate-spin" />} Simpan
+              {memuat && <Loader2 className="size-3.5 animate-spin" />} Simpan
             </button>
           </div>
         </div>
