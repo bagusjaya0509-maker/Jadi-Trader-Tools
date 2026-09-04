@@ -35,6 +35,10 @@ export interface AngkaPameran {
   /** Kurva saldo kumulatif, untuk grafik hero. */
   kurva: number[];
   tumbuh: number;
+  /** Dolar sejendela dengan `tumbuh`. Dokumen lama belum memuatnya —
+   *  dibaca dari kedua ujung `kurva` kalau begitu, karena di situlah
+   *  angkanya berasal. */
+  tumbuhUang: number;
   /** Total saldo — angka yang SAMA dengan kartu Total Saldo di Dashboard. */
   saldo: number;
   /** Transaksi paling lama; 0 kalau tidak diketahui. */
@@ -46,7 +50,7 @@ export interface AngkaPameran {
   contoh: boolean;
 }
 
-const KOSONG: AngkaPameran = { siap: false, jumlah: 0, winrate: 0, bersih: 0, kurva: [], tumbuh: 0, saldo: 0, sejak: 0, judul: '', sub: '', contoh: false };
+const KOSONG: AngkaPameran = { siap: false, jumlah: 0, winrate: 0, bersih: 0, kurva: [], tumbuh: 0, tumbuhUang: 0, saldo: 0, sejak: 0, judul: '', sub: '', contoh: false };
 /* ── Kenapa angkanya tidak lagi di sini ───────────────────────────────
    Dulu berkas ini juga memuat PAMERAN_CONTOH: winrate 57,6%, 213
    transaksi, saldo 1.140,50 — angka ilustrasi yang digambar kartu hero.
@@ -108,6 +112,8 @@ export function useAngkaPameran(): AngkaPameran {
           bersih: Number(nilai(f.bersih)) || 0,
           kurva: kurva.length > 1 ? kurva : [Number(nilai(f.saldo)) || 0],
           tumbuh: Number(nilai(f.tumbuh)) || 0,
+          tumbuhUang: Number(nilai(f.tumbuhUang))
+            || (kurva.length > 1 ? Number((kurva[kurva.length - 1] - kurva[0]).toFixed(2)) : 0),
           saldo: Number(nilai(f.saldo)) || 0,
           sejak: Number(nilai(f.sejak)) || 0,
           ...teksTerbit,
@@ -187,6 +193,11 @@ function muatDariShowcase(
           bersih,
           kurva: kurva.length > 1 ? kurva : [saldoAwal, jalan],
           tumbuh,
+          /* Di jalur ini kurvanya seumur akun, jadi dolarnya pun seumur
+             akun — dan itu memang `bersih`. Jendelanya beda dari jalur
+             utama, tapi di dalam jalur ini persen dan dolarnya tetap
+             mengukur rentang yang sama. */
+          tumbuhUang: bersih,
           saldo: jalan,
           sejak: baris[0]?.waktu ?? 0,
           ...teksTerbit,

@@ -46,6 +46,21 @@ export interface AngkaRingkas {
   bersih: number;
   kurva: number[];
   tumbuh: number;
+  /** Perubahan saldo dalam DOLAR pada jendela yang sama dengan `tumbuh` —
+   *  yaitu naik-turunnya kurva yang digambar di sebelahnya, bukan Net P/L
+   *  seumur akun.
+   *
+   *  Ada karena keduanya pernah dipajang berdampingan sebagai satu angka:
+   *  "+3,5%  -$150,25". Dua-duanya benar, dan justru itu masalahnya —
+   *  persennya menghitung bulan berjalan, dolarnya menghitung 2.342
+   *  transaksi sejak Juli. Pembacanya cuma melihat tanda plus di sebelah
+   *  tanda minus dan menyimpulkan aplikasinya tidak bisa berhitung.
+   *
+   *  Dihitung dari DUA UJUNG KURVA YANG SAMA dengan `tumbuh`, bukan rumus
+   *  sendiri: selama pembilangnya satu, keduanya tidak mungkin berselisih
+   *  tanda. Net P/L seumur akun tetap ada di `bersih` dan tetap digambar
+   *  Dashboard — di kartu yang memang menamainya begitu. */
+  tumbuhUang: number;
   /** Transaksi paling lama; 0 kalau belum ada transaksi sama sekali. */
   sejak: number;
 }
@@ -126,8 +141,9 @@ export function useRingkasanAkun() {
     bersih: Number(stat.bersih.toFixed(2)),
     kurva: titikIni.map((x) => x.ini as number),
     tumbuh: Number(selisihSaldo.toFixed(1)),
+    tumbuhUang: Number((akhirKurva - awalKurva).toFixed(2)),
     sejak,
-  }), [totalSaldo, stat.jumlah, stat.winrate, stat.bersih, kurvaSaldo, selisihSaldo, sejak]);
+  }), [totalSaldo, stat.jumlah, stat.winrate, stat.bersih, kurvaSaldo, selisihSaldo, awalKurva, akhirKurva, sejak]);
 
   return {
     /* Bahan mentah, supaya layar tidak memanggil hook yang sama dua kali. */

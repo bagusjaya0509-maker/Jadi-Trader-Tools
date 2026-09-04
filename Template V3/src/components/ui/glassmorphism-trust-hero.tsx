@@ -433,15 +433,27 @@ export default function HeroSection() {
                     pembaca yang paham berhenti percaya. */}
                 <div className="mb-6">
                   <div className="flex justify-between text-sm mb-2">
+                    {/* RENTANGNYA DISEBUT. Kurva ini saldo berjalan BULAN
+                        INI — sama seperti catatan di kartu saldo di atas —
+                        jadi persen di sebelah kanan juga bulan ini, bukan
+                        rekam jejak sejak akun dibuat. Tanpa keterangan itu
+                        pembacanya menganggapnya seumur akun, dan angka yang
+                        disalahpahami lebih buruk daripada angka yang tidak
+                        ditampilkan. */}
                     <span className="text-zinc-400">
-                      {pameran.contoh ? 'Perkembangan akun · contoh' : 'Perkembangan akun'}
+                      Perkembangan akun · {pameran.contoh ? 'contoh' : 'bulan ini'}
                     </span>
-                    {pameran.siap && (
+                    {/* Dua titik, bukan satu: pada tanggal 1 kurvanya baru
+                        punya satu titik, dan "berubah 0%" di hari yang belum
+                        sempat berubah adalah pernyataan, bukan fakta. */}
+                    {pameran.siap && pameran.kurva.length > 1 && (
                       <span className={pameran.tumbuh >= 0 ? "text-emerald-400 font-medium" : "text-red-400 font-medium"}>
                         {pameran.tumbuh >= 0 ? "+" : ""}{pameran.tumbuh.toFixed(1)}%{' '}
-                        <span className={pameran.bersih >= 0 ? 'font-normal text-emerald-400/90' : 'font-normal text-red-400/90'}>
-                          {uang(pameran.bersih, true)}
-                        </span>
+                        {/* Sewarna dengan persennya, dan memang begitu
+                            seharusnya: keduanya dihitung dari dua ujung yang
+                            sama, jadi tandanya tidak mungkin berbeda. Dua
+                            warna di sini dulu bukan gaya — itu gejala. */}
+                        <span className="font-normal opacity-90">{uang(pameran.tumbuhUang, true)}</span>
                       </span>
                     )}
                   </div>
