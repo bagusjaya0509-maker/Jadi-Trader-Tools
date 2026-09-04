@@ -43,7 +43,7 @@ import {
   daftarAnalisa, kirimAnalisa, bukaIsi, mintaAkses,
   ambilProfilAnalis, simpanProfilAnalis,
   statusSaya, putuskanAkses, tambahGambar, ambilPerforma,
-  batalkanAnalisa, bisaDibatalkan, keadaanSinyal, daftarAgenHadir,
+  batalkanAnalisa, bisaDibatalkan, keadaanSinyal, daftarAgenHadir, daftarSembunyiAnalis,
   type RingkasAnalisa, type IsiAnalisa, type PermintaanMasuk, type Performa,
   type AgenHadir,
 } from '@/lib/analisa';
@@ -1996,6 +1996,16 @@ export default function Analisa() {
      dibangun dari `daftar` — tidak ada barisnya di sana sampai tembusan
      pertama datang, dan agen tren bisa menunggu berhari-hari. */
   const [agenHadir, setAgenHadir] = useState<AgenHadir[]>([]);
+  /* Kartu yang disembunyikan pemilik dari Maintenance. Disaring DI SINI,
+     bukan di server: daftar sinyalnya sendiri tetap utuh untuk papan
+     peringkat, panel performa, dan tautan langsung ke satu sinyal — yang
+     disembunyikan cuma kartunya di papan.
+
+     Diambil sekali per pembukaan halaman. Isinya berubah kalau pemiliknya
+     menyunting, dan pemiliknya tidak menyunting sambil orang lain menatap
+     papan; menariknya berkala cuma satu permintaan tiap menit untuk daftar
+     yang berubah beberapa kali setahun. */
+  const [sembunyiKartu, setSembunyiKartu] = useState<Set<string>>(new Set());
   /* Harga terkini tiap pasangan, dipakai kartu sinyal untuk menjawab satu
      pertanyaan: rencana ini masih terpakai atau harganya sudah lewat?
 
@@ -2380,6 +2390,7 @@ export default function Analisa() {
     /* Gagal diam-diam: daftar agen itu pelengkap, dan papan analis tidak
        boleh ikut kosong cuma karena satu rute tambahan tidak menjawab. */
     void daftarAgenHadir().then(setAgenHadir).catch(() => { /* papan jalan tanpa kartu agen */ });
+    void daftarSembunyiAnalis().then((d) => setSembunyiKartu(new Set(d)));
     /* Contoh HANYA untuk yang belum punya akses. Pemilik dan pelanggan
        aktif — satu-satunya orang yang bisa benar-benar menirukan sinyal —
        selalu melihat rekam jejak sungguhan. */
@@ -3653,9 +3664,14 @@ export default function Analisa() {
            dicari tiap kali. Tapi ia naik TANPA jadi sematan: yang berubah
            urutannya saja, bukan daftar pin milik orangnya. */
         const naik = (uid: string) => (disematkan(uid) || diikutiSet.has(uid) ? 1 : 0);
-        const kanalUrut = [...kanal.entries()].sort((x, y) => {
-          return naik(y[0]) - naik(x[0]) || y[1][0].dibuat - x[1][0].dibuat;
-        });
+        const kanalUrut = [...kanal.entries()]
+          /* Disaring SEBELUM diurutkan, bukan sesudah: yang disembunyikan
+             tidak boleh ikut menentukan urutan apa pun, termasuk lewat
+             sematan yang menempel padanya. */
+          .filter(([uid]) => !sembunyiKartu.has(uid))
+          .sort((x, y) => {
+            return naik(y[0]) - naik(x[0]) || y[1][0].dibuat - x[1][0].dibuat;
+          });
         const perfDari = (uid: string) => performa?.analis.find((p) => p.uid === uid) ?? null;
         /* Uang yang dipertaruhkan per sinyal menurut model papan peringkat.
            Dipakai menyatakan drawdown dalam satuan risiko, bukan dolar. */
@@ -3665,7 +3681,7 @@ export default function Analisa() {
            agennya memposting satu sinyal saja, kanalnya lahir dan ia harus
            HILANG dari sini — dua kartu untuk satu agen di layar yang sama
            terbaca sebagai kerusakan. */
-        const agenSiaga = agenHadir.filter((ag) => !kanal.has(ag.uid));
+        const agenSiaga = agenHadir.filter((ag) => !kanal.has(ag.uid) && !sembunyiKartu.has(ag.uid));
         const terpilih = kanalBuka ? kanal.get(kanalBuka) ?? [] : [];
 
         return kanalBuka === null ? (

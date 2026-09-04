@@ -9,6 +9,7 @@ import {
 import { useAuth } from '@/lib/auth';
 import {
   useKuota, mintaAkses, permintaanSaya, masukDiscord, aktifkanKode, LINK_BAYAR,
+  tampilanAksesDiingat,
   type Permintaan,
 } from '@/lib/akses';
 import { BellNotify } from '@/components/ui/bell-notify';
@@ -57,6 +58,12 @@ function KartuKuota({ judul, pakai, total, sisa, warna, catatan }: {
 export default function Akses() {
   const { pengguna, memuat: memuatAuth, masuk, keluar, langganan, pemilik, galat } = useAuth();
   const { kuota, memuat: memuatKuota, muatUlang } = useKuota();
+  /* Dibaca SEKALI saat komponen lahir, bukan tiap render: begitu jawabannya
+     datang, `memuatKuota` sudah false dan nilai ini tidak lagi menentukan
+     apa pun — membacanya ulang cuma menyentuh localStorage puluhan kali
+     untuk jawaban yang sama. */
+  const [diingat] = useState(tampilanAksesDiingat);
+  const tahuTampilan = !memuatKuota || diingat !== null;
   const [params] = useSearchParams();
   const tujuan = params.get('dari') || '/dashboard';
 
@@ -188,7 +195,17 @@ export default function Akses() {
           yang dipilih: itu satu-satunya bagian yang memberi tahu orang
           mereka sedang berada di mana. */}
       <div className="relative hidden flex-1 overflow-hidden bg-zinc-950 lg:block">
-        {kuota.tampilanAkses === 'lonceng' ? (
+        {/* TIDAK MENEBAK. Selama server belum menjawab DAN peramban ini
+            belum pernah melihat jawabannya, panelnya dibiarkan gelap
+            kosong. Sebelumnya bawaan 'foto' yang dipakai: pembaca melihat
+            foto sepersekian detik lalu ditukar lonceng — kedipan yang
+            dilaporkan pemilik 4 Sep 2026.
+
+            Panel gelap bukan kekurangan di sini: keterangan mereknya
+            berdiri di luar percabangan ini, jadi yang hilang sesaat cuma
+            latarnya, dan latar yang datang sedetik terlambat jauh lebih
+            tenang daripada latar yang datang salah lalu dibetulkan. */}
+        {!tahuTampilan ? null : kuota.tampilanAkses === 'lonceng' ? (
           <>
             {/* Talinya sengaja setinggi 50vh dan MELEWATI tepi atas panel
                 — overflow-hidden di pembungkusnya yang memotongnya. Itu

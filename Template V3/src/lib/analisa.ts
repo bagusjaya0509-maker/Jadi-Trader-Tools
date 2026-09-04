@@ -1,5 +1,5 @@
 import { auth } from '@/lib/firebase';
-import { PROXY_BAWAAN } from '@/lib/koneksi';
+import { PROXY_BAWAAN, bacaKoneksi } from '@/lib/koneksi';
 
 /* ════════════════════════════════════════════════════════════════════════
    COPY TRADING — klien untuk rute /api/analisa di VPS
@@ -122,6 +122,39 @@ async function panggil(jalur: string, opsi: RequestInit = {}, pakaiToken = true)
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error || `Server menjawab ${r.status}`);
   return j;
+}
+
+/* ── KARTU YANG DISEMBUNYIKAN DARI PAPAN ─────────────────────────────────
+   Daftar uid, disimpan di server supaya berlaku untuk SEMUA pembaca — bukan
+   cuma merapikan layar pemiliknya. Bukan penghapusan: sinyalnya tetap ada
+   dan papan peringkat tetap menghitungnya. Lihat panel-sembunyi-kartu.tsx.
+
+   GAGAL = DAFTAR KOSONG, bukan lemparan. Papan Copy Signal harus tetap
+   tergambar kalau rute ini mati; kehilangan penyaringan berarti beberapa
+   kartu mati ikut tampil, dan itu jauh lebih ringan daripada papan yang
+   tidak muncul sama sekali. */
+export async function daftarSembunyiAnalis(): Promise<string[]> {
+  try {
+    const r = await fetch(`${DASAR}/api/analisa/sembunyi`);
+    if (!r.ok) return [];
+    const j = await r.json();
+    return Array.isArray(j.uid) ? j.uid.filter((x: unknown) => typeof x === 'string') : [];
+  } catch { return []; }
+}
+
+/** Hanya pemilik — dijaga App Token di server, sama seperti setelan akses.
+ *  SELURUH daftar dikirim, bukan tambah/hapus satu-satu: panelnya memegang
+ *  seluruh daftar di layar, dan dua bentuk perintah untuk satu keadaan
+ *  adalah dua jalan untuk berselisih saat dua tab terbuka bersamaan. */
+export async function simpanSembunyiAnalis(uid: string[]): Promise<string[]> {
+  const r = await fetch(`${DASAR}/api/analisa/sembunyi`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-App-Token': bacaKoneksi().token.trim() },
+    body: JSON.stringify({ uid }),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || `Server menjawab ${r.status}`);
+  return Array.isArray(j.uid) ? j.uid : [];
 }
 
 export async function daftarAnalisa(): Promise<RingkasAnalisa[]> {

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Upload, Trash2, RotateCcw, Plus, FileCode2, Image as ImageIcon, ShieldAlert } from 'lucide-react';
 import { PanelModerasiSinyal } from '@/components/panel-moderasi-sinyal';
+import { PanelSembunyiKartu } from '@/components/panel-sembunyi-kartu';
 import PanelLaporanPengguna from '@/components/panel-laporan-pengguna';
 import { Panel, PanelHead, KartuKpi } from '@/components/efferd-ui';
 import { cn } from '@/lib/utils';
@@ -491,7 +492,13 @@ export default function Maintenance() {
 
       {tab === 'konten' && <PanelTeksBeranda />}
 
-      {tab === 'moderasi' && <PanelModerasiSinyal />}
+      {/* Dua panel, dua urusan yang sengaja TIDAK digabung. Moderasi
+          menurunkan sinyal yang melanggar — itu kewajiban pengawasan dan
+          jejaknya tercatat. Menyembunyikan kartu cuma merapikan papan, dan
+          apa pun yang disembunyikan tetap dihitung papan peringkat.
+          Menyatukan keduanya di satu daftar akan membuat "dirapikan"
+          terbaca sebagai "ditindak". */}
+      {tab === 'moderasi' && <><PanelModerasiSinyal /><PanelSembunyiKartu /></>}
       {tab === 'bug' && <PanelLaporanPengguna />}
 
       {tab === 'produk' && (<>

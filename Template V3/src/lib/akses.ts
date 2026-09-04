@@ -47,12 +47,39 @@ export const KUOTA_KOSONG: Kuota = {
      server bilang pendaftaran ditutup. Lebih baik terlambat sedetik daripada
      menampilkan sesuatu yang langsung ditarik kembali. */
   bukaPermintaan: false,
-  /* Bawaan 'foto', dan ini penting: nilai ini yang terpakai selama jawaban
-     server belum datang. Foto adalah yang sudah ada sejak awal, jadi
-     memasangnya lebih dulu berarti halaman tidak pernah berkedip
-     menampilkan sesuatu yang lain sebelum menetap. */
+  /* Bawaan 'foto' — tapi JANGAN dipakai untuk memutuskan apa yang
+     digambar sebelum server menjawab. Catatan lama di sini berbunyi
+     "foto yang sudah ada sejak awal, jadi halaman tidak pernah berkedip";
+     itu benar sampai pemiliknya memilih lonceng, dan sejak itu bawaan ini
+     jadi TEBAKAN YANG SALAH: foto tampil sepersekian detik lalu ditukar
+     lonceng di depan mata pembacanya. Lihat `tampilanAksesDiingat()`. */
   tampilanAkses: 'foto',
 };
+
+/* ── TAMPILAN TERAKHIR YANG DIKETAHUI ──────────────────────────────────
+   Bukan setelan peramban — SALINAN jawaban server yang terakhir terbaca,
+   dipakai supaya bingkai pertama sudah benar alih-alih ditebak. Yang
+   memutuskan tetap pemilik lewat Maintenance; ini cuma ingatan.
+
+   localStorage, bukan state: yang dijawab adalah "apa yang digambar
+   sebelum React sempat mengambil apa pun", dan pada saat itu belum ada
+   satu pun permintaan jaringan yang selesai. */
+const KUNCI_TAMPILAN = 'jtTampilanAkses';
+
+/** Tampilan yang terakhir dikirim server di peramban ini, atau `null` kalau
+ *  halaman ini memang belum pernah dibuka. `null` berarti "belum tahu" —
+ *  dan yang belum tahu lebih baik menggambar panel kosong daripada menebak. */
+export function tampilanAksesDiingat(): 'foto' | 'lonceng' | null {
+  try {
+    const v = localStorage.getItem(KUNCI_TAMPILAN);
+    return v === 'foto' || v === 'lonceng' ? v : null;
+  } catch { return null; }
+}
+
+function ingatTampilan(v: unknown) {
+  if (v !== 'foto' && v !== 'lonceng') return;
+  try { localStorage.setItem(KUNCI_TAMPILAN, v); } catch { /* mode privat */ }
+}
 
 /** Link checkout Rp 17.900. Produknya bernama "Request Access". */
 export const LINK_BAYAR = 'https://lynk.id/karyahukum_store/66nd63r733k8/checkout';
@@ -86,7 +113,12 @@ async function kepalaLogin(): Promise<Record<string, string>> {
 
 /* ── Publik: sisa kuota ──────────────────────────────────────────────── */
 export function useKuota(): { kuota: Kuota; memuat: boolean; galat: string | null; muatUlang: () => void } {
-  const [kuota, setKuota] = useState<Kuota>(KUOTA_KOSONG);
+  /* Diunggulkan dari ingatan, bukan dari KUOTA_KOSONG: kunjungan kedua dan
+     seterusnya menggambar tampilan yang benar sejak bingkai pertama. */
+  const [kuota, setKuota] = useState<Kuota>(() => ({
+    ...KUOTA_KOSONG,
+    tampilanAkses: tampilanAksesDiingat() ?? KUOTA_KOSONG.tampilanAkses,
+  }));
   const [memuat, setMemuat] = useState(true);
   const [galat, setGalat] = useState<string | null>(null);
   const [putaran, setPutaran] = useState(0);
@@ -96,7 +128,15 @@ export function useKuota(): { kuota: Kuota; memuat: boolean; galat: string | nul
     setMemuat(true);
     fetch(`${dasar()}/api/akses/kuota`)
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`Server menjawab ${r.status}`))))
-      .then((j) => { if (hidup) { setKuota({ ...KUOTA_KOSONG, ...j }); setGalat(null); setMemuat(false); } })
+      .then((j) => {
+        if (!hidup) return;
+        /* Diingat SEBELUM dipasang. Kalau urutannya dibalik dan render
+           berikutnya melempar, ingatannya tidak pernah tertulis dan
+           kunjungan berikutnya berkedip lagi — persis gejala yang sedang
+           dibuang. */
+        ingatTampilan(j?.tampilanAkses);
+        setKuota({ ...KUOTA_KOSONG, ...j }); setGalat(null); setMemuat(false);
+      })
       .catch((e) => { if (hidup) { setGalat(e.message); setMemuat(false); } });
     return () => { hidup = false; };
   }, [putaran]);
