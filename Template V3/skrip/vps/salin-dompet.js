@@ -96,8 +96,25 @@ function bacaBerkas(dir) {
       salin: Array.isArray(d.salin) ? d.salin : [],
       log: Array.isArray(d.log) ? d.log : [],
       riwayat: Array.isArray(d.riwayat) ? d.riwayat : [],
+      maksLipat: bacaLipat(d.maksLipat),
     };
-  } catch { return { salin: [], log: [], riwayat: [] }; }
+  } catch { return { salin: [], log: [], riwayat: [], maksLipat: 1 }; }
+}
+
+/* ══ BATAS PER KOIN ══════════════════════════════════════════════════════
+   Berapa kali margin dasar boleh menumpuk di SATU koin, dihitung dari
+   seluruh isi akun — bukan per dompet.
+
+   1 (bawaan) = perilaku lama persis: satu koin, satu posisi. Kalau koin itu
+   sudah ada isinya, dari mana pun asalnya, salinan berikutnya ditahan.
+
+   Sengaja BUKAN per dompet. Pertanyaannya "berapa banyak uang saya yang
+   boleh menumpuk di ETH", dan uang itu satu — bursa menyatukan posisi dari
+   dompet mana pun ke satu posisi yang sama. Batas per dompet akan
+   menjanjikan sesuatu yang tidak bisa ditepati bursa. */
+function bacaLipat(v) {
+  const n = Number(v);
+  return Number.isFinite(n) && n >= 1 && n <= 10 ? Math.round(n * 10) / 10 : 1;
 }
 
 /** Dipertahankan apa adanya untuk pemanggil yang cuma butuh setelannya. */
@@ -114,6 +131,7 @@ function tulis(dir, isi) {
        pembaca tidak pernah melihat berkas setengah tertulis. */
     fs.writeFileSync(f + '.tmp', JSON.stringify({
       salin: d.salin || [],
+      maksLipat: bacaLipat(d.maksLipat),
       log: (d.log || []).slice(-MAKS_LOG),
       riwayat: (d.riwayat || []).slice(-MAKS_RIWAYAT),
     }, null, 2));
@@ -168,6 +186,7 @@ async function putaran({ dir, posisiDompet, catat, lonceng, bursa }) {
   if (!AKTIF) return;
   const berkas = bacaBerkas(dir);
   const salin = berkas.salin;
+  const LIPAT = bacaLipat(berkas.maksLipat);
   const hidup = salin.filter((s) => s.aktif === true && Number(s.usd) > 0);
   if (!hidup.length) return;
 
@@ -293,16 +312,30 @@ async function putaran({ dir, posisiDompet, catat, lonceng, bursa }) {
          Ditahan, BUKAN dibatalkan lalu dicoba lagi: hitungan konfirmasinya
          sengaja tidak dihapus, jadi begitu koinnya bebas ia langsung layak
          disalin tanpa menunggu dua pindaian dari nol. */
-      const dompetLain = hidup.find(
-        (x) => x !== s && x.punyaku && x.punyaku[k]);
-      if (dompetLain) {
-        jejak('tahan', s.alamat, k, 'salin ' + k + ': ditahan, koin ini sudah disalin dari '
-              + (dompetLain.nama || ringkas(dompetLain.alamat)) + ' — satu koin satu posisi');
-        continue;
-      }
-      if (potret && potret.some((p) => String(p.koin).toUpperCase() === String(k).toUpperCase())) {
-        jejak('tahan', s.alamat, k, 'salin ' + k + ': ditahan, posisi ' + k
-              + ' sudah terbuka di akun (kemungkinan dibuka manual) — satu koin satu posisi');
+      const dasar = Number(s.usd) || 0;
+      const batas = dasar * LIPAT;
+      /* Potret bursa MENANG kalau ada: ia satu-satunya yang tahu posisi
+         manual, dan ia tahu margin sesungguhnya — bukan nominal yang kita
+         niatkan waktu membuka. Catatan sendiri jadi cadangan supaya
+         penjaganya tidak ikut mati saat jaringan mati. */
+      const dariBursa = potret
+        ? potret.filter((p) => String(p.koin).toUpperCase() === String(k).toUpperCase())
+                .reduce((t, p) => t + (Number(p.margin) || 0), 0)
+        : null;
+      const dariCatatan = hidup.reduce(
+        (t, x) => t + (x.punyaku && x.punyaku[k] ? Number(x.punyaku[k].usd) || 0 : 0), 0);
+      const sudah = dariBursa !== null ? Math.max(dariBursa, dariCatatan) : dariCatatan;
+
+      /* Toleransi 1 sen. Margin di bursa bergerak sendiri mengikuti harga,
+         jadi posisi $30 bisa terbaca $29,98 — dan batas yang membandingkan
+         tanpa toleransi akan menolak lipatan yang sebenarnya pas. */
+      if (sudah + dasar > batas + 0.01) {
+        const asal = hidup.find((x) => x.punyaku && x.punyaku[k]);
+        jejak('tahan', s.alamat, k, 'salin ' + k + ': ditahan, ' + k + ' sudah terisi $'
+              + sudah.toFixed(2) + (asal ? ' (dari ' + (asal.nama || ringkas(asal.alamat)) + ')'
+                                        : ' (kemungkinan dibuka manual)')
+              + ' — menambah $' + dasar.toFixed(2) + ' melewati batas $' + batas.toFixed(2)
+              + ' (' + LIPAT + '× margin dasar)');
         continue;
       }
 
@@ -443,5 +476,5 @@ function ringkas(a) { return String(a || '').slice(0, 8) + '…'; }
 
 module.exports = {
   baca, bacaBerkas, tulis, putaran,
-  AKTIF, KONFIRMASI, MAKS_POSISI, BERKAS, MAKS_LOG, MAKS_RIWAYAT,
+  AKTIF, KONFIRMASI, MAKS_POSISI, BERKAS, MAKS_LOG, MAKS_RIWAYAT, bacaLipat,
 };

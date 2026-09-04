@@ -343,10 +343,24 @@ module.exports = (app, { butuhLogin, batasLaju, express, DIR }) => {
     res.json({
       ok: true,
       salin: d.salin || [],
+      /* Batas per koin, kelipatan margin dasar. GLOBAL, bukan per dompet —
+         bursa menyatukan posisi dari dompet mana pun jadi satu, jadi batas
+         per dompet menjanjikan sesuatu yang tidak bisa ditepati. */
+      maksLipat: lipatSah(d.maksLipat),
       log: (d.log || []).slice().reverse(),
       riwayat: (d.riwayat || []).slice().reverse(),
     });
   });
+
+  /* Disalin dari `bacaLipat` di salin-dompet.js. Disalin, bukan diimpor:
+     rute ini harus tetap menolak nilai ngawur walaupun mesin salinnya
+     kebetulan tidak terpasang di proses yang sama. Batas atas 10 dipasang
+     supaya salah ketik satu angka nol tidak jadi izin menumpuk sepuluh kali
+     lipat lebih banyak dari yang dimaksud. */
+  const lipatSah = (v) => {
+    const n = Number(v);
+    return Number.isFinite(n) && n >= 1 && n <= 10 ? Math.round(n * 10) / 10 : 1;
+  };
 
   app.post('/api/agen/wallet/salin', batasLaju, butuhLogin, hanyaPemilik, express.json(), (req, res) => {
     const b = req.body || {};
@@ -395,8 +409,13 @@ module.exports = (app, { butuhLogin, batasLaju, express, DIR }) => {
     if (b.nama !== undefined) s.nama = String(b.nama).slice(0, 60);
     s.diubah = Date.now();
 
+    /* Medan GLOBAL yang menumpang formulir per dompet. Ditulis hanya kalau
+       dikirim, supaya pemanggil lama yang belum tahu medan ini tidak
+       diam-diam mengembalikannya ke 1 tiap kali menyimpan setelan dompet. */
+    if (b.maksLipat !== undefined) d.maksLipat = lipatSah(b.maksLipat);
+
     tulis(SALIN, d);
-    res.json({ ok: true, salin: d.salin });
+    res.json({ ok: true, salin: d.salin, maksLipat: lipatSah(d.maksLipat) });
   });
 
   app.delete('/api/agen/wallet/salin/:alamat', batasLaju, butuhLogin, hanyaPemilik, (req, res) => {

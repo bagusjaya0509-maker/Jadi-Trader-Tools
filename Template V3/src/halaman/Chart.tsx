@@ -1067,6 +1067,15 @@ export default function ChartBacktest() {
      TERSIMPAN tetap relatif terhadap chart, jadi menutup panel tidak
      memindahkan bilah yang sudah ditaruh orangnya. */
   const [sisaKiri, setSisaKiri] = useState(0);
+  /* DUA panel kiri, dua pelapor. `PanelBelah` berdiri di LUAR ChartLilin
+     (Screener, konsensus, wallet view); `panelKiri` berdiri di DALAM-nya
+     (acuan jiplak, chart banding, dan panel Dompet). Keduanya bisa terbuka
+     bersamaan, jadi yang dipakai menggeser bilah alat adalah JUMLAHNYA —
+     memakai salah satu saja membuat bilahnya tetap tertimpa persis pada
+     kombinasi yang paling sering dipakai. Panel Dompet tertimpa karena
+     sumber kedua ini dulu tidak ada sama sekali. */
+  const [sisaKiriDalam, setSisaKiriDalam] = useState(0);
+  const kiriTotal = sisaKiri + sisaKiriDalam;
   const areaChart = useRef<HTMLDivElement>(null);
   /** Kartu chart utuh — bilah kendali DAN grafiknya. Inilah yang dinaikkan
    *  ke layar penuh; `areaChart` tetap dipakai untuk mengukur lebar kanvas. */
@@ -1086,7 +1095,7 @@ export default function ChartBacktest() {
        SEBENARNYA di layar — bukan dari angka bawaan yang tidak ada. */
     const awal = {
       x: e.clientX, y: e.clientY,
-      lx: letakAlat ? letakAlat.x : (b0 ? kotakBilah.left - b0.left - sisaKiri : 8),
+      lx: letakAlat ? letakAlat.x : (b0 ? kotakBilah.left - b0.left - kiriTotal : 8),
       ly: letakAlat ? letakAlat.y : (b0 ? kotakBilah.top - b0.top : 8),
     };
     const batas = () => areaChart.current?.getBoundingClientRect();
@@ -1098,7 +1107,7 @@ export default function ChartBacktest() {
       /* Dijepit di dalam area chart, disisakan 36 px supaya bilahnya
          tidak bisa diseret keluar layar dan hilang selamanya. */
       return {
-        x: Math.max(4, Math.min(b.width - sisaKiri - 36, x)),
+        x: Math.max(4, Math.min(b.width - kiriTotal - 36, x)),
         y: Math.max(4, Math.min(b.height - 36, y)),
       };
     };
@@ -1171,13 +1180,13 @@ export default function ChartBacktest() {
   /* Satu tempat menghitung posisi bilah alat, dipakai kedua wujudnya
      (terlipat dan terbuka) supaya keduanya tidak pernah menyimpang. */
   const gayaAlat: React.CSSProperties = letakAlat
-    ? { left: letakAlat.x + sisaKiri, top: letakAlat.y,
+    ? { left: letakAlat.x + kiriTotal, top: letakAlat.y,
         transform: geserAlat ? `translateY(${geserAlat}px)` : undefined }
     /* `left` inline juga untuk letak bawaannya — kelas `left-2` tidak bisa
        ikut bergeser saat panel kirinya membuka, dan bilah yang bawaannya
        menimpa daftar adalah cacat yang dilihat orang lebih dulu daripada
        bilah yang pernah dipindah. */
-    : { left: sisaKiri + 8,
+    : { left: kiriTotal + 8,
         transform: `translateY(calc(-50% + ${geserAlat}px))` };
 
   function aturAlatTutup(v: boolean) {
@@ -4659,6 +4668,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                             if (panelUbah) { tutupPanelUbah(); return; }
                             lepasSunting();
                           }}
+                          onLebarKiri={setSisaKiriDalam}
                           panelKiri={dexBuka ? (
                             <div className="flex h-full flex-col">
                               <div className="flex items-center gap-2 border-b border-zinc-800 px-2.5 py-1.5">

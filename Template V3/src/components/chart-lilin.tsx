@@ -251,7 +251,7 @@ export function ChartLilin({
   garisSeret, onSeret, onKlikGaris, onHapusGaris, onKlikKosong, garisKlik, onKlikGarisOrder, hamparanBawah, segmen, penandaPine, kotakPine, isianPine,
   alat, onAlatSelesai, gambarAlat, gambarPilih, onPilihGambar, onUbahGambar,
   posisiMt5, onUbahPosisi, hargaAsk, kunciUkuran, bagikanFoto, tandaAir, tampilan, pitaSmi,
-  jiplak, onUbahJiplak, onLepasJiplak, panelKiri,
+  jiplak, onUbahJiplak, onLepasJiplak, panelKiri, onLebarKiri,
   hamparanBarTertua, onUjungKiri,
 }: {
   /** Nama pasangan yang dicetak samar di tengah area harga, seperti
@@ -400,6 +400,15 @@ export function ChartLilin({
    *  menempati satu ruang, dan yang sedang dijiplak orang lebih spesifik
    *  daripada daftar yang cuma menunggu diklik. */
   panelKiri?: ReactNode;
+  /** Melaporkan lebar panel kiri dalam PIKSEL, 0 saat tidak ada.
+   *
+   *  Hamparan chart (bilah alat gambar) dijangkarkan ke wadah yang memuat
+   *  panel ini DAN grafiknya, jadi `left: 8` berhenti berarti "di tepi
+   *  lilin" begitu panelnya terbuka — bilahnya duduk menimpa isi panel.
+   *  Panel di LUAR ChartLilin sudah melaporkan lebarnya lewat
+   *  `PanelBelah.onLebar`; panel di DALAM sini tidak pernah, dan itulah
+   *  kenapa panel Dompet tertimpa sementara Screener tidak. */
+  onLebarKiri?: (px: number) => void;
   posisiMt5?: PosisiChartMt5[];
   /** Kirim SL/TP baru sebuah posisi ke EA; resolve true kalau EA sukses.
    *  Tanpa handler ini SL/TP posisinya tidak bisa diseret sama sekali. */
@@ -1856,6 +1865,22 @@ export function ChartLilin({
   const [lebarDaftar, setLebarDaftar] = useState(0.28);
   const adaKiri = !!jiplak || !!panelKiri;
   const jLebar = lebarSeret ?? (jiplak ? jiplak.lebar : lebarDaftar);
+
+  /* Diukur, bukan dihitung dari persen: lebarnya persen dari wadah yang
+     ukurannya sendiri berubah (layar penuh, sidebar dibuka, jendela
+     diseret). Satu ResizeObserver menjawab semuanya sekaligus. */
+  useEffect(() => {
+    if (!onLebarKiri) return;
+    const el = jiplakPanel.current;
+    if (!adaKiri || !el) { onLebarKiri(0); return; }
+    const lapor = () => onLebarKiri(el.getBoundingClientRect().width);
+    const ro = new ResizeObserver(lapor);
+    ro.observe(el);
+    lapor();
+    /* Dinolkan saat panelnya menutup — kalau tidak, bilah alat tetap
+       menepi ke kanan seolah panelnya masih ada. */
+    return () => { ro.disconnect(); onLebarKiri(0); };
+  }, [adaKiri, onLebarKiri]);
 
   /* Roda dipasang TANGAN, bukan lewat onWheel. Peramban memasang pendengar
      wheel sebagai pasif di banyak jalur, dan preventDefault yang diabaikan

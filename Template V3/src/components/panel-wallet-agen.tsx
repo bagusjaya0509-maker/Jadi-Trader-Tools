@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronRight, List, Loader2, Plus, RefreshCw, Trash2, Trophy, Users, Wallet, X } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { SparklineSaldo } from '@/components/kurva-saldo';
 import {
@@ -607,7 +607,12 @@ function KartuDompet({ w, posisi, log, bursa, dipilih, pilih, hapus, salin, sali
   const rona = ronaAlamat(w.alamat);
 
   return (
-    <div onClick={pilih}
+    /* `id` supaya baris di tab Posisi Copy bisa menuju kartu ini langsung.
+       Alamatnya dihuruf-kecilkan: yang datang dari daftar salin sudah
+       kecil semua, tapi nama dompet boleh ditulis dengan huruf besar dan
+       satu huruf beda membuat `getElementById` memulangkan null tanpa
+       sepatah pesan pun. */
+    <div id={'kartu-dompet-' + w.alamat.toLowerCase()} onClick={pilih}
       className={cn('group relative flex cursor-pointer flex-col overflow-hidden rounded-xl border bg-zinc-900/40 transition-colors',
         dipilih ? 'border-zinc-500' : 'border-zinc-800 hover:border-zinc-700')}>
 
@@ -1048,17 +1053,20 @@ function RincianDompet({ w, posisi, log, tiru, ubahTiru, tutup }: {
    masing-masing menyimpan sendiri — di formulir yang bisa memindahkan uang,
    keadaan setengah tersimpan adalah keadaan yang bisa dipakai pemantau di
    tengah putaran, dan tidak ada yang pernah bermaksud menyimpannya. */
-function DialogSalin({ w, awal, tutup, simpan, hapus }: {
+function DialogSalin({ w, awal, maksLipat, tutup, simpan, hapus }: {
   w: { alamat: string; nama: string };
   awal?: SetelanSalin;
+  /** Batas per koin yang sedang berlaku — GLOBAL, bukan milik dompet ini. */
+  maksLipat: number;
   tutup: () => void;
-  simpan: (v: { aktif: boolean; bursa: string; usd: number; leverage: number }) => Promise<void>;
+  simpan: (v: { aktif: boolean; bursa: string; usd: number; leverage: number; maksLipat: number }) => Promise<void>;
   hapus?: () => Promise<void>;
 }) {
   const [bursa, setBursa] = useState<string>(awal?.bursa ?? 'binance');
   const [usd, setUsd] = useState(String(awal?.usd ?? 30));
   const [lev, setLev] = useState(awal?.leverage ?? 1);
   const [aktif, setAktif] = useState(!!awal?.aktif);
+  const [lipat, setLipat] = useState(maksLipat);
   const [sibuk, setSibuk] = useState(false);
 
   const nilai = Number(usd);
@@ -1121,6 +1129,38 @@ function DialogSalin({ w, awal, tutup, simpan, hapus }: {
             dikunci oleh ukuran ordernya sendiri.
           </p>
 
+          {/* ── BATAS PER KOIN ────────────────────────────────────────────
+              Ditaruh di sini, di formulir per dompet, karena di sinilah
+              orangnya berada saat pertanyaannya muncul: "koin ini sudah
+              terbuka — boleh dibuka lagi?". Tapi nilainya GLOBAL, dan itu
+              ditulis besar-besar di keterangannya supaya tidak ada yang
+              mengira ia cuma berlaku untuk dompet yang sedang dibuka. */}
+          <label className="block rounded-md border border-zinc-800 bg-zinc-900/40 px-3 py-2.5">
+            <span className="mb-1 block text-[11px] uppercase tracking-wide text-zinc-500">
+              Batas per koin
+            </span>
+            <select value={lipat} onChange={(e) => setLipat(Number(e.target.value))}
+              className="angka w-full cursor-pointer rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-[13px] text-zinc-100 outline-none focus:border-zinc-500">
+              <option value={1}>1× — satu koin satu posisi</option>
+              {[1.5, 2, 2.5, 3, 4, 5].map((x) => (
+                <option key={x} value={x}>{x}× dari margin dasar</option>
+              ))}
+            </select>
+            <span className="mt-1.5 block text-[11px] leading-relaxed text-zinc-600">
+              <b className="text-zinc-400">Berlaku untuk SEMUA dompet yang disalin</b>, bukan
+              cuma yang ini — bursa menyatukan posisi dari dompet mana pun jadi satu.
+              {lipat > 1 ? (
+                <> Dengan ${sah ? nilai : '—'} per order, satu koin boleh terisi sampai{' '}
+                  <span className="angka text-zinc-300">${sah ? (nilai * lipat).toFixed(0) : '—'}</span>{' '}
+                  sebelum salinan berikutnya ditahan. Posisi yang kamu buka sendiri di
+                  Chart &amp; Entry ikut dihitung.</>
+              ) : (
+                <> Sekarang: koin yang sudah terisi — dari salinan lain maupun dari posisi
+                  yang kamu buka sendiri — menahan salinan berikutnya.</>
+              )}
+            </span>
+          </label>
+
           <label className={cn('flex cursor-pointer items-start gap-2 rounded-md border px-3 py-2 transition-colors',
             aktif ? 'border-red-500/40 bg-red-500/5' : 'border-zinc-800 hover:border-zinc-700')}>
             <input type="checkbox" checked={aktif} onChange={(e) => setAktif(e.target.checked)}
@@ -1159,7 +1199,7 @@ function DialogSalin({ w, awal, tutup, simpan, hapus }: {
             Batal
           </button>
           <button disabled={!sah || sibuk}
-            onClick={() => { setSibuk(true); void simpan({ aktif, bursa, usd: nilai, leverage: lev }).finally(() => setSibuk(false)); }}
+            onClick={() => { setSibuk(true); void simpan({ aktif, bursa, usd: nilai, leverage: lev, maksLipat: lipat }).finally(() => setSibuk(false)); }}
             className="cursor-pointer rounded-md bg-zinc-100 px-3 py-1.5 text-[12.5px] font-semibold text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-40">
             {sibuk ? 'Menyimpan…' : 'Simpan'}
           </button>
@@ -1459,12 +1499,16 @@ function Angka({ judul, nilai, warna, sub }: {
   );
 }
 
-function PosisiCopy({ salin, log, riwayat, dompet, buka, muat }: {
+function PosisiCopy({ salin, log, riwayat, dompet, maksLipat, buka, keKartu, muat }: {
   salin: SetelanSalin[];
   log: LogSalin[];
   riwayat: RiwayatSalin[];
   dompet: DompetPantau[];
+  /** Batas per koin yang sedang berlaku — GLOBAL, bukan milik satu dompet. */
+  maksLipat: number;
   buka: (w: { alamat: string; nama: string }) => void;
+  /** Pindah ke tab Dompet Pantauan, tepat di kartu dompet ini. */
+  keKartu: (alamat: string) => void;
   muat: boolean;
 }) {
   const nama = new Map(dompet.map((d) => [d.alamat, d.nama]));
@@ -1710,6 +1754,15 @@ function PosisiCopy({ salin, log, riwayat, dompet, buka, muat }: {
         <h3 className="mb-2 flex flex-wrap items-center gap-x-2 border-b border-zinc-800 pb-1.5">
           <span className="text-[13px] font-semibold text-zinc-200">Dompet yang disalin</span>
           <span className="text-[11px] font-normal text-zinc-600">· {salin.length} setelan</span>
+          {/* Batas per koin dipampang DI SINI, bukan cuma di dalam dialog.
+              Ia berlaku untuk semua baris di bawahnya, dan aturan yang cuma
+              terlihat sesudah membuka salah satu barisnya akan terbaca
+              sebagai milik baris itu. */}
+          <span className={cn('ml-auto rounded px-1.5 py-0.5 text-[10.5px]',
+            maksLipat > 1 ? 'bg-amber-500/15 text-amber-300' : 'bg-zinc-800 text-zinc-400')}>
+            batas per koin <span className="angka">{maksLipat}×</span>
+            {maksLipat > 1 ? ' margin dasar' : ' — satu koin satu posisi'}
+          </span>
         </h3>
         {!salin.length ? (
           <p className="rounded-lg border border-dashed border-zinc-800 px-4 py-5 text-[12px] leading-relaxed text-zinc-500">
@@ -1726,15 +1779,33 @@ function PosisiCopy({ salin, log, riwayat, dompet, buka, muat }: {
               const punyaDia = riwayat.filter((r) => r.alamat === s.alamat && r.pnl !== null);
               const hasilDia = punyaDia.reduce((t, r) => t + (r.pnl || 0), 0);
               const menangDia = punyaDia.filter((r) => (r.pnl || 0) > 0).length;
+              const sebutan = nama.get(s.alamat) || s.nama || 'Tanpa nama';
               return (
-                <button key={s.alamat}
-                  onClick={() => buka({ alamat: s.alamat, nama: nama.get(s.alamat) || s.nama || s.alamat })}
-                  className={cn('flex w-full flex-wrap items-baseline gap-x-3 gap-y-1 rounded-lg border px-3 py-2 text-left transition-colors',
+                /* ── DUA SASARAN KLIK DALAM SATU BARIS ────────────────────
+                   Barisnya membuka setelan salin, seperti sebelumnya. Yang
+                   baru: NAMA/ALAMAT-nya sendiri menuju kartu dompetnya di
+                   tab Dompet Pantauan — dua pertanyaan berbeda yang selama
+                   ini dijawab satu tombol, dan yang kedua ("dompet ini
+                   sebenarnya sedang apa") tidak punya jalan sama sekali.
+
+                   `div role="button"`, bukan `<button>`: tombol di dalam
+                   tombol bukan HTML yang sah, dan peramban boleh
+                   memperlakukannya sesukanya. Papan ketik tetap terlayani
+                   lewat tabIndex + penangan Enter/Spasi. */
+                <div key={s.alamat} role="button" tabIndex={0}
+                  onClick={() => buka({ alamat: s.alamat, nama: sebutan })}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); buka({ alamat: s.alamat, nama: sebutan }); }
+                  }}
+                  className={cn('flex w-full cursor-pointer flex-wrap items-baseline gap-x-3 gap-y-1 rounded-lg border px-3 py-2 text-left transition-colors',
                     s.aktif ? 'border-emerald-500/40 bg-emerald-500/5 hover:border-emerald-500/60'
                             : 'border-zinc-800 hover:border-zinc-700')}>
-                  <span className="text-[12.5px] font-medium text-zinc-100">
-                    {nama.get(s.alamat) || s.nama || 'Tanpa nama'}
-                  </span>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); keKartu(s.alamat); }}
+                    title={'Lihat kartu dompet ' + s.alamat}
+                    className="cursor-pointer rounded text-[12.5px] font-medium text-zinc-100 underline decoration-zinc-700 decoration-dotted underline-offset-4 transition-colors hover:text-sky-300 hover:decoration-sky-500/60">
+                    {sebutan}
+                  </button>
                   <span className={cn('rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase',
                     s.aktif ? 'bg-emerald-500/20 text-emerald-300' : 'bg-zinc-800 text-zinc-500')}>
                     {s.aktif ? 'hidup' : 'mati'}
@@ -1764,7 +1835,7 @@ function PosisiCopy({ salin, log, riwayat, dompet, buka, muat }: {
                       sumber pegang {s.pegang.length} koin
                     </span>
                   )}
-                </button>
+                </div>
               );
             })}
           </div>
@@ -1829,10 +1900,29 @@ export function PanelWalletAgen({ pemilik = false, tab: tabLuar }: {
      sering ditanyakan, dan rincian yang terbuka sendiri cuma mendorongnya
      ke luar layar. */
   const [pilih, setPilih] = useState<string | null>(null);
+
+  /* ── MENUJU SATU KARTU DOMPET DARI TAB LAIN ──────────────────────────
+     Lewat alamat (`?sub=dompet&w=0x…`), bukan lewat keadaan di dalam
+     komponen: tab-nya sendiri sudah hidup di alamat, dan sasaran yang
+     dititipkan ke keadaan akan hilang tiap kali orangnya menyegarkan
+     halaman atau menekan tombol kembali.
+
+     Parameternya dihapus SESUDAH kartunya benar-benar ketemu. Daftar
+     dompet datang dari jaringan, jadi pada gambar pertama kartunya belum
+     ada — menghapus parameter di situ berarti sasarannya hilang tepat
+     sebelum ia bisa dipakai. `dompet.length` jadi dep supaya percobaannya
+     diulang begitu daftarnya masuk. */
+  const [cari, setCari] = useSearchParams();
+  const keKartu = useCallback((alamat: string) => {
+    const b = new URLSearchParams(cari);
+    b.delete('sub');
+    b.set('w', alamat.toLowerCase());
+    setCari(b, { replace: false });
+  }, [cari, setCari]);
   /* Setelan salin ditarik terpisah dari keadaan dompet: ia milik pemilik
      saja dan digerbangi server, jadi menggabungkannya ke jawaban publik
      berarti menambah satu jalan bocor tanpa satu pun manfaat. */
-  const [isiSalin, setIsiSalin] = useState<IsiSalin>({ salin: [], log: [], riwayat: [] });
+  const [isiSalin, setIsiSalin] = useState<IsiSalin>({ salin: [], log: [], riwayat: [], maksLipat: 1 });
   const salin = isiSalin.salin;
   /* Sub-halaman DI DALAM kartu ini, bukan di sidebar Copy Signal. Yang di
      sidebar berlaku untuk seluruh halaman Copy Signal; ini cuma dua cara
@@ -1882,6 +1972,27 @@ export function PanelWalletAgen({ pemilik = false, tab: tabLuar }: {
   const dompet = d?.dompet || [];
   const posisi = d?.posisi || [];
   const log = d?.log || [];
+
+  /* Mendarat di kartu yang diminta `?w=`, lalu MENGHAPUS parameternya.
+     Dihapus supaya menyegarkan halaman tidak menggulir ulang ke sana
+     selamanya — sasaran itu sekali pakai, bukan keadaan halaman.
+
+     Dihapus juga hanya SESUDAH kartunya ketemu: daftar dompet datang dari
+     jaringan, jadi pada gambar pertama `getElementById` masih null.
+     `dompet.length` di dep membuat percobaannya diulang begitu daftarnya
+     masuk. */
+  const sorot = (cari.get('w') || '').toLowerCase();
+  useEffect(() => {
+    if (!sorot) return;
+    const el = document.getElementById('kartu-dompet-' + sorot);
+    if (!el) return;
+    setPilih(sorot);
+    el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    const b = new URLSearchParams(cari);
+    b.delete('w');
+    setCari(b, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sorot, dompet.length]);
   /* Nama tidak lagi perlu dicari dari tiap baris: pengelompokan per kartu
      membuat namanya dibaca sekali dari daftar dompet, dan salinan nama yang
      ikut tersimpan di tiap transaksi tidak pernah dipakai lagi. Itu sekaligus
@@ -1948,7 +2059,8 @@ export function PanelWalletAgen({ pemilik = false, tab: tabLuar }: {
 
       {tab === 'salin' ? (
         <PosisiCopy salin={salin} log={isiSalin.log} riwayat={isiSalin.riwayat}
-          dompet={dompet} muat={muat} buka={(w) => setDialogSalin(w)} />
+          dompet={dompet} muat={muat} maksLipat={isiSalin.maksLipat}
+          buka={(w) => setDialogSalin(w)} keKartu={keKartu} />
       ) : (<>
 
       {pemilik && <FormTambah selesai={() => void tarik()} />}
@@ -1956,6 +2068,7 @@ export function PanelWalletAgen({ pemilik = false, tab: tabLuar }: {
         <DialogSalin
           w={dialogSalin}
           awal={salinPeta.get(dialogSalin.alamat)}
+          maksLipat={isiSalin.maksLipat}
           tutup={() => setDialogSalin(null)}
           simpan={async (v) => {
             const h = await simpanSalin({ alamat: dialogSalin.alamat, nama: dialogSalin.nama, ...v });

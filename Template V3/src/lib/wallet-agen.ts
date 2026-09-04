@@ -195,6 +195,16 @@ export interface IsiSalin {
   salin: SetelanSalin[];
   log: LogSalin[];
   riwayat: RiwayatSalin[];
+  /* ── BATAS PER KOIN, KELIPATAN MARGIN DASAR ──────────────────────────
+     Berapa kali margin dasar boleh menumpuk di SATU koin, dihitung dari
+     seluruh isi akun. 1 = satu koin satu posisi (perilaku sebelum 4 Sep
+     2026): koin yang sudah ada isinya, dari mana pun asalnya, menahan
+     salinan berikutnya.
+
+     GLOBAL, bukan per dompet, dan itu bukan kemalasan: bursa MENYATUKAN
+     posisi dari dompet mana pun jadi satu posisi yang sama. Batas per
+     dompet akan menjanjikan sesuatu yang tidak bisa ditepati bursa. */
+  maksLipat: number;
 }
 
 export interface KeadaanDompet {
@@ -346,7 +356,7 @@ export async function batalTiru(alamat: string, koin: string): Promise<boolean> 
  *  panel ini menumpang di kartu yang juga menampilkan dompet pantauan, dan
  *  setelan yang tidak terbaca tidak boleh menjatuhkan keduanya. */
 export async function daftarSalin(): Promise<IsiSalin> {
-  const kosong: IsiSalin = { salin: [], log: [], riwayat: [] };
+  const kosong: IsiSalin = { salin: [], log: [], riwayat: [], maksLipat: 1 };
   const t = await token();
   if (!t) return kosong;
   try {
@@ -359,6 +369,10 @@ export async function daftarSalin(): Promise<IsiSalin> {
       salin: Array.isArray(j.salin) ? j.salin : [],
       log: Array.isArray(j.log) ? j.log : [],
       riwayat: Array.isArray(j.riwayat) ? j.riwayat : [],
+      /* Server lama tidak mengirim medan ini. Jatuh ke 1 = penjaga paling
+         ketat; nilai bawaan yang longgar pada jawaban yang tidak lengkap
+         adalah cara paling sunyi untuk melonggarkan penjaga uang. */
+      maksLipat: Number(j.maksLipat) >= 1 ? Number(j.maksLipat) : 1,
     };
   } catch { return kosong; }
 }
@@ -370,6 +384,9 @@ export async function daftarSalin(): Promise<IsiSalin> {
 export async function simpanSalin(ubah: {
   alamat: string; nama?: string; aktif: boolean;
   bursa: string; usd: number; leverage: number;
+  /** GLOBAL — menumpang formulir per dompet karena di situlah orangnya
+   *  berada saat memikirkannya. Server menulisnya hanya kalau dikirim. */
+  maksLipat?: number;
 }): Promise<{ ok: boolean; pesan?: string }> {
   const t = await token();
   if (!t) return { ok: false, pesan: 'Belum masuk.' };
