@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { RefreshCw, Trash2, Wallet, Loader2, Link2 } from 'lucide-react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { cn } from '@/lib/utils';
 import { useProfilPengguna, lepasDompet, type DompetTertaut } from '@/lib/profil-pengguna';
-import { sinkronRiwayatDompet, lupakanSinggahDompet, type HasilSinkronDompet } from '@/lib/tulis-jurnal';
+import { sinkronRiwayatDompet, lupakanSinggahDompet, saldoDompetHl, type HasilSinkronDompet } from '@/lib/tulis-jurnal';
 import type { Trade } from '@/data/contoh';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -51,7 +51,14 @@ function pendek(a: string): string {
   return a.length > 14 ? a.slice(0, 8) + '…' + a.slice(-6) : a;
 }
 
-export function PanelJurnalDompet({ trade }: { trade: Trade[] }) {
+export function PanelJurnalDompet({ trade, onRingkas }: {
+  trade: Trade[];
+  /** Melaporkan berapa dompet EVM yang tertaut dan berapa total saldonya,
+   *  supaya saldo itu bisa berjejer dengan saldo bursa di kartu Saldo —
+   *  di situlah orang membacanya, bukan di panel ini. `saldo: null` =
+   *  belum/tidak terbaca, yang berbeda dari nol. */
+  onRingkas?: (v: { jumlah: number; saldo: number | null }) => void;
+}) {
   const { profil, setProfil, memuat } = useProfilPengguna(true);
   const [hari, setHari] = useState(30);
   const [sibuk, setSibuk] = useState('');
@@ -65,7 +72,35 @@ export function PanelJurnalDompet({ trade }: { trade: Trade[] }) {
      (idempoten, cuma ongkos kuota). Ditulis di layar sebagai "termuat",
      bukan "ada". */
   const sudahAda = useMemo(() => new Set(trade.map((t) => t.id)), [trade]);
-  const daftar = profil.dompet;
+  /* HANYA EVM. Hyperliquid tidak mengenal alamat Solana, jadi baris Solana
+     di sini cuma bisa berkata "bukan Hyperliquid" — satu baris yang tidak
+     pernah bisa dipakai untuk apa pun. Ia tetap tertaut di profil; yang
+     disembunyikan cuma barisnya di panel jurnal. */
+  const daftar = useMemo(() => profil.dompet.filter((d) => d.pola === 'evm'), [profil.dompet]);
+
+  /* ── SALDO TIAP DOMPET ─────────────────────────────────────────────────
+     Ditarik langsung dari Hyperliquid, tanpa tanda tangan: keadaan akun
+     on-chain itu publik. Disegarkan saat daftarnya berubah saja — saldo
+     yang dikejar tiap detik cuma menambah permintaan untuk angka yang
+     jarang berubah, dan halaman ini bukan papan pantau harga. */
+  const [saldo, setSaldo] = useState<Record<string, number | null>>({});
+  const kunciDaftar = daftar.map((d) => d.alamat).join(',');
+  useEffect(() => {
+    if (!kunciDaftar) return;
+    let hidup = true;
+    void Promise.all(kunciDaftar.split(',').map(async (a) => [a, await saldoDompetHl(a)] as const))
+      .then((pasangan) => { if (hidup) setSaldo(Object.fromEntries(pasangan)); });
+    return () => { hidup = false; };
+  }, [kunciDaftar]);
+
+  /* Dilaporkan ke atas SESUDAH tergambar, bukan saat dihitung: memanggil
+     penyetel keadaan induk di tengah render anak adalah cara paling cepat
+     membuat React menggambar ulang tanpa henti. */
+  const terbaca = daftar.map((d) => saldo[d.alamat]).filter((x): x is number => typeof x === 'number');
+  const totalSaldo = terbaca.length ? terbaca.reduce((t, x) => t + x, 0) : null;
+  useEffect(() => {
+    onRingkas?.({ jumlah: daftar.length, saldo: totalSaldo });
+  }, [daftar.length, totalSaldo, onRingkas]);
 
   const jalankan = async (kunci: string, kerja: () => Promise<void>) => {
     setSibuk(kunci); setPesan(null); setKemajuan('');
@@ -104,6 +139,18 @@ export function PanelJurnalDompet({ trade }: { trade: Trade[] }) {
     });
   };
 
+  /* ── HILANG SAMA SEKALI SAAT TIDAK ADA YANG TERSAMBUNG ────────────────
+     Diminta pemilik 4 Sep 2026. Sebelumnya panelnya tetap berdiri dengan
+     ajakan menyambungkan dompet — dan ajakan yang selalu ada di halaman
+     yang dibuka tiap hari berhenti jadi ajakan, ia jadi latar. Jalan
+     masuknya tetap ada di tempat yang memang tentang dompet (tombol Dompet
+     di Chart & Entry, tombol Beli di Coin Hunter).
+
+     `memuat` ikut menahan supaya panelnya tidak berkedip muncul-hilang pada
+     pemuatan pertama: sebelum /api/profil menjawab, daftarnya memang kosong
+     tapi belum tentu benar-benar kosong. */
+  if (memuat || !daftar.length) return null;
+
   return (
     <Panel className="mt-4">
       <PanelHead
@@ -134,17 +181,7 @@ export function PanelJurnalDompet({ trade }: { trade: Trade[] }) {
           </div>
         )}
 
-        {memuat && !daftar.length ? (
-          <p className="flex items-center gap-2 py-4 text-[12.5px] text-zinc-500">
-            <Loader2 className="size-3.5 animate-spin" /> Memuat daftar dompet…
-          </p>
-        ) : !daftar.length ? (
-          <p className="py-4 text-center text-[12.5px] text-zinc-600">
-            Belum ada dompet tertaut. Sambungkan lewat tombol <b className="text-zinc-500">Dompet</b> di
-            Chart &amp; Entry atau <b className="text-zinc-500">Beli</b> di Coin Hunter — alamatnya
-            tersimpan sendiri.
-          </p>
-        ) : (
+        {(
           <ul>
             {daftar.map((d) => {
               const h = hitungan[d.alamat];
@@ -159,6 +196,12 @@ export function PanelJurnalDompet({ trade }: { trade: Trade[] }) {
                     </span>
                     <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-zinc-400">
                       {evm ? 'EVM' : 'Solana'}
+                    </span>
+                    {/* Saldonya di baris yang sama dengan alamatnya. Angka
+                        yang menjawab "dompet ini isinya berapa" tidak pantas
+                        berada dua ketukan jauhnya dari nama dompetnya. */}
+                    <span className="angka text-[11px] text-zinc-400">
+                      {saldo[d.alamat] == null ? '—' : '$' + saldo[d.alamat]!.toLocaleString('id-ID', { maximumFractionDigits: 2 })}
                     </span>
                     <span className="angka text-[11px] text-zinc-600">terlihat {tanggal(d.terlihat)}</span>
 

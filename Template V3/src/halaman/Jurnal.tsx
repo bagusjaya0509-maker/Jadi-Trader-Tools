@@ -9,7 +9,7 @@ import { useRiwayat, useSaldoAwal } from '@/lib/data';
 import { LabelContoh } from '@/components/gerbang';
 import { useAuth } from '@/lib/auth';
 import type { Trade, Sumber } from '@/data/contoh';
-import { useAkunMt5, useAkunBinance, type StatusAkun } from '@/lib/akun';
+import { useAkunMt5, useAkunBinance, type StatusAkun, type RincianBursa } from '@/lib/akun';
 import { ModalTrade } from '@/components/modal-trade';
 import { KotakArus } from '@/components/kotak-arus';
 import { PanelJurnalDompet } from '@/components/panel-jurnal-dompet';
@@ -86,16 +86,42 @@ function KartuSaldo({ judul, saldoJurnal, akun, keIntegrasi }: {
                Ukurannya turun sedikit saat bursanya tiga atau lebih supaya
                barisnya tidak membungkus — tapi turun BERSAMA-SAMA, jadi
                tetap tidak ada yang terlihat lebih penting. */
-            <div className="mt-2 flex flex-wrap items-end gap-x-7 gap-y-3">
-              {rincian.map((b, i) => (
-                <div key={b.id || i} className="min-w-0">
-                  <div className="truncate text-[11px] text-zinc-500">{b.nama}</div>
-                  <div className={cn('angka mt-1 font-semibold leading-none tracking-tight text-zinc-100',
-                    rincian.length >= 3 ? 'text-[22px]' : 'text-[28px]')}>
-                    {uang(b.saldo)}
+            /* ── ANGKANYA MENGECIL DULU, BARU TURUN BARIS ──────────────
+               Dilaporkan pemilik 4 Sep 2026: mengecilkan jendela membuat
+               saldonya melebar ke bawah dan berhenti sejajar. Ukuran tetap
+               (22/28 px) memang tidak punya pilihan lain — kalau tidak muat,
+               ia membungkus.
+
+               Sekarang ukurannya mengikuti LEBAR KARTU, bukan lebar layar.
+               Itu bedanya container query: kartu yang sama duduk di grid
+               1/2/4 kolom, jadi lebar layar sama sekali tidak memberi tahu
+               berapa ruang yang benar-benar ia punya.
+
+               `clamp(15px, (16,5/n)cqi, 28px)`. Koefisiennya diturunkan dari
+               lebar teksnya sendiri — tiap angka butuh sekitar 6x tinggi
+               fontnya — lalu diukur di peramban. Hasilnya: dua saldo SELALU
+               sebaris (16-28 px dari lebar 240 sampai 560); tiga saldo
+               sebaris sejak 300 px, sementara versi lama sudah membungkus di
+               340 px. Di kartu lebar, keduanya tetap 28 px penuh — persis
+               seperti sebelumnya, karena "tanpa dikecilkan" memang lebih
+               baik selama muat.
+
+               `flex-wrap` SENGAJA DIPERTAHANKAN sebagai jalan terakhir, dan
+               angkanya TIDAK di-`truncate`. Di kartu yang sangat sempit,
+               membungkus jelek — tapi angka uang yang terpotong ellipsis
+               BERBOHONG, dan itu jauh lebih buruk daripada jelek. */
+            <div className="@container mt-2">
+              <div className="flex flex-wrap items-end gap-x-5 gap-y-3">
+                {rincian.map((b, i) => (
+                  <div key={b.id || i} className="min-w-0">
+                    <div className="truncate text-[11px] text-zinc-500">{b.nama}</div>
+                    <div className="angka mt-1 font-semibold leading-none tracking-tight text-zinc-100"
+                      style={{ fontSize: `clamp(15px, ${(16.5 / rincian.length).toFixed(2)}cqi, 28px)` }}>
+                      {uang(b.saldo)}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           ) : (
             <div className="angka mt-2 text-[28px] font-semibold leading-none tracking-tight text-zinc-100">
@@ -183,7 +209,7 @@ function CatatanKecil({ c }: { c: { nada: 'baik' | 'awas' | 'buruk'; teks: strin
    ranjau. Mengisinya juga akan memunculkan dua spanduk impor sekaligus di
    satu halaman, karena blok ini digambar dua kali (Trade-Fi dan Kripto).
    Pilihannya tinggal punya satu rumah: Dashboard. */
-function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun, labelSaldo, keIntegrasi, sumber, arus, bisaTulis, dataContoh, pemisah = false }: {
+function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun, labelSaldo, keIntegrasi, sumber, arus, bisaTulis, dataContoh, rincianTambahan, panelBawah, pemisah = false }: {
   judul: string; ket: string; Ikon: typeof Bitcoin;
   trade: Trade[]; saldoAwal: number; warna: string; idGradien: string;
   akun: StatusAkun; labelSaldo: string; keIntegrasi: string;
@@ -195,6 +221,15 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
    *  catatan di atas. Yang ini tidak menggambar apa pun, ia cuma menutup
    *  gerbang efek auto-sinkron. */
   dataContoh: boolean;
+  /** Saldo di luar broker yang tetap pantas berjejer di kartu Saldo —
+   *  sekarang: dompet on-chain yang tertaut. Ditambahkan di sini, bukan di
+   *  `useAkunBinance`, karena hook itu memang cuma tahu akun backend; yang
+   *  tahu dompet tertaut adalah profil penggunanya. */
+  rincianTambahan?: RincianBursa[];
+  /** Ditempel di kaki blok, setelah tabel riwayat. Panel yang isinya khusus
+   *  satu sumber (dompet on-chain cuma berarti untuk kripto) tidak pantas
+   *  jadi cabang `if` di dalam blok yang dipakai dua jurnal. */
+  panelBawah?: React.ReactNode;
   /** Garis pemisah tebal di atas judul — menandai pergantian jurnal. */
   pemisah?: boolean;
   /** Kripto: pola emosinya sudah terwakili di Trade-Fi; riwayatnya yang
@@ -419,7 +454,14 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
               dipakai kotak Setoran & Penarikan, yang tempatnya memang di
               sini: ia bagian dari saldo, bukan catatan tambahan di bawah. */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <KartuSaldo judul={labelSaldo} saldoJurnal={stat.saldo} akun={akun} keIntegrasi={keIntegrasi} />
+            {/* Digabung DI SINI, sedekat mungkin dengan yang memakainya.
+                Menggabungnya di `useAkunBinance` akan membuat hook akun
+                backend memulangkan sesuatu yang bukan akun backend, dan
+                pembaca lainnya ikut menerimanya tanpa pernah memintanya. */}
+            <KartuSaldo judul={labelSaldo} saldoJurnal={stat.saldo} keIntegrasi={keIntegrasi}
+              akun={rincianTambahan?.length
+                ? { ...akun, rincian: [...(akun.rincian ?? []), ...rincianTambahan] }
+                : akun} />
 
             {/* Dua angka di atas, satu di bawah — bukan tiga sejajar.
                 Tiga kolom sama besar membuat ketiganya terbaca sederajat,
@@ -744,7 +786,18 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
                       Belum ada catatan emosi di jurnal ini.
                     </p>
                   ) : (
-                    <div className="gulir-senyap max-h-[170px] overflow-y-auto">
+                    /* ── ENAM BARIS, DIUKUR ─────────────────────────────
+                       170 px memuat 4,6 baris: baris keenam terpotong
+                       separuh, dan yang terpotong separuh terbaca sebagai
+                       daftar yang rusak, bukan daftar yang panjang.
+                       Diminta pemilik 4 Sep 2026 setelah jurnal kripto
+                       punya lima emosi dan kolomnya terlihat pendek.
+
+                       Tinggi baris diukur di peramban: py-2 (16) + teks
+                       12,5px pada line-height 1,5 (19) + garis bawah (1)
+                       = 36 px. Baris terakhir tanpa garis, jadi enam baris
+                       = 6x36 - 1 = 215 px. */
+                    <div className="gulir-senyap max-h-[215px] overflow-y-auto">
                       {emosi.map(([nama, d]) => (
                         <div key={nama} className="flex items-center justify-between border-b border-zinc-800/50 py-2 text-[12.5px] last:border-0">
                           <span className="truncate text-zinc-300">{nama}</span>
@@ -775,6 +828,12 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
           <Plus className="size-3.5" /> Tambah transaksi pertama
         </button>
       )}
+
+      {/* SESUDAH tabel riwayat, bukan di antara kartu-kartu di atas.
+          `useTinggiSejajar` mengukur isi kolom kiri untuk menentukan tinggi
+          tabelnya; panel yang disisipkan di tengah kolom itu akan ikut
+          terhitung dan memendekkan tabelnya diam-diam. */}
+      {!kosong && panelBawah}
 
       {modal && (
         <ModalTrade sumber={sumber} trade={modal === 'baru' ? null : modal} tutup={() => setModal(null)} />
@@ -857,6 +916,27 @@ export default function Jurnal() {
   const mt5 = useAkunMt5();
   const binance = useAkunBinance();
 
+  /* ── SALDO DOMPET TERTAUT IKUT BERJEJER ────────────────────────────────
+     Panelnya sendiri yang menariknya (ia sudah punya daftarnya), lalu
+     melaporkan ringkasannya ke sini. Arah itu disengaja: satu pembacaan
+     /api/profil, satu pembacaan saldo, dan tidak ada dua tempat yang bisa
+     berselisih tentang dompet mana yang tertaut.
+
+     `jumlah: 0` berarti panelnya sedang tidak menggambar apa pun — dan
+     saat itu barisnya juga tidak boleh muncul di kartu Saldo. */
+  const [ringkasDompet, setRingkasDompet] = useState<{ jumlah: number; saldo: number | null }>(
+    { jumlah: 0, saldo: null });
+  const rincianDompet = useMemo<RincianBursa[]>(() => (
+    ringkasDompet.jumlah && ringkasDompet.saldo !== null
+      ? [{
+        id: 'dompet-tertaut',
+        nama: ringkasDompet.jumlah > 1 ? `${ringkasDompet.jumlah} dompet tertaut` : 'Dompet tertaut',
+        saldo: ringkasDompet.saldo,
+        ekuitas: ringkasDompet.saldo,
+      }]
+      : []
+  ), [ringkasDompet]);
+
   return (
     <div className="p-4 sm:p-6">
       {contoh && <div className="mb-4"><LabelContoh tampil /></div>}
@@ -885,14 +965,19 @@ export default function Jurnal() {
         warna="text-emerald-400" idGradien="gEqKripto"
         akun={binance} labelSaldo="Saldo Binance Futures" keIntegrasi="/integrations"
         sumber="kripto" arus={arus} bisaTulis={bisaTulis} dataContoh={contoh}
-      />
+        rincianTambahan={rincianDompet}
+        /* DI DALAM blok kripto, bukan di bawah halaman. Diminta pemilik
+           4 Sep 2026, dan alasannya benar: isinya cuma berarti untuk jurnal
+           kripto — saldonya berjejer dengan saldo bursa di kartu yang sama,
+           dan trade yang ditariknya masuk ke kurva ekuitas dan riwayat yang
+           tepat di atasnya. Berdiri di luar, ia terbaca sebagai alat
+           terpisah yang kebetulan diletakkan di sana.
 
-      {/* Di BAWAH jurnal kripto, di luar grid-nya. Panel ini bukan bagian
-          dari angka-angka di atasnya — ia pintu masuk data, dan pintu masuk
-          yang diselipkan di antara KPI dan grafik akan ikut dihitung oleh
-          `useTinggiSejajar` sebagai isi kolom. Hanya untuk yang bisa
-          menulis: pengunjung data contoh tidak punya dompet untuk ditaut. */}
-      {bisaTulis && !contoh && <PanelJurnalDompet trade={kripto} />}
+           Panelnya sendiri yang menghilang saat tidak ada dompet tertaut. */
+        panelBawah={bisaTulis && !contoh
+          ? <PanelJurnalDompet trade={kripto} onRingkas={setRingkasDompet} />
+          : undefined}
+      />
     </div>
   );
 }

@@ -501,6 +501,37 @@ async function daftarDompetTertaut(): Promise<DompetTertaut[]> {
  *  berikutnya tidak memakai daftar yang sudah usang. */
 export function lupakanSinggahDompet(): void { singgahDompet = null; }
 
+/** Nilai akun Hyperliquid satu alamat, dalam USD. `null` = tidak terbaca.
+ *
+ *  Tanpa tanda tangan dan tanpa kunci: keadaan akun on-chain itu publik,
+ *  dan `info` mengirim CORS terbuka. Tidak lewat `dex-hl.ts` dengan sengaja
+ *  — berkas itu menyeret pustaka @nktkas/hyperliquid, dan halaman Jurnal
+ *  tidak butuh satu pun kemampuan menandatanganinya.
+ *
+ *  `nilaiAkun` = ekuitas perp (sudah termasuk P/L mengambang) DITAMBAH USDC
+ *  yang menganggur di spot. Keduanya, bukan salah satu: akun unified
+ *  menyimpan jaminannya di spot, dan membaca perp saja memulangkan $0 untuk
+ *  akun yang sebenarnya berisi. */
+export async function saldoDompetHl(alamat: string): Promise<number | null> {
+  const tanya = async (type: string) => {
+    const r = await fetch('https://api.hyperliquid.xyz/info', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type, user: alamat }),
+    });
+    if (!r.ok) throw new Error('Hyperliquid menjawab ' + r.status);
+    return r.json();
+  };
+  try {
+    const [perp, spot] = await Promise.all([
+      tanya('clearinghouseState'), tanya('spotClearinghouseState'),
+    ]);
+    const n = (x: unknown) => { const v = Number(x); return Number.isFinite(v) ? v : 0; };
+    const usdc = (spot?.balances ?? []).find(
+      (b: { coin?: string }) => String(b.coin).toUpperCase() === 'USDC');
+    return n(perp?.marginSummary?.accountValue) + n(usdc?.total);
+  } catch { return null; }
+}
+
 async function tanyaFillHl(badan: MintaFill): Promise<FillHl[]> {
   const r = await fetch('https://api.hyperliquid.xyz/info', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
