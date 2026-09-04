@@ -34,7 +34,8 @@ export interface AngkaPameran {
   bersih: number;
   /** Kurva saldo kumulatif, untuk grafik hero. */
   kurva: number[];
-  tumbuh: number;
+  /** `null` = tidak terhitung (modal nol), bukan nol persen. */
+  tumbuh: number | null;
   /** Dolar sejendela dengan `tumbuh`. Dokumen lama belum memuatnya —
    *  dibaca dari kedua ujung `kurva` kalau begitu, karena di situlah
    *  angkanya berasal. */
@@ -50,7 +51,7 @@ export interface AngkaPameran {
   contoh: boolean;
 }
 
-const KOSONG: AngkaPameran = { siap: false, jumlah: 0, winrate: 0, bersih: 0, kurva: [], tumbuh: 0, tumbuhUang: 0, saldo: 0, sejak: 0, judul: '', sub: '', contoh: false };
+const KOSONG: AngkaPameran = { siap: false, jumlah: 0, winrate: 0, bersih: 0, kurva: [], tumbuh: null, tumbuhUang: 0, saldo: 0, sejak: 0, judul: '', sub: '', contoh: false };
 /* ── Kenapa angkanya tidak lagi di sini ───────────────────────────────
    Dulu berkas ini juga memuat PAMERAN_CONTOH: winrate 57,6%, 213
    transaksi, saldo 1.140,50 — angka ilustrasi yang digambar kartu hero.
@@ -111,7 +112,10 @@ export function useAngkaPameran(): AngkaPameran {
           winrate: Number(nilai(f.winrate)) || 0,
           bersih: Number(nilai(f.bersih)) || 0,
           kurva: kurva.length > 1 ? kurva : [Number(nilai(f.saldo)) || 0],
-          tumbuh: Number(nilai(f.tumbuh)) || 0,
+          /* Dokumen lama memuat 0 di medan ini dan memang berarti nol —
+             yang tidak ada bedanya di layar, karena jalur ini hanya dipakai
+             untuk teks hero. Yang dijaga cuma bentuk datanya. */
+          tumbuh: f.tumbuh == null ? null : Number(nilai(f.tumbuh)) || 0,
           tumbuhUang: Number(nilai(f.tumbuhUang))
             || (kurva.length > 1 ? Number((kurva[kurva.length - 1] - kurva[0]).toFixed(2)) : 0),
           saldo: Number(nilai(f.saldo)) || 0,
@@ -183,7 +187,7 @@ function muatDariShowcase(
 
         let jalan = saldoAwal;
         const kurva = baris.map((b) => (jalan += b.pnl));
-        const tumbuh = saldoAwal > 0 ? ((jalan - saldoAwal) / saldoAwal) * 100 : 0;
+        const tumbuh = saldoAwal > 0 ? ((jalan - saldoAwal) / saldoAwal) * 100 : null;
 
         setAngka({
           siap: true,

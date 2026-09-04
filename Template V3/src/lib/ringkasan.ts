@@ -45,7 +45,13 @@ export interface AngkaRingkas {
   winrate: number;
   bersih: number;
   kurva: number[];
-  tumbuh: number;
+  /** Return total, persen. `null` = TIDAK TERHITUNG, bukan nol.
+   *
+   *  Bedanya nyata: akun yang mencatat trade sebelum mengisi saldo awal
+   *  punya modal 0, dan 0 bukan penyebut. Ditulis `number` dengan jawaban
+   *  darurat 0, layarnya menulis "+0,0%  -$174,98" — bentuk lain dari cacat
+   *  yang medan ini dibuat untuk membuangnya. */
+  tumbuh: number | null;
   /** Perubahan saldo dalam DOLAR pada jendela yang sama dengan `tumbuh`.
    *
    *  Ada karena keduanya pernah dipajang berdampingan sebagai satu angka:
@@ -137,7 +143,7 @@ export function useRingkasanAkun() {
      akun yang rugi terlihat rugi lebih sedikit, karena penyebutnya sudah
      ikut menyusut bersama kerugiannya. */
   const returnUang = stat.bersih;
-  const returnPersen = modalTotal > 0 ? (returnUang / modalTotal) * 100 : 0;
+  const returnPersen = modalTotal > 0 ? (returnUang / modalTotal) * 100 : null;
 
   /* Kurvanya ikut pindah rentang, bukan cuma angkanya. Angka seumur akun
      di atas grafik bulan berjalan adalah cacat yang sama dalam bentuk
@@ -170,7 +176,7 @@ export function useRingkasanAkun() {
     winrate: Number((stat.winrate ?? 0).toFixed(1)),
     bersih: Number(stat.bersih.toFixed(2)),
     kurva: kurvaPenuh,
-    tumbuh: Number(returnPersen.toFixed(1)),
+    tumbuh: returnPersen === null ? null : Number(returnPersen.toFixed(1)),
     tumbuhUang: Number(returnUang.toFixed(2)),
     sejak,
   }), [totalSaldo, stat.jumlah, stat.winrate, stat.bersih, kurvaPenuh, returnPersen, returnUang, sejak]);

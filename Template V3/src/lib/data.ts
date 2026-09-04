@@ -647,7 +647,8 @@ export interface RingkasanAkun {
   bersih: number;
   /** Kurva saldo ringkas — maksimal 60 titik supaya dokumennya tetap kecil. */
   kurva: number[];
-  tumbuh: number;
+  /** `null` = tidak ada modal untuk membaginya; lihat `AngkaRingkas`. */
+  tumbuh: number | null;
   /** Perubahan saldo dalam dolar pada jendela yang sama dengan `tumbuh`.
    *  Bentuk dokumen ini sengaja sama persis dengan `AngkaRingkas`; medan
    *  yang ditambahkan di satu sisi saja membuat halaman depan membaca

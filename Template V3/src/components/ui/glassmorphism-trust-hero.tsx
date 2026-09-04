@@ -452,10 +452,19 @@ export default function HeroSection() {
                         transaksi, dan "berubah 0%" untuk akun yang belum
                         pernah trading adalah pernyataan, bukan fakta. */}
                     {pameran.siap && pameran.kurva.length > 1 && (
-                      <span className={pameran.tumbuh >= 0 ? "text-emerald-400 font-medium" : "text-red-400 font-medium"}>
-                        {pameran.tumbuh >= 0 ? "+" : ""}{pameran.tumbuh.toFixed(1)}%{' '}
+                      /* Warnanya ditentukan DOLARNYA, bukan persennya:
+                         dolarnya selalu ada, persennya belum tentu. */
+                      <span className={pameran.tumbuhUang >= 0 ? "text-emerald-400 font-medium" : "text-red-400 font-medium"}>
+                        {/* Persennya tampil hanya kalau ada modal untuk
+                            membaginya. Akun yang mencatat trade sebelum
+                            mengisi saldo awal tetap melihat P/L-nya —
+                            yang tidak ia lihat cuma persen yang memang
+                            tidak bisa dihitung. */}
+                        {pameran.tumbuh !== null && (
+                          <>{pameran.tumbuh >= 0 ? "+" : ""}{pameran.tumbuh.toFixed(1)}%{' '}</>
+                        )}
                         {/* Sewarna dengan persennya, dan memang begitu
-                            seharusnya: keduanya dihitung dari dua ujung yang
+                            seharusnya: keduanya dihitung dari rentang yang
                             sama, jadi tandanya tidak mungkin berbeda. Dua
                             warna di sini dulu bukan gaya — itu gejala. */}
                         <span className="font-normal opacity-90">{uang(pameran.tumbuhUang, true)}</span>
