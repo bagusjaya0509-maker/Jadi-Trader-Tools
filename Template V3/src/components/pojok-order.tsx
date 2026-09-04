@@ -126,7 +126,7 @@ function IsianAngka({ nilai, atur, langkah, min = 0, maks, desimal = 2, lebar, j
 }
 
 export function PojokOrder({
-  posisi, hargaKini, draf, rencana, mode, jenis, risiko, tunda, onBatalTunda, onKirimSinyal, kabarSinyal, dariSinyal, onGantiCopy, onCopySinyal,
+  posisi, hargaKini, draf, rencana, mode, jenis, onMarket, risiko, tunda, onBatalTunda, onKirimSinyal, kabarSinyal, dariSinyal, onGantiCopy, onCopySinyal,
   onPilih, onUbah, onKirim, onBatal, onTutup, onGantiMode, onTukarArah, mati,
   nyataSetelan, aturNyata, sibukNyata, kabar, demoSetelan, aturDemo,
   catatan, aturCatatan, qtyDemo, mt5, lotMt5, aturLotMt5, nilaiLotMt5, desimalHarga = 6,
@@ -140,6 +140,9 @@ export function PojokOrder({
   hargaKini?: number;
   /** Label jenis order hasil letak garis entry: "Market", "Buy Limit", dst. */
   jenis?: string;
+  /** Menempelkan garis entry ke harga pasar — lencana jenisnya jadi tombol.
+   *  Tak diisi = lencananya tetap keterangan biasa. */
+  onMarket?: () => void;
   /** Risiko dolar menurut setelan saat ini. */
   risiko?: number;
   /** Qty demo yang dibekukan saat tiket dibuka — dolar risiko/imbalan
@@ -464,12 +467,32 @@ export function PojokOrder({
           {/* Jenis order MENGIKUTI letak garis entry — geser ke atas harga
               dan tulisannya berubah sendiri. Keterangan inilah cara orangnya
               tahu seretan barusan mengubah jenis ordernya. */}
-          {jenis && (
+          {/* ── LENCANANYA JUGA TOMBOL ─────────────────────────────────
+              Menyeret garis entry tepat ke harga pasar itu sulit — pitanya
+              cuma 0,05% dari harga, dan di lilin setinggi layar itu
+              beberapa piksel. Orang yang cuma ingin masuk sekarang jadi
+              harus membidik sesuatu yang tidak minta dibidik.
+
+              Jadi lencana yang selama ini melaporkan jenisnya sekarang
+              juga MENGUBAHNYA: satu klik menarik garis entry ke harga
+              pasar, dan SL/TP ikut bergeser sejauh yang sama supaya jarak
+              risikonya tidak berubah diam-diam.
+
+              Tidak jadi tombol saat sudah Market: tombol yang tidak
+              mengubah apa pun mengajari orang bahwa menekannya percuma,
+              dan pelajaran itu ia bawa ke saat lencananya justru berguna. */}
+          {jenis && (onMarket && jenis !== 'Market' ? (
+            <button onClick={onMarket}
+              title="Klik: tarik garis entry ke harga pasar (jadi Market)"
+              className="cursor-pointer rounded bg-amber-500/15 px-1.5 py-0.5 text-[9.5px] font-medium text-amber-300 underline decoration-amber-500/40 decoration-dotted underline-offset-2 transition-colors hover:bg-amber-500/25 hover:text-amber-200">
+              {jenis}
+            </button>
+          ) : (
             <span className={cn('rounded px-1.5 py-0.5 text-[9.5px] font-medium',
               jenis === 'Market' ? 'bg-zinc-800 text-zinc-300' : 'bg-amber-500/15 text-amber-300')}>
               {jenis}
             </span>
-          )}
+          ))}
           {/* Petunjuk geser ikut disembunyikan saat ringkas: ia kalimat
               untuk yang baru pertama memakai, dan yang sedang meringkas
               tiketnya jelas bukan orang itu. */}

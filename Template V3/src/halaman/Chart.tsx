@@ -2644,12 +2644,24 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
     if (a.jenis === 'sunting') { setSuntingSl(a.sl); setSuntingTp(a.tp); }
     else setRencana(a.nilai);
   };
+  /* ── ENTRY MENYUSUL HARGA SELAMA BELUM DISERET ──────────────────────
+     Dulu hanya bergerak saat LILIN BARU lahir — di TF 4 jam itu berarti
+     garisnya bisa tertinggal berjam-jam di belakang harga, dan tiket yang
+     dimaksudkan "masuk sekarang" berangkat sebagai limit tanpa ada yang
+     memilihnya. Sekarang harga hidup yang jadi acuan; jumlah lilin tetap
+     jadi dep supaya pergantian simbol tetap menyegarkannya.
+
+     PENJEPIT 0,05% adalah pengeremnya: selama garisnya masih di dalam pita
+     yang dianggap Market, objek yang sama dipulangkan dan React tidak
+     menggambar ulang apa pun. Tanpa itu, tiap denyut harga menggambar ulang
+     seluruh chart. Ia pindah hanya saat pindahnya berarti. */
   useEffect(() => {
     if (entryDigeser.current || aksiPosisi || seretTangan.current) return;
-    const h = lilin.closes[lilin.closes.length - 1];
+    const h = aksi?.hargaKini || lilin.closes[lilin.closes.length - 1];
     if (!h) return;
     setRencana((r) => {
       if (!r.sl && !r.tp) return r;
+      if (r.entry && Math.abs(r.entry - h) / h < 0.0005) return r;
       const geser = r.entry ? h - r.entry : 0;
       if (!geser) return { ...r, entry: h };
       return {
@@ -2659,7 +2671,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
       };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lilin.closes.length]);
+  }, [lilin.closes.length, aksi?.hargaKini]);
 
   const usulSl = rencana.sl;
   const usulTp = rencana.tp;
@@ -4870,7 +4882,31 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                               simbol={simbol}
                               posisi={aksi.posisi} hargaKini={aksi.hargaKini}
                               draf={draf} rencana={rencana} mode={aksi.mode}
-                              jenis={labelJenis} risiko={aksi.risiko} qtyDemo={qtyTampil}
+                              jenis={labelJenis}
+                              /* Menarik entry ke harga pasar, DAN menggeser
+                                 SL/TP sejauh yang sama: jarak risikonya
+                                 milik orangnya, dan memindahkan entry tanpa
+                                 memindahkan stop diam-diam mengubah berapa
+                                 dolar yang ia pertaruhkan.
+
+                                 `entryDigeser` dinolkan supaya sesudah ini
+                                 garisnya ikut menyusul harga sendiri —
+                                 menekan Market lalu melihat garisnya
+                                 tertinggal lagi semenit kemudian adalah
+                                 tombol yang cuma setengah bekerja. */
+                              onMarket={aksi.hargaKini ? () => {
+                                const h = aksi.hargaKini as number;
+                                setRencana((r) => {
+                                  const geser = r.entry ? h - r.entry : 0;
+                                  return {
+                                    entry: h,
+                                    sl: r.sl && geser ? r.sl + geser : r.sl,
+                                    tp: r.tp && geser ? r.tp + geser : r.tp,
+                                  };
+                                });
+                                entryDigeser.current = false;
+                              } : undefined}
+                              risiko={aksi.risiko} qtyDemo={qtyTampil}
                               tunda={aksiTunda} onBatalTunda={aksi.batalTunda}
                               onCopySinyal={sinyalAsal && kanalAsal ? () => setCopySinyalBuka(true) : undefined}
                               onGantiMode={(m, sebab) => {
