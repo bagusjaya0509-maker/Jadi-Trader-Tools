@@ -19,6 +19,11 @@ export interface DompetPantau {
   nama: string;
   sejak: number;
   aktif?: boolean;
+  /** Dompet ini punya kartunya sendiri di Copy Signal: tiap posisi yang ia
+   *  buka diterbitkan sebagai sinyal, dan ditutup saat dompetnya menutup.
+   *  Lihat cerminPutaran() di pemantau-wallet.js. */
+  analis?: boolean;
+  analisSejak?: number;
 }
 
 export interface PosisiDompet {
@@ -281,6 +286,35 @@ export async function tambahDompet(alamat: string, nama: string): Promise<{ ok: 
       method: 'POST',
       headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' },
       body: JSON.stringify({ alamat, nama }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return { ok: false, pesan: String(j.error || 'Ditolak server (' + r.status + ').') };
+    return { ok: true };
+  } catch {
+    return { ok: false, pesan: 'Tidak bisa menghubungi server.' };
+  }
+}
+
+/** Menjadikan (atau mencabut) sebuah dompet sebagai analis di Copy Signal.
+ *
+ *  SATU panggilan, bukan dua. Server yang memasukkannya ke daftar pantau
+ *  kalau belum ada — pemantau cuma melihat yang dipantau, jadi "analis tapi
+ *  tidak dipantau" adalah kartu yang tidak akan pernah berisi, dan
+ *  menyerahkan urutan itu ke layar berarti satu tombol yang lupa memanggil
+ *  rute pertama menghasilkan keadaan yang tidak bisa dijelaskan siapa pun.
+ *
+ *  `nama` jadi NAMA KARTU-nya, dan uid kartu diturunkan dari nama itu —
+ *  mengubahnya nanti melahirkan kartu baru dan membelah riwayatnya. */
+export async function jadikanAnalisDompet(
+  alamat: string, nama: string, analis = true,
+): Promise<{ ok: true } | { ok: false; pesan: string }> {
+  const t = await token();
+  if (!t) return { ok: false, pesan: 'Belum masuk.' };
+  try {
+    const r = await fetch(`${dasar()}/api/agen/wallet/analis`, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ alamat, nama, analis }),
     });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) return { ok: false, pesan: String(j.error || 'Ditolak server (' + r.status + ').') };

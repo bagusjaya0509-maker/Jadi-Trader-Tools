@@ -10,6 +10,7 @@ import {
   type IsiSalin, type LogSalin, type RiwayatSalin, type PosisiSalinan,
   type KeadaanDompet, type TransaksiDompet, type PosisiDompet, type Peringkat,
   type JendelaPeringkat, type PitaAkun, type RiwayatBursa, type PenandaTiru,
+  jadikanAnalisDompet,
   type DompetPantau,
 } from '@/lib/wallet-agen';
 import { Copy as IkonTiru, TriangleAlert } from 'lucide-react';
@@ -156,7 +157,16 @@ const JENDELA: { id: JendelaPeringkat; label: string }[] = [
    menjawab "dompet mana yang bagus" — tapi memantau berarti MENULIS ke
    daftar pemilik, dan tombol yang selalu gagal lebih buruk daripada tombol
    yang tidak ada. */
-function PapanPeringkat({ pantau }: { pantau?: (alamat: string, nama: string) => Promise<void> }) {
+function PapanPeringkat({ pantau, jadiAnalis, analisSet }: {
+  pantau?: (alamat: string, nama: string) => Promise<void>;
+  /** Menjadikan dompet ini analis di Copy Signal. Kosong = bukan pemilik. */
+  jadiAnalis?: (alamat: string, nama: string) => Promise<void>;
+  /** Alamat yang SUDAH jadi analis. Dikirim dari atas, bukan ditarik ulang
+   *  di sini: panel induknya sudah memegang daftar dompetnya, dan dua
+   *  tarikan untuk daftar yang sama adalah dua daftar yang bisa berselisih
+   *  di layar yang sama. */
+  analisSet?: Set<string>;
+}) {
   const [jendela, setJendela] = useState<JendelaPeringkat>('month');
   /* Bawaannya pita kecil, bukan "semua". Yang membuka papan ini mencari
      dompet untuk ditiru, dan dana kelola dua miliar dolar tidak bisa ditiru
@@ -439,7 +449,37 @@ function PapanPeringkat({ pantau }: { pantau?: (alamat: string, nama: string) =>
                     {w.vlm > 0 ? '$' + uangRingkas(w.vlm) : '—'}
                   </td>
                   <td className="px-2 py-1.5 text-right">
-                    {w.dipantau ? (
+                    {/* DUA TINDAKAN, dan yang kedua menyiratkan yang pertama:
+                        menjadikan analis memasukkan dompetnya ke daftar
+                        pantau sekalian (server yang mengurusnya). Jadi
+                        tombolnya tetap muncul untuk dompet yang belum
+                        dipantau — memaksa orang menekan "Pantau" dulu cuma
+                        menambah satu ketukan untuk sesuatu yang toh terjadi. */}
+                    {analisSet?.has(w.alamat) ? (
+                      <span className="text-[11px] text-[#ffcd75]/90" title="Dompet ini punya kartunya sendiri di Copy Signal.">
+                        Analis
+                      </span>
+                    ) : jadiAnalis ? (
+                      <span className="inline-flex items-center gap-1">
+                        {w.dipantau
+                          ? <span className="text-[11px] text-emerald-400/80">Dipantau</span>
+                          : pantau && (
+                            <button
+                              onClick={() => { setSibuk(w.alamat); void pantau(w.alamat, w.nama).finally(() => setSibuk(null)); }}
+                              disabled={sibuk === w.alamat}
+                              className="cursor-pointer rounded border border-zinc-700 px-2 py-0.5 text-[11px] text-zinc-300 transition-colors hover:border-zinc-500 hover:text-zinc-100 disabled:opacity-50">
+                              {sibuk === w.alamat ? '…' : 'Pantau'}
+                            </button>
+                          )}
+                        <button
+                          onClick={() => { setSibuk(w.alamat); void jadiAnalis(w.alamat, w.nama).finally(() => setSibuk(null)); }}
+                          disabled={sibuk === w.alamat}
+                          title="Posisi dompet ini terbit sebagai sinyal di Copy Signal, apa adanya — tanpa SL dan TP."
+                          className="cursor-pointer whitespace-nowrap rounded border border-[#ffcd75]/40 px-2 py-0.5 text-[11px] text-[#ffcd75]/90 transition-colors hover:border-[#ffcd75]/70 hover:text-[#ffcd75] disabled:opacity-50">
+                          {sibuk === w.alamat ? '…' : 'Jadikan analis'}
+                        </button>
+                      </span>
+                    ) : w.dipantau ? (
                       <span className="text-[11px] text-emerald-400/80">Dipantau</span>
                     ) : !pantau ? (
                       /* Tanpa izin menulis, kolomnya dibiarkan kosong.
@@ -2104,10 +2144,17 @@ export function PanelWalletAgen({ pemilik = false, tab: tabLuar }: {
           orang saat membuka panel ini pada hari-hari awal adalah "dompet
           mana", bukan "dompet yang sudah saya pilih sedang apa" — dan yang
           dicari lebih sering pantas duduk lebih dekat ke atas. */}
-      <PapanPeringkat pantau={pemilik ? (async (alamat, nama) => {
-        await tambahDompet(alamat, nama || alamat.slice(0, 10) + '…');
-        await tarik();
-      }) : undefined} />
+      <PapanPeringkat
+        pantau={pemilik ? (async (alamat, nama) => {
+          await tambahDompet(alamat, nama || alamat.slice(0, 10) + '…');
+          await tarik();
+        }) : undefined}
+        jadiAnalis={pemilik ? (async (alamat, nama) => {
+          await jadikanAnalisDompet(alamat, nama || 'Dompet ' + alamat.slice(2, 8));
+          await tarik();
+        }) : undefined}
+        analisSet={new Set(dompet.filter((d) => d.analis).map((d) => d.alamat))}
+      />
 
       {dompet.length === 0 ? (
         <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 px-4 py-10 text-center">
