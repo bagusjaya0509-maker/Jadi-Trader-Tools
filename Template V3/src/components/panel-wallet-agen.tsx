@@ -1919,6 +1919,42 @@ export function PanelWalletAgen({ pemilik = false, tab: tabLuar }: {
     b.set('w', alamat.toLowerCase());
     setCari(b, { replace: false });
   }, [cari, setCari]);
+
+  /* ── MENDARAT DI KARTU YANG DIMINTA `?w=` ────────────────────────────
+     DI ATAS `if (muat) return` — dan itu bukan selera, itu syarat.
+
+     Efek ini sempat duduk di bawah sana, sesudah kartunya digambar, karena
+     di situlah `dompet` sudah ada. Akibatnya: pada gambar PERTAMA `muat`
+     masih true, komponennya pulang lebih awal, dan efek ini tidak pernah
+     terhitung. Begitu datanya masuk dan `muat` jadi false, React menemukan
+     satu hook LEBIH BANYAK daripada gambar sebelumnya — dan itu galat yang
+     mematikan seluruh komponennya, bukan peringatan.
+
+     Yang terlihat pengguna: halaman Wallet Tracking berubah jadi "Halaman
+     ini gagal dimuat". Dilaporkan pemilik 4 Sep 2026.
+
+     Aturannya sederhana dan berlaku untuk berkas ini seterusnya: TIDAK ADA
+     hook di bawah `if (muat)`. Jumlah dompetnya dibaca dari `d` langsung,
+     jadi efek ini tidak perlu menunggu turunan mana pun.
+
+     Parameternya dihapus SESUDAH kartunya ketemu — daftar dompet datang
+     dari jaringan, jadi pada gambar pertama `getElementById` masih null,
+     dan jumlah dompet di dep membuat percobaannya diulang saat daftarnya
+     masuk. Sasaran itu sekali pakai: dibiarkan menempel, menyegarkan
+     halaman akan menggulir ke sana lagi selamanya. */
+  const sorot = (cari.get('w') || '').toLowerCase();
+  const jumlahDompet = d?.dompet?.length ?? 0;
+  useEffect(() => {
+    if (!sorot || !jumlahDompet) return;
+    const el = document.getElementById('kartu-dompet-' + sorot);
+    if (!el) return;
+    setPilih(sorot);
+    el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    const b = new URLSearchParams(cari);
+    b.delete('w');
+    setCari(b, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sorot, jumlahDompet]);
   /* Setelan salin ditarik terpisah dari keadaan dompet: ia milik pemilik
      saja dan digerbangi server, jadi menggabungkannya ke jawaban publik
      berarti menambah satu jalan bocor tanpa satu pun manfaat. */
@@ -1973,26 +2009,6 @@ export function PanelWalletAgen({ pemilik = false, tab: tabLuar }: {
   const posisi = d?.posisi || [];
   const log = d?.log || [];
 
-  /* Mendarat di kartu yang diminta `?w=`, lalu MENGHAPUS parameternya.
-     Dihapus supaya menyegarkan halaman tidak menggulir ulang ke sana
-     selamanya — sasaran itu sekali pakai, bukan keadaan halaman.
-
-     Dihapus juga hanya SESUDAH kartunya ketemu: daftar dompet datang dari
-     jaringan, jadi pada gambar pertama `getElementById` masih null.
-     `dompet.length` di dep membuat percobaannya diulang begitu daftarnya
-     masuk. */
-  const sorot = (cari.get('w') || '').toLowerCase();
-  useEffect(() => {
-    if (!sorot) return;
-    const el = document.getElementById('kartu-dompet-' + sorot);
-    if (!el) return;
-    setPilih(sorot);
-    el.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    const b = new URLSearchParams(cari);
-    b.delete('w');
-    setCari(b, { replace: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sorot, dompet.length]);
   /* Nama tidak lagi perlu dicari dari tiap baris: pengelompokan per kartu
      membuat namanya dibaca sekali dari daftar dompet, dan salinan nama yang
      ikut tersimpan di tiap transaksi tidak pernah dipakai lagi. Itu sekaligus
