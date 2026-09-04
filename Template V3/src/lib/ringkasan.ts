@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { statGabungan, statPer, saldoDuaBulan } from '@/lib/hitung';
+import { statGabungan, statPer, saldoDuaBulan, kurvaEkuitas } from '@/lib/hitung';
 import { useRiwayat, useSaldoAwal } from '@/lib/data';
 import { useAkunMt5, useAkunBinance } from '@/lib/akun';
 import { useArusKas, arusBersih } from '@/lib/tulis-jurnal';
@@ -46,9 +46,7 @@ export interface AngkaRingkas {
   bersih: number;
   kurva: number[];
   tumbuh: number;
-  /** Perubahan saldo dalam DOLAR pada jendela yang sama dengan `tumbuh` —
-   *  yaitu naik-turunnya kurva yang digambar di sebelahnya, bukan Net P/L
-   *  seumur akun.
+  /** Perubahan saldo dalam DOLAR pada jendela yang sama dengan `tumbuh`.
    *
    *  Ada karena keduanya pernah dipajang berdampingan sebagai satu angka:
    *  "+3,5%  -$150,25". Dua-duanya benar, dan justru itu masalahnya —
@@ -56,10 +54,10 @@ export interface AngkaRingkas {
    *  transaksi sejak Juli. Pembacanya cuma melihat tanda plus di sebelah
    *  tanda minus dan menyimpulkan aplikasinya tidak bisa berhitung.
    *
-   *  Dihitung dari DUA UJUNG KURVA YANG SAMA dengan `tumbuh`, bukan rumus
-   *  sendiri: selama pembilangnya satu, keduanya tidak mungkin berselisih
-   *  tanda. Net P/L seumur akun tetap ada di `bersih` dan tetap digambar
-   *  Dashboard — di kartu yang memang menamainya begitu. */
+   *  Medan ini sengaja dipertahankan meski sekarang isinya sama dengan
+   *  `bersih`: ia yang MENGIKAT dolar ke persennya. Selama keduanya
+   *  dihitung berdampingan di satu tempat, siapa pun yang kelak menggeser
+   *  rentang `tumbuh` melihat pasangannya persis di baris berikutnya. */
   tumbuhUang: number;
   /** Transaksi paling lama; 0 kalau belum ada transaksi sama sekali. */
   sejak: number;
@@ -121,12 +119,39 @@ export function useRingkasanAkun() {
   const adaBulanLalu = kurvaSaldo.some((k) => k.lalu !== null);
   const awalKurva = titikIni[0]?.ini ?? saldoAwal;
   const akhirKurva = titikIni[titikIni.length - 1]?.ini ?? saldoAwal;
-  /* SATU pembilang dan SATU pagar untuk keduanya. Ditulis terpisah, celahnya
-     terbuka lagi di tempat lain: kalau `awalKurva` nol, persennya dijawab 0
-     sementara dolarnya tetap sebesar saldo penuh — "+0,0%  +$1.410,30",
-     bentuk lain dari cacat yang sama. */
-  const selisihUang = awalKurva ? akhirKurva - awalKurva : 0;
-  const selisihSaldo = awalKurva ? (selisihUang / Math.abs(awalKurva)) * 100 : 0;
+  const selisihSaldo = awalKurva ? ((akhirKurva - awalKurva) / Math.abs(awalKurva)) * 100 : 0;
+
+  /* ── KARTU HERO BERBICARA SEUMUR AKUN ──────────────────────────────────
+     `selisihSaldo` di atas tetap dipakai Dashboard, dan di sana ia benar:
+     ia berdiri tepat di sebelah kurva bulan berjalan yang ia ukur.
+
+     Kartu hero tidak. Diputuskan pemilik 4 Sep 2026 — "sesuaikan saja
+     dengan persentase total return saya" — dan alasannya kuat: kartu itu
+     rekam jejak, dan rekam jejak yang cuma menghitung empat hari pertama
+     September memuji dirinya sendiri dengan memilih rentang. Winrate dan
+     jumlah transaksi di bawahnya sudah seumur akun; persennya sekarang
+     ikut.
+
+     Penyebutnya modal — saldo awal DITAMBAH setoran/penarikan bersih —
+     bukan saldo hari ini. Membaginya dengan saldo hari ini akan membuat
+     akun yang rugi terlihat rugi lebih sedikit, karena penyebutnya sudah
+     ikut menyusut bersama kerugiannya. */
+  const returnUang = stat.bersih;
+  const returnPersen = modalTotal > 0 ? (returnUang / modalTotal) * 100 : 0;
+
+  /* Kurvanya ikut pindah rentang, bukan cuma angkanya. Angka seumur akun
+     di atas grafik bulan berjalan adalah cacat yang sama dalam bentuk
+     lain — pembacanya melihat garis September menanjak sambil membaca
+     -11,0%, lalu mempercayai yang mana?
+
+     Diringkas ke 60 titik: dokumen terbitannya memang dipotong segitu
+     (`terbitkanRingkasan`), dan garis selebar 300 px tidak bisa
+     menggambarkan 2.342 titik — ia cuma jadi lebih mahal. */
+  const kurvaPenuh = useMemo(() => {
+    const n = kurvaEkuitas(RIWAYAT, modalTotal).map((x) => x.nilai);
+    if (n.length <= 60) return n;
+    return Array.from({ length: 60 }, (_, i) => n[Math.round((i * (n.length - 1)) / 59)]);
+  }, [RIWAYAT, modalTotal]);
 
   /* `Math.min()` tanpa argumen memulangkan Infinity, dan Infinity yang lolos
      ke layar tampil sebagai umur akun yang mustahil. Jadi daftar kosong
@@ -144,11 +169,11 @@ export function useRingkasanAkun() {
     jumlah: stat.jumlah,
     winrate: Number((stat.winrate ?? 0).toFixed(1)),
     bersih: Number(stat.bersih.toFixed(2)),
-    kurva: titikIni.map((x) => x.ini as number),
-    tumbuh: Number(selisihSaldo.toFixed(1)),
-    tumbuhUang: Number(selisihUang.toFixed(2)),
+    kurva: kurvaPenuh,
+    tumbuh: Number(returnPersen.toFixed(1)),
+    tumbuhUang: Number(returnUang.toFixed(2)),
     sejak,
-  }), [totalSaldo, stat.jumlah, stat.winrate, stat.bersih, kurvaSaldo, selisihSaldo, selisihUang, sejak]);
+  }), [totalSaldo, stat.jumlah, stat.winrate, stat.bersih, kurvaPenuh, returnPersen, returnUang, sejak]);
 
   return {
     /* Bahan mentah, supaya layar tidak memanggil hook yang sama dua kali. */

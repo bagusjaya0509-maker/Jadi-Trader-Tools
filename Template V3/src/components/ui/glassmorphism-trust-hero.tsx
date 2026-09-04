@@ -411,11 +411,16 @@ export default function HeroSection() {
                   <div>
                     {/* `saldo`, BUKAN titik terakhir kurva.
                         ────────────────────────────────────────────────────
-                        Kurva itu saldo berjalan BULAN INI; titik akhirnya
-                        bukan total saldo. Karena itu halaman depan sempat
-                        menulis $290 sementara Dashboard menulis $808 — dua
-                        angka yang keduanya benar untuk pertanyaan berbeda,
-                        dan yang ditanyakan di sini adalah total saldonya. */}
+                        Kurva itu modal ditambah P/L jurnal; ujungnya saldo
+                        MENURUT JURNAL, bukan saldo di bursa — swap, komisi,
+                        dan setoran yang tidak tercatat membuat keduanya
+                        selalu berselisih sedikit. Karena itu halaman depan
+                        sempat menulis $290 sementara Dashboard menulis $808:
+                        dua angka yang keduanya benar untuk pertanyaan
+                        berbeda, dan yang ditanyakan di sini total saldonya.
+
+                        (Dulu kurva ini bulan berjalan. Sejak 4 Sep 2026 ia
+                        seumur akun — alasan memakai `saldo` tidak berubah.) */}
                     <div className="angka text-3xl font-bold tracking-tight text-white">
                       {pameran.siap ? uang(pameran.saldo) : '—'}
                     </div>
@@ -433,19 +438,19 @@ export default function HeroSection() {
                     pembaca yang paham berhenti percaya. */}
                 <div className="mb-6">
                   <div className="flex justify-between text-sm mb-2">
-                    {/* RENTANGNYA DISEBUT. Kurva ini saldo berjalan BULAN
-                        INI — sama seperti catatan di kartu saldo di atas —
-                        jadi persen di sebelah kanan juga bulan ini, bukan
-                        rekam jejak sejak akun dibuat. Tanpa keterangan itu
-                        pembacanya menganggapnya seumur akun, dan angka yang
-                        disalahpahami lebih buruk daripada angka yang tidak
-                        ditampilkan. */}
+                    {/* RENTANGNYA DISEBUT. Persen, dolar, dan garis di
+                        bawahnya ketiganya seumur akun — sama rentang dengan
+                        Winrate dan Transaksi di kaki kartu. Keterangannya
+                        tetap ditulis meski sekarang semuanya seragam: yang
+                        membuat "+3,5%  -$150,25" bertahan lama justru karena
+                        tidak ada satu kata pun di layar yang menyebutkan
+                        rentang mana yang sedang dihitung. */}
                     <span className="text-zinc-400">
-                      Perkembangan akun · {pameran.contoh ? 'contoh' : 'bulan ini'}
+                      Perkembangan akun · {pameran.contoh ? 'contoh' : 'sejak awal'}
                     </span>
-                    {/* Dua titik, bukan satu: pada tanggal 1 kurvanya baru
-                        punya satu titik, dan "berubah 0%" di hari yang belum
-                        sempat berubah adalah pernyataan, bukan fakta. */}
+                    {/* Dua titik, bukan satu: satu titik berarti belum ada
+                        transaksi, dan "berubah 0%" untuk akun yang belum
+                        pernah trading adalah pernyataan, bukan fakta. */}
                     {pameran.siap && pameran.kurva.length > 1 && (
                       <span className={pameran.tumbuh >= 0 ? "text-emerald-400 font-medium" : "text-red-400 font-medium"}>
                         {pameran.tumbuh >= 0 ? "+" : ""}{pameran.tumbuh.toFixed(1)}%{' '}
