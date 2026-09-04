@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { RefreshCw, Trash2, Wallet, Loader2, Link2 } from 'lucide-react';
-import { Panel, PanelHead } from '@/components/efferd-ui';
+import { RefreshCw, Trash2, Wallet, Loader2, Link2, ChevronDown } from 'lucide-react';
+import { Panel } from '@/components/efferd-ui';
 import { cn } from '@/lib/utils';
 import { useProfilPengguna, lepasDompet, type DompetTertaut } from '@/lib/profil-pengguna';
 import { sinkronRiwayatDompet, lupakanSinggahDompet, saldoDompetHl, type HasilSinkronDompet } from '@/lib/tulis-jurnal';
@@ -65,6 +65,7 @@ export function PanelJurnalDompet({ trade, onRingkas }: {
   const [kemajuan, setKemajuan] = useState('');
   const [hitungan, setHitungan] = useState<Record<string, HasilSinkronDompet>>({});
   const [pesan, setPesan] = useState<{ teks: string; galat: boolean } | null>(null);
+  const [buka, setBuka] = useState(false);
 
   /* Potret id yang sudah termuat. Catatan jujurnya: jurnal memuat 2000
      trade terbaru per sumber, jadi yang lebih tua dari itu tidak ada di
@@ -151,27 +152,55 @@ export function PanelJurnalDompet({ trade, onRingkas }: {
      tapi belum tentu benar-benar kosong. */
   if (memuat || !daftar.length) return null;
 
+  /* ── SATU BARIS, BUKAN SATU PANEL ──────────────────────────────────────
+     Dilaporkan pemilik 4 Sep 2026: "panel paling bawah ini dompet tertaut
+     kok masih ada, kan sudah menyatu dengan kripto." Benar — sejak saldonya
+     berjejer di kartu Saldo, panel setinggi ini mengulang kabar yang sudah
+     terbaca di atas, dan pengulangan yang memakan seperempat layar terbaca
+     sebagai dua fitur yang kebetulan mirip.
+
+     Yang TIDAK bisa ikut hilang: menarik riwayat lama (dua langkah, hitung
+     dulu baru tulis) dan melepas dompet. Keduanya jarang dipakai — sekali
+     saat menyambungkan, lalu nyaris tidak pernah lagi — dan yang jarang
+     dipakai pantas duduk di balik satu ketukan, bukan memakan tempat setiap
+     hari.
+
+     Jadi bawaannya TERTUTUP: satu baris yang menyebut berapa dompet dan
+     berapa isinya, plus panah. Isi panelnya tidak berubah sedikit pun. */
+  const totalTeks = totalSaldo === null ? null
+    : '$' + totalSaldo.toLocaleString('id-ID', { maximumFractionDigits: 2 });
+
   return (
     <Panel className="mt-4">
-      <PanelHead
-        judul="Dompet tertaut"
-        sub="Riwayat Hyperliquid dari dompet yang pernah kamu sambungkan, masuk ke jurnal kripto"
-        kanan={
-          <label className="flex items-center gap-2 text-[11.5px] text-zinc-500">
+      <button onClick={() => setBuka((v) => !v)}
+        className="flex w-full cursor-pointer items-center gap-2 px-5 py-3 text-left">
+        <Wallet className="size-3.5 shrink-0 text-emerald-500" />
+        <span className="text-[12.5px] font-medium text-zinc-200">Dompet tertaut</span>
+        <span className="text-[11.5px] text-zinc-500">
+          · {daftar.length} dompet{totalTeks ? <> · <span className="angka">{totalTeks}</span></> : null}
+        </span>
+        <span className="ml-auto hidden text-[11px] text-zinc-600 sm:inline">
+          {buka ? 'tutup' : 'tarik riwayat lama / lepas dompet'}
+        </span>
+        <ChevronDown className={cn('size-4 shrink-0 text-zinc-600 transition-transform', buka && 'rotate-180')} />
+      </button>
+
+      {buka && (
+      <div className="border-t border-zinc-800 px-5 pb-5 pt-4">
+        <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+          <p className="max-w-lg text-[11.5px] leading-relaxed text-zinc-500">
+            Trade yang tutup dalam seminggu terakhir masuk sendiri tiap 5 menit selama halaman ini
+            terbuka. Tombol di bawah untuk menarik yang lebih lama — dihitung dulu, ditulis kalau
+            kamu setuju.
+          </p>
+          <label className="flex shrink-0 items-center gap-2 text-[11.5px] text-zinc-500">
             Rentang
             <select value={hari} onChange={(e) => setHari(Number(e.target.value))}
               className="h-[30px] cursor-pointer rounded-md border border-zinc-800 bg-zinc-900/60 px-2 text-[11.5px] text-zinc-300 outline-none">
               {RENTANG.map((r) => <option key={r.hari} value={r.hari}>{r.label}</option>)}
             </select>
           </label>
-        }
-      />
-      <div className="px-5 pb-5">
-        <p className="mb-3 text-[11.5px] leading-relaxed text-zinc-500">
-          Trade yang tutup dalam seminggu terakhir masuk sendiri tiap 5 menit selama halaman ini
-          terbuka. Tombol di bawah untuk menarik yang lebih lama — dihitung dulu, ditulis kalau
-          kamu setuju.
-        </p>
+        </div>
 
         {pesan && (
           <div className={cn('mb-3 rounded-lg border px-3 py-2 text-[12px]',
@@ -258,6 +287,7 @@ export function PanelJurnalDompet({ trade, onRingkas }: {
           </ul>
         )}
       </div>
+      )}
     </Panel>
   );
 }

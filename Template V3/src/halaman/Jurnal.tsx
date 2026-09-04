@@ -39,6 +39,12 @@ import { Link } from 'react-router-dom';
  *  persis (deposit, penarikan, biaya yang tidak masuk jurnal), dan
  *  menampilkan satu angka saja menyembunyikan selisih yang justru paling
  *  perlu diketahui. */
+/** Dolar penuh, tanpa sen. Dipakai saat tiga saldo atau lebih harus
+ *  berjejer di kartu selebar seperempat kisi — lihat catatan di sana. */
+function bulat(n: number): string {
+  return '$' + Math.round(n).toLocaleString('en-US');
+}
+
 function KartuSaldo({ judul, saldoJurnal, akun, keIntegrasi }: {
   judul: string; saldoJurnal: number; akun: StatusAkun; keIntegrasi: string;
 }) {
@@ -111,13 +117,28 @@ function KartuSaldo({ judul, saldoJurnal, akun, keIntegrasi }: {
                membungkus jelek — tapi angka uang yang terpotong ellipsis
                BERBOHONG, dan itu jauh lebih buruk daripada jelek. */
             <div className="@container mt-2">
-              <div className="flex flex-wrap items-end gap-x-5 gap-y-3">
+              {/* ── SEJAJAR ITU YANG DIMINTA, JADI SEN YANG MENGALAH ──────
+                  Percobaan pertama cuma mengecilkan hurufnya. Tidak cukup:
+                  kartu ini duduk di kisi empat kolom, jadi lebar dalamnya
+                  sekitar 250 px — dan tiga angka sepanjang "$1.646,90" di
+                  situ menuntut huruf 10 px sebelum muat. Yang terjadi
+                  akhirnya membungkus, persis yang dikeluhkan pemilik.
+
+                  Maka yang dikorbankan SEN, bukan kesejajaran. Tiga saldo
+                  atau lebih dibulatkan ke dolar penuh: "$611 · $302 · $734"
+                  butuh sepertiga lebar "$610,82 · $302,29 · $733,79", dan
+                  dua sen pada saldo enam ratus dolar bukan angka yang
+                  dibaca siapa pun. Totalnya di bawah tetap utuh sampai sen.
+
+                  Sampai dua saldo, tidak ada yang berubah — tetap lengkap
+                  dan tetap 28 px di kartu lebar. */}
+              <div className="flex items-end gap-x-4">
                 {rincian.map((b, i) => (
-                  <div key={b.id || i} className="min-w-0">
+                  <div key={b.id || i} className="min-w-0 flex-1">
                     <div className="truncate text-[11px] text-zinc-500">{b.nama}</div>
                     <div className="angka mt-1 font-semibold leading-none tracking-tight text-zinc-100"
-                      style={{ fontSize: `clamp(15px, ${(16.5 / rincian.length).toFixed(2)}cqi, 28px)` }}>
-                      {uang(b.saldo)}
+                      style={{ fontSize: `clamp(14px, ${(19 / rincian.length).toFixed(2)}cqi, 28px)` }}>
+                      {rincian.length >= 3 ? bulat(b.saldo) : uang(b.saldo)}
                     </div>
                   </div>
                 ))}

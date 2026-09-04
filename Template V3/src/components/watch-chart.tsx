@@ -489,9 +489,36 @@ export function WatchChart({ simbol, onPilih, onLebar }: {
                         <span className="angka text-[11px] text-zinc-500">
                           {mt5 ? (tk ? fHarga(tk.bid) : '—') : (t ? fHarga(t.lastPrice) : '—')}
                         </span>
-                        {!mt5 && t?.bursa === 'hyperliquid' && (
-                          <span title="Koin ini tidak ada di Binance — harga & ordernya lewat Hyperliquid"
-                            className="shrink-0 rounded bg-sky-500/15 px-1 text-[8.5px] font-semibold tracking-wide text-sky-300">HL</span>
+                        {/* ── NAMANYA UTUH, SINGKATANNYA UNTUK PONSEL ────
+                            Diminta pemilik 4 Sep 2026: "HL itu Hyperliquid
+                            dan yang lain Binance, kalau mode HP baru
+                            singkat." Jadi keduanya diberi nama — lencana
+                            yang cuma dipasang pada yang tidak biasa memang
+                            menjawab "yang ini kok beda", tapi tidak
+                            menjawab "yang lain dari mana".
+
+                            Dua elemen dengan `hidden`, bukan satu yang
+                            isinya dipilih JavaScript: lebar layar bisa
+                            berubah tanpa komponen ini digambar ulang
+                            (jendela diseret, ponsel diputar), dan teks yang
+                            dipilih saat render akan tertinggal di ukuran
+                            yang sudah tidak berlaku.
+
+                            Hyperliquid diberi warna, Binance dibiarkan
+                            kelabu: yang perlu menonjol memang yang jarang. */}
+                        {!mt5 && t && (
+                          <span title={t.bursa === 'hyperliquid'
+                            ? 'Koin ini tidak ada di Binance — harga & ordernya lewat Hyperliquid'
+                            : 'Harga & ordernya lewat Binance Futures'}
+                            className={cn('shrink-0 rounded px-1 text-[8.5px] font-semibold tracking-wide',
+                              t.bursa === 'hyperliquid' ? 'bg-sky-500/15 text-sky-300' : 'bg-zinc-800 text-zinc-500')}>
+                            <span className="hidden sm:inline">
+                              {t.bursa === 'hyperliquid' ? 'Hyperliquid' : 'Binance'}
+                            </span>
+                            <span className="sm:hidden">
+                              {t.bursa === 'hyperliquid' ? 'HL' : 'BN'}
+                            </span>
+                          </span>
                         )}
                       </div>
                     </div>
