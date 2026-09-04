@@ -265,6 +265,32 @@ function Beranda() {
 /** Satu-satunya tempat yang memutuskan boleh-tidaknya masuk. Dipakai
  *  Kerangka DAN halaman di luar kerangka, supaya tidak ada dua definisi
  *  "punya akses" yang bisa berselisih diam-diam. */
+/* ── SASARAN KEMBALI HARUS UTUH, BUKAN CUMA PATH ────────────────────────
+   Gerbang akses membawa alamat asal di `?dari=` supaya orangnya dikembalikan
+   ke tempat ia tadi berada. Selama ini yang dibawa cuma `pathname` — query
+   dan hash-nya DIBUANG.
+
+   Akibatnya tidak terlihat sampai halamannya punya sub-tab di alamat.
+   `/wallet-tracking?sub=copy` pulang sebagai `/wallet-tracking`, yaitu tab
+   Dompet Pantauan — bukan Posisi Copy tempat orangnya tadi bekerja. Sama
+   untuk `?sub=hunter`, `?simbol=…` di Chart & Entry, dan seluruh layar lain
+   yang menyimpan keadaannya di alamat.
+
+   Dan gerbang ini lewat lebih sering daripada dugaan: ia menendang siapa pun
+   yang status langganannya BELUM terbaca — termasuk sekejap saat auth masih
+   memuat, atau saat Firestore membalas galat (kuota habis, jaringan putus).
+   Jadi yang dialami orang bukan "ditolak", melainkan "kok tiba-tiba pindah
+   tab" sesudah menyimpan sesuatu. Dilaporkan pemilik 4 Sep 2026, dan
+   direproduksi langsung di peramban miliknya: membuka `?sub=copy` berakhir
+   di `/wallet-tracking`.
+
+   `search` DAN `hash` ikut. Hash-nya jarang dipakai sekarang, tapi
+   membawanya tidak berongkos dan yang lupa dibawa esok hari akan hilang
+   dengan cara yang sama persis. */
+function alamatPenuh(l: { pathname: string; search: string; hash: string }) {
+  return l.pathname + l.search + l.hash;
+}
+
 function usePenjaga() {
   const { memuat, pemilik, langganan } = useAuth();
   const lokasi = useLocation();
@@ -280,7 +306,7 @@ function usePenjaga() {
      "akun lama", dan membiarkannya membuka pintu berarti setiap akun yang
      dibuat sebelum 13 Agu punya akses permanen tanpa pernah disetujui. */
   const boleh = pemilik || langganan.status === 'aktif' || langganan.status === 'pratinjau';
-  const keAkses = <Navigate to={`/akses?dari=${encodeURIComponent(lokasi.pathname)}`} replace />;
+  const keAkses = <Navigate to={`/akses?dari=${encodeURIComponent(alamatPenuh(lokasi))}`} replace />;
   return { memuat, boleh, keAkses };
 }
 
@@ -367,7 +393,7 @@ function Kerangka() {
   const TERBUKA = new Set(['/docs', '/harga']);
   if (!import.meta.env.DEV && !preview && !TERBUKA.has(lokasi.pathname)
       && !(pemilik || langganan.status === 'aktif' || langganan.status === 'pratinjau')) {
-    return <Navigate to={`/akses?dari=${encodeURIComponent(lokasi.pathname)}`} replace />;
+    return <Navigate to={`/akses?dari=${encodeURIComponent(alamatPenuh(lokasi))}`} replace />;
   }
   return (
     <AppShell>
