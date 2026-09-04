@@ -31,7 +31,7 @@ export const ARTIKEL: Artikel[] = [
       },
       {
         "jenis": "p",
-        "isi": "Jalan keluarnya bukan disiplin yang lebih keras, tapi mencabut langkah menyalinnya. MetaTrader 5 bisa mengirim sendiri tiap transaksi yang tertutup ke jurnal, lewat sebuah Expert Advisor."
+        "isi": "Jalan keluarnya bukan disiplin yang lebih keras, melainkan mencabut langkah menyalinnya. MetaTrader 5 bisa mengirim sendiri tiap transaksi yang tertutup ke jurnal, lewat sebuah Expert Advisor."
       },
       {
         "jenis": "h2",
@@ -53,7 +53,7 @@ export const ARTIKEL: Artikel[] = [
         "jenis": "ol",
         "isi": [
           "<b>Unduh berkasnya.</b> Ambil JadiTraderSync.ex5 dari halaman Integrations.",
-          "<b>Buka folder data MT5.</b> Di MetaTrader 5 pilih <code>File → Open Data Folder</code>, lalu masuk ke <code>MQL5\\Experts</code> dan salin berkas .ex5 ke situ. Jangan mencarinya lewat Windows Explorer — tiap terminal MT5 punya folder datanya sendiri di lokasi yang panjang dan acak.",
+          "<b>Buka folder data MT5.</b> Di MetaTrader 5 pilih <code>File → Open Data Folder</code>, lalu masuk ke <code>MQL5\\Experts</code> dan salin berkas .ex5 ke situ. Jangan mencarinya lewat Windows Explorer — tiap terminal MT5 memiliki folder datanya sendiri di lokasi yang panjang dan acak.",
           "<b>Segarkan daftar EA.</b> Di panel Navigator (Ctrl+N), klik kanan <code>Expert Advisors → Refresh</code>. JadiTraderSync muncul di daftar. Kalau belum, tutup dan buka lagi MT5-nya.",
           "<b>Izinkan alamat server.</b> <code>Tools → Options → Expert Advisors</code>, centang <code>Allow WebRequest for listed URL</code>, lalu tambahkan alamat server yang tertulis di halaman Integrations. Salin persis, tanpa garis miring di ujung — MT5 mencocokkannya huruf per huruf, dan satu karakter beda membuat EA gagal tanpa pesan yang menjelaskan.",
           "<b>Seret ke chart mana pun.</b> Chart apa saja, timeframe apa saja: EA ini tidak membaca harga, jadi pilihan chart tidak berpengaruh. Di tab <code>Common</code> centang <code>Allow Algo Trading</code>.",
@@ -76,7 +76,7 @@ export const ARTIKEL: Artikel[] = [
       },
       {
         "jenis": "catatan",
-        "isi": "Pastikan tombol <b>Algo Trading</b> di toolbar MT5 berwarna hijau. Kalau merah, EA-nya terpasang tapi tidak berjalan sama sekali — dan tidak ada pesan galat yang memberitahumu."
+        "isi": "Pastikan tombol <b>Algo Trading</b> di toolbar MT5 berwarna hijau. Kalau merah, EA-nya terpasang tetapi tidak berjalan sama sekali — dan tidak ada pesan galat yang memberitahumu."
       },
       {
         "jenis": "h2",
@@ -86,7 +86,7 @@ export const ARTIKEL: Artikel[] = [
         "jenis": "ul",
         "isi": [
           "<b>Tab Experts menampilkan \"WebRequest ... 4060\"</b> — alamat server belum masuk daftar izin, atau ada bedanya satu karakter. Ulangi langkah 4.",
-          "<b>EA tersambung tapi jurnal tidak terisi</b> — WebRequest belum diizinkan, atau alamat server belum ditambahkan ke daftar putih MT5.",
+          "<b>EA tersambung tetapi jurnal tidak terisi</b> — WebRequest belum diizinkan, atau alamat server belum ditambahkan ke daftar putih MT5.",
           "<b>Tombol Algo Trading merah</b> — klik sekali supaya hijau."
         ]
       },
@@ -120,13 +120,17 @@ export const ARTIKEL: Artikel[] = [
     "slug": "cara-membuat-api-key-binance-yang-aman",
     "jenis": "fitur",
     "judul": "Cara Membuat API Key Binance yang Aman untuk Screener dan Chart",
-    "ringkas": "Satu centang yang tidak boleh diaktifkan, kenapa API key tidak pernah masuk ke peramban, dan apa bedanya dengan App Token.",
+    "ringkas": "API key yang bocor tidak membuat saldomu ikut hilang — asalkan satu centang tidak pernah kamu aktifkan.",
     "menit": 2,
     "gambar": "/artikel/gambar/cara-membuat-api-key-binance-yang-aman.webp",
     "isi": [
       {
         "jenis": "p",
-        "isi": "API key Binance itu kunci rumah. Ia dibuat sekali, ditempel sekali, lalu dilupakan — dan justru karena dilupakan itulah ia berbahaya. Halaman ini soal cara membuatnya sehingga kalaupun bocor, kerugiannya terbatas."
+        "isi": "API key Binance memberi izin penuh atas akun bursamu. Ia dibuat sekali, ditempel sekali, lalu dilupakan — dan justru karena dilupakan itulah ia berbahaya."
+      },
+      {
+        "jenis": "p",
+        "isi": "Halaman ini menjelaskan cara membuatnya sehingga kalaupun bocor, kerugiannya tetap terbatas."
       },
       {
         "jenis": "h2",
@@ -197,7 +201,7 @@ export const ARTIKEL: Artikel[] = [
       },
       {
         "jenis": "p",
-        "isi": "Ganti DNS bisa menolong sementara, tapi yang andal tetap proxy VPS yang diatur di halaman Integrations. Tutorial lengkapnya — dari membuat API key sampai <code>pm2 startup</code>, dengan perintah siap salin — ada di sana."
+        "isi": "Ganti DNS kadang menolong sementara, tetapi yang andal tetap proxy VPS yang diatur di halaman Integrations. Tutorial lengkapnya — dari membuat API key sampai <code>pm2 startup</code>, dengan perintah siap salin — ada di sana."
       }
     ],
     "terkait": [
@@ -223,7 +227,7 @@ export const ARTIKEL: Artikel[] = [
     "isi": [
       {
         "jenis": "p",
-        "isi": "Gejalanya khas: aplikasinya terbuka normal, tombolnya jalan, tapi chart kripto kosong dan screener tidak pernah selesai memuat. Tidak ada pesan galat yang menjelaskan, karena dari sudut pandang peramban permintaannya memang tidak ditolak — ia cuma tidak pernah dijawab."
+        "isi": "Gejalanya khas: aplikasinya terbuka normal, tombolnya jalan, tetapi chart kripto kosong dan screener tidak pernah selesai memuat. Tidak ada pesan galat yang menjelaskan, karena dari sudut pandang peramban permintaannya memang tidak ditolak — ia cuma tidak pernah dijawab."
       },
       {
         "jenis": "h2",
@@ -240,13 +244,13 @@ export const ARTIKEL: Artikel[] = [
       {
         "jenis": "ul",
         "isi": [
-          "<b>Ganti DNS.</b> Paling cepat dicoba dan kadang cukup. Tapi ia bergantung pada bagaimana ISP-mu memblokir, jadi bisa berhenti bekerja kapan saja tanpa pemberitahuan.",
+          "<b>Ganti DNS.</b> Paling cepat dicoba dan kadang cukup. Namun ia bergantung pada bagaimana ISP-mu memblokir, jadi bisa berhenti bekerja kapan saja tanpa pemberitahuan.",
           "<b>Proxy lewat VPS sendiri.</b> Permintaannya berangkat dari server di luar jaringan yang memblokir. Lebih repot dipasang sekali, lalu tidak perlu dipikirkan lagi."
         ]
       },
       {
         "jenis": "p",
-        "isi": "Cara kedua punya efek samping yang justru bagus: API key Binance-mu tinggal di VPS itu, tidak pernah masuk ke peramban."
+        "isi": "Cara kedua memiliki efek samping yang justru bagus: API key Binance-mu tinggal di VPS itu, tidak pernah masuk ke peramban."
       },
       {
         "jenis": "catatan",
@@ -270,57 +274,69 @@ export const ARTIKEL: Artikel[] = [
     "slug": "akun-sen-mt5-jurnal-seratus-kali-lipat",
     "jenis": "fitur",
     "judul": "Akun Sen di MT5 Bisa Membuat Jurnalmu Terlihat 100× Lebih Untung",
-    "ringkas": "Kenapa akun cent perlu diperlakukan berbeda, dan bagaimana saldo, swap, komisi, serta winrate gabungan dihitung.",
-    "menit": 1,
+    "ringkas": "Profit di jurnal terlihat seratus kali lebih besar daripada di MT5. Bukan salah hitung — akun sen memakai satuan yang berbeda.",
+    "menit": 2,
     "gambar": "/artikel/gambar/akun-sen-mt5-jurnal-seratus-kali-lipat.webp",
     "isi": [
       {
         "jenis": "p",
-        "isi": "Akun sen memakai satuan yang seratus kali lebih kecil dari akun biasa. Kalau angkanya masuk jurnal apa adanya, seluruh riwayatmu terbaca seratus kali lebih untung dari kenyataan — dan yang berbahaya bukan angkanya, melainkan keputusan yang kamu ambil dari angka itu."
+        "isi": "Kamu membuka jurnal, dan angkanya tidak masuk akal. Profit yang di MT5 tertulis $12 muncul sebagai $1.200. Saldo yang kamu tahu $50 terbaca $5.000."
       },
       {
         "jenis": "p",
-        "isi": "Akun sen dideteksi dari mata uang akun MT5, lalu dibagi 100 sebelum masuk jurnal."
+        "isi": "Bukan salah hitung. Akun sen memakai satuan seratus kali lebih kecil daripada akun biasa, dan kalau angkanya masuk apa adanya, seluruh riwayatmu terbaca seratus kali lebih untung."
+      },
+      {
+        "jenis": "p",
+        "isi": "Yang berbahaya bukan angkanya, melainkan keputusan yang kamu ambil dari angka itu."
       },
       {
         "jenis": "h2",
-        "isi": "Saldo dihitung dari transaksi yang sudah selesai"
+        "isi": "Yang perlu kamu lakukan: tidak ada"
       },
       {
         "jenis": "p",
-        "isi": "Saldo di Dashboard dan Journal berasal dari satu sumber: saldo awal ditambah seluruh P/L yang sudah direalisasi. Posisi yang masih terbuka tidak ikut — ia tampil terpisah sebagai floating."
-      },
-      {
-        "jenis": "p",
-        "isi": "Alasannya sederhana: mencampur keduanya membuat kurva ekuitas berubah tiap detik tanpa ada satu pun transaksi yang benar-benar terjadi. Kurva yang bergerak sendiri tidak bisa dipakai menilai apa pun."
+        "isi": "Jurnal mengenali akun sen dari mata uang akunmu di MT5, lalu membaginya seratus sebelum menyimpan. Kamu tidak perlu mengatur apa pun, dan tidak perlu mengoreksi angkanya sendiri."
       },
       {
         "jenis": "h2",
-        "isi": "Swap dan komisi masuk ke dalam P/L"
+        "isi": "Kenapa saldomu diam ketika posisi masih terbuka"
       },
       {
         "jenis": "p",
-        "isi": "Keduanya dihitung ke dalam P/L tiap transaksi, bukan dijadikan baris sendiri. Jadi angka yang kamu lihat adalah yang benar-benar masuk atau keluar dari akun, bukan angka kotor sebelum biaya."
+        "isi": "Saldo di Dashboard dan Journal datang dari satu sumber: saldo awal ditambah seluruh P/L yang sudah direalisasi. Posisi yang masih terbuka tidak ikut dihitung — ia tampil terpisah sebagai floating."
+      },
+      {
+        "jenis": "p",
+        "isi": "Alasannya, mencampur keduanya membuat kurva ekuitas berubah tiap detik tanpa satu pun transaksi yang benar-benar terjadi. Kurva yang bergerak sendiri tidak bisa dipakai menilai apa pun."
       },
       {
         "jenis": "h2",
-        "isi": "Winrate gabungan memakai jumlah transaksi"
+        "isi": "Kenapa profitnya lebih kecil daripada yang kamu ingat"
       },
       {
         "jenis": "p",
-        "isi": "Forex dan kripto disimpan terpisah lalu digabung saat ditampilkan. Winrate gabungannya dihitung dari jumlah transaksi, <b>bukan</b> rata-rata dua winrate."
-      },
-      {
-        "jenis": "p",
-        "isi": "Bedanya besar: 9 dari 10 trade forex menang dan 1 dari 90 trade kripto menang bukan berarti winrate-mu 50%. Rata-rata dua persentase menyembunyikan bahwa hampir semua transaksimu ada di sisi yang kalah."
+        "isi": "Swap dan komisi sudah dihitung ke dalam P/L tiap transaksi, bukan dijadikan baris sendiri. Jadi angka yang kamu lihat adalah yang benar-benar masuk atau keluar dari akun — bukan angka kotor sebelum biaya."
       },
       {
         "jenis": "h2",
-        "isi": "Kolom emosi tidak memengaruhi angka"
+        "isi": "Kenapa winrate gabunganmu bukan rata-rata dua angka"
       },
       {
         "jenis": "p",
-        "isi": "Kolom emosi dan alasan entry diisi manual, dan sengaja tidak dipakai menghitung apa pun. Gunanya muncul belakangan — saat pola \"entry karena FOMO\" sudah cukup banyak untuk dijumlahkan."
+        "isi": "Forex dan kripto disimpan terpisah, lalu digabung saat ditampilkan. Winrate gabungannya dihitung dari jumlah transaksi, <b>bukan</b> dari rata-rata dua persentase."
+      },
+      {
+        "jenis": "p",
+        "isi": "Bedanya besar. Menang 9 dari 10 trade forex dan 1 dari 90 trade kripto bukan berarti winrate-mu 50%. Hitungan sebenarnya 10 menang dari 100 transaksi — 10%. Rata-rata dua persentase menyembunyikan bahwa hampir semua transaksimu ada di sisi yang kalah."
+      },
+      {
+        "jenis": "h2",
+        "isi": "Kolom emosi tidak mengubah angka apa pun"
+      },
+      {
+        "jenis": "p",
+        "isi": "Kolom emosi dan alasan entry kamu isi sendiri, dan sengaja tidak dipakai menghitung apa pun. Gunanya muncul belakangan — ketika pola \"entry karena FOMO\" sudah cukup banyak untuk dijumlahkan."
       }
     ],
     "terkait": [
@@ -335,7 +351,7 @@ export const ARTIKEL: Artikel[] = [
     "slug": "cara-memasang-indikator-pine-di-tradingview",
     "jenis": "fitur",
     "judul": "Cara Memasang Indikator Pine di TradingView (dan Satu Sebab Gagal yang Paling Sering)",
-    "ringkas": "Menempel kode Pine, menyimpannya ke favorit, dan kenapa indikator v6 tidak mau dikompilasi di layout lama.",
+    "ringkas": "Indikatornya menempel hari ini, lalu hilang besok. Satu langkah yang sering dilewati membuatnya bertahan.",
     "menit": 1,
     "gambar": "/artikel/gambar/cara-memasang-indikator-pine-di-tradingview.webp",
     "isi": [
@@ -401,7 +417,7 @@ export const ARTIKEL: Artikel[] = [
     "slug": "cara-membuat-jurnal-trading-di-excel",
     "jenis": "edukasi",
     "judul": "Cara Membuat Jurnal Trading di Excel (dan Kapan Excel Mulai Merepotkan)",
-    "ringkas": "Kolom apa saja yang wajib ada, rumus winrate dan profit factor yang benar, dan tiga hal yang membuat jurnal Excel berhenti diisi.",
+    "ringkas": "Sepuluh kolom sudah cukup, dua rumusnya sering dihitung keliru, dan tiga hal membuat jurnalnya berhenti diisi.",
     "menit": 2,
     "gambar": "/artikel/gambar/cara-membuat-jurnal-trading-di-excel.webp",
     "isi": [
@@ -415,7 +431,7 @@ export const ARTIKEL: Artikel[] = [
       },
       {
         "jenis": "p",
-        "isi": "Jurnal gagal bukan karena kolomnya kurang, tapi karena kolomnya terlalu banyak. Sepuluh ini sudah cukup untuk menjawab hampir semua pertanyaan yang nanti kamu ajukan ke diri sendiri:"
+        "isi": "Jurnal gagal bukan karena kolomnya kurang, melainkan karena kolomnya terlalu banyak. Sepuluh ini sudah cukup untuk menjawab hampir semua pertanyaan yang nanti kamu ajukan ke diri sendiri:"
       },
       {
         "jenis": "ol",
@@ -429,12 +445,12 @@ export const ARTIKEL: Artikel[] = [
           "<b>Take profit</b>",
           "<b>Harga exit</b>",
           "<b>P/L bersih</b> — sesudah swap dan komisi, bukan angka kotor.",
-          "<b>Alasan entry</b> — satu kalimat. Ini kolom yang paling sering dikosongkan, dan paling berguna waktu dibaca ulang sebulan kemudian."
+          "<b>Alasan entry</b> — satu kalimat. Ini kolom yang paling sering dikosongkan, dan paling berguna ketika dibaca ulang sebulan kemudian."
         ]
       },
       {
         "jenis": "catatan",
-        "isi": "Kolom <b>emosi</b> boleh ditambah, tapi jangan dijadikan angka. Gunanya muncul belakangan — saat pola \"entry karena takut ketinggalan\" sudah cukup banyak untuk dijumlahkan."
+        "isi": "Kolom <b>emosi</b> boleh ditambah, tetapi jangan dijadikan angka. Gunanya muncul belakangan — saat pola \"entry karena takut ketinggalan\" sudah cukup banyak untuk dijumlahkan."
       },
       {
         "jenis": "h2",
@@ -454,7 +470,7 @@ export const ARTIKEL: Artikel[] = [
       },
       {
         "jenis": "p",
-        "isi": "<b>Kalau akunmu akun cent</b>, seluruh angka P/L harus dibagi 100 sebelum masuk jurnal. Kalau tidak, riwayatmu terbaca seratus kali lebih untung dari kenyataan."
+        "isi": "<b>Kalau akunmu akun cent</b>, seluruh angka P/L harus dibagi 100 sebelum masuk jurnal. Kalau tidak, riwayatmu terbaca seratus kali lebih untung daripada kenyataan."
       },
       {
         "jenis": "h2",
@@ -498,13 +514,13 @@ export const ARTIKEL: Artikel[] = [
     "slug": "cara-backtest-strategi-trading-gratis",
     "jenis": "edukasi",
     "judul": "Cara Backtest Strategi Trading Gratis di TradingView dan MT5",
-    "ringkas": "Tiga cara backtest tanpa bayar, batas masing-masing, dan sebab paling sering hasil backtest jauh lebih bagus daripada hasil live.",
+    "ringkas": "Backtest gratis lewat tiga cara, masing-masing dengan batasnya — dan empat sebab hasilnya jauh melebihi hasil live.",
     "menit": 2,
     "gambar": "/artikel/gambar/cara-backtest-strategi-trading-gratis.webp",
     "isi": [
       {
         "jenis": "p",
-        "isi": "Backtest itu menguji aturan entry-mu pada harga yang sudah lewat. Tujuannya bukan mencari strategi yang menang terus — tapi mengetahui seperti apa rasanya kalah beruntun sebelum uang sungguhan ikut."
+        "isi": "Backtest itu menguji aturan entry-mu pada harga yang sudah lewat. Tujuannya bukan mencari strategi yang menang terus, melainkan mengetahui seperti apa rasanya kalah beruntun sebelum uang sungguhan ikut."
       },
       {
         "jenis": "h2",
@@ -516,7 +532,7 @@ export const ARTIKEL: Artikel[] = [
       },
       {
         "jenis": "p",
-        "isi": "Ini satu-satunya cara yang menguji <b>kamu</b>, bukan cuma aturannya. Backtest yang dilihat sekaligus dari kanan ke kiri selalu terlihat gampang, karena matamu sudah tahu ke mana harga pergi."
+        "isi": "Ini satu-satunya cara yang menguji <b>kamu</b>, bukan cuma aturannya. Backtest yang dilihat sekaligus dari kanan ke kiri selalu terlihat mudah, karena matamu sudah tahu ke mana harga pergi."
       },
       {
         "jenis": "p",
@@ -524,7 +540,7 @@ export const ARTIKEL: Artikel[] = [
       },
       {
         "jenis": "h2",
-        "isi": "2. Strategy Tester MT5 — paling cepat, paling gampang menipu"
+        "isi": "2. Strategy Tester MT5 — paling cepat, paling mudah menipu"
       },
       {
         "jenis": "p",
@@ -548,11 +564,11 @@ export const ARTIKEL: Artikel[] = [
       },
       {
         "jenis": "p",
-        "isi": "Gulir chart ke belakang, catat tiap setup yang memenuhi aturanmu ke spreadsheet, lalu hitung hasilnya. Lambat, tapi kamu jadi hafal seperti apa setupmu terlihat — dan itu tidak didapat dari laporan yang dihasilkan mesin."
+        "isi": "Gulir chart ke belakang, catat tiap setup yang memenuhi aturanmu ke spreadsheet, lalu hitung hasilnya. Lambat, tetapi kamu jadi hafal seperti apa setupmu terlihat — dan itu tidak didapat dari laporan yang dihasilkan mesin."
       },
       {
         "jenis": "h2",
-        "isi": "Kenapa backtest bagus tapi live babak belur"
+        "isi": "Kenapa backtest bagus, tetapi live babak belur"
       },
       {
         "jenis": "p",
@@ -563,13 +579,13 @@ export const ARTIKEL: Artikel[] = [
         "isi": [
           "<b>Kamu tahu masa depannya.</b> Waktu backtest, lilin sesudahnya sudah ada di layar. Otak memakainya tanpa kamu sadari.",
           "<b>Aturannya berubah di tengah jalan.</b> Sesudah tiga kali kalah beruntun, ambangnya digeser sedikit. Di backtest penggeseran itu tidak tercatat di mana pun.",
-          "<b>Biaya tidak dihitung.</b> Spread, komisi, dan swap kecil per transaksi, tapi seratus transaksi kemudian ia bukan angka kecil lagi.",
-          "<b>Lotnya berbeda.</b> Di backtest lot tetap. Di live lot dinaikkan waktu yakin dan diturunkan waktu takut — dan itu strategi yang berbeda dari yang diuji."
+          "<b>Biaya tidak dihitung.</b> Spread, komisi, dan swap kecil per transaksi, tetapi seratus transaksi kemudian ia bukan angka kecil lagi.",
+          "<b>Lotnya berbeda.</b> Di backtest lot tetap. Di live lot dinaikkan ketika yakin dan diturunkan ketika takut — dan itu strategi yang berbeda dari yang diuji."
         ]
       },
       {
         "jenis": "catatan",
-        "isi": "Aturan praktis: backtest yang tidak pernah menunjukkan periode rugi beruntun bukan strategi bagus, melainkan backtest yang salah. Setiap strategi punya periode buruk; kalau tidak kelihatan, artinya periode itu belum diuji."
+        "isi": "Aturan praktis: backtest yang tidak pernah menunjukkan periode rugi beruntun bukan strategi bagus, melainkan backtest yang salah. Setiap strategi memiliki periode buruk; kalau tidak kelihatan, artinya periode itu belum diuji."
       }
     ],
     "terkait": [
@@ -589,7 +605,7 @@ export const ARTIKEL: Artikel[] = [
     "slug": "cara-pasang-ea-di-mt5-pc-dan-android",
     "jenis": "edukasi",
     "judul": "Cara Pasang EA di MT5 (dan Kenapa Tidak Bisa di Android atau iPhone)",
-    "ringkas": "Langkah memasang Expert Advisor di MT5 desktop, dan jawaban jujur untuk pertanyaan yang paling sering muncul soal HP.",
+    "ringkas": "EA dipasang di MT5 desktop lewat enam langkah. Di Android dan iPhone, ia tidak berjalan sama sekali.",
     "menit": 2,
     "gambar": "/artikel/gambar/cara-pasang-ea-di-mt5-pc-dan-android.webp",
     "isi": [
@@ -620,7 +636,7 @@ export const ARTIKEL: Artikel[] = [
       {
         "jenis": "ol",
         "isi": [
-          "Buka <code>File &rarr; Open Data Folder</code>. Jangan mencarinya lewat Windows Explorer — tiap terminal MT5 punya foldernya sendiri di lokasi yang panjang dan acak.",
+          "Buka <code>File &rarr; Open Data Folder</code>. Jangan mencarinya lewat Windows Explorer — tiap terminal MT5 memiliki foldernya sendiri di lokasi yang panjang dan acak.",
           "Masuk ke <code>MQL5\\Experts</code>, salin berkas <code>.ex5</code> atau <code>.mq5</code> ke situ.",
           "Kembali ke MT5, buka Navigator dengan <code>Ctrl+N</code>, klik kanan <code>Expert Advisors &rarr; Refresh</code>.",
           "Seret nama EA-nya ke chart mana pun.",
@@ -630,7 +646,7 @@ export const ARTIKEL: Artikel[] = [
       },
       {
         "jenis": "catatan",
-        "isi": "Kalau EA-nya perlu menghubungi alamat internet, alamat itu wajib dimasukkan ke <code>Tools &rarr; Options &rarr; Experts &rarr; Allow WebRequest for listed URL</code>. Tanpa itu EA berjalan tapi tidak mengirim apa-apa, dan tidak ada pesan galat yang menjelaskan."
+        "isi": "Kalau EA-nya perlu menghubungi alamat internet, alamat itu wajib dimasukkan ke <code>Tools &rarr; Options &rarr; Experts &rarr; Allow WebRequest for listed URL</code>. Tanpa itu EA berjalan tetapi tidak mengirim apa-apa, dan tidak ada pesan galat yang menjelaskan."
       },
       {
         "jenis": "h2",
@@ -645,7 +661,7 @@ export const ARTIKEL: Artikel[] = [
       },
       {
         "jenis": "p",
-        "isi": "Kalau EA-nya muncul di Navigator tapi tidak bisa diseret ke chart, biasanya yang tersalin cuma .mq5 dan belum pernah dikompilasi."
+        "isi": "Kalau EA-nya muncul di Navigator tetapi tidak bisa diseret ke chart, biasanya yang tersalin cuma .mq5 dan belum pernah dikompilasi."
       },
       {
         "jenis": "h2",
@@ -677,7 +693,7 @@ export const ARTIKEL: Artikel[] = [
     "slug": "cara-hitung-lot-forex-dan-akun-cent",
     "jenis": "edukasi",
     "judul": "Cara Hitung Lot Forex dari Risiko (dan Bedanya di Akun Cent)",
-    "ringkas": "Rumus lot yang berangkat dari jarak stop loss, bukan dari perasaan — plus koreksi yang wajib dipakai di akun cent.",
+    "ringkas": "Lot dihitung dari jarak stop loss, bukan dari perasaan. Di akun cent, hitungannya perlu satu koreksi.",
     "menit": 2,
     "gambar": "/artikel/gambar/cara-hitung-lot-forex-dan-akun-cent.webp",
     "isi": [
@@ -728,7 +744,7 @@ export const ARTIKEL: Artikel[] = [
           "<b>Saldo:</b> bagi 100 untuk mendapat nilai dolarnya.",
           "<b>Risiko:</b> hitung dari saldo dolarnya, bukan dari angka layar.",
           "<b>Lot:</b> 1 lot cent ≈ 0,01 lot standar.",
-          "<b>Jurnal:</b> seluruh P/L wajib dibagi 100. Kalau tidak, riwayatmu terbaca seratus kali lebih untung dari kenyataan."
+          "<b>Jurnal:</b> seluruh P/L wajib dibagi 100. Kalau tidak, riwayatmu terbaca seratus kali lebih untung daripada kenyataan."
         ]
       },
       {
@@ -741,7 +757,7 @@ export const ARTIKEL: Artikel[] = [
       },
       {
         "jenis": "p",
-        "isi": "Tidak ada yang salah dengan kalkulator. Yang salah adalah saat hitungan itu dilewati — dan ia paling sering dilewati persis di keadaan yang paling butuh: waktu harga bergerak cepat dan kamu takut ketinggalan."
+        "isi": "Tidak ada yang salah dengan kalkulator. Yang salah adalah saat hitungan itu dilewati — dan ia paling sering dilewati persis di keadaan yang paling membutuhkannya: ketika harga bergerak cepat dan kamu takut ketinggalan."
       },
       {
         "jenis": "p",
@@ -753,6 +769,248 @@ export const ARTIKEL: Artikel[] = [
         "slug": "akun-sen-mt5-jurnal-seratus-kali-lipat",
         "judul": "Akun Sen di MT5 Bisa Membuat Jurnalmu Terlihat 100× Lebih Untung",
         "gambar": "/artikel/gambar/akun-sen-mt5-jurnal-seratus-kali-lipat.webp"
+      },
+      {
+        "slug": "cara-membuat-jurnal-trading-di-excel",
+        "judul": "Cara Membuat Jurnal Trading di Excel (dan Kapan Excel Mulai Merepotkan)",
+        "gambar": "/artikel/gambar/cara-membuat-jurnal-trading-di-excel.webp"
+      }
+    ]
+  },
+  {
+    "slug": "copy-trade-wallet-empat-angka-yang-menipu",
+    "jenis": "edukasi",
+    "judul": "Copy Trade Wallet: Empat Angka yang Sering Menipu",
+    "ringkas": "Posisi dompet orang lain terbuka untuk siapa saja di bursa on-chain. Angka yang menyertainya tidak sejujur tampilannya.",
+    "menit": 2,
+    "gambar": "/artikel/gambar/copy-trade-wallet-empat-angka-yang-menipu.webp",
+    "isi": [
+      {
+        "jenis": "p",
+        "isi": "Kamu menemukan sebuah dompet dengan untung $400.000 di papan peringkat, lalu ingin mengikutinya. Naluri itu masuk akal, dan justru di situ letak masalahnya."
+      },
+      {
+        "jenis": "p",
+        "isi": "Di bursa perpetual on-chain, tiap transaksi tercatat terbuka. Siapa pun bisa melihat posisi dompet mana pun tanpa izin, tanpa akun, dan tanpa menunggu laporan bulanan. Keterbukaan itu nyata. Yang tidak ikut terbuka adalah konteksnya."
+      },
+      {
+        "jenis": "h2",
+        "isi": "Kenapa riwayat yang kamu lihat hampir selalu terpotong"
+      },
+      {
+        "jenis": "p",
+        "isi": "Hyperliquid memulangkan paling banyak 2.000 fill per dompet. Untuk dompet yang ramai, jumlah itu habis dalam satu sampai dua bulan terakhir saja."
+      },
+      {
+        "jenis": "p",
+        "isi": "Akibatnya, winrate yang tertulis di layar bukan winrate seumur hidup dompet tersebut, melainkan winrate dari 2.000 transaksi terakhirnya. Keduanya klaim yang berbeda, dan cuma satu yang bisa dibuktikan datanya."
+      },
+      {
+        "jenis": "h2",
+        "isi": "Kenapa umur dompet sering salah dibaca"
+      },
+      {
+        "jenis": "p",
+        "isi": "Umur biasanya dihitung dari transaksi tertua yang berhasil ditarik. Padahal umur sebenarnya ditentukan setoran pertama ke dompet itu."
+      },
+      {
+        "jenis": "p",
+        "isi": "Dompet berusia tiga tahun yang riwayatnya terpotong akan terbaca sebagai dompet berusia dua bulan. Kebalikannya juga terjadi: dompet baru yang langsung ramai terlihat lebih matang daripada kenyataannya."
+      },
+      {
+        "jenis": "h2",
+        "isi": "Kenapa RR yang terlalu bagus justru pertanda kurang data"
+      },
+      {
+        "jenis": "p",
+        "isi": "Rata-rata untung dibagi rata-rata rugi umumnya berkisar di angka satu sampai tiga. Data sungguhan dari papan peringkat pernah memulangkan 876 dan 429."
+      },
+      {
+        "jenis": "p",
+        "isi": "Angka itu benar secara hitungan. Artinya cuma satu: dompet tersebut hampir tidak pernah rugi berarti di jendela waktu yang terbaca. Ia tidak berarti dompet itu sepuluh kali lebih baik daripada dompet yang tertulis 87."
+      },
+      {
+        "jenis": "h2",
+        "isi": "Kenapa papan peringkat hanya bisa diurut dari untung terbesar"
+      },
+      {
+        "jenis": "p",
+        "isi": "Untung terbesar adalah satu-satunya angka yang bisa dipertanggungjawabkan dari sumber terbuka. Modal awal, target risiko, dan berapa akun lain yang dipegang orang yang sama tidak ikut terbaca."
+      },
+      {
+        "jenis": "p",
+        "isi": "Untung $400.000 dari modal $5 juta dan untung $400.000 dari modal $50.000 adalah dua hal yang sama sekali berbeda. Papan peringkat menampilkan keduanya di baris yang sama."
+      },
+      {
+        "jenis": "catatan",
+        "isi": "Karena itu papan peringkat di Wallet Tracking dipisah menurut pita ukuran akun. Membandingkan dompet kecil dengan dompet besar di satu daftar menghasilkan urutan yang tidak menjawab pertanyaan siapa pun."
+      },
+      {
+        "jenis": "h2",
+        "isi": "Yang berubah ketika dompet itu benar-benar kamu salin"
+      },
+      {
+        "jenis": "ul",
+        "isi": [
+          "<b>Harganya berbeda.</b> Order kamu masuk beberapa detik sesudah ordernya, dan di koin yang tipis selisih itu bukan angka kecil.",
+          "<b>Ukurannya berbeda.</b> Posisi yang aman untuk modal $5 juta bisa menghabiskan akun $2.000.",
+          "<b>Keluarnya tidak ikut tersalin.</b> Kebanyakan orang menyalin pembukaan posisi, lalu memutuskan sendiri kapan menutupnya — dan keputusan itulah yang menentukan hasilnya."
+        ]
+      },
+      {
+        "jenis": "h2",
+        "isi": "Kenapa tombol salinnya sengaja belum ada"
+      },
+      {
+        "jenis": "p",
+        "isi": "Di Jadi Trader, Dompet Pantauan masih berada di fase mencatat. Kamu bisa menambahkan alamat dompet, melihat apa yang sedang ia pegang, dan membaca apa yang baru saja ia lakukan. Tombol untuk menyalinnya belum dipasang."
+      },
+      {
+        "jenis": "p",
+        "isi": "Alasannya, menyalin dompet yang belum memiliki satu angka pun di penggaris kita sendiri sama saja dengan menyalin orang asing karena ia terlihat percaya diri."
+      },
+      {
+        "jenis": "p",
+        "isi": "Istilah bursanya pun ditulis apa adanya — Open Long, Close Short. Menerjemahkannya berarti menebak arti istilah dari bursa lain, dan istilah yang salah terjemah lebih membingungkan daripada istilah asing yang jujur."
+      },
+      {
+        "jenis": "catatan",
+        "isi": "Halaman ini menjelaskan cara membaca data, bukan rekomendasi untuk mengikuti dompet mana pun. Keputusan dan risikonya tetap milikmu."
+      }
+    ],
+    "terkait": [
+      {
+        "slug": "cara-hitung-lot-forex-dan-akun-cent",
+        "judul": "Cara Hitung Lot Forex dari Risiko (dan Bedanya di Akun Cent)",
+        "gambar": "/artikel/gambar/cara-hitung-lot-forex-dan-akun-cent.webp"
+      },
+      {
+        "slug": "cara-membuat-jurnal-trading-di-excel",
+        "judul": "Cara Membuat Jurnal Trading di Excel (dan Kapan Excel Mulai Merepotkan)",
+        "gambar": "/artikel/gambar/cara-membuat-jurnal-trading-di-excel.webp"
+      }
+    ]
+  },
+  {
+    "slug": "penghasilan-tetap-dari-trading",
+    "jenis": "edukasi",
+    "judul": "Penghasilan Tetap dari Trading: Kenapa Pertanyaannya Perlu Diganti",
+    "ringkas": "Trading tidak membayar jumlah tetap pada tanggal yang sama. Yang bisa dibuat tetap bukan penghasilannya, melainkan prosesnya.",
+    "menit": 2,
+    "gambar": "/artikel/gambar/penghasilan-tetap-dari-trading.webp",
+    "isi": [
+      {
+        "jenis": "p",
+        "isi": "Pertanyaannya hampir selalu muncul dalam bentuk yang sama: berapa modal supaya bisa mendapat Rp10 juta per bulan dari trading."
+      },
+      {
+        "jenis": "p",
+        "isi": "Kalau modalnya juga Rp10 juta, berarti dibutuhkan profit 100 persen setiap bulan. Itu bukan rencana, melainkan tekanan."
+      },
+      {
+        "jenis": "h2",
+        "isi": "Balik urutan hitungannya"
+      },
+      {
+        "jenis": "p",
+        "isi": "Mulai dari kebutuhan hidup, bukan dari modal yang kebetulan ada. Pada asumsi rata-rata 1 persen bersih per bulan, kebutuhan Rp10 juta menuntut modal sekitar Rp1 miliar. Pada asumsi 2 persen bersih per bulan, sekitar Rp500 juta."
+      },
+      {
+        "jenis": "p",
+        "isi": "Dua angka itu ilustrasi matematika, bukan tingkat imbal hasil yang dijamin siapa pun."
+      },
+      {
+        "jenis": "h2",
+        "isi": "Kenapa hitungan itu pun masih belum cukup"
+      },
+      {
+        "jenis": "p",
+        "isi": "Return tidak berbentuk gaji. Trading tidak membayar jumlah tetap pada tanggal yang sama tiap bulan. Ada bulan yang untung, bulan yang datar, dan periode drawdown yang panjangnya tidak bisa dipesan."
+      },
+      {
+        "jenis": "p",
+        "isi": "Kalau setiap bulan kamu wajib menarik uang, penarikan itu terjadi juga di bulan terburuk — persis ketika modalmu paling perlu dibiarkan utuh."
+      },
+      {
+        "jenis": "h2",
+        "isi": "Biaya yang jarang masuk hitungan"
+      },
+      {
+        "jenis": "ul",
+        "isi": [
+          "Biaya transaksi: spread, komisi, dan swap.",
+          "Pajak.",
+          "Inflasi.",
+          "Dana darurat di luar akun trading.",
+          "Penurunan modal saat drawdown.",
+          "Biaya kesehatan dan keluarga."
+        ]
+      },
+      {
+        "jenis": "h2",
+        "isi": "Struktur yang lebih masuk akal sebelum berhenti bekerja"
+      },
+      {
+        "jenis": "ol",
+        "isi": [
+          "<b>Dana hidup 12 sampai 24 bulan</b>, disimpan di luar akun trading.",
+          "<b>Modal trading yang terpisah</b> dari dana hidup itu.",
+          "<b>Track record yang sudah melewati berbagai kondisi pasar</b>, bukan cuma satu tren yang kebetulan searah.",
+          "<b>Batas drawdown yang ditulis sebelum dibutuhkan</b>, bukan ditentukan saat sedang rugi.",
+          "<b>Pendapatan cadangan</b> yang tidak bergantung pada hasil trading."
+        ]
+      },
+      {
+        "jenis": "h2",
+        "isi": "Satu angka yang menggantikan pertanyaan lama"
+      },
+      {
+        "jenis": "p",
+        "isi": "Ganti pertanyaan \"berapa profit saya bulan lalu\" dengan expectancy: berapa hasil rata-rata satu transaksi, dihitung dari seluruh sampel."
+      },
+      {
+        "jenis": "p",
+        "isi": "Rumusnya: (winrate × rata-rata profit) − (loss rate × rata-rata loss), memakai satuan R, yaitu besar risiko awal per posisi."
+      },
+      {
+        "jenis": "p",
+        "isi": "Contohnya. Winrate 40 persen dengan rata-rata profit 2R, loss rate 60 persen dengan rata-rata loss 1R. Hasilnya (0,4 × 2R) − (0,6 × 1R) = +0,2R per transaksi. Menang kurang dari separuh, hasilnya tetap positif."
+      },
+      {
+        "jenis": "p",
+        "isi": "Angka +0,2R bukan berarti tiap transaksi menghasilkan 0,2R. Hasil satu posisi tetap acak. Expectancy baru bermakna pada sampel yang cukup besar, dan selama cara eksekusinya konsisten."
+      },
+      {
+        "jenis": "h2",
+        "isi": "Yang benar-benar bisa dibuat tetap"
+      },
+      {
+        "jenis": "p",
+        "isi": "Bukan penghasilannya. Yang bisa dibuat tetap adalah hal-hal yang sepenuhnya ada di tanganmu:"
+      },
+      {
+        "jenis": "ul",
+        "isi": [
+          "Jam duduk di depan chart.",
+          "Ukuran risiko per posisi.",
+          "Jumlah setup yang ditunggu sebelum masuk.",
+          "Catatan tiap transaksi, termasuk yang rugi."
+        ]
+      },
+      {
+        "jenis": "p",
+        "isi": "Penghasilan yang stabil, kalau memang datang, datang sebagai akibat dari empat hal itu — bukan sebagai target yang bisa dipatok lebih dulu."
+      },
+      {
+        "jenis": "catatan",
+        "isi": "Halaman ini edukasi, bukan rekomendasi finansial. Tidak ada tingkat keuntungan yang dijamin di trading, dan kerugian adalah kemungkinan yang nyata."
+      }
+    ],
+    "terkait": [
+      {
+        "slug": "cara-hitung-lot-forex-dan-akun-cent",
+        "judul": "Cara Hitung Lot Forex dari Risiko (dan Bedanya di Akun Cent)",
+        "gambar": "/artikel/gambar/cara-hitung-lot-forex-dan-akun-cent.webp"
       },
       {
         "slug": "cara-membuat-jurnal-trading-di-excel",

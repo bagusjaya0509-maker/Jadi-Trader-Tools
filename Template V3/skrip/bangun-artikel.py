@@ -72,6 +72,12 @@ GAMBAR = {
         "/artikel/gambar/cara-pasang-ea-di-mt5-pc-dan-android.webp",
     "cara-hitung-lot-forex-dan-akun-cent":
         "/artikel/gambar/cara-hitung-lot-forex-dan-akun-cent.webp",
+    # Dua sampul sementara, dibuat dengan palet yang sama dengan
+    # sembilan lainnya. Diganti kalau nanti ada foto yang cocok.
+    "copy-trade-wallet-empat-angka-yang-menipu":
+        "/artikel/gambar/copy-trade-wallet-empat-angka-yang-menipu.webp",
+    "penghasilan-tetap-dari-trading":
+        "/artikel/gambar/penghasilan-tetap-dari-trading.webp",
 }
 GAMBAR_BAWAAN = "/artikel/gambar/cara-menghubungkan-mt5-ke-jurnal-trading-otomatis.webp"
 
