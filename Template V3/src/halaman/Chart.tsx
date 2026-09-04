@@ -2687,20 +2687,49 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
      "seandainya saya menguji silang EMA", bukan "saya mau melihat EMA di
      chart", dan yang kedua yang jauh lebih sering.
 
-     Panjang lariknya YANG menentukan jumlah garis. 9/21/50 sebagai bawaan
-     bukan selera acak: ketiganya yang paling sering dipakai untuk membaca
-     arah pendek, menengah, dan acuan — dan bawaan yang langsung berguna
-     membuat orang menyalakannya sekali, bukan membukanya lalu menutupnya
-     karena harus mengisi tiga kotak dulu. */
+     9/21/50 sebagai bawaan bukan selera acak: ketiganya yang paling sering
+     dipakai untuk membaca arah pendek, menengah, dan acuan — dan bawaan yang
+     langsung berguna membuat orang menyalakannya sekali, bukan membukanya
+     lalu menutupnya karena harus mengisi tiga kotak dulu.
+
+     ── TIGA PERIODE SELALU DISIMPAN, JUMLAHNYA MEMILIH BERAPA YANG DIPAKAI
+     Bentuk pertamanya memakai panjang larik sebagai jumlah garis, supaya
+     tidak ada dua medan yang bisa berselisih. Kedengarannya rapi dan
+     ternyata salah — terbukti waktu diuji di peramban: ketik 34 di kotak
+     kedua, tekan "1", tekan "3", dan angkanya kembali 21. Menurunkan
+     jumlahnya MEMOTONG lariknya, jadi tidak ada apa pun yang tersisa untuk
+     dikembalikan.
+
+     Sekarang lariknya selalu tiga dan `emaJumlah` memilih berapa yang
+     digambar. Keduanya tetap tidak bisa berselisih: tidak ada panjang yang
+     perlu disepakati, cuma satu angka yang menunjuk ke tiga yang selalu
+     ada. */
   const [tampilEma, setTampilEma] = useState(awal.ema ?? false);
-  const [emaPeriode, setEmaPeriode] = useState<number[]>(
-    Array.isArray(awal.emaPeriode) && awal.emaPeriode.length ? awal.emaPeriode : [9, 21, 50]
-  );
+  const [emaPeriode, setEmaPeriode] = useState<number[]>(() => {
+    const bawaan = [9, 21, 50];
+    const a = Array.isArray(awal.emaPeriode) ? awal.emaPeriode : [];
+    /* Dipadkan saat DIBACA, bukan dipercaya apa adanya: setelan tersimpan
+       dari bentuk pertama bisa berisi satu atau dua angka saja, dan larik
+       pendek akan membuat kotak ketiga menggambar `undefined`. */
+    return bawaan.map((b, i) => (Number.isFinite(Number(a[i])) ? Number(a[i]) : b));
+  });
+  const [emaJumlah, setEmaJumlah] = useState<number>(() => {
+    const n = Number(awal.emaJumlah);
+    if (Number.isFinite(n) && n >= 1 && n <= 3) return Math.round(n);
+    /* Belum ada medannya = setelan dari bentuk pertama. Di sana panjang
+       lariknya memang jumlahnya, jadi itu yang dibaca — tanpa ini, orang
+       yang sudah memilih satu garis mendapat tiga lagi setelah pemutakhiran. */
+    const lama = Array.isArray(awal.emaPeriode) ? awal.emaPeriode.length : 0;
+    return lama >= 1 && lama <= 3 ? lama : 3;
+  });
+  /* Yang benar-benar digambar. Dihitung sekali di sini supaya garis, menu,
+     dan ringkasan di bawah label semuanya membaca daftar yang SAMA. */
+  const emaDipakai = useMemo(() => emaPeriode.slice(0, emaJumlah), [emaPeriode, emaJumlah]);
 
   /* Simpan tiap kali salah satunya berubah. */
   useEffect(() => {
-    simpanSetelanChart({ simbol, tf, snr: tampilSnr, smi: tampilSmi, ema: tampilEma, emaPeriode });
-  }, [simbol, tf, tampilSnr, tampilSmi, tampilEma, emaPeriode]);
+    simpanSetelanChart({ simbol, tf, snr: tampilSnr, smi: tampilSmi, ema: tampilEma, emaPeriode, emaJumlah });
+  }, [simbol, tf, tampilSnr, tampilSmi, tampilEma, emaPeriode, emaJumlah]);
 
   const [tampilan, setTampilan] = useState(bacaTampilan);
   /* Cermin React dari preferensi pasar di lib/pasar. Sumber kebenarannya di
@@ -2932,7 +2961,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
        seperti garis harga di 200 bar pertama. */
     if (tampilEma && lilinGabung.closes.length) {
       const WARNA_EMA = ['#22d3ee', '#a78bfa', '#fb923c'];
-      emaPeriode.forEach((p, i) => {
+      emaDipakai.forEach((p, i) => {
         const n = Math.round(p);
         if (!isFinite(n) || n < 1) return;
         const deret = ema(lilinGabung.closes, n);
@@ -2956,7 +2985,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
     (pine?.plot ?? []).filter((p) => !p.osilator)
       .forEach((p) => keluar.push({ nama: p.judul, nilai: p.nilai, warna: p.warna }));
     return keluar;
-  }, [lilinGabung, set, pine, tampilEma, emaPeriode]);
+  }, [lilinGabung, set, pine, tampilEma, emaDipakai]);
 
   /* Zona dihitung sampai bar yang SEDANG tampil, bukan sampai bar terakhir.
      Selama replay, menggambar zona dari data masa depan adalah cara paling
@@ -4345,7 +4374,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                       <span className="min-w-0">
                         <span className="block text-[12px] text-zinc-200">EMA</span>
                         <span className="block truncate text-[10.5px] text-zinc-600">
-                          {tampilEma ? emaPeriode.map((p) => Math.round(p)).join(' · ') : 'Rata-rata bergerak eksponensial di panel harga'}
+                          {tampilEma ? emaDipakai.map((p) => Math.round(p)).join(' · ') : 'Rata-rata bergerak eksponensial di panel harga'}
                         </span>
                       </span>
                     </label>
@@ -4356,17 +4385,13 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                           <div className="ml-auto flex gap-0.5 rounded border border-zinc-800 p-0.5">
                             {[1, 2, 3].map((n) => (
                               <button key={n}
-                                onClick={() => setEmaPeriode((lama) => {
-                                  /* Periode yang sudah diketik DIPERTAHANKAN saat
-                                     jumlahnya naik-turun. Menyusun ulang dari
-                                     bawaan tiap kali angkanya diubah berarti
-                                     "3 → 1 → 3" diam-diam menghapus dua angka
-                                     yang baru saja diisi orangnya. */
-                                  const bawaan = [9, 21, 50];
-                                  return Array.from({ length: n }, (_, i) => lama[i] ?? bawaan[i]);
-                                })}
+                                /* Yang berubah CUMA berapa yang digambar.
+                                   Periodenya tidak disentuh sama sekali, jadi
+                                   "3 → 1 → 3" mengembalikan angka yang tadi
+                                   diketik — bukan bawaan. */
+                                onClick={() => setEmaJumlah(n)}
                                 className={cn('cursor-pointer rounded px-2 py-0.5 text-[11px] transition-colors',
-                                  emaPeriode.length === n ? 'bg-zinc-100 text-zinc-950' : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100')}>
+                                  emaJumlah === n ? 'bg-zinc-100 text-zinc-950' : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100')}>
                                 {n}
                               </button>
                             ))}
@@ -4375,7 +4400,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                         <div className="flex items-center gap-1.5">
                           <span className="shrink-0 text-[10.5px] text-zinc-500">Periode</span>
                           <div className="ml-auto flex gap-1">
-                            {emaPeriode.map((p, i) => (
+                            {emaDipakai.map((p, i) => (
                               <span key={i} className="relative">
                                 {/* Garis warna di bawah kotaknya — jawaban
                                     untuk "yang ungu itu yang mana" tanpa

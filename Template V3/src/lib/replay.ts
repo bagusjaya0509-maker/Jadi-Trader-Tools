@@ -174,13 +174,21 @@ export interface SetelanChart {
   smi: boolean;
   /** Overlay EMA di panel harga. */
   ema?: boolean;
-  /** Periode tiap garis EMA — panjang larik = jumlah garis (1–3).
-   *
-   *  JUMLAHNYA TIDAK DISIMPAN TERPISAH, dan itu disengaja: dua medan yang
-   *  harus sepakat ("jumlah: 2" tapi periodenya tiga) adalah dua medan yang
-   *  cepat atau lambat berselisih, dan yang berselisih di sini garis yang
-   *  digambar di atas uang orang. Panjang lariknya SUDAH jumlahnya. */
+  /** Periode KETIGA garis EMA, selalu tiga angka — termasuk yang sedang
+   *  tidak digambar. Lihat `emaJumlah`. */
   emaPeriode?: number[];
+  /** Berapa dari ketiga periode itu yang digambar (1–3).
+   *
+   *  Bentuk pertama tidak punya medan ini: panjang lariknya yang dianggap
+   *  jumlahnya, supaya tidak ada dua medan yang bisa berselisih. Itu terbukti
+   *  salah saat diuji di peramban — menurunkan jumlahnya MEMOTONG lariknya,
+   *  jadi periode yang sudah diketik lenyap dan menaikkannya lagi
+   *  mengembalikan bawaan, bukan angka orangnya.
+   *
+   *  Dua medan ini tidak bisa berselisih seperti yang dulu ditakutkan:
+   *  lariknya selalu tiga (dipadkan saat dibaca), dan medan ini cuma
+   *  memilih berapa yang dipakai. Tidak ada panjang yang perlu disepakati. */
+  emaJumlah?: number;
 }
 
 const KUNCI_SETELAN = 'jt.chartSetelan';
