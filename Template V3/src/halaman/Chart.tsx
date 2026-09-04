@@ -26,7 +26,7 @@ import { PanelDex } from '@/components/panel-dex';
 import type { AlatPegang, GambarAlat } from '@/lib/plugin-alat';
 import type { HasilPine } from '@/lib/pine';
 import { bacaSetelanChart, simpanSetelanChart, usulSlTp } from '@/lib/replay';
-import { atr } from '@/lib/jt-scan-core';
+import { atr, ema } from '@/lib/jt-scan-core';
 import { ambilKlines, ambilKlinesSebelum, aturPasarKripto, bacaAcuanMt5, bacaNamaMt5, bacaPasar, bacaSpekMt5, bacaTickMt5, daftarSimbolMt5, pasarKripto, type Lilin } from '@/lib/pasar';
 import { useAkunMt5, segarkanAkunMt5 } from '@/lib/akun';
 /* Langsung dari admin, BUKAN lewat usePosisi(): yang dibutuhkan di sini
@@ -2680,10 +2680,27 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
   const [tampilSnr, setTampilSnr] = useState(awal.snr ?? false);
   const [tampilSmi, setTampilSmi] = useState(awal.smi ?? true);
 
+  /* ── EMA: SATU SAMPAI TIGA GARIS, PERIODENYA MILIK PEMAKAINYA ─────────
+     EMA sudah ada di berkas ini sejak lama, tapi cuma sebagai bagian dari
+     STRATEGI backtest ('ema' vs 'smi') — garisnya muncul kalau strateginya
+     dipilih, dan periodenya ikut parameter uji. Itu menjawab pertanyaan
+     "seandainya saya menguji silang EMA", bukan "saya mau melihat EMA di
+     chart", dan yang kedua yang jauh lebih sering.
+
+     Panjang lariknya YANG menentukan jumlah garis. 9/21/50 sebagai bawaan
+     bukan selera acak: ketiganya yang paling sering dipakai untuk membaca
+     arah pendek, menengah, dan acuan — dan bawaan yang langsung berguna
+     membuat orang menyalakannya sekali, bukan membukanya lalu menutupnya
+     karena harus mengisi tiga kotak dulu. */
+  const [tampilEma, setTampilEma] = useState(awal.ema ?? false);
+  const [emaPeriode, setEmaPeriode] = useState<number[]>(
+    Array.isArray(awal.emaPeriode) && awal.emaPeriode.length ? awal.emaPeriode : [9, 21, 50]
+  );
+
   /* Simpan tiap kali salah satunya berubah. */
   useEffect(() => {
-    simpanSetelanChart({ simbol, tf, snr: tampilSnr, smi: tampilSmi });
-  }, [simbol, tf, tampilSnr, tampilSmi]);
+    simpanSetelanChart({ simbol, tf, snr: tampilSnr, smi: tampilSmi, ema: tampilEma, emaPeriode });
+  }, [simbol, tf, tampilSnr, tampilSmi, tampilEma, emaPeriode]);
 
   const [tampilan, setTampilan] = useState(bacaTampilan);
   /* Cermin React dari preferensi pasar di lib/pasar. Sumber kebenarannya di
@@ -2899,6 +2916,34 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
      DockPine memang menerima lilinGabung. */
   const garis: Garis[] = useMemo(() => {
     const keluar: Garis[] = [];
+
+    /* ── EMA INDIKATOR — terpisah dari EMA strategi di bawah ────────────
+       Warnanya sengaja BEDA dari pasangan kuning/biru milik backtest. Dua
+       hal berbeda yang kebetulan sama-sama bernama EMA, digambar dengan
+       warna yang sama, adalah chart yang tidak bisa dibaca sendiri: satu
+       mengikuti parameter uji, satu lagi mengikuti kotak yang baru diisi
+       orangnya.
+
+       WARM-UP DISEMBUNYIKAN. `ema()` di jt-scan-core memulai deretnya dari
+       harga penutupan PERTAMA, jadi bar-bar awal masih setengah benih dan
+       setengah rata-rata. Nilainya tidak diubah — yang disembunyikan cuma
+       `periode - 1` bar pertamanya, supaya garisnya mulai di tempat ia
+       benar-benar berarti. Menggambarnya utuh membuat EMA 200 terlihat
+       seperti garis harga di 200 bar pertama. */
+    if (tampilEma && lilinGabung.closes.length) {
+      const WARNA_EMA = ['#22d3ee', '#a78bfa', '#fb923c'];
+      emaPeriode.forEach((p, i) => {
+        const n = Math.round(p);
+        if (!isFinite(n) || n < 1) return;
+        const deret = ema(lilinGabung.closes, n);
+        keluar.push({
+          nama: `EMA ${n}`,
+          nilai: deret.map((v: number, j: number) => (j < n - 1 ? null : v)),
+          warna: WARNA_EMA[i % WARNA_EMA.length],
+        });
+      });
+    }
+
     if (set.strategi === 'ema' && lilinGabung.closes.length) {
       const g = garisIndikator(lilinGabung, set);
       keluar.push({ nama: `EMA ${set.emaCepat}`, nilai: g.cepat ?? [], warna: '#fbbf24' });
@@ -2911,7 +2956,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
     (pine?.plot ?? []).filter((p) => !p.osilator)
       .forEach((p) => keluar.push({ nama: p.judul, nilai: p.nilai, warna: p.warna }));
     return keluar;
-  }, [lilinGabung, set, pine]);
+  }, [lilinGabung, set, pine, tampilEma, emaPeriode]);
 
   /* Zona dihitung sampai bar yang SEDANG tampil, bukan sampai bar terakhir.
      Selama replay, menggambar zona dari data masa depan adalah cara paling
@@ -4253,9 +4298,12 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                   menuInd ? 'border-zinc-600 text-zinc-100' : 'border-zinc-800 text-zinc-300 hover:border-zinc-700 hover:text-zinc-100')}>
                 <Layers className="size-3.5" />
                 <span className="hidden sm:inline">Indikator</span>
-                {(Number(tampilSnr) + Number(tampilSmi) + (pineInfo ? 1 : 0)) > 0 && (
+                {/* EMA dihitung SATU, bukan sebanyak garisnya: yang
+                    dihitung lencana ini adalah berapa indikator yang
+                    menyala, dan tiga garis EMA tetap satu indikator. */}
+                {(Number(tampilSnr) + Number(tampilSmi) + Number(tampilEma) + (pineInfo ? 1 : 0)) > 0 && (
                   <span className="rounded bg-zinc-800 px-1 text-[10px] text-zinc-300">
-                    {Number(tampilSnr) + Number(tampilSmi) + (pineInfo ? 1 : 0)}
+                    {Number(tampilSnr) + Number(tampilSmi) + Number(tampilEma) + (pineInfo ? 1 : 0)}
                   </span>
                 )}
                 <ChevronDown className="hidden size-3 sm:block" />
@@ -4283,6 +4331,91 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                         <span className="block truncate text-[10.5px] text-zinc-600">Panel osilator di bawah chart</span>
                       </span>
                     </label>
+                    {/* ── EMA ─────────────────────────────────────────
+                        Setelannya TERBUKA DI TEMPAT, bukan di balik ikon
+                        gerigi. Yang diatur cuma empat ketukan (jumlah dan
+                        tiga angka), dan menyembunyikannya di satu lapis
+                        lagi berarti tiap penyesuaian kecil menuntut dua
+                        pembukaan menu. Ia cuma tampil saat EMA-nya menyala,
+                        jadi menu ini tidak melebar untuk orang yang tidak
+                        memakainya. */}
+                    <label className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors hover:bg-zinc-900">
+                      <input type="checkbox" checked={tampilEma} onChange={(e) => setTampilEma(e.target.checked)}
+                             className="size-3.5 cursor-pointer accent-emerald-500" />
+                      <span className="min-w-0">
+                        <span className="block text-[12px] text-zinc-200">EMA</span>
+                        <span className="block truncate text-[10.5px] text-zinc-600">
+                          {tampilEma ? emaPeriode.map((p) => Math.round(p)).join(' · ') : 'Rata-rata bergerak eksponensial di panel harga'}
+                        </span>
+                      </span>
+                    </label>
+                    {tampilEma && (
+                      <div className="mb-1 ml-8 mr-2 space-y-1.5 rounded-md border border-zinc-800/70 bg-zinc-900/40 px-2.5 py-2">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10.5px] text-zinc-500">Jumlah garis</span>
+                          <div className="ml-auto flex gap-0.5 rounded border border-zinc-800 p-0.5">
+                            {[1, 2, 3].map((n) => (
+                              <button key={n}
+                                onClick={() => setEmaPeriode((lama) => {
+                                  /* Periode yang sudah diketik DIPERTAHANKAN saat
+                                     jumlahnya naik-turun. Menyusun ulang dari
+                                     bawaan tiap kali angkanya diubah berarti
+                                     "3 → 1 → 3" diam-diam menghapus dua angka
+                                     yang baru saja diisi orangnya. */
+                                  const bawaan = [9, 21, 50];
+                                  return Array.from({ length: n }, (_, i) => lama[i] ?? bawaan[i]);
+                                })}
+                                className={cn('cursor-pointer rounded px-2 py-0.5 text-[11px] transition-colors',
+                                  emaPeriode.length === n ? 'bg-zinc-100 text-zinc-950' : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100')}>
+                                {n}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="shrink-0 text-[10.5px] text-zinc-500">Periode</span>
+                          <div className="ml-auto flex gap-1">
+                            {emaPeriode.map((p, i) => (
+                              <span key={i} className="relative">
+                                {/* Garis warna di bawah kotaknya — jawaban
+                                    untuk "yang ungu itu yang mana" tanpa
+                                    perlu menebak dari urutannya.
+
+                                    Kotaknya w-12 (48 px), DIUKUR bukan
+                                    dikira-kira: menunya w-72 (288 px),
+                                    dikurangi ml-8/mr-2 dan px-2.5 tersisa
+                                    ±228 px untuk label "Periode" (±48),
+                                    tiga kotak, dan dua celah. Pada 3,4rem
+                                    jumlahnya 225 px — muat, tapi tanpa sisa
+                                    sama sekali, dan satu piksel pembulatan
+                                    font cukup untuk melemparkan kotak
+                                    ketiga ke baris berikutnya. */}
+                                <input
+                                  type="number" min={1} max={500} value={p}
+                                  onChange={(e) => {
+                                    const n = Number(e.target.value);
+                                    setEmaPeriode((lama) => lama.map((x, j) => (j === i ? n : x)));
+                                  }}
+                                  onBlur={(e) => {
+                                    /* Dijepit saat SELESAI mengetik, bukan tiap
+                                       ketukan: menjepit di onChange membuat
+                                       kotak kosong langsung terisi 1 dan angka
+                                       "50" mustahil diketik dari "5". */
+                                    const n = Math.round(Number(e.target.value));
+                                    const aman = !isFinite(n) || n < 1 ? 9 : Math.min(500, n);
+                                    setEmaPeriode((lama) => lama.map((x, j) => (j === i ? aman : x)));
+                                  }}
+                                  className="w-12 rounded border border-zinc-800 bg-zinc-950 px-1 py-0.5 text-center text-[11px] text-zinc-200 outline-none focus:border-zinc-600"
+                                />
+                                <span className="pointer-events-none absolute inset-x-1.5 -bottom-px h-px"
+                                      style={{ background: ['#22d3ee', '#a78bfa', '#fb923c'][i % 3] }} />
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="mt-1 flex items-center justify-between border-t border-zinc-800/70 px-2 pb-1 pt-1.5">
                       <span className="text-[10px] font-medium uppercase tracking-wider text-zinc-600">Pine Script</span>
                       <button onClick={() => bukaDock('editor')}
