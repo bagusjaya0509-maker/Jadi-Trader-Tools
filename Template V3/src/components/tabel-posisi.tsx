@@ -26,6 +26,10 @@ export interface BarisPosisi {
   kunci: string;
   simbol: string;
   arah: 'BUY' | 'SELL';
+  /** Bursa tempat posisi ini BENAR-BENAR berada. Dibawa sampai ke perintah
+   *  tutup/ubah — lihat `bursaPosisi()` soal kenapa menebaknya dari chart
+   *  mengirim perintah ke bursa yang salah. */
+  bursa?: 'binance' | 'hyperliquid';
   /** Alasan baris ini patut diragukan, siap tampil. Kosong = tidak ada.
    *
    *  Dipakai posisi yang datang dari dokumen publik screener: dokumen itu

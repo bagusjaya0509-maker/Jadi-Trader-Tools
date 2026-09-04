@@ -1437,6 +1437,7 @@ export default function ChartBacktest() {
         await ubahSlTpNyata({
           symbol: sunting.simbol,
           side: sunting.arah,
+          bursa: sunting.bursa,
           sl: slBaru || undefined,
           slQuantity: slBaru ? qty : undefined,
           tp1: tpBaru || undefined,
@@ -1822,6 +1823,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
           symbol: sunting.simbol,
           orderId: sunting.tiket ?? '',
           isAlgo: asli?.algo ?? false,
+          bursa: sunting.bursa,
         });
         /* Garis SENGAJA tidak dihapus di sini. Yang baru terjadi cuma
            "Binance menerima perintahnya"; pembuktiannya menunggu order itu
@@ -1834,6 +1836,11 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
         const milik = orderBursa.filter((x) => x.simbol === sunting.simbol);
         await tutupPosisiNyata({
           symbol: sunting.simbol, side: sunting.arah, quantity: sunting.ukuran,
+          /* Bursa POSISINYA, bukan bursa chartnya. Tanpa ini, tiap koin yang
+             terdaftar di Binance DAN Hyperliquid dikirim ke Binance — dan
+             perintah tutup di bursa yang tidak punya posisinya tidak
+             melakukan apa pun. Lihat bursaPosisi() di data/contoh.ts. */
+          bursa: sunting.bursa,
         });
         /* SEMUA stop dibersihkan setelah posisinya tertutup. Stop yatim
            yang tertinggal tidak melakukan apa-apa hari ini — lalu menembak

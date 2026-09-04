@@ -423,6 +423,9 @@ export interface UbahSlTp {
   tp1?: number;
   tp1Quantity?: number;
   oldTp1OrderId?: string;
+  /** Bursa tempat posisinya berada; mengalahkan tebakan dari pasar chart.
+   *  Alasan lengkapnya di `tutupPosisiNyata`. */
+  bursa?: 'binance' | 'hyperliquid';
 }
 
 export async function ubahSlTpNyata(p: UbahSlTp): Promise<void> {
@@ -432,7 +435,7 @@ export async function ubahSlTpNyata(p: UbahSlTp): Promise<void> {
   const r = await fetch(`${dasar}/api/trade/futures/edit-sltp`, {
     method: 'POST',
     headers: { 'X-App-Token': token.trim(), 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...p, ...medanBursa(p.symbol) }),
+    body: JSON.stringify({ ...p, ...medanBursa(p.symbol), ...(p.bursa ? { bursa: p.bursa } : {}) }),
   });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) {
@@ -491,7 +494,11 @@ export async function kejarPendingNyata(p: {
   };
 }
 
-export async function batalPendingNyata(p: { symbol: string; orderId: string; isAlgo?: boolean }): Promise<void> {
+export async function batalPendingNyata(p: {
+  symbol: string; orderId: string; isAlgo?: boolean;
+  /** Lihat `tutupPosisiNyata`. */
+  bursa?: 'binance' | 'hyperliquid';
+}): Promise<void> {
   const { url, token } = bacaKoneksi();
   const dasar = (url.trim() || PROXY_BAWAAN).replace(/\/+$/, '');
   if (!token.trim()) throw new Error('App Token belum diisi di Integrations.');
@@ -505,7 +512,7 @@ export async function batalPendingNyata(p: { symbol: string; orderId: string; is
     method: 'POST',
     headers: { 'X-App-Token': token.trim(), 'Content-Type': 'application/json' },
     body: JSON.stringify({ symbol: p.symbol, orderId: p.orderId, isAlgo: p.isAlgo !== false,
-                           ...medanBursa(p.symbol) }),
+                           ...medanBursa(p.symbol), ...(p.bursa ? { bursa: p.bursa } : {}) }),
   });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(typeof j?.error === 'object' ? (j.error.msg ?? JSON.stringify(j.error)) : (j?.error ?? `Backend menjawab ${r.status}`));
@@ -517,6 +524,11 @@ export async function batalPendingNyata(p: { symbol: string; orderId: string; is
 export async function tutupPosisiNyata(p: {
   symbol: string; side: 'BUY' | 'SELL'; quantity: number;
   slOrderId?: string; tp1OrderId?: string;
+  /** Bursa tempat posisinya BERADA. Kalau diisi, ia mengalahkan tebakan
+   *  dari pasar chart — dan itu memang yang benar: yang menentukan ke mana
+   *  perintah tutup dikirim adalah di mana posisinya dibuka, bukan dari
+   *  bursa mana lilinnya kebetulan digambar. */
+  bursa?: 'binance' | 'hyperliquid';
 }): Promise<void> {
   const { url, token } = bacaKoneksi();
   const dasar = (url.trim() || PROXY_BAWAAN).replace(/\/+$/, '');
@@ -524,7 +536,10 @@ export async function tutupPosisiNyata(p: {
   const r = await fetch(`${dasar}/api/trade/futures/close`, {
     method: 'POST',
     headers: { 'X-App-Token': token.trim(), 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...p, ...medanBursa(p.symbol) }),
+    /* Urutannya menentukan: `medanBursa` DULU sebagai cadangan, lalu
+       `p.bursa` menimpanya kalau pemanggilnya tahu. Dibalik, tebakan chart
+       akan menimpa fakta posisinya. */
+    body: JSON.stringify({ ...p, ...medanBursa(p.symbol), ...(p.bursa ? { bursa: p.bursa } : {}) }),
   });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(typeof j?.error === 'object' ? (j.error.msg ?? JSON.stringify(j.error)) : (j?.error ?? `Backend menjawab ${r.status}`));

@@ -8,7 +8,7 @@ import { kirimPerintahMt5, tungguHasilMt5 } from '@/lib/mt5-order';
 import { useHargaPasar } from '@/lib/harga';
 import { bacaSpekMt5 } from '@/lib/pasar';
 import { TabelPosisi, type BarisPosisi } from '@/components/tabel-posisi';
-import type { Sumber } from '@/data/contoh';
+import { bursaPosisi, type Sumber } from '@/data/contoh';
 import { simbolDasarMt5 } from '@/lib/simbol';
 import { cariStopNyasar } from '@/lib/stop-nyasar';
 import { batalPendingNyata, kejarPendingNyata } from '@/lib/order-nyata';
@@ -58,6 +58,13 @@ export interface OrderSunting {
   ukuran: number;
   /** Tiket MT5, atau id order pending kripto. */
   tiket?: string;
+  /** Bursa tempat posisinya berada — 'binance' atau 'hyperliquid'. Kosong
+   *  untuk MT5 dan untuk baris yang bursanya memang tidak diketahui.
+   *
+   *  Dioper apa adanya ke perintah tutup/ubah supaya server tidak perlu
+   *  menebak. Tebakan servernya sendiri ("ada di Binance? ke Binance")
+   *  memilih bursa yang salah untuk tiap koin yang terdaftar di dua-duanya. */
+  bursa?: 'binance' | 'hyperliquid';
   /** Berapa order yang diringkas jadi satu baris. Terisi HANYA untuk baris
    *  gabungan; undefined berarti order tunggal yang sungguhan.
    *
@@ -377,6 +384,8 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
         const kini = kriptoContoh ? p.hargaKini : hargaPasar[p.simbol];
         return {
           kunci: p.id, simbol: p.simbol, arah: p.arah,
+          /* Dari posisinya sendiri, bukan dari chart. Lihat bursaPosisi(). */
+          bursa: bursaPosisi(p.venue) ?? undefined,
           /* Nama dompetnya, bukan sekadar "copy". Yang ditanyakan orang saat
              melihat ikon itu bukan "ini salinan?" melainkan "salinan SIAPA" —
              dan jawabannya menentukan apakah ia mau menahannya atau tidak. */
@@ -537,6 +546,7 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
     return {
       pasar: sumber === 'kripto' ? 'kripto' : 'mt5',
       jenis: 'posisi',
+      bursa: b.bursa,
       /* Nama DASAR, bukan nama broker: chart & tick dikirim EA dengan
          nama dasar. */
       simbolChart: sumber === 'kripto' ? b.simbol : `MT5:${simbolDasarMt5(b.simbol)}`,

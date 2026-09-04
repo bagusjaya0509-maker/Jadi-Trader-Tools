@@ -61,6 +61,34 @@ export interface Posisi {
   pnlFloat?: number;
 }
 
+/** Bursa tujuan PERINTAH untuk sebuah posisi — ditentukan oleh posisinya
+ *  sendiri, bukan oleh pasar yang kebetulan sedang digambar chart.
+ *
+ *  ── KENAPA INI ADA ────────────────────────────────────────────────────
+ *  Tombol Tutup dulu menurunkan bursanya dari `bacaPasar(simbol)` — pasar
+ *  yang dipakai proxy MENGGAMBAR LILIN simbol itu. Untuk koin yang cuma ada
+ *  di satu bursa jawabannya kebetulan selalu benar, dan itu yang membuatnya
+ *  bertahan lama: CASHCAT, koin yang jadi alasan jalur Hyperliquid dibangun,
+ *  memang tidak ada di Binance.
+ *
+ *  ASTER ada di keduanya. Posisinya dibuka di Hyperliquid, chartnya digambar
+ *  dari Binance, jadi perintah tutupnya dikirim — dengan yakin, lewat medan
+ *  `bursa` yang tegas — ke bursa yang tidak punya posisi itu. Dilaporkan
+ *  pemilik 5 Sep 2026: "nyoba tutup ASTER yang pakai Hyperliquid tapi kok
+ *  ga mau ketutup".
+ *
+ *  Yang tahu jawabannya sudah ada sejak awal: `venue`, dibaca dari jawaban
+ *  bursa dan ditampilkan di barisnya sendiri. Ia cuma tidak pernah ikut
+ *  sampai ke perintahnya.
+ *
+ *  `null` untuk Simulasi & MT5 — keduanya bukan bursa kripto, dan menebak
+ *  salah satunya untuk mereka lebih buruk daripada diam. */
+export function bursaPosisi(venue: Posisi['venue']): 'binance' | 'hyperliquid' | null {
+  if (venue === 'Hyperliquid') return 'hyperliquid';
+  if (venue === 'Binance Live') return 'binance';
+  return null;
+}
+
 const HARI = 86_400_000;
 const skrg = Date.now();
 
