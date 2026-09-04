@@ -2099,25 +2099,6 @@ export function PanelWalletAgen({ pemilik = false, tab: tabLuar }: {
       ) : (<>
 
       {pemilik && <FormTambah selesai={() => void tarik()} />}
-      {dialogSalin && (
-        <DialogSalin
-          w={dialogSalin}
-          awal={salinPeta.get(dialogSalin.alamat)}
-          maksLipat={isiSalin.maksLipat}
-          tutup={() => setDialogSalin(null)}
-          simpan={async (v) => {
-            const h = await simpanSalin({ alamat: dialogSalin.alamat, nama: dialogSalin.nama, ...v });
-            if (!h.ok) { alert(h.pesan || 'Gagal menyimpan.'); return; }
-            setIsiSalin(await daftarSalin());
-            setDialogSalin(null);
-          }}
-          hapus={async () => {
-            const h = await hapusSalin(dialogSalin.alamat);
-            if (!h.ok) { alert(h.pesan || 'Gagal menghapus.'); return; }
-            setIsiSalin(await daftarSalin());
-            setDialogSalin(null);
-          }} />
-      )}
 
       {/* Papan peringkat di ATAS daftar dompet, bukan di bawah. Yang dicari
           orang saat membuka panel ini pada hari-hari awal adalah "dompet
@@ -2189,6 +2170,41 @@ export function PanelWalletAgen({ pemilik = false, tab: tabLuar }: {
         </>
       )}
       </>)}
+
+      {/* ── DIALOG DI LUAR PERCABANGAN TAB ──────────────────────────────
+          Dulu ia duduk DI DALAM cabang "bukan salin". Akibatnya dialog
+          setelan salin cuma bisa tergambar dari tab Dompet Pantauan —
+          sementara dari tab Posisi Copy, menekan barisnya memanggil `buka`,
+          keadaannya berubah, dan TIDAK ADA APA-APA yang muncul. Bukan galat,
+          bukan pesan: cuma tidak terjadi apa-apa, yaitu bentuk kegagalan yang
+          paling lama tidak dilaporkan orang karena tidak ada yang bisa
+          ditunjuk.
+
+          Ditemukan 4 Sep 2026 dengan menekan barisnya di peramban pemilik dan
+          memeriksa pohon aksesibilitasnya: keadaan berubah, portalnya tidak
+          pernah ada.
+
+          Sekarang ia berdiri di luar percabangan — satu-satunya tempat yang
+          benar untuk sesuatu yang bisa dipanggil dari kedua tab. */}
+      {dialogSalin && (
+        <DialogSalin
+          w={dialogSalin}
+          awal={salinPeta.get(dialogSalin.alamat)}
+          maksLipat={isiSalin.maksLipat}
+          tutup={() => setDialogSalin(null)}
+          simpan={async (v) => {
+            const h = await simpanSalin({ alamat: dialogSalin.alamat, nama: dialogSalin.nama, ...v });
+            if (!h.ok) { alert(h.pesan || 'Gagal menyimpan.'); return; }
+            setIsiSalin(await daftarSalin());
+            setDialogSalin(null);
+          }}
+          hapus={async () => {
+            const h = await hapusSalin(dialogSalin.alamat);
+            if (!h.ok) { alert(h.pesan || 'Gagal menghapus.'); return; }
+            setIsiSalin(await daftarSalin());
+            setDialogSalin(null);
+          }} />
+      )}
     </div>
   );
 }
