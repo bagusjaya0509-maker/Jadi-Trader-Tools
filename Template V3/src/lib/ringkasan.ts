@@ -121,7 +121,12 @@ export function useRingkasanAkun() {
   const adaBulanLalu = kurvaSaldo.some((k) => k.lalu !== null);
   const awalKurva = titikIni[0]?.ini ?? saldoAwal;
   const akhirKurva = titikIni[titikIni.length - 1]?.ini ?? saldoAwal;
-  const selisihSaldo = awalKurva ? ((akhirKurva - awalKurva) / Math.abs(awalKurva)) * 100 : 0;
+  /* SATU pembilang dan SATU pagar untuk keduanya. Ditulis terpisah, celahnya
+     terbuka lagi di tempat lain: kalau `awalKurva` nol, persennya dijawab 0
+     sementara dolarnya tetap sebesar saldo penuh — "+0,0%  +$1.410,30",
+     bentuk lain dari cacat yang sama. */
+  const selisihUang = awalKurva ? akhirKurva - awalKurva : 0;
+  const selisihSaldo = awalKurva ? (selisihUang / Math.abs(awalKurva)) * 100 : 0;
 
   /* `Math.min()` tanpa argumen memulangkan Infinity, dan Infinity yang lolos
      ke layar tampil sebagai umur akun yang mustahil. Jadi daftar kosong
@@ -141,9 +146,9 @@ export function useRingkasanAkun() {
     bersih: Number(stat.bersih.toFixed(2)),
     kurva: titikIni.map((x) => x.ini as number),
     tumbuh: Number(selisihSaldo.toFixed(1)),
-    tumbuhUang: Number((akhirKurva - awalKurva).toFixed(2)),
+    tumbuhUang: Number(selisihUang.toFixed(2)),
     sejak,
-  }), [totalSaldo, stat.jumlah, stat.winrate, stat.bersih, kurvaSaldo, selisihSaldo, awalKurva, akhirKurva, sejak]);
+  }), [totalSaldo, stat.jumlah, stat.winrate, stat.bersih, kurvaSaldo, selisihSaldo, selisihUang, sejak]);
 
   return {
     /* Bahan mentah, supaya layar tidak memanggil hook yang sama dua kali. */
