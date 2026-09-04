@@ -50,6 +50,17 @@ export interface PenandaPine {
 }
 export interface KotakPine {
   kiri: number; atas: number; kanan: number; bawah: number;
+  /* ── TEKS DI DALAM KOTAK ─────────────────────────────────────────────
+     `box.new(..., text="Supply Zone")`. Dulu argumen ini diurai lalu
+     dibuang, jadi zona yang di TradingView bernama "Supply Zone" /
+     "Demand Zone" muncul di sini sebagai bidang warna tanpa keterangan —
+     dan zona tanpa nama menuntut orangnya mengingat warna mana berarti
+     apa, tiap kali. Dilaporkan pemilik 4 Sep 2026 sambil menyandingkan
+     layar TradingView-nya. */
+  teks?: string;
+  warnaTeks?: string;
+  rataH?: 'left' | 'center' | 'right';
+  rataV?: 'top' | 'center' | 'bottom';
   /* null = tidak digambar. Warna `na` di Pine berarti TAK TERLIHAT, bukan
      "pakai warna bawaan" — kotak isi-saja tampil tanpa bingkai, kotak
      bingkai-saja tampil tanpa isi. */
@@ -881,8 +892,28 @@ class Mesin {
       case 'dayofmonth': return bagianWaktu(this.l.times[this.bar] ?? 0, '').tanggal;
     }
     if (/^color\./.test(nama)) return WARNA[nama.slice(6)] ?? '#a1a1aa';
-    /* Konstanta gaya/tempat: nilainya namanya sendiri. */
-    if (/^(extend|line\.style_|label\.style_|box\.style_|shape|size|location|position|xloc|yloc|display|format|alert|plot\.style_|hline\.style_|barmerge|scale|order|font)\b/.test(nama) || /\.(style_|freq_)/.test(nama)) {
+    /* Konstanta gaya/tempat: nilainya namanya sendiri.
+       ---------------------------------------------------------------
+       `text.align_*` / `text.size_*` masuk lewat regex KEDUA, bukan yang
+       pertama. Itu bukan selera: yang pertama diakhiri ``, dan ``
+       menuntut batas kata SESUDAH potongannya. Sesudah `align_` selalu ada
+       huruf (`right`, `left`), jadi `text\.align_` TIDAK PERNAH cocok
+       dengan `text.align_right` — persis sebab yang sama membuat
+       `line\.style_` di daftar itu juga tidak pernah terpakai; yang
+       benar-benar melayaninya selama ini regex kedua. Ditulis di sini
+       supaya penambah berikutnya tidak mengulang kesalahan yang sama.
+
+       `text` tidak dimasukkan sebagai kata telanjang: ia nama variabel yang
+       wajar dibuat orang di skripnya sendiri, dan meloloskannya akan
+       membuat variabel itu diam-diam bernilai namanya sendiri.
+
+       Ketiadaannya bukan cacat kecil. Baris `box.new(...,
+       text_halign=text.align_right)` GAGAL SELURUHNYA -- bukan cuma
+       perataannya yang hilang, melainkan kotaknya tidak pernah lahir. Itu
+       yang membuat zona Supply/Demand hilang dari chart sementara skrip
+       yang sama menggambarnya di TradingView; dilaporkan pemilik 4 Sep
+       2026 sambil menyandingkan kedua layar. */
+    if (/^(extend|line\.style_|label\.style_|box\.style_|shape|size|location|position|xloc|yloc|display|format|alert|plot\.style_|hline\.style_|barmerge|scale|order|font)\b/.test(nama) || /\.(style_|freq_|align_|size_|wrap_)/.test(nama)) {
       return nama;
     }
     this.err(baris, `variabel "${nama}" belum didefinisikan`);
@@ -1219,6 +1250,14 @@ class Mesin {
             left: dapat('left', 0), top: dapat('top', 1), right: dapat('right', 2), bottom: dapat('bottom', 3),
             bgcolor: warnaOpsi('bgcolor', -1, 'rgba(160,160,160,.15)'),
             border_color: warnaOpsi('border_color', -1, '#a1a1aa'),
+            /* Semuanya lewat NAMA saja, tanpa posisi: di Pine keempatnya
+               memang cuma bisa dikirim bernama, dan menebak posisi untuk
+               argumen yang tidak punya posisi adalah cara membaca warna
+               sebagai teks. */
+            text: dapat('text', -1),
+            text_color: warnaOpsi('text_color', -1, '#e4e4e7'),
+            text_halign: dapat('text_halign', -1),
+            text_valign: dapat('text_valign', -1),
           },
         });
         return { jenis: 'box', id };
@@ -1589,8 +1628,22 @@ export function jalankanPineBar(kode: string, l: Lilin, tf = '4h',
       if (kiri == null || atas == null || kanan == null || bawah == null) continue;
       const warnaIsi = typeof d.bgcolor === 'string' ? d.bgcolor : null;
       const warnaTepi = typeof d.border_color === 'string' ? d.border_color : null;
-      if (warnaIsi === null && warnaTepi === null) continue;
-      kotak.push({ kiri, atas, kanan, bawah, warna: warnaIsi, garis: warnaTepi });
+      const teks = typeof d.text === 'string' && d.text.trim() ? d.text.trim() : undefined;
+      if (warnaIsi === null && warnaTepi === null && !teks) continue;
+      /* Pine menulis perataannya sebagai "text.align_right" dst.; yang
+         dipakai cuma kata terakhirnya. Bawaannya TENGAH, sama dengan
+         Pine — bukan kiri-atas, yang akan menempelkan namanya ke sudut. */
+      const kata = (v: unknown, bawaan: string) => {
+        const t = typeof v === 'string' ? v.split('.').pop() || '' : '';
+        return (t.replace('align_', '') || bawaan);
+      };
+      kotak.push({
+        kiri, atas, kanan, bawah, warna: warnaIsi, garis: warnaTepi,
+        teks,
+        warnaTeks: teks ? (typeof d.text_color === 'string' ? d.text_color : '#e4e4e7') : undefined,
+        rataH: teks ? kata(d.text_halign, 'center') as 'left' | 'center' | 'right' : undefined,
+        rataV: teks ? kata(d.text_valign, 'center') as 'top' | 'center' | 'bottom' : undefined,
+      });
     } else if (g.jenis === 'linefill') {
       /* Poligon di antara dua garis. Garis yang sudah dihapus skripnya
          membuat isiannya ikut hilang — persis TradingView. */
@@ -1633,3 +1686,4 @@ export function jalankanPineBar(kode: string, l: Lilin, tf = '4h',
     dilewati,
   };
 }
+

@@ -25,6 +25,12 @@ import type {
 export interface KotakIsi {
   b1: number; b2: number; atas: number; bawah: number;
   isi: string | null; tepi: string | null;
+  /** Nama zona dari `box.new(text=…)`. Tanpa ini, zona Supply/Demand
+   *  tampil sebagai bidang warna yang harus diingat sendiri artinya. */
+  teks?: string;
+  warnaTeks?: string;
+  rataH?: 'left' | 'center' | 'right';
+  rataV?: 'top' | 'center' | 'bottom';
 }
 export interface PoligonIsi {
   x1: number; ya1: number; yb1: number;
@@ -98,6 +104,34 @@ export class PenggambarIsi implements ISeriesPrimitive<Time> {
               const lebar = Math.abs(x2 - x1), tinggi = Math.abs(y2 - y1);
               if (k.isi) { ctx.fillStyle = k.isi; ctx.fillRect(kiri, puncak, lebar, tinggi); }
               if (k.tepi) { ctx.strokeStyle = k.tepi; ctx.lineWidth = 1; ctx.strokeRect(kiri, puncak, lebar, tinggi); }
+              /* ── NAMA ZONANYA ────────────────────────────────────────
+                 Digambar SESUDAH bidang dan tepinya, supaya tidak tertimpa
+                 keduanya, dan dilewati kalau kotaknya terlalu kecil —
+                 tulisan yang lebih besar dari wadahnya bukan keterangan,
+                 ia coretan yang menutupi harga.
+
+                 Bantalan 4 px dari tepi: Pine merapatkannya ke sisi yang
+                 diminta, dan teks yang menempel persis di garis tepi
+                 terbaca seperti bocor keluar kotaknya. */
+              if (k.teks && lebar > 28 && tinggi > 12) {
+                ctx.save();
+                ctx.font = '10px ui-sans-serif, system-ui, sans-serif';
+                ctx.fillStyle = k.warnaTeks || '#e4e4e7';
+                ctx.textBaseline = k.rataV === 'top' ? 'top' : k.rataV === 'bottom' ? 'bottom' : 'middle';
+                ctx.textAlign = k.rataH === 'left' ? 'left' : k.rataH === 'right' ? 'right' : 'center';
+                const px = k.rataH === 'left' ? kiri + 4 : k.rataH === 'right' ? kiri + lebar - 4 : kiri + lebar / 2;
+                const py = k.rataV === 'top' ? puncak + 3 : k.rataV === 'bottom' ? puncak + tinggi - 3 : puncak + tinggi / 2;
+                /* Dipotong pada lebar kotaknya, bukan dibiarkan menjulur:
+                   nama panjang di kotak sempit akan menutupi lilin di
+                   sebelahnya, dan itu terbaca sebagai gambar yang rusak. */
+                ctx.save();
+                ctx.beginPath();
+                ctx.rect(kiri, puncak, lebar, tinggi);
+                ctx.clip();
+                ctx.fillText(k.teks, px, py);
+                ctx.restore();
+                ctx.restore();
+              }
             }
             for (const f of this.poli) {
               /* Inilah yang paling menentukan: fill() antara dua plot Pine

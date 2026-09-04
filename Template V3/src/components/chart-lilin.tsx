@@ -1277,7 +1277,10 @@ export function ChartLilin({
        Model lama (dua garis tepi per kotak) itulah sumber "garis putih
        misterius": zona yang kehilangan isinya. */
     isiPine.current?.setData(
-      (kotakPine ?? []).map((k) => ({ b1: k.kiri, b2: k.kanan, atas: k.atas, bawah: k.bawah, isi: k.warna, tepi: k.garis })),
+      (kotakPine ?? []).map((k) => ({
+        b1: k.kiri, b2: k.kanan, atas: k.atas, bawah: k.bawah, isi: k.warna, tepi: k.garis,
+        teks: k.teks, warnaTeks: k.warnaTeks, rataH: k.rataH, rataV: k.rataV,
+      })),
       (isianPine ?? []).map((f) => {
         let { x2, y2a, y2b } = f;
         if (f.perpanjang === 'right' && x2 > f.x1) {
