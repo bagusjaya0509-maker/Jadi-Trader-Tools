@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronRight, List, Loader2, Plus, RefreshCw, Trash2, Trophy, Users, Wallet, X } from 'lucide-react';
+import { ChevronRight, ExternalLink, List, Loader2, Plus, RefreshCw, Trash2, Trophy, Users, Wallet, X } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { SparklineSaldo } from '@/components/kurva-saldo';
@@ -1792,20 +1792,27 @@ function PosisiCopy({ salin, log, riwayat, dompet, maksLipat, buka, keKartu, mua
                    tombol bukan HTML yang sah, dan peramban boleh
                    memperlakukannya sesukanya. Papan ketik tetap terlayani
                    lewat tabIndex + penangan Enter/Spasi. */
-                <div key={s.alamat} role="button" tabIndex={0}
+                /* ── SATU BARIS, SATU ARTI ────────────────────────────────
+                   Barisnya `<button>` lagi — persis seperti sebelum 4 Sep
+                   2026 — karena bentuk yang sempat menggantikannya RUSAK di
+                   layar: baris yang di DALAMNYA ada tombol lain (tautan ke
+                   kartu dompet). Diperiksa langsung di peramban pemilik:
+                   menekan barisnya tidak membuka apa pun, dialog setelan
+                   salin tidak pernah muncul.
+
+                   Elemen interaktif di dalam elemen interaktif memang tidak
+                   sah, dan yang membayarnya bukan validator melainkan orang
+                   yang menekan barisnya lalu tidak terjadi apa-apa.
+
+                   Tautan ke kartu dompet tetap ada — sebagai SAUDARA di
+                   sebelahnya, bukan anak. */
+                <div key={s.alamat} className="relative">
+                <button
                   onClick={() => buka({ alamat: s.alamat, nama: sebutan })}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); buka({ alamat: s.alamat, nama: sebutan }); }
-                  }}
-                  className={cn('flex w-full cursor-pointer flex-wrap items-baseline gap-x-3 gap-y-1 rounded-lg border px-3 py-2 text-left transition-colors',
+                  className={cn('flex w-full cursor-pointer flex-wrap items-baseline gap-x-3 gap-y-1 rounded-lg border py-2 pl-3 pr-10 text-left transition-colors',
                     s.aktif ? 'border-emerald-500/40 bg-emerald-500/5 hover:border-emerald-500/60'
                             : 'border-zinc-800 hover:border-zinc-700')}>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); keKartu(s.alamat); }}
-                    title={'Lihat kartu dompet ' + s.alamat}
-                    className="cursor-pointer rounded text-[12.5px] font-medium text-zinc-100 underline decoration-zinc-700 decoration-dotted underline-offset-4 transition-colors hover:text-sky-300 hover:decoration-sky-500/60">
-                    {sebutan}
-                  </button>
+                  <span className="text-[12.5px] font-medium text-zinc-100">{sebutan}</span>
                   <span className={cn('rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase',
                     s.aktif ? 'bg-emerald-500/20 text-emerald-300' : 'bg-zinc-800 text-zinc-500')}>
                     {s.aktif ? 'hidup' : 'mati'}
@@ -1835,6 +1842,18 @@ function PosisiCopy({ salin, log, riwayat, dompet, maksLipat, buka, keKartu, mua
                       sumber pegang {s.pegang.length} koin
                     </span>
                   )}
+                </button>
+                  {/* Tautan ke kartu dompet: SAUDARA tombol baris, bukan
+                      anaknya. Ditumpuk di ujung kanan lewat pembungkus
+                      `relative`; barisnya diberi `pr-10` supaya isinya tidak
+                      pernah lewat di bawah ikon ini. */}
+                  <button
+                    onClick={() => keKartu(s.alamat)}
+                    title={'Lihat kartu dompet ' + s.alamat + ' di tab Dompet Pantauan'}
+                    aria-label={'Lihat kartu dompet ' + sebutan}
+                    className="absolute right-1.5 top-1.5 inline-flex size-[22px] cursor-pointer items-center justify-center rounded text-zinc-600 transition-colors hover:bg-zinc-800 hover:text-sky-300">
+                    <ExternalLink className="size-3.5" />
+                  </button>
                 </div>
               );
             })}
