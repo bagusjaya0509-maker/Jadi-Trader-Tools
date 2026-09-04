@@ -4,6 +4,7 @@ import { TriangleAlert, Eye, Loader2, LogIn } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { discordSiap, mulaiLoginDiscord } from '@/lib/analisa';
 import { modePreview, akhiriPreview } from '@/lib/preview';
+import { usePenutupLuar } from '@/lib/tutup-luar';
 import { KartuProfil } from '@/components/kartu-profil';
 import { AvatarAnalis } from '@/components/avatar-analis';
 import { fotoTersimpan } from '@/lib/profil-pengguna';
@@ -150,6 +151,16 @@ export function MenuPengguna() {
     );
   }
 
+  /* ── MENUTUP SAAT DIKLIK DI LUAR ────────────────────────────────────────
+     Dulu ini sebuah lapisan `fixed inset-0 z-40` yang menangkap klik. Ia
+     TIDAK PERNAH BEKERJA — sebabnya `backdrop-blur` di bilah atas, dan
+     penjelasan lengkapnya ada di `usePenutupLuar`. Dilaporkan pemilik
+     4 Sep 2026: menunya baru mau tertutup kalau avatarnya ditekan lagi.
+
+     Hook yang SAMA dengan tiga dropdown bilah atas lainnya (lonceng,
+     amplop, changelog), bukan salinan keempat. */
+  const akar = usePenutupLuar<HTMLDivElement>(() => setBuka(false));
+
   /* Foto yang DIUNGGAH SENDIRI menang atas foto Google — orang yang repot
      menggantinya di kartu profil sedang menyatakan foto akun Google-nya
      bukan yang ia mau dipakai.
@@ -160,7 +171,7 @@ export function MenuPengguna() {
   const fotoBilah = fotoTersimpan(pengguna.uid) || pengguna.photoURL || '';
 
   return (
-    <div className="relative">
+    <div className="relative" ref={akar}>
       <button
         onClick={() => setBuka((v) => !v)}
         aria-label="Menu akun"
@@ -181,16 +192,9 @@ export function MenuPengguna() {
       </button>
 
       {buka && (
-        <>
-          {/* Lapisan penangkap klik-di-luar. Tetap di z-40 supaya kartunya
-              (z-50) berada di atasnya, dan tetap `fixed inset-0` supaya
-              klik di sudut mana pun menutup menunya — termasuk di atas
-              chart yang punya penangan klik sendiri. */}
-          <div className="fixed inset-0 z-40" onClick={() => setBuka(false)} />
-          <div className="absolute right-0 top-9 z-50">
-            <KartuProfil tutup={() => setBuka(false)} />
-          </div>
-        </>
+        <div className="absolute right-0 top-9 z-50">
+          <KartuProfil tutup={() => setBuka(false)} />
+        </div>
       )}
     </div>
   );

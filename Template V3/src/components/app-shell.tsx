@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { NavLink, useLocation, Link, useSearchParams, useNavigate } from 'react-router-dom';
 import {
   LayoutGrid, BarChart3, Briefcase, Users, Plug, CandlestickChart,
@@ -18,6 +18,7 @@ import { useAuth } from '@/lib/auth';
 import { useKabarAgen, umurKabar } from '@/lib/kabar';
 import { useKabarPribadi } from '@/lib/kabar-pribadi';
 import { MenuPengguna, PitaLangganan } from '@/components/gerbang';
+import { usePenutupLuar } from '@/lib/tutup-luar';
 import { NEWS, PESAN, CHANGELOG } from '@/data/notifikasi';
 import { PanelKabar, GrupKabar, BarisKabar, KosongKabar } from '@/components/panel-kabar';
 import { LogoJT } from '@/components/logo-jt';
@@ -262,25 +263,6 @@ const JUDUL: Record<string, string> = {
   '/harga': 'Pricing',
   '/social': 'Social',
 };
-
-/** Menutup panel saat diklik di luar. Dipakai tiga dropdown di bilah atas —
- *  tanpa ini, panel tetap menggantung dan menutupi isi halaman. */
-function usePenutupLuar<T extends HTMLElement>(saatTutup: () => void) {
-  const ref = useRef<T>(null);
-  useEffect(() => {
-    const klik = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) saatTutup();
-    };
-    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') saatTutup(); };
-    document.addEventListener('mousedown', klik);
-    document.addEventListener('keydown', esc);
-    return () => {
-      document.removeEventListener('mousedown', klik);
-      document.removeEventListener('keydown', esc);
-    };
-  }, [saatTutup]);
-  return ref;
-}
 
 /* ── Penanda sudah dibaca ────────────────────────────────────────────────
    Lencana merah yang tidak pernah hilang berhenti berarti apa-apa: setelah
