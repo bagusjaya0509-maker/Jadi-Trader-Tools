@@ -1,6 +1,7 @@
 import type { DompetTertaut } from '@/lib/profil-pengguna';
 import type { FillHl, MintaFill } from '@/lib/jurnal-dompet-inti';
 import { doc, getDoc, setDoc, deleteDoc, collection, onSnapshot, Timestamp, writeBatch } from 'firebase/firestore';
+import { tulisLatar } from '@/lib/tulis-lokal';
 import { useEffect, useState } from 'react';
 import { db } from '@/lib/data';
 import { auth } from '@/lib/firebase';
@@ -327,7 +328,23 @@ export async function sinkronRiwayatBinance(sudahAda: Set<string>, sejakMs: numb
         /* Sisi fill penutup BUY berarti posisinya SELL — arah jurnal adalah
            arah POSISINYA. */
         const arah = grup[0].side === 'BUY' ? 'SELL' : 'BUY';
-        await simpanTrade({
+        /* TIDAK di-await, dan alasannya di sini lebih berat daripada soal
+        tampilan (lihat lib/tulis-lokal.ts). Ketiga sinkron berjalan
+        BERURUTAN: Binance, lalu Hyperliquid, lalu dompet tertaut. Selama
+        baris ini menunggu server MENGAKUI tulisannya, satu tulisan yang
+        belum terjawab menyandera dua sinkron sesudahnya — bukan
+        memperlambat, menghentikan.
+
+        Terukur di peramban pemilik 5 Sep 2026 pada muat halaman yang
+        bersih: /api/income di 0,5 dtk, /api/user-trades di 0,7 dtk, lalu
+        sunyi — tiga puluh detik kemudian /api/hl/user-trades belum pernah
+        dipanggil sama sekali, dan ASTER yang baru ditutup di Hyperliquid
+        tidak pernah masuk jurnal.
+
+        Firestore sudah menerapkan tulisannya ke cache lokal dan
+        mengantrekannya sampai terkirim, jadi yang hilang dengan tidak
+        menunggu cuma penantiannya. */
+        tulisLatar(simpanTrade({
           id, sumber: 'kripto', pair: simbol, arah,
           lot: Number(qty.toFixed(6)),
           /* ── KOLOM "SIZE ORDER" MEMBACA INI, BUKAN `lot` ─────────────
@@ -348,7 +365,7 @@ export async function sinkronRiwayatBinance(sudahAda: Set<string>, sejakMs: numb
           pnl: Number(pnl.toFixed(4)), waktu,
           emosiMasuk: '', emosiEvaluasi: '',
           alasan: 'Sinkron Binance', catatan: 'Ditutup di Binance (' + orderId + ')',
-        }, { mesin: true });
+        }, { mesin: true }));
         masuk++;
       }
     }
@@ -405,7 +422,23 @@ export async function sinkronRiwayatHyperliquid(
     for (const t of (j.trades ?? [])) {
       const id = 'hl' + t.oid;
       if (sudahAda.has(id)) { dilewati++; continue; }
-      await simpanTrade({
+      /* TIDAK di-await, dan alasannya di sini lebih berat daripada soal
+      tampilan (lihat lib/tulis-lokal.ts). Ketiga sinkron berjalan
+      BERURUTAN: Binance, lalu Hyperliquid, lalu dompet tertaut. Selama
+      baris ini menunggu server MENGAKUI tulisannya, satu tulisan yang
+      belum terjawab menyandera dua sinkron sesudahnya — bukan
+      memperlambat, menghentikan.
+
+      Terukur di peramban pemilik 5 Sep 2026 pada muat halaman yang
+      bersih: /api/income di 0,5 dtk, /api/user-trades di 0,7 dtk, lalu
+      sunyi — tiga puluh detik kemudian /api/hl/user-trades belum pernah
+      dipanggil sama sekali, dan ASTER yang baru ditutup di Hyperliquid
+      tidak pernah masuk jurnal.
+
+      Firestore sudah menerapkan tulisannya ke cache lokal dan
+      mengantrekannya sampai terkirim, jadi yang hilang dengan tidak
+      menunggu cuma penantiannya. */
+      tulisLatar(simpanTrade({
         id, sumber: 'kripto', pair: String(t.simbol || ''), arah: t.arah === 'SELL' ? 'SELL' : 'BUY',
         lot: Number(Number(t.qty).toFixed(6)),
         /* Sama dengan jalur Binance — lihat catatan di sana. */
@@ -419,7 +452,7 @@ export async function sinkronRiwayatHyperliquid(
         alasan: 'Sinkron Hyperliquid',
         catatan: 'Ditutup di Hyperliquid (' + t.oid + ')'
                + (Number(t.isian) > 1 ? ' · ' + t.isian + ' isian' : ''),
-      }, { mesin: true });
+      }, { mesin: true }));
       masuk++;
     }
     return { masuk, dilewati, galat: null };
@@ -623,7 +656,23 @@ export async function sinkronRiwayatDompet(
         hasil.masuk++;
         if (pilihan.hanyaHitung) continue;
 
-        await simpanTrade({
+        /* TIDAK di-await, dan alasannya di sini lebih berat daripada soal
+        tampilan (lihat lib/tulis-lokal.ts). Ketiga sinkron berjalan
+        BERURUTAN: Binance, lalu Hyperliquid, lalu dompet tertaut. Selama
+        baris ini menunggu server MENGAKUI tulisannya, satu tulisan yang
+        belum terjawab menyandera dua sinkron sesudahnya — bukan
+        memperlambat, menghentikan.
+
+        Terukur di peramban pemilik 5 Sep 2026 pada muat halaman yang
+        bersih: /api/income di 0,5 dtk, /api/user-trades di 0,7 dtk, lalu
+        sunyi — tiga puluh detik kemudian /api/hl/user-trades belum pernah
+        dipanggil sama sekali, dan ASTER yang baru ditutup di Hyperliquid
+        tidak pernah masuk jurnal.
+
+        Firestore sudah menerapkan tulisannya ke cache lokal dan
+        mengantrekannya sampai terkirim, jadi yang hilang dengan tidak
+        menunggu cuma penantiannya. */
+        tulisLatar(simpanTrade({
           id, sumber: 'kripto',
           /* Sama dengan keSimbol() di server: koin + 'USDT'. */
           pair: t.koin + 'USDT', arah: t.arah,
@@ -645,7 +694,7 @@ export async function sinkronRiwayatDompet(
                  + (t.fee !== 0 ? ' · fee ' + t.fee.toFixed(4) : '')
                  + (t.masukLengkap ? '' : ' · harga masuk di luar jendela')
                  + ' · dompet ' + alamatPendek(d.alamat),
-        }, { mesin: true });
+        }, { mesin: true }));
         if (++ditulis % 25 === 0) pilihan.lapor?.(`${hasil.masuk} trade ditulis…`);
       }
     }

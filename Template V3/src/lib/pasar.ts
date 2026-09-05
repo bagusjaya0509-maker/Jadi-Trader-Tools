@@ -31,6 +31,92 @@ export interface Lilin {
 
 const KOSONG: Lilin = { opens: [], highs: [], lows: [], closes: [], times: [] };
 
+/* ════════════════════════════════════════════════════════════════════════
+   TIMEFRAME TURUNAN UNTUK SIMBOL MT5
+   ════════════════════════════════════════════════════════════════════════
+   EA Trade-Fi mengirim lima timeframe: 5m, 15m, 1h, 4h, 1d. Memilih Weekly
+   pada XAUUSDc karena itu menghasilkan chart kosong, dan layar menjelaskan
+   sebabnya dengan jujur — lalu menyuruh orangnya memperbarui EA.
+
+   Padahal dua dari tiga yang hilang TIDAK BUTUH EA baru. Lilin mingguan
+   adalah lilin harian yang digabung per pekan; 30 menit adalah dua lilin 15
+   menit. Yang benar-benar mustahil cuma 1 menit — tidak ada bahan yang
+   lebih halus untuk membangunnya, dan itu memang harus menunggu EA.
+
+   ── DIGABUNG PER PEKAN KALENDER, BUKAN PER TUJUH BARIS ──────────────────
+   Ini bagian yang mudah salah. Lilin harian MT5 melewati akhir pekan: satu
+   pekan berisi LIMA bar, bukan tujuh. Mengelompokkan tiap tujuh bar akan
+   menggeser batas pekannya sedikit demi sedikit sampai satu "pekan" memuat
+   Rabu sampai Rabu — dan tidak ada satu pun galat yang muncul, cuma lilin
+   yang salah yang terlihat masuk akal.
+
+   Jadi kuncinya cap waktu SENIN pekan itu. Libur, hari kejepit, dan pekan
+   yang cuma berisi tiga bar semuanya jatuh ke tempat yang benar tanpa
+   dihitung.
+   ════════════════════════════════════════════════════════════════════════ */
+/** Menit per lilin, untuk timeframe yang panjangnya tetap. */
+const MENIT_TF: Record<string, number> = {
+  '1m': 1, '5m': 5, '15m': 15, '30m': 30, '1h': 60, '4h': 240, '1d': 1440,
+};
+
+/* `menit` = PANJANG SATU LILIN HASIL, bukan berapa bar sumber yang dipakai.
+   Bentuk pertamanya menulis `per: 2` untuk 30 menit — maksudnya "dua bar 15
+   menit", tapi rumus pengelompokannya membacanya sebagai "dua menit", jadi
+   enam lilin 15 menit keluar sebagai enam lilin 30 menit dengan cap waktu
+   00:00, 00:14, 00:30. Ketahuan waktu diuji, bukan waktu dibaca: angkanya
+   kelihatan benar di kedua tempat, yang berbeda satuannya.
+
+   Berapa bar sumber yang perlu ditarik DITURUNKAN dari angka ini, bukan
+   ditulis sebagai medan kedua — dua medan yang harus sepakat adalah dua
+   medan yang bisa berselisih. */
+const TURUNAN_MT5: Record<string, { dari: string; menit: number | 'pekan' }> = {
+  '30m': { dari: '15m', menit: 30 },
+  '1w': { dari: '1d', menit: 'pekan' },
+};
+
+/** Timeframe ini bisa digambar untuk simbol MT5 — entah karena EA mengirimnya
+ *  langsung, atau karena ia bisa dibangun dari yang dikirim. */
+export function tfMt5Bisa(tf: string): boolean {
+  return ['5m', '15m', '1h', '4h', '1d'].includes(tf) || tf in TURUNAN_MT5;
+}
+
+/** Cap waktu Senin 00:00 UTC pada pekan yang memuat `ms`. */
+function awalPekan(ms: number): number {
+  const d = new Date(ms);
+  const hari = (d.getUTCDay() + 6) % 7;      // Senin = 0, Minggu = 6
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - hari);
+}
+
+/** Menggabung lilin halus jadi lilin kasar.
+ *
+ *  Open = open bar PERTAMA, close = close bar TERAKHIR, high/low = ekstrem
+ *  seluruh kelompok. Itu definisi lilin, bukan pilihan — rata-rata di salah
+ *  satunya akan menghasilkan bentuk yang tidak pernah terjadi di pasar. */
+function gabungLilin(l: Lilin, menit: number | 'pekan'): Lilin {
+  const out: Lilin = { opens: [], highs: [], lows: [], closes: [], times: [] };
+  let kunciAkhir: number | null = null;
+  for (let i = 0; i < l.times.length; i++) {
+    const t = l.times[i];
+    const kunci = menit === 'pekan'
+      ? awalPekan(t)
+      : Math.floor(t / (menit * 60_000)) * menit * 60_000;
+    if (kunci !== kunciAkhir) {
+      kunciAkhir = kunci;
+      out.times.push(kunci);
+      out.opens.push(l.opens[i]);
+      out.highs.push(l.highs[i]);
+      out.lows.push(l.lows[i]);
+      out.closes.push(l.closes[i]);
+      continue;
+    }
+    const j = out.times.length - 1;
+    out.highs[j] = Math.max(out.highs[j], l.highs[i]);
+    out.lows[j] = Math.min(out.lows[j], l.lows[i]);
+    out.closes[j] = l.closes[i];
+  }
+  return out;
+}
+
 /* Cache di memori. Satu pemindaian meminta 4 jam DAN 5 menit untuk simbol
    yang sama, dan beberapa section memakai simbol yang beririsan — tanpa ini
    satu klik "Cari Sinyal" bisa mengirim permintaan yang sama tiga kali. */
@@ -140,6 +226,31 @@ export async function ambilKlines(simbol: string, tf: string, batas = 200, segar
        sudah disamakan dengan /api/klines, jadi seluruh halaman — chart,
        indikator, replay, backtest — bekerja tanpa tahu bedanya. */
     const mt5 = simbol.startsWith('MT5:');
+
+    /* ── TF turunan dibangun dari TF sumbernya ────────────────────────
+       Ditaruh SESUDAH pemeriksaan cache di atas, jadi hasil gabungannya
+       ikut tersimpan dan pekan yang sama tidak dihitung ulang tiap tiga
+       detik. Rekursinya cuma satu tingkat: TF sumber tidak pernah turunan.
+
+       Bahannya diminta lebih banyak dari yang tampak perlu — lilin harian
+       MT5 cuma lima per pekan, jadi 200 pekan butuh sekitar 1.000 hari.
+       Kalau EA-nya tidak menyimpan sebanyak itu, yang didapat pekan lebih
+       sedikit; itu jujur, dan jauh lebih baik daripada chart kosong. */
+    const turunan = mt5 ? TURUNAN_MT5[tf] : undefined;
+    if (turunan) {
+      /* Diturunkan dari panjang lilinnya, bukan ditulis terpisah: 30 menit
+         dari 15 menit = dua bar, mingguan = tujuh hari kalender (lima bar
+         dagang, sisanya akhir pekan yang memang tidak ada). */
+      const lipat = turunan.menit === 'pekan'
+        ? 7
+        : Math.max(1, Math.round(turunan.menit / (MENIT_TF[turunan.dari] || 1)));
+      const bahan = await ambilKlines(simbol, turunan.dari, Math.min(1000, batas * lipat), segar);
+      if (!bahan.times.length) return KOSONG;
+      const hasil = gabungLilin(bahan, turunan.menit);
+      simpanan.set(kunci, { waktu: Date.now(), isi: hasil });
+      return hasil;
+    }
+
     const alamat = mt5
       ? `${dasar()}/api/mt5/klines?symbol=${encodeURIComponent(simbol.slice(4))}&interval=${tf}&limit=${batas}`
       : `${dasar()}/api/klines?symbol=${encodeURIComponent(simbol)}&interval=${tf}&limit=${batas}&market=${pasarPilihan}${segar ? '&fresh=1' : ''}`;

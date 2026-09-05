@@ -96,6 +96,11 @@ const TF = TF_PANEL;
  *  timeframe-nya terisi sendiri tanpa halaman ini perlu diubah lagi. */
 const TF_MT5 = ['5m', '15m', '1h', '4h', '1d'];
 
+/** Yang BISA digambar untuk simbol MT5 — termasuk yang dibangun sendiri dari
+ *  lilin yang dikirim EA (Weekly dari Daily, 30 menit dari 15 menit). Lihat
+ *  TURUNAN_MT5 di lib/pasar.ts. */
+const TF_MT5_BISA = [...TF_MT5, '30m', '1w'];
+
 /** Durasi tiap timeframe dalam milidetik. */
 const DURASI_TF: Record<string, number> = {
   '1m': 60_000, '5m': 5 * 60_000, '15m': 15 * 60_000, '30m': 30 * 60_000,
@@ -5457,15 +5462,20 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                      diketahui tidak boleh disampaikan sebagai "tidak ada
                      data", kalimat yang membuat orang mengira simbolnya
                      rusak lalu mencari-cari di tempat yang salah. */
-                  : simbol.startsWith('MT5:') && !TF_MT5.includes(tf) ? (
+                  : simbol.startsWith('MT5:') && !TF_MT5_BISA.includes(tf) ? (
                     <>
                       <span className="text-zinc-400">
                         Timeframe {TF.find((x) => x.nilai === tf)?.label ?? tf} belum dikirim EA Trade-Fi.
                       </span>
+                      {/* Kalimatnya dipersempit sesudah Weekly & 30 menit
+                          dibangun sendiri dari lilin harian dan 15 menit.
+                          Yang tersisa cuma 1 menit, dan itu memang mustahil
+                          diturunkan — tidak ada bahan yang lebih halus. */}
                       <span className="max-w-sm leading-relaxed">
-                        EA yang terpasang mengirim {TF_MT5.join(', ')}. Untuk kripto Binance,
-                        timeframe ini sudah bisa dipakai sekarang — pilih simbol non-MT5,
-                        atau perbarui EA-nya dari Marketplace.
+                        EA yang terpasang mengirim {TF_MT5.join(', ')}, dan dari situ
+                        Weekly &amp; 30 menit dibangun sendiri. Satu menit tidak bisa —
+                        tidak ada lilin yang lebih halus untuk menyusunnya. Perbarui
+                        EA-nya dari Marketplace kalau memang butuh.
                       </span>
                     </>
                   ) : 'Tidak ada data untuk simbol ini.'}
