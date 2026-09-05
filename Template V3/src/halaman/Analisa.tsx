@@ -1651,8 +1651,13 @@ function SignalDiikuti({ keRuang, onKosong }: {
               <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-zinc-100">
                 {l.analisNama}
               </span>
+              {/* Lencananya menyebut TUJUANNYA. "cent/standar" cuma berarti
+                  untuk MT5; untuk langganan Binance ia menjawab pertanyaan
+                  yang tidak pernah ditanyakan. */}
               <span className="shrink-0 rounded bg-zinc-800 px-1.5 py-0.5 text-[9.5px] uppercase tracking-wide text-zinc-400">
-                {l.jenisAkun === 'cent' ? 'cent' : 'standar'}
+                {(l.tujuan ?? 'mt5') === 'mt5'
+                  ? `MT5 · ${l.jenisAkun === 'cent' ? 'cent' : 'standar'}`
+                  : l.tujuan === 'hyperliquid' ? 'Hyperliquid' : 'Binance'}
               </span>
             </div>
 
@@ -1664,7 +1669,9 @@ function SignalDiikuti({ keRuang, onKosong }: {
               <div>
                 <div className="text-[9.5px] uppercase tracking-wide text-zinc-600">Ukuran</div>
                 <div className="angka text-[12.5px] text-zinc-200">
-                  {l.mode === 'lot' ? `${l.lotTetap} lot` : 'ikut jarak SL'}
+                  {l.mode === 'lot' ? `${l.lotTetap} lot`
+                    : (l.tujuan ?? 'mt5') !== 'mt5' ? `ikut jarak SL · ${l.leverage || 1}×`
+                    : 'ikut jarak SL'}
                 </div>
               </div>
               <div>
