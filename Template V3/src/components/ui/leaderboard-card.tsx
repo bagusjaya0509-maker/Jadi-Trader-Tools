@@ -74,14 +74,14 @@ export const LeaderboardCard = React.forwardRef<HTMLDivElement, LeaderboardCardP
 
         <LeaderboardPodium rankings={podiumRankings} className="mb-6" onPilih={onPilih} />
 
-        {/* EMPAT baris terlihat, sisanya digulir — diminta pemilik 5 Sep
-            2026. Penomoran halaman dicabut bersamaan: dua cara membatasi
-            daftar yang sama membuat "halaman 2" dan "gulir ke bawah"
-            berebut arti, dan yang menang selalu yang lebih membingungkan. */}
+        {/* LIMA baris per halaman. Empat sempat dicoba dan pemiliknya
+            menilainya terlalu sedikit — papan yang cuma menampilkan empat
+            nama membuat peringkat 5 terasa seperti "tidak masuk hitungan",
+            padahal ia cuma di baris berikutnya. */}
         <LeaderboardRankings
           rankings={rankings}
           currentUserId={currentUserId}
-          tampilMaks={4}
+          tampilMaks={5}
           onPilih={onPilih}
         />
 
