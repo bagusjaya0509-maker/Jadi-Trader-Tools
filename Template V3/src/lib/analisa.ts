@@ -36,6 +36,15 @@ export interface RingkasAnalisa {
    *  kartu untuk menampilkan entry dan menghitung P/L berjalan tanpa
    *  menembakkan satu permintaan per kartu. null = masih tertutup. */
   isiTerbuka?: { entry: number; sl: number; tp: number } | null;
+  /** Sinyal ini CERMIN posisi dompet on-chain: ia punya entry tapi tidak
+   *  punya SL maupun TP, dan selesainya ditentukan dompetnya menutup posisi
+   *  — bukan harga menyentuh apa pun.
+   *
+   *  Layar WAJIB membedakannya. `hasil: 'sl'` adalah satu-satunya kosakata
+   *  "kalah" yang dipunyai sistem ini, dan lencana menerjemahkannya jadi
+   *  "harga sudah menyentuh SL" — kalimat yang menggambarkan peristiwa yang
+   *  tidak pernah terjadi untuk sinyal tanpa SL. */
+  dompet?: boolean;
   /** Ditulis agen AI, bukan pengguna. Dipasang HANYA oleh rute
    *  /api/analisa/agen yang dijaga App Token — kalau nilainya bisa dikirim
    *  lewat POST biasa, siapa pun yang login bisa menyamar jadi agen resmi. */

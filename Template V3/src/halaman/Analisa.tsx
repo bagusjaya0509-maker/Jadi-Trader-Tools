@@ -358,7 +358,7 @@ function LencanaAgen({ geser }: { geser?: boolean }) {
 /** Label hasil sinyal. Muncul HANYA kalau backend sudah bisa memastikannya
  *  dari lilin sejak analisa diposting — kalau simbolnya tidak bisa dinilai,
  *  tidak ada label sama sekali. Diam lebih jujur daripada menebak. */
-function LencanaHasil({ hasil }: { hasil: 'sl' | 'tp' | 'batal' }) {
+function LencanaHasil({ hasil, dompet }: { hasil: 'sl' | 'tp' | 'batal'; dompet?: boolean }) {
   /* DIBATALKAN PUNYA WARNANYA SENDIRI — abu, bukan merah.
      Memberinya warna kalah akan membuat analis yang disiplin menarik
      rencana yang sudah tidak sah terlihat sama dengan yang kena SL,
@@ -373,15 +373,29 @@ function LencanaHasil({ hasil }: { hasil: 'sl' | 'tp' | 'batal' }) {
     );
   }
   const kenaTp = hasil === 'tp';
+  /* ── CERMIN DOMPET TIDAK PERNAH "KENA SL" ────────────────────────────
+     Sinyal ini tidak punya SL maupun TP — isinya sendiri mengatakan itu.
+     Yang menyelesaikannya dompetnya menutup posisi. Menuliskan "Expired ·
+     SL" di atasnya bukan sekadar kurang tepat: ia melaporkan peristiwa yang
+     tidak pernah terjadi, di kartu yang justru menjanjikan cermin apa
+     adanya. Dilaporkan pemilik 5 Sep 2026.
+
+     Warnanya tetap hijau/merah — untung dan rugi memang tetap untung dan
+     rugi; yang diperbaiki kalimatnya, bukan penilaiannya. */
+  const teks = dompet
+    ? (kenaTp ? 'Ditutup dompet · untung' : 'Ditutup dompet · rugi')
+    : `Expired · ${kenaTp ? 'TP' : 'SL'}`;
   return (
     <span className={cn(
       'flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold',
       kenaTp ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400',
     )}
-      title={kenaTp
-        ? 'Harga sudah menyentuh TP sejak analisa ini diposting — rencananya selesai.'
-        : 'Harga sudah menyentuh SL sejak analisa ini diposting — rencananya selesai.'}>
-      <Flag className="size-3" /> Expired · {kenaTp ? 'TP' : 'SL'}
+      title={dompet
+        ? 'Dompet yang dicerminkan sudah menutup posisinya. Sinyal ini memang tidak memasang SL maupun TP — hasilnya apa adanya dari dompet itu.'
+        : kenaTp
+          ? 'Harga sudah menyentuh TP sejak analisa ini diposting — rencananya selesai.'
+          : 'Harga sudah menyentuh SL sejak analisa ini diposting — rencananya selesai.'}>
+      <Flag className="size-3" /> {teks}
     </span>
   );
 }
@@ -875,7 +889,7 @@ function KartuAnalisa({ a, status, milikku, onSegarkan, performa, hargaKini }: {
                   {fHarga(hargaKini)}
                 </span>
               )}
-              {selesai && <LencanaHasil hasil={a.hasil as 'sl' | 'tp' | 'batal'} />}
+              {selesai && <LencanaHasil hasil={a.hasil as 'sl' | 'tp' | 'batal'} dompet={a.dompet} />}
               {/* Sinyal selesai kini terbuka untuk siapa pun — dikatakan di
                   kartunya supaya orang tahu tidak perlu membeli apa pun
                   untuk memeriksanya. */}

@@ -97,49 +97,23 @@ export function LeaderboardRankings({ rankings, currentUserId, showPagination, d
   currentUserId?: string;
   showPagination?: boolean;
   defaultPageSize?: number;
-  /** Berapa baris yang terlihat sekaligus; sisanya digulir di dalam kotak
-   *  yang sama. Kosong = perilaku lama (semua baris halaman itu tergambar,
-   *  dengan penomoran halaman kalau diminta).
-   *
-   *  Menggulir, BUKAN memenggal: papan peringkat dibaca dari atas ke bawah
-   *  sebagai satu urutan, dan tombol "halaman berikutnya" memutus urutan
-   *  itu jadi potongan yang harus disusun sendiri di kepala pembacanya. */
+  /** Berapa baris per halaman. Kosong = `defaultPageSize`. */
   tampilMaks?: number;
   /** Dipanggil saat sebuah baris ditekan. Tidak diberikan = barisnya
    *  sekadar tampilan, persis seperti sebelumnya. */
   onPilih?: (userId: string) => void;
 }) {
-  const [ukuran, setUkuran] = React.useState(defaultPageSize);
+  /* `tampilMaks` sekarang berarti BERAPA BARIS PER HALAMAN, bukan tinggi
+     kotak gulir — lihat catatan di kaki komponen. */
+  const [ukuran, setUkuran] = React.useState(tampilMaks || defaultPageSize);
   const [hal, setHal] = React.useState(0);
 
-  /* ── TINGGI KOTAK DIUKUR, BUKAN DITEBAK ──────────────────────────────
-     Tinggi satu baris ditentukan avatar, dua baris teks, dan padding —
-     tiga hal yang bisa berubah kapan saja tanpa berkas ini tahu. Angka
-     tetap di sini akan memotong baris keempat jadi separuh pada perubahan
-     gaya yang paling kecil sekalipun, dan separuh baris terbaca sebagai
-     daftar yang rusak.
-
-     Jadi yang dipakai jarak SEBENARNYA dari tepi atas baris pertama ke
-     tepi bawah baris ke-`tampilMaks`, dibaca dari DOM sesudah tergambar. */
-  const wadah = React.useRef<HTMLDivElement>(null);
-  const [tinggiKotak, setTinggiKotak] = React.useState<number | undefined>(undefined);
 
   const jmlHal = Math.max(1, Math.ceil(rankings.length / ukuran));
   /* Halaman dijepit saat daftarnya menyusut — tanpa ini, menyaring daftar
      saat sedang di halaman 3 menampilkan layar kosong tanpa penjelasan. */
   const halAman = Math.min(hal, jmlHal - 1);
   const potong = rankings.slice(halAman * ukuran, halAman * ukuran + ukuran);
-
-  React.useLayoutEffect(() => {
-    if (!tampilMaks || !wadah.current) { setTinggiKotak(undefined); return; }
-    const anak = Array.from(wadah.current.children) as HTMLElement[];
-    /* Tidak melebihi batas = tidak perlu dikurung sama sekali. Kotak gulir
-       yang isinya muat seluruhnya cuma menambah satu tepi yang tidak
-       menjelaskan apa pun. */
-    if (anak.length <= tampilMaks) { setTinggiKotak(undefined); return; }
-    const akhir = anak[tampilMaks - 1];
-    setTinggiKotak(akhir.offsetTop + akhir.offsetHeight - anak[0].offsetTop);
-  }, [tampilMaks, rankings.length]);
 
   const akuDiPotongan = potong.some((r) => r.userId === currentUserId);
   const aku = rankings.find((r) => r.userId === currentUserId);
@@ -153,18 +127,10 @@ export function LeaderboardRankings({ rankings, currentUserId, showPagination, d
     );
   }
 
-  /* Saat digulir, SELURUH daftar dirender — memenggalnya per halaman lalu
-     menggulirnya juga adalah dua cara membatasi hal yang sama, dan yang
-     kedua membuat gulirannya berhenti di tempat yang tidak berarti apa
-     pun. */
-  const tampil = tampilMaks ? rankings : potong;
-
   return (
     <div>
-      <div ref={wadah}
-        className={cn('space-y-0.5', tinggiKotak !== undefined && 'gulir-senyap overflow-y-auto pr-1')}
-        style={tinggiKotak !== undefined ? { maxHeight: tinggiKotak } : undefined}>
-        {tampil.map((r) => <Baris key={r.userId} r={r} aku={r.userId === currentUserId} onPilih={onPilih} />)}
+      <div className="space-y-0.5">
+        {potong.map((r) => <Baris key={r.userId} r={r} aku={r.userId === currentUserId} onPilih={onPilih} />)}
       </div>
 
       {/* Baris sendiri ditempel di bawah kalau tidak ikut di halaman ini. */}
@@ -174,6 +140,56 @@ export function LeaderboardRankings({ rankings, currentUserId, showPagination, d
         </div>
       )}
 
+      {/* ── PENOMORAN YANG SAMA DENGAN TABEL DI BAWAHNYA ────────────────
+          Diminta pemilik 5 Sep 2026, dan alasannya kuat: dua daftar di satu
+          halaman yang dipenggal dengan dua cara berbeda memaksa pembacanya
+          belajar dua kali. Bentuknya disalin dari papan-belum-layak.tsx —
+          "1–4 dari 9" di kiri, tombol halaman bernomor di kanan.
+
+          Kotak gulir yang sempat dipasang di sini dicabut: menggulir DAN
+          memenggal adalah dua cara membatasi hal yang sama, dan yang
+          menang selalu yang lebih membingungkan. */}
+      {rankings.length > ukuran && (
+        <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-zinc-800/60 pt-2">
+          <span className="angka text-[11px] text-zinc-600">
+            {halAman * ukuran + 1}–{Math.min((halAman + 1) * ukuran, rankings.length)} dari {rankings.length}
+          </span>
+          <div className="ml-auto flex items-center gap-1">
+            <button
+              onClick={() => setHal((n) => Math.max(0, n - 1))}
+              disabled={halAman === 0}
+              aria-label="Halaman sebelumnya"
+              className="flex cursor-pointer items-center rounded border border-zinc-800 p-1 text-zinc-400 transition-colors hover:border-zinc-700 hover:text-zinc-200 disabled:cursor-default disabled:opacity-40 disabled:hover:border-zinc-800">
+              <ChevronLeft className="size-3.5" />
+            </button>
+            {Array.from({ length: jmlHal }, (_, i) => (
+              <button
+                key={i}
+                onClick={() => setHal(i)}
+                aria-current={i === halAman ? 'page' : undefined}
+                className={cn(
+                  'angka cursor-pointer rounded border px-2 py-0.5 text-[11px] transition-colors',
+                  i === halAman
+                    ? 'border-zinc-700 bg-zinc-800 text-zinc-100'
+                    : 'border-zinc-800 text-zinc-500 hover:border-zinc-700 hover:text-zinc-300',
+                )}>
+                {i + 1}
+              </button>
+            ))}
+            <button
+              onClick={() => setHal((n) => Math.min(jmlHal - 1, n + 1))}
+              disabled={halAman >= jmlHal - 1}
+              aria-label="Halaman berikutnya"
+              className="flex cursor-pointer items-center rounded border border-zinc-800 p-1 text-zinc-400 transition-colors hover:border-zinc-700 hover:text-zinc-200 disabled:cursor-default disabled:opacity-40 disabled:hover:border-zinc-800">
+              <ChevronRight className="size-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Bentuk LAMA (pemilih "Tampil 5/10/25/50") disimpan untuk pemakai
+          lain yang memintanya lewat `showPagination`. Papan peringkat tidak
+          lagi memakainya. */}
       {showPagination && rankings.length > defaultPageSize && (
         <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-zinc-800/60 pt-3 text-[11.5px] text-zinc-500">
           <label className="flex items-center gap-1.5">
