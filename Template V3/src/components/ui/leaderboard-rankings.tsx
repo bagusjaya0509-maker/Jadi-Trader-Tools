@@ -92,11 +92,19 @@ function Baris({ r, aku, onPilih }: {
   );
 }
 
-export function LeaderboardRankings({ rankings, currentUserId, showPagination, defaultPageSize = 10, onPilih }: {
+export function LeaderboardRankings({ rankings, currentUserId, showPagination, defaultPageSize = 10, tampilMaks, onPilih }: {
   rankings: LeaderboardRankingItem[];
   currentUserId?: string;
   showPagination?: boolean;
   defaultPageSize?: number;
+  /** Berapa baris yang terlihat sekaligus; sisanya digulir di dalam kotak
+   *  yang sama. Kosong = perilaku lama (semua baris halaman itu tergambar,
+   *  dengan penomoran halaman kalau diminta).
+   *
+   *  Menggulir, BUKAN memenggal: papan peringkat dibaca dari atas ke bawah
+   *  sebagai satu urutan, dan tombol "halaman berikutnya" memutus urutan
+   *  itu jadi potongan yang harus disusun sendiri di kepala pembacanya. */
+  tampilMaks?: number;
   /** Dipanggil saat sebuah baris ditekan. Tidak diberikan = barisnya
    *  sekadar tampilan, persis seperti sebelumnya. */
   onPilih?: (userId: string) => void;
@@ -104,11 +112,34 @@ export function LeaderboardRankings({ rankings, currentUserId, showPagination, d
   const [ukuran, setUkuran] = React.useState(defaultPageSize);
   const [hal, setHal] = React.useState(0);
 
+  /* ── TINGGI KOTAK DIUKUR, BUKAN DITEBAK ──────────────────────────────
+     Tinggi satu baris ditentukan avatar, dua baris teks, dan padding —
+     tiga hal yang bisa berubah kapan saja tanpa berkas ini tahu. Angka
+     tetap di sini akan memotong baris keempat jadi separuh pada perubahan
+     gaya yang paling kecil sekalipun, dan separuh baris terbaca sebagai
+     daftar yang rusak.
+
+     Jadi yang dipakai jarak SEBENARNYA dari tepi atas baris pertama ke
+     tepi bawah baris ke-`tampilMaks`, dibaca dari DOM sesudah tergambar. */
+  const wadah = React.useRef<HTMLDivElement>(null);
+  const [tinggiKotak, setTinggiKotak] = React.useState<number | undefined>(undefined);
+
   const jmlHal = Math.max(1, Math.ceil(rankings.length / ukuran));
   /* Halaman dijepit saat daftarnya menyusut — tanpa ini, menyaring daftar
      saat sedang di halaman 3 menampilkan layar kosong tanpa penjelasan. */
   const halAman = Math.min(hal, jmlHal - 1);
   const potong = rankings.slice(halAman * ukuran, halAman * ukuran + ukuran);
+
+  React.useLayoutEffect(() => {
+    if (!tampilMaks || !wadah.current) { setTinggiKotak(undefined); return; }
+    const anak = Array.from(wadah.current.children) as HTMLElement[];
+    /* Tidak melebihi batas = tidak perlu dikurung sama sekali. Kotak gulir
+       yang isinya muat seluruhnya cuma menambah satu tepi yang tidak
+       menjelaskan apa pun. */
+    if (anak.length <= tampilMaks) { setTinggiKotak(undefined); return; }
+    const akhir = anak[tampilMaks - 1];
+    setTinggiKotak(akhir.offsetTop + akhir.offsetHeight - anak[0].offsetTop);
+  }, [tampilMaks, rankings.length]);
 
   const akuDiPotongan = potong.some((r) => r.userId === currentUserId);
   const aku = rankings.find((r) => r.userId === currentUserId);
@@ -122,10 +153,18 @@ export function LeaderboardRankings({ rankings, currentUserId, showPagination, d
     );
   }
 
+  /* Saat digulir, SELURUH daftar dirender — memenggalnya per halaman lalu
+     menggulirnya juga adalah dua cara membatasi hal yang sama, dan yang
+     kedua membuat gulirannya berhenti di tempat yang tidak berarti apa
+     pun. */
+  const tampil = tampilMaks ? rankings : potong;
+
   return (
     <div>
-      <div className="space-y-0.5">
-        {potong.map((r) => <Baris key={r.userId} r={r} aku={r.userId === currentUserId} onPilih={onPilih} />)}
+      <div ref={wadah}
+        className={cn('space-y-0.5', tinggiKotak !== undefined && 'gulir-senyap overflow-y-auto pr-1')}
+        style={tinggiKotak !== undefined ? { maxHeight: tinggiKotak } : undefined}>
+        {tampil.map((r) => <Baris key={r.userId} r={r} aku={r.userId === currentUserId} onPilih={onPilih} />)}
       </div>
 
       {/* Baris sendiri ditempel di bawah kalau tidak ikut di halaman ini. */}

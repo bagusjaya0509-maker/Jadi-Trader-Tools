@@ -177,7 +177,20 @@ export function PapanPeringkatSignal({ data }: { data: Performa | null }) {
        angka yang sama tidak punya dua nama di satu halaman. */
     ekstra: [
       a.slPersen == null ? null : `SL ${persen(a.slPersen)}`,
-      a.ddPersen === undefined ? null : `DD ${persen(a.ddPersen)}`,
+      /* "DD harian", bukan "DD". Dilaporkan pemilik 5 Sep 2026: sebuah
+         analis berwinrate 86,7% (13 menang, 2 kalah) tertulis DD 0,0%, dan
+         itu terbaca seperti angka yang rusak.
+
+         Angkanya benar — yang keliru namanya. Penurunan dihitung dari deret
+         hasil HARIAN, bukan per trade: analis yang kalah dua kali tapi
+         menutup SETIAP harinya net hijau memang tidak pernah punya lembah
+         untuk diukur. Diperiksa pada datanya sendiri: hariannya +341,28 dan
+         +164,51, dua-duanya positif.
+
+         Bukan gejala khusus kartu dompet, dan itu penting supaya tidak
+         dikejar ke tempat yang salah — Agen Momentum Balik (7 menang, 3
+         kalah, murni agen) menunjukkan 0,0% dengan sebab yang sama persis. */
+      a.ddPersen === undefined ? null : `DD harian ${persen(a.ddPersen)}`,
     ].filter(Boolean).join(' · '),
     ekstraJudul:
       `SL = jarak stop loss rata-rata dari harga, dari sinyalnya yang sudah selesai. `

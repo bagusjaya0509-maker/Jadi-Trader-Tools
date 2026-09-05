@@ -74,11 +74,14 @@ export const LeaderboardCard = React.forwardRef<HTMLDivElement, LeaderboardCardP
 
         <LeaderboardPodium rankings={podiumRankings} className="mb-6" onPilih={onPilih} />
 
+        {/* EMPAT baris terlihat, sisanya digulir — diminta pemilik 5 Sep
+            2026. Penomoran halaman dicabut bersamaan: dua cara membatasi
+            daftar yang sama membuat "halaman 2" dan "gulir ke bawah"
+            berebut arti, dan yang menang selalu yang lebih membingungkan. */}
         <LeaderboardRankings
           rankings={rankings}
           currentUserId={currentUserId}
-          showPagination
-          defaultPageSize={10}
+          tampilMaks={4}
           onPilih={onPilih}
         />
 
