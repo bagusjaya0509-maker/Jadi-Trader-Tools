@@ -1823,7 +1823,10 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
           symbol: sunting.simbol,
           orderId: sunting.tiket ?? '',
           isAlgo: asli?.algo ?? false,
-          bursa: sunting.bursa,
+          /* Bursa ORDERNYA lebih tahu daripada bursa posisi yang kebetulan
+             ada di simbol yang sama — dan pending memang bisa berdiri tanpa
+             posisi sama sekali. `sunting.bursa` cuma cadangan. */
+          bursa: asli?.bursa ?? sunting.bursa,
         });
         /* Garis SENGAJA tidak dihapus di sini. Yang baru terjadi cuma
            "Binance menerima perintahnya"; pembuktiannya menunggu order itu
@@ -2729,14 +2732,72 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
     const lama = Array.isArray(awal.emaPeriode) ? awal.emaPeriode.length : 0;
     return lama >= 1 && lama <= 3 ? lama : 3;
   });
+  const [emaWarna, setEmaWarna] = useState<string[]>(() => {
+    const bawaan = ['#22d3ee', '#a78bfa', '#fb923c'];
+    const a = Array.isArray(awal.emaWarna) ? awal.emaWarna : [];
+    return bawaan.map((b, i) => (typeof a[i] === 'string' && /^#[0-9a-fA-F]{6}$/.test(a[i]) ? a[i] : b));
+  });
+  const [emaTebal, setEmaTebal] = useState<number[]>(() => {
+    const a = Array.isArray(awal.emaTebal) ? awal.emaTebal : [];
+    return [0, 1, 2].map((i) => {
+      const n = Math.round(Number(a[i]));
+      return Number.isFinite(n) && n >= 1 && n <= 4 ? n : 1;
+    });
+  });
+
   /* Yang benar-benar digambar. Dihitung sekali di sini supaya garis, menu,
      dan ringkasan di bawah label semuanya membaca daftar yang SAMA. */
   const emaDipakai = useMemo(() => emaPeriode.slice(0, emaJumlah), [emaPeriode, emaJumlah]);
 
+  /* ── SETELAN EMA BERLAKU SAAT SIMPAN, BUKAN TIAP KETUKAN ──────────────
+     Diminta pemilik 5 Sep 2026. Sebelumnya tiap perubahan langsung menggambar
+     ulang; dengan pemilih warna itu berarti chart berkedip mengikuti kursor
+     yang sedang menyapu roda warna, dan mengetik "200" dari "2" menggambar
+     EMA 2 lalu EMA 20 lebih dulu.
+
+     Jadi panel ini menyunting SALINAN (`drafEma`), dan salinan itu yang
+     ditampilkan pemilih warnanya — pratinjaunya ada di panel, bukan di
+     chart. Yang menyentuh chart cuma tombol Simpan.
+
+     `null` berarti panelnya tertutup. Itu satu keadaan, bukan dua: tidak ada
+     "terbuka tapi tanpa draf" yang bisa terjadi, jadi tidak ada yang perlu
+     dijaga supaya keduanya sepakat. */
+  const [drafEma, setDrafEma] = useState<
+    { jumlah: number; periode: number[]; warna: string[]; tebal: number[] } | null
+  >(null);
+
+  function bukaAturEma() {
+    setDrafEma({
+      jumlah: emaJumlah,
+      periode: [...emaPeriode],
+      warna: [...emaWarna],
+      tebal: [...emaTebal],
+    });
+  }
+
+  function simpanEma() {
+    if (!drafEma) return;
+    /* Dijepit DI SINI, sekali, tepat sebelum nilainya berlaku. Menjepitnya
+       di tiap ketukan membuat kotak kosong langsung terisi 1 dan angka "200"
+       mustahil diketik dari "2". */
+    setEmaPeriode(drafEma.periode.map((p) => {
+      const n = Math.round(Number(p));
+      return !Number.isFinite(n) || n < 1 ? 9 : Math.min(500, n);
+    }));
+    setEmaJumlah(Math.max(1, Math.min(3, drafEma.jumlah)));
+    setEmaWarna(drafEma.warna.map((w) => (/^#[0-9a-fA-F]{6}$/.test(w) ? w : '#22d3ee')));
+    setEmaTebal(drafEma.tebal.map((t) => {
+      const n = Math.round(Number(t));
+      return Number.isFinite(n) && n >= 1 && n <= 4 ? n : 1;
+    }));
+    setDrafEma(null);
+  }
+
   /* Simpan tiap kali salah satunya berubah. */
   useEffect(() => {
-    simpanSetelanChart({ simbol, tf, snr: tampilSnr, smi: tampilSmi, ema: tampilEma, emaPeriode, emaJumlah });
-  }, [simbol, tf, tampilSnr, tampilSmi, tampilEma, emaPeriode, emaJumlah]);
+    simpanSetelanChart({ simbol, tf, snr: tampilSnr, smi: tampilSmi, ema: tampilEma,
+                        emaPeriode, emaJumlah, emaWarna, emaTebal });
+  }, [simbol, tf, tampilSnr, tampilSmi, tampilEma, emaPeriode, emaJumlah, emaWarna, emaTebal]);
 
   const [tampilan, setTampilan] = useState(bacaTampilan);
   /* Cermin React dari preferensi pasar di lib/pasar. Sumber kebenarannya di
@@ -2967,7 +3028,6 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
        benar-benar berarti. Menggambarnya utuh membuat EMA 200 terlihat
        seperti garis harga di 200 bar pertama. */
     if (tampilEma && lilinGabung.closes.length) {
-      const WARNA_EMA = ['#22d3ee', '#a78bfa', '#fb923c'];
       emaDipakai.forEach((p, i) => {
         const n = Math.round(p);
         if (!isFinite(n) || n < 1) return;
@@ -2975,7 +3035,8 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
         keluar.push({
           nama: `EMA ${n}`,
           nilai: deret.map((v: number, j: number) => (j < n - 1 ? null : v)),
-          warna: WARNA_EMA[i % WARNA_EMA.length],
+          warna: emaWarna[i] ?? '#22d3ee',
+          tebal: emaTebal[i] ?? 1,
         });
       });
     }
@@ -2992,7 +3053,7 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
     (pine?.plot ?? []).filter((p) => !p.osilator)
       .forEach((p) => keluar.push({ nama: p.judul, nilai: p.nilai, warna: p.warna }));
     return keluar;
-  }, [lilinGabung, set, pine, tampilEma, emaDipakai]);
+  }, [lilinGabung, set, pine, tampilEma, emaDipakai, emaWarna, emaTebal]);
 
   /* Zona dihitung sampai bar yang SEDANG tampil, bukan sampai bar terakhir.
      Selama replay, menggambar zona dari data masa depan adalah cara paling
@@ -4368,82 +4429,105 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
                       </span>
                     </label>
                     {/* ── EMA ─────────────────────────────────────────
-                        Setelannya TERBUKA DI TEMPAT, bukan di balik ikon
-                        gerigi. Yang diatur cuma empat ketukan (jumlah dan
-                        tiga angka), dan menyembunyikannya di satu lapis
-                        lagi berarti tiap penyesuaian kecil menuntut dua
-                        pembukaan menu. Ia cuma tampil saat EMA-nya menyala,
-                        jadi menu ini tidak melebar untuk orang yang tidak
-                        memakainya. */}
-                    <label className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors hover:bg-zinc-900">
-                      <input type="checkbox" checked={tampilEma} onChange={(e) => setTampilEma(e.target.checked)}
-                             className="size-3.5 cursor-pointer accent-emerald-500" />
-                      <span className="min-w-0">
-                        <span className="block text-[12px] text-zinc-200">EMA</span>
-                        <span className="block truncate text-[10.5px] text-zinc-600">
-                          {tampilEma ? emaDipakai.map((p) => Math.round(p)).join(' · ') : 'Rata-rata bergerak eksponensial di panel harga'}
+                        Barisnya DIV, bukan <label>, dan itu bukan soal gaya:
+                        tombol "Atur" di dalam sebuah label ikut menyalakan
+                        centangnya tiap kali ditekan — satu klik, dua akibat,
+                        dan yang kedua tidak diminta siapa pun. Centangnya
+                        tetap punya labelnya sendiri di sebelah kiri. */}
+                    <div className="flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-zinc-900">
+                      <label className="flex min-w-0 grow cursor-pointer items-center gap-2.5">
+                        <input type="checkbox" checked={tampilEma}
+                               onChange={(e) => {
+                                 setTampilEma(e.target.checked);
+                                 /* Dinyalakan = setelannya langsung terbuka.
+                                    Menyalakan indikator lalu harus mencari
+                                    tombol lain untuk mengaturnya adalah satu
+                                    ketukan yang tidak menghasilkan apa pun. */
+                                 if (e.target.checked) bukaAturEma(); else setDrafEma(null);
+                               }}
+                               className="size-3.5 cursor-pointer accent-emerald-500" />
+                        <span className="min-w-0">
+                          <span className="block text-[12px] text-zinc-200">EMA</span>
+                          <span className="block truncate text-[10.5px] text-zinc-600">
+                            {tampilEma ? emaDipakai.map((p) => Math.round(p)).join(' · ') : 'Rata-rata bergerak eksponensial di panel harga'}
+                          </span>
                         </span>
-                      </span>
-                    </label>
-                    {tampilEma && (
-                      <div className="mb-1 ml-8 mr-2 space-y-1.5 rounded-md border border-zinc-800/70 bg-zinc-900/40 px-2.5 py-2">
+                      </label>
+                      {tampilEma && (
+                        <button
+                          onClick={() => (drafEma ? setDrafEma(null) : bukaAturEma())}
+                          className="shrink-0 cursor-pointer rounded border border-zinc-800 px-1.5 py-0.5 text-[10.5px] text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-100">
+                          {drafEma ? 'Tutup' : 'Atur'}
+                        </button>
+                      )}
+                    </div>
+                    {tampilEma && drafEma && (
+                      <div className="mb-1 ml-8 mr-2 space-y-2 rounded-md border border-zinc-800/70 bg-zinc-900/40 px-2.5 py-2">
                         <div className="flex items-center gap-1.5">
                           <span className="text-[10.5px] text-zinc-500">Jumlah garis</span>
                           <div className="ml-auto flex gap-0.5 rounded border border-zinc-800 p-0.5">
                             {[1, 2, 3].map((n) => (
                               <button key={n}
-                                /* Yang berubah CUMA berapa yang digambar.
-                                   Periodenya tidak disentuh sama sekali, jadi
-                                   "3 → 1 → 3" mengembalikan angka yang tadi
-                                   diketik — bukan bawaan. */
-                                onClick={() => setEmaJumlah(n)}
+                                onClick={() => setDrafEma((d) => (d ? { ...d, jumlah: n } : d))}
                                 className={cn('cursor-pointer rounded px-2 py-0.5 text-[11px] transition-colors',
-                                  emaJumlah === n ? 'bg-zinc-100 text-zinc-950' : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100')}>
+                                  drafEma.jumlah === n ? 'bg-zinc-100 text-zinc-950' : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100')}>
                                 {n}
                               </button>
                             ))}
                           </div>
                         </div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="shrink-0 text-[10.5px] text-zinc-500">Periode</span>
-                          <div className="ml-auto flex gap-1">
-                            {emaDipakai.map((p, i) => (
-                              <span key={i} className="relative">
-                                {/* Garis warna di bawah kotaknya — jawaban
-                                    untuk "yang ungu itu yang mana" tanpa
-                                    perlu menebak dari urutannya.
 
-                                    Kotaknya w-12 (48 px), DIUKUR bukan
-                                    dikira-kira: menunya w-72 (288 px),
-                                    dikurangi ml-8/mr-2 dan px-2.5 tersisa
-                                    ±228 px untuk label "Periode" (±48),
-                                    tiga kotak, dan dua celah. Pada 3,4rem
-                                    jumlahnya 225 px — muat, tapi tanpa sisa
-                                    sama sekali, dan satu piksel pembulatan
-                                    font cukup untuk melemparkan kotak
-                                    ketiga ke baris berikutnya. */}
-                                <input
-                                  type="number" min={1} max={500} value={p}
-                                  onChange={(e) => {
-                                    const n = Number(e.target.value);
-                                    setEmaPeriode((lama) => lama.map((x, j) => (j === i ? n : x)));
-                                  }}
-                                  onBlur={(e) => {
-                                    /* Dijepit saat SELESAI mengetik, bukan tiap
-                                       ketukan: menjepit di onChange membuat
-                                       kotak kosong langsung terisi 1 dan angka
-                                       "50" mustahil diketik dari "5". */
-                                    const n = Math.round(Number(e.target.value));
-                                    const aman = !isFinite(n) || n < 1 ? 9 : Math.min(500, n);
-                                    setEmaPeriode((lama) => lama.map((x, j) => (j === i ? aman : x)));
-                                  }}
-                                  className="w-12 rounded border border-zinc-800 bg-zinc-950 px-1 py-0.5 text-center text-[11px] text-zinc-200 outline-none focus:border-zinc-600"
-                                />
-                                <span className="pointer-events-none absolute inset-x-1.5 -bottom-px h-px"
-                                      style={{ background: ['#22d3ee', '#a78bfa', '#fb923c'][i % 3] }} />
-                              </span>
-                            ))}
+                        {/* Lebarnya DIUKUR terhadap menu w-72 (288 px):
+                            dikurangi ml-8/mr-2 dan px-2.5 tersisa ±228 px.
+                            Warna 20 + periode 56 + tebal 56 + dua celah 16 =
+                            148 px — masih longgar, jadi tidak ada kolom yang
+                            terlempar ke baris berikutnya seperti waktu tiga
+                            kotak periode dulu berdiri sendiri. */}
+                        <div className="flex items-center gap-2 text-[9.5px] uppercase tracking-wider text-zinc-600">
+                          <span className="w-5 shrink-0" />
+                          <span className="w-14 text-center">Periode</span>
+                          <span className="w-14 text-center">Tebal</span>
+                        </div>
+                        {Array.from({ length: drafEma.jumlah }, (_, i) => (
+                          <div key={i} className="flex items-center gap-2">
+                            <input
+                              type="color" value={drafEma.warna[i] ?? '#22d3ee'}
+                              onChange={(e) => setDrafEma((d) => (d
+                                ? { ...d, warna: d.warna.map((w, j) => (j === i ? e.target.value : w)) } : d))}
+                              title="Warna garis"
+                              className="size-5 shrink-0 cursor-pointer rounded border border-zinc-800 bg-transparent p-0"
+                            />
+                            <input
+                              type="number" min={1} max={500} value={drafEma.periode[i] ?? 9}
+                              onChange={(e) => setDrafEma((d) => (d
+                                ? { ...d, periode: d.periode.map((p, j) => (j === i ? Number(e.target.value) : p)) } : d))}
+                              className="w-14 rounded border border-zinc-800 bg-zinc-950 px-1 py-0.5 text-center text-[11px] text-zinc-200 outline-none focus:border-zinc-600"
+                            />
+                            <select
+                              value={drafEma.tebal[i] ?? 1}
+                              onChange={(e) => setDrafEma((d) => (d
+                                ? { ...d, tebal: d.tebal.map((t, j) => (j === i ? Number(e.target.value) : t)) } : d))}
+                              className="w-14 cursor-pointer rounded border border-zinc-800 bg-zinc-950 px-1 py-0.5 text-center text-[11px] text-zinc-200 outline-none focus:border-zinc-600">
+                              {[1, 2, 3, 4].map((t) => <option key={t} value={t}>{t} px</option>)}
+                            </select>
                           </div>
+                        ))}
+
+                        <div className="flex items-center gap-2 pt-0.5">
+                          <button onClick={simpanEma}
+                            className="cursor-pointer rounded bg-zinc-100 px-2.5 py-1 text-[11px] font-medium text-zinc-950 transition-opacity hover:opacity-90">
+                            Simpan
+                          </button>
+                          {/* Batal MEMBUANG drafnya, bukan menyimpannya diam-
+                              diam. Panel yang menutup tanpa menyimpan tapi
+                              mengingat suntingan yang batal akan memasang
+                              angka itu pada pembukaan berikutnya, dan yang
+                              membukanya tidak pernah menyuruh begitu. */}
+                          <button onClick={() => setDrafEma(null)}
+                            className="cursor-pointer rounded px-2 py-1 text-[11px] text-zinc-500 transition-colors hover:text-zinc-200">
+                            Batal
+                          </button>
+                          <span className="ml-auto text-[10px] text-zinc-600">berlaku saat disimpan</span>
                         </div>
                       </div>
                     )}

@@ -454,6 +454,16 @@ export interface OrderBursa {
    *  Backend sudah lama mengirim bendera ini; tipe di sini yang belum
    *  menyebutnya, jadi ia terbuang diam-diam sebelum sampai ke pemakainya. */
   algo: boolean;
+  /** Bursa tempat order ini berada. Server SUDAH lama mengirimnya — baris
+   *  Binance ditandai 'binance' setelah kedua daftarnya digabung, dan
+   *  `pendingHl()` menandai punyanya 'hyperliquid'. Tipe di sini yang belum
+   *  menyebutnya, jadi ia terbuang diam-diam sebelum sampai ke pemakainya:
+   *  cerita yang persis sama dengan bendera `algo` di atas.
+   *
+   *  Akibatnya nyata: perintah batal menurunkan bursanya dari pasar CHART,
+   *  jadi pending Hyperliquid untuk koin yang juga ada di Binance dikirim ke
+   *  bursa yang salah dan tidak membatalkan apa pun. */
+  bursa?: 'binance' | 'hyperliquid';
   dibuat: number;
 }
 
@@ -544,6 +554,7 @@ export function usePosisiBinance(): {
               harga: Number(o.harga) || 0,
               qty: Number(o.qty) || 0,
               algo: !!o.algo,
+              bursa: o.bursa === 'hyperliquid' ? 'hyperliquid' : o.bursa === 'binance' ? 'binance' : undefined,
               dibuat: Number(o.dibuat) || 0,
             })));
           }

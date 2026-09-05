@@ -177,6 +177,10 @@ export interface SetelanChart {
   /** Periode KETIGA garis EMA, selalu tiga angka — termasuk yang sedang
    *  tidak digambar. Lihat `emaJumlah`. */
   emaPeriode?: number[];
+  /** Warna ketiga garis, hex. Selalu tiga, sama seperti periodenya. */
+  emaWarna?: string[];
+  /** Tebal ketiga garis dalam piksel (1–4). */
+  emaTebal?: number[];
   /** Berapa dari ketiga periode itu yang digambar (1–3).
    *
    *  Bentuk pertama tidak punya medan ini: panjang lariknya yang dianggap

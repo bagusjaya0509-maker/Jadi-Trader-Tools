@@ -27,7 +27,14 @@ import { useTema, temaSekarang, WARNA_CHART } from '@/lib/tema';
    bersama halaman Chart, jadi tidak menyentuh halaman lain sama sekali.
    ════════════════════════════════════════════════════════════════════════ */
 
-export interface Garis { nama: string; nilai: (number | null)[]; warna: string }
+export interface Garis {
+  nama: string;
+  nilai: (number | null)[];
+  warna: string;
+  /** Tebal garis dalam piksel. Kosong = 1, sama seperti sebelum medan ini
+   *  ada — jadi Pine dan garis strategi tidak berubah sedikit pun. */
+  tebal?: number;
+}
 
 /* ── Presisi sumbu harga ───────────────────────────────────────────────
    lightweight-charts memakai bawaan `minMove: 0.01` kalau tidak diberi
@@ -1211,7 +1218,13 @@ export function ChartLilin({
       const pecah = potongan.length <= 400 ? potongan : [potongan.flat()];
       pecah.forEach((titik) => {
         const s = c.addSeries(LineSeries, {
-          color: g.warna, lineWidth: 1, priceLineVisible: false, lastValueVisible: false,
+          /* `as 1` menenangkan tipe lightweight-charts, yang menuntut
+             LineWidth (1|2|3|4) padahal angkanya baru diketahui saat
+             berjalan. Dijepit ke rentang itu sebelum dioper, jadi
+             pemaksaannya tidak menyembunyikan nilai yang mustahil. */
+          color: g.warna,
+          lineWidth: Math.max(1, Math.min(4, Math.round(g.tebal ?? 1))) as 1,
+          priceLineVisible: false, lastValueVisible: false,
           /* Potongan sepanjang SATU bar tidak punya ruas untuk digambar —
              tanpa penanda titik ia lenyap tanpa jejak. */
           pointMarkersVisible: titik.length === 1,
