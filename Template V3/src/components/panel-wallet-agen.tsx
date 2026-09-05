@@ -884,10 +884,14 @@ function tanggalJam(ms: number) {
 
    Pola yang sama dengan papan analis di halaman ini: kartunya memilih,
    ruang di bawahnya menampilkan. */
-function RincianDompet({ w, posisi, log, tiru, ubahTiru, tutup }: {
+function RincianDompet({ w, posisi, log, tiru, ubahTiru, tutup, nilaiAkun }: {
   w: { alamat: string; nama: string };
   posisi: PosisiDompet[];
   log: TransaksiDompet[];
+  /** Nilai akun dompet saat pindaian terakhir. `undefined` = pemantau belum
+   *  pernah mencatatnya (mis. belum satu putaran sejak medannya ada) — dan
+   *  itu berbeda dari nol, jadi kalimatnya memang tidak ditampilkan. */
+  nilaiAkun?: number;
   tiru: PenandaTiru[];
   ubahTiru: (koin: string, nyala: boolean) => void;
   tutup: () => void;
@@ -1036,6 +1040,23 @@ function RincianDompet({ w, posisi, log, tiru, ubahTiru, tutup }: {
         <span className="font-medium text-zinc-300">Riwayat transaksi</span>
         {' — '}catatan tiap isian saat terjadi, bukan posisi yang sedang berjalan.
         {' '}Posisi hidup ada di kartu-kartu {posisi.length > 0 ? 'di atas' : '(sekarang kosong)'}.
+        {/* ── KENAPA KOSONG, bukan cuma "kosong" ────────────────────────
+            Dompet yang menutup semuanya dan dompet yang gagal dibaca
+            sama-sama menghasilkan nol kartu. Satu angka membedakannya:
+            akun $0 berarti dananya memang sudah ditarik, akun berisi
+            berarti ia sedang tidak memegang apa pun.
+
+            Dilaporkan pemilik 5 Sep 2026 — ia membaca belasan "Close Long"
+            berumur puluhan menit, tidak menemukan posisi terbuka, lalu
+            bertanya apakah posisinya tidak terekam. Terekam; dompetnya
+            yang kosong. */}
+        {posisi.length === 0 && typeof nilaiAkun === 'number' && (
+          <span className="block text-zinc-600">
+            {nilaiAkun > 0
+              ? `Akun dompet masih berisi $${nilaiAkun.toLocaleString('id-ID', { maximumFractionDigits: 2 })} — ia sedang tidak memegang posisi apa pun.`
+              : 'Akun dompet $0 — dananya sudah ditarik, bukan posisinya yang gagal terbaca.'}
+          </span>
+        )}
       </p>
 
       {log.length === 0 ? (
@@ -2208,6 +2229,7 @@ export function PanelWalletAgen({ pemilik = false, tab: tabLuar }: {
               w={dompet.find((w) => w.alamat === pilih)!}
               posisi={posisi.filter((p) => p.alamat === pilih)}
               log={log.filter((l) => l.alamat === pilih)}
+              nilaiAkun={d?.seumur?.[pilih!]?.nilaiAkun}
               tiru={d?.tiru || []}
               ubahTiru={(koin, nyala) => {
                 void (nyala ? tandaiTiru(pilih!, koin) : batalTiru(pilih!, koin)).then(() => tarik());

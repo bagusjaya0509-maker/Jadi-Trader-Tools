@@ -63,6 +63,11 @@ export interface RiwayatBursa {
    *  0/undefined kalau buku besarnya belum terbaca. */
   lahir?: number;
   lahirDicek?: number;
+  /** Nilai akun dompet dalam USD saat pindaian terakhir — dicatat WALAU
+   *  posisinya nol. Tanpa ini, dompet yang menutup semuanya lalu menarik
+   *  dananya terlihat persis sama dengan dompet yang gagal dibaca:
+   *  dua-duanya "tidak ada posisi". */
+  nilaiAkun?: number;
 }
 
 /** Penanda "koin ini sedang saya tiru dari dompet itu". Cuma penanda —
