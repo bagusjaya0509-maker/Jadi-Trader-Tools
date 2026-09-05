@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { daftarAnalisa, bukaIsi, catatDicopy, type RingkasAnalisa } from '@/lib/analisa';
-import { daftarLangganan } from '@/lib/copy-langganan';
+import { daftarLangganan, tujuanLangganan, type LanggananCopy } from '@/lib/copy-langganan';
+import { kirimOrderNyata } from '@/lib/order-nyata';
+import { bacaKoneksi, koneksiLengkap } from '@/lib/koneksi';
 import { daftarSimbolMt5 } from '@/lib/pasar';
 import { simbolDasarMt5 } from '@/lib/simbol';
 import { kirimPerintahMt5, tungguHasilMt5 } from '@/lib/mt5-order';
@@ -118,11 +120,25 @@ export function bacaWaktuPindai(uid?: string | null): number {
 /** Keputusan "sinyal ini disalin atau tidak" — fungsi murni, tanpa jaringan.
  *  Ditulis terpisah supaya bisa diuji dan supaya ia ikut pindah utuh saat
  *  pengikutnya dipindah ke server. */
-export function layakSalin(s: RingkasAnalisa, sejak: number, sudah: string[]): boolean {
+/** Pasar sebuah sinyal, dari bentuk pasangannya. Sama dengan `pasarKripto`
+ *  di halaman Copy Signal — dua tempat memutuskan hal yang sama harus
+ *  memutuskannya dengan cara yang sama. */
+export function sinyalKripto(s: RingkasAnalisa): boolean {
+  if (s.pasar) return s.pasar === 'kripto';
+  return /USDT$/i.test(s.pasangan || '');
+}
+
+export function layakSalin(
+  s: RingkasAnalisa, sejak: number, sudah: string[],
+  tujuan: 'mt5' | 'binance' | 'hyperliquid' = 'mt5',
+): boolean {
   if (sudah.includes(s.id)) return false;
-  /* Kripto lewat. Bukan karena rumusnya beda — karena jalurnya butuh kunci
-     API bursa, dan itu keamanan yang berbeda jenis. */
-  if (/USDT$/i.test(s.pasangan)) return false;
+  /* PASARNYA HARUS COCOK DENGAN TUJUANNYA. Langganan MT5 cuma menerima
+     sinyal Trade-Fi; langganan Binance/Hyperliquid cuma sinyal kripto.
+     Sebelumnya baris ini menolak SEMUA kripto — jalur kuncinya waktu itu
+     memang belum ada. Sekarang ada, dan pagarnya pindah dari "jenis pasar"
+     ke "kecocokan pasar dengan tujuan". */
+  if (sinyalKripto(s) !== (tujuan !== 'mt5')) return false;
   /* Sudah selesai atau ditarik: tidak ada yang bisa diikuti lagi. */
   if (s.hasil === 'sl' || s.hasil === 'tp' || s.hasil === 'batal') return false;
   /* Terbit SEBELUM langganan dimulai — bukan sinyal yang ia daftar untuk
@@ -167,25 +183,37 @@ export function usePengikutCopy(uid: string | null | undefined, jeda = 60_000) {
     });
 
     async function putaran() {
-      if (!hidup || sibuk.current || serverPegang.current) return;
+      if (!hidup || sibuk.current) return;
       const langganan = daftarLangganan(uid);
+      /* ── DUA JALUR, DUA SYARAT HIDUP ────────────────────────────────
+         MT5 butuh EA yang melapor, dan mundur kalau server memegangnya.
+         Kripto butuh Backend URL + App Token, dan TIDAK mundur ke server:
+         pengikut VPS memang cuma mengurus Trade-Fi (ia menyaring USDT
+         sejak baris pertamanya), jadi kalau jalur ini ikut mundur, salinan
+         kripto pemilik tidak pernah dikerjakan siapa pun.
+
+         Digerbangi sendiri-sendiri, bukan bersama: EA yang mati tidak boleh
+         menghentikan salinan Binance, dan App Token yang kosong tidak boleh
+         menghentikan salinan MT5. */
+      const subMt5 = langganan.filter((l) => tujuanLangganan(l) === 'mt5');
+      const subKripto = langganan.filter((l) => tujuanLangganan(l) !== 'mt5');
+      const akun = akunRef.current;
       /* Tidak melanggan siapa pun BUKAN berarti tidak ada apa-apa yang perlu
          diurus: salinan manual juga meninggalkan catatan, dan penarikan
-         sinyalnya tetap harus sampai. Berhenti di sini kalau keduanya kosong
-         akan membuat satu-satunya orang yang menyalin dengan tangan menjadi
-         satu-satunya orang yang tidak pernah ditarik. */
-      if (langganan.length === 0 && bacaTanda(uid).length === 0) return;
-
-      const akun = akunRef.current;
-      /* EA belum melapor: tidak ada terminal yang bisa menerima perintah.
-         Diam saja — mencoba mengirim cuma menumpuk perintah kedaluwarsa. */
-      if (!akun || akun.terhubung !== true) return;
+         sinyalnya tetap harus sampai. */
+      const jalanMt5 = !serverPegang.current
+        && (subMt5.length > 0 || bacaTanda(uid).length > 0)
+        && !!akun && akun.terhubung === true;
+      const jalanKripto = subKripto.length > 0 && koneksiLengkap(bacaKoneksi());
+      if (!jalanMt5 && !jalanKripto) return;
 
       sibuk.current = true;
       try {
         const semua = await daftarAnalisa();
         const sudah = bacaSudah(uid!);
-        const perAnalis = new Map(langganan.map((l) => [l.analisUid, l]));
+
+        if (jalanMt5 && akun) {
+        const perAnalis = new Map(subMt5.map((l) => [l.analisUid, l]));
 
         const antre = semua
           .filter((s) => perAnalis.has(s.uid))
@@ -364,9 +392,134 @@ export function usePengikutCopy(uid: string | null | undefined, jeda = 60_000) {
           }
         }
 
+        } /* jalanMt5 */
+
+        /* ═══ JALUR KRIPTO — Binance & Hyperliquid ══════════════════════
+           Pagarnya sama persis dengan MT5 di atas (hanya yang diikuti, hanya
+           sesudah langganan dimulai, sekali per sinyal, berurutan) — yang
+           berbeda cuma mesin ordernya dan cara menghitung ukurannya.
+
+           ── UKURAN DARI BATAS RUGI, BUKAN DARI MODAL ─────────────────
+           nilai posisi = rugiMaks / jarak SL (dalam persen harga).
+           Rugi $10 dengan SL 2% dari entry berarti posisi $500; SL 0,5%
+           berarti $2.000. Persis prinsip lot MT5 di atas, cuma satuannya
+           dolar nilai posisi alih-alih lot. Leverage TIDAK ikut menentukan
+           ukurannya — ia cuma menentukan margin yang dikunci bursa.
+
+           ── TANPA SL TIDAK DISALIN, dan itu bukan kekurangan ───────────
+           kirimOrderNyata mensyaratkan SL dan TP, dan syarat itu benar:
+           order otomatis yang berjalan tanpa stop adalah posisi yang tidak
+           ada yang menjaganya saat tabnya tertutup. Sinyal cermin dompet
+           memang tanpa keduanya — jalannya lewat Wallet Tracking > Posisi
+           Copy, mesin yang memang dibangun untuk mengikuti dompet sampai
+           ia menutup sendiri. */
+        if (jalanKripto) {
+          const perAnalisK = new Map<string, LanggananCopy>(subKripto.map((l) => [l.analisUid, l]));
+          const antreK = semua
+            .filter((s) => perAnalisK.has(s.uid))
+            .filter((s) => { const l = perAnalisK.get(s.uid)!; return layakSalin(s, l.sejak, sudah, tujuanLangganan(l)); })
+            .sort((a, b) => a.dibuat - b.dibuat);
+
+          for (const s of antreK) {
+            if (!hidup) break;
+            const l = perAnalisK.get(s.uid)!;
+            const bursa = tujuanLangganan(l) as 'binance' | 'hyperliquid';
+            const namaBursa = bursa === 'hyperliquid' ? 'Hyperliquid' : 'Binance';
+            const jejak = { sinyal: s.id, pasangan: s.pasangan, analis: l.analisNama || 'Analis' };
+            try {
+              const { isi } = await bukaIsi(s.id);
+              if (!(isi.entry > 0) || !(isi.sl > 0) || !(isi.tp > 0)) {
+                /* Ditandai supaya tidak dicoba lagi tiap menit: sinyal tanpa
+                   SL tidak akan tiba-tiba punya SL. */
+                tandai(uid!, s.id);
+                catat(uid!, { ...jejak, hasil: 'dilewati', sebab: s.dompet
+                  ? 'Sinyal cermin dompet tidak punya SL/TP — ikuti dompetnya lewat Wallet Tracking › Posisi Copy, bukan lewat langganan analis.'
+                  : 'Sinyalnya belum punya entry, SL, dan TP yang lengkap — salinan otomatis butuh ketiganya.' });
+                continue;
+              }
+              const benar = s.arah === 'BUY'
+                ? isi.sl < isi.entry && isi.tp > isi.entry
+                : isi.sl > isi.entry && isi.tp < isi.entry;
+              if (!benar) {
+                tandai(uid!, s.id);
+                catat(uid!, { ...jejak, hasil: 'dilewati', sebab: 'SL/TP sinyalnya ada di sisi yang salah terhadap entry.' });
+                continue;
+              }
+
+              /* JENIS ORDER DARI PENILAI, bukan ditebak di sini. Kalau
+                 penilai belum menulisnya, sinyalnya DIBIARKAN (tidak
+                 ditandai) supaya putaran berikutnya mencobanya lagi —
+                 biasanya cuma soal menit. */
+              const je = String(s.jenisEntry || '');
+              const jenis = /market/i.test(je) ? 'MARKET' : /limit/i.test(je) ? 'LIMIT' : /stop/i.test(je) ? 'STOP' : null;
+              if (!jenis) {
+                catat(uid!, { ...jejak, hasil: 'dilewati', sebab: 'Jenis ordernya belum dinilai server — dicoba lagi putaran berikutnya.' });
+                continue;
+              }
+
+              const jarakPersen = Math.abs(isi.entry - isi.sl) / isi.entry;
+              const nilaiPosisi = l.rugiMaks / jarakPersen;
+              const leverage = Math.max(1, Math.min(10, Math.round(l.leverage || 1)));
+              const modal = nilaiPosisi / leverage;
+              /* Bursa menolak nilai order di bawah ambang (Binance ±$5,
+                 Hyperliquid $10). Ditolak di sini dengan kalimat yang
+                 menjelaskan, bukan di bursa dengan kode galat. */
+              if (nilaiPosisi < 10) {
+                tandai(uid!, s.id);
+                catat(uid!, { ...jejak, hasil: 'dilewati', sebab: `Batas rugi $${l.rugiMaks} dengan SL ${(jarakPersen * 100).toFixed(2)}% cuma menghasilkan posisi ${uangRingkas(nilaiPosisi)} — di bawah minimum bursa ($10).` });
+                continue;
+              }
+
+              tandai(uid!, s.id);
+              const h = await kirimOrderNyata({
+                simbol: s.pasangan, arah: s.arah,
+                modal: Math.round(modal * 100) / 100, leverage,
+                entry: isi.entry, jenis, sl: isi.sl, tp: isi.tp,
+                /* Satu TP penuh di level analisnya — bukan 2× jarak SL,
+                   bukan partial. Yang disalin rencana analisnya, apa
+                   adanya; metode TP milik penyalin adalah rencana lain. */
+                metode: 'tp1only',
+                bursa, tanpaKonfirmasi: true,
+                alasan: `Copy Signal · ${l.analisNama || 'Analis'} · ${s.id}`,
+              });
+              catatCopy(uid!, {
+                simbol: s.pasangan, arah: s.arah, lot: Math.round((nilaiPosisi / isi.entry) * 1e6) / 1e6,
+                analis: l.analisNama || 'Analis', sinyal: s.id,
+              });
+              catat(uid!, { ...jejak, hasil: 'terkirim', sebab: `${s.arah} ${s.pasangan} ${uangRingkas(nilaiPosisi)} (${leverage}×) ke ${namaBursa} — ${h.pesan}` });
+              void catatDicopy(s.id);
+            } catch (e) {
+              catat(uid!, { ...jejak, hasil: 'gagal', sebab: e instanceof Error ? e.message : `Gagal mengirim order ke ${namaBursa}.` });
+            }
+          }
+
+          /* ── DITARIK ANALISNYA — versi kripto ──────────────────────────
+             Jalur MT5 di atas menutup salinannya lewat tiket. Order kripto
+             tidak memulangkan pengenal yang bisa dipegang, jadi memilih
+             order mana yang harus dibatalkan berarti MENEBAK dari simbol dan
+             harga — dan tebakan yang salah membatalkan order manual orangnya
+             di simbol yang sama. Untuk sekarang: dicatat SEKALI dengan
+             kalimat yang menyuruh menutupnya sendiri, lalu ditandai selesai
+             supaya tidak berulang tiap menit. Ini keterbatasan yang diakui,
+             bukan yang disamarkan. */
+          const ditarikK = semua.filter((s) => s.hasil === 'batal' && perAnalisK.has(s.uid) && !!tandaSinyal(uid!, s.id));
+          for (const s of ditarikK) {
+            const t = tandaSinyal(uid!, s.id);
+            if (!t || t.batalSelesai) continue;
+            tandaiBatalSelesai(uid!, s.id);
+            catat(uid!, { sinyal: s.id, pasangan: s.pasangan, analis: t.analis, hasil: 'dilewati',
+              sebab: `Analis menarik sinyal ini. Salinanmu di ${tujuanLangganan(perAnalisK.get(s.uid)!) === 'hyperliquid' ? 'Hyperliquid' : 'Binance'} TIDAK ditutup otomatis — periksa Posisi Terbuka dan tutup sendiri kalau masih ada.` });
+          }
+        } /* jalanKripto */
+
         try { localStorage.setItem(KUNCI_JALAN(uid!), String(Date.now())); } catch { /* privat */ }
       } catch { /* jaringan tersendat — putaran berikutnya mencoba lagi */ }
       finally { sibuk.current = false; }
+    }
+
+    /** "$1.234" / "$12,5" — untuk kalimat catatan, bukan tabel. */
+    function uangRingkas(n: number) {
+      return '$' + (n >= 100 ? Math.round(n).toLocaleString('en-US') : n.toFixed(1));
     }
 
     void putaran();

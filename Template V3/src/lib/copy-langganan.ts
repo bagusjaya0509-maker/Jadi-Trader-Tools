@@ -36,6 +36,23 @@ export interface LanggananCopy {
    *  jadi ia ikut disimpan — bukan ditebak ulang tiap panel dibuka. */
   jenisAkun: 'standar' | 'cent';
   sejak: number;
+  /** KE MANA salinannya dikirim. Kosong = 'mt5' — semua langganan yang
+   *  tersimpan sebelum medan ini ada memang Trade-Fi, satu-satunya jalur
+   *  yang waktu itu tersedia.
+   *
+   *  Dipilih SAAT MENGIKUTI, bukan ditebak dari sinyalnya: BTC ada di
+   *  Binance maupun Hyperliquid, dan bursa mana yang dipakai orangnya cuma
+   *  orangnya yang tahu. */
+  tujuan?: 'mt5' | 'binance' | 'hyperliquid';
+  /** Leverage untuk salinan kripto (1–10). Tidak menyentuh risikonya —
+   *  batas rugi tetap `rugiMaks` berapa pun leverage-nya; yang berubah cuma
+   *  margin yang dikunci bursa. Kosong = 1. */
+  leverage?: number;
+}
+
+/** Tujuan sebuah langganan, dengan bawaan yang benar untuk catatan lama. */
+export function tujuanLangganan(l: Pick<LanggananCopy, 'tujuan'>): 'mt5' | 'binance' | 'hyperliquid' {
+  return l.tujuan ?? 'mt5';
 }
 
 const kunci = (uid: string) => `jt.copy.langganan.${uid}`;

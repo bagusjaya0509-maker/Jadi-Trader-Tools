@@ -2088,7 +2088,10 @@ export default function Analisa() {
      kini dibuka dari tiga tempat — klik kanan kartu kanal, ikon di kartu
      sinyal, dan tombol di Performa Signal — dan dua di antaranya tidak
      berada di dalam kanal mana pun. Boolean cuma cukup untuk yang ketiga. */
-  const [copyUntuk, setCopyUntuk] = useState<{ uid: string; nama: string; pasangan?: string } | null>(null);
+  /* `pasar` ikut dibawa: panelnya menawarkan tujuan yang cocok dengan pasar
+     analisnya (MT5 untuk Trade-Fi, Binance/Hyperliquid untuk kripto), dan
+     yang tahu pasarnya adalah sinyal-sinyal di kanalnya. */
+  const [copyUntuk, setCopyUntuk] = useState<{ uid: string; nama: string; pasangan?: string; pasar?: 'kripto' | 'tradefi' } | null>(null);
   /* Pesan sekilas — muncul, dibaca, hilang sendiri. Dipakai untuk keadaan
      yang tidak pantas menempati halaman: "belum mengikuti siapa pun" adalah
      ketiadaan, dan ketiadaan tidak butuh ruang tetap di layar. */
@@ -2859,6 +2862,7 @@ export default function Analisa() {
           analisUid={copyUntuk.uid}
           analisNama={copyUntuk.nama}
           contohPasangan={copyUntuk.pasangan}
+          pasar={copyUntuk.pasar}
           tutup={() => setCopyUntuk(null)}
         />
       )}
@@ -4173,6 +4177,7 @@ export default function Analisa() {
                   uid: menuPin.uid,
                   nama: isi[0]?.nama || 'Analis ini',
                   pasangan: isi[0]?.pasangan,
+                  pasar: isi.some((s) => pasarKripto(s)) ? 'kripto' : 'tradefi',
                 });
               }}
               tutup={() => setMenuPin(null)} />
@@ -4243,6 +4248,7 @@ export default function Analisa() {
                         uid: kanalBuka ?? '',
                         nama: terpilih[0]?.nama || 'Analis ini',
                         pasangan: terpilih[0]?.pasangan,
+                        pasar: terpilih.some((s) => pasarKripto(s)) ? 'kripto' : 'tradefi',
                       })} />
                   </>
                 );

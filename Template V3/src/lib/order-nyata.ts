@@ -66,6 +66,16 @@ export interface PermintaanNyata {
   /** Emosi & alasan dari tiket — masuk record posisi screener dan jurnal. */
   emosi?: string;
   alasan?: string;
+  /** Bursa tujuan yang TEGAS. Mengalahkan tebakan dari pasar chart —
+   *  pengikut copy tahu persis bursa mana yang dipilih orangnya saat
+   *  mengikuti, dan tebakan chart tidak relevan untuk order yang tidak
+   *  lahir dari chart. */
+  bursa?: 'binance' | 'hyperliquid';
+  /** Lewati dialog persetujuan. HANYA untuk pengikut copy otomatis: di sana
+   *  tidak ada manusia di depan layar, dan persetujuannya sudah diberikan
+   *  sekali — saat menekan "Ikuti" dan menetapkan batas ruginya. Panel
+   *  manual tidak boleh memakainya. */
+  tanpaKonfirmasi?: boolean;
 }
 
 /* ── BURSA TUJUAN, SATU SUMBER ────────────────────────────────────────────
@@ -265,7 +275,8 @@ export async function kirimOrderNyata(p: PermintaanNyata): Promise<{ pesan: stri
   const kalimatBursa = bTujuan === 'hyperliquid' ? 'Kirim order SUNGGUHAN ke Hyperliquid?'
     : bTujuan === 'binance' ? 'Kirim order SUNGGUHAN ke Binance?'
     : 'Kirim order SUNGGUHAN? (bursanya dipilih server — pasar simbol ini belum terbaca di layar)';
-  if (!confirm(`${kalimatBursa}\n\n${rincian}\n\nUang sungguhan akan bergerak.`)) {
+  if (!p.tanpaKonfirmasi
+      && !confirm(`${kalimatBursa}\n\n${rincian}\n\nUang sungguhan akan bergerak.`)) {
     return { pesan: 'Dibatalkan.', pending: false };
   }
 
@@ -298,6 +309,9 @@ export async function kirimOrderNyata(p: PermintaanNyata): Promise<{ pesan: stri
       method: 'POST', headers: kepala,
       body: JSON.stringify({
         ...medanBursa(p.simbol),
+        /* Urutannya menentukan: tebakan chart dulu sebagai cadangan, lalu
+           pilihan tegas menimpanya. Sama seperti di tutupPosisiNyata. */
+        ...(p.bursa ? { bursa: p.bursa } : {}),
         symbol: p.simbol, side: p.arah, quantity: qtyStr, leverage: p.leverage,
         entryType: p.jenis === 'MARKET' ? 'MARKET' : p.jenis === 'LIMIT' ? 'LIMIT' : 'STOP_MARKET',
         entryPrice: p.jenis === 'MARKET' ? undefined : keStep(p.entry, tickSize, pP),
