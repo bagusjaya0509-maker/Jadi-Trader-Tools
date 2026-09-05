@@ -95,16 +95,48 @@ export class PenggambarAlat implements ISeriesPrimitive<Time> {
     this.minta?.();
   }
 
+  /* ── WAKTU -> KOORDINAT X ──────────────────────────────────────────────
+     Tiga tingkat, dari yang paling bisa dipercaya ke yang paling terakhir.
+
+     ── KENAPA TIDAK CUKUP timeToCoordinate ───────────────────────────────
+     Ia cuma menjawab untuk waktu yang PERSIS jatuh di sebuah bar. Gambar
+     disimpan sebagai stempel waktu mutlak dan hampir tidak pernah jatuh
+     tepat di batas bar timeframe lain — trendline yang ditarik di 1 jam
+     dibuka di 4 jam, stempelnya di menit ke-60 sementara bar 4 jam mulai
+     tiap 4 jam. Jadi untuk gambar lintas timeframe, jawabannya hampir
+     selalu null dan cadangannyalah yang benar-benar dipakai.
+
+     ── KENAPA CADANGAN LAMA DIGANTI ──────────────────────────────────────
+     Sebelumnya cadangannya `logicalToCoordinate(n - 1 + (t - tAkhir)/tfMs)`.
+     Hitungannya benar di atas kertas — diperiksa pada kasus yang dilaporkan
+     (USELESSUSDT 4 jam, garis 02 Sep 09:00 -> 06 Sep 17:00, n=1000,
+     tfMs=4 jam): indeks logikanya 981 dan 1007, dua-duanya di tepi KANAN.
+     Yang tergambar justru garis tegak menempel di tepi KIRI.
+
+     Jadi yang meleset bukan aritmetikanya melainkan sumbu logikanya, dan
+     tingkat kedua ini tidak lagi bergantung padanya: ia berangkat dari
+     koordinat SEBUAH BAR SUNGGUHAN — yang sudah pasti benar karena
+     digambar chart itu sendiri — lalu bergeser sejauh `barSpacing` per
+     bar. Dua besaran yang dua-duanya milik chart, bukan turunan.
+
+     Tingkat ketiga (sumbu logika) dibiarkan sebagai jaring terakhir: kalau
+     bar terakhirnya sendiri tidak punya koordinat, tidak ada jangkar untuk
+     dipakai, dan jawaban lama masih lebih baik daripada tidak menggambar. */
   private X(t: number): number | null {
     const c = this.chart;
     if (!c) return null;
     const skala = c.timeScale();
     const x = skala.timeToCoordinate(Math.floor(t / 1000) as Time);
     if (x != null) return x;
-    /* Waktu di luar data (masa depan / sebelum jendela) — lewat sumbu
-       logika, yang memang tak terbatas. */
+
     const { tAkhir, tfMs, n } = this.meta;
-    if (!n || !tfMs) return null;
+    if (!n || !tfMs || !tAkhir) return null;
+
+    const xAkhir = skala.timeToCoordinate(Math.floor(tAkhir / 1000) as Time);
+    const lebarBar = skala.options().barSpacing;
+    if (xAkhir != null && lebarBar > 0) {
+      return xAkhir + ((t - tAkhir) / tfMs) * lebarBar;
+    }
     return skala.logicalToCoordinate((n - 1 + (t - tAkhir) / tfMs) as Logical);
   }
 
