@@ -32,7 +32,7 @@ import { AvatarAnalis } from '@/components/avatar-analis';
 import { KartuAgenSiaga } from '@/components/kartu-agen-siaga';
 import { ringkasKanal, type RingkasKanal } from '@/lib/ringkas-kanal';
 import { usePinAnalis } from '@/lib/pin-analis';
-import { cn, uang, persen, harga as fHarga, tanggalPendek, tanggalAngka } from '@/lib/utils';
+import { cn, uang, persen, harga as fHarga, tanggalPendek, tanggalAngka, waktuLalu } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 import { useRiwayat, useSaldoAwal } from '@/lib/data';
 import { useHargaPasar, useHargaTradeFi } from '@/lib/harga';
@@ -788,7 +788,18 @@ function KartuAnalisa({ a, status, milikku, onSegarkan, performa, hargaKini }: {
               </span>
             )}
             {a.tf && <span className="angka text-[11px] text-zinc-500">{a.tf}</span>}
-            <span className="text-[11px] text-zinc-600">· {tanggalPendek(a.dibuat)}</span>
+            {/* UMURNYA, bukan tanggalnya. Yang ditanyakan orang saat melihat
+                sinyal bukan "tanggal berapa ini diposting" melainkan "masih
+                baru atau sudah basi" — dan "05 Sep" menuntut pembacanya
+                menghitung sendiri terhadap hari ini.
+
+                Tanggal lengkapnya tidak hilang, ia pindah ke tooltip: yang
+                butuh jam persisnya biasanya sedang mencocokkan sesuatu, dan
+                itu pekerjaan yang jarang tapi harus tetap bisa. */}
+            <span className="text-[11px] text-zinc-600"
+                  title={`Diposting ${tanggalPendek(a.dibuat)} ${new Date(a.dibuat).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`}>
+              · diposting {waktuLalu(a.dibuat)}
+            </span>
             {/* HARGA DI UJUNG BARIS INI, bukan di tengah kartu.
                 Sebelumnya ia berdiri sendiri di antara isi analisa dan
                 tombol, dan di rak mendatar posisinya ikut bergeser

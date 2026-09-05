@@ -20,6 +20,32 @@ export function uang(n: number | null | undefined, tanda = false) {
   return `${awalan}$${s}`;
 }
 
+/** "12 menit lalu", "3 jam lalu", "2 hari lalu" — dan tanggal biasa begitu
+ *  umurnya lewat sebulan.
+ *
+ *  ── KENAPA DI SINI, BUKAN DI KOMPONENNYA ───────────────────────────────
+ *  Fungsi seperti ini sudah ditulis EMPAT KALI di berkas yang berbeda
+ *  (dashboard, kartu-agen-siaga, panel-chart-agen, panel-laporan-pengguna),
+ *  masing-masing dengan ambang batasnya sendiri. Akibatnya kejadian yang
+ *  sama bisa tertulis "1 jam lalu" di satu panel dan "60 menit lalu" di
+ *  panel sebelahnya. Yang kelima tidak ditambahkan; yang ini dipakai
+ *  bersama, dan keempat yang lama boleh menyusul kapan saja.
+ *
+ *  Tanggal dipakai sesudah 30 hari karena di situlah angka relatif berhenti
+ *  membantu: "47 hari lalu" menuntut pembacanya menghitung sendiri, sementara
+ *  "12 Jul" langsung terbaca. */
+export function waktuLalu(ms: number | null | undefined): string {
+  if (typeof ms !== 'number' || !isFinite(ms) || ms <= 0) return '';
+  const jarak = Math.max(0, Date.now() - ms);
+  const menit = Math.floor(jarak / 60_000);
+  if (menit < 1) return 'baru saja';
+  if (menit < 60) return `${menit} menit lalu`;
+  const jam = Math.floor(menit / 60);
+  if (jam < 24) return `${jam} jam lalu`;
+  const hari = Math.floor(jam / 24);
+  return hari < 30 ? `${hari} hari lalu` : tanggalPendek(ms);
+}
+
 export function persen(n: number | null | undefined, desimal = 1) {
   if (typeof n !== 'number' || !isFinite(n)) return '—';
   return `${n.toFixed(desimal)}%`;
