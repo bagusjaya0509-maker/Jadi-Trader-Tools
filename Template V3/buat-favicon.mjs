@@ -43,6 +43,12 @@ const b = await chromium.launch();
 for (const [nama, isi, n, muat, tembus] of [
   ['public/favicon-32.png', svg, 32, 1, true],
   ['public/favicon-48.png', svg, 48, 1, true],
+  /* 96 px ADA KHUSUS UNTUK GOOGLE SEARCH. Panduannya meminta ikon
+     persegi berukuran kelipatan 48, dan ia MELEWATI favicon SVG sama
+     sekali — jadi raster terbesar yang dideklarasikan `link rel=icon`
+     adalah satu-satunya yang bisa dipilihnya. Dengan 48 sebagai yang
+     terbesar, ikon di hasil pencarian diperbesar dari 48 px. */
+  ['public/favicon-96.png', svg, 96, 1, true],
   ['public/apple-touch-icon.png', kotak, 180, 1, true],
   /* purpose "any": tile membulat apa adanya, sama dengan yang di tab. */
   ['public/pwa-192.png', svg, 192, 1, true],

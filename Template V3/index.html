@@ -59,11 +59,26 @@
          sendiri, dan tile yang sudah bulat lalu dimasker lagi menghasilkan
          tepi bergerigi.
 
-         Ketiga PNG dibuat dari favicon.svg yang sama lewat
-         `node buat-favicon.mjs` — bukan digambar ulang satu per satu. -->
+         Semua PNG dibuat dari favicon.svg yang sama lewat
+         `node buat-favicon.mjs` — bukan digambar ulang satu per satu.
+
+         ── 96 DAN 192 ADA UNTUK GOOGLE SEARCH, BUKAN UNTUK TAB ──────────
+         Google MELEWATI favicon SVG sama sekali dan meminta ikon persegi
+         berukuran kelipatan 48. Sampai 6 Sep 2026 raster terbesar yang
+         dideklarasikan di sini cuma 48 px, jadi ikon di hasil pencarian
+         diperbesar dari berkas 48 px — dan yang tampil di layar ponsel
+         berdiameter jauh lebih besar dari itu.
+
+         Ditaruh SESUDAH 32 dan 48, bukan sebelumnya: peramban memakai yang
+         pertama ia mengerti, dan Safari yang mengambil 192 px untuk petak
+         16 px di bilah tab cuma memboroskan unduhan. Google membaca seluruh
+         daftar lalu memilih yang paling cocok, jadi urutan tidak
+         merugikannya. -->
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
     <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32.png" />
     <link rel="icon" type="image/png" sizes="48x48" href="./favicon-48.png" />
+    <link rel="icon" type="image/png" sizes="96x96" href="./favicon-96.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="./pwa-192.png" />
     <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
 
     <!-- ── PASANG SEBAGAI APLIKASI ──────────────────────────────────────
