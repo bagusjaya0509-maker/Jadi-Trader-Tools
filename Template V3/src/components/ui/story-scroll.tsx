@@ -228,6 +228,119 @@ const FlowArt: React.FC<FlowArtProps> = ({
     { scope: containerRef, dependencies: [childCount(children), reducedMotion] },
   );
 
+  /* ══ BERGULIR SENDIRI ══════════════════════════════════════════════════
+     Diminta pemilik 6 Sep 2026, dan ia memperbaiki cacat yang sudah terukur
+     waktu turnya dipanjangkan jadi delapan layar: kotak ini MENAHAN roda
+     tetikus (data-lenis-prevent) sampai isinya habis. Delapan seksi = 4.512
+     px gulir di dalam kotak sebelum halaman mau bergerak sedikit pun —
+     sekitar empat puluh putaran roda. Pengunjung yang cuma ingin membaca
+     ke bawah merasa halamannya macet.
+
+     Sekarang turnya berjalan sendiri, dan yang tidak tertarik tinggal
+     menunggu beberapa detik sampai kotaknya habis lalu halaman lanjut.
+
+     ── SEKALI JALAN, TIDAK BERPUTAR ─────────────────────────────────────
+     Godaan besarnya membuatnya berulang. Dua sebab kenapa tidak:
+     pertama, kembali ke seksi 01 berarti kotaknya menahan roda LAGI, jadi
+     jebakannya kembali tiap satu putaran. Kedua, orang yang sedang membaca
+     keterangan seksi 08 akan disentak balik ke awal tanpa pernah memintanya.
+     Berhenti di seksi terakhir membuat kotaknya "habis" — dan kotak yang
+     habis meneruskan gulirannya ke halaman seperti kotak biasa.
+
+     ── BERHENTI PERMANEN BEGITU DISENTUH ────────────────────────────────
+     Sekali orangnya menggulir, menyeret, atau menekan tombol panah, dia
+     yang memegang kendali dan tidak dikembalikan. Carousel yang menyambung
+     lagi sesudah diambil alih adalah carousel yang berebut dengan
+     pembacanya — dan yang kalah selalu pembacanya, karena mesin tidak
+     pernah lelah.
+
+     ── BARU MULAI SAAT BENAR-BENAR TERLIHAT ─────────────────────────────
+     Tanpa IntersectionObserver, turnya sudah habis sebelum orangnya sampai
+     ke situ: halaman depan dibuka di atas, kotak ini beberapa layar di
+     bawah. Yang tersisa cuma seksi terakhir, dan tujuh layar pertama tidak
+     pernah dilihat siapa pun. */
+  useEffect(() => {
+    const kotak = containerRef.current;
+    if (!kotak || reducedMotion) return;
+
+    const seksi = Array.from(kotak.querySelectorAll<HTMLElement>('[data-flow-section]'));
+    if (seksi.length < 2) return;
+
+    let hidup = true;
+    let diambilAlih = false;
+    let jam = 0;
+    let rafId = 0;
+
+    const berhenti = () => {
+      diambilAlih = true;
+      window.clearTimeout(jam);
+      cancelAnimationFrame(rafId);
+    };
+    /* `passive` — pendengar ini TIDAK pernah memanggil preventDefault, dan
+       tanpa penanda itu peramban menahan guliran sepersekian detik menunggu
+       kepastian. Di kotak yang justru urusannya menggulir, jeda itu terasa. */
+    const opsi = { passive: true } as AddEventListenerOptions;
+    ['wheel', 'touchstart', 'pointerdown', 'keydown'].forEach((n) =>
+      kotak.addEventListener(n, berhenti, opsi));
+
+    /* Satu langkah = satu tinggi kotak, dianimasikan sendiri alih-alih
+       `behavior:'smooth'`. Durasi bawaan peramban tidak bisa diatur dan
+       berbeda-beda; ScrollTrigger di sini memakai scrub 0,4 yang perlu
+       laju yang bisa ditebak supaya rotasinya tidak tersendat. */
+    const luncur = (ke: number, lama: number) => {
+      const dari = kotak.scrollTop;
+      const jarak = ke - dari;
+      const mulai = performance.now();
+      const langkah = (kini: number) => {
+        if (!hidup || diambilAlih) return;
+        const t = Math.min(1, (kini - mulai) / lama);
+        /* easeInOutCubic: berangkat dan mendarat pelan. Laju rata membuat
+           tiap perpindahan terbaca sebagai sentakan mekanis. */
+        const e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+        kotak.scrollTop = dari + jarak * e;
+        if (t < 1) rafId = requestAnimationFrame(langkah);
+        else jadwalkan();
+      };
+      rafId = requestAnimationFrame(langkah);
+    };
+
+    const JEDA_BACA = 3200;   // waktu berhenti di tiap layar
+    const LAMA_GESER = 950;
+
+    /* Deklarasi fungsi, bukan const — `luncur` di atas memanggilnya dan ia
+       memanggil `luncur`, jadi salah satunya harus terangkat. Akibatnya
+       TypeScript kehilangan penyempitan `kotak` di sini (badan fungsi
+       terangkat dianggap bisa jalan sebelum penjaganya), jadi elemennya
+       dibaca ulang di dalam — sekaligus benar secara perilaku: kalau
+       komponennya sudah dilepas, `current` memang sudah null. */
+    function jadwalkan() {
+      const k = containerRef.current;
+      if (!hidup || diambilAlih || !k) return;
+      const maks = k.scrollHeight - k.clientHeight;
+      if (k.scrollTop >= maks - 2) return;   // sudah di seksi terakhir
+      jam = window.setTimeout(() => {
+        if (!hidup || diambilAlih) return;
+        luncur(Math.min(maks, k.scrollTop + k.clientHeight), LAMA_GESER);
+      }, JEDA_BACA);
+    }
+
+    const pengamat = new IntersectionObserver((entri) => {
+      for (const e of entri) {
+        if (e.isIntersecting && !diambilAlih) { pengamat.disconnect(); jadwalkan(); }
+      }
+    }, { threshold: 0.5 });
+    pengamat.observe(kotak);
+
+    return () => {
+      hidup = false;
+      pengamat.disconnect();
+      window.clearTimeout(jam);
+      cancelAnimationFrame(rafId);
+      ['wheel', 'touchstart', 'pointerdown', 'keydown'].forEach((n) =>
+        kotak.removeEventListener(n, berhenti, opsi));
+    };
+  }, [reducedMotion, childCount(children)]);
+
   return (
     <main
       ref={containerRef}
