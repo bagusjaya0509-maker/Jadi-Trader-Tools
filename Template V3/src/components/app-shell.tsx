@@ -177,6 +177,7 @@ const NAV = [
           { ke: '/integrations',             label: 'Connection' },
           { ke: '/integrations?tab=mt5',     label: 'Tutorial Pasang MT5' },
           { ke: '/integrations?tab=binance', label: 'Tutorial Connect Binance' },
+          { ke: '/integrations?tab=hl',      label: 'Tutorial Connect Hyperliquid' },
         ] },
     ],
   },

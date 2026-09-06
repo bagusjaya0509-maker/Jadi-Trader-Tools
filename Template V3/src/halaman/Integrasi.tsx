@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import {
   CheckCircle2, Circle, Copy, Eye, EyeOff, RefreshCw, Download,
   ShieldCheck, TriangleAlert, Plug, Link2Off, Activity, Server,
-  Radio, BookOpen, FileCode2,
+  Radio, BookOpen, FileCode2, Waves, Wallet, Loader2,
 } from 'lucide-react';
 import { Panel, PanelHead, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { TutorialVps } from '@/components/tutorial-vps';
@@ -14,17 +14,41 @@ import { useKodeMt5, useAkunMt5, versiKurangDari, VERSI_EA_PENDING,
 import { tautanBerkas } from '@/lib/admin';
 import { useAuth } from '@/lib/auth';
 import { usePaket } from '@/lib/paket';
+/* `dex-dompet` TIDAK punya satu pun impor — ia cuma bicara ke
+   `window.ethereum` dan localStorage, jadi menariknya ke halaman ini tidak
+   menambah sebiji pun ke bundelnya.
+   `dex-hl` beda: ia membawa SDK Hyperliquid dan viem. Ia diimpor dinamis
+   di dalam `aktifkanAgen`, jadi yang tidak pernah menekan tombolnya tidak
+   pernah mengunduhnya. */
+import {
+  adaDompet, sambungDompet, alamatTersambung, rantaiKini,
+  bacaAgen, hapusAgen, agenKedaluwarsa, type AgenTersimpan,
+} from '@/lib/dex-dompet';
+import { tautkanDompetDiam } from '@/lib/profil-pengguna';
 
 /* ════════════════════════════════════════════════════════════════════════
-   INTEGRATIONS — sambungan ke MetaTrader 5 dan Binance
+   INTEGRATIONS — MetaTrader 5, Binance, Hyperliquid, dan dompet Web3
    ════════════════════════════════════════════════════════════════════════
-   Dua sambungan ini sengaja dipisah menjadi dua kartu besar, bukan satu form
-   panjang, karena SIFAT RISIKONYA berbeda jauh:
+   Tiap sambungan dapat kartunya sendiri, bukan satu form panjang, karena
+   SIFAT RISIKONYA berbeda jauh:
 
      • MT5  — BACA-SAJA. EA hanya mengirim saldo, posisi, dan riwayat.
               Kalau kodenya bocor, yang terjadi cuma jurnal orang lain terisi.
      • Binance — MENGEKSEKUSI ORDER dengan uang sungguhan. Kalau App Token
               bocor, orang lain bisa membuka dan menutup posisi di akunmu.
+     • Hyperliquid — sama seperti Binance, dan lewat pintu yang sama persis:
+              App Token. Bedanya kuncinya tidak diketik di halaman ini
+              melainkan di .env backend sendiri, jadi yang bisa dilakukan
+              layar cuma MELAPORKAN, bukan menyambungkan.
+     • Dompet Web3 — satu-satunya yang kuncinya milik PENGGUNA. Ordernya
+              tidak lewat VPS sama sekali.
+
+   ── KENAPA HYPERLIQUID BARU MUNCUL DI SINI 6 SEP 2026 ───────────────────
+   Ordernya sudah berjalan berminggu-minggu sebelum halaman ini menyebutnya
+   sekali pun. Yang tertulis di layar "1 dari 2 aktif", dan siapa pun yang
+   membacanya menyimpulkan Hyperliquid belum ada. Satu-satunya cara
+   membuktikan sebaliknya adalah membuka .env di VPS lewat SSH — dan alat
+   yang cuma bisa dibuktikan lewat SSH sama saja dengan tidak ada.
 
    Baris status di atas TIDAK memakai KartuKpi seperti halaman lain, dan itu
    disengaja. Empat kotak angka besar cocok untuk halaman yang isinya laporan;
@@ -162,9 +186,10 @@ function Langkah({ no, judul, anak }: { no: number; judul: string; anak: React.R
    halaman pertama tinggal denyut sambungan — pendek, langsung terbaca.
    ════════════════════════════════════════════════════════════════════════ */
 const TAB_INT = [
-  { id: 'sehat',   label: 'Connection',        judul: 'Sambungan',                sub: 'Semua tombol menyambung ada di sini: MT5 dan Binance. Panduannya di dua tab sebelah.' },
+  { id: 'sehat',   label: 'Connection',        judul: 'Sambungan',                sub: 'Semua tombol menyambung ada di sini: MT5, Binance, Hyperliquid, dan dompet Web3. Panduannya di tab sebelah.' },
   { id: 'mt5',     label: 'Tutorial Pasang MT5',      judul: 'Tutorial Pasang EA di MetaTrader 5', sub: 'Enam langkah pemasangan dan daftar gejala kalau tidak jalan.' },
   { id: 'binance', label: 'Tutorial Connect Binance', judul: 'Tutorial Connect Binance',          sub: 'Dari membuat kunci API sampai order pertama berangkat.' },
+  { id: 'hl',      label: 'Tutorial Connect Hyperliquid', judul: 'Tutorial Connect Hyperliquid',  sub: 'Tiga baris di .env backend-mu sendiri, dan kenapa kunci yang dipakai bukan kunci dompet utama.' },
 ] as const;
 type IdTabInt = typeof TAB_INT[number]['id'];
 
@@ -326,16 +351,132 @@ export default function Integrasi() {
      "Belum terbaca" — BUKAN ditebak salah satunya. Menebak "Testnet" waktu
      tidak tahu persis mengulang kesalahan yang sedang diperbaiki. */
   const [baseUrlServer, setBaseUrlServer] = useState<string | null>(null);
+  /* ── KEADAAN HYPERLIQUID, DARI BACKEND YANG SAMA ─────────────────────
+     Kunci Hyperliquid tidak pernah lewat halaman ini — ia tinggal di .env
+     backend milik orangnya. Jadi yang bisa dikerjakan layar cuma BERTANYA,
+     dan pertanyaannya harus lebih tajam daripada "hidup atau mati": tiga
+     baris .env yang berbeda bisa jadi sebabnya, dan menebak yang mana
+     berarti menyunting berkas di server tiga kali sampai kebetulan benar.
+
+     Alamat akunnya cuma dipulangkan server kalau tokennya ikut dikirim —
+     alamat dompet yang bisa dibaca tanpa izin berarti posisi pemiliknya
+     bisa diintip tanpa izin. Karena itu efek ini ikut bergantung pada
+     `tersimpan`: begitu tokennya disimpan, pertanyaannya diulang dan
+     alamatnya menyusul. */
+  const [hl, setHl] = useState<{ siap: boolean; aktif: boolean; adaAkun: boolean; adaKunci: boolean; akun?: string } | null>(null);
   useEffect(() => {
     let hidup = true;
-    fetch(alamatBackend + '/api/health')
+    const k = bacaKoneksi();
+    fetch(alamatBackend + '/api/health',
+          k.token.trim() ? { headers: { 'X-App-Token': k.token.trim() } } : undefined)
       .then((r) => r.json())
-      .then((j) => { if (hidup) setBaseUrlServer(typeof j?.baseUrl === 'string' ? j.baseUrl : null); })
-      .catch(() => { if (hidup) setBaseUrlServer(null); });
+      .then((j) => {
+        if (!hidup) return;
+        setBaseUrlServer(typeof j?.baseUrl === 'string' ? j.baseUrl : null);
+        setHl(j?.hl && typeof j.hl === 'object' ? j.hl : null);
+      })
+      .catch(() => { if (hidup) { setBaseUrlServer(null); setHl(null); } });
     return () => { hidup = false; };
-  }, [alamatBackend]);
+  }, [alamatBackend, tersimpan]);
   const modeTestnet = baseUrlServer !== null && /testnet/i.test(baseUrlServer);
   const labelMode = baseUrlServer === null ? 'Belum terbaca' : modeTestnet ? 'Testnet' : 'Live';
+
+  const hlSiap = hl?.siap === true;
+  /* Satu kalimat yang menyebut PERSIS apa yang kurang, bukan "belum aktif".
+     Urutannya mengikuti urutan orang mengisinya. */
+  const hlKurang = !hl ? 'Backend belum menjawab — isi Backend URL dulu'
+    : !hl.aktif ? 'HL_AKTIF belum diisi 1 di .env backend'
+    : !hl.adaAkun ? 'HL_AKUN (alamat dompet) belum diisi'
+    : !hl.adaKunci ? 'HL_AGENT_KEY belum diisi'
+    : 'Belum aktif';
+  const hlSyarat: [string, boolean, string][] = [
+    ['HL_AKTIF=1', hl?.aktif === true, 'Sakelar utama. Sengaja harus ditulis 1 — sesuatu yang bisa membuka posisi tidak boleh menyala cuma karena barisnya kosong.'],
+    ['HL_AKUN', hl?.adaAkun === true, 'Alamat dompet Hyperliquid-mu. Publik di rantai, aman ditulis di .env.'],
+    ['HL_AGENT_KEY', hl?.adaKunci === true, 'Kunci agent wallet — bisa membuka dan menutup posisi, dan secara protokol tidak bisa menarik dana keluar.'],
+  ];
+
+  /* ── DOMPET WEB3 ───────────────────────────────────────────────────────
+     Kartu keempat, dan satu-satunya yang kuncinya milik PENGGUNA. Ia
+     berdiri di halaman yang sama dengan tiga kartu lain atas permintaan
+     pemilik 6 Sep 2026 — "biar jadi 1 halaman" — sementara panel ordernya
+     tetap di sisi Chart & Entry. Yang pindah ke sini SAMBUNGANNYA, bukan
+     panel ordernya: halaman ini menjawab "sudah tersambung apa saja", bukan
+     "mau beli berapa".
+
+     Gerbangnya `pemilik`, SAMA PERSIS dengan tombol Dompet di Chart & Entry
+     dan halaman /dex. Itu bukan kehati-hatian yang diwarisi tanpa dipikir:
+     menyediakan akses perpetual futures ke pengguna ritel lewat frontend
+     sendiri adalah kegiatan yang diatur, dan non-kustodial tidak otomatis
+     membebaskan. Menambah pintu keempat tanpa gerbang berarti membuka
+     seluruhnya lewat pintu belakang. */
+  const [alamatW, setAlamatW] = useState<string | null>(null);
+  const [rantaiW, setRantaiW] = useState<number>(0);
+  const [agenW, setAgenW] = useState<AgenTersimpan | null>(null);
+  const [sibukW, setSibukW] = useState('');
+  const [galatW, setGalatW] = useState('');
+  const [kabarW, setKabarW] = useState('');
+  useEffect(() => {
+    if (!pemilik || !adaDompet()) return;
+    let hidup = true;
+    /* alamatTersambung() TIDAK memunculkan dialog dompet — ia cuma bertanya
+       akun mana yang sudah pernah diizinkan. Memanggil sambungDompet() di
+       sini akan membuka MetaMask tiap kali halaman ini dibuka. */
+    void alamatTersambung().then((a) => {
+      if (!hidup || !a) return;
+      setAlamatW(a); setAgenW(bacaAgen(a));
+      void rantaiKini().then((r) => { if (hidup) setRantaiW(r); });
+    });
+    return () => { hidup = false; };
+  }, [pemilik]);
+  const agenSiapW = !!agenW && !agenKedaluwarsa(agenW);
+  const sisaHariW = agenW ? Math.max(0, Math.ceil((agenW.sampai - Date.now()) / 86400000)) : 0;
+  const pendekAlamat = (a: string) => a.slice(0, 6) + '…' + a.slice(-4);
+
+  async function jalanW(nama: string, kerja: () => Promise<void>) {
+    setGalatW(''); setKabarW(''); setSibukW(nama);
+    try { await kerja(); }
+    catch (e) {
+      /* Penolakan di dompet BUKAN kegagalan sistem. Menampilkannya sebagai
+         galat merah panjang membuat orang mengira ada yang rusak padahal ia
+         sendiri yang menekan "tolak". */
+      const t = e instanceof Error ? e.message : String(e);
+      setGalatW(/user rejected|denied|4001/i.test(t) ? 'Tanda tangan dibatalkan di dompet.' : t);
+    }
+    finally { setSibukW(''); }
+  }
+
+  const sambungW = () => jalanW('sambung', async () => {
+    const a = await sambungDompet();
+    setAlamatW(a);
+    /* Ditautkan ke akun Google-nya supaya jurnal on-chain tahu alamat siapa
+       yang harus dibaca saat dompetnya sedang tidak terbuka sama sekali. */
+    tautkanDompetDiam(a);
+    setAgenW(bacaAgen(a));
+    setRantaiW(await rantaiKini());
+  });
+
+  const aktifkanAgenW = () => jalanW('agen', async () => {
+    if (!alamatW) return;
+    /* Impor DINAMIS: `dex-hl` membawa SDK Hyperliquid dan viem. Halaman
+       Integrations dibuka jauh lebih sering daripada tombol ini ditekan. */
+    const { setujuiAgen } = await import('@/lib/dex-hl');
+    const a = await setujuiAgen(alamatW);
+    setAgenW(a);
+    setKabarW('Trading aktif. Agent wallet ' + pendekAlamat(a.alamat) + ' berlaku '
+      + Math.round((a.sampai - Date.now()) / 86400000) + ' hari.');
+  });
+
+  const lepasAgenW = () => {
+    if (!alamatW) return;
+    if (!confirm('Hapus agent wallet dari peramban ini?\n\n'
+      + 'Posisi yang sedang terbuka TIDAK ikut tertutup — ia tetap hidup di Hyperliquid '
+      + 'dan bisa diurus dari app.hyperliquid.xyz.\n\n'
+      + 'Persetujuan di sisi Hyperliquid tidak ikut dicabut; untuk mencabutnya, '
+      + 'buka Hyperliquid → API lalu hapus agent "jaditrader".')) return;
+    hapusAgen(alamatW);
+    setAgenW(null);
+    setGalatW(''); setKabarW('');
+  };
 
   return (
     <div className="p-4 sm:p-6">
@@ -370,15 +511,18 @@ export default function Integrasi() {
       <Panel>
         <PanelHead
           judul="Connection health"
-          sub="Dua mesin yang melayani halaman ini, dan seberapa cepat keduanya menjawab."
+          sub="Tiga mesin yang melayani halaman ini, dan seberapa cepat ketiganya menjawab."
           kanan={
             <span className="inline-flex items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900/60 px-2.5 py-1.5 text-[11.5px] text-zinc-400">
               <Activity className="size-3.5 text-emerald-500" strokeWidth={2} />
-              {Number(mt5Tersambung) + Number(binanceTersambung)} dari 2 aktif
+              {Number(mt5Tersambung) + Number(binanceTersambung) + Number(hlSiap)} dari 3 aktif
             </span>
           }
         />
-        <div className="grid grid-cols-1 gap-3 px-5 pb-5 lg:grid-cols-[1fr_1fr_260px]">
+        {/* Tiga ubin, bukan dua. Grafik latensi turun ke baris sendiri di
+            layar sedang: memaksanya berdampingan dengan tiga ubin membuat
+            keempatnya sempit dan tidak ada satu pun yang terbaca. */}
+        <div className="grid grid-cols-1 gap-3 px-5 pb-5 md:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_240px]">
           <Ubin
             Ikon={Radio} nama="MetaTrader 5" hidup={mt5Tersambung}
             ket={mt5Tersambung ? 'EA mengirim tiap 20 detik' : 'EA belum melapor'}
@@ -392,6 +536,20 @@ export default function Integrasi() {
             : uji === 'takTerjangkau' ? 'Alamat backend tidak terjangkau'
             : 'Backend URL / token belum diisi'}
             stat={[['Mode', binanceTersambung ? labelMode : '—'], ['Trade masuk', '94 kripto']]}
+          />
+          {/* Lewat backend yang SAMA dengan Binance, jadi ia tidak punya
+              alamat maupun token sendiri — yang membedakan cuma tiga baris
+              di .env. Karena itu barisan statnya menyebut akunnya, bukan
+              latensinya: pertanyaan yang sungguh dibawa orang ke sini adalah
+              "akun mana yang dipakai", bukan "berapa milidetik". */}
+          <Ubin
+            Ikon={Waves} nama="Hyperliquid" hidup={hlSiap}
+            ket={hlSiap ? 'Order, SL/TP, dan tutup posisi aktif' : hlKurang}
+            stat={[
+              ['Akun', hl?.akun ? hl.akun.slice(0, 6) + '…' + hl.akun.slice(-4)
+                     : hlSiap ? 'Simpan token dulu' : '—'],
+              ['Pasar', 'Perp on-chain'],
+            ]}
           />
           <GarisLatensi />
         </div>
@@ -781,8 +939,255 @@ export default function Integrasi() {
             </div>
           </div>
         </Panel>
+
+        {/* ── HYPERLIQUID ─────────────────────────────────────────────────
+            TANPA KOTAK ISIAN, dan itu bukan kekurangan melainkan bentuk yang
+            benar. Kunci agent Hyperliquid tinggal di .env backend milik
+            orangnya; halaman ini tidak pernah memegangnya, jadi kotak isian
+            di sini akan menjanjikan sesuatu yang tidak bisa ditepatinya.
+
+            Yang bisa dikerjakan layar: BERTANYA ke backend, lalu mengatakan
+            persis baris mana yang belum terisi. */}
+        <Panel className="border-sky-500/25">
+          <PanelHead
+            judul="Hyperliquid"
+            sub="Perp on-chain lewat backend yang sama dengan Binance. Kuncinya di .env-mu, bukan di sini."
+            kanan={<StatusPil tersambung={hlSiap} />}
+          />
+          <div className="px-5 pb-5">
+            <div className="mb-4 flex items-start gap-2.5 rounded-lg border border-sky-500/25 bg-sky-500/[0.06] p-3">
+              <ShieldCheck className="mt-0.5 size-4 shrink-0 text-sky-400" strokeWidth={2} />
+              <div className="text-[12.5px] leading-relaxed text-zinc-300">
+                Yang dipakai <span className="font-medium text-sky-300">agent wallet</span>, bukan kunci dompet
+                utamamu. Ia bisa membuka dan menutup posisi, dan secara protokol{' '}
+                <span className="font-medium text-sky-300">tidak bisa menarik dana keluar</span> — itu jaminan
+                Hyperliquid, bukan janji kami.
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              {hlSyarat.map(([nama, ada, ket]) => (
+                <div key={nama} className="flex items-start gap-2.5 rounded-lg border border-zinc-800/70 bg-zinc-900/40 p-3">
+                  {ada
+                    ? <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-500" strokeWidth={2} />
+                    : <Circle className="mt-0.5 size-4 shrink-0 text-zinc-600" strokeWidth={2} />}
+                  <div className="min-w-0">
+                    <div className="angka text-[12.5px] text-zinc-200">{nama}</div>
+                    <div className="mt-0.5 text-[11.5px] leading-relaxed text-zinc-500">{ket}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {hl?.akun && (
+              <p className="mt-3 text-[11.5px] text-zinc-500">
+                Akun yang dipakai backend:{' '}
+                <span className="angka text-zinc-300">{hl.akun}</span>
+              </p>
+            )}
+            {hlSiap && !hl?.akun && (
+              <p className="mt-3 text-[11.5px] text-zinc-600">
+                Alamat akunnya cuma dipulangkan kalau App Token ikut dikirim. Simpan token di kartu
+                Binance di atas, lalu muat ulang halaman ini.
+              </p>
+            )}
+            {!hl && (
+              <p className="mt-3 rounded-md border border-zinc-800 bg-zinc-900/40 px-3 py-2 text-[11.5px] leading-relaxed text-zinc-500">
+                Backend belum menjawab. Isi <span className="text-zinc-300">Backend URL</span> di kartu Binance
+                dulu — Hyperliquid memakai alamat yang sama, tidak ada alamat kedua yang perlu diisi.
+              </p>
+            )}
+
+            <div className="mt-4">
+              <button onClick={() => setTab('hl')}
+                className="flex cursor-pointer items-center gap-2 rounded-md border border-zinc-800 px-3.5 py-2 text-[12.5px] text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100">
+                <BookOpen className="size-3.5" /> Buka panduannya
+              </button>
+            </div>
+          </div>
+        </Panel>
+
+        {/* ── DOMPET WEB3 ─────────────────────────────────────────────────
+            Gerbang `pemilik` sama persis dengan tombol Dompet di Chart &
+            Entry dan halaman /dex — lihat catatan panjang di dekat
+            deklarasi alamatW. Kartunya TIDAK dirender sama sekali untuk yang
+            lain, bukan dirender lalu dimatikan: kartu mati di halaman ini
+            mengajak orang bertanya kenapa, dan jawabannya panjang. */}
+        {pemilik && (
+        <Panel className="border-violet-500/25">
+          <PanelHead
+            judul="Dompet Web3"
+            sub="Trading dengan dompetmu sendiri. Ordernya tidak lewat VPS sama sekali."
+            kanan={<StatusPil tersambung={agenSiapW} />}
+          />
+          <div className="px-5 pb-5">
+            <div className="mb-4 flex items-start gap-2.5 rounded-lg border border-violet-500/25 bg-violet-500/[0.06] p-3">
+              <Wallet className="mt-0.5 size-4 shrink-0 text-violet-300" strokeWidth={2} />
+              <div className="text-[12.5px] leading-relaxed text-zinc-300">
+                Satu-satunya sambungan di halaman ini yang kuncinya milikmu sendiri. Kami tidak pernah
+                meminta seed phrase maupun kunci privat dompet utama, dan tidak punya kotak isian untuknya —
+                dompet utama cuma diminta <span className="font-medium text-violet-200">menandatangani</span>.
+              </div>
+            </div>
+
+            {!adaDompet() ? (
+              <p className="text-[12.5px] leading-relaxed text-zinc-400">
+                Tidak ada dompet di peramban ini. Pasang MetaMask atau Rabby dulu, lalu muat ulang halaman.
+              </p>
+            ) : !alamatW ? (
+              <>
+                <p className="mb-3 text-[12.5px] leading-relaxed text-zinc-400">
+                  Hubungkan dompet yang sudah punya saldo di Hyperliquid. Menyambung hanya memberi tahu
+                  alamatmu — belum ada satu pun yang bisa dikirim atas namamu.
+                </p>
+                <button onClick={sambungW} disabled={!!sibukW}
+                  className="flex cursor-pointer items-center gap-2 rounded-md bg-zinc-100 px-3.5 py-2 text-[12.5px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-40">
+                  {sibukW === 'sambung' ? <Loader2 className="size-3.5 animate-spin" /> : <Wallet className="size-3.5" />}
+                  Hubungkan dompet
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  <span className="angka rounded bg-zinc-800 px-2 py-1 text-[11.5px] text-zinc-200">{pendekAlamat(alamatW)}</span>
+                  <span className="text-[11px] text-zinc-500">chain {rantaiW || '—'}</span>
+                  {/* Dua akun, dan bedanya bukan soal tampilan. Chart & Entry
+                      memakai akun milik backend; kartu ini memakai dompet yang
+                      barusan disambungkan. Hyperliquid memperlakukan
+                      sub-account sebagai akun yang sepenuhnya terpisah. */}
+                  <span className="text-[11px] text-zinc-600"
+                        title="Kartu Hyperliquid di atas memakai akun milik backend, bukan dompet ini. Posisi keduanya tidak saling terlihat.">
+                    · terpisah dari akun backend di kartu sebelah
+                  </span>
+                </div>
+
+                {agenSiapW ? (
+                  <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/[0.04] p-3 text-[12.5px] leading-relaxed text-zinc-300">
+                    Trading aktif lewat agent wallet{' '}
+                    <span className="angka text-zinc-100">{pendekAlamat(agenW!.alamat)}</span> — sisa{' '}
+                    <span className="text-emerald-300">{sisaHariW} hari</span>. Panel ordernya ada di tombol
+                    Dompet pada Chart &amp; Entry.
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-zinc-800/70 bg-zinc-900/40 p-3">
+                    <p className="mb-2.5 text-[12.5px] leading-relaxed text-zinc-400">
+                      {agenW
+                        ? 'Agent wallet di peramban ini sudah kedaluwarsa. Aktifkan ulang untuk trading.'
+                        : 'Satu tanda tangan untuk mengaktifkan trading. Yang disetujui adalah agent wallet '
+                          + 'yang dibuat di peramban ini — ia bisa membuka dan menutup posisi, dan secara '
+                          + 'protokol tidak bisa menarik dana keluar.'}
+                    </p>
+                    <button onClick={aktifkanAgenW} disabled={!!sibukW}
+                      className="flex cursor-pointer items-center gap-2 rounded-md bg-zinc-100 px-3.5 py-2 text-[12.5px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-40">
+                      {sibukW === 'agen' ? <Loader2 className="size-3.5 animate-spin" /> : <ShieldCheck className="size-3.5" />}
+                      Aktifkan trading
+                    </button>
+                  </div>
+                )}
+
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {agenW && (
+                    <button onClick={lepasAgenW}
+                      className="flex cursor-pointer items-center gap-2 rounded-md border border-zinc-800 px-3 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100">
+                      <Link2Off className="size-3.5" /> Hapus agent dari peramban ini
+                    </button>
+                  )}
+                  {kabarW && <span className="text-[12px] text-emerald-400">{kabarW}</span>}
+                  {galatW && <span className="text-[12px] text-red-400">{galatW}</span>}
+                </div>
+              </>
+            )}
+          </div>
+        </Panel>
+        )}
       </div>
       </>)}
+
+      {/* ── Panduan menyambung Hyperliquid ─────────────────────
+          BUKAN panduan mengisi formulir, karena tidak ada formulirnya. Yang
+          diatur di sini berkas .env di server orangnya sendiri — jadi
+          panduannya berbentuk tiga baris yang harus ada di sana, bukan enam
+          langkah menekan tombol.
+
+          Kuncinya TIDAK PERNAH ditulis contohnya secara utuh, bahkan sebagai
+          contoh palsu. Kunci berbentuk lengkap di layar mengundang orang
+          menyalin-tempelnya balik ke tempat lain untuk "membandingkan". */}
+      {tab === 'hl' && (
+        <Panel>
+          <div className="px-5 py-5">
+            <div className="mb-4 flex items-start gap-2.5 rounded-lg border border-sky-500/25 bg-sky-500/[0.06] p-3">
+              <ShieldCheck className="mt-0.5 size-4 shrink-0 text-sky-400" strokeWidth={2} />
+              <div className="text-[12.5px] leading-relaxed text-zinc-300">
+                Yang dipasang di backend <span className="font-medium text-sky-300">agent wallet</span>, bukan kunci
+                dompet utamamu. Agent bisa membuka dan menutup posisi, dan secara protokol tidak bisa
+                menarik dana keluar — jadi kalaupun berkas .env-mu bocor, saldonya tidak bisa dibawa pergi.
+                Jangan pernah menaruh seed phrase atau kunci dompet utama di sana.
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-zinc-800/60 p-4">
+              <div className="text-[11.5px] font-medium uppercase tracking-wider text-zinc-500">
+                Cara menyambung — 4 langkah
+              </div>
+              <div className="mt-3">
+                <Langkah no={1} judul="Siapkan akun Hyperliquid" anak={
+                  <>Buka <span className="text-zinc-300">app.hyperliquid.xyz</span>, hubungkan dompetmu, lalu
+                    setor USDC ke perps. Hanya USDC yang bisa jadi margin — token spot lain terhitung
+                    kepemilikan, bukan daya beli.</>
+                } />
+                <Langkah no={2} judul="Buat agent wallet (API wallet)" anak={
+                  <>Di Hyperliquid: <span className="text-zinc-300">More → API</span>, beri nama misalnya
+                    <span className="angka text-zinc-300"> jaditrader</span>, lalu buat. Yang muncul sekali
+                    dan tidak bisa dilihat lagi adalah <span className="text-zinc-300">kunci privat agent</span>-nya.
+                    <span className="mt-1 block text-zinc-600">Simpan langsung ke tempat tujuannya. Kunci yang sempat
+                    mampir di catatan, chat, atau tangkapan layar harus dianggap bocor dan dibuat ulang.</span></>
+                } />
+                <Langkah no={3} judul="Isi tiga baris di .env backend" anak={
+                  <>Di server tempat backend-mu berjalan, buka berkas
+                    <span className="angka text-zinc-300"> .env</span> lalu tambahkan:
+                    <span className="mt-1.5 block">
+                      <code className="angka block whitespace-pre-line rounded border border-zinc-800 bg-zinc-900 px-2.5 py-2 text-[11.5px] leading-relaxed text-zinc-300">
+                        HL_AKTIF=1{'\n'}HL_AKUN=0x…alamat dompetmu…{'\n'}HL_AGENT_KEY=0x…kunci agent tadi…
+                      </code>
+                    </span>
+                    <span className="mt-1 block text-zinc-600">
+                      <span className="angka text-zinc-500">HL_AKTIF</span> sengaja harus ditulis <b>1</b>, bukan
+                      sekadar "tidak nol": sesuatu yang bisa membuka posisi dengan uang sungguhan tidak boleh
+                      menyala hanya karena barisnya kosong.
+                    </span>
+                    <span className="mt-1 block text-zinc-600">
+                      Dua baris pilihan: <span className="angka text-zinc-500">HL_MAKS_USD</span> dan{' '}
+                      <span className="angka text-zinc-500">HL_MAKS_LEV</span> membatasi ukuran dan leverage untuk
+                      mesin salin dompet. Bawaannya 60 dan 3.
+                    </span></>
+                } />
+                <Langkah no={4} judul="Nyalakan ulang backend, lalu muat ulang halaman ini" anak={
+                  <>Contohnya <span className="angka text-zinc-300">pm2 restart binance-backend</span>. Kartu
+                    Hyperliquid di tab <span className="text-zinc-300">Connection</span> akan berubah jadi
+                    Connected, dan ketiga baris tadi bercentang satu per satu.
+                    <span className="mt-1 block text-zinc-600">Kalau masih abu-abu, kartunya menyebut baris mana
+                    yang belum terbaca — tidak perlu menebak.</span></>
+                } />
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-lg border border-zinc-800/60 p-4">
+              <div className="text-[11.5px] font-medium uppercase tracking-wider text-zinc-500">
+                Sesudah tersambung
+              </div>
+              <ul className="mt-2.5 space-y-1.5 text-[12.5px] leading-relaxed text-zinc-400">
+                <li>· Koin yang tidak ada di Binance Futures dirutekan sendiri ke Hyperliquid — tidak
+                  ada sakelar yang perlu ditekan tiap order.</li>
+                <li>· Kirim order, pasang SL/TP, dan tutup posisi berjalan dari panel yang sama dengan
+                  Binance di Chart &amp; Entry.</li>
+                <li>· Di Copy Signal, Hyperliquid bisa dipilih sebagai bursa tujuan saat menekan Ikuti.</li>
+                <li>· Akun ini terpisah dari <span className="text-zinc-300">Dompet Web3</span> di tab
+                  Connection. Yang ini dijalankan backend-mu; yang itu dompet di perambanmu.</li>
+              </ul>
+            </div>
+          </div>
+        </Panel>
+      )}
 
       {/* ── Tutorial pasang EA MT5 ── */}
       {tab === 'mt5' && (
@@ -929,7 +1334,7 @@ export default function Integrasi() {
           tab Connection, tempat semua tombolnya juga berada. */}
       {tab === 'sehat' && (
       <Panel className="mt-4">
-        <PanelHead judul="Connection log" sub="Kejadian terakhir dari kedua sambungan." />
+        <PanelHead judul="Connection log" sub="Kejadian terakhir dari sambungan yang aktif." />
         <div className="px-5 pb-5">
           <TabelBungkus>
             <Tabel>
