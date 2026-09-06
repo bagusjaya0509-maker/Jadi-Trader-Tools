@@ -1732,12 +1732,12 @@ export default function ChartBacktest() {
     setPanelUbah(true);
   }
 
-  function tutupDariTabel(o: OrderSunting) {
+  function tutupDariTabel(o: OrderSunting, porsi = 1) {
     bukaSunting(o);
     /* Satu putaran render supaya `sunting` sudah terisi saat akhiriOrder
        membacanya. Tanpa jeda ini ia membaca state lama dan menutup order
        yang salah — atau tidak menutup apa pun. */
-    setTimeout(() => { void akhiriOrder(o); }, 0);
+    setTimeout(() => { void akhiriOrder(o, porsi); }, 0);
   }
 
   /* ── Menunggu bursa BENAR-BENAR melepas order ────────────────────────
@@ -1781,7 +1781,7 @@ export default function ChartBacktest() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hapusMenunggu, orderBursa]);
 
-  async function akhiriOrder(dipilih?: OrderSunting) {
+  async function akhiriOrder(dipilih?: OrderSunting, porsiMinta = 1) {
     const sunting = dipilih ?? suntingAktif.current;
     if (!sunting) return;
     if (sunting.gabungan) {
@@ -1793,23 +1793,54 @@ export default function ChartBacktest() {
       return;
     }
     const nama = `${sunting.simbol} ${sunting.arah}`;
+    /* Porsi cuma berlaku untuk POSISI. Pending belum jadi posisi — "batalkan
+       50% dari niat" tidak berarti apa-apa, dan menerimanya di sini berarti
+       mengirim lot separuh ke perintah yang mengabaikannya. */
+    const porsi = sunting.jenis === 'pending' ? 1 : Math.max(0, Math.min(1, porsiMinta));
+    const sebagian = porsi > 0 && porsi < 1;
+    /* ── ANGKA YANG AKAN BERANGKAT DISEBUT SEBELUM DISETUJUI ────────────
+       Untuk MT5 ukurannya pasti di sini (lot, dibulatkan ke 0,01). Untuk
+       kripto ia baru pasti sesudah aturan lot simbolnya dibaca di
+       `tutupPosisiNyata` — jadi yang ditulis di sini persennya, bukan
+       jumlah koin yang belum tentu itu yang berangkat. Menjanjikan angka
+       lalu mengirim angka lain adalah cara tercepat kehilangan kepercayaan
+       pada dialog yang justru dipasang untuk dipercaya. */
+    const lotMt5 = sunting.pasar === 'mt5' && sebagian
+      ? Math.max(0.01, Math.round(sunting.ukuran * porsi * 100) / 100)
+      : 0;
+    const barisPorsi = !sebagian ? ''
+      : sunting.pasar === 'mt5'
+        ? `\n\nYang ditutup ${Math.round(porsi * 100)}% — ${lotMt5} lot dari ${sunting.ukuran} lot. Sisanya tetap terbuka.`
+        : `\n\nYang ditutup ${Math.round(porsi * 100)}% dari posisi, dibulatkan ke lot minimum simbol ini. `
+          + 'Sisanya tetap terbuka, dan SL/TP yang sudah terpasang TIDAK dibatalkan.';
     const pesan = sunting.jenis === 'pending'
       ? `Batalkan pending order ${nama}?
 
 Order ini belum jadi posisi — tidak ada rugi/untung yang terkunci.`
-      : `Tutup posisi ${nama} sekarang di harga pasar?
+      : `${sebagian ? `Tutup ${Math.round(porsi * 100)}% posisi` : 'Tutup posisi'} ${nama} sekarang di harga pasar?
 
-${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini akan TERKUNCI begitu ditutup.` : 'P/L berjalan tidak diketahui.'}`;
+${pnlSunting !== null
+  ? `P/L berjalan: ${uang(pnlSunting, true)}${sebagian ? ' untuk SELURUH posisi — yang terkunci cuma bagian yang ditutup.' : ' — angka ini akan TERKUNCI begitu ditutup.'}`
+  : 'P/L berjalan tidak diketahui.'}${barisPorsi}`;
     if (!confirm(pesan)) return;
 
     setSuntingSibuk(true);
     setSuntingKabar(sunting.jenis === 'pending' ? 'Membatalkan order…' : 'Menutup posisi…');
     try {
       if (sunting.pasar === 'mt5') {
-        const { id } = await kirimPerintahMt5({ aksi: 'TUTUP', tiket: sunting.tiket });
+        /* `lot` cuma dikirim kalau memang sebagian. Nol berarti "tutup
+           semuanya" — bentuk yang sudah dimengerti EA versi mana pun, jadi
+           tutup penuh tidak berubah perilakunya sama sekali.
+
+           EA LAMA MENGABAIKAN `lot` PADA TUTUP dan menutup penuh. Karena
+           itu tombol porsi untuk Trade-Fi digerbangi versi EA di panelnya;
+           lihat VERSI_EA_PARSIAL. */
+        const { id } = await kirimPerintahMt5({
+          aksi: 'TUTUP', tiket: sunting.tiket, ...(lotMt5 > 0 ? { lot: lotMt5 } : {}),
+        });
         const hasil = await tungguHasilMt5(id);
         setSuntingKabar(hasil.status === 'sukses' ? `Selesai — ${hasil.pesan}` : `Gagal: ${hasil.pesan}`);
-        if (hasil.status === 'sukses') { segarkanAkunMt5(); setSunting(null); }
+        if (hasil.status === 'sukses') { segarkanAkunMt5(); if (!sebagian) setSunting(null); }
       } else if (sunting.jenis === 'pending') {
         /* PENANDA DAFTAR IKUT DIKIRIM, tidak lagi ditebak.
            ────────────────────────────────────────────────────────────────
@@ -1842,8 +1873,13 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
         segarkanBursa();
       } else {
         const milik = orderBursa.filter((x) => x.simbol === sunting.simbol);
-        await tutupPosisiNyata({
+        const hasilTutup = await tutupPosisiNyata({
           symbol: sunting.simbol, side: sunting.arah, quantity: sunting.ukuran,
+          /* Pembulatannya milik pustaka, bukan halaman ini — dan pustaka
+             juga yang memutuskan bahwa sisa lebih kecil dari satu lot
+             minimum lebih baik ditutup sekalian daripada ditinggal jadi
+             remah yang tidak bisa disentuh lagi. */
+          porsi,
           /* Bursa POSISINYA, bukan bursa chartnya. Tanpa ini, tiap koin yang
              terdaftar di Binance DAN Hyperliquid dikirim ke Binance — dan
              perintah tutup di bursa yang tidak punya posisinya tidak
@@ -1858,17 +1894,26 @@ ${pnlSunting !== null ? `P/L berjalan: ${uang(pnlSunting, true)} — angka ini a
            membatalkannya lagi dari sini cuma menghasilkan galat palsu. */
         const boronganTutup = bacaPasar(sunting.simbol) === 'hyperliquid';
         const sisaTutup: string[] = [];
-        if (!boronganTutup) {
+        /* Stop DIBIARKAN kalau posisinya cuma ditutup sebagian. Membatalkan
+           SL lalu meninggalkan separuh posisi tanpa pengaman mengubah "ambil
+           untung sebagian" jadi posisi telanjang — dan yang menekannya tidak
+           akan tahu sampai harganya bergerak. */
+        if (!boronganTutup && hasilTutup.penuh) {
           for (const o of milik.filter((x) => x.jenis === 'SL' || x.jenis === 'TP')) {
             try { await batalPendingNyata({ symbol: sunting.simbol, orderId: o.id, isAlgo: true }); }
             catch { sisaTutup.push(`${o.jenis} ${o.pemicu}`); }
           }
         }
-        setSuntingKabar(sisaTutup.length
-          ? `Posisi ditutup, tapi ${sisaTutup.length} stop lama gagal dibatalkan (${sisaTutup.join(', ')}). Batalkan manual di ${bacaPasar(sunting.simbol) === 'hyperliquid' ? 'Hyperliquid' : 'Binance'}.`
-          : 'Posisi ditutup dan semua stop-nya dibersihkan.');
+        setSuntingKabar(!hasilTutup.penuh
+          ? `Ditutup ${hasilTutup.qty} dari ${sunting.ukuran}. Sisanya tetap terbuka beserta SL/TP-nya.`
+          : sisaTutup.length
+            ? `Posisi ditutup, tapi ${sisaTutup.length} stop lama gagal dibatalkan (${sisaTutup.join(', ')}). Batalkan manual di ${bacaPasar(sunting.simbol) === 'hyperliquid' ? 'Hyperliquid' : 'Binance'}.`
+            : 'Posisi ditutup dan semua stop-nya dibersihkan.');
         segarkanBursa();
-        setSunting(null);
+        /* Panelnya ditutup HANYA kalau posisinya benar-benar habis. Sisa
+           yang masih hidup tetap perlu panelnya terbuka — orang yang baru
+           menutup 50% biasanya sedang menimbang 50% berikutnya. */
+        if (hasilTutup.penuh) setSunting(null);
       }
     } catch (e) {
       menungguHapus.current = false;

@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown, ChevronUp, Copy, Pen } from 'lucide-react';
 import { TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn, uang, harga } from '@/lib/utils';
@@ -194,10 +195,130 @@ function gabungBaris(g: BarisPosisi[]): BarisPosisi {
   };
 }
 
-export function TabelPosisi({ baris, kosong, onKlikBaris, onTutup, onUbah, onKlikCopy }: {
+/* ════════════════════════════════════════════════════════════════════════
+   MENU PORSI TUTUP
+   ════════════════════════════════════════════════════════════════════════
+   Diminta pemilik 6 Sep 2026: tutup 50% harus benar-benar menutup 50%.
+
+   ── KENAPA PORTAL, BUKAN KOTAK DI DALAM SELNYA ─────────────────────────
+   Tabelnya duduk di dalam TabelBungkus yang menggulir mendatar, dan apa pun
+   yang digambar di dalam sel akan TERPOTONG di tepi kotak gulir itu — menu
+   yang muncul separuh, atau tidak muncul sama sekali di layar sempit. Portal
+   ke body dengan posisi `fixed` lolos dari kotak itu.
+
+   Konsekuensinya: posisinya dihitung dari rect tombolnya dan TIDAK ikut
+   bergerak saat halaman digulir. Karena itu menggulir MENUTUP menu ini,
+   bukan menyeretnya — menu yang menggantung di tempat tombolnya tadi berada
+   adalah menu yang tombol "50%"-nya akan ditekan orang untuk baris yang
+   salah.
+
+   ── PERSENNYA TIDAK LANGSUNG MENGIRIM ──────────────────────────────────
+   Menekan 50% cuma MEMILIH; yang mengirim tombol di bawahnya. Satu klik
+   ekstra pada perbuatan yang tidak bisa dibatalkan itu murah, dan menu
+   melayang yang mengeksekusi begitu disentuh adalah cara paling gampang
+   menutup posisi yang salah dengan siku. */
+const PORSI_CEPAT = [25, 50, 75, 100];
+
+function MenuPorsi({ b, rect, tutup, kirim }: {
+  b: BarisPosisi;
+  rect: DOMRect;
+  tutup: () => void;
+  kirim: (porsi: number) => void;
+}) {
+  const [persen, setPersen] = useState(50);
+  const kotakRef = useRef<HTMLDivElement>(null);
+  const [posisi, setPosisi] = useState<{ kiri: number; atas: number } | null>(null);
+
+  /* Diukur SESUDAH menempel tapi SEBELUM digambar: menu selebar 210 px yang
+     tombolnya berada 40 px dari tepi kanan akan menjulur keluar layar, dan
+     yang menjulur di layar sempit adalah kolom aksi — persis kolom ini. */
+  useLayoutEffect(() => {
+    const el = kotakRef.current;
+    if (!el) return;
+    const l = el.getBoundingClientRect();
+    const kiri = Math.max(8, Math.min(rect.right - l.width, window.innerWidth - l.width - 8));
+    const muatBawah = rect.bottom + l.height + 8 < window.innerHeight;
+    setPosisi({ kiri, atas: muatBawah ? rect.bottom + 6 : rect.top - l.height - 6 });
+  }, [rect]);
+
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => { if (e.key === 'Escape') tutup(); };
+    const luar = (e: MouseEvent) => {
+      if (!kotakRef.current?.contains(e.target as Node)) tutup();
+    };
+    window.addEventListener('keydown', k);
+    /* `true` — fase tangkap. Tanpa itu klik di luar sempat memicu handler
+       barisnya dulu (buka order di chart) sebelum menu ini menutup. */
+    document.addEventListener('mousedown', luar, true);
+    window.addEventListener('scroll', tutup, true);
+    window.addEventListener('resize', tutup);
+    return () => {
+      window.removeEventListener('keydown', k);
+      document.removeEventListener('mousedown', luar, true);
+      window.removeEventListener('scroll', tutup, true);
+      window.removeEventListener('resize', tutup);
+    };
+  }, [tutup]);
+
+  const p = Math.max(1, Math.min(100, Math.round(persen) || 0));
+  return createPortal(
+    <div ref={kotakRef} role="dialog" aria-label={`Tutup ${b.simbol}`}
+      onClick={(e) => e.stopPropagation()}
+      style={{ left: posisi?.kiri ?? rect.right, top: posisi?.atas ?? rect.bottom + 6,
+               visibility: posisi ? 'visible' : 'hidden' }}
+      className="fixed z-[95] w-[230px] rounded-lg border border-zinc-700 bg-zinc-900 p-3 shadow-2xl">
+      <div className="mb-2 text-[11px] text-zinc-400">
+        Tutup <span className="text-zinc-200">{b.simbol}</span> — ukuran {b.ukuran}
+      </div>
+
+      <div className="mb-2 grid grid-cols-4 gap-1">
+        {PORSI_CEPAT.map((n) => (
+          <button key={n} onClick={() => setPersen(n)}
+            className={cn('cursor-pointer rounded border py-1 text-[11.5px] transition-colors',
+              p === n ? 'border-zinc-500 bg-zinc-800 text-zinc-100'
+                      : 'border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200')}>
+            {n}%
+          </button>
+        ))}
+      </div>
+
+      <div className="mb-2.5 flex items-center gap-2">
+        <input type="number" min={1} max={100} value={persen}
+          onChange={(e) => setPersen(Number(e.target.value))}
+          aria-label="Porsi yang ditutup, persen"
+          className="h-8 w-full rounded border border-zinc-700 bg-zinc-950 px-2 text-[12px] text-zinc-100 outline-none focus:border-zinc-500" />
+        <span className="text-[12px] text-zinc-500">%</span>
+      </div>
+
+      <button onClick={() => { kirim(p / 100); tutup(); }}
+        className="w-full cursor-pointer rounded-md border border-red-500/40 bg-red-500/10 py-1.5 text-[12px] font-medium text-red-300 transition-colors hover:bg-red-500/20">
+        {p >= 100 ? 'Tutup seluruhnya' : `Tutup ${p}%`}
+      </button>
+
+      {/* Angka pastinya TIDAK dijanjikan di sini. Ukuran yang benar-benar
+          berangkat dibulatkan ke lot minimum simbolnya, dan itu baru
+          diketahui sesudah aturan simbolnya dibaca — menuliskan "0,0235 BTC"
+          sekarang berarti menjanjikan angka yang akan berbeda. Dialog
+          konfirmasi berikutnya yang menyebutkannya. */}
+      <p className="mt-2 text-[10.5px] leading-relaxed text-zinc-600">
+        Dibulatkan ke lot minimum simbol ini. Ukuran pastinya disebut di
+        konfirmasi berikutnya.
+      </p>
+    </div>,
+    document.body,
+  );
+}
+
+export function TabelPosisi({ baris, kosong, onKlikBaris, onTutup, onUbah, onKlikCopy, tanpaPorsi }: {
   baris: BarisPosisi[];
-  /** Tombol Tutup per baris. Kolomnya hanya muncul kalau diberikan. */
-  onTutup?: (b: BarisPosisi) => void;
+  /** Tombol Tutup per baris. Kolomnya hanya muncul kalau diberikan.
+   *  `porsi` 0–1: bagian posisi yang diminta ditutup. 1 = seluruhnya. */
+  onTutup?: (b: BarisPosisi, porsi: number) => void;
+  /** Sembunyikan pemilih porsi — tombol Tutup langsung menutup seluruhnya.
+   *  Dipakai Trade-Fi dengan EA lama, yang mengabaikan `lot` pada TUTUP:
+   *  menu yang menawarkan 50% ke terminal yang akan menutup 100% lebih
+   *  buruk daripada tidak ada menunya sama sekali. */
+  tanpaPorsi?: boolean;
   /** Ikon pensil per baris — langsung ke panel ubah SL/TP di chart.
    *
    *  Klik BARIS sudah membuka ordernya di chart, tapi berhenti di situ:
@@ -234,6 +355,10 @@ export function TabelPosisi({ baris, kosong, onKlikBaris, onTutup, onUbah, onKli
      pertama orang selalu "totalnya berapa", bukan "order ke-tujuh isinya
      apa". Yang perlu melihat satu-satu tinggal menekan Lepas. */
   const [dilepas, setDilepas] = useState<Record<string, boolean>>({});
+  /* Menu porsi yang sedang terbuka, kalau ada. `rect` disimpan APA ADANYA
+     dari saat tombolnya ditekan — menu ini berposisi fixed dan sengaja tidak
+     mengikuti gulir; menggulir menutupnya (lihat catatan di MenuPorsi). */
+  const [menu, setMenu] = useState<{ kunci: string; b: BarisPosisi; rect: DOMRect } | null>(null);
 
   if (!baris.length) {
     return <div className="py-5 text-center text-[12.5px] text-zinc-600">{kosong}</div>;
@@ -495,10 +620,23 @@ export function TabelPosisi({ baris, kosong, onKlikBaris, onTutup, onUbah, onKli
                         refleks pada tindakan yang tidak bisa dibatalkan. */}
                     {onTutup && (
                       <button
-                        onClick={(e) => { e.stopPropagation(); onTutup(b); }}
-                        title="Tutup posisi ini di harga pasar"
-                        className="inline-flex h-[23px] shrink-0 cursor-pointer items-center rounded border border-zinc-800 px-2 text-[11px] text-zinc-400 transition-colors hover:border-red-500/40 hover:text-red-400">
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (tanpaPorsi) { onTutup(b, 1); return; }
+                          const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                          setMenu((m) => (m && m.kunci === b.kunci ? null : { kunci: b.kunci, b, rect: r }));
+                        }}
+                        title={tanpaPorsi
+                          ? 'Tutup posisi ini di harga pasar'
+                          : 'Tutup posisi ini di harga pasar — seluruhnya atau sebagian'}
+                        aria-haspopup={tanpaPorsi ? undefined : 'dialog'}
+                        aria-expanded={tanpaPorsi ? undefined : menu?.kunci === b.kunci}
+                        className={cn('inline-flex h-[23px] shrink-0 cursor-pointer items-center gap-1 rounded border px-2 text-[11px] transition-colors',
+                          menu?.kunci === b.kunci
+                            ? 'border-red-500/40 text-red-400'
+                            : 'border-zinc-800 text-zinc-400 hover:border-red-500/40 hover:text-red-400')}>
                         Tutup
+                        {!tanpaPorsi && <ChevronDown className="size-3" strokeWidth={2.5} />}
                       </button>
                     )}
                     </div>
@@ -509,6 +647,11 @@ export function TabelPosisi({ baris, kosong, onKlikBaris, onTutup, onUbah, onKli
           })}
         </tbody>
       </Tabel>
+    {menu && onTutup && (
+      <MenuPorsi b={menu.b} rect={menu.rect}
+        tutup={() => setMenu(null)}
+        kirim={(porsi) => onTutup(menu.b, porsi)} />
+    )}
     </TabelBungkus>
   );
 }

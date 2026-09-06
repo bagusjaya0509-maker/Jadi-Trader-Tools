@@ -123,6 +123,16 @@ export interface AkunMt5Ringkas {
 /** Versi EA paling awal yang mengirim daftar pending order. */
 export const VERSI_EA_PENDING = '2.05';
 
+/** Versi EA pertama yang MEMBACA `lot` pada perintah TUTUP, jadi bisa
+ *  menutup posisi sebagian.
+ *
+ *  Sebelum ini `lot` tetap ikut dikirim tapi EA memanggil PositionClose()
+ *  yang menutup PENUH — dan diam soal itu. Menawarkan tombol "50%" ke
+ *  terminal yang akan menutup 100% adalah janji yang dibayar orang lain,
+ *  jadi tombolnya digerbangi versi ini, bukan dipasang lalu diberi
+ *  peringatan. */
+export const VERSI_EA_PARSIAL = '2.11';
+
 /** Bandingkan versi bergaya "2.4.1" tanpa terjebak perbandingan teks:
  *  "2.10" > "2.9" secara angka, tapi lebih kecil kalau diadu sebagai
  *  string. Versi EA akan menembus 2.10 cepat atau lambat. */

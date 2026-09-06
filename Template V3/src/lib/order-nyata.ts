@@ -581,29 +581,85 @@ export async function batalPendingNyata(p: {
 
 /** Tutup posisi kripto di harga pasar. SL/TP yang masih menggantung ikut
  *  dibatalkan backend — stop yatim yang tertinggal akan menembak posisi
- *  BERIKUTNYA di pair yang sama. */
+ *  BERIKUTNYA di pair yang sama.
+ *
+ *  ── TUTUP SEBAGIAN ─────────────────────────────────────────────────────
+ *  `porsi` di bawah 1 menutup sebagian saja. Backend sudah menerimanya sejak
+ *  lama — ia mengirim MARKET `reduceOnly` seukuran `quantity` yang diberi,
+ *  berapa pun itu — jadi yang selama ini hilang bukan kemampuannya melainkan
+ *  jalan menuju ke sana.
+ *
+ *  PEMBULATANNYA DIKERJAKAN DI SINI, bukan di halaman yang memanggil. 50%
+ *  dari 0,047 BTC adalah 0,0235, dan Binance menolak angka itu dengan -1111
+ *  karena stepSize BTCUSDT 0,001. Menaruh pembulatannya di layar berarti
+ *  tiap layar berikutnya harus mengingat aturan yang sama — dan yang lupa
+ *  tidak akan tahu sampai ordernya ditolak. Lihat catatan panjang di
+ *  `kirimOrderNyata` soal bursa mana yang aturan angkanya dipakai. */
 export async function tutupPosisiNyata(p: {
   symbol: string; side: 'BUY' | 'SELL'; quantity: number;
   slOrderId?: string; tp1OrderId?: string;
+  /** Bagian posisi yang ditutup, 0–1. Kosong atau >= 1 = tutup penuh. */
+  porsi?: number;
   /** Bursa tempat posisinya BERADA. Kalau diisi, ia mengalahkan tebakan
    *  dari pasar chart — dan itu memang yang benar: yang menentukan ke mana
    *  perintah tutup dikirim adalah di mana posisinya dibuka, bukan dari
    *  bursa mana lilinnya kebetulan digambar. */
   bursa?: 'binance' | 'hyperliquid';
-}): Promise<void> {
+}): Promise<{ qty: number; penuh: boolean }> {
   const { url, token } = bacaKoneksi();
   const dasar = (url.trim() || PROXY_BAWAAN).replace(/\/+$/, '');
   if (!token.trim()) throw new Error('App Token belum diisi di Integrations.');
+
+  const porsi = typeof p.porsi === 'number' && isFinite(p.porsi) ? p.porsi : 1;
+  let qty = p.quantity;
+  let penuh = true;
+  if (porsi > 0 && porsi < 1) {
+    const f = await ambilFilter(dasar, p.symbol, {
+      'Content-Type': 'application/json', 'X-App-Token': token.trim(),
+    });
+    const keHl = f.bursa === 'hyperliquid';
+    const step: number = Number(f.stepSize) > 0 ? Number(f.stepSize) : (keHl ? 0 : 0.001);
+    const qP: number | null = f.quantityPrecision ?? null;
+    const potong = Number(keStep(p.quantity * porsi, step, qP));
+    if (!(potong > 0)) {
+      throw new Error(`${Math.round(porsi * 100)}% dari posisi ini lebih kecil daripada satu lot minimum `
+        + `${p.symbol}. Pilih porsi yang lebih besar, atau tutup penuh.`);
+    }
+    /* SISA YANG TIDAK BISA DITUTUP LAGI = JEBAKAN, bukan ketelitian.
+       Kalau yang tersisa lebih kecil daripada satu step, ia jadi remah yang
+       tidak bisa dijadikan order berikutnya — posisi yang terlihat masih
+       terbuka tapi tidak bisa disentuh. Lebih baik ditutup sekalian, dan
+       dikatakan. */
+    const sisa = p.quantity - potong;
+    if (step > 0 && sisa < step) {
+      qty = p.quantity; penuh = true;
+    } else {
+      qty = potong; penuh = false;
+    }
+  }
+
   const r = await fetch(`${dasar}/api/trade/futures/close`, {
     method: 'POST',
     headers: { 'X-App-Token': token.trim(), 'Content-Type': 'application/json' },
     /* Urutannya menentukan: `medanBursa` DULU sebagai cadangan, lalu
        `p.bursa` menimpanya kalau pemanggilnya tahu. Dibalik, tebakan chart
        akan menimpa fakta posisinya. */
-    body: JSON.stringify({ ...p, ...medanBursa(p.symbol), ...(p.bursa ? { bursa: p.bursa } : {}) }),
+    /* `porsi` TIDAK ikut dikirim — ia urusan layar, bukan bursa. Yang
+       berangkat cuma `quantity` yang sudah dibulatkan.
+
+       SL/TP juga tidak ikut kalau tutupnya sebagian: membatalkan stop lalu
+       meninggalkan separuh posisi tanpa pengaman adalah cara mengubah
+       "ambil untung sebagian" jadi posisi telanjang yang tidak diminta
+       siapa pun. */
+    body: JSON.stringify({
+      ...p, porsi: undefined, quantity: qty,
+      ...(penuh ? {} : { slOrderId: undefined, tp1OrderId: undefined }),
+      ...medanBursa(p.symbol), ...(p.bursa ? { bursa: p.bursa } : {}),
+    }),
   });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(typeof j?.error === 'object' ? (j.error.msg ?? JSON.stringify(j.error)) : (j?.error ?? `Backend menjawab ${r.status}`));
+  return { qty, penuh };
 }
 
 

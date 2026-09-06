@@ -3,7 +3,7 @@ import { Copy, Trash2, Loader2, Zap } from 'lucide-react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { cn, uang, harga as fHarga } from '@/lib/utils';
 import { usePosisi } from '@/lib/data';
-import { useAkunMt5, versiKurangDari, VERSI_EA_PENDING, segarkanAkunMt5 } from '@/lib/akun';
+import { useAkunMt5, versiKurangDari, VERSI_EA_PENDING, VERSI_EA_PARSIAL, segarkanAkunMt5 } from '@/lib/akun';
 import { kirimPerintahMt5, tungguHasilMt5 } from '@/lib/mt5-order';
 import { useHargaPasar } from '@/lib/harga';
 import { bacaSpekMt5 } from '@/lib/pasar';
@@ -94,10 +94,11 @@ export function PanelPosisiTerbuka({ sumber, onSunting, onTutup, onUbahSlTp, onB
   /** Klik baris = buka order itu di chart. Tanpa ini barisnya tidak bisa
    *  diklik sama sekali. */
   onSunting?: (o: OrderSunting) => void;
-  /** Tombol Tutup per baris. Terpisah dari onSunting karena menutup posisi
+  /** Tombol Tutup per baris. `porsi` 0–1 = bagian yang diminta ditutup.
+   *  Terpisah dari onSunting karena menutup posisi
    *  adalah tindakan yang tidak bisa dibatalkan — ia harus punya tombolnya
    *  sendiri, bukan menumpang klik baris yang sama dengan "lihat di chart". */
-  onTutup?: (o: OrderSunting) => void;
+  onTutup?: (o: OrderSunting, porsi: number) => void;
   /** Ikon pensil per baris — buka ordernya di chart DENGAN panel ubah SL/TP
    *  sudah terbuka. Bentuk datanya sama persis dengan `onSunting`; yang
    *  berbeda cuma seberapa jauh penerimanya membuka. */
@@ -645,7 +646,13 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
             sampai ke penerimanya selalu tunggal. */}
         <TabelPosisi
           baris={baris}
-          onTutup={onTutup && ((b) => onTutup(keOrder(b)))}
+          /* Kripto selalu bisa sebagian - backend sudah menerima quantity
+             berapa pun sejak awal. Trade-Fi menunggu EA v2.11: sebelum itu
+             EA memanggil PositionClose() yang menutup PENUH berapa pun lot
+             yang diminta, dan diam soal itu. */
+          tanpaPorsi={sumber !== 'kripto'
+            && (!mt5.versiEa || versiKurangDari(mt5.versiEa, VERSI_EA_PARSIAL))}
+          onTutup={onTutup && ((b, porsi) => onTutup(keOrder(b), porsi))}
           onKlikBaris={onSunting && ((b, gabungan) => onSunting(keOrder(b, gabungan)))}
           onUbah={onUbahSlTp && ((b) => onUbahSlTp(keOrder(b)))}
           onKlikCopy={sumber === 'kripto' && salinPerSimbol.size && onBanding ? bukaBanding : undefined}
