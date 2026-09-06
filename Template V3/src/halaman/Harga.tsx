@@ -70,14 +70,28 @@ export default function Harga() {
   /* Diportal ke body, bukan digambar di dalam kerangka. Kolom isi kerangka
      punya `overflow` sendiri; lapisan yang lahir di dalamnya akan terpotong
      di tepi kolom itu alih-alih menutupi layar. */
+  /* ── YANG MENGGULIR ISINYA, BUKAN LAPISANNYA ────────────────────────
+     Bentuk pertama membuat PEMBUNGKUS-nya yang menggulir, dengan kartunya
+     `my-auto` di dalamnya. Diukur di layar 901 px: kartunya 949 px — lebih
+     tinggi daripada layarnya — dan akibatnya tombol tutup, yang menempel di
+     pojok kartu, ikut tergulir keluar layar begitu orangnya turun melihat
+     paket paling bawah. Satu-satunya jalan keluar yang tersisa Escape atau
+     menekan latar, dan keduanya tidak terlihat di mana pun.
+
+     Sekarang kartunya dipatok setinggi layar dan ISINYA yang menggulir.
+     Tombol tutup berdiri di luar daerah gulir, jadi ia tidak pernah pergi.
+
+     `items-center` tanpa `my-auto`: dua-duanya memusatkan, dan dipakai
+     bersamaan pada isi yang lebih tinggi daripada wadahnya justru memotong
+     bagian ATAS sampai tak terjangkau. */
   return createPortal(
-    <div className="fixed inset-0 z-[90] flex items-start justify-center overflow-y-auto p-3 sm:p-6"
+    <div className="fixed inset-0 z-[90] flex items-center justify-center p-3 sm:p-6"
          onClick={tutup}>
       <div className="fixed inset-0 bg-black/70 backdrop-blur-sm" />
 
       <div onClick={(e) => e.stopPropagation()}
            role="dialog" aria-modal="true" aria-label="Paket & harga"
-           className="relative my-auto w-full max-w-5xl overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950 shadow-2xl">
+           className="relative flex max-h-full w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950 shadow-2xl">
         {/* Tombol tutup MELAYANG di atas isinya, bukan di bilah kepala
             sendiri. Blok harganya sudah punya judul besarnya sendiri
             ("Pilih Akses Sesuai Kebutuhanmu"); menambah bilah kepala kedua
@@ -95,7 +109,7 @@ export default function Harga() {
             menghasilkan pemilih turunan yang kekhususannya lebih tinggi
             daripada kelas py-24 di seksinya, jadi ia menang tanpa perlu
             !important dan tanpa mengubah komponen tempelannya. */}
-        <div className="[&>section]:bg-transparent [&>section]:py-6 sm:[&>section]:py-8">
+        <div className="gulir-senyap min-h-0 flex-1 overflow-y-auto [&>section]:bg-transparent [&>section]:py-6 sm:[&>section]:py-8">
           <Pricing_05 />
         </div>
       </div>
