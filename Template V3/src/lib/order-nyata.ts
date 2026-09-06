@@ -202,7 +202,6 @@ export async function kirimOrderNyata(p: PermintaanNyata): Promise<{ pesan: stri
   /* null (pasar belum terbaca) diperlakukan sebagai BUKAN Hyperliquid:
      jalur Binance yang mengambil filter presisi adalah perilaku lama, dan
      ketidaktahuan tidak boleh mengubahnya. */
-  const keHl = bursaSimbol(p.simbol) === 'hyperliquid';
   /* Filter TETAP diambil untuk Hyperliquid: rutenya sekarang menjawab
      simbol HL juga. Yang dijawabnya cuma aturan UKURAN (szDecimals), dan
      itu justru bagian yang paling perlu — qty angka TURUNAN yang dihitung
@@ -214,6 +213,36 @@ export async function kirimOrderNyata(p: PermintaanNyata): Promise<{ pesan: stri
      tickSize. `keStep` dengan step 0 berarti "jangan bulatkan di sini" —
      server yang punya `bulatHarga` yang mengerjakannya. */
   const f = await ambilFilter(dasar, p.simbol, kepala);
+
+  /* ── ATURAN ANGKA INI MILIK BURSA MANA? ────────────────────────────────
+     Dulu dijawab peta pasar chart — sumber yang BERBEDA dari sumber angkanya.
+     Dua sumber bisa berselisih, dan waktu berselisih tak ada yang berteriak.
+
+     6 Sep 2026 selisih itu terjadi: satu permintaan backend ke Binance lewat
+     waktu, cadangannya menjawab dengan aturan Hyperliquid, dan jawaban itu
+     tersimpan enam jam untuk BTCUSDT. Chart tetap menyebut BTCUSDT milik
+     Binance. Jadi qty dibulatkan ke lima desimal (aturan Hyperliquid) lalu
+     ordernya berangkat ke Binance yang cuma menerima tiga. Yang terbaca
+     pemilik: '-1111 Precision is over the maximum defined for this asset' —
+     kalimat yang tidak menyebut sepatah pun soal bursa, di layar yang sedang
+     memasang Buy Stop BTC.
+
+     Sekarang aturannya dibaca dari yang MENGIRIM aturannya. */
+  const bFilter: 'binance' | 'hyperliquid' = f.bursa === 'hyperliquid' ? 'hyperliquid' : 'binance';
+  /* Ke mana ordernya benar-benar berangkat: pilihan tegas menang, lalu peta
+     chart. Null berarti belum ada yang tahu — ditangani saat pengiriman. */
+  const bTujuan: 'binance' | 'hyperliquid' | null = p.bursa ?? bursaSimbol(p.simbol);
+  if (bTujuan && bTujuan !== bFilter) {
+    /* BERHENTI, bukan memilih salah satu. Dua-duanya bisa memindahkan uang
+       sungguhan ke bursa yang tidak diminta siapa pun, dan itu jauh lebih
+       buruk daripada satu order yang tidak jadi berangkat. */
+    throw new Error(
+      `Aturan angka ${p.simbol} datang dari ${bFilter}, tapi ordernya menuju ${bTujuan}. `
+      + 'Order dibatalkan sebelum berangkat. Muat ulang halaman lalu coba lagi — '
+      + 'kalau tetap begini, backend sedang tidak bisa membaca aturan simbol dari Binance.',
+    );
+  }
+  const keHl = bFilter === 'hyperliquid';
   const stepSize: number = Number(f.stepSize) > 0 ? Number(f.stepSize) : (keHl ? 0 : 0.001);
   const tickSize: number = Number(f.tickSize) > 0 ? Number(f.tickSize) : (keHl ? 0 : 0.01);
   const qP: number | null = f.quantityPrecision ?? null;
@@ -223,6 +252,15 @@ export async function kirimOrderNyata(p: PermintaanNyata): Promise<{ pesan: stri
      Menjawabnya dengan daftar kosong membuat keduanya dilewati — yang benar,
      karena di Hyperliquid setiap perp mendukung trigger order. */
   const orderTypes: string[] = keHl ? [] : (Array.isArray(f.orderTypes) ? f.orderTypes : []);
+
+  /* Harga Binance TANPA aturan desimalnya berarti payload filternya cacat.
+     Dibiarkan lewat, `keStep` memakai bawaannya sendiri — `toFixed(6)` — dan
+     SETIAP harga berangkat dengan enam desimal, ditolak -1111 oleh hampir
+     semua simbol Binance. Berhenti di sini menukar galat bursa yang tidak
+     menyebut sebab dengan kalimat yang menyebutnya. */
+  if (!keHl && (pP === null || !(tickSize > 0))) {
+    throw new Error(`Aturan harga ${p.simbol} tidak lengkap dari backend — order dibatalkan sebelum berangkat.`);
+  }
 
   /* Pengaman PALING PENTING — sama dengan V2. */
   if (orderTypes.length && (!orderTypes.includes('STOP_MARKET') || !orderTypes.includes('TAKE_PROFIT_MARKET'))) {
@@ -270,11 +308,16 @@ export async function kirimOrderNyata(p: PermintaanNyata): Promise<{ pesan: stri
 
      Ketahuan bukan dari membaca kode, melainkan dari memeriksa bundel yang
      BENAR-BENAR tayang dan menemukan kalimat lama masih di sana — sesudah
-     versi yang sudah diperbaiki dikira sudah terpasang. */
-  const bTujuan = bursaSimbol(p.simbol);
-  const kalimatBursa = bTujuan === 'hyperliquid' ? 'Kirim order SUNGGUHAN ke Hyperliquid?'
-    : bTujuan === 'binance' ? 'Kirim order SUNGGUHAN ke Binance?'
-    : 'Kirim order SUNGGUHAN? (bursanya dipilih server — pasar simbol ini belum terbaca di layar)';
+     versi yang sudah diperbaiki dikira sudah terpasang.
+
+     Sekarang ia menyebut bursa yang SAMA dengan yang dikirim ke server, dan
+     sama pula dengan yang aturan angkanya dipakai membulatkan qty dan harga
+     di atas — satu sumber untuk ketiganya. Cabang ketiga yang dulu berbunyi
+     "bursanya dipilih server" ikut hilang, karena tidak ada lagi keadaan di
+     mana layar mengirim order tanpa tahu tujuannya. */
+  const bKirim: 'binance' | 'hyperliquid' = bTujuan ?? bFilter;
+  const kalimatBursa = bKirim === 'hyperliquid' ? 'Kirim order SUNGGUHAN ke Hyperliquid?'
+    : 'Kirim order SUNGGUHAN ke Binance?';
   if (!p.tanpaKonfirmasi
       && !confirm(`${kalimatBursa}\n\n${rincian}\n\nUang sungguhan akan bergerak.`)) {
     return { pesan: 'Dibatalkan.', pending: false };
@@ -308,10 +351,14 @@ export async function kirimOrderNyata(p: PermintaanNyata): Promise<{ pesan: stri
     r = await fetch(`${dasar}/api/trade/futures`, {
       method: 'POST', headers: kepala,
       body: JSON.stringify({
-        ...medanBursa(p.simbol),
-        /* Urutannya menentukan: tebakan chart dulu sebagai cadangan, lalu
-           pilihan tegas menimpanya. Sama seperti di tutupPosisiNyata. */
-        ...(p.bursa ? { bursa: p.bursa } : {}),
+        /* Bursanya DISEBUT, selalu. Dibiarkan kosong, server memilih sendiri
+           lewat `bursaUntuk` — dan pilihannya bisa berbeda dari bursa yang
+           aturan angkanya baru saja dipakai membulatkan qty dan harga di atas.
+           `bTujuan` sudah dipastikan sama dengan `bFilter` di awal, jadi
+           menyebutnya di sini menutup celah terakhir: simbol yang pasarnya
+           belum sempat terbaca chart, yang dulu berangkat tanpa tujuan dan
+           membiarkan server menebak sendiri. */
+        bursa: bKirim,
         symbol: p.simbol, side: p.arah, quantity: qtyStr, leverage: p.leverage,
         entryType: p.jenis === 'MARKET' ? 'MARKET' : p.jenis === 'LIMIT' ? 'LIMIT' : 'STOP_MARKET',
         entryPrice: p.jenis === 'MARKET' ? undefined : keStep(p.entry, tickSize, pP),
