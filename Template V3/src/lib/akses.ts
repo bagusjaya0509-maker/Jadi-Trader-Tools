@@ -163,8 +163,33 @@ export function bacaPaketMinta(v: string | null | undefined): PaketMinta | null 
   return v === 'testing' || v === 'premium3' || v === 'tahunan' ? v : null;
 }
 
+/* ── PRODUK MARKETPLACE YANG DIJUAL LEWAT LYNK ──────────────────────────
+   Pembelian indikator dan EA melewati halaman aktivasi yang sama dengan
+   paket akses — pembeli mendaftar, pemilik menyerahkan barangnya. Bedanya
+   `produk`, dan itulah yang membuat antrean bisa dibaca: "beli EA MT5"
+   berdiri terpisah dari "beli akses tahunan".
+
+   Kuncinya SAMA PERSIS dengan id di katalog produk. Kalau tidak sama,
+   pemeriksa "satu permintaan terbuka per produk" di server akan menganggap
+   keduanya barang yang berbeda dan seseorang bisa mengantre dua kali untuk
+   hal yang sama.
+
+   Daftar putih, bukan untai bebas: nilainya ikut ke catatan yang dibaca
+   pemilik, dan medan bebas di tempat seperti itu adalah tempat menitipkan
+   kalimat yang tidak pernah kamu tulis. */
+export const PRODUK_LYNK: Record<string, string> = {
+  'jadi-traderindicator-v3': 'Jadi Trader Indikator V3',
+  'trade-fi-sync-v2': 'Trade-Fi Sync V2.10 (EA MT5)',
+};
+
+export function bacaProdukLynk(v: string | null | undefined): string | null {
+  return v && Object.prototype.hasOwnProperty.call(PRODUK_LYNK, v) ? v : null;
+}
+
 export async function mintaAkses(opsi: {
   jenis: 'gratis' | 'bayar'; catatan?: string; bukti?: string; paketMinta?: PaketMinta;
+  /** Id produk katalog untuk pembelian Marketplace. Kosong = akses aplikasi. */
+  produk?: string;
 }): Promise<{ ok: boolean; sudahAda?: boolean; id?: string;
   /* Terisi kalau permintaannya langsung disetujui sendiri (akses gratis
      dengan saklar otomatis menyala). Halaman pemanggil memakainya untuk
@@ -177,7 +202,7 @@ export async function mintaAkses(opsi: {
     body: JSON.stringify({
       jenis: opsi.jenis,
       ...(opsi.paketMinta ? { paketMinta: opsi.paketMinta } : {}),
-      produk: 'jadi-trader-v3',
+      produk: opsi.produk || 'jadi-trader-v3',
       catatan: (opsi.catatan ?? '').slice(0, 300),
       bukti: (opsi.bukti ?? '').slice(0, 300),
     }),

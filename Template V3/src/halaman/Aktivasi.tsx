@@ -6,7 +6,7 @@ import {
 import { useAuth, pesanAuth } from '@/lib/auth';
 import { auth } from '@/lib/firebase';
 import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
-import { mintaAkses, permintaanSaya, masukDiscord, bacaPaketMinta, NAMA_PAKET, type Permintaan } from '@/lib/akses';
+import { mintaAkses, permintaanSaya, masukDiscord, bacaPaketMinta, bacaProdukLynk, NAMA_PAKET, PRODUK_LYNK, type Permintaan } from '@/lib/akses';
 import { cn } from '@/lib/utils';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -91,6 +91,11 @@ export default function Aktivasi() {
      nilai berbeda masuk ke permintaan yang sudah terkirim. */
   const [paketDibeli] = useState(() =>
     bacaPaketMinta(new URLSearchParams(window.location.search).get('paket')));
+  /* Pembelian Marketplace lewat pintu yang sama. `?produk=` menggantikan
+     `?paket=`; keduanya tidak pernah dipakai bersamaan karena satu produk
+     Lynk menjual satu hal. */
+  const [produkDibeli] = useState(() =>
+    bacaProdukLynk(new URLSearchParams(window.location.search).get('produk')));
   const [punyaku, setPunyaku] = useState<Permintaan[] | null>(null);
   const [galat, setGalat] = useState('');
   const [mengirim, setMengirim] = useState(false);
@@ -123,17 +128,21 @@ export default function Aktivasi() {
         const daftar = await permintaanSaya();
         if (!hidup) return;
         setPunyaku(daftar);
-        const ada = daftar.find((p) => p.produk === 'jadi-trader-v3' && p.status !== 'ditolak');
+        const produkIni = produkDibeli || 'jadi-trader-v3';
+        const ada = daftar.find((p) => p.produk === produkIni && p.status !== 'ditolak');
         if (ada || sudahCoba.current) return;
         sudahCoba.current = true;
         setMengirim(true);
         await mintaAkses({
           jenis: 'bayar',
-          catatan: paketDibeli
-            ? `Pembayaran lewat Lynk — ${NAMA_PAKET[paketDibeli]}`
-            : 'Pembayaran lewat Lynk — dibuka dari link kiriman otomatis',
+          catatan: produkDibeli
+            ? `Pembelian lewat Lynk — ${PRODUK_LYNK[produkDibeli]}`
+            : paketDibeli
+              ? `Pembayaran lewat Lynk — ${NAMA_PAKET[paketDibeli]}`
+              : 'Pembayaran lewat Lynk — dibuka dari link kiriman otomatis',
           bukti: PENANDA_LYNK,
           ...(paketDibeli ? { paketMinta: paketDibeli } : {}),
+          ...(produkDibeli ? { produk: produkDibeli } : {}),
         });
         if (!hidup) return;
         setPunyaku(await permintaanSaya());
