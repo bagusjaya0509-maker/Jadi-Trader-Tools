@@ -48,8 +48,16 @@ type Fase = 'diam' | 'mengunggah' | 'memproses' | 'selesai' | 'gagal';
 const ARTI_STATUS: Record<string, string> = {
   PROCESSING_UPLOAD: 'TikTok sedang memproses videonya…',
   PUBLISH_COMPLETE: 'Selesai — videonya sudah ada di TikTok.',
+  /* Selama aplikasinya belum lulus audit, TikTok menolak terbit langsung dan
+     hanya menerima jalur kotak masuk. Statusnya berhenti di sini, BUKAN di
+     PUBLISH_COMPLETE — dan tanpa baris ini layarnya berputar sampai lima
+     menit lalu memunculkan galat, padahal unggahannya berhasil. */
+  SEND_TO_USER_INBOX: 'Selesai — draf sudah masuk ke kotak masuk TikTok. Buka aplikasi TikTok untuk menerbitkannya.',
   FAILED: 'TikTok menolak videonya.',
 };
+
+/* Dua status yang sama-sama berarti pekerjaan sudah selesai. */
+const STATUS_SELESAI = ['PUBLISH_COMPLETE', 'SEND_TO_USER_INBOX'];
 
 export default function Sosmed() {
   const { pemilik, memuat } = useAuth();
@@ -176,7 +184,7 @@ export default function Sosmed() {
         const d = await s.json();
         if (!s.ok) throw new Error(d.error || 'gagal membaca status');
         setPesan(ARTI_STATUS[d.status] || d.status);
-        if (d.status === 'PUBLISH_COMPLETE') { setFase('selesai'); return; }
+        if (STATUS_SELESAI.includes(d.status)) { setFase('selesai'); return; }
         if (d.status === 'FAILED') throw new Error(d.gagal || 'TikTok menolak videonya');
         if (Date.now() > sampai) throw new Error('Belum selesai setelah 5 menit. publish_id: ' + j.publish_id);
       }
