@@ -306,6 +306,25 @@ const FlowArt: React.FC<FlowArtProps> = ({
 
     const JEDA_BACA = 3200;   // waktu berhenti di tiap layar
     const LAMA_GESER = 950;
+    /* ── LANGKAH PERTAMA BERANGKAT CEPAT ───────────────────────────────
+       Dilaporkan pemilik dari layar HP: sampai ke bagian gambar, lalu diam.
+       Yang ia tunggu bukan gulirannya melainkan jeda baca 3,2 detik SEBELUM
+       langkah pertama — dan selama detik-detik itu tidak ada satu pun tanda
+       bahwa kotaknya akan bergerak sendiri.
+
+       Jeda baca masuk akal untuk layar KEDUA dan seterusnya: waktu itu
+       orangnya memang sedang membaca keterangan yang barusan masuk. Untuk
+       layar pertama ia belum membaca apa pun — ia baru saja sampai. Dan
+       gerakan yang muncul segera adalah satu-satunya cara kotak ini memberi
+       tahu bahwa ia berjalan sendiri; yang diam tiga detik terbaca sebagai
+       gambar mati, lalu digulir lewat. */
+    const JEDA_PERTAMA = 700;
+    /* Layar terakhir ditahan lebih lama sebelum diputar ulang. Ia penutup —
+       dan penutup yang langsung dirobek terbaca sebagai kesalahan, bukan
+       sebagai awal putaran berikutnya. */
+    const JEDA_PENUTUP = 4200;
+    const LAMA_PUTAR_ULANG = 1500;
+    let langkahPertama = true;
 
     /* Deklarasi fungsi, bukan const — `luncur` di atas memanggilnya dan ia
        memanggil `luncur`, jadi salah satunya harus terangkat. Akibatnya
@@ -317,18 +336,50 @@ const FlowArt: React.FC<FlowArtProps> = ({
       const k = containerRef.current;
       if (!hidup || diambilAlih || !k) return;
       const maks = k.scrollHeight - k.clientHeight;
-      if (k.scrollTop >= maks - 2) return;   // sudah di seksi terakhir
+
+      /* ── SAMPAI DI LAYAR TERAKHIR: PUTAR ULANG KE LAYAR 1 ────────────
+         Diminta pemilik. Saya sempat sengaja TIDAK memutarnya, dan
+         keberatannya tetap berlaku jadi ditulis di sini alih-alih hilang:
+         kotak ini menahan roda tetikus sampai isinya habis, jadi kembali ke
+         layar 1 berarti delapan layar guliran itu menghadang lagi. Orang
+         yang menonton satu putaran penuh lalu ingin lanjut ke bawah harus
+         melewatinya sekali lagi.
+
+         Yang meredam: satu sentuhan apa pun menghentikan putaran ini
+         PERMANEN (lihat `berhenti` di atas). Jadi jebakannya cuma ada
+         selama orangnya memang sedang menonton — dan begitu ia mencoba
+         menggulir, kendalinya kembali padanya dan tidak diambil lagi.
+
+         Diputar dengan animasi 1,5 detik, bukan lompat ke nol. Lompatan
+         seketika membuat delapan panel bertumpuk berpindah dalam satu
+         frame, dan ScrollTrigger yang memakai scrub 0,4 akan mengejarnya
+         dengan rotasi yang tersendat. Yang meluncur terbaca sebagai
+         "mengulang dari awal". */
+      if (k.scrollTop >= maks - 2) {
+        jam = window.setTimeout(() => {
+          if (!hidup || diambilAlih) return;
+          luncur(0, LAMA_PUTAR_ULANG);
+        }, JEDA_PENUTUP);
+        return;
+      }
+
+      const jeda = langkahPertama ? JEDA_PERTAMA : JEDA_BACA;
+      langkahPertama = false;
       jam = window.setTimeout(() => {
         if (!hidup || diambilAlih) return;
         luncur(Math.min(maks, k.scrollTop + k.clientHeight), LAMA_GESER);
-      }, JEDA_BACA);
+      }, jeda);
     }
 
+    /* Ambang 0,35, bukan 0,5. Di HP kotak ini tinggi separuh layar atau
+       kurang, dan menunggunya setengah terlihat berarti menunggu orangnya
+       menggulir lebih jauh dulu — padahal gambarnya sudah kelihatan sejak
+       sepertiga masuk. Di layar lebar bedanya tidak terasa. */
     const pengamat = new IntersectionObserver((entri) => {
       for (const e of entri) {
         if (e.isIntersecting && !diambilAlih) { pengamat.disconnect(); jadwalkan(); }
       }
-    }, { threshold: 0.5 });
+    }, { threshold: 0.35 });
     pengamat.observe(kotak);
 
     return () => {

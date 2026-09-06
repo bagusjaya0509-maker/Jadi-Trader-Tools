@@ -685,12 +685,57 @@ export async function terbitkanRingkasan(r: RingkasanAkun, trade?: Trade[]) {
        tidak. Kalau batas itu mau digeser, geser DI SINI — bukan dengan
        menyaring di sisi pembaca, karena yang menentukan apa yang tersiar
        adalah apa yang ditulis, bukan apa yang dibaca. */
+    /* ── DIAMBIL BERIMBANG PER SUMBER, BUKAN 150 TERATAS ────────────────
+       `trade.slice(0, 150)` mengambil 150 baris teratas dari satu daftar
+       gabungan. Selama satu sumber jauh lebih ramai daripada yang lain, ia
+       menelan seluruh jatah — dan sumber yang lain terbit sebagai NOL.
+
+       Terukur 6 Sep 2026: ke-150 baris di public/ringkasanAkun semuanya
+       `kripto`, tidak satu pun forex. Akibatnya panel "Jurnal Trade-Fi" di
+       mode preview dan di akun baru berbunyi "Belum ada transaksi jurnal
+       trade-fi" — bukan karena datanya tidak ada, melainkan karena tidak
+       ada yang tersisa untuknya saat diterbitkan. Dilaporkan pemilik dari
+       layarnya sendiri.
+
+       Ini KESALAHAN YANG SAMA yang sudah diperbaiki di sisi pembacaan (lihat
+       "SATU KUERI PER SUMBER" di useRiwayat, yang lahir waktu 1100 transaksi
+       MT5 menelan jatah kripto). Perbaikannya waktu itu tidak ikut turun ke
+       penerbit ini, dan gejalanya cuma kebalikannya: yang menang sekarang
+       kripto.
+
+       Gilir per sumber, bukan kuota tetap per sumber: kalau nanti cuma ada
+       satu sumber, ia tetap boleh memakai seluruh 150 — yang dijaga hanya
+       bahwa sumber yang PUNYA data tidak pernah tergusur sampai nol. */
     ...(trade ? {
-      contohTrade: trade.slice(0, 150).map((t) => ({
-        p: t.pair, a: t.arah, s: t.sumber, w: t.waktu,
-        n: Number(t.pnl.toFixed(2)), l: t.lot ?? 0,
-        e: t.emosi ?? '',
-      })),
+      contohTrade: (() => {
+        const perSumber = new Map<string, typeof trade>();
+        for (const t of trade) {
+          const k = t.sumber || 'lain';
+          const a = perSumber.get(k);
+          if (a) a.push(t); else perSumber.set(k, [t]);
+        }
+        const antre = [...perSumber.values()];
+        const pilih: typeof trade = [];
+        for (let i = 0; pilih.length < 150; i++) {
+          let adaYangDiambil = false;
+          for (const a of antre) {
+            if (i >= a.length || pilih.length >= 150) continue;
+            pilih.push(a[i]);
+            adaYangDiambil = true;
+          }
+          if (!adaYangDiambil) break;   // semua sumber habis
+        }
+        /* Diurutkan ulang supaya kurva & kalender di layar penerima tetap
+           berurutan waktu; giliran di atas cuma cara MEMILIH, bukan urutan
+           yang dikirim. */
+        return pilih
+          .sort((a, b) => b.waktu - a.waktu)
+          .map((t) => ({
+            p: t.pair, a: t.arah, s: t.sumber, w: t.waktu,
+            n: Number(t.pnl.toFixed(2)), l: t.lot ?? 0,
+            e: t.emosi ?? '',
+          }));
+      })(),
     } : {}),
     _updatedAt: Date.now(),
   }, { merge: true });
