@@ -84,7 +84,7 @@ export default function Pricing_05() {
         }]
       : []),
     {
-      title: "Testing — New Launch",
+      title: "Paket Starter",
       price: usd(h.hargaTesting),
       strike: h.hargaTestingCoret,
       unit: `/ ${h.hari} hari`,
@@ -130,7 +130,7 @@ export default function Pricing_05() {
       ],
     },
     {
-      title: "Tahunan",
+      title: "Premium Tahunan",
       price: usd(h.hargaTahunan),
       strike: 0,
       unit: "/ 12 bulan",

@@ -336,7 +336,7 @@ export function PanelSetelanAkses() {
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <Uang label="Testing — New Launch" nilai={st.hargaTesting}
+                <Uang label="Paket Starter" nilai={st.hargaTesting}
                       catatan="harga jual paket peluncuran"
                       atur={(n) => setSt({ ...st, hargaTesting: n })} />
                 <Uang label="Harga coret" nilai={st.hargaTestingCoret}
@@ -371,7 +371,7 @@ export function PanelSetelanAkses() {
             <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-3">
               <div className="mb-3 text-[12.5px] text-zinc-200">Tautan checkout tiap paket</div>
               <div className="grid gap-3">
-                <Tautan label="Testing — New Launch" nilai={st.linkTesting}
+                <Tautan label="Paket Starter" nilai={st.linkTesting}
                         catatan="kosongkan untuk memakai halaman Akses yang sekarang"
                         atur={(v) => setSt({ ...st, linkTesting: v })} />
                 <Tautan label="Premium 3 Bulan" nilai={st.linkPremium3}

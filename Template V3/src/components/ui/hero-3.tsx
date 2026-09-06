@@ -48,7 +48,7 @@ export function HeroSection({ children }: { children?: React.ReactNode }) {
             <p className="font-mono text-xs">BARU</p>
           </div>
 
-          <span className="text-xs">pendaftaran akses perintis dibuka</span>
+          <span className="text-xs">pendaftaran Paket Starter dibuka</span>
           <span className="block h-5 border-l" />
 
           <div className="pr-1">

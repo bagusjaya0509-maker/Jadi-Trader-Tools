@@ -61,9 +61,9 @@ import { usePermintaanLisensi, putuskanLisensi, hapusPermintaanLisensi,
     ditampilkan di sini cuma keterangan, yang mengikat yang di sana. */
 const PAKET_MANUAL: { nilai: PaketManual; label: string; sub: string }[] = [
   { nilai: 'gratis',   label: 'Gratis',            sub: 'Event Terbatas — 30 hari' },
-  { nilai: 'testing',  label: 'Berbayar 1 bulan',  sub: 'Testing / New Launch — 30 hari' },
+  { nilai: 'testing',  label: 'Paket Starter',     sub: 'Starter — 30 hari' },
   { nilai: 'premium3', label: 'Berbayar 3 bulan',  sub: 'Premium 3 Bulan — 90 hari' },
-  { nilai: 'tahunan',  label: 'Tahunan',           sub: 'Tahunan — 365 hari' },
+  { nilai: 'tahunan',  label: 'Premium Tahunan',   sub: 'Premium Tahunan — 365 hari' },
 ];
 
 export function PanelLisensi() {
@@ -286,9 +286,9 @@ export function PanelLisensi() {
                   {x.paketMinta && (
                     <span className="ml-1 inline-flex items-center gap-1 rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-300"
                           title="Paket yang disebut tautan pembelian. Cocokkan dengan pesanan di Lynk sebelum menyetujui.">
-                      minta: {x.paketMinta === 'testing' ? 'Perintis 30 hari'
-                            : x.paketMinta === 'premium3' ? 'Premium 90 hari'
-                            : 'Tahunan 365 hari'}
+                      minta: {x.paketMinta === 'testing' ? 'Starter 30 hari'
+                            : x.paketMinta === 'premium3' ? 'Premium 3 Bulan 90 hari'
+                            : 'Premium Tahunan 365 hari'}
                     </span>
                   )}
                   {x.bukti && x.bukti !== 'lynk' && (

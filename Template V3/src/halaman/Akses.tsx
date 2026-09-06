@@ -351,7 +351,7 @@ export default function Akses() {
               <KartuKuota judul="Akses gratis" pakai={kuota.gratisTerpakai} total={kuota.gratisTotal}
                           sisa={kuota.gratisSisa} warna="bg-emerald-500"
                           catatan={`${kuota.hari} hari`} />
-              <KartuKuota judul="Akses perintis" pakai={kuota.bayarTerpakai} total={kuota.bayarTotal}
+              <KartuKuota judul="Paket Starter" pakai={kuota.bayarTerpakai} total={kuota.bayarTotal}
                           sisa={kuota.bayarSisa} warna="bg-[#ffcd75]"
                           catatan={`${HARGA_PERINTIS_TEKS} · ${kuota.hari} hari`} />
             </>

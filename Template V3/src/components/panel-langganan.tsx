@@ -207,7 +207,7 @@ export function PanelLangganan() {
             </div>
           </div>
           <div className="rounded-lg border border-zinc-800/60 p-3">
-            <div className="text-[11px] text-zinc-500">Sisa akses perintis</div>
+            <div className="text-[11px] text-zinc-500">Sisa Paket Starter</div>
             <div className={cn('angka mt-0.5 text-[20px] font-semibold',
               kuota.bayarHabis ? 'text-red-400' : 'text-zinc-100')}>
               {memuatKuota ? '…' : kuota.bayarSisa}

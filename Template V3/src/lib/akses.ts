@@ -153,10 +153,18 @@ export function useKuota(): { kuota: Kuota; memuat: boolean; galat: string | nul
  *  sama persis dengan kunci PAKET_UPGRADE di server. */
 export type PaketMinta = 'testing' | 'premium3' | 'tahunan';
 
+/* SATU nama untuk tiap paket, dipakai di mana pun paketnya disebut ke
+   manusia: kartu harga, catatan permintaan, lencana antrean, panel pemilik.
+   Kunci di kiri (`testing`, `premium3`, `tahunan`) TIDAK ikut berubah — ia
+   ada di PAKET_UPGRADE server dan di alamat /aktivasi?paket=, jadi mengganti
+   satu huruf di sana mematahkan tautan yang sudah tercetak di produk Lynk.
+
+   Nama tampilan boleh berubah kapan saja; kunci tidak. Itulah gunanya
+   keduanya dipisah. */
 export const NAMA_PAKET: Record<PaketMinta, string> = {
-  testing: 'Akses Perintis — 30 hari',
+  testing: 'Paket Starter — 30 hari',
   premium3: 'Premium 3 Bulan — 90 hari',
-  tahunan: 'Akses Tahunan — 365 hari',
+  tahunan: 'Premium Tahunan — 365 hari',
 };
 
 export function bacaPaketMinta(v: string | null | undefined): PaketMinta | null {

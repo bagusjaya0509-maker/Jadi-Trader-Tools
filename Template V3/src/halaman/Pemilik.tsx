@@ -124,10 +124,10 @@ function rupaSisa(n: number | null): { teks: string; kelas: string } {
 
 const KELOMPOK_LISENSI = [
   { id: 'gratis',   judul: 'Gratis',              tepi: 'border-l-zinc-600',    titik: 'bg-zinc-500',    angka: 'bg-zinc-800 text-zinc-400',        sub: () => 'Akses 30 hari tanpa biaya, dari kuota gratis.' },
-  { id: 'testing',  judul: 'Testing — New Launch', tepi: 'border-l-sky-500', titik: 'bg-sky-500', angka: 'bg-sky-500/15 text-sky-300', sub: (f: (n: number) => string, h?: { hargaTesting: number; hargaTestingCoret: number }) =>
+  { id: 'testing',  judul: 'Paket Starter',        tepi: 'border-l-sky-500', titik: 'bg-sky-500', angka: 'bg-sky-500/15 text-sky-300', sub: (f: (n: number) => string, h?: { hargaTesting: number; hargaTestingCoret: number }) =>
       h ? (h.hargaTestingCoret > h.hargaTesting ? `${f(h.hargaTesting)} · dari ${f(h.hargaTestingCoret)}` : f(h.hargaTesting)) : '' },
   { id: 'premium3', judul: 'Premium 3 Bulan',     tepi: 'border-l-violet-500', titik: 'bg-violet-500', angka: 'bg-violet-500/15 text-violet-300', sub: (f: (n: number) => string, h?: { hargaPremium3: number }) => (h ? f(h.hargaPremium3) : '') },
-  { id: 'tahunan',  judul: 'Tahunan',             tepi: 'border-l-amber-400', titik: 'bg-amber-400', angka: 'bg-amber-400/15 text-amber-300', sub: (f: (n: number) => string, h?: { hargaTahunan: number }) => (h ? f(h.hargaTahunan) : '') },
+  { id: 'tahunan',  judul: 'Premium Tahunan',     tepi: 'border-l-amber-400', titik: 'bg-amber-400', angka: 'bg-amber-400/15 text-amber-300', sub: (f: (n: number) => string, h?: { hargaTahunan: number }) => (h ? f(h.hargaTahunan) : '') },
   { id: 'market',   judul: 'Produk Marketplace',  tepi: 'border-l-emerald-500', titik: 'bg-emerald-500', angka: 'bg-emerald-500/15 text-emerald-300', sub: () => 'Indikator dan EA yang dibeli terpisah dari paket akses.' },
   { id: 'lain',     judul: 'Aktivasi Manual',     tepi: 'border-l-zinc-700', titik: 'bg-zinc-600', angka: 'bg-zinc-800 text-zinc-500', sub: () => 'Diaktifkan langsung lewat panel, tanpa permintaan dari pembeli — biasanya uji coba.' },
 ] as const;
@@ -308,7 +308,7 @@ export default function Pemilik() {
      catatan adalah cara membuat keduanya berselisih. */
   const barisJual = useMemo(() => {
     const namaPaket = (p?: string) =>
-      p === 'tahunan' ? 'Tahunan' : p === 'premium3' ? 'Premium 3 bulan' : p === 'testing' ? 'Testing' : 'Akses';
+      p === 'tahunan' ? 'Premium Tahunan' : p === 'premium3' ? 'Premium 3 Bulan' : p === 'testing' ? 'Paket Starter' : 'Akses';
     const dariLisensi = lisensiTerjual.map((x) => ({
       kunci: 'L' + x.id,
       waktu: x.diputusPada || x.waktu,
