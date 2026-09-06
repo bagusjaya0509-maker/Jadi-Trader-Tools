@@ -221,9 +221,38 @@ export function useRiwayat(): HasilData<Trade[]> {
     bacaPilihanContoh(pengguna.uid) !== 'kosong';
 
   const pakaiContoh = !pengguna || kosongBaru;
+
+  /* ── CONTOH NYATA MENIMPA PER SUMBER, BUKAN SELURUHNYA ────────────────
+     Dulu satu baris: `contohNyata ?? RIWAYAT`. Begitu dokumen contoh publik
+     terbit, ia menggantikan SEMUA contoh statis — termasuk sumber yang tidak
+     ia punyai sama sekali.
+
+     Terukur 6 Sep 2026 lewat REST Firestore: 150 baris di
+     public/ringkasanAkun semuanya `kripto`, nol forex. Akibatnya panel
+     "Jurnal Trade-Fi" di mode preview dan di akun baru berbunyi "Belum ada
+     transaksi jurnal trade-fi" — padahal contoh statisnya punya 29 trade
+     forex yang siap pakai, cuma sudah terlanjur dibuang seluruhnya.
+
+     Sekarang penggantiannya per sumber: yang PUNYA data nyata memakainya,
+     yang tidak jatuh ke contoh statis. Dua sifat yang dijaga sekaligus —
+     angka nyata tetap menang di mana ia ada, dan tidak ada panel yang bisa
+     kosong hanya karena penerbitnya kebetulan tidak menyertakan sumbernya.
+
+     Penerbitnya juga sudah diperbaiki (lihat "DIAMBIL BERIMBANG PER SUMBER"
+     di terbitkanRingkasan), tapi perbaikan itu baru berlaku pada penerbitan
+     BERIKUTNYA. Yang di sini menyembuhkan dokumen yang sudah terlanjur
+     terbit, dan tetap berguna sesudahnya sebagai jaring pengaman. */
+  const contohGabung = useMemo(() => {
+    if (!contohNyata || !contohNyata.length) return RIWAYAT;
+    const adaSumber = new Set(contohNyata.map((t) => t.sumber));
+    const penambal = RIWAYAT.filter((t) => !adaSumber.has(t.sumber));
+    if (!penambal.length) return contohNyata;
+    return [...contohNyata, ...penambal].sort((a, b) => b.waktu - a.waktu);
+  }, [contohNyata]);
+
   return {
-    /* Prioritas contoh: transaksi NYATA pemilik > contoh statis. */
-    data: pakaiContoh ? (contohNyata ?? RIWAYAT) : data,
+    /* Prioritas contoh: transaksi NYATA pemilik > contoh statis, per sumber. */
+    data: pakaiContoh ? contohGabung : data,
     memuat: memuat || memuatAuth,
     contoh: pakaiContoh,
     galat,
