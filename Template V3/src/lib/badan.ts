@@ -56,3 +56,26 @@ export const BADAN = {
 
 /** Tautan WhatsApp siap pakai. Dipakai Help Center dan Documentation. */
 export const WA_LINK = `https://wa.me/${BADAN.waNomor}`;
+
+/* ── AKUN SOSIAL ────────────────────────────────────────────────────────
+   Ditulis SEKALI di sini karena keduanya gampang tertukar, dan tertukar di
+   footer berarti mengirim pengunjung ke akun orang lain.
+
+   Dua nama yang beredar di catatan — `jaditrader.co.id` dan
+   `jaditradertools` — dan keduanya BENAR, tapi untuk layanan yang berbeda:
+
+     Instagram  @jaditrader.co.id   `jaditradertools` di IG menjawab
+                                    "Profile isn't available" (diperiksa
+                                    6 Sep 2026)
+     TikTok     @jaditradertools    yang tersambung ke API dan yang dibuka
+                                    pemilik di perambannya
+
+   Jadi jangan "menyeragamkan" keduanya jadi satu nama. Kalau salah satu
+   berubah, periksa dulu ke halaman profilnya, jangan menyalin dari yang
+   satunya. */
+export const SOSMED = {
+  instagram: 'https://www.instagram.com/jaditrader.co.id/',
+  igTampil: '@jaditrader.co.id',
+  tiktok: 'https://www.tiktok.com/@jaditradertools',
+  tiktokTampil: '@jaditradertools',
+} as const;

@@ -10,8 +10,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Mail, MessageCircle, Send } from 'lucide-react';
-import { BADAN, WA_LINK } from '@/lib/badan';
+import { Mail, MessageCircle, Send, Instagram } from 'lucide-react';
+import { BADAN, WA_LINK, SOSMED } from '@/lib/badan';
 
 /* ════════════════════════════════════════════════════════════════════════
    FOOTER — kerangka tempelan, isi milik sendiri
@@ -72,6 +72,19 @@ import { BADAN, WA_LINK } from '@/lib/badan';
    40 - 2 = 38, lalu 38 + 8 = 46 px. Angka yang "kelihatan benar" (-inset-[2px]
    untuk mencapai 44) sebenarnya cuma menghasilkan 42. */
 const SASARAN = "relative rounded-full after:absolute after:-inset-1 after:content-['']";
+
+/* TikTok tidak ada di lucide, dan itu bukan kelalaian: lucide menolak
+   lambang merek karena lisensinya milik pemiliknya masing-masing. Jalur di
+   bawah bentuk resmi yang disederhanakan, memakai `currentColor` supaya ia
+   ikut warna tombol persis seperti ikon lucide di sebelahnya — memasang PNG
+   hitam di sini akan lenyap di tema gelap. */
+function IkonTikTok({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden="true">
+      <path d="M16.6 5.82A4.28 4.28 0 0 1 15.54 3h-3.09v12.4a2.59 2.59 0 0 1-2.59 2.5 2.6 2.6 0 0 1-2.6-2.6c0-1.72 1.66-3.01 3.37-2.48V9.66c-3.45-.46-6.47 2.22-6.47 5.64 0 3.33 2.76 5.7 5.69 5.7 3.14 0 5.69-2.55 5.69-5.7V9.01a7.35 7.35 0 0 0 4.3 1.38V7.3s-1.88.09-3.24-1.48Z" />
+    </svg>
+  );
+}
 
 const TAUTAN = [
   { ke: '/', teks: 'Beranda' },
@@ -182,7 +195,11 @@ function Footerdemo() {
           </div>
 
           <div className="relative">
-            <h3 className="mb-4 text-lg font-semibold">Hubungi kami</h3>
+            {/* "Hubungi & ikuti", bukan "Hubungi kami" saja. Dua tombol
+                pertama memang saluran bantuan; dua yang baru bukan — dan
+                judul yang menjanjikan bantuan lalu menyodorkan Instagram
+                membuat orang mengira DM di sana dijawab secepat WhatsApp. */}
+            <h3 className="mb-4 text-lg font-semibold">Hubungi &amp; ikuti</h3>
             <div className="flex space-x-4">
               <TooltipProvider>
                 <Tooltip>
@@ -210,6 +227,38 @@ function Footerdemo() {
                   </TooltipTrigger>
                   <TooltipContent>
                     <p>{BADAN.email}</p>
+                  </TooltipContent>
+                </Tooltip>
+
+                {/* Sosial ditaruh SESUDAH saluran bantuan, bukan sebelumnya.
+                    Yang datang ke footer dengan pertanyaan mendesak mencari
+                    WhatsApp; yang penasaran akan tetap menemukan Instagram
+                    walau ia nomor tiga. */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="icon" className={SASARAN} asChild>
+                      <a href={SOSMED.instagram} target="_blank" rel="noopener noreferrer">
+                        <Instagram className="h-4 w-4" />
+                        <span className="sr-only">Instagram</span>
+                      </a>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Instagram {SOSMED.igTampil}</p>
+                  </TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="icon" className={SASARAN} asChild>
+                      <a href={SOSMED.tiktok} target="_blank" rel="noopener noreferrer">
+                        <IkonTikTok className="h-4 w-4" />
+                        <span className="sr-only">TikTok</span>
+                      </a>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>TikTok {SOSMED.tiktokTampil}</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
