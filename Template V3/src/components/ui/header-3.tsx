@@ -151,7 +151,7 @@ export function Header() {
                 </NavigationMenuContent>
               </NavigationMenuItem>
               <NavigationMenuLink className="px-4" asChild>
-                <a href="https://lynk.id/jaditrader_payment" className="hover:bg-accent rounded-md p-2">
+                <a href="https://lynk.id/karyahukum_store/page/books" className="hover:bg-accent rounded-md p-2">
                   Harga
                 </a>
               </NavigationMenuLink>

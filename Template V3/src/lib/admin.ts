@@ -638,6 +638,10 @@ export interface PermintaanLisensi {
   /** Ditentukan SERVER, bukan diterima dari browser — kalau kuota gratis
    *  habis, permintaan yang mengaku gratis otomatis jadi berbayar. */
   jenis?: 'gratis' | 'bayar';
+  /** Paket yang DISEBUT tautan pembelian Lynk — klaim pembeli, bukan paket
+   *  yang sudah diberikan. Terpisah dari `paket` dengan sengaja; lihat
+   *  catatan di server.js dan di halaman Aktivasi. */
+  paketMinta?: 'testing' | 'premium3' | 'tahunan';
   /** Paket berbayar yang dipasang tangan lewat panel Akses & Lisensi.
    *  Kosong berarti gratis, atau berbayar dari sebelum fitur ini ada —
    *  keduanya diperlakukan sebagai paket termurah saat ditampilkan. */

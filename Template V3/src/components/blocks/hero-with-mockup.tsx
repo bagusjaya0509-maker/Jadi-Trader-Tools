@@ -29,7 +29,7 @@ export function HeroWithMockup({
   title,
   description,
   primaryCta = { text: 'Mulai gratis', href: '/jurnal' },
-  secondaryCta = { text: 'Lihat harga', href: 'https://lynk.id/jaditrader_payment' },
+  secondaryCta = { text: 'Lihat harga', href: 'https://lynk.id/karyahukum_store/page/books' },
   mockupImage,
   children,
   className,

@@ -92,6 +92,10 @@ export interface Permintaan {
   email?: string;
   nama?: string;
   jenis?: 'gratis' | 'bayar';
+  /** Paket yang DIKLAIM pembeli lewat tautan Lynk — bukan paket yang
+   *  diberikan. Lihat catatan panjang di server.js soal kenapa keduanya
+   *  sengaja dipisah. */
+  paketMinta?: PaketMinta;
   produk: string;
   catatan?: string;
   bukti?: string;
@@ -145,8 +149,22 @@ export function useKuota(): { kuota: Kuota; memuat: boolean; galat: string | nul
 }
 
 /* ── Pengguna: kirim permintaan & lihat miliknya sendiri ─────────────── */
+/** Paket yang boleh disebut tautan aktivasi. Daftar putih, dan sengaja
+ *  sama persis dengan kunci PAKET_UPGRADE di server. */
+export type PaketMinta = 'testing' | 'premium3' | 'tahunan';
+
+export const NAMA_PAKET: Record<PaketMinta, string> = {
+  testing: 'Akses Perintis — 30 hari',
+  premium3: 'Premium 3 Bulan — 90 hari',
+  tahunan: 'Akses Tahunan — 365 hari',
+};
+
+export function bacaPaketMinta(v: string | null | undefined): PaketMinta | null {
+  return v === 'testing' || v === 'premium3' || v === 'tahunan' ? v : null;
+}
+
 export async function mintaAkses(opsi: {
-  jenis: 'gratis' | 'bayar'; catatan?: string; bukti?: string;
+  jenis: 'gratis' | 'bayar'; catatan?: string; bukti?: string; paketMinta?: PaketMinta;
 }): Promise<{ ok: boolean; sudahAda?: boolean; id?: string;
   /* Terisi kalau permintaannya langsung disetujui sendiri (akses gratis
      dengan saklar otomatis menyala). Halaman pemanggil memakainya untuk
@@ -158,6 +176,7 @@ export async function mintaAkses(opsi: {
     headers: await kepalaLogin(),
     body: JSON.stringify({
       jenis: opsi.jenis,
+      ...(opsi.paketMinta ? { paketMinta: opsi.paketMinta } : {}),
       produk: 'jadi-trader-v3',
       catatan: (opsi.catatan ?? '').slice(0, 300),
       bukti: (opsi.bukti ?? '').slice(0, 300),

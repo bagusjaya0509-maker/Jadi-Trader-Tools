@@ -273,6 +273,24 @@ export function PanelLisensi() {
                       Lynk · sudah bayar
                     </span>
                   )}
+                  {/* PAKET YANG DIBELI, dibaca dari tautan produk Lynk-nya
+                      sendiri. Sebelum ini barisnya cuma bertanda "Lynk" dan
+                      pemilik harus membuka daftar Orders untuk tahu yang
+                      mana — pekerjaan yang berulang tiap pembelian.
+
+                      Ditulis "minta", bukan nama paketnya saja: nilai ini
+                      datang dari alamat halaman yang diketik peramban, jadi
+                      ia KLAIM pembeli, bukan sesuatu yang sudah dibuktikan.
+                      Yang membuktikannya tetap pesanan di Lynk, dan yang
+                      memberikannya tetap tombol setujui di baris ini. */}
+                  {x.paketMinta && (
+                    <span className="ml-1 inline-flex items-center gap-1 rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-300"
+                          title="Paket yang disebut tautan pembelian. Cocokkan dengan pesanan di Lynk sebelum menyetujui.">
+                      minta: {x.paketMinta === 'testing' ? 'Perintis 30 hari'
+                            : x.paketMinta === 'premium3' ? 'Premium 90 hari'
+                            : 'Tahunan 365 hari'}
+                    </span>
+                  )}
                   {x.bukti && x.bukti !== 'lynk' && (
                     <div className="mt-1 text-[11.5px] text-zinc-600">
                       Bukti: <span className="text-zinc-400">{x.bukti}</span>

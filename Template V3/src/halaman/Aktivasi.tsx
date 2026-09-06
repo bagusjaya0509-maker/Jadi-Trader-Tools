@@ -6,7 +6,7 @@ import {
 import { useAuth, pesanAuth } from '@/lib/auth';
 import { auth } from '@/lib/firebase';
 import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
-import { mintaAkses, permintaanSaya, masukDiscord, type Permintaan } from '@/lib/akses';
+import { mintaAkses, permintaanSaya, masukDiscord, bacaPaketMinta, NAMA_PAKET, type Permintaan } from '@/lib/akses';
 import { cn } from '@/lib/utils';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -32,6 +32,22 @@ import { cn } from '@/lib/utils';
    pesanan di link kirimannya, jadi tidak ada yang bisa dibaca otomatis
    dari alamat halaman; berpura-pura ada akan menghasilkan pencocokan yang
    kelihatan otomatis padahal menebak.
+
+   ── PAKETNYA DIBEDAKAN LEWAT ALAMAT, 6 Sep 2026 ────────────────────────
+   Tiap produk di Lynk sekarang mengirim pembelinya ke alamat yang berbeda:
+   ?paket=testing, ?paket=premium3, ?paket=tahunan. Sebelumnya ketiganya
+   mendarat di alamat yang sama dan pemilik harus membuka daftar Orders
+   untuk tahu yang mana — pekerjaan yang berulang tiap pembelian.
+
+   YANG DIBAWA CUMA LABELNYA, BUKAN AKSESNYA. Alamat halaman datang dari
+   peramban; siapa pun bisa mengetik ?paket=tahunan. Kalau nilai itu
+   memberi akses, satu tautan yang tersebar sekali di grup Telegram sama
+   dengan lisensi tahunan gratis untuk semua pembacanya. Jadi server
+   menyimpannya di `paketMinta` yang TERPISAH dari `paket`, dan yang boleh
+   mengisi `paket` tetap cuma persetujuan pemilik.
+
+   Yang hilang bukan pengamanannya, melainkan pekerjaan mencocokkannya:
+   pemilik melihat "minta: Akses Tahunan" langsung di barisnya.
 
    ── TIGA JALAN MASUK, SATU MUARA ───────────────────────────────────────
    1. Bayar lewat Lynk  → halaman ini → pemilik menyetujui
@@ -70,6 +86,11 @@ function Langkah({ n, judul, ket, keadaan }: {
 export default function Aktivasi() {
   const { pengguna, memuat: memuatAuth, pemilik, langganan } = useAuth();
   const arahkan = useNavigate();
+  /* DIBACA SEKALI SAAT LAHIR, bukan tiap render. Alamatnya tidak berubah
+     selama halaman ini terbuka, dan membacanya ulang cuma memberi peluang
+     nilai berbeda masuk ke permintaan yang sudah terkirim. */
+  const [paketDibeli] = useState(() =>
+    bacaPaketMinta(new URLSearchParams(window.location.search).get('paket')));
   const [punyaku, setPunyaku] = useState<Permintaan[] | null>(null);
   const [galat, setGalat] = useState('');
   const [mengirim, setMengirim] = useState(false);
@@ -108,8 +129,11 @@ export default function Aktivasi() {
         setMengirim(true);
         await mintaAkses({
           jenis: 'bayar',
-          catatan: 'Pembayaran lewat Lynk — dibuka dari link kiriman otomatis',
+          catatan: paketDibeli
+            ? `Pembayaran lewat Lynk — ${NAMA_PAKET[paketDibeli]}`
+            : 'Pembayaran lewat Lynk — dibuka dari link kiriman otomatis',
           bukti: PENANDA_LYNK,
+          ...(paketDibeli ? { paketMinta: paketDibeli } : {}),
         });
         if (!hidup) return;
         setPunyaku(await permintaanSaya());

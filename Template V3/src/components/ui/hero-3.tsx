@@ -83,7 +83,7 @@ export function HeroSection({ children }: { children?: React.ReactNode }) {
             </a>
           </Button>
           <Button asChild>
-            <a href="https://lynk.id/jaditrader_payment">
+            <a href="https://lynk.id/karyahukum_store/page/books">
               Lihat paket <ArrowRightIcon className="size-4 ml-2" data-icon="inline-end" />
             </a>
           </Button>
