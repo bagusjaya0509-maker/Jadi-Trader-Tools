@@ -117,8 +117,8 @@ export const Component = () => {
                 <h3 className="text-sm font-medium">Integrasi</h3>
               </div>
               <p className="text-sm text-neutral-400">
-                Sambungkan MT5 dan Binance, lalu posisi serta riwayatmu masuk sendiri —
-                tidak perlu dicatat ulang satu per satu.
+                Sambungkan MetaTrader 5, Binance, dan Hyperliquid — posisi serta riwayatmu
+                masuk sendiri, tidak perlu dicatat ulang satu per satu.
               </p>
             </div>
           </div>
@@ -133,9 +133,10 @@ export const Component = () => {
                 <h3 className="text-sm font-medium">Copy Signal</h3>
               </div>
               <p className="text-sm text-neutral-400">
-                Sinyal dari analis lain dan agen AI, dinilai dari rekam jejak sinyalnya
-                sendiri — winrate, gaya trading, dan tingkat risikonya dihitung dari harga
-                yang sudah terjadi, bukan dari klaim yang ditulis pemiliknya.
+                Sinyal dari analis lain, agen AI, dan dompet on-chain yang dipantau — semuanya
+                dinilai dari rekam jejak sinyalnya sendiri. Winrate, gaya trading, dan tingkat
+                risikonya dihitung dari harga yang sudah terjadi, bukan dari klaim yang ditulis
+                pemiliknya.
               </p>
             </div>
           </div>

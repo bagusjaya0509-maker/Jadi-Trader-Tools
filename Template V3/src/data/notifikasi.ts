@@ -94,6 +94,38 @@ export interface Rilis {
 /* Urutan: terbaru dulu. CHANGELOG[0] yang tampil di kotak sidebar. */
 export const CHANGELOG: Rilis[] = [
   {
+    versi: 'v3.7',
+    tanggal: '6 September 2026',
+    judul: 'Bursa kedua, dan uang on-chain yang bisa diikuti',
+    ringkas: 'Order berangkat ke Hyperliquid, dompet perp on-chain punya menunya sendiri dan ikut dinilai papan peringkat, dan copy signal berhenti terkunci di MetaTrader 5.',
+    sorotan:
+      'Dua minggu terakhir semuanya menuju satu arah: alat ini berhenti mengandaikan satu bursa dan satu jenis ' +
+      'lawan main. Hyperliquid kini bisa dikirimi order dan ditutup posisinya dari panel yang sama dengan Binance, ' +
+      'sinyal yang kamu ikuti bisa disalin ke bursa mana pun yang kamu pilih saat menekan Ikuti, dan dompet perp ' +
+      'on-chain — yang tidak pernah menulis sinyal, cuma membuka posisi — masuk papan peringkat memakai aturan ' +
+      'penilaian yang sama dengan analis manusia dan agen AI. Yang dinilai tetap hasil yang sudah terjadi, bukan ' +
+      'yang dijanjikan siapa pun.',
+    butir: [
+      { jenis: 'baru', teks: 'Order Hyperliquid — kirim, pasang SL/TP, dan tutup posisi dari panel yang sama dengan Binance. Simbol yang tidak ada di Binance dirutekan sendiri oleh server.' },
+      { jenis: 'baru', teks: 'Wallet Tracking jadi menu sendiri, berisi Dompet Pantauan, Posisi Copy, dan Coin Hunter — tiga hal yang dulu cuma bisa ditemukan sesudah membuka kartu agen yang tepat.' },
+      { jenis: 'baru', teks: 'Papan peringkat Hyperliquid: puluhan ribu dompet diurutkan dari hasil trading-nya sendiri, lengkap dengan posisi yang sedang dipegang dan sejak harga berapa.' },
+      { jenis: 'baru', teks: 'Dompet on-chain ikut masuk papan peringkat analis. Rekam jejaknya dihitung dengan aturan yang sama dengan analis manusia dan agen AI.' },
+      { jenis: 'baru', teks: 'Copy Signal bisa menyalin ke Binance dan Hyperliquid, bukan cuma MetaTrader 5. Bursa tujuan dan leverage-nya dipilih saat menekan Ikuti.' },
+      { jenis: 'baru', teks: 'Coin Hunter — tempel alamat kontrak koin presale, dan halaman ini berbunyi begitu ada kolam DEX dengan likuiditas nyata, beserta berapa kali lipat harganya terhadap harga belimu.' },
+      { jenis: 'baru', teks: 'EMA masuk indikator bawaan Chart & Entry: satu sampai tiga garis, periodenya diatur sendiri.' },
+      { jenis: 'baru', teks: 'Multi-chart — beberapa chart berdampingan di satu layar, saling menyusul saat simbol atau replay-nya digeser.' },
+      { jenis: 'baru', teks: 'Timeframe 30 menit dan mingguan untuk simbol MetaTrader 5, disusun dari data yang sudah ada tanpa menunggu kiriman baru dari EA.' },
+      { jenis: 'peningkatan', teks: 'Halaman harga terbuka sebagai lapisan di atas pekerjaanmu, bukan halaman penuh. Ditutup, dan kamu kembali ke tempat semula.' },
+      { jenis: 'peningkatan', teks: 'Papan peringkat memakai penomoran geser seperti panel analis, jadi daftar yang panjang tidak lagi memanjangkan halamannya.' },
+      { jenis: 'peningkatan', teks: 'Kartu sinyal menyebut umur postingannya — "12 menit lalu" — bukan tanggal yang harus dihitung sendiri terhadap hari ini.' },
+      { jenis: 'perbaikan', teks: 'Order Buy Stop BTC ditolak "-1111 Precision" karena aturan angka simbolnya sempat terbaca dari bursa yang salah. Aturan angka dan bursa tujuan kini wajib berasal dari satu sumber, dan ordernya berhenti sebelum berangkat kalau keduanya berselisih.' },
+      { jenis: 'perbaikan', teks: 'Tutup posisi Hyperliquid dari tabel Posisi Terbuka. Permintaannya dulu dirutekan ke Binance, yang tidak mengenal nama simbolnya.' },
+      { jenis: 'perbaikan', teks: 'Perkembangan akun di Dashboard dihitung dari total return sepanjang masa, bukan bulan berjalan — dulu bisa menulis +3,5% pada akun yang sedang minus.' },
+      { jenis: 'perbaikan', teks: 'Setoran dan penarikan di Journal berhenti terlihat seperti masih memuat padahal angkanya sudah tersimpan.' },
+      { jenis: 'perbaikan', teks: 'Tangkapan layar di halaman depan menyusul isi aplikasinya lagi. Skrip pemotretnya masih memakai alamat model lama sejak router diganti, jadi selama tiga minggu ia memotret halaman yang sama berulang kali tanpa satu pun galat.' },
+    ],
+  },
+  {
     versi: 'v3.6',
     tanggal: '24 Agustus 2026',
     judul: 'Dua agen AI masuk papan sebagai trader independen',

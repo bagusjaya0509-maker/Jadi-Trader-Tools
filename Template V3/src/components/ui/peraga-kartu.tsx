@@ -95,9 +95,17 @@ export function PeragaJurnal() {
    terbaca seperti satu lampu yang dikedipkan, bukan seperti dua sambungan
    yang masing-masing hidup. */
 
+/* Tiga, sejak 6 Sep 2026. Hyperliquid sudah dilalui order sungguhan —
+   kirim, tutup, dan salin — jauh sebelum baris ini menyebutnya, jadi yang
+   diperbaiki di sini bukan kemampuannya melainkan halaman yang masih
+   menceritakan kemampuan bulan lalu.
+
+   Keterangan kanannya menyebut PASAR, bukan merek: orang yang belum kenal
+   Hyperliquid tidak terbantu oleh kata "Hyperliquid" diulang dua kali. */
 const SAMBUNGAN = [
   { n: 'MetaTrader 5', k: 'Forex & Emas' },
   { n: 'Binance', k: 'Kripto Futures' },
+  { n: 'Hyperliquid', k: 'Perp on-chain' },
 ];
 
 export function PeragaIntegrasi() {
@@ -125,7 +133,7 @@ export function PeragaIntegrasi() {
         </div>
       ))}
       <div className="mt-0.5 font-mono text-[9.5px] leading-relaxed text-neutral-600">
-        Kunci API disimpan di perangkatmu sendiri.
+        Kunci API tinggal di backend-mu sendiri.
       </div>
     </div>
   );

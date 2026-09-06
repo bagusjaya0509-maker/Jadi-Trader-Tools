@@ -36,37 +36,68 @@ type Layar = {
 
 /* Urutannya BUKAN urutan menu, melainkan urutan cerita: yang paling dulu
    ditunjukkan adalah layar yang paling menjelaskan produk ini. Chart &
-   Entry dinaikkan ke nomor satu karena di situlah replay dan penyusunan
-   order terjadi — inti yang dijual. Screener turun ke nomor tiga.
+   Entry nomor satu karena di situlah replay dan penyusunan order terjadi —
+   inti yang dijual. Lalu berpindah ke luar: apa yang dicari (Screener),
+   siapa yang sedang bergerak (Wallet Tracking, Copy Signal), baru kembali
+   ke dalam untuk apa yang tercatat (Dashboard, Journal, Personal Area).
 
    Kalau daftar ini diubah lagi, `no` harus ikut dinomori ulang: angkanya
    ditulis tangan, tidak diturunkan dari indeks, jadi menukar dua entri
-   tanpa memperbaiki `no` akan menampilkan "03" di posisi pertama. */
+   tanpa memperbaiki `no` akan menampilkan "03" di posisi pertama.
+
+   ── DARI LIMA JADI DELAPAN, 6 Sep 2026 ──────────────────────────────────
+   Diminta pemilik: tiga menu tumbuh sejak Agustus dan tidak satu pun pernah
+   terlihat di halaman depan. Yang ditambahkan Wallet Tracking, Personal
+   Area, dan Marketplace.
+
+   Coin Hunter TIDAK ikut walau ia menu tersendiri. Layarnya minta login
+   sebelum menampilkan apa pun, jadi yang bisa dipotret cuma tiga kotak
+   kosong — dan kotak kosong di halaman jualan mengatakan hal yang salah
+   tentang alat yang sebenarnya bekerja.
+
+   Aksennya sengaja berjauhan di roda warna, bukan sekadar "delapan warna
+   cerah": dua seksi berurutan dengan biru yang mirip terbaca sebagai satu
+   seksi yang gambarnya berganti, bukan sebagai dua layar berbeda. */
 const LAYAR: Layar[] = [
   {
     no: '01', berkas: 'chart', aksen: '#60a5fa',
     judul: 'Chart & Entry',
-    ket: 'Susun entry, SL, dan TP dengan menggeser garis. Order berangkat ke Binance lewat VPS-mu sendiri.',
+    ket: 'Susun entry, SL, dan TP dengan menggeser garis. Ordernya berangkat ke Binance, Hyperliquid, atau MetaTrader 5 lewat VPS-mu sendiri.',
   },
   {
-    no: '02', berkas: 'dashboard', aksen: '#34d399',
-    judul: 'Dashboard',
-    ket: 'Saldo, winrate, dan profit factor dihitung dari transaksimu sendiri — bukan dari angka yang kami karang.',
-  },
-  {
-    no: '03', berkas: 'screener', aksen: '#ffcd75',
+    no: '02', berkas: 'screener', aksen: '#ffcd75',
     judul: 'Screener Area',
     ket: 'Pindai ratusan pair sekaligus. Yang lolos saring muncul dengan alasannya, bukan cuma tanda panah.',
   },
   {
-    no: '04', berkas: 'jurnal', aksen: '#f472b6',
+    no: '03', berkas: 'wallet', aksen: '#2dd4bf',
+    judul: 'Wallet Tracking',
+    ket: 'Puluhan ribu dompet Hyperliquid diperingkat dari hasil trading-nya sendiri — kelihatan siapa yang sedang pegang apa, dan sejak harga berapa.',
+  },
+  {
+    no: '04', berkas: 'copy', aksen: '#c084fc',
+    judul: 'Copy Signal',
+    ket: 'Sinyal dari analis lain, agen AI, dan dompet on-chain. Diurutkan dari rekam jejak sinyalnya sendiri, bukan dari jumlah pengikut.',
+  },
+  {
+    no: '05', berkas: 'dashboard', aksen: '#34d399',
+    judul: 'Dashboard',
+    ket: 'Saldo, winrate, dan profit factor dihitung dari transaksimu sendiri — bukan dari angka yang kami karang.',
+  },
+  {
+    no: '06', berkas: 'jurnal', aksen: '#f472b6',
     judul: 'Journal',
     ket: 'Kurva ekuitas dan kalender P/L terisi sendiri dari MetaTrader 5 dan Binance. Tidak ada yang diketik ulang.',
   },
   {
-    no: '05', berkas: 'copy', aksen: '#c084fc',
-    judul: 'Copy Signal',
-    ket: 'Sinyal dari analis lain, diurutkan dari hasil sinyalnya sendiri — bukan dari jumlah pengikut.',
+    no: '07', berkas: 'personal', aksen: '#fb923c',
+    judul: 'Personal Area',
+    ket: 'Bukan cuma akun trading. Emas, saham, tabungan, sampai utang duduk di satu tempat — dan pos bertanda live ikut bergerak mengikuti harga.',
+  },
+  {
+    no: '08', berkas: 'marketplace', aksen: '#a3e635',
+    judul: 'Marketplace',
+    ket: 'Indikator dan EA yang dipakai terminal ini. Yang Pine berjalan di mesin aplikasi ini sendiri — dipasang sekali, langsung tergambar di chart.',
   },
 ];
 

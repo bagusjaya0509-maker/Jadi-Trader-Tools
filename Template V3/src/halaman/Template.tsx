@@ -6,6 +6,7 @@ import {
   ArrowRightIcon, EyeIcon,
   GlobeIcon, LayersIcon, UserPlusIcon, Users, Star,
   FileText, Shield, RotateCcw, Handshake, HelpCircle, BarChart, PlugIcon, BookOpen,
+  Footprints,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ParallaxComponent } from '@/components/ui/parallax-scrolling';
@@ -400,7 +401,11 @@ const productLinks: LinkItem[] = [
   { title: 'Journal',        href: '/jurnal',    description: 'Catat trade, emosi, dan alasan — dari MT5 & Binance',      icon: FileText },
   { title: 'Copy Signal',    href: '/copy',      description: 'Sinyal analis lain, dinilai dari performa sinyalnya',      icon: UserPlusIcon },
   { title: 'Marketplace',    href: '/marketplace', description: 'EA, indikator, dan alat bantu trading',                  icon: GlobeIcon },
-  { title: 'Integrations',   href: '/integrasi', description: 'Sambungkan MetaTrader 5 dan Binance Futures',              icon: PlugIcon },
+  /* Wallet Tracking BARU MASUK 6 Sep 2026. Menunya sudah hidup di aplikasi
+     sejak akhir Agustus, tapi menu produk di halaman depan tidak ikut — jadi
+     satu-satunya cara menemukannya adalah membayar dulu. */
+  { title: 'Wallet Tracking', href: '/wallet-tracking', description: 'Dompet perp on-chain yang dilacak, dan koin presale yang ditunggu', icon: Footprints },
+  { title: 'Integrations',   href: '/integrasi', description: 'Sambungkan MetaTrader 5, Binance, dan Hyperliquid',        icon: PlugIcon },
 ];
 
 const companyLinks: LinkItem[] = [
