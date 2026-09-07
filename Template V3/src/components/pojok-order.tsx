@@ -126,7 +126,7 @@ function IsianAngka({ nilai, atur, langkah, min = 0, maks, desimal = 2, lebar, j
 }
 
 export function PojokOrder({
-  posisi, hargaKini, draf, rencana, mode, jenis, onMarket, risiko, tunda, onBatalTunda, onKirimSinyal, kabarSinyal, dariSinyal, onGantiCopy, onCopySinyal,
+  posisi, hargaKini, draf, rencana, mode, jenis, onMarket, risiko, tunda, onBatalTunda, onKirimSinyal, kabarSinyal, dariSinyal, tanpaSlTp, onGantiCopy, onCopySinyal,
   onPilih, onUbah, onKirim, onBatal, onTutup, onGantiMode, onTukarArah, mati,
   nyataSetelan, aturNyata, sibukNyata, kabar, demoSetelan, aturDemo,
   catatan, aturCatatan, qtyDemo, mt5, lotMt5, aturLotMt5, nilaiLotMt5, desimalHarga = 6,
@@ -192,6 +192,11 @@ export function PojokOrder({
   /** Level di chart ini datang dari analisa Copy Signal. Menyalakan
    *  penanda COPY biru — lihat catatan di tempat pembuatannya. */
   dariSinyal?: boolean;
+  /** Tiket lahir dari sinyal cermin dompet: SL & TP boleh kosong. Kartunya
+   *  sudah menyatakan dompetnya tidak memasang keduanya, jadi mengunci
+   *  tombol Kirim sampai keduanya diisi cuma menghalangi. Yang diisi tetap
+   *  diperiksa sisinya. */
+  tanpaSlTp?: boolean;
   /** `sebab` menerangkan KENAPA modenya berpindah, dan itu menentukan
    *  apakah draf yang sedang disusun ikut dibuang. Lihat putarMode. */
   onGantiMode: (m: 'demo' | 'real', sebab?: 'menuju-copy') => void;
@@ -397,9 +402,15 @@ export function PojokOrder({
     const rr = risk > 0 && reward > 0 ? reward / risk : null;
     /* SL di sisi yang salah bukan sekadar RR jelek — ia order yang langsung
        kena begitu terkirim. Ditahan di sini, bukan ditolak backend. */
-    const arahBenar = !entry || !sl || !tp
-      ? false
-      : draf === 'BUY' ? sl < entry && tp > entry : sl > entry && tp < entry;
+    /* Sisi diperiksa hanya untuk level yang ADA — di mode tanpa SL/TP,
+       yang kosong bukan salah, cuma tidak dipasang. */
+    const sisiOk = (h: number | undefined, diAtas: boolean) =>
+      !h || !entry || (diAtas ? h > entry : h < entry);
+    const arahBenar = !entry ? false
+      : tanpaSlTp
+        ? sisiOk(sl, draf !== 'BUY') && sisiOk(tp, draf === 'BUY')
+        : !sl || !tp ? false
+          : draf === 'BUY' ? sl < entry && tp > entry : sl > entry && tp < entry;
 
     /* -- YANG HILANG BUKAN YANG SALAH SISI -----------------------------
        Keduanya sama-sama mengunci tombol Kirim, tapi jalan keluarnya
@@ -416,7 +427,7 @@ export function PojokOrder({
        menyebut arah dan zona masuk membuka tiket dengan SL dan TP kosong.
        Ordernya memang tidak boleh berangkat tanpa SL — tapi orangnya berhak
        tahu ia tinggal mengisi dua kotak, bukan menebak aplikasinya rusak. */
-    const kurang = ([!entry && 'Entry', !sl && 'SL', !tp && 'TP']
+    const kurang = ([!entry && 'Entry', !tanpaSlTp && !sl && 'SL', !tanpaSlTp && !tp && 'TP']
       .filter(Boolean) as string[]);
     const alasanKunci = kurang.length
       ? kurang.join(' & ') + ' belum diisi — ketik angkanya, atau seret garisnya di chart.'

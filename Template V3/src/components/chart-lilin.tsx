@@ -256,7 +256,7 @@ export interface PosisiChartMt5 {
 /** Lihat prop `refKoordinat` — harga ke piksel viewport; null kalau chart
  *  belum hidup atau harganya tidak bisa dipetakan. `kanan` = tepi kanan
  *  area gambar (sebelum skala harga). */
-export type KoordinatChart = (harga: number) => { y: number; kanan: number } | null;
+export type KoordinatChart = (harga: number) => { y: number; kanan: number; xAkhir: number | null } | null;
 
 export function ChartLilin({
   lilin, garis, trade, tinggi = 420, hingga, garisHarga, onKlikBar, smi, mundur, pojok,
@@ -725,7 +725,16 @@ export function ChartLilin({
         const r = el.getBoundingClientRect();
         let lebar = 0;
         try { lebar = c.priceScale('right').width(); } catch { /* versi lama */ }
-        return { y: r.top + y, kanan: r.right - lebar };
+        /* x LILIN TERAKHIR, dibaca dari data seri (bukan prop `lilin` yang
+           dibekukan efek berdependensi kosong ini). Null kalau belum ada bar
+           atau chart belum diukur — pemanggil jatuh ke tepi skala harga. */
+        let xAkhir: number | null = null;
+        try {
+          const n = s.data().length;
+          const xa = n > 0 ? c.timeScale().logicalToCoordinate((n - 1) as Logical) : null;
+          xAkhir = xa === null || !Number.isFinite(xa) ? null : r.left + xa;
+        } catch { /* belum ada bar */ }
+        return { y: r.top + y, kanan: r.right - lebar, xAkhir };
       };
     }
 

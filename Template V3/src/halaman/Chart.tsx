@@ -1978,6 +1978,12 @@ ${pnlSunting !== null
      Kosong = jalur biasa, ketiganya tidak muncul. */
   const sinyalAsal = cari.get('sinyal');
   const kanalAsal = cari.get('kanal');
+  /* Sinyal cermin dompet on-chain tidak punya SL/TP — dompetnya memang tidak
+     memasangnya, dan kartunya sudah mengatakan itu. Panel order yang tetap
+     mengunci "SL & TP belum diisi" untuk sinyal seperti ini menghalangi
+     satu-satunya hal yang mau dilakukan orangnya: mengikuti posisinya.
+     Diminta pemilik 7 Sep 2026. Hanya berlaku untuk kanal agen:dompet-*. */
+  const tanpaSlTp = !!kanalAsal && kanalAsal.startsWith('agen:dompet');
   const analisAsal = cari.get('analis') || '';
   const [copySinyalBuka, setCopySinyalBuka] = useState(false);
   /** COPY yang datang dari NIAT orangnya, bukan dari level orang lain.
@@ -4170,6 +4176,12 @@ ${pnlSunting !== null
   const kotakUbah = useRef<HTMLDivElement>(null);
   /* Diisi ChartLilin: harga → piksel viewport. Dibaca di `jepitUbah`. */
   const koordinatUbah = useRef<KoordinatChart | null>(null);
+  /* Sisi lilin terakhir tempat panel duduk — diputuskan SEKALI saat panel
+     dibuka, lalu dipegang sampai ditutup. Kalau dihitung ulang tiap frame,
+     panel melompat ke sisi lain begitu ruang di kanan menyempit saat chart
+     digeser — dan benda yang bergerak melawan arah tangan terbaca sebagai
+     rusak (pelajaran kartu "Muat lebih lama"). */
+  const sisiUbah = useRef<'kanan' | 'kiri' | null>(null);
   const [letakPakai, setLetakPakai] = useState<{ x: number; y: number } | null>(letakUbah);
 
   useLayoutEffect(() => {
@@ -4193,15 +4205,35 @@ ${pnlSunting !== null
          Kalau chart belum hidup atau harganya belum terpetakan, jatuh ke
          kelas CSS pojok kanan bawah (letakPakai = null) — jangan sampai
          panelnya hilang cuma karena jembatan koordinatnya belum siap. */
-      let minta: { x: number; y: number } | null = letakUbah;
-      if (!minta) {
+      if (!letakUbah) {
         const jangkar = sunting.entry || sunting.sl || sunting.tp || 0;
         const t = jangkar > 0 ? (koordinatUbah.current?.(jangkar) ?? null) : null;
         if (!t) { setLetakPakai(null); return; }
-        minta = { x: t.kanan - b.left - k.width - 6, y: t.y - b.top + 8 };
+        /* ── MENEMPEL PADA LILIN TERAKHIR, SEPERTI KARTU "MUAT LEBIH LAMA" ──
+           Versi sebelumnya cuma menempel secara VERTIKAL (di bawah garis
+           entry) sementara x-nya dipatok ke skala harga — jadi menggeser
+           chart ke kiri meninggalkan panelnya diam di tepi, dan pemilik
+           menyebutnya "belum menempel di grafik". Sekarang x-nya lilin
+           terakhir: geser chart, panel ikut; tarik riwayat lebih lama,
+           panel ikut keluar layar bersama lilinnya — TANPA penjaga tepi,
+           dengan alasan yang sama seperti kartu itu: panel yang parkir di
+           tepi lalu ditimpa lilin adalah persis kelakuan yang mau
+           dihilangkan. Ia kembali begitu chartnya digeser balik, dan
+           garis ordernya sendiri tetap bisa diklik untuk memanggilnya.
+
+           Sisi (kanan/kiri lilin terakhir) diputuskan sekali — lihat
+           `sisiUbah`. Kanan kalau ruang sebelum skala harga cukup, kiri
+           kalau tidak; keduanya tetap ikut bergerak bersama lilinnya. */
+        const xa = t.xAkhir ?? (t.kanan - 14 - k.width);
+        if (!sisiUbah.current) sisiUbah.current = (t.kanan - xa) >= k.width + 20 ? 'kanan' : 'kiri';
+        const xTempel = sisiUbah.current === 'kanan' ? xa + 14 : xa - 10 - k.width;
+        const bx = Math.round(xTempel - b.left);
+        const by = Math.round(t.y - b.top + 8);
+        setLetakPakai((l) => (l && l.x === bx && l.y === by ? l : { x: bx, y: by }));
+        return;
       }
-      const x = Math.max(4, Math.min(maxX, minta.x));
-      let y = Math.max(4, Math.min(maxY, minta.y));
+      const x = Math.max(4, Math.min(maxX, letakUbah.x));
+      let y = Math.max(4, Math.min(maxY, letakUbah.y));
 
       /* ── Batas kedua: bagian chart yang BENAR-BENAR TERLIHAT ────────
          Muat di dalam kotak chart belum berarti terlihat. Chart ini
@@ -4249,6 +4281,7 @@ ${pnlSunting !== null
        tidak dipasang: panel yang diam tidak perlu dihitung 60 kali sedetik. */
     let bingkai = 0;
     if (!letakUbah) {
+      sisiUbah.current = null;
       const tik = () => { jepitUbah(); bingkai = requestAnimationFrame(tik); };
       bingkai = requestAnimationFrame(tik);
     }
@@ -5449,8 +5482,17 @@ ${pnlSunting !== null
                               }}
                               onKirim={() => {
                                 seretAsal.current = null;
-                                const { entry, sl, tp } = rencana;
-                                if (!draf || !entry || !sl || !tp) return;
+                                const { entry } = rencana;
+                                /* 0 = kosong. Angka pasti supaya cabang MT5 dan demo di
+                                   bawah tetap menerima number; keduanya masih menuntut
+                                   SL & TP lewat gerbang berikutnya. */
+                                const sl = rencana.sl || 0, tp = rencana.tp || 0;
+                                if (!draf || !entry) return;
+                                /* Tanpa SL/TP HANYA untuk sinyal cermin dompet (lihat
+                                   `tanpaSlTp`) dan HANYA di jalur kripto sungguhan: EA
+                                   MT5 dan mesin demo masih menuntut keduanya. */
+                                const tanpaSlTpKini = tanpaSlTp && aksi.mode === 'real' && !simbol.startsWith('MT5:');
+                                if (!tanpaSlTpKini && (!sl || !tp)) return;
                                 if (aksi.mode === 'real') {
                                   if (simbol.startsWith('MT5:')) {
                                     /* Jalur TRADE-FI: perintah masuk antrean
@@ -5518,7 +5560,7 @@ ${pnlSunting !== null
                                     simbol, tf, arah: draf,
                                     modal: nyataSetelan.modal, leverage: nyataSetelan.leverage,
                                     entry: jenisEntry === 'MARKET' ? (aksi.hargaKini ?? entry) : entry,
-                                    jenis: jenisEntry, sl, tp, metode: nyataSetelan.metode,
+                                    jenis: jenisEntry, sl, tp, tanpaSlTp: tanpaSlTpKini || undefined, metode: nyataSetelan.metode,
                                     emosi: catatanTiket.emosi, alasan: catatanTiket.alasan,
                                   }).then((h) => {
                                     setKabarNyata(h.pesan);
@@ -5552,6 +5594,7 @@ ${pnlSunting !== null
                               onKirimSinyal={kirimKeCopySignal}
                               kabarSinyal={kabarKirimSinyal || undefined}
                               dariSinyal={dariSinyal}
+                              tanpaSlTp={tanpaSlTp}
                               onGantiCopy={(v) => { copyManual.current = v; setDariSinyal(v); }} />
                             </div>
                           ) : undefined} />

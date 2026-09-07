@@ -76,6 +76,12 @@ export interface PermintaanNyata {
    *  sekali — saat menekan "Ikuti" dan menetapkan batas ruginya. Panel
    *  manual tidak boleh memakainya. */
   tanpaKonfirmasi?: boolean;
+  /** Sinyal cermin dompet: SL & TP boleh KOSONG KEDUANYA. Ordernya berangkat
+   *  tanpa stop dan server tidak memasang apa pun; klien menyatakannya
+   *  terang-terangan lewat bendera ini, bukan lewat angka nol. Kalau salah
+   *  satunya diisi, keduanya wajib — separuh perlindungan yang diam-diam
+   *  dibuang server lebih buruk daripada penolakan. */
+  tanpaSlTp?: boolean;
 }
 
 /* ── BURSA TUJUAN, SATU SUMBER ────────────────────────────────────────────
@@ -171,9 +177,17 @@ export async function kirimOrderNyata(p: PermintaanNyata): Promise<{ pesan: stri
   if (!koneksiLengkap(koneksi)) {
     throw new Error('Backend URL & App Token belum dipasang — buka Integrations dulu.');
   }
-  if (!p.entry || !p.sl || !p.tp) throw new Error('Entry, SL, dan TP wajib terisi.');
-  const sisiBenar = p.arah === 'BUY' ? p.sl < p.entry && p.tp > p.entry : p.sl > p.entry && p.tp < p.entry;
-  if (!sisiBenar) throw new Error('SL/TP berada di sisi yang salah terhadap entry.');
+  const tanpaSlTp = p.tanpaSlTp === true && !p.sl && !p.tp;
+  if (!p.entry) throw new Error('Entry wajib terisi.');
+  if (!tanpaSlTp && (!p.sl || !p.tp)) {
+    throw new Error(p.tanpaSlTp
+      ? 'Isi SL dan TP keduanya, atau kosongkan keduanya.'
+      : 'Entry, SL, dan TP wajib terisi.');
+  }
+  if (!tanpaSlTp) {
+    const sisiBenar = p.arah === 'BUY' ? p.sl < p.entry && p.tp > p.entry : p.sl > p.entry && p.tp < p.entry;
+    if (!sisiBenar) throw new Error('SL/TP berada di sisi yang salah terhadap entry.');
+  }
 
   const dasar = koneksi.url.trim().replace(/\/+$/, '');
   const kepala = { 'Content-Type': 'application/json', 'X-App-Token': koneksi.token.trim() };
@@ -272,11 +286,11 @@ export async function kirimOrderNyata(p: PermintaanNyata): Promise<{ pesan: stri
 
   const qtyStr = keStep((p.modal * p.leverage) / p.entry, stepSize, qP);
   if (Number(qtyStr) <= 0) throw new Error('Modal terlalu kecil untuk lot minimum simbol ini.');
-  const slStr = keStep(p.sl, tickSize, pP);
-  const jarak = Math.abs(p.entry - p.sl);
+  const slStr = tanpaSlTp ? '' : keStep(p.sl, tickSize, pP);
+  const jarak = tanpaSlTp ? 0 : Math.abs(p.entry - p.sl);
   const tp2N = p.arah === 'BUY' ? p.entry + jarak * 2 : p.entry - jarak * 2;
-  const tp1Fmt = keStep(p.tp, tickSize, pP);
-  const tp2Fmt = keStep(tp2N, tickSize, pP);
+  const tp1Fmt = tanpaSlTp ? '' : keStep(p.tp, tickSize, pP);
+  const tp2Fmt = tanpaSlTp ? '' : keStep(tp2N, tickSize, pP);
 
   /* Pemetaan metode — SALINAN SETIA cabang-cabang V2. */
   let qty1 = qtyStr, tp1Kirim = tp1Fmt, tp2Kirim: string | undefined, qty2Kirim: string | undefined;
@@ -293,12 +307,15 @@ export async function kirimOrderNyata(p: PermintaanNyata): Promise<{ pesan: stri
     tp1Kirim = tp2Fmt; /* satu TP penuh di 2× risiko */
   }
 
+  if (tanpaSlTp) { qty1 = qtyStr; tp1Kirim = ''; tp2Kirim = undefined; qty2Kirim = undefined; }
   const labelJenis = p.jenis === 'MARKET' ? 'Market'
     : `${p.arah === 'BUY' ? 'Buy' : 'Sell'} ${p.jenis === 'STOP' ? 'Stop' : 'Limit'} @ ${fHarga(p.entry)}`;
   const rincian = [
     `${p.arah} ${p.simbol} · ${labelJenis}`,
     `Nilai order ${uang(p.modal * p.leverage)} (modal ${uang(p.modal)} × ${p.leverage}) · qty ${qtyStr}`,
-    `SL ${slStr} · TP1 ${tp1Kirim} (qty ${qty1})${tp2Kirim ? ` · TP2 ${tp2Kirim} (qty ${qty2Kirim})` : ''}`,
+    tanpaSlTp
+      ? 'TANPA SL DAN TP — mengikuti dompet. Posisi tidak dilindungi stop; tambahkan nanti lewat Ubah Posisi.'
+      : `SL ${slStr} · TP1 ${tp1Kirim} (qty ${qty1})${tp2Kirim ? ` · TP2 ${tp2Kirim} (qty ${qty2Kirim})` : ''}`,
     `Metode: ${METODE_TP.find((m) => m.nilai === p.metode)?.label}`,
   ].join('\n');
   /* ── KALIMAT INI DULU SELALU MENULIS "ke Binance" ─────────────────────
@@ -362,7 +379,7 @@ export async function kirimOrderNyata(p: PermintaanNyata): Promise<{ pesan: stri
         symbol: p.simbol, side: p.arah, quantity: qtyStr, leverage: p.leverage,
         entryType: p.jenis === 'MARKET' ? 'MARKET' : p.jenis === 'LIMIT' ? 'LIMIT' : 'STOP_MARKET',
         entryPrice: p.jenis === 'MARKET' ? undefined : keStep(p.entry, tickSize, pP),
-        sl: slStr, tp1: tp1Kirim, qty1,
+        ...(tanpaSlTp ? { tanpaSlTp: true } : { sl: slStr, tp1: tp1Kirim, qty1 }),
         ...(tp2Kirim ? { tp2: tp2Kirim, qty2: qty2Kirim } : {}),
       }),
     });
@@ -414,7 +431,8 @@ export async function kirimOrderNyata(p: PermintaanNyata): Promise<{ pesan: stri
   } catch { /* localStorage penuh/privat — ordernya sendiri sudah terkirim */ }
 
   if (j.pending) {
-    mulaiPantau({ simbol: p.simbol, arah: p.arah, qty: qtyStr, sl: slStr, tp1: tp1Kirim, qty1, tp2: tp2Kirim, qty2: qty2Kirim });
+    /* Tanpa SL/TP tidak ada yang perlu dipasang saat entry-nya terisi. */
+    if (!tanpaSlTp) mulaiPantau({ simbol: p.simbol, arah: p.arah, qty: qtyStr, sl: slStr, tp1: tp1Kirim, qty1, tp2: tp2Kirim, qty2: qty2Kirim });
     return {
       /* Bursanya disebut, bukan diandaikan. Kalimat ini muncul tepat
          sesudah uang berangkat, dan menyebut bursa yang salah di situ

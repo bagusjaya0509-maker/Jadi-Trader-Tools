@@ -13,6 +13,13 @@ import { PROXY_BAWAAN, bacaKoneksi } from '@/lib/koneksi';
 
 const DASAR = PROXY_BAWAAN;
 
+/** Satu perubahan ukuran posisi dompet yang dicerminkan: `tambah` menggeser
+ *  entry rata-rata, `kurang` = tutup sebagian. `persen` DARI UKURAN TERBESAR
+ *  yang pernah dipegang, supaya angkanya bisa dijumlahkan. */
+export interface TahapDompet {
+  w: number; j: 'tambah' | 'kurang'; persen: number; harga: number; ukuran: number; pnl?: number;
+}
+
 export interface RingkasAnalisa {
   id: string; uid: string; nama: string; judul: string; pasangan: string;
   /** Analisnya sedang membuka situs — kunjungan terakhirnya lebih baru
@@ -45,6 +52,10 @@ export interface RingkasAnalisa {
    *  "harga sudah menyentuh SL" — kalimat yang menggambarkan peristiwa yang
    *  tidak pernah terjadi untuk sinyal tanpa SL. */
   dompet?: boolean;
+  /** Jejak ukuran sinyal cermin dompet — hanya untuk `dompet`. */
+  tahap?: TahapDompet[];
+  ukuran?: number;
+  ukuranMaks?: number;
   /** Ditulis agen AI, bukan pengguna. Dipasang HANYA oleh rute
    *  /api/analisa/agen yang dijaga App Token — kalau nilainya bisa dikirim
    *  lewat POST biasa, siapa pun yang login bisa menyamar jadi agen resmi. */

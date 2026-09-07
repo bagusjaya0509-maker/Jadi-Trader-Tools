@@ -1016,8 +1016,42 @@ function KartuAnalisa({ a, status, milikku, onSegarkan, performa, hargaKini }: {
         {buka && isi ? (
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[12.5px]">
             <span className="text-zinc-500">Entry <span className="angka text-zinc-200">{fHarga(isi.entry)}</span></span>
-            <span className="text-zinc-500">SL <span className="angka text-red-400">{fHarga(isi.sl)}</span></span>
-            <span className="text-zinc-500">TP <span className="angka text-emerald-500">{fHarga(isi.tp)}</span></span>
+            {/* Sinyal cermin dompet memang tanpa SL/TP: ditulis "—", bukan
+                harga nol yang terbaca seperti angka. */}
+            <span className="text-zinc-500">SL <span className="angka text-red-400">{a.dompet && !isi.sl ? '—' : fHarga(isi.sl)}</span></span>
+            <span className="text-zinc-500">TP <span className="angka text-emerald-500">{a.dompet && !isi.tp ? '—' : fHarga(isi.tp)}</span></span>
+            {/* ── JEJAK POSISI DOMPET ───────────────────────────────────
+                Satu kartu = satu posisi bersih di Hyperliquid. Tiap
+                penambahan menggeser entry rata-rata (angka Entry di atas
+                sudah yang terbaru); tiap pengurangan adalah tutup sebagian,
+                persennya dari posisi terbesar yang pernah dipegang. Lima
+                terakhir, terbaru di atas. */}
+            {a.dompet && a.tahap && a.tahap.length > 0 && (
+              <div className="w-full">
+                <div className="text-[11px] text-zinc-500">
+                  Jejak posisi dompet
+                  {a.ukuranMaks ? (
+                    <> · sisa <span className="angka text-zinc-300">
+                      {Math.round(((a.ukuran ?? 0) / a.ukuranMaks) * 1000) / 10}%
+                    </span> dari posisi terbesarnya</>
+                  ) : null}
+                </div>
+                <ul className="mt-1 space-y-0.5 text-[11.5px]">
+                  {a.tahap.slice(-5).reverse().map((t, i) => (
+                    <li key={t.w + '-' + i} className="flex flex-wrap items-center gap-x-2 text-zinc-400">
+                      <span className={t.j === 'kurang' ? 'text-amber-400' : 'text-sky-400'}>
+                        {t.j === 'kurang' ? 'Tutup' : 'Tambah'} {t.persen}%
+                      </span>
+                      {t.harga > 0 && <span>@ <span className="angka text-zinc-300">{fHarga(t.harga)}</span></span>}
+                      {t.j === 'kurang' && typeof t.pnl === 'number' && t.pnl !== 0 && (
+                        <span className={cn('angka', t.pnl > 0 ? 'text-emerald-400' : 'text-red-400')}>{uang(t.pnl, true)}</span>
+                      )}
+                      <span className="text-zinc-600">{waktuLalu(t.w)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             {/* ALASANNYA MENEMPEL DI BAWAH ENTRY/SL/TP, bukan di bawah
                 tombol. Ia keterangan tentang ANGKA-ANGKA di atasnya —
                 kenapa level itu yang dipilih — jadi tempatnya menempel pada
