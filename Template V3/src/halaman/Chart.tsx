@@ -12,6 +12,7 @@ import { simpanDraf } from '@/lib/draf-sinyal';
 import { Panel, PanelHead, KartuKpi, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn, uang, persen, harga, tanggalPendek } from '@/lib/utils';
 import { ChartLilin, TAMPILAN_BAWAAN, type Garis, type GarisHarga, type GarisKlik, type GarisSeret, type PosisiChartMt5, type TampilanChart } from '@/components/chart-lilin';
+import type { KoordinatChart } from '@/components/chart-lilin';
 import { barisPendingKripto, rencanaLokal } from '@/lib/pending-kripto';
 import { POLOS, UTAMA, ID_PANEL, TF_PANEL, kirimBus, dengarBus, nyalakanMulti, replayDipegangLain, pegangReplay } from '@/lib/multi-chart';
 import { PanelReplay, type AksiOrder, type JenisEntry } from '@/components/panel-replay';
@@ -1525,15 +1526,18 @@ export default function ChartBacktest() {
      akibatnya tidak bisa dibatalkan: yang satu mengubah level, yang satu
      mengakhiri ordernya. Keduanya minta konfirmasi yang MENYEBUT apa
      yang akan hilang — "Yakin?" tidak memberi tahu apa-apa. */
-  /* Letak panel ubah order. null = belum dipernah dipindah → duduk di
-     kanan panel order lewat kelas CSS. Angka baru muncul setelah
-     orangnya menyeretnya, dengan alasan yang sama seperti bilah alat:
-     bawaan berangka mengunci letaknya ke satu ukuran layar. */
+  /* Letak panel ubah order yang DIMINTA orangnya. null = belum pernah
+     diseret → panel menempel pada garis ordernya dan ikut ke mana pun
+     chart digeser (lihat `jepitUbah`). Angka baru muncul setelah diseret,
+     dan sejak itu panelnya lepas dari garis: diam di tempat ia ditaruh.
+
+     Dulu diingat di localStorage ('jt.letakUbah'). Dicabut 7 Sep 2026 atas
+     permintaan pemilik: seretan cuma berlaku SELAMA sesi ini — muat ulang
+     atau masuk lagi mengembalikannya ke letak bawaan. Simpanan lama
+     dibersihkan supaya yang pernah menyeretnya tidak terkunci selamanya di
+     sudut yang ia pilih untuk susunan panel yang mungkin sudah berbeda. */
   const [letakUbah, setLetakUbah] = useState<{ x: number; y: number } | null>(() => {
-    try {
-      const d = JSON.parse(localStorage.getItem('jt.letakUbah') ?? 'null');
-      if (d && typeof d.x === 'number' && typeof d.y === 'number') return d;
-    } catch { /* privat */ }
+    try { localStorage.removeItem('jt.letakUbah'); } catch { /* privat */ }
     return null;
   });
 
@@ -1573,7 +1577,7 @@ export default function ChartBacktest() {
     const lepas = (ev: PointerEvent) => {
       window.removeEventListener('pointermove', gerak);
       window.removeEventListener('pointerup', lepas);
-      try { localStorage.setItem('jt.letakUbah', JSON.stringify(hitung(ev))); } catch { /* privat */ }
+      setLetakUbah(hitung(ev));
     };
     window.addEventListener('pointermove', gerak);
     window.addEventListener('pointerup', lepas);
@@ -4148,19 +4152,40 @@ ${pnlSunting !== null
      pemiliknya sendiri; menimpa letak simpanan akan menghukum orang
      karena sempat mengecilkan chart sebentar. */
   const kotakUbah = useRef<HTMLDivElement>(null);
+  /* Diisi ChartLilin: harga → piksel viewport. Dibaca di `jepitUbah`. */
+  const koordinatUbah = useRef<KoordinatChart | null>(null);
   const [letakPakai, setLetakPakai] = useState<{ x: number; y: number } | null>(letakUbah);
 
   useLayoutEffect(() => {
     if (!sunting || !panelUbah) return;
     const jepitUbah = () => {
-      if (!letakUbah) { setLetakPakai(null); return; }
       const b = areaChart.current?.getBoundingClientRect();
       const k = kotakUbah.current?.getBoundingClientRect();
       if (!b || !k) return;
       const maxX = Math.max(4, b.width - k.width - 4);
       const maxY = Math.max(4, b.height - k.height - 4);
-      const x = Math.max(4, Math.min(maxX, letakUbah.x));
-      let y = Math.max(4, Math.min(maxY, letakUbah.y));
+
+      /* ── LETAK BAWAAN: MENEMPEL PADA GARIS ORDERNYA ──────────────────
+         Selama belum diseret, panel duduk tepat di bawah garis entry
+         order yang sedang disunting, rapat ke skala harga di kanan — dan
+         ikut bergerak setiap chart digulir, di-zoom, atau skalanya
+         ditarik, karena letaknya dihitung ulang dari harga garis itu,
+         bukan dari sudut layar. Panel yang mengubah SL/TP sebuah order
+         pantas berdiri di samping garis yang ia ubah; yang duduk di pojok
+         memaksa mata bolak-balik antara angka dan garisnya.
+
+         Kalau chart belum hidup atau harganya belum terpetakan, jatuh ke
+         kelas CSS pojok kanan bawah (letakPakai = null) — jangan sampai
+         panelnya hilang cuma karena jembatan koordinatnya belum siap. */
+      let minta: { x: number; y: number } | null = letakUbah;
+      if (!minta) {
+        const jangkar = sunting.entry || sunting.sl || sunting.tp || 0;
+        const t = jangkar > 0 ? (koordinatUbah.current?.(jangkar) ?? null) : null;
+        if (!t) { setLetakPakai(null); return; }
+        minta = { x: t.kanan - b.left - k.width - 6, y: t.y - b.top + 8 };
+      }
+      const x = Math.max(4, Math.min(maxX, minta.x));
+      let y = Math.max(4, Math.min(maxY, minta.y));
 
       /* ── Batas kedua: bagian chart yang BENAR-BENAR TERLIHAT ────────
          Muat di dalam kotak chart belum berarti terlihat. Chart ini
@@ -4199,9 +4224,22 @@ ${pnlSunting !== null
        Ongkosnya dua getBoundingClientRect; setLetakPakai hanya menulis
        kalau angkanya benar-benar berubah, jadi tidak ada render sia-sia. */
     const denyut = setInterval(jepitUbah, 200);
+    /* Selama masih menempel pada garis (belum diseret), letaknya dihitung
+       ulang TIAP FRAME: menggeser chart mengubah koordinat garisnya
+       puluhan kali sedetik, dan panel yang menyusul 200 ms kemudian
+       terlihat tersendat di belakang garisnya. Ongkos per frame: dua
+       getBoundingClientRect dan satu priceToCoordinate — dan setLetakPakai
+       hanya menulis kalau angkanya berubah. Begitu diseret, putaran ini
+       tidak dipasang: panel yang diam tidak perlu dihitung 60 kali sedetik. */
+    let bingkai = 0;
+    if (!letakUbah) {
+      const tik = () => { jepitUbah(); bingkai = requestAnimationFrame(tik); };
+      bingkai = requestAnimationFrame(tik);
+    }
     return () => {
       ro.disconnect();
       clearInterval(denyut);
+      cancelAnimationFrame(bingkai);
       window.removeEventListener('resize', jepitUbah);
       window.removeEventListener('scroll', jepitUbah, true);
     };
@@ -4924,6 +4962,7 @@ ${pnlSunting !== null
             ) : undefined}>
           {lilin.times.length > 0
             ? <ChartLilin key={`${simbol}|${tf}|${kunciChart}`}
+                          refKoordinat={koordinatUbah}
                           lilin={lilinGabung} garis={garis} trade={replayIdx === null ? hasil?.trade : undefined}
                           tinggi={tinggiChart} hingga={replayIdx ?? undefined} smi={smi}
                           garisHarga={[...garisHarga, ...garisZonaEntry, ...garisZona, ...garisDompet, ...garisKonsensus, ...(modeNyata ? garisOrder : [])]}
@@ -5534,9 +5573,11 @@ ${pnlSunting !== null
               bilah yang menutupi harga justru menghalangi keputusan yang
               sedang diambil. */}
           {/* ── Panel ubah order — hamparan yang BISA DIPINDAH ────────
-              Bawaannya duduk di kanan panel order; begitu diseret, letak
-              pilihannya diingat. Alasannya sama dengan bilah alat: tidak
-              ada satu sudut yang benar untuk semua susunan panel. */}
+              Bawaannya menempel di bawah garis entry order yang dipilih
+              dan ikut bergerak bersama chart. Begitu diseret ia lepas dari
+              garisnya dan diam di tempat ia ditaruh — sampai halaman
+              dimuat ulang, lalu kembali menempel. Diminta pemilik 7 Sep
+              2026; letak seretan sengaja TIDAK diingat lintas sesi. */}
           {/* Ikut syarat mode yang sama dengan garisnya. Panel ubah SL/TP
               yang tertinggal setelah garisnya hilang menawarkan tombol
               Kirim untuk order yang tidak terlihat di mana pun — dan itu

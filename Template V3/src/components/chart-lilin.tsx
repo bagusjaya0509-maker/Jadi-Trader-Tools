@@ -253,13 +253,18 @@ export interface PosisiChartMt5 {
   tp: number;
 }
 
+/** Lihat prop `refKoordinat` — harga ke piksel viewport; null kalau chart
+ *  belum hidup atau harganya tidak bisa dipetakan. `kanan` = tepi kanan
+ *  area gambar (sebelum skala harga). */
+export type KoordinatChart = (harga: number) => { y: number; kanan: number } | null;
+
 export function ChartLilin({
   lilin, garis, trade, tinggi = 420, hingga, garisHarga, onKlikBar, smi, mundur, pojok,
   garisSeret, onSeret, onKlikGaris, onHapusGaris, onKlikKosong, garisKlik, onKlikGarisOrder, hamparanBawah, segmen, penandaPine, kotakPine, isianPine,
   alat, onAlatSelesai, gambarAlat, gambarPilih, onPilihGambar, onUbahGambar,
   posisiMt5, onUbahPosisi, hargaAsk, kunciUkuran, bagikanFoto, tandaAir, tampilan, pitaSmi,
   jiplak, onUbahJiplak, onLepasJiplak, panelKiri, onLebarKiri,
-  hamparanBarTertua, onUjungKiri,
+  hamparanBarTertua, onUjungKiri, refKoordinat,
 }: {
   /** Nama pasangan yang dicetak samar di tengah area harga, seperti
    *  TradingView. `utama` nama simbolnya, `sub` baris kecil di bawahnya --
@@ -335,6 +340,14 @@ export function ChartLilin({
   /** Dipanggil saat lilin tertua masuk / keluar layar. Hanya saat BERUBAH,
    *  bukan tiap piksel geseran. */
   onUjungKiri?: (di: boolean) => void;
+  /** Jembatan koordinat untuk hamparan yang digambar DI LUAR komponen ini
+   *  tapi ingin menempel pada sebuah harga — panel ubah order di halaman
+   *  chart. Diisi fungsi `harga → { y, kanan }` dalam piksel VIEWPORT begitu
+   *  chartnya hidup, dan dikosongkan saat chartnya dibuang. Pemanggil yang
+   *  membacanya (rAF/polling), bukan lewat callback: yang menggeser garis
+   *  bukan cuma harga tapi juga guliran, zoom, dan tarikan skala harga, dan
+   *  tidak ada satu kejadian pustaka yang menutup semuanya. */
+  refKoordinat?: React.MutableRefObject<KoordinatChart | null>;
   /** Trendline miring dari Pine (line.new) — bar → waktu di sini. */
   segmen?: SegmenPine[];
   /** Label BUY/SELL dari Pine (label.new / plotshape). */
@@ -702,7 +715,21 @@ export function ChartLilin({
     };
     bagikanFotoRef.current?.(fotoRef.current);
 
-    return () => { pengamat.disconnect(); window.removeEventListener('resize', ukurUlang); ukurLagi.current = null; c.remove(); chart.current = null; seri.current = null; seriGaris.current = []; penanda.current = null; garisPos.current = []; isiPine.current = null; alatPrim.current = null; };
+    if (refKoordinat) {
+      refKoordinat.current = (harga: number) => {
+        const s = seri.current;
+        const el = kotak.current;
+        if (!s || !el || !(harga > 0)) return null;
+        const y = s.priceToCoordinate(harga);
+        if (y === null || !Number.isFinite(y)) return null;
+        const r = el.getBoundingClientRect();
+        let lebar = 0;
+        try { lebar = c.priceScale('right').width(); } catch { /* versi lama */ }
+        return { y: r.top + y, kanan: r.right - lebar };
+      };
+    }
+
+    return () => { if (refKoordinat) refKoordinat.current = null; pengamat.disconnect(); window.removeEventListener('resize', ukurUlang); ukurLagi.current = null; c.remove(); chart.current = null; seri.current = null; seriGaris.current = []; penanda.current = null; garisPos.current = []; isiPine.current = null; alatPrim.current = null; };
   }, []);
 
   /* Kolom chart berubah lebar (watchlist ditarik) → ukur ulang.
