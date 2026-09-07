@@ -6,7 +6,8 @@ import {
 import { useAuth, pesanAuth } from '@/lib/auth';
 import { auth } from '@/lib/firebase';
 import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
-import { mintaAkses, permintaanSaya, masukDiscord, bacaPaketMinta, bacaProdukLynk, NAMA_PAKET, PRODUK_LYNK, type Permintaan } from '@/lib/akses';
+import { mintaAkses, permintaanSaya, masukDiscord, bacaPaketMinta, bacaProdukLynk, NAMA_PAKET, PRODUK_LYNK, KUNCI_LISENSI_LOKAL, type Permintaan } from '@/lib/akses';
+import { Copy, Check, ShoppingBag } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -104,7 +105,21 @@ export default function Aktivasi() {
      terisi lima baris untuk satu orang yang sama. */
   const sudahCoba = useRef(false);
 
-  const sudahAktif = pemilik || langganan.status === 'aktif';
+  /* ── DUA MACAM PEMBELIAN, DUA MACAM "SUDAH" ────────────────────────
+     Membeli AKSES selesai begitu langganannya aktif — tidak ada yang perlu
+     dilakukan lagi di sini, jadi halaman mengantar ke Dashboard.
+
+     Membeli PRODUK tidak pernah "sudah" karena langganan. Yang ditunggu
+     KODE LISENSI-nya, dan pemegang paket Testing atau Premium 3 Bulan yang
+     membeli indikator tetap butuh kode itu. Dilaporkan pemilik 6 Sep 2026:
+     tautan pembelian Indikator V3 mendarat di layar "Akses aktif — kamu
+     diarahkan ke Dashboard", dan kodenya tidak pernah terlihat.
+
+     Jadi `sudahAktif` cuma bermakna untuk mode akses. Di mode produk ia
+     dipaksa false, dan seluruh cabang yang bergantung padanya ikut diam. */
+  const modeProduk = !!produkDibeli;
+  const sudahAktif = !modeProduk && (pemilik || langganan.status === 'aktif');
+  const namaProduk = produkDibeli ? PRODUK_LYNK[produkDibeli] : '';
 
   async function masukGoogle() {
     setGalat('');
@@ -155,8 +170,45 @@ export default function Aktivasi() {
     return () => { hidup = false; };
   }, [pengguna, sudahAktif]);
 
-  const terakhir = punyaku?.find((p) => p.produk === 'jadi-trader-v3') ?? punyaku?.[0] ?? null;
+  const produkIni = produkDibeli || 'jadi-trader-v3';
+  const terakhir = punyaku?.find((p) => p.produk === produkIni) ?? null;
   const tercatat = !!terakhir && terakhir.status !== 'ditolak';
+  /* Kode lisensi yang sudah terbit untuk produk INI. Server hanya
+     memulangkannya kepada pemilik permintaannya sendiri dan hanya sesudah
+     disetujui — jadi kalau ada isinya, ia sah. */
+  const kodeTerbit = modeProduk && terakhir?.status === 'disetujui' && terakhir.kode
+    ? terakhir.kode : '';
+  const [tersalin, setTersalin] = useState(false);
+
+  /* Begitu kodenya terbit, dititipkan ke perangkat ini di kunci yang sama
+     dengan yang dibaca Marketplace. Orangnya sampai di sana dengan kolom
+     kode sudah terisi — mengetik ulang 19 karakter adalah gesekan yang tidak
+     perlu untuk barang yang sudah dibayar. */
+  useEffect(() => {
+    if (!kodeTerbit) return;
+    try { localStorage.setItem(KUNCI_LISENSI_LOKAL, kodeTerbit); } catch { /* mode privat */ }
+  }, [kodeTerbit]);
+
+  /* ── MENUNGGU TANPA MUAT ULANG ──────────────────────────────────────
+     Persetujuan datang beberapa menit sampai beberapa jam kemudian, dan
+     orang yang membiarkan tab ini terbuka pantas melihat kodenya muncul
+     sendiri. Dua puluh detik cukup: rute /minta/saya ringan, dan yang
+     ditunggu bukan sesuatu yang berubah tiap detik. Berhenti begitu kodenya
+     ada atau permintaannya ditolak. */
+  useEffect(() => {
+    if (!modeProduk || !pengguna || !terakhir || terakhir.status !== 'baru') return;
+    const jam = window.setInterval(() => {
+      permintaanSaya().then(setPunyaku).catch(() => { /* coba lagi putaran berikutnya */ });
+    }, 20_000);
+    return () => window.clearInterval(jam);
+  }, [modeProduk, pengguna, terakhir]);
+
+  function salinKode() {
+    if (!kodeTerbit) return;
+    navigator.clipboard?.writeText(kodeTerbit).catch(() => {});
+    setTersalin(true);
+    setTimeout(() => setTersalin(false), 1600);
+  }
 
   /* Sudah aktif = tidak ada lagi yang perlu dilakukan di sini. */
   useEffect(() => {
@@ -187,17 +239,27 @@ export default function Aktivasi() {
         <div className="animate-fade-in delay-100 mb-6">
           <div className="mb-3 inline-flex w-fit items-center gap-1.5 rounded-full border border-emerald-500/25 bg-emerald-500/[0.08] px-3 py-1.5">
             <ShieldCheck className="size-3.5 text-emerald-400" />
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-400">Pembayaran diterima</span>
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-400">
+              {modeProduk ? 'Pembelian diterima' : 'Pembayaran diterima'}
+            </span>
           </div>
+          {/* Judulnya menyebut BARANGNYA. "Aktifkan aksesmu" untuk orang yang
+              baru membayar indikator terbaca sebagai halaman yang salah —
+              dan memang salah, sampai 6 Sep 2026. */}
           <h1 className="text-4xl font-medium leading-[0.95] tracking-tighter text-zinc-50 sm:text-5xl">
-            Aktifkan{' '}
+            {modeProduk ? 'Ambil ' : 'Aktifkan '}
             <span className="bg-gradient-to-br from-white via-white to-[#ffcd75] bg-clip-text text-transparent">
-              aksesmu
+              {modeProduk ? namaProduk : 'aksesmu'}
             </span>
           </h1>
           <p className="mt-3 max-w-[42ch] text-[14px] leading-relaxed text-zinc-400">
-            Terima kasih sudah membeli. Satu langkah lagi: masuk dengan akun yang akan
-            kamu pakai, supaya aksesnya bisa <span className="text-zinc-200">diikat ke akun itu</span>.
+            {modeProduk ? (
+              <>Terima kasih sudah membeli. Masuk dengan akunmu, dan kode lisensinya{' '}
+                <span className="text-zinc-200">terbit di halaman ini</span> begitu pesananmu dicocokkan.</>
+            ) : (
+              <>Terima kasih sudah membeli. Satu langkah lagi: masuk dengan akun yang akan
+                kamu pakai, supaya aksesnya bisa <span className="text-zinc-200">diikat ke akun itu</span>.</>
+            )}
           </p>
         </div>
 
@@ -251,15 +313,52 @@ export default function Aktivasi() {
               <div className="flex items-center gap-2 text-[12.5px] text-zinc-400">
                 <Loader2 className="size-3.5 animate-spin" /> Mencatat pembayaranmu…
               </div>
+            ) : kodeTerbit ? (
+              <>
+                {/* ── KODE LISENSI TERBIT ─────────────────────────────
+                    Inilah yang ditunggu pembeli produk, dan inilah yang
+                    dulu tidak pernah tampil. Kodenya ditulis besar, bisa
+                    disalin, dan tombol di bawahnya membawa ke produknya
+                    dengan kolom kode sudah terisi (lihat useEffect
+                    localStorage di atas). */}
+                <div className="flex items-center gap-2 text-[13.5px] font-medium text-emerald-400">
+                  <CheckCircle2 className="size-4" /> Kode lisensi {namaProduk} terbit
+                </div>
+                <div className="mt-3 flex items-center gap-2">
+                  <code className="angka flex-1 rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-[15px] tracking-wider text-zinc-50">
+                    {kodeTerbit}
+                  </code>
+                  <button onClick={salinKode} aria-label="Salin kode lisensi"
+                    className="flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-md border border-zinc-700 text-zinc-300 transition-colors hover:border-zinc-500 hover:text-zinc-100">
+                    {tersalin ? <Check className="size-4 text-emerald-400" /> : <Copy className="size-4" />}
+                  </button>
+                </div>
+                <p className="mt-2 text-[11.5px] leading-relaxed text-zinc-500">
+                  Kode ini milikmu sendiri — sudah disimpan di perangkat ini dan ikut dikirim ke{' '}
+                  <span className="text-zinc-300">{pengguna.email}</span>. Salinan produk yang kamu
+                  ambil memuat penanda lisensimu.
+                </p>
+                <Link to={`/marketplace?produk=${encodeURIComponent(produkIni)}`}
+                  className="mt-4 inline-flex items-center gap-2 rounded-md bg-zinc-100 px-5 py-2.5 text-[13px] font-semibold text-zinc-950 transition-colors hover:bg-white">
+                  <ShoppingBag className="size-3.5" /> Ambil {namaProduk} <ArrowRight className="size-3.5" />
+                </Link>
+              </>
             ) : tercatat ? (
               <>
                 <div className="flex items-center gap-2 text-[13.5px] font-medium text-zinc-100">
                   <Clock className="size-4 text-[#ffcd75]" /> Menunggu pencocokan
                 </div>
                 <p className="mt-1.5 text-[12px] leading-relaxed text-zinc-500">
-                  Pembayaranmu sudah masuk antrean atas nama{' '}
-                  <span className="text-zinc-300">{pengguna.email}</span>. Pemilik mencocokkannya
-                  dengan pesanan di Lynk, lalu aksesnya dibuka. Kamu tidak perlu mengirim apa pun lagi.
+                  {modeProduk ? (
+                    <>Pembelianmu sudah masuk antrean atas nama{' '}
+                      <span className="text-zinc-300">{pengguna.email}</span>. Begitu penjual mencocokkannya
+                      dengan pesanan di Lynk, kode lisensinya muncul <span className="text-zinc-300">di sini</span>{' '}
+                      dan dikirim ke emailmu. Halaman ini memeriksanya sendiri — tidak perlu dimuat ulang.</>
+                  ) : (
+                    <>Pembayaranmu sudah masuk antrean atas nama{' '}
+                      <span className="text-zinc-300">{pengguna.email}</span>. Pemilik mencocokkannya
+                      dengan pesanan di Lynk, lalu aksesnya dibuka. Kamu tidak perlu mengirim apa pun lagi.</>
+                  )}
                 </p>
               </>
             ) : (
@@ -278,22 +377,36 @@ export default function Aktivasi() {
                        ket="Selesai — link ini hanya dikirim setelah pembayaran lunas." />
               <Langkah n={2} keadaan="selesai" judul="Masuk dengan akunmu"
                        ket={`Terhubung sebagai ${pengguna.email ?? pengguna.uid.slice(0, 8)}.`} />
-              <Langkah n={3} keadaan={tercatat ? 'sedang' : 'nanti'} judul="Pemilik mencocokkan pesanan"
+              <Langkah n={3} keadaan={kodeTerbit ? 'selesai' : tercatat ? 'sedang' : 'nanti'} judul="Penjual mencocokkan pesanan"
                        ket="Dicocokkan lewat email pesanan Lynk. Biasanya tidak lama." />
-              <Langkah n={4} keadaan="nanti" judul="Akses terbuka 30 hari"
-                       ket="Berlaku otomatis di akun ini — tanpa kode, tanpa langkah tambahan." />
+              {modeProduk ? (
+                <Langkah n={4} keadaan={kodeTerbit ? 'sedang' : 'nanti'} judul={`Kode lisensi terbit — ambil ${namaProduk}`}
+                         ket="Kodenya muncul di atas dan sudah terisi di Marketplace. Tempel sekali, produknya turun." />
+              ) : (
+                <Langkah n={4} keadaan="nanti" judul="Akses terbuka 30 hari"
+                         ket="Berlaku otomatis di akun ini — tanpa kode, tanpa langkah tambahan." />
+              )}
             </div>
           </div>
         )}
 
-        {!sudahAktif && (
+        {!sudahAktif && !kodeTerbit && (
           <p className="animate-fade-in delay-300 mt-5 text-[11.5px] leading-relaxed text-zinc-600">
             <KeyRound className="mr-1 inline size-3" />
-            Punya kode aktivasi dari pembelian sebelumnya?{' '}
-            <Link to="/akses" className="text-zinc-400 underline decoration-zinc-700 underline-offset-2 hover:text-zinc-200">
-              Tukar di halaman akses
-            </Link>{' '}
-            — kode berlaku langsung tanpa menunggu ditinjau.
+            {modeProduk ? (
+              <>Sudah punya kode lisensi produk ini?{' '}
+                <Link to={`/marketplace?produk=${encodeURIComponent(produkIni)}`}
+                  className="text-zinc-400 underline decoration-zinc-700 underline-offset-2 hover:text-zinc-200">
+                  Tempel langsung di Marketplace
+                </Link>{' '}
+                — tidak perlu menunggu apa pun.</>
+            ) : (
+              <>Punya kode aktivasi dari pembelian sebelumnya?{' '}
+                <Link to="/akses" className="text-zinc-400 underline decoration-zinc-700 underline-offset-2 hover:text-zinc-200">
+                  Tukar di halaman akses
+                </Link>{' '}
+                — kode berlaku langsung tanpa menunggu ditinjau.</>
+            )}
           </p>
         )}
       </div>

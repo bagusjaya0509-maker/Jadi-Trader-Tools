@@ -1,5 +1,6 @@
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { KUNCI_LISENSI_LOKAL } from '@/lib/akses';
 import {
   Check, Crown, Download, Copy, X, Star, MessageCircle, ExternalLink, KeyRound, Loader2, Trash2,
   LineChart,
@@ -171,7 +172,7 @@ import {
 /* Kode lisensi pembeli disimpan di perangkatnya sendiri. Mengetiknya ulang
    tiap kali ingin mengambil versi baru adalah gesekan yang tidak perlu — dan
    kode itu memang bukan rahasia bersama, ia milik pembeli itu sendiri. */
-const KUNCI_LISENSI = 'jtLisensiSaya_v1';
+const KUNCI_LISENSI = KUNCI_LISENSI_LOKAL;
 
 /* Jenis sumber ditentukan dari nama berkas di katalog, persis seperti yang
    dilakukan marketplace V2: `.mq5` diambil sebagai mq5, sisanya txt. */
@@ -681,6 +682,24 @@ export default function Marketplace() {
      yang berubah di dalam SATU komponen yang sama. */
   const tutupModal = useTutupLuar(() => setAktif(null));
   const { data: PRODUK, mentah } = useProduk();
+
+  /* ── ?produk=<id> MEMBUKA DETAILNYA LANGSUNG ────────────────────────
+     Dipakai halaman aktivasi: pembeli yang kode lisensinya baru terbit
+     diantar ke sini dengan produknya SUDAH terbuka dan kolom kodenya sudah
+     terisi. Tanpa ini ia mendarat di etalase penuh dan harus mencari lagi
+     barang yang baru saja ia bayar.
+
+     Sekali saja saat katalog pertama termuat. Bukan tiap perubahan alamat:
+     menutup detailnya lalu membiarkan alamat lama membukanya lagi adalah
+     jendela yang tidak mau ditutup. */
+  const [cariAlamat] = useSearchParams();
+  const produkDariAlamat = cariAlamat.get('produk');
+  const sudahDibuka = useRef(false);
+  useEffect(() => {
+    if (sudahDibuka.current || !produkDariAlamat || !PRODUK.length) return;
+    const p = PRODUK.find((x) => x.id === produkDariAlamat);
+    if (p) { sudahDibuka.current = true; setAktif(p); }
+  }, [produkDariAlamat, PRODUK]);
   const { pengguna, pemilik } = useAuth();
 
   /* ── Urutan kartu: milik pemilik, diatur dengan menyeret ──────────────

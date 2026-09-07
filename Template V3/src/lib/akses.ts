@@ -190,6 +190,13 @@ export const PRODUK_LYNK: Record<string, string> = {
   'trade-fi-sync-v2': 'Trade-Fi Sync V2.10 (EA MT5)',
 };
 
+/** Kunci localStorage tempat Marketplace menyimpan kode lisensi pembeli.
+ *  DIEKSPOR supaya halaman aktivasi bisa menitipkan kodenya di situ begitu
+ *  terbit — dan kolom kode di Marketplace sudah terisi saat orangnya sampai.
+ *  Nilainya tidak boleh diubah: kode yang tersimpan di perangkat pembeli
+ *  lama hidup di bawah nama ini. */
+export const KUNCI_LISENSI_LOKAL = 'jtLisensiSaya_v1';
+
 export function bacaProdukLynk(v: string | null | undefined): string | null {
   return v && Object.prototype.hasOwnProperty.call(PRODUK_LYNK, v) ? v : null;
 }
