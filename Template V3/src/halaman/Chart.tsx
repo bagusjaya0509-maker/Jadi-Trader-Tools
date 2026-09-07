@@ -28,7 +28,7 @@ import type { AlatPegang, GambarAlat } from '@/lib/plugin-alat';
 import type { HasilPine } from '@/lib/pine';
 import { bacaSetelanChart, simpanSetelanChart, usulSlTp } from '@/lib/replay';
 import { atr, ema } from '@/lib/jt-scan-core';
-import { ambilKlines, ambilKlinesSebelum, ambilTickers, aturPasarKripto, bacaAcuanMt5, bacaNamaMt5, bacaPasar, bacaSpekMt5, bacaTickMt5, daftarSimbolMt5, pasarKripto, type Lilin } from '@/lib/pasar';
+import { ambilKlines, ambilKlinesSebelum, aturBursaSimbol, aturPasarKripto, bacaAcuanMt5, bacaNamaMt5, bacaPasar, bacaSpekMt5, bacaTickMt5, daftarSimbolHl, daftarSimbolMt5, pasarKripto, type Lilin } from '@/lib/pasar';
 import { useAkunMt5, segarkanAkunMt5 } from '@/lib/akun';
 /* Langsung dari admin, BUKAN lewat usePosisi(): yang dibutuhkan di sini
    cuma daftar order bursa, sementara usePosisi() juga memasang listener
@@ -3978,10 +3978,12 @@ ${pnlSunting !== null
   useEffect(() => {
     if (!saranBuka || simbolHl.length) return;
     let hidup = true;
-    void ambilTickers(true).then((t) => {
-      if (!hidup) return;
-      setSimbolHl(Object.keys(t).filter((s) => t[s].bursa === 'hyperliquid').sort());
-    }).catch(() => { /* rute ditolak/offline: saran Binance & MT5 tetap jalan */ });
+    /* daftarSimbolHl, BUKAN ambilTickers(true): rute tickers membuang koin
+       Hyperliquid yang simbolnya sudah ada di Binance, jadi dari sana koin
+       yang ada di DUA bursa tidak pernah terlihat ada di Hyperliquid —
+       persis pengetahuan yang dibutuhkan daftar saran ini. */
+    void daftarSimbolHl().then((d) => { if (hidup) setSimbolHl(d.slice().sort()); })
+      .catch(() => { /* rute ditolak/offline: saran Binance & MT5 tetap jalan */ });
     return () => { hidup = false; };
   }, [saranBuka, simbolHl.length]);
   const saranSimbol = useMemo(() => {
@@ -3991,23 +3993,33 @@ ${pnlSunting !== null
          dasar (MT5:XAUUSD) — itu kunci yang dipakai mencari lilinnya. Kalau
          nilainya ikut berubah, rutenya mencari simbol yang tidak ada di
          penyimpanan dan chartnya kosong tanpa pesan apa pun. */
-      ...simbolMt5.map((s) => ({ nilai: 'MT5:' + s, label: bacaNamaMt5(s), sumber: 'Trade-Fi · MT5' })),
+      ...simbolMt5.map((s) => ({ nilai: 'MT5:' + s, label: bacaNamaMt5(s), bursa: 'mt5' as const })),
       /* Daftar HIDUP, bukan `SIMBOL_DASAR` yang beku. Inilah yang membuat
          koin hasil pencarian sendiri muncul di sini pada kunjungan
          berikutnya -- dan yang membuat koin yang diblokir dari Screener
          benar-benar hilang dari sini juga. */
-      ...simbolAktif.map((s) => ({ nilai: s, label: s, sumber: 'Kripto · Binance' })),
-      /* Yang sudah ada di Binance tidak diulang: satu simbol, satu baris. */
-      ...simbolHl.filter((s) => !simbolAktif.includes(s))
-        .map((s) => ({ nilai: s, label: s, sumber: 'Kripto · Hyperliquid' })),
+      ...simbolAktif.map((s) => ({ nilai: s, label: s, bursa: 'binance' as const })),
+      /* ── YANG ADA DI DUA BURSA DAPAT DUA BARIS ─────────────────────────
+         Dulu koin Hyperliquid yang juga ada di Binance disaring keluar,
+         dengan alasan "satu simbol, satu baris". Diminta pemilik 7 Sep
+         2026 untuk dibalik: kalau koinnya ada di dua-duanya, tampilkan
+         dua-duanya dengan lencana masing-masing supaya ia tinggal memilih.
+         Pilihannya bukan hiasan — lihat `aturBursaSimbol` di pilihSimbol. */
+      ...simbolHl.map((s) => ({ nilai: s, label: s, bursa: 'hyperliquid' as const })),
     ];
     return (q ? semua.filter((o) => o.label.toLowerCase().includes(q)) : semua).slice(0, 40);
   }, [ketik, simbolMt5, simbolAktif, simbolHl]);
 
-  function pilihSimbol(v: string) {
+  function pilihSimbol(v: string, bursa?: 'mt5' | 'binance' | 'hyperliquid') {
     setKetik(v);
     setSaranBuka(false);
+    /* Bursa yang DIPILIH orangnya diingat untuk simbol itu; MT5 tidak
+       lewat /api/klines sama sekali, jadi tidak ada yang perlu diingat. */
+    if (bursa === 'hyperliquid' || bursa === 'binance') aturBursaSimbol(v, bursa);
     if (v !== simbol) setSimbol(v);
+    /* Simbol yang SAMA dengan bursa yang berbeda tetap harus ditarik ulang:
+       setSimbol tidak berubah, jadi tidak ada efek yang menyala sendiri. */
+    else { setSegar((n) => n + 1); setKunciChart((n) => n + 1); }
   }
 
   const [detik, setDetik] = useState(0);
@@ -4441,16 +4453,27 @@ ${pnlSunting !== null
                     panel News dan menu Indikator; jangkarnya bilah kendali. */}
                 <div className="absolute inset-x-0 top-full z-40 mt-1 max-h-[min(60vh,320px)] w-auto overflow-y-auto rounded-lg border border-zinc-800 bg-zinc-950 p-1 shadow-2xl sm:inset-x-auto sm:left-0 sm:w-72">
                   {saranSimbol.map((o) => (
-                    <button key={o.nilai} type="button"
+                    <button key={o.nilai + '|' + o.bursa} type="button"
                       /* onPointerDown + preventDefault, BUKAN onClick.
                          Menyentuh daftar ini membuat kotak isian kehilangan
                          fokus lebih dulu, dan onBlur menjalankan komitSimbol
                          yang menutup daftarnya — kliknya tidak pernah sampai.
                          preventDefault menahan perpindahan fokus itu. */
-                      onPointerDown={(e) => { e.preventDefault(); pilihSimbol(o.nilai); }}
+                      onPointerDown={(e) => { e.preventDefault(); pilihSimbol(o.nilai, o.bursa); }}
                       className="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-left transition-colors hover:bg-zinc-900">
                       <span className="angka text-[12.5px] text-zinc-200">{o.label}</span>
-                      <span className="ml-auto shrink-0 text-[10.5px] text-zinc-600">{o.sumber}</span>
+                      {/* Lencana berwarna, bukan teks kelabu: sejak satu koin
+                          bisa muncul dua kali, warnalah yang membedakan
+                          barisnya sebelum namanya selesai dibaca. Warnanya
+                          dari palet aplikasi dan dipakai SAMA di watchlist —
+                          Binance kuning, Trade-Fi biru, Hyperliquid hijau
+                          (pemilik, 7 Sep 2026). */}
+                      <span className={cn('ml-auto shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold tracking-wide',
+                        o.bursa === 'mt5' ? 'bg-sky-500/15 text-sky-300'
+                        : o.bursa === 'hyperliquid' ? 'bg-emerald-500/15 text-emerald-300'
+                        : 'bg-amber-500/15 text-amber-300')}>
+                        {o.bursa === 'mt5' ? 'Trade-Fi' : o.bursa === 'hyperliquid' ? 'Hyperliquid' : 'Binance'}
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -5636,7 +5659,17 @@ ${pnlSunting !== null
                               onGantiCopy={(v) => { copyManual.current = v; setDariSinyal(v); }} />
                             </div>
                           ) : undefined} />
-            : <div className="flex h-[440px] flex-col items-center justify-center gap-1.5 px-6 text-center text-[12.5px] text-zinc-600">
+            /* ── TINGGINYA SAMA DENGAN CHARTNYA ────────────────────────
+                Dulu `h-[440px]` tetap, sementara chartnya setinggi
+                `tinggiChart` (500+ px, dihitung dari layar). Tiap ganti
+                timeframe atau koin, kotak ini menggantikan chart selama
+                sekejap dan seluruh isi halaman di bawahnya melompat naik
+                60-100 px lalu turun lagi — dilaporkan pemilik 7 Sep 2026
+                ("bagian bawahnya sering terangkat"). Yang melompat bukan
+                cuma pemandangan: tombol yang sedang dituju kursor pindah
+                tempat di tengah gerakan. */
+            : <div style={{ height: tinggiChart }}
+                   className="flex flex-col items-center justify-center gap-1.5 px-6 text-center text-[12.5px] text-zinc-600">
                 {memuat ? 'Memuat lilin…'
                   /* Kosong pada simbol Trade-Fi di timeframe yang belum
                      dikirim EA punya SEBAB yang diketahui — dan sebab yang

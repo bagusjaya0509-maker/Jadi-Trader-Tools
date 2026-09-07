@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, X, GripVertical, Pencil, FolderPlus } from 'lucide-react';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { cn, harga as fHarga } from '@/lib/utils';
-import { ambilTickers, hargaTickMt5, daftarSimbolMt5, type Ticker } from '@/lib/pasar';
+import { ambilTickers, hargaTickMt5, daftarSimbolHl, daftarSimbolMt5, type Ticker } from '@/lib/pasar';
 import { SIMBOL_DASAR, useSimbol } from '@/lib/simbol';
 import { useMulti, kirimBus, ID_PANEL, POLOS } from '@/lib/multi-chart';
 import { db } from '@/lib/data';
@@ -64,6 +64,22 @@ function bacaSeksi(): SeksiWatch[] {
 
 /** Lebar minimum yang masih berguna. Di bawah ini daftarnya tidak
  *  terbaca, jadi seretan yang berhenti di situ dianggap "tutup". */
+/* ── WARNA LENCANA BURSA, SATU SUMBER ──────────────────────────────────
+   Dipakai daftar saran DAN baris watchlist, dan warnanya dari palet
+   aplikasi: Binance kuning (kuning memang warna bursanya), Trade-Fi biru,
+   Hyperliquid hijau. Diminta pemilik 7 Sep 2026 — sebelumnya Binance
+   kelabu (terbaca seperti "tidak penting"), MT5 kuning, dan Hyperliquid
+   biru, jadi tiga-tiganya menunjuk ke arah yang salah. */
+type Bursa = 'mt5' | 'binance' | 'hyperliquid';
+const KELAS_BURSA: Record<Bursa, string> = {
+  mt5: 'bg-sky-500/15 text-sky-300',
+  binance: 'bg-amber-500/15 text-amber-300',
+  hyperliquid: 'bg-emerald-500/15 text-emerald-300',
+};
+const NAMA_BURSA: Record<Bursa, string> = {
+  mt5: 'Trade-Fi', binance: 'Binance', hyperliquid: 'Hyperliquid',
+};
+
 const LEBAR_MIN = 170;
 const LEBAR_MAKS = 460;
 /** Lebar yang dipakai saat dibuka lewat klik dua kali pada pembatas. */
@@ -155,6 +171,12 @@ export function WatchChart({ simbol, onPilih, onLebar }: {
   const [tickers, setTickers] = useState<Record<string, Ticker>>({});
   const [tickMt5, setTickMt5] = useState<Record<string, { bid: number; waktu: number }>>({});
   const [pilihanMt5, setPilihanMt5] = useState<string[]>([]);
+  const [pilihanHl, setPilihanHl] = useState<string[]>([]);
+  /* Daftar saran dibuka sendiri, bukan <datalist>. Dua sebabnya: opsi
+     datalist tidak bisa diberi lencana berwarna, dan menyentuhnya cuma
+     mengisi kotak — orangnya masih harus menekan "+". Diminta pemilik
+     7 Sep 2026: yang diklik langsung masuk daftar. */
+  const [usulBuka, setUsulBuka] = useState(false);
   const [ketik, setKetik] = useState('');
   const [lebar, setLebar] = useState(bacaLebar);
   const terbuka = lebar > 0;
@@ -204,25 +226,27 @@ export function WatchChart({ simbol, onPilih, onLebar }: {
      dicari orang selalu ada di kelompok pertama. */
   const usulSimbol = useMemo(() => {
     const q = ketik.trim().toUpperCase();
-    if (!q) return [] as { nilai: string; ket?: string }[];
+    if (!q) return [] as { nilai: string; sumber: Bursa[] }[];
     const dipakai = new Set(semuaSimbol);
-    const awal: { nilai: string; ket?: string }[] = [];
-    const tengah: { nilai: string; ket?: string }[] = [];
-    const taruh = (nilai: string, ket?: string) => {
+    const awal: { nilai: string; sumber: Bursa[] }[] = [];
+    const tengah: { nilai: string; sumber: Bursa[] }[] = [];
+    const taruh = (nilai: string, ket: Bursa[]) => {
       if (dipakai.has(nilai)) return;
       const i = nilai.indexOf(q);
-      if (i === 0) awal.push({ nilai, ket });
-      else if (i > 0) tengah.push({ nilai, ket });
+      if (i === 0) awal.push({ nilai, sumber: ket });
+      else if (i > 0) tengah.push({ nilai, sumber: ket });
     };
-    for (const s of pilihanMt5) taruh('MT5:' + s, 'Trade-Fi — MT5');
-    for (const s of kolamSimbol) taruh(s);
-    /* Koin Hyperliquid yang tidak ada di Binance (CASHCAT dkk.) — tickers
-       di sini memang sudah ditarik dengan hl=1. */
-    for (const s of Object.keys(tickers)) {
-      if (tickers[s].bursa === 'hyperliquid' && !kolamSimbol.includes(s)) taruh(s, 'Kripto — Hyperliquid');
-    }
+    for (const s of pilihanMt5) taruh('MT5:' + s, ['mt5']);
+    /* SATU baris per simbol, dengan lencana SEMUA bursa yang punya. Beda
+       dengan daftar saran di Chart & Entry yang memberi dua baris: di sana
+       pilihannya menentukan lilin mana yang ditarik, di sini yang disimpan
+       cuma nama koinnya — dua baris yang menyimpan hal yang sama persis
+       hanya akan jadi jebakan "sudah ada di daftar". */
+    const adaHl = new Set(pilihanHl);
+    for (const s of kolamSimbol) taruh(s, adaHl.has(s) ? ['binance', 'hyperliquid'] : ['binance']);
+    for (const s of pilihanHl) if (!kolamSimbol.includes(s)) taruh(s, ['hyperliquid']);
     return [...awal, ...tengah].slice(0, 40);
-  }, [ketik, pilihanMt5, kolamSimbol, semuaSimbol, tickers]);
+  }, [ketik, pilihanMt5, pilihanHl, kolamSimbol, semuaSimbol]);
 
   function simpanSeksi(d: SeksiWatch[]) {
     setSeksi(d);
@@ -248,21 +272,24 @@ export function WatchChart({ simbol, onPilih, onLebar }: {
     const tarikBinance = () => void ambilTickers(true).then((t) => { if (hidup) setTickers(t); }).catch(() => { /* diam */ });
     const tarikMt5 = () => void hargaTickMt5().then((t) => { if (hidup) setTickMt5(t); }).catch(() => { /* diam */ });
     const tarikDaftar = () => void daftarSimbolMt5().then((d) => { if (hidup) setPilihanMt5(d); });
+    const tarikHl = () => void daftarSimbolHl().then((d) => { if (hidup) setPilihanHl(d); }).catch(() => { /* diam */ });
     tarikBinance();
     tarikMt5();
     tarikDaftar();
+    tarikHl();
     const jamB = setInterval(tarikBinance, 30_000);
     const jamM = setInterval(tarikMt5, 5_000);
     const jamD = setInterval(tarikDaftar, 30_000);
     return () => { hidup = false; clearInterval(jamB); clearInterval(jamM); clearInterval(jamD); };
   }, [terbuka]);
 
-  function tambah() {
-    const v = ketik.trim().toUpperCase();
+  function tambahNilai(v: string) {
+    setUsulBuka(false);
     if (!/^(MT5:)?[A-Z0-9]{3,15}$/.test(v) || semuaSimbol.includes(v)) { setKetik(''); return; }
     simpanSeksi(seksi.map((k, i) => (i === 0 ? { ...k, simbol: [...k.simbol, v] } : k)));
     setKetik('');
   }
+  function tambah() { tambahNilai(ketik.trim().toUpperCase()); }
 
   function tambahSeksi() {
     const nama = (seksiBaru ?? '').trim();
@@ -417,22 +444,49 @@ export function WatchChart({ simbol, onPilih, onLebar }: {
               <FolderPlus className="size-3" /> Seksi
             </button>
           </div>
-          <div className="flex items-center gap-1">
-            <input list="watchSimbol" value={ketik}
-                   onChange={(e) => setKetik(e.target.value.toUpperCase())}
-                   onKeyDown={(e) => { if (e.key === 'Enter') tambah(); }}
+          <div className="relative flex items-center gap-1">
+            <input value={ketik}
+                   onChange={(e) => { setKetik(e.target.value.toUpperCase()); setUsulBuka(true); }}
+                   onFocus={() => setUsulBuka(true)}
+                   onKeyDown={(e) => {
+                     if (e.key === 'Enter') tambah();
+                     if (e.key === 'Escape') setUsulBuka(false);
+                   }}
                    placeholder="Tambah pair…"
+                   autoComplete="off" spellCheck={false}
                    className="angka h-7 min-w-0 grow rounded border border-zinc-800 bg-zinc-900 px-2 text-[11.5px] text-zinc-200 outline-none focus-visible:border-zinc-600" />
-            <datalist id="watchSimbol">
-              {usulSimbol.map((u) => (
-                u.ket ? <option key={u.nilai} value={u.nilai}>{u.ket}</option>
-                      : <option key={u.nilai} value={u.nilai} />
-              ))}
-            </datalist>
+            {/* Tombol + TETAP ADA: yang diketik lengkap tapi tidak ada di
+                daftar saran (koin baru yang belum masuk katalog mana pun)
+                cuma bisa masuk lewat sini. */}
             <button onClick={tambah} title="Tambah ke seksi pertama"
               className="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded border border-zinc-800 text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-100">
               <Plus className="size-3.5" />
             </button>
+            {usulBuka && usulSimbol.length > 0 && (
+              <>
+                <div className="fixed inset-0 z-30" onPointerDown={() => setUsulBuka(false)} />
+                <div className="absolute inset-x-0 top-full z-40 mt-1 max-h-64 overflow-y-auto rounded-lg border border-zinc-800 bg-zinc-950 p-1 shadow-2xl">
+                  {usulSimbol.map((u) => (
+                    /* onPointerDown + preventDefault: menyentuh daftar ini
+                       membuat kotak isian kehilangan fokus lebih dulu, dan
+                       klik yang menyusul tidak pernah sampai. Sama seperti
+                       daftar saran di Chart & Entry. */
+                    <button key={u.nilai} type="button"
+                      onPointerDown={(e) => { e.preventDefault(); tambahNilai(u.nilai); }}
+                      className="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-zinc-900">
+                      <span className="angka truncate text-[11.5px] text-zinc-200">{u.nilai}</span>
+                      <span className="ml-auto flex shrink-0 items-center gap-1">
+                        {u.sumber.map((b) => (
+                          <span key={b} className={cn('rounded px-1 text-[9px] font-semibold tracking-wide', KELAS_BURSA[b])}>
+                            {NAMA_BURSA[b]}
+                          </span>
+                        ))}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
           {seksiBaru !== null && (
             <input autoFocus value={seksiBaru}
@@ -523,7 +577,7 @@ export function WatchChart({ simbol, onPilih, onLebar }: {
                       <div className={cn('flex items-center gap-1.5 truncate text-[12px]', s === simbol ? 'text-zinc-100' : 'text-zinc-300')}>
                         {mt5 ? dasarS : (<>{s.replace('USDT', '')}<span className="text-zinc-600">/USDT</span></>)}
                         {mt5 && (
-                          <span className="rounded bg-amber-500/15 px-1 text-[8.5px] font-semibold tracking-wide text-amber-300">MT5</span>
+                          <span className={cn('rounded px-1 text-[8.5px] font-semibold tracking-wide', KELAS_BURSA.mt5)}>MT5</span>
                         )}
                       </div>
                       {/* ── ASAL BURSANYA, DI SAMPING HARGANYA ────────────
@@ -563,7 +617,7 @@ export function WatchChart({ simbol, onPilih, onLebar }: {
                             ? 'Koin ini tidak ada di Binance — harga & ordernya lewat Hyperliquid'
                             : 'Harga & ordernya lewat Binance Futures'}
                             className={cn('shrink-0 rounded px-1 text-[8.5px] font-semibold tracking-wide',
-                              t.bursa === 'hyperliquid' ? 'bg-sky-500/15 text-sky-300' : 'bg-zinc-800 text-zinc-500')}>
+                              t.bursa === 'hyperliquid' ? KELAS_BURSA.hyperliquid : KELAS_BURSA.binance)}>
                             <span className="hidden sm:inline">
                               {t.bursa === 'hyperliquid' ? 'Hyperliquid' : 'Binance'}
                             </span>

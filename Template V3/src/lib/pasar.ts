@@ -150,6 +150,47 @@ let pasarPilihan: PasarKripto = bacaPasarPilihan();
 
 export function pasarKripto(): PasarKripto { return pasarPilihan; }
 
+/* ── BURSA PILIHAN PER SIMBOL ──────────────────────────────────────────
+   `pasarPilihan` (spot/futures) berlaku global. Ini berbeda: ia menjawab
+   "koin INI dari bursa mana", dan cuma terisi kalau orangnya memilihnya
+   sendiri dari daftar saran.
+
+   Perlunya begini. Rute /api/klines mencoba spot -> futures -> Hyperliquid
+   berurutan, jadi koin yang ada di DUA-DUANYA selalu berakhir di Binance —
+   tidak ada cara memilih yang lain. Sejak daftar saran menampilkan
+   keduanya dengan lencana masing-masing (diminta pemilik 7 Sep 2026),
+   memilih "Hyperliquid" harus benar-benar memberi lilin Hyperliquid;
+   lencana yang tidak mengubah apa pun lebih buruk daripada tidak ada
+   lencana sama sekali.
+
+   Disimpan supaya pilihannya bertahan sesudah halaman dimuat ulang —
+   orang yang memilih Hyperliquid untuk satu koin memilihnya sekali. */
+const KUNCI_BURSA_SIMBOL = 'jt.bursaSimbol';
+type BursaSimbol = 'binance' | 'hyperliquid';
+function bacaBursaSimbol(): Record<string, BursaSimbol> {
+  try {
+    const d = JSON.parse(localStorage.getItem(KUNCI_BURSA_SIMBOL) ?? '{}');
+    return d && typeof d === 'object' ? d : {};
+  } catch { return {}; }
+}
+let bursaSimbolPeta = bacaBursaSimbol();
+export function bursaSimbol(simbol: string): BursaSimbol | null {
+  return bursaSimbolPeta[simbol] ?? null;
+}
+export function aturBursaSimbol(simbol: string, b: BursaSimbol | null) {
+  if (b) bursaSimbolPeta[simbol] = b;
+  else delete bursaSimbolPeta[simbol];
+  try { localStorage.setItem(KUNCI_BURSA_SIMBOL, JSON.stringify(bursaSimbolPeta)); } catch { /* privat */ }
+  /* Cache lilin dikunci per pasar (lihat `kunci` di ambilKlines), jadi
+     tidak ada yang perlu dibuang di sini — permintaan berikutnya memakai
+     kunci yang berbeda dengan sendirinya. */
+}
+
+/** Nilai `market` yang dikirim ke /api/klines untuk simbol ini. */
+function pasarUntuk(simbol: string): string {
+  return bursaSimbolPeta[simbol] === 'hyperliquid' ? 'hyperliquid' : pasarPilihan;
+}
+
 export function aturPasarKripto(p: PasarKripto) {
   pasarPilihan = p;
   try { localStorage.setItem(KUNCI_PASAR, p); } catch { /* privat */ }
@@ -189,7 +230,7 @@ export async function ambilKlinesSebelum(simbol: string, tf: string, sebelumMs: 
        bukan berputar selamanya. */
     if (mt5) return KOSONG;
     const r = await fetch(
-      `${dasar()}/api/klines?symbol=${encodeURIComponent(simbol)}&interval=${tf}&limit=${batas}&endTime=${sebelumMs}&market=${pasarPilihan}`);
+      `${dasar()}/api/klines?symbol=${encodeURIComponent(simbol)}&interval=${tf}&limit=${batas}&endTime=${sebelumMs}&market=${pasarUntuk(simbol)}`);
     if (!r.ok) return KOSONG;
     const j = await r.json();
     const baris = Array.isArray(j) ? j : (j?.data ?? []);
@@ -216,7 +257,7 @@ export async function ambilKlines(simbol: string, tf: string, batas = 200, segar
   /* Pasarnya IKUT ke dalam kunci. Tanpa itu, menekan tombol spot/futures
      memulangkan lilin pasar lama dari cache selama umurnya -- bug yang
      tampak persis seperti "tombolnya tidak bekerja". */
-  const kunci = `${pasarPilihan}|${simbol}|${tf}|${batas}`;
+  const kunci = `${pasarUntuk(simbol)}|${simbol}|${tf}|${batas}`;
   const ada = simpanan.get(kunci);
   if (ada && Date.now() - ada.waktu < (segar ? 2_500 : UMUR_MS)) return ada.isi;
 
@@ -253,7 +294,7 @@ export async function ambilKlines(simbol: string, tf: string, batas = 200, segar
 
     const alamat = mt5
       ? `${dasar()}/api/mt5/klines?symbol=${encodeURIComponent(simbol.slice(4))}&interval=${tf}&limit=${batas}`
-      : `${dasar()}/api/klines?symbol=${encodeURIComponent(simbol)}&interval=${tf}&limit=${batas}&market=${pasarPilihan}${segar ? '&fresh=1' : ''}`;
+      : `${dasar()}/api/klines?symbol=${encodeURIComponent(simbol)}&interval=${tf}&limit=${batas}&market=${pasarUntuk(simbol)}${segar ? '&fresh=1' : ''}`;
 
     /* -- Coba ulang, HANYA untuk jalur chart hidup (segar) ---------------
        Chart menarik ulang tiap 3 detik. Satu kedipan koneksi -- dan sambungan
@@ -488,6 +529,25 @@ export async function ambilTickers(sertakanHl = false): Promise<Record<string, T
 /** Benar kalau proxy menjawab sama sekali. Dipakai layar untuk membedakan
  *  "tidak ada sinyal" dari "tidak bisa menghubungi server" — dua keadaan
  *  yang terlihat sama persis kalau tidak dibedakan. */
+/* Daftar perp Hyperliquid — NAMA saja, termasuk yang juga ada di Binance.
+   /api/tickers?hl=1 membuang yang kembar (Binance menang soal harga), jadi
+   daftar inilah satu-satunya cara layar tahu sebuah koin ada di dua bursa.
+   Di-cache selama sesi: universe perp berubah beberapa kali sebulan. */
+let simpananHl: { waktu: number; isi: string[] } | null = null;
+export async function daftarSimbolHl(): Promise<string[]> {
+  if (simpananHl && Date.now() - simpananHl.waktu < 10 * 60_000) return simpananHl.isi;
+  try {
+    const r = await fetch(`${dasar()}/api/hl/simbol`);
+    if (!r.ok) return simpananHl?.isi ?? [];
+    const j = await r.json();
+    const isi = Array.isArray(j?.data) ? j.data.filter((x: unknown) => typeof x === 'string') : [];
+    simpananHl = { waktu: Date.now(), isi };
+    return isi;
+  } catch {
+    return simpananHl?.isi ?? [];
+  }
+}
+
 export async function proxyHidup(): Promise<boolean> {
   try {
     const r = await fetch(`${dasar()}/api/health`);
