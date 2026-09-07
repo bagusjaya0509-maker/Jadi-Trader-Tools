@@ -10,6 +10,7 @@ import { cn, tanggalPendek } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 import { useKurs } from '@/lib/kurs';
 import { useHargaPaket } from '@/lib/harga-akses';
+import { useProduk } from '@/lib/data';
 import {
   useKlien, usePenjualan, usePengeluaran, useLisensi,
   type PermintaanLisensi,
@@ -231,18 +232,45 @@ export default function Pemilik() {
 
      Tanggalnya `diputusPada`, bukan `waktu`: yang dicatat laporan ini
      adalah kapan uangnya masuk, bukan kapan orang menekan tombol minta. */
-  const hargaLisensi = (x: PermintaanLisensi): number => {
-    if (Number.isFinite(x.hargaSaat) && (x.hargaSaat as number) > 0) return x.hargaSaat as number;
-    if (x.paket === 'tahunan') return harga.hargaTahunan;
-    if (x.paket === 'premium3') return harga.hargaPremium3;
-    return harga.hargaTesting;
+  /* ── PRODUK MARKETPLACE DINILAI DARI KATALOGNYA ──────────────────────
+     Dilaporkan pemilik 7 Sep 2026: Indikator V3 ($47) tercatat $5, EA MT5
+     ($7) tercatat $1. Sebabnya di server: `hargaSaat` dulu SELALU diisi
+     harga paket Starter saat permintaan dibuat — server tidak tahu harga
+     katalog (katalog ada di Firestore, server tidak punya kredensialnya)
+     dan tidak melihat `paketMinta`. Urutan penilaiannya sekarang:
+       1. produk Marketplace → harga katalog SEKARANG (ditandai taksiran);
+       2. paket Premium 3 Bulan / Tahunan → hargaSaat kalau ia memang harga
+          paket itu; kalau yang tersimpan cuma harga Starter (jejak server
+          lama), tabel harga paketnya;
+       3. Starter → hargaSaat yang tersimpan, lalu tabel harga.
+     Server ikut dibetulkan pada hari yang sama: permintaan baru mencatat
+     harga paket yang diminta, dan mengosongkan hargaSaat untuk produk. */
+  const katalog = useProduk();
+  const petaProduk = useMemo(
+    () => new Map(katalog.data.map((pr) => [pr.id, pr] as const)), [katalog.data]);
+  const produkDari = (x: PermintaanLisensi) =>
+    x.produk && x.produk !== 'jadi-trader-v3' ? petaProduk.get(x.produk) : undefined;
+  const nilaiLisensi = (x: PermintaanLisensi): { nilai: number; taksiran: boolean } => {
+    const pr = produkDari(x);
+    if (pr && pr.harga > 0) return { nilai: pr.harga, taksiran: true };
+    const tersimpan = Number.isFinite(x.hargaSaat) && (x.hargaSaat as number) > 0
+      ? (x.hargaSaat as number) : 0;
+    const coret = (harga as { hargaTestingCoret?: number }).hargaTestingCoret ?? 0;
+    const cumaStarter = tersimpan === harga.hargaTesting || tersimpan === coret;
+    if (x.paket === 'tahunan' || x.paket === 'premium3') {
+      if (tersimpan > 0 && !cumaStarter) return { nilai: tersimpan, taksiran: false };
+      return { nilai: x.paket === 'tahunan' ? harga.hargaTahunan : harga.hargaPremium3, taksiran: true };
+    }
+    if (tersimpan > 0) return { nilai: tersimpan, taksiran: false };
+    return { nilai: harga.hargaTesting, taksiran: true };
   };
+  const hargaLisensi = (x: PermintaanLisensi): number => nilaiLisensi(x).nilai;
   const lisensiTerjual = useMemo(
     () => permintaan.data.filter((x) => x.status === 'disetujui' && x.jenis === 'bayar'),
     [permintaan.data]);
   const totalLisensi = useMemo(
     () => lisensiTerjual.reduce((s, x) => s + hargaLisensi(x), 0),
-    [lisensiTerjual, harga]);
+    [lisensiTerjual, harga, petaProduk]);
 
   const totalManual = penjualan.data.reduce((s, p) => s + p.nilai, 0);
   /* Omzet = lisensi otomatis + catatan tangan. Yang kedua tetap ada untuk
@@ -295,7 +323,7 @@ export default function Pemilik() {
        tergantung berapa bulan yang tergambar; satu kolom tidak. */
     pengeluaran.data.forEach((p) => { ambil(p.waktu).keluar -= p.nilai; });
     return [...peta.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([, v]) => v);
-  }, [penjualan.data, pengeluaran.data, lisensiTerjual, harga]);
+  }, [penjualan.data, pengeluaran.data, lisensiTerjual, harga, petaProduk]);
 
 
   /* Recent sales = lisensi + catatan tangan, DIURUT BERSAMA.
@@ -316,14 +344,17 @@ export default function Pemilik() {
          atasnya: di sana "Keperluan | Kategori", di sini "Produk | Paket".
          Dua tabel uang yang bentuknya sama bisa dibaca dengan satu
          kebiasaan mata, bukan dua. */
-      produk: x.produk && x.produk !== 'jadi-trader-v3' ? x.produk : 'Lisensi akses',
-      kategori: namaPaket(x.paket),
+      /* Nama produk dari katalog, bukan id mentahnya: "jadi-traderindicator-v3"
+         adalah nama berkas, bukan nama barang yang dijual. */
+      produk: produkDari(x)?.nama
+        ?? (x.produk && x.produk !== 'jadi-trader-v3' ? x.produk : 'Lisensi akses'),
+      kategori: produkDari(x) ? 'Produk Marketplace' : namaPaket(x.paket),
       pembeli: namaPemakai(x.email, x.nama, x.uid),
-      nilai: hargaLisensi(x),
-      /* Harga TERCATAT vs harga DITAKSIR. Permintaan lama tidak menyimpan
-         hargaSaat, jadi angkanya diturunkan dari tabel harga sekarang —
-         dan orang yang membaca laporan berhak tahu mana yang mana. */
-      taksiran: !(Number.isFinite(x.hargaSaat) && (x.hargaSaat as number) > 0),
+      nilai: nilaiLisensi(x).nilai,
+      /* Harga TERCATAT vs harga DITAKSIR — lihat `nilaiLisensi`. Yang
+         membaca laporan berhak tahu mana angka yang tersimpan saat
+         transaksi dan mana yang diturunkan dari harga sekarang. */
+      taksiran: nilaiLisensi(x).taksiran,
       manual: false as const, id: '',
     }));
     const dariTangan = penjualan.data.map((p) => ({
@@ -331,7 +362,7 @@ export default function Pemilik() {
       nilai: p.nilai, taksiran: false, manual: true as const, id: p.id,
     }));
     return [...dariLisensi, ...dariTangan].sort((a, b) => b.waktu - a.waktu);
-  }, [lisensiTerjual, penjualan.data, harga]);
+  }, [lisensiTerjual, penjualan.data, harga, petaProduk]);
 
   /* ── LISENSI DIGOLONGKAN per tingkat harga ────────────────────────────
      Satu tabel berisi 24 baris tidak menjawab pertanyaan yang sebenarnya
@@ -633,7 +664,7 @@ export default function Pemilik() {
                       </Td>
                       <Td className="text-zinc-500">{p.kategori}</Td>
                       <Td className="angka text-right text-emerald-500">
-                        {p.taksiran && <span className="mr-0.5 text-zinc-600" title="Permintaan lama tidak menyimpan harganya — angka ini diturunkan dari tabel harga sekarang">≈</span>}
+                        {p.taksiran && <span className="mr-0.5 text-zinc-600" title="Diturunkan dari harga SEKARANG — katalog Marketplace atau tabel paket — bukan angka yang tersimpan saat transaksi">≈</span>}
                         {fmt(p.nilai)}
                       </Td>
                       <Td className="text-right">
