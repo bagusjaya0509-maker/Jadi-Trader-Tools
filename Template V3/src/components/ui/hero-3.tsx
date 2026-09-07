@@ -71,9 +71,13 @@ export function HeroSection({ children }: { children?: React.ReactNode }) {
             'fade-in slide-in-from-bottom-10 animate-in fill-mode-backwards delay-200 duration-500 ease-out',
           )}
         >
-          Chart, screener, jurnal, dan eksekusi ke Binance Futures serta MetaTrader 5 —{' '}
+          {/* "eksekusi" sempat berdiri sejajar dengan Chart/screener/jurnal
+              sebagai fitur yang KAMI sediakan. Yang benar: pengguna mengirim
+              order ke akunnya sendiri, aplikasi ini layarnya. Sama dengan
+              perbaikan di story-scroll-demo. */}
+          Chart, screener, dan jurnal di satu layar.{' '}
           <br className="hidden sm:block" />
-          tanpa pindah aplikasi untuk mengubah stop loss.
+          Kirim order ke akun Binance Futures atau MetaTrader 5 milikmu sendiri, dan ubah stop loss tanpa pindah aplikasi.
         </p>
 
         <div className="fade-in slide-in-from-bottom-10 flex w-fit animate-in items-center justify-center gap-3 fill-mode-backwards pt-2 delay-300 duration-500 ease-out">

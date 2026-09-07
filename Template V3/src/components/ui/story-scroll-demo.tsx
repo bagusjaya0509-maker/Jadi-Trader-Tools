@@ -62,7 +62,18 @@ const LAYAR: Layar[] = [
   {
     no: '01', berkas: 'chart', aksen: '#60a5fa',
     judul: 'Chart & Entry',
-    ket: 'Susun entry, SL, dan TP dengan menggeser garis. Ordernya berangkat ke Binance, Hyperliquid, atau MetaTrader 5 lewat VPS-mu sendiri.',
+    /* ── SUBJEK KALIMATNYA PENGGUNA, BUKAN KAMI ─────────────────────────
+       "Ordernya berangkat ke Binance…" tidak menyebut siapa yang mengirim,
+       dan kalimat tanpa pelaku dibaca sebagai: aplikasi inilah yang
+       menempatkan order. Itu keliru — kunci API, VPS, dan akun bursanya
+       milik pengguna, dan kami tidak pernah memegang dana siapa pun.
+
+       Bukan soal gaya bahasa. Xendit menolak pengajuan merchant 19 Agu 2026
+       dengan alasan "data tidak valid atau tidak memenuhi syarat dalam bukti
+       bisnis (website)", sementara KBLI di NIB kami 62199 — pemrograman
+       komputer. Kalimat yang membuat kami terbaca sebagai pihak yang
+       mengeksekusi order membenturkan situs dengan izinnya sendiri. */
+    ket: 'Susun entry, SL, dan TP dengan menggeser garis, lalu kirim ordernya ke Binance, Hyperliquid, atau MetaTrader 5 — lewat API key dan VPS milikmu sendiri, bukan server kami.',
   },
   {
     no: '02', berkas: 'screener', aksen: '#ffcd75',
@@ -77,7 +88,11 @@ const LAYAR: Layar[] = [
   {
     no: '04', berkas: 'copy', aksen: '#c084fc',
     judul: 'Copy Signal',
-    ket: 'Sinyal dari analis lain, agen AI, dan dompet on-chain. Diurutkan dari rekam jejak sinyalnya sendiri, bukan dari jumlah pengikut.',
+    /* Yang ditawarkan AKSES KE ALAT PEMANTAUNYA. Sinyalnya ditulis pengguna
+       lain, agen, atau dibaca dari dompet publik on-chain — kami tidak
+       mengurasi dan tidak menjualnya. "Kamu yang pilih" menaruh keputusan di
+       tempat yang benar. */
+    ket: 'Sinyal dari analis lain, agen AI, dan dompet on-chain — kamu yang pilih siapa yang mau diikuti. Urutannya dari rekam jejak sinyalnya sendiri, bukan jumlah pengikut.',
   },
   {
     no: '05', berkas: 'dashboard', aksen: '#34d399',

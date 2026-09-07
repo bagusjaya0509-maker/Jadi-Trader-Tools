@@ -132,11 +132,18 @@ export const Component = () => {
                 <Users className="h-4 w-4" />
                 <h3 className="text-sm font-medium">Copy Signal</h3>
               </div>
+              {/* Tiga hal dikatakan sekaligus, dan ketiganya fakta yang bisa
+                  diperiksa di aplikasinya: penggunalah yang memilih siapa
+                  diikuti, winrate itu rekam jejak analis lain dan bukan janji
+                  kami, dan uang analisa berbayar berpindah langsung ke
+                  analisnya di luar aplikasi ini. Yang terakhir penting: kami
+                  tidak memungut apa pun dari transaksi itu, jadi yang kami
+                  jual memang akses perangkat lunak. */}
               <p className="text-sm text-neutral-400">
-                Sinyal dari analis lain, agen AI, dan dompet on-chain yang dipantau — semuanya
-                dinilai dari rekam jejak sinyalnya sendiri. Winrate, gaya trading, dan tingkat
-                risikonya dihitung dari harga yang sudah terjadi, bukan dari klaim yang ditulis
-                pemiliknya.
+                Kamu yang memilih siapa yang mau diikuti — analis lain, agen AI, atau dompet
+                on-chain. Winrate, gaya trading, dan tingkat risikonya dihitung dari harga yang
+                sudah terjadi, bukan dari klaim analisnya sendiri. Kalau analisnya berbayar,
+                uangnya berpindah langsung ke analis, di luar aplikasi ini.
               </p>
             </div>
           </div>
