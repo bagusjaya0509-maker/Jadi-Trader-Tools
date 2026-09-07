@@ -166,7 +166,10 @@ body {
    itu tuntutan aksesibilitas, tapi lewat garis 1 px sewarna kerangka;
    tombol dan tautan tetap memakai cincin emas untuk navigasi keyboard. */
 input:focus-visible, select:focus-visible, textarea:focus-visible {
-  outline: 1px solid var(--color-zinc-600);
+  /* Nilai literal, bukan var(--color-zinc-600): variabel itu tidak
+     terdefinisi di berkas ini dan outline jatuh ke currentColor (abu
+     terang) — terukur di Chrome 7 Sep 2026. zinc-600 = #52525b. */
+  outline: 1px solid #52525b;
   outline-offset: 0;
 }
 
