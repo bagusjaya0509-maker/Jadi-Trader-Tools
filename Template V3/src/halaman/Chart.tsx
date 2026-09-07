@@ -856,6 +856,24 @@ export default function ChartBacktest() {
   /* Panel Backtest tertutup saat halaman dibuka. Ia beta, dan yang beta
      tidak boleh menempati ruang tetap di layar seolah sudah matang. */
   const [backtestBuka, setBacktestBuka] = useState(false);
+  /* ── DIBUKA = DIGULIRKAN KE SANA ────────────────────────────────────
+     Ikon "Posisi Trade" dan "Backtest" duduk di kaki chart, sedangkan
+     panel yang mereka buka terbentang DI BAWAH lipatan layar. Menekan
+     ikonnya lalu harus menggulir sendiri untuk melihat hasilnya terasa
+     seperti dua pekerjaan untuk satu maksud -- diminta pemilik 7 Sep 2026.
+     Gulir hanya saat DIBUKA; menutupnya tidak memindahkan layar ke mana
+     pun. scroll-mt-16 pada sasarannya menjaga judul panel tidak tertutup
+     bilah judul halaman yang menempel di puncak. */
+  const gridPosisiRef = useRef<HTMLDivElement>(null);
+  const panelBacktestRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (posisiSembunyi) return;
+    gridPosisiRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [posisiSembunyi]);
+  useEffect(() => {
+    if (!backtestBuka) return;
+    panelBacktestRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [backtestBuka]);
   /* Lebar watchlist naik ke sini HANYA sebagai pemicu ukur-ulang chart —
      kolomnya sendiri tetap diurus WatchChart. */
   const [lebarWatch, setLebarWatch] = useState(0);
@@ -6496,7 +6514,7 @@ ${pnlSunting !== null
             Panel sendiri membuat keduanya terbaca sebagai dua alat yang
             kebetulan bertetangga. */}
         {backtestBuka && (
-          <div className="border-t border-zinc-800/80">
+          <div ref={panelBacktestRef} className="scroll-mt-16 border-t border-zinc-800/80">
       {/* ── Backtest (beta) — tampil hanya kalau dibuka dari ikon di
              pojok bawah chart ── */}
           <div className="mt-px border border-amber-500/25 bg-amber-500/[0.04] px-4 py-2.5 text-[12px] leading-relaxed text-amber-200/80">
@@ -6656,7 +6674,7 @@ ${pnlSunting !== null
             <div className={cn('grid grid-cols-1 lg:grid-cols-2',
               POLOS ? 'mt-0 gap-4' : 'mt-px gap-px',
               /* Disembunyikan, BUKAN dilepas — lihat catatan di `posisiSembunyi`. */
-              posisiSembunyi && 'hidden')}>
+              posisiSembunyi && 'hidden', 'scroll-mt-16')} ref={gridPosisiRef}>
               <PanelPosisiTerbuka sumber="kripto" onSunting={bukaSunting} onTutup={tutupDariTabel} onUbahSlTp={ubahDariTabel} onBanding={bukaBandingSalin} tanpaBingkai={POLOS} menyatu onTotal={totalKripto} />
               <PanelPosisiTerbuka sumber="forex" onSunting={bukaSunting} onTutup={tutupDariTabel} onUbahSlTp={ubahDariTabel} tanpaBingkai={POLOS} menyatu onTotal={totalForex} />
             </div>
