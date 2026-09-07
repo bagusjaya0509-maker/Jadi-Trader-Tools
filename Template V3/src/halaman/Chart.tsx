@@ -6,7 +6,7 @@ import {
   Layers, ChevronDown, ChevronUp, Settings2, Code2, X, Ruler, Rows3, Square, Eraser, Minus, TrendingUp,
   MoveRight,
   FlaskConical, GripHorizontal, Maximize2, Minimize2, SquareArrowUp, SquareArrowDown,
-  Settings, RotateCcw, LayoutGrid, Link2 } from 'lucide-react';
+  Settings, RotateCcw, LayoutGrid, Link2, Briefcase } from 'lucide-react';
 import { PanelNews } from '@/components/panel-news';
 import { simpanDraf } from '@/lib/draf-sinyal';
 import { Panel, PanelHead, KartuKpi, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
@@ -744,7 +744,23 @@ export default function ChartBacktest() {
      untuk melihat tabel membuat chartnya keluar layar, dan satu klik yang
      meleset di sana terasa seperti chartnya hilang. Yang tersembunyi tidak
      bisa ditabrak. */
-  const [posisiSembunyi, setPosisiSembunyi] = useState(POLOS);
+  /* TERSEMBUNYI BAWAAN di kedua mode — diminta pemilik 7 Sep 2026. Dulu
+     tabel Posisi Terbuka Kripto & Trade-Fi selalu terbentang di bawah
+     chart; sekarang ia dibuka dari ikon "Posisi Trade" di baris kaki chart
+     (sejajar Backtest), dan yang tampil sebelum dibuka cuma P/L
+     mengambangnya. Tabelnya tetap DIPASANG saat tersembunyi (kelas
+     `hidden`, bukan unmount): dialah yang menghitung P/L itu, dan angka yang
+     berhenti bergerak begitu tabelnya ditutup adalah angka yang menipu. */
+  const [posisiSembunyi, setPosisiSembunyi] = useState(true);
+  /* P/L berjalan gabungan per sumber, dilaporkan tabelnya lewat `onTotal`.
+     null = belum ada angka (baris tanpa P/L, atau belum ada posisi). */
+  const [ringkasPosisi, setRingkasPosisi] = useState<{
+    kripto: number | null; forex: number | null; nKripto: number; nForex: number;
+  }>({ kripto: null, forex: null, nKripto: 0, nForex: 0 });
+  const totalKripto = useCallback((t: number | null, n: number) =>
+    setRingkasPosisi((r) => (r.kripto === t && r.nKripto === n ? r : { ...r, kripto: t, nKripto: n })), []);
+  const totalForex = useCallback((t: number | null, n: number) =>
+    setRingkasPosisi((r) => (r.forex === t && r.nForex === n ? r : { ...r, forex: t, nForex: n })), []);
   /* ── Menu timeframe lewat KLIK KANAN di chart ─────────────────────────
      Hanya di mode polos. Panel yang dilepas jadi jendela sendiri tidak
      punya baris nomor panel — di sanalah pemilih TF hidup — jadi tanpa ini
@@ -6355,8 +6371,40 @@ ${pnlSunting !== null
             baris ini menggantung tanpa apa pun di kiri-kanannya. pr-4 sama
             dengan px-4 hamparan di atasnya, supaya tepi kanannya segaris
             dengan ikon multi. */}
-        <div className={cn('flex items-center justify-end border-t border-zinc-800/80 py-1.5 pr-4',
+        <div className={cn('flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-zinc-800/80 py-1.5 pl-2 pr-4',
           POLOS && 'hidden')}>
+          {/* ── KIRI: ikon Posisi Trade + P/L mengambang ───────────────
+              Sakelar tabel posisi dan angka yang mewakilinya saat tabelnya
+              tertutup. Angkanya dari tabel itu sendiri (onTotal), bukan
+              dihitung lagi di sini. Warna mengikuti tanda, sama dengan
+              kepala tabelnya, supaya membuka tabel tidak mengubah apa pun
+              selain menambah rinciannya. */}
+          <div className="flex min-w-0 items-center gap-2 text-[11px]">
+            <button
+              onClick={() => setPosisiSembunyi((v) => !v)}
+              title={posisiSembunyi ? 'Tampilkan Posisi Terbuka Kripto & Trade-Fi' : 'Sembunyikan tabel posisi'}
+              aria-expanded={!posisiSembunyi}
+              className={cn('flex cursor-pointer items-center gap-1.5 rounded px-2 py-1 transition-colors',
+                posisiSembunyi ? 'text-zinc-500 hover:text-zinc-300' : 'text-zinc-200')}>
+              <Briefcase className="size-3" strokeWidth={2} />
+              Posisi Trade
+              {posisiSembunyi ? <ChevronDown className="size-3" /> : <ChevronUp className="size-3" />}
+            </button>
+            <span className="h-3 w-px bg-zinc-800" aria-hidden />
+            {([
+              ['Kripto', ringkasPosisi.kripto, ringkasPosisi.nKripto],
+              ['Trade-Fi', ringkasPosisi.forex, ringkasPosisi.nForex],
+            ] as const).map(([nama, t, n], i) => (
+              <span key={nama} className="flex items-center gap-1 whitespace-nowrap text-zinc-500">
+                {i > 0 && <span className="mr-1 text-zinc-800">·</span>}
+                {nama}
+                <span className={cn('angka',
+                  t === null ? 'text-zinc-600' : t >= 0 ? 'text-emerald-500' : 'text-red-400')}>
+                  {t === null ? (n ? `${n} posisi` : '—') : uang(t, true)}
+                </span>
+              </span>
+            ))}
+          </div>
           <button
             onClick={() => setBacktestBuka((v) => !v)}
             title={backtestBuka ? 'Tutup panel Backtest' : 'Buka panel Backtest (beta)'}
@@ -6550,7 +6598,7 @@ ${pnlSunting !== null
               {posisiSembunyi ? 'Posisi & order terbuka' : 'Sembunyikan posisi & order'}
             </button>
           )}
-          {!(POLOS && posisiSembunyi) && (
+          {(
             /* SEJAJAR DENGAN GRAFIK, bukan berjarak sendiri. Sempat dibuat
                berjarak seperti sebelumnya, dan hasilnya justru terlihat
                tidak disengaja: satu kotak menempel ke pembatas, kotak di
@@ -6563,9 +6611,11 @@ ${pnlSunting !== null
                kedua kartu terbaca sebagai dua benda terpisah yang kebetulan
                berdekatan, bukan sebagai satu bidang yang terbagi. */
             <div className={cn('grid grid-cols-1 lg:grid-cols-2',
-              POLOS ? 'mt-0 gap-4' : 'mt-px gap-px')}>
-              <PanelPosisiTerbuka sumber="kripto" onSunting={bukaSunting} onTutup={tutupDariTabel} onUbahSlTp={ubahDariTabel} onBanding={bukaBandingSalin} tanpaBingkai={POLOS} menyatu />
-              <PanelPosisiTerbuka sumber="forex" onSunting={bukaSunting} onTutup={tutupDariTabel} onUbahSlTp={ubahDariTabel} tanpaBingkai={POLOS} menyatu />
+              POLOS ? 'mt-0 gap-4' : 'mt-px gap-px',
+              /* Disembunyikan, BUKAN dilepas — lihat catatan di `posisiSembunyi`. */
+              posisiSembunyi && 'hidden')}>
+              <PanelPosisiTerbuka sumber="kripto" onSunting={bukaSunting} onTutup={tutupDariTabel} onUbahSlTp={ubahDariTabel} onBanding={bukaBandingSalin} tanpaBingkai={POLOS} menyatu onTotal={totalKripto} />
+              <PanelPosisiTerbuka sumber="forex" onSunting={bukaSunting} onTutup={tutupDariTabel} onUbahSlTp={ubahDariTabel} tanpaBingkai={POLOS} menyatu onTotal={totalForex} />
             </div>
           )}
         </>

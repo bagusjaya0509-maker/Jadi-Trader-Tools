@@ -75,7 +75,12 @@ export interface OrderSunting {
   gabungan?: number;
 }
 
-export function PanelPosisiTerbuka({ sumber, onSunting, onTutup, onUbahSlTp, onBanding, tanpaBingkai, menyatu }: {
+export function PanelPosisiTerbuka({ sumber, onSunting, onTutup, onUbahSlTp, onBanding, tanpaBingkai, menyatu, onTotal }: {
+  /** Melaporkan P/L berjalan gabungan dan jumlah baris ke induk — dipakai
+   *  Chart & Entry untuk menulis angkanya di baris kaki chart saat panelnya
+   *  sedang disembunyikan. Angkanya tetap dihitung DI SINI, satu tempat;
+   *  induknya cuma membaca. */
+  onTotal?: (total: number | null, jumlah: number) => void;
   /** Lepas garis tepi dan latar kartu. Dipakai di panel multi-chart, yang
    *  sudah punya garis pemisahnya sendiri — kartu bergaris di dalam kotak
    *  bergaris menghasilkan dua garis sejajar berjarak beberapa piksel. */
@@ -588,6 +593,8 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
   const total = baris.some((b) => b.pnl !== undefined)
     ? baris.reduce((s, b) => s + (b.pnl ?? 0), 0)
     : null;
+  const jumlahBaris = baris.length;
+  useEffect(() => { onTotal?.(total, jumlahBaris); }, [total, jumlahBaris, onTotal]);
 
   return (
     /* self-start: panel ini setinggi ISINYA, tidak ikut meregang

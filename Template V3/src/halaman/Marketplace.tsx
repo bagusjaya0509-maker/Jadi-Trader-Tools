@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { KUNCI_LISENSI_LOKAL } from '@/lib/akses';
 import {
   Check, Crown, Download, Copy, X, Star, MessageCircle, ExternalLink, KeyRound, Loader2, Trash2,
@@ -95,6 +95,7 @@ function TombolPasangChart({ produk, besar }: { produk: Produk; besar?: boolean 
   const { paket, memuat } = usePaket();
   const [pesan, setPesan] = useState('');
   const [gagal, setGagal] = useState(false);
+  const navigate = useNavigate();
 
   if (!bisaDipasang(produk)) return null;
 
@@ -107,14 +108,18 @@ function TombolPasangChart({ produk, besar }: { produk: Produk; besar?: boolean 
       ? 'Isi Marketplace belum termasuk paket Event Terbatas'
       : 'Perlu paket Tahunan untuk memasang indikator berbayar';
 
+  /* ── TERPASANG = LANGSUNG KE CHART & ENTRY ──────────────────────────
+     Diminta pemilik 7 Sep 2026. Dulu tombol ini memasang lalu menggantung
+     kabar "Terpasang — buka Chart & Entry" dan orangnya harus mencari
+     jalannya sendiri. Ikon grafik menjanjikan grafik; yang ditekan
+     memang ingin MELIHAT indikatornya, bukan membaca bahwa ia sudah ada.
+     Kabar hanya tersisa untuk kegagalan — satu-satunya keadaan yang
+     masih butuh dibaca di halaman ini. */
   function pasang() {
     const h = pasangIndikator(produk);
-    setGagal(h === 'gagal');
-    setPesan(
-      h === 'gagal' ? 'Gagal memasang — penyimpanan peramban ditolak.'
-      : h === 'sudahAda' ? 'Sudah terpasang — diaktifkan di chart.'
-      : h === 'diperbarui' ? 'Versi terbaru dipasang & diaktifkan.'
-      : 'Terpasang — buka Chart & Entry.');
+    if (h !== 'gagal') { navigate('/chart-entry'); return; }
+    setGagal(true);
+    setPesan('Gagal memasang — penyimpanan peramban ditolak.');
     setTimeout(() => setPesan(''), 4000);
   }
 
@@ -211,6 +216,7 @@ function AmbilSumber({ produk }: { produk: Produk }) {
      kode itu sekali — bukti aktif, bukan janji. */
   const [terbuka, setTerbuka] = useState(false);
   const { pengguna, pemilik } = useAuth();
+  const navigate = useNavigate();
   const gratis = produk.harga === 0;
 
   /* ── INDIKATOR PINE BERBAYAR: DIPASANG, BUKAN DISALIN ────────────────
@@ -254,10 +260,16 @@ function AmbilSumber({ produk }: { produk: Produk }) {
       if (indikatorPine) {
         const h = pasangKodePine(produk.id, produk.nama, isi);
         setTerbuka(true);
-        setGagal(h === 'gagal');
-        setKabar(h === 'gagal'
-          ? 'Lisensi lolos, tapi gagal memasang — penyimpanan peramban ditolak.'
-          : 'Terpasang & aktif. Buka Chart & Entry untuk melihatnya.');
+        if (h !== 'gagal') {
+          /* Lisensi lolos & kode terpasang: langsung ke chartnya. Tombolnya
+             berbunyi "Buka & Terapkan ke Chart" — dan yang dijanjikan
+             adalah chartnya, bukan kalimat bahwa chartnya bisa dibuka. */
+          try { localStorage.setItem(KUNCI_LISENSI, rapi); } catch { /* mode privat */ }
+          navigate('/chart-entry');
+          return;
+        }
+        setGagal(true);
+        setKabar('Lisensi lolos, tapi gagal memasang — penyimpanan peramban ditolak.');
         return;
       }
 
