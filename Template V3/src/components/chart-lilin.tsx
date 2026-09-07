@@ -720,11 +720,22 @@ export function ChartLilin({
         const s = seri.current;
         const el = kotak.current;
         if (!s || !el || !(harga > 0)) return null;
-        const y = s.priceToCoordinate(harga);
+        /* SELURUH badan dijaga, bukan cuma priceScale(). Pemanggilnya
+           membaca ref ini dari putaran rAF yang hidup di komponen LAIN
+           (halaman chart), jadi ia bisa menembak tepat pada celah antara
+           chart ini dibuang dan cleanup di bawah sempat mengosongkan
+           refnya — dan lightweight-charts menjawabnya dengan melempar
+           "Object is disposed" yang lolos ke luar sebagai galat tak
+           tertangkap. Terlihat di konsol Chrome 7 Sep 2026 saat simbol
+           diganti cepat berkali-kali. */
+        let y: number | null = null;
+        let lebar = 0;
+        try {
+          y = s.priceToCoordinate(harga);
+          lebar = c.priceScale('right').width();
+        } catch { return null; }
         if (y === null || !Number.isFinite(y)) return null;
         const r = el.getBoundingClientRect();
-        let lebar = 0;
-        try { lebar = c.priceScale('right').width(); } catch { /* versi lama */ }
         /* x LILIN TERAKHIR, dibaca dari data seri (bukan prop `lilin` yang
            dibekukan efek berdependensi kosong ini). Null kalau belum ada bar
            atau chart belum diukur — pemanggil jatuh ke tepi skala harga. */
