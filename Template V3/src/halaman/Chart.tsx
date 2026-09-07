@@ -28,7 +28,7 @@ import type { AlatPegang, GambarAlat } from '@/lib/plugin-alat';
 import type { HasilPine } from '@/lib/pine';
 import { bacaSetelanChart, simpanSetelanChart, usulSlTp } from '@/lib/replay';
 import { atr, ema } from '@/lib/jt-scan-core';
-import { ambilKlines, ambilKlinesSebelum, aturPasarKripto, bacaAcuanMt5, bacaNamaMt5, bacaPasar, bacaSpekMt5, bacaTickMt5, daftarSimbolMt5, pasarKripto, type Lilin } from '@/lib/pasar';
+import { ambilKlines, ambilKlinesSebelum, ambilTickers, aturPasarKripto, bacaAcuanMt5, bacaNamaMt5, bacaPasar, bacaSpekMt5, bacaTickMt5, daftarSimbolMt5, pasarKripto, type Lilin } from '@/lib/pasar';
 import { useAkunMt5, segarkanAkunMt5 } from '@/lib/akun';
 /* Langsung dari admin, BUKAN lewat usePosisi(): yang dibutuhkan di sini
    cuma daftar order bursa, sementara usePosisi() juga memasang listener
@@ -3967,6 +3967,23 @@ ${pnlSunting !== null
      MT5" atau "Kripto · Binance" — karena dari namanya saja XAUUSD dan
      BTCUSDT terlihat sejenis padahal datangnya dari dua tempat berbeda. */
   const [saranBuka, setSaranBuka] = useState(false);
+  /* ── KOIN HYPERLIQUID IKUT DITAWARKAN ─────────────────────────────────
+     Dilaporkan pemilik 7 Sep 2026: mengetik "CASHCAT" tidak menawarkan
+     apa pun, padahal "CASHCATUSDT" lengkap memang membuka chart
+     Hyperliquid-nya. Daftar saran cuma tahu MT5 dan Binance. Sekarang
+     koin Hyperliquid ditarik dari /api/tickers?hl=1 saat kotak sarannya
+     dibuka (bukan saat halaman dimuat — tamu tanpa langganan ditolak rute
+     itu, dan penolakannya tidak boleh mengganggu apa pun). */
+  const [simbolHl, setSimbolHl] = useState<string[]>([]);
+  useEffect(() => {
+    if (!saranBuka || simbolHl.length) return;
+    let hidup = true;
+    void ambilTickers(true).then((t) => {
+      if (!hidup) return;
+      setSimbolHl(Object.keys(t).filter((s) => t[s].bursa === 'hyperliquid').sort());
+    }).catch(() => { /* rute ditolak/offline: saran Binance & MT5 tetap jalan */ });
+    return () => { hidup = false; };
+  }, [saranBuka, simbolHl.length]);
   const saranSimbol = useMemo(() => {
     const q = ketik.trim().replace(/^MT5:/i, '').toLowerCase();
     const semua = [
@@ -3980,9 +3997,12 @@ ${pnlSunting !== null
          berikutnya -- dan yang membuat koin yang diblokir dari Screener
          benar-benar hilang dari sini juga. */
       ...simbolAktif.map((s) => ({ nilai: s, label: s, sumber: 'Kripto · Binance' })),
+      /* Yang sudah ada di Binance tidak diulang: satu simbol, satu baris. */
+      ...simbolHl.filter((s) => !simbolAktif.includes(s))
+        .map((s) => ({ nilai: s, label: s, sumber: 'Kripto · Hyperliquid' })),
     ];
     return (q ? semua.filter((o) => o.label.toLowerCase().includes(q)) : semua).slice(0, 40);
-  }, [ketik, simbolMt5, simbolAktif]);
+  }, [ketik, simbolMt5, simbolAktif, simbolHl]);
 
   function pilihSimbol(v: string) {
     setKetik(v);
@@ -6148,8 +6168,17 @@ ${pnlSunting !== null
               z-30, yang menyamakannya dengan dock Pine — dan panel yang
               menutupi separuh chart pantas berada di atas tiga ikon kecil
               di dasarnya, bukan sebaliknya. */}
-          <div className={cn('pointer-events-none absolute inset-x-0 bottom-0 z-[25] flex items-center gap-3 px-4 py-2 text-[11.5px] text-zinc-600',
-            POLOS && 'hidden')}>
+          {/* ── TEPI KANANNYA TEPI AREA CHART, BUKAN TEPI LUAR ──────────
+              Dulu `inset-x-0`: hamparan ini membentang selebar wadah yang
+              memuat chart DAN watchlist, jadi ikon multi & gerigi duduk di
+              bawah watchlist — 216 px di kanan sumbu harga, terukur 7 Sep
+              2026, dan pemilik menyebutnya "diam di area watchlist".
+              Sekarang tepi kanannya dihitung: lebar watchlist + pegangan
+              6 px + padding wadah 8 px, jadi ikonnya kembali ke petak sudut
+              sumbu waktu/harga dan IKUT bergeser saat watchlist ditarik. */}
+          <div className={cn('pointer-events-none absolute bottom-0 left-0 z-[25] flex items-center gap-3 px-4 py-2 text-[11.5px] text-zinc-600',
+            POLOS && 'hidden')}
+               style={{ right: lebarWatch + 6 + 8 }}>
             {/* GERIGI PINDAH KE UJUNG KANAN, berjejer dengan ikon multi —
                 lihat kelompok ikon di bawah. Dulu ia sendirian di pojok kiri,
                 terpisah sejauh lebar chart dari satu-satunya sakelar lain di

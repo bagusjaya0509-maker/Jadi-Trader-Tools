@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, X, GripVertical, Pencil, FolderPlus } from 'lucide-react';
+import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { cn, harga as fHarga } from '@/lib/utils';
 import { ambilTickers, hargaTickMt5, daftarSimbolMt5, type Ticker } from '@/lib/pasar';
 import { SIMBOL_DASAR, useSimbol } from '@/lib/simbol';
-import { useMulti, kirimBus, ID_PANEL } from '@/lib/multi-chart';
+import { useMulti, kirimBus, ID_PANEL, POLOS } from '@/lib/multi-chart';
+import { db } from '@/lib/data';
+import { useAuth } from '@/lib/auth';
 
 /* ════════════════════════════════════════════════════════════════════════
    WATCHLIST CHART — kolom kanan dengan PEMBATAS yang diseret
@@ -40,13 +43,14 @@ const BAWAAN = ['MT5:XAUUSD', 'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XAUTUSDT'];
 
 interface SeksiWatch { id: string; nama: string; simbol: string[] }
 
+function seksiSah(d: unknown): d is SeksiWatch[] {
+  return Array.isArray(d) && d.length > 0
+    && d.every((x) => x && typeof x.id === 'string' && typeof x.nama === 'string' && Array.isArray(x.simbol));
+}
 function bacaSeksi(): SeksiWatch[] {
   try {
-    const d = JSON.parse(localStorage.getItem(KUNCI_SEKSI) ?? 'null') as SeksiWatch[];
-    if (Array.isArray(d) && d.length
-      && d.every((x) => x && typeof x.id === 'string' && typeof x.nama === 'string' && Array.isArray(x.simbol))) {
-      return d;
-    }
+    const d = JSON.parse(localStorage.getItem(KUNCI_SEKSI) ?? 'null');
+    if (seksiSah(d)) return d;
   } catch { /* privat */ }
   /* Migrasi dari era satu-daftar: daftar lama jadi seksi pertama. */
   try {
@@ -117,6 +121,37 @@ export function WatchChart({ simbol, onPilih, onLebar }: {
   };
 
   const [seksi, setSeksi] = useState<SeksiWatch[]>(bacaSeksi);
+  /* ── WATCHLIST IKUT AKUN, BUKAN CUMA PERAMBAN ─────────────────────────
+     Dilaporkan pemilik 7 Sep 2026: watchlist yang sudah diatur "sering
+     hilang dan berubah". Tidak ada kode yang menghapus jt.watchSeksi —
+     yang terjadi, ia cuma hidup di localStorage SATU peramban di SATU
+     perangkat. Buka dari HP, dari peramban lain, atau sesudah data situs
+     dibersihkan, dan yang muncul adalah bawaan lagi.
+
+     Sekarang daftarnya ikut disimpan di users/{uid}/setelan/watchlist.
+     Aturannya: yang di awan MENANG begitu terbaca (ia satu-satunya salinan
+     yang mengikuti orangnya ke mana-mana); kalau awan belum punya apa-apa,
+     salinan lokal yang diunggah — jadi setelan yang sudah ada tidak hilang
+     saat sinkronisasi ini pertama kali menyala. Tamu tanpa akun tetap
+     memakai localStorage seperti dulu. Gagal/offline: lokal tetap dipakai,
+     tidak ada galat yang ditampilkan — watchlist bukan tempat orang
+     membaca pesan sistem. */
+  const { pengguna } = useAuth();
+  const dokWatch = pengguna ? doc(db, 'users', pengguna.uid, 'setelan', 'watchlist') : null;
+  useEffect(() => {
+    if (!dokWatch) return;
+    return onSnapshot(dokWatch, (s) => {
+      const awan = s.data()?.seksi;
+      if (seksiSah(awan)) {
+        setSeksi((lama) => (JSON.stringify(lama) === JSON.stringify(awan) ? lama : awan));
+        try { localStorage.setItem(KUNCI_SEKSI, JSON.stringify(awan)); } catch { /* privat */ }
+      } else if (!s.exists()) {
+        void setDoc(dokWatch, { seksi: bacaSeksi(), _updatedAt: Date.now() }, { merge: true })
+          .catch(() => { /* aturan/offline: lokal tetap dipakai */ });
+      }
+    }, () => { /* aturan/offline: lokal tetap dipakai */ });
+    /* eslint-disable-next-line react-hooks/exhaustive-deps -- dokWatch berganti hanya bersama uid */
+  }, [pengguna?.uid]);
   const [tickers, setTickers] = useState<Record<string, Ticker>>({});
   const [tickMt5, setTickMt5] = useState<Record<string, { bid: number; waktu: number }>>({});
   const [pilihanMt5, setPilihanMt5] = useState<string[]>([]);
@@ -181,12 +216,21 @@ export function WatchChart({ simbol, onPilih, onLebar }: {
     };
     for (const s of pilihanMt5) taruh('MT5:' + s, 'Trade-Fi — MT5');
     for (const s of kolamSimbol) taruh(s);
+    /* Koin Hyperliquid yang tidak ada di Binance (CASHCAT dkk.) — tickers
+       di sini memang sudah ditarik dengan hl=1. */
+    for (const s of Object.keys(tickers)) {
+      if (tickers[s].bursa === 'hyperliquid' && !kolamSimbol.includes(s)) taruh(s, 'Kripto — Hyperliquid');
+    }
     return [...awal, ...tengah].slice(0, 40);
-  }, [ketik, pilihanMt5, kolamSimbol, semuaSimbol]);
+  }, [ketik, pilihanMt5, kolamSimbol, semuaSimbol, tickers]);
 
   function simpanSeksi(d: SeksiWatch[]) {
     setSeksi(d);
     try { localStorage.setItem(KUNCI_SEKSI, JSON.stringify(d)); } catch { /* privat */ }
+    if (dokWatch) {
+      void setDoc(dokWatch, { seksi: d, _updatedAt: Date.now() }, { merge: true })
+        .catch(() => { /* lokal sudah tersimpan; awan menyusul saat online */ });
+    }
   }
 
   /* Harga ditarik HANYA selagi panelnya terbuka. Binance tiap 30 detik
@@ -312,7 +356,12 @@ export function WatchChart({ simbol, onPilih, onLebar }: {
   }
 
   return (
-    <div className="flex shrink-0" style={{ width: lebar + 6 }}>
+    /* marginBottom NEGATIF: memanjangkan kolom ini sampai garis kaki chart.
+       Di bawah baris chart masih ada pegangan tinggi (12 px) dan padding
+       wadah (8 px) — pegangan lebar yang berhenti 20 px di atas garis
+       section terbaca "menggantung" (pemilik, 7 Sep 2026; terukur 20 px
+       persis). Di mode panel tidak ada pegangan tinggi, sisanya 8 px. */
+    <div className="flex shrink-0" style={{ width: lebar + 6, marginBottom: POLOS ? -8 : -20 }}>
       {menuPanel && (
         /* fixed + koordinat kursor: menu di dalam kolom watchlist yang
            bergulir akan terpotong oleh overflow induknya persis saat ia
@@ -462,7 +511,10 @@ export function WatchChart({ simbol, onPilih, onLebar }: {
                          e.preventDefault();
                          setMenuPanel({ simbol: s, x: e.clientX, y: e.clientY });
                        }}
-                       className={cn('group flex cursor-pointer items-center gap-1.5 px-2 py-2 transition-colors hover:bg-zinc-900/70',
+                       /* border-b: garis pembatas antar koin — diminta pemilik
+                          7 Sep 2026; tanpa garis, baris-baris harga terbaca
+                          sebagai satu blok. */
+                       className={cn('group flex cursor-pointer items-center gap-1.5 border-b border-zinc-800/60 px-2 py-2 transition-colors hover:bg-zinc-900/70',
                          s === simbol && 'bg-zinc-900/50',
                          /* Garis penanda tempat jatuh: sisi atas baris ini. */
                          sasar?.seksi === k.id && sasar.idx === i && 'shadow-[inset_0_2px_0_0_rgba(16,185,129,.8)]')}>

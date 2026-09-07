@@ -159,6 +159,17 @@ body {
   border-radius: 4px;
 }
 
+/* Kotak isian, select, textarea: cincin emas 2 px terlalu mencolok untuk
+   sesuatu yang disentuh puluhan kali per sesi — kotak cari simbol dan
+   pilihan timeframe di Chart & Entry menyala kuning tiap kali diklik.
+   Dilaporkan pemilik 7 Sep 2026 ("terlalu norak"). Fokus tetap TERLIHAT,
+   itu tuntutan aksesibilitas, tapi lewat garis 1 px sewarna kerangka;
+   tombol dan tautan tetap memakai cincin emas untuk navigasi keyboard. */
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 1px solid var(--color-zinc-600);
+  outline-offset: 0;
+}
+
 * { scrollbar-width: thin; scrollbar-color: var(--color-zinc-700) transparent; }
 *::-webkit-scrollbar { width: 9px; height: 9px; }
 *::-webkit-scrollbar-track { background: transparent; }
