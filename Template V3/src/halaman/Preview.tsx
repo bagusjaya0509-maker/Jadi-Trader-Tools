@@ -13,9 +13,21 @@ import { useAuth } from '@/lib/auth';
    yang sesungguhnya, bukan brosur tentang bentuk itu.
 
    Jadi berkas ini tidak menggambar apa pun. Ia menyalakan mode preview
-   lalu menyerahkan orangnya ke Dashboard yang asli. Seluruh sisanya —
+   lalu menyerahkan orangnya ke Chart & Entry yang asli. Seluruh sisanya —
    sidebar, perpindahan halaman, tiap panel — adalah aplikasi yang sama
    persis dengan yang dipakai pelanggan.
+
+   ── KENAPA CHART & ENTRY, BUKAN DASHBOARD ────────────────────────────
+   Diminta pemilik 7 Sep 2026, dan alasannya bisa dibaca dari kedua
+   halamannya. Dashboard adalah RINGKASAN atas data yang orangnya belum
+   punya: di mode preview isinya angka contoh, dan halaman pertama yang
+   memperlihatkan untung-rugi karangan tidak menjelaskan alat apa yang
+   sedang ditawarkan. Chart & Entry adalah ALATNYA sendiri — grafik yang
+   hidup, indikator yang bisa dinyalakan, tiket order, replay — dan ia
+   sama berguna bagi orang yang belum punya satu transaksi pun.
+
+   Yang sudah dijelajahi tetap utuh: sidebar-nya sama, Dashboard tinggal
+   satu klik. Yang berubah cuma halaman mana yang dilihat lebih dulu.
 
    Konsekuensinya yang paling berharga: tidak ada halaman kembar yang
    harus ikut diperbarui tiap kali panel aslinya berubah. Halaman tiruan
@@ -35,5 +47,5 @@ export default function Preview() {
   }, [memuat, pengguna]);
 
   if (memuat) return null;
-  return <Navigate to="/dashboard" replace />;
+  return <Navigate to="/chart-entry" replace />;
 }
