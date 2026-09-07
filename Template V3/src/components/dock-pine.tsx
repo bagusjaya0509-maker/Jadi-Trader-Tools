@@ -186,11 +186,19 @@ function KontrolInput({ inp, nilai, atur }: {
     const alfa = s.length === 9 ? s.slice(7)
       : typeof inp.bawaan === 'string' && inp.bawaan.length === 9 ? inp.bawaan.slice(7) : '';
     return (
-      <label className="flex cursor-pointer items-center gap-2 py-0.5 text-[12px] text-zinc-300">
+      /* <div>, BUKAN <label>. Label mengikat SELURUH baris ke isian di
+         dalamnya, jadi klik pada teks judul -- atau ruang kosong di kanannya
+         -- ikut membuka pemilih warna, dan pemilih yang muncul tanpa
+         disengaja terbaca sebagai panel yang rusak. Dilaporkan pemilik 7 Sep
+         2026: "mousenya harus pas di warna dulu baru bisa ubah warna".
+         Sekarang cuma petak warnanya yang membuka; judulnya tetap dibaca
+         pembaca layar lewat aria-label. */
+      <div className="flex items-center gap-2 py-0.5 text-[12px] text-zinc-300">
         <input type="color" value={dasar} onChange={(e) => atur(e.target.value + alfa)}
+               aria-label={inp.judul}
                className="h-5 w-8 shrink-0 cursor-pointer rounded border border-zinc-700 bg-transparent p-0" />
         <span className="truncate" title={inp.judul}>{inp.judul}</span>
-      </label>
+      </div>
     );
   }
   if (inp.jenis === 'string' && inp.pilihan?.length) {
