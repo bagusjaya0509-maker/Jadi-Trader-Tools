@@ -4,7 +4,7 @@ import { Panel, PanelHead, KartuKpi, TabelBungkus, Tabel, Th, Td, Tr } from '@/c
 import { cn, tanggalPendek } from '@/lib/utils';
 import {
   referralAdmin, putuskanPencairan, simpanSetelanReferral, rupiah, dolar, namaPaketRef,
-  type DataReferralAdmin, type SetelanReferral,
+  ringkasSetelan, type DataReferralAdmin, type SetelanReferral,
 } from '@/lib/referral';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -26,6 +26,10 @@ export function PanelReferralPemilik() {
   const [galat, setGalat] = useState('');
   const [memuat, setMemuat] = useState(true);
   const [setelan, setSetelan] = useState<SetelanReferral | null>(null);
+  /* Nilai yang BENAR-BENAR tersimpan saat panel ini terakhir membaca
+     server. Dibandingkan lagi sebelum menyimpan — lihat catatan di
+     simpan(). */
+  const [setelanAwal, setSetelanAwal] = useState<SetelanReferral | null>(null);
   const [sibukSetelan, setSibukSetelan] = useState(false);
   const [kabarSetelan, setKabarSetelan] = useState('');
   const [catatan, setCatatan] = useState<Record<string, string>>({});
@@ -35,18 +39,42 @@ export function PanelReferralPemilik() {
     setMemuat(true); setGalat('');
     try {
       const d = await referralAdmin();
-      setData(d); setSetelan(d.setelan);
+      setData(d); setSetelan(d.setelan); setSetelanAwal(d.setelan);
     } catch (e) { setGalat(e instanceof Error ? e.message : 'Gagal memuat.'); }
     finally { setMemuat(false); }
   }, []);
   useEffect(() => { void muat(); }, [muat]);
 
+  /* ── FORMULIR BASI TIDAK BOLEH MENIMPA DIAM-DIAM ────────────────────
+     8 Sep 2026 komisi disetel 50%, lalu kembali 20% beberapa menit
+     kemudian tanpa ada yang merasa mengubahnya. Penyebab paling mungkin:
+     panel ini dibuka SEBELUM perubahan, jadi formulirnya masih memuat 20,
+     dan satu klik Simpan mengembalikan angka lama.
+
+     Tidak ada yang salah di mata orang yang menekannya — itulah yang
+     membuatnya berbahaya. Jadi sebelum menulis, nilai di server dibaca
+     ulang dan dibandingkan dengan yang dimuat panel ini. Kalau sudah
+     berbeda, orangnya melihat keduanya dan memilih sendiri. */
   async function simpan() {
     if (!setelan) return;
     setSibukSetelan(true); setKabarSetelan('');
     try {
+      const kini = (await referralAdmin()).setelan;
+      if (setelanAwal && JSON.stringify(kini) !== JSON.stringify(setelanAwal)) {
+        const lanjut = window.confirm(
+          'Setelan di server sudah berubah sejak panel ini dibuka.\n\n'
+          + 'Tersimpan sekarang: ' + ringkasSetelan(kini) + '\n'
+          + 'Yang ada di layar ini: ' + ringkasSetelan(setelan) + '\n\n'
+          + 'Menyimpan akan menimpanya dengan angka di layar. Lanjutkan?');
+        if (!lanjut) {
+          setSetelan(kini); setSetelanAwal(kini);
+          setKabarSetelan('Dibatalkan. Formulir disegarkan ke nilai yang tersimpan.');
+          return;
+        }
+      }
       const s = await simpanSetelanReferral(setelan);
-      setSetelan(s); setKabarSetelan('Setelan tersimpan.');
+      setSetelan(s); setSetelanAwal(s); setKabarSetelan('Setelan tersimpan.');
+      void muat();
     } catch (e) { setKabarSetelan(e instanceof Error ? e.message : 'Gagal menyimpan.'); }
     finally { setSibukSetelan(false); }
   }
@@ -159,6 +187,25 @@ export function PanelReferralPemilik() {
             </button>
           </div>
         </div>
+        {/* Riwayat singkat, tepat di bawah formulirnya. Setelan yang
+            menentukan berapa uang keluar pantas punya jejak yang bisa
+            dilihat tanpa membuka log server. */}
+        {!!data.jejakSetelan?.length && (
+          <div className="mt-3 border-t border-zinc-800/80 pt-3">
+            <div className="mb-1.5 text-[11px] uppercase tracking-wider text-zinc-500">Perubahan terakhir</div>
+            <ul className="space-y-1">
+              {data.jejakSetelan.slice(0, 4).map((j) => (
+                <li key={j.waktu} className="flex flex-wrap items-baseline gap-x-2 text-[11.5px] text-zinc-500">
+                  <span className="angka text-zinc-400">{tanggalPendek(j.waktu)}</span>
+                  <span>{ringkasSetelan(j.sebelum)}</span>
+                  <span className="text-zinc-600">→</span>
+                  <span className="text-zinc-300">{ringkasSetelan(j.sesudah)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         <div className="mt-3 flex items-center gap-3">
           <button onClick={() => void simpan()} disabled={sibukSetelan}
             className="flex cursor-pointer items-center gap-1.5 rounded-md bg-zinc-100 px-3.5 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:opacity-50">

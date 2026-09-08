@@ -111,8 +111,13 @@ export async function ajukanPencairan(b: { nama: string; bank: string; rekening:
 export interface PencairanAdmin extends Pencairan { uid: string; email: string; komisiIds: string[] }
 export interface KomisiAdmin extends Komisi { perujuk: string; perujukEmail: string; dariEmail: string; kurs: number; permintaanId: string }
 export interface PerujukTeratas { uid: string; kode: string; email: string; nama: string; rujukan: number; komisiRp: number; membeli: number }
+/** Satu baris = satu kali setelan berubah. Ada karena komisi pernah
+ *  berbalik dari 50% ke 20% tanpa jejak apa pun (8 Sep 2026). */
+export interface JejakSetelan { waktu: number; sebelum: SetelanReferral; sesudah: SetelanReferral }
+
 export interface DataReferralAdmin {
   setelan: SetelanReferral;
+  jejakSetelan?: JejakSetelan[];
   ringkas: { perujuk: number; rujukan: number; komisi: number; totalRp: number; siapRp: number; diajukanRp: number; dibayarRp: number; pencairanMenunggu: number };
   pencairan: PencairanAdmin[]; komisi: KomisiAdmin[]; perujukTeratas: PerujukTeratas[];
 }
@@ -146,6 +151,9 @@ export async function simpanSetelanReferral(s: Partial<SetelanReferral>) {
 /* ── Pembantu tampilan ───────────────────────────────────────────────── */
 export const rupiah = (n: number) => 'Rp ' + Math.round(Number(n) || 0).toLocaleString('id-ID');
 export const dolar = (n: number) => '$' + (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+export const ringkasSetelan = (s: SetelanReferral) =>
+  `${s.persen}% · minimal ${rupiah(s.minimalRp)} · ${s.masaBulan} bulan · ${s.aktif ? 'aktif' : 'dijeda'}`;
 
 export const NAMA_PAKET_REF: Record<string, string> = {
   testing: 'Starter 30 hari', premium3: 'Premium 3 bulan', tahunan: 'Tahunan', gratis: 'Akses gratis',
