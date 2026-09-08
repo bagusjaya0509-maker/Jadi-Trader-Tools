@@ -344,8 +344,13 @@ export default function Akses() {
               mulaiDari={9} />
           </h1>
           <p className="max-w-[46ch] text-[15.5px] leading-relaxed text-zinc-400">
-            Akses dibuka bertahap agar setiap pengguna baru mendapat pendampingan.
-            Pilih cara masuk, kirim permintaan, lalu{' '}
+            {/* "Pendampingan" dibuang 8 Sep 2026: pemilik menilai kalimatnya
+                kurang enak didengar, dan memang kata itu menjanjikan sesuatu
+                yang bentuknya tidak jelas. Faktanya tidak berubah, tempat
+                memang dibuka per gelombang; yang berubah cuma cara
+                mengatakannya, dari bahasa loket jadi bahasa orang. */}
+            Masuk dengan Google atau Discord, lalu kirim permintaan. Tempat dibuka
+            per gelombang supaya tiap orang baru sempat dibantu saat memulai, jadi{' '}
             <span className="text-zinc-200">akses dibuka setelah ditinjau</span>.
           </p>
 
