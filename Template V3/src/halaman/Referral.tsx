@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { Panel, PanelHead, KartuKpi, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { useAuth } from '@/lib/auth';
+import { useKuota } from '@/lib/akses';
 import { cn, tanggalPendek } from '@/lib/utils';
 import {
   referralSaya, ajukanPencairan, rupiah, dolar, namaPaketRef,
@@ -70,39 +71,31 @@ async function salin(teks: string): Promise<boolean> {
    menolaknya 8 Sep 2026: yang ia minta bukan galeri pilihan, melainkan
    tombol Bagikan yang pesannya sudah terisi. Ia benar. Orang membuka
    halaman ini untuk membagikan tautan, bukan untuk membaca empat versi
-   kalimat lalu memilih salah satunya; pilihan yang tidak diminta adalah
-   pekerjaan tambahan yang menyamar jadi fitur.
+   kalimat lalu memilih salah satunya.
 
-   `{tautan}` diganti tautan referralnya. Tanpa tanda pisah panjang:
-   sebagian ponsel menampilkannya sebagai kotak di WhatsApp.
+   ── NASKAHNYA TULISAN PEMILIK SENDIRI ────────────────────────────────
+   Dua versi yang saya tulis ditolak. Yang pertama daftar fitur, yang
+   kedua bertolak dari keluhan tapi tetap tidak ia sukai. Versi ini
+   kalimatnya sendiri, disalin apa adanya; yang saya sentuh hanya ejaan
+   (Hallo, konsiten, Iven, kuoata) dan alamat situsnya, yang tertulis
+   jaditradertools.co.id padahal domainnya jaditrader.co.id.
 
-   Komisi TIDAK disebut, dengan sengaja. Yang menerima pesan bukan calon
-   perujuk, dan menyebut angkanya membuat ajakannya terbaca seperti orang
-   yang sedang dibayar untuk mengirimnya.
+   ── DUA ANGKA DIAMBIL HIDUP, BUKAN DIKETIK ───────────────────────────
+   Potongan harga dihitung dari harga Starter yang berlaku saat itu, dan
+   sisa kuotanya dari penghitung yang sama dengan halaman /akses. Angka
+   promo yang diketik tangan akan tetap berkata "tinggal 91 lagi" di hari
+   kuotanya sudah habis, dan janji yang basi lebih merugikan daripada
+   tidak menyebut angka sama sekali.
 
-   ── KENAPA MULAI DARI KELUHAN, BUKAN DARI FITUR ─────────────────────
-   Versi pertama berbunyi "Saya pakai Jadi Trader Tools untuk chart,
-   screener, dan jurnal trading dalam satu halaman", dan pemilik menilainya
-   jelek 8 Sep 2026. Ia benar: itu daftar isi, dan setiap alat trading
-   menuliskan daftar yang mirip. Tidak ada satu pun kata di dalamnya yang
-   membuat pembacanya merasa sedang dibicarakan.
-
-   Sekarang kalimat pertamanya menyebut keadaan yang dikenali orangnya
-   sendiri, baru mesinnya, baru langkah termurah. Ditulis dalam sudut
-   pandang PEMBACA ("catatan tradingmu"), bukan pengirimnya: naskah yang
-   berkata "dulu saya begini" menaruh riwayat karangan di mulut orang yang
-   membagikannya, dan ia belum tentu pernah mengalaminya.
-
-   Pratinjau 24 jam ditaruh di akhir karena itu langkah yang paling mudah
-   disetujui: tidak ada yang diminta, tidak ada yang dipasang. */
-const PESAN_AJAKAN =
-  'Kalau catatan tradingmu tidak pernah rapi, susah tahu kebiasaan mana yang sebenarnya bikin akun bocor. '
-  + 'Di sini jurnalnya terisi sendiri dari MetaTrader 5 dan Binance, lengkap sampai pola emosinya, '
-  + 'dan chart replay-nya bisa dipakai latihan di pergerakan lama. '
-  + 'Ada pratinjau 24 jam kalau mau lihat isinya dulu tanpa daftar: {tautan}';
+   Kalimat urgensinya HILANG SENDIRI kalau kuotanya habis atau
+   pendaftaran ditutup, dan kalimat diskonnya hilang kalau harga
+   coretnya tidak lebih tinggi. Naskah tidak boleh menjanjikan sesuatu
+   yang sudah tidak ada. */
 
 export default function Referral() {
   const { pengguna, memuat: memuatAuth } = useAuth();
+  /* Rute kuota TANPA login — sama yang dipakai halaman /akses. */
+  const { kuota } = useKuota();
   const [data, setData] = useState<DataReferral | null>(null);
   const [galat, setGalat] = useState('');
   const [memuat, setMemuat] = useState(true);
@@ -140,7 +133,22 @@ export default function Referral() {
     if (await salin(data.tautan)) { setDisalin(true); setTimeout(() => setDisalin(false), 2200); }
   }
 
-  const pesanAjakan = () => PESAN_AJAKAN.replace('{tautan}', data?.tautan ?? '');
+  const pesanAjakan = () => {
+    const bagian = [
+      'Halo traders, saya menggunakan Jadi Trader Tools untuk membantu saya disiplin'
+      + ' dan konsisten profit lewat charting, journaling, dan executing.',
+    ];
+    const coret = Number(kuota.hargaTestingCoret) || 0;
+    const kini = Number(kuota.hargaTesting) || 0;
+    const diskon = coret > kini && coret > 0 ? Math.round((1 - kini / coret) * 100) : 0;
+    bagian.push(diskon > 0
+      ? `Ayo latihan bareng di ${data?.tautan ?? ''} dan dapatkan potongan harga hingga ${diskon}% untuk paket Starter.`
+      : `Ayo latihan bareng di ${data?.tautan ?? ''}.`);
+    if (kuota.bukaPermintaan && !kuota.bayarHabis && kuota.bayarSisa > 0) {
+      bagian.push(`Buruan, kuota promonya tinggal ${kuota.bayarSisa} lagi.`);
+    }
+    return bagian.join(' ');
+  };
 
   /* ── DISALIN SEKALIGUS DIBUKA ────────────────────────────────────────
      wa.me?text= sudah mengisi kolom pesannya sendiri, dan di ponsel itu

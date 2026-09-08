@@ -38,6 +38,13 @@ export interface Kuota {
    *  Maintenance adalah tampilan yang DILIHAT SEMUA ORANG. Pilihan yang
    *  disimpan di localStorage cuma mengubah layar pemiliknya sendiri. */
   tampilanAkses: TampilanAkses;
+  /* Harga paket Starter dalam dolar, sudah lama ikut di rute publik ini
+     tapi belum pernah diakui tipenya. Dipakai halaman referral untuk
+     menghitung sendiri berapa persen potongannya, supaya angka di pesan
+     ajakan tidak jadi bohong begitu pemilik mengubah harga. Opsional:
+     server lama boleh tidak mengirimnya. */
+  hargaTesting?: number;
+  hargaTestingCoret?: number;
 }
 
 /* Ditulis sekali di sini, bukan diulang sebagai untai di lima tempat.
