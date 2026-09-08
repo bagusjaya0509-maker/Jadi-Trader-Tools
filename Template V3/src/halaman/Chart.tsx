@@ -3976,7 +3976,11 @@ ${pnlSunting !== null
      itu, dan penolakannya tidak boleh mengganggu apa pun). */
   const [simbolHl, setSimbolHl] = useState<string[]>([]);
   useEffect(() => {
-    if (!saranBuka || simbolHl.length) return;
+    /* Juga dimuat di mode real tanpa membuka daftar saran: lencana bursa
+       di panel order butuh tahu apakah koin ini ada di Hyperliquid supaya
+       bisa jadi tombol putar. Tanpa ini tombolnya baru hidup sesudah orang
+       kebetulan mengetik di kotak simbol. */
+    if (!(saranBuka || modeNyata) || simbolHl.length) return;
     let hidup = true;
     /* daftarSimbolHl, BUKAN ambilTickers(true): rute tickers membuang koin
        Hyperliquid yang simbolnya sudah ada di Binance, jadi dari sana koin
@@ -3985,7 +3989,24 @@ ${pnlSunting !== null
     void daftarSimbolHl().then((d) => { if (hidup) setSimbolHl(d.slice().sort()); })
       .catch(() => { /* rute ditolak/offline: saran Binance & MT5 tetap jalan */ });
     return () => { hidup = false; };
-  }, [saranBuka, simbolHl.length]);
+  }, [saranBuka, modeNyata, simbolHl.length]);
+  /* Bursa yang memang punya simbol chart saat ini — bahan tombol putar di
+     lencana bursa panel order. Dari daftar yang SAMA dengan daftar saran,
+     supaya "ada di dua bursa" berarti hal yang sama di kedua tempat.
+     Pasar yang sedang melayani chart ikut dihitung: daftar simbolnya bisa
+     belum tiba sementara lilinnya sudah jalan, dan tombol yang berkedip
+     hilang sedetik-dua saat halaman dibuka cuma membingungkan. */
+  const bursaTersediaSimbol = useMemo<('binance' | 'hyperliquid')[]>(() => {
+    if (simbol.startsWith('MT5:')) return [];
+    const d: ('binance' | 'hyperliquid')[] = [];
+    if (simbolAktif.includes(simbol)) d.push('binance');
+    if (simbolHl.includes(simbol)) d.push('hyperliquid');
+    const p = bacaPasar(simbol);
+    if (p && p !== 'hyperliquid' && !d.includes('binance')) d.unshift('binance');
+    if (p === 'hyperliquid' && !d.includes('hyperliquid')) d.push('hyperliquid');
+    return d;
+  }, [simbol, simbolAktif, simbolHl, kunciChart]);
+
   const saranSimbol = useMemo(() => {
     const q = ketik.trim().replace(/^MT5:/i, '').toLowerCase();
     const semua = [
@@ -5328,6 +5349,17 @@ ${pnlSunting !== null
                             <div ref={pojokRef}>
                             <PojokOrder
                               simbol={simbol}
+                              bursaTersedia={bursaTersediaSimbol}
+                              onGantiBursa={(b) => {
+                                /* Jalur yang sama dengan memilih simbol yang
+                                   sama dari daftar saran dengan bursa lain
+                                   (pilihSimbol): catat pilihannya, lalu paksa
+                                   lilin ditarik ulang — setSimbol tidak
+                                   berubah, jadi tidak ada efek yang menyala
+                                   sendiri. */
+                                aturBursaSimbol(simbol, b);
+                                setSegar((n) => n + 1); setKunciChart((n) => n + 1);
+                              }}
                               posisi={aksi.posisi} hargaKini={aksi.hargaKini}
                               draf={draf} rencana={rencana} mode={aksi.mode}
                               jenis={labelJenis}

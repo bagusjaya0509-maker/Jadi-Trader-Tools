@@ -430,6 +430,7 @@ export async function kirimOrderNyata(p: PermintaanNyata): Promise<{ pesan: stri
     localStorage.setItem(KUNCI_PSIM, JSON.stringify(simpanan));
   } catch { /* localStorage penuh/privat — ordernya sendiri sudah terkirim */ }
 
+  umumkanOrderBerubah();
   if (j.pending) {
     /* Tanpa SL/TP tidak ada yang perlu dipasang saat entry-nya terisi. */
     if (!tanpaSlTp) mulaiPantau({ simbol: p.simbol, arah: p.arah, qty: qtyStr, sl: slStr, tp1: tp1Kirim, qty1, tp2: tp2Kirim, qty2: qty2Kirim });
@@ -447,6 +448,23 @@ export async function kirimOrderNyata(p: PermintaanNyata): Promise<{ pesan: stri
 /* ── Pemantau fill untuk entry LIMIT/STOP ────────────────────────────────
    Modul-level: bertahan selama tab hidup, berapa pun komponen yang
    bongkar-pasang. Berhenti sendiri setelah SL/TP terpasang atau 24 jam. */
+/* ── BERI TAHU LAYAR SEKARANG, JANGAN TUNGGU PUTARAN POLLING ────────────
+   usePosisiBinance (lib/admin.ts) menarik /api/positions + /api/open-orders
+   tiap 30 detik. Tanpa dorongan ini, garis SL/TP sungguhan di chart dan
+   baris di panel Posisi Terbuka baru muncul sampai setengah menit sesudah
+   order berangkat — "SL/TP-nya kadang delay" yang dilaporkan pemilik
+   8 Sep 2026. Servernya sendiri sudah memasang SL dan TP berbarengan
+   (Promise.allSettled); yang terlambat cuma layarnya.
+
+   Yang dikirim cuma tanda tanpa muatan; yang mendengar memutuskan sendiri
+   kapan dan berapa kali menarik ulang. Nama peristiwanya ditulis literal di
+   admin.ts juga, sengaja — mengimpor dari sini akan menarik seluruh modul
+   order ke jalur muat panel yang tidak pernah mengirim order. */
+const PERISTIWA_ORDER_NYATA = 'jt:order-nyata-berubah';
+function umumkanOrderBerubah() {
+  try { window.dispatchEvent(new CustomEvent(PERISTIWA_ORDER_NYATA)); } catch { /* bukan peramban */ }
+}
+
 const pantauan = new Map<string, ReturnType<typeof setInterval>>();
 
 function mulaiPantau(d: { simbol: string; arah: 'BUY' | 'SELL'; qty: string; sl: string; tp1: string; qty1: string; tp2?: string; qty2?: string }) {
@@ -475,6 +493,9 @@ function mulaiPantau(d: { simbol: string; arah: 'BUY' | 'SELL'; qty: string; sl:
         }),
       });
       clearInterval(jam); pantauan.delete(kunci);
+      /* SL/TP baru saja terpasang di bursa: garisnya harus muncul sekarang,
+         bukan pada putaran 30 detik berikutnya. */
+      umumkanOrderBerubah();
     } catch { /* coba lagi putaran berikutnya */ }
   }, 10_000);
   pantauan.set(kunci, jam);
@@ -523,6 +544,7 @@ export async function ubahSlTpNyata(p: UbahSlTp): Promise<void> {
     const rinci = typeof j?.error === 'object' ? (j.error.msg ?? JSON.stringify(j.error)) : j?.error;
     throw new Error(rinci ? String(rinci) : `Backend menjawab ${r.status}`);
   }
+  umumkanOrderBerubah();
 }
 
 /** Batalkan pending order kripto yang belum ke-fill. */
@@ -595,6 +617,7 @@ export async function batalPendingNyata(p: {
   });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(typeof j?.error === 'object' ? (j.error.msg ?? JSON.stringify(j.error)) : (j?.error ?? `Backend menjawab ${r.status}`));
+  umumkanOrderBerubah();
 }
 
 /** Tutup posisi kripto di harga pasar. SL/TP yang masih menggantung ikut

@@ -591,6 +591,23 @@ export function usePosisiBinance(): {
     return () => { hidup = false; clearInterval(jam); };
   }, [token, pemicu]);
 
+  /* ── DENGARKAN ORDER YANG BARU BERANGKAT ────────────────────────────
+     order-nyata.ts mengumumkan 'jt:order-nyata-berubah' sesudah order
+     terkirim, SL/TP terpasang, diubah, atau dibatalkan. Ditarik DUA kali:
+     segera, dan 2,5 detik kemudian — Binance kadang belum mencantumkan
+     algo order (SL/TP) di /openOrders pada permintaan yang datang di detik
+     yang sama dengan pemasangannya. Dua tarikan tambahan per order adalah
+     harga yang murah dibanding garis yang terlambat 30 detik. */
+  useEffect(() => {
+    let t: ReturnType<typeof setTimeout> | null = null;
+    const dengar = () => {
+      setPemicu((n) => n + 1);
+      if (t) clearTimeout(t);
+      t = setTimeout(() => { t = null; setPemicu((n) => n + 1); }, 2500);
+    };
+    window.addEventListener('jt:order-nyata-berubah', dengar);
+    return () => { window.removeEventListener('jt:order-nyata-berubah', dengar); if (t) clearTimeout(t); };
+  }, []);
   return { data, order, aktif, memeriksa, segarkan: () => setPemicu((n) => n + 1) };
 }
 
