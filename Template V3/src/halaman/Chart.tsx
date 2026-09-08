@@ -1394,7 +1394,7 @@ export default function ChartBacktest() {
     sidikBroker.current = '';
   }
 
-  function bukaSunting(o: OrderSunting) {
+  function bukaSunting(o: OrderSunting, opsi?: { gulir?: boolean }) {
     setSimbol(rapikanSimbol(o.simbolChart));
     /* ── NAIK KE CHART, JANGAN SURUH MENGGULIR SENDIRI ──────────────────
        Tabel Posisi Terbuka duduk di BAWAH chart, dan mengklik satu barisnya
@@ -1406,8 +1406,22 @@ export default function ChartBacktest() {
        block:'start' menaruh kepala panel chart tepat di bawah header yang
        menempel; `scroll-mt` di wadahnya yang mengurus jaraknya. Halus, bukan
        melompat: lompatan seketika menghilangkan hubungan sebab-akibat antara
-       baris yang ditekan dan grafik yang muncul. */
-    areaChart.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+       baris yang ditekan dan grafik yang muncul.
+
+       ── TAPI HANYA KALAU HASILNYA MEMANG DI ATAS ──────────────────────
+       `gulir: false` dipakai penutupan posisi dari tabel (pemilik, 8 Sep
+       2026). Bedanya niat, bukan jarak: mengklik BARIS berarti "tunjukkan
+       yang ini di grafik", sedangkan menekan Tutup berarti "selesaikan yang
+       ini" — dan hasilnya muncul di baris itu sendiri, yang menghilang dari
+       tabel. Menggulir ke chart di situ justru melempar orangnya dari
+       tempat ia sedang bekerja, tepat di detik ia perlu memastikan
+       posisinya benar-benar tertutup.
+
+       Dijaga di sini, bukan di pemanggilnya, supaya seluruh urusan "kapan
+       layar bergerak" tetap terbaca di satu tempat. */
+    if (opsi?.gulir !== false) {
+      areaChart.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
     /* PINDAH KE MODE REAL, otomatis.
        ──────────────────────────────────────────────────────────────────
        Yang diklik adalah posisi SUNGGUHAN di broker. Membukanya sementara
@@ -1839,7 +1853,9 @@ export default function ChartBacktest() {
   }
 
   function tutupDariTabel(o: OrderSunting, porsi = 1) {
-    bukaSunting(o);
+    /* Tanpa gulir: aksinya sudah terjadi di panel Posisi Terbuka.
+       `bukaSunting` tetap dipanggil karena akhiriOrder membaca `sunting`. */
+    bukaSunting(o, { gulir: false });
     /* Satu putaran render supaya `sunting` sudah terisi saat akhiriOrder
        membacanya. Tanpa jeda ini ia membaca state lama dan menutup order
        yang salah — atau tidak menutup apa pun. */
