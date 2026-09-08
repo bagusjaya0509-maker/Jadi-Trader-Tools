@@ -6689,7 +6689,14 @@ ${pnlSunting !== null
               <Panel className="mt-px rounded-none bg-transparent px-5 py-6 text-center text-[12.5px] text-zinc-500">{hasil.catatan}</Panel>
             ) : (
               <>
-                <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+                {/* my-4, bukan mt-4: kartunya punya 16 px di atas tapi tidak
+                    ada apa pun di bawah, sementara panel Daftar Trade
+                    menyusul dengan mt-px. Hasilnya kartu paling bawah
+                    menempel ke garis pemisah — dilaporkan pemilik 8 Sep
+                    2026. Jarak atas dan bawah kini sama, jadi barisan KPI
+                    berdiri sebagai satu kelompok, bukan tergencet ke tabel
+                    di bawahnya. */}
+                <div className="my-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
                   <KartuKpi label="Total Trade" nilai={String(hasil.jumlah)}
                             catatan={`${hasil.menang} menang · ${hasil.kalah} kalah`} />
                   <KartuKpi label="Winrate" nilai={persen(hasil.winrate)} catatan="dari transaksi selesai" />
