@@ -752,6 +752,62 @@ export default function ChartBacktest() {
      `hidden`, bukan unmount): dialah yang menghitung P/L itu, dan angka yang
      berhenti bergerak begitu tabelnya ditutup adalah angka yang menipu. */
   const [posisiSembunyi, setPosisiSembunyi] = useState(true);
+
+  /* ── LEBAR KEDUA PANEL POSISI BISA DISERET ──────────────────────────
+     Diminta pemilik 8 Sep 2026. Dulu keduanya dipatok 50:50 lewat
+     `lg:grid-cols-2`, dan itu keliru untuk isi yang tidak pernah sama
+     banyak: tabel kripto kerap memuat sepuluh baris sementara Trade-Fi
+     cuma dua, atau sebaliknya. Yang tahu perbandingannya cuma orang yang
+     sedang melihatnya.
+
+     Disimpan per peramban, bukan di server: ini preferensi tampilan
+     perangkat ini, dan menyimpannya di akun berarti satu tulisan jaringan
+     tiap kali pemisahnya digeser.
+
+     Dijepit 20-80%. Di bawah itu tabelnya berhenti jadi tabel — kolom
+     Entry, Gerak, dan Target TP mulai menindih, dan yang tersisa kotak
+     berisi angka terpotong. */
+  const KUNCI_LEBAR_POSISI = 'jt.lebarPosisi';
+  const [lebarPosisi, setLebarPosisi] = useState<number>(() => {
+    try {
+      const v = Number(localStorage.getItem(KUNCI_LEBAR_POSISI));
+      return v >= 20 && v <= 80 ? v : 50;
+    } catch { return 50; }
+  });
+  /* Cermin ref: nilai terakhir dibutuhkan saat pointer DILEPAS, dan
+     penangan lepas itu ditutup di atas nilai state saat seretan dimulai —
+     bukan yang terbaru. */
+  const lebarPosisiRef = useRef(lebarPosisi);
+  const simpanLebarPosisi = (v: number) => {
+    lebarPosisiRef.current = v;
+    setLebarPosisi(v);
+  };
+  function seretPemisahPosisi(e: React.PointerEvent<HTMLDivElement>) {
+    if (e.button !== 0) return;
+    const wadah = gridPosisiRef.current;
+    if (!wadah) return;
+    e.preventDefault();
+    const el = e.currentTarget;
+    el.setPointerCapture(e.pointerId);
+    const gerak = (g: PointerEvent) => {
+      const r = wadah.getBoundingClientRect();
+      if (r.width <= 0) return;
+      const persen = ((g.clientX - r.left) / r.width) * 100;
+      simpanLebarPosisi(Math.min(80, Math.max(20, persen)));
+    };
+    const lepas = () => {
+      el.removeEventListener('pointermove', gerak);
+      el.removeEventListener('pointerup', lepas);
+      el.removeEventListener('pointercancel', lepas);
+      /* Ditulis SEKALI di sini, bukan tiap piksel. Seretan sepanjang layar
+         memicu ratusan gerakan, dan localStorage menulis ke disk. */
+      try { localStorage.setItem(KUNCI_LEBAR_POSISI, String(Math.round(lebarPosisiRef.current))); }
+      catch { /* mode privat — lebarnya cukup hidup di halaman ini */ }
+    };
+    el.addEventListener('pointermove', gerak);
+    el.addEventListener('pointerup', lepas);
+    el.addEventListener('pointercancel', lepas);
+  }
   /* P/L berjalan gabungan per sumber, dilaporkan tabelnya lewat `onTotal`.
      null = belum ada angka (baris tanpa P/L, atau belum ada posisi). */
   const [ringkasPosisi, setRingkasPosisi] = useState<{
@@ -6831,12 +6887,51 @@ ${pnlSunting !== null
                gap-px, bukan gap-4: celah ANTAR kartu harus sama dengan celah
                ke tepi. Celah luar 1 px dengan celah tengah 16 px membuat
                kedua kartu terbaca sebagai dua benda terpisah yang kebetulan
-               berdekatan, bukan sebagai satu bidang yang terbagi. */
-            <div className={cn('grid grid-cols-1 lg:grid-cols-2',
+               berdekatan, bukan sebagai satu bidang yang terbagi.
+
+               Lebarnya lewat variabel CSS, bukan style langsung di
+               elemennya. Style sebaris tidak bisa dibatasi media query,
+               sedangkan pembagian dua kolom ini HANYA berlaku dari lg ke
+               atas: di ponsel keduanya ditumpuk dan pemisahnya tidak
+               digambar sama sekali. Variabelnya diisi sebaris, propertinya
+               dipasang di kelas lg.
+
+               Komentar ini digabung ke blok di atas, bukan berdiri sendiri
+               berkurung kurawal: cabang ini harus berisi TEPAT satu
+               ekspresi, dan komentar bergaya JSX di depan elemennya membuat
+               cabang itu berisi dua. */
+            <div className={cn('grid grid-cols-1 lg:[grid-template-columns:var(--kolom-posisi)]',
               POLOS ? 'mt-0 gap-4' : 'mt-px gap-px',
               /* Disembunyikan, BUKAN dilepas — lihat catatan di `posisiSembunyi`. */
-              posisiSembunyi && 'hidden', 'scroll-mt-16')} ref={gridPosisiRef}>
+              posisiSembunyi && 'hidden', 'scroll-mt-16')} ref={gridPosisiRef}
+              /* minmax(0, …fr), bukan …fr telanjang. Bawaan item grid
+                 `min-width: auto` berarti ia tidak boleh menyusut lebih
+                 kecil daripada isinya, dan tabel posisi punya isi yang
+                 lebar. Akibatnya perbandingannya diabaikan diam-diam:
+                 terukur 665 px lawan 604 px padahal setelannya 50:50, dan
+                 seretan ke arah tabel yang lebih penuh tidak menghasilkan
+                 apa pun. minmax(0, …) mencabut lantai itu; tabelnya sendiri
+                 sudah punya guliran mendatar. */
+              style={{ '--kolom-posisi': `minmax(0,${lebarPosisi}fr) 6px minmax(0,${100 - lebarPosisi}fr)` } as React.CSSProperties}>
               <PanelPosisiTerbuka sumber="kripto" onSunting={bukaSunting} onTutup={tutupDariTabel} onUbahSlTp={ubahDariTabel} onBanding={bukaBandingSalin} tanpaBingkai={POLOS} menyatu onTotal={totalKripto} />
+
+              {/* Klik dua kali menyamakan lagi. Seretan yang tidak punya
+                  jalan pulang membuat orang enggan mencobanya — dan yang
+                  paling sering diinginkan sesudah bereksperimen memang
+                  kembali ke 50:50. */}
+              <div
+                onPointerDown={seretPemisahPosisi}
+                onDoubleClick={() => { simpanLebarPosisi(50); try { localStorage.setItem(KUNCI_LEBAR_POSISI, '50'); } catch { /* privat */ } }}
+                role="separator"
+                aria-orientation="vertical"
+                aria-label="Ubah lebar panel posisi"
+                title="Seret untuk mengubah lebar · klik dua kali untuk menyamakan"
+                className="group relative hidden cursor-col-resize touch-none lg:block"
+              >
+                <span aria-hidden className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-zinc-800 transition-colors group-hover:bg-zinc-600" />
+                <span aria-hidden className="pointer-events-none absolute left-1/2 top-1/2 h-8 w-[3px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-zinc-600 opacity-0 transition-opacity group-hover:opacity-100" />
+              </div>
+
               <PanelPosisiTerbuka sumber="forex" onSunting={bukaSunting} onTutup={tutupDariTabel} onUbahSlTp={ubahDariTabel} tanpaBingkai={POLOS} menyatu onTotal={totalForex} />
             </div>
           )}
