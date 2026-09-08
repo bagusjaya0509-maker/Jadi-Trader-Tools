@@ -94,6 +94,41 @@ function Segitiga({ arah }: { arah: 'atas' | 'bawah' }) {
    Koma diterima dan diterjemahkan jadi titik: papan ketik ponsel Indonesia
    memberi koma sebagai pemisah desimal, dan angka yang ditolak diam-diam
    terbaca sebagai kolom yang rusak. */
+/* ── PITA PERINGATAN: DI LUAR PANEL, DAN PERGI SENDIRI ───────────────────
+   Diminta pemilik 8 Sep 2026. Kalimat "SL belum diisi — ketik angkanya,
+   atau seret garisnya di chart" dulu duduk sebagai baris DI DALAM tiket.
+   Dua akibatnya:
+
+     · Tiketnya melar. Satu kalimat sepanjang itu menambah baris penuh,
+       jadi kotak yang tadinya rapi berubah ukuran tiap kali ada yang
+       kurang — persis saat orang sedang mengetik di dalamnya.
+     · Ia menetap. Peringatan yang tidak pernah pergi berhenti dibaca;
+       yang tersisa cuma baris kuning yang selalu ada.
+
+   Sekarang ia mengambang DI BAWAH tiket (`absolute top-full`), jadi
+   ukurannya tidak menyentuh panel sama sekali, dan hilang sendiri
+   sesudah 5 detik.
+
+   Kuncinya `pesan` sendiri, bukan penghitung: kalimat yang BERGANTI
+   (dari "SL belum diisi" jadi "TP belum diisi") harus memulai lima detik
+   yang baru, kalau tidak yang kedua ikut terhapus oleh jam milik yang
+   pertama. */
+function PitaPeringatan({ pesan }: { pesan: string }) {
+  const [tampak, setTampak] = useState(false);
+  useEffect(() => {
+    if (!pesan) { setTampak(false); return; }
+    setTampak(true);
+    const t = setTimeout(() => setTampak(false), 5000);
+    return () => clearTimeout(t);
+  }, [pesan]);
+  if (!pesan || !tampak) return null;
+  return (
+    <div className="pointer-events-none absolute left-0 top-full z-20 mt-1 max-w-[280px] rounded-md border border-amber-500/35 bg-zinc-950/95 px-2.5 py-1.5 text-[10.5px] leading-snug text-amber-300/90 shadow-lg backdrop-blur-sm">
+      {pesan}
+    </div>
+  );
+}
+
 function IsianHarga({ nilai, atur, desimal, label, warna }: {
   nilai: number | undefined;
   atur: (n: number | undefined) => void;
@@ -513,8 +548,11 @@ export function PojokOrder({
          dan ujung kanannya menabrak legend indikator. Dibatasi menyisakan
          5 rem supaya sumbu harga dan legend tetap terbaca; isinya sudah
          `flex-wrap`, jadi yang terjadi cuma turun baris. */
-      <div className={cn('max-w-[calc(100vw-5rem)] rounded-lg border bg-zinc-900/92 px-2.5 py-2 backdrop-blur-sm sm:max-w-none',
+      /* `relative` supaya pita peringatannya bisa digantung di bawah tiket
+         tanpa ikut menghitung tingginya. */
+      <div className={cn('relative max-w-[calc(100vw-5rem)] rounded-lg border bg-zinc-900/92 px-2.5 py-2 backdrop-blur-sm sm:max-w-none',
         nyata ? 'border-red-500/40' : 'border-zinc-700')}>
+        <PitaPeringatan pesan={!arahBenar ? alasanKunci : ''} />
         <div className="mb-1.5 flex items-center gap-2">
           {Lencana}
           {/* BISA DIKLIK UNTUK MEMBALIK ARAH. Dulu ia label mati, dan
@@ -781,14 +819,6 @@ export function PojokOrder({
               className="ml-auto flex cursor-pointer items-center gap-1 rounded border border-sky-500/40 bg-sky-500/10 px-2 py-1 text-[11px] text-sky-300 transition-colors hover:bg-sky-500/20 disabled:cursor-not-allowed disabled:opacity-40">
               <Share2 className="size-3" /> Ke Copy Signal
             </button>
-          )}
-          {/* Sebaris di bawah tombolnya, memakai pola yang sama dengan
-              `kabarSinyal` di bawah: `w-full` membuatnya turun ke barisnya
-              sendiri alih-alih memepet tombol Batal. Cuma muncul kalau
-              tombolnya memang terkunci — tiket yang lengkap tidak perlu
-              diberi tahu apa-apa. */}
-          {!arahBenar && alasanKunci && (
-            <span className="w-full px-1 text-[10.5px] leading-tight text-amber-300/90">{alasanKunci}</span>
           )}
           {/* Alasan gagalnya DITAMPILKAN. Tombol yang diam saat ditekan
               membuat orang menekannya berulang kali sambil menebak apa

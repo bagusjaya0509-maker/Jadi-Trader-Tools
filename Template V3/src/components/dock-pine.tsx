@@ -8,6 +8,14 @@ import { jalankanPine, CONTOH_PINE, SUPERTREND_PINE, type HasilPine, type InputP
 import type { Lilin } from '@/lib/pasar';
 import { susunPermintaanPine, terapkanTambalanPine, fiturHilang } from '@/lib/pine-tambalan';
 
+/* Lebar kolom Pine. Batas bawah 280 px: di bawah itu barisan Pine Script
+   yang panjang terpotong tiap beberapa kata dan editor berhenti berguna.
+   Batas atas 760 px supaya chart tidak pernah tinggal sesobek. */
+const KUNCI_LEBAR = 'jt.pineLebar';
+const LEBAR_BAWAAN = 380;
+const LEBAR_MIN = 280;
+const LEBAR_MAKS = 760;
+
 /* ════════════════════════════════════════════════════════════════════════
    DOCK PINE — editor & setelan indikator di SISI KANAN chart
    ════════════════════════════════════════════════════════════════════════
@@ -250,7 +258,7 @@ export interface KendaliPine {
   hapus: (id: string) => void;
 }
 
-export function DockPine({ buka, tab, aturTab, onTutup, lilin, simbol, tf, hingga, aturHasil, onInfo, onKendali }: {
+export function DockPine({ buka, tab, aturTab, onTutup, lilin, simbol, tf, hingga, aturHasil, onInfo, onKendali, onLebar, rapat = 0 }: {
   buka: boolean;
   tab: 'editor' | 'input';
   aturTab: (t: 'editor' | 'input') => void;
@@ -267,6 +275,12 @@ export function DockPine({ buka, tab, aturTab, onTutup, lilin, simbol, tf, hingg
   onInfo: (i: InfoPine | null) => void;
   /** Daftar skrip + aksi jalankan/nonaktif — bahan menu Indikator. */
   onKendali: (k: KendaliPine) => void;
+  /** Lebar yang sedang dipakai, 0 saat tertutup. Pemanggilnya memerlukannya
+   *  untuk menghitung tepi kanan hamparan di kaki chart. */
+  onLebar?: (n: number) => void;
+  /** Margin bawah negatif, disamakan dengan watchlist supaya garis bawah
+   *  ketiga bilahnya sejajar. */
+  rapat?: number;
 }) {
   const [daftar, setDaftar] = useState<SkripPine[]>(bacaDaftar);
   /* Sesudah daftarnya terbentuk, bukan sebelum: yang ditandai adalah
@@ -511,16 +525,77 @@ export function DockPine({ buka, tab, aturTab, onTutup, lilin, simbol, tf, hingg
     else kelompok.push([inp.grup, [inp]]);
   });
 
+  /* ── LEBAR KOLOM, DISERET SEPERTI WATCHLIST ──────────────────────────
+     Diminta pemilik 8 Sep 2026: "grafiknya jangan membelakangi pine script
+     tapi ada di samping, jadi seperti belah section, dan batasnya bisa
+     dicustom seperti watchlist."
+
+     Sebelumnya panel ini hamparan `absolute` yang menutupi sisi kanan
+     chart. Akibatnya lilin di tepi kanan — yang paling sering dilihat —
+     tertutup persis saat orang membuka editor untuk membaca skrip yang
+     menggambar di lilin itu.
+
+     Sekarang ia kolom ketiga yang berdiri sendiri: chart menyusut, tidak
+     tertimpa. Polanya disalin dari WatchChart supaya ketiga bilahnya
+     berperilaku sama — lebar disimpan per peramban, pemisah 6 px yang
+     diseret, klik dua kali kembali ke bawaan. */
+  const akar = useRef<HTMLDivElement>(null);
+  const [lebar, setLebar] = useState(() => {
+    try {
+      const n = Number(localStorage.getItem(KUNCI_LEBAR));
+      return n >= LEBAR_MIN && n <= LEBAR_MAKS ? n : LEBAR_BAWAAN;
+    } catch { return LEBAR_BAWAAN; }
+  });
+  const lebarRef = useRef(lebar);
+  const jepit = (n: number) => Math.min(LEBAR_MAKS, Math.max(LEBAR_MIN, Math.round(n)));
+
+  /* Lebar 0 saat tertutup: pemanggilnya memakai angka ini untuk menghitung
+     tepi kanan hamparan di kaki chart, dan hamparan itu harus kembali
+     melebar begitu panelnya ditutup. */
+  useEffect(() => { onLebar?.(buka ? lebar + 6 : 0); }, [buka, lebar, onLebar]);
+
+  function mulaiTarik(e: React.PointerEvent<HTMLDivElement>) {
+    if (e.button !== 0) return;
+    const w = akar.current; if (!w) return;
+    e.preventDefault();
+    const el = e.currentTarget;
+    el.setPointerCapture(e.pointerId);
+    const kanan = w.getBoundingClientRect().right;
+    const gerak = (g: PointerEvent) => {
+      const n = jepit(kanan - g.clientX - 6);
+      lebarRef.current = n; setLebar(n);
+    };
+    const lepas = () => {
+      el.removeEventListener('pointermove', gerak);
+      el.removeEventListener('pointerup', lepas);
+      el.removeEventListener('pointercancel', lepas);
+      try { localStorage.setItem(KUNCI_LEBAR, String(lebarRef.current)); } catch { /* privat */ }
+    };
+    el.addEventListener('pointermove', gerak);
+    el.addEventListener('pointerup', lepas);
+    el.addEventListener('pointercancel', lepas);
+  }
+
   return (
-    <div className={cn(
-      /* border-y, bukan cuma border-l. Dilaporkan pemilik 8 Sep 2026:
-         kakinya tidak punya garis sehingga panelnya terlihat melayang, dan
-         kepalanya naik tanpa batas yang jelas. Satu sisi bergaris di
-         tengah bidang gelap memang tidak membentuk apa pun -- yang
-         membuat sesuatu terbaca sebagai panel adalah tepinya yang
-         tertutup. */
-      'absolute inset-y-0 right-0 z-30 flex w-[380px] max-w-[92%] flex-col border-y border-l border-zinc-800 bg-zinc-950/[.97] backdrop-blur transition-transform duration-300',
-      buka ? 'translate-x-0' : 'pointer-events-none translate-x-full')}>
+    <div ref={akar} className={cn(
+      'flex shrink-0 overflow-hidden',
+      !buka && 'pointer-events-none')}
+      /* Kakinya dirapatkan dengan angka yang sama seperti watchlist, jadi
+         garis bawah ketiga bilahnya sejajar. Diminta pemilik: "garis bawah
+         pine script disejajarkan saja dengan garis watchlist." */
+      style={{ width: buka ? lebar + 6 : 0, marginBottom: rapat }}>
+
+      {/* Pemisah, di KIRI panel: yang diseret adalah batas antara chart dan
+          panel ini, dan pegangan yang duduk di sisi yang salah membuat
+          orang menarik tepi yang bukan miliknya. */}
+      <div onPointerDown={mulaiTarik}
+           onDoubleClick={() => { setLebar(LEBAR_BAWAAN); lebarRef.current = LEBAR_BAWAAN;
+             try { localStorage.setItem(KUNCI_LEBAR, String(LEBAR_BAWAAN)); } catch { /* privat */ } }}
+           role="separator" aria-orientation="vertical" aria-label="Ubah lebar panel Pine"
+           title="Seret untuk mengubah lebar · klik dua kali untuk kembali ke bawaan"
+           className="group relative w-1.5 shrink-0 cursor-ew-resize touch-none bg-zinc-800/60 transition-colors hover:bg-zinc-600" />
+
+      <div className="flex min-w-0 flex-1 flex-col border-y border-l border-zinc-800 bg-zinc-950">
       {/* ── Kepala: tab + tutup ── */}
       <div className="flex items-center gap-1 border-b border-zinc-800 px-3 py-2">
         <span className="mr-1 text-[12.5px] font-medium text-zinc-200">Pine Script</span>
@@ -756,6 +831,7 @@ export function DockPine({ buka, tab, aturTab, onTutup, lilin, simbol, tf, hingg
           )}
         </div>
       )}
+      </div>
     </div>
   );
 }

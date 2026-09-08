@@ -3186,8 +3186,18 @@ export function ChartLilin({
              className={cn('angka pointer-events-none absolute left-3 z-10 pr-1.5 text-right text-[10.5px] font-semibold tabular-nums',
                sorotPos === p.tiket ? 'text-blue-400'
                  : p.arah === 'BUY' ? 'text-emerald-400' : 'text-red-400')}
-             style={{ transform: 'translateY(-100%)', visibility: 'hidden',
-               textShadow: '0 1px 4px rgba(9,9,11,.95), 0 0 2px rgba(9,9,11,.9)' }}>
+             /* TANPA textShadow. Dulu ada sorotan hitam ganda di sini —
+                dibuat supaya teks bertahan di atas badan lilin, dan itu
+                memang bekerja di chart gelap. Di chart putih ia jadi noda
+                gelap yang mengaburkan hurufnya sendiri; pemilik menyebutnya
+                "hijau ada shadow gelap" 8 Sep 2026 dan meminta bayangannya
+                dibuang.
+
+                Yang menggantikan tugasnya: warnanya sendiri. text-emerald-400
+                dan text-red-400 keduanya ikut tema, jadi di latar putih ia
+                sudah hijau/merah pekat — cukup terbaca tanpa dibingkai
+                apa pun. */
+             style={{ transform: 'translateY(-100%)', visibility: 'hidden' }}>
           {/* Arah dan lot saja. Nomor tiketnya dibuang bersama yang di
               label SL/TP — lihat catatannya di efek garis posisi. */}
           {p.arah} {p.lot}

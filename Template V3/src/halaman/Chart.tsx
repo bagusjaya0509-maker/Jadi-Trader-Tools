@@ -951,6 +951,9 @@ export default function ChartBacktest() {
   /* Lebar watchlist naik ke sini HANYA sebagai pemicu ukur-ulang chart —
      kolomnya sendiri tetap diurus WatchChart. */
   const [lebarWatch, setLebarWatch] = useState(0);
+  /* Lebar kolom Pine, 0 saat tertutup. Ikut dihitung di tepi kanan
+     hamparan kaki chart — lihat catatan di sana. */
+  const [lebarPine, setLebarPine] = useState(0);
   const [aksi, setAksi] = useState<AksiOrder | null>(null);
   const [pine, setPine] = useState<HasilPine | null>(null);
   /* ── Menu indikator, dock Pine, watchlist, alat gambar ─────────────
@@ -6311,14 +6314,23 @@ ${pnlSunting !== null
           </div>
           )}
 
-          {/* Dock Pine & watchlist SELALU terpasang (autorun skrip aktif dan
-              harga watchlist hidup di dalamnya); yang berganti hanya
-              geserannya. */}
+          </div>
+
+          {/* ── PINE SEBAGAI KOLOM, BUKAN HAMPARAN ───────────────────────
+              Dulu ia `absolute` di dalam wadah chart, jadi membukanya
+              menutupi lilin di tepi kanan — persis lilin yang sedang
+              dibaca orang yang membuka editornya. Sekarang ia bilah
+              ketiga di antara chart dan watchlist: chart menyusut, tidak
+              tertimpa. Diminta pemilik 8 Sep 2026.
+
+              SELALU terpasang, cuma lebarnya yang jadi nol saat ditutup:
+              autorun skrip aktif hidup di dalamnya, dan melepasnya dari
+              pohon berarti indikatornya berhenti tiap panel ditutup. */}
           <DockPine buka={dockBuka} tab={dockTab} aturTab={setDockTab}
                     onTutup={() => setDockBuka(false)}
+                    onLebar={setLebarPine} rapat={POLOS ? -8 : -20}
                     lilin={lilinGabung} simbol={simbol} tf={tf} hingga={replayIdx ?? undefined}
                     aturHasil={setPine} onInfo={setPineInfo} onKendali={setKendaliPine} />
-          </div>
           {/* Watchlist beserta garis pembatasnya ditiadakan di panel BIASA:
               di lebar seperempat layar ia memakan ruang chart yang justru
               jadi alasan panel itu ada. Tetap hidup di panel UTAMA — dari
@@ -6374,7 +6386,7 @@ ${pnlSunting !== null
               sumbu waktu/harga dan IKUT bergeser saat watchlist ditarik. */}
           <div className={cn('pointer-events-none absolute bottom-0 left-0 z-[25] flex items-center gap-3 px-4 py-2 text-[11.5px] text-zinc-600',
             POLOS && 'hidden')}
-               style={{ right: lebarWatch + 6 + 8 }}>
+               style={{ right: lebarWatch + lebarPine + 6 + 8 }}>
             {/* GERIGI PINDAH KE UJUNG KANAN, berjejer dengan ikon multi —
                 lihat kelompok ikon di bawah. Dulu ia sendirian di pojok kiri,
                 terpisah sejauh lebar chart dari satu-satunya sakelar lain di
