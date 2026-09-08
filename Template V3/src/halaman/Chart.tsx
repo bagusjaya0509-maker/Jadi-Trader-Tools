@@ -1340,6 +1340,18 @@ export default function ChartBacktest() {
 
   function bukaSunting(o: OrderSunting) {
     setSimbol(rapikanSimbol(o.simbolChart));
+    /* ── NAIK KE CHART, JANGAN SURUH MENGGULIR SENDIRI ──────────────────
+       Tabel Posisi Terbuka duduk di BAWAH chart, dan mengklik satu barisnya
+       berarti "tunjukkan yang ini di grafik". Tanpa ini chartnya memang
+       berganti — di layar yang tidak sedang dilihat siapa pun, seribu piksel
+       di atas, dan orangnya harus menggulir sendiri untuk melihat hasil
+       perbuatannya. Diminta pemilik 8 Sep 2026.
+
+       block:'start' menaruh kepala panel chart tepat di bawah header yang
+       menempel; `scroll-mt` di wadahnya yang mengurus jaraknya. Halus, bukan
+       melompat: lompatan seketika menghilangkan hubungan sebab-akibat antara
+       baris yang ditekan dan grafik yang muncul. */
+    areaChart.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     /* PINDAH KE MODE REAL, otomatis.
        ──────────────────────────────────────────────────────────────────
        Yang diklik adalah posisi SUNGGUHAN di broker. Membukanya sementara
@@ -4531,6 +4543,35 @@ ${pnlSunting !== null
                 {gerak >= 0 ? '+' : ''}{gerak.toFixed(2)}%
               </span>
             )}
+            {/* ── BURSA KOIN INI ───────────────────────────────────────
+                Pindahan dari lencana per-baris di watchlist (pemilik, 8 Sep
+                2026). Di sini ia cuma digambar sekali dan menerangkan koin
+                yang sedang dibaca, jadi ia kembali jadi keterangan alih-alih
+                tekstur.
+
+                Dibaca dari `bacaPasar` — pasar yang BENAR-BENAR melayani
+                lilin yang sedang tampil, bukan dari pilihan yang tersimpan.
+                Kalau proxy jatuh balik ke Binance karena koinnya sudah tidak
+                ada di Hyperliquid, yang tertulis di sini ikut jujur.
+
+                Warnanya mengikuti kesepakatan lama: Binance kuning,
+                Hyperliquid hijau. Tidak pernah berbarengan dengan lencana
+                TRADE-FI — yang satu untuk simbol MT5, yang satu untuk
+                kripto. */}
+            {!simbol.startsWith('MT5:') && (() => {
+              const p = bacaPasar(simbol);
+              if (!p) return null;
+              const hl = p === 'hyperliquid';
+              return (
+                <span className={cn('mb-1 rounded px-1.5 py-0.5 text-[10px] font-semibold tracking-wide',
+                  hl ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300')}
+                  title={hl
+                    ? 'Lilin dan order simbol ini lewat Hyperliquid.'
+                    : `Lilin simbol ini dari Binance ${p === 'futures' ? 'Futures' : 'Spot'}; order REAL berangkat ke Binance Futures.`}>
+                  {hl ? 'HYPERLIQUID' : 'BINANCE'}
+                </span>
+              );
+            })()}
             {simbol.startsWith('MT5:') && (() => {
               /* Lencana ini menyebut BROKER, bukan cuma "MT5". Ia duduk tepat
                  di sebelah harga — tempat mata jatuh sebelum menekan Buy —
@@ -4979,7 +5020,7 @@ ${pnlSunting !== null
               menyusut saat pembatas ditarik, jadi lilin di tepi kanan
               tidak pernah tertutup daftar. */}
           <div className="flex">
-          <div ref={areaChart} className="relative min-w-0 grow overflow-hidden"
+          <div ref={areaChart} className="relative min-w-0 grow scroll-mt-16 overflow-hidden"
                onContextMenu={POLOS ? (e) => {
                  /* Alat gambar memakai klik KIRI; klik kanan di chart tidak
                     dipakai apa pun, jadi tidak ada yang direbut di sini. */

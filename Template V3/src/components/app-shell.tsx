@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { NavLink, useLocation, Link, useSearchParams, useNavigate } from 'react-router-dom';
 import {
   LayoutGrid, BarChart3, Briefcase, Users, Plug, CandlestickChart,
   Wallet, TrendingUp, Wrench, CreditCard, LifeBuoy, BookOpen,
-  PanelLeft, Bell, Mail, X, Sparkles, MessageCircle, Send, AtSign,
+  PanelLeft, Bell, Mail, X, Sparkles, MessageCircle, Send, AtSign, MessageSquarePlus, Loader2, Check,
   AlertTriangle, Newspaper, ChevronRight, ChevronDown, Copy, Radar, UserCircle2, Crown,
   Footprints,
   CheckCircle2,
@@ -22,7 +23,7 @@ import { usePenutupLuar } from '@/lib/tutup-luar';
 import { NEWS, PESAN, CHANGELOG } from '@/data/notifikasi';
 import { PanelKabar, GrupKabar, BarisKabar, KosongKabar } from '@/components/panel-kabar';
 import { LogoJT } from '@/components/logo-jt';
-import { usePermintaanLisensi } from '@/lib/admin';
+import { kirimMasukan, usePermintaanLisensi } from '@/lib/admin';
 import { usePengikutCopy } from '@/lib/pengikut-copy';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -486,6 +487,171 @@ function Lonceng() {
         </PanelKabar>
       )}
     </div>
+  );
+}
+
+
+/* ════════════════════════════════════════════════════════════════════════
+   MASUKAN — satu kotak untuk bug, saran, dan error
+   ════════════════════════════════════════════════════════════════════════
+   Diminta pemilik 8 Sep 2026, mengikuti pola situs 21st.dev: satu ikon di
+   bilah atas, satu kotak terpusat berisi judul, ajakan, kotak tulis, dan
+   satu tombol. Isinya mendarat di `POST /api/lapor` dan muncul di
+   Maintenance → Error & Fixing.
+
+   ── KENAPA ADA PEMILIH JENIS, PADAHAL CONTOHNYA CUMA KOTAK TULIS ──────
+   Panel di Maintenance menyaring dan menandai per `jenis`. Tanpa pemilih
+   ini semua masukan masuk sebagai "bug" — termasuk pujian dan usul fitur —
+   dan daftar yang isinya bukan bug tapi bernama bug berhenti dipakai
+   sebagai daftar bug. Tiga pilihan, bawaannya Saran, dan memilih bukan
+   syarat: yang tidak menyentuhnya tetap terkirim.
+   ════════════════════════════════════════════════════════════════════════ */
+const JENIS_MASUKAN = [
+  { id: 'saran' as const, label: 'Saran' },
+  { id: 'bug' as const, label: 'Bug' },
+  { id: 'error' as const, label: 'Error' },
+];
+
+function Masukan() {
+  const [buka, setBuka] = useState(false);
+  const [jenis, setJenis] = useState<'bug' | 'saran' | 'error'>('saran');
+  const [teks, setTeks] = useState('');
+  const [sibuk, setSibuk] = useState(false);
+  const [galat, setGalat] = useState('');
+  const [selesai, setSelesai] = useState(false);
+  const lokasi = useLocation();
+
+  /* Esc menutup. Kotak terpusat yang menutupi layar tanpa jalan keluar
+     lewat papan ketik adalah jebakan kecil bagi yang tidak memakai tetikus. */
+  useEffect(() => {
+    if (!buka) return;
+    const k = (e: KeyboardEvent) => { if (e.key === 'Escape') setBuka(false); };
+    window.addEventListener('keydown', k);
+    return () => window.removeEventListener('keydown', k);
+  }, [buka]);
+
+  function tutup() {
+    setBuka(false);
+    /* Isian TIDAK dikosongkan saat ditutup — orang yang tidak sengaja
+       menekan Esc di tengah kalimat panjang tidak boleh kehilangan
+       kalimatnya. Yang dibersihkan cuma sesudah benar-benar terkirim. */
+    setGalat('');
+    setSelesai(false);
+  }
+
+  async function kirim() {
+    const isi = teks.trim();
+    if (!isi || sibuk) return;
+    setSibuk(true); setGalat('');
+    try {
+      await kirimMasukan({ jenis, pesan: isi, halaman: lokasi.pathname + lokasi.search });
+      setTeks(''); setSelesai(true);
+      /* Ditutup sendiri sesudah tanda terima sempat terbaca. Menutupnya
+         seketika membuat orang tidak yakin masukannya benar-benar masuk. */
+      setTimeout(() => { setBuka(false); setSelesai(false); }, 1800);
+    } catch (e) {
+      setGalat(e instanceof Error ? e.message : 'Gagal mengirim masukan.');
+    } finally { setSibuk(false); }
+  }
+
+  return (
+    <>
+      <button
+        onClick={() => setBuka(true)}
+        aria-label="Kirim masukan"
+        title="Kirim masukan — bug, saran, atau error"
+        className="cursor-pointer text-zinc-400 transition-colors hover:text-zinc-100"
+      >
+        <MessageSquarePlus className="size-[18px]" strokeWidth={1.8} />
+      </button>
+
+      {/* ── LEWAT PORTAL KE <body>, BUKAN DI TEMPAT ──────────────────────
+          Tombolnya duduk di dalam <header> yang memakai `backdrop-blur`,
+          dan backdrop-filter membuat elemen itu jadi containing block bagi
+          seluruh keturunan `position: fixed`-nya. Akibatnya `inset-0` di
+          bawah ini bukan berarti "seluruh layar" melainkan "sebesar
+          header" — terukur di peramban: kotaknya mendarat di top -172 px
+          padahal layarnya 950 px, jadi separuh judulnya terpotong ke atas.
+
+          Dipindah ke <body> supaya `fixed` kembali berarti layar. Ini juga
+          alasan kenapa tidak cukup menambah `top-0` atau margin: yang salah
+          bukan angkanya, melainkan terhadap apa angkanya dihitung. */}
+      {buka && createPortal((
+        <div
+          onClick={tutup}
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-zinc-950/70 p-4 backdrop-blur-sm"
+        >
+          {/* stopPropagation: klik DI DALAM kotak tidak boleh menutupnya —
+              menyeret untuk memilih teks lalu melepas di luar kotak adalah
+              cara paling sering orang kehilangan tulisannya sendiri. */}
+          <div
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Kirim masukan"
+            className="relative w-full max-w-[420px] rounded-2xl border border-zinc-800 bg-zinc-900 p-6 shadow-2xl"
+          >
+            <button onClick={tutup} aria-label="Tutup"
+              className="absolute right-4 top-4 cursor-pointer rounded p-1 text-zinc-500 transition-colors hover:text-zinc-200">
+              <X className="size-4" />
+            </button>
+
+            <h2 className="text-center text-[18px] font-semibold text-zinc-100">Kirim masukan</h2>
+            <p className="mt-1.5 text-center text-[12.5px] leading-relaxed text-zinc-500">
+              Ide, bug, atau apa pun yang bisa membuat Jadi Trader lebih enak dipakai.
+            </p>
+
+            {selesai ? (
+              <div className="mt-6 flex flex-col items-center gap-2 py-4">
+                <div className="flex size-10 items-center justify-center rounded-full bg-emerald-500/15">
+                  <Check className="size-5 text-emerald-400" />
+                </div>
+                <p className="text-[12.5px] text-zinc-300">Terkirim. Terima kasih.</p>
+              </div>
+            ) : (
+              <>
+                <div className="mt-5 flex justify-center gap-1.5">
+                  {JENIS_MASUKAN.map((j) => (
+                    <button key={j.id} onClick={() => setJenis(j.id)}
+                      className={cn('cursor-pointer rounded-full px-3 py-1 text-[11.5px] transition-colors',
+                        jenis === j.id
+                          ? 'bg-zinc-100 font-medium text-zinc-950'
+                          : 'border border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200')}>
+                      {j.label}
+                    </button>
+                  ))}
+                </div>
+
+                <textarea
+                  autoFocus
+                  value={teks}
+                  onChange={(e) => setTeks(e.target.value)}
+                  rows={5}
+                  maxLength={4000}
+                  placeholder="Apa yang ada di pikiranmu?"
+                  className="mt-3 w-full resize-y rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2.5 text-[13px] leading-relaxed text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-600 focus:outline-none"
+                />
+
+                {galat && <p className="mt-2 text-[11.5px] text-red-400">{galat}</p>}
+
+                <button
+                  onClick={() => void kirim()}
+                  disabled={!teks.trim() || sibuk}
+                  className="mt-3 flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-zinc-100 text-[13px] font-semibold text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {sibuk && <Loader2 className="size-4 animate-spin" />}
+                  Kirim
+                </button>
+
+                <p className="mt-2.5 text-center text-[10.5px] leading-relaxed text-zinc-600">
+                  Halaman yang sedang kamu buka ikut tercatat supaya lebih mudah ditelusuri.
+                </p>
+              </>
+            )}
+          </div>
+        </div>
+      ), document.body)}
+    </>
   );
 }
 
@@ -1029,6 +1195,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 jadi yang berpindah cuma satu kendali, bukan dua kendali
                 berbeda untuk hal yang sama. */}
             {ciut && <span className="hidden md:block"><TombolTema ciut /></span>}
+            {/* Kiri ikon pesan, sesuai permintaan pemilik. Urutannya bukan
+                selera: yang paling jarang ditekan duduk paling kiri, dan
+                yang paling sering — profil — tetap di ujung tempat tangan
+                mencarinya. */}
+            <Masukan />
             <Pesan />
             <Lonceng />
             <MenuPengguna />

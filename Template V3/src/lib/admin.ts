@@ -165,6 +165,38 @@ export function useLaporan(): Hasil<Laporan[]> {
     })), []);
 }
 
+/* ── Kirim masukan dari pengguna ──────────────────────────────────────
+   Rutenya SUDAH ada di backend sejak V2 (`POST /api/lapor`) dan panel
+   "Error & Fixing" di Maintenance sudah membacanya lewat useLaporan —
+   yang belum ada cuma jalan bagi pengguna untuk mengisinya. Sampai
+   sekarang laporan hanya bisa masuk lewat orang yang tahu alamat rutenya.
+
+   Bearer OPSIONAL, dan itu disengaja di sisi server: masukan dari orang
+   yang belum masuk tetap diterima, cuma tanpa uid dan surel. Menuntut
+   login lebih dulu berarti membuang justru laporan yang paling perlu
+   didengar — dari orang yang halamannya rusak sebelum ia sempat masuk. */
+export async function kirimMasukan(p: { jenis: 'bug' | 'saran' | 'error'; pesan: string; halaman: string }) {
+  const kepala: Record<string, string> = { 'Content-Type': 'application/json' };
+  try {
+    const u = auth.currentUser;
+    if (u) kepala.Authorization = 'Bearer ' + (await u.getIdToken());
+  } catch { /* tanpa sesi -> masuk sebagai anonim */ }
+  const r = await fetch(`${dasar()}/api/lapor`, {
+    method: 'POST',
+    headers: kepala,
+    body: JSON.stringify({
+      jenis: p.jenis,
+      pesan: p.pesan,
+      halaman: p.halaman,
+      /* Versi build ikut supaya laporan lama tidak dikejar di kode yang
+         sudah berubah. */
+      versi: (import.meta as { env?: Record<string, string> }).env?.VITE_VERSI ?? 'v3',
+    }),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error ?? `Backend menjawab ${r.status}`);
+}
+
 /* ── Lisensi aktif ───────────────────────────────────────────────────── */
 export interface Lisensi { sidik: string; produk: string; catatan: string; tgl: number; }
 

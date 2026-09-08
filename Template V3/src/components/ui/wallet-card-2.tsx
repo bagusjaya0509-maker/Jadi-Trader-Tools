@@ -63,13 +63,18 @@ export interface KartuDompetProps {
   onSegarkan: () => void;
   onAktifkan: () => void;
   onPutuskan: () => void;
+  /** Digambar DI DALAM kartu, di bawah baris ringkasan, dipisah satu garis.
+   *  Dipakai panel-dex untuk menaruh formulir kirim order — pemilik meminta
+   *  8 Sep 2026 supaya keduanya jadi satu panel, bukan dua kotak bertumpuk
+   *  yang masing-masing punya bingkai sendiri. */
+  children?: React.ReactNode;
 }
 
 export function KartuDompet({
   alamat, rantai, diSpot, diPerps, bisaDipakai, nilaiAkun,
   jumlahPosisi, pnlPosisi, jumlahOrder,
   agenSiap, agenAlamat, sisaHari, sibuk, sembunyi, onSembunyi, sempit,
-  onSegarkan, onAktifkan, onPutuskan,
+  onSegarkan, onAktifkan, onPutuskan, children,
 }: KartuDompetProps) {
   /* Disamarkan, BUKAN dikosongkan. Titik-titik selebar angkanya membuat
      tata letak tidak melompat saat mata dinyalakan lagi — dan orang tahu
@@ -236,6 +241,14 @@ export function KartuDompet({
               : 'Tidak ada order yang menunggu'}
           />
         </div>
+
+        {/* Dipisah garis, bukan jarak: yang di bawah ini perbuatan yang
+            berbeda jenis — di atas MEMBACA keadaan akun, di bawah MENGIRIM
+            order. Garis membuat batas itu terlihat tanpa memecah kartunya
+            jadi dua kotak berbingkai. */}
+        {children && (
+          <div className="border-t border-zinc-800 pt-4">{children}</div>
+        )}
       </div>
     </Card>
   );

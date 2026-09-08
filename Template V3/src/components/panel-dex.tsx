@@ -210,6 +210,20 @@ export function PanelDex({ koinChart, sempit }: {
      tapi tetap SEKALI, dengan alasan yang sama seperti di bawah. */
   useEffect(() => {
     if (koinTerisi.current || !koinChart) return;
+    /* ── SIMBOL MT5 BUKAN KOIN HYPERLIQUID ──────────────────────────────
+       Dilaporkan pemilik 8 Sep 2026: membuka chart MT5:XAUUSD membuat kolom
+       koin terisi "MT5:XAUUSD". Pemanggilnya cuma memotong akhiran USDT,
+       dan nama MT5 tidak punya akhiran itu — jadi awalannya ikut masuk utuh.
+
+       Hyperliquid tidak punya pasangan bergaya MT5, jadi isian itu pasti
+       ditolak. Dan ditolak BUKAN keadaan terburuknya: XAU memang ada di
+       Hyperliquid, jadi menebak-nebak dengan mengupas awalannya bisa
+       mengirim order emas ke bursa yang berbeda dari yang sedang dilihat.
+
+       Yang benar tidak mengisi apa-apa: koinnya tetap di nilai sebelumnya,
+       dan orangnya mengetik sendiri apa yang ia maksud. Huruf dan angka
+       saja — nama koin Hyperliquid tidak pernah memuat titik dua. */
+    if (!/^[A-Za-z0-9]{1,12}$/.test(koinChart)) return;
     koinTerisi.current = true;
     setKoin(koinChart.toUpperCase());
     setHargaTeks('');
@@ -387,8 +401,17 @@ export function PanelDex({ koinChart, sempit }: {
           </button>
         </Kartu>
       ) : (
-        <div className={cn('grid gap-4', !sempit && 'lg:grid-cols-[minmax(0,1fr)_320px]')}>
-          <div className="space-y-4">
+        /* ── SATU KOLOM, SATU KARTU ─────────────────────────────────────
+           Dulu grid dua kolom di layar lebar: ringkasan akun di kiri,
+           formulir order di kanan. Diminta pemilik 8 Sep 2026 supaya
+           keduanya jadi satu panel — dan memang di panel sisi chart
+           (~340 px) kolom keduanya tidak pernah muat, jadi yang tampak
+           selama ini cuma dua kotak berbingkai yang bertumpuk.
+
+           Komentar ini blok JS biasa, bukan komentar bergaya JSX berkurung
+           kurawal: cabang ternary harus berisi TEPAT satu ekspresi, dan
+           komentar JSX di depan elemennya membuat cabang itu berisi dua. */
+        <div className="space-y-4">
             {/* ── KARTU DOMPET ────────────────────────────────────────
                 Menggantikan kartu ringkasan lama (alamat + tiga angka +
                 blok aktivasi) dengan templat yang dipilih pemilik 8 Sep
@@ -421,7 +444,92 @@ export function PanelDex({ koinChart, sempit }: {
               onSegarkan={segarkanKlik}
               onAktifkan={aktifkan}
               onPutuskan={putuskan}
-            />
+            >
+              {/* Formulir order hidup DI DALAM kartu dompet. Yang berpindah
+                  cuma tempatnya menggambar; seluruh state dan validasinya
+                  tetap milik berkas ini. */}
+              <h3 className="mb-3 text-[13px] font-semibold text-zinc-200">Kirim order</h3>
+        <div className="space-y-2.5">
+          <div className="grid grid-cols-2 gap-2">
+            <Bidang label="Koin">
+              <input className={cn(KOTAK, 'uppercase')} value={koin}
+                     onChange={(e) => { setKoin(e.target.value); setHargaTeks(''); }} />
+            </Bidang>
+            <Bidang label="Arah">
+              <select className={cn(KOTAK, 'cursor-pointer')} value={arah}
+                      onChange={(e) => setArah(e.target.value as 'BUY' | 'SELL')}>
+                <option value="BUY">BUY / Long</option>
+                <option value="SELL">SELL / Short</option>
+              </select>
+            </Bidang>
+          </div>
+
+          <Bidang label="Jenis">
+            <select className={cn(KOTAK, 'cursor-pointer')} value={jenis}
+                    onChange={(e) => setJenis(e.target.value as 'MARKET' | 'LIMIT')}>
+              <option value="LIMIT">Limit (GTC)</option>
+              <option value="MARKET">Market (IOC menyeberang buku)</option>
+            </select>
+          </Bidang>
+
+          {jenis === 'LIMIT' && (
+            <Bidang label={`Harga limit${pasar > 0 ? ` · pasar ${pasar}` : ''}`}>
+              <input className={cn(KOTAK, 'angka')} inputMode="decimal" value={hargaTeks}
+                     onChange={(e) => setHargaTeks(e.target.value)} />
+            </Bidang>
+          )}
+
+          {/* OPSIONAL, dan kosong berarti TIDAK DIPASANG — bukan nol.
+              Keduanya berangkat sebagai trigger reduce-only sesudah
+              entry-nya terisi, disizing dari fill yang sungguhan. */}
+          <div className="grid grid-cols-2 gap-2">
+            <Bidang label="SL (opsional)">
+              <input className={cn(KOTAK, 'angka')} inputMode="decimal" value={slTeks}
+                     placeholder="—" onChange={(e) => setSlTeks(e.target.value)} />
+            </Bidang>
+            <Bidang label="TP (opsional)">
+              <input className={cn(KOTAK, 'angka')} inputMode="decimal" value={tpTeks}
+                     placeholder="—" onChange={(e) => setTpTeks(e.target.value)} />
+            </Bidang>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <Bidang label="Modal (USD)">
+              <input className={cn(KOTAK, 'angka')} inputMode="decimal" value={modalTeks}
+                     onChange={(e) => setModalTeks(e.target.value)} />
+            </Bidang>
+            <Bidang label="Leverage">
+              <input className={cn(KOTAK, 'angka')} inputMode="numeric" value={levTeks}
+                     onChange={(e) => setLevTeks(e.target.value)} />
+            </Bidang>
+          </div>
+
+          {/* Ditulis sebelum tombol, bukan sesudah dikirim. Nilai posisi
+              adalah angka yang sebenarnya dipertaruhkan, dan ia tidak
+              pernah sama dengan modal yang barusan diketik. */}
+          <div className="rounded-md border border-zinc-800 bg-zinc-900/60 px-3 py-2 text-[11.5px] leading-relaxed text-zinc-400">
+            Nilai posisi <span className="angka text-zinc-200">{uang(nilaiPosisi)}</span>
+            {perkiraanUkuran > 0 && (
+              <> · perkiraan <span className="angka text-zinc-200">{perkiraanUkuran.toPrecision(6)} {koin.toUpperCase()}</span></>
+            )}
+            <br />
+            Ukuran akhir dibulatkan ke aturan Hyperliquid dan bisa sedikit berbeda.
+          </div>
+
+          <button onClick={kirim} disabled={!!sibuk || !agenSiap} className={cn(TOMBOL, 'w-full')}>
+            {sibuk === 'order' ? <Loader2 className="size-3.5 animate-spin" /> : null}
+            {agenSiap ? `Kirim ${arah}` : 'Aktifkan trading dulu'}
+          </button>
+
+          {jenis === 'MARKET' && (
+            <p className="text-[11px] leading-relaxed text-zinc-500">
+              Hyperliquid tidak punya order market. Yang dikirim limit IOC yang
+              menyeberangi buku — sisanya yang tidak terisi seketika dibatalkan, jadi
+              order bisa terisi sebagian.
+            </p>
+          )}
+        </div>
+            </KartuDompet>
 
             {/* Hyperliquid menolak approveAgent untuk alamat yang belum
                 pernah punya akun di sana, dengan pesan yang tidak
@@ -517,90 +625,6 @@ export function PanelDex({ koinChart, sempit }: {
                 </div>
               </Kartu>
             )}
-          </div>
-
-          <Kartu judul="Kirim order">
-            <div className="space-y-2.5">
-              <div className="grid grid-cols-2 gap-2">
-                <Bidang label="Koin">
-                  <input className={cn(KOTAK, 'uppercase')} value={koin}
-                         onChange={(e) => { setKoin(e.target.value); setHargaTeks(''); }} />
-                </Bidang>
-                <Bidang label="Arah">
-                  <select className={cn(KOTAK, 'cursor-pointer')} value={arah}
-                          onChange={(e) => setArah(e.target.value as 'BUY' | 'SELL')}>
-                    <option value="BUY">BUY / Long</option>
-                    <option value="SELL">SELL / Short</option>
-                  </select>
-                </Bidang>
-              </div>
-
-              <Bidang label="Jenis">
-                <select className={cn(KOTAK, 'cursor-pointer')} value={jenis}
-                        onChange={(e) => setJenis(e.target.value as 'MARKET' | 'LIMIT')}>
-                  <option value="LIMIT">Limit (GTC)</option>
-                  <option value="MARKET">Market (IOC menyeberang buku)</option>
-                </select>
-              </Bidang>
-
-              {jenis === 'LIMIT' && (
-                <Bidang label={`Harga limit${pasar > 0 ? ` · pasar ${pasar}` : ''}`}>
-                  <input className={cn(KOTAK, 'angka')} inputMode="decimal" value={hargaTeks}
-                         onChange={(e) => setHargaTeks(e.target.value)} />
-                </Bidang>
-              )}
-
-              {/* OPSIONAL, dan kosong berarti TIDAK DIPASANG — bukan nol.
-                  Keduanya berangkat sebagai trigger reduce-only sesudah
-                  entry-nya terisi, disizing dari fill yang sungguhan. */}
-              <div className="grid grid-cols-2 gap-2">
-                <Bidang label="SL (opsional)">
-                  <input className={cn(KOTAK, 'angka')} inputMode="decimal" value={slTeks}
-                         placeholder="—" onChange={(e) => setSlTeks(e.target.value)} />
-                </Bidang>
-                <Bidang label="TP (opsional)">
-                  <input className={cn(KOTAK, 'angka')} inputMode="decimal" value={tpTeks}
-                         placeholder="—" onChange={(e) => setTpTeks(e.target.value)} />
-                </Bidang>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <Bidang label="Modal (USD)">
-                  <input className={cn(KOTAK, 'angka')} inputMode="decimal" value={modalTeks}
-                         onChange={(e) => setModalTeks(e.target.value)} />
-                </Bidang>
-                <Bidang label="Leverage">
-                  <input className={cn(KOTAK, 'angka')} inputMode="numeric" value={levTeks}
-                         onChange={(e) => setLevTeks(e.target.value)} />
-                </Bidang>
-              </div>
-
-              {/* Ditulis sebelum tombol, bukan sesudah dikirim. Nilai posisi
-                  adalah angka yang sebenarnya dipertaruhkan, dan ia tidak
-                  pernah sama dengan modal yang barusan diketik. */}
-              <div className="rounded-md border border-zinc-800 bg-zinc-900/60 px-3 py-2 text-[11.5px] leading-relaxed text-zinc-400">
-                Nilai posisi <span className="angka text-zinc-200">{uang(nilaiPosisi)}</span>
-                {perkiraanUkuran > 0 && (
-                  <> · perkiraan <span className="angka text-zinc-200">{perkiraanUkuran.toPrecision(6)} {koin.toUpperCase()}</span></>
-                )}
-                <br />
-                Ukuran akhir dibulatkan ke aturan Hyperliquid dan bisa sedikit berbeda.
-              </div>
-
-              <button onClick={kirim} disabled={!!sibuk || !agenSiap} className={cn(TOMBOL, 'w-full')}>
-                {sibuk === 'order' ? <Loader2 className="size-3.5 animate-spin" /> : null}
-                {agenSiap ? `Kirim ${arah}` : 'Aktifkan trading dulu'}
-              </button>
-
-              {jenis === 'MARKET' && (
-                <p className="text-[11px] leading-relaxed text-zinc-500">
-                  Hyperliquid tidak punya order market. Yang dikirim limit IOC yang
-                  menyeberangi buku — sisanya yang tidak terisi seketika dibatalkan, jadi
-                  order bisa terisi sebagian.
-                </p>
-              )}
-            </div>
-          </Kartu>
         </div>
       )}
 
