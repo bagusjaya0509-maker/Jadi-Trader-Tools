@@ -50,6 +50,19 @@ const TOMBOL2 = 'flex cursor-pointer items-center gap-1.5 rounded-md border bord
               + 'px-2.5 py-1 text-[11.5px] text-zinc-300 transition-colors '
               + 'hover:border-zinc-500 hover:text-zinc-100 disabled:opacity-40';
 
+/* ── CATATAN KESELAMATAN DIBACA SEKALI ────────────────────────────────
+   Kalimatnya penting tapi tidak berubah, dan sesuatu yang tidak berubah
+   berhenti dibaca sesudah kali kedua — yang tersisa cuma kotak kuning
+   setinggi enam baris di panel selebar 180 px. Diminta pemilik 8 Sep 2026
+   supaya tampil sekali lalu berhenti.
+
+   Ditandai saat pertama digambar, bukan saat ditutup: kalau menunggu
+   tombol ditutup, orang yang menggulir lewat akan melihatnya lagi selamanya.
+   Isi yang paling perlu diingat — bahwa agent wallet TIDAK BISA menarik
+   dana — tetap tertulis di kartu "Aktifkan trading", yaitu tepat pada saat
+   tanda tangannya diminta. */
+const KUNCI_PERINGATAN = 'jt.dexPeringatanDibaca';
+
 const uang = (n: number) => '$' + n.toLocaleString('id-ID', { maximumFractionDigits: 2, minimumFractionDigits: 2 });
 const pendek = (a: string) => a.slice(0, 6) + '…' + a.slice(-4);
 
@@ -70,6 +83,13 @@ export function PanelDex({ koinChart, sempit }: {
   const [sibuk, setSibuk] = useState<string>('');
   const [galat, setGalat] = useState('');
   const [kabar, setKabar] = useState('');
+  const [tampilPeringatan, setTampilPeringatan] = useState(() => {
+    try { return localStorage.getItem(KUNCI_PERINGATAN) !== '1'; } catch { return true; }
+  });
+  useEffect(() => {
+    if (!tampilPeringatan) return;
+    try { localStorage.setItem(KUNCI_PERINGATAN, '1'); } catch { /* mode privat */ }
+  }, [tampilPeringatan]);
 
   /* Isian tiket. Disimpan sebagai TEKS, bukan angka — isian angka yang
      menyimpan number tidak bisa diketik: "0." berubah jadi 0 di tengah
@@ -307,15 +327,26 @@ export function PanelDex({ koinChart, sempit }: {
 
   return (
     <div className={sempit ? 'flex h-full flex-col gap-3 overflow-y-auto p-3' : ''}>
-      <div className="mb-4 flex items-start gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/[0.06] p-3">
-        <TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-400" strokeWidth={1.8} />
-        <div className="text-[12px] leading-relaxed text-amber-200/90">
-          <b className="font-semibold text-amber-200">Uang sungguhan, langsung ke Hyperliquid.</b>{' '}
-          Order dari halaman ini tidak lewat server Jadi Trader sama sekali — ditandatangani
-          di peramban Anda dan dikirim ke bursanya. Kami tidak pernah meminta seed phrase
-          maupun kunci privat dompet utama, dan tidak punya kotak isian untuknya.
+      {/* Tanpa bingkai dan tanpa latar: yang tersisa cuma teks dengan ikon,
+          jadi ia terbaca sebagai keterangan — bukan galat yang menuntut
+          diperbuat sesuatu. */}
+      {tampilPeringatan && (
+        <div className="mb-3 flex items-start gap-2 text-[11.5px] leading-relaxed text-amber-200/75">
+          <TriangleAlert className="mt-[3px] size-3.5 shrink-0 text-amber-400/80" strokeWidth={1.8} />
+          <p className="min-w-0">
+            <b className="font-semibold text-amber-200">Uang sungguhan, langsung ke Hyperliquid.</b>{' '}
+            Order dari halaman ini tidak lewat server Jadi Trader — ditandatangani di peramban
+            Anda dan dikirim ke bursanya. Kami tidak pernah meminta seed phrase maupun kunci
+            privat dompet utama.
+          </p>
+          <button onClick={() => setTampilPeringatan(false)}
+                  title="Tutup — catatan ini memang hanya tampil sekali"
+                  aria-label="Tutup catatan"
+                  className="-mt-0.5 shrink-0 cursor-pointer rounded p-1 text-amber-200/50 transition-colors hover:text-amber-100">
+            <X className="size-3" />
+          </button>
         </div>
-      </div>
+      )}
 
       {!adaDompet() ? (
         <Kartu>
@@ -340,7 +371,10 @@ export function PanelDex({ koinChart, sempit }: {
           <div className="space-y-4">
             <Kartu>
               <div className="mb-3 flex flex-wrap items-center gap-2">
-                <span className="angka rounded bg-zinc-800 px-2 py-1 text-[11.5px] text-zinc-200">{pendek(alamat)}</span>
+                <span className="angka rounded bg-zinc-800 px-2 py-1 text-[11.5px] text-zinc-200"
+                      title={`${alamat}\n\nAkun dompet ini — terpisah dari Chart & Entry, yang memakai akun milik backend. Posisi di kedua halaman tidak saling terlihat.`}>
+                  {pendek(alamat)}
+                </span>
                 <span className="text-[11px] text-zinc-500">chain {rantai || '—'}</span>
                 {/* ── DUA HALAMAN, DUA AKUN ────────────────────────────────
                     Ditanyakan pemilik 3 Sep 2026: kalau saya trading di sini,
@@ -358,10 +392,16 @@ export function PanelDex({ koinChart, sempit }: {
                     melihat dua halaman menampilkan bursa yang sama akan
                     mengira keduanya melihat uang yang sama, dan mereka akan
                     terus mengiranya sampai ada yang mengatakan sebaliknya. */}
-                <span className="text-[11px] text-zinc-600"
-                      title="Chart & Entry memakai akun milik backend, bukan dompet ini. Posisi di kedua halaman tidak saling terlihat.">
-                  · akun dompet ini, terpisah dari Chart &amp; Entry
-                </span>
+                {/* Di panel sempit kalimat ini memakan tiga baris penuh untuk
+                    sesuatu yang cuma penjelasan. Keterangannya tidak hilang —
+                    ia pindah ke title alamat dompetnya, tempat orang memang
+                    menunjuk waktu bertanya "ini akun yang mana". */}
+                {!sempit && (
+                  <span className="text-[11px] text-zinc-600"
+                        title="Chart & Entry memakai akun milik backend, bukan dompet ini. Posisi di kedua halaman tidak saling terlihat.">
+                    · akun dompet ini, terpisah dari Chart &amp; Entry
+                  </span>
+                )}
                 <button onClick={() => void segarkan(alamat)} className={cn(TOMBOL2, 'ml-auto')}>
                   <RefreshCw className="size-3" /> Segarkan
                 </button>
@@ -382,7 +422,11 @@ export function PanelDex({ koinChart, sempit }: {
                   yang tidak lengkap, dan laporan uang yang terlihat tidak
                   lengkap membuat orang berhenti mempercayai semua angka di
                   sebelahnya juga. */}
-              <div className="grid grid-cols-3 gap-3">
+              {/* Tiga kolom di panel selebar 180 px berarti tiap angka dapat
+                  60 px — "$1.202,86" pecah jadi dua baris dan keterangannya
+                  jadi tiang huruf. Di panel sempit ditumpuk saja; tinggi
+                  bisa digulir, lebar tidak bisa ditambah. */}
+              <div className={cn('grid gap-3', sempit ? 'grid-cols-1' : 'grid-cols-3')}>
                 <Angka label="Bisa dipakai" nilai={keadaan ? uang(keadaan.bisaDipakai) : '—'}
                        ket="USDC perps + spot" />
                 <Angka label="USDC di perps" nilai={keadaan ? uang(keadaan.diPerps) : '—'} />
