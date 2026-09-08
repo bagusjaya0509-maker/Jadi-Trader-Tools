@@ -90,7 +90,18 @@ async function salin(teks: string): Promise<boolean> {
    Kalimat urgensinya HILANG SENDIRI kalau kuotanya habis atau
    pendaftaran ditutup, dan kalimat diskonnya hilang kalau harga
    coretnya tidak lebih tinggi. Naskah tidak boleh menjanjikan sesuatu
-   yang sudah tidak ada. */
+   yang sudah tidak ada.
+
+   ── KENAPA "PROFIT" TIDAK ADA DI SINI ────────────────────────────────
+   Aslinya berbunyi "disiplin dan konsisten profit". Pemilik menyetujui
+   pembuangannya 8 Sep 2026 sesudah alasannya disampaikan: pesan ini
+   dikirim banyak orang sekaligus, jadi ia materi pemasaran dan bukan
+   lagi obrolan pribadi. Halaman /legal situs ini menyatakan sendiri
+   tidak menjanjikan hasil, dan Midtrans sedang meninjau usahanya.
+
+   Yang hilang cuma satu kata; ajakannya tetap utuh karena tenaganya ada
+   di sapaan, penawaran, dan batas kuotanya, bukan di janji hasil.
+   JANGAN dikembalikan tanpa pemilik memintanya. */
 
 export default function Referral() {
   const { pengguna, memuat: memuatAuth } = useAuth();
@@ -136,7 +147,7 @@ export default function Referral() {
   const pesanAjakan = () => {
     const bagian = [
       'Halo traders, saya menggunakan Jadi Trader Tools untuk membantu saya disiplin'
-      + ' dan konsisten profit lewat charting, journaling, dan executing.',
+      + ' dan konsisten lewat charting, journaling, dan executing.',
     ];
     const coret = Number(kuota.hargaTestingCoret) || 0;
     const kini = Number(kuota.hargaTesting) || 0;
