@@ -107,6 +107,52 @@ function Footerdemo() {
      dipakai. Satu tombol dulu — pilihannya menyusul setelah orangnya
      menyatakan memang mau mengirim. */
   const [pilihBuka, setPilihBuka] = React.useState(false);
+  /* ── ALAMAT SUREL YANG SELALU BERBUAT SESUATU ────────────────────────
+     Dilaporkan pemilik 8 Sep 2026: mengklik alamat di kolom "Badan usaha"
+     tidak melakukan apa-apa. Tautannya sendiri benar — `mailto:` memang
+     ada di sana — tapi `mailto:` hanya bekerja kalau mesin itu punya
+     aplikasi surel bawaan yang terdaftar. Di komputer yang surelnya cuma
+     dibuka lewat tab Gmail, mengkliknya memang tidak menghasilkan apa pun,
+     dan yang mengklik tidak punya cara tahu kenapa.
+
+     Jadi kliknya mengerjakan DUA hal sekaligus: `href` tetap mencoba
+     membuka penyusun surat, dan penanganan kliknya menyalin alamatnya ke
+     papan klip lalu mengatakannya. Yang punya aplikasi surel mendapat
+     penyusun surat seperti biasa; yang tidak, tetap mendapat sesuatu yang
+     terlihat dan alamat yang siap ditempel. */
+  const [disalin, setDisalin] = React.useState(false);
+  const salinSurel = () => {
+    /* Dua jalur, karena yang pertama tidak selalu diizinkan. API papan klip
+       modern menolak di konteks tanpa gestur yang ia akui dan di beberapa
+       peramban lama; `execCommand` yang usang justru lolos di sana. Yang
+       dipakai mana pun yang berhasil.
+
+       Tandanya baru dinyalakan kalau penyalinannya BENAR-BENAR berhasil.
+       Mengatakan "disalin" untuk sesuatu yang tidak tersalin membuat orang
+       menempelkan papan klip lamanya ke kolom penerima. */
+    const tandai = () => {
+      setDisalin(true);
+      window.setTimeout(() => setDisalin(false), 2200);
+    };
+    const cadangan = () => {
+      try {
+        const kotak = document.createElement('textarea');
+        kotak.value = BADAN.email;
+        kotak.setAttribute('readonly', '');
+        kotak.style.cssText = 'position:fixed;top:-9999px;opacity:0';
+        document.body.appendChild(kotak);
+        kotak.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(kotak);
+        if (ok) tandai();
+      } catch { /* menyerah — mailto tetap jalan */ }
+    };
+    try {
+      const p = navigator.clipboard?.writeText(BADAN.email);
+      if (p) p.then(tandai).catch(cadangan);
+      else cadangan();
+    } catch { cadangan(); }
+  };
 
   /* Kotak isian ini BUKAN pendaftaran buletin seperti di sumbernya —
      tidak ada layanan buletin di belakangnya, dan kotak yang tidak
@@ -277,13 +323,19 @@ function Footerdemo() {
               <p className="text-foreground">{BADAN.nama}</p>
               <p>NIB {BADAN.nib}</p>
               <p>{BADAN.wilayah}</p>
-              <p>
+              <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <a
-                  href={`mailto:${BADAN.email}`}
+                  href={`mailto:${BADAN.email}?subject=${encodeURIComponent('Pertanyaan untuk Jadi Trader Tools')}`}
+                  onClick={salinSurel}
                   className="transition-colors hover:text-foreground"
                 >
                   {BADAN.email}
                 </a>
+                {disalin && (
+                  <span className="inline-flex items-center gap-1 text-xs text-emerald-500">
+                    <Check className="h-3 w-3" /> alamat disalin
+                  </span>
+                )}
               </p>
             </address>
           </div>
