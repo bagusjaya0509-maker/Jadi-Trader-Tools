@@ -8,6 +8,7 @@ import { useAuth } from '@/lib/auth';
 import { cn, tanggalPendek } from '@/lib/utils';
 import {
   referralSaya, ajukanPencairan, rupiah, dolar, namaPaketRef,
+  PAKET_KOMISI, persenPaketRef, persenMaks,
   type DataReferral, type StatusPencairan,
 } from '@/lib/referral';
 
@@ -221,11 +222,23 @@ export default function Referral() {
                 <Gift className="size-4 text-emas" strokeWidth={1.8} />
               </div>
               <div>
-                <h1 className="text-[15px] font-medium text-zinc-100">Ajak trader lain, dapat komisi {setelan.persen}%</h1>
+                <h1 className="text-[15px] font-medium text-zinc-100">Ajak trader lain, dapat komisi sampai {persenMaks(setelan)}%</h1>
                 <p className="text-[12px] text-zinc-500">
                   Dari setiap paket berbayar yang dibeli orang rujukanmu dalam {setelan.masaBulan} bulan pertama.
                 </p>
               </div>
+            </div>
+
+            {/* Rincian per paket ditaruh tepat di bawah judulnya. "Sampai
+                50%" tanpa rinciannya adalah janji yang baru ketahuan
+                salah waktu komisinya masuk, dan itu tempat paling buruk
+                untuk mengoreksi harapan orang. */}
+            <div className="mt-2.5 flex flex-wrap gap-1.5">
+              {PAKET_KOMISI.map((k) => (
+                <span key={k.id} className="rounded-md border border-zinc-800 bg-zinc-900/50 px-2 py-1 text-[11.5px] text-zinc-400">
+                  {k.nama} <span className="angka font-medium text-emas">{persenPaketRef(setelan, k.id)}%</span>
+                </span>
+              ))}
             </div>
 
             <div className="mt-4">
@@ -260,7 +273,7 @@ export default function Referral() {
             {[
               ['Bagikan tautan', 'Lewat WhatsApp, grup, atau bio media sosial.'],
               ['Mereka mendaftar', 'Masuk lewat tautanmu, akun BARU tercatat sebagai rujukanmu.'],
-              ['Mereka beli paket', `Komisi ${setelan.persen}% masuk begitu paketnya disetujui, siap dicairkan dari ${rupiah(setelan.minimalRp)}.`],
+              ['Mereka beli paket', `Komisinya masuk begitu paket itu disetujui, siap dicairkan mulai ${rupiah(setelan.minimalRp)}.`],
             ].map(([j, k], i) => (
               <li key={j} className="flex gap-2.5 rounded-lg border border-zinc-800/80 bg-zinc-900/40 px-3 py-2">
                 <span className="angka mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-[10.5px] text-zinc-300">{i + 1}</span>
@@ -478,7 +491,8 @@ export default function Referral() {
       <Panel className="p-5">
         <ul className="grid gap-2 text-[12.5px] leading-relaxed text-zinc-400 sm:grid-cols-2">
           {[
-            `Komisi ${setelan.persen}% dihitung dari harga paket yang benar-benar dibayar, dalam dolar, lalu dirupiahkan dengan kurs yang berlaku saat itu.`,
+            `Besar komisinya berbeda per paket: ${PAKET_KOMISI.map((k) => `${k.nama} ${persenPaketRef(setelan, k.id)}%`).join(', ')}.`,
+            'Dihitung dari harga yang benar-benar dibayar dalam dolar, lalu dirupiahkan dengan kurs yang berlaku saat itu.',
             'Yang dihitung hanya paket akses Jadi Trader Tools (Starter, Premium 3 Bulan, Tahunan). Produk Marketplace satuan tidak termasuk.',
             'Rujukan hanya sah untuk akun yang benar-benar baru — belum pernah punya akses, gratis maupun berbayar.',
             `Pembelian dihitung selama ${setelan.masaBulan} bulan sejak orang itu mendaftar lewat tautanmu.`,

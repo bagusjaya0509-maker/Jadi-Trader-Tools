@@ -78,7 +78,15 @@ export type StatusRujukan = 'belum' | 'gratis' | 'bayar';
 export type StatusKomisi = 'siap' | 'diajukan' | 'dibayar' | 'batal';
 export type StatusPencairan = 'diajukan' | 'dibayar' | 'ditolak';
 
-export interface SetelanReferral { aktif: boolean; persen: number; minimalRp: number; masaBulan: number }
+export interface SetelanReferral {
+  aktif: boolean;
+  /** Jatuhan untuk paket yang tidak punya angkanya sendiri. */
+  persen: number;
+  /** Persen per paket. Server yang menentukan isinya; layar cuma membaca. */
+  persenPaket?: Record<string, number>;
+  minimalRp: number;
+  masaBulan: number;
+}
 export interface Rujukan { waktu: number; pengguna: string; email: string; status: StatusRujukan; paket: string; komisiRp: number }
 export interface Komisi { id: string; waktu: number; paket: string; dari: string; usd: number; persen: number; jumlahUsd: number; jumlahRp: number; status: StatusKomisi }
 export interface Pencairan { id: string; waktu: number; jumlahRp: number; jumlahUsd: number; bank: string; rekening: string; nama: string; status: StatusPencairan; diputusPada: number; catatan: string }
@@ -152,8 +160,29 @@ export async function simpanSetelanReferral(s: Partial<SetelanReferral>) {
 export const rupiah = (n: number) => 'Rp ' + Math.round(Number(n) || 0).toLocaleString('id-ID');
 export const dolar = (n: number) => '$' + (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+/* Paket yang punya persen sendiri, dalam urutan harga. Ditulis di sini
+   supaya panel pemilik dan halaman pengguna menggambar urutan yang sama;
+   dua daftar yang bisa berbeda urutan membuat angka terbaca tertukar. */
+export const PAKET_KOMISI: { id: string; nama: string }[] = [
+  { id: 'testing', nama: 'Starter' },
+  { id: 'premium3', nama: 'Premium 3 Bulan' },
+  { id: 'tahunan', nama: 'Tahunan' },
+];
+
+export function persenPaketRef(s: SetelanReferral, paket: string): number {
+  const v = Number(s.persenPaket?.[paket]);
+  return Number.isFinite(v) && v >= 0 && v <= 100 ? v : (Number(s.persen) || 0);
+}
+
+/** Angka terbesar di antara paketnya. Dipakai untuk judul "sampai N%" —
+ *  yang paling menarik disebut lebih dulu, rinciannya menyusul di
+ *  barisnya sendiri. */
+export const persenMaks = (s: SetelanReferral) =>
+  Math.max(...PAKET_KOMISI.map((p) => persenPaketRef(s, p.id)));
+
 export const ringkasSetelan = (s: SetelanReferral) =>
-  `${s.persen}% · minimal ${rupiah(s.minimalRp)} · ${s.masaBulan} bulan · ${s.aktif ? 'aktif' : 'dijeda'}`;
+  `${PAKET_KOMISI.map((p) => `${p.nama} ${persenPaketRef(s, p.id)}%`).join(' · ')}`
+  + ` · minimal ${rupiah(s.minimalRp)} · ${s.masaBulan} bulan · ${s.aktif ? 'aktif' : 'dijeda'}`;
 
 export const NAMA_PAKET_REF: Record<string, string> = {
   testing: 'Starter 30 hari', premium3: 'Premium 3 bulan', tahunan: 'Tahunan', gratis: 'Akses gratis',

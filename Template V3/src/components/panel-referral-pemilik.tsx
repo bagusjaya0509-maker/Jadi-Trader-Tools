@@ -4,7 +4,8 @@ import { Panel, PanelHead, KartuKpi, TabelBungkus, Tabel, Th, Td, Tr } from '@/c
 import { cn, tanggalPendek } from '@/lib/utils';
 import {
   referralAdmin, putuskanPencairan, simpanSetelanReferral, rupiah, dolar, namaPaketRef,
-  ringkasSetelan, type DataReferralAdmin, type SetelanReferral,
+  ringkasSetelan, PAKET_KOMISI, persenPaketRef,
+  type DataReferralAdmin, type SetelanReferral,
 } from '@/lib/referral';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -46,15 +47,19 @@ export function PanelReferralPemilik() {
   useEffect(() => { void muat(); }, [muat]);
 
   /* ── FORMULIR BASI TIDAK BOLEH MENIMPA DIAM-DIAM ────────────────────
-     8 Sep 2026 komisi disetel 50%, lalu kembali 20% beberapa menit
-     kemudian tanpa ada yang merasa mengubahnya. Penyebab paling mungkin:
-     panel ini dibuka SEBELUM perubahan, jadi formulirnya masih memuat 20,
-     dan satu klik Simpan mengembalikan angka lama.
+     Panel ini membaca setelan sekali saat dibuka. Tab yang dibiarkan
+     terbuka sejak pagi masih memegang angka pagi itu, dan satu klik
+     Simpan mengembalikannya tanpa terlihat salah bagi yang menekannya.
 
-     Tidak ada yang salah di mata orang yang menekannya — itulah yang
-     membuatnya berbahaya. Jadi sebelum menulis, nilai di server dibaca
-     ulang dan dibandingkan dengan yang dimuat panel ini. Kalau sudah
-     berbeda, orangnya melihat keduanya dan memilih sendiri. */
+     BELUM PERNAH TERJADI. Ia sempat saya kira penyebab komisi yang
+     berubah 8 Sep 2026, dan dugaan itu meleset — pemiliknya sendiri yang
+     mengubahnya. Penjaganya tetap dipasang karena yang disimpan di sini
+     menentukan berapa uang keluar, dan ongkosnya cuma satu pembacaan
+     ulang sebelum menulis. Kalau nilai di server sudah berbeda dari yang
+     dimuat panel, orangnya melihat keduanya dan memilih sendiri.
+
+     Pelajaran yang lebih mahal ada di riwayat di bawah: yang benar-benar
+     kurang bukan penjaganya, melainkan catatan siapa mengubah apa. */
   async function simpan() {
     if (!setelan) return;
     setSibukSetelan(true); setKabarSetelan('');
@@ -162,12 +167,23 @@ export function PanelReferralPemilik() {
           <h3 className="text-[13.5px] font-medium text-zinc-200">Setelan program</h3>
           <p className="text-[12px] text-zinc-500">Berlaku untuk komisi yang lahir SESUDAH disimpan. Komisi yang sudah tercatat tidak dihitung ulang.</p>
         </div>
-        <div className="grid gap-3 sm:grid-cols-4">
-          <div>
-            <label className="mb-1 block text-[11px] text-zinc-500">Komisi (%)</label>
-            <input type="number" min={0} max={100} step={0.5} value={setelan.persen}
-              onChange={(e) => setSetelan({ ...setelan, persen: Number(e.target.value) })} className={cn(kelasIsian, 'angka')} />
-          </div>
+        {/* Satu kolom per paket. Diminta pemilik 8 Sep 2026: paket murah
+            dipakai menarik orang masuk sehingga separuhnya boleh
+            diserahkan, sementara paket tahunan bernilai paling besar dan
+            paling menarik untuk diakali lewat akun kedua sendiri. */}
+        <div className="mb-3 grid gap-3 sm:grid-cols-3">
+          {PAKET_KOMISI.map((k) => (
+            <div key={k.id}>
+              <label className="mb-1 block text-[11px] text-zinc-500">Komisi {k.nama} (%)</label>
+              <input type="number" min={0} max={100} step={0.5} value={persenPaketRef(setelan, k.id)}
+                onChange={(e) => setSetelan({
+                  ...setelan,
+                  persenPaket: { ...(setelan.persenPaket ?? {}), [k.id]: Number(e.target.value) },
+                })} className={cn(kelasIsian, 'angka')} />
+            </div>
+          ))}
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
           <div>
             <label className="mb-1 block text-[11px] text-zinc-500">Minimal pencairan (Rp)</label>
             <input type="number" min={0} step={1000} value={setelan.minimalRp}
