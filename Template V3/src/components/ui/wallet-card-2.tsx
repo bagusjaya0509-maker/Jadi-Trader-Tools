@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -88,8 +89,36 @@ export function KartuDompet({
      ada nilainya di sana, cuma sedang tidak ditampilkan. */
   const nilai = (n: number | null) => (sembunyi ? '••••••' : n === null ? '—' : uang(n));
 
+  /* ── LEBAR DIUKUR, BUKAN DITEBAK DARI PROP ───────────────────────────
+     `sempit` cuma menjawab "dipasang di sisi chart atau tidak". Lebar
+     sebenarnya ditentukan pemisah yang bisa diseret orangnya, jadi satu
+     boolean tidak cukup: panel yang sama bisa 340 px atau 250 px.
+
+     Di bawah 230 px, keterangan kedua pada tiap ubin dan tiap baris
+     ringkasan dibuang, dan tombol tinggal ikon. Yang dibuang selalu yang
+     BISA disimpulkan dari yang tersisa — bukan angkanya. */
+  const wadah = useRef<HTMLDivElement>(null);
+  const [lebar, setLebar] = useState(0);
+  useEffect(() => {
+    const el = wadah.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => setLebar(el.getBoundingClientRect().width));
+    ro.observe(el);
+    setLebar(el.getBoundingClientRect().width);
+    return () => ro.disconnect();
+  }, []);
+  /* lebar 0 = belum terukur (render pertama). Dianggap lega, bukan sempit:
+     berkedip dari padat ke lega lebih mengganggu daripada sebaliknya. */
+  const mini = lebar > 0 && lebar < 230;
+  /* Ambang KEDUA, khusus baris tombol. Tiga tombol sebaris dengan satu label
+     "Aktifkan trading" butuh ~300 px; di bawah itu tombol Setor meluber 7 px
+     keluar kartu — terukur di peramban pada lebar 277 px. Labelnya yang
+     dilepas duluan, bukan tombolnya yang dihilangkan: yang hilang dari layar
+     tidak bisa ditekan sama sekali, sedangkan ikon tanpa nama masih bisa. */
+  const padat = lebar > 0 && lebar < 300;
+
   return (
-    <Card className={cn(
+    <Card ref={wadah} className={cn(
       'rounded-3xl border-zinc-800 bg-zinc-900/40 shadow-xl',
       sempit ? 'p-3' : 'p-5',
     )}>
@@ -102,20 +131,23 @@ export function KartuDompet({
         <div className={cn('grid gap-2.5', sempit ? 'grid-cols-1' : 'grid-cols-2')}>
           <Ubin
             Ikon={Wallet}
-            label="USDC di spot"
+            label={mini ? 'Spot' : 'USDC di spot'}
             nilai={nilai(diSpot)}
+            mini={mini}
             kelas="from-rose-500/20 to-pink-500/[0.08] border-rose-400/20"
           />
           <Ubin
             Ikon={TrendingUp}
-            label="USDC di perps"
+            label={mini ? 'Perps' : 'USDC di perps'}
             nilai={nilai(diPerps)}
+            mini={mini}
             kelas="from-violet-500/20 to-indigo-500/[0.08] border-violet-400/20"
           />
         </div>
 
         {/* ── Blok saldo ──────────────────────────────────────────────── */}
-        <div className="space-y-3 rounded-2xl border border-zinc-800 bg-zinc-950/60 px-4 py-4">
+        <div className={cn('space-y-3 rounded-2xl border border-zinc-800 bg-zinc-950/60 py-4',
+          mini ? 'px-3' : 'px-4')}>
           <div className="flex items-center gap-2">
             <span
               className="angka min-w-0 truncate rounded bg-zinc-800 px-2 py-1 text-[11px] text-zinc-200"
@@ -123,7 +155,7 @@ export function KartuDompet({
             >
               {pendek(alamat)}
             </span>
-            {!sempit && (
+            {!sempit && !mini && (
               <span className="shrink-0 text-[11px] text-zinc-600">chain {rantai || '—'}</span>
             )}
             <button
@@ -148,8 +180,8 @@ export function KartuDompet({
           <div>
             <div className="text-[10.5px] uppercase tracking-wide text-zinc-500">Bisa dipakai</div>
             <div className={cn(
-              'angka mt-1 font-bold leading-none tracking-tight text-zinc-50',
-              sempit ? 'text-[24px]' : 'text-[32px]',
+              'angka mt-1 truncate font-bold leading-none tracking-tight text-zinc-50',
+              mini ? 'text-[19px]' : sempit ? 'text-[24px]' : 'text-[32px]',
             )}>
               {nilai(bisaDipakai)}
             </div>
@@ -160,8 +192,8 @@ export function KartuDompet({
                 akan diterima bursa. */}
             <div className="mt-2 flex items-center gap-1.5 text-[11.5px] text-amber-400/80">
               <Layers className="size-3.5 shrink-0" />
-              <span className="angka">{nilai(nilaiAkun)}</span>
-              <span className="text-zinc-600">nilai akun</span>
+              <span className="angka truncate">{nilai(nilaiAkun)}</span>
+              {!mini && <span className="shrink-0 text-zinc-600">nilai akun</span>}
             </div>
           </div>
         </div>
@@ -174,25 +206,36 @@ export function KartuDompet({
             dompet. Yang tersisa cuma yang benar-benar bekerja, ditambah
             satu tautan jujur ke tempat setorannya. */}
         <div className="flex gap-2">
+          {/* Di bawah 230 px tulisannya dibuang, ikonnya tinggal. Tiga
+              tombol berlabel pada lebar itu tidak menyusut — ia meluber
+              keluar kartunya, dan tombol yang setengahnya di luar kotak
+              lebih buruk daripada tombol tanpa nama. Namanya pindah ke
+              title dan aria-label, jadi tidak ada yang hilang bagi pembaca
+              layar maupun bagi yang menunggu sebentar dengan tetikus. */}
           {!agenSiap ? (
             <Button
               onClick={onAktifkan}
               disabled={!!sibuk}
-              className="h-11 flex-1 gap-2 rounded-2xl bg-emerald-500 text-zinc-950 hover:bg-emerald-400"
+              title="Aktifkan trading"
+              aria-label="Aktifkan trading"
+              className={cn('h-11 min-w-0 flex-1 gap-2 rounded-2xl bg-emerald-500 text-zinc-950 hover:bg-emerald-400',
+                padat && 'px-0')}
             >
               {sibuk === 'agen'
                 ? <Loader2 className="size-4 animate-spin" />
                 : <ShieldCheck className="size-4" />}
-              Aktifkan trading
+              {!padat && 'Aktifkan trading'}
             </Button>
           ) : (
             <Button
               variant="secondary"
               onClick={onPutuskan}
-              className="h-11 flex-1 gap-2 rounded-2xl"
+              title="Putuskan agent wallet"
+              aria-label="Putuskan agent wallet"
+              className={cn('h-11 min-w-0 flex-1 gap-2 rounded-2xl', padat && 'px-0')}
             >
               <Unplug className="size-4" />
-              Putuskan
+              {!padat && 'Putuskan'}
             </Button>
           )}
           {/* ── IKON ENTRI ─────────────────────────────────────────────
@@ -207,7 +250,7 @@ export function KartuDompet({
               aria-expanded={!!entriAktif}
               title={entriAktif ? 'Tutup formulir kirim order' : 'Buka formulir kirim order'}
               aria-label={entriAktif ? 'Tutup formulir kirim order' : 'Buka formulir kirim order'}
-              className={cn('h-11 rounded-2xl px-4',
+              className={cn('h-11 shrink-0 rounded-2xl', padat ? 'px-3' : 'px-4',
                 entriAktif && 'bg-zinc-100 text-zinc-950 hover:bg-white')}
             >
               <SquarePen className="size-4" />
@@ -216,12 +259,13 @@ export function KartuDompet({
           <Button
             asChild
             variant="secondary"
-            className="h-11 gap-2 rounded-2xl px-4"
+            className={cn('h-11 shrink-0 gap-2 rounded-2xl', padat ? 'px-3' : 'px-4')}
           >
             <a href="https://app.hyperliquid.xyz" target="_blank" rel="noreferrer"
+               aria-label="Setor di Hyperliquid"
                title="Setoran dan penarikan dilakukan di Hyperliquid, bukan di halaman ini">
               <ExternalLink className="size-4" />
-              {!sempit && 'Setor'}
+              {!sempit && !padat && 'Setor'}
             </a>
           </Button>
         </div>
@@ -239,6 +283,7 @@ export function KartuDompet({
             harus dicoba tanpa memindahkan siapa pun ke mana pun. */}
         <div className="space-y-1.5">
           <BarisRingkas
+            mini={mini}
             Ikon={TrendingUp}
             kelasIkon="bg-violet-500/15 text-violet-300 border-violet-400/20"
             judul="Posisi perp terbuka"
@@ -258,6 +303,7 @@ export function KartuDompet({
             ) : null}
           />
           <BarisRingkas
+            mini={mini}
             Ikon={ListOrdered}
             kelasIkon="bg-rose-500/15 text-rose-300 border-rose-400/20"
             judul="Order menggantung"
@@ -281,40 +327,54 @@ export function KartuDompet({
 
 /* ── Potongan ────────────────────────────────────────────────────────── */
 
-function Ubin({ Ikon, label, nilai, kelas }: {
+function Ubin({ Ikon, label, nilai, kelas, mini }: {
   Ikon: typeof Wallet;
   label: string;
   nilai: string;
   kelas: string;
+  mini?: boolean;
 }) {
   return (
-    <div className={cn('rounded-2xl border bg-gradient-to-r p-3', kelas)}>
+    <div className={cn('rounded-2xl border bg-gradient-to-r', kelas, mini ? 'p-2.5' : 'p-3')}>
       <div className="flex items-center gap-2">
-        <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-white/10">
-          <Ikon className="size-3.5 text-zinc-100" strokeWidth={1.8} />
-        </div>
+        {/* Kotak ikon dibuang di lebar mini: 28 px dari 200 px adalah
+            sepertujuh baris, dipakai untuk lambang yang artinya sudah
+            tertulis persis di sebelahnya. */}
+        {!mini && (
+          <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-white/10">
+            <Ikon className="size-3.5 text-zinc-100" strokeWidth={1.8} />
+          </div>
+        )}
         <span className="min-w-0 truncate text-[11px] text-zinc-300">{label}</span>
       </div>
-      <div className="angka mt-2 text-[16px] font-semibold text-zinc-50">{nilai}</div>
+      <div className={cn('angka mt-1.5 truncate font-semibold text-zinc-50',
+        mini ? 'text-[14px]' : 'mt-2 text-[16px]')}>{nilai}</div>
     </div>
   );
 }
 
-function BarisRingkas({ Ikon, kelasIkon, judul, ket, kanan }: {
+function BarisRingkas({ Ikon, kelasIkon, judul, ket, kanan, mini }: {
   Ikon: typeof Wallet;
   kelasIkon: string;
   judul: string;
   ket: string;
   kanan?: React.ReactNode;
+  mini?: boolean;
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-2xl border border-zinc-800/80 p-2.5">
-      <div className={cn('flex size-9 shrink-0 items-center justify-center rounded-xl border', kelasIkon)}>
-        <Ikon className="size-4" strokeWidth={1.8} />
+    <div className={cn('flex items-center rounded-2xl border border-zinc-800/80',
+      mini ? 'gap-2 p-2' : 'gap-3 p-2.5')}
+      title={mini ? `${judul} — ${ket}` : undefined}>
+      <div className={cn('flex shrink-0 items-center justify-center rounded-xl border', kelasIkon,
+        mini ? 'size-7' : 'size-9')}>
+        <Ikon className={mini ? 'size-3.5' : 'size-4'} strokeWidth={1.8} />
       </div>
       <div className="min-w-0 flex-1">
-        <h3 className="truncate text-[12.5px] font-semibold text-zinc-200">{judul}</h3>
-        <p className="truncate text-[11px] text-zinc-500">{ket}</p>
+        <h3 className={cn('truncate font-semibold text-zinc-200', mini ? 'text-[11.5px]' : 'text-[12.5px]')}>{judul}</h3>
+        {/* Keterangannya dibuang di lebar mini, bukan dipotong: "Belum ada
+            — token spot ti…" tidak menerangkan apa pun. Kalimat utuhnya
+            pindah ke title barisnya. */}
+        {!mini && <p className="truncate text-[11px] text-zinc-500">{ket}</p>}
       </div>
       {kanan}
     </div>

@@ -3020,11 +3020,25 @@ export function ChartLilin({
               if (!w) return null;
               const r = w.getBoundingClientRect();
               if (r.width <= 0) return null;
-              /* Dijepit 15–75%. Batas bawahnya menjaga gambar tetap
-                 berguna, batas atasnya menjaga chart tetap bisa dipakai —
-                 panel acuan yang menutup seluruh layar berarti tidak ada
-                 lagi yang dijiplak. */
-              return Math.min(0.75, Math.max(0.15, (g.clientX - r.left) / r.width));
+              /* Dijepit 15–75%. Batas atasnya menjaga chart tetap bisa
+                 dipakai — panel acuan yang menutup seluruh layar berarti
+                 tidak ada lagi yang dijiplak.
+
+                 ── LANTAINYA PIKSEL, BUKAN PERSEN, UNTUK PANEL ───────────
+                 15% cukup untuk GAMBAR jiplakan: gambar yang mengecil tetap
+                 gambar. Ia tidak cukup untuk PANEL BERISI: 15% dari area
+                 chart 600 px adalah 90 px, dan pada lebar itu panel dompet
+                 hancur — label terpotong jadi "U…", angka saldo pecah dua
+                 baris, tombol Putuskan meluber keluar kotaknya. Dilaporkan
+                 pemilik 8 Sep 2026.
+
+                 250 px bukan angka bulat yang enak dilihat, melainkan lebar
+                 tersempit yang masih memuat "$1.202,86" beserta labelnya
+                 dalam satu baris. Di bawah itu tidak ada tata letak yang
+                 menyelamatkan; yang benar adalah tidak mengizinkannya. */
+              const frac = (g.clientX - r.left) / r.width;
+              const lantai = panelKiri ? Math.max(0.15, 250 / r.width) : 0.15;
+              return Math.min(0.75, Math.max(lantai, frac));
             };
             const gerak = (g: PointerEvent) => { const v = hitung(g); if (v !== null) setLebarSeret(v); };
             const lepas = (g: PointerEvent) => {
