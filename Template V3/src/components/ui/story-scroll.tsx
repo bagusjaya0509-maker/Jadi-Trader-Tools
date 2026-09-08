@@ -224,6 +224,31 @@ const FlowArt: React.FC<FlowArtProps> = ({
                  pendek yang halus. 0,4 cukup untuk meredam tanpa membuat
                  panelnya terasa terlambat mengikuti jari. */
               scrub: 0.4,
+
+              /* ── PANEL YANG SUDAH SELESAI DIKUNCI ────────────────────
+                 Diminta pemilik 8 Sep 2026: begitu orang mulai menarik
+                 panel berikutnya, panel sebelumnya tidak boleh bergerak
+                 lagi.
+
+                 `scrub: 0.4` menyuruh GSAP MENGEJAR posisi gulir, bukan
+                 menempel padanya — dan pengejaran itu tidak berhenti di
+                 garis akhir: 0,4 detik sesudah panel ini selesai, sudutnya
+                 masih menyusut sepersekian derajat menuju nol. Di layar
+                 lebar itu tidak terlihat. Di ponsel, jari yang sudah
+                 beralih menarik panel BERIKUTNYA sementara panel ini masih
+                 merapikan diri terbaca persis seperti yang dilaporkan:
+                 gambar sebelumnya ikut bergerak.
+
+                 Melewati garis akhir, sudutnya dipatok ke nilai akhir
+                 seketika. Yang hilang cuma ekor 0,4 detik yang memang
+                 sedang menuju ke sana; yang didapat panel yang benar-benar
+                 diam begitu giliran berikutnya dimulai.
+
+                 onLeaveBack mengerjakan kebalikannya supaya menggulir
+                 kembali ke atas tetap mengembalikannya ke sudut 30° tanpa
+                 menyisakan sisa dari ekor yang sama. */
+              onLeave: (self) => { self.animation?.progress(1); },
+              onLeaveBack: (self) => { self.animation?.progress(0); },
             },
           });
           if (tween.scrollTrigger) triggers.push(tween.scrollTrigger);

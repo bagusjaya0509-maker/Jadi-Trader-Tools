@@ -101,6 +101,12 @@ function Footerdemo() {
   const [sibuk, setSibuk] = React.useState(false);
   const [kabar, setKabar] = React.useState('');
   const [terkirim, setTerkirim] = React.useState(false);
+  /* Pilihan saluran BARU MUNCUL sesudah tombol kirim ditekan. Diminta
+     pemilik 8 Sep 2026: dua tombol yang berdiri terus di kaki halaman
+     membuat kolom ini memanjang ke bawah untuk pilihan yang belum tentu
+     dipakai. Satu tombol dulu — pilihannya menyusul setelah orangnya
+     menyatakan memang mau mengirim. */
+  const [pilihBuka, setPilihBuka] = React.useState(false);
 
   /* Kotak isian ini BUKAN pendaftaran buletin seperti di sumbernya —
      tidak ada layanan buletin di belakangnya, dan kotak yang tidak
@@ -123,8 +129,7 @@ function Footerdemo() {
      suratnya tersendat, pertanyaannya tetap terbaca di panel Maintenance —
      jadi tidak ada pertanyaan yang hilang karena satu layanan luar sedang
      turun. */
-  const keSurel = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const keSurel = async () => {
     const isi = pesan.trim();
     if (isi.length < 3) { setKabar('Tulis pertanyaanmu dulu.'); return; }
     setSibuk(true); setKabar('');
@@ -141,7 +146,7 @@ function Footerdemo() {
       });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error ?? `Server menjawab ${r.status}`);
-      setPesan(''); setSurelBalas(''); setTerkirim(true);
+      setPesan(''); setSurelBalas(''); setTerkirim(true); setPilihBuka(false);
       setKabar(surelBalas.trim()
         ? 'Terkirim. Balasannya akan masuk ke alamat itu.'
         : 'Terkirim. Tulis alamat surelmu lain kali kalau mau dibalas.');
@@ -174,53 +179,69 @@ function Footerdemo() {
             <p className="mb-6 text-muted-foreground">
               Tulis di sini, pesanmu akan diterima dan dibantu lebih responsif oleh customer service.
             </p>
-            <form className="space-y-2.5" onSubmit={keSurel}>
-              <label htmlFor="tanya" className="sr-only">
-                Tulis pertanyaanmu
-              </label>
-              <Input
-                id="tanya"
-                type="text"
-                value={pesan}
-                onChange={(e) => { setPesan(e.target.value); setTerkirim(false); }}
-                placeholder="Tulis pertanyaanmu di sini"
-                className="backdrop-blur-sm"
-              />
-
-              {/* Alamat balasan OPSIONAL, dan dikatakan begitu di
-                  placeholder-nya. Menjadikannya wajib akan menahan
-                  pertanyaan dari orang yang cuma ingin bertanya cepat —
-                  dan pertanyaan yang tidak jadi dikirim tidak menolong
-                  siapa pun. Yang lewat WhatsApp tidak memerlukannya sama
-                  sekali karena nomornya sudah ikut. */}
-              <label htmlFor="tanya-surel" className="sr-only">
-                Alamat surelmu, opsional
-              </label>
-              <Input
-                id="tanya-surel"
-                type="email"
-                value={surelBalas}
-                onChange={(e) => setSurelBalas(e.target.value)}
-                placeholder="Email kamu (opsional, agar bisa dibalas)"
-                className="backdrop-blur-sm"
-              />
-
-              <div className="flex flex-wrap gap-2">
-                <Button type="submit" disabled={sibuk} className="flex-1 gap-2">
-                  {sibuk ? <Loader2 className="h-4 w-4 animate-spin" />
-                    : terkirim ? <Check className="h-4 w-4" />
-                    : <Send className="h-4 w-4" />}
-                  Kirim lewat email
-                </Button>
-                <Button type="button" variant="outline" onClick={keWhatsApp} className="flex-1 gap-2">
-                  <MessageCircle className="h-4 w-4" />
-                  WhatsApp
+            <form
+              className="space-y-2.5"
+              onSubmit={(e) => { e.preventDefault(); if (pesan.trim().length >= 3) setPilihBuka(true); else setKabar('Tulis pertanyaanmu dulu.'); }}
+            >
+              <div className="relative">
+                <label htmlFor="tanya" className="sr-only">
+                  Tulis pertanyaanmu
+                </label>
+                <Input
+                  id="tanya"
+                  type="text"
+                  value={pesan}
+                  onChange={(e) => { setPesan(e.target.value); setTerkirim(false); setKabar(''); }}
+                  placeholder="Tulis pertanyaanmu di sini"
+                  className="pr-12 backdrop-blur-sm"
+                />
+                <Button
+                  type="submit"
+                  size="icon"
+                  className="absolute right-1 top-1 h-8 w-8 rounded-full bg-primary text-primary-foreground transition-transform hover:scale-105"
+                >
+                  <Send className="h-4 w-4" />
+                  <span className="sr-only">Pilih cara mengirim</span>
                 </Button>
               </div>
 
+              {/* ── PILIHAN SALURAN ────────────────────────────────────────
+                  Muncul hanya sesudah tombol kirim ditekan, dan hilang lagi
+                  begitu pesannya benar-benar terkirim. Alamat balasan ikut
+                  di sini, bukan berdiri sendiri di atas: ia cuma berguna
+                  untuk jalur surel, dan isian yang tidak berguna untuk
+                  jalur yang sedang dipilih hanya menambah yang harus
+                  dilewati. */}
+              {pilihBuka && !terkirim && (
+                <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-2.5">
+                  <label htmlFor="tanya-surel" className="sr-only">
+                    Alamat surelmu, opsional
+                  </label>
+                  <Input
+                    id="tanya-surel"
+                    type="email"
+                    value={surelBalas}
+                    onChange={(e) => setSurelBalas(e.target.value)}
+                    placeholder="Email kamu (opsional, agar bisa dibalas)"
+                    className="h-9 backdrop-blur-sm"
+                  />
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="button" onClick={keSurel} disabled={sibuk} className="flex-1 gap-2">
+                      {sibuk ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+                      Email
+                    </Button>
+                    <Button type="button" variant="outline" onClick={keWhatsApp} className="flex-1 gap-2">
+                      <MessageCircle className="h-4 w-4" />
+                      WhatsApp
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               {kabar && (
-                <p className={cn('text-xs leading-relaxed',
+                <p className={cn('flex items-start gap-1.5 text-xs leading-relaxed',
                   terkirim ? 'text-emerald-500' : 'text-muted-foreground')}>
+                  {terkirim && <Check className="mt-px h-3.5 w-3.5 shrink-0" />}
                   {kabar}
                 </p>
               )}
