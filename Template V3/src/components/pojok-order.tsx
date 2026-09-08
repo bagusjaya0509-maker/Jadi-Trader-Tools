@@ -64,6 +64,67 @@ function Segitiga({ arah }: { arah: 'atas' | 'bawah' }) {
   );
 }
 
+/* ── ISIAN HARGA: ENTRY, SL, TP ──────────────────────────────────────────
+   Dilaporkan pemilik 8 Sep 2026: angka SL dan TP di tiket order tidak bisa
+   dihapus maupun disunting. Tiga sebab menumpuk, dan yang pertama membuat
+   dua sisanya tidak pernah terlihat.
+
+   1. KOMPONENNYA LAHIR ULANG TIAP RENDER. `Isian` dulu didefinisikan di
+      dalam badan render induknya. React membandingkan TIPE komponen, dan
+      fungsi yang baru dibuat tiap render selalu tipe yang berbeda — jadi
+      isiannya dibongkar lalu dipasang lagi, dan kursornya ikut hilang.
+      Satu huruf masuk, fokus lepas, huruf kedua jatuh ke luar kolom.
+      Harga hidup yang berdetak tiap detik membuat render itu terjadi terus.
+
+   2. TITIK DESIMAL TIDAK PERNAH SEMPAT TERBENTUK. Nilainya dibaca ulang
+      dari angka tiap render: mengetik "0." menghasilkan Number("0.") = 0,
+      lalu `|| undefined` mengosongkannya. Angka pecahan mustahil diketik
+      dari nol.
+
+   3. NOL BERARTI KOSONG. `Number(v) || undefined` memperlakukan 0 sebagai
+      tidak-diisi.
+
+   Obatnya sama dengan IsianAngka di bawah: teks MENTAH disimpan selama
+   kolomnya dipegang, dan angka baru dikirim ke atas kalau teksnya memang
+   angka yang sah. Bedanya satu hal — di sini kolom yang dikosongkan MEMANG
+   dikirim sebagai `undefined`, karena menghapus SL adalah perbuatan yang
+   sah dan tiketnya sudah punya penjaga sendiri yang menolak berangkat
+   tanpa SL.
+
+   Koma diterima dan diterjemahkan jadi titik: papan ketik ponsel Indonesia
+   memberi koma sebagai pemisah desimal, dan angka yang ditolak diam-diam
+   terbaca sebagai kolom yang rusak. */
+function IsianHarga({ nilai, atur, desimal, label, warna }: {
+  nilai: number | undefined;
+  atur: (n: number | undefined) => void;
+  desimal: number;
+  label: string;
+  warna: string;
+}) {
+  const [draf, setDraf] = useState<string | null>(null);
+  const teks = draf ?? (nilai === undefined ? '' : String(Number(nilai.toFixed(desimal))));
+  return (
+    <label className="block">
+      <span className="mb-0.5 block text-[9.5px] uppercase tracking-wide" style={{ color: warna }}>{label}</span>
+      <input value={teks} inputMode="decimal"
+             onChange={(e) => {
+               const v = e.target.value;
+               /* Yang bukan angka ditolak SEBELUM masuk draf, bukan sesudah:
+                  huruf yang sempat tampil lalu hilang sendiri membuat orang
+                  mengira kolomnya berkedip. */
+               if (!/^[0-9]*[.,]?[0-9]*$/.test(v)) return;
+               setDraf(v);
+               const bersih = v.replace(',', '.');
+               if (bersih.trim() === '' || bersih === '.') { atur(undefined); return; }
+               const n = Number(bersih);
+               if (isFinite(n) && n > 0) atur(n);
+             }}
+             onBlur={() => setDraf(null)}
+             className={cn(KELAS_ISIAN, 'angka w-[86px]')} />
+    </label>
+  );
+}
+
 function IsianAngka({ nilai, atur, langkah, min = 0, maks, desimal = 2, lebar, judul, mati }: {
   nilai: number;
   atur: (n: number) => void;
@@ -445,16 +506,6 @@ export function PojokOrder({
       : draf === 'BUY' ? 'Untuk BUY: SL harus DI BAWAH entry dan TP di atasnya.'
                        : 'Untuk SELL: SL harus DI ATAS entry dan TP di bawahnya.';
 
-    const Isian = ({ k, label, warna }: { k: 'entry' | 'sl' | 'tp'; label: string; warna: string }) => (
-      <label className="block">
-        <span className="mb-0.5 block text-[9.5px] uppercase tracking-wide" style={{ color: warna }}>{label}</span>
-        <input value={rencana[k] === undefined ? '' : String(Number(rencana[k]!.toFixed(desimalHarga)))}
-               inputMode="decimal"
-               onChange={(e) => onUbah({ ...rencana, [k]: Number(e.target.value) || undefined })}
-               className={cn(KELAS_ISIAN, 'angka w-[86px]')} />
-      </label>
-    );
-
     return (
       /* max-w di HP: tiket ini duduk sebagai hamparan di pojok kiri-atas
          chart, dan tanpa batas ia melebar mengikuti isinya sampai ~306 px —
@@ -527,9 +578,20 @@ export function PojokOrder({
         </div>
 
         <div className="flex items-end gap-1.5">
-          <Isian k="entry" label="Entry" warna="#d4d4d8" />
-          <Isian k="sl" label="SL" warna="#f87171" />
-          <Isian k="tp" label="TP" warna="#10b981" />
+          {/* Warnanya lewat variabel CSS, bukan heksa mati. Nilainya IDENTIK
+              di tema gelap (zinc-300 #d4d4d8, red-400 #f87171, emerald-500
+              #10b981), dan ikut terbalik di tema terang -- #d4d4d8 hilang di
+              latar putih, sama seperti garis Entry di chart.
+
+              Variabel, bukan useTema(): blok ini bukan badan komponen, jadi
+              memanggil hook di sini melanggar aturannya. CSS menyelesaikan
+              hal yang sama tanpa satu pun render tambahan. */}
+          <IsianHarga label="Entry" warna="var(--color-zinc-300)" desimal={desimalHarga}
+                      nilai={rencana.entry} atur={(n) => onUbah({ ...rencana, entry: n })} />
+          <IsianHarga label="SL" warna="var(--color-red-400)" desimal={desimalHarga}
+                      nilai={rencana.sl} atur={(n) => onUbah({ ...rencana, sl: n })} />
+          <IsianHarga label="TP" warna="var(--color-emerald-500)" desimal={desimalHarga}
+                      nilai={rencana.tp} atur={(n) => onUbah({ ...rencana, tp: n })} />
         </div>
 
         {catatan && aturCatatan && !ringkas && (
