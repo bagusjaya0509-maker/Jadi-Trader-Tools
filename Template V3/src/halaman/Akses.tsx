@@ -195,11 +195,7 @@ export default function Akses() {
           Keterangan mereknya di luar percabangan supaya tetap ada apa pun
           yang dipilih: itu satu-satunya bagian yang memberi tahu orang
           mereka sedang berada di mana. */}
-      {/* @container: tema Prisma mengukur hurufnya dari lebar PANEL INI,
-          bukan lebar layar — panel ini sisa layar sesudah kolom isi 560 px
-          diambil, jadi ukuran yang dihitung dari layar melimpah di jendela
-          sempit dan tenggelam di layar lebar. */}
-      <div className="relative hidden flex-1 overflow-hidden bg-zinc-950 [container-type:inline-size] lg:block">
+      <div className="relative hidden flex-1 overflow-hidden bg-zinc-950 lg:block">
         {/* TIDAK MENEBAK. Selama server belum menjawab DAN peramban ini
             belum pernah melihat jawabannya, panelnya dibiarkan gelap
             kosong. Sebelumnya bawaan 'foto' yang dipakai: pembaca melihat
@@ -216,7 +212,7 @@ export default function Akses() {
              kebetulan ada tulisan di atasnya. Keterangan bersama di bawah
              karena itu disembunyikan; dua baris nama merek di satu panel
              adalah pengulangan yang paling cepat terlihat. */
-          <PanelGerbangPrisma gambar={`${import.meta.env.BASE_URL}hero-bg3.webp`} />
+          <PanelGerbangPrisma poster={`${import.meta.env.BASE_URL}hero-bg3.webp`} />
         ) : kuota.tampilanAkses === 'lonceng' ? (
           <>
             {/* Talinya sengaja setinggi 50vh dan MELEWATI tepi atas panel
@@ -245,16 +241,19 @@ export default function Akses() {
             <div className="absolute inset-0 bg-gradient-to-r from-zinc-950/40 via-zinc-950/20 to-zinc-950" />
           </>
         )}
-        {kuota.tampilanAkses !== 'prisma' && (
-          <div className="pointer-events-none absolute bottom-10 left-10 right-10">
-            <div className="text-[15px] font-medium tracking-tight text-zinc-100">
-              Jadi Trader <span className="text-zinc-400">Tools</span>
-            </div>
-            <p className="mt-1.5 max-w-[34ch] text-[12.5px] leading-relaxed text-zinc-400">
-              Chart, screener, jurnal, dan eksekusi Pasar Kripto &amp; Forex di satu layar.
-            </p>
+        {/* Berlaku untuk KETIGA tema lagi. Tema Prisma sempat membawa
+            keterangan mereknya sendiri karena huruf raksasanya bagian dari
+            rancangan; hurufnya dihapus 8 Sep 2026 (terlalu ramai di atas
+            videonya), jadi pengecualian ini ikut hilang. Satu keterangan,
+            satu tempat. */}
+        <div className="pointer-events-none absolute bottom-10 left-10 right-10">
+          <div className="text-[15px] font-medium tracking-tight text-zinc-100">
+            Jadi Trader <span className="text-zinc-400">Tools</span>
           </div>
-        )}
+          <p className="mt-1.5 max-w-[34ch] text-[12.5px] leading-relaxed text-zinc-400">
+            Chart, screener, jurnal, dan eksekusi Pasar Kripto &amp; Forex di satu layar.
+          </p>
+        </div>
       </div>
 
       {/* Kanan: isi */}

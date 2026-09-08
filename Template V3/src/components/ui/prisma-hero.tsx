@@ -1,120 +1,98 @@
-import { motion, useInView } from 'framer-motion';
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 
 /* ════════════════════════════════════════════════════════════════════════
-   PRISMA — huruf yang naik kata demi kata
+   PRISMA — video sebagai panel kiri halaman gerbang
    ════════════════════════════════════════════════════════════════════════
-   Dari templat yang dikirim pemilik 8 Sep 2026, dipakai sebagai tampilan
-   KETIGA panel kiri halaman gerbang, di samping Foto dan Lonceng.
+   Tampilan KETIGA panel kiri /akses, di samping Foto dan Lonceng. Dari
+   templat yang dikirim pemilik 8 Sep 2026.
 
-   ── YANG DIAMBIL DAN YANG TIDAK ─────────────────────────────────────────
-   Yang diambil: gerakan hurufnya (tiap kata naik dengan jeda berurutan),
-   tumpukan lapisannya (latar, bintik, tirai gelap), dan tata letaknya —
-   satu kata besar di bawah, keterangan kecil di sebelahnya.
+   ── TINGGAL VIDEONYA ────────────────────────────────────────────────────
+   Templatnya menaruh nama merek raksasa di atas video, dan itu sempat
+   dipasang. Pemilik menghapusnya di hari yang sama: gambarnya jadi terlalu
+   ramai. Maka yang tersisa videonya saja — keterangan merek yang kecil di
+   kaki panel dikembalikan ke tempat asalnya di `Akses.tsx`, sama seperti
+   yang dipakai tampilan Foto dan Lonceng.
 
-   Yang TIDAK diambil: bilah menu contohnya ("Our story", "Collective", …)
-   karena halaman gerbang tidak punya menu, dan VIDEO LATARNYA. Videonya
-   ditaruh di CloudFront milik orang lain; menautkannya dari halaman masuk
-   berarti tampilan gerbang kita bergantung pada berkas yang tidak bisa
-   kita jaga — hari ia dihapus, yang tersisa kotak hitam di halaman yang
-   paling tidak boleh terlihat rusak. Latarnya memakai gambar merek sendiri
-   yang sudah ada di public/.
+   Ikut hilang bersamanya: `WordsPullUp`, animasi huruf naik kata demi kata
+   dari templat itu. Ia tidak dipakai di tempat lain, dan komponen bergerak
+   yang tidak pernah digambar cuma menyisakan pertanyaan. Ada di riwayat
+   git kalau suatu saat diperlukan lagi.
 
-   `WordsPullUp` diekspor terpisah karena gerakannya berguna di luar tema
-   ini juga, dan komponen yang cuma bisa dipakai satu tempat tidak perlu
-   jadi berkas sendiri.
+   ── SOAL VIDEO LATARNYA ─────────────────────────────────────────────────
+   Videonya ditaruh di CloudFront milik orang lain. Percobaan pertama
+   menggantinya dengan gambar merek sendiri supaya gerbang tidak bergantung
+   pada berkas yang tak bisa kita jaga; pemilik menolaknya — hasilnya
+   dinilai jauh di bawah kode aslinya, dan risiko tautan mati dianggap
+   murah karena tinggal ditukar. Keputusan itu miliknya.
+
+   `poster` tetap dipasang: bukan pengganti keputusan itu, melainkan
+   penyangga selama 15 MB videonya masih dalam perjalanan — tanpa itu,
+   bingkai pertama halaman masuk adalah kotak hitam. Kalau videonya
+   benar-benar hilang suatu hari, poster inilah yang tersisa, dan
+   gerbangnya tetap terlihat disengaja.
    ════════════════════════════════════════════════════════════════════════ */
 
-interface WordsPullUpProps {
-  text: string;
-  className?: string;
-  style?: React.CSSProperties;
-  /** Jeda antar kata, detik. Makin panjang kalimatnya makin kecil angkanya
-   *  — delapan kata dengan jeda 0,08 s berarti kata terakhir baru muncul
-   *  0,64 detik sesudah yang pertama, dan sesudah itu ia terbaca lamban. */
-  jeda?: number;
-  /** Menunda seluruh rangkaian; dipakai supaya baris kedua mulai sesudah
-   *  baris pertama selesai, bukan berbarengan. */
-  mulai?: number;
-}
-
-export const WordsPullUp = ({ text, className = '', style, jeda = 0.08, mulai = 0 }: WordsPullUpProps) => {
-  const ref = useRef<HTMLDivElement>(null);
-  /* once: true — animasinya dimainkan SEKALI. Panel gerbang tidak digulir,
-     tapi tanpa ini ia ikut main lagi tiap kali komponennya digambar ulang,
-     dan huruf yang melompat tiap kali kuota disegarkan terbaca seperti
-     kedipan, bukan sambutan. */
-  const isInView = useInView(ref, { once: true });
-  const words = text.split(' ');
-
-  return (
-    <div ref={ref} className={`inline-flex flex-wrap ${className}`} style={style}>
-      {words.map((word, i) => (
-        <motion.span
-          key={i}
-          initial={{ y: 20, opacity: 0 }}
-          animate={isInView ? { y: 0, opacity: 1 } : {}}
-          transition={{ duration: 0.6, delay: mulai + i * jeda, ease: [0.16, 1, 0.3, 1] }}
-          className="relative inline-block"
-          style={{ marginRight: i === words.length - 1 ? 0 : '0.25em' }}
-        >
-          {word}
-        </motion.span>
-      ))}
-    </div>
-  );
-};
-
-/* Bintik halus sebagai data-URI, bukan berkas gambar: satu permintaan
-   jaringan lagi di halaman masuk untuk tekstur setipis ini tidak sepadan,
-   dan berkas yang gagal dimuat meninggalkan bidang yang terlalu bersih
-   dibanding rancangannya. */
+/* Bintik sebagai data-URI, bukan berkas: satu permintaan jaringan lagi di
+   halaman masuk untuk tekstur setipis ini tidak sepadan, dan berkas yang
+   gagal dimuat meninggalkan bidang yang terlalu bersih dibanding
+   rancangannya. */
 const BINTIK =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E\")";
 
-/** Panel kiri halaman gerbang — tampilan "Prisma".
- *
- *  Membawa keterangan mereknya sendiri, jadi pemanggilnya menyembunyikan
- *  keterangan bersama saat tema ini menyala. Dua baris nama merek di satu
- *  panel adalah pengulangan yang paling cepat terlihat. */
-export function PanelGerbangPrisma({ gambar }: { gambar: string }) {
+const VIDEO =
+  'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260405_170732_8a9ccda6-5cff-4628-b164-059c500a2b41.mp4';
+
+export function PanelGerbangPrisma({ poster }: { poster: string }) {
+  /* ── DIPUTAR SENDIRI, JANGAN CUMA DIMINTA ────────────────────────────
+     Atribut `autoplay` bukan jaminan: sebagian peramban menahannya sampai
+     ada sentuhan, dan yang tersisa poster diam. Terukur saat menguji tema
+     ini — videonya siap penuh (readyState 4) tapi `paused` tetap true
+     sampai `play()` dipanggil tangan.
+
+     Penolakannya ditelan: kalau peramban memang melarang, poster yang
+     tampil sudah cukup, dan galat di konsol halaman masuk tidak menolong
+     siapa pun. */
+  const video = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    const v = video.current;
+    if (!v) return;
+    const coba = () => { void v.play().catch(() => { /* ditahan peramban */ }); };
+    coba();
+    v.addEventListener('loadeddata', coba);
+    return () => v.removeEventListener('loadeddata', coba);
+  }, []);
+
   return (
-    <div className="absolute inset-0 overflow-hidden">
-      <img src={gambar} alt="" className="absolute inset-0 size-full object-cover" />
+    <div className="absolute inset-0 overflow-hidden bg-zinc-950">
+      {/* muted + playsInline WAJIB dua-duanya: tanpa `muted` peramban
+          menolak memutar sendiri, dan tanpa `playsInline` iOS membuka
+          videonya layar penuh begitu ia mulai. */}
+      <video
+        ref={video}
+        autoPlay
+        loop
+        muted
+        playsInline
+        preload="auto"
+        poster={poster}
+        aria-hidden="true"
+        className="absolute inset-0 size-full object-cover"
+        src={VIDEO}
+      />
 
       <div
-        className="pointer-events-none absolute inset-0 opacity-[0.14] mix-blend-overlay"
+        className="pointer-events-none absolute inset-0 opacity-[0.55] mix-blend-overlay"
         style={{ backgroundImage: BINTIK }}
       />
 
-      {/* Dua tirai, dua tugas. Yang menurun menggelapkan kaki panel supaya
-          huruf putih di bawah tetap terbaca berapa pun terangnya gambar;
-          yang mendatar menyatukan sisi kanan panel dengan kolom isi di
-          sebelahnya — sama seperti pada tampilan Foto. */}
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-zinc-950/40 via-transparent to-zinc-950/90" />
+      {/* Tiga tirai, tiga tugas. Dua yang pertama dari templatnya: menahan
+          bagian atas dan menggelapkan kaki panel supaya keterangan merek di
+          sana terbaca berapa pun terangnya bingkai video yang sedang lewat.
+          Yang ketiga milik kita — menyatukan sisi kanan panel dengan kolom
+          isi di sebelahnya, sama seperti pada tampilan Foto. */}
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-black/60" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-zinc-950/85 to-transparent" />
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-zinc-950" />
-
-      <div className="absolute inset-x-0 bottom-0 px-10 pb-10">
-        {/* Ukurannya dari lebar PANEL (cqw), bukan lebar layar (vw).
-            Panel ini tinggal sisa layar sesudah kolom isi selebar 560 px
-            diambil, jadi ukuran yang dihitung dari layar akan melimpah di
-            jendela sempit dan tenggelam di layar lebar. */}
-        <h2
-          className="font-medium leading-[0.85] tracking-[-0.06em] text-zinc-100"
-          style={{ fontSize: 'clamp(2.75rem, 17cqw, 9rem)' }}
-        >
-          <WordsPullUp text="Jadi Trader" jeda={0.1} />
-        </h2>
-
-        <motion.p
-          initial={{ y: 16, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.8, delay: 0.45, ease: [0.16, 1, 0.3, 1] }}
-          className="mt-4 max-w-[38ch] text-[12.5px] leading-relaxed text-zinc-400"
-        >
-          Chart, screener, jurnal, dan eksekusi Pasar Kripto &amp; Forex di satu layar.
-        </motion.p>
-      </div>
     </div>
   );
 }
