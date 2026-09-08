@@ -582,14 +582,14 @@ function Masukan() {
         onClick={() => setBuka(true)}
         aria-label="Kirim masukan"
         title="Kirim masukan — bug, saran, atau error"
-        /* Tingginya disamakan dengan ikon pesan di sebelahnya (18 px):
-           pil setinggi 33 px membuat baris ini punya dua garis dasar yang
-           berbeda, dan mata membacanya sebagai dua kelompok kendali
-           padahal ketiganya sederajat. leading-none supaya tinggi barisnya
-           tidak menambah ruang di atas-bawah teks. */
-        className="flex h-[18px] shrink-0 cursor-pointer items-center gap-1 rounded-full border border-zinc-700 px-1.5 text-[10.5px] font-medium leading-none text-zinc-300 transition-colors hover:border-zinc-500 hover:text-zinc-100 sm:gap-1.5 sm:px-2"
+        /* Sempat dikecilkan jadi 18 px supaya tingginya sama dengan ikon
+           pesan; pemilik menilai hasilnya jelek dan meminta ukuran semula
+           dikembalikan (8 Sep 2026). Memang benar: pil ini SATU-SATUNYA
+           kendali berlabel di baris itu, dan memaksanya setinggi ikon
+           membuat tulisannya mengecil sampai hampir tidak terbaca. */
+        className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-zinc-700 px-2.5 py-1 text-[12.5px] font-medium text-zinc-300 transition-colors hover:border-zinc-500 hover:text-zinc-100 sm:px-3 sm:py-1.5"
       >
-        <IkonMasukan className="size-3 shrink-0" strokeWidth={2.2} />
+        <IkonMasukan className="size-4 shrink-0" strokeWidth={2} />
         <span className="hidden sm:inline">Feedback</span>
       </button>
 
