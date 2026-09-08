@@ -325,9 +325,13 @@ export default function Akses() {
               baris yang mulai serempak terbaca sebagai dua judul yang
               kebetulan bertumpuk, bukan satu kalimat. */}
           <h1 className="text-4xl font-medium leading-[0.95] tracking-tighter text-zinc-50 sm:text-5xl lg:text-[56px]">
-            <TeksKaskade teks="Masuk ke" warnaSentuh="#ffcd75" />
+            <TeksKaskade teks="Masuk ke" warnaSentuh="var(--color-emas)" />
             <br />
-            <TeksKaskade teks="Jadi Trader Tools" warna="#ffcd75" warnaSentuh="#ffffff"
+            {/* Lewat variabel, bukan heksa: di tema terang emas pucat ini
+                berasio 1,47 di atas putih — judul merek yang nyaris tak
+                terlihat. Warna sentuhnya "putih" yang ikut dibalik tema,
+                supaya di tema terang ia menuju gelap, bukan lenyap. */}
+            <TeksKaskade teks="Jadi Trader Tools" warna="var(--color-emas)" warnaSentuh="var(--color-white, #ffffff)"
               mulaiDari={9} />
           </h1>
           <p className="max-w-[46ch] text-[15.5px] leading-relaxed text-zinc-400">
@@ -365,7 +369,7 @@ export default function Akses() {
                           sisa={kuota.gratisSisa} warna="bg-emerald-500"
                           catatan={`${kuota.hari} hari`} />
               <KartuKuota judul="Paket Starter" pakai={kuota.bayarTerpakai} total={kuota.bayarTotal}
-                          sisa={kuota.bayarSisa} warna="bg-[#ffcd75]"
+                          sisa={kuota.bayarSisa} warna="bg-emas"
                           catatan={`${HARGA_PERINTIS_TEKS} · ${kuota.hari} hari`} />
             </>
           )}
@@ -608,7 +612,7 @@ export default function Akses() {
                   !pahamRisiko
                     ? 'pointer-events-none cursor-not-allowed bg-zinc-800 text-zinc-600'
                     : kuota.gratisHabis
-                      ? 'bg-[#ffcd75] text-zinc-950 hover:bg-[#ffd98f]'
+                      ? 'bg-emas text-zinc-950 hover:bg-emas-muda'
                       : 'border border-zinc-800 text-zinc-300 hover:bg-zinc-900',
                 )}
               >

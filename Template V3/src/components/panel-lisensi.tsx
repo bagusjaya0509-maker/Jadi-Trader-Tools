@@ -243,7 +243,7 @@ export function PanelLisensi() {
                     {x.jenis && (
                       <span className={cn('rounded px-1.5 py-0.5 text-[10px]',
                         x.jenis === 'bayar'
-                          ? 'bg-[#ffcd75]/10 text-[#ffcd75]'
+                          ? 'bg-emas/10 text-emas'
                           : 'bg-emerald-500/10 text-emerald-500')}>
                         {x.jenis === 'bayar' ? 'berbayar' : 'gratis'}
                       </span>
@@ -269,7 +269,7 @@ export function PanelLisensi() {
                       di lynk.id, dan mencarinya di antara catatan bebas
                       berarti membacanya satu per satu. */}
                   {x.bukti === 'lynk' && (
-                    <span className="inline-flex items-center gap-1 rounded bg-[#ffcd75]/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#ffcd75]">
+                    <span className="inline-flex items-center gap-1 rounded bg-emas/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emas">
                       Lynk · sudah bayar
                     </span>
                   )}

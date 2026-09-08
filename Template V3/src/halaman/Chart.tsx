@@ -5405,7 +5405,7 @@ ${pnlSunting !== null
                                   {tolakRiwayat} Akses berbayar membuka riwayat tanpa batas.
                                 </p>
                                 <Link to="/harga"
-                                  className="mt-2 block cursor-pointer rounded-md bg-emerald-600 px-2 py-1.5 text-[11px] font-medium text-white transition-colors hover:bg-emerald-500">
+                                  className="mt-2 block cursor-pointer rounded-md bg-emerald-600 px-2 py-1.5 text-[11px] font-medium text-putih-mutlak transition-colors hover:bg-emerald-500">
                                   Lihat paket
                                 </Link>
                               </div>
@@ -5425,7 +5425,7 @@ ${pnlSunting !== null
                                 <button
                                   onClick={() => void muatLebihLama()}
                                   disabled={muatLama}
-                                  className="mt-2 w-full cursor-pointer rounded-md bg-emerald-600 px-2 py-1.5 text-[11px] font-medium text-white transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60">
+                                  className="mt-2 w-full cursor-pointer rounded-md bg-emerald-600 px-2 py-1.5 text-[11px] font-medium text-putih-mutlak transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60">
                                   {muatLama ? 'Memuat\u2026' : 'Muat lebih lama'}
                                 </button>
                                 {/* Angka dari server, dan hanya kalau paketnya
@@ -6593,7 +6593,7 @@ ${pnlSunting !== null
                           Batal
                         </button>
                         <button onClick={simpanTampilan}
-                          className="flex-1 cursor-pointer rounded-md bg-emerald-600 px-2 py-1.5 text-[11.5px] font-medium text-white transition-colors hover:bg-emerald-500">
+                          className="flex-1 cursor-pointer rounded-md bg-emerald-600 px-2 py-1.5 text-[11.5px] font-medium text-putih-mutlak transition-colors hover:bg-emerald-500">
                           Simpan
                         </button>
                       </div>

@@ -456,7 +456,7 @@ function PapanPeringkat({ pantau, jadiAnalis, analisSet }: {
                         dipantau — memaksa orang menekan "Pantau" dulu cuma
                         menambah satu ketukan untuk sesuatu yang toh terjadi. */}
                     {analisSet?.has(w.alamat) ? (
-                      <span className="text-[11px] text-[#ffcd75]/90" title="Dompet ini punya kartunya sendiri di Copy Signal.">
+                      <span className="text-[11px] text-emas/90" title="Dompet ini punya kartunya sendiri di Copy Signal.">
                         Analis
                       </span>
                     ) : jadiAnalis ? (
@@ -475,7 +475,7 @@ function PapanPeringkat({ pantau, jadiAnalis, analisSet }: {
                           onClick={() => { setSibuk(w.alamat); void jadiAnalis(w.alamat, w.nama).finally(() => setSibuk(null)); }}
                           disabled={sibuk === w.alamat}
                           title="Posisi dompet ini terbit sebagai sinyal di Copy Signal, apa adanya — tanpa SL dan TP."
-                          className="cursor-pointer whitespace-nowrap rounded border border-[#ffcd75]/40 px-2 py-0.5 text-[11px] text-[#ffcd75]/90 transition-colors hover:border-[#ffcd75]/70 hover:text-[#ffcd75] disabled:opacity-50">
+                          className="cursor-pointer whitespace-nowrap rounded border border-emas/40 px-2 py-0.5 text-[11px] text-emas/90 transition-colors hover:border-emas/70 hover:text-emas disabled:opacity-50">
                           {sibuk === w.alamat ? '…' : 'Jadikan analis'}
                         </button>
                       </span>

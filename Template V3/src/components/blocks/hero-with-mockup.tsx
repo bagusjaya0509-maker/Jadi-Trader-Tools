@@ -74,8 +74,8 @@ export function HeroWithMockup({
               asChild
               size="lg"
               className={cn(
-                'bg-gradient-to-b from-[#ffcd75] to-[#c9a24b]',
-                'hover:from-[#ffcd75] hover:to-[#ffcd75]',
+                'bg-gradient-to-b from-emas to-[#c9a24b]',
+                'hover:from-emas hover:to-emas',
                 'text-zinc-950 font-semibold shadow-lg',
                 'transition-all duration-300',
               )}

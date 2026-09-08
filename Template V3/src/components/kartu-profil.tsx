@@ -261,7 +261,7 @@ export function KartuProfil({ tutup }: { tutup: () => void }) {
           to="/harga" onClick={tutup}
           title={pemilik ? 'Lihat halaman harga' : 'Upgrade paket'}
           aria-label={pemilik ? 'Lihat halaman harga' : 'Upgrade paket'}
-          className="absolute right-3 top-3 flex size-8 items-center justify-center rounded-lg border border-white/10 bg-zinc-950/50 text-zinc-300 backdrop-blur-sm transition-colors hover:border-[#ffcd75]/40 hover:bg-zinc-950/70 hover:text-[#ffcd75]"
+          className="absolute right-3 top-3 flex size-8 items-center justify-center rounded-lg border border-white/10 bg-zinc-950/50 text-zinc-300 backdrop-blur-sm transition-colors hover:border-emas/40 hover:bg-zinc-950/70 hover:text-emas"
         >
           <Rocket className="size-4" />
         </Link>

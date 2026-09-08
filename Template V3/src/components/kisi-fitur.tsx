@@ -31,7 +31,7 @@ import { cn } from '@/lib/utils';
  *  benar-benar berguna: di menu mana barang ini tinggal. */
 function Tempat({ anak }: { anak: string }) {
   return (
-    <span className="angka text-[10px] font-semibold uppercase tracking-[0.14em] text-[#ffcd75]/70">
+    <span className="angka text-[10px] font-semibold uppercase tracking-[0.14em] text-emas/70">
       {anak}
     </span>
   );
@@ -56,7 +56,7 @@ function Kartu({ tempat, ikon: Ikon, judul, kalimat, lebar, children }: {
       <div className="border-t border-zinc-900 bg-zinc-950/40 p-6">
         <Tempat anak={tempat} />
         <div className="mt-2 flex items-center gap-2.5">
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[#ffcd75]/10 text-[#ffcd75]">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-emas/10 text-emas">
             <Ikon className="size-4" />
           </span>
           <h3 className="text-[15px] font-semibold text-zinc-100">{judul}</h3>
@@ -161,7 +161,7 @@ function PeragaKunci() {
       <div className="rounded-lg border border-zinc-800/80 bg-zinc-950 p-3">
         <div className="text-zinc-600">VPS-mu</div>
         <div className="mt-1 break-all text-zinc-400">
-          BINANCE_KEY=<span className="text-[#ffcd75]/80">••••••••••••••••</span>
+          BINANCE_KEY=<span className="text-emas/80">••••••••••••••••</span>
         </div>
         <div className="mt-3 flex items-center gap-2 border-t border-zinc-900 pt-3 text-zinc-500">
           <span className="motion-safe:animate-pulse size-1.5 rounded-full bg-emerald-500" />

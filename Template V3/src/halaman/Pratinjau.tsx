@@ -96,7 +96,7 @@ export default function Pratinjau() {
           </div>
           <h1 className="text-4xl font-medium leading-[1.02] tracking-tighter text-zinc-50 sm:text-[44px]">
             Lihat isinya dulu,<br />
-            <span className="bg-gradient-to-br from-white via-white to-[#ffcd75] bg-clip-text text-transparent">
+            <span className="bg-gradient-to-br from-white via-white to-emas bg-clip-text text-transparent">
               sehari penuh
             </span>
           </h1>

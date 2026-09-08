@@ -76,7 +76,7 @@ function IkonKoin({ simbol }: { simbol: string }) {
   const warna = WARNA_KOIN[nama] ?? "#71717a";
   return (
     <span
-      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[9.5px] font-bold text-white ring-1 ring-white/15"
+      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[9.5px] font-bold text-putih-mutlak ring-1 ring-putih-mutlak/15"
       style={{ background: `linear-gradient(140deg, ${warna}, ${warna}66)` }}
       aria-hidden
     >
@@ -356,7 +356,7 @@ export default function HeroSection() {
                   {barisJudul.map((b, i) => (
                     <span key={i}>
                       {i === barisEmas
-                        ? <span className="bg-gradient-to-br from-white via-white to-[#ffcd75] bg-clip-text text-transparent">{b}</span>
+                        ? <span className="bg-gradient-to-br from-white via-white to-emas bg-clip-text text-transparent">{b}</span>
                         : b}
                       {i < barisJudul.length - 1 && <br />}
                     </span>

@@ -248,7 +248,7 @@ export default function Aktivasi() {
               dan memang salah, sampai 6 Sep 2026. */}
           <h1 className="text-4xl font-medium leading-[0.95] tracking-tighter text-zinc-50 sm:text-5xl">
             {modeProduk ? 'Ambil ' : 'Aktifkan '}
-            <span className="bg-gradient-to-br from-white via-white to-[#ffcd75] bg-clip-text text-transparent">
+            <span className="bg-gradient-to-br from-white via-white to-emas bg-clip-text text-transparent">
               {modeProduk ? namaProduk : 'aksesmu'}
             </span>
           </h1>
@@ -346,7 +346,7 @@ export default function Aktivasi() {
             ) : tercatat ? (
               <>
                 <div className="flex items-center gap-2 text-[13.5px] font-medium text-zinc-100">
-                  <Clock className="size-4 text-[#ffcd75]" /> Menunggu pencocokan
+                  <Clock className="size-4 text-emas" /> Menunggu pencocokan
                 </div>
                 <p className="mt-1.5 text-[12px] leading-relaxed text-zinc-500">
                   {modeProduk ? (
