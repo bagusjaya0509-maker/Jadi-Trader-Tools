@@ -78,9 +78,27 @@ async function salin(teks: string): Promise<boolean> {
 
    Komisi TIDAK disebut, dengan sengaja. Yang menerima pesan bukan calon
    perujuk, dan menyebut angkanya membuat ajakannya terbaca seperti orang
-   yang sedang dibayar untuk mengirimnya. */
+   yang sedang dibayar untuk mengirimnya.
+
+   ── KENAPA MULAI DARI KELUHAN, BUKAN DARI FITUR ─────────────────────
+   Versi pertama berbunyi "Saya pakai Jadi Trader Tools untuk chart,
+   screener, dan jurnal trading dalam satu halaman", dan pemilik menilainya
+   jelek 8 Sep 2026. Ia benar: itu daftar isi, dan setiap alat trading
+   menuliskan daftar yang mirip. Tidak ada satu pun kata di dalamnya yang
+   membuat pembacanya merasa sedang dibicarakan.
+
+   Sekarang kalimat pertamanya menyebut keadaan yang dikenali orangnya
+   sendiri, baru mesinnya, baru langkah termurah. Ditulis dalam sudut
+   pandang PEMBACA ("catatan tradingmu"), bukan pengirimnya: naskah yang
+   berkata "dulu saya begini" menaruh riwayat karangan di mulut orang yang
+   membagikannya, dan ia belum tentu pernah mengalaminya.
+
+   Pratinjau 24 jam ditaruh di akhir karena itu langkah yang paling mudah
+   disetujui: tidak ada yang diminta, tidak ada yang dipasang. */
 const PESAN_AJAKAN =
-  'Saya pakai Jadi Trader Tools untuk chart, screener, dan jurnal trading dalam satu halaman. '
+  'Kalau catatan tradingmu tidak pernah rapi, susah tahu kebiasaan mana yang sebenarnya bikin akun bocor. '
+  + 'Di sini jurnalnya terisi sendiri dari MetaTrader 5 dan Binance, lengkap sampai pola emosinya, '
+  + 'dan chart replay-nya bisa dipakai latihan di pergerakan lama. '
   + 'Ada pratinjau 24 jam kalau mau lihat isinya dulu tanpa daftar: {tautan}';
 
 export default function Referral() {
