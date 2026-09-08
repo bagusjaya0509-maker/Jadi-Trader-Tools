@@ -260,7 +260,10 @@ const CSS_TANPA_CANGKANG = `
      dasarnya --v2-* ikut — alias di :root cuma menunjuk ke sana, jadi
      yang memakai --v2-kertas-2 langsung pun ikut berubah. Nilainya
      salinan dari index.css: zinc netral yang lebih curam di ujung terang,
-     hijau #047857, merah #c81e1e, emas #a16207. */
+     merah #c81e1e. Hijau dan emasnya SATU tangga lebih pekat daripada
+     V3 (#065f46, #92400e): di screener keduanya duduk di atas rona
+     tipis warnanya sendiri (tombol BUY NOW, lencana SMI, tag SAHAM/ETF),
+     dan di situ #047857 cuma 4,3 — terukur sesudah putaran pertama. */
 
   [data-tema='terang'] .ema-screener {
     background: #ffffff !important;
@@ -278,12 +281,12 @@ const CSS_TANPA_CANGKANG = `
     --v2-kertas: #09090b !important;
     --v2-kertas-2: #48484f !important;
     --v2-kertas-3: #62626a !important;
-    --v2-emas: #a16207 !important;
-    --v2-emas-terang: #b8720a !important;
-    --v2-emas-kabut: rgba(161,98,7,.10) !important;
-    --v2-emas-garis: rgba(161,98,7,.35) !important;
-    --v2-naik: #047857 !important;
-    --v2-naik-kabut: rgba(4,120,87,.11) !important;
+    --v2-emas: #92400e !important;
+    --v2-emas-terang: #a16207 !important;
+    --v2-emas-kabut: rgba(146,64,14,.10) !important;
+    --v2-emas-garis: rgba(146,64,14,.35) !important;
+    --v2-naik: #065f46 !important;
+    --v2-naik-kabut: rgba(6,95,70,.09) !important;
     --v2-turun: #c81e1e !important;
     --v2-turun-kabut: rgba(200,30,30,.10) !important;
     /* alias screener */
@@ -295,14 +298,14 @@ const CSS_TANPA_CANGKANG = `
     --text: #09090b !important;
     --muted: #48484f !important;
     --dim: #62626a !important;
-    --gold: #a16207 !important;
-    --gold-soft: rgba(161,98,7,.10) !important;
-    --gold-dim: rgba(161,98,7,.10) !important;
-    --bull: #047857 !important;
+    --gold: #92400e !important;
+    --gold-soft: rgba(146,64,14,.10) !important;
+    --gold-dim: rgba(146,64,14,.10) !important;
+    --bull: #065f46 !important;
     --bear: #c81e1e !important;
-    --bull-dim: rgba(4,120,87,.11) !important;
+    --bull-dim: rgba(6,95,70,.09) !important;
     --bear-dim: rgba(200,30,30,.10) !important;
-    --bull-soft: rgba(4,120,87,.11) !important;
+    --bull-soft: rgba(6,95,70,.09) !important;
     --bear-soft: rgba(200,30,30,.10) !important;
     /* alias skema jurnal */
     --ground: #ffffff !important;
@@ -312,11 +315,11 @@ const CSS_TANPA_CANGKANG = `
     --ink: #09090b !important;
     --ink-dim: #48484f !important;
     --ink-faint: #62626a !important;
-    --accent: #a16207 !important;
-    --accent-dim: #a16207 !important;
-    --accent-soft: rgba(161,98,7,.10) !important;
-    --profit: #047857 !important;
-    --profit-soft: rgba(4,120,87,.11) !important;
+    --accent: #92400e !important;
+    --accent-dim: #92400e !important;
+    --accent-soft: rgba(146,64,14,.10) !important;
+    --profit: #065f46 !important;
+    --profit-soft: rgba(6,95,70,.09) !important;
     --loss: #c81e1e !important;
     --loss-soft: rgba(200,30,30,.10) !important;
   }
