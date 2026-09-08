@@ -47,6 +47,12 @@ export interface TradeReplay extends PosisiReplay {
   pnl: number;
   masukWaktu: number;
   keluarWaktu: number;
+  /** Catatan evaluasi SESUDAH trade selesai — diisi di panel replay, bukan
+   *  di tiket. `emosi`/`alasan` dari tiket adalah keadaan SEBELUM masuk;
+   *  yang di sini penilaian sesudah tahu hasilnya. Keduanya disimpan
+   *  karena justru selisihnya yang mengajari. */
+  evaluasi?: string;
+  emosiEvaluasi?: string;
 }
 
 export const KECEPATAN = [
@@ -129,6 +135,8 @@ export interface SesiReplay {
   posisi: PosisiReplay | null;
   trade: TradeReplay[];
   modal: number;
+  /** Catatan sesi — pelajaran dari keseluruhan latihan, bukan per trade. */
+  catatan?: string;
 }
 
 const AWALAN = 'jt.replay.';
@@ -145,6 +153,7 @@ export function bacaSesi(simbol: string, tf: string): SesiReplay | null {
       posisi: s.posisi ?? null,
       trade: Array.isArray(s.trade) ? s.trade : [],
       modal: Number(s.modal) || 1000,
+      catatan: typeof s.catatan === 'string' ? s.catatan : '',
     };
   } catch { return null; }
 }
@@ -157,6 +166,136 @@ export function simpanSesi(simbol: string, tf: string, s: SesiReplay) {
 export function hapusSesi(simbol: string, tf: string) {
   try { localStorage.removeItem(kunciSesi(simbol, tf)); } catch { /* abaikan */ }
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   ANALISA LATIHAN
+   ════════════════════════════════════════════════════════════════════════
+   Semua angka di panel jurnal latihan dihitung di sini, dari daftar trade
+   yang sama — bukan dari state tampilan. Panelnya tinggal menggambar.
+
+   Dihitung ulang tiap render, dan itu sengaja: sesi latihan puluhan trade,
+   bukan ribuan, dan satu fungsi murni lebih mudah diuji daripada memo yang
+   harus diberi tahu kapan ia basi.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/** Pilihan emosi yang sama dengan tiket order (pojok-order.tsx). Ditulis di
+ *  sini, bukan diimpor dari lib/emosi-posisi.ts: berkas itu mengimpor
+ *  Firestore dan auth, dan panel replay ada di jalur muat awal halaman Chart. */
+export const EMOSI_LATIHAN = ['Netral', 'Percaya Diri', 'Tenang', 'Ragu-ragu', 'FOMO', 'Panik', 'Balas Dendam'] as const;
+
+export interface TitikEkuitas { no: number; ekuitas: number; waktu: number }
+
+export interface KelompokReplay {
+  nama: string;
+  jumlah: number;
+  menang: number;
+  winrate: number;
+  bersih: number;
+}
+
+export interface AnalisaReplay {
+  /** Dimulai dari modal (no 0) supaya kurvanya punya titik awal. */
+  kurva: TitikEkuitas[];
+  puncak: number;
+  lembah: number;
+  /** Persen penurunan terdalam dari puncak ekuitas sebelumnya. */
+  drawdownMaks: number;
+  rataMenang: number;
+  rataKalah: number;
+  /** Dolar yang diharapkan per trade = winrate×rataMenang − lossrate×rataKalah. */
+  ekspektasi: number;
+  rasioRataRata: number | null;
+  terbaik: TradeReplay | null;
+  terburuk: TradeReplay | null;
+  beruntunMenang: number;
+  beruntunKalah: number;
+  /** Rata-rata bar yang ditahan dari masuk sampai keluar. */
+  rataBar: number;
+  perArah: KelompokReplay[];
+  perSebab: KelompokReplay[];
+  /** Emosi SAAT MASUK dari tiket. Yang tidak mengisi dikelompokkan sebagai
+   *  "Tidak dicatat" — bukan "Netral", karena tidak menulis bukan berarti
+   *  tenang. */
+  perEmosi: KelompokReplay[];
+}
+
+function kelompokkan(trade: TradeReplay[], kunci: (t: TradeReplay) => string): KelompokReplay[] {
+  const peta = new Map<string, TradeReplay[]>();
+  for (const t of trade) {
+    const k = kunci(t);
+    if (!peta.has(k)) peta.set(k, []);
+    peta.get(k)!.push(t);
+  }
+  return [...peta.entries()].map(([nama, d]) => {
+    const menang = d.filter((t) => t.pnl > 0).length;
+    return {
+      nama, jumlah: d.length, menang,
+      winrate: d.length ? (menang / d.length) * 100 : 0,
+      bersih: d.reduce((s, t) => s + t.pnl, 0),
+    };
+  }).sort((a, b) => b.jumlah - a.jumlah);
+}
+
+export function analisaReplay(trade: TradeReplay[], modal: number): AnalisaReplay {
+  const urut = [...trade].sort((a, b) => a.no - b.no);
+  const kurva: TitikEkuitas[] = [{ no: 0, ekuitas: modal, waktu: urut[0]?.masukWaktu ?? 0 }];
+  let ekuitas = modal, puncak = modal, lembah = modal, ddMaks = 0;
+  let runM = 0, runK = 0, maksM = 0, maksK = 0;
+  for (const t of urut) {
+    ekuitas += t.pnl;
+    kurva.push({ no: t.no, ekuitas, waktu: t.keluarWaktu });
+    if (ekuitas > puncak) puncak = ekuitas;
+    if (ekuitas < lembah) lembah = ekuitas;
+    const dd = puncak > 0 ? ((puncak - ekuitas) / puncak) * 100 : 0;
+    if (dd > ddMaks) ddMaks = dd;
+    if (t.pnl > 0) { runM += 1; runK = 0; } else { runK += 1; runM = 0; }
+    maksM = Math.max(maksM, runM); maksK = Math.max(maksK, runK);
+  }
+  const menang = urut.filter((t) => t.pnl > 0);
+  const kalah = urut.filter((t) => t.pnl <= 0);
+  const rataMenang = menang.length ? menang.reduce((s, t) => s + t.pnl, 0) / menang.length : 0;
+  const rataKalah = kalah.length ? Math.abs(kalah.reduce((s, t) => s + t.pnl, 0) / kalah.length) : 0;
+  const pMenang = urut.length ? menang.length / urut.length : 0;
+  const ekspektasi = pMenang * rataMenang - (1 - pMenang) * rataKalah;
+  const rataBar = urut.length
+    ? urut.reduce((s, t) => s + Math.max(0, t.keluarIdx - t.masukIdx), 0) / urut.length
+    : 0;
+  return {
+    kurva, puncak, lembah, drawdownMaks: ddMaks,
+    rataMenang, rataKalah, ekspektasi,
+    rasioRataRata: rataKalah > 0 ? rataMenang / rataKalah : null,
+    terbaik: urut.length ? urut.reduce((a, t) => (t.pnl > a.pnl ? t : a)) : null,
+    terburuk: urut.length ? urut.reduce((a, t) => (t.pnl < a.pnl ? t : a)) : null,
+    beruntunMenang: maksM, beruntunKalah: maksK, rataBar,
+    perArah: kelompokkan(urut, (t) => t.arah),
+    perSebab: kelompokkan(urut, (t) => (t.sebab === 'Manual' ? 'Tutup manual' : 'Kena ' + t.sebab)),
+    perEmosi: kelompokkan(urut, (t) => t.emosi || 'Tidak dicatat'),
+  };
+}
+
+/** Sesi latihan lain yang tersimpan di perangkat ini — untuk daftar
+ *  "sesi lain" di panel, supaya latihan di simbol/TF berbeda tidak hilang
+ *  dari pandangan. Cuma yang punya trade; sesi kosong bukan riwayat. */
+export interface RingkasSesi { simbol: string; tf: string; jumlah: number; bersih: number; modal: number }
+
+export function daftarSesi(): RingkasSesi[] {
+  const hasil: RingkasSesi[] = [];
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i) ?? '';
+      if (!k.startsWith(AWALAN)) continue;
+      const sisa = k.slice(AWALAN.length);
+      const titik = sisa.lastIndexOf('.');
+      if (titik < 0) continue;
+      const simbol = sisa.slice(0, titik), tf = sisa.slice(titik + 1);
+      const s = bacaSesi(simbol, tf);
+      if (!s || !s.trade.length) continue;
+      hasil.push({ simbol, tf, jumlah: s.trade.length, bersih: s.trade.reduce((a, t) => a + t.pnl, 0), modal: s.modal });
+    }
+  } catch { /* privat */ }
+  return hasil.sort((a, b) => b.jumlah - a.jumlah);
+}
+
 
 /* ── Setelan halaman Chart ───────────────────────────────────────────────
    Simbol, timeframe, indikator yang menyala, dan setelan backtest bertahan

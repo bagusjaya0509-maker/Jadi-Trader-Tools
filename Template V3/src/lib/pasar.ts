@@ -184,6 +184,12 @@ export function aturBursaSimbol(simbol: string, b: BursaSimbol | null) {
   /* Cache lilin dikunci per pasar (lihat `kunci` di ambilKlines), jadi
      tidak ada yang perlu dibuang di sini — permintaan berikutnya memakai
      kunci yang berbeda dengan sendirinya. */
+  /* Yang menggambar lencana bursa di tempat lain (watchlist) diberi tahu.
+     Peta ini modul-level, bukan state React, jadi tanpa peristiwa ini
+     watchlist baru ikut berubah pada polling tickers berikutnya — dan
+     selama jeda itu lencananya berkata Binance sementara tanda air chart
+     berkata Hyperliquid (dilaporkan pemilik 8 Sep 2026). */
+  try { window.dispatchEvent(new CustomEvent('jt:bursa-simbol-berubah', { detail: simbol })); } catch { /* bukan peramban */ }
 }
 
 /** Nilai `market` yang dikirim ke /api/klines untuk simbol ini. */

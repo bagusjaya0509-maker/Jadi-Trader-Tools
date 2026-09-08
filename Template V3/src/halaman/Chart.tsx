@@ -6,7 +6,7 @@ import {
   Layers, ChevronDown, ChevronUp, Settings2, Code2, X, Ruler, Rows3, Square, Eraser, Minus, TrendingUp,
   MoveRight,
   FlaskConical, GripHorizontal, Maximize2, Minimize2, SquareArrowUp, SquareArrowDown,
-  Settings, RotateCcw, LayoutGrid, Link2, Briefcase } from 'lucide-react';
+  Settings, RotateCcw, LayoutGrid, Link2, Briefcase, Trash2 } from 'lucide-react';
 import { PanelNews } from '@/components/panel-news';
 import { simpanDraf } from '@/lib/draf-sinyal';
 import { Panel, PanelHead, KartuKpi, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
@@ -6250,8 +6250,15 @@ ${pnlSunting !== null
                 baris ini; dua kendali sejenis yang dipakai bergantian tidak
                 punya alasan duduk di ujung yang berlawanan. */}
             <span className="flex min-w-0 items-center gap-2 truncate">
+              {/* Chip ini kini tombol: satu klik menghapus penanda dari
+                  chart tanpa harus membuka panelnya dulu. pointer-events
+                  dinyalakan lagi khusus di sini karena wadahnya sengaja
+                  tembus klik supaya tidak menghalangi chart di bawahnya. */}
               {hasil?.trade.length ? (
-                <span className="truncate">{hasil.trade.length} penanda trade</span>
+                <button onClick={() => setHasil(null)} title="Hapus penanda backtest dari chart"
+                  className="pointer-events-auto cursor-pointer truncate transition-colors hover:text-zinc-300">
+                  {hasil.trade.length} penanda trade · hapus
+                </button>
               ) : null}
             </span>
 
@@ -6609,27 +6616,39 @@ ${pnlSunting !== null
             kebetulan bertetangga. */}
         {backtestBuka && (
           <div ref={panelBacktestRef} className="scroll-mt-16 border-t border-zinc-800/80">
-      {/* ── Backtest (beta) — tampil hanya kalau dibuka dari ikon di
-             pojok bawah chart ── */}
-          <div className="mt-px border border-amber-500/25 bg-amber-500/[0.04] px-4 py-2.5 text-[12px] leading-relaxed text-amber-200/80">
-            <span className="font-medium">Backtest masih beta.</span>
-            <span className="text-amber-200/60">
-              {' '}Angkanya dihitung dari data lilin yang sedang tampil dan belum memperhitungkan
-              slippage maupun spread yang berubah-ubah. Pakai sebagai pembanding kasar antar setelan,
-              bukan sebagai janji hasil.
-            </span>
-          </div>
-      {/* ── Setelan uji ── */}
-          <Panel className="mt-px rounded-none bg-transparent">
+          {/* ── Setelan uji ──
+              Satu kepala untuk seluruh panel. Peringatan beta yang dulu
+              jadi spanduk kuning sendiri dipadatkan ke sub-judul — isinya
+              tetap, cuma tidak lagi mendorong seluruh panel ke bawah.
+
+              Dua tombol yang dulu tidak ada: "Hapus hasil" dan "Tutup".
+              Pemilik melaporkan 8 Sep 2026 tidak menemukan cara
+              menghilangkan penanda backtest dari chart. Hasilnya memang
+              sengaja bertahan sesudah panel ditutup (chip "N penanda
+              trade" di kaki chart), jadi jalan keluarnya harus tertulis
+              di panelnya sendiri, bukan diandaikan. */}
+          <Panel className="rounded-none bg-transparent">
             <PanelHead
               judul="Backtest"
-              sub="Dihitung dengan indikator yang sama persis dengan Screener Entry."
+              sub="Indikator yang sama dengan Screener Entry. Masih beta: tanpa slippage dan spread yang berubah — pembanding antar setelan, bukan janji hasil."
               kanan={
-                <button onClick={jalankan} disabled={uji || lilin.closes.length < 60}
-                  className="flex cursor-pointer items-center gap-2 rounded-md bg-zinc-100 px-3.5 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50">
-                  {uji ? <Loader2 className="size-3.5 animate-spin" /> : <Play className="size-3.5" />}
-                  Jalankan Backtest
-                </button>
+                <div className="flex items-center gap-2">
+                  {hasil && (
+                    <button onClick={() => setHasil(null)} title="Hapus hasil dan penandanya dari chart"
+                      className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 py-1.5 text-[12px] text-zinc-400 transition-colors hover:border-red-500/30 hover:text-red-400">
+                      <Trash2 className="size-3.5" /> Hapus hasil
+                    </button>
+                  )}
+                  <button onClick={jalankan} disabled={uji || lilin.closes.length < 60}
+                    className="flex cursor-pointer items-center gap-2 rounded-md bg-zinc-100 px-3.5 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50">
+                    {uji ? <Loader2 className="size-3.5 animate-spin" /> : <Play className="size-3.5" />}
+                    Jalankan Backtest
+                  </button>
+                  <button onClick={() => setBacktestBuka(false)} title="Tutup panel Backtest" aria-label="Tutup panel Backtest"
+                    className="flex size-7 cursor-pointer items-center justify-center rounded-md border border-zinc-800 text-zinc-500 transition-colors hover:border-zinc-700 hover:text-zinc-200">
+                    <X className="size-3.5" />
+                  </button>
+                </div>
               }
             />
             <div className="grid grid-cols-2 gap-3 px-5 pb-5 sm:grid-cols-4 xl:grid-cols-7">

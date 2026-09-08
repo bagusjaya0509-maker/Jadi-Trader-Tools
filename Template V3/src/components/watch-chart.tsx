@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, X, GripVertical, Pencil, FolderPlus } from 'lucide-react';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { cn, harga as fHarga } from '@/lib/utils';
-import { ambilTickers, hargaTickMt5, daftarSimbolHl, daftarSimbolMt5, type Ticker } from '@/lib/pasar';
+import { ambilTickers, hargaTickMt5, daftarSimbolHl, daftarSimbolMt5, bursaSimbol, type Ticker } from '@/lib/pasar';
 import { SIMBOL_DASAR, useSimbol } from '@/lib/simbol';
 import { useMulti, kirimBus, ID_PANEL, POLOS } from '@/lib/multi-chart';
 import { db } from '@/lib/data';
@@ -107,6 +107,22 @@ export function WatchChart({ simbol, onPilih, onLebar }: {
      dipakai jadi yang paling lambat. */
   const multi = useMulti();
   const [menuPanel, setMenuPanel] = useState<{ simbol: string; x: number; y: number } | null>(null);
+  /* ── LENCANA BURSA MENGIKUTI PILIHAN, BUKAN CUMA ASAL TICKERS ─────────
+     `t.bursa` dari /api/tickers menjawab "koin ini adanya di mana" —
+     Binance kalau ada di Binance. Tapi sejak lencana di panel order bisa
+     memindahkan koin yang ada di dua bursa ke Hyperliquid, yang benar
+     untuk baris ini adalah bursa yang DIPILIH orangnya: tanda air chart
+     sudah berkata Hyperliquid, dan watchlist yang tetap berkata Binance
+     membuat dua bagian layar berselisih tentang hal yang sama.
+
+     Petanya modul-level (pasar.ts), jadi komponen ini perlu dicolek agar
+     menggambar ulang begitu pilihannya berubah — itulah `bursaTik`. */
+  const [, setBursaTik] = useState(0);
+  useEffect(() => {
+    const naik = () => setBursaTik((n) => n + 1);
+    window.addEventListener('jt:bursa-simbol-berubah', naik);
+    return () => window.removeEventListener('jt:bursa-simbol-berubah', naik);
+  }, []);
   useEffect(() => {
     if (!menuPanel) return;
     const tutup = () => setMenuPanel(null);
@@ -612,20 +628,23 @@ export function WatchChart({ simbol, onPilih, onLebar }: {
 
                             Hyperliquid diberi warna, Binance dibiarkan
                             kelabu: yang perlu menonjol memang yang jarang. */}
-                        {!mt5 && t && (
-                          <span title={t.bursa === 'hyperliquid'
-                            ? 'Koin ini tidak ada di Binance — harga & ordernya lewat Hyperliquid'
-                            : 'Harga & ordernya lewat Binance Futures'}
-                            className={cn('shrink-0 rounded px-1 text-[8.5px] font-semibold tracking-wide',
-                              t.bursa === 'hyperliquid' ? KELAS_BURSA.hyperliquid : KELAS_BURSA.binance)}>
-                            <span className="hidden sm:inline">
-                              {t.bursa === 'hyperliquid' ? 'Hyperliquid' : 'Binance'}
+                        {!mt5 && t && (() => {
+                          const dipilih = bursaSimbol(s);
+                          const hl = (dipilih ?? t.bursa) === 'hyperliquid';
+                          const judul = dipilih
+                            ? `Bursa pilihanmu untuk koin ini — ganti lewat lencana bursa di panel order`
+                            : hl
+                              ? 'Koin ini tidak ada di Binance — harga & ordernya lewat Hyperliquid'
+                              : 'Harga & ordernya lewat Binance Futures';
+                          return (
+                            <span title={judul}
+                              className={cn('shrink-0 rounded px-1 text-[8.5px] font-semibold tracking-wide',
+                                hl ? KELAS_BURSA.hyperliquid : KELAS_BURSA.binance)}>
+                              <span className="hidden sm:inline">{hl ? 'Hyperliquid' : 'Binance'}</span>
+                              <span className="sm:hidden">{hl ? 'HL' : 'BN'}</span>
                             </span>
-                            <span className="sm:hidden">
-                              {t.bursa === 'hyperliquid' ? 'HL' : 'BN'}
-                            </span>
-                          </span>
-                        )}
+                          );
+                        })()}
                       </div>
                     </div>
                     <span className={cn('angka shrink-0 text-[11px]', mt5 ? 'text-zinc-600' : naik ? 'text-emerald-500' : 'text-red-400')}>
