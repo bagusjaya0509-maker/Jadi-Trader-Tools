@@ -1,1 +1,0 @@
-import{b as r,o as a,d as s}from"./index-BXg4YMJ-.js";import{r as u,N as o}from"./react-C97iXi1P.js";import"./firebase-Csnso1ng.js";function f(){const{pengguna:e,memuat:t}=r();return u.useEffect(()=>{!t&&!e&&a()},[t,e]),t?null:s.jsx(o,{to:"/chart-entry",replace:!0})}export{f as default};
