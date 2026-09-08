@@ -4,11 +4,12 @@ import { NavLink, useLocation, Link, useSearchParams, useNavigate } from 'react-
 import {
   LayoutGrid, BarChart3, Briefcase, Users, Plug, CandlestickChart,
   Wallet, TrendingUp, Wrench, CreditCard, LifeBuoy, BookOpen,
-  PanelLeft, Bell, Mail, X, Sparkles, MessageCircle, Send, AtSign, MessageSquarePlus, Loader2,
+  PanelLeft, Bell, Mail, X, Sparkles, MessageCircle, Send, AtSign, Loader2,
   AlertTriangle, Newspaper, ChevronRight, ChevronDown, Copy, Radar, UserCircle2, Crown,
   Footprints,
   CheckCircle2,
   Sun, Moon } from 'lucide-react';
+import { IkonMasukan } from '@/components/ui/ikon-masukan';
 import { cn } from '@/lib/utils';
 import { Switch } from '@/components/ui/switch-button';
 import { MultiChart } from '@/components/multi-chart';
@@ -386,7 +387,7 @@ function Lonceng() {
   const kabar = agen.kabar.slice(0, 8);
 
   return (
-    <div className="relative" ref={ref}>
+    <div className="relative flex items-center" ref={ref}>
       <button
         onClick={() => { setBuka((v) => !v); tandai(); agen.tandai(); }}
         aria-label="Berita pasar & kabar agen"
@@ -581,9 +582,14 @@ function Masukan() {
         onClick={() => setBuka(true)}
         aria-label="Kirim masukan"
         title="Kirim masukan — bug, saran, atau error"
-        className="flex cursor-pointer items-center gap-1.5 rounded-full border border-zinc-700 px-2.5 py-1 text-[12.5px] font-medium text-zinc-300 transition-colors hover:border-zinc-500 hover:text-zinc-100 sm:px-3 sm:py-1.5"
+        /* Tingginya disamakan dengan ikon pesan di sebelahnya (18 px):
+           pil setinggi 33 px membuat baris ini punya dua garis dasar yang
+           berbeda, dan mata membacanya sebagai dua kelompok kendali
+           padahal ketiganya sederajat. leading-none supaya tinggi barisnya
+           tidak menambah ruang di atas-bawah teks. */
+        className="flex h-[18px] shrink-0 cursor-pointer items-center gap-1 rounded-full border border-zinc-700 px-1.5 text-[10.5px] font-medium leading-none text-zinc-300 transition-colors hover:border-zinc-500 hover:text-zinc-100 sm:gap-1.5 sm:px-2"
       >
-        <MessageSquarePlus className="size-4 shrink-0" strokeWidth={1.8} />
+        <IkonMasukan className="size-3 shrink-0" strokeWidth={2.2} />
         <span className="hidden sm:inline">Feedback</span>
       </button>
 
@@ -730,7 +736,7 @@ function Pesan() {
   const akun = pribadi.slice(0, 6);
 
   return (
-    <div className="relative" ref={ref}>
+    <div className="relative flex items-center" ref={ref}>
       <button
         onClick={() => { setBuka((v) => !v); tandai(); tandaiPribadi(); }}
         aria-label="Pemberitahuan"
@@ -842,7 +848,7 @@ function Bantuan({ ciut }: { ciut: boolean }) {
   ];
 
   return (
-    <div className="relative" ref={ref}>
+    <div className="relative flex items-center" ref={ref}>
       <button
         onClick={() => setBuka((v) => !v)}
         title={ciut ? 'Help Center' : undefined}
@@ -1227,6 +1233,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <span className="text-[13px] font-medium">{judul}</span>
           </div>
 
+          {/* Tiap kendali di baris ini punya kotak setinggi ISINYA. Pembungkus
+              `relative` milik Pesan dan Lonceng dulu setinggi 24 px karena tinggi
+              baris teks, sementara tombol di dalamnya 18 px dan menempel di atas
+              kotaknya — jadi ikonnya duduk 3 px lebih tinggi daripada tetangga yang
+              ukurannya pas. Tidak terlihat selama isinya ikon semua; langsung
+              terlihat begitu pil Feedback berdiri di sebelahnya (8 Sep 2026).
+              Ditambahi `flex items-center` di sana, bukan digeser di sini. */}
           <div className="ml-auto flex items-center gap-3">
             {/* Sakelar tema tinggal di sidebar. Ia MUNCUL LAGI di sini
                 hanya saat sidebar-nya menciut di layar lebar: isi barisnya
