@@ -2,7 +2,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
   Wallet, TrendingUp, Eye, EyeOff, RefreshCw, ShieldCheck, Unplug,
-  ExternalLink, Layers, ListOrdered, Loader2,
+  ExternalLink, Layers, ListOrdered, Loader2, SquarePen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -63,18 +63,25 @@ export interface KartuDompetProps {
   onSegarkan: () => void;
   onAktifkan: () => void;
   onPutuskan: () => void;
-  /** Digambar DI DALAM kartu, di bawah baris ringkasan, dipisah satu garis.
-   *  Dipakai panel-dex untuk menaruh formulir kirim order — pemilik meminta
-   *  8 Sep 2026 supaya keduanya jadi satu panel, bukan dua kotak bertumpuk
-   *  yang masing-masing punya bingkai sendiri. */
+  /** Formulir kirim order, digambar DI DALAM kartu di bawah baris ringkasan
+   *  dan dipisah satu garis — tapi HANYA saat ikon entri dinyalakan.
+   *
+   *  Sempat dibuat menempel permanen, dan pemilik menolaknya 8 Sep 2026:
+   *  kartu ini dibaca jauh lebih sering daripada dipakai mengirim order,
+   *  dan formulir sepuluh baris yang selalu terbuka mendorong seluruh
+   *  ringkasan akun ke luar layar di panel setinggi 460 px. */
   children?: React.ReactNode;
+  /** Menyalakan/mematikan formulir entri. Tanpa ini ikonnya tidak digambar
+   *  sama sekali — tombol yang tidak menghidupkan apa pun tidak dipasang. */
+  onEntri?: () => void;
+  entriAktif?: boolean;
 }
 
 export function KartuDompet({
   alamat, rantai, diSpot, diPerps, bisaDipakai, nilaiAkun,
   jumlahPosisi, pnlPosisi, jumlahOrder,
   agenSiap, agenAlamat, sisaHari, sibuk, sembunyi, onSembunyi, sempit,
-  onSegarkan, onAktifkan, onPutuskan, children,
+  onSegarkan, onAktifkan, onPutuskan, children, onEntri, entriAktif,
 }: KartuDompetProps) {
   /* Disamarkan, BUKAN dikosongkan. Titik-titik selebar angkanya membuat
      tata letak tidak melompat saat mata dinyalakan lagi — dan orang tahu
@@ -186,6 +193,24 @@ export function KartuDompet({
             >
               <Unplug className="size-4" />
               Putuskan
+            </Button>
+          )}
+          {/* ── IKON ENTRI ─────────────────────────────────────────────
+              Di samping Putuskan, sesuai permintaan pemilik. Berpendar saat
+              menyala karena ia mengubah ISI kartu di bawahnya — keadaan yang
+              menambah sesuatu ke layar harus terlihat tanpa dicari, sama
+              seperti tombol Replay dan Dompet di bilah chart. */}
+          {onEntri && (
+            <Button
+              variant="secondary"
+              onClick={onEntri}
+              aria-expanded={!!entriAktif}
+              title={entriAktif ? 'Tutup formulir kirim order' : 'Buka formulir kirim order'}
+              aria-label={entriAktif ? 'Tutup formulir kirim order' : 'Buka formulir kirim order'}
+              className={cn('h-11 rounded-2xl px-4',
+                entriAktif && 'bg-zinc-100 text-zinc-950 hover:bg-white')}
+            >
+              <SquarePen className="size-4" />
             </Button>
           )}
           <Button

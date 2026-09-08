@@ -88,6 +88,10 @@ export function PanelDex({ koinChart, sempit }: {
   const [sibuk, setSibuk] = useState<string>('');
   const [galat, setGalat] = useState('');
   const [kabar, setKabar] = useState('');
+  /* Formulir entri TERTUTUP saat panel dibuka. Kartu ini jauh lebih sering
+     dibaca ("berapa saldoku, ada posisi apa") daripada dipakai mengirim
+     order, dan yang jarang dipakai tidak berhak memakan layar terus-menerus. */
+  const [entriBuka, setEntriBuka] = useState(false);
   const [saldoSembunyi, setSaldoSembunyi] = useState(() => {
     try { return localStorage.getItem(KUNCI_SEMBUNYI) === '1'; } catch { return false; }
   });
@@ -444,10 +448,18 @@ export function PanelDex({ koinChart, sempit }: {
               onSegarkan={segarkanKlik}
               onAktifkan={aktifkan}
               onPutuskan={putuskan}
+              onEntri={() => setEntriBuka((v) => !v)}
+              entriAktif={entriBuka}
             >
-              {/* Formulir order hidup DI DALAM kartu dompet. Yang berpindah
-                  cuma tempatnya menggambar; seluruh state dan validasinya
-                  tetap milik berkas ini. */}
+              {/* Formulir order hidup DI DALAM kartu dompet, tapi baru
+                  digambar saat ikon entri dinyalakan. `children` yang bernilai
+                  false membuat KartuDompet ikut tidak menggambar garis
+                  pemisahnya — jadi kartunya benar-benar kembali sependek
+                  semula, bukan sekadar kosong dengan garis menggantung.
+
+                  Yang berpindah cuma tempatnya menggambar; seluruh state dan
+                  validasinya tetap milik berkas ini. */}
+              {entriBuka && (<>
               <h3 className="mb-3 text-[13px] font-semibold text-zinc-200">Kirim order</h3>
         <div className="space-y-2.5">
           <div className="grid grid-cols-2 gap-2">
@@ -529,6 +541,7 @@ export function PanelDex({ koinChart, sempit }: {
             </p>
           )}
         </div>
+              </>)}
             </KartuDompet>
 
             {/* Hyperliquid menolak approveAgent untuk alamat yang belum
