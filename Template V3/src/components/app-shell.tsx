@@ -4,7 +4,7 @@ import { NavLink, useLocation, Link, useSearchParams, useNavigate } from 'react-
 import {
   LayoutGrid, BarChart3, Briefcase, Users, Plug, CandlestickChart,
   Wallet, TrendingUp, Wrench, CreditCard, LifeBuoy, BookOpen,
-  PanelLeft, Bell, Mail, X, Sparkles, MessageCircle, Send, AtSign, MessageSquarePlus, Loader2, Check,
+  PanelLeft, Bell, Mail, X, Sparkles, MessageCircle, Send, AtSign, MessageSquarePlus, Loader2,
   AlertTriangle, Newspaper, ChevronRight, ChevronDown, Copy, Radar, UserCircle2, Crown,
   Footprints,
   CheckCircle2,
@@ -518,8 +518,23 @@ function Masukan() {
   const [teks, setTeks] = useState('');
   const [sibuk, setSibuk] = useState(false);
   const [galat, setGalat] = useState('');
-  const [selesai, setSelesai] = useState(false);
+  /* Tanda terima muncul sebagai TOAST di pojok layar, bukan sebagai
+     keadaan di dalam kotaknya. Diminta pemilik 8 Sep 2026, dan memang lebih
+     benar: kotaknya sudah selesai dipakai begitu Kirim ditekan, jadi
+     menahannya terbuka 1,8 detik hanya untuk memperlihatkan centang membuat
+     orang menunggu sesuatu yang tidak perlu ditunggu. Kotak langsung
+     ditutup; tanda terimanya menyusul di tempat yang tidak menghalangi. */
+  const [toast, setToast] = useState(false);
   const lokasi = useLocation();
+
+  /* Hilang sendiri sesudah enam detik — cukup untuk dibaca dua kali, tidak
+     cukup lama untuk jadi sampah di sudut layar. Waktunya dihitung ulang
+     tiap kali toast muncul lagi. */
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(false), 6000);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   /* Esc menutup. Kotak terpusat yang menutupi layar tanpa jalan keluar
      lewat papan ketik adalah jebakan kecil bagi yang tidak memakai tetikus. */
@@ -536,7 +551,6 @@ function Masukan() {
        menekan Esc di tengah kalimat panjang tidak boleh kehilangan
        kalimatnya. Yang dibersihkan cuma sesudah benar-benar terkirim. */
     setGalat('');
-    setSelesai(false);
   }
 
   async function kirim() {
@@ -545,10 +559,9 @@ function Masukan() {
     setSibuk(true); setGalat('');
     try {
       await kirimMasukan({ jenis, pesan: isi, halaman: lokasi.pathname + lokasi.search });
-      setTeks(''); setSelesai(true);
-      /* Ditutup sendiri sesudah tanda terima sempat terbaca. Menutupnya
-         seketika membuat orang tidak yakin masukannya benar-benar masuk. */
-      setTimeout(() => { setBuka(false); setSelesai(false); }, 1800);
+      setTeks('');
+      setBuka(false);
+      setToast(true);
     } catch (e) {
       setGalat(e instanceof Error ? e.message : 'Gagal mengirim masukan.');
     } finally { setSibuk(false); }
@@ -556,13 +569,22 @@ function Masukan() {
 
   return (
     <>
+      {/* ── PIL BERGARIS, BUKAN IKON TELANJANG ──────────────────────────
+          Bentuknya diminta pemilik 8 Sep 2026 mengikuti contoh yang ia
+          kirim: garis tepi membulat penuh, ikon, lalu kata "Feedback".
+
+          Tulisannya disembunyikan di layar sempit dan menyisakan ikonnya.
+          Di HP baris ini berebut ruang dengan tiga kendali lain dan judul
+          halaman; pil berlabel di sana akan mendorong sesuatu keluar layar.
+          Namanya tetap terbaca pembaca layar lewat aria-label. */}
       <button
         onClick={() => setBuka(true)}
         aria-label="Kirim masukan"
         title="Kirim masukan — bug, saran, atau error"
-        className="cursor-pointer text-zinc-400 transition-colors hover:text-zinc-100"
+        className="flex cursor-pointer items-center gap-1.5 rounded-full border border-zinc-700 px-2.5 py-1 text-[12.5px] font-medium text-zinc-300 transition-colors hover:border-zinc-500 hover:text-zinc-100 sm:px-3 sm:py-1.5"
       >
-        <MessageSquarePlus className="size-[18px]" strokeWidth={1.8} />
+        <MessageSquarePlus className="size-4 shrink-0" strokeWidth={1.8} />
+        <span className="hidden sm:inline">Feedback</span>
       </button>
 
       {/* ── LEWAT PORTAL KE <body>, BUKAN DI TEMPAT ──────────────────────
@@ -601,14 +623,7 @@ function Masukan() {
               Ide, bug, atau apa pun yang bisa membuat Jadi Trader lebih enak dipakai.
             </p>
 
-            {selesai ? (
-              <div className="mt-6 flex flex-col items-center gap-2 py-4">
-                <div className="flex size-10 items-center justify-center rounded-full bg-emerald-500/15">
-                  <Check className="size-5 text-emerald-400" />
-                </div>
-                <p className="text-[12.5px] text-zinc-300">Terkirim. Terima kasih.</p>
-              </div>
-            ) : (
+            {(
               <>
                 <div className="mt-5 flex justify-center gap-1.5">
                   {JENIS_MASUKAN.map((j) => (
@@ -649,6 +664,31 @@ function Masukan() {
               </>
             )}
           </div>
+        </div>
+      ), document.body)}
+
+      {/* ── TANDA TERIMA ─────────────────────────────────────────────────
+          Ikut lewat portal dengan alasan yang sama seperti kotaknya: ia
+          `fixed`, dan `backdrop-blur` di header akan mengubah arti "pojok
+          layar" jadi "pojok header".
+
+          Kalimatnya tidak menyebut "tim". Yang membaca masukan ini satu
+          orang, dan janji yang lebih besar daripada kenyataannya adalah
+          hal pertama yang membuat kotak masukan berhenti dipercaya. */}
+      {toast && createPortal((
+        <div role="status" aria-live="polite"
+             className="fixed bottom-4 right-4 z-[70] flex w-[min(340px,calc(100vw-2rem))] items-start gap-2.5 rounded-xl border border-zinc-700 bg-zinc-900 p-3.5 shadow-2xl">
+          <CheckCircle2 className="mt-px size-4 shrink-0 text-emerald-400" strokeWidth={2} />
+          <div className="min-w-0 flex-1">
+            <p className="text-[12.5px] font-semibold text-zinc-100">Terima kasih atas masukanmu.</p>
+            <p className="mt-0.5 text-[11.5px] leading-relaxed text-zinc-400">
+              Setiap catatan dibaca, dan ikut menentukan apa yang dikerjakan berikutnya.
+            </p>
+          </div>
+          <button onClick={() => setToast(false)} aria-label="Tutup pemberitahuan"
+            className="-mr-1 -mt-1 shrink-0 cursor-pointer rounded p-1 text-zinc-500 transition-colors hover:text-zinc-200">
+            <X className="size-3.5" />
+          </button>
         </div>
       ), document.body)}
     </>
