@@ -65,38 +65,23 @@ async function salin(teks: string): Promise<boolean> {
   } catch { return false; }
 }
 
-/* ── PESAN SIAP KIRIM ────────────────────────────────────────────────────
-   Diminta pemilik 8 Sep 2026: "masa yang dikirim linknya aja, perlu
-   kalimat-kalimat ajakan biar user ga capek ngetik."
+/* ── SATU PESAN, MENEMPEL DI TOMBOLNYA ───────────────────────────────────
+   Sempat dibuat empat kartu naskah di badan halaman, dan pemilik
+   menolaknya 8 Sep 2026: yang ia minta bukan galeri pilihan, melainkan
+   tombol Bagikan yang pesannya sudah terisi. Ia benar. Orang membuka
+   halaman ini untuk membagikan tautan, bukan untuk membaca empat versi
+   kalimat lalu memilih salah satunya; pilihan yang tidak diminta adalah
+   pekerjaan tambahan yang menyamar jadi fitur.
 
-   Empat sudut yang berbeda, bukan empat variasi kalimat yang sama. Orang
-   yang mengirim ke satu teman butuh kalimat lain daripada orang yang
-   menempelkannya di status grup, dan yang membacanya pun berbeda.
+   `{tautan}` diganti tautan referralnya. Tanpa tanda pisah panjang:
+   sebagian ponsel menampilkannya sebagai kotak di WhatsApp.
 
-   `{tautan}` diganti tautan referralnya saat disalin. Tanpa tanda pisah
-   panjang: sebagian ponsel menampilkannya sebagai kotak di WhatsApp.
-
-   Komisi TIDAK disebut di sini, dengan sengaja. Yang menerima pesan bukan
-   calon perujuk, dan menyebut angka komisi membuat ajakannya terbaca
-   seperti orang yang sedang dibayar untuk mengirimnya. */
-const AJAKAN: { nama: string; pesan: string }[] = [
-  {
-    nama: 'Singkat',
-    pesan: 'Saya pakai ini untuk chart, screener, dan jurnal trading dalam satu halaman. Kalau mau lihat isinya: {tautan}',
-  },
-  {
-    nama: 'Cerita jurnal',
-    pesan: 'Dulu jurnal trading saya selalu berhenti di minggu kedua. Niatnya rajin, tapi mencatat entry satu per satu setelah pasar tutup itu melelahkan. Sekarang jurnalnya menarik sendiri dari MetaTrader 5, jadi yang saya lakukan tinggal membaca hasilnya. Kalau catatanmu juga sering bolong, coba lihat: {tautan}',
-  },
-  {
-    nama: 'Untuk grup',
-    pesan: 'Buat yang sedang cari tempat latihan sebelum pakai uang sungguhan: ada chart replay untuk mengulang pergerakan lama, screener multi-pair, dan jurnal yang mengisi sendiri dari MetaTrader 5 dan Binance. Isinya bisa dilihat dulu tanpa daftar. {tautan}',
-  },
-  {
-    nama: 'Pratinjau dulu',
-    pesan: 'Ada pratinjau 24 jam di sini, jadi seluruh isinya bisa kamu keliling dulu sebelum memutuskan daftar atau tidak. Chart replay, screener, jurnal, dan papan copy signal semuanya terbuka. {tautan}',
-  },
-];
+   Komisi TIDAK disebut, dengan sengaja. Yang menerima pesan bukan calon
+   perujuk, dan menyebut angkanya membuat ajakannya terbaca seperti orang
+   yang sedang dibayar untuk mengirimnya. */
+const PESAN_AJAKAN =
+  'Saya pakai Jadi Trader Tools untuk chart, screener, dan jurnal trading dalam satu halaman. '
+  + 'Ada pratinjau 24 jam kalau mau lihat isinya dulu tanpa daftar: {tautan}';
 
 export default function Referral() {
   const { pengguna, memuat: memuatAuth } = useAuth();
@@ -104,10 +89,7 @@ export default function Referral() {
   const [galat, setGalat] = useState('');
   const [memuat, setMemuat] = useState(true);
   const [disalin, setDisalin] = useState(false);
-  /* -1 = tidak ada yang baru disalin. Penanda per kartu, bukan satu
-     penanda bersama: dua kartu yang menyala bersamaan membuat orang ragu
-     yang mana yang benar-benar masuk papan klip. */
-  const [salinKe, setSalinKe] = useState(-1);
+  const [pesanDisalin, setPesanDisalin] = useState(false);
 
   const [nama, setNama] = useState('');
   const [bank, setBank] = useState('');
@@ -140,20 +122,30 @@ export default function Referral() {
     if (await salin(data.tautan)) { setDisalin(true); setTimeout(() => setDisalin(false), 2200); }
   }
 
-  /* Satu sumber naskah untuk tombol di kepala halaman DAN untuk kartu di
-     bawah. Dulu tombol itu punya kalimatnya sendiri, dan dua naskah untuk
-     satu maksud selalu berakhir dengan yang satu diperbaiki sementara yang
-     lain tertinggal. */
-  const isiAjakan = (i: number) => AJAKAN[i].pesan.replace('{tautan}', data?.tautan ?? '');
+  const pesanAjakan = () => PESAN_AJAKAN.replace('{tautan}', data?.tautan ?? '');
 
-  function keWhatsApp(i = 0) {
-    if (!data) return;
-    window.open(`https://wa.me/?text=${encodeURIComponent(isiAjakan(i))}`, '_blank', 'noopener');
-  }
+  /* ── DISALIN SEKALIGUS DIBUKA ────────────────────────────────────────
+     wa.me?text= sudah mengisi kolom pesannya sendiri, dan di ponsel itu
+     cukup. Di desktop tidak selalu: sebagian pemasangan WhatsApp Web
+     membuka jendela tanpa membawa teksnya, dan yang tersisa kolom kosong
+     tepat setelah orang mengira pesannya sudah siap.
 
-  async function salinAjakan(i: number) {
+     Jadi papan klip diisi juga. Kalau teksnya terbawa, salinan itu tidak
+     mengganggu apa pun; kalau tidak, satu tempel menyelesaikannya.
+
+     Keduanya dipanggil BERURUTAN DI DALAM satu gestur klik, dan itu yang
+     menentukan: `salin()` menyimpan janjinya lalu window.open jalan
+     seketika, jadi peramban tidak pernah melihat jendela yang dibuka
+     sesudah `await` -- yang justru diblokirnya sebagai popup. */
+  function keWhatsApp() {
     if (!data) return;
-    if (await salin(isiAjakan(i))) { setSalinKe(i); setTimeout(() => setSalinKe(-1), 2200); }
+    const teks = pesanAjakan();
+    void salin(teks).then((ok) => {
+      if (!ok) return;
+      setPesanDisalin(true);
+      setTimeout(() => setPesanDisalin(false), 2600);
+    });
+    window.open(`https://wa.me/?text=${encodeURIComponent(teks)}`, '_blank', 'noopener');
   }
 
   async function kirimPencairan(e: React.FormEvent) {
@@ -255,13 +247,19 @@ export default function Referral() {
                   {disalin ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
                   {disalin ? 'Tersalin' : 'Salin tautan'}
                 </button>
-                <button onClick={() => keWhatsApp(0)}
-                  className="flex cursor-pointer items-center justify-center gap-1.5 rounded-md border border-zinc-800 px-3.5 py-2 text-[12.5px] text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100">
-                  <MessageCircle className="size-3.5" /> Bagikan ke WhatsApp
+                <button onClick={keWhatsApp}
+                  title={pesanAjakan()}
+                  className={cn('flex cursor-pointer items-center justify-center gap-1.5 rounded-md border px-3.5 py-2 text-[12.5px] transition-colors',
+                    pesanDisalin
+                      ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400'
+                      : 'border-zinc-800 text-zinc-300 hover:border-zinc-700 hover:text-zinc-100')}>
+                  {pesanDisalin ? <Check className="size-3.5" /> : <MessageCircle className="size-3.5" />}
+                  {pesanDisalin ? 'Pesan tersalin' : 'Bagikan ke WhatsApp'}
                 </button>
               </div>
               <div className="mt-2 text-[11.5px] text-zinc-500">
-                Kode referral: <span className="angka text-zinc-300">{data.kode}</span>
+                Tombol WhatsApp membawa ajakan yang sudah tertulis, tinggal kirim.
+                {' · '}Kode referral: <span className="angka text-zinc-300">{data.kode}</span>
                 {data.dirujukOleh && <span> · kamu masuk lewat kode <span className="angka">{data.dirujukOleh}</span></span>}
               </div>
             </div>
@@ -283,40 +281,6 @@ export default function Referral() {
           </ol>
         </div>
       </Panel>
-
-      {/* ── Pesan siap kirim ────────────────────────────────────────
-          Ditaruh SEBELUM angka-angka, dan itu disengaja. Bagi orang yang
-          baru membuka halaman ini seluruh angkanya masih nol; yang
-          benar-benar berguna baginya adalah kalimat yang tinggal dikirim. */}
-      <Bagian judul="Pesan siap kirim"
-        sub="Salin salah satu atau kirim langsung ke WhatsApp. Tautanmu sudah menempel di dalamnya." />
-      <div className="grid gap-3 md:grid-cols-2">
-        {AJAKAN.map((a, i) => (
-          <Panel key={a.nama} className="flex flex-col p-4">
-            <div className="mb-2 flex items-baseline justify-between gap-2">
-              <span className="text-[12.5px] font-medium text-zinc-200">{a.nama}</span>
-              <span className="angka text-[11px] text-zinc-600">{isiAjakan(i).length} huruf</span>
-            </div>
-            {/* Teksnya ditampilkan penuh, bukan dipotong. Yang dikirim atas
-                nama seseorang harus bisa dibacanya lebih dulu. */}
-            <p className="flex-1 rounded-lg border border-zinc-800/80 bg-zinc-950/50 px-3 py-2.5 text-[12.5px] leading-relaxed text-zinc-400">
-              {isiAjakan(i)}
-            </p>
-            <div className="mt-2.5 flex gap-2">
-              <button onClick={() => void salinAjakan(i)}
-                className={cn('flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors',
-                  salinKe === i ? 'bg-emerald-500/15 text-emerald-400' : 'bg-zinc-100 text-zinc-950 hover:bg-white')}>
-                {salinKe === i ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-                {salinKe === i ? 'Tersalin' : 'Salin'}
-              </button>
-              <button onClick={() => keWhatsApp(i)}
-                className="flex cursor-pointer items-center justify-center gap-1.5 rounded-md border border-zinc-800 px-3 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100">
-                <MessageCircle className="size-3.5" /> Kirim
-              </button>
-            </div>
-          </Panel>
-        ))}
-      </div>
 
       {/* ── Angka ──────────────────────────────────────────────────── */}
       <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
