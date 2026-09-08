@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Wallet, Loader2, ShieldCheck, TriangleAlert, RefreshCw, X, Unplug, CandlestickChart } from 'lucide-react';
+import { Wallet, Loader2, TriangleAlert, X, CandlestickChart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   adaDompet, sambungDompet, alamatTersambung, rantaiKini,
   bacaAgen, hapusAgen, agenKedaluwarsa, type AgenTersimpan,
 } from '@/lib/dex-dompet';
 import { tautkanDompetDiam } from '@/lib/profil-pengguna';
+import { KartuDompet } from '@/components/ui/wallet-card-2';
 import {
   setujuiAgen, keadaanAkun, orderTerbuka, kirimOrderDex, tutupPosisiDex,
   batalOrderDex, cariAset, hargaKini,
@@ -62,6 +63,10 @@ const TOMBOL2 = 'flex cursor-pointer items-center gap-1.5 rounded-md border bord
    dana — tetap tertulis di kartu "Aktifkan trading", yaitu tepat pada saat
    tanda tangannya diminta. */
 const KUNCI_PERINGATAN = 'jt.dexPeringatanDibaca';
+/* Saldo disamarkan bertahan antar muat halaman: yang menyalakannya sedang
+   berbagi layar atau merekam, dan keadaan itu berlangsung lebih lama
+   daripada satu kunjungan. */
+const KUNCI_SEMBUNYI = 'jt.dexSaldoSembunyi';
 
 const uang = (n: number) => '$' + n.toLocaleString('id-ID', { maximumFractionDigits: 2, minimumFractionDigits: 2 });
 const pendek = (a: string) => a.slice(0, 6) + '…' + a.slice(-4);
@@ -83,6 +88,13 @@ export function PanelDex({ koinChart, sempit }: {
   const [sibuk, setSibuk] = useState<string>('');
   const [galat, setGalat] = useState('');
   const [kabar, setKabar] = useState('');
+  const [saldoSembunyi, setSaldoSembunyi] = useState(() => {
+    try { return localStorage.getItem(KUNCI_SEMBUNYI) === '1'; } catch { return false; }
+  });
+  function aturSembunyi(v: boolean) {
+    setSaldoSembunyi(v);
+    try { localStorage.setItem(KUNCI_SEMBUNYI, v ? '1' : '0'); } catch { /* mode privat */ }
+  }
   const [tampilPeringatan, setTampilPeringatan] = useState(() => {
     try { return localStorage.getItem(KUNCI_PERINGATAN) !== '1'; } catch { return true; }
   });
@@ -251,6 +263,14 @@ export function PanelDex({ koinChart, sempit }: {
     setRantai(await rantaiKini());
   });
 
+  /* Pembungkus supaya ikon segarkan di kartu bisa berputar. `segarkan`
+     sendiri dipakai juga oleh polling 15 detik, dan yang otomatis tidak
+     boleh menyalakan penanda sibuk — panel yang berkedip tiap seperempat
+     menit terbaca seperti sedang rusak. */
+  const segarkanKlik = () => jalankan('segar', async () => {
+    if (alamat) await segarkan(alamat);
+  });
+
   const aktifkan = () => jalankan('agen', async () => {
     if (!alamat) return;
     const a = await setujuiAgen(alamat);
@@ -369,132 +389,75 @@ export function PanelDex({ koinChart, sempit }: {
       ) : (
         <div className={cn('grid gap-4', !sempit && 'lg:grid-cols-[minmax(0,1fr)_320px]')}>
           <div className="space-y-4">
-            <Kartu>
-              <div className="mb-3 flex flex-wrap items-center gap-2">
-                <span className="angka rounded bg-zinc-800 px-2 py-1 text-[11.5px] text-zinc-200"
-                      title={`${alamat}\n\nAkun dompet ini — terpisah dari Chart & Entry, yang memakai akun milik backend. Posisi di kedua halaman tidak saling terlihat.`}>
-                  {pendek(alamat)}
-                </span>
-                <span className="text-[11px] text-zinc-500">chain {rantai || '—'}</span>
-                {/* ── DUA HALAMAN, DUA AKUN ────────────────────────────────
-                    Ditanyakan pemilik 3 Sep 2026: kalau saya trading di sini,
-                    ordernya muncul di Chart & Entry?
+            {/* ── KARTU DOMPET ────────────────────────────────────────
+                Menggantikan kartu ringkasan lama (alamat + tiga angka +
+                blok aktivasi) dengan templat yang dipilih pemilik 8 Sep
+                2026. Yang berpindah cuma cara menggambarnya; seluruh angka
+                dan perbuatannya tetap dihitung di berkas ini.
 
-                    Tidak, dan bedanya bukan soal tampilan melainkan soal AKUN.
-                    Chart & Entry memakai akun milik backend; halaman ini
-                    memakai dompet yang barusan Anda sambungkan. Di kasus
-                    pemilik keduanya bahkan bersaudara — yang satu sub-account
-                    dari yang satunya — dan Hyperliquid memperlakukan
-                    sub-account sebagai akun yang sepenuhnya terpisah: saldo
-                    sendiri, posisi sendiri.
+                Catatan lama yang TIDAK ikut pindah dan sengaja tetap di
+                sini: kenapa "USDC di spot" hanya menghitung USDC, bukan
+                seluruh token. Yang bisa jadi jaminan margin perp di
+                Hyperliquid memang hanya USDC — token spot lain adalah
+                kepemilikan, bukan daya beli, dan menjumlahkannya akan
+                menjanjikan ukuran posisi yang tidak akan diterima bursa. */}
+            <KartuDompet
+              alamat={alamat}
+              rantai={rantai}
+              diSpot={keadaan ? keadaan.diSpot : null}
+              diPerps={keadaan ? keadaan.diPerps : null}
+              bisaDipakai={keadaan ? keadaan.bisaDipakai : null}
+              nilaiAkun={keadaan ? keadaan.nilaiAkun : null}
+              jumlahPosisi={keadaan?.posisi.length ?? 0}
+              pnlPosisi={(keadaan?.posisi ?? []).reduce((a, x) => a + x.pnl, 0)}
+              jumlahOrder={order.length}
+              agenSiap={agenSiap}
+              agenAlamat={agen?.alamat}
+              sisaHari={sisaHari}
+              sibuk={sibuk}
+              sembunyi={saldoSembunyi}
+              onSembunyi={aturSembunyi}
+              sempit={sempit}
+              onSegarkan={segarkanKlik}
+              onAktifkan={aktifkan}
+              onPutuskan={putuskan}
+            />
 
-                    Ditulis DI LAYAR, bukan cuma di catatan ini. Orang yang
-                    melihat dua halaman menampilkan bursa yang sama akan
-                    mengira keduanya melihat uang yang sama, dan mereka akan
-                    terus mengiranya sampai ada yang mengatakan sebaliknya. */}
-                {/* Di panel sempit kalimat ini memakan tiga baris penuh untuk
-                    sesuatu yang cuma penjelasan. Keterangannya tidak hilang —
-                    ia pindah ke title alamat dompetnya, tempat orang memang
-                    menunjuk waktu bertanya "ini akun yang mana". */}
-                {!sempit && (
-                  <span className="text-[11px] text-zinc-600"
-                        title="Chart & Entry memakai akun milik backend, bukan dompet ini. Posisi di kedua halaman tidak saling terlihat.">
-                    · akun dompet ini, terpisah dari Chart &amp; Entry
-                  </span>
-                )}
-                <button onClick={() => void segarkan(alamat)} className={cn(TOMBOL2, 'ml-auto')}>
-                  <RefreshCw className="size-3" /> Segarkan
-                </button>
-              </div>
+            {/* Hyperliquid menolak approveAgent untuk alamat yang belum
+                pernah punya akun di sana, dengan pesan yang tidak
+                menyebutkan setoran sama sekali. Ditulis di depan supaya
+                orang tidak mengejar galat yang sebenarnya cuma "akunnya
+                memang belum ada". */}
+            {!agenSiap && keadaan && keadaan.bisaDipakai === 0 && !keadaan.posisi.length && (
+              <p className="-mt-1 px-1 text-[11.5px] leading-relaxed text-zinc-500">
+                Alamat ini belum punya saldo di Hyperliquid. Setor dulu lewat
+                app.hyperliquid.xyz — persetujuan agent akan ditolak selama akunnya
+                belum ada di sana.
+              </p>
+            )}
 
-              {/* ── KETIGANYA MENYEBUT USDC, DAN ITU BUKAN KERINCIAN ──────────
-                  Dilaporkan pemilik 3 Sep 2026: akunnya jelas berisi XAUT, ZEC,
-                  HYPE, BTC, dan ETH di spot, tapi angka "Di spot" di sini cuma
-                  menampilkan USDC-nya.
+            {!agenSiap && (
+              <p className="-mt-1 px-1 text-[11.5px] leading-relaxed text-zinc-500">
+                {agen
+                  ? 'Agent wallet di peramban ini sudah kedaluwarsa. Aktifkan ulang untuk trading.'
+                  : 'Satu tanda tangan untuk mengaktifkan trading. Yang disetujui adalah agent '
+                    + 'wallet yang dibuat di peramban ini — ia bisa membuka dan menutup posisi, '
+                    + 'dan secara protokol TIDAK BISA menarik dana keluar.'}
+              </p>
+            )}
 
-                  Angkanya BENAR dan sengaja: yang bisa jadi jaminan margin perp
-                  di Hyperliquid hanya USDC. Token spot lain adalah kepemilikan,
-                  bukan daya beli — menjumlahkannya ke sini akan menjanjikan
-                  ukuran posisi yang tidak akan diterima bursa.
+            {/* ── DAFTARNYA SAJA, JUDULNYA DI KARTU ───────────────────
+                Baris ringkasan di dalam KartuDompet sudah menyebut "Posisi
+                perp terbuka" beserta jumlah dan P/L-nya. Judul kedua di
+                sini mengulang kata yang sama tepat 40 piksel di bawahnya.
 
-                  Yang salah label lamanya. "Di spot" untuk angka yang cuma
-                  menghitung satu token dari delapan terbaca sebagai laporan
-                  yang tidak lengkap, dan laporan uang yang terlihat tidak
-                  lengkap membuat orang berhenti mempercayai semua angka di
-                  sebelahnya juga. */}
-              {/* Tiga kolom di panel selebar 180 px berarti tiap angka dapat
-                  60 px — "$1.202,86" pecah jadi dua baris dan keterangannya
-                  jadi tiang huruf. Di panel sempit ditumpuk saja; tinggi
-                  bisa digulir, lebar tidak bisa ditambah. */}
-              <div className={cn('grid gap-3', sempit ? 'grid-cols-1' : 'grid-cols-3')}>
-                <Angka label="Bisa dipakai" nilai={keadaan ? uang(keadaan.bisaDipakai) : '—'}
-                       ket="USDC perps + spot" />
-                <Angka label="USDC di perps" nilai={keadaan ? uang(keadaan.diPerps) : '—'} />
-                <Angka label="USDC di spot" nilai={keadaan ? uang(keadaan.diSpot) : '—'}
-                       ket="Token spot lain tidak jadi margin" />
-              </div>
-
-              {!agenSiap ? (
-                <div className="mt-4 border-t border-zinc-800 pt-3">
-                  <p className="mb-2 text-[12.5px] leading-relaxed text-zinc-400">
-                    {agen
-                      ? 'Agent wallet di peramban ini sudah kedaluwarsa. Aktifkan ulang untuk trading.'
-                      : 'Satu tanda tangan untuk mengaktifkan trading. Yang disetujui adalah agent '
-                        + 'wallet yang dibuat di peramban ini — ia bisa membuka dan menutup posisi, '
-                        + 'dan secara protokol TIDAK BISA menarik dana keluar.'}
-                  </p>
-                  <button onClick={aktifkan} disabled={!!sibuk} className={TOMBOL}>
-                    {sibuk === 'agen' ? <Loader2 className="size-3.5 animate-spin" /> : <ShieldCheck className="size-3.5" />}
-                    Aktifkan trading
-                  </button>
-                  {/* Hyperliquid menolak approveAgent untuk alamat yang belum
-                      pernah punya akun di sana, dengan pesan yang tidak
-                      menyebutkan setoran sama sekali. Ditulis di depan supaya
-                      orang tidak mengejar galat yang sebenarnya cuma "akunnya
-                      memang belum ada". */}
-                  {keadaan && keadaan.bisaDipakai === 0 && !keadaan.posisi.length && (
-                    <p className="mt-2 text-[11.5px] leading-relaxed text-zinc-500">
-                      Alamat ini belum punya saldo di Hyperliquid. Setor dulu lewat
-                      app.hyperliquid.xyz — persetujuan agent akan ditolak selama akunnya
-                      belum ada di sana.
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-zinc-800 pt-3">
-                  <ShieldCheck className="size-3.5 text-emerald-400" />
-                  <span className="text-[12px] text-zinc-400">
-                    Trading aktif · agent <span className="angka text-zinc-300">{pendek(agen!.alamat)}</span>
-                    {' '}· sisa {sisaHari} hari
-                  </span>
-                  <button onClick={putuskan} className={cn(TOMBOL2, 'ml-auto')}>
-                    <Unplug className="size-3" /> Putuskan
-                  </button>
-                </div>
-              )}
-            </Kartu>
-
-            <Kartu judul="Posisi perp terbuka">
-              {!keadaan?.posisi.length ? (
-                /* ── "POSISI" DAN "PUNYA TOKEN" ITU DUA HAL BERBEDA ──────────
-                   Pemilik membaca daftar Balances di Hyperliquid — XAUT, ZEC,
-                   HYPE beserta persen PNL-nya — sebagai posisi terbuka, lalu
-                   heran halaman ini menyebut kosong.
-
-                   Keduanya memang berbeda: spot berarti tokennya MILIK Anda,
-                   perp berarti Anda memegang posisi berleverage yang punya
-                   likuidasi. Halaman ini membaca `assetPositions`, dan itu
-                   perps saja.
-
-                   Kalimatnya karena itu tidak boleh cuma "belum ada posisi" —
-                   itu benar tapi terdengar seperti halamannya gagal membaca
-                   akun. Ia harus menyebut apa yang TIDAK dihitungnya. */
-                <p className="text-[12.5px] leading-relaxed text-zinc-500">
-                  Belum ada posisi perp di akun ini. Token yang Anda pegang di spot
-                  (XAUT, HYPE, dan seterusnya) tidak muncul di sini — itu kepemilikan,
-                  bukan posisi berleverage.
-                </p>
-              ) : (
+                Keadaan kosongnya juga pindah ke sana, termasuk kalimat yang
+                membedakan punya token dari punya posisi: pemilik pernah
+                membaca daftar Balances Hyperliquid (XAUT, ZEC, HYPE) sebagai
+                posisi terbuka lalu heran panel ini menyebut kosong. Yang
+                dibaca di sini `assetPositions` — perps saja. */}
+            {!!keadaan?.posisi.length && (
+              <Kartu>
                 <div className="space-y-2">
                   {keadaan.posisi.map((p) => (
                     <div key={p.koin} className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-zinc-800 px-3 py-2">
@@ -529,13 +492,12 @@ export function PanelDex({ koinChart, sempit }: {
                     </div>
                   ))}
                 </div>
-              )}
-            </Kartu>
+              </Kartu>
+            )}
 
-            <Kartu judul="Order menggantung">
-              {!order.length ? (
-                <p className="text-[12.5px] text-zinc-500">Tidak ada order yang menunggu harga.</p>
-              ) : (
+            {/* Judul dan keadaan kosongnya ada di baris ringkasan kartu. */}
+            {!!order.length && (
+              <Kartu>
                 <div className="space-y-2">
                   {order.map((o) => (
                     <div key={o.oid} className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-zinc-800 px-3 py-2">
@@ -553,8 +515,8 @@ export function PanelDex({ koinChart, sempit }: {
                     </div>
                   ))}
                 </div>
-              )}
-            </Kartu>
+              </Kartu>
+            )}
           </div>
 
           <Kartu judul="Kirim order">
@@ -662,16 +624,6 @@ function Kartu({ judul, children }: { judul?: string; children: React.ReactNode 
     <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
       {judul && <h2 className="mb-3 text-[13px] font-semibold text-zinc-200">{judul}</h2>}
       {children}
-    </div>
-  );
-}
-
-function Angka({ label, nilai, ket }: { label: string; nilai: string; ket?: string }) {
-  return (
-    <div>
-      <div className="text-[10.5px] uppercase tracking-wide text-zinc-500">{label}</div>
-      <div className="angka mt-0.5 text-[15px] font-semibold text-zinc-100">{nilai}</div>
-      {ket && <div className="mt-0.5 text-[10px] leading-snug text-zinc-600">{ket}</div>}
     </div>
   );
 }
