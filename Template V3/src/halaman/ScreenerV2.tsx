@@ -242,25 +242,83 @@ const CSS_TANPA_CANGKANG = `
      pernah aktif. Tema gelap tidak bisa rusak oleh blok ini, dan itu
      jaminan susunannya, bukan janji saya.
 
-     Warnanya memakai tangga slate yang sama dengan tema terang V3 supaya
-     bingkai dan isinya tidak berbeda keluarga abu. */
+     Warnanya memakai tangga yang SAMA dengan blok [data-tema='terang'] di
+     index.css supaya bingkai dan isinya tidak berbeda keluarga abu.
+
+     ── DISELARASKAN ULANG 8 Sep 2026 ─────────────────────────────────
+     Versi sebelumnya cuma menimpa delapan alias abu (--bg, --panel,
+     --muted, --dim …) dengan tangga slate lama. Diukur di dalam iframe
+     pada tema terang: 124 dari 328 teks gagal 4,5:1. Yang tidak pernah
+     ditimpa justru yang paling sering dipakai screener — --bull hijau V2
+     #4f9e82 (tombol BUY NOW, lencana SMI: rasio 2,7), --gold #c9a24b
+     (bintang, tag SAHAM/ETF: 2,3), --bear #c2544d (4,3) — ketiganya
+     warna yang dibuat untuk latar hitam. Dan --dim slate #94a3b8 (2,5)
+     dipakai untuk peringkat "#1 • TF 4H" di tiap kartu.
+
+     Sekarang SEMUA alias V2 ditimpa (termasuk skema jurnal --ink/--ground
+     yang dipakai berkas V2 lain di bingkai yang sama), dan variabel
+     dasarnya --v2-* ikut — alias di :root cuma menunjuk ke sana, jadi
+     yang memakai --v2-kertas-2 langsung pun ikut berubah. Nilainya
+     salinan dari index.css: zinc netral yang lebih curam di ujung terang,
+     hijau #047857, merah #c81e1e, emas #a16207. */
 
   [data-tema='terang'] .ema-screener {
     background: #ffffff !important;
-    color: #0f172a !important;
+    color: #09090b !important;
   }
-  /* Variabel V2 diselaraskan DI SUMBERNYA — termasuk tiga variabel teks
-     yang terlewat waktu itu. Menambal per selektor berarti memburu
-     puluhan tempat dan tetap meninggalkan yang belum ketemu. */
   [data-tema='terang'], [data-tema='terang'] .ema-screener {
+    /* dasar V2 */
+    --v2-hitam: #ffffff !important;
+    --v2-hitam-2: #ffffff !important;
+    --v2-panel: #f4f4f5 !important;
+    --v2-panel-2: #e4e4e7 !important;
+    --v2-panel-3: #d4d4d8 !important;
+    --v2-garis: #d4d4d8 !important;
+    --v2-garis-soft: #e4e4e7 !important;
+    --v2-kertas: #09090b !important;
+    --v2-kertas-2: #48484f !important;
+    --v2-kertas-3: #62626a !important;
+    --v2-emas: #a16207 !important;
+    --v2-emas-terang: #b8720a !important;
+    --v2-emas-kabut: rgba(161,98,7,.10) !important;
+    --v2-emas-garis: rgba(161,98,7,.35) !important;
+    --v2-naik: #047857 !important;
+    --v2-naik-kabut: rgba(4,120,87,.11) !important;
+    --v2-turun: #c81e1e !important;
+    --v2-turun-kabut: rgba(200,30,30,.10) !important;
+    /* alias screener */
     --bg: #ffffff !important;
     --bg-2: #ffffff !important;
-    --panel: #f8fafc !important;
-    --panel-2: #f1f5f9 !important;
-    --border: #e2e8f0 !important;
-    --text: #0f172a !important;
-    --muted: #64748b !important;
-    --dim: #94a3b8 !important;
+    --panel: #f4f4f5 !important;
+    --panel-2: #e4e4e7 !important;
+    --border: #d4d4d8 !important;
+    --text: #09090b !important;
+    --muted: #48484f !important;
+    --dim: #62626a !important;
+    --gold: #a16207 !important;
+    --gold-soft: rgba(161,98,7,.10) !important;
+    --gold-dim: rgba(161,98,7,.10) !important;
+    --bull: #047857 !important;
+    --bear: #c81e1e !important;
+    --bull-dim: rgba(4,120,87,.11) !important;
+    --bear-dim: rgba(200,30,30,.10) !important;
+    --bull-soft: rgba(4,120,87,.11) !important;
+    --bear-soft: rgba(200,30,30,.10) !important;
+    /* alias skema jurnal */
+    --ground: #ffffff !important;
+    --surface: #f4f4f5 !important;
+    --surface-2: #e4e4e7 !important;
+    --border-soft: #e4e4e7 !important;
+    --ink: #09090b !important;
+    --ink-dim: #48484f !important;
+    --ink-faint: #62626a !important;
+    --accent: #a16207 !important;
+    --accent-dim: #a16207 !important;
+    --accent-soft: rgba(161,98,7,.10) !important;
+    --profit: #047857 !important;
+    --profit-soft: rgba(4,120,87,.11) !important;
+    --loss: #c81e1e !important;
+    --loss-soft: rgba(200,30,30,.10) !important;
   }
   [data-tema='terang'] html, [data-tema='terang'] body,
   [data-tema='terang'] .ema-screener, [data-tema='terang'] .es-main,
@@ -270,9 +328,9 @@ const CSS_TANPA_CANGKANG = `
   [data-tema='terang'] .ema-screener select,
   [data-tema='terang'] .ema-screener input[type="text"],
   [data-tema='terang'] .ema-screener input[type="number"] {
-    border-color: #e2e8f0 !important;
+    border-color: #a1a1aa !important;
     background: #ffffff !important;
-    color: #334155 !important;
+    color: #27272a !important;
   }
   /* Tombol utama ikut berbalik: di tema gelap ia putih dengan teks gelap,
      jadi di tema terang ia gelap dengan teks putih. "Putih" di sana
@@ -299,11 +357,11 @@ const CSS_TANPA_CANGKANG = `
      bergantung pada urutan berkas. */
   [data-tema='terang'] .ema-screener .es-priority-btn {
     background: #ffffff !important;
-    border-color: #a97b1f !important;
-    color: #8a6420 !important;
+    border-color: #a16207 !important;
+    color: #854d0e !important;
   }
   [data-tema='terang'] .ema-screener .es-priority-btn:hover {
-    background: #fdf6e7 !important;
+    background: #fbf3e4 !important;
   }
 
   /* ── DUA TOMBOL YANG DIKUNCI LEWAT ID ─────────────────────────────
@@ -336,23 +394,23 @@ const CSS_TANPA_CANGKANG = `
      itu berlaku di tema mana pun. */
   [data-tema='terang'] #esPantauBtn,
   [data-tema='terang'] #esLiveTradeBtn {
-    color: #0f172a !important;
+    color: #09090b !important;
     background: #ffffff !important;
-    border-color: #cbd5e1 !important;
+    border-color: #a1a1aa !important;
   }
   [data-tema='terang'] #esPantauBtn:hover,
   [data-tema='terang'] #esLiveTradeBtn:hover {
-    background: #f1f5f9 !important;
+    background: #f4f4f5 !important;
   }
   [data-tema='terang'] .es-section-head,
   [data-tema='terang'] .es-priority-header {
-    color: #0f172a !important;
+    color: #09090b !important;
   }
   [data-tema='terang'] * {
-    scrollbar-color: #cbd5e1 transparent !important;
+    scrollbar-color: #d4d4d8 transparent !important;
   }
   [data-tema='terang'] *::-webkit-scrollbar-thumb {
-    background: #cbd5e1 !important;
+    background: #d4d4d8 !important;
   }
 `;
 
