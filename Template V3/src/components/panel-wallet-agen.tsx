@@ -2099,23 +2099,41 @@ export function PanelWalletAgen({ pemilik = false, tab: tabLuar }: {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="min-w-0 flex-1">
+      {/* ── SATU KALIMAT PENDEK, BATASANNYA TURUN SATU TINGKAT ──────────
+          Dulu semuanya satu paragraf: "Posisi dan setiap transaksi dompet
+          perp on-chain. Fase mencatat — tidak ada order yang dikirim, dan
+          belum ada sinyal yang terbit ke publik." Di ponsel ia pecah jadi
+          lima baris sempit di samping lencana pindai, dan yang terbaca
+          bukan keterangan melainkan blok abu-abu.
+
+          Sekarang dua bagian. Baris pertama menjawab "yang saya lihat ini
+          apa" dalam delapan kata. Baris kedua batasannya — tetap ada karena
+          ia janji hukum, bukan hiasan, tapi diturunkan ukuran dan
+          terangnya supaya tidak berebut perhatian dengan isinya.
+
+          basis-full di ponsel: lencana dan tombolnya turun ke baris sendiri
+          alih-alih menjepit teks jadi separuh lebar layar. */}
+      <div className="flex flex-wrap items-start gap-3">
+        <div className="min-w-0 flex-1 basis-full sm:basis-0">
           <h2 className="text-[15px] font-semibold text-zinc-100">Dompet Pantauan</h2>
           <p className="mt-0.5 text-[12.5px] text-zinc-500">
-            Posisi dan setiap transaksi dompet perp on-chain. Fase mencatat —
-            tidak ada order yang dikirim, dan belum ada sinyal yang terbit ke publik.
+            Posisi dan transaksi dompet perp on-chain yang dipantau.
+          </p>
+          <p className="mt-1 text-[11.5px] leading-relaxed text-zinc-600">
+            Baru fase mencatat, belum ada order dikirim atau sinyal terbit.
           </p>
         </div>
-        <span className={cn('flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11.5px]',
-          sehat ? 'border-emerald-500/30 text-emerald-400' : 'border-amber-500/30 text-amber-300')}>
-          <span aria-hidden className={cn('size-1.5 rounded-full', sehat ? 'bg-emerald-400' : 'bg-amber-400')} />
-          {d && d.denyut ? 'Pindai ' + umur(d.denyut) : 'Belum pernah memindai'}
-        </span>
-        <button onClick={() => void tarik(true)} title="Muat ulang"
-          className="cursor-pointer rounded-md border border-zinc-800 p-1.5 text-zinc-400 transition-colors hover:text-zinc-100">
-          <RefreshCw className="size-3.5" />
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className={cn('flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11.5px]',
+            sehat ? 'border-emerald-500/30 text-emerald-400' : 'border-amber-500/30 text-amber-300')}>
+            <span aria-hidden className={cn('size-1.5 rounded-full', sehat ? 'bg-emerald-400' : 'bg-amber-400')} />
+            {d && d.denyut ? 'Pindai ' + umur(d.denyut) : 'Belum pernah memindai'}
+          </span>
+          <button onClick={() => void tarik(true)} title="Muat ulang"
+            className="cursor-pointer rounded-md border border-zinc-800 p-1.5 text-zinc-400 transition-colors hover:text-zinc-100">
+            <RefreshCw className="size-3.5" />
+          </button>
+        </div>
       </div>
 
       {gagal && (
