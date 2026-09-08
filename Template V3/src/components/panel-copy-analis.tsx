@@ -289,7 +289,7 @@ export function PanelCopyAnalis({ analisUid, analisNama, contohPasangan, pasar, 
                     akun {jenisAkun}
                   </span>
                   {jenisAkun === 'cent' && ' — 1 lot = 1/100 standar'}
-                  {akun.mataUang && <span className="text-zinc-700"> · {akun.mataUang}</span>}
+                  {akun.mataUang && <span className="text-zinc-600"> · {akun.mataUang}</span>}
                 </div>
               </>
             )}

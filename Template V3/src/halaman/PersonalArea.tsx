@@ -11,6 +11,7 @@ import { ModalImporPorto } from '@/components/modal-impor-porto';
 import { usePorto, bawaan, idBaru, type PosAset } from '@/lib/porto';
 import { useHargaPasar } from '@/lib/harga';
 import { useAuth } from '@/lib/auth';
+import { useTema } from '@/lib/tema';
 
 /* ════════════════════════════════════════════════════════════════════════
    PERSONAL AREA — pelacak portofolio
@@ -33,6 +34,14 @@ import { useAuth } from '@/lib/auth';
 const KATEGORI: KategoriAset[] = ['Kripto', 'Sekuritas', 'Emas', 'Bank', 'E-Wallet', 'Tunai'];
 
 export default function PersonalArea() {
+  /* Grafik Recharts menerima heksa, bukan kelas, jadi warnanya harus
+     dipilih di sini dan digambar ulang saat tombol tema ditekan —
+     useTema() mengamati atribut di <html>. Lihat catatan WARNA_KATEGORI_
+     TERANG di data/porto.ts untuk kenapa tabelnya dibalik. */
+  const tema = useTema();
+  const terang = tema === 'terang';
+  const emas = terang ? '#a16207' : '#ffcd75';
+  const abuSumbu = terang ? '#62626a' : '#71717a';
   const { pengguna } = useAuth();
   const { isi, tampil, contoh, memuat, galat, kosong, simpan } = usePorto();
   const [pesan, setPesan] = useState('');
@@ -230,7 +239,7 @@ export default function PersonalArea() {
                     isAnimationActive={false}
                   >
                     {perKategori.map((k) => (
-                      <Cell key={k.nama} fill={warnaKategori(k.nama)} />
+                      <Cell key={k.nama} fill={warnaKategori(k.nama, tema)} />
                     ))}
                   </Pie>
                   <Tooltip
@@ -252,7 +261,7 @@ export default function PersonalArea() {
             <div className="space-y-1.5">
               {perKategori.map((k) => (
                 <div key={k.nama} className="flex items-center gap-2.5 text-[12.5px]">
-                  <span className="size-2.5 shrink-0 rounded-sm" style={{ background: warnaKategori(k.nama) }} />
+                  <span className="size-2.5 shrink-0 rounded-sm" style={{ background: warnaKategori(k.nama, tema) }} />
                   <span className="flex-1 text-zinc-400">{k.nama}</span>
                   <span className="angka text-zinc-300">{((k.nilai / totalAset) * 100).toFixed(1)}%</span>
                   <span className="angka w-24 text-right text-zinc-500">{rupiahRingkas(k.nilai)}</span>
@@ -279,13 +288,13 @@ export default function PersonalArea() {
               <AreaChart data={riwayatBulan} margin={{ top: 8, right: 12, left: 8, bottom: 0 }}>
                 <defs>
                   <linearGradient id="gPorto" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#ffcd75" stopOpacity={0.24} />
-                    <stop offset="100%" stopColor="#ffcd75" stopOpacity={0} />
+                    <stop offset="0%" stopColor={emas} stopOpacity={0.24} />
+                    <stop offset="100%" stopColor={emas} stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid vertical={false} stroke="currentColor" strokeOpacity={0.09} />
-                <XAxis dataKey="bulan" tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} minTickGap={16} />
-                <YAxis tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} width={56}
+                <XAxis dataKey="bulan" tick={{ fill: abuSumbu, fontSize: 11 }} axisLine={false} tickLine={false} minTickGap={16} />
+                <YAxis tick={{ fill: abuSumbu, fontSize: 11 }} axisLine={false} tickLine={false} width={56}
                        tickFormatter={(v) => `${Math.round(v / 1_000_000)}jt`} />
                 <Tooltip
                   content={({ active, payload, label }: any) =>
@@ -298,7 +307,7 @@ export default function PersonalArea() {
                   }
                   cursor={{ stroke: 'currentColor', strokeOpacity: 0.22 }}
                 />
-                <Area type="monotone" dataKey="porto" stroke="#ffcd75" strokeWidth={1.8} fill="url(#gPorto)" dot={false} />
+                <Area type="monotone" dataKey="porto" stroke={emas} strokeWidth={1.8} fill="url(#gPorto)" dot={false} />
               </AreaChart>
             </ResponsiveContainer>
             )}
@@ -361,7 +370,7 @@ export default function PersonalArea() {
                       </Td>
                       <Td>
                         <span className="flex items-center gap-1.5 text-[12px] text-zinc-500">
-                          <span className="size-2 rounded-sm" style={{ background: warnaKategori(a.kategori) }} />
+                          <span className="size-2 rounded-sm" style={{ background: warnaKategori(a.kategori, tema) }} />
                           {a.kategori}
                         </span>
                       </Td>

@@ -224,7 +224,7 @@ export function PanelCopyTradeFi({ sinyalId, analisUid, pasangan, arah, entry, s
             Akun terbaca sebagai{' '}
             <span className={jenisAkun === 'cent' ? 'text-amber-300' : 'text-zinc-300'}>{jenisAkun}</span>
             {jenisAkun === 'cent' && ' — 1 lot = 1/100 standar'}
-            {akun.saldo != null && <span className="text-zinc-700"> · saldo {uang(akun.saldo)}</span>}
+            {akun.saldo != null && <span className="text-zinc-600"> · saldo {uang(akun.saldo)}</span>}
           </div>
 
           <div className="mt-2.5 grid grid-cols-2 gap-2">
@@ -339,7 +339,7 @@ function Baris({ k, v, ket }: { k: string; v: string; ket?: string }) {
   return (
     <div className="flex items-baseline gap-2">
       <span className="text-zinc-500">{k}</span>
-      {ket && <span className="text-[9.5px] text-zinc-700">{ket}</span>}
+      {ket && <span className="text-[9.5px] text-zinc-600">{ket}</span>}
       <span className="angka ml-auto text-zinc-200">{v}</span>
     </div>
   );

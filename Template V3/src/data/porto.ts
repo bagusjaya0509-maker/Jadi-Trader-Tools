@@ -56,6 +56,25 @@ export const WARNA_KATEGORI: Record<KategoriAset, string> = {
   Tunai:      '#3f3f46',
 };
 
+/* ── Tema terang: tangga abunya DIBALIK, bukan dipakai ulang ────────────
+   Warna di atas dirancang untuk latar hitam: Kripto — irisan terbesar —
+   putih, dan yang kecil makin gelap. Di atas putih, irisan putih itu
+   lenyap: pemilik melihat pie "terpotong" 62 persen (8 Sep 2026), dan
+   garis Perkembangan Porto yang emas pucat hilang sama sekali.
+
+   Ini heksa mati yang masuk ke SVG Recharts, bukan kelas Tailwind, jadi
+   pembalikan tangga zinc di index.css tidak menjangkaunya. Maka tabel
+   kedua: peringkat terangnya dibalik (yang tadinya paling terang jadi
+   paling gelap), emasnya versi pekat yang sama dengan token `emas`. */
+export const WARNA_KATEGORI_TERANG: Record<KategoriAset, string> = {
+  Kripto:     '#18181b',
+  Sekuritas:  '#52525b',
+  Emas:       '#a16207',
+  Bank:       '#71717a',
+  'E-Wallet': '#a1a1aa',
+  Tunai:      '#c4c4c9',
+};
+
 /* Riwayat porto 12 bulan. Deterministik supaya grafiknya tidak berubah tiap
    refresh — angka yang bergeser sendiri membuat mustahil menilai apakah
    sebuah perbedaan visual itu perbaikan atau kebetulan. */
@@ -172,8 +191,9 @@ export function rupiah(n: number) {
  *  tiap kali halaman dimuat membuat grafik komposisi tidak bisa dibaca. */
 const PALET_LAIN = ['#8b5cf6', '#06b6d4', '#f472b6', '#84cc16', '#f97316', '#14b8a6'];
 
-export function warnaKategori(nama: string): string {
-  const bawaan = (WARNA_KATEGORI as Record<string, string>)[nama];
+export function warnaKategori(nama: string, tema: 'gelap' | 'terang' = 'gelap'): string {
+  const tabel = tema === 'terang' ? WARNA_KATEGORI_TERANG : WARNA_KATEGORI;
+  const bawaan = (tabel as Record<string, string>)[nama];
   if (bawaan) return bawaan;
   let h = 0;
   for (let i = 0; i < nama.length; i++) h = (h * 31 + nama.charCodeAt(i)) >>> 0;
