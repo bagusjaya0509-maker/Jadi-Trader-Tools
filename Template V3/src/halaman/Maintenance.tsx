@@ -4,6 +4,7 @@ import { Upload, Trash2, RotateCcw, Plus, FileCode2, Image as ImageIcon, ShieldA
 import { PanelModerasiSinyal } from '@/components/panel-moderasi-sinyal';
 import { PanelSembunyiKartu } from '@/components/panel-sembunyi-kartu';
 import PanelLaporanPengguna from '@/components/panel-laporan-pengguna';
+import { PanelReferralPemilik } from '@/components/panel-referral-pemilik';
 import { Panel, PanelHead, KartuKpi } from '@/components/efferd-ui';
 import { cn } from '@/lib/utils';
 import { useProduk, simpanKatalogProduk } from '@/lib/data';
@@ -224,6 +225,7 @@ const TAB = [
      rusak". Dua pertanyaan yang tidak pernah ditanyakan bersamaan, dan yang
      kedua selalu kalah perhatian di sebelah angka pemasukan. */
   { id: 'bug',     label: 'Error & Fixing',  judul: 'Error & Fixing',             sub: 'Bug, saran, dan error yang dikirim pengguna dari dalam aplikasi.' },
+  { id: 'referral', label: 'Program Referral', judul: 'Program Referral',          sub: 'Permintaan pencairan komisi, perujuk teratas, dan setelan persen. Transfer dilakukan tangan dari rekening usaha — panel ini mencatat keputusannya.' },
 ] as const;
 type IdTab = typeof TAB[number]['id'];
 
@@ -500,6 +502,7 @@ export default function Maintenance() {
           terbaca sebagai "ditindak". */}
       {tab === 'moderasi' && <><PanelModerasiSinyal /><PanelSembunyiKartu /></>}
       {tab === 'bug' && <PanelLaporanPengguna />}
+      {tab === 'referral' && <PanelReferralPemilik />}
 
       {tab === 'produk' && (<>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">

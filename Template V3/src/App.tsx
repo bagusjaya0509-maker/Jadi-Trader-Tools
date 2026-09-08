@@ -120,6 +120,7 @@ const Integrasi     = lazy(() => muat(() => import('@/halaman/Integrasi')));
 const Pemilik       = lazy(() => muat(() => import('@/halaman/Pemilik')));
 const Maintenance   = lazy(() => muat(() => import('@/halaman/Maintenance')));
 const Billing       = lazy(() => muat(() => import('@/halaman/Billing')));
+const Referral      = lazy(() => muat(() => import('@/halaman/Referral')));
 const Dokumentasi   = lazy(() => muat(() => import('@/halaman/Dokumentasi')));
 const Changelog     = lazy(() => muat(() => import('@/halaman/Changelog')));
 const Legal         = lazy(() => muat(() => import('@/halaman/Legal')));
@@ -554,6 +555,7 @@ export default function App() {
             <Route path="/social"         element={<Sosmed />} />
             <Route path="/maintenance"    element={<Maintenance />} />
             <Route path="/billing"        element={<Billing />} />
+            <Route path="/referral"       element={<Referral />} />
             {/* Daftar paket DI DALAM aplikasi. Ada karena halaman depan
                 tidak bisa dipakai untuk ini: "/" merender Beranda begitu
                 orangnya login, jadi tautan "/#harga" mendarat di halaman

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { jejak } from '@/lib/pixel';
 import { auth } from '@/lib/firebase';
 import { bacaKoneksi, PROXY_BAWAAN } from '@/lib/koneksi';
+import { bacaRefKode } from '@/lib/referral';
 
 /* ════════════════════════════════════════════════════════════════════════
    AKSES PERINTIS — 20 gratis, 80 berbayar, 30 hari
@@ -234,6 +235,9 @@ export async function mintaAkses(opsi: {
       produk: opsi.produk || 'jadi-trader-v3',
       catatan: (opsi.catatan ?? '').slice(0, 300),
       bukti: (opsi.bukti ?? '').slice(0, 300),
+      /* Kode referral dari ?ref= yang tersimpan — jalur kedua sesudah
+         laporkanRef(); server menolak sendiri kalau tidak sah. */
+      ...(bacaRefKode() ? { ref: bacaRefKode() } : {}),
     }),
   });
   const j = await r.json().catch(() => ({}));

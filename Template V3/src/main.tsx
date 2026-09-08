@@ -25,6 +25,22 @@ import { StrictMode } from 'react';
 
    Hanya untuk hash yang berbentuk RUTE (#/sesuatu). Jangkar biasa seperti
    #harga tidak disentuh — itu tautan ke seksi di halaman yang sama. */
+/* ── KODE REFERRAL DARI ?ref= — DISIMPAN SEBELUM ROUTER MENYENTUH ALAMAT ──
+   Tautan referral berbentuk /akses?ref=JTXXXXXX. Disimpan di sini, bukan
+   di halaman Akses, karena beberapa halaman mengganti query string saat
+   dipasang (pengalihan gerbang, tab) dan kode yang cuma dibaca satu
+   render kemudian bisa sudah hilang. Bentuk dan kuncinya harus sama
+   dengan bacaRefKode() di lib/referral.ts — sengaja tidak diimpor dari
+   sana: main.tsx harus tetap ringan, dan lib itu menyeret Firebase. */
+{
+  try {
+    const ref = new URLSearchParams(window.location.search).get('ref');
+    if (ref && /^[A-Za-z0-9]{4,12}$/.test(ref)) {
+      localStorage.setItem('jt.ref', JSON.stringify({ kode: ref.toUpperCase(), waktu: Date.now() }));
+    }
+  } catch { /* mode privat: tanpa referral, aplikasinya tetap jalan */ }
+}
+
 {
   const hash = window.location.hash;
   if (hash.startsWith('#/') && hash.length > 2) {

@@ -7,6 +7,7 @@ import {
   ArrowLeft, CheckCircle2, Clock, Eye, KeyRound, Loader2, LogOut, ShieldCheck, XCircle,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
+import { laporkanRef } from '@/lib/referral';
 import {
   useKuota, mintaAkses, permintaanSaya, masukDiscord, aktifkanKode, LINK_BAYAR,
   tampilanAksesDiingat,
@@ -135,6 +136,14 @@ export default function Akses() {
       .catch(() => { if (hidup) setPunyaku([]); });
     return () => { hidup = false; };
   }, [pengguna?.uid, kabar]);
+
+  /* Kode referral yang tersimpan dari ?ref= dilaporkan begitu orangnya
+     masuk. Sekali per uid; server yang menilai sah atau tidak (akun baru,
+     bukan diri sendiri, kode dikenal). Gagal jaringan dibiarkan — jalur
+     keduanya ada di mintaAkses(), yang mengirim kode yang sama. */
+  useEffect(() => {
+    if (pengguna?.uid) void laporkanRef(pengguna.uid);
+  }, [pengguna?.uid]);
 
   const terakhir = punyaku?.find((p) => p.produk === 'jadi-trader-v3') ?? punyaku?.[0] ?? null;
   const sudahAktif = pemilik || langganan.status === 'aktif';

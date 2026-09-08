@@ -8,7 +8,7 @@ import {
   AlertTriangle, Newspaper, ChevronRight, ChevronDown, Copy, Radar, UserCircle2, Crown,
   Footprints,
   CheckCircle2,
-  Sun, Moon } from 'lucide-react';
+  Sun, Moon, Gift } from 'lucide-react';
 import { IkonMasukan } from '@/components/ui/ikon-masukan';
 import { cn } from '@/lib/utils';
 import { Switch } from '@/components/ui/switch-button';
@@ -192,6 +192,10 @@ const NAV = [
        satu tempat; lencana di menu cuma mengulanginya. */
     grup: 'Administration',
     butir: [
+      /* Referral di atas Billing: yang satu hidup, yang satu diparkir.
+         Menu yang bisa dipakai tidak boleh berdiri di bawah menu yang
+         cuma menunggu. */
+      { ke: '/referral',    label: 'Program Referral', Ikon: Gift },
       { ke: '/billing',     label: 'Billing',          Ikon: CreditCard },
     ],
   },
@@ -238,6 +242,7 @@ const NAV = [
           { ke: '/maintenance?tab=pine',    label: 'Mesin Pine' },
           { ke: '/maintenance?tab=konten',  label: 'Situs & Konten' },
           { ke: '/maintenance?tab=bug',     label: 'Error & Fixing' },
+          { ke: '/maintenance?tab=referral', label: 'Program Referral' },
         ] },
     ],
   },
@@ -258,6 +263,7 @@ const JUDUL: Record<string, string> = {
   '/owner': 'Sales Report',
   '/maintenance': 'Maintenance',
   '/billing': 'Billing',
+  '/referral': 'Program Referral',
   '/docs': 'Documentation',
   '/changelog': 'Changelog',
   /* Dua rute ini terlewat dan jatuh ke bawaan 'Dashboard' -- jadi bilah
