@@ -24,6 +24,30 @@ import { useGSAP } from '@gsap/react';
 
 gsap.registerPlugin(ScrollTrigger);
 
+/* ── BILAH ALAMAT PONSEL JANGAN MEMICU HITUNG ULANG ─────────────────────
+   Dilaporkan pemilik 8 Sep 2026: di ponsel, gambar yang baru dilewati
+   "naik turun mirip bergetar", dan getarnya berlanjut sesudah jari
+   diangkat.
+
+   Sebabnya bukan animasinya. Peramban ponsel menyembunyikan lalu
+   memunculkan bilah alamat sepanjang orang menggulir, dan tiap perubahan
+   itu adalah `resize` di mata halaman. ScrollTrigger menghitung ulang
+   seluruh titik start/end setiap kali resize datang, sasaran rotasinya
+   bergeser, dan `scrub: 0,4` mengejar sasaran yang baru saja pindah. Yang
+   terlihat: panel yang sudah lewat bergoyang naik-turun, dan goyangannya
+   baru berhenti sesudah bilah alamatnya selesai bergerak — yaitu beberapa
+   saat SESUDAH jari diangkat.
+
+   `ignoreMobileResize` menyuruh ScrollTrigger mengabaikan resize yang cuma
+   mengubah TINGGI viewport di perangkat sentuh. Perubahan lebar — yang
+   berarti perangkatnya benar-benar diputar — tetap memicu hitung ulang,
+   jadi tata letaknya tidak pernah tertinggal basi.
+
+   Disetel di tingkat modul, sekali, bukan di dalam efek: ia setelan global
+   ScrollTrigger, dan memanggilnya berulang tiap komponen dipasang cuma
+   menulis nilai yang sama berkali-kali. */
+ScrollTrigger.config({ ignoreMobileResize: true });
+
 function cx(...parts: Array<string | undefined | false | null>): string {
   return parts.filter(Boolean).join(' ');
 }

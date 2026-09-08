@@ -71,35 +71,8 @@ export function ParallaxComponent() {
       });
     }
 
-    /* ── LENIS HANYA DI PERANGKAT BERTETIKUS ──────────────────────────
-       Dilaporkan pemilik 8 Sep 2026: di ponsel, gambar yang baru dilewati
-       "naik turun mirip bergetar" dan getarannya berlanjut SESUDAH jari
-       diangkat.
-
-       Sebabnya dua penggulir yang mendorong halaman yang sama. Peramban
-       ponsel punya momentum gulirnya sendiri yang tidak bisa dimatikan,
-       sementara Lenis juga menganimasikan posisi gulir menuju sasarannya.
-       Keduanya saling mengoreksi beberapa piksel tiap frame, dan karena
-       `scrub: 0` membuat lapisan parallax mengikuti posisi itu seketika,
-       koreksi yang seharusnya tidak terlihat berubah jadi getaran yang
-       terlihat.
-
-       Di ponsel Lenis juga tidak menambah apa-apa: gulir sentuh sudah
-       halus dari sananya. Yang hilang cuma pelembutan yang memang tidak
-       diminta; yang didapat halaman yang diam saat berhenti digulir.
-
-       `pointer: coarse` — bukan lebar layar. Yang menentukan bukan
-       sempitnya layar melainkan ADANYA momentum gulir bawaan, dan itu
-       milik perangkat sentuh, termasuk tablet selebar laptop.
-
-       prefers-reduced-motion ikut dihormati: orang yang meminta gerakan
-       dikurangi tidak seharusnya mendapat gulir yang dianimasikan. */
-    const sentuh = typeof window.matchMedia === 'function'
-      && (window.matchMedia('(pointer: coarse)').matches
-        || window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-
-    const lenis = sentuh ? null : new Lenis();
-    lenis?.on('scroll', ScrollTrigger.update);
+    const lenis = new Lenis();
+    lenis.on('scroll', ScrollTrigger.update);
 
     /* Fungsinya dipegang di variabel supaya bisa DILEPAS lagi di bawah.
        Versi aslinya menuliskannya sebagai fungsi anonim langsung di dalam
@@ -107,17 +80,9 @@ export function ParallaxComponent() {
        akan pernah bisa dicabut. Tiap kali komponen ini dipasang ulang,
        satu callback baru menumpuk, dan yang lama tetap memanggil raf()
        pada Lenis yang sudah dihancurkan. */
-    const detak = lenis ? (time: number) => { lenis.raf(time * 1000); } : null;
-    if (detak) {
-      gsap.ticker.add(detak);
-      /* lagSmoothing(0) ikut HANYA saat Lenis dipakai. Ia mematikan
-         penghalus lonjakan GSAP supaya gulir Lenis tidak tersendat saat
-         satu frame kelewat — masuk akal ketika gulirnya memang
-         dianimasikan. Tanpa Lenis ia justru merugikan: satu frame yang
-         terlambat di ponsel langsung diterjemahkan jadi lompatan besar
-         pada lapisan parallax. */
-      gsap.ticker.lagSmoothing(0);
-    }
+    const detak = (time: number) => { lenis.raf(time * 1000); };
+    gsap.ticker.add(detak);
+    gsap.ticker.lagSmoothing(0);
 
     return () => {
       /* HANYA milik komponen ini yang dibersihkan.
@@ -138,11 +103,9 @@ export function ParallaxComponent() {
       /* Urutannya penting: cabut detaknya DULU, baru hancurkan Lenis.
          Terbalik, masih ada peluang satu frame memanggil raf() pada
          instance yang sudah mati. */
-      if (detak) {
-        gsap.ticker.remove(detak);
-        gsap.ticker.lagSmoothing(500, 33);   // kembalikan bawaan GSAP
-      }
-      lenis?.destroy();
+      gsap.ticker.remove(detak);
+      gsap.ticker.lagSmoothing(500, 33);   // kembalikan bawaan GSAP
+      lenis.destroy();
     };
   }, []);
 
