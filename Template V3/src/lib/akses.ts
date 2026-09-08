@@ -36,7 +36,21 @@ export interface Kuota {
    *  server, bukan dari pilihan tiap peramban: yang diatur pemilik di
    *  Maintenance adalah tampilan yang DILIHAT SEMUA ORANG. Pilihan yang
    *  disimpan di localStorage cuma mengubah layar pemiliknya sendiri. */
-  tampilanAkses: 'foto' | 'lonceng';
+  tampilanAkses: TampilanAkses;
+}
+
+/* Ditulis sekali di sini, bukan diulang sebagai untai di lima tempat.
+   Menambah tampilan keempat nanti berarti menyunting satu baris ini dan
+   satu daftar di `TAMPILAN_SAH` — bukan berburu semua tempat yang
+   kebetulan menyebut 'foto' atau 'lonceng'. */
+export type TampilanAkses = 'foto' | 'lonceng' | 'prisma';
+
+/** Nilai yang boleh datang dari server. Dipakai penjaga di bawah supaya
+ *  jawaban yang aneh — versi server lebih baru, tampilan yang belum
+ *  dikenal peramban ini — jatuh ke bawaan alih-alih menggambar kosong. */
+const TAMPILAN_SAH: readonly TampilanAkses[] = ['foto', 'lonceng', 'prisma'];
+export function tampilanSah(v: unknown): v is TampilanAkses {
+  return typeof v === 'string' && (TAMPILAN_SAH as readonly string[]).includes(v);
 }
 
 export const KUOTA_KOSONG: Kuota = {
@@ -69,15 +83,15 @@ const KUNCI_TAMPILAN = 'jtTampilanAkses';
 /** Tampilan yang terakhir dikirim server di peramban ini, atau `null` kalau
  *  halaman ini memang belum pernah dibuka. `null` berarti "belum tahu" —
  *  dan yang belum tahu lebih baik menggambar panel kosong daripada menebak. */
-export function tampilanAksesDiingat(): 'foto' | 'lonceng' | null {
+export function tampilanAksesDiingat(): TampilanAkses | null {
   try {
     const v = localStorage.getItem(KUNCI_TAMPILAN);
-    return v === 'foto' || v === 'lonceng' ? v : null;
+    return tampilanSah(v) ? v : null;
   } catch { return null; }
 }
 
 function ingatTampilan(v: unknown) {
-  if (v !== 'foto' && v !== 'lonceng') return;
+  if (!tampilanSah(v)) return;
   try { localStorage.setItem(KUNCI_TAMPILAN, v); } catch { /* mode privat */ }
 }
 
@@ -311,7 +325,7 @@ export async function simpanSetelanAkses(nilai: {
   hargaTesting?: number; hargaTestingCoret?: number;
   hargaPremium3?: number; hargaTahunan?: number; nilaiMarketplace?: number;
   kursUsd?: number; eventGratis?: boolean; otoGratis?: boolean;
-  tampilanAkses?: 'foto' | 'lonceng';
+  tampilanAkses?: TampilanAkses;
   linkTesting?: string; linkPremium3?: string; linkTahunan?: string;
 }): Promise<SetelanAkses> {
   const r = await fetch(`${dasar()}/api/akses/setelan`, {

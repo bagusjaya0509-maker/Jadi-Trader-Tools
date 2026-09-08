@@ -238,6 +238,7 @@ export function PanelSetelanAkses() {
                 {([
                   { nilai: 'foto' as const, judul: 'Foto', sub: 'Gambar merek hero-bg.webp' },
                   { nilai: 'lonceng' as const, judul: 'Lonceng', sub: 'Lonceng bercahaya, animasi CSS' },
+                  { nilai: 'prisma' as const, judul: 'Prisma', sub: 'Nama merek besar, naik kata demi kata' },
                 ]).map((o) => {
                   const aktif = (st.tampilanAkses ?? 'foto') === o.nilai;
                   return (
