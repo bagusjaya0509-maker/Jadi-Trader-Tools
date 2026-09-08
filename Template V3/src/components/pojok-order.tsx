@@ -123,7 +123,18 @@ function PitaPeringatan({ pesan }: { pesan: string }) {
   }, [pesan]);
   if (!pesan || !tampak) return null;
   return (
-    <div className="pointer-events-none absolute left-0 top-full z-20 mt-1 max-w-[280px] rounded-md border border-amber-500/35 bg-zinc-950/95 px-2.5 py-1.5 text-[10.5px] leading-snug text-amber-300/90 shadow-lg backdrop-blur-sm">
+    /* TANPA bingkai dan TANPA bayangan, satu baris memanjang — pemilik,
+       8 Sep 2026. Kotak bergaris di bawah tiket terbaca sebagai panel
+       kedua yang menempel, padahal ini cuma kabar yang lewat; dan dua
+       baris terbungkus membuat tinggi hamparannya berubah-ubah persis di
+       tempat yang tadi dibereskan.
+
+       Latarnya TETAP ada: hurufnya duduk di atas lilin, dan teks
+       telanjang di sana kadang jatuh tepat pada badan lilin sewarna.
+       `whitespace-nowrap` yang menjadikannya satu baris; kalau kepanjangan
+       ia terpotong oleh `overflow-hidden` milik wadah chart, bukan
+       melebarkan halaman. */
+    <div className="pointer-events-none absolute left-0 top-full z-20 mt-1 whitespace-nowrap rounded bg-zinc-950/90 px-2 py-1 text-[10.5px] leading-none text-amber-300/90 backdrop-blur-sm">
       {pesan}
     </div>
   );
