@@ -595,7 +595,19 @@ export function DockPine({ buka, tab, aturTab, onTutup, lilin, simbol, tf, hingg
            title="Seret untuk mengubah lebar · klik dua kali untuk kembali ke bawaan"
            className="group relative w-1.5 shrink-0 cursor-ew-resize touch-none bg-zinc-800/60 transition-colors hover:bg-zinc-600" />
 
-      <div className="flex min-w-0 flex-1 flex-col border-y border-l border-zinc-800 bg-zinc-950">
+      {/* ── TINGGINYA DATANG DARI CHART, BUKAN DARI ISINYA ──────────────
+          Sesudah panel ini jadi kolom, tab Input yang punya dua puluhan
+          baris setelan membuat dirinya lebih tinggi daripada chart — dan
+          di baris flex, anak yang paling tinggi menentukan tinggi seluruh
+          barisnya. Akibatnya panel menjulur ke bawah melewati chart.
+
+          Isinya dikeluarkan dari aliran (`absolute inset-0`), jadi
+          tingginya tidak lagi dihitung: kolom ini meregang mengikuti
+          chart, dan daftar setelan yang panjang digulir di dalamnya —
+          wadah gulirnya memang sudah ada, yang hilang cuma batas
+          tingginya. */}
+      <div className="relative min-w-0 flex-1 border-y border-l border-zinc-800 bg-zinc-950">
+      <div className="absolute inset-0 flex flex-col">
       {/* ── Kepala: tab + tutup ── */}
       <div className="flex items-center gap-1 border-b border-zinc-800 px-3 py-2">
         <span className="mr-1 text-[12.5px] font-medium text-zinc-200">Pine Script</span>
@@ -831,6 +843,7 @@ export function DockPine({ buka, tab, aturTab, onTutup, lilin, simbol, tf, hingg
           )}
         </div>
       )}
+      </div>
       </div>
     </div>
   );
