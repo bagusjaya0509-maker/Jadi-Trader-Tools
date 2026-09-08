@@ -10,8 +10,10 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Mail, MessageCircle, Send, Instagram } from 'lucide-react';
+import { Mail, MessageCircle, Send, Instagram, Loader2, Check } from 'lucide-react';
 import { BADAN, WA_LINK, SOSMED } from '@/lib/badan';
+import { PROXY_BAWAAN, bacaKoneksi } from '@/lib/koneksi';
+import { cn } from '@/lib/utils';
 
 /* ════════════════════════════════════════════════════════════════════════
    FOOTER — kerangka tempelan, isi milik sendiri
@@ -95,16 +97,57 @@ const TAUTAN = [
 
 function Footerdemo() {
   const [pesan, setPesan] = React.useState('');
+  const [surelBalas, setSurelBalas] = React.useState('');
+  const [sibuk, setSibuk] = React.useState(false);
+  const [kabar, setKabar] = React.useState('');
+  const [terkirim, setTerkirim] = React.useState(false);
 
   /* Kotak isian ini BUKAN pendaftaran buletin seperti di sumbernya —
      tidak ada layanan buletin di belakangnya, dan kotak yang tidak
      tersambung ke mana-mana cuma menampung pertanyaan yang tidak pernah
-     terbaca. Ia membuka WhatsApp dengan pesannya sudah terisi; yang
-     menekan kirim tetap orangnya sendiri. */
-  const kirim = (e: React.FormEvent) => {
-    e.preventDefault();
+     terbaca.
+
+     DUA JALAN KELUAR, diminta pemilik 8 Sep 2026. Sebelumnya cuma
+     WhatsApp, dan itu memaksa orang membuka aplikasi lain — atau, di
+     desktop tanpa WhatsApp terpasang, tidak ke mana-mana sama sekali. */
+  const keWhatsApp = () => {
     const isi = pesan.trim();
     window.open(isi ? `${WA_LINK}?text=${encodeURIComponent(isi)}` : WA_LINK, '_blank', 'noopener');
+  };
+
+  /* Lewat backend sendiri (Resend), BUKAN FormSubmit. Jalur surelnya sudah
+     ada dan sudah terbukti jalan; menambah pihak ketiga berarti satu
+     pendaftaran lagi dan satu layanan lagi yang bisa mati tanpa kabar.
+
+     Pesannya juga DISIMPAN di sisi server, bukan cuma dikirim. Kalau
+     suratnya tersendat, pertanyaannya tetap terbaca di panel Maintenance —
+     jadi tidak ada pertanyaan yang hilang karena satu layanan luar sedang
+     turun. */
+  const keSurel = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const isi = pesan.trim();
+    if (isi.length < 3) { setKabar('Tulis pertanyaanmu dulu.'); return; }
+    setSibuk(true); setKabar('');
+    try {
+      const dasar = (bacaKoneksi().url.trim() || PROXY_BAWAAN).replace(/\/+$/, '');
+      const r = await fetch(`${dasar}/api/tanya`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pesan: isi,
+          dari: surelBalas.trim(),
+          halaman: window.location.pathname + window.location.search,
+        }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error ?? `Server menjawab ${r.status}`);
+      setPesan(''); setSurelBalas(''); setTerkirim(true);
+      setKabar(surelBalas.trim()
+        ? 'Terkirim. Balasannya akan masuk ke alamat itu.'
+        : 'Terkirim. Tulis alamat surelmu lain kali kalau mau dibalas.');
+    } catch (err) {
+      setKabar(err instanceof Error ? err.message : 'Gagal mengirim.');
+    } finally { setSibuk(false); }
   };
 
   return (
@@ -131,7 +174,7 @@ function Footerdemo() {
             <p className="mb-6 text-muted-foreground">
               Tulis di sini, pesanmu akan diterima dan dibantu lebih responsif oleh customer service.
             </p>
-            <form className="relative" onSubmit={kirim}>
+            <form className="space-y-2.5" onSubmit={keSurel}>
               <label htmlFor="tanya" className="sr-only">
                 Tulis pertanyaanmu
               </label>
@@ -139,18 +182,48 @@ function Footerdemo() {
                 id="tanya"
                 type="text"
                 value={pesan}
-                onChange={(e) => setPesan(e.target.value)}
+                onChange={(e) => { setPesan(e.target.value); setTerkirim(false); }}
                 placeholder="Tulis pertanyaanmu di sini"
-                className="pr-12 backdrop-blur-sm"
+                className="backdrop-blur-sm"
               />
-              <Button
-                type="submit"
-                size="icon"
-                className="absolute right-1 top-1 h-8 w-8 rounded-full bg-primary text-primary-foreground transition-transform hover:scale-105"
-              >
-                <Send className="h-4 w-4" />
-                <span className="sr-only">Kirim lewat WhatsApp</span>
-              </Button>
+
+              {/* Alamat balasan OPSIONAL, dan dikatakan begitu di
+                  placeholder-nya. Menjadikannya wajib akan menahan
+                  pertanyaan dari orang yang cuma ingin bertanya cepat —
+                  dan pertanyaan yang tidak jadi dikirim tidak menolong
+                  siapa pun. Yang lewat WhatsApp tidak memerlukannya sama
+                  sekali karena nomornya sudah ikut. */}
+              <label htmlFor="tanya-surel" className="sr-only">
+                Alamat surelmu, opsional
+              </label>
+              <Input
+                id="tanya-surel"
+                type="email"
+                value={surelBalas}
+                onChange={(e) => setSurelBalas(e.target.value)}
+                placeholder="Email kamu (opsional, agar bisa dibalas)"
+                className="backdrop-blur-sm"
+              />
+
+              <div className="flex flex-wrap gap-2">
+                <Button type="submit" disabled={sibuk} className="flex-1 gap-2">
+                  {sibuk ? <Loader2 className="h-4 w-4 animate-spin" />
+                    : terkirim ? <Check className="h-4 w-4" />
+                    : <Send className="h-4 w-4" />}
+                  Kirim lewat email
+                </Button>
+                <Button type="button" variant="outline" onClick={keWhatsApp} className="flex-1 gap-2">
+                  <MessageCircle className="h-4 w-4" />
+                  WhatsApp
+                </Button>
+              </div>
+
+              {kabar && (
+                <p className={cn('text-xs leading-relaxed',
+                  terkirim ? 'text-emerald-500' : 'text-muted-foreground')}>
+                  {kabar}
+                </p>
+              )}
             </form>
             <div className="absolute -right-4 top-0 h-24 w-24 rounded-full bg-primary/10 blur-2xl" />
           </div>
@@ -219,7 +292,16 @@ function Footerdemo() {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button variant="outline" size="icon" className={SASARAN} asChild>
-                      <a href={`mailto:${BADAN.email}`}>
+                      {/* Perihal diisikan supaya penyusun suratnya terbuka
+                          dengan konteks, bukan halaman kosong yang harus
+                          dijudulinya sendiri.
+
+                          Kalau tidak ada yang terbuka sama sekali, itu
+                          bukan tautannya: mesin itu belum punya aplikasi
+                          surel bawaan. Untuk keadaan itu ada kotak tanya di
+                          kolom pertama kaki halaman ini — ia mengirim tanpa
+                          aplikasi apa pun. */}
+                      <a href={`mailto:${BADAN.email}?subject=${encodeURIComponent('Pertanyaan untuk Jadi Trader Tools')}`}>
                         <Mail className="h-4 w-4" />
                         <span className="sr-only">Surel</span>
                       </a>
