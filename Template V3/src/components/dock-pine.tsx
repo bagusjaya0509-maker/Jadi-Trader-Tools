@@ -513,7 +513,13 @@ export function DockPine({ buka, tab, aturTab, onTutup, lilin, simbol, tf, hingg
 
   return (
     <div className={cn(
-      'absolute inset-y-0 right-0 z-30 flex w-[380px] max-w-[92%] flex-col border-l border-zinc-800 bg-zinc-950/[.97] backdrop-blur transition-transform duration-300',
+      /* border-y, bukan cuma border-l. Dilaporkan pemilik 8 Sep 2026:
+         kakinya tidak punya garis sehingga panelnya terlihat melayang, dan
+         kepalanya naik tanpa batas yang jelas. Satu sisi bergaris di
+         tengah bidang gelap memang tidak membentuk apa pun -- yang
+         membuat sesuatu terbaca sebagai panel adalah tepinya yang
+         tertutup. */
+      'absolute inset-y-0 right-0 z-30 flex w-[380px] max-w-[92%] flex-col border-y border-l border-zinc-800 bg-zinc-950/[.97] backdrop-blur transition-transform duration-300',
       buka ? 'translate-x-0' : 'pointer-events-none translate-x-full')}>
       {/* ── Kepala: tab + tutup ── */}
       <div className="flex items-center gap-1 border-b border-zinc-800 px-3 py-2">

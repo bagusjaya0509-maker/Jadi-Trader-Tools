@@ -463,6 +463,38 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
     } finally { setBatalTiket(null); }
   }
 
+  /* ── BATALKAN PENDING KRIPTO ────────────────────────────────────────
+     Diminta pemilik 8 Sep 2026. Sebelumnya ikon hapus sengaja hanya ada
+     di Trade-Fi, dengan alasan yang masih benar: daftar pending kripto
+     mencampur order sungguhan di bursa dengan RENCANA lokal yang belum
+     dikirim ke mana-mana, dan satu ikon yang kadang menghapus order
+     kadang cuma catatan sendiri adalah ikon yang tidak bisa dipercaya.
+
+     Yang keliru bukan kekhawatirannya, melainkan jalan keluarnya. Barisnya
+     sudah membawa penanda `rencana`, dan penanda itu yang dipakai tombol
+     Chasing di sebelahnya sejak awal. Jadi ikon hapusnya memakai gerbang
+     yang sama: muncul HANYA untuk order yang benar-benar hidup di bursa.
+     Baris rencana tetap tanpa ikon, dan artinya tidak pernah mendua.
+
+     Konfirmasinya menyebut arah, ukuran, dan harga limitnya. "Yakin?"
+     tidak memberi tahu apa yang akan hilang. */
+  async function batalkanPendingKripto(o: BarisPending) {
+    if (batalTiket) return;
+    const asli = pendingKripto.find((x) => x.id === o.kunci);
+    if (!asli) { setBatalKabar('Order itu sudah tidak ada di daftar bursa.'); return; }
+    if (!confirm(`Batalkan order ini di bursa?\n\n`
+      + `${o.arah} ${o.simbol} — ${asli.qty}\n`
+      + `Limit ${fHarga(o.harga)}\n\n`
+      + `Ordernya dihapus dari bursa dan tidak akan terisi.`)) return;
+    setBatalTiket(o.kunci);
+    setBatalKabar('');
+    try {
+      await batalPendingNyata({ symbol: asli.simbol, orderId: asli.id, isAlgo: asli.algo });
+    } catch (e) {
+      setBatalKabar(e instanceof Error ? e.message : 'Gagal membatalkan order.');
+    } finally { setBatalTiket(null); }
+  }
+
   /* ── CHASING: HABISKAN PENDING DI HARGA PASAR ──────────────────────
      Diminta pemilik 3 Sep 2026. Order yang menggantung dan tidak kunjung
      terisi, dibuat terisi sekarang juga.
@@ -841,16 +873,17 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
                             : <Zap className="size-3.5" />}
                         </button>
                       )}
-                      {/* Hanya untuk Trade-Fi. Pending kripto di daftar ini
-                          sebagian RENCANA lokal yang belum ada di bursa,
-                          dan satu ikon yang kadang menghapus order sungguhan
-                          kadang cuma catatan sendiri adalah ikon yang tidak
-                          bisa dipercaya. */}
-                      {sumber !== 'kripto' && (
+                      {/* Gerbangnya SAMA dengan tombol Chasing di sebelahnya:
+                          `!o.rencana`. Baris rencana adalah catatan lokal yang
+                          belum jadi order di bursa, dan ikon hapus di sana akan
+                          berarti dua hal berbeda di dua baris yang tampak
+                          serupa. Lihat catatan panjang di batalkanPendingKripto. */}
+                      {(sumber !== 'kripto' || !o.rencana) && (
                         <button type="button"
-                          onClick={(e) => { e.stopPropagation(); void batalkanPending(o.kunci); }}
+                          onClick={(e) => { e.stopPropagation();
+                            void (sumber === 'kripto' ? batalkanPendingKripto(o) : batalkanPending(o.kunci)); }}
                           disabled={batalTiket !== null}
-                          title="Batalkan order ini di MT5"
+                          title={sumber === 'kripto' ? 'Batalkan order ini di bursa' : 'Batalkan order ini di MT5'}
                           aria-label={`Batalkan ${o.arah} ${o.simbol}`}
                           className="rounded p-0.5 text-zinc-600 transition-colors hover:bg-red-500/10 hover:text-red-400 disabled:opacity-40">
                           {batalTiket === o.kunci

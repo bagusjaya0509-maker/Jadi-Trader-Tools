@@ -42,6 +42,7 @@ import {
 } from '@/lib/backtest';
 import { simbolDasarMt5, useSimbol, bacaAktif, tambahSimbol } from '@/lib/simbol';
 import { useAuth } from '@/lib/auth';
+import { useTema } from '@/lib/tema';
 import { modePreview, jatahTerpakai, pakaiJatah } from '@/lib/preview';
 import { usePaket, pakaiKuota, teksSisa } from '@/lib/paket';
 import { JIPLAK_BAWAAN, type AturJiplak } from '@/components/jiplak-chart';
@@ -751,6 +752,23 @@ export default function ChartBacktest() {
      mengambangnya. Tabelnya tetap DIPASANG saat tersembunyi (kelas
      `hidden`, bukan unmount): dialah yang menghitung P/L itu, dan angka yang
      berhenti bergerak begitu tabelnya ditutup adalah angka yang menipu. */
+  /* ── WARNA GARIS ORDER IKUT TEMA ──────────────────────────────────
+     Garis Entry ditulis mati #d4d4d8, abu terang yang terbaca jelas di
+     chart hitam dan nyaris hilang di chart putih. Dilaporkan pemilik
+     8 Sep 2026: angkanya tidak kelihatan di mode terang.
+
+     Sama persis dengan kasus pie Personal Area: heksa ini masuk ke
+     pustaka chart, bukan ke CSS, jadi pembalikan tangga zinc di
+     index.css tidak pernah menjangkaunya. Yang begini harus dipilih di
+     JS dan digambar ulang saat tombol tema ditekan.
+
+     SL dan TP tidak ikut diubah: merah dan hijau pekat tetap terbaca di
+     kedua latar, dan menukarnya berarti mengubah arti warna. */
+  const temaChart = useTema();
+  const chartTerang = temaChart === 'terang';
+  const warnaEntry = chartTerang ? '#52525b' : '#d4d4d8';
+  const warnaEntryHapus = chartTerang ? '#a1a1aa' : '#71717a';
+
   const [posisiSembunyi, setPosisiSembunyi] = useState(true);
 
   /* ── LEBAR KEDUA PANEL POSISI BISA DISERET ──────────────────────────
@@ -3689,7 +3707,7 @@ ${pnlSunting !== null
         : `· ${sunting.arah}`;
       const ketStop = sedangHapus ? '· menghapus…' : gabung ? '· rata-rata' : '';
       if (sunting.entry) g.push({
-        id: 'entry', harga: sunting.entry, warna: sedangHapus ? '#71717a' : '#d4d4d8', label: 'Entry',
+        id: 'entry', harga: sunting.entry, warna: sedangHapus ? warnaEntryHapus : warnaEntry, label: 'Entry',
         ket: ketEntry,
         bisaSeret: !sedangHapus && !gabung,
       });
@@ -3782,7 +3800,7 @@ ${pnlSunting !== null
       ? `· ${aksiTunda.arah === 'BUY' ? 'Buy' : 'Sell'} ${aksiTunda.jenis === 'STOP' ? 'Stop' : 'Limit'} menunggu`
       : draf ? `· ${labelJenis}` : '';
 
-    if (sumber.entry) g.push({ id: 'entry', harga: sumber.entry, warna: '#d4d4d8', label: 'Entry', ket: ketEntry, bisaSeret: !kunci });
+    if (sumber.entry) g.push({ id: 'entry', harga: sumber.entry, warna: warnaEntry, label: 'Entry', ket: ketEntry, bisaSeret: !kunci });
     if (sumber.sl) g.push({ id: 'sl', harga: sumber.sl, warna: '#f87171', label: 'SL', ket: ketSl, bisaSeret: !kunci });
     if (sumber.tp) g.push({ id: 'tp', harga: sumber.tp, warna: '#10b981', label: 'TP', ket: ketTp, bisaSeret: !kunci });
     return g;
