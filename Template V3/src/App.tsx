@@ -391,7 +391,14 @@ function Kerangka() {
      maupun Firestore. Ia cuma membungkus komponen Pricing_05 yang sama
      dengan yang dipakai halaman pendaratan. Tidak ada data siapa pun di
      dalamnya untuk bocor. */
-  const TERBUKA = new Set(['/docs', '/harga']);
+  /* /referral ikut terbuka sejak 9 Sep 2026 (pemilik): halamannya punya
+     data contoh sendiri untuk tamu, jadi orang bisa melihat bentuk program
+     referral sebelum memutuskan mendaftar. Yang butuh akun — menyalin
+     tautan, membagikan, mengajukan pencairan — mengarah ke /akses dari
+     dalam halamannya, bukan dari gerbang ini. Data siapa pun tidak ada di
+     situ selama belum masuk: referralSaya() tidak pernah dipanggil tanpa
+     pengguna. */
+  const TERBUKA = new Set(['/docs', '/harga', '/referral']);
   if (!import.meta.env.DEV && !preview && !TERBUKA.has(lokasi.pathname)
       && !(pemilik || langganan.status === 'aktif' || langganan.status === 'pratinjau')) {
     return <Navigate to={`/akses?dari=${encodeURIComponent(alamatPenuh(lokasi))}`} replace />;
