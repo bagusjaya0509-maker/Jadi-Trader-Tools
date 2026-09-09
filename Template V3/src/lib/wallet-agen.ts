@@ -128,6 +128,10 @@ export interface SetelanSalin {
    *  posisi. Nilai posisinya usd x leverage. */
   usd?: number;
   leverage?: number;
+  /** Kalau ukuran per order di bawah minimum bursa (BTCUSDT Binance: nilai
+   *  posisi 100 USDT; Hyperliquid: $10), naikkan sendiri ke minimum, bukan
+   *  ditolak. Batas SALIN_MAKS_USD di server tetap berlaku. Bawaan mati. */
+  sesuaikanMinimum?: boolean;
   dibuat?: number;
   diubah?: number;
 
@@ -158,6 +162,10 @@ export interface PosisiSalinan {
   leverage?: number;
   /** Arah dompet sumbernya: LONG / SHORT. */
   arahSumber?: string;
+  /** true = ukurannya dinaikkan mesin ke minimum bursa; `usd` di atas adalah
+   *  margin yang TERPAKAI, `usdDiminta` yang diketik di setelan. */
+  disesuaikan?: boolean;
+  usdDiminta?: number;
   /** Potret dari bursa. `terbaca: false` = posisinya tidak ketemu di
    *  jawaban bursa terakhir — angkanya yang tertinggal sudah basi, dan
    *  layar harus mengatakannya alih-alih menampilkannya seolah segar. */
@@ -423,6 +431,7 @@ export async function daftarSalin(): Promise<IsiSalin> {
 export async function simpanSalin(ubah: {
   alamat: string; nama?: string; aktif: boolean;
   bursa: string; usd: number; leverage: number;
+  sesuaikanMinimum?: boolean;
   /** GLOBAL — menumpang formulir per dompet karena di situlah orangnya
    *  berada saat memikirkannya. Server menulisnya hanya kalau dikirim. */
   maksLipat?: number;

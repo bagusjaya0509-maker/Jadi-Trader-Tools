@@ -83,11 +83,37 @@ async function meta() {
 
 /** Indeks aset + szDecimals untuk sebuah koin, atau null kalau koin itu
  *  tidak diperdagangkan di Hyperliquid perps. null = jawaban, bukan galat. */
+/* ── MENERIMA "ASTER" MAUPUN "ASTERUSDT" ────────────────────────────────
+   Hyperliquid menamai asetnya dengan koinnya saja: ASTER, BTC, HYPE. Layar
+   dan Binance menyebut hal yang sama "ASTERUSDT", dan itulah yang sampai ke
+   sini dari /api/trade/futures/close — `tutupHl(symbol, quantity)` mengoper
+   apa yang ia terima apa adanya.
+
+   Akibatnya: SETIAP perintah tutup posisi Hyperliquid dari Chart & Entry
+   mati di baris pertama fungsi ini dengan "ASTERUSDT tidak ada di
+   Hyperliquid perps". Dilaporkan pemilik dua kali; perbaikan sebelumnya
+   (memilih bursa dari posisinya, bukan dari chart) sudah benar tapi cuma
+   memindahkan kegagalannya satu baris ke bawah — permintaannya akhirnya
+   SAMPAI ke Hyperliquid, lalu ditolak di sini.
+
+   Jalur salin dompet tidak pernah kena karena ia memanggil tutupHl dengan
+   nama koin telanjang. Dua bentuk masuk ke satu pintu, dan pintunya cuma
+   mengenal satu.
+
+   DICOBA PERSIS DULU, baru dipotong. Urutan itu yang membuatnya aman: kalau
+   suatu hari ada aset yang memang bernama "…USDT", nama aslinya menang dan
+   pemotongan tidak pernah dijalankan. (Hari ini tidak ada satu pun — dari
+   233 aset, tidak ada yang namanya bahkan memuat "USD".) */
 async function asetHl(koin) {
   const k = String(koin || '').trim();
   const m = await meta();
-  const i = (m.universe || []).findIndex(
-    (u) => String(u.name).toUpperCase() === k.toUpperCase());
+  const cari = (nama) => (m.universe || []).findIndex(
+    (u) => String(u.name).toUpperCase() === String(nama).toUpperCase());
+  let i = cari(k);
+  if (i < 0) {
+    const dipotong = keKoin(k);
+    if (dipotong && dipotong !== k.toUpperCase()) i = cari(dipotong);
+  }
   if (i < 0) return null;
   return { indeks: i, szDecimals: Number(m.universe[i].szDecimals) || 0,
            maxLeverage: Number(m.universe[i].maxLeverage) || 1, nama: m.universe[i].name };
@@ -182,7 +208,7 @@ function bulatHarga(h, szDecimals) {
  *  Perbedaan lain yang disengaja: fungsi ini TIDAK memasang SL/TP. Salinan
  *  keluar saat dompet sumbernya keluar, bukan saat harga menyentuh angka
  *  yang kita karang sendiri. */
-async function bukaHl({ koin, arah, usd, leverage = 1 }) {
+async function bukaHl({ koin, arah, usd, leverage = 1, sesuaikanMinimum = false }) {
   if (!siap()) throw new Error('Hyperliquid belum aktif (HL_AKTIF/HL_AKUN/HL_AGENT_KEY)');
 
   const nilaiUsd = Number(usd);
@@ -203,10 +229,34 @@ async function bukaHl({ koin, arah, usd, leverage = 1 }) {
     throw new Error(`Saldo $${saldo.bisaDipakai.toFixed(2)} kurang dari ukuran order $${nilaiUsd}`);
   }
 
-  const ukuran = bulatUkuran((nilaiUsd * lev) / harga, aset.szDecimals);
+  let ukuran = bulatUkuran((nilaiUsd * lev) / harga, aset.szDecimals);
+
+  /* ── SESUAIKAN KE MINIMUM BURSA ────────────────────────────────────────
+     Hyperliquid menolak order bernilai di bawah $10. Sama seperti jalur
+     Binance: kalau setelan dompetnya menyalakan `sesuaikanMinimum`, ukuran
+     dinaikkan ke kelipatan desimal terkecil yang memenuhi, marginnya
+     dihitung ulang, dan HL_MAKS_USD tetap jadi pagar. */
+  const MIN_NILAI_HL = 10;
+  let usdDipakai = nilaiUsd, disesuaikan = false;
+  if ((!(ukuran > 0) || ukuran * harga < MIN_NILAI_HL) && sesuaikanMinimum) {
+    const f = Math.pow(10, aset.szDecimals);
+    let ukMin = Math.ceil(Number(((MIN_NILAI_HL / harga) * f).toPrecision(12))) / f;
+    if (ukMin * harga < MIN_NILAI_HL) ukMin = (Math.round(ukMin * f) + 1) / f;
+    ukuran = ukMin;
+    usdDipakai = Math.round(((ukuran * harga) / lev) * 100) / 100;
+    if (usdDipakai > HL_MAKS_USD) {
+      throw new Error(`Minimum ${koin} butuh margin $${usdDipakai} di ${lev}x (nilai order minimal $${MIN_NILAI_HL}) `
+                    + `— melewati batas HL_MAKS_USD (${HL_MAKS_USD}). Naikkan leverage atau batasnya.`);
+    }
+    if (saldo.bisaDipakai < usdDipakai) {
+      throw new Error(`Saldo $${saldo.bisaDipakai.toFixed(2)} kurang dari margin minimum $${usdDipakai}`);
+    }
+    disesuaikan = true;
+  }
   if (!(ukuran > 0)) {
     throw new Error(`Ukuran $${nilaiUsd} terlalu kecil untuk ${koin} `
-                  + `(harga ${harga}, ${aset.szDecimals} desimal) — membulat jadi nol`);
+                  + `(harga ${harga}, ${aset.szDecimals} desimal) — membulat jadi nol`
+                  + (sesuaikanMinimum ? '' : '. Nyalakan "Sesuaikan ke minimum bursa" di setelan salin dompet ini.'));
   }
 
   const beli = arah === 'BUY' || arah === 'LONG';
@@ -242,7 +292,7 @@ async function bukaHl({ koin, arah, usd, leverage = 1 }) {
   const isi = st?.filled;
   return {
     ok: true, koin: aset.nama, arah: beli ? 'BUY' : 'SELL',
-    ukuran, hargaKirim, leverage: lev,
+    ukuran, hargaKirim, leverage: lev, usd: usdDipakai, disesuaikan,
     terisi: isi ? { ukuran: Number(isi.totalSz), harga: Number(isi.avgPx) } : null,
     mentah: st,
   };
@@ -784,8 +834,21 @@ async function tutupHl(koin, qty) {
            terisi: st?.filled || null, sltpDicabut: bersih };
 }
 
+/** Keadaan setelan, untuk halaman Integrations. Menjawab pertanyaan yang
+ *  selama ini cuma bisa dijawab dengan membuka .env di VPS: dari tiga hal
+ *  yang dibutuhkan Hyperliquid, mana yang belum ada?
+ *
+ *  KUNCINYA TIDAK IKUT, dan tidak akan pernah. Yang dipulangkan cuma
+ *  ADA-atau-TIDAK — cukup untuk memberi tahu apa yang kurang, tidak cukup
+ *  untuk dipakai siapa pun. `akun` itu alamat dompet publik; ia tetap
+ *  digerbangi token di server.js karena alamat yang bisa dibaca tanpa izin
+ *  berarti posisi pemiliknya bisa diintip tanpa izin juga. */
+function setelan() {
+  return { aktif: HL_AKTIF, adaAkun: !!AKUN, adaKunci: !!KUNCI, akun: AKUN };
+}
+
 module.exports = {
-  siap, asetHl, saldoHl, hargaHl, bulatUkuran, bulatHarga,
+  siap, setelan, asetHl, saldoHl, hargaHl, bulatUkuran, bulatHarga,
   /* Mesin salin — berpagar HL_MAKS_USD/LEV. */
   bukaHl,
   /* Order manual dari Chart & Entry — tanpa pagar nominal, digerbangi

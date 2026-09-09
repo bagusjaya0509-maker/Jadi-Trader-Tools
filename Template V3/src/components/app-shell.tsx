@@ -69,7 +69,17 @@ function KartuBaru({ versi, judul, ringkas }: { versi: string; judul: string; ri
     return () => clearTimeout(jeda);
   }, [buka, sembunyi]);
 
-  if (sembunyi) return null;
+  /* ── DI HP TIDAK DIRENDER SAMA SEKALI ──────────────────────────────────
+     Pemilik, 9 Sep 2026: "panel baru v3.7 di mode HP jangan ditampilkan
+     saja." Menyapa tujuh detik lalu melipat (kode di atas) tetap berarti
+     kartu itu sempat mendorong menu ke bawah persis saat orang membuka
+     laci untuk mencari menu. Diputuskan SEKALI saat kartu lahir, bukan
+     tiap render: memutar ponsel ke lanskap tidak boleh memunculkan kartu
+     yang baru saja tidak ada. Isinya tetap satu ketukan jauhnya di
+     halaman Changelog. */
+  const [ponsel] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
+
+  if (sembunyi || ponsel) return null;
 
   return (
     <Link to="/changelog"

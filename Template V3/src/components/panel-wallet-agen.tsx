@@ -1120,7 +1120,7 @@ function DialogSalin({ w, awal, maksLipat, tutup, simpan, hapus }: {
   /** Batas per koin yang sedang berlaku — GLOBAL, bukan milik dompet ini. */
   maksLipat: number;
   tutup: () => void;
-  simpan: (v: { aktif: boolean; bursa: string; usd: number; leverage: number; maksLipat: number }) => Promise<void>;
+  simpan: (v: { aktif: boolean; bursa: string; usd: number; leverage: number; maksLipat: number; sesuaikanMinimum: boolean }) => Promise<void>;
   hapus?: () => Promise<void>;
 }) {
   const [bursa, setBursa] = useState<string>(awal?.bursa ?? 'binance');
@@ -1128,6 +1128,7 @@ function DialogSalin({ w, awal, maksLipat, tutup, simpan, hapus }: {
   const [lev, setLev] = useState(awal?.leverage ?? 1);
   const [aktif, setAktif] = useState(!!awal?.aktif);
   const [lipat, setLipat] = useState(maksLipat);
+  const [sesuaikan, setSesuaikan] = useState(awal?.sesuaikanMinimum === true);
   const [sibuk, setSibuk] = useState(false);
 
   const nilai = Number(usd);
@@ -1189,6 +1190,33 @@ function DialogSalin({ w, awal, maksLipat, tutup, simpan, hapus }: {
             Di 1× keduanya sama, dan tanpa leverage tidak ada likuidasi: kerugian terburuk
             dikunci oleh ukuran ordernya sendiri.
           </p>
+
+          {/* ── SESUAIKAN KE MINIMUM BURSA ────────────────────────────────
+              Pemilik, 9 Sep 2026: salinan $30 di BTC terus ditolak — Binance
+              mensyaratkan nilai posisi minimal per simbol (BTCUSDT: 100
+              USDT), Hyperliquid minimal $10 per order. Dengan sakelar ini
+              mesin MENAIKKAN ukurannya ke minimum, bukan menolak; margin
+              yang terpakai tercatat apa adanya di daftar posisi. Batas
+              SALIN_MAKS_USD di server tetap jadi pagar: kalau minimumnya
+              melewati batas itu, order tetap ditolak dengan pesan yang
+              menyebut angkanya. Per dompet, bawaan mati — uang yang
+              dinaikkan sendiri oleh mesin bukan uang yang diketik orangnya. */}
+          <label className={cn('flex cursor-pointer items-start gap-2 rounded-md border px-3 py-2 transition-colors',
+            sesuaikan ? 'border-amber-500/40 bg-amber-500/5' : 'border-zinc-800 hover:border-zinc-700')}>
+            <input type="checkbox" checked={sesuaikan} onChange={(e) => setSesuaikan(e.target.checked)}
+              className="mt-0.5 size-3.5 shrink-0 cursor-pointer accent-amber-400" />
+            <span className="min-w-0 flex-1">
+              <span className={cn('block text-[12.5px] font-medium', sesuaikan ? 'text-amber-200' : 'text-zinc-300')}>
+                Sesuaikan ke minimum bursa
+              </span>
+              <span className="block text-[11px] leading-relaxed text-zinc-600">
+                Kalau ${sah ? nilai : '—'} di {lev}× tidak mencapai minimum bursa untuk koin itu
+                (BTCUSDT Binance: nilai posisi 100 USDT, Hyperliquid: $10), ukurannya dinaikkan
+                sendiri ke minimum — bukan ditolak. Margin yang benar-benar terpakai tercatat
+                di daftar posisi. Batas maksimal per order di server tetap berlaku.
+              </span>
+            </span>
+          </label>
 
           {/* ── BATAS PER KOIN ────────────────────────────────────────────
               Ditaruh di sini, di formulir per dompet, karena di sinilah
@@ -1260,7 +1288,7 @@ function DialogSalin({ w, awal, maksLipat, tutup, simpan, hapus }: {
             Batal
           </button>
           <button disabled={!sah || sibuk}
-            onClick={() => { setSibuk(true); void simpan({ aktif, bursa, usd: nilai, leverage: lev, maksLipat: lipat }).finally(() => setSibuk(false)); }}
+            onClick={() => { setSibuk(true); void simpan({ aktif, bursa, usd: nilai, leverage: lev, maksLipat: lipat, sesuaikanMinimum: sesuaikan }).finally(() => setSibuk(false)); }}
             className="cursor-pointer rounded-md bg-zinc-100 px-3 py-1.5 text-[12.5px] font-semibold text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-40">
             {sibuk ? 'Menyimpan…' : 'Simpan'}
           </button>

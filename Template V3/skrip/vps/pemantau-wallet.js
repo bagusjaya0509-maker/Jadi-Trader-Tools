@@ -394,7 +394,7 @@ async function kirimSalin(simbol, arah, usd, leverage) {
    Perutean 'dua': Binance DIUTAMAKAN, Hyperliquid jadi jaring untuk koin
    yang tidak terdaftar di sana. */
 const adaptorBursa = {
-  async buka({ koin, arah, usd, leverage, bursa }) {
+  async buka({ koin, arah, usd, leverage, bursa, sesuaikanMinimum = false }) {
     const mauHl = bursa === 'hyperliquid';
     const mauDua = bursa === 'dua';
 
@@ -412,12 +412,14 @@ const adaptorBursa = {
         const r = await fetch(DASAR + '/api/trade/futures/salin', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'X-App-Token': APP_TOKEN },
-          body: JSON.stringify({ symbol: simbol, side: arah, usd, leverage }),
+          body: JSON.stringify({ symbol: simbol, side: arah, usd, leverage, sesuaikanMinimum }),
           signal: AbortSignal.timeout(30000),
         });
         const j = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(j.error || ('server menjawab ' + r.status));
-        return { bursa: 'binance', simbol };
+        /* `usd` dari server = margin yang BENAR-BENAR terpakai; berbeda dari
+           yang diminta kalau ukurannya dinaikkan ke minimum bursa. */
+        return { bursa: 'binance', simbol, usd: Number(j.usd) > 0 ? Number(j.usd) : usd, disesuaikan: j.disesuaikan === true };
       }
       if (!mauDua) throw new Error(koin + ' tidak ada di Binance Futures');
     }
@@ -425,8 +427,8 @@ const adaptorBursa = {
     if (!HL.siap()) throw new Error('Hyperliquid belum aktif (HL_AKTIF)');
     const aset = await HL.asetHl(koin);
     if (!aset) throw new Error(koin + ' tidak ada di Binance maupun Hyperliquid');
-    const h = await HL.bukaHl({ koin: aset.nama, arah, usd, leverage });
-    return { bursa: 'hyperliquid', simbol: h.koin };
+    const h = await HL.bukaHl({ koin: aset.nama, arah, usd, leverage, sesuaikanMinimum });
+    return { bursa: 'hyperliquid', simbol: h.koin, usd: Number(h.usd) > 0 ? Number(h.usd) : usd, disesuaikan: h.disesuaikan === true };
   },
 
   /* ── POTRET POSISI KITA SENDIRI, SATU BENTUK UNTUK DUA BURSA ──────
@@ -1023,7 +1025,33 @@ async function pindai() {
   const semuaBaru = [];
   const semuaPosisi = [];
   const seumur = {};
+  /* ── NILAI AKUN DICATAT WALAU POSISINYA NOL ──────────────────────────
+     Sampai sekarang angka ini cuma menumpang di tiap baris posisi. Dompet
+     yang menutup semuanya lalu menarik dananya jadi tidak punya satu baris
+     pun yang membawanya — dan di layar ia terlihat PERSIS sama dengan
+     dompet yang gagal dibaca: dua-duanya "tidak ada posisi".
+
+     Dilaporkan pemilik 5 Sep 2026: ia melihat belasan "Close Long" berumur
+     puluhan menit di satu dompet, tidak menemukan satu pun posisi terbuka
+     di atasnya, lalu bertanya apakah posisinya memang tidak terekam.
+     Jawabannya tidak: dompet itu memang kosong, akunnya $0. Yang kurang
+     bukan pencatatannya, melainkan satu angka yang mengatakannya. */
+  const nilaiAkunPer = {};
+  /* Alamat yang jawabannya BENAR-BENAR diterima putaran ini. Dipakai cermin
+     untuk membedakan "dompetnya menutup semua posisi" dari "kita gagal
+     bertanya" — dua keadaan yang menghasilkan daftar posisi yang sama
+     persis: kosong. */
+  const terbaca = new Set();
   const gagal = [];
+  /* ── PALING BANYAK DUA TARIKAN PENUH PER PUTARAN ─────────────────────
+     Riwayat penuh (userFills, 2000 fill) basi serentak untuk semua dompet
+     tiap 6 jam, dan dua belas tarikan 2000 fill dalam satu detik dijawab
+     Hyperliquid dengan HTTP 429 untuk hampir semuanya (log 6 Sep 12:07 &
+     18:10). Dompet yang gagal dibaca tidak punya posisi di putaran itu —
+     dan itulah yang membuat cermin Copy Signal menganggap posisinya hilang.
+     Dijatah dua per putaran: yang basi tetap segar dalam enam menit, tanpa
+     sekali pun menabrak batas laju. */
+  let jatahPenuh = 2;
 
   for (const d of dompet) {
     try {
@@ -1035,9 +1063,11 @@ async function pindai() {
          tidak, yang ditarik hanya fill sesudah `sejak` — beberapa kilobita,
          sering nol. */
       const seumurLamaIni = seumurLama[d.alamat];
-      const perluPenuh = !seumurLamaIni
+      const basi = !seumurLamaIni
         || !seumurLamaIni.dicek
         || Date.now() - seumurLamaIni.dicek > RIWAYAT_SEGAR;
+      const perluPenuh = basi && jatahPenuh > 0;
+      if (perluPenuh) jatahPenuh -= 1;
 
       const [isi, fills] = await Promise.all([
         tanya({ type: 'clearinghouseState', user: d.alamat }),
@@ -1051,7 +1081,12 @@ async function pindai() {
           : tanya({ type: 'userFillsByTime', user: d.alamat, startTime: sejak }),
       ]);
 
+      terbaca.add(d.alamat);
       const nilaiAkun = Number(isi?.marginSummary?.accountValue) || 0;
+      /* Ditulis SEBELUM perulangan posisi, jadi ia tetap tercatat untuk
+         dompet yang tidak punya satu posisi pun — justru dompet itu yang
+         paling butuh angkanya. */
+      nilaiAkunPer[d.alamat] = Math.round(nilaiAkun * 100) / 100;
       for (const p of (isi?.assetPositions || [])) {
         const po = p.position || {};
         const sz = Number(po.szi) || 0;
@@ -1118,6 +1153,13 @@ async function pindai() {
   for (const a of Object.keys(umur)) {
     seumur[a] = Object.assign({}, seumur[a] || {}, umur[a]);
   }
+  /* Ditempel PALING AKHIR supaya ia tidak bisa terhapus oleh penggabungan
+     di atas — dan hanya untuk dompet yang benar-benar terbaca putaran ini.
+     Dompet yang gagal dibaca mempertahankan angka lamanya, sama seperti
+     WR dan umurnya: data lama yang benar mengalahkan nol yang baru. */
+  for (const a of Object.keys(nilaiAkunPer)) {
+    seumur[a] = Object.assign({}, seumur[a] || {}, { nilaiAkun: nilaiAkunPer[a] });
+  }
 
   /* Dibunyikan SEBELUM disimpan? Tidak — sesudah. Kalau prosesnya mati di
      tengah, catatan yang sudah tersimpan tanpa lonceng lebih baik daripada
@@ -1139,6 +1181,12 @@ async function pindai() {
 
   try { await bunyikanTiruan(semuaBaru, dompet); }
   catch (e) { catat('lonceng tiruan gagal:', e && e.message); }
+
+  /* SESUDAH potret disimpan, dan itu penting: kalau proses ini mati di
+     tengah penerbitan, catatan posisinya sudah aman di berkas dan putaran
+     berikutnya melanjutkan dari keadaan yang benar. */
+  try { await cerminPutaran(DIR, dompet, semuaPosisi, semuaBaru, terbaca); }
+  catch (e) { catat('cermin dompet gagal:', e && e.message); }
 
   /* Dijalankan dengan potret posisi yang BARU SAJA dibaca di putaran ini,
      bukan dengan berkas yang tersimpan. Membaca ulang berkasnya berarti
@@ -1162,6 +1210,362 @@ async function pindai() {
       bursa: adaptorBursa,
     });
   } catch (e) { catat('salin dompet gagal:', e && e.message); }
+}
+
+/* ══ CERMIN DOMPET -> COPY SIGNAL ══════════════════════════════════════
+   Dompet yang ditandai `analis: true` di daftar pantau punya kartunya
+   SENDIRI di Copy Signal, terpisah dari kartu "AI Wallet" milik pemantau
+   ini. Tiap posisi yang ia buka jadi satu sinyal; tiap posisi yang ia tutup
+   menutup sinyal itu dengan hasil dompetnya sendiri.
+
+   ── TANPA SL DAN TP, DAN ITU DISENGAJA ──────────────────────────────────
+   Dompet perp on-chain kebanyakan tidak memasang keduanya di bursa. Yang
+   dikirim ke sini adalah apa yang benar-benar terlihat: harga masuk, arah,
+   ukuran. Mengarang SL dari likuidasi atau TP dari "rata-rata target"
+   berarti menerbitkan rencana yang tidak pernah dipunyai orangnya.
+
+   Akibatnya penilai harga di server melewatkannya sendiri — dua-duanya
+   sudah berhenti pada `if (!entry || !sl) continue;` — dan yang menutupnya
+   HARUS proses ini, lewat /api/analisa/agen/tutup.
+
+   ── HASILNYA DIUKUR TERHADAP MARGIN ─────────────────────────────────────
+   Tidak ada SL berarti tidak ada satuan risiko. Yang dipakai sebagai
+   penggantinya: laba/rugi dibagi MARGIN yang dompet itu pertaruhkan
+   (nilai posisi dibagi leverage). +0,4 berarti ia menutup dengan untung 40%
+   dari marginnya sendiri. Itu ukuran yang benar-benar terjadi, bukan
+   perbandingan terhadap stop yang tidak ada.
+
+   ── SATU BERKAS PENGHUBUNG ──────────────────────────────────────────────
+   `wallet-cermin.json` memetakan alamat|KOIN ke id sinyalnya. Tanpa itu,
+   posisi yang tutup tidak punya cara menemukan sinyal mana yang harus
+   diselesaikan, dan papan akan penuh sinyal yang berjalan selamanya. */
+const CERMIN_FILE = 'wallet-cermin.json';
+
+function bacaCermin(DIR) {
+  try {
+    const j = JSON.parse(fs.readFileSync(path.join(DIR, CERMIN_FILE), 'utf8'));
+    return (j && typeof j === 'object' && j.buka) ? j : { buka: {} };
+  } catch (e) { return { buka: {} }; }
+}
+
+function tulisCermin(DIR, d) {
+  const tmp = path.join(DIR, CERMIN_FILE) + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(d, null, 2));
+  fs.renameSync(tmp, path.join(DIR, CERMIN_FILE));
+}
+
+/** Margin yang dipertaruhkan posisi ini. 0 kalau tidak terbaca — dan 0
+ *  dipakai untuk MELEWATI penutupan, bukan untuk membagi: pembagian dengan
+ *  nol memulangkan Infinity, dan Infinity yang lolos ke papan peringkat
+ *  memenangkan kartu itu selamanya. */
+function marginPosisi(p) {
+  const lev = Number(p.leverage) || 0;
+  const nilai = Math.abs(Number(p.nilai) || 0);
+  return lev > 0 ? nilai / lev : 0;
+}
+
+async function kirimSinyalDompet(d, p) {
+  const arah = p.arah === 'LONG' ? 'BUY' : 'SELL';
+  const r = await fetch(DASAR + '/api/analisa/agen', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-App-Token': APP_TOKEN },
+    body: JSON.stringify({
+      agenNama: d.nama,
+      dompet: true,
+      judul: arah + ' ' + p.koin + ' mengikuti dompet',
+      pasangan: p.koin + 'USDT',
+      arah,
+      tf: '1h',
+      pasar: 'kripto',
+      ringkas: 'Dompet ' + d.nama + ' membuka ' + p.arah + ' ' + p.koin
+             + ' di ' + p.entry + (p.leverage ? ' · ' + p.leverage + 'x' : '')
+             + ' · nilai $' + Math.round(p.nilai).toLocaleString('id-ID')
+             + '. Tanpa SL dan TP — persis seperti yang dipasang dompetnya.',
+      isi: {
+        entry: p.entry, sl: 0, tp: 0,
+        alasan: 'Cermin posisi on-chain. Sinyal ini tidak memasang stop loss '
+              + 'maupun take profit karena dompet yang dicerminkan tidak '
+              + 'memasangnya di bursa. Ia selesai saat dompet itu menutup '
+              + 'posisinya, dengan hasil apa adanya.'
+              + (p.likuidasi ? ' Harga likuidasi dompet: ' + p.likuidasi + '.' : ''),
+      },
+    }),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || ('server menjawab ' + r.status));
+  return j.id;
+}
+
+async function tutupSinyalDompet(id, rr) {
+  const r = await fetch(DASAR + '/api/analisa/agen/tutup', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-App-Token': APP_TOKEN },
+    body: JSON.stringify({ id, rr }),
+  });
+  if (!r.ok) {
+    const j = await r.json().catch(() => ({}));
+    throw new Error(j.error || ('server menjawab ' + r.status));
+  }
+}
+
+/** Satu putaran cermin: posisi baru diterbitkan, posisi yang hilang ditutup.
+ *
+ *  `fillBaru` adalah transaksi yang MEMANG SUDAH ditarik putaran ini — dari
+ *  situ laba/rugi penutupan dibaca (`closedPnl`). Kalau posisinya hilang
+ *  tanpa satu pun fill terlihat di jendela ini (mis. pemantau sempat mati),
+ *  dipakai P/L mengambang terakhir yang tercatat: kurang tepat, tapi jauh
+ *  lebih dekat daripada menganggapnya impas. */
+function persenDari(bagian, dasar) {
+  return dasar > 0 ? Math.round((bagian / dasar) * 1000) / 10 : 0;
+}
+
+/* Harga rata-rata tertimbang fill koin itu di putaran ini — harga tempat
+   penambahan/pengurangannya benar-benar terjadi. Nol kalau tidak ada fill
+   (pemanggil jatuh ke entry rata-rata posisi). */
+function hargaFillPutaran(fillBaru, alamat, koin) {
+  let u = 0, n = 0;
+  for (const f of (Array.isArray(fillBaru) ? fillBaru : [])) {
+    if (f.alamat !== alamat || String(f.koin).toUpperCase() !== koin) continue;
+    const q = Math.abs(Number(f.ukuran) || 0);
+    u += q; n += q * (Number(f.harga) || 0);
+  }
+  return u > 0 ? Math.round((n / u) * 1e8) / 1e8 : 0;
+}
+
+async function ubahSinyalDompet(rec) {
+  const r = await fetch(DASAR + '/api/analisa/agen/ubah', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-App-Token': APP_TOKEN },
+    body: JSON.stringify({
+      id: rec.id, entry: rec.entry, ukuran: rec.ukuran, ukuranMaks: rec.ukuranMaks, tahap: rec.tahap,
+    }),
+  });
+  if (!r.ok) {
+    const j = await r.json().catch(() => ({}));
+    throw new Error(j.error || ('server menjawab ' + r.status));
+  }
+}
+
+/* ── JEJAK UKURAN: SATU SINYAL PER POSISI, BUKAN SATU PER PENAMBAHAN ────
+   Hyperliquid memegang SATU posisi bersih per koin: menambah tidak membuka
+   posisi kedua, ia menggeser ukuran dan entry rata-ratanya (entryPx). Yang
+   diminta pemilik 7 Sep 2026: kartu sinyalnya juga satu — entry ikut
+   rata-rata baru saat ditambah, dan tiap pengurangan dicatat sebagai
+   "tutup X% dari posisi terbesarnya" beserta P/L fill-nya, supaya orang
+   yang menyalin tahu berapa yang sudah direalisasikan dompetnya.
+
+   Persennya DARI UKURAN TERBESAR yang pernah dipegang, bukan dari ukuran
+   sesaat sebelumnya: "tutup 50%" dua kali berturut-turut dari sisa yang
+   makin kecil membuat orang mengira posisinya sudah habis, padahal masih
+   seperempat. Dari puncaknya, angkanya bisa dijumlahkan.
+
+   Catatan lama (sebelum medan ini ada) diisi ukuran pada pertemuan
+   pertama tanpa tahap — tidak ada yang bisa dikatakan tentang apa yang
+   terjadi sebelum kita mulai menghitung. Memulangkan true kalau ada yang
+   berubah di catatannya. */
+async function jejakUkuran(rec, p, fillBaru, alamat, koin) {
+  const kini = Number(p.ukuran) || 0;
+  if (!(kini > 0)) return false;
+  if (!(Number(rec.ukuran) > 0)) {
+    rec.ukuran = kini; rec.ukuranMaks = kini; rec.tahap = rec.tahap || [];
+    return true;
+  }
+  const lama = Number(rec.ukuran);
+  const selisih = kini - lama;
+  if (Math.abs(selisih) <= lama * 0.001) return false;
+
+  rec.tahap = rec.tahap || [];
+  rec.ukuranMaks = Math.max(Number(rec.ukuranMaks) || 0, kini);
+  const hargaFill = hargaFillPutaran(fillBaru, alamat, koin);
+  if (selisih > 0) {
+    /* entryPx Hyperliquid SUDAH rata-rata tertimbang seluruh posisi. */
+    rec.entry = Number(p.entry) || rec.entry;
+    rec.margin = Math.max(Number(rec.margin) || 0, marginPosisi(p));
+    rec.tahap.push({
+      w: Date.now(), j: 'tambah',
+      persen: persenDari(selisih, rec.ukuranMaks),
+      harga: hargaFill || Number(p.entry) || 0, ukuran: selisih,
+    });
+  } else {
+    const pnlFill = (Array.isArray(fillBaru) ? fillBaru : [])
+      .filter((f) => f.alamat === alamat && String(f.koin).toUpperCase() === koin)
+      .reduce((t, f) => t + (Number(f.pnl) || 0), 0);
+    /* P/L parsial DIAKUMULASI ke pnlTutup: penutupan akhir nanti memakai
+       jumlah seluruh realisasi, bukan cuma keping terakhirnya. */
+    rec.pnlTutup = (Number(rec.pnlTutup) || 0) + pnlFill;
+    rec.tahap.push({
+      w: Date.now(), j: 'kurang',
+      persen: persenDari(-selisih, rec.ukuranMaks),
+      harga: hargaFill || 0, ukuran: -selisih,
+      pnl: Math.round(pnlFill * 100) / 100,
+    });
+  }
+  if (rec.tahap.length > 60) rec.tahap = rec.tahap.slice(-60);
+  rec.ukuran = kini;
+  try { await ubahSinyalDompet(rec); }
+  catch (e) { catat('cermin gagal memperbarui', rec.id, koin, '—', e && e.message); }
+  return true;
+}
+
+async function cerminPutaran(DIR, dompet, posisi, fillBaru, terbaca) {
+  if (!APP_TOKEN) return;
+  /* ── DUA HIMPUNAN, DAN BEDANYA YANG DULU MENGHAPUS SINYAL ──────────────
+     `semuaAnalis` = dompet yang sakelar analisnya menyala. `analis` =
+     yang dari antaranya BERHASIL DIBACA putaran ini. Dulu cuma ada yang
+     kedua, dan ia dipakai untuk memutuskan "sakelarnya dicabut" — jadi
+     tiap kali Hyperliquid menjawab 429 (tiap 6 jam, saat 12 tarikan
+     riwayat penuh berangkat serentak), dompetnya terlihat seperti dicabut,
+     catatannya dibuang, dan putaran berikutnya posisi yang SAMA terbit
+     sebagai sinyal baru. Dompet a99c9e punya 11 pasang "BUY HYPE" +
+     "BUY BTC" dengan entry identik karena ini. Dompet yang tidak terbaca
+     sekarang cuma dilewati: tidak dibuka, tidak ditutup, tidak dibuang. */
+  const semuaAnalis = dompet.filter((d) => d.analis);
+  const analis = semuaAnalis.filter((d) => !terbaca || terbaca.has(d.alamat));
+  if (!semuaAnalis.length) return;
+
+  const c = bacaCermin(DIR);
+  c.buka = c.buka || {};
+  let berubah = false;
+
+  const alamatAnalis = new Set(semuaAnalis.map((d) => d.alamat));
+  const alamatTerbaca = new Set(analis.map((d) => d.alamat));
+  const hidup = new Map();
+  for (const p of posisi) {
+    if (alamatAnalis.has(p.alamat)) hidup.set(p.alamat + '|' + String(p.koin).toUpperCase(), p);
+  }
+
+  /* ── Posisi baru -> sinyal baru ─────────────────────────────────────── */
+  for (const [kunci, p] of hidup) {
+    const ada = c.buka[kunci];
+    if (ada) {
+      /* P/L mengambang terakhir disimpan tiap putaran — ia jadi jaring
+         pengaman saat penutupannya tidak terlihat lewat fill. */
+      if (Number.isFinite(Number(p.pnl))) { ada.pnlAkhir = Number(p.pnl); berubah = true; }
+      const [alamatIni, koinIni] = kunci.split('|');
+      if (await jejakUkuran(ada, p, fillBaru, alamatIni, koinIni)) berubah = true;
+      continue;
+    }
+    const d = analis.find((x) => x.alamat === p.alamat);
+    const margin = marginPosisi(p);
+    if (!p.entry || margin <= 0) {
+      catat('cermin dilewati (entry/margin tidak terbaca):', p.nama, p.koin);
+      continue;
+    }
+    try {
+      const id = await kirimSinyalDompet(d, p);
+      c.buka[kunci] = {
+        id, dibuka: Date.now(), margin, arah: p.arah, entry: p.entry, pnlAkhir: Number(p.pnl) || 0,
+        ukuran: Number(p.ukuran) || 0, ukuranMaks: Number(p.ukuran) || 0, tahap: [],
+      };
+      berubah = true;
+      catat('cermin: sinyal', id, 'dari', d.nama, p.arah, p.koin, '@', p.entry);
+    } catch (e) {
+      catat('cermin gagal memposting', p.koin, '—', e && e.message);
+    }
+  }
+
+  /* ── Posisi hilang -> sinyal ditutup ──────────────────────────────────
+     TAPI TIDAK PADA PUTARAN PERTAMA IA MENGHILANG. Hyperliquid sesekali
+     memulangkan daftar posisi yang belum lengkap, dan bacaan yang gagal
+     total sudah disaring di atas — yang tersisa kedipan: posisi ada di
+     putaran N, tidak ada di N+1, ada lagi di N+2.
+
+     Tanpa pagar ini kedipan itu menutup sinyalnya lalu membuka sinyal BARU
+     untuk posisi yang sama, dan papan mencatat satu perdagangan sebagai dua
+     kemenangan. Terlihat di data: BTC milik Dompet 118ce6 tercatat +83,80
+     DAN +81,96; ETH +60,69 DAN +58,35 — pasangan-pasangan yang selisihnya
+     cuma pergerakan harga beberapa menit.
+
+     Dua putaran (dua menit) cukup: penutupan sungguhan tetap tercatat satu
+     menit kemudian, dan kedipan satu putaran tidak pernah lolos. */
+  for (const kunci of Object.keys(c.buka)) {
+    if (hidup.has(kunci)) {
+      if (c.buka[kunci].hilang) { c.buka[kunci].hilang = 0; berubah = true; }
+      continue;
+    }
+    const rec = c.buka[kunci];
+    const [alamat, koin] = kunci.split('|');
+    if (!alamatAnalis.has(alamat)) {
+      /* Sakelar analisnya dicabut sementara posisinya masih terbuka.
+         Catatannya dibuang tanpa menutup sinyal: yang mencabut memilih
+         berhenti mencerminkan, bukan menyatakan hasilnya. */
+      delete c.buka[kunci]; berubah = true; continue;
+    }
+    /* Tidak terbaca putaran ini = tidak tahu apa-apa. Bukan hilang, bukan
+       hidup — dilewati, dan hitungan `hilang`-nya tidak bertambah. */
+    if (!alamatTerbaca.has(alamat)) continue;
+    /* Fill penutupan dikumpulkan LINTAS PUTARAN, bukan cuma dari putaran
+       ini: penutupannya terjadi di putaran saat posisinya menghilang, dan
+       kita baru menutup sinyalnya satu putaran sesudahnya. Tanpa ini
+       angkanya selalu jatuh ke cadangan. */
+    const fillKini = (Array.isArray(fillBaru) ? fillBaru : [])
+      .filter((f) => f.alamat === alamat && String(f.koin).toUpperCase() === koin)
+      .reduce((t, f) => t + (Number(f.pnl) || 0), 0);
+    rec.pnlTutup = (Number(rec.pnlTutup) || 0) + fillKini;
+
+    rec.hilang = (Number(rec.hilang) || 0) + 1;
+    if (rec.hilang < 2) { berubah = true; continue; }
+
+    /* P/L SUNGGUHAN dari fill kalau ada. Cadangannya P/L mengambang
+       terakhir — dan itu memang taksiran, bukan hasil: ia dipakai hanya
+       kalau bursa tidak pernah menunjukkan isian penutupnya sama sekali. */
+    const pnl = rec.pnlTutup !== 0 ? rec.pnlTutup : (Number(rec.pnlAkhir) || 0);
+    const margin = Number(rec.margin) || 0;
+    if (margin <= 0) { delete c.buka[kunci]; berubah = true; continue; }
+    const rr = Math.round((pnl / margin) * 10000) / 10000;
+    /* Sisa posisinya dicatat sebagai tahap terakhir SEBELUM ditutup, supaya
+       jumlah persen di kartu menutup ke 100 dan orang tahu berapa yang
+       dilepas di ujung — bukan cuma bahwa ia selesai. */
+    if (Number(rec.ukuranMaks) > 0 && Number(rec.ukuran) > 0) {
+      rec.tahap = rec.tahap || [];
+      rec.tahap.push({
+        w: Date.now(), j: 'kurang',
+        persen: persenDari(Number(rec.ukuran), Number(rec.ukuranMaks)),
+        harga: hargaFillPutaran(fillBaru, alamat, koin) || 0,
+        ukuran: Number(rec.ukuran), pnl: Math.round(fillKini * 100) / 100,
+      });
+      rec.ukuran = 0;
+      try { await ubahSinyalDompet(rec); }
+      catch (e) { catat('cermin gagal mencatat tahap akhir', rec.id, '—', e && e.message); }
+    }
+    try {
+      await tutupSinyalDompet(rec.id, rr);
+      catat('cermin: tutup', rec.id, koin, 'pnl $' + pnl.toFixed(2), '=', rr + 'R');
+    } catch (e) {
+      catat('cermin gagal menutup', rec.id, '—', e && e.message);
+    }
+    /* Dibuang APA PUN hasil panggilannya. Kalau server menolak (mis. sinyalnya
+       sudah selesai lewat jalan lain), menyimpannya cuma membuat putaran
+       berikutnya mencoba lagi selamanya untuk posisi yang sudah tidak ada. */
+    delete c.buka[kunci];
+    berubah = true;
+  }
+
+  if (berubah) tulisCermin(DIR, c);
+}
+
+/** Kartu tiap dompet analis lahir SEBELUM posisi pertamanya, sama seperti
+ *  agen lain. Dompet yang sedang tidak pegang apa-apa dan dompet yang belum
+ *  pernah didaftarkan sama-sama papan kosong tanpa ini. */
+async function daftarHadirAnalis(dompet) {
+  if (!APP_TOKEN) return;
+  for (const d of dompet.filter((x) => x.analis)) {
+    try {
+      await fetch(DASAR + '/api/analisa/agen/hadir', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-App-Token': APP_TOKEN },
+        body: JSON.stringify({
+          nama: d.nama,
+          strategi: 'Cermin dompet perp on-chain ' + d.alamat.slice(0, 6) + '…' + d.alamat.slice(-4)
+                  + '. Tiap posisi yang dibuka dompet ini diterbitkan apa adanya — '
+                  + 'tanpa SL dan tanpa TP, karena dompetnya tidak memasangnya — '
+                  + 'dan ditutup saat dompetnya menutup posisi.',
+          pasangan: 0,
+          tf: '1h',
+        }),
+      });
+    } catch (e) { catat('daftar hadir analis gagal:', d.nama, e && e.message); }
+  }
 }
 
 /** Mendaftarkan diri di papan supaya kartunya ADA sebelum transaksi
@@ -1189,11 +1593,18 @@ async function daftarHadir() {
 (async () => {
   catat('pemantau dompet hidup ·', bacaDompet(DIR).length, 'dompet · jeda', JEDA / 1000, 'detik');
   await daftarHadir();
+  await daftarHadirAnalis(bacaDompet(DIR));
   await pindai();
   setInterval(() => { void pindai().catch((e) => catat('putaran gagal:', e && e.message)); }, JEDA);
   /* Daftar hadir disegarkan tiap jam supaya "terakhir pindai" di papan
      tidak membeku dan agennya terbaca mati padahal ia bekerja. */
-  setInterval(() => { void daftarHadir(); }, 60 * 60 * 1000);
+  setInterval(() => {
+    void daftarHadir();
+    /* Daftar dompet dibaca ULANG tiap jam, bukan dipakai yang di awal:
+       dompet yang dijadikan analis siang hari tidak boleh menunggu proses
+       ini di-restart supaya kartunya lahir. */
+    void daftarHadirAnalis(bacaDompet(DIR));
+  }, 60 * 60 * 1000);
 })().catch((e) => {
   console.error('[' + jam() + '] pemantau dompet berhenti:', e && e.message);
   process.exit(1);

@@ -705,8 +705,20 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
                     Sekarang batasnya datang dari tata letak, bukan dari
                     angka atau pengukuran: kolom kiri setinggi kolom kanan,
                     dan daftar ini mengisi sisa ruangnya. Tidak ada yang bisa
-                    gagal diam-diam karena tidak ada yang dihitung. */}
-                <TabelBungkus className="min-h-0 flex-1 lg:overflow-y-auto">
+                    gagal diam-diam karena tidak ada yang dihitung.
+
+                    ── DI PONSEL: 12 BARIS, SISANYA DIGULIR ─────────────────
+                    Pemilik, 9 Sep 2026 (tiga kali): di HP kolomnya bertumpuk,
+                    tidak ada kolom kanan yang bisa diikuti, dan 200 baris
+                    membuat halaman "panjang banget ke bawah". Ia minta 12
+                    baris terlihat lalu scroll bar — untuk Trade-Fi maupun
+                    Kripto (panel ini melayani keduanya lewat `sumber`).
+                    568 px = kepala 28 + 12 x 45 (tinggi baris terukur di
+                    peramban, catatan di atas), jadi baris ke-12 utuh dan
+                    baris ke-13 terpotong jelas sebagai tanda masih ada isi.
+                    Di lg ke atas batas ini dilepas (lg:max-h-none) dan
+                    tinggi kembali mengikuti kolom kanan. */}
+                <TabelBungkus className="max-h-[568px] min-h-0 flex-1 overflow-y-auto lg:max-h-none">
                   <Tabel>
                     <thead className="sticky top-0 bg-zinc-950">
                       <tr>

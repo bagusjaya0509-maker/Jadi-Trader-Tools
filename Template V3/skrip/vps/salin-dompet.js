@@ -351,28 +351,47 @@ async function putaran({ dir, posisiDompet, catat, lonceng, bursa }) {
           koin: k, arah, usd: Number(s.usd),
           leverage: Math.max(1, Number(s.leverage) || 1),
           bursa: s.bursa || 'binance',
+          /* Per dompet, dimatikan bawaannya: ukuran yang dinaikkan sendiri
+             oleh mesin adalah uang yang tidak pernah diketik orangnya. */
+          sesuaikanMinimum: s.sesuaikanMinimum === true,
         });
         delete s.konfirmasiBuka[k];
+        /* Margin yang dicatat = yang TERPAKAI. Kalau bursa menuntut minimum
+           lebih besar dan setelannya mengizinkan, angkanya lebih besar dari
+           `s.usd` — dan itulah yang harus tampil di layar. */
+        const usdNyata = h && Number(h.usd) > 0 ? Number(h.usd) : Number(s.usd);
+        const dinaikkan = !!(h && h.disesuaikan);
         /* Setelan DIPOTRET ke dalam posisinya, bukan dibaca dari `s` saat
            ditampilkan. Ukuran dan leverage boleh diubah orangnya kapan
            saja, dan posisi yang dibuka dengan $30 tidak berubah jadi
            posisi $50 hanya karena setelannya dinaikkan sesudahnya. */
         s.punyaku[k] = {
           bursa: h.bursa, simbol: h.simbol, arah, waktu: Date.now(),
-          usd: Number(s.usd), leverage: Math.max(1, Number(s.leverage) || 1),
+          usd: usdNyata, leverage: Math.max(1, Number(s.leverage) || 1),
           arahSumber: sumber.arah,
+          ...(dinaikkan ? { disesuaikan: true, usdDiminta: Number(s.usd) } : {}),
         };
         berubah = true;
         jejak('buka', s.alamat, k, 'SALIN BUKA ' + arah + ' ' + h.simbol + ' di ' + h.bursa
-              + ' — $' + s.usd + ' ' + (s.leverage || 1) + 'x, meniru ' + (s.nama || ringkas(s.alamat)));
+              + ' — $' + usdNyata + ' ' + (s.leverage || 1) + 'x'
+              + (dinaikkan ? ' (dinaikkan dari $' + s.usd + ' ke minimum bursa)' : '')
+              + ', meniru ' + (s.nama || ringkas(s.alamat)));
         await lonceng({
           id: 'salin-buka-' + s.alamat.slice(0, 8) + '-' + k + '-' + Date.now(),
           judul: 'Salin ' + (s.nama || ringkas(s.alamat)) + ': ' + arah + ' ' + k,
           detail: 'Dompet itu membuka ' + sumber.arah + ' ' + k + '. Disalin di ' + h.bursa
-                + ' sebesar ' + s.usd + ' USD, ' + (s.leverage || 1) + 'x.',
+                + ' sebesar ' + usdNyata + ' USD, ' + (s.leverage || 1) + 'x'
+                + (dinaikkan ? ' — dinaikkan dari ' + s.usd + ' USD karena minimum bursa.' : '.'),
         });
       } catch (e) {
-        const pesan = (e && e.message) || 'tidak diketahui';
+        let pesan = (e && e.message) || 'tidak diketahui';
+        /* Penolakan karena ukuran di bawah minimum bursa adalah yang paling
+           sering — dan jalan keluarnya satu klik di setelan. Disebut di
+           sini, di pesan yang benar-benar dibaca orangnya. */
+        if (s.sesuaikanMinimum !== true && /minimum|terlalu kecil|membulat jadi nol/i.test(pesan)
+            && !/Sesuaikan ke minimum/.test(pesan)) {
+          pesan += ' · Nyalakan "Sesuaikan ke minimum bursa" di setelan salin dompet ini.';
+        }
         jejak('gagal', s.alamat, k, 'salin buka GAGAL ' + k + ': ' + pesan);
         /* Konfirmasi TIDAK direset di sini. Kegagalan sesaat -- bursa sibuk,
            jaringan putus -- tidak boleh membuat koin ini mengulang hitungan
