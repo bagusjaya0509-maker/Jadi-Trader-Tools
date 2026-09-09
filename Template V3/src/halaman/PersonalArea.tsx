@@ -8,6 +8,7 @@ import { Panel, PanelHead, KartuKpi, TabelBungkus, Tabel, Th, Td, Tr } from '@/c
 import { cn } from '@/lib/utils';
 import { warnaKategori, rupiah, rupiahRingkas, type KategoriAset } from '@/data/porto';
 import { ModalImporPorto } from '@/components/modal-impor-porto';
+import { PanelKas } from '@/components/panel-kas';
 import { usePorto, bawaan, idBaru, type PosAset } from '@/lib/porto';
 import { useHargaPasar } from '@/lib/harga';
 import { useAuth } from '@/lib/auth';
@@ -488,6 +489,13 @@ export default function PersonalArea() {
             </div>
           </Panel>
         </div>
+      </div>
+
+      {/* Catatan kas: pemasukan & pengeluaran per bulan, catat otomatis dari
+          ketikan, dan tautan Telegram. Diminta pemilik 9 Sep 2026. Datanya
+          di users/{uid}/porto/arus — dokumen yang sudah ditulis agen arus.js. */}
+      <div className="mt-4">
+        <PanelKas />
       </div>
     </div>
   );
