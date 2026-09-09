@@ -3677,8 +3677,10 @@ ${pnlSunting !== null
     if (!lewat) return '';
     const persen = Math.abs(((h - e) / e) * 100).toFixed(1);
     const f = (n: number) => n.toLocaleString('id-ID', { maximumFractionDigits: desimalHarga });
-    return `Entry sinyal ini sudah lewat ${persen}% — harga sekarang ${f(h)}, entry ${f(e)}. `
-      + `Order ${labelJenis} di situ baru terisi kalau harga balik ke sana; tekan Market kalau mau masuk di harga sekarang.`;
+    /* Dua kalimat pendek: catatan ini menggantung di bawah tiket dan
+       dibatasi lebarnya, jadi kalimat panjang cuma jadi paragraf. */
+    return `Entry sinyal sudah lewat ${persen}% (harga ${f(h)}, entry ${f(e)}). `
+      + `${labelJenis} di situ menunggu harga balik — tekan Market untuk masuk sekarang.`;
   }, [sinyalAsal, draf, rencana.entry, aksi?.hargaKini, aksiPosisi, desimalHarga, labelJenis]);
   const garisSeret: GarisSeret[] = useMemo(() => {
     /* Mode SUNTING menang atas semuanya: begitu sebuah order dipilih dari

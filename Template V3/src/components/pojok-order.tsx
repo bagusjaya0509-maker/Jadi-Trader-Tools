@@ -113,7 +113,7 @@ function Segitiga({ arah }: { arah: 'atas' | 'bawah' }) {
    (dari "SL belum diisi" jadi "TP belum diisi") harus memulai lima detik
    yang baru, kalau tidak yang kedua ikut terhapus oleh jam milik yang
    pertama. */
-function PitaPeringatan({ pesan }: { pesan: string }) {
+function PitaPeringatan({ pesan, turun }: { pesan: string; turun?: boolean }) {
   const [tampak, setTampak] = useState(false);
   useEffect(() => {
     if (!pesan) { setTampak(false); return; }
@@ -134,7 +134,8 @@ function PitaPeringatan({ pesan }: { pesan: string }) {
        `whitespace-nowrap` yang menjadikannya satu baris; kalau kepanjangan
        ia terpotong oleh `overflow-hidden` milik wadah chart, bukan
        melebarkan halaman. */
-    <div className="pointer-events-none absolute left-0 top-full z-20 mt-1 whitespace-nowrap rounded bg-zinc-950/90 px-2 py-1 text-[10.5px] leading-none text-amber-300/90 backdrop-blur-sm">
+    <div className={cn('pointer-events-none absolute left-0 top-full z-20 whitespace-nowrap rounded bg-zinc-950/90 px-2 py-1 text-[10.5px] leading-none text-amber-300/90 backdrop-blur-sm',
+      turun ? 'mt-14' : 'mt-1')}>
       {pesan}
     </div>
   );
@@ -567,7 +568,7 @@ export function PojokOrder({
          tanpa ikut menghitung tingginya. */
       <div className={cn('relative max-w-[calc(100vw-5rem)] rounded-lg border bg-zinc-900/92 px-2.5 py-2 backdrop-blur-sm sm:max-w-none',
         nyata ? 'border-red-500/40' : 'border-zinc-700')}>
-        <PitaPeringatan pesan={!arahBenar ? alasanKunci : ''} />
+        <PitaPeringatan pesan={!arahBenar ? alasanKunci : ''} turun={!!peringatan} />
         {/* ── ENTRY SINYAL YANG SUDAH LEWAT ─────────────────────────────
             Pemilik, 9 Sep 2026: kartu sinyal berbunyi "Sedang berjalan",
             tiketnya berbunyi "Buy Limit" — dan ia mengira keduanya tidak
@@ -578,9 +579,16 @@ export function PojokOrder({
             itu hampir pasti tidak terisi. Keterangan ini yang mengatakannya.
             Jenis ordernya TIDAK diubah otomatis — masuk di harga sekarang
             atau menunggu harga balik adalah keputusan dagang, bukan
-            keputusan tampilan. */}
+            keputusan tampilan.
+
+            DI LUAR TIKET, seperti pita — pemilik, 9 Sep 2026: catatan apa pun
+            yang duduk di dalam panel membuat panelnya memanjang, persis saat
+            orang sedang mengetik di dalamnya. Digantung di bawah tiket
+            (`absolute top-full`), jadi ukuran tiketnya tidak pernah ikut
+            berubah. Bedanya dengan pita: yang ini MENETAP selama keadaannya
+            berlaku, karena ini keadaan tiket, bukan kejadian yang lewat. */}
         {peringatan && (
-          <div className="mb-1.5 rounded bg-amber-500/10 px-2 py-1 text-[10.5px] leading-snug text-amber-300/90">
+          <div className="pointer-events-none absolute left-0 top-full z-20 mt-1 max-w-[26rem] rounded bg-zinc-950/90 px-2 py-1 text-[10.5px] leading-snug text-amber-300/90 backdrop-blur-sm">
             {peringatan}
           </div>
         )}
