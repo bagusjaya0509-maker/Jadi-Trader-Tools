@@ -103,8 +103,45 @@ async function salin(teks: string): Promise<boolean> {
    di sapaan, penawaran, dan batas kuotanya, bukan di janji hasil.
    JANGAN dikembalikan tanpa pemilik memintanya. */
 
+/* ── PRATINJAU TANPA LOGIN ──────────────────────────────────────────────
+   Pemilik, 9 Sep 2026: orang harus bisa melihat halaman ini sebelum masuk,
+   seperti halaman lain yang punya data contoh. Yang dulu ada cuma satu
+   kalimat "Masuk dulu" — dan halaman program referral yang menyembunyikan
+   isinya justru tidak menjelaskan kenapa orang harus tertarik.
+
+   Data contohnya SENGAJA dibuat terlihat seperti contoh: kode "JTCONTOH",
+   nama-nama generik, angka bulat. Yang belum masuk tetap tidak bisa
+   menyalin tautan, membagikan, atau mengajukan pencairan — tombolnya
+   mengarahkan ke halaman masuk. Membagikan tautan contoh sama dengan
+   membagikan tautan orang lain, dan komisinya tidak akan pernah tercatat
+   atas nama siapa pun. */
+const HARI = 86400000;
+const CONTOH_REFERRAL: DataReferral = {
+  kode: 'JTCONTOH',
+  tautan: 'https://jaditrader.co.id/akses?ref=JTCONTOH',
+  dirujukOleh: '',
+  setelan: { aktif: true, persen: 20, persenPaket: { testing: 50, premium3: 50, tahunan: 20 }, minimalRp: 50000, masaBulan: 12 },
+  ringkas: { terdaftar: 5, membeli: 2, totalRp: 224000, totalUsd: 12.7, siapRp: 99000, siapUsd: 5.6, diajukanRp: 0, dibayarRp: 125000 },
+  rujukan: [
+    { waktu: Date.now() - 2 * HARI, pengguna: 'Andi P.', email: '', status: 'bayar', paket: 'premium3', komisiRp: 125000 },
+    { waktu: Date.now() - 6 * HARI, pengguna: 'Rina S.', email: '', status: 'bayar', paket: 'testing', komisiRp: 99000 },
+    { waktu: Date.now() - 9 * HARI, pengguna: 'Bayu K.', email: '', status: 'gratis', paket: 'gratis', komisiRp: 0 },
+    { waktu: Date.now() - 14 * HARI, pengguna: 'Dewi L.', email: '', status: 'belum', paket: '', komisiRp: 0 },
+    { waktu: Date.now() - 20 * HARI, pengguna: 'Fajar M.', email: '', status: 'gratis', paket: 'gratis', komisiRp: 0 },
+  ],
+  komisi: [
+    { id: 'c1', waktu: Date.now() - 2 * HARI, paket: 'premium3', dari: 'Andi P.', usd: 14.2, persen: 50, jumlahUsd: 7.1, jumlahRp: 125000, status: 'dibayar' },
+    { id: 'c2', waktu: Date.now() - 6 * HARI, paket: 'testing', dari: 'Rina S.', usd: 11.2, persen: 50, jumlahUsd: 5.6, jumlahRp: 99000, status: 'siap' },
+  ],
+  pencairan: [
+    { id: 'p1', waktu: Date.now() - 3 * HARI, jumlahRp: 125000, jumlahUsd: 7.1, bank: 'BCA', rekening: '••••1234', nama: 'Contoh', status: 'dibayar', diputusPada: Date.now() - 2 * HARI, catatan: '' },
+  ],
+};
+
 export default function Referral() {
   const { pengguna, memuat: memuatAuth } = useAuth();
+  /* true = yang tampil data contoh karena belum masuk. */
+  const pratinjau = !memuatAuth && !pengguna;
   /* Rute kuota TANPA login — sama yang dipakai halaman /akses. */
   const { kuota } = useKuota();
   const [data, setData] = useState<DataReferral | null>(null);
@@ -128,9 +165,13 @@ export default function Referral() {
 
   useEffect(() => {
     if (memuatAuth) return;
-    if (!pengguna) { setMemuat(false); return; }
+    if (!pengguna) { setData(CONTOH_REFERRAL); setMemuat(false); return; }
     void muat();
   }, [pengguna?.uid, memuatAuth, muat]);
+
+  /* Di pratinjau, tiga aksi yang butuh akun diarahkan ke halaman masuk —
+     lengkap dengan alamat balik supaya sesudah masuk ia kembali ke sini. */
+  const keMasuk = () => { window.location.assign('/akses?dari=' + encodeURIComponent('/referral')); };
 
   /* Nama rekening diisi dari nama akun sebagai awalan yang bisa diubah —
      kebanyakan orang memakai nama yang sama, dan yang tidak tinggal
@@ -140,6 +181,7 @@ export default function Referral() {
   }, [pengguna?.displayName, nama]);
 
   async function salinTautan() {
+    if (pratinjau) { keMasuk(); return; }
     if (!data) return;
     if (await salin(data.tautan)) { setDisalin(true); setTimeout(() => setDisalin(false), 2200); }
   }
@@ -175,6 +217,7 @@ export default function Referral() {
      seketika, jadi peramban tidak pernah melihat jendela yang dibuka
      sesudah `await` -- yang justru diblokirnya sebagai popup. */
   function keWhatsApp() {
+    if (pratinjau) { keMasuk(); return; }
     if (!data) return;
     const teks = pesanAjakan();
     void salin(teks).then((ok) => {
@@ -187,6 +230,7 @@ export default function Referral() {
 
   async function kirimPencairan(e: React.FormEvent) {
     e.preventDefault();
+    if (pratinjau) { keMasuk(); return; }
     if (!data) return;
     setSibuk(true); setKabar(null);
     try {
@@ -196,18 +240,6 @@ export default function Referral() {
     } catch (err) {
       setKabar({ jenis: 'galat', teks: err instanceof Error ? err.message : 'Gagal mengirim.' });
     } finally { setSibuk(false); }
-  }
-
-  if (!memuatAuth && !pengguna) {
-    return (
-      <div className="p-4 sm:p-6">
-        <Panel className="p-6 text-center">
-          <Gift className="mx-auto mb-2 size-6 text-zinc-500" strokeWidth={1.6} />
-          <div className="text-[13.5px] text-zinc-200">Masuk dulu untuk melihat kode referralmu.</div>
-          <p className="mt-1 text-[12px] text-zinc-500">Kode rujukan terikat ke akun, jadi komisinya tercatat atas namamu.</p>
-        </Panel>
-      </div>
-    );
   }
 
   if (memuat && !data) {
@@ -236,6 +268,18 @@ export default function Referral() {
 
   return (
     <div className="p-4 sm:p-6">
+      {pratinjau && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emas/25 bg-emas/[0.06] px-4 py-3 text-[12.5px] text-zinc-200">
+          <span>
+            <span className="font-medium text-emas">Pratinjau dengan data contoh.</span>{' '}
+            Begini bentuk halaman referralmu nanti — kode, rujukan, dan komisinya milik akunmu sendiri setelah masuk.
+          </span>
+          <button onClick={keMasuk}
+            className="cursor-pointer rounded-md bg-zinc-100 px-3 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white">
+            Masuk untuk mendapatkan tautanmu
+          </button>
+        </div>
+      )}
       {!setelan.aktif && (
         <div className="mb-4 rounded-xl border border-amber-500/25 bg-amber-500/[0.05] px-4 py-3 text-[12.5px] text-amber-300">
           Program referral sedang dijeda. Tautanmu tetap ada, tapi rujukan dan komisi baru tidak dicatat sampai program dibuka lagi.

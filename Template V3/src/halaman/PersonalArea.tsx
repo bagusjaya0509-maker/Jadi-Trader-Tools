@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
-  AreaChart, Area, XAxis, YAxis, CartesianGrid,
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, BarChart, Bar,
 } from 'recharts';
-import { Plus, RefreshCw, Wallet, TrendingUp, Banknote, Scale, Radio, Trash2, Loader2, Upload } from 'lucide-react';
+import { Plus, RefreshCw, Wallet, TrendingUp, Banknote, Scale, Radio, Trash2, Loader2, Upload, FileSpreadsheet, Download } from 'lucide-react';
 import { Panel, PanelHead, KartuKpi, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn } from '@/lib/utils';
 import { warnaKategori, rupiah, rupiahRingkas, type KategoriAset } from '@/data/porto';
 import { ModalImporPorto } from '@/components/modal-impor-porto';
+import { unduhXlsx, lembarContohPorto, lembarEksporPorto } from '@/lib/tulis-xlsx';
+import { useKas, ringkasBulan, kunciBulan as kunciBulanKas, geserBulan, rupiahKas } from '@/lib/kas';
 import { PanelKas } from '@/components/panel-kas';
 import { usePorto, bawaan, idBaru, type PosAset } from '@/lib/porto';
 import { useHargaPasar } from '@/lib/harga';
@@ -129,6 +131,32 @@ export default function PersonalArea() {
     })),
     [tampil.bulanan]
   );
+  /* ── CASH FLOW BULANAN ─────────────────────────────────────────────
+     Pemilik, 9 Sep 2026: satu panel, dua judul yang bisa diklik —
+     "Perkembangan Porto | Cash Flow Bulanan" — seperti halaman Sales
+     Report. Sumbernya Catatan Kas (users/{uid}/porto/arus), jadi grafik
+     ini TIDAK mengarang: bulan tanpa catatan memang tampil nol.
+
+     Delapan bulan terakhir, termasuk bulan berjalan. Lebih dari itu batang
+     bulanan jadi terlalu kurus untuk dibaca di lebar panel ini. */
+  const [grafik, setGrafik] = useState<'porto' | 'kas'>('porto');
+  const { daftar: kasDaftar } = useKas();
+  const cashFlow = useMemo(() => {
+    const kini = kunciBulanKas();
+    const hasil: { bulan: string; masuk: number; keluar: number }[] = [];
+    for (let i = 7; i >= 0; i--) {
+      const k = geserBulan(kini, -i);
+      const r = ringkasBulan(kasDaftar, k);
+      const [t, b] = k.split('-').map(Number);
+      hasil.push({
+        bulan: new Date(t, b - 1, 1).toLocaleDateString('id-ID', { month: 'short', year: '2-digit' }),
+        masuk: r.masuk, keluar: r.keluar,
+      });
+    }
+    return hasil;
+  }, [kasDaftar]);
+  const adaCashFlow = cashFlow.some((c) => c.masuk || c.keluar);
+
   const bulanIni = riwayatBulan[riwayatBulan.length - 1];
   const bulanLalu = riwayatBulan[riwayatBulan.length - 2];
   const tumbuh = bulanIni && bulanLalu && bulanLalu.porto !== 0
@@ -274,9 +302,71 @@ export default function PersonalArea() {
 
         {/* Perkembangan */}
         <Panel className="lg:col-span-2">
-          <PanelHead judul="Perkembangan Porto" sub="Porto bersih tiap bulan, dicatat sejak kamu mulai memakai halaman ini." />
+          <PanelHead
+            judul={
+              /* Dua judul, satu panel. Yang aktif putih, yang lain redup
+                 dan bisa diklik — pemisahnya garis tegak, persis yang
+                 diminta: "Perkembangan Porto | Cash Flow Bulanan". */
+              <span className="flex items-center gap-2">
+                {([['porto', 'Perkembangan Porto'], ['kas', 'Cash Flow Bulanan']] as const).map(([k, label], i) => (
+                  <span key={k} className="flex items-center gap-2">
+                    {i > 0 && <span className="font-normal text-zinc-700">|</span>}
+                    <button type="button" onClick={() => setGrafik(k)}
+                            aria-pressed={grafik === k}
+                            className={cn('cursor-pointer transition-colors',
+                              grafik === k ? 'text-zinc-100' : 'text-zinc-500 hover:text-zinc-300')}>
+                      {label}
+                    </button>
+                  </span>
+                ))}
+              </span>
+            }
+            sub={grafik === 'porto'
+              ? 'Porto bersih tiap bulan, dicatat sejak kamu mulai memakai halaman ini.'
+              : 'Pemasukan dan pengeluaran per bulan dari Catatan Kas, delapan bulan terakhir.'}
+          />
           <div className="h-[300px] px-2 pb-4">
-            {riwayatBulan.length < 2 ? (
+            {grafik === 'kas' ? (
+              !adaCashFlow ? (
+                <div className="flex h-full items-center justify-center px-6 text-center text-[12.5px] leading-relaxed text-zinc-600">
+                  Belum ada catatan kas. Kotak “Catat otomatis” di panel Catatan Kas di bawah mengisinya —
+                  ketik seperti chat, misalnya <span className="text-zinc-400">beli kopi 25rb</span>.
+                </div>
+              ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                {/* `barSize` pasti, bukan maxBarSize — alasan yang sama
+                    dengan grafik di Sales Report: tanpa itu dua batang satu
+                    bulan bisa terlempar jauh karena masing-masing dipusatkan
+                    di slotnya sendiri. */}
+                <BarChart data={cashFlow} barSize={18} barGap={3} margin={{ top: 8, right: 12, left: 8, bottom: 0 }}>
+                  <CartesianGrid vertical={false} stroke="currentColor" strokeOpacity={0.09} />
+                  <XAxis dataKey="bulan" tick={{ fill: abuSumbu, fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: abuSumbu, fontSize: 11 }} axisLine={false} tickLine={false} width={56}
+                         tickFormatter={(v) => v >= 1_000_000 ? `${(v / 1_000_000).toFixed(v % 1_000_000 ? 1 : 0)}jt` : v >= 1000 ? `${Math.round(v / 1000)}rb` : String(v)} />
+                  <Tooltip
+                    cursor={{ fill: 'currentColor', fillOpacity: 0.05 }}
+                    content={({ active, payload, label }: any) =>
+                      active && payload?.length ? (
+                        <div className="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 shadow-xl">
+                          <div className="text-[11px] text-zinc-500">{label}</div>
+                          {payload.map((pl: any) => (
+                            <div key={pl.dataKey} className="angka text-[12.5px]" style={{ color: pl.fill }}>
+                              {pl.dataKey === 'masuk' ? 'Masuk' : 'Keluar'} {rupiahKas(pl.value)}
+                            </div>
+                          ))}
+                          <div className="angka mt-0.5 text-[12px] text-zinc-300">
+                            Selisih {(() => { const m = payload.find((x: any) => x.dataKey === 'masuk')?.value || 0; const k = payload.find((x: any) => x.dataKey === 'keluar')?.value || 0; return (m - k < 0 ? '−' : '') + rupiahKas(Math.abs(m - k)); })()}
+                          </div>
+                        </div>
+                      ) : null
+                    }
+                  />
+                  <Bar dataKey="masuk" fill={terang ? '#047857' : '#34d399'} radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="keluar" fill={terang ? '#c81e1e' : '#f87171'} radius={[3, 3, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+              )
+            ) : riwayatBulan.length < 2 ? (
               <div className="flex h-full items-center justify-center px-6 text-center text-[12.5px] leading-relaxed text-zinc-600">
                 {/* Satu titik bukan grafik. Menariknya jadi garis lurus akan
                     terbaca sebagai "porto stabil", padahal artinya cuma
@@ -436,10 +526,33 @@ export default function PersonalArea() {
                 menjanjikan sesuatu yang tidak ada. */}
             <PanelHead judul="Tambah Pos" sub="Ketik satu pos, atau impor sekaligus dari lembar."
               kanan={
-                <button onClick={() => setImporBuka(true)} disabled={!pengguna}
-                  className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 py-1.5 text-[11.5px] text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100 disabled:cursor-not-allowed disabled:opacity-50">
-                  <Upload className="size-3.5" /> Impor
-                </button>
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* ── CONTOH & EKSPOR EXCEL ──────────────────────────────────
+                      Pemilik, 9 Sep 2026: ia ingin menulis komposisi porto di Excel
+                      dengan format yang pasti terbaca, dan berkas yang sama jadi
+                      patokan untuk pengguna lain. Dua tombol, satu format:
+                        · Contoh Excel — lembar berisi pos contoh + cara pakai, bisa
+                          diunduh siapa pun, termasuk yang belum masuk.
+                        · Ekspor Excel — porto yang sedang tampil, di format yang
+                          SAMA, jadi hasil ekspornya bisa diimpor balik apa adanya.
+                      Berkasnya dibuat di peramban (tulis-xlsx.ts), tidak ada yang
+                      dikirim ke server. */}
+                  <button onClick={() => unduhXlsx('contoh-portofolio.xlsx', [lembarContohPorto()])}
+                    title="Unduh lembar contoh berformat siap impor"
+                    className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 py-1.5 text-[12px] text-zinc-300 transition-colors hover:bg-zinc-800">
+                    <FileSpreadsheet className="size-3.5" /> Contoh Excel
+                  </button>
+                  <button onClick={() => unduhXlsx('portofolio-saya.xlsx', [lembarEksporPorto(tampil)])}
+                    disabled={!tampil.aset.length && !tampil.kewajiban.length}
+                    title="Simpan porto yang tampil ke Excel — bisa diimpor balik"
+                    className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 py-1.5 text-[12px] text-zinc-300 transition-colors hover:bg-zinc-800 disabled:cursor-default disabled:opacity-40">
+                    <Download className="size-3.5" /> Ekspor Excel
+                  </button>
+                  <button onClick={() => setImporBuka(true)} disabled={!pengguna}
+                    className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 py-1.5 text-[11.5px] text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100 disabled:cursor-not-allowed disabled:opacity-50">
+                    <Upload className="size-3.5" /> Impor
+                  </button>
+                </div>
               } />
             <div className="space-y-3 px-5 pb-5">
               <div id="isiManual" className="rounded-lg border border-zinc-800/60 p-3">

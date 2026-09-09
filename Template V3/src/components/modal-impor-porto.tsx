@@ -103,7 +103,7 @@ export function ModalImporPorto({ isi, simpan, tutup }: {
               sibuk ? 'cursor-wait opacity-60' : 'cursor-pointer hover:border-zinc-600 hover:bg-zinc-900/40')}>
               {sibuk ? <Loader2 className="size-6 animate-spin text-zinc-500" /> : <Upload className="size-6 text-zinc-500" strokeWidth={1.6} />}
               <span className="text-[13px] text-zinc-300">{sibuk ? 'Membaca lembar…' : 'Pilih berkas .xlsx atau .csv'}</span>
-              <span className="text-[11.5px] text-zinc-600">Dua kolom: nama pos di kiri, nilainya di kanan</span>
+              <span className="text-[11.5px] text-zinc-600">Nama pos · Kategori · Nilai (Rp) · Simbol — atau cukup nama dan nilainya</span>
               <input type="file" accept=".xlsx,.csv,.txt" className="hidden" disabled={sibuk}
                      onChange={(e) => void pilihBerkas(e.target.files?.[0])} />
             </label>

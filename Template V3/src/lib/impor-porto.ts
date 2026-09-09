@@ -29,6 +29,37 @@ export interface BarisImpor {
   kewajiban: boolean;
   /** Ikut disimpan? Baris ringkasan otomatis tidak dicentang. */
   pakai: boolean;
+  /** Simbol pasar kalau lembarnya menyebutkan (kolom "Simbol" di format contoh). */
+  simbol?: string;
+}
+
+/* ── KOLOM KATEGORI DIHORMATI ──────────────────────────────────────────
+   Sejak ada berkas contoh Excel (9 Sep 2026), lembar bisa membawa kolom
+   "Kategori" yang diisi orangnya sendiri. Kalau sel itu ada, ia menang
+   atas tebakan dari nama — tebakan hanya untuk lembar bebas yang tidak
+   punya kolom itu. "Kewajiban" di kolom yang sama memindahkan baris ke
+   blok bon tanpa perlu kata "kredit" di namanya. */
+const NAMA_KATEGORI: Record<string, KategoriAset | 'Kewajiban'> = {
+  kripto: 'Kripto', crypto: 'Kripto', bank: 'Bank', sekuritas: 'Sekuritas', saham: 'Sekuritas',
+  emas: 'Emas', 'e-wallet': 'E-Wallet', ewallet: 'E-Wallet', tunai: 'Tunai', cash: 'Tunai',
+  kewajiban: 'Kewajiban', bon: 'Kewajiban', utang: 'Kewajiban', hutang: 'Kewajiban',
+};
+function kategoriDariSel(sel: string[]): KategoriAset | 'Kewajiban' | null {
+  for (const c of sel) {
+    const k = NAMA_KATEGORI[String(c || '').trim().toLowerCase()];
+    if (k) return k;
+  }
+  return null;
+}
+/* Simbol: sel huruf besar-angka 2–12 karakter yang bukan nama, bukan
+   kategori, bukan angka — "BTCUSDT", "XAUUSD", "USDT". */
+function simbolDariSel(sel: string[], nama: string): string | undefined {
+  for (const c of sel) {
+    const t = String(c || '').trim();
+    if (!t || t === nama || keAngka(t) !== null) continue;
+    if (/^[A-Z0-9]{2,12}$/.test(t) && !NAMA_KATEGORI[t.toLowerCase()]) return t;
+  }
+  return undefined;
 }
 
 /* Baris yang BUKAN pos — ia hasil penjumlahan pos-pos di atasnya. Ikut
@@ -106,14 +137,21 @@ export function keBaris(baris: string[][]): BarisImpor[] {
     const ringkasan = POLA_RINGKASAN.test(nama);
     if (!ringkasan && POLA_KEWAJIBAN.test(nama)) modeKewajiban = true;
 
+    /* Kolom Kategori (kalau ada) menang atas tebakan dan atas blok. */
+    const eksplisit = kategoriDariSel(sel);
+    const kewajiban = eksplisit ? eksplisit === 'Kewajiban' : modeKewajiban;
+    const kategori = kewajiban ? '' : (eksplisit && eksplisit !== 'Kewajiban' ? eksplisit : tebakKategori(nama));
+    const simbol = simbolDariSel(sel, nama);
+
     keluar.push({
       nama,
       nilai: Math.abs(nilai),
-      kategori: modeKewajiban ? '' : tebakKategori(nama),
-      kewajiban: modeKewajiban,
+      kategori,
+      kewajiban,
       /* Baris ringkasan ikut ditampilkan tapi TIDAK dicentang — supaya
          terlihat bahwa ia terbaca dan sengaja dilewati, bukan hilang. */
       pakai: !ringkasan,
+      ...(simbol ? { simbol } : {}),
     });
   }
   return keluar;
@@ -204,7 +242,7 @@ export function keAsetDanKewajiban(baris: BarisImpor[]) {
   const kewajiban: PosKewajiban[] = [];
   baris.filter((b) => b.pakai).forEach((b) => {
     if (b.kewajiban) kewajiban.push({ id: idBaru(), nama: b.nama, nilai: b.nilai });
-    else aset.push({ id: idBaru(), nama: b.nama, nilai: b.nilai, kategori: b.kategori as KategoriAset });
+    else aset.push({ id: idBaru(), nama: b.nama, nilai: b.nilai, kategori: b.kategori as KategoriAset, ...(b.simbol ? { simbol: b.simbol } : {}) });
   });
   return { aset, kewajiban };
 }

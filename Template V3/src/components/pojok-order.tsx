@@ -234,7 +234,7 @@ function IsianAngka({ nilai, atur, langkah, min = 0, maks, desimal = 2, lebar, j
 
 export function PojokOrder({
   posisi, hargaKini, draf, rencana, mode, jenis, onMarket, risiko, tunda, onBatalTunda, onKirimSinyal, kabarSinyal, dariSinyal, tanpaSlTp, onGantiCopy, onCopySinyal,
-  onPilih, onUbah, onKirim, onBatal, onTutup, onGantiMode, onTukarArah, mati,
+  peringatan, onPilih, onUbah, onKirim, onBatal, onTutup, onGantiMode, onTukarArah, mati,
   nyataSetelan, aturNyata, sibukNyata, kabar, demoSetelan, aturDemo,
   catatan, aturCatatan, qtyDemo, mt5, lotMt5, aturLotMt5, nilaiLotMt5, desimalHarga = 6,
   simbol, bursaTersedia, onGantiBursa,
@@ -309,6 +309,10 @@ export function PojokOrder({
   /** Level di chart ini datang dari analisa Copy Signal. Menyalakan
    *  penanda COPY biru — lihat catatan di tempat pembuatannya. */
   dariSinyal?: boolean;
+  /** Keterangan yang MENETAP (bukan pita 5 detik): keadaan tiket yang perlu
+   *  diketahui sebelum menekan Kirim, mis. entry sinyal yang sudah lewat.
+   *  Pita dipakai untuk kejadian; ini untuk keadaan. */
+  peringatan?: string;
   /** Tiket lahir dari sinyal cermin dompet: SL & TP boleh kosong. Kartunya
    *  sudah menyatakan dompetnya tidak memasang keduanya, jadi mengunci
    *  tombol Kirim sampai keduanya diisi cuma menghalangi. Yang diisi tetap
@@ -564,6 +568,22 @@ export function PojokOrder({
       <div className={cn('relative max-w-[calc(100vw-5rem)] rounded-lg border bg-zinc-900/92 px-2.5 py-2 backdrop-blur-sm sm:max-w-none',
         nyata ? 'border-red-500/40' : 'border-zinc-700')}>
         <PitaPeringatan pesan={!arahBenar ? alasanKunci : ''} />
+        {/* ── ENTRY SINYAL YANG SUDAH LEWAT ─────────────────────────────
+            Pemilik, 9 Sep 2026: kartu sinyal berbunyi "Sedang berjalan",
+            tiketnya berbunyi "Buy Limit" — dan ia mengira keduanya tidak
+            sinkron. Sebenarnya keduanya benar: harga memang sudah lewat
+            entry (itu "berjalan"), dan order di harga entry yang kini di
+            bawah pasar memang Buy Limit. Yang salah adalah tiket yang diam:
+            ia menawarkan limit 28% di bawah pasar tanpa mengatakan order
+            itu hampir pasti tidak terisi. Keterangan ini yang mengatakannya.
+            Jenis ordernya TIDAK diubah otomatis — masuk di harga sekarang
+            atau menunggu harga balik adalah keputusan dagang, bukan
+            keputusan tampilan. */}
+        {peringatan && (
+          <div className="mb-1.5 rounded bg-amber-500/10 px-2 py-1 text-[10.5px] leading-snug text-amber-300/90">
+            {peringatan}
+          </div>
+        )}
         <div className="mb-1.5 flex items-center gap-2">
           {Lencana}
           {/* BISA DIKLIK UNTUK MEMBALIK ARAH. Dulu ia label mati, dan

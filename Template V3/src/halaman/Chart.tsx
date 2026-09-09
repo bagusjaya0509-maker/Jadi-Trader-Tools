@@ -3663,6 +3663,23 @@ ${pnlSunting !== null
   }, [draf, rencana.entry, aksi?.hargaKini]);
   const labelJenis = jenisEntry === 'MARKET' ? 'Market'
     : `${draf === 'BUY' ? 'Buy' : 'Sell'} ${jenisEntry === 'STOP' ? 'Stop' : 'Limit'}`;
+
+  /* ── Entry sinyal sudah lewat? ─────────────────────────────────────────
+     Hanya untuk tiket yang DIBUKA DARI SINYAL (ada ?sinyal= di alamat) dan
+     belum jadi posisi. Ambangnya 1%: di bawah itu harga masih di sekitar
+     entry dan limitnya wajar; di atasnya order itu menunggu harga BALIK,
+     dan orangnya berhak tahu sebelum menekan Kirim. Angkanya ditulis
+     lengkap — "sudah lewat" tanpa berapa jauh cuma menakut-nakuti. */
+  const entryTerlewat = useMemo(() => {
+    const e = rencana.entry, h = aksi?.hargaKini;
+    if (!sinyalAsal || !draf || !e || !h || aksiPosisi) return '';
+    const lewat = draf === 'BUY' ? h > e * 1.01 : h < e * 0.99;
+    if (!lewat) return '';
+    const persen = Math.abs(((h - e) / e) * 100).toFixed(1);
+    const f = (n: number) => n.toLocaleString('id-ID', { maximumFractionDigits: desimalHarga });
+    return `Entry sinyal ini sudah lewat ${persen}% — harga sekarang ${f(h)}, entry ${f(e)}. `
+      + `Order ${labelJenis} di situ baru terisi kalau harga balik ke sana; tekan Market kalau mau masuk di harga sekarang.`;
+  }, [sinyalAsal, draf, rencana.entry, aksi?.hargaKini, aksiPosisi, desimalHarga, labelJenis]);
   const garisSeret: GarisSeret[] = useMemo(() => {
     /* Mode SUNTING menang atas semuanya: begitu sebuah order dipilih dari
        panel, yang digambar adalah order ITU — bukan rencana tiket yang
@@ -5821,6 +5838,7 @@ ${pnlSunting !== null
                               onKirimSinyal={kirimKeCopySignal}
                               kabarSinyal={kabarKirimSinyal || undefined}
                               dariSinyal={dariSinyal}
+                              peringatan={entryTerlewat || undefined}
                               tanpaSlTp={tanpaSlTp}
                               onGantiCopy={(v) => { copyManual.current = v; setDariSinyal(v); }} />
                             </div>
