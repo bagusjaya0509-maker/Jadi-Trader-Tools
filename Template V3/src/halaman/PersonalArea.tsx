@@ -325,7 +325,27 @@ export default function PersonalArea() {
 
       {/* Daftar aset + cara mengisi */}
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <Panel className="lg:col-span-2">
+        {/* ── KENAPA ADA PEMBUNGKUS DI SINI ────────────────────────────────
+            Diminta pemilik 9 Sep 2026: bagian bawah Rincian Aset harus
+            sejajar dengan kolom kanan, tidak menjulur sendirian.
+
+            Di grid, tinggi barisnya ditentukan anak yang PALING TINGGI —
+            dan itu daftar aset, yang belasan baris. Selama ia ikut
+            menghitung, tidak ada tinggi yang bisa dikejar: menyamakan diri
+            dengan sesuatu yang ia sendiri tentukan itu melingkar.
+
+            Pembungkus ini yang jadi anak grid; isinya diangkat keluar dari
+            aliran (`absolute inset-0`) sehingga tingginya nol. Baris grid
+            lalu ditentukan HANYA oleh kolom kanan, dan panel kiri mengisi
+            persis setinggi itu. Cuma dari `lg` ke atas — di bawah itu
+            kolomnya bertumpuk, dan memaksa tinggi berarti dua bilah gulir
+            bersarang di layar yang sudah sempit.
+
+            `min-h` 26rem menjaga kalau kolom kanan sedang pendek (kewajiban
+            kosong): daftar aset boleh lebih pendek dari tetangganya, tapi
+            tidak boleh tinggal dua baris. */}
+        <div className="lg:relative lg:col-span-2 lg:min-h-[26rem]">
+        <Panel className="flex flex-col lg:absolute lg:inset-0">
           <PanelHead
             judul="Rincian Aset"
             sub="Pos bertanda live ikut bergerak mengikuti harga pasar."
@@ -336,15 +356,19 @@ export default function PersonalArea() {
               </button>
             }
           />
-          <div className="px-5 pb-5">
-            {/* Tanpa tinggi maksimum.
-                ──────────────────────────────────────────────────────────
-                `max-h-[420px]` membuat daftarnya bergulir di dalam kotak
-                sendiri sementara halaman di bawahnya masih kosong — barisnya
-                terlihat terpotong padahal ruangnya ada. Daftar aset panjangnya
-                belasan baris, bukan ribuan; membiarkannya memanjang jauh lebih
-                mudah dibaca daripada dua bilah gulir bersarang. */}
-            <TabelBungkus>
+          <div className="flex min-h-0 flex-1 flex-col px-5 pb-5">
+            {/* Tingginya TIDAK dipatok angka.
+                ─────────────────────────────────────────────────────────
+                `max-h-[420px]` pernah dipakai dan dicabut: daftarnya bergulir
+                di dalam kotak sendiri sementara halaman di bawahnya masih
+                kosong, jadi barisnya terlihat terpotong padahal ruangnya ada.
+                Keberatan itu masih berlaku untuk angka mati.
+
+                Yang sekarang beda: batasnya BUKAN angka, melainkan tinggi
+                kolom sebelahnya. Ruang di bawahnya tidak pernah kosong — di
+                situ ada panel Kewajiban. Barisnya tergulir hanya sejauh yang
+                memang tidak muat. */}
+            <TabelBungkus className="min-h-0 flex-1 lg:overflow-y-auto">
               <Tabel>
                 <thead className="sticky top-0 bg-zinc-950">
                   <tr><Th>Pos</Th><Th>Jenis</Th><Th className="text-right">Nilai</Th><Th className="text-right">Porsi</Th></tr>
@@ -386,16 +410,23 @@ export default function PersonalArea() {
                       </Td>
                     </Tr>
                   ))}
-                  <Tr className="border-t border-zinc-800">
-                    <Td className="font-medium text-zinc-100" colSpan={2}>Aset Kotor</Td>
-                    <Td className="angka text-right font-medium text-zinc-100">{rupiah(totalAset)}</Td>
-                    <Td className="angka text-right text-zinc-500">100%</Td>
+                  {/* Total menempel di dasar kotak gulir. Angka inilah yang
+                      dicari orang saat membuka panel ini; kalau ia ikut
+                      tergulir keluar, daftar yang bergulir justru menyembunyikan
+                      satu-satunya baris yang selalu ingin dilihat.
+                      Latarnya PADAT (bukan setengah tembus) supaya baris yang
+                      lewat di bawahnya tidak menembus. */}
+                  <Tr className="sticky bottom-0 z-10 border-t border-zinc-800 bg-zinc-950 hover:bg-zinc-950">
+                    <Td className="border-b-0 font-medium text-zinc-100" colSpan={2}>Aset Kotor</Td>
+                    <Td className="angka border-b-0 text-right font-medium text-zinc-100">{rupiah(totalAset)}</Td>
+                    <Td className="angka border-b-0 text-right text-zinc-500">100%</Td>
                   </Tr>
                 </tbody>
               </Tabel>
             </TabelBungkus>
           </div>
         </Panel>
+        </div>
 
         <div className="space-y-4">
           <Panel>
