@@ -17,7 +17,7 @@ import { Panel, PanelHead, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/
 import { cn } from '@/lib/utils';
 import {
   useKas, useTautanTelegram, mintaKodeTelegram, lepasTelegram, ringkasBulan, kunciBulan, geserBulan, namaBulan,
-  uraiBanyak, rupiahKas, KATEGORI_KELUAR, KATEGORI_MASUK, type BarisKas, type JenisKas, type KodeTelegram,
+  uraiBanyak, rupiahKas, KATEGORI_KELUAR, KATEGORI_MASUK, type JenisKas, type KodeTelegram,
 } from '@/lib/kas';
 
 const AKUN = ['Bank', 'E-Wallet', 'Tunai', 'Kripto', 'Sekuritas', 'Emas'];
@@ -68,13 +68,14 @@ export function PanelKas() {
 
   const catatOtomatis = () => {
     if (!pratinjau || !pratinjau.hasil.length) return;
+    /* `sumber` = potongan kalimat yang melahirkan baris ini, bukan seluruh
+       ketikan. Satu pesan bisa jadi empat baris ("listrik 100k, makan 250k,
+       …"); menyimpan kalimat penuh di keempatnya membuat jejaknya tidak
+       menunjuk apa pun. */
     const baris = pratinjau.hasil.map((h) => ({
       jenis: h.jenis, jumlah: h.jumlah, kategori: h.kategori, judul: h.judul, tanggal: h.tanggal,
-      akun: h.akun, dicatat: 'otomatis' as const,
+      akun: h.akun, teks: h.sumber, dicatat: 'otomatis' as const,
     }));
-    /* Teks aslinya ikut disimpan per baris kalau cuma satu — untuk banyak
-       baris, teks gabungannya tidak menjelaskan baris mana pun. */
-    if (baris.length === 1) (baris[0] as Partial<BarisKas>).teks = teks.trim();
     void jalankan(async () => { await tambah(baris); setTeks(''); kotak.current?.focus(); },
       baris.length === 1 ? 'Tercatat.' : `${baris.length} baris tercatat.`);
   };

@@ -34,6 +34,8 @@ export interface HasilUrai {
   yakin: 'tinggi' | 'sedang' | 'rendah';
   /** Angka polos di bawah 1000 dibaca sebagai ribuan ("kopi 25" → 25.000). */
   tebakanRibu?: boolean;
+  /** Potongan kalimat yang melahirkan baris ini — untuk melacak salah baca. */
+  sumber: string;
 }
 
 export const KATEGORI_KELUAR = [
@@ -223,62 +225,151 @@ function cariKategori(t: string, peta: Array<[string, string[]]>): string | null
   return terbaik;
 }
 
-function rapikanJudul(s: string): string {
-  const j = s.replace(/\b(rp|sebesar|sejumlah|total|harga|seharga|senilai|untuk|buat|utk|dgn|dengan|pakai|pake|via|lewat|dari|ke|di|tadi|barusan)\b/gi, ' ')
-    .replace(/[^\p{L}\p{N}&/'-]+/gu, ' ').replace(/\s+/g, ' ').trim();
-  if (!j) return '';
-  return j.charAt(0).toUpperCase() + j.slice(1);
+/* ── Keterangan: kata DI SEKITAR angkanya, bukan seluruh kalimat ────────
+   Pemilik, 9 Sep 2026: "keterangannya jangan diisi [seluruh pesan], nanti
+   kalau panjangnya satu halaman masa mau ditulis semua."
+
+   Yang dipakai kata SEBELUM angkanya, karena begitulah bahasa Indonesia
+   menyusunnya: benda dulu, harga belakangan ("listrik 100k", "cat rumah
+   28k"). Ekor sesudah angka hampir selalu kalimat lain — di pesan yang
+   memicu perbaikan ini, ekornya "bantu sya catat di web", yang bukan nama
+   pengeluaran apa pun. Kalau di depan tidak ada apa-apa ("25rb kopi"),
+   barulah dilihat ke belakang.
+
+   Maksimal tiga kata: cukup untuk mengenali, terlalu pendek untuk jadi
+   paragraf di kolom tabel. */
+const KATA_BUANG = new Set([
+  'rp', 'sebesar', 'sejumlah', 'total', 'harga', 'seharga', 'senilai', 'untuk', 'buat', 'utk',
+  'dgn', 'dengan', 'pakai', 'pake', 'via', 'lewat', 'dari', 'ke', 'di', 'tadi', 'barusan',
+  'saya', 'sya', 'aku', 'gw', 'gue', 'ane', 'sudah', 'udah', 'uda', 'td', 'nih', 'dong', 'ya',
+  'yg', 'yang', 'bantu', 'tolong', 'mohon', 'catat', 'catet', 'web', 'itu', 'ini', 'juga',
+  'lagi', 'aja', 'saja', 'sama', 'dan', 'lalu', 'terus', 'kemudian', 'habis', 'abis',
+]);
+
+function judulRingkas(sebelum: string, sesudah: string): string {
+  const ambil = (teks: string, dariBelakang: boolean) => {
+    const kata = teks.replace(/[^\p{L}\p{N}&/'-]+/gu, ' ').split(/\s+/).filter(Boolean)
+      .filter((k) => !KATA_BUANG.has(k.toLowerCase()));
+    if (!kata.length) return '';
+    const potong = dariBelakang ? kata.slice(-3) : kata.slice(0, 3);
+    return potong.join(' ').slice(0, 40).trim();
+  };
+  const j = ambil(sebelum, true) || ambil(sesudah, false);
+  return j ? j.charAt(0).toUpperCase() + j.slice(1) : '';
 }
 
-/** Urai SATU baris. Mengembalikan null kalau tidak ada angka yang bisa dibaca sebagai jumlah. */
-export function uraiKas(teks: string, hariIni: Date = new Date()): HasilUrai | null {
-  const asli = String(teks || '').replace(/\s+/g, ' ').trim();
-  if (!asli) return null;
-  const t = asli.toLowerCase();
+/* ── Memecah satu pesan jadi beberapa catatan ───────────────────────────
+   Pemicunya pesan nyata pemilik 9 Sep 2026:
+     "Sya beli listrik 100k, makan 250k, cat rumah 28k, bensin 120k …"
+   Versi pertama membaca SATU angka saja (yang terakhir) dan mencatat
+   Rp120.000 — padahal isinya empat pengeluaran, Rp498.000.
 
-  const { tanggal, potong } = bacaTanggal(t, hariIni);
-  let sisa = asli;
-  for (const p of potong) sisa = sisa.replace(p, ' ');
+   Kesalahannya bukan di pemilihan angka, melainkan di anggapan bahwa satu
+   pesan berarti satu catatan. Orang menulis belanjaan sekaligus; itu cara
+   normal, bukan penyalahgunaan.
 
-  const angka = bacaAngka(sisa);
+   Pemecahannya dua tahap. Pertama tanda pemisah yang memang berarti "lalu"
+   — koma, titik koma, plus, kata "dan/lalu/terus". Kalau sesudah itu masih
+   ada penggal yang memuat lebih dari satu angka ("listrik 100k makan 250k"
+   tanpa koma), penggal itu dipotong lagi di batas tiap angka.
+
+   Yang TIDAK dipecah: pesan yang seluruhnya cuma punya satu angka. Di sana
+   koma justru bisa memisahkan nama dari harganya ("beli kopi, 25rb"), dan
+   memecahnya akan membuang namanya. */
+const PEMISAH = /\s*[,;]\s*|\s+\+\s+|\s+(?:dan|lalu|terus|kemudian)\s+/i;
+
+function pecahSegmen(teks: string): string[] {
+  const hasil: string[] = [];
+  for (const bagian of teks.split(PEMISAH)) {
+    const b = (bagian || '').trim();
+    if (!b) continue;
+    const angka = bacaAngka(b);
+    if (angka.length <= 1) { hasil.push(b); continue; }
+    /* Tiap angka membawa kata di depannya sampai batas angka sebelumnya. */
+    let mulai = 0;
+    for (const a of angka) { hasil.push(b.slice(mulai, a.akhir).trim()); mulai = a.akhir; }
+  }
+  return hasil.filter(Boolean);
+}
+
+/* Satu segmen -> satu catatan. `penuh` dipakai untuk hal yang dinyatakan
+   sekali untuk seluruh pesan: arah (masuk/keluar) dan nama akun. Kategori
+   TIDAK ikut jatuh ke pesan penuh — kalau ikut, "cat rumah 28k" di dalam
+   pesan yang memuat kata "makan" akan tercatat sebagai Makan & Minum,
+   persis salah baca yang dilaporkan. */
+function uraiSatu(segmen: string, tanggal: string, penuh: string): HasilUrai | null {
+  const angka = bacaAngka(segmen);
   const pilihan = pilihJumlah(angka);
   if (!pilihan || pilihan.angka.nilai <= 0) return null;
   const { angka: jumlah, tebakanRibu } = pilihan;
   if (jumlah.nilai > 1e11) return null;   /* >100 miliar: pasti salah ketik nol */
 
-  /* Jenis: kata kerja bobot 2, benda bobot 1. Seri → keluar, karena catatan
-     kas sehari-hari didominasi pengeluaran, dan salah arah pada pemasukan
-     jauh lebih mudah dikenali (angkanya hijau di tempat yang salah). */
-  const nilaiMasuk = 2 * skor(t, KERJA_MASUK) + skor(t, BENDA_MASUK);
-  const nilaiKeluar = 2 * skor(t, KERJA_KELUAR) + skor(t, BENDA_KELUAR);
-  const jenis: JenisKas = nilaiMasuk > nilaiKeluar ? 'masuk' : 'keluar';
-  const jenisYakin = nilaiMasuk !== nilaiKeluar;
+  const t = segmen.toLowerCase(), tp = penuh.toLowerCase();
+  const arah = (teks: string) => ({
+    masuk: 2 * skor(teks, KERJA_MASUK) + skor(teks, BENDA_MASUK),
+    keluar: 2 * skor(teks, KERJA_KELUAR) + skor(teks, BENDA_KELUAR),
+  });
+  let n = arah(t);
+  let jenisYakin = n.masuk !== n.keluar;
+  if (!jenisYakin) { const np = arah(tp); if (np.masuk !== np.keluar) { n = np; jenisYakin = true; } }
+  /* Seri tetap berarti keluar: catatan harian didominasi pengeluaran, dan
+     salah arah pada pemasukan lebih mudah terlihat (angka hijau di tempat
+     yang salah) daripada sebaliknya. */
+  const jenis: JenisKas = n.masuk > n.keluar ? 'masuk' : 'keluar';
 
   const kategoriTebak = cariKategori(t, jenis === 'masuk' ? KATA_MASUK : KATA_KELUAR);
   const kategori = kategoriTebak || 'Lainnya';
 
   let akun: string | undefined;
   for (const [nama, kata] of AKUN) if (skor(t, kata)) { akun = nama; break; }
+  if (!akun) for (const [nama, kata] of AKUN) if (skor(tp, kata)) { akun = nama; break; }
 
-  let judul = rapikanJudul(sisa.slice(0, jumlah.mulai) + ' ' + sisa.slice(jumlah.akhir));
-  if (akun) judul = judul.replace(new RegExp('\\b(' + AKUN.find((a) => a[0] === akun)![1].join('|') + ')\\b', 'gi'), ' ').replace(/\s+/g, ' ').trim();
-  if (!judul) judul = kategori;
-  judul = judul.slice(0, 120);
+  let sebelum = segmen.slice(0, jumlah.mulai);
+  let sesudah = segmen.slice(jumlah.akhir);
+  if (akun) {
+    const pola = new RegExp('\\b(' + AKUN.find((a) => a[0] === akun)![1].join('|') + ')\\b', 'gi');
+    sebelum = sebelum.replace(pola, ' '); sesudah = sesudah.replace(pola, ' ');
+  }
+  const judul = judulRingkas(sebelum, sesudah) || kategori;
 
   const yakin: HasilUrai['yakin'] = tebakanRibu ? 'rendah' : (jenisYakin && kategoriTebak) ? 'tinggi' : 'sedang';
-  const hasil: HasilUrai = { jumlah: jumlah.nilai, jenis, kategori, judul, tanggal, yakin };
+  const hasil: HasilUrai = { jumlah: jumlah.nilai, jenis, kategori, judul, tanggal, yakin, sumber: segmen.slice(0, 200) };
   if (akun) hasil.akun = akun;
   if (tebakanRibu) hasil.tebakanRibu = true;
   return hasil;
 }
 
-/** Urai banyak baris sekaligus (tempelan). Baris tanpa angka dilewati dan dilaporkan. */
+/** Urai satu pesan jadi SEMUA catatan yang ada di dalamnya (bisa lebih dari satu). */
+export function uraiSemua(teks: string, hariIni: Date = new Date()): HasilUrai[] {
+  const asli = String(teks || '').replace(/\s+/g, ' ').trim();
+  if (!asli) return [];
+  /* Tanggal dibaca sekali untuk seluruh pesan: "kemarin beli A 10rb, B 20rb"
+     berarti keduanya kemarin. */
+  const { tanggal, potong } = bacaTanggal(asli.toLowerCase(), hariIni);
+  let sisa = asli;
+  for (const p of potong) sisa = sisa.replace(p, ' ');
+
+  const segmen = bacaAngka(sisa).length > 1 ? pecahSegmen(sisa) : [sisa];
+  const hasil: HasilUrai[] = [];
+  for (const sg of segmen) {
+    const h = uraiSatu(sg, tanggal, sisa);
+    if (h) hasil.push(h);
+  }
+  return hasil;
+}
+
+/** Urai satu baris, ambil catatan pertamanya saja. Null kalau tidak ada angka. */
+export function uraiKas(teks: string, hariIni: Date = new Date()): HasilUrai | null {
+  return uraiSemua(teks, hariIni)[0] || null;
+}
+
+/** Urai tempelan banyak baris. Baris tanpa angka dilewati dan dilaporkan. */
 export function uraiBanyak(teks: string, hariIni: Date = new Date()): { hasil: HasilUrai[]; gagal: string[] } {
   const hasil: HasilUrai[] = [], gagal: string[] = [];
-  for (const baris of String(teks || '').split(/\r?\n|;/)) {
+  for (const baris of String(teks || '').split(/\r?\n/)) {
     const b = baris.trim(); if (!b) continue;
-    const h = uraiKas(b, hariIni);
-    if (h) hasil.push(h); else gagal.push(b);
+    const h = uraiSemua(b, hariIni);
+    if (h.length) hasil.push(...h); else gagal.push(b);
   }
   return { hasil, gagal };
 }
