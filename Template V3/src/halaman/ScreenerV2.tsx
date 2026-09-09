@@ -412,6 +412,106 @@ const CSS_TANPA_CANGKANG = `
   [data-tema='terang'] * {
     scrollbar-color: #d4d4d8 transparent !important;
   }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     BARIS FILTER SEBAGAI DERETAN CHIP
+     ══════════════════════════════════════════════════════════════════════
+     Diminta pemilik 9 Sep 2026, mengikuti bentuk komponen "Filters" yang ia
+     kirim: pil-pil kecil berlatar redup yang berjejer rapat sejak layar
+     dibuka, bukan kotak besar yang berjarak lebar.
+
+     ── KENAPA DI SINI, BUKAN DI BERKAS V2 ────────────────────────────────
+     Percobaan pertama menulisnya di ema-cross-screener_3.html, dan hasilnya
+     RUSAK: aturan ".ema-screener select { background: … !important }" di
+     blok atas berkas INI menimpa "background" sebagai shorthand, jadi
+     gambar latarnya terhapus dan "background-repeat" kembali ke "repeat" —
+     chevron 9 px berubah jadi deretan garis seperti barcode di seluruh
+     lebar select. Sudah dipulihkan; berkas V2 kembali seperti semula.
+
+     Pelajarannya: penampilan screener di dalam aplikasi dimiliki berkas
+     ini, bukan berkas V2. Menaruhnya di dua tempat berarti dua aturan yang
+     berkelahi lewat !important, dan yang menang bergantung pada urutan
+     muat yang tidak dijamin siapa pun.
+
+     ── KENAPA "!important" DAN URUTAN INI ────────────────────────────────
+     Aturan yang ditimpa sendiri memakai !important, jadi ini satu-satunya
+     cara menang. Kekhususannya juga dinaikkan lewat ".es-priority-controls"
+     di tengah, dan bloknya sengaja ditaruh PALING AKHIR supaya juga menang
+     atas blok "[data-tema='terang']" yang kekhususannya setara.
+
+     ── SATU HAL YANG TIDAK IKUT DIPINJAM ─────────────────────────────────
+     Contohnya punya ruas "is" di tengah tiap chip ("Priority is High").
+     Itu masuk akal untuk filter berbentuk medan-operator-nilai. Di sini
+     isinya pilihan, bukan perbandingan: "TF is 4 Jam" cuma menambah satu
+     kata yang tidak menjelaskan apa pun.
+
+     Warna ikonnya dipatok #7a7a80. background-image tidak bisa mewarisi
+     currentColor, dan abu tengah itu satu-satunya nilai yang tetap terbaca
+     di tema gelap maupun terang. */
+  .ema-screener .es-priority-controls { gap: 6px !important; }
+
+  .ema-screener .es-priority-controls select,
+  .ema-screener .es-priority-controls .es-priority-btn,
+  .ema-screener .es-priority-controls .es-ai-regime {
+    height: 28px !important;
+    border-radius: 5px !important;
+    font-size: 12px !important;
+  }
+
+  .ema-screener .es-priority-controls select {
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    /* background-color, BUKAN shorthand: shorthand-lah yang tadi
+       menghapus gambar latarnya sendiri. */
+    background-color: var(--panel-2) !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237a7a80' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 8px center !important;
+    background-size: 9px 9px !important;
+    border-color: transparent !important;
+    color: var(--muted) !important;
+    padding: 0 24px 0 10px !important;
+  }
+  .ema-screener .es-priority-controls select:hover {
+    background-color: var(--panel-3) !important;
+    color: var(--text) !important;
+  }
+
+  /* Ikon kiri HANYA untuk empat penyaring yang benar-benar menentukan hasil
+     pindaian. Select milik kalender ekonomi ikut baris ini juga, dan jam di
+     sebelah pilihan "Mata Uang" cuma membingungkan. */
+  .ema-screener #esPantauTf,
+  .ema-screener #esChTf {
+    padding-left: 27px !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237a7a80' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v5l3 2'/%3E%3C/svg%3E"), url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237a7a80' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important;
+    background-position: 8px center, right 8px center !important;
+    background-size: 12px 12px, 9px 9px !important;
+  }
+  .ema-screener #esPantauRezim,
+  .ema-screener #esChSnrFilter {
+    padding-left: 27px !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237a7a80' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20V16'/%3E%3Cpath d='M10 20V12'/%3E%3Cpath d='M16 20V8'/%3E%3Cpath d='M22 20V4'/%3E%3C/svg%3E"), url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237a7a80' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important;
+    background-position: 8px center, right 8px center !important;
+    background-size: 12px 12px, 9px 9px !important;
+  }
+
+  .ema-screener .es-priority-controls .es-ai-regime {
+    background: var(--panel-2) !important;
+    border-color: transparent !important;
+  }
+
+  /* Layar sempit: tingginya dikembalikan ke ukuran sentuh. Berkas V2 sudah
+     menaikkannya jadi 38 px di bawah 820 px, dan aturan chip di atas
+     memakai !important yang mengalahkannya — jadi angkanya ditulis ulang
+     di sini, bukan dibiarkan kalah diam-diam. */
+  @media (max-width: 820px) {
+    .ema-screener .es-priority-controls select,
+    .ema-screener .es-priority-controls .es-priority-btn,
+    .ema-screener .es-priority-controls .es-ai-regime {
+      height: 36px !important;
+    }
+  }
+
   [data-tema='terang'] *::-webkit-scrollbar-thumb {
     background: #d4d4d8 !important;
   }
