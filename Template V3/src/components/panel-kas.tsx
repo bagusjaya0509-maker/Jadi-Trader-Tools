@@ -17,8 +17,9 @@ import { Panel, PanelHead, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/
 import { cn } from '@/lib/utils';
 import {
   useKas, useTautanTelegram, mintaKodeTelegram, lepasTelegram, ringkasBulan, kunciBulan, geserBulan, namaBulan,
-  uraiBanyak, rupiahKas, KATEGORI_KELUAR, KATEGORI_MASUK, type JenisKas, type KodeTelegram,
+  uraiBanyak, rupiahKas, labelAsing, KATEGORI_KELUAR, KATEGORI_MASUK, type JenisKas, type KodeTelegram,
 } from '@/lib/kas';
+import { useKurs } from '@/lib/kurs-kas';
 
 const AKUN = ['Bank', 'E-Wallet', 'Tunai', 'Kripto', 'Sekuritas', 'Emas'];
 
@@ -56,7 +57,13 @@ export function PanelKas() {
 
   /* ── Catat otomatis ─────────────────────────────────────────────── */
   const [teks, setTeks] = useState('');
-  const pratinjau = useMemo(() => (teks.trim() ? uraiBanyak(teks) : null), [teks]);
+  /* Kurs ikut jadi ketergantungan: saat kurs hidup datang, pratinjau yang
+     tadi memakai tabel cadangan dihitung ulang dengan angka hari ini. */
+  const kurs = useKurs();
+  const pratinjau = useMemo(
+    () => (teks.trim() ? uraiBanyak(teks, undefined, kurs.peta) : null),
+    [teks, kurs]
+  );
   const kotak = useRef<HTMLTextAreaElement>(null);
 
   const jalankan = async (kerja: () => Promise<unknown>, sukses: string) => {
@@ -75,6 +82,7 @@ export function PanelKas() {
     const baris = pratinjau.hasil.map((h) => ({
       jenis: h.jenis, jumlah: h.jumlah, kategori: h.kategori, judul: h.judul, tanggal: h.tanggal,
       akun: h.akun, teks: h.sumber, dicatat: 'otomatis' as const,
+      mataUang: h.mataUang, jumlahAsli: h.jumlahAsli, kurs: h.kurs,
     }));
     void jalankan(async () => { await tambah(baris); setTeks(''); kotak.current?.focus(); },
       baris.length === 1 ? 'Tercatat.' : `${baris.length} baris tercatat.`);
@@ -140,7 +148,7 @@ export function PanelKas() {
       <div className="mt-4 rounded-lg border border-zinc-800 bg-zinc-950/40 p-3">
         <div className="mb-2 flex items-center gap-2 text-[12.5px] font-medium text-zinc-200">
           <Wand2 className="size-3.5 text-amber-300" /> Catat otomatis
-          <span className="font-normal text-zinc-500">— contoh: <span className="text-zinc-400">beli kopi 25rb</span>, <span className="text-zinc-400">gaji masuk 5jt</span>, <span className="text-zinc-400">bayar listrik 350.000 bca kemarin</span></span>
+          <span className="font-normal text-zinc-500">— contoh: <span className="text-zinc-400">beli kopi 25rb</span>, <span className="text-zinc-400">listrik 100k, makan 250k, bensin 28k</span>, <span className="text-zinc-400">bayar server 39 usd</span></span>
         </div>
         <div className="flex gap-2">
           <textarea ref={kotak} value={teks} rows={1} placeholder="Ketik di sini, Enter untuk mencatat. Beberapa baris sekaligus juga bisa."
@@ -164,6 +172,10 @@ export function PanelKas() {
                 <span className="text-zinc-500">· {h.judul}</span>
                 <span className="text-zinc-500">· {tanggalPendek(h.tanggal)}</span>
                 {h.akun && <span className="text-zinc-500">· dari {h.akun}</span>}
+                {h.mataUang && !h.kursTakAda && (
+                  <span className="text-sky-300/80">· {labelAsing(h)} × {rupiahKas(h.kurs || 0)}{kurs.perkiraan ? ' (kurs perkiraan)' : ''}</span>
+                )}
+                {h.kursTakAda && <span className="text-amber-300/90">· kurs {h.mataUang} belum ada — angkanya belum diubah ke rupiah</span>}
                 {h.tebakanRibu && <span className="text-amber-300/90">· angkanya dibaca ribuan — tulis “rb” atau “000” kalau maksudnya lain</span>}
               </div>
             ))}
@@ -282,6 +294,11 @@ export function PanelKas() {
                       <Td className="text-zinc-200">
                         {b.judul}
                         {b.akun && <span className="ml-1.5 text-[11px] text-zinc-600">{b.akun}</span>}
+                        {b.mataUang && b.jumlahAsli != null && (
+                          <span className="ml-1.5 text-[11px] text-sky-300/70">
+                            {Number.isInteger(b.jumlahAsli) ? b.jumlahAsli.toLocaleString('id-ID') : b.jumlahAsli} {b.mataUang}
+                          </span>
+                        )}
                         {b.dicatat === 'telegram' && <span className="ml-1.5 text-[10.5px] text-sky-300/80">via Telegram</span>}
                       </Td>
                       <Td className="text-zinc-400">{b.kategori}</Td>

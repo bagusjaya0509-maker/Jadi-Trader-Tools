@@ -36,7 +36,18 @@ export interface HasilUrai {
   tebakanRibu?: boolean;
   /** Potongan kalimat yang melahirkan baris ini — untuk melacak salah baca. */
   sumber: string;
+  /** Kode mata uang aslinya kalau bukan rupiah, mis. "USD". */
+  mataUang?: string;
+  /** Nominal dalam mata uang aslinya, sebelum dikonversi. */
+  jumlahAsli?: number;
+  /** Rupiah per 1 satuan mata uang asli yang dipakai saat mengonversi. */
+  kurs?: number;
+  /** Mata uang asing terbaca tapi kursnya tidak ada — `jumlah` BELUM dikonversi. */
+  kursTakAda?: boolean;
 }
+
+/** Kurs: rupiah per 1 satuan, mis. { USD: 17628.62 }. */
+export type PetaKurs = Record<string, number>;
 
 export const KATEGORI_KELUAR = [
   'Makan & Minum', 'Transportasi', 'Belanja', 'Tagihan', 'Rumah', 'Kesehatan',
@@ -111,6 +122,66 @@ const KERJA_KELUAR = ['beli', 'membeli', 'bayar', 'byr', 'membayar', 'belanja', 
 const BENDA_KELUAR = ['kopi', 'bensin', 'parkir', 'tol', 'listrik', 'pulsa', 'kuota', 'tagihan', 'cicilan', 'angsuran', 'kos', 'kontrakan',
   'obat', 'dokter', 'spp', 'tiket', 'hotel', 'baju', 'sepatu', 'iuran', 'pajak', 'ongkir', 'sl', 'stop loss'];
 
+/* ── MATA UANG ──────────────────────────────────────────────────────────
+   Diminta pemilik 9 Sep 2026: "400 dollar" harus terbaca dan dikonversi ke
+   rupiah. Yang dikenali kode ISO-nya plus sebutan sehari-hari dalam bahasa
+   Indonesia — orang menulis "400 dollar" atau "rm 50", bukan "USD 400.00".
+
+   KURSNYA DATANG DARI LUAR, tidak pernah ditanam di sini. Berkas ini
+   dipakai peramban dan server; kalau ia memegang angka kursnya sendiri,
+   dua tempat itu bisa memakai kurs berbeda untuk pesan yang sama. Pemanggil
+   yang menyediakan lewat argumen `kurs`. Tanpa kurs, mata uangnya tetap
+   dikenali dan ditandai `kursTakAda` — jumlahnya TIDAK dikarang. */
+const SIMBOL: Record<string, string> = { '$': 'USD', '€': 'EUR', '£': 'GBP', '¥': 'JPY', '₩': 'KRW', '₹': 'INR', '฿': 'THB', '₫': 'VND' };
+
+const MATA_UANG: Array<[string, string[]]> = [
+  ['IDR', ['rp', 'idr', 'rupiah', 'perak']],
+  ['USD', ['usd', 'dollar', 'dolar', 'us$', 'usd$', 'dolar as', 'dollar as', 'dolar amerika']],
+  ['SGD', ['sgd', 's$', 'dolar singapura', 'dollar singapura']],
+  ['MYR', ['myr', 'rm', 'ringgit']],
+  ['EUR', ['eur', 'euro']],
+  ['GBP', ['gbp', 'pound', 'poundsterling', 'pound sterling']],
+  ['JPY', ['jpy', 'yen']],
+  ['CNY', ['cny', 'rmb', 'yuan', 'renminbi']],
+  ['AUD', ['aud', 'a$', 'dolar australia', 'dollar australia']],
+  ['KRW', ['krw', 'won']],
+  ['THB', ['thb', 'baht']],
+  ['SAR', ['sar', 'riyal', 'real saudi']],
+  ['AED', ['aed', 'dirham']],
+  ['INR', ['inr', 'rupee']],
+  ['HKD', ['hkd', 'dolar hongkong', 'dolar hong kong']],
+  ['PHP', ['php', 'peso']],
+  ['VND', ['vnd', 'dong']],
+  ['TRY', ['try', 'lira']],
+  ['CHF', ['chf', 'franc']],
+  ['CAD', ['cad', 'dolar kanada', 'dollar kanada']],
+  ['NZD', ['nzd']], ['TWD', ['twd']], ['BND', ['bnd']], ['PKR', ['pkr']], ['BDT', ['bdt']],
+  ['EGP', ['egp']], ['QAR', ['qar']], ['KWD', ['kwd', 'dinar']], ['ZAR', ['zar', 'rand']],
+  ['RUB', ['rub', 'rubel']], ['BRL', ['brl']],
+];
+
+/* Semua sebutan mata uang, untuk dibuang dari keterangan. */
+const KATA_UANG = new Set(MATA_UANG.flatMap(([, a]) => a).flatMap((a) => a.split(' ')));
+
+function mataUangDekat(teks: string, mulai: number, akhir: number): string | undefined {
+  const depan = teks.slice(Math.max(0, mulai - 16), mulai);
+  const belakang = teks.slice(akhir, akhir + 18);
+  const simD = depan.match(/([$€£¥₩₹฿₫])\s*$/);
+  if (simD) return SIMBOL[simD[1]];
+  const simB = belakang.match(/^\s*([$€£¥₩₹฿₫])/);
+  if (simB) return SIMBOL[simB[1]];
+  for (const [kode, alias] of MATA_UANG) {
+    for (const a of alias) {
+      const e = a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      /* Sesudah angka lebih diutamakan karena itu urutan bahasa Indonesia
+         ("400 dollar"); sebelum angka untuk gaya "USD 400" dan "$400". */
+      if (new RegExp('^\\s*' + e + '(?=$|[^a-z0-9])', 'i').test(belakang)) return kode;
+      if (new RegExp('(^|[^a-z0-9])' + e + '\\s*$', 'i').test(depan)) return kode;
+    }
+  }
+  return undefined;
+}
+
 const AKUN: Array<[string, string[]]> = [
   ['Bank', ['bca', 'bni', 'bri', 'mandiri', 'btn', 'cimb', 'permata', 'danamon', 'jago', 'jenius', 'seabank', 'blu', 'neo', 'bank',
     'rekening', 'rek', 'atm', 'debit', 'kartu kredit', 'cc', 'qris bank']],
@@ -173,8 +244,10 @@ function pilihJumlah(daftar: Angka[]): { angka: Angka; tebakanRibu: boolean } | 
   if (bersatuan.length) return { angka: bersatuan[bersatuan.length - 1], tebakanRibu: false };
   const besar = daftar.filter((a) => a.nilai >= 1000);
   if (besar.length) return { angka: besar[besar.length - 1], tebakanRibu: false };
-  const polos = daftar[daftar.length - 1];
-  return { angka: { ...polos, nilai: polos.nilai * 1000 }, tebakanRibu: true };
+  /* Nilainya TIDAK dikalikan seribu di sini. Tebakan itu hanya berlaku untuk
+     rupiah; "400 dollar" berarti empat ratus dolar, bukan empat ratus ribu.
+     Yang tahu ada mata uang asing atau tidak adalah pemanggilnya. */
+  return { angka: daftar[daftar.length - 1], tebakanRibu: true };
 }
 
 /* ── Tanggal ───────────────────────────────────────────────────────────── */
@@ -249,7 +322,7 @@ const KATA_BUANG = new Set([
 function judulRingkas(sebelum: string, sesudah: string): string {
   const ambil = (teks: string, dariBelakang: boolean) => {
     const kata = teks.replace(/[^\p{L}\p{N}&/'-]+/gu, ' ').split(/\s+/).filter(Boolean)
-      .filter((k) => !KATA_BUANG.has(k.toLowerCase()));
+      .filter((k) => !KATA_BUANG.has(k.toLowerCase()) && !KATA_UANG.has(k.toLowerCase()));
     if (!kata.length) return '';
     const potong = dariBelakang ? kata.slice(-3) : kata.slice(0, 3);
     return potong.join(' ').slice(0, 40).trim();
@@ -297,12 +370,29 @@ function pecahSegmen(teks: string): string[] {
    TIDAK ikut jatuh ke pesan penuh — kalau ikut, "cat rumah 28k" di dalam
    pesan yang memuat kata "makan" akan tercatat sebagai Makan & Minum,
    persis salah baca yang dilaporkan. */
-function uraiSatu(segmen: string, tanggal: string, penuh: string): HasilUrai | null {
+function uraiSatu(segmen: string, tanggal: string, penuh: string, kurs?: PetaKurs): HasilUrai | null {
   const angka = bacaAngka(segmen);
   const pilihan = pilihJumlah(angka);
   if (!pilihan || pilihan.angka.nilai <= 0) return null;
-  const { angka: jumlah, tebakanRibu } = pilihan;
-  if (jumlah.nilai > 1e11) return null;   /* >100 miliar: pasti salah ketik nol */
+  const { angka: jumlah } = pilihan;
+
+  /* ── Mata uang ─────────────────────────────────────────────────────────
+     Kalau ada mata uang asing yang jelas disebut, tebakan "angka kecil
+     berarti ribuan" tidak berlaku lagi: yang menandai besaran adalah mata
+     uangnya, bukan kebiasaan menulis rupiah. */
+  const uang = mataUangDekat(segmen, jumlah.mulai, jumlah.akhir);
+  const asing = !!uang && uang !== 'IDR';
+  const tebakanRibu = pilihan.tebakanRibu && !asing;
+
+  let nilai = tebakanRibu ? jumlah.nilai * 1000 : jumlah.nilai;
+  let jumlahAsli: number | undefined, kursDipakai: number | undefined, kursTakAda = false;
+  if (asing) {
+    const k = kurs && kurs[uang!];
+    jumlahAsli = nilai;
+    if (k && k > 0) { kursDipakai = k; nilai = Math.round(nilai * k); }
+    else kursTakAda = true;   /* jumlahnya dibiarkan apa adanya, bukan dikarang */
+  }
+  if (nilai > 1e11) return null;   /* >100 miliar: pasti salah ketik nol */
 
   const t = segmen.toLowerCase(), tp = penuh.toLowerCase();
   const arah = (teks: string) => ({
@@ -332,15 +422,21 @@ function uraiSatu(segmen: string, tanggal: string, penuh: string): HasilUrai | n
   }
   const judul = judulRingkas(sebelum, sesudah) || kategori;
 
-  const yakin: HasilUrai['yakin'] = tebakanRibu ? 'rendah' : (jenisYakin && kategoriTebak) ? 'tinggi' : 'sedang';
-  const hasil: HasilUrai = { jumlah: jumlah.nilai, jenis, kategori, judul, tanggal, yakin, sumber: segmen.slice(0, 200) };
+  const yakin: HasilUrai['yakin'] = (tebakanRibu || kursTakAda) ? 'rendah' : (jenisYakin && kategoriTebak) ? 'tinggi' : 'sedang';
+  const hasil: HasilUrai = { jumlah: nilai, jenis, kategori, judul, tanggal, yakin, sumber: segmen.slice(0, 200) };
   if (akun) hasil.akun = akun;
   if (tebakanRibu) hasil.tebakanRibu = true;
+  if (asing) {
+    hasil.mataUang = uang;
+    hasil.jumlahAsli = jumlahAsli;
+    if (kursDipakai) hasil.kurs = kursDipakai;
+    if (kursTakAda) hasil.kursTakAda = true;
+  }
   return hasil;
 }
 
 /** Urai satu pesan jadi SEMUA catatan yang ada di dalamnya (bisa lebih dari satu). */
-export function uraiSemua(teks: string, hariIni: Date = new Date()): HasilUrai[] {
+export function uraiSemua(teks: string, hariIni: Date = new Date(), kurs?: PetaKurs): HasilUrai[] {
   const asli = String(teks || '').replace(/\s+/g, ' ').trim();
   if (!asli) return [];
   /* Tanggal dibaca sekali untuk seluruh pesan: "kemarin beli A 10rb, B 20rb"
@@ -352,26 +448,47 @@ export function uraiSemua(teks: string, hariIni: Date = new Date()): HasilUrai[]
   const segmen = bacaAngka(sisa).length > 1 ? pecahSegmen(sisa) : [sisa];
   const hasil: HasilUrai[] = [];
   for (const sg of segmen) {
-    const h = uraiSatu(sg, tanggal, sisa);
+    const h = uraiSatu(sg, tanggal, sisa, kurs);
     if (h) hasil.push(h);
   }
   return hasil;
 }
 
 /** Urai satu baris, ambil catatan pertamanya saja. Null kalau tidak ada angka. */
-export function uraiKas(teks: string, hariIni: Date = new Date()): HasilUrai | null {
-  return uraiSemua(teks, hariIni)[0] || null;
+export function uraiKas(teks: string, hariIni: Date = new Date(), kurs?: PetaKurs): HasilUrai | null {
+  return uraiSemua(teks, hariIni, kurs)[0] || null;
 }
 
 /** Urai tempelan banyak baris. Baris tanpa angka dilewati dan dilaporkan. */
-export function uraiBanyak(teks: string, hariIni: Date = new Date()): { hasil: HasilUrai[]; gagal: string[] } {
+export function uraiBanyak(teks: string, hariIni: Date = new Date(), kurs?: PetaKurs): { hasil: HasilUrai[]; gagal: string[] } {
   const hasil: HasilUrai[] = [], gagal: string[] = [];
   for (const baris of String(teks || '').split(/\r?\n/)) {
     const b = baris.trim(); if (!b) continue;
-    const h = uraiSemua(b, hariIni);
+    const h = uraiSemua(b, hariIni, kurs);
     if (h.length) hasil.push(...h); else gagal.push(b);
   }
   return { hasil, gagal };
+}
+
+/* ── KURS CADANGAN ──────────────────────────────────────────────────────
+   Dipakai HANYA kalau kurs hidup tidak bisa diambil. Angkanya diambil dari
+   open.er-api.com 9 Sep 2026, dan ia akan menua — karena itu pemakainya
+   wajib menandai hasilnya sebagai perkiraan, bukan menyamakannya dengan
+   kurs hari ini. Lebih baik angka yang meleset beberapa persen dengan
+   keterangan jujur daripada catatan yang gagal tersimpan sama sekali. */
+export const KURS_CADANGAN: PetaKurs = {
+  USD: 17628.62, SGD: 13936.71, MYR: 4340.81, EUR: 20491.74, GBP: 23872.39, JPY: 114.61,
+  CNY: 2620.09, AUD: 12724.38, KRW: 13.15, THB: 535.82, SAR: 4700.96, AED: 4800.17,
+  INR: 185.87, HKD: 2248.18, PHP: 281.86, VND: 0.68, TRY: 363.71, CHF: 21774.21,
+  CAD: 12788.58, NZD: 10321.17, TWD: 559.62, BND: 13936.44, PKR: 63.52, BDT: 143.49,
+  EGP: 345.51, QAR: 4843.03, KWD: 57130.41, ZAR: 1101.78, RUB: 203.99, BRL: 3455.18,
+};
+
+/** "400 USD" — nominal asli, untuk ditampilkan di sebelah hasil konversinya. */
+export function labelAsing(h: HasilUrai): string {
+  if (!h.mataUang || h.jumlahAsli == null) return '';
+  const n = h.jumlahAsli;
+  return (Number.isInteger(n) ? n.toLocaleString('id-ID') : String(n)) + ' ' + h.mataUang;
 }
 
 export function rupiahKas(n: number): string {

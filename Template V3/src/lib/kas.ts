@@ -26,7 +26,8 @@ import { bacaKoneksi, PROXY_BAWAAN } from '@/lib/koneksi';
 import type { JenisKas } from '@/lib/urai-kas';
 
 export type { JenisKas };
-export { KATEGORI_KELUAR, KATEGORI_MASUK, uraiKas, uraiBanyak, rupiahKas } from '@/lib/urai-kas';
+export { KATEGORI_KELUAR, KATEGORI_MASUK, uraiKas, uraiBanyak, rupiahKas, labelAsing, KURS_CADANGAN } from '@/lib/urai-kas';
+export type { PetaKurs, HasilUrai } from '@/lib/urai-kas';
 
 export type Dicatat = 'manual' | 'otomatis' | 'telegram' | 'agen';
 
@@ -43,6 +44,13 @@ export interface BarisKas {
   akun?: string;
   /** Ketikan aslinya, kalau lahir dari pengurai — supaya salah baca bisa dilacak. */
   teks?: string;
+  /* ── Jejak konversi mata uang ────────────────────────────────────────
+     Disimpan supaya angka rupiahnya bisa dipertanggungjawabkan setahun
+     lagi. Tanpa kurs yang dipakai, "Rp7.051.448" hanyalah angka yang tidak
+     bisa diperiksa ulang — kurs hari ini bukan kurs waktu itu. */
+  mataUang?: string;
+  jumlahAsli?: number;
+  kurs?: number;
 }
 
 export const BATAS_BARIS = 1000;
@@ -74,6 +82,9 @@ function bersihkan(b: Partial<BarisKas>): BarisKas {
   /* `undefined` ditolak Firestore — field opsional hanya ikut kalau berisi. */
   if (b.akun) baris.akun = String(b.akun).slice(0, 40);
   if (b.teks) baris.teks = String(b.teks).slice(0, 200);
+  if (b.mataUang) baris.mataUang = String(b.mataUang).slice(0, 8);
+  if (Number.isFinite(Number(b.jumlahAsli))) baris.jumlahAsli = Number(b.jumlahAsli);
+  if (Number.isFinite(Number(b.kurs))) baris.kurs = Number(b.kurs);
   return baris;
 }
 
@@ -106,6 +117,9 @@ export function useKas(): HasilKas {
           jumlah: Number(b.jumlah) || 0, kategori: namaKategori(String(b.kategori || 'Lainnya')),
           judul: String(b.judul || ''), dicatat: (b.dicatat as Dicatat) || 'agen',
           ...(b.akun ? { akun: String(b.akun) } : {}), ...(b.teks ? { teks: String(b.teks) } : {}),
+          ...(b.mataUang ? { mataUang: String(b.mataUang) } : {}),
+          ...(Number.isFinite(Number(b.jumlahAsli)) ? { jumlahAsli: Number(b.jumlahAsli) } : {}),
+          ...(Number.isFinite(Number(b.kurs)) ? { kurs: Number(b.kurs) } : {}),
         })));
         setMemuat(false); setGalat(null);
       },
