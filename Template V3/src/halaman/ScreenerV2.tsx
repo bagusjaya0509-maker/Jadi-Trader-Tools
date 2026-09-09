@@ -472,8 +472,13 @@ const CSS_TANPA_CANGKANG = `
     color: var(--muted) !important;
     padding: 0 24px 0 10px !important;
   }
+  /* --panel-3 TIDAK ADA di dalam iframe (terukur: untai kosong), dan
+     var() yang tak terdefinisi membuat deklarasinya batal -- latarnya
+     hilang sama sekali begitu kursor lewat. --v2-panel-3 ada di kedua
+     tema; fallback-nya tetap dipasang supaya sorotan paling buruk cuma
+     "tidak berubah", bukan "jadi bening". */
   .ema-screener .es-priority-controls select:hover {
-    background-color: var(--panel-3) !important;
+    background-color: var(--v2-panel-3, var(--panel-2)) !important;
     color: var(--text) !important;
   }
 
