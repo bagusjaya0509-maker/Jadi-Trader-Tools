@@ -294,6 +294,11 @@ const CSS_TANPA_CANGKANG = `
     --bg-2: #ffffff !important;
     --panel: #f4f4f5 !important;
     --panel-2: #e4e4e7 !important;
+    /* Chip filter (jtfFilter di berkas V2) memakai warna PADAT sendiri karena
+       --panel-2 gelapnya tembus; ini padanan terangnya. */
+    --jtf-chip: #e4e4e7 !important;
+    --jtf-chip-sorot: #d4d4d8 !important;
+    --jtf-pop: #ffffff !important;
     --border: #d4d4d8 !important;
     --text: #09090b !important;
     --muted: #48484f !important;

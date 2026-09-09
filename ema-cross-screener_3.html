@@ -980,6 +980,10 @@
 
      Select aslinya tidak dihapus: ia disembunyikan (.jtf-diambil) dan
      tetap jadi sumber kebenaran. Chip cuma menulis ke sana. */
+  /* Warna chip PADAT, bukan var(--panel-2): di dalam aplikasi V3 variabel itu
+     ditimpa jadi rgba(24,24,27,.6) yang tembus, dan pemilik memintanya
+     dipadatkan. Nilai terangnya ditimpa dari blok tema terang V3. */
+  :root{ --jtf-chip:#27272a; --jtf-chip-sorot:#3f3f46; --jtf-pop:#18181b; }
   .jtf{ display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
   .jtf-diambil{ display:none !important; }
 
@@ -987,16 +991,19 @@
   .jtf-seg{
     display:inline-flex; align-items:center; gap:5px;
     height:26px; padding:0 7px;
-    background: var(--panel-2); color: var(--muted);
+    background: var(--jtf-chip); color: var(--muted);
     border:0; border-radius:0; font:inherit; font-size:12px; cursor:default;
     white-space:nowrap;
   }
+  /* Nilai yang belum dipilih (Zona Pantau: jenis sinyal) — terlihat seperti
+     kolom kosong yang menunggu, bukan seperti nilai. */
+  .jtf-seg-kosong{ color: var(--dim); font-style:italic; }
   .jtf-seg svg{ width:13px; height:13px; flex:0 0 auto; }
   .jtf-seg-awal{ border-radius:5px 0 0 5px; color: var(--text); font-weight:600; }
   .jtf-seg-akhir{ border-radius:0 5px 5px 0; }
   .jtf-seg-op{ color: var(--dim); }
   button.jtf-seg{ cursor:pointer; transition: background-color .12s, color .12s; }
-  button.jtf-seg:hover{ background: var(--v2-panel-3, var(--panel-2)); color: var(--text); }
+  button.jtf-seg:hover{ background: var(--jtf-chip-sorot); color: var(--text); }
   .jtf-hapus{ padding:0 6px; }
   .jtf-hapus svg{ width:11px; height:11px; }
 
@@ -1008,14 +1015,14 @@
     transition: background-color .12s, color .12s, border-color .12s;
   }
   .jtf-tambah svg{ width:13px; height:13px; }
-  .jtf-tambah:hover, .jtf-reset:hover{ background: var(--panel-2); color: var(--text); }
+  .jtf-tambah:hover, .jtf-reset:hover{ background: var(--jtf-chip); color: var(--text); }
   .jtf-reset{ border-color: var(--border); }
 
   /* Popover dipasang di <body> dengan posisi fixed: kalau menempel di dalam
      baris, section yang bisa dilipat bisa memotongnya. */
   .jtf-pop{
     position:fixed; z-index:10050; width:224px;
-    background: var(--panel); color: var(--text);
+    background: var(--jtf-pop); color: var(--text);
     border:1px solid var(--border); border-radius:8px;
     box-shadow: 0 12px 32px rgba(0,0,0,.35);
     overflow:hidden; font-size:12.5px;
@@ -1034,7 +1041,7 @@
     color: var(--text); font:inherit; font-size:12.5px; text-align:left; cursor:pointer;
   }
   .jtf-item svg{ width:13px; height:13px; color: var(--muted); flex:0 0 auto; }
-  .jtf-item:hover, .jtf-item.jtf-sorot{ background: var(--panel-2); }
+  .jtf-item:hover, .jtf-item.jtf-sorot{ background: var(--jtf-chip); }
   .jtf-item .jtf-cek{ margin-left:auto; color: var(--gold); opacity:0; }
   .jtf-item.jtf-aktif .jtf-cek{ opacity:1; }
   .jtf-kosong{ padding:14px 8px; text-align:center; color: var(--dim); }
@@ -10671,28 +10678,48 @@
      disembunyikan, dan chip menulis ke .value-nya lalu memicu "change".
      Seluruh JS pemindaian membaca select saat tombol ditekan, jadi tidak
      ada satu baris pun logika pindai yang perlu tahu komponen ini ada.
-     Kalau komponen ini gagal dibangun, select-nya tetap terlihat dan
-     screener berjalan persis seperti sebelumnya.
+     Kalau komponen ini gagal dibangun, select dan tombolnya tetap terlihat
+     dan screener berjalan persis seperti sebelumnya.
+
+     ── PINDAI OTOMATIS (pemilik, 9 Sep 2026) ──────────────────────────────
+     Tombol "Cari Sinyal …" disembunyikan, BUKAN dihapus. Setiap filter
+     berubah, komponen ini mengklik tombol tersembunyi itu — jadi seluruh
+     penjaganya (izin, section terlipat, `disabled` selama memindai) tetap
+     berlaku tanpa ditulis ulang. Kalau tombolnya sedang `disabled` karena
+     pindaian sebelumnya masih jalan, kliknya diulang sampai bebas, supaya
+     filter yang diubah di tengah pindaian tidak hilang begitu saja.
+
+     Zona Pantau lain ceritanya: pindaiannya berat (100 koin, SMI 4 jam +
+     sentuhan M5), jadi jenis sinyalnya sengaja MULAI KOSONG. Pindaian
+     pertama baru jalan saat orang memilihnya — pilihan sadar, bukan
+     halaman yang memindai sendiri saat dibuka.
 
      ── MENAMBAH JENIS FILTER BARU ─────────────────────────────────────────
      Tambahkan satu <select> di baris kontrol section-nya, lalu satu baris
-     di BAGIAN di bawah: { id, label, ikon, select, wajib | netral }.
-       · wajib  : dimensi yang harus selalu terisi (timeframe). Chip-nya
-                  tidak punya tombol ×.
-       · netral : nilai yang berarti "tanpa saringan" (mis. "all"). Chip
-                  hilang saat nilainya netral, dan × mengembalikannya ke situ.
-     Tidak ada yang lain yang perlu diubah. -->
+     di BAGIAN di bawah: { id, label, ikon, select, wajib | netral, mulaiKosong? }.
+       · wajib       : harus selalu terisi (timeframe). Chip tanpa tombol ×.
+       · netral      : nilai "tanpa saringan" (mis. "all"). Chip hilang saat
+                       netral, dan × mengembalikannya ke situ.
+       · mulaiKosong : chip tampil "Pilih…" sampai orang memilih; pemilihan
+                       pertama itulah yang memicu pindaian section-nya.
+     Select yang sedang `disabled` (mis. TF saat mode SNR H4) chip-nya
+     otomatis disembunyikan. Tidak ada yang lain yang perlu diubah. -->
 <script id="jtfFilter">
 (function(){
   'use strict';
   var BAGIAN = [
-    { filter: [
+    { tombol:'esPantauBtn', status:'esPantauStatus',
+      statusAwal:'Pemindaian berjalan otomatis setiap filter berubah.',
+      filter: [
         { id:'tf',   label:'Timeframe', ikon:'jam',    select:'esPantauTf',    wajib:true,  potong:/^TF\s+/i },
         { id:'arah', label:'Arah',      ikon:'sinyal', select:'esPantauRezim', netral:'all' }
     ]},
-    { filter: [
+    { tombol:'esChBtn', status:'esChStatus',
+      statusAwal:'Pilih jenis sinyal untuk mulai memindai.',
+      filter: [
         { id:'tf',     label:'Timeframe', ikon:'jam',    select:'esChTf',        wajib:true, potong:/^TF\s+/i },
-        { id:'sinyal', label:'Sinyal',    ikon:'target', select:'esChSnrFilter', wajib:true, potong:/^Sinyal\s+/i }
+        { id:'sinyal', label:'Sinyal',    ikon:'target', select:'esChSnrFilter', wajib:true, potong:/^Sinyal\s+/i,
+          mulaiKosong:true, teksKosong:'Pilih jenis sinyal' }
     ]}
   ];
 
@@ -10740,18 +10767,48 @@
     var sel = byId(f.select), o = opsi(sel).filter(function(x){ return x.nilai === nilai; })[0];
     return o ? o.teks : nilai;
   }
+  function belumDipilih(f){ return !!f.mulaiKosong && !f.dipilih; }
   function aktif(f){ var sel = byId(f.select); return !!f.wajib || sel.value !== f.netral; }
   function menyimpang(f){
     var sel = byId(f.select);
+    if (f.mulaiKosong) return false;          /* memilih bukan penyimpangan */
     return f.wajib ? sel.value !== bawaan(sel) : sel.value !== f.netral;
   }
-  function terapkan(bagian, f, nilai){
-    var sel = byId(f.select);
-    if (sel.value !== nilai){
+  /* Section boleh dipindai otomatis kalau tidak ada dimensi yang masih kosong. */
+  function siapPindai(bagian){ return !bagian.filter.some(belumDipilih); }
+
+  /* ── Pindai otomatis lewat tombol tersembunyi ──────────────────────── */
+  function jadwalkanPindai(bagian){
+    if (!bagian.tombol || !siapPindai(bagian)) return;
+    clearTimeout(bagian._jam);
+    /* Debounce: Reset menulis dua select berturut-turut, dan itu harus jadi
+       SATU pindaian, bukan dua. */
+    bagian._jam = setTimeout(function(){
+      var ulang = 0;
+      (function coba(){
+        var btn = byId(bagian.tombol); if (!btn) return;
+        /* Klik pada tombol `disabled` tidak menghasilkan apa-apa — dan
+           tombol itu `disabled` sepanjang pindaian. Tunggu sampai bebas. */
+        if (btn.disabled){ if (ulang++ < 150) setTimeout(coba, 400); return; }
+        btn.click();
+      })();
+    }, 250);
+  }
+  function terapkan(bagian, f, nilai, opsiTerapkan){
+    var sel = byId(f.select), berubah = sel.value !== nilai;
+    if (berubah){
       sel.value = nilai;
       sel.dispatchEvent(new Event('change', { bubbles:true }));
     }
+    var pertama = belumDipilih(f);
+    if (f.mulaiKosong) f.dipilih = true;
     render(bagian);
+    /* Pindai kalau nilainya berubah — atau kalau ini pemilihan PERTAMA pada
+       dimensi yang mulai kosong (nilainya bisa sama dengan bawaan select,
+       jadi "berubah" saja tidak cukup). Reset tidak memindai kalau ia
+       mengosongkan lagi dimensi yang wajib dipilih. */
+    if (opsiTerapkan && opsiTerapkan.tanpaPindai) return;
+    if (berubah || pertama) jadwalkanPindai(bagian);
   }
 
   /* ── Popover ───────────────────────────────────────────────────────── */
@@ -10820,14 +10877,16 @@
   }
 
   function daftarNilai(f){
-    var sel = byId(f.select);
-    return opsi(sel).map(function(o){ return { teks:o.teks, nilai:o.nilai, aktif: o.nilai === sel.value }; });
+    var sel = byId(f.select), kosong = belumDipilih(f);
+    return opsi(sel).map(function(o){ return { teks:o.teks, nilai:o.nilai, aktif: !kosong && o.nilai === sel.value }; });
   }
   function bukaNilai(bagian, f, pemicu){
     bukaPop(pemicu, f.label, daftarNilai(f), function(d){ tutupPop(); terapkan(bagian, f, d.nilai); });
   }
   function bukaJenis(bagian, pemicu){
-    var jenis = bagian.filter.map(function(f){ return { teks:f.label, ikon:f.ikon, f:f }; });
+    var jenis = bagian.filter
+      .filter(function(f){ return !byId(f.select).disabled; })
+      .map(function(f){ return { teks:f.label, ikon:f.ikon, f:f }; });
     bukaPop(pemicu, 'Filter…', jenis, function(d){
       /* Jenis dipilih → popover yang sama berganti isi jadi nilai-nilainya,
          persis alur komponen aslinya (satu popover, dua langkah). */
@@ -10839,14 +10898,19 @@
   function render(bagian){
     var w = bagian.wadah; w.innerHTML = '';
     bagian.filter.forEach(function(f){
-      if (!aktif(f)) return;
       var sel = byId(f.select);
+      /* Select yang dimatikan skrip lain (TF saat mode SNR H4) tidak
+         dipakai pemindaian — chip-nya ikut disembunyikan supaya tidak
+         terlihat seperti bisa disetel. */
+      if (sel.disabled || !aktif(f)) return;
+      var kosong = belumDipilih(f);
       var chip = el('div','jtf-chip');
       var awal = el('span','jtf-seg jtf-seg-awal'); awal.appendChild(svg(f.ikon)); awal.appendChild(el('span',null,f.label));
       chip.appendChild(awal);
-      chip.appendChild(el('span','jtf-seg jtf-seg-op','is'));
-      var nilai = el('button','jtf-seg jtf-seg-nilai' + (f.wajib ? ' jtf-seg-akhir' : ''), ringkas(f, nilaiTeks(f, sel.value)));
-      nilai.type = 'button'; nilai.title = 'Ganti ' + f.label.toLowerCase();
+      chip.appendChild(el('span','jtf-seg jtf-seg-op','='));
+      var nilai = el('button','jtf-seg jtf-seg-nilai' + (f.wajib ? ' jtf-seg-akhir' : '') + (kosong ? ' jtf-seg-kosong' : ''),
+        kosong ? (f.teksKosong || 'Pilih…') : ringkas(f, nilaiTeks(f, sel.value)));
+      nilai.type = 'button'; nilai.title = (kosong ? 'Pilih ' : 'Ganti ') + f.label.toLowerCase();
       nilai.addEventListener('click', function(){ bukaNilai(bagian, f, nilai); });
       chip.appendChild(nilai);
       if (!f.wajib){
@@ -10861,7 +10925,10 @@
     if (bagian.filter.some(menyimpang)){
       var reset = el('button','jtf-reset','Reset'); reset.type = 'button'; reset.title = 'Kembalikan semua filter';
       reset.addEventListener('click', function(){
-        bagian.filter.forEach(function(f){ var sel = byId(f.select); terapkan(bagian, f, f.wajib ? bawaan(sel) : f.netral); });
+        bagian.filter.forEach(function(f){
+          if (f.mulaiKosong) return;
+          var sel = byId(f.select); terapkan(bagian, f, f.wajib ? bawaan(sel) : f.netral);
+        });
       });
       w.appendChild(reset);
     }
@@ -10884,12 +10951,20 @@
         bagian.wadah = el('div','jtf');
         baris.insertBefore(bagian.wadah, baris.firstChild);
         render(bagian);
-        /* Baru SESUDAH chip-nya jadi, select-nya disembunyikan. Kalau ada
-           yang gagal di atas, select tetap terlihat dan semuanya berjalan
-           seperti sebelum komponen ini ada. */
+        /* Baru SESUDAH chip-nya jadi, select dan tombolnya disembunyikan.
+           Kalau ada yang gagal di atas, keduanya tetap terlihat dan semuanya
+           berjalan seperti sebelum komponen ini ada. */
         bagian.filter.forEach(function(f){ byId(f.select).classList.add('jtf-diambil'); });
+        var btn = bagian.tombol && byId(bagian.tombol);
+        if (btn) btn.classList.add('jtf-diambil');
+        /* Teks status awal masih menyuruh "Klik tombol" yang kini tak ada.
+           Diganti hanya kalau memang masih teks awal itu — kalau pindaian
+           sudah jalan (auto-scan saat dibuka), statusnya biarkan. */
+        var st = bagian.status && byId(bagian.status);
+        if (st && bagian.statusAwal && /^Klik /.test(st.textContent)) st.textContent = bagian.statusAwal;
         /* Perubahan dari luar (skrip lain menulis select lalu memicu change)
-           ikut tergambar. */
+           ikut tergambar. Tidak memicu pindai: yang memicu hanya `terapkan`,
+           supaya perubahan programatik tidak jadi pindaian tak diminta. */
         bagian.filter.forEach(function(f){ byId(f.select).addEventListener('change', function(){ render(bagian); }); });
       }catch(e){ console.warn('[jtfFilter] gagal dipasang:', e); }
     });
