@@ -921,7 +921,21 @@ export default function Jurnal() {
           jadi dua kali saldo awal — dan angka Dashboard tidak akan pernah
           cocok dengan penjumlahan kedua jurnal ini. */}
       <BlokJurnal
-        judul="Jurnal Trade-Fi" ket="Forex & XAU lewat MetaTrader 5"
+        /* Tanda hubungnya U+2011 (non-breaking hyphen), BUKAN "-" biasa.
+           Di ponsel kolom judulnya sempit dan peramban memilih tanda
+           hubung sebagai titik patah, jadi judulnya terbaca
+           "Jurnal Trade-" / "Fi" — satu kata dibelah dua. Dilaporkan
+           pemilik 9 Sep 2026.
+
+           U+2011 menutup titik patah itu, jadi satu-satunya tempat yang
+           tersisa adalah spasi sesudah "Jurnal": persis yang diminta,
+           "Jurnal" di atas dan "Trade‑Fi" utuh di bawah.
+
+           Tetap string, bukan JSX: `judul` juga dipakai apa adanya di
+           kalimat kosong ("Belum ada transaksi jurnal trade‑fi"), dan
+           mengubahnya jadi ReactNode mematikan .toLowerCase() di sana.
+           Satu karakter menyelesaikan keduanya. */
+        judul={'Jurnal Trade‑Fi'} ket="Forex & XAU lewat MetaTrader 5"
         Ikon={CandlestickChart} trade={forex} saldoAwal={saldoAwal}
         warna="text-amber-400" idGradien="gEqForex"
         akun={mt5} labelSaldo="Saldo MetaTrader 5" keIntegrasi="/integrations"

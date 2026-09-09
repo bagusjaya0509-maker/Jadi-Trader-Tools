@@ -246,9 +246,13 @@ export default function HeroSection() {
           from { opacity: 0; transform: translateY(20px); }
           to { opacity: 1; transform: translateY(0); }
         }
+        /* -33,3333%, BUKAN -50%. Isinya diulang TIGA kali, jadi satu
+           putaran penuh sama dengan sepertiga lebarnya. Pada -50% putaran
+           berakhir di TENGAH salinan kedua lalu melompat balik ke awal —
+           patahan yang terlihat tiap 40 detik. */
         @keyframes marquee {
           from { transform: translateX(0); }
-          to { transform: translateX(-50%); }
+          to { transform: translateX(-33.3333%); }
         }
         .animate-fade-in { animation: fadeSlideIn 0.8s ease-out forwards; opacity: 0; }
         .animate-marquee { animation: marquee 40s linear infinite; }
@@ -527,7 +531,26 @@ export default function HeroSection() {
                   WebkitMaskImage: "linear-gradient(to right, transparent, black 20%, black 80%, transparent)"
                 }}
               >
-                <div className="animate-marquee flex gap-10 whitespace-nowrap px-4">
+                {/* ── KENAPA `key` DAN GERBANG PANJANG ────────────────────
+                    Dilaporkan pemilik 9 Sep 2026: barisnya sering kosong
+                    lama sekali, lalu muncul sendiri.
+
+                    Sebabnya animasi yang mulai TERLALU DINI. Elemen ini
+                    terpasang sebelum posisi sungguhannya datang — mula-mula
+                    isinya contoh, lalu Firestore dan bursa menggantinya.
+                    Animasinya menggeser -33% dari LEBAR ELEMEN, dan lebar
+                    itu ikut berubah begitu isinya berganti; geseran yang
+                    tadinya beberapa ratus piksel tiba-tiba jadi ribuan,
+                    dan seluruh barisnya terlempar ke kiri layar. Ia baru
+                    kembali terlihat saat putaran 40 detik berikutnya
+                    dimulai — persis "lama-lama muncul juga".
+
+                    `key` yang berisi jumlah posisi memasang ulang elemennya
+                    tiap kali isinya berubah, jadi animasinya selalu mulai
+                    dari nol dengan lebar yang benar. Gerbang panjangnya
+                    mencegah kejadian yang sama saat daftarnya masih kosong. */}
+                <div key={posisi.length}
+                     className={`flex gap-10 whitespace-nowrap px-4${posisi.length ? ' animate-marquee' : ''}`}>
                   {posisi.length === 0 && (
                     <span className="px-4 text-sm text-zinc-600">Tidak ada posisi terbuka saat ini.</span>
                   )}
