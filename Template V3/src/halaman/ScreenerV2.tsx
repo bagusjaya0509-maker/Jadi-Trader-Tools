@@ -416,9 +416,12 @@ const CSS_TANPA_CANGKANG = `
   /* ══════════════════════════════════════════════════════════════════════
      BARIS FILTER SEBAGAI DERETAN CHIP
      ══════════════════════════════════════════════════════════════════════
-     Diminta pemilik 9 Sep 2026, mengikuti bentuk komponen "Filters" yang ia
-     kirim: pil-pil kecil berlatar redup yang berjejer rapat sejak layar
-     dibuka, bukan kotak besar yang berjarak lebar.
+     Diminta pemilik 9 Sep 2026, mengikuti komponen "Filters" yang ia kirim.
+     Barisnya kini dibangun komponen jtfFilter di berkas V2 (skrip di ujung
+     ema-cross-screener_3.html): tombol filter → jenis → nilai → chip.
+     Empat <select> penyaring disembunyikan olehnya, jadi aturan select di
+     bawah ini sekarang hanya menjangkau select kalender ekonomi — masih
+     perlu, supaya bentuknya seragam dengan chip di sebelahnya.
 
      ── KENAPA DI SINI, BUKAN DI BERKAS V2 ────────────────────────────────
      Percobaan pertama menulisnya di ema-cross-screener_3.html, dan hasilnya
@@ -482,23 +485,17 @@ const CSS_TANPA_CANGKANG = `
     color: var(--text) !important;
   }
 
-  /* Ikon kiri HANYA untuk empat penyaring yang benar-benar menentukan hasil
-     pindaian. Select milik kalender ekonomi ikut baris ini juga, dan jam di
-     sebelah pilihan "Mata Uang" cuma membingungkan. */
-  .ema-screener #esPantauTf,
-  .ema-screener #esChTf {
-    padding-left: 27px !important;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237a7a80' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v5l3 2'/%3E%3C/svg%3E"), url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237a7a80' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important;
-    background-position: 8px center, right 8px center !important;
-    background-size: 12px 12px, 9px 9px !important;
-  }
-  .ema-screener #esPantauRezim,
-  .ema-screener #esChSnrFilter {
-    padding-left: 27px !important;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237a7a80' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20V16'/%3E%3Cpath d='M10 20V12'/%3E%3Cpath d='M16 20V8'/%3E%3Cpath d='M22 20V4'/%3E%3C/svg%3E"), url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237a7a80' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important;
-    background-position: 8px center, right 8px center !important;
-    background-size: 12px 12px, 9px 9px !important;
-  }
+  /* ── CHIP FILTER (komponen jtfFilter di berkas V2) ─────────────────────
+     Aturan ".ema-screener button { border-radius: 6px !important }" di atas
+     memaksa SEMUA tombol jadi 6 px — termasuk ruas tengah chip yang harus
+     siku supaya menyambung dengan tetangganya. Ditulis ulang di sini dengan
+     !important yang sama; tanpa ini chip terlihat seperti tiga tombol
+     terpisah, bukan satu pil bersambung. Warnanya tidak diatur di sini:
+     chip memakai var(--panel-2)/--muted/--text yang sudah ikut tema. */
+  .ema-screener .jtf-seg { border-radius: 0 !important; font-size: 12px !important; }
+  .ema-screener .jtf-seg-awal { border-radius: 5px 0 0 5px !important; }
+  .ema-screener .jtf-seg-akhir { border-radius: 0 5px 5px 0 !important; }
+  .ema-screener .jtf-tambah, .ema-screener .jtf-reset { border-radius: 5px !important; }
 
   .ema-screener .es-priority-controls .es-ai-regime {
     background: var(--panel-2) !important;
