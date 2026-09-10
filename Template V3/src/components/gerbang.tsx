@@ -67,7 +67,11 @@ export function TombolMasuk({ penuh }: { penuh?: boolean }) {
         <button onClick={mulaiLoginDiscord}
           className={cn(
             'mt-2 flex cursor-pointer items-center justify-center gap-2 rounded-md border border-[#5865F2]/40',
-            'bg-[#5865F2]/10 px-3.5 py-2 text-[12.5px] font-medium text-[#8b93f8] transition-colors hover:bg-[#5865F2]/20',
+            /* `text-discord`, bukan hex mentah: hex tidak ikut dibalik tema
+               dan tombol ini nyaris hilang di tema terang. Lihat
+               --color-discord di index.css. */
+            'bg-[#5865F2]/10 px-3.5 py-2 text-[12.5px] font-medium text-discord',
+            'transition-colors hover:bg-[#5865F2]/20',
             penuh && 'w-full py-2.5'
           )}>
           Masuk dengan Discord

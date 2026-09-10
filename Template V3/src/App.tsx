@@ -337,27 +337,27 @@ function RuteChartEntry() {
   return <ChartBacktest />;
 }
 
-/* ── DUA HALAMAN YANG TIDAK IKUT DIBUKA MODE PREVIEW ────────────────
+/* ── YANG TIDAK IKUT DIBUKA MODE PREVIEW ────────────────────────
    Preview memperlihatkan bentuk aplikasinya kepada pengunjung yang belum
    masuk, dan untuk hampir semua halaman itu tidak memberikan apa pun:
    tanpa sesi, Firestore menolak setiap pembacaan, jadi yang tampil cuma
    data contoh.
 
-   Dua halaman ini pengecualiannya, dan keduanya karena alasan yang sama:
-   isinya BUKAN dari Firestore, jadi tidak ada Security Rules yang ikut
-   menjaganya.
+   Screener Area dan Wallet Tracking pengecualiannya — isinya BUKAN dari
+   Firestore, jadi tidak ada Security Rules yang ikut menjaganya. Tapi
+   keduanya mengurus dirinya SENDIRI dengan kartu <PerluMasuk>: penjelasan
+   tentang apa yang ada di baliknya, berikut tombol masuk di halaman itu
+   juga. Melempar orangnya dari sini justru merusak yang itu, jadi mereka
+   sengaja TIDAK ada di daftar ini — /coin-listing pun tidak, karena ia
+   cuma pengalihan ke /wallet-tracking.
 
-   · Wallet Tracking membaca /api/agen/wallet di VPS — posisi on-chain
-     sungguhan, log penariknya, dan papan peringkat dompet. Itu hasil
-     kerja pengumpulan, bukan data contoh.
-   · Screener Area memanggil proxy pasar VPS tiap kali dipindai. Jatah
-     "sekali lihat" dulu menahannya setengah jalan; sekarang pintunya
-     yang ditutup, jadi tidak ada dua aturan yang bisa menyimpang.
+   Yang tersisa cuma /screener-react: port React yang memanggil proxy pasar
+   begitu dibuka dan tidak punya kartu semacam itu. Ia tidak ada di sidebar
+   dan memang cuma untuk membandingkan, jadi pintunya ditutup di sini saja.
 
-   Masuk sudah cukup — bukan lisensi aktif. Yang sudah masuk tetap
-   diurus gerbang di bawah seperti biasa. */
-const PREVIEW_TERKUNCI = new Set(
-  ['/screener', '/screener-react', '/wallet-tracking', '/coin-listing']);
+   Masuk sudah cukup — bukan lisensi aktif. Yang sudah masuk tetap diurus
+   gerbang di bawah seperti biasa. */
+const PREVIEW_TERKUNCI = new Set(['/screener-react']);
 
 function Kerangka() {
   const { memuat, pemilik, langganan, pengguna } = useAuth();

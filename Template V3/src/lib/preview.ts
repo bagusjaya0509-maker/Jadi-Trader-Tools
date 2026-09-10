@@ -57,24 +57,20 @@ export function langgananPreview(f: () => void): () => void {
 }
 
 /* ── Jatah "sekali lihat" ────────────────────────────────────────────────
-   Dua alat di dalam aplikasi ini bisa dipakai berjam-jam tanpa pernah
-   menyentuh alasan untuk mendaftar: REPLAY (latihan eksekusi di atas data
-   pasar sungguhan) dan SCREENER AREA (pemindai yang memanggil proxy VPS
-   tiap kali dijalankan). Membiarkan keduanya bebas berarti preview berhenti
-   jadi etalase dan berubah jadi versi gratis yang utuh.
+   REPLAY — latihan eksekusi di atas data pasar sungguhan — bisa dipakai
+   berjam-jam tanpa pernah menyentuh alasan untuk mendaftar. Sekali, bukan
+   nol: satu kali cukup untuk merasakan bentuknya, dan itu memang yang perlu
+   dilihat sebelum memutuskan. Yang dibatasi cuma PENGULANGANNYA.
 
-   Sekali, bukan nol: satu kali cukup untuk merasakan bentuknya, dan itu
-   memang yang perlu dilihat sebelum memutuskan. Yang dibatasi cuma
-   PENGULANGANNYA.
-
-   SATU pasang fungsi untuk keduanya, bukan dua pasang yang mirip. Dua
-   salinan aturan yang sama akan menyimpang begitu salah satunya diperbaiki
-   — dan yang menyimpang di sini adalah siapa yang kena batas.
+   SCREENER AREA dulu ikut di sini. Dicabut 10 Sep 2026 (pemilik): halaman
+   itu sekarang minta akun sejak klik pertama, dan menjelaskannya lewat
+   kartu <PerluMasuk> di halamannya sendiri. Aturan yang tinggal satu tempat
+   tidak bisa menyimpang dari dirinya sendiri.
 
    Di sessionStorage bersama penanda previewnya sendiri, jadi semuanya lahir
    dan mati bersamaan. Yang sudah masuk tidak pernah melewati pemeriksaan
    ini — pemanggilnya wajib memastikan tidak ada sesi. */
-export type Jatah = 'replay' | 'screener';
+export type Jatah = 'replay';
 
 const kunciJatah = (nama: Jatah) => `jt.preview.${nama}`;
 

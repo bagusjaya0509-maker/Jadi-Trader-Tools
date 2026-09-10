@@ -70,6 +70,13 @@
   --color-emas: #ffcd75;
   --color-emas-muda: #ffd98f;
 
+  /* Rona teks tombol "Masuk dengan Discord". Alasannya sama persis
+     dengan emas di atas: #8b93f8 terbaca di atas hitam, tapi di tema
+     terang ia biru pucat di atas lavender pucat — 2,4:1, di bawah
+     ambang mana pun. Latarnya (#5865F2/10) sengaja TIDAK ikut jadi
+     token: warna merek Discord memang tetap di kedua tema. */
+  --color-discord: #8b93f8;
+
   /* Putih yang TIDAK ikut dibalik tema. `text-white` di tema terang jadi
      gelap — benar untuk teks di atas latar zinc, salah untuk teks di atas
      tombol hijau atau lingkaran avatar berwarna yang latarnya tidak ikut
@@ -422,6 +429,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
      rasio 5,0. Yang muda untuk sentuhan tombol. */
   --color-emas: #a16207;
   --color-emas-muda: #b8720a;
+  --color-discord: #4a53c9;
 
   /* ── Token semantik ──────────────────────────────────────────────────
      Dipakai header & hero halaman Pendaratan. Ditulis terpisah, bukan

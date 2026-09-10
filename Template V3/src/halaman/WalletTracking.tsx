@@ -3,6 +3,8 @@ import { useSearchParams } from 'react-router-dom';
 import { Wallet } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
+import { modePreview } from '@/lib/preview';
+import { PerluMasuk } from '@/components/perlu-masuk';
 import { Memuat } from '@/components/memuat';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -55,7 +57,7 @@ const SUB = [
 type IdSub = typeof SUB[number]['id'];
 
 export default function WalletTracking() {
-  const { pemilik } = useAuth();
+  const { pemilik, pengguna } = useAuth();
   const [cari, setCari] = useSearchParams();
 
   const tampil = SUB.filter((s) => !('hanyaPemilik' in s && s.hanyaPemilik) || pemilik);
@@ -77,6 +79,39 @@ export default function WalletTracking() {
     if (id === 'dompet') b.delete('sub'); else b.set('sub', id);
     setCari(b, { replace: true });
   };
+
+  /* ── DI LUAR MODE PREVIEW ─────────────────────────────────────────────
+     Isi halaman ini datang dari /api/agen/wallet di VPS, bukan dari
+     Firestore — jadi tidak ada Security Rules yang ikut menjaganya, dan
+     yang tampil untuk pengunjung tanpa sesi bukan data contoh melainkan
+     posisi on-chain sungguhan berikut log penariknya. Rutenya sendiri
+     sudah menolak tanpa token sejak 10 Sep 2026; kartu ini yang menjelaskan
+     kenapa, di halaman yang orangnya tuju.
+
+     `!pengguna` bukan pelengkap: penanda preview hidup di sessionStorage
+     dan bisa TERTINGGAL di tab yang sama sesudah orangnya masuk. */
+  const tamuPreview = modePreview() && !pengguna;
+  if (tamuPreview) {
+    return (
+      <PerluMasuk
+        judul="Wallet Tracking"
+        ket={<>
+          Mengikuti uang yang bergerak di on-chain: dompet perp yang sedang
+          dipantau, posisi yang kita salin, dan koin presale yang menunggu
+          listing. Isinya ditarik dari server kami tiap menit — <b>bukan data
+          contoh</b>, dan itu sebabnya halaman ini minta akun.
+        </>}
+        poin={[
+          ['Dompet Pantauan',
+           'Posisi hidup tiap dompet perp yang dipantau, disegarkan tiap 60 detik.'],
+          ['Papan peringkat dompet',
+           'Hasil penyaringan puluhan ribu baris riwayat, bukan angka yang tergeletak.'],
+          ['Coin Hunter',
+           'Koin presale yang ditunggu listingnya, berikut jejak likuiditas dan pemegangnya.'],
+        ]}
+      />
+    );
+  }
 
   return (
     <div className="p-4 md:p-6">
