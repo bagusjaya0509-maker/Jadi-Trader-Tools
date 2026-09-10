@@ -337,6 +337,28 @@ function RuteChartEntry() {
   return <ChartBacktest />;
 }
 
+/* ── DUA HALAMAN YANG TIDAK IKUT DIBUKA MODE PREVIEW ────────────────
+   Preview memperlihatkan bentuk aplikasinya kepada pengunjung yang belum
+   masuk, dan untuk hampir semua halaman itu tidak memberikan apa pun:
+   tanpa sesi, Firestore menolak setiap pembacaan, jadi yang tampil cuma
+   data contoh.
+
+   Dua halaman ini pengecualiannya, dan keduanya karena alasan yang sama:
+   isinya BUKAN dari Firestore, jadi tidak ada Security Rules yang ikut
+   menjaganya.
+
+   · Wallet Tracking membaca /api/agen/wallet di VPS — posisi on-chain
+     sungguhan, log penariknya, dan papan peringkat dompet. Itu hasil
+     kerja pengumpulan, bukan data contoh.
+   · Screener Area memanggil proxy pasar VPS tiap kali dipindai. Jatah
+     "sekali lihat" dulu menahannya setengah jalan; sekarang pintunya
+     yang ditutup, jadi tidak ada dua aturan yang bisa menyimpang.
+
+   Masuk sudah cukup — bukan lisensi aktif. Yang sudah masuk tetap
+   diurus gerbang di bawah seperti biasa. */
+const PREVIEW_TERKUNCI = new Set(
+  ['/screener', '/screener-react', '/wallet-tracking', '/coin-listing']);
+
 function Kerangka() {
   const { memuat, pemilik, langganan, pengguna } = useAuth();
   const lokasi = useLocation();
@@ -358,7 +380,7 @@ function Kerangka() {
      Yang dibuka cuma TAMPILAN. Tanpa sesi, Firestore Security Rules
      menolak setiap pembacaan dan penulisan — jadi yang terlihat hanya
      data contoh yang memang sudah disiapkan untuk pengunjung. */
-  const preview = modePreview() && !pengguna;
+  const preview = modePreview() && !pengguna && !PREVIEW_TERKUNCI.has(lokasi.pathname);
   /* ── /docs DIBUKA UNTUK PUBLIK, 21 Agu 2026 ─────────────────────────
      Dokumentasi di balik gerbang langganan itu keliru dua kali.
 

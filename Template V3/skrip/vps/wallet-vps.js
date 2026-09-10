@@ -74,13 +74,25 @@ module.exports = (app, { butuhLogin, batasLaju, express, DIR }) => {
          yang menyalakan auto-close akan menutup posisi pemilik dengan uang
          pemilik. Itu bukan fitur yang kurang matang; itu fitur yang tidak
          boleh ada sampai tiap orang memasang kuncinya sendiri. */
-  app.get('/api/agen/wallet', batasLaju, (req, res) => {
+  /* ── MEMBACA BUTUH LOGIN, 10 Sep 2026 ────────────────────────────────
+     Rute ini dulu terbuka dengan alasan "isinya data rantai publik".
+     Yang ia pulangkan bukan itu: daftar dompet yang DIPILIH untuk
+     dipantau, posisi hidupnya, dan log penariknya — sekitar satu MB
+     hasil pengumpulan yang selama ini bisa diunduh siapa pun yang tahu
+     alamatnya.
+
+     LOGIN, bukan lisensi aktif: keputusan pemilik. Yang perlu ditutup
+     adalah pengambilan borongan tanpa identitas, bukan akses pelanggan
+     yang masa lisensinya kebetulan sedang habis.
+
+     Menulis tetap `butuhLogin + hanyaPemilik` seperti sebelumnya. */
+  app.get('/api/agen/wallet', batasLaju, butuhLogin, (req, res) => {
     const p = baca(PANTAU, { dompet: [] });
     const a = baca(AKTIVITAS, { log: [], posisi: [], denyut: 0, galat: '' });
     res.json({
       ok: true,
       dompet: p.dompet || [],
-      log: a.log || [],
+      log: logUntukLayar(a),
       posisi: a.posisi || [],
       seumur: a.seumur || {},
       denyut: a.denyut || 0,
@@ -117,6 +129,66 @@ module.exports = (app, { butuhLogin, batasLaju, express, DIR }) => {
     res.json({ ok: true, dompet: p.dompet });
   });
 
+  /* ── DOMPET SEBAGAI ANALIS DI COPY SIGNAL ─────────────────────────────
+     Satu tombol di papan peringkat, dan sesudahnya dompet itu punya kartunya
+     sendiri di Copy Signal: tiap posisi yang ia buka jadi sinyal, tiap posisi
+     yang ia tutup jadi hasil.
+
+     ── SATU RUTE, BUKAN DUA LANGKAH ───────────────────────────────────
+     Menjadikan analis MENYIRATKAN memantau — pemantau dompet cuma melihat
+     yang ada di daftar pantau, jadi dompet yang ditandai analis tapi tidak
+     dipantau adalah kartu yang tidak akan pernah berisi. Menyerahkan urutan
+     itu ke layar berarti satu tombol yang lupa memanggil rute pertama
+     menghasilkan keadaan yang tidak bisa dijelaskan siapa pun.
+
+     ── DICABUT TIDAK BERARTI DIHAPUS ──────────────────────────────────
+     `analis: false` menghentikan sinyal BARU. Kartu dan riwayat sinyalnya
+     tetap ada di papan — itu rekam jejak yang sudah terjadi, dan rekam jejak
+     yang ikut hilang saat sakelarnya dimatikan tidak berarti apa-apa.
+     Yang mau menyembunyikan kartunya punya panel sendiri di Maintenance. */
+  app.post('/api/agen/wallet/analis', batasLaju, butuhLogin, hanyaPemilik, express.json(), (req, res) => {
+    const b = req.body || {};
+    const alamat = String(b.alamat || '').trim().toLowerCase();
+    if (!/^0x[0-9a-f]{40}$/.test(alamat)) {
+      return res.status(400).json({ error: 'Alamat harus 0x diikuti 40 karakter heksadesimal.' });
+    }
+    const jadi = b.analis !== false;
+    const p = baca(PANTAU, { dompet: [] });
+    p.dompet = p.dompet || [];
+    let d = p.dompet.find((x) => x.alamat === alamat);
+
+    if (!d) {
+      if (!jadi) return res.status(404).json({ error: 'Dompet itu tidak ada di daftar pantau.' });
+      if (p.dompet.length >= 20) {
+        return res.status(400).json({ error: 'Batas 20 dompet. Hapus salah satu dulu.' });
+      }
+      /* Nama dipakai sebagai NAMA KARTU di Copy Signal, dan uid kartunya
+         diturunkan dari nama itu di server analisa. Alamat mentah 42
+         karakter jadi judul kartu yang tidak bisa dibaca siapa pun, jadi
+         kalau pemanggil tidak mengirim nama, dipakai potongan alamatnya —
+         tetap buruk, tapi setidaknya sependek judul. */
+      d = { alamat, nama: String(b.nama || '').slice(0, 40).trim() || ('Dompet ' + alamat.slice(2, 8)),
+            sejak: Date.now(), aktif: true };
+      p.dompet.push(d);
+    } else if (jadi && b.nama) {
+      /* Nama BARU diterima hanya saat menyalakan, dan hanya kalau dikirim.
+         Mengganti nama dompet yang sudah jadi analis akan melahirkan kartu
+         BARU di Copy Signal (uid kartu diturunkan dari nama) dan membelah
+         riwayatnya jadi dua — jadi penggantian nama harus tindakan yang
+         disengaja, bukan efek samping menekan tombol yang sama dua kali. */
+      if (!d.analis) d.nama = String(b.nama).slice(0, 40).trim() || d.nama;
+    }
+
+    if (jadi) {
+      d.analis = true;
+      d.analisSejak = d.analisSejak || Date.now();
+    } else {
+      d.analis = false;
+    }
+    tulis(PANTAU, p);
+    res.json({ ok: true, dompet: p.dompet });
+  });
+
   /* ── PAPAN PERINGKAT ──────────────────────────────────────────────────
      Menjawab "dompet mana yang layak dipantau" — pertanyaan yang tersisa
      dari fase pertama, dan satu-satunya alasan alamat 42 karakter harus
@@ -128,7 +200,9 @@ module.exports = (app, { butuhLogin, batasLaju, express, DIR }) => {
      penarikannya dikerjakan di dalam server ini, satu permintaan panel akan
      membekukan SELURUH API selama beberapa detik — termasuk order yang
      sedang dikirim orang lain. */
-  app.get('/api/agen/wallet/peringkat', batasLaju, (req, res) => {
+  /* Butuh login dengan alasan yang sama seperti /api/agen/wallet: papan
+     ini hasil penyaringan 44 ribu baris, bukan data yang tergeletak. */
+  app.get('/api/agen/wallet/peringkat', batasLaju, butuhLogin, (req, res) => {
     const p = baca(PERINGKAT, null);
     if (!p || !Array.isArray(p.daftar)) {
       return res.json({ ok: true, daftar: [], diperbarui: 0, belumAda: true });
@@ -406,6 +480,9 @@ module.exports = (app, { butuhLogin, batasLaju, express, DIR }) => {
     s.bursa = bursa;
     s.usd = Math.round(usd * 100) / 100;
     s.leverage = leverage;
+    /* Per dompet. Ditulis hanya kalau dikirim — pemanggil lama tidak boleh
+       diam-diam mematikannya. Nilai selain `true` persis = mati. */
+    if (b.sesuaikanMinimum !== undefined) s.sesuaikanMinimum = b.sesuaikanMinimum === true;
     if (b.nama !== undefined) s.nama = String(b.nama).slice(0, 60);
     s.diubah = Date.now();
 
@@ -454,11 +531,159 @@ module.exports = (app, { butuhLogin, batasLaju, express, DIR }) => {
    Dipisah dari rutenya dengan alasan yang sama seperti arsip chart:
    pemantau berjalan sebagai proses sendiri, dan berkas adalah satu-satunya
    saluran yang keduanya sudah pakai. */
-/* 1000 baris ≈ 250 KB — masih berkas kecil, tapi cukup panjang untuk
-   menampung beberapa dompet ramai tanpa yang satu menghapus jejak yang
-   lain. Batasnya ada supaya berkasnya tidak tumbuh tanpa akhir, bukan
-   supaya daftarnya pendek. */
-const AKTIVITAS_MAKS = 1000;
+/* ── BATAS PER DOMPET, BUKAN SATU BATAS UNTUK SEMUA ──────────────────────
+   Dulu 1000 baris untuk seluruh daftar, dengan alasan "cukup panjang untuk
+   beberapa dompet ramai tanpa yang satu menghapus jejak yang lain". Terukur
+   7 Sep 2026: SATU dompet (0x615f…, ~75 fill/jam) memakan 929 dari 1000
+   baris itu, dan sembilan dari dua belas dompet tidak punya satu baris pun
+   — padahal dipantau sejak 28 Agu. Yang terjadi tiap menit: jejak mereka
+   tidak ada di log, jadi `batasTerakhir` jatuh ke tanggal mulai, seluruh
+   riwayatnya ditarik ulang dari bursa ("Agresif 40x · 182 transaksi baru"
+   setiap menit di log pm2), ditulis, lalu langsung tergusur lagi oleh
+   1000 baris dompet ramai yang semuanya lebih baru. Di layar: kartu
+   "$0.00 · 0 penutupan" untuk dompet yang kemarin masih berkurva. Bukan
+   reset — tergusur. Dan 182 baris "baru" itu ikut masuk ke lonceng dan
+   cermin Copy Signal tiap putaran.
+
+   Sekarang tiga wadah, dua di antaranya berbatas PER DOMPET:
+     `log`       — umpan transaksi terbaru, semua jenis fill. Untuk dompet
+                   ramai ini beberapa jam; untuk dompet biasa berbulan.
+     `penutupan` — buku penutupan per dompet: fill ber-closedPnl, sudah
+                   dikelompokkan persis seperti di layar (koin+arah yang
+                   sama dalam 5 menit = satu penutupan). Inilah yang
+                   menjaga "realisasi sejak dipantau" dan kurvanya tetap
+                   ada sesudah umpannya bergeser. Disimpan TERTUA DI DEPAN
+                   supaya penambahannya cuma push.
+     `batas`     — tanda air waktu fill terakhir per dompet, ditulis
+                   eksplisit; tidak lagi disimpulkan dari log yang bisa
+                   tergusur. */
+const AKTIVITAS_PER_DOMPET = 250;
+const PENUTUPAN_PER_DOMPET = 3000;
+/* Sama dengan `JEDA_SATU_KELUAR` di pemantau dan di panel-wallet-agen.tsx.
+   Tiga tempat memutuskan hal yang sama, jadi angkanya harus sama. */
+const JEDA_SATU_KELUAR = 5 * 60 * 1000;
+/* Kunci fill anggota yang diingat tiap kelompok — cukup untuk menolak fill
+   yang sama dikirim dua kali, tanpa menyimpan seluruh riwayatnya. */
+const ANGGOTA_MAKS = 40;
+
+function kunciFill(l) {
+  return [l.alamat, l.hash, l.waktu, l.koin, l.ukuran, l.harga, l.dir].join('|');
+}
+function kunciAnggota(l) {
+  return [l.hash, l.waktu, l.ukuran].join('|');
+}
+function bulat(n, k) { return Math.round((Number(n) || 0) * k) / k; }
+
+/* Menempelkan satu fill penutupan ke buku dompetnya. Pengelompokannya
+   meniru `penutupanDompet` di layar: hanya dibandingkan dengan kelompok
+   TERAKHIR — koin dan arah sama, selisih waktu ≤ 5 menit. Keduanya harus
+   memberi jumlah penutupan yang sama, jadi algoritmanya tidak boleh
+   lebih pintar di satu sisi. */
+function tempelPenutupan(peta, l) {
+  const daftar = peta[l.alamat] || (peta[l.alamat] = []);
+  const k = kunciAnggota(l);
+  for (let i = daftar.length - 1; i >= 0 && i >= daftar.length - 10; i--) {
+    if ((daftar[i].anggota || []).indexOf(k) >= 0) return false;
+  }
+  const g = daftar[daftar.length - 1];
+  if (g && g.koin === l.koin && g.dir === l.dir && l.waktu >= g.waktu && l.waktu - g.waktu <= JEDA_SATU_KELUAR) {
+    const u = (Number(g.ukuran) || 0) + (Number(l.ukuran) || 0);
+    if (u > 0) g.harga = bulat((g.harga * g.ukuran + l.harga * l.ukuran) / u, 1e8);
+    g.ukuran = bulat(u, 1e8);
+    g.nilai = bulat(g.nilai + l.nilai, 100);
+    g.pnl = bulat(g.pnl + l.pnl, 1e6);
+    g.waktu = l.waktu;
+    if (!Array.isArray(g.anggota)) g.anggota = [];
+    if (g.anggota.length < ANGGOTA_MAKS) g.anggota.push(k);
+    return true;
+  }
+  daftar.push({
+    waktu: l.waktu, mulai: l.waktu, alamat: l.alamat, nama: l.nama,
+    koin: l.koin, arah: l.arah, dir: l.dir,
+    harga: Number(l.harga) || 0, ukuran: Number(l.ukuran) || 0,
+    nilai: Number(l.nilai) || 0, pnl: Number(l.pnl) || 0,
+    hash: l.hash, anggota: [k],
+  });
+  return true;
+}
+
+/* Menggabungkan fill baru ke berkas: tolak yang sudah ada, potong umpan
+   per dompet, tempel penutupannya ke buku, majukan tanda air. Memulangkan
+   jumlah baris yang benar-benar baru. */
+function gabungAktivitas(d, baru) {
+  if (!Array.isArray(d.log)) d.log = [];
+  if (!d.penutupan || typeof d.penutupan !== 'object') d.penutupan = {};
+  if (!d.batas || typeof d.batas !== 'object') d.batas = {};
+
+  const ada = new Set(d.log.map(kunciFill));
+  const segar = [];
+  for (const l of baru) {
+    if (!l || !l.alamat) continue;
+    const k = kunciFill(l);
+    if (ada.has(k)) continue;
+    ada.add(k);
+    segar.push(l);
+  }
+  if (!segar.length) return 0;
+
+  /* Yang terbaru di depan, diurutkan ULANG sesudah digabung: satu putaran
+     bisa memulangkan beberapa dompet sekaligus, dan urutan kedatangannya
+     bukan urutan waktunya. Lalu dipotong PER DOMPET. */
+  const semua = [...segar, ...d.log].sort((a, b) => b.waktu - a.waktu);
+  const hitung = {};
+  const log = [];
+  for (const l of semua) {
+    const n = (hitung[l.alamat] || 0) + 1;
+    hitung[l.alamat] = n;
+    if (n <= AKTIVITAS_PER_DOMPET) log.push(l);
+  }
+  d.log = log;
+
+  const tutup = segar.filter((l) => Number(l.pnl) !== 0).sort((a, b) => a.waktu - b.waktu);
+  for (const l of tutup) tempelPenutupan(d.penutupan, l);
+  for (const a of Object.keys(d.penutupan)) {
+    const daftar = d.penutupan[a];
+    if (Array.isArray(daftar) && daftar.length > PENUTUPAN_PER_DOMPET) {
+      d.penutupan[a] = daftar.slice(daftar.length - PENUTUPAN_PER_DOMPET);
+    }
+  }
+
+  for (const l of segar) {
+    if (!d.batas[l.alamat] || l.waktu > d.batas[l.alamat]) d.batas[l.alamat] = l.waktu;
+  }
+  return segar.length;
+}
+
+/* Bentuk yang dibaca layar: umpan terbaru DITAMBAH kelompok penutupan yang
+   sudah lebih tua daripada baris umpan tertua dompet itu. Yang lebih baru
+   dari batas itu sudah ada di umpan sebagai fill asli — menambahkannya lagi
+   berarti menghitung P/L yang sama dua kali. */
+function logUntukLayar(a) {
+  const log = Array.isArray(a.log) ? a.log : [];
+  const tertua = {};
+  for (const l of log) {
+    if (!(l.alamat in tertua) || l.waktu < tertua[l.alamat]) tertua[l.alamat] = l.waktu;
+  }
+  const tambahan = [];
+  const peta = a.penutupan && typeof a.penutupan === 'object' ? a.penutupan : {};
+  for (const alamat of Object.keys(peta)) {
+    const bawah = alamat in tertua ? tertua[alamat] : Infinity;
+    for (const g of (peta[alamat] || [])) {
+      if (g.waktu >= bawah) continue;
+      tambahan.push({
+        waktu: g.waktu, alamat: g.alamat || alamat, nama: g.nama, koin: g.koin,
+        arah: g.arah, dir: g.dir, harga: g.harga, ukuran: g.ukuran,
+        nilai: g.nilai, pnl: g.pnl, hash: g.hash, kelompok: true,
+      });
+    }
+  }
+  if (!tambahan.length) return log;
+  return [...log, ...tambahan].sort((x, y) => y.waktu - x.waktu);
+}
+
+module.exports.gabungAktivitas = gabungAktivitas;
+module.exports.logUntukLayar = logUntukLayar;
+module.exports.kunciFill = kunciFill;
 
 module.exports.bacaDompet = function bacaDompet(DIR) {
   try {
@@ -477,12 +702,7 @@ module.exports.catatWallet = function catatWallet(DIR, baris) {
   try { d = JSON.parse(fs.readFileSync(F, 'utf8')); } catch (e) { /* baru */ }
   if (!Array.isArray(d.log)) d.log = [];
 
-  if (Array.isArray(baris.log) && baris.log.length) {
-    /* Yang terbaru di depan, dan diurutkan ULANG sesudah digabung: satu
-       putaran pindai bisa memulangkan beberapa transaksi sekaligus dari
-       dompet yang berbeda, dan urutan kedatangannya bukan urutan waktunya. */
-    d.log = [...baris.log, ...d.log].sort((a, b) => b.waktu - a.waktu).slice(0, AKTIVITAS_MAKS);
-  }
+  if (Array.isArray(baris.log) && baris.log.length) gabungAktivitas(d, baris.log);
   if (Array.isArray(baris.posisi)) d.posisi = baris.posisi;
   /* DITIMPA, bukan digabung — sama seperti posisi. Ia potret hitungan
      terakhir atas seluruh riwayat, dan menggabungnya dengan potret
@@ -505,8 +725,15 @@ module.exports.batasTerakhir = function batasTerakhir(DIR) {
   const peta = {};
   try {
     const d = JSON.parse(fs.readFileSync(path.join(DIR, 'wallet-aktivitas.json'), 'utf8'));
+    /* Tanda air eksplisit lebih dulu; log dan buku penutupan cuma
+       penyempurna untuk berkas dari versi sebelum tanda air ada. */
+    for (const a of Object.keys(d.batas || {})) peta[a] = Number(d.batas[a]) || 0;
     for (const l of (d.log || [])) {
       if (!peta[l.alamat] || l.waktu > peta[l.alamat]) peta[l.alamat] = l.waktu;
+    }
+    const pen = d.penutupan && typeof d.penutupan === 'object' ? d.penutupan : {};
+    for (const a of Object.keys(pen)) {
+      for (const g of (pen[a] || [])) if (!peta[a] || g.waktu > peta[a]) peta[a] = g.waktu;
     }
   } catch (e) { /* belum ada */ }
   return peta;

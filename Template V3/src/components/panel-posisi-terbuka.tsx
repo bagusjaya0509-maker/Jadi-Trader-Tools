@@ -367,8 +367,23 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
     for (const s of salin) {
       for (const [koin, ps] of Object.entries(s.punyaku ?? {})) {
         if (!ps?.simbol) continue;
-        peta.set(String(ps.simbol).toUpperCase(),
-                 { nama: s.nama || s.alamat, alamat: s.alamat, koin, salinan: ps });
+        const isi = { nama: s.nama || s.alamat, alamat: s.alamat, koin, salinan: ps };
+        /* HYPERLIQUID MENAMAI PASARNYA DENGAN KOIN TELANJANG.
+           ────────────────────────────────────────────────────────────
+           Order Binance dicatat sebagai "ZECUSDT" dan barisnya juga
+           bernama "ZECUSDT", jadi satu kunci cukup. Order Hyperliquid
+           dicatat sebagai "VVV" — itu memang nama pasarnya di sana, dan
+           `bursa.tutup()` di VPS memakai nama itu untuk menutup posisi,
+           jadi catatannya TIDAK boleh diubah jadi "VVVUSDT". Yang
+           berbeda cuma penyebutan di layar: perbatasan hyperliquid.js
+           memulangkannya sebagai `koin + 'USDT'`.
+
+           Karena itu aliasnya didaftarkan di sini, bukan diterjemahkan
+           saat dicari — pencariannya tetap satu baris, dan aturan
+           penamaannya tinggal di satu tempat. */
+        for (const kunci of new Set([String(ps.simbol), koin + 'USDT'])) {
+          peta.set(kunci.toUpperCase(), isi);
+        }
       }
     }
     return peta;

@@ -246,8 +246,16 @@ async function token(): Promise<string | null> {
 }
 
 /** null = tidak bisa bertanya, bukan "kosong". Dua jawaban yang berbeda. */
-/** Keadaan dompet pantauan. TANPA token: isinya data rantai publik, dan
- *  pengunjung yang belum login pun boleh melihatnya.
+/** Keadaan dompet pantauan. BUTUH LOGIN sejak 10 Sep 2026.
+ *
+ *  Isinya memang data rantai yang bisa dilihat siapa pun di block explorer,
+ *  tapi yang ada di sini bukan itu: ini hasil pengumpulan — dompet mana yang
+ *  dipilih untuk dipantau, posisi hidupnya, dan log penariknya. Membiarkan
+ *  rutenya terbuka berarti menyerahkan daftar pilihan itu ke siapa saja yang
+ *  mengetikkan alamatnya, lengkap dan tanpa diminta.
+ *
+ *  Masuk sudah cukup — bukan lisensi aktif. Pengunjung mode preview tidak
+ *  pernah sampai ke sini: /wallet-tracking sekarang di luar preview.
  *
  *  Penanda tiruan ditarik TERPISAH dan hanya berhasil untuk pemilik. Ia
  *  sengaja tidak ikut di jawaban utama: menyatukannya berarti satu rute
@@ -256,7 +264,10 @@ async function token(): Promise<string | null> {
  *  salah memilah. */
 export async function keadaanDompet(): Promise<KeadaanDompet | null> {
   try {
-    const r = await fetch(`${dasar()}/api/agen/wallet`);
+    const t = await token();
+    if (!t) return null;
+    const r = await fetch(`${dasar()}/api/agen/wallet`,
+      { headers: { Authorization: 'Bearer ' + t } });
     if (!r.ok) return null;
     const j = await r.json();
 
@@ -265,14 +276,11 @@ export async function keadaanDompet(): Promise<KeadaanDompet | null> {
        tiruan" memang tidak dirender untuk orang lain. */
     let tiru: PenandaTiru[] = [];
     try {
-      const t = await token();
-      if (t) {
-        const rt = await fetch(`${dasar()}/api/agen/wallet/tiru`,
-          { headers: { Authorization: 'Bearer ' + t } });
-        if (rt.ok) {
-          const jt = await rt.json();
-          if (Array.isArray(jt?.tiru)) tiru = jt.tiru;
-        }
+      const rt = await fetch(`${dasar()}/api/agen/wallet/tiru`,
+        { headers: { Authorization: 'Bearer ' + t } });
+      if (rt.ok) {
+        const jt = await rt.json();
+        if (Array.isArray(jt?.tiru)) tiru = jt.tiru;
       }
     } catch { /* bukan pemilik, atau jaringan berkedip */ }
 
@@ -537,8 +545,11 @@ export async function peringkatDompet(
   jendela: JendelaPeringkat, pita: PitaAkun, batas = 40,
 ): Promise<Peringkat | null> {
   try {
+    const t = await token();
+    if (!t) return null;
     const q = `jendela=${jendela}&pita=${pita}&batas=${batas}`;
-    const r = await fetch(`${dasar()}/api/agen/wallet/peringkat?${q}`);
+    const r = await fetch(`${dasar()}/api/agen/wallet/peringkat?${q}`,
+      { headers: { Authorization: 'Bearer ' + t } });
     if (!r.ok) return null;
     const j = await r.json();
     return {
