@@ -394,6 +394,34 @@ export function PojokOrder({
      posisi berjalan), jadi tidak ada hook yang boleh lahir sesudah
      titik ini. */
   const [ringkas, setRingkas] = useState(true);
+
+  /* ── TIKET COPY BISA DILIPAT DI PONSEL ──────────────────────────
+     Pemilik, 12 Sep 2026, dengan tangkapan layar: chart yang dibuka dari
+     kartu analis Copy Signal di HP tertutup tiketnya sendiri — seperempat
+     lilin hilang di balik panel. Mode ringkas tidak menolong di sini: yang
+     disembunyikannya baris-baris setelan, dan di mode COPY baris itu memang
+     tidak digambar. Yang tersisa sudah inti tiketnya.
+
+     KENAPA BOLEH DILIPAT PADAHAL PENJAGA DI ATAS MELARANG. Aturan di dekat
+     `tutupPanel` berbunyi: keadaan yang sedang membawa uang tidak boleh
+     tersembunyi di balik ikon. Mode COPY tidak membawa uang — tiketnya
+     rencana yang mau DIBAGIKAN, bukan order; tombol Kirim pun sengaja tidak
+     digambar di sana. DEMO dan REAL tidak ikut berubah: di keduanya
+     melipat tiket berarti menyembunyikan order yang sedang disusun.
+
+     BAWAANNYA TERLIPAT DI PONSEL SAJA. Yang membuka chart dari kartu sinyal
+     datang untuk melihat SETUP-nya, dan entry/SL/TP sudah tergambar sebagai
+     garis berlabel lengkap dengan harganya di sumbu kanan — tiketnya alat
+     menyunting, dan alat boleh menunggu dipanggil. Di desktop tidak ada
+     yang tertutup, jadi di sana tetap terbuka.
+
+     Diukur sekali saat lahir, tanpa pendengar: memutar ponsel di tengah
+     jalan lalu menemukan tiket yang sudah dibuka melipat sendiri lebih
+     mengganggu daripada lebar yang tidak ikut diperbarui. */
+  const [lipatCopy, setLipatCopy] = useState(() => {
+    try { return !window.matchMedia('(min-width: 768px)').matches; }
+    catch { return false; }
+  });
   const bangunkan = () => setSentuh((n) => n + 1);
   const menganggur = !posisi && !tunda && !draf;
   useEffect(() => {
@@ -551,6 +579,26 @@ export function PojokOrder({
       : draf === 'BUY' ? 'Untuk BUY: SL harus DI BAWAH entry dan TP di atasnya.'
                        : 'Untuk SELL: SL harus DI ATAS entry dan TP di bawahnya.';
 
+    /* Terlipat: lencana arah, bukan ikon polos. Yang terlipat di sini sebuah
+       rencana yang PUNYA arah, dan arah itulah satu-satunya hal yang perlu
+       terbaca tanpa membukanya — angkanya sudah ada di garis chart. Ikon
+       chevron yang sama dengan tombol ringkas dipakai sebagai isyarat
+       "ada yang bisa dibuka di sini". */
+    if (modeSekarang === 'copy' && lipatCopy) {
+      return (
+        <button onClick={() => setLipatCopy(false)}
+          title="Buka tiket order — entry, SL, TP, dan tombol Ke Copy Signal"
+          aria-label="Buka tiket order"
+          className={cn('flex cursor-pointer items-center gap-1.5 rounded-lg border bg-zinc-900/90 px-2 py-1.5 text-[10.5px] font-semibold backdrop-blur-sm transition-colors',
+            draf === 'BUY' ? 'border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10'
+                           : 'border-red-500/40 text-red-300 hover:bg-red-500/10')}>
+          {draf === 'BUY' ? <TrendingUp className="size-3.5" /> : <TrendingDown className="size-3.5" />}
+          {draf}
+          <ChevronsUpDown className="size-3 text-zinc-500" />
+        </button>
+      );
+    }
+
     return (
       /* max-w di HP: tiket ini duduk sebagai hamparan di pojok kiri-atas
          chart, dan tanpa batas ia melebar mengikuti isinya sampai ~306 px —
@@ -646,6 +694,18 @@ export function PojokOrder({
             className="ml-auto flex shrink-0 cursor-pointer items-center rounded p-1 text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-200">
             {ringkas ? <ChevronsUpDown className="size-3.5" /> : <ChevronsDownUp className="size-3.5" />}
           </button>
+          {/* Lipat — hanya mode COPY; alasannya di catatan dekat `lipatCopy`.
+              Terpisah dari tombol ringkas di sebelahnya karena keduanya
+              menjawab hal berbeda: ringkas menyembunyikan SETELAN, ini
+              menyingkirkan seluruh tiketnya dari atas lilin. */}
+          {modeSekarang === 'copy' && (
+            <button onClick={() => setLipatCopy(true)}
+              title="Lipat tiket — sisakan lencana arahnya supaya chart terlihat penuh"
+              aria-label="Lipat tiket order"
+              className="flex shrink-0 cursor-pointer items-center rounded p-1 text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-200">
+              <Minus className="size-3.5" />
+            </button>
+          )}
         </div>
 
         <div className="flex items-end gap-1.5">
