@@ -119,13 +119,29 @@ function medanBursa(simbol: string): { bursa?: 'binance' | 'hyperliquid' } {
 const cacheFilter = new Map<string, { waktu: number; isi: any }>();
 const UMUR_FILTER_MS = 10 * 60 * 1000;
 
-async function ambilFilter(dasar: string, simbol: string, kepala: Record<string, string>) {
-  const kena = cacheFilter.get(simbol);
+/** @param bursa Bursa TUJUAN ordernya. Wajib disebut kalau sudah diketahui.
+ *
+ *  Tanpa itu server selalu mencoba Binance dulu dan baru jatuh ke Hyperliquid
+ *  kalau Binance tidak mengenal simbolnya — jadi simbol yang hidup di KEDUA
+ *  bursa (FARTCOINUSDT) selalu dijawab aturan Binance. Layar lalu membulatkan
+ *  angkanya dengan aturan Binance sementara ordernya menuju Hyperliquid, dan
+ *  pengaman di bawah menolak berangkat. Benar sebagai pengaman, tapi ordernya
+ *  tidak pernah bisa dikirim sama sekali (pemilik, 10 Sep 2026).
+ *
+ *  Kunci simpanan IKUT membawa bursanya. Satu kunci untuk dua jawaban berarti
+ *  aturan Binance yang tersimpan sepuluh menit ikut disajikan ke penanya
+ *  Hyperliquid — kekeliruan yang sama, cuma berpindah ke sisi layar. */
+async function ambilFilter(dasar: string, simbol: string, kepala: Record<string, string>,
+                           bursa?: 'binance' | 'hyperliquid' | null) {
+  const hl = bursa === 'hyperliquid';
+  const kunci = simbol + (hl ? ':hl' : '');
+  const kena = cacheFilter.get(kunci);
   if (kena && Date.now() - kena.waktu < UMUR_FILTER_MS) return kena.isi;
-  const rf = await fetch(`${dasar}/api/symbol-filters?symbol=${simbol}`, { headers: kepala });
+  const rf = await fetch(`${dasar}/api/symbol-filters?symbol=${simbol}${hl ? '&bursa=hyperliquid' : ''}`,
+    { headers: kepala });
   const f = await rf.json();
   if (!rf.ok) throw new Error(f.error || `symbol-filters menjawab ${rf.status}`);
-  cacheFilter.set(simbol, { waktu: Date.now(), isi: f });
+  cacheFilter.set(kunci, { waktu: Date.now(), isi: f });
   return f;
 }
 
@@ -226,7 +242,12 @@ export async function kirimOrderNyata(p: PermintaanNyata): Promise<{ pesan: stri
      sini: aturan harga Hyperliquid dua lapis dan tidak bisa diwakili satu
      tickSize. `keStep` dengan step 0 berarti "jangan bulatkan di sini" —
      server yang punya `bulatHarga` yang mengerjakannya. */
-  const f = await ambilFilter(dasar, p.simbol, kepala);
+  /* Ke mana ordernya benar-benar berangkat: pilihan tegas menang, lalu peta
+     chart. Dihitung SEBELUM aturan angkanya diminta — justru inilah yang
+     menentukan aturan bursa mana yang pantas ditanyakan. Null berarti belum
+     ada yang tahu; server yang memilih, seperti dulu. */
+  const bTujuan: 'binance' | 'hyperliquid' | null = p.bursa ?? bursaSimbol(p.simbol);
+  const f = await ambilFilter(dasar, p.simbol, kepala, bTujuan);
 
   /* ── ATURAN ANGKA INI MILIK BURSA MANA? ────────────────────────────────
      Dulu dijawab peta pasar chart — sumber yang BERBEDA dari sumber angkanya.
@@ -243,9 +264,11 @@ export async function kirimOrderNyata(p: PermintaanNyata): Promise<{ pesan: stri
 
      Sekarang aturannya dibaca dari yang MENGIRIM aturannya. */
   const bFilter: 'binance' | 'hyperliquid' = f.bursa === 'hyperliquid' ? 'hyperliquid' : 'binance';
-  /* Ke mana ordernya benar-benar berangkat: pilihan tegas menang, lalu peta
-     chart. Null berarti belum ada yang tahu — ditangani saat pengiriman. */
-  const bTujuan: 'binance' | 'hyperliquid' | null = p.bursa ?? bursaSimbol(p.simbol);
+  /* Pengaman ini TETAP, walau bursanya sekarang sudah diminta tegas di atas:
+     yang dijaga bukan permintaannya melainkan JAWABANNYA. Server masih boleh
+     memulangkan aturan bursa lain — cadangan, simpanan lama, atau simbol yang
+     ternyata tidak ada di sana — dan yang berangkat harus selalu angka yang
+     dibulatkan dengan aturan bursa yang menerimanya. */
   if (bTujuan && bTujuan !== bFilter) {
     /* BERHENTI, bukan memilih salah satu. Dua-duanya bisa memindahkan uang
        sungguhan ke bursa yang tidak diminta siapa pun, dan itu jauh lebih
@@ -657,7 +680,7 @@ export async function tutupPosisiNyata(p: {
   if (porsi > 0 && porsi < 1) {
     const f = await ambilFilter(dasar, p.symbol, {
       'Content-Type': 'application/json', 'X-App-Token': token.trim(),
-    });
+    }, p.bursa ?? bursaSimbol(p.symbol));
     const keHl = f.bursa === 'hyperliquid';
     const step: number = Number(f.stepSize) > 0 ? Number(f.stepSize) : (keHl ? 0 : 0.001);
     const qP: number | null = f.quantityPrecision ?? null;

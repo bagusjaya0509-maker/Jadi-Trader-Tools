@@ -4100,11 +4100,16 @@ ${pnlSunting !== null
      itu, dan penolakannya tidak boleh mengganggu apa pun). */
   const [simbolHl, setSimbolHl] = useState<string[]>([]);
   useEffect(() => {
-    /* Juga dimuat di mode real tanpa membuka daftar saran: lencana bursa
-       di panel order butuh tahu apakah koin ini ada di Hyperliquid supaya
-       bisa jadi tombol putar. Tanpa ini tombolnya baru hidup sesudah orang
-       kebetulan mengetik di kotak simbol. */
-    if (!(saranBuka || modeNyata) || simbolHl.length) return;
+    /* Dimuat untuk SEMUA simbol kripto, bukan cuma saat daftar saran terbuka
+       atau saat mode real. Sejak lencana bursa pindah ke kepala halaman
+       (pemilik, 10 Sep 2026) ia SELALU terlihat, jadi ia juga harus selalu
+       tahu apakah koin ini ada di Hyperliquid. Dengan syarat lama tombolnya
+       cuma hidup di mode real, dan lencana yang kadang bisa diklik kadang
+       tidak — tanpa pola yang bisa ditebak — lebih buruk daripada lencana
+       yang tidak bisa diklik sama sekali.
+
+       Sekali per kunjungan halaman: `simbolHl.length` menahan yang kedua. */
+    if (simbol.startsWith('MT5:') || simbolHl.length) return;
     let hidup = true;
     /* daftarSimbolHl, BUKAN ambilTickers(true): rute tickers membuang koin
        Hyperliquid yang simbolnya sudah ada di Binance, jadi dari sana koin
@@ -4113,7 +4118,7 @@ ${pnlSunting !== null
     void daftarSimbolHl().then((d) => { if (hidup) setSimbolHl(d.slice().sort()); })
       .catch(() => { /* rute ditolak/offline: saran Binance & MT5 tetap jalan */ });
     return () => { hidup = false; };
-  }, [saranBuka, modeNyata, simbolHl.length]);
+  }, [simbol, simbolHl.length]);
   /* Bursa yang memang punya simbol chart saat ini — bahan tombol putar di
      lencana bursa panel order. Dari daftar yang SAMA dengan daftar saran,
      supaya "ada di dua bursa" berarti hal yang sama di kedua tempat.
@@ -4130,6 +4135,19 @@ ${pnlSunting !== null
     if (p === 'hyperliquid' && !d.includes('hyperliquid')) d.push('hyperliquid');
     return d;
   }, [simbol, simbolAktif, simbolHl, kunciChart]);
+
+  /* Memindahkan pasar chart simbol ini, lalu memaksa lilinnya ditarik ulang.
+     `setSimbol` sengaja TIDAK disentuh: simbolnya memang tidak berubah, dan
+     mengubahnya akan menyalakan efek-efek lain yang tidak ada urusannya.
+
+     Satu jalur untuk semua pemanggil — dulu badannya ditulis langsung di
+     properti PojokOrder, dan begitu lencananya pindah, jalur itu harus ikut
+     pindah juga. Sekarang ia punya nama. */
+  const gantiBursaSimbol = useCallback((b: 'binance' | 'hyperliquid') => {
+    aturBursaSimbol(simbol, b);
+    setSegar((n) => n + 1);
+    setKunciChart((n) => n + 1);
+  }, [simbol]);
 
   const saranSimbol = useMemo(() => {
     const q = ketik.trim().replace(/^MT5:/i, '').toLowerCase();
@@ -4674,13 +4692,44 @@ ${pnlSunting !== null
               const p = bacaPasar(simbol);
               if (!p) return null;
               const hl = p === 'hyperliquid';
+              /* ── LENCANA INI SEKALIGUS SAKLARNYA ─────────────────────
+                 Pindahan dari bilah order (pemilik, 10 Sep 2026). Klik
+                 "BINANCE" → pindah ke Hyperliquid dan sebaliknya, tanpa
+                 membuka daftar saran.
+
+                 Pilihannya HANYA bursa yang benar-benar punya simbol ini
+                 (`bursaTersediaSimbol`); koin yang cuma hidup di satu bursa
+                 lencananya tetap keterangan biasa, tidak bisa diklik.
+
+                 Yang diputar pasar CHART-nya, bukan keadaan lencana ini.
+                 Sesudah itu ia tetap membaca `bacaPasar()`, jadi kalau proxy
+                 ternyata jatuh balik ke Binance karena koinnya sudah tidak
+                 ada di Hyperliquid, yang tertulis di sini ikut jujur — dan
+                 order berangkat ke bursa yang TERTULIS, bukan yang diklik. */
+              const kini: 'binance' | 'hyperliquid' = hl ? 'hyperliquid' : 'binance';
+              const pilihan = bursaTersediaSimbol.filter((b, i, a) => a.indexOf(b) === i);
+              const berikut = pilihan.length > 1
+                ? pilihan[(Math.max(0, pilihan.indexOf(kini)) + 1) % pilihan.length]
+                : null;
+              const nama = (b: 'binance' | 'hyperliquid') => (b === 'hyperliquid' ? 'Hyperliquid' : 'Binance');
+              const kelas = cn('mb-1 rounded px-1.5 py-0.5 text-[10px] font-semibold tracking-wide',
+                hl ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300');
+              const tulisan = hl ? 'HYPERLIQUID' : 'BINANCE';
+              if (berikut) {
+                return (
+                  <button type="button" onClick={() => gantiBursaSimbol(berikut)}
+                    title={`Lilin dan order ${simbol} lewat ${nama(kini)}. Klik untuk pindah ke ${nama(berikut)}.`}
+                    className={cn(kelas, 'cursor-pointer transition-[filter] hover:brightness-125')}>
+                    {tulisan} ⇄
+                  </button>
+                );
+              }
               return (
-                <span className={cn('mb-1 rounded px-1.5 py-0.5 text-[10px] font-semibold tracking-wide',
-                  hl ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300')}
+                <span className={kelas}
                   title={hl
-                    ? 'Lilin dan order simbol ini lewat Hyperliquid.'
+                    ? 'Lilin dan order simbol ini lewat Hyperliquid. Koin ini tidak ada di Binance Futures, jadi tidak ada yang bisa ditukar.'
                     : `Lilin simbol ini dari Binance ${p === 'futures' ? 'Futures' : 'Spot'}; order REAL berangkat ke Binance Futures.`}>
-                  {hl ? 'HYPERLIQUID' : 'BINANCE'}
+                  {tulisan}
                 </span>
               );
             })()}
@@ -5501,18 +5550,6 @@ ${pnlSunting !== null
                           pojok={aksi ? (
                             <div ref={pojokRef}>
                             <PojokOrder
-                              simbol={simbol}
-                              bursaTersedia={bursaTersediaSimbol}
-                              onGantiBursa={(b) => {
-                                /* Jalur yang sama dengan memilih simbol yang
-                                   sama dari daftar saran dengan bursa lain
-                                   (pilihSimbol): catat pilihannya, lalu paksa
-                                   lilin ditarik ulang — setSimbol tidak
-                                   berubah, jadi tidak ada efek yang menyala
-                                   sendiri. */
-                                aturBursaSimbol(simbol, b);
-                                setSegar((n) => n + 1); setKunciChart((n) => n + 1);
-                              }}
                               posisi={aksi.posisi} hargaKini={aksi.hargaKini}
                               draf={draf} rencana={rencana} mode={aksi.mode}
                               jenis={labelJenis}

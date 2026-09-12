@@ -6,7 +6,6 @@ import { useEffect, useState } from 'react';
 const JEDA_LIPAT_SENDIRI_MS = 12_000;
 import { TrendingUp, TrendingDown, X, Check, Ban, CandlestickChart, Minus, Hourglass, Share2, Copy, ChevronsDownUp, ChevronsUpDown } from 'lucide-react';
 import { cn, uang, harga as fHarga } from '@/lib/utils';
-import { bacaPasar } from '@/lib/pasar';
 import { METODE_TP, type MetodeTp } from '@/lib/order-nyata';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -238,22 +237,17 @@ export function PojokOrder({
   peringatan, onPilih, onUbah, onKirim, onBatal, onTutup, onGantiMode, onTukarArah, mati,
   nyataSetelan, aturNyata, sibukNyata, kabar, demoSetelan, aturDemo,
   catatan, aturCatatan, qtyDemo, mt5, lotMt5, aturLotMt5, nilaiLotMt5, desimalHarga = 6,
-  simbol, bursaTersedia, onGantiBursa,
 }: {
-  /** Simbol yang sedang dibuka — dipakai HANYA untuk memberi tahu ke bursa
-   *  mana order akan berangkat. Opsional supaya pemanggil lama tidak pecah;
-   *  tanpa itu lencananya tidak digambar, bukan menebak. */
-  simbol?: string;
   /** Bursa yang MEMANG punya simbol ini — dihitung pemanggil dari daftar
    *  simbol Binance dan Hyperliquid. Lencana bursa jadi tombol putar hanya
    *  kalau isinya lebih dari satu; dengan satu bursa tidak ada yang bisa
    *  dipilih, dan tombol yang tidak mengubah apa pun lebih buruk daripada
    *  label. */
-  bursaTersedia?: ('binance' | 'hyperliquid')[];
+
   /** Dipanggil dengan bursa BERIKUTNYA saat lencana diklik. Pemanggil yang
    *  memindahkan chartnya; lencana ini tidak menyimpan keadaan sendiri dan
    *  tetap membaca bacaPasar() sesudahnya supaya sumber kebenarannya satu. */
-  onGantiBursa?: (b: 'binance' | 'hyperliquid') => void;
+
   posisi: { arah: 'BUY' | 'SELL'; masuk: number; sl: number; tp: number; pnl: number; risiko: number; unit: number } | null;
   hargaKini?: number;
   /** Label jenis order hasil letak garis entry: "Market", "Buy Limit", dst. */
@@ -890,61 +884,15 @@ export function PojokOrder({
     <div onPointerEnter={bangunkan} onPointerDown={bangunkan}
          className="flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900/85 px-1.5 py-1.5 backdrop-blur-sm">
       {Lencana}
-      {/* ── KE BURSA MANA ────────────────────────────────────────────────
-          Cuma digambar di mode order sungguhan: di mode latihan tidak ada
-          uang yang berpindah, dan lencana bursa di sana cuma menambah satu
-          hal untuk dibaca tanpa menjawab apa pun.
+      {/* Lencana bursa DICABUT dari sini 10 Sep 2026 (pemilik). Ia sekarang
+          duduk di sebelah harga terakhir di kepala halaman — satu lencana
+          bursa untuk satu layar, dan yang itu sekaligus saklarnya. Dua
+          lencana bursa berdampingan, yang satu keterangan dan yang satu
+          tombol, cuma membuat orang menebak mana yang mana.
 
-          Diturunkan dari pasar chart yang sedang tampil — bukan saklar
-          sendiri, supaya tidak ada dua sumber kebenaran yang bisa
-          berselisih tentang ke mana uangnya pergi. */}
-      {simbol && modeSekarang === 'real' && (() => {
-        const p = bacaPasar(simbol);
-        const hl = p === 'hyperliquid';
-        /* ── LENCANA JADI TOMBOL PUTAR ───────────────────────────────────
-           Diminta pemilik 8 Sep 2026: klik "Binance" → pindah ke
-           Hyperliquid (dan sebaliknya) tanpa membuka daftar saran.
-           Pilihannya HANYA bursa yang memang punya simbol ini
-           (`bursaTersedia`); koin yang cuma ada di satu bursa lencananya
-           tetap keterangan biasa.
-
-           Yang diputar bukan keadaan lencana ini, melainkan pasar chart-nya
-           (onGantiBursa → aturBursaSimbol + lilin ditarik ulang). Sesudah
-           itu lencana tetap membaca bacaPasar(), jadi kalau proxy ternyata
-           jatuh balik ke Binance, yang tertulis di sini ikut jujur — dan
-           order berangkat ke bursa yang tertulis, bukan yang diklik. */
-        const kini: 'binance' | 'hyperliquid' = hl ? 'hyperliquid' : 'binance';
-        const daftar = (bursaTersedia ?? []).filter((b, i, a) => a.indexOf(b) === i);
-        const bisaPutar = !!onGantiBursa && daftar.length > 1;
-        const berikut = bisaPutar
-          ? daftar[(Math.max(0, daftar.indexOf(kini)) + 1) % daftar.length]
-          : null;
-        const nama = (b: 'binance' | 'hyperliquid') => (b === 'hyperliquid' ? 'Hyperliquid' : 'Binance');
-        const label = hl ? 'Hyperliquid' : p ? 'Binance' : 'auto';
-        const kelas = cn('shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium',
-          hl ? 'bg-sky-500/15 text-sky-300'
-          : p ? 'bg-amber-500/15 text-amber-300'
-          : 'bg-zinc-700/50 text-zinc-400',
-          bisaPutar && 'cursor-pointer transition-[filter] hover:brightness-125');
-        if (bisaPutar && berikut) {
-          return (
-            <button type="button" onClick={() => onGantiBursa!(berikut)}
-              title={`Order berangkat ke ${nama(kini)}. Klik untuk pindah ke ${nama(berikut)} — chart ikut pindah.`}
-              className={kelas}>
-              {label} ⇄
-            </button>
-          );
-        }
-        return (
-          <span
-            title={p
-              ? `Order berangkat ke ${nama(kini)} — mengikuti pasar chart yang sedang tampil.`
-              : 'Pasar simbol ini belum terbaca di layar; server yang memilih bursanya.'}
-            className={kelas}>
-            {label}
-          </span>
-        );
-      })()}
+          Ke mana ordernya berangkat TIDAK berubah: tetap `bacaPasar(simbol)`
+          yang sama, dibaca di `kirimOrderNyata`. Yang hilang cuma
+          gambarannya di bilah ini. */}
       <button onClick={() => onPilih('BUY')} disabled={mati}
         className="flex cursor-pointer items-center gap-1 rounded bg-emerald-500/20 px-2.5 py-1 text-[11.5px] font-semibold text-emerald-300 transition-colors hover:bg-emerald-500/30 disabled:cursor-not-allowed disabled:opacity-40">
         <TrendingUp className="size-3.5" /> BUY
