@@ -6742,48 +6742,22 @@ ${pnlSunting !== null
               kepala tabelnya, supaya membuka tabel tidak mengubah apa pun
               selain menambah rinciannya. */}
           <div className="flex min-w-0 items-center gap-2 text-[11px]">
-            {/* IKON SAJA DI HP. Barisnya memakan tinggi chart di layar sempit,
-                dan chart yang dibuka dari Copy Signal sudah punya kotak order
-                menutupi sebagian atasnya. Tulisannya hilang di bawah 768 px;
-                yang tersisa ikon, dan angka P/L-nya diringkas jadi satu titik
-                berwarna supaya "ada posisi, sedang merah" tetap terbaca. */}
             <button
               onClick={() => setPosisiSembunyi((v) => !v)}
               title={posisiSembunyi ? 'Tampilkan Posisi Terbuka Kripto & Trade-Fi' : 'Sembunyikan tabel posisi'}
-              aria-label={posisiSembunyi ? 'Tampilkan posisi terbuka' : 'Sembunyikan posisi terbuka'}
               aria-expanded={!posisiSembunyi}
-              className={cn('relative flex cursor-pointer items-center gap-1.5 rounded px-2 py-1 transition-colors',
+              className={cn('flex cursor-pointer items-center gap-1.5 rounded px-2 py-1 transition-colors',
                 posisiSembunyi ? 'text-zinc-500 hover:text-zinc-300' : 'text-zinc-200')}>
-              <Briefcase className="size-3.5 md:size-3" strokeWidth={2} />
-              {/* Titik penanda hanya di HP, dan hanya kalau memang ada yang
-                  terbuka: titik yang selalu menyala tidak memberi tahu apa pun.
-                  Diturunkan dari ringkasan yang SUDAH ada — dua hitungan untuk
-                  angka yang sama suatu hari akan berselisih. */}
-              {(() => {
-                const n = (ringkasPosisi.nKripto || 0) + (ringkasPosisi.nForex || 0);
-                if (!n) return null;
-                const ada = [ringkasPosisi.kripto, ringkasPosisi.forex]
-                  .filter((v): v is number => typeof v === 'number');
-                /* null = ada posisi tapi nilainya belum terbaca. Itu keadaan
-                   yang berbeda dari nol, dan warnanya harus berbeda juga. */
-                const t = ada.length ? ada.reduce((a, b) => a + b, 0) : null;
-                return (
-                  <span aria-hidden
-                    className={cn('absolute right-0.5 top-0.5 size-1.5 rounded-full md:hidden',
-                      t === null ? 'bg-zinc-500' : t >= 0 ? 'bg-emerald-500' : 'bg-red-400')} />
-                );
-              })()}
-              <span className="hidden md:inline">Posisi Trade</span>
-              <span className="hidden md:inline">
-                {posisiSembunyi ? <ChevronDown className="size-3" /> : <ChevronUp className="size-3" />}
-              </span>
+              <Briefcase className="size-3" strokeWidth={2} />
+              Posisi Trade
+              {posisiSembunyi ? <ChevronDown className="size-3" /> : <ChevronUp className="size-3" />}
             </button>
-            <span className="hidden h-3 w-px bg-zinc-800 md:block" aria-hidden />
+            <span className="h-3 w-px bg-zinc-800" aria-hidden />
             {([
               ['Kripto', ringkasPosisi.kripto, ringkasPosisi.nKripto],
               ['Trade-Fi', ringkasPosisi.forex, ringkasPosisi.nForex],
             ] as const).map(([nama, t, n], i) => (
-              <span key={nama} className="hidden items-center gap-1 whitespace-nowrap text-zinc-500 md:flex">
+              <span key={nama} className="flex items-center gap-1 whitespace-nowrap text-zinc-500">
                 {i > 0 && <span className="mr-1 text-zinc-800">·</span>}
                 {nama}
                 <span className={cn('angka',
@@ -6798,9 +6772,9 @@ ${pnlSunting !== null
             title={backtestBuka ? 'Tutup panel Backtest' : 'Buka panel Backtest (beta)'}
             className={cn('flex cursor-pointer items-center gap-1.5 rounded px-2 py-1 text-[11px] transition-colors',
               backtestBuka ? 'text-zinc-200' : 'text-zinc-500 hover:text-zinc-300')}>
-            <FlaskConical className="size-3.5 md:size-3" strokeWidth={2} />
-            <span className="hidden md:inline">Backtest</span>
-            <span className="hidden rounded bg-amber-500/15 px-1 text-[9.5px] text-amber-400/90 md:inline">beta</span>
+            <FlaskConical className="size-3" strokeWidth={2} />
+            Backtest
+            <span className="rounded bg-amber-500/15 px-1 text-[9.5px] text-amber-400/90">beta</span>
           </button>
         </div>
 
