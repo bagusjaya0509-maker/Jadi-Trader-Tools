@@ -34,6 +34,8 @@ import { ringkasKanal, type RingkasKanal } from '@/lib/ringkas-kanal';
 import { usePinAnalis } from '@/lib/pin-analis';
 import { cn, uang, persen, harga as fHarga, tanggalPendek, tanggalAngka, waktuLalu } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
+import { modePreview } from '@/lib/preview';
+import { PerluMasuk } from '@/components/perlu-masuk';
 import { useRiwayat, useSaldoAwal } from '@/lib/data';
 import { useHargaPasar, useHargaTradeFi } from '@/lib/harga';
 import { simbolDasarMt5 } from '@/lib/simbol';
@@ -1740,7 +1742,59 @@ function pasarKripto(s: RingkasAnalisa): boolean {
   return /USDT$/i.test(s.pasangan || '');
 }
 
-export default function Analisa() {
+/* ── PINTU COPY SIGNAL UNTUK TAMU PRATINJAU ───────────────────────────
+   Pengunjung pratinjau yang belum masuk berhenti DI SINI, dengan kartu
+   yang menerangkan apa yang ada di baliknya — pola yang sama dengan
+   Screener Area dan Wallet Tracking.
+
+   Dulu ia dilempar ke /akses. Melempar orang keluar dari halaman yang
+   baru saja ia klik memaksanya menebak sendiri apa yang tadi hendak ia
+   lihat, dan halaman akses tidak pernah menyebutkannya. Kartu di tempat
+   menjawab pertanyaan itu sebelum ia sempat muncul.
+
+   ── KENAPA PEMBUNGKUS, BUKAN `return` DI DALAM KOMPONENNYA ───────────
+   Isi Copy Signal memanggil belasan hook — useEffect delapan kali,
+   useMemo, usePaket, useHargaPasar, dan seterusnya. `return` lebih awal
+   di tengahnya berarti jumlah hook yang dijalankan BERUBAH begitu
+   `pengguna` berpindah dari null ke terisi, dan React menghentikan
+   seluruh halaman dengan "Rendered fewer hooks than expected".
+
+   Wallet Tracking bisa memakai return di tengah karena seluruh isinya
+   ada di komponen anak; di sini tidak. Pembungkus ini cuma punya SATU
+   hook yang selalu dipanggil, dan isinya dipasang atau dilepas sebagai
+   anak — hal yang memang sudah diurus React.
+
+   Yang dijaga bukan datanya. Papan peringkat memang boleh dilihat siapa
+   saja. Yang dijaga aset di latarnya: kantor 3D beserta dua model GLB
+   yang bisa diunduh utuh oleh siapa pun yang membuka tab jaringan. */
+export default function CopySignal() {
+  const { pengguna } = useAuth();
+  if (modePreview() && !pengguna) {
+    return (
+      <PerluMasuk
+        judul="Copy Signal"
+        ket={<>
+          Sinyal dari analis lain, agen AI, dan cermin dompet on-chain —
+          lengkap dengan rekam jejak tiap analis yang dihitung dari hasil
+          sinyalnya sendiri, bukan dari jumlah pengikutnya. Isinya ditarik
+          hidup dari server kami, dan mengikuti sebuah sinyal menempel pada
+          akun — itu sebabnya halaman ini minta kamu masuk dulu.
+        </>}
+        poin={[
+          ['Papan Peringkat Analis',
+           'Urutannya dari sinyal yang sudah selesai: winrate, drawdown harian, dan pelanggaran aturannya sendiri.'],
+          ['Market Signal',
+           'Sinyal yang sedang berjalan berikut entry, SL, dan TP-nya — bisa dibuka langsung di chart.'],
+          ['Salin ke akunmu',
+           'Lot dihitung dari modal dan risikomu sendiri, lalu ordernya berangkat ke bursa yang kamu pakai.'],
+        ]}
+      />
+    );
+  }
+  return <IsiCopySignal />;
+}
+
+function IsiCopySignal() {
   /* Sub-halaman DIBACA DARI ALAMAT (`#/copy?sub=performa`), bukan cuma dari
      state: sidebar sekarang punya sub-menu yang menunjuk langsung ke sini,
      dan tab yang tidak bisa dituju lewat alamat tidak bisa ditaut siapa pun. */
