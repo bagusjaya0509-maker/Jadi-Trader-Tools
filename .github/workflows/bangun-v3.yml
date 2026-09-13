@@ -161,8 +161,20 @@ jobs:
             # Nama berkasnya berhash, jadi dua rilis tidak pernah bertabrakan
             # nama untuk isi yang berbeda. `-n` menjaga rilis baru selalu
             # menang seandainya namanya sama persis.
+            #
+            # --preserve=timestamps BUKAN kerapian. Tanpa itu, `cp` memberi
+            # SETIAP salinan stempel waktu hari ini — termasuk berkas rilis
+            # setengah tahun lalu yang kebetulan ikut terbawa. Akibatnya
+            # pemangkas -mtime +7 di bawah tidak pernah menemukan satu pun
+            # berkas yang cukup tua, dan asetnya menumpuk tanpa batas.
+            #
+            # Terukur 13 Sep 2026: /root/v3/assets berisi 17.973 berkas,
+            # 619 MB, dan hanya 95 di antaranya (3,9 MB) yang benar-benar
+            # dirujuk situs tayang. Seluruh 17.878 sisanya bertanggal hari
+            # deploy terakhir, dan NOL yang lebih tua dari tujuh hari —
+            # pemangkasnya memang tidak pernah punya sasaran.
             if [ -d /root/v3.lama/assets ]; then
-              cp -rn /root/v3.lama/assets/. /root/v3/assets/ 2>/dev/null || true
+              cp -rn --preserve=timestamps /root/v3.lama/assets/. /root/v3/assets/ 2>/dev/null || true
             fi
 
             # Dan dipangkas, kalau tidak ia menumpuk selamanya: rilis
