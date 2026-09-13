@@ -399,6 +399,7 @@ export function usePosisi(): HasilData<Posisi[]> & { pending: OrderBursa[]; stop
                yang KEBETULAN juga tercatat di dokumen publik tetap
                berlabel Binance. */
             venue: b.bursa === 'hyperliquid' ? 'Hyperliquid' : 'Binance Live',
+            funding: b.funding,
           }
         : {
             id: `bursa-${b.simbol}`,
@@ -408,7 +409,7 @@ export function usePosisi(): HasilData<Posisi[]> & { pending: OrderBursa[]; stop
                dan sesudah jalur Hyperliquid ada itu jadi keterangan yang
                SALAH — bukan kurang lengkap, salah. */
             venue: b.bursa === 'hyperliquid' ? 'Hyperliquid' : 'Binance Live', buka: 0,
-            jumlah: b.jumlah, pnlFloat: b.pnl,
+            jumlah: b.jumlah, pnlFloat: b.pnl, funding: b.funding,
           };
     });
   }, [aktif, bursa, data, memeriksaBursa]);

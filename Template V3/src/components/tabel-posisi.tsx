@@ -101,6 +101,18 @@ export interface BarisPosisi {
    *  posisinya tidak diketahui) — dan itu ditulis apa adanya, bukan nol. */
   risikoUsd?: number;
   imbalUsd?: number;
+  /** Funding yang sudah dibayar (NEGATIF) atau diterima (POSITIF) sejak
+   *  posisi dibuka.
+   *
+   *  Bukan taksiran dan bukan ongkos yang akan datang: ini uang yang SUDAH
+   *  berpindah, terpisah dari P/L yang masih mengambang. Keduanya sengaja
+   *  jadi dua kolom — menjumlahkannya diam-diam membuat P/L berbeda dari
+   *  angka yang sama di layar bursa, dan selisih yang tidak bisa dijelaskan
+   *  lebih merusak kepercayaan daripada satu kolom tambahan.
+   *
+   *  undefined = belum/tidak diketahui, dan ditulis sebagai tanda hubung.
+   *  Nol dipakai HANYA kalau funding-nya memang nol. */
+  funding?: number;
 }
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -184,6 +196,10 @@ function gabungBaris(g: BarisPosisi[]): BarisPosisi {
     pnl: jumlah((b) => b.pnl),
     risikoUsd: jumlah((b) => b.risikoUsd),
     imbalUsd: jumlah((b) => b.imbalUsd),
+    /* DIJUMLAH, seperti uang yang lain di baris ini. Satu simbol yang
+       dibuka di dua bursa membayar funding di dua tempat, dan yang ingin
+       diketahui pemiliknya total yang sudah keluar untuk posisi itu. */
+    funding: jumlah((b) => b.funding),
     gabungBeda: beda.length ? beda : undefined,
     ket: g.length + ' order' + (beda.length ? ' · ' + beda.join(' & ') + ' beragam' : ''),
     ragu: g.map((b) => b.ragu).find(Boolean),
@@ -309,11 +325,19 @@ function MenuPorsi({ b, rect, tutup, kirim }: {
   );
 }
 
-export function TabelPosisi({ baris, kosong, onKlikBaris, onTutup, onUbah, onKlikCopy, tanpaPorsi }: {
+export function TabelPosisi({ baris, kosong, onKlikBaris, onTutup, onUbah, onKlikCopy, tanpaPorsi, kolomFunding }: {
   baris: BarisPosisi[];
   /** Tombol Tutup per baris. Kolomnya hanya muncul kalau diberikan.
    *  `porsi` 0–1: bagian posisi yang diminta ditutup. 1 = seluruhnya. */
   onTutup?: (b: BarisPosisi, porsi: number) => void;
+  /** Tampilkan kolom Funding.
+   *
+   *  Diminta pemanggil, BUKAN disimpulkan dari isi baris. Kalau disimpulkan,
+   *  kolomnya baru muncul sesudah jawaban /api/funding datang — dan seluruh
+   *  tabel bergeser ke kanan satu kolom beberapa detik sesudah tampil.
+   *  Pemanggil sudah tahu jawabannya sejak awal: funding cuma ada di perp
+   *  kripto, tidak di MT5. */
+  kolomFunding?: boolean;
   /** Sembunyikan pemilih porsi — tombol Tutup langsung menutup seluruhnya.
    *  Dipakai Trade-Fi dengan EA lama, yang mengabaikan `lot` pada TUTUP:
    *  menu yang menawarkan 50% ke terminal yang akan menutup 100% lebih
@@ -394,6 +418,12 @@ export function TabelPosisi({ baris, kosong, onKlikBaris, onTutup, onUbah, onKli
             <Th className="text-right">Size</Th>
             <Th className="text-right">Entry</Th>
             <Th className="text-right">Gerak</Th>
+            {/* Funding duduk SESUDAH Gerak, sebelum Risk. Gerak dan Funding
+                sama-sama bercerita tentang yang SUDAH terjadi sejak posisi
+                dibuka; Risk, Target, dan P/L adalah kalimat lain tentang
+                yang masih mungkin terjadi. Menyisipkannya di tengah ketiga
+                kolom terakhir memutus kalimat itu. */}
+            {kolomFunding && <Th className="text-right">Funding</Th>}
             {/* Risk & Target duduk TEPAT SEBELUM P/L, bukan di ujung.
                 Ketiganya satu kalimat yang dibaca sekali jalan: berapa yang
                 dipertaruhkan, berapa yang diincar, dan di mana posisinya
@@ -524,6 +554,18 @@ export function TabelPosisi({ baris, kosong, onKlikBaris, onTutup, onUbah, onKli
                     Dua angka telanjang bersebelahan terbaca sebagai dua
                     jumlah yang sama sifatnya; tandanya yang memberi tahu
                     mana yang keluar dari saku dan mana yang masuk. */}
+                {/* Funding yang DIBAYAR ditulis merah, yang DITERIMA hijau —
+                    aturan warna yang sama dengan P/L, karena pertanyaannya
+                    memang sama: uang ini masuk atau keluar. Tepat nol tidak
+                    diberi warna: ia bukan kabar baik dan bukan kabar buruk. */}
+                {kolomFunding && (
+                  <Td className={cn('angka text-right',
+                    b.funding === undefined ? 'text-zinc-600'
+                      : b.funding > 0 ? 'text-emerald-500/90'
+                        : b.funding < 0 ? 'text-red-400/90' : 'text-zinc-500')}>
+                    {b.funding === undefined ? '—' : uang(b.funding, true)}
+                  </Td>
+                )}
                 <Td className={cn('angka text-right',
                   b.risikoUsd === undefined ? 'text-zinc-600' : 'text-red-400/90')}>
                   {b.risikoUsd === undefined ? '—' : `-${uang(b.risikoUsd)}`}

@@ -59,6 +59,10 @@ export interface Posisi {
   jumlah?: number;
   /** PnL berjalan dalam USD, langsung dari bursa. */
   pnlFloat?: number;
+  /** Funding yang sudah dibayar (negatif) atau diterima (positif) sejak
+   *  posisi ini dibuka. null = tidak bisa dipastikan, undefined = belum
+   *  dijawab. Keterangan lengkapnya di PosisiBursa.funding. */
+  funding?: number | null;
 }
 
 /** Bursa tujuan PERINTAH untuk sebuah posisi — ditentukan oleh posisinya

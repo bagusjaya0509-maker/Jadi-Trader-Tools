@@ -424,6 +424,12 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
           sl: p.sl, tp: p.tp,
           pnl: p.pnlFloat,
           ukuranUsd: unit > 0 && p.entry > 0 ? unit * p.entry : undefined,
+          /* null dari bursa (tidak bisa dipastikan sejak kapan posisinya
+             dibuka) disamakan dengan undefined DI SINI, satu kali. Tabel cuma
+             perlu membedakan "ada angkanya" dari "tidak ada", dan membawa dua
+             bentuk ketiadaan sampai ke sel hanya menghasilkan dua cabang yang
+             menggambar tanda hubung yang sama. */
+          funding: p.funding ?? undefined,
           risikoUsd: uangDari(p.sl > 0 ? Math.abs(p.entry - p.sl) : 0, unit),
           imbalUsd: uangDari(p.tp > 0 ? Math.abs(p.tp - p.entry) : 0, unit),
         };
@@ -700,6 +706,12 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
             sampai ke penerimanya selalu tunggal. */}
         <TabelPosisi
           baris={baris}
+          /* Funding cuma ada di perp kripto; MT5 tidak mengenalnya sama
+             sekali. Diputuskan DI SINI, bukan disimpulkan tabel dari isi
+             barisnya — kalau disimpulkan, kolomnya baru muncul sesudah
+             jawaban /api/funding datang dan seluruh tabel bergeser satu
+             kolom beberapa detik sesudah tampil. */
+          kolomFunding={sumber === 'kripto'}
           /* Kripto selalu bisa sebagian - backend sudah menerima quantity
              berapa pun sejak awal. Trade-Fi menunggu EA v2.11: sebelum itu
              EA memanggil PositionClose() yang menutup PENUH berapa pun lot

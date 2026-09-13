@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { bacaKoneksi, PROXY_BAWAAN } from '@/lib/koneksi';
@@ -459,6 +459,23 @@ export interface PosisiBursa {
    *  SL yang digeser lewat aplikasi Binance ikut terbaca. */
   sl: number;
   tp: number;
+  /** Funding yang sudah dibayar (NEGATIF) atau diterima (POSITIF) posisi ini
+   *  sejak dibuka, dalam USD.
+   *
+   *  Datang dari /api/funding, bukan dari /api/positions — rute yang ini
+   *  dibaca tiap 30 detik, sedangkan funding berubah tiga kali sehari dan
+   *  menghitungnya butuh riwayat trade tiap simbol di sisi VPS.
+   *
+   *  TIGA keadaan, dan ketiganya berbeda arti:
+   *    number     — angkanya diketahui
+   *    null       — bursa tidak bisa memastikan sejak kapan posisi ini
+   *                 dibuka, jadi tidak ada rentang yang bisa dijumlah
+   *    undefined  — jawabannya belum datang
+   *
+   *  Nol TIDAK boleh dipakai untuk dua yang terakhir: kolom biaya yang
+   *  berbunyi nol menyatakan "posisi ini gratis", dan itu keterangan yang
+   *  salah, bukan keterangan yang kurang. */
+  funding?: number | null;
 }
 
 /** Satu order yang SEDANG menggantung di bursa.
@@ -541,6 +558,7 @@ export function usePosisiBinance(): {
   const [data, setData] = useState<PosisiBursa[]>([]);
   const [order, setOrder] = useState<OrderBursa[]>([]);
   const [aktif, setAktif] = useState(false);
+  const [funding, setFunding] = useState<Map<string, number | null>>(new Map());
   const [memeriksa, setMemeriksa] = useState(true);
   const sudahPertama = useRef(false);
   const { token } = bacaKoneksi();
@@ -623,6 +641,49 @@ export function usePosisiBinance(): {
     return () => { hidup = false; clearInterval(jam); };
   }, [token, pemicu]);
 
+  /* ── FUNDING: RUTE SENDIRI, PUTARAN SENDIRI ─────────────────────────
+     Funding diselesaikan tiap 8 jam di Binance, dan di sisi VPS
+     menghitungnya butuh riwayat trade tiap simbol untuk menemukan kapan
+     posisinya dibuka. Menumpangkannya pada putaran 30 detik berarti
+     belasan panggilan ke bursa tiap setengah menit demi angka yang
+     berubah tiga kali sehari.
+
+     Kegagalannya SENGAJA diam: tabel posisi tanpa kolom funding masih
+     menjawab pertanyaan utamanya, sedangkan tabel yang hilang karena
+     kolom tambahannya gagal tidak menjawab apa pun. */
+  useEffect(() => {
+    if (!token.trim()) { setFunding(new Map()); return; }
+    let hidup = true;
+    async function ambilFunding() {
+      try {
+        const r = await fetch(`${dasar()}/api/funding`, { headers: { 'X-App-Token': token.trim() } });
+        if (!r.ok) return;
+        const j = await r.json();
+        if (!hidup) return;
+        setFunding(new Map((j.funding ?? []).map((f: any) => [
+          `${f.bursa === 'hyperliquid' ? 'hyperliquid' : 'binance'}|${String(f.simbol ?? '')}`,
+          f.funding === null || f.funding === undefined ? null : Number(f.funding),
+        ] as [string, number | null])));
+      } catch { /* funding tidak boleh menjatuhkan tabel posisi */ }
+    }
+    void ambilFunding();
+    const jam = setInterval(ambilFunding, 300_000);
+    return () => { hidup = false; clearInterval(jam); };
+  }, [token, pemicu]);
+
+  /* Ditempelkan DI SINI, bukan di dalam ambil(): dua putaran dengan
+     kecepatan berbeda tidak boleh saling menunggu. Posisi yang datang
+     duluan tampil duluan; funding menyusul menambahinya.
+
+     Kuncinya bursa+simbol, bukan simbol saja. FARTCOINUSDT hidup di
+     Binance DAN Hyperliquid pada akun ini, dengan funding yang berbeda —
+     kunci bersimbol saja akan menempelkan biaya bursa yang satu ke posisi
+     bursa yang lain. */
+  const dataFunding = useMemo(
+    () => data.map((p) => ({ ...p, funding: funding.get(`${p.bursa}|${p.simbol}`) })),
+    [data, funding],
+  );
+
   /* ── DENGARKAN ORDER YANG BARU BERANGKAT ────────────────────────────
      order-nyata.ts mengumumkan 'jt:order-nyata-berubah' sesudah order
      terkirim, SL/TP terpasang, diubah, atau dibatalkan. Ditarik DUA kali:
@@ -640,7 +701,7 @@ export function usePosisiBinance(): {
     window.addEventListener('jt:order-nyata-berubah', dengar);
     return () => { window.removeEventListener('jt:order-nyata-berubah', dengar); if (t) clearTimeout(t); };
   }, []);
-  return { data, order, aktif, memeriksa, segarkan: () => setPemicu((n) => n + 1) };
+  return { data: dataFunding, order, aktif, memeriksa, segarkan: () => setPemicu((n) => n + 1) };
 }
 
 /** Unggah satu gambar ke VPS, dapat URL publiknya.
