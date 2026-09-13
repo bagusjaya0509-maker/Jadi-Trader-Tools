@@ -1,0 +1,17 @@
+TRADING FLOOR — MINI ROBOT OFFICE SIMULATOR
+
+Robot model: “Mini Robot” by Onur
+https://sketchfab.com/3d-models/mini-robot-3454c84d6eff4a9dabbfadbfd1f56524
+https://sketchfab.com/onurpearl
+Licensed under Creative Commons Attribution 4.0 International:
+https://creativecommons.org/licenses/by/4.0/
+
+Modifications: skeleton rig, digital expression morphs, sample animation clips,
+typing animation, browser material adaptation, NPC behavior, navigation, camera
+controls, and market displays created with OpenAI Codex.
+
+Office: the interior reconstruction created earlier in this conversation from
+the user's supplied reference. Existing furniture and architectural layout reused.
+Market screens contain fictional simulation data, not live quotes.
+
+Rendering: Three.js 0.180.0, MIT license (see vendor/LICENSE).

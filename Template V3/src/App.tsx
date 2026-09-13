@@ -355,9 +355,19 @@ function RuteChartEntry() {
    begitu dibuka dan tidak punya kartu semacam itu. Ia tidak ada di sidebar
    dan memang cuma untuk membandingkan, jadi pintunya ditutup di sini saja.
 
+   /copy-signal MENYUSUL, 13 Sep 2026 — dan alasannya berbeda dari yang
+   lain di daftar ini. Bukan soal data: papan peringkat memang boleh
+   dilihat siapa saja. Yang dijaga ASET DI LATARNYA — kantor 3D beserta
+   dua model GLB-nya, 25 MB karya yang bisa diunduh utuh oleh siapa pun
+   yang membuka tab jaringan.
+
+   Login tidak membuatnya mustahil disalin; tidak ada yang bisa. Yang ia
+   lakukan menaikkan ongkosnya dari "buka alamat, klik unduh" jadi "buat
+   akun dulu" — dan itu sudah cukup untuk menyaring yang sekadar lewat.
+
    Masuk sudah cukup — bukan lisensi aktif. Yang sudah masuk tetap diurus
    gerbang di bawah seperti biasa. */
-const PREVIEW_TERKUNCI = new Set(['/screener-react']);
+const PREVIEW_TERKUNCI = new Set(['/screener-react', '/copy-signal']);
 
 function Kerangka() {
   const { memuat, pemilik, langganan, pengguna } = useAuth();

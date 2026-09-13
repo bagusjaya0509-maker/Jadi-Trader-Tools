@@ -139,6 +139,43 @@ export function PapanPeringkatSignal({ data }: { data: Performa | null }) {
   const { pengguna } = useAuth();
   const navigasi = useNavigate();
 
+  /* ── LATAR 3D DI BELAKANG PAPAN — PERCOBAAN LOKAL, 13 Sep 2026 ──────
+     Berkasnya ada di public/3d/trading-floor/ dan SENGAJA tidak ikut
+     di-commit: 27 MB, sebagian besar dua model GLB. Selama masih
+     percobaan, ia hidup di komputer ini saja.
+
+     Dipasang lewat <iframe>, bukan dengan memanggil Three.js dari React.
+     Alasannya bukan kerapian: Rollup memuat modul secara utuh, dan satu
+     impor three.js menyeret 1,4 MB ke bundel yang dibaca SETIAP pengunjung
+     — termasuk yang tidak pernah membuka Copy Signal. Iframe menjaga
+     ongkos itu tetap milik halaman yang memakainya.
+
+     Dipasang SESUDAH cat pertama. Papan peringkat adalah hal pertama yang
+     dilihat orang di halaman ini; ia tidak boleh menunggu 25 MB model 3D
+     selesai diurai lebih dulu. Satu putaran kosong sudah cukup — yang
+     dibutuhkan cuma agar React menggambar papannya duluan. */
+  const [latar3d, setLatar3d] = useState(false);
+  /* Latar yang bisa DIMASUKI. Bawaannya mati: halaman ini dibuka untuk
+     membaca papan peringkat, dan ruangan yang langsung menangkap seretan
+     akan membuat orang yang cuma mau menggulir malah memutar kamera.
+
+     Yang berubah saat dinyalakan cuma tiga: iframe menerima tetikus,
+     tabir gelapnya dilepas, dan kontrol milik halaman 3D-nya sendiri
+     dimunculkan lagi lewat postMessage — TANPA memuat ulang, karena
+     memuat ulang berarti menunggu 25 MB model untuk sekali klik. */
+  const [main3d, setMain3d] = useState(false);
+  const bingkai3d = useRef<HTMLIFrameElement>(null);
+  function tukar3d() {
+    const baru = !main3d;
+    setMain3d(baru);
+    bingkai3d.current?.contentWindow?.postMessage(
+      baru ? 'jt:latar-mati' : 'jt:latar-hidup', '*');
+  }
+  useEffect(() => {
+    const t = setTimeout(() => setLatar3d(true), 600);
+    return () => clearTimeout(t);
+  }, []);
+
   /* Menekan seorang analis di papan MEMBUKA KANALNYA, langsung di sub
      Performa Signal — bukan di daftar sinyalnya.
      ────────────────────────────────────────────────────────────────────
@@ -257,6 +294,64 @@ export function PapanPeringkatSignal({ data }: { data: Performa | null }) {
           `Kpi` tetap dipakai di kanal per-analis di bawah, jadi
           komponennya tidak ikut dibuang. */}
       <div className="space-y-3">
+          {/* Pembungkus BERTINGKAT: latar di lapis bawah, papannya di atas.
+              Keduanya harus berbagi satu kotak yang sama supaya tingginya
+              ikut isi papan — latar setinggi tetap akan menggantung atau
+              terpotong begitu jumlah analisnya berubah. */}
+          <div className="relative">
+            {latar3d && (
+              /* aria-hidden + tabIndex -1 + pointer-events-none: ini
+                 GAMBAR, bukan isi. Pembaca layar tidak perlu menyusurinya,
+                 Tab tidak boleh masuk ke dalamnya, dan klik harus tembus ke
+                 kartu di atasnya. Iframe yang menangkap tetikus akan
+                 mematikan seluruh baris peringkat yang bisa diklik. */
+              <div aria-hidden={!main3d}
+                   className={cn('absolute inset-x-0 top-0 overflow-hidden rounded-xl transition-all duration-300',
+                     main3d
+                       ? 'pointer-events-auto z-20 h-[78vh] ring-1 ring-zinc-700'
+                       : 'pointer-events-none z-0 h-[360px]')}>
+                <iframe
+                  ref={bingkai3d}
+                  src="/3d/trading-floor/index.html?latar=1"
+                  title={main3d ? 'Kantor trading 3D' : ''}
+                  tabIndex={main3d ? 0 : -1}
+                  loading="lazy"
+                  className={cn('size-full border-0 transition-opacity duration-300',
+                    main3d ? 'opacity-100' : 'pointer-events-none opacity-70')} />
+                {/* Tabir gelap yang MENEBAL ke bawah. Bagian atas dibiarkan
+                    terbuka — di situlah ruangannya terlihat. Makin ke bawah
+                    makin pekat supaya baris peringkat tetap terbaca di atas
+                    apa pun yang kebetulan lewat di ruangan itu; teks di atas
+                    gambar bergerak adalah teks yang dibaca dua kali. */}
+                {!main3d && (
+                  <div className="absolute inset-0 bg-gradient-to-b from-zinc-950/55 via-zinc-950/75 to-zinc-950" />
+                )}
+                {/* Jalan keluarnya mengambang DI ATAS ruangan, bukan di
+                    baris judul: begitu mode jelajah menyala, ruangannya
+                    menutupi baris itu. Tombol keluar yang tertimbun oleh
+                    hal yang ingin ditinggalkan adalah jebakan, bukan
+                    tombol.
+
+                    DI TENGAH ATAS, bukan pojok kanan. Pojok kanan sudah
+                    dipakai halaman 3D-nya sendiri — lencana MARKET SIMULASI
+                    beserta tiga tombol ikon (panduan, sembunyikan
+                    antarmuka, layar penuh) — dan tombol ini mendarat tepat
+                    di atasnya. Dua tombol bertumpuk di satu titik berarti
+                    salah satunya tidak bisa ditekan, dan tidak ada yang
+                    bisa menebak yang mana.
+
+                    Tengah atas satu-satunya tepi yang memang kosong: kiri
+                    atas panel Sudut pandang, kanan panel Robot terpilih,
+                    bawah bilah kamera, kiri bawah keterangan KAMERA. */}
+                {main3d && (
+                  <button onClick={tukar3d}
+                    className="pointer-events-auto absolute left-1/2 top-3 z-30 -translate-x-1/2 cursor-pointer rounded-md border border-zinc-600 bg-zinc-950/85 px-2.5 py-1 text-[11px] text-zinc-200 shadow-lg backdrop-blur-sm transition-colors hover:border-zinc-400 hover:bg-zinc-900">
+                    Tutup ruangan
+                  </button>
+                )}
+              </div>
+            )}
+          <div className="relative z-10">
           <LeaderboardCard
             /* Bingkai dan latar panelnya dimatikan lewat className, BUKAN
                dengan menyunting components/ui/leaderboard-card.tsx.
@@ -287,6 +382,17 @@ export function PapanPeringkatSignal({ data }: { data: Performa | null }) {
                 </span>
               )}
               <span className="angka text-[11px] text-zinc-600">{totalSinyal} sinyal selesai</span>
+              {/* Menumpang baris judul yang sudah ada, bukan bilah baru.
+                  Halaman ini sudah punya tempat untuk keterangan tentang
+                  papan; satu bilah tambahan cuma untuk satu tombol akan
+                  mendorong seluruh isinya turun. */}
+              {latar3d && !main3d && (
+                <button onClick={tukar3d}
+                  title="Masuk ke ruangan 3D — kamera, robot, dan seluruh kontrolnya"
+                  className="cursor-pointer rounded border border-zinc-700 px-1.5 py-0.5 text-[10px] text-zinc-400 transition-colors hover:border-zinc-500 hover:text-zinc-200">
+                  Jelajahi ruangan
+                </button>
+              )}
             </>}
             fromDate={semuaHari[0]}
             toDate={semuaHari[semuaHari.length - 1]}
@@ -294,6 +400,8 @@ export function PapanPeringkatSignal({ data }: { data: Performa | null }) {
             podiumRankings={peringkat.slice(0, 3)}
             rankings={peringkat}
           />
+          </div>
+        </div>
 
           {/* Kedua catatan dilipat BERSAMA, satu tombol untuk keduanya.
               Dulu yang atas dititipkan lewat prop `catatan` LeaderboardCard

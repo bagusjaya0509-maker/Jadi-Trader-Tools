@@ -1,0 +1,121 @@
+@import url('./tokens.css');
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden}body{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:16px}button,input{font:inherit}button{color:inherit;cursor:pointer}button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--orange);outline-offset:4px}button:disabled{opacity:.45;cursor:wait}button svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.65;stroke-linecap:round;stroke-linejoin:round;flex:none}button{border:0;background:none}a{color:inherit}#world{position:fixed;inset:0;touch-action:none}#world canvas{display:block;width:100%;height:100%}.chrome{position:fixed;z-index:2;pointer-events:none}.chrome>*{pointer-events:auto}.topbar{top:0;left:0;right:0;height:80px;display:flex;align-items:center;justify-content:space-between;padding:0 30px;background:linear-gradient(#071016ee,#07101600)}.brand{display:flex;align-items:center;gap:13px}.brandmark{display:grid;place-items:center;width:36px;height:36px;border:1px solid #f6995055;border-radius:10px;color:var(--orange);background:#ff8a0b10;font-weight:750;font-size:19px}.brand h1{font-size:17px;font-weight:650;letter-spacing:.14em;margin:0}.brand p{font-size:12px;color:var(--muted);margin:4px 0 0;letter-spacing:.12em}.top-actions{display:flex;gap:10px;align-items:center}.sim-label{font-size:12px;letter-spacing:.08em;color:var(--muted);padding:8px 12px;border:1px solid var(--line);border-radius:6px}.icon-button{display:grid;place-items:center;width:38px;height:38px;background:#15242bc9;border:1px solid var(--line);border-radius:9px;transition:background .2s}.icon-button:hover{background:#25353e}.panel{background:linear-gradient(145deg,#122029ee,#0a151dd9);border:1px solid var(--line);box-shadow:0 12px 48px #0002;backdrop-filter:blur(18px);border-radius:15px}.view-panel{top:108px;left:28px;width:190px;padding:18px 10px 10px}.eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:550}.view-panel>.eyebrow{padding:0 10px;margin-bottom:13px}.view-button{width:100%;display:flex;align-items:center;text-align:left;gap:12px;padding:11px 10px;border-radius:8px;font-size:14px;color:#c7d1d6;transition:background .2s,color .2s}.view-button svg{opacity:.6}.view-button:hover{background:#ffffff09;color:white}.view-button.active{background:#f18a1920;color:#ffc27c}.view-button.active svg{opacity:1}.key{margin-left:auto;font-family:ui-monospace,monospace;font-size:12px;color:#72838d}.divider{height:1px;background:var(--line);margin:12px 8px}.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:9px 10px;gap:8px;font-size:13px;color:#bcc9d0;cursor:pointer}.toggle-row input{accent-color:var(--orange);width:15px;height:15px}.npc-panel{right:28px;top:108px;width:254px;padding:20px}.npc-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:17px}.npc-title button{color:var(--muted);padding:0;font-size:12px}.npc-name{font-size:22px;font-weight:580;margin:0 0 3px;letter-spacing:-.03em}.npc-role{font-size:13px;color:var(--muted);margin-bottom:17px}.npc-select{display:flex;gap:7px;margin-bottom:20px}.npc-chip{flex:1;border:1px solid var(--line);border-radius:7px;padding:7px 0;color:var(--muted);font-size:12px;letter-spacing:.04em}.npc-chip.active{background:#f18a1915;border-color:#f18a1960;color:#ffd1a4}.activity-row{display:flex;gap:9px;align-items:center;font-size:14px;min-height:38px}.activity-dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 10px #71d2a155;flex:none}.task-track{height:3px;background:#ffffff0b;border-radius:3px;margin:13px 0 18px;overflow:hidden}.task-progress{width:20%;height:100%;background:linear-gradient(90deg,#ed8239,#ffbd6d);transition:width .4s linear}.small-stats{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}.small-stats strong{font-weight:500;color:#dce4e8}.npc-actions{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:18px}.soft-button{padding:10px 8px;border:1px solid var(--line);border-radius:8px;font-size:13px;display:flex;gap:7px;align-items:center;justify-content:center;background:#ffffff03}.soft-button:hover{background:#ffffff0a}.soft-button svg{width:15px;height:15px}.hint{position:fixed;bottom:137px;left:50%;transform:translateX(-50%);font-size:12px;color:#b5c0c7;background:#0b18218c;backdrop-filter:blur(10px);padding:9px 16px;border:1px solid #ffffff09;border-radius:30px;z-index:2;white-space:nowrap;pointer-events:none}.director{bottom:45px;left:50%;transform:translateX(-50%);padding:8px;display:flex;align-items:center;gap:4px;white-space:nowrap}.mode-button{display:flex;align-items:center;gap:9px;border-radius:9px;padding:12px 17px;font-size:14px;color:var(--muted);transition:all .2s}.mode-button:hover{color:white}.mode-button.active{color:#10201a;background:#c7e8d6;box-shadow:0 4px 14px #0002}.director-divider{width:1px;height:27px;background:var(--line);margin:0 7px}.play-button{width:40px;height:42px;display:grid;place-items:center;border-radius:9px}.play-button:hover{background:#ffffff08}.speed-button{min-width:42px;font:13px ui-monospace,monospace;color:#dbe4e9;padding:12px 6px}.camera-info{left:28px;bottom:46px;display:grid;gap:6px;font-size:12px;color:var(--muted);letter-spacing:.04em}.camera-info strong{font-size:14px;color:#dae2e6;font-weight:500;letter-spacing:0}.copyright{right:27px;bottom:17px;font-size:11px;color:#8999a3;pointer-events:auto}.copyright a{text-underline-offset:3px}.clock{left:28px;bottom:17px;font:11px ui-monospace,monospace;color:#8999a3;letter-spacing:.08em}.reticle{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:6px;height:6px;border:1px solid #fff7;border-radius:50%;pointer-events:none;opacity:0}.scene-label{position:absolute;pointer-events:none;transform:translate(-50%,-100%);background:#0a1923df;border:1px solid #ffffff22;border-radius:6px;padding:5px 8px;font:11px ui-monospace,monospace;white-space:nowrap;color:#e7f1f5;display:none}.scene-label.selected{border-color:#fdb66780;color:#ffd49e}.loading{position:fixed;z-index:20;inset:0;background:radial-gradient(ellipse at 50% 30%,#20313c,#09121a 70%);display:grid;place-items:center;transition:opacity .6s}.loading.done{opacity:0;pointer-events:none}.loading-inner{width:min(340px,80vw);text-align:center}.loading-symbol{margin:0 auto 25px;width:60px;height:60px;border-radius:17px;background:#f69c2b14;border:1px solid #f69c2b55;display:grid;place-items:center;color:var(--orange);font-size:30px;font-weight:650;animation:breathe 2s infinite}.loading h2{font-size:22px;font-weight:500;letter-spacing:-.02em;margin:0 0 10px}.loading p{font-size:14px;color:var(--muted);line-height:1.6;margin:0}.loading-track{height:3px;background:#ffffff10;margin:24px 0 12px;border-radius:5px;overflow:hidden}.loading-track div{height:100%;background:var(--orange);width:8%;transition:width .3s}.load-note{font:12px ui-monospace,monospace;color:#8498a4}.loading button{margin-top:20px;border:1px solid #ffb25d80;padding:11px 18px;border-radius:8px;color:#ffc489}.toast{position:fixed;top:84px;left:50%;transform:translateX(-50%) translateY(-10px);z-index:30;background:#14232cee;border:1px solid #425561;border-radius:9px;padding:12px 18px;font-size:14px;pointer-events:none;opacity:0;transition:all .25s;max-width:90vw;text-align:center}.toast.visible{opacity:1;transform:translateX(-50%) translateY(0)}dialog{background:#0e1b24;color:var(--text);border:1px solid #38505e;border-radius:17px;max-width:460px;width:calc(100% - 32px);padding:28px;box-shadow:0 30px 90px #0008}dialog::backdrop{background:#0008;backdrop-filter:blur(5px)}dialog h2{margin:0 0 18px;font-size:23px;font-weight:550}dialog p{color:#b9c8d1;font-size:14px;line-height:1.65}dialog dl{display:grid;grid-template-columns:1fr 1.4fr;gap:14px;font-size:14px}dialog dt{color:#f2b677}dialog dd{margin:0;color:#bdcbd4}dialog button.close{margin-top:15px;background:#c7e8d6;color:#10201a;width:100%;padding:12px;border-radius:9px}.hide-ui .chrome,.hide-ui .hint,.hide-ui .scene-label{display:none!important}.hide-ui #restore-ui{display:grid}#restore-ui{display:none;position:fixed;right:18px;bottom:18px;z-index:4}.compact .npc-panel{display:none}@keyframes breathe{50%{box-shadow:0 0 40px #e68b181c;transform:translateY(-4px)}}@media(max-width:1100px){.npc-panel{width:225px;right:20px}.view-panel{left:20px;width:167px}.camera-info{display:none}.mode-button{padding:12px 13px}}@media(max-width:760px){.topbar{padding:0 16px;height:70px}.brand h1{font-size:14px;letter-spacing:.09em}.brand p{font-size:10px}.brandmark{width:32px;height:32px;font-size:17px}.sim-label{display:none}.top-actions{gap:7px}.view-panel{top:83px;left:13px;width:45px;padding:6px;border-radius:10px}.view-panel .eyebrow,.view-button span,.view-button .key,.view-panel .divider,.view-panel .toggle-row{display:none}.view-button{padding:10px 7px;justify-content:center}.view-button svg{width:18px;height:18px}.npc-panel{top:83px;right:13px;width:174px;padding:13px;border-radius:11px}.npc-title{margin-bottom:10px}.npc-title .eyebrow{font-size:10px}.npc-name{font-size:17px}.npc-role{font-size:11px;margin-bottom:10px}.npc-select{gap:4px;margin-bottom:11px}.npc-chip{font-size:10px}.activity-row{font-size:12px;min-height:28px;gap:6px}.task-track{margin:10px 0}.small-stats{font-size:10px}.npc-actions{margin-top:12px;gap:5px}.soft-button{font-size:11px;padding:8px 4px}.npc-actions svg{display:none}.director{bottom:39px;max-width:calc(100% - 22px);padding:6px;gap:0}.mode-button{font-size:12px;padding:10px;gap:6px}.mode-button svg{width:15px;height:15px}.director-divider{margin:0 3px}.play-button{width:33px;height:37px}.speed-button{min-width:33px;font-size:12px}.hint{bottom:111px;font-size:10px;padding:8px 11px;max-width:95vw;white-space:normal;text-align:center}.copyright{right:13px;font-size:9px;bottom:13px}.clock{left:13px;font-size:9px;bottom:13px}.reticle{display:none}}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}.loading-symbol{animation:none}}
+
+/* Kartu copy trade milik robot terpilih. Angkanya rata kanan dengan angka
+   tabular supaya kolomnya tidak bergoyang tiap harga berubah. */
+.dompet{margin:10px 0 2px;display:flex;flex-direction:column;gap:8px;font-variant-numeric:tabular-nums}
+.dompet-kepala{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.dompet-kepala span{font-size:12px;font-weight:600;letter-spacing:.02em}
+.dompet-kepala code{font-size:11px;opacity:.6}
+.dompet-angka{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.dompet-angka .petak{display:flex;flex-direction:column;gap:2px;padding:6px 8px;border-radius:9px;
+  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.07)}
+.dompet-angka .petak{min-width:0}
+.dompet-angka .petak span{font-size:9.5px;letter-spacing:.04em;text-transform:uppercase;opacity:.6;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Angkanya yang menentukan lebar petak, jadi ia yang harus mengalah:
+   "+$523.35" di petak sempit lebih baik mengecil daripada mendorong
+   seluruh panel keluar layar. */
+.dompet-angka .petak strong{font-size:12.5px;font-weight:600;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dompet .naik{color:#5fc79b}
+.dompet .turun{color:#e08a80}
+.dompet .diam{opacity:.72}
+.dompet-posisi{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:5px;
+  max-height:132px;overflow-y:auto}
+.dompet-posisi li{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:7px;
+  padding:5px 8px;border-radius:8px;background:rgba(255,255,255,.04);font-size:11px}
+.dompet-posisi li.tunggu{opacity:.55}
+.dompet-posisi .p-koin{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dompet-posisi .p-arah{font-size:9px;letter-spacing:.07em;padding:1px 5px;border-radius:5px;
+  background:rgba(95,199,155,.15)}
+.dompet-posisi .p-arah.turun{background:rgba(224,138,128,.16)}
+.dompet-posisi .p-tf{opacity:.6;font-variant-numeric:tabular-nums}
+.dompet-mati{margin:0;font-size:11px;line-height:1.5;opacity:.6}
+
+.dompet-sebab{display:inline-block;margin-top:4px;font-size:10.5px;opacity:.75;font-family:ui-monospace,monospace}
+
+/* Tujuh robot atau lebih: chip dibungkus jadi grid, bukan dipaksa satu
+   baris sampai tulisannya terpotong. */
+.npc-select.banyak{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+.npc-select.banyak .npc-chip{padding:5px 0;text-align:center}
+
+/* Panel melayang saat robot atau monitor diklik kanan. Bentuknya sengaja
+   sama dengan panel "Robot terpilih" di sisi kanan — satu bahasa untuk satu
+   ruangan; yang berbeda cuma ia muncul di tempat yang diklik. */
+/* PADDING WAJIB DISEBUT. `.panel` cuma memberi latar, tepi, dan sudut —
+   jaraknya datang dari `.npc-panel{padding:20px}`, dan panel ini bukan itu.
+   Tanpa baris ini tulisannya menempel ke tepi dan terbaca seperti terpotong,
+   persis yang dilaporkan pemilik 10 Sep 2026. */
+.popup-atur{position:fixed;z-index:60;width:272px;padding:16px;
+  max-height:min(74vh,540px);overflow-y:auto;
+  display:flex;flex-direction:column;gap:9px}
+/* Kepala menempel di atas saat isinya digulir: tanpa itu tombol Tutup ikut
+   hilang ke atas dan panelnya cuma bisa ditutup lewat Esc. */
+.popup-atur .npc-title{position:sticky;top:-16px;z-index:1;margin:-16px -16px 0;
+  padding:16px 16px 9px;background:linear-gradient(#122029f2,#122029e0)}
+.popup-atur .npc-title button{font-size:11px}
+.popup-atur .npc-name{margin:0}
+/* Label petak boleh turun baris. Tiga petak di panel 272 px berarti ~74 px
+   per label, dan yang dipaksa satu baris berakhir jadi "TOTAL TRA…". */
+.popup-atur .dompet-angka .petak span{white-space:normal;overflow:visible;line-height:1.25}
+.popup-atur .dompet-angka{gap:5px}
+/* Baris kaki boleh turun ke baris kedua. Di panel selebar 268 px "Hasil
+   +$523.35" dan "4 sinyal berjalan" tidak selalu muat berdampingan, dan yang
+   dipaksa berdampingan berakhir terpotong di tepi. */
+.popup-atur .small-stats{display:flex;flex-wrap:wrap;gap:4px 10px;justify-content:space-between}
+.atur-judul{margin-top:2px;font-size:10px;letter-spacing:.07em;text-transform:uppercase;opacity:.55}
+.atur-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+.atur-grid.tf{grid-template-columns:repeat(6,1fr)}
+/* Tombol pilihan: yang terpilih dibedakan warna DAN tebal hurufnya, bukan
+   warna saja — di layar siaran yang dikompresi, beda warna tipis hilang. */
+.pilih{cursor:pointer;padding:5px 2px;border:1px solid rgba(255,255,255,.08);
+  border-radius:7px;background:rgba(255,255,255,.03);color:inherit;
+  font:inherit;font-size:10.5px;line-height:1.1;opacity:.72;
+  transition:background-color .12s,opacity .12s}
+.pilih:hover{background:rgba(255,255,255,.09);opacity:1}
+.pilih.aktif{background:rgba(122,189,189,.22);border-color:rgba(122,189,189,.5);
+  font-weight:600;opacity:1}
+
+/* Panel mode atur. Duduk di kiri bawah supaya tidak menutupi panel robot di
+   kanan — keduanya bisa terbuka bersamaan. */
+.hud-atur{left:28px;bottom:120px;width:250px;padding:16px;z-index:60;
+  display:flex;flex-direction:column;gap:8px}
+.hud-atur .npc-name{margin:0;font-size:18px;word-break:break-word}
+.hud-angka{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;
+  font:11.5px ui-monospace,monospace;color:#cfdae1}
+.hud-angka span{padding:5px 4px;border-radius:6px;background:rgba(255,255,255,.05);text-align:center}
+.hud-catat{margin:0;font-size:10.5px;line-height:1.5;color:var(--muted)}
+.hud-atur .npc-actions{margin-top:2px}
+.hud-atur .soft-button{font-size:11.5px;padding:8px 6px}
+@media(max-width:760px){.hud-atur{display:none}}
+
+/* Tombol yang memakan dua kolom di grid .npc-actions. */
+.hud-atur .soft-button.lebar{grid-column:1/-1;margin-top:-2px}
+
+
+/* ════════════════════════════════════════════════════════════════════
+   MODE LATAR — dipakai lewat ?latar=1
+   ════════════════════════════════════════════════════════════════════
+   Halaman ini punya dua peran sekarang: halaman yang dikunjungi, dan
+   latar di belakang panel lain. Yang kedua tidak boleh punya satu pun
+   benda yang bisa diklik — panel di atasnyalah yang menerima klik, dan
+   tombol yang mengintip dari balik kartu terbaca sebagai kerusakan.
+
+   Disembunyikan dengan display:none, bukan opacity:0. Yang tembus pandang
+   tetap menangkap tetikus, dan tombol tak terlihat yang bisa ditekan lebih
+   buruk daripada tombol yang terlihat. */
+html.latar .chrome,
+html.latar .hint,
+html.latar #labels,
+html.latar .reticle,
+html.latar #restore-ui,
+html.latar #loading,
+html.latar dialog { display: none !important; }
+
+/* Latar halaman dibiarkan gelap seperti aslinya — adegannya memang
+   berlantai dan berdinding, jadi tidak ada yang perlu ditembuskan. Yang
+   penting kanvasnya tidak menangkap tetikus. */
+html.latar, html.latar body { background: #08131d; }
+html.latar #world { pointer-events: none; }
+html.latar #world canvas { pointer-events: none; }
