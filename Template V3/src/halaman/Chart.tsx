@@ -30,6 +30,7 @@ import { bacaSetelanChart, simpanSetelanChart, usulSlTp } from '@/lib/replay';
 import { atr, ema } from '@/lib/jt-scan-core';
 import { ambilKlines, ambilKlinesSebelum, aturBursaSimbol, aturPasarKripto, bacaAcuanMt5, bacaNamaMt5, bacaPasar, bacaSpekMt5, bacaTickMt5, daftarSimbolHl, daftarSimbolMt5, pasarKripto, type Lilin } from '@/lib/pasar';
 import { useAkunMt5, segarkanAkunMt5 } from '@/lib/akun';
+import { kunciPasar } from '@/lib/simbol';
 /* Langsung dari admin, BUKAN lewat usePosisi(): yang dibutuhkan di sini
    cuma daftar order bursa, sementara usePosisi() juga memasang listener
    Firestore. Halaman chart dibuka lama dan sering — menambah satu
@@ -1483,7 +1484,8 @@ export default function ChartBacktest() {
      levelnya sudah berubah, baru berkata berhasil — dan pada detik yang
      sama tabelnya dipaksa membaca ulang, supaya keduanya berubah
      berbarengan. */
-  async function tungguStopBursa(simbol: string, sl: number, tp: number): Promise<boolean> {
+  async function tungguStopBursa(simbol: string, sl: number, tp: number,
+                                 bursa?: 'binance' | 'hyperliquid'): Promise<boolean> {
     /* Toleransi relatif: harga yang dikirim sudah dibulatkan ke tick,
        tapi bursa memulangkannya dengan jumlah desimal versinya sendiri
        (63215.90 vs 63215.9). Membandingkan persis akan selalu meleset. */
@@ -1491,7 +1493,7 @@ export default function ChartBacktest() {
       !diminta || (dibursa > 0 && Math.abs(dibursa - diminta) <= Math.max(diminta * 1e-4, 1e-9));
     for (let i = 0; i < 12; i++) {
       await new Promise((r) => setTimeout(r, 900));
-      const kini = await bacaStopBursa(simbol);
+      const kini = await bacaStopBursa(simbol, bursa);
       if (kini && sama(kini.sl, sl) && sama(kini.tp, tp)) return true;
     }
     return false;
@@ -1567,7 +1569,18 @@ export default function ChartBacktest() {
            dan membatalkan satu saja meninggalkan sisanya hidup: stop
            menumpuk melebihi ukuran posisi, lalu yang tersisa menembak
            posisi BERIKUTNYA di pair yang sama. */
-        const milik = orderBursa.filter((x) => x.simbol === sunting.simbol);
+        /* MILIK BURSA INI, bukan milik simbol ini.
+           ────────────────────────────────────────────────────
+           Dilaporkan pemilik 14 Sep 2026: menggeser SL/TP posisi Binance
+           ikut mengubah posisi Hyperliquid di pair yang sama. Ini salah satu
+           dari dua sebabnya — daftar "stop lama yang harus dibatalkan"
+           memuat stop KEDUA bursa, jadi satu kali Kirim mencabut pengaman
+           posisi yang bahkan tidak sedang dibuka panelnya.
+
+           Yang kedua ada di peta stop `usePosisiBinance` (lib/admin.ts),
+           yang dulu juga berkunci simbol saja. */
+        const kunciSunting = kunciPasar(sunting.bursa, sunting.simbol);
+        const milik = orderBursa.filter((x) => kunciPasar(x.bursa, x.simbol) === kunciSunting);
         const stopLama = milik.filter((x) => x.jenis === 'SL' || x.jenis === 'TP');
         const qty = sunting.ukuran || stopLama[0]?.qty || 0;
         if (!qty) throw new Error('Ukuran posisi tidak diketahui — muat ulang halaman lalu coba lagi.');
@@ -1610,11 +1623,22 @@ export default function ChartBacktest() {
            mengirim orang membuka aplikasi bursa untuk membereskan sesuatu
            yang tidak perlu dibereskan, dan pelan-pelan mengajarinya
            mengabaikan peringatan yang sama saat suatu hari benar. */
-        const borongan = bacaPasar(sunting.simbol) === 'hyperliquid';
+        /* Bursa POSISINYA yang menentukan, bukan pasar chart. `bacaPasar`
+           menjawab satu nilai per nama simbol, jadi untuk koin yang ada di
+           dua-duanya ia memilihkan salah satu — dan salah pilih di sini
+           berakibat dua arah: melewatkan pembatalan yang perlu (stop lama
+           Binance tertinggal hidup di samping yang baru), atau membatalkan
+           yang tidak perlu. */
+        const borongan = sunting.bursa
+          ? sunting.bursa === 'hyperliquid'
+          : bacaPasar(sunting.simbol) === 'hyperliquid';
         const sisa: string[] = [];
         if (!borongan) {
           for (const o of stopLama) {
-            try { await batalPendingNyata({ symbol: sunting.simbol, orderId: o.id, isAlgo: true }); }
+            try {
+              await batalPendingNyata({ symbol: sunting.simbol, orderId: o.id, isAlgo: true,
+                                        bursa: o.bursa ?? sunting.bursa });
+            }
             catch { sisa.push(`${o.jenis} ${o.pemicu}`); }
           }
         }
@@ -1629,7 +1653,7 @@ export default function ChartBacktest() {
           setSuntingKabar(`SL/TP baru terpasang, tapi ${sisa.length} order lama gagal dibatalkan (${sisa.join(', ')}). Batalkan manual di ${borongan ? 'Hyperliquid' : 'Binance'}.`);
         } else {
           setSuntingKabar('Terkirim — menunggu bursa mencatatnya…');
-          const tercatat = await tungguStopBursa(sunting.simbol, slBaru, tpBaru);
+          const tercatat = await tungguStopBursa(sunting.simbol, slBaru, tpBaru, sunting.bursa);
           segarkanBursa();
           setSuntingKabar(tercatat
             ? 'Berhasil — bursa sudah mencatat SL/TP barunya.'
@@ -1736,7 +1760,10 @@ export default function ChartBacktest() {
       const p = akunMt5.posisi.find((x) => x.tiket === sunting.tiket);
       return p ? p.profit : null;
     }
-    const p = posisiBursa.find((x) => x.simbol === sunting.simbol);
+    /* Bursanya ikut dicocokkan: pair yang terbuka di dua bursa punya dua
+       P/L yang berbeda, dan yang ditampilkan harus milik baris yang diklik. */
+    const kunciP = kunciPasar(sunting.bursa, sunting.simbol);
+    const p = posisiBursa.find((x) => kunciPasar(x.bursa, x.simbol) === kunciP);
     return p ? p.pnl : null;
   }, [sunting, akunMt5.posisi, posisiBursa]);
 
@@ -1786,7 +1813,10 @@ export default function ChartBacktest() {
       /* Pending kripto dikenali dari id-nya; SL/TP tidak dilaporkan di
          daftar order, jadi yang diperiksa cuma masih-ada atau tidak. */
       if (orderBursa.some((x) => x.id === (o.tiket ?? ''))) return;
-    } else if (posisiBursa.some((x) => x.simbol === o.simbol)) {
+    } else if (posisiBursa.some((x) => kunciPasar(x.bursa, x.simbol) === kunciPasar(o.bursa, o.simbol))) {
+      /* Sebursa, bukan cuma sesimbol. Posisi Binance yang sudah tertutup
+         akan tampak "masih ada" selama kembarannya di Hyperliquid hidup —
+         dan garisnya tetap tergambar sebagai posisi yang masih berjalan. */
       return;
     }
 
@@ -2015,7 +2045,11 @@ ${pnlSunting !== null
         setHapusMenunggu({ id: sunting.tiket ?? '', sejak: Date.now() });
         segarkanBursa();
       } else {
-        const milik = orderBursa.filter((x) => x.simbol === sunting.simbol);
+        /* Sebursa — alasan sama dengan jalur ubah SL/TP di atas. Tanpa ini,
+           menutup posisi Binance ikut mencabut stop Hyperliquid, dan posisi
+           di sana tertinggal telanjang tanpa satu pun tanda di layar. */
+        const kunciTutup = kunciPasar(sunting.bursa, sunting.simbol);
+        const milik = orderBursa.filter((x) => kunciPasar(x.bursa, x.simbol) === kunciTutup);
         const hasilTutup = await tutupPosisiNyata({
           symbol: sunting.simbol, side: sunting.arah, quantity: sunting.ukuran,
           /* Pembulatannya milik pustaka, bukan halaman ini — dan pustaka
@@ -2035,7 +2069,9 @@ ${pnlSunting !== null
         /* Alasan yang sama dengan jalur ubah SL/TP: `tutupHl` mencabut
            sendiri stop yang tersisa begitu posisinya tertutup PENUH, jadi
            membatalkannya lagi dari sini cuma menghasilkan galat palsu. */
-        const boronganTutup = bacaPasar(sunting.simbol) === 'hyperliquid';
+        const boronganTutup = sunting.bursa
+          ? sunting.bursa === 'hyperliquid'
+          : bacaPasar(sunting.simbol) === 'hyperliquid';
         const sisaTutup: string[] = [];
         /* Stop DIBIARKAN kalau posisinya cuma ditutup sebagian. Membatalkan
            SL lalu meninggalkan separuh posisi tanpa pengaman mengubah "ambil
@@ -2043,14 +2079,17 @@ ${pnlSunting !== null
            akan tahu sampai harganya bergerak. */
         if (!boronganTutup && hasilTutup.penuh) {
           for (const o of milik.filter((x) => x.jenis === 'SL' || x.jenis === 'TP')) {
-            try { await batalPendingNyata({ symbol: sunting.simbol, orderId: o.id, isAlgo: true }); }
+            try {
+              await batalPendingNyata({ symbol: sunting.simbol, orderId: o.id, isAlgo: true,
+                                        bursa: o.bursa ?? sunting.bursa });
+            }
             catch { sisaTutup.push(`${o.jenis} ${o.pemicu}`); }
           }
         }
         setSuntingKabar(!hasilTutup.penuh
           ? `Ditutup ${hasilTutup.qty} dari ${sunting.ukuran}. Sisanya tetap terbuka beserta SL/TP-nya.`
           : sisaTutup.length
-            ? `Posisi ditutup, tapi ${sisaTutup.length} stop lama gagal dibatalkan (${sisaTutup.join(', ')}). Batalkan manual di ${bacaPasar(sunting.simbol) === 'hyperliquid' ? 'Hyperliquid' : 'Binance'}.`
+            ? `Posisi ditutup, tapi ${sisaTutup.length} stop lama gagal dibatalkan (${sisaTutup.join(', ')}). Batalkan manual di ${boronganTutup ? 'Hyperliquid' : 'Binance'}.`
             : 'Posisi ditutup dan semua stop-nya dibersihkan.');
         segarkanBursa();
         /* Panelnya ditutup HANYA kalau posisinya benar-benar habis. Sisa
@@ -3920,7 +3959,15 @@ ${pnlSunting !== null
       }
       return g;
     }
-    const milik = orderBursa.filter((o) => o.jenis === 'ENTRY' && o.simbol === simbol)
+    /* Chart menampilkan SATU pasar. Untuk koin yang terdaftar di Binance
+       DAN Hyperliquid, menggambar pending kedua bursa di satu grafik berarti
+       dua garis "Buy Limit" di harga berbeda yang tidak bisa dibedakan — dan
+       mengklik salah satunya membuka panel yang mengirim perintah ke bursa
+       yang tidak punya order itu. Yang digambar milik pasar chart ini saja. */
+    const bursaChart: 'binance' | 'hyperliquid' =
+      bacaPasar(simbol) === 'hyperliquid' ? 'hyperliquid' : 'binance';
+    const milik = orderBursa.filter((o) => o.jenis === 'ENTRY' && o.simbol === simbol
+                                           && kunciPasar(o.bursa, o.simbol) === kunciPasar(bursaChart, simbol))
       /* Order yang SEDANG dipegang panel tiket sudah digambar sebagai
          garis Entry beserta rencana SL/TP-nya. Menggambarnya sekali lagi
          dari bursa menaruh dua garis di harga yang sama persis — terbaca
@@ -3950,6 +3997,9 @@ ${pnlSunting !== null
         pilih: {
           pasar: 'kripto', jenis: 'pending',
           simbolChart: o.simbol, simbol: o.simbol, arah: o.arah,
+          /* Bursa ordernya dibawa serta — perintah batal/ubah tidak boleh
+             menebaknya dari nama simbol. */
+          bursa: o.bursa,
           entry: o.pemicu || o.harga,
           /* RENCANA TIDAK IKUT. SL/TP yang masih catatan lokal belum ada di
              bursa; menggambarnya sebagai garis yang bisa diseret lalu

@@ -219,6 +219,13 @@ export function PanelPosisiTerbuka({ sumber, onSunting, onTutup, onUbahSlTp, onB
         /* MT5 lain cerita: SL/TP menempel di order pending-nya sendiri,
            jadi angka dari EA memang sudah terpasang — bukan rencana. */
         harga: o.harga, sl: o.sl, tp: o.tp, rencana: false,
+        /* Disebut walau selalu kosong: "bursa" di sini berarti Binance atau
+           Hyperliquid, dan MT5 bukan keduanya — ordernya lewat broker sendiri
+           dengan tiketnya sendiri. Ditulis eksplisit supaya kedua cabang
+           punya bentuk yang sama; tanpa itu, satu-satunya cara membaca
+           `bursa` dari daftar gabungan ini adalah dengan mencabang lagi di
+           tiap tempat yang memakainya. */
+        bursa: undefined as 'binance' | 'hyperliquid' | undefined,
       }));
 
 
@@ -234,7 +241,16 @@ export function PanelPosisiTerbuka({ sumber, onSunting, onTutup, onUbahSlTp, onB
      yang boleh dilakukan panel yang cuma bertugas menampilkan. */
   const nyasar = useMemo(
     () => (sumber === 'kripto'
-      ? cariStopNyasar(stopKripto, posisiKripto.map((p) => ({ simbol: p.simbol, jumlah: p.jumlah ?? 0 })), pendingKripto)
+      ? cariStopNyasar(
+          stopKripto,
+          /* Bursanya IKUT. Tanpa itu posisi FARTCOINUSDT di Binance dan
+             di Hyperliquid terhitung satu, dan stop yang sah di salah
+             satunya dilaporkan sebagai tumpukan yang perlu dibatalkan. */
+          posisiKripto.map((p) => ({
+            simbol: p.simbol, jumlah: p.jumlah ?? 0,
+            bursa: bursaPosisi(p.venue) ?? undefined,
+          })),
+          pendingKripto)
       : []),
     [sumber, stopKripto, posisiKripto, pendingKripto]);
   /* Tiket yang sedang dibatalkan. Satu per satu, bukan penanda boolean
@@ -255,7 +271,17 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
     setSibukBersih(true); setKabarBersih('');
     let sukses = 0; const gagal: string[] = [];
     for (const n of nyasar) {
-      try { await batalPendingNyata({ symbol: n.order.simbol, orderId: n.order.id, isAlgo: true }); sukses++; }
+      try {
+        await batalPendingNyata({
+          symbol: n.order.simbol, orderId: n.order.id, isAlgo: true,
+          /* Bursa ORDERNYA. Tanpa ini perintah batal diturunkan dari nama
+             simbol, dan untuk koin yang ada di dua bursa ia dikirim ke
+             bursa yang salah: yang dituju menjawab "tidak ketemu",
+             stop nyasarnya tetap hidup. */
+          bursa: n.order.bursa,
+        });
+        sukses++;
+      }
       catch { gagal.push(`${n.order.simbol} ${n.order.jenis}`); }
     }
     setSibukBersih(false);
@@ -510,7 +536,8 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
     setBatalTiket(o.kunci);
     setBatalKabar('');
     try {
-      await batalPendingNyata({ symbol: asli.simbol, orderId: asli.id, isAlgo: asli.algo });
+      await batalPendingNyata({ symbol: asli.simbol, orderId: asli.id, isAlgo: asli.algo,
+                                bursa: asli.bursa });
     } catch (e) {
       setBatalKabar(e instanceof Error ? e.message : 'Gagal membatalkan order.');
     } finally { setBatalTiket(null); }
@@ -857,6 +884,10 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
                           menghasilkan galat. Yang dibawa cuma yang
                           benar-benar terpasang. */
                        entry: o.harga, sl: o.rencana ? 0 : o.sl, tp: o.rencana ? 0 : o.tp,
+                       /* Bursanya dibawa ke chart. Panel ubah di sana memakainya
+                          untuk memilih stop mana yang miliknya — lihat
+                          kunciPasar() di lib/simbol.ts. */
+                       bursa: o.bursa,
                        ukuran: sumber === 'kripto'
                          ? (pendingKripto.find((x) => x.id === o.kunci)?.qty ?? 0)
                          : (mt5.pending.find((x) => x.tiket === o.kunci)?.lot ?? 0),

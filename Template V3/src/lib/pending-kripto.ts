@@ -1,4 +1,5 @@
 import type { OrderBursa } from '@/lib/admin';
+import { kunciPasar } from '@/lib/simbol';
 
 /* ════════════════════════════════════════════════════════════════════════
    ORDER KRIPTO YANG MENUNGGU HARGA — satu penulisan untuk dua panel
@@ -39,6 +40,10 @@ export interface BarisPending {
   tp: number;
   /** true = SL/TP-nya belum ada di bursa, baru catatan lokal. */
   rencana: boolean;
+  /** Bursa tempat order ini menggantung. Diteruskan apa adanya ke perintah
+   *  batal/ubah — koin yang terdaftar di dua bursa akan dikirim ke bursa
+   *  yang salah kalau penerimanya harus menebak dari nama simbol. */
+  bursa?: 'binance' | 'hyperliquid';
 }
 
 /** Rencana SL/TP order yang masih menggantung, dari catatan lokal.
@@ -70,8 +75,13 @@ export function barisPendingKripto(
        beberapa stop hidup sekaligus (TP bertingkat, atau sisa perubahan yang
        gagal dibatalkan), dan memilih yang pertama ketemu berarti barisnya
        menampilkan stop milik rencana yang lain. */
+    /* SEBURSA, bukan cuma sesimbol. Pending Binance yang mengambil stop
+       Hyperliquid akan menampilkan SL yang tidak pernah menjaganya — dan
+       angka yang salah di kolom SL persis jenis kebohongan yang membuat
+       orang meninggalkan posisi sambil merasa terlindungi. */
+    const kunci = kunciPasar(o.bursa, o.simbol);
     const dekat = (jenis: 'SL' | 'TP') => stop
-      .filter((x) => x.simbol === o.simbol && x.jenis === jenis)
+      .filter((x) => kunciPasar(x.bursa, x.simbol) === kunci && x.jenis === jenis)
       .sort((a, b) => Math.abs(a.pemicu - o.harga) - Math.abs(b.pemicu - o.harga))[0];
     const sl = dekat('SL');
     const tp = dekat('TP');
@@ -86,6 +96,7 @@ export function barisPendingKripto(
       sl: sl?.pemicu ?? rc?.sl ?? 0,
       tp: tp?.pemicu ?? rc?.tp ?? 0,
       rencana: !!rc,
+      bursa: o.bursa,
     };
   });
 }

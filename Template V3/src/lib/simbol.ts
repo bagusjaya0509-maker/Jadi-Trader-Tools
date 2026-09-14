@@ -148,6 +148,32 @@ export function useSimbol() {
  *
  *  Ditulis di sini, bukan di tempat pemakaian, supaya aturan yang harus
  *  cocok dengan EA hidup di SATU tempat. */
+/** Kunci yang memisahkan satu pair DI DUA BURSA.
+ *  ───────────────────────────────────────────────────────────────────
+ *  FARTCOINUSDT hidup di Binance DAN di Hyperliquid pada akun ini, dengan
+ *  posisi sendiri-sendiri dan stop sendiri-sendiri. Selama apa pun
+ *  dipasangkan lewat NAMA SIMBOL saja, dua kewajiban yang berbeda bertemu
+ *  di satu kunci — dan akibatnya bukan cuma salah tampil:
+ *
+ *    · SL/TP satu bursa muncul di baris bursa yang lain (yang terakhir
+ *      dibaca menimpa yang sebelumnya);
+ *    · menggeser SL Binance ikut membatalkan stop Hyperliquid, karena
+ *      daftar "stop lama milik simbol ini" memuat keduanya;
+ *    · penjaga stop nyasar melihat dua TP di satu posisi lalu menawarkan
+ *      membatalkan salah satunya — padahal keduanya sah, di bursa berbeda.
+ *
+ *  Ditulis SEKALI di sini, bukan sebagai template literal yang disalin ke
+ *  tujuh tempat: kunci yang disalin akan menyimpang pada hari salah satu
+ *  penyalinnya disunting, dan yang menyimpang adalah order mana yang
+ *  dibatalkan.
+ *
+ *  Bursa kosong dianggap 'binance'. Itu bukan tebakan asal — jawaban lama
+ *  dari server yang belum punya medan `bursa` memang seluruhnya Binance,
+ *  dan Hyperliquid selalu menandai barisnya sendiri. */
+export function kunciPasar(bursa: string | null | undefined, simbol: string): string {
+  return (bursa === 'hyperliquid' ? 'hyperliquid' : 'binance') + '|' + simbol;
+}
+
 export function simbolDasarMt5(nama: string): string {
   let q = nama.length;
   while (q > 0) {

@@ -1,4 +1,5 @@
 import type { OrderBursa } from '@/lib/admin';
+import { kunciPasar } from '@/lib/simbol';
 
 /* ════════════════════════════════════════════════════════════════════════
    STOP NYASAR — SL/TP yang tidak menjaga apa pun
@@ -31,19 +32,28 @@ export interface StopNyasar {
   ket: string;
 }
 
+/* ── DIHITUNG PER BURSA, BUKAN PER SIMBOL ────────────────────────
+   FARTCOINUSDT terbuka di Binance DAN Hyperliquid sekaligus. Dikelompokkan
+   per simbol, TP Binance dan TP Hyperliquid bertemu di satu keranjang, lalu
+   penjaga "menumpuk" di bawah menyimpulkan salah satunya kelebihan — dan
+   menawarkan membatalkannya. Keduanya sah; yang keliru pengelompokannya.
+
+   Bahayanya nyata dan satu arah: tombol Bersihkan akan mencabut stop yang
+   benar-benar menjaga uang, di bursa yang bahkan tidak sedang dilihat. */
 export function cariStopNyasar(
   stop: OrderBursa[],
-  posisi: { simbol: string; jumlah: number }[],
-  pending: { simbol: string }[],
+  posisi: { simbol: string; jumlah: number; bursa?: 'binance' | 'hyperliquid' }[],
+  pending: { simbol: string; bursa?: 'binance' | 'hyperliquid' }[],
 ): StopNyasar[] {
   const hasil: StopNyasar[] = [];
-  const simbol = [...new Set(stop.map((s) => s.simbol))];
+  const kunci = [...new Set(stop.map((s) => kunciPasar(s.bursa, s.simbol)))];
 
-  for (const sim of simbol) {
-    const milik = stop.filter((s) => s.simbol === sim && (s.jenis === 'SL' || s.jenis === 'TP'));
+  for (const k of kunci) {
+    const milik = stop.filter((s) => kunciPasar(s.bursa, s.simbol) === k
+                                     && (s.jenis === 'SL' || s.jenis === 'TP'));
     if (!milik.length) continue;
-    const pos = posisi.find((p) => p.simbol === sim);
-    const adaPending = pending.some((o) => o.simbol === sim);
+    const pos = posisi.find((p) => kunciPasar(p.bursa, p.simbol) === k);
+    const adaPending = pending.some((o) => kunciPasar(o.bursa, o.simbol) === k);
 
     if (!pos && !adaPending) {
       milik.forEach((o) => hasil.push({

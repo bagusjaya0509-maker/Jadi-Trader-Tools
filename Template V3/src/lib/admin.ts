@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { bacaKoneksi, PROXY_BAWAAN } from '@/lib/koneksi';
+import { kunciPasar } from '@/lib/simbol';
 
 /* ════════════════════════════════════════════════════════════════════════
    DATA PEMILIK — trafik, klien, penjualan, laporan, lisensi, status VPS
@@ -521,14 +522,21 @@ export interface OrderBursa {
  *  layar berani mengatakan "berhasil". Mengembalikan null kalau bursanya
  *  tidak menjawab — itu berbeda dari "tidak ada stop", dan bedanya
  *  penting: yang satu berarti belum tahu, yang satu berarti telanjang. */
-export async function bacaStopBursa(simbol: string): Promise<{ sl: number; tp: number } | null> {
+export async function bacaStopBursa(
+  simbol: string,
+  /** Bursa posisinya. Wajib disebut untuk koin yang terdaftar di dua-duanya —
+   *  tanpa itu, "sudah tercatat?" dijawab oleh stop bursa yang salah, dan
+   *  layar mengatakan "berhasil" untuk perubahan yang belum sampai. */
+  bursa?: 'binance' | 'hyperliquid',
+): Promise<{ sl: number; tp: number } | null> {
   const token = bacaKoneksi().token.trim();
   if (!token) return null;
   try {
     const r = await fetch(`${dasar()}/api/open-orders`, { headers: { 'X-App-Token': token } });
     if (!r.ok) return null;
     const j = await r.json();
-    const o = (j.order ?? []).find((x: any) => String(x.simbol ?? '') === simbol);
+    const cari = kunciPasar(bursa, simbol);
+    const o = (j.order ?? []).find((x: any) => kunciPasar(x.bursa, String(x.simbol ?? '')) === cari);
     return { sl: Number(o?.sl) || 0, tp: Number(o?.tp) || 0 };
   } catch { return null; }
 }
@@ -586,8 +594,18 @@ export function usePosisiBinance(): {
           const ro = await fetch(`${dasar()}/api/open-orders`, { headers: kepala });
           if (ro.ok) {
             const jo = await ro.json();
+            /* Kuncinya BURSA + SIMBOL, bukan simbol saja.
+               ─────────────────────────────────────────────────────────
+               Dilaporkan pemilik 14 Sep 2026: mengubah SL/TP posisi Binance
+               ikut mengubah yang di Hyperliquid. Di layar sebabnya persis di
+               baris ini — FARTCOINUSDT punya ringkasan stop di dua bursa,
+               keduanya ditulis ke kunci yang sama, dan yang dibaca terakhir
+               menimpa yang pertama. Dua baris posisi lalu menampilkan angka
+               yang sama, tanpa satu pun tanda bahwa salah satunya bukan
+               miliknya. */
             (jo.order ?? []).forEach((o: any) => {
-              stop.set(String(o.simbol ?? ''), { sl: Number(o.sl) || 0, tp: Number(o.tp) || 0 });
+              stop.set(kunciPasar(o.bursa, String(o.simbol ?? '')),
+                       { sl: Number(o.sl) || 0, tp: Number(o.tp) || 0 });
             });
             /* Daftar mentahnya ikut disimpan. Ringkasan sl/tp per simbol
                menjawab "posisi ini dijaga di harga berapa", tapi TIDAK
@@ -614,18 +632,26 @@ export function usePosisiBinance(): {
            posisi; menampilkannya berarti daftar sepanjang ratusan baris. */
         setData((j.positions ?? [])
           .filter((p: any) => Math.abs(Number(p.positionAmt)) > 0)
-          .map((p: any): PosisiBursa => ({
-            simbol: String(p.symbol ?? ''),
+          .map((p: any): PosisiBursa => {
             /* Bawaannya 'binance' — itu yang benar untuk jawaban lama yang
                belum punya medan ini, bukan tebakan. */
-            bursa: p.bursa === 'hyperliquid' ? 'hyperliquid' : 'binance',
-            arah: Number(p.positionAmt) > 0 ? 'BUY' : 'SELL',
-            jumlah: Math.abs(Number(p.positionAmt)) || 0,
-            entry: Number(p.entryPrice) || 0,
-            pnl: Number(p.unRealizedProfit) || 0,
-            sl: stop.get(String(p.symbol ?? ''))?.sl ?? 0,
-            tp: stop.get(String(p.symbol ?? ''))?.tp ?? 0,
-          })));
+            const bursa: PosisiBursa['bursa'] = p.bursa === 'hyperliquid' ? 'hyperliquid' : 'binance';
+            const simbol = String(p.symbol ?? '');
+            /* Dicari dengan kunci bursa+simbol — lihat catatan di peta stop
+               di atas. Tidak ketemu berarti posisi ini memang belum punya
+               stop DI BURSA INI, dan 0 mengatakannya apa adanya. */
+            const s = stop.get(kunciPasar(bursa, simbol));
+            return {
+              simbol,
+              bursa,
+              arah: Number(p.positionAmt) > 0 ? 'BUY' : 'SELL',
+              jumlah: Math.abs(Number(p.positionAmt)) || 0,
+              entry: Number(p.entryPrice) || 0,
+              pnl: Number(p.unRealizedProfit) || 0,
+              sl: s?.sl ?? 0,
+              tp: s?.tp ?? 0,
+            };
+          }));
         setAktif(true);
       } catch {
         if (hidup) { setAktif(false); }
