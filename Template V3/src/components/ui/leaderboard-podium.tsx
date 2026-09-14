@@ -97,18 +97,32 @@ export function LeaderboardPodium({ rankings, className, onPilih }: {
                   } }
               : {})}>
             <Avatar nama={r.userName} peringkat={r.rank} foto={r.foto} uid={r.userId} />
-            <div className="mt-2.5 w-full truncate text-center text-[11.5px] text-zinc-300" title={r.userName}>
+            <div className="mt-2.5 w-full truncate text-center text-[11.5px] font-medium text-white [text-shadow:0_1px_4px_rgb(0_0_0/0.85)]" title={r.userName}>
               {r.userName}
             </div>
             <div className="flex items-baseline justify-center gap-1">
-              <span className="text-[9px] uppercase tracking-wide text-zinc-600">PNL</span>
+              {/* ── DINAIKKAN DARI zinc-600 ─────────────────────────────
+                  Papan ini sekarang berdiri di atas FOTO ruangan, bukan
+                  di atas latar zinc-950 polos seperti waktu warnanya
+                  dipilih. zinc-600 (#52525b) punya rasio kontras yang
+                  masih lolos di atas hitam, tapi di atas lantai kayu yang
+                  terang ia praktis lenyap.
+
+                  Dilaporkan pemilik 14 Sep 2026: PNL, winrate, dan jumlah
+                  sinyal di podium tidak terbaca.
+
+                  Yang dinaikkan cuma yang di ATAS gambar. Keterangan di
+                  bawah kartu tetap di nada lamanya — di sana latarnya
+                  memang masih pekat, dan menaikkan semuanya berarti
+                  membuang hierarki yang sengaja dibuat. */}
+              <span className="text-[9px] uppercase tracking-wide text-zinc-200 [text-shadow:0_1px_4px_rgb(0_0_0/0.85)]">PNL</span>
               <span className={cn('angka text-[12.5px] font-semibold',
                 r.value >= 0 ? 'text-emerald-400' : 'text-red-400')}>
                 {nilaiRingkas(r.value)}
               </span>
             </div>
             {r.byline && (
-              <div className="truncate text-center text-[10px] text-zinc-600" title={r.byline}>{r.byline}</div>
+              <div className="truncate text-center text-[10px] font-medium text-white [text-shadow:0_1px_4px_rgb(0_0_0/0.85)]" title={r.byline}>{r.byline}</div>
             )}
             <div className={cn('mt-2 flex w-full items-start justify-center rounded-t-lg border border-b-0 pt-1.5',
               TINGGI[r.rank], WARNA[r.rank])}>

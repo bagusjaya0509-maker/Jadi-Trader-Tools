@@ -58,7 +58,7 @@ function Baris({ r, aku, onPilih }: {
       onPilih && 'cursor-pointer transition-colors',
       aku ? 'border-zinc-600 bg-zinc-800/60' : 'border-transparent hover:bg-zinc-900/60',
     )}>
-      <span className="angka w-5 shrink-0 text-center text-[12px] text-zinc-500">{r.rank}</span>
+      <span className="angka w-5 shrink-0 text-center text-[12px] text-zinc-200 [text-shadow:0_1px_4px_rgb(0_0_0/0.85)]">{r.rank}</span>
       {r.rank <= 3
         ? <Crown className={cn('size-3.5 shrink-0',
             r.rank === 1 ? 'text-amber-400' : r.rank === 2 ? 'text-zinc-300' : 'text-orange-400')} />
@@ -67,15 +67,17 @@ function Baris({ r, aku, onPilih }: {
                     className="size-7" kelasHuruf="text-[11px]" />
       <span className="min-w-0 grow">
         <span className="flex items-center gap-1.5">
-          <span className="truncate text-[12.5px] text-zinc-200">{r.userName}</span>
+          <span className="truncate text-[12.5px] font-medium text-white [text-shadow:0_1px_4px_rgb(0_0_0/0.85)]">{r.userName}</span>
           {r.agen && <Sparkles className="size-3 shrink-0 text-sky-300" aria-label="AI Agent" />}
           {aku && <span className="shrink-0 rounded bg-zinc-700 px-1 text-[9.5px] text-zinc-200">kamu</span>}
         </span>
+        {/* Teks di atas foto ruangan: putih + bayangan, bukan abu.
+            Alasannya sama dengan di podium. */}
         {(r.byline || r.ekstra) && (
-          <span className="block text-[10.5px] leading-snug text-zinc-600 line-clamp-2">
+          <span className="block text-[10.5px] leading-snug text-white [text-shadow:0_1px_4px_rgb(0_0_0/0.85)] line-clamp-2">
             {r.byline}
             {r.ekstra && (
-              <span className="angka text-zinc-500" title={r.ekstraJudul}> · {r.ekstra}</span>
+              <span className="angka text-zinc-200" title={r.ekstraJudul}> · {r.ekstra}</span>
             )}
           </span>
         )}
@@ -83,7 +85,7 @@ function Baris({ r, aku, onPilih }: {
       {/* ANGKANYA DIBERI NAMA. Tanpa label, "+$66.8" di ujung kanan baris
           bisa terbaca sebagai harga, saldo, atau biaya berlangganan —
           tiga hal yang sama masuk akalnya di halaman ini. */}
-      <span className="shrink-0 text-[9.5px] uppercase tracking-wide text-zinc-600">PNL</span>
+      <span className="shrink-0 text-[9.5px] uppercase tracking-wide text-zinc-200 [text-shadow:0_1px_4px_rgb(0_0_0/0.85)]">PNL</span>
       <span className={cn('angka shrink-0 text-[12.5px] font-semibold',
         r.value >= 0 ? 'text-emerald-400' : 'text-red-400')}>
         {nilaiUang(r.value)}

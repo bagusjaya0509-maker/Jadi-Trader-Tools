@@ -62,7 +62,18 @@ export const LeaderboardCard = React.forwardRef<HTMLDivElement, LeaderboardCardP
             rentang tanggal) sedangkan keterangan kanannya satu baris.
             Ditengahkan, keterangan itu menggantung di antara dua baris dan
             tidak sejajar dengan apa pun. */}
-        <div className="mb-5 flex items-start gap-2">
+        {/* ── DIGESER DARI TEPI ────────────────────────────────────
+            Halaman Copy Signal memakai kartu ini dengan `p-0` supaya latarnya
+            tembus ke foto ruangan di belakangnya — dan tanpa padding, judul
+            "Papan Peringkat Analis" duduk tepat di garis tepi foto itu.
+            Dilaporkan pemilik 14 Sep 2026: hurufnya terbaca seperti terpotong
+            oleh batas gambar.
+
+            Padding dipasang DI BARIS JUDUL, bukan dikembalikan ke kartunya:
+            yang perlu bernapas cuma baris ini. Mengembalikan padding kartu
+            akan ikut mendorong podium dan daftar peringkat ke dalam, dan
+            keduanya justru sudah pas terhadap lebar fotonya. */}
+        <div className="mb-5 flex items-start gap-2 px-3">
           <div className="min-w-0">
             <h3 className="text-[14px] font-semibold text-zinc-100">{title}</h3>
             {(dari || sampai) && (

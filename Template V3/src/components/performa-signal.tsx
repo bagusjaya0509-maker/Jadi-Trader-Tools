@@ -400,7 +400,7 @@ export function PapanPeringkatSignal({ data }: { data: Performa | null }) {
                   <Eye className="size-2.5" /> data contoh
                 </span>
               )}
-              <span className="angka text-[11px] text-zinc-600">{totalSinyal} sinyal selesai</span>
+              <span className="angka text-[11px] text-zinc-400">{totalSinyal} sinyal selesai</span>
               {/* Menumpang baris judul yang sudah ada, bukan bilah baru.
                   Halaman ini sudah punya tempat untuk keterangan tentang
                   papan; satu bilah tambahan cuma untuk satu tombol akan
