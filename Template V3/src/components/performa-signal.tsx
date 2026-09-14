@@ -154,7 +154,21 @@ export function PapanPeringkatSignal({ data }: { data: Performa | null }) {
      dilihat orang di halaman ini; ia tidak boleh menunggu 25 MB model 3D
      selesai diurai lebih dulu. Satu putaran kosong sudah cukup — yang
      dibutuhkan cuma agar React menggambar papannya duluan. */
-  const [latar3d, setLatar3d] = useState(false);
+  /* ── YANG JADI LATAR SEKARANG FOTO, BUKAN RUANGANNYA ─────────────
+     Diputuskan pemilik 14 Sep 2026. Latarnya satu berkas WebP 137 KB —
+     satu bingkai ruangan yang sama, dipotret dari sudut yang ia pilih
+     sendiri. Ruangan sungguhannya baru dimuat kalau ada yang menekan
+     "Jelajahi ruangan".
+
+     Bedanya bukan sedikit: 25 MB model GLB, WebGL, dan satu render loop
+     yang berjalan terus-menerus — semuanya untuk sesuatu yang 95%
+     pengunjung cuma lihat sebagai gambar di belakang papan peringkat.
+     Di ponsel itu terasa sebagai halaman yang panas dan tersendat sebelum
+     satu baris peringkat pun sempat dibaca.
+
+     Fotonya dibuat dari halaman 3D-nya sendiri, bukan digambar ulang:
+     kalau ruangannya berubah, potretnya diambil lagi dari sana. */
+  const FOTO_RUANGAN = '/3d/ruang-trading.webp';
   /* Latar yang bisa DIMASUKI. Bawaannya mati: halaman ini dibuka untuk
      membaca papan peringkat, dan ruangan yang langsung menangkap seretan
      akan membuat orang yang cuma mau menggulir malah memutar kamera.
@@ -164,17 +178,17 @@ export function PapanPeringkatSignal({ data }: { data: Performa | null }) {
      dimunculkan lagi lewat postMessage — TANPA memuat ulang, karena
      memuat ulang berarti menunggu 25 MB model untuk sekali klik. */
   const [main3d, setMain3d] = useState(false);
-  const bingkai3d = useRef<HTMLIFrameElement>(null);
-  function tukar3d() {
-    const baru = !main3d;
-    setMain3d(baru);
-    bingkai3d.current?.contentWindow?.postMessage(
-      baru ? 'jt:latar-mati' : 'jt:latar-hidup', '*');
-  }
-  useEffect(() => {
-    const t = setTimeout(() => setLatar3d(true), 600);
-    return () => clearTimeout(t);
-  }, []);
+  /* DILEPAS saat ditutup, tidak disembunyikan.
+     ──────────────────────────────────────────────────────────────
+     Versi sebelumnya sengaja MEMPERTAHANKAN iframe-nya supaya masuk-keluar
+     ruangan tidak berarti memuat ulang 25 MB. Itu benar selama ia memang
+     jadi latar sepanjang waktu — tapi sekarang latarnya foto, dan iframe
+     yang disembunyikan tetap menjalankan render loop-nya di belakang
+     gambar diam. Menyembunyikan yang berat bukan meringankan.
+
+     Ongkos masuk kedua kalinya kecil: modelnya sudah ada di cache
+     peramban, jadi yang diulang cuma penguraiannya. */
+  function tukar3d() { setMain3d((m) => !m); }
 
   /* Menekan seorang analis di papan MEMBUKA KANALNYA, langsung di sub
      Performa Signal — bukan di daftar sinyalnya.
@@ -299,30 +313,35 @@ export function PapanPeringkatSignal({ data }: { data: Performa | null }) {
               ikut isi papan — latar setinggi tetap akan menggantung atau
               terpotong begitu jumlah analisnya berubah. */}
           <div className="relative">
-            {latar3d && (
-              /* aria-hidden + tabIndex -1 + pointer-events-none: ini
-                 GAMBAR, bukan isi. Pembaca layar tidak perlu menyusurinya,
-                 Tab tidak boleh masuk ke dalamnya, dan klik harus tembus ke
-                 kartu di atasnya. Iframe yang menangkap tetikus akan
-                 mematikan seluruh baris peringkat yang bisa diklik. */
+            {(
+              /* aria-hidden + tabIndex -1 + pointer-events-none: selama
+                 belum dimasuki ini GAMBAR, bukan isi. Pembaca layar tidak
+                 perlu menyusurinya, Tab tidak boleh masuk ke dalamnya, dan
+                 klik harus tembus ke kartu di atasnya — lapisan yang
+                 menangkap tetikus akan mematikan seluruh baris peringkat
+                 yang bisa diklik. */
               <div aria-hidden={!main3d}
                    className={cn('absolute inset-x-0 top-0 overflow-hidden rounded-xl transition-all duration-300',
                      main3d
                        ? 'pointer-events-auto z-20 h-[78vh] ring-1 ring-zinc-700'
                        : 'pointer-events-none z-0 h-[360px]')}>
-                <iframe
-                  ref={bingkai3d}
-                  src="/3d/trading-floor/index.html?latar=1"
-                  title={main3d ? 'Kantor trading 3D' : ''}
-                  tabIndex={main3d ? 0 : -1}
-                  loading="lazy"
-                  className={cn('size-full border-0 transition-opacity duration-300',
-                    main3d ? 'opacity-100' : 'pointer-events-none opacity-70')} />
+                {/* FOTONYA TETAP TERGAMBAR di belakang iframe, bukan
+                    ditukar. Selama ruangan 3D-nya masih diurai, yang
+                    terlihat ruangan itu juga — bukan kotak hitam yang
+                    terbaca seperti gagal dimuat. */}
+                <img src={FOTO_RUANGAN} alt="" aria-hidden
+                     className="size-full object-cover object-center" />
+                {main3d && (
+                  <iframe
+                    src="/3d/trading-floor/index.html"
+                    title="Kantor trading 3D"
+                    className="absolute inset-0 size-full border-0" />
+                )}
                 {/* Tabir gelap yang MENEBAL ke bawah. Bagian atas dibiarkan
                     terbuka — di situlah ruangannya terlihat. Makin ke bawah
                     makin pekat supaya baris peringkat tetap terbaca di atas
-                    apa pun yang kebetulan lewat di ruangan itu; teks di atas
-                    gambar bergerak adalah teks yang dibaca dua kali. */}
+                    apa pun yang ada di gambarnya; teks di atas gambar ramai
+                    adalah teks yang dibaca dua kali. */}
                 {!main3d && (
                   <div className="absolute inset-0 bg-gradient-to-b from-zinc-950/55 via-zinc-950/75 to-zinc-950" />
                 )}
@@ -386,9 +405,9 @@ export function PapanPeringkatSignal({ data }: { data: Performa | null }) {
                   Halaman ini sudah punya tempat untuk keterangan tentang
                   papan; satu bilah tambahan cuma untuk satu tombol akan
                   mendorong seluruh isinya turun. */}
-              {latar3d && !main3d && (
+              {!main3d && (
                 <button onClick={tukar3d}
-                  title="Masuk ke ruangan 3D — kamera, robot, dan seluruh kontrolnya"
+                  title="Masuk ke ruangan 3D — kamera, robot, dan seluruh kontrolnya. Memuat sekitar 25 MB."
                   className="cursor-pointer rounded border border-zinc-700 px-1.5 py-0.5 text-[10px] text-zinc-400 transition-colors hover:border-zinc-500 hover:text-zinc-200">
                   Jelajahi ruangan
                 </button>
