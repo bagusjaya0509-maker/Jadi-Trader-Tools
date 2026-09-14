@@ -45,6 +45,20 @@ export interface DrafSinyal {
    *  cocok di layar yang sama. Kosong = disusun langsung di formulir,
    *  tanpa melewati chart. */
   qty?: number;
+  /** Jenis order yang DIPILIH analisnya di tiket chart: MARKET, LIMIT, atau
+   *  STOP.
+   *  ────────────────────────────────────────────────────────────────────
+   *  Server menyimpulkan sendiri jenis entry dengan membandingkan level ke
+   *  harga pasar — dan untuk MARKET kesimpulannya sering meleset, karena
+   *  acuannya harga PEMBUKA lilin pertama sesudah posting, bukan harga saat
+   *  tombolnya ditekan. Di XAUUSD selisih beberapa dolar sudah melewati
+   *  ambang 0,05% yang memisahkan "Market" dari "Buy Limit", dan sinyal yang
+   *  sebenarnya sudah masuk pasar terbaca "Menunggu harga" — menunggu harga
+   *  kembali ke tempat yang barusan ia tinggalkan.
+   *
+   *  Yang tahu jawabannya cuma tiket chart, pada detik itu, terhadap harga
+   *  hidup. Jadi jawabannya dibawa, bukan disuruh ditebak ulang. */
+  jenis?: 'MARKET' | 'LIMIT' | 'STOP';
   waktu: number;
 }
 

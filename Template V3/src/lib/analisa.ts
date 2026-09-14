@@ -235,6 +235,18 @@ export async function kirimAnalisa(d: {
    *  tidak mengirimkannya, dan server menyimpannya false. Itu jujur:
    *  persetujuan itu memang tidak pernah diminta. */
   izinJurnal?: boolean;
+  /** "Market" — satu-satunya jenis entry yang boleh dinyatakan klien, dan
+   *  hanya kalau tiket chartnya memang Market DAN levelnya masih di harga
+   *  pasar pada detik Posting ditekan.
+   *
+   *  Kenapa cuma Market: Limit dan Stop bisa disimpulkan server dari letak
+   *  level terhadap harga, kapan pun ia sempat memeriksanya. "Market" tidak
+   *  — ia pernyataan tentang SATU DETIK yang sudah lewat sebelum server
+   *  sempat menengok, dan menebaknya dari lilin berikutnya menghasilkan
+   *  "Buy Limit" untuk order yang sudah masuk pasar.
+   *
+   *  Tidak dikirim = server menyimpulkan sendiri seperti sebelumnya. */
+  jenisEntry?: 'Market';
 }) {
   return panggil('/api/analisa', { method: 'POST', body: JSON.stringify(d) });
 }

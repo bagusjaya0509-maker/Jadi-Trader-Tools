@@ -2382,6 +2382,9 @@ function IsiCopySignal() {
    *  "Risk SL" di sini menampilkan angka yang SAMA dengan tiket chart —
    *  bukan −$10 mati dari model contoh. 0 = disusun langsung di sini. */
   const [qtyDraf, setQtyDraf] = useState(0);
+  /* Jenis order dari tiket chart. null = formulir ini diisi tangan, jadi
+     tidak ada yang bisa dinyatakan — server yang menyimpulkan. */
+  const [jenisDraf, setJenisDraf] = useState<'MARKET' | 'LIMIT' | 'STOP' | null>(null);
   /** Tangkapan layar chart yang ikut di draf dari "Susun di Chart & Entry".
    *
    *  UNTUK DIPERIKSA, BUKAN UNTUK TERBIT. Jalan menambah foto ke sinyal
@@ -2502,6 +2505,7 @@ function IsiCopySignal() {
        dilihat sama saja dengan draf yang hilang — orangnya menekan "Ke Copy
        Signal" di chart lalu tiba di daftar kanal, tanpa tanda apa pun bahwa
        rencananya sudah sampai. */
+    if (d.jenis) setJenisDraf(d.jenis);
     if (d.tf) setTfSinyal(d.tf);
     setCariSub({ sub: 'posting' }, { replace: true });
     setNada('info');
@@ -2632,9 +2636,37 @@ function IsiCopySignal() {
         return;
       }
     }
+    /* ── MARKET DINYATAKAN, BUKAN DITEBAK SERVER ────────────────────
+       Dilaporkan pemilik 14 Sep 2026: sinyal yang dikirim dari tiket
+       MARKET sering mendarat sebagai "Menunggu harga" — menunggu harga
+       kembali ke tempat yang barusan ia tinggalkan.
+
+       Sebabnya beda ACUAN, bukan beda aturan. Chart dan server memakai
+       ambang yang sama (0,05% dari harga pasar), tapi chart mengukurnya
+       terhadap harga HIDUP saat tombolnya ditekan, sementara server
+       mengukurnya terhadap harga pembuka lilin pertama sesudah posting —
+       dan lilin yang memuat detik pengisiannya justru dibuang, karena ia
+       dibuka sebelum sinyalnya ada. Di XAUUSD 0,05% cuma $2,17: satu
+       gerakan biasa sudah cukup membuat "Market" terbaca "Buy Limit",
+       dan sejak itu sinyalnya menunggu harga yang tidak perlu ditunggu.
+
+       DIPERIKSA ULANG DI SINI, bukan diteruskan begitu saja. Antara tiket
+       dan tombol Posting bisa lewat beberapa menit, dan Market yang sudah
+       ditinggal harga BUKAN Market lagi — pengikutnya tidak bisa masuk di
+       situ. Kalau harganya sudah lari, pernyataannya digugurkan dan server
+       menyimpulkan sendiri seperti sebelumnya. */
+    const marketKini = (() => {
+      if (jenisDraf !== 'MARKET') return undefined;
+      const e0 = bacaAngka(entry);
+      const pasarKini = hargaUntuk(pasangan.trim().toUpperCase());
+      if (!e0 || !pasarKini) return undefined;
+      return Math.abs(e0 - pasarKini) / pasarKini < 0.0005 ? ('Market' as const) : undefined;
+    })();
+
     setSibuk(true); setKabar(''); setNada('info');
     try {
       const hasil = await kirimAnalisa({
+        jenisEntry: marketKini,
         /* Judul rekaman diturunkan dari ringkasan — kolomnya sudah dihapus
            dari formulir. Server tetap mewajibkannya, dan kartu-kartu lama
            yang judulnya berbeda dari ringkasannya tetap tampil apa adanya. */
@@ -2692,7 +2724,8 @@ function IsiCopySignal() {
       setNada('ok');
       setKabar('Analisa terposting — dan kini permanen. Semoga levelnya bekerja.' + catatanFoto);
       setRingkas(''); setEntry(''); setSl(''); setTp(''); setAlasan('');
-      setPahamPermanen(false); setQtyDraf(0); setSampulDraf(''); setSampulDariBerkas(false);
+      setPahamPermanen(false); setQtyDraf(0); setJenisDraf(null);
+      setSampulDraf(''); setSampulDariBerkas(false);
       setSampulAsli(''); setMemotong(false);
       segarkan();
     } catch (e) {

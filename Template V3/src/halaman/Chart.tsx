@@ -2186,6 +2186,10 @@ ${pnlSunting !== null
       /* Qty beku ikut dikirim — inilah yang membuat "Risk SL" di formulir
          menampilkan angka yang sama dengan tiket ini, bukan −$10 mati. */
       qty: qtyDemo.current > 0 ? qtyDemo.current : undefined,
+      /* Jenis ordernya ikut. Lihat catatan panjang di DrafSinyal.jenis:
+         server tidak bisa menyimpulkan ulang "Market" dengan andal, karena
+         acuan harganya sudah telat satu lilin saat ia sempat memeriksanya. */
+      jenis: jenisEntry,
     });
     if (!ok) { setKabarKirimSinyal('Gagal menyiapkan draf — coba lagi.'); return; }
     /* Alamat TANPA level: level sudah ikut di draf, dan menaruhnya juga di
