@@ -1142,6 +1142,26 @@ function wireUI(){
     if(key==='h')toggleUI();if(key==='f')fullscreen();const k=['overview','desk','market','meeting','top'][+key-1];if(k)setView(k);});
 }
 
-async function start(){try{setupRenderer();HIDUP.mulaiPasar();const progress={office:0,robot:0};const manager=new THREE.LoadingManager();const loader=new GLTFLoader(manager);const asset=(name)=>loader.loadAsync('./assets/'+name+'.glb',event=>{progress[name]=event.lengthComputable?event.loaded/event.total:Math.min(.85,event.loaded/(16*1024*1024));const pct=12+(progress.office+progress.robot)*40;$('#loading-progress').style.width=pct+'%';$('#loading-note').textContent=Math.round(pct)+'% · '+(progress.office>=1?'Robot & animasi':'Geometri kantor');});const results=await Promise.all([asset('office'),asset('robot'),fetch('./assets/office-layout.json').then(r=>{if(!r.ok)throw Error('Layout missing');return r.json();}),fetch('./assets/navigation.json').then(r=>{if(!r.ok)throw Error('Navigation missing');return r.json();})]);layout=results[2];nav=new Navigation(results[3]);loadOffice(results[0]);setupMarkets();for(const st of Object.values(stations))if(st.duduk)ukurKursi(st);daftarPemain=await susunPemain();pasangChip();npcs=daftarPemain.map((_,i)=>new NPC(i,results[1]));wireUI();selectNPC(0,false);$('#loading-progress').style.width='100%';$('#loading-text').textContent='Trading floor siap';await renderer.compileAsync(scene,camera);state.loaded=true;$('#loading').classList.add('done');lastTime=performance.now();requestAnimationFrame(loop);setInterval(segarkanAnalis,60000);setTimeout(()=>$('#loading').remove(),800);document.body.classList.toggle('compact',innerWidth<480);}
+async function start(){try{setupRenderer();HIDUP.mulaiPasar();const progress={office:0,robot:0};const manager=new THREE.LoadingManager();const loader=new GLTFLoader(manager);const asset=(name)=>loader.loadAsync('./assets/'+name+'.glb',event=>{progress[name]=event.lengthComputable?event.loaded/event.total:Math.min(.85,event.loaded/(16*1024*1024));const pct=12+(progress.office+progress.robot)*40;$('#loading-progress').style.width=pct+'%';$('#loading-note').textContent=Math.round(pct)+'% · '+(progress.office>=1?'Robot & animasi':'Geometri kantor');});const results=await Promise.all([asset('office'),asset('robot'),fetch('./assets/office-layout.json').then(r=>{if(!r.ok)throw Error('Layout missing');return r.json();}),fetch('./assets/navigation.json').then(r=>{if(!r.ok)throw Error('Navigation missing');return r.json();})]);layout=results[2];nav=new Navigation(results[3]);loadOffice(results[0]);setupMarkets();for(const st of Object.values(stations))if(st.duduk)ukurKursi(st);daftarPemain=await susunPemain();pasangChip();npcs=daftarPemain.map((_,i)=>new NPC(i,results[1]));wireUI();selectNPC(0,false);/* AUTO TOUR ADALAH KEADAAN AWAL, bukan pilihan yang menunggu diklik.
+   ────────────────────────────────────────────────────
+   Halaman ini paling sering TIDAK dikunjungi — ia berdiri sebagai latar
+   di belakang Papan Peringkat, dan di situ tidak ada satu pun tombol
+   yang bisa ditekan siapa pun. Kamera yang diam di satu sudut membuat
+   ruangan 25 MB ini terbaca sebagai gambar diam: robotnya memang
+   berjalan, tapi tanpa kamera yang ikut bergerak tidak ada yang sadar.
+
+   Dipasang DI SINI, bukan lewat klik tombol dari index.html.
+   Versi sebelumnya memanggil `[data-mode="cinema"]`.click() dari
+   penjadwal 250 ms dengan alasan "tombolnya baru ada sesudah main.js
+   memasang penangannya" — dan itu keliru. Tombolnya ada di HTML statis
+   sejak bait pertama, jadi penjadwalnya berhasil menemukannya pada
+   putaran PERTAMA, mengkliknya saat belum ada satu pun penangan
+   terpasang, lalu berhenti dengan puas. Kliknya jatuh ke ruang kosong.
+
+   Menekan "Jelajahi ruangan" cuma membuka kembali chrome-nya — tidak
+   memuat ulang apa pun — jadi tur yang sudah berjalan ikut terbawa.
+   Seretan pertama tetap menurunkannya ke Bebas seperti biasa (lihat
+   pendengar 'start' di controls): begitu ada yang memegang kameranya,
+   kamera itu miliknya. */setMode('cinema');$('#loading-progress').style.width='100%';$('#loading-text').textContent='Trading floor siap';await renderer.compileAsync(scene,camera);state.loaded=true;$('#loading').classList.add('done');lastTime=performance.now();requestAnimationFrame(loop);setInterval(segarkanAnalis,60000);setTimeout(()=>$('#loading').remove(),800);document.body.classList.toggle('compact',innerWidth<480);}
 catch(error){fail(error);}}
 start();
