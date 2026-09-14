@@ -5643,6 +5643,55 @@ ${pnlSunting !== null
                                 }
                               }}
                               onPilih={(arah) => {
+                                /* ── ORDER YANG SEDANG DIPEGANG DILEPAS DULU ─────
+                                   Dilaporkan pemilik 14 Sep 2026: dengan posisi
+                                   XAUUSD dan BTC masih terbuka, menekan BUY di
+                                   tiket tidak memunculkan garis SL/TP-nya —
+                                   "agak mandet dan kadang ga muncul".
+
+                                   Sebabnya bukan di tiketnya. Mengklik baris
+                                   posisi di tabel memasang `sunting`, dan
+                                   `sunting` sengaja BERTAHAN selama ordernya
+                                   masih ada di broker. Tapi `garisSeret`
+                                   memulangkan cabang sunting LEBIH DULU lalu
+                                   berhenti di situ, jadi rencana tiket yang
+                                   baru disusun tidak pernah sampai ke chart.
+                                   Yang tergambar tetap entry/SL/TP posisi
+                                   LAMA — di harga yang mirip, sehingga terbaca
+                                   seperti garis yang cuma muncul setengah.
+
+                                   Menyeretnya pun mendarat di tempat yang
+                                   salah: `onSeret` juga memeriksa `sunting`
+                                   lebih dulu, jadi seretan itu mengubah SL
+                                   posisi lama, bukan SL order baru. Angka di
+                                   tiket tidak ikut bergerak — itulah
+                                   "mandet"-nya.
+
+                                   Menggambar DUA set sekaligus sengaja tidak
+                                   dipilih: id garis seret cuma 'entry' | 'sl'
+                                   | 'tp', jadi dua set bertabrakan di id yang
+                                   sama — dan dua garis berlabel "SL" di satu
+                                   chart persis keadaan yang tidak bisa
+                                   dibedakan siapa pun.
+
+                                   Untuk MT5 pelepasan ini tidak menghilangkan
+                                   apa pun: posisinya kembali digambar sebagai
+                                   garis broker (`posisiMt5`), yang tadi
+                                   disembunyikan justru KARENA ia sedang
+                                   dipegang sunting. Layering yang dijanjikan
+                                   catatan di memo itu baru benar-benar jalan
+                                   sesudah ini.
+
+                                   KECUALI sedang mengirim. Di tengah
+                                   pengiriman panelnya menampilkan hasil yang
+                                   belum selesai, dan mencabutnya berarti
+                                   orangnya tidak pernah tahu perubahan tadi
+                                   berhasil atau tidak. */
+                                if (sunting && !suntingSibuk) lepasSunting();
+                                /* Cadangan seretan ikut gugur. Tanpa ini, Esc
+                                   sesudah menekan BUY akan memulangkan angka
+                                   ke order yang barusan dilepas. */
+                                seretAsal.current = null;
                                 setDraf(arah);
                                 setKabarNyata('');
                                 /* Tiket BARU: penandanya gugur. Menekan

@@ -35,11 +35,18 @@
 (function () {
   if (!new URLSearchParams(location.search).has('latar')) return;
   document.documentElement.classList.add('latar');
-  /* Tombolnya baru ada sesudah main.js memasang penangannya. Diklik lewat
-     antarmuka yang sama dengan yang dipakai orang, bukan dengan memanggil
-     fungsi dalamnya — main.js tidak mengumumkan satu pun fungsi ke luar,
-     dan menebaknya berarti latar ini rusak diam-diam setiap kali situs
-     aslinya diperbarui. */
+  /* Auto tour TIDAK lagi diurus di sini — lihat setMode('cinema') di
+     main.js. Dulu tempatnya memang di sini, berupa penjadwal 250 ms yang
+     mengklik tombol Auto tour "sesudah main.js sempat memasang
+     penangannya". Premisnya salah: tombol itu ada di HTML statis sejak
+     awal, jadi penjadwalnya menemukannya pada putaran pertama — jauh
+     sebelum ada penangan — mengkliknya, lalu berhenti. Yang tersisa
+     adalah latar yang diam sepenuhnya, dan tidak ada galat apa pun yang
+     mengatakannya.
+
+     Pelajarannya dipakai di tempat lain juga: menunggu "sesuatu muncul di
+     DOM" bukan cara menunggu KODE siap. Yang ditunggu harus hal yang
+     benar-benar berubah saat kesiapan itu datang. */
   /* ── SAKELAR DARI HALAMAN INDUK ──────────────────────────────────
      Induknya boleh menyalakan kembali seluruh kontrol tanpa memuat ulang
      apa pun. Memuat ulang bukan pilihan: dua model 3D di sini berjumlah
@@ -54,13 +61,6 @@
     if (e.data === 'jt:latar-mati') document.documentElement.classList.remove('latar');
     else if (e.data === 'jt:latar-hidup') document.documentElement.classList.add('latar');
   });
-
-  var coba = 0;
-  var jam = setInterval(function () {
-    var b = document.querySelector('[data-mode="cinema"]');
-    if (b) { b.click(); clearInterval(jam); }
-    else if (++coba > 40) clearInterval(jam);
-  }, 250);
 })();
 </script>
 </body></html>
