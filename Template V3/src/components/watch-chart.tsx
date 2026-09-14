@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, X, GripVertical, Pencil, FolderPlus } from 'lucide-react';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { cn, harga as fHarga } from '@/lib/utils';
-import { ambilTickers, hargaTickMt5, daftarSimbolHl, daftarSimbolMt5, type Ticker } from '@/lib/pasar';
+import { ambilTickers, hargaTickMt5, daftarSimbolHl, daftarSimbolMt5, type Ticker, ambilKlines} from '@/lib/pasar';
 import { SIMBOL_DASAR, useSimbol } from '@/lib/simbol';
 import { useMulti, kirimBus, ID_PANEL, POLOS } from '@/lib/multi-chart';
 import { db } from '@/lib/data';
@@ -170,6 +170,10 @@ export function WatchChart({ simbol, onPilih, onLebar }: {
   }, [pengguna?.uid]);
   const [tickers, setTickers] = useState<Record<string, Ticker>>({});
   const [tickMt5, setTickMt5] = useState<Record<string, { bid: number; waktu: number }>>({});
+  /* Perubahan 24 jam pair Trade-Fi. Dihitung di sini, bukan datang dari
+     server: EA tidak melaporkan persentase apa pun, ia cuma mengirim tick
+     dan lilin. */
+  const [ubahMt5, setUbahMt5] = useState<Record<string, number>>({});
   const [pilihanMt5, setPilihanMt5] = useState<string[]>([]);
   const [pilihanHl, setPilihanHl] = useState<string[]>([]);
   /* Daftar saran dibuka sendiri, bukan <datalist>. Dua sebabnya: opsi
@@ -271,10 +275,52 @@ export function WatchChart({ simbol, onPilih, onLebar }: {
        ditambahkan. Screener tetap memanggil tanpa bendera ini. */
     const tarikBinance = () => void ambilTickers(true).then((t) => { if (hidup) setTickers(t); }).catch(() => { /* diam */ });
     const tarikMt5 = () => void hargaTickMt5().then((t) => { if (hidup) setTickMt5(t); }).catch(() => { /* diam */ });
+    /* ── PERUBAHAN 24 JAM PAIR TRADE-FI ─────────────────────────────
+       Dilaporkan pemilik 14 Sep 2026: persentase di watchlist berbeda dari
+       TradingView. Untuk koin memang tidak — angkanya diambil apa adanya
+       dari `priceChangePercent` bursa, yang sudah 24 jam berjalan. Yang
+       berbeda baris TRADE-FI: ia tidak punya persentase SAMA SEKALI,
+       cuma lencana "live". Kolom yang kosong di sebelah kolom yang terisi
+       terbaca sebagai angka yang gagal dimuat, bukan sebagai angka yang
+       memang tidak ada.
+
+       Acuannya dicari lewat CAP WAKTU, bukan dengan mundur 24 lilin.
+       XAUUSD tidak diperdagangkan 24 jam penuh: akhir pekan dan jeda sesi
+       membuat lilin ke-24 di belakang bisa berumur tiga hari, dan
+       "perubahan 24 jam" yang sebenarnya mengukur tiga hari adalah angka
+       yang salah tanpa ada yang tahu.
+
+       Harga sekarang dari TICK, bukan dari lilin terakhir: itu angka yang
+       sedang tertulis di baris yang sama, dan dua angka bersebelahan yang
+       dihitung dari sumber berbeda pasti berselisih. */
+    const tarikUbahMt5 = async () => {
+      const daftar = [...new Set(seksi.flatMap((k) => k.simbol).filter((x) => x.startsWith('MT5:')))];
+      if (!daftar.length) return;
+      const hasil: Record<string, number> = {};
+      await Promise.all(daftar.map(async (sim) => {
+        const dasarS = sim.slice(4);
+        try {
+          const l = await ambilKlines(sim, '1h', 40);
+          if (!l.closes.length) return;
+          const batas = Date.now() - 24 * 3600_000;
+          let i = l.times.findIndex((t: number) => t >= batas);
+          /* Tidak ada lilin setua itu (pasar baru buka, atau EA baru
+             dipasang): dipakai yang paling tua yang kita punya. Lebih
+             pendek dari 24 jam, tapi tetap benar terhadap datanya —
+             berbeda dari mengarang nol. */
+          if (i < 0) i = 0;
+          const acuan = l.closes[i];
+          const kini = tickMt5[dasarS]?.bid || l.closes[l.closes.length - 1];
+          if (acuan > 0 && kini > 0) hasil[dasarS] = ((kini - acuan) / acuan) * 100;
+        } catch { /* satu pair gagal tidak boleh menghapus yang lain */ }
+      }));
+      if (hidup) setUbahMt5((x) => ({ ...x, ...hasil }));
+    };
     const tarikDaftar = () => void daftarSimbolMt5().then((d) => { if (hidup) setPilihanMt5(d); });
     const tarikHl = () => void daftarSimbolHl().then((d) => { if (hidup) setPilihanHl(d); }).catch(() => { /* diam */ });
     tarikBinance();
     tarikMt5();
+    void tarikUbahMt5();
     tarikDaftar();
     tarikHl();
     const jamB = setInterval(tarikBinance, 30_000);
@@ -539,7 +585,11 @@ export function WatchChart({ simbol, onPilih, onLebar }: {
                 const dasarS = mt5 ? s.slice(4) : s;
                 const t = mt5 ? undefined : tickers[s];
                 const tk = mt5 ? tickMt5[dasarS] : undefined;
-                const naik = (t?.ubah24j ?? 0) >= 0;
+                /* Satu sumber untuk dua jenis baris — kripto dari bursa,
+                   Trade-Fi dari hitungan di atas. Disatukan di sini supaya
+                   pewarnaan dan formatnya di bawah cuma ditulis sekali. */
+                const ubah = mt5 ? ubahMt5[dasarS] : t?.ubah24j;
+                const naik = (ubah ?? 0) >= 0;
                 return (
                   <div key={s}
                        draggable
@@ -617,10 +667,18 @@ export function WatchChart({ simbol, onPilih, onLebar }: {
                             yang jarang justru perlu ditandai. */}
                       </div>
                     </div>
-                    <span className={cn('angka shrink-0 text-[11px]', mt5 ? 'text-zinc-600' : naik ? 'text-emerald-500' : 'text-red-400')}>
-                      {mt5
-                        ? (tk && Date.now() - tk.waktu < 30_000 ? 'live' : '')
-                        : (t ? `${naik ? '+' : ''}${t.ubah24j.toFixed(2)}%` : '')}
+                    {/* Lencana "live" pindah ke sebelah harga sebagai titik
+                        kecil; kolom kanan sekarang milik persentase, sama
+                        untuk kedua jenis baris. Satu kolom yang artinya
+                        berganti menurut jenis barisnya adalah kolom yang
+                        harus dibaca dua kali. */}
+                    <span className={cn('angka shrink-0 text-[11px]',
+                      ubah === undefined ? 'text-zinc-600' : naik ? 'text-emerald-500' : 'text-red-400')}>
+                      {mt5 && tk && Date.now() - tk.waktu < 30_000 && (
+                        <span title="Tick dari MetaTrader kurang dari 30 detik yang lalu"
+                              className="mr-1 inline-block size-1 rounded-full bg-emerald-500 align-middle" />
+                      )}
+                      {ubah === undefined ? '—' : `${naik ? '+' : ''}${ubah.toFixed(2)}%`}
                     </span>
                     <button
                       onClick={(e) => {
