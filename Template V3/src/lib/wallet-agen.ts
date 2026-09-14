@@ -470,6 +470,38 @@ export async function hapusSalin(alamat: string): Promise<{ ok: boolean; pesan?:
   } catch { return { ok: false, pesan: 'Tidak bisa menghubungi server.' }; }
 }
 
+/** BERHENTI MENYALIN, TANPA MENUTUP APA PUN.
+ *
+ *  Bedanya dengan dua tombol yang sudah ada, dan kenapa keduanya tidak
+ *  cukup:
+ *
+ *    sakelar mati    menghentikan salinan BARU — tapi posisi yang sudah
+ *                    terbuka tetap dipegang mesin dan tetap akan ditutup
+ *                    otomatis saat dompet sumbernya melepas. Entah kapan,
+ *                    dan bisa saja tidak pernah.
+ *    `hapusSalin`    DITOLAK server (409) selama masih ada posisi salinan
+ *                    terbuka.
+ *
+ *  Jadi yang ingin lepas dari sebuah dompet sekarang juga tidak punya
+ *  jalan sama sekali. Ini jalannya: mesin melupakan posisi itu, dan
+ *  posisinya TETAP TERBUKA di bursa jadi milik pemakainya sendiri.
+ *
+ *  Sengaja TIDAK ikut menutup posisi. Tombol berlabel "berhenti menyalin"
+ *  yang diam-diam menjual posisi senilai ratusan dolar adalah kejutan yang
+ *  memakai uang sungguhan — keputusan pemilik, 14 Sep 2026. Yang dilepas
+ *  dicatat ke log salinan supaya perpindahan tanggung jawabnya terlihat. */
+export async function lepasSalin(alamat: string): Promise<{ ok: boolean; lepas?: string[]; pesan?: string }> {
+  const t = await token();
+  if (!t) return { ok: false, pesan: 'Belum masuk.' };
+  try {
+    const r = await fetch(`${dasar()}/api/agen/wallet/salin/${encodeURIComponent(alamat)}/lepas`,
+      { method: 'POST', headers: { Authorization: 'Bearer ' + t } });
+    const j = await r.json().catch(() => ({}));
+    if (r.ok) return { ok: true, lepas: j.lepas ?? [] };
+    return { ok: false, pesan: j.error || `Server menjawab ${r.status}` };
+  } catch { return { ok: false, pesan: 'Tidak bisa menghubungi server.' }; }
+}
+
 export async function hapusDompet(alamat: string): Promise<boolean> {
   const t = await token();
   if (!t) return false;

@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import { SparklineSaldo } from '@/components/kurva-saldo';
 import {
   keadaanDompet, tambahDompet, hapusDompet, peringkatDompet, tandaiTiru, batalTiru,
-  daftarSalin, simpanSalin, hapusSalin, type SetelanSalin,
+  daftarSalin, simpanSalin, hapusSalin, lepasSalin, type SetelanSalin,
   type IsiSalin, type LogSalin, type RiwayatSalin, type PosisiSalinan,
   type KeadaanDompet, type TransaksiDompet, type PosisiDompet, type Peringkat,
   type JendelaPeringkat, type PitaAkun, type RiwayatBursa, type PenandaTiru,
@@ -1114,7 +1114,7 @@ function RincianDompet({ w, posisi, log, tiru, ubahTiru, tutup, nilaiAkun }: {
    masing-masing menyimpan sendiri — di formulir yang bisa memindahkan uang,
    keadaan setengah tersimpan adalah keadaan yang bisa dipakai pemantau di
    tengah putaran, dan tidak ada yang pernah bermaksud menyimpannya. */
-function DialogSalin({ w, awal, maksLipat, tutup, simpan, hapus }: {
+function DialogSalin({ w, awal, maksLipat, tutup, simpan, hapus, lepas }: {
   w: { alamat: string; nama: string };
   awal?: SetelanSalin;
   /** Batas per koin yang sedang berlaku — GLOBAL, bukan milik dompet ini. */
@@ -1122,6 +1122,8 @@ function DialogSalin({ w, awal, maksLipat, tutup, simpan, hapus }: {
   tutup: () => void;
   simpan: (v: { aktif: boolean; bursa: string; usd: number; leverage: number; maksLipat: number; sesuaikanMinimum: boolean }) => Promise<void>;
   hapus?: () => Promise<void>;
+  /** Berhenti menyalin tanpa menutup posisi yang sudah terbuka. */
+  lepas?: () => Promise<void>;
 }) {
   const [bursa, setBursa] = useState<string>(awal?.bursa ?? 'binance');
   const [usd, setUsd] = useState(String(awal?.usd ?? 30));
@@ -1267,11 +1269,36 @@ function DialogSalin({ w, awal, maksLipat, tutup, simpan, hapus }: {
           </label>
 
           {terbuka.length > 0 && (
-            <p className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-[11px] leading-relaxed text-amber-200/80">
-              Sedang memegang {terbuka.length} posisi salinan: {terbuka.join(', ')}.
-              Mematikan sakelar menghentikan salinan BARU; posisi yang sudah terbuka tetap
-              ditutup saat dompet sumbernya melepasnya.
-            </p>
+            <div className="space-y-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2">
+              <p className="text-[11px] leading-relaxed text-amber-200/80">
+                Sedang memegang {terbuka.length} posisi salinan: {terbuka.join(', ')}.
+                Mematikan sakelar menghentikan salinan BARU; posisi yang sudah terbuka tetap
+                ditutup saat dompet sumbernya melepasnya — entah kapan, dan bisa saja
+                tidak pernah.
+              </p>
+              {lepas && (
+                <>
+                  <button disabled={sibuk}
+                    onClick={() => {
+                      if (!confirm(`Berhenti menyalin dompet ini sekarang?\n\n`
+                        + `${terbuka.length} posisi salinan (${terbuka.join(', ')}) TETAP TERBUKA `
+                        + `di bursa dan tidak ditutup.\n\n`
+                        + `Sesudah ini mesin tidak lagi mengurusnya: ia tidak akan ikut tertutup `
+                        + `saat dompet sumbernya melepas. Menutupnya jadi tugasmu, lewat tabel `
+                        + `Posisi Terbuka di Chart & Entry.`)) return;
+                      setSibuk(true); void lepas().finally(() => setSibuk(false));
+                    }}
+                    className="cursor-pointer rounded-md border border-amber-500/50 px-2.5 py-1.5 text-[12px] font-medium text-amber-200 transition-colors hover:border-amber-400 hover:bg-amber-500/10 disabled:opacity-40">
+                    {sibuk ? 'Melepas…' : 'Berhenti menyalin · posisi dibiarkan terbuka'}
+                  </button>
+                  <p className="text-[10.5px] leading-relaxed text-zinc-500">
+                    Tidak ada yang dijual. Posisinya berpindah tangan dari mesin ke kamu, dan
+                    perpindahan itu dicatat di log salinan supaya tidak ada posisi yang
+                    diam-diam jadi tak bertuan.
+                  </p>
+                </>
+              )}
+            </div>
           )}
         </div>
 
@@ -2316,6 +2343,21 @@ export function PanelWalletAgen({ pemilik = false, tab: tabLuar }: {
           hapus={async () => {
             const h = await hapusSalin(dialogSalin.alamat);
             if (!h.ok) { alert(h.pesan || 'Gagal menghapus.'); return; }
+            setIsiSalin(await daftarSalin());
+            setDialogSalin(null);
+          }}
+          lepas={async () => {
+            const h = await lepasSalin(dialogSalin.alamat);
+            if (!h.ok) { alert(h.pesan || 'Gagal melepas salinan.'); return; }
+            /* Disebut jumlahnya, bukan cuma "berhasil": yang baru saja
+               berpindah tangan adalah posisi dengan uang di dalamnya, dan
+               orangnya harus tahu persis ada berapa yang kini jadi
+               tanggung jawabnya. */
+            const n = h.lepas?.length ?? 0;
+            alert(n
+              ? `${n} posisi dilepas dan TETAP TERBUKA: ${h.lepas!.join(', ')}.\n\n`
+                + `Tutup sendiri lewat Posisi Terbuka di Chart & Entry.`
+              : 'Salinan dihentikan. Tidak ada posisi terbuka yang perlu dilepas.');
             setIsiSalin(await daftarSalin());
             setDialogSalin(null);
           }} />
