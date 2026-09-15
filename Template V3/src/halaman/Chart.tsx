@@ -11,7 +11,6 @@ import { PanelNews } from '@/components/panel-news';
 import { simpanDraf } from '@/lib/draf-sinyal';
 import { Panel, PanelHead, KartuKpi, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn, uang, persen, harga, tanggalPendek } from '@/lib/utils';
-import { dariMarketplace } from '@/lib/pasang-indikator';
 import { ChartLilin, TAMPILAN_BAWAAN, type Garis, type GarisHarga, type GarisKlik, type GarisSeret, type PosisiChartMt5, type TampilanChart } from '@/components/chart-lilin';
 import type { KoordinatChart } from '@/components/chart-lilin';
 import { barisPendingKripto, rencanaLokal } from '@/lib/pending-kripto';
@@ -5066,34 +5065,16 @@ ${pnlSunting !== null
                                 <Settings2 className="size-3.5" />
                               </button>
                             )}
-{/* TETAP TAMPIL, TAPI MATI untuk indikator marketplace.
-                                Diminta pemilik 15 Sep 2026: kodenya jangan
-                                bisa disalin orang.
-
-                                Dibiarkan tampil, bukan disembunyikan, karena
-                                ketiga ikon ini sebaris — menghilangkan yang
-                                tengah membuat dua ikon sisanya berpindah
-                                tempat tergantung indikator mana yang dipilih,
-                                dan tangan yang sudah hafal letaknya akan
-                                menekan yang salah.
-
-                                Skrip tulisan sendiri TIDAK ikut dikunci: di
-                                situlah gunanya editor ini, dan mengunci semua
-                                akan mematikan fiturnya demi melindungi yang
-                                bukan miliknya. */}
-                            <button
-                              onClick={() => { if (!dariMarketplace(s.id)) { bukaDock('editor'); setMenuInd(false); } }}
-                              disabled={dariMarketplace(s.id)}
-                              title={dariMarketplace(s.id)
-                                ? 'Kode indikator marketplace tidak dibuka di sini'
-                                : 'Buka kodenya'}
-                              aria-label={dariMarketplace(s.id)
-                                ? 'Kode indikator marketplace tidak dibuka di sini'
-                                : 'Buka kodenya'}
-                              className={cn('shrink-0 rounded p-1 transition-colors',
-                                dariMarketplace(s.id)
-                                  ? 'cursor-not-allowed text-zinc-700'
-                                  : 'cursor-pointer text-zinc-500 hover:text-zinc-100')}>
+                            {/* Tetap hidup untuk SEMUA skrip. Yang menjaga kode indikator
+                                marketplace bukan tombol ini, melainkan tab Editor
+                                sendiri: ia cuma merender separuh kodenya. Mematikan
+                                tombol di sini tidak menambah apa pun — tab Editor
+                                punya pemilih skripnya sendiri, jadi kodenya toh
+                                terjangkau lewat dua klik — dan cuma membuat orang
+                                yang memang membelinya merasa dihalangi. */}
+                            <button onClick={() => { bukaDock('editor'); setMenuInd(false); }}
+                              title="Buka kodenya" aria-label="Buka kodenya"
+                              className="shrink-0 cursor-pointer rounded p-1 text-zinc-500 transition-colors hover:text-zinc-100">
                               <Code2 className="size-3.5" />
                             </button>
                           </>

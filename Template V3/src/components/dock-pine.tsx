@@ -9,6 +9,60 @@ import type { Lilin } from '@/lib/pasar';
 import { susunPermintaanPine, terapkanTambalanPine, fiturHilang } from '@/lib/pine-tambalan';
 import { dariMarketplace } from '@/lib/pasang-indikator';
 
+/* ── PRATINJAU KODE INDIKATOR MARKETPLACE ─────────────────────────
+   Baris yang disembunyikan TIDAK DIRENDER, bukan dikaburkan.
+
+   Blur, `opacity`, dan `user-select:none` semuanya cuma soal tampilan:
+   tulisannya tetap duduk di DOM, dan Ctrl+A di luar elemennya — atau
+   “Copy element” — mengambilnya utuh. Yang tidak pernah dikirim ke DOM
+   tidak bisa diambil dari DOM. Itu satu-satunya bagian di sini yang benar
+   -benar menahan sesuatu; `select-none` di bawah hanya menyulitkan blok-
+   lalu-salin dengan tetikus.
+
+   Perlu disebut jujur: separuh yang TAMPIL tetap bisa disalin siapa pun yang
+   mau mengetik ulang, dan kode Pine tiap indikator bawaan masih ikut terkirim
+   di bundel JavaScript halaman ini. Pagar ini menghalangi penyalinan santai,
+   bukan penyalinan yang niat. Perlindungan yang sesungguhnya menuntut kodenya
+   tidak pernah sampai ke klien — dijalankan di server, yang dikirim cuma
+   hasil gambarnya. Itu perubahan arsitektur, bukan sebuah tombol. */
+const BAGIAN_TAMPIL = 0.5;
+/* Langit-langit untuk skrip yang sangat panjang: separuh dari 400 baris masih
+   200 baris, dan itu bukan lagi cuplikan. */
+const PRATINJAU_MAKS = 60;
+
+function cuplikKode(kode: string): { teks: string; sisa: number } {
+  const baris = kode.replace(/[\s\uFEFF\xA0]+$/, '').split('\n');
+  const tampil = Math.max(1, Math.min(Math.ceil(baris.length * BAGIAN_TAMPIL), PRATINJAU_MAKS));
+  return { teks: baris.slice(0, tampil).join('\n'), sisa: Math.max(0, baris.length - tampil) };
+}
+
+function KodeTerkunci({ kode }: { kode: string }) {
+  const { teks, sisa } = cuplikKode(kode);
+  return (
+    <div className="flex min-h-0 grow flex-col overflow-hidden rounded-md border border-zinc-800 bg-zinc-900/60">
+      {/* Isinya diangkat keluar aliran supaya tingginya ditentukan kotak ini,
+          bukan sebaliknya — <pre> yang panjang akan mendorong bilah catatan di
+          bawah keluar dari dock. */}
+      <div className="relative min-h-0 grow">
+        <pre onCopy={(e) => e.preventDefault()}
+          className="gulir-senyap absolute inset-0 select-none overflow-auto p-2.5 font-mono text-[11px] leading-relaxed text-zinc-200">
+          {teks}
+        </pre>
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-b from-transparent to-zinc-900" />
+      </div>
+      <div className="flex shrink-0 items-center gap-1.5 border-t border-zinc-800 bg-zinc-900 px-2.5 py-2">
+        <Lock className="size-3.5 shrink-0 text-zinc-600" />
+        <p className="text-[11px] leading-relaxed text-zinc-500">
+          {sisa > 0 ? (
+            <><span className="text-zinc-400">{sisa} baris berikutnya disembunyikan.</span>{' '}</>
+          ) : null}
+          Indikatornya tetap berjalan penuh — setelan inputnya ada di tab Input.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 /* Lebar kolom Pine. Batas bawah 280 px: di bawah itu barisan Pine Script
    yang panjang terpotong tiap beberapa kata dan editor berhenti berguna.
    Batas atas 760 px supaya chart tidak pernah tinggal sesobek. */
@@ -644,23 +698,11 @@ export function DockPine({ buka, tab, aturTab, onTutup, lilin, simbol, tf, hingg
             </button>
           </div>
 
-{/* Kode indikator marketplace TIDAK ditampilkan di sini.
-              Mematikan tombol "Buka kodenya" saja tidak cukup: tab Editor
-              punya pemilih skripnya sendiri, jadi tanpa penjaga di sini
-              kodenya tetap terbaca lewat dua klik.
-
-              Yang tampil PEMBERITAHUAN, bukan kotak kosong — kotak kosong
-              terbaca sebagai skrip yang gagal dimuat, dan orang akan
-              mencoba memperbaiki sesuatu yang memang disengaja. */}
-          {pilih && dariMarketplace(pilih.id) ? (
-            <div className="flex min-h-0 grow flex-col items-center justify-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900/60 p-6 text-center">
-              <Lock className="size-5 text-zinc-600" />
-              <p className="text-[12px] text-zinc-300">Kode indikator marketplace tidak ditampilkan.</p>
-              <p className="max-w-[24rem] text-[11px] leading-relaxed text-zinc-500">
-                Indikatornya tetap berjalan seperti biasa — setelan inputnya ada di tab
-                Input. Skrip yang Anda tulis sendiri tetap bisa disunting di sini.
-              </p>
-            </div>
+          {/* Indikator marketplace: kodenya tampil SEPARUH, sisanya tidak ada.
+              Skrip tulisan sendiri tetap dapat kotak sunting yang utuh — di
+              situlah gunanya tab ini. */}
+          {pilih && dariMarketplace(pilih) ? (
+            <KodeTerkunci kode={pilih.kode} />
           ) : (
             <textarea value={pilih?.kode ?? ''} onChange={(e) => ubahKode(e.target.value)} spellCheck={false}
               className="min-h-0 grow resize-none rounded-md border border-zinc-800 bg-zinc-900/60 p-2.5 font-mono text-[11px] leading-relaxed text-zinc-200 outline-none focus-visible:border-zinc-600" />

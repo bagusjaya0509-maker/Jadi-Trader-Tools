@@ -63,14 +63,33 @@ function normal(t: string): string {
   return t.toLowerCase().replace(/[\s_\-‐-―]+/g, '');
 }
 
+/* Awalan id untuk apa pun yang dipasang DARI marketplace.
+
+   Ditaruh di satu tetapan karena pernah dipakai di satu tempat lalu diandaikan
+   tidak ada di tempat lain, dan itu mematikan seluruh pagarnya tanpa satu pun
+   galat. Yang menulis awalan dan yang membacanya sekarang memakai nilai yang
+   sama persis. */
+export const AWALAN_PASAR = 'pasar-';
+
 /** Skrip ini datang dari marketplace, bukan ditulis sendiri pemakainya?
  *
- *  Dibaca dari ID-nya, BUKAN dari medan baru di penyimpanan: `pasangKodePine`
- *  menyimpan skrip marketplace dengan id = kunci peta ini, jadi tandanya
- *  sudah ada sejak dulu. Menambah medan `dariMarket` berarti skrip yang
- *  TERLANJUR terpasang di peramban orang tidak punya medan itu, dan kodenya
- *  tetap terbuka sampai mereka memasang ulang — pagar yang bocor persis
- *  untuk orang yang sudah memilikinya.
+ *  Dikenali dari AWALAN id-nya, BUKAN dari pencocokan ke `INDIKATOR_TERPASANG`.
+ *  Versi pertama fungsi ini mencocokkan ke peta itu dan TIDAK PERNAH SEKALI PUN
+ *  menyala. Dua sebabnya, dan keduanya diam:
+ *
+ *    1. `pasangKodePine` menyimpan id berawalan `pasar-`, jadi yang dicari di
+ *       peta adalah “pasar-volume-profile-order-blocks” sementara kuncinya
+ *       “volume-profile-order-blocks”. Tidak pernah cocok.
+ *
+ *    2. Yang lebih berat: indikator BERBAYAR dipasang dari `Marketplace.tsx`
+ *       memakai id produk Firestore, dan id itu memang tidak pernah ada di peta
+ *       ini — peta cuma memuat indikator yang kodenya ikut di bundel. Jadi
+ *       justru indikator $47, satu-satunya yang benar-benar perlu dijaga, yang
+ *       paling tidak terjaga. Pencocokan ke peta tidak akan pernah bisa
+ *       menangkapnya, seberapa pun betulnya awalan tadi diperbaiki.
+ *
+ *  Awalan `pasar-` menangkap keduanya, dan tidak bertabrakan dengan yang lain:
+ *  skrip tulisan sendiri ber-id `s<stempel waktu>`, contoh bawaan `bawaan-…`.
  *
  *  ── SEJAUH MANA INI MELINDUNGI ─────────────────────────────
  *  Sejauh menghalangi penyalinan SANTAI, dan tidak lebih. Kode Pine tiap
@@ -84,8 +103,8 @@ function normal(t: string): string {
  *  perubahan arsitektur, bukan sebuah tombol. Ditulis di sini supaya yang
  *  membaca berikutnya tidak mengira pagar ini lebih tinggi dari yang
  *  sebenarnya. */
-export function dariMarketplace(id: string): boolean {
-  return id in INDIKATOR_TERPASANG;
+export function dariMarketplace(skrip: { id: string }): boolean {
+  return skrip.id.startsWith(AWALAN_PASAR);
 }
 
 export function kunciIndikator(produk: { id: string; nama: string }): string | null {
@@ -146,7 +165,7 @@ export function pasangKodePine(kunci: string, nama: string, kode: string): Hasil
       return sama ? 'sudahAda' : 'diperbarui';
     }
 
-    lain.push({ id: 'pasar-' + kunci, nama, kode, aktif: true });
+    lain.push({ id: AWALAN_PASAR + kunci, nama, kode, aktif: true });
     localStorage.setItem(KUNCI_DAFTAR, JSON.stringify(lain));
     tandaiBerubah();
     return 'baru';
