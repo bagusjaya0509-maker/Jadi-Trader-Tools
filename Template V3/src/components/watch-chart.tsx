@@ -170,10 +170,11 @@ export function WatchChart({ simbol, onPilih, onLebar }: {
   }, [pengguna?.uid]);
   const [tickers, setTickers] = useState<Record<string, Ticker>>({});
   const [tickMt5, setTickMt5] = useState<Record<string, { bid: number; waktu: number }>>({});
-  /* Perubahan 24 jam pair Trade-Fi. Dihitung di sini, bukan datang dari
-     server: EA tidak melaporkan persentase apa pun, ia cuma mengirim tick
-     dan lilin. */
-  const [ubahMt5, setUbahMt5] = useState<Record<string, number>>({});
+  /* Acuan harian pair Trade-Fi: harga PEMBUKAAN hari ini menurut broker,
+     plus penutupan terakhir sebagai cadangan sebelum tick pertama datang.
+     Yang disimpan acuannya, bukan persentasenya — persentase dihitung
+     saat menggambar, dari tick yang sedang hidup. Lihat tarikAcuanMt5(). */
+  const [acuanMt5, setAcuanMt5] = useState<Record<string, { acuan: number; akhir: number }>>({});
   const [pilihanMt5, setPilihanMt5] = useState<string[]>([]);
   const [pilihanHl, setPilihanHl] = useState<string[]>([]);
   /* Daftar saran dibuka sendiri, bukan <datalist>. Dua sebabnya: opsi
@@ -275,58 +276,62 @@ export function WatchChart({ simbol, onPilih, onLebar }: {
        ditambahkan. Screener tetap memanggil tanpa bendera ini. */
     const tarikBinance = () => void ambilTickers(true).then((t) => { if (hidup) setTickers(t); }).catch(() => { /* diam */ });
     const tarikMt5 = () => void hargaTickMt5().then((t) => { if (hidup) setTickMt5(t); }).catch(() => { /* diam */ });
-    /* ── PERUBAHAN 24 JAM PAIR TRADE-FI ─────────────────────────────
-       Dilaporkan pemilik 14 Sep 2026: persentase di watchlist berbeda dari
-       TradingView. Untuk koin memang tidak — angkanya diambil apa adanya
-       dari `priceChangePercent` bursa, yang sudah 24 jam berjalan. Yang
-       berbeda baris TRADE-FI: ia tidak punya persentase SAMA SEKALI,
-       cuma lencana "live". Kolom yang kosong di sebelah kolom yang terisi
-       terbaca sebagai angka yang gagal dimuat, bukan sebagai angka yang
-       memang tidak ada.
+    /* ── PERSENTASE HARIAN PAIR TRADE-FI ─────────────────
+       Baris TRADE-FI dulu tidak punya persentase sama sekali, cuma lencana
+       "live". Percobaan pertama (14 Sep 2026) mengisinya dengan perubahan
+       24 JAM BERJALAN, dan itu salah dua kali — pemilik melaporkannya
+       15 Sep: "persentase tradefi ini masih salah dan tidak bergerak,
+       harusnya sudah reset seperti tradingview".
 
-       Acuannya dicari lewat CAP WAKTU, bukan dengan mundur 24 lilin.
-       XAUUSD tidak diperdagangkan 24 jam penuh: akhir pekan dan jeda sesi
-       membuat lilin ke-24 di belakang bisa berumur tiga hari, dan
-       "perubahan 24 jam" yang sebenarnya mengukur tiga hari adalah angka
-       yang salah tanpa ada yang tahu.
+       SALAH PERTAMA — tidak pernah reset. Jendela 24 jam berjalan tidak
+       punya awal hari; ia menyeret kejatuhan kemarin ikut sepanjang hari
+       ini. TradingView memakai batas HARI: begitu hari perdagangan baru
+       dibuka, angkanya mulai lagi dari nol. Maka acuannya sekarang harga
+       PEMBUKAAN lilin harian yang sedang berjalan, dan batas harinya milik
+       broker sendiri — sumber datanya memang broker itu, jadi memakai
+       tengah malam versi kita sendiri justru akan meleset dari layarnya.
 
-       Harga sekarang dari TICK, bukan dari lilin terakhir: itu angka yang
-       sedang tertulis di baris yang sama, dan dua angka bersebelahan yang
-       dihitung dari sumber berbeda pasti berselisih. */
-    const tarikUbahMt5 = async () => {
+       SALAH KEDUA — beku. Fungsinya cuma dipanggil sekali saat panel
+       dibuka, sementara tick MT5 masuk tiap 5 detik. Yang tersimpan
+       persentase jadinya, bukan bahannya, jadi angka itu mengeras di
+       layar sementara harganya terus jalan.
+
+       Yang disimpan sekarang ACUANNYA saja. Persentasenya dihitung saat
+       menggambar, dari tick yang sedang hidup, jadi ia ikut bergerak tiap
+       tick tanpa satu pun permintaan jaringan tambahan. Acuannya sendiri
+       cukup disegarkan semenit sekali — ia hanya berubah saat hari
+       perdagangan berganti. */
+    const tarikAcuanMt5 = async () => {
       const daftar = [...new Set(seksi.flatMap((k) => k.simbol).filter((x) => x.startsWith('MT5:')))];
       if (!daftar.length) return;
-      const hasil: Record<string, number> = {};
+      const hasil: Record<string, { acuan: number; akhir: number }> = {};
       await Promise.all(daftar.map(async (sim) => {
         const dasarS = sim.slice(4);
         try {
-          const l = await ambilKlines(sim, '1h', 40);
-          if (!l.closes.length) return;
-          const batas = Date.now() - 24 * 3600_000;
-          let i = l.times.findIndex((t: number) => t >= batas);
-          /* Tidak ada lilin setua itu (pasar baru buka, atau EA baru
-             dipasang): dipakai yang paling tua yang kita punya. Lebih
-             pendek dari 24 jam, tapi tetap benar terhadap datanya —
-             berbeda dari mengarang nol. */
-          if (i < 0) i = 0;
-          const acuan = l.closes[i];
-          const kini = tickMt5[dasarS]?.bid || l.closes[l.closes.length - 1];
-          if (acuan > 0 && kini > 0) hasil[dasarS] = ((kini - acuan) / acuan) * 100;
+          const l = await ambilKlines(sim, '1d', 3, true);
+          const n = l.opens.length;
+          if (!n) return;
+          const acuan = l.opens[n - 1];
+          const akhir = l.closes[n - 1];
+          if (acuan > 0) hasil[dasarS] = { acuan, akhir };
         } catch { /* satu pair gagal tidak boleh menghapus yang lain */ }
       }));
-      if (hidup) setUbahMt5((x) => ({ ...x, ...hasil }));
+      if (hidup) setAcuanMt5((x) => ({ ...x, ...hasil }));
     };
     const tarikDaftar = () => void daftarSimbolMt5().then((d) => { if (hidup) setPilihanMt5(d); });
     const tarikHl = () => void daftarSimbolHl().then((d) => { if (hidup) setPilihanHl(d); }).catch(() => { /* diam */ });
     tarikBinance();
     tarikMt5();
-    void tarikUbahMt5();
+    void tarikAcuanMt5();
     tarikDaftar();
     tarikHl();
     const jamB = setInterval(tarikBinance, 30_000);
     const jamM = setInterval(tarikMt5, 5_000);
     const jamD = setInterval(tarikDaftar, 30_000);
-    return () => { hidup = false; clearInterval(jamB); clearInterval(jamM); clearInterval(jamD); };
+    /* Acuan harian disegarkan semenit sekali: cukup rapat untuk menangkap
+       pergantian hari perdagangan, cukup jarang untuk tidak jadi beban. */
+    const jamA = setInterval(() => void tarikAcuanMt5(), 60_000);
+    return () => { hidup = false; clearInterval(jamB); clearInterval(jamM); clearInterval(jamD); clearInterval(jamA); };
   }, [terbuka]);
 
   function tambahNilai(v: string) {
@@ -588,7 +593,14 @@ export function WatchChart({ simbol, onPilih, onLebar }: {
                 /* Satu sumber untuk dua jenis baris — kripto dari bursa,
                    Trade-Fi dari hitungan di atas. Disatukan di sini supaya
                    pewarnaan dan formatnya di bawah cuma ditulis sekali. */
-                const ubah = mt5 ? ubahMt5[dasarS] : t?.ubah24j;
+                /* Dihitung SAAT MENGGAMBAR, bukan disimpan: harga
+                   sekarang diambil dari tick yang sedang hidup, jadi
+                   persentasenya ikut bergerak tiap 5 detik. */
+                const acu = mt5 ? acuanMt5[dasarS] : undefined;
+                const kiniMt5 = tk?.bid || acu?.akhir || 0;
+                const ubah = mt5
+                  ? (acu && kiniMt5 > 0 ? ((kiniMt5 - acu.acuan) / acu.acuan) * 100 : undefined)
+                  : t?.ubah24j;
                 const naik = (ubah ?? 0) >= 0;
                 return (
                   <div key={s}
@@ -667,17 +679,15 @@ export function WatchChart({ simbol, onPilih, onLebar }: {
                             yang jarang justru perlu ditandai. */}
                       </div>
                     </div>
-                    {/* Lencana "live" pindah ke sebelah harga sebagai titik
-                        kecil; kolom kanan sekarang milik persentase, sama
-                        untuk kedua jenis baris. Satu kolom yang artinya
-                        berganti menurut jenis barisnya adalah kolom yang
-                        harus dibaca dua kali. */}
+                    {/* Titik hijau "live" dibuang atas permintaan pemilik
+                        15 Sep 2026. Ia lahir waktu baris Trade-Fi belum
+                        punya persentase, sebagai satu-satunya tanda bahwa
+                        barisnya hidup. Sekarang persentasenya sendiri yang
+                        bergerak tiap tick — dan angka yang berubah adalah
+                        tanda hidup yang jauh lebih jujur daripada titik
+                        yang menyala biarpun harganya diam. */}
                     <span className={cn('angka shrink-0 text-[11px]',
                       ubah === undefined ? 'text-zinc-600' : naik ? 'text-emerald-500' : 'text-red-400')}>
-                      {mt5 && tk && Date.now() - tk.waktu < 30_000 && (
-                        <span title="Tick dari MetaTrader kurang dari 30 detik yang lalu"
-                              className="mr-1 inline-block size-1 rounded-full bg-emerald-500 align-middle" />
-                      )}
                       {ubah === undefined ? '—' : `${naik ? '+' : ''}${ubah.toFixed(2)}%`}
                     </span>
                     <button

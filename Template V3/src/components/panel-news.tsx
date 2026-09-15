@@ -171,7 +171,15 @@ const Baris = forwardRef<HTMLDivElement, PropsBaris>(function Baris({ e, kini },
         <span className="angka shrink-0 text-[11px] text-zinc-500">
           {d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
         </span>
-        <span className="shrink-0 rounded bg-zinc-800/70 px-1.5 py-0.5 text-[10px] font-medium text-zinc-300">
+        {/* Lencana mata uang ikut menyandang dampaknya. Garis tepi kiri
+            sudah memberi kodenya, tapi garis setipis 2 px di ujung baris
+            mudah terlewat saat kalendernya penuh — sedangkan mata uang
+            justru yang pertama dicari mata. Merah cuma untuk dampak
+            tinggi; kalau semua baris berwarna, tidak ada yang menonjol. */}
+        <span className={cn('shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium',
+          e.dampak === 'high' ? 'bg-red-500/20 text-red-300 ring-1 ring-inset ring-red-500/40'
+          : e.dampak === 'medium' ? 'bg-amber-500/15 text-amber-300/90'
+          : 'bg-zinc-800/70 text-zinc-300')}>
           {e.mataUang}
         </span>
         <span className="min-w-0 flex-1 text-[12px] leading-snug text-zinc-200">{e.judul}</span>
