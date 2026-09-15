@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Play, Trash2, TriangleAlert, CheckCircle2, RotateCcw, X, Plus, Square,
-         Loader2, Stethoscope, Copy, Check } from 'lucide-react';
+         Loader2, Stethoscope, Copy, Check, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { bacaKoneksi, PROXY_BAWAAN } from '@/lib/koneksi';
 import { auth } from '@/lib/firebase';
 import { jalankanPine, CONTOH_PINE, SUPERTREND_PINE, type HasilPine, type InputPine } from '@/lib/pine';
 import type { Lilin } from '@/lib/pasar';
 import { susunPermintaanPine, terapkanTambalanPine, fiturHilang } from '@/lib/pine-tambalan';
+import { dariMarketplace } from '@/lib/pasang-indikator';
 
 /* Lebar kolom Pine. Batas bawah 280 px: di bawah itu barisan Pine Script
    yang panjang terpotong tiap beberapa kata dan editor berhenti berguna.
@@ -643,8 +644,27 @@ export function DockPine({ buka, tab, aturTab, onTutup, lilin, simbol, tf, hingg
             </button>
           </div>
 
-          <textarea value={pilih?.kode ?? ''} onChange={(e) => ubahKode(e.target.value)} spellCheck={false}
-            className="min-h-0 grow resize-none rounded-md border border-zinc-800 bg-zinc-900/60 p-2.5 font-mono text-[11px] leading-relaxed text-zinc-200 outline-none focus-visible:border-zinc-600" />
+{/* Kode indikator marketplace TIDAK ditampilkan di sini.
+              Mematikan tombol "Buka kodenya" saja tidak cukup: tab Editor
+              punya pemilih skripnya sendiri, jadi tanpa penjaga di sini
+              kodenya tetap terbaca lewat dua klik.
+
+              Yang tampil PEMBERITAHUAN, bukan kotak kosong — kotak kosong
+              terbaca sebagai skrip yang gagal dimuat, dan orang akan
+              mencoba memperbaiki sesuatu yang memang disengaja. */}
+          {pilih && dariMarketplace(pilih.id) ? (
+            <div className="flex min-h-0 grow flex-col items-center justify-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900/60 p-6 text-center">
+              <Lock className="size-5 text-zinc-600" />
+              <p className="text-[12px] text-zinc-300">Kode indikator marketplace tidak ditampilkan.</p>
+              <p className="max-w-[24rem] text-[11px] leading-relaxed text-zinc-500">
+                Indikatornya tetap berjalan seperti biasa — setelan inputnya ada di tab
+                Input. Skrip yang Anda tulis sendiri tetap bisa disunting di sini.
+              </p>
+            </div>
+          ) : (
+            <textarea value={pilih?.kode ?? ''} onChange={(e) => ubahKode(e.target.value)} spellCheck={false}
+              className="min-h-0 grow resize-none rounded-md border border-zinc-800 bg-zinc-900/60 p-2.5 font-mono text-[11px] leading-relaxed text-zinc-200 outline-none focus-visible:border-zinc-600" />
+          )}
 
           <div className="flex flex-wrap items-center gap-1.5">
             <button onClick={() => jalankan(idPilih)} disabled={!lilin.closes.length}

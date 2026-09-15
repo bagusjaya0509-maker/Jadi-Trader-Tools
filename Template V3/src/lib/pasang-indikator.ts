@@ -63,6 +63,31 @@ function normal(t: string): string {
   return t.toLowerCase().replace(/[\s_\-‐-―]+/g, '');
 }
 
+/** Skrip ini datang dari marketplace, bukan ditulis sendiri pemakainya?
+ *
+ *  Dibaca dari ID-nya, BUKAN dari medan baru di penyimpanan: `pasangKodePine`
+ *  menyimpan skrip marketplace dengan id = kunci peta ini, jadi tandanya
+ *  sudah ada sejak dulu. Menambah medan `dariMarket` berarti skrip yang
+ *  TERLANJUR terpasang di peramban orang tidak punya medan itu, dan kodenya
+ *  tetap terbuka sampai mereka memasang ulang — pagar yang bocor persis
+ *  untuk orang yang sudah memilikinya.
+ *
+ *  ── SEJAUH MANA INI MELINDUNGI ─────────────────────────────
+ *  Sejauh menghalangi penyalinan SANTAI, dan tidak lebih. Kode Pine tiap
+ *  indikator ikut terkirim di bundel JavaScript halaman ini — terbukti,
+ *  `Marketplace-*.js` memuat sumbernya utuh — jadi siapa pun yang membuka
+ *  DevTools tetap bisa membacanya. Ia juga tersimpan di localStorage
+ *  `jt.pineDaftar` di peramban yang memasangnya.
+ *
+ *  Perlindungan yang sesungguhnya menuntut kodenya TIDAK PERNAH sampai ke
+ *  klien: dijalankan di server, yang dikirim hanya hasil gambarnya. Itu
+ *  perubahan arsitektur, bukan sebuah tombol. Ditulis di sini supaya yang
+ *  membaca berikutnya tidak mengira pagar ini lebih tinggi dari yang
+ *  sebenarnya. */
+export function dariMarketplace(id: string): boolean {
+  return id in INDIKATOR_TERPASANG;
+}
+
 export function kunciIndikator(produk: { id: string; nama: string }): string | null {
   if (produk.id in INDIKATOR_TERPASANG) return produk.id;
   const n = normal(produk.nama);
