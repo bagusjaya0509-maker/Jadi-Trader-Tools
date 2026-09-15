@@ -57,7 +57,7 @@ function GrafikPorto({ nilai }: { nilai: number[] }) {
   );
 }
 
-import { uang, persen } from "@/lib/utils";
+import { cn, uang, persen } from "@/lib/utils";
 
 /* ── Ikon koin ─────────────────────────────────────────────────────────────
    Lucide tidak punya logo kripto, dan mengunduh logo asli berarti bergantung
@@ -555,11 +555,28 @@ export default function HeroSection() {
                     <span className="px-4 text-sm text-zinc-600">Tidak ada posisi terbuka saat ini.</span>
                   )}
                   {/* Diulang tiga kali supaya marquee-nya tidak pernah putus.
-                      Yang TIDAK ditampilkan: persentase pergerakan. Harga
-                      terkini butuh proxy berbayar yang memang tidak terbuka
-                      untuk pengunjung yang belum masuk, dan menghitungnya dari
-                      harga entry berarti selalu menulis "+0,00%" — angka yang
-                      terlihat seperti fakta padahal cuma tanda "tidak tahu". */}
+
+                      ── YANG DITAMPILKAN DI UJUNG BARIS ──────────────────
+                      PnL FLOATING, dan timeframe cuma kalau ia benar-benar
+                      ada. Sebelum ini yang tampil `p.tf` apa adanya — dan
+                      posisi yang datang langsung dari bursa memang tidak
+                      punya timeframe, jadi `data.ts` mengisinya "—".
+                      Hasilnya 12 dari 14 baris di beranda cuma menampilkan
+                      satu tanda pisah. Dilaporkan pemilik berulang kali.
+
+                      Komentar lama di sini menolak menampilkan "persentase
+                      pergerakan" dengan alasan harga terkini butuh proxy
+                      berbayar. Alasan itu benar UNTUK PERSENTASE, dan tidak
+                      berlaku untuk angka ini: `pnlFloat` datang dari bursa
+                      lewat `unRealizedProfit` di /api/positions — sudah jadi,
+                      tidak dihitung di peramban, tidak butuh harga apa pun.
+
+                      Yang TETAP tidak dilakukan: menghitung PnL saat
+                      `pnlFloat` tidak ada. Pada jalur dokumen publik
+                      `hargaKini` disalin dari `entry`, jadi hitungannya akan
+                      SELALU nol — "$0,00" yang terlihat seperti fakta padahal
+                      cuma tanda "tidak tahu". Kalau angkanya tidak ada,
+                      ujungnya dibiarkan kosong. */}
                   {[...posisi, ...posisi, ...posisi].map((p, i) => (
                     <div key={i} className="flex items-center gap-2.5 transition-all hover:scale-105 cursor-default">
                       <IkonKoin simbol={p.simbol} />
@@ -571,7 +588,20 @@ export default function HeroSection() {
                       }`}>
                         {p.arah}
                       </span>
-                      <span className="text-sm tabular-nums text-zinc-400">{p.tf}</span>
+                      {/* Timeframe hanya kalau ada isinya. Ungkapan `!== '—'`
+                          ini sama dengan yang sudah dipakai Dashboard — di
+                          sana pun "—" berarti "tidak ada", bukan sebuah nilai. */}
+                      {p.tf && p.tf !== '—' && (
+                        <span className="text-sm tabular-nums text-zinc-500">{p.tf}</span>
+                      )}
+                      {typeof p.pnlFloat === 'number' && isFinite(p.pnlFloat) && (
+                        <span className={cn('text-sm font-semibold tabular-nums',
+                          p.pnlFloat > 0 ? 'text-emerald-400'
+                            : p.pnlFloat < 0 ? 'text-red-400'
+                              : 'text-zinc-400')}>
+                          {uang(p.pnlFloat, true)}
+                        </span>
+                      )}
                     </div>
                   ))}
                 </div>
