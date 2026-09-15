@@ -27,9 +27,20 @@ export interface Lilin {
   lows: number[];
   closes: number[];
   times: number[];
+  /* Volume per bar. Ditambahkan 15 Sep 2026 — sebelumnya DIBUANG saat
+     penguraian walau balasan klines selalu membawanya di kolom ke-6.
+
+     Akibatnya tidak kelihatan sampai ada yang mencarinya: `volume` di mesin
+     Pine memulangkan 0 apa adanya, jadi setiap indikator berbasis volume
+     berjalan tanpa satu pun galat dan tidak menggambar apa pun.
+
+     Boleh kosong: sumber yang tidak melaporkan volume (sebagian feed acuan
+     MT5) memulangkan larik kosong, dan yang membacanya harus menganggap itu
+     "tidak tahu", bukan nol. */
+  volumes: number[];
 }
 
-const KOSONG: Lilin = { opens: [], highs: [], lows: [], closes: [], times: [] };
+const KOSONG: Lilin = { opens: [], highs: [], lows: [], closes: [], times: [], volumes: [] };
 
 /* ════════════════════════════════════════════════════════════════════════
    TIMEFRAME TURUNAN UNTUK SIMBOL MT5
@@ -93,7 +104,7 @@ function awalPekan(ms: number): number {
  *  seluruh kelompok. Itu definisi lilin, bukan pilihan — rata-rata di salah
  *  satunya akan menghasilkan bentuk yang tidak pernah terjadi di pasar. */
 function gabungLilin(l: Lilin, menit: number | 'pekan'): Lilin {
-  const out: Lilin = { opens: [], highs: [], lows: [], closes: [], times: [] };
+  const out: Lilin = { opens: [], highs: [], lows: [], closes: [], times: [], volumes: [] };
   let kunciAkhir: number | null = null;
   for (let i = 0; i < l.times.length; i++) {
     const t = l.times[i];
@@ -107,12 +118,18 @@ function gabungLilin(l: Lilin, menit: number | 'pekan'): Lilin {
       out.highs.push(l.highs[i]);
       out.lows.push(l.lows[i]);
       out.closes.push(l.closes[i]);
+      out.volumes.push(l.volumes[i] ?? 0);
       continue;
     }
     const j = out.times.length - 1;
     out.highs[j] = Math.max(out.highs[j], l.highs[i]);
     out.lows[j] = Math.min(out.lows[j], l.lows[i]);
     out.closes[j] = l.closes[i];
+    /* Volume DIJUMLAHKAN, bukan diambil yang terakhir seperti close.
+       Satu bar mingguan memperdagangkan seluruh volume lima hari itu, dan
+       memakai volume hari Jumat saja akan membuat profil volume mingguan
+       terbaca seperti hari yang sepi. */
+    out.volumes[j] = (out.volumes[j] ?? 0) + (l.volumes[i] ?? 0);
   }
   return out;
 }
@@ -253,6 +270,11 @@ export async function ambilKlinesSebelum(simbol: string, tf: string, sebelumMs: 
       highs: baris.map((k: unknown[]) => Number(k[2])),
       lows: baris.map((k: unknown[]) => Number(k[3])),
       closes: baris.map((k: unknown[]) => Number(k[4])),
+      /* Kolom ke-6 = volume, bentuk baku klines Binance dan ditiru rute
+         MT5. `|| 0` bukan kemalasan: sumber yang tidak melaporkannya
+         memberi undefined, dan NaN yang lolos ke perhitungan menular ke
+         seluruh hasil tanpa jejak asalnya. */
+      volumes: baris.map((k: unknown[]) => Number(k[5]) || 0),
     };
   } catch {
     return KOSONG;
@@ -380,6 +402,7 @@ export async function ambilKlines(simbol: string, tf: string, batas = 200, segar
       highs: baris.map((k) => Number(k[2])),
       lows: baris.map((k) => Number(k[3])),
       closes: baris.map((k) => Number(k[4])),
+      volumes: baris.map((k) => Number(k[5]) || 0),
     };
     simpanan.set(kunci, { waktu: Date.now(), isi });
     return isi;

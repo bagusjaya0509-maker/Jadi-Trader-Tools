@@ -559,7 +559,7 @@ export default function ChartBacktest() {
     navigasi({ search: '?' + q.toString() }, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [simbol]);
-  const [lilin, setLilin] = useState<Lilin>({ opens: [], highs: [], lows: [], closes: [], times: [] });
+  const [lilin, setLilin] = useState<Lilin>({ opens: [], highs: [], lows: [], closes: [], times: [], volumes: [] });
   /* Dibaca di dalam penarikan data untuk memutuskan apakah kegagalan layak
      jadi peringatan. Ref, bukan state: penarikannya berjalan di dalam efek
      yang sengaja TIDAK berdependensi pada lilin -- kalau iya, setiap data
@@ -589,8 +589,8 @@ export default function ChartBacktest() {
      sementara kegagalan pada simbol yang sama tetap tidak menghapus apa pun,
      persis seperti sebelumnya. */
   useEffect(() => {
-    setLilin({ opens: [], highs: [], lows: [], closes: [], times: [] });
-    lilinRef.current = { opens: [], highs: [], lows: [], closes: [], times: [] };
+    setLilin({ opens: [], highs: [], lows: [], closes: [], times: [], volumes: [] });
+    lilinRef.current = { opens: [], highs: [], lows: [], closes: [], times: [], volumes: [] };
   }, [simbol, tf]);
   /* Riwayat tambahan hasil "Muat lebih lama", DISIMPAN TERPISAH dari `lilin`.
      ────────────────────────────────────────────────────────────────────
@@ -631,6 +631,9 @@ export default function ChartBacktest() {
     return {
       times:  [...riwayatLama.times.slice(0, potong),  ...lilin.times],
       opens:  [...riwayatLama.opens.slice(0, potong),  ...lilin.opens],
+      /* Volume ikut digabung seperti deret lain — lihat catatan di
+         penyambung riwayat di bawah. */
+      volumes: [...(riwayatLama.volumes ?? []).slice(0, potong), ...(lilin.volumes ?? [])],
       highs:  [...riwayatLama.highs.slice(0, potong),  ...lilin.highs],
       lows:   [...riwayatLama.lows.slice(0, potong),   ...lilin.lows],
       closes: [...riwayatLama.closes.slice(0, potong), ...lilin.closes],
@@ -669,6 +672,11 @@ export default function ChartBacktest() {
       setRiwayatLama((lama) => lama ? {
         times:  [...potongan.times,  ...lama.times],
         opens:  [...potongan.opens,  ...lama.opens],
+        /* Volume ikut disambung seperti deret lain. Ketinggalan di sini
+           berarti profil volume sepi persis di bagian riwayat yang baru
+           dimuat — dan itu terbaca sebagai pasar yang tenang, bukan
+           sebagai data yang tidak ada. */
+        volumes: [...(potongan.volumes ?? []), ...(lama.volumes ?? [])],
         highs:  [...potongan.highs,  ...lama.highs],
         lows:   [...potongan.lows,   ...lama.lows],
         closes: [...potongan.closes, ...lama.closes],

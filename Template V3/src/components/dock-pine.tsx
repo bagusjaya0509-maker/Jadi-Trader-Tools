@@ -397,7 +397,7 @@ export function DockPine({ buka, tab, aturTab, onTutup, lilin, simbol, tf, hingg
     return {
       opens: l.opens.slice(0, n), highs: l.highs.slice(0, n),
       lows: l.lows.slice(0, n), closes: l.closes.slice(0, n),
-      times: l.times.slice(0, n),
+      times: l.times.slice(0, n), volumes: (l.volumes ?? []).slice(0, n),
     };
   }
 

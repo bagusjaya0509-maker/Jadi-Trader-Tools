@@ -691,6 +691,15 @@ class Mesin {
     switch (nama) {
       case 'open': return l.opens; case 'high': return l.highs;
       case 'low': return l.lows; case 'close': return l.closes;
+      /* VOLUME sebagai DERET, bukan cuma nilai per bar. Tanpa baris ini
+         `volume` kini terbaca benar tapi `volume[3]` memulangkan null,
+         dan yang paling menyesatkan: null itu tidak menimbulkan galat —
+         ia mengalir ke perhitungan lalu menghasilkan profil volume kosong
+         yang terbaca seperti "tidak ada transaksi di sana".
+
+         Terbukti 15 Sep 2026: volume=6900, volume[3]=null, sementara
+         close[3] normal. */
+      case 'volume': return l.volumes ?? [];
       /* `time` sebagai DERET, bukan angka tunggal: skrip menulis
          `time[1]` untuk membandingkan bar ini dengan bar sebelumnya —
          itulah cara mendeteksi "bar pertama hari Senin". Dijadikan deret
@@ -840,7 +849,14 @@ class Mesin {
       case 'na': return null;
       case 'true': return true; case 'false': return false;
       case 'bar_index': return this.bar;
-      case 'volume': return 0;
+      /* Volume SUNGGUHAN sejak 15 Sep 2026. Dulu dikeraskan 0, dan itu
+         bukan sekadar kurang lengkap: setiap indikator berbasis volume
+         berjalan tanpa satu pun galat lalu menggambar kosong, dan tidak
+         ada apa pun di layar yang menjelaskan kenapa.
+
+         Deret kosong tetap memulangkan 0 — sumber yang tidak melaporkan
+         volume tidak boleh mengarang angka. */
+      case 'volume': return this.l.volumes?.[this.bar] ?? 0;
       case 'barstate.islast': return this.bar === this.n - 1;
       case 'barstate.isconfirmed': return true;
       /* FORMAT TRADINGVIEW, bukan format kita: skrip menulis
@@ -1163,8 +1179,28 @@ class Mesin {
 
       /* ── array ── */
       case 'array.new': case 'array.new_float': case 'array.new_int': case 'array.new_bool':
-      case 'array.new_string': case 'array.new_line': case 'array.new_label': case 'array.new_box':
-        return { jenis: 'array', isi: [] };
+      case 'array.new_string': case 'array.new_line': case 'array.new_label': case 'array.new_box': {
+        /* UKURAN DAN NILAI AWAL DIHORMATI. Dulu keduanya diabaikan dan
+           fungsi ini selalu memulangkan larik KOSONG.
+
+           Akibatnya persis pola kegagalan yang paling mahal: tidak ada
+           galat sama sekali. `array.new_float(10, 0)` memberi larik kosong,
+           lalu `array.set(a, 5, x)` menulis ke indeks yang tidak ada dan
+           hilang begitu saja. Indikator profil volume berjalan mulus dan
+           menggambar nol kotak — 15 Sep 2026, terlacak dengan menghitung
+           `array.size()` yang memulangkan 1 untuk larik yang diminta 10.
+
+           Ukuran dibatasi 100.000: skrip yang keliru menulis
+           `array.new_float(bar_index)` tidak boleh membekukan tab orang. */
+        const n = e.arg.length > 0 ? Math.floor(Number(arg(0))) : 0;
+        if (!(n > 0)) return { jenis: 'array', isi: [] };
+        const bawaan = e.nama === 'array.new_bool' ? false
+          : e.nama === 'array.new_string' ? ''
+          : (e.nama === 'array.new_line' || e.nama === 'array.new_label' || e.nama === 'array.new_box') ? null
+          : 0;
+        const awal = e.arg.length > 1 ? arg(1) : bawaan;
+        return { jenis: 'array', isi: new Array(Math.min(n, 100_000)).fill(awal) };
+      }
       /* array.from(...) — dipakai untuk daftar tanggal yang ditulis tangan.
          Argumennya dievaluasi apa adanya, jadi `array.from(timestamp(...),
          timestamp(...))` langsung jadi larik stempel waktu. */

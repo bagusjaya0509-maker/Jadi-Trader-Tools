@@ -1,6 +1,7 @@
 import { SUPERTREND_PINE } from '@/lib/pine';
 import { MOMENTUM_CANDLE_PINE } from '@/lib/pine-momentum-candle';
 import { SMI_PINE } from '@/lib/pine-smi';
+import { VOLUME_OB_PINE } from '@/lib/pine-volume-ob';
 
 /* ════════════════════════════════════════════════════════════════════════
    PASANG INDIKATOR DARI MARKETPLACE KE CHART
@@ -33,6 +34,12 @@ export const INDIKATOR_TERPASANG: Record<string, { nama: string; kode: string }>
   },
   'smi-indikator': {
     nama: 'Stochastic Momentum Index (SMI)', kode: SMI_PINE,
+  },
+  /* Nama di sini HARUS sama dengan nama produk di katalog Firestore —
+     pencocokannya lewat id ATAU nama yang dinormalkan, dan kalau keduanya
+     meleset tombol Pasang hilang tanpa satu pun galat. */
+  'volume-profile-order-blocks': {
+    nama: 'Volume Profile Order Blocks', kode: VOLUME_OB_PINE,
   },
 };
 
