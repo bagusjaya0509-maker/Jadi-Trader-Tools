@@ -2086,7 +2086,12 @@ ${pnlSunting !== null
             catch { sisaTutup.push(`${o.jenis} ${o.pemicu}`); }
           }
         }
-        setSuntingKabar(!hasilTutup.penuh
+        setSuntingKabar(hasilTutup.kosong
+          /* Bursa menjawab 200 TAPI tidak menemukan posisinya. Dikatakan apa
+             adanya, bukan disamarkan jadi "ditutup": yang membaca layar ini
+             sedang memutuskan apakah masih perlu menutup tangan di bursa. */
+          ? `${sunting.simbol} tidak ditemukan di ${boronganTutup ? 'Hyperliquid' : 'Binance'} — tidak ada yang ditutup. Segarkan daftar posisi, lalu periksa langsung di bursa.`
+          : !hasilTutup.penuh
           ? `Ditutup ${hasilTutup.qty} dari ${sunting.ukuran}. Sisanya tetap terbuka beserta SL/TP-nya.`
           : sisaTutup.length
             ? `Posisi ditutup, tapi ${sisaTutup.length} stop lama gagal dibatalkan (${sisaTutup.join(', ')}). Batalkan manual di ${boronganTutup ? 'Hyperliquid' : 'Binance'}.`
@@ -2095,7 +2100,9 @@ ${pnlSunting !== null
         /* Panelnya ditutup HANYA kalau posisinya benar-benar habis. Sisa
            yang masih hidup tetap perlu panelnya terbuka — orang yang baru
            menutup 50% biasanya sedang menimbang 50% berikutnya. */
-        if (hasilTutup.penuh) setSunting(null);
+        /* Panel TETAP terbuka kalau tidak ada yang ditutup: menutupnya
+           akan terbaca sebagai selesai. */
+        if (hasilTutup.penuh && !hasilTutup.kosong) setSunting(null);
       }
     } catch (e) {
       menungguHapus.current = false;

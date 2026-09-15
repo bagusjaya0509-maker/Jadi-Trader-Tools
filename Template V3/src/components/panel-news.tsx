@@ -177,7 +177,7 @@ const Baris = forwardRef<HTMLDivElement, PropsBaris>(function Baris({ e, kini },
             justru yang pertama dicari mata. Merah cuma untuk dampak
             tinggi; kalau semua baris berwarna, tidak ada yang menonjol. */}
         <span className={cn('shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium',
-          e.dampak === 'high' ? 'bg-red-500/20 text-red-300 ring-1 ring-inset ring-red-500/40'
+          e.dampak === 'high' ? 'bg-red-500/20 text-red-300'
           : e.dampak === 'medium' ? 'bg-amber-500/15 text-amber-300/90'
           : 'bg-zinc-800/70 text-zinc-300')}>
           {e.mataUang}

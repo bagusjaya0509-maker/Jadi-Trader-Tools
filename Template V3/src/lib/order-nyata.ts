@@ -669,7 +669,9 @@ export async function tutupPosisiNyata(p: {
    *  perintah tutup dikirim adalah di mana posisinya dibuka, bukan dari
    *  bursa mana lilinnya kebetulan digambar. */
   bursa?: 'binance' | 'hyperliquid';
-}): Promise<{ qty: number; penuh: boolean }> {
+  /* `kosong` = bursa menjawab "tidak ada posisi itu di sini". Lihat
+     catatan di akhir fungsi soal kenapa itu WAJIB diteruskan. */
+}): Promise<{ qty: number; penuh: boolean; kosong: boolean }> {
   const { url, token } = bacaKoneksi();
   const dasar = (url.trim() || PROXY_BAWAAN).replace(/\/+$/, '');
   if (!token.trim()) throw new Error('App Token belum diisi di Integrations.');
@@ -723,7 +725,18 @@ export async function tutupPosisiNyata(p: {
   });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(typeof j?.error === 'object' ? (j.error.msg ?? JSON.stringify(j.error)) : (j?.error ?? `Backend menjawab ${r.status}`));
-  return { qty, penuh };
+  /* ── "TIDAK ADA YANG DITUTUP" BUKAN "BERHASIL DITUTUP" ─────────────
+     Jalur Hyperliquid menjawab `{ ok: true, kosong: true }` kalau posisi
+     yang diminta tidak ketemu di bursa. Statusnya 200, jadi baris di atas
+     melewatkannya, dan layar mengabarkan "Posisi ditutup dan semua stop-nya
+     dibersihkan" untuk posisi yang tidak tersentuh sama sekali.
+
+     Itu kegagalan yang paling buruk bentuknya di halaman uang: bukan galat
+     yang bisa dibaca, melainkan keberhasilan palsu. Orang menutup layar
+     sambil percaya posisinya sudah habis.
+
+     Benderanya diteruskan supaya pemanggil bisa mengatakannya apa adanya. */
+  return { qty, penuh, kosong: j?.kosong === true };
 }
 
 
