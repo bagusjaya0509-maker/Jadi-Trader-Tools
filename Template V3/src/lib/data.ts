@@ -290,6 +290,33 @@ function kePosisiPublik(p: any, i: number): Posisi {
   };
 }
 
+/** Kunci sebuah posisi bursa: BURSA + SIMBOL, tidak pernah simbol saja.
+ *
+ *  Dulu `bursa-${simbol}`. Satu koin yang terbuka di Binance DAN di Hyperliquid
+ *  — ZECUSDT, persis yang dilaporkan pemilik — lalu mendapat dua posisi
+ *  dengan id yang sama persis. Dua akibatnya, dan dua-duanya diam:
+ *
+ *    · Tabel memakai id ini sebagai `key` React. Dua bersaudara berkunci sama
+ *      membuat React salah memasangkan simpul tiap kali harganya diperbarui:
+ *      baris anak bocor jadi baris induk, baris lama tertinggal, dan
+ *      tumpukannya bertambah selama kelompoknya dibentangkan. Terlihat sebagai
+ *      satu ZECUSDT yang beranak tujuh, masing-masing dengan persentase gerak
+ *      yang beku di waktu yang berbeda-beda. Muat ulang menyembuhkannya
+ *      sebentar karena kelompoknya kembali tergabung — dan itu yang membuatnya
+ *      terbaca seperti gangguan sesaat, bukan cacat.
+ *
+ *    · Yang lebih mahal: `panel-posisi-terbuka` mencari ukuran lot lewat
+ *      `find((p) => p.id === kunci)` saat hendak menutup. `find` memulangkan
+ *      yang PERTAMA, jadi menutup posisi Hyperliquid mengirim ukuran posisi
+ *      Binance. Itu bukan salah gambar — itu salah jumlah, ke bursa yang
+ *      sungguhan.
+ *
+ *  Simbol saja TIDAK PERNAH cukup sebagai identitas sejak jalur Hyperliquid
+ *  ada: keduanya sama-sama menulis COINUSDT. */
+function idPosisiBursa(b: { bursa: string; simbol: string }): string {
+  return `bursa-${b.bursa}-${b.simbol}`;
+}
+
 /** Posisi yang SEDANG terbuka di Binance.
  *
  *  Sumbernya `public/posisiTerbuka`, yang ditulis ulang oleh screener V2
@@ -391,7 +418,11 @@ export function usePosisi(): HasilData<Posisi[]> & { pending: OrderBursa[]; stop
          open-orders ada. */
       return p
         ? {
-            ...p, arah: b.arah, entry: b.entry || p.entry,
+            /* Id dari BURSA, menimpa id dokumen publik. `dariPublik` dikunci
+               simbol saja, jadi posisi Binance dan Hyperliquid untuk koin yang
+               sama mencomot baris publik yang sama — dan ikut mewarisi id-nya
+               kalau tidak ditimpa di sini. */
+            ...p, id: idPosisiBursa(b), arah: b.arah, entry: b.entry || p.entry,
             sl: b.sl || p.sl, tp: b.tp || p.tp,
             jumlah: b.jumlah, pnlFloat: b.pnl,
             /* Dokumen publik tidak tahu bursanya; yang tahu jawaban bursa
@@ -402,7 +433,7 @@ export function usePosisi(): HasilData<Posisi[]> & { pending: OrderBursa[]; stop
             funding: b.funding,
           }
         : {
-            id: `bursa-${b.simbol}`,
+            id: idPosisiBursa(b),
             simbol: b.simbol, arah: b.arah, tf: '—',
             entry: b.entry, sl: b.sl, tp: b.tp, hargaKini: b.entry,
             /* Dibaca dari bursanya sendiri. Dulu dikeraskan 'Binance Live',
