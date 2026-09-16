@@ -239,8 +239,28 @@ export function PanelPosisiTerbuka({ sumber, onSunting, onTutup, onUbahSlTp, onB
      ditekan orangnya, dengan kotak konfirmasi yang MENYEBUT tiap order —
      membatalkan order diam-diam di latar belakang adalah hal terakhir
      yang boleh dilakukan panel yang cuma bertugas menampilkan. */
+  /* ── DIAM SAAT DAFTAR POSISINYA BUKAN DARI BURSA ────────────────────
+     Dilaporkan pemilik 17 Sep 2026: mengubah TP sebuah posisi Hyperliquid
+     memunculkan peringatan "SL/TP tidak menjaga apa pun" untuk simbol
+     Hyperliquid, lalu hilang sendiri beberapa detik kemudian.
+
+     Bukan kedipan acak. Kalau SATU putaran /api/positions gagal, `aktif`
+     jadi false, dan `usePosisi` lalu jatuh ke dokumen publik
+     `public/posisiTerbuka` — dokumen yang ditulis screener V2 dan HANYA
+     berisi posisi Binance. Daftar stop tetap memegang stop Hyperliquid yang
+     baru saja dibaca. Dibandingkan begitu saja, SETIAP stop Hyperliquid
+     kehilangan pasangannya dan terbaca yatim.
+
+     Mengubah order memicu dua penyegaran beruntun (langsung, lalu 2,5
+     detik) — itu yang membuat kegagalan sesaat jauh lebih sering terjadi
+     tepat saat mengubah order, bukan di waktu lain.
+
+     Jadi gerbangnya `bursaAktif`, bukan penundaan atau peredam. "Belum
+     terjawab" bukan "tidak ada", dan satu-satunya jawaban yang jujur saat
+     bursanya bungkam adalah tidak menuduh apa pun. Ongkos salahnya satu
+     arah: tombol Bersihkan mencabut stop yang sedang menjaga uang. */
   const nyasar = useMemo(
-    () => (sumber === 'kripto'
+    () => (sumber === 'kripto' && bursaAktif
       ? cariStopNyasar(
           stopKripto,
           /* Bursanya IKUT. Tanpa itu posisi FARTCOINUSDT di Binance dan
@@ -252,7 +272,7 @@ export function PanelPosisiTerbuka({ sumber, onSunting, onTutup, onUbahSlTp, onB
           })),
           pendingKripto)
       : []),
-    [sumber, stopKripto, posisiKripto, pendingKripto]);
+    [sumber, bursaAktif, stopKripto, posisiKripto, pendingKripto]);
   /* Tiket yang sedang dibatalkan. Satu per satu, bukan penanda boolean
      bersama: dua order menunggu di daftar yang sama, dan penanda tunggal
      akan memutar spinner di baris yang tidak sedang diapa-apakan. */
@@ -262,8 +282,15 @@ export function PanelPosisiTerbuka({ sumber, onSunting, onTutup, onUbahSlTp, onB
   const [kabarBersih, setKabarBersih] = useState('');
 
   async function bersihkanNyasar() {
-    const daftar = nyasar.map((n, i) => `${i + 1}. ${n.order.simbol} ${n.order.jenis} @ ${fHarga(n.order.pemicu)} — ${n.ket}`).join('\n');
-    if (!confirm(`Batalkan ${nyasar.length} order berikut di Binance?
+    /* Bursanya DISEBUT per baris, dan judulnya menyebut yang benar-benar
+       terlibat. Sebelumnya judulnya mengeraskan "di Binance" sementara
+       ordernya bisa saja seluruhnya Hyperliquid — kotak konfirmasi yang
+       menyebut bursa yang salah adalah persetujuan yang diberikan untuk
+       tindakan yang berbeda dari yang dikira. */
+    const namaBursa = (b?: string) => (b === 'hyperliquid' ? 'Hyperliquid' : 'Binance');
+    const daftar = nyasar.map((n, i) => `${i + 1}. [${namaBursa(n.order.bursa)}] ${n.order.simbol} ${n.order.jenis} @ ${fHarga(n.order.pemicu)} — ${n.ket}`).join('\n');
+    const bursaTerlibat = [...new Set(nyasar.map((n) => namaBursa(n.order.bursa)))].join(' & ');
+    if (!confirm(`Batalkan ${nyasar.length} order berikut di ${bursaTerlibat}?
 
 ${daftar}
 
