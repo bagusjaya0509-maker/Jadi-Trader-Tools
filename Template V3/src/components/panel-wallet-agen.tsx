@@ -646,6 +646,27 @@ function KartuDompet({ w, posisi, log, bursa, dipilih, pilih, hapus, salin, sali
   const titik = titikDompet(tutup);
   const rona = ronaAlamat(w.alamat);
 
+  /* Menu klik kanan. Koordinat layar, bukan koordinat kartu: kartunya
+     `overflow-hidden`, jadi apa pun yang digambar di dalamnya akan terpotong
+     di tepi kartu. Karena itu menunya diportalkan ke `document.body`. */
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+  useEffect(() => {
+    if (!menu) return;
+    const tutupMenu = () => setMenu(null);
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenu(null); };
+    /* `scroll` ditangkap di fase CAPTURE supaya guliran di dalam panel mana
+       pun ikut menutupnya — menu yang tertinggal di koordinat lamanya sambil
+       kartunya bergerak menunjuk dompet yang salah. */
+    window.addEventListener('scroll', tutupMenu, true);
+    window.addEventListener('resize', tutupMenu);
+    window.addEventListener('keydown', esc);
+    return () => {
+      window.removeEventListener('scroll', tutupMenu, true);
+      window.removeEventListener('resize', tutupMenu);
+      window.removeEventListener('keydown', esc);
+    };
+  }, [menu]);
+
   return (
     /* `id` supaya baris di tab Posisi Copy bisa menuju kartu ini langsung.
        Alamatnya dihuruf-kecilkan: yang datang dari daftar salin sudah
@@ -653,6 +674,17 @@ function KartuDompet({ w, posisi, log, bursa, dipilih, pilih, hapus, salin, sali
        satu huruf beda membuat `getElementById` memulangkan null tanpa
        sepatah pesan pun. */
     <div id={'kartu-dompet-' + w.alamat.toLowerCase()} onClick={pilih}
+      onContextMenu={(e) => {
+        if (!salin && !hapus) return;          // bukan pemilik: menu peramban biasa
+        e.preventDefault();
+        /* Dijepit ke dalam layar. Menu yang lahir di kursor dekat tepi kanan
+           atau bawah akan separuh keluar jendela, dan yang keluar itu justru
+           baris terakhirnya — di sini baris "Berhenti memantau". */
+        setMenu({
+          x: Math.min(e.clientX, window.innerWidth - 208),
+          y: Math.min(e.clientY, window.innerHeight - 96),
+        });
+      }}
       className={cn('group relative flex cursor-pointer flex-col overflow-hidden rounded-xl border bg-zinc-900/40 transition-colors',
         dipilih ? 'border-zinc-500' : 'border-zinc-800 hover:border-zinc-700')}>
 
@@ -664,7 +696,15 @@ function KartuDompet({ w, posisi, log, bursa, dipilih, pilih, hapus, salin, sali
         </span>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-[12.5px] font-semibold text-zinc-100">{w.nama}</span>
-          <span className="block font-mono text-[10px] text-zinc-600">
+          {/* `truncate` DI SINI JUGA, bukan cuma di namanya.
+              Dilaporkan pemilik 17 Sep 2026: tulisan di kepala kartu saling
+              bertindih. Sebabnya baris alamat ini — lebarnya tetap ±13
+              karakter dan tanpa `truncate` ia melimpah keluar kotaknya lalu
+              menimpa blok WR di sebelah kanan. Namanya sudah dipotong sejak
+              dulu, jadi yang bertindih selalu baris keduanya; itu yang
+              membuat gejalanya terbaca seperti tata letak yang kacau
+              padahal cuma satu kelas yang hilang. */}
+          <span className="block truncate font-mono text-[10px] text-zinc-600">
             {w.alamat.slice(0, 6)}…{w.alamat.slice(-4)}
           </span>
         </span>
@@ -722,22 +762,23 @@ function KartuDompet({ w, posisi, log, bursa, dipilih, pilih, hapus, salin, sali
             Menyala hijau saat salinannya HIDUP — supaya sekilas pandang
             ke seluruh daftar sudah menjawab "dompet mana yang sedang
             berjalan atas namaku". */}
-        {salin && (
-          <button onClick={(e) => { e.stopPropagation(); salin(); }}
-            title={salinAktif
-              ? 'Salinan HIDUP — order berangkat sendiri. Klik untuk mengubah setelannya.'
-              : 'Salin dompet ini: atur bursa, ukuran order, dan leverage.'}
-            className={cn('shrink-0 cursor-pointer rounded p-1 transition-colors',
-              salinAktif ? 'text-emerald-400 hover:text-emerald-300'
-                         : 'text-zinc-800 hover:text-zinc-300 group-hover:text-zinc-600')}>
+        {/* ── SATU IKON, DAN HANYA KALAU ADA ARTINYA ────────────────
+            Dulu dua ikon berdiri di sini terus-menerus: salin dan hapus.
+            Keduanya memakan ±44 px di kepala kartu selebar 15,5 rem — ruang
+            yang diambil dari nama dompet dan blok WR, dua hal yang justru
+            dibaca. Sekarang keduanya pindah ke menu klik kanan, dan yang
+            tertinggal cuma satu LAMPU: ikon salin yang muncul HANYA saat
+            salinannya hidup.
+
+            Jadi ikon ini bukan tombol yang kebetulan menyala, melainkan
+            penanda keadaan — sekali pandang ke seluruh daftar sudah
+            menjawab "dompet mana yang sedang berjalan atas namaku".
+            Diminta pemilik 17 Sep 2026. */}
+        {salinAktif && (
+          <span aria-hidden title="Salinan HIDUP — order berangkat sendiri. Klik kanan untuk mengubah setelannya."
+            className="shrink-0 p-1 text-emerald-400">
             <IkonTiru className="size-3.5" />
-          </button>
-        )}
-        {hapus && (
-          <button onClick={(e) => { e.stopPropagation(); hapus(); }} title="Berhenti memantau"
-            className="shrink-0 cursor-pointer rounded p-1 text-zinc-800 transition-colors hover:text-red-400 group-hover:text-zinc-600">
-            <Trash2 className="size-3.5" />
-          </button>
+          </span>
         )}
       </div>
 
@@ -758,6 +799,44 @@ function KartuDompet({ w, posisi, log, bursa, dipilih, pilih, hapus, salin, sali
           )}
         </span>
       </div>
+
+      {menu && createPortal((
+        <>
+          {/* Tirai penangkap klik. Ikut menangkap klik KANAN juga: tanpa itu,
+              klik kanan kedua membuka menu peramban di atas menu ini. */}
+          <div className="fixed inset-0 z-[60]"
+            onClick={() => setMenu(null)}
+            onContextMenu={(e) => { e.preventDefault(); setMenu(null); }} />
+          <div role="menu" style={{ left: menu.x, top: menu.y }}
+            onClick={(e) => e.stopPropagation()}
+            className="fixed z-[61] min-w-[12rem] overflow-hidden rounded-lg border border-zinc-700 bg-zinc-900 py-1 shadow-xl">
+            <div className="truncate px-3 py-1 text-[10.5px] text-zinc-500">{w.nama}</div>
+            {salin && (
+              <button role="menuitem" type="button"
+                onClick={() => { setMenu(null); salin(); }}
+                className="flex w-full cursor-pointer items-center gap-2 px-3 py-1.5 text-left text-[12px] text-zinc-200 transition-colors hover:bg-zinc-800">
+                <IkonTiru className="size-3.5 shrink-0 text-zinc-500" />
+                {salinAktif ? 'Ubah setelan salin' : 'Salin dompet ini…'}
+              </button>
+            )}
+            {hapus && (
+              <button role="menuitem" type="button"
+                onClick={() => {
+                  setMenu(null);
+                  /* Ditanya dulu. Dulu aksinya ada di ikon yang terlihat
+                     terus, jadi salah tekan langsung terlihat; dari menu,
+                     dua baris bersebelahan dan yang bawah menghapus. */
+                  if (confirm('Berhenti memantau ' + w.nama + '?\n\n'
+                    + 'Catatan penutupan yang sudah dikumpulkan untuk dompet ini ikut hilang.')) hapus();
+                }}
+                className="flex w-full cursor-pointer items-center gap-2 px-3 py-1.5 text-left text-[12px] text-red-400 transition-colors hover:bg-zinc-800">
+                <Trash2 className="size-3.5 shrink-0" />
+                Berhenti memantau
+              </button>
+            )}
+          </div>
+        </>
+      ), document.body)}
 
       {/* Kurva menempel ke tepi bawah kartu, tanpa jarak kiri-kanan. Kurva
           yang mengambang di tengah kotak berpadding terbaca sebagai gambar
@@ -2269,7 +2348,10 @@ export function PanelWalletAgen({ pemilik = false, tab: tabLuar }: {
             <h3 className="mb-2 border-b border-zinc-800 pb-1.5 text-[13px] font-semibold text-zinc-200">
               Dompet yang dipantau <span className="font-normal text-zinc-600">· {dompet.length}</span>
               <span className="ml-2 text-[11px] font-normal text-zinc-600">
-                Klik kartunya untuk melihat posisi &amp; transaksinya
+                {/* Aksi yang cuma ada di klik kanan tidak bisa ditemukan
+                    sendiri. Disebut di sini, sekali, di tempat orang sudah
+                    membaca. */}
+                Klik kartunya untuk melihat posisi &amp; transaksinya · klik kanan untuk salin &amp; berhenti pantau
               </span>
             </h3>
             <div className="grid gap-2.5 [grid-template-columns:repeat(auto-fill,minmax(min(100%,15.5rem),1fr))]">
