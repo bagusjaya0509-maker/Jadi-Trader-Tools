@@ -695,6 +695,11 @@ export default function ChartBacktest() {
   const [uji, setUji] = useState(false);
   /* null = replay mati. Angkanya indeks bar terakhir yang boleh tampil. */
   const [replayIdx, setReplayIdx] = useState<number | null>(null);
+  /* Bar tempat sinyalnya dibuka. Dipakai DUA hal: titik mulai replay, dan
+     batas peredupan lilin — bar sesudahnya adalah kelanjutan yang sedang
+     diputar, dan itulah yang diwarnai lebih pudar. */
+  const [barSinyal, setBarSinyal] = useState<number | null>(null);
+  const putarSelesai = useRef(false);
   /* MODE BIDIK — sekali pakai, bukan keadaan yang menetap.
      ────────────────────────────────────────────────────────────────────
      Menekan Replay tidak langsung memulai; ia menyalakan mode ini, dan
@@ -2155,6 +2160,11 @@ ${pnlSunting !== null
      Kosong = jalur biasa, ketiganya tidak muncul. */
   const sinyalAsal = cari.get('sinyal');
   const kanalAsal = cari.get('kanal');
+  /* Replay otomatis sinyal selesai. Keduanya dibaca sekali di sini supaya
+     efek penggeraknya di bawah tidak menyentuh `cari` lagi — objek itu
+     berganti identitas tiap render dan akan menyalakan ulang efeknya. */
+  const putarSinyal = cari.get('putar') === '1';
+  const dibukaSinyal = Number(cari.get('dibuka')) || 0;
   /* Sinyal cermin dompet on-chain tidak punya SL/TP — dompetnya memang tidak
      memasangnya, dan kartunya sudah mengatakan itu. Panel order yang tetap
      mengunci "SL & TP belum diisi" untuk sinyal seperti ini menghalangi
@@ -3260,6 +3270,57 @@ ${pnlSunting !== null
      atas deret lilin yang berbeda berarti setiap indeks menunjuk waktu yang
      lain, dan posisi yang sedang terbuka jadi tidak punya arti. */
   useEffect(() => { setReplayIdx(null); setGarisHarga([]); }, [simbol, tf]);
+
+  /* ── REPLAY OTOMATIS SINYAL YANG SUDAH SELESAI ───────────────────────
+     Datang dari kartu sinyal selesai (`&putar=1&dibuka=<ms>`). Chart mulai
+     di bar tempat sinyalnya dibuka, lalu maju sendiri sampai harga menyentuh
+     SL atau TP — jawaban atas "ternyata lanjutannya seperti apa", yang tidak
+     bisa dibaca dari kartu mana pun.
+
+     BERHENTI DI BAR YANG MENYENTUH, bukan kembali ke harga sekarang: yang
+     dicari orangnya justru bar itu. Melanjutkan sampai ujung data akan
+     mengubur hasilnya di tengah ratusan lilin sesudahnya.
+
+     `putarSelesai` menjaga ia berjalan SEKALI. Tanpa itu, tiap kali
+     `lilinGabung` diperbarui (tiap 15 detik, atau saat "Muat lebih lama"
+     ditekan) replay-nya mulai lagi dari awal — dan orang yang sedang
+     menonton kelanjutan sinyalnya dilempar balik ke titik masuk.
+
+     SL/TP dibaca dari URL, bukan dihitung ulang: keduanya milik sinyal itu,
+     dan menghitung ulang dari data sekarang berarti menilai rencana lama
+     dengan angka baru. */
+  const arahSinyalUrl = cari.get('arah') === 'SELL' ? 'SELL' : 'BUY';
+  const slSinyalUrl = Number(cari.get('sl')) || 0;
+  const tpSinyalUrl = Number(cari.get('tp')) || 0;
+  useEffect(() => {
+    if (!putarSinyal || !dibukaSinyal || putarSelesai.current) return;
+    const t = lilinGabung.times;
+    if (t.length < 30) return;
+    /* Bar TERAKHIR yang waktunya belum melewati saat sinyal dibuka. Sinyal
+       lahir di tengah sebuah bar, bukan tepat di batasnya. */
+    let idx = -1;
+    for (let i = 0; i < t.length; i++) { if (t[i] <= dibukaSinyal) idx = i; else break; }
+    /* Di luar jangkauan data yang termuat: jangan memulai apa pun. Lebih
+       jujur diam daripada memutar dari bar nol — itu akan terbaca seperti
+       sinyalnya memang dibuka di awal grafik. */
+    if (idx < 5 || idx >= t.length - 2) return;
+    putarSelesai.current = true;
+    setBarSinyal(idx);
+    setReplayIdx(idx);
+    let kini = idx;
+    const jam = setInterval(() => {
+      kini += 1;
+      if (kini >= t.length - 1) { clearInterval(jam); return; }
+      setReplayIdx(kini);
+      const h = lilinGabung.highs[kini], l = lilinGabung.lows[kini];
+      const kena = arahSinyalUrl === 'BUY'
+        ? (slSinyalUrl > 0 && l <= slSinyalUrl) || (tpSinyalUrl > 0 && h >= tpSinyalUrl)
+        : (slSinyalUrl > 0 && h >= slSinyalUrl) || (tpSinyalUrl > 0 && l <= tpSinyalUrl);
+      if (kena) clearInterval(jam);
+    }, 220);
+    return () => clearInterval(jam);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [putarSinyal, dibukaSinyal, lilinGabung]);
 
   /* SEMUA deret yang digambar per indeks WAJIB dihitung dari lilinGabung,
      bukan lilin. ChartLilin menggambar lilinGabung dan memetakan nilai[i] ke
@@ -5373,7 +5434,8 @@ ${pnlSunting !== null
             ? <ChartLilin key={`${simbol}|${tf}|${kunciChart}`}
                           refKoordinat={koordinatUbah}
                           lilin={lilinGabung} garis={garis} trade={replayIdx === null ? hasil?.trade : undefined}
-                          tinggi={tinggiChart} hingga={replayIdx ?? undefined} smi={smi}
+                          tinggi={tinggiChart} hingga={replayIdx ?? undefined}
+                          redupDari={barSinyal ?? undefined} smi={smi}
                           garisHarga={[...garisHarga, ...garisZonaEntry, ...garisZona, ...garisDompet, ...garisKonsensus, ...(modeNyata ? garisOrder : [])]}
                           /* Klik chart HANYA berlaku saat mode bidik menyala —
                               sekali, untuk menentukan titik mulai replay.

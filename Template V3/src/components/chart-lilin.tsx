@@ -259,7 +259,7 @@ export interface PosisiChartMt5 {
 export type KoordinatChart = (harga: number) => { y: number; kanan: number; xAkhir: number | null } | null;
 
 export function ChartLilin({
-  lilin, garis, trade, tinggi = 420, hingga, garisHarga, onKlikBar, smi, mundur, pojok,
+  lilin, garis, trade, tinggi = 420, hingga, redupDari, garisHarga, onKlikBar, smi, mundur, pojok,
   garisSeret, onSeret, onKlikGaris, onHapusGaris, onKlikKosong, garisKlik, onKlikGarisOrder, hamparanBawah, segmen, penandaPine, kotakPine, isianPine,
   alat, onAlatSelesai, gambarAlat, gambarPilih, onPilihGambar, onUbahGambar,
   posisiMt5, onUbahPosisi, hargaAsk, kunciUkuran, bagikanFoto, tandaAir, tampilan, pitaSmi,
@@ -293,6 +293,17 @@ export function ChartLilin({
      seluruhnya. Pemotongan terjadi di SINI, bukan di pemanggil, supaya
      indikator dan penanda ikut terpotong pada batas yang sama persis. */
   hingga?: number;
+  /** Indeks bar tempat lilin mulai DIREDUPKAN.
+   *
+   *  Dipakai replay otomatis sinyal analis: bar sebelum titik ini adalah
+   *  sejarah yang sudah terjadi saat sinyalnya dibuat, bar sesudahnya adalah
+   *  kelanjutan yang sedang diputar. Meredupkannya membuat batas keduanya
+   *  terbaca tanpa satu pun garis tambahan — dan garis vertikal memang tidak
+   *  ada di lightweight-charts, jadi warna inilah pembatasnya.
+   *
+   *  Warnanya diambil mendekati latar, bukan abu-abu netral: yang dicari
+   *  bukan "lilin berwarna lain" melainkan "lilin yang mundur selangkah". */
+  redupDari?: number;
   /** Garis horizontal (entry, SL, TP) untuk posisi yang sedang dibuka. */
   garisHarga?: GarisHarga[];
   /** Klik pada chart -> indeks bar. Dipakai untuk memulai replay dari situ. */
@@ -1015,6 +1026,16 @@ export function ChartLilin({
        memegang lilinnya, justru dialah yang paling terlihat melompat. */
     const batas = hingga === undefined ? lilin.times.length : Math.max(1, Math.min(lilin.times.length, hingga + 1));
 
+    /* Objek KOSONG untuk bar biasa, bukan warna bawaan yang ditulis ulang:
+       lightweight-charts memakai warna seri untuk bar yang tidak menyebutkan
+       warnanya sendiri, dan menyebutkannya di tiap bar berarti tema chart
+       berhenti berlaku pada lilin. */
+    const warnaRedup = (i: number) => (
+      redupDari === undefined || i < redupDari ? {} : {
+        color: '#4a4f57', borderColor: '#4a4f57', wickColor: '#3b3f46',
+      }
+    );
+
     /* ── JALUR CEPAT: replay maju satu bar ────────────────────────────────
        Kasus yang paling sering saat replay berjalan, dan satu-satunya yang
        benar-benar butuh cepat. `update()` menyentuh SATU lilin; `setData`
@@ -1033,6 +1054,7 @@ export function ChartLilin({
       const i = batas - 1;
       seri.current.update({
         time: Math.floor(lilin.times[i] / 1000) as Time,
+        ...warnaRedup(i),
         open: lilin.opens[i], high: lilin.highs[i], low: lilin.lows[i], close: lilin.closes[i],
       });
       terakhirBatas.current = batas;
@@ -1047,6 +1069,7 @@ export function ChartLilin({
       /* lightweight-charts memakai DETIK, bukan milidetik. Mengirim ms
          menaruh setiap lilin di tahun 58.000 dan sumbunya jadi kosong. */
       time: Math.floor(t / 1000) as Time,
+      ...warnaRedup(i),
       open: lilin.opens[i], high: lilin.highs[i], low: lilin.lows[i], close: lilin.closes[i],
     })));
 
@@ -1084,7 +1107,7 @@ export function ChartLilin({
         });
       } catch { /* chart baru / rentang tidak sah */ }
     }
-  }, [lilin, hingga]);
+  }, [lilin, hingga, redupDari]);
 
   /* Garis harga posisi (entry / SL / TP) */
   useEffect(() => {

@@ -607,7 +607,18 @@ function KartuAnalisa({ a, status, milikku, onSegarkan, performa, hargaKini }: {
        harus pulang ke mana, dan ikon copy tidak tahu apa yang disalin. */
     + (lv ? `&arah=${a.arah}&entry=${lv.entry}&sl=${lv.sl}&tp=${lv.tp}`
           + `&sinyal=${encodeURIComponent(a.id)}&kanal=${encodeURIComponent(a.uid)}`
-          + `&analis=${encodeURIComponent(a.nama || '')}` : '');
+          + `&analis=${encodeURIComponent(a.nama || '')}`
+          /* ── SINYAL YANG SUDAH SELESAI MINTA DIPUTAR ─────────────────
+             Yang dicari orang saat membuka sinyal selesai bukan levelnya —
+             itu sudah tertulis di kartunya — melainkan APA YANG TERJADI
+             SESUDAHNYA. Tanpa dua parameter ini chart mendarat di harga
+             sekarang, berminggu-minggu sesudah sinyalnya, dan titik
+             masuknya bahkan tidak kelihatan di layar.
+
+             `dibuka` dikirim sebagai milidetik apa adanya; chart yang
+             mencocokkannya ke bar terdekat, karena cuma ia yang tahu
+             timeframe mana yang sedang digambar. */
+          + (selesai && a.dibuat ? `&dibuka=${a.dibuat}&putar=1` : '') : '');
   const tautanChart = alamatChart(isi);
   const bolehBatal = bisaDibatalkan(a, pengguna?.uid);
 
