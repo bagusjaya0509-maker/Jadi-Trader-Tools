@@ -6314,6 +6314,66 @@
     };
   }
 
+  /* ── HASIL PINDAI DISIMPAN SEBENTAR ──────────────────────────────────
+     Menekan BUY/SELL NOW atau kartu screener memindahkan orang ke Chart &
+     Entry — dan kembali dari sana berarti bingkai ini dimuat ULANG dari nol.
+     Tanpa simpanan, satu kali menengok chart membayar ongkos pemindaian penuh
+     lagi: 200-360 koin, hampir semenit menunggu, dan jatah proxy 600/menit
+     yang dibagi seluruh halaman.
+
+     sessionStorage, bukan localStorage: hasil pindai cuma masuk akal selama
+     orangnya masih di perjalanan yang sama. Dibuka lagi besok, angka-angkanya
+     sudah bohong; dan tab sebelah mungkin sedang memandang filter lain.
+
+     BATAS 10 MENIT bukan demi hemat, melainkan demi jujur: harga bergerak.
+     Kartu yang dipulihkan menyebutkan umurnya sendiri di baris status supaya
+     tidak ada yang mengira itu keadaan detik ini.
+
+     Yang disimpan HASILNYA, bukan HTML-nya. Kartu harus dijahit ulang lewat
+     fungsi gambar aslinya supaya daftar sinyal yang bisa dipilih
+     (registerTradableSignals) dan pendengar per-kartu ikut terpasang lagi.
+     Dipulihkan sebagai HTML mentah, kartunya terlihat utuh tapi tombol
+     BUY/SELL NOW-nya tidak menunjuk apa pun — rusak yang paling mahal, karena
+     ia baru ketahuan saat orangnya sudah menekan. */
+  var JT_UMUR_SIMPAN = 10 * 60 * 1000;
+
+  function jtKunciSimpan(nama){ return 'jt-pindai-' + nama; }
+
+  function jtSimpanPindai(nama, setelan, data, status){
+    try{
+      sessionStorage.setItem(jtKunciSimpan(nama), JSON.stringify({
+        waktu: Date.now(), setelan: setelan, status: status || '', data: data
+      }));
+    }catch(e){
+      /* Kuota penuh, atau penyimpanan dimatikan (mode penyamaran). Simpanan
+         lama ikut dibuang: yang tertinggal di situ milik pindaian SEBELUMNya,
+         dan memulihkannya nanti berarti menampilkan hasil yang sudah diganti
+         di layar ini. */
+      try{ sessionStorage.removeItem(jtKunciSimpan(nama)); }catch(e2){}
+    }
+  }
+
+  function jtAmbilPindai(nama){
+    try{
+      var mentah = sessionStorage.getItem(jtKunciSimpan(nama));
+      if(!mentah) return null;
+      var o = JSON.parse(mentah);
+      if(!o || typeof o.waktu !== 'number' || !Array.isArray(o.data) || !o.data.length) return null;
+      var umur = Date.now() - o.waktu;
+      /* Umur negatif berarti jam sistemnya mundur sejak disimpan. Dibuang,
+         bukan dipakai: "hasil -3 menit lalu" lebih membingungkan daripada
+         memindai ulang. */
+      if(umur < 0 || umur > JT_UMUR_SIMPAN){ sessionStorage.removeItem(jtKunciSimpan(nama)); return null; }
+      o.umur = umur;
+      return o;
+    }catch(e){ return null; }
+  }
+
+  function jtUmurTeks(ms){
+    var menit = Math.floor(ms / 60000);
+    return menit < 1 ? 'hasil pindai barusan' : 'hasil pindai ' + menit + ' menit lalu';
+  }
+
   function renderPantauSignals(top){
     window.__esLastPantauResults = top;
     registerTradableSignals('pantau', top);
@@ -6477,6 +6537,9 @@
       pantauStatusEl.textContent = `${hasil.length} koin dipantau (${nOs} oversold, ${nOb} overbought) `
         + `• ${nBalik} sudah mulai berbalik • TF ${PANTAU_TF_LABEL[tf]||tf}`
         + ` • ${new Date().toLocaleTimeString('id-ID')}.`;
+      /* Setelan ikut disimpan, bukan cuma hasilnya: yang dipulihkan nanti
+         harus bisa membuktikan ia milik TF dan mode yang mana. */
+      jtSimpanPindai('pantau', { tf: tf, mode: mode }, hasil, pantauStatusEl.textContent);
     }catch(e){
       pantauStatusEl.classList.add('error');
       pantauStatusEl.textContent = `Gagal memindai sinyal pantau: ${e && e.message ? e.message : 'kesalahan tak terduga'}.`;
@@ -6671,6 +6734,15 @@
       obStatusEl.textContent = 'Tidak ada koin yang sedang menyentuh order block di TF ' + tf + '.';
       return;
     }
+    jtRenderOb(hasil);
+    obStatusEl.textContent = hasil.length + ' koin menyentuh / hampir menyentuh order block aktif di TF ' + tf + '.';
+    jtSimpanPindai('ob', { tf: tf, arah: saringArah, jarak: String(tolAtr) }, hasil, obStatusEl.textContent);
+  }
+
+  /* Penggambar dipisah dari pemindai supaya hasil yang dipulihkan dari
+     simpanan digambar oleh kode yang SAMA — bukan tiruan yang pelan-pelan
+     menyimpang dari aslinya setiap kali salah satunya disunting. */
+  function jtRenderOb(hasil){
     obGrid.innerHTML = hasil.map(function(r,i){
       const cls = r.arah === 1 ? 'buy' : 'sell';
       const ket = r.di ? 'DI DALAM zona' : 'hampir sentuh';
@@ -6698,7 +6770,6 @@
         + '</div>'
         + '</div>';
     }).join('');
-    obStatusEl.textContent = hasil.length + ' koin menyentuh / hampir menyentuh order block aktif di TF ' + tf + '.';
   }
 
   /* Tombolnya kini disembunyikan komponen chip, jadi tidak ada lagi kendali
@@ -10846,7 +10917,52 @@
   // jadi manual - supaya kombinasi berat tidak dipanggil diam-diam tiap refresh.
   // Keduanya juga tidak jalan kalau section-nya sedang dilipat (dijaga di
   // dalam fungsinya masing-masing).
-  if(pantauTfSel.value === '4h' && pantauRezimSel.value === 'align') cariSinyalPantau();
+  /* ── PULIHKAN HASIL PINDAI TERAKHIR ──────────────────────────────────
+     Dijalankan SEBELUM pemindaian otomatis di bawah: kalau simpanannya masih
+     berlaku, pemindaian itu tidak perlu jalan sama sekali.
+
+     Nilai filternya ikut dikembalikan ke keadaan saat hasil itu dibuat. Tanpa
+     itu kartunya milik TF 1 jam sementara chip-nya berbunyi 4 jam — layar yang
+     memberi keterangan salah tentang datanya sendiri, dan orang mengambil
+     keputusan dari keterangan itu.
+
+     Nilainya ditulis TANPA menyulut `change`. Area Pantau masih punya
+     pendengar `change` sendiri yang langsung memindai, jadi menyulutnya di
+     sini akan memulai persis pemindaian yang sedang kita hindari. Komponen
+     chip menggambar barisnya dari nilai select, dan ia baru dipasang sesudah
+     blok ini — jadi chip-nya tetap terbaca benar tanpa perlu disulut. */
+  function jtSetelDiam(sel, nilai){
+    if(sel && nilai !== undefined && nilai !== null && sel.value !== nilai) sel.value = nilai;
+  }
+
+  var jtAdaPulihanPantau = false;
+  (function jtPulihkanPindai(){
+    try{
+      var p = jtAmbilPindai('pantau');
+      if(p && p.setelan){
+        jtSetelDiam(pantauTfSel, p.setelan.tf);
+        jtSetelDiam(pantauRezimSel, p.setelan.mode);
+        renderPantauSignals(p.data);
+        pantauStatusEl.textContent = p.status + ' · ' + jtUmurTeks(p.umur);
+        jtAdaPulihanPantau = true;
+      }
+      var o = jtAmbilPindai('ob');
+      if(o && o.setelan){
+        jtSetelDiam(obTfSel, o.setelan.tf);
+        jtSetelDiam(obArahSel, o.setelan.arah);
+        jtSetelDiam(obJarakSel, o.setelan.jarak);
+        jtRenderOb(o.data);
+        obStatusEl.textContent = o.status + ' · ' + jtUmurTeks(o.umur);
+      }
+    }catch(e){
+      /* Simpanan rusak tidak boleh menjatuhkan halaman: yang gagal cuma
+         pemulihannya, dan tanpa pemulihan semuanya kembali seperti sebelum
+         fitur ini ada. */
+      console.warn('[jt] pemulihan hasil pindai dilewati:', e);
+    }
+  })();
+
+  if(!jtAdaPulihanPantau && pantauTfSel.value === '4h' && pantauRezimSel.value === 'align') cariSinyalPantau();
 
   // Posisi SIMULASI cukup ikut siklus scan 90 detik yang sudah ada (scan()
   // sendiri sudah panggil monitorPrioritySimPositions + renderPrioritySimUI
