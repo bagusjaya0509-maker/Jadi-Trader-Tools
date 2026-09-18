@@ -409,19 +409,17 @@ export function PojokOrder({
      digambar di sana. DEMO dan REAL tidak ikut berubah: di keduanya
      melipat tiket berarti menyembunyikan order yang sedang disusun.
 
-     BAWAANNYA TERLIPAT DI PONSEL SAJA. Yang membuka chart dari kartu sinyal
-     datang untuk melihat SETUP-nya, dan entry/SL/TP sudah tergambar sebagai
-     garis berlabel lengkap dengan harganya di sumbu kanan — tiketnya alat
-     menyunting, dan alat boleh menunggu dipanggil. Di desktop tidak ada
-     yang tertutup, jadi di sana tetap terbuka.
+     BAWAANNYA TERLIPAT, DI LAYAR MANA PUN. Yang membuka chart dari kartu
+     sinyal datang untuk melihat SETUP-nya, dan entry/SL/TP sudah tergambar
+     sebagai garis berlabel lengkap dengan harganya di sumbu kanan —
+     tiketnya alat menyunting, dan alat boleh menunggu dipanggil.
 
-     Diukur sekali saat lahir, tanpa pendengar: memutar ponsel di tengah
-     jalan lalu menemukan tiket yang sudah dibuka melipat sendiri lebih
-     mengganggu daripada lebar yang tidak ikut diperbarui. */
-  const [lipatCopy, setLipatCopy] = useState(() => {
-    try { return !window.matchMedia('(min-width: 768px)').matches; }
-    catch { return false; }
-  });
+     Dulu ini cuma berlaku di bawah 768 px, dengan alasan "di desktop tidak
+     ada yang tertutup". Alasan itu benar soal ruang tapi meleset soal
+     perhatian: tiket yang terbuka sendiri menarik mata ke formulir, padahal
+     yang baru saja diklik orangnya adalah "buka di chart" — ia datang untuk
+     melihat grafiknya. Diminta pemilik 18 Sep 2026. */
+  const [lipatCopy, setLipatCopy] = useState(true);
   const bangunkan = () => setSentuh((n) => n + 1);
   const menganggur = !posisi && !tunda && !draf;
   useEffect(() => {
@@ -585,17 +583,35 @@ export function PojokOrder({
        chevron yang sama dengan tombol ringkas dipakai sebagai isyarat
        "ada yang bisa dibuka di sini". */
     if (modeSekarang === 'copy' && lipatCopy) {
+      /* DUA TOMBOL BERSEBELAHAN, bukan satu tombol dengan ikon di dalamnya.
+         Tombol di dalam tombol tidak sah di HTML, dan peramban menanganinya
+         dengan caranya masing-masing — yang paling umum: klik pada ikon
+         dalam ikut menembakkan tombol luarnya, jadi menekan silang justru
+         MEMBUKA tiket alih-alih membuangnya.
+
+         Silangnya memanggil `onBatal`, aksi yang sama persis dengan tombol
+         Batal di tiket yang terbuka. Diminta pemilik: dari keadaan terlipat
+         pun rencananya harus bisa dibuang tanpa membukanya dulu. */
       return (
-        <button onClick={() => setLipatCopy(false)}
-          title="Buka tiket order — entry, SL, TP, dan tombol Ke Copy Signal"
-          aria-label="Buka tiket order"
-          className={cn('flex cursor-pointer items-center gap-1.5 rounded-lg border bg-zinc-900/90 px-2 py-1.5 text-[10.5px] font-semibold backdrop-blur-sm transition-colors',
-            draf === 'BUY' ? 'border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10'
-                           : 'border-red-500/40 text-red-300 hover:bg-red-500/10')}>
-          {draf === 'BUY' ? <TrendingUp className="size-3.5" /> : <TrendingDown className="size-3.5" />}
-          {draf}
-          <ChevronsUpDown className="size-3 text-zinc-500" />
-        </button>
+        <div className={cn('flex items-center gap-0.5 rounded-lg border bg-zinc-900/90 pr-0.5 backdrop-blur-sm',
+          draf === 'BUY' ? 'border-emerald-500/40' : 'border-red-500/40')}>
+          <button onClick={() => setLipatCopy(false)}
+            title="Buka tiket order — entry, SL, TP, dan tombol Ke Copy Signal"
+            aria-label="Buka tiket order"
+            className={cn('flex cursor-pointer items-center gap-1.5 rounded-l-lg px-2 py-1.5 text-[10.5px] font-semibold transition-colors',
+              draf === 'BUY' ? 'text-emerald-300 hover:bg-emerald-500/10'
+                             : 'text-red-300 hover:bg-red-500/10')}>
+            {draf === 'BUY' ? <TrendingUp className="size-3.5" /> : <TrendingDown className="size-3.5" />}
+            {draf}
+            <ChevronsUpDown className="size-3 text-zinc-500" />
+          </button>
+          <button onClick={onBatal}
+            title="Buang rencana ini — sama dengan tombol Batal di tiketnya"
+            aria-label="Buang rencana ini"
+            className="flex size-6 cursor-pointer items-center justify-center rounded text-zinc-600 transition-colors hover:bg-zinc-800 hover:text-zinc-200">
+            <X className="size-3.5" />
+          </button>
+        </div>
       );
     }
 
