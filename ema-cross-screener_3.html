@@ -640,8 +640,18 @@
     font-weight:700;
     font-size:16px;
   }
+  /* Kartu Order Block seluruhnya bisa diklik (ke Chart & Entry), jadi
+     kursornya harus mengatakan begitu. Panah di atas sesuatu yang ternyata
+     bereaksi adalah cara tercepat membuat orang tidak pernah mencobanya. */
+  #esObGrid .es-card{ cursor:pointer; }
+
   .es-cap-tag{
     font-family: var(--font-mono);
+    /* Sekali pun teksnya dipendekkan, lencana ini tidak boleh patah dua baris:
+       ia berada di baris kepala kartu, dan satu baris tambahan di situ
+       menggeser SELURUH isi kartu ke bawah - tinggi kartu jadi tidak seragam
+       dan tombol di kakinya berdiri di ketinggian yang berbeda-beda. */
+    white-space:nowrap;
     font-size:9.5px;
     letter-spacing:.04em;
     color: var(--muted);
@@ -4301,7 +4311,7 @@
 
   /* Perpetual saham & ETF. Dipisah dari kripto karena peringkat kapitalisasi
      yang dipakai kartu berasal dari CoinGecko - di sana Apple tentu tidak ada,
-     jadi tanpa daftar ini AAPL akan dilabeli "LOW/MID CAP". */
+     jadi tanpa daftar ini AAPL akan dilabeli "L/Mid Cap". */
   const TRADFI_SYMBOLS = new Set([
     'AAPLUSDT','TSLAUSDT','NVDAUSDT','MSFTUSDT','GOOGLUSDT','AMZNUSDT','METAUSDT',
     'SPYUSDT','QQQUSDT','COINUSDT','MSTRUSDT'
@@ -4753,7 +4763,7 @@
       </button>
       <div class="es-card-top">
         <div><span class="es-rank">TF ${r.tfLabel}</span><span class="es-symbol">${r.symbol.replace('USDT','')}</span></div>
-        <span class="es-cap-tag">${r.cap==='big'?'BIG CAP':'LOW/MID CAP'}</span>
+        <span class="es-cap-tag">${r.cap==='big'?'Big Cap':'L/Mid Cap'}</span>
       </div>
       <div class="es-price-row">
         <span class="es-price">$${fmtPrice(r.price)}</span>
@@ -5213,7 +5223,7 @@
       return `<div class="es-card ${fresh?'fresh':''}" data-symbol="${r.symbol}">
         <div class="es-card-top">
           <div><span class="es-rank">#${i+1}</span><span class="es-symbol">${r.symbol.replace('USDT','')}</span></div>
-          <span class="es-cap-tag">${r.cap==='big'?'BIG CAP':'LOW/MID CAP'}</span>
+          <span class="es-cap-tag">${r.cap==='big'?'Big Cap':'L/Mid Cap'}</span>
         </div>
         <div class="es-price-row">
           <span class="es-price">$${fmtPrice(r.price)}</span>
@@ -6325,7 +6335,7 @@
           <div><span class="es-rank">#${i+1} &bull; TF ${c.tfLabel}</span><span class="es-symbol">${c.symbol.replace('USDT','')}</span></div>
           <div class="es-card-top-right">
             ${jtLabelSumber(c.symbol)}
-            <span class="es-cap-tag${c.cap==='tradfi'?' tradfi':''}">${c.cap==='tradfi'?'SAHAM / ETF':c.cap==='big'?'BIG CAP':'LOW/MID CAP'}</span>
+            <span class="es-cap-tag${c.cap==='tradfi'?' tradfi':''}">${c.cap==='tradfi'?'Saham / ETF':c.cap==='big'?'Big Cap':'L/Mid Cap'}</span>
             <span class="es-sig-star${fav?' on':''}" data-symbol="${c.symbol}" title="${fav?'Hapus dari koin favorit':'Jadikan koin favorit (naik ke urutan depan)'}">&#9733;</span>
           </div>
         </div>
@@ -10619,7 +10629,7 @@
       return out;
     }
 
-    function jtBukaChartDariKartu(kartu){
+    function jtBukaChartDariKartu(kartu, opsi){
       if(!kartu) return;
       var simbol = kartu.getAttribute('data-symbol');
       if(!simbol) return;
@@ -10630,12 +10640,22 @@
       var arah = kartu.getAttribute('data-arah') || '';
       if(window.parent !== window){
         try{
-          /* `daftar` ditambahkan: induk memasangnya di panel kiri Chart
-             supaya koin berikutnya tinggal ditekan. Induk versi lama yang
-             belum mengenalnya cuma mengabaikan medan ini -- kartunya tetap
-             terbuka seperti sebelumnya. */
-          window.parent.postMessage({ jt: 'buka-chart', simbol: simbol, tf: tf, sl: sl, tp: tp, arah: arah,
-                                      daftar: jtKumpulkanDaftar(kartu) }, window.location.origin);
+          var pesan = { jt: 'buka-chart', simbol: simbol, tf: tf, sl: sl, tp: tp, arah: arah };
+          /* `daftar` membuat induk membelah layar: screener dipasang di panel
+             kiri Chart supaya koin berikutnya tinggal ditekan. Itu berguna —
+             tapi hanya untuk yang MEMINTANYA, yaitu ikon chart di kartu, yang
+             tooltipnya sendiri menjanjikan "daftar hasil pindai ikut di panel
+             kiri".
+
+             Badge BUY/SELL NOW tidak meminta apa-apa selain satu koin itu.
+             Membelah layar untuknya memakan 42% lebar yang justru mau dipakai
+             melihat chart-nya — jadi badge mengirim pesan tanpa `daftar`, dan
+             induk membiarkan layarnya utuh.
+
+             Induk versi lama yang belum mengenal medan ini cuma
+             mengabaikannya — kartunya tetap terbuka seperti sebelumnya. */
+          if(!(opsi && opsi.tanpaDaftar)) pesan.daftar = jtKumpulkanDaftar(kartu);
+          window.parent.postMessage(pesan, window.location.origin);
           return;
         }catch(e){ /* induk beda asal — jatuh ke tab baru di bawah */ }
       }
@@ -10649,7 +10669,7 @@
       /* Kartu PANTAU belum punya arah — tetap boleh dibuka, chart-nya cuma
          terbuka tanpa garis rencana. Yang ditolak cuma kartu tanpa simbol,
          dan itu sudah dijaga di dalam fungsinya. */
-      jtBukaChartDariKartu(badge.closest('[data-symbol]'));
+      jtBukaChartDariKartu(badge.closest('[data-symbol]'), { tanpaDaftar: true });
     }, true);
 
     /* Ikon chart di kartu. Pendengarnya TERPISAH dari badge di atas dan
@@ -10666,6 +10686,28 @@
       e.stopPropagation();
       jtBukaChartDariKartu(ikon.closest('[data-symbol]'));
     }, true);
+
+    /* ── KARTU ORDER BLOCK: SEKALI KLIK KE CHART & ENTRY ────────────────
+       Section ini tidak punya badge BUY/SELL — sinyalnya memang bukan "masuk
+       sekarang", melainkan "harga sedang menempel di zona". Tapi yang masuk
+       akal dilakukan orang sesudah melihat kartunya tetap satu: membuka
+       chartnya. Tanpa jalan itu, satu-satunya cara adalah mengetik ulang nama
+       koinnya di halaman lain.
+
+       SELURUH kartu jadi tombolnya, bukan sepetak kecil di dalamnya: di
+       kartu ini tidak ada yang lain untuk diklik, jadi target sebesar
+       kartunya adalah target yang paling sulit meleset.
+
+       Label sumber (BNB/HL) dikecualikan — ia punya tugas sendiri, menukar
+       bursa kartu itu. Tanpa pengecualian ini satu tekan di label akan
+       menukar sumbernya SEKALIGUS meninggalkan halamannya, dan hasil
+       tukarnya tidak pernah sempat terlihat. */
+    document.addEventListener('click', function(e){
+      if(!e.target || !e.target.closest) return;
+      var kartuOb = e.target.closest('#esObGrid .es-card[data-symbol]');
+      if(!kartuOb || e.target.closest('.jt-sumber')) return;
+      jtBukaChartDariKartu(kartuOb, { tanpaDaftar: true });
+    });
 
     let simbolAktif = null, bagianAktif = null, kartuAktifEl = null;
     const tutup = () => { menu.classList.remove('open'); simbolAktif = null; };
@@ -10685,7 +10727,7 @@
       menu.innerHTML =
           '<div class="es-koin-menu-judul">' + simbolAktif.replace('USDT','') + '</div>'
         + '<button type="button" data-aksi="chart">Buka di TradingView</button>'
-        + '<button type="button" data-aksi="chartjt">Buka di Chart &amp; Backtest</button>'
+        + '<button type="button" data-aksi="chartjt">Buka di Chart &amp; Entry</button>'
         + '<button type="button" data-aksi="ganti" class="bahaya">Hilangkan &amp; ganti koin ini</button>';
 
       // Dijepit ke dalam layar - tanpa ini menu di kartu paling kanan/bawah
@@ -10707,7 +10749,7 @@
 
       if(aksi === 'chart'){ openTradingView(simbol); return; }
 
-      /* Buka di halaman Chart & Backtest milik V3.
+      /* Buka di halaman Chart & Entry milik V3.
          ──────────────────────────────────────────────────────────────────
          Halaman ini bisa berdiri sendiri ATAU ditempel di dalam V3. Kalau
          di dalam bingkai, cukup memberi tahu induknya lewat postMessage -

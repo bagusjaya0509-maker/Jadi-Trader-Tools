@@ -642,10 +642,19 @@ export default function ScreenerV2({ tinggi, onPilihSimbol }: {
         return;
       }
 
-      /* Sebagai HALAMAN: pindah ke Chart & Entry, dan bawa panel screener
-         ikut terbuka di sebelahnya — itu yang membuat koin berikutnya
-         tinggal ditekan tanpa kembali ke sini. */
-      q.set('screener', '1');
+      /* Sebagai HALAMAN: pindah ke Chart & Entry. Panel screener di
+         sebelahnya ikut terbuka HANYA kalau bingkainya mengirim daftar —
+         dan yang mengirimnya cuma ikon chart di kartu, yang tooltipnya
+         sendiri menjanjikan daftarnya ikut.
+
+         Badge BUY/SELL NOW tidak mengirimnya: yang diminta orang di situ
+         satu koin yang itu, dan panel kiri memakan 42% lebar layar yang
+         justru mau ia pakai melihat chart-nya.
+
+         Ambang DUA baris, bukan satu: membelah layar demi daftar berisi satu
+         koin berarti mengorbankan sepertiga chart untuk baris yang sudah jadi
+         judul chart itu sendiri. */
+      if (Array.isArray(d.daftar) && d.daftar.length >= 2) q.set('screener', '1');
       arahkan(`/chart-entry?${q}`);
     };
     window.addEventListener('message', dengar);
