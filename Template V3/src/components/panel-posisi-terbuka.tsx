@@ -6,6 +6,7 @@ import { usePosisi } from '@/lib/data';
 import { useAkunMt5, versiKurangDari, VERSI_EA_PENDING, VERSI_EA_PARSIAL, segarkanAkunMt5 } from '@/lib/akun';
 import { kirimPerintahMt5, tungguHasilMt5 } from '@/lib/mt5-order';
 import { useHargaPasar } from '@/lib/harga';
+import { kunciPosisiMt5 } from '@/lib/akun';
 import { bacaSpekMt5 } from '@/lib/pasar';
 import { TabelPosisi, type BarisPosisi } from '@/components/tabel-posisi';
 import { bursaPosisi, type Sumber } from '@/data/contoh';
@@ -211,7 +212,7 @@ export function PanelPosisiTerbuka({ sumber, onSunting, onTutup, onUbahSlTp, onB
        waktu, dan yang baru saja dikirim adalah yang sedang dipikirkan —
        menaruhnya di ekor daftar berarti ia harus dicari dulu. */
     : [...mt5.pending].sort((a, b) => b.waktu - a.waktu).map((o) => ({
-        kunci: o.tiket, simbol: o.simbol, arah: o.arah,
+        kunci: kunciPosisiMt5(o), simbol: o.simbol, arah: o.arah,
         copy: tandaCopy.get(o.tiket),
         ukuran: `${o.lot} lot`,
         ukuranNum: o.lot,
@@ -495,9 +496,18 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
         const nilaiLot = bacaSpekMt5(simbolDasarMt5(p.simbol));
         const unit = nilaiLot ? p.lot * nilaiLot : 0;
         return {
-          kunci: p.tiket, simbol: p.simbol, arah: p.arah,
+          /* Kunci GABUNGAN login+tiket, bukan tiket saja.
+             Nomor tiket MT5 unik PER AKUN, bukan global. Dengan dua broker
+             terpasang sekaligus, dua baris bisa memakai tiket yang sama —
+             React lalu salah memasangkan simpul (baris berkedip dan
+             bertukar tempat), dan yang lebih mahal: pencarian lot saat
+             menutup akan menjawab posisi milik broker yang lain. */
+          kunci: kunciPosisiMt5(p), simbol: p.simbol, arah: p.arah,
           copy: tandaCopy.get(p.tiket),
-          ket: `#${p.tiket}`,
+          /* Brokernya disebut, persis seperti kripto menyebut Binance Live
+             atau Hyperliquid. Tanpa ini dua terminal yang jalan berbarengan
+             menghasilkan daftar yang tidak bisa dibaca asal-usulnya. */
+          ket: p.broker ? `${p.broker} · #${p.tiket}` : `#${p.tiket}`,
           ukuran: `${p.lot} lot`,
           ukuranNum: p.lot,
           entry: p.hargaBuka, hargaKini: p.hargaKini, sl: p.sl, tp: p.tp,
@@ -616,7 +626,7 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
      terminal tidak menjawab sukses, BUKA tidak pernah berangkat. */
   async function kejarMt5(o: BarisPending) {
     if (kejarKunci) return;
-    const asli = mt5.pending.find((x) => x.tiket === o.kunci);
+    const asli = mt5.pending.find((x) => kunciPosisiMt5(x) === o.kunci);
     if (!asli) { setKejarKabar('Order itu sudah tidak ada di daftar terminal.'); return; }
     if (!confirm(`Habiskan order ini di harga pasar sekarang?\n\n`
       + `${asli.arah} ${asli.simbol} — ${asli.lot} lot\n`
@@ -691,7 +701,7 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
         ? (b.ukuranNum ?? 0)
         : sumber === 'kripto'
           ? (posisiKripto.find((p) => p.id === b.kunci)?.jumlah ?? 0)
-          : (mt5.posisi.find((p) => p.tiket === b.kunci)?.lot ?? 0),
+          : (mt5.posisi.find((p) => kunciPosisiMt5(p) === b.kunci)?.lot ?? 0),
       tiket: b.tiket,
       gabungan: gabungan,
     };
@@ -728,7 +738,15 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
              pertanyaannya memang "order ini di akun mana" — bukan "chart ini
              sumbernya apa". */
           ? (() => {
-              const ak = mt5.daftarAkun.find((a) => a.login === mt5.loginAktif);
+              /* SELURUH terminal hidup disebut, bukan yang kebetulan
+                 terpilih. Sejak dua broker bisa jalan berbarengan, menulis
+                 satu nama di kepala panel yang isinya dari dua broker
+                 adalah keterangan yang salah — bukan kurang lengkap. */
+              const hidup = mt5.daftarAkun.filter((a) => a.terhubung);
+              if (hidup.length > 1) {
+                return hidup.map((a) => `${a.broker || 'MT5'} · ${a.login}`).join('  +  ');
+              }
+              const ak = hidup[0] ?? mt5.daftarAkun.find((a) => a.login === mt5.loginAktif);
               return ak
                 ? `${ak.broker || 'MetaTrader 5'} · ${ak.login}`
                 : 'Dari MetaTrader 5, lewat EA JadiTraderSync.';
@@ -917,7 +935,7 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
                        bursa: o.bursa,
                        ukuran: sumber === 'kripto'
                          ? (pendingKripto.find((x) => x.id === o.kunci)?.qty ?? 0)
-                         : (mt5.pending.find((x) => x.tiket === o.kunci)?.lot ?? 0),
+                         : (mt5.pending.find((x) => kunciPosisiMt5(x) === o.kunci)?.lot ?? 0),
                        tiket: o.kunci,
                      }) : undefined}
                      title={onSunting ? 'Buka di chart untuk mengubah harga/SL/TP' : undefined}

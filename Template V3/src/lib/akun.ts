@@ -40,9 +40,25 @@ export interface PosisiBroker {
   /** Sudah dikonversi ke USD — akun sen dibagi 100. */
   profit: number;
   waktuBuka: number;
+  /** Nomor akun MT5 asalnya. Kosong = backend lama yang belum memecah.
+   *
+   *  WAJIB ikut ke mana pun tiket dibawa. NOMOR TIKET MT5 UNIK PER AKUN,
+   *  bukan global: dua broker bisa memulangkan tiket yang sama persis, dan
+   *  `find((p) => p.tiket === kunci)` akan menjawab akun yang salah — lalu
+   *  menutup lot milik posisi yang bukan itu. Persis kelas kekeliruan yang
+   *  sama dengan id posisi kripto yang dulu cuma memakai simbol. */
+  login?: string;
+  /** Nama broker untuk label di layar, mis. "Exness-MT5Real20". */
+  broker?: string;
+}
+
+/** Kunci baris yang TIDAK bisa bertabrakan antar terminal. */
+export function kunciPosisiMt5(p: { login?: string; tiket: string }): string {
+  return (p.login || '-') + '|' + p.tiket;
 }
 
 /** Order MT5 yang MENUNGGU harga — belum jadi posisi.
+ *  Membawa `login` & `broker` dengan alasan yang sama seperti PosisiBroker.
  *
  *  MT5 menyimpannya terpisah dari posisi (OrdersTotal vs PositionsTotal),
  *  dan EA di bawah v2.05 tidak melaporkannya sama sekali. Akibatnya empat
@@ -104,7 +120,12 @@ export interface StatusAkun {
    *  EA sengaja memangkas akhiran brokernya (XAUUSDc -> XAUUSD), jadi tanpa
    *  pemisahan ini keduanya saling menimpa. */
   daftarAkun: AkunMt5Ringkas[];
-  /** Nomor akun yang SEDANG ditampilkan. null kalau belum ada yang melapor. */
+  /** Nomor akun yang SEDANG ditampilkan. null kalau belum ada yang melapor.
+   *
+   *  Sejak posisi digabung dari SELURUH terminal, medan ini tidak lagi
+   *  menentukan apa yang tampil di daftar posisi — ia cuma dipakai pemilih
+   *  akun di halaman Integrasi dan label saldo. Dibiarkan supaya layar yang
+   *  memang menanyakan "akun mana yang sedang dibuka" tetap terjawab. */
   loginAktif: string | null;
 }
 
@@ -294,7 +315,26 @@ export function useAkunMt5(): StatusAkun {
         /* Profit tiap posisi ikut dikonversi. Akun ini bermata uang USC
            (sen), jadi tanpa pembagian 100 satu posisi rugi -50,60 sen
            terbaca sebagai rugi $50,60 — hampir seratus kali lipat. */
-        const posisi: PosisiBroker[] = (j?.data?.posisi ?? []).map((p: any) => ({
+        /* ── SEMUA TERMINAL, BUKAN SATU ────────────────────────────────
+           `posisiSemua` datang dari backend yang menggabungkan tiap terminal
+           hidup; `data.posisi` adalah jalur lama (satu akun). Jatuh balik ke
+           yang lama supaya web ini tetap jalan kalau backend belum diperbarui.
+
+           Konversi mata uangnya PER BARIS, bukan sekali untuk semuanya: dua
+           broker bisa berbeda mata uang, dan akun sen ('…c') dibagi 100.
+           Memakai satu `mu` untuk gabungan dua akun akan melipatgandakan
+           profit salah satunya seratus kali. */
+        const dariSemua: any[] = Array.isArray(j?.posisiSemua) ? j.posisiSemua : [];
+        const dariSemuaP: any[] = Array.isArray(j?.pendingSemua) ? j.pendingSemua : [];
+        const sumberPosisi = dariSemua.length || dariSemuaP.length
+          ? dariSemua : (j?.data?.posisi ?? []);
+        const sumberPending = dariSemua.length || dariSemuaP.length
+          ? dariSemuaP : (j?.data?.pending ?? []);
+        const muBaris = (p: any) => (p?.mataUang ? String(p.mataUang) : mu);
+
+        const posisi: PosisiBroker[] = sumberPosisi.map((p: any) => ({
+          login: p.login ? String(p.login) : undefined,
+          broker: p.broker ? String(p.broker) : undefined,
           tiket: String(p.tiket ?? ''),
           simbol: String(p.simbol ?? ''),
           arah: p.arah === 'SELL' ? 'SELL' : 'BUY',
@@ -303,11 +343,13 @@ export function useAkunMt5(): StatusAkun {
           hargaKini: Number(p.hargaKini) || 0,
           sl: Number(p.sl) || 0,
           tp: Number(p.tp) || 0,
-          profit: keUsd((Number(p.profit) || 0) + (Number(p.swap) || 0), mu),
+          profit: keUsd((Number(p.profit) || 0) + (Number(p.swap) || 0), muBaris(p)),
           /* EA mengirim detik, bukan milidetik. */
           waktuBuka: (Number(p.waktuBuka) || 0) * 1000,
         }));
-        const pending: PendingBroker[] = (j?.data?.pending ?? []).map((p: any) => ({
+        const pending: PendingBroker[] = sumberPending.map((p: any) => ({
+          login: p.login ? String(p.login) : undefined,
+          broker: p.broker ? String(p.broker) : undefined,
           tiket: String(p.tiket ?? ''),
           simbol: String(p.simbol ?? ''),
           jenis: String(p.jenis ?? ''),
@@ -323,19 +365,47 @@ export function useAkunMt5(): StatusAkun {
           ekuitas: keUsd(Number(akun.ekuitas) || 0, mu),
           mataUang: mu, waktu: Date.now(),
         });
+        /* Saldo DIJUMLAHKAN dari tiap terminal hidup, dan rinciannya ikut
+           supaya angkanya bisa ditelusuri. Menampilkan saldo satu broker
+           sementara posisinya dari dua broker membuat persentase risiko
+           terhitung dari modal yang salah. `rincian` memakai bentuk yang
+           sudah dipakai kripto — komentar di definisinya memang menyebut
+           "broker berikutnya menambah satu entri". */
+        const rincianMt5: RincianBursa[] = Array.isArray(j?.rincian)
+          ? j.rincian.map((x: any) => ({
+              id: String(x.id ?? ''),
+              nama: String(x.nama ?? ''),
+              saldo: keUsd(Number(x.saldo) || 0, x.mataUang ?? mu),
+              ekuitas: keUsd(Number(x.ekuitas) || 0, x.mataUang ?? mu),
+            }))
+          : [];
+        const banyakTerminal = rincianMt5.length > 1;
+        const saldoTotal = banyakTerminal
+          ? rincianMt5.reduce((n, x) => n + x.saldo, 0)
+          : keUsd(Number(akun.saldo) || 0, mu);
+        const ekuitasTotal = banyakTerminal
+          ? rincianMt5.reduce((n, x) => n + x.ekuitas, 0)
+          : keUsd(Number(akun.ekuitas) || 0, mu);
+
         setSt({
-          terhubung: eaHidup,
-          saldo: keUsd(Number(akun.saldo) || 0, mu),
-          ekuitas: keUsd(Number(akun.ekuitas) || 0, mu),
+          terhubung: eaHidup || !!j?.adaHidup,
+          saldo: saldoTotal,
+          ekuitas: ekuitasTotal,
           mataUang: mu,
-          ket: eaHidup
-            ? (akun.login ? `Akun ${akun.login} · ${akun.broker ?? ''}`.trim() : 'MetaTrader 5')
-            : 'EA offline — saldo dari laporan terakhir',
+          ket: banyakTerminal
+            ? `${rincianMt5.length} terminal · ${rincianMt5.map((x) => x.nama).join(' + ')}`
+            : eaHidup
+              ? (akun.login ? `Akun ${akun.login} · ${akun.broker ?? ''}`.trim() : 'MetaTrader 5')
+              : 'EA offline — saldo dari laporan terakhir',
           /* Posisi TIDAK ditampilkan saat EA mati: saldo terakhir tetap
              benar sampai ada transaksi, tapi posisi terbuka bisa sudah
              berubah tanpa kita tahu. */
-          posisi: eaHidup ? posisi : [],
-          pending: eaHidup ? pending : [],
+          /* Gabungan dipakai kalau ADA terminal hidup mana pun — bukan
+             kalau yang KEBETULAN terpilih sedang hidup. Dulu satu terminal
+             yang mati membuat posisi terminal lain yang hidup ikut hilang. */
+          posisi: (eaHidup || j?.adaHidup) ? posisi : [],
+          pending: (eaHidup || j?.adaHidup) ? pending : [],
+          rincian: rincianMt5.length ? rincianMt5 : undefined,
           versiEa: String(j?.data?.versiEa || ''),
           daftarAkun: Array.isArray(j?.akun) ? j.akun : [],
           loginAktif: j?.login ? String(j.login) : null,
