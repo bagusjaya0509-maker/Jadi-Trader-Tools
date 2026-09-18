@@ -259,7 +259,7 @@ export interface PosisiChartMt5 {
 export type KoordinatChart = (harga: number) => { y: number; kanan: number; xAkhir: number | null } | null;
 
 export function ChartLilin({
-  lilin, garis, trade, tinggi = 420, hingga, redupDari, garisHarga, onKlikBar, smi, mundur, pojok,
+  lilin, garis, trade, tinggi = 420, hingga, redupDari, pusatkanBar, garisHarga, onKlikBar, smi, mundur, pojok,
   garisSeret, onSeret, onKlikGaris, onHapusGaris, onKlikKosong, garisKlik, onKlikGarisOrder, hamparanBawah, segmen, penandaPine, kotakPine, isianPine,
   alat, onAlatSelesai, gambarAlat, gambarPilih, onPilihGambar, onUbahGambar,
   posisiMt5, onUbahPosisi, hargaAsk, kunciUkuran, bagikanFoto, tandaAir, tampilan, pitaSmi,
@@ -304,6 +304,14 @@ export function ChartLilin({
    *  Warnanya diambil mendekati latar, bukan abu-abu netral: yang dicari
    *  bukan "lilin berwarna lain" melainkan "lilin yang mundur selangkah". */
   redupDari?: number;
+  /** Bar yang diletakkan di TENGAH layar, sekali, saat nilainya berubah.
+   *
+   *  Tanpa ini replay mulai dengan bar sinyalnya menempel di tepi kanan —
+   *  sisi kiri penuh sejarah, sisi kanan kosong, dan titik masuknya justru
+   *  di tempat mata paling jarang berhenti. Ditaruh di tengah, kelanjutan
+   *  yang sedang diputar punya ruang untuk tumbuh ke kanan dan orangnya
+   *  melihat keduanya sekaligus. */
+  pusatkanBar?: number;
   /** Garis horizontal (entry, SL, TP) untuk posisi yang sedang dibuka. */
   garisHarga?: GarisHarga[];
   /** Klik pada chart -> indeks bar. Dipakai untuk memulai replay dari situ. */
@@ -452,6 +460,30 @@ export function ChartLilin({
      berubah lebar. */
   const ukurLagi = useRef<(() => void) | null>(null);
   const chart = useRef<IChartApi | null>(null);
+
+  /* ── LILIN SINYAL DITARUH DI TENGAH ──────────────────────────────────
+     Dipisah dari efek mana pun yang menyimpan-memulihkan rentang: yang ini
+     SENGAJA memindahkan pandangan, sementara yang lain ada justru untuk
+     mencegahnya berpindah. Digabung, keduanya saling membatalkan dan
+     hasilnya bergantung urutan efek — bentuk kekeliruan yang paling sulit
+     dilacak karena ia berubah begitu ada efek baru disisipkan. */
+  useEffect(() => {
+    if (pusatkanBar === undefined) return;
+    /* Dua bingkai: deret lilinnya baru dipasang pada render ini, dan skala
+       waktu belum tahu ada berapa bar sampai ia selesai. */
+    const id = requestAnimationFrame(() => requestAnimationFrame(() => {
+      const c = chart.current;
+      if (!c) return;
+      try {
+        const LEBAR = 70;
+        c.timeScale().setVisibleLogicalRange({
+          from: (pusatkanBar - LEBAR / 2) as Logical,
+          to: (pusatkanBar + LEBAR / 2) as Logical,
+        });
+      } catch { /* chart belum siap */ }
+    }));
+    return () => cancelAnimationFrame(id);
+  }, [pusatkanBar]);
   /* Grafik ini KANVAS, bukan SVG — warnanya tidak ikut variabel CSS
      seperti sisa aplikasi, jadi temanya harus dibaca dan dipasang
      tangan. Lihat catatan lengkapnya di lib/tema.ts. */

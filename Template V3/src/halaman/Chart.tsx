@@ -5435,7 +5435,8 @@ ${pnlSunting !== null
                           refKoordinat={koordinatUbah}
                           lilin={lilinGabung} garis={garis} trade={replayIdx === null ? hasil?.trade : undefined}
                           tinggi={tinggiChart} hingga={replayIdx ?? undefined}
-                          redupDari={barSinyal ?? undefined} smi={smi}
+                          redupDari={barSinyal ?? undefined}
+                          pusatkanBar={barSinyal ?? undefined} smi={smi}
                           garisHarga={[...garisHarga, ...garisZonaEntry, ...garisZona, ...garisDompet, ...garisKonsensus, ...(modeNyata ? garisOrder : [])]}
                           /* Klik chart HANYA berlaku saat mode bidik menyala —
                               sekali, untuk menentukan titik mulai replay.

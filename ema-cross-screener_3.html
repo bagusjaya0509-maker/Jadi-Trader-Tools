@@ -956,6 +956,10 @@
     text-transform:uppercase; transition:background .15s,color .15s; }
   .jt-sumber:hover{ background:rgba(255,255,255,.12); color:var(--text); }
   .jt-sumber.hl{ background:rgba(103,232,209,.13); color:#67e8d1; }
+  /* BINANCE dipendekkan jadi BNB dan diberi warna kuning: label penuh
+     memakan hampir separuh baris kepala kartu, mendorong lencana kapitalisasi
+     dan bintang favorit sampai berdesakan. */
+  .jt-sumber.bnb{ background:rgba(240,185,11,.14); color:#f0b90b; }
   .jt-sumber.dua::after{ content:' \21C4'; opacity:.75; }
   #esObGrid{ padding:22px 18px; }
   .jt-ob-jarak{ font-size:10.5px; color:var(--muted); }
@@ -2691,8 +2695,22 @@
           <option value="30m">TF 30 Menit</option>
           <option value="1h">TF 1 Jam</option>
           <option value="4h" selected>TF 4 Jam</option>
-          <option value="1d">TF Harian</option>
-          <option value="1w">TF Mingguan</option>
+          <option value="1d">TF Daily</option>
+          <option value="1w">TF Weekly</option>
+        </select>
+        <!-- Saringan arah, bentuk yang SAMA dengan Area Pantau. Sebelumnya
+             section ini cuma punya TF dan tombol, dan berdiri di antara dua
+             section yang keduanya punya dua dropdown - terbaca seperti
+             section yang belum selesai dipasang. -->
+        <select id="esObArah">
+          <option value="all" selected>Semua Arah</option>
+          <option value="bull">Hanya Bullish OB (potensi BUY)</option>
+          <option value="bear">Hanya Bearish OB (potensi SELL)</option>
+        </select>
+        <select id="esObJarak">
+          <option value="0.35" selected>Sentuh &amp; hampir (0,35x ATR)</option>
+          <option value="0.15">Rapat (0,15x ATR)</option>
+          <option value="0.60">Longgar (0,60x ATR)</option>
         </select>
         <button id="esObBtn" class="es-priority-btn">Cari Order Block</button>
       </div>
@@ -4964,6 +4982,11 @@
     // stochPanel: {k,d} -> tambahkan sub-panel Stochastic di bawah chart harga.
     const noEma = !!data.noEma;
     const stochPanel = data.stochPanel || null;
+    /* volPanel: larik volume -> sub-panel batang di bawah chart harga.
+       Dipakai kartu Order Block. Bentuknya sengaja SAMA dengan stochPanel
+       (tinggi, jarak, batas) supaya dua section berdampingan tidak terlihat
+       digambar oleh dua orang yang berbeda. */
+    const volPanel = data.volPanel || null;
     const total = closes.length;
     const N = Math.min(40, total);
     const start = total - N;
@@ -4985,7 +5008,7 @@
     const range = (max-min) || 1;
     // priceH = tinggi area harga. Kalau ada panel stochastic, SVG-nya
     // diperpanjang ke bawah - area harga tidak menyusut.
-    const w = 300, priceH = 160, panelH = stochPanel ? 72 : 0;
+    const w = 300, priceH = 160, panelH = (stochPanel || volPanel) ? 72 : 0;
     const h = priceH + panelH, padX=4, padY=6;
 
     const xAt = (i) => padX + (i/(N<=1?1:N-1))*(w-padX*2);
@@ -5046,6 +5069,32 @@
     // Sub-panel SMI: skala -100..+100, garis batas +40/-40 dan garis tengah 0,
     // lalu SMI (biru) dan EMA-nya (oranye) - mengikuti Pine script aslinya.
     let stochHtml = '';
+    if(volPanel){
+      /* Batang volume, diskalakan ke volume TERBESAR di jendela yang sama
+         dengan lilinnya - bukan ke volume sepanjang sejarah. Diskalakan ke
+         sejarah, batang di kartu koin sepi akan rata nol semua dan panelnya
+         tidak mengatakan apa pun. */
+      const top = priceH + 6, bot = h - 5;
+      const sv = volPanel.slice(start);
+      const maks = Math.max.apply(null, sv.filter(function(v){ return isFinite(v); }).concat([1]));
+      const lebar = Math.max(1.5, (w - padX*2) / Math.max(1, sv.length) * 0.62);
+      let batang = '';
+      sv.forEach(function(v, i){
+        if(!isFinite(v) || v <= 0) return;
+        const t = bot - (v / maks) * (bot - top);
+        /* Warnanya mengikuti arah lilin di bar yang sama - volume naik pada
+           lilin turun artinya lain dari volume naik pada lilin naik, dan
+           satu warna untuk keduanya membuang bedanya. */
+        const naik = cc[i] >= co[i];
+        batang += '<rect x="' + (xAt(i) - lebar/2).toFixed(1) + '" y="' + t.toFixed(1)
+               + '" width="' + lebar.toFixed(1) + '" height="' + Math.max(0.8, bot - t).toFixed(1)
+               + '" fill="' + (naik ? 'rgba(38,166,154,.55)' : 'rgba(239,83,80,.55)') + '"/>';
+      });
+      /* Ditampung di `stochHtml`, penampung yang sama dengan sub-panel
+         Stochastic — cuma satu dari keduanya yang pernah terisi, dan SVG di
+         bawah sudah menyisipkan penampung itu di tempat yang benar. */
+      stochHtml += batang;
+    }
     if(stochPanel){
       const top = priceH + 4, bot = h - 5;
       const BATAS = 100;
@@ -6441,8 +6490,8 @@
       ? 'Koin ini ada di Binance dan Hyperliquid. Klik untuk menukar sumber datanya.'
       : (hl ? 'Data dari Hyperliquid — koin ini tidak ada di Binance.'
             : 'Data dari Binance.');
-    return '<span class="jt-sumber' + (hl?' hl':'') + (dua?' dua':'') + '" data-jt-sumber="' + sym + '" title="' + judul + '">'
-      + (hl ? 'HL' : 'BINANCE') + '</span>';
+    return '<span class="jt-sumber' + (hl?' hl':' bnb') + (dua?' dua':'') + '" data-jt-sumber="' + sym + '" title="' + judul + '">'
+      + (hl ? 'HL' : 'BNB') + '</span>';
   }
 
   /* Satu pendengar di dokumen, bukan satu per kartu: kartunya digambar ulang
@@ -6505,9 +6554,9 @@
   const obGrid = document.getElementById('esObGrid');
   const obStatusEl = document.getElementById('esObStatus');
 
-  async function jtCariSatuOb(sym, tf){
+  async function jtCariSatuOb(sym, tf, tolAtr, saringArah){
     const k = await fetchKlines(sym, tf, OB_LILIN, jtPasar(sym));
-    const { opens:o, highs:h, lows:l, closes:c } = k;
+    const { opens:o, highs:h, lows:l, closes:c, volumes:v } = k;
     if(!c || c.length < OB_TUNING + 20) return null;
     const a = atr(h, l, c, 14);
     const atrKini = a[a.length-1];
@@ -6518,25 +6567,75 @@
 
     let terbaik = null;
     for(const b of blok){
+      if(saringArah === 'bull' && b.arah !== 1) continue;
+      if(saringArah === 'bear' && b.arah !== -1) continue;
       const di = harga >= b.bawah && harga <= b.atas;
       const jarak = di ? 0 : Math.min(Math.abs(harga - b.atas), Math.abs(harga - b.bawah));
-      if(jarak > atrKini * OB_TOL_ATR) continue;
+      if(jarak > atrKini * tolAtr) continue;
       if(!terbaik || jarak < terbaik.jarak) {
         terbaik = { jarak: jarak, di: di, blok: b };
       }
     }
     if(!terbaik) return null;
+
+    /* ── GRAFIK KARTU, PEMBANGUN YANG SAMA DENGAN STOCHASTIC ZONE ──────
+       Diminta pemilik: kartunya berisi grafik DAN gambaran indikatornya,
+       persis seperti section di atasnya. Dipakai `buildMiniChart` yang sama —
+       bukan penggambar kedua — supaya dua section berdampingan tidak
+       terlihat digambar oleh dua orang berbeda, dan supaya perbaikan pada
+       satu grafik berlaku untuk keduanya.
+
+       ZONA ORDER BLOCK dikirim lewat resZones/supZones: pembangun itu sudah
+       menggambar keduanya sebagai pita berlabel. Blok BULLISH adalah zona
+       penopang (S), blok BEARISH zona penahan (R) — jadi pemetaannya bukan
+       selera, itu memang artinya.
+
+       `momentum` dikirim sebagai larik kosong, bukan dihilangkan: pembangunnya
+       membaca `momentum.bullish` TANPA penjaga, dan objek yang hilang
+       menjatuhkan seluruh kartu. */
+    const zona = [{ value: (terbaik.blok.atas + terbaik.blok.bawah) / 2,
+                    top: terbaik.blok.atas, bottom: terbaik.blok.bawah }];
+    const chartSvg = buildMiniChart({
+      opens:o, highs:h, lows:l, closes:c,
+      noEma: true, e9:[], e21:[], e200:[],
+      momentum: { bullish: [], bearish: [] },
+      crossIdx: -1,
+      resZones: terbaik.blok.arah === -1 ? zona : [],
+      supZones: terbaik.blok.arah === 1 ? zona : [],
+      demandZones: [], supplyZones: [],
+      volPanel: v && v.length ? v : null,
+    });
+
+    /* Volume relatif: volume bar terakhir dibanding rata-rata 20 bar. Angka
+       inilah yang membuat panel volume di bawah grafik bisa dibaca sebagai
+       fakta, bukan cuma bentuk. */
+    let volRel = null;
+    if(v && v.length >= 21){
+      const ekor = v.slice(-21, -1).filter(function(x){ return isFinite(x) && x > 0; });
+      if(ekor.length){
+        const rata = ekor.reduce(function(x,y){ return x+y; }, 0) / ekor.length;
+        if(rata > 0) volRel = v[v.length-1] / rata;
+      }
+    }
+
     return {
       symbol: sym, tf: tf, harga: harga, atr: atrKini,
       jarak: terbaik.jarak, di: terbaik.di,
       atasZona: terbaik.blok.atas, bawahZona: terbaik.blok.bawah,
       arah: terbaik.blok.arah,
       persen: terbaik.jarak / harga * 100,
+      chartSvg: chartSvg, volRel: volRel,
+      tinggiZona: (terbaik.blok.atas - terbaik.blok.bawah) / harga * 100,
     };
   }
 
+  const obArahSel = document.getElementById('esObArah');
+  const obJarakSel = document.getElementById('esObJarak');
+
   async function jtCariOrderBlock(){
     const tf = obTfSel.value;
+    const saringArah = obArahSel ? obArahSel.value : 'all';
+    const tolAtr = obJarakSel ? (parseFloat(obJarakSel.value) || OB_TOL_ATR) : OB_TOL_ATR;
     obBtn.disabled = true;
     /* Dipastikan semestanya sudah termuat sebelum memindai — klik pertama
        yang datang lebih cepat dari jawaban /api/hl/simbol akan memindai
@@ -6552,7 +6651,7 @@
     async function pekerja(){
       while(antre.length){
         const sym = antre.shift();
-        try{ const r = await jtCariSatuOb(sym, tf); if(r) hasil.push(r); }catch(e){}
+        try{ const r = await jtCariSatuOb(sym, tf, tolAtr, saringArah); if(r) hasil.push(r); }catch(e){}
       }
     }
     await Promise.all([pekerja(),pekerja(),pekerja(),pekerja(),pekerja(),pekerja()]);
@@ -6565,6 +6664,7 @@
     obGrid.innerHTML = hasil.map(function(r,i){
       const cls = r.arah === 1 ? 'buy' : 'sell';
       const ket = r.di ? 'DI DALAM zona' : 'hampir sentuh';
+      const vol = r.volRel === null ? 'n/a' : (r.volRel.toFixed(2) + 'x');
       return '<div class="es-card pantau ' + cls + '" data-symbol="' + r.symbol + '" data-tf="' + r.tf + '" data-price="' + r.harga + '">'
         + '<div class="es-card-top">'
         +   '<div><span class="es-rank">#' + (i+1) + ' &bull; TF ' + r.tf + '</span>'
@@ -6573,11 +6673,19 @@
         + '</div>'
         + '<div class="es-price-row"><span class="es-price">$' + fmtPrice(r.harga) + '</span>'
         +   '<span class="es-chg ' + (r.arah===1?'up':'down') + '">' + (r.arah===1?'BULLISH OB':'BEARISH OB') + '</span></div>'
+        + r.chartSvg
         + '<div class="es-sr-row">'
         +   '<span class="res">Atas $' + fmtPrice(r.atasZona) + '</span>'
         +   '<span class="sup">Bawah $' + fmtPrice(r.bawahZona) + '</span>'
         + '</div>'
-        + '<div class="jt-ob-jarak">' + ket + ' &bull; <b>' + r.persen.toFixed(2) + '%</b> dari tepi zona</div>'
+        /* Tiga angka, dan ketiganya menjawab pertanyaan yang berbeda:
+           seberapa dekat harganya, setebal apa zonanya, dan apakah volume
+           bar terakhir memang ramai. Volume tanpa pembanding cuma angka
+           besar; dibagi rata-rata 20 bar ia jadi "ramai" atau "sepi". */
+        + '<div class="jt-ob-jarak">' + ket + ' &bull; <b>' + r.persen.toFixed(2) + '%</b> dari tepi'
+        +   ' &bull; tebal zona <b>' + r.tinggiZona.toFixed(2) + '%</b>'
+        +   ' &bull; vol <b>' + vol + '</b> rata-20'
+        + '</div>'
         + '</div>';
     }).join('');
     obStatusEl.textContent = hasil.length + ' koin menyentuh / hampir menyentuh order block aktif di TF ' + tf + '.';
