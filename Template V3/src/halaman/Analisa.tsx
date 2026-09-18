@@ -723,6 +723,29 @@ function KartuAnalisa({ a, status, milikku, onSegarkan, performa, hargaKini }: {
     return Math.round((gerak / jarakSl) * RISIKO_SINYAL * 100) / 100;
   })();
 
+  /* ── SINYAL TANPA SL PUNYA UKURAN LAIN ────────────────────────────────
+     `pnlJalan` di atas memakai model risiko papan peringkat: hasil diukur
+     sebagai kelipatan JARAK STOP. Sinyal cermin dompet tidak punya stop sama
+     sekali — ia memang dipasang persis seperti dompet sumbernya — jadi
+     pembaginya nol dan angkanya selalu null.
+
+     Akibatnya kartu sinyal dompet yang sedang berjalan tidak pernah
+     menunjukkan ke mana harganya bergerak, padahal justru itu satu-satunya
+     hal yang ingin dilihat orang yang sedang mengikutinya.
+
+     Yang dipakai di sini PERSENTASE GERAK, bukan dolar karangan: tanpa stop
+     tidak ada "risiko satu R" yang bisa dijadikan satuan, dan mengarang
+     angka dolar dari nilai posisi dompet orang lain akan terbaca seperti
+     uang pembacanya sendiri. Persen itu benar untuk siapa pun yang
+     mengikutinya, berapa pun lotnya. */
+  const gerakPersen = (() => {
+    if (selesai || !level || !hargaKini || keadaanSinyal(a) !== 'jalan') return null;
+    if (!(level.entry > 0)) return null;
+    if (Math.abs(level.entry - level.sl) > 0) return null;   // sudah terwakili pnlJalan
+    const gerak = (hargaKini - level.entry) * (a.arah === 'BUY' ? 1 : -1);
+    return Math.round((gerak / level.entry) * 1000) / 10;
+  })();
+
   return (
     /* `relative` wajib: lencana AI Agent duduk absolut di pojok panel. */
     /* flex-col + h-full: kartu mengisi tinggi raknya, bukan tinggi isinya.
@@ -950,18 +973,34 @@ function KartuAnalisa({ a, status, milikku, onSegarkan, performa, hargaKini }: {
                     winrate di sebelahnya. Yang menjawab "rencana ini sedang
                     ke mana?" adalah P/L berjalan — dan itu yang menggantikan
                     tempatnya. */}
-                {pnlJalan !== null && (
-                  <span title={`Perkiraan hasil kalau ditutup sekarang, dengan model risiko yang sama dengan papan peringkat: kena SL = −${uang(RISIKO_SINYAL)}. Bukan uangmu sungguhan — lotmu sendiri yang menentukan.`}>
-                    P/L jalan{' '}
-                    <span className={cn('angka font-semibold',
-                      pnlJalan > 0 ? 'text-emerald-400' : pnlJalan < 0 ? 'text-red-400' : 'text-zinc-300')}>
-                      {pnlJalan > 0 ? '+' : ''}{uang(pnlJalan)}
-                    </span>
-                  </span>
-                )}
               </>
             ) : (
               <span className="text-zinc-600">belum ada sinyal selesai</span>
+            )}
+            {/* ── P/L BERJALAN, DI LUAR CABANG WINRATE ────────────────────
+                Dulu ia bersarang di dalam cabang "analis ini punya sinyal
+                selesai", jadi analis yang belum punya satu pun hasil — persis
+                keadaan kartu cermin dompet — jatuh ke "belum ada sinyal
+                selesai" dan P/L berjalannya tidak pernah tergambar sama
+                sekali. Padahal keduanya menjawab pertanyaan yang berbeda:
+                winrate itu rekam jejak, P/L jalan itu keadaan sekarang. */}
+            {pnlJalan !== null && (
+              <span title={`Perkiraan hasil kalau ditutup sekarang, dengan model risiko yang sama dengan papan peringkat: kena SL = −${uang(RISIKO_SINYAL)}. Bukan uangmu sungguhan — lotmu sendiri yang menentukan.`}>
+                P/L jalan{' '}
+                <span className={cn('angka font-semibold',
+                  pnlJalan > 0 ? 'text-emerald-400' : pnlJalan < 0 ? 'text-red-400' : 'text-zinc-300')}>
+                  {pnlJalan > 0 ? '+' : ''}{uang(pnlJalan)}
+                </span>
+              </span>
+            )}
+            {gerakPersen !== null && (
+              <span title="Gerak harga sejak entry. Sinyal ini tidak punya SL — dipasang persis seperti dompet sumbernya — jadi hasilnya tidak bisa diukur sebagai kelipatan risiko. Persen ini benar untuk siapa pun yang mengikutinya, berapa pun lotnya.">
+                gerak{' '}
+                <span className={cn('angka font-semibold',
+                  gerakPersen > 0 ? 'text-emerald-400' : gerakPersen < 0 ? 'text-red-400' : 'text-zinc-300')}>
+                  {gerakPersen > 0 ? '+' : ''}{gerakPersen}%
+                </span>
+              </span>
             )}
             {/* HITUNGAN PENGCOPY DICABUT DARI SINI — permintaan pemilik.
                 Di kartu sinyal ia hampir selalu 0 atau 1 dan tidak menjawab
@@ -1917,6 +1956,37 @@ function IsiCopySignal() {
      Yang tersisa cuma `kanalBuka === null`: membuka satu kanal adalah masuk
      ke dalam sesuatu, dan di sana seluruh halaman memang berganti. */
   const diDepan = kanalBuka === null;
+
+  /* ── PULANG KE KARTUNYA, BUKAN KE PUNCAK DAFTAR ──────────────────────
+     Daftar kanal ini panjang. Menekan "Kembali" dari kanal yang duduk di
+     baris kelima mendaratkan orang di puncak halaman, dan ia harus menggulir
+     mencari kartu yang BARU SAJA ia tinggalkan — satu-satunya kartu yang
+     sudah pasti ia ingat letaknya.
+
+     Dikerjakan lewat efek pada `kanalBuka`, bukan di dalam tombolnya:
+     `kanalBuka` dibaca dari parameter URL, jadi tombol "Kembali" dan tombol
+     back peramban menempuh jalan yang sama. Menaruhnya di onClick berarti
+     back peramban tidak ikut — dan itu justru jalan yang paling sering
+     dipakai orang.
+
+     Ref, bukan state: nilainya cuma dibutuhkan pada render BERIKUTNYA dan
+     tidak pernah digambar, jadi menyimpannya sebagai state cuma menambah
+     satu render tanpa mengubah apa pun di layar. */
+  const kanalTerakhir = useRef<string | null>(null);
+  useEffect(() => {
+    if (kanalBuka) { kanalTerakhir.current = kanalBuka; return; }
+    const uid = kanalTerakhir.current;
+    if (!uid) return;
+    kanalTerakhir.current = null;
+    /* Dua bingkai, bukan satu: daftarnya baru dipasang ulang pada render ini
+       dan tingginya belum final sampai kartu-kartunya selesai diukur.
+       Menggulir ke elemen yang tingginya masih berubah mendarat di tempat
+       yang salah beberapa ratus piksel. */
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const el = document.getElementById('kartu-kanal-' + uid);
+      if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }));
+  }, [kanalBuka]);
 
   /* ── Tab mana yang tampil, dan mana yang sedang dibuka ────────────────
      Daftar kanal : Market + Posting  (seperti semula)
@@ -4010,7 +4080,7 @@ function IsiCopySignal() {
                    kartu, dan tombol bersarang di dalam tombol tidak sah —
                    peramban memutus sarangnya sendiri dan salah satunya
                    berhenti bisa diklik. */
-                <div key={uid}
+                <div key={uid} id={'kartu-kanal-' + uid}
                   onContextMenu={(e) => {
                     e.preventDefault();
                     setMenuPin({ uid, x: e.clientX, y: e.clientY });
