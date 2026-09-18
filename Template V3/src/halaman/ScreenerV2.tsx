@@ -913,7 +913,12 @@ export default function ScreenerV2({ tinggi, onPilihSimbol }: {
                    [data-section] karena kelas .es-priority-title dipakai
                    tiga section berbeda. */
                 const j1 = d.querySelector('.es-pantau-title') as HTMLElement | null;
-                if (j1) j1.textContent = 'Koin Hunter';
+                /* "Stochastic Zone", diminta pemilik 18 Sep 2026. Nama
+                   ini menyebut APA yang dicari section-nya — SMI di wilayah
+                   ekstrem — sementara "Koin Hunter" cuma menyebut bahwa ia
+                   mencari koin, yang berlaku untuk seluruh section di
+                   halaman ini. */
+                if (j1) j1.textContent = 'Stochastic Zone';
                 /* -- Ikon chart DI JUDUL, bukan di tiap kartu ----------
                    Percobaan pertama menaruh ikon ini di kartu koin, dan
                    ia tidak pernah muncul: kartu Koin Hunter dibangun

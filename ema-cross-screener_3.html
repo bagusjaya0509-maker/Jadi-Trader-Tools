@@ -947,6 +947,19 @@
      scroll-snap dimatikan di sini - kalau tidak, grid auto-geser sejauh padding
      kiri saat dimuat sehingga cahaya kartu paling kiri ikut terpotong. */
   #esPantauGrid{ padding:22px 18px; scroll-snap-type:none; }
+  /* Label sumber bursa. TANPA outline — diminta pemilik: modelnya saklar,
+     bukan lencana. Yang berbingkai terbaca sebagai keterangan yang tidak
+     bisa disentuh; yang polos dengan latar tipis terbaca sebagai sesuatu
+     yang bisa ditekan. */
+  .jt-sumber{ cursor:pointer; border:0; background:rgba(255,255,255,.06); color:var(--muted);
+    font-size:9.5px; font-weight:700; letter-spacing:.02em; padding:2px 6px; border-radius:5px;
+    text-transform:uppercase; transition:background .15s,color .15s; }
+  .jt-sumber:hover{ background:rgba(255,255,255,.12); color:var(--text); }
+  .jt-sumber.hl{ background:rgba(103,232,209,.13); color:#67e8d1; }
+  .jt-sumber.dua::after{ content:' \21C4'; opacity:.75; }
+  #esObGrid{ padding:22px 18px; }
+  .jt-ob-jarak{ font-size:10.5px; color:var(--muted); }
+  .jt-ob-jarak b{ color:var(--text); }
   /* Semua kontrol di baris ini disamakan tingginya (32px), font, padding, dan
      radius-nya - sebelumnya select, tombol, tombol kelola koin, dan badge rezim
      punya ukuran sendiri-sendiri sehingga barisnya terlihat bergerigi. */
@@ -2663,6 +2676,31 @@
     </div>
   </div>
 
+  <!-- ══ VOLUME PROFILE ORDER BLOCKS ══════════════════════════════════
+       Diminta pemilik 18 Sep 2026: koin yang SEDANG menyentuh atau hampir
+       menyentuh garis order block yang masih aktif - "karena itu pas banget
+       buat entry". Logikanya diturunkan dari indikator Volume Profile Order
+       Blocks yang sudah dipasang di halaman Chart, bukan ditulis ulang
+       dengan aturan baru. -->
+  <div class="es-priority-section es-collapsible" data-section="orderblock">
+    <div class="es-priority-title">Volume Profile Order Blocks</div>
+    <div class="es-section-body">
+      <div class="es-priority-controls">
+        <select id="esObTf">
+          <option value="15m">TF 15 Menit</option>
+          <option value="30m">TF 30 Menit</option>
+          <option value="1h">TF 1 Jam</option>
+          <option value="4h" selected>TF 4 Jam</option>
+          <option value="1d">TF Harian</option>
+          <option value="1w">TF Mingguan</option>
+        </select>
+        <button id="esObBtn" class="es-priority-btn">Cari Order Block</button>
+      </div>
+      <div class="es-grid" id="esObGrid"></div>
+      <div class="es-priority-status" id="esObStatus">Klik "Cari Order Block" untuk memindai.</div>
+    </div>
+  </div>
+
   <!-- Section "Sinyal Prioritas" dulu berdiri sendiri di sini. Sekarang jadi
        salah satu MODE di dropdown filter Parallel Signal di bawah, karena
        keduanya menjawab pertanyaan yang sama ("sinyal mana yang layak dilihat
@@ -3836,6 +3874,84 @@
 
   let activeSymbols = loadActiveSymbols();
 
+  /* ══ KOIN HYPERLIQUID ═══════════════════════════════════════════════
+     Diminta pemilik 18 Sep 2026: screener ikut memindai koin Hyperliquid,
+     dan koin yang ada di KEDUA bursa cukup muncul sekali dengan label yang
+     bisa diklik untuk menukar sumbernya.
+
+     Daftarnya datang dari /api/hl/simbol — rute yang sudah ada dan sudah
+     memuat aset dex bangunan (XYZ:GOLD dan kawan-kawan), bukan cuma perp
+     bawaan.
+
+     BATAS 120, bukan "semua". Proxy membatasi 600 permintaan per menit per
+     IP; satu pindaian memanggil 2 permintaan per koin (TF pindai + 4 jam
+     untuk zona SNR). Dengan 44 koin Binance yang sudah ada, menambahkan
+     seluruh ~190 koin Hyperliquid berarti ~470 permintaan dalam satu klik —
+     lewat batas begitu ada dua tab terbuka. 120 menyisakan ruang untuk itu.
+     Angkanya di satu tempat supaya bisa dinaikkan kalau batasnya berubah. */
+  const JT_HL_BATAS = 120;
+  const JT_HL_KUNCI = 'jtHlSimbol_v1';
+  const JT_SUMBER_KUNCI = 'jtSumberKoin_v1';
+  let JT_HL_SET = new Set();
+  let JT_SUMBER = {};
+  try { JT_SUMBER = JSON.parse(localStorage.getItem(JT_SUMBER_KUNCI) || '{}') || {}; } catch(e){ JT_SUMBER = {}; }
+  try {
+    const c = JSON.parse(localStorage.getItem(JT_HL_KUNCI) || 'null');
+    if (c && Array.isArray(c.data) && (Date.now() - c.waktu) < 6*60*60*1000) JT_HL_SET = new Set(c.data);
+  } catch(e){}
+
+  /* Nama dasar koin, untuk menjodohkan BTCUSDT (Binance) dengan BTCUSDT
+     (Hyperliquid). Aset dex membawa awalan bursanya (XYZ:GOLD) dan memang
+     TIDAK punya padanan di Binance — awalan itu dipertahankan supaya ia
+     tidak salah dijodohkan dengan GOLDUSDT kalau suatu hari ada. */
+  function jtDasar(sym){ return String(sym||'').toUpperCase().replace(/USDT$/,''); }
+
+  /* Sumber yang SEDANG dipakai untuk satu koin. Pilihan orangnya menang;
+     kalau belum pernah memilih, Binance dulu bila koinnya ada di sana. */
+  function jtSumber(sym){
+    const k = jtDasar(sym);
+    if (JT_SUMBER[k] === 'hyperliquid' || JT_SUMBER[k] === 'binance') return JT_SUMBER[k];
+    return JT_HL_SET.has(sym) && !BASE_SYMBOLS.includes(sym) ? 'hyperliquid' : 'binance';
+  }
+  function jtAdaDiDua(sym){ return JT_HL_SET.has(sym) && BASE_SYMBOLS.includes(sym); }
+  function jtTukarSumber(sym){
+    const k = jtDasar(sym);
+    JT_SUMBER[k] = jtSumber(sym) === 'binance' ? 'hyperliquid' : 'binance';
+    try { localStorage.setItem(JT_SUMBER_KUNCI, JSON.stringify(JT_SUMBER)); } catch(e){}
+  }
+  /* Dipakai tiap pemanggilan klines: 'hyperliquid' atau undefined.
+     undefined, BUKAN 'binance' — supaya perilaku lama (spot dulu, jatuh ke
+     futures) tidak berubah untuk koin yang memang dari Binance. */
+  function jtPasar(sym){ return jtSumber(sym) === 'hyperliquid' ? 'hyperliquid' : undefined; }
+
+  async function jtMuatHl(){
+    const base = esMarketBase();
+    if(!base) return;
+    try{
+      const r = await fetch(base + '/api/hl/simbol', { headers: (typeof JTLangganan !== 'undefined' && JTLangganan.kepala) ? JTLangganan.kepala() : {} });
+      if(!r.ok) return;
+      const j = await r.json();
+      const d = (j && Array.isArray(j.data)) ? j.data : [];
+      if(!d.length) return;
+      JT_HL_SET = new Set(d);
+      try { localStorage.setItem(JT_HL_KUNCI, JSON.stringify({ waktu: Date.now(), data: d })); } catch(e){}
+      /* Yang BELUM ada di daftar pindai ditambahkan; yang sudah ada
+         dibiarkan — koin yang sama tidak boleh muncul dua kartu. */
+      const ada = new Set(activeSymbols);
+      const tambah = d.filter(function(s){ return !ada.has(s); }).slice(0, JT_HL_BATAS);
+      if(tambah.length){ activeSymbols = activeSymbols.concat(tambah); }
+    }catch(e){}
+  }
+  /* DITUNDA satu putaran, bukan dipanggil di sini.
+     `jtMuatHl` memakai `esMarketBase()`, yang membaca `MARKET_PROXY_DEFAULT`
+     — sebuah `const` yang dideklarasikan JAUH DI BAWAH blok ini. Dipanggil
+     langsung, ia menabrak zona mati temporal dan seluruh skrip berhenti
+     dengan "Cannot access 'MARKET_PROXY_DEFAULT' before initialization".
+     Terbukti: berkas asli bersih, yang bergalat cuma yang sudah disunting.
+     setTimeout(...,0) menjadwalkannya sesudah seluruh badan skrip selesai
+     dievaluasi. */
+  setTimeout(jtMuatHl, 0);
+
   function blockAndReplaceSymbol(symbol){
     /* Pencatatan blokir dilakukan LEBIH DULU dan tanpa syarat.
 
@@ -4117,19 +4233,30 @@
     return MARKET_PROXY_DEFAULT;
   }
 
-  async function fetchKlines(symbol, interval, limit=150){
+  async function fetchKlines(symbol, interval, limit=150, pasarMinta){
     let data = null, market = 'spot';
+    /* `pasarMinta` diteruskan apa adanya ke proxy. Rute /api/klines sudah
+       lama bisa melayani Hyperliquid — lewat `market=hyperliquid` atau simbol
+       bertitik-dua seperti XYZ:GOLDUSDT — jadi koin Hyperliquid TIDAK butuh
+       jalur data baru, cuma satu parameter yang selama ini tidak pernah
+       dikirim dari screener. */
+    const qPasar = pasarMinta ? ('&market=' + encodeURIComponent(pasarMinta)) : '';
     // 1) Lewat backend/proxy dulu
     const base = esMarketBase();
     if(base){
       try{
-        const r = await fetch(`${base}/api/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`, { headers: (typeof JTLangganan !== 'undefined' ? JTLangganan.kepalaAuth() : {}) });
+        const r = await fetch(`${base}/api/klines?symbol=${symbol}&interval=${interval}&limit=${limit}${qPasar}`, { headers: (typeof JTLangganan !== 'undefined' ? JTLangganan.kepalaAuth() : {}) });
         if(r.ok){
           const j = await r.json();
           if(j && Array.isArray(j.data)){ data = j.data; market = j.market || 'spot'; }
         }
       }catch(e){}
     }
+    /* Koin Hyperliquid TIDAK punya jalan mundur ke Binance. Dibiarkan
+       jatuh ke sana, simbol yang cuma ada di Hyperliquid akan menabrak 400
+       dari Binance dan dilaporkan sebagai "klines fail" — padahal datanya
+       ada, cuma di bursa yang lain. */
+    if(!data && pasarMinta === 'hyperliquid') throw new Error('klines fail: '+symbol);
     // 2) Kalau backend gagal: Binance langsung (spot -> futures)
     if(!data){
       try{
@@ -6148,6 +6275,7 @@
         <div class="es-card-top">
           <div><span class="es-rank">#${i+1} &bull; TF ${c.tfLabel}</span><span class="es-symbol">${c.symbol.replace('USDT','')}</span></div>
           <div class="es-card-top-right">
+            ${jtLabelSumber(c.symbol)}
             <span class="es-cap-tag${c.cap==='tradfi'?' tradfi':''}">${c.cap==='tradfi'?'SAHAM / ETF':c.cap==='big'?'BIG CAP':'LOW/MID CAP'}</span>
             <span class="es-sig-star${fav?' on':''}" data-symbol="${c.symbol}" title="${fav?'Hapus dari koin favorit':'Jadikan koin favorit (naik ke urutan depan)'}">&#9733;</span>
           </div>
@@ -6301,6 +6429,161 @@
 
   // Manual trigger saja - tidak auto-scan saat halaman dibuka, biar tidak nambah beban.
   pantauBtn.addEventListener('click', cariSinyalPantau);
+
+  /* ══ LABEL SUMBER BURSA ════════════════════════════════════════════
+     Ditempel di kartu mana pun yang punya `data-symbol`. Koin yang ada di
+     DUA bursa mendapat tanda panah dua arah — itu yang membedakan label
+     yang bisa ditukar dari label yang cuma memberi tahu. */
+  function jtLabelSumber(sym){
+    const hl = jtSumber(sym) === 'hyperliquid';
+    const dua = jtAdaDiDua(sym);
+    const judul = dua
+      ? 'Koin ini ada di Binance dan Hyperliquid. Klik untuk menukar sumber datanya.'
+      : (hl ? 'Data dari Hyperliquid — koin ini tidak ada di Binance.'
+            : 'Data dari Binance.');
+    return '<span class="jt-sumber' + (hl?' hl':'') + (dua?' dua':'') + '" data-jt-sumber="' + sym + '" title="' + judul + '">'
+      + (hl ? 'HL' : 'BINANCE') + '</span>';
+  }
+
+  /* Satu pendengar di dokumen, bukan satu per kartu: kartunya digambar ulang
+     tiap pindai, dan pendengar yang dipasang per kartu ikut mati bersamanya. */
+  document.addEventListener('click', function(e){
+    const t = e.target && e.target.closest ? e.target.closest('[data-jt-sumber]') : null;
+    if(!t) return;
+    const sym = t.getAttribute('data-jt-sumber');
+    if(!jtAdaDiDua(sym)) return;          // cuma satu bursa: tidak ada yang bisa ditukar
+    e.preventDefault(); e.stopPropagation();
+    jtTukarSumber(sym);
+    t.classList.toggle('hl');
+    t.textContent = jtSumber(sym) === 'hyperliquid' ? 'HL' : 'BINANCE';
+  }, true);
+
+  /* ══ VOLUME PROFILE ORDER BLOCKS ═══════════════════════════════════
+     Diturunkan dari indikator yang sudah dipasang di Chart, bukan aturan
+     baru. Tiga langkahnya sama persis:
+
+       1. ORDER BLOCK: lilin asal di offset (tuning-1) harus naik, lalu
+          SELURUH lilin sesudahnya tidak naik — itu blok BEARISH. Bullish
+          kebalikannya.
+       2. MITIGASI: blok mati begitu harga menutup melewati sisi seberangnya.
+          Dipakai "Close 100%", bawaan indikatornya.
+       3. SENTUHAN: yang dicari screener ini — harga SEKARANG berada di dalam
+          zona, atau kurang dari toleransi dari tepinya.
+
+     Toleransinya kelipatan ATR, bukan persentase tetap: 0,3% itu jauh untuk
+     BTC dan dekat untuk koin kecil, dan satu ambang untuk keduanya akan
+     memilih koin yang salah di dua ujung daftar. */
+  const OB_TUNING = 7;        // panjang dorongan, sama dengan bawaan indikator
+  const OB_TOL_ATR = 0.35;    // "hampir menyentuh" = 0,35x ATR dari tepi zona
+  const OB_MAKS_BLOK = 6;     // blok teraktif yang dinilai, dari yang terbaru
+  const OB_LILIN = 300;
+
+  function jtOrderBlocks(o, h, l, c){
+    const n = c.length, blok = [];
+    for(let i = OB_TUNING - 1; i < n; i++){
+      const a = i - (OB_TUNING - 1);
+      let bear = c[a] > o[a], bull = c[a] < o[a];
+      for(let j = a + 1; j <= i; j++){
+        if(c[j] > o[j]) bear = false;
+        if(c[j] < o[j]) bull = false;
+      }
+      if(bear || bull) blok.push({ atas:h[a], bawah:l[a], arah: bull?1:-1, bar:a });
+    }
+    /* Yang sudah dimitigasi dibuang DI SINI, bukan disaring saat menggambar:
+       blok mati bukan "blok yang tidak ditampilkan", ia bukan blok lagi. */
+    return blok.filter(function(b){
+      for(let j = b.bar + OB_TUNING; j < n; j++){
+        if(b.arah === 1 && c[j] < b.bawah) return false;
+        if(b.arah === -1 && c[j] > b.atas) return false;
+      }
+      return true;
+    }).slice(-OB_MAKS_BLOK);
+  }
+
+  const obTfSel = document.getElementById('esObTf');
+  const obBtn = document.getElementById('esObBtn');
+  const obGrid = document.getElementById('esObGrid');
+  const obStatusEl = document.getElementById('esObStatus');
+
+  async function jtCariSatuOb(sym, tf){
+    const k = await fetchKlines(sym, tf, OB_LILIN, jtPasar(sym));
+    const { opens:o, highs:h, lows:l, closes:c } = k;
+    if(!c || c.length < OB_TUNING + 20) return null;
+    const a = atr(h, l, c, 14);
+    const atrKini = a[a.length-1];
+    if(!(atrKini > 0)) return null;
+    const harga = c[c.length-1];
+    const blok = jtOrderBlocks(o, h, l, c);
+    if(!blok.length) return null;
+
+    let terbaik = null;
+    for(const b of blok){
+      const di = harga >= b.bawah && harga <= b.atas;
+      const jarak = di ? 0 : Math.min(Math.abs(harga - b.atas), Math.abs(harga - b.bawah));
+      if(jarak > atrKini * OB_TOL_ATR) continue;
+      if(!terbaik || jarak < terbaik.jarak) {
+        terbaik = { jarak: jarak, di: di, blok: b };
+      }
+    }
+    if(!terbaik) return null;
+    return {
+      symbol: sym, tf: tf, harga: harga, atr: atrKini,
+      jarak: terbaik.jarak, di: terbaik.di,
+      atasZona: terbaik.blok.atas, bawahZona: terbaik.blok.bawah,
+      arah: terbaik.blok.arah,
+      persen: terbaik.jarak / harga * 100,
+    };
+  }
+
+  async function jtCariOrderBlock(){
+    const tf = obTfSel.value;
+    obBtn.disabled = true;
+    /* Dipastikan semestanya sudah termuat sebelum memindai — klik pertama
+       yang datang lebih cepat dari jawaban /api/hl/simbol akan memindai
+       daftar Binance saja, lalu orang menyimpulkan koin Hyperliquid tidak
+       ikut. Idempoten: pemanggilan kedua cuma menyegarkan singgahannya. */
+    await jtMuatHl();
+    obStatusEl.textContent = 'Memindai ' + activeSymbols.length + ' koin di TF ' + tf + '…';
+    obGrid.innerHTML = '';
+    const hasil = [];
+    /* Enam sekaligus, angka yang sama dengan pemindai lain di halaman ini.
+       Batas proxy 600/menit dibagi bersama seluruh section. */
+    const antre = activeSymbols.slice();
+    async function pekerja(){
+      while(antre.length){
+        const sym = antre.shift();
+        try{ const r = await jtCariSatuOb(sym, tf); if(r) hasil.push(r); }catch(e){}
+      }
+    }
+    await Promise.all([pekerja(),pekerja(),pekerja(),pekerja(),pekerja(),pekerja()]);
+    hasil.sort(function(x,y){ return x.jarak - y.jarak; });
+    if(!hasil.length){
+      obStatusEl.textContent = 'Tidak ada koin yang sedang menyentuh order block di TF ' + tf + '.';
+      obBtn.disabled = false;
+      return;
+    }
+    obGrid.innerHTML = hasil.map(function(r,i){
+      const cls = r.arah === 1 ? 'buy' : 'sell';
+      const ket = r.di ? 'DI DALAM zona' : 'hampir sentuh';
+      return '<div class="es-card pantau ' + cls + '" data-symbol="' + r.symbol + '" data-tf="' + r.tf + '" data-price="' + r.harga + '">'
+        + '<div class="es-card-top">'
+        +   '<div><span class="es-rank">#' + (i+1) + ' &bull; TF ' + r.tf + '</span>'
+        +   '<span class="es-symbol">' + r.symbol.replace('USDT','') + '</span></div>'
+        +   '<div class="es-card-top-right">' + jtLabelSumber(r.symbol) + '</div>'
+        + '</div>'
+        + '<div class="es-price-row"><span class="es-price">$' + fmtPrice(r.harga) + '</span>'
+        +   '<span class="es-chg ' + (r.arah===1?'up':'down') + '">' + (r.arah===1?'BULLISH OB':'BEARISH OB') + '</span></div>'
+        + '<div class="es-sr-row">'
+        +   '<span class="res">Atas $' + fmtPrice(r.atasZona) + '</span>'
+        +   '<span class="sup">Bawah $' + fmtPrice(r.bawahZona) + '</span>'
+        + '</div>'
+        + '<div class="jt-ob-jarak">' + ket + ' &bull; <b>' + r.persen.toFixed(2) + '%</b> dari tepi zona</div>'
+        + '</div>';
+    }).join('');
+    obStatusEl.textContent = hasil.length + ' koin menyentuh / hampir menyentuh order block aktif di TF ' + tf + '.';
+    obBtn.disabled = false;
+  }
+  obBtn.addEventListener('click', jtCariOrderBlock);
   pantauTfSel.addEventListener('change', cariSinyalPantau);
   pantauRezimSel.addEventListener('change', cariSinyalPantau);
 
