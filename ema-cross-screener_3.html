@@ -6632,11 +6632,12 @@
   const obArahSel = document.getElementById('esObArah');
   const obJarakSel = document.getElementById('esObJarak');
 
-  async function jtCariOrderBlock(){
+  async function jtCariOrderBlockInti(){
     const tf = obTfSel.value;
     const saringArah = obArahSel ? obArahSel.value : 'all';
     const tolAtr = obJarakSel ? (parseFloat(obJarakSel.value) || OB_TOL_ATR) : OB_TOL_ATR;
     obBtn.disabled = true;
+    obStatusEl.classList.remove('error');
     /* Dipastikan semestanya sudah termuat sebelum memindai — klik pertama
        yang datang lebih cepat dari jawaban /api/hl/simbol akan memindai
        daftar Binance saja, lalu orang menyimpulkan koin Hyperliquid tidak
@@ -6658,7 +6659,6 @@
     hasil.sort(function(x,y){ return x.jarak - y.jarak; });
     if(!hasil.length){
       obStatusEl.textContent = 'Tidak ada koin yang sedang menyentuh order block di TF ' + tf + '.';
-      obBtn.disabled = false;
       return;
     }
     obGrid.innerHTML = hasil.map(function(r,i){
@@ -6689,7 +6689,21 @@
         + '</div>';
     }).join('');
     obStatusEl.textContent = hasil.length + ' koin menyentuh / hampir menyentuh order block aktif di TF ' + tf + '.';
-    obBtn.disabled = false;
+  }
+
+  /* Tombolnya kini disembunyikan komponen chip, jadi tidak ada lagi kendali
+     terlihat untuk mencoba ulang. Satu galat yang lolos akan meninggalkan
+     tombol itu `disabled` selamanya — dan penjadwal pindai otomatis justru
+     MENUNGGU tombol itu bebas sebelum mengklik. Tanpa `finally` di sini,
+     satu jaringan putus membuat section-nya mati diam-diam: tidak ada pesan,
+     tidak ada tombol, dan mengganti filter pun tidak menghasilkan apa-apa. */
+  async function jtCariOrderBlock(){
+    try{ await jtCariOrderBlockInti(); }
+    catch(e){
+      obStatusEl.textContent = 'Pemindaian order block gagal: ' + ((e && e.message) || e);
+      obStatusEl.classList.add('error');
+    }
+    finally{ obBtn.disabled = false; }
   }
   obBtn.addEventListener('click', jtCariOrderBlock);
   pantauTfSel.addEventListener('change', cariSinyalPantau);
@@ -11111,6 +11125,24 @@
         { id:'tf',     label:'Timeframe', ikon:'jam',    select:'esChTf',        wajib:true, potong:/^TF\s+/i },
         { id:'sinyal', label:'Sinyal',    ikon:'target', select:'esChSnrFilter', wajib:true, potong:/^Sinyal\s+/i,
           mulaiKosong:true, teksKosong:'Pilih jenis sinyal' }
+    ]},
+    /* Volume Profile Order Blocks. Didaftarkan di sini, bukan dibuatkan baris
+       kendali sendiri: komponen inilah bentuk panel filter yang berlaku
+       sekarang, dan section yang menggambar barisnya sendiri akan menyimpang
+       lagi begitu komponen ini berubah.
+
+       JARAK ditandai `wajib` supaya chip-nya selalu terlihat. Ia bukan
+       penyaring tambahan — seberapa dekat harga boleh disebut "menyentuh"
+       adalah pertanyaan pokok section ini; disembunyikan di balik menu
+       tambah-filter, orang tidak akan tahu angkanya bisa disetel sama
+       sekali. ARAH sebaliknya: penyempit biasa, sama seperti di Area
+       Pantau, jadi chip-nya muncul hanya kalau dipakai. */
+    { tombol:'esObBtn', status:'esObStatus',
+      statusAwal:'Pemindaian berjalan otomatis setiap filter berubah.',
+      filter: [
+        { id:'tf',    label:'Timeframe', ikon:'jam',    select:'esObTf',    wajib:true, potong:/^TF\s+/i },
+        { id:'jarak', label:'Jarak',     ikon:'target', select:'esObJarak', wajib:true },
+        { id:'arah',  label:'Arah',      ikon:'sinyal', select:'esObArah',  netral:'all' }
     ]}
   ];
 
@@ -11169,7 +11201,11 @@
   function siapPindai(bagian){ return !bagian.filter.some(belumDipilih); }
 
   /* ── Pindai otomatis lewat tombol tersembunyi ──────────────────────── */
-  function jadwalkanPindai(bagian){
+  function sibuk(bagian){
+    var b = bagian.tombol && byId(bagian.tombol);
+    return !!(b && b.disabled);
+  }
+  function jadwalkanPindai(bagian, sibukSebelum){
     if (!bagian.tombol || !siapPindai(bagian)) return;
     clearTimeout(bagian._jam);
     /* Debounce: Reset menulis dua select berturut-turut, dan itu harus jadi
@@ -11178,6 +11214,20 @@
       var ulang = 0;
       (function coba(){
         var btn = byId(bagian.tombol); if (!btn) return;
+        /* ── SECTION YANG SUDAH MEMINDAI SENDIRI DARI `change` ───────────
+           Area Pantau memasang listener `change` pada select-nya jauh sebelum
+           komponen ini ada, jadi pindaiannya sudah berjalan begitu `terapkan`
+           menulis nilai baru. Mengklik tombol sesudah itu berarti pindaian
+           KEDUA dengan nilai yang sama persis: 368 koin dipindai dua kali,
+           waktu tunggu dua kali lipat, dan jatah proxy 600/menit yang dibagi
+           seluruh halaman ikut terbakar dua kali.
+
+           Tandanya dibaca dari luar dan tidak perlu tahu section mana:
+           tombolnya BEBAS sebelum nilainya diubah, lalu SIBUK 250 ms
+           sesudahnya — tidak ada yang bisa memulainya selain perubahan itu.
+           Kalau ia memang sudah sibuk sejak sebelum diubah, pindaian yang
+           sedang jalan memakai nilai LAMA dan kliknya tetap diperlukan. */
+        if (!sibukSebelum && btn.disabled) return;
         /* Klik pada tombol `disabled` tidak menghasilkan apa-apa — dan
            tombol itu `disabled` sepanjang pindaian. Tunggu sampai bebas. */
         if (btn.disabled){ if (ulang++ < 150) setTimeout(coba, 400); return; }
@@ -11187,6 +11237,9 @@
   }
   function terapkan(bagian, f, nilai, opsiTerapkan){
     var sel = byId(f.select), berubah = sel.value !== nilai;
+    /* Dicatat SEBELUM nilainya ditulis: sesudahnya, pindaian yang dipicu
+       listener `change` section itu sendiri sudah menyalakan `disabled`. */
+    var sibukSebelum = sibuk(bagian);
     if (berubah){
       sel.value = nilai;
       sel.dispatchEvent(new Event('change', { bubbles:true }));
@@ -11199,7 +11252,7 @@
        jadi "berubah" saja tidak cukup). Reset tidak memindai kalau ia
        mengosongkan lagi dimensi yang wajib dipilih. */
     if (opsiTerapkan && opsiTerapkan.tanpaPindai) return;
-    if (berubah || pertama) jadwalkanPindai(bagian);
+    if (berubah || pertama) jadwalkanPindai(bagian, sibukSebelum);
   }
 
   /* ── Popover ───────────────────────────────────────────────────────── */
