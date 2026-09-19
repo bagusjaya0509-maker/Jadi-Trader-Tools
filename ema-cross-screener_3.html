@@ -1180,18 +1180,19 @@
   /* Sinyal Prioritas (.es-snr-pick) memakai gaya yang SAMA dengan Parallel.
      Sebelumnya hanya .es-ch-pick yang punya aturan ini, jadi tombol BUY/SELL di
      section SNR tampil polos tanpa efek hover/tekan - beda sendiri. */
-  /* .es-priority-signal dan .es-pantau-pick ikut: sejak badge ini membuka
-     Chart & Entry, ia harus TERLIHAT bisa diklik. Kursor panah pada
-     sesuatu yang ternyata bereaksi adalah cara tercepat membuat orang
-     tidak pernah mencobanya. */
-  .es-ch-pick, .es-snr-pick, .es-priority-signal, .es-pantau-pick{
+  /* .es-priority-signal ikut: sejak badge ini membuka Chart & Entry, ia
+     harus TERLIHAT bisa diklik. Kursor panah pada sesuatu yang ternyata
+     bereaksi adalah cara tercepat membuat orang tidak pernah mencobanya.
+     (.es-pantau-pick dulu ikut di sini; tombolnya sudah dibuang — di Area
+     Pantau seluruh kartunya yang membuka Chart & Entry.) */
+  .es-ch-pick, .es-snr-pick, .es-priority-signal{
     border:none;
     cursor:pointer;
     line-height:1;
     transition:filter .15s, transform .1s;
   }
-  .es-ch-pick:hover, .es-snr-pick:hover, .es-priority-signal:hover, .es-pantau-pick:hover{ filter:brightness(1.25); }
-  .es-ch-pick:active, .es-snr-pick:active, .es-priority-signal:active, .es-pantau-pick:active{ transform:scale(0.96); }
+  .es-ch-pick:hover, .es-snr-pick:hover, .es-priority-signal:hover{ filter:brightness(1.25); }
+  .es-ch-pick:active, .es-snr-pick:active, .es-priority-signal:active{ transform:scale(0.96); }
 
   /* Menu klik-kanan pada kartu sinyal - pengganti tombol "Ganti Chart / Kelola
      Koin" yang dulu nongkrong di bilah kendali tiap section. Ditaruh di kartunya
@@ -1281,30 +1282,10 @@
 
   /* ===== Sinyal Pantau Kripto ===== */
   /* Hijau untuk pantau BUY, merah untuk pantau SELL */
-  .es-pantau-foot{
-    display:flex;
-    align-items:flex-end;
-    justify-content:flex-end;   /* tinggal ikon saja - rapat ke pojok kanan bawah */
-    gap:8px;
-    margin-top:6px;
-  }
-  .es-pantau-pick{
-    flex-shrink:0;
-    border:1px solid transparent;
-    border-radius:6px;
-    padding:5px 12px;
-    font-family: var(--font-mono);
-    font-size:11px;
-    font-weight:700;
-    letter-spacing:.04em;
-    line-height:1;
-    cursor:pointer;
-    transition:filter .15s, transform .1s;
-  }
-  .es-pantau-pick.buy { background: var(--bull-dim); color: var(--bull); border-color: rgba(79,158,130,0.5); }
-  .es-pantau-pick.sell{ background: var(--bear-dim); color: var(--bear); border-color: rgba(192,90,78,0.5); }
-  .es-pantau-pick:hover{ filter:brightness(1.25); }
-  .es-pantau-pick:active{ transform:scale(0.96); }
+  /* Tombol BUY/SELL NOW di kaki kartu Area Pantau sudah dibuang beserta
+     gayanya: sekarang seluruh kartunya yang membuka Chart & Entry, dan sinyal
+     yang mau diorder dipilih dari sana. */
+  #esPantauGrid .es-card, #esObGrid .es-card{ cursor:pointer; }
   /* Kartu Pantau biasa: border netral seperti kartu lain - tanpa warna arah.
      Hanya 3 teratas yang diberi glow, meniru .es-live-trade-box. */
   .es-card.pantau.top3{
@@ -4810,7 +4791,7 @@
     favCrossGridEl.querySelectorAll('.es-card').forEach(card=>{
       card.addEventListener('click', (e)=>{
         if(e.target.classList.contains('es-favcross-trade-btn')) return;
-        openTradingView(card.getAttribute('data-symbol'), card.getAttribute('data-tf'));
+        jtBukaKartu(card, card.getAttribute('data-symbol'), card.getAttribute('data-tf'));
       });
     });
     favCrossGridEl.querySelectorAll('.es-favcross-trade-btn').forEach(btn=>{
@@ -5258,7 +5239,7 @@
       card.addEventListener('click', (e)=>{
         if(e.target.classList.contains('es-cross-trade-btn')) return;
         const sym = card.getAttribute('data-symbol');
-        openTradingView(sym);
+        jtBukaKartu(card, sym);
       });
     });
 
@@ -5378,6 +5359,28 @@
   const TV_INTERVAL_MAP = {
     '1m':'1', '5m':'5', '15m':'15', '30m':'30', '1h':'60', '4h':'240', '1d':'D'
   };
+
+  /* ── KARTU KOIN MEMBUKA CHART & ENTRY ────────────────────────────────
+     TradingView bagus untuk melihat, tapi tidak untuk melanjutkan: dari sana
+     tidak ada jalan ke order, ke SL/TP sinyalnya, atau ke panel entri. Kartu
+     hasil pindai justru diklik orang SAAT sedang memutuskan, jadi tujuannya
+     halaman yang bisa menerima keputusan itu.
+
+     TradingView tidak dihapus — ia pindah ke menu klik-kanan, tempat yang
+     tepat untuk "saya cuma mau lihat".
+
+     Pintunya lewat `window` karena penggeraknya (jtBukaChartDariKartu) tinggal
+     di dalam pasangMenuKoin bersama perakit alamat dan pengumpul daftarnya.
+     Kalau blok itu gagal dipasang, TradingView jadi jalan cadangan: kartu yang
+     diklik tidak boleh berakhir tanpa reaksi apa pun — diam adalah satu-satunya
+     hasil yang tidak bisa dibaca orang sebagai apa pun. */
+  function jtBukaKartu(kartu, simbol, tf){
+    if(kartu && typeof window.jtBukaChart === 'function'){
+      window.jtBukaChart(kartu, { tanpaDaftar: true, tf: tf });
+      return;
+    }
+    openTradingView(simbol, tf);
+  }
 
   function openTradingView(symbol, overrideInterval, market){
     // intervalSel ikut terhapus bersama grid Cross EMA lama. Tanpa cadangan ini,
@@ -5659,7 +5662,7 @@
       const cand = top[i];
       card.addEventListener('click', (e)=>{
         if(e.target.classList.contains('es-priority-trade-btn')) return;
-        openTradingView(cand.symbol, cand.tfValue);
+        jtBukaKartu(card, cand.symbol, cand.tfValue);
       });
       const tradeBtn = card.querySelector('.es-priority-trade-btn');
       tradeBtn.addEventListener('click', (e)=>{
@@ -5971,7 +5974,7 @@
       const cand = list[i];
       card.addEventListener('click', (e)=>{
         if(e.target.classList.contains('es-priority-trade-btn')) return;
-        openTradingView(cand.symbol, cand.tfValue);
+        jtBukaKartu(card, cand.symbol, cand.tfValue);
       });
       const tradeBtn = card.querySelector('.es-priority-trade-btn');
       if(tradeBtn){
@@ -6325,9 +6328,10 @@
      orangnya masih di perjalanan yang sama. Dibuka lagi besok, angka-angkanya
      sudah bohong; dan tab sebelah mungkin sedang memandang filter lain.
 
-     BATAS 10 MENIT bukan demi hemat, melainkan demi jujur: harga bergerak.
+     BATAS 1 JAM bukan demi hemat, melainkan demi jujur: harga bergerak.
      Kartu yang dipulihkan menyebutkan umurnya sendiri di baris status supaya
-     tidak ada yang mengira itu keadaan detik ini.
+     tidak ada yang mengira itu keadaan detik ini — makin panjang batasnya,
+     makin penting keterangan umur itu ada.
 
      Yang disimpan HASILNYA, bukan HTML-nya. Kartu harus dijahit ulang lewat
      fungsi gambar aslinya supaya daftar sinyal yang bisa dipilih
@@ -6335,7 +6339,7 @@
      Dipulihkan sebagai HTML mentah, kartunya terlihat utuh tapi tombol
      BUY/SELL NOW-nya tidak menunjuk apa pun — rusak yang paling mahal, karena
      ia baru ketahuan saat orangnya sudah menekan. */
-  var JT_UMUR_SIMPAN = 10 * 60 * 1000;
+  var JT_UMUR_SIMPAN = 60 * 60 * 1000;
 
   function jtKunciSimpan(nama){ return 'jt-pindai-' + nama; }
 
@@ -6371,7 +6375,13 @@
 
   function jtUmurTeks(ms){
     var menit = Math.floor(ms / 60000);
-    return menit < 1 ? 'hasil pindai barusan' : 'hasil pindai ' + menit + ' menit lalu';
+    if(menit < 1) return 'hasil pindai barusan';
+    if(menit < 60) return 'hasil pindai ' + menit + ' menit lalu';
+    /* Sesudah batasnya jadi sejam, "hasil pindai 58 menit lalu" masih terbaca
+       sebagai angka menit yang wajar. Yang lewat 60 ditulis sebagai jam supaya
+       umurnya terbaca sekali lihat, bukan dihitung dulu di kepala. */
+    var jam = Math.floor(menit / 60), sisa = menit % 60;
+    return 'hasil pindai ' + jam + ' jam' + (sisa ? ' ' + sisa + ' menit' : '') + ' lalu';
   }
 
   function renderPantauSignals(top){
@@ -6417,22 +6427,19 @@
           <span>SMI (${SMI_K},${SMI_D},${SMI_EMA})</span>
           <span class="es-stoch-badge ${c.kondisi}">${stochLabel}</span>
         </div>
-        <div class="es-pantau-foot">
-          <button class="es-pantau-pick ${cls}" type="button" title="Pilih sinyal ini">${c.signal} NOW</button>
-        </div>
       </div>`;
     }).join('');
 
     pantauGrid.querySelectorAll('.es-card').forEach((card,i)=>{
       const cand = top[i];
       card.addEventListener('click', (e)=>{
-        if(e.target.classList.contains('es-pantau-pick')) return;
         if(e.target.classList.contains('es-sig-star')) return;
-        openTradingView(cand.symbol, cand.tfValue);
-      });
-      card.querySelector('.es-pantau-pick').addEventListener('click', (e)=>{
-        e.stopPropagation();
-        selectTradableSignalByUid(tradableUid('pantau', cand.symbol, cand.tfValue));
+        /* Label sumber (BNB/HL) menukar bursa kartu ini. Ia menghentikan
+           kliknya sendiri HANYA kalau koinnya ada di dua bursa — kalau cuma
+           satu, kliknya lolos ke sini. Tanpa penjagaan ini, menekan label
+           yang tidak bisa ditukar malah memindahkan orang ke halaman lain. */
+        if(e.target.closest('.jt-sumber')) return;
+        jtBukaKartu(card, cand.symbol, cand.tfValue);
       });
       // Bintang: masuk/keluar favorit lalu daftar LANGSUNG diurut ulang di
       // tempat - tidak perlu pindai ulang (data hasilnya sudah ada di tangan),
@@ -6576,8 +6583,15 @@
     if(!jtAdaDiDua(sym)) return;          // cuma satu bursa: tidak ada yang bisa ditukar
     e.preventDefault(); e.stopPropagation();
     jtTukarSumber(sym);
-    t.classList.toggle('hl');
-    t.textContent = jtSumber(sym) === 'hyperliquid' ? 'HL' : 'BINANCE';
+    /* Dua kelas disetel eksplisit, bukan satu di-toggle: `bnb` dan `hl` sama
+       kuat dan `bnb` ditulis belakangan, jadi elemen yang memakai KEDUANYA
+       tampil kuning walau tulisannya "HL". Teksnya juga ikut nama pendeknya —
+       menulis "BINANCE" di sini mengembalikan label panjang yang justru
+       dipendekkan supaya baris kepala kartu tidak berdesakan. */
+    var keHl = jtSumber(sym) === 'hyperliquid';
+    t.classList.toggle('hl', keHl);
+    t.classList.toggle('bnb', !keHl);
+    t.textContent = keHl ? 'HL' : 'BNB';
   }, true);
 
   /* ══ VOLUME PROFILE ORDER BLOCKS ═══════════════════════════════════
@@ -7333,7 +7347,7 @@
       card.addEventListener('click', (e)=>{
         if(e.target.classList.contains('es-ch-pick')) return;
         if(e.target.classList.contains('es-sig-star')) return;
-        openTradingView(cand.symbol, cand.tfValue);
+        jtBukaKartu(card, cand.symbol, cand.tfValue);
       });
       card.querySelector('.es-ch-pick').addEventListener('click', (e)=>{
         e.stopPropagation();
@@ -7612,7 +7626,7 @@
         // terjadi, tapi yang perlu dinilai sebelum entry adalah zonanya - dan
         // zona itu digambar dari struktur 4 jam. Membuka M5 langsung membuang
         // konteks yang justru jadi alasan sinyalnya muncul.
-        openTradingView(cand.symbol, '4h');
+        jtBukaKartu(card, cand.symbol, '4h');
       });
       card.querySelector('.es-snr-pick').addEventListener('click', (e)=>{
         e.stopPropagation();
@@ -7962,7 +7976,7 @@
       const cand = top[i];
       card.addEventListener('click', (e)=>{
         if(e.target.classList.contains('es-priority-trade-btn')) return;
-        openTradingView(cand.symbol, cand.tfValue);
+        jtBukaKartu(card, cand.symbol, cand.tfValue);
       });
       card.querySelector('.es-priority-trade-btn').addEventListener('click', (e)=>{
         e.stopPropagation();
@@ -10645,8 +10659,8 @@
        pendengar yang ditempel per kartu ikut hilang bersama kartunya.
 
        ── KENAPA FASE CAPTURE, BUKAN BUBBLE ───────────────────────────────
-       Dua dari tiga badge (.es-snr-pick dan .es-pantau-pick) SUDAH punya
-       tugas sendiri — selectTradableSignalByUid() — dan pendengarnya
+       .es-snr-pick SUDAH punya tugas sendiri — selectTradableSignalByUid()
+       — dan pendengarnya
        memanggil e.stopPropagation(). Dipasang di fase bubble seperti
        biasa, pendengar ini tidak akan pernah kebagian: kliknya sudah
        dihentikan di tombolnya sendiri.
@@ -10704,7 +10718,11 @@
       if(!kartu) return;
       var simbol = kartu.getAttribute('data-symbol');
       if(!simbol) return;
-      var tf = kartu.getAttribute('data-tf')
+      /* `opsi.tf` menang atas data-tf kartunya. Dipakai kartu SNR: sentuhannya
+         terjadi di M5, tapi zona yang harus dinilai sebelum entry digambar
+         dari struktur 4 jam — membuka M5 membuang konteks yang justru jadi
+         alasan sinyalnya muncul. */
+      var tf = (opsi && opsi.tf) || kartu.getAttribute('data-tf')
             || ((typeof intervalSel !== 'undefined' && intervalSel) ? intervalSel.value : '4h');
       var sl = kartu.getAttribute('data-sl') || '';
       var tp = kartu.getAttribute('data-tp') || '';
@@ -10732,10 +10750,14 @@
       }
       window.open(alamatChartV3(simbol, tf, sl, tp, arah), '_blank');
     }
+    /* Dibuka ke luar blok ini: kartu di semua section memanggilnya lewat
+       jtBukaKartu, sementara perakit alamat dan pengumpul daftarnya tinggal
+       di sini. Satu pintu, bukan satu salinan per section. */
+    window.jtBukaChart = jtBukaChartDariKartu;
 
     document.addEventListener('click', function(e){
       if(!e.target || !e.target.closest) return;
-      var badge = e.target.closest('.es-priority-signal, .es-snr-pick, .es-pantau-pick');
+      var badge = e.target.closest('.es-priority-signal, .es-snr-pick');
       if(!badge) return;
       /* Kartu PANTAU belum punya arah — tetap boleh dibuka, chart-nya cuma
          terbuka tanpa garis rencana. Yang ditolak cuma kartu tanpa simbol,
