@@ -970,7 +970,15 @@
      memakan hampir separuh baris kepala kartu, mendorong lencana kapitalisasi
      dan bintang favorit sampai berdesakan. */
   .jt-sumber.bnb{ background:rgba(240,185,11,.14); color:#f0b90b; }
+  /* Panah penukar bursa ditempel lewat ::after dengan spasi di depannya, dan
+     spasi itu tempat baris boleh patah: di kartu yang kepalanya sempit,
+     panahnya turun sendiri ke baris bawah dan terbaca seperti ikon lepas milik
+     entah apa. Label sumber ditahan satu baris, dan kelompok lencana di kanan
+     kepala kartu dilarang menyusut — yang menyusut biar bagian kiri yang
+     memang teks biasa. */
   .jt-sumber.dua::after{ content:' \21C4'; opacity:.75; }
+  .jt-sumber{ white-space:nowrap; }
+  .es-card-top-right{ flex-shrink:0; flex-wrap:nowrap; }
   #esObGrid{ padding:22px 18px; }
   .jt-ob-jarak{ font-size:10.5px; color:var(--muted); }
   .jt-ob-jarak b{ color:var(--text); }
@@ -1286,6 +1294,24 @@
      gayanya: sekarang seluruh kartunya yang membuka Chart & Entry, dan sinyal
      yang mau diorder dipilih dari sana. */
   #esPantauGrid .es-card, #esObGrid .es-card{ cursor:pointer; }
+
+  /* ── KAKI KARTU RATA SATU GARIS ──────────────────────────────────────
+     Kartu-kartu sebaris tingginya sudah sama (flex `stretch`), tapi isinya
+     tidak: kepala kartu yang namanya panjang patah jadi dua baris, dan kartu
+     yang punya baris SNR 4H membawa satu baris tambahan. Isinya menumpuk dari
+     ATAS, jadi sisa ruangnya jatuh di bawah — dan baris SMI berakhir di
+     ketinggian yang berbeda-beda di tiap kartu.
+
+     Mata membaca deret kartu dengan menyapu MENDATAR: satu baris angka yang
+     naik-turun memaksa mata mencari ulang tiap kali pindah kartu, dan
+     perbandingan yang seharusnya sekali lihat jadi pekerjaan.
+
+     `margin-top:auto` pada baris R/S mendorong seluruh blok bawah menempel ke
+     dasar kartu, jadi baris TERAKHIR rata untuk semua. Kartu yang punya baris
+     SNR 4H tetap membawanya di atas baris SMI — yang disejajarkan dasarnya,
+     bukan jumlah barisnya. */
+  #esPantauGrid .es-card .es-sr-row,
+  #esObGrid .es-card .es-sr-row{ margin-top:auto; }
   /* Kartu Pantau biasa: border netral seperti kartu lain - tanpa warna arah.
      Hanya 3 teratas yang diberi glow, meniru .es-live-trade-box. */
   .es-card.pantau.top3{
@@ -10627,13 +10653,14 @@
      Satu listener di document, bukan per kartu: isi grid diganti tiap kali
      memindai, dan listener per kartu berarti memasang ulang terus-menerus. */
   (function pasangMenuKoin(){
-    const GRID = { esPantauGrid:'pantau', esChGrid:'crosshunter' };
+    const GRID = { esPantauGrid:'pantau', esChGrid:'crosshunter', esObGrid:'ob' };
     // Grid Parallel sekarang bisa berisi kartu parallel ATAU kartu SNR H4;
     // findCrossHunterSignals sendiri yang memilih pemindaian sesuai mode aktif,
     // jadi satu pintu ini sudah benar untuk keduanya.
     const PINDAI = {
       pantau: () => cariSinyalPantau(),
-      crosshunter: () => findCrossHunterSignals()
+      crosshunter: () => findCrossHunterSignals(),
+      ob: () => jtCariOrderBlock()
     };
 
     const menu = document.createElement('div');
@@ -10898,7 +10925,9 @@
         }
 
         const st = document.getElementById(
-          bagian === 'pantau' ? 'esPantauStatus' : 'esChStatus');
+          bagian === 'pantau' ? 'esPantauStatus'
+          : bagian === 'ob' ? 'esObStatus'
+          : 'esChStatus');
         if(st){
           st.classList.remove('error');
           st.textContent = pengganti
@@ -10957,7 +10986,7 @@
     if(sel && nilai !== undefined && nilai !== null && sel.value !== nilai) sel.value = nilai;
   }
 
-  var jtAdaPulihanPantau = false;
+  var jtAdaPulihanPantau = false, jtAdaPulihanOb = false;
   (function jtPulihkanPindai(){
     try{
       var p = jtAmbilPindai('pantau');
@@ -10975,6 +11004,7 @@
         jtSetelDiam(obJarakSel, o.setelan.jarak);
         jtRenderOb(o.data);
         obStatusEl.textContent = o.status + ' · ' + jtUmurTeks(o.umur);
+        jtAdaPulihanOb = true;
       }
     }catch(e){
       /* Simpanan rusak tidak boleh menjatuhkan halaman: yang gagal cuma
@@ -10984,7 +11014,34 @@
     }
   })();
 
-  if(!jtAdaPulihanPantau && pantauTfSel.value === '4h' && pantauRezimSel.value === 'align') cariSinyalPantau();
+  /* ── PINDAI OTOMATIS: AREA PANTAU DULU, ORDER BLOCK MENYUSUL ─────────
+     Order Block tidak dijalankan berbarengan. Keduanya menarik ratusan koin
+     lewat proxy yang sama — 600 permintaan per menit dibagi SELURUH halaman —
+     dan dijalankan bersamaan keduanya melambat. Yang paling terasa justru
+     section pertama, yaitu yang sedang ditunggu orangnya.
+
+     Menunggu lewat promise `cariSinyalPantau`, bukan lewat jeda waktu tebakan:
+     lama pindaian berubah-ubah menurut jumlah koin dan kecepatan proxy, dan
+     angka detik yang dikarang pasti salah di salah satu ujungnya.
+
+     `.catch` sebelum `.then`: kalau pindaian pertama gagal, yang kedua tetap
+     jalan. Satu section yang error bukan alasan section lain ikut kosong. */
+  (function jtPindaiOtomatis(){
+    var pantauJalan = (!jtAdaPulihanPantau && pantauTfSel.value === '4h' && pantauRezimSel.value === 'align')
+      ? cariSinyalPantau()
+      : null;
+    /* Hasil OB sudah ada dari simpanan — tidak ada yang perlu dipindai. */
+    if(jtAdaPulihanOb) return;
+    Promise.resolve(pantauJalan).catch(function(){}).then(function(){
+      /* Dijaga dua kali: tombolnya sibuk berarti pindaian OB sudah berjalan
+         (orangnya mengubah filter selagi menunggu), dan grid yang sudah berisi
+         berarti pindaian itu malah sudah selesai. Keduanya sama artinya —
+         jangan mengulang. */
+      if(!obBtn || obBtn.disabled) return;
+      if(obGrid && obGrid.children.length) return;
+      jtCariOrderBlock();
+    });
+  })();
 
   // Posisi SIMULASI cukup ikut siklus scan 90 detik yang sudah ada (scan()
   // sendiri sudah panggil monitorPrioritySimPositions + renderPrioritySimUI
