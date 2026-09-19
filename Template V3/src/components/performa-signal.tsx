@@ -321,10 +321,26 @@ export function PapanPeringkatSignal({ data }: { data: Performa | null }) {
                  menangkap tetikus akan mematikan seluruh baris peringkat
                  yang bisa diklik. */
               <div aria-hidden={!main3d}
-                   className={cn('absolute inset-x-0 top-0 overflow-hidden rounded-xl transition-all duration-300',
+                   className={cn('overflow-hidden rounded-xl transition-all duration-300',
                      main3d
-                       ? 'pointer-events-auto z-20 h-[78vh] ring-1 ring-zinc-700'
-                       : 'pointer-events-none z-0 h-[360px]')}>
+                       /* ── DIBUKA: IKUT ALIRAN, BUKAN MELAYANG DI ATASNYA ──
+                          Sebagai LATAR ia memang harus melayang (absolute):
+                          papan peringkat duduk di atasnya dan tinggi kotaknya
+                          ikut isi papan, bukan sebaliknya.
+
+                          Tapi begitu ruangannya dibuka ia bukan latar lagi —
+                          ia jadi isi setinggi 78vh. Dibiarkan melayang, ia
+                          MENIMBUN papan peringkat di bawahnya: nama analis
+                          terbaca separuh di tepi bawah ruangan, dan yang
+                          tertutup tidak bisa digulung karena memang tidak
+                          memakan ruang sama sekali. Dilaporkan pemilik 19 Sep
+                          2026.
+
+                          Dikembalikan ke aliran normal, tingginya terhitung,
+                          dan papan peringkat turun ke bawahnya — persis
+                          seperti dua section yang berurutan. */
+                       ? 'relative z-20 mb-4 h-[78vh] ring-1 ring-zinc-700'
+                       : 'pointer-events-none absolute inset-x-0 top-0 z-0 h-[360px]')}>
                 {/* FOTONYA TETAP TERGAMBAR di belakang iframe, bukan
                     ditukar. Selama ruangan 3D-nya masih diurai, yang
                     terlihat ruangan itu juga — bukan kotak hitam yang
