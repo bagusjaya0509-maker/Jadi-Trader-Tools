@@ -119,3 +119,44 @@ html.latar dialog { display: none !important; }
 html.latar, html.latar body { background: #08131d; }
 html.latar #world { pointer-events: none; }
 html.latar #world canvas { pointer-events: none; }
+
+/* ── PANEL MELAYANG TIDAK BOLEH MENABRAK BARIS BAWAH ───────────────────
+   Dilaporkan pemilik 19 Sep 2026: panelnya tumpang tindih begitu jendelanya
+   dikecilkan.
+
+   Sebabnya dua jangkar yang berlawanan. `.view-panel` dan `.npc-panel`
+   dijangkar ke ATAS (top 83-108 px) dan tingginya mengikuti isinya — panel
+   robot terukur 499 px. Semua yang lain dijangkar ke BAWAH viewport: bilah
+   sutradara 39 px dari dasar dan baris petunjuk di atasnya. Begitu ruangnya
+   dipersempit, yang satu diam di tempat dan yang lain NAIK menghampirinya.
+
+   Terukur pada lebar 450 px: mulai menabrak baris petunjuk di tinggi 700 px,
+   menimpa bilah sutradara di 600 px, dan panelnya keluar layar sama sekali di
+   bawah 582 px. Halaman ini tampil di dalam bingkai setinggi 78vh, jadi
+   jendela yang tidak terlalu pendek pun sudah masuk rentang itu.
+
+   Batasnya dipasang pada TINGGI PANELNYA, bukan pada lebar layar: berapa pun
+   tinggi yang tersedia, panel berhenti sebelum wilayah baris bawah dan sisanya
+   digulung. Menyembunyikan panelnya juga menyelesaikan tabrakan — tapi dengan
+   cara menghapus satu-satunya tempat robot bisa dipilih, yang justru isi
+   ruangan ini.
+
+   290 px itu jatah yang disisihkan: 83-108 px untuk bilah atas sampai kepala
+   panel, sisanya untuk baris petunjuk dan bilah sutradara di dasar beserta
+   jaraknya. */
+.view-panel,
+.npc-panel{
+  max-height: calc(100vh - 290px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Panel setelan melayang di kiri-bawah juga tumbuh ke atas dari jangkar
+   bawahnya; tanpa batas ini ia menembus panel sudut pandang di atasnya pada
+   jendela pendek. Ia sudah disembunyikan di bawah 760 px, jadi yang dijaga di
+   sini cuma rentang menengah. */
+.hud-atur{
+  max-height: calc(100vh - 260px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
