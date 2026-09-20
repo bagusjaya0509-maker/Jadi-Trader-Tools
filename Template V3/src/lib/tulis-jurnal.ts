@@ -271,6 +271,138 @@ export function arusBersih(daftar: Arus[], sumber: Sumber) {
 }
 
 /* ════════════════════════════════════════════════════════════════════════
+   ARUS KAS YANG TERISI SENDIRI
+   ════════════════════════════════════════════════════════════════════════
+   Setoran dan penarikan yang tidak tercatat membuat saldo jurnal meleset dari
+   saldo bursa — dan selisihnya terbaca sebagai "hitungan jurnalnya salah",
+   bukan sebagai "ada uang masuk yang belum dicatat".
+
+   ── KAPAN INI MULAI BERLAKU ───────────────────────────────────────────
+   Diminta pemilik 20 Sep 2026: Binance dan Hyperliquid mulai tercatat
+   otomatis BULAN DEPAN, bukan hari itu juga, supaya angka bulan yang sedang
+   berjalan tidak berubah di tengah jalan. MT5 memakai batas yang sama, dan di
+   sana alasannya malah lebih keras: riwayat saldo di terminal bisa mundur
+   bertahun-tahun, dan menariknya seluruhnya akan mengubah saldo bulan-bulan
+   yang sudah lama ditutup.
+
+   Ditulis sebagai UTC, bukan waktu lokal peramban: 1 Oktober 2026 pukul 00.00
+   WIB adalah SATU saat tertentu, dan batas yang bergeser tujuh jam mengikuti
+   jam perangkat pembacanya bukan batas.
+
+   ── KENAPA CATATAN LAMA TIDAK MUNGKIN RUSAK ───────────────────────────
+   Dua pagar, dan keduanya perlu:
+
+     1. Baris yang lebih tua dari batas TIDAK PERNAH ditulis.
+     2. Id hasil sinkron punya ruang sendiri (`binTf-`, `hlTf-`, `mt5Tf-`),
+        sementara baris manual ber-id `<jenis>-<sumber>-<waktu>`. Keduanya
+        tidak bisa bertabrakan, jadi sinkron tidak akan pernah menimpa satu
+        pun baris yang diketik tangan — bahkan kalau waktunya sama persis.
+   ════════════════════════════════════════════════════════════════════════ */
+export const MULAI_ARUS_OTOMATIS = Date.UTC(2026, 8, 30, 17, 0, 0);
+
+/** Tulis satu arus kas hasil sinkron. Memulangkan `true` kalau benar-benar
+ *  ditulis — yang di luar batas atau sudah ada dilewati diam-diam. */
+function tulisArusSekali(a: Arus, sudahAdaArus: Set<string>): boolean {
+  if (!(a.nilai > 0)) return false;
+  if (a.waktu < MULAI_ARUS_OTOMATIS) return false;
+  if (sudahAdaArus.has(a.id)) return false;
+  /* Ditambahkan ke himpunan SEBELUM tulisannya selesai: satu putaran sinkron
+     bisa menemukan baris yang sama dua kali (mis. income dan ledger yang
+     tumpang tindih), dan menunggu Firestore menjawab berarti keduanya lolos. */
+  sudahAdaArus.add(a.id);
+  tulisLatar(simpanArus(a));
+  return true;
+}
+
+export interface HasilArus { masuk: number; galat: string | null }
+
+/* ── BINANCE ──────────────────────────────────────────────────────────
+   `incomeType: 'TRANSFER'` adalah uang yang masuk ke atau keluar dari dompet
+   Futures. Datanya sudah lama ikut di jawaban /api/income — yang selama ini
+   membuangnya justru saringan REALIZED_PNL di jalur trade.
+
+   PERMINTAAN SENDIRI, bukan menumpang jalur trade. Jendela waktu keduanya
+   berbeda: jalur trade bertanya "sejak trade terakhir", sedangkan arus kas
+   harus bertanya "sejak batas mulai atau sejak arus terakhir". Menumpang
+   berarti setoran yang terjadi sebelum trade terakhir tidak pernah terlihat.
+
+   Perlu dicatat, dan sudah disampaikan ke pemilik: yang tercatat di sini
+   adalah pindahan Spot <-> Futures, BUKAN setoran dari bank. Untuk jurnal
+   yang mengikuti saldo akun Futures, itu memang arus kas akunnya. */
+export async function sinkronArusBinance(sudahAdaArus: Set<string>, sejakMs: number): Promise<HasilArus> {
+  const { bacaKoneksi, koneksiLengkap } = await import('@/lib/koneksi');
+  const k = bacaKoneksi();
+  if (!koneksiLengkap(k)) return { masuk: 0, galat: null };
+  const dasar = k.url.trim().replace(/\/+$/, '');
+
+  try {
+    const sejak = Math.max(sejakMs, MULAI_ARUS_OTOMATIS);
+    const r = await fetch(dasar + '/api/income?since=' + sejak, { headers: { 'X-App-Token': k.token.trim() } });
+    const j = await r.json();
+    if (!r.ok) return { masuk: 0, galat: j.error || ('income menjawab ' + r.status) };
+
+    let masuk = 0;
+    for (const x of (j.income ?? []) as any[]) {
+      if (x.incomeType !== 'TRANSFER') continue;
+      const n = Number(x.income);
+      if (!n) continue;
+      const ok = tulisArusSekali({
+        /* tranId milik Binance, unik per mutasi. Kalau suatu saat ia kosong,
+           waktu dipakai sebagai gantinya — dua mutasi pada milidetik yang
+           sama jauh lebih jarang daripada baris tanpa id sama sekali. */
+        id: 'binTf-' + String(x.tranId || x.tradeId || x.time),
+        sumber: 'kripto',
+        jenis: n > 0 ? 'setor' : 'tarik',
+        nilai: Math.abs(n),
+        waktu: Number(x.time) || 0,
+        catatan: 'Transfer Binance' + (x.asset ? ' (' + x.asset + ')' : ''),
+      }, sudahAdaArus);
+      if (ok) masuk++;
+    }
+    return { masuk, galat: null };
+  } catch (e) {
+    return { masuk: 0, galat: e instanceof Error ? e.message : 'gagal sinkron arus' };
+  }
+}
+
+/* ── HYPERLIQUID ──────────────────────────────────────────────────────
+   Fills tidak memuat setoran; yang memuatnya `userNonFundingLedgerUpdates`,
+   dan server yang memanggilnya (lihat /api/hl/arus). Penyaringan jenis
+   dikerjakan di server — termasuk membuang pindahan perp <-> spot di akun
+   yang sama, yang kalau ikut akan terbaca sebagai setoran padahal tidak ada
+   satu sen pun yang datang dari luar. */
+export async function sinkronArusHyperliquid(sudahAdaArus: Set<string>, sejakMs: number): Promise<HasilArus> {
+  const { bacaKoneksi, koneksiLengkap } = await import('@/lib/koneksi');
+  const k = bacaKoneksi();
+  if (!koneksiLengkap(k)) return { masuk: 0, galat: null };
+  const dasar = k.url.trim().replace(/\/+$/, '');
+
+  try {
+    const sejak = Math.max(sejakMs, MULAI_ARUS_OTOMATIS);
+    const r = await fetch(dasar + '/api/hl/arus?since=' + sejak, { headers: { 'X-App-Token': k.token.trim() } });
+    const j = await r.json();
+    if (!r.ok) return { masuk: 0, galat: j.error || ('arus HL menjawab ' + r.status) };
+    if (!j.aktif) return { masuk: 0, galat: null };
+
+    let masuk = 0;
+    for (const a of (j.arus ?? []) as any[]) {
+      const ok = tulisArusSekali({
+        id: 'hlTf-' + String(a.id),
+        sumber: 'kripto',
+        jenis: a.masuk ? 'setor' : 'tarik',
+        nilai: Math.abs(Number(a.nilai) || 0),
+        waktu: Number(a.waktu) || 0,
+        catatan: 'Hyperliquid (' + String(a.jenis || 'transfer') + ')',
+      }, sudahAdaArus);
+      if (ok) masuk++;
+    }
+    return { masuk, galat: null };
+  } catch (e) {
+    return { masuk: 0, galat: e instanceof Error ? e.message : 'gagal sinkron arus' };
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════════
    SINKRON RIWAYAT BINANCE — jurnal kripto
    ════════════════════════════════════════════════════════════════════════
    Order yang DITUTUP DI LUAR situs (aplikasi Binance, web Binance) tidak
@@ -726,6 +858,8 @@ export interface HasilSinkron {
 }
 
 export interface HasilSinkron2 extends HasilSinkron {
+  /** Setoran/penarikan MT5 yang baru masuk. Tidak ada di EA < 2.13. */
+  arusMasuk?: number;
   /** Transaksi terlama & terbaru yang DIKIRIM EA, bukan yang tersimpan.
    *  Dipakai untuk mengatakan terus terang seberapa jauh riwayat MT5-nya
    *  benar-benar mencapai — kalau EA cuma mengirim 30 hari terakhir, tidak
@@ -738,6 +872,7 @@ export interface HasilSinkron2 extends HasilSinkron {
 export async function sinkronRiwayatMt5(
   sudahAda: Set<string>,
   sejakMs = 0,
+  sudahAdaArus?: Set<string>,
 ): Promise<HasilSinkron2> {
   const u = auth.currentUser;
   if (!u) throw new Error('Masuk dulu dengan akun Google.');
@@ -747,6 +882,41 @@ export async function sinkronRiwayatMt5(
   const r = await fetch(`${dasar}/api/mt5/status`, { headers: { Authorization: 'Bearer ' + token } });
   if (!r.ok) throw new Error(`Backend menjawab ${r.status}`);
   const j = await r.json();
+
+  /* ── SETORAN & PENARIKAN DARI TERMINAL ───────────────────────────────
+     Dikirim EA 2.13 ke atas sebagai bagian `arus` — deal bersaldo MT5
+     (DEAL_TYPE_BALANCE). EA lama tidak mengirimnya sama sekali, dan itu
+     bukan galat: bagiannya kosong, jurnalnya tetap jalan seperti sebelum
+     fitur ini ada.
+
+     Dikerjakan SEBELUM pemeriksaan `riwayat.length` di bawah, karena akun
+     yang baru disetor tapi belum pernah trade memang punya arus tanpa punya
+     riwayat — dan melempar galat di situ akan membuang setorannya. */
+  let arusMasuk = 0;
+  if (sudahAdaArus) {
+    const loginArus = String(j?.login || j?.data?.akun?.login || '');
+    const muArus: string | null = j?.data?.akun?.mataUang ?? null;
+    const senArus = !!muArus && /cent|USC/i.test(muArus);
+    for (const a of (j?.data?.arus ?? []) as any[]) {
+      const tiketA = String(a?.tiket ?? '');
+      if (!tiketA) continue;
+      const n = (Number(a.nilai) || 0) / (senArus ? 100 : 1);
+      if (!n) continue;
+      const ok = tulisArusSekali({
+        /* Nomor akun ikut, sama seperti id riwayat: tiket unik PER BROKER,
+           bukan global, jadi tanpa nomor akun setoran dari broker kedua akan
+           menimpa setoran broker pertama. */
+        id: 'mt5Tf-' + (loginArus || '0') + '-' + tiketA,
+        sumber: 'forex',
+        jenis: n > 0 ? 'setor' : 'tarik',
+        nilai: Math.abs(n),
+        /* Waktu MT5 dalam detik. */
+        waktu: (Number(a.waktu) || 0) * 1000,
+        catatan: String(a.komentar || '').trim() || 'Saldo MT5',
+      }, sudahAdaArus);
+      if (ok) arusMasuk++;
+    }
+  }
 
   const riwayat: any[] = j?.data?.riwayat ?? [];
   if (!riwayat.length) {
@@ -838,7 +1008,7 @@ export async function sinkronRiwayatMt5(
 
   if (dalamBatch > 0) await batch.commit();
   return {
-    ditemukan: riwayat.length, ditambah, dilewati, diluarRentang,
+    ditemukan: riwayat.length, ditambah, dilewati, diluarRentang, arusMasuk,
     terlama: isFinite(terlama) ? terlama : 0, terbaru,
   };
 }

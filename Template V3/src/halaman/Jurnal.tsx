@@ -12,7 +12,7 @@ import type { Trade, Sumber } from '@/data/contoh';
 import { useAkunMt5, useAkunBinance, type StatusAkun, type RincianBursa } from '@/lib/akun';
 import { ModalTrade } from '@/components/modal-trade';
 import { KotakArus } from '@/components/kotak-arus';
-import { useArusKas, arusBersih, sinkronRiwayatMt5, sinkronRiwayatBinance, sinkronRiwayatHyperliquid, sinkronRiwayatDompet, useSaldoDompetTertaut, type Arus } from '@/lib/tulis-jurnal';
+import { useArusKas, arusBersih, sinkronRiwayatMt5, sinkronRiwayatBinance, sinkronRiwayatHyperliquid, sinkronRiwayatDompet, sinkronArusBinance, sinkronArusHyperliquid, MULAI_ARUS_OTOMATIS, useSaldoDompetTertaut, type Arus } from '@/lib/tulis-jurnal';
 import { bacaStatistik, bacaPnl } from '@/lib/catatan-stat';
 import { Link } from 'react-router-dom';
 
@@ -278,7 +278,11 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
          menghabiskan kuota tulis untuk data yang sudah sama persis. */
       const sudah = new Set(trade.map((x) => x.id));
       const batas = sejak === '0' ? 0 : Date.now() - Number(sejak) * 86_400_000;
-      const h = await sinkronRiwayatMt5(sudah, batas);
+      /* Himpunan arus DIPISAH dari himpunan trade: keduanya koleksi yang
+         berbeda di Firestore, dan menyatukannya berarti satu id trade bisa
+         membuat arus dengan id kebetulan sama dilewati diam-diam. */
+      const sudahArus = new Set(arusRef.current.map((x) => x.id));
+      const h = await sinkronRiwayatMt5(sudah, batas, sudahArus);
 
       const jangkauan = h.terlama
         ? `Riwayat yang dikirim EA: ${tanggalPendek(h.terlama)} – ${tanggalPendek(h.terbaru)}.`
@@ -295,6 +299,7 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
             ? `${h.ditambah} transaksi baru masuk jurnal.`
             : 'Sudah mutakhir — tidak ada transaksi baru.',
           h.diluarRentang ? `${h.diluarRentang} di luar rentang yang dipilih.` : '',
+          h.arusMasuk ? `${h.arusMasuk} setoran/penarikan ikut tercatat.` : '',
           jangkauan,
         ].filter(Boolean).join(' '),
       });
@@ -345,6 +350,12 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
      efek terpasang sekali, dan angkanya tetap yang terbaru saat dipakai. */
   const tradeRef = useRef(trade);
   tradeRef.current = trade;
+  /* Arus kas ikut lewat ref, dan persis karena alasan yang ditulis panjang
+     di atas untuk `trade`: menjadikannya dep berarti tiap baris arus yang
+     masuk membongkar-pasang efeknya, dan tiap pemasangan memulai rantai
+     sinkron baru dengan potret yang sudah usang. */
+  const arusRef = useRef(arus);
+  arusRef.current = arus;
   /* Satu putaran pada satu waktu. Interval 5 menit biasanya lebih panjang
      dari putarannya, tapi "biasanya" tidak berlaku saat backend lambat atau
      saat dompet punya belasan ribu fill. */
@@ -381,10 +392,29 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
       const hDompet = await sinkronRiwayatDompet(sudahAda, sejak);
       if (!hidup) return;
 
+      /* ── ARUS KAS, JENDELA SENDIRI ────────────────────────────────────
+         `sejak` di atas dihitung dari TRADE terakhir, dan itu jendela yang
+         salah untuk setoran: akun yang tidak menutup posisi seminggu ini
+         tetap bisa menerima setoran kemarin. Jadi jendelanya dihitung dari
+         ARUS terakhir, dan tidak pernah lebih awal dari batas mulai —
+         `tulisArusSekali` menolak apa pun yang lebih tua, tapi meminta data
+         yang pasti ditolak cuma memperlambat putarannya. */
+      const arusKini = arusRef.current;
+      const sudahAdaArus = new Set(arusKini.map((a) => a.id));
+      const arusTerbaru = arusKini.reduce((s, a) => Math.max(s, a.waktu), 0);
+      const sejakArus = Math.max(MULAI_ARUS_OTOMATIS, arusTerbaru ? arusTerbaru - 3_600_000 : 0);
+
+      const aBin = await sinkronArusBinance(sudahAdaArus, sejakArus);
+      if (!hidup) return;
+      const aHl = await sinkronArusHyperliquid(sudahAdaArus, sejakArus);
+      if (!hidup) return;
+
       const kabar: string[] = [];
       if (!h.galat && h.masuk > 0) kabar.push(`${h.masuk} dari Binance`);
       if (!hHl.galat && hHl.masuk > 0) kabar.push(`${hHl.masuk} dari Hyperliquid`);
       if (!hDompet.galat && hDompet.masuk > 0) kabar.push(`${hDompet.masuk} dari dompet tertaut`);
+      const nArus = (aBin.masuk || 0) + (aHl.masuk || 0);
+      if (nArus > 0) kabar.push(`${nArus} setoran/penarikan`);
       setPesanBin(kabar.length ? `${kabar.join(' dan ')} masuk otomatis.` : '');
       } finally { sedangSinkron.current = false; }
     };
