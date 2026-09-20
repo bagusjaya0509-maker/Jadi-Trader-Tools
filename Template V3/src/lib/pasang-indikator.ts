@@ -176,6 +176,62 @@ export function pasangKodePine(kunci: string, nama: string, kode: string): Hasil
   }
 }
 
+/* ── INDIKATOR BERBAYAR TIDAK IKUT BERPINDAH AKUN ──────────────────────
+   `jt.pineDaftar` milik PERANGKAT, bukan milik akun. Akibatnya indikator
+   berbayar yang dipasang satu akun tetap terpasang — dan tetap bisa dipakai —
+   sesudah orang itu keluar dan akun LAIN masuk di peramban yang sama. Kode
+   lisensinya pun tersimpan di perangkat, jadi akun kedua bahkan bisa
+   mengunduh ulang sumbernya dari server. Dilaporkan pemilik 20 Sep 2026.
+
+   Yang dibuang HANYA yang berawalan `pasar-`. Skrip tulisan sendiri tidak
+   ikut: bukan itu yang dijual, dan kehilangannya jauh lebih mahal bagi orang
+   yang menulisnya daripada keuntungan apa pun dari membuangnya.
+
+   TIDAK dijalankan saat keluar (uid kosong). Keluar lalu masuk lagi dengan
+   akun yang SAMA adalah hal biasa, dan membuang pasangannya di situ berarti
+   menghukum pemilik sahnya. Yang memicu pembersihan adalah munculnya uid yang
+   BERBEDA.
+
+   Perangkat yang belum pernah mencatat pemilik dianggap BERBEDA. Kita memang
+   tidak tahu isinya punya siapa, dan menebak "punya yang sedang masuk" persis
+   kekeliruan yang sedang diperbaiki di sini. Ongkosnya: pembeli sah memasang
+   ulang sekali dari halaman Marketplace — kodenya bisa ia lihat sendiri di
+   sana, di bawah akunnya. */
+const KUNCI_PEMILIK = 'jt.pineMilik';
+
+export function pangkasMilikAkunLain(uid: string | null | undefined, kunciIkut: string[] = []): number {
+  if (!uid) return 0;
+  try {
+    if (localStorage.getItem(KUNCI_PEMILIK) === uid) return 0;
+    localStorage.setItem(KUNCI_PEMILIK, uid);
+
+    /* Kode lisensi pembeli ikut dibuang. Membuang skripnya saja tidak
+       menutup apa pun: dengan kode itu masih di perangkat, akun kedua
+       tinggal menekan "Salin Kode" dan memasangnya kembali. */
+    for (const k of kunciIkut) localStorage.removeItem(k);
+
+    const mentah = localStorage.getItem(KUNCI_DAFTAR);
+    const daftar: SkripTersimpan[] = mentah ? JSON.parse(mentah) : [];
+    if (!Array.isArray(daftar) || !daftar.length) return 0;
+
+    const sisa = daftar.filter((s) => !(s && typeof s.id === 'string' && s.id.startsWith(AWALAN_PASAR)));
+    if (sisa.length === daftar.length) return 0;
+
+    /* Kalau yang dibuang kebetulan yang sedang aktif, daftarnya tertinggal
+       tanpa satu pun yang tergambar — dan chart kosong terbaca sebagai rusak,
+       bukan sebagai indikator yang dicabut. */
+    if (sisa.length && !sisa.some((s) => s.aktif)) sisa[0] = { ...sisa[0], aktif: true };
+
+    localStorage.setItem(KUNCI_DAFTAR, JSON.stringify(sisa));
+    tandaiBerubah();
+    return daftar.length - sisa.length;
+  } catch {
+    /* localStorage ditolak (mode privat): tidak ada yang tersimpan, jadi
+       tidak ada pula yang bocor. */
+    return 0;
+  }
+}
+
 /* Halaman Chart mungkin sedang terbuka di tab lain. Event `storage` hanya
    menyala di tab LAIN, tidak di tab yang menulis — jadi kalau nanti dock
    Pine perlu menyegarkan dirinya di tab yang sama, sinyalnya harus dikirim

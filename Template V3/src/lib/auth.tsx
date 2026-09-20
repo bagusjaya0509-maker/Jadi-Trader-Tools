@@ -381,6 +381,19 @@ export function PenyediaAuth({ children }: { children: React.ReactNode }) {
 
       setPengguna(u);
       if (u) {
+        /* ── MILIK AKUN LAIN DIBERSIHKAN DARI PERANGKAT INI ──────────────
+           Indikator berbayar dan kode lisensi tersimpan di localStorage, yang
+           milik PERANGKAT — bukan milik akun. Tanpa langkah ini, akun kedua
+           di peramban yang sama mewarisi indikator berbayar akun pertama,
+           lengkap dengan kodenya.
+
+           Impor dinamis, dan itu bukan gaya: `pasang-indikator` membawa
+           seluruh sumber Pine, dan menariknya lewat impor biasa dari berkas
+           ini berarti memasukkannya ke jalur muat AWAL setiap pengunjung. */
+        void Promise.all([import('@/lib/pasang-indikator'), import('@/lib/akses')])
+          .then(([pi, ak]) => pi.pangkasMilikAkunLain(u.uid, [ak.KUNCI_LISENSI_LOKAL]))
+          .catch(() => { /* gagal membersihkan bukan alasan menahan aplikasi */ });
+
         /* Catat kehadiran ke backend supaya halaman Traffic & Sales punya
            daftar klien. Emailnya diambil backend dari ID token yang sudah
            diverifikasi, jadi halaman ini tidak bisa mendaftarkan email orang
