@@ -38,7 +38,7 @@ const cek = (nama, dapat, harap) => {
   console.log(`GAGAL  ${nama}\n   dapat ${JSON.stringify(dapat)}\n   harap ${JSON.stringify(harap)}`);
 };
 
-const MULAI = 18, JUMLAH = 42;
+const MULAI = 30, JUMLAH = 64, LEBAR = 640, PER_LILIN = 3;
 
 /* ── Babak 1: memilih titik mulai ───────────────────────────────────────
    Selama ini lilin TIDAK boleh bertambah. Kalau ia sudah maju sambil garis
@@ -54,15 +54,15 @@ cek('garis menyapu maju',
 /* ── Babak 2: memutar ── */
 cek('tepat sesudah memilih, mulai memutar', keadaanReplay(22).babak, 'putar');
 cek('lilin pertama terbuka di titik mulai', keadaanReplay(22).sampai, MULAI);
-cek('satu lilin tiap 4 tick', keadaanReplay(26).sampai, MULAI + 1);
-cek('empat lilin sesudah 16 tick', keadaanReplay(38).sampai, MULAI + 4);
+cek('satu lilin tiap 3 tick', keadaanReplay(22 + PER_LILIN).sampai, MULAI + 1);
+cek('empat lilin sesudah 12 tick', keadaanReplay(22 + PER_LILIN * 4).sampai, MULAI + 4);
 cek('garis menempel di lilin terakhir',
-  Math.round(keadaanReplay(38).xGaris * 100) / 100,
-  Math.round((MULAI + 4) * (300 / JUMLAH) * 100) / 100);
+  Math.round(keadaanReplay(22 + PER_LILIN * 4).xGaris * 100) / 100,
+  Math.round((MULAI + 4) * (LEBAR / JUMLAH) * 100) / 100);
 
 /* ── Babak 3: berhenti di ujung, lalu mengulang ── */
 {
-  const T_PILIH = 22, T_PUTAR = (JUMLAH - MULAI) * 4 + 1;
+  const T_PILIH = 22, T_PUTAR = (JUMLAH - MULAI) * PER_LILIN + 1;
   const ujung = T_PILIH + T_PUTAR;
   cek('sampai lilin terakhir', keadaanReplay(ujung - 1).sampai, JUMLAH);
   cek('menahan di ujung', keadaanReplay(ujung + 5).babak, 'tahan');

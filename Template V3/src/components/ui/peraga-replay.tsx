@@ -46,15 +46,28 @@ import { PROXY_BAWAAN } from '@/lib/koneksi';
    cuma "aslinya", bukan kartunya.
    ════════════════════════════════════════════════════════════════════════ */
 
-const JUMLAH_LILIN = 42;
+/* ── KERAPATAN MENGIKUTI LEBAR KARTUNYA ──────────────────────────────
+   42 lilin dulu pas untuk kotak selebar 448px. Sesudah kartunya dibiarkan
+   memakai lebar penuh dua kolom, jumlah yang sama berarti tiap lilin
+   melar jadi ~17px — grafik yang terbaca seperti sedang di-zoom, bukan
+   seperti layar yang memang selebar itu.
+
+   64 memberi kerapatan yang sama seperti sebelumnya pada lebar barunya,
+   dan kebetulan juga lebih jujur: makin banyak bar yang terlihat sekaligus
+   memang alasan orang melebarkan chartnya sendiri. */
+const JUMLAH_LILIN = 64;
 /** Sampai sini "riwayat" yang sudah terlihat; sisanya yang diputar. */
-const MULAI = 18;
+const MULAI = 30;
 const JEDA_TICK = 60;
 
 /* Panjang tiap babak dalam tick. Disetel supaya satu putaran penuh ±9 detik:
    cukup lambat untuk terbaca, cukup pendek untuk tidak membosankan. */
 const T_PILIH = 22;                 // garis menyapu memilih titik mulai
-const T_PER_LILIN = 4;              // satu lilin tiap 4 tick
+/* 3, bukan 4. Lilin yang diputar bertambah dari 24 jadi 34; dengan 4 tick
+   per lilin satu putaran jadi ±15 detik — terlalu lama untuk kartu yang
+   dilewati orang sambil menggulir. Pada 3 tick ia kembali ke ±9 detik,
+   angka yang memang dipilih semula. */
+const T_PER_LILIN = 3;              // satu lilin tiap 3 tick
 /* +1 bukan tambalan asal: tanpanya lilin TERAKHIR baru terbuka tepat di
    tick pertama babak "tahan", jadi babak putar berakhir sementara satu
    lilin belum tampil. Ketahuan oleh uji-peraga-replay.mjs, bukan oleh
@@ -112,7 +125,9 @@ function buatDeret(): Lilin[] {
   return keluar;
 }
 
-const L = 300, T = 128;
+/* 640, bukan 300: perbandingan sisi viewBox dibuat mendekati bentuk
+   kartunya supaya peregangan mendatarnya tipis. */
+const L = 640, T = 128;
 const LEBAR_LILIN = L / JUMLAH_LILIN;
 
 const PASANGAN = 'BTCUSDT';
@@ -186,6 +201,31 @@ export function PeragaReplay() {
   const tampil = deret.slice(0, sampai);
   const terakhir = tampil[tampil.length - 1];
 
+  /* ── BRACKET ENTRY / SL / TP ─────────────────────────────────────────
+     Kartunya bernama "Chart & Entry" tapi selama ini cuma memperagakan
+     Chart-nya. Bracket inilah bagian Entry — dan ia bukan hiasan yang
+     mengisi ruang kosong: ia muncul TEPAT sesudah titik mulai dipilih, lalu
+     bertahan diam sementara bar-barnya datang satu per satu.
+
+     Urutan itu yang menjadi seluruh isi kartu ini. Rencananya dipasang
+     sebelum lanjutannya diketahui; sesudah itu yang berubah cuma harganya,
+     bukan rencananya. Kalimat di kaki kartu mengatakan hal yang sama, dan
+     kalimat selalu kalah oleh sesuatu yang bisa dilihat terjadi.
+
+     Levelnya diturunkan dari rentang grafiknya sendiri, bukan angka tetap:
+     dengan lilin pasar sungguhan, jarak yang dipatok akan terlihat masuk
+     akal hari ini dan konyol bulan depan. Tidak ada satu angka harga pun
+     ditulis — yang ditandai posisinya, bukan nilainya. */
+  const bracket = useMemo(() => {
+    const d = deret[MULAI - 1];
+    if (!d) return null;
+    const risiko = (atas - bawah) * 0.11;
+    return { tp: d.c + risiko * 2, entry: d.c, sl: d.c - risiko };
+  }, [deret, atas, bawah]);
+
+  const xMulai = MULAI * LEBAR_LILIN;
+  const tampilBracket = !memilih && !!bracket;
+
   return (
     <div className="flex w-full flex-col gap-3">
       <div className="flex items-center gap-2 font-mono text-[10px] text-neutral-500">
@@ -202,7 +242,12 @@ export function PeragaReplay() {
         </span>
       </div>
 
-      <svg viewBox={`0 0 ${L} ${T}`} className="h-32 w-full" role="img"
+      {/* `relative` menampung label bracket. Labelnya HTML, bukan <text>
+          di dalam SVG — dengan preserveAspectRatio="none" seluruh isi SVG
+          ikut melar mendatar, dan huruf yang melar terbaca sebagai cacat
+          render. Garisnya boleh melar (memang harus), hurufnya tidak. */}
+      <div className="relative">
+      <svg viewBox={`0 0 ${L} ${T}`} preserveAspectRatio="none" className="h-32 w-full sm:h-36" role="img"
            aria-label="Peraga replay grafik: memilih titik mulai, lalu memutar harga bar demi bar">
         {[0.25, 0.5, 0.75].map((g) => (
           <line key={g} x1="0" x2={L} y1={T * g} y2={T * g}
@@ -225,17 +270,52 @@ export function PeragaReplay() {
           );
         })}
 
+        {tampilBracket && bracket && (
+          <g>
+            {/* Dua bidang tipis: imbalan di atas entry, risiko di bawahnya.
+                Perbandingan keduanya terbaca sekali lihat tanpa satu angka
+                pun — dan itu memang yang dinilai orang saat memasang
+                rencana. */}
+            <rect x={xMulai} width={L - xMulai} y={y(bracket.tp)}
+                  height={Math.max(y(bracket.entry) - y(bracket.tp), 0)} fill="rgba(52,211,153,0.055)" />
+            <rect x={xMulai} width={L - xMulai} y={y(bracket.entry)}
+                  height={Math.max(y(bracket.sl) - y(bracket.entry), 0)} fill="rgba(248,113,113,0.055)" />
+            {([['tp', '#34d399'], ['entry', 'rgba(255,255,255,0.45)'], ['sl', '#f87171']] as const)
+              .map(([kunci, warna]) => (
+                <line key={kunci} x1={xMulai} x2={L} y1={y(bracket[kunci])} y2={y(bracket[kunci])}
+                      stroke={warna} strokeWidth="1" vectorEffect="non-scaling-stroke"
+                      strokeDasharray={kunci === 'entry' ? '4 3' : undefined} />
+              ))}
+          </g>
+        )}
+
         {terakhir && (
           <line x1="0" x2={L} y1={y(terakhir.c)} y2={y(terakhir.c)} strokeDasharray="3 3"
+                vectorEffect="non-scaling-stroke"
                 stroke={terakhir.c >= terakhir.o ? '#34d399' : '#f87171'} strokeWidth="1" opacity="0.5" />
         )}
 
         {/* Garis pemutar. Kuning saat memilih, putih redup saat berjalan. */}
         {!gerakMinim && (
-          <line x1={xGaris} x2={xGaris} y1="0" y2={T} strokeWidth="1"
+          <line x1={xGaris} x2={xGaris} y1="0" y2={T} strokeWidth="1" vectorEffect="non-scaling-stroke"
                 stroke={memilih ? 'rgba(251,191,36,0.85)' : 'rgba(255,255,255,0.25)'} />
         )}
       </svg>
+
+      {tampilBracket && bracket && (
+        <>
+          {([['TP', bracket.tp, 'text-emerald-400'],
+             ['Entry', bracket.entry, 'text-neutral-300'],
+             ['SL', bracket.sl, 'text-red-400']] as const).map(([teks, nilai, kelas]) => (
+            <span key={teks}
+                  className={`pointer-events-none absolute right-0 -translate-y-1/2 bg-[#050505] pl-1.5 font-mono text-[9px] ${kelas}`}
+                  style={{ top: y(nilai) }}>
+              {teks}
+            </span>
+          ))}
+        </>
+      )}
+      </div>
     </div>
   );
 }

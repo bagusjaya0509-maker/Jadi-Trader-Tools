@@ -74,10 +74,20 @@ export const Component = () => {
               Semua peraga diam total kalau pengguna menyalakan "kurangi
               gerak" di setelan sistemnya — lihat lib/gerak-minim.ts. */}
           <div className="group flex min-h-[320px] flex-col overflow-hidden rounded-xl border border-white/[0.08] bg-[#050505] transition-colors hover:border-white/[0.15] md:col-span-2">
-            <div className="relative flex flex-1 items-center justify-center p-8">
-              <div className="w-full max-w-md">
-                <PeragaReplay />
-              </div>
+            {/* ── LEBARNYA DIPAKAI, BUKAN DIKOSONGKAN ────────────────
+                Kartu ini selebar DUA kolom, tapi isinya dulu dikunci
+                `max-w-md` lalu dipusatkan — jadi sepertiga kiri dan
+                sepertiga kanannya kosong sepanjang waktu. Dilaporkan
+                pemilik 21 Sep 2026.
+
+                Peraga yang mengambang kecil di tengah kotak besar terbaca
+                sebagai gambar yang ditempel, bukan sebagai layar yang
+                memang begitu bentuknya. Grafik justru barang yang paling
+                diuntungkan lebar: makin lebar, makin banyak bar yang
+                terlihat sekaligus — persis alasan orang melebarkan
+                chartnya sendiri. */}
+            <div className="relative flex flex-1 items-center justify-center p-6 sm:p-7">
+              <PeragaReplay />
             </div>
             <div className="border-t border-white/[0.04] bg-white/[0.01] p-6">
               <div className="mb-2 flex items-center gap-2 text-white">
@@ -125,8 +135,14 @@ export const Component = () => {
 
           {/* ── Kartu 4: Copy Signal ───────────────────────────────────── */}
           <div className="group flex min-h-[320px] flex-col overflow-hidden rounded-xl border border-white/[0.08] bg-[#050505] transition-colors hover:border-white/[0.15] md:col-span-2">
-            <div className="relative flex flex-1 items-center justify-center p-8">
-              <div className="w-full max-w-sm"><PeragaLeaderboard /></div>            </div>
+            {/* Sama seperti kartu Chart: `max-w-sm` di dalam kartu dua
+                kolom menyisakan ruang kosong yang lebih lebar daripada
+                isinya sendiri. Papan peringkat malah butuh lebar itu —
+                nama, jenis, balok, dan angka baru muat berdampingan tanpa
+                saling desak. */}
+            <div className="relative flex flex-1 items-center justify-center p-6 sm:p-7">
+              <PeragaLeaderboard />
+            </div>
             <div className="border-t border-white/[0.04] bg-white/[0.01] p-6">
               <div className="mb-2 flex items-center gap-2 text-white">
                 <Users className="h-4 w-4" />

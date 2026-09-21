@@ -149,11 +149,16 @@ export function PeragaIntegrasi() {
    baru seketika, tanpa transisi. Dengan transform, tiap baris meluncur ke
    peringkat barunya dan matanya bisa mengikuti siapa yang naik. */
 
+/* `jenis` ikut ditulis, bukan disimpulkan dari namanya. Papan peringkat
+   yang sebenarnya memang mencampur tiga jenis pengikut — analis manusia,
+   agen AI, dan dompet on-chain — dan itulah yang membedakannya dari daftar
+   sinyal biasa. Menyembunyikannya membuat kartu ini menjanjikan lebih
+   sedikit daripada yang benar-benar ada. */
 const ANALIS = [
-  { id: 'a1', nama: 'Analis 1' },
-  { id: 'a2', nama: 'Analis 2' },
-  { id: 'a3', nama: 'Analis 3' },
-  { id: 'a4', nama: 'AI Agent' },
+  { id: 'a1', nama: 'Analis 1', jenis: 'Analis' },
+  { id: 'a2', nama: 'Analis 2', jenis: 'Analis' },
+  { id: 'a3', nama: 'Analis 3', jenis: 'Analis' },
+  { id: 'a4', nama: 'AI Agent', jenis: 'Agen AI' },
 ];
 
 /* Beberapa keadaan papan yang dilalui bergiliran. Ditulis tetap, bukan
@@ -190,7 +195,7 @@ export function PeragaLeaderboard() {
     <div className="flex w-full flex-col gap-2">
       <div className="flex items-center justify-between font-mono text-[10px] text-neutral-600">
         <span>PAPAN PERINGKAT</span>
-        <span>winrate</span>
+        <span>winrate · dihitung dari harga yang sudah terjadi</span>
       </div>
 
       {/* Tinggi dikunci karena barisnya dipaku absolut — tanpa ini kotaknya
@@ -209,7 +214,12 @@ export function PeragaLeaderboard() {
               <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-[10px] font-semibold text-neutral-300">
                 {a.nama.startsWith('AI') ? 'AI' : a.nama.slice(-1)}
               </span>
-              <span className="w-[62px] shrink-0 truncate text-[11px] text-neutral-300">{a.nama}</span>
+              <span className="w-[74px] shrink-0 truncate text-[12px] text-neutral-200">{a.nama}</span>
+              {/* Lencana jenis disembunyikan di layar sempit: di sana yang
+                  lebih berguna panjang baloknya, bukan satu kata lagi. */}
+              <span className="hidden w-[58px] shrink-0 rounded border border-white/[0.07] px-1.5 py-0.5 text-center font-mono text-[9px] text-neutral-500 sm:block">
+                {a.jenis}
+              </span>
               {/* Balok: lebarnya relatif terhadap yang tertinggi, jadi
                   perubahan kecil pun terlihat sebagai pergeseran. */}
               <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/[0.05]">
