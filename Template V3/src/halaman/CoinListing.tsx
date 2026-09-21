@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Radar, BellRing, Plus, Trash2, RefreshCw, ShieldAlert, ExternalLink,
-  Loader2, Wallet, AlertTriangle, X, Clock, ShoppingCart,
+  Loader2, Wallet, AlertTriangle, X, Clock, ShoppingCart, CandlestickChart,
 } from 'lucide-react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { cn } from '@/lib/utils';
@@ -337,6 +338,27 @@ function Baris({ k, jaringan, sibuk, aksi }: {
               `ml-auto` bersyarat yang harus ikut berubah tiap kali ada
               tombol yang muncul atau hilang. */}
           <div className="ml-auto flex shrink-0 items-center gap-1 self-center">
+            {/* ── LIHAT DULU, BARU BELI ───────────────────────────────
+                Tombol Beli membuka panel tukar tanpa memperlihatkan satu
+                pun lilin — dan itu urutan yang salah untuk koin yang
+                seluruh riwayatnya baru beberapa hari.
+
+                Tombol ini mengantar ke /dex-koin: grafik kolamnya, fakta
+                kolamnya, pemeriksaan kontraknya, dan panel beli yang sama
+                dalam satu layar. Ditaruh SEBELUM Beli karena itu memang
+                urutan yang diharapkan.
+
+                Muncul juga saat baru ada kolam benih. Grafik kolam benih
+                memang nyaris rata — tapi "nyaris rata" adalah jawaban,
+                dan halamannya mengatakannya apa adanya. */}
+            {(listing || k.benih) && (
+              <Link
+                to={`/dex-koin?jaringan=${encodeURIComponent(k.jaringan)}&alamat=${encodeURIComponent(k.alamat)}${k.simbol ? `&simbol=${encodeURIComponent(k.simbol)}` : ''}`}
+                title="Lihat grafik kolam DEX-nya dulu"
+                className="inline-flex h-[23px] shrink-0 cursor-pointer items-center gap-1 rounded border border-zinc-700 px-2 text-[11px] text-zinc-300 transition-colors hover:border-zinc-500 hover:text-zinc-100">
+                <CandlestickChart className="size-3" /> Chart
+              </Link>
+            )}
             {/* BELI: HANYA SESUDAH LISTING. Sebelum ada kolam DEX tidak ada
                 apa pun untuk ditukar — agregatornya akan menjawab "tidak ada
                 rute", dan tombol yang selalu berakhir dengan galat adalah
