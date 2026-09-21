@@ -211,9 +211,29 @@ export default function DexKoin() {
                 <p className="max-w-md text-center text-[12.5px] leading-relaxed text-zinc-500">{galat}</p>
               </div>
             ) : lilin ? (
-              <ChartLilin key={`${jaringan}|${alamat}|${tf}`} lilin={lilin} tinggi={440} />
+              <ChartLilin key={`${jaringan}|${alamat}|${tf}`} lilin={lilin} tinggi={440}
+                muatPenuh tandaAir={{ utama: simbol, sub: `${jaringan} · ${tf}` }} />
             ) : null}
           </Panel>
+
+          {/* ── JUMLAH LILIN ITU KABAR, BUKAN CATATAN KAKI ─────────────
+              GeckoTerminal cuma menerbitkan bar untuk periode yang benar-
+              benar ada transaksinya — jeda tidak diisi. Jadi deret 10 lilin
+              di timeframe 1 jam TIDAK berarti kolamnya berumur 10 jam; bisa
+              jadi ia berumur seminggu dan cuma diperdagangkan sepuluh jam
+              di antaranya.
+
+              Perbedaan itu menentukan. Chart yang terlihat rapat dan
+              berkelanjutan, padahal barnya melompati dua hari sunyi, akan
+              dibaca sebagai tren — dan yang dibaca sebagai tren dijadikan
+              alasan membeli. */}
+          {lilin && lilin.times.length < 60 && (
+            <p className="mt-2 px-1 text-[11px] leading-relaxed text-zinc-600">
+              Cuma {lilin.times.length} lilin di timeframe ini — bar hanya terbit untuk jam
+              yang ada transaksinya, dan jeda sepi tidak diisi. Jarak antarbar di layar
+              belum tentu sama dengan jarak waktu sebenarnya.
+            </p>
+          )}
 
           {/* Fakta kolam. Ditaruh di bawah grafik, bukan di kolom kanan:
               yang di kanan adalah urusan membeli, dan angka-angka ini

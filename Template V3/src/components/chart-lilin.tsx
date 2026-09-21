@@ -262,7 +262,7 @@ export function ChartLilin({
   lilin, garis, trade, tinggi = 420, hingga, redupDari, pusatkanBar, garisHarga, onKlikBar, smi, mundur, pojok,
   garisSeret, onSeret, onKlikGaris, onHapusGaris, onKlikKosong, garisKlik, onKlikGarisOrder, hamparanBawah, segmen, penandaPine, kotakPine, isianPine,
   alat, onAlatSelesai, gambarAlat, gambarPilih, onPilihGambar, onUbahGambar,
-  posisiMt5, onUbahPosisi, hargaAsk, kunciUkuran, bagikanFoto, tandaAir, tampilan, pitaSmi,
+  posisiMt5, onUbahPosisi, hargaAsk, kunciUkuran, muatPenuh, bagikanFoto, tandaAir, tampilan, pitaSmi,
   jiplak, onUbahJiplak, onLepasJiplak, panelKiri, onLebarKiri,
   hamparanBarTertua, onUjungKiri, refKoordinat,
 }: {
@@ -283,6 +283,22 @@ export function ChartLilin({
    *  objek chartnya — lihat catatan di tempat pemasangannya. */
   bagikanFoto?: (ambil: () => string | null) => void;
   lilin: Lilin;
+  /** Muat SELURUH deret ke dalam layar, sekali, saat data pertama masuk.
+   *
+   *  Ada untuk deret PENDEK. Bawaan lightweight-charts memakai lebar bar
+   *  tetap dan menempelkan bar terakhir ke tepi kanan — masuk akal untuk
+   *  500 lilin Binance, tapi deret 10 lilin jadi segumpal kecil di kanan
+   *  dengan sembilan persepuluh kanvas kosong. Bentuk itu terbaca sebagai
+   *  chart yang gagal memuat, bukan sebagai kolam yang memang baru
+   *  diperdagangkan sepuluh jam.
+   *
+   *  Kolam DEX berumur beberapa hari memang sependek itu, dan lebih pendek
+   *  lagi kalau jarang ada transaksi: GeckoTerminal cuma menerbitkan bar
+   *  untuk periode yang BENAR-BENAR ada transaksinya, tidak mengisi jeda.
+   *
+   *  Cuma SEKALI per chart, bukan tiap data masuk — kalau tidak, tiap
+   *  penyegaran akan membatalkan zoom yang baru saja diatur orangnya. */
+  muatPenuh?: boolean;
   /** Berubah = kolom chart berubah lebar; chart diukur ulang.
    *  Nilainya tidak dipakai, cuma perubahannya. */
   kunciUkuran?: number;
@@ -489,6 +505,9 @@ export function ChartLilin({
      tangan. Lihat catatan lengkapnya di lib/tema.ts. */
   const tema = useTema();
   const seri = useRef<ISeriesApi<'Candlestick'> | null>(null);
+  /** Sudah pernah dimuat penuh. Ref, bukan state: perubahannya tidak boleh
+   *  menggambar ulang apa pun, ia cuma mencatat bahwa gilirannya lewat. */
+  const sudahPenuh = useRef(false);
   const seriGaris = useRef<ISeriesApi<'Line'>[]>([]);
   const penanda = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
   const seriSmi = useRef<ISeriesApi<'Line'>[]>([]);
@@ -1122,6 +1141,16 @@ export function ChartLilin({
        lebar yang sama — bukan dipendekkan. Lebar tetap berarti tingkat
        zoom tidak berubah; yang berubah cuma bar terakhir kini duduk di
        tepi kanan, tempat orangnya memang akan melanjutkan. */
+    /* Dijalankan SEBELUM pemulihan jendela di bawah, dan `return`-nya
+       memang menghentikan pemulihan itu: keduanya sama-sama mengatur
+       jendela, dan yang belakangan menang. Pada muatan pertama tidak ada
+       jendela lama yang perlu dijaga — yang ada cuma bawaan pustaka, dan
+       justru itulah yang sedang diganti. */
+    if (muatPenuh && c && batas > 0 && !sudahPenuh.current) {
+      sudahPenuh.current = true;
+      try { c.timeScale().fitContent(); return; } catch { /* chart baru */ }
+    }
+
     if (tampak && c && batas > 1) {
       const akhirData = Math.floor(lilin.times[batas - 1] / 1000);
       const dari = Number(tampak.from), ke = Number(tampak.to);
@@ -1139,7 +1168,7 @@ export function ChartLilin({
         });
       } catch { /* chart baru / rentang tidak sah */ }
     }
-  }, [lilin, hingga, redupDari]);
+  }, [lilin, hingga, redupDari, muatPenuh]);
 
   /* Garis harga posisi (entry / SL / TP) */
   useEffect(() => {
