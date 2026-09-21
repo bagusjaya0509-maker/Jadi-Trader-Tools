@@ -298,7 +298,17 @@ function Header() {
           {/* Dua tombol template ini dulu tidak menuju ke mana pun. Tombol
               mati di pojok kanan atas halaman depan adalah tempat pertama
               orang menekan saat sudah tertarik. */}
-          <Button variant="outline" asChild><a href="/preview">Lihat preview</a></Button>
+          {/* "Lihat preview" DIPINDAH PERANNYA jadi Login, diminta pemilik
+              21 Sep 2026. Tombol yang sama sudah berdiri di hero beberapa
+              ratus piksel di bawahnya — dua pintu ke tempat yang sama, dan
+              yang di atas memakan satu-satunya tempat yang dicari orang
+              saat ia SUDAH punya akun dan cuma mau masuk.
+
+              Keduanya menuju /akses, dan itu memang satu halaman: gerbangnya
+              melayani yang mau masuk maupun yang mau meminta akses. Yang
+              berbeda niatnya, dan label yang menyebut niat itu membuat orang
+              berhenti mencari-cari. */}
+          <Button variant="outline" asChild><a href="/akses">Login</a></Button>
           <Button asChild><a href="/akses">Ambil akses</a></Button>
         </div>
         <Button
@@ -335,8 +345,11 @@ function Header() {
           </div>
         </NavigationMenu>
         <div className="flex flex-col gap-2">
+          {/* Menu ponsel mengikuti bilah atas — kalau tidak, tombol yang sama
+              menyebut dirinya berbeda tergantung lebar layar, dan orang yang
+              berpindah perangkat harus belajar dua kali. */}
           <Button variant="outline" className="w-full bg-transparent" asChild>
-            <a href="/preview">Lihat preview</a>
+            <a href="/akses">Login</a>
           </Button>
           <Button className="w-full" asChild><a href="/akses">Ambil akses</a></Button>
         </div>

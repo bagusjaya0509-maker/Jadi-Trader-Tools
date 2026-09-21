@@ -221,7 +221,22 @@ export default function Akses() {
              kebetulan ada tulisan di atasnya. Keterangan bersama di bawah
              karena itu disembunyikan; dua baris nama merek di satu panel
              adalah pengulangan yang paling cepat terlihat. */
-          <PanelGerbangPrisma poster={`${import.meta.env.BASE_URL}hero-bg3.webp`} />
+          /* POSTERNYA HARUS BINGKAI PERTAMA VIDEONYA, dan sebelum ini bukan.
+              `hero-bg3.webp` adalah salah satu dari tiga latar hero halaman
+              depan — sosok di depan pintu biru di gang merah — sementara
+              videonya mulai dengan orang berlaptop di atas awan. Dua gambar
+              yang tidak berhubungan sama sekali, jadi tiap kali halaman masuk
+              dibuka orang melihat gambar PERTAMA berganti jadi gambar LAIN
+              begitu videonya mulai. Dilaporkan pemilik 21 Sep 2026.
+
+              `poster-prisma.webp` diambil dari detik nol videonya sendiri,
+              jadi pergantiannya tidak terlihat: yang tampil selama video
+              masih di jalan memang bingkai yang akan muncul sesudahnya.
+
+              Berkasnya BARU, bukan hero-bg3 yang ditimpa — berkas itu masih
+              dipakai rotasi latar hero halaman depan, dan menimpanya berarti
+              memperbaiki satu halaman sambil diam-diam mengubah halaman lain. */
+          <PanelGerbangPrisma poster={`${import.meta.env.BASE_URL}poster-prisma.webp`} />
         ) : kuota.tampilanAkses === 'lonceng' ? (
           <>
             {/* Talinya sengaja setinggi 50vh dan MELEWATI tepi atas panel

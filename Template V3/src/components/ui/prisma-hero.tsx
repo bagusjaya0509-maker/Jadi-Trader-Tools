@@ -30,6 +30,20 @@ import { useEffect, useRef } from 'react';
    bingkai pertama halaman masuk adalah kotak hitam. Kalau videonya
    benar-benar hilang suatu hari, poster inilah yang tersisa, dan
    gerbangnya tetap terlihat disengaja.
+
+   ── POSTERNYA WAJIB BINGKAI PERTAMA VIDEONYA ────────────────────────────
+   Poster mana pun menghilangkan kotak hitam, tapi hanya bingkai NOL yang
+   menghilangkan KEDIPANNYA. Poster yang isinya lain akan tampil sesaat lalu
+   ditukar gambar yang sama sekali berbeda begitu videonya mulai — dan itu
+   terbaca sebagai kerusakan, bukan sebagai pemuatan.
+
+   Pernah terjadi: posternya `hero-bg3.webp` (pintu biru di gang merah, salah
+   satu latar hero halaman depan) sementara videonya membuka dengan orang
+   berlaptop di atas awan. Dilaporkan pemilik 21 Sep 2026, diganti
+   `poster-prisma.webp` yang diambil dari detik nol videonya sendiri.
+
+   Jadi kalau videonya suatu hari ditukar, posternya HARUS ikut ditukar —
+   ambil lagi bingkai pertamanya, jangan pakai gambar yang kebetulan ada.
    ════════════════════════════════════════════════════════════════════════ */
 
 /* Bintik sebagai data-URI, bukan berkas: satu permintaan jaringan lagi di
