@@ -77,6 +77,18 @@ const KELAS_ISIAN =
    Batas gratis GeckoTerminal 30 permintaan/menit. Yang paling rapat di
    sini (20 detik) memakai 6/menit — dua permintaan per tarikan, karena
    kolam terdalamnya ikut dicari ulang. */
+/** Panjang satu lilin, dalam milidetik. Dipakai untuk menjawab satu
+ *  pertanyaan: apakah lilin TERBARU yang kita punya itu lilin yang sedang
+ *  berjalan, atau lilin lama yang sesudahnya tidak ada transaksi sama
+ *  sekali. */
+const PANJANG: Record<TfDex, number> = {
+  '5m': 5 * 60_000,
+  '15m': 15 * 60_000,
+  '1h': 60 * 60_000,
+  '4h': 4 * 60 * 60_000,
+  '1d': 24 * 60 * 60_000,
+};
+
 const DETAK: Record<TfDex, number> = {
   '5m': 20_000,
   '15m': 30_000,
@@ -302,6 +314,35 @@ export default function DexKoin() {
     return ((akhir - awal) / awal) * 100;
   }, [lilin]);
 
+  /* ── KENAPA GARISNYA TIDAK BERGERAK ──────────────────────────────
+     Dilaporkan pemilik 21 Sep 2026: "tapi garisnya itu ga gerak sama
+     sekali kenapa ya". Detaknya jalan — lencananya bahkan menulis "30
+     dtk lalu" — tapi lilinnya diam.
+
+     Ternyata bukan grafiknya. Kolam mmETH di Base diperiksa langsung ke
+     GeckoTerminal: lilin 4 jam TERBARU yang ada bertanggal 21 Sep 00:00,
+     hampir 8 jam sebelumnya, dan di antara 18 Sep 16:00 dan 20 Sep 16:00
+     tidak ada lilin sama sekali. Kolamnya cuma ditransaksikan beberapa
+     kali sehari; bar untuk periode berjalan belum lahir karena belum ada
+     satu pun transaksi di dalamnya.
+
+     Jadi yang salah bukan datanya, melainkan yang DILAPORKAN lencana:
+     ia menulis kapan KITA terakhir bertanya, bukan seberapa baru
+     jawabannya. Di pasar bursa dua angka itu praktis sama, jadi
+     perbedaannya tidak pernah terasa. Di kolam DEX sepi keduanya bisa
+     berselisih berjam-jam — dan lencana hijau berdenyut di sebelah
+     grafik yang membeku adalah janji yang tidak ditepati.
+
+     Sekarang yang dilaporkan umur LILIN TERAKHIR, dan kalau lilin
+     periode berjalan belum ada, halamannya mengatakannya dengan kalimat
+     penuh. */
+  const umurLilin = lilin && lilin.times.length
+    ? sekarang - lilin.times[lilin.times.length - 1]
+    : null;
+  /** Lilin periode berjalan sudah lahir — artinya ada transaksi di dalam
+   *  periode ini, dan grafiknya memang sedang bergerak. */
+  const lilinBerjalan = umurLilin !== null && umurLilin < PANJANG[tf];
+
   const hargaKini = lilin ? lilin.closes[lilin.closes.length - 1] : (kolam?.harga ?? 0);
 
   const simbol = simbolAwal || (kolam?.nama || '').split('/')[0].trim() || alamat.slice(0, 6);
@@ -395,13 +436,23 @@ export default function DexKoin() {
                     tanpa henti juga berputar saat datanya macet. Yang
                     membuktikan adalah UMUR data terakhir, dan itu yang
                     ditulis di sebelahnya. */}
-                {segarPada > 0 && (
-                  <span className="hidden items-center gap-1.5 text-[10.5px] text-zinc-600 sm:flex">
+                {segarPada > 0 && umurLilin !== null && (
+                  <span title={`Terakhir ditarik ${umurSegar(segarPada, sekarang)}`}
+                    className="hidden items-center gap-1.5 text-[10.5px] text-zinc-600 sm:flex">
+                    {/* Berdenyut HANYA kalau lilin periode berjalan memang
+                        sudah ada. Titik hijau berdenyut di sebelah grafik
+                        yang membeku persis menyesatkan seperti angka yang
+                        tidak pernah berubah. */}
                     <span className="relative flex size-1.5">
-                      <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-500 opacity-60" />
-                      <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
+                      {lilinBerjalan && (
+                        <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-500 opacity-60" />
+                      )}
+                      <span className={cn('relative inline-flex size-1.5 rounded-full',
+                        lilinBerjalan ? 'bg-emerald-500' : 'bg-zinc-600')} />
                     </span>
-                    {umurSegar(segarPada, sekarang)}
+                    {lilinBerjalan
+                      ? 'lilin berjalan'
+                      : `lilin terakhir ${umurRingkas(umurLilin)} lalu`}
                   </span>
                 )}
                 <button onClick={() => void tarik(tf, kolam?.kolam)}
@@ -418,6 +469,24 @@ export default function DexKoin() {
                 hal yang cuma berlaku untuk koin DEX dan tidak punya
                 padanan di bursa: token yang sama bisa punya banyak kolam
                 dengan harga berbeda-beda. */}
+            {/* ── GRAFIK DIAM KARENA KOLAMNYA DIAM ──────────────────────
+                Kalimat ini menjawab pertanyaan yang pasti muncul dan sampai
+                sekarang tidak dijawab siapa pun di layar: "kenapa tidak
+                bergerak?". Jawabannya bukan soal sambungan atau grafik —
+                di kolam DEX, bar cuma lahir kalau ada yang bertransaksi.
+
+                Ditaruh di sini, bukan sebagai catatan kaki di bawah chart:
+                yang bertanya sedang menatap bilah harga, dan jawaban yang
+                harus dicari dengan menggulir sama saja dengan tidak ada. */}
+            {umurLilin !== null && !lilinBerjalan && (
+              <div className="border-t border-amber-500/20 bg-amber-500/[0.04] px-4 py-2 text-[11px] leading-relaxed text-amber-200/80">
+                Belum ada transaksi di lilin yang sedang berjalan — yang terakhir{' '}
+                <b>{umurRingkas(umurLilin)} lalu</b>. Grafiknya tidak akan bergerak sampai ada
+                yang menukar di kolam ini, dan itu normal untuk kolam sesepi ini
+                {kolam?.volume24 ? <> (volume 24 jam {tulisUsd(kolam.volume24)})</> : null}.
+              </div>
+            )}
+
             {kolam && (kolam.jumlahKolam ?? 0) > 1 && (
               <div className="border-t border-zinc-800/80 px-4 py-2 text-[11px] leading-relaxed text-zinc-500">
                 Digambar dari kolam paling dalam. Token ini punya {kolam.jumlahKolam} kolam —
@@ -511,6 +580,20 @@ function umurSegar(ms: number, sekarang: number): string {
   const m = Math.floor(d / 60);
   if (m < 60) return `${m} mnt lalu`;
   return 'lebih dari sejam lalu';
+}
+
+/** Selisih waktu sependek mungkin: "12 dtk", "4 mnt", "7,9 jam",
+ *  "3 hari". Jam memakai satu desimal karena di rentang itulah selisihnya
+ *  paling menentukan — "7 jam" dan "8 jam" terbaca sama, padahal beda satu
+ *  periode lilin 4 jam penuh. */
+function umurRingkas(selisih: number): string {
+  const d = Math.max(0, Math.round(selisih / 1000));
+  if (d < 60) return `${d} dtk`;
+  const m = Math.floor(d / 60);
+  if (m < 60) return `${m} mnt`;
+  const j = selisih / 3_600_000;
+  if (j < 24) return `${j.toFixed(1).replace('.', ',')} jam`;
+  return `${Math.floor(j / 24)} hari`;
 }
 
 function Fakta({ k, v }: { k: string; v: string }) {
