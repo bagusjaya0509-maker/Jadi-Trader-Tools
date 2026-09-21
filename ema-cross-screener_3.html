@@ -1133,6 +1133,65 @@
   }
   .es-priority-status.error{ color: var(--bear); }
 
+  /* ── PEMINDAIAN YANG TERLIHAT SEDANG BEKERJA ────────────────────────────
+     Baris status selama ini diam: "Memindai 237 koin (TF 4H)..." tampil sama
+     persis, huruf demi huruf, selama hampir satu menit. Teks diam yang lama
+     tidak bisa dibedakan dari teks yang MACET — dan orang yang mengira
+     halamannya menggantung akan menekan tombolnya lagi, yang justru memulai
+     pemindaian kedua di atas yang pertama.
+
+     Dua gerakan, dan keduanya dari komponen yang dikirim pemilik: garis yang
+     menggambar lalu menghapus dirinya sendiri, dan kilau yang menyapu
+     tulisannya. Keduanya murni SVG + CSS — komponen aslinya React, dan
+     halaman ini bukan React, tapi yang bergerak di sana memang bukan
+     React-nya.
+
+     Panjang lintasan dihitung sekali lewat getTotalLength() dan dititipkan ke
+     --jt-panjang, persis seperti aslinya: angka yang ditulis tangan akan
+     meleset begitu lintasannya disunting satu piksel pun, dan melesetnya
+     terlihat sebagai garis yang tidak pernah menutup. */
+  @keyframes jtGambarGaris{
+    0%   { stroke-dashoffset: var(--jt-panjang); animation-timing-function: ease-in-out; }
+    50%  { stroke-dashoffset: 0;                 animation-timing-function: ease-in-out; }
+    100% { stroke-dashoffset: calc(var(--jt-panjang) * -1); }
+  }
+  @keyframes jtKilau{
+    0%   { background-position: -100% center; }
+    100% { background-position:  100% center; }
+  }
+
+  /* Baris pembungkus: pemuat dan teksnya harus sebaris. Margin status
+     dipindahkan ke sini supaya jarak atas-bawahnya tetap sama seperti
+     sebelum pemuatnya ada. */
+  .jt-baris-status{ display:flex; align-items:center; gap:7px; margin-top:16px; margin-bottom:14px; }
+  .jt-baris-status > .es-priority-status{ margin-top:0; margin-bottom:0; }
+
+  .jt-muat{ display:none; flex:0 0 auto; line-height:0; }
+  .jt-muat.tampil{ display:inline-flex; }
+  .jt-muat svg{ width:15px; height:15px; color: var(--text); }
+  .jt-muat path{ stroke-dasharray: var(--jt-panjang); animation: jtGambarGaris 2.5s infinite; }
+
+  /* Kilau DIPASANG DI TEKSNYA, bukan di baris pembungkusnya. `background-clip:
+     text` menuntut warna hurufnya transparan — dan pemuat di sebelahnya
+     menggambar dengan currentColor, jadi ikut dibuat transparan kalau
+     keduanya berbagi satu elemen: animasinya jalan, garisnya tak terlihat. */
+  .es-priority-status.jt-kilau{
+    background-image: linear-gradient(90deg,
+      var(--muted) 0%, var(--muted) 40%, #ffffff 50%, var(--muted) 60%, var(--muted) 100%);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    animation: jtKilau 2s ease-in-out infinite;
+  }
+
+  /* Yang tidak mau gerakan tetap mendapat kabarnya, cuma tanpa geraknya. */
+  @media (prefers-reduced-motion: reduce){
+    .jt-muat path, .es-priority-status.jt-kilau{ animation: none; }
+    .es-priority-status.jt-kilau{ color: var(--text); -webkit-text-fill-color: currentColor; }
+  }
+
   .es-priority-grid{
     display:grid;
     grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
@@ -11307,6 +11366,87 @@
 })();
 </script>
 <script src="v2-cangkang.js?v=202608091100" defer></script>
+<script id="jtPemuatPindai">
+(function(){
+  'use strict';
+  /* Seluruh section yang punya baris status. `esChStatus` sengaja disebut
+     sekali walau dipakai dua section (Parallel & SNR H4): keduanya menulis ke
+     elemen yang sama, jadi satu pemuat memang sudah benar. */
+  var STATUS = ['esPantauStatus', 'esChStatus', 'esObStatus', 'esPriorityStatus',
+                'esPriorityIctStatus', 'esPriorityAiStatus', 'esFavStatus', 'esFavCrossStatus'];
+
+  var LINTASAN = 'M4.43431 2.42415C-0.789139 6.90104 1.21472 15.2022 8.434 15.9242C15.5762 '
+               + '16.6384 18.8649 9.23035 15.9332 4.5183C14.1316 1.62255 8.43695 0.0528911 '
+               + '7.51841 3.33733C6.48107 7.04659 15.2699 15.0195 17.4343 16.9241';
+
+  /* Yang dianggap "sedang memindai" ditentukan dari TEKSNYA, bukan dari
+     keadaan tombol. Delapan section menulis baris statusnya masing-masing di
+     belasan tempat; menyalakan pemuat dari sisi penulis berarti menyunting
+     semuanya dan melewatkan satu. Teksnya sendiri sudah mengatakan apa yang
+     sedang terjadi — itu satu sumber untuk semuanya. */
+  function sedangPindai(t){
+    t = String(t || '');
+    /* Tandanya TITIK-TITIK DI UJUNG, bukan kata "Memindai". Satu pemindaian
+       melewati beberapa fase dan tiap fase menulis kalimatnya sendiri —
+       "Membaca rezim pasar BTC...", "Mengambil data ... di TF ...",
+       "Menganalisa 237 koin...". Mencocokkan kata "Memindai" saja membuat
+       pemuatnya berkedip mati di tengah kerja, dan kedipan itu terbaca
+       sebagai selesai padahal belum.
+
+       Halaman ini memang sudah memakai elipsis sebagai penanda "belum
+       selesai": yang sudah selesai berakhir dengan titik biasa. Jadi aturan
+       ini mengikuti kebiasaan yang sudah ada, bukan memaksakan yang baru.
+       Kata "Memindai" tetap ikut sebagai jaring pengaman. */
+    return /(\.\.\.|…)\s*$/.test(t) || /^\s*Memindai/i.test(t);
+  }
+
+  function pasang(){
+    STATUS.forEach(function(id){
+      var el = document.getElementById(id);
+      if (!el || el.parentNode.classList.contains('jt-baris-status')) return;
+
+      var baris = document.createElement('div');
+      baris.className = 'jt-baris-status';
+      el.parentNode.insertBefore(baris, el);
+
+      var muat = document.createElement('span');
+      muat.className = 'jt-muat';
+      muat.innerHTML = '<svg viewBox="0 0 19 19" fill="none" aria-hidden="true">'
+        + '<path d="' + LINTASAN + '" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
+
+      baris.appendChild(muat);
+      baris.appendChild(el);
+
+      /* Dihitung dari lintasannya sendiri. Kalau peramban menolak menjawab
+         (SVG belum ter-layout), animasinya dilewati — garis diam lebih baik
+         daripada garis yang menyentak karena panjangnya salah. */
+      try {
+        var p = muat.querySelector('path');
+        var L = p.getTotalLength();
+        if (L > 0) muat.style.setProperty('--jt-panjang', L);
+      } catch (e) {}
+
+      function segarkan(){
+        var aktif = sedangPindai(el.textContent);
+        muat.classList.toggle('tampil', aktif);
+        el.classList.toggle('jt-kilau', aktif);
+      }
+      segarkan();
+
+      /* HANYA childList & characterData. Menambahkan `attributes` akan
+         membuat pengamat ini menyalakan dirinya sendiri: ia mengubah kelas
+         elemen yang sedang diamatinya, dan perubahan itu akan memanggilnya
+         lagi, tanpa akhir. */
+      try {
+        new MutationObserver(segarkan).observe(el, { childList: true, characterData: true, subtree: true });
+      } catch (e) {}
+    });
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', pasang);
+  else pasang();
+})();
+</script>
 
 <!-- ══════════════════════════════════════════════════════════════════════
      FILTER BERANTAI (chip): tombol filter → jenis → nilai → chip aktif
