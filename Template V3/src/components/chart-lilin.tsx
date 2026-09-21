@@ -1141,16 +1141,6 @@ export function ChartLilin({
        lebar yang sama — bukan dipendekkan. Lebar tetap berarti tingkat
        zoom tidak berubah; yang berubah cuma bar terakhir kini duduk di
        tepi kanan, tempat orangnya memang akan melanjutkan. */
-    /* Dijalankan SEBELUM pemulihan jendela di bawah, dan `return`-nya
-       memang menghentikan pemulihan itu: keduanya sama-sama mengatur
-       jendela, dan yang belakangan menang. Pada muatan pertama tidak ada
-       jendela lama yang perlu dijaga — yang ada cuma bawaan pustaka, dan
-       justru itulah yang sedang diganti. */
-    if (muatPenuh && c && batas > 0 && !sudahPenuh.current) {
-      sudahPenuh.current = true;
-      try { c.timeScale().fitContent(); return; } catch { /* chart baru */ }
-    }
-
     if (tampak && c && batas > 1) {
       const akhirData = Math.floor(lilin.times[batas - 1] / 1000);
       const dari = Number(tampak.from), ke = Number(tampak.to);
@@ -1168,7 +1158,27 @@ export function ChartLilin({
         });
       } catch { /* chart baru / rentang tidak sah */ }
     }
-  }, [lilin, hingga, redupDari, muatPenuh]);
+  }, [lilin, hingga, redupDari]);
+
+  /* ── MUAT PENUH, SEKALI ──────────────────────────────────────────────
+     Efek sendiri, bukan ditempel di akhir efek setData, dan alasannya
+     tertulis di efek `pusatkanBar` di atas: deret lilinnya baru dipasang
+     pada render ini, dan skala waktu belum tahu ada berapa bar sampai ia
+     selesai. `fitContent()` yang dipanggil sebelum itu memuat data yang
+     menurut skala waktu belum ada — dan diam-diam tidak melakukan apa pun.
+     Pernah dicoba versi sinkronnya dulu; chartnya tetap menempel di tepi
+     kanan seolah propnya tidak terpasang.
+
+     Dua bingkai, sama seperti tetangganya. */
+  useEffect(() => {
+    if (!muatPenuh || sudahPenuh.current) return;
+    if (!lilin.times.length) return;
+    sudahPenuh.current = true;
+    const id = requestAnimationFrame(() => requestAnimationFrame(() => {
+      try { chart.current?.timeScale().fitContent(); } catch { /* chart belum siap */ }
+    }));
+    return () => cancelAnimationFrame(id);
+  }, [muatPenuh, lilin]);
 
   /* Garis harga posisi (entry / SL / TP) */
   useEffect(() => {
