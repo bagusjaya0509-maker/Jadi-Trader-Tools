@@ -93,7 +93,21 @@ export default function DexKoin() {
     const h = await ambilLilinDex(jaringan, alamat, t, pakaiKolam);
     setMuat(false);
     if ('error' in h) { setGalat(h.error); return; }
-    if (h.kolam) setKolam(h.kolam);
+    /* DIGABUNG, bukan diganti.
+       ──────────────────────────────────────────────────────────────
+       Permintaan pertama mencari kolam terdalam dan memulangkan fakta
+       lengkapnya. Permintaan berikutnya mengirim id kolam itu kembali
+       supaya pencariannya tidak diulang — dan server lalu memulangkan
+       id-nya saja, tanpa harga, likuiditas, atau nama DEX.
+
+       Menimpanya mentah-mentah membuat seluruh baris fakta berubah jadi
+       "—" begitu timeframe-nya diganti sekali. Id kolamnya tidak pernah
+       berubah di sepanjang halaman ini, jadi fakta lama tetap fakta
+       kolam yang sama. */
+    if (h.kolam) {
+      const k = h.kolam;
+      setKolam((lama) => ({ ...(lama ?? {}), ...k, kolam: k.kolam }));
+    }
     if (!h.lilin.length) {
       setLilin(null);
       setGalat(h.kolam
