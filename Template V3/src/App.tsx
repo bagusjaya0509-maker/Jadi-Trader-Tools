@@ -136,6 +136,11 @@ const WalletTracking = lazy(() => muat(() => import('@/halaman/WalletTracking'))
    diam untuk semua pengunjung adalah persis kebiasaan yang sudah pernah
    membuat halaman depan berat. */
 const DexTrading    = lazy(() => muat(() => import('@/halaman/DexTrading')));
+/* Grafik + beli untuk satu koin DEX. Dipisah dari DexTrading (yang perp
+   Hyperliquid) dan dari Chart & Entry (yang order berpelindung) atas
+   permintaan pemilik 21 Sep 2026: mode DEX "punya jalan tersendiri aja".
+   Alasan lengkapnya ada di kepala berkas halamannya. */
+const DexKoin       = lazy(() => muat(() => import('@/halaman/DexKoin')));
 const HalamanHarga  = lazy(() => muat(() => import('@/halaman/Harga')));
 const Markas        = lazy(() => muat(() => import('@/halaman/Markas')));
 const Sosmed        = lazy(() => muat(() => import('@/halaman/Sosmed')));
@@ -578,6 +583,7 @@ export default function App() {
             <Route path="/copy-signal"    element={<CopyTrading />} />
             <Route path="/wallet-tracking" element={<WalletTracking />} />
             <Route path="/dex" element={<DexTrading />} />
+            <Route path="/dex-koin" element={<DexKoin />} />
             {/* ── ALAMAT LAMA TETAP HIDUP ────────────────────────────────
                 /coin-listing sudah pernah dibagikan dan tersimpan di bookmark
                 orang. Ia sekarang tab ketiga di Wallet Tracking, jadi yang

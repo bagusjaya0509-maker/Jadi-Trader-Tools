@@ -189,6 +189,36 @@ export function PanelBeliKoin({ koin, onTutup }: { koin: KoinPantau; onTutup: ()
             </p>
           </div>
 
+          {/* ── BELUM DIPERIKSA ≠ AMAN ───────────────────────────────────
+              Ditambahkan 21 Sep 2026. Sebelum ini `bacaBahaya(undefined)`
+              memulangkan daftar kosong, dan daftar kosong dipakai layar
+              sebagai "tidak ada temuan" — jadi token yang BELUM PERNAH
+              diperiksa tampil persis seperti token yang sudah lolos
+              pemeriksaan: tanpa peringatan apa pun.
+
+              Keduanya sama diamnya, padahal artinya berlawanan. Dan letak
+              diamnya paling buruk: tepat di atas tombol yang memindahkan
+              uang. */}
+          {!koin.aman && (
+            <div className="flex gap-2 rounded-md border border-amber-500/30 bg-amber-500/[0.06] px-3 py-2">
+              <ShieldAlert className="mt-0.5 size-3.5 shrink-0 text-amber-400" />
+              <p className="text-[11.5px] leading-relaxed text-amber-200/90">
+                Kontrak ini <b>belum diperiksa</b>. Itu bukan berarti aman — berarti belum
+                ada yang melihat apakah pasokannya masih bisa dicetak atau saldonya bisa
+                dibekukan.
+              </p>
+            </div>
+          )}
+          {koin.aman?.kosong && (
+            <div className="flex gap-2 rounded-md border border-amber-500/25 bg-amber-500/[0.04] px-3 py-2">
+              <ShieldAlert className="mt-0.5 size-3.5 shrink-0 text-amber-400/80" />
+              <p className="text-[11.5px] leading-relaxed text-amber-200/90">
+                Kontraknya <b>tidak bisa dibaca</b> pemeriksa keamanan — sering terjadi pada
+                token yang baru lahir. Artinya tetap sama: belum ada yang bisa dipastikan.
+              </p>
+            </div>
+          )}
+
           {/* ── Fakta keamanan yang sudah dipunya barisnya ──────────────── */}
           {bahaya.length > 0 && (
             <div className="flex gap-2 rounded-md border border-red-500/40 bg-red-500/[0.07] px-3 py-2">

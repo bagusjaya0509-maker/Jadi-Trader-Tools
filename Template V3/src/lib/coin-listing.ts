@@ -202,6 +202,64 @@ export async function periksaKeamanan(jaringan: string, alamat: string) {
   return panggil('/api/listing/aman', { method: 'POST', body: JSON.stringify({ jaringan, alamat }) });
 }
 
+/* ════════════════════════════════════════════════════════════════════════
+   JALUR DEX — koin yang belum pernah menyentuh bursa mana pun
+   ════════════════════════════════════════════════════════════════════════
+   Dua fungsi di bawah melayani halaman /dex-koin, dan keduanya sengaja
+   TIDAK memakai daftar pantau sebagai syarat.
+
+   Alasannya satu: orang sampai ke halaman itu dari Lintasan Koin, tempat
+   sebagian besar barisnya milik orang lain. Menuntut ia memantau dulu
+   sebelum boleh melihat grafik atau tahu apakah kontraknya bisa mencetak
+   pasokan sendiri akan membalik urutan yang benar — pemeriksaan paling
+   dibutuhkan justru pada koin yang belum dikenal.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/** Kolam yang dipakai sebagai sumber lilin, apa adanya dari server. */
+export interface KolamDex {
+  kolam: string;
+  nama?: string;
+  dex?: string;
+  harga?: number;
+  likuiditas?: number;
+  volume24?: number;
+  fdv?: number;
+  dibuatKolam?: number;
+  jumlahKolam?: number;
+}
+
+export type TfDex = '5m' | '15m' | '1h' | '4h' | '1d';
+
+export interface HasilLilinDex {
+  /** [waktuMs, open, high, low, close, volume], menaik. */
+  lilin: number[][];
+  kolam: KolamDex | null;
+}
+
+export async function ambilLilinDex(
+  jaringan: string, alamat: string, tf: TfDex, kolam?: string,
+): Promise<HasilLilinDex | { error: string }> {
+  const q = new URLSearchParams({ jaringan, alamat, tf });
+  if (kolam) q.set('kolam', kolam);
+  const j = await panggil('/api/dex/klines?' + q.toString());
+  if (j.error) return { error: j.error };
+  return {
+    lilin: Array.isArray(j.lilin) ? j.lilin : [],
+    kolam: j.kolam && j.kolam.kolam ? (j.kolam as KolamDex) : null,
+  };
+}
+
+/** Hasil pemeriksaan kontrak. `undefined` = belum pernah diperiksa, dan itu
+ *  keadaan yang WAJIB dibedakan dari "sudah diperiksa, bersih". */
+export async function ambilAmanDex(
+  jaringan: string, alamat: string,
+): Promise<FaktaAman | null> {
+  const q = new URLSearchParams({ jaringan, alamat });
+  const j = await panggil('/api/dex/aman?' + q.toString());
+  if (j.error || !j.aman) return null;
+  return j.aman as FaktaAman;
+}
+
 export async function tandaiDibaca(alamat?: string) {
   return panggil('/api/listing/dibaca', { method: 'POST', body: JSON.stringify({ alamat }) });
 }

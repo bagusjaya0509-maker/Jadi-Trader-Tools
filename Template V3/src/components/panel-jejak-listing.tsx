@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { RotateCcw, Plus, Star } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { RotateCcw, Plus, Star, CandlestickChart } from 'lucide-react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { Memuat } from '@/components/memuat';
 import { DaftarLipat, NomorBaris } from '@/components/daftar-lipat';
@@ -169,12 +170,31 @@ export function PanelJejakListing({ onPantau }: {
                         <Tren label="Volume 7h" nilai={k.trenVolume} cukup />
                         <Tren label="Likuiditas 14h" nilai={k.trenLikuiditas} cukup={cukupLangsung} />
                         <Tren label="Pemegang 14h" nilai={k.trenPemegang} cukup={cukupLangsung} />
-                        {!k.milikPemilik && onPantau && (
-                          <button onClick={() => onPantau(k.jaringan, k.alamat)}
-                            className="mt-3 flex shrink-0 cursor-pointer items-center gap-1 rounded-md border border-zinc-800 px-2 py-1 text-[11.5px] text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200">
-                            <Plus className="size-3" /> Pantau
-                          </button>
-                        )}
+{/* ── JALAN KELUAR DARI BARIS INI ─────────────────────────
+                            Sebelumnya baris Lintasan cuma bisa berakhir di
+                            "Pantau" — ditambahkan ke daftar, lalu menunggu.
+                            Padahal pertanyaan yang muncul saat melihat baris
+                            yang volumenya naik bukan "mau saya pantau?"
+                            melainkan "bentuk grafiknya bagaimana, dan kalau
+                            bagus belinya di mana?".
+
+                            Diminta pemilik 21 Sep 2026. Tujuannya halaman
+                            DEX-nya sendiri, bukan Chart & Entry — koin ini
+                            tidak ada di bursa mana pun, jadi tidak ada yang
+                            bisa digambar chart bursa. */}
+                        <div className="mt-3 flex shrink-0 items-center gap-1.5">
+                          <Link
+                            to={`/dex-koin?jaringan=${encodeURIComponent(k.jaringan)}&alamat=${encodeURIComponent(k.alamat)}${k.simbol ? `&simbol=${encodeURIComponent(k.simbol)}` : ''}`}
+                            className="flex cursor-pointer items-center gap-1 rounded-md border border-zinc-700 px-2 py-1 text-[11.5px] text-zinc-300 transition-colors hover:border-zinc-500 hover:text-zinc-100">
+                            <CandlestickChart className="size-3" /> Chart & Beli
+                          </Link>
+                          {!k.milikPemilik && onPantau && (
+                            <button onClick={() => onPantau(k.jaringan, k.alamat)}
+                              className="flex cursor-pointer items-center gap-1 rounded-md border border-zinc-800 px-2 py-1 text-[11.5px] text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200">
+                              <Plus className="size-3" /> Pantau
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
