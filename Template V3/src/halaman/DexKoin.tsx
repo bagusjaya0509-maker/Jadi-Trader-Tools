@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ExternalLink, Loader2, RefreshCw, ShieldCheck, ShieldQuestion, TriangleAlert } from 'lucide-react';
 import { Panel } from '@/components/efferd-ui';
@@ -64,6 +64,27 @@ const KELAS_ISIAN =
   'h-9 rounded-md border border-zinc-800 bg-zinc-900/60 px-2.5 text-[12.5px] text-zinc-200 ' +
   'outline-none transition-colors hover:border-zinc-700 focus-visible:border-zinc-600';
 
+/* ── SEBERAPA SERING LILINNYA DITARIK ULANG ──────────────────────────
+   Tidak ada websocket untuk kolam DEX — GeckoTerminal cuma punya HTTP,
+   jadi hidupnya chart ini berarti menarik ulang, bukan mendengarkan.
+
+   Selangnya mengikuti timeframe karena itu yang menentukan kapan ada
+   yang baru untuk dilihat: lilin 1 hari tidak berubah bentuk tiap menit,
+   dan menariknya tiap menit cuma membakar kuota tanpa menambah satu
+   piksel pun. Pemilik memakai PC tethering; angka-angka ini dipilih
+   dengan itu di kepala.
+
+   Batas gratis GeckoTerminal 30 permintaan/menit. Yang paling rapat di
+   sini (20 detik) memakai 6/menit — dua permintaan per tarikan, karena
+   kolam terdalamnya ikut dicari ulang. */
+const DETAK: Record<TfDex, number> = {
+  '5m': 20_000,
+  '15m': 30_000,
+  '1h': 60_000,
+  '4h': 120_000,
+  '1d': 300_000,
+};
+
 const TF: { nilai: TfDex; label: string }[] = [
   { nilai: '5m', label: '5m' },
   { nilai: '15m', label: '15m' },
@@ -120,20 +141,40 @@ export default function DexKoin() {
   const [kolam, setKolam] = useState<KolamDex | null>(kolamAwal ? { kolam: kolamAwal } : null);
   const [muat, setMuat] = useState(true);
   const [galat, setGalat] = useState('');
+  /** Kapan lilinnya terakhir benar-benar berganti isi. Dipakai lencana
+   *  detak supaya "hidup" itu bisa dibuktikan, bukan cuma dijanjikan. */
+  const [segarPada, setSegarPada] = useState(0);
+  /** Jam yang berdetak tiap 5 detik. Tanpa ini umur data di lencana
+   *  tertulis sekali lalu diam — dan angka yang diam justru meyakinkan
+   *  orang bahwa datanya baru, padahal ia bisa sudah sepuluh menit. */
+  const [sekarang, setSekarang] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setSekarang(Date.now()), 5_000);
+    return () => window.clearInterval(id);
+  }, []);
 
   const [aman, setAman] = useState<FaktaAman | undefined>(undefined);
   const [periksa, setPeriksa] = useState(false);
 
   /* ── LILIN ──────────────────────────────────────────────────────────
-     Kolamnya dikirim balik ke server pada permintaan berikutnya supaya
-     pencarian kolam terdalam cuma terjadi sekali, bukan tiap kali
-     timeframe-nya diganti. */
-  const tarik = useCallback(async (t: TfDex, pakaiKolam?: string) => {
+     `diam` untuk tarikan detak: ia TIDAK menyalakan keadaan memuat dan
+     TIDAK menghapus galat yang sedang tampil.
+
+     Dua-duanya disengaja. Spinner yang berkedip tiap 20 detik di halaman
+     yang sedang dibaca orang terbaca sebagai halaman yang bermasalah;
+     dan galat yang dibersihkan oleh tarikan latar lalu muncul lagi
+     sedetik kemudian adalah kedipan yang tidak menyampaikan apa pun.
+
+     Kolamnya SENGAJA tidak dikirim balik pada tarikan detak (lihat
+     pemanggilnya): dengan `?kolam=` server melewati pencarian kolam dan
+     ikut melewati harga, likuiditas, serta volume terbarunya — grafiknya
+     hidup sementara angka di bawahnya membeku. */
+  const tarik = useCallback(async (t: TfDex, pakaiKolam?: string, diam = false) => {
     if (!jaringan || !alamat) return;
-    setMuat(true); setGalat('');
+    if (!diam) { setMuat(true); setGalat(''); }
     const h = await ambilLilinDex(jaringan, alamat, t, pakaiKolam);
-    setMuat(false);
-    if ('error' in h) { setGalat(h.error); return; }
+    if (!diam) setMuat(false);
+    if ('error' in h) { if (!diam) setGalat(h.error); return; }
     /* DIGABUNG, bukan diganti.
        ──────────────────────────────────────────────────────────────
        Permintaan pertama mencari kolam terdalam dan memulangkan fakta
@@ -150,6 +191,11 @@ export default function DexKoin() {
       setKolam((lama) => ({ ...(lama ?? {}), ...k, kolam: k.kolam }));
     }
     if (!h.lilin.length) {
+      /* Tarikan detak yang pulang kosong TIDAK mengosongkan grafik yang
+         sudah tergambar. Kolam sepi kadang memulangkan daftar kosong
+         sesaat, dan chart yang hilang lalu muncul lagi lebih buruk
+         daripada chart yang tertinggal beberapa detik. */
+      if (diam) return;
       setLilin(null);
       setGalat(h.kolam
         ? 'Kolamnya ada, tapi belum ada transaksi yang cukup untuk membentuk lilin di timeframe ini. Coba timeframe yang lebih kecil.'
@@ -164,9 +210,44 @@ export default function DexKoin() {
       closes: h.lilin.map((b) => b[4]),
       volumes: h.lilin.map((b) => b[5]),
     });
+    setSegarPada(Date.now());
   }, [jaringan, alamat]);
 
   useEffect(() => { void tarik(tf, kolam?.kolam || kolamAwal || undefined); }, [tf, tarik]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* ── DETAK ───────────────────────────────────────────────────────────
+     Berhenti saat tabnya tidak dilihat, dan menarik sekali begitu ia
+     dilihat lagi.
+
+     Bukan kesopanan: tab yang ditinggal terbuka semalam akan menarik
+     ribuan kali tanpa satu mata pun melihat hasilnya, dan yang membayar
+     itu kuota pemiliknya. Kembali ke tabnya juga harus langsung
+     menunjukkan yang terbaru — menunggu selang berikutnya berarti orang
+     membaca harga lama justru pada detik ia kembali untuk memeriksanya.
+
+     `tarikRef` supaya selangnya tidak dipasang ulang tiap render: isi
+     `tarik` berubah identitasnya setiap `jaringan`/`alamat` berubah, dan
+     interval yang dibongkar-pasang kehilangan hitungannya. */
+  const tarikRef = useRef(tarik);
+  tarikRef.current = tarik;
+  useEffect(() => {
+    if (!jaringan || !alamat) return;
+    let id: number | undefined;
+    const mulai = () => {
+      if (id !== undefined) return;
+      id = window.setInterval(() => { void tarikRef.current(tf, undefined, true); }, DETAK[tf]);
+    };
+    const henti = () => {
+      if (id !== undefined) { window.clearInterval(id); id = undefined; }
+    };
+    const lihat = () => {
+      if (document.visibilityState === 'visible') { void tarikRef.current(tf, undefined, true); mulai(); }
+      else henti();
+    };
+    if (document.visibilityState === 'visible') mulai();
+    document.addEventListener('visibilitychange', lihat);
+    return () => { henti(); document.removeEventListener('visibilitychange', lihat); };
+  }, [tf, jaringan, alamat]);
 
   /* ── KONTRAK ────────────────────────────────────────────────────────
      Dijalankan sendiri saat halaman dibuka, tidak menunggu ditekan.
@@ -308,7 +389,21 @@ export default function DexKoin() {
                 </div>
               </div>
 
-              <div className="ml-auto flex items-center gap-1.5 self-end pb-0.5">
+              <div className="ml-auto flex items-center gap-2 self-end pb-0.5">
+                {/* ── BUKTI BAHWA IA HIDUP ────────────────────────────
+                    Titik berdenyut saja tidak cukup: animasi yang berputar
+                    tanpa henti juga berputar saat datanya macet. Yang
+                    membuktikan adalah UMUR data terakhir, dan itu yang
+                    ditulis di sebelahnya. */}
+                {segarPada > 0 && (
+                  <span className="hidden items-center gap-1.5 text-[10.5px] text-zinc-600 sm:flex">
+                    <span className="relative flex size-1.5">
+                      <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-500 opacity-60" />
+                      <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
+                    </span>
+                    {umurSegar(segarPada, sekarang)}
+                  </span>
+                )}
                 <button onClick={() => void tarik(tf, kolam?.kolam)}
                   title="Tarik ulang lilin dari kolamnya"
                   className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100 sm:px-2.5">
@@ -372,7 +467,12 @@ export default function DexKoin() {
           {kolam && (
             <Panel className="mt-3 p-3">
               <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
-                <Fakta k="Harga" v={kolam.harga ? tulisHarga(kolam.harga) : '—'} />
+                {/* Dari lilin terakhir, bukan `kolam.harga`: keduanya
+                    datang dari sumber yang sama tapi yang satu ikut
+                    disegarkan detak dan yang satu tidak — dan dua harga
+                    berbeda di satu layar membuat dua-duanya tidak
+                    dipercaya. */}
+                <Fakta k="Harga" v={hargaKini > 0 ? tulisHarga(hargaKini) : '—'} />
                 <Fakta k="Likuiditas kolam" v={kolam.likuiditas ? tulisUsd(kolam.likuiditas) : '—'} />
                 <Fakta k="Volume 24 jam" v={kolam.volume24 ? tulisUsd(kolam.volume24) : '—'} />
                 <Fakta k="FDV" v={kolam.fdv ? tulisUsd(kolam.fdv) : '—'} />
@@ -398,6 +498,19 @@ export default function DexKoin() {
       </div>
     </div>
   );
+}
+
+/** Umur data terakhir, sependek mungkin — ia duduk di bilah alat, bukan
+ *  di paragraf. Di atas satu jam berhenti menghitung: kalau sudah selama
+ *  itu, yang perlu diketahui bukan berapa menit tepatnya melainkan bahwa
+ *  detaknya memang berhenti. */
+function umurSegar(ms: number, sekarang: number): string {
+  const d = Math.max(0, Math.round((sekarang - ms) / 1000));
+  if (d < 10) return 'baru saja';
+  if (d < 60) return `${d} dtk lalu`;
+  const m = Math.floor(d / 60);
+  if (m < 60) return `${m} mnt lalu`;
+  return 'lebih dari sejam lalu';
 }
 
 function Fakta({ k, v }: { k: string; v: string }) {
