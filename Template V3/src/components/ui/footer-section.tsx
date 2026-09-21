@@ -323,20 +323,14 @@ function Footerdemo() {
               <p className="text-foreground">{BADAN.nama}</p>
               <p>NIB {BADAN.nib}</p>
               <p>{BADAN.wilayah}</p>
-              <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                <a
-                  href={`mailto:${BADAN.email}?subject=${encodeURIComponent('Pertanyaan untuk Jadi Trader Tools')}`}
-                  onClick={salinSurel}
-                  className="transition-colors hover:text-foreground"
-                >
-                  {BADAN.email}
-                </a>
-                {disalin && (
-                  <span className="inline-flex items-center gap-1 text-xs text-emerald-500">
-                    <Check className="h-3 w-3" /> alamat disalin
-                  </span>
-                )}
-              </p>
+              {/* Alamat surelnya TIDAK ditulis lagi di sini. Ia sudah berdiri
+                  sebagai ikon di kolom "Hubungi & ikuti" beberapa sentimeter
+                  ke kanan, dan satu alamat yang sama tercetak dua kali di satu
+                  kaki halaman membuat pembacanya mengira ada dua alamat
+                  berbeda yang perlu dibandingkan. Diminta pemilik 21 Sep 2026.
+
+                  Yang ikut pindah ke ikonnya: penyalinan alamat. Lihat
+                  catatan di sana soal kenapa itu tetap perlu ada. */}
             </address>
           </div>
 
@@ -374,14 +368,28 @@ function Footerdemo() {
                           surel bawaan. Untuk keadaan itu ada kotak tanya di
                           kolom pertama kaki halaman ini — ia mengirim tanpa
                           aplikasi apa pun. */}
-                      <a href={`mailto:${BADAN.email}?subject=${encodeURIComponent('Pertanyaan untuk Jadi Trader Tools')}`}>
+                      {/* Menekan ikon ini melakukan DUA hal sekaligus, dan
+                          keduanya perlu: membuka penyusun surat, DAN menyalin
+                          alamatnya ke papan klip. Di mesin yang tidak punya
+                          aplikasi surel bawaan, yang pertama tidak
+                          menghasilkan apa pun — dan tanpa yang kedua, orang
+                          itu berakhir tanpa alamat sama sekali karena
+                          teksnya memang sudah tidak ditulis di mana pun. */}
+                      <a href={`mailto:${BADAN.email}?subject=${encodeURIComponent('Pertanyaan untuk Jadi Trader Tools')}`}
+                         onClick={salinSurel}>
                         <Mail className="h-4 w-4" />
                         <span className="sr-only">Surel</span>
                       </a>
                     </Button>
                   </TooltipTrigger>
+                  {/* Tooltip yang sama dipakai untuk mengabarkan hasilnya:
+                      ia sudah terbuka tepat saat ikonnya ditekan, jadi tidak
+                      perlu lencana baru yang menggeser barisan ikon. */}
                   <TooltipContent>
-                    <p>{BADAN.email}</p>
+                    <p className={disalin ? 'inline-flex items-center gap-1 text-emerald-500' : undefined}>
+                      {disalin && <Check className="h-3 w-3" />}
+                      {disalin ? 'alamat disalin' : BADAN.email}
+                    </p>
                   </TooltipContent>
                 </Tooltip>
 
