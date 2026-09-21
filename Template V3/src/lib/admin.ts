@@ -571,17 +571,53 @@ export function usePosisiBinance(): {
   const sudahPertama = useRef(false);
   const { token } = bacaKoneksi();
   const [pemicu, setPemicu] = useState(0);
+  /** Sudah pernah dijawab 403 — jalur login ditutup untuk sesi ini. */
+  const bukanPemilik = useRef(false);
 
   useEffect(() => {
-    /* Tanpa token tidak ada yang perlu diperiksa — jawabannya sudah pasti
-       sekarang juga, jadi jangan menahan pemanggil menunggu. */
-    if (!token.trim()) { setAktif(false); setData([]); setMemeriksa(false); return; }
     let hidup = true;
+
+    /* ── APP TOKEN ATAU LOGIN PEMILIK ────────────────────────────────────
+       Dilaporkan pemilik 21 Sep 2026: panel posisi kripto kosong di salah
+       satu jendelanya, padahal ada tiga posisi hidup di Hyperliquid.
+
+       App Token tersimpan PER PERANGKAT di localStorage. Jendela kedua,
+       profil Chrome lain, atau komputer lain = kotak token kosong, dan
+       seluruh jalur posisi kripto mati di sana — sementara panel MT5 di
+       layar yang sama tetap terisi, karena ia mengikuti AKUN lewat login
+       Firebase.
+
+       Dua panel bersebelahan, data yang sama-sama milik orang yang sama,
+       satu hidup satu mati: itu tidak akan pernah terbaca sebagai "token
+       perangkat ini belum diisi". Itu terbaca sebagai rusak.
+
+       Jadi kalau tokennya tidak ada, dicoba dengan login. Server menerima
+       ID token pemilik untuk DUA rute baca ini saja; yang membelanjakan
+       uang tetap menuntut App Token. Lihat `bacaPosisiBoleh` di server. */
+    async function kepalaBaca(): Promise<Record<string, string> | null> {
+      if (token.trim()) return { 'X-App-Token': token.trim() };
+      /* Pengguna biasa yang sudah login akan dijawab 403 oleh server —
+         posisi yang dibaca rute itu milik akun bursa PEMILIK, bukan
+         miliknya. Sekali ditolak, jalur ini ditutup untuk sesi ini supaya
+         tidak ada permintaan sia-sia tiap 30 detik. */
+      if (bukanPemilik.current) return null;
+      try {
+        const { auth } = await import('@/lib/firebase');
+        const t = await auth.currentUser?.getIdToken();
+        return t ? { Authorization: 'Bearer ' + t } : null;
+      } catch { return null; }
+    }
 
     async function ambil() {
       try {
-        const kepala = { 'X-App-Token': token.trim() };
+        const kepala = await kepalaBaca();
+        /* Tidak ada satu pun cara masuk — jawabannya sudah pasti sekarang
+           juga, jadi jangan menahan pemanggil menunggu. */
+        if (!kepala) { setAktif(false); setData([]); setMemeriksa(false); return; }
         const r = await fetch(`${dasar()}/api/positions`, { headers: kepala });
+        /* 403 = login sah tapi bukan pemilik. Bukan galat sesaat yang layak
+           dicoba lagi; jawabannya akan sama selamanya. */
+        if (r.status === 403) { bukanPemilik.current = true; setAktif(false); setData([]); setMemeriksa(false); return; }
         if (!r.ok) throw new Error(String(r.status));
         const j = await r.json();
         if (!hidup) return;
