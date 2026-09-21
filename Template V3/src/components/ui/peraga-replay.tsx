@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useGerakMinim } from '@/lib/gerak-minim';
+/* Cuma konstantanya. `koneksi` sendiri ringan — Firebase di dalamnya
+   diimpor dinamis, jadi kartu di halaman depan tidak menyeretnya. */
+import { PROXY_BAWAAN } from '@/lib/koneksi';
 
 /* ════════════════════════════════════════════════════════════════════════
    PERAGA REPLAY — berjalan sendiri, tanpa tombol
@@ -14,14 +17,33 @@ import { useGerakMinim } from '@/lib/gerak-minim';
    lilin sesudahnya terbuka satu per satu. Kalau langsung jalan, yang
    tersampaikan cuma "ada animasi", bukan "kamu yang menentukan dari mana".
 
-   ── ANGKANYA TIDAK MENGAKU SEBAGAI PASAR MANA PUN ───────────────────────
-   Tidak ada nama simbol, tidak ada sumbu harga, tidak ada satu angka harga
-   pun di layar — yang tampil hanya bentuk lilin. Jadi tidak ada yang bisa
-   dibaca sebagai level pasar sungguhan, dan itu memang syaratnya: halaman
-   ini dibaca orang yang sedang menimbang keputusan uang.
+   ── LILINNYA SEKARANG PASAR SUNGGUHAN ───────────────────────────────────
+   Diminta pemilik 21 Sep 2026: "bisa pakai grafik asli ga?" Bisa, dan
+   sekarang memang begitu — BTC/USDT 4 jam, ditarik dari proxy pasar yang
+   sama dengan yang dipakai aplikasinya.
 
-   Deretnya dibangkitkan dari BENIH TETAP. Grafik yang berubah tiap muat
-   membuat orang mengira ia data langsung — persis kesan yang dihindari.
+   Sebelumnya deretnya dibangkitkan dari benih tetap, dan alasannya ditulis
+   di sini: halaman ini dibaca orang yang sedang menimbang keputusan uang,
+   jadi jangan sampai ada yang terbaca sebagai level pasar. Keberatan itu
+   TIDAK hilang, ia dijawab dengan cara lain:
+
+     · tidak ada satu angka harga pun di layar, dan tidak ada sumbu harga —
+       yang tampil cuma BENTUK pergerakannya;
+     · pasangan dan timeframe-nya disebut terus terang, jadi tidak ada yang
+       perlu ditebak tentang apa yang sedang dilihat;
+     · yang diputar RIWAYAT yang sudah tertutup, bukan harga berjalan, dan
+       kartunya memang menjelaskan fitur replay.
+
+   Gerak lilin palsu di halaman jualan justru yang sulit dipertahankan: ia
+   berbentuk pasar tapi bukan pasar, dan tidak ada label yang bisa
+   menjelaskan itu tanpa terdengar seperti pengakuan.
+
+   ── KALAU DATANYA TIDAK DATANG ──────────────────────────────────────────
+   Deret benih tetap DIPERTAHANKAN sebagai cadangan, bukan dibuang. Kartu
+   ini berdiri di halaman depan: proxy yang sedang sibuk, jaringan pengunjung
+   yang putus, atau rute yang suatu hari berubah tidak boleh menyisakan kotak
+   kosong di tempat pertama orang menilai produknya. Yang hilang saat itu
+   cuma "aslinya", bukan kartunya.
    ════════════════════════════════════════════════════════════════════════ */
 
 const JUMLAH_LILIN = 42;
@@ -93,10 +115,57 @@ function buatDeret(): Lilin[] {
 const L = 300, T = 128;
 const LEBAR_LILIN = L / JUMLAH_LILIN;
 
+const PASANGAN = 'BTCUSDT';
+const TF = '4h';
+
+/** Lilin sungguhan dari proxy pasar. Memulangkan `null` untuk SETIAP
+ *  kegagalan — jaringan, status, maupun bentuk data yang tidak terduga.
+ *  Pemanggilnya cuma perlu tahu "ada atau tidak", dan cadangannya siap. */
+async function ambilLilinAsli(): Promise<Lilin[] | null> {
+  try {
+    const r = await fetch(
+      `${PROXY_BAWAAN}/api/klines?symbol=${PASANGAN}&interval=${TF}&limit=${JUMLAH_LILIN}`);
+    if (!r.ok) return null;
+    const j = await r.json();
+    const baris: unknown[] = Array.isArray(j?.data) ? j.data : Array.isArray(j) ? j : [];
+    if (baris.length < JUMLAH_LILIN) return null;
+    const out = baris.slice(-JUMLAH_LILIN).map((b) => {
+      const k = b as unknown[];
+      return { o: Number(k[1]), h: Number(k[2]), l: Number(k[3]), c: Number(k[4]) };
+    });
+    /* Satu bar cacat merusak seluruh skala grafiknya — min/max dihitung dari
+       semuanya, jadi satu NaN membuat kartunya kosong tanpa galat. Lebih baik
+       menolak seluruh kirimannya dan memakai cadangan. */
+    return out.every((d) => Number.isFinite(d.o) && Number.isFinite(d.h)
+                         && Number.isFinite(d.l) && Number.isFinite(d.c)) ? out : null;
+  } catch { return null; }
+}
+
 export function PeragaReplay() {
-  const deret = useMemo(buatDeret, []);
+  const cadangan = useMemo(buatDeret, []);
+  const [asli, setAsli] = useState<Lilin[] | null>(null);
+  const deret = asli ?? cadangan;
   const gerakMinim = useGerakMinim();
   const [tick, setTick] = useState(0);
+
+  /* Cadangan digambar LEBIH DULU, data aslinya menyusul. Menunggu jaringan
+     sebelum menggambar apa pun berarti kartu kosong di paruh atas halaman
+     depan selama beberapa ratus milidetik — dan kosong di situ terbaca
+     sebagai rusak, bukan sebagai sedang memuat.
+
+     Ticknya dikembalikan ke nol saat datanya datang supaya replay-nya mulai
+     lagi dari babak "pilih titik mulai". Tanpa itu deretnya bertukar di
+     tengah putaran: lilin yang sudah terbuka berganti bentuk sekaligus, dan
+     yang terlihat adalah kedipan, bukan pergantian data. */
+  useEffect(() => {
+    let hidup = true;
+    void ambilLilinAsli().then((d) => {
+      if (!hidup || !d) return;
+      setAsli(d);
+      setTick(0);
+    });
+    return () => { hidup = false; };
+  }, []);
 
   useEffect(() => {
     if (gerakMinim) return;                       // diam: tampilkan keadaan akhir
@@ -120,7 +189,12 @@ export function PeragaReplay() {
   return (
     <div className="flex w-full flex-col gap-3">
       <div className="flex items-center gap-2 font-mono text-[10px] text-neutral-500">
-        <span className="rounded border border-white/[0.08] px-1.5 py-0.5">4 Jam</span>
+        {/* Pasangannya disebut hanya kalau lilinnya memang miliknya. Saat
+            cadangan yang tergambar, menyebut "BTC/USDT" berarti menamai
+            grafik dengan nama yang bukan datanya. */}
+        <span className="rounded border border-white/[0.08] px-1.5 py-0.5">
+          {asli ? 'BTC/USDT · 4 Jam' : '4 Jam'}
+        </span>
         <span className="ml-auto flex items-center gap-1.5">
           <span className={`h-1.5 w-1.5 rounded-full ${
             gerakMinim ? 'bg-neutral-600' : memilih ? 'bg-amber-400' : 'bg-emerald-400'}`} />
