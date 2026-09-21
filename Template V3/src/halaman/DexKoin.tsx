@@ -4,6 +4,18 @@ import { ArrowLeft, ExternalLink, Loader2, RefreshCw, ShieldCheck, ShieldQuestio
 import { Panel } from '@/components/efferd-ui';
 import { Memuat } from '@/components/memuat';
 import { ChartLilin } from '@/components/chart-lilin';
+/* smiSeries langsung dari inti screener, BUKAN `deretSmi` dari
+   lib/backtest.
+   ──────────────────────────────────────────────────────────────────────
+   `deretSmi` cuma pembungkus tiga baris di atas smiSeries yang sama, tapi
+   mengimpornya menyeret seluruh potongan backtest: 236 kB (76 kB gzip)
+   demi satu osilator. Diukur di keluaran build, bukan ditaksir.
+
+   Potongan jt-scan-core yang dipakai sekarang 5,5 kB. Konstantanya ikut
+   diambil dari sana juga, jadi SMI di halaman ini memakai periode yang
+   sama persis dengan screener dan Chart & Entry — bukan salinan angka
+   yang bisa menyimpang sendiri. */
+import { smiSeries, SMI_K, SMI_D, SMI_EMA } from '@/lib/jt-scan-core';
 import { PanelBeliKoin } from '@/components/panel-beli-koin';
 import type { Lilin } from '@/lib/pasar';
 import { cn } from '@/lib/utils';
@@ -44,6 +56,14 @@ import {
    Lintasan Koin, dan pulang ke sana.
    ════════════════════════════════════════════════════════════════════════ */
 
+/* Disalin apa adanya dari Chart & Entry. Bukan karena malas mencari
+   abstraksi: dua halaman chart yang isiannya berbeda setengah piksel
+   terbaca sebagai dua produk, dan yang dikeluhkan pemilik memang itu —
+   "agak beda tampilannya". */
+const KELAS_ISIAN =
+  'h-9 rounded-md border border-zinc-800 bg-zinc-900/60 px-2.5 text-[12.5px] text-zinc-200 ' +
+  'outline-none transition-colors hover:border-zinc-700 focus-visible:border-zinc-600';
+
 const TF: { nilai: TfDex; label: string }[] = [
   { nilai: '5m', label: '5m' },
   { nilai: '15m', label: '15m' },
@@ -62,9 +82,30 @@ const PENJELAJAH: Record<string, (a: string) => string> = {
   polygon_pos: (a) => `https://polygonscan.com/token/${a}`,
 };
 
+/** Tinggi chart diturunkan dari TINGGI LAYAR, sama seperti Chart & Entry.
+ *
+ *  Angka tetap 440px membuat chartnya duduk di sepertiga atas layar 1440p
+ *  dengan ruang kosong di bawahnya — dan chart yang tidak memakai tinggi
+ *  yang tersedia adalah perbedaan pertama yang terlihat saat dua halaman
+ *  dibandingkan berdampingan.
+ *
+ *  Potongannya lebih kecil daripada Chart & Entry (270 lawan 343) karena
+ *  halaman ini tidak punya bilah kepala setinggi itu. */
+function useTinggiChart(): number {
+  const [tinggi, setTinggi] = useState(() =>
+    typeof window === 'undefined' ? 460 : Math.max(420, window.innerHeight - 270));
+  useEffect(() => {
+    const ukur = () => setTinggi(Math.max(420, window.innerHeight - 270));
+    window.addEventListener('resize', ukur);
+    return () => window.removeEventListener('resize', ukur);
+  }, []);
+  return tinggi;
+}
+
 export default function DexKoin() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
+  const tinggiChart = useTinggiChart();
 
   const jaringan = params.get('jaringan') || '';
   const alamat = params.get('alamat') || '';
@@ -141,6 +182,47 @@ export default function DexKoin() {
 
   useEffect(() => { void periksaKontrak(); }, [periksaKontrak]);
 
+  /* Panel osilator di kaki chart — persis yang ada di Chart & Entry.
+     30 lilin adalah syarat SMI itu sendiri, bukan pilihan gaya: di bawah
+     itu nilainya belum stabil, dan osilator yang belum stabil tergambar
+     sebagai garis liar yang terbaca seperti sinyal. Kolam DEX muda sering
+     ada di bawah ambang ini, dan di sana panelnya memang tidak muncul. */
+  const smi = useMemo(
+    () => {
+      if (!lilin || lilin.closes.length < 30) return null;
+      const d = smiSeries(lilin.highs, lilin.lows, lilin.closes, SMI_K, SMI_D, SMI_EMA);
+      return d ? { smi: d.smi, signal: d.signal } : null;
+    },
+    [lilin],
+  );
+
+  /* Perubahan 24 jam, dihitung dari lilinnya sendiri.
+     ──────────────────────────────────────────────────────────────────
+     Dicari lilin terakhir yang stempelnya <= 24 jam sebelum lilin
+     terakhir, lalu dibandingkan penutupannya. BUKAN "lilin pertama
+     dibanding terakhir": rentang itu berubah-ubah mengikuti timeframe,
+     jadi angka yang sama akan berarti sehari di satu TF dan dua bulan di
+     TF lain — sementara yang membacanya tetap membacanya sebagai "hari
+     ini".
+
+     `null` kalau datanya belum menjangkau 24 jam ke belakang. Angka yang
+     dihitung dari enam jam lalu tapi dilabeli 24 jam adalah kebohongan
+     kecil yang dipakai orang untuk mengambil keputusan. */
+  const ubah24 = useMemo(() => {
+    if (!lilin || lilin.times.length < 2) return null;
+    const n = lilin.times.length;
+    const akhir = lilin.closes[n - 1];
+    const batas = lilin.times[n - 1] - 24 * 60 * 60 * 1000;
+    if (lilin.times[0] > batas) return null;
+    let i = n - 1;
+    while (i > 0 && lilin.times[i] > batas) i -= 1;
+    const awal = lilin.closes[i];
+    if (!(awal > 0) || !Number.isFinite(akhir)) return null;
+    return ((akhir - awal) / awal) * 100;
+  }, [lilin]);
+
+  const hargaKini = lilin ? lilin.closes[lilin.closes.length - 1] : (kolam?.harga ?? 0);
+
   const simbol = simbolAwal || (kolam?.nama || '').split('/')[0].trim() || alamat.slice(0, 6);
 
   /* `KoinPantau` bikinan, bukan baris daftar pantau. Panel beli cuma
@@ -171,63 +253,98 @@ export default function DexKoin() {
 
   return (
     <div className="p-4 md:p-6">
-      {/* ── Kepala ─────────────────────────────────────────────────── */}
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <Link to="/wallet-tracking?sub=hunter"
-            className="mb-1.5 inline-flex items-center gap-1.5 text-[11.5px] text-zinc-500 transition-colors hover:text-zinc-300">
-            <ArrowLeft className="size-3.5" /> Lintasan Koin
-          </Link>
-          <h1 className="flex flex-wrap items-center gap-2 text-[16px] font-semibold text-zinc-100">
-            {simbol}
-            <span className="rounded border border-zinc-800 px-1.5 py-0.5 text-[10.5px] font-medium text-zinc-400">
-              {jaringan}
-            </span>
-            {kolam?.dex && (
-              <span className="rounded border border-zinc-800 px-1.5 py-0.5 text-[10.5px] font-medium text-zinc-500">
-                {kolam.dex}
-              </span>
-            )}
-          </h1>
-          <p className="mt-1 text-[11.5px] leading-relaxed text-zinc-500">
-            Harga dari kolam DEX paling dalam, bukan dari bursa.
-            {kolam && (kolam.jumlahKolam ?? 0) > 1 && (
-              <> Token ini punya {kolam.jumlahKolam} kolam — yang lain harganya bisa berbeda.</>
-            )}
-          </p>
-        </div>
-
-        <div className="flex items-center gap-1.5">
-          {TF.map((x) => (
-            <button key={x.nilai} onClick={() => setTf(x.nilai)}
-              className={cn('cursor-pointer rounded-md border px-2.5 py-1 text-[11.5px] transition-colors',
-                tf === x.nilai
-                  ? 'border-zinc-600 bg-zinc-800 text-zinc-100'
-                  : 'border-zinc-800 text-zinc-500 hover:border-zinc-700 hover:text-zinc-300')}>
-              {x.label}
-            </button>
-          ))}
-          <button onClick={() => void tarik(tf, kolam?.kolam)} aria-label="Segarkan"
-            className="ml-1 cursor-pointer rounded-md border border-zinc-800 p-1.5 text-zinc-500 transition-colors hover:border-zinc-700 hover:text-zinc-300">
-            <RefreshCw className={cn('size-3.5', muat && 'animate-spin')} />
-          </button>
-        </div>
-      </div>
+      <Link to="/wallet-tracking?sub=hunter"
+        className="mb-2 inline-flex items-center gap-1.5 text-[11.5px] text-zinc-500 transition-colors hover:text-zinc-300">
+        <ArrowLeft className="size-3.5" /> Lintasan Koin
+      </Link>
 
       <div className="flex flex-col gap-4 lg:flex-row">
         {/* ── Grafik ───────────────────────────────────────────────── */}
         <div className="min-w-0 flex-1">
           <Panel className="overflow-hidden">
-            {muat && !lilin ? (
-              <Memuat pesan="Menarik lilin dari kolam DEX…" className="min-h-[420px]" />
-            ) : galat && !lilin ? (
-              <div className="flex min-h-[420px] items-center justify-center p-6">
-                <p className="max-w-md text-center text-[12.5px] leading-relaxed text-zinc-500">{galat}</p>
+            {/* ── BILAH ALAT, SUSUNAN CHART & ENTRY ──────────────────────
+                Medan berlabel di kiri, harga terakhir di sebelahnya,
+                tombol di kanan — urutan yang sama, tinggi isian yang sama,
+                jarak yang sama. Bedanya cuma isinya: di sana simbol bursa
+                yang bisa diketik, di sini koin yang sudah ditentukan
+                alamat halamannya, jadi ia kotak mati. */}
+            <div className="flex flex-wrap items-end gap-x-4 gap-y-3 px-4 py-3">
+              <div>
+                <div className="mb-1 text-[10.5px] text-zinc-500">Koin</div>
+                <div className={cn(KELAS_ISIAN, 'flex items-center gap-2')}>
+                  <span className="font-medium">{simbol}</span>
+                  <span className="text-[10.5px] text-zinc-500">{jaringan}</span>
+                </div>
               </div>
-            ) : lilin ? (
-              <ChartLilin key={`${jaringan}|${alamat}|${tf}`} lilin={lilin} tinggi={440}
-                muatPenuh tandaAir={{ utama: simbol, sub: `${jaringan} · ${tf}` }} />
-            ) : null}
+
+              <div>
+                <div className="mb-1 text-[10.5px] text-zinc-500">Timeframe</div>
+                <select value={tf} onChange={(e) => setTf(e.target.value as TfDex)}
+                  className={cn(KELAS_ISIAN, 'cursor-pointer')}>
+                  {TF.map((x) => <option key={x.nilai} value={x.nilai}>{x.label}</option>)}
+                </select>
+              </div>
+
+              <div className="min-w-0">
+                <div className="mb-1 text-[10.5px] text-zinc-500">Harga terakhir</div>
+                <div className="flex h-9 flex-wrap items-center gap-2">
+                  <span className="angka text-[15px] font-semibold text-zinc-100">
+                    {hargaKini > 0 ? tulisHarga(hargaKini) : '—'}
+                  </span>
+                  {/* Hanya kalau datanya memang menjangkau 24 jam. Lihat
+                      catatan di `ubah24` — labelnya menjanjikan rentang,
+                      dan rentangnya harus benar-benar ada. */}
+                  {ubah24 !== null && (
+                    <span className={cn('angka text-[12px]',
+                      ubah24 >= 0 ? 'text-emerald-400' : 'text-red-400')}>
+                      {ubah24 >= 0 ? '+' : ''}{ubah24.toFixed(2)}% <span className="text-zinc-600">24j</span>
+                    </span>
+                  )}
+                  {kolam?.dex && (
+                    <span className="rounded border border-zinc-800 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-500">
+                      {kolam.dex}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="ml-auto flex items-center gap-1.5 self-end pb-0.5">
+                <button onClick={() => void tarik(tf, kolam?.kolam)}
+                  title="Tarik ulang lilin dari kolamnya"
+                  className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100 sm:px-2.5">
+                  <RefreshCw className={cn('size-3.5', muat && 'animate-spin')} />
+                  <span className="hidden sm:inline">Segarkan</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Baris keterangan kolam. Di Chart & Entry tempat ini dipakai
+                kabar galat dan batas jatah replay; di sini dipakai satu
+                hal yang cuma berlaku untuk koin DEX dan tidak punya
+                padanan di bursa: token yang sama bisa punya banyak kolam
+                dengan harga berbeda-beda. */}
+            {kolam && (kolam.jumlahKolam ?? 0) > 1 && (
+              <div className="border-t border-zinc-800/80 px-4 py-2 text-[11px] leading-relaxed text-zinc-500">
+                Digambar dari kolam paling dalam. Token ini punya {kolam.jumlahKolam} kolam —
+                harga di kolam lain bisa berbeda, dan yang dangkal bisa berbeda jauh.
+              </div>
+            )}
+
+            {/* `px-2 pb-2` + garis pemisah: kerangka yang sama persis
+                dengan area chart di Chart & Entry. */}
+            <div className="border-t border-zinc-800/80 px-2 pb-2">
+              {muat && !lilin ? (
+                <Memuat pesan="Menarik lilin dari kolam DEX…" className="min-h-[420px]" />
+              ) : galat && !lilin ? (
+                <div className="flex min-h-[420px] items-center justify-center p-6">
+                  <p className="max-w-md text-center text-[12.5px] leading-relaxed text-zinc-500">{galat}</p>
+                </div>
+              ) : lilin ? (
+                <ChartLilin key={`${jaringan}|${alamat}|${tf}`} lilin={lilin}
+                  tinggi={tinggiChart} muatPenuh smi={smi} pitaSmi
+                  tandaAir={{ utama: simbol, sub: `${jaringan} · ${tf}` }} />
+              ) : null}
+            </div>
           </Panel>
 
           {/* ── JUMLAH LILIN ITU KABAR, BUKAN CATATAN KAKI ─────────────
