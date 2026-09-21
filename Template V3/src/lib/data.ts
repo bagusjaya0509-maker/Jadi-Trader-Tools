@@ -346,6 +346,10 @@ export function usePosisi(): HasilData<Posisi[]> & {
   /** Siaran screener ada tapi sudah berhenti berdetak — barisnya sengaja
    *  TIDAK ditampilkan, dan panelnya memakai ini untuk mengatakan kenapa. */
   siaranBasi: boolean;
+  /** Bursa yang jawabannya gagal pada putaran terakhir. Daftar posisi yang
+   *  memendek diam-diam adalah kebohongan yang menenangkan — lihat catatan
+   *  di `usePosisiBinance`. */
+  gagalBursa: { binance: string | null; hyperliquid: string | null };
 } {
   const { pengguna, memuat: memuatAuth, pemilik } = useAuth();
   const [data, setData] = useState<Posisi[]>(POSISI_TERBUKA);
@@ -393,7 +397,7 @@ export function usePosisi(): HasilData<Posisi[]> & {
      buka. Binance tidak mengirimkan keempatnya di rute posisi, jadi
      mengganti begitu saja akan menukar data yang lebih lengkap dengan yang
      lebih benar — padahal keduanya bisa dipakai bersama. */
-  const { data: bursa, order, aktif, memeriksa: memeriksaBursa } = usePosisiBinance();
+  const { data: bursa, order, aktif, memeriksa: memeriksaBursa, gagal: gagalBursa } = usePosisiBinance();
 
   /* Order ENTRY yang belum ke-fill: BELUM jadi posisi, jadi ia tidak
      boleh masuk daftar posisi — tapi juga tidak boleh hilang. Order yang
@@ -501,6 +505,7 @@ export function usePosisi(): HasilData<Posisi[]> & {
          menyebut tanggal untuk angka yang dikarang justru membuatnya terbaca
          seperti catatan sungguhan. */
       siaranPada: null, siaranBasi: false,
+      gagalBursa: { binance: null, hyperliquid: null },
       memuat: false, contoh: true, galat: null,
     };
   }
@@ -577,6 +582,7 @@ export function usePosisi(): HasilData<Posisi[]> & {
     bursaAktif: aktif,
     siaranPada,
     siaranBasi: basi,
+    gagalBursa,
     /* `contoh` berarti "ini bukan datamu, ini contoh". Dokumen publik itu
        data sungguhan, jadi labelnya hanya muncul kalau dokumennya memang
        belum ada. */

@@ -557,6 +557,14 @@ export function usePosisiBinance(): {
    *  menyalakannya lagi — kalau tidak, tabelnya akan berkedip kosong tiap
    *  setengah menit. */
   memeriksa: boolean;
+  /** Bursa yang jawabannya GAGAL pada putaran terakhir, kalau ada.
+   *
+   *  Sebelum ini `gagalHl` dari server tidak dibaca siapa pun — jadi
+   *  Hyperliquid yang sedang tidak terjangkau menghasilkan daftar yang
+   *  lebih pendek tanpa satu pun tanda. Daftar posisi yang memendek
+   *  diam-diam adalah kebohongan yang menenangkan: orang berhenti memantau
+   *  sesuatu yang sebenarnya masih hidup dan masih bisa rugi. */
+  gagal: { binance: string | null; hyperliquid: string | null };
   /** Paksa baca ulang sekarang, tanpa menunggu putaran 30 detik.
    *  Dipakai setelah mengubah order: menunggu satu putaran penuh membuat
    *  layar bilang "berhasil" sementara tabelnya masih menampilkan angka
@@ -568,6 +576,8 @@ export function usePosisiBinance(): {
   const [aktif, setAktif] = useState(false);
   const [funding, setFunding] = useState<Map<string, number | null>>(new Map());
   const [memeriksa, setMemeriksa] = useState(true);
+  const [gagal, setGagal] = useState<{ binance: string | null; hyperliquid: string | null }>(
+    { binance: null, hyperliquid: null });
   const sudahPertama = useRef(false);
   const { token } = bacaKoneksi();
   const [pemicu, setPemicu] = useState(0);
@@ -688,6 +698,12 @@ export function usePosisiBinance(): {
               tp: s?.tp ?? 0,
             };
           }));
+        /* Dibaca dari jawaban yang SAMA dengan posisinya, supaya
+           tandanya tidak pernah bercerita soal putaran yang berbeda. */
+        setGagal({
+          binance: j?.gagalBinance ? String(j.gagalBinance) : null,
+          hyperliquid: j?.gagalHl ? String(j.gagalHl) : null,
+        });
         setAktif(true);
       } catch {
         if (hidup) { setAktif(false); }
@@ -763,7 +779,7 @@ export function usePosisiBinance(): {
     window.addEventListener('jt:order-nyata-berubah', dengar);
     return () => { window.removeEventListener('jt:order-nyata-berubah', dengar); if (t) clearTimeout(t); };
   }, []);
-  return { data: dataFunding, order, aktif, memeriksa, segarkan: () => setPemicu((n) => n + 1) };
+  return { data: dataFunding, order, aktif, memeriksa, gagal, segarkan: () => setPemicu((n) => n + 1) };
 }
 
 /** Unggah satu gambar ke VPS, dapat URL publiknya.

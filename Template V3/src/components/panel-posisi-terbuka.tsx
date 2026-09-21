@@ -134,7 +134,7 @@ export function PanelPosisiTerbuka({ sumber, onSunting, onTutup, onUbahSlTp, onB
    *  dan area untuk membelahnya. Lihat catatan di `ChartBanding`. */
   onBanding?: (b: BandingSalinan) => void;
 }) {
-  const { data: posisiKripto, pending: pendingKripto, stop: stopKripto, contoh: kriptoContoh, bursaAktif, siaranPada, siaranBasi } = usePosisi();
+  const { data: posisiKripto, pending: pendingKripto, stop: stopKripto, contoh: kriptoContoh, bursaAktif, siaranPada, siaranBasi, gagalBursa } = usePosisi();
   /* ── SUBJUDUL MENYEBUT BURSA YANG SUNGGUH ADA ISINYA ─────────────────
      Dulu tertulis "di Binance" apa pun isinya. Sesudah posisi Hyperliquid
      bisa muncul di daftar yang sama, kalimat itu berhenti jadi kurang
@@ -838,6 +838,33 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
               : 'Tidak ada posisi kripto terbuka.'
             : mt5.terhubung === true ? 'Tidak ada posisi MT5 terbuka.' : mt5.ket}
         />
+
+        {/* ── BURSA YANG TIDAK TERBACA HARUS DISEBUT ─────────────────
+            Dilaporkan pemilik 21 Sep 2026: posisi tidak kelihatan di Chart
+            & Entry. Sebabnya Binance mem-ban IP VPS (-1003, mesin salin
+            menarik `filters` tanpa singgahan), dan rute posisi dulu mati
+            TOTAL karenanya — tiga posisi Hyperliquid yang tidak ada
+            hubungannya ikut hilang.
+
+            Server sekarang memulangkan sisi yang berhasil dan menyebut
+            sisi yang gagal. Sebutan itu WAJIB sampai ke layar: daftar yang
+            memendek tanpa tanda terbaca sebagai "posisi saya sudah
+            tertutup" — kebohongan yang menenangkan, dan orang berhenti
+            memantau sesuatu yang masih hidup dan masih bisa rugi. */}
+        {sumber === 'kripto' && bursaAktif
+          && (gagalBursa.binance || gagalBursa.hyperliquid) && (
+          <div className="mt-3 rounded-lg border border-amber-500/25 bg-amber-500/[0.04] px-3 py-2 text-[11px] leading-relaxed text-amber-200/80">
+            {gagalBursa.binance && gagalBursa.hyperliquid
+              ? 'Binance dan Hyperliquid sama-sama tidak terbaca saat ini.'
+              : gagalBursa.binance
+                ? 'Posisi Binance tidak terbaca saat ini — yang tampil di bawah hanya Hyperliquid.'
+                : 'Posisi Hyperliquid tidak terbaca saat ini — yang tampil di bawah hanya Binance.'}
+            <span className="text-amber-200/55">
+              {' '}Daftarnya belum lengkap, bukan berarti posisinya sudah tertutup. Periksa
+              langsung di bursanya kalau perlu memastikan.
+            </span>
+          </div>
+        )}
 
         {/* Sama seperti di Dashboard: EA lama tidak bisa melaporkan
             pending, dan layar yang diam soal itu memberi kesan order-nya
