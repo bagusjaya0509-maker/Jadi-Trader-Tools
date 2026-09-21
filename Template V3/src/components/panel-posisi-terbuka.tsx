@@ -134,7 +134,7 @@ export function PanelPosisiTerbuka({ sumber, onSunting, onTutup, onUbahSlTp, onB
    *  dan area untuk membelahnya. Lihat catatan di `ChartBanding`. */
   onBanding?: (b: BandingSalinan) => void;
 }) {
-  const { data: posisiKripto, pending: pendingKripto, stop: stopKripto, contoh: kriptoContoh, bursaAktif, siaranPada } = usePosisi();
+  const { data: posisiKripto, pending: pendingKripto, stop: stopKripto, contoh: kriptoContoh, bursaAktif, siaranPada, siaranBasi } = usePosisi();
   /* ── SUBJUDUL MENYEBUT BURSA YANG SUNGGUH ADA ISINYA ─────────────────
      Dulu tertulis "di Binance" apa pun isinya. Sesudah posisi Hyperliquid
      bisa muncul di daftar yang sama, kalimat itu berhenti jadi kurang
@@ -778,8 +778,10 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
                sedang berjalan selama tidak ada yang menyebutkan kapan ia
                ditulis. Sesudah disebut, pembacanya bisa menilai sendiri
                apakah itu masih berlaku. */
-            : `Dari catatan screener — App Token belum diisi, jadi belum dicocokkan ke Binance.${
-                siaranPada ? ` Terakhir diperbarui ${umurSiaran(siaranPada)}.` : ''}`}
+            : siaranBasi
+              ? `Screener sedang tidak berjalan — siaran terakhirnya ${siaranPada ? umurSiaran(siaranPada) : 'lama sekali'}.`
+              : `Dari catatan screener — App Token belum diisi, jadi belum dicocokkan ke Binance.${
+                  siaranPada ? ` Terakhir diperbarui ${umurSiaran(siaranPada)}.` : ''}`}
         kanan={
           total === null
             ? <span className="text-[11.5px] text-zinc-500">{baris.length} posisi</span>
@@ -820,8 +822,20 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
           onKlikBaris={onSunting && ((b, gabungan) => onSunting(keOrder(b, gabungan)))}
           onUbah={onUbahSlTp && ((b) => onUbahSlTp(keOrder(b)))}
           onKlikCopy={sumber === 'kripto' && salinPerSimbol.size && onBanding ? bukaBanding : undefined}
+          /* ── KOSONG YANG MENJELASKAN DIRINYA ──────────────────────
+             Baris siaran basi disembunyikan di `usePosisi`, dan tabel yang
+             tiba-tiba kosong tanpa sepatah kata pun cuma memindahkan
+             kebingungannya: yang tadinya "kenapa ada posisi ini?" berubah
+             jadi "posisi saya ke mana?".
+
+             Jadi keadaan kosongnya menyebut sebabnya, dan menyebut juga
+             apa yang harus dilakukan kalau daftar itu memang masih
+             dibutuhkan — buka screener-nya, atau isi App Token supaya
+             angkanya datang dari bursa dan bukan dari catatan. */
           kosong={sumber === 'kripto'
-            ? 'Tidak ada posisi kripto terbuka.'
+            ? siaranBasi
+              ? 'Catatan screener terakhir sudah lama dan tidak lagi diperbarui, jadi tidak ditampilkan sebagai posisi berjalan. Buka halaman Screener supaya siarannya hidup lagi, atau isi App Token agar posisinya dibaca langsung dari bursa.'
+              : 'Tidak ada posisi kripto terbuka.'
             : mt5.terhubung === true ? 'Tidak ada posisi MT5 terbuka.' : mt5.ket}
         />
 

@@ -332,11 +332,20 @@ function idPosisiBursa(b: { bursa: string; simbol: string }): string {
  *
  *  Dokumen ini juga sengaja publik: pengunjung yang belum berlangganan tetap
  *  bisa melihat posisi pemilik — itu memang bagian dari etalasenya. */
+/** Selama ini dianggap masih berjalan. Screener menulis ulang stempelnya
+ *  tiap 2 menit; 10 menit memberi ruang empat detak terlewat sebelum ia
+ *  dinyatakan berhenti — cukup longgar untuk tab yang tersendat, cukup
+ *  ketat untuk tidak memajang siaran kemarin. */
+const UMUR_SIARAN_HIDUP = 10 * 60 * 1000;
+
 export function usePosisi(): HasilData<Posisi[]> & {
   pending: OrderBursa[]; stop: OrderBursa[]; bursaAktif: boolean;
   /** Kapan `public/posisiTerbuka` terakhir ditulis, atau null kalau belum
    *  pernah. Dipakai panelnya untuk mengatakan UMUR catatannya. */
   siaranPada: number | null;
+  /** Siaran screener ada tapi sudah berhenti berdetak — barisnya sengaja
+   *  TIDAK ditampilkan, dan panelnya memakai ini untuk mengatakan kenapa. */
+  siaranBasi: boolean;
 } {
   const { pengguna, memuat: memuatAuth, pemilik } = useAuth();
   const [data, setData] = useState<Posisi[]>(POSISI_TERBUKA);
@@ -491,7 +500,7 @@ export function usePosisi(): HasilData<Posisi[]> & {
       /* Pengunjung melihat data contoh, dan contoh tidak punya umur siaran —
          menyebut tanggal untuk angka yang dikarang justru membuatnya terbaca
          seperti catatan sungguhan. */
-      siaranPada: null,
+      siaranPada: null, siaranBasi: false,
       memuat: false, contoh: true, galat: null,
     };
   }
@@ -527,8 +536,35 @@ export function usePosisi(): HasilData<Posisi[]> & {
      kelalaian: keduanya datang dari `usePosisiBinance()` — order di bursa
      milik yang sedang masuk, lewat App Token-nya sendiri. Tanpa bursa aktif
      keduanya memang sudah kosong. */
+  /* ── SIARAN YANG SUDAH BERHENTI BERDETAK TIDAK DITAMPILKAN ──────────
+     Dilaporkan pemilik dua kali, terakhir 21 Sep 2026: posisi lama muncul
+     lagi di panel kripto. Percobaan pertama cuma MENYEBUTKAN umurnya di
+     subjudul — dan itu tidak cukup. Baris yang duduk di tabel berjudul
+     "Posisi Terbuka" dibaca sebagai posisi terbuka, berapa pun keterangan
+     yang ditempel di atasnya.
+
+     Dulu ini tidak bisa diputuskan dari data: dengan aturan lama, stempel
+     siaran cuma berubah saat ISI-nya berubah, jadi posisi simulasi yang
+     memang masih terbuka berhari-hari punya stempel setua siaran yang
+     sudah ditinggalkan. Menyembunyikan yang tua berarti ikut menghilangkan
+     posisi yang benar-benar ada.
+
+     Screener sekarang menulis ulang stempelnya tiap 2 menit selama
+     halamannya hidup, isinya berubah atau tidak. Stempel tua karena itu
+     berarti satu hal saja: screener sedang tidak berjalan. Tidak ada yang
+     memantau posisi-posisi itu, tidak ada yang akan menutupnya, dan tidak
+     ada yang akan memperbaruinya — memajangnya sebagai posisi berjalan
+     adalah klaim yang tidak ditopang apa pun.
+
+     Bursa yang aktif TIDAK terpengaruh: `aktif` berarti angkanya datang
+     dari Binance lewat App Token, dan dokumen publik cuma memasok SL/TP
+     serta timeframe. Yang dijaga di sini hanya keadaan tanpa bursa, saat
+     dokumen itu satu-satunya sumbernya. */
+  const basi = !aktif && siaranPada !== null
+    && Date.now() - siaranPada > UMUR_SIARAN_HIDUP;
+
   return {
-    data: pemilik || aktif ? gabungan : [],
+    data: pemilik || aktif ? (basi ? [] : gabungan) : [],
     pending, stop,
     /* Apakah daftar ini benar-benar dibacakan BURSA, atau cuma dokumen
        publik screener. Dua hal yang sangat berbeda, dan sebelum ini panelnya
@@ -540,6 +576,7 @@ export function usePosisi(): HasilData<Posisi[]> & {
        bursa adalah klaim yang tidak bisa ditopang apa pun. */
     bursaAktif: aktif,
     siaranPada,
+    siaranBasi: basi,
     /* `contoh` berarti "ini bukan datamu, ini contoh". Dokumen publik itu
        data sungguhan, jadi labelnya hanya muncul kalau dokumennya memang
        belum ada. */

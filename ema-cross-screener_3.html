@@ -3298,6 +3298,9 @@
      SL, TP, dan waktu buka - dari situ jurnal siapa pun bisa menghitung sendiri
      pergerakan harganya secara langsung, tanpa perlu halaman ini terbuka. */
   var esSiaranPosisiTerakhir = '';
+  /* Kapan siaran terakhir benar-benar ditulis. Dipakai detak di bawah. */
+  var esSiaranPosisiWaktu = 0;
+  var ES_DETAK_SIARAN = 2 * 60 * 1000;
   function esTerbitkanPosisiTerbuka(){
     if(!esIsOwner) return;
     if(typeof prioritySimPositions === 'undefined') return;
@@ -3333,16 +3336,47 @@
       };
     }).sort(function(a,b){ return a.buka - b.buka; });
 
-    // Ditulis HANYA kalau isinya berubah. renderPrioritySimUI dipanggil tiap
-    // detik untuk menyegarkan mark price; menulis tiap detik akan menghabiskan
-    // kuota tulis Firestore untuk data yang sebetulnya sama saja.
+    /* Ditulis kalau isinya BERUBAH, atau kalau siaran terakhir sudah lebih
+       dari ES_DETAK_SIARAN. renderPrioritySimUI dipanggil tiap detik untuk
+       menyegarkan mark price; menulis tiap detik akan menghabiskan kuota
+       tulis Firestore untuk data yang sebetulnya sama saja.
+
+       ── KENAPA ADA DETAK, BUKAN CUMA "TULIS KALAU BERUBAH" ──────────────
+       Dilaporkan pemilik dua kali: posisi lama "tiba-tiba muncul" di panel
+       Posisi Terbuka - Kripto, terakhir 21 Sep 2026.
+
+       Sebabnya bentuk stempelnya. Dengan aturan tulis-kalau-berubah,
+       `_updatedAt` berarti "kapan isinya terakhir GANTI" - bukan "kapan
+       screener terakhir hidup". Dua hal itu berbeda jauh: begitu halaman
+       screener ditutup, baris terakhirnya menetap di Firestore tanpa batas
+       waktu, dan panel di V3 menampilkannya seperti posisi yang sedang
+       berjalan sekarang. Siaran 18 September masih terpajang tiga hari
+       kemudian karena memang tidak ada yang pernah menghapusnya.
+
+       Menghapus barisnya saat halaman ditutup tidak bisa diandalkan - tab
+       yang mati, laptop yang ditutup, dan koneksi yang putus tidak memberi
+       kesempatan menulis apa pun.
+
+       Jadi yang dibetulkan ARTI stempelnya: sekarang ia ditulis ulang tiap
+       2 menit selama screener hidup, isinya berubah atau tidak. Dengan
+       begitu "stempel tua" berarti satu hal yang jelas dan bisa dipakai
+       pembacanya - screener sedang tidak berjalan - dan V3 memakai itu
+       untuk berhenti menampilkan barisnya.
+
+       2 menit: satu tulis per 2 menit selama halaman terbuka = maksimum
+       720 tulis sehari, jauh di bawah 20.000 tulis/hari jatah gratis
+       Firestore. */
     var sidik = JSON.stringify(daftar);
-    if(sidik === esSiaranPosisiTerakhir) return;
+    var sekarangMs = Date.now();
+    var perluDetak = (sekarangMs - esSiaranPosisiWaktu) >= ES_DETAK_SIARAN;
+    if(sidik === esSiaranPosisiTerakhir && !perluDetak) return;
     esSiaranPosisiTerakhir = sidik;
+    esSiaranPosisiWaktu = sekarangMs;
     esDb.collection('public').doc('posisiTerbuka')
-      .set({ posisi: daftar, _updatedAt: Date.now() })
+      .set({ posisi: daftar, _updatedAt: sekarangMs })
       .catch(function(e){
         esSiaranPosisiTerakhir = '';   // gagal -> coba lagi siklus berikutnya
+        esSiaranPosisiWaktu = 0;
         /* Dulu error di sini dibuang diam-diam, dan itulah sebabnya bug
            `tp: undefined` bertahan berbulan-bulan tanpa ketahuan: siarannya
            gagal setiap kali, tapi tidak ada satu pun tanda di layar maupun
