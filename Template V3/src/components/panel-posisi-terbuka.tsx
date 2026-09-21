@@ -1,7 +1,27 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Copy, Trash2, Loader2, Zap } from 'lucide-react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
-import { cn, uang, harga as fHarga } from '@/lib/utils';
+import { cn, uang, harga as fHarga, tanggalAngka } from '@/lib/utils';
+
+/** Umur catatan screener, dibaca manusia.
+ *
+ *  Di bawah sehari yang berguna JARAKNYA ("3 jam lalu"); di atas itu yang
+ *  berguna TANGGALNYA. "72 jam lalu" memaksa pembacanya berhitung, dan
+ *  "18-09-26" pada catatan yang baru dua jam terasa lebih jauh daripada
+ *  yang sebenarnya.
+ *
+ *  Tahunnya ikut karena alasan yang sama dengan `tanggalAngka` sendiri:
+ *  catatan setahun lalu yang tertulis "18 Sep" terbaca seperti minggu ini. */
+function umurSiaran(ms: number): string {
+  const selisih = Date.now() - ms;
+  if (selisih < 0) return tanggalAngka(ms);          // jam perangkat mundur
+  const menit = Math.floor(selisih / 60_000);
+  if (menit < 2) return 'barusan';
+  if (menit < 60) return `${menit} menit lalu`;
+  const jam = Math.floor(menit / 60);
+  if (jam < 24) return `${jam} jam lalu`;
+  return tanggalAngka(ms);
+}
 import { usePosisi } from '@/lib/data';
 import { useAkunMt5, versiKurangDari, VERSI_EA_PENDING, VERSI_EA_PARSIAL, segarkanAkunMt5 } from '@/lib/akun';
 import { kirimPerintahMt5, tungguHasilMt5 } from '@/lib/mt5-order';
@@ -114,7 +134,7 @@ export function PanelPosisiTerbuka({ sumber, onSunting, onTutup, onUbahSlTp, onB
    *  dan area untuk membelahnya. Lihat catatan di `ChartBanding`. */
   onBanding?: (b: BandingSalinan) => void;
 }) {
-  const { data: posisiKripto, pending: pendingKripto, stop: stopKripto, contoh: kriptoContoh, bursaAktif } = usePosisi();
+  const { data: posisiKripto, pending: pendingKripto, stop: stopKripto, contoh: kriptoContoh, bursaAktif, siaranPada } = usePosisi();
   /* ── SUBJUDUL MENYEBUT BURSA YANG SUNGGUH ADA ISINYA ─────────────────
      Dulu tertulis "di Binance" apa pun isinya. Sesudah posisi Hyperliquid
      bisa muncul di daftar yang sama, kalimat itu berhenti jadi kurang
@@ -753,7 +773,13 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
             })()
           : bursaAktif
             ? `Order yang sedang berjalan di ${namaBursaAktif}.`
-            : 'Dari catatan screener — App Token belum diisi, jadi belum dicocokkan ke Binance.'}
+            /* Umurnya disebut, dan itu bukan kelengkapan — itu jawabannya.
+               Catatan screener berumur tiga hari terbaca sebagai posisi yang
+               sedang berjalan selama tidak ada yang menyebutkan kapan ia
+               ditulis. Sesudah disebut, pembacanya bisa menilai sendiri
+               apakah itu masih berlaku. */
+            : `Dari catatan screener — App Token belum diisi, jadi belum dicocokkan ke Binance.${
+                siaranPada ? ` Terakhir diperbarui ${umurSiaran(siaranPada)}.` : ''}`}
         kanan={
           total === null
             ? <span className="text-[11.5px] text-zinc-500">{baris.length} posisi</span>

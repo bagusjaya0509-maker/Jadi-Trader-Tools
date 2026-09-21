@@ -332,12 +332,33 @@ function idPosisiBursa(b: { bursa: string; simbol: string }): string {
  *
  *  Dokumen ini juga sengaja publik: pengunjung yang belum berlangganan tetap
  *  bisa melihat posisi pemilik — itu memang bagian dari etalasenya. */
-export function usePosisi(): HasilData<Posisi[]> & { pending: OrderBursa[]; stop: OrderBursa[]; bursaAktif: boolean } {
+export function usePosisi(): HasilData<Posisi[]> & {
+  pending: OrderBursa[]; stop: OrderBursa[]; bursaAktif: boolean;
+  /** Kapan `public/posisiTerbuka` terakhir ditulis, atau null kalau belum
+   *  pernah. Dipakai panelnya untuk mengatakan UMUR catatannya. */
+  siaranPada: number | null;
+} {
   const { pengguna, memuat: memuatAuth, pemilik } = useAuth();
   const [data, setData] = useState<Posisi[]>(POSISI_TERBUKA);
   const [memuat, setMemuat] = useState(true);
   const [galat, setGalat] = useState<string | null>(null);
   const [ada, setAda] = useState(false);
+  /* ── KAPAN CATATANNYA DITULIS ────────────────────────────────────────
+     Dilaporkan pemilik 21 Sep 2026: dua posisi muncul "tiba-tiba" di panel
+     kripto. Ternyata bukan tiba-tiba — itu posisi simulasi screener miliknya
+     sendiri yang disiarkan 18 Sep dan tidak pernah dibersihkan siapa pun.
+
+     Screener hanya menulis dokumen ini SELAMA halamannya terbuka, dan hanya
+     kalau isinya berubah. Jadi begitu halaman itu ditutup, baris terakhirnya
+     menetap di sana tanpa batas waktu — dan panel ini menampilkannya seperti
+     sesuatu yang sedang berjalan sekarang.
+
+     Yang diperbaiki BUKAN dengan menyembunyikan barisnya kalau sudah tua:
+     posisi simulasi yang memang masih terbuka berhari-hari juga tidak
+     memperbarui stempel ini, karena isinya tidak berubah. Menyembunyikannya
+     berarti menghilangkan posisi yang benar-benar ada. Yang benar
+     mengatakan umurnya, lalu membiarkan pembacanya menilai. */
+  const [siaranPada, setSiaranPada] = useState<number | null>(null);
 
   useEffect(() => {
     setMemuat(true);
@@ -346,6 +367,8 @@ export function usePosisi(): HasilData<Posisi[]> & { pending: OrderBursa[]; stop
         const daftar = s.exists() ? (s.data()?.posisi ?? []) : [];
         setData(Array.isArray(daftar) ? daftar.map(kePosisiPublik) : []);
         setAda(s.exists());
+        const stempel = Number(s.data()?._updatedAt);
+        setSiaranPada(Number.isFinite(stempel) && stempel > 0 ? stempel : null);
         setMemuat(false); setGalat(null);
       },
       (e) => { console.warn('posisiTerbuka:', e); setGalat(e.message); setMemuat(false); }
@@ -465,6 +488,10 @@ export function usePosisi(): HasilData<Posisi[]> & { pending: OrderBursa[]; stop
       /* Data contoh: tidak ada bursa di belakangnya, dan memang tidak
          mengaku begitu — subjudulnya sudah diurus label "contoh". */
       bursaAktif: false,
+      /* Pengunjung melihat data contoh, dan contoh tidak punya umur siaran —
+         menyebut tanggal untuk angka yang dikarang justru membuatnya terbaca
+         seperti catatan sungguhan. */
+      siaranPada: null,
       memuat: false, contoh: true, galat: null,
     };
   }
@@ -512,6 +539,7 @@ export function usePosisi(): HasilData<Posisi[]> & { pending: OrderBursa[]; stop
        tertutup bisa tertinggal berhari-hari di sana. Menyebutnya berjalan di
        bursa adalah klaim yang tidak bisa ditopang apa pun. */
     bursaAktif: aktif,
+    siaranPada,
     /* `contoh` berarti "ini bukan datamu, ini contoh". Dokumen publik itu
        data sungguhan, jadi labelnya hanya muncul kalau dokumennya memang
        belum ada. */
