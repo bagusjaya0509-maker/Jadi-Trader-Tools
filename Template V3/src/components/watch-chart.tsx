@@ -8,6 +8,7 @@ import { useMulti, kirimBus, ID_PANEL, POLOS } from '@/lib/multi-chart';
 import { db } from '@/lib/data';
 import { useAuth } from '@/lib/auth';
 import { ambilSentimen, zonaSentimen, type Sentimen } from '@/lib/coin-listing';
+import { IsiSentimen } from '@/components/panel-sentimen';
 
 /* ════════════════════════════════════════════════════════════════════════
    WATCHLIST CHART — kolom kanan dengan PEMBATAS yang diseret
@@ -119,12 +120,35 @@ function bacaLebar(): number {
    kali. Rute sentimen memang bukan Firestore, tapi kebiasaannya sama. */
 let _sentimenSinggah: { waktu: number; isi: Sentimen | null } = { waktu: 0, isi: null };
 const SENTIMEN_TTL = 30 * 60 * 1000;
+/* 0 tidak dipakai sebagai batas bawah: seksi setinggi nol yang kepalanya
+   masih ada terbaca sebagai rusak. Yang mau menghilangkannya menekan
+   kepalanya — itu kendali yang memang untuk itu. */
+const MIN_FNG = 90;
+const MAKS_FNG = 700;
 
 function SeksiSentimen() {
   const [data, setData] = useState<Sentimen | null>(_sentimenSinggah.isi);
   const [muat, setMuat] = useState(!_sentimenSinggah.isi);
   const [tutup, setTutup] = useState(() => {
     try { return localStorage.getItem('jt.fngTutup') === '1'; } catch { return false; }
+  });
+  /* ── TINGGINYA MILIK ORANGNYA, BUKAN MILIK KODE ──────────────────────
+     Diminta pemilik 22 Sep 2026: garis seksinya bisa diseret-seret untuk
+     mengubah ukuran, seperti pembatas panel Watchlist terhadap grafik di
+     sebelahnya.
+
+     Alasannya masuk akal begitu isinya diganti dengan tampilan Coin Hunter:
+     busur 128 px + pembanding + garis 30 hari itu tinggi, dan berapa banyak
+     dari itu yang pantas memakan kolom watchlist adalah keputusan yang
+     berbeda untuk tiap layar. Yang di layar 1440p mau melihat semuanya;
+     yang di laptop 13 inci mau menyisakan ruang untuk pair-nya.
+
+     Disimpan per perangkat — sama seperti lebar panelnya sendiri. */
+  const [tinggi, setTinggi] = useState(() => {
+    try {
+      const n = parseInt(localStorage.getItem('jt.fngTinggi') || '', 10);
+      return Number.isFinite(n) ? Math.max(MIN_FNG, Math.min(MAKS_FNG, n)) : 300;
+    } catch { return 300; }
   });
 
   useEffect(() => {
@@ -146,69 +170,77 @@ function SeksiSentimen() {
     });
   };
 
+  /* Menyeret KE ATAS membesarkan seksinya — arah yang sama dengan
+     intuisi "menarik atapnya naik". Karena itu deltanya dibalik. */
+  const mulaiSeret = (e: React.PointerEvent) => {
+    e.preventDefault();
+    if (tutup) return;
+    const awalY = e.clientY;
+    const awalT = tinggi;
+    const jepit = (n: number) => Math.max(MIN_FNG, Math.min(MAKS_FNG, n));
+    const gerak = (ev: PointerEvent) => setTinggi(jepit(awalT - (ev.clientY - awalY)));
+    const lepas = (ev: PointerEvent) => {
+      window.removeEventListener('pointermove', gerak);
+      window.removeEventListener('pointerup', lepas);
+      const akhir = jepit(awalT - (ev.clientY - awalY));
+      try { localStorage.setItem('jt.fngTinggi', String(Math.round(akhir))); } catch { /* privat */ }
+    };
+    window.addEventListener('pointermove', gerak);
+    window.addEventListener('pointerup', lepas);
+  };
+
   const zona = data ? zonaSentimen(data.nilai) : null;
 
   return (
-    <div className="mt-1 border-t border-zinc-800/60 pt-1">
-      {/* Kepala seksi memakai gaya yang SAMA PERSIS dengan seksi watchlist
-          di atasnya — kalau berbeda, ia terbaca sebagai tempelan, bukan
-          bagian dari panel yang sama. */}
+    <div className="mt-1">
+      {/* ── PEMBATAS YANG BISA DISERET ────────────────────────────────
+          Bentuknya sengaja sama dengan pembatas panel terhadap grafik:
+          garis tipis yang menebal saat disentuh. Daerah tangkapnya lebih
+          tebal daripada garisnya (py-1.5) — garis setebal satu piksel yang
+          harus dikenai tepat adalah kendali yang terlihat ada tapi terasa
+          rusak. */}
+      <div onPointerDown={mulaiSeret}
+        title={tutup ? 'Buka seksinya dulu untuk mengubah tinggi' : 'Seret untuk mengubah tinggi seksi'}
+        className={cn('group/garis py-1.5', tutup ? 'cursor-default' : 'cursor-row-resize')}>
+        <div className={cn('mx-3 h-px rounded-full bg-zinc-800 transition-colors',
+          !tutup && 'group-hover/garis:bg-zinc-600')} />
+      </div>
+
       <button onClick={gantiTutup}
         title={tutup ? 'Buka Fear & Greed' : 'Tutup Fear & Greed'}
-        className="flex w-full cursor-pointer items-center gap-1.5 px-3 pb-0.5 pt-2 text-left">
+        className="flex w-full cursor-pointer items-center gap-1.5 px-3 pb-0.5 text-left">
         <span className="truncate text-[10.5px] font-semibold uppercase tracking-wider text-zinc-500">
           Fear &amp; Greed
         </span>
+        {/* Angkanya tetap terlihat saat seksinya ditutup — ditutup berarti
+            menghemat ruang, bukan kehilangan bacaannya. */}
         {data && <span className={cn('angka text-[10.5px]', zona?.kelas)}>{data.nilai}</span>}
         <ChevronDown className={cn('ml-auto size-3 shrink-0 text-zinc-600 transition-transform',
           tutup && '-rotate-90')} />
       </button>
 
       {!tutup && (
-        <div className="px-3 pb-2.5">
+        /* Isinya bisa lebih tinggi daripada jatah yang diseret — di situ ia
+           bergulir sendiri, jadi menyempitkan seksinya tidak pernah
+           memotong isinya tanpa jalan keluar. */
+        <div style={{ height: tinggi }} className="overflow-y-auto px-3 pb-3 pt-1">
           {muat ? (
-            <p className="py-2 text-[10.5px] text-zinc-600">Memuat…</p>
+            <p className="py-2 text-[11px] text-zinc-600">Memuat…</p>
           ) : !data ? (
-            <p className="py-2 text-[10.5px] leading-relaxed text-zinc-600">
+            <p className="py-2 text-[11px] leading-relaxed text-zinc-600">
               Indeksnya belum bisa dibaca sekarang.
             </p>
           ) : (
             <>
-              <div className="flex items-baseline gap-2">
-                <span className={cn('angka text-[19px] font-semibold leading-none', zona?.kelas)}>
-                  {data.nilai}
-                </span>
-                <span className={cn('text-[11px]', zona?.kelas)}>{zona?.nama}</span>
-              </div>
-
-              {/* Batang 0-100. Gradasi dingin->hangat, BUKAN merah/hijau:
-                  di indeks ini "extreme greed" justru keadaan yang paling
-                  sering mendahului koreksi, dan mewarnainya hijau berarti
-                  panel memberi saran yang tidak pernah diminta. */}
-              <div className="relative mt-2 h-1 w-full rounded-full"
-                style={{ background: 'linear-gradient(90deg,#7dd3fc,#bae6fd,#d4d4d8,#fcd34d,#fb923c)' }}>
-                <span className="absolute top-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-zinc-950 bg-zinc-100"
-                  style={{ left: `${Math.max(0, Math.min(100, data.nilai))}%` }} />
-              </div>
-
-              <div className="mt-2 flex items-center gap-x-3 text-[10px] text-zinc-600">
-                {data.kemarin !== null && (
-                  <span>kemarin <span className="angka text-zinc-500">{data.kemarin}</span></span>
-                )}
-                {data.pekanLalu !== null && (
-                  <span>pekan lalu <span className="angka text-zinc-500">{data.pekanLalu}</span></span>
-                )}
-              </div>
-
-              {/* `basi` datang dari server saat sumbernya sedang tidak
-                  terjangkau dan yang dikirim singgahan lama. WAJIB tampil:
-                  angka kemarin yang menyamar jadi angka hari ini adalah
-                  kebohongan kecil yang dipakai orang mengambil keputusan. */}
-              {data.basi && (
-                <p className="mt-1.5 text-[10px] leading-relaxed text-amber-200/70">
-                  Sumbernya sedang tidak terjangkau — ini angka tersimpan, bukan hari ini.
-                </p>
-              )}
+              <IsiSentimen s={data} />
+              {/* Kalimat penutupnya BEDA dengan yang di Coin Hunter, dan
+                  memang harus: di sana ia bicara soal koin presale yang
+                  dipantau di bawahnya; di sini yang ada di sebelahnya
+                  grafik dan tiket order. */}
+              <p className="mt-4 border-t border-zinc-800/60 pt-3 text-[11px] leading-relaxed text-zinc-600">
+                Mengukur suasana pasar kripto secara keseluruhan — bukan pair yang sedang
+                terbuka di chart. Latar untuk membaca, bukan aba-aba masuk.
+              </p>
             </>
           )}
         </div>

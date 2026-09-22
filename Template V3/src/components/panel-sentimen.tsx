@@ -91,6 +91,55 @@ function Banding({ label, nilai, kini }: { label: string; nilai: number | null; 
   );
 }
 
+/** Isi panel sentimen TANPA bingkainya — busur, angka, pembanding, dan
+ *  garis 30 hari.
+ *
+ *  Dipisah 22 Sep 2026 supaya panel Watchlist di Chart & Entry memakai
+ *  tampilan yang SAMA, bukan tiruan. Versi pertamanya di sana memang
+ *  tiruan ringkas, dan pemilik memintanya diganti dengan yang ini.
+ *
+ *  Dua tiruan yang harus dijaga tetap sepakat adalah dua tempat yang suatu
+ *  hari akan berselisih — dan untuk angka yang dipakai menilai pasar,
+ *  berselisih berarti salah satunya bohong. */
+export function IsiSentimen({ s }: { s: Sentimen }) {
+  const zona = zonaSentimen(s.nilai);
+  return (
+    <>
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
+        <div className="relative shrink-0">
+          <Busur nilai={s.nilai} warna={zona.cincin} />
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <div className={cn('angka text-[30px] leading-none', zona.kelas)}>{s.nilai}</div>
+            <div className="mt-1 text-[10.5px] text-zinc-500">dari 100</div>
+          </div>
+        </div>
+
+        <div className="min-w-[150px] flex-1">
+          <div className={cn('text-[15px] font-semibold', zona.kelas)}>{zona.nama}</div>
+          <p className="mt-0.5 text-[11.5px] text-zinc-600">
+            {s.basi
+              ? 'Angka terakhir yang tersimpan — sumbernya sedang tidak terjangkau.'
+              : `Diperbarui ${new Date(s.waktu).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}`}
+          </p>
+          <div className="mt-3 space-y-1.5">
+            <Banding label="Kemarin" nilai={s.kemarin} kini={s.nilai} />
+            <Banding label="Sepekan lalu" nilai={s.pekanLalu} kini={s.nilai} />
+          </div>
+        </div>
+      </div>
+
+      {s.riwayat.length > 1 && (
+        <div className="mt-4">
+          <Garis data={s.riwayat} />
+          <div className="mt-1 flex justify-between text-[10.5px] text-zinc-600">
+            <span>30 hari lalu</span><span>hari ini</span>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 export function PanelSentimen() {
   const [s, setS] = useState<Sentimen | null>(null);
   const [muat, setMuat] = useState(true);
@@ -104,7 +153,6 @@ export function PanelSentimen() {
 
   useEffect(() => { void tarik(); }, [tarik]);
 
-  const zona = s ? zonaSentimen(s.nilai) : null;
 
   return (
     <Panel className="mb-4">
@@ -127,37 +175,7 @@ export function PanelSentimen() {
           <div className="h-[128px]" />   /* menahan tinggi supaya tidak melompat */
         ) : (
           <>
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
-              <div className="relative shrink-0">
-                <Busur nilai={s.nilai} warna={zona!.cincin} />
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <div className={cn('angka text-[30px] leading-none', zona!.kelas)}>{s.nilai}</div>
-                  <div className="mt-1 text-[10.5px] text-zinc-500">dari 100</div>
-                </div>
-              </div>
-
-              <div className="min-w-[150px] flex-1">
-                <div className={cn('text-[15px] font-semibold', zona!.kelas)}>{zona!.nama}</div>
-                <p className="mt-0.5 text-[11.5px] text-zinc-600">
-                  {s.basi
-                    ? 'Angka terakhir yang tersimpan — sumbernya sedang tidak terjangkau.'
-                    : `Diperbarui ${new Date(s.waktu).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}`}
-                </p>
-                <div className="mt-3 space-y-1.5">
-                  <Banding label="Kemarin" nilai={s.kemarin} kini={s.nilai} />
-                  <Banding label="Sepekan lalu" nilai={s.pekanLalu} kini={s.nilai} />
-                </div>
-              </div>
-            </div>
-
-            {s.riwayat.length > 1 && (
-              <div className="mt-4">
-                <Garis data={s.riwayat} />
-                <div className="mt-1 flex justify-between text-[10.5px] text-zinc-600">
-                  <span>30 hari lalu</span><span>hari ini</span>
-                </div>
-              </div>
-            )}
+            <IsiSentimen s={s} />
 
             {/* Kalimat ini bagian dari fiturnya, bukan penafian yang
                 ditempel belakangan. Angka besar berwarna di layar trading
