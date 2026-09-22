@@ -215,26 +215,41 @@ function SeksiSentimen() {
 
           Bidang sentuhnya diperluas ±10 px ke atas-bawah — garis 6 px
           mustahil dipegang jari. */}
+      {/* Setipis mungkin — SATU piksel. Diminta pemilik 22 Sep 2026, dan
+          titik tiganya ikut dibuang karena itulah yang memaksa garisnya
+          setebal 6 px: titik 2 px butuh ruang untuk duduk.
+
+          Yang hilang cuma petunjuk bahwa ia bisa diseret. Diganti dua hal
+          yang tidak makan ruang sama sekali: kursor berubah jadi
+          `row-resize` saat dilewati, dan garisnya menyala. Bidang sentuhnya
+          tetap ±9 px ke atas-bawah — garis satu piksel yang harus dikenai
+          tepat adalah kendali yang terlihat ada tapi terasa rusak. */}
       <div onPointerDown={mulaiSeret}
            onDoubleClick={alihkan}
            title={tinggi > 0
              ? 'Tarik untuk mengatur tinggi — tarik ke bawah untuk menutup'
              : 'Tarik ke atas untuk membuka Fear & Greed'}
-           className="group/hg relative h-1.5 cursor-row-resize touch-none bg-zinc-800/60 transition-colors hover:bg-zinc-600">
-        <span className="absolute inset-x-0 -bottom-2.5 -top-2.5" />
-        <span className="pointer-events-none absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 gap-[3px]">
-          {[0, 1, 2].map((i) => (
-            <span key={i} className="block size-[2px] rounded-full bg-zinc-600 transition-colors group-hover/hg:bg-zinc-300" />
-          ))}
-        </span>
+           className="group/hg relative h-px cursor-row-resize touch-none bg-zinc-800 transition-colors hover:bg-zinc-500">
+        <span className="absolute inset-x-0 -bottom-2 -top-2" />
       </div>
 
       {tinggi > 0 && (
-        /* `maxHeight` persen adalah pagar yang bekerja TANPA JavaScript:
-           jendela yang dikecilkan tidak memicu seretan, jadi jepitan di
-           atas tidak pernah jalan — dan tanpa pagar ini panelnya menjulur
-           lagi begitu chartnya memendek. */
-        <div className="flex flex-col" style={{ height: tinggi, maxHeight: '70%' }}>
+        /* ── `maxHeight: '70%'` DIBUANG, DAN ITU PENTING ────────────────
+           Dipasang kemarin sebagai "pagar tanpa JavaScript". Ia justru jadi
+           bug: persen pada max-height dihitung terhadap CONTAINING BLOCK —
+           yaitu pembungkus seksi ini, yang tingginya ditentukan oleh anaknya
+           sendiri. Jadi kotak ini menjepit dirinya sendiri.
+
+           Terukur di peramban 22 Sep 2026: `height: 289px` menghasilkan
+           tinggi nyata 206,5 px — tepat 70% dari pembungkus 295 px — dan
+           sisa ~82 px jadi bidang hitam kosong di bawah paragraf penutup.
+           Dilaporkan pemilik: "kok bisa ga full padahal masih ada sisa
+           space ruang disana".
+
+           Pagarnya sekarang cukup satu: jepitan saat menyeret, yang membaca
+           tinggi kolom SEBENARNYA dari DOM. Itu acuan yang benar; persen
+           CSS di sini tidak punya acuan yang benar untuk dipakai. */
+        <div className="flex flex-col" style={{ height: tinggi }}>
           {/* Kepala seksi DIBUANG atas permintaan pemilik 22 Sep 2026.
               Alasannya benar: busurnya sudah memuat angkanya sendiri di
               tengah, dan "FEAR & GREED 78" tepat di atas "78" cuma
