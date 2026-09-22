@@ -7,7 +7,7 @@ import { SIMBOL_DASAR, useSimbol } from '@/lib/simbol';
 import { useMulti, kirimBus, ID_PANEL, POLOS } from '@/lib/multi-chart';
 import { db } from '@/lib/data';
 import { useAuth } from '@/lib/auth';
-import { ambilSentimen, zonaSentimen, type Sentimen } from '@/lib/coin-listing';
+import { ambilSentimen, type Sentimen } from '@/lib/coin-listing';
 import { IsiSentimen } from '@/components/panel-sentimen';
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -205,8 +205,6 @@ function SeksiSentimen() {
     setTinggi((v) => { const n = v > 0 ? 0 : FNG_BAWAAN; simpan(n); return n; });
   };
 
-  const zona = data ? zonaSentimen(data.nilai) : null;
-
   return (
     <div ref={akar} className="shrink-0">
       {/* ── PEMBATAS GESER ────────────────────────────────────────────
@@ -237,13 +235,16 @@ function SeksiSentimen() {
            atas tidak pernah jalan — dan tanpa pagar ini panelnya menjulur
            lagi begitu chartnya memendek. */
         <div className="flex flex-col" style={{ height: tinggi, maxHeight: '70%' }}>
-          <div className="flex shrink-0 items-center gap-1.5 px-3 pb-0.5 pt-1.5">
-            <span className="truncate text-[10.5px] font-semibold uppercase tracking-wider text-zinc-500">
-              Fear &amp; Greed
-            </span>
-            {data && <span className={cn('angka text-[10.5px]', zona?.kelas)}>{data.nilai}</span>}
-          </div>
+          {/* Kepala seksi DIBUANG atas permintaan pemilik 22 Sep 2026.
+              Alasannya benar: busurnya sudah memuat angkanya sendiri di
+              tengah, dan "FEAR & GREED 78" tepat di atas "78" cuma
+              mengulang. Judul yang mengulang isinya bukan judul, itu
+              pengisi ruang — dan ruang di kolom ini sedang diperebutkan.
 
+              Yang hilang bersamanya cuma satu hal: nama indeksnya tidak
+              lagi tertulis. Tidak apa-apa di sini — busur setengah lingkaran
+              berskala 0-100 dengan label zona "Extreme Greed" di sebelahnya
+              cuma punya satu arti di layar trading. */}
           {/* `gulir-senyap`: bergulir tanpa memperlihatkan batangnya —
               diminta pemilik. Batang gulir di kolom selebar ini memakan
               ruang yang justru sedang diperebutkan isinya. */}
