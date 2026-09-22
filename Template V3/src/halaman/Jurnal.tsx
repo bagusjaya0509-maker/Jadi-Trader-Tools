@@ -254,6 +254,20 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
   const [otomatis, setOtomatis] = useState(() => {
     try { return localStorage.getItem('jtSinkronOtomatis') === '1'; } catch { return false; }
   });
+  /* Rentang sendiri untuk kripto — TIDAK berbagi dengan Trade-Fi.
+     Keduanya menarik dari sumber yang berbeda dengan ongkos yang berbeda:
+     MT5 membaca berkas di VPS, kripto memanggil bursa yang punya batas laju.
+     Satu nilai untuk dua tombol berarti mengubah satu diam-diam mengubah
+     yang lain. */
+  const [sejakKripto, setSejakKripto] = useState(() => {
+    try { return localStorage.getItem('jtSinkronSejakKripto') ?? '7'; } catch { return '7'; }
+  });
+  const aturSejakKripto = (v: string) => {
+    setSejakKripto(v);
+    try { localStorage.setItem('jtSinkronSejakKripto', v); } catch { /* mode privat */ }
+  };
+  const [sinkronKripto, setSinkronKripto] = useState<{ sibuk: boolean; pesan: string }>(
+    { sibuk: false, pesan: '' });
 
   const aturSejak = (v: string) => {
     setSejak(v);
@@ -361,36 +375,66 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
      saat dompet punya belasan ribu fill. */
   const sedangSinkron = useRef(false);
 
-  useEffect(() => {
-    /* `dataContoh` menutup gerbang. Tanpa itu, pengguna baru yang jurnalnya
-       masih kosong dihitung dari 94 trade CONTOH: `terbaru` jadi > 0, cabang
-       "7 hari" tidak pernah terpakai, dan jendelanya menyempit jadi sekitar
-       1,5 hari — persis pada orang yang paling butuh tarikan 7 hari itu. */
-    if (!bisaTulis || dataContoh || sumber !== 'kripto') return;
-    let hidup = true;
-    const jalan = async () => {
-      if (sedangSinkron.current) return;
-      sedangSinkron.current = true;
-      try {
+  /* ── SATU FUNGSI, DUA PEMANGGIL ─────────────────────────────────────
+     Dulu seluruh isi sinkron kripto terkurung di dalam `useEffect`, jadi
+     satu-satunya cara menjalankannya adalah menunggu putaran 5 menit.
+     Diminta pemilik 22 Sep 2026: tombol sinkron manual dan pemilih rentang,
+     seperti yang sudah ada di Trade-Fi.
+
+     `sejakPaksa` diisi tombol; kosong berarti jendela otomatis. */
+  const tarikKripto = useCallback(async (sejakPaksa?: number, diam = true) => {
+    if (sedangSinkron.current) return;
+    sedangSinkron.current = true;
+    if (!diam) setSinkronKripto({ sibuk: true, pesan: '' });
+    try {
       const kini = tradeRef.current;
       const sudahAda = new Set(kini.map((t) => t.id));
       const terbaru = kini.reduce((s, t) => Math.max(s, t.waktu), 0);
-      const sejak = terbaru > 0 ? terbaru - 3_600_000 : Date.now() - 7 * 86_400_000;
+      /* ── KENAPA 24 JAM, BUKAN 1 JAM ────────────────────────────────
+         Dilaporkan pemilik 22 Sep 2026: PUMP yang ditutup di Hyperliquid
+         tidak pernah muncul di jurnal. Ditelusuri, dan sebabnya di baris
+         ini.
+
+         `terbaru` adalah trade TERBARU yang sudah ada di jurnal, jadi
+         jendelanya bergerak maju setiap kali satu trade masuk — batas air
+         tertinggi. Dengan mundur cuma 1 jam, apa pun yang lebih tua
+         daripada (trade terbaru − 1 jam) tidak akan pernah terlihat lagi.
+
+         Itu persis yang terjadi. Bursanya diperiksa langsung:
+
+           21 Sep 15:16  DASH    ditutup di Binance
+           21 Sep 15:17  PUMP    ditutup di Hyperliquid
+           21 Sep 16:35  FARTCOIN
+           21 Sep 16:38  HBAR
+           21 Sep 16:39  SOL, ETH, HYPE
+
+         Begitu satu putaran menangkap yang jam 16:38, jendela berikutnya
+         mulai 15:38 — dan PUMP jam 15:17 tertinggal 21 menit di luar,
+         selamanya.
+
+         24 jam memberi ruang untuk seluruh sesi trading, bukan cuma satu
+         jam terakhir. Tidak ada risiko duplikat: `sudahAda` menyaring
+         berdasarkan id sebelum menulis, jadi yang terbaca ulang cuma
+         dilewati. Yang dibayar sedikit lalu lintas ke bursa. */
+      const sejak = sejakPaksa !== undefined ? sejakPaksa
+        : terbaru > 0 ? terbaru - 24 * 3_600_000 : Date.now() - 7 * 86_400_000;
+      {
+      const hidup = true;
       /* DUA BURSA, SATU PUTARAN. Berurutan, bukan Promise.all: keduanya
          menulis ke koleksi yang sama dan `sudahAda` yang dipakai keduanya
          adalah potret SEBELUM putaran ini — menjalankannya bersamaan tidak
          mempercepat apa pun yang terasa, dan menambah satu cara baru untuk
          dua penulis bertemu di satu id. */
       const h = await sinkronRiwayatBinance(sudahAda, sejak);
-      if (!hidup) return;
+      if (!hidup) return;   // eslint-disable-line no-constant-condition
       const hHl = await sinkronRiwayatHyperliquid(sudahAda, sejak);
-      if (!hidup) return;
+      if (!hidup) return;   // eslint-disable-line no-constant-condition
       /* Ketiga, dompet yang ditautkan pengguna sendiri — TERAKHIR, karena
          ia memakai konvensi id yang sama dengan jalur HL pemilik (hl<oid>)
          dan membawa isi yang lebih lengkap; kalau keduanya menulis oid yang
          sama di satu putaran, yang lebih lengkap yang menetap. */
       const hDompet = await sinkronRiwayatDompet(sudahAda, sejak);
-      if (!hidup) return;
+      if (!hidup) return;   // eslint-disable-line no-constant-condition
 
       /* ── ARUS KAS, JENDELA SENDIRI ────────────────────────────────────
          `sejak` di atas dihitung dari TRADE terakhir, dan itu jendela yang
@@ -405,9 +449,9 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
       const sejakArus = Math.max(MULAI_ARUS_OTOMATIS, arusTerbaru ? arusTerbaru - 3_600_000 : 0);
 
       const aBin = await sinkronArusBinance(sudahAdaArus, sejakArus);
-      if (!hidup) return;
+      if (!hidup) return;   // eslint-disable-line no-constant-condition
       const aHl = await sinkronArusHyperliquid(sudahAdaArus, sejakArus);
-      if (!hidup) return;
+      if (!hidup) return;   // eslint-disable-line no-constant-condition
 
       const kabar: string[] = [];
       if (!h.galat && h.masuk > 0) kabar.push(`${h.masuk} dari Binance`);
@@ -416,12 +460,39 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
       const nArus = (aBin.masuk || 0) + (aHl.masuk || 0);
       if (nArus > 0) kabar.push(`${nArus} setoran/penarikan`);
       setPesanBin(kabar.length ? `${kabar.join(' dan ')} masuk otomatis.` : '');
-      } finally { sedangSinkron.current = false; }
-    };
-    void jalan();
-    const jam = setInterval(() => void jalan(), 5 * 60_000);
-    return () => { hidup = false; clearInterval(jam); };
-  }, [bisaTulis, dataContoh, sumber]);
+
+      /* Tombol manual menjawab SENDIRI, termasuk saat tidak ada yang baru.
+         Tombol yang ditekan lalu diam tidak bisa dibedakan dari tombol yang
+         rusak — dan "sudah mutakhir" adalah jawaban yang sah. */
+      if (!diam) {
+        const galat = [h.galat, hHl.galat, hDompet.galat].filter(Boolean)[0];
+        bersihkanPesan();
+        setSinkronKripto({
+          sibuk: false,
+          pesan: galat ? String(galat)
+            : kabar.length ? `${kabar.join(' dan ')} masuk jurnal.`
+            : 'Sudah mutakhir — tidak ada transaksi baru di rentang itu.',
+        });
+      }
+      }
+    } catch (e) {
+      if (!diam) {
+        bersihkanPesan();
+        setSinkronKripto({ sibuk: false, pesan: e instanceof Error ? e.message : 'Gagal menarik riwayat' });
+      }
+    } finally { sedangSinkron.current = false; }
+  }, [bersihkanPesan]);
+
+  useEffect(() => {
+    /* `dataContoh` menutup gerbang. Tanpa itu, pengguna baru yang jurnalnya
+       masih kosong dihitung dari 94 trade CONTOH: `terbaru` jadi > 0, cabang
+       "7 hari" tidak pernah terpakai, dan jendelanya menyempit jadi sekitar
+       1,5 hari — persis pada orang yang paling butuh tarikan 7 hari itu. */
+    if (!bisaTulis || dataContoh || sumber !== 'kripto') return;
+    void tarikKripto();
+    const jam = setInterval(() => void tarikKripto(), 5 * 60_000);
+    return () => clearInterval(jam);
+  }, [bisaTulis, dataContoh, sumber, tarikKripto]);
   const pl = useMemo(() => plPerHari(trade), [trade]);
 
   const emosi = useMemo(() => {
@@ -701,6 +772,40 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
                       )}
                     </span>
                   )}
+
+                  {/* ── SINKRON KRIPTO ────────────────────────────────────
+                      Diminta pemilik 22 Sep 2026, dan permintaannya lahir
+                      dari kejadian nyata: PUMP yang ditutup di Hyperliquid
+                      tidak pernah muncul di jurnal, dan tidak ada satu pun
+                      cara menariknya kembali selain menunggu putaran
+                      otomatis yang justru sudah melewatkannya.
+
+                      Bentuknya sengaja kembar dengan blok Trade-Fi di
+                      atasnya — rentang di kiri, tombol di kanan. Yang
+                      berbeda cuma pilihan rentangnya: kripto ditarik dari
+                      bursa yang punya batas laju, jadi pilihan terpanjangnya
+                      90 hari, bukan "Semua". */}
+                  {sumber === 'kripto' && (
+                    <span className="flex items-center gap-2">
+                      <select value={sejakKripto} onChange={(e) => aturSejakKripto(e.target.value)}
+                        title="Seberapa jauh ke belakang yang diambil dari bursa"
+                        className="h-[30px] cursor-pointer rounded-md border border-zinc-800 bg-zinc-900/60 px-2 text-[11.5px] text-zinc-300 outline-none">
+                        <option value="1">24 jam</option>
+                        <option value="7">7 hari</option>
+                        <option value="30">30 hari</option>
+                        <option value="90">90 hari</option>
+                      </select>
+                      <button
+                        onClick={() => void tarikKripto(Date.now() - Number(sejakKripto) * 86_400_000, false)}
+                        disabled={!bisaTulis || sinkronKripto.sibuk}
+                        title="Tarik riwayat Binance, Hyperliquid, dan dompet tertaut untuk rentang yang dipilih"
+                        className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100 disabled:cursor-not-allowed disabled:opacity-50">
+                        <RefreshCw className={cn('size-3.5', sinkronKripto.sibuk && 'animate-spin')} />
+                        {sinkronKripto.sibuk ? 'Menarik…' : 'Sinkron'}
+                      </button>
+                    </span>
+                  )}
+
                   <button onClick={() => setModal('baru')} disabled={!bisaTulis}
                     title={bisaTulis ? undefined : 'Masuk dulu untuk menambah catatan'}
                     className="flex cursor-pointer items-center gap-1.5 rounded-md bg-zinc-100 px-3 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50">
@@ -715,11 +820,18 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
                     {sinkron.pesan}
                   </div>
                 )}
-                {pesanBin && sumber === 'kripto' && (
+                {/* Pesan tombol manual MENANG atas pesan otomatis: yang
+                    baru saja menekan sedang menunggu jawaban untuk
+                    tekanannya, bukan kabar dari putaran latar. */}
+                {sinkronKripto.pesan && sumber === 'kripto' ? (
+                  <div className="mb-3 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-2 text-[12px] text-zinc-300">
+                    {sinkronKripto.pesan}
+                  </div>
+                ) : pesanBin && sumber === 'kripto' ? (
                   <div className="mb-3 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-2 text-[12px] text-emerald-400/90">
                     {pesanBin}
                   </div>
-                )}
+                ) : null}
                 {/* Tingginya TIDAK dipatok angka.
                     ────────────────────────────────────────────────────────
                     Pernah `max-h-[433px]` (28 + 9x45, tinggi sembilan baris
