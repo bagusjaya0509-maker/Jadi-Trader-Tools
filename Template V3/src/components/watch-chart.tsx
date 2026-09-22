@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, X, GripVertical, Pencil, FolderPlus } from 'lucide-react';
+import { Plus, X, GripVertical, Pencil, FolderPlus, ChevronDown } from 'lucide-react';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { cn, harga as fHarga } from '@/lib/utils';
 import { ambilTickers, hargaTickMt5, daftarSimbolHl, daftarSimbolMt5, type Ticker, ambilKlines} from '@/lib/pasar';
@@ -7,6 +7,7 @@ import { SIMBOL_DASAR, useSimbol } from '@/lib/simbol';
 import { useMulti, kirimBus, ID_PANEL, POLOS } from '@/lib/multi-chart';
 import { db } from '@/lib/data';
 import { useAuth } from '@/lib/auth';
+import { ambilSentimen, zonaSentimen, type Sentimen } from '@/lib/coin-listing';
 
 /* ════════════════════════════════════════════════════════════════════════
    WATCHLIST CHART — kolom kanan dengan PEMBATAS yang diseret
@@ -91,6 +92,129 @@ function bacaLebar(): number {
     if (n === 0) return 0;                       /* sengaja ditutup */
     return n >= LEBAR_MIN && n <= LEBAR_MAKS ? n : 0;
   } catch { return 0; }
+}
+
+/* ══ FEAR & GREED DI KAKI WATCHLIST ═══════════════════════════════════
+   Diminta pemilik 22 Sep 2026: seksi indeks Fear & Greed di panel
+   Watchlist, ditaruh paling bawah — di bawah seksi Trade-Fi.
+
+   Dibuat ULANG di sini, tidak memakai `PanelSentimen` yang sudah ada di
+   Coin Hunter. Bukan karena kembar: yang di sana punya gauge 128 px dan
+   padding 20 px, dibuat untuk kolom selebar halaman. Kolom ini ~230 px,
+   dan komponen yang dipaksa masuk ke ruang sepertiga lebarnya akan
+   mengecil sampai angkanya sendiri tidak terbaca.
+
+   Yang dibagi bersama justru bagian yang memang harus sama: `ambilSentimen`
+   dan `zonaSentimen` — sumber datanya dan pembagian zonanya. Yang berbeda
+   cuma bentuknya.
+
+   ── SEKALI AMBIL PER SESI ────────────────────────────────────────────
+   Indeksnya diperbarui SEKALI SEHARI. Menariknya tiap kali panel dipasang
+   ulang — dan panel ini ikut dibongkar-pasang tiap chart berganti simbol —
+   berarti puluhan permintaan untuk angka yang sama. Disimpan di lingkup
+   modul, jadi tarikan kedua dan seterusnya gratis.
+
+   Ini pelajaran yang baru saja mahal: kuota Firestore proyek ini habis
+   22 Sep gara-gara satu papan tampilan yang menarik data mahal berulang
+   kali. Rute sentimen memang bukan Firestore, tapi kebiasaannya sama. */
+let _sentimenSinggah: { waktu: number; isi: Sentimen | null } = { waktu: 0, isi: null };
+const SENTIMEN_TTL = 30 * 60 * 1000;
+
+function SeksiSentimen() {
+  const [data, setData] = useState<Sentimen | null>(_sentimenSinggah.isi);
+  const [muat, setMuat] = useState(!_sentimenSinggah.isi);
+  const [tutup, setTutup] = useState(() => {
+    try { return localStorage.getItem('jt.fngTutup') === '1'; } catch { return false; }
+  });
+
+  useEffect(() => {
+    if (_sentimenSinggah.isi && Date.now() - _sentimenSinggah.waktu < SENTIMEN_TTL) return;
+    let hidup = true;
+    void (async () => {
+      const s = await ambilSentimen();
+      if (!hidup) return;
+      _sentimenSinggah = { waktu: Date.now(), isi: s };
+      setData(s); setMuat(false);
+    })();
+    return () => { hidup = false; };
+  }, []);
+
+  const gantiTutup = () => {
+    setTutup((v) => {
+      try { localStorage.setItem('jt.fngTutup', v ? '0' : '1'); } catch { /* privat */ }
+      return !v;
+    });
+  };
+
+  const zona = data ? zonaSentimen(data.nilai) : null;
+
+  return (
+    <div className="mt-1 border-t border-zinc-800/60 pt-1">
+      {/* Kepala seksi memakai gaya yang SAMA PERSIS dengan seksi watchlist
+          di atasnya — kalau berbeda, ia terbaca sebagai tempelan, bukan
+          bagian dari panel yang sama. */}
+      <button onClick={gantiTutup}
+        title={tutup ? 'Buka Fear & Greed' : 'Tutup Fear & Greed'}
+        className="flex w-full cursor-pointer items-center gap-1.5 px-3 pb-0.5 pt-2 text-left">
+        <span className="truncate text-[10.5px] font-semibold uppercase tracking-wider text-zinc-500">
+          Fear &amp; Greed
+        </span>
+        {data && <span className={cn('angka text-[10.5px]', zona?.kelas)}>{data.nilai}</span>}
+        <ChevronDown className={cn('ml-auto size-3 shrink-0 text-zinc-600 transition-transform',
+          tutup && '-rotate-90')} />
+      </button>
+
+      {!tutup && (
+        <div className="px-3 pb-2.5">
+          {muat ? (
+            <p className="py-2 text-[10.5px] text-zinc-600">Memuat…</p>
+          ) : !data ? (
+            <p className="py-2 text-[10.5px] leading-relaxed text-zinc-600">
+              Indeksnya belum bisa dibaca sekarang.
+            </p>
+          ) : (
+            <>
+              <div className="flex items-baseline gap-2">
+                <span className={cn('angka text-[19px] font-semibold leading-none', zona?.kelas)}>
+                  {data.nilai}
+                </span>
+                <span className={cn('text-[11px]', zona?.kelas)}>{zona?.nama}</span>
+              </div>
+
+              {/* Batang 0-100. Gradasi dingin->hangat, BUKAN merah/hijau:
+                  di indeks ini "extreme greed" justru keadaan yang paling
+                  sering mendahului koreksi, dan mewarnainya hijau berarti
+                  panel memberi saran yang tidak pernah diminta. */}
+              <div className="relative mt-2 h-1 w-full rounded-full"
+                style={{ background: 'linear-gradient(90deg,#7dd3fc,#bae6fd,#d4d4d8,#fcd34d,#fb923c)' }}>
+                <span className="absolute top-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-zinc-950 bg-zinc-100"
+                  style={{ left: `${Math.max(0, Math.min(100, data.nilai))}%` }} />
+              </div>
+
+              <div className="mt-2 flex items-center gap-x-3 text-[10px] text-zinc-600">
+                {data.kemarin !== null && (
+                  <span>kemarin <span className="angka text-zinc-500">{data.kemarin}</span></span>
+                )}
+                {data.pekanLalu !== null && (
+                  <span>pekan lalu <span className="angka text-zinc-500">{data.pekanLalu}</span></span>
+                )}
+              </div>
+
+              {/* `basi` datang dari server saat sumbernya sedang tidak
+                  terjangkau dan yang dikirim singgahan lama. WAJIB tampil:
+                  angka kemarin yang menyamar jadi angka hari ini adalah
+                  kebohongan kecil yang dipakai orang mengambil keputusan. */}
+              {data.basi && (
+                <p className="mt-1.5 text-[10px] leading-relaxed text-amber-200/70">
+                  Sumbernya sedang tidak terjangkau — ini angka tersimpan, bukan hari ini.
+                </p>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function WatchChart({ simbol, onPilih, onLebar }: {
@@ -718,6 +842,11 @@ export function WatchChart({ simbol, onPilih, onLebar }: {
           {semuaSimbol.length === 0 && (
             <p className="px-3 py-6 text-center text-[11.5px] text-zinc-600">Watchlist kosong — tambah pair di atas.</p>
           )}
+
+          {/* Paling bawah, di dalam daerah yang sama dengan seksi pair —
+              jadi ia ikut tergulir dan ikut hilang saat panelnya disempitkan,
+              persis seperti yang diminta. */}
+          <SeksiSentimen />
         </div>
       </div>
       )}
