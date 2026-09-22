@@ -263,7 +263,11 @@ function SeksiSentimen() {
           {/* `gulir-senyap`: bergulir tanpa memperlihatkan batangnya —
               diminta pemilik. Batang gulir di kolom selebar ini memakan
               ruang yang justru sedang diperebutkan isinya. */}
-          <div className="gulir-senyap min-h-0 grow overflow-y-auto px-3 pb-3">
+          {/* `pt-3`: kepala seksinya sudah dibuang, jadi busurnya dulu
+              menempel langsung di garis pembatas — terbaca sesak, dan
+              bikin garis yang bisa diseret itu seperti bagian dari isinya.
+              Diminta pemilik 22 Sep 2026. */}
+          <div className="gulir-senyap min-h-0 grow overflow-y-auto px-3 pb-3 pt-3">
             {muat ? (
               <p className="py-2 text-[11px] text-zinc-600">Memuat…</p>
             ) : !data ? (
