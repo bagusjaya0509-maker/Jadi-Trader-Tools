@@ -128,6 +128,7 @@ const FNG_MAKS = 560;
 const FNG_BAWAAN = 300;
 
 function SeksiSentimen() {
+  const akar = useRef<HTMLDivElement>(null);
   const [data, setData] = useState<Sentimen | null>(_sentimenSinggah.isi);
   const [muat, setMuat] = useState(!_sentimenSinggah.isi);
   /* ── TINGGI ADALAH KEADAANNYA ────────────────────────────────────────
@@ -173,9 +174,21 @@ function SeksiSentimen() {
     e.preventDefault();
     try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* pointer lepas */ }
     const awalY = e.clientY, awalT = tinggi;
+    /* ── BATAS ATASNYA DINAMIS, PERSIS SEPERTI PEGANGAN LEBAR ──────────
+       Ditemukan saat menguji: nilai 700 yang tersimpan dari percobaan
+       sebelumnya membuat panel ini lebih tinggi daripada kolomnya sendiri,
+       jadi ia menjulur keluar lagi — gejala yang sama persis dengan yang
+       baru saja diperbaiki, cuma sebabnya pindah.
+
+       Angka mati tidak bisa jadi batas untuk sesuatu yang tingginya
+       ditentukan layar. Jadi dijepit ke 70% tinggi kolom yang sebenarnya:
+       daftar koin dijamin selalu kebagian sepertiga, dan selalu ada
+       pegangan untuk menariknya kembali. */
+    const kolom = akar.current?.parentElement?.clientHeight || 0;
+    const maks = kolom > 0 ? Math.min(FNG_MAKS, Math.round(kolom * 0.7)) : FNG_MAKS;
     const jepit = (n: number) => {
       if (n < FNG_MIN * 0.6) return 0;
-      return Math.max(FNG_MIN, Math.min(FNG_MAKS, n));
+      return Math.max(FNG_MIN, Math.min(maks, n));
     };
     const hitung = (y: number) => jepit(awalT + (awalY - y));
     const gerak = (ev: PointerEvent) => setTinggi(hitung(ev.clientY));
@@ -195,7 +208,7 @@ function SeksiSentimen() {
   const zona = data ? zonaSentimen(data.nilai) : null;
 
   return (
-    <div className="shrink-0">
+    <div ref={akar} className="shrink-0">
       {/* ── PEMBATAS GESER ────────────────────────────────────────────
           Bentuknya sengaja kembar dengan pegangan lebar panel ini: garis
           tipis + tiga titik, menebal saat disentuh. Dua pegangan yang
@@ -219,7 +232,11 @@ function SeksiSentimen() {
       </div>
 
       {tinggi > 0 && (
-        <div className="flex flex-col" style={{ height: tinggi }}>
+        /* `maxHeight` persen adalah pagar yang bekerja TANPA JavaScript:
+           jendela yang dikecilkan tidak memicu seretan, jadi jepitan di
+           atas tidak pernah jalan — dan tanpa pagar ini panelnya menjulur
+           lagi begitu chartnya memendek. */
+        <div className="flex flex-col" style={{ height: tinggi, maxHeight: '70%' }}>
           <div className="flex shrink-0 items-center gap-1.5 px-3 pb-0.5 pt-1.5">
             <span className="truncate text-[10.5px] font-semibold uppercase tracking-wider text-zinc-500">
               Fear &amp; Greed
