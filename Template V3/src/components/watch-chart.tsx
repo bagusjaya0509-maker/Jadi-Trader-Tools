@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, X, GripVertical, Pencil, FolderPlus, ChevronDown } from 'lucide-react';
+import { Plus, X, GripVertical, Pencil, FolderPlus } from 'lucide-react';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { cn, harga as fHarga } from '@/lib/utils';
 import { ambilTickers, hargaTickMt5, daftarSimbolHl, daftarSimbolMt5, type Ticker, ambilKlines} from '@/lib/pasar';
@@ -120,129 +120,137 @@ function bacaLebar(): number {
    kali. Rute sentimen memang bukan Firestore, tapi kebiasaannya sama. */
 let _sentimenSinggah: { waktu: number; isi: Sentimen | null } = { waktu: 0, isi: null };
 const SENTIMEN_TTL = 30 * 60 * 1000;
-/* 0 tidak dipakai sebagai batas bawah: seksi setinggi nol yang kepalanya
-   masih ada terbaca sebagai rusak. Yang mau menghilangkannya menekan
-   kepalanya — itu kendali yang memang untuk itu. */
-const MIN_FNG = 90;
-const MAKS_FNG = 700;
+/* Nol SAH — itu keadaan tertutup, dan pembatas gesernya tetap ada sebagai
+   jalan pulang. Yang tidak sah adalah tinggi di antara nol dan FNG_MIN:
+   terlalu pendek untuk terbaca, cukup tinggi untuk menghalangi. */
+const FNG_MIN = 120;
+const FNG_MAKS = 560;
+const FNG_BAWAAN = 300;
 
 function SeksiSentimen() {
   const [data, setData] = useState<Sentimen | null>(_sentimenSinggah.isi);
   const [muat, setMuat] = useState(!_sentimenSinggah.isi);
-  const [tutup, setTutup] = useState(() => {
-    try { return localStorage.getItem('jt.fngTutup') === '1'; } catch { return false; }
-  });
-  /* ── TINGGINYA MILIK ORANGNYA, BUKAN MILIK KODE ──────────────────────
-     Diminta pemilik 22 Sep 2026: garis seksinya bisa diseret-seret untuk
-     mengubah ukuran, seperti pembatas panel Watchlist terhadap grafik di
-     sebelahnya.
+  /* ── TINGGI ADALAH KEADAANNYA ────────────────────────────────────────
+     Diminta pemilik 22 Sep 2026: "jadi list coin diatas bisa ditarik
+     keatas bisa ditarik kebawah gtu bukan pakai tombol hide segitiga" —
+     persis panel kanan TradingView.
 
-     Alasannya masuk akal begitu isinya diganti dengan tampilan Coin Hunter:
-     busur 128 px + pembanding + garis 30 hari itu tinggi, dan berapa banyak
-     dari itu yang pantas memakan kolom watchlist adalah keputusan yang
-     berbeda untuk tiap layar. Yang di layar 1440p mau melihat semuanya;
-     yang di laptop 13 inci mau menyisakan ruang untuk pair-nya.
-
-     Disimpan per perangkat — sama seperti lebar panelnya sendiri. */
+     Jadi tombol chevron dibuang. Nol berarti tertutup, dan satu seretan
+     mengurus tiga hal sekaligus: membuka, mengubah ukuran, menutup.
+     Alasannya sama dengan yang sudah tertulis di `mulaiTarikLebar` untuk
+     pegangan lebar panel ini: saklar dan ukuran yang disimpan terpisah
+     bisa berselisih — tertutup tapi tingginya 300, atau sebaliknya — dan
+     yang menang jadi tergantung urutan pembacaan. */
   const [tinggi, setTinggi] = useState(() => {
     try {
       const n = parseInt(localStorage.getItem('jt.fngTinggi') || '', 10);
-      return Number.isFinite(n) ? Math.max(MIN_FNG, Math.min(MAKS_FNG, n)) : 300;
-    } catch { return 300; }
+      if (!Number.isFinite(n)) return FNG_BAWAAN;
+      return n <= 0 ? 0 : Math.max(FNG_MIN, Math.min(FNG_MAKS, n));
+    } catch { return FNG_BAWAAN; }
   });
 
   useEffect(() => {
     if (_sentimenSinggah.isi && Date.now() - _sentimenSinggah.waktu < SENTIMEN_TTL) return;
     let hidup = true;
     void (async () => {
-      const s = await ambilSentimen();
+      const x = await ambilSentimen();
       if (!hidup) return;
-      _sentimenSinggah = { waktu: Date.now(), isi: s };
-      setData(s); setMuat(false);
+      _sentimenSinggah = { waktu: Date.now(), isi: x };
+      setData(x); setMuat(false);
     })();
     return () => { hidup = false; };
   }, []);
 
-  const gantiTutup = () => {
-    setTutup((v) => {
-      try { localStorage.setItem('jt.fngTutup', v ? '0' : '1'); } catch { /* privat */ }
-      return !v;
-    });
+  const simpan = (n: number) => {
+    try { localStorage.setItem('jt.fngTinggi', String(Math.round(n))); } catch { /* privat */ }
   };
 
-  /* Menyeret KE ATAS membesarkan seksinya — arah yang sama dengan
-     intuisi "menarik atapnya naik". Karena itu deltanya dibalik. */
+  /* Menyeret KE ATAS membesarkan — deltanya dibalik. Yang di bawah ambang
+     dijepit ke NOL, bukan ke FNG_MIN: berhenti di tinggi yang terlalu
+     pendek menghasilkan panel yang isinya tidak terbaca DAN tidak bisa
+     ditutup dengan gerakan yang sama. */
   const mulaiSeret = (e: React.PointerEvent) => {
     e.preventDefault();
-    if (tutup) return;
-    const awalY = e.clientY;
-    const awalT = tinggi;
-    const jepit = (n: number) => Math.max(MIN_FNG, Math.min(MAKS_FNG, n));
-    const gerak = (ev: PointerEvent) => setTinggi(jepit(awalT - (ev.clientY - awalY)));
+    try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* pointer lepas */ }
+    const awalY = e.clientY, awalT = tinggi;
+    const jepit = (n: number) => {
+      if (n < FNG_MIN * 0.6) return 0;
+      return Math.max(FNG_MIN, Math.min(FNG_MAKS, n));
+    };
+    const hitung = (y: number) => jepit(awalT + (awalY - y));
+    const gerak = (ev: PointerEvent) => setTinggi(hitung(ev.clientY));
     const lepas = (ev: PointerEvent) => {
       window.removeEventListener('pointermove', gerak);
       window.removeEventListener('pointerup', lepas);
-      const akhir = jepit(awalT - (ev.clientY - awalY));
-      try { localStorage.setItem('jt.fngTinggi', String(Math.round(akhir))); } catch { /* privat */ }
+      simpan(hitung(ev.clientY));
     };
     window.addEventListener('pointermove', gerak);
     window.addEventListener('pointerup', lepas);
   };
 
+  const alihkan = () => {
+    setTinggi((v) => { const n = v > 0 ? 0 : FNG_BAWAAN; simpan(n); return n; });
+  };
+
   const zona = data ? zonaSentimen(data.nilai) : null;
 
   return (
-    <div className="mt-1">
-      {/* ── PEMBATAS YANG BISA DISERET ────────────────────────────────
-          Bentuknya sengaja sama dengan pembatas panel terhadap grafik:
-          garis tipis yang menebal saat disentuh. Daerah tangkapnya lebih
-          tebal daripada garisnya (py-1.5) — garis setebal satu piksel yang
-          harus dikenai tepat adalah kendali yang terlihat ada tapi terasa
-          rusak. */}
+    <div className="shrink-0">
+      {/* ── PEMBATAS GESER ────────────────────────────────────────────
+          Bentuknya sengaja kembar dengan pegangan lebar panel ini: garis
+          tipis + tiga titik, menebal saat disentuh. Dua pegangan yang
+          pekerjaannya sama persis (mengubah ukuran dengan diseret) tapi
+          bentuknya berbeda memaksa orang mempelajarinya dua kali.
+
+          Bidang sentuhnya diperluas ±10 px ke atas-bawah — garis 6 px
+          mustahil dipegang jari. */}
       <div onPointerDown={mulaiSeret}
-        title={tutup ? 'Buka seksinya dulu untuk mengubah tinggi' : 'Seret untuk mengubah tinggi seksi'}
-        className={cn('group/garis py-1.5', tutup ? 'cursor-default' : 'cursor-row-resize')}>
-        <div className={cn('mx-3 h-px rounded-full bg-zinc-800 transition-colors',
-          !tutup && 'group-hover/garis:bg-zinc-600')} />
+           onDoubleClick={alihkan}
+           title={tinggi > 0
+             ? 'Tarik untuk mengatur tinggi — tarik ke bawah untuk menutup'
+             : 'Tarik ke atas untuk membuka Fear & Greed'}
+           className="group/hg relative h-1.5 cursor-row-resize touch-none bg-zinc-800/60 transition-colors hover:bg-zinc-600">
+        <span className="absolute inset-x-0 -bottom-2.5 -top-2.5" />
+        <span className="pointer-events-none absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 gap-[3px]">
+          {[0, 1, 2].map((i) => (
+            <span key={i} className="block size-[2px] rounded-full bg-zinc-600 transition-colors group-hover/hg:bg-zinc-300" />
+          ))}
+        </span>
       </div>
 
-      <button onClick={gantiTutup}
-        title={tutup ? 'Buka Fear & Greed' : 'Tutup Fear & Greed'}
-        className="flex w-full cursor-pointer items-center gap-1.5 px-3 pb-0.5 text-left">
-        <span className="truncate text-[10.5px] font-semibold uppercase tracking-wider text-zinc-500">
-          Fear &amp; Greed
-        </span>
-        {/* Angkanya tetap terlihat saat seksinya ditutup — ditutup berarti
-            menghemat ruang, bukan kehilangan bacaannya. */}
-        {data && <span className={cn('angka text-[10.5px]', zona?.kelas)}>{data.nilai}</span>}
-        <ChevronDown className={cn('ml-auto size-3 shrink-0 text-zinc-600 transition-transform',
-          tutup && '-rotate-90')} />
-      </button>
+      {tinggi > 0 && (
+        <div className="flex flex-col" style={{ height: tinggi }}>
+          <div className="flex shrink-0 items-center gap-1.5 px-3 pb-0.5 pt-1.5">
+            <span className="truncate text-[10.5px] font-semibold uppercase tracking-wider text-zinc-500">
+              Fear &amp; Greed
+            </span>
+            {data && <span className={cn('angka text-[10.5px]', zona?.kelas)}>{data.nilai}</span>}
+          </div>
 
-      {!tutup && (
-        /* Isinya bisa lebih tinggi daripada jatah yang diseret — di situ ia
-           bergulir sendiri, jadi menyempitkan seksinya tidak pernah
-           memotong isinya tanpa jalan keluar. */
-        <div style={{ height: tinggi }} className="overflow-y-auto px-3 pb-3 pt-1">
-          {muat ? (
-            <p className="py-2 text-[11px] text-zinc-600">Memuat…</p>
-          ) : !data ? (
-            <p className="py-2 text-[11px] leading-relaxed text-zinc-600">
-              Indeksnya belum bisa dibaca sekarang.
-            </p>
-          ) : (
-            <>
-              <IsiSentimen s={data} />
-              {/* Kalimat penutupnya BEDA dengan yang di Coin Hunter, dan
-                  memang harus: di sana ia bicara soal koin presale yang
-                  dipantau di bawahnya; di sini yang ada di sebelahnya
-                  grafik dan tiket order. */}
-              <p className="mt-4 border-t border-zinc-800/60 pt-3 text-[11px] leading-relaxed text-zinc-600">
-                Mengukur suasana pasar kripto secara keseluruhan — bukan pair yang sedang
-                terbuka di chart. Latar untuk membaca, bukan aba-aba masuk.
+          {/* `gulir-senyap`: bergulir tanpa memperlihatkan batangnya —
+              diminta pemilik. Batang gulir di kolom selebar ini memakan
+              ruang yang justru sedang diperebutkan isinya. */}
+          <div className="gulir-senyap min-h-0 grow overflow-y-auto px-3 pb-3">
+            {muat ? (
+              <p className="py-2 text-[11px] text-zinc-600">Memuat…</p>
+            ) : !data ? (
+              <p className="py-2 text-[11px] leading-relaxed text-zinc-600">
+                Indeksnya belum bisa dibaca sekarang.
               </p>
-            </>
-          )}
+            ) : (
+              <>
+                <IsiSentimen s={data} />
+                {/* Kalimat penutupnya BEDA dengan yang di Coin Hunter, dan
+                    memang harus: di sana ia bicara soal koin presale yang
+                    dipantau di bawahnya; di sini yang ada di sebelahnya
+                    grafik dan tiket order. */}
+                <p className="mt-4 border-t border-zinc-800/60 pt-3 text-[11px] leading-relaxed text-zinc-600">
+                  Mengukur suasana pasar kripto secara keseluruhan — bukan pair yang sedang
+                  terbuka di chart. Latar untuk membaca, bukan aba-aba masuk.
+                </p>
+              </>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -875,11 +883,19 @@ export function WatchChart({ simbol, onPilih, onLebar }: {
             <p className="px-3 py-6 text-center text-[11.5px] text-zinc-600">Watchlist kosong — tambah pair di atas.</p>
           )}
 
-          {/* Paling bawah, di dalam daerah yang sama dengan seksi pair —
-              jadi ia ikut tergulir dan ikut hilang saat panelnya disempitkan,
-              persis seperti yang diminta. */}
-          <SeksiSentimen />
         </div>
+
+        {/* ── DIPATOK DI KAKI, DI LUAR DAERAH GULIR DAFTAR ──────────────
+            Sebelumnya ia duduk DI DALAM daftar yang bergulir, jadi ia ikut
+            terdorong turun oleh pair-pair di atasnya dan menjulur melewati
+            garis kaki chart — dilaporkan pemilik 22 Sep 2026: "bagian bawah
+            grafiknya jangan sampai ke bawah juga dong".
+
+            Sekarang susunannya sama dengan panel kanan TradingView: daftar
+            koin mengambil sisa ruang dan bergulir sendiri, panel ini dipatok
+            di kaki dengan tinggi yang diseret orangnya. Tidak ada lagi yang
+            bisa menjulur keluar kolom. */}
+        <SeksiSentimen />
       </div>
       )}
     </div>
