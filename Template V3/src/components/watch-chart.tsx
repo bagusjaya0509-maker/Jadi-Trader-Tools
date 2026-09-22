@@ -274,12 +274,24 @@ function SeksiSentimen() {
   );
 }
 
-export function WatchChart({ simbol, onPilih, onLebar }: {
+export function WatchChart({ simbol, onPilih, onLebar, tinggi }: {
   /** Dipanggil tiap lebar berubah — chart memakainya untuk mengukur
    *  ulang dirinya. */
   onLebar?: (n: number) => void;
   simbol: string;
   onPilih: (s: string) => void;
+  /** Tinggi kolom dalam piksel — TINGGI CHART di sebelahnya.
+   *
+   *  Tanpa ini `h-full` di dalam tidak punya acuan: induknya setinggi isi,
+   *  jadi `grow` + `min-h-0` tidak menjepit apa pun dan `overflow-y-auto`
+   *  tidak pernah menyala. Diukur di peramban 22 Sep 2026 — kolomnya 1276 px
+   *  di layar 901 px, dan daftar koinnya `scrollHeight === clientHeight`,
+   *  bukti ia memang tidak pernah bergulir.
+   *
+   *  Itu sebab sesungguhnya isi panel menjulur ke bawah garis kaki chart:
+   *  bukan seksi sentimennya yang kepanjangan, melainkan kolomnya yang
+   *  tidak pernah dibatasi apa pun. */
+  tinggi?: number;
 }) {
   /* ── Menu klik kanan: kirim pasangan ini ke panel mana ────────────────
      Hanya hidup di mode multi-chart. Klik KIRI tetap membuka di panel ini
@@ -620,7 +632,11 @@ export function WatchChart({ simbol, onPilih, onLebar }: {
        wadah (8 px) — pegangan lebar yang berhenti 20 px di atas garis
        section terbaca "menggantung" (pemilik, 7 Sep 2026; terukur 20 px
        persis). Di mode panel tidak ada pegangan tinggi, sisanya 8 px. */
-    <div className="flex shrink-0" style={{ width: lebar + 6, marginBottom: POLOS ? -8 : -20 }}>
+    <div className="flex shrink-0"
+         style={{ width: lebar + 6, marginBottom: POLOS ? -8 : -20,
+                  /* +20 (atau +8) menyamai margin negatif di atas: kolomnya
+                     memang dimaksudkan turun sampai garis kaki chart. */
+                  height: tinggi ? tinggi + (POLOS ? 8 : 20) : undefined }}>
       {menuPanel && (
         /* fixed + koordinat kursor: menu di dalam kolom watchlist yang
            bergulir akan terpotong oleh overflow induknya persis saat ia

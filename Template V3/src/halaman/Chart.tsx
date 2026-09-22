@@ -6582,7 +6582,7 @@ ${pnlSunting !== null
               sanalah pasangan dikirim ke panel lain lewat klik kanan, jadi
               satu watchlist melayani seluruh grid. */}
           {(!POLOS || UTAMA) && (
-            <WatchChart simbol={simbol} onPilih={setSimbol} onLebar={setLebarWatch} />
+            <WatchChart simbol={simbol} onPilih={setSimbol} onLebar={setLebarWatch} tinggi={tinggiChart} />
           )}
           </div>
           {/* Pegangan tinggi chart: diseret = diatur, dilepas = dikunci dan
