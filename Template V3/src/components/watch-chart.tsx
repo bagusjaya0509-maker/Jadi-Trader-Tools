@@ -215,21 +215,24 @@ function SeksiSentimen() {
 
           Bidang sentuhnya diperluas ±10 px ke atas-bawah — garis 6 px
           mustahil dipegang jari. */}
-      {/* Setipis mungkin — SATU piksel. Diminta pemilik 22 Sep 2026, dan
-          titik tiganya ikut dibuang karena itulah yang memaksa garisnya
-          setebal 6 px: titik 2 px butuh ruang untuk duduk.
+      {/* 3 px — separuh dari 6 px yang asli. Diminta pemilik 22 Sep 2026
+          dalam dua langkah: pertama "pertipis", lalu "terlalu tipis,
+          setengahnya saja" waktu saya turunkan sampai 1 px.
 
-          Yang hilang cuma petunjuk bahwa ia bisa diseret. Diganti dua hal
-          yang tidak makan ruang sama sekali: kursor berubah jadi
-          `row-resize` saat dilewati, dan garisnya menyala. Bidang sentuhnya
-          tetap ±9 px ke atas-bawah — garis satu piksel yang harus dikenai
-          tepat adalah kendali yang terlihat ada tapi terasa rusak. */}
+          Satu piksel memang salah: ia tidak lagi terbaca sebagai PEMBATAS,
+          cuma seperti garis pemisah biasa yang kebetulan ada di situ.
+          Pembatas yang bisa diseret perlu punya badan.
+
+          Titik tiganya tetap dibuang — itulah yang dulu memaksa 6 px,
+          karena titik 2 px butuh ruang untuk duduk. Petunjuk "bisa diseret"
+          sekarang dari kursor `row-resize` dan garis yang menyala saat
+          dilewati; bidang sentuhnya diperluas ±8 px ke atas-bawah. */}
       <div onPointerDown={mulaiSeret}
            onDoubleClick={alihkan}
            title={tinggi > 0
              ? 'Tarik untuk mengatur tinggi — tarik ke bawah untuk menutup'
              : 'Tarik ke atas untuk membuka Fear & Greed'}
-           className="group/hg relative h-px cursor-row-resize touch-none bg-zinc-800 transition-colors hover:bg-zinc-500">
+           className="group/hg relative h-[3px] cursor-row-resize touch-none bg-zinc-800 transition-colors hover:bg-zinc-500">
         <span className="absolute inset-x-0 -bottom-2 -top-2" />
       </div>
 
