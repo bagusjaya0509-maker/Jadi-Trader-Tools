@@ -141,6 +141,10 @@ const DexTrading    = lazy(() => muat(() => import('@/halaman/DexTrading')));
    permintaan pemilik 21 Sep 2026: mode DEX "punya jalan tersendiri aja".
    Alasan lengkapnya ada di kepala berkas halamannya. */
 const DexKoin       = lazy(() => muat(() => import('@/halaman/DexKoin')));
+/* Ruangan 3D-nya sendiri TIDAK ada di bundel ini — halamannya cuma bingkai
+   iframe ke /trabar2, yang disajikan dari /root/ruang3d di VPS. Lihat
+   catatan panjang di kepala berkas halamannya. */
+const TradingFloor  = lazy(() => muat(() => import('@/halaman/TradingFloor')));
 const HalamanHarga  = lazy(() => muat(() => import('@/halaman/Harga')));
 const Markas        = lazy(() => muat(() => import('@/halaman/Markas')));
 const Sosmed        = lazy(() => muat(() => import('@/halaman/Sosmed')));
@@ -584,6 +588,7 @@ export default function App() {
             <Route path="/wallet-tracking" element={<WalletTracking />} />
             <Route path="/dex" element={<DexTrading />} />
             <Route path="/dex-koin" element={<DexKoin />} />
+            <Route path="/trading-floor" element={<TradingFloor />} />
             {/* ── ALAMAT LAMA TETAP HIDUP ────────────────────────────────
                 /coin-listing sudah pernah dibagikan dan tersimpan di bookmark
                 orang. Ia sekarang tab ketiga di Wallet Tracking, jadi yang
