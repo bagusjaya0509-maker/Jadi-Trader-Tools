@@ -325,8 +325,20 @@ function MenuPorsi({ b, rect, tutup, kirim }: {
   );
 }
 
-export function TabelPosisi({ baris, kosong, onKlikBaris, onTutup, onUbah, onKlikCopy, tanpaPorsi, kolomFunding }: {
+export function TabelPosisi({ baris, kosong, onKlikBaris, onTutup, onUbah, onKlikCopy, tanpaPorsi, kolomFunding, maksBaris }: {
   baris: BarisPosisi[];
+  /** Berapa baris yang boleh tampil sebelum sisanya bergulir.
+   *
+   *  Diminta pemilik 25 Sep 2026 untuk Dashboard: dengan empat belas posisi
+   *  terbuka, panelnya memanjang ke bawah sampai panel di sebelahnya
+   *  terlihat seperti kolom kosong, dan seluruh isi halaman di bawahnya
+   *  terdorong jauh dari layar.
+   *
+   *  TIDAK dipakai di Chart & Entry. Di sana panelnya memang tempat kerja —
+   *  yang dicari orang adalah SATU posisi tertentu untuk disunting, dan
+   *  daftar yang bergulir membuatnya harus mencari dua kali. Batas ini
+   *  untuk ringkasan, bukan untuk meja kerja. */
+  maksBaris?: number;
   /** Tombol Tutup per baris. Kolomnya hanya muncul kalau diberikan.
    *  `porsi` 0–1: bagian posisi yang diminta ditutup. 1 = seluruhnya. */
   onTutup?: (b: BarisPosisi, porsi: number) => void;
@@ -384,6 +396,64 @@ export function TabelPosisi({ baris, kosong, onKlikBaris, onTutup, onUbah, onKli
      mengikuti gulir; menggulir menutupnya (lihat catatan di MenuPorsi). */
   const [menu, setMenu] = useState<{ kunci: string; b: BarisPosisi; rect: DOMRect } | null>(null);
 
+  /* ── TINGGI DIUKUR DARI BARISNYA SENDIRI, BUKAN DITEBAK ──────────────
+     Angka piksel mati (`max-h-[340px]`) akan salah begitu satu hal berubah:
+     ukuran huruf peramban, tema terang yang tebalnya beda, atau kolom
+     Funding yang membuat barisnya membungkus. Yang diminta pemilik bukan
+     "340 piksel", melainkan "tujuh baris" — jadi yang diukur barisnya.
+
+     `useLayoutEffect` supaya pengukurannya terjadi SEBELUM cat pertama:
+     dengan useEffect biasa, panelnya sempat tergambar setinggi empat belas
+     baris lalu mengerut — kedipan yang justru paling terlihat pada layar
+     yang lambat, yang memang paling butuh perbaikan ini.
+
+     ResizeObserver menjaga angkanya tetap benar saat lebarnya berubah
+     (sidebar dilipat, jendela diubah) — di lebar sempit satu baris bisa
+     jadi dua baris teks, dan tujuh baris jadi dua kali lebih tinggi. */
+  const bungkusRef = useRef<HTMLDivElement | null>(null);
+  const [tinggiMaks, setTinggiMaks] = useState<number | undefined>(undefined);
+  useLayoutEffect(() => {
+    if (!maksBaris) { setTinggiMaks(undefined); return; }
+    const el = bungkusRef.current;
+    if (!el) return;
+    const ukur = () => {
+      const kepala = el.querySelector('thead');
+      const badan = el.querySelector('tbody');
+      const brs = badan ? Array.from(badan.rows) : [];
+      if (brs.length <= maksBaris) { setTinggiMaks(undefined); return; }
+      /* Dijumlahkan dari baris SUNGGUHAN, bukan tinggi baris pertama dikali
+         tujuh: baris gabungan yang sedang dilepas membawa anak-anaknya, dan
+         tingginya tidak sama dengan induknya. */
+      let t = kepala ? kepala.getBoundingClientRect().height : 0;
+      for (let i = 0; i < maksBaris; i++) t += brs[i].getBoundingClientRect().height;
+      /* ── PAGAR KEDUA: JANGAN PERNAH LEBIH TINGGI DARI LAYAR ──────────
+         "Tujuh baris" mengandaikan satu baris kira-kira setinggi satu
+         baris teks. Itu benar di layar lebar; diukur di sini 33 px.
+
+         Di lebar sempit tidak: delapan kolom yang tidak muat mulai
+         membungkus, dan satu baris terukur 139 px. Tujuh baris jadi
+         1.001 px — lebih tinggi daripada layarnya sendiri, dan yang
+         diminta pemilik justru supaya panelnya TIDAK memanjang ke bawah.
+         Membatasi jumlah baris tanpa membatasi tingginya cuma memindahkan
+         masalah ke layar yang paling sempit.
+
+         70% tinggi jendela: cukup longgar sehingga di desktop pagar ini
+         tidak pernah kena (tujuh baris ~260 px lawan ~750 px), dan cukup
+         ketat sehingga di ponsel panelnya selalu menyisakan ruang untuk
+         menunjukkan bahwa ada sesuatu di bawahnya. */
+      setTinggiMaks(Math.ceil(Math.min(t, window.innerHeight * 0.7)));
+    };
+    ukur();
+    const ro = new ResizeObserver(ukur);
+    ro.observe(el);
+    /* Pendengar jendela IKUT, dan bukan berlebihan: mengubah TINGGI jendela
+       saja tidak mengubah ukuran elemen ini sama sekali, jadi
+       ResizeObserver diam — sementara pagar 70% tinggi layar di atas baru
+       saja berubah artinya. */
+    window.addEventListener('resize', ukur);
+    return () => { ro.disconnect(); window.removeEventListener('resize', ukur); };
+  }, [maksBaris, baris, dilepas]);
+
   if (!baris.length) {
     return <div className="py-5 text-center text-[12.5px] text-zinc-600">{kosong}</div>;
   }
@@ -410,9 +480,28 @@ export function TabelPosisi({ baris, kosong, onKlikBaris, onTutup, onUbah, onKli
   const adaGabungan = tampil.some((t) => !!t.jml);
 
   return (
-    <TabelBungkus>
+    <TabelBungkus
+      ref={bungkusRef}
+      className={cn(tinggiMaks !== undefined && 'overflow-y-auto')}
+      style={tinggiMaks !== undefined ? { maxHeight: tinggiMaks } : undefined}
+    >
       <Tabel>
-        <thead>
+        {/* Kepala kolom LENGKET saat isinya bergulir. Tanpa ini, menggulir
+            ke posisi kesepuluh berarti membaca enam angka tanpa tahu kolom
+            mana yang mana — dan dua di antaranya (Risk SL, Target TP) cuma
+            bisa dibedakan dari judulnya.
+
+            Latarnya `color-mix`, bukan heksa mati: kartu ini `bg-zinc-900/40`
+            di atas `bg-zinc-950`, dan KEDUA variabel itu ditukar di tema
+            terang. Warna mati akan benar di gelap dan jadi lubang gelap di
+            terang. `color-mix` memulangkan campuran yang sama persis di
+            dua-duanya. */}
+        <thead
+          className={cn(tinggiMaks !== undefined && 'sticky top-0 z-10')}
+          style={tinggiMaks !== undefined
+            ? { backgroundColor: 'color-mix(in srgb, var(--color-zinc-900) 40%, var(--color-zinc-950))' }
+            : undefined}
+        >
           <tr>
             <Th>Pair</Th>
             <Th className="text-right">Size</Th>

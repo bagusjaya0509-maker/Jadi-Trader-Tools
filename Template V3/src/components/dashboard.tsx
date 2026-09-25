@@ -330,6 +330,10 @@ export function Dashboard() {
           />
           <div className="px-5 pb-5">
             <TabelPosisi
+              /* Tujuh, dan angkanya sama dengan panel Trade-Fi di sebelah —
+                 dua panel berdampingan yang tingginya dibatasi berbeda akan
+                 terbaca seperti salah satunya kehabisan data. */
+              maksBaris={7}
               kosong="Tidak ada posisi kripto terbuka."
               baris={POSISI_TERBUKA.map((p) => ({
                 kunci: p.id,
@@ -440,6 +444,7 @@ export function Dashboard() {
                 dua panel berdampingan menjawab pertanyaan yang sama dengan
                 dua bentuk berbeda — orang jadi mengira datanya beda. */}
             <TabelPosisi
+              maksBaris={7}
               kosong={mt5.terhubung === true ? 'Tidak ada posisi MT5 terbuka.' : mt5.ket}
               baris={POSISI_MT5.map((p) => ({
                 kunci: p.tiket,
