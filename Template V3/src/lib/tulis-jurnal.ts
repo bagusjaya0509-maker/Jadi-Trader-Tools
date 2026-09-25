@@ -337,7 +337,10 @@ export async function sinkronArusBinance(sudahAdaArus: Set<string>, sejakMs: num
 
   try {
     const sejak = Math.max(sejakMs, MULAI_ARUS_OTOMATIS);
-    const r = await fetch(dasar + '/api/income?since=' + sejak, { headers: { 'X-App-Token': k.token.trim() } });
+    /* `all=1` — lihat catatan panjang di sinkronRiwayatBinance. Tanpa itu
+       jawabannya dipotong 100 baris dan setoran yang lebih baru daripada
+       baris ke-100 tidak pernah terlihat. */
+    const r = await fetch(dasar + '/api/income?all=1&since=' + sejak, { headers: { 'X-App-Token': k.token.trim() } });
     const j = await r.json();
     if (!r.ok) return { masuk: 0, galat: j.error || ('income menjawab ' + r.status) };
 
@@ -425,7 +428,30 @@ export async function sinkronRiwayatBinance(sudahAda: Set<string>, sejakMs: numb
   const kepala = { 'X-App-Token': k.token.trim() };
 
   try {
-    const ri = await fetch(dasar + '/api/income?since=' + sejakMs, { headers: kepala });
+    /* ── `all=1`, DAN INI BUKAN PENGHEMATAN YANG DILEWATKAN ─────────────
+       Dilaporkan pemilik 25 Sep 2026: XPL yang ditutup di Binance tidak
+       pernah muncul di jurnal. Yang ditemukan jauh lebih luas daripada satu
+       koin.
+
+       /api/income tanpa `all` meneruskan permintaan ke Binance TANPA
+       `limit`, dan bawaan Binance 100 baris — diambil dari yang PALING TUA
+       sejak `startTime`. Diukur di akun pemilik, jendela 7 hari:
+
+         tanpa all : 100 baris, 18-21 Sep, REALIZED_PNL = 0 simbol
+         all=1     : 497 baris, 18-25 Sep, REALIZED_PNL = 14 simbol
+
+       Baris income bukan cuma penutupan: komisi dan funding fee ikut di
+       sana, dan funding menulis satu baris tiap delapan jam untuk TIAP
+       posisi terbuka. Seratus baris pertama habis dipakai itu.
+
+       Akibatnya bukan "XPL hilang" — akibatnya daftar simbol yang dicari
+       jadi KOSONG, jadi seluruh penutupan Binance sejak 21 Sep tidak pernah
+       masuk jurnal. Diam-diam, karena permintaannya berhasil dan jawabannya
+       memang berisi seratus baris yang sah.
+
+       Cabang `all` di server memaginasi sampai habis (1.000 per halaman,
+       maksimum 30 halaman). Itu yang seharusnya dipakai sejak awal. */
+    const ri = await fetch(dasar + '/api/income?all=1&since=' + sejakMs, { headers: kepala });
     const ji = await ri.json();
     if (!ri.ok) return { masuk: 0, dilewati: 0, galat: ji.error || ('income menjawab ' + ri.status) };
     const simbolKena = [...new Set(

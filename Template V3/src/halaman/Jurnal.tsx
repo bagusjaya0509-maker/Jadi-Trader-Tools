@@ -234,10 +234,6 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
      satu baris memang satu posisi. */
   const rangkum = sumber !== 'kripto';
   const [menuSinkron, setMenuSinkron] = useState(false);
-  const barisTabel = useMemo(
-    () => (rangkum ? rangkumLayering(trade) : trade.map((x) => ({ ...x, lapis: 1 }))),
-    [rangkum, trade]
-  );
 
   /* Catatan evaluasi dihitung dari daftar transaksi yang SAMA dengan
      statistiknya. Kalau keduanya berasal dari sumber berbeda, kalimatnya
@@ -259,12 +255,18 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
      MT5 membaca berkas di VPS, kripto memanggil bursa yang punya batas laju.
      Satu nilai untuk dua tombol berarti mengubah satu diam-diam mengubah
      yang lain. */
+  /* Kunci BARU (`jtJurnalRentangKripto`), bukan `jtSinkronSejakKripto`.
+     Bawaannya berubah dari '7' jadi '0' (Semua) atas permintaan pemilik 25
+     Sep 2026 — dan nilai '7' yang tersimpan tidak bisa dibedakan antara
+     "dipilih orangnya" dan "bawaan lama yang tidak pernah disentuh".
+     Kunci baru membuat semua orang mulai dari Semua sekali, lalu pilihannya
+     sendiri yang diingat. */
   const [sejakKripto, setSejakKripto] = useState(() => {
-    try { return localStorage.getItem('jtSinkronSejakKripto') ?? '7'; } catch { return '7'; }
+    try { return localStorage.getItem('jtJurnalRentangKripto') ?? '0'; } catch { return '0'; }
   });
   const aturSejakKripto = (v: string) => {
     setSejakKripto(v);
-    try { localStorage.setItem('jtSinkronSejakKripto', v); } catch { /* mode privat */ }
+    try { localStorage.setItem('jtJurnalRentangKripto', v); } catch { /* mode privat */ }
   };
   const [sinkronKripto, setSinkronKripto] = useState<{ sibuk: boolean; pesan: string }>(
     { sibuk: false, pesan: '' });
@@ -277,6 +279,34 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
     setOtomatis(v);
     try { localStorage.setItem('jtSinkronOtomatis', v ? '1' : '0'); } catch { /* idem */ }
   };
+
+  /* ── RENTANG MENYARING YANG TAMPIL, BUKAN CUMA YANG DITARIK ──────────
+     Dilaporkan pemilik 25 Sep 2026: "ketika saya pilih 24 jam atau
+     mingguan kok riwayatnya tidak auto sesuai yang muncul?"
+
+     Ia benar membacanya begitu. Dropdown ini sejak lahir cuma menentukan
+     seberapa jauh ke belakang yang DIMINTA DARI BURSA; tabelnya selalu
+     menggambar 200 baris terakhir apa pun pilihannya. Dua arti untuk satu
+     kotak, dan yang terbaca orang selalu arti yang lebih jelas: "tampilkan
+     rentang ini".
+
+     ── YANG SENGAJA TIDAK IKUT TERSARING ─────────────────────────────
+     Kotak statistik, Kurva Ekuitas, dan Kalender P/L tetap memakai SELURUH
+     transaksi. Kendalinya duduk di kepala panel Riwayat Trade, jadi itu
+     yang dijanjikannya. Menyaring Net P/L diam-diam dari dropdown di panel
+     lain berarti angka besar di atas berubah tanpa ada yang menyentuhnya —
+     dan itu angka yang paling dipercaya orang di halaman ini. */
+  const batasTampil = useMemo(() => {
+    const n = Number(sumber === 'kripto' ? sejakKripto : sejak);
+    return n > 0 ? Date.now() - n * 86_400_000 : 0;
+  }, [sumber, sejakKripto, sejak]);
+  const tradeTampil = useMemo(
+    () => (batasTampil ? trade.filter((t) => t.waktu >= batasTampil) : trade),
+    [trade, batasTampil]);
+  const barisTabel = useMemo(
+    () => (rangkum ? rangkumLayering(tradeTampil) : tradeTampil.map((x) => ({ ...x, lapis: 1 }))),
+    [rangkum, tradeTampil]
+  );
 
   const jamPesan = useRef<number | undefined>(undefined);
   const bersihkanPesan = useCallback(() => {
@@ -722,9 +752,15 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
                    jauh dari layar. Isinya pun keterangan, bukan angka yang
                    dicari: berapa baris yang tampil sudah terlihat sendiri
                    dari tabelnya. */
-                sub={<span className="hidden sm:inline">{rangkum && barisTabel.length !== trade.length
-                  ? `${Math.min(200, barisTabel.length)} baris dari ${barisTabel.length} — ${trade.length} transaksi asli dirangkum per pair, arah, dan hari.`
-                  : `${Math.min(200, trade.length)} transaksi terakhir dari ${trade.length}.`}</span>}
+                sub={<span className="hidden sm:inline">{
+                  /* Jumlahnya dihitung dari yang TERSARING, dan selisihnya
+                     terhadap keseluruhan disebut terang-terangan: tabel yang
+                     tiba-tiba berisi tiga baris tanpa mengatakan kenapa
+                     terbaca seperti data yang hilang. */
+                  rangkum && barisTabel.length !== tradeTampil.length
+                    ? `${Math.min(200, barisTabel.length)} baris dari ${barisTabel.length} — ${tradeTampil.length} transaksi asli dirangkum per pair, arah, dan hari.`
+                    : `${Math.min(200, tradeTampil.length)} transaksi terakhir dari ${tradeTampil.length}`
+                      + (batasTampil ? ` (disaring; total ${trade.length}).` : '.')}</span>}
                 kanan={
                   <span className="flex items-center gap-2">
                   {/* Rangkum layering berjalan tanpa saklar di layar — akun cent
@@ -735,7 +771,7 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
                   {sumber === 'forex' && (
                     <span className="relative flex items-center gap-2">
                       <select value={sejak} onChange={(e) => aturSejak(e.target.value)}
-                        title="Seberapa jauh ke belakang yang diambil"
+                        title="Rentang yang ditampilkan di tabel — sekaligus seberapa jauh yang ditarik"
                         className="h-[30px] cursor-pointer rounded-md border border-zinc-800 bg-zinc-900/60 px-2 text-[11.5px] text-zinc-300 outline-none">
                         <option value="30">30 hari</option>
                         <option value="90">90 hari</option>
@@ -788,17 +824,28 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
                   {sumber === 'kripto' && (
                     <span className="flex items-center gap-2">
                       <select value={sejakKripto} onChange={(e) => aturSejakKripto(e.target.value)}
-                        title="Seberapa jauh ke belakang yang diambil dari bursa"
+                        title="Rentang yang ditampilkan di tabel — sekaligus seberapa jauh yang ditarik dari bursa (Semua menarik 90 hari, batas bursa)"
                         className="h-[30px] cursor-pointer rounded-md border border-zinc-800 bg-zinc-900/60 px-2 text-[11.5px] text-zinc-300 outline-none">
-                        <option value="1">24 jam</option>
+                        {/* "1 hari", bukan "24 jam" — diminta pemilik 25 Sep
+                            2026. Empat pilihan lain memakai satuan hari, dan
+                            satu yang memakai jam membuat daftar ini terbaca
+                            seperti dua jenis pilihan yang dicampur. */}
+                        <option value="1">1 hari</option>
                         <option value="7">7 hari</option>
                         <option value="30">30 hari</option>
                         <option value="90">90 hari</option>
+                        <option value="0">Semua</option>
                       </select>
                       <button
-                        onClick={() => void tarikKripto(Date.now() - Number(sejakKripto) * 86_400_000, false)}
+                        /* "Semua" (0) untuk TAMPILAN berarti tanpa batas; untuk
+                           TARIKAN ia tidak bisa berarti begitu. Bursa punya batas
+                           laju, dan `Date.now() - 0` justru berarti "tarik nol
+                           hari" — tombol yang tidak menarik apa pun. Jadi Semua
+                           menarik 90 hari, sejauh yang masih ditoleransi bursa,
+                           dan `title` tombolnya menyebutkan itu. */
+                        onClick={() => void tarikKripto(Date.now() - (Number(sejakKripto) || 90) * 86_400_000, false)}
                         disabled={!bisaTulis || sinkronKripto.sibuk}
-                        title="Tarik riwayat Binance, Hyperliquid, dan dompet tertaut untuk rentang yang dipilih"
+                        title="Tarik riwayat Binance, Hyperliquid, dan dompet tertaut — Semua menarik 90 hari terakhir"
                         className="flex cursor-pointer items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 py-1.5 text-[12px] text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100 disabled:cursor-not-allowed disabled:opacity-50">
                         <RefreshCw className={cn('size-3.5', sinkronKripto.sibuk && 'animate-spin')} />
                         {sinkronKripto.sibuk ? 'Menarik…' : 'Sinkron'}

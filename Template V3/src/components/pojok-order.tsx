@@ -335,6 +335,16 @@ export function PojokOrder({
   aturCatatan?: (c: { emosi: string; alasan: string }) => void;
 }) {
   const nyata = mode === 'real';
+  /* ── "TANPA SL & TP" DIPILIH SENDIRI ────────────────────────────────
+     Gerbangnya HARUS sama persis dengan gerbang di Chart.tsx yang
+     memutuskan apakah benderanya ikut terkirim (`nyata && !mt5`). Kalau
+     panel lebih longgar, tombol Kirim menyala untuk order yang diam-diam
+     dipulangkan pemanggilnya — tombol hidup yang tidak melakukan apa pun
+     adalah kegagalan yang paling sulit dilaporkan orang.
+
+     MT5 dan demo sengaja tidak ikut: EA dan mesin latihan sama-sama
+     menuntut SL & TP, dan itu tidak diubah permintaan ini. */
+  const metodeTanpa = nyata && !mt5 && nyataSetelan?.metode === 'tanpa';
   /* Terlipat atau terbuka — pilihan yang diingat.
      ────────────────────────────────────────────────────────────────────
      BAWAANNYA TERLIPAT. Dulu terbuka, dan di ponsel bilah BUY/SELL itu
@@ -549,6 +559,10 @@ export function PojokOrder({
     const sisiOk = (h: number | undefined, diAtas: boolean) =>
       !h || !entry || (diAtas ? h > entry : h < entry);
     const arahBenar = !entry ? false
+      /* Levelnya tidak dikirim sama sekali, jadi sisinya tidak berarti
+         apa-apa. Menahan tombol karena garis yang akan diabaikan adalah
+         pagar yang menjaga sesuatu yang tidak ada di situ. */
+      : metodeTanpa ? true
       : tanpaSlTp
         ? sisiOk(sl, draf !== 'BUY') && sisiOk(tp, draf === 'BUY')
         : !sl || !tp ? false
@@ -569,7 +583,8 @@ export function PojokOrder({
        menyebut arah dan zona masuk membuka tiket dengan SL dan TP kosong.
        Ordernya memang tidak boleh berangkat tanpa SL — tapi orangnya berhak
        tahu ia tinggal mengisi dua kotak, bukan menebak aplikasinya rusak. */
-    const kurang = ([!entry && 'Entry', !tanpaSlTp && !sl && 'SL', !tanpaSlTp && !tp && 'TP']
+    const bolehKosong = tanpaSlTp || metodeTanpa;
+    const kurang = ([!entry && 'Entry', !bolehKosong && !sl && 'SL', !bolehKosong && !tp && 'TP']
       .filter(Boolean) as string[]);
     const alasanKunci = kurang.length
       ? kurang.join(' & ') + ' belum diisi — ketik angkanya, atau seret garisnya di chart.'
@@ -735,10 +750,20 @@ export function PojokOrder({
               hal yang sama tanpa satu pun render tambahan. */}
           <IsianHarga label="Entry" warna="var(--color-zinc-300)" desimal={desimalHarga}
                       nilai={rencana.entry} atur={(n) => onUbah({ ...rencana, entry: n })} />
-          <IsianHarga label="SL" warna="var(--color-red-400)" desimal={desimalHarga}
-                      nilai={rencana.sl} atur={(n) => onUbah({ ...rencana, sl: n })} />
-          <IsianHarga label="TP" warna="var(--color-emerald-500)" desimal={desimalHarga}
-                      nilai={rencana.tp} atur={(n) => onUbah({ ...rencana, tp: n })} />
+          {/* Diredupkan, BUKAN disembunyikan. Garisnya masih ada di chart dan
+              masih berguna sebagai rencana; yang berubah cuma satu hal —
+              ia tidak ikut berangkat. Menghilangkan kotaknya membuat orang
+              mengira garisnya ikut terhapus. */}
+          <div className={cn(metodeTanpa && 'opacity-40')}
+               title={metodeTanpa ? 'Metode "Tanpa SL & TP" — angka ini tidak dikirim ke bursa.' : undefined}>
+            <IsianHarga label="SL" warna="var(--color-red-400)" desimal={desimalHarga}
+                        nilai={rencana.sl} atur={(n) => onUbah({ ...rencana, sl: n })} />
+          </div>
+          <div className={cn(metodeTanpa && 'opacity-40')}
+               title={metodeTanpa ? 'Metode "Tanpa SL & TP" — angka ini tidak dikirim ke bursa.' : undefined}>
+            <IsianHarga label="TP" warna="var(--color-emerald-500)" desimal={desimalHarga}
+                        nilai={rencana.tp} atur={(n) => onUbah({ ...rencana, tp: n })} />
+          </div>
         </div>
 
         {catatan && aturCatatan && !ringkas && (
@@ -830,11 +855,27 @@ export function PojokOrder({
 
         <div className="mt-1.5 flex items-center gap-2">
           <span className="text-[10.5px] text-zinc-500">
-            R:R <span className={cn('angka', rr && rr >= 1.5 ? 'text-emerald-400' : 'text-zinc-300')}>
-              {rr ? rr.toFixed(2) : '—'}
+            R:R <span className={cn('angka', !metodeTanpa && rr && rr >= 1.5 ? 'text-emerald-400' : 'text-zinc-300')}>
+              {!metodeTanpa && rr ? rr.toFixed(2) : '—'}
             </span>
           </span>
           {(() => {
+            /* ── ANGKA RUGI DICABUT, BUKAN DIBIARKAN ───────────────────
+               Baris ini biasanya menulis "-$25 / +$50" dari jarak entry ke
+               SL. Dengan metode "tanpa", SL-nya tidak dikirim — jadi angka
+               itu memberi tahu berapa ruginya KALAU ada stop, padahal
+               justru stop itu yang sengaja tidak dipasang.
+
+               Angka yang salah di tempat ini lebih berbahaya daripada
+               tidak ada angka: ia satu-satunya tempat di tiket yang
+               menjawab "berapa yang saya pertaruhkan". */
+            if (metodeTanpa) {
+              return (
+                <span className="text-[10.5px] font-medium text-red-400">
+                  Tanpa stop — rugi tidak dibatasi
+                </span>
+              );
+            }
             /* REAL: dolar dari ukuran order yang SEBENARNYA — qty = modal ×
                leverage / entry, dikali jarak harga. Angka risiko demo (persen
                dari modal latihan) di sini menyesatkan: ia bukan uang yang

@@ -5959,10 +5959,20 @@ ${pnlSunting !== null
                                    SL & TP lewat gerbang berikutnya. */
                                 const sl = rencana.sl || 0, tp = rencana.tp || 0;
                                 if (!draf || !entry) return;
-                                /* Tanpa SL/TP HANYA untuk sinyal cermin dompet (lihat
-                                   `tanpaSlTp`) dan HANYA di jalur kripto sungguhan: EA
-                                   MT5 dan mesin demo masih menuntut keduanya. */
-                                const tanpaSlTpKini = tanpaSlTp && aksi.mode === 'real' && !simbol.startsWith('MT5:');
+                                /* Dua sebab boleh tanpa SL/TP, dan keduanya tetap
+                                   HANYA berlaku di jalur kripto sungguhan — EA MT5 dan
+                                   mesin demo masih menuntut keduanya:
+
+                                     · sinyal cermin dompet (`tanpaSlTp`), sejak 7 Sep;
+                                     · metode TP "tanpa" yang dipilih sendiri di panel
+                                       entri, sejak 24 Sep.
+
+                                   Syaratnya ditulis sekali di sini dan ditiru persis
+                                   oleh panel (`metodeTanpa` di pojok-order.tsx) supaya
+                                   tombol Kirim tidak pernah menyala untuk permintaan
+                                   yang baris di bawah ini akan pulangkan diam-diam. */
+                                const tanpaSlTpKini = (tanpaSlTp || nyataSetelan.metode === 'tanpa')
+                                  && aksi.mode === 'real' && !simbol.startsWith('MT5:');
                                 if (!tanpaSlTpKini && (!sl || !tp)) return;
                                 if (aksi.mode === 'real') {
                                   if (simbol.startsWith('MT5:')) {

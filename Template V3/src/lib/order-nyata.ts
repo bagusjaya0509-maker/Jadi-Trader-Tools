@@ -22,7 +22,7 @@ import { mulaiKirim, tandaiTerkirim, tandaiGagal } from '@/lib/order-sementara';
    terisi — selama tab-nya masih terbuka.
    ════════════════════════════════════════════════════════════════════════ */
 
-export type MetodeTp = 'partial' | 'nopartial' | 'tp1only' | 'tp2only' | 'slplus';
+export type MetodeTp = 'partial' | 'nopartial' | 'tp1only' | 'tp2only' | 'slplus' | 'tanpa';
 
 /* ── URUTAN & LABEL: YANG PALING SEDERHANA DI ATAS ──────────────────────
    `tp1only` naik ke puncak dan jadi bawaan (2 Sep 2026, permintaan pemilik:
@@ -48,6 +48,17 @@ export const METODE_TP: { nilai: MetodeTp; label: string }[] = [
   { nilai: 'nopartial', label: 'TP1 & TP2 — SL ke BE di TP1, tanpa partial' },
   { nilai: 'tp2only', label: 'SL & TP saja — TP di 2× jarak SL' },
   { nilai: 'slplus', label: 'SL+ — partial 50%, SL naik tiap 1× risiko' },
+  /* ── PALING BAWAH, DAN ITU DISENGAJA ──────────────────────────────────
+     Diminta pemilik 24 Sep 2026. Jalur `tanpaSlTp` sendiri sudah ada sejak
+     7 Sep — tapi dulu hanya bisa dinyalakan oleh sinyal cermin dompet;
+     tidak ada cara memilihnya sendiri.
+
+     Ia duduk di urutan terakhir karena ia satu-satunya pilihan di daftar
+     ini yang MENGURANGI perlindungan, bukan mengatur cara keluarnya.
+     Empat yang di atas memperdebatkan di mana untungnya diambil; yang ini
+     mencabut batas ruginya. Menaruhnya di tengah daftar berarti ia bisa
+     terpilih oleh tangan yang cuma menggeser satu baris. */
+  { nilai: 'tanpa', label: 'Tanpa SL & TP — posisi telanjang, tanpa batas rugi' },
 ];
 
 export interface PermintaanNyata {
@@ -193,7 +204,17 @@ export async function kirimOrderNyata(p: PermintaanNyata): Promise<{ pesan: stri
   if (!koneksiLengkap(koneksi)) {
     throw new Error('Backend URL & App Token belum dipasang — buka Integrations dulu.');
   }
-  const tanpaSlTp = p.tanpaSlTp === true && !p.sl && !p.tp;
+  /* ── DUA JALAN MASUK, SATU AKIBAT ───────────────────────────────────
+     `metode: 'tanpa'` — orangnya memilihnya sendiri di panel entri. Garis
+     SL/TP boleh SAJA masih terpasang di chart; yang dipilihnya adalah
+     "jangan kirim", bukan "tidak punya angka". Karena itu cabang ini
+     TIDAK menuntut `!p.sl && !p.tp` — menuntutnya berarti orang harus
+     menghapus dulu garis yang ia gambar sendiri untuk bisa memilih ini.
+
+     `tanpaSlTp: true` — sinyal cermin dompet. Di sana angkanya memang
+     tidak ada, dan syarat kosong itu dipertahankan persis seperti semula:
+     bendera tanpa angka kosong berarti klien salah menyusun permintaan. */
+  const tanpaSlTp = p.metode === 'tanpa' || (p.tanpaSlTp === true && !p.sl && !p.tp);
   if (!p.entry) throw new Error('Entry wajib terisi.');
   if (!tanpaSlTp && (!p.sl || !p.tp)) {
     throw new Error(p.tanpaSlTp
@@ -337,7 +358,9 @@ export async function kirimOrderNyata(p: PermintaanNyata): Promise<{ pesan: stri
     `${p.arah} ${p.simbol} · ${labelJenis}`,
     `Nilai order ${uang(p.modal * p.leverage)} (modal ${uang(p.modal)} × ${p.leverage}) · qty ${qtyStr}`,
     tanpaSlTp
-      ? 'TANPA SL DAN TP — mengikuti dompet. Posisi tidak dilindungi stop; tambahkan nanti lewat Ubah Posisi.'
+      ? (p.metode === 'tanpa'
+          ? 'TANPA SL DAN TP — kamu yang memilihnya. Posisi berangkat tanpa batas rugi; pasang lewat Ubah Posisi kapan saja.'
+          : 'TANPA SL DAN TP — mengikuti dompet. Posisi tidak dilindungi stop; tambahkan nanti lewat Ubah Posisi.')
       : `SL ${slStr} · TP1 ${tp1Kirim} (qty ${qty1})${tp2Kirim ? ` · TP2 ${tp2Kirim} (qty ${qty2Kirim})` : ''}`,
     `Metode: ${METODE_TP.find((m) => m.nilai === p.metode)?.label}`,
   ].join('\n');
