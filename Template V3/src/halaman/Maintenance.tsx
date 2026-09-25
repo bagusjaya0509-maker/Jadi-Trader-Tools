@@ -89,6 +89,12 @@ function PanelLisensiAktif() {
              TabelBungkus — persis keluhan "panelnya terpotong". */
           <DaftarLipat
             data={urut}
+            /* `catatan` yang memuat emailnya — lihat baris utama kartu di
+               bawah, yang menampilkan `l.catatan || l.sidik`. Sidik ikut
+               karena ia yang tertulis di baris bawah kartu, dan apa pun
+               yang terbaca di layar harus bisa dicari. */
+            tekstCari={(l) => [l.catatan, l.sidik, l.produk].filter(Boolean).join(' ')}
+            petunjukCari="Cari email atau sidik…"
             kosong={null}
             render={(l, no) => (
               /* Bentuk kartunya DISAMAKAN dengan panel Permintaan di

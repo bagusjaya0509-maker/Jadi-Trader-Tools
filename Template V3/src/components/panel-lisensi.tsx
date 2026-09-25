@@ -215,6 +215,14 @@ export function PanelLisensi() {
 
         <DaftarLipat
           data={urut}
+          /* Bukan email saja. Yang dicari pemilik di panel ini sering
+             bukan orangnya melainkan KODE-nya — "JT3 yang mana tadi" — dan
+             nama serta uid ikut karena sebagian permintaan datang tanpa
+             email sama sekali (baris itu menampilkan nama atau uid sebagai
+             gantinya, jadi yang terlihat di layar harus bisa dicari). */
+          tekstCari={(x) => [x.email, x.nama, x.uid, x.kode, x.produk, x.catatan]
+            .filter(Boolean).join(' ')}
+          petunjukCari="Cari email, nama, atau kode…"
           kosong={null}
           render={(x, no) => (
             <div key={x.id} className={cn('rounded-lg border p-3',
