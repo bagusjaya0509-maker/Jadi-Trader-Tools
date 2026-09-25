@@ -295,14 +295,72 @@ export function saldoDuaBulan(
   return out;
 }
 
+/* ── KUNCI HARI: WAKTU LOKAL, BUKAN UTC ────────────────────────────────
+   `toISOString()` memulangkan tanggal UTC. Di WIB (UTC+7) itu berarti trade
+   yang ditutup antara 00:00 dan 07:00 diberi kunci tanggal KEMARIN:
+
+     ditutup 25 Sep 03:00 WIB  ->  kunci UTC   2026-09-24
+                               ->  kunci lokal 2026-09-25
+
+   `kalender-pl.tsx` sudah lama menyusun kuncinya dari komponen tanggal
+   LOKAL, lengkap dengan komentar yang menjelaskan kenapa toISOString salah.
+   Yang tidak ikut diperbaiki waktu itu: fungsi yang MEMBUAT petanya, di
+   sini. Jadi separuh perbaikannya berdiri sendirian, dan trade dini hari
+   jatuh di kotak yang salah tanpa ada yang terlihat aneh — angkanya sah,
+   cuma di hari sebelumnya.
+
+   Ketahuan 25 Sep 2026 saat menyiapkan gelembung rincian: isinya akan
+   membantah angka di kotaknya sendiri. */
+function kunciHari(ms: number): string {
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+       + `-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 /** P/L per hari untuk kalender & grafik batang. */
 export function plPerHari(trade: Trade[]) {
   const peta = new Map<string, number>();
   trade.filter((t) => !t.latihan).forEach((t) => {
-    const k = new Date(t.waktu).toISOString().slice(0, 10);
-    peta.set(k, (peta.get(k) ?? 0) + t.pnl);
+    peta.set(kunciHari(t.waktu), (peta.get(kunciHari(t.waktu)) ?? 0) + t.pnl);
   });
   return peta;
+}
+
+/** Satu pair pada satu hari — isi gelembung rincian di kalender. */
+export interface BarisHari {
+  pair: string;
+  pnl: number;
+  /** Berapa transaksi. Satu hari bisa berisi lima trade pada pair yang
+   *  sama, dan jumlahnya menjelaskan angka yang besar jauh lebih baik
+   *  daripada pnl-nya sendirian. */
+  n: number;
+  menang: number;
+}
+
+/** Rincian per pair untuk tiap hari. Kuncinya SAMA PERSIS dengan
+ *  `plPerHari` — keduanya lewat `kunciHari`, jadi gelembungnya tidak bisa
+ *  menunjuk ke hari yang berbeda dari kotak yang diklik. */
+export function rincianPerHari(trade: Trade[]): Map<string, BarisHari[]> {
+  const peta = new Map<string, Map<string, BarisHari>>();
+  trade.filter((t) => !t.latihan).forEach((t) => {
+    const k = kunciHari(t.waktu);
+    let hari = peta.get(k);
+    if (!hari) { hari = new Map(); peta.set(k, hari); }
+    const pair = t.pair || '—';
+    const b = hari.get(pair) ?? { pair, pnl: 0, n: 0, menang: 0 };
+    b.pnl += t.pnl;
+    b.n += 1;
+    if (t.pnl > 0) b.menang += 1;
+    hari.set(pair, b);
+  });
+  const hasil = new Map<string, BarisHari[]>();
+  /* Diurutkan menurut BESARNYA, bukan tandanya: yang paling ingin dilihat
+     orang saat membuka hari yang merah adalah pair mana yang paling
+     menentukan — dan itu bisa yang paling rugi atau yang paling untung. */
+  peta.forEach((hari, k) => {
+    hasil.set(k, [...hari.values()].sort((a, b) => Math.abs(b.pnl) - Math.abs(a.pnl)));
+  });
+  return hasil;
 }
 
 /* ════════════════════════════════════════════════════════════════════════

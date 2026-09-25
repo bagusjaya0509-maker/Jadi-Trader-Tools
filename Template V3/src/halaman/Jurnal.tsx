@@ -4,7 +4,7 @@ import { Plus, Pencil, Bitcoin, CandlestickChart, Link2, Link2Off, RefreshCw } f
 import { Panel, PanelHead, BadgeTren, TipGrafik, TabelBungkus, Tabel, Th, Td, Tr } from '@/components/efferd-ui';
 import { cn, uang, persen, tanggalPendek } from '@/lib/utils';
 import { KalenderPl } from '@/components/kalender-pl';
-import { statGabungan, kurvaEkuitas, plPerHari, rangkumLayering } from '@/lib/hitung';
+import { statGabungan, kurvaEkuitas, plPerHari, rincianPerHari, rangkumLayering } from '@/lib/hitung';
 import { useRiwayat, useSaldoAwal } from '@/lib/data';
 import { LabelContoh } from '@/components/gerbang';
 import { useAuth } from '@/lib/auth';
@@ -524,6 +524,11 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
     return () => clearInterval(jam);
   }, [bisaTulis, dataContoh, sumber, tarikKripto]);
   const pl = useMemo(() => plPerHari(trade), [trade]);
+  /* Dihitung dari `trade` yang SAMA dengan `pl`, bukan dari `tradeTampil`.
+     Kalender memang tidak ikut disaring rentang riwayat (lihat catatan di
+     `batasTampil`), jadi gelembungnya pun harus melihat seluruh transaksi —
+     kalau tidak, kotak yang berangka bisa membuka gelembung kosong. */
+  const rincianHari = useMemo(() => rincianPerHari(trade), [trade]);
 
   const emosi = useMemo(() => {
     const peta = new Map<string, { n: number; pnl: number }>();
@@ -979,8 +984,10 @@ function BlokJurnal({ judul, ket, Ikon, trade, saldoAwal, warna, idGradien, akun
                 Posisi Terbuka di kiri ikut meregang menyamainya. */}
             <div className="flex min-w-0 flex-col gap-4">
               <Panel className="flex min-w-0 flex-col">
-                <PanelHead judul="Kalender P/L" sub="Klik panah atau nama bulan untuk berpindah." />
-                <div className="flex grow flex-col justify-start px-5 pb-5"><KalenderPl pl={pl} /></div>
+                <PanelHead judul="Kalender P/L" sub="Arahkan atau klik tanggalnya untuk rincian per pair." />
+                <div className="flex grow flex-col justify-start px-5 pb-5">
+                  <KalenderPl pl={pl} rincian={rincianHari} />
+                </div>
               </Panel>
               <Panel className="min-w-0">
                 <PanelHead judul="Pola Emosi" sub="Emosi saat entry vs hasilnya." />
