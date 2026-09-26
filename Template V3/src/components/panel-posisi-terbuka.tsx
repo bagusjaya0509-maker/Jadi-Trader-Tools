@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Copy, Trash2, Loader2, Zap } from 'lucide-react';
+import { Copy, Trash2, Loader2, Zap, ArrowUpDown, X } from 'lucide-react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { cn, uang, harga as fHarga, tanggalAngka } from '@/lib/utils';
 
@@ -28,7 +28,8 @@ import { kirimPerintahMt5, tungguHasilMt5 } from '@/lib/mt5-order';
 import { useHargaPasar } from '@/lib/harga';
 import { kunciPosisiMt5 } from '@/lib/akun';
 import { bacaSpekMt5 } from '@/lib/pasar';
-import { TabelPosisi, type BarisPosisi } from '@/components/tabel-posisi';
+import { TabelPosisi, URUT_POSISI, type BarisPosisi, type UrutPosisi } from '@/components/tabel-posisi';
+import { useDibukaPosisi } from '@/lib/admin';
 import { bursaPosisi, type Sumber } from '@/data/contoh';
 import { simbolDasarMt5 } from '@/lib/simbol';
 import { cariStopNyasar } from '@/lib/stop-nyasar';
@@ -135,6 +136,34 @@ export function PanelPosisiTerbuka({ sumber, onSunting, onTutup, onUbahSlTp, onB
   onBanding?: (b: BandingSalinan) => void;
 }) {
   const { data: posisiKripto, pending: pendingKripto, stop: stopKripto, contoh: kriptoContoh, bursaAktif, siaranPada, siaranBasi, gagalBursa } = usePosisi();
+  /* Kapan tiap posisi kripto dibuka — dari riwayat isian di server, BUKAN
+     dari `updateTime` positionRisk. Lihat catatan di /api/posisi-dibuka:
+     `updateTime` ikut berubah tiap funding dibebankan, jadi tiga posisi
+     yang umurnya berbeda-beda semuanya bercap tengah malam UTC. */
+  const dibukaPeta = useDibukaPosisi();
+
+  /* ── URUTAN TAMPIL ──────────────────────────────────────────────────
+     Diminta pemilik 26 Sep 2026. Disimpan PER PANEL (`sumber` ikut di
+     kuncinya): urutan yang masuk akal untuk posisi kripto — yang jumlahnya
+     belasan dan ukurannya jauh berbeda — belum tentu yang diinginkan untuk
+     order Trade-Fi di sebelahnya.
+
+     Bawaannya `null` = urutan asli dari bursa, yaitu persis seperti sebelum
+     filter ini ada. Fitur pengurutan yang memaksakan urutannya sendiri sejak
+     muat pertama mengubah tampilan orang tanpa diminta. */
+  const kunciUrut = 'jtUrutPosisi.' + sumber;
+  const [urut, setUrut] = useState<UrutPosisi | null>(() => {
+    try {
+      const v = localStorage.getItem(kunciUrut);
+      return URUT_POSISI.some((u) => u.nilai === v) ? (v as UrutPosisi) : null;
+    } catch { return null; }
+  });
+  const [menuUrut, setMenuUrut] = useState(false);
+  const aturUrut = (v: UrutPosisi | null) => {
+    setUrut(v); setMenuUrut(false);
+    try { if (v) localStorage.setItem(kunciUrut, v); else localStorage.removeItem(kunciUrut); }
+    catch { /* mode privat */ }
+  };
   /* ── SUBJUDUL MENYEBUT BURSA YANG SUNGGUH ADA ISINYA ─────────────────
      Dulu tertulis "di Binance" apa pun isinya. Sesudah posisi Hyperliquid
      bisa muncul di daftar yang sama, kalimat itu berhenti jadi kurang
@@ -504,6 +533,7 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
              bentuk ketiadaan sampai ke sel hanya menghasilkan dua cabang yang
              menggambar tanda hubung yang sama. */
           funding: p.funding ?? undefined,
+          dibuka: dibukaPeta.get((bursaPosisi(p.venue) ?? 'binance') + '|' + p.simbol),
           risikoUsd: uangDari(p.sl > 0 ? Math.abs(p.entry - p.sl) : 0, unit),
           imbalUsd: uangDari(p.tp > 0 ? Math.abs(p.tp - p.entry) : 0, unit),
         };
@@ -533,6 +563,9 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
           entry: p.hargaBuka, hargaKini: p.hargaKini, sl: p.sl, tp: p.tp,
           pnl: p.profit,
           tiket: p.tiket,
+          /* Trade-Fi punya waktu buka yang SEBENARNYA dari EA — tidak perlu
+             direka ulang dari riwayat isian seperti kripto. */
+          dibuka: p.waktuBuka,
           risikoUsd: uangDari(p.sl > 0 ? Math.abs(p.hargaBuka - p.sl) : 0, unit),
           imbalUsd: uangDari(p.tp > 0 ? Math.abs(p.tp - p.hargaBuka) : 0, unit),
         };
@@ -783,11 +816,63 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
               : `Dari catatan screener — App Token belum diisi, jadi belum dicocokkan ke Binance.${
                   siaranPada ? ` Terakhir diperbarui ${umurSiaran(siaranPada)}.` : ''}`}
         kanan={
-          total === null
-            ? <span className="text-[11.5px] text-zinc-500">{baris.length} posisi</span>
-            : <span className={cn('angka text-[12.5px]', total >= 0 ? 'text-emerald-500' : 'text-red-400')}>
-                {uang(total, true)}
+          <span className="flex items-center gap-2">
+            {/* ── CHIP URUTAN ───────────────────────────────────────────
+                Bentuknya mengikuti chip filter di Screener Area, permintaan
+                pemilik: pil berlabel dua ruas — nama filternya di kiri
+                dengan latar lebih gelap, nilainya di kanan — dan silang
+                kecil untuk mencabutnya. Yang belum dipilih tampil sebagai
+                satu pil polos, jadi ia tidak berteriak sebelum dipakai. */}
+            {baris.length > 1 && (
+              <span className="relative flex items-center">
+                <span className={cn('flex items-center overflow-hidden rounded-md border text-[11px]',
+                  urut ? 'border-zinc-700' : 'border-zinc-800')}>
+                  <button onClick={() => setMenuUrut((v) => !v)}
+                    title="Urutkan baris di panel ini"
+                    className="flex cursor-pointer items-center gap-1 bg-zinc-800/60 px-1.5 py-1 text-zinc-400 transition-colors hover:text-zinc-200">
+                    <ArrowUpDown className="size-3" /> Urutan
+                  </button>
+                  <button onClick={() => setMenuUrut((v) => !v)}
+                    className={cn('cursor-pointer px-1.5 py-1 transition-colors hover:text-zinc-100',
+                      urut ? 'text-zinc-200' : 'text-zinc-500')}>
+                    {urut ? URUT_POSISI.find((u) => u.nilai === urut)?.label : 'bawaan bursa'}
+                  </button>
+                  {urut && (
+                    <button onClick={() => aturUrut(null)} aria-label="Kembalikan urutan bursa"
+                      className="cursor-pointer pr-1.5 text-zinc-500 transition-colors hover:text-zinc-200">
+                      <X className="size-3" />
+                    </button>
+                  )}
+                </span>
+                {menuUrut && (
+                  <>
+                    {/* Tirai penutup: menu yang cuma bisa ditutup dengan
+                        menekan tombolnya lagi adalah menu yang menjebak
+                        orang yang mengira klik di luar sudah cukup. */}
+                    <span className="fixed inset-0 z-10" onClick={() => setMenuUrut(false)} />
+                    <span className="absolute right-0 top-[26px] z-20 flex w-44 flex-col rounded-lg border border-zinc-800 bg-zinc-950 p-1 shadow-xl">
+                      {URUT_POSISI.map((u) => (
+                        <button key={u.nilai} onClick={() => aturUrut(u.nilai)}
+                          className={cn('cursor-pointer rounded px-2 py-1.5 text-left text-[11.5px] transition-colors',
+                            urut === u.nilai ? 'bg-zinc-800 text-zinc-100' : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200')}>
+                          {u.label}
+                        </button>
+                      ))}
+                      <button onClick={() => aturUrut(null)}
+                        className="mt-1 cursor-pointer rounded border-t border-zinc-800 px-2 py-1.5 text-left text-[11px] text-zinc-500 transition-colors hover:text-zinc-300">
+                        Bawaan bursa
+                      </button>
+                    </span>
+                  </>
+                )}
               </span>
+            )}
+            {total === null
+              ? <span className="text-[11.5px] text-zinc-500">{baris.length} posisi</span>
+              : <span className={cn('angka text-[12.5px]', total >= 0 ? 'text-emerald-500' : 'text-red-400')}>
+                  {uang(total, true)}
+                </span>}
+          </span>
         }
       />
       <div className="px-5 pb-5">
@@ -806,6 +891,7 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
             sampai ke penerimanya selalu tunggal. */}
         <TabelPosisi
           baris={baris}
+          urut={urut}
           /* Funding cuma ada di perp kripto; MT5 tidak mengenalnya sama
              sekali. Diputuskan DI SINI, bukan disimpulkan tabel dari isi
              barisnya — kalau disimpulkan, kolomnya baru muncul sesudah

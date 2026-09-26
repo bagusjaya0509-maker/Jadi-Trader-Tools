@@ -61,6 +61,11 @@ export interface BarisPosisi {
    *  Menghitung dari teks tampilan memang selalu salah. Angkanya dibawa
    *  utuh dari sumbernya. */
   ukuranNum?: number;
+  /** Kapan posisi ini dibuka, ms. Kosong = tidak bisa dipastikan — dan itu
+   *  keadaan yang sah: posisi yang isian pembukanya sudah di luar jendela
+   *  riwayat bursa tidak punya jawaban, dan mengarangnya lebih buruk
+   *  daripada tanda hubung. */
+  dibuka?: number;
   /** Level mana yang BERBEDA-BEDA di antara order yang digabung.
    *
    *  Rata-rata sepuluh SL yang berlainan menghasilkan angka yang tidak
@@ -325,7 +330,43 @@ function MenuPorsi({ b, rect, tutup, kirim }: {
   );
 }
 
-export function TabelPosisi({ baris, kosong, onKlikBaris, onTutup, onUbah, onKlikCopy, tanpaPorsi, kolomFunding, maksBaris }: {
+/** Pilihan urutan. `null` = urutan asli dari bursa, yaitu yang dipakai
+ *  sebelum filter ini ada — dan tetap jadi bawaannya. */
+export type UrutPosisi =
+  | 'size-besar' | 'size-kecil'
+  | 'pnl-untung' | 'pnl-rugi'
+  | 'baru' | 'lama';
+
+export const URUT_POSISI: { nilai: UrutPosisi; label: string }[] = [
+  { nilai: 'size-besar', label: 'Size terbesar' },
+  { nilai: 'size-kecil', label: 'Size terkecil' },
+  { nilai: 'pnl-untung', label: 'Profit terbesar' },
+  { nilai: 'pnl-rugi', label: 'Rugi terbesar' },
+  { nilai: 'baru', label: 'Paling baru' },
+  { nilai: 'lama', label: 'Paling lama' },
+];
+
+/* ── YANG TIDAK PUNYA ANGKA SELALU DI BAWAH ───────────────────────────
+   Baris tanpa `dibuka` (bursa tidak bisa memastikan) atau tanpa ukuran
+   dolar tidak boleh ikut diperebutkan di puncak daftar — dinaikkan ke atas
+   ia terbaca sebagai "paling besar" atau "paling baru", dua klaim yang
+   justru tidak bisa dibuat. Diturunkan, sekali, di satu tempat. */
+function bandingUrut(a: BarisPosisi, b: BarisPosisi, urut: UrutPosisi): number {
+  const angka = (x: number | undefined) => (typeof x === 'number' && isFinite(x) ? x : null);
+  const pilih = (x: BarisPosisi) => {
+    if (urut === 'size-besar' || urut === 'size-kecil') return angka(x.ukuranUsd) ?? angka(x.ukuranNum);
+    if (urut === 'pnl-untung' || urut === 'pnl-rugi') return angka(x.pnl);
+    return angka(x.dibuka);
+  };
+  const na = pilih(a), nb = pilih(b);
+  if (na === null && nb === null) return 0;
+  if (na === null) return 1;
+  if (nb === null) return -1;
+  const naik = urut === 'size-kecil' || urut === 'pnl-rugi' || urut === 'lama';
+  return naik ? na - nb : nb - na;
+}
+
+export function TabelPosisi({ baris, kosong, onKlikBaris, onTutup, onUbah, onKlikCopy, tanpaPorsi, kolomFunding, maksBaris, urut }: {
   baris: BarisPosisi[];
   /** Berapa baris yang boleh tampil sebelum sisanya bergulir.
    *
@@ -339,6 +380,8 @@ export function TabelPosisi({ baris, kosong, onKlikBaris, onTutup, onUbah, onKli
    *  daftar yang bergulir membuatnya harus mencari dua kali. Batas ini
    *  untuk ringkasan, bukan untuk meja kerja. */
   maksBaris?: number;
+  /** Urutan tampil. Kosong = urutan asli dari bursa. */
+  urut?: UrutPosisi | null;
   /** Tombol Tutup per baris. Kolomnya hanya muncul kalau diberikan.
    *  `porsi` 0–1: bagian posisi yang diminta ditutup. 1 = seluruhnya. */
   onTutup?: (b: BarisPosisi, porsi: number) => void;
@@ -475,6 +518,30 @@ export function TabelPosisi({ baris, kosong, onKlikBaris, onTutup, onUbah, onKli
     const buka = !!dilepas[induk.kunci];
     tampil.push({ b: induk, jml: kel.length, buka });
     if (buka) for (const a of kel) tampil.push({ b: a, anak: true });
+  }
+
+  /* ── DIURUTKAN SESUDAH DIGABUNG, BUKAN SEBELUM ─────────────────────
+     Baris gabungan adalah yang benar-benar dilihat orang, dan ukurannya
+     JUMLAH dari anak-anaknya — bukan ukuran salah satunya. Mengurutkan
+     sebelum penggabungan berarti mengurutkan angka yang tidak pernah
+     tampil, lalu penggabungan menyusun ulang hasilnya.
+
+     Anak dari kelompok yang sedang dilepas sengaja TIDAK ikut diurutkan
+     ulang: ia menempel di bawah induknya, dan melepasnya dari induk untuk
+     dilempar ke tempat lain di daftar membuat tombol "Lepas" terbaca
+     seperti merusak tabel. */
+  if (urut) {
+    const induk = tampil.filter((t) => !t.anak);
+    induk.sort((x, y) => bandingUrut(x.b, y.b, urut));
+    const susun: typeof tampil = [];
+    for (const i of induk) {
+      susun.push(i);
+      if (i.buka) {
+        for (const t of tampil) if (t.anak && t.b.simbol === i.b.simbol && t.b.arah === i.b.arah) susun.push(t);
+      }
+    }
+    tampil.length = 0;
+    tampil.push(...susun);
   }
 
   const adaGabungan = tampil.some((t) => !!t.jml);

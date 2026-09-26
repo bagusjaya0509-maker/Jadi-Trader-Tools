@@ -199,6 +199,56 @@ export async function kirimMasukan(p: { jenis: 'bug' | 'saran' | 'error'; pesan:
 }
 
 /* ── Lisensi aktif ───────────────────────────────────────────────────── */
+/* ── KAPAN POSISI DIBUKA ──────────────────────────────────────────────
+   Kunci peta: `bursa|SIMBOL`, mis. `binance|ETHUSDT`.
+
+   Dihitung SERVER dari riwayat isian — lihat catatan panjang di
+   /api/posisi-dibuka. Ringkasnya: `updateTime` milik positionRisk terlihat
+   seperti jawaban tapi ikut berubah tiap funding dibebankan, jadi tiga
+   posisi yang umurnya berbeda-beda semuanya bercap tengah malam UTC.
+
+   Diminta 5 menit sekali, bukan 30 detik seperti posisinya: jawabannya
+   hampir tidak pernah berubah — posisi dibuka satu kali — dan servernya pun
+   menyinggahkan selama itu. */
+export function useDibukaPosisi(): Map<string, number> {
+  const [peta, setPeta] = useState<Map<string, number>>(new Map());
+  const { token } = bacaKoneksi();
+
+  useEffect(() => {
+    let hidup = true;
+    async function kepala(): Promise<Record<string, string> | null> {
+      if (token.trim()) return { 'X-App-Token': token.trim() };
+      try {
+        const { auth } = await import('@/lib/firebase');
+        const t = await auth.currentUser?.getIdToken();
+        return t ? { Authorization: 'Bearer ' + t } : null;
+      } catch { return null; }
+    }
+    async function ambil() {
+      const k = await kepala();
+      if (!k || !hidup) return;
+      try {
+        const r = await fetch(dasar() + '/api/posisi-dibuka', { headers: k });
+        if (!r.ok || !hidup) return;
+        const j = await r.json();
+        const m = new Map<string, number>();
+        for (const [sim, ms] of Object.entries(j?.binance ?? {})) {
+          if (Number(ms) > 0) m.set('binance|' + sim, Number(ms));
+        }
+        for (const [sim, ms] of Object.entries(j?.hyperliquid ?? {})) {
+          if (Number(ms) > 0) m.set('hyperliquid|' + sim, Number(ms));
+        }
+        setPeta(m);
+      } catch { /* panel tetap jalan tanpa kolom umur */ }
+    }
+    void ambil();
+    const jam = setInterval(() => void ambil(), 5 * 60_000);
+    return () => { hidup = false; clearInterval(jam); };
+  }, [token]);
+
+  return peta;
+}
+
 export interface Lisensi { sidik: string; produk: string; catatan: string; tgl: number; }
 
 export function useLisensi(): Hasil<Lisensi[]> {
