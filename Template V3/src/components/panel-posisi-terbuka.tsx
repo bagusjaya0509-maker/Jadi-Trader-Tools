@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Copy, Trash2, Loader2, Zap, ArrowUpDown, X } from 'lucide-react';
+import { Copy, Trash2, Loader2, Zap } from 'lucide-react';
 import { Panel, PanelHead } from '@/components/efferd-ui';
 import { cn, uang, harga as fHarga, tanggalAngka } from '@/lib/utils';
 
@@ -29,6 +29,7 @@ import { useHargaPasar } from '@/lib/harga';
 import { kunciPosisiMt5 } from '@/lib/akun';
 import { bacaSpekMt5 } from '@/lib/pasar';
 import { TabelPosisi, URUT_POSISI, type BarisPosisi, type UrutPosisi } from '@/components/tabel-posisi';
+import { ChipUrut } from '@/components/chip-urut';
 import { useDibukaPosisi } from '@/lib/admin';
 import { bursaPosisi, type Sumber } from '@/data/contoh';
 import { simbolDasarMt5 } from '@/lib/simbol';
@@ -176,7 +177,11 @@ export function PanelPosisiTerbuka({ sumber, onSunting, onTutup, onUbahSlTp, onB
     const punya = new Set(posisiKripto.map((p) => p.venue));
     const hl = punya.has('Hyperliquid');
     const bn = punya.has('Binance Live');
-    if (hl && bn) return 'Binance dan Hyperliquid';
+    /* "Binance & Hyperliquid Exchange", diminta pemilik 26 Sep 2026.
+       Dieja Exchange, bukan "Excange" seperti di pesannya — itu salah ketik,
+       dan nama bursa yang salah eja di kepala panel terbaca seperti
+       aplikasinya yang tidak tahu nama tempat uangnya disimpan. */
+    if (hl && bn) return 'Binance & Hyperliquid Exchange';
     if (hl) return 'Hyperliquid';
     return 'Binance';
   })();
@@ -805,7 +810,7 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
                 : 'Dari MetaTrader 5, lewat EA JadiTraderSync.';
             })()
           : bursaAktif
-            ? `Order yang sedang berjalan di ${namaBursaAktif}.`
+            ? (namaBursaAktif.includes('&') ? namaBursaAktif + '.' : `Order yang sedang berjalan di ${namaBursaAktif}.`)
             /* Umurnya disebut, dan itu bukan kelengkapan — itu jawabannya.
                Catatan screener berumur tiga hari terbaca sebagai posisi yang
                sedang berjalan selama tidak ada yang menyebutkan kapan ia
@@ -824,48 +829,7 @@ Posisi yang sedang terbuka TIDAK ikut ditutup.`)) return;
                 kecil untuk mencabutnya. Yang belum dipilih tampil sebagai
                 satu pil polos, jadi ia tidak berteriak sebelum dipakai. */}
             {baris.length > 1 && (
-              <span className="relative flex items-center">
-                <span className={cn('flex items-center overflow-hidden rounded-md border text-[11px]',
-                  urut ? 'border-zinc-700' : 'border-zinc-800')}>
-                  <button onClick={() => setMenuUrut((v) => !v)}
-                    title="Urutkan baris di panel ini"
-                    className="flex cursor-pointer items-center gap-1 bg-zinc-800/60 px-1.5 py-1 text-zinc-400 transition-colors hover:text-zinc-200">
-                    <ArrowUpDown className="size-3" /> Urutan
-                  </button>
-                  <button onClick={() => setMenuUrut((v) => !v)}
-                    className={cn('cursor-pointer px-1.5 py-1 transition-colors hover:text-zinc-100',
-                      urut ? 'text-zinc-200' : 'text-zinc-500')}>
-                    {urut ? URUT_POSISI.find((u) => u.nilai === urut)?.label : 'bawaan bursa'}
-                  </button>
-                  {urut && (
-                    <button onClick={() => aturUrut(null)} aria-label="Kembalikan urutan bursa"
-                      className="cursor-pointer pr-1.5 text-zinc-500 transition-colors hover:text-zinc-200">
-                      <X className="size-3" />
-                    </button>
-                  )}
-                </span>
-                {menuUrut && (
-                  <>
-                    {/* Tirai penutup: menu yang cuma bisa ditutup dengan
-                        menekan tombolnya lagi adalah menu yang menjebak
-                        orang yang mengira klik di luar sudah cukup. */}
-                    <span className="fixed inset-0 z-10" onClick={() => setMenuUrut(false)} />
-                    <span className="absolute right-0 top-[26px] z-20 flex w-44 flex-col rounded-lg border border-zinc-800 bg-zinc-950 p-1 shadow-xl">
-                      {URUT_POSISI.map((u) => (
-                        <button key={u.nilai} onClick={() => aturUrut(u.nilai)}
-                          className={cn('cursor-pointer rounded px-2 py-1.5 text-left text-[11.5px] transition-colors',
-                            urut === u.nilai ? 'bg-zinc-800 text-zinc-100' : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200')}>
-                          {u.label}
-                        </button>
-                      ))}
-                      <button onClick={() => aturUrut(null)}
-                        className="mt-1 cursor-pointer rounded border-t border-zinc-800 px-2 py-1.5 text-left text-[11px] text-zinc-500 transition-colors hover:text-zinc-300">
-                        Bawaan bursa
-                      </button>
-                    </span>
-                  </>
-                )}
-              </span>
+              <ChipUrut nilai={urut} atur={aturUrut} buka={menuUrut} setBuka={setMenuUrut} />
             )}
             {total === null
               ? <span className="text-[11.5px] text-zinc-500">{baris.length} posisi</span>
